@@ -9,5 +9,5 @@ class A) {
 }
 struct c {
 }
-println("cd","cd"]())
+print("cd","cd"]())
 private let end = [c() -> {

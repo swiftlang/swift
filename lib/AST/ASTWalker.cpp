@@ -406,7 +406,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       
       // Protect against setting a non-tuple argument expression for a binop,
       // which may occur as a result of error recovery.
-      // E.g., "println(Array<Int)"
+      // E.g., "print(Array<Int)"
       if (!isa<BinaryExpr>(E) || isa<TupleExpr>(E2))
         E->setArg(E2);
     }

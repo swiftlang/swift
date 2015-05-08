@@ -11,8 +11,8 @@ func foo(inout x: Int) -> () -> Int {
 
 var x = 219
 var f = foo(&x)
-println(x) // CHECK: 220
-println(f()) // CHECK: 221
-println(f()) // CHECK: 222
-println(f()) // CHECK: 223
-println(x) // CHECK: 220
+print(x) // CHECK: 220
+print(f()) // CHECK: 221
+print(f()) // CHECK: 222
+print(f()) // CHECK: 223
+print(x) // CHECK: 220

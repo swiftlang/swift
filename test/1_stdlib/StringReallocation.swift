@@ -19,18 +19,18 @@ func testReallocation() {
         // To avoid dumping a vast string here, just write the first
         // part of the story out each time there's a reallocation.
         var intro = story._split(":")[0]
-        println("reallocation \(reallocations), with intro \(intro)")
+        print("reallocation \(reallocations), with intro \(intro)")
         
         if reallocations >= 30 {
-          println("Reallocations exceeded 30")
+          print("Reallocations exceeded 30")
           return
         }
       }
     }
     story += "."
   }
-  println("total reallocations = \(reallocations)")
+  print("total reallocations = \(reallocations)")
 }
 
 testReallocation()
-println("done!")
+print("done!")

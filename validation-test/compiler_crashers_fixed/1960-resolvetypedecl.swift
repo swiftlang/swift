@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 class a<T where H.f = d.Element>(T
-println("A, object2)
+print("A, object2)
 class func a(n: A> {
 typealias R = A"
 class A : a {

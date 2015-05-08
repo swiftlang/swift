@@ -15,7 +15,7 @@ var a_m: NSMutableArray = ["two", 12, [11,12,13]]
 // CHECK:   3
 // CHECK: )
 for x: AnyObject in a {
-  println(x.description!)
+  print(x.description!)
 }
 
 // CHECK: two
@@ -26,23 +26,23 @@ for x: AnyObject in a {
 // CHECK:   13
 // CHECK: )
 for x: AnyObject in a_m {
-  println(x.description!)
+  print(x.description!)
 }
 
 class Canary {
   var x: Int
 
-  deinit { println("dead \(x)") }
+  deinit { print("dead \(x)") }
   init(_ x: Int) { self.x = x }
-  func chirp() { println("\(x)") }
+  func chirp() { print("\(x)") }
 }
 
 autoreleasepool {
-  println("making array")
+  print("making array")
 
   var b: NSArray = NSArray(objects: [Canary(1), Canary(2), Canary(3)], count: 3)
 
-  println("iterating array")
+  print("iterating array")
 
   // CHECK: 1
   for x: AnyObject in b {
@@ -51,25 +51,25 @@ autoreleasepool {
   }
 
   // CHECK: exiting
-  println("exiting")
+  print("exiting")
 }
 // CHECK: dead
 // CHECK: dead
 // CHECK: dead
 // CHECK: exited
-println("exited")
+print("exited")
 
 var d : NSDictionary = [415 : "Giants", 510 : "A's"]
 var d_m : NSMutableDictionary = [1415 : "Big Giants", 11510 : "B's"]
 
 // CHECK: 510 => A's
 for (key, value) in d {
-  println("\(key.description!) => \(value.description!)")
+  print("\(key.description!) => \(value.description!)")
 }
 
 // CHECK: 11510 => B's
 for (key, value) in d_m {
-  println("\(key.description!) => \(value.description!)")
+  print("\(key.description!) => \(value.description!)")
 }
 
 var s = NSSet(object: "the most forward-thinking test yet")
@@ -77,12 +77,12 @@ var s_m = NSMutableSet(object: "the next most forward-thinking test yet")
 
 // CHECK: the most forward-thinking test yet
 for x: AnyObject in s {
-  println(x.description!)
+  print(x.description!)
 }
 
 // CHECK: the next most forward-thinking test yet
 for x: AnyObject in s_m {
-  println(x.description!)
+  print(x.description!)
 }
 
 // Enumeration over a _SwiftDeferredNSArray
@@ -92,5 +92,5 @@ for x: AnyObject in s_m {
 var a2 = [3, 2, 1]
 var nsa2 = (a2._buffer._asCocoaArray() as AnyObject) as! NSArray
 for x: AnyObject in nsa2 {
-  println(x.description!)
+  print(x.description!)
 }

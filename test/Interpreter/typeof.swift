@@ -3,15 +3,15 @@
 protocol Fooable { static func foo() }
 
 class B : Fooable {
-  class func foo() { println("Beads?!") }
+  class func foo() { print("Beads?!") }
 }
 
 class D : B {
-  override class func foo() { println("Deeds?!") }
+  override class func foo() { print("Deeds?!") }
 }
 
 struct S : Fooable {
-  static func foo() { println("Seeds?!") }
+  static func foo() { print("Seeds?!") }
 }
 
 func classMetatype(b: B.Type) {

@@ -6,7 +6,7 @@
 // Test case found by fuzzing
 
 protocol b {
-println(f<T.init() {
+print(f<T.init() {
 }
 struct c = "")"")
 typealias F>(n: String = b> : B? {

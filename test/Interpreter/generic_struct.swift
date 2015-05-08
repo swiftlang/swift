@@ -8,13 +8,13 @@ protocol MyPrintable {
 
 extension Int : MyPrintable {
   func myPrint() {
-    print(self.description)
+    print(self.description, appendNewline: false)
   }
 }
 
 extension String : MyPrintable {
   func myPrint() {
-    print(self.debugDescription)
+    print(self.debugDescription, appendNewline: false)
   }
 }
 
@@ -31,21 +31,21 @@ enum State : MyPrintable {
   func myPrint() {
     switch self {
     case .CA:
-      print("California")
+      print("California", appendNewline: false)
     case .OR:
-      print("Oregon")
+      print("Oregon", appendNewline: false)
     case .WA:
-      print("Washington")
+      print("Washington", appendNewline: false)
     }
   }
 }
 
 func printPair<A : MyPrintable, B : MyPrintable>(p: BufferedPair<A,B>) {
-  print("\(p.front) ")
+  print("\(p.front) ", appendNewline: false)
   p.first.myPrint()
-  print(" ")
+  print(" ", appendNewline: false)
   p.second.myPrint()
-  println(" \(p.back)")
+  print(" \(p.back)")
 }
 
 var p = BufferedPair(front: 219, first: State.OR, second: "Idaho's Portugal",

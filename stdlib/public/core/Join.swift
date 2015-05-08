@@ -145,7 +145,7 @@ public func +<
 /// For example, this code excerpt writes "``here be dragons``" to the standard
 /// output:
 ///
-///     println(join(" ", [ "here", "be", "dragons" ]))
+///     print(join(" ", [ "here", "be", "dragons" ]))
 public func join<
   C : ExtensibleCollectionType, S : SequenceType
   where S.Generator.Element == C

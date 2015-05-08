@@ -21,7 +21,7 @@ struct c {
 }
 let h> {
 }
-println() {
+print() {
 class C<T.dynamicType)-> T>) {
 }
 }

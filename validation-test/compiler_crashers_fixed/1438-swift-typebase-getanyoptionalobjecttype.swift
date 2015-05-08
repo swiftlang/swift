@@ -6,7 +6,7 @@
 
 func g<T : NSObject {
 class c
-println(z: Any) {
+print(z: Any) {
 struct c> == A, Any) {
 typealias h: NSObject {
 protocol c : d {

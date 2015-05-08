@@ -36,7 +36,7 @@ return nil
 convenience init(x: AnyObject) {
 let t: AnyObject) -> {
 }
-println(")
+print(")
 extension NSSet {
 extension NSSet {
 class A {
@@ -101,7 +101,7 @@ typealias E
 }
 typealias e {
 import CoreData
-println(f)
+print(f)
 let t: e: NSManagedObject {
 struct B<C> : A.c : AnyObject.c = e!.d
 }

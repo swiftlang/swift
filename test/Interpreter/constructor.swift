@@ -1,26 +1,26 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
 class A {
-  init() { println("a") }
-  init(_ x:Int) { println("b") }
-  init<T>(_ x:Int, _ y:T) { println("c") }
+  init() { print("a") }
+  init(_ x:Int) { print("b") }
+  init<T>(_ x:Int, _ y:T) { print("c") }
 }
 
 class B<T> {
-  init() { println("d") }
-  init(_ x:Int) { println("e") }
-  init(_ x:T) { println("f") }
+  init() { print("d") }
+  init(_ x:Int) { print("e") }
+  init(_ x:T) { print("f") }
 
-  init<U>(_ x:Int, _ y:U) { println("g") }
-  init<U>(_ x:T, _ y:U) { println("h") }
+  init<U>(_ x:Int, _ y:U) { print("g") }
+  init<U>(_ x:T, _ y:U) { print("h") }
 }
 
 protocol Runcible {}
 
 class C<T : Runcible> {
-  init() { println("i") }
-  init(_ x:Int) { println("j") }
-  init(_ x:T) { println("k") }
+  init() { print("i") }
+  init(_ x:Int) { print("j") }
+  init(_ x:T) { print("k") }
 }
 
 // CHECK: a

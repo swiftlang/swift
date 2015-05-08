@@ -9,7 +9,7 @@ import AssetsLibrary
 let library = ALAssetsLibrary()
 library.enumerateGroupsWithTypes(ALAssetsGroupAll,
   usingBlock: {(group: ALAssetsGroup!, stop: UnsafeMutablePointer<ObjCBool>) -> Void in
-                println("Swift usingBlock")},
+                print("Swift usingBlock")},
   failureBlock: {(error: NSError!) -> Void in
-                  println("Swift failureBlock")})
+                  print("Swift failureBlock")})
 

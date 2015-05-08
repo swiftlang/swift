@@ -429,22 +429,11 @@ public:
             if (FnD && PE &&
                 FnD->getModuleContext() == Context.TheStdlibModule) {
               StringRef FnName = FnD->getNameStr();
-              enum class CallType {
-                NotAPrint = 0,
-                Print,
-                Println
-              } CT = CallType::NotAPrint;
               if (FnName.equals("print")) {
-                CT = CallType::Print;
-              } else if (FnName.equals("println")) {
-                CT = CallType::Println;
-              }
-              if (CT != CallType::NotAPrint) {
                 Expr *S = PE->getSubExpr();
                 std::pair<PatternBindingDecl *, VarDecl *> PV =
                   buildPatternAndVariable(S);
-                Expr *Log = logPrint(PV.second, AE->getSourceRange(),
-                                     (CT == CallType::Println));
+                Expr *Log = logPrint(PV.second, AE->getSourceRange());
                 Elements[EI] = PV.first;
                 Elements.insert(Elements.begin() + (EI + 1), PV.second);
                 Elements.insert(Elements.begin() + (EI + 2), Log);
@@ -653,8 +642,8 @@ public:
     }
   }
 
-  Expr *logPrint(VarDecl *VD, SourceRange SR, bool IsPrintln) {
-    const char *LoggerName = IsPrintln ? "$builtin_println" : "$builtin_print";
+  Expr *logPrint(VarDecl *VD, SourceRange SR) {
+    const char *LoggerName = "$builtin_print";
     DeclRefExpr *DRE = 
       new (Context) DeclRefExpr(ConcreteDeclRef(VD),
                                 SourceLoc(),

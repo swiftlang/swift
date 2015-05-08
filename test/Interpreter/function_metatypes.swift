@@ -25,21 +25,21 @@ var i = 0
 // Dynamic casting
 var f = foo((Int, Int).self)
 var g = f as! (Int, Int) -> Int
-println(g(1010, 2020))
+print(g(1010, 2020))
 // CHECK: 6060
 
 // Struct with InOut
 let hio = HasInOut(f: { (inout x: Int) in x = 3030 })
 i = 0
 hio.f(&i)
-println(i)
+print(i)
 // CHECK: 3030
 
 // Struct that conforms to Protocol with InOut
 let hiop = HasInOutProtocol(f: { (inout x: Int) in x = 4040 })
 i = 0
 hiop.f(&i)
-println(i)
+print(i)
 // CHECK: 4040
 
 func fooInOut<T>(t: T.Type) -> Any {
@@ -50,5 +50,5 @@ var fio = fooInOut((Int, Int).self)
 var gio = fio as! (inout (Int, Int)) -> ()
 var xy = (0, 0)
 gio(&xy)
-println(xy)
+print(xy)
 // CHECK: (8080, 9090)

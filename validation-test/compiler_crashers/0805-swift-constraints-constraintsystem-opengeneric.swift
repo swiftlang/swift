@@ -7,6 +7,6 @@
 enum S<T, U, g<f = b: T: P {
 struct c : String = e)
 struct Q<f = compose("")
-println() {
+print() {
 class func b<A> {
 return b

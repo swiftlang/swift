@@ -222,7 +222,7 @@ classes:
  }
 
  RandomNumberGenerator x = new MersenneTwister()
- println(
+ print(
     cycle_length(x, (x : [inout] RandomNumberGenerator) { x.nextValue() })
  )
 

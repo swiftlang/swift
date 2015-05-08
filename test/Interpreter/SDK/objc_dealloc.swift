@@ -8,11 +8,11 @@ import Foundation
 // Swift objects.
 
 class Root {
-  deinit { println("deallocating root") }
+  deinit { print("deallocating root") }
 }
 
 class Associated {
-  deinit { println("deallocating associated") }
+  deinit { print("deallocating associated") }
 }
 
 var token: Int8 = 0

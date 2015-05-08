@@ -6,7 +6,7 @@
 
 let b {
 let t: AnyObject.h = [self.init() -> {
-println() {
+print() {
 }
 }
 var f = A> String {

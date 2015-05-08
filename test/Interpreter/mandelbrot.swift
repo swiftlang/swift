@@ -8,15 +8,15 @@ import complex
 
 func printDensity(d: Int) {
   if (d > 40) {
-     print(" ")
+     print(" ", appendNewline: false)
   } else if d > 6 {
-     print(".")
+     print(".", appendNewline: false)
   } else if d > 4 {
-     print("+")
+     print("+", appendNewline: false)
   } else if d > 2 {
-     print("*")
+     print("*", appendNewline: false)
   } else {
-     print("#")
+     print("#", appendNewline: false)
   }
 }
 
@@ -43,7 +43,7 @@ func mandelbrot(xMin: Double, _ xMax: Double,
       var c = Complex(real: col, imag: row)
       printDensity(getMandelbrotIterations(c, 200))
     }
-    print("\n")
+    print("\n", appendNewline: false)
   }
 }
 

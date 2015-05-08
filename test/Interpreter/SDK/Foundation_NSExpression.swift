@@ -10,6 +10,6 @@ import Foundation
 let expression = NSExpression(format: "(3 + 2)**2", "LLLL", "BBBB")
 let result = expression.expressionValueWithObject(expression, context:nil) as! NSNumber
 let number = result.stringValue
-println(number)
+print(number)
 
 // CHECK: 25

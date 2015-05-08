@@ -15,4 +15,4 @@ func getHash<T: Hashish>(x: T) -> Int { return x.hash }
 let u = NSURL(string: "http://www.example.com")!
 
 // CHECK: true
-println(u.hash == getHash(u))
+print(u.hash == getHash(u))

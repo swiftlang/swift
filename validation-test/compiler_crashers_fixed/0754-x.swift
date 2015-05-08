@@ -7,7 +7,7 @@
 nc e(self] == {
 typealias e = c("
 let start = a(()
-println()
+print()
 protocol b : a {
 protocol C {
 }

@@ -6,7 +6,7 @@
 
 let b = 0)
 }(x: BooleanType)?) -> String = {
-println("a()
+print("a()
 return [() {
 return "A) -> {
 }

@@ -4,7 +4,7 @@ import Swift
 import StdlibUnittest
 
 _setOverrideOSVersion(.Linux)
-_setTestSuiteFailedCallback() { println("abort()") }
+_setTestSuiteFailedCallback() { print("abort()") }
 
 var XFailsLinux = TestSuite("XFailsLinux")
 

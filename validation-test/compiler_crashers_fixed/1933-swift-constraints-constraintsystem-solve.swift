@@ -10,6 +10,6 @@ func b<T -> T, Any) {
 protocol A {
 }
 func g
-println(T) {
+print(T) {
 }(self)
 return self.f = [self.init()

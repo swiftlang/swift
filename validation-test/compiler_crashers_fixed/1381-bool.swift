@@ -16,7 +16,7 @@ protocol b {
 }
 }
 struct e where k.init<U) {
-println(n: H) {
+print(n: H) {
 typealias A {
 func call(c) -> String {
 }

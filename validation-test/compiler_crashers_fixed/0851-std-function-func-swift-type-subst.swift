@@ -11,7 +11,7 @@ init()
 }
 protocol C {
 var f : A where H.e : c>? {
-println() -> (T>? = "
+print() -> (T>? = "
 }
 func compose<T](object1: P {
 }

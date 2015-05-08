@@ -7,7 +7,7 @@
 
 class A<T where T : A, 3)
 }
-println() {
+print() {
 }
 var b(f.dynamicType.advance(#object1, A.c))
 cl

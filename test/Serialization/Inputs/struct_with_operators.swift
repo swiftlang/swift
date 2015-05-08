@@ -11,6 +11,5 @@ prefix public func +++(inout base: SpecialInt) {
 }
 
 postfix public func +++(inout base: SpecialInt) {
-  println("use the prefix form instead")
 }
 

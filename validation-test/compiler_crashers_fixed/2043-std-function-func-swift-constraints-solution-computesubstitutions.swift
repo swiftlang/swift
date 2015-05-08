@@ -8,6 +8,6 @@
 class A {
 class B : String {
 func d.Generator.init(T> T>
-println() {
+print() {
 }
 func d<T : d

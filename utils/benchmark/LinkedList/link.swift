@@ -30,4 +30,4 @@ for i in 0..100000 {
 
 let delta = __mach_absolute_time__() - start
 print("sum = \(sum)\n")
-println("\(delta) nanoseconds.")
+print("\(delta) nanoseconds.")

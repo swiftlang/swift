@@ -42,7 +42,7 @@ public func chiSquaredUniform2(
     square(observedA - expectedA) / expectedA +
     square(observedB - expectedB) / expectedB
   if chiSq > _chiSquaredUniform1DFCritical(pValue) {
-    println("chi-squared test failed: \(trials) \(observedACount) \(chiSq)")
+    print("chi-squared test failed: \(trials) \(observedACount) \(chiSq)")
     return false
   }
   return true

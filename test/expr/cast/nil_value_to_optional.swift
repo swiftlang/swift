@@ -2,8 +2,11 @@
 
 var t = true
 var f = false
-println(t != nil) // expected-error{{cannot find an overload for 'println' that accepts an argument list of type '(Bool)'}}
-println(f != nil) // expected-error{{cannot find an overload for 'println' that accepts an argument list of type '(Bool)'}}
+
+func markUsed<T>(t: T) {}
+
+markUsed(t != nil) // expected-error {{cannot invoke 'markUsed' with an argument list of type '(Bool)'}} expected-note {{expected an argument list of type '(T)'}}
+markUsed(f != nil) // expected-error {{cannot invoke 'markUsed' with an argument list of type '(Bool)'}} expected-note {{expected an argument list of type '(T)'}}
 
 class C : Equatable {}
 

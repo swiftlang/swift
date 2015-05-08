@@ -32,12 +32,12 @@ import class Swift.Bool // expected-error {{'Bool' was imported as 'class', but 
 
 import struct FooBar.x // expected-error {{'x' was imported as 'struct', but is a variable}} {{8-14=var}}
 
-import struct Swift.println // expected-error {{'println' was imported as 'struct', but is a function}} {{8-14=func}}
+import struct Swift.print // expected-error {{'print' was imported as 'struct', but is a function}} {{8-14=func}}
 
-// CHECK: [[@LINE-2]]:15: error: 'println' was imported as 'struct', but is a function
+// CHECK: [[@LINE-2]]:15: error: 'print' was imported as 'struct', but is a function
 // CHECK-NEXT: Number FIXITs = 1
 // CHECK-NEXT: FIXIT: ([[FILE]]:[[@LINE-4]]:8 - [[FILE]]:[[@LINE-4]]:14): "func"
-// CHECK-NOT: note: 'println' declared here
+// CHECK-NOT: note: 'print' declared here
 
 
 import func ambiguous.funcOrVar // expected-error{{ambiguous name 'funcOrVar' in module 'ambiguous'}}

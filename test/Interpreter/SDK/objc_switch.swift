@@ -5,27 +5,27 @@
 import Foundation
 
 func testAnyObjectIsa(obj: AnyObject) {
-  print("(")
+  print("(", appendNewline: false)
   if obj is String {
-    print("String")
+    print("String", appendNewline: false)
   }
   if obj is Int {
-    print("Int")
+    print("Int", appendNewline: false)
   }
   if obj is [NSString] {
-    print("[NSString]")
+    print("[NSString]", appendNewline: false)
   }
   if obj is [Int] {
-    print("[Int]")
+    print("[Int]", appendNewline: false)
   }
   if obj is Dictionary<String, Int> {
-    print("Dictionary<String, Int>")
+    print("Dictionary<String, Int>", appendNewline: false)
   }
-  println(")")
+  print(")")
 }
 
 // CHECK: testing...
-println("testing...")
+print("testing...")
 
 
 // CHECK-NEXT: (String)
@@ -44,14 +44,14 @@ testAnyObjectIsa([1, 2, 3, 4, 5])
 testAnyObjectIsa(["hello" : 1, "world" : 2])
 
 func testNSArrayIsa(nsArr: NSArray) {
-  print("(")
+  print("(", appendNewline: false)
   if nsArr is [String] {
-    print("[String]")
+    print("[String]", appendNewline: false)
   }
   if nsArr is [Int] {
-    print("[Int]")
+    print("[Int]", appendNewline: false)
   }
-  println(")")
+  print(")")
 }
 
 // CHECK-NEXT: ([String])
@@ -64,14 +64,14 @@ testNSArrayIsa([1, 2, 3])
 testNSArrayIsa([[1, 2], [3, 4], [5, 6]])
 
 func testArrayIsa(arr: Array<AnyObject>) {
-  print("(")
+  print("(", appendNewline: false)
   if arr is [NSString] {
-    print("[NSString]")
+    print("[NSString]", appendNewline: false)
   }
   if arr is [NSNumber] {
-    print("[NSNumber]")
+    print("[NSNumber]", appendNewline: false)
   }
-  println(")")
+  print(")")
 }
 
 // CHECK-NEXT: ([NSString])
@@ -84,14 +84,14 @@ testArrayIsa([1, 2, 3])
 testArrayIsa([[1, 2], [3, 4], [5, 6]])
 
 func testArrayIsaBridged(arr: Array<AnyObject>) {
-  print("(")
+  print("(", appendNewline: false)
   if arr is [String] {
-    print("[String]")
+    print("[String]", appendNewline: false)
   }
   if arr is [Int] {
-    print("[Int]")
+    print("[Int]", appendNewline: false)
   }
-  println(")")
+  print(")")
 }
 
 // CHECK-NEXT: ([String])
@@ -106,9 +106,9 @@ testArrayIsaBridged([[1, 2], [3, 4], [5, 6]])
 func testNSMutableStringMatch(sa: NSMutableString) {
   switch(sa) {
   case "foobar":
-    println("MATCH")
+    print("MATCH")
   default:
-    println("nomatch")
+    print("nomatch")
   }
 }
 
@@ -121,22 +121,22 @@ testNSMutableStringMatch("nope")
 func testAnyObjectDowncast(obj: AnyObject!) {
   switch obj {
   case let str as String:
-    println("String: \(str)")
+    print("String: \(str)")
 
   case let int as Int:
-    println("Int: \(int)")
+    print("Int: \(int)")
     
   case let nsStrArr as [NSString]:
-    println("NSString array: \(nsStrArr)")
+    print("NSString array: \(nsStrArr)")
 
   case let intArr as [Int]:
-    println("Int array: \(intArr)")
+    print("Int array: \(intArr)")
 
   case let dict as Dictionary<String, Int>:
-    println("Dictionary<String, Int>: \(dict)")
+    print("Dictionary<String, Int>: \(dict)")
 
   default:
-    println("Did not match")
+    print("Did not match")
   }
 }
 
@@ -164,13 +164,13 @@ testAnyObjectDowncast(nil)
 func testNSArrayDowncast(nsArr: NSArray?) {
   switch nsArr {
   case let strArr as [String]:
-    println("[String]: \(strArr)")
+    print("[String]: \(strArr)")
 
   case let intArr as [Int]:
-    println("[Int]: \(intArr)")
+    print("[Int]: \(intArr)")
 
   default:
-    println("Did not match");
+    print("Did not match");
   }
 }
 

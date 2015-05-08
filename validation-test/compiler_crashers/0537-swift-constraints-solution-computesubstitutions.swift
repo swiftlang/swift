@@ -22,4 +22,4 @@ protocol e = a() -> (g<T) {
 }
 typealias F = b
 }
-println(f: A.b in
+print(f: A.b in

@@ -118,7 +118,7 @@ extension CGRectTy {
 
 extension CGRect {
   func printAsX11Geometry() {
-    print("\(size.width)x\(size.height)+\(origin.x)+\(origin.y)")
+    print("\(size.width)x\(size.height)+\(origin.x)+\(origin.y)", appendNewline: false)
   }
 }
 

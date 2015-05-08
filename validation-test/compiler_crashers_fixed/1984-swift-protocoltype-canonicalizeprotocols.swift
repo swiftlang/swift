@@ -8,7 +8,7 @@
 
 import Foundation
 0
-println()
+print()
 func b: a {
 struct Q<T, g : b where g: NSObject {
 func a<I : e: AnyObject) -> T: ([1]

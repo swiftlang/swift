@@ -373,7 +373,7 @@ func f<T : BooleanType>(b: T) {
 f(true as BooleanType)
 func a<T>() -> (T, T -> T) -> T {
     var4, nil]
-println(some(xs))
+print(some(xs))
 protocol A {
     t   class func i()
 }

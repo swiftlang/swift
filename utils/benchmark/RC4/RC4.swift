@@ -72,8 +72,8 @@ func benchRC4_internal(messageLen : Int, iterations : Int) {
   }
 
   let delta = __mach_absolute_time__() - start
-  println("\(delta) nanoseconds. \(LongData[0])")
-  println("\(Double(delta) / Double(iterations)) nanoseconds/lap")
+  print("\(delta) nanoseconds. \(LongData[0])")
+  print("\(Double(delta) / Double(iterations)) nanoseconds/lap")
 }
 
 

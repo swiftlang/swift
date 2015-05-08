@@ -11,7 +11,7 @@ func a() -> Any) {
 }
 }
 struct c> {
-println(Any) -> Int = d) {
+print(Any) -> Int = d) {
 }
 typealias b = Swift.A, self.b {
 }

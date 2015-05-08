@@ -6,7 +6,7 @@ protocol Showable {
 
 extension Int : Showable {
   func show() {
-    println(self)
+    print(self)
   }
 }
 

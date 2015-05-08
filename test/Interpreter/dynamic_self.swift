@@ -13,57 +13,57 @@ protocol CP : class {
 }
 
 func callDynamicSelfExistential(p: P) {
-  println("Before first call")
+  print("Before first call")
   var p2 = p.f()
-  println("Between calls")
+  print("Between calls")
   p2.g()
-  println("After second call")
+  print("After second call")
 }
 
 func callDynamicSelfClassExistential(cp: CP) {
-  println("Before first call")
+  print("Before first call")
   var cp2 = cp.f()
-  println("Between calls")
+  print("Between calls")
   cp2.g()
-  println("After second call")
+  print("After second call")
 }
 
 struct S : P {
   func f() -> S {
-    println("S.f()")
+    print("S.f()")
     return self
   }
 
   func g() -> S {
-    println("S.g()")
+    print("S.g()")
     return self
   }
 }
 
 class C : P, CP {
   init() {
-    println("Allocating C")
+    print("Allocating C")
   }
 
   deinit {
-    println("Destroying C")
+    print("Destroying C")
   }
 
   func f() -> Self {
-    println("C.f()")
+    print("C.f()")
     return self
   }
 
   func g() -> Self {
-    println("C.g()")
+    print("C.g()")
     return self
   }
 }
 
-println("-------------------------------")
+print("-------------------------------")
 
 // CHECK: S() as non-class existential
-println("S() as non-class existential")
+print("S() as non-class existential")
 // CHECK-NEXT: Before first call
 // CHECK-NEXT: S.f()
 // CHECK-NEXT: Between calls
@@ -72,7 +72,7 @@ println("S() as non-class existential")
 callDynamicSelfExistential(S())
 
 // CHECK-NEXT: C() as non-class existential
-println("C() as non-class existential")
+print("C() as non-class existential")
 // CHECK-NEXT: Allocating C
 // CHECK-NEXT: Before first call
 // CHECK-NEXT: C.f()
@@ -83,7 +83,7 @@ println("C() as non-class existential")
 callDynamicSelfExistential(C())
 
 // CHECK-NEXT: C() as class existential
-println("C() as class existential")
+print("C() as class existential")
 // CHECK-NEXT: Allocating C
 // CHECK-NEXT: Before first call
 // CHECK-NEXT: C.f()
@@ -94,4 +94,4 @@ println("C() as class existential")
 callDynamicSelfClassExistential(C())
 
 // CHECK-NEXT: Done
-println("Done")
+print("Done")

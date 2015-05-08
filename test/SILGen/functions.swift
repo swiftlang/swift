@@ -2,6 +2,8 @@
 
 import Swift // just for Optional
 
+func markUsed<T>(t: T) {}
+
 typealias Int = Builtin.Int64
 typealias Int64 = Builtin.Int64
 typealias Bool = Builtin.Int1
@@ -584,7 +586,7 @@ func testNoescape() {
   noescapefunc {
     escapefunc { a = 42 }
   }
-  println(a)
+  markUsed(a)
 }
 
 // CHECK-LABEL: functions.testNoescape () -> ()
@@ -607,9 +609,9 @@ func testNoescape2() {
   var a = 0
   noescapefunc {
     escapefunc { a = 42 }
-    println(a)
+    markUsed(a)
   }
-  println(a)
+  markUsed(a)
 }
 
 // CHECK-LABEL: sil hidden @_TF9functions13testNoescape2FT_T_ : $@convention(thin) () -> () {

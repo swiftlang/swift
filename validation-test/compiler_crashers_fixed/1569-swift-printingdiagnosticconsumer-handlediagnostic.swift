@@ -17,7 +17,7 @@ return NSData() {
 for b {
 }
 }
-println() {
+print() {
 }
 }
 func f() -> (T.b : N

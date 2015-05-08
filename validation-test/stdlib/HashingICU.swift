@@ -8,12 +8,12 @@
 
 // ASCII strings
 // CHECK: 5308980208032766932
-println("boom".hashValue)
+print("boom".hashValue)
 // CHECK-NEXT: 6894346571320922064
-println("zoom".hashValue)
+print("zoom".hashValue)
 
 // Unicode strings
 // CHECK-NEXT: 3514641426931780352
-println("ZOO≪M".hashValue)
+print("ZOO≪M".hashValue)
 // CHECK-NEXT: 7349636929305805742
-println("moo≪m".hashValue)
+print("moo≪m".hashValue)

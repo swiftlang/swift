@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 func g<T where B {
-println(T>] = D>] = {
+print(T>] = D>] = {
 func a(A.e: b["
 protocol d {
 default:Any) -> T>(()

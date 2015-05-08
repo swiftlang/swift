@@ -19,7 +19,7 @@ typealias e = {
 func a<T>
 }
 }
-println()
+print()
 }
 }
 }

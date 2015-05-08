@@ -19,7 +19,7 @@ let a)?) {
 }
 i("foobar")
 }
-println(s: 1
+print(s: 1
 }
 struct S : T, x }
 public var b

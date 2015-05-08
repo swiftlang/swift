@@ -13,5 +13,5 @@ override func b(x: c, a<T -> Any) -> {
 return [".<T, object2)
 protocol A {
 typealias d(b(#object1: U {
-println("""a)
+print("""a)
 protocol c in a {

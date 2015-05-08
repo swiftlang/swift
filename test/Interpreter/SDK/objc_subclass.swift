@@ -35,24 +35,24 @@ class SuperString : NSString {
 }
 
 // CHECK: 0123456789
-println(SuperString(10))
+print(SuperString(10))
 // CHECK: 0123456789
-println(NSString(string: SuperString(10) as String))
+print(NSString(string: SuperString(10) as String))
 // CHECK: 012
-println(SuperString(10).substringWithRange(NSRange(location: 0, length: 3)))
+print(SuperString(10).substringWithRange(NSRange(location: 0, length: 3)))
 // CHECK: 345
-println(SuperString(10).substringWithRange(NSRange(location: 3, length: 3)))
+print(SuperString(10).substringWithRange(NSRange(location: 3, length: 3)))
 
 class X {
   var label: String
 
   init(_ label: String) {
     self.label = label
-    println("Initializing \(label)");
+    print("Initializing \(label)");
   }
 
   deinit {
-    println("Destroying \(label)");
+    print("Destroying \(label)");
   }
 }
 
@@ -62,11 +62,11 @@ class A : NSObject {
   var x2 = X("A.x2")
 
   override init() {
-    println("Initializing A instance");
+    print("Initializing A instance");
   }
 
   deinit {
-    println("Destroying A instance");
+    print("Destroying A instance");
   }
 }
 
@@ -76,11 +76,11 @@ class B : A {
 
   override init() {
     super.init()
-    println("Initializing B instance");
+    print("Initializing B instance");
   }
 
   deinit {
-    println("Destroying B instance");
+    print("Destroying B instance");
   }
 }
 
@@ -107,7 +107,7 @@ class MyNSData : NSData {
   init?(base64EncodedString str: String) {
     super.init(base64EncodedString:str, 
                options:NSDataBase64DecodingOptions(0))
-    println("MyNSData code should not be executed")
+    print("MyNSData code should not be executed")
   }
 
   required init?(coder: NSCoder) {
@@ -117,10 +117,10 @@ class MyNSData : NSData {
 
 // CHECK-NOT: should not be executed
 if let myNSData = MyNSData(base64EncodedString:"\n\n\n") {
-  println("NSData came back non-nil?")
+  print("NSData came back non-nil?")
 } else {
   // CHECK: nil MyNSData as expected
-  println("nil MyNSData as expected")
+  print("nil MyNSData as expected")
 }
 
 // Propagating nil out of delegating initialization.
@@ -128,7 +128,7 @@ extension NSData {
   convenience init?(myString str: String) {
     self.init(base64EncodedString:str, 
               options:NSDataBase64DecodingOptions(0))
-    println("NSData code should not be executed")
+    print("NSData code should not be executed")
   }
 }
 
@@ -136,6 +136,6 @@ extension NSData {
 var nsData : NSData! = NSData(myString:"\n\n\n")
 if nsData == nil {
   // CHECK: nil NSData as expected
-  println("nil NSData as expected")
+  print("nil NSData as expected")
 }
 

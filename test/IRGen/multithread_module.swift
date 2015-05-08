@@ -45,7 +45,7 @@ protocol MyProto {
 
 @inline(never)
 func callproto(p: MyProto) {
-	println(p.protofunc())
+	print(p.protofunc())
 }
 
 

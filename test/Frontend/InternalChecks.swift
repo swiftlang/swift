@@ -5,7 +5,7 @@ import Swift
 
 func test_internal_checks_config(x: Int, _ y: Int) -> Int {
 #if INTERNAL_CHECKS_ENABLED
-  println("internal check emitted")
+  print("internal check emitted")
 #endif
   return x + y
 }

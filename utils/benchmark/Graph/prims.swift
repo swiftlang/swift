@@ -55,11 +55,11 @@ class PriorityQueue {
   }
 
   func dumpDebug() {
-    println("QUEUE")
+    print("QUEUE")
     for nodeCost in heap {
       let nodeId : Int = nodeCost!.nodeId
       let cost : Double = nodeCost!.cost
-      println("(\(nodeId), \(cost))")
+      print("(\(nodeId), \(cost))")
     }
   }
 
@@ -89,14 +89,14 @@ class PriorityQueue {
 
       if (leftChild < heap.count) {
         if heap[leftChild]!.cost < heap[index]!.cost {
-          println("Left: \(heap[leftChild]!.cost); Parent: \(heap[index]!.cost)")
+          print("Left: \(heap[leftChild]!.cost); Parent: \(heap[index]!.cost)")
         }
         assert(heap[leftChild]!.cost >= heap[index]!.cost);
         s.append(leftChild);
       }
       if (rightChild < heap.count) {
         if heap[rightChild]!.cost < heap[index]!.cost {
-          println("Right: \(heap[rightChild]!.cost); Parent: \(heap[index]!.cost)")
+          print("Right: \(heap[rightChild]!.cost); Parent: \(heap[index]!.cost)")
         }
         assert(heap[rightChild]!.cost >= heap[index]!.cost);
         s.append(rightChild);
@@ -789,7 +789,7 @@ func benchPrimsInternal(iterations: Int) {
     })
 
     //for i in 0...treeEdges.count {
-    //  println("Node: \(i). Parent: \(treeEdges[i]!)")
+    //  print("Node: \(i). Parent: \(treeEdges[i]!)")
     //}
   }
 }
@@ -798,7 +798,7 @@ func benchPrims() {
   let start = __mach_absolute_time__()
   benchPrimsInternal(100)
   let delta = __mach_absolute_time__() - start
-  println("\(delta) nanoseconds.")
+  print("\(delta) nanoseconds.")
 }
 
 benchPrims()

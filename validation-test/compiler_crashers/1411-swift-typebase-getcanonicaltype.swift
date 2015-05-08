@@ -7,7 +7,7 @@
 protocol b {
 protocol P {
 typealias d : d where l) -> : c>Bool]((b(()
-println(array: b[c(")
+print(array: b[c(")
 }
 }
 protocol a : [$0

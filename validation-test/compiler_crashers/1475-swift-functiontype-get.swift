@@ -29,4 +29,4 @@ func a(AnyObject) {
 public var b {
 }
 }
-println() -> {
+print() -> {

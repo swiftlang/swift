@@ -6,7 +6,7 @@
 
 enum B {
 func b<T, k : b: b
-println(array: k) {
+print(array: k) {
 func g<T.b {
 var e: Any) {
 let a<T])() ->(n: d = F

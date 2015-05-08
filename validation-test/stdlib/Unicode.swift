@@ -1929,7 +1929,7 @@ UTF16Decoder.test("measure") {
 
 UTF16Decoder.test("Decoding") {
   for (name, batch) in UTF16Tests {
-    println("Batch: \(name)")
+    print("Batch: \(name)")
     for test in batch {
       expectTrue(checkDecodeUTF16(test.scalarsHead, test.scalarsRepairedTail,
           test.encoded), stackTrace: test.loc.withCurrentLoc())
@@ -2182,7 +2182,7 @@ func checkUTF16View(expected: [UInt16], _ subject: String,
 
 func forStringsWithUnpairedSurrogates(checkClosure: (UTF16Test, String) -> ()) {
   for (name, batch) in UTF16Tests {
-    println("Batch: \(name)")
+    print("Batch: \(name)")
     for test in batch {
       let subject = NonContiguousNSString(test.encoded) as String
       checkClosure(test, subject)
@@ -2262,7 +2262,7 @@ StringCookedViews.test("UTF8ForNonContiguousUTF16") {
   }
 
   for (name, batch) in UTF16Tests {
-    println("Batch: \(name)")
+    print("Batch: \(name)")
     for test in batch {
       var expected = ArraySinkOf<UInt8>()
       var expectedScalars = test.scalarsHead + test.scalarsRepairedTail

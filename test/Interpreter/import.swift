@@ -5,7 +5,7 @@
 // Make sure we actually IRGen this.
 import implementation
 
-println("Hello")
+print("Hello")
 
 // CHECK: {{^}}1 2 3 4 5{{$}}
 implementation.countToFive()

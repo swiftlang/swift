@@ -9,7 +9,7 @@ let start = {
 enum B {
 class a {
 var c) {
-println() -> e(T) -> Any) -> S {
+print() -> e(T) -> Any) -> S {
 }
 }
 protocol A : b {

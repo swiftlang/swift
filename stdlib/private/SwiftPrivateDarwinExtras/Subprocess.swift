@@ -84,7 +84,7 @@ public func spawnChild(args: _UnitTestArray<String>)
       &pid, Process.arguments[0], &fileActions, nil, $0, _getEnviron())
   }
   if spawnResult != 0 {
-    println(String.fromCString(strerror(spawnResult)))
+    print(String.fromCString(strerror(spawnResult)))
     preconditionFailure("posix_spawn() failed")
   }
 

@@ -200,8 +200,8 @@ class ForwardReference {
   }
 }
 
-func questionablyValidForwardReference() { print(qvfrVar); }; var qvfrVar: Int = 0
+func questionablyValidForwardReference() { print(qvfrVar, appendNewline: false); }; var qvfrVar: Int = 0
 
 // FIXME: This should warn too.
-print(forwardReferenceVar); var forwardReferenceVar: Int = 0
+print(forwardReferenceVar, appendNewline: false); var forwardReferenceVar: Int = 0
 

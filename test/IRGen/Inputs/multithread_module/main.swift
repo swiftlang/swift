@@ -22,12 +22,12 @@ private struct MyStruct : MyProto {
 public var g1 = 234
 
 let i = testit(27)
-println(i)
+print(i)
 
 let i2 = callmember(Derived())
-println(i2)
+print(i2)
 
 callproto(MyStruct(x: 42))
 
-println(callPrivInc(g1))
+print(callPrivInc(g1))
 

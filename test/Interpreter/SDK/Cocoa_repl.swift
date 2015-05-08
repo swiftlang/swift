@@ -6,4 +6,4 @@
 import Cocoa
 
 // CHECK: 0{{$}}
-println(NSNumber(integer: 0).description)
+print(NSNumber(integer: 0).description)

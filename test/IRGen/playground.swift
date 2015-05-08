@@ -9,11 +9,13 @@ import Swift
 
 @objc class C { }
 
-println()
+public func anchor() {}
+
+anchor()
 
 // CHECK-LABEL: define i32 @main
 // CHECK:         call void @runtime_registration
-// CHECK:         call void @_TFSs7printlnFT_T_
+// CHECK:         call void @_TF10playground6anchorFT_T_
 // CHECK:         ret void
 // CHECK:       }
 

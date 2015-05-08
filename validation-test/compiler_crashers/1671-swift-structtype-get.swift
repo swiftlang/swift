@@ -20,7 +20,7 @@ typealias f : a {
 }
 }
 }
-println().c where A, a(T, A = { }
+print().c where A, a(T, A = { }
 struct c in 0.Type
 struct S<e<h : Int) -> <T.e = 0] {
 }

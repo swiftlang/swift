@@ -21,4 +21,4 @@ func Glob(g: String) -> Array<String> {
 }
 
 // CHECK: [{{.*}}]
-println(Glob("/*"))
+print(Glob("/*"))

@@ -12,7 +12,7 @@ enum A {
 }
 }
 }
-println(a<S : NSObject {
+print(a<S : NSObject {
 i<T> T: P> (")!)
 struct A {
 func c(t.Generator.Generator.a<h: ExtensibleCollectionType>) -> {

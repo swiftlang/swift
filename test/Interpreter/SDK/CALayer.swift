@@ -6,7 +6,7 @@ import QuartzCore
 
 class Canary: NSObject {
   deinit {
-    println("died")
+    print("died")
   }
 }
 
@@ -47,7 +47,7 @@ class FooLayer: CALayer {
 
 if true {
   let layer = FooLayer()
-  println("\(layer)")
+  print("\(layer)")
 }
 
 // CHECK: FooLayer

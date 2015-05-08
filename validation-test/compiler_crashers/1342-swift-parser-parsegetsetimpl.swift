@@ -9,7 +9,7 @@ struct Q<T where f.g : NSManagedObject {
 let g : ExtensibleCollectionType>] = b((Any, U, (self] {
 func a()"]](T>()
 }
-println((c() -> Any, length: String {
+print((c() -> Any, length: String {
 protocol P {
 }
 var b {

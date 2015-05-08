@@ -6,7 +6,7 @@
 // Test case found by fuzzing
 
 class func compose<T -> T : T where g()
-println() {
+print() {
 typealias e {
 }
 protocol C {

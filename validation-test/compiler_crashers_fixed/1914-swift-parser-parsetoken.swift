@@ -29,7 +29,7 @@ class a {
 func c<h, object2: c = {
 }
 }
-println(T> T where B {
+print(T> T where B {
 }
 let b {
 d.<T -> T : c) {

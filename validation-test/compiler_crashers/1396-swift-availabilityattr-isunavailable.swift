@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 let t: A {
-println(""A, U) {
+print(""A, U) {
 return z: A {
 () {
 }

@@ -5,7 +5,7 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-println("")
+print("")
 import Founda
 (h() as p).dynamicType.g()
 func j<f: l: e -> e = {

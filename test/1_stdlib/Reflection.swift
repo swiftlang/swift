@@ -31,7 +31,7 @@ struct Complex<T> {
   let real, imag: T
 }
 // CHECK-LABEL: Complex:
-println("Complex:")
+print("Complex:")
 // CHECK-NEXT:    Reflection.Complex<Swift.Double>
 // CHECK-NEXT:      real: 1.5
 // CHECK-NEXT:      imag: 0.75
@@ -69,7 +69,7 @@ class Best : Better {
 // CHECK-NEXT:    Reflection.Good #0
 // CHECK-NEXT:      x: 11
 // CHECK-NEXT:      y: 222
-println("Root class:")
+print("Root class:")
 dump(Good())
 
 // CHECK-LABEL: Subclass:
@@ -80,13 +80,13 @@ dump(Good())
 // CHECK-NEXT:          y: 222
 // CHECK-NEXT:        z: 333.5
 // CHECK-NEXT:      w: 4444
-println("Subclass:")
+print("Subclass:")
 dump(Best())
 
 // Test protocol types, which reflect as their dynamic types.
 // CHECK-LABEL: Any int:
 // CHECK-NEXT:    1
-println("Any int:")
+print("Any int:")
 var any: Any = 1
 dump(any)
 
@@ -98,30 +98,30 @@ dump(any)
 // CHECK-NEXT:          y: 222
 // CHECK-NEXT:        z: 333.5
 // CHECK-NEXT:      w: 4444
-println("Any class:")
+print("Any class:")
 any = Best()
 dump(any)
 // CHECK-LABEL: second verse
 // CHECK-NEXT:    Reflection.Best #0
-println("second verse same as the first:")
+print("second verse same as the first:")
 dump(any)
 
 // CHECK-LABEL: Any double:
 // CHECK-NEXT:    2.5
-println("Any double:")
+print("Any double:")
 any = 2.5
 dump(any)
 
 // CHECK-LABEL: Character:
 // CHECK-NEXT: a
-println("Character:")
-println(reflect(Character("a")).summary)
+print("Character:")
+print(reflect(Character("a")).summary)
 
 let range = 3...9
 // CHECK-NEXT: 3..<10
-println(reflect(range).summary)
+print(reflect(range).summary)
 // CHECK-NEXT: startIndex=3
-println("startIndex=\(reflect(range)[0].1.summary)")
+print("startIndex=\(reflect(range)[0].1.summary)")
 
 protocol Fooable {}
 extension Int : Fooable {}
@@ -129,13 +129,13 @@ extension Double : Fooable {}
 
 // CHECK-LABEL: Fooable int:
 // CHECK-NEXT:    1
-println("Fooable int:")
+print("Fooable int:")
 var fooable: Fooable = 1
 dump(fooable)
 
 // CHECK-LABEL: Fooable double:
 // CHECK-NEXT:    2.5
-println("Fooable double:")
+print("Fooable double:")
 fooable = 2.5
 dump(fooable)
 
@@ -150,55 +150,55 @@ extension Best: Barrable {}
 // CHECK-NEXT:          y: 222
 // CHECK-NEXT:        z: 333.5
 // CHECK-NEXT:      w: 4444
-println("Barrable class:")
+print("Barrable class:")
 var barrable: Barrable = Best()
 dump(barrable)
 // CHECK-LABEL: second verse
 // CHECK-NEXT:    Reflection.Best #0
-println("second verse same as the first:")
+print("second verse same as the first:")
 dump(barrable)
 
 // With Reflectable protocols we extract the witness table from the container.
 // CHECK-LABEL: Reflectable int:
 // CHECK-NEXT:   1
-println("Reflectable int:")
+print("Reflectable int:")
 var reflectable: Reflectable = 1
 dump(reflectable)
 
 // CHECK-NEXT: Logical: true
 switch reflect(true).quickLookObject {
-  case .None: println("no quicklook")
+  case .None: print("no quicklook")
   case .Some(let ql):
     switch ql {
-      case .Logical(let x): println("Logical: \(x)")
-      default: println("wrong quicklook type")
+      case .Logical(let x): print("Logical: \(x)")
+      default: print("wrong quicklook type")
     }
 }
 
 // CHECK-NEXT: Hello world
-println( reflect(Optional<String>("Hello world")).summary )
+print( reflect(Optional<String>("Hello world")).summary )
 // CHECK-NEXT: nil
-println( reflect(Optional<String>()).summary  )
+print( reflect(Optional<String>()).summary  )
 
 let intArray = [1,2,3,4,5]
 let intArrayMirror = reflect(intArray)
 // CHECK-NEXT: 5 elements
-println(intArrayMirror.summary)
+print(intArrayMirror.summary)
 // CHECK-NEXT: [0]: 1
-println("\(intArrayMirror[0].0): \(intArrayMirror[0].1.summary)")
+print("\(intArrayMirror[0].0): \(intArrayMirror[0].1.summary)")
 // CHECK-NEXT: [4]: 5
-println("\(intArrayMirror[4].0): \(intArrayMirror[4].1.summary)")
+print("\(intArrayMirror[4].0): \(intArrayMirror[4].1.summary)")
 
 enum JustSomeEnum {case A,B}
 // CHECK-NEXT: (Enum Value)
-println(reflect(JustSomeEnum.A).summary)
+print(reflect(JustSomeEnum.A).summary)
 
 var justSomeFunction = { (x:Int)->Int in return x + 1 }
 // CHECK-NEXT: (Function)
-println(reflect(justSomeFunction).summary)
+print(reflect(justSomeFunction).summary)
 
 // CHECK-NEXT: Swift.String
-println(reflect(String.self).summary)
+print(reflect(String.self).summary)
 
 // CHECK-NEXT: CollectionOfOne(Howdy Swift!)
 // CHECK-NEXT:  - element: Howdy Swift!
@@ -206,10 +206,10 @@ dump(CollectionOfOne("Howdy Swift!"))
 
 // CHECK-NEXT: EmptyCollection
 var emptyCollectionOfInt: EmptyCollection<Int> = EmptyCollection()
-println(reflect(emptyCollectionOfInt).summary)
+print(reflect(emptyCollectionOfInt).summary)
 
 // CHECK-NEXT: .One
-println(reflect(Bit.One).summary)
+print(reflect(Bit.One).summary)
 
 // CHECK-NEXT: ▿
 // CHECK-NEXT: from: 1.0
@@ -219,28 +219,28 @@ dump(stride(from: 1.0, through: 12.15, by: 3.14))
 
 // Check ObjC mirror implementation.
 // CHECK-LABEL: ObjC:
-println("ObjC:")
+print("ObjC:")
 // CHECK-NEXT:  <NSObject: {{0x[0-9a-f]+}}>
 dump(NSObject())
 
 // CHECK-NEXT: UnsafeMutablePointer(nil)
 var nilUnsafeMutablePointerString: UnsafeMutablePointer<String> = nil
-println(reflect(nilUnsafeMutablePointerString).summary)
+print(reflect(nilUnsafeMutablePointerString).summary)
 
 // CHECK-NEXT: UnsafeMutablePointer(0x123456)
 var randomUnsafeMutablePointerString = UnsafeMutablePointer<String>(
   bitPattern: 0x123456)
-println(reflect(randomUnsafeMutablePointerString).summary)
+print(reflect(randomUnsafeMutablePointerString).summary)
 
 // CHECK-NEXT: Hello panda
 var sanePointerString = UnsafeMutablePointer<String>.alloc(1)
 sanePointerString.initialize("Hello panda")
-println(reflect(sanePointerString.memory).summary)
+print(reflect(sanePointerString.memory).summary)
 sanePointerString.destroy()
 sanePointerString.dealloc(1)
 
 // CHECK-LABEL: ObjC subclass:
-println("ObjC subclass:")
+print("ObjC subclass:")
 // CHECK-NEXT: woozle wuzzle
 dump("woozle wuzzle" as NSString)
 
@@ -256,17 +256,17 @@ class NSBetter : NSGood {
 // CHECK-NEXT:    Reflection.NSBetter #0
 // CHECK-NEXT:      super: Reflection.NSGood
 // CHECK-NEXT:        super: <Reflection.NSBetter: {{0x[0-9a-f]+}}>
-println("Swift ObjC subclass:")
+print("Swift ObjC subclass:")
 dump(NSBetter())
 
 // CHECK-LABEL: ObjC quick look objects:
-println("ObjC quick look objects:")
+print("ObjC quick look objects:")
 
 // Don't crash when introspecting framework types such as NSURL.
 // <rdar://problem/16592777>
 // CHECK-LABEL: NSURL:
 // CHECK-NEXT:    file:///Volumes/
-println("NSURL:")
+print("NSURL:")
 dump(NSURL(fileURLWithPath: "/Volumes", isDirectory: true))
 
 // -- Check that quick look Cocoa objects get binned correctly to their
@@ -275,16 +275,16 @@ dump(NSURL(fileURLWithPath: "/Volumes", isDirectory: true))
 // CHECK-NEXT: got the expected quick look text
 switch reflect("woozle wuzzle" as NSString).quickLookObject {
 case .Some(.Text("woozle wuzzle")):
-  println("got the expected quick look text")
+  print("got the expected quick look text")
 case _:
-  println("got something else")
+  print("got something else")
 }
 
 // CHECK-NEXT: foobar
 let somesubclassofnsstring = ("foo" + "bar") as NSString
 switch reflect(somesubclassofnsstring).quickLookObject {
-  case .Some(.Text(let text)): println(text)
-  default: println("not the expected quicklook")
+  case .Some(.Text(let text)): print(text)
+  default: print("not the expected quicklook")
 }
 
 // CHECK-NEXT: got the expected quick look attributed string
@@ -292,41 +292,41 @@ let astr = NSAttributedString(string: "yizzle pizzle")
 switch reflect(astr as NSAttributedString).quickLookObject {
 case .Some(.AttributedString(let astr2 as NSAttributedString))
 where astr === astr2:
-  println("got the expected quick look attributed string")
+  print("got the expected quick look attributed string")
 case _:
-  println("got something else")
+  print("got something else")
 }
 
 // CHECK-NEXT: got the expected quick look int
 switch reflect(Int.max as NSNumber).quickLookObject {
 case .Some(.Int(+Int64(Int.max))):
-  println("got the expected quick look int")
+  print("got the expected quick look int")
 case _:
-  println("got something else")
+  print("got something else")
 }
 
 // CHECK-NEXT: got the expected quick look uint
 switch reflect(NSNumber(unsignedLongLong: UInt64.max)).quickLookObject {
 case .Some(.UInt(UInt64.max)):
-  println("got the expected quick look uint")
+  print("got the expected quick look uint")
 case _:
-  println("got something else")
+  print("got something else")
 }
 
 // CHECK-NEXT: got the expected quick look double
 switch reflect(22.5 as NSNumber).quickLookObject {
 case .Some(.Double(22.5)):
-  println("got the expected quick look double")
+  print("got the expected quick look double")
 case _:
-  println("got something else")
+  print("got something else")
 }
 
 // CHECK-NEXT: got the expected quick look float
 switch reflect(Float32(1.25)).quickLookObject {
 case .Some(.Float(1.25)):
-  println("got the expected quick look float")
+  print("got the expected quick look float")
 case _:
-  println("got something else")
+  print("got something else")
 }
 
 // CHECK-NEXT: got the expected quick look image
@@ -336,41 +336,41 @@ case _:
 let image = OSImage(contentsOfFile:Process.arguments[1])!
 switch reflect(image).quickLookObject {
 case .Some(.Image(let image2 as OSImage)) where image === image2:
-  println("got the expected quick look image")
+  print("got the expected quick look image")
 case _:
-  println("got something else")
+  print("got something else")
 }
 
 let color = OSColor.blackColor()
 switch reflect(color).quickLookObject {
 case .Some(.Color(let color2 as OSColor)) where color === color2:
-  println("got the expected quick look color")
+  print("got the expected quick look color")
 case _:
-  println("got something else")
+  print("got something else")
 }
 
 let path = OSBezierPath()
 switch reflect(path).quickLookObject {
 case .Some(.BezierPath(let path2 as OSBezierPath)) where path === path2:
-  println("got the expected quick look bezier path")
+  print("got the expected quick look bezier path")
 case _:
-  println("got something else")
+  print("got something else")
 }
 
 let intNSArray : NSArray = [1 as NSNumber,2 as NSNumber,3 as NSNumber,4 as NSNumber,5 as NSNumber]
 let intNSArrayMirror = reflect(intNSArray)
 // CHECK-NEXT: 5 elements
-println(intNSArrayMirror.summary)
+print(intNSArrayMirror.summary)
 // CHECK-NEXT: [0]: 1
-println("\(intNSArrayMirror[0].0): \(intNSArrayMirror[0].1.summary)")
+print("\(intNSArrayMirror[0].0): \(intNSArrayMirror[0].1.summary)")
 // CHECK-NEXT: [4]: 5
-println("\(intNSArrayMirror[4].0): \(intNSArrayMirror[4].1.summary)")
+print("\(intNSArrayMirror[4].0): \(intNSArrayMirror[4].1.summary)")
 
 
 let numset = NSSet(objects: 1,2,3,4)
 let numsetMirror = reflect(numset)
 // CHECK-NEXT: 4 elements
-println(numsetMirror.summary)
+print(numsetMirror.summary)
 // CHECK-NEXT: I see all four elements
 let num0 = (numsetMirror[0].1.summary)
 let num1 = (numsetMirror[1].1.summary)
@@ -381,9 +381,9 @@ let have2 = (num0 == "2" || num1 == "2" || num2 == "2" || num3 == "2")
 let have3 = (num0 == "3" || num1 == "3" || num2 == "3" || num3 == "3")
 let have4 = (num0 == "4" || num1 == "4" || num2 == "4" || num3 == "4")
 if have1 && have2 && have3 && have4 {
-  println("I see all four elements")
+  print("I see all four elements")
 } else {
-  println("I see \(num0), \(num1), \(num2), \(num3)")
+  print("I see \(num0), \(num1), \(num2), \(num3)")
 }
 
 // CHECK-NEXT: 42
@@ -394,9 +394,9 @@ class MyQLTestClass {
 }
 
 switch reflect(MyQLTestClass()).quickLookObject {
-  case .Some(.Int(let value)): println(value)
-  case .Some(_): println("non-Int object")
-  default: println("None")
+  case .Some(.Int(let value)): print(value)
+  case .Some(_): print("non-Int object")
+  default: print("None")
 }
 
 // CHECK-NEXT nil is good here
@@ -407,9 +407,9 @@ class MyNonQLTestClass {
 }
 
 switch reflect(MyQLTestClass()).quickLookObject {
-  case .Some(.Int(let value)): println(value)
-  case .Some(_): println("non-Int object")
-  default: println("nil is good here")
+  case .Some(.Int(let value)): print(value)
+  case .Some(_): print("non-Int object")
+  default: print("nil is good here")
 }
 
 // <rdar://problem/17027510>
@@ -441,22 +441,22 @@ class SubScene : SKScene {
 // CHECK-NEXT:       [2]: 456.0
 // CHECK-NEXT:         Some: 456.0
 // CHECK-NEXT:   zim: 20721
-println("SKScene subclass:")
+print("SKScene subclass:")
 dump(SubScene())
 
 // CHECK-NEXT: (3.0, 6.0)
-println(reflect(CGPoint(x: 3,y: 6)).summary)
+print(reflect(CGPoint(x: 3,y: 6)).summary)
 // CHECK-NEXT: (30.0, 60.0)
-println(reflect(CGSize(width: 30, height: 60)).summary)
+print(reflect(CGSize(width: 30, height: 60)).summary)
 // CHECK-NEXT: (50.0, 60.0, 100.0, 150.0)
-println(reflect(CGRect(x: 50, y: 60, width: 100, height: 150)).summary)
+print(reflect(CGRect(x: 50, y: 60, width: 100, height: 150)).summary)
 
 // rdar://problem/18513769 -- Make sure that QuickLookObject lookup correctly
 // manages memory.
 
 @objc class CanaryBase {
   deinit {
-    println("\(self.dynamicType) overboard")
+    print("\(self.dynamicType) overboard")
   }
 
   required init() { }
@@ -539,5 +539,5 @@ dump(rawPointer)
 // CHECK: - (Opaque Value)
 
 // CHECK-LABEL: and now our song is done
-println("and now our song is done")
+print("and now our song is done")
 

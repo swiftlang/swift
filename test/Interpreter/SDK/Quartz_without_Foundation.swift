@@ -7,4 +7,4 @@ import QuartzCore
 
 var v = CIVector(x:7);
 // CHECK: x = 7
-println("x = \(v.X)")
+print("x = \(v.X)")

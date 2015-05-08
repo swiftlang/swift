@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
+func markUsed<T>(t: T) {}
+
 // CHECK-LABEL: sil @main
 // CHECK: bb0({{%.*}} : $Int32, {{%.*}} : $UnsafeMutablePointer<UnsafeMutablePointer<Int8>>):
 
@@ -11,7 +13,7 @@
 var x = 999
 
 func print_x() {
-  println(x)
+  markUsed(x)
 }
 
 // -- assign x
@@ -41,14 +43,14 @@ if x == 5 {
 
 // CHECK: [[MERGE]]:
 // CHECK: load [[COUNTMUI]]
-println(count)
+markUsed(count)
 
 
 
 var y : Int
 
 func print_y() {
-  println(y)
+  markUsed(y)
 }
 
 

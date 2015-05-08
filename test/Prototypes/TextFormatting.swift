@@ -268,7 +268,7 @@ func ~> <T:XPrintableInteger> (x: T, args: _formatArgs) -> RadixFormat<T> {
 //
 
 struct StdoutStream : XOutputStream {
-  func append(text: String) { Swift.print(text) }
+  func append(text: String) { Swift.print(text, appendNewline: false) }
   // debugging only
   func dump() -> String {
     return "<StdoutStream>"

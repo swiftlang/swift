@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 func g<T] {
-println() {
+print() {
 for b in x in x }
 assert(n: NSObject {
 class B) {

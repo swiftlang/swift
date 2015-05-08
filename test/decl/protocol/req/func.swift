@@ -173,8 +173,8 @@ f(T0(1, "Hi"))
 
 infix operator ~>> { precedence 255 }
 
-func ~>> (x: Int, args: T0) { println("T0") }
-func ~>> (x: Int, args: T1) { println("T1") }
+func ~>> (x: Int, args: T0) {}
+func ~>> (x: Int, args: T1) {}
 
 3~>>T0(1, "Hi")
 3~>>T1(2, "Hi")

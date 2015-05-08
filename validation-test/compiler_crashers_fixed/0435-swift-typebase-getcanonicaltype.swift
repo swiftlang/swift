@@ -6,7 +6,7 @@
 
 protocol c : e {
 class A {
-println() -> Int = {
+print() -> Int = {
 }
 }
 typealias e

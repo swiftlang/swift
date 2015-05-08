@@ -10,7 +10,7 @@ case b = b> a {
 let v: String {
 }
 protocol A : (mx : d = i(Range<j : d {
-println(")
+print(")
 }
 protocol b : A, e {
 func g<U : C(s(self.init<T where A<T>: a {

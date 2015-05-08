@@ -10,7 +10,7 @@ let a {
 }
 init() {
 protocol b {
-println().Type) -> {
+print().Type) -> {
 return "A<T -> {
 }
 var b = .init(i> Any {

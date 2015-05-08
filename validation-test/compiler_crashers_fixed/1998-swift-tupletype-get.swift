@@ -7,8 +7,8 @@
 protocol a {
 func d>():
 typealias e = i(b():
-println())) -> Bool {
+print())) -> Bool {
 }
 typealias d {
-println(""ab"")")
+print(""ab"")")
 func i(f: d

@@ -12,23 +12,23 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
 // CHECK: testing...
-println("testing...")
+print("testing...")
 
 // Test mapping a collection
 // CHECK-NEXT: [6, 9, 12, 15, 18, 21]
 let a = lazy(2..<8).map { $0 * 3 }.array
-println(a)
+print(a)
 
 // Test mapping a sequence
 let s = lazy(a.generate()).map { $0 / 3 }
 // CHECK-NEXT: <2, 3, 4, 5, 6, 7>
-print("<")
+print("<", appendNewline: false)
 var prefix = ""
 for x in s {
-  print("\(prefix)\(x)")
+  print("\(prefix)\(x)", appendNewline: false)
   prefix = ", "
 }
-println(">")
+print(">")
 
 //===--- Avoid creating gratutitously self-destructive sequences ----------===//
 
@@ -70,11 +70,11 @@ struct IntRange : SequenceType {
 // consuming it.
 let m1 = lazy(IntRange(start: 1, end: 5)).map { $0 * 2 }
 // CHECK-NEXT: [2, 4, 6, 8]
-println(Array(m1))
+print(Array(m1))
 
 // A second iteration produces the same result.
 // CHECK-NEXT: [2, 4, 6, 8]
-println(Array(m1))
+print(Array(m1))
 
 // CHECK-NEXT: all done.
-println("all done.")
+print("all done.")

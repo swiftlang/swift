@@ -9,7 +9,7 @@ import Swift
 import SwiftShims
 
 class C {
-  deinit { println("deallocated") }
+  deinit { print("deallocated") }
 }
 
 #if arch(i386) || arch(arm)
@@ -48,20 +48,18 @@ if true {
   let x1: C = Builtin.castReferenceFromBridgeObject(bo)
   let x2: C = Builtin.castReferenceFromBridgeObject(bo2)
   // CHECK:      true
-  println(x === x1)
+  print(x === x1)
   // CHECK-NEXT: true
-  println(x === x2)
+  print(x === x2)
 
-  println(nonPointerBits(bo) == 0)
+  print(nonPointerBits(bo) == 0)
   // CHECK-NEXT: true
   
   var bo3 = Builtin.castToBridgeObject(C(), 0._builtinWordValue)
-  println(
-    _getBool(Builtin.isUnique(&bo3)))
+  print(_getBool(Builtin.isUnique(&bo3)))
   // CHECK-NEXT: true
   let bo4 = bo3
-  println(
-    _getBool(Builtin.isUnique(&bo3)))
+  print(_getBool(Builtin.isUnique(&bo3)))
   // CHECK-NEXT: false
   _fixLifetime(bo3)
   _fixLifetime(bo4)
@@ -78,20 +76,18 @@ if true {
   let x1: C = Builtin.castReferenceFromBridgeObject(bo)
   let x2: C = Builtin.castReferenceFromBridgeObject(bo2)
   // CHECK-NEXT: true
-  println(x === x1)
+  print(x === x1)
   // CHECK-NEXT: true
-  println(x === x2)
+  print(x === x2)
   
-  println(nonPointerBits(bo) == NATIVE_SPARE_BITS)
+  print(nonPointerBits(bo) == NATIVE_SPARE_BITS)
   // CHECK-NEXT: true
   
   var bo3 = Builtin.castToBridgeObject(C(), NATIVE_SPARE_BITS._builtinWordValue)
-  println(
-    _getBool(Builtin.isUnique(&bo3)))
+  print(_getBool(Builtin.isUnique(&bo3)))
   // CHECK-NEXT: true
   let bo4 = bo3
-  println(
-    _getBool(Builtin.isUnique(&bo3)))
+  print(_getBool(Builtin.isUnique(&bo3)))
   // CHECK-NEXT: false
   _fixLifetime(bo3)
   _fixLifetime(bo4)
@@ -118,13 +114,12 @@ if true {
   let x1: NSNumber = Builtin.castReferenceFromBridgeObject(bo)
   let x2: NSNumber = Builtin.castReferenceFromBridgeObject(bo2)
   // CHECK-NEXT: true
-  println(x === x1)
+  print(x === x1)
   // CHECK-NEXT: true
-  println(x === x2)
+  print(x === x2)
 
   var bo3 = nonNativeBridgeObject(NSNumber(integer: 22))
-  println(
-    _getBool(Builtin.isUnique(&bo3)))
+  print(_getBool(Builtin.isUnique(&bo3)))
   // CHECK-NEXT: false
   _fixLifetime(bo3)
 }
@@ -141,13 +136,12 @@ if true {
   let x1: NSString = Builtin.castReferenceFromBridgeObject(bo)
   let x2: NSString = Builtin.castReferenceFromBridgeObject(bo2)
   // CHECK-NEXT: true
-  println(x === x1)
+  print(x === x1)
   // CHECK-NEXT: true
-  println(x === x2)
+  print(x === x2)
   
   var bo3 = nonNativeBridgeObject(unTaggedString)
-  println(
-    _getBool(Builtin.isUnique(&bo3)))
+  print(_getBool(Builtin.isUnique(&bo3)))
   // CHECK-NEXT: false
   _fixLifetime(bo3)
 }
@@ -157,24 +151,24 @@ if true {
 func hitOptionalGenerically<T>(x: T?) {
   switch x {
   case .Some:
-    println("Some")
+    print("Some")
   case .None:
-    println("None")
+    print("None")
   }
 }
 
 func hitOptionalSpecifically(x: Builtin.BridgeObject?) {
   switch x {
   case .Some:
-    println("Some")
+    print("Some")
   case .None:
-    println("None")
+    print("None")
   }
 }
 
 if true {
   // CHECK-NEXT: true
-  println(sizeof(Optional<Builtin.BridgeObject>.self)
+  print(sizeof(Optional<Builtin.BridgeObject>.self)
             == sizeof(Builtin.BridgeObject.self))
 
   var bo: Builtin.BridgeObject? = nil

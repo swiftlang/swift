@@ -298,6 +298,7 @@ func test_isa_2(p: P) {
     
 }
 
+func runcibleWhy() {}
 protocol Runcible {
   func runce()
 }
@@ -310,7 +311,7 @@ func printSinglePayloadAddressOnly(v:SinglePayloadAddressOnly) {
   case .x(var runcible):
     runcible.runce()
   case .y:
-    println("Why?")
+    runcibleWhy()
   }
   
   

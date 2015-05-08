@@ -29,7 +29,7 @@ private func foo(a: A) -> Int {
   return a.f()
 }
 
-println("foo(C()) = \(foo(C()))")
+print("foo(C()) = \(foo(C()))")
 
 private class F1 {
   init() {
@@ -70,4 +70,4 @@ private class F3 : F2 {
 
 private var f = F2(v:1)
 f.test()
-println("unary constraint is: \(f)")
+print("unary constraint is: \(f)")

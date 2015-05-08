@@ -12,13 +12,13 @@ classes.addObject(NSString.self)
 classes.addObject(NSNumber.self)
 
 for obj: AnyObject in classes {
-  println(obj.description)
+  print(obj.description)
 }
 // CHECK: NSObject
 // CHECK-NEXT: NSString
 // CHECK-NEXT: NSNumber
 
-println(NSObject.conformsToProtocol(NSCopying.self))
+print(NSObject.conformsToProtocol(NSCopying.self))
 // CHECK-NEXT: false
-println(NSString.conformsToProtocol(NSCopying.self))
+print(NSString.conformsToProtocol(NSCopying.self))
 // CHECK-NEXT: true

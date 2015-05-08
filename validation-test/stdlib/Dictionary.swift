@@ -995,7 +995,7 @@ func pickRandom<T>(a: [T]) -> T {
 
 DictionaryTestSuite.test("deleteChainCollisionRandomized") {
   let timeNow = CUnsignedInt(time(nil))
-  println("time is \(timeNow)")
+  print("time is \(timeNow)")
   srandom(timeNow)
 
   func check(d: Dictionary<TestKeyTy, TestValueTy>) {
@@ -1016,7 +1016,7 @@ DictionaryTestSuite.test("deleteChainCollisionRandomized") {
 
   var collisionChains = pickRandom(collisionChainsChoices)
   var chainOverlap = pickRandom(chainOverlapChoices)
-  println("chose parameters: collisionChains=\(collisionChains) chainLength=\(chainOverlap)")
+  print("chose parameters: collisionChains=\(collisionChains) chainLength=\(chainOverlap)")
 
   let chainLength = 7
 

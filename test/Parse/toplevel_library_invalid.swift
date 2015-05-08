@@ -1,7 +1,8 @@
 // RUN: %target-parse-verify-swift -parse-as-library
 
-println("a"); // expected-error {{expressions are not allowed at the top level}}
-println("a"); // expected-error {{expressions are not allowed at the top level}}
+let x = 42
+x + x; // expected-error {{expressions are not allowed at the top level}}
+x + x; // expected-error {{expressions are not allowed at the top level}}
 // Make sure we don't crash on closures at the top level
 ({ }) // expected-error {{expressions are not allowed at the top level}} expected-error{{type of expression is ambiguous without more context}}
 ({ 5 }()) // expected-error {{expressions are not allowed at the top level}}

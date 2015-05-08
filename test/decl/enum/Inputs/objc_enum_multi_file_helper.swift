@@ -1,7 +1,7 @@
 func useEnum(x: TheEnum) {
   switch x {
   case A:
-    println("a!")
+    print("a!")
   default:
     break;
   }

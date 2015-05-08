@@ -4,7 +4,7 @@
 // REQUIRES: objc_interop
 
 // CHECK: testing...
-println("testing...")
+print("testing...")
 
 class C {}
 
@@ -20,7 +20,7 @@ func bridgedStatus<T>(_: T.Type) -> String {
 }
 
 func testBridging<T>(x: T, _ name: String) {
-  println("\(name) \(bridgedStatus(T.self))")
+  print("\(name) \(bridgedStatus(T.self))")
   var b : String
   if let result = _bridgeToObjectiveC(x) {
     b = "bridged as " + (
@@ -29,7 +29,7 @@ func testBridging<T>(x: T, _ name: String) {
   else {
     b = "did not bridge"
   }
-  println("\(name) instance \(b)")
+  print("\(name) instance \(b)")
 }
 
 //===----------------------------------------------------------------------===//
@@ -111,4 +111,4 @@ testBridging(
   ConditionallyBridged<String>(), "ConditionallyBridged<String>")
 
 // CHECK-NEXT: done.
-println("done.")
+print("done.")

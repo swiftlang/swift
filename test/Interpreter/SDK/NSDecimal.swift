@@ -97,22 +97,22 @@ func +(x: NSDecimalResult, y: NSDecimalResult) -> NSDecimalResult {
 }
 
 let zero = NSDecimalResult()
-println(zero) // CHECK: 0
+print(zero) // CHECK: 0
 
 let two: NSDecimalResult = "1" + "1"
-println(two) // CHECK: 2
+print(two) // CHECK: 2
 
 let point95: NSDecimalResult = "0.8" + "0.1" + "0.05"
-println(point95) // CHECK: 0.95
+print(point95) // CHECK: 0.95
 
 let twoAgain = point95 + "1.05"
-println(twoAgain) // CHECK: 2
-println(two == twoAgain) // CHECK: true
+print(twoAgain) // CHECK: 2
+print(two == twoAgain) // CHECK: true
 
-println(two + "not a number") // CHECK: NaN
-println(two + "not a number" == "still not a number") // CHECK: false
-println(two + "not a number" == two) // CHECK: false
+print(two + "not a number") // CHECK: NaN
+print(two + "not a number" == "still not a number") // CHECK: false
+print(two + "not a number" == two) // CHECK: false
 
 let one: NSDecimalResult = "1"
-println(one.pow10(2)) // CHECK: 100
-println(one.pow10(-2)) // CHECK: 0.01
+print(one.pow10(2)) // CHECK: 100
+print(one.pow10(-2)) // CHECK: 0.01

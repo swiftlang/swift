@@ -11,25 +11,25 @@
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-simple-swift | FileCheck %s
 
-println("testing...")
+print("testing...")
 // CHECK: testing...
 
-print("for loop: ")
+print("for loop: ", appendNewline: false)
 for x in CollectionOfOne(2) {
-  print(x)
+  print(x, appendNewline: false)
 }
-println(".")
+print(".")
 // CHECK-NEXT: for loop: 2.
 
 let twentyOne = CollectionOfOne(21)
 
-print("index loop: ")
+print("index loop: ", appendNewline: false)
 for x in twentyOne.indices {
-  print(twentyOne[x] * 2)
+  print(twentyOne[x] * 2, appendNewline: false)
 }
-println(".")
+print(".")
 // CHECK-NEXT: index loop: 42.
 
-println("done.")
+print("done.")
 // CHECK-NEXT: done.
 

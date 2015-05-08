@@ -11,7 +11,7 @@
 // CHECK: fizz
 // CHECK: buzz
 for i in 1..<11 {
-  println(i % 3 == 0
+  print(i % 3 == 0
     ? "fizz"
     : i % 5 == 0
     ? "buzz"

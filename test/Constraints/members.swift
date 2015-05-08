@@ -32,7 +32,7 @@ yf.f0(1)
 yf.f1(i, y: 1)
 
 // Module
-Swift.print(3)
+Swift.print(3, appendNewline: false)
 
 var format : String
 format._splitFirstIf({ $0.isASCII() })

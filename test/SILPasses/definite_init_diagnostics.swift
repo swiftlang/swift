@@ -6,6 +6,8 @@
 import Swift
 import gizmo
 
+func markUsed<T>(t: T) {}
+
 // These are tests for definite initialization, which is implemented by the
 // memory promotion pass.
 
@@ -54,18 +56,18 @@ func test2() {
 
   var b1 : Int        // expected-note {{variable defined here}}
   takes_closure {     // expected-error {{variable 'b1' used before being initialized}}
-    print(b1)
+    markUsed(b1)
   }
 
   var b2 = 4
   takes_closure {     // ok.
-    print(b2)
+    markUsed(b2)
   }
 
   var b3 : Int
   b3 = 4
   takes_closure {     // ok.
-    print(b3)
+    markUsed(b3)
   }
 
   // Structs
@@ -78,11 +80,11 @@ func test2() {
 
   // Classes
   var c1 : SomeClass   // expected-note {{variable defined here}}
-  print(c1.x)          // expected-error {{variable 'c1' used before being initialized}}
+  markUsed(c1.x)          // expected-error {{variable 'c1' used before being initialized}}
 
 
   var c2 = SomeClass()
-  print(c2.x)          // ok
+  markUsed(c2.x)          // ok
   
   
   // Weak
@@ -107,20 +109,20 @@ func test2() {
 // Tuple field sensitivity.
 func test4() {
   var t1 = (1, 2, 3)
-  print(t1.0 + t1.1 + t1.2)  // ok
+  markUsed(t1.0 + t1.1 + t1.2)  // ok
 
 
   var t2 : (Int, Int, Int)   // expected-note 3 {{variable defined here}}
-  print(t2.0)   // expected-error {{variable 't2.0' used before being initialized}}
-  print(t2.1)   // expected-error {{variable 't2.1' used before being initialized}}
-  print(t2.2)   // expected-error {{variable 't2.2' used before being initialized}}
+  markUsed(t2.0)   // expected-error {{variable 't2.0' used before being initialized}}
+  markUsed(t2.1)   // expected-error {{variable 't2.1' used before being initialized}}
+  markUsed(t2.2)   // expected-error {{variable 't2.2' used before being initialized}}
 
 
   var t3 : (Int, Int, Int)   // expected-note {{variable defined here}}
   t3.0 = 1; t3.2 = 42
-  print(t3.0)
-  print(t3.1)   // expected-error {{variable 't3.1' used before being initialized}}
-  print(t3.2)
+  markUsed(t3.0)
+  markUsed(t3.1)   // expected-error {{variable 't3.1' used before being initialized}}
+  markUsed(t3.2)
 
 
   // Partially set, wholey read.
@@ -132,21 +134,21 @@ func test4() {
   // Subelement sets.
   var t5 : (a : (Int, Int), b : Int)  // expected-note {{variable defined here}}
   t5.a = (1,2)
-  print(t5.a.0)
-  print(t5.a.1)
-  print(t5.b)       // expected-error {{variable 't5.b' used before being initialized}}
+  markUsed(t5.a.0)
+  markUsed(t5.a.1)
+  markUsed(t5.b)       // expected-error {{variable 't5.b' used before being initialized}}
   
 
   var t6 : (a : (Int, Int), b : Int)  // expected-note {{variable defined here}}
   t6.b = 12; t6.a.1 = 1
-  print(t6.a.0)     // expected-error {{variable 't6.a.0' used before being initialized}}
-  print(t6.a.1)
-  print(t6.b)
+  markUsed(t6.a.0)     // expected-error {{variable 't6.a.0' used before being initialized}}
+  markUsed(t6.a.1)
+  markUsed(t6.b)
 }
 
 func tupleinout(inout a: (lo: Int, hi: Int)) {
-  print(a.0)   // ok
-  print(a.1)   // ok
+  markUsed(a.0)   // ok
+  markUsed(a.1)   // ok
 }
 
 // Address only types
@@ -174,11 +176,11 @@ func test7(cond: Bool) {
   var a : Int
   
   if cond { a = 42 } else { a = 17 }
-  print(a)         // ok
+  markUsed(a)         // ok
 
   var b : Int      // expected-note {{variable defined here}}
   if cond { } else { b = 17 }
-  print(b)         // expected-error {{variable 'b' used before being initialized}}
+  markUsed(b)         // expected-error {{variable 'b' used before being initialized}}
 }
 
 protocol SomeProtocol {
@@ -214,17 +216,17 @@ var g1 : Int                 // expected-note {{variable defined here}}
 var g2 : Int = 42
 
 func testTopLevelCode() {    // expected-error {{variable 'g1' used by function definition before being initialized}}
-  print(g1)
-  print(g2)
+  markUsed(g1)
+  markUsed(g2)
 }
 
 var (g3,g4) : (Int,Int)          // expected-note 2 {{variable defined here}}
 class DITLC_Class {
   init() {            // expected-error {{variable 'g3' used by function definition before being initialized}}
-    print(g3)
+    markUsed(g3)
   }
   deinit {            // expected-error {{variable 'g4' used by function definition before being initialized}}
-    print(g4)
+    markUsed(g4)
   }
 }
 
@@ -964,7 +966,7 @@ class r19254812Derived: r19254812Base{
   let pi = 3.14159265359
   
   init(x : ()) {
-    println(pi)  // ok, no diagnostic expected.
+    markUsed(pi)  // ok, no diagnostic expected.
   }
 }
 

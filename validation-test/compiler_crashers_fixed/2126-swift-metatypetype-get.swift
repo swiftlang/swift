@@ -7,7 +7,7 @@
 if true {
 typealias g: B
 class func g<j(i {
-println("
+print("
 ) -i -> e {
 d<A()
 return { clq) ->, e: AnyObject, length: a : Sequen

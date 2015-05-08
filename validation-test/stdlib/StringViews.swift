@@ -15,7 +15,7 @@ import Swift
 import StdlibUnittest
 
 // CHECK: testing...
-println("testing...")
+print("testing...")
 
 let replacementUTF16: UTF16.CodeUnit = 0xFFFD
 let replacementUTF8: [UTF8.CodeUnit] = [0xEF, 0xBF, 0xBD]
@@ -37,19 +37,6 @@ let winterUTF8: [UTF8.CodeUnit] = [
 let summer = "school's out!"
 let summerBytes: [UInt8] = [
   0x73, 0x63, 0x68, 0x6f, 0x6f, 0x6c, 0x27, 0x73, 0x20, 0x6f, 0x75, 0x74, 0x21]
-
-func printHexSequence<
-  S:SequenceType where S.Generator.Element : IntegerType
->(s: S) {
-  print("[")
-  var prefix = ""
-  for x in s {
-    print(prefix);
-    print(String(x.toIntMax(), radix: 16))
-    prefix = " "
-  }
-  println("]")
-}
 
 var tests = TestSuite("StringViews")
 

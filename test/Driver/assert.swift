@@ -5,4 +5,4 @@
 
 // CHECK: error: swift frontend command failed due to signal
 
-println("Hello, World")
+print("Hello, World")

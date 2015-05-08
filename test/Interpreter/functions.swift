@@ -13,16 +13,16 @@ func twice(f: (Int) -> Int, _ x: Int) -> Int {
 }
 
 // CHECK: 4
-println(double(2))
+print(double(2))
 // CHECK: 8
-println(double(4))
+print(double(4))
 
 // CHECK: 12
-println(curriedSubtract(16)(4))
+print(curriedSubtract(16)(4))
 
 // CHECK: 20
-println(twice(double, 5))
+print(twice(double, 5))
 // CHECK: 7
-println(twice({ $0 + 1 }, 5))
+print(twice({ $0 + 1 }, 5))
 // CHECK: 3
-println(twice({ x in x - 1 }, 5))
+print(twice({ x in x - 1 }, 5))

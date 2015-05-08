@@ -13,7 +13,7 @@ class A {
 return """cd""")) {
 protocol a {
 class a {
-println()?) {
+print()?) {
 func compose<d where B {
 }
 }

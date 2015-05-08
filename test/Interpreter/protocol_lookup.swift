@@ -7,37 +7,37 @@ protocol Fooable {
 }
 
 struct S: Fooable {
-  func foo() { println("S") }
+  func foo() { print("S") }
 }
 
 class C: Fooable {
-  func foo() { println("C") }
+  func foo() { print("C") }
 }
 
 class D: C {
-  override func foo() { println("D") }
+  override func foo() { print("D") }
 }
 
 class E: D {
-  override func foo() { println("E") }
+  override func foo() { print("E") }
 }
 
 struct X {}
 
 extension Int: Fooable {
-  func foo() { println("Int") }
+  func foo() { print("Int") }
 }
 
 func fooify<T>(x: T) {
   if let foo = x as? Fooable {
     foo.foo()
   } else {
-    println("not fooable")
+    print("not fooable")
   }
 }
 
 struct G<T>: Fooable {
-  func foo() { println("G") }
+  func foo() { print("G") }
 }
 
 struct H<T> {}
@@ -88,21 +88,21 @@ protocol Barrable {
   func bar()
 }
 extension Int: Barrable {
-  func bar() { println("Int.bar") }
+  func bar() { print("Int.bar") }
 }
 
 let foo: Fooable = 2
 if let bar = foo as? Barrable {
   bar.bar() // CHECK-NEXT: Int.bar
 } else {
-  println("not barrable")
+  print("not barrable")
 }
 
 let foo2: Fooable = S()
 if let bar2 = foo2 as? Barrable {
   bar2.bar()
 } else {
-  println("not barrable") // CHECK-NEXT: not barrable
+  print("not barrable") // CHECK-NEXT: not barrable
 }
 
 protocol Runcible: class {
@@ -116,12 +116,12 @@ protocol Runcible: class {
 #endif
 
 extension C: Runcible {
-  func runce() { println("C") }
+  func runce() { print("C") }
 }
 
 #if _runtime(_ObjC)
 extension D: Fungible {
-  @objc func funge() { println("D") }
+  @objc func funge() { print("D") }
 }
 #endif
 
@@ -131,13 +131,13 @@ if let fruncible = c1 as? protocol<Fooable, Runcible> {
   fruncible.foo() // CHECK-NEXT: C
   fruncible.runce() // CHECK-NEXT: C
 } else {
-  println("not fooable and runcible")
+  print("not fooable and runcible")
 }
 if let fruncible = c2 as? protocol<Fooable, Runcible> {
   fruncible.foo() // CHECK-NEXT: C
   fruncible.runce() // CHECK-NEXT: C
 } else {
-  println("not fooable and runcible")
+  print("not fooable and runcible")
 }
 
 // Protocol lookup for metatypes.
@@ -160,10 +160,10 @@ class StaticWibble : StaticBar, StaticFoo {
 }
 
 // CHECK: no Foo for you
-println(StaticBar.mightHaveFoo())
+print(StaticBar.mightHaveFoo())
 
 // CHECK: StaticWibble.foo
-println(StaticWibble.mightHaveFoo())
+print(StaticWibble.mightHaveFoo())
 
 #if _runtime(_ObjC)
 let d: D = D()
@@ -174,21 +174,21 @@ if let frungible = d1 as? protocol<Fooable, Runcible, Fungible> {
   frungible.runce() // CHECK-objc-NEXT: C
   frungible.funge() // CHECK-objc-NEXT: D
 } else {
-  println("not fooable, runcible, and fungible")
+  print("not fooable, runcible, and fungible")
 }
 
 let inttype: Any.Type = Int.self
 if let frungibleType = inttype as? protocol<Fooable, Runcible, Fungible>.Type {
-  println("is fooable, runcible, and fungible")
+  print("is fooable, runcible, and fungible")
 } else {
-  println("not fooable, runcible, and fungible") // CHECK-objc-NEXT: not
+  print("not fooable, runcible, and fungible") // CHECK-objc-NEXT: not
 }
 
 let dtype: Any.Type = D.self
 if let frungibleType = dtype as? protocol<Fooable, Runcible, Fungible>.Type {
-  println("is fooable, runcible, and fungible") // CHECK-objc-NEXT: is
+  print("is fooable, runcible, and fungible") // CHECK-objc-NEXT: is
 } else {
-  println("not fooable, runcible, and fungible")
+  print("not fooable, runcible, and fungible")
 }
 
 func genericCast<U: AnyObject>(x: AnyObject, _: U.Type) -> U? {
@@ -198,7 +198,7 @@ func genericCast<U: AnyObject>(x: AnyObject, _: U.Type) -> U? {
 if let fungible = genericCast(d, Fungible.self) {
   fungible.funge() // CHECK-objc-NEXT: D
 } else {
-  println("not fungible")
+  print("not fungible")
 }
 #endif
 

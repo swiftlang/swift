@@ -18,14 +18,14 @@ class MyClass {
         delegate?.didFindCureForCancer()
     }
 
-    deinit { println("MyClass died") }
+    deinit { print("MyClass died") }
 }
 
 
 class AppDelegate: MyClassDelegate {
 
     func application() -> Bool {
-        println("starting")
+        print("starting")
         let cureFinder = MyClass()
         cureFinder.delegate = self
         cureFinder.findCure()
@@ -34,10 +34,10 @@ class AppDelegate: MyClassDelegate {
     }
 
     func didFindCureForCancer() {
-        println("about time...")
+        print("about time...")
     }
 
-    deinit { println("AppDelegate died") }
+    deinit { print("AppDelegate died") }
 }
 
 _ = {

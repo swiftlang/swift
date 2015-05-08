@@ -7,7 +7,7 @@
 struct S<H : Int {
 protocol a {
 if c : A : SequenceType> () {
-println("").C> {
+print("").C> {
 enum B {
 }
 for c where A> {

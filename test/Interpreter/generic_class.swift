@@ -10,19 +10,19 @@ protocol MyPrintable {
 
 extension Int : MyPrintable {
   func myPrint() {
-    print(self.description)
+    print(self.description, appendNewline: false)
   }
 }
 
 extension Double : MyPrintable {
   func myPrint() {
-    print(self.description)
+    print(self.description, appendNewline: false)
   }
 }
 
 extension String : MyPrintable {
   func myPrint() {
-    print(self.debugDescription)
+    print(self.debugDescription, appendNewline: false)
   }
 }
 
@@ -46,21 +46,21 @@ enum State : MyPrintable {
   func myPrint() {
     switch self {
     case .CA:
-      print("California")
+      print("California", appendNewline: false)
     case .OR:
-      print("Oregon")
+      print("Oregon", appendNewline: false)
     case .WA:
-      print("Washington")
+      print("Washington", appendNewline: false)
     }
   }
 }
 
 func printPair<A: MyPrintable, B: MyPrintable>(p: BufferedPair<A,B>) {
-  print("\(p.front) ")
+  print("\(p.front) ", appendNewline: false)
   p.first.myPrint()
-  print(" ")
+  print(" ", appendNewline: false)
   p.second.myPrint()
-  println(" \(p.back)")
+  print(" \(p.back)")
 }
 
 var p = BufferedPair(99, State.OR, "Washington's Mexico", 84)
@@ -81,13 +81,13 @@ func printTriple
   <D: MyPrintable, E: MyPrintable, F: MyPrintable>
   (p: AwkwardTriple<D, E, F>)
 {
-  print("\(p.front) ")
+  print("\(p.front) ", appendNewline: false)
   p.first.myPrint()
-  print(" ")
+  print(" ", appendNewline: false)
   p.second.myPrint()
-  print(" \(p.back) ")
+  print(" \(p.back) ", appendNewline: false)
   p.third.myPrint()
-  println()
+  print("")
 }
 
 var q = AwkwardTriple(123, State.CA, "Foo", 234, State.WA)
@@ -111,15 +111,15 @@ func printQuad
   <G: MyPrintable, H: MyPrintable, I: MyPrintable, J: MyPrintable>
   (p: FourthWheel<G, H, I, J>)
 {
-  print("\(p.front) ")
+  print("\(p.front) ", appendNewline: false)
   p.first.myPrint()
-  print(" ")
+  print(" ", appendNewline: false)
   p.second.myPrint()
-  print(" \(p.back) ")
+  print(" \(p.back) ", appendNewline: false)
   p.third.myPrint()
-  print(" ")
+  print(" ", appendNewline: false)
   p.fourth.myPrint()
-  println()
+  print("")
 }
 
 var r = FourthWheel(21, State.WA, "Bar", 31, State.OR, 3.125)
@@ -155,13 +155,13 @@ class SemiConcreteTriple<O> : ConcretePair {
 }
 
 func printConcretePair(p: ConcretePair) {
-  println("\(p.first) \(p.second)")
+  print("\(p.first) \(p.second)")
 }
 
 func printSemiTriple<O : MyPrintable>(p: SemiConcreteTriple<O>) {
-  print("\(p.first) \(p.second) ")
+  print("\(p.first) \(p.second) ", appendNewline: false)
   p.third.myPrint()
-  println()
+  print("")
 }
 
 var s = SemiConcreteTriple(120, 230, State.CA)

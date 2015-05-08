@@ -12,7 +12,7 @@ func g<c) -> T -> Int {
 }
 }
 }
-println() -> {
+print() -> {
 }
 protocol a {
 protocol A {

@@ -129,9 +129,9 @@ case nil: break
 
 // Test x???? patterns.
 switch (nil as Int???) {
-case let x???: print(x)
-case let x??: print(x)
-case let x?: print(x)
+case let x???: print(x, appendNewline: false)
+case let x??: print(x, appendNewline: false)
+case let x?: print(x, appendNewline: false)
 case 4???: break
 case nil??: break
 case nil?: break

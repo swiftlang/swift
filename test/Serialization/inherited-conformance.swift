@@ -7,7 +7,7 @@
 import User
 
 var test = User.OneToAThousand()
-println(test[test.startIndex])
+print(test[test.startIndex])
 
 func useSigned<T: SpecialProto>(_: T) {}
 useSigned(5 as Int)

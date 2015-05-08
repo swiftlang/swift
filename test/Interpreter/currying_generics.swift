@@ -5,15 +5,15 @@ func curry<T, U, V>(f: (T, U) -> V)(_ x: T)(_ y: U) -> V {
 }
 
 let insult = curry(+)("I'm with stupid ☞ ")
-println(insult("😡")) // CHECK: I'm with stupid ☞ 😡
+print(insult("😡")) // CHECK: I'm with stupid ☞ 😡
 
 let plus1 = curry(+)(1)
-println(plus1(5)) // CHECK-NEXT: 6
+print(plus1(5)) // CHECK-NEXT: 6
 
 let plus5 = curry(+)(5)
-println(plus5(5)) // CHECK-NEXT: 10
+print(plus5(5)) // CHECK-NEXT: 10
 
-println(insult("😰")) // CHECK-NEXT: I'm with stupid ☞ 😰
+print(insult("😰")) // CHECK-NEXT: I'm with stupid ☞ 😰
 
 // rdar://problem/18988428
 
@@ -23,7 +23,7 @@ func clamp<T: Comparable>(minValue: T, _ maxValue: T)(n: T) -> T {
 
 let clampFoo2 = clamp(10.0, 30.0)
 
-println(clampFoo2(n: 3.0)) // CHECK-NEXT: 10.0
+print(clampFoo2(n: 3.0)) // CHECK-NEXT: 10.0
 
 // rdar://problem/19195470
 
@@ -46,8 +46,8 @@ func <+><T,U,V> (lhs: T?, rhs: T -> U -> V) -> U -> V? {
 
 let a : Int? = 23
 let b : Int? = 42
-println((b <+> pair)(a!)) // CHECK-NEXT: (42, 23)
-println((b <+> pair_)(a!)) // CHECK-NEXT: (42, 23)
+print((b <+> pair)(a!)) // CHECK-NEXT: (42, 23)
+print((b <+> pair_)(a!)) // CHECK-NEXT: (42, 23)
 
 //
 // rdar://problem/20475584
@@ -126,9 +126,9 @@ infix operator <<< {
 }
 
 
-println(view(_1)((1, 2))) // CHECK-NEXT: 1
-println(over(_1)({ $0 * 4 })((1, 2))) // CHECK-NEXT: (4, 2)
-println(set(_1)(3)((1, 2))) // CHECK-NEXT: (3, 2)
+print(view(_1)((1, 2))) // CHECK-NEXT: 1
+print(over(_1)({ $0 * 4 })((1, 2))) // CHECK-NEXT: (4, 2)
+print(set(_1)(3)((1, 2))) // CHECK-NEXT: (3, 2)
 
-println(view(_2)("hello", 5)) // CHECK-NEXT: 5
+print(view(_2)("hello", 5)) // CHECK-NEXT: 5
 

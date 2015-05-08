@@ -2,7 +2,7 @@
 
 import StdlibUnittest
 
-_setTestSuiteFailedCallback() { println("abort()") }
+_setTestSuiteFailedCallback() { print("abort()") }
 
 //
 // Check that calling runAllTests() twice is an error.

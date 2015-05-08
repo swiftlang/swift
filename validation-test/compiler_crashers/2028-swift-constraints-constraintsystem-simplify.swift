@@ -7,6 +7,6 @@
 
 for () in 0)!.count](self):
 case c> T>][unowned self.A.E
-println(T) -> ("]() {
+print(T) -> ("]() {
 struct Q<T where d: A.Type) + seq: a {
 var b = F>(i: T.

@@ -28,19 +28,19 @@ var s = Singleton.x(1, "a")
 switch s {
 case .x(var int, var char):
   // CHECK: 1
-  println(int)
+  print(int)
   // CHECK: a
-  println(char)
+  print(char)
 }
 
 func printNoPayload(v: NoPayload) {
   switch v {
   case .x:
-    println("NoPayload.x")
+    print("NoPayload.x")
   case .y:
-    println("NoPayload.y")
+    print("NoPayload.y")
   case .z:
-    println("NoPayload.z")
+    print("NoPayload.z")
   }
 }
 
@@ -54,11 +54,11 @@ printNoPayload(.z)
 func printSinglePayloadTrivial(v: SinglePayloadTrivial) {
   switch v {
   case .x(var char, var int):
-    println("SinglePayloadTrivial.x(\(char), \(int))")
+    print("SinglePayloadTrivial.x(\(char), \(int))")
   case .y:
-    println("SinglePayloadTrivial.y")
+    print("SinglePayloadTrivial.y")
   case .z:
-    println("SinglePayloadTrivial.z")
+    print("SinglePayloadTrivial.z")
   }
 }
 
@@ -72,11 +72,11 @@ printSinglePayloadTrivial(.z)
 func printMultiPayloadTrivial(v: MultiPayloadTrivial) {
   switch v {
   case .x(var char, var int):
-    println("MultiPayloadTrivial.x(\(char), \(int))")
+    print("MultiPayloadTrivial.x(\(char), \(int))")
   case .y(var int, var double):
-    println("MultiPayloadTrivial.y(\(int), \(double))")
+    print("MultiPayloadTrivial.y(\(int), \(double))")
   case .z:
-    println("MultiPayloadTrivial.z")
+    print("MultiPayloadTrivial.z")
   }
 }
 
@@ -93,12 +93,12 @@ protocol Runcible {
 
 struct Spoon : Runcible {
   var xxx = 0
-  func runce() { println("Spoon!") }
+  func runce() { print("Spoon!") }
 }
 
 struct Hat : Runcible {
   var xxx : Float = 0
-  func runce() { println("Hat!") }
+  func runce() { print("Hat!") }
 }
 
 enum SinglePayloadAddressOnly {
@@ -111,7 +111,7 @@ func printSinglePayloadAddressOnly(v: SinglePayloadAddressOnly) {
   case .x(var runcible):
     runcible.runce()
   case .y:
-    println("Why?")
+    print("Why?")
   }
 }
 
@@ -133,10 +133,10 @@ func printMultiPayloadAddressOnly(v: MultiPayloadAddressOnly) {
   case .x(var runcible):
     runcible.runce()
   case .y(var s, var runcible):
-    print("\(s) ")
+    print("\(s) ", appendNewline: false)
     runcible.runce()
   case .z:
-    println("Zed.")
+    print("Zed.")
   }
 }
 
@@ -166,19 +166,19 @@ var tg : TrivialGeneric<Int, String> = .x(23, "skidoo")
 // CHECK: 23 skidoo
 switch tg {
 case .x(var t, var u):
-  println("\(t) \(u)")
+  print("\(t) \(u)")
 }
 
 // CHECK: 413 dream
 switch unwrapTrivialGeneric(.x(413, "dream")) {
 case (var t, var u):
-  println("\(t) \(u)")
+  print("\(t) \(u)")
 }
 
 // CHECK: 1 is the loneliest number that you'll ever do
 switch wrapTrivialGeneric(1, "is the loneliest number that you'll ever do") {
 case .x(var t, var u):
-  println("\(t) \(u)")
+  print("\(t) \(u)")
 }
 
 enum Ensemble<S : Runcible, H : Runcible> {
@@ -227,7 +227,7 @@ func tryRunce<T : Runcible>(x: Optionable<T>) {
   case .Mere(var r):
     r.runce()
   case .Nought:
-    println("nought")
+    print("nought")
   }
 }
 
@@ -255,9 +255,9 @@ func optionableInts() {
   for o in optionables {
     switch o {
     case .Mere(var x):
-      println(x)
+      print(x)
     case .Nought:
-      println("---")
+      print("---")
     }
   }
 }
@@ -266,21 +266,21 @@ func optionableInts() {
 // CHECK: ---
 // CHECK: ---
 // CHECK: 20721
-println("Optionable ints:")
+print("Optionable ints:")
 optionableInts()
 
 enum Suit { case Spades, Hearts, Diamonds, Clubs }
 
-func println(suit: Suit) {
+func print(suit: Suit) {
   switch suit {
   case .Spades:
-    println("♠")
+    print("♠")
   case .Hearts:
-    println("♡")
+    print("♡")
   case .Diamonds:
-    println("♢")
+    print("♢")
   case .Clubs:
-    println("♣")
+    print("♣")
   }
 }
 
@@ -295,9 +295,9 @@ func optionableSuits() {
   for o in optionables {
     switch o {
     case .Mere(var x):
-      println(x)
+      print(x)
     case .Nought:
-      println("---")
+      print("---")
     }
   }
 }
@@ -321,7 +321,7 @@ func optionableRuncibles<T : Runcible>(x: T) {
     case .Mere(var x):
       x.runce()
     case .Nought:
-      println("---")
+      print("---")
     }
   }
 }
@@ -345,12 +345,12 @@ class Rdar15383966 : ClassProtocol
     var id : Int
 
     init(_ anID : Int) {
-      println("X(\(anID))")
+      print("X(\(anID))")
       id = anID
     }
 
     deinit {
-       println("~X(\(id))")
+       print("~X(\(id))")
     }
 }
 
@@ -410,15 +410,15 @@ enum MultiPayloadSpareBitAggregates {
 func test_spare_bit_aggregate(x: MultiPayloadSpareBitAggregates) {
   switch x {
   case .x(var i32, var i64):
-    println(".x(\(i32), \(i64))")
+    print(".x(\(i32), \(i64))")
   case .y(var a, var b):
-    println(".y(\(a.id), \(b.id))")
+    print(".y(\(a.id), \(b.id))")
   case .z(S(a: var a, b: var b)):
-    println(".z(\(a), \(b))")
+    print(".z(\(a), \(b))")
   }
 }
 
-println("---")
+print("---")
 // CHECK: .x(22, 44)
 test_spare_bit_aggregate(.x(22, 44))
 // CHECK: X(222)
@@ -430,7 +430,7 @@ test_spare_bit_aggregate(.y(Rdar15383966(222), Rdar15383966(444)))
 // CHECK: .z(333, 666)
 test_spare_bit_aggregate(.z(S(333, 666)))
 
-println("---")
+print("---")
 struct OptionalTuple<T> {
   var value : (T, T)?
 
@@ -439,10 +439,10 @@ struct OptionalTuple<T> {
   }
 }
 func test_optional_generic_tuple<T>(a: OptionalTuple<T>) -> T {
-  println("optional pair is same size as pair: \(sizeofValue(a) == sizeof(T)*2)")
+  print("optional pair is same size as pair: \(sizeofValue(a) == sizeof(T)*2)")
   return a.value!.0
 }
-println("Int result: \(test_optional_generic_tuple(OptionalTuple<Int>((5, 6))))")
+print("Int result: \(test_optional_generic_tuple(OptionalTuple<Int>((5, 6))))")
 // CHECK: optional pair is same size as pair: false
 // CHECK: Int result: 5
 
@@ -450,17 +450,17 @@ class AnyOldClass {
   var x: Int
   init(_ value: Int) { x = value }
 }
-println("class result: \(test_optional_generic_tuple(OptionalTuple((AnyOldClass(10), AnyOldClass(11)))).x)")
+print("class result: \(test_optional_generic_tuple(OptionalTuple((AnyOldClass(10), AnyOldClass(11)))).x)")
 // CHECK: optional pair is same size as pair: true
 // CHECK: class result: 10
 
 // <rdar://problem/16887421>
 // CHECK-LABEL: Optional equality:
-println("Optional equality:")
+print("Optional equality:")
 // CHECK: true
-println((NoPayload.x as NoPayload?) == NoPayload.x)
+print((NoPayload.x as NoPayload?) == NoPayload.x)
 // CHECK: false
-println((NoPayload.x as NoPayload?) == NoPayload.y)
+print((NoPayload.x as NoPayload?) == NoPayload.y)
 
 // rdar://problem/17814752
 class Foo {}
@@ -485,7 +485,7 @@ enum Planet: String {
     }
 }
 var pl1 = Planet()
-println(pl1.rawValue)
+print(pl1.rawValue)
 // CHECK: Venus
 
 enum EitherOr<T, U> {
@@ -499,13 +499,13 @@ enum EitherOr<T, U> {
 func presentEitherOr<T, U>(e: EitherOr<T, U>) {
   switch e {
   case .Left(let l):
-    println("Left(\(l))")
+    print("Left(\(l))")
   case .Right(let r):
-    println("Right(\(r))")
+    print("Right(\(r))")
   case .Middle:
-    println("Middle")
+    print("Middle")
   case .Center:
-    println("Center")
+    print("Center")
   }
 }
 
@@ -551,4 +551,4 @@ presentEitherOr(EitherOr<(), String>.Right("foo")) // CHECK-NEXT: Right(foo)
 presentEitherOrsOf(t: (), u: "foo")
 
 // CHECK-NEXT: done
-println("done")
+print("done")

@@ -9,9 +9,9 @@ func test() {
   array[4] = "rlrezqqlfpoktoiitbtyngyyyeoglmwxfrxjtejmyy"
   array = sorted(array)
   for i in array {
-    println(i)
+    print(i)
   }
-  print("\n")
+  print("\n", appendNewline: false)
 }
 
 test()

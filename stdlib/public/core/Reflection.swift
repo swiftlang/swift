@@ -259,42 +259,42 @@ func _dumpWithMirror<TargetStream : OutputStreamType>(
   if maxItemCounter <= 0 { return }
   --maxItemCounter
 
-  for _ in 0..<indent { print(" ", &targetStream) }
+  for _ in 0..<indent { print(" ", &targetStream, appendNewline: false) }
 
   let count = mirror.count
   let bullet = count == 0    ? "-"
              : maxDepth <= 0 ? "▹" : "▿"
-  print("\(bullet) ", &targetStream)
+  print("\(bullet) ", &targetStream, appendNewline: false)
 
   if let nam = name {
-    print("\(nam): ", &targetStream)
+    print("\(nam): ", &targetStream, appendNewline: false)
   }
-  print(mirror.summary, &targetStream)
+  print(mirror.summary, &targetStream, appendNewline: false)
 
   if let id = mirror.objectIdentifier {
     if let previous = visitedItems[id] {
-      println(" #\(previous)", &targetStream)
+      print(" #\(previous)", &targetStream)
       return
     }
     let identifier = visitedItems.count
     visitedItems[id] = identifier
-    print(" #\(identifier)", &targetStream)
+    print(" #\(identifier)", &targetStream, appendNewline: false)
   }
 
-  println("", &targetStream)
+  print("", &targetStream)
 
   if maxDepth <= 0 { return }
 
   for i in 0..<count {
     if maxItemCounter <= 0 {
-      for _ in 0..<(indent+4) { print(" ", &targetStream) }
+      for _ in 0..<(indent+4) { print(" ", &targetStream, appendNewline: false) }
       let remainder = count - i
-      print("(\(remainder)", &targetStream)
-      if i > 0 { print(" more", &targetStream) }
+      print("(\(remainder)", &targetStream, appendNewline: false)
+      if i > 0 { print(" more", &targetStream, appendNewline: false) }
       if remainder == 1 {
-        println(" child)", &targetStream)
+        print(" child)", &targetStream)
       } else {
-        println(" children)", &targetStream)
+        print(" children)", &targetStream)
       }
       return
     }

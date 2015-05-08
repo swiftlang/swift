@@ -115,7 +115,7 @@ public func singleDefaultArgument(#i: Int = {
   return 2
 
 }()){
-  println(i)
+  print(i)
 }
 
 public func doubleFunc() {

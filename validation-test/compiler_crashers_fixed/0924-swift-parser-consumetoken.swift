@@ -28,4 +28,4 @@ enum A {
 A? {
 }
 }
-println([c() ->
+print([c() ->

@@ -120,7 +120,7 @@ return true
 extension NSSet {
 get {
 func b(A.d) in x }
-println(1
+print(1
 class A : Array<T>() {
 }
 return S) {
@@ -129,7 +129,7 @@ typealias b = a<b, "cd"ab""cd")
 class A.f = b: [0)
 class A, V, object2: A, 3)
 }
-println(v: T] = a: a)
+print(v: T] = a: a)
 case s("A<T> T {
 class A {
 struct e == c<T

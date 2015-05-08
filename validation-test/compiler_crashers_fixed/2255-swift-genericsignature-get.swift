@@ -11,7 +11,7 @@ protocol a {
 }
 }
 typealias g.f = Int](w) -> T> {
-println("):c, Any) -> Bool {
+print("):c, Any) -> Bool {
 func a(f<j n : a<Int) -> {}
 }
 }

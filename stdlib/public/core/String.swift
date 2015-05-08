@@ -51,7 +51,7 @@ import SwiftShims
 ///     var a = "foo"
 ///     var b = a
 ///     b.extend("bar")
-///     println("a=\(a), b=\(b)")     // a=foo, b=foobar
+///     print("a=\(a), b=\(b)")     // a=foo, b=foobar
 ///
 /// Strings use Copy-on-Write so that their data is only copied
 /// lazily, upon mutation, when more than one string instance is using

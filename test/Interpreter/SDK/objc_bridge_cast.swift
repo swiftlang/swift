@@ -16,7 +16,7 @@ func genericConditionalCast<T, U>(a: T) -> U? {
 
 func testForcedValueToObjectBridging() {
   // CHECK: ---Forced value to object bridging---
-  println("---Forced value to object bridging---")
+  print("---Forced value to object bridging---")
 
   let array: [String] = ["Hello", "World"]
 
@@ -25,37 +25,37 @@ func testForcedValueToObjectBridging() {
   // CHECK-NEXT:   Hello,
   // CHECK-NEXT:   World
   // CHECK-NEXT: )
-  println(genericForcedCast(array) as NSArray)
+  print(genericForcedCast(array) as NSArray)
 
   // Forced bridging (superclass)
   // CHECK-NEXT: (
   // CHECK-NEXT:   Hello,
   // CHECK-NEXT:   World
   // CHECK-NEXT: )
-  println(genericForcedCast(array) as NSObject)
+  print(genericForcedCast(array) as NSObject)
 
   // Forced bridging (AnyObject)
   // CHECK-NEXT: (
   // CHECK-NEXT:   Hello,
   // CHECK-NEXT:   World
   // CHECK-NEXT: )
-  println(genericForcedCast(array) as NSObject)
+  print(genericForcedCast(array) as NSObject)
 
   // Forced bridging (existential success)
   // CHECK-NEXT: (
   // CHECK-NEXT:   Hello,
   // CHECK-NEXT:   World
   // CHECK-NEXT: )
-  println(genericForcedCast(array) as NSCoding)
+  print(genericForcedCast(array) as NSCoding)
 
-  println("Done")
+  print("Done")
 }
 // CHECK: Done
 testForcedValueToObjectBridging()
 
 func testConditionalValueToObjectBridging() {
   // CHECK: ---Conditional value to object bridging---
-  println("---Conditional value to object bridging---")
+  print("---Conditional value to object bridging---")
 
   let array: [String] = ["Hello", "World"]
 
@@ -65,9 +65,9 @@ func testConditionalValueToObjectBridging() {
   // CHECK-NEXT:   World
   // CHECK-NEXT: )
   if let nsArray = (genericConditionalCast(array) as NSArray?) {
-    println("\(nsArray)")
+    print("\(nsArray)")
   } else {
-    println("Not an NSArray")
+    print("Not an NSArray")
   }
 
   // Conditional bridging (superclass)
@@ -76,9 +76,9 @@ func testConditionalValueToObjectBridging() {
   // CHECK-NEXT:   World
   // CHECK-NEXT: )
   if let nsObject = (genericConditionalCast(array) as NSObject?) {
-    println("\(nsObject)")
+    print("\(nsObject)")
   } else {
-    println("Not an NSObject")
+    print("Not an NSObject")
   }
 
   // Conditional bridging (AnyObject)
@@ -87,9 +87,9 @@ func testConditionalValueToObjectBridging() {
   // CHECK-NEXT:   World
   // CHECK-NEXT: )
   if let anyObject = (genericConditionalCast(array) as AnyObject?) {
-    println("\(anyObject)")
+    print("\(anyObject)")
   } else {
-    println("Not an AnyObject")
+    print("Not an AnyObject")
   }
 
   // Conditional bridging (existential success)
@@ -98,63 +98,63 @@ func testConditionalValueToObjectBridging() {
   // CHECK-NEXT:   World
   // CHECK-NEXT: )
   if let coding = (genericConditionalCast(array) as NSCoding?) {
-    println("\(coding)")
+    print("\(coding)")
   } else {
-    println("Not an NSCoding")
+    print("Not an NSCoding")
   }
 
   // CHECK-NEXT: NSXMLParserDelegate
   if let delegate = (genericConditionalCast(array) as NSXMLParserDelegate?) {
-    println("\(delegate)")
+    print("\(delegate)")
   } else {
-    println("Not an NSXMLParserDelegate")
+    print("Not an NSXMLParserDelegate")
   }
 
   // Conditional bridging (unrelated class)
   // CHECK-NEXT: Not an NSString
   if let nsString = (genericConditionalCast(array) as NSString?) {
-    println("\(nsString)")
+    print("\(nsString)")
   } else {
-    println("Not an NSString")
+    print("Not an NSString")
   }
 
-  println("Done")
+  print("Done")
 }
 // CHECK: Done
 testConditionalValueToObjectBridging()
 
 func testForcedObjectToValueBridging() {
   // CHECK: ---Forced object to value bridging---
-  println("---Forced object to value bridging---")
+  print("---Forced object to value bridging---")
 
   let nsArray: NSArray = ["Hello", "World"]
 
   // Forced bridging (exact)
   // CHECK: [Hello, World]
-  println(genericForcedCast(nsArray) as [String])
+  print(genericForcedCast(nsArray) as [String])
 
   // Forced bridging (superclass)
   // CHECK: [Hello, World]
   let nsObject: NSObject = nsArray
-  println(genericForcedCast(nsObject) as [String])
+  print(genericForcedCast(nsObject) as [String])
 
   // Forced bridging (AnyObject)
   // CHECK: [Hello, World]
   let anyObject: AnyObject = nsArray
-  println(genericForcedCast(anyObject) as [String])
+  print(genericForcedCast(anyObject) as [String])
 
   // Forced bridging (existential success)
   let nsCoding: NSCoding = nsArray
-  println(genericForcedCast(nsCoding) as [String])
+  print(genericForcedCast(nsCoding) as [String])
 
-  println("Done")
+  print("Done")
 }
 // CHECK: Done
 testForcedObjectToValueBridging()
 
 func testConditionalObjectToValueBridging() {
   // CHECK: ---Conditional object to value bridging---
-  println("---Conditional object to value bridging---")
+  print("---Conditional object to value bridging---")
 
   let nsArray: NSArray = ["Hello", "World"]
   let nsObject: NSObject = nsArray
@@ -165,60 +165,60 @@ func testConditionalObjectToValueBridging() {
   // Conditional bridging (exact)
   // CHECK: [Hello, World]
   if let arr = (genericConditionalCast(nsArray) as [String]?) {
-    println(arr)
+    print(arr)
   } else {
-    println("Not a [String]")
+    print("Not a [String]")
   }
 
   // Conditional bridging (superclass)
   // CHECK: [Hello, World]
   if let arr = (genericConditionalCast(nsObject) as [String]?) {
-    println(arr)
+    print(arr)
   } else {
-    println("Not a [String]")
+    print("Not a [String]")
   }
 
   // Conditional bridging (AnyObject)
   // CHECK: [Hello, World]
   if let arr = (genericConditionalCast(anyObject) as [String]?) {
-    println(arr)
+    print(arr)
   } else {
-    println("Not a [String]")
+    print("Not a [String]")
   }
 
   // Conditional bridging (existential success)
   // CHECK: [Hello, World]
   if let arr = (genericConditionalCast(nsCoding) as [String]?) {
-    println(arr)
+    print(arr)
   } else {
-    println("Not a [String]")
+    print("Not a [String]")
   }
 
   // Conditional bridging (existential failure)
   // Not a [Int]
   if let arr = (genericConditionalCast(nsCoding) as [Int]?) {
-    println(arr)
+    print(arr)
   } else {
-    println("Not a [String]")
+    print("Not a [String]")
   }
 
   // Conditional bridging (unrelated class type)
   // CHECK: Not a [String]
   if let arr = (genericConditionalCast(nsString) as [String]?) {
-    println(arr)
+    print(arr)
   } else {
-    println("Not a [String]")
+    print("Not a [String]")
   }
 
   // Conditional bridging (unrelated element type)
   // CHECK: Not a [Int]
   if let arr = (genericConditionalCast(nsArray) as [Int]?) {
-    println(arr)
+    print(arr)
   } else {
-    println("Not a [Int]")
+    print("Not a [Int]")
   }
 
-  println("Done")
+  print("Done")
 }
 // CHECK: Done
 testConditionalObjectToValueBridging()

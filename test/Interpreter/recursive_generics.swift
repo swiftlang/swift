@@ -20,10 +20,10 @@ let c = List(value: 2.0, next: b)
 b.value = 4.0
 a.value = 8.0
 
-println("begin")
-println(c.value)
-println(c.next!.value)
-println(c.next!.next!.value)
+print("begin")
+print(c.value)
+print(c.next!.value)
+print(c.next!.next!.value)
 // CHECK:      begin
 // CHECK-NEXT: 2.0
 // CHECK-NEXT: 4.0

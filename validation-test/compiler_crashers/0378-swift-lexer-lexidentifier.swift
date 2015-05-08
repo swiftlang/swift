@@ -6,7 +6,7 @@
 // Test case found by fuzzing
 
 if true {
-println(c: NSObject {
+print(c: NSObject {
 struct D : NSManagedObject {
 struct S {
 }

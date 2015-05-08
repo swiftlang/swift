@@ -9,7 +9,7 @@ class Interval {
   }
 
   func show() {
-    println("[\(lo), \(hi)]")
+    print("[\(lo), \(hi)]")
   }
   
   class func like(lo: Int, _ hi: Int) -> Interval {
@@ -23,7 +23,7 @@ class OpenInterval : Interval {
   }
 
   override func show() {
-    println("(\(lo), \(hi))")
+    print("(\(lo), \(hi))")
   }
 
   override class func like(lo:Int, _ hi:Int) -> Interval {
@@ -55,14 +55,14 @@ prefix func -(a: Interval) -> Interval {
 (-OpenInterval(-2,3)).show()
 
 // CHECK: false
-println(Interval(1,2) is OpenInterval)
+print(Interval(1,2) is OpenInterval)
 // CHECK: true
 var i12 : Interval = OpenInterval(1,2)
-println(i12 is OpenInterval)
+print(i12 is OpenInterval)
 
 class RDar16563763_A {}
 class RDar16563763_B : RDar16563763_A {}
-println("self is Type = \(RDar16563763_A.self is RDar16563763_B.Type)")
+print("self is Type = \(RDar16563763_A.self is RDar16563763_B.Type)")
 // CHECK: self is Type = false
 
 //
@@ -101,11 +101,11 @@ public func driver() {
   var d = SonOfCompilerCrasher()
   var e = ReturnOfCompilerCrasher()
   var r = testCrash(c)
-  println(r)
+  print(r)
   r = testCrash(d)
-  println(r)
+  print(r)
   r = testCrash(e)
-  println(r)
+  print(r)
 }
 driver()
 // CHECK: Optional("CompilerCrasher")

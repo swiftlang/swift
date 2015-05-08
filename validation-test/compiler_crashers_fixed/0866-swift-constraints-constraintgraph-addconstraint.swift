@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 if true {
-println() {
+print() {
 }
 func g<T.b : U : T] in
 self.b = c: P {

@@ -8,24 +8,24 @@ var maybe_one = w.next()
 var is_ = "is"
 var is_not = "is not"
 
-println("maybe_one \(maybe_one == nil ? is_ : is_not) None")
+print("maybe_one \(maybe_one == nil ? is_ : is_not) None")
 // CHECK: maybe_one is not None
 
 switch maybe_one {
 case .Some(var one):
-  println("one \(one == 1 ? is_ : is_not) 1")
+  print("one \(one == 1 ? is_ : is_not) 1")
   // CHECK: one is 1
 case .None:
   ()
 }
 
-println("w.next() \(w.next() == nil ? is_ : is_not) None")
+print("w.next() \(w.next() == nil ? is_ : is_not) None")
 // CHECK: w.next() is None
 
 // Test SequenceType protocol
 w = (1..<2).generate()
 for x in w { 
-  println("x is \(x)") 
+  print("x is \(x)") 
 }
 
 // Test round-trip GeneratorType/GeneratorType adaptation
@@ -34,7 +34,7 @@ var y = x
 var z = ZipGenerator2(y, (1..<7).generate())
 
 for a in GeneratorSequence(z) {
-  println("\(a.0), \(a.1)")
+  print("\(a.0), \(a.1)")
 }
 // CHECK:      1, 1
 // CHECK-NEXT: 2, 2
@@ -43,5 +43,5 @@ for a in GeneratorSequence(z) {
 // CHECK-NEXT: 5, 5
 // CHECK-NEXT: 6, 6
 
-println("done.")
+print("done.")
 // CHECK: done.

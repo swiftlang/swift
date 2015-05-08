@@ -17,7 +17,7 @@ struct C<D, E: A where D.C == EType, T where Optional<T> == S.Generator.Element>
     return nil
 }
 let xs : [Int?] = [nil, 4, nil]
-println(some(xs))
+print(some(xs))
 protocol a : a {
 }
 protocol a {

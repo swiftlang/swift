@@ -2,22 +2,22 @@
 
 func test()
 {
-    print("[")
+    print("[", appendNewline: false)
   for i in lazy(0..<10).reverse() {
-        print(i)
-        print(" ")
+        print(i, appendNewline: false)
+        print(" ", appendNewline: false)
     }
-    print("]\n")
+    print("]\n", appendNewline: false)
 }
 
 func testr()
 {
-    print("[")
+    print("[", appendNewline: false)
     for i in lazy(0..<10).reverse().reverse() {
-        print(i)
-        print(" ")
+        print(i, appendNewline: false)
+        print(" ", appendNewline: false)
     }
-    print("]\n")
+    print("]\n", appendNewline: false)
 }
 
 test()

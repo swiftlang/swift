@@ -22,4 +22,4 @@ func foo() -> UInt64 {
 }
 
 // CHECK: 1
-println(foo())
+print(foo())

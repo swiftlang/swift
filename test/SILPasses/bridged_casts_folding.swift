@@ -626,115 +626,115 @@ public func testCondCastSwiftToNSSetString() -> NSSet? {
 //// ObjC -> Swift
 
 // Arrays
-println("NS to Swift arrays: Start")
-println(testForcedCastNStoSwiftArrayInt())
-println(testCondCastNStoSwiftArrayInt())
+print("NS to Swift arrays: Start")
+print(testForcedCastNStoSwiftArrayInt())
+print(testCondCastNStoSwiftArrayInt())
 
-println(testForcedCastNStoSwiftArrayDouble())
-println(testCondCastNStoSwiftArrayDouble())
+print(testForcedCastNStoSwiftArrayDouble())
+print(testCondCastNStoSwiftArrayDouble())
 
-println(testForcedCastNStoSwiftArrayString())
-println(testCondCastNStoSwiftArrayString())
-println("NS to Swift arrays: End")
+print(testForcedCastNStoSwiftArrayString())
+print(testCondCastNStoSwiftArrayString())
+print("NS to Swift arrays: End")
 
 // Dicts
-println("NS to Swift dictionaries: Start")
-println(testForcedCastNStoSwiftDictInt())
-println(testCondCastNStoSwiftDictInt())
+print("NS to Swift dictionaries: Start")
+print(testForcedCastNStoSwiftDictInt())
+print(testCondCastNStoSwiftDictInt())
 
-println(testForcedCastNStoSwiftDictDouble())
-println(testCondCastNStoSwiftDictDouble())
+print(testForcedCastNStoSwiftDictDouble())
+print(testCondCastNStoSwiftDictDouble())
 
-println(testForcedCastNStoSwiftDictString())
-println(testCondCastNStoSwiftDictString())
-println(testCondCastNSDictStringtoSwiftDictInt())
+print(testForcedCastNStoSwiftDictString())
+print(testCondCastNStoSwiftDictString())
+print(testCondCastNSDictStringtoSwiftDictInt())
 // This line should crash at run-time
-//println(testForcedCastNSDictStringtoSwiftDictInt())
-println("NS to Swift dictionaries: End")
+//print(testForcedCastNSDictStringtoSwiftDictInt())
+print("NS to Swift dictionaries: End")
 
 // Sets
-println("NS to Swift sets: Start")
-println(testForcedCastNStoSwiftSetInt())
-println(testCondCastNStoSwiftSetInt())
+print("NS to Swift sets: Start")
+print(testForcedCastNStoSwiftSetInt())
+print(testCondCastNStoSwiftSetInt())
 
-println(testForcedCastNStoSwiftSetDouble())
-println(testCondCastNStoSwiftSetDouble())
+print(testForcedCastNStoSwiftSetDouble())
+print(testCondCastNStoSwiftSetDouble())
 
-println(testForcedCastNStoSwiftSetString())
-println(testCondCastNStoSwiftSetString())
-println("NS to Swift sets: End")
+print(testForcedCastNStoSwiftSetString())
+print(testCondCastNStoSwiftSetString())
+print("NS to Swift sets: End")
 
 
 // Basic types
 
-println("NS to Swift basic types: Start")
-println(testForcedCastNSNumberToSwiftInt())
-println(testCondCastNSNumberToSwiftInt())
+print("NS to Swift basic types: Start")
+print(testForcedCastNSNumberToSwiftInt())
+print(testCondCastNSNumberToSwiftInt())
 
-println(testForcedCastNSNumberToSwiftDouble())
-println(testCondCastNSNumberToSwiftDouble())
+print(testForcedCastNSNumberToSwiftDouble())
+print(testCondCastNSNumberToSwiftDouble())
 
-println(testForcedCastNSIntNumberToSwiftDouble())
-println(testCondCastNSIntNumberToSwiftDouble())
+print(testForcedCastNSIntNumberToSwiftDouble())
+print(testCondCastNSIntNumberToSwiftDouble())
 
-println(testForcedCastNStoSwiftString())
-println(testCondCastNStoSwiftString())
-println("NS to Swift basic types: End")
+print(testForcedCastNStoSwiftString())
+print(testCondCastNStoSwiftString())
+print("NS to Swift basic types: End")
 
 //// Swift -> ObjC
 
 // Basic types
 
-println("Swift to NS basic types: Start")
-println(testForcedCastSwiftIntToNSNumber())
-println(testCondCastSwiftIntToNSNumber())
+print("Swift to NS basic types: Start")
+print(testForcedCastSwiftIntToNSNumber())
+print(testCondCastSwiftIntToNSNumber())
 
-println(testForcedCastSwiftDoubleToNSNumber())
-println(testCondCastSwiftDoubleToNSNumber())
+print(testForcedCastSwiftDoubleToNSNumber())
+print(testCondCastSwiftDoubleToNSNumber())
 
-println(testForcedCastSwiftToNSString())
-println(testCondCastSwiftToNSString())
-println("Swift to NS basic types: End")
+print(testForcedCastSwiftToNSString())
+print(testCondCastSwiftToNSString())
+print("Swift to NS basic types: End")
 
 // Arrays
-println("Swift to NS arrays: Start")
+print("Swift to NS arrays: Start")
 
-println(testForcedCastSwiftToNSArrayInt())
-println(testCondCastSwiftToNSArrayInt())
+print(testForcedCastSwiftToNSArrayInt())
+print(testCondCastSwiftToNSArrayInt())
 
-println(testForcedCastSwiftToNSArrayDouble())
-println(testCondCastSwiftToNSArrayDouble())
+print(testForcedCastSwiftToNSArrayDouble())
+print(testCondCastSwiftToNSArrayDouble())
 
-println(testForcedCastSwiftToNSArrayString())
-println(testCondCastSwiftToNSArrayString())
+print(testForcedCastSwiftToNSArrayString())
+print(testCondCastSwiftToNSArrayString())
 
-println("Swift to NS arrays: End")
+print("Swift to NS arrays: End")
 
 
 // Dicts
-println("Swift to NS dictionaries: Start")
+print("Swift to NS dictionaries: Start")
 
-println(testForcedCastSwiftToNSDictInt())
-println(testCondCastSwiftToNSDictInt())
+print(testForcedCastSwiftToNSDictInt())
+print(testCondCastSwiftToNSDictInt())
 
-println(testForcedCastSwiftToNSDictDouble())
-println(testCondCastSwiftToNSDictDouble())
+print(testForcedCastSwiftToNSDictDouble())
+print(testCondCastSwiftToNSDictDouble())
 
-println(testForcedCastSwiftToNSDictString())
-println(testCondCastSwiftToNSDictString())
+print(testForcedCastSwiftToNSDictString())
+print(testCondCastSwiftToNSDictString())
 
-println("Swift to NS dictionariess: End")
+print("Swift to NS dictionariess: End")
 
 // Sets
-println("Swift to NS sets: Start")
+print("Swift to NS sets: Start")
 
-println(testForcedCastSwiftToNSSetInt())
-println(testCondCastSwiftToNSSetInt())
+print(testForcedCastSwiftToNSSetInt())
+print(testCondCastSwiftToNSSetInt())
 
-println(testForcedCastSwiftToNSSetDouble())
-println(testCondCastSwiftToNSSetDouble())
+print(testForcedCastSwiftToNSSetDouble())
+print(testCondCastSwiftToNSSetDouble())
 
-println(testForcedCastSwiftToNSSetString())
-println(testCondCastSwiftToNSSetString())
+print(testForcedCastSwiftToNSSetString())
+print(testCondCastSwiftToNSSetString())
 
-println("Swift to NS sets: End")
+print("Swift to NS sets: End")

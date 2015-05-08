@@ -68,7 +68,7 @@ struct MrMcRange : CollectionType {
   }
   
   var startIndex: Int {
-    println("using collection API")
+    print("using collection API")
     return base.startIndex
   }
   
@@ -124,20 +124,20 @@ struct MrMcArray<T> : CollectionType, __ArrayType {
 }
 
 func printSequence<T : SequenceType>(x: T) {
-  print("<")
+  print("<", appendNewline: false)
   var prefix = ""
   for a in x {
-    print(prefix)
-    print(a)
+    print(prefix, appendNewline: false)
+    print(a, appendNewline: false)
     prefix = " "
   }
-  println(">")
+  print(">")
 }
 
 
 
 // CHECK: testing...
-println("testing...")
+print("testing...")
 
 func test() {
   //===--- Sequences can be converted -------------------------------------===//
@@ -161,12 +161,12 @@ func test() {
   let n2 = a0~>cp
 
   // CHECK-NEXT: true
-  println(n1.identity == n2.identity)
+  print(n1.identity == n2.identity)
 }
 test()
 
 // CHECK-NEXT: trackedCount = 0
-println("trackedCount = \(trackedCount)")
+print("trackedCount = \(trackedCount)")
 
 // CHECK-NEXT: done.
-println("done.")
+print("done.")

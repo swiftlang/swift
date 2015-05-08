@@ -6,10 +6,10 @@ func test() {
   var d1_alias = d1
 //  Dictionary is no longer a class type
 //  if d1 !== d2 {
-    println("good")
+    print("good")
 //  }
 //  if d1 === d1_alias {
-    println("also good")
+    print("also good")
 //  }
 }
 

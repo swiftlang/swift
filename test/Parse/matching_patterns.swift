@@ -33,7 +33,7 @@ case let a:
 case var var a: // expected-error {{'var' cannot appear nested inside another 'var' or 'let' pattern}}
   a += 1
 case var let a: // expected-error {{'let' cannot appear nested inside another 'var' or 'let' pattern}}
-  print(a)
+  print(a, appendNewline: false)
 case var (var b): // expected-error {{'var' cannot appear nested inside another 'var'}}
   b += 1
 

@@ -209,10 +209,10 @@ extension SomeClass {
 var closureWithObservedProperty: () -> () = {
   var a: Int = 42 {
   willSet {
-    println("Will set a to \(newValue)")
+    let message = "Will set a to \(newValue)"
   }
   didSet {
-    println("Did set a with old value of \(oldValue)")
+    let message = "Did set a with old value of \(oldValue)"
   }
   }
 }

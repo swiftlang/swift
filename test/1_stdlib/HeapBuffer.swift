@@ -2,7 +2,7 @@
 
 import Swift
 
-println("testing...")
+print("testing...")
 // CHECK: testing...
 
 struct Bundle {
@@ -22,41 +22,41 @@ for x in 0..<10 {
   (a.baseAddress + x).initialize(x)
 }
 
-println("buffer has storage: \(a.storage != nil)")
+print("buffer has storage: \(a.storage != nil)")
 // CHECK-NEXT: buffer has storage: true
 
 func testUnique() {
-  println("buffer is unique: \(a.isUniquelyReferenced())")
+  print("buffer is unique: \(a.isUniquelyReferenced())")
   // CHECK-NEXT: buffer is unique: true
   
   var addRef = [ a ]
-  println("copied buffer is unique: \(a.isUniquelyReferenced())")
+  print("copied buffer is unique: \(a.isUniquelyReferenced())")
   // CHECK-NEXT: copied buffer is unique: false
 }
 testUnique()
 
-println("a == a: \(a == a)")
+print("a == a: \(a == a)")
 // CHECK-NEXT: a == a: true
 
 let other = _HeapBuffer<Bundle,Int>(
   _HeapBufferStorage<Bundle,Int>.self, Bundle(), 0)
-println("a == other: \(a == other)")
+print("a == other: \(a == other)")
 // CHECK-NEXT: a == other: false
 
-println("name=\(a.value.name)")
+print("name=\(a.value.name)")
 // CHECK-NEXT: name=DaveA
 
-println("length=\(a.value.locations.count)")
+print("length=\(a.value.locations.count)")
 // CHECK-NEXT: length=2
 
-println("locations[0]=\(a.value.locations[0])")
+print("locations[0]=\(a.value.locations[0])")
 // CHECK-NEXT: locations[0]=Princeton
 
-println("locations[1]=\(a.value.locations[1])")
+print("locations[1]=\(a.value.locations[1])")
 // CHECK-NEXT: locations[1]=San Jose
 
 for x in 0..<10 {
-  print(a.baseAddress[x])
+  print(a.baseAddress[x], appendNewline: false)
 }
-println("")
+print("")
 // CHECK-NEXT: 0123456789

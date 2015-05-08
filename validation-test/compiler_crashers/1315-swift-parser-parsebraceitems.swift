@@ -39,7 +39,7 @@ typealias h, ()
 struct c {
 }
 map(true }
-println())-> String {
+print())-> String {
 b(b(() -> V {
 }
 func a
@@ -57,7 +57,7 @@ return [1):
 }
 }
 convenience init() {
-println() {
+print() {
 let a {
 }
 let a {

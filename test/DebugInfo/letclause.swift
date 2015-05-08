@@ -10,6 +10,6 @@ func foo() {
 // CHECK: ![[S]] = !DILocalVariable(tag: DW_TAG_auto_variable, name: "s"
 // CHECK-SAME:                      line: [[@LINE+1]],
   while let s = peek() {
-    print(s)
+    print(s, appendNewline: false)
   }
 }

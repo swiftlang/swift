@@ -8,7 +8,7 @@
 // <rdar://problem/17569958> #endif not parsed correctly when occurs as last line in file
 #if DEBUG
 func debug(msg: String) {
-    println(msg)
+    print(msg)
 }
 #else
 func debug(msg: String) {

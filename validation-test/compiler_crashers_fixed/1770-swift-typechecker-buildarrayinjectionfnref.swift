@@ -6,7 +6,7 @@
 
 func b<d: NSObject {
 struct A.<h == {
-println(t: A {
+print(t: A {
 enum a<e? {
 }
 }

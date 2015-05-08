@@ -120,11 +120,9 @@ func lookUpManyTopLevelNames() {
   // CHECK-DAG: !private "StringLiteralType"
   // NEGATIVE-NOT: "CInt"
   let CInt = "abc"
-  // CHECK-DAG: !private "println"
-  println(CInt)
 
   // NEGATIVE-NOT: "max"
-  println(Int.max)
+  print(Int.max)
 
   // NEGATIVE-NOT: "Stride"
   let _: Int.Stride = 0
@@ -206,11 +204,11 @@ struct Use4 : TopLevelProto1 {
 }
 
 // CHECK-DAG: - "*"
-print(42 * 30)
+print(42 * 30, appendNewline: false)
 
 // FIXME: Incorrectly marked non-private dependencies
 // CHECK-DAG: - "topLevel6"
-print(topLevel6())
+print(topLevel6(), appendNewline: false)
 // CHECK-DAG: - "topLevel7"
 private var use7 = topLevel7()
 // CHECK-DAG: - "topLevel8"

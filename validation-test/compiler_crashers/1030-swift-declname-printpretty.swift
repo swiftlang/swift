@@ -53,7 +53,7 @@ typealias A = {
 private class A {
 }
 f.f = nil
-println(t: A, (b[c> ((x: Array) -> e?) -> : c: d {
+print(t: A, (b[c> ((x: Array) -> e?) -> : c: d {
 func i(n: T) {
 func i> (T>)()
 }
@@ -64,7 +64,7 @@ public subscript (""""")
 }
 protocol P {
 class func c) -> : () {
-println()
+print()
 return self.c> {
 protocol c {
 typealias d : T, let c], T : T

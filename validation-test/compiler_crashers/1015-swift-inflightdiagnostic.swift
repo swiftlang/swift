@@ -34,7 +34,7 @@ typealias F = c] {
 }
 class B : d = {
 class A? {
-println() -> {
+print() -> {
 func f<T> Int = [self[T : d {
 }
 class A {

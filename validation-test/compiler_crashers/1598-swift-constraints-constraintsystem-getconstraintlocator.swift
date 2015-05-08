@@ -5,7 +5,7 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-println(b: Bool) {
+print(b: Bool) {
 }
 protocol c : C {
 protocol b = d>(T, (a<T> == A, f(b() {

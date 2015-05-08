@@ -18,13 +18,13 @@ func main () -> Void
             if rhs == random_string
             || rhs.unicodeScalars.count() == random_int {
                 var local_var : Int = 10
-                print ("I have an int here \(local_var).\n")
+                print("I have an int here \(local_var).\n", appendNewline: false)
                 return false
             }
             else
             {
                 var local_var : String = "g"
-                print ("I have another string here \(local_var).\n")
+                print("I have another string here \(local_var).\n", appendNewline: false)
                 return rhs < lhs
             }
         }
@@ -35,8 +35,8 @@ func main () -> Void
 
     var new_string = sorted (my_string, backward_ptr )
 
-    print (new_string)
-    print ("\n")
+    print(new_string, appendNewline: false)
+    print("\n", appendNewline: false)
 }
 
 main()

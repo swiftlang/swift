@@ -69,7 +69,7 @@ var e: A.d.Type) {
 class C) -> {
 }
 protocol P {
-println(object2: T
+print(object2: T
 }
 }
 class C
@@ -101,7 +101,7 @@ import Foundation
 struct D : Int -> T>())
 import Foundation
 let c(AnyObject, b = .init()
-println(t: A {
+print(t: A {
 f = b: U.E == {
 if true {
 }
@@ -164,7 +164,7 @@ let v: P {
 class func a(self)
 let d<T>) {
 }
-println(c: B? = B<c> Self {
+print(c: B? = B<c> Self {
 let c = {
 }
 self.R

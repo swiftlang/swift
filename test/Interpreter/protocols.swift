@@ -23,12 +23,12 @@ struct Crow : RollCallable, Snarker {
 }
 
 func printRollCall(x: RollCallable) {
-  println(x.rollCall())
+  print(x.rollCall())
 }
 
 func printRollCallWithSnark(x: protocol<RollCallable, Snarker>) {
   printRollCall(x)
-  println("(\(x.snark()))")
+  print("(\(x.snark()))")
 }
 
 // CHECK: Cambot!

@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 var d {
-println(n: AnyObject) -> String {
+print(n: AnyObject) -> String {
 }
 func f<C<I : d = b: e {
 return $0) -> : B<T) {

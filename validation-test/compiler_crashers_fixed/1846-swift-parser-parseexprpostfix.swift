@@ -8,4 +8,4 @@ class A<U -> String {
 var b {
 struct c where H.Generator.B = g<h : a {
 typealias d where f(T>) -> {
-println(c() -> T
+print(c() -> T

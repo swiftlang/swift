@@ -43,17 +43,17 @@ class Packet {
   }
 
   func dump() {
-    println("PACKET")
+    print("PACKET")
     if link {
-      println("link \(link!.id)")
+      print("link \(link!.id)")
     }
-    println("id \(id)")
-    println("a1 \(a1)")
+    print("id \(id)")
+    print("a1 \(a1)")
     print("a2 ")
     for a in a2 {
       print("\(a) ")
     }
-    println()
+    print()
   }
 }
 
@@ -220,7 +220,7 @@ struct Richards {
 
   mutating func trace(a: UnicodeScalar) {
     if --layout <= 0 {
-      println()
+      print()
       layout = 50;
     }
     print("\(a)");
@@ -289,8 +289,8 @@ struct Richards {
       t = tasktab[id]
     }
     if !t {
-      println()
-      println("Bad task id \(id)")
+      print()
+      print("Bad task id \(id)")
     }
     return t
   }
@@ -446,7 +446,7 @@ struct Richards {
     let Qpktcountval = 2326410
     let Holdcountval = 930563
 
-    println("Bench mark starting")
+    print("Bench mark starting")
     var wkq: Packet? = .None
     createTask(TIIdle, pri:0, wkq:wkq, state:Task.State.Bits(TSRun), fn:idlefn,
       v1:Task.Val1.TaskID(1), v2:Task.Val2.Count(Count))
@@ -480,25 +480,25 @@ struct Richards {
 
     tcb = tasklist
 
-    println("Starting")
+    print("Starting")
 
     schedule()
 
-    println("Finished")
+    print("Finished")
 
-    println("qpkt count = \(qpktcount) holdcount = \(holdcount)")
+    print("qpkt count = \(qpktcount) holdcount = \(holdcount)")
 
-    println("These results are ")
+    print("These results are ")
     var retval:Int
     if qpktcount == Qpktcountval && holdcount == Holdcountval {
-      println("correct")
+      print("correct")
       retval = 0
     }
     else {
-      println("incorrect")
+      print("incorrect")
       retval = 1
     }
-    println("end of run")
+    print("end of run")
     return retval
   }
 

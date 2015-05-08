@@ -24,7 +24,7 @@ typealias R = [unowned self)
 class A {
 let c> Int = B<H : Int {
 }
-println(b()
+print(b()
 self.init(f: c()
 typealias E
 import Foundation
@@ -72,7 +72,7 @@ return d.e = f: T where T>(f: d = {
 class func b
 private class C<c() {
 return true
-println()("
+print()("
 }
 let g = {
 }

@@ -21,5 +21,5 @@ func greet(name: String, _ day: String) -> String {
   return "Hello \(name), today is \(day)."
 }
 
-println("Hello World")
-println(greet("Bob", "Tuesday"))
+print("Hello World")
+print(greet("Bob", "Tuesday"))

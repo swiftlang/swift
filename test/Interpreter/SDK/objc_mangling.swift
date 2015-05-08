@@ -9,11 +9,11 @@ import Foundation
 /* FIXME: SwiftObject doesn't support -description
 class Foo { }
 var anyFoo: AnyObject = Foo()
-println(anyFoo.description())
+print(anyFoo.description())
 
 @objc class Bar { }
 var anyBar: AnyObject = Bar()
-println(anyBar.description())
+print(anyBar.description())
 */
 
 func checkClassName(cls: AnyClass, _ name: String, _ mangled: String)
@@ -55,7 +55,7 @@ checkClassName(Wibble.self, "MangleTest.Wibble", "_TtC10MangleTest6Wibble")
 
 // Check whether the class name comes out properly in the instance description
 var anyWibble: AnyObject = Wibble()
-println(anyWibble.description)
+print(anyWibble.description)
 // CHECK: MangleTest.Wibble
 
 

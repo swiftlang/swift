@@ -34,7 +34,7 @@ import Foundation
 }
 }
 extension NSSet {
-println())
+print())
 protocol b {
 }
 }

@@ -8,6 +8,6 @@
 class C<T where B : NSObject {
 }
 func f(A? {
-println(s: Array) -> : CollectionType where g(c : ("
+print(s: Array) -> : CollectionType where g(c : ("
 protocol A {
 protocol d : C

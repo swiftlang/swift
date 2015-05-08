@@ -68,14 +68,14 @@ func < (x: X, y: X) -> Bool {
 //===----------------------------------------------------------------------===//
 
 func printSequence<T : SequenceType>(x: T) {
-  print("[")
+  print("[", appendNewline: false)
   var prefix = ""
   for a in x {
-    print(prefix)
-    print(a)
+    print(prefix, appendNewline: false)
+    print(a, appendNewline: false)
     prefix = ", "
   }
-  println("]")
+  print("]")
 }
 
 typealias BufferID = UnsafePointer<Void>
@@ -90,7 +90,7 @@ func checkReallocation<T : _ArrayType>(
   let currentBuffer = bufferID(x)
   if (currentBuffer != lastBuffer) != reallocationExpected {
     let message = reallocationExpected ? "lack of" : ""
-    println("unexpected \(message) reallocation")
+    print("unexpected \(message) reallocation")
   }
   return currentBuffer
 }
@@ -103,7 +103,7 @@ func checkEqual<
 >(a1: S1, _ a2: S2, _ expected: Bool) {
   if a1.elementsEqual(a2) != expected {
     let un = expected ? "un" : ""
-    println("unexpectedly \(un)equal sequences!")
+    print("unexpectedly \(un)equal sequences!")
   }
 }
 
@@ -114,7 +114,7 @@ where T.Generator.Element == T._Buffer.Element,
           T.Element == X,
           T.Index == Int
 >(_: T.Type, _ label: String) {
-  print("test: \(label)...")
+  print("test: \(label)...", appendNewline: false)
 
   var x: T = [1, 2, 3, 4, 5]
   
@@ -158,7 +158,7 @@ where T.Generator.Element == T._Buffer.Element,
     }
     
     if reallocations > 3 {
-      println(
+      print(
         "Unexpectedly found \(reallocations) reallocations "
         + "of \(label) when growing via \(growthDescription)")
     }
@@ -166,10 +166,10 @@ where T.Generator.Element == T._Buffer.Element,
 
   checkReallocations(x, "append") { (inout x: T)->() in x.append(42) }
   checkReallocations(x, "+=") { (inout x: T)->() in x.append(42) }
-  println("done.")
+  print("done.")
 }
 
-println("testing...")
+print("testing...")
 // CHECK: testing...
 
 test(ContiguousArray<X>.self, "ContiguousArray")
@@ -185,34 +185,34 @@ test(ArraySlice<X>.self, "ArraySlice")
 // CHECK-NEXT: test: ArraySlice...done
 
 func testAsArray() {
-  println("== AsArray ==")
+  print("== AsArray ==")
   var w: ContiguousArray<X> = [4, 2, 1]
   // CHECK: == AsArray == 
   
   let x = ContiguousArray(w)
-  println(bufferID(w) == bufferID(x))
+  print(bufferID(w) == bufferID(x))
   // CHECK-NEXT: true
   
   let y = Array(x)
-  println(bufferID(x) == bufferID(y))
+  print(bufferID(x) == bufferID(y))
   // CHECK-NEXT: true
 
   // Because of their indirection, arrays of classes can share
   // buffers.  
   let y1 = Array(y)
-  println(bufferID(y1) == bufferID(y))
+  print(bufferID(y1) == bufferID(y))
   // CHECK-NEXT: true
   
   let z = ArraySlice(y)
-  println(bufferID(y) == bufferID(z))
+  print(bufferID(y) == bufferID(z))
   // CHECK-NEXT: true
 
   w = ContiguousArray(z)
-  println(bufferID(w) == bufferID(z))
+  print(bufferID(w) == bufferID(z))
   // CHECK-NEXT: true
 
   let zz = y[0..<2]
-  println(bufferID(zz))
+  print(bufferID(zz))
   // CHECK-NEXT: 0x
 }
 testAsArray()
@@ -229,7 +229,7 @@ func nsArrayOfStrings() -> Array<NSString> {
 }
 
 func testCocoa() {
-  println("== Cocoa ==")
+  print("== Cocoa ==")
   // CHECK: == Cocoa ==
 
   var a = nsArrayOfStrings()
@@ -264,13 +264,13 @@ func testCocoa() {
   printSequence(a)
   // CHECK-NEXT: [foo, bar, baz]
   
-  println(a.capacity >= 30)
+  print(a.capacity >= 30)
   // CHECK-NEXT: true
 
   // Prove that we create contiguous storage for an opaque NSArray
   a.withUnsafeBufferPointer {
     (p)->() in
-    println(p[0])
+    print(p[0])
     // CHECK-NEXT: foo
   }
 }
@@ -283,7 +283,7 @@ extension ArraySlice {
 }
 
 func testSlice() {
-  println("== ArraySlice ==")
+  print("== ArraySlice ==")
   // CHECK: == ArraySlice ==
   
   // do some tests on the shared semantics
@@ -291,21 +291,21 @@ func testSlice() {
 
   // ArraySlice it
   var bSlice = b[3..<5]
-  println("<\(bSlice.count)>")
+  print("<\(bSlice.count)>")
   // CHECK-NEXT: <2>
-  println("bSlice0: \(bSlice)")           // CHECK-NEXT: bSlice0: [3, 4]
+  print("bSlice0: \(bSlice)")           // CHECK-NEXT: bSlice0: [3, 4]
 
   // bSlice += X(11)..<X(13)
 
   // Writing into b does not change bSlice
   b[4] = 41        
-  println("bSlice1: \(bSlice)")           // CHECK-NEXT: bSlice1: [3, 4]
+  print("bSlice1: \(bSlice)")           // CHECK-NEXT: bSlice1: [3, 4]
 
   // Writing into bSlice does not change b
   bSlice[1] = 42
 
   
-  println("bSlice2: \(bSlice)")           // CHECK-NEXT: bSlice2: [3, 42]
+  print("bSlice2: \(bSlice)")           // CHECK-NEXT: bSlice2: [3, 42]
   printSequence(b)                // CHECK-NEXT: [0, 1, 2, 3, 41, 5, 6]
 
   var c = b
@@ -331,7 +331,11 @@ func testSlice() {
 
   // Appending to aSlice works...
   aSlice.append("fodder")
+<<<<<<< HEAD
   println("<\(aSlice.count)>")    // CHECK-NEXT: <3>
+=======
+  print("<\(aSlice.count())>")    // CHECK-NEXT: <3>
+>>>>>>> stdlib: implement new print() API
   printSequence(aSlice)           // CHECK-NEXT: [buzz, baz, fodder]
 
   // And doesn't change a
@@ -370,12 +374,17 @@ func testReplace${A}(
   testReplace({ r })
   
   // This test should ensure r's retain isn't dropped before we start testing.
+<<<<<<< HEAD
   if (r.count != testWidth) {
     println("something bad happened!")
+=======
+  if (r.count() != testWidth) {
+    print("something bad happened!")
+>>>>>>> stdlib: implement new print() API
   }
 }
 
-println("testing subrange replacement in ${A}")
+print("testing subrange replacement in ${A}")
 testReplace${A}()
 %end
 
@@ -383,7 +392,7 @@ testReplace${A}()
 // case is interesting because when the buffer is uniquely referenced
 // we can expect to expand the slice in-place
 for (maxValue, label) in [(testWidth, "trailing"), (testWidth*2, "interior")] {
-  println("testing subrange replacement in \(label) Sub-ArraySlice")
+  print("testing subrange replacement in \(label) Sub-ArraySlice")
   testReplaceArraySlice {
     var a = ContiguousArray(X(-testWidth)..<X(maxValue))
     a.reserveCapacity(a.count * 3 / 2)
@@ -434,17 +443,17 @@ testInoutViolation()
 %for A in arrayTypes:
 
 func testSingleElementModifiers${A}() {
-  println("testing ${A} single-argument modifiers")
+  print("testing ${A} single-argument modifiers")
   // CHECK-NEXT: testing ${A} single-argument modifiers
   
   var a = ${A}(X(0)..<10)
-  println(a.removeLast().value)     // CHECK-NEXT: 9
+  print(a.removeLast().value)     // CHECK-NEXT: 9
   printSequence(a)               // CHECK-NEXT: [0, 1, 2, 3, 4, 5, 6, 7, 8]
   
   a.insert(42, atIndex: 4)
   printSequence(a)               // CHECK-NEXT: [0, 1, 2, 3, 42, 4, 5, 6, 7, 8]
   
-  println(a.removeAtIndex(2).value) // CHECK-NEXT: 2
+  print(a.removeAtIndex(2).value) // CHECK-NEXT: 2
   printSequence(a)                  // CHECK-NEXT: [0, 1, 3, 42, 4, 5, 6, 7, 8]
 }
 testSingleElementModifiers${A}()
@@ -455,26 +464,26 @@ testSingleElementModifiers${A}()
 %for A in arrayTypes:
 
 func testIsEmptyFirstLast${A}() {
-  println("testing ${A} isEmpty, first, and last")
+  print("testing ${A} isEmpty, first, and last")
   // CHECK-NEXT: testing ${A} isEmpty, first, and last
 
-  println(${A}<Int>().isEmpty)          // CHECK-NEXT: true
-  println(${A}(42...42).isEmpty)   // CHECK-NEXT: false
+  print(${A}<Int>().isEmpty)          // CHECK-NEXT: true
+  print(${A}(42...42).isEmpty)   // CHECK-NEXT: false
 
-  println("<\(${A}(3...42).first!)>")  // CHECK-NEXT: <3>
-  println("<\(${A}(3...42).last!)>")   // CHECK-NEXT: <42>
+  print("<\(${A}(3...42).first!)>")  // CHECK-NEXT: <3>
+  print("<\(${A}(3...42).last!)>")   // CHECK-NEXT: <42>
 
-  println("<\(${A}<Int>().first)>")    // CHECK-NEXT: nil
-  println("<\(${A}<Int>().last)>")     // CHECK-NEXT: nil
+  print("<\(${A}<Int>().first)>")    // CHECK-NEXT: nil
+  print("<\(${A}<Int>().last)>")     // CHECK-NEXT: nil
   
   var a = ${A}(X(0)..<10)
-  println(a.removeLast().value)     // CHECK-NEXT: 9
+  print(a.removeLast().value)     // CHECK-NEXT: 9
   printSequence(a)               // CHECK-NEXT: [0, 1, 2, 3, 4, 5, 6, 7, 8]
   
   a.insert(42, atIndex: 4)
   printSequence(a)               // CHECK-NEXT: [0, 1, 2, 3, 42, 4, 5, 6, 7, 8]
   
-  println(a.removeAtIndex(2).value) // CHECK-NEXT: 2
+  print(a.removeAtIndex(2).value) // CHECK-NEXT: 2
   printSequence(a)                  // CHECK-NEXT: [0, 1, 3, 42, 4, 5, 6, 7, 8]
 }
 testIsEmptyFirstLast${A}()
@@ -485,7 +494,7 @@ func rdar16958865() {
   var a: [Int] = []
   a += AnySequence([ 42, 4242 ])
   // CHECK-NEXT: [42, 4242]
-  println(a)
+  print(a)
 }
 rdar16958865()
 
@@ -496,18 +505,18 @@ class Rdar16914909 : NSObject {
   
   func doColorStuff() {
     basicColorSet.append(SKColor.lightGrayColor())
-    println("appended")
+    print("appended")
   }
 }
 
 Rdar16914909().doColorStuff()
 // CHECK-NEXT: appended
 
-println("leaks = \(xCount)")
+print("leaks = \(xCount)")
 // CHECK-NEXT: leaks = 0
 
 // CHECK-NEXT: all done.
-println("all done.")
+print("all done.")
 
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)

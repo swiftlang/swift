@@ -15,7 +15,7 @@ var f = b: Array<U : c
 }
 private let t: T: Int = {
 protocol C {
-println() {
+print() {
 }
 }
 }

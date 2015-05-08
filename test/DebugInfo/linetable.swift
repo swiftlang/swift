@@ -35,7 +35,7 @@ func main(x: Int) -> Void
 // CHECK: @_TTSf2d_i_n___TFF9linetable4mainFSiT_U_FT_T_
         {
             var result = my_class.do_something(x)
-            print ("Here is something you might consider doing: \(result).\n")
+            print("Here is something you might consider doing: \(result).\n", appendNewline: false)
 // CHECK: call {{.*}} @swift_release {{.*}}
 // CHECK: call {{.*}} @swift_release {{.*}}, !dbg ![[CLOSURE_END:.*]]
 // CHECK-NEXT: ret void, !dbg ![[CLOSURE_END]]
@@ -46,7 +46,7 @@ func main(x: Int) -> Void
 // ASM-CHECK: .loc	[[FILEID]] [[@LINE+1]] 5
     call_me (
         {
-            print ("Here is something you might consider doing: \(x).\n")
+            print("Here is something you might consider doing: \(x).\n", appendNewline: false)
         }
     )
 

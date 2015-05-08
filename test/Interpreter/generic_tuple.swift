@@ -11,4 +11,4 @@ func drop<T>(x: T) {}
 
 var x = ()
 drop(dup(x))
-println("ok") // CHECK: ok
+print("ok") // CHECK: ok

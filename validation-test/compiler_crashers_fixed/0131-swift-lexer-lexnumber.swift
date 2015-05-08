@@ -126,5 +126,5 @@ func some<S: SequenceType, T where Optional<T> == S.Generator.Element>(xs : S) -
     return nil
 }
 let xs : [Int?] = [nil, 4, nil]
-println(some(xs))
+print(some(xs))
 a=1 as a=1

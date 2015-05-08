@@ -10,7 +10,7 @@ d<c>]() -> {
 }
 }
 typealias h: B<T>(e)
-println(#object2: $0) -> {
+print(#object2: $0) -> {
 }
 }
 func g<f : $0) {

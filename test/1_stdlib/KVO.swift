@@ -33,7 +33,7 @@ class Target : NSString {
   }
 
   func print() { 
-    println("swiftValue \(self.swiftValue.value), objcValue \(objcValue)")
+    Swift.print("swiftValue \(self.swiftValue.value), objcValue \(objcValue)")
   }
 }
 
@@ -60,14 +60,14 @@ class Observer : NSObject {
 
 var t = Target()
 var o = Observer()
-println("unobserved")
+print("unobserved")
 // CHECK: unobserved
 t.objcValue = "one"
 t.objcValue = "two"
-println("registering observer")
+print("registering observer")
 // CHECK-NEXT: registering observer
 o.observeTarget(t)
-println("Now witness the firepower of this fully armed and operational panopticon!")
+print("Now witness the firepower of this fully armed and operational panopticon!")
 // CHECK-NEXT: panopticon
 t.objcValue = "three"
 // CHECK-NEXT: swiftValue 42, objcValue three
@@ -111,16 +111,16 @@ class ObserverKVO : NSObject {
 
 var t2 = Target()
 var o2 = ObserverKVO()
-println("unobserved 2")
+print("unobserved 2")
 t2.objcValue = "one"
 t2.objcValue = "two"
-println("registering observer 2")
+print("registering observer 2")
 o2.observeTarget(t2)
-println("Now witness the firepower of this fully armed and operational panopticon!")
+print("Now witness the firepower of this fully armed and operational panopticon!")
 t2.objcValue = "three"
 t2.objcValue = "four"
 o2.removeTarget()
-println("target removed")
+print("target removed")
 
 // CHECK: registering observer 2
 // CHECK-NEXT: Now witness the firepower of this fully armed and operational panopticon!

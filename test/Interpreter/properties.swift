@@ -2,32 +2,32 @@
 
 var foo: Int {
   get {
-    println("foo gotten")
+    print("foo gotten")
     return 219
   }
   set {
-    println("foo set")
+    print("foo set")
   }
 }
 
 struct Bar {
   var bar: Int {
     get {
-      println("bar gotten")
+      print("bar gotten")
       return 20721
     }
     set {
-      println("bar set")
+      print("bar set")
     }
   }
 
   static var staticBar: Int {
     get {
-      println("staticBar gotten")
+      print("staticBar gotten")
       return 97210
     }
     set {
-      println("staticBar set")
+      print("staticBar set")
     }
   }
 
@@ -37,10 +37,10 @@ struct Bar {
 struct WillSetDidSetStruct {
   var x : Int {
     didSet {
-      println("got \(x)")
+      print("got \(x)")
     }
     willSet {
-      println("from \(x) to \(newValue)")
+      print("from \(x) to \(newValue)")
     }
   }
   init() {
@@ -51,10 +51,10 @@ struct WillSetDidSetStruct {
 struct WillSetDidSetClass {
   var x : Int {
     didSet {
-      println("got \(x)")
+      print("got \(x)")
     }
     willSet {
-      println("from \(x) to \(newValue)")
+      print("from \(x) to \(newValue)")
     }
   }
   init() {
@@ -70,7 +70,7 @@ class DynamicPropertiesBase {
       return "base"
     }
     set {
-      println("set y to \(newValue)")
+      print("set y to \(newValue)")
     }
   }
 }
@@ -82,10 +82,10 @@ class DynamicPropertiesObserved : DynamicPropertiesBase {
 
   override var y : String {
     willSet {
-      println("willSet Y from \(y) to \(newValue)!")
+      print("willSet Y from \(y) to \(newValue)!")
     }
     didSet {
-      println("didSet Y from \(oldValue) to \(y)!")
+      print("didSet Y from \(oldValue) to \(y)!")
     }
   }
 }
@@ -96,33 +96,33 @@ func test() {
   var b = Bar()
   // CHECK: foo gotten
   // CHECK: 219
-  println(foo)
+  print(foo)
   // CHECK: foo set
   foo = 1
 
   // CHECK: bar gotten
   // CHECK: 20721
-  println(b.bar)
+  print(b.bar)
   // CHECK: bar set
   b.bar = 2
 
   // CHECK: staticBar gotten
   // CHECK: 97210
-  println(Bar.staticBar)
+  print(Bar.staticBar)
   // CHECK: staticBar set
   Bar.staticBar = 3
 
   // CHECK: 123456
-  println(Bar.staticStoredBar)
+  print(Bar.staticStoredBar)
   Bar.staticStoredBar = 654321
   // CHECK: 654321
-  println(Bar.staticStoredBar)
+  print(Bar.staticStoredBar)
   
   
   var ds = WillSetDidSetStruct()
-  println("start is \(ds.x)")
+  print("start is \(ds.x)")
   ds.x = 42
-  println("now is \(ds.x)")
+  print("now is \(ds.x)")
   
   // CHECK: start is 0
   // CHECK: from 0 to 42
@@ -130,9 +130,9 @@ func test() {
   // CHECK: now is 42
 
   var dsc = WillSetDidSetClass()
-  println("start is \(dsc.x)")
+  print("start is \(dsc.x)")
   dsc.x = 42
-  println("now is \(dsc.x)")
+  print("now is \(dsc.x)")
   
   // CHECK: start is 0
   // CHECK: from 0 to 42
@@ -142,13 +142,13 @@ func test() {
 
   // Properties should be dynamically dispatched.
   var dpd = DynamicPropertiesDerived()
-  println("dpd.x is \(dpd.x)")  // CHECK: dpd.x is derived
+  print("dpd.x is \(dpd.x)")  // CHECK: dpd.x is derived
   
   var dpb : DynamicPropertiesBase = dpd
-  println("dpb.x is \(dpb.x)")  // CHECK: dpb.x is derived
+  print("dpb.x is \(dpb.x)")  // CHECK: dpb.x is derived
 
   dpb = DynamicPropertiesBase()
-  println("dpb.x is \(dpb.x)")  // CHECK: dpb.x is base
+  print("dpb.x is \(dpb.x)")  // CHECK: dpb.x is base
 
   dpb = DynamicPropertiesObserved()
   dpb.y = "newString"
@@ -159,7 +159,7 @@ func test() {
 test()
 
 func lazyInitFunction() -> Int {
-  println("lazy property initialized")
+  print("lazy property initialized")
   return 0
 }
 
@@ -169,18 +169,18 @@ class LazyPropertyClass {
   lazy var lazyProperty = lazyInitFunction()
 
   lazy var lazyProperty2 : Int = {
-    println("other lazy property initialized")
+    print("other lazy property initialized")
     return 0
   }()
 
 
   init(_ ident : Int) {
     id = ident
-    println("LazyPropertyClass.init #\(id)")
+    print("LazyPropertyClass.init #\(id)")
   }
 
   deinit {
-    println("LazyPropertyClass.deinit #\(id)")
+    print("LazyPropertyClass.deinit #\(id)")
   }
   
 
@@ -188,7 +188,7 @@ class LazyPropertyClass {
 
 
 func testLazyProperties() {
-  println("testLazyPropertiesStart") // CHECK: testLazyPropertiesStart
+  print("testLazyPropertiesStart") // CHECK: testLazyPropertiesStart
   if true {
     var a = LazyPropertyClass(1)      // CHECK-NEXT: LazyPropertyClass.init #1
     _ = a.lazyProperty                // CHECK-NEXT: lazy property initialized
@@ -207,7 +207,7 @@ func testLazyProperties() {
     // CHECK-NEXT: LazyPropertyClass.deinit #2
     // CHECK-NEXT: LazyPropertyClass.deinit #3
   }
-  println("testLazyPropertiesDone")    // CHECK: testLazyPropertiesDone
+  print("testLazyPropertiesDone")    // CHECK: testLazyPropertiesDone
 }
 
 
@@ -224,15 +224,15 @@ class rdar16805609Base<T> {
 class rdar16805609Derived<T> : rdar16805609Base<String>{
     override var value : String {
         didSet(val) {
-          println("reached me")
+          print("reached me")
         }
     }
 }
 
 let person = rdar16805609Derived<Int>()
-println("testing rdar://16805609")    // CHECK: testing rdar://16805609
+print("testing rdar://16805609")    // CHECK: testing rdar://16805609
 person.value = "foo"                  // CHECK-NEXT: reached me
-println("done rdar://16805609")       // CHECK-NEXT: done rdar://16805609
+print("done rdar://16805609")       // CHECK-NEXT: done rdar://16805609
 
 
 
@@ -250,17 +250,17 @@ x.testLazy()
 
 // <rdar://problem/17226384> Setting an lazy optional property to nil has a strange behavior (Swift)
 class r17226384Class {
-  lazy var x : Int? = { println("propertyRun"); return 42 }()
+  lazy var x : Int? = { print("propertyRun"); return 42 }()
 }
 func test_r17226384() {
   var c = r17226384Class()
-  println("created")  // CHECK-NEXT: created
+  print("created")  // CHECK-NEXT: created
                       // CHECK-NEXT: propertyRun
-  println(c.x)        // CHECK-NEXT: Optional(42)
-  println("setting")  // CHECK-NEXT: setting
+  print(c.x)        // CHECK-NEXT: Optional(42)
+  print("setting")  // CHECK-NEXT: setting
   c.x = nil
-  println(c.x)        // CHECK-NEXT: nil
-  println("done")     // CHECK-NEXT: done
+  print(c.x)        // CHECK-NEXT: nil
+  print("done")     // CHECK-NEXT: done
 }
 test_r17226384()
 

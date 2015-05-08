@@ -27,36 +27,36 @@ func testCFStringAnyObject() {
     = CFStringCreateWithCString(nil, "Swift", CFStringBuiltInEncodings.ASCII.rawValue)
 
   // CHECK: Swift
-  println(cfStr)
+  print(cfStr)
 
   // Convert it to AnyObject
   let anyObject: AnyObject = cfStr
 
   // CHECK: Swift
-  println(anyObject)
+  print(anyObject)
 
   // Convert it back to a CFString
   let cfStr2 = anyObject as! CFString
 
   // CHECK: Swift
-  println(cfStr2)
+  print(cfStr2)
 
   // Conditional cast through a generic to a CFString
   if let cfStr3 = genericCast(anyObject, CFString.self) {
     // CHECK: Swift
-    println(cfStr3)
+    print(cfStr3)
   } else {
-    println("Conditional cast failed")
+    print("Conditional cast failed")
   }
 
   // Forced cast through a generic to a CFString
   let cfStr4 = genericCastUnconditional(anyObject, CFString.self)
 
   // CHECK: Swift
-  println(cfStr4)
+  print(cfStr4)
 
   // CHECK: done
-  println("done")
+  print("done")
 }
 testCFStringAnyObject()
 
@@ -68,19 +68,19 @@ func testCFStringAnyObjectType() {
 
   let cfStrType = cfStr.dynamicType
   // CHECK: [[STRING_CLASS:(NS|CF).*String]]
-  println(cfStrType)
+  print(cfStrType)
 
   // Convert to AnyObject.Type
   let anyObjectType: AnyObject.Type = cfStrType
   // CHECK: [[STRING_CLASS]]
-  println(anyObjectType)
+  print(anyObjectType)
 
   // Convert back to CFString.Type
   let cfStrType2 = anyObjectType as! CFString.Type
   // CHECK: [[STRING_CLASS]]
-  println(cfStrType2)
+  print(cfStrType2)
 
   // CHECK: done
-  println("done")
+  print("done")
 }
 testCFStringAnyObjectType()

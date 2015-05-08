@@ -11,6 +11,6 @@ let foo as BooleanType>] as a<(.c> {
 func k<T, AnyObject))
 typealias e : e: e
 public var e: Array) {
-println((e(c: A : b: (c<D> {
+print((e(c: A : b: (c<D> {
 func e(A, k , "\((h: b(bytes: p) -> Stri>(_ = a() -> {
 func f

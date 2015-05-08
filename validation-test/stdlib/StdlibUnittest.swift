@@ -4,7 +4,7 @@ import SwiftPrivate
 import StdlibUnittest
 
 _setOverrideOSVersion(.OSX(major: 10, minor: 9, bugFix: 3))
-_setTestSuiteFailedCallback() { println("abort()") }
+_setTestSuiteFailedCallback() { print("abort()") }
 
 //
 // Test that harness aborts when a test fails
@@ -198,14 +198,14 @@ XFailsOSX.test("xfail 10.9.[3-4]")
 var PassThroughStdoutStderr = TestSuite("PassThroughStdoutStderr")
 
 PassThroughStdoutStderr.test("hasNewline") {
-  println("stdout first")
-  println("stdout second")
-  println("stdout third")
+  print("stdout first")
+  print("stdout second")
+  print("stdout third")
 
   var stderr = _Stderr()
-  println("stderr first", &stderr)
-  println("stderr second", &stderr)
-  println("stderr third", &stderr)
+  print("stderr first", &stderr)
+  print("stderr second", &stderr)
+  print("stderr third", &stderr)
 }
 // CHECK: [ RUN      ] PassThroughStdoutStderr.hasNewline
 // CHECK-DAG: out>>> stdout first
@@ -217,14 +217,14 @@ PassThroughStdoutStderr.test("hasNewline") {
 // CHECK: [       OK ] PassThroughStdoutStderr.hasNewline
 
 PassThroughStdoutStderr.test("noNewline") {
-  println("stdout first")
-  println("stdout second")
-  print("stdout third")
+  print("stdout first")
+  print("stdout second")
+  print("stdout third", appendNewline: false)
 
   var stderr = _Stderr()
-  println("stderr first", &stderr)
-  println("stderr second", &stderr)
-  print("stderr third", &stderr)
+  print("stderr first", &stderr)
+  print("stderr second", &stderr)
+  print("stderr third", &stderr, appendNewline: false)
 }
 // CHECK: [ RUN      ] PassThroughStdoutStderr.noNewline
 // CHECK-DAG: out>>> stdout first
@@ -243,11 +243,11 @@ PassThroughStdoutStderr.test("noNewline") {
 var TestSuiteWithSetUpPasses = TestSuite("TestSuiteWithSetUpPasses")
 
 TestSuiteWithSetUpPasses.test("passes") {
-  println("test body")
+  print("test body")
 }
 
 TestSuiteWithSetUpPasses.setUp {
-  println("setUp")
+  print("setUp")
 }
 // CHECK: [ RUN      ] TestSuiteWithSetUpPasses.passes
 // CHECK: out>>> setUp
@@ -258,11 +258,11 @@ TestSuiteWithSetUpPasses.setUp {
 var TestSuiteWithSetUpFails = TestSuite("TestSuiteWithSetUpFails")
 
 TestSuiteWithSetUpFails.test("fails") {
-  println("test body")
+  print("test body")
 }
 
 TestSuiteWithSetUpFails.setUp {
-  println("setUp")
+  print("setUp")
   expectEqual(1, 2)
 }
 // CHECK: [ RUN      ] TestSuiteWithSetUpFails.fails
@@ -275,11 +275,11 @@ TestSuiteWithSetUpFails.setUp {
 var TestSuiteWithTearDownPasses = TestSuite("TestSuiteWithTearDownPasses")
 
 TestSuiteWithTearDownPasses.test("passes") {
-  println("test body")
+  print("test body")
 }
 
 TestSuiteWithTearDownPasses.tearDown {
-  println("tearDown")
+  print("tearDown")
 }
 // CHECK: [ RUN      ] TestSuiteWithTearDownPasses.passes
 // CHECK: out>>> test body
@@ -289,11 +289,11 @@ TestSuiteWithTearDownPasses.tearDown {
 var TestSuiteWithTearDownFails = TestSuite("TestSuiteWithTearDownFails")
 
 TestSuiteWithTearDownFails.test("fails") {
-  println("test body")
+  print("test body")
 }
 
 TestSuiteWithTearDownFails.tearDown {
-  println("tearDown")
+  print("tearDown")
   expectEqual(1, 2)
 }
 // CHECK: TestSuiteWithTearDownPasses: All tests passed

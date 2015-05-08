@@ -6,7 +6,7 @@
 // Test case found by fuzzing
 
 if true {
-println() {
+print() {
 }
 let c : c(self.a: T : e() in c {
 }

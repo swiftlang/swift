@@ -13,4 +13,4 @@ func a<U -> : b("[](f() -> [c<Q<d : AnyObject) {
 }
 }
 }
-println([c() {
+print([c() {

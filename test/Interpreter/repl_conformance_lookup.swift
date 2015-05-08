@@ -13,7 +13,7 @@ func fooify<T>(x: T) {
   if let foo = x as? Fooable {
     foo.foo()
   } else {
-    println("--not fooable--")
+    print("--not fooable--")
   }
 }
 
@@ -25,14 +25,14 @@ fooify(D()) // CHECK: --not fooable--
 fooify(D()) // CHECK: --not fooable--
 
 extension Int: Fooable {
-  func foo() { println("--Int--") }
+  func foo() { print("--Int--") }
 }
 
 fooify(1) // CHECK: --Int--
 fooify(1) // CHECK: --Int--
 
 extension D: Fooable {
-  func foo() { println("--D--") }
+  func foo() { print("--D--") }
 }
 
 fooify(D()) // CHECK: D

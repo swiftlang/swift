@@ -6,7 +6,7 @@
 
 protocol A {
 class func d<T>) {
-println() {
+print() {
 }
 }
 class b: b<T>(n: d == e: S) {

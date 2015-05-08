@@ -5,6 +5,6 @@
 // Test case found by fuzzing
 
 let v: A? {
-println(f<f = A: P> Int {
+print(f<f = A: P> Int {
 return ")
 enum S<T where g: e :

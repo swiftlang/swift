@@ -834,100 +834,100 @@ public func testFailingBridgedCastFromSwiftToObjC(s: String) -> NSInteger {
   return s as! NSInteger
 } 
 
-println("test0=\(test0())")
+print("test0=\(test0())")
 
-println("test1=\(test1())")
+print("test1=\(test1())")
 
-println("test2=\(test2())")
+print("test2=\(test2())")
 
-println("test3=\(test3())")
+print("test3=\(test3())")
 
-println("test4=\(test4())")
+print("test4=\(test4())")
 
-println("test5_1=\(test5_1())")
+print("test5_1=\(test5_1())")
 
-println("test5_2=\(test5_2())")
+print("test5_2=\(test5_2())")
 
-println("test6_1=\(test6_1())")
+print("test6_1=\(test6_1())")
 
-println("test6_2=\(test6_2())")
+print("test6_2=\(test6_2())")
 
-println("test7_1=\(test7_1())")
+print("test7_1=\(test7_1())")
 
-println("test7_2=\(test7_2())")
-
-
-println("test8=\(test8())")
-
-println("test9=\(test9())")
-
-println("test10=\(test10())")
-
-println("test11=\(test11())")
-
-println("test12_1=\(test12_1())")
-
-println("test12_2=\(test12_2())")
-
-println("test13_1=\(test13_1())")
-
-println("test13_2=\(test13_2())")
-
-println("test13_3=\(test13_3())")
-
-println("test14_1=\(test14_1())")
-
-println("test14_2=\(test14_2())")
-
-println("test15_1=\(test15_1())")
-
-println("test15_2=\(test15_2())")
-
-println("test16_1=\(test16_1())")
-
-println("test16_2=\(test16_2())")
+print("test7_2=\(test7_2())")
 
 
-println("test17_1=\(test17_1())")
+print("test8=\(test8())")
 
-println("test17_2=\(test17_2())")
+print("test9=\(test9())")
 
-println("test18_1=\(test18_1())")
+print("test10=\(test10())")
 
-println("test18_2=\(test18_2())")
+print("test11=\(test11())")
 
-println("test19=\(test19())")
+print("test12_1=\(test12_1())")
 
-println("test20_1=\(test20_1())")
+print("test12_2=\(test12_2())")
 
-println("test20_2=\(test20_2())")
+print("test13_1=\(test13_1())")
 
-println("test21_1=\(test21_1())")
+print("test13_2=\(test13_2())")
 
-println("test21_2=\(test21_2())")
+print("test13_3=\(test13_3())")
 
-println("test22_1=\(test22_1())")
+print("test14_1=\(test14_1())")
 
-println("test22_2=\(test22_2())")
+print("test14_2=\(test14_2())")
 
-println("test23=\(test23())")
+print("test15_1=\(test15_1())")
 
-println("test24_1=\(test24_1())")
+print("test15_2=\(test15_2())")
 
-println("test24_2=\(test24_2())")
+print("test16_1=\(test16_1())")
 
-println("test24_3=\(test24_3())")
+print("test16_2=\(test16_2())")
 
-println("test25=\(test25())")
 
-println("test26=\(test26())")
+print("test17_1=\(test17_1())")
 
-println("test27=\(test27())")
+print("test17_2=\(test17_2())")
 
-println("test28_1=\(test28_1())")
+print("test18_1=\(test18_1())")
 
-println("test28_2=\(test28_2())")
+print("test18_2=\(test18_2())")
 
-println("test28_3=\(test28_3))")
+print("test19=\(test19())")
 
-println("test29=\(test29())")
+print("test20_1=\(test20_1())")
+
+print("test20_2=\(test20_2())")
+
+print("test21_1=\(test21_1())")
+
+print("test21_2=\(test21_2())")
+
+print("test22_1=\(test22_1())")
+
+print("test22_2=\(test22_2())")
+
+print("test23=\(test23())")
+
+print("test24_1=\(test24_1())")
+
+print("test24_2=\(test24_2())")
+
+print("test24_3=\(test24_3())")
+
+print("test25=\(test25())")
+
+print("test26=\(test26())")
+
+print("test27=\(test27())")
+
+print("test28_1=\(test28_1())")
+
+print("test28_2=\(test28_2())")
+
+print("test28_3=\(test28_3))")
+
+print("test29=\(test29())")

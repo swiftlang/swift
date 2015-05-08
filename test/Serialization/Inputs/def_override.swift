@@ -6,7 +6,6 @@ public class OverrideComputedProperty : ComputedProperty {
       return super.value + 1
     }
     set {
-      println(newValue)
       super.value = newValue
     }
   }
@@ -59,7 +58,6 @@ public class OverrideComplexSubscript : ComplexSubscript {
 
 public class OverrideFunc : StillEmpty {
   public override func reset() {
-    println("ha!")
   }
   public override init () {}
 }

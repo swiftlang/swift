@@ -53,7 +53,7 @@ func testNormal() {
   _precondition(positiveNormal == -negativeNormal)
   _precondition(negativeNormal == -positiveNormal)
 
-  println("testNormal done")
+  print("testNormal done")
 }
 testNormal()
 // CHECK: testNormal done
@@ -90,7 +90,7 @@ func testZero() {
   _precondition(minusZero == plusZero)
   _precondition(minusZero == minusZero)
 
-  println("testZero done")
+  print("testZero done")
 }
 testZero()
 // CHECK: testZero done
@@ -145,7 +145,7 @@ func testSubnormal() {
   _precondition(negativeSubnormal.floatingPointClass == .NegativeSubnormal)
   _precondition(negativeSubnormal != -0.0)
 
-  println("testSubnormal done")
+  print("testSubnormal done")
 }
 testSubnormal()
 // CHECK: testSubnormal done
@@ -191,7 +191,7 @@ func testInf() {
   _precondition(stdlibPlusInf != computedMinusInf)
   _precondition(stdlibMinusInf != computedPlusInf)
 
-  println("testInf done")
+  print("testInf done")
 }
 testInf()
 // CHECK: testInf done
@@ -223,11 +223,11 @@ func testNaN() {
   var stdlibQNaN = TestFloat.quietNaN
   checkQNaN(stdlibQNaN)
 
-  println("testNaN done")
+  print("testNaN done")
 }
 testNaN()
 // CHECK: testNaN done
 
-println("all done.")
+print("all done.")
 // CHECK: all done.
 

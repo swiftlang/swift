@@ -215,7 +215,7 @@ A computed variable may also be overridden with another computed variable::
         }
       }
       set {
-        println("Sorry, we choose our own colors here.")
+        print("Sorry, we choose our own colors here.")
       }
     }
   }
@@ -231,7 +231,7 @@ A subclass may override the superclass's variable with a new computed variable::
   class ColorBase {
     var color : Color {
       didSet {
-        println("I've been painted \(color)!")
+        print("I've been painted \(color)!")
       }
     }
   }

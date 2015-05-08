@@ -14,9 +14,9 @@ enum B {
 let x = B.C(A.A, "")
 switch x {
     case .C(.A, let foo as String):
-        println("")
+        print("")
     case .C(.B, let foo as String):
-        println("")
+        print("")
     default:
-        println("")
+        print("")
 }

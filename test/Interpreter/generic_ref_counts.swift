@@ -20,9 +20,9 @@ struct Generic<T> {
 func g0() {
   var x = Generic<Int>()
   // CHECK: true
-  println(x.isUniquelyReferenced())
+  print(x.isUniquelyReferenced())
   // CHECK-NEXT: true
-  println(x.buffer.isUniquelyReferenced())
+  print(x.buffer.isUniquelyReferenced())
 }
 g0()
 
@@ -44,8 +44,8 @@ struct NonGeneric {
 func g1() {
   var x = NonGeneric()
   // CHECK-NEXT: true
-  println(x.isUniquelyReferenced())
+  print(x.isUniquelyReferenced())
   // CHECK-NEXT: true
-  println(x.buffer.isUniquelyReferenced())
+  print(x.buffer.isUniquelyReferenced())
 }
 g1()

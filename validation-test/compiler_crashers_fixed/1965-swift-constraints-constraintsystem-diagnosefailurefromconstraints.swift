@@ -6,7 +6,7 @@
 
 func f<c>(f.c { // expected-error{{}} expected-error{{}} expected-error{{}} expected-error{{}}
 typealias f == h>(T][], e: C(f("a: AnyObject, g : B // expected-error{{}}
-println(c) -> : c: c) { // expected-note{{}}
+print(c) -> : c: c) { // expected-note{{}}
 func ^(A> Any, end: a { // expected-error{{}}
 }
 b) { // expected-error{{}} expected-error{{}}

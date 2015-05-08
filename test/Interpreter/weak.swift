@@ -11,25 +11,25 @@ protocol Protocol : class {
 //========================== Test pure Swift classes ==========================
 
 class SwiftClassBase : Protocol {
-  func noop() { println("noop") }
+  func noop() { print("noop") }
 }
 
 class SwiftClass : SwiftClassBase {
   override init() {
-    println("SwiftClass Created")
+    print("SwiftClass Created")
   }
 
   deinit {
-    println("SwiftClass Destroyed")
+    print("SwiftClass Destroyed")
   }
 }
 
 func printState(x : SwiftClassBase?) {
-  println((x != nil) ? "is present" : "is nil")
+  print((x != nil) ? "is present" : "is nil")
 }
 
 func testSwiftClass() {
-  println("testSwiftClass")               // CHECK: testSwiftClass
+  print("testSwiftClass")               // CHECK: testSwiftClass
   
   weak var w : SwiftClassBase?
   printState(w)                           // CHECK-NEXT: is nil
@@ -47,7 +47,7 @@ testSwiftClass()
 
 
 func testSwiftImplicitOptionalClass() {
-  println("testSwiftImplicitOptionalClass") // CHECK: testSwiftImplicitOptionalClass
+  print("testSwiftImplicitOptionalClass") // CHECK: testSwiftImplicitOptionalClass
   
   weak var w : SwiftClassBase!
   printState(w)                           // CHECK-NEXT: is nil
@@ -66,26 +66,26 @@ testSwiftImplicitOptionalClass()
 
 @objc
 class ObjCClassBase : Protocol {
-  func noop() { println("noop") }
+  func noop() { print("noop") }
 }
 
 @objc
 class ObjCClass : ObjCClassBase {
   override init() {
-    println("ObjCClass Created")
+    print("ObjCClass Created")
   }
 
   deinit {
-    println("ObjCClass Destroyed")
+    print("ObjCClass Destroyed")
   }
 }
 
 func printState(x : ObjCClassBase?) {
-  println((x != nil) ? "is present" : "is nil")
+  print((x != nil) ? "is present" : "is nil")
 }
 
 func testObjCClass() {
-  println("testObjCClass")                // CHECK: testObjCClass
+  print("testObjCClass")                // CHECK: testObjCClass
   
   weak var w : ObjCClassBase?
   printState(w)                           // CHECK-NEXT: is nil
@@ -106,11 +106,11 @@ testObjCClass()
 
   
 func printState(x : Protocol?) {
-  println((x != nil) ? "is present" : "is nil")
+  print((x != nil) ? "is present" : "is nil")
 }
 
 func testProtocol() {
-  println("testProtocol")                 // CHECK: testProtocol
+  print("testProtocol")                 // CHECK: testProtocol
   
   weak var w : Protocol?
   printState(w)                           // CHECK-NEXT: is nil

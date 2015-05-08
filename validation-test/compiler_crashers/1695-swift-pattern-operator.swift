@@ -30,7 +30,7 @@ class A, let i> String {
 import Foundation
 protocol A {
 var b = d<T) {
-println(")
+print(")
 private class A, (h: a {
 }
 func f.A.a()

@@ -6,7 +6,7 @@
 
 func v<x>() -> (x, x -> x) -> x {
 l y j s<q : l, y: l m y.= .b {
-println("")
+print("")
 }
 extension NSSet {
 l) {

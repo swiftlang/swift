@@ -6,7 +6,7 @@ import Foundation
 
 class Canary: NSObject {
   deinit {
-    println("died")
+    print("died")
   }
 }
 
@@ -27,7 +27,7 @@ func hangCanary(o: AnyObject) {
 }
 
 // CHECK-LABEL: NSData:
-println("NSData:")
+print("NSData:")
 autoreleasepool {
   var bytes: UnsafeMutablePointer<UInt8>
   repeat {
@@ -35,14 +35,14 @@ autoreleasepool {
     hangCanary(data)
     bytes = UnsafeMutablePointer<UInt8>(data.bytes)
   } while false // CHECK-NOT: died
-  println(bytes[0]) // CHECK:      2
-  println(bytes[1]) // CHECK-NEXT: 3
-  println(bytes[2]) // CHECK-NEXT: 5
-  println(bytes[3]) // CHECK-NEXT: 7
+  print(bytes[0]) // CHECK:      2
+  print(bytes[1]) // CHECK-NEXT: 3
+  print(bytes[2]) // CHECK-NEXT: 5
+  print(bytes[3]) // CHECK-NEXT: 7
 } // CHECK-NEXT: died
 
 // CHECK-LABEL: AnyObject:
-println("AnyObject:")
+print("AnyObject:")
 autoreleasepool {
   var bytes: UnsafeMutablePointer<UInt8>
   repeat {
@@ -51,8 +51,8 @@ autoreleasepool {
     let dataAsAny: AnyObject = data
     bytes = UnsafeMutablePointer<UInt8>(dataAsAny.bytes!)
   } while false // CHECK-NOT: died
-  println(bytes[0]) // CHECK:      11
-  println(bytes[1]) // CHECK-NEXT: 13
-  println(bytes[2]) // CHECK-NEXT: 17
-  println(bytes[3]) // CHECK-NEXT: 19
+  print(bytes[0]) // CHECK:      11
+  print(bytes[1]) // CHECK-NEXT: 13
+  print(bytes[2]) // CHECK-NEXT: 17
+  print(bytes[3]) // CHECK-NEXT: 19
 } // CHECK-NEXT: died

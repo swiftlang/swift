@@ -10,40 +10,40 @@ import CoreGraphics
 func print3(op: String, _ d: Double, _ f: Float, _ g: CGFloat) {
 #if arch(i386) || arch(arm)
   if (f != Float(g)  &&  f.isNaN != g.isNaN) {
-    println("\(op)(CGFloat) got \(g) instead of \(f)")
+    print("\(op)(CGFloat) got \(g) instead of \(f)")
   }
 #else
   if (d != Double(g)  &&  d.isNaN != g.isNaN) {
-    println("\(op)(CGFloat) got \(g) instead of \(d)")
+    print("\(op)(CGFloat) got \(g) instead of \(d)")
   }
 #endif
-  println("\(op) \(d) \(f) \(op)")
+  print("\(op) \(d) \(f) \(op)")
 }
 
 func print3(op: String, _ d: Bool, _ f: Bool, _ g: Bool) {
 #if arch(i386) || arch(arm)
   if (f != g) {
-    println("\(op)(CGFloat) got \(g) instead of \(f)")
+    print("\(op)(CGFloat) got \(g) instead of \(f)")
   }
 #else
   if (d != g) {
-    println("\(op)(CGFloat) got \(g) instead of \(d)")
+    print("\(op)(CGFloat) got \(g) instead of \(d)")
   }
 #endif
-  println("\(op) \(d) \(f) \(op)")
+  print("\(op) \(d) \(f) \(op)")
 }
 
 func print3(op: String, _ d: Int, _ f: Int, _ g: Int) {
 #if arch(i386) || arch(arm)
   if (f != g) {
-    println("\(op)(CGFloat) got \(g) instead of \(f)")
+    print("\(op)(CGFloat) got \(g) instead of \(f)")
   }
 #else
   if (d != g) {
-    println("\(op)(CGFloat) got \(g) instead of \(d)")
+    print("\(op)(CGFloat) got \(g) instead of \(d)")
   }
 #endif
-  println("\(op) \(d) \(f) \(op)")
+  print("\(op) \(d) \(f) \(op)")
 }
 
 func print6(op: String, _ d1: Double, _ d2: Double, 
@@ -51,14 +51,14 @@ func print6(op: String, _ d1: Double, _ d2: Double,
 {
 #if arch(i386) || arch(arm)
   if (f1 != Float(g1)  ||  f2 != Float(g2)) {
-    println("\(op)(CGFloat) got \(g1),\(g2) instead of \(f1),\(f2)")
+    print("\(op)(CGFloat) got \(g1),\(g2) instead of \(f1),\(f2)")
   }
 #else
   if (d1 != Double(g1)  ||  d2 != Double(g2)) {
-    println("\(op)(CGFloat) got \(g1),\(g2) instead of \(d1),\(d2)")
+    print("\(op)(CGFloat) got \(g1),\(g2) instead of \(d1),\(d2)")
   }
 #endif
-  println("\(op) \(d1),\(d2) \(f1),\(f2) \(op)")
+  print("\(op) \(d1),\(d2) \(f1),\(f2) \(op)")
 }
 
 func print6(op: String, _ d1: Double, _ di: Int, 
@@ -66,14 +66,14 @@ func print6(op: String, _ d1: Double, _ di: Int,
 {
 #if arch(i386) || arch(arm)
   if (f1 != Float(g1)  ||  fi != gi) {
-    println("\(op)(CGFloat) got \(g1),\(gi) instead of \(f1),\(fi)")
+    print("\(op)(CGFloat) got \(g1),\(gi) instead of \(f1),\(fi)")
   }
 #else
   if (d1 != Double(g1)  ||  di != gi) {
-    println("\(op)(CGFloat) got \(g1),\(gi) instead of \(d1),\(di)")
+    print("\(op)(CGFloat) got \(g1),\(gi) instead of \(d1),\(di)")
   }
 #endif
-  println("\(op) \(d1),\(di) \(f1),\(fi) \(op)")
+  print("\(op) \(d1),\(di) \(f1),\(fi) \(op)")
 }
 
 // inputs
@@ -100,7 +100,7 @@ var b1, b2, b3: Bool
 
 // The order of these tests matches tgmath.swift.gyb.
 
-println("Shopping is hard, let's do math")
+print("Shopping is hard, let's do math")
 // CHECK: Shopping is hard, let's do math
 
 // Unary functions
@@ -460,26 +460,26 @@ print3("fma", d1, f1, g1)
 
 
 d1 = j0(dx)
-println("j0 \(d1) j0")
+print("j0 \(d1) j0")
 // CHECK-NEXT: j0 0.99750156206604 j0
 
 d1 = j1(dx)
-println("j1 \(d1) j1")
+print("j1 \(d1) j1")
 // CHECK-NEXT: j1 0.049937526036242 j1
 
 d1 = jn(ix, dx)
-println("jn \(d1) jn")
+print("jn \(d1) jn")
 // CHECK-NEXT: jn 1.22299266103565e-22 jn
 
 d1 = y0(dx)
-println("y0 \(d1) y0")
+print("y0 \(d1) y0")
 // CHECK-NEXT: y0 -1.53423865135037 y0
 
 d1 = y1(dx)
-println("y1 \(d1) y1")
+print("y1 \(d1) y1")
 // CHECK-NEXT: y1 -6.45895109470203 y1
 
 d1 = yn(ix, dx)
-println("yn \(d1) yn")
+print("yn \(d1) yn")
 // CHECK-NEXT: yn -2.36620129448696e+20 yn
 

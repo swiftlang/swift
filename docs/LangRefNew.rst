@@ -908,7 +908,7 @@ of the parameter is the ``set-name``, if provided, or ``value`` otherwise.
   var vec = BitVector64()
   vec[2] = true
   if vec[3] {
-    println("third bit is set")
+    print("third bit is set")
   }
 
 .. _langref.decl.attribute_list:
@@ -977,21 +977,21 @@ of :ref:`switch statements <langref.stmt.switch>`.  Some examples::
     // Extract the elements of the "point" tuple and bind them to
     // variables x, y, and z.
     var (x, y, z) = point
-    println("x=\(x) y=\(y) z=\(z)")
+    print("x=\(x) y=\(y) z=\(z)")
 
     // Dispatch on the elements of a tuple in a "switch" statement.
     switch point {
     case (0, 0, 0):
-      println("origin")
+      print("origin")
     // The pattern "_" matches any value.
     case (_, 0, 0):
-      println("on the x axis")
+      print("on the x axis")
     case (0, _, 0):
-      println("on the y axis")
+      print("on the y axis")
     case (0, 0, _):
-      println("on the z axis")
+      print("on the z axis")
     case (var x, var y, var z):
-      println("x=\(x) y=\(y) z=\(z)")
+      print("x=\(x) y=\(y) z=\(z)")
     }
 
 
@@ -1061,13 +1061,13 @@ bindings are immutable.
     switch point {
     // Bind x, y, z to the elements of point.
     case (var x, var y, var z):
-      println("x=\(x) y=\(y) z=\(z)")
+      print("x=\(x) y=\(y) z=\(z)")
     }
 
     switch point {
     // Same. 'var' distributes to the identifiers in its subpattern.
     case var (x, y, z):
-      println("x=\(x) y=\(y) z=\(z)")
+      print("x=\(x) y=\(y) z=\(z)")
     }
 
 Outside of a <tt>var</tt> pattern, an identifier behaves as an :ref:`expression
@@ -1080,9 +1080,9 @@ pattern <langref.pattern.expr>` referencing an existing definition.
     // x and z are bound as new variables.
     // zero is a reference to the existing 'zero' variable.
     case (var x, zero, var z):
-      println("point off the y axis: x=\(x) z=\(z)")
+      print("point off the y axis: x=\(x) z=\(z)")
     default:
-      println("on the y axis")
+      print("on the y axis")
     }
 
 The left-hand pattern of a :ref:`var declaration <langref.decl.var>` and the
@@ -1151,11 +1151,11 @@ appear in declarations.
   for b in bs {
     switch b {
     case is B:
-      println("B")
+      print("B")
     case is D1:
-      println("D1")
+      print("D1")
     case is D2:
-      println("D2")
+      print("D2")
     }
   }
 
@@ -1183,11 +1183,11 @@ type, the value of that type can be matched against an optional subpattern.
 
   switch tag {
   case .BR:
-    println("<br>")
+    print("<br>")
   case .IMG(var src, var alt):
-    println("<img src=\"\(escape(src))\" alt=\"\(escape(alt))\">")
+    print("<img src=\"\(escape(src))\" alt=\"\(escape(alt))\">")
   case .A(var href):
-    println("<a href=\"\(escape(href))\">")
+    print("<a href=\"\(escape(href))\">")
   }
 
 Enum element patterns are refutable and thus cannot appear in declarations.
@@ -1213,12 +1213,12 @@ operator may be overloaded like any function.
   switch point {
   // Equality comparison.
   case (0, 0, 0):
-    println("origin")
+    print("origin")
   // Range comparison.
   case (-10...10, -10...10, -10...10):
-    println("close to the origin")
+    print("close to the origin")
   default:
-    println("too far away")
+    print("too far away")
   }
 
   // Define pattern matching of an integer value to a string expression.
@@ -1229,9 +1229,9 @@ operator may be overloaded like any function.
   // Now we can pattern-match strings to integers:
   switch point {
   case ("0", "0", "0"):
-    println("origin")
+    print("origin")
   default:
-    println("not the origin")
+    print("not the origin")
   }
 
 The order of evaluation of expressions in patterns, including whether an
@@ -1347,22 +1347,22 @@ otherwise empty cases in switch statements.
   func classifyPoint(point: (Int, Int)) {
     switch point {
     case (0, 0):
-      println("origin")
+      print("origin")
 
     case (_, 0):
-      println("on the x axis")
+      print("on the x axis")
 
     case (0, _):
-      println("on the y axis")
+      print("on the y axis")
 
     case (var x, var y) where x == y:
-      println("on the y = x diagonal")
+      print("on the y = x diagonal")
 
     case (var x, var y) where -x == y:
-      println("on the y = -x diagonal")
+      print("on the y = -x diagonal")
 
     case (var x, var y):
-      println("length \(sqrt(x*x + y*y))")
+      print("length \(sqrt(x*x + y*y))")
     }
   }
 

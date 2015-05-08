@@ -63,8 +63,8 @@ CustomStringConvertible Types
 -----------------------------
 
 ``CustomStringConvertible`` types can be used in string literal interpolations,
-printed with ``print(x)`` and ``println(x)``, and can be converted to
-``String`` with ``x.toString()``.
+printed with ``print(x)``, and can be converted to ``String`` with
+``x.toString()``.
 
 The simple extension story for beginners is as follows: 
 

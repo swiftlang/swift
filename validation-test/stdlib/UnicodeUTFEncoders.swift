@@ -117,7 +117,7 @@ class CodecTest<Codec : TestableUnicodeCodec> {
   func testOne(scalar: UnicodeScalar) {
     /* Progress reporter
     if (scalar.value % 0x1000) == 0 {
-      println("\(asHex(scalar.value))")
+      print("\(asHex(scalar.value))")
     }
     */
 
@@ -148,7 +148,7 @@ class CodecTest<Codec : TestableUnicodeCodec> {
   }
 
   func run(minScalarOrd: Int, _ maxScalarOrd: Int) {
-    println("testing \(Codec.name())")
+    print("testing \(Codec.name())")
     for i in minScalarOrd..<maxScalarOrd {
       testOne(nthUnicodeScalar(UInt32(i)))
     }
@@ -169,11 +169,11 @@ UTFEncoders.test("encodeRandomBlock") {
   var maxScalarOrd: Int
 
   if testAll {
-    println("Testing all Unicode scalars")
+    print("Testing all Unicode scalars")
     minScalarOrd = 0
     maxScalarOrd = unicodeScalarCount
   } else {
-    println("Testing Unicode scalar group \(testGroup) of \(testGroupCount)")
+    print("Testing Unicode scalar group \(testGroup) of \(testGroupCount)")
     minScalarOrd = unicodeScalarCount * testGroup / testGroupCount
     maxScalarOrd = unicodeScalarCount * (testGroup+1) / testGroupCount
   }

@@ -128,7 +128,7 @@ var allTests = TestSuite("DiscriminatedBridgeObject")
 
 class C {
   deinit {
-    println("bye C!")
+    print("bye C!")
   }
 }
 import Foundation
@@ -255,3 +255,4 @@ allTests.test("${Self}") {
 % end
 
 runAllTests()
+

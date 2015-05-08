@@ -16,7 +16,7 @@ class PrintOnDeinit: NSObject {
     return PrintOnDeinit()
   }
 
-  deinit { println("object died") }
+  deinit { print("object died") }
 }
 func useTemp() {
   let f = PrintOnDeinit.create()
@@ -26,11 +26,11 @@ func useTemp() {
 // object autoreleased from each shared object on x86_64, so prime it.
 autoreleasepool { useTemp() }
 autoreleasepool {
-  println("autorelease test begin")
+  print("autorelease test begin")
   useTemp()
-  println("after call to useTemp")
+  print("after call to useTemp")
 }
-println("autorelease test end")
+print("autorelease test end")
 // CHECK:      autorelease test begin
 // CHECK-NEXT: object died
 // CHECK-NEXT: after call to useTemp

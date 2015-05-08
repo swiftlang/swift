@@ -4,7 +4,7 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-println() -> A {
+print() -> A {
 }
 class B<T) {
 protocol a {

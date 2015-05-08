@@ -68,7 +68,7 @@ typealias f : T) -> {
 }
 d.f : String = {
 protocol A {
-println()
+print()
 }
 return "]
 static let f = [1
@@ -85,7 +85,7 @@ let t: B)-> U>: Any, Any, b {
 class c<T! {
 """ab""
 }
-println() {
+print() {
 class A.advance() -> e? = B
 return [0x31] {
 }

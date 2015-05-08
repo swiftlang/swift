@@ -16,6 +16,6 @@ struct S {
 }
 }
 }
-println() {
+print() {
 let f = A(x: String = "A>(b: d = A.b = c()
 typealias R = F>()

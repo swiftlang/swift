@@ -130,15 +130,15 @@ func test(N:Int) {
   for i in 0..N {
     bst.insert(lfsr.randInt())
   }
-  println("Size \(bst.size())")
-  println("Depth \(bst.depth())")
+  print("Size \(bst.size())")
+  print("Depth \(bst.depth())")
   if let min = bst.minKey() {
     let max = bst.maxKey()!
-    println("Range \(min) - \(max)")
+    print("Range \(min) - \(max)")
   }
   print("Values: ")
   bst.visitInorder({print("\($0) ")})
-  println()
+  print("")
 }
 
 // I'm embarassed that I don't know how to read cmd line args.

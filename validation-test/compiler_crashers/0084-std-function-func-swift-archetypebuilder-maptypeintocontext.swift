@@ -58,7 +58,7 @@ func u<qp: SequenceType, t where Optional<t> == qp.Generator.Element>(r : qp) ->
     p ml
 }
 let r : [Int?] = [ml, po, ml]
-println(u(r))
+print(u(r))
 class ml {
     typealias fe = fe
 }

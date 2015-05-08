@@ -22,7 +22,7 @@ b: d == {
 let foo as BooleanType).c: B) -> {
 }
 let a<T) {
-println(g(#object1: d : a {
+print(g(#object1: d : a {
 }
 typealias f == c<d = d, AnyObject.count], c()))!
 }

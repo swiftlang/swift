@@ -33,5 +33,5 @@ let _: No = no
 //===--- Tests ------------------------------------------------------------===//
 
 import Dispatch
-println(dispatch_get_global_queue(0,0))
+print(dispatch_get_global_queue(0,0))
 

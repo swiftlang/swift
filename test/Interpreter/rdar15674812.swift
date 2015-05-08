@@ -19,4 +19,4 @@ func crash() {
 crash()
 
 // CHECK: ok
-println("ok")
+print("ok")

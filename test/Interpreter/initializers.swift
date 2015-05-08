@@ -4,8 +4,8 @@
 var depth = 0
 
 func printAtDepth(s: String) {
-  for i in 0..<depth { print("*") }
-  println(s)
+  for i in 0..<depth { print("*", appendNewline: false) }
+  print(s)
 }
 
 class A {
@@ -79,7 +79,7 @@ class C : B {
   }
 }
 
-println("-----Constructing C()-----")
+print("-----Constructing C()-----")
 // CHECK: Starting A.init()
 // CHECK: *Starting A.init withInt(5)
 // CHECK: **Starting B.init withInt(5) string(hello)
@@ -102,11 +102,11 @@ C()
 class Foo: FloatLiteralConvertible {
   required init(floatLiteral: Float) { }
 
-  func identify() { println("Foo") }
+  func identify() { print("Foo") }
 }
 
 class Bar: Foo {
-  override func identify() { println("Bar") }
+  override func identify() { print("Bar") }
 }
 
 let x: Bar = 1.0

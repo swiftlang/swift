@@ -106,7 +106,7 @@ public:
 };
 
 /// BraceStmt - A brace enclosed sequence of expressions, stmts, or decls, like
-/// { var x = 10; println(10) }.
+/// { var x = 10; print(10) }.
 class BraceStmt : public Stmt {
 private:
   unsigned NumElements;
@@ -764,7 +764,7 @@ public:
 /// Example:
 /// \code
 /// for i in 0..10 {
-///   println(String(i))
+///   print(String(i))
 /// }
 /// \endcode
 class ForEachStmt : public LabeledStmt {

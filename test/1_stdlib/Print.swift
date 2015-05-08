@@ -66,10 +66,10 @@ func printedIs<T>(
     match = expected2! == actual
   }
   if !match {
-    println("check failed at \(file), line \(line)")
-    println("expected: \"\(expected1)\" or \"\(expected2)\"")
-    println("actual: \"\(actual)\"")
-    println()
+    print("check failed at \(file), line \(line)")
+    print("expected: \"\(expected1)\" or \"\(expected2)\"")
+    print("actual: \"\(actual)\"")
+    print("")
     failed = true
   }
 }
@@ -79,12 +79,12 @@ func debugPrintedIs<T>(
     file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   var actual = ""
-  debugPrint(object, &actual)
+  debugPrint(object, &actual, appendNewline: false)
   if expected1 != actual && (expected2 != nil && expected2! != actual) {
-    println("check failed at \(file), line \(line)")
-    println("expected: \"\(expected1)\" or \"\(expected2)\"")
-    println("actual: \"\(actual)\"")
-    println()
+    print("check failed at \(file), line \(line)")
+    print("expected: \"\(expected1)\" or \"\(expected2)\"")
+    print("actual: \"\(actual)\"")
+    print("")
     failed = true
   }
 }
@@ -94,10 +94,10 @@ func assertEquals(
     file: StaticString = __FILE__, line: UWord = __LINE__
 ) {
   if expected != actual {
-    println("check failed at \(file), line \(line)")
-    println("expected: \"\(expected)\"")
-    println("actual: \"\(actual)\"")
-    println()
+    print("check failed at \(file), line \(line)")
+    print("expected: \"\(expected)\"")
+    print("actual: \"\(actual)\"")
+    print("")
     failed = true
   }
 }
@@ -178,7 +178,7 @@ func test_StdlibTypesPrinted() {
         "Wrapper(Optional(Wrapper(Optional(Wrapper(nil)))))")
   }
 
-  println("test_StdlibTypesPrinted done")
+  print("test_StdlibTypesPrinted done")
 }
 test_StdlibTypesPrinted()
 // CHECK: test_StdlibTypesPrinted done
@@ -257,7 +257,7 @@ func test_IntegerPrinting() {
   printedIs(UInt32(42), "42")
   printedIs(UInt64(42), "42")
 
-  println("test_IntegerPrinting done")
+  print("test_IntegerPrinting done")
 }
 test_IntegerPrinting()
 // CHECK: test_IntegerPrinting done
@@ -402,7 +402,7 @@ func test_FloatingPointPrinting() {
   printedIs(asFloat80(0.0000000000000000125), "1.25e-17")
 #endif
 
-  println("test_FloatingPointPrinting done")
+  print("test_FloatingPointPrinting done")
 }
 test_FloatingPointPrinting()
 // CHECK: test_FloatingPointPrinting done
@@ -415,7 +415,7 @@ func test_BoolPrinting() {
   printedIs(true, "true")
   printedIs(false, "false")
 
-  println("test_BoolPrinting done")
+  print("test_BoolPrinting done")
 }
 test_BoolPrinting()
 // CHECK: test_BoolPrinting done
@@ -443,7 +443,7 @@ func test_CTypesPrinting() {
   printedIs(CBool(true), "true")
   printedIs(CBool(false), "false")
 
-  println("test_CTypesPrinting done")
+  print("test_CTypesPrinting done")
 }
 test_CTypesPrinting()
 // CHECK: test_CTypesPrinting done
@@ -479,7 +479,7 @@ func test_PointerPrinting() {
   printedIs(CVaListPointer(_fromUnsafeMutablePointer: nullUP), expectedNull)
   printedIs(AutoreleasingUnsafeMutablePointer<Int>(), expectedNull)
 
-  println("test_PointerPrinting done")
+  print("test_PointerPrinting done")
 }
 test_PointerPrinting()
 // CHECK: test_PointerPrinting done
@@ -690,7 +690,7 @@ func test_ObjectPrinting() {
     printedIs(c, "<description: 1>")
   }
 
-  println("test_ObjectPrinting done")
+  print("test_ObjectPrinting done")
 }
 test_ObjectPrinting()
 // CHECK: test_ObjectPrinting done
@@ -711,7 +711,7 @@ func test_gcMetatypePrinting() {
   printedIs([ classMetatype ], "[a.ClassPrintable]")
   test_ThickMetatypePrintingImpl(classMetatype, "a.ClassPrintable")
 
-  println("test_gcMetatypePrinting done")
+  print("test_gcMetatypePrinting done")
 }
 test_gcMetatypePrinting()
 // CHECK: test_gcMetatypePrinting done
@@ -746,7 +746,7 @@ func test_ArrayPrinting() {
               ClassPrintable(3) ] as Array<AnyObject>,
             "[►1◀︎, ►2◀︎, ►3◀︎]")
 
-  println("test_ArrayPrinting done")
+  print("test_ArrayPrinting done")
 }
 test_ArrayPrinting()
 // CHECK: test_ArrayPrinting done
@@ -768,7 +768,7 @@ func test_DictionaryPrinting() {
   printedIs(dictSS, "[aaa: bbb]")
   debugPrintedIs(dictSS, "[\"aaa\": \"bbb\"]")
 
-  println("test_DictionaryPrinting done")
+  print("test_DictionaryPrinting done")
 }
 test_DictionaryPrinting()
 // CHECK: test_DictionaryPrinting done
@@ -786,7 +786,7 @@ func test_SetPrinting() {
   printedIs(sS, "[\"Hello\", \"world\"]", expected2: "[\"world\", \"Hello\"]")
   debugPrintedIs(sS, "Set([\"Hello\", \"world\"])", expected2: "Set([\"world\", \"Hello\"])")
 
-  println("test_SetPrinting done")
+  print("test_SetPrinting done")
 }
 test_SetPrinting()
 // CHECK: test_SetPrinting done
@@ -821,7 +821,7 @@ func test_TuplePrinting() {
         (111, "two hundred twenty-two", WithoutDescription(333)) ]
   printedIs(arrayOfTuples2, "[(1, \"two\", a.WithoutDescription(x: 3)), (11, \"twenty-two\", a.WithoutDescription(x: 33)), (111, \"two hundred twenty-two\", a.WithoutDescription(x: 333))]")
 
-  println("test_TuplePrinting done")
+  print("test_TuplePrinting done")
 }
 test_TuplePrinting()
 // CHECK: test_TuplePrinting done
@@ -841,7 +841,7 @@ func test_ArbitraryStructPrinting() {
     ValuesWithoutDescription(1.25, "abc", [ 1, 2, 3 ]),
     "a.ValuesWithoutDescription<Swift.Double, Swift.String, Swift.Array<Swift.Int>>(t: 1.25, u: \"abc\", v: [1, 2, 3])")
 
-  println("test_ArbitraryStructPrinting done")
+  print("test_ArbitraryStructPrinting done")
 }
 test_ArbitraryStructPrinting()
 // CHECK: test_ArbitraryStructPrinting done
@@ -849,7 +849,7 @@ test_ArbitraryStructPrinting()
 func test_MetatypePrinting() {
   printedIs(Int.self, "Swift.Int")
 
-  println("test_MetatypePrinting done")
+  print("test_MetatypePrinting done")
 }
 test_MetatypePrinting()
 // CHECK: test_MetatypePrinting done
@@ -870,7 +870,7 @@ func test_StringInterpolation() {
   assertEquals("<[►1◀︎, ►2◀︎, ►3◀︎]>", "<\([ StructPrintable(1), StructPrintable(2), StructPrintable(3) ])>")
   assertEquals("a.WithoutDescription(x: 1)", "\(WithoutDescription(1))")
 
-  println("test_StringInterpolation done")
+  print("test_StringInterpolation done")
 }
 test_StringInterpolation()
 // CHECK: test_StringInterpolation done
@@ -911,22 +911,22 @@ func test_CustomStringInterpolation() {
   assertEquals("<segment aaa><segment 1><segment bbb>",
                ("aaa\(1)bbb" as MyString).value)
 
-  println("test_CustomStringInterpolation done")
+  print("test_CustomStringInterpolation done")
 }
 test_CustomStringInterpolation()
 // CHECK: test_CustomStringInterpolation done
 
 func test_StdoutUTF8Printing() {
-  println("\u{00B5}")
+  print("\u{00B5}")
 // CHECK: {{^}}µ{{$}}
 
-  println("test_StdoutUTF8Printing done")
+  print("test_StdoutUTF8Printing done")
 }
 test_StdoutUTF8Printing()
 // CHECK: test_StdoutUTF8Printing done
 
 if !failed {
-  println("OK")
+  print("OK")
 }
 // CHECK: OK
 

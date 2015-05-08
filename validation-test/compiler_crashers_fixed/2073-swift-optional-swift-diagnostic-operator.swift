@@ -21,7 +21,7 @@ d() {
 protocol P {
 class B {
 protocol b where d.c {
-println(A"
+print(A"
 }
 import Foundation
 type

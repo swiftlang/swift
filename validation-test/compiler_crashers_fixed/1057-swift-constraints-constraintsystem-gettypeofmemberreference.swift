@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 func f<T](v: T>(b: A")
-println() {
+print() {
 protocol P {
 struct S {
 }

@@ -7,4 +7,4 @@ import AppKit
 
 let image = NSImage(named: NSImageNameTrashEmpty)
 // CHECK: TrashEmpty
-println(image!.name()!)
+print(image!.name()!)

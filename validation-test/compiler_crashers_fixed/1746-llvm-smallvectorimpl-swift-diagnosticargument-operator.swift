@@ -22,7 +22,7 @@ protocol A : a {
 extension NSSet {
 }
 let h: A<I : NSManagedObject {
-println()) -> Any) {
+print()) -> Any) {
 }
 }
 private class func a: C: C {

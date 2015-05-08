@@ -8,13 +8,13 @@
 
 false // CHECK: Bool = false
 (1,2) // CHECK: (Int, Int) = (1, 2)
-println(10)
-println(10)
+print(10)
+print(10)
 // CHECK: 10
 // CHECK-NEXT: 10
 
 func f() {
-  println("Hello")
+  print("Hello")
 }
 f() // CHECK: Hello
 
@@ -115,7 +115,7 @@ var dict = [ "Hello" : 1.5 ]
 String(0)
 // CHECK: "0"
 
-for i in 0..<10 { println(i); }
+for i in 0..<10 { print(i); }
 // CHECK: 0
 // CHECK-NEXT: 1
 // CHECK-NEXT: 2
@@ -127,7 +127,7 @@ for i in 0..<10 { println(i); }
 // CHECK-NEXT: 8
 // CHECK-NEXT: 9
 
-for i in 0..<10 { println(i); }
+for i in 0..<10 { print(i); }
 // CHECK: 0
 // CHECK-NEXT: 1
 // CHECK-NEXT: 2
@@ -139,7 +139,7 @@ for i in 0..<10 { println(i); }
 // CHECK-NEXT: 8
 // CHECK-NEXT: 9
 
-for c in "foobar".unicodeScalars { print(c); println("") }
+for c in "foobar".unicodeScalars { print(c) }
 // CHECK: f
 // CHECK-NEXT: o
 // CHECK-NEXT: o
@@ -174,7 +174,7 @@ protocol Proto {
 }
 extension Double : Proto { 
   func foo() {
-    print("Double: \(self)\n") 
+    print("Double: \(self)\n", appendNewline: false) 
   }
 }
 var pr : Proto = 3.14159
@@ -186,7 +186,7 @@ pr = "foo"
 
 extension String : Proto {
   func foo() {
-    print("String: \(self)\n")
+    print("String: \(self)\n", appendNewline: false)
   }
 }
 pr = "foo"
@@ -208,15 +208,15 @@ chained
 true && true
 // CHECK: = true
 
-if ({true}()) { println("yeah1") }
+if ({true}()) { print("yeah1") }
 // CHECK: yeah1
-if true && true { println("yeah2") }
+if true && true { print("yeah2") }
 // CHECK: yeah2
-if true && true { if true && true { println("yeah3") } }
+if true && true { if true && true { print("yeah3") } }
 // CHECK: yeah3
-if true && (true && true) { if true && (true && true) { println("yeah4") } }
+if true && (true && true) { if true && (true && true) { print("yeah4") } }
 // CHECK: yeah4
-if true && true { if true && true { println(true && true) } }
+if true && true { if true && true { print(true && true) } }
 // CHECK: true
 
 "ok"

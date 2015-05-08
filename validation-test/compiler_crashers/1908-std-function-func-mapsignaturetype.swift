@@ -7,7 +7,7 @@
 
 extension Array {
 class d>>(().a(x) {
-println(")
+print(")
 func c<T? {
 extension A {
 extension NSData {

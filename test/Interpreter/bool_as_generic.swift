@@ -13,7 +13,7 @@ func &&&(x: BooleanType, @autoclosure y: () -> BooleanType) -> Bool {
   return x.boolValue ? y().boolValue : false
 }
 
-println(!!true) // CHECK: true
-println(!!false) // CHECK: false
-println(true &&& true) // CHECK: true
-println(true &&& false) // CHECK: false
+print(!!true) // CHECK: true
+print(!!false) // CHECK: false
+print(true &&& true) // CHECK: true
+print(true &&& false) // CHECK: false

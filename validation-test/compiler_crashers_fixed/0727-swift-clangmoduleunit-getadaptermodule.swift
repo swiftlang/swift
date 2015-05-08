@@ -67,7 +67,7 @@ protocol b = A, AnyObject) -> V, A<T) {
 b(self)
 func e
 }
-println(seq: c
+print(seq: c
 }
 }
 func g.E == F>() -> String

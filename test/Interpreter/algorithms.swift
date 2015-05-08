@@ -3,7 +3,7 @@
 func fib() {
   var (a, b) = (0, 1)
   while b < 10 {
-    println(b)
+    print(b)
     (a, b) = (b, a+b)
   }
 }
@@ -18,7 +18,7 @@ fib()
 
 // From: <rdar://problem/17796401>
 let two_one = Array(lazy([1, 2, 3, 4]).reverse().filter { $0 % 2 == 0 }.map { $0 / 2 })
-println(two_one)
+print(two_one)
 // CHECK: [2, 1]
 
 // rdar://problem/18208283
@@ -35,7 +35,7 @@ func flatten<Element, Sequence: SequenceType, InnerSequence: SequenceType
 
 // CHECK: [1, 2, 3, 4, 5, 6]
 let flat = flatten([[1,2,3], [4,5,6]])
-println(flat)
+print(flat)
 
 // rdar://problem/19416848
 func observe<T:SequenceType, V where V == T.Generator.Element>(g:T) { }

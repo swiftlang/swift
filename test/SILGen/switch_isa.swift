@@ -1,11 +1,13 @@
 // RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
+func markUsed<T>(t: T) {}
+
 // rdar://17772217
 func testSwitchOnExistential(value: Any) {
   switch value {
-    case true as Bool: println("true")
-    case false as Bool: println("false")
-    default: println("default")
+    case true as Bool: markUsed("true")
+    case false as Bool: markUsed("false")
+    default: markUsed("default")
   }
 }
 

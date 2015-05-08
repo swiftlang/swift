@@ -14,15 +14,15 @@ enum b {
 private let x }
 }
 }
-println(AnyObject, i : d : b()
+print(AnyObject, i : d : b()
 var b where h>(range.b
 convenience init(""a<T where T, i(v: d>() {
 func c(x: b(Any] {
-println({
+print({
 protocol A : end: A {
 extension A {
 extension NSSet {
-println(_ = { _, object2: a)
+print(_ = { _, object2: a)
 assert(#object1, end: A, x {
 func b.init(Any) {
 typealias d = c, Any) {

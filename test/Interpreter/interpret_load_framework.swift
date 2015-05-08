@@ -9,4 +9,4 @@
 import VerySmallObjCFramework
 
 // CHECK: 42
-println(globalValue)
+print(globalValue)

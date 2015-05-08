@@ -3,11 +3,11 @@
 class C {
   init() {}
 
-  func bar() { println("bar") }
+  func bar() { print("bar") }
 }
 
 class D : C {
-  func foo() { println("foo") }
+  func foo() { print("foo") }
 }
 
 func down<T : C>(x: C, _: T.Type) -> T {
@@ -27,6 +27,6 @@ down(D(), D.self).foo()
 // CHECK: bar
 up(D()).bar()
 // CHECK: true
-println(isa(D(), D.self))
+print(isa(D(), D.self))
 // CHECK: false
-println(isa(C(), D.self))
+print(isa(C(), D.self))

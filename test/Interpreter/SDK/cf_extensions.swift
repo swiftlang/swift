@@ -33,9 +33,9 @@ let pink = CGColor.create(colorSpace: .deviceRGB(),
                           components: [1.0, 0.5, 0.25, 1.0])
 
 // CHECK: 1.0
-println(pink.r)
+print(pink.r)
 // CHECK-NEXT: 0.5
-println(pink.g)
+print(pink.g)
 // CHECK-NEXT: 0.25
-println(pink.b)
+print(pink.b)
 

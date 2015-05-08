@@ -16,7 +16,7 @@ init([T : d {
 }
 func f<D> {
 class A? {
-println(f<T>? {
+print(f<T>? {
 }
 var f = i> (t: I) -> {
 map("""

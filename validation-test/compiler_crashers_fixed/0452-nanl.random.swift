@@ -41,7 +41,7 @@ typealias e where T: c()
 self.E == c() {
 }
 }
-println(x: c>? {
+print(x: c>? {
 var d = ""
 }
 }
@@ -55,7 +55,7 @@ protocol a {
 let h == nil
 e {
 }(#object2)
-println()
+print()
 b
 struct c = a
 }

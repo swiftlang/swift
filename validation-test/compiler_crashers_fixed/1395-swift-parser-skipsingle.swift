@@ -18,7 +18,7 @@ var b, g = c(T, c>]() -> S(f()] as [unowned self.b.g = A? = B
 enum b where g(e> (A> Self {
 typealias f == A) {
 class a(() -> {
-println((h: (.B
+print((h: (.B
 protocol A {
 func a(A.f : T, x in a {
 typealias A {

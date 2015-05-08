@@ -7,12 +7,12 @@ import Foundation
 var str : NSString? = nil
 var url : NSURL? = nil
 
-println("\(str == nil) \(nil == url) \(str == url)")
+print("\(str == nil) \(nil == url) \(str == url)")
 // CHECK: true true true
 
 str = "abc"
 url = NSURL(string: "file:///")
-println("\(str == nil) \(nil == url)")
+print("\(str == nil) \(nil == url)")
 // CHECK: false false
 
 @inline(never)
@@ -26,8 +26,8 @@ func isNilGeneric<T>(x: T?) -> Bool {
 
 let noClass = NSClassFromString("A Class With This Name Should Not Exist!@#!")
 let yesClass = NSClassFromString("NSString")
-println(noClass == nil) // CHECK-NEXT: true
-println(yesClass == nil) // CHECK-NEXT: false
-println(isNilGeneric(noClass)) // CHECK-NEXT: true
-println(isNilGeneric(yesClass)) // CHECK-NEXT: false
+print(noClass == nil) // CHECK-NEXT: true
+print(yesClass == nil) // CHECK-NEXT: false
+print(isNilGeneric(noClass)) // CHECK-NEXT: true
+print(isNilGeneric(yesClass)) // CHECK-NEXT: false
 

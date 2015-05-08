@@ -3,14 +3,14 @@
 class C {
 
   deinit {
-    println("boom! roasted")
+    print("boom! roasted")
   }
 }
 
 class D : C {
 
   deinit {
-    println("i can't decide between a fat joke and a dumb joke")
+    print("i can't decide between a fat joke and a dumb joke")
   }
 }
 

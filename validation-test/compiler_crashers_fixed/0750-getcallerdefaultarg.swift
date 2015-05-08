@@ -5,4 +5,4 @@
 // Test case found by fuzzing
 
 let i: NSObject {
-println("\(f: Int -> U))"
+print("\(f: Int -> U))"

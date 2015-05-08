@@ -32,31 +32,29 @@ struct REPLContext {
   TypeChecker &TC;
   ASTContext &Context;
   SourceFile &SF;
-  Identifier Id_print;
   SmallVector<ValueDecl *, 4> PrintDecls;
-  Identifier Id_debugDebugPrintln;
   SmallVector<ValueDecl *, 4> DebugPrintlnDecls;
 
   REPLContext(TypeChecker &TC, SourceFile &SF)
-      : TC(TC), Context(TC.Context), SF(SF),
-        Id_print(Context.getIdentifier("print")),
-        Id_debugDebugPrintln(Context.getIdentifier("debugPrintln")) {}
+      : TC(TC), Context(TC.Context), SF(SF) {}
 
   bool requirePrintDecls() {
     if (!PrintDecls.empty() && !DebugPrintlnDecls.empty())
       return false;
 
     {
+      Identifier Id(Context.getIdentifier("_replPrintLiteralString"));
       auto lookup = TC.lookupUnqualified(TC.getStdlibModule(&SF),
-                                         Id_print, SourceLoc());
+                                         Id, SourceLoc());
       if (!lookup)
         return true;
       for (auto result : lookup)
         PrintDecls.push_back(result.Decl);
     }
     {
+      Identifier Id(Context.getIdentifier("_replDebugPrintln"));
       auto lookup = TC.lookupUnqualified(TC.getStdlibModule(&SF),
-                                         Id_debugDebugPrintln, SourceLoc());
+                                         Id, SourceLoc());
       if (!lookup)
         return true;
       for (auto result : lookup)

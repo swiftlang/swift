@@ -4,7 +4,7 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-println(true as [1
+print(true as [1
 func b: a {
 class a<A? {
 enum a<T, () -> T> T! {

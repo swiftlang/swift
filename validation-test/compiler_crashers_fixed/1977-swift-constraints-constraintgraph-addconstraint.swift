@@ -7,7 +7,7 @@
 extension Array {
 func x: NSObject {
 var d : start: NSManagedObject {
-println(T) {
+print(T) {
 }
 }
 class B {

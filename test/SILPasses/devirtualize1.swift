@@ -3,7 +3,7 @@
 class Bar<T> {
   var m_x : Int
   init(x : Int) { m_x = x }
-  func ping() { print(m_x)}
+  func ping() { print(m_x, appendNewline: false)}
 }
 
 //CHECK: function_with_interesting_stuff

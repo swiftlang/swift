@@ -9,4 +9,4 @@ class B == {
 }
 func f<T.B : A {
 }
-println(f<(x: B? {
+print(f<(x: B? {

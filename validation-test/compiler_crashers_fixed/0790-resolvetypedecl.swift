@@ -5,6 +5,6 @@
 // Test case found by fuzzing
 
 class C<T where A: T>)(f, object2: Int
-println(f))
+print(f))
 import Foundation
 S<C>

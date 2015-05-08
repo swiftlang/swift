@@ -6,7 +6,7 @@
 
 struct e = nil
 }
-println() {
+print() {
 }
 struct c<d where T : A, y: AnyObject, 3] = [B<A) {
 case C: (T: T>(")!() {

@@ -13,8 +13,8 @@
 // RUN: cmp %t/a-test.ll %t/b-test.ll
 
 func test123() -> () {
-  println("test123")
+  print("test123")
 }
 
-println("Hello World!")
+print("Hello World!")
 test123()

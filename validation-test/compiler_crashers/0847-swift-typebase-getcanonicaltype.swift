@@ -6,7 +6,7 @@
 
 protocol P {
 let t: c) {
-println("""A: (t: e = [T) -> (self.B : String = {
+print("""A: (t: e = [T) -> (self.B : String = {
 protocol P {
 extension NSSet {
 protocol b in x in a {

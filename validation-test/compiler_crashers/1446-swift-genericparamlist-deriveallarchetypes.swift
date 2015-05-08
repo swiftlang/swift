@@ -11,7 +11,7 @@ a()
 }
 protocol a {
 func ^()
-println("
+print("
 protocol b where T> String {
 return "a: c(true {
 }
@@ -68,10 +68,10 @@ func f()"foo""a<T> T> == T> T -> A : Array<T>() -> : l) -> {
 self.C(()
 }
 }() {
-println(x(Any) {
+print(x(Any) {
 protocol c where g(2, B, (() {
 var f.advance(T>()
-println() {
+print() {
 }
 typealias C {
 let f = ")
@@ -107,7 +107,7 @@ func f)"a()
 class A : a {
 }
 func a: A? {
-println(t: A, e = a: Int
+print(t: A, e = a: Int
 A.d.substringWithRange(1)
 let h = b: a {
 }

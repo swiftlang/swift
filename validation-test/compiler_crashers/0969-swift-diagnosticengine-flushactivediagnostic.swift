@@ -27,9 +27,9 @@ typealias e, g<T -> {
 func call(t: B? {
 protocol d where h, f(A, Any, k : B>) {
 let a {
-println(a(true {
+print(a(true {
 }
-println(Any, let v: [B
+print(Any, let v: [B
 func d>(a)
 func b(")
 }

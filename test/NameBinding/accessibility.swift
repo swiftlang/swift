@@ -18,28 +18,29 @@ import has_accessibility
 // This deliberately has the wrong import kind.
 import var has_accessibility.zz // expected-error {{no such decl in module}}
 
+func markUsed<T>(t: T) {}
 
-println(has_accessibility.x)
-println(has_accessibility.y) // expected-error {{module 'has_accessibility' has no member named 'y'}}
-println(has_accessibility.z) // expected-error {{module 'has_accessibility' has no member named 'z'}}
+markUsed(has_accessibility.x)
+markUsed(has_accessibility.y) // expected-error {{module 'has_accessibility' has no member named 'y'}}
+markUsed(has_accessibility.z) // expected-error {{module 'has_accessibility' has no member named 'z'}}
 // TESTABLE-NOT: :[[@LINE-3]]:{{[^:]+}}:
 // TESTABLE-NOT: :[[@LINE-3]]:{{[^:]+}}:
-// TESTABLE: :[[@LINE-3]]:9: error: module 'has_accessibility' has no member named 'z'
+// TESTABLE: :[[@LINE-3]]:10: error: module 'has_accessibility' has no member named 'z'
 
-println(accessibility.a)
-println(accessibility.b)
-println(accessibility.c) // expected-error {{module 'accessibility' has no member named 'c'}}
+markUsed(accessibility.a)
+markUsed(accessibility.b)
+markUsed(accessibility.c) // expected-error {{module 'accessibility' has no member named 'c'}}
 
-println(x)
-println(y) // expected-error {{use of unresolved identifier 'y'}}
-println(z) // expected-error {{use of unresolved identifier 'z'}}
+markUsed(x)
+markUsed(y) // expected-error {{use of unresolved identifier 'y'}}
+markUsed(z) // expected-error {{use of unresolved identifier 'z'}}
 // TESTABLE-NOT: :[[@LINE-3]]:{{[^:]+}}:
 // TESTABLE-NOT: :[[@LINE-3]]:{{[^:]+}}:
-// TESTABLE: :[[@LINE-3]]:9: error: use of unresolved identifier 'z'
+// TESTABLE: :[[@LINE-3]]:10: error: use of unresolved identifier 'z'
 
-println(a)
-println(b)
-println(c) // expected-error {{use of unresolved identifier 'c'}}
+markUsed(a)
+markUsed(b)
+markUsed(c) // expected-error {{use of unresolved identifier 'c'}}
 
 Foo.x()
 Foo.y() // expected-error {{'Foo.Type' does not have a member named 'y'}}
@@ -79,7 +80,7 @@ class Sub : Base {
 
 class ObservingOverrider : Base {
   override var value: Int { // expected-error {{cannot observe read-only property 'value'; it can't change}}
-    willSet { println(newValue) }
+    willSet { markUsed(newValue) }
   }
 }
 

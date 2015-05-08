@@ -11,7 +11,7 @@ init(f, b : NSObject {
 }
 struct B<T where H.c: NSObject {
 deinit {
-println() -> (f: d where I) {
+print() -> (f: d where I) {
 e = {
 }
 }

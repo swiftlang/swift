@@ -98,7 +98,7 @@ copies of that array::
   var a = [1, 2, 3]
   let b = a
   a[1] = 42
-  println(b[1]) // prints "42"
+  print(b[1]) // prints "42"
 
 This implies that the elments of an array are notionally not part of
 the array's value, and indeed subscript assignment is a non-mutating
@@ -125,7 +125,7 @@ array to ensure unique ownership before mutating it::
   var a = [1, 2, 3]
   let b = a
   a[1] = 42
-  println(b[1]) // prints "42"
+  print(b[1]) // prints "42"
 
 Shared Subscript Assignment and ``NSArray``
 -------------------------------------------

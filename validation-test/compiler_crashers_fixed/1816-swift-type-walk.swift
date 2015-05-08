@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 class A, AnyObject> String {
-println("foobar"""
+print("foobar"""
 }
 enum A {
 init<T? = {

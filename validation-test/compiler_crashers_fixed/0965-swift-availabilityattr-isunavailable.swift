@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 struct S : a {
-println() -> String {
+print() -> String {
 var b = true as BooleanType)) {
 }
 }

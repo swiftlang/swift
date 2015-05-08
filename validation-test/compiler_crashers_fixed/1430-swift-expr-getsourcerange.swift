@@ -19,6 +19,6 @@ protocol C = { x in a {
 }
 }
 return self.a() -> a {
-println() {
+print() {
 }
 }

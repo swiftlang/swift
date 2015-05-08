@@ -11,6 +11,6 @@ extension NSSet {
 typealias e == c: C {
 }
 class A {
-println(t: B<U : Int {
+print(t: B<U : Int {
 var b = a(")
 let f = A())

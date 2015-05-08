@@ -12,6 +12,6 @@ import ObjectiveC
 func lookUpClassOpaque(name: UnsafePointer<CChar>) -> COpaquePointer
 
 let ptr = lookUpClassOpaque("ClassFromLibrary")
-println("Loaded? \(ptr != nil)")
+print("Loaded? \(ptr != nil)")
 // WITH-LIB: Loaded? true
 // WITHOUT-LIB: Loaded? false

@@ -1061,7 +1061,7 @@ SetTestSuite.test("deleteChainCollision2") {
 
 SetTestSuite.test("deleteChainCollisionRandomized") {
   let timeNow = CUnsignedInt(time(nil))
-  println("time is \(timeNow)")
+  print("time is \(timeNow)")
   srandom(timeNow)
 
   func check(s: Set<TestKeyTy>) {
@@ -1082,7 +1082,7 @@ SetTestSuite.test("deleteChainCollisionRandomized") {
 
   var collisionChains = pickRandom(collisionChainsChoices)
   var chainOverlap = pickRandom(chainOverlapChoices)
-  println("chose parameters: collisionChains=\(collisionChains) chainLength=\(chainOverlap)")
+  print("chose parameters: collisionChains=\(collisionChains) chainLength=\(chainOverlap)")
 
   let chainLength = 7
 

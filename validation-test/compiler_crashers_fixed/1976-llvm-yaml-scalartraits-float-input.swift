@@ -25,7 +25,7 @@ func a: C {
 }
 let t..d
 }
-println(false):
+print(false):
 }
 typealias d>(()
 pu

@@ -28,5 +28,5 @@ class StaticWibble : StaticBar, StaticFoo {
 }
 
 // CHECK: StaticWibble.foo
-println(StaticWibble.mightHaveFoo())
+print(StaticWibble.mightHaveFoo())
 

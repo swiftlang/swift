@@ -17,7 +17,7 @@ var test1 =
 "world" +
 "world"
 
-println(test1)
+print(test1)
 
 // CHECK: helloworldworldworldworldworldworldworldworldworldworldworldworldworldworld
 
@@ -124,23 +124,23 @@ var test2 =
 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 // 1000
 */
 
-println(test2)
+print(test2)
 // CHECK: 100
 
-println("\(1.0/1.0) \(1.0/1.0) \(1.0/1.0)")
+print("\(1.0/1.0) \(1.0/1.0) \(1.0/1.0)")
 // CHECK: 1.0 1.0 1.0
 
 var yo = "yo"
 var yoyo = yo + yo + yo + yo + yo + yo + yo + yo
-println(yoyo)
+print(yoyo)
 // CHECK: yoyoyoyoyoyoyoyo
 
 var i1 = 1
 var ia = i1 + i1 + i1 + i1 + i1 + i1 + i1 + i1 + i1 + i1
-println(ia)
+print(ia)
 // CHECK: 10
 
-println( "test" + "ing" + " " + "this" + " " + "code" )
+print( "test" + "ing" + " " + "this" + " " + "code" )
 // CHECK: testing this code
 
 let at1 : Float = 0
@@ -148,7 +148,7 @@ let at2 : Float = 0
 let rat : Float = 0
 var rr : Float = 0
 var ii : Float = 0
-println((rr-at1)*(rr-at1) + (ii-at2)*(ii-at2))
+print((rr-at1)*(rr-at1) + (ii-at2)*(ii-at2))
 // CHECK: 0.0
 
 let y = 1
@@ -157,22 +157,22 @@ let kWorldSize = 4096
 let kWorldTileSize = kWorldSize / kWorldTileDivisor
 let kWorldCenter = kWorldSize / 2
 
-println((kWorldSize - (y * kWorldTileSize)) - kWorldCenter  - kWorldTileSize / 2)
+print((kWorldSize - (y * kWorldTileSize)) - kWorldCenter  - kWorldTileSize / 2)
 // CHECK: 1856
 
 let p: [Double] = [0.0, 1.0]
 let q: [Double] = [0.0, 1.0]
 let r: [Double] = [0.0, 1.0]
 let size : Double = (q[0]-p[0])*(r[1]-p[1]) - (q[1]-p[1])*(r[0]-p[0])
-println(size)
+print(size)
 // CHECK: 0.0
 
 let cc = 1 + 1 + 1.0 + 1 + 1 + 1.0
-println(cc)
+print(cc)
 // CHECK: 6.0
 
 let dd = 1 + 1 + Double(1) + 1 + Double(1)
-println(dd)
+print(dd)
 // CHECK: 5.0
 
 struct Point2D {
@@ -196,7 +196,7 @@ var signedArea: Float {
     }
 }
 
-println(signedArea)
+print(signedArea)
 // CHECK: 0.0
 
 struct D {
@@ -214,5 +214,5 @@ struct D {
 }
 let components = D(year:1776, month:7, day:4)
 let date = String(components.year) + "-" + String(components.month) + "-" + String(components.day)
-println(date)
+print(date)
 // CHECK: 1776-7-4

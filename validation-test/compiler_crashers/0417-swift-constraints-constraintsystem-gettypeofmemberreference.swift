@@ -13,7 +13,7 @@ f : NSManagedObject {
 func b: P {
 }
 }
-println() {
+print() {
 let t: String {
 }
 func g: NSObject {

@@ -1088,8 +1088,8 @@ func benchStringSort() {
   }
   let delta = __mach_absolute_time__() - start
 
-  println("\(delta) nanoseconds.")
-  println("\(Double(delta) / Double(50)) nanoseconds/lap")
+  print("\(delta) nanoseconds.")
+  print("\(Double(delta) / Double(50)) nanoseconds/lap")
 }
 
 func benchRC4_internal(messageLen : Int, iterations : Int, validate : Bool) {
@@ -1120,15 +1120,15 @@ func benchRC4_internal(messageLen : Int, iterations : Int, validate : Bool) {
   }
 
   let delta = __mach_absolute_time__() - start
-  println("\(delta) nanoseconds.")
-  println("\(Double(delta) / Double(iterations)) nanoseconds/lap")
+  print("\(delta) nanoseconds.")
+  print("\(Double(delta) / Double(iterations)) nanoseconds/lap")
 
 
   if (validate) {
-    println("Validating ...")
+    print("Validating ...")
     for i in 0..messageLen {
       if (LongData[i] != SecretData[i % SecretData.count]) {
-        println("Error at \(i)");
+        print("Error at \(i)");
       }
     }
   }
@@ -1152,8 +1152,8 @@ func benchStringComplexWalk() -> Int {
     }
   }
   let delta = __mach_absolute_time__() - start
-  println("\(delta) nanoseconds.")
-  println("\(Double(delta) / Double(laps)) nanoseconds/lap")
+  print("\(delta) nanoseconds.")
+  print("\(Double(delta) / Double(laps)) nanoseconds/lap")
   return count
 }
 
@@ -1169,8 +1169,8 @@ func benchStringWalk() -> Int {
     }
   }
   let delta = __mach_absolute_time__() - start
-  println("\(delta) nanoseconds.")
-  println("\(Double(delta) / Double(laps)) nanoseconds/lap")
+  print("\(delta) nanoseconds.")
+  print("\(Double(delta) / Double(laps)) nanoseconds/lap")
   return count
 }
 
@@ -1214,7 +1214,7 @@ class NthToggle : Toggle {
 func benchObjInst_internal(n : Int) {
   var toggle1 = Toggle(start_state: true)
   //for i in 0...5 {
-  //  println(toggle1.activate().value())
+  //  print(toggle1.activate().value())
   //}
 
   for i in 0..5 {
@@ -1223,7 +1223,7 @@ func benchObjInst_internal(n : Int) {
 
   var ntoggle1 = NthToggle(start_state: true, max_counter: 3)
   //for i in 0...5 {
-  //  println(ntoggle1.activate().value())
+  //  print(ntoggle1.activate().value())
   //}
 
   for i in 0..n {
@@ -1235,7 +1235,7 @@ func benchObjInst() {
   let start = __mach_absolute_time__()
   benchObjInst_internal(100000000)
   let delta = __mach_absolute_time__() - start
-  println("\(delta) nanoseconds.")
+  print("\(delta) nanoseconds.")
 }
 
 
@@ -1247,26 +1247,26 @@ func Ackermann(M : Int, N : Int) -> Int {
 
 func benchAckermann() {
   let start = __mach_absolute_time__()
-  println(Ackermann(3, 13))
+  print(Ackermann(3, 13))
   let delta = __mach_absolute_time__() - start
-  println("\(delta) nanoseconds.")
+  print("\(delta) nanoseconds.")
 }
 
 func benchAll() {
-  println(" --- Ackermann --------------")
+  print(" --- Ackermann --------------")
   benchAckermann()
-  println(" --- ObjInst ----------------")
+  print(" --- ObjInst ----------------")
   benchObjInst()
-  println(" --- RC4 ------------------- ")
+  print(" --- RC4 ------------------- ")
   benchRC4()
-  println(" --- String Sort ------------")
+  print(" --- String Sort ------------")
   benchStringSort()
-  println(" --- String Walk ------------")
+  print(" --- String Walk ------------")
   benchStringWalk()
-  println(" --- String Complex Walk ----")
+  print(" --- String Complex Walk ----")
   benchStringComplexWalk()
-  println(" --- Prim MST ----")
-  println(" ----------------------------")
+  print(" --- Prim MST ----")
+  print(" ----------------------------")
 }
 
 benchAll()

@@ -761,12 +761,12 @@ StringTests.test("reserveCapacity") {
   s.splice(Repeat(count: s.capacity + 1, repeatedValue: x), atIndex: s.endIndex)
   expectNotEqual(id0, s.bufferID)
   s = ""
-  println("empty capacity \(s.capacity)")
+  print("empty capacity \(s.capacity)")
   s.reserveCapacity(oldCap + 2)
-  println("reserving \(oldCap + 2) -> \(s.capacity), width = \(s._core.elementWidth)")
+  print("reserving \(oldCap + 2) -> \(s.capacity), width = \(s._core.elementWidth)")
   let id1 = s.bufferID
   s.splice(Repeat(count: oldCap + 2, repeatedValue: x), atIndex: s.endIndex)
-  println("extending by \(oldCap + 2) -> \(s.capacity), width = \(s._core.elementWidth)")
+  print("extending by \(oldCap + 2) -> \(s.capacity), width = \(s._core.elementWidth)")
   expectEqual(id1, s.bufferID)
   s.splice(Repeat(count: s.capacity + 100, repeatedValue: x), atIndex: s.endIndex)
   expectNotEqual(id1, s.bufferID)

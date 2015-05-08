@@ -33,7 +33,7 @@ if true }
 }
 }
 }
-println(((self.c == .Generator.c)
+print(((self.c == .Generator.c)
 }
 func b: c] in
 var b {

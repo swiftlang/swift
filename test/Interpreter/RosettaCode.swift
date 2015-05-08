@@ -9,7 +9,7 @@ func factorial(x: Int) -> Int {
 // From http://rosettacode.org/wiki/Towers_of_Hanoi
 func TowersOfHanoi(ndisks: Int, from: Int, to: Int, via: Int) -> Void {
   if (ndisks == 1) {
-    print("Move disk from pole \(from) to pole \(to)\n")
+    print("Move disk from pole \(from) to pole \(to)\n", appendNewline: false)
   }
   else {
     TowersOfHanoi(ndisks-1, from: from, to: via, via: to);
@@ -19,8 +19,8 @@ func TowersOfHanoi(ndisks: Int, from: Int, to: Int, via: Int) -> Void {
 }
 
 // Driver code.
-print("Factorial of 10 = \(factorial(10))\n\n")
-print("Towers of Hanoi, 4 disks\n")
+print("Factorial of 10 = \(factorial(10))\n\n", appendNewline: false)
+print("Towers of Hanoi, 4 disks\n", appendNewline: false)
 TowersOfHanoi(4, from: 1, to: 2, via: 3)
 
 // CHECK: Factorial of 10 = 3628800

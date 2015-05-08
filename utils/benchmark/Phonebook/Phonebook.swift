@@ -62,7 +62,7 @@ func benchStringSort() {
   }
   let delta = __mach_absolute_time__() - start
 
-  println("\(delta) nanoseconds.")
+  print("\(delta) nanoseconds.")
 }
 
 benchStringSort()

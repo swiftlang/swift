@@ -254,7 +254,7 @@ public struct EnumerateSequence<Base : SequenceType> : SequenceType {
 /// the elements of `base`:
 ///
 ///     > for (n, c) in enumerate("Swift".characters) {
-///         println("\(n): '\(c)'" )
+///         print("\(n): '\(c)'" )
 ///       }
 ///     0: 'S'
 ///     1: 'w'

@@ -6,7 +6,7 @@
 
 S(T> () -> {
 }
-println(t: T -> T
+print(t: T -> T
 }
 }
 protocol A {
@@ -48,7 +48,7 @@ var e: A.E == a() {
 private let a = compose<I : c) {
 struct B<c("A? = b() {
 }(v: String {
-println() -> T : String = b(x)
+print() -> T : String = b(x)
 let f = B<T>? = b<T>() -> String = compose(f: Int
 let f = D> {
 return d.d: String = {

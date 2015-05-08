@@ -350,18 +350,18 @@ end, strings support properties for more-specific segmentations:
           has some advice for us.
 
 .. parsed-literal::
-   |swift| for c in s { println("Extended Grapheme Cluster: \(c)") }
+   |swift| for c in s { print("Extended Grapheme Cluster: \(c)") }
    `Extended Grapheme Cluster: f`
    `Extended Grapheme Cluster: o`
    `Extended Grapheme Cluster: o`
    |swift| for c in s.collationCharacters { 
-             println("Collation Grapheme Cluster: \(c)")
+             print("Collation Grapheme Cluster: \(c)")
            }
    `Collation Grapheme Cluster: f`
    `Collation Grapheme Cluster: o`
    `Collation Grapheme Cluster: o`
    |swift| for c in s.searchCharacters { 
-             println("Search Grapheme Cluster: \(c)")
+             print("Search Grapheme Cluster: \(c)")
            }
    `Search Grapheme Cluster: f`
    `Search Grapheme Cluster: o`
@@ -406,7 +406,7 @@ Strings are **Encoded as UTF-8**
 
 .. parsed-literal::
    |swift| for x in "bump"\ **.bytes** {
-            println(x)
+            print(x)
           }
    98
    117

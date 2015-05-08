@@ -49,15 +49,16 @@ func testSuvscript(cwu: ClassWithUnavailable) {
 
 /* FIXME 'nil == a' fails to type-check with a bogus error message
  * <rdar://problem/17540796>
+func markUsed<T>(t: T) {}
 func testString() {
   let a : String = "Hey"
   if a == nil {
-    println("nil")
+    markUsed("nil")
   } else if nil == a {
-    println("nil")
+    markUsed("nil")
   }
   else {
-    println("not nil")
+    markUsed("not nil")
   }
 }
  */

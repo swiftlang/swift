@@ -7,7 +7,7 @@
 
 struct d<T, U, i: b = {
 class A<T where T: b() -> T : X.C(.B() -> == b<d {
-println(b("
+print(b("
 var f = [c<T : A<T>(()) -> {
 }
 protocol c == B<U) -> {

@@ -4,7 +4,7 @@ import Swift
 import StdlibUnittest
 
 _setOverrideOSVersion(.iOS(major: 10, minor: 9, bugFix: 3))
-_setTestSuiteFailedCallback() { println("abort()") }
+_setTestSuiteFailedCallback() { print("abort()") }
 
 var XFailsIOS = TestSuite("XFailsIOS")
 

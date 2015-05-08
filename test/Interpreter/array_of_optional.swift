@@ -13,12 +13,12 @@ func main() {
 	for item in arrOpt {
 		switch item {
 			case .None:
-			println("None")
+			print("None")
 			case .Some(var v):
-			println(v)
+			print(v)
 		}
 	}
-	println("hello world")
+	print("hello world")
 }
 
 main()

@@ -57,7 +57,7 @@ UnicodeTrie.test("_UnicodeGraphemeClusterBreakPropertyTrie") {
 
   for cp in UInt32(0)...UInt32(0x10ffff) {
     if cp % 0x10000 == 0 {
-      println("\(cp)...")
+      print("\(cp)...")
     }
     expectEqual(expected[Int(cp)], trie.getPropertyValue(cp)) {
       "code point \(cp)"

@@ -42,7 +42,7 @@ public func singleDefaultArgument(i i: Int = {
   return 2
 
   }()){
-    println(i)
+    print(i)
 }
 
 

@@ -2,8 +2,8 @@
 
 // CHECK: import struct <iMod>Swift</iMod>.<iStruct@>Int</iStruct>
 import struct Swift.Int
-// CHECK: import func <iMod>Swift</iMod>.println
-import func Swift.println
+// CHECK: import func <iMod>Swift</iMod>.print_new
+import func Swift.print_new
 
 // CHECK: struct <Struct>S</Struct> {
 // CHECK-NEXT:   var <Var>x</Var>: <iStruct@>Int</iStruct> = 0

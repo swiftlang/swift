@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -enable-experimental-patterns -emit-silgen %s | FileCheck %s
 
+func markUsed<T>(t: T) {}
+
 // TODO: Implement tuple equality in the library.
 // BLOCKED: <rdar://problem/13822406>
 func ~= (x: (Int, Int), y: (Int, Int)) -> Bool {
@@ -1124,9 +1126,9 @@ func test_class_pattern_with_isa_2(#k: ClassPatternTest) {
 // <rdar://problem/14826416>
 func rdar14826416<T, U>(#t: T, u: U) {
   switch t {
-  case is Int: println("Int")
-  case is U: println("U")
-  case _: println("other")
+  case is Int: markUsed("Int")
+  case is U: markUsed("U")
+  case _: markUsed("other")
   }
 }
 // CHECK-LABEL: sil hidden @_TF6switch12rdar14826416U___FT1tQ_1uQ0__T_
@@ -1141,10 +1143,10 @@ class SubRdar14835992 : Rdar14835992 {}
 // CHECK-LABEL: sil hidden @_TF6switch12rdar14835992U___FT1tCS_12Rdar148359922ttQ_2uuQ0__T_
 func rdar14835992<T, U>(#t: Rdar14835992, tt: T, uu: U) {
   switch t {
-  case is SubRdar14835992: println("Sub")
-  case is T: println("T")
-  case is U: println("U")
-  case _: println("other")
+  case is SubRdar14835992: markUsed("Sub")
+  case is T: markUsed("T")
+  case is U: markUsed("U")
+  case _: markUsed("other")
   }
 }
 
@@ -1159,7 +1161,7 @@ struct StructWithComputedProperty {
 func testStructWithComputedProperty(#s : StructWithComputedProperty) {
   switch s {
   case StructWithComputedProperty(foo: let a):
-    println(a)
+    markUsed(a)
   }
 }
 

@@ -9,7 +9,7 @@ class func e() -> Int = c)
 }
 class c : a {
 func a()
-println(A> T) {
+print(A> T) {
 protocol a {
 }
 }

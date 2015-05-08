@@ -1,11 +1,13 @@
 // RUN: %target-parse-verify-swift
 
+func my_print<T>(t: T) {}
+
 class 你好 {
   class שלום {
     class வணக்கம் {
       class Γειά {
         class func привет() {
-          println("hello")
+          my_print("hello")
         }
       }
     }

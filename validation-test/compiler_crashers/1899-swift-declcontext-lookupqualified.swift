@@ -15,6 +15,6 @@ case A<T : A<T> {
 }
 return g<Int].init() {
 class A<T where d: d : l.a)() -> {
-println(b(T
+print(b(T
 enum S("[c<T.Element == {
 private let f = A

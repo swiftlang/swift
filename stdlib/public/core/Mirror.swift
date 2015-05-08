@@ -127,7 +127,7 @@ public struct Mirror {
   ///
   ///     if let b = AnyBidirectionalCollection(someMirror.children) {
   ///       for i in advance(b.endIndex, -20, b.startIndex)..<b.endIndex {
-  ///          println(b[i])
+  ///          print(b[i])
   ///       }
   ///     }
   public typealias Children = AnyForwardCollection<Child>
@@ -640,7 +640,7 @@ public protocol CustomPlaygroundQuickLookable {
 ///     }
 ///
 ///     let x = IntPairs([1:2, 1:1, 3:4, 2:1])
-///     println(x.elements)  // [(1, 2), (1, 1), (3, 4), (2, 1)]
+///     print(x.elements)  // [(1, 2), (1, 1), (3, 4), (2, 1)]
 public struct DictionaryLiteral<Key, Value> : DictionaryLiteralConvertible {
   /// Store `elements`
   public init(dictionaryLiteral elements: (Key, Value)...) {
@@ -706,7 +706,7 @@ extension String {
   /// - seealso: `String.init<T>(reflecting: T)`
   public init<T>(_ instance: T) {
     self.init()
-    print(instance, &self)
+    print(instance, &self, appendNewline: false)
   }
 
   /// Initialize `self` with a detailed textual representation of
@@ -727,6 +727,6 @@ extension String {
   /// - seealso: `String.init<T>(T)`
   public init<T>(reflecting subject: T) {
     self.init()
-    debugPrint(subject, &self)
+    debugPrint(subject, &self, appendNewline: false)
   }
 }

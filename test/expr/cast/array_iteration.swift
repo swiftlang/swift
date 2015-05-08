@@ -1,7 +1,9 @@
 // RUN: %target-parse-verify-swift
 
+func doFoo() {}
+
 class View {
-	var subviews: Array<AnyObject>! = []
+  var subviews: Array<AnyObject>! = []
 }
 
 var rootView = View()
@@ -11,12 +13,12 @@ rootView.subviews = v
 rootView.subviews as! [View]
 
 for view in rootView.subviews as! [View] {
-	println("found subview")
+  doFoo()
 }
 
 // FIXME: Unhelpful diagnostic here.
 for view:View in rootView.subviews { // expected-error{{'Array<AnyObject>!' is not convertible to '_BuiltinIntegerLiteralConvertible'}}
-	println("found subview")
+  doFoo()
 }
 
 (rootView.subviews!) as! [View]
@@ -30,17 +32,17 @@ ao as! [View] // works
 var b = Array<(String, Int)>()
 
 for x in b {
-  println("hi")
+  doFoo()
 }
 
 var c : Array<(String, Int)>! = Array()
 
 for x in c {
-  println("hi")
+  doFoo()
 }
 
 var d : Array<(String, Int)>? = Array()
 
 for x in d! {
-	println("hi")
+  doFoo()
 }

@@ -27,6 +27,6 @@ func test() {
     let r = lfsr.randInt()
     assert(!rands[r])
     rands[r] = true
-    println(r)
+    print(r)
   }
 }

@@ -13,20 +13,20 @@ func fooify<T>(x: T) {
   if let foo = x as? Fooable {
     foo.foo()
   } else {
-    println("not fooable")
+    print("not fooable")
   }
 }
 
 extension NSRect: Fooable {
-  func foo() { println("NSRect") }
+  func foo() { print("NSRect") }
 }
 
 extension CFSet: Fooable {
-  func foo() { println("CFSet") }
+  func foo() { print("CFSet") }
 }
 
 extension NSString: Fooable {
-  func foo() { println("NSString") }
+  func foo() { print("NSString") }
 }
 
 fooify(NSRect()) // CHECK: NSRect

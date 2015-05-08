@@ -13,4 +13,4 @@ init()
 func c> U>())
 protocol a {
 }
-println(b<T : c) -> Any, let end = c()
+print(b<T : c) -> Any, let end = c()

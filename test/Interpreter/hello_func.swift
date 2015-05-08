@@ -2,7 +2,7 @@
 
 // CHECK: Nice shoes
 func hello() {
-  println("Nice shoes")
+  print("Nice shoes")
 }
 
 hello()

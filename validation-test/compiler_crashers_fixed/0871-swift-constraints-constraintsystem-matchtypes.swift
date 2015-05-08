@@ -10,7 +10,7 @@ import Foundation
 return [unowned self.Type) {
 return self.d.c = compose(self.init("
 var d where I) {
-println((v: NSObject {
+print((v: NSObject {
 protocol d = {
 var e!.h = {
 }

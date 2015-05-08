@@ -19,31 +19,31 @@ func <+>=(inout a: Interval, b: Interval) {
   a.hi += b.hi
 }
 
-func println(x: Interval) {
-  println("(lo=\(x.lo), hi=\(x.hi))")
+func print(x: Interval) {
+  print("(lo=\(x.lo), hi=\(x.hi))")
 }
 
 // CHECK: (lo=4, hi=6)
-println((1,2) <+> (3,4))
+print((1,2) <+> (3,4))
 // CHECK: (lo=4, hi=6)
-println((hi:2,lo:1) <+> (lo:3,hi:4))
+print((hi:2,lo:1) <+> (lo:3,hi:4))
 // CHECK: (lo=1, hi=3)
-println((3,4) <-> (1,2))
+print((3,4) <-> (1,2))
 
 func mutate() {
   var x:Interval = (1, 2)
   x <+>= (3, 4)
   // CHECK: (lo=4, hi=6)
-  println(x)
+  print(x)
 }
 mutate()
 
 func printInts(ints: Int...) {
-  print("\(ints.count) ints: ")
+  print("\(ints.count) ints: ", appendNewline: false)
   for int in ints {
-    print("\(int) ")
+    print("\(int) ", appendNewline: false)
   }
-  print("\n")
+  print("\n", appendNewline: false)
 }
 
 // CHECK: 0 ints

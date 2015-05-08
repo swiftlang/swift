@@ -33,7 +33,7 @@ assert()
 class c
 }
 }
-println(e<b
+print(e<b
 var b: P> (e?
 """foo")
 }

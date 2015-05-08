@@ -6,7 +6,7 @@
 
 lass func g<T> () {
 class A {
-println() -> T) -> T -> Any {
+print() -> T) -> T -> Any {
 }
 enum b : C) {
 }

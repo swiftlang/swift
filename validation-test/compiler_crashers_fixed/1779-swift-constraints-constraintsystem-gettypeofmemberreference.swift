@@ -10,7 +10,7 @@ var f = [""")
 class A = {
 }
 class func c) {
-println("foo")
+print("foo")
 }
 }
 protocol A {

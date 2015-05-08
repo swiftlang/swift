@@ -11,5 +11,5 @@ struct A? = b(h>(c where B = ")
 func b
 }
 }
-println() { c
+print() { c
 ext

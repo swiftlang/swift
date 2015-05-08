@@ -9,7 +9,7 @@
 }
 }
 import Foundation
-println(a
+print(a
 }
 protocol c = i<T) { c: AnyObject)
 })()
@@ -29,7 +29,7 @@ struct c : T, B<T -> V>() -> (Range<T, Any, i: b.Type
 e = A, f<d where f<T>: a()
 }
 }
-println(range.e> {
+print(range.e> {
 override func b(s(start, Bool].init(t: Int {
 let g = T>?
 if true {

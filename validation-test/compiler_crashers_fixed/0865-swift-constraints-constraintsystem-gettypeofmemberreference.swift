@@ -7,7 +7,7 @@
 struct A {
 A) -> {
 class A: String {
-println()) -> Any {
+print()) -> Any {
 }
 }
 }

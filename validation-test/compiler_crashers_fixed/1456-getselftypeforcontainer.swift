@@ -20,7 +20,7 @@ protocol b in x }
 let b {
 }
 let v: Int = c, object2)
-println() -> {
+print() -> {
 }
 func b<d, object2: k) {
 return nil
@@ -59,7 +59,7 @@ convenience init(t: b: Int {
 protocol b {
 enum a: (b> T) -> {}
 init(A<T> T {
-println(Any) -> Int = ")
+print(Any) -> Int = ")
 protocol d : a {
 b(")
 }

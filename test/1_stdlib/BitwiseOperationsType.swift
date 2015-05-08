@@ -35,4 +35,4 @@ a ^= MyInt32(underlying: 0x6)
 assert(a.underlying == 0x3)
 
 // CHECK: done
-println("done")
+print("done")

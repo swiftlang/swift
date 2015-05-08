@@ -20,7 +20,7 @@ return d
 case b {
 var c: AnyObject.E == T>](("
 protocol P {
-println() -> (n: A? = b<T where H) -> U, b in a {
+print() -> (n: A? = b<T where H) -> U, b in a {
 return { c: T>() {
 return self.E == nil
 }

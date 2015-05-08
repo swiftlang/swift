@@ -60,7 +60,7 @@ func repr(x: String) -> String {
 // ===------- Appending -------===
 
 // CHECK: --- Appending ---
-println("--- Appending ---")
+print("--- Appending ---")
 
 var s = "⓪" // start non-empty
 
@@ -70,22 +70,22 @@ s.reserveCapacity(8)
 
 // CHECK-NEXT: String(Contiguous(owner: .Native@[[buffer0:[x0-9a-f]+]][0...2], capacity = 8)) = "⓪1"
 s += "1"
-println("\(repr(s))")
+print("\(repr(s))")
 
 // CHECK-NEXT: String(Contiguous(owner: .Native@[[buffer1:[x0-9a-f]+]][0...8], capacity = 8)) = "⓪1234567"
 s += "234567"
-println("\(repr(s))")
+print("\(repr(s))")
 
 // -- expect a reallocation here
 
 // CHECK-NEXT: String(Contiguous(owner: .Native@[[buffer2:[x0-9a-f]+]][0...9], capacity = 16)) = "⓪12345678"
 // CHECK-NOT: .Native@[[buffer1]]
 s += "8"
-println("\(repr(s))")
+print("\(repr(s))")
 
 // CHECK-NEXT: String(Contiguous(owner: .Native@[[buffer2]][0...16], capacity = 16)) = "⓪123456789012345"
 s += "9012345"
-println("\(repr(s))")
+print("\(repr(s))")
 
 // -- expect a reallocation here
 
@@ -100,14 +100,14 @@ println("\(repr(s))")
 // CHECK-NEXT: String(Contiguous(owner: .Native@[[buffer3:[x0-9a-f]+]][0...48], capacity = 48))
 // CHECK-NOT: .Native@[[buffer2]]
 s += s + s
-println("\(repr(s))")
+print("\(repr(s))")
 
 // -- expect a reallocation here
 
 // CHECK-NEXT: String(Contiguous(owner: .Native@[[buffer4:[x0-9a-f]+]][0...49], capacity = 96))
 // CHECK-NOT: .Native@[[buffer3]]
 s += "C"
-println("\(repr(s))")
+print("\(repr(s))")
 
 /// An additional reference to the same buffer doesn't, by itself,
 /// impede the use of available capacity
@@ -115,10 +115,10 @@ var s1 = s
 
 // CHECK-NEXT: String(Contiguous(owner: .Native@[[buffer4]][0...50], capacity = 96))
 s += "F"
-println("\(repr(s))")
+print("\(repr(s))")
 
 // CHECK-NEXT: String(Contiguous(owner: .Native@[[buffer4]][0...49], capacity = 96))
-println("\(repr(s1))")
+print("\(repr(s1))")
 
 /// The use of later buffer capacity by another string forces
 /// reallocation
@@ -126,11 +126,11 @@ println("\(repr(s1))")
 // CHECK-NEXT: String{{.*}} = {{.*}}X"
 // CHECK-NOT: .Native@[[buffer4]]
 s1 += "X"
-println("\(repr(s1))")
+print("\(repr(s1))")
 
 /// Appending to an empty string re-uses the RHS
 
 // CHECK-NEXT: .Native@[[buffer4]]
 var s2 = String()
 s2 += s
-println("\(repr(s2))")
+print("\(repr(s2))")

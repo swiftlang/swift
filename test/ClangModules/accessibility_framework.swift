@@ -26,4 +26,4 @@ class AA: NSView {
 }
 
 let a = A()
-print(a.accessibilityLabel())
+print(a.accessibilityLabel(), appendNewline: false)

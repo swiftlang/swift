@@ -98,7 +98,7 @@ struct X : _ObjectiveCBridgeable {
 }
 
 // CHECK: testing...
-println("testing...")
+print("testing...")
 
 func testScope() {
   let a = [X(1), X(2), X(3)]
@@ -106,17 +106,17 @@ func testScope() {
 
   // construction of these tracked objects is lazy
   // CHECK-NEXT: trackedCount = 0 .
-  println("trackedCount = \(trackedCount) .")
+  print("trackedCount = \(trackedCount) .")
 
   // We can get a single element out
   // CHECK-NEXT: nsx[0]: 1 .
   var one = nsx.objectAtIndex(0) as! Tracked
-  println("nsx[0]: \(one.value) .")
+  print("nsx[0]: \(one.value) .")
 
   // We can get the element again, but it may not have the same identity
   // CHECK-NEXT: object identity matches?
   var anotherOne = nsx.objectAtIndex(0) as! Tracked
-  println("object identity matches? \(one === anotherOne)")
+  print("object identity matches? \(one === anotherOne)")
 
   // Because the elements come back at +0, we really don't want to
   // treat them as objects, or we'll get double deletion
@@ -132,7 +132,7 @@ func testScope() {
 
   // CHECK-NEXT: getObjects yields them at +0: true
   var x = objects[0]
-  println("getObjects yields them at +0: "
+  print("getObjects yields them at +0: "
     + "\(_isUnique_native(&x))")
 }
 
@@ -141,5 +141,5 @@ autoreleasepool() {
 }
 
 // CHECK-NEXT: leaks = 0 .
-println("leaks = \(trackedCount) .")
+print("leaks = \(trackedCount) .")
 

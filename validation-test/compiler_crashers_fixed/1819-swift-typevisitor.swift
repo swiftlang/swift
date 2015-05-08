@@ -16,7 +16,7 @@ case C: e : b {
 typealias e = e, i> String {
 }
 case c, let n1: a {
-println(c(start, U>, let a {
+print(c(start, U>, let a {
 }
 enum S) -> : Any) -> Int = h
 }

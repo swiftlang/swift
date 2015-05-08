@@ -7,11 +7,11 @@
 
 // REQUIRES: swift_interpreter
 
-println("Begin")
+print("Begin")
 for arg in Process.arguments {
-  println(arg)
+  print(arg)
 }
-println("End")
+print("End")
 
 // NONE: Begin
 // NONE-NEXT: {{.*}}shebang.swift

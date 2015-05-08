@@ -2,7 +2,6 @@ public class BaseProblem
 {
     func run() -> Int
     {
-        println("Base class implementation")
         return 0
     }
 }
@@ -22,7 +21,7 @@ class Evaluator
         if let problemBlock = map[n]
         {
             let foo = problemBlock()
-            println("foo = \(foo)")
+            print("foo = \(foo)")
         }
     }
 }

@@ -14,12 +14,12 @@ enum Bewl : BooleanType {
 }
 
 func truthy() -> Bewl {
-  print("truthy ")
+  print("truthy ", appendNewline: false)
   return .True
 }
 
 func falsy() -> Bewl {
-  print("falsy ")
+  print("falsy ", appendNewline: false)
   return .False
 }
 
@@ -29,21 +29,21 @@ func logicValueTests() {
     var boolValue: Bool { return false }
   }
   var anX = X()
-  println("BooleanType Bool = \(Bool(anX))")   // CHECK: BooleanType Bool = false
+  print("BooleanType Bool = \(Bool(anX))")   // CHECK: BooleanType Bool = false
 
-  println("\(!Bewl.True)") // CHECK: false
-  println("\(!Bewl.False)") // CHECK: true
+  print("\(!Bewl.True)") // CHECK: false
+  print("\(!Bewl.False)") // CHECK: true
 
   // Test short-circuiting operators
-  println("\(Bool(truthy() && truthy()))") // CHECK: truthy truthy true
-  println("\(Bool(truthy() && falsy()))") // CHECK: truthy falsy false
-  println("\(Bool(falsy() && truthy()))") // CHECK: falsy false
-  println("\(Bool(falsy() && falsy()))") // CHECK: falsy false
+  print("\(Bool(truthy() && truthy()))") // CHECK: truthy truthy true
+  print("\(Bool(truthy() && falsy()))") // CHECK: truthy falsy false
+  print("\(Bool(falsy() && truthy()))") // CHECK: falsy false
+  print("\(Bool(falsy() && falsy()))") // CHECK: falsy false
 
-  println("\(Bool(truthy() || truthy()))") // CHECK: truthy true
-  println("\(Bool(truthy() || falsy()))") // CHECK: truthy true
-  println("\(Bool(falsy() || truthy()))") // CHECK: falsy truthy true
-  println("\(Bool(falsy() || falsy()))") // CHECK: falsy falsy false
+  print("\(Bool(truthy() || truthy()))") // CHECK: truthy true
+  print("\(Bool(truthy() || falsy()))") // CHECK: truthy true
+  print("\(Bool(falsy() || truthy()))") // CHECK: falsy truthy true
+  print("\(Bool(falsy() || falsy()))") // CHECK: falsy falsy false
 }
 
 logicValueTests()

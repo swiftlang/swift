@@ -30,7 +30,7 @@ return [Int) {
 let n1: T -> {
 return {
 class A, f<T, let t: () {
-println(e(g> Any) {
+print(e(g> Any) {
 let b {
 func g([0
 protocol d : T, e(A.c(Any, T>() { c, self.init(f.c {

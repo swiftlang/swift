@@ -11,39 +11,39 @@ import Foundation
 
 func printEquality<T : Equatable>(lhs: T, _ rhs: T, _ lhsName: String, _ rhsName: String) {
   if lhs == lhs {
-    println("\(lhsName) == \(lhsName)")
+    print("\(lhsName) == \(lhsName)")
   }
   if lhs != lhs {
-    println("\(lhsName) != \(lhsName)")
+    print("\(lhsName) != \(lhsName)")
   }
   if lhs == rhs {
-    println("\(lhsName) == \(rhsName)")
+    print("\(lhsName) == \(rhsName)")
   }
   if lhs != rhs {
-    println("\(lhsName) != \(rhsName)")
+    print("\(lhsName) != \(rhsName)")
   }
 }
 
 func printIdentity(lhs: AnyObject, _ rhs: AnyObject, _ lhsName: String, _ rhsName: String) {
   if lhs === lhs {
-    println("\(lhsName) === \(lhsName)")
+    print("\(lhsName) === \(lhsName)")
   }
   if lhs !== lhs {
-    println("\(lhsName) !== \(lhsName)")
+    print("\(lhsName) !== \(lhsName)")
   }
   if lhs === rhs {
-    println("\(lhsName) === \(rhsName)")
+    print("\(lhsName) === \(rhsName)")
   }
   if lhs !== rhs {
-    println("\(lhsName) !== \(rhsName)")
+    print("\(lhsName) !== \(rhsName)")
   }
 }
 
 
-println("NoisyEqual ==")
+print("NoisyEqual ==")
 class NoisyEqual : NSObject {
   override func isEqual(rhs: AnyObject?) -> Bool {
-    println("wow much equal")
+    print("wow much equal")
     return super.isEqual(rhs)
   }
 }
@@ -52,7 +52,7 @@ let n1 = NoisyEqual.init()
 let n2 = NoisyEqual.init()
 printIdentity(n1, n2, "n1", "n2")
 printEquality(n1, n2, "n1", "n2")
-println("done NoisyEqual ==")
+print("done NoisyEqual ==")
 // CHECK: NoisyEqual ==
 // CHECK-NEXT: n1 === n1
 // CHECK-NEXT: n1 !== n2
@@ -65,7 +65,7 @@ println("done NoisyEqual ==")
 // CHECK-NEXT: done NoisyEqual ==
 
 
-println("NSObject ==")
+print("NSObject ==")
 let o1 = NSObject.init()
 let o2 = NSObject.init()
 printIdentity(o1, o2, "o1", "o2")
@@ -74,7 +74,7 @@ printIdentity(o1, 10, "o1", "10")
 printEquality(o1, 10, "o1", "10")
 printIdentity(10, o1, "10", "o1")
 printEquality(10, o1, "10", "o1")
-println("done NSObject ==")
+print("done NSObject ==")
 // CHECK: NSObject ==
 // CHECK-NEXT: o1 === o1
 // CHECK-NEXT: o1 !== o2
@@ -91,16 +91,16 @@ println("done NSObject ==")
 // CHECK: done NSObject ==
 
 
-println("NSMutableString ==")
+print("NSMutableString ==")
 let s1 = NSMutableString.init(string:"hazcam")
 let s2 = NSMutableString.init(string:"hazcam")
 printIdentity(s1, s2, "s1", "s2")
 printEquality(s1, s2, "s1", "s2")
-println("mutate")
+print("mutate")
 s2.appendString("navcam")
 printIdentity(s1, s2, "s1", "s2")
 printEquality(s1, s2, "s1", "s2")
-println("done NSMutableString ==")
+print("done NSMutableString ==")
 // CHECK: NSMutableString ==
 // CHECK-NEXT: s1 === s1
 // CHECK-NEXT: s1 !== s2
@@ -119,17 +119,17 @@ println("done NSMutableString ==")
 //===----------------------------------------------------------------------===//
 
 func printHashValue<T : Hashable>(x: T, _ name: String) {
-  println("\(name) hashes to \(x.hashValue)")
+  print("\(name) hashes to \(x.hashValue)")
 }
 
 
-println("NSMutableString hashValue")
-println("\(s1.hashValue)")
-println("\(s1.hash)")
+print("NSMutableString hashValue")
+print("\(s1.hashValue)")
+print("\(s1.hash)")
 s1.appendString("pancam")
-println("\(s1.hashValue)")
-println("\(s1.hash)")
-println("done NSMutableString hashValue")
+print("\(s1.hashValue)")
+print("\(s1.hash)")
+print("done NSMutableString hashValue")
 // CHECK: NSMutableString hashValue
 // CHECK-NEXT: [[H1:[0-9]+]]
 // CHECK-NEXT: [[H1]]
@@ -140,15 +140,15 @@ println("done NSMutableString hashValue")
 
 class NoisyHash : NSObject {
   override var hash : Int {
-    println("so hash")
+    print("so hash")
     return super.hash
   }
 }
 
-println("NoisyHash hashValue")
+print("NoisyHash hashValue")
 let nh = NoisyHash.init()
 printHashValue(nh, "nh")
-println("done NoisyHash hashValue")
+print("done NoisyHash hashValue")
 // CHECK: NoisyHash hashValue
 // CHECK-NEXT: so hash
 // CHECK-NEXT: nh hashes to {{[0-9]+}}
@@ -175,7 +175,7 @@ class ValueLike : NSObject {
   }
 }
 
-println("ValueLike hashValue")
+print("ValueLike hashValue")
 let sh1 = ValueLike.init(int:10)
 let sh2 = ValueLike.init(int:20)
 let sh3 = ValueLike.init(int:10)
@@ -191,10 +191,10 @@ printEquality(sh2.hashValue, sh3.hashValue, "sh2 hash", "sh3 hash")
 var dict = Dictionary<ValueLike, Int>()
 dict[sh1] = sh1.x
 dict[sh2] = sh2.x
-println("sh1 \(dict[sh1]!)")
-println("sh2 \(dict[sh2]!)")
-println("sh3 \(dict[sh3]!)")
-println("done ValueLike hashValue")
+print("sh1 \(dict[sh1]!)")
+print("sh2 \(dict[sh2]!)")
+print("sh3 \(dict[sh3]!)")
+print("done ValueLike hashValue")
 // CHECK: ValueLike hashValue
 // CHECK-NEXT: sh1 === sh1
 // CHECK-NEXT: sh1 !== sh2
@@ -227,37 +227,37 @@ class GenericNativeSwift<T> {}
 var native: AnyObject = NativeSwift()
 
 if native.respondsToSelector(".cxx_construct") {
-  println("SwiftObject has nontrivial constructor")
+  print("SwiftObject has nontrivial constructor")
 } else {
-  println("no nontrivial constructor") // CHECK-NEXT: no nontrivial constructor
+  print("no nontrivial constructor") // CHECK-NEXT: no nontrivial constructor
 }
 if native.respondsToSelector(".cxx_destruct") {
-  println("SwiftObject has nontrivial destructor")
+  print("SwiftObject has nontrivial destructor")
 } else {
-  println("no nontrivial destructor") // CHECK-NEXT: no nontrivial destructor
+  print("no nontrivial destructor") // CHECK-NEXT: no nontrivial destructor
 }
 
 native = GenericNativeSwift<Int>()
 
 if native.respondsToSelector(".cxx_construct") {
-  println("SwiftObject has nontrivial constructor")
+  print("SwiftObject has nontrivial constructor")
 } else {
-  println("no nontrivial constructor") // CHECK-NEXT: no nontrivial constructor
+  print("no nontrivial constructor") // CHECK-NEXT: no nontrivial constructor
 }
 if native.respondsToSelector(".cxx_destruct") {
-  println("SwiftObject has nontrivial destructor")
+  print("SwiftObject has nontrivial destructor")
 } else {
-  println("no nontrivial destructor") // CHECK-NEXT: no nontrivial destructor
+  print("no nontrivial destructor") // CHECK-NEXT: no nontrivial destructor
 }
 
 class D : NSObject {}
-println(D.self) // CHECK-NEXT: D
-println(_getSuperclass(D.self) == NSObject.self) // CHECK-NEXT: true
-println(_getSuperclass(_getSuperclass(D.self)!) == nil) // CHECK-NEXT: true
+print(D.self) // CHECK-NEXT: D
+print(_getSuperclass(D.self) == NSObject.self) // CHECK-NEXT: true
+print(_getSuperclass(_getSuperclass(D.self)!) == nil) // CHECK-NEXT: true
 class E : NSString {}
-println(  // CHECK-NEXT: true
+print(  // CHECK-NEXT: true
   _getSuperclass(E.self) == NSString.self)
-println( // CHECK-NEXT: true
+print( // CHECK-NEXT: true
   _getSuperclass(_getSuperclass(E.self)!) == NSObject.self)
-println( // CHECK-NEXT: true
+print( // CHECK-NEXT: true
   _getSuperclass(_getSuperclass(_getSuperclass(E.self)!)!) == nil)

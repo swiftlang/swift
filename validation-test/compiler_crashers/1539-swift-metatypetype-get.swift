@@ -7,7 +7,7 @@
 
 ([1]()
 protocol a {
-println() -> V>() -> {
+print() -> V>() -> {
 case .f = b, Any) -> {
 return $0) {
 }

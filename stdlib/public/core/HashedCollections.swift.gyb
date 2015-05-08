@@ -740,7 +740,7 @@ extension Set: CustomStringConvertible, CustomDebugStringConvertible {
       } else {
         result += ", "
       }
-      debugPrint(member, &result)
+      debugPrint(member, &result, appendNewline: false)
     }
     result += isDebug ? "])" : "]"
     return result
@@ -1279,15 +1279,15 @@ extension Dictionary : CustomStringConvertible, CustomDebugStringConvertible {
         result += ", "
       }
       if isDebug {
-        debugPrint(k, &result)
+        debugPrint(k, &result, appendNewline: false)
       } else {
-        print(k, &result)
+        print(k, &result, appendNewline: false)
       }
       result += ": "
       if isDebug {
-        debugPrint(v, &result)
+        debugPrint(v, &result, appendNewline: false)
       } else {
-        print(v, &result)
+        print(v, &result, appendNewline: false)
       }
     }
     result += "]"

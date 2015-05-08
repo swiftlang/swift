@@ -19,14 +19,14 @@ prefix func ~~~(x: Int) -> (Int, Int, Int) {
 }
 
 var triple = (~~~42)
-println("(\(triple.0), \(triple.1), \(triple.2))")
+print("(\(triple.0), \(triple.1), \(triple.2))")
 // OUTPUT: (42, 42, 42)
 
 postfix func ^^(x: Int) -> Int {
   return x ^ x
 }
 
-println("\(1^^)")
+print("\(1^^)")
 // OUTPUT: 0
 
 
@@ -40,11 +40,11 @@ func *-*(lhs: Int, rhs: Int) -> Int {
   return lhs - rhs
 }
 
-println("\(5 *- 3 *- 2) \(5 -* 3 -* 2)")
+print("\(5 *- 3 *- 2) \(5 -* 3 -* 2)")
 // OUTPUT: 0 4
-println("\(5 *- 3 -* 2) \(5 -* 3 *- 2)")
+print("\(5 *- 3 -* 2) \(5 -* 3 *- 2)")
 // OUTPUT: 0 4
-println("\(5 *- 3 *-* 2) \(5 *-* 3 *- 2)")
+print("\(5 *- 3 *-* 2) \(5 *-* 3 *- 2)")
 // OUTPUT: 0 4
 
 #if !INTERP

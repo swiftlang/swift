@@ -8,8 +8,8 @@ func pipe<T>(input: AnySequence<T>, _ output: SinkOf<T>) {
 
 struct Print<T : CustomStringConvertible> : SinkType {
   func put(x: T) {
-    print(x)
-    print("/")
+    print(x, appendNewline: false)
+    print("/", appendNewline: false)
   }
 }
 
@@ -17,7 +17,7 @@ var z = [ 1, 2, 3 ]
 
 func printArray<T : CustomStringConvertible>(x: [T]) {
   pipe(AnySequence(x), SinkOf(Print<T>()))
-  println()
+  print("")
 }
 
 // CHECK: 1/2/3/4/

@@ -37,7 +37,7 @@ class Observer : NSObject {
       return super.observeValueForKeyPath(keyPath!, ofObject: object!, change: change!, context: context)
     }
 
-    println(object!.valueForKeyPath(keyPath!))
+    print(object!.valueForKeyPath(keyPath!))
   }
 }
 
@@ -53,4 +53,4 @@ let foo = Foo()
 foo.addObserver(foo, forKeyPath: "foo", options: nil, context: &kvoContext)
 let bar = foo.foo
 // CHECK-NEXT: 0
-println(bar)
+print(bar)

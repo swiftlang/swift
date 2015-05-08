@@ -31,7 +31,7 @@ extension NSString: Fungible {
 }
 
 func check(x: AnyObject) {
-  println("\(x is Fungible) \(x is Runcible)")
+  print("\(x is Fungible) \(x is Runcible)")
 }
 
 check(NSString()) // CHECK: true true

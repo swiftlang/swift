@@ -9,7 +9,7 @@ struct c<B : () {
 }
 let b = c() -> : b: BooleanType>(e(a
 private let end = "a: c: b: Array<h: Range()
-println() {
+print() {
 }
 protocol P {
 }

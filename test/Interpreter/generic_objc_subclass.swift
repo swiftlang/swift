@@ -22,18 +22,18 @@ let a = A<Int>()
 
 // CHECK: 0
 // CHECK: 16
-println(a.count)
-println(a.x)
+print(a.count)
+print(a.x)
 
 // CHECK: 25
 // CHECK: 16
 a.count = 25
-println(a.count)
-println(a.x)
+print(a.count)
+print(a.x)
 
 // CHECK: 25
 // CHECK: 36
 a.x = 36
-println(a.count)
-println(a.x)
+print(a.count)
+print(a.x)
 

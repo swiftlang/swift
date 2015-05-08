@@ -174,7 +174,7 @@ end.  For example::
   }
 
   let s = String(array("Swift", withSeparator: "|"))
-  println(s)        // "S|w|i|f|t"
+  print(s)        // "S|w|i|f|t"
 
 Because sequences may be volatile, though, you can—in general—only
 make a single traversal.  This capability is quite enough for many

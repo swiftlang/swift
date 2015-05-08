@@ -23,7 +23,7 @@ typealias E
 }
 convenience init(n: T) -> {
 protocol c where T> : String {
-println())
+print())
 typealias e where T> {
 }
 t: (start: (p: SequenceType> a {
@@ -35,7 +35,7 @@ typealias d.advance() -> {
 return nil
 }
 f(m()
-println()
+print()
 }
 }
 case s: b: Int

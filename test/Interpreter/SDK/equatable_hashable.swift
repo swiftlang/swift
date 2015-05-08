@@ -10,7 +10,7 @@ func testHash<H: Hashable>(x: H) -> Int { return x.hashValue }
 func test_CBool() {
   let x: CBool = true
   let hash = testHash(x)
-  println("C_Bool: hash = \(hash)")
+  print("C_Bool: hash = \(hash)")
 }
 // CHECK: C_Bool: hash = 1
 test_CBool()
@@ -18,7 +18,7 @@ test_CBool()
 func test_ObjCBool() {
   let x = ObjCBool(true)
   let hash = testHash(Bool(x))
-  println("ObjCBool: hash = \(hash)")
+  print("ObjCBool: hash = \(hash)")
 }
 // CHECK-NEXT: ObjCBool: hash = 1
 test_ObjCBool()
@@ -26,7 +26,7 @@ test_ObjCBool()
 func test_Word() {
   let x: Word = 42
   let hash = testHash(x)
-  println("Word: hash = \(hash)")
+  print("Word: hash = \(hash)")
 }
 // CHECK-NEXT: Word: hash = 42
 test_Word()
@@ -34,7 +34,7 @@ test_Word()
 func test_UWord() {
   let x: UWord = 42
   let hash = testHash(x)
-  println("UWord: hash = \(hash)")
+  print("UWord: hash = \(hash)")
 }
 // CHECK-NEXT: UWord: hash = 42
 test_UWord()
@@ -45,9 +45,9 @@ func test_Equatable() {
   // CHECK-NEXT: Found 2.5 at index 1
   let array: [NSNumber] = [1, 2.5, 3.14159]
   if let index = array.indexOf(2.5) {
-    println("Found \(array[index]) at index \(index)")
+    print("Found \(array[index]) at index \(index)")
   } else {
-    println("Did not find 2.5?")
+    print("Did not find 2.5?")
   }
 
   testEquatable(array[1])

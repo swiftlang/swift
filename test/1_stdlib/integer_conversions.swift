@@ -5,24 +5,24 @@ var a : Int
 func test_Int8() {
   var i8 : Int8
   i8 = -0x1
-  println(Int(i8))
+  print(Int(i8))
 }
 
 func test_UInt8() {
   var ui8 : UInt8
   ui8 = 0xFF
-  println(ui8)
+  print(ui8)
   var i8 = Int8(bitPattern: ui8)
-  println(Int(i8))
+  print(Int(i8))
 }
 
 func test_UInt32() {
   var ui32 : UInt32
   ui32 = 0xFFFFFFFF
-  println(ui32)
+  print(ui32)
   var i8 : Int8
   i8 = Int8(ui32 & (0xF))
-  println(String(i8))
+  print(String(i8))
 }
 
 test_Int8()
@@ -32,7 +32,7 @@ test_UInt32()
 var tentwenty : UInt64
 tentwenty = 1000
 tentwenty += 20
-println(tentwenty)
+print(tentwenty)
 
 // CHECK:  -1
 // CHECK:  255

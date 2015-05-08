@@ -11,7 +11,7 @@ import Foundation
 class A : NSObject {
     var c: (()->Bool)?
     deinit {
-        println("A")
+        print("A")
     }
 }
 class B : NSObject {
@@ -20,7 +20,7 @@ class B : NSObject {
         super.init()
         d.c = {
             [unowned self] in
-            println("\(self)")
+            print("\(self)")
             return true
         }
     }

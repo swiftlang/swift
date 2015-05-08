@@ -194,7 +194,7 @@ An example::
 
   // Print the Fibonacci sequence up to 1000
   for x in fibonacci() {
-    println(x)
+    print(x)
     if x > 1000 { break }
   }
 
@@ -280,7 +280,7 @@ yield. This can be used to implement stateful event handlers::
 
   let handler = senseDoubleClicks(clickDelay: 0.1,
                                   doubleClickDelay: 1.0,
-                                  onDoubleClick: { println("double-click!") })
+                                  onDoubleClick: { print("double-click!") })
   // Simulate an event sequence
   handler.put(.MouseDown(0.0))
   handler.put(.MouseUp(0.05))
@@ -362,11 +362,11 @@ one can implement a "try" block using ``Result<T, Error>`` as a yieldable type::
 
     for line in contents.lines {
       if line.endswith("gry") {
-        println(line)
+        print(line)
       }
     }
   }.catch { err in
-    println("failed to read /usr/share/dict/words: \(err)")
+    print("failed to read /usr/share/dict/words: \(err)")
   }
 
 The equivalent of C#'s ``async``/``await`` can also be implemented using

@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 func i<T -> {
-println(i(({
+print(i(({
 }
 class c: a {
 class b> Int {

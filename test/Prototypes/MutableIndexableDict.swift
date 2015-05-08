@@ -295,7 +295,7 @@ struct Dictionary<Key: Hashable, Value> : CollectionType, SequenceType {
 
     if !isUnique || capacity < minimumCapacity {
       var newOwner = _Self(minimumCapacity: minimumCapacity)
-      println("reallocating with isUnique: \(isUnique) and capacity \(capacity)=>\(newOwner.capacity)")
+      print("reallocating with isUnique: \(isUnique) and capacity \(capacity)=>\(newOwner.capacity)")
 
       for i in 0..<capacity {
         var x = _buffer[i]
@@ -457,27 +457,27 @@ func != <K: Equatable, V: Equatable>(
 //
 
 // CHECK: testing
-println("testing")
+print("testing")
 
 var d0 = Dictionary<Int, String>()
 d0[0] = "zero"
-println("Inserting #2")
+print("Inserting #2")
 // CHECK-NEXT: Inserting #2
 d0[1] = "one"
 // CHECK-NEXT: reallocating with isUnique: true and capacity 2=>4
 
 d0[2] = "two"
 var d1 = d0
-println("copies are equal: \(d1 == d0)")
+print("copies are equal: \(d1 == d0)")
 // CHECK-NEXT: copies are equal: true
 
 d1[3] = "three"
 // CHECK-NEXT: reallocating with isUnique: false and capacity 4=>8
-println("adding a key to one makes them unequal: \(d1 != d0)")
+print("adding a key to one makes them unequal: \(d1 != d0)")
 // CHECK-NEXT: adding a key to one makes them unequal: true
 
 d1.deleteKey(3)
-println("deleting that key makes them equal again: \(d1 == d0)")
+print("deleting that key makes them equal again: \(d1 == d0)")
 
 // ---------
 
@@ -485,13 +485,14 @@ class X : CustomStringConvertible {
    var constructed : Bool
    var id = 0
 
-   init() {println("X()"); constructed = true}
+   init() {print("X()"); constructed = true}
    init(_ anID : Int) {
-      print("X("); print(anID); println(")")
-     id = anID; constructed = true}
+      print("X(\(anID))")
+     id = anID; constructed = true
+   }
 
    deinit {
-      print("~X("); print(id); println(")")
+      print("~X(\(id))")
       constructed = false
    }
 
@@ -507,13 +508,13 @@ extension String {
 }
 
 func display(v : Dictionary<Int, X>) {
-  print("[ ")
+  print("[ ", appendNewline: false)
   var separator = ""
   for p in v {
-    print("\(separator) \(p.key) : \(p.value)")
+    print("\(separator) \(p.key) : \(p.value)", appendNewline: false)
     separator = ", "
   }
-  println(" ]")
+  print(" ]")
 }
 
 func test() {

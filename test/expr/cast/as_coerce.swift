@@ -12,6 +12,8 @@ class A : P1 {
   func bar() { }
 }
 
+func doFoo() {}
+
 func test_coercion(a: A, b: B) {
   // Coercion to a protocol type
   var x = a as P1
@@ -49,10 +51,10 @@ c1.f(5)
 class CC : P {}
 let cc: Any = CC()
 if cc is P {
-   println("P")
+  doFoo()
 }
 if let p = cc as? P {
-   println("P")
+  doFoo()
 }
 
 // Test that 'as?' coercion fails.

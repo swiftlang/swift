@@ -3,7 +3,7 @@
 
 import StdlibUnittest
 
-_setTestSuiteFailedCallback() { println("abort()") }
+_setTestSuiteFailedCallback() { print("abort()") }
 
 struct RaceTest1 : RaceTestWithPerTrialDataType {
   static var shouldPass: Bool = true

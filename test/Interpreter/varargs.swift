@@ -5,7 +5,7 @@
 import Foundation
 
 func vf(params: CVarArgType...) {
-	println("OK")
+	print("OK")
 }
 
 var a: [AnyObject]! = ["a"]

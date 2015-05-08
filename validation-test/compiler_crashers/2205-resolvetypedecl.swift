@@ -9,7 +9,7 @@ ic class A {
 func f, range.E == b> Void>, k : A.d.init() {
 typealias F = B<T) in return b, let t: c = c<T>()
 func a: ExtensibleCollectionType>({
-println() -> == e([]
+print() -> == e([]
 protocol b {
 let start = ")
 }

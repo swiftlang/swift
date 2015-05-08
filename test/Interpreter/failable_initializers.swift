@@ -1,7 +1,7 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
 class Canary {
-  deinit { println("died") }
+  deinit { print("died") }
 }
 
 struct GuineaPig {
@@ -32,88 +32,88 @@ struct GuineaPig {
 
 // CHECK: it's alive
 if let x = GuineaPig(fail: false) {
-  println("it's alive")
+  print("it's alive")
 } else {
-  println("it's dead")
+  print("it's dead")
 }
 // CHECK-NEXT: died
 
-println("--") // CHECK-NEXT: --
+print("--") // CHECK-NEXT: --
 
 // CHECK-NEXT: died
 // CHECK-NEXT: it's dead
 if let y = GuineaPig(fail: true) {
-  println("it's alive")
+  print("it's alive")
 } else {
-  println("it's dead")
+  print("it's dead")
 }
 
-println("--") // CHECK-NEXT: --
+print("--") // CHECK-NEXT: --
 
 // CHECK-NEXT: it's alive
 // CHECK-NEXT: died
 if let a = GuineaPig(failBefore: false) {
-  println("it's alive")
+  print("it's alive")
 } else {
-  println("it's dead")
+  print("it's dead")
 }
 
-println("--") // CHECK-NEXT: --
+print("--") // CHECK-NEXT: --
 
 // CHECK-NEXT: it's dead
 if let b = GuineaPig(failBefore: true) {
-  println("it's alive")
+  print("it's alive")
 } else {
-  println("it's dead")
+  print("it's dead")
 }
 
-println("--") // CHECK-NEXT: --
+print("--") // CHECK-NEXT: --
 
 // CHECK-NEXT: it's dead
 if let c = GuineaPig(alwaysFail: ()) {
-  println("it's alive")
+  print("it's alive")
 } else {
-  println("it's dead")
+  print("it's dead")
 }
 
-println("--") // CHECK-NEXT: --
+print("--") // CHECK-NEXT: --
 
 // CHECK-NEXT: it's dead
 if let d = GuineaPig(delegateFailure: false, failBefore: true, failAfter: false) {
-  println("it's alive")
+  print("it's alive")
 } else {
-  println("it's dead")
+  print("it's dead")
 }
 
-println("--") // CHECK-NEXT: --
+print("--") // CHECK-NEXT: --
 
 // CHECK-NEXT: died
 // CHECK-NEXT: it's dead
 if let e = GuineaPig(delegateFailure: true, failBefore: false, failAfter: false) {
-  println("it's alive")
+  print("it's alive")
 } else {
-  println("it's dead")
+  print("it's dead")
 }
 
-println("--") // CHECK-NEXT: --
+print("--") // CHECK-NEXT: --
 
 // CHECK-NEXT: died
 // CHECK-NEXT: it's dead
 if let f = GuineaPig(delegateFailure: false, failBefore: false, failAfter: true) {
-  println("it's alive")
+  print("it's alive")
 } else {
-  println("it's dead")
+  print("it's dead")
 }
 
 // CHECK-NEXT: it's alive
 // CHECK-NEXT: died
 if let g = GuineaPig(delegateFailure: false, failBefore: false, failAfter: false) {
-  println("it's alive")
+  print("it's alive")
 } else {
-  println("it's dead")
+  print("it's dead")
 }
 
-println("--") // CHECK-NEXT: --
+print("--") // CHECK-NEXT: --
 
 struct Chimera {
   let canary: Canary
@@ -140,66 +140,66 @@ struct Chimera {
 
 // CHECK-NEXT: it's dead
 if let q = Chimera(failBefore: true) {
-  println("it's alive")
+  print("it's alive")
 } else {
-  println("it's dead")
+  print("it's dead")
 }
 
-println("--") // CHECK-NEXT: --
+print("--") // CHECK-NEXT: --
 
 // CHECK-NEXT: it's alive
 // CHECK-NEXT: died
 // CHECK-NEXT: died
 if let r = Chimera(failBefore: false) {
-  println("it's alive")
+  print("it's alive")
 } else {
-  println("it's dead")
+  print("it's dead")
 }
 
-println("--") // CHECK-NEXT: --
+print("--") // CHECK-NEXT: --
 
 // CHECK-NEXT: died
 // CHECK-NEXT: it's dead
 if let s = Chimera(failBetween: true) {
-  println("it's alive")
+  print("it's alive")
 } else {
-  println("it's dead")
+  print("it's dead")
 }
 
-println("--") // CHECK-NEXT: --
+print("--") // CHECK-NEXT: --
 
 // CHECK-NEXT: it's alive
 // CHECK-NEXT: died
 // CHECK-NEXT: died
 if let t = Chimera(failBetween: false) {
-  println("it's alive")
+  print("it's alive")
 } else {
-  println("it's dead")
+  print("it's dead")
 }
 
-println("--") // CHECK-NEXT: --
+print("--") // CHECK-NEXT: --
 
 // CHECK-NEXT: died
 // CHECK-NEXT: died
 // CHECK-NEXT: it's dead
 if let u = Chimera(failAfter: true) {
-  println("it's alive")
+  print("it's alive")
 } else {
-  println("it's dead")
+  print("it's dead")
 }
 
-println("--") // CHECK-NEXT: --
+print("--") // CHECK-NEXT: --
 
 // CHECK-NEXT: it's alive
 // CHECK-NEXT: died
 // CHECK-NEXT: died
 if let v = Chimera(failAfter: false) {
-  println("it's alive")
+  print("it's alive")
 } else {
-  println("it's dead")
+  print("it's dead")
 }
 
-println("--") // CHECK-NEXT: --
+print("--") // CHECK-NEXT: --
 
 class Bear {
   let x: Canary
@@ -233,85 +233,85 @@ final class PolarBear: Bear {
 // CHECK-NEXT: it's alive
 // CHECK-NEXT: died
 if let ba = Bear(fail: false) {
-  println("it's alive")
+  print("it's alive")
 } else {
-  println("it's dead")
+  print("it's dead")
 }
 
-println("--") // CHECK-NEXT: --
+print("--") // CHECK-NEXT: --
 
 // CHECK-NEXT: died
 // CHECK-NEXT: it's dead
 if let bb = Bear(fail: true) {
-  println("it's alive")
+  print("it's alive")
 } else {
-  println("it's dead")
+  print("it's dead")
 }
 
-println("--") // CHECK-NEXT: --
+print("--") // CHECK-NEXT: --
 
 // CHECK-NEXT: it's alive
 // CHECK-NEXT: died
 if let bc = Bear(delegateFailure: false, failAfter: false) {
-  println("it's alive")
+  print("it's alive")
 } else {
-  println("it's dead")
+  print("it's dead")
 }
 
-println("--") // CHECK-NEXT: --
+print("--") // CHECK-NEXT: --
 
 // CHECK-NEXT: died
 // CHECK-NEXT: it's dead
 if let bd = Bear(delegateFailure: false, failAfter: true) {
-  println("it's alive")
+  print("it's alive")
 } else {
-  println("it's dead")
+  print("it's dead")
 }
 
-println("--") // CHECK-NEXT: --
+print("--") // CHECK-NEXT: --
 
 // CHECK-NEXT: died
 // CHECK-NEXT: it's dead
 if let bd = Bear(delegateFailure: true, failAfter: true) {
-  println("it's alive")
+  print("it's alive")
 } else {
-  println("it's dead")
+  print("it's dead")
 }
 
-println("--") // CHECK-NEXT: --
+print("--") // CHECK-NEXT: --
 
 // CHECK-NEXT: it's alive
 // CHECK-NEXT: died
 // CHECK-NEXT: died
 if let be = PolarBear(chainFailure: false, failAfter: false) {
-  println("it's alive")
+  print("it's alive")
 } else {
-  println("it's dead")
+  print("it's dead")
 }
 
-println("--") // CHECK-NEXT: --
+print("--") // CHECK-NEXT: --
 
 // CHECK-NEXT: died
 // CHECK-NEXT: died
 // CHECK-NEXT: it's dead
 if let bf = PolarBear(chainFailure: false, failAfter: true) {
-  println("it's alive")
+  print("it's alive")
 } else {
-  println("it's dead")
+  print("it's dead")
 }
 
-println("--") // CHECK-NEXT: --
+print("--") // CHECK-NEXT: --
 
 // CHECK-NEXT: died
 // CHECK-NEXT: died
 // CHECK-NEXT: it's dead
 if let bf = PolarBear(chainFailure: true, failAfter: true) {
-  println("it's alive")
+  print("it's alive")
 } else {
-  println("it's dead")
+  print("it's dead")
 }
 
-println("--") // CHECK-NEXT: --
+print("--") // CHECK-NEXT: --
 
 protocol FailableOnDemand {
   init?(fail: Bool)
@@ -342,9 +342,9 @@ final class IUOPolarBear: Bear, FailableOnDemand {
 
 func tryInitFail<T: FailableOnDemand>(_: T.Type, #fail: Bool) {
   if let x = T(fail: fail) {
-    println("it's alive")
+    print("it's alive")
   } else {
-    println("it's dead")
+    print("it's dead")
   }
 }
 
@@ -352,20 +352,20 @@ func tryInitFail<T: FailableOnDemand>(_: T.Type, #fail: Bool) {
 // CHECK-NEXT: died
 tryInitFail(GuineaPig.self, fail: false)
 
-println("--") // CHECK-NEXT: --
+print("--") // CHECK-NEXT: --
 
 // CHECK-NEXT: died
 // CHECK-NEXT: it's dead
 tryInitFail(GuineaPig.self, fail: true)
 
-println("--") // CHECK-NEXT: --
+print("--") // CHECK-NEXT: --
 
 // CHECK-NEXT: it's alive
 // CHECK-NEXT: died
 // CHECK-NEXT: died
 tryInitFail(PolarBear.self, fail: false)
 
-println("--") // CHECK-NEXT: --
+print("--") // CHECK-NEXT: --
 
 // CHECK-NEXT: died
 // CHECK-NEXT: died
@@ -376,20 +376,20 @@ tryInitFail(PolarBear.self, fail: true)
 tryInitFail(IUOGuineaPig.self, fail: false)
 // CHECK-NEXT: died
 
-println("--") // CHECK-NEXT: --
+print("--") // CHECK-NEXT: --
 
 // CHECK-NEXT: died
 // CHECK-NEXT: it's dead
 tryInitFail(IUOGuineaPig.self, fail: true)
 
-println("--") // CHECK-NEXT: --
+print("--") // CHECK-NEXT: --
 
 // CHECK-NEXT: it's alive
 // CHECK-NEXT: died
 // CHECK-NEXT: died
 tryInitFail(IUOPolarBear.self, fail: false)
 
-println("--") // CHECK-NEXT: --
+print("--") // CHECK-NEXT: --
 
 // CHECK-NEXT: died
 // CHECK-NEXT: died
@@ -397,6 +397,6 @@ println("--") // CHECK-NEXT: --
 tryInitFail(IUOPolarBear.self, fail: true)
 
 // CHECK-NEXT: done
-println("done")
+print("done")
 
 

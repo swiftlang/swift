@@ -9,7 +9,7 @@ struct S {
   init(_ x:UnicodeScalar) {
     a = 219
     b = 912
-    println("constructed \(x)")
+    print("constructed \(x)")
   }
 }
 
@@ -18,46 +18,46 @@ class C {
   init(x:UnicodeScalar) {
     a = 20721
     b = 12702
-    println("constructed \(x)")
+    print("constructed \(x)")
   }
 }
 
 class D : C {
   init() {
     super.init(x: "z")
-    println("...in bed")
+    print("...in bed")
   }
 }
 
-func println(s: S) {
-  println("S(a=\(s.a), b=\(s.b))")
+func print(s: S) {
+  print("S(a=\(s.a), b=\(s.b))")
 }
 
-func println(c: C) {
-  println("C(a=\(c.a), b=\(c.b))")
+func print(c: C) {
+  print("C(a=\(c.a), b=\(c.b))")
 }
 
 // CHECK: S(a=1, b=2)
-println(S(1, 2))
+print(S(1, 2))
 // CHECK: constructed x
 // CHECK: S(a=219, b=912)
-println(S("x"))
+print(S("x"))
 
 // CHECK: constructed y
 // CHECK: C(a=20721, b=12702)
-println(C(x: "y"))
+print(C(x: "y"))
 
 // CHECK: constructed z
 // CHECK: ...in bed
 // CHECK: C(a=20721, b=12702)
-println(D())
+print(D())
 
 class BaseWithDummyParameter {
   init() {
     fatalError("wrong init")
   }
   init(dummy: ()) {
-    println("correct")
+    print("correct")
   }
 }
 class DerivedWithDummyParameter : BaseWithDummyParameter {

@@ -14,4 +14,4 @@ let foo: [CGColor] = [CGColorCreate(CGColorSpaceCreateDeviceRGB(), [1.0, 0.0, 0.
 let bar = foo as NSArray
 
 // CHECK: CGColor
-println(bar[0])
+print(bar[0])

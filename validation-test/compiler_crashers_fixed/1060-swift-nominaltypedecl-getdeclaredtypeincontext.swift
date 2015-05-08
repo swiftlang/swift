@@ -82,7 +82,7 @@ return x
 return nil
 }
 let xs : [Int?] = [nil, 4, nil]
-println(some(xs))
+print(some(xs))
 protocol a {
 typealias d
 typealias e = d

@@ -7,7 +7,7 @@
 @testable import testability_helper
 
 func log(value: Any, line: Int = __LINE__) {
-  println("\(line): \(value)")
+  print("\(line): \(value)")
 }
 
 log(Base(1)) // CHECK: {{^}}[[@LINE]]: instance 1{{$}}

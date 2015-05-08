@@ -76,11 +76,11 @@ public struct SourceLocStack {
 
 func _printStackTrace(stackTrace: SourceLocStack?) {
   guard let s = stackTrace else { return }
-  println("stacktrace:")
+  print("stacktrace:")
   for i in 0..<s.locs.count {
     let loc = s.locs[s.locs.count - i - 1]
     let comment = (loc.comment != nil) ? " ; \(loc.comment!)" : ""
-    println("  #\(i): \(loc.file):\(loc.line)\(comment)")
+    print("  #\(i): \(loc.file):\(loc.line)\(comment)")
   }
 }
 
@@ -122,12 +122,12 @@ public func expectEqual<T>(
 ) {
   if !equal(expected, actual) {
     _anyExpectFailed = true
-    println("check failed at \(file), line \(line)")
+    print("check failed at \(file), line \(line)")
     _printStackTrace(stackTrace)
-    println("expected: \"\(expected)\" (of type \(_stdlib_getDemangledTypeName(expected)))")
-    println("actual: \"\(actual)\" (of type \(_stdlib_getDemangledTypeName(expected)))")
-    if collectMoreInfo != nil { println(collectMoreInfo!()) }
-    println()
+    print("expected: \"\(expected)\" (of type \(_stdlib_getDemangledTypeName(expected)))")
+    print("actual: \"\(actual)\" (of type \(_stdlib_getDemangledTypeName(expected)))")
+    if collectMoreInfo != nil { print(collectMoreInfo!()) }
+    print("")
   }
 }
 
@@ -139,11 +139,11 @@ public func expectNotEqual<T : Equatable>(
 ) {
   if expected == actual {
     _anyExpectFailed = true
-    println("check failed at \(file), line \(line)")
+    print("check failed at \(file), line \(line)")
     _printStackTrace(stackTrace)
-    println("unexpected value: \"\(actual)\" (of type \(_stdlib_getDemangledTypeName(actual)))")
-    if collectMoreInfo != nil { println(collectMoreInfo!()) }
-    println()
+    print("unexpected value: \"\(actual)\" (of type \(_stdlib_getDemangledTypeName(actual)))")
+    if collectMoreInfo != nil { print(collectMoreInfo!()) }
+    print("")
   }
 }
 
@@ -156,11 +156,11 @@ public func expectOptionalEqual<T : Equatable>(
 ) {
   if (actual == nil) || expected != actual! {
     _anyExpectFailed = true
-    println("check failed at \(file), line \(line)")
+    print("check failed at \(file), line \(line)")
     _printStackTrace(stackTrace)
-    println("expected: \"\(expected)\" (of type \(_stdlib_getDemangledTypeName(expected)))")
-    println("actual: \"\(actual)\" (of type \(_stdlib_getDemangledTypeName(actual)))")
-    println()
+    print("expected: \"\(expected)\" (of type \(_stdlib_getDemangledTypeName(expected)))")
+    print("actual: \"\(actual)\" (of type \(_stdlib_getDemangledTypeName(actual)))")
+    print("")
   }
 }
 
@@ -172,11 +172,11 @@ public func expectEqual<T : Equatable>(
   if (actual == nil) != (expected == nil)
     || actual != nil && expected! != actual! {
     _anyExpectFailed = true
-    println("check failed at \(file), line \(line)")
+    print("check failed at \(file), line \(line)")
     _printStackTrace(stackTrace)
-    println("expected: \"\(expected)\" (of type \(_stdlib_getDemangledTypeName(expected)))")
-    println("actual: \"\(actual)\" (of type \(_stdlib_getDemangledTypeName(actual)))")
-    println()
+    print("expected: \"\(expected)\" (of type \(_stdlib_getDemangledTypeName(expected)))")
+    print("actual: \"\(actual)\" (of type \(_stdlib_getDemangledTypeName(actual)))")
+    print("")
   }
 }
 
@@ -228,10 +228,10 @@ func _expectNotEqual${Generic}(
 ) {
   if expected == actual {
     _anyExpectFailed = true
-    println("check failed at \(file), line \(line)")
-    println("unexpected value: \"\(actual)\" (of type \(_stdlib_getDemangledTypeName(actual)))")
-    if collectMoreInfo != nil { println(collectMoreInfo!()) }
-    println()
+    print("check failed at \(file), line \(line)")
+    print("unexpected value: \"\(actual)\" (of type \(_stdlib_getDemangledTypeName(actual)))")
+    if collectMoreInfo != nil { print(collectMoreInfo!()) }
+    print("")
   }
 }
 
@@ -241,10 +241,10 @@ public func expectOptionalEqual${Generic}(
 ) {
   if (actual == nil) || expected != actual! {
     _anyExpectFailed = true
-    println("check failed at \(file), line \(line)")
-    println("expected: \"\(expected)\" (of type \(_stdlib_getDemangledTypeName(expected)))")
-    println("actual: \"\(actual)\" (of type \(_stdlib_getDemangledTypeName(actual)))")
-    println()
+    print("check failed at \(file), line \(line)")
+    print("expected: \"\(expected)\" (of type \(_stdlib_getDemangledTypeName(expected)))")
+    print("actual: \"\(actual)\" (of type \(_stdlib_getDemangledTypeName(actual)))")
+    print("")
   }
 }
 
@@ -260,12 +260,12 @@ public func expectLT(
 ) {
   if !(expected < actual) {
     _anyExpectFailed = true
-    println("check failed at \(file), line \(line)")
+    print("check failed at \(file), line \(line)")
     _printStackTrace(stackTrace)
-    println("expected: \"\(expected)\"")
-    println("actual: \"\(actual)\"")
-    if collectMoreInfo != nil { println(collectMoreInfo!()) }
-    println()
+    print("expected: \"\(expected)\"")
+    print("actual: \"\(actual)\"")
+    if collectMoreInfo != nil { print(collectMoreInfo!()) }
+    print("")
   }
 }
 
@@ -277,12 +277,12 @@ public func expectLE(
 ) {
   if !(expected <= actual) {
     _anyExpectFailed = true
-    println("check failed at \(file), line \(line)")
+    print("check failed at \(file), line \(line)")
     _printStackTrace(stackTrace)
-    println("expected: \"\(expected)\"")
-    println("actual: \"\(actual)\"")
-    if collectMoreInfo != nil { println(collectMoreInfo!()) }
-    println()
+    print("expected: \"\(expected)\"")
+    print("actual: \"\(actual)\"")
+    if collectMoreInfo != nil { print(collectMoreInfo!()) }
+    print("")
   }
 }
 
@@ -294,12 +294,12 @@ public func expectGE(
 ) {
   if !(expected >= actual) {
     _anyExpectFailed = true
-    println("check failed at \(file), line \(line)")
+    print("check failed at \(file), line \(line)")
     _printStackTrace(stackTrace)
-    println("expected: \"\(expected)\"")
-    println("actual: \"\(actual)\"")
-    if collectMoreInfo != nil { println(collectMoreInfo!()) }
-    println()
+    print("expected: \"\(expected)\"")
+    print("actual: \"\(actual)\"")
+    if collectMoreInfo != nil { print(collectMoreInfo!()) }
+    print("")
   }
 }
 
@@ -344,11 +344,11 @@ public func expectUnreachable(
   collectMoreInfo: (()->String)? = nil
 ) {
   _anyExpectFailed = true
-  println("check failed at \(file), line \(line)")
+  print("check failed at \(file), line \(line)")
   _printStackTrace(stackTrace)
-  println("this code should not be executed")
-  if collectMoreInfo != nil { println(collectMoreInfo!()) }
-  println()
+  print("this code should not be executed")
+  if collectMoreInfo != nil { print(collectMoreInfo!()) }
+  print("")
 }
 
 public func expectUnreachableCatch(
@@ -358,11 +358,11 @@ public func expectUnreachableCatch(
   collectMoreInfo: (()->String)? = nil
 ) {
   _anyExpectFailed = true
-  println("check failed at \(file), line \(line)")
+  print("check failed at \(file), line \(line)")
   _printStackTrace(stackTrace)
-  println("error should not be thrown: \"\(error)\"")
-  if collectMoreInfo != nil { println(collectMoreInfo!()) }
-  println()
+  print("error should not be thrown: \"\(error)\"")
+  if collectMoreInfo != nil { print(collectMoreInfo!()) }
+  print("")
 }
 
 %for BoolType in ['Bool', 'AssertionResult']:
@@ -375,12 +375,12 @@ public func expectTrue(
 ) {
   if !actual {
     _anyExpectFailed = true
-    println("check failed at \(file), line \(line)")
+    print("check failed at \(file), line \(line)")
     _printStackTrace(stackTrace)
-    println("expected: true")
-    println("actual: \(actual)")
-    if collectMoreInfo != nil { println(collectMoreInfo!()) }
-    println()
+    print("expected: true")
+    print("actual: \(actual)")
+    if collectMoreInfo != nil { print(collectMoreInfo!()) }
+    print("")
   }
 }
 
@@ -392,12 +392,12 @@ public func expectFalse(
 ) {
   if actual {
     _anyExpectFailed = true
-    println("check failed at \(file), line \(line)")
+    print("check failed at \(file), line \(line)")
     _printStackTrace(stackTrace)
-    println("expected: false")
-    println("actual: \(actual)")
-    if collectMoreInfo != nil { println(collectMoreInfo!()) }
-    println()
+    print("expected: false")
+    print("actual: \(actual)")
+    if collectMoreInfo != nil { print(collectMoreInfo!()) }
+    print("")
   }
 }
 
@@ -411,12 +411,12 @@ public func expectEmpty<T>(
 ) {
   if value != nil {
     _anyExpectFailed = true
-    println("check failed at \(file), line \(line)")
+    print("check failed at \(file), line \(line)")
     _printStackTrace(stackTrace)
-    println("expected optional to be empty")
-    println("actual: \"\(value)\"")
-    if collectMoreInfo != nil { println(collectMoreInfo!()) }
-    println()
+    print("expected optional to be empty")
+    print("actual: \"\(value)\"")
+    if collectMoreInfo != nil { print(collectMoreInfo!()) }
+    print("")
   }
 }
 
@@ -426,18 +426,18 @@ public func expectNotEmpty<T>(
 ) -> T? {
   if value == nil {
     _anyExpectFailed = true
-    println("check failed at \(file), line \(line)")
-    println("expected optional to be non-empty")
-    println()
+    print("check failed at \(file), line \(line)")
+    print("expected optional to be non-empty")
+    print("")
   }
   return value
 }
 
 public func expectCrashLater() {
-  println("\(_stdlibUnittestStreamPrefix);expectCrash;\(_anyExpectFailed)")
+  print("\(_stdlibUnittestStreamPrefix);expectCrash;\(_anyExpectFailed)")
 
   var stderr = _Stderr()
-  println("\(_stdlibUnittestStreamPrefix);expectCrash", &stderr)
+  print("\(_stdlibUnittestStreamPrefix);expectCrash", &stderr)
 
   _seenExpectCrash = true
 }
@@ -481,8 +481,8 @@ func _stdlib_getline() -> String? {
 }
 
 func _printDebuggingAdvice(fullTestName: String) {
-  println("To debug, run:")
-  println("$ \(Process.arguments[0]) " +
+  print("To debug, run:")
+  print("$ \(Process.arguments[0]) " +
     "--stdlib-unittest-in-process --stdlib-unittest-filter \"\(fullTestName)\"")
 }
 
@@ -505,10 +505,10 @@ func _childProcess() {
     _anyExpectFailed = false
     testSuite._runTest(testName)
 
-    println("\(_stdlibUnittestStreamPrefix);end;\(_anyExpectFailed)")
+    print("\(_stdlibUnittestStreamPrefix);end;\(_anyExpectFailed)")
 
     var stderr = _Stderr()
-    println("\(_stdlibUnittestStreamPrefix);end", &stderr)
+    print("\(_stdlibUnittestStreamPrefix);end", &stderr)
 
     if !testSuite._testByName(testName).canReuseChildProcessAfterTest {
       return
@@ -560,11 +560,11 @@ struct _ParentProcess {
       _spawnChild()
     }
 
-    println("\(testSuite.name);\(testName)", &_childStdin)
+    print("\(testSuite.name);\(testName)", &_childStdin)
 
     let currentTest = testSuite._testByName(testName)
     if let stdinText = currentTest.stdinText {
-      print(stdinText, &_childStdin)
+      print(stdinText, &_childStdin, appendNewline: false)
     }
     if currentTest.stdinEndsWithEOF {
       _childStdin.close()
@@ -623,7 +623,7 @@ struct _ParentProcess {
           if stdoutSeenCrashDelimiter {
             capturedCrashStdout.append(line)
           }
-          println("out>>> \(line)")
+          print("out>>> \(line)")
         }
         continue
       }
@@ -648,7 +648,7 @@ struct _ParentProcess {
           if stderrSeenCrashDelimiter {
             capturedCrashStderr.append(line)
           }
-          println("err>>> \(line)")
+          print("err>>> \(line)")
         }
         continue
       }
@@ -686,7 +686,7 @@ struct _ParentProcess {
 
   mutating func run() {
     if let filter = _filter {
-      println("StdlibUnittest: using filter: \(filter)")
+      print("StdlibUnittest: using filter: \(filter)")
     }
     for testSuite in _allTestSuites {
       var uxpassedTests = _UnitTestArray<String>()
@@ -701,14 +701,14 @@ struct _ParentProcess {
         let activeSkips = t.getActiveSkipPredicates()
         if !activeSkips.isEmpty {
           skippedTests += [ t.name ]
-          println("[ SKIP     ] \(fullTestName) (skip: \(activeSkips))")
+          print("[ SKIP     ] \(fullTestName) (skip: \(activeSkips))")
           continue
         }
 
         let activeXFails = t.getActiveXFailPredicates()
         let expectXFail = !activeXFails.isEmpty
         let activeXFailsText = expectXFail ? " (XFAIL: \(activeXFails))" : ""
-        println("[ RUN      ] \(fullTestName)\(activeXFailsText)")
+        print("[ RUN      ] \(fullTestName)\(activeXFailsText)")
 
         var expectCrash = false
         var childTerminationStatus: ProcessTerminationStatus? = nil
@@ -716,7 +716,7 @@ struct _ParentProcess {
         var crashStderr = _UnitTestArray<String>()
         if _runTestsInProcess {
           if t.stdinText != nil {
-            println("The test \(fullTestName) requires stdin input and can't be run in-process, marking as failed")
+            print("The test \(fullTestName) requires stdin input and can't be run in-process, marking as failed")
             _anyExpectFailed = true
           } else {
             _anyExpectFailed = false
@@ -759,7 +759,7 @@ struct _ParentProcess {
               }
             }
             if !found {
-              println("did not find expected string after crash: \(expectedCrashOutput.debugDescription)")
+              print("did not find expected string after crash: \(expectedCrashOutput.debugDescription)")
               testPassed = false
             }
           }
@@ -768,26 +768,26 @@ struct _ParentProcess {
         // Apply XFAILs.
         switch (testPassed, expectXFail) {
         case (true, false):
-          println("[       OK ] \(fullTestName)")
+          print("[       OK ] \(fullTestName)")
 
         case (true, true):
           uxpassedTests += [ t.name ]
-          println("[   UXPASS ] \(fullTestName)")
+          print("[   UXPASS ] \(fullTestName)")
 
         case (false, false):
           failedTests += [ t.name ]
-          println("[     FAIL ] \(fullTestName)")
+          print("[     FAIL ] \(fullTestName)")
 
         case (false, true):
-          println("[    XFAIL ] \(fullTestName)")
+          print("[    XFAIL ] \(fullTestName)")
         }
       }
 
       if !uxpassedTests.isEmpty || !failedTests.isEmpty {
-        println("\(testSuite.name): Some tests failed, aborting")
-        println("UXPASS: \(uxpassedTests)")
-        println("FAIL: \(failedTests)")
-        println("SKIP: \(skippedTests)")
+        print("\(testSuite.name): Some tests failed, aborting")
+        print("UXPASS: \(uxpassedTests)")
+        print("FAIL: \(failedTests)")
+        print("SKIP: \(skippedTests)")
         if !uxpassedTests.isEmpty {
           _printDebuggingAdvice(uxpassedTests[0])
         }
@@ -796,7 +796,7 @@ struct _ParentProcess {
         }
         _testSuiteFailedCallback()
       } else {
-        println("\(testSuite.name): All tests passed")
+        print("\(testSuite.name): All tests passed")
       }
     }
   }
@@ -808,7 +808,7 @@ public func runAllTests() {
   }
 
   if PersistentState.runAllTestsWasCalled {
-    println("runAllTests() called twice.  It is not allowed, aborting.")
+    print("runAllTests() called twice.  It is not allowed, aborting.")
     _testSuiteFailedCallback()
     return
   }
@@ -841,14 +841,15 @@ public func runAllTests() {
         continue
       }
       if arg == "--help" {
-        println(
+        let message =
 "optional arguments:\n" +
 "--stdlib-unittest-in-process\n" +
 "                        run tests in-process without intercepting crashes.\n" +
 "                        Useful for running under a debugger.\n" +
 "--stdlib-unittest-filter FILTER-STRING\n" +
 "                        only run tests whose names contain FILTER-STRING as\n" +
-"                        a substring.")
+"                        a substring."
+        print(message)
         return
       }
 
@@ -1809,10 +1810,10 @@ where
         let newValues = makeNewValues(newCount)
 
         func reportFailure(inout a: A, _ message: String) {
-          println("\(message) when replacing indices \(ix)...\(jx)")
-          println("  in \(_UnitTestArray(source)) with \(_UnitTestArray(newValues))")
-          println("  yielding \(_UnitTestArray(a))")
-          println("====================================")
+          print("\(message) when replacing indices \(ix)...\(jx)")
+          print("  in \(_UnitTestArray(source)) with \(_UnitTestArray(newValues))")
+          print("  yielding \(_UnitTestArray(a))")
+          print("====================================")
           expectTrue(false)
         }
 
@@ -1894,12 +1895,12 @@ public func expectEqualSequence<
 ) {
   if !expected.elementsEqual(actual, isEquivalent: sameValue) {
     _anyExpectFailed = true
-    println("check failed at \(file), line \(line)")
+    print("check failed at \(file), line \(line)")
     _printStackTrace(stackTrace)
-    println("expected elements: \"\(expected)\"")
-    println("actual: \"\(actual)\" (of type \(_stdlib_getDemangledTypeName(actual)))")
-    if collectMoreInfo != nil { println(collectMoreInfo!()) }
-    println()
+    print("expected elements: \"\(expected)\"")
+    print("actual: \"\(actual)\" (of type \(_stdlib_getDemangledTypeName(actual)))")
+    if collectMoreInfo != nil { print(collectMoreInfo!()) }
+    print("")
   }
 }
 
@@ -2080,12 +2081,12 @@ public func expectEqualUnicodeScalars(
   let actualUnicodeScalars = _UnitTestArray(lazy(actual.unicodeScalars).map { $0.value })
   if !expected.elementsEqual(actualUnicodeScalars) {
     _anyExpectFailed = true
-    println("check failed at \(file), line \(line)")
+    print("check failed at \(file), line \(line)")
     _printStackTrace(stackTrace)
-    println("expected elements: \"\(asHex(expected))\"")
-    println("actual: \"\(asHex(actualUnicodeScalars))\"")
-    if collectMoreInfo != nil { println(collectMoreInfo!()) }
-    println()
+    print("expected elements: \"\(asHex(expected))\"")
+    print("actual: \"\(asHex(actualUnicodeScalars))\"")
+    if collectMoreInfo != nil { print(collectMoreInfo!()) }
+    print("")
   }
 
 }
@@ -2097,10 +2098,10 @@ public func expectPrinted<T>(
   let actual = String(object)
   if !patterns.contains(actual) {
     _anyExpectFailed = true
-    println("check failed at \(file), line \(line)")
-    println("expected: any of \(patterns.debugDescription)")
-    println("actual: \"\(actual)\"")
-    println()
+    print("check failed at \(file), line \(line)")
+    print("expected: any of \(patterns.debugDescription)")
+    print("actual: \"\(actual)\"")
+    print("")
   }
 }
 
@@ -2118,10 +2119,10 @@ public func expectDebugPrinted<T>(
   let actual = String(reflecting: object)
   if !patterns.contains(actual) {
     _anyExpectFailed = true
-    println("check failed at \(file), line \(line)")
-    println("expected: any of \(patterns.debugDescription)")
-    println("actual: \"\(actual)\"")
-    println()
+    print("check failed at \(file), line \(line)")
+    print("expected: any of \(patterns.debugDescription)")
+    print("actual: \"\(actual)\"")
+    print("")
   }
 }
 

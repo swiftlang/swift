@@ -97,7 +97,7 @@ if True:
 ///     var a = [1, 2, 3]
 ///     var b = a
 ///     b[0] = 4
-///     println("a=\(a), b=\(b)")     // a=[1, 2, 3], b=[4, 2, 3]
+///     print("a=\(a), b=\(b)")     // a=[1, 2, 3], b=[4, 2, 3]
 ///
 /// (Of course, if the array stores `class` references, the objects
 /// are shared; only the values of the references are independent)
@@ -712,9 +712,9 @@ extension ${Self} : CustomStringConvertible, CustomDebugStringConvertible {
         result += ", "
       }
       if isDebug {
-        debugPrint(item, &result)
+        debugPrint(item, &result, appendNewline: false)
       } else {
-        print(item, &result)
+        print(item, &result, appendNewline: false)
       }
     }
     result += "]"

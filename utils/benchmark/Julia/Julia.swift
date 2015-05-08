@@ -117,10 +117,10 @@ func drawJulia(context : CGContextRef, frame : CGRect) {
       CGContextFillRect(context, rRect)
     }
   }
-  println("Total loop count: \(loopCountForPerf)")
+  print("Total loop count: \(loopCountForPerf)")
   let methodFinish : NSDate = NSDate()
   var executionTime : NSTimeInterlet = methodFinish.timeIntervalSinceDate(anotherDate: methodStart)
-  println("Execution time: \(executionTime)")
+  print("Execution time: \(executionTime)")
 }
 
 // Create the image bitmap context.
@@ -157,7 +157,7 @@ func writeImageToDisk(context : CGContextRef, outPath : NSString) -> Bool {
   assert(destination != CGImageDestinationRef())
   CGImageDestinationAddImage(destination, image, COpaquePointer())
   if !CGImageDestinationFinalize(destination) {
-    println("Failed to write image")
+    print("Failed to write image")
     return (false)
   }
   return (true)

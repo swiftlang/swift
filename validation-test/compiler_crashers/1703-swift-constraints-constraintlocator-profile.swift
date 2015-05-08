@@ -5,7 +5,7 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-println() {
+print() {
 }
 class A<T where k.h : A? {
 let start = e?

@@ -16,8 +16,8 @@ func genericCaller<B>(f: () -> B) -> B {
 }
 
 if createSome() != nil {
-  println("test ok")
+  print("test ok")
 } else {
-  println("test failed")
+  print("test failed")
 }
 

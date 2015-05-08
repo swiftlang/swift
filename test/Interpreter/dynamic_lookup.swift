@@ -7,17 +7,17 @@ import Foundation
 class X {
   init() {}
 
-  @objc func f() { println("X.f()") }
+  @objc func f() { print("X.f()") }
 
   @objc var myValue : Int {
-    println("X.myValue getter\n")
+    print("X.myValue getter\n")
     return 17
   }
 }
 
 class Y { 
   init() {}
-  @objc class func g() { println("Y.g()") }
+  @objc class func g() { print("Y.g()") }
 }
 
 class Z {
@@ -25,7 +25,7 @@ class Z {
 }
 
 extension Z { 
-  @objc func f() { println("Z.f()") }
+  @objc func f() { print("Z.f()") }
 }
 
 
@@ -34,7 +34,7 @@ func test_dynamic_lookup_f(obj: AnyObject) {
   if of != nil {
     of!()
   } else {
-    print("Object does not respond to the selector \"f\".\n")
+    print("Object does not respond to the selector \"f\".\n", appendNewline: false)
   }
 }
 
@@ -43,16 +43,16 @@ func test_dynamic_lookup_g(obj: AnyObject) {
   if og != nil {
     og!()
   } else {
-    print("Class does not respond to the selector \"g\".\n")
+    print("Class does not respond to the selector \"g\".\n", appendNewline: false)
   }
 }
 
 func test_dynamic_lookup_myValue(obj: AnyObject) {
   var ov = obj.myValue
   if ov != nil {
-    println("myValue = \(ov!)")
+    print("myValue = \(ov!)")
   } else {
-    println("Object does not respond to the selector \"myValue\".")
+    print("Object does not respond to the selector \"myValue\".")
   }
 }
 
@@ -78,8 +78,8 @@ test_dynamic_lookup_myValue(Y())
 // <rdar://problem/16554056> __FUNCTION__ in deinit for NSObject subclasses crashes the compiler
 // Test __FUNCTION__
 class FUNCTION_NAME_TEST : NSObject {
-  override init() { super.init() ; println(__FUNCTION__) }
-  deinit { println(__FUNCTION__) }
+  override init() { super.init() ; print(__FUNCTION__) }
+  deinit { print(__FUNCTION__) }
 }
 
 FUNCTION_NAME_TEST()

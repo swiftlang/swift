@@ -8,7 +8,7 @@ P> {
 }
 }
 if true {
-println()!
+print()!
 func b.a<D>) {
 let i())
 })

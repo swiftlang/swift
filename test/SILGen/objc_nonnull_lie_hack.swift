@@ -23,7 +23,7 @@ import gizmo
 func makeObject() -> NSObject? {
   let foo: NSObject? = NSObject()
   if foo == nil {
-    println("nil")
+    print("nil")
   }
   return foo
 }
@@ -37,7 +37,7 @@ func callInstanceMethod(gizmo: Gizmo) -> Gizmo? {
   let foo: Gizmo? = gizmo.nonNilGizmo()
 
   if foo == nil {
-    println("nil")
+    print("nil")
   }
   return foo
 }
@@ -52,7 +52,7 @@ func callInstanceMethod(gizmo: Gizmo) -> Gizmo? {
 func callClassMethod() -> Gizmo? {
   let foo: Gizmo? = Gizmo.nonNilGizmo()
   if foo == nil {
-    println("nil")
+    print("nil")
   }
   return foo  
 }
@@ -65,7 +65,7 @@ func callClassMethod() -> Gizmo? {
 func loadProperty(gizmo: Gizmo) -> Gizmo? {
   let foo: Gizmo? = gizmo.nonNilGizmoProperty
   if foo == nil {
-    println("nil")
+    print("nil")
   }
   return foo  
 }
@@ -78,7 +78,7 @@ func loadProperty(gizmo: Gizmo) -> Gizmo? {
 func loadUnownedProperty(gizmo: Gizmo) -> Gizmo? {
   let foo: Gizmo? = gizmo.unownedNonNilGizmoProperty
   if foo == nil {
-    println("nil")
+    print("nil")
   }
   return foo  
 }

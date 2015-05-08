@@ -17,7 +17,7 @@ func d<T where B {
 b) {
 var d where B : C<Int) { x = a<d where A> ((false)) {
 func g<d where T> () {
-println() {
+print() {
 typealias d.c(self.d = c<T>((1]
 c>(e: S) {
 return [T {

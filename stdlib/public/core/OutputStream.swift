@@ -43,7 +43,7 @@ public protocol Streamable {
 /// A type with a customized textual representation.
 ///
 /// This textual representation is used when values are written to an
-/// *output stream*, for example, by `print` and `println`.
+/// *output stream*, for example, by `print`.
 ///
 /// - note: `String(instance)` will work for an `instance` of *any*
 /// type, returning its `description` if the `instance` happens to be
@@ -108,13 +108,13 @@ internal func _adHocPrint<T, TargetStream : OutputStreamType>(
       }
       var (label, elementMirror) = mirror[i]
       var elt = elementMirror.value
-      debugPrint(elt, &target)
+      debugPrint(elt, &target, appendNewline: false)
     }
     target.write(")")
     return
   }
   if mirror is _StructMirror {
-    print(mirror.summary, &target)
+    print(mirror.summary, &target, appendNewline: false)
     target.write("(")
     var first = true
     for i in 0..<mirror.count {
@@ -124,14 +124,14 @@ internal func _adHocPrint<T, TargetStream : OutputStreamType>(
         target.write(", ")
       }
       var (label, elementMirror) = mirror[i]
-      print(label, &target)
+      print(label, &target, appendNewline: false)
       target.write(": ")
-      debugPrint(elementMirror.value, &target)
+      debugPrint(elementMirror.value, &target, appendNewline: false)
     }
     target.write(")")
     return
   }
-  print(mirror.summary, &target)
+  print(mirror.summary, &target, appendNewline: false)
 }
 
 @inline(never)
@@ -156,96 +156,6 @@ internal func _print_unlocked<T, TargetStream : OutputStreamType>(
   _adHocPrint(value, &target)
 }
 
-/// Writes the textual representation of `value` into the stream `target`.
-///
-/// The textual representation is obtained from the `value` using its protocol
-/// conformances, in the following order of preference: `Streamable`,
-/// `CustomStringConvertible`, `CustomDebugStringConvertible`.
-///
-/// Do not overload this function for your type.  Instead, adopt one of the
-/// protocols mentioned above.
-@inline(never)
-public func print<T, TargetStream : OutputStreamType>(
-  value: T, inout _ target: TargetStream
-) {
-  target._lock()
-  _print_unlocked(value, &target)
-  target._unlock()
-}
-
-/// Writes the textual representation of `value` and a newline character into
-/// the stream `target`.
-///
-/// The textual representation is obtained from the `value` using its protocol
-/// conformances, in the following order of preference: `Streamable`,
-/// `CustomStringConvertible`, `CustomDebugStringConvertible`.
-///
-/// Do not overload this function for your type.  Instead, adopt one of the
-/// protocols mentioned above.
-@inline(never)
-public func println<T, TargetStream : OutputStreamType>(
-    value: T, inout _ target: TargetStream
-) {
-  target._lock()
-  _print_unlocked(value, &target)
-  target.write("\n")
-  target._unlock()
-}
-
-/// Writes the textual representation of `value` into the standard output.
-///
-/// The textual representation is obtained from the `value` using its protocol
-/// conformances, in the following order of preference: `Streamable`,
-/// `CustomStringConvertible`, `CustomDebugStringConvertible`.
-///
-/// Do not overload this function for your type.  Instead, adopt one of the
-/// protocols mentioned above.
-@inline(never)
-@_semantics("stdlib_binary_only")
-public func print<T>(value: T) {
-  var target = _Stdout()
-  target._lock()
-  _print_unlocked(value, &target)
-  target._unlock()
-}
-
-/// Writes the textual representation of `value` and a newline character into
-/// the standard output.
-///
-/// The textual representation is obtained from the `value` using its protocol
-/// conformances, in the following order of preference: `Streamable`,
-/// `CustomStringConvertible`, `CustomDebugStringConvertible`.
-///
-/// Do not overload this function for your type.  Instead, adopt one of the
-/// protocols mentioned above.
-@inline(never)
-@_semantics("stdlib_binary_only")
-public func println<T>(value: T) {
-  var target = _Stdout()
-  target._lock()
-  _print_unlocked(value, &target)
-  target.write("\n")
-  target._unlock()
-}
-
-/// Writes a single newline character into the standard output.
-@inline(never)
-@_semantics("stdlib_binary_only")
-public func println() {
-  var target = _Stdout()
-  target._lock()
-  target.write("\n")
-  target._unlock()
-}
-
-/// Returns the result of `print`'ing `x` into a `String`
-@inline(never)
-public func toString<T>(x: T) -> String {
-  var result = ""
-  print(x, &result)
-  return result
-}
-
 /// Returns the result of `print`'ing `x` into a `String`
 ///
 /// Exactly the same as `String`, but annotated 'readonly' to allow
@@ -263,13 +173,6 @@ func _toStringReadOnlyStreamable<T : Streamable>(x: T) -> String {
 @inline(never) @effects(readonly)
 func _toStringReadOnlyPrintable<T : CustomStringConvertible>(x: T) -> String {
   return x.description
-}
-
-/// Returns the result of `debugPrint`'ing `x` into a `String`
-public func toDebugString<T>(x: T) -> String {
-  var result = ""
-  debugPrint(x, &result)
-  return result
 }
 
 //===----------------------------------------------------------------------===//
@@ -296,80 +199,6 @@ public func _debugPrint_unlocked<T, TargetStream : OutputStreamType>(
   }
 
   _adHocPrint(value, &target)
-}
-
-/// Write to `target` the textual representation of `x` most suitable
-/// for debugging.
-///
-/// * If `T` conforms to `CustomDebugStringConvertible`, write
-///   `x.debugDescription`
-/// * Otherwise, if `T` conforms to `CustomStringConvertible`, write
-///   `x.description`
-/// * Otherwise, if `T` conforms to `Streamable`, write `x`
-/// * Otherwise, fall back to a default textual representation.
-///
-/// - seealso: `debugPrintln(x, &target)`
-@inline(never)
-public func debugPrint<T, TargetStream : OutputStreamType>(
-    value: T, inout _ target: TargetStream
-) {
-  target._lock()
-  _debugPrint_unlocked(value, &target)
-  target._unlock()
-}
-
-/// Write to `target` the textual representation of `x` most suitable
-/// for debugging, followed by a newline.
-///
-/// * If `T` conforms to `CustomDebugStringConvertible`, write `x.debugDescription`
-/// * Otherwise, if `T` conforms to `CustomStringConvertible`, write `x.description`
-/// * Otherwise, if `T` conforms to `Streamable`, write `x`
-/// * Otherwise, fall back to a default textual representation.
-///
-/// - seealso: `debugPrint(x, &target)`
-@inline(never)
-public func debugPrintln<T, TargetStream : OutputStreamType>(
-    x: T, inout _ target: TargetStream
-) {
-  target._lock()
-  _debugPrint_unlocked(x, &target)
-  target.write("\n")
-  target._unlock()
-}
-
-/// Write to the console the textual representation of `x` most suitable
-/// for debugging.
-///
-/// * If `T` conforms to `CustomDebugStringConvertible`, write `x.debugDescription`
-/// * Otherwise, if `T` conforms to `CustomStringConvertible`, write `x.description`
-/// * Otherwise, if `T` conforms to `Streamable`, write `x`
-/// * Otherwise, fall back to a default textual representation.
-///
-/// - seealso: `debugPrintln(x)`
-@inline(never)
-public func debugPrint<T>(x: T) {
-  var target = _Stdout()
-  target._lock()
-  _debugPrint_unlocked(x, &target)
-  target._unlock()
-}
-
-/// Write to the console the textual representation of `x` most suitable
-/// for debugging, followed by a newline.
-///
-/// * If `T` conforms to `CustomDebugStringConvertible`, write `x.debugDescription`
-/// * Otherwise, if `T` conforms to `CustomStringConvertible`, write `x.description`
-/// * Otherwise, if `T` conforms to `Streamable`, write `x`
-/// * Otherwise, fall back to a default textual representation.
-///
-/// - seealso: `debugPrint(x)`
-@inline(never)
-public func debugPrintln<T>(x: T) {
-  var target = _Stdout()
-  target._lock()
-  _debugPrint_unlocked(x, &target)
-  target.write("\n")
-  target._unlock()
 }
 
 //===----------------------------------------------------------------------===//
@@ -426,3 +255,263 @@ extension UnicodeScalar : Streamable {
     target.write(String(Character(self)))
   }
 }
+
+//===----------------------------------------------------------------------===//
+// Compatibility APIs
+//===----------------------------------------------------------------------===//
+
+/// Writes the textual representation of `value` and a newline character into
+/// the stream `target`.
+///
+/// The textual representation is obtained from the `value` using its protocol
+/// conformances, in the following order of preference: `Streamable`,
+/// `CustomStringConvertible`, `CustomDebugStringConvertible`.
+///
+/// Do not overload this function for your type.  Instead, adopt one of the
+/// protocols mentioned above.
+@availability(*, unavailable, renamed="print")
+@inline(never)
+public func println<T, TargetStream : OutputStreamType>(
+    value: T, inout _ target: TargetStream
+) {
+  target._lock()
+  _print_unlocked(value, &target)
+  target.write("\n")
+  target._unlock()
+}
+
+/// Writes the textual representation of `value` and a newline character into
+/// the standard output.
+///
+/// The textual representation is obtained from the `value` using its protocol
+/// conformances, in the following order of preference: `Streamable`,
+/// `CustomStringConvertible`, `CustomDebugStringConvertible`.
+///
+/// Do not overload this function for your type.  Instead, adopt one of the
+/// protocols mentioned above.
+@availability(*, unavailable, renamed="print")
+@inline(never)
+@_semantics("stdlib_binary_only")
+public func println<T>(value: T) {
+  var target = _Stdout()
+  target._lock()
+  _print_unlocked(value, &target)
+  target.write("\n")
+  target._unlock()
+}
+
+/// Writes a single newline character into the standard output.
+@availability(*, unavailable, message="use print(\"\")")
+@inline(never)
+@_semantics("stdlib_binary_only")
+public func println() {
+  var target = _Stdout()
+  target._lock()
+  target.write("\n")
+  target._unlock()
+}
+
+/// Returns the result of `print`'ing `x` into a `String`
+@availability(*, unavailable, renamed="String")
+@inline(never)
+public func toString<T>(x: T) -> String {
+  var result = ""
+  print(x, &result, appendNewline: false)
+  return result
+}
+
+/// Write to `target` the textual representation of `x` most suitable
+/// for debugging, followed by a newline.
+///
+/// * If `T` conforms to `CustomDebugStringConvertible`, write `x.debugDescription`
+/// * Otherwise, if `T` conforms to `CustomStringConvertible`, write `x.description`
+/// * Otherwise, if `T` conforms to `Streamable`, write `x`
+/// * Otherwise, fall back to a default textual representation.
+///
+/// - seealso: `debugPrint(x, &target)`
+@availability(*, unavailable, message="use debugPrint()")
+@inline(never)
+public func debugPrintln<T, TargetStream : OutputStreamType>(
+    x: T, inout _ target: TargetStream
+) {
+  target._lock()
+  _debugPrint_unlocked(x, &target)
+  target.write("\n")
+  target._unlock()
+}
+
+/// Write to the console the textual representation of `x` most suitable
+/// for debugging, followed by a newline.
+///
+/// * If `T` conforms to `CustomDebugStringConvertible`, write `x.debugDescription`
+/// * Otherwise, if `T` conforms to `CustomStringConvertible`, write `x.description`
+/// * Otherwise, if `T` conforms to `Streamable`, write `x`
+/// * Otherwise, fall back to a default textual representation.
+///
+/// - seealso: `debugPrint(x)`
+@availability(*, unavailable, renamed="debugPrint")
+@inline(never)
+public func debugPrintln<T>(x: T) {
+  var target = _Stdout()
+  target._lock()
+  _debugPrint_unlocked(x, &target)
+  target.write("\n")
+  target._unlock()
+}
+
+/// Returns the result of `debugPrint`'ing `x` into a `String`
+@availability(*, unavailable, message="use String(reflecting:)")
+public func toDebugString<T>(x: T) -> String {
+  var result = ""
+  debugPrint(x, &result)
+  return result
+}
+
+//===----------------------------------------------------------------------===//
+// print()
+//===----------------------------------------------------------------------===//
+
+/// Writes the textual representation of `value`, and an optional newline,
+/// into the stream `target`.
+///
+/// The textual representation is obtained from the `value` using its protocol
+/// conformances, in the following order of preference: `Streamable`,
+/// `CustomStringConvertible`, `CustomDebugStringConvertible`.  If none of
+/// these conformances are found, a default text representation is constructed
+/// in an implementation-defined way, based on the type kind and structure.
+///
+/// Do not overload this function for your type.  Instead, adopt one of the
+/// protocols mentioned above.
+///
+/// - parameter appendNewline: iff `true` (the default), write a trailing
+/// newline.
+@inline(never)
+@_semantics("stdlib_binary_only")
+public func print<T, TargetStream : OutputStreamType>(
+  value: T, inout _ target: TargetStream, appendNewline: Bool
+) {
+  target._lock()
+  _print_unlocked(value, &target)
+  if appendNewline {
+    target.write("\n")
+  }
+  target._unlock()
+}
+
+@inline(never)
+@_semantics("stdlib_binary_only")
+public func print<T, TargetStream : OutputStreamType>(
+  value: T, inout _ target: TargetStream
+) {
+  // FIXME: workaround for rdar://20775669
+  print(value, &target, appendNewline: true)
+}
+
+/// Writes the textual representation of `value`, and an optional newline,
+/// into the standard output.
+///
+/// The textual representation is obtained from the `value` using its protocol
+/// conformances, in the following order of preference: `Streamable`,
+/// `CustomStringConvertible`, `CustomDebugStringConvertible`.  If none of
+/// these conformances are found, a default text representation is constructed
+/// in an implementation-defined way, based on the type kind and structure.
+///
+/// Do not overload this function for your type.  Instead, adopt one of the
+/// protocols mentioned above.
+///
+/// - parameter appendNewline: iff `true` (the default), write a trailing
+/// newline.
+@inline(never)
+@_semantics("stdlib_binary_only")
+public func print<T>(value: T, appendNewline: Bool) {
+  var target = _Stdout()
+  target._lock()
+  _print_unlocked(value, &target)
+  if appendNewline {
+    target.write("\n")
+  }
+  target._unlock()
+}
+
+@inline(never)
+@_semantics("stdlib_binary_only")
+public func print<T>(value: T) {
+  // FIXME: workaround for rdar://20775669
+  print(value, appendNewline: true)
+}
+
+//===----------------------------------------------------------------------===//
+// debugPrint()
+//===----------------------------------------------------------------------===//
+
+/// Writes the textual representation of `value` most suitable for debugging,
+/// and an optional newline, into the stream `target`.
+///
+/// The textual representation is obtained from the `value` using its protocol
+/// conformances, in the following order of preference:
+/// `CustomDebugStringConvertible`, `CustomStringConvertible`, `Streamable`.
+/// If none of these conformances are found, a default text representation is
+/// constructed in an implementation-defined way, based on the type kind and
+/// structure.
+///
+/// Do not overload this function for your type.  Instead, adopt one of the
+/// protocols mentioned above.
+///
+/// - parameter appendNewline: iff `true` (the default), write a trailing
+/// newline.
+@inline(never)
+@_semantics("stdlib_binary_only")
+public func debugPrint<T, TargetStream : OutputStreamType>(
+  value: T, inout _ target: TargetStream, appendNewline: Bool
+) {
+  target._lock()
+  _debugPrint_unlocked(value, &target)
+  if appendNewline {
+    target.write("\n")
+  }
+  target._unlock()
+}
+
+@inline(never)
+@_semantics("stdlib_binary_only")
+public func debugPrint<T, TargetStream : OutputStreamType>(
+  value: T, inout _ target: TargetStream
+) {
+  // FIXME: workaround for rdar://20775669
+  debugPrint(value, &target, appendNewline: true)
+}
+
+/// Writes the textual representation of `value` most suitable for debugging,
+/// and an optional newline, into the standard output.
+///
+/// The textual representation is obtained from the `value` using its protocol
+/// conformances, in the following order of preference:
+/// `CustomDebugStringConvertible`, `CustomStringConvertible`, `Streamable`.
+/// If none of these conformances are found, a default text representation is
+/// constructed in an implementation-defined way, based on the type kind and
+/// structure.
+///
+/// Do not overload this function for your type.  Instead, adopt one of the
+/// protocols mentioned above.
+///
+/// - parameter appendNewline: iff `true` (the default), write a trailing
+/// newline.
+@inline(never)
+@_semantics("stdlib_binary_only")
+public func debugPrint<T>(value: T, appendNewline: Bool) {
+  var target = _Stdout()
+  target._lock()
+  _debugPrint_unlocked(value, &target)
+  if appendNewline {
+    target.write("\n")
+  }
+  target._unlock()
+}
+
+@inline(never)
+@_semantics("stdlib_binary_only")
+public func debugPrint<T>(value: T) {
+  // FIXME: workaround for rdar://20775669
+  debugPrint(value, appendNewline: true)
+}
+

@@ -4,7 +4,7 @@
 
 import Foundation
 
-println("Begin test.");
+print("Begin test.");
 // CHECK:      Begin test.
 
 let str = "Created as String"
@@ -12,19 +12,19 @@ let nsstr: NSString = "Created as NSString"
 
 // CHECK-NEXT: Created as NSString
 let cfstr: CFString = nsstr
-println(cfstr)
+print(cfstr)
 
 // CHECK-NEXT: ----
-println("----")
+print("----")
 
 // CHECK-NEXT: Created as NSString
 let cfstrAsNSStr: NSString = cfstr
-println(cfstrAsNSStr)
+print(cfstrAsNSStr)
 
 // CHECK-NEXT: Created as NSString
 let cfstrAsStr = cfstr as NSString as String
-println(cfstrAsStr)
+print(cfstrAsStr)
 
 // CHECK-NEXT: Created as String
 let cfstr2: CFString = str as NSString
-println(cfstr2)
+print(cfstr2)

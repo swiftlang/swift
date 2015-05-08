@@ -60,4 +60,4 @@ func test_varArgs3() {
 test_varArgs3()
 
 // CHECK: done.
-println("done.")
+print("done.")

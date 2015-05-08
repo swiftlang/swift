@@ -6,6 +6,8 @@
 
 // REQUIRES: OS=macosx
 
+func markUsed<T>(t: T) {}
+
 @availability(OSX, introduced=10.9)
 func globalFuncAvailableOn10_9() -> Int { return 9 }
 
@@ -579,12 +581,12 @@ func useEnums() {
     let point: CompassPoint = .North
     switch (point) {
       case .North, .South, .East:
-        println("NSE")
+        markUsed("NSE")
       case .West: // We do not expect an error here
-        print("W")
+        markUsed("W")
 
       case .WithAvailableByEnumElementPayload(let p):
-        println("WithAvailableByEnumElementPayload")
+        markUsed("WithAvailableByEnumElementPayload")
 
         // For the moment, we do not incorporate enum element availability into 
         // TRC construction. Perhaps we should?

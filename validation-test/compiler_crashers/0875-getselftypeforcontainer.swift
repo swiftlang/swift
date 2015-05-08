@@ -27,7 +27,7 @@ let c: P {
 protocol c = e, V>: Array) {
 }
 self] {
-println() -> {
+print() -> {
 }
 protocol P {
 }

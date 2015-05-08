@@ -2,10 +2,10 @@
 
 var x : Optional<Int> = nil
 if x != nil { 
-  println("x is non-empty!")
+  print("x is non-empty!")
 }
 else { 
-  println("an empty optional is logically false")
+  print("an empty optional is logically false")
 }
 // CHECK: an empty optional is logically false
 
@@ -21,37 +21,37 @@ x = .Some(0)
 x = .Some(1)
 
 if x != nil {
-  println("a non-empty optional is logically true") 
+  print("a non-empty optional is logically true") 
 } else { 
   assert(false, "x is empty!")
 }
 // CHECK: a non-empty optional is logically true
 
 if x == nil { 
-  println("logical negation fails 0")
+  print("logical negation fails 0")
 }
 else { 
-  println("logical negation works 0") 
+  print("logical negation works 0") 
 }
 // CHECK: logical negation works 0
 
 if true {
   var y1 : Optional<Int> = .None
   if y1 == nil {
-    println("y1 is .None")
+    print("y1 is .None")
   }
   // CHECK: y1 is .None
 
   var y2 : Optional<Int> = .None
   if y2 == nil {
-    println("y2 is .None")
+    print("y2 is .None")
   }
   // CHECK: y2 is .None
 }
 
 func optional_param(x: Optional<Int>) {
   if x == nil {
-    println("optional param OK")
+    print("optional param OK")
   }
 }
 optional_param(.None)
@@ -61,24 +61,24 @@ func optional_return() -> Optional<Int> {
   return .None
 }
 if optional_return() == nil {
-  println("optional return OK")
+  print("optional return OK")
 }
 // CHECK: optional return OK
 
 var empty: Bool = true
 switch x {
 case .Some(var y):
-  println("destructuring bind: \(y).")
+  print("destructuring bind: \(y).")
 case .None:
   ()
 }
 // CHECK: destructuring bind: 1.
 
 
-println("forced extraction: \(x!).")
+print("forced extraction: \(x!).")
 // CHECK: forced extraction: 1.
 
-println("forced extraction use: \(x!.successor()).")
+print("forced extraction use: \(x!.successor()).")
 // CHECK-NEXT: forced extraction use: 2.
 
 func testRelation(p: (Int?, Int?) -> Bool) {
@@ -90,10 +90,10 @@ func testRelation(p: (Int?, Int?) -> Bool) {
 
   var prefix = ""
   for (l,r) in relationships {
-    print("\(prefix)\(p(l, r))")
+    print("\(prefix)\(p(l, r))", appendNewline: false)
     prefix=", "
   }
-  println(".")
+  print(".")
 }
 
 testRelation(==)
@@ -117,58 +117,58 @@ func nilComparison() {
 
   /*
   // FIXME: <rdar://problem/17489239> Optional<T>() == nil where T: !Equatable
-  println(x1 == nil) // DISABLED-CHECK-NEXT: false
-  println(x1 != nil) // DISABLED-CHECK-NEXT: true
-  println(x0 == nil) // DISABLED-CHECK-NEXT: true
-  println(x0 != nil) // DISABLED-CHECK-NEXT: false
+  print(x1 == nil) // DISABLED-CHECK-NEXT: false
+  print(x1 != nil) // DISABLED-CHECK-NEXT: true
+  print(x0 == nil) // DISABLED-CHECK-NEXT: true
+  print(x0 != nil) // DISABLED-CHECK-NEXT: false
 
-  println(nil == x1) // DISABLED-CHECK-NEXT: false
-  println(nil != x1) // DISABLED-CHECK-NEXT: true
-  println(nil == x0) // DISABLED-CHECK-NEXT: true
-  println(nil != x0) // DISABLED-CHECK-NEXT: false
+  print(nil == x1) // DISABLED-CHECK-NEXT: false
+  print(nil != x1) // DISABLED-CHECK-NEXT: true
+  print(nil == x0) // DISABLED-CHECK-NEXT: true
+  print(nil != x0) // DISABLED-CHECK-NEXT: false
   */
   
   let v0: Int? = nil
   let v1: Int? = 1
   
-  println(v1 == nil) // CHECK-NEXT: false
-  println(v1 != nil) // CHECK-NEXT: true
-  println(v0 == nil) // CHECK-NEXT: true
-  println(v0 != nil) // CHECK-NEXT: false
+  print(v1 == nil) // CHECK-NEXT: false
+  print(v1 != nil) // CHECK-NEXT: true
+  print(v0 == nil) // CHECK-NEXT: true
+  print(v0 != nil) // CHECK-NEXT: false
 
-  println(nil == v1) // CHECK-NEXT: false
-  println(nil != v1) // CHECK-NEXT: true
-  println(nil == v0) // CHECK-NEXT: true
-  println(nil != v0) // CHECK-NEXT: false
+  print(nil == v1) // CHECK-NEXT: false
+  print(nil != v1) // CHECK-NEXT: true
+  print(nil == v0) // CHECK-NEXT: true
+  print(nil != v0) // CHECK-NEXT: false
 
   let c0: C? = nil
   let c1: C? = C()
   
   /*
   // FIXME: <rdar://problem/17489239> Optional<T>() == nil where T: !Equatable
-  println(c1 == nil) // DISABLED-CHECK-NEXT: false
-  println(c1 != nil) // DISABLED-CHECK-NEXT: true
-  println(c0 == nil) // DISABLED-CHECK-NEXT: true
-  println(c0 != nil) // DISABLED-CHECK-NEXT: false
+  print(c1 == nil) // DISABLED-CHECK-NEXT: false
+  print(c1 != nil) // DISABLED-CHECK-NEXT: true
+  print(c0 == nil) // DISABLED-CHECK-NEXT: true
+  print(c0 != nil) // DISABLED-CHECK-NEXT: false
 
-  println(nil == c1) // DISABLED-CHECK-NEXT: false
-  println(nil != c1) // DISABLED-CHECK-NEXT: true
-  println(nil == c0) // DISABLED-CHECK-NEXT: true
-  println(nil != c0) // DISABLED-CHECK-NEXT: false
+  print(nil == c1) // DISABLED-CHECK-NEXT: false
+  print(nil != c1) // DISABLED-CHECK-NEXT: true
+  print(nil == c0) // DISABLED-CHECK-NEXT: true
+  print(nil != c0) // DISABLED-CHECK-NEXT: false
   */
   
   let e0: E? = nil
   let e1: E? = E()
   
-  println(e1 == nil) // CHECK-NEXT: false
-  println(e1 != nil) // CHECK-NEXT: true
-  println(e0 == nil) // CHECK-NEXT: true
-  println(e0 != nil) // CHECK-NEXT: false
+  print(e1 == nil) // CHECK-NEXT: false
+  print(e1 != nil) // CHECK-NEXT: true
+  print(e0 == nil) // CHECK-NEXT: true
+  print(e0 != nil) // CHECK-NEXT: false
 
-  println(nil == e1) // CHECK-NEXT: false
-  println(nil != e1) // CHECK-NEXT: true
-  println(nil == e0) // CHECK-NEXT: true
-  println(nil != e0) // CHECK-NEXT: false
+  print(nil == e1) // CHECK-NEXT: false
+  print(nil != e1) // CHECK-NEXT: true
+  print(nil == e0) // CHECK-NEXT: true
+  print(nil != e0) // CHECK-NEXT: false
 }
 nilComparison()
 
@@ -184,25 +184,25 @@ let d: Int? = 456
 let e: Int? = nil
 let f: Int? = nil
 
-debugPrintln(a ?? nextCounter())      // CHECK-NEXT: 123
-debugPrintln(b ?? nextCounter())      // CHECK-NEXT: 0
-debugPrintln(c ?? nextCounter())      // CHECK-NEXT: 1
-debugPrintln(d ?? nextCounter())      // CHECK-NEXT: 456
-debugPrintln(e ?? d ?? nextCounter()) // CHECK-NEXT: 456
-debugPrintln(f ?? nextCounter())      // CHECK-NEXT: 2
+debugPrint(a ?? nextCounter())      // CHECK-NEXT: 123
+debugPrint(b ?? nextCounter())      // CHECK-NEXT: 0
+debugPrint(c ?? nextCounter())      // CHECK-NEXT: 1
+debugPrint(d ?? nextCounter())      // CHECK-NEXT: 456
+debugPrint(e ?? d ?? nextCounter()) // CHECK-NEXT: 456
+debugPrint(f ?? nextCounter())      // CHECK-NEXT: 2
 
 func nextCounter2() -> Int? {
   return nextCounter()
 }
 
-debugPrintln(c ?? d)                   // CHECK-NEXT: Optional(456)
-debugPrintln(c ?? e)                   // CHECK-NEXT: nil
-debugPrintln(a ?? nextCounter2())      // CHECK-NEXT: Optional(123)
-debugPrintln(b ?? nextCounter2())      // CHECK-NEXT: Optional(3)
-debugPrintln(c ?? nextCounter2())      // CHECK-NEXT: Optional(4)
-debugPrintln(d ?? nextCounter2())      // CHECK-NEXT: Optional(456)
-debugPrintln(e ?? d ?? nextCounter2()) // CHECK-NEXT: Optional(456)
-debugPrintln(f ?? nextCounter2())      // CHECK-NEXT: Optional(5)
+debugPrint(c ?? d)                   // CHECK-NEXT: Optional(456)
+debugPrint(c ?? e)                   // CHECK-NEXT: nil
+debugPrint(a ?? nextCounter2())      // CHECK-NEXT: Optional(123)
+debugPrint(b ?? nextCounter2())      // CHECK-NEXT: Optional(3)
+debugPrint(c ?? nextCounter2())      // CHECK-NEXT: Optional(4)
+debugPrint(d ?? nextCounter2())      // CHECK-NEXT: Optional(456)
+debugPrint(e ?? d ?? nextCounter2()) // CHECK-NEXT: Optional(456)
+debugPrint(f ?? nextCounter2())      // CHECK-NEXT: Optional(5)
 
 import StdlibUnittest
 import Swift

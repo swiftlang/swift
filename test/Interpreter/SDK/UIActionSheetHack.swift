@@ -6,39 +6,39 @@ import UIKit
 let actionSheet = UIActionSheet(title: nil, delegate: nil, cancelButtonTitle: "ABC", destructiveButtonTitle: "DEF")
 
 // CHECK: <UIActionSheet: 0x{{.+}}>{{$}}
-println(actionSheet.description)
+print(actionSheet.description)
 // CHECK-NEXT: 0
-println(actionSheet.destructiveButtonIndex)
+print(actionSheet.destructiveButtonIndex)
 // CHECK-NEXT: 2
-println(actionSheet.numberOfButtons)
+print(actionSheet.numberOfButtons)
 
 
 let actionSheet2 = UIActionSheet(title: nil, delegate: nil, cancelButtonTitle: "ABC", destructiveButtonTitle: "DEF", otherButtonTitles: "G", "H")
 
 // CHECK: <UIActionSheet: 0x{{.+}}>{{$}}
-println(actionSheet2.description)
+print(actionSheet2.description)
 // CHECK-NEXT: 0
-println(actionSheet2.destructiveButtonIndex)
+print(actionSheet2.destructiveButtonIndex)
 // CHECK-NEXT: 4
-println(actionSheet2.numberOfButtons)
+print(actionSheet2.numberOfButtons)
 
 
 let alertView = UIAlertView(title: "Error", message: "The operation completed successfully.", delegate: nil, cancelButtonTitle: "Abort")
 
 // CHECK: <UIAlertView: 0x{{.+}}>{{$}}
-println(alertView.description)
+print(alertView.description)
 // CHECK-NEXT: 0
-println(alertView.cancelButtonIndex)
+print(alertView.cancelButtonIndex)
 // CHECK-NEXT: 1
-println(alertView.numberOfButtons)
+print(alertView.numberOfButtons)
 
 
 let alertView2 = UIAlertView(title: "Error", message: "The operation completed successfully.", delegate: nil, cancelButtonTitle: "Abort", otherButtonTitles: "Cry", "Apologize")
 
 // CHECK: <UIAlertView: 0x{{.+}}>{{$}}
-println(alertView2.description)
+print(alertView2.description)
 // CHECK-NEXT: 0
-println(alertView2.cancelButtonIndex)
+print(alertView2.cancelButtonIndex)
 // CHECK-NEXT: 3
-println(alertView2.numberOfButtons)
+print(alertView2.numberOfButtons)
 

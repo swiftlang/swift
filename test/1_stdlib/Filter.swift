@@ -12,16 +12,16 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
 // CHECK: testing...
-println("testing...")
+print("testing...")
 
 func printlnByGenerating<S: SequenceType>(s: S) {
-  print("<")
+  print("<", appendNewline: false)
   var prefix = ""
   for x in s {
-    print("\(prefix)\(x)")
+    print("\(prefix)\(x)", appendNewline: false)
     prefix = ", "
   }
-  println(">")
+  print(">")
 }
 
 func printlnByIndexing<C: CollectionType>(c: C) {
@@ -66,4 +66,4 @@ if true {
 }
 
 // CHECK-NEXT: all done.
-println("all done.")
+print("all done.")

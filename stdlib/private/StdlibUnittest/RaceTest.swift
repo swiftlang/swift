@@ -542,7 +542,7 @@ public func runRaceTest<RT : RaceTestWithPerTrialDataType>(
 
   let aggregatedEvaluations = sharedState.aggregatedEvaluations
   expectFalse(aggregatedEvaluations.isFailed)
-  println(aggregatedEvaluations)
+  print(aggregatedEvaluations)
 }
 
 internal func _divideRoundUp(lhs: Int, _ rhs: Int) -> Int {

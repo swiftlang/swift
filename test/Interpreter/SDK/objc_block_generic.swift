@@ -12,5 +12,5 @@ autoreleasepool {
   let gg = ff
 
   // CHECK: 219
-  println(gg!(219))
+  print(gg!(219))
 }

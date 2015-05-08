@@ -10,13 +10,13 @@
 #if os(OSX)
 import AppKit
 
-println(NSButtonType(rawValue: 20721)!.rawValue)
+print(NSButtonType(rawValue: 20721)!.rawValue)
 #endif
 
 #if os(iOS)
 import UIKit
 
-println(UIViewAnimationCurve(rawValue: 20721)!.rawValue)
+print(UIViewAnimationCurve(rawValue: 20721)!.rawValue)
 #endif
 
 // CHECK: 20721

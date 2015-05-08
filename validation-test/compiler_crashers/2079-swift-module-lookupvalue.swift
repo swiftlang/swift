@@ -7,7 +7,7 @@
 
 let f = true }
 struct D : NSObject {
-println() -> {
+print() -> {
 }
 protocol P {
 typealias d : d == b> Int = [B

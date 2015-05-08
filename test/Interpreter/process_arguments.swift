@@ -5,9 +5,9 @@
 
 // REQUIRES: swift_interpreter
 
-println("Begin")
-for arg in Process.arguments { println(arg) }
-println("End")
+print("Begin")
+for arg in Process.arguments { print(arg) }
+print("End")
 
 // CHECK-NONE: Begin
 // CHECK-NONE-NEXT: {{.*}}process_arguments.swift

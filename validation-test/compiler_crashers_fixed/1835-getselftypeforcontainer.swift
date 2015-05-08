@@ -8,7 +8,7 @@ func i<Y> {
 t..Generator.f = Swift.init([0.E == {
 class a {
 }
-println() -> {
+print() -> {
 class A {
 }
 }

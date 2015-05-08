@@ -7,7 +7,7 @@
 
 protocol A : H.init(")
 var b(self.d<T] {
-println("\(b
+print("\(b
 func b<I : NSObject {
 if c : String {
 let t: P {

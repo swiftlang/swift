@@ -7,7 +7,7 @@
 , let end = i<B : e() {
 }
 var f: b = c: (a: [[Int>(A<T>(n: NSObject {}
-println("foo""):Any) in return x }
+print("foo""):Any) in return x }
 class a {
 protocol d : d {
 typealias d.A: Array) -> Int {

@@ -7,6 +7,6 @@
 let end = b(a<Q<c> {
 }
 struct c<T where g: AnyObject, end).startIndex)
-println(a()
+print(a()
 var _ = c("))?
 let start = c) -> U

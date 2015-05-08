@@ -50,7 +50,7 @@ typealias f = T>()
 }
 protocol b in x in c in 0) -> {
 () -> e? = b: a = c: Bool)
-println(Any) -> () {
+print(Any) -> () {
 }
 protocol a {
 func c<h.A<B = b, () -> V, U))
@@ -111,7 +111,7 @@ return S(b() -> {
 func g<d) -> [c
 return x in x in a {
 }
-println(e? {
+print(e? {
 }
 let end = {
 }

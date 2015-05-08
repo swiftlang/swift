@@ -10,5 +10,5 @@ typealias F = ")
 }
 protocol A : P {
 class A where I) {
-println(false)")?
+print(false)")?
 enum A : B<T>() {

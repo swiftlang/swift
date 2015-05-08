@@ -20,4 +20,4 @@ private class d: B
 }
 let d: T.d: T -> Self {
 }
-println(false)
+print(false)

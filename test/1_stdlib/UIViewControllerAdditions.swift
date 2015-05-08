@@ -30,30 +30,30 @@ class MissingViewController : UIViewController { }
 let bundle = NSBundle(path: Process.arguments[1])
 
 let v1 = View1Controller(nibName:nil, bundle:bundle)
-println("tag 1 0=\(v1.view.tag) you're it")
+print("tag 1 0=\(v1.view.tag) you're it")
 // CHECK: tag 1 0=0 you're it
 
 let v2 = View2Controller(nibName:nil, bundle:bundle)
-println("tag 2 0=\(v2.view.tag) you're it")
+print("tag 2 0=\(v2.view.tag) you're it")
 // CHECK: tag 2 0=0 you're it
 
 let v3 = View3Controller(nibName:nil, bundle:bundle)
-println("tag 3 3=\(v3.view.tag) you're it")
+print("tag 3 3=\(v3.view.tag) you're it")
 // CHECK: tag 3 3=3 you're it
 
 let v4 = View4Controller(nibName:nil, bundle:bundle)
-println("tag 4 4=\(v4.view.tag) you're it")
+print("tag 4 4=\(v4.view.tag) you're it")
 // CHECK: tag 4 4=4 you're it
 
 let v5 = View5Controller(nibName:nil, bundle:bundle)
-println("tag 5 0=\(v5.view.tag) you're it")
+print("tag 5 0=\(v5.view.tag) you're it")
 // CHECK: tag 5 0=0 you're it
 
 let v6 = View6Controller(nibName:nil, bundle:bundle)
-println("tag 6 0=\(v6.view.tag) you're it")
+print("tag 6 0=\(v6.view.tag) you're it")
 // CHECK: tag 6 0=0 you're it
 
 let v7 = MissingViewController(nibName:nil, bundle:bundle)
-println("tag 7 0=\(v7.view.tag) you're it")
+print("tag 7 0=\(v7.view.tag) you're it")
 // CHECK: tag 7 0=0 you're it
 

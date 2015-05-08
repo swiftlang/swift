@@ -8,7 +8,7 @@ protocol A {
 struct X<Y> : A {
   func b(b: X.Type) {
     let x: Any = b
-    println(b as X.Type)
+    print(b as X.Type)
   }
 }
 

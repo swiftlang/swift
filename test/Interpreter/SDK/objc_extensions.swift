@@ -6,7 +6,7 @@ import Foundation
 
 extension NSObject {
   func frob() {
-    println("I've been frobbed!")
+    print("I've been frobbed!")
   }
 
   var asHerself : NSObject {
@@ -15,11 +15,11 @@ extension NSObject {
 
   var blackHoleWithHawkingRadiation : NSObject? {
     get {
-      println("e+")
+      print("e+")
       return nil
     }
     set {
-      println("e-")
+      print("e-")
     }
   }
 }
@@ -29,20 +29,20 @@ var o = NSObject()
 func drop(x: NSObject?) {}
 
 // CHECK: true
-println(o.respondsToSelector("frob"))
+print(o.respondsToSelector("frob"))
 // CHECK: true
-println(o.respondsToSelector("asHerself"))
+print(o.respondsToSelector("asHerself"))
 // CHECK: false
-println(o.respondsToSelector("setAsHerself:"))
+print(o.respondsToSelector("setAsHerself:"))
 // CHECK: true
-println(o.respondsToSelector("blackHoleWithHawkingRadiation"))
+print(o.respondsToSelector("blackHoleWithHawkingRadiation"))
 // CHECK: true
-println(o.respondsToSelector("setBlackHoleWithHawkingRadiation:"))
+print(o.respondsToSelector("setBlackHoleWithHawkingRadiation:"))
 
 // CHECK: I've been frobbed!
 o.frob()
 // CHECK: true
-println(o === o.asHerself)
+print(o === o.asHerself)
 // CHECK: e+
 drop(o.blackHoleWithHawkingRadiation)
 // CHECK: e-

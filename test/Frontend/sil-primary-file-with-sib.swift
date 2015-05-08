@@ -15,4 +15,4 @@ func return_a_number() -> Int64 {
   return 1995
 }
 
-println("The number: \(return_a_number())")
+print("The number: \(return_a_number())")

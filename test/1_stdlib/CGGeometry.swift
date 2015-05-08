@@ -5,18 +5,18 @@
 import CoreGraphics
 
 func print(r: CGPoint, _ prefix: String) {
-  println("\(prefix) \(r.x) \(r.y)")
+  print("\(prefix) \(r.x) \(r.y)")
 }
 func print(r: CGSize, _ prefix: String) {
-  println("\(prefix) \(r.width) \(r.height)")
+  print("\(prefix) \(r.width) \(r.height)")
 }
 
 func print(r: CGVector, _ prefix: String) {
-  println("\(prefix) \(r.dx) \(r.dy)")
+  print("\(prefix) \(r.dx) \(r.dy)")
 }
 
 func print(r: CGRect, _ prefix: String) {
-  println("\(prefix) \(r.origin.x) \(r.origin.y) \(r.size.width) \(r.size.height)")
+  print("\(prefix) \(r.origin.x) \(r.origin.y) \(r.size.width) \(r.size.height)")
 }
 
 let int1: Int = 1
@@ -34,7 +34,7 @@ let double2: Double = 2
 let double3: Double = 3
 let double4: Double = 4
 
-println("You may begin.")
+print("You may begin.")
 // CHECK: You may begin.
 
 

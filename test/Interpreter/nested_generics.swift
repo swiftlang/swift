@@ -10,7 +10,7 @@ struct PrintableValue : MyPrintable {
   }
 
   func print() {
-    Swift.print(value)
+    Swift.print(value, appendNewline: false)
   }
 
   var value: String
@@ -18,17 +18,17 @@ struct PrintableValue : MyPrintable {
 
 class Foo<T : MyPrintable> {
   init<U : MyPrintable>(_ t: T, _ u: U) {
-    print("init ")
+    print("init ", appendNewline: false)
     t.print()
-    print(" ")
+    print(" ", appendNewline: false)
     u.print()
-    println("")
+    print("")
   }
 
   func bar<U : MyPrintable>(u: U) {
-    print("bar ")
+    print("bar ", appendNewline: false)
     u.print()
-    println("")
+    print("")
   }
 }
 

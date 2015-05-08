@@ -4,7 +4,7 @@
 // CHECK-DAG: ![[SFNODE:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "Float",{{.*}} identifier: [[SF:.*]])
 // CHECK-DAG: ![[VOIDNODE:.*]] = !DICompositeType(tag: DW_TAG_structure_type, name: "_TtT_",{{.*}} identifier: [[VOID:.*]])
 func bar() {
-    print ("bar()")
+    print("bar()", appendNewline: false)
 }
 func baz(i: Float) -> Int { return 0; }
 func barz(i: Float, _ j: Float) -> Int { return 0; }

@@ -1,61 +1,61 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
 func test1() {
-  println("test1")
+  print("test1")
   var i : Int
   for i=0;;++i {
     if i > 2 {
       break
     }
-    println(i)
+    print(i)
     continue
   }
 }
 func test2() {
-  println("test2")
+  print("test2")
   var i : Int
   for i=0;i<10;++i {
     if i > 2 {
       continue
     }
-    println(i)
+    print(i)
   }
 }
 func test3() {
-  println("test3")
+  print("test3")
   var i : Int
   for i=0;i<10;++i {
     if i > 2 {
       break
     }
-    println(i)
+    print(i)
   }
 }
 func test4() {
-  println("test4")
+  print("test4")
   for i in 0..<10 {
     if i > 2 {
       break
     }
-    println(i)
+    print(i)
   }
 }
 func test5() {
-  println("test5")
+  print("test5")
   for i in 0..<10 {
     if i < 2 {
-      println(i)
+      print(i)
       continue
     }
     return
   }
 }
 func test6() {
-  println("test6")
+  print("test6")
   var i = 0
   while (i < 10) {
     if i < 2 {
-      println(i)
+      print(i)
       ++i
       continue
     }
@@ -63,35 +63,35 @@ func test6() {
   }
 }
 func test7() {
-  println("test7")
+  print("test7")
   var i = 0
   while (i < 10) {
     if i < 2 {
-      println(i)
+      print(i)
       break
     }
     return
   }
-  println("foo")
+  print("foo")
 }
 func test8() {
-  println("test8")
+  print("test8")
   var i : Int
   for i=0;;++i {
     for j in 0..<10 {
       if j > 1 {
         break
       }
-      println(j)
+      print(j)
     }
     if i > 2 {
       break
     }
-    println(i)
+    print(i)
     continue
   }
 }
-println("start")
+print("start")
 test1()
 // CHECK: test1
 // CHECK-NEXT: 0

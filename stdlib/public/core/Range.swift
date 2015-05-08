@@ -71,14 +71,14 @@ public struct RangeGenerator<
 /// subscripting with `T` is a compile-time error:
 ///
 ///     // error: could not find an overload for 'subscript'...
-///     println(Range<Int>(start: -99, end: 100)[0])
+///     print(Range<Int>(start: -99, end: 100)[0])
 ///
 /// However, subscripting that range still works in a generic context:
 ///
 ///     func brackets<T : ForwardIndexType>(x: Range<T>, i: T) -> T {
 ///       return x[i] // Just forward to subscript
 ///     }
-///     println(brackets(Range<Int>(start:-99, end:100), 0)) // prints 0
+///     print(brackets(Range<Int>(start:-99, end:100), 0)) // prints 0
 public struct Range<
   T : ForwardIndexType
 > : Equatable, CollectionType,

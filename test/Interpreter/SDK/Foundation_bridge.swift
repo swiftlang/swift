@@ -9,25 +9,25 @@ import Foundation
 // CHECK: 17 bridges to 17
 var i = 17
 if let obj = _bridgeToObjectiveC(i) {
-  println("\(i) bridges to \(obj.description!)")
+  print("\(i) bridges to \(obj.description!)")
 } else {
-  println("\(i) is not bridged to Objective-C")
+  print("\(i) is not bridged to Objective-C")
 }
 
 // CHECK: 3.14159 bridges to 3.14159
 var d = 3.14159
 if let obj = _bridgeToObjectiveC(d) {
-  println("\(d) bridges to \(obj.description!)")
+  print("\(d) bridges to \(obj.description!)")
 } else {
-  println("\(d) is not bridged to Objective-C")
+  print("\(d) is not bridged to Objective-C")
 }
 
 // CHECK: Hello, world! bridges to Hello, world!
 var s = "Hello, world!"
 if let obj = _bridgeToObjectiveC(s) {
-  println("\(s) bridges to \(obj.description!)")
+  print("\(s) bridges to \(obj.description!)")
 } else {
-  println("\(s) is not bridged to Objective-C")
+  print("\(s) is not bridged to Objective-C")
 }
 
 // CHECK: int array bridges to (
@@ -37,9 +37,9 @@ if let obj = _bridgeToObjectiveC(s) {
 // CHECK: )
 var a = [1, 2, 3]
 if let obj = _bridgeToObjectiveC(a) {
-  println("int array bridges to \(obj.description!)")
+  print("int array bridges to \(obj.description!)")
 } else {
-  println("int array is not bridged to Objective-C")
+  print("int array is not bridged to Objective-C")
 }
 
 // CHECK: uint array bridges to (
@@ -49,9 +49,9 @@ if let obj = _bridgeToObjectiveC(a) {
 // CHECK: )
 var aui: [UInt] = [1, 2, 3]
 if let obj = _bridgeToObjectiveC(aui) {
-  println("uint array bridges to \(obj.description!)")
+  print("uint array bridges to \(obj.description!)")
 } else {
-  println("uint array is not bridged to Objective-C")
+  print("uint array is not bridged to Objective-C")
 }
 
 // CHECK: float array bridges to (
@@ -61,9 +61,9 @@ if let obj = _bridgeToObjectiveC(aui) {
 // CHECK: )
 var af: [Float] = [1.5, 2.5, 3.5]
 if let obj = _bridgeToObjectiveC(af) {
-  println("float array bridges to \(obj.description!)")
+  print("float array bridges to \(obj.description!)")
 } else {
-  println("float array is not bridged to Objective-C")
+  print("float array is not bridged to Objective-C")
 }
 
 // CHECK: double array bridges to (
@@ -73,9 +73,9 @@ if let obj = _bridgeToObjectiveC(af) {
 // CHECK: )
 var ad = [1.5, 2.5, 3.5]
 if let obj = _bridgeToObjectiveC(ad) {
-  println("double array bridges to \(obj.description!)")
+  print("double array bridges to \(obj.description!)")
 } else {
-  println("double array is not bridged to Objective-C")
+  print("double array is not bridged to Objective-C")
 }
 
 // CHECK: string array bridges to (
@@ -85,9 +85,9 @@ if let obj = _bridgeToObjectiveC(ad) {
 // CHECK: )
 var a2 = ["Hello", "Swift", "World"]
 if let obj = _bridgeToObjectiveC(a2) {
-  println("string array bridges to \(obj.description!)")
+  print("string array bridges to \(obj.description!)")
 } else {
-  println("string array is not bridged to Objective-C")
+  print("string array is not bridged to Objective-C")
 }
 
 // CHECK: bool array bridges to (
@@ -97,17 +97,17 @@ if let obj = _bridgeToObjectiveC(a2) {
 // CHECK: )
 var ab = [false, true, false]
 if let obj = _bridgeToObjectiveC(ab) {
-  println("bool array bridges to \(obj.description!)")
+  print("bool array bridges to \(obj.description!)")
 } else {
-  println("bool array is not bridged to Objective-C")
+  print("bool array is not bridged to Objective-C")
 }
 
 // CHECK: tuple array is not bridged to Objective-C
 var a3 = [(1, 1), (1, 1), (1, 2)]
 if let obj = _bridgeToObjectiveC(a3) {
-  println("tuple array bridges to \(obj.description!)")
+  print("tuple array bridges to \(obj.description!)")
 } else {
-  println("tuple array is not bridged to Objective-C")
+  print("tuple array is not bridged to Objective-C")
 }
 
 // CHECK:      dictionary bridges to {
@@ -116,9 +116,9 @@ if let obj = _bridgeToObjectiveC(a3) {
 // CHECK-NEXT: }
 var dict: Dictionary<NSNumber, NSString> = [1: "Hello", 2: "World"]
 if let obj = _bridgeToObjectiveC(dict) {
-  println("dictionary bridges to \(obj.description!)")
+  print("dictionary bridges to \(obj.description!)")
 } else {
-  println("dictionary is not bridged to Objective-C")
+  print("dictionary is not bridged to Objective-C")
 }
 
 // CHECK:      dictionary bridges to {
@@ -127,17 +127,17 @@ if let obj = _bridgeToObjectiveC(dict) {
 // CHECK-NEXT: }
 var dict2 = [1: "Hello", 2: "World"]
 if let obj = _bridgeToObjectiveC(dict2) {
-  println("dictionary bridges to \(obj.description!)")
+  print("dictionary bridges to \(obj.description!)")
 } else {
-  println("dictionary is not bridged to Objective-C")
+  print("dictionary is not bridged to Objective-C")
 }
 
 // CHECK: dictionary is not bridged to Objective-C
 var dict3 = [1: ("Hello", 1), 2: ("World", 2)]
 if let obj = _bridgeToObjectiveC(dict3) {
-  println("dictionary bridges to \(obj.description!)")
+  print("dictionary bridges to \(obj.description!)")
 } else {
-  println("dictionary is not bridged to Objective-C")
+  print("dictionary is not bridged to Objective-C")
 }
 
 // Check dictionary bridging.
@@ -150,17 +150,17 @@ var world: NSString = "World"
 // nondeterministic.
 // CHECK: Hello
 for key in dict4.keys {
-  println(key.description)
+  print(key.description)
 }
 
 // CHECK: Hello: 1
-println("Hello: \(dict4[hello]!.description!)")
+print("Hello: \(dict4[hello]!.description!)")
 // CHECK: World: 2
-println("World: \(dict4[world]!.description!)")
+print("World: \(dict4[world]!.description!)")
 
 // <rdar://problem/17035548> bridging array of blocks.
 class Foo: NSObject {
-    func foo() { println("Foo.foo()") }
+    func foo() { print("Foo.foo()") }
     lazy var closures: [(@convention(block) () -> Void)] = [self.foo]
     func invoke() {
         closures[0]()
@@ -172,10 +172,10 @@ Foo().invoke()
 
 // <rdar://problem/19734621> Dealing with APIs that have been updated not to return nil in newer SDKs
 // CHECK: getNullable: nil
-println("getNullable: \(getNullable())")
+print("getNullable: \(getNullable())")
 // CHECK: getNonnull: []
-println("getNonnull: \(getNonnull())")
+print("getNonnull: \(getNonnull())")
 
 // CHECK: final
-println("final")
+print("final")
 

@@ -5,7 +5,7 @@
 // Test case found by fuzzing
 
 func f<A<1 {
-println() {
+print() {
 }
 enum b : b {
 func b: A.a

@@ -49,7 +49,7 @@ capturing closures that get and set the property, e.g.::
   var x = 0
   let xRef = Ref(getter: { x }, setter: { x = $0 })
   xRef.value = 2
-  println(x)
+  print(x)
 
 which no one would ever want to write by hand. I propose that we extend the
 ``inout`` modifier so that it can also be applied to return types, and
@@ -63,7 +63,7 @@ capturing local variables in the process::
   var x = 0
   let xRef = { &x }
   xRef() = 2
-  println(x)
+  print(x)
 
 When combined with our existing ``@autoclosure`` and ``assignment``
 operator features, we can write a "bind" operator with implicit capture
@@ -287,10 +287,10 @@ semantics::
   // ...or methods with specific arguments...
   button2.setTarget(button2=>.setTitle("Click me again, I dare you"))
   // ...or free functions...
-  button3.setTarget(message=>println)
+  button3.setTarget(message=>print)
   // ...or (context-free) blocks of code!
   button4.setTarget(message => {
-    println("The button so nice, it prints twice: \($0) \($0)")
+    print("The button so nice, it prints twice: \($0) \($0)")
   })
 
 A further refinement on ``@thin`` would be to have ``@static`` function values,
@@ -363,10 +363,10 @@ chaining operator ``?``::
 
 This has the added power of letting you chain closures or free functions::
 
-  x ¿ .sorted(<) ¿ println // prints "[1, 2, 3]"
-  y ¿ .sorted(<) ¿ println // does nothing
+  x ¿ .sorted(<) ¿ print // prints "[1, 2, 3]"
+  y ¿ .sorted(<) ¿ print // does nothing
 
-  x ¿ .sorted(<) ¿ { println($0[0]) } // prints "1"
+  x ¿ .sorted(<) ¿ { print($0[0]) } // prints "1"
 
 Key Paths
 ---------

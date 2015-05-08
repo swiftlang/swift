@@ -8,7 +8,7 @@
 var b {
 let a<Int>(n: T>? = c: AnyObject) {
 }
-println()
+print()
 class A, Any, U) -> {
 typealias A {
 }

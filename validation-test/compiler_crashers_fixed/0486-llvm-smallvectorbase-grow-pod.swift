@@ -7,4 +7,4 @@
 func g<T) -> T where I) {
 class A {
 static let c : A? = T>(g.R
-println(n: A.init(b: P>
+print(n: A.init(b: P>

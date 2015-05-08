@@ -10,7 +10,7 @@ class A<T: d {
 class B {
 }
 }
-println()
+print()
 protocol b : P {
 typealias e = a
 var a: B) ->

@@ -4,10 +4,10 @@ class C {
    let name: String
    init(name: String) { self.name = name }
    lazy var asString: () -> String = { [unowned self] in return self.name }
-   deinit { println("deinitializing...") }
+   deinit { print("deinitializing...") }
 }
 var c: C? = C(name: "I am a C")
-println(c!.asString())
+print(c!.asString())
 c = nil
 
 // CHECK: I am a C

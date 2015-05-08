@@ -302,7 +302,6 @@ tests.test("basics") {
   expectEqual(x, OptionSet(.one) | OptionSet(.two))
 
   let y = OptionSet<Options>(.four)
-  println(y)
 
   let z = x | y
   expectEqual(OptionSet(.one, .two, .four), z)

@@ -2,7 +2,8 @@
 
 var zero: Int = 0
 
-func use(_:Int) {}
+func use(_: Int) {}
+func use(_: Double) {}
 func getInt() -> Int { return zero }
 
 // CHECK-LABEL: sil hidden  @{{.*}}physical_tuple_lvalue
@@ -871,7 +872,7 @@ class r19254812Derived: r19254812Base{
   let pi = 3.14159265359
   
   init(x : ()) {
-    println(pi)
+    use(pi)
   }
   
 // Accessing the "pi" property should not retain/release self.

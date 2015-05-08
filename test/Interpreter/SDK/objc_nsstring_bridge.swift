@@ -12,11 +12,11 @@ extension String {
 }
 
 func printString(x: String) {
-  println(x)
+  print(x)
 }
 
 func printDescription(o: AnyObject) {
-  println(o.description!.reallyAString())
+  print(o.description!.reallyAString())
 }
 
 class Pootie : NSObject {
@@ -62,4 +62,4 @@ var s8 = ao as? String
 
 
 // CHECK-NEXT: done
-println("done")
+print("done")

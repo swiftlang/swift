@@ -1,8 +1,8 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
-class B {     func foo() { println("foo") } }
-class D : B {    func bar() { println("bar") } }
-class G<T> : B {   func bas() { println("bas") } }
+class B {     func foo() { print("foo") } }
+class D : B {    func bar() { print("bar") } }
+class G<T> : B {   func bas() { print("bas") } }
 
 // CHECK: foo
 func up(d: D) { d.foo() }

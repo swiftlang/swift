@@ -323,7 +323,7 @@
     func accuseSuspect(suspect:PersonOfInterest)
         inRoom(room:Room)
         withWeapon(weapon:Weapon) {
-      println("It was \(suspect) in the \(room) with the \(weapon)")
+      print("It was \(suspect) in the \(room) with the \(weapon)")
     }
 
     <i>// Calling a selector-style function.</i>
@@ -816,14 +816,14 @@
     var x = 219
     var f = foo(&x)
     // x is updated to the value of foo's local x at function exit.
-    println("global x = \(x)")
+    print("global x = \(x)")
     // These calls only update the captured local 'x', which is now independent
     // of the inout parameter.
-    println("local x = \(f())")
-    println("local x = \(f())")
-    println("local x = \(f())")
+    print("local x = \(f())")
+    print("local x = \(f())")
+    print("local x = \(f())")
 
-    println("global x = \(x)")
+    print("global x = \(x)")
   </pre>
 
   will print:
@@ -1581,7 +1581,7 @@ ill-formed if the type does not conform to the protocol.</p>
     x += a ? b ? y : z : w
 
     for i in 1...101 {
-      println(i % 15      ? "fizzbuzz"
+      print(i % 15      ? "fizzbuzz"
             : i %  3 == 0 ? "fizz"
             : i %  5 == 0 ? "buzz"
             : "\(i)")
@@ -1731,7 +1731,7 @@ ill-formed if the type does not conform to the protocol.</p>
     func log(message:String,
              file:String = __FILE__,
              line:Int = __LINE__) {
-      println("\(file):\(line): \(message)")
+      print("\(file):\(line): \(message)")
     }
 
     log("Orders received")
@@ -1807,7 +1807,7 @@ ill-formed if the type does not conform to the protocol.</p>
     infix func +-+ &lt;T, U&gt;(t:T.Type, u:U.Type) -&gt; Foo { }
     
     var foo = (Dict&lt;String, Int&gt;) +-+ (Array&lt;UnicodeScalar&gt;)
-    println(foo)
+    print(foo)
   </pre>
 
   <p>On the other hand, some expressions involving <tt>&lt;</tt> and
@@ -2495,7 +2495,7 @@ func map<T, U>(array : T[])(fn : (T) -> U) -> U[] { ... }
   
   <pre class="example">
     for i in 0...100 {
-      println(String(i));
+      print(String(i));
     }
  </pre>
 

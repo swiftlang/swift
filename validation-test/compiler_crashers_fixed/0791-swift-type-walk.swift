@@ -39,7 +39,7 @@ typealias A {
 }
 }
 var f : SequenceType where A, U) -> Bool {
-println()
+print()
 }
 class A {
 struct c in c {

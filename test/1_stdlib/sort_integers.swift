@@ -48,7 +48,7 @@ func randomize(size : Int, _ verify : ([Int]) -> ()) {
 
 // Verify the permute method itself:
 let printer : ([Int]) -> () = {
-  println($0)
+  print($0)
 }
 //CHECK: [0, 1, 2]
 //CHECK: [0, 2, 1]
@@ -63,7 +63,7 @@ let sort_verifier : ([Int]) -> () = {
     var y = sorted($0)
     for i in 0..<y.count - 1 {
     if (y[i] > y[i+1]) {
-        println("Error: \(y)")
+        print("Error: \(y)")
         return
       }
     }
@@ -74,7 +74,7 @@ permute(2, sort_verifier)
 permute(6, sort_verifier)
 permute(7, sort_verifier)
 //CHECK: Test1 - Done
-println("Test1 - Done")
+print("Test1 - Done")
 
 // Now, let's verify the sort.
 let partition_verifier : ([Int]) -> () = {
@@ -85,7 +85,7 @@ let partition_verifier : ([Int]) -> () = {
     // equal to the pivot value.
     for i in 0..<idx {
       if y[i] > y[idx]  {
-        print("Error!\n")
+        print("Error!\n", appendNewline: false)
         return
       }
     }
@@ -93,7 +93,7 @@ let partition_verifier : ([Int]) -> () = {
     // equal to the pivot value.
     for i in idx..<y.count - 1 {
       if y[i] < y[idx]  {
-        print("Error!\n")
+        print("Error!\n", appendNewline: false)
         return
       }
     }
@@ -106,7 +106,7 @@ permute(6, partition_verifier)
 permute(7, partition_verifier)
 //CHECK-NOT: Error!
 //CHECK: Test2 - Done
-println("Test2 - Done")
+print("Test2 - Done")
 
 
 randomize(70, sort_verifier)
@@ -114,5 +114,5 @@ randomize(700, sort_verifier)
 randomize(1900, sort_verifier)
 //CHECK-NOT: Error!
 //CHECK: Test3 - Done
-println("Test3 - Done")
+print("Test3 - Done")
 

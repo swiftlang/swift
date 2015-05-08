@@ -29,6 +29,6 @@ class Base {
 class Sub : Base {
   override func foo() {}
   override var prop: Int {
-    didSet { println("hi") }
+    didSet { print("hi") }
   }
 }

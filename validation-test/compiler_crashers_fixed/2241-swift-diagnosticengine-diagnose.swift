@@ -17,7 +17,7 @@ f : (x, Any) {
 }
 }
 func a<e(t: b
-println("):
+print("):
 let end = i(b.advance(a(c {
 }
 class func b> {

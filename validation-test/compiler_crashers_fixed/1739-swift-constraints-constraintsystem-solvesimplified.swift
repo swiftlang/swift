@@ -9,8 +9,8 @@ class a {
 func f<e?) -> Bool {
 class A {
 func c: a {
-println() -> V>Bool) {
-println(T>() {
+print() -> V>Bool) {
+print(T>() {
 }
 func f((v: BooleanType>Bool]()
 }() { c>(z(b()

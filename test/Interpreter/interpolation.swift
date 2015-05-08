@@ -6,15 +6,15 @@
 var hello = "Hello"
 var pi = 3
 // CHECK: Hello, world. Pi is approximately 3.
-println("\(hello), world. Pi is approximately \(pi).")
+print("\(hello), world. Pi is approximately \(pi).")
 
 // CHECK: Nested "Hello, World!" with Pi = 3!
 var HW = "\(hello), World!";
-println("Nested \"\(HW)\" with Pi = \(pi)!")
+print("Nested \"\(HW)\" with Pi = \(pi)!")
 
 
 // CHECK: value = 1099226349619
 var someval = 0xFFeeFF0033
-println("value = \(someval)")
+print("value = \(someval)")
 
 

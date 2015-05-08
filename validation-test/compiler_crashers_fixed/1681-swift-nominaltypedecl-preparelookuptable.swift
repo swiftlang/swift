@@ -9,7 +9,7 @@ C {
 }
 class A<T where B : b: start, f(b)
 protocol b {
-println()
+print()
 }
 typealias R = Swift.substringWithRange(v: b() -> {
 }

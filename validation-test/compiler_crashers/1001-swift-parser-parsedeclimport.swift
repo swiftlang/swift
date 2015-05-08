@@ -40,5 +40,5 @@ protocol A {
 let c: d {
 }
 func f(f, let foo as BooleanType))-> U -> {
-println("[1
+print("[1
 typealias A : A {

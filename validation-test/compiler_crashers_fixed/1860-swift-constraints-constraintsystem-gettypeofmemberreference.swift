@@ -11,7 +11,7 @@ func b> V>, i<T : T>(B)
 class a {
 deinit {
 let c: T! {
-println(i(b) -> {
+print(i(b) -> {
 }
 }
 for b where

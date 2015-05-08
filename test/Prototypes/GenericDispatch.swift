@@ -18,7 +18,7 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
 // CHECK: testing...
-println("testing...")
+print("testing...")
 
 //===----------------------------------------------------------------------===//
 //===--- Think of this code as being "in the library" ---------------------===//
@@ -52,7 +52,7 @@ func _distance<I>(other: I) -> (_Distance, (I)) {
 // Default Implementation of distance for F's
 func ~> <I: F>(self_:I, (_Distance, (I))) -> Int {
   self_.successor() // Use an F-specific operation
-  println("F")
+  print("F")
   return 0
 }
 
@@ -76,7 +76,7 @@ protocol R : F {
 func ~> <I: R>(x: I, args: (_Distance, (I))) -> Int {
   let other = args.1
   I.sub(other, y: x)
-  println("R")
+  print("R")
   return 1
 }
 
@@ -111,7 +111,7 @@ struct FastIndex : R {
 struct X : D {
   // Customized distance implementation
   func distance(y: X) -> Int {
-    println("X")
+    print("X")
     return 3
   }
   // Inherited requirements
@@ -135,4 +135,4 @@ sort(FastIndex())
 sort(X())
 
 // CHECK-NEXT: done
-println("done.")
+print("done.")

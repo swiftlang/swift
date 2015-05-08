@@ -33,11 +33,11 @@ only the currently inhabited type is ever used::
   var p : Pattern = .Checkers(.Black, .White)
   switch p {
   case .Solid(var c):
-    println("solid \(c)")
+    print("solid \(c)")
   case .Outline(var c):
-    println("outlined \(c)")
+    print("outlined \(c)")
   case .Checkers(var a, var b):
-    println("checkered \(a) and \(b)")
+    print("checkered \(a) and \(b)")
   }
 
 Given the choice between two familiar keywords, we decided to use 'enum' to

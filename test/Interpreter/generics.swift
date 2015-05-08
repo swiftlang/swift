@@ -14,35 +14,35 @@ var bigStruct = id(BigStruct(a: 1, b: 2,c: 3, d: 4, e: 5, f: 6, g: 7, h: 8))
 //var someClass = SomeClass()
 //var someClass2 = id(someClass)
 
-func println(bs: BigStruct) {
+func print(bs: BigStruct) {
   // FIXME: typechecker is too slow to handle this as an interpolated literal
-  print("BigStruct(")
-  print(bs.a)
-  print(", ")
-  print(bs.b)
-  print(", ")
-  print(bs.c)
-  print(", ")
-  print(bs.d)
-  print(", ")
-  print(bs.e)
-  print(", ")
-  print(bs.f)
-  print(", ")
-  print(bs.g)
-  print(", ")
-  print(bs.h)
-  println(")")
+  print("BigStruct(", appendNewline: false)
+  print(bs.a, appendNewline: false)
+  print(", ", appendNewline: false)
+  print(bs.b, appendNewline: false)
+  print(", ", appendNewline: false)
+  print(bs.c, appendNewline: false)
+  print(", ", appendNewline: false)
+  print(bs.d, appendNewline: false)
+  print(", ", appendNewline: false)
+  print(bs.e, appendNewline: false)
+  print(", ", appendNewline: false)
+  print(bs.f, appendNewline: false)
+  print(", ", appendNewline: false)
+  print(bs.g, appendNewline: false)
+  print(", ", appendNewline: false)
+  print(bs.h, appendNewline: false)
+  print(")")
 }
 
 // CHECK: 1
-println(int)
+print(int)
 // CHECK: BigStruct(1, 2, 3, 4, 5, 6, 7, 8)
-println(bigStruct)
+print(bigStruct)
 
 // FIXME: missing symbol for Object destructor?
 // C/HECK: true
-//println(someClass === someClass2)
+//print(someClass === someClass2)
 
 
 //===----
@@ -57,21 +57,21 @@ struct S1 : P1 {}
 struct S2 : P2 {}
 struct S3 : P3 {}
 
-func foo1<T : P1>(x: T) { println("P1") }
-func foo1<T : P2>(x: T) { println("P2") }
-func foo1<T : P3>(x: T) { println("P3") }
+func foo1<T : P1>(x: T) { print("P1") }
+func foo1<T : P2>(x: T) { print("P2") }
+func foo1<T : P3>(x: T) { print("P3") }
 
-func foo2<T : P1>(x: T) { println("P1") }
-func foo2<T : P2>(x: T) { println("P2") }
+func foo2<T : P1>(x: T) { print("P1") }
+func foo2<T : P2>(x: T) { print("P2") }
 
-func foo3<T : P1>(x: T) { println("P1") }
-func foo3<T : P3>(x: T) { println("P3") }
+func foo3<T : P1>(x: T) { print("P1") }
+func foo3<T : P3>(x: T) { print("P3") }
 
-func foo4<T : P3, U : P1>(x: T, _ y: U) { println("P3, P1") }
-func foo4<T : P3, U : P3>(x: T, _ y: U) { println("P3, P3") }
+func foo4<T : P3, U : P1>(x: T, _ y: U) { print("P3, P1") }
+func foo4<T : P3, U : P3>(x: T, _ y: U) { print("P3, P3") }
 
 func checkOverloadResolution() {
-  println("overload resolution:")
+  print("overload resolution:")
   // CHECK-LABEL: overload resolution
 
   foo1(S1()) // CHECK-NEXT: P1
@@ -115,6 +115,6 @@ func parse<T:Base>()->T {
 
 var m : D1 = parse()
 
-println(m.v)
+print(m.v)
 // CHECK: 2
 

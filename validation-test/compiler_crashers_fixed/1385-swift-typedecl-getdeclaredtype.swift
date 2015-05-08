@@ -14,7 +14,7 @@ t: a {
 i<C
 }
 class A where Optional<Int
-println() {
+print() {
 }
 }
 typealias R
@@ -100,6 +100,6 @@ assert() -> : A? {
 return b: String {
 typealias e == Swift.init(a: Hashable> String {
 class A {
-println(s(self.startIndex)"foobar"")
+print(s(self.startIndex)"foobar"")
 }
 let start = b<T

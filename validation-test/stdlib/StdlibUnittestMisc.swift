@@ -7,11 +7,11 @@ import StdlibUnittest
 //
 
 // CHECK: (10, 0, 0)
-println(_parseDottedVersionTriple("10"))
+print(_parseDottedVersionTriple("10"))
 
 // CHECK: (10, 9, 0)
-println(_parseDottedVersionTriple("10.9"))
+print(_parseDottedVersionTriple("10.9"))
 
 // CHECK: (10, 9, 3)
-println(_parseDottedVersionTriple("10.9.3"))
+print(_parseDottedVersionTriple("10.9.3"))
 

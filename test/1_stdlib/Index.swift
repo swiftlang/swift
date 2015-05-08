@@ -19,7 +19,7 @@ struct F : ForwardIndexType {
   }
 
   func successor() -> F {
-    println("F.successor: \(x)")
+    print("F.successor: \(x)")
     return F(x + 1)
   }
 }
@@ -36,11 +36,11 @@ struct B : BidirectionalIndexType {
   }
 
   func successor() -> B {
-    println("B.successor: \(x)")
+    print("B.successor: \(x)")
     return B(x + 1)
   }
   func predecessor() -> B {
-    println("B.predecessor: \(x)")
+    print("B.predecessor: \(x)")
     return B(x - 1)
   }
 }
@@ -57,19 +57,19 @@ struct R : RandomAccessIndexType {
   }
 
   func successor() -> R {
-    println("R.successor: \(x)")
+    print("R.successor: \(x)")
     return R(x + 1)
   }
   func predecessor() -> R {
-    println("R.predecessor: \(x)")
+    print("R.predecessor: \(x)")
     return R(x - 1)
   }
   func distanceTo(rhs: R) -> Int {
-    println("R.distanceTo: \(x), \(rhs.x)")
+    print("R.distanceTo: \(x), \(rhs.x)")
     return rhs.x - x
   }
   func advancedBy(n: Int) -> R {
-    println("R.advancedBy: \(x), \(n)")
+    print("R.advancedBy: \(x), \(n)")
     return R(x + n)
   }
 }
@@ -78,96 +78,96 @@ func ==(a: R, b: R) -> Bool {
   return a.x == b.x
 }
 
-println("testing...")
+print("testing...")
 // CHECK: testing...
 
-println("<F>")
+print("<F>")
 // CHECK-NEXT: <F>
-println("[\(distance(F(10), F(10)))]")
+print("[\(distance(F(10), F(10)))]")
 // CHECK-NEXT: [0]
-println("[\(distance(F(10), F(13)))]")
+print("[\(distance(F(10), F(13)))]")
 // CHECK-NEXT: F.successor: 10
 // CHECK-NEXT: F.successor: 11
 // CHECK-NEXT: F.successor: 12
 // CHECK-NEXT: [3]
-println("[\(advance(F(7), 0).x)]")
+print("[\(advance(F(7), 0).x)]")
 // CHECK-NEXT: [7]
-println("[\(advance(F(7), 2).x)]")
+print("[\(advance(F(7), 2).x)]")
 // CHECK-NEXT: F.successor: 7
 // CHECK-NEXT: F.successor: 8
 // CHECK-NEXT: [9]
-println("[\(advance(F(3), 99, F(5)).x)]")
+print("[\(advance(F(3), 99, F(5)).x)]")
 // CHECK-NEXT: F.successor: 3
 // CHECK-NEXT: F.successor: 4
 // CHECK-NEXT: [5]
 
-println("<B>")
+print("<B>")
 // CHECK-NEXT: <B>
-println("[\(distance(B(10), B(10)))]")
+print("[\(distance(B(10), B(10)))]")
 // CHECK-NEXT: [0]
-println("[\(distance(B(10), B(12)))]")
+print("[\(distance(B(10), B(12)))]")
 // CHECK-NEXT: B.successor: 10
 // CHECK-NEXT: B.successor: 11
 // CHECK-NEXT: [2]
-println("[\(advance(B(7), 2).x)]")
+print("[\(advance(B(7), 2).x)]")
 // CHECK-NEXT: B.successor: 7
 // CHECK-NEXT: B.successor: 8
 // CHECK-NEXT: [9]
-println("[\(advance(B(7), -3).x)]")
+print("[\(advance(B(7), -3).x)]")
 // CHECK-NEXT: B.predecessor: 7
 // CHECK-NEXT: B.predecessor: 6
 // CHECK-NEXT: B.predecessor: 5
 // CHECK-NEXT: [4]
-println("[\(advance(B(13), 0, B(17)).x)]")
+print("[\(advance(B(13), 0, B(17)).x)]")
 // CHECK-NEXT: [13]
-println("[\(advance(B(13), 99, B(17)).x)]")
+print("[\(advance(B(13), 99, B(17)).x)]")
 // CHECK-NEXT: B.successor: 13
 // CHECK-NEXT: B.successor: 14
 // CHECK-NEXT: B.successor: 15
 // CHECK-NEXT: B.successor: 16
 // CHECK-NEXT: [17]
-println("[\(advance(B(13), -99, B(11)).x)]")
+print("[\(advance(B(13), -99, B(11)).x)]")
 // CHECK-NEXT: B.predecessor: 13
 // CHECK-NEXT: B.predecessor: 12
 // CHECK-NEXT: [11]
 
 
-println("<R>")
+print("<R>")
 // CHECK-NEXT: <R>
-println("[\(distance(R(10), R(10)))]")
+print("[\(distance(R(10), R(10)))]")
 // CHECK-NEXT: R.distanceTo: 10, 10
 // CHECK-NEXT: [0]
-println("[\(distance(R(10), R(20)))]")
+print("[\(distance(R(10), R(20)))]")
 // CHECK-NEXT: R.distanceTo: 10, 20
 // CHECK-NEXT: [10]
-println("[\(advance(R(7), 2).x)]")
+print("[\(advance(R(7), 2).x)]")
 // CHECK-NEXT: R.advancedBy: 7, 2
 // CHECK-NEXT: [9]
-println("[\(advance(R(13), 99, R(17)).x)]")
+print("[\(advance(R(13), 99, R(17)).x)]")
 // CHECK-NEXT: R.distanceTo: 13, 17
 // CHECK-NEXT: [17]
-println("[\(advance(R(13), 3, R(17)).x)]")
+print("[\(advance(R(13), 3, R(17)).x)]")
 // CHECK-NEXT: R.distanceTo: 13, 17
 // CHECK-NEXT: R.advancedBy: 13, 3
 // CHECK-NEXT: [16]
-println("[\(advance(R(13), -99, R(10)).x)]")
+print("[\(advance(R(13), -99, R(10)).x)]")
 // CHECK-NEXT: R.distanceTo: 13, 10
 // CHECK-NEXT: [10]
-println("[\(advance(R(13), -3, R(0)).x)]")
+print("[\(advance(R(13), -3, R(0)).x)]")
 // CHECK-NEXT: R.distanceTo: 13, 0
 // CHECK-NEXT: R.advancedBy: 13, -3
 // CHECK-NEXT: [10]
 
 // Tests for advancing away from the end bound.
-println("[\(advance(R(13), -99, R(16)).x)]")
+print("[\(advance(R(13), -99, R(16)).x)]")
 // CHECK-NEXT: R.distanceTo: 13, 16
 // CHECK-NEXT: R.advancedBy: 13, -99
 // CHECK-NEXT: [-86]
-println("[\(advance(R(16), 99, R(13)).x)]")
+print("[\(advance(R(16), 99, R(13)).x)]")
 // CHECK-NEXT: R.distanceTo: 16, 13
 // CHECK-NEXT: R.advancedBy: 16, 99
 // CHECK-NEXT: [115]
 
-println("all done.")
+print("all done.")
 // CHECK-NEXT: all done.
 

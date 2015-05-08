@@ -7,14 +7,14 @@
 import Foundation
 
 class FullyNative {
-  deinit { println("dead") }
+  deinit { print("dead") }
 }
 
 autoreleasepool {
   let c: AnyObject = FullyNative() as AnyObject
 
   // CHECK: {{^}}main.FullyNative{{$}}
-  println(c.description!)
+  print(c.description!)
 }
 // CHECK-NEXT: dead
 

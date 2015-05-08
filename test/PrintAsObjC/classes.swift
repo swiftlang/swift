@@ -348,7 +348,7 @@ private class Private : A1 {}
       return 42
     }
     set {
-      println("it doesn't change")
+      // Ignore it.
     }
   }
 
@@ -396,7 +396,7 @@ private class Private : A1 {}
       return super.bees
     }
     set {
-      println("can't change that")
+      // Ignore it.
     }
   }
 }
@@ -441,7 +441,7 @@ private class Private : A1 {}
       return self
     }
     set {
-      println("nope")
+      // Ignore it.
     }
   }
 
@@ -450,7 +450,7 @@ private class Private : A1 {}
       return o
     }
     set {
-      println("nope")
+      // Ignore it.
     }
   }
 

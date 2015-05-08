@@ -8,7 +8,7 @@ init(A.Element == A<T.Type) {
 let end = { c<e)) {
 protocol C {
 }
-println(x) { c
+print(x) { c
 }
 }
 class B == [[B, a(g())

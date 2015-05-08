@@ -6,7 +6,7 @@
 // Test case found by fuzzing
 
 class c {
-println():Any) -> {
+print():Any) -> {
 }
 protocol d {
 func b: A {

@@ -9,9 +9,7 @@ public class A {
 
 class B: A {
   @inline(never)
-  override class func foo() {
-    println("B")
-  }
+  override class func foo() {}
 }
 
 // CHECK-LABEL: sil @_TF22devirt_value_metatypes17testValueMetatypeFCS_1AT_ 

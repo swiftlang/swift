@@ -16,7 +16,7 @@ class AClass : AProtocol {
 // CHECK: ![[SWIFTMETATYPE]] = !DIDerivedType(tag: DW_TAG_typedef, name: "$swift.type",
 // CHECK-SAME:                                baseType: ![[VOIDPTR]]
 func aFunction<T : AProtocol>(x: T) {
-    println("I am in aFunction: \(x.f())")
+    print("I am in aFunction: \(x.f())")
 }
 
 aFunction(AClass())

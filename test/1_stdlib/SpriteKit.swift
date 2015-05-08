@@ -13,17 +13,17 @@ var b = CGFloat(0)
 var a = CGFloat(0)
 var color = SKColor.redColor()
 color.getRed(&r, green:&g, blue:&b, alpha:&a)
-println("color \(r) \(g) \(b) \(a)")
+print("color \(r) \(g) \(b) \(a)")
 // CHECK: color 1.0 0.0 0.0 1.0
 
 #if os(OSX)
 func f(c: NSColor) {
-  println("colortastic")
+  print("colortastic")
 }
 #endif
 #if os(iOS) || os(tvOS)
 func f(c: UIColor) {
-  println("colortastic")
+  print("colortastic")
 }
 #endif
 f(color)

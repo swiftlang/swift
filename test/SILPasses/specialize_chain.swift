@@ -32,7 +32,7 @@ struct YYY<T> {
 
 func exp1() {
   var II = YYY<Int>(t: 5)
-  print(II.AAA9(t: 4))
+  print(II.AAA9(t: 4), appendNewline: false)
 }
 //CHECK: sil shared @_TTSg5Si___TFV16specialize_chain3YYY4AAA9U__fRGS0_Q__FT1tQ__Si
 //CHECK: sil shared @_TTSg5Si___TFV16specialize_chain3YYY4AAA8U__fRGS0_Q__FT1tQ__Si

@@ -7,7 +7,7 @@
 
 class A, Any) -> {
 }
-println(A? {
+print(A? {
 }
 func g<T: A {
 protocol a {

@@ -6,7 +6,7 @@
 // Test case found by fuzzing
 
 T: b> A {
-println(a: A<l : A>]])
+print(a: A<l : A>]])
 let a
 return ")
 }

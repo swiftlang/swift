@@ -10,11 +10,11 @@ func subclassFloatLiteral() -> Bar {
 class Foo: FloatLiteralConvertible {
   required init(floatLiteral: Float) { }
 
-  func identify() { println("Foo") }
+  func identify() {}
 }
 
 class Bar: Foo {
-  override func identify() { println("Bar") }
+  override func identify() {}
 }
 
 // CHECK-LABEL: sil_vtable Foo {

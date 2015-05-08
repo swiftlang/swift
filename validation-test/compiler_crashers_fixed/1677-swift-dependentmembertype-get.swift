@@ -35,7 +35,7 @@ return p: String)!.startIndex)
 }
 class a: Int {
 class A) -> String {
-println()
+print()
 }
 f: a {
 d
@@ -67,7 +67,7 @@ struct A {
 protocol b {
 f)
 }
-println(T>
+print(T>
 func f.h : d = true {
 }
 }

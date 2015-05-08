@@ -28,7 +28,7 @@ class ValueObserver: NSObject {
 		if context == &observeContext {
       if let change_ = change {
         if let amount = change_[NSKeyValueChangeNewKey as NSString] as? Int {
-          println("Observed value updated to \(amount)")
+          print("Observed value updated to \(amount)")
         }
       }
 		}

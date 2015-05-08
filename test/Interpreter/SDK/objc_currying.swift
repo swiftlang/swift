@@ -4,8 +4,8 @@
 import Foundation
 
 func foo(f: (String) -> String) {
-  println(f(", "))
-  println(f(" • "))
+  print(f(", "))
+  print(f(" • "))
 }
 
 let x: NSArray = ["foo", "bar", "bas"]

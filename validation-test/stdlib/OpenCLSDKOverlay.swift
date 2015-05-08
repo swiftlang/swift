@@ -106,7 +106,7 @@ tests.test("clSetKernelArgsListAPPLE") {
   err = clGetDeviceIDs(nil, cl_device_type(gpu != 0 ? CL_DEVICE_TYPE_GPU : CL_DEVICE_TYPE_CPU), 1, &device_id, nil)
   if (err != CL_SUCCESS)
   {
-    println("Error: Failed to create a device group!")
+    print("Error: Failed to create a device group!")
     exit(EXIT_FAILURE)
   }
   
@@ -115,7 +115,7 @@ tests.test("clSetKernelArgsListAPPLE") {
   context = clCreateContext(nil, 1, &device_id, nil, nil, &err)
   if (context == nil)
   {
-    println("Error: Failed to create a compute context!")
+    print("Error: Failed to create a compute context!")
     exit(EXIT_FAILURE)
   }
 
@@ -124,7 +124,7 @@ tests.test("clSetKernelArgsListAPPLE") {
   commands = clCreateCommandQueue(context, device_id, 0, &err)
   if (commands == nil)
   {
-    println("Error: Failed to create a command commands!")
+    print("Error: Failed to create a command commands!")
     exit(EXIT_FAILURE)
   }
 
@@ -138,7 +138,7 @@ tests.test("clSetKernelArgsListAPPLE") {
   }
   if (program == nil)
   {
-    println("Error: Failed to create compute program!")
+    print("Error: Failed to create compute program!")
     exit(EXIT_FAILURE)
   }
 
@@ -151,10 +151,10 @@ tests.test("clSetKernelArgsListAPPLE") {
     
     var buffer = [CChar](count:2048, repeatedValue: 0)
 
-    println("Error: Failed to build program executable!")
+    print("Error: Failed to build program executable!")
     clGetProgramBuildInfo(
       program, device_id, cl_program_build_info(CL_PROGRAM_BUILD_LOG), 2048, &buffer, &len)
-    println("\(String.fromCString(buffer)!)")
+    print("\(String.fromCString(buffer)!)")
     exit(1)
   }
 
@@ -163,7 +163,7 @@ tests.test("clSetKernelArgsListAPPLE") {
   kernel = clCreateKernel(program, "square", &err)
   if (kernel == nil || err != cl_int(CL_SUCCESS))
   {
-    println("Error: Failed to create compute kernel!")
+    print("Error: Failed to create compute kernel!")
     exit(1)
   }
 
@@ -173,7 +173,7 @@ tests.test("clSetKernelArgsListAPPLE") {
   output = clCreateBuffer(context, cl_mem_flags(CL_MEM_WRITE_ONLY), sizeof(Float.self) * count, nil, nil)
   if (input == nil || output == nil)
   {
-    println("Error: Failed to allocate device memory!")
+    print("Error: Failed to allocate device memory!")
     exit(1)
   }    
   
@@ -182,7 +182,7 @@ tests.test("clSetKernelArgsListAPPLE") {
   err = clEnqueueWriteBuffer(commands, input, cl_bool(CL_TRUE), 0, sizeof(Float.self) * count, data, 0, nil, nil)
   if (err != CL_SUCCESS)
   {
-    println("Error: Failed to write to source array!")
+    print("Error: Failed to write to source array!")
     exit(1)
   }
 
@@ -201,7 +201,7 @@ tests.test("clSetKernelArgsListAPPLE") {
   
   if (err != CL_SUCCESS)
   {
-    println("Error: Failed to set kernel arguments! \(err)")
+    print("Error: Failed to set kernel arguments! \(err)")
     exit(1)
   }
 
@@ -210,7 +210,7 @@ tests.test("clSetKernelArgsListAPPLE") {
   err = clGetKernelWorkGroupInfo(kernel, device_id, cl_kernel_work_group_info(CL_KERNEL_WORK_GROUP_SIZE), sizeofValue(local), &local, nil)
   if (err != CL_SUCCESS)
   {
-    println("Error: Failed to retrieve kernel work group info! \(err)")
+    print("Error: Failed to retrieve kernel work group info! \(err)")
     exit(1)
   }
 
@@ -221,7 +221,7 @@ tests.test("clSetKernelArgsListAPPLE") {
   err = clEnqueueNDRangeKernel(commands, kernel, 1, nil, &global, &local, 0, nil, nil)
   if (err != 0)
   {
-    println("Error: Failed to execute kernel!")
+    print("Error: Failed to execute kernel!")
     exit(EXIT_FAILURE)
   }
 
@@ -234,7 +234,7 @@ tests.test("clSetKernelArgsListAPPLE") {
   err = clEnqueueReadBuffer( commands, output, cl_bool(CL_TRUE), 0, sizeof(Float.self) * count, &results, cl_uint(0), nil, nil )
   if (err != CL_SUCCESS)
   {
-    println("Error: Failed to read output array! \(err)")
+    print("Error: Failed to read output array! \(err)")
     exit(1)
   }
   
@@ -250,7 +250,7 @@ tests.test("clSetKernelArgsListAPPLE") {
   
   // Print a brief summary detailing the results
   //
-  println("Computed '\(correct)/\(count)' correct values!")
+  print("Computed '\(correct)/\(count)' correct values!")
   
   // Shutdown and cleanup
   //

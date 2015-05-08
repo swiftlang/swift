@@ -16,10 +16,10 @@ struct Falselike : BooleanType {
   }
 }
 
-println(andc(true, Truthy())) // CHECK: false
-println(andc(false, Truthy())) // CHECK: false
-println(andc(true, Falselike())) // CHECK: true
-println(andc(false, Falselike())) // CHECK: false
+print(andc(true, Truthy())) // CHECK: false
+print(andc(false, Truthy())) // CHECK: false
+print(andc(true, Falselike())) // CHECK: true
+print(andc(false, Falselike())) // CHECK: false
 
 func must<T : BooleanType>(x: T) {
   assert(x.boolValue)
@@ -31,4 +31,4 @@ func shant<T : BooleanType>(x: T) {
 must(Truthy())
 shant(Falselike())
 
-println("ok") // CHECK: ok
+print("ok") // CHECK: ok

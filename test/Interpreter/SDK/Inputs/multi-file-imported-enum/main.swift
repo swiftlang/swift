@@ -8,4 +8,4 @@ class B {
   }
 }
 
-println(B().f())
+print(B().f())

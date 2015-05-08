@@ -16,4 +16,4 @@ let h : a {
 }
 }
 for ()
-println(A()
+print(A()

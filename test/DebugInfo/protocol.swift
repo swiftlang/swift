@@ -28,7 +28,7 @@ func main() -> Int64 {
 // CHECK: call void @llvm.dbg.declare(metadata {{.*}} [[LOC2D]], metadata ![[LOC:.*]], metadata !{{[0-9]+}})
     var loc2d : protocol<PointUtils> = pt
     var distance = loc2d.distanceFromOrigin()
-    print("hello") // Set breakpoint here
+    print("hello", appendNewline: false) // Set breakpoint here
     return 0
 }
 

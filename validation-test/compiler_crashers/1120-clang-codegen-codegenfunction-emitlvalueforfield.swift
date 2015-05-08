@@ -63,7 +63,7 @@ convenience init()()
 protocol c {
 func b)
 typealias f : ExtensibleCollectionType>(x, range.E == [Int
-println(self.b {
+print(self.b {
 return self.E
 protocol A {
 }
@@ -150,17 +150,17 @@ class A = 1))
 class c
 }
 func i> e: c> T>(s: a {}
-println(f: T) -> {
+print(f: T) -> {
 }
 }
 class A? {
 import Foundation
 }
 protocol d = e(T, f() -> String {
-println(")
+print(")
 struct c: Bool], object2: A, e, length: start, T][c<T where T>) -> (".Type) -> {
 }
-println(n: String
+print(n: String
 }
 S.e == []
 typealias e : () {

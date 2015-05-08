@@ -30,8 +30,8 @@ var r: CGFloat = 0.5, g: CGFloat = 0.5, b: CGFloat = 0.5, a: CGFloat = 0.5
 nsRed!.getRed(&r, green: &g, blue: &b, alpha: &a)
 
 // CHECK-LABEL: Red is:
-println("Red is:")
-println("<\(r) \(g) \(b) \(a)>") // CHECK-NEXT: <1.0 0.0 0.0 1.0>
+print("Red is:")
+print("<\(r) \(g) \(b) \(a)>") // CHECK-NEXT: <1.0 0.0 0.0 1.0>
 
 //
 // Void C pointers
@@ -45,16 +45,16 @@ let notFromData = fromData
 data.getBytes(&fromData, length: sizeof(Double.self) * 3)
 
 // CHECK-LABEL: Data is:
-println("Data is:")
-println(fromData[0]) // CHECK-NEXT: 1.5
-println(fromData[1]) // CHECK-NEXT: 2.25
-println(fromData[2]) // CHECK-NEXT: 3.125
+print("Data is:")
+print(fromData[0]) // CHECK-NEXT: 1.5
+print(fromData[1]) // CHECK-NEXT: 2.25
+print(fromData[2]) // CHECK-NEXT: 3.125
 
 // CHECK-LABEL: Independent data is:
-println("Independent data is:")
-println(notFromData[0]) // CHECK-NEXT: 0.25
-println(notFromData[1]) // CHECK-NEXT: 0.25
-println(notFromData[2]) // CHECK-NEXT: 0.25
+print("Independent data is:")
+print(notFromData[0]) // CHECK-NEXT: 0.25
+print(notFromData[1]) // CHECK-NEXT: 0.25
+print(notFromData[2]) // CHECK-NEXT: 0.25
 
 //
 // ObjC pointers
@@ -62,7 +62,7 @@ println(notFromData[2]) // CHECK-NEXT: 0.25
 
 class Canary: NSObject {
   deinit {
-    println("died")
+    print("died")
   }
 }
 
@@ -82,14 +82,14 @@ func hangCanary(o: AnyObject) {
 }
 
 // CHECK-LABEL: NSError out:
-println("NSError out:")
+print("NSError out:")
 autoreleasepool {
   do {
     let s = try NSString(contentsOfFile: "/hopefully/does/not/exist\u{1B}",
                          encoding: NSUTF8StringEncoding)
     _preconditionFailure("file should not actually exist")
   } catch {
-    println(error.code) // CHECK-NEXT: 260
+    print(error.code) // CHECK-NEXT: 260
     hangCanary(error as NSError)
   }
 }
@@ -106,13 +106,13 @@ class DumbString: NSString {
 }
 
 // CHECK-LABEL: NSError in:
-println("NSError in:")
+print("NSError in:")
 autoreleasepool {
   do {
     try DumbString(contentsOfFile: "foo", encoding: NSUTF8StringEncoding)
   } catch {
-    println(error.domain) // CHECK-NEXT: Malicious Mischief
-    println(error.code) // CHECK-NEXT: 594
+    print(error.domain) // CHECK-NEXT: Malicious Mischief
+    print(error.code) // CHECK-NEXT: 594
     hangCanary(error as NSError)
   }
 }
@@ -132,4 +132,4 @@ qsort(&unsorted, unsorted.count, sizeofValue(unsorted[0])) { a, b in
   return Int32(UnsafePointer<Int>(a).memory - UnsafePointer<Int>(b).memory)
 }
 // CHECK-NEXT: [2, 3, 5, 6, 9, 14, 15]
-println(unsorted)
+print(unsorted)

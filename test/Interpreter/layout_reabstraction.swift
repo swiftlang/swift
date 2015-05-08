@@ -4,31 +4,31 @@ struct S {}
 struct Q {}
 
 func printMetatype<T>(x: Any, _: T.Type) {
-  println(x as! T.Type)
+  print(x as! T.Type)
 }
 
 func printMetatypeConditional<T>(x: Any, _: T.Type) {
   if let y = x as? T.Type {
-    println(y)
+    print(y)
   } else {
-    println("nope")
+    print("nope")
   }
 }
 
 var any: Any = S.self
 // CHECK: downcast in substituted context:
-println("downcast in substituted context:")
+print("downcast in substituted context:")
 // CHECK-NEXT: main.S
-println(any as! S.Type)
+print(any as! S.Type)
 // CHECK-NEXT: nope
 if let q = any as? Q.Type {
-  println(q)
+  print(q)
 } else {
-  println("nope")
+  print("nope")
 }
 
 // CHECK-NEXT: downcast in generic context:
-println("downcast in generic context:")
+print("downcast in generic context:")
 // CHECK-NEXT: main.S
 printMetatype(any, S.self)
 // CHECK-NEXT: main.S
@@ -53,14 +53,14 @@ struct ContainsTupleOfTrivialMetatype<T> {
 }
 
 // CHECK-NEXT: 8
-println(sizeof(ContainsTrivialMetatype<Int64>.self))
+print(sizeof(ContainsTrivialMetatype<Int64>.self))
 // CHECK-NEXT: 8
-println(unspecializedSizeOf(ContainsTrivialMetatype<Int64>.self))
+print(unspecializedSizeOf(ContainsTrivialMetatype<Int64>.self))
 
 // CHECK-NEXT: 8
-println(sizeof(ContainsTupleOfTrivialMetatype<Int64>.self))
+print(sizeof(ContainsTupleOfTrivialMetatype<Int64>.self))
 // CHECK-NEXT: 8
-println(unspecializedSizeOf(ContainsTupleOfTrivialMetatype<Int64>.self))
+print(unspecializedSizeOf(ContainsTupleOfTrivialMetatype<Int64>.self))
 
 struct ContainsTupleOfFunctions<T> {
   var x: (T, T -> T)
@@ -71,21 +71,21 @@ struct ContainsTupleOfFunctions<T> {
 }
 
 // CHECK-NEXT: 2
-println(sizeof(ContainsTupleOfFunctions<()>.self) / sizeof(Int.self))
+print(sizeof(ContainsTupleOfFunctions<()>.self) / sizeof(Int.self))
 // CHECK-NEXT: 2
-println(unspecializedSizeOf(ContainsTupleOfFunctions<()>.self) / sizeof(Int.self))
+print(unspecializedSizeOf(ContainsTupleOfFunctions<()>.self) / sizeof(Int.self))
 // CHECK-NEXT: 3
-println(sizeof(ContainsTupleOfFunctions<Int>.self) / sizeof(Int.self))
+print(sizeof(ContainsTupleOfFunctions<Int>.self) / sizeof(Int.self))
 // CHECK-NEXT: 3
-println(unspecializedSizeOf(ContainsTupleOfFunctions<Int>.self) / sizeof(Int.self))
+print(unspecializedSizeOf(ContainsTupleOfFunctions<Int>.self) / sizeof(Int.self))
 
 let x = ContainsTupleOfFunctions(x: (1, { $0 + 1 }))
 let y = ContainsTupleOfFunctions(x: ("foo", { $0 + "bar" }))
 
 // CHECK-NEXT: 2
-println(x.apply())
+print(x.apply())
 // CHECK-NEXT: foobar
-println(y.apply())
+print(y.apply())
 
 func callAny<T>(f: Any, _ x: T) -> T {
   return (f as! T -> T)(x)
@@ -93,6 +93,6 @@ func callAny<T>(f: Any, _ x: T) -> T {
 
 any = {(x: Int) -> Int in x + x}
 // CHECK-NEXT: 24
-println((any as! Int -> Int)(12))
+print((any as! Int -> Int)(12))
 // CHECK-NEXT: 24
-println(callAny(any, 12))
+print(callAny(any, 12))

@@ -8,7 +8,7 @@ ere T: a : T>(range: SequenceType, range.E
 ")
 class A {
 protocol e : start, a(A.b
-println("A> {
+print("A> {
 struct c, () -> {
 protocol P {
 }

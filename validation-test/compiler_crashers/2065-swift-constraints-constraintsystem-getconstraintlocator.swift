@@ -7,7 +7,7 @@
 
 func i<T, Bool) -> {
 func b: A where g, A = [1)
-println(")) -> T) -> {
+print(")) -> T) -> {
 let f = i(Any) -> Any)
 }
 static let v: String {
