@@ -22,7 +22,7 @@ class Base: Q, A {
 }
 
 // CHECK-LABEL: interface_type_mangling.f1 :
-// CHECK:                                    [[F_SIGNATURE:<T_0_0 where T_0_0: interface_type_mangling.PP, T_0_0: interface_type_mangling.PQ> \(T_0_0\) -> \(\)]]
+// CHECK:                                    [[F_SIGNATURE:<A where A: interface_type_mangling.PP, A: interface_type_mangling.PQ> \(A\) -> \(\)]]
 func f1<T where T: PP, T: PQ>(x: T) {}
 // CHECK:       interface_type_mangling.f2 : [[F_SIGNATURE]]
 func f2<T where T: PQ, T: PP>(x: T) {}
@@ -30,7 +30,7 @@ func f2<T where T: PQ, T: PP>(x: T) {}
 func f3<T where T: PQ, T: PP, T: P>(x: T) {}
 
 // CHECK-LABEL: interface_type_mangling.g1 :
-// CHECK:                                    [[G_SIGNATURE:<T_0_0, T_0_1 where T_0_0: interface_type_mangling.PP, T_0_1: interface_type_mangling.PQ> \(T_0_1, y : T_0_0\) -> \(\)]]
+// CHECK:                                    [[G_SIGNATURE:<A, B where A: interface_type_mangling.PP, B: interface_type_mangling.PQ> \(B, y : A\) -> \(\)]]
 func g1<U, T where T: PQ, U: PP>(x: T, y: U) {}
 // CHECK:       interface_type_mangling.g2 : [[G_SIGNATURE]]
 func g2<U, T where T: PQ, T.Assoc1: A, U: PP>(x: T, y: U) {}
@@ -38,7 +38,7 @@ func g2<U, T where T: PQ, T.Assoc1: A, U: PP>(x: T, y: U) {}
 func g3<U, T where U: PP, T: PQ, T.Assoc1: A>(x: T, y: U) {}
 
 // CHECK-LABEL: interface_type_mangling.h1 :
-// CHECK:                                    [[H_SIGNATURE:<T_0_0 where T_0_0: interface_type_mangling.Base, T_0_0: interface_type_mangling.P> \(T_0_0\) -> \(\)]]
+// CHECK:                                    [[H_SIGNATURE:<A where A: interface_type_mangling.Base, A: interface_type_mangling.P> \(A\) -> \(\)]]
 func h1<T where T: Base, T: P>(x: T) {}
 // CHECK:       interface_type_mangling.h2 : [[H_SIGNATURE]]
 func h2<T where T: P, T: Base>(x: T) {}
@@ -51,7 +51,7 @@ func h4<T where T: P, T: Base, T: Q>(x: T) {}
 func h5<T where T: P, T: Base, T: Q /* TODO: same type constraints , T.Assoc0 == Base*/>(x: T) {}
 
 // CHECK-LABEL: interface_type_mangling.i1 :
-// CHECK:                                    [[I_SIGNATURE:<T_0_0 where T_0_0: interface_type_mangling.P, T_0_0: interface_type_mangling.Q, T_0_0.Assoc1: interface_type_mangling.P, T_0_0.Assoc0: interface_type_mangling.Q> \(T_0_0\) -> \(\)]]
+// CHECK:                                    [[I_SIGNATURE:<A where A: interface_type_mangling.P, A: interface_type_mangling.Q, A.Assoc1: interface_type_mangling.P, A.Assoc0: interface_type_mangling.Q> \(A\) -> \(\)]]
 func i1<T where T: P, T: Q, T.Assoc1: P, T.Assoc0: Q>(x: T) {}
 // CHECK:       interface_type_mangling.i2 : [[I_SIGNATURE]]
 func i2<T where T: P, T: Q, T.Assoc0: Q, T.Assoc1: P>(x: T) {}
@@ -59,7 +59,7 @@ func i2<T where T: P, T: Q, T.Assoc0: Q, T.Assoc1: P>(x: T) {}
 /* FIXME: ArchetypeBuilder introduces extra associated type equivalence
  * classes without filtering them out as redundant. */
 // CHECK-LABEL: interface_type_mangling.j01 :
-// CHECK:                                     [[J_SIGNATURE:<T_0_0 where T_0_0: interface_type_mangling.P, T_0_0: interface_type_mangling.Q, T_0_0.Assoc1 == T_0_0.Assoc0, T_0_0.Assoc2 == T_0_0.Assoc0> \(T_0_0\) -> \(\)]]
+// CHECK:                                     [[J_SIGNATURE:<A where A: interface_type_mangling.P, A: interface_type_mangling.Q, A.Assoc1 == A.Assoc0, A.Assoc2 == A.Assoc0> \(A\) -> \(\)]]
 func j01<T where T: P, T: Q, T.Assoc0 == T.Assoc1, T.Assoc1 == T.Assoc2>(x: T) {}
 // FIXME:       interface_type_mangling.j02 : [[J_SIGNATURE]]
 func j02<T where T: P, T: Q, T.Assoc0 == T.Assoc2, T.Assoc1 == T.Assoc2>(x: T) {}
@@ -100,7 +100,7 @@ struct S {}
 struct G<X> {}
 
 // CHECK-LABEL: interface_type_mangling.k01 :
-// CHECK:                                     [[K_SIGNATURE:<T_0_0 where T_0_0: interface_type_mangling.P, T_0_0.Assoc1 == interface_type_mangling.S, T_0_0.Assoc2 == interface_type_mangling.S> \(T_0_0\) -> \(\)]]
+// CHECK:                                     [[K_SIGNATURE:<A where A: interface_type_mangling.P, A.Assoc1 == interface_type_mangling.S, A.Assoc2 == interface_type_mangling.S> \(A\) -> \(\)]]
 func k01<T where T: P, S == T.Assoc1, T.Assoc1 == T.Assoc2>(x: T) {}
 // CHECK:       interface_type_mangling.k02 : [[K_SIGNATURE]]
 func k02<T where T: P, S == T.Assoc2, T.Assoc1 == T.Assoc2>(x: T) {}
@@ -138,7 +138,7 @@ func k17<T where T: P, T.Assoc2 == T.Assoc1, T.Assoc2 == S>(x: T) {}
 func k18<T where T: P, S == T.Assoc1, T.Assoc2 == S>(x: T) {}
 
 // CHECK-LABEL: interface_type_mangling.L01 :
-// CHECK:                                     [[L_SIGNATURE:<T_0_0 where T_0_0: interface_type_mangling.P, T_0_0.Assoc1 == interface_type_mangling.G<T_0_0>, T_0_0.Assoc2 == interface_type_mangling.G<T_0_0>> \(T_0_0\) -> \(\)]]
+// CHECK:                                     [[L_SIGNATURE:<A where A: interface_type_mangling.P, A.Assoc1 == interface_type_mangling.G<A>, A.Assoc2 == interface_type_mangling.G<A>> \(A\) -> \(\)]]
 func L01<T where T: P, G<T> == T.Assoc1, T.Assoc1 == T.Assoc2>(x: T) {}
 // CHECK:       interface_type_mangling.L02 : [[L_SIGNATURE]]
 func L02<T where T: P, G<T> == T.Assoc2, T.Assoc1 == T.Assoc2>(x: T) {}
@@ -175,12 +175,19 @@ func L17<T where T: P, T.Assoc2 == T.Assoc1, T.Assoc2 == G<T>>(x: T) {}
 // CHECK:       interface_type_mangling.L18 : [[L_SIGNATURE]]
 func L18<T where T: P, G<T> == T.Assoc1, T.Assoc2 == G<T>>(x: T) {}
 
-// CHECK-LABEL: sil shared @_TFFV23interface_type_mangling18GenericTypeContext23closureInGenericContextu__rFGS0_q__Fqd__T_L_3fooFTQd__Q__T_
 struct GenericTypeContext<T> {
   var a: T
+  // CHECK-LABEL: sil shared @_TFFV23interface_type_mangling18GenericTypeContext23closureInGenericContextu__rFGS0_q__Fqd__T_L_3fooFTQd__Q__T_
   func closureInGenericContext<U>(b: U) {
     func foo(x: T, _ y: U) { }
 
     foo(a, b)
+  }
+
+  // CHECK-LABEL: sil shared @_TFFV23interface_type_mangling18GenericTypeContextg31closureInGenericPropertyContextq_L_3fooFT_Q_
+  var closureInGenericPropertyContext: T {
+    func foo() -> T { }
+
+    return foo()
   }
 }

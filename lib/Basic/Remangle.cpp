@@ -1355,14 +1355,8 @@ void Remangler::mangleSelfTypeRef(Node *node) {
 }
 
 void Remangler::mangleArchetypeRef(Node *node) {
-  auto it = Archetypes.find(node->getText());
-  assert(it != Archetypes.end());
-
-  ArchetypeInfo info = it->second;
-  assert(AbsoluteArchetypeDepth >= info.AbsoluteDepth);
-
-  Node::IndexType relativeDepth = (AbsoluteArchetypeDepth - info.AbsoluteDepth);
-  Node::IndexType index = info.Index;
+  Node::IndexType relativeDepth = node->getChild(0)->getIndex();
+  Node::IndexType index = node->getChild(1)->getIndex();
 
   Out << 'Q';
   if (relativeDepth != 0) {
@@ -1415,17 +1409,18 @@ void Remangler::mangleDependentMemberType(Node *node) {
 
 void Remangler::mangleDependentGenericParamType(Node *node) {
   Out << 'q';
-  StringRef text = node->getText();
-  bool stripped = stripPrefix(text, "T_");
-  assert(stripped); (void) stripped;
-  auto split = text.split('_');
-  auto depth = (Node::IndexType) atoi(split.first.data());
-  auto index = (Node::IndexType) atoi(split.second.data());
+  auto depth = node->getChild(0)->getIndex();
+  auto index = node->getChild(1)->getIndex();
+  
   if (depth != 0) {
     Out << 'd';
     mangleIndex(depth - 1);
   }
   mangleIndex(index);
+}
+
+void Remangler::mangleIndex(Node *node) {
+  mangleIndex(node->getIndex());
 }
 
 void Remangler::mangleProtocol(Node *node, EntityContext &ctx) {

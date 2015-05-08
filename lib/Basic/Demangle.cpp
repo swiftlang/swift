@@ -1328,7 +1328,7 @@ private:
       D.ArchetypeCount = D.ArchetypeCounts.back();
     }
   };
-
+  
   /// Demangle a generic clause.
   ///
   /// \param C - not really required; just a token to prove that the caller
@@ -1375,8 +1375,17 @@ private:
   }
 
   NodePointer demangleArchetypeRef(Node::IndexType depth, Node::IndexType i) {
-    if (depth == 0 && ArchetypeCount == 0)
-      return NodeFactory::create(Node::Kind::ArchetypeRef, archetypeName(i));
+    auto makeArchetypeRef = [&](Node::IndexType nameIndex) -> NodePointer {
+      auto ref = NodeFactory::create(Node::Kind::ArchetypeRef,
+                                     archetypeName(nameIndex));
+      ref->addChild(NodeFactory::create(Node::Kind::Index, depth));
+      ref->addChild(NodeFactory::create(Node::Kind::Index, i));
+      return ref;
+    };
+  
+    if (depth == 0 && ArchetypeCount == 0) {
+      return makeArchetypeRef(i);
+    }
     size_t length = ArchetypeCounts.size();
     if (depth >= length)
       return nullptr;
@@ -1385,8 +1394,8 @@ private:
         (depth == 0) ? ArchetypeCount : ArchetypeCounts[length - depth];
     if (index >= max)
       return nullptr;
-    return NodeFactory::create(Node::Kind::ArchetypeRef,
-                                 archetypeName(index));
+    
+    return makeArchetypeRef(index);
   }
   
   NodePointer demangleDependentType() {
@@ -1420,17 +1429,37 @@ private:
     }
     
     DemanglerPrinter Name;
-    Name << "T_" << depth << '_' << index;
+    if (depth == 0) {
+      Name << archetypeName(index);
+    } else {
+      if (depth >= ArchetypeCounts.size())
+        return nullptr;
+      Name << archetypeName(ArchetypeCounts[depth] + index);
+    }
 
     auto paramTy = NodeFactory::create(Node::Kind::DependentGenericParamType,
                                        std::move(Name.str()));
+    paramTy->addChild(NodeFactory::create(Node::Kind::Index, depth));
+    paramTy->addChild(NodeFactory::create(Node::Kind::Index, index));
+    
     return paramTy;
   }
   
   NodePointer demangleGenericSignature() {
+    assert(ArchetypeCounts.empty() && "already some generic context?!");
+
     auto sig = NodeFactory::create(Node::Kind::DependentGenericSignature);
     // First read in the parameter counts at each depth.
     Node::IndexType count = ~(Node::IndexType)0;
+    
+    auto addCount = [&]{
+      auto countNode =
+        NodeFactory::create(Node::Kind::DependentGenericParamCount, count);
+      sig->addChild(countNode);
+      ArchetypeCounts.push_back(ArchetypeCount);
+      ArchetypeCount += count;
+    };
+    
     while (Mangled.peek() != 'R' && Mangled.peek() != 'r') {
       if (Mangled.nextIf('z')) {
         count = 0;
@@ -1439,15 +1468,14 @@ private:
       } else {
         return nullptr;
       }
-      auto countNode =
-          NodeFactory::create(Node::Kind::DependentGenericParamCount, count);
-      sig->addChild(countNode);
+      addCount();
     }
     
     // No mangled parameters means we have exactly one.
-    if (count == ~(Node::IndexType)0)
-      sig->addChild(
-                NodeFactory::create(Node::Kind::DependentGenericParamCount, 1));
+    if (count == ~(Node::IndexType)0) {
+      count = 1;
+      addCount();
+    }
     
     // Next read in the generic requirements, if any.
     if (Mangled.nextIf('r'))
@@ -2300,6 +2328,7 @@ private:
     case Node::Kind::Global:
     case Node::Kind::GlobalGetter:
     case Node::Kind::Identifier:
+    case Node::Kind::Index:
     case Node::Kind::IVarInitializer:
     case Node::Kind::IVarDestroyer:
     case Node::Kind::ImplConvention:
@@ -2714,6 +2743,9 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
   case Node::Kind::Module:
   case Node::Kind::Identifier:
     Printer << pointer->getText();
+    return;
+  case Node::Kind::Index:
+    Printer << pointer->getIndex();
     return;
   case Node::Kind::AutoClosureType:
     Printer << "@autoclosure ";
@@ -3269,6 +3301,7 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
   case Node::Kind::DependentGenericSignature: {
     Printer << '<';
     
+    unsigned paramNumber = 0;
     unsigned depth = 0;
     unsigned numChildren = pointer->getNumChildren();
     for (;
@@ -3276,11 +3309,14 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
            && pointer->getChild(depth)->getKind()
                == Node::Kind::DependentGenericParamCount;
          ++depth) {
+      if (depth != 0)
+        Printer << "><";
+      
       unsigned count = pointer->getChild(depth)->getIndex();
       for (unsigned index = 0; index < count; ++index) {
-        if (depth || index)
+        if (index != 0)
           Printer << ", ";
-        Printer << "T_" << depth << '_' << index;
+        Printer << archetypeName(paramNumber++);
       }
     }
     
