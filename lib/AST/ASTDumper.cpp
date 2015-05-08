@@ -1183,6 +1183,15 @@ public:
     OS.indent(Indent) << "(for_each_stmt\n";
     printRec(S->getPattern());
     OS << '\n';
+    if (S->getWhere()) {
+      Indent += 2;
+      OS.indent(Indent) << "(where\n";
+      printRec(S->getWhere());
+      OS << ")\n";
+      Indent -= 2;
+    }
+    printRec(S->getPattern());
+    OS << '\n';
     printRec(S->getSequence());
     OS << '\n';
     printRec(S->getBody());

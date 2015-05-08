@@ -161,10 +161,6 @@ ERROR(let_cannot_be_addressed_property,decl_parsing,none,
 ERROR(disallowed_var_multiple_getset,decl_parsing,none,
       "'var' declarations with multiple variables cannot have explicit"
       " getters/setters", ())
-ERROR(expected_condition_where,decl_parsing,PointsToFirstBadToken,
-      "expected condition after 'where'", ())
-ERROR(let_else_rename,decl_parsing,PointsToFirstBadToken,
-      "let/else has been resyntaxed to 'guard'", ())
 
 ERROR(disallowed_type,decl_parsing,none,
       "type not allowed here", ())
@@ -817,6 +813,8 @@ ERROR(expected_foreach_container,stmt_parsing,none,
       "expected SequenceType expression for for-each loop", ())
 ERROR(expected_foreach_lbrace,stmt_parsing,none,
       "expected '{' to start the body of for-each loop", ())
+ERROR(expected_foreach_where_expr,stmt_parsing,PointsToFirstBadToken,
+      "expected expression in 'where' guard of 'for/in'", ())
 
 // Switch Stmt
 ERROR(expected_switch_expr,stmt_parsing,PointsToFirstBadToken,

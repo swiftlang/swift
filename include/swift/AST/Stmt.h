@@ -763,15 +763,16 @@ public:
 ///
 /// Example:
 /// \code
-/// for i in 0..10 {
+/// for i in 0...10 {
 ///   print(String(i))
 /// }
 /// \endcode
 class ForEachStmt : public LabeledStmt {
   SourceLoc ForLoc;
-  SourceLoc InLoc;
   Pattern *Pat;
+  SourceLoc InLoc;
   Expr *Sequence;
+  Expr *WhereExpr = nullptr;
   BraceStmt *Body;
   
   /// The generator variable along with its initializer.
@@ -782,12 +783,12 @@ class ForEachStmt : public LabeledStmt {
 
 public:
   ForEachStmt(LabeledStmtInfo LabelInfo, SourceLoc ForLoc, Pattern *Pat,
-              SourceLoc InLoc,  Expr *Sequence, BraceStmt *Body,
+              SourceLoc InLoc, Expr *Sequence, Expr *WhereExpr, BraceStmt *Body,
               Optional<bool> implicit = None)
     : LabeledStmt(StmtKind::ForEach, getDefaultImplicitFlag(implicit, ForLoc),
                   LabelInfo),
-      ForLoc(ForLoc), InLoc(InLoc), Pat(Pat),
-      Sequence(Sequence), Body(Body) { }
+      ForLoc(ForLoc), Pat(Pat), InLoc(InLoc), Sequence(Sequence),
+      WhereExpr(WhereExpr), Body(Body) { }
   
   /// getForLoc - Retrieve the location of the 'for' keyword.
   SourceLoc getForLoc() const { return ForLoc; }
@@ -799,7 +800,10 @@ public:
   /// These variables will only be visible within the body of the loop.
   Pattern *getPattern() const { return Pat; }
   void setPattern(Pattern *p) { Pat = p; }
-  
+
+  Expr *getWhere() const { return WhereExpr; }
+  void setWhere(Expr *W) { WhereExpr = W; }
+
   /// getSequence - Retrieve the Sequence whose elements will be visited
   /// by this foreach loop, as it was written in the source code and
   /// subsequently type-checked. To determine the semantic behavior of this

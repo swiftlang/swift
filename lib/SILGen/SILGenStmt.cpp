@@ -722,6 +722,19 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
       if (!val.isInContext())
         RValue(SGF, S, optTy.getAnyOptionalObjectType(), val)
           .forwardInto(SGF, initLoopVars.get(), S);
+
+
+      // Now that the pattern has been initialized, check any where condition.
+      // If it fails, loop around as if 'continue' happened.
+      if (auto *Where = S->getWhere()) {
+        auto cond = SGF.emitCondition(Where, /*hasFalse*/false, /*invert*/true);
+        // If self is null, branch to the epilog.
+        cond.enterTrue(SGF);
+        SGF.Cleanups.emitBranchAndCleanups(loopDest, Where, { });
+        cond.exitTrue(SGF);
+        cond.complete(SGF);
+      }
+
       visit(S->getBody());
     }
     

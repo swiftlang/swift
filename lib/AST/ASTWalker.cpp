@@ -1020,6 +1020,14 @@ Stmt *Traversal::visitForEachStmt(ForEachStmt *S) {
       return nullptr;
   }
 
+  if (Expr *Where = S->getWhere()) {
+    if ((Where = doIt(Where)))
+      S->setWhere(Where);
+    else
+      return nullptr;
+  }
+
+
   if (Expr *Sequence = S->getSequence()) {
     if ((Sequence = doIt(Sequence)))
       S->setSequence(Sequence);

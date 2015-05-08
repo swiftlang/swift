@@ -1848,7 +1848,8 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc,
 
 /// 
 ///   stmt-for-each:
-///     (identifier ':')? 'for' pattern 'in' expr-basic stmt-brace
+///     (identifier ':')? 'for' pattern 'in' expr-basic \
+///             ('where' expr-basic)? stmt-brace
 ParserResult<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc,
                                             LabeledStmtInfo LabelInfo) {
   ParserStatus Status;
@@ -1897,6 +1898,18 @@ ParserResult<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc,
   // Introduce variables to the current scope.
   addPatternVariablesToScope(Pattern.get());
 
+  // Parse the 'where' expression if present.
+  ParserResult<Expr> Where;
+  if (consumeIf(tok::kw_where)) {
+    Where = parseExprBasic(diag::expected_foreach_where_expr);
+    if (Where.hasCodeCompletion())
+      return makeParserCodeCompletionResult<Stmt>();
+    if (Where.isNull())
+      Where = makeParserErrorResult(new (Context) ErrorExpr(Tok.getLoc()));
+    Status |= Where;
+  }
+
+
   // stmt-brace
   ParserResult<BraceStmt> Body =
       parseBraceItemList(diag::expected_foreach_lbrace);
@@ -1908,7 +1921,8 @@ ParserResult<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc,
   return makeParserResult(
       Status,
       new (Context) ForEachStmt(LabelInfo, ForLoc, Pattern.get(), InLoc,
-                                Container.get(), Body.get()));
+                                Container.get(), Where.getPtrOrNull(),
+                                Body.get()));
 }
 
 ///

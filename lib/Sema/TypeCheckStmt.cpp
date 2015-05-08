@@ -437,12 +437,12 @@ public:
     {
       AddLabeledStmt loopNest(*this, RWS);
       Stmt *S = RWS->getBody();
-      if (typeCheckStmt(S)) return 0;
+      if (typeCheckStmt(S)) return nullptr;
       RWS->setBody(S);
     }
     
     Expr *E = RWS->getCond();
-    if (TC.typeCheckCondition(E, DC)) return 0;
+    if (TC.typeCheckCondition(E, DC)) return nullptr;
     RWS->setCond(E);
     return RWS;
   }
@@ -454,26 +454,26 @@ public:
     if (auto *Initializer = FS->getInitializer().getPtrOrNull()) {
       if (TC.typeCheckExpression(Initializer, DC, Type(), Type(),
                                  /*discardedExpr=*/true))
-        return 0;
+        return nullptr;
       FS->setInitializer(Initializer);
     }
 
     if (auto *Cond = FS->getCond().getPtrOrNull()) {
       if (TC.typeCheckCondition(Cond, DC))
-        return 0;
+        return nullptr;
       FS->setCond(Cond);
     }
 
     if (auto *Increment = FS->getIncrement().getPtrOrNull()) {
       if (TC.typeCheckExpression(Increment, DC, Type(), Type(),
                                  /*discardedExpr=*/true))
-        return 0;
+        return nullptr;
       FS->setIncrement(Increment);
     }
 
     AddLabeledStmt loopNest(*this, FS);
     Stmt *S = FS->getBody();
-    if (typeCheckStmt(S)) return 0;
+    if (typeCheckStmt(S)) return nullptr;
     FS->setBody(S);
     
     return FS;
@@ -492,6 +492,13 @@ public:
 
     if (TC.typeCheckForEachBinding(DC, S))
       return nullptr;
+
+    if (auto *Where = S->getWhere()) {
+      if (TC.typeCheckCondition(Where, DC))
+        return nullptr;
+      S->setWhere(Where);
+    }
+
 
     // Retrieve the 'Sequence' protocol.
     ProtocolDecl *sequenceProto
