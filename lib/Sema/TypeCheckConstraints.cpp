@@ -288,11 +288,12 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
   SourceLoc Loc = UDRE->getLoc();
 
   // Perform standard value name lookup.
-  UnqualifiedLookup Lookup(Name, Context, &TC,
-                           /*NonCascading=*/isa<AbstractFunctionDecl>(Context),
-                           UDRE->getLoc());
+  NameLookupOptions LookupOptions = defaultMemberTypeLookupOptions;
+  if (isa<AbstractFunctionDecl>(Context))
+    LookupOptions |= NameLookupFlags::KnownPrivate;
+  auto Lookup = TC.lookupUnqualified(Context, Name, Loc, LookupOptions);
 
-  if (!Lookup.isSuccess()) {
+  if (!Lookup) {
     TC.diagnose(Loc, diag::use_unresolved_identifier, Name);
     return new (TC.Context) ErrorExpr(Loc);
   }
@@ -301,38 +302,25 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
 
   bool AllDeclRefs = true;
   SmallVector<ValueDecl*, 4> ResultValues;
-  for (auto Result : Lookup.Results) {
-    switch (Result.Kind) {
-      case UnqualifiedLookupResult::MemberProperty:
-      case UnqualifiedLookupResult::MemberFunction:
-      case UnqualifiedLookupResult::MetatypeMember:
-      case UnqualifiedLookupResult::ExistentialMember:
-      case UnqualifiedLookupResult::ArchetypeMember:
-      case UnqualifiedLookupResult::MetaArchetypeMember:
-        // Types are never referenced with an implicit 'self'.
-        if (!isa<TypeDecl>(Result.getValueDecl())) {
-          AllDeclRefs = false;
-          break;
-        }
-
-        SWIFT_FALLTHROUGH;
-
-      case UnqualifiedLookupResult::ModuleMember:
-      case UnqualifiedLookupResult::LocalDecl: {
-        ValueDecl *D = Result.getValueDecl();
-        if (!D->hasType()) {
-          assert(D->getDeclContext()->isLocalContext());
-          if (!D->isInvalid()) {
-            TC.diagnose(Loc, diag::use_local_before_declaration, Name);
-            TC.diagnose(D->getLoc(), diag::decl_declared_here, Name);
-          }
-          return new (TC.Context) ErrorExpr(Loc);
-        }
-        if (matchesDeclRefKind(D, UDRE->getRefKind()))
-          ResultValues.push_back(D);
-        break;
-      }
+  for (auto Result : Lookup) {
+    // If we find a member, then all of the results aren't non-members.
+    bool IsMember = Result.Base && !isa<ModuleDecl>(Result.Base);
+    if (IsMember && !isa<TypeDecl>(Result.Decl)) {
+      AllDeclRefs = false;
+      break;
     }
+
+    ValueDecl *D = Result.Decl;
+    if (!D->hasType()) {
+      assert(D->getDeclContext()->isLocalContext());
+      if (!D->isInvalid()) {
+        TC.diagnose(Loc, diag::use_local_before_declaration, Name);
+        TC.diagnose(D->getLoc(), diag::decl_declared_here, Name);
+      }
+      return new (TC.Context) ErrorExpr(Loc);
+    }
+    if (matchesDeclRefKind(D, UDRE->getRefKind()))
+      ResultValues.push_back(D);
   }
 
   // If we have an unambiguous reference to a type decl, form a TypeExpr.  This
@@ -391,29 +379,21 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
   ResultValues.clear();
   bool AllMemberRefs = true;
   ValueDecl *Base = 0;
-  for (auto Result : Lookup.Results) {
-    switch (Result.Kind) {
-      case UnqualifiedLookupResult::MemberProperty:
-      case UnqualifiedLookupResult::MemberFunction:
-      case UnqualifiedLookupResult::MetatypeMember:
-      case UnqualifiedLookupResult::ExistentialMember:
-        ResultValues.push_back(Result.getValueDecl());
-        if (Base && Result.getBaseDecl() != Base) {
-          AllMemberRefs = false;
-          break;
-        }
-        Base = Result.getBaseDecl();
-        break;
-      case UnqualifiedLookupResult::ModuleMember:
-      case UnqualifiedLookupResult::LocalDecl:
+  for (auto Result : Lookup) {
+    // Track the base for member declarations.
+    if (Result.Base && !isa<ModuleDecl>(Result.Base)) {
+      ResultValues.push_back(Result.Decl);
+      if (Base && Result.Base != Base) {
         AllMemberRefs = false;
         break;
-      case UnqualifiedLookupResult::MetaArchetypeMember:
-      case UnqualifiedLookupResult::ArchetypeMember:
-        // FIXME: We need to extend OverloadedMemberRefExpr to deal with this.
-        llvm_unreachable("Archetype members in overloaded member references");
-        break;
+      }
+
+      Base = Result.Base;
+      continue;
     }
+
+    AllMemberRefs = false;
+    break;
   }
 
   if (AllMemberRefs) {
