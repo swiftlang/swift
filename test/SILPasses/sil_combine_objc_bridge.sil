@@ -6,6 +6,7 @@ sil_stage canonical
 
 import Builtin
 import Swift
+import Foundation
 
 class AnNSArray {
 }
@@ -173,3 +174,23 @@ bb0(%0 : $AnNSArray):
   %4 = apply %3<AnArray<Unbridged>>(%2) : $@convention(method) <T> (@owned AnArray<T>) -> @owned AnNSArray
   return %4 : $AnNSArray
 }
+
+// CHECK-LABEL: sil shared @bridge_from_swift_array_to_NSObject_cast
+// CHECK: function_ref @_TFE10FoundationSa19_bridgeToObjectiveCU__fGSaQ__FT_CSo7NSArray
+// CHECK: retain_value
+// CHECK: apply
+// CHECK: release_value
+// CHECK: upcast %{{.*}} : $NSArray to $NSObject
+// CHECK: store
+// CHECK: return
+sil shared @bridge_from_swift_array_to_NSObject_cast: $@convention(thin) (@out NSObject, @in Array<String>) -> () {
+bb0(%0 : $*NSObject, %1 : $*Array<String>):
+  %2 = alloc_stack $Array<String>
+  copy_addr %1 to [initialization] %2#1 : $*Array<String>
+  unconditional_checked_cast_addr take_always Array<String> in %2#1 : $*Array<String> to NSObject in %0 : $*NSObject
+  dealloc_stack %2#0 : $*@local_storage Array<String>
+  destroy_addr %1 : $*Array<String>
+  %7 = tuple ()
+  return %7 : $()
+}
+

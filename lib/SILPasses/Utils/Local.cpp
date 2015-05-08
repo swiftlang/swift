@@ -1179,7 +1179,15 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
 
   if (Dest) {
     // If it is addr cast then store the result.
-    NewI = Builder.createStore(Loc, SILValue(NewAI, 0), Dest);
+    auto ConvTy = NewAI->getType();
+    auto DestTy = Dest.getType().getObjectType();
+    assert((ConvTy == DestTy || DestTy.isSuperclassOf(ConvTy)) &&
+           "Destination should have the same type or be a superclass "
+           "of the source operand");
+    auto CastedValue = SILValue(
+        (ConvTy == DestTy) ? NewI : Builder.createUpcast(Loc, NewAI, DestTy),
+        0);
+    NewI = Builder.createStore(Loc, CastedValue, Dest);
   }
 
   if (Dest) {
