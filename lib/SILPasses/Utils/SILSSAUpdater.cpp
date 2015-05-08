@@ -481,6 +481,9 @@ static StructInst *replaceBBArgWithStruct(
   SmallVectorImpl<SILValue> &ArgValues) {
 
   SILBasicBlock *PhiBB = Arg->getParent();
+  auto *FirstSI = dyn_cast<StructInst>(ArgValues[0]);
+  if (!FirstSI)
+    return nullptr;
 
   // Collect the BBArg index of each struct oper.
   // e.g.
@@ -488,34 +491,34 @@ static StructInst *replaceBBArgWithStruct(
   //   br (B, A)
   // : ArgIdxForOper => {1, 0}
   SmallVector<unsigned, 4> ArgIdxForOper;
-  // Visit each PredBB and its ArgValue in order.
-  SmallVectorImpl<SILValue>::const_iterator AVIter = ArgValues.begin();
-  for (SILBasicBlock *PredBB : PhiBB->getPreds()) {
-    // All argument values must be StructInst.
-    auto *PredSI = dyn_cast<StructInst>(*AVIter++);
-    if (!PredSI)
-      return nullptr;
-
-    // Initialize ArgIdxForOper for the first predecessor.
-    if (ArgIdxForOper.empty()) {
-      for (auto Oper : PredSI->getElements()) {
-        auto ArgIdx = findEdgeValueIdx(Oper, PredBB, PhiBB);
-        if (!ArgIdx.hasValue())
+  for (unsigned OperIdx : indices(FirstSI->getElements())) {
+    bool FoundMatchingArgIdx = false;
+    for (unsigned ArgIdx : indices(PhiBB->getBBArgs())) {
+      SmallVectorImpl<SILValue>::const_iterator AVIter = ArgValues.begin();
+      bool TryNextArgIdx = false;
+      for (SILBasicBlock *PredBB : PhiBB->getPreds()) {
+        // All argument values must be StructInst.
+        auto *PredSI = dyn_cast<StructInst>(*AVIter++);
+        if (!PredSI)
           return nullptr;
-        ArgIdxForOper.push_back(*ArgIdx);
+        OperandValueArrayRef EdgeValues =
+          getEdgeValuesForTerminator(PredBB->getTerminator(), PhiBB);
+        if (EdgeValues[ArgIdx] != PredSI->getElements()[OperIdx]) {
+          TryNextArgIdx = true;
+          break;
+        }
       }
-    } else {
-      // Check consistent ArgIdxForOper for the remaining incoming structs.
-      OperandValueArrayRef EdgeValues =
-        getEdgeValuesForTerminator(PredBB->getTerminator(), PhiBB);
-      for (unsigned OperIdx : indices(PredSI->getElements())) {
-        if (EdgeValues[ArgIdxForOper[OperIdx]]
-            != PredSI->getElements()[OperIdx])
-          return nullptr;
+      if (!TryNextArgIdx) {
+        assert(AVIter == ArgValues.end() && "# ArgValues does not match # BB preds");
+        FoundMatchingArgIdx = true;
+        ArgIdxForOper.push_back(ArgIdx);
+        break;
       }
     }
+    if (!FoundMatchingArgIdx)
+      return nullptr;
   }
-  assert(AVIter == ArgValues.end() && "# ArgValues does not match # BB preds");
+
   SmallVector<SILValue, 4> StructArgs;
   for (auto ArgIdx : ArgIdxForOper)
     StructArgs.push_back(PhiBB->getBBArg(ArgIdx));

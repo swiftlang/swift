@@ -214,19 +214,19 @@ bb0(%a0 : $Int32):
 // CHECK:  cond_br
 // CHECK: bb1:
 // CHECK:  br bb2
-// CHECK: bb2([[WORD:%[0-9]+]]
+// CHECK: bb2({{%.*}} : $Builtin.Int32, [[WORD:%.*]] : $Builtin.Int32
 // CHECK:  [[STRUCT:%[0-9]+]] = struct $Int32 ([[WORD]]
 // CHECK:  apply {{.*}}([[STRUCT]])
 // CHECK:  cond_br
-// CHECK: bb3:
+// CHECK: bb3({{.*}}):
 // CHECK:  return
 sil @struct_arg : $@convention(thin) () -> () {
 bb0:
   %c0 = integer_literal $Builtin.Int32, 0
   %c100 = integer_literal $Builtin.Int32, 100
-  br bb1(%c0 : $Builtin.Int32)
+  br bb1(%c0 : $Builtin.Int32, %c0 : $Builtin.Int32)
 
-bb1(%a0 : $Builtin.Int32):
+bb1(%a1 : $Builtin.Int32, %a0 : $Builtin.Int32):
   %s0 = struct $Int32 (%a0 : $Builtin.Int32)
   %z1 = builtin "cmp_eq_Word"(%a0 : $Builtin.Int32, %c100 : $Builtin.Int32) : $Builtin.Int1
   cond_br %z1, bb2, bb3
@@ -236,13 +236,16 @@ bb3:
   %z2 = integer_literal $Builtin.Int1, 0
   %d1 = builtin "sadd_with_overflow_Word"(%a0 : $Builtin.Int32, %c1 : $Builtin.Int32, %z2 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
   %t1 = tuple_extract %d1 : $(Builtin.Int32, Builtin.Int1), 0
+  %d2 = builtin "sadd_with_overflow_Word"(%a1 : $Builtin.Int32, %c1 : $Builtin.Int32, %z2 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
+  %t2 = tuple_extract %d2 : $(Builtin.Int32, Builtin.Int1), 0
   %f1 = function_ref @readInt : $@convention(thin) (Int32) -> ()
   %l1 = apply %f1(%s0) : $@convention(thin) (Int32) -> ()
-  br bb1(%t1 : $Builtin.Int32)
+  br bb1(%t2 : $Builtin.Int32, %t1 : $Builtin.Int32)
 
 bb2:
-  %t2 = tuple ()
-  return %t2 : $()
+  %14 = struct $Int32 (%a1 : $Builtin.Int32)
+  %t3 = tuple ()
+  return %t3 : $()
 
 }
 
