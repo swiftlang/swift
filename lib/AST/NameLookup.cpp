@@ -460,8 +460,6 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
                                      LazyResolver *TypeResolver,
                                      bool IsKnownNonCascading,
                                      SourceLoc Loc, bool IsTypeLookup) {
-  typedef UnqualifiedLookupResult Result;
-
   Module &M = *DC->getParentModule();
   ASTContext &Ctx = M.getASTContext();
   const SourceManager &SM = Ctx.SourceMgr;
@@ -507,7 +505,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
               localVal.checkPattern(P);
           }
           if (localVal.MatchingValue) {
-            Results.push_back(Result::getLocalDecl(localVal.MatchingValue));
+            Results.push_back(UnqualifiedLookupResult(localVal.MatchingValue));
             return;
           }
         }
@@ -546,7 +544,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
               localVal.checkPattern(CE->getParams());
             }
             if (localVal.MatchingValue) {
-              Results.push_back(Result::getLocalDecl(localVal.MatchingValue));
+              Results.push_back(
+                UnqualifiedLookupResult(localVal.MatchingValue));
               return;
             }
           }
@@ -583,7 +582,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         localVal.checkGenericParams(GenericParams);
 
         if (localVal.MatchingValue) {
-          Results.push_back(Result::getLocalDecl(localVal.MatchingValue));
+          Results.push_back(UnqualifiedLookupResult(localVal.MatchingValue));
           return;
         }
       }
@@ -615,42 +614,19 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           // Types are local or metatype members.
           if (auto TD = dyn_cast<TypeDecl>(Result)) {
             if (isa<GenericTypeParamDecl>(TD))
-              Results.push_back(Result::getLocalDecl(Result));
+              Results.push_back(UnqualifiedLookupResult(Result));
             else
-              Results.push_back(Result::getMetatypeMember(MetaBaseDecl, Result));
+              Results.push_back(UnqualifiedLookupResult(MetaBaseDecl, Result));
+            continue;
+          } else if (auto FD = dyn_cast<FuncDecl>(Result)) {
+            if (FD->isStatic() && !isMetatypeType)
+              continue;
+          } else if (isa<EnumElementDecl>(Result)) {
+            Results.push_back(UnqualifiedLookupResult(MetaBaseDecl, Result));
             continue;
           }
 
-          // Functions are either metatype members or member functions.
-          if (auto FD = dyn_cast<FuncDecl>(Result)) {
-            if (FD->isStatic()) {
-              if (isMetatypeType)
-                Results.push_back(Result::getMetatypeMember(BaseDecl, Result));
-            } else {
-              Results.push_back(Result::getMemberFunction(BaseDecl, Result));
-            }
-            continue;
-          }
-
-          if (isa<EnumElementDecl>(Result)) {
-            Results.push_back(Result::getMetatypeMember(MetaBaseDecl, Result));
-            continue;
-          }
-
-          // Archetype members
-          if (ExtendedType->is<ArchetypeType>()) {
-            Results.push_back(Result::getArchetypeMember(BaseDecl, Result));
-            continue;
-          }
-
-          // Existential members.
-          if (ExtendedType->isExistentialType()) {
-            Results.push_back(Result::getExistentialMember(BaseDecl, Result));
-            continue;
-          }
-
-          // Everything else is a member property.
-          Results.push_back(Result::getMemberProperty(BaseDecl, Result));
+          Results.push_back(UnqualifiedLookupResult(BaseDecl, Result));
         }
 
         if (FoundAny) {
@@ -672,7 +648,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           localVal.checkGenericParams(dcGenericParams);
 
           if (localVal.MatchingValue) {
-            Results.push_back(Result::getLocalDecl(localVal.MatchingValue));
+            Results.push_back(UnqualifiedLookupResult(localVal.MatchingValue));
             return;
           }
         }
@@ -693,7 +669,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
       FindLocalVal localVal(SM, Loc, Name);
       localVal.checkSourceFile(*SF);
       if (localVal.MatchingValue) {
-        Results.push_back(Result::getLocalDecl(localVal.MatchingValue));
+        Results.push_back(UnqualifiedLookupResult(localVal.MatchingValue));
         return;
       }
     }
@@ -720,7 +696,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
                  resolutionKind, TypeResolver, DC, extraImports);
 
   for (auto VD : CurModuleResults)
-    Results.push_back(Result::getModuleMember(VD));
+    Results.push_back(UnqualifiedLookupResult(VD));
 
   if (DebugClient)
     filterForDiscriminator(Results, DebugClient);
@@ -739,7 +715,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
   // Look for a module with the given name.
   if (Name.isSimpleName(M.getName())) {
-    Results.push_back(Result::getModuleMember(&M));
+    Results.push_back(UnqualifiedLookupResult(&M));
     return;
   }
 
@@ -749,7 +725,7 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
   if (desiredModule) {
     forAllVisibleModules(DC, [&](const Module::ImportedModule &import) -> bool {
       if (import.second == desiredModule) {
-        Results.push_back(Result::getModuleMember(import.second));
+        Results.push_back(UnqualifiedLookupResult(import.second));
         return false;
       }
       return true;

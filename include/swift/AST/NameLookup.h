@@ -41,118 +41,17 @@ private:
   ValueDecl *Value;
 
 public:
-  /// Kind - The kind of reference.
-  enum KindTy {
-    /// ModuleMember - "x" refers to a value declared at module scope.
-    ModuleMember,
+  UnqualifiedLookupResult(ValueDecl *value) : Base(nullptr), Value(value) { }
 
-    /// LocalDecl - "x" refers to a value declared in a local scope.
-    LocalDecl,
-
-    /// MemberProperty - "x" refers to an instance property of a type which
-    /// is a containing scope.
-    MemberProperty,
-
-    /// MemberFunction - "x" refers to an instance function of a type
-    /// is a containing scope.  If the lookup is inside an instance function
-    /// of the containing type, it refers to the instance function; otherwise,
-    /// it refers to the curried function on the metatype.
-    MemberFunction,
-
-    /// MetatypeMember - "x" refers to a member of a metatype "A", which is a
-    /// referred to by BaseDecl.
-    MetatypeMember,
-  
-    /// ExistentialMember - "x" refers to a member of an existential type,
-    /// which is referred to by BaseDecl.
-    ExistentialMember,
-
-    /// ArchetypeMember - "x" refers to a member of an archetype type,
-    /// which is referred to by BaseDecl.
-    ArchetypeMember,
-
-    /// MetaArchetypeMember - "x" refers to a member of the metatype of an
-    /// archetype type, which is referred to by BaseDecl. The base is evaluated
-    /// and ignored.
-    MetaArchetypeMember
-  } Kind;
+  UnqualifiedLookupResult(ValueDecl *base, ValueDecl *value)
+    : Base(base), Value(value) { }
 
   ValueDecl *getValueDecl() const {
     return Value;
   }
-
+  
   ValueDecl *getBaseDecl() const {
     return Base;
-  }
-
-  static UnqualifiedLookupResult getModuleMember(ValueDecl *value) {
-    UnqualifiedLookupResult R;
-    R.Base = nullptr;
-    R.Value = value;
-    R.Kind = ModuleMember;
-    return R;
-  }
-
-  static UnqualifiedLookupResult getLocalDecl(ValueDecl *value) {
-    UnqualifiedLookupResult R;
-    R.Base = nullptr;
-    R.Value = value;
-    R.Kind = LocalDecl;
-    return R;
-  }
-
-  static UnqualifiedLookupResult getMemberProperty(ValueDecl *base,
-                                                   ValueDecl *value) {
-    UnqualifiedLookupResult R;
-    R.Base = base;
-    R.Value = value;
-    R.Kind = MemberProperty;
-    return R;
-  }
-
-  static UnqualifiedLookupResult getMemberFunction(ValueDecl *base,
-                                                   ValueDecl *value) {
-    UnqualifiedLookupResult R;
-    R.Base = base;
-    R.Value = value;
-    R.Kind = MemberFunction;
-    return R;
-  }
-
-  static UnqualifiedLookupResult getMetatypeMember(ValueDecl *base,
-                                                   ValueDecl *value) {
-    UnqualifiedLookupResult R;
-    R.Base = base;
-    R.Value = value;
-    R.Kind = MetatypeMember;
-    return R;
-  }
-
-  static UnqualifiedLookupResult getExistentialMember(ValueDecl *base,
-                                                      ValueDecl *value) {
-    UnqualifiedLookupResult R;
-    R.Base = base;
-    R.Value = value;
-    R.Kind = ExistentialMember;
-    return R;
-  }
-
-  static UnqualifiedLookupResult getArchetypeMember(ValueDecl *base,
-                                                    ValueDecl *value) {
-    UnqualifiedLookupResult R;
-    R.Base = base;
-    R.Value = value;
-    R.Kind = ArchetypeMember;
-    return R;
-  }
-
-  static UnqualifiedLookupResult getMetaArchetypeMember(ValueDecl *base,
-                                                        ValueDecl *value) {
-    UnqualifiedLookupResult R;
-    R.Base = base;
-    R.Value = value;
-    R.Kind = MetaArchetypeMember;
-    return R;
   }
 };
 
