@@ -68,6 +68,7 @@ function(_add_variant_c_compile_link_flags
     list(APPEND result
         "-arch" "${arch}"
         "-F" "${SWIFT_SDK_${sdk}_PATH}/../../../Developer/Library/Frameworks"
+        "-F" "${SWIFT_SDK_${sdk}_PATH}/../../../Developer/AppleInternal/Library/Frameworks"
         "-m${SWIFT_SDK_${sdk}_VERSION_MIN_NAME}-version-min=${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION}")
 
     append_darwin_segalign_link_flags("${arch}" result)
@@ -125,7 +126,8 @@ function(_add_variant_swift_compile_flags
 
   if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
     list(APPEND result
-        "-F" "${SWIFT_SDK_${sdk}_PATH}/../../../Developer/Library/Frameworks")
+        "-F" "${SWIFT_SDK_${sdk}_PATH}/../../../Developer/Library/Frameworks"
+        "-F" "${SWIFT_SDK_${sdk}_PATH}/../../../Developer/AppleInternal/Library/Frameworks")
 
     append_darwin_segalign_link_flags("${arch}" result)
   endif()
