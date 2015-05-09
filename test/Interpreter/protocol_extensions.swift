@@ -258,5 +258,29 @@ print(hasP.p.extValue)
 toggle(&hasP.p.extValue)
 print(hasP.p.extValue)
 
+// rdar://problem/20739719
+class Super: Init {
+  required init(x: Int) { print("\(x) \(self.dynamicType)") }
+}
+
+class Sub: Super {}
+
+protocol Init { init(x: Int) }
+extension Init { init() { self.init(x: 17) } }
+
+// CHECK: 17 main.Super
+Super()
+
+// CHECK: 17 main.Sub
+Sub()
+
+// CHECK: 17 main.Super
+var sup: Super.Type = Super.self
+sup()
+
+// CHECK: 17 main.Sub
+sup = Sub.self
+sup()
+
 // CHECK: DONE
 print("DONE")

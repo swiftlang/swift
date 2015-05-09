@@ -5427,6 +5427,8 @@ public:
         TC.diagnose(CD->getLoc(), diag::designated_init_in_extension, extType)
           .fixItInsert(CD->getLoc(), "convenience ");
         CD->setInitKind(CtorInitializerKind::Convenience);
+      } else if (CD->getDeclContext()->isProtocolExtensionContext()) {
+        CD->setInitKind(CtorInitializerKind::Convenience);
       }
     }
 

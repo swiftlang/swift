@@ -5497,7 +5497,8 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   if (isNonFinalClass(ty) &&
       !fn->isStaticallyDerivedMetatype() &&
       !decl->hasClangNode() &&
-      !cast<ConstructorDecl>(decl)->isRequired()) {
+      !(cast<ConstructorDecl>(decl)->isRequired() ||
+        decl->getDeclContext()->isProtocolExtensionContext())) {
     if (SuppressDiagnostics)
       return nullptr;
 
