@@ -960,7 +960,7 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
       BindingKindStr = Tok.getText();
       VarLoc = consumeToken();
 
-      // If will probably  be a common typo to write "if let case" instead of
+      // If will probably be a common typo to write "if let case" instead of
       // "if case let" so detect this and produce a nice fixit.
       if ((BindingKind == BK_Let || BindingKind == BK_Var) &&
           Tok.is(tok::kw_case)) {
@@ -1022,7 +1022,8 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
           P->setImplicit();
       }
 
-      ThePattern = parseOptionalPatternTypeAnnotation(ThePattern);
+      ThePattern = parseOptionalPatternTypeAnnotation(ThePattern,
+                                                      BindingKind != BK_Case);
       Status |= ThePattern;
 
       if (ThePattern.isNull() || ThePattern.hasCodeCompletion())

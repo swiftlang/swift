@@ -1018,7 +1018,8 @@ public:
   ParserResult<Pattern> parsePatternTuple();
   
   ParserResult<Pattern>
-  parseOptionalPatternTypeAnnotation(ParserResult<Pattern> P);
+  parseOptionalPatternTypeAnnotation(ParserResult<Pattern> P,
+                                     bool isOptional);
   ParserResult<Pattern> parseMatchingPattern(bool isExprBasic);
   ParserResult<Pattern> parseMatchingPatternAsLetOrVar(bool isLet,
                                                        SourceLoc VarLoc,

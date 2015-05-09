@@ -153,7 +153,7 @@ public struct Mirror {
     var clsMirror = Swift.reflect(subject)
 
     // Walk up the chain of mirrors/classes until we find staticSubclass
-    while let superclass: AnyClass? = _getSuperclass(cls) {
+    while let superclass: AnyClass = _getSuperclass(cls) {
       guard let superclassMirror = clsMirror._superMirror() else { break }
       
       if superclass == targetSuperclass { return superclassMirror }

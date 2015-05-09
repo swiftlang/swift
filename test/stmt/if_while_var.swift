@@ -100,3 +100,11 @@ func testIfCase(a : Int?) {
 
 }
 
+// <rdar://problem/20883147> Type annotation for 'let' condition still expected to be optional
+func testTypeAnnotations() {
+  if let x: Int = Optional(1) {}
+  if let x: Int = .Some(1) {}
+
+  if case _ : Int8 = 19 {}  // expected-warning {{'if' condition is always true}}
+}
+
