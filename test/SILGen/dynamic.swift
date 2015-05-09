@@ -86,7 +86,7 @@ protocol Proto {
 // Protocol witnesses use best appropriate dispatch
 
 // Native witnesses use vtable dispatch:
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC7dynamic3FooS_5ProtoS_FS1_12nativeMethodUS1___fQPS1_FT_T_
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC7dynamic3FooS_5ProtoS_FS1_12nativeMethoduRq_S1__fq_FT_T_
 // CHECK:         class_method {{%.*}} : $Foo, #Foo.nativeMethod!1 :
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC7dynamic3FooS_5ProtoS_FS1_g10nativePropSi
 // CHECK:         class_method {{%.*}} : $Foo, #Foo.nativeProp!getter.1 :
@@ -98,7 +98,7 @@ protocol Proto {
 // CHECK:         class_method {{%.*}} : $Foo, #Foo.subscript!setter.1 :
 
 // @objc witnesses use vtable dispatch:
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC7dynamic3FooS_5ProtoS_FS1_10objcMethodUS1___fQPS1_FT_T_
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC7dynamic3FooS_5ProtoS_FS1_10objcMethoduRq_S1__fq_FT_T_
 // CHECK:         class_method {{%.*}} : $Foo, #Foo.objcMethod!1 :
 // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC7dynamic3FooS_5ProtoS_FS1_g8objcPropSi
 // CHECK:         class_method {{%.*}} : $Foo, #Foo.objcProp!getter.1 :
@@ -110,7 +110,7 @@ protocol Proto {
 // CHECK:         class_method {{%.*}} : $Foo, #Foo.subscript!setter.1 :
 
 // Dynamic witnesses use objc dispatch:
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC7dynamic3FooS_5ProtoS_FS1_13dynamicMethodUS1___fQPS1_FT_T_
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC7dynamic3FooS_5ProtoS_FS1_13dynamicMethoduRq_S1__fq_FT_T_
 // CHECK:         function_ref @_TTDFC7dynamic3Foo13dynamicMethodfS0_FT_T_
 // CHECK-LABEL: sil shared [transparent] @_TTDFC7dynamic3Foo13dynamicMethodfS0_FT_T_
 // CHECK:         class_method [volatile] {{%.*}} : $Foo, #Foo.dynamicMethod!1.foreign :

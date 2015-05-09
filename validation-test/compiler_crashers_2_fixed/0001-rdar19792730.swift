@@ -1,5 +1,4 @@
-// RUN: not --crash %target-swift-frontend %s -emit-silgen
-// REQUIRES: asserts
+// RUN: %target-swift-frontend %s -emit-silgen
 
 // rdar://problem/19792730
 

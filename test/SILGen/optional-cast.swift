@@ -134,7 +134,7 @@ func opt_to_opt_trivial(x: Int?) -> Int! {
 // CHECK-NEXT:}
 func opt_to_opt_reference(x : C!) -> C? { return x }
 
-// CHECK-LABEL: sil hidden @_TF4main22opt_to_opt_addressOnlyU__FGSQQ__GSqQ__
+// CHECK-LABEL: sil hidden @_TF4main22opt_to_opt_addressOnlyurFGSQq__GSqq__
 // CHECK-NEXT:  bb0(%0 : $*Optional<T>, %1 : $*ImplicitlyUnwrappedOptional<T>):
 // CHECK-NEXT:  debug_value_addr %1 : $*ImplicitlyUnwrappedOptional<T>  // let x
 // CHECK-NEXT:  %3 = unchecked_addr_cast %0 : $*Optional<T> to $*ImplicitlyUnwrappedOptional<T>
@@ -146,7 +146,7 @@ class C {}
 public struct TestAddressOnlyStruct<T>  {
   func f(a : T?) {}
   
-  // CHECK-LABEL: sil hidden @_TFV4main21TestAddressOnlyStruct8testCallU__fGS0_Q__FGSQQ__T_
+  // CHECK-LABEL: sil hidden @_TFV4main21TestAddressOnlyStruct8testCallurfGS0_q__FGSQq__T_
   // CHECK-NEXT: bb0(%0 : $*ImplicitlyUnwrappedOptional<T>, %1 : $TestAddressOnlyStruct<T>):
   // CHECK: [[TMPBUF:%.*]] = alloc_stack $Optional<T>
   // CHECK: [[TMPCAST:%.*]] = unchecked_addr_cast [[TMPBUF]]#1

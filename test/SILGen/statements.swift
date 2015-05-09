@@ -522,7 +522,7 @@ func testRequireExprPattern(a : Int) {
   // CHECK: [[M1:%[0-9]+]] = function_ref @_TF10statements8marker_1FT_T_ : $@convention(thin) () -> ()
   // CHECK-NEXT: apply [[M1]]() : $@convention(thin) () -> ()
 
-  // CHECK: function_ref static Swift.~= infix <A : Swift.Equatable>(A, A) -> Swift.Bool
+  // CHECK: function_ref static Swift.~= infix : <A where A: Swift.Equatable> (A, A) -> Swift.Bool
   // CHECK: cond_br {{.*}}, bb1, bb2
   guard case 4 = a else { marker_2(); return }
 
@@ -589,7 +589,7 @@ enum MyOpt<T> {
   case None, Some(T)
 }
 
-// CHECK-LABEL: sil hidden @_TF10statements28testAddressOnlyEnumInRequireU__FGOS_5MyOptQ__Q_
+// CHECK-LABEL: sil hidden @_TF10statements28testAddressOnlyEnumInRequireurFGOS_5MyOptq__q_
 // CHECK-NEXT: bb0(%0 : $*T, %1 : $*MyOpt<T>):
 // CHECK-NEXT: debug_value_addr %1 : $*MyOpt<T>  // let a
 // CHECK-NEXT: %3 = alloc_stack $T  // let t
@@ -624,7 +624,7 @@ func testAddressOnlyEnumInRequire<T>(a : MyOpt<T>) -> T {
 
 
 
-// CHECK-LABEL: sil hidden @_TF10statements19testCleanupEmissionU__FQ_T_
+// CHECK-LABEL: sil hidden @_TF10statements19testCleanupEmissionurFq_T_
 // <rdar://problem/20563234> let-else problem: cleanups for bound patterns shouldn't be run in the else block
 protocol MyProtocol {}
 func testCleanupEmission<T>(x: T) {

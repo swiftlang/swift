@@ -58,7 +58,7 @@ struct S2 {
     // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box $S2
     // CHECK:   [[SELF:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]#1 : $*S2
 
-    // CHECK:   [[S2_DELEG_INIT:%[0-9]+]] = function_ref @_TFV19init_ref_delegation2S2CfMS0_U__FT1tQ__S0_ : $@convention(thin) <τ_0_0> (@in τ_0_0, @thin S2.Type) -> S2
+    // CHECK:   [[S2_DELEG_INIT:%[0-9]+]] = function_ref @_TFV19init_ref_delegation2S2CurfMS0_FT1tq__S0_ : $@convention(thin) <τ_0_0> (@in τ_0_0, @thin S2.Type) -> S2
 
     // CHECK:   [[X_INIT:%[0-9]+]] = function_ref @_TFV19init_ref_delegation1XCfMS0_FT_S0_ : $@convention(thin) (@thin X.Type) -> X
     // CHECK:   [[X_META:%[0-9]+]] = metatype $@thin X.Type

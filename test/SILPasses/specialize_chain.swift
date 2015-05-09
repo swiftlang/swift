@@ -34,16 +34,16 @@ func exp1() {
   var II = YYY<Int>(t: 5)
   print(II.AAA9(t: 4), appendNewline: false)
 }
-//CHECK: sil shared @_TTSg5Si___TFV16specialize_chain3YYY4AAA9U__fRGS0_Q__FT1tQ__Si
-//CHECK: sil shared @_TTSg5Si___TFV16specialize_chain3YYY4AAA8U__fRGS0_Q__FT1tQ__Si
-//CHECK: sil shared @_TTSg5Si___TFV16specialize_chain3YYY4AAA7U__fRGS0_Q__FT1tQ__Si
-//CHECK: sil shared @_TTSg5Si___TFV16specialize_chain3YYY4AAA6U__fRGS0_Q__FT1tQ__Si
-//CHECK: sil shared @_TTSg5Si___TFV16specialize_chain3YYY4AAA5U__fRGS0_Q__FT1tQ__Si
-//CHECK: sil shared @_TTSg5Si___TFV16specialize_chain3YYY4AAA4U__fRGS0_Q__FT1tQ__Si
-//CHECK: sil shared @_TTSg5Si___TFV16specialize_chain3YYY4AAA3U__fRGS0_Q__FT1tQ__Si
-//CHECK: sil shared @_TTSg5Si___TFV16specialize_chain3YYY4AAA2U__fRGS0_Q__FT1tQ__Si
-//CHECK: sil shared @_TTSg5Si___TFV16specialize_chain3YYY4AAA1U__fRGS0_Q__FT1tQ__Si
+//CHECK: sil shared @_TTSg5Si___TFV16specialize_chain3YYY4AAA9urfRGS0_q__FT1tq__Si
+//CHECK: sil shared @_TTSg5Si___TFV16specialize_chain3YYY4AAA8urfRGS0_q__FT1tq__Si
+//CHECK: sil shared @_TTSg5Si___TFV16specialize_chain3YYY4AAA7urfRGS0_q__FT1tq__Si
+//CHECK: sil shared @_TTSg5Si___TFV16specialize_chain3YYY4AAA6urfRGS0_q__FT1tq__Si
+//CHECK: sil shared @_TTSg5Si___TFV16specialize_chain3YYY4AAA5urfRGS0_q__FT1tq__Si
+//CHECK: sil shared @_TTSg5Si___TFV16specialize_chain3YYY4AAA4urfRGS0_q__FT1tq__Si
+//CHECK: sil shared @_TTSg5Si___TFV16specialize_chain3YYY4AAA3urfRGS0_q__FT1tq__Si
+//CHECK: sil shared @_TTSg5Si___TFV16specialize_chain3YYY4AAA2urfRGS0_q__FT1tq__Si
+//CHECK: sil shared @_TTSg5Si___TFV16specialize_chain3YYY4AAA1urfRGS0_q__FT1tq__Si
 //CHECK: exp1
-//CHECK: function_ref @_TTSg5Si___TFV16specialize_chain3YYYCU__fMGS0_Q__FT1tQ__GS0_Q__
-//CHECK: function_ref @_TTSg5Si___TFV16specialize_chain3YYY4AAA9U__fRGS0_Q__FT1tQ__Si
+//CHECK: function_ref @_TTSg5Si___TFV16specialize_chain3YYYCurfMGS0_q__FT1tq__GS0_q__
+//CHECK: function_ref @_TTSg5Si___TFV16specialize_chain3YYY4AAA9urfRGS0_q__FT1tq__Si
 //CHECK: return

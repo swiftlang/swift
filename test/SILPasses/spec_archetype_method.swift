@@ -25,10 +25,10 @@ func useFoo<T>(#x: T) {
 }
 
 //CHECK-LABEL: sil hidden @_TF21spec_archetype_method21interesting_code_hereFT_T_
-//CHECK: function_ref @_TTSg5C21spec_archetype_method3ABCS0_S_8pingableS____TF21spec_archetype_method12generic_callUS_8pingable__FT1xQ__T_
+//CHECK: function_ref @_TTSg5C21spec_archetype_method3ABCS0_S_8pingableS____TF21spec_archetype_method12generic_calluRq_S_8pingable_FT1xq__T_
 //CHECK-NEXT: retain
 //CHECK-NEXT: apply
-//CHECK:  function_ref @_TTSg5C21spec_archetype_method3ABC___TF21spec_archetype_method6useFooU__FT1xQ__T_ : $@convention(thin) (@in ABC) -> ()
+//CHECK:  function_ref @_TTSg5C21spec_archetype_method3ABC___TF21spec_archetype_method6useFoourFT1xq__T_ : $@convention(thin) (@in ABC) -> ()
 //CHECK-NEXT: apply
 //CHECK: return
 func interesting_code_here() {

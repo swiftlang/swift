@@ -18,7 +18,7 @@ func getDescription(o: NSObject) -> String {
 // CHECK:  [[BRIDGED_BOX:%.*]] = enum $Optional<NSString>, #Optional.Some!enumelt.1, [[BRIDGED]]
 // CHECK:  [[NATIVE:%.*]] = apply [[NSSTRING_TO_STRING]]([[BRIDGED_BOX]])
 // CHECK:  [[OPT_NATIVE:%.*]] = enum $ImplicitlyUnwrappedOptional<String>, #ImplicitlyUnwrappedOptional.Some!enumelt.1, [[NATIVE]]
-// CHECK:  [[T0:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_
+// CHECK:  [[T0:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueurFGSQq__q_
 // CHECK:  apply [[T0]]<String>([[NATIVE_BUF:%.*]]#1,
 // CHECK:  [[NATIVE:%.*]] = load [[NATIVE_BUF]]
 // CHECK:  return [[NATIVE]] 
@@ -41,7 +41,7 @@ func getUppercaseString(s: NSString) -> String {
 // CHECK:   [[BRIDGED_BOX:%.*]] = enum $Optional<NSString>, #Optional.Some!enumelt.1, [[BRIDGED]]
 // CHECK:   [[NATIVE:%.*]] = apply [[NSSTRING_TO_STRING]]([[BRIDGED_BOX]])
 // CHECK:   [[OPT_NATIVE:%.*]] = enum $ImplicitlyUnwrappedOptional<String>, #ImplicitlyUnwrappedOptional.Some!enumelt.1, [[NATIVE]]
-// CHECK:   [[T0:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_
+// CHECK:   [[T0:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueurFGSQq__q_
 // CHECK:   apply [[T0]]<String>([[NATIVE_BUF:%.*]]#1,
 // CHECK:   [[NATIVE:%.*]] = load [[NATIVE_BUF]]
 // CHECK:   return [[NATIVE]]
@@ -151,7 +151,7 @@ func callBar() -> String {
 // CHECK:   [[BRIDGED_BOX:%.*]] = enum $Optional<NSString>, #Optional.Some!enumelt.1, [[BRIDGED]]
 // CHECK:   [[NATIVE:%.*]] = apply [[NSSTRING_TO_STRING]]([[BRIDGED_BOX]])
 // CHECK:   [[OPT_NATIVE:%.*]] = enum $ImplicitlyUnwrappedOptional<String>, #ImplicitlyUnwrappedOptional.Some!enumelt.1, [[NATIVE]]
-// CHECK:   [[T0:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_
+// CHECK:   [[T0:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueurFGSQq__q_
 // CHECK:   apply [[T0]]<String>([[NATIVE_BUF:%.*]]#1,
 // CHECK:   [[NATIVE:%.*]] = load [[NATIVE_BUF]]
 // CHECK:   return [[NATIVE]]

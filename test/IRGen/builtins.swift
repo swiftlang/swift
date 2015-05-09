@@ -203,7 +203,7 @@ func sizeof_alignof_test() {
 
 }
 
-// CHECK: define hidden void @_TF8builtins27generic_sizeof_alignof_testU__FQ_T_(
+// CHECK: define hidden void @_TF8builtins27generic_sizeof_alignof_testurFq_T_(
 func generic_sizeof_alignof_test<T>(_: T) {
   // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 17
   // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
@@ -219,7 +219,7 @@ func generic_sizeof_alignof_test<T>(_: T) {
   var a = Builtin.alignof(T.self)
 }
 
-// CHECK: define hidden void @_TF8builtins21generic_strideof_testU__FQ_T_(
+// CHECK: define hidden void @_TF8builtins21generic_strideof_testurFq_T_(
 func generic_strideof_test<T>(_: T) {
   // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 19
   // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
@@ -228,7 +228,7 @@ func generic_strideof_test<T>(_: T) {
   var s = Builtin.strideof(T.self)
 }
 
-// CHECK: define hidden void @_TF8builtins29generic_strideof_nonzero_testU__FQ_T_(
+// CHECK: define hidden void @_TF8builtins29generic_strideof_nonzero_testurFq_T_(
 func generic_strideof_nonzero_test<T>(_: T) {
   // CHECK:      [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T:%.*]], i32 19
   // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]]
@@ -427,7 +427,7 @@ func destroyNonPODArray(array: Builtin.RawPointer, count: Builtin.Word) {
   Builtin.destroyArray(C.self, array, count)
 }
 
-// CHECK-LABEL: define hidden void @_TF8builtins15destroyGenArrayU__FTBp5countBwQ__T_(i8*, i64, %swift.opaque*, %swift.type* %T)
+// CHECK-LABEL: define hidden void @_TF8builtins15destroyGenArrayurFTBp5countBwq__T_(i8*, i64, %swift.opaque*, %swift.type* %T)
 // CHECK-NOT:   loop:
 // CHECK:         call void %destroyArray
 func destroyGenArray<T>(array: Builtin.RawPointer, count: Builtin.Word, _: T) {

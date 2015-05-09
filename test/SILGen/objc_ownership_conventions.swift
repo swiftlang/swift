@@ -75,7 +75,7 @@ func test8(g: Gizmo) -> Gizmo {
   // CHECK-NEXT: [[RESULT:%.*]] = apply [[METHOD]]([[G]])
   // CHECK-NEXT: store
   // CHECK-NEXT: function_ref
-  // CHECK-NEXT: function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_
+  // CHECK-NEXT: function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueurFGSQq__q_
   // CHECK-NEXT: alloc_stack
   // CHECK-NEXT: apply
   // CHECK-NEXT: [[RESULT:%.*]] = load
@@ -97,7 +97,7 @@ func test9(g: Gizmo) -> Gizmo {
   // CHECK-NEXT: retain_autoreleased [[RESULT]]
   // CHECK-NEXT: store [[RESULT]]
   // CHECK-NEXT: function_ref
-  // CHECK-NEXT: function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_
+  // CHECK-NEXT: function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueurFGSQq__q_
   // CHECK-NEXT: alloc_stack
   // CHECK-NEXT: apply
   // CHECK-NEXT: [[RESULT:%.*]] = load
@@ -119,7 +119,7 @@ func test10(let g: Gizmo) -> AnyClass {
   // CHECK:      [[OBJC:%.*]] = unchecked_enum_data [[OPT_OBJC]]
   // CHECK-NEXT: [[THICK:%.*]] = objc_to_thick_metatype [[OBJC]]
   // CHECK:      [[T0:%.*]] = enum $ImplicitlyUnwrappedOptional<AnyObject.Type>, #ImplicitlyUnwrappedOptional.Some!enumelt.1, [[THICK]]
-  // CHECK:      [[T0:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_
+  // CHECK:      [[T0:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueurFGSQq__q_
   // CHECK:      apply [[T0]]<AnyObject.Type>([[THICK_BUF:%.*]]#1, {{.*}})
   // CHECK-NEXT: [[RES:%.*]] = load [[THICK_BUF]]#1
   // CHECK:      strong_release [[G]] : $Gizmo
@@ -139,7 +139,7 @@ func test11(let g: Gizmo) -> AnyClass {
   // CHECK:      [[OBJC:%.*]] = unchecked_enum_data [[OPT_OBJC]]
   // CHECK-NEXT: [[THICK:%.*]] = objc_to_thick_metatype [[OBJC]]
   // CHECK:      [[T0:%.*]] = enum $ImplicitlyUnwrappedOptional<AnyObject.Type>, #ImplicitlyUnwrappedOptional.Some!enumelt.1, [[THICK]]
-  // CHECK:      [[T0:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_
+  // CHECK:      [[T0:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueurFGSQq__q_
   // CHECK:      apply [[T0]]<AnyObject.Type>([[THICK_BUF:%.*]]#1, {{.*}})
   // CHECK-NEXT: [[RES:%.*]] = load [[THICK_BUF]]#1
   // CHECK:      strong_release [[G]] : $Gizmo

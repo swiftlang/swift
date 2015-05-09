@@ -33,7 +33,7 @@ func setIntPropExistential(a: ProtocolA) {
   a.intProp = 0
 }
 
-// CHECK-LABEL: sil hidden @_TF30generic_property_base_lifetime17getIntPropGenericUS_9ProtocolA__FQ_Si
+// CHECK-LABEL: sil hidden @_TF30generic_property_base_lifetime17getIntPropGenericuRq_S_9ProtocolA_Fq_Si
 // CHECK-NOT:     strong_retain %0
 // CHECK:         apply {{%.*}}<T>(%0)
 // CHECK:         strong_release %0
@@ -41,7 +41,7 @@ func getIntPropGeneric<T: ProtocolA>(a: T) -> Int {
   return a.intProp
 }
 
-// CHECK-LABEL: sil hidden @_TF30generic_property_base_lifetime17setIntPropGenericUS_9ProtocolA__FQ_T_
+// CHECK-LABEL: sil hidden @_TF30generic_property_base_lifetime17setIntPropGenericuRq_S_9ProtocolA_Fq_T_
 // CHECK-NOT:     strong_retain %0
 // CHECK:         apply {{%.*}}<T>({{%.*}}, %0)
 // CHECK:         strong_release %0
@@ -61,7 +61,7 @@ func getIntPropExistential(a: ProtocolB) -> Int {
   return a.intProp
 }
 
-// CHECK-LABEL: sil hidden @_TF30generic_property_base_lifetime17getIntPropGenericUS_9ProtocolB__FQ_Si
+// CHECK-LABEL: sil hidden @_TF30generic_property_base_lifetime17getIntPropGenericuRq_S_9ProtocolB_Fq_Si
 // CHECK:         [[STACK:%[0-9]+]] = alloc_stack $T
 // CHECK:         copy_addr %0 to [initialization] [[STACK]]#1
 // CHECK:         apply {{%.*}}<T>([[STACK]]#1)
@@ -98,7 +98,7 @@ func setIntPropExistential(a: ProtocolO) {
   a.intProp = 0
 }
 
-// CHECK-LABEL: sil hidden @_TF30generic_property_base_lifetime17getIntPropGenericUS_9ProtocolO__FQ_Si
+// CHECK-LABEL: sil hidden @_TF30generic_property_base_lifetime17getIntPropGenericuRq_S_9ProtocolO_Fq_Si
 // CHECK-NOT:     strong_retain %0
 // CHECK:         apply {{%.*}}<T>(%0)
 // CHECK:         strong_release %0
@@ -107,7 +107,7 @@ func getIntPropGeneric<T: ProtocolO>(a: T) -> Int {
   return a.intProp
 }
 
-// CHECK-LABEL: sil hidden @_TF30generic_property_base_lifetime17setIntPropGenericUS_9ProtocolO__FQ_T_
+// CHECK-LABEL: sil hidden @_TF30generic_property_base_lifetime17setIntPropGenericuRq_S_9ProtocolO_Fq_T_
 // CHECK-NOT:     strong_retain %0
 // CHECK:         apply {{%.*}}<T>({{%.*}}, %0)
 // CHECK:         strong_release %0

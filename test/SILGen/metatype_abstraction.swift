@@ -111,7 +111,7 @@ func class_metatype_of_metatype(x: C) -> C.Type.Type {
   return x.dynamicType.dynamicType
 }
 
-// CHECK-LABEL: sil hidden @_TF20metatype_abstraction28generic_metatype_of_metatypeU__FQ_MMQ_
+// CHECK-LABEL: sil hidden @_TF20metatype_abstraction28generic_metatype_of_metatypeurFq_MMq_
 // CHECK:         [[METATYPE:%.*]] = value_metatype $@thick T.Type
 // CHECK:         [[META_METATYPE:%.*]] = value_metatype $@thick T.Type.Type, [[METATYPE]]
 func generic_metatype_of_metatype<T>(x: T) -> T.Type.Type {

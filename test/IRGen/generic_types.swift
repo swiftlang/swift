@@ -33,7 +33,7 @@ import Swift
 // CHECK:   i32 16,
 // CHECK:   %swift.type* null,
 // CHECK:   void (%swift.opaque*, [[A]]*)* @_TFC13generic_types1A3run
-// CHECK:   %C13generic_types1A* (i64, %C13generic_types1A*)* @_TFC13generic_types1AcU__fMGS0_Q__FT1ySi_GS0_Q__
+// CHECK:   %C13generic_types1A* (i64, %C13generic_types1A*)* @_TFC13generic_types1AcurfMGS0_q__FT1ySi_GS0_q__
 // CHECK: }
 // CHECK: @_TMPdC13generic_types1B = global [[B_METADATA_T:{.* } }]] {
 // CHECK:   %swift.type* (%swift.type_pattern*, i8**)* [[B_METADATA_CREATE:@[a-z0-9_]+]],

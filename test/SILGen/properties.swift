@@ -836,7 +836,7 @@ func genericProps(x: GenericClass<String>) {
   let _ = x.z
 }
 
-// CHECK-LABEL: sil hidden @_TF10properties28genericPropsInGenericContextU__FGCS_12GenericClassQ__T_
+// CHECK-LABEL: sil hidden @_TF10properties28genericPropsInGenericContexturFGCS_12GenericClassq__T_
 func genericPropsInGenericContext<U>(x: GenericClass<U>) {
   // CHECK: [[Z:%.*]] = ref_element_addr %0 : $GenericClass<U>, #GenericClass.z
   // CHECK: copy_addr [[Z]] {{.*}} : $*U
@@ -948,7 +948,7 @@ func addressOnlyNonmutatingProperty<T>(x: AddressOnlyNonmutatingSet<T>)
   x.prop = 0
   return x.prop
 }
-// CHECK-LABEL: sil hidden @_TF10properties30addressOnlyNonmutatingPropertyU__FGVS_25AddressOnlyNonmutatingSetQ__Si : $@convention(thin) <T> (@in AddressOnlyNonmutatingSet<T>) -> Int {
+// CHECK-LABEL: sil hidden @_TF10properties30addressOnlyNonmutatingPropertyurFGVS_25AddressOnlyNonmutatingSetq__Si : $@convention(thin) <T> (@in AddressOnlyNonmutatingSet<T>) -> Int {
 // CHECK:         [[SET:%.*]] = function_ref @_TFV10properties25AddressOnlyNonmutatingSets4propSi
 // CHECK:         apply [[SET]]<T>({{%.*}}, [[TMP:%.*]]#1)
 // CHECK:         destroy_addr [[TMP]]

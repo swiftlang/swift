@@ -211,10 +211,10 @@ class ReabstractDefaultArgument<T> {
 
 // CHECK-LABEL: sil hidden @_TF17default_arguments32testDefaultArgumentReabstractionFT_T_
 // function_ref default_arguments.ReabstractDefaultArgument.__allocating_init <A>(default_arguments.ReabstractDefaultArgument<A>.Type)(a : (A, A) -> Swift.Bool) -> default_arguments.ReabstractDefaultArgument<A>
-// CHECK: [[INITFN:%[0-9]+]] = function_ref @_TFC17default_arguments25ReabstractDefaultArgumentCU__fMGS0_Q__FT1aFTQ_Q__Sb_GS0_Q__
+// CHECK: [[INITFN:%[0-9]+]] = function_ref @_TFC17default_arguments25ReabstractDefaultArgumentCurfMGS0_q__FT1aFTq_q__Sb_GS0_q__
 // %1 = metatype $@thick ReabstractDefaultArgument<Int>.Type
 // function_ref default_arguments.ReabstractDefaultArgument.(init <A>(default_arguments.ReabstractDefaultArgument<A>.Type) -> (a : (A, A) -> Swift.Bool) -> default_arguments.ReabstractDefaultArgument<A>).(default argument 0)
-// CHECK: %2 = function_ref @_TIFC17default_arguments25ReabstractDefaultArgumentcU__FMGS0_Q__FT1aFTQ_Q__Sb_GS0_Q__A_ : $@convention(thin) <τ_0_0> () -> @owned @callee_owned (@in τ_0_0, @in τ_0_0) -> Bool
+// CHECK: %2 = function_ref @_TIFC17default_arguments25ReabstractDefaultArgumentcurFMGS0_q__FT1aFTq_q__Sb_GS0_q__A_ : $@convention(thin) <τ_0_0> () -> @owned @callee_owned (@in τ_0_0, @in τ_0_0) -> Bool
 // CHECK-NEXT: %3 = apply %2<Int>() : $@convention(thin) <τ_0_0> () -> @owned @callee_owned (@in τ_0_0, @in τ_0_0) -> Bool
 // CHECK-NEXT: function_ref reabstraction thunk helper from @callee_owned (@in Swift.Int, @in Swift.Int) -> (@unowned Swift.Bool) to @callee_owned (@unowned Swift.Int, @unowned Swift.Int) -> (@unowned Swift.Bool)
 // CHECK-NEXT: %4 = function_ref @_TTRXFo_iSiiSi_dSb_XFo_dSidSi_dSb_ : $@convention(thin) (Int, Int, @owned @callee_owned (@in Int, @in Int) -> Bool) -> Bool

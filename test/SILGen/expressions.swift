@@ -223,7 +223,7 @@ struct Generic<T> {
     typevar_member = x.typevar_member
   }
 
-  // CHECK-LABEL: sil hidden @_TZFV11expressions7Generic12class_methodU__fMGS0_Q__FT_T_
+  // CHECK-LABEL: sil hidden @_TZFV11expressions7Generic12class_methodurfMGS0_q__FT_T_
   static func class_method() {}
 }
 

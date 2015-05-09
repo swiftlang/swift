@@ -27,7 +27,7 @@ bb0(%0 : $Int, %1 : $Int):
 
   // CHECK: [[STACK:%[0-9]+]] = alloc_stack $MMString
   %37 = alloc_stack $MMString
-  // CHECK: [[ID:%[0-9]+]] = function_ref @_TTSg5C7inherit8MMStringS0_Ss8HashableS__GSQCS_6MMFont___callee : $@convention(method) (@in MMString, Int, @owned MMStorage<MMString, ImplicitlyUnwrappedOptional<MMFont>>) -> Bool
+  // CHECK: [[ID:%[0-9]+]] = function_ref @_TTSg5C7inherit8MMStringCS_8MMObjectSs8HashableS__GSQCS_6MMFont___callee : $@convention(method) (@in MMString, Int, @owned MMStorage<MMString, ImplicitlyUnwrappedOptional<MMFont>>) -> Bool
   %34 = function_ref @callee : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in τ_0_0, Int, @owned MMStorage<τ_0_0, τ_0_1>) -> Bool
   // CHECK: apply [[ID]]([[STACK]]#1, %1, %{{[0-9]+}}) : $@convention(method) (@in MMString, Int, @owned MMStorage<MMString, ImplicitlyUnwrappedOptional<MMFont>>) -> Bool
   %45 = apply %34<MMString, MMFont!>(%37#1, %1, %14) : $@convention(method) <τ_0_0, τ_0_1 where τ_0_0 : Hashable> (@in τ_0_0, Int, @owned MMStorage<τ_0_0, τ_0_1>) -> Bool
@@ -36,7 +36,7 @@ bb0(%0 : $Int, %1 : $Int):
   return %14 : $MMStorage<MMString, ImplicitlyUnwrappedOptional<MMFont>>
 }
 
-// CHECK-LABEL: @_TTSg5C7inherit8MMStringS0_Ss8HashableS__GSQCS_6MMFont___callee : $@convention(method) (@in MMString, Int, @owned MMStorage<MMString, ImplicitlyUnwrappedOptional<MMFont>>) -> Bool {
+// CHECK-LABEL: @_TTSg5C7inherit8MMStringCS_8MMObjectSs8HashableS__GSQCS_6MMFont___callee : $@convention(method) (@in MMString, Int, @owned MMStorage<MMString, ImplicitlyUnwrappedOptional<MMFont>>) -> Bool {
 // CHECK: [[META:%[0-9]+]] = metatype $@thick MMString.Type
 // CHECK: [[ID3:%[0-9]+]] = witness_method $MMObject, #Equatable."=="!1 :
 // CHECK: [[STACK2:%[0-9]+]] = alloc_stack $MMString

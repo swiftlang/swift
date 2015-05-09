@@ -384,7 +384,7 @@ class Foo<T> {
   // Class initializer
   init() {
   // -- initializing entry point
-  // CHECK-LABEL: sil hidden @_TFC8lifetime3FoocU__fMGS0_Q__FT_GS0_Q__ :
+  // CHECK-LABEL: sil hidden @_TFC8lifetime3FoocurfMGS0_q__FT_GS0_q__ :
     // CHECK: bb0([[THISIN:%[0-9]+]] : $Foo<T>):
     // CHECK: [[THIS:%[0-9]+]] = mark_uninitialized
 
@@ -407,10 +407,10 @@ class Foo<T> {
     // CHECK: return [[THIS]]
 
   // -- allocating entry point
-  // CHECK-LABEL: sil hidden @_TFC8lifetime3FooCU__fMGS0_Q__FT_GS0_Q__ :
+  // CHECK-LABEL: sil hidden @_TFC8lifetime3FooCurfMGS0_q__FT_GS0_q__ :
     // CHECK: bb0([[METATYPE:%[0-9]+]] : $@thick Foo<T>.Type):
     // CHECK: [[THIS:%[0-9]+]] = alloc_ref $Foo<T>
-    // CHECK: [[INIT_METHOD:%[0-9]+]] = function_ref @_TFC8lifetime3FoocU__fMGS0_Q__FT_GS0_Q__
+    // CHECK: [[INIT_METHOD:%[0-9]+]] = function_ref @_TFC8lifetime3FoocurfMGS0_q__FT_GS0_q__
     // CHECK: [[INIT_THIS:%[0-9]+]] = apply [[INIT_METHOD]]<{{.*}}>([[THIS]])
     // CHECK: return [[INIT_THIS]]
 
@@ -420,7 +420,7 @@ class Foo<T> {
     z = Foo<T>.makeT()
 
   // -- initializing entry point
-  // CHECK-LABEL: sil hidden @_TFC8lifetime3FoocU__fMGS0_Q__FT3chiSi_GS0_Q__ :
+  // CHECK-LABEL: sil hidden @_TFC8lifetime3FoocurfMGS0_q__FT3chiSi_GS0_q__ :
     // CHECK: bb0([[CHI:%[0-9]+]] : $Int, [[THISIN:%[0-9]+]] : $Foo<T>):
     // CHECK: [[CHIADDR:%[0-9]+]] = alloc_box $Int
     // CHECK: store [[CHI]] to [[CHIADDR]]
@@ -437,10 +437,10 @@ class Foo<T> {
     // CHECK: return [[THIS]]
 
   // -- allocating entry point
-  // CHECK-LABEL: sil hidden @_TFC8lifetime3FooCU__fMGS0_Q__FT3chiSi_GS0_Q__ :
+  // CHECK-LABEL: sil hidden @_TFC8lifetime3FooCurfMGS0_q__FT3chiSi_GS0_q__ :
     // CHECK: bb0([[CHI:%[0-9]+]] : $Int, [[METATYPE:%[0-9]+]] : $@thick Foo<T>.Type):
     // CHECK: [[THIS:%[0-9]+]] = alloc_ref $Foo<T>
-    // CHECK: [[INIT_METHOD:%[0-9]+]] = function_ref @_TFC8lifetime3FoocU__fMGS0_Q__FT3chiSi_GS0_Q__
+    // CHECK: [[INIT_METHOD:%[0-9]+]] = function_ref @_TFC8lifetime3FoocurfMGS0_q__FT3chiSi_GS0_q__
     // CHECK: [[INIT_THIS:%[0-9]+]] = apply [[INIT_METHOD]]<{{.*}}>([[CHI]], [[THIS]])
     // CHECK: return [[INIT_THIS]]
   }
@@ -533,7 +533,7 @@ class ImplicitDtorDerived<T> : ImplicitDtor {
 class ImplicitDtorDerivedFromGeneric<T> : ImplicitDtorDerived<Int> {
   init() { super.init(z: 5) }
 
-  // CHECK-LABEL: sil hidden @_TFC8lifetime30ImplicitDtorDerivedFromGenericcU__fMGS0_Q__FT_GS0_Q__
+  // CHECK-LABEL: sil hidden @_TFC8lifetime30ImplicitDtorDerivedFromGenericcurfMGS0_q__FT_GS0_q__
   // CHECK: bb0([[THIS:%[0-9]+]] : $ImplicitDtorDerivedFromGeneric<T>):
   // -- base dtor
   // CHECK: [[BASE:%[0-9]+]] = upcast [[THIS]] : ${{.*}} to $ImplicitDtorDerived<Int>

@@ -102,7 +102,7 @@ struct LoadableStruct {
   // CHECK:         [[DELEGATEE_SELF:%.*]] = apply [[DELEGATEE_INIT]]
   // CHECK:         [[DELEGATEE_SELF_MAT:%.*]] = alloc_stack $ImplicitlyUnwrappedOptional<LoadableStruct>
   // CHECK:         store [[DELEGATEE_SELF]] to [[DELEGATEE_SELF_MAT]]
-  // CHECK:         [[GET_VALUE_FN:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_
+  // CHECK:         [[GET_VALUE_FN:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueurFGSQq__q_
   // CHECK:         [[TMP:%.*]] = alloc_stack $LoadableStruct
   // CHECK:         apply [[GET_VALUE_FN]]<LoadableStruct>([[TMP]]#1, [[DELEGATEE_SELF_MAT]]#1)
   // CHECK:         [[DELEGATEE_SELF_VAL:%.*]] = load [[TMP]]
@@ -197,7 +197,7 @@ struct AddressOnlyStruct {
   // CHECK:         [[DELEGATEE_INIT:%.*]] = function_ref @_TFV21failable_initializers17AddressOnlyStructCfMS0_FT3iuoSb_GSQS0__
   // CHECK:         [[DELEGATEE_SELF:%.*]] = alloc_stack $ImplicitlyUnwrappedOptional<AddressOnlyStruct>
   // CHECK:         apply [[DELEGATEE_INIT]]([[DELEGATEE_SELF]]
-  // CHECK:         [[GET_VALUE_FN:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_
+  // CHECK:         [[GET_VALUE_FN:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueurFGSQq__q_
   // CHECK:         [[TMP:%.*]] = alloc_stack $AddressOnlyStruct
   // CHECK:         apply [[GET_VALUE_FN]]<AddressOnlyStruct>([[TMP]]#1, [[DELEGATEE_SELF]]#1)
   // CHECK:         copy_addr [take] [[TMP]]#1 to [[SELF_MARKED]]

@@ -48,7 +48,7 @@ import gizmo
 // -- Check that offset vars are emitted for fixed-layout generics
 //    <rdar://problem/15081049>
 // CHECK: @_TWvdvC15generic_classes22RootGenericFixedLayout1xVSs5UInt8 = global i64 16, align 8
-// CHECK: @_TWvdvC15generic_classes22RootGenericFixedLayout1yGSaQ__ = global i64 24, align 8
+// CHECK: @_TWvdvC15generic_classes22RootGenericFixedLayout1yGSaq__ = global i64 24, align 8
 // CHECK: @_TWvdvC15generic_classes22RootGenericFixedLayout1zVSs5UInt8 = global i64 32, align 8
 
 // -- fixed-layout nongeneric descriptor

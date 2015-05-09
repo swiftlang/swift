@@ -10,4 +10,4 @@ import generic_extension_1
 
 ["a", "b", "c"].wobble()
 
-// CHECK: sil @_TFE19generic_extension_1Sa6wobbleU__fGSaQ__FT_GSqQ__ : $@convention(method) <τ_0_0> (@out Optional<τ_0_0>, @guaranteed Array<τ_0_0>) -> ()
+// CHECK: sil @_TFE19generic_extension_1Sa6wobbleurfGSaq__FT_GSqq__ : $@convention(method) <τ_0_0> (@out Optional<τ_0_0>, @guaranteed Array<τ_0_0>) -> ()

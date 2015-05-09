@@ -372,7 +372,7 @@ func calls(var i:Int, var j:Int, var k:Int) {
   // -- Use an apply or partial_apply instruction to bind type parameters of a generic.
 
   // CHECK: [[GADDR:%[0-9]+]] = alloc_box $SomeGeneric<Builtin.Int64>
-  // CHECK: [[CTOR_GEN:%[0-9]+]] = function_ref @_TFC9functions11SomeGenericCU__fMGS0_Q__FT_GS0_Q__ : $@convention(thin) <τ_0_0> (@thick SomeGeneric<τ_0_0>.Type) -> @owned SomeGeneric<τ_0_0>
+  // CHECK: [[CTOR_GEN:%[0-9]+]] = function_ref @_TFC9functions11SomeGenericCurfMGS0_q__FT_GS0_q__ : $@convention(thin) <τ_0_0> (@thick SomeGeneric<τ_0_0>.Type) -> @owned SomeGeneric<τ_0_0>
   // CHECK: [[META:%[0-9]+]] = metatype $@thick SomeGeneric<Builtin.Int64>.Type
   // CHECK: apply [[CTOR_GEN]]<Builtin.Int64>([[META]])
   var g = SomeGeneric<Builtin.Int64>()
@@ -546,7 +546,7 @@ protocol AlwaysInline {
 // CHECK-LABEL: sil hidden [always_inline] @_TFV9functions19AlwaysInlinedMember13alwaysInlinedfS0_FT_T_ : $@convention(method) (AlwaysInlinedMember) -> () {
 
 // protocol witness for functions.AlwaysInline.alwaysInlined <A : functions.AlwaysInline>(functions.AlwaysInline.Self)() -> () in conformance functions.AlwaysInlinedMember : functions.AlwaysInline in functions
-// CHECK-LABEL: sil hidden [transparent] [thunk] [always_inline] @_TTWV9functions19AlwaysInlinedMemberS_12AlwaysInlineS_FS1_13alwaysInlinedUS1___fQPS1_FT_T_ : $@convention(witness_method) (@in_guaranteed AlwaysInlinedMember) -> () {
+// CHECK-LABEL: sil hidden [transparent] [thunk] [always_inline] @_TTWV9functions19AlwaysInlinedMemberS_12AlwaysInlineS_FS1_13alwaysInlineduRq_S1__fq_FT_T_ : $@convention(witness_method) (@in_guaranteed AlwaysInlinedMember) -> () {
 struct AlwaysInlinedMember : AlwaysInline {
   @inline(__always)
   func alwaysInlined() {}

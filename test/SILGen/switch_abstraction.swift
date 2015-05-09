@@ -26,7 +26,7 @@ enum Wacky<A, B> {
   case Bar(B -> A)
 }
 
-// CHECK-LABEL: sil hidden @_TF18switch_abstraction45enum_addr_only_to_loadable_with_reabstractionU__FT1xGOS_5WackyQ_VS_1A_1aS1__Q_ : $@convention(thin) <T> (@out T, @in Wacky<T, A>, A) -> () {
+// CHECK-LABEL: sil hidden @_TF18switch_abstraction45enum_addr_only_to_loadable_with_reabstractionurFT1xGOS_5Wackyq_VS_1A_1aS1__q_ : $@convention(thin) <T> (@out T, @in Wacky<T, A>, A) -> () {
 // CHECK: switch_enum_addr [[ENUM:%.*]] : $*Wacky<T, A>, {{.*}} case #Wacky.Bar!enumelt.1: [[DEST:bb[0-9]+]]
 // CHECK: [[DEST]]:
 // CHECK:   [[ORIG_ADDR:%.*]] = unchecked_take_enum_data_addr [[ENUM]] : $*Wacky<T, A>, #Wacky.Bar

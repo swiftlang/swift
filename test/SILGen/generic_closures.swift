@@ -66,9 +66,9 @@ var f: (Char) -> () = generic_curried_function(zero)
   // context.
 
   // CHECK: sil hidden @_TF16generic_closures25nested_closure_in_generic{{.*}} : $@convention(thin) <T> (@out T, @in T) -> ()
-  // CHECK:   function_ref [[OUTER_CLOSURE:@_TFF16generic_closures25nested_closure_in_genericU__FQ_Q_U_FT_Q_]]
+  // CHECK:   function_ref [[OUTER_CLOSURE:@_TFF16generic_closures25nested_closure_in_genericurFq_q_U_FT_Q_]]
   // CHECK: sil shared [[OUTER_CLOSURE]] : $@convention(thin) <T> (@out T, @inout T) -> ()
-  // CHECK:   function_ref [[INNER_CLOSURE:@_TFFF16generic_closures25nested_closure_in_genericU__FQ_Q_U_FT_Q_U_FT_Q_]]
+  // CHECK:   function_ref [[INNER_CLOSURE:@_TFFF16generic_closures25nested_closure_in_genericurFq_q_U_FT_Q_U_FT_Q_]]
   // CHECK: sil shared [[INNER_CLOSURE]] : $@convention(thin) <T> (@out T, @inout T) -> () {
   func nested_closure_in_generic<T>(x:T) -> T {
     return { { x }() }()

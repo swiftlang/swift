@@ -5,7 +5,7 @@ public protocol P1 {
 }
 
 extension P1 {
-  // CHECK-LABEL: sil hidden @_TFP19protocol_extensions2P16extP1aUS0___fQPS0_FT_T_ : $@convention(method) <Self where Self : P1> (@in_guaranteed Self) -> () {
+  // CHECK-LABEL: sil hidden @_TFP19protocol_extensions2P16extP1auRq_S0__fq_FT_T_ : $@convention(method) <Self where Self : P1> (@in_guaranteed Self) -> () {
   // CHECK-NEXT: bb0([[SELF:%[0-9]+]] : $*Self):
   final func extP1a() {
     // CHECK: [[WITNESS:%[0-9]+]] = witness_method $Self, #P1.reqP1a!1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> ()
@@ -14,10 +14,10 @@ extension P1 {
     // CHECK: return
   }
 
-  // CHECK-LABEL: sil @_TFP19protocol_extensions2P16extP1bUS0___fQPS0_FT_T_ : $@convention(method) <Self where Self : P1> (@in_guaranteed Self) -> () {
+  // CHECK-LABEL: sil @_TFP19protocol_extensions2P16extP1buRq_S0__fq_FT_T_ : $@convention(method) <Self where Self : P1> (@in_guaranteed Self) -> () {
   // CHECK-NEXT: bb0([[SELF:%[0-9]+]] : $*Self):
   public final func extP1b() {
-    // CHECK: [[FN:%[0-9]+]] = function_ref @_TFP19protocol_extensions2P16extP1aUS0___fQPS0_FT_T_ : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> ()
+    // CHECK: [[FN:%[0-9]+]] = function_ref @_TFP19protocol_extensions2P16extP1auRq_S0__fq_FT_T_ : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> ()
     // CHECK-NEXT: apply [[FN]]<Self>([[SELF]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> ()
     extP1a()
     // CHECK: return
@@ -37,7 +37,7 @@ class D : C { }
 // CHECK-NEXT: bb0([[D:%[0-9]+]] : $D):
 func testD(d: D) {
   // CHECK: [[D2:%[0-9]+]] = alloc_box $D
-  // CHECK: [[FN:%[0-9]+]] = function_ref @_TFP19protocol_extensions2P111returnsSelfUS0___fQPS0_FT_S1_
+  // CHECK: [[FN:%[0-9]+]] = function_ref @_TFP19protocol_extensions2P111returnsSelfuRq_S0__fq_FT_q_
   // CHECK: [[DCOPY:%[0-9]+]] = alloc_stack $D
   // CHECK: store [[D]] to [[DCOPY]]#1 : $*D
   // CHECK: [[RESULT:%[0-9]+]] = alloc_stack $D
@@ -78,12 +78,12 @@ extension P1 {
 // CHECK: bb0([[P:%[0-9]+]] : $*P1, [[B:%[0-9]+]] : $Bool, [[I:%[0-9]+]] : $Int64):
 func testExistentials1(p1: P1, b: Bool, i: Int64) {
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr [[P]] : $*P1 to $*@opened([[UUID:".*"]])
-  // CHECK: [[F1:%[0-9]+]] = function_ref @_TFP19protocol_extensions2P12f1US0___fQPS0_FT_T_
+  // CHECK: [[F1:%[0-9]+]] = function_ref @_TFP19protocol_extensions2P12f1uRq_S0__fq_FT_T_
   // CHECK: apply [[F1]]<@opened([[UUID]]) P1>([[POPENED]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> ()
   p1.f1()
 
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr [[P]] : $*P1 to $*@opened([[UUID:".*"]]) P1
-  // CHECK: [[CURRIED1:%[0-9]+]] = function_ref @_TFP19protocol_extensions2P18curried1US0___fQPS0_fSbFVSs5Int64T_
+  // CHECK: [[CURRIED1:%[0-9]+]] = function_ref @_TFP19protocol_extensions2P18curried1uRq_S0__fq_fSbFVSs5Int64T_
   // CHECK: [[CURRIED1]]<@opened([[UUID]]) P1>([[I]], [[B]], [[POPENED]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (Int64, Bool, @in_guaranteed τ_0_0) -> ()
   p1.curried1(b)(i)
 
@@ -111,7 +111,7 @@ func testExistentials2(p1: P1) {
   // CHECK: [[P1A:%[0-9]+]] = alloc_box $P1
   // CHECK: [[POPENED:%[0-9]+]] = open_existential_addr [[P]] : $*P1 to $*@opened([[UUID:".*"]]) P1
   // CHECK: [[P1AINIT:%[0-9]+]] = init_existential_addr [[P1A]]#1 : $*P1, $@opened([[UUID2:".*"]]) P1
-  // CHECK: [[FN:%[0-9]+]] = function_ref @_TFP19protocol_extensions2P111returnsSelfUS0___fQPS0_FT_S1_
+  // CHECK: [[FN:%[0-9]+]] = function_ref @_TFP19protocol_extensions2P111returnsSelfuRq_S0__fq_FT_q_
   // CHECK: apply [[FN]]<@opened([[UUID]]) P1>([[P1AINIT]], [[POPENED]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@out τ_0_0, @in_guaranteed τ_0_0) -> ()
   var p1a: P1 = p1.returnsSelf()
 }
@@ -258,7 +258,7 @@ protocol InitRequirement {
 }
 
 extension InitRequirement {
-  // CHECK-LABEL: sil hidden @_TFP19protocol_extensions15InitRequirementCUS0___fMQPS0_FT1dCS_1D_S1_ : $@convention(thin) <Self where Self : InitRequirement> (@out Self, @owned D, @thick Self.Type) -> ()
+  // CHECK-LABEL: sil hidden @_TFP19protocol_extensions15InitRequirementCuRq_S0__fMq_FT1dCS_1D_q_ : $@convention(thin) <Self where Self : InitRequirement> (@out Self, @owned D, @thick Self.Type) -> ()
   // CHECK:       bb0([[OUT:%.*]] : $*Self, [[ARG:%.*]] : $D, [[SELF_TYPE:%.*]] : $@thick Self.Type):
   init(d: D) {
   // CHECK:         [[DELEGATEE:%.*]] = witness_method $Self, #InitRequirement.init!allocator.1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : InitRequirement> (@out τ_0_0, @owned C, @thick τ_0_0.Type) -> ()
@@ -267,8 +267,8 @@ extension InitRequirement {
     self.init(c: d)
   }
 
-  // CHECK-LABEL: sil hidden @_TFP19protocol_extensions15InitRequirementCUS0___fMQPS0_FT2d2CS_1D_S1_
-  // CHECK:         function_ref @_TFP19protocol_extensions15InitRequirementCUS0___fMQPS0_FT1dCS_1D_S1_
+  // CHECK-LABEL: sil hidden @_TFP19protocol_extensions15InitRequirementCuRq_S0__fMq_FT2d2CS_1D_q_
+  // CHECK:         function_ref @_TFP19protocol_extensions15InitRequirementCuRq_S0__fMq_FT1dCS_1D_q_
   init(d2: D) {
     self.init(d: d2)
   }
@@ -279,7 +279,7 @@ protocol ClassInitRequirement: class {
 }
 
 extension ClassInitRequirement {
-  // CHECK-LABEL: sil hidden @_TFP19protocol_extensions20ClassInitRequirementCUS0___fMQPS0_FT1dCS_1D_S1_ : $@convention(thin) <Self where Self : ClassInitRequirement> (@owned D, @thick Self.Type) -> @owned Self
+  // CHECK-LABEL: sil hidden @_TFP19protocol_extensions20ClassInitRequirementCuRq_S0__fMq_FT1dCS_1D_q_ : $@convention(thin) <Self where Self : ClassInitRequirement> (@owned D, @thick Self.Type) -> @owned Self
   // CHECK:       bb0([[ARG:%.*]] : $D, [[SELF_TYPE:%.*]] : $@thick Self.Type):
   // CHECK:         [[DELEGATEE:%.*]] = witness_method $Self, #ClassInitRequirement.init!allocator.1 : $@convention(witness_method) <τ_0_0 where τ_0_0 : ClassInitRequirement> (@owned C, @thick τ_0_0.Type) -> @owned τ_0_0
   // CHECK:         [[ARG_UP:%.*]] = upcast [[ARG]]
@@ -301,7 +301,7 @@ func foo(t: ObjCInitRequirement.Type, c: OC) -> ObjCInitRequirement {
 }
 
 extension ObjCInitRequirement {
-  // CHECK-LABEL: sil hidden @_TFP19protocol_extensions19ObjCInitRequirementCUS0___fMQPS0_FT1dCS_2OD_S1_ : $@convention(thin) <Self where Self : ObjCInitRequirement> (@owned OD, @thick Self.Type) -> @owned Self
+  // CHECK-LABEL: sil hidden @_TFP19protocol_extensions19ObjCInitRequirementCuRq_S0__fMq_FT1dCS_2OD_q_ : $@convention(thin) <Self where Self : ObjCInitRequirement> (@owned OD, @thick Self.Type) -> @owned Self
   // CHECK:       bb0([[ARG:%.*]] : $OD, [[SELF_TYPE:%.*]] : $@thick Self.Type):
   // CHECK:         [[OBJC_SELF_TYPE:%.*]] = thick_to_objc_metatype [[SELF_TYPE]]
   // CHECK:         [[SELF:%.*]] = alloc_ref_dynamic [objc] [[OBJC_SELF_TYPE]] : $@objc_metatype Self.Type, $Self

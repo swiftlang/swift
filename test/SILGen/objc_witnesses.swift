@@ -19,7 +19,7 @@ class Phoûx : NSObject, Fooable {
 }
 
 // witness for Foo.foo uses the foreign-to-native thunk:
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWCSo3Foo14objc_witnesses7FooableS0_FS1_3fooUS1___fQPS1_FT_GSQSS_
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWCSo3Foo14objc_witnesses7FooableS0_FS1_3foouRq_S1__fq_FT_GSQSS_
 // CHECK:         function_ref @_TTOFCSo3Foo3foofS_FT_GSQSS_
 
 // *NOTE* We have an extra copy here for the time being right
@@ -27,7 +27,7 @@ class Phoûx : NSObject, Fooable {
 // extra copy.
 //
 // witness for Phoûx.foo uses the Swift vtable
-// CHECK-LABEL: _TTWC14objc_witnessesX8Phox_xraS_7FooableS_FS1_3fooUS1___fQPS1_FT_GSQSS_
+// CHECK-LABEL: _TFC14objc_witnessesX8Phox_xra3foofS0_FT_GSQSS_
 // CHECK:      bb0([[IN_ADDR:%.*]] : 
 // CHECK:         [[STACK_SLOT:%.*]] = alloc_stack $Phoûx
 // CHECK:         copy_addr [[IN_ADDR]] to [initialization] [[STACK_SLOT]]#1
@@ -41,7 +41,7 @@ protocol Bells {
 extension Gizmo : Bells {
 }
 
-// CHECK: sil hidden [transparent] [thunk] @_TTWCSo5Gizmo14objc_witnesses5BellsS0_FS1_CUS1___fMQPS1_FT7bellsOnSi_S2_
+// CHECK: sil hidden [transparent] [thunk] @_TTWCSo5Gizmo14objc_witnesses5BellsS0_FS1_CuRq_S1__fMq_FT7bellsOnSi_q_
 // CHECK: bb0([[SELF:%[0-9]+]] : $*Gizmo, [[I:%[0-9]+]] : $Int, [[META:%[0-9]+]] : $@thick Gizmo.Type):
 
 // CHECK:   [[INIT:%[0-9]+]] = function_ref @_TFCSo5GizmoCfMS_FT7bellsOnSi_GSQS__ : $@convention(thin) (Int, @thick Gizmo.Type) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
@@ -49,7 +49,7 @@ extension Gizmo : Bells {
 // CHECK:   [[IUO_RESULT_TEMP:%[0-9]+]] = alloc_stack $ImplicitlyUnwrappedOptional<Gizmo>
 // CHECK:   store [[IUO_RESULT]] to [[IUO_RESULT_TEMP]]#1 : $*ImplicitlyUnwrappedOptional<Gizmo>
 
-// CHECK:   [[UNWRAP_FUNC:%[0-9]+]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueU__FGSQQ__Q_ : $@convention(thin) <τ_0_0> (@out τ_0_0, @in ImplicitlyUnwrappedOptional<τ_0_0>) -> ()
+// CHECK:   [[UNWRAP_FUNC:%[0-9]+]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueurFGSQq__q_ : $@convention(thin) <τ_0_0> (@out τ_0_0, @in ImplicitlyUnwrappedOptional<τ_0_0>) -> ()
 // CHECK:   [[UNWRAPPED_RESULT_TEMP:%[0-9]+]] = alloc_stack $Gizmo
 // CHECK:   apply [[UNWRAP_FUNC]]<Gizmo>([[UNWRAPPED_RESULT_TEMP]]#1, [[IUO_RESULT_TEMP]]#1) : $@convention(thin) <τ_0_0> (@out τ_0_0, @in ImplicitlyUnwrappedOptional<τ_0_0>) -> ()
 // CHECK:   [[UNWRAPPED_RESULT:%[0-9]+]] = load [[UNWRAPPED_RESULT_TEMP]]#1 : $*Gizmo

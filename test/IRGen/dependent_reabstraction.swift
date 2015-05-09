@@ -8,7 +8,7 @@ protocol A {
 }
 
 struct X<Y> : A {
-  // CHECK-LABEL: define hidden void @_TTWU__GV23dependent_reabstraction1XQ__S_1AS_FS1_1bUS1__U__fQPS1_FQS2_1BT_(%swift.type**, %V23dependent_reabstraction1X*, %swift.type* %Self)
+  // CHECK-LABEL: define hidden void @_TTWurGV23dependent_reabstraction1Xq__S_1AS_FS1_1buRq_S1__fq_Fqq_S1_1BT_(%swift.type**, %V23dependent_reabstraction1X*, %swift.type* %Self)
   func b(b: X.Type) {
     let x: Any = b
     markUsed(b as X.Type)

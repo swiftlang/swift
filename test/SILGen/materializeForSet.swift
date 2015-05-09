@@ -125,7 +125,7 @@ struct Bill : Totalled {
 // SILGEN:   copy_addr [[SELF]] to [initialization] [[BOX]]#1
 // SILGEN:   [[T0:%.*]] = struct_element_addr [[BOX]]#1 : $*Bill, #Bill.total
 // SILGEN:   [[T1:%.*]] = address_to_pointer [[T0]] : $*Int to $Builtin.RawPointer
-// SILGEN:   [[INIT:%.*]] = function_ref @_TFSqCU__fMGSqQ__FT10nilLiteralT__GSqQ__ : $@convention(thin) <τ_0_0> (@out Optional<τ_0_0>, @thin Optional<τ_0_0>.Type) -> ()
+// SILGEN:   [[INIT:%.*]] = function_ref @_TFSqCurfMGSqq__FT10nilLiteralT__GSqq__ : $@convention(thin) <τ_0_0> (@out Optional<τ_0_0>, @thin Optional<τ_0_0>.Type) -> ()
 // SILGEN:   [[META:%.*]] = metatype $@thin Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Bill, @thick Bill.Type) -> ()>.Type
 // SILGEN:   [[T2:%.*]] = alloc_stack $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Bill, @thick Bill.Type) -> ()>
 // SILGEN:   [[OPT:%.*]] = apply [[INIT]]<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout Bill, @thick Bill.Type) -> ()>([[T2]]#1, [[META]]) : $@convention(thin) <τ_0_0> (@out Optional<τ_0_0>, @thin Optional<τ_0_0>.Type) -> ()

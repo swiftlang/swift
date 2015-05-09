@@ -164,7 +164,7 @@ protocol Frobable {
   var anse: Anse { get set }
 }
 
-// CHECK-LABEL: sil hidden @_TF9writeback12test_genericUS_8Runcible_US_8Frobable___FT5runceRQ_4anseQQQ_4Frob4Anse_T_ 
+// CHECK-LABEL: sil hidden @_TF9writeback12test_genericuRq_S_8Runcible_FT5runceRq_4anseqqq_S0_4FrobS_8Frobable4Anse_T_ 
 // CHECK:         witness_method $Runce, #Runcible.frob!materializeForSet.1
 // CHECK:         witness_method $Runce.Frob, #Frobable.anse!setter.1
 func test_generic<Runce: Runcible>(inout #runce: Runce, #anse: Runce.Frob.Anse) {
@@ -180,7 +180,7 @@ func loadAddressOnly() -> Fungible {
   return addressOnly
 }
 
-// CHECK-LABEL: sil hidden @_TF9writeback10loadMemberUS_8Runcible_US_8Frobable___FT5runceQ__QQQ_4Frob4Anse
+// CHECK-LABEL: sil hidden @_TF9writeback10loadMemberuRq_S_8Runcible_FT5runceq__qqq_S0_4FrobS_8Frobable4Anse
 // CHECK:         witness_method $Runce, #Runcible.frob!getter.1
 // CHECK:         witness_method $Runce.Frob, #Frobable.anse!getter.1
 // CHECK-NOT:     witness_method $Runce.Frob, #Frobable.anse!setter.1

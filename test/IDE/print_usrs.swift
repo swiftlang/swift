@@ -70,7 +70,7 @@ class GenericClass {
 protocol Prot {
   // CHECK: [[@LINE+1]]:13 s:P14swift_ide_test4Prot5Blarg{{$}}
   typealias Blarg
-  // CHECK: [[@LINE+1]]:8 s:FP14swift_ide_test4Prot8protMethUS0__U__FQPS0_FQS1_5BlargS2_{{$}}
+  // CHECK: [[@LINE+1]]:8 s:FP14swift_ide_test4Prot8protMethuRq_S0__Fq_Fqq_S0_5Blargqq_S0_5Blarg{{$}}
   func protMeth(x: Blarg) -> Blarg
   // CHECK: [[@LINE+2]]:7 s:vP14swift_ide_test4Prot17protocolProperty1Si{{$}}
   // CHECK: [[@LINE+1]]:32 s:FP14swift_ide_test4Protg17protocolProperty1Si{{$}}
@@ -87,7 +87,7 @@ class SubCls : MyCls, Prot {
   var protocolProperty1 = 0
 }
 
-// CHECK: [[@LINE+1]]:6 s:F14swift_ide_test5genFnUS_4Prot_US_5Prot2__FQ_Si{{$}}
+// CHECK: [[@LINE+1]]:6 s:F14swift_ide_test5genFnuRq_S_4Protqq_S0_5BlargS_5Prot2_Fq_Si{{$}}
 func genFn<T : Prot where T.Blarg : Prot2>(p : T) -> Int {}
 
 // CHECK: [[@LINE+1]]:6 s:F14swift_ide_test3barFSiTSiSf_{{$}}
@@ -95,11 +95,11 @@ func bar(x: Int) -> (Int, Float) {}
 
 // CHECK: [[@LINE+1]]:7 s:C14swift_ide_test6GenCls{{$}}
 class GenCls<T> {
-  // CHECK: [[@LINE+1]]:3 s:FC14swift_ide_test6GenClscU__FMGS0_Q__FT_GS0_Q__{{$}}
+  // CHECK: [[@LINE+1]]:3 s:FC14swift_ide_test6GenClscurFMGS0_q__FT_GS0_q__{{$}}
   init() {}
   // CHECK: [[@LINE+1]]:3 s:FC14swift_ide_test6GenClsd{{$}}
   deinit {}
-  // CHECK: [[@LINE+1]]:14 s:ZFC14swift_ide_test6GenCls4cfooU__FMGS0_Q__FT_T_{{$}}
+  // CHECK: [[@LINE+1]]:14 s:ZFC14swift_ide_test6GenCls4cfoourFMGS0_q__FT_T_{{$}}
   class func cfoo() {}
 
   // CHECK: [[@LINE+1]]:3 s:sC14swift_ide_test6GenCls9subscriptFTSiSi_Si{{$}}

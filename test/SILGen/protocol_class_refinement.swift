@@ -10,7 +10,7 @@ protocol ObjectUID : class, UID {}
 
 class Base {}
 
-// CHECK-LABEL: sil hidden @_TF25protocol_class_refinement12getObjectUIDUS_9ObjectUID__FQ_TSiSi_
+// CHECK-LABEL: sil hidden @_TF25protocol_class_refinement12getObjectUIDuRq_S_9ObjectUID_Fq_TSiSi_
 // CHECK:       bb0([[X:%.*]] : $T):
 // CHECK-NOT:         strong_retain [[X]]
 // -- call x.uid()
@@ -47,7 +47,7 @@ func getObjectUID<T: ObjectUID>(x: T) -> (Int, Int) {
   return (x.iid, x.clsid)
 }
 
-// CHECK-LABEL: sil hidden @_TF25protocol_class_refinement16getBaseObjectUIDUS_3UID__FQ_TSiSi_
+// CHECK-LABEL: sil hidden @_TF25protocol_class_refinement16getBaseObjectUIDuRdq_CS_4Baseq_S_3UID_Fq_TSiSi_
 // CHECK:       bb0([[X:%.*]] : $T):
 // CHECK-NOT:         strong_retain [[X]]
 // -- call x.uid()

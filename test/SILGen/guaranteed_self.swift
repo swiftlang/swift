@@ -99,7 +99,7 @@ struct S: Fooable {
 }
 
 // Witness thunk for nonmutating 'foo'
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_3fooUS1___fQPS1_FSiT_ : $@convention(witness_method) (Int, @in_guaranteed S) -> () {
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_3foouRq_S1__fq_FSiT_ : $@convention(witness_method) (Int, @in_guaranteed S) -> () {
 // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*S):
 // CHECK:         [[SELF_COPY:%.*]] = alloc_stack $S
 // CHECK:         copy_addr [[SELF_ADDR]] to [initialization] [[SELF_COPY]]
@@ -110,14 +110,14 @@ struct S: Fooable {
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
 // Witness thunk for mutating 'bar'
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_3barUS1___fRQPS1_FT_T_ : $@convention(witness_method) (@inout S) -> () {
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_3baruRq_S1__fRq_FT_T_ : $@convention(witness_method) (@inout S) -> () {
 // CHECK:       bb0([[SELF_ADDR:%.*]] : $*S):
 // CHECK-NOT:     load [[SELF_ADDR]]
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
 // Witness thunk for 'bas', which is mutating in the protocol, but nonmutating
 // in the implementation
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_3basUS1___fRQPS1_FT_T_ : $@convention(witness_method) (@inout S) -> ()
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV15guaranteed_self1SS_7FooableS_FS1_3basuRq_S1__fRq_FT_T_ : $@convention(witness_method) (@inout S) -> ()
 // CHECK:       bb0([[SELF_ADDR:%.*]] : $*S):
 // CHECK:         [[SELF:%.*]] = load [[SELF_ADDR]]
 // CHECK:         retain_value [[SELF]]
@@ -205,7 +205,7 @@ struct AO<T>: Fooable {
   var x: T?
 
   init() {}
-  // CHECK-LABEL: sil hidden @_TFV15guaranteed_self2AO3fooU__fGS0_Q__FSiT_ : $@convention(method) <T> (Int, @in_guaranteed AO<T>) -> ()
+  // CHECK-LABEL: sil hidden @_TFV15guaranteed_self2AO3foourfGS0_q__FSiT_ : $@convention(method) <T> (Int, @in_guaranteed AO<T>) -> ()
   // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*AO<T>):
   // CHECK-NOT:     copy_addr
   // CHECK:         apply {{.*}} [[SELF_ADDR]]
@@ -217,7 +217,7 @@ struct AO<T>: Fooable {
   mutating func bar() {
     self.bar()
   }
-  // CHECK-LABEL: sil hidden @_TFV15guaranteed_self2AO3basU__fGS0_Q__FT_T_ : $@convention(method) <T> (@in_guaranteed AO<T>) -> ()
+  // CHECK-LABEL: sil hidden @_TFV15guaranteed_self2AO3basurfGS0_q__FT_T_ : $@convention(method) <T> (@in_guaranteed AO<T>) -> ()
   // CHECK:       bb0([[SELF_ADDR:%.*]] : $*AO<T>):
   // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
   func bas() {
@@ -250,7 +250,7 @@ struct AO<T>: Fooable {
 }
 
 // Witness for nonmutating 'foo'
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWU__GV15guaranteed_self2AOQ__S_7FooableS_FS1_3fooUS1___fQPS1_FSiT_ : $@convention(witness_method) <T> (Int, @in_guaranteed AO<T>) -> ()
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWurGV15guaranteed_self2AOq__S_7FooableS_FS1_3foouRq_S1__fq_FSiT_ : $@convention(witness_method) <T> (Int, @in_guaranteed AO<T>) -> ()
 // CHECK:       bb0({{.*}} [[SELF_ADDR:%.*]] : $*AO<T>):
 // TODO: This copy isn't necessary.
 // CHECK:         copy_addr [[SELF_ADDR]] to [initialization] [[SELF_COPY:%.*]]#1
@@ -259,7 +259,7 @@ struct AO<T>: Fooable {
 // CHECK-NOT:     destroy_addr [[SELF_ADDR]]
 
 // Witness for 'bar', which is mutating in protocol but nonmutating in impl
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWU__GV15guaranteed_self2AOQ__S_7FooableS_FS1_3barUS1___fRQPS1_FT_T_ : $@convention(witness_method) <T> (@inout AO<T>) -> ()
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWurGV15guaranteed_self2AOq__S_7FooableS_FS1_3baruRq_S1__fRq_FT_T_ : $@convention(witness_method) <T> (@inout AO<T>) -> ()
 // CHECK:       bb0([[SELF_ADDR:%.*]] : $*AO<T>):
 // -- NB: This copy *is* necessary, unless we're willing to assume an inout
 //        parameter is not mutably aliased.
@@ -408,7 +408,7 @@ func AO_curryThunk<T>(ao: AO<T>) -> (AO<T> -> Int -> ()/*, Int -> ()*/) {
 // correctly if we are asked to.
 // ----------------------------------------------------------------------------
 
-// CHECK-LABEL: sil [transparent] [thunk] @_TTWV15guaranteed_self9FakeArrayS_12SequenceTypeS_FS1_17_constrainElementUS1__U_S_17FakeGeneratorType___fQPS1_FQS3_7ElementT_ : $@convention(witness_method) (@in FakeElement, @in_guaranteed FakeArray) -> () {
+// CHECK-LABEL: sil [transparent] [thunk] @_TTWV15guaranteed_self9FakeArrayS_12SequenceTypeS_FS1_17_constrainElementuRq_S1__fq_Fqq_S_20SequenceDefaultsType7ElementT_ : $@convention(witness_method) (@in FakeElement, @in_guaranteed FakeArray) -> () {
 // CHECK: bb0([[ARG0_PTR:%.*]] : $*FakeElement, [[ARG1_PTR:%.*]] : $*FakeArray):
 // CHECK: [[GUARANTEED_COPY_STACK_SLOT:%.*]] = alloc_stack $FakeArray
 // CHECK: copy_addr [[ARG1_PTR]] to [initialization] [[GUARANTEED_COPY_STACK_SLOT]]#1
@@ -416,7 +416,7 @@ func AO_curryThunk<T>(ao: AO<T>) -> (AO<T> -> Int -> ()/*, Int -> ()*/) {
 // CHECK: [[GUARANTEED_COPY:%.*]] = load [[GUARANTEED_COPY_STACK_SLOT]]#1
 // CHECK: [[TRANSLATION_STACK_SLOT:%.*]] = alloc_stack $FakeArray
 // CHECK: store [[GUARANTEED_COPY]] to [[TRANSLATION_STACK_SLOT:%.*]]#1
-// CHECK: function_ref guaranteed_self.SequenceDefaultsType._constrainElement <A : guaranteed_self.SequenceDefaultsType>(guaranteed_self.SequenceDefaultsType.Self)(guaranteed_self.FakeElement) -> ()
+// CHECK: function_ref guaranteed_self.SequenceDefaultsType._constrainElement : <A where A: guaranteed_self.SequenceDefaultsType> (A)(guaranteed_self.FakeElement) -> ()
 // CHECK: [[FUN:%.*]] = function_ref @_{{.*}}
 // CHECK: apply [[FUN]]<FakeArray, FakeElement, FakeGenerator, FakeElement>([[ARG0]], [[TRANSLATION_STACK_SLOT]]#1)
 // CHECK: destroy_addr [[TRANSLATION_STACK_SLOT]]#1

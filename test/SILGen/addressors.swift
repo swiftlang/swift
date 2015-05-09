@@ -145,7 +145,7 @@ func id_int(i: Int32) -> Int32 { return i }
 // CHECK-LABEL: sil hidden @_TF10addressors11test_carrayFRGVS_6CArrayFVSs5Int32S1__S1_ : $@convention(thin) (@inout CArray<Int32 -> Int32>) -> Int32 {
 // CHECK: bb0([[ARRAY:%.*]] : $*CArray<Int32 -> Int32>):
 func test_carray(inout array: CArray<Int32 -> Int32>) -> Int32 {
-// CHECK:   [[T0:%.*]] = function_ref @_TFV10addressors6CArrayau9subscriptFSiQ_ :
+// CHECK:   [[T0:%.*]] = function_ref @_TFV10addressors6CArrayau9subscriptFSiq_ :
 // CHECK:   [[T1:%.*]] = apply [[T0]]<Int32 -> Int32>({{%.*}}, [[ARRAY]])
 // CHECK:   [[T2:%.*]] = struct_extract [[T1]] : $UnsafeMutablePointer<Int32 -> Int32>, #UnsafeMutablePointer._rawValue
 // CHECK:   [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to $*@callee_owned (@out Int32, @in Int32) -> ()
@@ -153,7 +153,7 @@ func test_carray(inout array: CArray<Int32 -> Int32>) -> Int32 {
   array[0] = id_int
 
 // CHECK:   [[T0:%.*]] = load [[ARRAY]]
-// CHECK:   [[T1:%.*]] = function_ref @_TFV10addressors6CArraylu9subscriptFSiQ_ :
+// CHECK:   [[T1:%.*]] = function_ref @_TFV10addressors6CArraylu9subscriptFSiq_ :
 // CHECK:   [[T2:%.*]] = apply [[T1]]<Int32 -> Int32>({{%.*}}, [[T0]])
 // CHECK:   [[T3:%.*]] = struct_extract [[T2]] : $UnsafePointer<Int32 -> Int32>, #UnsafePointer._rawValue
 // CHECK:   [[T4:%.*]] = pointer_to_address [[T3]] : $Builtin.RawPointer to $*@callee_owned (@out Int32, @in Int32) -> ()
@@ -191,7 +191,7 @@ struct D : Subscriptable {
 // SILGEN:   [[T0:%.*]] = function_ref @_TFV10addressors1Dau9subscriptFVSs5Int32S1_
 // SILGEN:   [[PTR:%.*]] = apply [[T0]]([[I]], [[BOX]]#1)
 // SILGEN:   [[ADDR:%.*]] = struct_extract [[PTR]] : $UnsafeMutablePointer<Int32>,
-// SILGEN:   [[INIT:%.*]] = function_ref @_TFSqCU__fMGSqQ__FT10nilLiteralT__GSqQ__
+// SILGEN:   [[INIT:%.*]] = function_ref @_TFSqCurfMGSqq__FT10nilLiteralT__GSqq__
 // SILGEN:   [[META:%.*]] = metatype $@thin Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout D, @thick D.Type) -> ()>.Type
 // SILGEN:   [[T0:%.*]] = alloc_stack $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout D, @thick D.Type) -> ()>
 // SILGEN:   [[OPT:%.*]] = apply [[INIT]]<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout D, @thick D.Type) -> ()>([[T0]]#1, [[META]])

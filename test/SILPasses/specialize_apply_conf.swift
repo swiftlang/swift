@@ -19,7 +19,7 @@ func main_func<T>(#In : T) {
 }
 
 //CHECK: sil hidden @_TF21specialize_apply_conf11interestingFT_T_
-//CHECK: function_ref @_TTSg5Si___TF21specialize_apply_conf9main_funcU__FT2InQ__T_
+//CHECK: function_ref @_TTSg5Si___TF21specialize_apply_conf9main_funcurFT2Inq__T_
 //CHECK-NEXT: apply
 //CHECK: return
 func interesting() {

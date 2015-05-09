@@ -41,12 +41,12 @@ struct Conformer: Q, QQ {
 // -- FIXME: associated type and witness table
 // CHECK:   i8* null,
 // CHECK:   i8* null,
-// CHECK:   i8* bitcast (void (%swift.type*, %swift.type*)* @_TTWV18sil_witness_tables9ConformerS_1PS_ZFS1_12staticMethodUS1__US_1A__fMQPS1_FT_T_ to i8*),
-// CHECK:   i8* bitcast (void (%V18sil_witness_tables9Conformer*, %swift.type*)* @_TTWV18sil_witness_tables9ConformerS_1PS_FS1_14instanceMethodUS1__US_1A__fQPS1_FT_T_ to i8*)
+// CHECK:   i8* bitcast (void (%swift.type*, %swift.type*)* @_TTWV18sil_witness_tables9ConformerS_1PS_ZFS1_12staticMethoduRq_S1__fMq_FT_T_ to i8*),
+// CHECK:   i8* bitcast (void (%V18sil_witness_tables9Conformer*, %swift.type*)* @_TTWV18sil_witness_tables9ConformerS_1PS_FS1_14instanceMethoduRq_S1__fq_FT_T_ to i8*)
 // CHECK: ]
 // CHECK: [[CONFORMER_Q_WITNESS_TABLE:@_TWPV18sil_witness_tables9ConformerS_1QS_]] = hidden constant [2 x i8*] [
 // CHECK:   i8* bitcast ([4 x i8*]* [[CONFORMER_P_WITNESS_TABLE]] to i8*),
-// CHECK:   i8* bitcast (void (%V18sil_witness_tables9Conformer*, %swift.type*)* @_TTWV18sil_witness_tables9ConformerS_1QS_FS1_7qMethodUS1__US_1A__fQPS1_FT_T_ to i8*)
+// CHECK:   i8* bitcast (void (%V18sil_witness_tables9Conformer*, %swift.type*)* @_TTWV18sil_witness_tables9ConformerS_1QS_FS1_7qMethoduRq_S1__fq_FT_T_ to i8*)
 // CHECK: ]
 // CHECK: [[CONFORMER2_P_WITNESS_TABLE:@_TWPV18sil_witness_tables10Conformer2S_1PS_]] = hidden constant [4 x i8*]
 

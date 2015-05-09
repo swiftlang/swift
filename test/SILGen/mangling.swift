@@ -32,17 +32,17 @@ prefix operator +- {}
 postfix operator +- {}
 infix operator +- {}
 
-// CHECK-LABEL: sil hidden @_TZF8manglingop2psU__FQ_T_
+// CHECK-LABEL: sil hidden @_TZF8manglingop2psurFq_T_
 prefix func +- <T>(a: T) {}
-// CHECK-LABEL: sil hidden @_TZF8manglingoP2psU__FQ_T_
+// CHECK-LABEL: sil hidden @_TZF8manglingoP2psurFq_T_
 postfix func +- <T>(a: T) {}
 
-// CHECK-LABEL: sil hidden @_TZF8manglingoi2psU__FTQ_Q__T_
+// CHECK-LABEL: sil hidden @_TZF8manglingoi2psurFTq_q__T_
 func +- <T>(a: T, b: T) {}
 
-// CHECK-LABEL: sil hidden @_TZF8manglingop2psU__FT1aQ_1bQ__T_
+// CHECK-LABEL: sil hidden @_TZF8manglingop2psurFT1aq_1bq__T_
 prefix func +- <T>(_: (a: T, b: T)) {}
-// CHECK-LABEL: sil hidden @_TZF8manglingoP2psU__FT1aQ_1bQ__T_
+// CHECK-LABEL: sil hidden @_TZF8manglingoP2psurFT1aq_1bq__T_
 postfix func +- <T>(_: (a: T, b: T)) {}
 
 infix operator «+» {}
@@ -72,9 +72,9 @@ func two_protocol(_: protocol<Foo, Bar>) {}
 
 // Ensure archetype depths are mangled correctly.
 class Zim<T> {
-  // CHECK-LABEL: sil hidden @_TFC8mangling3Zim4zangU__fGS0_Q__U__FTQd__Q__T_
+  // CHECK-LABEL: sil hidden @_TFC8mangling3Zim4zangu__rfGS0_q__FTq_qd___T_
   func zang<U>(_: T, _: U) {}
-  // CHECK-LABEL: sil hidden @_TFC8mangling3Zim4zungU__fGS0_Q__U__FTQ_Qd___T_
+  // CHECK-LABEL: sil hidden @_TFC8mangling3Zim4zungu__rfGS0_q__FTqd__q__T_
   func zung<U>(_: U, _: T) {}
 }
 
@@ -97,9 +97,9 @@ func uses_clang_struct(#r: NSRect) {}
 func uses_optionals(#x: Int?) -> UnicodeScalar? { return Optional() }
 
 enum GenericUnion<T> {
-  // CHECK-LABEL: sil hidden [transparent] @_TFO8mangling12GenericUnion3FooU__fMGS0_Q__FSiGS0_Q__
+  // CHECK-LABEL: sil hidden [transparent] @_TFO8mangling12GenericUnion3FoourfMGS0_q__FSiGS0_q__
   case Foo(Int)
-  // CHECK-LABEL: sil hidden [transparent] @_TFO8mangling12GenericUnion3BarU__FMGS0_Q__GS0_Q__
+  // CHECK-LABEL: sil hidden [transparent] @_TFO8mangling12GenericUnion3BarurFMGS0_q__GS0_q__
   case Bar
 }
  
@@ -134,9 +134,9 @@ protocol HasAssocType {
   typealias Assoc
 }
 
-// CHECK-LABEL: sil hidden @_TF8mangling4fooAUS_12HasAssocType_U__FQ_T_ : $@convention(thin) <T where T : HasAssocType> (@in T) -> ()
+// CHECK-LABEL: sil hidden @_TF8mangling4fooAuRq_S_12HasAssocType_Fq_T_ : $@convention(thin) <T where T : HasAssocType> (@in T) -> ()
 func fooA<T: HasAssocType>(_: T) {}
-// CHECK-LABEL: sil hidden @_TF8mangling4fooBUS_12HasAssocType_US_9AssocReqt__FQ_T_ : $@convention(thin) <T where T : HasAssocType, T.Assoc : AssocReqt> (@in T) -> ()
+// CHECK-LABEL: sil hidden @_TF8mangling4fooBuRq_S_12HasAssocTypeqq_S0_5AssocS_9AssocReqt_Fq_T_ : $@convention(thin) <T where T : HasAssocType, T.Assoc : AssocReqt> (@in T) -> ()
 func fooB<T: HasAssocType where T.Assoc: AssocReqt>(_: T) {}
 
 // CHECK-LABEL: sil hidden @_TZF8manglingoi2qqFTSiSi_T_

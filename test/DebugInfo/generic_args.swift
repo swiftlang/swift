@@ -29,7 +29,7 @@ aFunction(AClass(),AnotherClass(),"aFunction")
 struct Wrapper<T: AProtocol> {
 
   init<U: AProtocol>(from : Wrapper<U>) {
-  // CHECK-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "Wrapper",{{.*}} identifier: "_TtGV12generic_args7WrapperQq_FS0_cUS_9AProtocol__FMGS0_Q__US1___FT4fromGS0_Q___GS0_Qd____")
+  // CHECK-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "Wrapper",{{.*}} identifier: "_TtGV12generic_args7WrapperQq_FS0_cu__Rq_S_9AProtocolqd__S1__FMGS0_q__FT4fromGS0_qd____GS0_q___")
     var wrapped = from
   }
 
@@ -42,7 +42,7 @@ struct Wrapper<T: AProtocol> {
   }
 }
 
-// CHECK: !DILocalVariable(tag: DW_TAG_arg_variable, name: "f", {{.*}}, line: [[@LINE+1]], type: !"_TtFQq_F12generic_args5applyU___FTQ_1fFQ_Q0__Q0_Qq0_F12generic_args5applyU___FTQ_1fFQ_Q0__Q0_")
+// CHECK: !DILocalVariable(tag: DW_TAG_arg_variable, name: "f", {{.*}}, line: [[@LINE+1]], type: !"_TtFQq_F12generic_args5applyu0_rFTq_1fFq_q0__q0_Qq0_F12generic_args5applyu0_rFTq_1fFq_q0__q0_")
 func apply<T, U> (x: T, f: (T)->(U)) -> U {
   return f(x)
 }

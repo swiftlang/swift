@@ -460,13 +460,13 @@ func reinterpretCast(c: C) -> (Builtin.Word, D, C?) {
           Builtin.reinterpretCast(c) as C?)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins19reinterpretAddrOnlyU___FQ_Q0_
+// CHECK-LABEL: sil hidden @_TF8builtins19reinterpretAddrOnlyu0_rFq_q0_
 func reinterpretAddrOnly<T, U>(t: T) -> U {
   // CHECK: unchecked_addr_cast {{%.*}} : $*T to $*U
   return Builtin.reinterpretCast(t)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins28reinterpretAddrOnlyToTrivialU__FQ_Si
+// CHECK-LABEL: sil hidden @_TF8builtins28reinterpretAddrOnlyToTrivialurFq_Si
 func reinterpretAddrOnlyToTrivial<T>(t: T) -> Int {
   // CHECK: [[ADDR:%.*]] = unchecked_addr_cast [[INPUT:%.*]] : $*T to $*Int
   // CHECK: [[VALUE:%.*]] = load [[ADDR]]
@@ -474,7 +474,7 @@ func reinterpretAddrOnlyToTrivial<T>(t: T) -> Int {
   return Builtin.reinterpretCast(t)
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins27reinterpretAddrOnlyLoadableU__FTSiQ__TQ_Si_
+// CHECK-LABEL: sil hidden @_TF8builtins27reinterpretAddrOnlyLoadableurFTSiq__Tq_Si_
 func reinterpretAddrOnlyLoadable<T>(a: Int, _ b: T) -> (T, Int) {
   // CHECK: [[BUF:%.*]] = alloc_stack $Int
   // CHECK: store {{%.*}} to [[BUF]]#1

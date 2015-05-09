@@ -29,7 +29,7 @@ func dont_make_a_cat() throws -> Cat {
   throw HomeworkError.TooHard
 }
 
-// CHECK: sil hidden @_TF6errors11dont_returnU__FzQ_Q_ : $@convention(thin) <T> (@out T, @in T) -> @error ErrorType {
+// CHECK: sil hidden @_TF6errors11dont_returnurFzq_q_ : $@convention(thin) <T> (@out T, @in T) -> @error ErrorType {
 // CHECK:      [[BOX:%.*]] = alloc_existential_box $ErrorType, $HomeworkError
 // CHECK:      [[T0:%.*]] = function_ref @_TFO6errors13HomeworkError7TooMuchFMS0_S0_ : $@convention(thin) (@thin HomeworkError.Type) -> @owned HomeworkError
 // CHECK-NEXT: [[T1:%.*]] = metatype $@thin HomeworkError.Type
@@ -44,7 +44,7 @@ func dont_return<T>(argument: T) throws -> T {
 
 // CHECK:    sil hidden @_TF6errors16all_together_nowFSbCS_3Cat : $@convention(thin) (Bool) -> @owned Cat {
 // CHECK:    bb0(%0 : $Bool):
-// CHECK:      [[DR_FN:%.*]] = function_ref @_TF6errors11dont_returnU__FzQ_Q_ :
+// CHECK:      [[DR_FN:%.*]] = function_ref @_TF6errors11dont_returnurFzq_q_ :
 
 //   Branch on the flag.
 // CHECK:      cond_br {{%.*}}, [[FLAG_TRUE:bb[0-9]+]], [[FLAG_FALSE:bb[0-9]+]]
@@ -190,7 +190,7 @@ protocol Doomed {
   func check() throws
 }
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV6errors12DoomedStructS_6DoomedS_FS1_5checkUS1___fQPS1_FzT_T_ : $@convention(witness_method) (@in_guaranteed DoomedStruct) -> @error ErrorType
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV6errors12DoomedStructS_6DoomedS_FS1_5checkuRq_S1__fq_FzT_T_ : $@convention(witness_method) (@in_guaranteed DoomedStruct) -> @error ErrorType
 // CHECK:      [[TEMP:%.*]] = alloc_stack $DoomedStruct
 // CHECK:      copy_addr %0 to [initialization] [[TEMP]]#1
 // CHECK:      [[SELF:%.*]] = load [[TEMP]]#1 : $*DoomedStruct
@@ -207,7 +207,7 @@ struct DoomedStruct : Doomed {
   func check() throws {}
 }
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC6errors11DoomedClassS_6DoomedS_FS1_5checkUS1___fQPS1_FzT_T_ : $@convention(witness_method) (@in_guaranteed DoomedClass) -> @error ErrorType {
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC6errors11DoomedClassS_6DoomedS_FS1_5checkuRq_S1__fq_FzT_T_ : $@convention(witness_method) (@in_guaranteed DoomedClass) -> @error ErrorType {
 // CHECK:      [[TEMP:%.*]] = alloc_stack $DoomedClass
 // CHECK:      copy_addr %0 to [initialization] [[TEMP]]#1
 // CHECK:      [[SELF:%.*]] = load [[TEMP]]#1 : $*DoomedClass
@@ -226,7 +226,7 @@ class DoomedClass : Doomed {
   func check() throws {}
 }
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV6errors11HappyStructS_6DoomedS_FS1_5checkUS1___fQPS1_FzT_T_ : $@convention(witness_method) (@in_guaranteed HappyStruct) -> @error ErrorType
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV6errors11HappyStructS_6DoomedS_FS1_5checkuRq_S1__fq_FzT_T_ : $@convention(witness_method) (@in_guaranteed HappyStruct) -> @error ErrorType
 // CHECK:      [[TEMP:%.*]] = alloc_stack $HappyStruct
 // CHECK:      copy_addr %0 to [initialization] [[TEMP]]#1
 // CHECK:      [[SELF:%.*]] = load [[TEMP]]#1 : $*HappyStruct
@@ -238,7 +238,7 @@ struct HappyStruct : Doomed {
   func check() {}
 }
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC6errors10HappyClassS_6DoomedS_FS1_5checkUS1___fQPS1_FzT_T_ : $@convention(witness_method) (@in_guaranteed HappyClass) -> @error ErrorType
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC6errors10HappyClassS_6DoomedS_FS1_5checkuRq_S1__fq_FzT_T_ : $@convention(witness_method) (@in_guaranteed HappyClass) -> @error ErrorType
 // CHECK:      [[TEMP:%.*]] = alloc_stack $HappyClass
 // CHECK:      copy_addr %0 to [initialization] [[TEMP]]#1
 // CHECK:      [[SELF:%.*]] = load [[TEMP]]#1 : $*HappyClass

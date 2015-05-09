@@ -10,4 +10,4 @@ import TestModule
 testit(MyStruct())
 
 // CHECK: sil_witness_table private_external [fragile] MyStruct: Proto module TestModule
-// CHECK-NEXT: method #Proto.confx!1: @_TTWV10TestModule{{.*}}confxUS1___fQPS1_FT_T_
+// CHECK-NEXT: method #Proto.confx!1: @_TTWV10TestModule{{.*}}confxuRq_S1__fq_FT_T_

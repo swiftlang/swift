@@ -1131,7 +1131,7 @@ func rdar14826416<T, U>(#t: T, u: U) {
   case _: markUsed("other")
   }
 }
-// CHECK-LABEL: sil hidden @_TF6switch12rdar14826416U___FT1tQ_1uQ0__T_
+// CHECK-LABEL: sil hidden @_TF6switch12rdar14826416u0_rFT1tq_1uq0__T_
 // CHECK:   checked_cast_addr_br copy_on_success T in {{%.*}} : $*T to Int in {{%.*}} : $*Int, [[IS_INT:bb[0-9]+]], [[ISNT_INT:bb[0-9]+]]
 // CHECK: [[ISNT_INT]]:
 // CHECK:   checked_cast_addr_br copy_on_success T in {{%.*}} : $*T to U in {{%.*}} : $*U, [[ISNT_INT_IS_U:bb[0-9]+]], [[ISNT_INT_ISNT_U:bb[0-9]+]]
@@ -1140,7 +1140,7 @@ func rdar14826416<T, U>(#t: T, u: U) {
 class Rdar14835992 {}
 class SubRdar14835992 : Rdar14835992 {}
 
-// CHECK-LABEL: sil hidden @_TF6switch12rdar14835992U___FT1tCS_12Rdar148359922ttQ_2uuQ0__T_
+// CHECK-LABEL: sil hidden @_TF6switch12rdar14835992u0_rFT1tCS_12Rdar148359922ttq_2uuq0__T_
 func rdar14835992<T, U>(#t: Rdar14835992, tt: T, uu: U) {
   switch t {
   case is SubRdar14835992: markUsed("Sub")
