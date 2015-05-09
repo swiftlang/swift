@@ -1,11 +1,11 @@
-// RUN: not --crash %target-swift-frontend %s -parse
-// XFAIL: asan
+// RUN: not %target-swift-frontend %s -parse
 
 // Distributed under the terms of the MIT license
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-class B<d where B : a {
+import Foundation
+struct B<A, T where T : B, i("[0x31] == B
+if c {
 }
-let g : (Any) -> (e: BooleanType>: A<T> Void>()
-let h = B
+var b[B) {

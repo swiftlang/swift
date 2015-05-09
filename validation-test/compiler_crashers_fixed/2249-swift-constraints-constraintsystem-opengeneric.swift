@@ -1,10 +1,13 @@
-// RUN: not --crash %target-swift-frontend %s -parse
-// XFAIL: asan
+// RUN: not %target-swift-frontend %s -parse
 
 // Distributed under the terms of the MIT license
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-class B<T where B = c
-enum S<f = i: SequenceType where h: A {
-let end = B
+struct c<T where T: c: e: B
+struct S<T -> {
+struct c(f, f: NSObjec
+init<b()"\(h> ()
+}
+if c {
+c(c: A

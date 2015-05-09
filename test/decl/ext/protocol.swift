@@ -627,6 +627,30 @@ func testSConstrained3(sc3a: SConstrained3a, sc3b: SConstrained3b) {
 
 extension PConstrained3 where AssocTypePC2 : PInherit1 { }
 
+// Extending via a superclass constraint.
+class Superclass {
+  func foo() { }
+  static func bar() { }
+
+  typealias Foo = Int
+}
+
+protocol PConstrained4 { }
+
+extension PConstrained4 where Self : Superclass {
+  final func testFoo() -> Foo {
+    foo()
+    self.foo()
+
+    return Foo(5)
+  }
+
+  final static func testBar() {
+    bar()
+    self.bar()
+  }
+}
+
 // ----------------------------------------------------------------------------
 // Semantic restrictions
 // ----------------------------------------------------------------------------

@@ -1,14 +1,10 @@
-// RUN: not --crash %target-swift-frontend %s -parse
-// XFAIL: asan
+// RUN: not %target-swift-frontend %s -parse
 
 // Distributed under the terms of the MIT license
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-struct c<T where T: c: e: B
-struct S<T -> {
-struct c(f, f: NSObjec
-init<b()"\(h> ()
+class B<d where B : a {
 }
-if c {
-c(c: A
+let g : (Any) -> (e: BooleanType>: A<T> Void>()
+let h = B

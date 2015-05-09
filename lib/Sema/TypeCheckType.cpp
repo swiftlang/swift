@@ -311,22 +311,17 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
     }
   }
 
-  // If we found something in a protocol or extension thereof, substitute in
-  // the appropriate type for 'Self'.
+  // Substitute in the appropriate type for 'Self'.
   // FIXME: We shouldn't have to guess here; the caller should tell us.
-  if (isa<ProtocolDecl>(ownerNominal)) {
-    Type fromType;
-    if (fromDC->isProtocolOrProtocolExtensionContext())
-      fromType = fromDC->getProtocolSelf()->getArchetype();
-    else
-      fromType = resolver->resolveTypeOfContext(fromDC);
+  Type fromType;
+  if (fromDC->isProtocolOrProtocolExtensionContext())
+    fromType = fromDC->getProtocolSelf()->getArchetype();
+  else
+    fromType = resolver->resolveTypeOfContext(fromDC);
 
-    // Perform the substitution.
-    return substMemberTypeWithBase(fromDC->getParentModule(), typeDecl,
-                                   fromType, /*isTypeReference=*/true);
-   }
-
-  llvm_unreachable("Shouldn't have found this type");
+  // Perform the substitution.
+  return substMemberTypeWithBase(fromDC->getParentModule(), typeDecl,
+                                 fromType, /*isTypeReference=*/true);
 }
 
 /// Apply generic arguments to the given type.

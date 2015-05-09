@@ -647,6 +647,8 @@ namespace {
           parentTy = parentTy.transform(*this);
 
         auto unboundDecl = unbound->getDecl();
+        if (unboundDecl->isInvalid())
+          return ErrorType::get(cs.getASTContext());
 
         // Open up the generic type.
         cs.openGeneric(unboundDecl,
