@@ -552,3 +552,20 @@ func implodeRecursiveTuple(expr: ((Int, Int), Int)?) {
   let (x, y) = expr!
 }
 
+func test20087517() {
+  class Color {
+    static func greenColor() -> Color { return Color() }
+  }
+  let x: (Color!, Int) = (.greenColor(), 1)
+}
+
+func test20596042() {
+  enum E {
+    case thing1
+    case thing2
+  }
+
+  func f() -> (E?, Int)? {
+    return (.thing1, 1)
+  }
+}
