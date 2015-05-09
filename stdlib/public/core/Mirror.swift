@@ -730,16 +730,3 @@ extension String {
     debugPrint(subject, &self, appendNewline: false)
   }
 }
-
-/// Reflection for Mirror itself
-extension Mirror : CustomStringConvertible {
-  public var description: String {
-    return "Mirror for \(self.subjectType)"
-  }
-}
-
-extension Mirror : CustomReflectable {
-  public func customMirror() -> Mirror {
-    return Mirror(self, children: [:])
-  }
-}

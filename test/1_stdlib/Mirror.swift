@@ -24,8 +24,8 @@ import StdlibUnittest
 
 var mirrors = TestSuite("Mirrors")
 
-extension Mirror {
-  public var testDescription: String {
+extension Mirror: CustomStringConvertible {
+  public var description: String {
     let nil_ = "nil"
     return "[" + ", ".join(
       lazy(children).map { "\($0.0 ?? nil_): \(String(reflecting: $0.1))" }
@@ -42,7 +42,7 @@ mirrors.test("RandomAccessStructure") {
 
   let x = Eggs().customMirror()
   
-  expectEqual("[nil: \"aay\", nil: \"bee\", nil: \"cee\"]", x.testDescription)
+  expectEqual("[nil: \"aay\", nil: \"bee\", nil: \"cee\"]", x.description)
 }
 
 let letters = "abcdefghijklmnopqrstuvwxyz "
@@ -78,7 +78,7 @@ mirrors.test("ForwardStructure") {
   
   // Because we don't control the order of a Set, we need to do a
   // fancy dance in order to validate the result.
-  let description = w.testDescription
+  let description = w.description
   for c in letters {
     let expected = "nil: \"\(c)\""
     expectNotEmpty(find(expected, within: description))
@@ -96,7 +96,7 @@ mirrors.test("BidirectionalStructure") {
   let y = Why().customMirror()
   expectEqual(.Collection, y.displayStyle)
 
-  let description = y.testDescription
+  let description = y.description
   expectEqual(
     "[nil: \"a\", nil: \"b\", nil: \"c\", nil: \"",
     description[description.startIndex..<description.indexOf("d")!])
@@ -111,7 +111,7 @@ mirrors.test("LabeledStructure") {
   }
 
   let z = Zee().customMirror()
-  expectEqual("[bark: 1, bite: 0]", z.testDescription)
+  expectEqual("[bark: 1, bite: 0]", z.description)
   expectEmpty(z.displayStyle)
 
   struct Zee2 : CustomReflectable {
@@ -122,7 +122,7 @@ mirrors.test("LabeledStructure") {
   }
   let z2 = Zee2().customMirror()
   expectEqual(.Dictionary, z2.displayStyle)
-  expectEqual("[bark: 1, bite: 0]", z2.testDescription)
+  expectEqual("[bark: 1, bite: 0]", z2.description)
 
   struct Heterogeny : CustomReflectable {
     func customMirror() -> Mirror {
@@ -131,7 +131,7 @@ mirrors.test("LabeledStructure") {
     }
   }
   let h = Heterogeny().customMirror()
-  expectEqual("[bark: 1, bite: Zee]", h.testDescription)
+  expectEqual("[bark: 1, bite: Zee]", h.description)
 }
 
 mirrors.test("Legacy") {
