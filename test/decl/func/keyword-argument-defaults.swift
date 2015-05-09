@@ -112,5 +112,5 @@ func testSubscripts(i: Int, s: String, x: Y) {
 }
 
 // # is being removed
-func pound(#a: Int, // expected-warning{{'#' has been removed from Swift; double-up 'a a' to make the argument label the same as the parameter name}}{{12-13=a }}
+func pound(#a: Int, // expected-warning{{'#' has been removed from Swift; double up 'a a' to make the argument label the same as the parameter name}}{{12-13=a }}
            #b: Int) { } // expected-warning{{'#' has been removed from Swift; 'b' already has an argument label}}{{12-13=}}
