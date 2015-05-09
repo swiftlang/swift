@@ -1,5 +1,6 @@
 add_swift_library(swiftIDE
   CodeCompletion.cpp
+  CodeCompletionCache.cpp
   CommentConversion.cpp
   ModuleInterfacePrinting.cpp
   REPLCodeCompletion.cpp

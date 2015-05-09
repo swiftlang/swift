@@ -15,9 +15,7 @@
 
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/LLVM.h"
-#include "swift/Basic/ThreadSafeRefCounted.h"
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/TimeValue.h"
@@ -34,8 +32,10 @@ class ModuleDecl;
 
 namespace ide {
 
+class CodeCompletionCache;
 class CodeCompletionContext;
 class CodeCompletionResultBuilder;
+struct RequestedCachedModule;
 
 /// \brief A routine to remove code completion tokens from code completion
 /// tests.
@@ -510,53 +510,6 @@ struct CodeCompletionResultSink {
 
   CodeCompletionResultSink()
       : Allocator(std::make_shared<llvm::BumpPtrAllocator>()) {}
-};
-
-struct CodeCompletionCacheImpl;
-
-/// \brief In-memory per-module code completion result cache.
-///
-/// These results persist between multiple code completion requests and can be
-/// used with different ASTContexts.
-class CodeCompletionCache {
-  std::unique_ptr<CodeCompletionCacheImpl> Impl;
-
-public:
-  /// \brief Cache key.
-  struct Key {
-    std::string ModuleFilename;
-    std::string ModuleName;
-    std::vector<std::string> AccessPath;
-    bool ResultsHaveLeadingDot;
-    bool ForTestableLookup;
-
-    friend bool operator==(const Key &LHS, const Key &RHS) {
-      return LHS.ModuleFilename == RHS.ModuleFilename &&
-             LHS.ModuleName == RHS.ModuleName &&
-             LHS.AccessPath == RHS.AccessPath &&
-             LHS.ResultsHaveLeadingDot == RHS.ResultsHaveLeadingDot &&
-             LHS.ForTestableLookup == RHS.ForTestableLookup;
-    }
-  };
-
-  struct Value : public ThreadSafeRefCountedBase<Value> {
-    llvm::sys::TimeValue ModuleModificationTime;
-    CodeCompletionResultSink Sink;
-  };
-  using ValueRefCntPtr = llvm::IntrusiveRefCntPtr<Value>;
-
-  CodeCompletionCache();
-  ~CodeCompletionCache();
-
-  ValueRefCntPtr createValue();
-  Optional<ValueRefCntPtr> get(const Key &K);
-  void set(const Key &K, ValueRefCntPtr V);
-};
-
-struct RequestedCachedModule {
-  CodeCompletionCache::Key Key;
-  const ModuleDecl *TheModule;
-  bool OnlyTypes;
 };
 
 class CodeCompletionContext {

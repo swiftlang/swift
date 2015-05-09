@@ -19,6 +19,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/IDE/CodeCompletion.h"
+#include "swift/IDE/CodeCompletionCache.h"
 #include "swift/Parse/CodeCompletionCallbacks.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"

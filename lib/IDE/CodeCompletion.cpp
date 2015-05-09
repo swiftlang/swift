@@ -11,8 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/CodeCompletion.h"
+#include "swift/IDE/CodeCompletionCache.h"
 #include "swift/IDE/Utils.h"
-#include "swift/Basic/Cache.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
@@ -524,95 +524,6 @@ void CodeCompletionResultBuilder::finishResult() {
   Sink.Results.push_back(takeResult());
 }
 
-namespace swift {
-namespace ide {
-struct CodeCompletionCacheImpl {
-  using Key = CodeCompletionCache::Key;
-  using Value = CodeCompletionCache::Value;
-  using ValueRefCntPtr = CodeCompletionCache::ValueRefCntPtr;
-  sys::Cache<Key, ValueRefCntPtr> TheCache{"swift.libIDE.CodeCompletionCache"};
-};
-} // end namespace ide
-} // end namespace swift
-
-namespace llvm {
-template<>
-struct DenseMapInfo<swift::ide::CodeCompletionCacheImpl::Key> {
-  using KeyTy = swift::ide::CodeCompletionCacheImpl::Key;
-  static inline KeyTy getEmptyKey() {
-    return KeyTy{"", "", {}, false, false};
-  }
-  static inline KeyTy getTombstoneKey() {
-    return KeyTy{"", "", {}, true, false};
-  }
-  static unsigned getHashValue(const KeyTy &Val) {
-    size_t H = 0;
-    H ^= std::hash<std::string>()(Val.ModuleFilename);
-    H ^= std::hash<std::string>()(Val.ModuleName);
-    for (auto Piece : Val.AccessPath)
-      H ^= std::hash<std::string>()(Piece);
-    H ^= std::hash<bool>()(Val.ResultsHaveLeadingDot);
-    H ^= std::hash<bool>()(Val.ForTestableLookup);
-    return static_cast<unsigned>(H);
-  }
-  static bool isEqual(const KeyTy &LHS, const KeyTy &RHS) {
-    return LHS == RHS;
-  }
-};
-} // namespace llvm
-
-namespace swift {
-namespace sys {
-template<>
-struct CacheValueCostInfo<swift::ide::CodeCompletionCacheImpl::Value> {
-  static size_t
-  getCost(const swift::ide::CodeCompletionCacheImpl::Value &V) {
-    return V.Sink.Allocator->getTotalMemory();
-  }
-};
-} // namespace sys
-} // namespace swift
-
-CodeCompletionCache::ValueRefCntPtr CodeCompletionCache::createValue() {
-  return ValueRefCntPtr(new Value);
-}
-
-Optional<CodeCompletionCache::ValueRefCntPtr>
-CodeCompletionCache::get(const Key &K) {
-  auto &TheCache = Impl->TheCache;
-  llvm::Optional<ValueRefCntPtr> V = TheCache.get(K);
-  if (V) {
-    // Check whether V is up to date.
-    llvm::sys::fs::file_status ModuleStatus;
-    if (llvm::sys::fs::status(K.ModuleFilename, ModuleStatus) ||
-        V.getValue()->ModuleModificationTime !=
-            ModuleStatus.getLastModificationTime()) {
-      // Cache is stale.
-      V = None;
-      TheCache.remove(K);
-    }
-  }
-  return V;
-}
-
-void CodeCompletionCache::set(const Key &K, ValueRefCntPtr V) {
-  {
-    assert(!K.ModuleFilename.empty());
-
-    llvm::sys::fs::file_status ModuleStatus;
-    if (llvm::sys::fs::status(K.ModuleFilename, ModuleStatus)) {
-      V->ModuleModificationTime = llvm::sys::TimeValue::now();
-    } else {
-      V->ModuleModificationTime = ModuleStatus.getLastModificationTime();
-    }
-  }
-  Impl->TheCache.set(K, V);
-}
-
-CodeCompletionCache::CodeCompletionCache()
-    : Impl(new CodeCompletionCacheImpl()) {}
-
-CodeCompletionCache::~CodeCompletionCache() {}
 
 MutableArrayRef<CodeCompletionResult *> CodeCompletionContext::takeResults() {
   // Copy pointers to the results.
