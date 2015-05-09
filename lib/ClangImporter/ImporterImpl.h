@@ -279,6 +279,12 @@ private:
   /// \brief Clang parser, which is used to load textual headers.
   std::unique_ptr<clang::Parser> Parser;
 
+  /// Tracks top level decls from the bridging header.
+  std::vector<clang::Decl *> BridgeHeaderTopLevelDecls;
+
+  /// Tracks macro definitions from the bridging header.
+  std::vector<clang::MacroInfo *> BridgeHeaderMacros;
+
   /// The active type checker, or null if there is no active type checker.
   ///
   /// The flag is \c true if there has ever been a type resolver assigned, i.e.
@@ -633,6 +639,7 @@ public:
 
   /// Imports the given header contents into the Clang context.
   void importHeader(Module *adapter, StringRef headerName, SourceLoc diagLoc,
+                    bool trackParsedSymbols,
                     std::unique_ptr<llvm::MemoryBuffer> contents);
 
   /// Returns the redeclaration of \p D that contains its definition for any

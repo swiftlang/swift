@@ -396,38 +396,6 @@ void swift::ide::printSubmoduleInterface(
   }
 }
 
-namespace {
-class ImportedHeaderFilter : public VisibleDeclConsumer {
-  ClangImporter &Importer;
-  llvm::function_ref<void(ValueDecl *)> Receiver;
-  const clang::FileEntry *File;
-
-public:
-  ImportedHeaderFilter(StringRef Filename,
-                       ClangImporter &Importer,
-                       llvm::function_ref<void(ValueDecl *)> Receiver)
-  : Importer(Importer),
-    Receiver(Receiver) {
-    File = Importer.getClangPreprocessor().getFileManager().getFile(Filename);
-  }
-
-private:
-  void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
-    auto ClangN = VD->getClangNode();
-    if (ClangN.isNull())
-      return;
-
-    auto &SM = Importer.getClangPreprocessor().getSourceManager();
-    auto ClangLoc = SM.getFileLoc(ClangN.getLocation());
-    if (ClangLoc.isInvalid())
-      return;
-
-    if (SM.getFileEntryForID(SM.getFileID(ClangLoc)) == File)
-      Receiver(VD);
-  }
-};
-}
-
 void swift::ide::printHeaderInterface(
        StringRef Filename,
        ASTContext &Ctx,
@@ -436,8 +404,24 @@ void swift::ide::printHeaderInterface(
   auto AdjustedOptions = Options;
   adjustPrintOptions(AdjustedOptions);
 
-  SmallVector<ValueDecl *, 32> ClangDecls;
-  auto DeclReceiver = [&](ValueDecl *D) {
+  auto &Importer = static_cast<ClangImporter &>(*Ctx.getClangModuleLoader());
+  auto &ClangSM = Importer.getClangASTContext().getSourceManager();
+  const clang::FileEntry *File =
+    Importer.getClangPreprocessor().getFileManager().getFile(Filename);
+
+  auto headerFilter = [&](ClangNode ClangN) -> bool {
+    if (ClangN.isNull())
+      return false;
+
+    auto ClangLoc = ClangSM.getFileLoc(ClangN.getLocation());
+    if (ClangLoc.isInvalid())
+      return false;
+
+    return ClangSM.getFileEntryForID(ClangSM.getFileID(ClangLoc)) == File;
+  };
+
+  SmallVector<Decl *, 32> ClangDecls;
+  auto headerReceiver = [&](Decl *D) {
     // If requested, skip unavailable declarations.
     if (Options.SkipUnavailable && D->getAttrs().isUnavailable(Ctx))
       return;
@@ -445,14 +429,11 @@ void swift::ide::printHeaderInterface(
     ClangDecls.push_back(D);
   };
 
-  auto &Importer = static_cast<ClangImporter &>(*Ctx.getClangModuleLoader());
-  ImportedHeaderFilter Filter(Filename, Importer, DeclReceiver);
-  Importer.lookupVisibleDecls(Filter);
+  Importer.lookupBridgingHeaderDecls(headerFilter, headerReceiver);
 
-  auto &ClangSM = Importer.getClangASTContext().getSourceManager();
   // Sort imported declarations in source order.
   std::sort(ClangDecls.begin(), ClangDecls.end(),
-            [&](ValueDecl *LHS, ValueDecl *RHS) -> bool {
+            [&](Decl *LHS, Decl *RHS) -> bool {
               return ClangSM.isBeforeInTranslationUnit(
                                             LHS->getClangNode().getLocation(),
                                             RHS->getClangNode().getLocation());

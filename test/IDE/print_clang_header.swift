@@ -13,3 +13,8 @@
 // CHECK: }
 // CHECK: protocol SameNameProtocol {
 // CHECK: }
+
+// CHECK: extension BaseInHead {
+// CHECK:  class func doItInCategory()
+// CHECK:  func doItInCategory()
+// CHECK: }

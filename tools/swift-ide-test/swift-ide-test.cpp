@@ -1687,7 +1687,9 @@ static int doPrintHeaders(const CompilerInvocation &InitInvok,
     auto &Importer = static_cast<ClangImporter &>(
                                               *Context.getClangModuleLoader());
     Importer.importBridgingHeader(FEOpts.ImplicitObjCHeaderPath,
-                                  CI.getMainModule());
+                                  CI.getMainModule(),
+                                  /*diagLoc=*/{},
+                                  /*trackParsedSymbols=*/true);
   }
 
   int ExitCode = 0;

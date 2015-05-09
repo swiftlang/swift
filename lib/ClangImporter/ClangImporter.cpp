@@ -528,6 +528,7 @@ bool ClangImporter::addSearchPath(StringRef newSearchPath, bool isFramework) {
 
 void ClangImporter::Implementation::importHeader(
     Module *adapter, StringRef headerName, SourceLoc diagLoc,
+    bool trackParsedSymbols,
     std::unique_ptr<llvm::MemoryBuffer> sourceBuffer) {
   // Don't even try to load the bridging header if the Clang AST is in a bad
   // state. It could cause a crash.
@@ -556,7 +557,13 @@ void ClangImporter::Implementation::importHeader(
   pp.LookAhead(0);
 
   clang::Parser::DeclGroupPtrTy parsed;
-  while (!Parser->ParseTopLevelDecl(parsed)) {}
+  while (!Parser->ParseTopLevelDecl(parsed)) {
+    if (trackParsedSymbols && parsed) {
+      for (auto *D : parsed.get()) {
+        BridgeHeaderTopLevelDecls.push_back(D);
+      }
+    }
+  }
   pp.EndSourceFile();
 
   if (!hadError && clangDiags.hasErrorOccurred()) {
@@ -583,11 +590,13 @@ void ClangImporter::importHeader(StringRef header, Module *adapter,
   std::unique_ptr<llvm::MemoryBuffer> sourceBuffer{
     llvm::MemoryBuffer::getMemBuffer(cachedContents, header)
   };
-  Impl.importHeader(adapter, header, diagLoc, std::move(sourceBuffer));
+  Impl.importHeader(adapter, header, diagLoc, /*trackParsedSymbols=*/false,
+                    std::move(sourceBuffer));
 }
 
 void ClangImporter::importBridgingHeader(StringRef header, Module *adapter,
-                                         SourceLoc diagLoc) {
+                                         SourceLoc diagLoc,
+                                         bool trackParsedSymbols) {
   clang::FileManager &fileManager = Impl.Instance->getFileManager();
   const clang::FileEntry *headerFile = fileManager.getFile(header,
                                                            /*open=*/true);
@@ -606,7 +615,8 @@ void ClangImporter::importBridgingHeader(StringRef header, Module *adapter,
       importLine, Implementation::bridgingHeaderBufferName)
   };
 
-  Impl.importHeader(adapter, header, diagLoc, std::move(sourceBuffer));
+  Impl.importHeader(adapter, header, diagLoc, trackParsedSymbols,
+                    std::move(sourceBuffer));
 }
 
 std::string ClangImporter::getBridgingHeaderContents(StringRef headerPath,
@@ -2124,6 +2134,19 @@ public:
 };
 
 } // unnamed namespace
+
+void ClangImporter::lookupBridgingHeaderDecls(
+                              llvm::function_ref<bool(ClangNode)> filter,
+                              llvm::function_ref<void(Decl*)> receiver) const {
+  for (auto *D : Impl.BridgeHeaderTopLevelDecls) {
+    if (filter(D)) {
+      if (auto *ND = dyn_cast<clang::NamedDecl>(D)) {
+        if (Decl *imported = Impl.importDeclReal(ND))
+          receiver(imported);
+      }
+    }
+  }
+}
 
 void ClangImporter::lookupVisibleDecls(VisibleDeclConsumer &Consumer) const {
   if (Impl.CurrentCacheState != Implementation::CacheState::Valid) {

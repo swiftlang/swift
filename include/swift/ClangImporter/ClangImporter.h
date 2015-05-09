@@ -23,6 +23,7 @@
 
 namespace llvm {
   class Triple;
+  template<typename Fn> class function_ref;
 }
 
 namespace clang {
@@ -118,6 +119,17 @@ public:
   /// are found and imported.
   void lookupVisibleDecls(VisibleDeclConsumer &Consumer) const;
 
+  /// Look for textually included declarations from the bridging header.
+  ///
+  /// \param filter returns true if the given clang decl/macro should be
+  /// imported and fed to the consumer
+  /// \param receiver will be fed decls as they are found and imported.
+  ///
+  /// \c receiver is not a VisibleDeclConsumer so that it is not limited to
+  /// accepting ValueDecls only.
+  void lookupBridgingHeaderDecls(llvm::function_ref<bool(ClangNode)> filter,
+                                llvm::function_ref<void(Decl*)> receiver) const;
+
   /// \brief Load extensions to the given nominal type.
   ///
   /// \param nominal The nominal type whose extensions should be loaded.
@@ -165,10 +177,13 @@ public:
   ///        directive.
   /// \param adapter The module that depends on the contents of this header.
   /// \param diagLoc A location to attach any diagnostics to if import fails.
+  /// \param trackParsedSymbols If true, tracks decls and macros that were
+  ///        parsed from the bridging header.
   ///
   /// \sa getImportedHeaderModule
   void importBridgingHeader(StringRef header, ModuleDecl *adapter,
-                            SourceLoc diagLoc = {});
+                            SourceLoc diagLoc = {},
+                            bool trackParsedSymbols = false);
 
   /// Returns the module that contains imports and declarations from all loaded
   /// Objective-C header files.

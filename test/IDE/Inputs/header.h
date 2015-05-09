@@ -9,3 +9,7 @@ void doSomethingInHead(int arg);
 @end
 @protocol SameName
 @end
+
+@interface BaseInHead(SomeCategory)
+-(void)doItInCategory;
+@end
