@@ -1857,7 +1857,7 @@ ParserResult<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc,
 
   ParserResult<Pattern> pattern;
 
-  // Parse teh pattern.  This is either 'case <refutable pattern>' or just a
+  // Parse the pattern.  This is either 'case <refutable pattern>' or just a
   // normal pattern.
   if (consumeIf(tok::kw_case)) {
     pattern = parseMatchingPattern(/*isExprBasic*/true);
