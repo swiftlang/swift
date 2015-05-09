@@ -209,14 +209,16 @@ public:
 
     StringRef Text;
 
-    Chunk(ChunkKind Kind, unsigned NestingLevel, StringRef Text)
-        : Kind(unsigned(Kind)), NestingLevel(NestingLevel), IsAnnotation(0),
-          Text(Text) {
+    Chunk(ChunkKind Kind, unsigned NestingLevel, StringRef Text,
+          bool isAnnotation)
+        : Kind(unsigned(Kind)), NestingLevel(NestingLevel),
+          IsAnnotation(isAnnotation), Text(Text) {
       assert(chunkHasText(Kind));
     }
 
-    Chunk(ChunkKind Kind, unsigned NestingLevel)
-        : Kind(unsigned(Kind)), NestingLevel(NestingLevel), IsAnnotation(0) {
+    Chunk(ChunkKind Kind, unsigned NestingLevel, bool isAnnotation)
+        : Kind(unsigned(Kind)), NestingLevel(NestingLevel),
+          IsAnnotation(isAnnotation) {
       assert(!chunkHasText(Kind));
     }
 
@@ -252,12 +254,13 @@ public:
     }
 
     static Chunk createWithText(ChunkKind Kind, unsigned NestingLevel,
-                                StringRef Text) {
-      return Chunk(Kind, NestingLevel, Text);
+                                StringRef Text, bool isAnnoation = false) {
+      return Chunk(Kind, NestingLevel, Text, isAnnoation);
     }
 
-    static Chunk createSimple(ChunkKind Kind, unsigned NestingLevel) {
-      return Chunk(Kind, NestingLevel);
+    static Chunk createSimple(ChunkKind Kind, unsigned NestingLevel,
+                              bool isAnnoation = false) {
+      return Chunk(Kind, NestingLevel, isAnnoation);
     }
   };
 
@@ -449,6 +452,22 @@ public:
         BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs) {
     assert(AssociatedDecl && "should have a decl");
     AssociatedDeclKind = unsigned(getCodeCompletionDeclKind(AssociatedDecl));
+    assert(CompletionString);
+  }
+
+  // FIXME:
+  CodeCompletionResult(SemanticContextKind SemanticContext,
+                       unsigned NumBytesToErase,
+                       CodeCompletionString *CompletionString,
+                       CodeCompletionDeclKind DeclKind, StringRef ModuleName,
+                       bool NotRecommended, StringRef BriefDocComment,
+                       ArrayRef<StringRef> AssociatedUSRs)
+      : Kind(ResultKind::Declaration),
+        SemanticContext(unsigned(SemanticContext)),
+        NotRecommended(NotRecommended), NumBytesToErase(NumBytesToErase),
+        CompletionString(CompletionString), ModuleName(ModuleName),
+        BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs) {
+    AssociatedDeclKind = static_cast<unsigned>(DeclKind);
     assert(CompletionString);
   }
 

@@ -21,6 +21,7 @@ namespace swift {
 namespace ide {
 
 struct CodeCompletionCacheImpl;
+class OnDiskCodeCompletionCache;
 
 /// \brief In-memory per-module code completion result cache.
 ///
@@ -28,6 +29,7 @@ struct CodeCompletionCacheImpl;
 /// used with different ASTContexts.
 class CodeCompletionCache {
   std::unique_ptr<CodeCompletionCacheImpl> Impl;
+  OnDiskCodeCompletionCache *nextCache;
 
 public:
   /// \brief Cache key.
@@ -53,12 +55,36 @@ public:
   };
   using ValueRefCntPtr = llvm::IntrusiveRefCntPtr<Value>;
 
-  CodeCompletionCache();
+  CodeCompletionCache(OnDiskCodeCompletionCache *nextCache = nullptr);
   ~CodeCompletionCache();
 
-  ValueRefCntPtr createValue();
+  static ValueRefCntPtr createValue();
   Optional<ValueRefCntPtr> get(const Key &K);
-  void set(const Key &K, ValueRefCntPtr V);
+  void set(const Key &K, ValueRefCntPtr V) { setImpl(K, V, /*setChain*/ true); }
+
+private:
+  void setImpl(const Key &K, ValueRefCntPtr V, bool setChain);
+};
+
+/// \brief On-disk per-module code completion result cache.
+///
+/// These results persist between multiple code completion requests and can be
+/// used with different ASTContexts.
+class OnDiskCodeCompletionCache {
+  std::string cacheDirectory;
+
+public:
+  using Key = CodeCompletionCache::Key;
+  using Value = CodeCompletionCache::Value;
+  using ValueRefCntPtr = CodeCompletionCache::ValueRefCntPtr;
+
+  OnDiskCodeCompletionCache(Twine cacheDirectory);
+  ~OnDiskCodeCompletionCache();
+
+  Optional<ValueRefCntPtr> get(const Key &K);
+  std::error_code set(const Key &K, ValueRefCntPtr V);
+
+  static Optional<ValueRefCntPtr> getFromFile(StringRef filename);
 };
 
 struct RequestedCachedModule {

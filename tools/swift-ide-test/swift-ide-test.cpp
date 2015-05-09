@@ -65,6 +65,7 @@ enum class ActionType {
   None,
   CodeCompletion,
   REPLCodeCompletion,
+  DumpCompletionCache,
   SyntaxColoring,
   DumpAPI,
   DumpComments,
@@ -136,6 +137,8 @@ Action(llvm::cl::desc("Mode:"), llvm::cl::init(ActionType::None),
                       "code-completion", "Perform code completion"),
            clEnumValN(ActionType::REPLCodeCompletion,
                       "repl-code-completion", "Perform REPL-style code completion"),
+           clEnumValN(ActionType::DumpCompletionCache,
+                      "dump-completion-cache", "Dump a code completion cache file"),
            clEnumValN(ActionType::SyntaxColoring,
                       "syntax-coloring", "Perform syntax coloring"),
            clEnumValN(ActionType::DumpAPI,
@@ -203,6 +206,11 @@ Triple("target", llvm::cl::desc("target triple"));
 
 static llvm::cl::opt<std::string>
 ModuleCachePath("module-cache-path", llvm::cl::desc("Clang module cache path"));
+
+static llvm::cl::opt<std::string>
+    CompletionCachePath("completion-cache-path",
+                        llvm::cl::desc("Code completion cache path"),
+                        llvm::cl::ZeroOrMore);
 
 static llvm::cl::list<std::string>
 ImportPaths("I", llvm::cl::desc("add a directory to the import search path"));
@@ -462,7 +470,12 @@ static int doCodeCompletion(const CompilerInvocation &InitInvok,
   CompilerInvocation Invocation(InitInvok);
   Invocation.setCodeCompletionPoint(CleanFile.get(), CodeCompletionOffset);
 
-  ide::CodeCompletionCache CompletionCache;
+  std::unique_ptr<ide::OnDiskCodeCompletionCache> OnDiskCache;
+  if (!options::CompletionCachePath.empty()) {
+    OnDiskCache = llvm::make_unique<ide::OnDiskCodeCompletionCache>(
+        options::CompletionCachePath);
+  }
+  ide::CodeCompletionCache CompletionCache(OnDiskCache.get());
   ide::CodeCompletionContext CompletionContext(CompletionCache);
 
   // Create a CodeCompletionConsumer.
@@ -2293,6 +2306,26 @@ int main(int argc, char *argv[]) {
     return 1;
   }
 
+  if (options::Action == ActionType::DumpCompletionCache) {
+    if (options::InputFilenames.empty()) {
+      llvm::errs() << "-dump-completin-cache requires an input file\n";
+      return 1;
+    }
+
+    ide::PrintingCodeCompletionConsumer Consumer(
+        llvm::outs(), options::CodeCompletionKeywords);
+    for (StringRef filename : options::InputFilenames) {
+      auto resultsOpt = ide::OnDiskCodeCompletionCache::getFromFile(filename);
+      if (!resultsOpt) {
+        // FIXME: error?
+        continue;
+      }
+      Consumer.handleResults(resultsOpt->get()->Sink.Results);
+    }
+
+    return 0;
+  }
+
   if (options::SourceFilename.empty()) {
     llvm::errs() << "source file required\n";
     llvm::cl::PrintHelpMessage();
@@ -2389,6 +2422,7 @@ int main(int argc, char *argv[]) {
   case ActionType::CompilerInvocationFromModule:
   case ActionType::GenerateModuleAPIDescription:
   case ActionType::DiffModuleAPI:
+  case ActionType::DumpCompletionCache:
     llvm_unreachable("should be handled above");
 
   case ActionType::CodeCompletion:
