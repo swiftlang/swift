@@ -572,9 +572,12 @@ void Mangler::mangleDeclType(const ValueDecl *decl,
 
   if (decl->getASTContext().LangOpts.EnableInterfaceTypeMangling) {
     // Bind the declaration's generic context for nested decls.
-    if (auto context = dyn_cast<DeclContext>(decl)) {
-      if (auto params = context->getGenericParamsOfContext()) {
-        bindAllGenericParameters(*this, params);
+    if (decl->getInterfaceType()
+        && !decl->getInterfaceType()->is<ErrorType>()) {
+      if (auto context = dyn_cast<DeclContext>(decl)) {
+        if (auto params = context->getGenericParamsOfContext()) {
+          bindAllGenericParameters(*this, params);
+        }
       }
     }
   }
