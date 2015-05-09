@@ -1855,23 +1855,31 @@ ParserResult<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc,
                                             LabeledStmtInfo LabelInfo) {
   ParserStatus Status;
 
-  // Change the parser state to know that the pattern we're about to parse is
-  // implicitly mutable.  Bound variables can be changed to mutable explicitly
-  // if desired by using a 'var' pattern.
-  assert(InVarOrLetPattern == IVOLP_NotInVarOrLet &&
-         "for-each loops cannot exist inside other patterns");
-  InVarOrLetPattern = IVOLP_ImplicitlyImmutable;
-  ParserResult<Pattern> Pattern = parseTypedPattern();
-  assert(InVarOrLetPattern == IVOLP_ImplicitlyImmutable);
-  InVarOrLetPattern = IVOLP_NotInVarOrLet;
+  ParserResult<Pattern> pattern;
+
+  // Parse teh pattern.  This is either 'case <refutable pattern>' or just a
+  // normal pattern.
+  if (consumeIf(tok::kw_case)) {
+    pattern = parseMatchingPattern(/*isExprBasic*/true);
+    pattern = parseOptionalPatternTypeAnnotation(pattern, /*isOptional*/false);
+  } else {
+    // Change the parser state to know that the pattern we're about to parse is
+    // implicitly mutable.  Bound variables can be changed to mutable explicitly
+    // if desired by using a 'var' pattern.
+    assert(InVarOrLetPattern == IVOLP_NotInVarOrLet &&
+           "for-each loops cannot exist inside other patterns");
+    InVarOrLetPattern = IVOLP_ImplicitlyImmutable;
+    pattern = parseTypedPattern();
+    assert(InVarOrLetPattern == IVOLP_ImplicitlyImmutable);
+    InVarOrLetPattern = IVOLP_NotInVarOrLet;
+  }
   
-  
-  if (Pattern.isNull())
+  if (pattern.isNull())
     // Recover by creating a "_" pattern.
-    Pattern = makeParserErrorResult(new (Context) AnyPattern(SourceLoc()));
+    pattern = makeParserErrorResult(new (Context) AnyPattern(SourceLoc()));
 
   // Bound variables all get their initial values from the generator.
-  Pattern.get()->markHasNonPatternBindingInit();
+  pattern.get()->markHasNonPatternBindingInit();
   
   SourceLoc InLoc;
   parseToken(tok::kw_in, InLoc, diag::expected_foreach_in);
@@ -1897,7 +1905,7 @@ ParserResult<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc,
   Scope S(this, ScopeKind::ForeachVars);
   
   // Introduce variables to the current scope.
-  addPatternVariablesToScope(Pattern.get());
+  addPatternVariablesToScope(pattern.get());
 
   // Parse the 'where' expression if present.
   ParserResult<Expr> Where;
@@ -1921,7 +1929,7 @@ ParserResult<Stmt> Parser::parseStmtForEach(SourceLoc ForLoc,
 
   return makeParserResult(
       Status,
-      new (Context) ForEachStmt(LabelInfo, ForLoc, Pattern.get(), InLoc,
+      new (Context) ForEachStmt(LabelInfo, ForLoc, pattern.get(), InLoc,
                                 Container.get(), Where.getPtrOrNull(),
                                 Body.get()));
 }

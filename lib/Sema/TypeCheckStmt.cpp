@@ -484,6 +484,15 @@ public:
     options |= TR_AllowUnspecifiedTypes;
     options |= TR_AllowUnboundGenerics;
     options |= TR_InExpression;
+    
+    if (auto *P = TC.resolvePattern(S->getPattern(), DC,
+                                    /*isStmtCondition*/false)) {
+      S->setPattern(P);
+    } else {
+      S->getPattern()->setType(ErrorType::get(TC.Context));
+      return nullptr;
+    }
+  
     if (TC.typeCheckPattern(S->getPattern(), DC, options)) {
       // FIXME: Handle errors better.
       S->getPattern()->setType(ErrorType::get(TC.Context));

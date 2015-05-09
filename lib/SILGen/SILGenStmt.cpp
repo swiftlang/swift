@@ -705,8 +705,11 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
     // at the end of each loop iteration.
     {
       Scope InnerForScope(SGF.Cleanups, CleanupLocation(S->getBody()));
+      // Emit the initialization for the pattern.  If any of the bound patterns
+      // fail (because this is a 'for case' pattern with a refutable pattern,
+      // the code should jump to the continue block.
       InitializationPtr initLoopVars
-        = SGF.emitPatternBindingInitialization(S->getPattern());
+        = SGF.emitPatternBindingInitialization(S->getPattern(), loopDest);
       ManagedValue val;
 
       // If we had a loadable "next" generator value, we know it is present.

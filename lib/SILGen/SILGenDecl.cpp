@@ -884,7 +884,8 @@ void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *PBD) {
   // Allocate the variables and build up an Initialization over their
   // allocated storage.
   for (auto entry : PBD->getPatternList()) {
-    auto initialization = emitPatternBindingInitialization(entry.ThePattern);
+    auto initialization = emitPatternBindingInitialization(entry.ThePattern,
+                                                           JumpDest::invalid());
 
     // If an initial value expression was specified by the decl, emit it into
     // the initialization. Otherwise, mark it uninitialized for DI to resolve.
@@ -943,8 +944,9 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond,
 }
 
 InitializationPtr
-SILGenFunction::emitPatternBindingInitialization(Pattern *P) {
-  return InitializationForPattern(*this, JumpDest::invalid()).visit(P);
+SILGenFunction::emitPatternBindingInitialization(Pattern *P,
+                                                 JumpDest failureDest) {
+  return InitializationForPattern(*this, failureDest).visit(P);
 }
 
 /// Enter a cleanup to deallocate the given location.

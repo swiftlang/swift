@@ -1296,7 +1296,8 @@ public:
   void visitFuncDecl(FuncDecl *D);
   void visitPatternBindingDecl(PatternBindingDecl *D);
   
-  std::unique_ptr<Initialization> emitPatternBindingInitialization(Pattern *P);
+  std::unique_ptr<Initialization>
+  emitPatternBindingInitialization(Pattern *P, JumpDest failureDest);
     
   void visitTypeAliasDecl(TypeAliasDecl *D) {
     // No lowering support needed.
