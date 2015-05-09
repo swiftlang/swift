@@ -6,10 +6,15 @@ import StdlibUnittest
 
 var UnmanagedTests = TestSuite("Unmanaged")
 
-UnmanagedTests.test("fromOpaque()/trap") {
+UnmanagedTests.test("fromOpaque()/trap")
+  .skip(.Custom(
+    { !_isDebugAssertConfiguration() },
+    reason: "fromOpaque() does a _debugPrecondition() for null pointers"))
+  .code {
   let null = getPointer(COpaquePointer())
   expectCrashLater()
-  Unmanaged<AnyObject>.fromOpaque(null)
+  let unmanaged = Unmanaged<AnyObject>.fromOpaque(null)
+  _blackHole(unmanaged)
 }
 
 class FooClass {}
