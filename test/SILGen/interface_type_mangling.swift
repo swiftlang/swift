@@ -175,6 +175,16 @@ func L17<T where T: P, T.Assoc2 == T.Assoc1, T.Assoc2 == G<T>>(x: T) {}
 // CHECK:       interface_type_mangling.L18 : [[L_SIGNATURE]]
 func L18<T where T: P, G<T> == T.Assoc1, T.Assoc2 == G<T>>(x: T) {}
 
+struct X {}; struct Y {}
+
+// CHECK-LABEL: interface_type_mangling.m1 :
+// CHECK:                                    [[M_SIGNATURE:<A, B where A: interface_type_mangling.A, B: interface_type_mangling.A, A.Assoc == interface_type_mangling.X, B.Assoc == interface_type_mangling.Y> \(A, y : B\) -> \(\)]]
+func m1<T: A, U: A where T.Assoc == X, U.Assoc == Y>(x: T, y: U) {}
+// CHECK:       interface_type_mangling.m2 : [[M_SIGNATURE]]
+func m2<T: A, U: A where U.Assoc == Y, T.Assoc == X>(x: T, y: U) {}
+// CHECK:       interface_type_mangling.m3 : [[M_SIGNATURE]]
+func m3<T, U where T: A, U: A, U.Assoc == Y, T.Assoc == X>(x: T, y: U) {}
+
 protocol GenericWitnessTest {
   typealias Tee
 

@@ -1116,34 +1116,34 @@ GenericSignature::getCanonicalManglingSignature(Module &M) const {
   }
   
   // Collect the same type constraints.
-  using SameTypeSet = std::pair<CanType, SmallVector<CanType, 2>>;
-  SmallVector<SameTypeSet, 2> sameTypeSets;
+  unsigned sameTypeBegin = minimalRequirements.size();
   
   for (auto &group : sameTypes) {
     // Sort the types in the set.
     auto types = std::move(group.second);
     types.push_back(group.first);
     llvm::array_pod_sort(types.begin(), types.end(), compareDependentTypes);
-    
-    // Collect them again, keyed by the greatest type in the set (which will be
-    // the concrete type, if one).
-    auto keyType = types.pop_back_val();
-    sameTypeSets.push_back({keyType, std::move(types)});
-  }
-  
-  // Sort the same-type sets by their RHS.
-  std::sort(sameTypeSets.begin(), sameTypeSets.end(),
-            [](const SameTypeSet &a, const SameTypeSet &b) {
-              return compareDependentTypes(&a.first, &b.first);
-            });
-  
-  // Emit the same-type constraints.
-  for (auto &set : sameTypeSets) {
-    for (auto lhs : set.second) {
+
+    // Form constraints with the greater type on the right (which will be the
+    // concrete type, if one).
+    auto rhsType = types.pop_back_val();
+    for (auto lhsType : types)
       minimalRequirements.push_back(Requirement(RequirementKind::SameType,
-                                                lhs, set.first));
-    }
+                                                lhsType, rhsType));
   }
+  
+  // Sort the same-types by LHS, then by RHS.
+  std::sort(minimalRequirements.begin() + sameTypeBegin, minimalRequirements.end(),
+    [](const Requirement &a, const Requirement &b) -> bool {
+      assert(a.getKind() == b.getKind()
+             && a.getKind() == RequirementKind::SameType
+             && "not same type constraints");
+      CanType aLHS(a.getFirstType()), bLHS(b.getFirstType());
+      if (int compareLHS = compareDependentTypes(&aLHS, &bLHS))
+        return compareLHS < 0;
+      CanType aRHS(a.getSecondType()), bRHS(b.getSecondType());
+      return compareDependentTypes(&aRHS, &bRHS);
+    });
   
   // Build the minimized signature.
   auto manglingSig = GenericSignature::get(canonical->getGenericParams(),
