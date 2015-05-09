@@ -98,7 +98,43 @@ func == (lhs: EnumWithoutPayloads, rhs: EnumWithoutPayloads) -> Bool {
   }
 }
 
+struct SequenceWithCustomUnderestimateCount : SequenceType {
+  init(_ data: [Int]) {
+    self._data = MinimalSequence(data._prext_map { OpaqueValue($0) })
+  }
+
+  func generate() -> MinimalSequence<OpaqueValue<Int>>.Generator {
+    return _data.generate()
+  }
+
+  func underestimateCount() -> Int {
+    ++SequenceWithCustomUnderestimateCount.timesUnderestimateCountWasCalled
+    return _data.underestimateCount()
+  }
+
+  static var timesUnderestimateCountWasCalled: Int = 0
+
+  let _data: MinimalSequence<OpaqueValue<Int>>
+}
+
 % for array_type in all_array_types:
+
+ArrayTestSuite.test("${array_type}/init(SequenceType)") {
+  let base = SequenceWithCustomUnderestimateCount(
+    [ 0, 30, 10, 90 ])
+
+  SequenceWithCustomUnderestimateCount.timesUnderestimateCountWasCalled = 0
+
+  let result = ${array_type}(base)
+
+  expectEqual([ 0, 30, 10, 90 ], result._prext_map { $0.value })
+
+  expectEqual(1, SequenceWithCustomUnderestimateCount.timesUnderestimateCountWasCalled)
+
+  expectEqualSequence([], Array(base)._prext_map { $0.value }) {
+    "sequence should be consumed"
+  }
+}
 
 ArrayTestSuite.test("${array_type}/Sliceable/Enums") {
   typealias E = EnumWithoutPayloads
