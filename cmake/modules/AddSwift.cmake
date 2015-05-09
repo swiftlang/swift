@@ -627,6 +627,7 @@ endfunction()
 #     [LINK_FLAGS flag1...]
 #     [API_NOTES_NON_OVERLAY]
 #     [FILE_DEPENDS target1 ...]
+#     [DONT_EMBED_BITCODE]
 #     [IS_STDLIB]
 #     [IS_STDLIB_CORE]
 #     [IS_SDK_OVERLAY]
@@ -675,6 +676,9 @@ endfunction()
 # FILE_DEPENDS
 #   Additional files this library depends on.
 #
+# DONT_EMBED_BITCODE
+#   Don't embed LLVM bitcode in this target, even if it is enabled globally.
+#
 # IS_STDLIB
 #   Install library dylib and swift module files to lib/swift.
 #
@@ -692,7 +696,7 @@ endfunction()
 function(_add_swift_library_single target name)
   set(SWIFTLIB_SINGLE_options
       SHARED IS_STDLIB IS_STDLIB_CORE IS_SDK_OVERLAY
-      API_NOTES_NON_OVERLAY)
+      API_NOTES_NON_OVERLAY DONT_EMBED_BITCODE)
   parse_arguments(SWIFTLIB_SINGLE
     "DEPENDS;LINK_LIBRARIES;FRAMEWORK_DEPENDS;COMPONENT_DEPENDS;C_COMPILE_FLAGS;SWIFT_COMPILE_FLAGS;LINK_FLAGS;PRIVATE_LINK_LIBRARIES;INTERFACE_LINK_LIBRARIES;FILE_DEPENDS;SDK;ARCHITECTURE;INSTALL_IN_COMPONENT"
     "${SWIFTLIB_SINGLE_options}"
@@ -720,7 +724,7 @@ function(_add_swift_library_single target name)
       "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_LIB_SUBDIR}/${SWIFTLIB_SINGLE_ARCHITECTURE}")
 
   # Include LLVM Bitcode slices for iOS, Watch OS, and Apple TV OS device libraries.
-  if(SWIFT_ALLOW_BITCODE_SECTION)
+  if(SWIFT_ALLOW_BITCODE_SECTION AND NOT SWIFTLIB_DONT_EMBED_BITCODE)
     if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "IOS" OR "${SWIFTLIB_SINGLE_SDK}" STREQUAL "TVOS" OR "${SWIFTLIB_SINGLE_SDK}" STREQUAL "WATCHOS")
       set(SWIFTLIB_SINGLE_C_COMPILE_FLAGS "${SWIFTLIB_SINGLE_C_COMPILE_FLAGS}" "-fembed-bitcode")
       set(SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS "${SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS}" "-embed-bitcode")
@@ -1077,6 +1081,7 @@ endfunction()
 #     [C_COMPILE_FLAGS flag1...]
 #     [SWIFT_COMPILE_FLAGS flag1...]
 #     [LINK_FLAGS flag1...]
+#     [DONT_EMBED_BITCODE]
 #     [API_NOTES_NON_OVERLAY]
 #     [INSTALL]
 #     [IS_STDLIB]
@@ -1131,6 +1136,9 @@ endfunction()
 # API_NOTES_NON_OVERLAY
 #   Generate API notes for non-overlayed modules with this target.
 #
+# DONT_EMBED_BITCODE
+#   Don't embed LLVM bitcode in this target, even if it is enabled globally.
+#
 # IS_STDLIB
 #   Treat the library as a part of the Swift standard library.
 #   IS_STDLIB implies TARGET_LIBRARY.
@@ -1153,7 +1161,7 @@ endfunction()
 function(add_swift_library name)
   set(SWIFTLIB_options
       SHARED IS_STDLIB IS_STDLIB_CORE IS_SDK_OVERLAY TARGET_LIBRARY
-      API_NOTES_NON_OVERLAY)
+      API_NOTES_NON_OVERLAY DONT_EMBED_BITCODE)
   parse_arguments(SWIFTLIB
     "DEPENDS;LINK_LIBRARIES;SWIFT_MODULE_DEPENDS;SWIFT_MODULE_DEPENDS_OSX;SWIFT_MODULE_DEPENDS_IOS_TVOS;FRAMEWORK_DEPENDS;COMPONENT_DEPENDS;FILE_DEPENDS;TARGET_SDKS;C_COMPILE_FLAGS;SWIFT_COMPILE_FLAGS;LINK_FLAGS;PRIVATE_LINK_LIBRARIES;INTERFACE_LINK_LIBRARIES;INSTALL_IN_COMPONENT"
       "${SWIFTLIB_options}"
@@ -1270,6 +1278,7 @@ function(add_swift_library name)
           SWIFT_COMPILE_FLAGS ${SWIFTLIB_SWIFT_COMPILE_FLAGS}
           LINK_FLAGS ${SWIFTLIB_LINK_FLAGS}
           PRIVATE_LINK_LIBRARIES ${swiftlib_private_link_libraries_targets}
+          ${SWIFTLIB_DONT_EMBED_BITCODE_keyword}
           ${SWIFTLIB_API_NOTES_NON_OVERLAY_keyword}
           ${SWIFTLIB_IS_STDLIB_keyword}
           ${SWIFTLIB_IS_STDLIB_CORE_keyword}
@@ -1415,6 +1424,7 @@ function(add_swift_library name)
       LINK_FLAGS ${SWIFTLIB_LINK_FLAGS}
       PRIVATE_LINK_LIBRARIES ${SWIFTLIB_PRIVATE_LINK_LIBRARIES}
       INTERFACE_LINK_LIBRARIES ${SWIFTLIB_INTERFACE_LINK_LIBRARIES}
+      ${SWIFTLIB_DONT_EMBED_BITCODE_keyword}
       ${SWIFTLIB_API_NOTES_NON_OVERLAY_keyword}
       ${SWIFTLIB_IS_STDLIB_keyword}
       ${SWIFTLIB_IS_STDLIB_CORE_keyword}
