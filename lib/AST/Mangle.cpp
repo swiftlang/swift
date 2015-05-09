@@ -1575,13 +1575,24 @@ void Mangler::mangleProtocolConformance(const ProtocolConformance *conformance){
   
   ContextStack context(*this);
   // If the conformance is generic, mangle its generic parameters.
-  if (auto gp = conformance->getGenericParams()) {
-    Buffer << 'U';
-    bindGenericParameters(gp, /*mangle*/ true);
+  if (conformance->getDeclContext()->getASTContext()
+        .LangOpts.EnableInterfaceTypeMangling) {
+    if (auto sig = conformance->getGenericSignature()) {
+      Buffer << 'u';
+      mangleGenericSignature(sig, ResilienceExpansion::Minimal);
+    }
+    
+    mangleType(conformance->getInterfaceType()->getCanonicalType(),
+               ResilienceExpansion::Minimal, 0);
+  } else {
+    if (auto gp = conformance->getGenericParams()) {
+      Buffer << 'U';
+      bindGenericParameters(gp, /*mangle*/ true);
+    }
+    
+    mangleType(conformance->getType()->getCanonicalType(),
+               ResilienceExpansion::Minimal, 0);
   }
-  
-  mangleType(conformance->getType()->getCanonicalType(),
-             ResilienceExpansion::Minimal, 0);
   mangleProtocolName(conformance->getProtocol());
   mangleModule(conformance->getDeclContext()->getParentModule());
 }

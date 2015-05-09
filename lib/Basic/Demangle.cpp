@@ -348,6 +348,11 @@ public:
                                            unsigned(*_kind)));     \
   } while (false)
 
+  void resetGenericContext() {
+    ArchetypeCounts.clear();
+    ArchetypeCount = 0;
+  }
+
   /// Attempt to demangle the source string.  The root node will
   /// always be a Global.  Extra characters at the end will be
   /// tolerated (and included as a Suffix node as a child of the
@@ -368,8 +373,7 @@ public:
         // The Substitution header does not share state with the rest
         // of the mangling.
         Substitutions.clear();
-        ArchetypeCounts.clear();
-        ArchetypeCount = 0;
+        resetGenericContext();
       } while (Mangled.nextIf("_TTS"));
 
       // Then check that we have a global.
@@ -642,6 +646,8 @@ private:
       if (Mangled.nextIf('W')) {
         NodePointer thunk = NodeFactory::create(Node::Kind::ProtocolWitness);
         DEMANGLE_CHILD_OR_RETURN(thunk, ProtocolConformance);
+        // The entity is mangled in its own generic context.
+        resetGenericContext();
         DEMANGLE_CHILD_OR_RETURN(thunk, Entity);
         return thunk;
       }

@@ -1009,6 +1009,7 @@ they are mangled following a second ``U``.
 ::
 
   protocol-conformance ::= ('U' generics '_')? type protocol module
+  protocol-conformance ::= ('u' generic-signature)? type protocol module
 
 ``<protocol-conformance>`` refers to a type's conformance to a protocol. The named
 module is the one containing the extension or type declaration that declared
