@@ -1604,6 +1604,7 @@ getOrCreateReabstractionThunk(GenericParamList *thunkContextParams,
     stream << "_TTR";
     if (auto generics = thunkType->getGenericSignature()) {
       stream << 'G';
+      mangler.setModuleContext(M.getSwiftModule());
       mangler.mangleGenericSignature(generics,
                                      ResilienceExpansion::Minimal);
     }

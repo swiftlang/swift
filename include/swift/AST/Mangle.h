@@ -47,6 +47,7 @@ class Mangler {
   llvm::DenseMap<const void *, unsigned> Substitutions;
   llvm::DenseMap<const ArchetypeType *, ArchetypeInfo> Archetypes;
   unsigned ArchetypesDepth = 0;
+  ModuleDecl *Mod = nullptr;
   const DeclContext *DeclCtx = nullptr;
   /// If enabled, Arche- and Alias types are mangled with context.
   bool DWARFMangling;
@@ -84,6 +85,8 @@ public:
     }
     ~ContextStack() { M.ArchetypesDepth = OldDepth; }
   };
+
+  void setModuleContext(ModuleDecl *M) { Mod = M; }
 
   /// \param DWARFMangling - use the 'Qq' mangling format for
   /// archetypes and the 'a' mangling for alias types.

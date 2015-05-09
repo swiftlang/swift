@@ -567,6 +567,7 @@ void Mangler::mangleDeclType(const ValueDecl *decl,
     type = decl->hasType() ? decl->getType()
                            : ErrorType::get(decl->getASTContext());
   }
+  Mod = decl->getModuleContext();
   mangleType(type->getCanonicalType(), explosion, uncurryLevel);
 
   if (decl->getASTContext().LangOpts.EnableInterfaceTypeMangling) {
@@ -583,10 +584,9 @@ void Mangler::mangleGenericSignature(const GenericSignature *sig,
                                      ResilienceExpansion expansion) {
   // TODO: For staging purposes, only canonicalize the signature when interface
   // type mangling is enabled. We ought to do this all the time.
+  assert(Mod);
   if (sig->getASTContext().LangOpts.EnableInterfaceTypeMangling)
-    // FIXME: Is module important?
-    sig = sig->getCanonicalManglingSignature(
-                                       *sig->getASTContext().getStdlibModule());
+    sig = sig->getCanonicalManglingSignature(*Mod);
   
   // Mangle the number of parameters.
   unsigned depth = 0;
@@ -1577,11 +1577,11 @@ void Mangler::mangleProtocolConformance(const ProtocolConformance *conformance){
   // If the conformance is generic, mangle its generic parameters.
   if (conformance->getDeclContext()->getASTContext()
         .LangOpts.EnableInterfaceTypeMangling) {
+    Mod = conformance->getDeclContext()->getParentModule();
     if (auto sig = conformance->getGenericSignature()) {
       Buffer << 'u';
       mangleGenericSignature(sig, ResilienceExpansion::Minimal);
     }
-    
     mangleType(conformance->getInterfaceType()->getCanonicalType(),
                ResilienceExpansion::Minimal, 0);
   } else {
