@@ -1146,7 +1146,7 @@ GenericSignature::getCanonicalManglingSignature(Module &M) const {
   }
   
   // Build the minimized signature.
-  auto manglingSig = GenericSignature::get(getGenericParams(),
+  auto manglingSig = GenericSignature::get(canonical->getGenericParams(),
                                            minimalRequirements);
   
   CanGenericSignature canSig(manglingSig);
