@@ -3,9 +3,9 @@
 import c_simd
 import simd
 
-let f4: Float4 = makes_float4()
-let i3: Int3 = makes_int3()
-let d2: Double2 = makes_double2()
+let f4: float4 = makes_float4()
+let i3: int3 = makes_int3()
+let d2: double2 = makes_double2()
 
 takes_float4(f4)
 takes_int3(i3)

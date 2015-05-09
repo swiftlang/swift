@@ -19,20 +19,20 @@
 import Foundation
 import simd
 
-// CHECK-LABEL: typedef float swift_Float4 __attribute__((__ext_vector_type__(4)));
-// CHECK-LABEL: typedef double swift_Double2 __attribute__((__ext_vector_type__(2)));
-// CHECK-LABEL: typedef int swift_Int3 __attribute__((__ext_vector_type__(3)));
+// CHECK-LABEL: typedef float swift_float4 __attribute__((__ext_vector_type__(4)));
+// CHECK-LABEL: typedef double swift_double2 __attribute__((__ext_vector_type__(2)));
+// CHECK-LABEL: typedef int swift_int3 __attribute__((__ext_vector_type__(3)));
 
 // -- The C simd module is useless to Swift.
 // CHECK-NOT: @import simd;
 
 // CHECK-LABEL: @interface Foo : NSObject
 @objc class Foo: NSObject {
-  // CHECK-LABEL: - (swift_Float4)doStuffWithFloat4:(swift_Float4)x;
-  @objc func doStuffWithFloat4(x: Float4) -> Float4 { return x }
-  // CHECK-LABEL: - (swift_Double2)doStuffWithDouble2:(swift_Double2)x;
-  @objc func doStuffWithDouble2(x: Double2) -> Double2 { return x }
-  // CHECK-LABEL: - (swift_Int3)doStuffWithInt3:(swift_Int3)x;
-  @objc func doStuffWithInt3(x: Int3) -> Int3 { return x }
+  // CHECK-LABEL: - (swift_float4)doStuffWithFloat4:(swift_float4)x;
+  @objc func doStuffWithFloat4(x: float4) -> float4 { return x }
+  // CHECK-LABEL: - (swift_double2)doStuffWithDouble2:(swift_double2)x;
+  @objc func doStuffWithDouble2(x: double2) -> double2 { return x }
+  // CHECK-LABEL: - (swift_int3)doStuffWithInt3:(swift_int3)x;
+  @objc func doStuffWithInt3(x: int3) -> int3 { return x }
 }
 

@@ -3074,7 +3074,7 @@ void TypeChecker::fillObjCRepresentableTypeCache(const DeclContext *DC) {
   Identifier ID_SIMD = Context.Id_simd;
   if (auto SIMDModule = Context.getLoadedModule(ID_SIMD)) {
     StdlibTypeNames.clear();
-#define MAP_SIMD_TYPE(_, __, BASENAME)                                   \
+#define MAP_SIMD_TYPE(BASENAME, __)                                      \
     {                                                                    \
       char name[] = #BASENAME "0";                                       \
       for (unsigned i = 2; i <= SWIFT_MAX_IMPORTED_SIMD_ELEMENTS; ++i) { \

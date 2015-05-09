@@ -673,7 +673,7 @@ private:
         = { "NSZone *", true };
       
       // Use typedefs we set up for SIMD vector types.
-#define MAP_SIMD_TYPE(_, __, BASENAME) \
+#define MAP_SIMD_TYPE(BASENAME, __) \
       specialNames[{ctx.Id_simd, ctx.getIdentifier(#BASENAME "2")}] \
         = { "swift_" #BASENAME "2", false };                        \
       specialNames[{ctx.Id_simd, ctx.getIdentifier(#BASENAME "3")}] \
@@ -720,7 +720,8 @@ private:
   void visitNameAliasType(NameAliasType *aliasTy,
                           Optional<OptionalTypeKind> optionalKind) {
     const TypeAliasDecl *alias = aliasTy->getDecl();
-    if (printIfKnownTypeName(alias->getModuleContext()->Name, alias->getName(),
+    if (printIfKnownTypeName(alias->getModuleContext()->getName(),
+                             alias->getName(),
                              optionalKind))
       return;
 
@@ -776,7 +777,7 @@ private:
       return;
     }
 
-    if (printIfKnownTypeName(SD->getModuleContext()->Name, SD->getName(),
+    if (printIfKnownTypeName(SD->getModuleContext()->getName(), SD->getName(),
                              optionalKind))
       return;
 
@@ -1540,10 +1541,13 @@ public:
            "# endif\n"
            "#  define SWIFT_NULLABILITY(X)\n"
            "#endif\n"
-#define MAP_SIMD_TYPE(C_TYPE, _, SWIFT_NAME) \
-           "typedef " #C_TYPE " swift_" #SWIFT_NAME "2 __attribute__((__ext_vector_type__(2)));\n" \
-           "typedef " #C_TYPE " swift_" #SWIFT_NAME "3 __attribute__((__ext_vector_type__(3)));\n" \
-           "typedef " #C_TYPE " swift_" #SWIFT_NAME "4 __attribute__((__ext_vector_type__(4)));\n"
+#define MAP_SIMD_TYPE(C_TYPE, _) \
+           "typedef " #C_TYPE " swift_" #C_TYPE "2"       \
+           "  __attribute__((__ext_vector_type__(2)));\n" \
+           "typedef " #C_TYPE " swift_" #C_TYPE "3"       \
+           "  __attribute__((__ext_vector_type__(3)));\n" \
+           "typedef " #C_TYPE " swift_" #C_TYPE "4"       \
+           "  __attribute__((__ext_vector_type__(4)));\n"
 #include "swift/ClangImporter/SIMDMappedTypes.def"
            ;
     static_assert(SWIFT_MAX_IMPORTED_SIMD_ELEMENTS == 4,

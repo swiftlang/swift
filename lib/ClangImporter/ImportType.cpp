@@ -437,9 +437,9 @@ namespace {
         if (auto builtinTy
               = dyn_cast<clang::BuiltinType>(type->getElementType())){
           switch (builtinTy->getKind()) {
-#define MAP_SIMD_TYPE(_, BUILTIN_KIND, SWIFT_BASENAME) \
-          case clang::BuiltinType::BUILTIN_KIND:    \
-            names << #SWIFT_BASENAME;               \
+#define MAP_SIMD_TYPE(TYPE_NAME, BUILTIN_KIND)   \
+          case clang::BuiltinType::BUILTIN_KIND: \
+            names << #TYPE_NAME;                 \
             break;
 #include "swift/ClangImporter/SIMDMappedTypes.def"
           default:

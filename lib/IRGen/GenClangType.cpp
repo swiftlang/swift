@@ -608,9 +608,9 @@ void ClangTypeConverter::fillSpeciallyImportedTypeCache(IRGenModule &IGM) {
   
   // Handle SIMD types.
   if (auto SIMDModule = IGM.Context.getLoadedModule(IGM.Context.Id_simd)) {
-#define MAP_SIMD_TYPE(_, CLANG_KIND, SWIFT_NAME)                               \
+#define MAP_SIMD_TYPE(TYPE_NAME, CLANG_KIND)                                   \
     {                                                                          \
-      char name[] = #SWIFT_NAME "0";                                           \
+      char name[] = #TYPE_NAME "0";                                            \
       for (unsigned i = 2; i <= SWIFT_MAX_IMPORTED_SIMD_ELEMENTS; ++i) {       \
         *(std::end(name) - 2) = '0' + i;                                       \
         auto eltTy = getClangBuiltinTypeFromKind(ctx,                          \
