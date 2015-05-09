@@ -35,14 +35,7 @@ internal func _replExit() {
 /// Print a string as is to stdout.
 public // COMPILER_INTRINSIC
 func _replPrintLiteralString(text: String) {
-  var target = _Stdout()
-  target._lock()
-  _print_unlocked(text, &target)
-  target._unlock()
-  // FIXME: <rdar://problem/20812952> _replPrintLiteralString and _replDebugPrintln should use print()
-  //
-  // Should be:
-  // print(text, appendNewline: false)
+  print(text, appendNewline: false)
 }
 
 /// Print the debug representation of `value`, followed by a newline.
@@ -50,14 +43,6 @@ func _replPrintLiteralString(text: String) {
 @_semantics("stdlib_binary_only")
 public // COMPILER_INTRINSIC
 func _replDebugPrintln<T>(value: T) {
-  var target = _Stdout()
-  target._lock()
-  _debugPrint_unlocked(value, &target)
-  target.write("\n")
-  target._unlock()
-  // FIXME: <rdar://problem/20812952> _replPrintLiteralString and _replDebugPrintln should use print()
-  //
-  // Should be:
-  // debugPrint(value)
+  debugPrint(value)
 }
 
