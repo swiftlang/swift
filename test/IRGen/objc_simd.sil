@@ -1,21 +1,11 @@
-// RUN: rm -rf %t
-// RUN: mkdir %t
-
-// FIXME: BEGIN -enable-source-import hackaround
-// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift
-// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/CoreGraphics.swift
-// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/Foundation.swift
-// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/simd.swift
-// FIXME: END -enable-source-import hackaround
-
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource) -I %t -emit-ir %s | FileCheck %s --check-prefix=%target-cpu
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-ir %s | FileCheck %s --check-prefix=%target-cpu
 
 import Swift
 import simd
 
 // Work around rdar://problem/20577079 with a Swift function that touches all
-// the fields of Float.Vector4, forcing it to be validated.
-func forceStuff(x: Float.Vector4) -> (Float,Float,Float,Float) {
+// the fields of Float4, forcing it to be validated.
+func forceStuff(x: Float4) -> (Float,Float,Float,Float) {
   return (x.x, x.y, x.z, x.w)
 }
 
@@ -25,22 +15,22 @@ func forceStuff(x: Float.Vector4) -> (Float,Float,Float,Float) {
 // armv7-LABEL: define <4 x float> @simd_c_args(<4 x float>)
 // armv7s-LABEL: define <4 x float> @simd_c_args(<4 x float>)
 // armv7k-LABEL: define <4 x float> @simd_c_args(<4 x float>)
-sil @simd_c_args : $@convention(c) (Float.Vector4) -> Float.Vector4 {
-entry(%x : $Float.Vector4):
-  return %x : $Float.Vector4
+sil @simd_c_args : $@convention(c) (Float4) -> Float4 {
+entry(%x : $Float4):
+  return %x : $Float4
 }
 
-// x86_64-LABEL: define void @simd_native_args(%VE4simdSf7Vector4* noalias sret, float, float, float, float)
-// i386-LABEL: define void @simd_native_args(%VE4simdSf7Vector4* noalias sret, float, float, float, float)
+// x86_64-LABEL: define void @simd_native_args(%V4simd6Float4* noalias sret, float, float, float, float)
+// i386-LABEL: define void @simd_native_args(%V4simd6Float4* noalias sret, float, float, float, float)
 // arm64-LABEL: define { float, float, float, float } @simd_native_args(float, float, float, float)
-// armv7-LABEL: define void @simd_native_args(%VE4simdSf7Vector4* noalias sret, float, float, float, float)
-// armv7s-LABEL: define void @simd_native_args(%VE4simdSf7Vector4* noalias sret, float, float, float, float)
-// armv7k-LABEL: define void @simd_native_args(%VE4simdSf7Vector4* noalias sret, float, float, float, float)
-sil @simd_native_args : $@convention(thin) (Float.Vector4) -> Float.Vector4 {
-entry(%x : $Float.Vector4):
-  %f = function_ref @simd_c_args : $@convention(c) (Float.Vector4) -> Float.Vector4
-  %y = apply %f(%x) : $@convention(c) (Float.Vector4) -> Float.Vector4
-  return %y : $Float.Vector4
+// armv7-LABEL: define void @simd_native_args(%V4simd6Float4* noalias sret, float, float, float, float)
+// armv7s-LABEL: define void @simd_native_args(%V4simd6Float4* noalias sret, float, float, float, float)
+// armv7k-LABEL: define void @simd_native_args(%V4simd6Float4* noalias sret, float, float, float, float)
+sil @simd_native_args : $@convention(thin) (Float4) -> Float4 {
+entry(%x : $Float4):
+  %f = function_ref @simd_c_args : $@convention(c) (Float4) -> Float4
+  %y = apply %f(%x) : $@convention(c) (Float4) -> Float4
+  return %y : $Float4
 }
 
 

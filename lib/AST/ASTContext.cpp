@@ -908,40 +908,6 @@ FuncDecl *ASTContext::getIsOSVersionAtLeastDecl(LazyResolver *resolver) const {
   return decl;
 }
 
-TypeDecl *
-ASTContext::getSIMDVectorType(Type elementType, unsigned elements) const {
-  // If the SIMD module isn't loaded, don't bother.
-  auto *SIMD = getLoadedModule(Id_simd);
-  if (!SIMD)
-    return nullptr;
-  
-  // Look up the VectorN nested type.
-  llvm::SmallString<8> vectorName;
-  {
-    llvm::raw_svector_ostream names(vectorName);
-    names << "Vector" << elements;
-    names.flush();
-  }
-    
-  SmallVector<ValueDecl*, 1> vectorDecls;
-
-  if (!SIMD->lookupQualified(elementType,
-                             getIdentifier(vectorName),
-                             NL_QualifiedDefault, nullptr,
-                             vectorDecls))
-    return nullptr;
-
-  // Look for a type decl.
-  for (auto decl : vectorDecls) {
-    if (auto typeDecl = dyn_cast<TypeDecl>(decl)) {
-      return typeDecl;
-    }
-  }
-
-  // If we didn't find one, give up.
-  return nullptr;
-}
-
 /// Check whether the given function is generic over a single,
 /// unconstrained archetype.
 static bool isGenericIntrinsic(FuncDecl *fn, CanType &input, CanType &output,

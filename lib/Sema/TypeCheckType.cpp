@@ -3072,22 +3072,18 @@ void TypeChecker::fillObjCRepresentableTypeCache(const DeclContext *DC) {
   
   // Pull SIMD types of size 2...4 from the SIMD module, if it exists.
   Identifier ID_SIMD = Context.Id_simd;
-  if (Context.getLoadedModule(ID_SIMD)) {
+  if (auto SIMDModule = Context.getLoadedModule(ID_SIMD)) {
     StdlibTypeNames.clear();
-#define MAP_SIMD_TYPE(_, __, BASENAME) \
-    StdlibTypeNames.push_back(Context.getIdentifier(#BASENAME));
-#include "swift/ClangImporter/SIMDMappedTypes.def"
-    llvm::DenseSet<CanType> VectorBaseTypes;
-    
-    lookupLibraryTypes(*this, Stdlib, StdlibTypeNames, VectorBaseTypes);
-    
-    for (auto baseType : VectorBaseTypes) {
-      for (unsigned i = 2; i <= SWIFT_MAX_IMPORTED_SIMD_ELEMENTS; ++i) {
-        if (auto vectorDecl = Context.getSIMDVectorType(baseType, i))
-          ObjCMappedTypes.insert(vectorDecl->getDeclaredType()
-                                           ->getCanonicalType());
-      }
+#define MAP_SIMD_TYPE(_, __, BASENAME)                                   \
+    {                                                                    \
+      char name[] = #BASENAME "0";                                       \
+      for (unsigned i = 2; i <= SWIFT_MAX_IMPORTED_SIMD_ELEMENTS; ++i) { \
+        *(std::end(name) - 2) = '0' + i;                                 \
+        StdlibTypeNames.push_back(Context.getIdentifier(name));          \
+      }                                                                  \
     }
+#include "swift/ClangImporter/SIMDMappedTypes.def"
+    lookupLibraryTypes(*this, SIMDModule, StdlibTypeNames, ObjCMappedTypes);
   }
 }
 

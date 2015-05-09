@@ -497,9 +497,6 @@ public:
   DefaultArgumentInitializer *createDefaultArgumentContext(DeclContext *fn,
                                                            unsigned index);
   void destroyDefaultArgumentContext(DefaultArgumentInitializer *DC);
-  
-  /// Get the nested vector type associated with a base type.
-  TypeDecl *getSIMDVectorType(Type elementType, unsigned elements) const;
 
   //===--------------------------------------------------------------------===//
   // Diagnostics Helper functions
