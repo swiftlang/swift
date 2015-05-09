@@ -22,6 +22,7 @@
 #include "swift/AST/Substitution.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeWalker.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/SaveAndRestore.h"
 
@@ -710,7 +711,7 @@ class swift::ConformanceLookupTable {
   typedef llvm::TinyPtrVector<ConformanceEntry *> ConformanceEntries;
 
   /// The type of the internal conformance table.
-  typedef llvm::DenseMap<ProtocolDecl *, ConformanceEntries> ConformanceTable;
+  typedef llvm::MapVector<ProtocolDecl *, ConformanceEntries> ConformanceTable;
 
   /// The conformance table.
   ConformanceTable Conformances;
@@ -719,7 +720,7 @@ class swift::ConformanceLookupTable {
 
   /// List of all of the protocols to which a given context declares
   /// conformance, both explicitly and implicitly.
-  llvm::DenseMap<DeclContext *, SmallVector<ConformanceEntry *, 4>>
+  llvm::MapVector<DeclContext *, SmallVector<ConformanceEntry *, 4>>
     AllConformances;
 
   /// The complete set of diagnostics about erroneously superseded
