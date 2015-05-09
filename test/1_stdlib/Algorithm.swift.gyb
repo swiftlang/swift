@@ -2085,7 +2085,7 @@ SequenceTypeAlgorithms.test("_copyToNativeArrayBuffer/OverestimatedCount") {
 // CollectionType.generate(), CollectionType.Generator
 //===----------------------------------------------------------------------===//
 
-struct MinimalCollectionWithDefaultGenerator : CollectionType {
+struct MinimalForwardCollectionWithDefaultGenerator : CollectionType {
   init(count: Int) {
     self._count = count
   }
@@ -2112,13 +2112,13 @@ func callGenericGenerate<S : SequenceType>(sequence: S) -> S.Generator {
 
 SequenceTypeAlgorithms.test("CollectionType.generate()/DefaultImplementation") {
   for count in [ 0, 5 ] {
-    let collection = MinimalCollectionWithDefaultGenerator(count: count)
+    let collection = MinimalForwardCollectionWithDefaultGenerator(count: count)
 
     if true {
       // Check the return type of the function when called statically.
       var generator = collection.generate()
       expectType(
-        IndexingGenerator<MinimalCollectionWithDefaultGenerator>.self,
+        IndexingGenerator<MinimalForwardCollectionWithDefaultGenerator>.self,
         &generator)
     }
 
@@ -2126,7 +2126,7 @@ SequenceTypeAlgorithms.test("CollectionType.generate()/DefaultImplementation") {
       // Check the return type of the function when called generically.
       var generator = callGenericGenerate(collection)
       expectType(
-        IndexingGenerator<MinimalCollectionWithDefaultGenerator>.self,
+        IndexingGenerator<MinimalForwardCollectionWithDefaultGenerator>.self,
         &generator)
     }
 
@@ -2138,7 +2138,7 @@ SequenceTypeAlgorithms.test("CollectionType.generate()/DefaultImplementation") {
   }
 }
 
-struct MinimalCollectionWithCustomGenerator : CollectionType {
+struct MinimalForwardCollectionWithCustomGenerator : CollectionType {
   init(count: Int) {
     self._count = count
   }
@@ -2146,7 +2146,7 @@ struct MinimalCollectionWithCustomGenerator : CollectionType {
   static var timesGenerateWasCalled: Int = 0
 
   func generate() -> MinimalGenerator<OpaqueValue<Int>> {
-    ++MinimalCollectionWithCustomGenerator.timesGenerateWasCalled
+    ++MinimalForwardCollectionWithCustomGenerator.timesGenerateWasCalled
     return MinimalGenerator<OpaqueValue<Int>>(
       Array(1..<_count+1)._prext_map { OpaqueValue($0) } as [OpaqueValue<Int>]
     )
@@ -2170,26 +2170,26 @@ struct MinimalCollectionWithCustomGenerator : CollectionType {
 
 SequenceTypeAlgorithms.test("CollectionType.generate()/CustomImplementation") {
   for count in [ 0, 5 ] {
-    let collection = MinimalCollectionWithCustomGenerator(count: count)
+    let collection = MinimalForwardCollectionWithCustomGenerator(count: count)
 
     if true {
       // Check the return type of the function when called statically.
-      MinimalCollectionWithCustomGenerator.timesGenerateWasCalled = 0
+      MinimalForwardCollectionWithCustomGenerator.timesGenerateWasCalled = 0
       var generator = collection.generate()
       expectType(
         MinimalGenerator<OpaqueValue<Int>>.self,
         &generator)
-      expectEqual(1, MinimalCollectionWithCustomGenerator.timesGenerateWasCalled)
+      expectEqual(1, MinimalForwardCollectionWithCustomGenerator.timesGenerateWasCalled)
     }
 
     if true {
-      MinimalCollectionWithCustomGenerator.timesGenerateWasCalled = 0
+      MinimalForwardCollectionWithCustomGenerator.timesGenerateWasCalled = 0
       // Check the return type of the function when called generically.
       var generator = callGenericGenerate(collection)
       expectType(
         MinimalGenerator<OpaqueValue<Int>>.self,
         &generator)
-      expectEqual(1, MinimalCollectionWithCustomGenerator.timesGenerateWasCalled)
+      expectEqual(1, MinimalForwardCollectionWithCustomGenerator.timesGenerateWasCalled)
     }
 
     checkForwardCollection(
@@ -2205,9 +2205,14 @@ SequenceTypeAlgorithms.test("CollectionType.generate()/CustomImplementation") {
 // CollectionType.subscript(range:), CollectionType.SubSlice
 //===----------------------------------------------------------------------===//
 
-struct MinimalCollectionWithDefaultSlicing : CollectionType {
+struct MinimalForwardCollectionWithDefaultSlicing : CollectionType {
   init(count: Int) {
     self._count = count
+  }
+
+  // FIXME: should return MinimalGenerator<OpaqueValue<Int>>
+  func generate() -> MinimalGenerator<OpaqueValue<Int>> {
+    return MinimalGenerator((1..<_count+1)._prext_map { OpaqueValue($0) })
   }
 
   var startIndex: MinimalForwardIndex {
@@ -2236,13 +2241,13 @@ func callGenericSlicing<C : CollectionType>(
 // FIXME: need separate tests for the Slice type itself.
 SequenceTypeAlgorithms.test("subscript(range:)/DefaultImplementation") {
   for count in [ 0, 5 ] {
-    let collection = MinimalCollectionWithDefaultSlicing(count: count)
+    let collection = MinimalForwardCollectionWithDefaultSlicing(count: count)
 
     if true {
       // Check the return type of the function when called statically.
       var slice = collection[collection.startIndex..<collection.endIndex]
       expectType(
-        _prext_Slice<MinimalCollectionWithDefaultSlicing>.self,
+        _prext_Slice<MinimalForwardCollectionWithDefaultSlicing>.self,
         &slice)
     }
 
@@ -2252,7 +2257,7 @@ SequenceTypeAlgorithms.test("subscript(range:)/DefaultImplementation") {
         collection,
         collection.startIndex..<collection.endIndex)
       expectType(
-        _prext_Slice<MinimalCollectionWithDefaultSlicing>.self,
+        _prext_Slice<MinimalForwardCollectionWithDefaultSlicing>.self,
         &slice)
     }
 
@@ -2261,11 +2266,12 @@ SequenceTypeAlgorithms.test("subscript(range:)/DefaultImplementation") {
       Array(1..<count+1)._prext_map { OpaqueValue($0) } as [OpaqueValue<Int>],
       collection,
       { $0.value == $1.value },
+      resiliencyChecks: .none,
       SourceLocStack().withCurrentLoc())
   }
 }
 
-struct MinimalCollectionWithCustomSlicing : CollectionType {
+struct MinimalForwardCollectionWithCustomSlicing : CollectionType {
   init(count: Int) {
     self._count = count
   }
@@ -2323,7 +2329,7 @@ struct CustomSlice : CollectionType {
 // FIXME: need separate tests for the Slice type itself.
 SequenceTypeAlgorithms.test("subscript(range:)/CustomImplementation") {
   for count in [ 0, 5 ] {
-    let collection = MinimalCollectionWithCustomSlicing(count: count)
+    let collection = MinimalForwardCollectionWithCustomSlicing(count: count)
 
     if true {
       // Check the return type of the function when called statically.
@@ -2352,7 +2358,7 @@ SequenceTypeAlgorithms.test("subscript(range:)/CustomImplementation") {
 // isEmpty
 //===----------------------------------------------------------------------===//
 
-struct MinimalCollectionWithDefaultIsEmpty : CollectionType {
+struct MinimalForwardCollectionWithDefaultIsEmpty : CollectionType {
   init(count: Int) {
     self._count = count
   }
@@ -2375,7 +2381,7 @@ struct MinimalCollectionWithDefaultIsEmpty : CollectionType {
 }
 
 func callStaticIsEmpty(
-  collection: MinimalCollectionWithDefaultIsEmpty
+  collection: MinimalForwardCollectionWithDefaultIsEmpty
 ) -> Bool {
   return collection.isEmpty
 }
@@ -2388,18 +2394,18 @@ func callGenericIsEmpty<C : CollectionType>(collection: C) -> Bool {
 
 SequenceTypeAlgorithms.test("isEmpty/DefaultImplementation/${dispatch}") {
   if true {
-    let s = MinimalCollectionWithDefaultIsEmpty(count: 0)
+    let s = MinimalForwardCollectionWithDefaultIsEmpty(count: 0)
     expectTrue(call${dispatch}IsEmpty(s))
   }
   if true {
-    let s = MinimalCollectionWithDefaultIsEmpty(count: 1)
+    let s = MinimalForwardCollectionWithDefaultIsEmpty(count: 1)
     expectFalse(call${dispatch}IsEmpty(s))
   }
 }
 
 % end
 
-struct MinimalCollectionWithCustomIsEmpty : CollectionType {
+struct MinimalForwardCollectionWithCustomIsEmpty : CollectionType {
   static var timesIsEmptyWasColled: Int = 0
 
   init(count: Int) {
@@ -2423,7 +2429,7 @@ struct MinimalCollectionWithCustomIsEmpty : CollectionType {
   }
 
   var isEmpty: Bool {
-    ++MinimalCollectionWithCustomIsEmpty.timesIsEmptyWasColled
+    ++MinimalForwardCollectionWithCustomIsEmpty.timesIsEmptyWasColled
     return _count == 0
   }
 
@@ -2431,7 +2437,7 @@ struct MinimalCollectionWithCustomIsEmpty : CollectionType {
 }
 
 func callStaticIsEmpty(
-  collection: MinimalCollectionWithCustomIsEmpty
+  collection: MinimalForwardCollectionWithCustomIsEmpty
 ) -> Bool {
   return collection.isEmpty
 }
@@ -2440,16 +2446,16 @@ func callStaticIsEmpty(
 
 SequenceTypeAlgorithms.test("isEmpty/DefaultImplementation/${dispatch}") {
   if true {
-    let s = MinimalCollectionWithCustomIsEmpty(count: 0)
-    MinimalCollectionWithCustomIsEmpty.timesIsEmptyWasColled = 0
+    let s = MinimalForwardCollectionWithCustomIsEmpty(count: 0)
+    MinimalForwardCollectionWithCustomIsEmpty.timesIsEmptyWasColled = 0
     expectTrue(call${dispatch}IsEmpty(s))
-    expectEqual(1, MinimalCollectionWithCustomIsEmpty.timesIsEmptyWasColled)
+    expectEqual(1, MinimalForwardCollectionWithCustomIsEmpty.timesIsEmptyWasColled)
   }
   if true {
-    let s = MinimalCollectionWithCustomIsEmpty(count: 1)
-    MinimalCollectionWithCustomIsEmpty.timesIsEmptyWasColled = 0
+    let s = MinimalForwardCollectionWithCustomIsEmpty(count: 1)
+    MinimalForwardCollectionWithCustomIsEmpty.timesIsEmptyWasColled = 0
     expectFalse(call${dispatch}IsEmpty(s))
-    expectEqual(1, MinimalCollectionWithCustomIsEmpty.timesIsEmptyWasColled)
+    expectEqual(1, MinimalForwardCollectionWithCustomIsEmpty.timesIsEmptyWasColled)
   }
 }
 
@@ -2507,7 +2513,7 @@ SequenceTypeAlgorithms.test("last") {
 
 % for Implementation in [ 'Default', 'Custom' ]:
 
-struct MinimalCollectionWith${Implementation}Count : CollectionType {
+struct MinimalForwardCollectionWith${Implementation}Count : CollectionType {
   init(count: Int) {
     self._count = count
   }
@@ -2537,7 +2543,7 @@ struct MinimalCollectionWith${Implementation}Count : CollectionType {
   static var timesCountWasCalled: Int = 0
 
   func count() -> Int32 {
-    ++MinimalCollectionWithCustomCount.timesCountWasCalled
+    ++MinimalForwardCollectionWithCustomCount.timesCountWasCalled
     return Int32(_count)
   }
 
@@ -2554,31 +2560,31 @@ func callGenericCount<C : CollectionType>(collection: C) -> C.Index.Distance {
 
 SequenceTypeAlgorithms.test("CollectionType.count()/${Implementation}Implementation") {
   for count in [ 0, 5 ] {
-    let collection = MinimalCollectionWith${Implementation}Count(count: count)
+    let collection = MinimalForwardCollectionWith${Implementation}Count(count: count)
 
     if true {
       // Check the return type of the function when called statically.
 %   if Implementation == 'Custom':
-      MinimalCollectionWithCustomCount.timesCountWasCalled = 0
+      MinimalForwardCollectionWithCustomCount.timesCountWasCalled = 0
 %   end
       var result = collection.count()
       expectType(Int32.self, &result)
       expectEqual(Int32(count), result)
 %   if Implementation == 'Custom':
-      expectEqual(1, MinimalCollectionWithCustomCount.timesCountWasCalled)
+      expectEqual(1, MinimalForwardCollectionWithCustomCount.timesCountWasCalled)
 %   end
     }
 
     if true {
       // Check the return type of the function when called generically.
 %   if Implementation == 'Custom':
-      MinimalCollectionWithCustomCount.timesCountWasCalled = 0
+      MinimalForwardCollectionWithCustomCount.timesCountWasCalled = 0
 %   end
       var result = callGenericCount(collection)
       expectType(Int32.self, &result)
       expectEqual(Int32(count), result)
 %   if Implementation == 'Custom':
-      expectEqual(1, MinimalCollectionWithCustomCount.timesCountWasCalled)
+      expectEqual(1, MinimalForwardCollectionWithCustomCount.timesCountWasCalled)
 %   end
     }
 
