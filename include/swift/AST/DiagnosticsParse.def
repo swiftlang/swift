@@ -1150,15 +1150,15 @@ ERROR(late_class_requirement,decl_parsing,none,
 // Build configuration parsing diagnostics
 //------------------------------------------------------------------------------
 ERROR(unsupported_build_config_binary_expression,parsing,none,
-"expected '&&' or '||' expression", ())
+      "expected '&&' or '||' expression", ())
 ERROR(unsupported_build_config_unary_expression,parsing,none,
-"expected unary '!' expression", ())
+      "expected unary '!' expression", ())
 ERROR(unsupported_target_config_expression,parsing,none,
-"unexpected target configuration expression (expected 'os' or 'arch')", ())
+      "unexpected target configuration expression (expected 'os' or 'arch')",())
 ERROR(unsupported_target_config_argument_type,parsing,none,
-"unexpected target configuration expression argument type", ())
+      "unexpected target configuration expression argument type", ())
 ERROR(unsupported_config_conditional_expression_type,parsing,none,
-"unexpected configuration expression type", ())
+      "unexpected configuration expression type", ())
 
 //------------------------------------------------------------------------------
 // Availability query parsing diagnostics
