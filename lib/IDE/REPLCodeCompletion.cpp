@@ -136,7 +136,7 @@ static void toDisplayString(CodeCompletionResult *Result,
 }
 
 namespace swift {
-class REPLCodeCompletionConsumer : public CodeCompletionConsumer {
+class REPLCodeCompletionConsumer : public SimpleCachingCodeCompletionConsumer {
   REPLCompletions &Completions;
 
 public:

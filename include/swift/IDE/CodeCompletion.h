@@ -548,15 +548,15 @@ public:
   CodeCompletionCache();
   ~CodeCompletionCache();
 
-  void
-  getResults(const Key &K, CodeCompletionResultSink &TargetSink, bool OnlyTypes,
-             const ModuleDecl *TheModule,
-             std::function<ValueRefCntPtr(CodeCompletionCache &, Key,
-                                          const ModuleDecl *)> FillCacheCallback);
-
   ValueRefCntPtr createValue();
   Optional<ValueRefCntPtr> get(const Key &K);
   void set(const Key &K, ValueRefCntPtr V);
+};
+
+struct RequestedCachedModule {
+  CodeCompletionCache::Key Key;
+  const ModuleDecl *TheModule;
+  bool OnlyTypes;
 };
 
 class CodeCompletionContext {
@@ -589,17 +589,35 @@ public:
 };
 
 /// \brief An abstract base class for consumers of code completion results.
+/// \see \c SimpleCachingCodeCompletionConsumer.
 class CodeCompletionConsumer {
 public:
   virtual ~CodeCompletionConsumer() {}
+  virtual void
+  handleResultsAndModules(CodeCompletionContext &context,
+                          ArrayRef<RequestedCachedModule> requestedModules,
+                          DeclContext *DCForModules) = 0;
+};
 
+/// A simplified code completion consumer interface that clients can use to get
+/// CodeCompletionResults with automatic caching of top-level completions from
+/// imported modules.
+struct SimpleCachingCodeCompletionConsumer : public CodeCompletionConsumer {
+
+  // Implement the CodeCompletionConsumer interface.
+  void handleResultsAndModules(CodeCompletionContext &context,
+                               ArrayRef<RequestedCachedModule> requestedModules,
+                               DeclContext *DCForModules) override;
+
+  /// Clients should overrride this method to receive \p Results.
   virtual void handleResults(
       MutableArrayRef<CodeCompletionResult *> Results) = 0;
 };
 
 /// \brief A code completion result consumer that prints the results to a
 /// \c raw_ostream.
-class PrintingCodeCompletionConsumer : public CodeCompletionConsumer {
+class PrintingCodeCompletionConsumer
+    : public SimpleCachingCodeCompletionConsumer {
   llvm::raw_ostream &OS;
   bool IncludeKeywords;
 

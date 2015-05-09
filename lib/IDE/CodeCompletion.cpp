@@ -573,23 +573,6 @@ struct CacheValueCostInfo<swift::ide::CodeCompletionCacheImpl::Value> {
 } // namespace sys
 } // namespace swift
 
-void CodeCompletionCache::getResults(
-    const Key &K, CodeCompletionResultSink &TargetSink, bool OnlyTypes,
-    const Module *TheModule,
-    std::function<ValueRefCntPtr(CodeCompletionCache &, Key, const Module *)>
-        FillCacheCallback) {
-  // FIXME(thread-safety): lock the whole AST context.  We might load a module.
-  llvm::Optional<ValueRefCntPtr> V = get(K);
-  if (!V.hasValue()) {
-    // No cached results found. Fill the cache.
-    V = FillCacheCallback(*this, K, TheModule);
-  }
-  assert(V.hasValue());
-  auto &SourceSink = V.getValue()->Sink;
-
-  copyCodeCompletionResults(TargetSink, SourceSink, OnlyTypes);
-}
-
 CodeCompletionCache::ValueRefCntPtr CodeCompletionCache::createValue() {
   return ValueRefCntPtr(new Value);
 }
@@ -753,6 +736,7 @@ void CodeCompletionContext::sortCompletionResults(
 namespace {
 class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
   CodeCompletionContext &CompletionContext;
+  std::vector<RequestedCachedModule> RequestedModules;
   CodeCompletionConsumer &Consumer;
 
   enum class CompletionKind {
@@ -2856,23 +2840,10 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
 
   if (Lookup.RequestedCachedResults) {
-    // Create helpers for result caching.
-    auto &SwiftContext = P.Context;
-
     // Use the current SourceFile as the DeclContext so that we can use it to
     // perform qualified lookup, and to get the correct visibility for
     // @testable imports.
     const SourceFile &SF = P.SF;
-
-    auto FillCacheCallback = [&SwiftContext, &SF](
-        CodeCompletionCache &Cache, const CodeCompletionCache::Key &K,
-        const Module *TheModule) {
-      auto V = Cache.createValue();
-      lookupCodeCompletionResultsFromModule(V->Sink, TheModule, K.AccessPath,
-                                            K.ResultsHaveLeadingDot, &SF);
-      Cache.set(K, V);
-      return V;
-    };
 
     auto &Request = Lookup.RequestedCachedResults.getValue();
 
@@ -2907,9 +2878,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
         if (!Result.second)
           return; // already handled.
 
-        CompletionContext.Cache.getResults(K, CompletionContext.getResultSink(),
-                                           Request.OnlyTypes, TheModule,
-                                           FillCacheCallback);
+        RequestedModules.push_back(
+            {std::move(K), TheModule, Request.OnlyTypes});
       }
     };
 
@@ -2942,11 +2912,15 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 }
 
 void CodeCompletionCallbacksImpl::deliverCompletionResults() {
-  auto Results = CompletionContext.takeResults();
-  if (!Results.empty()) {
-    Consumer.handleResults(Results);
-    DeliveredResults = true;
-  }
+  // Use the current SourceFile as the DeclContext so that we can use it to
+  // perform qualified lookup, and to get the correct visibility for
+  // @testable imports.
+  DeclContext *DCForModules = &P.SF;
+
+  Consumer.handleResultsAndModules(CompletionContext, RequestedModules,
+                                   DCForModules);
+  RequestedModules.clear();
+  DeliveredResults = true;
 }
 
 void PrintingCodeCompletionConsumer::handleResults(
@@ -3050,4 +3024,28 @@ void swift::ide::copyCodeCompletionResults(CodeCompletionResultSink &targetSink,
                               sourceSink.Results.begin(),
                               sourceSink.Results.end());
   }
+}
+
+void SimpleCachingCodeCompletionConsumer::handleResultsAndModules(
+    CodeCompletionContext &context,
+    ArrayRef<RequestedCachedModule> requestedModules,
+    DeclContext *DCForModules) {
+  for (auto &R : requestedModules) {
+    // FIXME(thread-safety): lock the whole AST context.  We might load a
+    // module.
+    llvm::Optional<CodeCompletionCache::ValueRefCntPtr> V =
+        context.Cache.get(R.Key);
+    if (!V.hasValue()) {
+      // No cached results found. Fill the cache.
+      V = context.Cache.createValue();
+      lookupCodeCompletionResultsFromModule(
+          (*V)->Sink, R.TheModule, R.Key.AccessPath,
+          R.Key.ResultsHaveLeadingDot, DCForModules);
+      context.Cache.set(R.Key, *V);
+    }
+    assert(V.hasValue());
+    copyCodeCompletionResults(context.getResultSink(), (*V)->Sink, R.OnlyTypes);
+  }
+
+  handleResults(context.takeResults());
 }
