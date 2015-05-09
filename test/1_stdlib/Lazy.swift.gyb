@@ -84,6 +84,43 @@ LazyTestSuite.test("MapSequenceView<Sequence>/underestimateCount") {
   expectEqual(42, lazyMap.underestimateCount())
 }
 
+struct SequenceWithCustomUnderestimateCount : SequenceType {
+  init(_ data: [Int]) {
+    self._data = MinimalSequence(data._prext_map { OpaqueValue($0) })
+  }
+
+  func generate() -> MinimalSequence<OpaqueValue<Int>>.Generator {
+    return _data.generate()
+  }
+
+  func underestimateCount() -> Int {
+    ++SequenceWithCustomUnderestimateCount.timesUnderestimateCountWasCalled
+    return _data.underestimateCount()
+  }
+
+  static var timesUnderestimateCountWasCalled: Int = 0
+
+  let _data: MinimalSequence<OpaqueValue<Int>>
+}
+
+LazyTestSuite.test("LazySequence.array") {
+  SequenceWithCustomUnderestimateCount.timesUnderestimateCountWasCalled = 0
+
+  let base = SequenceWithCustomUnderestimateCount([ 0, 30, 10, 90 ])
+  let lazySequence = LazySequence(base)
+  let arrayFromLazy = lazySequence.array
+
+  expectEqual([ 0, 30, 10, 90 ], arrayFromLazy._prext_map { $0.value })
+
+  // Lazy sequences should use underestimated count to preallocate array
+  // storage.
+  expectEqual(1, SequenceWithCustomUnderestimateCount.timesUnderestimateCountWasCalled)
+
+  expectEqualSequence([], Array(base)._prext_map { $0.value }) {
+    "sequence should be consumed"
+  }
+}
+
 %for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
 
 LazyTestSuite.test("MapCollectionView<${traversal}Collection>/underestimateCount") {
@@ -100,6 +137,20 @@ LazyTestSuite.test("MapCollectionView<${traversal}Collection>/underestimateCount
     >.self,
     &lazyMap)
   expectEqual(42, lazyMap.underestimateCount())
+}
+
+LazyTestSuite.test("Lazy${traversal}Collection.array") {
+  let base = Minimal${traversal}Collection(
+    [ 0, 30, 10, 90 ], underestimatedCount: .Value(42))
+  let lazyCollection = Lazy${traversal}Collection(base)
+  let arrayFromLazy = lazyCollection.array
+
+  expectEqual([ 0, 30, 10, 90 ], arrayFromLazy)
+
+  // Lazy collections should not use underestimated count to preallocate array
+  // storage, since they have access to real count instead.
+  expectLE(4, arrayFromLazy.capacity)
+  expectGE(40, arrayFromLazy.capacity)
 }
 
 %end
