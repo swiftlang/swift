@@ -190,4 +190,9 @@ struct GenericTypeContext<T> {
 
     return foo()
   }
+
+  // CHECK-LABEL: twoParamsAtDepth : <A><B, C> (interface_type_mangling.GenericTypeContext<A>)(B, y : C) -> ()
+  // CHECK-LABEL: sil hidden @_TFV23interface_type_mangling18GenericTypeContext16twoParamsAtDepthu_0_rfGS0_q__FTqd__1yqd_0__T_
+  func twoParamsAtDepth<A, B>(x: A, y: B) {}
 }
+

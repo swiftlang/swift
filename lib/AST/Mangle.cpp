@@ -611,8 +611,9 @@ void Mangler::mangleGenericSignature(const GenericSignature *sig,
   for (auto param : sig->getGenericParams()) {
     if (param->getDepth() != depth) {
       assert(param->getDepth() > depth && "generic params not ordered");
-      while (depth++ < param->getDepth()) {
+      while (depth < param->getDepth()) {
         mangleGenericParamCount(count);
+        ++depth;
         count = 0;
       }
     }
