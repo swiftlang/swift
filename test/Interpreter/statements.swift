@@ -34,7 +34,7 @@ for case let i? in OptionalArr where i != 3 {
   print(i)
 }
 
-// CHECK-LABEL: foreach/case
+// CHECK-LABEL: foreach/case/where
 // CHECK-NEXT: 1
 // CHECK-NEXT: 2
 // CHECK-NEXT: 4
