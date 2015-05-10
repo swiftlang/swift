@@ -403,7 +403,7 @@ class _RaceTestSharedState<RT : RaceTestWithPerTrialDataType> {
     self.trialBarrier = _stdlib_Barrier(threadCount: racingThreadCount + 1)
 
     self.workerStates.reserveCapacity(racingThreadCount)
-    for i in 0..<racingThreadCount {
+    for _ in 0..<racingThreadCount {
       self.workerStates.append(_RaceTestWorkerState<RT>())
     }
   }
@@ -502,7 +502,7 @@ public func runRaceTest<RT : RaceTestWithPerTrialDataType>(
 
   let masterThreadBody: (_: ())->() = {
     (_: ())->() in
-    for trial in 0..<trials {
+    for _ in 0..<trials {
       autoreleasepool {
         _masterThreadOneTrial(sharedState)
       }
@@ -511,7 +511,7 @@ public func runRaceTest<RT : RaceTestWithPerTrialDataType>(
 
   let racingThreadBody: (Int)->() = {
     (tid: Int)->() in
-    for trial in 0..<trials {
+    for _ in 0..<trials {
       _workerThreadOneTrial(tid, sharedState)
     }
   }
@@ -563,9 +563,9 @@ public func runRaceTest<RT : RaceTestWithPerTrialDataType>(
 }
 
 public func consumeCPU(units amountOfWork: Int) {
-  for i in 0..<amountOfWork {
+  for _ in 0..<amountOfWork {
     let scale = 16
-    for j in 0..<scale {
+    for _ in 0..<scale {
       _blackHole(42)
     }
   }

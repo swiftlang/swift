@@ -455,9 +455,9 @@ public func _setTestSuiteFailedCallback(callback: () -> ()) {
 extension ProcessTerminationStatus {
   var isSwiftTrap: Bool {
     switch self {
-    case .Exit(var status):
+    case .Exit(_):
       return false
-    case .Signal(var signal):
+    case .Signal(let signal):
       return CInt(signal) == SIGILL || CInt(signal) == SIGTRAP
     }
   }
@@ -730,18 +730,15 @@ struct _ParentProcess {
 
         // Determine if the test passed, not taking XFAILs into account.
         var testPassed = false
-        var testFailureExplanation = ""
         switch (_anyExpectFailed, childTerminationStatus, expectCrash) {
         case (_, .None, false):
           testPassed = !_anyExpectFailed
 
         case (_, .None, true):
           testPassed = false
-          testFailureExplanation = "expecting a crash, but the test did not crash"
 
-        case (_, .Some(let status), false):
+        case (_, .Some(_), false):
           testPassed = false
-          testFailureExplanation = "the test crashed unexpectedly"
 
         case (_, .Some(_), true):
           testPassed = !_anyExpectFailed
@@ -1434,7 +1431,7 @@ public func checkGenerator<
   if resiliencyChecks.callNextOnExhaustedGenerator {
     // Having returned `.None` once, a `GeneratorType` should not generate more
     // elements.
-    for i in 0..<10 {
+    for _ in 0..<10 {
       expectEmpty(
         mutableGen.next(),
         stackTrace: stackTrace.withCurrentLoc(),
@@ -1550,7 +1547,7 @@ public func check${traversal}Collection<
   collectMoreInfo: (()->String)? = nil
 ) {
   // A `CollectionType` is a multi-pass `SequenceType`.
-  for i in 0..<3 {
+  for _ in 0..<3 {
     checkSequence(
       expected, collection, sameValue,
       resiliencyChecks: resiliencyChecks,
@@ -1566,12 +1563,12 @@ public func check${traversal}Collection<
     stackTrace: stackTrace.withCurrentLoc(),
     collectMoreInfo: collectMoreInfo)
 
-  for i in 0..<3 {
+  for _ in 0..<3 {
     if true {
       let startIndex = collection.startIndex
       let endIndex = collection.endIndex
 
-      for i in collection.indices {
+      for _ in collection.indices {
         expectEqual(startIndex, collection.startIndex,
           stackTrace: stackTrace.withCurrentLoc()) {
           "Iteration should not change startIndex"
@@ -1590,7 +1587,7 @@ public func check${traversal}Collection<
 
     if expectedArray.count() >= 2 {
       for i in 0..<allIndices.count-1 {
-        var successor1 = allIndices[i].successor()
+        let successor1 = allIndices[i].successor()
         var successor2 = allIndices[i]
         successor2++
         var successor3 = allIndices[i]
@@ -1608,7 +1605,7 @@ public func check${traversal}Collection<
       }
 %   if traversal == "Bidirectional":
       for i in 1..<allIndices.count {
-        var predecessor1 = allIndices[i].predecessor()
+        let predecessor1 = allIndices[i].predecessor()
         var predecessor2 = allIndices[i]
         predecessor2--
         var predecessor3 = allIndices[i]

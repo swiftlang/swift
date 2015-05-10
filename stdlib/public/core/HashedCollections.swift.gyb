@@ -2752,7 +2752,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
       let newCapacity = newNativeStorage.capacity
 
       for i in 0..<oldCapacity {
-        var x = oldNativeStorage[i]
+        let x = oldNativeStorage[i]
         if x != nil {
           if oldCapacity == newCapacity {
             // FIXME(performance): optimize this case further: we don't have to
@@ -2936,7 +2936,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
           native.count + 1,
           native.maxLoadFactorInverse)
 
-    let (reallocated, capacityChanged) = ensureUniqueNativeStorage(minCapacity)
+    let (_, capacityChanged) = ensureUniqueNativeStorage(minCapacity)
     if capacityChanged {
       i = native._find(key, native._bucket(key)).pos
     }

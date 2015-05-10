@@ -14,7 +14,7 @@
 func _stdlib_getPointer(x: COpaquePointer) -> COpaquePointer
 
 public func _opaqueIdentity<T>(x: T) -> T {
-  var ptr = UnsafeMutablePointer<T>.alloc(1)
+  let ptr = UnsafeMutablePointer<T>.alloc(1)
   ptr.initialize(x)
   let result =
     UnsafeMutablePointer<T>(_stdlib_getPointer(COpaquePointer(ptr))).memory

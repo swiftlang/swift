@@ -106,7 +106,7 @@ internal func _adHocPrint<T, TargetStream : OutputStreamType>(
       } else {
         target.write(", ")
       }
-      let (label, elementMirror) = mirror[i]
+      let (_, elementMirror) = mirror[i]
       let elt = elementMirror.value
       debugPrint(elt, &target, appendNewline: false)
     }
