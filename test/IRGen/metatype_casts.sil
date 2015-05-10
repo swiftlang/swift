@@ -87,3 +87,12 @@ end:
   return undef : $()
 }
 
+// CHECK-LABEL: define %swift.type* @checked_cast_to_anyobject_type
+// CHECK:         [[METATYPE:%.*]] = call %swift.type* @_TMaC14metatype_casts9SomeClass() #3
+// CHECK:         ret %swift.type* [[METATYPE]]
+sil @checked_cast_to_anyobject_type : $@convention(thin) () -> @thick AnyObject.Type {
+entry:
+  %1 = metatype $@thick SomeClass.Type
+  %2 = unconditional_checked_cast %1 : $@thick SomeClass.Type to $@thick AnyObject.Type
+  return %2 : $@thick AnyObject.Type
+}

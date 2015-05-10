@@ -456,10 +456,27 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
     objcProtos.push_back(emitReferenceToObjCProtocol(IGF, proto));
   }
   
+  llvm::Type *resultType;
+  if (metatypeKind) {
+    switch (*metatypeKind) {
+    case MetatypeRepresentation::Thin:
+      llvm_unreachable("can't cast to thin metatype");
+    case MetatypeRepresentation::Thick:
+      resultType = IGF.IGM.TypeMetadataPtrTy;
+      break;
+    case MetatypeRepresentation::ObjC:
+      resultType = IGF.IGM.ObjCClassPtrTy;
+      break;
+    }
+  } else {
+    auto schema = IGF.getTypeInfo(destType).getSchema();
+    resultType = schema[0].getScalarType();
+  }
+  
   // If we don't have any protocols we really need to check, then trivially
   // succeed.
   if (objcProtos.empty() && !requiresWitnessTableLookup && !requiresClassCheck){
-    value = IGF.Builder.CreateBitCast(value, IGF.IGM.ObjCPtrTy);
+    value = IGF.Builder.CreateBitCast(value, resultType);
     ex.add(value);
     return;
   }
@@ -532,23 +549,6 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
   }
 
   // Add the value to the explosion.
-  llvm::Type *resultType;
-  if (metatypeKind) {
-    switch (*metatypeKind) {
-    case MetatypeRepresentation::Thin:
-      llvm_unreachable("can't cast to thin metatype");
-    case MetatypeRepresentation::Thick:
-      resultType = IGF.IGM.TypeMetadataPtrTy;
-      break;
-    case MetatypeRepresentation::ObjC:
-      resultType = IGF.IGM.ObjCClassPtrTy;
-      break;
-    }
-  } else {
-    auto schema = IGF.getTypeInfo(destType).getSchema();
-    resultType = schema[0].getScalarType();
-  }
-  
   llvm::Value *resultValue;
   if (objcCast)
     resultValue = IGF.Builder.CreateBitCast(objcCast, resultType);
