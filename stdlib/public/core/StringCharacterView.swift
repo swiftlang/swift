@@ -160,7 +160,7 @@ extension String.CharacterView : CollectionType {
     internal static func _measureExtendedGraphemeClusterBackward(
         end: UnicodeScalarView.Index
     ) -> Int {
-      var start = end._viewStartIndex
+      let start = end._viewStartIndex
       if start == end {
         return 0
       }
@@ -277,7 +277,7 @@ extension String.CharacterView : ExtensibleCollectionType {
     case .Small(let _63bits):
       let bytes = Character._smallValue(_63bits)
       _core.extend(Character._SmallUTF16(bytes))
-    case .Large(let storage):
+    case .Large(_):
       _core.append(String(c)._core)
     }
   }

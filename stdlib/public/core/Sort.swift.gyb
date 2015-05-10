@@ -57,7 +57,7 @@ func _insertionSort<
     // Continue until the sorted elements cover the whole sequence
     while (++sortedEnd != range.endIndex) {
       // get the first unsorted element
-      var x: C.Generator.Element = elements[sortedEnd]
+      let x: C.Generator.Element = elements[sortedEnd]
 
       // Look backwards for x's position in the sorted sequence,
       // moving elements forward to make room.
@@ -267,7 +267,7 @@ func _heapSort<
   ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
 ) {
   var hi = range.endIndex
-  var lo = range.startIndex
+  let lo = range.startIndex
   _heapify(&elements, range ${", &isOrderedBefore" if p else ""})
   while --hi != lo {
     swap(&elements[lo], &elements[hi])

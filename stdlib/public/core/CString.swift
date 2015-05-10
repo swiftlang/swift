@@ -55,7 +55,7 @@ public func _persistCString(s: UnsafePointer<CChar>) -> [CChar]? {
   if s == nil {
     return .None
   }
-  var length = Int(strlen(s))
+  let length = Int(strlen(s))
   var result = [CChar](count: length + 1, repeatedValue: 0)
   for var i = 0; i < length; ++i {
     // FIXME: this will not compile on platforms where 'CChar' is unsigned.

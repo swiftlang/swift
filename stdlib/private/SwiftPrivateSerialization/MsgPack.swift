@@ -30,7 +30,7 @@ public struct MsgPackEncoder {
 
   internal mutating func _appendBigEndian(value: Swift.UInt64) {
     var x = value.byteSwapped
-    for i in 0..<8 {
+    for _ in 0..<8 {
       bytes.append(UInt8(truncatingBitPattern: x))
       x >>= 8
     }
@@ -38,7 +38,7 @@ public struct MsgPackEncoder {
 
   internal mutating func _appendBigEndian(value: Swift.UInt32) {
     var x = value.byteSwapped
-    for i in 0..<4 {
+    for _ in 0..<4 {
       bytes.append(UInt8(truncatingBitPattern: x))
       x >>= 8
     }
@@ -46,7 +46,7 @@ public struct MsgPackEncoder {
 
   internal mutating func _appendBigEndian(value: Swift.UInt16) {
     var x = value.byteSwapped
-    for i in 0..<2 {
+    for _ in 0..<2 {
       bytes.append(UInt8(truncatingBitPattern: x))
       x >>= 8
     }
@@ -316,7 +316,7 @@ public struct MsgPackDecoder {
   internal mutating func _readBigEndianUInt16() -> UInt16? {
     if _haveNBytes(2) {
       var result: UInt16 = 0
-      for i in 0..<2 {
+      for _ in 0..<2 {
         result <<= 8
         result |= UInt16(_consumeByte()!)
       }
@@ -328,7 +328,7 @@ public struct MsgPackDecoder {
   internal mutating func _readBigEndianUInt32() -> UInt32? {
     if _haveNBytes(4) {
       var result: UInt32 = 0
-      for i in 0..<4 {
+      for _ in 0..<4 {
         result <<= 8
         result |= UInt32(_consumeByte()!)
       }
@@ -347,7 +347,7 @@ public struct MsgPackDecoder {
   internal mutating func _readBigEndianUInt64() -> UInt64? {
     if _haveNBytes(8) {
       var result: UInt64 = 0
-      for i in 0..<8 {
+      for _ in 0..<8 {
         result <<= 8
         result |= UInt64(_consumeByte()!)
       }
@@ -805,7 +805,7 @@ public enum MsgPackVariant {
     if let count = decoder.readBeginArray() {
       var array: [MsgPackVariant] = []
       array.reserveCapacity(count)
-      for i in 0..<count {
+      for _ in 0..<count {
         let maybeValue = MsgPackVariant._deserializeFrom(&decoder)
         if let value = maybeValue {
           array.append(value)
@@ -819,11 +819,10 @@ public enum MsgPackVariant {
     if let count = decoder.readBeginMap() {
       var map: [(MsgPackVariant, MsgPackVariant)] = []
       map.reserveCapacity(count)
-      for i in 0..<count {
+      for _ in 0..<count {
         let maybeKey = MsgPackVariant._deserializeFrom(&decoder)
         let maybeValue = MsgPackVariant._deserializeFrom(&decoder)
         if let key = maybeKey, value = maybeValue {
-          let keyValue = (key, value)
           map.append(key, value)
         } else {
           return nil

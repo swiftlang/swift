@@ -27,7 +27,7 @@ public enum Optional<T> : Reflectable, NilLiteralConvertible {
   /// If `self == nil`, returns `nil`.  Otherwise, returns `f(self!)`.
   public func map<U>(@noescape f: (T)->U) -> U? {
     switch self {
-    case .Some(var y):
+    case .Some(let y):
       return .Some(f(y))
     case .None:
       return .None

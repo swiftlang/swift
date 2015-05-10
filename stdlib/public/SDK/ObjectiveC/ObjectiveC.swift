@@ -196,7 +196,7 @@ func __pushAutoreleasePool() -> COpaquePointer
 func __popAutoreleasePool(pool: COpaquePointer)
 
 public func autoreleasepool(@noescape code: () -> ()) {
-  var pool = __pushAutoreleasePool()
+  let pool = __pushAutoreleasePool()
   code()
   __popAutoreleasePool(pool)
 }

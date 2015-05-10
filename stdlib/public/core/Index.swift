@@ -145,7 +145,7 @@ public prefix func ++ <T : _Incrementable> (inout i: T) -> T {
 /// value of `i`.
 @transparent
 public postfix func ++ <T : _Incrementable> (inout i: T) -> T {
-  var ret = i
+  let ret = i
   i._successorInPlace()
   return ret
 }
@@ -273,7 +273,7 @@ public prefix func -- <T : _BidirectionalIndexType> (inout i: T) -> T {
 /// value of `i`.
 @transparent
 public postfix func -- <T : _BidirectionalIndexType> (inout i: T) -> T {
-  var ret = i
+  let ret = i
   i._predecessorInPlace()
   return ret
 }
@@ -386,7 +386,7 @@ public func ~> <T : _RandomAccessIndexType>(
   let end = rest.1.1
 
   let d = start.distanceTo(end)
-  var amount = n
+  let amount = n
   if n < 0 {
     if d < 0 && d > n {
       return end

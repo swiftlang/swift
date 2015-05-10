@@ -94,7 +94,7 @@ public typealias Printable = CustomStringConvertible
 internal func _adHocPrint<T, TargetStream : OutputStreamType>(
     value: T, inout _ target: TargetStream
 ) {
-  var mirror = reflect(value)
+  let mirror = reflect(value)
   // Checking the mirror kind is not a good way to implement this, but we don't
   // have a more expressive reflection API now.
   if mirror is _TupleMirror {
@@ -106,8 +106,8 @@ internal func _adHocPrint<T, TargetStream : OutputStreamType>(
       } else {
         target.write(", ")
       }
-      var (label, elementMirror) = mirror[i]
-      var elt = elementMirror.value
+      let (label, elementMirror) = mirror[i]
+      let elt = elementMirror.value
       debugPrint(elt, &target, appendNewline: false)
     }
     target.write(")")
@@ -123,7 +123,7 @@ internal func _adHocPrint<T, TargetStream : OutputStreamType>(
       } else {
         target.write(", ")
       }
-      var (label, elementMirror) = mirror[i]
+      let (label, elementMirror) = mirror[i]
       print(label, &target, appendNewline: false)
       target.write(": ")
       debugPrint(elementMirror.value, &target, appendNewline: false)
@@ -143,7 +143,7 @@ internal func _print_unlocked<T, TargetStream : OutputStreamType>(
     return
   }
 
-  if case var printableObject as CustomStringConvertible = value {
+  if case let printableObject as CustomStringConvertible = value {
     printableObject.description.writeTo(&target)
     return
   }
@@ -188,7 +188,7 @@ public func _debugPrint_unlocked<T, TargetStream : OutputStreamType>(
     return
   }
 
-  if var printableObject = value as? CustomStringConvertible {
+  if let printableObject = value as? CustomStringConvertible {
     printableObject.description.writeTo(&target)
     return
   }

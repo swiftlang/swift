@@ -59,7 +59,7 @@ func _isPowerOf2(x: Int) -> Bool {
 func _withUninitializedString<R>(
   body: (UnsafeMutablePointer<String>) -> R
 ) -> (R, String) {
-  var stringPtr = UnsafeMutablePointer<String>.alloc(1)
+  let stringPtr = UnsafeMutablePointer<String>.alloc(1)
   let bodyResult = body(stringPtr)
   let stringResult = stringPtr.move()
   stringPtr.dealloc(1)
@@ -74,7 +74,7 @@ public func _stdlib_getDemangledMetatypeNameImpl(type: Any.Type, _ result: Unsaf
 
 /// Returns the demangled name of a metatype.
 public func _typeName(type: Any.Type) -> String {
-  var stringPtr = UnsafeMutablePointer<String>.alloc(1)
+  let stringPtr = UnsafeMutablePointer<String>.alloc(1)
   _stdlib_getDemangledMetatypeNameImpl(type, stringPtr)
   let result = stringPtr.move()
   stringPtr.dealloc(1)
@@ -86,7 +86,7 @@ public func _stdlib_getDemangledTypeName<T>(value: T) -> String {
   // FIXME: this code should be using _withUninitializedString, but it leaks
   // when called from here.
   // <rdar://problem/17892969> Closures in generic context leak their captures?
-  var stringPtr = UnsafeMutablePointer<String>.alloc(1)
+  let stringPtr = UnsafeMutablePointer<String>.alloc(1)
   _stdlib_getDemangledTypeNameImpl(value, stringPtr)
   let stringResult = stringPtr.move()
   stringPtr.dealloc(1)
@@ -100,7 +100,7 @@ func _stdlib_demangleNameImpl(
     _ demangledName: UnsafeMutablePointer<String>)
 
 public func _stdlib_demangleName(mangledName: String) -> String {
-  var mangledNameUTF8 = Array(mangledName.utf8)
+  let mangledNameUTF8 = Array(mangledName.utf8)
   return mangledNameUTF8.withUnsafeBufferPointer {
     (mangledNameUTF8) in
     let (_, demangledName) = _withUninitializedString {

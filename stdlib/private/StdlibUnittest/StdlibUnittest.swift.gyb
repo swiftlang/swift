@@ -743,7 +743,7 @@ struct _ParentProcess {
           testPassed = false
           testFailureExplanation = "the test crashed unexpectedly"
 
-        case (_, .Some(let status), true):
+        case (_, .Some(_), true):
           testPassed = !_anyExpectFailed
         }
         if testPassed && t.crashOutputMatches.count > 0 {
@@ -1010,9 +1010,9 @@ public enum OSVersion : CustomStringConvertible {
 
   public var description: String {
     switch self {
-    case OSX(var major, var minor, var bugFix):
+    case OSX(let major, let minor, let bugFix):
       return "OS X \(major).\(minor).\(bugFix)"
-    case iOS(var major, var minor, var bugFix):
+    case iOS(let major, let minor, let bugFix):
       return "iOS \(major).\(minor).\(bugFix)"
     case iOSSimulator:
       return "iOSSimulator"

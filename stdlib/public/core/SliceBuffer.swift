@@ -174,7 +174,7 @@ struct _SliceBuffer<T> : _ArrayBufferType {
 
   public
   func _uninitializedCopy(
-    subRange: Range<Int>, var target: UnsafeMutablePointer<T>
+    subRange: Range<Int>, target: UnsafeMutablePointer<T>
   ) -> UnsafeMutablePointer<T> {
     _invariantCheck()
     _sanityCheck(subRange.startIndex >= 0)

@@ -54,7 +54,7 @@ extension String {
       _precondition(position >= 0 && position < _length,
           "out-of-range access on a UTF16View")
 
-      var index = _toInternalIndex(position)
+      let index = _toInternalIndex(position)
       let u = _core[index]
       if _fastPath((u >> 11) != 0b1101_1) {
         // Neither high-surrogate, nor low-surrogate -- well-formed sequence

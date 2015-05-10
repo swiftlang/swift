@@ -20,7 +20,7 @@ extension String {
         capacity: s._core.count * count,
         initialSize: 0,
         elementWidth: s._core.elementWidth))
-    for i in 0..<count {
+    for _ in 0..<count {
       self += s
     }
   }
@@ -37,7 +37,7 @@ extension String {
   }
   
   public func _split(separator: UnicodeScalar) -> [String] {
-    var scalarSlices = Swift.split(unicodeScalars) { $0 == separator }
+    let scalarSlices = Swift.split(unicodeScalars) { $0 == separator }
     return scalarSlices.map { String($0) }
   }
 
@@ -150,7 +150,7 @@ extension String {
   func _substr(start: Int) -> String {
     var rng = unicodeScalars
     var startIndex = rng.startIndex
-    for i in 0..<start {
+    for _ in 0..<start {
       ++startIndex
     }
     return String(rng[startIndex..<rng.endIndex])
@@ -196,7 +196,7 @@ extension String {
   /// the given predicate evaluates true, returning an array of strings that
   /// before/between/after those delimiters.
   func _splitIf(predicate: (UnicodeScalar) -> Bool) -> [String] {
-    var scalarSlices = Swift.split(unicodeScalars, isSeparator: predicate)
+    let scalarSlices = Swift.split(unicodeScalars, isSeparator: predicate)
     return scalarSlices.map { String($0) }
   }
 }

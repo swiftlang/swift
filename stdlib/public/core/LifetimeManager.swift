@@ -47,7 +47,7 @@ extension String {
 // Fix the lifetime of the given instruction so that the ARC optimizer does not
 // shorten the lifetime of x to be before this point.
 @transparent
-public func _fixLifetime<T>(var x: T) {
+public func _fixLifetime<T>(x: T) {
   Builtin.fixLifetime(x)
 }
 

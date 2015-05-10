@@ -612,13 +612,13 @@ public struct UTF16 : UnicodeCodecType {
   public static func encode<
       S : SinkType where S.Element == CodeUnit
   >(input: UnicodeScalar, inout output: S) {
-    var scalarValue: UInt32 = UInt32(input)
+    let scalarValue: UInt32 = UInt32(input)
 
     if scalarValue <= UInt32(UInt16.max) {
       output.put(UInt16(scalarValue))
     }
     else {
-      var lead_offset = UInt32(0xd800) - UInt32(0x10000 >> 10)
+      let lead_offset = UInt32(0xd800) - UInt32(0x10000 >> 10)
       output.put(UInt16(lead_offset + (scalarValue >> 10)))
       output.put(UInt16(0xdc00 + (scalarValue & 0x3ff)))
     }
@@ -760,7 +760,7 @@ internal func _transcodeSomeUTF16AsUTF8<
           scalarUtf8Length = 3
         }
       } else {
-        var unit0 = u
+        let unit0 = u
         if _slowPath((unit0 >> 10) == 0b1101_11) {
           // `unit0` is a low-surrogate.  We have an ill-formed sequence.
           // Replace it with U+FFFD.

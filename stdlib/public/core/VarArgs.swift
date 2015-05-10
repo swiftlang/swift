@@ -59,7 +59,7 @@ let _x86_64RegisterSaveWords = _x86_64CountGPRegisters + _x86_64CountSSERegister
 /// Invoke `f` with a C `va_list` argument derived from `args`.
 public func withVaList<R>(args: [CVarArgType],
   @noescape _ f: CVaListPointer -> R) -> R {
-  var builder = VaListBuilder()
+  let builder = VaListBuilder()
   for a in args {
     builder.append(a)
   }
@@ -82,7 +82,7 @@ public func withVaList<R>(builder: VaListBuilder,
 /// may find that the language rules don't allow you to use
 /// `withVaList` as intended.
 public func getVaList(args: [CVarArgType]) -> CVaListPointer {
-  var builder = VaListBuilder()
+  let builder = VaListBuilder()
   for a in args {
     builder.append(a)
   }
@@ -93,7 +93,7 @@ public func getVaList(args: [CVarArgType]) -> CVaListPointer {
 }
 
 public func _encodeBitsAsWords<T : CVarArgType>(x: T) -> [Word] {
-  var result = [Word](
+  let result = [Word](
     count: (sizeof(T.self) + sizeof(Word.self) - 1) / sizeof(Word.self),
     repeatedValue: 0)
   var tmp = x

@@ -152,9 +152,9 @@ public enum ProcessTerminationStatus : CustomStringConvertible {
 
   public var description: String {
     switch self {
-    case .Exit(var status):
+    case .Exit(let status):
       return "Exit(\(status))"
-    case .Signal(var signal):
+    case .Signal(let signal):
       return "Signal(\(_signalToString(signal)))"
     }
   }

@@ -61,7 +61,7 @@ extension String {
       public func successor() -> Index {
         var scratch = _ScratchGenerator(_core, _position)
         var decoder = UTF16()
-        let (result, length) = decoder._decodeOne(&scratch)
+        let (_, length) = decoder._decodeOne(&scratch)
         return Index(_position + length, _core)
       }
 

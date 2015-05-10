@@ -360,7 +360,7 @@ public struct _MagicMirrorData {
   }
 
   var summary: String {
-    var (_, result) = _withUninitializedString {
+    let (_, result) = _withUninitializedString {
       _swift_MagicMirrorData_summaryImpl(self.metadata, $0)
     }
     return result

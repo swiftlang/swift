@@ -21,7 +21,7 @@ extension CIFilter {
   //            arguments args: [AnyObject]!,
   //            options dict: Dictionary<NSObject, AnyObject>!) -> CIImage!
   func apply(k: CIKernel!, args: [AnyObject]!, options: (NSCopying, AnyObject)...) -> CIImage {
-    var dict = NSMutableDictionary()
+    let dict = NSMutableDictionary()
     for (key, value) in options {
       dict[key] = value
     }
@@ -32,7 +32,7 @@ extension CIFilter {
   @availability(OSX, introduced=10.10)
   convenience init(name: String!,
                    elements: (NSCopying, AnyObject)...) {
-    var dict =  NSMutableDictionary()
+    let dict =  NSMutableDictionary()
         for (key, value) in elements {
             dict[key] = value
         }
@@ -44,7 +44,7 @@ extension CIFilter {
 extension CISampler {
     // - (id)initWithImage:(CIImage *)im keysAndValues:key0, ...;
     convenience init(im: CIImage!, elements: (NSCopying, AnyObject)...) {
-        var dict = NSMutableDictionary()
+        let dict = NSMutableDictionary()
         for (key, value) in elements {
             dict[key] = value
         }

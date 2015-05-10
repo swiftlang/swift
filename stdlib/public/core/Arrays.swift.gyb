@@ -318,7 +318,7 @@ public struct ${Self}<T>
   // path preventing retains/releases to be matched accross that region.
   @inline(never)
   func _copyBuffer(inout buffer: _Buffer) {
-    var newBuffer = _ContiguousArrayBuffer<T>(
+    let newBuffer = _ContiguousArrayBuffer<T>(
       count: buffer.count, minimumCapacity: buffer.count)
     let target = buffer._uninitializedCopy(
       0..<count, target: newBuffer.baseAddress)
@@ -479,7 +479,7 @@ extension ${Self} : _ArrayType {
   internal static func _allocateUninitialized(
     count: Int
   ) -> (${Self}, UnsafeMutablePointer<T>) {
-    var result = ${Self}(_uninitializedCount: count)
+    let result = ${Self}(_uninitializedCount: count)
     return (result, result._buffer.baseAddress)
   }
 
@@ -523,7 +523,7 @@ extension ${Self} : _ArrayType {
   public mutating func reserveCapacity(minimumCapacity: Int) {
     if _buffer.requestUniqueMutableBackingBuffer(minimumCapacity) == nil {
 
-      var newBuffer = _ContiguousArrayBuffer<T>(
+      let newBuffer = _ContiguousArrayBuffer<T>(
         count: count, minimumCapacity: minimumCapacity)
 
       _buffer._uninitializedCopy(0..<count, target: newBuffer.baseAddress)
@@ -1261,7 +1261,7 @@ extension Array {
   public init(
     _fromCocoaArray source: _NSArrayCoreType,
     noCopy: Bool = false) {
-    var selectedSource: _NSArrayCoreType =
+    let selectedSource: _NSArrayCoreType =
       noCopy ?
         source :
         unsafeBitCast(

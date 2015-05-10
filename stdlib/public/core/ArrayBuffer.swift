@@ -233,7 +233,7 @@ extension _ArrayBuffer {
     
     // Make another pass to retain the copied objects
     var result = target
-    for i in subRange {
+    for _ in subRange {
       result.initialize(result.memory)
       ++result
     }
@@ -262,7 +262,7 @@ extension _ArrayBuffer {
     }
     
     // No contiguous storage found; we must allocate
-    var result = _ContiguousArrayBuffer<T>(
+    let result = _ContiguousArrayBuffer<T>(
         count: subRangeCount, minimumCapacity: 0)
 
     // Tell Cocoa to copy the objects into our storage

@@ -786,7 +786,7 @@ extension String {
     if self._core.isASCII {
       let length = self._core.count
       let source = self._core.startASCII
-      var buffer = _StringBuffer(
+      let buffer = _StringBuffer(
         capacity: length, initialSize: length, elementWidth: 1)
       var dest = UnsafeMutablePointer<UInt8>(buffer.start)
       for i in 0..<length {
@@ -824,7 +824,7 @@ extension String {
     if self._core.isASCII {
       let length = self._core.count
       let source = self._core.startASCII
-      var buffer = _StringBuffer(
+      let buffer = _StringBuffer(
         capacity: length, initialSize: length, elementWidth: 1)
       var dest = UnsafeMutablePointer<UInt8>(buffer.start)
       for i in 0..<length {

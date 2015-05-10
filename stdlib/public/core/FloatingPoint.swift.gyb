@@ -179,7 +179,7 @@ public struct ${Self} {
   /// Create an instance initialized to zero.
   @transparent public
   init() {
-    var zero: Int64 = 0
+    let zero: Int64 = 0
     value = Builtin.uitofp_Int64_FPIEEE${bits}(zero.value)
   }
 
@@ -224,7 +224,7 @@ extension ${Self} : FloatingPointType {
   }
 
   func __getSignificand() -> _BitsType {
-    var mask: _BitsType = (1 << ${getSignificantBitCount(bits)}) - 1
+    let mask: _BitsType = (1 << ${getSignificantBitCount(bits)}) - 1
     return _toBitPattern() & mask
   }
 
@@ -251,7 +251,7 @@ extension ${Self} : FloatingPointType {
   /// `true` iff `self` is normal (not zero, subnormal, infinity, or
   /// NaN).
   public var isNormal:  Bool {
-    var biasedExponent = __getBiasedExponent()
+    let biasedExponent = __getBiasedExponent()
     return biasedExponent != ${getInfinityExponent(bits)} &&
            biasedExponent != 0
   }
@@ -265,7 +265,7 @@ extension ${Self} : FloatingPointType {
   /// `true` iff `self` is +0.0 or -0.0.
   public var isZero:  Bool {
     // Mask out the sign bit.
-    var mask: _BitsType = (1 << (${bits} - 1)) - 1
+    let mask: _BitsType = (1 << (${bits} - 1)) - 1
     return (_toBitPattern() & mask) == 0
   }
 
@@ -315,7 +315,7 @@ extension ${Self} : FloatingPointType {
       // bit of the trailing significand field is 0, some other bit of the
       // trailing significand field must be non-zero to distinguish the NaN
       // from infinity.
-      var significand = __getSignificand()
+      let significand = __getSignificand()
       if significand != 0 {
         return (significand >> (${getSignificantBitCount(bits)} - 1)) == 0
       }
@@ -329,19 +329,19 @@ extension ${Self} /* : FloatingPointType */ {
   /// The IEEE 754 "class" of this type.
   public var floatingPointClass: FloatingPointClassification {
     get {
-      var biasedExponent = __getBiasedExponent()
+      let biasedExponent = __getBiasedExponent()
       if biasedExponent == ${getInfinityExponent(bits)} {
-        var significand = __getSignificand()
+        let significand = __getSignificand()
         // This is either +/-inf or NaN.
         if significand == 0 {
           return isSignMinus ? .NegativeInfinity : .PositiveInfinity
         }
-        var isQNaN = (significand >> (${getSignificantBitCount(bits)} - 1)) == 1
+        let isQNaN = (significand >> (${getSignificantBitCount(bits)} - 1)) == 1
         return isQNaN ? .QuietNaN : .SignalingNaN
       }
 
       // OK, the number is finite.
-      var isMinus = isSignMinus
+      let isMinus = isSignMinus
       if biasedExponent != 0 {
         return isMinus ? .NegativeNormal : .PositiveNormal
       }

@@ -188,7 +188,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
     }
     // FIXME: workaround for <rdar://problem/18619176>.  If we don't
     // access value somewhere, its addressor gets linked away
-    let x = value
+    _ = value
   }
 
   /// Manage the given `buffer`.

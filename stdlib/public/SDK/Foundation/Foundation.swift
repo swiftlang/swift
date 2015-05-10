@@ -515,7 +515,7 @@ extension Array : _ObjectiveCBridgeable {
     inout result: Array?
   ) -> Bool {
     // Construct the result array by conditionally bridging each element.
-    var anyObjectArr = [AnyObject](_fromNSArray: source)
+    let anyObjectArr = [AnyObject](_fromNSArray: source)
 
     result = _arrayConditionalCast(anyObjectArr)
     return result != nil
@@ -712,7 +712,7 @@ final public class NSFastGenerator : GeneratorType {
       refresh()
       if count == 0 { return .None }
     }
-    var next : AnyObject = state[0].itemsPtr[n]!
+    let next : AnyObject = state[0].itemsPtr[n]!
     ++n
     return next
   }
@@ -934,7 +934,7 @@ extension NSDictionary : SequenceType {
       switch _fastGenerator.next() {
       case .None:
         return .None
-      case .Some(var key):
+      case .Some(let key):
         // Deliberately avoid the subscript operator in case the dictionary
         // contains non-copyable keys. This is rare since NSMutableDictionary
         // requires them, but we don't want to paint ourselves into a corner.

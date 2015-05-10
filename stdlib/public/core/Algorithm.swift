@@ -121,7 +121,7 @@ public func split<S: Sliceable, R:BooleanType>(
   for j in elements.indices {
     if isSeparator(elements[j]) {
       if startIndex != nil {
-        var i = startIndex!
+        let i = startIndex!
         result.append(elements[i..<j])
         startIndex = .Some(j.successor())
         if ++splits >= maxSplit {
@@ -207,7 +207,7 @@ public struct EnumerateGenerator<
   ///
   /// Requires: no preceding call to `self.next()` has returned `nil`.
   public mutating func next() -> Element? {
-    var b = base.next()
+    let b = base.next()
     if b == nil { return .None }
     return .Some((index: count++, element: b!))
   }

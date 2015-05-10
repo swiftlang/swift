@@ -582,7 +582,7 @@ func _copyCollectionToNativeArrayBuffer<
     return _ContiguousArrayBuffer()
   }
 
-  var result = _ContiguousArrayBuffer<C.Generator.Element>(
+  let result = _ContiguousArrayBuffer<C.Generator.Element>(
     count: numericCast(count),
     minimumCapacity: 0
   )

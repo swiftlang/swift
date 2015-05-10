@@ -583,7 +583,7 @@ public struct Set<T : Hashable> :
     //
     // FIXME(performance): perform this operation at a lower level
     // to avoid invalidating the index and avoiding a copy.
-    var result = self.intersect(sequence)
+    let result = self.intersect(sequence)
 
     // The result can only have fewer or the same number of elements.
     // If no elements were removed, don't perform a reassignment
@@ -609,7 +609,7 @@ public struct Set<T : Hashable> :
   public mutating func exclusiveOrInPlace<
     S: SequenceType where S.Generator.Element == T
   >(sequence: S) {
-    var other = sequence as? Set<T> ?? Set(sequence)
+    let other = sequence as? Set<T> ?? Set(sequence)
     for member in other {
       if contains(member) {
         remove(member)
@@ -677,7 +677,7 @@ public func == <T : Hashable>(lhs: Set<T>, rhs: Set<T>) -> Bool {
     }
 
     for member in lhs {
-      var (pos, found) = rhsNative._find(member, rhsNative._bucket(member))
+      let (pos, found) = rhsNative._find(member, rhsNative._bucket(member))
       if !found {
         return false
       }
@@ -766,7 +766,7 @@ func _stdlib_CFSetGetValues(nss: _NSSetType, UnsafeMutablePointer<AnyObject>)
 internal func _stdlib_NSSet_allObjects(nss: _NSSetType) ->
   _HeapBuffer<Int, AnyObject> {
   let count = nss.count
-  var buffer = _HeapBuffer<Int, AnyObject>(
+  let buffer = _HeapBuffer<Int, AnyObject>(
     _HeapBufferStorage<Int, AnyObject>.self, count, count)
   _stdlib_CFSetGetValues(nss, buffer.baseAddress)
   return buffer
@@ -1198,7 +1198,7 @@ public func == <Key : Equatable, Value : Equatable>(
     }
 
     for (k, v) in lhs {
-      var (pos, found) = rhsNative._find(k, rhsNative._bucket(k))
+      let (pos, found) = rhsNative._find(k, rhsNative._bucket(k))
       // FIXME: Can't write the simple code pending
       // <rdar://problem/15484639> Refcounting bug
       /*
@@ -1311,7 +1311,7 @@ extension Dictionary : CustomStringConvertible, CustomDebugStringConvertible {
 internal func _stdlib_NSDictionary_allKeys(nsd: _NSDictionaryType)
     -> _HeapBuffer<Int, AnyObject> {
   let count = nsd.count
-  var buffer = _HeapBuffer<Int, AnyObject>(
+  let buffer = _HeapBuffer<Int, AnyObject>(
     _HeapBufferStorage<Int, AnyObject>.self, count, count)
 
   nsd.getObjects(nil, andKeys: buffer.baseAddress)
@@ -1756,7 +1756,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
     // The invariant guarantees there's always a hole, so we just loop
     // until we find one
     while true {
-      var keyVal = self[bucket]
+      let keyVal = self[bucket]
       if (keyVal == nil) || keyVal!.key == k {
         return (Index(nativeStorage: self, offset: bucket), (keyVal != nil))
       }
@@ -1779,7 +1779,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
 %if Self == 'Set':
 
   internal mutating func unsafeAddNew(key newKey: T) {
-    var (i, found) = _find(newKey, _bucket(newKey))
+    let (i, found) = _find(newKey, _bucket(newKey))
     _sanityCheck(
       !found, "unsafeAddNew was called, but the key is already present")
     self[i.offset] = Element(key: newKey)
@@ -1788,7 +1788,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
 %elif Self == 'Dictionary':
 
   internal mutating func unsafeAddNew(key newKey: Key, value: Value) {
-    var (i, found) = _find(newKey, _bucket(newKey))
+    let (i, found) = _find(newKey, _bucket(newKey))
     _sanityCheck(
       !found, "unsafeAddNew was called, but the key is already present")
     self[i.offset] = Element(key: newKey, value: value)
@@ -1904,7 +1904,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
 
     var count = 0
     for key in elements {
-      var (i, found) = nativeStorage._find(key, nativeStorage._bucket(key))
+      let (i, found) = nativeStorage._find(key, nativeStorage._bucket(key))
       if found {
         continue
       }
@@ -1916,7 +1916,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
 %elif Self == 'Dictionary':
 
     for (key, value) in elements {
-      var (i, found) = nativeStorage._find(key, nativeStorage._bucket(key))
+      let (i, found) = nativeStorage._find(key, nativeStorage._bucket(key))
       _precondition(!found, "${Self} literal contains duplicate keys")
       nativeStorage[i.offset] = Element(key: key, value: value)
     }
@@ -2545,7 +2545,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
         break
       }
 
-      var bridgedKey: AnyObject = _getBridgedKey(currIndex)
+      let bridgedKey: AnyObject = _getBridgedKey(currIndex)
       unmanagedObjects[i] = bridgedKey
       ++stored
       currIndex = currIndex.successor()
@@ -2780,7 +2780,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
       let cocoa${Self} = cocoaStorage.cocoa${Self}
       let newNativeOwner = NativeStorageOwner(minimumCapacity: minimumCapacity)
       var newNativeStorage = newNativeOwner.nativeStorage
-      var oldCocoaGenerator = _Cocoa${Self}Generator(cocoa${Self})
+      let oldCocoaGenerator = _Cocoa${Self}Generator(cocoa${Self})
 %if Self == 'Set':
       while let key = oldCocoaGenerator.next() {
         newNativeStorage.unsafeAddNew(
@@ -2876,11 +2876,11 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
     case .Cocoa(let cocoaStorage):
 #if _runtime(_ObjC)
 %if Self == 'Set':
-      var anyObjectValue: AnyObject = cocoaStorage.assertingGet(i._cocoaIndex)
+      let anyObjectValue: AnyObject = cocoaStorage.assertingGet(i._cocoaIndex)
       let nativeValue = _forceBridgeFromObjectiveC(anyObjectValue, Value.self)
       return nativeValue
 %elif Self == 'Dictionary':
-      var (anyObjectKey, anyObjectValue) =
+      let (anyObjectKey, anyObjectValue) =
           cocoaStorage.assertingGet(i._cocoaIndex)
       let nativeKey = _forceBridgeFromObjectiveC(anyObjectKey, Key.self)
       let nativeValue = _forceBridgeFromObjectiveC(anyObjectValue, Value.self)
@@ -3007,13 +3007,13 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
       // something out-of-place.
       var b: Int
       for b = lastInChain; b != hole; b = nativeStorage._prev(b) {
-        var idealBucket = nativeStorage._bucket(nativeStorage[b]!.key)
+        let idealBucket = nativeStorage._bucket(nativeStorage[b]!.key)
 
         // Does this element belong between start and hole?  We need
         // two separate tests depending on whether [start,hole] wraps
         // around the end of the buffer
-        var c0 = idealBucket >= start
-        var c1 = idealBucket <= hole
+        let c0 = idealBucket >= start
+        let c1 = idealBucket <= hole
         if start <= hole ? (c0 && c1) : (c0 || c1) {
           break // found it
         }
@@ -3063,8 +3063,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
 
     // The provided index should be valid, so we will always mutating the
     // set storage.  Request unique storage.
-    let (reallocated, capacityChanged) =
-        ensureUniqueNativeStorage(nativeStorage.capacity)
+    let (reallocated, _) = ensureUniqueNativeStorage(nativeStorage.capacity)
     if reallocated {
       nativeStorage = native
     }
@@ -3134,8 +3133,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
 
     // We have already checked for the empty dictionary case, so we will always
     // mutating the dictionary storage.  Request unique storage.
-    let (reallocated, capacityChanged) =
-        ensureUniqueNativeStorage(nativeStorage.capacity)
+    let (reallocated, _) = ensureUniqueNativeStorage(nativeStorage.capacity)
     if reallocated {
       nativeStorage = native
     }

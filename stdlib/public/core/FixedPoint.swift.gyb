@@ -614,7 +614,7 @@ public prefix func ++ (inout x: ${Self}) -> ${Self} {
 
 @transparent
 public postfix func ++ (inout x: ${Self}) -> ${Self} {
-  var ret = x
+  let ret = x
   x = x + 1
   return ret
 }
@@ -627,7 +627,7 @@ public prefix func -- (inout x: ${Self}) -> ${Self} {
 
 @transparent
 public postfix func -- (inout x: ${Self}) -> ${Self} {
-  var ret = x
+  let ret = x
   x = x - 1
   return ret
 }

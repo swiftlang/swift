@@ -97,7 +97,7 @@ public struct Character :
       s.startIndex.successor() == s.endIndex,
       "Can't form a Character from a String containing more than one extended grapheme cluster")
 
-    var (count, initialUTF8) = s._core._encodeSomeUTF8(0)
+    let (count, initialUTF8) = s._core._encodeSomeUTF8(0)
     // Notice that the result of sizeof() is a small non-zero number and can't
     // overflow when multiplied by 8.
     let bits = sizeofValue(initialUTF8) &* 8 &- 1

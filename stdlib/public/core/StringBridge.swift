@@ -75,10 +75,10 @@ internal func _cocoaStringToContiguous(
   _sanityCheck(CFStringGetCharactersPtr(source) == nil,
     "Known contiguously-stored strings should already be converted to Swift")
 
-  var startIndex = range.startIndex
-  var count = range.endIndex - startIndex
+  let startIndex = range.startIndex
+  let count = range.endIndex - startIndex
 
-  var buffer = _StringBuffer(capacity: max(count, minimumCapacity), 
+  let buffer = _StringBuffer(capacity: max(count, minimumCapacity), 
                              initialSize: count, elementWidth: 2)
 
   CFStringGetCharacters(

@@ -92,7 +92,7 @@ public struct UnicodeScalar :
   /// representation.
   public func escape(asASCII forceASCII: Bool) -> String {
     func lowNibbleAsHex(v: UInt32) -> String {
-      var nibble = v & 15
+      let nibble = v & 15
       if nibble < 10 {
         return String(UnicodeScalar(nibble+48))    // 48 = '0'
       } else {

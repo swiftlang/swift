@@ -148,7 +148,7 @@ internal func _arrayConditionalBridgeElements<SourceElement, TargetElement>(
   _sanityCheck(_isBridgedVerbatimToObjectiveC(SourceElement.self))
   _sanityCheck(!_isBridgedVerbatimToObjectiveC(TargetElement.self))
   
-  var buf = _ContiguousArrayBuffer<TargetElement>(
+  let buf = _ContiguousArrayBuffer<TargetElement>(
     count: source.count, minimumCapacity: 0)
   
   var p = buf.baseAddress

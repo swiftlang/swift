@@ -428,7 +428,7 @@ public struct _StringCore {
     newSize newSize: Int, newCapacity: Int, minElementWidth: Int
   ) {
     _sanityCheck(newCapacity >= newSize)
-    var oldCount = count
+    let oldCount = count
 
     // Allocate storage.
     let newElementWidth =
@@ -436,7 +436,7 @@ public struct _StringCore {
       ? minElementWidth
       : representableAsASCII() ? 1 : 2
 
-    var newStorage = _StringBuffer(capacity: newCapacity, initialSize: newSize,
+    let newStorage = _StringBuffer(capacity: newCapacity, initialSize: newSize,
                                    elementWidth: newElementWidth)
 
     if hasContiguousStorage {
