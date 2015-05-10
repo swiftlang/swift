@@ -23,7 +23,7 @@
 
 import Swift
 
-//===--- Code mimics stdlib without swizzling ----------------------------===//
+//===--- Code mimics the stdlib without using spare pointer bits ----------===//
 import SwiftShims
 
 protocol BridgeStorage {
