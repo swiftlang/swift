@@ -24,7 +24,7 @@ class Foo {
   // i386-ios: define hidden void @_TToFC8abitypes3Foo3barfS0_FT_VSC6MyRect(%VSC6MyRect* noalias sret, i8*, i8*) unnamed_addr {{.*}} {
   // armv7-ios: define hidden void @_TFC8abitypes3Foo3barfS0_FT_VSC6MyRect(%VSC6MyRect* noalias sret, %C8abitypes3Foo*) {{.*}} {
   // armv7-ios: define hidden void @_TToFC8abitypes3Foo3barfS0_FT_VSC6MyRect(%VSC6MyRect* noalias sret, i8*, i8*) unnamed_addr {{.*}} {
-  // arm64-ios: define hidden { float, float, float, float } @_TFC8abitypes3Foo3barfS0_FT_VSC6MyRect(%C8abitypes3Foo*) {{.*}} {
+  // arm64-ios: define hidden void @_TFC8abitypes3Foo3barfS0_FT_VSC6MyRect(%VSC6MyRect* noalias sret, %C8abitypes3Foo*) {{.*}} {
   // arm64-ios: define hidden [[ARM64MYRECT]] @_TToFC8abitypes3Foo3barfS0_FT_VSC6MyRect(i8*, i8*) unnamed_addr {{.*}} {
   dynamic func bar() -> MyRect {
     return MyRect(x: 1, y: 2, width: 3, height: 4)

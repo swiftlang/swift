@@ -45,9 +45,6 @@ static void configureARM64(IRGenModule &IGM, const llvm::Triple &triple,
       SWIFT_ABI_DARWIN_ARM64_LEAST_VALID_POINTER;
   }
 
-  // CGPoint and CGRect are both returned in registers.
-  target.MaxScalarsForDirectResult = 4;
-
   // arm64 has no special objc_msgSend variants, not even stret.
   target.ObjCUseStret = false;
 

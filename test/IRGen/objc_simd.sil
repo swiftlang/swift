@@ -22,7 +22,7 @@ entry(%x : $float4):
 
 // x86_64-LABEL: define void @simd_native_args(%V4simd6float4* noalias sret, float, float, float, float)
 // i386-LABEL: define void @simd_native_args(%V4simd6float4* noalias sret, float, float, float, float)
-// arm64-LABEL: define { float, float, float, float } @simd_native_args(float, float, float, float)
+// arm64-LABEL: define void @simd_native_args(%V4simd6float4* noalias sret, float, float, float, float)
 // armv7-LABEL: define void @simd_native_args(%V4simd6float4* noalias sret, float, float, float, float)
 // armv7s-LABEL: define void @simd_native_args(%V4simd6float4* noalias sret, float, float, float, float)
 // armv7k-LABEL: define void @simd_native_args(%V4simd6float4* noalias sret, float, float, float, float)

@@ -73,8 +73,6 @@ public:
   uint64_t LeastValidPointerValue;
 
   /// The maximum number of scalars that we allow to be returned directly.
-  /// FIXME Until rdar://14679857, this must be set such that 
-  /// NSRect and NSPoint structs are returned correctly.
   unsigned MaxScalarsForDirectResult = 3;
 
   /// Inline assembly to mark a call to objc_retainAutoreleasedReturnValue.
