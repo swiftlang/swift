@@ -2140,6 +2140,9 @@ bool FailureDiagnosis::diagnoseFailureForCallExpr() {
       argNames.push_back(elName);
       argTypes.push_back(elType);
     }
+  } else if (auto typeExpr = dyn_cast<TypeExpr>(argExpr)) {
+    argNames.push_back(Identifier());
+    argTypes.push_back(typeExpr->getType());
   }
   
   if (foundIntermediateError)

@@ -60,3 +60,10 @@ func retAI() -> Int {
     let b = [""]
     return (a + b) // expected-error {{cannot convert return expression of type '[String]' to expected return type 'Int'}}
 }
+
+func testIS1() -> Int { return 0 }
+let _: String = testIS1() // expected-error {{'Int' is not convertible to 'String'}}
+
+func insertA<T>(inout array : [T], elt : T) {
+  array.append(T); // expected-error {{cannot invoke 'append' with an argument list of type '(T.Type)'}}
+}
