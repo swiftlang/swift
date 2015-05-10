@@ -1710,6 +1710,9 @@ void PrintAST::visitConstructorDecl(ConstructorDecl *decl) {
        decl->getInitKind() == CtorInitializerKind::ConvenienceFactory) &&
       !decl->getAttrs().hasAttribute<ConvenienceAttr>())
     Printer << "convenience ";
+  else
+    if (decl->getInitKind() == CtorInitializerKind::Factory)
+      Printer << "/*not inherited*/ ";
   
   recordDeclLoc(decl,
     [&]{

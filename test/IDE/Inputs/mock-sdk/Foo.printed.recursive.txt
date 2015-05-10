@@ -150,6 +150,9 @@ class FooClassBase {
   class func fooBaseInstanceFuncOverridden()
   func fooBaseInstanceFuncOverridden()
   class func fooBaseClassFunc0()
+  /*not inherited*/ init!(_ x: Int32)
+  @availability(*, unavailable, message="use object construction 'FooClassBase(_:)'")
+  class func fooClassBase(x: Int32) -> FooClassBase!
 }
 
 /// Aaa.  FooClassDerived.  Bbb.

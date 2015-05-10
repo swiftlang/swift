@@ -150,6 +150,9 @@ protocol <loc>FooProtocolBase</loc> {
   <decl:Func>class func <loc>fooBaseInstanceFuncOverridden()</loc></decl>
   <decl:Func>func <loc>fooBaseInstanceFuncOverridden()</loc></decl>
   <decl:Func>class func <loc>fooBaseClassFunc0()</loc></decl>
+  <decl:Constructor>/*not inherited*/ <loc>init!(_ x: <ref:Struct>Int32</ref>)</loc></decl>
+  <decl:Func>@availability(*, unavailable, message="use object construction 'FooClassBase(_:)'")
+  class func <loc>fooClassBase(x: <ref:Struct>Int32</ref>)</loc> -> <ref:Class>FooClassBase</ref>!</decl>
 }</decl>
 
 <decl:Class>/// Aaa.  FooClassDerived.  Bbb.

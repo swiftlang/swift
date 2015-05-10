@@ -151,6 +151,7 @@ int redeclaredInMultipleModulesFunc1(int a);
 - (void) fooBaseInstanceFuncOverridden;
 
 + (void) fooBaseClassFunc0;
++ (FooClassBase *)fooClassBase:(int)x;
 @end
 
 /// Aaa.  FooClassDerived.  Bbb.
