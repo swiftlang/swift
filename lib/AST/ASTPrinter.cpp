@@ -2829,7 +2829,11 @@ public:
       Printer << "@opened(\"" << T->getOpenedExistentialID() << "\") ";
       visit(existentialTy);
     } else {
-      Printer << T->getFullName();
+      if (auto parent = T->getParent()) {
+        visit(parent);
+        Printer << ".";
+      }
+      Printer << T->getName().str();
     }
   }
 

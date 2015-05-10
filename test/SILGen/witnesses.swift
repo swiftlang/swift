@@ -434,13 +434,26 @@ final class IUOFailableClassModel: NonFailableClassRefinement, IUOFailableClassR
   init!(foo: Int) {}
 }
 
-protocol GenericParameterNameCollisionType {
-  func foo<T>(x: T)
+protocol HasAssoc {
+  typealias Assoc
 }
 
-// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWurGV9witnesses29GenericParameterNameCollisionq__S_33GenericParameterNameCollisionTypeS_FS1_3foou__Rq_S1__fq_Fqd__T_ : $@convention(witness_method) <T1><T> (@in T, @in_guaranteed GenericParameterNameCollision<T1>) -> () {
-// CHECK:       bb0(%0 : $*T, %1 : $*GenericParameterNameCollision<T1>):
-// CHECK:         apply {{%.*}}<T1, T>
-struct GenericParameterNameCollision<T>: GenericParameterNameCollisionType {
+protocol GenericParameterNameCollisionType {
+  func foo<T>(x: T)
+  typealias Assoc2
+  func bar<T>(x: T -> Assoc2)
+}
+
+struct GenericParameterNameCollision<T: HasAssoc> :
+    GenericParameterNameCollisionType {
+
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTW{{.*}}GenericParameterNameCollision{{.*}}GenericParameterNameCollisionType{{.*}}foo{{.*}} : $@convention(witness_method) <T1 where T1 : HasAssoc><T> (@in T, @in_guaranteed GenericParameterNameCollision<T1>) -> () {
+  // CHECK:       bb0(%0 : $*T, %1 : $*GenericParameterNameCollision<T1>):
+  // CHECK:         apply {{%.*}}<T1, T1.Assoc, T>
   func foo<U>(x: U) {}
+
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTW{{.*}}GenericParameterNameCollision{{.*}}GenericParameterNameCollisionType{{.*}}bar{{.*}} : $@convention(witness_method) <T1 where T1 : HasAssoc><T> (@owned @callee_owned (@out T1.Assoc, @in T) -> (), @in_guaranteed GenericParameterNameCollision<T1>) -> () {
+  // CHECK:       bb0(%0 : $@callee_owned (@out T1.Assoc, @in T) -> (), %1 : $*GenericParameterNameCollision<T1>):
+  // CHECK:         apply {{%.*}}<T1, T1.Assoc, T>
+  func bar<V>(x: V -> T.Assoc) {}
 }
