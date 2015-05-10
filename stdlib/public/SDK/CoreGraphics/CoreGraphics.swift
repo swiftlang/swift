@@ -188,3 +188,21 @@ public func == (lhs: CGRect, rhs: CGRect) -> Bool {
   return CGRectEqualToRect(lhs, rhs)
 }
 
+// Overlay the C names of these constants with concrete definitions. The
+// C constants are opaque extern globals for no good reason.
+
+public var CGPointZero: CGPoint {
+  get { return CGPoint.zeroPoint }
+}
+
+public var CGRectZero: CGRect {
+  get { return CGRect.zeroRect }
+}
+
+public var CGSizeZero: CGSize {
+  get { return CGSize.zeroSize }
+}
+
+public var CGAffineTransformIdentity: CGAffineTransform {
+  get { return CGAffineTransform(a: 1, b: 0, c: 0, d: 1, tx: 0, ty: 0) }
+}
