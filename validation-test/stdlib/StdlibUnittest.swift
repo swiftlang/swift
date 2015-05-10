@@ -318,5 +318,50 @@ AssertionsTestSuite.test("expectUnreachable") {
 // CHECK: out>>> this code should not be executed
 // CHECK: [     FAIL ] Assertions.expectUnreachable
 
+AssertionsTestSuite.test("expectCrashLater/Pass") {
+  let ptr = _opaqueIdentity(UnsafePointer<Int>())
+  expectCrashLater()
+  _blackHole(ptr.memory)
+}
+// CHECK: [ RUN      ] Assertions.expectCrashLater/Pass
+// CHECK: err>>> CRASHED: SIGSEGV
+// CHECK: [       OK ] Assertions.expectCrashLater/Pass
+
+AssertionsTestSuite.test("expectCrashLater/UXPass")
+  .xfail(.Custom({ true }, reason: "test"))
+  .code {
+  let ptr = _opaqueIdentity(UnsafePointer<Int>())
+  expectCrashLater()
+  _blackHole(ptr.memory)
+}
+// CHECK: [ RUN      ] Assertions.expectCrashLater/UXPass (XFAIL: [Custom(reason: test)])
+// CHECK: err>>> CRASHED: SIGSEGV
+// CHECK: [   UXPASS ] Assertions.expectCrashLater/UXPass
+
+AssertionsTestSuite.test("expectCrashLater/Fail") {
+  expectCrashLater()
+}
+// CHECK: [ RUN      ] Assertions.expectCrashLater/Fail
+// CHECK: expecting a crash, but the test did not crash
+// CHECK: [     FAIL ] Assertions.expectCrashLater/Fail
+
+AssertionsTestSuite.test("expectCrashLater/XFail")
+  .xfail(.Custom({ true }, reason: "test"))
+  .code {
+  expectCrashLater()
+}
+// CHECK: [ RUN      ] Assertions.expectCrashLater/XFail (XFAIL: [Custom(reason: test)])
+// CHECK: expecting a crash, but the test did not crash
+// CHECK: [    XFAIL ] Assertions.expectCrashLater/XFail
+
+AssertionsTestSuite.test("UnexpectedCrash") {
+  let ptr = _opaqueIdentity(UnsafePointer<Int>())
+  _blackHole(ptr.memory)
+}
+// CHECK: [ RUN      ] Assertions.UnexpectedCrash
+// CHECK: err>>> CRASHED: SIGSEGV
+// CHECK: the test crashed unexpectedly
+// CHECK: [     FAIL ] Assertions.UnexpectedCrash
+
 runAllTests()
 

@@ -730,17 +730,19 @@ struct _ParentProcess {
 
         // Determine if the test passed, not taking XFAILs into account.
         var testPassed = false
-        switch (_anyExpectFailed, childTerminationStatus, expectCrash) {
-        case (_, .None, false):
+        switch (childTerminationStatus, expectCrash) {
+        case (.None, false):
           testPassed = !_anyExpectFailed
 
-        case (_, .None, true):
+        case (.None, true):
           testPassed = false
+          print("expecting a crash, but the test did not crash")
 
-        case (_, .Some(_), false):
+        case (.Some(_), false):
           testPassed = false
+          print("the test crashed unexpectedly")
 
-        case (_, .Some(_), true):
+        case (.Some(_), true):
           testPassed = !_anyExpectFailed
         }
         if testPassed && t.crashOutputMatches.count > 0 {
