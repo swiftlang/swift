@@ -54,3 +54,9 @@ class A {
 }
 
 func retV() { return true } // expected-error {{unexpected non-void return value in void function}}
+
+func retAI() -> Int {
+    let a = [""]
+    let b = [""]
+    return (a + b) // expected-error {{cannot convert return expression of type '[String]' to expected return type 'Int'}}
+}

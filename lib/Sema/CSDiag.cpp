@@ -1478,6 +1478,13 @@ bool GeneralFailureDiagnosis::diagnoseGeneralValueMemberFailure() {
 
 bool GeneralFailureDiagnosis::diagnoseGeneralOverloadFailure() {
   
+  // If this is a return expression with available conversion constraints,
+  // we can produce a better diagnostic by pointing out the return expression
+  // conversion failure.
+  if (expr->isReturnExpr() &&
+      (conversionConstraint || argumentConstraint))
+    return diagnoseGeneralConversionFailure();
+  
   // In the absense of a better conversion constraint failure, point out the
   // inability to find an appropriate overload.
   if (overloadConstraint) {
