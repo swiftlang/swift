@@ -1582,6 +1582,12 @@ ERROR(implicit_use_of_self_in_closure,tce_sema,none,
       " capture semantics explicit", ())
 ERROR(capture_before_declaration,tce_sema,none,
       "cannot capture %0 before it is declared", (Identifier))
+ERROR(transitive_capture_before_declaration,tce_sema,none,
+      "cannot capture %0, which would use %1 before it is declared",
+      (Identifier, Identifier))
+NOTE(transitive_capture_through_here,tce_sema,none,
+     "%0, declared here, captures %1",
+     (Identifier, Identifier))
 ERROR(unsupported_local_function_reference,tce_sema,none,
       "cannot reference a local function with captures from another local "
       "function", ())

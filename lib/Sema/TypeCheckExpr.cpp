@@ -21,6 +21,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/PointerUnion.h"
@@ -743,19 +744,73 @@ namespace {
       if (!isa<VarDecl>(D) && !D->getDeclContext()->isLocalContext())
         return { false, DRE };
 
-      // Can only capture a local that is declared before the capturing entity.
-      if (DRE->getDecl()->getDeclContext()->isLocalContext() &&
-          CaptureLoc.isValid() && DRE->getDecl()->getLoc().isValid() &&
-          TC.Context.SourceMgr.isBeforeInBuffer(CaptureLoc,
-                                                DRE->getDecl()->getLoc())) {
-        if (Diagnosed.insert(DRE->getDecl()).second) {
-          TC.diagnose(DRE->getLoc(), diag::capture_before_declaration,
-                      DRE->getDecl()->getName());
-          TC.diagnose(DRE->getDecl()->getLoc(), diag::decl_declared_here,
-                      DRE->getDecl()->getName());
+      // Can only capture a variable that is declared before the capturing
+      // entity.
+      llvm::DenseSet<ValueDecl *> checkedCaptures;
+      llvm::SmallVector<FuncDecl *, 2> capturePath;
+      
+      std::function<bool (ValueDecl *)>
+      validateForwardCapture = [&](ValueDecl *capturedDecl) -> bool {
+        if (!checkedCaptures.insert(capturedDecl).second)
+          return true;
+      
+        // Captures at nonlocal scope are order-invariant.
+        if (!capturedDecl->getDeclContext()->isLocalContext())
+          return true;
+        
+        // Assume implicit decl captures are OK.
+        if (!CaptureLoc.isValid() || !capturedDecl->getLoc().isValid())
+          return true;
+        
+        // Check the order of the declarations.
+        if (!TC.Context.SourceMgr.isBeforeInBuffer(CaptureLoc,
+                                                   capturedDecl->getLoc()))
+          return true;
+        
+        // Forward captures of functions are OK, if the function doesn't
+        // transitively capture variables ahead of the original function.
+        if (auto func = dyn_cast<FuncDecl>(capturedDecl)) {
+          if (!func->getCaptureInfo().hasBeenComputed()) {
+            // Check later.
+            TC.ForwardCapturedFuncs[func].push_back(AFR);
+            return true;
+          }
+          // Recursively check the transitive captures.
+          capturePath.push_back(func);
+          defer([&]{ capturePath.pop_back(); });
+          for (auto capture : func->getCaptureInfo().getCaptures())
+            if (!validateForwardCapture(capture.getDecl()))
+              return false;
+          return true;
         }
+        
+        // Diagnose the improper forward capture.
+        if (Diagnosed.insert(capturedDecl).second) {
+          if (capturedDecl == DRE->getDecl()) {
+            TC.diagnose(DRE->getLoc(), diag::capture_before_declaration,
+                        capturedDecl->getName());
+          } else {
+            TC.diagnose(DRE->getLoc(),
+                        diag::transitive_capture_before_declaration,
+                        DRE->getDecl()->getName(),
+                        capturedDecl->getName());
+            ValueDecl *prevDecl = capturedDecl;
+            for (auto path : reversed(capturePath)) {
+              TC.diagnose(path->getLoc(),
+                          diag::transitive_capture_through_here,
+                          path->getName(),
+                          prevDecl->getName());
+              prevDecl = path;
+            }
+          }
+          TC.diagnose(capturedDecl->getLoc(), diag::decl_declared_here,
+                      capturedDecl->getName());
+        }
+        return false;
+      };
+      
+      if (!validateForwardCapture(DRE->getDecl()))
         return { false, DRE };
-      }
 
       // We're going to capture this, compute flags for the capture.
       unsigned Flags = 0;

@@ -18,7 +18,6 @@ func local_recursion(x: Int, y: Int) {
   // CHECK: apply [[CLOSURE]]([[Y]])
   sr(y)
 
-  /* FIXME: Not allowed by Sema.
   func mutually_recursive_1(a: Int) {
     mutually_recursive_2(x + a)
   }
@@ -26,8 +25,9 @@ func local_recursion(x: Int, y: Int) {
     mutually_recursive_1(y + b)
   }
 
+  // CHECK: [[MUTUALLY_RECURSIVE_REF:%.*]] = function_ref [[MUTUALLY_RECURSIVE_1:@_TFF15local_recursion15local_recursionFTSi1ySi_T_L_20mutually_recursive_1fSiT_]]
+  // CHECK: apply [[MUTUALLY_RECURSIVE_REF]]([[X]], [[Y]], [[X]])
   mutually_recursive_1(x)
-   */
 
   func transitive_capture_1(a: Int) -> Int {
     return x + a
@@ -67,6 +67,16 @@ func local_recursion(x: Int, y: Int) {
 // CHECK: bb0([[A:%0]] : $Int, [[X:%1]] : $Int):
 // CHECK:   [[SELF_REF:%.*]] = function_ref [[SELF_RECURSIVE]]
 // CHECK:   apply [[SELF_REF]]({{.*}}, [[X]])
+
+// CHECK: sil shared [[MUTUALLY_RECURSIVE_1]]
+// CHECK: bb0([[A:%0]] : $Int, [[Y:%1]] : $Int, [[X:%2]] : $Int):
+// CHECK:   [[MUTUALLY_RECURSIVE_REF:%.*]] = function_ref [[MUTUALLY_RECURSIVE_2:@_TFF15local_recursion15local_recursionFTSi1ySi_T_L_20mutually_recursive_2fSiT_]]
+// CHECK:   apply [[MUTUALLY_RECURSIVE_REF]]({{.*}}, [[X]], [[Y]])
+// CHECK: sil shared [[MUTUALLY_RECURSIVE_2]]
+// CHECK: bb0([[B:%0]] : $Int, [[X:%1]] : $Int, [[Y:%2]] : $Int):
+// CHECK:   [[MUTUALLY_RECURSIVE_REF:%.*]] = function_ref [[MUTUALLY_RECURSIVE_1]]
+// CHECK:   apply [[MUTUALLY_RECURSIVE_REF]]({{.*}}, [[Y]], [[X]])
+
 
 // CHECK: sil shared [[TRANS_CAPTURE_1:@_TFF15local_recursion15local_recursionFTSi1ySi_T_L_20transitive_capture_1fSiSi]]
 // CHECK: bb0([[A:%0]] : $Int, [[X:%1]] : $Int):

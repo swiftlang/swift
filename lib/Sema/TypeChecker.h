@@ -387,6 +387,25 @@ public:
     SourceLoc CaptureLoc;
   };
 
+  /// Local functions that have been captured before their definitions.
+  ///
+  /// We need this to guard against functions that would transitively capture
+  /// variables before their definition, e.g.:
+  ///
+  /// func outer() {
+  ///   func first() {
+  ///     second()
+  ///   }
+  ///   second()
+  ///   var x
+  ///   func second() {
+  ///     use(x)
+  ///   }
+  /// }
+  
+  llvm::SmallDenseMap<AnyFunctionRef, SmallVector<AnyFunctionRef, 4>, 4>
+    ForwardCapturedFuncs;
+
   /// A set of local functions from which C function pointers are derived.
   ///
   /// This is used to diagnose the use of local functions with captured context
