@@ -31,7 +31,7 @@ bb0:
 // CHECK-NEXT: br i1 [[T1]]
 // CHECK:      [[T0:%.*]] = call %objc_class* @swift_getInitializedObjCClass({{.*}} @_TMdC12typemetadata1C {{.*}})
 // CHECK-NEXT: [[T1:%.*]] = bitcast %objc_class* [[T0]] to %swift.type*
-// CHECK:      store atomic %swift.type* [[T1]], %swift.type** @_TMLC12typemetadata1C release, align 8
+// CHECK:      store %swift.type* [[T1]], %swift.type** @_TMLC12typemetadata1C, align 8
 // CHECK-NEXT: br label
 // CHECK:      [[RES:%.*]] = phi
 // CHECK-NEXT: ret %swift.type* [[RES]]
@@ -42,7 +42,7 @@ bb0:
 // CHECK-NEXT: br i1 [[T1]]
 // CHECK:      [[T0:%.*]] = call %swift.type* @_TMaC12typemetadata1C()
 // CHECK-NEXT: [[T1:%.*]] = call %swift.type* @swift_getTupleTypeMetadata2(%swift.type* {{.*}} @_TMdV12typemetadata1S {{.*}}, %swift.type* [[T0]], i8* null, i8** null)
-// CHECK-NEXT: store atomic %swift.type* [[T1]], %swift.type** @_TMLTV12typemetadata1SCS_1C_ release, align 8
+// CHECK-NEXT: store %swift.type* [[T1]], %swift.type** @_TMLTV12typemetadata1SCS_1C_, align 8
 // CHECK-NEXT: br label
 // CHECK:      [[RES:%.*]] = phi
 // CHECK-NEXT: ret %swift.type* [[RES]]

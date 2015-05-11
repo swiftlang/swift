@@ -489,6 +489,10 @@ namespace {
   /// A visitor class for emitting a reference to a metatype object.
   /// This implements a "raw" access, useful for implementing cache
   /// functions or for implementing dependent accesses.
+  ///
+  /// If the access requires runtime initialization, that initialization
+  /// must be dependency-ordered-before any load that carries a dependency
+  /// from the resulting metadata pointer.
   class EmitTypeMetadataRef
     : public CanTypeVisitor<EmitTypeMetadataRef, llvm::Value *> {
   private:
@@ -983,6 +987,8 @@ static llvm::Function *getTypeMetadataAccessFunction(IRGenModule &IGM,
   // accesses.
   //
   // Therefore, we can perform a completely naked load here.
+  // FIXME: Technically should be "consume", but that introduces barriers in the
+  // current LLVM ARM backend.
   auto load = IGF.Builder.CreateLoad(cache);
 
   // Compare the load result against null.
@@ -996,11 +1002,10 @@ static llvm::Function *getTypeMetadataAccessFunction(IRGenModule &IGM,
   IGF.Builder.emitBlock(isNullBB);
   llvm::Value *directResult = emitDirectTypeMetadataRef(IGF, type);
 
-  // Store it back to the cache variable.  This does require a
-  // barrier on ARM; a 'dmb st' is sufficient.  x86 does not require
-  // a barrier here.
-  auto store = IGF.Builder.CreateStore(directResult, cache);
-  store->setAtomic(llvm::Release);
+  // Store it back to the cache variable.  The direct metadata lookup is
+  // required to have already dependency-ordered any initialization
+  // it triggered before loads from the pointer it returned.
+  IGF.Builder.CreateStore(directResult, cache);
 
   IGF.Builder.CreateBr(contBB);
   auto storeBB = IGF.Builder.GetInsertBlock();
