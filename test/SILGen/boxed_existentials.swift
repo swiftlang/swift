@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
-// RUN: %target-swift-frontend -emit-silgen -enable-guaranteed-self %s | FileCheck %s --check-prefix=GUARANTEED
+// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s --check-prefix=GUARANTEED
 
 func test_type_lowering(x: ErrorType) { }
 // CHECK-LABEL: sil hidden @_TF18boxed_existentials18test_type_loweringFPSs9ErrorType_T_ : $@convention(thin) (@owned ErrorType) -> () {
