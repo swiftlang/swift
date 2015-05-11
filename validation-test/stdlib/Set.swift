@@ -2969,13 +2969,13 @@ SetTestSuite.test("∪") {
 
 SetTestSuite.test("unionInPlace") {
   // These are anagrams - they should amount to the same sets.
-  var s1 = Set("the morse code")
-  let s2 = Set("here come dots")
-  let s3 = Set("and then dashes")
+  var s1 = Set("the morse code".characters)
+  let s2 = Set("here come dots".characters)
+  let s3 = Set("and then dashes".characters)
 
   let identity1 = unsafeBitCast(s1, Word.self)
 
-  s1.unionInPlace("")
+  s1.unionInPlace("".characters)
   expectEqual(identity1, unsafeBitCast(s1, Word.self))
 
   expectEqual(s1, s2)
@@ -2990,13 +2990,13 @@ SetTestSuite.test("unionInPlace") {
 
 SetTestSuite.test("∪=") {
   // These are anagrams - they should amount to the same sets.
-  var s1 = Set("the morse code")
-  let s2 = Set("here come dots")
-  let s3 = Set("and then dashes")
+  var s1 = Set("the morse code".characters)
+  let s2 = Set("here come dots".characters)
+  let s3 = Set("and then dashes".characters)
 
   let identity1 = unsafeBitCast(s1, Word.self)
 
-  s1 ∪= ""
+  s1 ∪= "".characters
   expectEqual(identity1, unsafeBitCast(s1, Word.self))
 
   expectEqual(s1, s2)

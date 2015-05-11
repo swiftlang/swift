@@ -48,8 +48,8 @@ mirrors.test("RandomAccessStructure") {
 let letters = "abcdefghijklmnopqrstuvwxyz "
 
 func find(substring: String, within domain: String) -> String.Index? {
-  let domainCount = domain.count()
-  let substringCount = substring.count()
+  let domainCount = domain.characters.count()
+  let substringCount = substring.characters.count()
 
   if (domainCount < substringCount) { return nil }
   var sliceStart = domain.startIndex
@@ -68,18 +68,21 @@ func find(substring: String, within domain: String) -> String.Index? {
 mirrors.test("ForwardStructure") {
   struct DoubleYou : CustomReflectable {
     func customMirror() -> Mirror {
-      return Mirror(self, unlabeledChildren: Set(letters), displayStyle: .Set)
+      return Mirror(
+        self,
+        unlabeledChildren: Set(letters.characters),
+        displayStyle: .Set)
     }
   }
 
   let w = DoubleYou().customMirror()
   expectEqual(.Set, w.displayStyle)
-  expectEqual(letters.count(), numericCast(w.children.count()))
+  expectEqual(letters.characters.count(), numericCast(w.children.count()))
   
   // Because we don't control the order of a Set, we need to do a
   // fancy dance in order to validate the result.
   let description = w.description
-  for c in letters {
+  for c in letters.characters {
     let expected = "nil: \"\(c)\""
     expectNotEmpty(find(expected, within: description))
   }
@@ -88,7 +91,10 @@ mirrors.test("ForwardStructure") {
 mirrors.test("BidirectionalStructure") {
   struct Why : CustomReflectable {
     func customMirror() -> Mirror {
-      return Mirror(self, unlabeledChildren: letters, displayStyle: .Collection)
+      return Mirror(
+        self,
+        unlabeledChildren: letters.characters,
+        displayStyle: .Collection)
     }
   }
 
@@ -99,7 +105,7 @@ mirrors.test("BidirectionalStructure") {
   let description = y.description
   expectEqual(
     "[nil: \"a\", nil: \"b\", nil: \"c\", nil: \"",
-    description[description.startIndex..<description.indexOf("d")!])
+    description[description.startIndex..<description.characters.indexOf("d")!])
 }
 
 mirrors.test("LabeledStructure") {

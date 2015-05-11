@@ -608,9 +608,9 @@ StringTests.test("stringCoreExtensibility") {
       for boundary in 0..<length {
         
         var x = (
-            k == 0 ? asciiString("b")
-          : k == 1 ? String("b" as NSString)
-          : String("b" as NSMutableString)
+            k == 0 ? asciiString("b".characters)
+          : k == 1 ? ("b" as NSString as String)
+          : ("b" as NSMutableString as String)
         )._core
 
         if k == 0 { expectEqual(1, x.elementWidth) }
@@ -642,7 +642,7 @@ StringTests.test("stringCoreReserve") {
 
     switch k {
     case 0: (base, startedNative) = (String(), true)
-    case 1: (base, startedNative) = (asciiString("x"), true)
+    case 1: (base, startedNative) = (asciiString("x".characters), true)
     case 2: (base, startedNative) = ("Ξ", true)
     case 3: (base, startedNative) = ("x" as NSString as String, false)
     case 4: (base, startedNative) = ("x" as NSMutableString as String, false)
@@ -860,8 +860,7 @@ StringTests.test("growth") {
 }
 
 StringTests.test("Construction") {
-  let text = "Thirsty pirates"
-  expectEqual(text, String(Array<Character>(text)))
+  expectEqual("abc", String([ "a", "b", "c" ] as [Character]))
 }
 
 StringTests.test("Conversions") {
@@ -1125,10 +1124,12 @@ StringTests.test("String.append(_: Character)") {
     for prefix in ["", " "] {
       let base = baseStrings[baseIdx]
       for inputIdx in baseCharacters.indices {
-        let input = (prefix + String(baseCharacters[inputIdx])).last!
+        let input = (prefix + String(baseCharacters[inputIdx])).characters.last!
         var s = base
         s.append(input)
-        expectEqual(Array(base) + [ input ], Array(s)) {
+        expectEqualSequence(
+          Array(base.characters) + [ input ],
+          Array(s.characters)) {
           "baseIdx=\(baseIdx) inputIdx=\(inputIdx)"
         }
       }

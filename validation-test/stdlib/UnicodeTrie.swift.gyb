@@ -136,7 +136,7 @@ func checkGraphemeClusterSegmentation(
 ) {
   var actualBoundaries: [Int] = [ 0 ]
   var unicodeScalarCount = 0
-  for c in subject {
+  for c in subject.characters {
     let currentClusterSize = String(c).unicodeScalars.count()
     unicodeScalarCount += currentClusterSize
     actualBoundaries += [ unicodeScalarCount ]
@@ -146,8 +146,8 @@ func checkGraphemeClusterSegmentation(
     "scalars: \(asHex(lazy(subject.unicodeScalars).map { $0.value }.array))"
   }
 
-  var expectedCharacters: [Character] = Array(subject)
-  checkSliceableWithBidirectionalIndex(expectedCharacters, subject,
+  var expectedCharacters: [Character] = Array(subject.characters)
+  checkSliceableWithBidirectionalIndex(expectedCharacters, subject.characters,
       stackTrace.withCurrentLoc())
 }
 

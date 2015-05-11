@@ -1779,7 +1779,7 @@ func checkCharacterComparison(
 
 NSStringAPIs.test("Character.{Equatable,Hashable,Comparable}") {
   for test in comparisonTests {
-    if test.lhs.count() == 1 && test.rhs.count() == 1 {
+    if test.lhs.characters.count() == 1 && test.rhs.characters.count() == 1 {
       let lhsCharacter = Character(test.lhs)
       let rhsCharacter = Character(test.rhs)
       checkCharacterComparison(
@@ -1807,11 +1807,11 @@ func checkHasPrefixHasSuffix(
   // To determine the expected results, compare grapheme clusters,
   // scalar-to-scalar, of the NFD form of the strings.
   let lhsNFDGraphemeClusters =
-    map(lhs.decomposedStringWithCanonicalMapping) {
+    map(lhs.decomposedStringWithCanonicalMapping.characters) {
       Array(String($0).unicodeScalars)
     }
   let rhsNFDGraphemeClusters =
-    map(rhs.decomposedStringWithCanonicalMapping) {
+    map(rhs.decomposedStringWithCanonicalMapping.characters) {
       Array(String($0).unicodeScalars)
     }
   let expectHasPrefix = lhsNFDGraphemeClusters.startsWith(

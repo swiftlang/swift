@@ -166,7 +166,7 @@ tests.test("BidirectionalCollection") {
   }
   
   // Can't upgrade a non-random-access collection to random access
-  let s0 = "Hello, Woyld"
+  let s0 = "Hello, Woyld".characters
   let bc1 = AnyBidirectionalCollection(s0)
   let fc3 = AnyForwardCollection(bc1)
   expectTrue(fc3 === bc1)

@@ -56,6 +56,12 @@ extension String {
     swap(&_core, &tmp._core)
     return r
   }
+
+  /// Construct the `String` corresponding to the given sequence of
+  /// Unicode scalars.
+  public init(_ characters: CharacterView) {
+    self.init(characters._core)
+  }
 }
 
 /// `String.CharacterView` is a collection of `Character`
@@ -383,3 +389,17 @@ extension String.CharacterView : RangeReplaceableCollectionType {
     Swift.removeAll(&self, keepCapacity: keepCapacity)
   }
 }
+
+extension String.CharacterView : Sliceable {
+  /// Access the characters in the given `subRange`
+  ///
+  /// - complexity: O(1) unless bridging from Objective-C requires an
+  /// O(N) conversion.
+  public subscript(subRange: Range<Index>) -> String.CharacterView {
+    let unicodeScalarRange =
+      subRange.startIndex._base..<subRange.endIndex._base
+    return String.CharacterView(
+      String(_core).unicodeScalars[unicodeScalarRange]._core)
+  }
+}
+

@@ -570,14 +570,13 @@ public func < (lhs: String.Index, rhs: String.Index) -> Bool {
   return lhs._base < rhs._base
 }
 
-extension String : Sliceable {
+extension String {
   /// Access the characters in the given `subRange`
   ///
   /// - complexity: O(1) unless bridging from Objective-C requires an
   /// O(N) conversion.
   public subscript(subRange: Range<Index>) -> String {
-    return String(
-      unicodeScalars[subRange.startIndex._base..<subRange.endIndex._base]._core)
+    return String(characters[subRange])
   }
 
   @availability(
@@ -646,7 +645,19 @@ extension String {
       (inout v: CharacterView) in v.replaceRange(subRange, with: newElements)
     }
   }
-  
+
+  /// Replace the given `subRange` of elements with `newElements`.
+  ///
+  /// Invalidates all indices with respect to `self`.
+  ///
+  /// - complexity: O(`subRange.count()`) if `subRange.endIndex
+  /// == self.endIndex` and `isEmpty(newElements)`, O(N) otherwise.
+  public mutating func replaceRange(
+    subRange: Range<Index>, with newElements: String
+  ) {
+    replaceRange(subRange, with: newElements.characters)
+  }
+
   /// Insert `newElement` at index `i`.
   ///
   /// Invalidates all indices with respect to `self`.

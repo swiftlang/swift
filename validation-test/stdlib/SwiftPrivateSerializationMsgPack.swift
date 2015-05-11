@@ -130,7 +130,7 @@ func makeString(length: Int) -> String {
   for i in 0..<(length / 10) {
     result += "0123456789"
   }
-  result += String(Array("0123456789")[0 ..< length % 10])
+  result += String(Array("0123456789".characters)[0 ..< length % 10])
   return result
 }
 

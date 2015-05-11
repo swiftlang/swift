@@ -3,12 +3,11 @@
 
 func markUsed<T>(t: T) {}
 
-var puzzleInput = "great minds think alike"
-var puzzleOutput = ""
+var puzzleOutput: [String] = []
 // CHECK-NOT: !DILocalVariable(tag: DW_TAG_auto_variable, name: "$letter$generator"
 // CHECK: !DILocalVariable(tag: DW_TAG_auto_variable, name: "letter",
 // CHECK-SAME:             line: [[@LINE+1]]
-for letter in puzzleInput {
+for letter in [ "g", "r", "e", "a", "t" ] {
   switch letter {
   case "a", "e", "i", "o", "u", " ":
     continue

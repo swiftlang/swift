@@ -1,7 +1,7 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
 struct X : CollectionType {
-  typealias Element = String.Generator.Element
+  typealias Element = String.CharacterView.Generator.Element
   typealias Index = String.Index
   var msg: String
 

@@ -88,7 +88,7 @@ tests.test("index-mapping/character-to-utf8") {
       replacementUTF8
     ] as [[UTF8.CodeUnit]],
 
-    winter.indices.map { 
+    winter.characters.indices.map {
       i in (0..<3).map {
         winter.utf8[advance(i.samePositionIn(winter.utf8), $0)]
       }
@@ -98,7 +98,7 @@ tests.test("index-mapping/character-to-utf8") {
   
   expectEqualSequence(
     summerBytes,
-    summer.indices.map { summer.utf8[$0.samePositionIn(summer.utf8)] }
+    summer.characters.indices.map { summer.utf8[$0.samePositionIn(summer.utf8)] }
   )
   
   expectEqual(summer.utf8.endIndex, summer.endIndex.samePositionIn(summer.utf8))
@@ -288,7 +288,7 @@ tests.test("index-mapping/character-to-utf16") {
       replacementUTF16, 0x20, replacementUTF16, replacementUTF16
     ] as [UTF16.CodeUnit],
     
-    winter.indices.map {
+    winter.characters.indices.map {
       winter.utf16[$0.samePositionIn(winter.utf16)]
     }, ==)
 
@@ -296,7 +296,7 @@ tests.test("index-mapping/character-to-utf16") {
   
   expectEqualSequence(
     summerBytes.map { UTF16.CodeUnit($0) },
-    summer.indices.map { summer.utf16[$0.samePositionIn(summer.utf16)] }
+    summer.characters.indices.map { summer.utf16[$0.samePositionIn(summer.utf16)] }
   )
   
   expectEqual(summer.utf16.endIndex, summer.endIndex.samePositionIn(summer.utf16))
@@ -391,7 +391,7 @@ tests.test("index-mapping/character-to-unicode-scalar") {
   
   expectEqualSequence(
     winterCharacterUnicodeScalars,
-    winter.indices.map {
+    winter.characters.indices.map {
       winter.unicodeScalars[$0.samePositionIn(winter.unicodeScalars)]
     })
 
@@ -399,7 +399,7 @@ tests.test("index-mapping/character-to-unicode-scalar") {
   
   expectEqualSequence(
     summerBytes.map { UnicodeScalar($0) },
-    summer.indices.map { summer.unicodeScalars[$0.samePositionIn(summer.unicodeScalars)] }
+    summer.characters.indices.map { summer.unicodeScalars[$0.samePositionIn(summer.unicodeScalars)] }
   )
   
   expectEqual(summer.unicodeScalars.endIndex, summer.endIndex.samePositionIn(summer.unicodeScalars))
@@ -713,7 +713,7 @@ tests.test("UTF8->String") {
 tests.test("UnicodeScalars->String") {
   let s = summer + winter + winter + summer
   let v = s.unicodeScalars
-  for i in s.indices {
+  for i in s.characters.indices {
     for j in i..<s.endIndex {
       expectEqual(
         s[i..<j],
