@@ -2069,19 +2069,8 @@ namespace {
       // # empty cases
       addConstantInt32(strategy.getElementsWithNoPayload().size());
 
-      // Build the list of case names, payload followed by no-payload.
-      llvm::SmallString<64> fieldNames;
-      for (auto &payloadCase : strategy.getElementsWithPayload()) {
-        fieldNames.append(payloadCase.decl->getName().str());
-        fieldNames.push_back('\0');
-      }
-      for (auto &noPayloadCase : strategy.getElementsWithNoPayload()) {
-        fieldNames.append(noPayloadCase.decl->getName().str());
-        fieldNames.push_back('\0');
-      }
-      // The final null terminator is provided by getAddrOfGlobalString.
-      addWord(IGM.getAddrOfGlobalString(fieldNames));
-      
+      addWord(strategy.emitCaseNames(IGM));
+
       // Build the case type accessor.
       llvm::Function *caseTypeVectorAccessor
         = getFieldTypeAccessorFn(IGM, Target,

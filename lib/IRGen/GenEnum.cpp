@@ -73,6 +73,21 @@ void irgen::EnumImplStrategy::initializeFromParams(IRGenFunction &IGF,
   TI->initializeWithTake(IGF, dest, src, T);
 }
 
+llvm::Constant *EnumImplStrategy::emitCaseNames(IRGenModule &IGM) const {
+    // Build the list of case names, payload followed by no-payload.
+    llvm::SmallString<64> fieldNames;
+    for (auto &payloadCase : getElementsWithPayload()) {
+      fieldNames.append(payloadCase.decl->getName().str());
+      fieldNames.push_back('\0');
+    }
+    for (auto &noPayloadCase : getElementsWithNoPayload()) {
+      fieldNames.append(noPayloadCase.decl->getName().str());
+      fieldNames.push_back('\0');
+    }
+    // The final null terminator is provided by getAddrOfGlobalString.
+    return IGM.getAddrOfGlobalString(fieldNames);
+}
+
 llvm::Value *irgen::EnumImplStrategy::
 loadRefcountedPtr(IRGenFunction &IGF, SourceLoc loc, Address addr) const {
   IGF.IGM.error(loc, "Can only load from an address of an optional "
@@ -1056,6 +1071,13 @@ namespace {
                               llvm::Value *index,
                               Address dest, SILType T) const override {
       llvm_unreachable("no extra inhabitants");
+    }
+
+    llvm::Constant *emitCaseNames(IRGenModule &IGM) const override {
+      // C enums have arbitrary values and we don't preserve the mapping
+      // between the case and raw value at runtime, so don't emit any
+      // case names at all so that reflection can give up in this case.
+      return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
     }
   };
 

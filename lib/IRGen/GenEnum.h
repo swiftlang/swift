@@ -282,6 +282,9 @@ public:
     return -1;
   }
 
+  /// Emit field names for enum reflection.
+  virtual llvm::Constant *emitCaseNames(IRGenModule &IGM) const;
+
   /// \brief Return the bits used for discriminators for payload cases.
   ///
   /// These bits are populated in increasing value according to the order of
