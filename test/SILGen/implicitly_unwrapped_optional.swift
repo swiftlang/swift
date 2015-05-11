@@ -1,7 +1,5 @@
 // RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
-import Foundation
-
 func foo(var f f: (()->())!) {
   f?()
 }
