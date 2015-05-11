@@ -114,6 +114,18 @@ We can't make ``map()``, ``filter()``, etc. all return ``Self``:
   required by Functor, so it's a false purity.  We'd rather preserve the
   semantics of functional ``map()`` than its signature.
 
+- The behavior is surprising (and error-prone) in generic code::
+
+    func countFlattenedElements<
+      S : SequenceType where S.Generator.Element == Set<Double>
+    >(sequence: S) -> Int {
+      return sequence.map { $0.count }.reduce(0) { $0 + $1 }
+    }
+
+The function behaves as expected when given an ``[Set<Double>]``, but the
+results are wrong for ``Set<Set<Double>>``.  The ``sequence.map()`` operation
+would return a ``Set<Int>``, and all non-unique counts would disappear.
+
 - Even if we throw semantics under the bus, maintaining mathematical purity of
   signature prevents us from providing useful variants of these algorithms that
   are the same in spirit, like the ``flatMap()`` that selects the non-nil
