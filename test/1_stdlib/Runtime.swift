@@ -1619,6 +1619,14 @@ Reflection.test("FieldNamesBug") {
   }
 }
 
+Reflection.test("MirrorMirror") {
+  var object = 1
+  var mirror = Mirror(reflecting: object)
+  var mirrorMirror = Mirror(reflecting: mirror)
+  
+  expectEqual(0, mirrorMirror.children.count())
+}
+
 Reflection.test("COpaquePointer/null") {
   // Don't crash on null pointers. rdar://problem/19708338
   var sequence = COpaquePointer()
