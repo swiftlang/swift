@@ -1159,6 +1159,9 @@ ERROR(unsupported_target_config_argument_type,parsing,none,
       "unexpected target configuration expression argument type", ())
 ERROR(unsupported_config_conditional_expression_type,parsing,none,
       "unexpected configuration expression type", ())
+ERROR(unsupported_config_integer,parsing,none,
+      "'%0' is not a valid configuration option, use '%1'",
+      (StringRef, StringRef))
 
 //------------------------------------------------------------------------------
 // Availability query parsing diagnostics

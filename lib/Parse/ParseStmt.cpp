@@ -798,6 +798,7 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
     auto var = new (P.Context) VarDecl(/*static*/ false, /*IsLet*/true,
                                        loc, errorName, Type(),
                                        P.CurDeclContext);
+    var->setImplicit();
     auto namePattern = new (P.Context) NamedPattern(var);
     auto varPattern = new (P.Context) VarPattern(loc, /*isLet*/true,
                                                  namePattern, /*implicit*/true);
@@ -1304,6 +1305,18 @@ bool Parser::evaluateConfigConditionExpr(Expr *configExpr) {
     auto target = Context.LangOpts.getTargetConfigOption(targetValue);
     return target == UDRE->getName().str();
   }
+  
+  // "#if 0" isn't valid, but it is common, so recognize it and handle it
+  // with a fixit elegantly.
+  if (auto *IL = dyn_cast<IntegerLiteralExpr>(configExpr))
+    if (IL->getDigitsText() == "0" || IL->getDigitsText() == "1") {
+      StringRef replacement = IL->getDigitsText() == "0" ? "false" :"true";
+      diagnose(IL->getLoc(), diag::unsupported_config_integer,
+               IL->getDigitsText(), replacement)
+        .fixItReplace(IL->getLoc(), replacement);
+      return IL->getDigitsText() == "1";
+    }
+  
   
   // If we've gotten here, it's an unsupported expression type.
   diagnose(configExpr->getLoc(),
