@@ -121,6 +121,10 @@ public:
     return Ptr.get<const clang::Module *>();
   }
 
+  /// Returns the module either the one wrapped directly, the one from a
+  /// clang::ImportDecl or null if it's neither.
+  const clang::Module *getClangModule() const;
+
   clang::SourceLocation getLocation() const;
   clang::SourceRange getSourceRange() const;
 
@@ -1534,7 +1538,7 @@ public:
                             SourceLoc ImportLoc, ImportKind Kind,
                             SourceLoc KindLoc,
                             ArrayRef<AccessPathElement> Path,
-                            const clang::Module *Mod = nullptr);
+                            ClangNode ClangN = ClangNode());
 
   /// Returns the import kind that is most appropriate for \p VD.
   ///
@@ -1580,9 +1584,7 @@ public:
   void setDecls(ArrayRef<ValueDecl *> Ds) { Decls = Ds; }
 
   const clang::Module *getClangModule() const {
-    if (ClangNode ClangN = getClangNode())
-      return ClangN.castAsModule();
-    return nullptr;
+    return getClangNode().getClangModule();
   }
 
   SourceLoc getStartLoc() const { return ImportLoc; }

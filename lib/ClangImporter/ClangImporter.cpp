@@ -86,6 +86,11 @@ using clang::CompilerInvocation;
 
 #pragma mark Internal data structures
 
+static ImportDecl *createImportDecl(ASTContext &Ctx,
+                                    DeclContext *DC,
+                                    ClangNode ClangN,
+                                    ArrayRef<clang::Module *> Exported);
+
 namespace {
   class HeaderImportCallbacks : public clang::PPCallbacks {
     ClangImporter &Importer;
@@ -526,6 +531,83 @@ bool ClangImporter::addSearchPath(StringRef newSearchPath, bool isFramework) {
   return false;
 }
 
+namespace {
+class BridgingPPTracker : public clang::PPCallbacks {
+  clang::ASTContext &ClangCtx;
+  ASTContext &SwiftCtx;
+  DeclContext *SwiftDC;
+  std::vector<ImportDecl *> &BridgeHeaderTopLevelImports;
+  std::vector<clang::IdentifierInfo *> &BridgeHeaderMacros;
+
+public:
+  BridgingPPTracker(clang::ASTContext &ClangCtx,
+                    DeclContext *SwiftDC,
+                    std::vector<ImportDecl *> &BridgeHeaderTopLevelImports,
+      std::vector<clang::IdentifierInfo *> &BridgeHeaderMacros)
+  : ClangCtx(ClangCtx),
+    SwiftCtx(SwiftDC->getASTContext()),
+    SwiftDC(SwiftDC),
+    BridgeHeaderTopLevelImports(BridgeHeaderTopLevelImports),
+    BridgeHeaderMacros(BridgeHeaderMacros) {}
+
+private:
+  static unsigned getNumModuleIdentifiers(const clang::Module *Mod) {
+    unsigned Result = 1;
+    while (Mod->Parent) {
+      Mod = Mod->Parent;
+      ++Result;
+    }
+    return Result;
+  }
+
+  void InclusionDirective(clang::SourceLocation HashLoc,
+                          const clang::Token &IncludeTok,
+                          StringRef FileName,
+                          bool IsAngled,
+                          clang::CharSourceRange FilenameRange,
+                          const clang::FileEntry *File,
+                          StringRef SearchPath,
+                          StringRef RelativePath,
+                          const clang::Module *Imported) override {
+    if (!Imported)
+      return;
+    // Synthesize identifier locations.
+    SmallVector<clang::SourceLocation, 4> IdLocs;
+    for (unsigned I = 0, E = getNumModuleIdentifiers(Imported); I != E; ++I)
+      IdLocs.push_back(HashLoc);
+    handleImport(HashLoc, IdLocs, Imported);
+  }
+
+  void moduleImport(clang::SourceLocation ImportLoc,
+                    clang::ModuleIdPath Path,
+                    const clang::Module *Imported) override {
+    if (!Imported)
+      return;
+    SmallVector<clang::SourceLocation, 4> IdLocs;
+    for (auto &P : Path)
+      IdLocs.push_back(P.second);
+    handleImport(ImportLoc, IdLocs, Imported);
+  }
+
+  void handleImport(clang::SourceLocation ImportLoc,
+                    ArrayRef<clang::SourceLocation> IdLocs,
+                    const clang::Module *Imported) {
+    clang::ImportDecl *ClangImport = clang::ImportDecl::Create(ClangCtx,
+                                            ClangCtx.getTranslationUnitDecl(),
+                                            ImportLoc,
+                                           const_cast<clang::Module*>(Imported),
+                                            IdLocs);
+    auto *ID = createImportDecl(SwiftCtx, SwiftDC, ClangImport, {});
+    BridgeHeaderTopLevelImports.push_back(ID);
+  }
+
+  void MacroDefined(const clang::Token &MacroNameTok,
+                    const clang::MacroDirective *MD) override {
+    BridgeHeaderMacros.push_back(MacroNameTok.getIdentifierInfo());
+  }
+};
+}
+
 void ClangImporter::Implementation::importHeader(
     Module *adapter, StringRef headerName, SourceLoc diagLoc,
     bool trackParsedSymbols,
@@ -541,8 +623,17 @@ void ClangImporter::Implementation::importHeader(
 
   bool hadError = clangDiags.hasErrorOccurred();
 
+  clang::ASTContext &ClangCtx = getClangASTContext();
   clang::Preprocessor &pp = getClangPreprocessor();
-  clang::SourceManager &sourceMgr = getClangASTContext().getSourceManager();
+  if (trackParsedSymbols) {
+    auto ppTracker = llvm::make_unique<BridgingPPTracker>(ClangCtx,
+                                                          adapter,
+                                                    BridgeHeaderTopLevelImports,
+                                                    BridgeHeaderMacros);
+    pp.addPPCallbacks(std::move(ppTracker));
+  }
+  
+  clang::SourceManager &sourceMgr = ClangCtx.getSourceManager();
 
   clang::SourceLocation includeLoc =
     sourceMgr.getLocForStartOfFile(sourceMgr.getMainFileID());
@@ -2138,12 +2229,25 @@ public:
 void ClangImporter::lookupBridgingHeaderDecls(
                               llvm::function_ref<bool(ClangNode)> filter,
                               llvm::function_ref<void(Decl*)> receiver) const {
-  for (auto *D : Impl.BridgeHeaderTopLevelDecls) {
-    if (filter(D)) {
-      if (auto *ND = dyn_cast<clang::NamedDecl>(D)) {
+  for (auto *ImportD : Impl.BridgeHeaderTopLevelImports) {
+    if (filter(ImportD->getClangDecl()))
+      receiver(ImportD);
+  }
+  for (auto *ClangD : Impl.BridgeHeaderTopLevelDecls) {
+    if (filter(ClangD)) {
+      if (auto *ND = dyn_cast<clang::NamedDecl>(ClangD)) {
         if (Decl *imported = Impl.importDeclReal(ND))
           receiver(imported);
       }
+    }
+  }
+  ASTContext &Ctx = Impl.SwiftContext;
+  auto &ClangPP = Impl.getClangPreprocessor();
+  for (clang::IdentifierInfo *II : Impl.BridgeHeaderMacros) {
+    if (auto *MI = ClangPP.getMacroInfo(II)) {
+      Identifier Name = Ctx.getIdentifier(II->getName());
+      if (Decl *imported = Impl.importMacro(Name, MI))
+        receiver(imported);
     }
   }
 }
@@ -2256,6 +2360,36 @@ void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
   results.append(extensions.begin(), extensions.end());
 }
 
+static ImportDecl *createImportDecl(ASTContext &Ctx,
+                                    DeclContext *DC,
+                                    ClangNode ClangN,
+                                    ArrayRef<clang::Module *> Exported) {
+  auto *ImportedMod = ClangN.getClangModule();
+  assert(ImportedMod);
+  SmallVector<std::pair<swift::Identifier, swift::SourceLoc>, 4> AccessPath;
+  auto *TmpMod = ImportedMod;
+  while (TmpMod) {
+    AccessPath.push_back({ Ctx.getIdentifier(TmpMod->Name), SourceLoc() });
+    TmpMod = TmpMod->Parent;
+  }
+  std::reverse(AccessPath.begin(), AccessPath.end());
+
+  bool IsExported = false;
+  for (auto *ExportedMod : Exported) {
+    if (ImportedMod == ExportedMod) {
+      IsExported = true;
+      break;
+    }
+  }
+
+  auto *ID = ImportDecl::create(Ctx, DC, SourceLoc(),
+                                ImportKind::Module, SourceLoc(), AccessPath,
+                                ClangN);
+  if (IsExported)
+    ID->getAttrs().add(new (Ctx) ExportedAttr(/*IsImplicit=*/false));
+  return ID;
+}
+
 static void getImportDecls(ClangModuleUnit *ClangUnit, const clang::Module *M,
                            SmallVectorImpl<Decl *> &Results) {
   assert(M);
@@ -2265,27 +2399,7 @@ static void getImportDecls(ClangModuleUnit *ClangUnit, const clang::Module *M,
   ASTContext &Ctx = ClangUnit->getASTContext();
 
   for (auto *ImportedMod : M->Imports) {
-    SmallVector<std::pair<swift::Identifier, swift::SourceLoc>, 4> AccessPath;
-    auto *TmpMod = ImportedMod;
-    while (TmpMod) {
-      AccessPath.push_back({ Ctx.getIdentifier(TmpMod->Name), SourceLoc() });
-      TmpMod = TmpMod->Parent;
-    }
-    std::reverse(AccessPath.begin(), AccessPath.end());
-
-    bool IsExported = false;
-    for (auto *ExportedMod : Exported) {
-      if (ImportedMod == ExportedMod) {
-        IsExported = true;
-        break;
-      }
-    }
-
-    auto *ID = ImportDecl::create(Ctx, ClangUnit, SourceLoc(),
-                                  ImportKind::Module, SourceLoc(), AccessPath,
-                                  ImportedMod);
-    if (IsExported)
-      ID->getAttrs().add(new (Ctx) ExportedAttr(/*IsImplicit=*/false));
+    auto *ID = createImportDecl(Ctx, ClangUnit, ImportedMod, Exported);
     Results.push_back(ID);
   }
 }

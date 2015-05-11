@@ -1,20 +1,3 @@
-// RUN: echo '#include "header.h"' > %t.m
-// RUN: %target-swift-ide-test -source-filename %s -print-header -header-to-print %S/Inputs/header.h --cc-args -Xclang -triple -Xclang %target-triple -fsyntax-only %t.m -I %S/Inputs > %t.txt
-// RUN: FileCheck -input-file=%t.txt %s
-
-// CHECK: func doSomethingInHead(arg: Int32)
-// CHECK: class BaseInHead {
-// CHECK:   class func doIt(arg: Int32)
-// CHECK:   func doIt(arg: Int32)
-// CHECK: }
-
-// CHECK: /// Awesome name.
-// CHECK: class SameName {
-// CHECK: }
-// CHECK: protocol SameNameProtocol {
-// CHECK: }
-
-// CHECK: extension BaseInHead {
-// CHECK:  class func doItInCategory()
-// CHECK:  func doItInCategory()
-// CHECK: }
+// RUN: echo '#include "header-to-print.h"' > %t.m
+// RUN: %target-swift-ide-test -source-filename %s -print-header -header-to-print %S/Inputs/header-to-print.h -print-regular-comments --cc-args -Xclang -triple -Xclang %target-triple -isysroot %clang-importer-sdk-path -fsyntax-only %t.m -I %S/Inputs > %t.txt
+// RUN: diff -u %S/Inputs/header-to-print.h.printed.txt %t.txt

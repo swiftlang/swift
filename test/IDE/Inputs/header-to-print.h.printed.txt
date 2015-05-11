@@ -1,0 +1,22 @@
+import Foundation
+import Dispatch
+
+var MY_MACRO: Int32 { get }
+
+func doSomethingInHead(arg: Int32)
+
+class BaseInHead {
+  class func doIt(arg: Int32)
+  func doIt(arg: Int32)
+}
+
+/// Awesome name.
+class SameName {
+}
+protocol SameNameProtocol {
+}
+
+extension BaseInHead {
+  class func doItInCategory()
+  func doItInCategory()
+}

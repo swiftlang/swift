@@ -281,9 +281,10 @@ private:
 
   /// Tracks top level decls from the bridging header.
   std::vector<clang::Decl *> BridgeHeaderTopLevelDecls;
+  std::vector<ImportDecl *> BridgeHeaderTopLevelImports;
 
   /// Tracks macro definitions from the bridging header.
-  std::vector<clang::MacroInfo *> BridgeHeaderMacros;
+  std::vector<clang::IdentifierInfo *> BridgeHeaderMacros;
 
   /// The active type checker, or null if there is no active type checker.
   ///

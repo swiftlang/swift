@@ -63,6 +63,14 @@ clang::SourceRange ClangNode::getSourceRange() const {
   return clang::SourceLocation();
 }
 
+const clang::Module *ClangNode::getClangModule() const {
+  if (auto *M = getAsModule())
+    return M;
+  if (auto *ID = dyn_cast_or_null<clang::ImportDecl>(getAsDecl()))
+    return ID->getImportedModule();
+  return nullptr;
+}
+
 // Only allow allocation of Decls using the allocator in ASTContext.
 void *Decl::operator new(size_t Bytes, ASTContext &C,
                          unsigned Alignment) {
@@ -727,14 +735,16 @@ ImportDecl *ImportDecl::create(ASTContext &Ctx, DeclContext *DC,
                                SourceLoc ImportLoc, ImportKind Kind,
                                SourceLoc KindLoc,
                                ArrayRef<AccessPathElement> Path,
-                               const clang::Module *ClangMod) {
+                               ClangNode ClangN) {
   assert(!Path.empty());
   assert(Kind == ImportKind::Module || Path.size() > 1);
+  assert(ClangN.isNull() || ClangN.getAsModule() ||
+         isa<clang::ImportDecl>(ClangN.getAsDecl()));
   size_t Size = sizeof(ImportDecl) + Path.size() * sizeof(AccessPathElement);
-  void *ptr = allocateMemoryForDecl<ImportDecl>(Ctx, Size, ClangMod != nullptr);
+  void *ptr = allocateMemoryForDecl<ImportDecl>(Ctx, Size, !ClangN.isNull());
   auto D = new (ptr) ImportDecl(DC, ImportLoc, Kind, KindLoc, Path);
-  if (ClangMod)
-    D->setClangNode(ClangMod);
+  if (ClangN)
+    D->setClangNode(ClangN);
   return D;
 }
 
