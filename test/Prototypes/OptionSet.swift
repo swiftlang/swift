@@ -17,98 +17,25 @@
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-simple-swift
 
-//===--- workarounds for <rdar://20443893> --------------------------------===//
-// Skip to the next divider for the real content.  These protocols and
-// operators duplicate the hierarchy for RawOptionSetType, less an
-// init? that is causing SILGen fits.
-//===----------------------------------------------------------------------===//
-
-/// A type that can be converted to an associated "raw" type, then
-/// converted back to produce an instance equivalent to the original.
-public protocol MyRawRepresentable {
-  /// The "raw" type that can be used to represent all values of `Self`.
-  ///
-  /// Every distinct value of `self` has a corresponding unique
-  /// value of `RawValue`, but `RawValue` may have representations
-  /// that do not correspond to an value of `Self`.
-  typealias RawValue
-
-  /// Convert from a value of `RawValue`, yielding `nil` iff
-  /// `rawValue` does not correspond to a value of `Self`.
-  // FIXME: disabled due to <rdar://20443893>
-  // init?(rawValue: RawValue)
-
-  /// The corresponding value of the "raw" type.
-  ///
-  /// `Self(rawValue: self.rawValue)!` is equivalent to `self`.
-  var rawValue: RawValue { get }
-}
-
-// Workaround for our lack of circular conformance checking. Allow == to be
-// defined on _MyRawOptionSetType in order to satisfy the Equatable requirement of
-// MyRawOptionSetType without a circularity our type-checker can't yet handle.
-
-/// This protocol is an implementation detail of `MyRawOptionSetType`; do
-/// not use it directly.
-///
-/// Its requirements are inherited by `MyRawOptionSetType` and thus must
-/// be satisfied by types conforming to that protocol.
-public protocol _MyRawOptionSetType : MyRawRepresentable, Equatable {
-  typealias RawValue : BitwiseOperationsType, Equatable
-  init(rawValue: RawValue)
-}
-
-public func == <T : _MyRawOptionSetType>(a: T, b: T) -> Bool {
-  return a.rawValue == b.rawValue
-}
-
-public func & <T : _MyRawOptionSetType>(a: T, b: T) -> T {
-  return T(rawValue: a.rawValue & b.rawValue)
-}
-public func | <T : _MyRawOptionSetType>(a: T, b: T) -> T {
-  return T(rawValue: a.rawValue | b.rawValue)
-}
-public func ^ <T : _MyRawOptionSetType>(a: T, b: T) -> T {
-  return T(rawValue: a.rawValue ^ b.rawValue)
-}
-public prefix func ~ <T : _MyRawOptionSetType>(a: T) -> T {
-  return T(rawValue: ~a.rawValue)
-}
-
-/// Protocol for `NS_OPTIONS` imported from Objective-C
-public protocol MyRawOptionSetType : _MyRawOptionSetType, BitwiseOperationsType,
-    NilLiteralConvertible {
-  // FIXME: Disabled pending <rdar://problem/14011860> (Default
-  // implementations in protocols)
-  // The Clang importer synthesizes these for imported NS_OPTIONS.
-
-  /* init?(rawValue: RawValue) { self.init(rawValue) } */
-}
-
-//===--- end workarounds for <rdar://20443893> ----------------------------===//
-// Real content starts here
-//===----------------------------------------------------------------------===//
-
 protocol SetAlgebraBaseType {
-  typealias Basis
+  typealias Element
   func subtract(other: Self) -> Self
   func isSubsetOf(other: Self) -> Bool
   func isDisjointWith(other: Self) -> Bool
   func isSupersetOf(other: Self) -> Bool
   func isSupersetOf<
-    S : SequenceType where S.Generator.Element == Basis
+    S : SequenceType where S.Generator.Element == Element
   >(other: S) -> Bool
+  var isEmpty: Bool { get }
+  func _deduceElement(Element)
 }
 
 protocol SetAlgebraType : Equatable, SetAlgebraBaseType {
-  
   init()
-  func contains(member: Basis) -> Bool
+  func contains(member: Element) -> Bool
   func union(other: Self) -> Self
   func intersect(other: Self) -> Self
   func exclusiveOr(other: Self) -> Self
-
-  var isEmpty: Bool { get }
 }
 
 extension SetAlgebraType {
@@ -123,15 +50,19 @@ extension SetAlgebraType {
   final func isDisjointWith(other: Self) -> Bool {
     return self.intersect(other).isEmpty
   }
-  
+
   final func isSupersetOf<
-    S : SequenceType where S.Generator.Element == Basis
+    S : SequenceType where S.Generator.Element == Element
   >(other: S) -> Bool {
     return !other.contains { !self.contains($0) }
   }
-
+  
   final func subtract(other: Self) -> Self {
     return self.intersect(self.exclusiveOr(other))
+  }
+
+  final var isEmpty: Bool {
+    return self == Self()
   }
 }
 
@@ -146,57 +77,61 @@ extension SetAlgebraType where Self : CollectionType {
 }
 
 protocol MutableSetAlgebraBaseType {
-  typealias Basis
-  init()
-  init<S : SequenceType where S.Generator.Element == Basis>(_ sequence: S)
+  typealias Element
+  init<S : SequenceType where S.Generator.Element == Element>(_ sequence: S)
 
   mutating func subtractInPlace(other: Self)
-  
+
   mutating func unionInPlace<
-    S : SequenceType where S.Generator.Element == Basis
+    S : SequenceType where S.Generator.Element == Element
   >(sequence: S)
   
   mutating func subtractInPlace<
-    S : SequenceType where S.Generator.Element == Basis
+    S : SequenceType where S.Generator.Element == Element
   >(sequence: S)
 
   mutating func exclusiveOrInPlace<
-    S : SequenceType where S.Generator.Element == Basis
+    S : SequenceType where S.Generator.Element == Element
   >(sequence: S)
 }
 
-protocol MutableSetAlgebraType : SetAlgebraType, MutableSetAlgebraBaseType {
-  mutating func insert(member: Basis)
-  mutating func remove(member: Basis) -> Basis?
+protocol MutableSetAlgebraType
+  : SetAlgebraType, ArrayLiteralConvertible, MutableSetAlgebraBaseType {
+  mutating func insert(member: Element)
+  mutating func remove(member: Element) -> Element?
   mutating func unionInPlace(other: Self)
   mutating func intersectInPlace(other: Self)
   mutating func exclusiveOrInPlace(other: Self)
 }
 
 extension MutableSetAlgebraType {
-  init<S : SequenceType where S.Generator.Element == Basis>(_ sequence: S) {
+  init<S : SequenceType where S.Generator.Element == Element>(_ sequence: S) {
     self.init()
     for e in sequence { insert(e) }
+  }
+  
+  init(arrayLiteral: Element...) {
+    self.init(arrayLiteral)
   }
   
   final mutating func subtractInPlace(other: Self) {
     self.intersectInPlace(self.exclusiveOr(other))
   }
-  
+
   final mutating func unionInPlace<
-    S : SequenceType where S.Generator.Element == Basis
+    S : SequenceType where S.Generator.Element == Element
   >(sequence: S) {
     for x in sequence { insert(x) }
   }
   
   final mutating func subtractInPlace<
-    S : SequenceType where S.Generator.Element == Basis
+    S : SequenceType where S.Generator.Element == Element
   >(sequence: S) {
     for x in sequence { remove(x) }
   }
   
   final mutating func exclusiveOrInPlace<
-    S : SequenceType where S.Generator.Element == Basis
+    S : SequenceType where S.Generator.Element == Element
   >(sequence: S) {
     for x in sequence {
       if let _ = self.remove(x) {
@@ -208,86 +143,120 @@ extension MutableSetAlgebraType {
 }
 
 extension Set : MutableSetAlgebraType {
-  typealias Basis = Element
+  func _deduceElement(Element) {}
 }
 
-/*
-extension MutableSetAlgebraType {
-  init<S : SequenceType where S.Generator.Element == T>(_ sequence: S) {
-    self.init()
-    for e in sequence { insert(e) }
+// We can't constrain the associated Element type to be the same as
+// Self, but we can do almost as well with a default and a constrained
+// extension
+protocol OptionSetType : MutableSetAlgebraType, RawRepresentable {
+  typealias Element = Self
+  init(rawValue: RawValue)
+}
+
+func == <
+  T : RawRepresentable where T.RawValue : Equatable
+>(lhs: T, rhs: T) -> Bool {
+  return lhs.rawValue == rhs.rawValue
+}
+
+extension OptionSetType {
+  final
+  func contains(member: Self) -> Bool {
+    return self.isSupersetOf(member)
   }
   
-  func isSubsetOf<
-    S : SequenceType where S.Generator.Element == T
-  >(sequence: S) -> Bool
-
-  func union(other: Self) -> Self
-  func intersect(other: Self) -> Self
-  func exclusiveOr(other: Self) -> Self
-
-  func isDisjointWith<S : SequenceType where S.Generator.Element == T>(sequence: S) -> Bool
-  func isStrictSubsetOf<S : SequenceType where S.Generator.Element == T>(sequence: S) -> Bool
-  func isStrictSubsetOf(other: Self) -> Bool
-  func isStrictSupersetOf<S : SequenceType where S.Generator.Element == T>(sequence: S) -> Bool
-  func union<S : SequenceType where S.Generator.Element == T>(sequence: S) -> Set<T>
-
-  func subtract<S : SequenceType where S.Generator.Element == T>(sequence: S) -> Set<T>
-  func intersect<S : SequenceType where S.Generator.Element == T>(sequence: S) -> Set<T>
-  func exclusiveOr<S : SequenceType where S.Generator.Element == T>(sequence: S) -> Set<T>
-  
-  mutating func unionInPlace<S : SequenceType where S.Generator.Element == T>(sequence: S)
-  mutating func subtractInPlace<S : SequenceType where S.Generator.Element == T>(sequence: S)
-  mutating func intersectInPlace<S : SequenceType where S.Generator.Element == T>(sequence: S)
-  mutating func exclusiveOrInPlace<S : SequenceType where S.Generator.Element == T>(sequence: S)
+  final func _deduceElement(Self) {}
 }
-*/
 
-/// Elements of this set can be instances of any enumeration with Int
-/// as its raw-value type.
-public struct OptionSet<
-  Element: RawRepresentable where Element.RawValue == Int
-> : MyRawOptionSetType
+extension OptionSetType
+where Self.Element == Self, Self.RawValue : BitwiseOperationsType
 {
-  public init() {
-    self.rawValue = 0
+  init() {
+    self.init(rawValue: .allZeros)
   }
 
-  // This one shouldn't be necessary because of the one below, right?
-  public init(_ element: Element) {
-    self.rawValue = 1 << RawValue(element.rawValue)
-  }
-
-  public init(_ elements: Element...) {
-    self.rawValue = elements.reduce(0 as RawValue) {
-      $0 | (1 << RawValue($1.rawValue))
-    }
-  }
-
-  //===--- protocol requirements ------------------------------------------===//
-  public typealias RawValue = UIntMax       // RawRepresentable
-  public let rawValue: RawValue             // RawRepresentable
-
-  public init(nilLiteral: ()) {             // NilLiteralConvertible
-    self.init()
-  }
-
-  public static var allZeros: OptionSet {   // BitwiseOperationsType
-    return OptionSet()
+  final
+  mutating func insert(member: Element) {
+    self.unionInPlace(member)
   }
   
-  public init(rawValue: RawValue) {         // RawOptionSetType
-    self.rawValue = rawValue
+  final
+  mutating func remove(member: Element) -> Element? {
+    let r = isSupersetOf(member) ? Optional(member) : nil
+    self.subtractInPlace(member)
+    return r
   }
-}
 
-extension OptionSet : CustomDebugStringConvertible {
-  public var debugDescription: String {
-    return "OptionSet(rawValue: 0b\(String(rawValue, radix: 2)))"
+  final
+  func union(other: Self) -> Self {
+    var r: Self = Self(rawValue: self.rawValue)
+    r.unionInPlace(other)
+    return r
+  }
+  
+  final
+  func intersect(other: Self) -> Self {
+    var r = Self(rawValue: self.rawValue)
+    r.intersectInPlace(other)
+    return r
+  }
+  
+  final
+  func exclusiveOr(other: Self) -> Self {
+    var r = Self(rawValue: self.rawValue)
+    r.exclusiveOrInPlace(other)
+    return r
+  }
+  
+  final
+  mutating func unionInPlace(other: Self) {
+    self = Self(rawValue: self.rawValue | other.rawValue)
+  }
+  
+  final
+  mutating func intersectInPlace(other: Self) {
+    self = Self(rawValue: self.rawValue & other.rawValue)
+  }
+  
+  final
+  mutating func exclusiveOrInPlace(other: Self) {
+    self = Self(rawValue: self.rawValue ^ other.rawValue)
+  }
+  
+  init(_ components: Self...) {
+    self.init(
+      rawValue: lazy(components).map { $0.rawValue }.reduce(.allZeros) {
+        $0 | $1
+      }
+    )
   }
 }
 
 //===--- Tests ------------------------------------------------------------===//
+
+struct X : OptionSetType {
+  let rawValue: Int
+  init(rawValue: Int) { self.rawValue = rawValue }
+
+  static let Box = X(rawValue: 1)
+  static let Carton = X(rawValue: 2)
+  static let Bag = X(rawValue: 4)
+  static let Satchel = X(rawValue: 8)
+  static let BoxOrBag: X = [Box, Bag]
+  static let BoxOrCartonOrBag = X(Box, Carton, Bag)
+  static let SatchelOrBag = Satchel.union(Bag)
+}
+
+debugPrint(X.Box)
+debugPrint(X.Carton)
+debugPrint(X.Bag)
+debugPrint(X.Satchel)
+debugPrint([X.Satchel, X.Bag, X.Box] as X)
+debugPrint(X.BoxOrCartonOrBag)
+debugPrint(X.BoxOrBag == ([.Box, .Satchel] as X))
+
+/*
 // Hack this part out if you want to play with OptionSet outside the
 // test framework.
 import StdlibUnittest
@@ -310,3 +279,4 @@ tests.test("basics") {
 }
 
 runAllTests()
+*/
