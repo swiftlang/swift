@@ -20,7 +20,7 @@ ternary(false, 1, 2 as Int32)
 ternary(false, 1, 2 as Float)
 
 func genericFloatingLiteral<T : FloatLiteralConvertible>(x: T) {
-  var x2 : T = 2.5
+  var _ : T = 2.5
 }
 
 var d = 3.5

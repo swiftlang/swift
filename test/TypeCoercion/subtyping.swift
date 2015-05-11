@@ -47,9 +47,10 @@ func fp_gen_to_p(_: () -> FormattedPrintable) -> CustomStringConvertible {}
 func nonTrivialNested() {
   // FIXME: closures make ABI conversions explicit. rdar://problem/19517003
   var f1 : (_ : () -> CustomStringConvertible) -> CustomStringConvertible = { p_gen_to_fp($0) }
-  var f2 : (_ : () -> CustomStringConvertible) -> FormattedPrintable = p_gen_to_fp
-  var f3 : (_ : () -> FormattedPrintable) -> CustomStringConvertible = fp_gen_to_p
+  let f2 : (_ : () -> CustomStringConvertible) -> FormattedPrintable = p_gen_to_fp
+  let f3 : (_ : () -> FormattedPrintable) -> CustomStringConvertible = fp_gen_to_p
 
   f1 = { f2($0) } // okay
   f1 = f3 // expected-error{{annot assign a value of type '(() -> FormattedPrintable) -> CustomStringConvertible' to a value of type '(() -> CustomStringConvertible) -> CustomStringConvertible'}}
+  let _ = f1
 }

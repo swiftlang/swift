@@ -63,6 +63,7 @@ func testTrueFalse() {
 func testCStrings() -> Bool {
   var str: String = UTF8_STRING
   str = VERSION_STRING
+  _ = str
 }
 
 func testObjCString() -> Int {
@@ -104,8 +105,8 @@ func testNil() {
 }
 
 func testBitwiseOps() {
-  let maxUnsigned: CUnsignedLongLong = DISPATCH_TIME_FOREVER
-  let mask: CInt = BIT_SHIFT_1 | BIT_SHIFT_2
+  let _: CUnsignedLongLong = DISPATCH_TIME_FOREVER
+  let _: CInt = BIT_SHIFT_1 | BIT_SHIFT_2
   let _: CLongLong = BIT_SHIFT_3
   let _: CUnsignedInt = BIT_SHIFT_4
 }

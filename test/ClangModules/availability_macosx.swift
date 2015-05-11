@@ -6,7 +6,7 @@ import Foundation
 import AvailabilityExtras
 
 func test_unavailable_because_deprecated() {
-  let x = NSRealMemoryAvailable() // expected-error {{APIs deprecated as of OS X 10.9 and earlier are unavailable in Swift}}
+  let _ = NSRealMemoryAvailable() // expected-error {{APIs deprecated as of OS X 10.9 and earlier are unavailable in Swift}}
 }
 
 func test_swift_unavailable_wins() {

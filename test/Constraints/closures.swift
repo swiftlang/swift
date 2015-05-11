@@ -49,13 +49,14 @@ struct X3<T> {
 }
 
 func testX3(var x: Int) {
-  var q = X3({ x = $0 })
+  var _ = X3({ x = $0 })
 }
 
 // <rdar://problem/13811882>
 func test13811882() {
-  var f : (Int) -> (Int, Int) = {($0, $0)}
+  var _ : (Int) -> (Int, Int) = {($0, $0)}
   var x = 1
-  var g : (Int) -> (Int, Int) = {($0, x)}
+  var _ : (Int) -> (Int, Int) = {($0, x)}
+  x = 2
 }
 

@@ -34,4 +34,5 @@ func testDictionaryBridge(dict: Dictionary<String, String>) {
 func testStringBridge() {
   var i = String.someFactoryMethod()
   i = 17
+  _ = i
 }

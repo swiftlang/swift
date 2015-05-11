@@ -15,7 +15,7 @@ protocol Comparable: Eq {
 func find<R : GeneratorType where R.Element : Eq>
        (range : R, value : R.Element) -> R {
   var result = range
-  var z = GeneratorSequence(range)
+//  var z = GeneratorSequence(range)
   for x in GeneratorSequence(range) {
     if x == value {
       break
@@ -98,7 +98,7 @@ func mismatch<R1 : GeneratorType, R2 : GeneratorType where R1.Element : Eq,
   var prev1 = range1, prev2 = range2
 
   while true {
-    var e1 = range1.next(), e2 = range2.next()
+    let e1 = range1.next(), e2 = range2.next()
     
     if (e1 == nil) || (e2 == nil) || e1! != e2! { break }
     prev1.next()
@@ -114,7 +114,7 @@ func mismatchIf<R1 : GeneratorType, R2 : GeneratorType>
   var prev1 = range1, prev2 = range2
 
   while true {
-    var e1 = range1.next(), e2 = range2.next()
+    let e1 = range1.next(), e2 = range2.next()
     
     if (e1 == nil) || (e2 == nil) || !predicate(e1!, e2!) { break }
     prev1.next()
@@ -166,7 +166,7 @@ func lowerBound<R : RandomAccessStreamType where R.Element : Comparable>
        (inputrange : R, value : R.Element) -> R {
   var range = inputrange
   while range.size() > 1 {
-    var mid = range.size() / 2
+    let mid = range.size() / 2
     if range.getNth(mid) < value {
       range = range[mid + 1..<range.size()]
     } else {
@@ -180,7 +180,7 @@ func upperBound<R : RandomAccessStreamType where R.Element : Comparable>
        (inputrange : R, value : R.Element) -> R {
   var range = inputrange
   while range.size() > 1 {
-    var mid = range.size() / 2
+    let mid = range.size() / 2
     if value < range.getNth(mid) {
       range = range[0..<mid]
     } else {

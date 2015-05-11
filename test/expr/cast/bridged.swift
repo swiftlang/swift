@@ -39,7 +39,7 @@ struct BridgedStruct : _ObjectiveCBridgeable {
 
 func testBridgeDowncast(obj: AnyObject, objOpt: AnyObject?, 
                         objImplicitOpt: AnyObject!) -> BridgedStruct? {
-  var s1Opt = obj as? BridgedStruct
+  let s1Opt = obj as? BridgedStruct
   var s2Opt = objOpt as? BridgedStruct
   var s3Opt = objImplicitOpt as? BridgedStruct
 
@@ -48,6 +48,7 @@ func testBridgeDowncast(obj: AnyObject, objOpt: AnyObject?,
   s2Opt = s1Opt
   s2Opt = s3Opt
   s3Opt = s1Opt
+  _ = s2Opt
 
   return s1Opt
 }
@@ -62,16 +63,16 @@ func testBridgeIsa(obj: AnyObject, objOpt: AnyObject?,
 func testBridgeDowncastSuperclass(obj: NSObject, objOpt: NSObject?,
                                   objImplicitOpt: NSObject!) 
        -> BridgedStruct? {
-  var s1Opt = obj as? BridgedStruct
-  var s2Opt = objOpt as? BridgedStruct
-  var s3Opt = objImplicitOpt as? BridgedStruct
+  var _ = obj as? BridgedStruct
+  var _ = objOpt as? BridgedStruct
+  var _ = objImplicitOpt as? BridgedStruct
 }
 
 func testBridgeDowncastExact(obj: BridgedClass, objOpt: BridgedClass?,
                              objImplicitOpt: BridgedClass!) -> BridgedStruct? {
-  var s1Opt = obj as? BridgedStruct // expected-warning{{conditional cast from 'BridgedClass' to 'BridgedStruct' always succeeds}}
-  var s2Opt = objOpt as? BridgedStruct
-  var s3Opt = objImplicitOpt as? BridgedStruct // expected-warning{{conditional cast from 'BridgedClass!' to 'BridgedStruct' always succeeds}}
+  var _ = obj as? BridgedStruct // expected-warning{{conditional cast from 'BridgedClass' to 'BridgedStruct' always succeeds}}
+  var _ = objOpt as? BridgedStruct
+  var _ = objImplicitOpt as? BridgedStruct // expected-warning{{conditional cast from 'BridgedClass!' to 'BridgedStruct' always succeeds}}
 }
 
 func testExplicitBridging(var object: BridgedClass, var value: BridgedStruct) {
@@ -80,6 +81,6 @@ func testExplicitBridging(var object: BridgedClass, var value: BridgedStruct) {
 }
 
 func testBridgingFromSubclass(obj: SubclassOfBridgedClass) {
-  var s1 = obj as! BridgedStruct // expected-warning{{forced cast from 'SubclassOfBridgedClass' to 'BridgedStruct' always succeeds; did you mean to use 'as'?}}
-  var s2 = obj as BridgedStruct
+  var _ = obj as! BridgedStruct // expected-warning{{forced cast from 'SubclassOfBridgedClass' to 'BridgedStruct' always succeeds; did you mean to use 'as'?}}
+  var _ = obj as BridgedStruct
 }

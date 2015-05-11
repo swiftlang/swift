@@ -15,10 +15,10 @@ func f1(i: Int?, ii: Int??, a: [Base]?, d: [Base : Base]?) {
 }
 
 func implicitCastOfLiteralToOptional() {
-  var optinalInt: Int? = 0
-  var optionalString: String? = ""
-  var optionalArray: [Int] = []
-  var optionalDictionary: [Int : Int]? = [:]
-  var optionalSet: Set<Int> = []
+  var _: Int? = 0
+  var _: String? = ""
+  var _: [Int] = []
+  var _: [Int : Int]? = [:]
+  var _: Set<Int> = []
 }
 

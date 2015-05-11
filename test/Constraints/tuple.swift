@@ -74,7 +74,7 @@ extension Int : PosixErrorReturn {
 func posixCantFail<A, T : protocol<Comparable, PosixErrorReturn>>
   (f:(A) -> T)(args:A) -> T
 {
-  var result = f(args)
+  let result = f(args)
   assert(result != T.errorReturnValue())
   return result
 }
@@ -93,4 +93,7 @@ class C {
 
 func testLValue(var c: C) {
   c.f(c)
+  
+  let x = c
+  c = x
 }

@@ -770,7 +770,7 @@ class ClassWithDeclarationsOfUnavailableClasses {
   }
 
   func methodWithUnavailableLocalDeclaration() {
-    let o : ClassAvailableOn10_10 = methodWithUnavailableReturnType() // expected-error {{'ClassAvailableOn10_10' is only available on OS X 10.10 or newer}}
+    let _ : ClassAvailableOn10_10 = methodWithUnavailableReturnType() // expected-error {{'ClassAvailableOn10_10' is only available on OS X 10.10 or newer}}
       // expected-note@-1 {{add @availability attribute to enclosing class}}
       // expected-note@-2 {{add @availability attribute to enclosing instance method}}
       // expected-note@-3 {{guard with version check}}
@@ -778,7 +778,7 @@ class ClassWithDeclarationsOfUnavailableClasses {
   
   @availability(OSX, introduced=10.10)
   func unavailableMethodWithUnavailableLocalDeclaration() {
-    let o : ClassAvailableOn10_10 = methodWithUnavailableReturnType()
+    let _ : ClassAvailableOn10_10 = methodWithUnavailableReturnType()
   }
 }
 
@@ -1073,6 +1073,7 @@ func useGuardAvailable() {
   if globalFuncAvailableOn10_10() > 0 {
     guard #available(OSX 10.11, *),
             let x = injectToOptional(globalFuncAvailableOn10_11()) else { return }
+    _ = x
   }
 
   let _ = globalFuncAvailableOn10_11() // expected-error {{'globalFuncAvailableOn10_11()' is only available on OS X 10.11 or newer}}
@@ -1220,7 +1221,7 @@ class X {
 }
 
 func testForFixitWithNestedMemberRefExpr() {
-  var x = X()
+  let x = X()
 
   x.y.z = globalFuncAvailableOn10_11()
       // expected-error@-1 {{'globalFuncAvailableOn10_11()' is only available on OS X 10.11 or newer}}
@@ -1228,7 +1229,7 @@ func testForFixitWithNestedMemberRefExpr() {
       // expected-note@-3 {{add @availability attribute to enclosing global function}} {{1-1=@availability(OSX, introduced=10.11)\n}}
 
   // Access via dynamic member reference
-  var anyX: AnyObject = x
+  let anyX: AnyObject = x
   anyX.y?.z = globalFuncAvailableOn10_11()
       // expected-error@-1 {{'globalFuncAvailableOn10_11()' is only available on OS X 10.11 or newer}}
       // expected-note@-2 {{guard with version check}} {{3-43=if #available(OSX 10.11, *) {\n      anyX.y?.z = globalFuncAvailableOn10_11()\n  } else {\n      // Fallback on earlier versions\n  }}}

@@ -3,11 +3,12 @@
 func boolLiterals() {
   var b: Bool = false
   b = true
+  _ = b
 }
 
 func defaultBoolLiterals() {
-  var b = false
-  var b2: Bool = b
+  let b = false
+  var _: Bool = b
 }
 
 struct CustomBool : BooleanLiteralConvertible {
@@ -21,5 +22,6 @@ struct CustomBool : BooleanLiteralConvertible {
 func customBoolLiterals() {
   var b: CustomBool = false
   b = true
+  _ = b
 }
 

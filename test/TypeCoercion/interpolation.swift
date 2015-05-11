@@ -5,7 +5,7 @@ func simple_ret(s: String, i: Int) -> String {
 }
 
 func in_context(s: String, i: Int) -> String {
-  var h = "\(s) = \(i)" 
+  let h = "\(s) = \(i)"
   return h
 }
 

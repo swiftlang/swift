@@ -29,8 +29,8 @@ func testArrayDowncast(arr: [AnyObject], arrImplicit: [AnyObject]!) {
 }
 
 func testDowncastNSArrayToArray(nsarray: NSArray) {
-  var nsstrArr1 = nsarray as! [NSString]
-  var strArr1 = nsarray as! [String]
+  var _ = nsarray as! [NSString]
+  var _ = nsarray as! [String]
 }
 
 // CHECK-LABEL: testDowncastOptionalObject

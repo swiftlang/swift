@@ -62,8 +62,9 @@ func lvalue_or_rvalue(x: X) -> Y { }
 func test_lvalue_or_rvalue() {
   var x : X;
   var y : Y;
-  var x1 = lvalue_or_rvalue(&x)
+  let x1 = lvalue_or_rvalue(&x)
   x = x1
-  var y1 = lvalue_or_rvalue(x)
+  let y1 = lvalue_or_rvalue(x)
   y = y1
+  _ = y
 }

@@ -70,8 +70,8 @@ func getFirst<R : GeneratorType>(var r: R) -> R.Element {
   return r.next()!
 }
 
-func testGetFirst(var ir: Range<Int>) {
-  var i : Int = getFirst(ir.generate())
+func testGetFirst(ir: Range<Int>) {
+  var _ : Int = getFirst(ir.generate())
 }
 
 struct XT<T> {
@@ -272,11 +272,11 @@ var xarray : XArray = [1, 2, 3]
 // Type parameters can be referenced only via unqualified name lookup
 struct XParam<T> {
   func foo(x: T) {
-    var y : T = x
+    var _ : T = x
   }
 
   static func bar(x: T) {
-    var y : T = x
+    var _ : T = x
   }
 }
 

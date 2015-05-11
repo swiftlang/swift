@@ -237,7 +237,7 @@ trailingclosure1(x: 1, { return 5 }) // expected-error{{missing argument label '
 func trailingclosure2(x x: Int, f: (() -> Int)!...) {}
 trailingclosure2(x: 5) { return 5 }
 
-func trailingclosure3(x x: Int, var f: (() -> Int)!) {}
+func trailingclosure3(x x: Int, var f: (() -> Int)!) { f = nil}
 trailingclosure3(x: 5) { return 5 }
 
 func trailingclosure4(f f: () -> Int) {}

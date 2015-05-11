@@ -4,7 +4,7 @@
 // Refer to members of literals
 //===----------------------------------------------------------------------===//
 func testLiteralMembers() {
-  var x = 0.value
+  var _ = 0.value
   Int(0.value)
 }
 
@@ -25,7 +25,7 @@ func testLiteralOverloadinovlLitB() {
 func literalOverloadSameReturn(i: Int) -> Int {}
 func literalOverloadSameReturn(i: Int32) -> Int {}
 func literalOverload2() {
-  var x : Int = literalOverloadSameReturn(literalOverloadSameReturn(1))
+  var _ : Int = literalOverloadSameReturn(literalOverloadSameReturn(1))
 }
 
 //===----------------------------------------------------------------------===//

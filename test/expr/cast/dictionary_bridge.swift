@@ -86,20 +86,22 @@ func testUpcastBridge() {
   dictDO = dictBB // expected-error{{cannot assign a value of type 'Dictionary<BridgedToObjC, BridgedToObjC>' to a value of type 'Dictionary<DerivesObjC, ObjC>'}}
   dictOD = dictBB // expected-error{{cannot assign a value of type 'Dictionary<BridgedToObjC, BridgedToObjC>' to a value of type 'Dictionary<ObjC, DerivesObjC>'}}
   dictDD = dictBB // expected-error{{cannot assign a value of type 'Dictionary<BridgedToObjC, BridgedToObjC>' to a value of type 'Dictionary<DerivesObjC, DerivesObjC>'}}
+  
+  _ = dictDD; _ = dictDO; _ = dictOD; _ = dictOO; _ = dictOR; _ = dictOR; _ = dictRR; _ = dictRO
 }
 
 func testDowncastBridge() {
-  var dictRR = Dictionary<Root, Root>()
-  var dictRO = Dictionary<Root, ObjC>()
-  var dictOR = Dictionary<ObjC, Root>()
-  var dictOO = Dictionary<ObjC, ObjC>()
-  var dictOD = Dictionary<ObjC, DerivesObjC>()
-  var dictDO = Dictionary<DerivesObjC, ObjC>()
-  var dictDD = Dictionary<DerivesObjC, DerivesObjC>()
+  let dictRR = Dictionary<Root, Root>()
+  let dictRO = Dictionary<Root, ObjC>()
+  let _ = Dictionary<ObjC, Root>()
+  let _ = Dictionary<ObjC, ObjC>()
+  let _ = Dictionary<ObjC, DerivesObjC>()
+  let dictDO = Dictionary<DerivesObjC, ObjC>()
+  let _ = Dictionary<DerivesObjC, DerivesObjC>()
 
-  var dictBB = Dictionary<BridgedToObjC, BridgedToObjC>()
-  var dictBO = Dictionary<BridgedToObjC, ObjC>()
-  var dictOB = Dictionary<ObjC, BridgedToObjC>()
+  let _ = Dictionary<BridgedToObjC, BridgedToObjC>()
+  let dictBO = Dictionary<BridgedToObjC, ObjC>()
+  let dictOB = Dictionary<ObjC, BridgedToObjC>()
 
   // Downcast to bridged value types.
   dictRR as! Dictionary<BridgedToObjC, BridgedToObjC>

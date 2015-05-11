@@ -45,7 +45,7 @@ func useTwoIdentical(xi: Int, yi: Float) {
 
 func mySwap<T>(inout x: T,
                inout _ y: T) {
-  var tmp = x
+  let tmp = x
   x = y
   y = tmp
 }
@@ -182,6 +182,7 @@ func testStatic(sf: StaticFuncs, sfi: StaticFuncsGeneric<Int>) {
   // x = sfi.chameleon()
   // typealias SFI = StaticFuncsGeneric<Int>
   // x = SFI.chameleon()
+  _ = x
 }
 
 //===----------------------------------------------------------------------===//

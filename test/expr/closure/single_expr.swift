@@ -14,7 +14,8 @@ func myMap<T, U>(array: [T], _ f: (T) -> U) -> [U] {}
 
 func testMap(array: [Int]) {
   var farray = myMap(array, { Float($0) })
-  var f : Float = farray[0]
-  var farray2 = myMap(array, { (x : Int) in Float(x) })
+  var _ : Float = farray[0]
+  let farray2 = myMap(array, { (x : Int) in Float(x) })
   farray = farray2
+  _ = farray
 }

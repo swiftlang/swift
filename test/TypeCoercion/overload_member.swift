@@ -27,9 +27,11 @@ class A {
 func test_method_overload(a: A, x: X, y: Y) {
   var x1 = a.f(x: x)
   x1 = x
+  _ = x1
 
   var y1 = a.f(y: y)
   y1 = y
+  _ = y1
 }
 
 func test_method_overload_coerce(a: A, inout x: X, inout y: Y, z: Z) {
@@ -39,16 +41,18 @@ func test_method_overload_coerce(a: A, inout x: X, inout y: Y, z: Z) {
 }
 
 func test_method_value_coerce(a: A) {
-  var fp1 : (X) -> X = a.f;
-  var fp2 : (A) -> (X) -> X = A.f;
+  var _ : (X) -> X = a.f;
+  var _ : (A) -> (X) -> X = A.f;
 }
 
 func test_static_method_overload(a: A, x: X, y: Y) {
   var x1 = A.sf(x: x)
   x1 = x
+  _ = x1
 
   var y1 = A.sf(y: y)
   y1 = y
+  _ = y1
 }
 
 func test_static_method_overload_coerce(a: A, inout x: X, inout y: Y, z: Z) {
@@ -58,8 +62,8 @@ func test_static_method_overload_coerce(a: A, inout x: X, inout y: Y, z: Z) {
 }
 
 func test_static_method_value_coerce(a: A) {
-  var fp1 : (X) -> X = A.sf;
-  var fp2 : (Y) -> Y = A.sf;
+  var _ : (X) -> X = A.sf;
+  var _ : (Y) -> Y = A.sf;
 }
 
 func test_mixed_overload(a: A, x: X, y: Y) {
@@ -79,27 +83,33 @@ func test_mixed_overload_coerce(a: A, inout x: X, y: Y, z: Z) {
   a.mixed2(z: z)
   var y1 = A.mixed2(z: z)
   y1 = y
+  _ = y1
   x = a.mixed2(z: z)
 }
 
 func test_mixed_method_value_coerce(a: A) {
-  var fp1 : (X) -> X = a.mixed;
-  var fp2 : (Y) -> Y = A.mixed;
-  var fp3 : (Y) -> Y = a.mixed; // expected-error{{'Y' is not a subtype of 'X'}}
-  var fp4 : (A) -> (X) -> X = A.mixed;
+  var _ : (X) -> X = a.mixed;
+  var _ : (Y) -> Y = A.mixed;
+  var _ : (Y) -> Y = a.mixed; // expected-error{{'Y' is not a subtype of 'X'}}
+  var _ : (A) -> (X) -> X = A.mixed;
 }
 
 extension A {
   func test_method_overload(x x: X, y: Y) {
     var x1 = self.f(x: x)
     x1 = x
+    _ = x1
     var x2 = f(x: x)
     x2 = x
+    _ = x2
+
 
     var y1 = self.f(y: y)
     y1 = y
+    _ = y1
     var y2 = f(y: y)
     y2 = y
+    _ = y2
   }
 
   func test_method_overload_coerce(inout x x: X, inout y: Y, z: Z) {
@@ -109,9 +119,9 @@ extension A {
   }
 
   func test_method_value_coerce() {
-    var fp1 : (X) -> X = f;
-    var fp2 : (A) -> (X) -> X = A.f;
-    var fp3 : (A) -> (X) -> X = A.f;
+    var _ : (X) -> X = f;
+    var _ : (A) -> (X) -> X = A.f;
+    var _ : (A) -> (X) -> X = A.f;
   }
 
   func test_mixed_overload_coerce(inout x x: X, y: Y, z: Z) {
@@ -120,18 +130,20 @@ extension A {
   }
 
   func test_mixed_method_value_coerce() {
-    var fp1 : (X) -> X = mixed;
-    var fp2 : (Y) -> Y = mixed; // expected-error{{'Y' is not a subtype of 'X'}}
-    var fp3 : (Y) -> Y = mixed; // expected-error{{'Y' is not a subtype of 'X'}}
-    var fp4 : (A) -> (X) -> X = A.mixed;
+    var _ : (X) -> X = mixed;
+    var _ : (Y) -> Y = mixed; // expected-error{{'Y' is not a subtype of 'X'}}
+    var _ : (Y) -> Y = mixed; // expected-error{{'Y' is not a subtype of 'X'}}
+    var _ : (A) -> (X) -> X = A.mixed;
   }
 
   class func test_method_overload_static(x x: X, y: Y, z: Z) {
     var x1 = sf(x: x)
     x1 = x
+    _ = x1
 
     var y1 = sf(y: y)
     y1 = y
+    _ = y1
   }
 
   class func test_method_overload_coerce_static(inout x x: X, inout y: Y, z: Z) {
@@ -141,8 +153,8 @@ extension A {
   }
 
   class func test_method_value_coerce_static() {
-    var fp1 : (X) -> X = sf;
-    var fp2 : (Y) -> Y = sf;
+    var _ : (X) -> X = sf
+    var _ : (Y) -> Y = sf
   }
 
   class func test_mixed_overload_static(a a: A, x: X, y: Y) {
@@ -156,11 +168,12 @@ extension A {
   class func test_mixed_overload_coerce_static(y y: Y, z: Z) {
     var y1 = mixed2(z: z)
     y1 = y
+    _ = y1
   }
 
   class func test_mixed_method_value_coerce_static() {
-    var fp1 : (Y) -> Y = mixed;
-    var fp2 : (A) -> (X) -> X = mixed;
+    var _ : (Y) -> Y = mixed;
+    var _ : (A) -> (X) -> X = mixed;
   }
 }
 
@@ -170,7 +183,7 @@ struct WeirdIvarLookupBehavior {
   var clams : Y
 
   func f() {
-    var y : Y = clams
+    var _ : Y = clams
   }
 
   static func static_f() {

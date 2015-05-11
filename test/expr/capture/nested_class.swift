@@ -7,4 +7,6 @@ func capture_nested_class() {
       return a // FIXME: should probably be disallowed
     }
   }
+  a = 1
+  _ = a
 }

@@ -121,7 +121,7 @@ struct d0100_FooStruct {
   func instanceFunc2(a: Int, inout b: Double) {}
 // PASS_COMMON-NEXT: {{^}}  func instanceFunc2(a: Int, inout b: Double){{$}}
 
-  func instanceFunc3(var a: Int, let b: Double) {}
+  func instanceFunc3(var a: Int, let b: Double) { a = 1}
 // PASS_COMMON-NEXT: {{^}}  func instanceFunc3(a: Int, b: Double){{$}}
 
   func instanceFuncWithDefaultArg1(a: Int = 0) {}

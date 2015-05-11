@@ -31,12 +31,12 @@ func variadic() {
 
 // Closures with attributes in the parameter list.
 func attrs() {
-  var f1 = {(inout z: Int) -> Int in z }
+  var _ = {(inout z: Int) -> Int in z }
 }
 
 // Closures with argument and parameter names.
 func argAndParamNames() -> Int {
-  var f1: (x: Int, y: Int) -> Int = { (a x, b y) in x + y }
+  let f1: (x: Int, y: Int) -> Int = { (a x, b y) in x + y }
   f1(x: 1, y: 2)
   return f1(x: 1, y: 2)
 }

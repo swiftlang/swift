@@ -29,9 +29,9 @@ func testAnonEnum() {
   var a = AnonConst1
   a = AnonConst2
 #if arch(i386) || arch(arm)
-  var a2: CUnsignedLongLong = a
+  var _: CUnsignedLongLong = a
 #elseif arch(x86_64) || arch(arm64)
-  var a2: CUnsignedLong = a
+  var _: CUnsignedLong = a
 #else
   __portMe()
 #endif
@@ -40,7 +40,7 @@ func testAnonEnum() {
 func testAnonEnumSmall() {
   var a = AnonConstSmall1
   a = AnonConstSmall2
-  var a2: Int = a
+  var _: Int = a
 }
 
 func testPoint() -> Float {
@@ -57,14 +57,14 @@ func testAnonStructs() {
 }
 
 func testBitfieldMembers() {
-  var a: StructWithBitfields
+  var _: StructWithBitfields
   // TODO: Expose the bitfields as properties.
 }
 
 // FIXME: Import arrays as real array-looking things.
 
 func testArrays() {
-  var fes: NSFastEnumerationState
+  let fes: NSFastEnumerationState
   var ulong: CUnsignedLong
   var pulong: UnsafeMutablePointer<CUnsignedLong>
 
@@ -75,14 +75,15 @@ func testArrays() {
   ulong = fes.extra.2
   ulong = fes.extra.3
   ulong = fes.extra.4
+  _ = ulong; _ = pulong
 }
 
 // FIXME: Import pointers to opaque types as unique types.
 
 func testPointers() {
-  var hWnd: HWND = nil
-  var cfstr: CFString? = nil
-  var cfty: CFTypeRef? = cfstr
+  var _: HWND = nil
+  let cfstr: CFString? = nil
+  var _: CFTypeRef? = cfstr
 }
 
 // Ensure that imported structs can be extended, even if typedef'ed on the C
@@ -123,11 +124,13 @@ extension CGRect {
 }
 
 func testFuncStructDisambiguation() {
-  var a : funcOrStruct
+  let a : funcOrStruct
   var i = funcOrStruct()
   i = 5
+  _ = i
   var a2 = funcOrStruct(i: 5)
   a2 = a
+  _ = a2
 }
 
 func testVoid() {
@@ -159,31 +162,35 @@ func testImportStdintTypes() {
   var t10_unqual : UInt = uintptr_t_test
   t9_unqual = word
   t10_unqual = uword
+  _ = t9_unqual
+  _ = t10_unqual
 
   var t9_qual : intptr_t = 0 // no-warning
   var t10_qual : uintptr_t = 0 // no-warning
   t9_qual = word
   t10_qual = uword
+  _ = t9_qual
+  _ = t10_qual
 }
 
 func testImportStddefTypes() {
-  var t1_unqual: Int = ptrdiff_t_test
-  var t2_unqual: Int = size_t_test
-  var t3_unqual: Int = rsize_t_test
+  let t1_unqual: Int = ptrdiff_t_test
+  let t2_unqual: Int = size_t_test
+  let t3_unqual: Int = rsize_t_test
 
-  var t1_qual: ctypes.ptrdiff_t = t1_unqual
-  var t2_qual: ctypes.size_t = t2_unqual
-  var t3_qual: ctypes.rsize_t = t3_unqual
+  let _: ctypes.ptrdiff_t = t1_unqual
+  let _: ctypes.size_t = t2_unqual
+  var _: ctypes.rsize_t = t3_unqual
 }
 
 func testImportSysTypesTypes() {
-  var t1_unqual: Int = ssize_t_test
-  var t1_qual: ctypes.ssize_t = t1_unqual
+  let t1_unqual: Int = ssize_t_test
+  var _: ctypes.ssize_t = t1_unqual
 }
 
 func testImportCFTypes() {
-  var t1_unqual: Int = CFIndex_test
-  var t1_qual: CoreFoundation.CFIndex = t1_unqual
+  let t1_unqual: Int = CFIndex_test
+  var _: CoreFoundation.CFIndex = t1_unqual
 }
 
 func testImportOSTypesTypes() {
@@ -238,10 +245,10 @@ func testFunctionPointers() {
   let fp = getFunctionPointer()
   useFunctionPointer(fp)
 
-  let explicitFP: @convention(c) (CInt) -> CInt = fp
+  let _: @convention(c) (CInt) -> CInt = fp
 
   let wrapper: FunctionPointerWrapper = FunctionPointerWrapper(a: nil, b: nil)
-  let wrapper2 = FunctionPointerWrapper(a: fp, b: fp)
+  let _ = FunctionPointerWrapper(a: fp, b: fp)
   useFunctionPointer(wrapper.a)
   let _: @convention(c) (CInt) -> CInt = wrapper.b
 

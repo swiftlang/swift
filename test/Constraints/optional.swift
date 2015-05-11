@@ -35,7 +35,7 @@ func test1(a: A) {
 extension Optional {
   func bind<U>(f: T -> U?) -> U? {
     switch self {
-    case .Some(var x):
+    case .Some(let x):
       return f(x)
     case .None:
       return .None
@@ -76,7 +76,7 @@ func test7(x : A) {
 }
 
 func test8(x : AnyObject?) {
-  let y : A = x as! A
+  let _ : A = x as! A
 }
 
 
@@ -85,10 +85,10 @@ func test9_helper<T>(x: T) -> Int { }
 func test9_helper<T>(x: T?) -> Double { }
 
 func test9(i: Int, io: Int?) {
-  var result = test9_helper(i)
-  var i2: Int = result
-  var result2 = test9_helper(io)
-  let d: Double = result2
+  let result = test9_helper(i)
+  var _: Int = result
+  let result2 = test9_helper(io)
+  let _: Double = result2
 }
 
 protocol P { }
@@ -100,10 +100,10 @@ extension Int : P { }
 
 func test10(i: Int, io: Int?) {
   let result = test10_helper(i)
-  var i2: Int = result
+  var _: Int = result
 
   let result2 = test10_helper(io)
-  var d: Double = result2
+  var _: Double = result2
 }
 
 var z: Int? = nil

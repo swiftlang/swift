@@ -176,5 +176,7 @@ func importedMacros() {
   let m2 = MACRO_FROM_IMPL
   // CHECK: [[@LINE+1]]:12 c:@macro@USES_MACRO_FROM_OTHER_MODULE_1{{$}}
   let m3 = USES_MACRO_FROM_OTHER_MODULE_1
+  
+  _ = m1; _ = m2; _ = m3
 }
 

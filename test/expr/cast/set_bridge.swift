@@ -53,21 +53,22 @@ func testUpcastBridge() {
   var setB = Set<BridgedToObjC>()
 
   // Upcast to object types.
-  setR = setB
-  setO = setB
+  setR = setB; _ = setR
+  setO = setB; _ = setO
 
   // Upcast object to bridged type
   setB = setO // expected-error{{cannot assign a value of type 'Set<ObjC>' to a value of type 'Set<BridgedToObjC>'}}
 
   // Failed upcast
   setD = setB // expected-error{{cannot assign a value of type 'Set<BridgedToObjC>' to a value of type 'Set<DerivesObjC>'}}
+  _ = setD
 }
 
 func testForcedDowncastBridge() {
-  var setR = Set<Root>()
-  var setO = Set<ObjC>()
-  var setD = Set<DerivesObjC>()
-  var setB = Set<BridgedToObjC>()
+  let setR = Set<Root>()
+  let setO = Set<ObjC>()
+  let setD = Set<DerivesObjC>()
+  let setB = Set<BridgedToObjC>()
 
   setR as! Set<BridgedToObjC>
   setO as! Set<BridgedToObjC>

@@ -131,14 +131,14 @@ protocol P2 {
 
 
 func generic<T: P>(t: T) {
-  var bar = t.bar // expected-error{{partial application of generic method is not allowed}}
-  var barFull : () = t.bar(0)
+  var _ = t.bar // expected-error{{partial application of generic method is not allowed}}
+  var _ : () = t.bar(0)
 }
 
 func existential(p: P, p2 : P2) {
-  var bar = p.bar // expected-error{{partial application of protocol method is not allowed}}
-  var bar2 = p2.bar // expected-error{{partial application of protocol method is not allowed}}
-  var barFull : () = p.bar(0)
+  var _ = p.bar // expected-error{{partial application of protocol method is not allowed}}
+  var _ = p2.bar // expected-error{{partial application of protocol method is not allowed}}
+  var _ : () = p.bar(0)
 }
 
 protocol ClassP : class {
@@ -146,13 +146,13 @@ protocol ClassP : class {
 }
 
 func genericClassP<T: ClassP>(t: T) {
-  var bas = t.bas
-  var barFull : () = t.bas(0)
+  var _ = t.bas
+  var _ : () = t.bas(0)
 }
 
 func existentialClassP(p: ClassP) {
-  var bas = p.bas  // expected-error{{partial application of protocol method is not allowed}}
-  var basFull : () = p.bas(0)
+  var _ = p.bas  // expected-error{{partial application of protocol method is not allowed}}
+  var _ : () = p.bas(0)
 }
 
 // <rdar://problem/15537772>
@@ -173,8 +173,8 @@ class InstanceOrClassMethod {
 
 func testPreferClassMethodToCurriedInstanceMethod(obj: InstanceOrClassMethod) {
   let result = InstanceOrClassMethod.method(obj)
-  let resultChecked: Bool = result // no-warning
-  let curried: () -> Bool = InstanceOrClassMethod.method(obj)
+  let _: Bool = result // no-warning
+  let _: () -> Bool = InstanceOrClassMethod.method(obj)
 }
 
 protocol Numeric {

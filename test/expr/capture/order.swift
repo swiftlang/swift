@@ -6,6 +6,7 @@ func makeIncrementor(amount: Int) -> () -> Int {
     return currentTotal // note: redundant diagnostic suppressed
   }
   var currentTotal = 0 // expected-note{{'currentTotal' declared here}}
+  currentTotal = 1; _ = currentTotal
   return incrementor
 }
 

@@ -35,8 +35,9 @@ struct B {
 }
 
 func test2(var b : B!) {
-  var x = b.x
+  let x = b.x
   b.x = x
+  b = nil
 }
 
 struct Subscriptable {
@@ -57,11 +58,11 @@ func test4(f: (Int -> Float)!) -> Float {
 }
 
 func test5(value : Int!) {
-  let value2 : Int? = value
+  let _ : Int? = value
 }
 
 func test6(value : Int!) {
-  let value2 : Int? = value
+  let _ : Int? = value
 }
 
 class Test9a {}
@@ -69,9 +70,9 @@ class Test9b : Test9a {}
 func test9_produceUnchecked() -> Test9b! { return Test9b() }
 func test9_consume(foo : Test9b) {}
 func test9() -> Test9a {
-  var foo = test9_produceUnchecked()
+  let foo = test9_produceUnchecked()
   test9_consume(foo)
-  var bar : Test9a = foo
+  let _ : Test9a = foo
   return foo
 }
 
@@ -85,4 +86,5 @@ func test11_helper<T : P11>(t: T) { }
 func test11(i: Int!, var j: Int!) {
   test11_helper(i)
   test11_helper(j)
+  j = nil
 }

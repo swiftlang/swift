@@ -5,7 +5,7 @@
 
 func foo() { // expected-note {{to match this opening '{'}}
 #if BLAH
-  var x = 123;
+  var _ = 123;
 #elseif !BLAH
 #else
 #else // expected-error{{further conditions after #else are unreachable}}

@@ -175,7 +175,7 @@ struct SpecificAnimal<F:Food> : Animal {
     typealias EdibleFood=F
     let _eat:(f:F)->()
 
-    init<A:Animal where A.EdibleFood == F>(var _ selfie:A) {
+    init<A:Animal where A.EdibleFood == F>(_ selfie:A) {
         _eat = { selfie.eat($0) }
     }
     func eat(f:F) {

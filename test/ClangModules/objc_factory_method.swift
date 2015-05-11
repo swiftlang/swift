@@ -6,36 +6,36 @@ import AppKit
 import NotificationCenter
 
 func testInstanceTypeFactoryMethod(queen: B) {
-  var hive1 = Hive(queen: queen)
+  var _ = Hive(queen: queen)
   
-  var of1 = NSObjectFactory() // okay, prefers init method
-  var of2 = NSObjectFactory(integer: 1)
-  var of3 = NSObjectFactory(double: 314159)
-  var of4 = NSObjectFactory(float: 314159)
+  var _ = NSObjectFactory() // okay, prefers init method
+  var _ = NSObjectFactory(integer: 1)
+  var _ = NSObjectFactory(double: 314159)
+  var _ = NSObjectFactory(float: 314159)
 }
 
 func testInstanceTypeFactoryMethodInherited() {
-  var of1 = NSObjectFactorySub() // okay, prefers init method
-  var of2 = NSObjectFactorySub(integer: 1)
-  var of3 = NSObjectFactorySub(double: 314159)
-  var of4 = NSObjectFactorySub(float: 314159) // expected-error{{incorrect argument label in call (have 'float:', expected 'integer:')}}
-  var of5 = NSObjectFactorySub(buildingWidgets: ()) // expected-error{{cannot find an initializer for type 'NSObjectFactorySub' that accepts an argument list of type '(buildingWidgets: ())'}}
+  var _ = NSObjectFactorySub() // okay, prefers init method
+  var _ = NSObjectFactorySub(integer: 1)
+  var _ = NSObjectFactorySub(double: 314159)
+  var _ = NSObjectFactorySub(float: 314159) // expected-error{{incorrect argument label in call (have 'float:', expected 'integer:')}}
+  var _ = NSObjectFactorySub(buildingWidgets: ()) // expected-error{{cannot find an initializer for type 'NSObjectFactorySub' that accepts an argument list of type '(buildingWidgets: ())'}}
 }
 
 func testNSErrorFactoryMethod(path: String) throws {
-  var s1 = try NSString(contentsOfFile: path)
+  var _ = try NSString(contentsOfFile: path)
 }
 
 func testNonInstanceTypeFactoryMethod(s: String) {
-  var of1 = NSObjectFactory(string: s) // expected-error{{extra argument 'string' in call}}
+  var _ = NSObjectFactory(string: s) // expected-error{{extra argument 'string' in call}}
 }
 
 func testUseOfFactoryMethod(queen: B) {
-  var of1 = Hive.hiveWithQueen(queen) // expected-error{{'hiveWithQueen' is unavailable: use object construction 'Hive(queen:)'}}
+  var _ = Hive.hiveWithQueen(queen) // expected-error{{'hiveWithQueen' is unavailable: use object construction 'Hive(queen:)'}}
 }
 
 func testNonsplittableFactoryMethod() {
-  var of5 = NSObjectFactory.factoryBuildingWidgets()
+  var _ = NSObjectFactory.factoryBuildingWidgets()
 }
 
 func testFactoryMethodBlacklist() {
@@ -44,7 +44,7 @@ func testFactoryMethodBlacklist() {
 }
 
 func test17261609() {
-  let num1 = NSDecimalNumber(mantissa:1, exponent:1, isNegative:true)
+  let _ = NSDecimalNumber(mantissa:1, exponent:1, isNegative:true)
   NSDecimalNumber.decimalNumberWithMantissa(1, exponent:1, isNegative:true) // expected-error{{'decimalNumberWithMantissa(_:exponent:isNegative:)' is unavailable: use object construction 'NSDecimalNumber(mantissa:exponent:isNegative:)'}}
 }
 

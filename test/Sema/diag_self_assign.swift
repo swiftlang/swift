@@ -95,7 +95,7 @@ class SA_Deep1 {
   var aFoo = Foo()
 
   func test() {
-    var aBar = Bar()
+    let aBar = Bar()
     aBar.aFoo = Foo()
     aBar.aFoo.aThing = self.aFoo.aThing // no-error
   }

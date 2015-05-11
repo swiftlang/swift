@@ -69,15 +69,17 @@ func testBridgedDowncastAnyObject(arr: [AnyObject], arrOpt: [AnyObject]?,
   if let bArr = arrIUO as? [B] {
     b = bArr[0]
   }
+  _ = b
 }
 
 func testBridgedIsAnyObject(arr: [AnyObject], arrOpt: [AnyObject]?, 
                              arrIUO: [AnyObject]!) -> Bool {
-  var b = B()
+  let b = B()
 
   if arr is [B] { return arr is [B] }
   if arrOpt is [B] { return arrOpt is [B] }
   if arrIUO is [B] { return arrIUO is [B] }
+  _ = b
 
   return false
 }

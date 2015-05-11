@@ -14,12 +14,12 @@ import ObjCParseExtrasToo
 func markUsed<T>(t: T) {}
 
 func testAnyObject(obj: AnyObject) {
-  var optStr = obj.nsstringProperty
+  var _ = obj.nsstringProperty
 }
 
 // Construction
 func construction() {
-  var b = B()
+  var _ = B()
 }
 
 // Subtyping
@@ -160,7 +160,7 @@ func newConstruction(a: A, aproxy: AProxy) {
 // Indexed subscripting
 func indexedSubscripting(b: B, idx: Int, a: A) {
   b[idx] = a
-  var a2 = b[idx] as! A
+  var _ = b[idx] as! A
 }
 
 // Keyed subscripting
@@ -178,7 +178,7 @@ func keyedSubscripting(b: B, idx: A, a: A) {
 
 // Typed indexed subscripting
 func checkHive(hive: Hive, b: B) {
-  var b2 = hive.bees[5] as! B
+  let b2 = hive.bees[5] as! B
   b2.method(1, withFloat:1.5)
 }
 
@@ -230,7 +230,7 @@ func getDescription(array: NSArray) {
 
 // Method overriding with unfortunate ordering.
 func overridingTest(srs: SuperRefsSub) {
-  var rs : RefedSub
+  let rs : RefedSub
   rs.overridden()
 }
 
@@ -242,7 +242,7 @@ func almostSubscriptableValueMismatch(as1: AlmostSubscriptable, a: A) {
 func almostSubscriptableKeyMismatch(bc: BadCollection, key: NSString) {
   // FIXME: We end up importing this as read-only due to the mismatch between
   // getter/setter element types.
-  var v : AnyObject = bc[key]
+  var _ : AnyObject = bc[key]
 }
 
 func almostSubscriptableKeyMismatchInherited(bc: BadCollectionChild,
@@ -278,7 +278,7 @@ func optionalMemberAccess(w: NSWobbling) {
 }
 
 func protocolInheritance(s: NSString) {
-  var coding: NSCoding = s
+  var _: NSCoding = s
 }
 
 func ivars(hive: Hive) {
@@ -360,8 +360,8 @@ class ProtocolAdopterBad3 : FooProto { // expected-error{{type 'ProtocolAdopterB
 func testPreferClassMethodToCurriedInstanceMethod(obj: NSObject) {
   // FIXME: We shouldn't need the ": Bool" type annotation here.
   // <rdar://problem/18006008>
-  let result: Bool = NSObject.isEqual(obj)
-  let curried = NSObject.isEqual(obj) as (NSObject!) -> Bool // no-warning
+  let _: Bool = NSObject.isEqual(obj)
+  let _ = NSObject.isEqual(obj) as (NSObject!) -> Bool // no-warning
 }
 
 
@@ -375,6 +375,7 @@ func testPropertyAndMethodCollision(obj: PropertyAndMethodCollision,
 
   var value: AnyObject = obj.protoProp()
   value = obj.protoPropRO()
+  _ = value
 }
 
 func testSubscriptAndPropertyRedeclaration(obj: SubscriptAndProperty) {
@@ -478,6 +479,6 @@ class ProtoAdopter : NSObject, ExplicitSetterProto, OptionalSetterProto {
 }
 
 func testUnusedResults(ur: UnusedResults) {
-  let x = ur.producesResult()
+  let _ = ur.producesResult()
   ur.producesResult() // expected-warning{{result of call to 'producesResult()' is unused}}
 }

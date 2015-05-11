@@ -16,9 +16,9 @@ struct Baz {
 
 // CHECK: sil hidden @_TF17capture_promotion22test_capture_promotionFT_FT_Si
 func test_capture_promotion() -> () -> Int {
-  var x : Int = 1
-  var y : Foo = Foo()
-  var z : Baz = Baz()
+  var x : Int = 1; x = 1
+  var y : Foo = Foo(); y = Foo()
+  var z : Baz = Baz(); z = Baz()
 
 // CHECK-NOT: alloc_box
 

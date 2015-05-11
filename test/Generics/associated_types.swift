@@ -18,7 +18,7 @@ struct Z : Fooable {
   func foo(x: Float) {}
 
   func blah() {
-    var at : AssocType
+    var _ : AssocType
   }
 
   // FIXME: We should be able to find this.

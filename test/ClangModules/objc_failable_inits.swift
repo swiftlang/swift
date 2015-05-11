@@ -12,17 +12,17 @@ func testDictionary() {
 
 func testString() throws {
   // Optional
-  var stringOpt = NSString(path: "blah", encoding: 0)
-  var nsStr: NSString = stringOpt // expected-error{{value of optional type 'NSString?' not unwrapped; did you mean to use '!' or '?'?}}
+  let stringOpt = NSString(path: "blah", encoding: 0)
+  let _: NSString = stringOpt // expected-error{{value of optional type 'NSString?' not unwrapped; did you mean to use '!' or '?'?}}
 
   // Implicitly unwrapped optional
-  var stringIUO = NSString(path: "blah")
+  let stringIUO = NSString(path: "blah")
   if stringIUO == nil { }
-  var nsStr2: NSString = stringIUO
+  var _: NSString = stringIUO
 }
 
 func testHive() {
-  var hiveIUO = Hive()
+  let hiveIUO = Hive()
   if hiveIUO == nil { }
-  var hive: Hive = hiveIUO
+  var _: Hive = hiveIUO
 }

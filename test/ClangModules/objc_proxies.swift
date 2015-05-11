@@ -8,6 +8,6 @@ func testAnimatorProxy(constraint:NSLayoutConstraint) {
   // Rely on warning on 'AnyObject' as an inferred type to check
   // if the result of 'animator' is being treated as instancetype.
   let x = constraint.animator()
-  let y = x.constant
+  let _ = x.constant
 }
 

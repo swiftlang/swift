@@ -37,21 +37,21 @@ func f(x: Dict) {} // expected-error{{reference to generic type 'Dict' requires 
 // ---------------------------------------------
 struct GS<T> {
   func f() -> GS {
-    var gs = GS()
+    let gs = GS()
     return gs
   }
 
   struct Nested { // expected-error{{nested in generic type}}
     func ff() -> GS {
-      var gs = GS()
+      let gs = GS()
       return gs
     }
   }
 
   struct NestedGeneric<U> { // expected-note{{generic type 'NestedGeneric' declared here}} // expected-error{{generic type 'NestedGeneric' nested in type}}
     func fff() -> (GS, NestedGeneric) {
-      var gs = GS()
-      var ns = NestedGeneric()
+      let gs = GS()
+      let ns = NestedGeneric()
       return (gs, ns)
     }
   }
@@ -62,12 +62,12 @@ struct GS<T> {
 
 extension GS {
   func g() -> GS {
-    var gs = GS()
+    let gs = GS()
     return gs
   }
 
   func h() {
-    var gs : GS<Int> = GS() // expected-error{{'GS<T>' is not convertible to 'GS<Int>'}}
+    var _ : GS<Int> = GS() // expected-error{{'GS<T>' is not convertible to 'GS<Int>'}}
   }
 }
 
@@ -75,14 +75,14 @@ class GC<T, U> {
   init() {} 
 
   func f() -> GC {
-    var gc = GC()
+    let gc = GC()
     return gc
   }
 }
 
 extension GC {
   func g() -> GC {
-    var gc = GC()
+    let gc = GC()
     return gc
   }
 }

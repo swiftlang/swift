@@ -54,6 +54,6 @@ func testMacro() {
 }
 
 func testFoundationOverlay() {
-  let utf8 = NSUTF8StringEncoding // no ambiguity
+  let _ = NSUTF8StringEncoding // no ambiguity
   let _: UInt = NSUTF8StringEncoding // and we should get the overlay version
 }

@@ -5,5 +5,5 @@
 }
 
 func testStaticProperty(classObj: AnyObject.Type) {
-  var x = classObj.staticVar1
+  var _ = classObj.staticVar1
 }

@@ -17,42 +17,52 @@ func testVariableTypes(param: Int, inout param2: Double) {
 // CHECK:         IntegerLiteralExpr:[[@LINE-2]] '''42''' Int2048{{$}}
 // FULL:  VarDecl '''a1''' Swift.Int{{$}}
 // FULL:          IntegerLiteralExpr:[[@LINE-4]] '''42''' Builtin.Int2048{{$}}
+  a1 = 17; _ = a1
 
+  
   var a2 : Int = 42
 // CHECK: VarDecl '''a2''' Int{{$}}
 // CHECK:         IntegerLiteralExpr:[[@LINE-2]] '''42''' Int2048{{$}}
 // FULL:  VarDecl '''a2''' Swift.Int{{$}}
 // FULL:          IntegerLiteralExpr:[[@LINE-4]] '''42''' Builtin.Int2048{{$}}
+  a2 = 17; _ = a2
 
   var a3 = Int16(42)
 // CHECK: VarDecl '''a3''' Int16{{$}}
 // CHECK:         IntegerLiteralExpr:[[@LINE-2]] '''42''' Int2048{{$}}
 // FULL:  VarDecl '''a3''' Swift.Int16{{$}}
 // FULL:          IntegerLiteralExpr:[[@LINE-4]] '''42''' Builtin.Int2048{{$}}
+  a3 = 17; _ = a3
+
 
   var a4 = Int32(42)
 // CHECK: VarDecl '''a4''' Int32{{$}}
 // CHECK:         IntegerLiteralExpr:[[@LINE-2]] '''42''' Int2048{{$}}
 // FULL:  VarDecl '''a4''' Swift.Int32{{$}}
 // FULL:          IntegerLiteralExpr:[[@LINE-4]] '''42''' Builtin.Int2048{{$}}
+  a4 = 17; _ = a4
 
   var a5 : Int64 = 42
 // CHECK: VarDecl '''a5''' Int64{{$}}
 // CHECK:         IntegerLiteralExpr:[[@LINE-2]] '''42''' Int2048{{$}}
 // FULL:  VarDecl '''a5''' Swift.Int64{{$}}
 // FULL:          IntegerLiteralExpr:[[@LINE-4]] '''42''' Builtin.Int2048{{$}}
+  a5 = 17; _ = a5
 
   var typealias1 : MyInt = 42
 // CHECK: VarDecl '''typealias1''' MyInt{{$}}
 // CHECK:         IntegerLiteralExpr:[[@LINE-2]] '''42''' Int2048{{$}}
 // FULL:  VarDecl '''typealias1''' swift_ide_test.MyInt{{$}}
 // FULL:          IntegerLiteralExpr:[[@LINE-4]] '''42''' Builtin.Int2048{{$}}
+  _ = typealias1 ; typealias1 = 1
 
   var optional1 = Optional<Int>.None
 // CHECK: VarDecl '''optional1''' Optional<Int>{{$}}
 // FULL:  VarDecl '''optional1''' Swift.Optional<Swift.Int>{{$}}
+  _ = optional1 ; optional1 = nil
 
   var optional2 = Optional<[Int]>.None
+  _ = optional2 ; optional2 = nil
 // CHECK: VarDecl '''optional2''' Optional<[Int]>{{$}}
 // FULL:  VarDecl '''optional2''' Swift.Optional<[Swift.Int]>{{$}}
 }
@@ -104,14 +114,17 @@ func testInGenericFunc1<A, B : FooProtocol, C : protocol<FooProtocol, BarProtoco
 // FULL:  FuncDecl '''testInGenericFunc1''' <A, B : FooProtocol, C : protocol<FooProtocol, BarProtocol>> (A, b: B, c: C) -> (){{$}}
 
   var a1 = a
+  _ = a1; a1 = a
 // CHECK: VarDecl '''a1''' A{{$}}
 // FULL:  VarDecl '''a1''' A{{$}}
 
   var b1 = b
+  _ = b1; b1 = b
 // CHECK: VarDecl '''b1''' B{{$}}
 // FULL:  VarDecl '''b1''' B{{$}}
 
   var gs1 = GenericStruct<A, B>()
+  _ = gs1; gs1 = GenericStruct<A, B>()
 // CHECK: VarDecl '''gs1''' GenericStruct<A, B>{{$}}
 // CHECK:    CallExpr:[[@LINE-2]] '''GenericStruct<A, B>()''' GenericStruct<A, B>{{$}}
 // CHECK:          ConstructorRefCallExpr:[[@LINE-3]] '''GenericStruct<A, B>''' () -> GenericStruct<A, B>

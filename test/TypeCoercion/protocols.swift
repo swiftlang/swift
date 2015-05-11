@@ -48,6 +48,7 @@ func testPrintableCoercion(ip1: IsPrintable1,
   p = inp1 // expected-error{{cannot assign a value of type 'IsNotPrintable1' to a value of type 'MyPrintable'}}
   p = inp2 // expected-error{{cannot assign a value of type 'IsNotPrintable2' to a value of type 'MyPrintable'}}
   p = op // expected-error{{cannot assign a value of type 'OtherPrintable' to a value of type 'MyPrintable'}}
+  _ = p
 }
 
 func testTitledCoercion(ip1: IsPrintable1, book: Book, lackey: Lackey,
@@ -58,6 +59,7 @@ func testTitledCoercion(ip1: IsPrintable1, book: Book, lackey: Lackey,
   t = lackey
   t = number // expected-error{{cannot assign a value of type 'Number' to a value of type 'Titled'}}
   t = ip2 // expected-error{{cannot assign a value of type 'IsPrintable2' to a value of type 'Titled'}}
+  _ = t
 }
 
 
@@ -164,8 +166,8 @@ func doREPLPrint(p: MyREPLPrintable) {
 }
 
 func testREPLPrintable() {
-  var i : Int
-  var rp : MyREPLPrintable = i
+  let i : Int = 1
+  var _ : MyREPLPrintable = i
   doREPLPrint(i)
   doREPLPrint(1)
   doREPLPrint("foo")

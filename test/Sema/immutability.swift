@@ -304,7 +304,7 @@ protocol SubscriptNoGetter {
 }
 
 func testSubscriptNoGetter(let iis: SubscriptNoGetter) {
-  var i: Int = iis[17]
+  var _: Int = iis[17]
 }
 
 func testSelectorStyleArguments1(var x: Int, var bar y: Int) {

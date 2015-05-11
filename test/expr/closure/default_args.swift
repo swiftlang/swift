@@ -7,7 +7,7 @@ func simple_default_args() {
 
 func func_default_args() {
   func has_default_args(x x: Int = 1) -> Int { return x+1 }
-  var f1 : (Int) -> Int = has_default_args // okay
-  var f2 : () -> Int = has_default_args // expected-error{{(x: Int) -> Int' is not convertible to '() -> Int}}
+  var _ : (Int) -> Int = has_default_args // okay
+  var _ : () -> Int = has_default_args // expected-error{{(x: Int) -> Int' is not convertible to '() -> Int}}
 }
 

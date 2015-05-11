@@ -7,7 +7,7 @@ class C<A> {
 // CHECK-DAG: ![[B:[0-9]+]] = !DICompositeType(tag: DW_TAG_structure_type, name: "_TtQq_FC11archetypes21C3foo
 // CHECK-DAG: !DILocalVariable(tag: DW_TAG_arg_variable, name: "x", {{.*}}line: [[@LINE+2]],{{.*}}type: ![[A]]
 // CHECK-DAG: !DILocalVariable(tag: DW_TAG_arg_variable, name: "y", {{.*}}line: [[@LINE+1]],{{.*}}type: ![[B]]
-  func foo <B> (var x : A, var y : B) {
+  func foo <B> ( x : A,  y : B) {
     markUsed("hello world")
   }
 }

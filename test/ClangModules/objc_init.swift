@@ -42,6 +42,7 @@ func createMyDocument1() {
 
   // Inherited convenience init.
   md = MyDocument1(string: "http://llvm.org")
+  _ = md
 }
 
 class MyDocument2 : NSDocument {
@@ -59,6 +60,7 @@ class MyDocument3 : NSAwesomeDocument {
 func createMyDocument3() {
   var md = MyDocument3()
   md = MyDocument3(URL: "http://llvm.org")
+  _ = md
 }
 
 class MyInterestingDesignated : NSInterestingDesignatedSub { 
@@ -72,7 +74,7 @@ class MyInterestingDesignated : NSInterestingDesignatedSub {
 }
 
 func createMyInterestingDesignated() {
-  var md = MyInterestingDesignated(URL: "http://llvm.org")
+  var _ = MyInterestingDesignated(URL: "http://llvm.org")
 }
 
 func testNoReturn(a : NSAwesomeDocument) -> Int {
@@ -124,7 +126,7 @@ func checkInitWithCoder(coder: NSCoder) {
 class MyDictionary1 : NSDictionary {}
 
 func getMyDictionary1() {
-  var nsd = MyDictionary1()
+  _ = MyDictionary1()
 }
 
 // <rdar://problem/16838515>
@@ -141,14 +143,14 @@ class MyString : NSString {
 // <rdar://problem/17281900>
 class View: NSView {
   override func addSubview(aView: NSView) {
-    var p = MyViewController.init()
+    _ = MyViewController.init()
   }
 }
 
 // rdar://problem/19726164
 class NonNullDefaultInitSubSub : NonNullDefaultInitSub {
   func foo() {
-    var x: NonNullDefaultInitSubSub? = NonNullDefaultInitSubSub()
+    var _: NonNullDefaultInitSubSub? = NonNullDefaultInitSubSub()
   }
 }
 

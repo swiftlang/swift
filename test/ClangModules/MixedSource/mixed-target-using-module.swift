@@ -58,9 +58,9 @@ class Derived : Base {
 }
 
 func testMethod(container: Base, input: ForwardClass, inputProto: ForwardProto, inputPartial: PartialSubClass) {
-  let output: ForwardClass = container.unsafeOverrideReturn(input) // no-warning
-  let outputProto: ForwardProto = container.unsafeOverrideProtoReturn(inputProto) // no-warning
-  let outputPartial: PartialSubClass = container.unsafeOverridePartialSubReturn(inputPartial) // no-warning
+  let _: ForwardClass = container.unsafeOverrideReturn(input) // no-warning
+  let _: ForwardProto = container.unsafeOverrideProtoReturn(inputProto) // no-warning
+  let _: PartialSubClass = container.unsafeOverridePartialSubReturn(inputPartial) // no-warning
 }
 
 

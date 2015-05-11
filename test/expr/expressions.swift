@@ -161,13 +161,13 @@ func test4() -> ((arg1: Int, arg2: Int) -> Int) {
 }
 
 func test5() {
-  var a: (Int, Int)
+  let a: (Int, Int) = (1,2)
   var
-     b: ((Int) -> Int, Int) = a  // expected-error {{'Int' is not convertible to '(Int) -> Int'}}
+     _: ((Int) -> Int, Int) = a  // expected-error {{'Int' is not convertible to '(Int) -> Int'}}
 
 
-  var c: (a: Int, b: Int)
-  var d: (b: Int, a: Int) = c  // Ok, reshuffle tuple.
+  let c: (a: Int, b: Int) = (1,2)
+  let _: (b: Int, a: Int) = c  // Ok, reshuffle tuple.
 }
 
 
@@ -210,10 +210,10 @@ func test_unary3() {
 }
 
 func test_as_1() {
-  var x: Int
+  var _: Int
 }
 func test_as_2() {
-  var x: Int
+  let x: Int = 1
   x as [] // expected-error {{expected element type}}
 }
 
@@ -239,10 +239,10 @@ func test_lambda2() {
 }
 
 func test_floating_point() {
-  var x = 0.0
-  var y = 100.1
-  var x1: Float = 0.0
-  var x2: Double = 0.0
+  var _ = 0.0
+  var _ = 100.1
+  var _: Float = 0.0
+  var _: Double = 0.0
 }
 
 func test_nonassoc(x: Int, y: Int) -> Bool {
@@ -312,10 +312,10 @@ markUsed((tupleelemvar, tupleelemvar).1)
 
 func int_literals() {
   // Fits exactly in 64-bits - rdar://11297273
-  var a = 1239123123123123
+  var _ = 1239123123123123
   // Overly large integer.
   // FIXME: Should warn about it. <rdar://problem/14070127>
-  var b = 123912312312312312312
+  var _ = 123912312312312312312
   
 }
 
@@ -540,8 +540,8 @@ func..<(x: Double, y: Double) -> Double {
 }
 
 func iterators() {
-  var a = 0..<42
-  var b = 0.0..<42.0
+  var _ = 0..<42
+  var _ = 0.0..<42.0
 }
 
 //===----------------------------------------------------------------------===//
@@ -549,9 +549,9 @@ func iterators() {
 //===----------------------------------------------------------------------===//
 
 func magic_literals() {
-  var x = __FILE__
-  var y = __LINE__ + __COLUMN__
-  var z: UInt8 = __LINE__ + __COLUMN__
+  _ = __FILE__
+  _ = __LINE__ + __COLUMN__
+  var _: UInt8 = __LINE__ + __COLUMN__
 }
 
 //===----------------------------------------------------------------------===//
@@ -653,7 +653,7 @@ func testOptionalChaining(a : Int?, b : Int!, c : Int??) {
   b?   // expected-error {{'?' must be followed by a call, member lookup, or subscript}}
   b?.getMirror()
 
-  var y: Int? = c?   // expected-error {{'?' must be followed by a call, member lookup, or subscript}}
+  var _: Int? = c?   // expected-error {{'?' must be followed by a call, member lookup, or subscript}}
 }
 
 

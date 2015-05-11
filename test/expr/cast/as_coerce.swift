@@ -16,10 +16,10 @@ func doFoo() {}
 
 func test_coercion(a: A, b: B) {
   // Coercion to a protocol type
-  var x = a as P1
+  let x = a as P1
   x.foo()
   // Coercion to a superclass type
-  var y = b as A
+  let y = b as A
   y.foo()
 }
 
@@ -29,7 +29,7 @@ class D : C { }
 
 
 func prefer_coercion(inout c: C) {
-  var d = c as! D
+  let d = c as! D
   c = d
 }
 

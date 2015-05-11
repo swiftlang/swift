@@ -5,19 +5,19 @@
 import Foundation
 
 func testNSArrayBridging(hive: Hive) {
-  let bees: [Bee] = hive.bees
+  let _: [Bee] = hive.bees
 }
 
 func testNSDictionaryBridging(hive: Hive) {
-  let beesByName: [String : Bee] = hive.beesByName // expected-error{{value of optional type '[String : Bee]?' not unwrapped;}}
+  let _: [String : Bee] = hive.beesByName // expected-error{{value of optional type '[String : Bee]?' not unwrapped;}}
 
   var dict1 = hive.anythingToBees
-  var dict2: [NSObject : Bee] = dict1
+  let dict2: [NSObject : Bee] = dict1
   dict1 = dict2
 }
 
 func testNSSetBridging(hive: Hive) {
-  let relatedHives: Set<Bee>= hive.allBees
+  let _: Set<Bee>= hive.allBees
 }
 
 public func expectType<T>(_: T.Type, inout _ x: T) {}

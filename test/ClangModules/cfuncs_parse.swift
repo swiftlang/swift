@@ -10,35 +10,35 @@ func test_cfunc1(i: Int) {
 }
 
 func test_cfunc2(i: Int) {
-  var f = cfunc2(i, 17)
-  var f2 : Float = f
+  let f = cfunc2(i, 17)
+  var _ : Float = f
   // FIXME: Should report this error: {{cannot convert the expression's type '$T3' to type 'CLong'}}
   cfunc2(b:17, a:i) // expected-error{{cannot invoke 'cfunc2' with an argument list of type '(b: Int, a: Int)'}} expected-note {{expected an argument list of type '(Int, Int32)'}}
 }
 
 func test_cfunc3_a() {
-  var b = cfunc3( { (a : Double, b : Double) -> Double in a + b } )
-  var d : Double = b(1.5, 2.5)
-  var d1 : Double = b // expected-error{{'double_bin_op_block' is not convertible to 'Double'}}
+  let b = cfunc3( { (a : Double, b : Double) -> Double in a + b } )
+  var _ : Double = b(1.5, 2.5)
+  var _ : Double = b // expected-error{{'double_bin_op_block' is not convertible to 'Double'}}
 }
 
 func test_cfunc3_b() {
-  var b = cfunc3( { a, b in a + b } )
-  var d : Double = b(1.5, 2.5)
-  var d1 : Double = b // expected-error{{'double_bin_op_block' is not convertible to 'Double'}}
+  let b = cfunc3( { a, b in a + b } )
+  var _ : Double = b(1.5, 2.5)
+  var _ : Double = b // expected-error{{'double_bin_op_block' is not convertible to 'Double'}}
 }
 
 func test_cfunc3_c() {
-  var b = cfunc3({ $0 + $1 })
-  var d : Double = b(1.5, 2.5)
-  var d1 : Double = b // expected-error{{'double_bin_op_block' is not convertible to 'Double'}}
+  let b = cfunc3({ $0 + $1 })
+  var _ : Double = b(1.5, 2.5)
+  var _ : Double = b // expected-error{{'double_bin_op_block' is not convertible to 'Double'}}
 }
 
 func test_cfunc3_d() {
-  var x: Double = 0
-  var y: Double = 0
-  var z: Double? = cfunc3(nil)?(x, y)
-  var w: Double = cfunc3(nil)!(x, y)
+  let x: Double = 0
+  let y: Double = 0
+  var _: Double? = cfunc3(nil)?(x, y)
+  var _: Double = cfunc3(nil)!(x, y)
 }
 
 func test_cfunc4() {
@@ -51,11 +51,11 @@ func test_pow() {
 }
 
 func test_puts(s: String) {
-  var i = s.withCString { puts($0) + 32 };
+  var _ = s.withCString { puts($0) + 32 };
 }
 
 func test_fopen(filename: String) -> CInt {
-  var file = filename.withCString { fopen($0, "r") }
+  let file = filename.withCString { fopen($0, "r") }
   return file.memory.inode
 }
 
@@ -103,7 +103,7 @@ func test_pointer() {
   param_const_void_pointer(fa)
   // FIXME: param_const_void_pointer([1.0, 2.0, 3.0])
 
-  var op = COpaquePointer()
+  let op = COpaquePointer()
   opaque_pointer_param(op)
 }
 

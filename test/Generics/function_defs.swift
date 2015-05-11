@@ -47,11 +47,13 @@ protocol OtherEqualComparable {
 func otherExistential<T : EqualComparable>(t1: T) {
   var otherEqComp : OtherEqualComparable = t1 // expected-error{{type 'T' does not conform to protocol 'OtherEqualComparable'}} expected-error{{protocol 'OtherEqualComparable' can only be used as a generic constraint}}
   otherEqComp = t1 // expected-error{{cannot assign a value of type 'T' to a value of type 'OtherEqualComparable'}}
-
+  _ = otherEqComp
+  
   var otherEqComp2 : OtherEqualComparable // expected-error{{protocol 'OtherEqualComparable' can only be used as a generic constraint}}
   otherEqComp2 = t1 // expected-error{{cannot assign a value of type 'T' to a value of type 'OtherEqualComparable'}}
+  _ = otherEqComp2
 
-  var everyEq : protocol<EqualComparable, OtherEqualComparable> = t1 // expected-error{{type 'T' does not conform to protocol 'OtherEqualComparable'}} expected-error{{protocol 'OtherEqualComparable' can only be used as a generic constraint}} expected-error{{protocol 'EqualComparable' can only be used as a generic constraint}}
+  var _ : protocol<EqualComparable, OtherEqualComparable> = t1 // expected-error{{type 'T' does not conform to protocol 'OtherEqualComparable'}} expected-error{{protocol 'OtherEqualComparable' can only be used as a generic constraint}} expected-error{{protocol 'EqualComparable' can only be used as a generic constraint}}
 }
 
 protocol Runcible {
@@ -186,7 +188,7 @@ func testOrdered<T : Ordered>(x: T, y: Int) {
 func conformanceViaRequires<T 
        where T : EqualComparable, T : MethodLessComparable
      >(t1: T, t2: T) -> Bool {
-  var b1 = t1.isEqual(t2)
+  let b1 = t1.isEqual(t2)
   if b1 || t1.isLess(t2) {
     return true;
   }
@@ -204,7 +206,7 @@ protocol AcceptsAnElement {
 
 func impliedSameType<T : GeneratesAnElement where T : AcceptsAnElement>(t: T) {
   t.accept(t.generate())
-  var e = t.generate(), e2 = t.generate()
+  let e = t.generate(), e2 = t.generate()
   if e.isEqual(e2) || e.isLess(e2) {
     return
   }
@@ -243,7 +245,7 @@ func recursiveSameType
        (t: T, u: U)
 {
   t.get().accept(t.get().generate())
-  var e = t.get().generate(), e2 = t.get().generate()
+  let e = t.get().generate(), e2 = t.get().generate()
   if e.isEqual(e2) || e.isLess(e2) {
     return
   }

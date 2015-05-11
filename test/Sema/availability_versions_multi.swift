@@ -37,7 +37,7 @@ func useFromOtherOn10_10() {
   o10_10.returns10_11Introduced10_11() // expected-error {{'returns10_11Introduced10_11()' is only available on OS X 10.11 or newer}}
       // expected-note@-1 {{guard with version check}}
 
-  let o10_11 = OtherIntroduced10_11() // expected-error {{'OtherIntroduced10_11' is only available on OS X 10.11 or newer}}
+  let _ = OtherIntroduced10_11() // expected-error {{'OtherIntroduced10_11' is only available on OS X 10.11 or newer}}
       // expected-note@-1 {{guard with version check}}
 
   o10_10.extensionMethodOnOtherIntroduced10_10AvailableOn10_11() // expected-error {{'extensionMethodOnOtherIntroduced10_10AvailableOn10_11()' is only available on OS X 10.11 or newer}}
