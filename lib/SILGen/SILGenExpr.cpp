@@ -1292,7 +1292,8 @@ emitOpenExistentialForErasure(SILGenFunction &gen,
   // container so we can steal its value.
   // TODO: Have a way to represent this operation in-place. The supertype
   // should be able to fit in the memory of the subtype existential.
-  ManagedValue subExistential = gen.emitRValueAsSingleValue(subExpr);
+  ManagedValue subExistential = gen.emitRValueAsSingleValue(subExpr,
+                                           SGFContext::AllowGuaranteedPlusZero);
   CanArchetypeType subFormalTy = ArchetypeType::getOpened(subType);
   SILType subLoweredTy = gen.getLoweredType(subFormalTy);
   bool isTake = subExistential.hasCleanup();
@@ -1325,7 +1326,9 @@ emitOpenExistentialForErasure(SILGenFunction &gen,
   case ExistentialRepresentation::Boxed:
     // Can never take from a box; the value might be shared.
     isTake = false;
-    llvm_unreachable("boxed-to-unboxed existential erasure not implemented");
+    subPayload = gen.B.createOpenExistentialBox(loc,
+                                                subExistential.getValue(),
+                                                subLoweredTy);
   }
   gen.setArchetypeOpeningSite(subFormalTy, subPayload);
   ManagedValue subMV = isTake
@@ -1361,8 +1364,10 @@ static RValue emitAddressOnlyErasure(SILGenFunction &gen, ErasureExpr *E,
                                                         subFormalTy,
                                                         subMV.getType(),
                                                         E->getConformances());
-    
-    subMV.forwardInto(gen, E, destAddr);
+    if (subMV.hasCleanup())
+      subMV.forwardInto(gen, E, destAddr);
+    else
+      subMV.copyInto(gen, destAddr, E);
   } else {
     // Otherwise, we need to initialize a new existential container from
     // scratch.
@@ -1415,7 +1420,10 @@ static RValue emitBoxedErasure(SILGenFunction &gen, ErasureExpr *E) {
                                                subFormalTy, subMV.getType(),
                                                E->getConformances());
     existential = box->getExistentialResult();
-    subMV.forwardInto(gen, E, box->getValueAddressResult());
+    if (subMV.hasCleanup())
+      subMV.forwardInto(gen, E, box->getValueAddressResult());
+    else
+      subMV.copyInto(gen, box->getValueAddressResult(), E);
   } else {
     // Allocate a box and evaluate the subexpression into it.
     auto concreteFormalType = subType->getCanonicalType();

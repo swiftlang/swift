@@ -30,8 +30,8 @@ func test_composition_erasure(x: protocol<HairType, ErrorType>) -> ErrorType {
 // CHECK-LABEL: sil hidden @_TF18boxed_existentials24test_composition_erasureFPSs9ErrorTypeS_8HairType_PS0__
 // CHECK:         [[VALUE_ADDR:%.*]] = open_existential_addr [[OLD_EXISTENTIAL:%.*]] : $*protocol<ErrorType, HairType> to $*[[VALUE_TYPE:@opened\(.*\) protocol<ErrorType, HairType>]]
 // CHECK:         [[NEW_EXISTENTIAL:%.*]] = alloc_existential_box $ErrorType, $[[VALUE_TYPE]]
-// CHECK:         copy_addr [take] [[VALUE_ADDR]] to [initialization] [[NEW_EXISTENTIAL]]#1
-// CHECK:         deinit_existential_addr [[OLD_EXISTENTIAL]]
+// CHECK:         copy_addr [[VALUE_ADDR]] to [initialization] [[NEW_EXISTENTIAL]]#1
+// CHECK:         destroy_addr [[OLD_EXISTENTIAL]]
 // CHECK:         return [[NEW_EXISTENTIAL]]#0
 
 protocol HairClassType: class {}
@@ -141,4 +141,35 @@ func test_open_existential_semantics(guaranteed: ErrorType,
   // GUARANTEED-NOT: destroy_addr [[VALUE]]
   // GUARANTEED: strong_release [[PLUS_ONE]]
   plusOneErrorType().extensionMethod()
+}
+
+// CHECK-LABEL: sil hidden @_TF18boxed_existentials14erasure_to_anyFTPSs9ErrorType_PS0___P_
+// CHECK:       bb0([[OUT:%.*]] : $*protocol<>, [[GUAR:%.*]] : $ErrorType,
+func erasure_to_any(guaranteed: ErrorType, var _ immediate: ErrorType) -> Any {
+  // CHECK:       [[IMMEDIATE_BOX:%.*]] = alloc_box $ErrorType
+  if true {
+    // CHECK-NOT: retain [[GUAR]]
+    // CHECK:     [[FROM_VALUE:%.*]] = open_existential_box [[GUAR:%.*]]
+    // CHECK:     [[TO_VALUE:%.*]] = init_existential_addr [[OUT]]
+    // CHECK:     copy_addr [[FROM_VALUE]] to [initialization] [[TO_VALUE]]
+    // CHECK-NOT: release [[GUAR]]
+    return guaranteed
+  } else if true {
+    // CHECK:     [[IMMEDIATE:%.*]] = load [[IMMEDIATE_BOX]]
+    // CHECK:     retain [[IMMEDIATE]]
+    // CHECK:     [[FROM_VALUE:%.*]] = open_existential_box [[IMMEDIATE]]
+    // CHECK:     [[TO_VALUE:%.*]] = init_existential_addr [[OUT]]
+    // CHECK:     copy_addr [[FROM_VALUE]] to [initialization] [[TO_VALUE]]
+    // CHECK:     release [[IMMEDIATE]]
+    return immediate
+  } else if true {
+    // CHECK:     function_ref boxed_existentials.plusOneErrorType
+    // CHECK:     [[PLUS_ONE:%.*]] = apply
+    // CHECK:     [[FROM_VALUE:%.*]] = open_existential_box [[PLUS_ONE]]
+    // CHECK:     [[TO_VALUE:%.*]] = init_existential_addr [[OUT]]
+    // CHECK:     copy_addr [[FROM_VALUE]] to [initialization] [[TO_VALUE]]
+    // CHECK:     release [[PLUS_ONE]]
+
+    return plusOneErrorType()
+  }
 }
