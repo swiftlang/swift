@@ -1435,9 +1435,6 @@ bb0(%0 : $F):
   return %2 : $()
 }
 
-// This is not the real signature. We pattern match off the prefix _swift_isUniquelyReferenced
-sil @_swift_isUniquelyReferenced_2 : $@convention(thin) (Builtin.RawPointer) -> ()
-
 // Make sure that is_unique stops code motion.
 // CHECK-LABEL: sil @is_unique_stops_codemotion : $@convention(thin) (@inout Builtin.NativeObject) -> () {
 // CHECK: bb0([[IN:%[0-9]+]] : $*Builtin.NativeObject):
