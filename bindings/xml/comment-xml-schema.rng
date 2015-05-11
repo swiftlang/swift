@@ -507,6 +507,14 @@
     </element>
   </define>
 
+  <define name="Requires">
+    <element name="Requires">
+      <zeroOrMore>
+        <ref name="BlockContent"/>
+      </zeroOrMore>
+    </element>
+  </define>
+
   <define name="See">
     <element name="See">
       <zeroOrMore>
@@ -715,6 +723,7 @@
       <ref name="Precondition"/>
       <ref name="Remark"/>
       <ref name="Remarks"/>
+      <ref name="Requires"/>
       <ref name="See"/>
       <ref name="Since"/>
       <ref name="TODO"/>

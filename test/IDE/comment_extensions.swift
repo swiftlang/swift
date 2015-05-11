@@ -67,6 +67,11 @@ func remark() {}
 func remarks() {}
 // CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>remarks()</Name><USR>s:F14swift_ide_test7remarksFT_T_</USR><Declaration>func remarks()</Declaration><Discussion><Remarks><Para></Para><List-Bullet><Item><Para>Never let a bear approach you.</Para></Item></List-Bullet></Remarks></Discussion></Function>]
 
+/// - requires:
+///   - explicit package name. Just kidding!
+func requires() {}
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>requires()</Name><USR>s:F14swift_ide_test8requiresFT_T_</USR><Declaration>func requires()</Declaration><Discussion><Requires><Para></Para><List-Bullet><Item><Para>explicit package name. Just kidding!</Para></Item></List-Bullet></Requires></Discussion></Function>]
+
 /// - seealso: the pie (it's very good).
 func see() {}
 // CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>see()</Name><USR>s:F14swift_ide_test3seeFT_T_</USR><Declaration>func see()</Declaration><Discussion><See><Para>the pie (it&apos;s very good).</Para></See></Discussion></Function>]
