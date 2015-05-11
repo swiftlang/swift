@@ -624,11 +624,9 @@ struct DeallocatorConventions : Conventions {
 namespace {
   /// The default Swift conventions.
   struct DefaultConventions : Conventions {
-    bool hasGuaranteedSelf;
 
-    DefaultConventions(bool guaranteedSelf)
-      : Conventions(ConventionsKind::Default),
-        hasGuaranteedSelf(guaranteedSelf) {}
+    DefaultConventions()
+      : Conventions(ConventionsKind::Default) {}
 
     ParameterConvention getIndirectParameter(unsigned index,
                               const AbstractionPattern &type) const override {
@@ -650,16 +648,12 @@ namespace {
 
     ParameterConvention
     getDirectSelfParameter(const AbstractionPattern &type) const override {
-      if (hasGuaranteedSelf)
-        return ParameterConvention::Direct_Guaranteed;
-      return ParameterConvention::Direct_Owned;
+      return ParameterConvention::Direct_Guaranteed;
     }
 
     ParameterConvention
     getIndirectSelfParameter(const AbstractionPattern &type) const override {
-      if (hasGuaranteedSelf)
-        return ParameterConvention::Indirect_In_Guaranteed;
-      return ParameterConvention::Indirect_In;
+      return ParameterConvention::Indirect_In_Guaranteed;
     }    
 
     static bool classof(const Conventions *C) {
@@ -741,11 +735,10 @@ static CanSILFunctionType getNativeSILFunctionType(SILModule &M,
   case SILFunctionType::Representation::Thick:
   case SILFunctionType::Representation::Method:
   case SILFunctionType::Representation::WitnessMethod: {
-    bool enableGuaranteedSelf = M.getOptions().EnableGuaranteedSelf;
     switch (kind) {
     case SILDeclRef::Kind::Initializer:
       return getSILFunctionType(M, origType, substType, substInterfaceType,
-                  extInfo, DefaultInitializerConventions(enableGuaranteedSelf),
+                  extInfo, DefaultInitializerConventions(),
                                 None);
     
     case SILDeclRef::Kind::Func:
@@ -758,7 +751,7 @@ static CanSILFunctionType getNativeSILFunctionType(SILModule &M,
     case SILDeclRef::Kind::IVarDestroyer:
     case SILDeclRef::Kind::EnumElement:
       return getSILFunctionType(M, origType, substType, substInterfaceType,
-                            extInfo, DefaultConventions(enableGuaranteedSelf),
+                            extInfo, DefaultConventions(),
                                 None);
     case SILDeclRef::Kind::Deallocator:
       return getSILFunctionType(M, origType, substType, substInterfaceType,

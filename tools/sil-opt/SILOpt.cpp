@@ -284,12 +284,6 @@ RemoveRuntimeAsserts("remove-runtime-asserts",
                      llvm::cl::desc("Remove runtime assertions (cond_fail)."));
 
 static llvm::cl::opt<bool>
-EnableGuaranteedSelf("enable-guaranteed-self",
-                     llvm::cl::Hidden,
-                     llvm::cl::init(true),
-                     llvm::cl::desc("Enable guaranteed self"));
-
-static llvm::cl::opt<bool>
 EnableSILPrintAll("sil-print-all",
                   llvm::cl::Hidden,
                   llvm::cl::init(false),
@@ -402,7 +396,6 @@ int main(int argc, char **argv) {
   SILOpts.PrintAll = EnableSILPrintAll;
   SILOpts.RemoveRuntimeAsserts = RemoveRuntimeAsserts;
   SILOpts.AssertConfig = AssertConfId;
-  SILOpts.EnableGuaranteedSelf = EnableGuaranteedSelf;
 
   // Load the input file.
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =

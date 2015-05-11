@@ -384,7 +384,7 @@ static ManagedValue manageParam(SILGenFunction &gen,
   case ParameterConvention::Indirect_In_Guaranteed:
     // FIXME: Avoid a behavior change while guaranteed self is disabled by
     // default.
-    if (allowPlusZero || !gen.SGM.M.getOptions().EnableGuaranteedSelf) {
+    if (allowPlusZero) {
       return ManagedValue::forUnmanaged(paramValue);
     } else {
       auto copy = gen.emitTemporaryAllocation(loc, paramValue.getType());
@@ -1588,16 +1588,8 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
     
     bool inoutDifference;
     
-    if (SGM.M.getOptions().EnableGuaranteedSelf) {
-      inoutDifference = reqConvention == ParameterConvention::Indirect_Inout &&
-                      witnessConvention != ParameterConvention::Indirect_Inout;
-    } else {
-      // TODO: Avoid a behavior change while guaranteed self is disabled
-      // by default; preserve the old, incorrect condition here.
-      inoutDifference = isIndirectParameter(reqConvention) &&
-                        !isConsumedParameter(reqConvention) &&
-                        isConsumedParameter(witnessConvention);
-    }
+    inoutDifference = reqConvention == ParameterConvention::Indirect_Inout &&
+                    witnessConvention != ParameterConvention::Indirect_Inout;
 
     if (inoutDifference) {
       // If there is an inout difference in self, load the inout self parameter.

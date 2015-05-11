@@ -929,7 +929,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   Opts.DebugSerialization |= Args.hasArg(OPT_sil_debug_serialization);
   Opts.PrintInstCounts |= Args.hasArg(OPT_print_inst_counts);
   Opts.EnableFuncSigOpts &= !Args.hasArg(OPT_disable_func_sig_opts);
-  Opts.EnableGuaranteedSelf |= Args.hasArg(OPT_enable_guaranteed_self);
   if (const Arg *A = Args.getLastArg(OPT_external_pass_pipeline_filename))
     Opts.ExternalPassPipelineFilename = A->getValue();
 

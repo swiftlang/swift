@@ -89,9 +89,6 @@ public:
   /// Should we optimize function signatures?
   bool EnableFuncSigOpts = true;
 
-  /// Should we emit self as a guaranteed parameter?
-  bool EnableGuaranteedSelf = true;
-
   /// Instrument code to generate profiling information.
   bool GenerateProfile = false;
 
