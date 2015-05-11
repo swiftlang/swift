@@ -12,7 +12,7 @@ func func2(@autoclosure fp : () -> Int) { func2(4)}
 
 func func3(@autoclosure fp fpx : () -> Int) {func3(fp: 0)}
 func func4(@autoclosure fp fp : () -> Int) {func4(fp: 0)}
-func func5(@autoclosure var fp fp : () -> Int) {func5(fp: 0)}
+func func5(@autoclosure var fp fp : () -> Int) {func5(fp: 0)} // expected-warning {{parameter 'fp' was never mutated}}
 func func6(@autoclosure () -> Int) {func6(0)}
 
 // declattr and typeattr on the argument.

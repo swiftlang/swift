@@ -1120,7 +1120,11 @@ bool TypeChecker::typeCheckAbstractFunctionBody(AbstractFunctionDecl *AFD) {
   if (DebugTimeFunctionBodies)
     timer.emplace(AFD);
 
-  return typeCheckAbstractFunctionBodyUntil(AFD, SourceLoc());
+  if (typeCheckAbstractFunctionBodyUntil(AFD, SourceLoc()))
+    return true;
+  
+  performAbstractFuncDeclDiagnostics(*this, AFD);
+  return false;
 }
 
 // Type check a function body (defined with the func keyword) that is either a

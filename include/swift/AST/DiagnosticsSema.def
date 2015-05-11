@@ -2265,6 +2265,28 @@ ERROR(availability_declaration_less_available_than_protocol, sema_avail,
 NOTE(availability_protocol_requirement_here, sema_avail, none,
      "protocol requirement here", ())
 
+
+//------------------------------------------------------------------------------
+// Variable usage diagnostics
+//------------------------------------------------------------------------------
+
+WARNING(pbd_never_used, sema_varusage, none,
+        "initialization of %select{variable|immutable value}1 %0 was never used"
+        "; consider replacing with assignment to '_' or removing it",
+        (Identifier, unsigned))
+
+WARNING(variable_never_used, sema_varusage, none,
+        "%select{variable|immutable value}1 %0 was never used; "
+        "consider replacing with '_' or removing it",
+        (Identifier, unsigned))
+WARNING(variable_never_mutated, sema_varusage, none,
+        "%select{variable|parameter}1 %0 was never mutated; "
+        "consider changing to 'let' constant",
+        (Identifier, unsigned))
+WARNING(variable_never_read, sema_varusage, none,
+        "%select{variable|parameter}1 %0 was written to, but never read",
+        (Identifier, unsigned))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

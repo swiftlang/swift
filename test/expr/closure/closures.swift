@@ -92,8 +92,8 @@ func closure_no_body(p: () -> ()) {
 
 // rdar://12019415
 func t() {
-  var u8 : UInt8
-  var x : Bool
+  let u8 : UInt8 = 1
+  let x : Bool = true
 
   if 0xA0..<0xBF ~= Int(u8) && x {
   }
@@ -139,9 +139,11 @@ class ExplicitSelfRequiredTest {
 
     // <rdar://problem/18877391> "self." shouldn't be required in the initializer expression in a capture list
     // This should not produce an error, "x" isn't being captured by the closure.
+    // expected-warning @+1 {{initialization of immutable value 'myX' was never used}}
     doStuff({ [myX = x] in 4 })
 
     // This should produce an error, since x is used within the inner closure.
+    // expected-warning @+1 {{initialization of immutable value 'myX' was never used}}
     doStuff({ [myX = {x}] in 4 })    // expected-error {{reference to property 'x' in closure requires explicit 'self.' to make capture semantics explicit}}
 
     return 42
@@ -161,9 +163,9 @@ class SomeClass {
 func testCaptureBehavior(ptr : SomeClass) {
   // Test normal captures.
   weak var wv : SomeClass? = ptr
-  unowned var uv : SomeClass = ptr
-  unowned(unsafe) var uv1 : SomeClass = ptr
-  unowned(safe) var uv2 : SomeClass = ptr
+  unowned let uv : SomeClass = ptr
+  unowned(unsafe) let uv1 : SomeClass = ptr
+  unowned(safe) let uv2 : SomeClass = ptr
   doStuff { wv!.foo() }
   doStuff { uv.foo() }
   doStuff { uv1.foo() }
@@ -171,10 +173,11 @@ func testCaptureBehavior(ptr : SomeClass) {
 
   
   // Capture list tests
-  var v1 : SomeClass? = ptr
-  var v2 : SomeClass = ptr
+  let v1 : SomeClass? = ptr
+  let v2 : SomeClass = ptr
 
   doStuff { [weak v1] in v1!.foo() }
+  // expected-warning @+2 {{variable 'v1' was written to, but never read}}
   doStuff { [weak v1,                 // expected-note {{previous}}
              weak v1] in v1!.foo() }  // expected-error {{definition conflicts with previous value}}
   doStuff { [unowned v2] in v2.foo() }
@@ -182,7 +185,8 @@ func testCaptureBehavior(ptr : SomeClass) {
   doStuff { [unowned(safe) v2] in v2.foo() }
   doStuff { [weak v1, weak v2] in v1!.foo() + v2!.foo() }
 
-  var i = 42
+  let i = 42
+  // expected-warning @+1 {{variable 'i' was never mutated}}
   doStuff { [weak i] in i! }   // expected-error {{'weak' cannot be applied to non-class type 'Int'}}
 }
 
@@ -194,13 +198,14 @@ extension SomeClass {
 
     // rdar://16889886 - Assert when trying to weak capture a property of self in a lazy closure
     doStuff { [weak self.field] in field!.foo() }   // expected-error {{fields may only be captured by assigning to a specific name}} expected-error {{reference to property 'field' in closure requires explicit 'self.' to make capture semantics explicit}}
+    // expected-warning @+1 {{variable 'self' was written to, but never read}}
     doStuff { [weak self&field] in 42 }  // expected-error {{expected ']' at end of capture list}}
 
   }
 
   func strong_in_capture_list() {
     // <rdar://problem/18819742> QOI: "[strong self]" in capture list generates unhelpful error message
-    var fn = {[strong self] () -> () in return }  // expected-error {{expected 'weak', 'unowned', or no specifier in capture list}}
+    var _ = {[strong self] () -> () in return }  // expected-error {{expected 'weak', 'unowned', or no specifier in capture list}}
   }
 }
 
@@ -209,10 +214,10 @@ extension SomeClass {
 var closureWithObservedProperty: () -> () = {
   var a: Int = 42 {
   willSet {
-    let message = "Will set a to \(newValue)"
+    let _ = "Will set a to \(newValue)"
   }
   didSet {
-    let message = "Did set a with old value of \(oldValue)"
+    let _ = "Did set a with old value of \(oldValue)"
   }
   }
 }

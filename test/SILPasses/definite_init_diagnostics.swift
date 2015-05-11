@@ -12,6 +12,7 @@ func markUsed<T>(t: T) {}
 // memory promotion pass.
 
 func test1() -> Int {
+  // expected-warning @+1 {{variable 'a' was never mutated; consider changing to 'let' constant}}
   var a : Int  // expected-note {{variable defined here}}
   return a     // expected-error {{variable 'a' used before being initialized}}
 }
@@ -54,6 +55,7 @@ func test2() {
 
   // Closures.
 
+  // expected-warning @+1 {{variable 'b1' was never mutated}}
   var b1 : Int        // expected-note {{variable defined here}}
   takes_closure {     // expected-error {{variable 'b1' used before being initialized}}
     markUsed(b1)
@@ -63,6 +65,7 @@ func test2() {
   takes_closure {     // ok.
     markUsed(b2)
   }
+  b2 = 1
 
   var b3 : Int
   b3 = 4
@@ -73,17 +76,19 @@ func test2() {
   // Structs
   var s1 : SomeStruct
   s1 = SomeStruct()   // ok
+  _ = s1
 
   var s2 : SomeStruct  // expected-note {{variable defined here}}
   s2.x = 1             // expected-error {{struct 's2' must be completely initialized before a member is stored to}}
 
 
   // Classes
+  // expected-warning @+1 {{variable 'c1' was never mutated}}
   var c1 : SomeClass   // expected-note {{variable defined here}}
   markUsed(c1.x)          // expected-error {{variable 'c1' used before being initialized}}
 
 
-  var c2 = SomeClass()
+  let c2 = SomeClass()
   markUsed(c2.x)          // ok
   
   
@@ -97,10 +102,11 @@ func test2() {
   
   // Unowned.  This is immediately crashing code (it causes a retain of a
   // released object) so it should be diagnosed with a warning someday.
+  // expected-warning @+1 {{variable 'u1' was never mutated; consider changing to 'let' constant}}
   unowned var u1 : SomeClass // expected-note {{variable defined here}}
   var _ = u1                // expected-error {{variable 'u1' used before being initialized}}
 
-  unowned var u2 = SomeClass()
+  unowned let u2 = SomeClass()
   var _ = u2                // ok
 }
 
@@ -108,10 +114,12 @@ func test2() {
 
 // Tuple field sensitivity.
 func test4() {
+  // expected-warning @+1 {{variable 't1' was never mutated; consider changing to 'let' constant}}
   var t1 = (1, 2, 3)
   markUsed(t1.0 + t1.1 + t1.2)  // ok
 
 
+  // expected-warning @+1 {{variable 't2' was never mutated; consider changing to 'let' constant}}
   var t2 : (Int, Int, Int)   // expected-note 3 {{variable defined here}}
   markUsed(t2.0)   // expected-error {{variable 't2.0' used before being initialized}}
   markUsed(t2.1)   // expected-error {{variable 't2.1' used before being initialized}}
@@ -156,7 +164,7 @@ func test5<T>(x: T, y: T) {
   var a : ((T, T), T)  // expected-note {{variable defined here}}
   a.0 = (x, y)
   
-  var b = a     // expected-error {{variable 'a.1' used before being initialized}}
+  _ = a     // expected-error {{variable 'a.1' used before being initialized}}
 }
 
 
@@ -190,24 +198,32 @@ protocol SomeProtocol {
 protocol DerivedProtocol : SomeProtocol {}
 
 func existentials(i: Int, dp: DerivedProtocol) {
+  // expected-warning @+1 {{variable 'a' was written to, but never read}}
   var a : Any = ()
   a = i
 
+  // expected-warning @+1 {{variable 'b' was written to, but never read}}
   var b : Any
   b = ()
 
+  // expected-warning @+1 {{variable 'c' was never used}}
   var c : Any   // no uses.
   
+  // expected-warning @+1 {{variable 'd1' was never mutated}}
   var d1 : Any  // expected-note {{variable defined here}}
-  var d2 = d1   // expected-error {{variable 'd1' used before being initialized}}
+  _ = d1   // expected-error {{variable 'd1' used before being initialized}}
   
+
+  // expected-warning @+1 {{variable 'e' was never mutated}}
   var e : SomeProtocol  // expected-note {{variable defined here}}
   e.protoMe()           // expected-error {{variable 'e' used before being initialized}}
   
   var f : SomeProtocol = dp  // ok, init'd by existential upcast.
   
+  // expected-warning @+1 {{variable 'g' was never mutated}}
   var g : DerivedProtocol   // expected-note {{variable defined here}}
   f = g                     // expected-error {{variable 'g' used before being initialized}}
+  _ = f
 }
 
 
@@ -235,9 +251,11 @@ struct EmptyStruct {}
 func useEmptyStruct(a: EmptyStruct) {}
 
 func emptyStructTest() {
-  var a : EmptyStruct  // expected-note {{variable defined here}}
+  let a : EmptyStruct  // expected-note {{variable defined here}}
   useEmptyStruct(a)    // expected-error {{variable 'a' used before being initialized}}
 
+  // expected-warning @+2 {{variable 'b' was never mutated}}
+  // expected-warning @+1 {{variable 'd' was never mutated}}
   var (b,c,d) : (EmptyStruct,EmptyStruct,EmptyStruct) // expected-note 2 {{variable defined here}}
   
   c = EmptyStruct()
@@ -271,6 +289,7 @@ func partialInit() {
       var x : Int
       if (n > 2) { continue }
       x = 1
+      _ = x
     }
   }
   
@@ -278,6 +297,7 @@ func partialInit() {
   func trivial_tuple() {
     var a : (Int, Int)
     a.1 = 1
+    _ = a.1
   }
 
 
@@ -288,6 +308,7 @@ func partialInit() {
       x.0 = SomeClass()
     } else {
       x.1 = SomeClass()
+      _ = x.1
     }
   }
 }
@@ -305,6 +326,7 @@ func conditionalInitOrAssign(c : Bool, x : Int) {
     t = x
   }
   t = 2
+  _ = t
   
   // Nontrivial type
   var sc : SomeClass
@@ -312,6 +334,7 @@ func conditionalInitOrAssign(c : Bool, x : Int) {
     sc = SomeClass()
   }
   sc = SomeClass()
+  _ = sc
   
   // Tuple element types
   var tt : (SomeClass, SomeClass)
@@ -354,12 +377,12 @@ func tuple_test() -> Int {
 
   t.1 = 4
 
-  for i in 0..<45 {
+  for _ in 0..<45 {
   }
 
   t.0 = 1
 
-  for i in 0..<45 {
+  for _ in 0..<45 {
   }
   
   return t.1+t.0  // No diagnostic, everything is fully initialized.
@@ -443,7 +466,7 @@ class DelegatingCtorClass {
 
   convenience init(x: EmptyStruct) {
     self.init()
-    var tmp = ivar // okay: ivar has been initialized by the delegation above
+    _ = ivar // okay: ivar has been initialized by the delegation above
   }
   
   convenience init(x: EmptyStruct, y: EmptyStruct) {
@@ -480,11 +503,11 @@ struct DelegatingCtorStruct {
 
   init(a : Double) {
     self.init()
-    var tmp = ivar // okay: ivar has been initialized by the delegation above
+    _ = ivar // okay: ivar has been initialized by the delegation above
   }
   
   init(a : Int) {
-    var tmp = ivar // expected-error {{use of 'self' in delegating initializer before self.init is called}}
+    _ = ivar // expected-error {{use of 'self' in delegating initializer before self.init is called}}
     self.init()
   }
 
@@ -511,12 +534,12 @@ enum DelegatingCtorEnum {
 
   init(a : Double) {
     self.init()
-    var tmp = self // okay: self has been initialized by the delegation above
+    _ = self // okay: self has been initialized by the delegation above
     self = .Dinosaur
   }
   
   init(a : Int) {
-    var tmp = self // expected-error {{use of 'self' in delegating initializer before self.init is called}}
+    _ = self // expected-error {{use of 'self' in delegating initializer before self.init is called}}
     self.init()
   }
 
@@ -577,7 +600,7 @@ class rdar16119509_Derived : rdar16119509_Base {
 // <rdar://problem/16797372> Bogus error: self.init called multiple times in initializer
 extension Foo {
   convenience init() {
-    for i in 0..<42 {
+    for _ in 0..<42 {
     }
     self.init(a: 4)
   }
@@ -928,7 +951,7 @@ struct MyMutabilityImplementation : TestMutabilityProtocol {
 func testLocalProperties(b : Int) -> Int {
   // expected-note @+1 {{change 'let' to 'var' to make it mutable}}
   let x : Int
-  let y : Int // never assigned is ok
+  let y : Int // never assigned is ok    expected-warning {{immutable value 'y' was never used}}
 
   x = b
   x = b    // expected-error {{immutable value 'x' may only be initialized once}}
@@ -941,6 +964,7 @@ func testLocalProperties(b : Int) -> Int {
     z = b
   }
 
+  _ = z
   return x
 }
 
@@ -949,7 +973,7 @@ func testAddressOnlyProperty<T>(b : T) -> T {
   // expected-note @+1 {{change 'let' to 'var' to make it mutable}}
   let x : T
   let y : T
-  let z : T   // never assigned is ok.
+  let z : T   // never assigned is ok.  expected-warning {{immutable value 'z' was never used}}
   x = b
   y = b
   x = b   // expected-error {{immutable value 'x' may only be initialized once}}
@@ -1023,7 +1047,7 @@ class MyClassTestExample {
 
   init(){
     clientFormat = MyClassWithAnInt()
-    let channels = clientFormat.channelCount
+    let _ = clientFormat.channelCount
   }
 }
 
@@ -1101,6 +1125,7 @@ func testReassignment() {
   let c : Int  // expected-note {{change 'let' to 'var' to make it mutable}}
   c = 12
   c = 32  // expected-error {{immutable value 'c' may only be initialized once}}
+  _ = c
 }
 
 

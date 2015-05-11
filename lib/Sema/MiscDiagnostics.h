@@ -16,6 +16,7 @@
 #include "swift/AST/Attr.h"
 
 namespace swift {
+  class AbstractFunctionDecl;
   class DeclContext;
   class Expr;
   class InFlightDiagnostic;
@@ -29,6 +30,9 @@ void performExprDiagnostics(TypeChecker &TC, const Expr *E,
 /// \brief Emit diagnostics for a given statement.
 void performStmtDiagnostics(TypeChecker &TC, const Stmt *S);
 
+void performAbstractFuncDeclDiagnostics(TypeChecker &TC,
+                                        AbstractFunctionDecl *AFD);
+  
 /// Emit a fix-it to set the accessibility of \p VD to \p desiredAccess.
 ///
 /// This actually updates \p VD as well.

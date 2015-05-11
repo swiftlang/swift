@@ -113,7 +113,7 @@ var x15: Int {
   // For the purpose of this test we need to use an attribute that can not be
   // applied to the getter.
   weak
-  var foo: SomeClass? = SomeClass()
+  var foo: SomeClass? = SomeClass()  // expected-warning {{variable 'foo' was written to, but never read}}
   return 0
 }
 
@@ -179,7 +179,7 @@ func disambiguateGetSet3Attr() {
 // Disambiguated as stored property with a trailing closure in the initializer.
 func disambiguateGetSet4() {
   func set(x: Int, fn: () -> ()) {}
-  var newValue: Int = 0
+  let newValue: Int = 0
   var a: Int = takeTrailingClosure {
     set(newValue) {}
   }
@@ -425,7 +425,7 @@ extension ProtocolWithExtension1 {
 }
 
 func getS() -> S {
-  var s: S
+  let s: S
   return s
 }
 
@@ -491,7 +491,8 @@ func accept_int(c: Int) { }
 
 func test_settable_of_nonsettable(a: Aleph) {
   a.b.c = 1 // expected-error{{cannot assign}}
-  var x:Int = a.b.c
+  let x:Int = a.b.c
+  _ = x
 
   accept_int(a.b.c)
   accept_int_inout(&a.b.c) // expected-error {{cannot pass immutable value of type 'Int' as inout argument}}
@@ -597,7 +598,7 @@ class SelfRefProperties {
     }
     set {
       markUsed(setter) // no-warning
-      var unused = setter + setter
+      var unused = setter + setter // expected-warning {{initialization of variable 'unused' was never used; consider replacing with assignment to '_' or removing it}}
       setter = newValue // expected-warning {{attempting to modify 'setter' within its own setter}}
       // expected-note@-1 {{access 'self' explicitly to silence this warning}} {{7-7=self.}}
     }

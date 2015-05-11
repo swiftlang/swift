@@ -5,6 +5,6 @@
 // rdar://18175202
 
 func d<b: SequenceType, e where Optional<e> == b.Generator.Element>(c : b) -> e? {
-    for mx : e? in c {
+    for mx : e? in c { // expected-warning {{immutable value 'mx' was never used}}
     }
 }

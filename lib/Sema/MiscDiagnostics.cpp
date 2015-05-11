@@ -19,6 +19,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/Parse/Lexer.h"
+#include "llvm/ADT/MapVector.h"
 using namespace swift;
 
 //===--------------------------------------------------------------------===//
@@ -773,6 +774,364 @@ void swift::performStmtDiagnostics(TypeChecker &TC, const Stmt *S) {
   TC.checkUnsupportedProtocolType(const_cast<Stmt *>(S));
   return diagUnreachableCode(TC, S);
 }
+
+//===--------------------------------------------------------------------===//
+// Per func/init diagnostics
+//===--------------------------------------------------------------------===//
+
+namespace {
+class VarDeclUsageChecker : public ASTWalker {
+  TypeChecker &TC;
+  
+  // Keep track of some information about a variable.
+  enum {
+    RK_Read    = 1,      ///< Whether it was ever read.
+    RK_Written = 2,      ///< Whether it was ever written or passed inout.
+  };
+  
+  /// These are all of the variables that we are tracking.  VarDecls get added
+  /// to this when the declaration is seen.  We use a MapVector to keep the
+  /// diagnostics emission in deterministic order.
+  llvm::SmallMapVector<VarDecl*, unsigned, 32> VarDecls;
+  
+  bool sawError = false;
+  
+public:
+  VarDeclUsageChecker(TypeChecker &TC, AbstractFunctionDecl *AFD) : TC(TC) {
+    // Track the parameters of the function.
+    for (auto P : AFD->getBodyParamPatterns())
+      P->forEachVariable([&](VarDecl *VD) {
+        if (shouldTrackVarDecl(VD))
+          VarDecls[VD] = 0;
+      });
+  }
+
+  // After we have scanned the entire region, diagnose variables that could be
+  // declared with a narrower usage kind.
+  ~VarDeclUsageChecker();
+  
+  bool shouldTrackVarDecl(VarDecl *VD) {
+    // If the variable is implicit, ignore it.
+    if (VD->isImplicit() || VD->getLoc().isInvalid())
+      return false;
+    
+    // If the variable was invalid, ignore it and notice that the code is
+    // malformed.
+    if (VD->isInvalid() || !VD->hasType()) {
+      sawError = true;
+      return false;
+    }
+    
+    // If the variable is already unnamed, ignore it.
+    if (!VD->hasName() || VD->getName().str() == "_")
+      return false;
+    
+    return true;
+  }
+
+  void addMark(Decl *D, unsigned Flag) {
+    auto *vd = dyn_cast<VarDecl>(D);
+    if (!vd) return;
+
+    auto vdi = VarDecls.find(vd);
+    if (vdi != VarDecls.end())
+      vdi->second |= Flag;
+  }
+  
+  void markBaseOfAbstractStorageDeclStore(Expr *E, ConcreteDeclRef decl);
+  
+  void markStoredOrInOutExpr(Expr *E, unsigned Flags);
+  
+  // We generally walk into declarations, other than types and nested functions.
+  // FIXME: peek into capture lists of nested functions.
+  bool walkToDeclPre(Decl *D) override {
+    if (isa<TypeDecl>(D))
+      return false;
+      
+    // If this is a VarDecl, then add it to our list of things to track.
+    if (auto *vd = dyn_cast<VarDecl>(D))
+      if (shouldTrackVarDecl(vd))
+        VarDecls[vd] = 0;
+
+    if (auto *afd = dyn_cast<AbstractFunctionDecl>(D)) {
+      // If this is a nested function with a capture list, mark any captured
+      // variables.
+      if (afd->isBodyTypeChecked()) {
+        for (const auto &capture : afd->getCaptureInfo().getCaptures())
+          addMark(capture.getDecl(), RK_Read|RK_Written);
+      } else {
+        // If the body hasn't been type checked yet, be super-conservative and
+        // mark all variables as used.  This can be improved later, e.g. by
+        // walking the untype-checked body to look for things that could
+        // possibly be used.
+        VarDecls.clear();
+      }
+      
+      // Don't walk into it though, it may not even be type checked yet.
+      return false;
+    }
+
+    
+    // Note that we ignore the initialization behavior of PatternBindingDecls,
+    // but we do want to walk into them, because we want to see any uses or
+    // other things going on in the initializer expressions.
+    return true;
+  }
+  
+  /// The heavy lifting happens when visiting expressions.
+  std::pair<bool, Expr *> walkToExprPre(Expr *E) override;
+};
+}
+
+
+// After we have scanned the entire region, diagnose variables that could be
+// declared with a narrower usage kind.
+VarDeclUsageChecker::~VarDeclUsageChecker() {
+  // If we saw an ErrorExpr somewhere in the body, then we have a malformed AST
+  // and we know stuff got dropped.  Instead of producing these diagnostics,
+  // lets let the bigger issues get resolved first.
+  if (sawError)
+    return;
+  
+  for (auto elt : VarDecls) {
+    auto *var = elt.first;
+    unsigned access = elt.second;
+
+    // If this is a 'let' value, any stores to it are actually initializations,
+    // not mutations.
+    if (var->isLet())
+      access &= ~RK_Written;
+    
+    // If this variable has WeakStorageType, then it can be mutated in ways we
+    // don't know.
+    if (var->getType()->is<WeakStorageType>())
+      access |= RK_Written;
+    
+    // If this is a vardecl with 'inout' type, then it is an inout argument to a
+    // function, never diagnose anything related to it.
+    if (var->getType()->is<InOutType>())
+      continue;    
+    
+    // Consider parameters to always have been read.  It is common to name a
+    // parameter and not use it (e.g. because you are an override or want the
+    // named keyword, etc).  Warning to rewrite it to _ is more annoying than
+    // it is useful.
+    if (isa<ParamDecl>(var))
+      access |= RK_Read;
+    
+    // Diagnose variables that were never used (other than their
+    // initialization).
+    //
+    if (access == 0) {
+      // If the source of the VarDecl is a trivial PatternBinding with only a
+      // single binding, rewrite the whole thing into an assignment.
+      //    let x = foo()
+      //  ->
+      //    _ = foo()
+      if (auto *pbd = var->getParentPatternBinding())
+        if (pbd->getSingleVar() == var && pbd->getInit(0) != nullptr) {
+          unsigned varKind = var->isLet();
+          TC.diagnose(var->getLoc(), diag::pbd_never_used,
+                      var->getName(), varKind)
+            .fixItReplace(SourceRange(pbd->getLoc(), var->getLoc()), "_");
+          continue;
+        }
+      
+      // Otherwise, this is something more complex, perhaps
+      //    let (a,b) = foo()
+      // Just rewrite the one variable with a _.
+      unsigned varKind = var->isLet();
+      TC.diagnose(var->getLoc(), diag::variable_never_used,
+                  var->getName(), varKind)
+        .fixItReplace(var->getLoc(), "_");
+      continue;
+    }
+    
+    // If this is a mutable 'var', and it was never written to, suggest
+    // upgrading to 'let'.  We do this even for a parameter.
+    if (!var->isLet() && (access & RK_Written) == 0) {
+      SourceLoc FixItLoc;
+      
+      // Try to find the location of the 'var' so we can produce a fixit.  If
+      // this is a simple PatternBinding, use its location.
+      if (auto *PBD = var->getParentPatternBinding())
+        if (PBD->getSingleVar() == var)
+          FixItLoc = PBD->getLoc();
+      
+      // If this is a parameter explicitly marked 'var', remove it.
+      if (auto *param = dyn_cast<ParamDecl>(var))
+        if (auto *pattern = param->getParamParentPattern())
+          if (auto *vp = dyn_cast<VarPattern>(pattern)) {
+            TC.diagnose(var->getLoc(), diag::variable_never_mutated,
+                        var->getName(), /*param*/1)
+              .fixItRemove(vp->getLoc());
+            continue;
+          }
+      
+      unsigned varKind = isa<ParamDecl>(var);
+      // FIXME: fixit when we can find a pattern binding.
+      if (FixItLoc.isInvalid())
+        TC.diagnose(var->getLoc(), diag::variable_never_mutated,
+                    var->getName(), varKind);
+      else
+        TC.diagnose(var->getLoc(), diag::variable_never_mutated,
+                    var->getName(), varKind)
+          .fixItReplace(FixItLoc, "let");
+      continue;
+    }
+    
+    // If this is a variable that was only written to, emit a warning.
+    if ((access & RK_Read) == 0) {
+      TC.diagnose(var->getLoc(), diag::variable_never_read, var->getName(),
+                  isa<ParamDecl>(var));
+      continue;
+    }
+  }
+}
+
+/// Handle a store to "x.y" where 'base' is the expression for x and 'decl' is
+/// the decl for 'y'.
+void VarDeclUsageChecker::
+markBaseOfAbstractStorageDeclStore(Expr *base, ConcreteDeclRef decl) {
+  // If the base is a class or an rvalue, then this store just loads the base.
+  if (base->getType()->isAnyClassReferenceType() ||
+      !(base->getType()->isLValueType() || base->getType()->is<InOutType>())) {
+    base->walk(*this);
+    return;
+  }
+
+  // If the store is to a non-mutating member, then this is just a load, even
+  // if the base is an inout expr.
+  auto *ASD = cast<AbstractStorageDecl>(decl.getDecl());
+  if ((ASD->hasAccessorFunctions() && ASD->getSetter() &&
+       !ASD->getSetter()->isMutating()) ||
+      (ASD->hasAddressors() && ASD->getMutableAddressor() &&
+       !ASD->getMutableAddressor()->isMutating())) {
+    // Sema conservatively converts the base to inout expr when it is an lvalue.
+    // Look through it because we know it isn't actually doing a load/store.
+    if (auto *ioe = dyn_cast<InOutExpr>(base))
+      base = ioe->getSubExpr();
+    base->walk(*this);
+    return;
+  }
+  
+  // Otherwise this is a read and write of the base.
+  return markStoredOrInOutExpr(base, RK_Written|RK_Read);
+}
+
+
+ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
+   // Sema leaves some subexpressions null, which seems really unfortunate.  It
+   // should replace them with ErrorExpr.
+   if (E == nullptr || !E->getType() || E->getType()->is<ErrorType>()) {
+     sawError = true;
+     return;
+   }
+   
+   // Ignore parens and other easy cases.
+   E = E->getSemanticsProvidingExpr();
+   
+   // If we found a decl that is being assigned to, then mark it.
+   if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
+     addMark(DRE->getDecl(), Flags);
+     return;
+   }
+
+   if (auto *TE = dyn_cast<TupleExpr>(E)) {
+     for (auto &elt : TE->getElements())
+       markStoredOrInOutExpr(elt, Flags);
+     return;
+   }
+   
+   // If this is an assignment into a mutating subscript lvalue expr, then we
+   // are mutating the base expression.  We also need to visit the index
+   // expressions as loads though.
+   if (auto *SE = dyn_cast<SubscriptExpr>(E)) {
+     // The index of the subscript is evaluted as an rvalue.
+     SE->getIndex()->walk(*this);
+     if (SE->hasDecl())
+       markBaseOfAbstractStorageDeclStore(SE->getBase(), SE->getDecl());
+     else  // FIXME: Should not be needed!
+       markStoredOrInOutExpr(SE->getBase(), RK_Written|RK_Read);
+     
+     return;
+   }
+   
+   if (auto *ioe = dyn_cast<InOutExpr>(E))
+     return markStoredOrInOutExpr(ioe->getSubExpr(), RK_Written|RK_Read);
+   
+   if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
+     markBaseOfAbstractStorageDeclStore(MRE->getBase(), MRE->getMember());
+     return;
+   }
+   
+   if (auto *TEE = dyn_cast<TupleElementExpr>(E))
+     return markStoredOrInOutExpr(TEE->getBase(), Flags);
+
+
+   // If we don't know what kind of expression this is, assume it's a reference
+   // and mark it as a read.
+   E->walk(*this);
+}
+
+   
+
+/// The heavy lifting happens when visiting expressions.
+std::pair<bool, Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
+  // Sema leaves some subexpressions null, which seems really unfortunate.  It
+  // should replace them with ErrorExpr.
+  if (E == nullptr || !E->getType() || E->getType()->is<ErrorType>()) {
+    sawError = true;
+    return { false, E };
+  }
+
+  // If this is a DeclRefExpr found in a random place, it is a load of the
+  // vardecl.
+  if (auto *DRE = dyn_cast<DeclRefExpr>(E))
+    addMark(DRE->getDecl(), RK_Read);
+
+  // If this is an AssignExpr, see if we're mutating something that we know
+  // about.
+  if (auto *assign = dyn_cast<AssignExpr>(E)) {
+    markStoredOrInOutExpr(assign->getDest(), RK_Written);
+    
+    // Don't walk into the LHS of the assignment, only the RHS.
+    assign->getSrc()->walk(*this);
+    return { false, E };
+  }
+  
+  // '&x' is a read and write of 'x'.
+  if (auto *io = dyn_cast<InOutExpr>(E)) {
+    markStoredOrInOutExpr(io->getSubExpr(), RK_Read|RK_Written);
+    // Don't bother walking into this.
+    return { false, E };
+  }
+  
+  // If we saw an ErrorExpr, take note of this.
+  if (isa<ErrorExpr>(E))
+    sawError = true;
+  
+  return { true, E };
+}
+
+
+
+/// Perform diagnostics for func/init/deinit declarations.
+void swift::performAbstractFuncDeclDiagnostics(TypeChecker &TC,
+                                               AbstractFunctionDecl *AFD) {
+  assert(AFD->getBody() && "Need a body to check");
+  
+  // Don't produce these diagnostics for implicitly generated code.
+  if (AFD->getLoc().isInvalid() || AFD->isImplicit() || AFD->isInvalid())
+    return;
+  
+  // Check for unused variables, as well as variables that are could be
+  // declared as constants.
+  AFD->getBody()->walk(VarDeclUsageChecker(TC, AFD));
+}
+
+
+
 
 //===--------------------------------------------------------------------===//
 // Utility functions
