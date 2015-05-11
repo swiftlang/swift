@@ -360,6 +360,7 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
     SourceLoc NRStart = ObjectE->getNameLoc();
     SourceLoc NREnd = NRStart.getAdvancedLoc(ObjectE->getName().getLength());
     SN.NameRange = CharSourceRange(SM, NRStart, NREnd);
+    SN.BodyRange = innerCharSourceRangeFromSourceRange(SM, E->getSourceRange());
     pushStructureNode(SN, E);
 
   } else if (auto *ArrayE = dyn_cast<ArrayExpr>(E)) {
@@ -383,6 +384,7 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
         addExprElem(Elem, SN);
       }
     }
+    SN.BodyRange = innerCharSourceRangeFromSourceRange(SM, E->getSourceRange());
     pushStructureNode(SN, E);
   } else if (auto *AQE = dyn_cast<AvailabilityQueryExpr>(E)) {
     SmallVector<CharSourceRange, 5> PlatformRanges;
