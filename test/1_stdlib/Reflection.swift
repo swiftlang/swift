@@ -168,9 +168,51 @@ print("\(intArrayMirror[0].0): \(intArrayMirror[0].1.summary)")
 // CHECK-NEXT: [4]: 5
 print("\(intArrayMirror[4].0): \(intArrayMirror[4].1.summary)")
 
+// Simple enum with no payload
+
 enum JustSomeEnum {case A,B}
-// CHECK-NEXT: (Enum Value)
-print(reflect(JustSomeEnum.A).summary)
+
+// CHECK-NEXT: JustSomeEnum.A
+print(JustSomeEnum.A)
+
+// CHECK-NEXT: JustSomeEnum.B
+print(JustSomeEnum.B)
+
+enum Highlander {case ThereCanOnlyBeOne}
+
+// Singleton enums have an empty representation
+
+// CHECK-NEXT: Highlander.ThereCanOnlyBeOne
+print(Highlander.ThereCanOnlyBeOne)
+
+// Single payload enum
+
+enum Pet {
+  case Cat
+  case Volleyball(String, Int)
+}
+
+// CHECK-NEXT: Pet.Cat
+print(Pet.Cat)
+// CHECK-NEXT: Pet.Volleyball("Wilson", 2000)
+print(Pet.Volleyball("Wilson", 2000))
+
+// Single payload enum with single case
+enum Exaggeration<T> {
+  case Claim(T)
+}
+
+// CHECK-NEXT: Exaggeration<Swift.Array<Swift.Int>>.Claim([])
+print(Exaggeration<Array<Int>>.Claim([]))
+
+// Multi-payload enum
+enum Hylomorphism {
+  case Yin(Int)
+  case Yang(Int)
+}
+
+// CHECK-NEXT: Hylomorphism
+print(Hylomorphism.Yin(5))
 
 var justSomeFunction = { (x:Int)->Int in return x + 1 }
 // CHECK-NEXT: (Function)

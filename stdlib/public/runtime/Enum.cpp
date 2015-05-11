@@ -49,6 +49,45 @@ static unsigned getNumTagBytes(size_t size, unsigned emptyCases,
           numTags < 65536 ? 2 : 4);
 }
 
+/// This is a small and fast implementation of memcpy with a constant count. It
+/// should be a performance win for small constant values where the function
+/// can be inlined, the loop unrolled and the memory accesses merged.
+template <unsigned count> static void small_memcpy(void *dest, const void *src) {
+  uint8_t *d8 = (uint8_t*)dest, *s8 = (uint8_t*)src;
+  for (unsigned int i = 0; i < count; i++) {
+    *d8++ = *s8++;
+  }
+}
+
+static inline void small_memcpy(void *dest, const void *src, unsigned count) {
+  // This is specialization of the memcpy line below with
+  // specialization for values of 1, 2 and 4.
+  // memcpy(dst, src, count)
+  if (count == 1) {
+    small_memcpy<1>(dest, src);
+  } else if (count == 2) {
+    small_memcpy<2>(dest, src);
+  } else if (count == 4) {
+    small_memcpy<4>(dest, src);
+  } else {
+    crash("Tagbyte values should be 1, 2 or 4.");
+  }
+}
+
+
+int
+swift::swift_getEnumCaseSimple(const OpaqueValue *value, unsigned emptyCases) {
+  auto *valueAddr = reinterpret_cast<const uint8_t*>(value);
+  unsigned tag = 0;
+
+  // FIXME: endianness
+  unsigned numBytes = getNumTagBytes(0, emptyCases, 0);
+  if (numBytes != 0)
+    small_memcpy(&tag, valueAddr, numBytes);
+
+  return tag;
+}
+
 void
 swift::swift_initEnumValueWitnessTableSinglePayload(ValueWitnessTable *vwtable,
                                                      const Metadata *payload,
@@ -110,16 +149,6 @@ swift::swift_initEnumValueWitnessTableSinglePayload(ValueWitnessTable *vwtable,
 }
 
 
-/// This is a small and fast implementation of memcpy with a constant count. It
-/// should be a performance win for small constant values where the function
-/// can be inlined, the loop unrolled and the memory accesses merged.
-template <unsigned count> static void small_memcpy(void *dest, const void *src) {
-  uint8_t *d8 = (uint8_t*)dest, *s8 = (uint8_t*)src;
-  for (unsigned int i = 0; i < count; i++) {
-    *d8++ = *s8++;
-  }
-}
-
 int
 swift::swift_getEnumCaseSinglePayload(const OpaqueValue *value,
                                       const Metadata *payload,
@@ -138,19 +167,7 @@ swift::swift_getEnumCaseSinglePayload(const OpaqueValue *value,
                                        emptyCases-payloadNumExtraInhabitants,
                                        1 /*payload case*/);
 
-    // This is specialization of the memcpy line below with
-    // specialization for values of 1, 2 and 4.
-    // memcpy(&extraTagBits, extraTagBitAddr, numBytes);
-    // FIXME: endian
-    if (numBytes == 1) {
-      small_memcpy<1>(&extraTagBits, extraTagBitAddr);
-    } else if (numBytes == 2) {
-      small_memcpy<2>(&extraTagBits, extraTagBitAddr);
-    } else if (numBytes == 4) {
-      small_memcpy<4>(&extraTagBits, extraTagBitAddr);
-    } else {
-      crash("Tagbyte values should be 1, 2 or 4.");
-    }
+    small_memcpy(&extraTagBits, extraTagBitAddr, numBytes);
 
     // If the extra tag bits are zero, we have a valid payload or
     // extra inhabitant (checked below). If nonzero, form the case index from
@@ -299,20 +316,7 @@ static void storeMultiPayloadTag(OpaqueValue *value,
                                  MultiPayloadLayout layout,
                                  unsigned tag) {
   auto tagBytes = reinterpret_cast<char *>(value) + layout.payloadSize;
-  
-  // This is specialization of the memcpy line below with
-  // specialization for values of 1, 2 and 4.
-  // memcpy(&extraTagBits, extraTagBitAddr, numBytes);
-  // FIXME: endian
-  if (layout.numTagBytes == 1) {
-    small_memcpy<1>(tagBytes, &tag);
-  } else if (layout.numTagBytes == 2) {
-    small_memcpy<2>(tagBytes, &tag);
-  } else if (layout.numTagBytes == 4) {
-    small_memcpy<4>(tagBytes, &tag);
-  } else {
-    crash("Tagbyte values should be 1, 2 or 4.");
-  }
+  small_memcpy(tagBytes, &tag, layout.numTagBytes);
 }
 
 static void storeMultiPayloadValue(OpaqueValue *value,
@@ -333,18 +337,9 @@ static unsigned loadMultiPayloadTag(const OpaqueValue *value,
                                     MultiPayloadLayout layout) {
   auto tagBytes = reinterpret_cast<const char *>(value) + layout.payloadSize;
 
-  // FIXME: endian
   unsigned tag = 0;
-  if (layout.numTagBytes == 1) {
-    small_memcpy<1>(&tag, tagBytes);
-  } else if (layout.numTagBytes == 2) {
-    small_memcpy<2>(&tag, tagBytes);
-  } else if (layout.numTagBytes == 4) {
-    small_memcpy<4>(&tag, tagBytes);
-  } else {
-    crash("Tagbyte values should be 1, 2 or 4.");
-  }
-  
+  small_memcpy(&tag, tagBytes, layout.numTagBytes);
+
   return tag;
 }
 

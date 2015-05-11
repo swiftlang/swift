@@ -14,6 +14,7 @@
 #include "swift/Runtime/Reflection.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
+#include "swift/Runtime/Enum.h"
 #include "swift/Basic/Demangle.h"
 #include "Debug.h"
 #include "Private.h"
@@ -378,6 +379,18 @@ StringMirrorTuple swift_TupleMirror_subscript(intptr_t i,
   return result;
 }
   
+// Get a field name from a doubly-null-terminated list.
+static String getFieldName(const char *fieldNames, size_t i) {
+  const char *fieldName = fieldNames;
+  for (size_t j = 0; j < i; ++j) {
+    size_t len = strlen(fieldName);
+    assert(len != 0);
+    fieldName += len + 1;
+  }
+
+  return String(fieldName);
+}
+
 // -- Struct destructuring.
   
 extern "C"
@@ -406,19 +419,78 @@ StringMirrorTuple swift_StructMirror_subscript(intptr_t i,
   
   auto bytes = reinterpret_cast<const char*>(value);
   auto fieldData = reinterpret_cast<const OpaqueValue *>(bytes + fieldOffset);
-  
-  // Get the field name from the doubly-null-terminated list.
-  const char *fieldName = Struct->Description->Struct.FieldNames;
-  for (size_t j = 0; j < (size_t)i; ++j) {
-    while (*fieldName++);
-  }
 
-  result.first = String(fieldName);
+  result.first = getFieldName(Struct->Description->Struct.FieldNames, i);
+
   // This matches the -1 in swift_unsafeReflectAny.
   swift_retain(owner);
 
   // 'owner' is consumed by this call.
   result.second = swift_unsafeReflectAny(owner, fieldData, fieldType);
+
+  return result;
+}
+
+// -- Enum destructuring.
+
+extern "C"
+intptr_t swift_EnumMirror_count(HeapObject *owner,
+                                const OpaqueValue *value,
+                                const Metadata *type) {
+  const auto Enum = static_cast<const EnumMetadata *>(type);
+  const auto &Description = Enum->Description->Enum;
+
+  // No metadata for C and @objc enums yet
+  if (Description.CaseNames == nullptr)
+    return 0;
+
+  // No metadata for multi-payload enums yet
+  if (Description.getNumPayloadCases() > 1)
+    return 0;
+
+  return 1;
+}
+
+extern "C"
+StringMirrorTuple swift_EnumMirror_subscript(intptr_t i,
+                                             HeapObject *owner,
+                                             const OpaqueValue *value,
+                                             const Metadata *type) {
+  StringMirrorTuple result;
+
+  const auto Enum = static_cast<const EnumMetadata *>(type);
+  const auto &Description = Enum->Description->Enum;
+
+  const Metadata *payloadType;
+  unsigned emptyCases = Description.getNumEmptyCases();
+  bool hasPayload = false;
+  int tag;
+
+  switch (Description.getNumPayloadCases()) {
+  case 0:
+    payloadType = nullptr;
+    tag = swift_getEnumCaseSimple(value, emptyCases);
+    hasPayload = false;
+    break;
+  case 1:
+    payloadType = Description.GetCaseTypes(type)[0];
+    tag = swift_getEnumCaseSinglePayload(value, payloadType, emptyCases);
+    if (tag == -1) hasPayload = true;
+    tag++;
+    break;
+  default:
+    swift::crash("multi-payload enum reflection not implemented");
+  }
+
+  // If there's no payload, just show the empty tuple
+  if (!hasPayload)
+    payloadType = &_TMdT_;
+
+  // This matches the -1 in swift_unsafeReflectAny.
+  swift_retain(owner);
+
+  result.first = getFieldName(Description.CaseNames, tag);
+  result.second = swift_unsafeReflectAny(owner, value, payloadType);
 
   return result;
 }
@@ -456,7 +528,7 @@ intptr_t swift_ClassMirror_count(HeapObject *owner,
 
   return count;
 }
-  
+
 /// \param owner passed at +1, consumed.
 /// \param value passed unowned.
 extern "C"
@@ -506,13 +578,7 @@ StringMirrorTuple swift_ClassMirror_subscript(intptr_t i,
   auto bytes = *reinterpret_cast<const char * const*>(value);
   auto fieldData = reinterpret_cast<const OpaqueValue *>(bytes + fieldOffset);
   
-  // Get the field name from the doubly-null-terminated list.
-  const char *fieldName = Clas->getDescription()->Class.FieldNames;
-  for (size_t j = 0; j < (size_t)i; ++j) {
-    while (*fieldName++);
-  }
-
-  result.first = String(fieldName);
+  result.first = getFieldName(Clas->getDescription()->Class.FieldNames, i);
   // 'owner' is consumed by this call.
   result.second = swift_unsafeReflectAny(owner, fieldData, fieldType);
   return result;
@@ -804,6 +870,11 @@ extern "C" const FullMetadata<Metadata> StructMirrorMetadata
 extern "C" const MirrorWitnessTable StructMirrorWitnessTable
   __asm__(UNDERSCORE "_TWPVSs13_StructMirrorSs10MirrorTypeSs");
 
+extern "C" const FullMetadata<Metadata> EnumMirrorMetadata
+  __asm__(UNDERSCORE "_TMdVSs11_EnumMirror");
+extern "C" const MirrorWitnessTable EnumMirrorWitnessTable
+  __asm__(UNDERSCORE "_TWPVSs11_EnumMirrorSs10MirrorTypeSs");
+
 extern "C" const FullMetadata<Metadata> ClassMirrorMetadata
   __asm__(UNDERSCORE "_TMdVSs12_ClassMirror");
 extern "C" const MirrorWitnessTable ClassMirrorWitnessTable
@@ -914,6 +985,10 @@ getImplementationForType(const Metadata *T, const OpaqueValue *Value) {
     return std::make_tuple(
         T, &StructMirrorMetadata, &StructMirrorWitnessTable);
       
+  case MetadataKind::Enum:
+    return std::make_tuple(
+        T, &EnumMirrorMetadata, &EnumMirrorWitnessTable);
+
   case MetadataKind::ObjCClassWrapper:
   case MetadataKind::ForeignClass:
   case MetadataKind::Class: {
@@ -946,7 +1021,6 @@ getImplementationForType(const Metadata *T, const OpaqueValue *Value) {
   }
     
   /// TODO: Implement specialized mirror witnesses for all kinds.
-  case MetadataKind::Enum:
   case MetadataKind::Function:
   case MetadataKind::Existential:
     return std::make_tuple(

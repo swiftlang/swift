@@ -423,6 +423,26 @@ struct _StructMirror : MirrorType {
   var disposition: MirrorDisposition { return .Struct }
 }
 
+struct _EnumMirror : MirrorType {
+  let data: _MagicMirrorData
+
+  var value: Any { return data.value }
+  var valueType: Any.Type { return data.valueType }
+  var objectIdentifier: ObjectIdentifier? { return nil }
+  var count: Int {
+    @asmname("swift_EnumMirror_count")get
+  }
+  subscript(i: Int) -> (String, MirrorType) {
+    @asmname("swift_EnumMirror_subscript")get
+  }
+
+  var summary: String {
+    return _stdlib_getDemangledTypeName(value)
+  }
+  var quickLookObject: QuickLookObject? { return nil }
+  var disposition: MirrorDisposition { return .Enum }
+}
+
 @asmname("swift_ClassMirror_count")
 func _getClassCount(_MagicMirrorData) -> Int
 @asmname("swift_ClassMirror_subscript")

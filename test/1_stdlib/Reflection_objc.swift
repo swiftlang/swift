@@ -54,6 +54,12 @@ dump(NSBetter())
 // CHECK-LABEL: ObjC quick look objects:
 print("ObjC quick look objects:")
 
+// CHECK-LABEL: ObjC enums:
+print("ObjC enums:")
+
+// CHECK-NEXT: We cannot reflect C.NSComparisonResult yet
+print("We cannot reflect \(NSComparisonResult.OrderedAscending) yet")
+
 // Don't crash when introspecting framework types such as NSURL.
 // <rdar://problem/16592777>
 // CHECK-LABEL: NSURL:

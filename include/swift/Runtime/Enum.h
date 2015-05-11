@@ -23,7 +23,20 @@ struct OpaqueValue;
 struct ValueWitnessTable;
 struct Metadata;
 struct EnumMetadata;
-  
+
+/// \brief Return an integer value representing which case is inhabited for
+///        an enum where all cases are empty.
+///
+/// Only used by reflection and not called from generated code, but extern
+/// it for consistency.
+///
+/// \param value - pointer to the enum value.
+/// \param emptyCases - the number of empty cases in the enum.
+///
+/// \returns a value greater than or equal to zero and less than emptyCases.
+extern "C" int swift_getEnumCaseSimple(const OpaqueValue *value,
+                                       unsigned emptyCases);
+
 /// \brief Initialize the value witness table for a generic, single-payload
 ///        enum instance.
 ///

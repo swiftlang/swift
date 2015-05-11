@@ -88,9 +88,7 @@ public typealias Printable = CustomStringConvertible
 // Default (ad-hoc) printing
 //===----------------------------------------------------------------------===//
 
-/// Do our best to print a value that can not be printed directly,
-/// using one of its conformances to `Streamable`,
-/// `CustomStringConvertible` or `CustomDebugStringConvertible`.
+/// Do our best to print a value that can not be printed directly.
 internal func _adHocPrint<T, TargetStream : OutputStreamType>(
     value: T, inout _ target: TargetStream
 ) {
@@ -128,6 +126,26 @@ internal func _adHocPrint<T, TargetStream : OutputStreamType>(
       target.write(": ")
       debugPrint(elementMirror.value, &target, appendNewline: false)
     }
+    target.write(")")
+    return
+  }
+  if mirror is _EnumMirror {
+    print(mirror.summary, &target, appendNewline: false)
+    if mirror.count == 0 {
+      return
+    }
+    let (tag, payload) = mirror[0]
+    target.write(".")
+    target.write(tag)
+    if payload is _TupleMirror {
+      if payload.count == 0 {
+        return
+      }
+      debugPrint(payload.value, &target, appendNewline: false)
+      return
+    }
+    target.write("(")
+    debugPrint(payload.value, &target, appendNewline: false)
     target.write(")")
     return
   }
