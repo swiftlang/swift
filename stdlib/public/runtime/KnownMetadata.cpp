@@ -31,32 +31,6 @@ OpaqueValue *swift::swift_copyPOD(OpaqueValue *dest, OpaqueValue *src,
   return (OpaqueValue*) memcpy(dest, src, type->getValueWitnesses()->size);
 }
 
-/// A function which does a naive copy.
-template <class T> static T *copy(T *dest, T *src, const Metadata *self) {
-  *dest = *src;
-  return dest;
-}
-
-#define POD_VALUE_WITNESS_TABLE(TYPE, SIZE) { \
-  (value_witness_types::destroyBuffer*) &doNothing,                     \
-  (value_witness_types::initializeBufferWithCopyOfBuffer*) &copy<TYPE>, \
-  (value_witness_types::projectBuffer*) &projectBuffer,                 \
-  (value_witness_types::deallocateBuffer*) &doNothing,                  \
-  (value_witness_types::destroy*) &doNothing,                           \
-  (value_witness_types::initializeBufferWithCopy*) &copy<TYPE>,         \
-  (value_witness_types::initializeWithCopy*) &copy<TYPE>,               \
-  (value_witness_types::assignWithCopy*) &copy<TYPE>,                   \
-  (value_witness_types::initializeBufferWithTake*) &copy<TYPE>,         \
-  (value_witness_types::initializeWithTake*) &copy<TYPE>,               \
-  (value_witness_types::assignWithTake*) &copy<TYPE>,                   \
-  (value_witness_types::allocateBuffer*) &projectBuffer,                \
-  (value_witness_types::initializeBufferWithTakeOfBuffer*) &copy<TYPE>, \
-  (value_witness_types::size) (SIZE),                                   \
-  ValueWitnessFlags().withAlignment(SIZE).withPOD(true)                 \
-                     .withInlineStorage(true),                          \
-  (value_witness_types::stride) (SIZE)                                  \
-}
-
 namespace {
   // A type sized and aligned the way Swift wants Int128 (and Float80/Float128)
   // to be sized and aligned.
