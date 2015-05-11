@@ -2,6 +2,8 @@
 // -- Check that we can successfully round-trip.
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -import-ns-options-as-option-set-type -D IRGEN -emit-ir %s >/dev/null
 
+// REQUIRES: objc_interop
+
 import Foundation
 import user_objc
 
