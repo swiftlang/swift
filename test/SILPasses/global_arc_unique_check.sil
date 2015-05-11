@@ -58,4 +58,48 @@ bb5:
   br bb1(%13 : $Builtin.Int32)
 
 }
-sil @_swift_isUniquelyReferenced_native : $@convention(thin) (Int32) -> Bool
+
+class C {}
+
+// Check that retains are not moved across an is_unique that may alias.
+sil @test_uniq_alias : $@convention(method) (@owned C) -> Builtin.Int1 {
+// CHECK: bb0
+bb0(%0 : $C):
+  %1 = alloc_stack $C  // var x
+  store %0 to %1#1 : $*C
+// CHECK: strong_retain %0 : $C
+  strong_retain %0 : $C
+// CHECK: is_unique %1#1 : $*C
+  %4 = is_unique %1#1 : $*C
+// CHECK-NOT: strong_retain
+  fix_lifetime %0 : $C
+// CHECK: strong_release %0 : $C
+  strong_release %0 : $C
+// CHECK: [[LOADED:%[0-9]+]] = load %1#1 : $*C
+  %8 = load %1#1 : $*C
+// CHECK: strong_release [[LOADED]] : $C
+  strong_release %8 : $C
+  dealloc_stack %1#0 : $*@local_storage C
+  return %4 : $Builtin.Int1
+}
+
+// The following test could optimize to:
+//  %2 = load %1 : $*C                              // user: %4
+//  %3 = is_unique %0 : $*C                         // user: %5
+//  fix_lifetime %2 : $C                            // id: %4
+//
+// But ARC is currently conservative. When this is fixed,
+// change _CHECK: strong... into _CHECK_NOT: strong...
+sil @test_uniq_noalias : $@convention(thin) (@inout C, @inout C) -> Builtin.Int1 {
+// CHECK: bb0
+bb0(%0 : $*C, %1 : $*C):
+  %2 = load %1 : $*C
+// CHECK: strong_retain %2 : $C
+  strong_retain %2 : $C
+// CHECK: is_unique %0 : $*C
+  %4 = is_unique %0 : $*C
+  fix_lifetime %2 : $C
+// CHECK: strong_release %2 : $C
+  strong_release %2 : $C
+  return %4 : $Builtin.Int1
+}

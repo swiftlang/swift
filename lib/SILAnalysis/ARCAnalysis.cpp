@@ -99,6 +99,10 @@ static bool canApplyDecrementRefCount(BuiltinInst *BI, SILValue Ptr,
 
 /// Is the may have side effects user by the definition of its value kind unable
 /// to decrement ref counts.
+///
+/// Although is_unique will never decrement a refcount, it must appear to do so
+/// from the perspective of the optimizer. This forces a separate retain to be
+/// preserved for any original source level copy.
 static bool canDecrementRefCountsByValueKind(SILInstruction *User) {
   assert(User->getMemoryBehavior()
            ==  SILInstruction::MemoryBehavior::MayHaveSideEffects &&
@@ -116,8 +120,6 @@ static bool canDecrementRefCountsByValueKind(SILInstruction *User) {
   case ValueKind::CopyBlockInst:
   case ValueKind::CondFailInst:
   case ValueKind::StrongPinInst:
-  case ValueKind::IsUniqueInst:
-  case ValueKind::IsUniqueOrPinnedInst:
     return false;
 
   case ValueKind::CopyAddrInst:
