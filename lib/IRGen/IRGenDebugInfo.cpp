@@ -119,7 +119,8 @@ static unsigned getSizeInBits(const llvm::DILocalVariable *Var,
 IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
                                ClangImporter &CI,
                                IRGenModule &IGM,
-                               llvm::Module &M)
+                               llvm::Module &M,
+                               SourceFile *SF)
   : Opts(Opts),
     CI(CI),
     SM(IGM.Context.SourceMgr),
@@ -134,15 +135,16 @@ IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
 {
   assert(Opts.DebugInfoKind > IRGenDebugInfoKind::None
          && "no debug info should be generated");
+  StringRef SourceFileName = SF ? SF->getFilename() :
+                                  StringRef(Opts.MainInputFilename);
   StringRef Dir, Filename;
-  if (Opts.MainInputFilename.empty()) {
+  if (SourceFileName.empty()) {
     Filename = "<unknown>";
     Dir = getCurrentDirname();
   } else {
     // Separate path and filename.
-    Filename =
-        BumpAllocatedString(llvm::sys::path::filename(Opts.MainInputFilename));
-    llvm::SmallString<512> Path(Opts.MainInputFilename);
+    Filename = BumpAllocatedString(llvm::sys::path::filename(SourceFileName));
+    llvm::SmallString<512> Path(SourceFileName);
     llvm::sys::path::remove_filename(Path);
     llvm::sys::fs::make_absolute(Path);
     llvm::SmallString<512> NPath;

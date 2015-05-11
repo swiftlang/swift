@@ -293,7 +293,7 @@ IRGenModule::IRGenModule(IRGenModuleDispatcher &dispatcher, SourceFile *SF,
   ABITypes = new CodeGenABITypes(clangASTContext, Module, DataLayout);
 
   if (Opts.DebugInfoKind != IRGenDebugInfoKind::None) {
-    DebugInfo = new IRGenDebugInfo(Opts, *CI, *this, Module);
+    DebugInfo = new IRGenDebugInfo(Opts, *CI, *this, Module, SF);
   }
 
   initClangTypeConverter();

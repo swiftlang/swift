@@ -128,7 +128,7 @@ class IRGenDebugInfo {
 
 public:
   IRGenDebugInfo(const IRGenOptions &Opts, ClangImporter &CI, IRGenModule &IGM,
-                 llvm::Module &M);
+                 llvm::Module &M, SourceFile *SF);
 
   /// Finalize the llvm::DIBuilder owned by this object.
   void finalize();
