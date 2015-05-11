@@ -3830,7 +3830,7 @@ void IRGenSILFunction::visitNullClassInst(swift::NullClassInst *i) {
 
 
 void IRGenSILFunction::visitUpcastInst(swift::UpcastInst *i) {
-  auto toTy = getTypeInfo(i->getType()).getStorageType();
+  auto toTy = getTypeInfo(i->getType()).getSchema()[0].getScalarType();
 
   // If we have an address, just bitcast, don't explode.
   if (i->getOperand().getType().isAddress()) {

@@ -1992,9 +1992,23 @@ public:
             "Upcast can only upcast in between types of the same "
             "SILValueCategory. This prevents address types from being cast to "
             "object types or vis-a-versa");
-    require(UI->getType().getClassOrBoundGenericClass(),
+
+    auto ToTy = UI->getType();
+    auto FromTy = UI->getOperand().getType();
+
+    // Upcast from Optional<B> to Optional<B> is legal
+    // as long as B is a subclass of A.
+    if (ToTy.getSwiftRValueType().getAnyOptionalObjectType() &&
+        FromTy.getSwiftRValueType().getAnyOptionalObjectType()) {
+      ToTy = SILType::getPrimitiveObjectType(
+          ToTy.getSwiftRValueType().getAnyOptionalObjectType());
+      FromTy = SILType::getPrimitiveObjectType(
+          FromTy.getSwiftRValueType().getAnyOptionalObjectType());
+    }
+
+    require(ToTy.getClassOrBoundGenericClass(),
             "upcast must convert a class instance to a class type");
-    require(UI->getType().isSuperclassOf(UI->getOperand().getType()),
+    require(ToTy.isSuperclassOf(FromTy),
             "upcast must cast to a superclass");
   }
 

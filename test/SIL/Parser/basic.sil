@@ -231,6 +231,15 @@ bb0:
   %7 = return %6 : $()
 }
 
+sil @optional_upcasts : $@convention(thin) (Optional<D>) -> () {
+bb0(%0: $Optional<D>):
+  // CHECK: upcast {{.*}} : $Optional<D> to $Optional<C>
+  %1 = upcast %0 : $Optional<D> to $Optional<C>
+  %2 = tuple ()
+  %3 = return %2 : $()
+}
+
+
 // Generated from:
 // func archetype_member_ref<T:Runcible>(x:T) {
 //   x.free_method()
