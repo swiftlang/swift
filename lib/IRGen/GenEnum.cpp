@@ -1389,8 +1389,9 @@ namespace {
                                   unsigned bitWidth,
                                   unsigned offset) const override {
       PackEnumPayload pack(IGF, bitWidth);
-      // Pack payload.
-      pack.addAtOffset(src.claimNext(), offset);
+      // Pack payload, if any.
+      if (payloadTy)
+        pack.addAtOffset(src.claimNext(), offset);
 
       // Pack tag bits, if any.
       if (ExtraTagBitCount > 0) {
@@ -1408,8 +1409,9 @@ namespace {
                             unsigned offset) const override {
       UnpackEnumPayload unpack(IGF, outerPayload);
 
-      // Unpack our inner payload.
-      dest.add(unpack.claimAtOffset(payloadTy, offset));
+      // Unpack our inner payload, if any.
+      if (payloadTy)
+        dest.add(unpack.claimAtOffset(payloadTy, offset));
 
       // Unpack our extra tag bits, if any.
       if (ExtraTagBitCount > 0) {

@@ -2456,6 +2456,23 @@ entry:
   return %t : $(Optionable<ContainsUnownedObjC>, Optionable<Optionable<ContainsUnownedObjC>>)
 }
 
+// CHECK-LABEL: define { i64, i1 } @empty_payload_enum_in_enum(i32)
+sil @empty_payload_enum_in_enum : $@convention(thin) (Int32) -> Optional<(Optional<()>, Int32)> {
+entry(%x : $Int32):
+  %a = tuple ()
+  %b = enum $Optional<()>, #Optional.Some!enumelt.1, %a : $()
+  %c = tuple (%b : $Optional<()>, %x : $Int32)
+  // CHECK: [[INT_ZEXT:%.*]] = zext i32 %0 to i64
+  // CHECK: [[INT_SHL:%.*]] = shl i64 [[INT_ZEXT]], 32
+  // CHECK: [[COMBINE:%.*]] = or i64 0, [[INT_SHL]]
+  %d = enum $Optional<(Optional<()>, Int32)>, #Optional.Some!enumelt.1, %c : $(Optional<()>, Int32)
+  // CHECK: [[BIT:%.*]] = trunc i64 [[COMBINE]] to i1
+  // CHECK: [[INT_SHR:%.*]] = lshr i64 [[COMBINE]], 32
+  // CHECK: [[INT:%.*]] = trunc i64 [[INT_SHR]] to i32
+  %e = unchecked_enum_data %d : $Optional<(Optional<()>, Int32)>, #Optional.Some!enumelt.1
+  return %d : $Optional<(Optional<()>, Int32)>
+}
+
 sil @force_global_variables_to_materialize : $() -> () {
 entry:
   // Force the global variables to materialize.
