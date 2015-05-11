@@ -2,6 +2,7 @@
 
 import Builtin
 import Swift
+import Foundation
 
 //////////////////////
 // Simple DCE Tests //
@@ -744,6 +745,21 @@ bb0(%0 : $XX):
   %7 = tuple (%4: $AnyObject, %6: $AnyObject)
   return %7 : $(AnyObject, AnyObject)
 }
+
+
+// CHECK-LABEL: sil @cse_objc_protocol
+// CHECK: objc_protocol #XX : $Protocol
+// CHECK-NOT: objc_protocol
+// CHECK: tuple (%0 : $Protocol, %0 : $Protocol)
+// CHECK: return
+sil @cse_objc_protocol : $@convention(thin) () -> @owned (Protocol, Protocol) {
+bb0:
+  %0 = objc_protocol #XX : $Protocol
+  %1 = objc_protocol #XX : $Protocol
+  %2 = tuple (%0: $Protocol, %1: $Protocol)
+  return %2 : $(Protocol, Protocol)
+}
+
 
 // CHECK-LABEL: sil @cse_objc_metatype_to_object
 // CHECK: value_metatype $@objc_metatype

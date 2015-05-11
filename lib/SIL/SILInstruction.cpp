@@ -565,6 +565,11 @@ namespace {
       return true;
     }
 
+    bool visitObjCProtocolInst(ObjCProtocolInst *RHS) {
+      auto *X = cast<ObjCProtocolInst>(LHS);
+      return X->getProtocol() == RHS->getProtocol();
+    }
+
     bool visitClassMethodInst(ClassMethodInst *RHS) {
       auto *X = cast<ClassMethodInst>(LHS);
       return X->getMember()  == RHS->getMember() &&
