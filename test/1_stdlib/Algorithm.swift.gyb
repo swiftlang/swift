@@ -1408,7 +1408,7 @@ struct ${CollectionType} : RangeReplaceableCollectionType {
   }
 
   subscript(i: MinimalForwardIndex) -> OpaqueValue<Int> {
-    return OpaqueValue(i.position + 1)
+    return elements[i.position]
   }
 
   mutating func reserveCapacity(n: Int) {
@@ -1586,7 +1586,78 @@ let mapTests = [
   MapTest(Array(101..<200), Array(1..<100), { (x: Int) -> Int32 in x + 100 }),
 ]
 
-SequenceTypeAlgorithms.test("map/SequenceType") {
+var MinimalSequenceWithCustomMap_timesMapWasCalled: Int = 0
+
+% for Implementation in [ 'Default', 'Custom' ]:
+
+struct MinimalSequenceWith${Implementation}Map<Element> : SequenceType {
+  init(_ data: [Element], underestimatedCount: UnderestimateCountBehavior) {
+    self._data = MinimalSequence(
+      data, underestimatedCount: underestimatedCount)
+  }
+
+  func generate() -> MinimalGenerator<Element> {
+    return _data.generate()
+  }
+
+  var _data: MinimalSequence<Element>
+
+
+%   if Implementation == 'Custom':
+
+  static var timesMapWasCalled: Int {
+    get {
+      return MinimalSequenceWithCustomMap_timesMapWasCalled
+    }
+    set {
+      MinimalSequenceWithCustomMap_timesMapWasCalled = newValue
+    }
+  }
+
+  func _prext_map<T>(
+    @noescape transform: (Element) -> T
+  ) -> [T] {
+    ++MinimalSequenceWithCustomMap.timesMapWasCalled
+    return _data._prext_map(transform)
+  }
+
+%   end
+}
+
+% end
+
+func callStaticSequenceMap<T>(
+  sequence: MinimalSequenceWithDefaultMap<OpaqueValue<Int>>,
+  @noescape transform: (OpaqueValue<Int>) -> T
+) -> [T] {
+  var result = sequence._prext_map(transform)
+  expectType([T].self, &result)
+  return result
+}
+
+func callStaticSequenceMap<T>(
+  sequence: MinimalSequenceWithCustomMap<OpaqueValue<Int>>,
+  @noescape transform: (OpaqueValue<Int>) -> T
+) -> [T] {
+  var result = sequence._prext_map(transform)
+  expectType([T].self, &result)
+  return result
+}
+
+func callGenericSequenceMap<S : SequenceType, T>(
+  sequence: S,
+  @noescape transform: (S.Generator.Element) -> T
+) -> [T] {
+  var result = sequence._prext_map(transform)
+  expectType([T].self, &result)
+  return result
+}
+
+% for Implementation in [ 'Default', 'Custom' ]:
+
+%   for dispatch in [ 'Static', 'Generic' ]:
+
+SequenceTypeAlgorithms.test("map/SequenceType/${Implementation}Implementation/${dispatch}") {
   expectEqual(0, LifetimeTracked.instances)
   for test in mapTests {
     for underestimateCountBehavior in [
@@ -1594,13 +1665,16 @@ SequenceTypeAlgorithms.test("map/SequenceType") {
       UnderestimateCountBehavior.Half,
       UnderestimateCountBehavior.Value(0)
     ] {
-      let s = MinimalSequence<OpaqueValue<Int>>(
-        test.sequence.map { OpaqueValue($0) },
+      let s = MinimalSequenceWith${Implementation}Map<OpaqueValue<Int>>(
+        test.sequence._prext_map { OpaqueValue($0) },
         underestimatedCount: underestimateCountBehavior)
       let closureLifetimeTracker = LifetimeTracked(0)
       expectEqual(1, LifetimeTracked.instances)
       var timesClosureWasCalled = 0
-      var result = s._prext_map {
+%     if Implementation == 'Custom':
+      MinimalSequenceWithCustomMap<OpaqueValue<Int>>.timesMapWasCalled = 0
+%     end
+      var result = call${dispatch}SequenceMap(s) {
         (element: OpaqueValue<Int>) -> OpaqueValue<Int32> in
         _blackHole(closureLifetimeTracker)
         ++timesClosureWasCalled
@@ -1608,6 +1682,9 @@ SequenceTypeAlgorithms.test("map/SequenceType") {
       }
       expectType([OpaqueValue<Int32>].self, &result)
       expectEqual(test.expected, result._prext_map { $0.value })
+%     if Implementation == 'Custom':
+      expectEqual(1, MinimalSequenceWithCustomMap<OpaqueValue<Int>>.timesMapWasCalled)
+%     end
       expectEqual([], s._prext_map { $0.value }) { "sequence should be consumed" }
       expectEqual(test.sequence.count, timesClosureWasCalled) {
         "map() should be eager and should only call its predicate once per element"
@@ -1617,7 +1694,97 @@ SequenceTypeAlgorithms.test("map/SequenceType") {
   expectEqual(0, LifetimeTracked.instances)
 }
 
-SequenceTypeAlgorithms.test("map/CollectionType") {
+%   end
+
+% end
+
+var MinimalForwardCollectionWithCustomMap_timesMapWasCalled: Int = 0
+
+% for Implementation in [ 'Default', 'Custom' ]:
+
+struct MinimalForwardCollectionWith${Implementation}Map<Element>
+  : CollectionType {
+
+  init(_ data: [Element], underestimatedCount: UnderestimateCountBehavior) {
+    self._data = MinimalForwardCollection(
+      data, underestimatedCount: underestimatedCount)
+  }
+
+  func generate() -> MinimalGenerator<Element> {
+    return _data.generate()
+  }
+
+  var startIndex: MinimalForwardIndex {
+    return _data.startIndex
+  }
+
+  var endIndex: MinimalForwardIndex {
+    return _data.endIndex
+  }
+
+  subscript(i: MinimalForwardIndex) -> Element {
+    return _data[i]
+  }
+
+  var _data: MinimalForwardCollection<Element>
+
+
+%   if Implementation == 'Custom':
+
+  static var timesMapWasCalled: Int {
+    get {
+      return MinimalForwardCollectionWithCustomMap_timesMapWasCalled
+    }
+    set {
+      MinimalForwardCollectionWithCustomMap_timesMapWasCalled = newValue
+    }
+  }
+
+  func _prext_map<T>(
+    @noescape transform: (Element) -> T
+  ) -> [T] {
+    ++MinimalForwardCollectionWithCustomMap.timesMapWasCalled
+    return _data._prext_map(transform)
+  }
+
+%   end
+
+}
+
+% end
+
+func callStaticCollectionMap<T>(
+  collection: MinimalForwardCollectionWithDefaultMap<OpaqueValue<Int>>,
+  @noescape transform: (OpaqueValue<Int>) -> T
+) -> [T] {
+  var result = collection._prext_map(transform)
+  expectType([T].self, &result)
+  return result
+}
+
+func callStaticCollectionMap<T>(
+  collection: MinimalForwardCollectionWithCustomMap<OpaqueValue<Int>>,
+  @noescape transform: (OpaqueValue<Int>) -> T
+) -> [T] {
+  var result = collection._prext_map(transform)
+  expectType([T].self, &result)
+  return result
+}
+
+func callGenericCollectionMap<C : CollectionType, T>(
+  collection: C,
+  @noescape transform: (C.Generator.Element) -> T
+) -> [T] {
+  var result = collection._prext_map(transform)
+  expectType([T].self, &result)
+  return result
+}
+
+% for Implementation in [ 'Default', 'Custom' ]:
+
+%   for dispatch in [ 'Static', 'Generic' ]:
+
+SequenceTypeAlgorithms.test("map/CollectionType/${Implementation}Implementation/${dispatch}") {
   expectEqual(0, LifetimeTracked.instances)
   for test in mapTests {
     for underestimateCountBehavior in [
@@ -1625,13 +1792,16 @@ SequenceTypeAlgorithms.test("map/CollectionType") {
       UnderestimateCountBehavior.Half,
       UnderestimateCountBehavior.Value(0)
     ] {
-      let s = MinimalForwardCollection<OpaqueValue<Int>>(
+      let s = MinimalForwardCollectionWith${Implementation}Map<OpaqueValue<Int>>(
         test.sequence.map { OpaqueValue($0) },
         underestimatedCount: underestimateCountBehavior)
       let closureLifetimeTracker = LifetimeTracked(0)
       expectEqual(1, LifetimeTracked.instances)
       var timesClosureWasCalled = 0
-      var result = s._prext_map {
+%     if Implementation == 'Custom':
+      MinimalForwardCollectionWithCustomMap<OpaqueValue<Int>>.timesMapWasCalled = 0
+%     end
+      var result = call${dispatch}CollectionMap(s) {
         (element: OpaqueValue<Int>) -> OpaqueValue<Int32> in
         _blackHole(closureLifetimeTracker)
         ++timesClosureWasCalled
@@ -1639,6 +1809,9 @@ SequenceTypeAlgorithms.test("map/CollectionType") {
       }
       expectType([OpaqueValue<Int32>].self, &result)
       expectEqual(test.expected, result._prext_map { $0.value })
+%     if Implementation == 'Custom':
+      expectEqual(1, MinimalForwardCollectionWithCustomMap<OpaqueValue<Int>>.timesMapWasCalled)
+%     end
       expectEqual(test.sequence, s._prext_map { $0.value }) {
         "collection should not be consumed"
       }
@@ -1649,6 +1822,10 @@ SequenceTypeAlgorithms.test("map/CollectionType") {
   }
   expectEqual(0, LifetimeTracked.instances)
 }
+
+%   end
+
+% end
 
 //===----------------------------------------------------------------------===//
 // flatMap()

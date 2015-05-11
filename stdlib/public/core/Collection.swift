@@ -173,6 +173,26 @@ public protocol CollectionType
   func _customIndexOfEquatableElement(element: Generator.Element) -> Index??
 }
 
+extension CollectionType {
+  /// Return an `Array` containing the results of mapping `transform`
+  /// over `self`.
+  ///
+  /// - complexity: O(N)
+  final public func _prext_map<T>(
+    @noescape transform: (Generator.Element) -> T
+  ) -> [T] {
+    // Cast away @noescape.
+    typealias Transform = (Generator.Element) -> T
+    let escapableTransform = unsafeBitCast(transform, Transform.self)
+
+    // The implementation looks exactly the same as
+    // `SequenceType._prext_map()`, but it is more efficient, since here we
+    // statically know that `self` is a collection, and `lazy(self)`
+    // returns an instance of a different type.
+    return Array<T>(lazy(self).map(escapableTransform))
+  }
+}
+
 // A fast implementation for when you are backed by a contiguous array.
 public func ~> <T : protocol<_Sequence_Type, _ArrayType>>(
   source: T, ptr: (_InitializeTo, UnsafeMutablePointer<T.Generator.Element>)) {

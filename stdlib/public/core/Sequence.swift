@@ -91,6 +91,14 @@ public protocol _Sequence_Type
   /// - complexity: O(N)
   func underestimateCount() -> Int
 
+  /// Return an `Array` containing the results of mapping `transform`
+  /// over `self`.
+  ///
+  /// - complexity: O(N)
+  func _prext_map<T>(
+    @noescape transform: (Generator.Element) -> T
+  ) -> [T]
+
   func _customContainsEquatableElement(
     element: Generator.Element
   ) -> Bool?
@@ -124,6 +132,21 @@ public protocol SequenceType : _Sequence_Type {
 
   /// Copy a Sequence into an array.
   func ~> (source:Self, ptr:(_InitializeTo, UnsafeMutablePointer<Generator.Element>))
+}
+
+extension SequenceType {
+  /// Return an `Array` containing the results of mapping `transform`
+  /// over `self`.
+  ///
+  /// - complexity: O(N)
+  final public func _prext_map<T>(
+    @noescape transform: (Generator.Element) -> T
+  ) -> [T] {
+    // Cast away @noescape.
+    typealias Transform = (Generator.Element) -> T
+    let escapableTransform = unsafeBitCast(transform, Transform.self)
+    return Array<T>(lazy(self).map(escapableTransform))
+  }
 }
 
 public struct _CopyToNativeArrayBuffer {}
