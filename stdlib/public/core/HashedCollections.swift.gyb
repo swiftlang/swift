@@ -1897,7 +1897,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
     let requiredCapacity =
       _Native${Self}Storage<${TypeParameters}>.getMinCapacity(
         elements.count, _hashContainerDefaultMaxLoadFactorInverse)
-    var nativeStorage = _Native${Self}Storage<${TypeParameters}>(
+    let nativeStorage = _Native${Self}Storage<${TypeParameters}>(
       minimumCapacity: requiredCapacity)
 
 %if Self == 'Set':

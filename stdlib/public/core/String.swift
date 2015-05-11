@@ -788,7 +788,7 @@ extension String {
       let source = self._core.startASCII
       let buffer = _StringBuffer(
         capacity: length, initialSize: length, elementWidth: 1)
-      var dest = UnsafeMutablePointer<UInt8>(buffer.start)
+      let dest = UnsafeMutablePointer<UInt8>(buffer.start)
       for i in 0..<length {
         // For each character in the string, we lookup if it should be shifted
         // in our ascii table, then we return 0x20 if it should, 0x0 if not.
@@ -826,7 +826,7 @@ extension String {
       let source = self._core.startASCII
       let buffer = _StringBuffer(
         capacity: length, initialSize: length, elementWidth: 1)
-      var dest = UnsafeMutablePointer<UInt8>(buffer.start)
+      let dest = UnsafeMutablePointer<UInt8>(buffer.start)
       for i in 0..<length {
         // See the comment above in lowercaseString.
         let value = source[i]
