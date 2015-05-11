@@ -833,3 +833,14 @@ bb3:
   dealloc_stack %1#0 : $*@local_storage HoldsRef
   return %16 : $()
 }
+
+// Check that we don't crash if the address is an unchecked_addr_cast.
+// CHECK-LABEL: sil @test_unchecked_addr_cast
+sil @test_unchecked_addr_cast : $@convention(thin) (@inout A, A) -> A {
+bb0(%0 : $*A, %1 : $A):
+  %2 = unchecked_addr_cast %0 : $*A to $*A
+  store %1 to %2 : $*A
+  %l1 = load %2 : $*A
+  return %l1 : $A
+}
+

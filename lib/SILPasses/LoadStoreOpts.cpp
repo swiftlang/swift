@@ -1031,8 +1031,15 @@ bool LSBBForwarder::tryToForwardLoad(LSContext &Ctx, LoadInst *LI,
     SILValue Addr = P.first;
 
     auto CheckResult = ForwardingAnalysis::canForwardAddrToLd(Addr, LI);
-    if (!CheckResult)
+    if (!CheckResult) {
+      if (Addr == LI->getOperand()) {
+        // Although the addresses match, we cannot load the stored value.
+        stopTrackingAddress(Addr, StoreMap);
+        startTrackingLoad(LI);
+        return false;
+      }
       continue;
+    }
 
     SILValue Value = P.second.getForwardingValue();
     SILValue Result = CheckResult->forwardAddr(Addr, Value, LI);
