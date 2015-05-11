@@ -141,3 +141,33 @@ final class C1:C {
 func driver1(var c: C1) -> Int32 {
   return c.doSomething().getValue()
 }
+
+public class Bear {
+  public init?(fail: Bool) {
+    if fail { return nil }
+  }
+
+  // Check that devirtualizer can handle convenience initializers, which have covariant optional
+  // return types.
+  // CHECK-LABEL: sil @_TFC23devirt_covariant_return4BearcfMS0_FT15delegateFailureSb9failAfterSb_GSqS0__
+  // CHECK: checked_cast_br [exact] %{{.*}} : $Bear to $PolarBear
+  // CHECK: upcast %{{.*}} : $Optional<PolarBear> to $Optional<Bear>
+  // CHECK: }
+  public convenience init?(delegateFailure: Bool, failAfter: Bool) {
+    self.init(fail: delegateFailure)
+    if failAfter { return nil }
+  }
+}
+
+final class PolarBear: Bear {
+
+  override public init?(fail: Bool) {
+    super.init(fail: fail)
+  }
+
+  public init?(chainFailure: Bool, failAfter: Bool) {
+    super.init(fail: chainFailure)
+    if failAfter { return nil }
+  }
+}
+

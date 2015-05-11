@@ -372,11 +372,25 @@ SILInstruction *swift::devirtualizeClassMethod(ApplyInst *AI,
   // or the other way around
   bool UnwrapOptionalResult = false;
   OptionalTypeKind OTK;
+  OptionalTypeKind AI_OTK;
 
   auto OptionalReturnType = ReturnType.getSwiftRValueType()
-    .getAnyOptionalObjectType();
+    .getAnyOptionalObjectType(OTK);
+
+  auto OptionalAIType = AI->getType().getSwiftRValueType()
+    .getAnyOptionalObjectType(AI_OTK);
+
+  if (OptionalReturnType && OptionalAIType &&
+      SILType::getPrimitiveObjectType(OptionalAIType)
+          .isSuperclassOf(
+              SILType::getPrimitiveObjectType(OptionalReturnType))) {
+    // Both types are optional and one of them is the superclass of the other.
+    DEBUG(llvm::dbgs() << "        SUCCESS: " << F->getName() << "\n");
+    NumClassDevirt++;
+    return B.createUpcast(AI->getLoc(), SILValue(NewAI, 0), AI->getType());
+  }
+
   if (OptionalReturnType == AI->getType().getSwiftRValueType()) {
-    ReturnType.getSwiftRValueType().getAnyOptionalObjectType(OTK);
     UnwrapOptionalResult = true;
   }
 
