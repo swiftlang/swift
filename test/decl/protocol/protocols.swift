@@ -31,7 +31,7 @@ protocol Test2 {
 
 func test1() {
   var v1: Test
-  var s: String
+  var s: String 
   
   v1.setTitle(s)
   v1.creator = "Me"                   // expected-error {{cannot assign to 'creator' in 'v1'}}
@@ -93,7 +93,7 @@ struct Circle {
 func testCircular(circle: Circle) {
   // FIXME: It would be nice if this failure were suppressed because the protocols
   // have circular definitions.
-  var circular : CircleStart = circle // expected-error{{type 'Circle' does not conform to protocol 'CircleStart'}}
+  var _ : CircleStart = circle // expected-error{{type 'Circle' does not conform to protocol 'CircleStart'}}
 }
 
 // <rdar://problem/14750346>
@@ -162,7 +162,7 @@ struct IntGeneratorType : GeneratorType /*, SequenceType, ReplPrintable*/ {
 
   mutating func next() -> Int? {
     if min >= max { return .None }
-    var prev = min
+    let prev = min
     min += stride
     return prev
   }
@@ -284,7 +284,7 @@ struct DictionaryIntInt {
 }
 
 func testSubscripting(iis: IntIntSubscriptable, i_s: IntSubscriptable) { // expected-error{{has Self or associated type requirements}}
-  var i: Int = iis[17]
+  var i: Int = iis[17] 
   // FIXME: Crummy diagnostics.
   var i2 = i_s[17] // expected-error{{'IntSubscriptable' does not have a member named 'subscript'}}
 }
@@ -309,7 +309,7 @@ struct StaticAndInstanceS : InstanceP {
   func f() {}
 }
 func StaticProtocolFunc() {
-  var a: StaticP = StaticS1()
+  let a: StaticP = StaticS1()
   a.f() // expected-error{{'StaticP' does not have a member named 'f'}}
 }
 func StaticProtocolGenericFunc<t : StaticP>(_: t) {

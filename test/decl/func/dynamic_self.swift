@@ -49,7 +49,7 @@ class C1 {
     if !b { return self.dynamicType(int: 5) }
 
     // Can't utter Self within the body of a method.
-    var s2: Self = self // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'C1'?}}
+    var _: Self = self // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'C1'?}}
 
     // Okay to return 'self', because it has the appropriate type.
     return self // okay
@@ -220,7 +220,7 @@ func testGenericCall<T: P>(var t: T) {
 // ----------------------------------------------------------------------------
 // Existential uses of Self methods.
 func testExistentialCall(p: P) {
-  var p2 = p.f()
+  let _ = p.f()
 }
 
 // ----------------------------------------------------------------------------

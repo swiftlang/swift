@@ -8,7 +8,7 @@ func ifFalse() -> Int {
 }
 
 func ifTrue() -> Int {
-  var x = 0
+  var _ = 0
   if true { // expected-note {{always evaluates to true}}
     return 1
   }
@@ -45,7 +45,6 @@ func whileTrueReachable(v: Int) -> () {
 
 func whileTrueTwoPredecessorsEliminated() -> () {
   var x = 0
-  var v = 0
   while (true) { // expected-note {{always evaluates to true}}
     if false {
       break
@@ -70,7 +69,7 @@ func unreachableBranch() -> Int {
 // We should not report unreachable user code inside inlined transparent function.
 @transparent
 func ifTrueTransparent(b: Bool) -> Int {
-  var x = 0
+  var _ = 0
   if b {
     return 1
   }
@@ -115,7 +114,7 @@ enum X {
 
 func testSwitchEnum(xi: Int) -> Int {
   var x = xi
-  var cond: X = .Two
+  let cond: X = .Two
   switch cond { // expected-warning {{switch condition evaluates to a constant}}
   case .One:
     userCode() // expected-note {{will never be executed}}
@@ -180,7 +179,7 @@ func testSwitchEnumOptionalNil(x: Int?) -> Int {
 // true and false are covered by the switch.
 func testSwitchEnumBool(b: Bool, xi: Int) -> Int {
   var x = xi
-  var Cond = b
+  let Cond = b
   
   switch Cond { // no warning
   default:
@@ -211,7 +210,7 @@ func testSwitchEnumBool(b: Bool, xi: Int) -> Int {
 // true and false are covered for a boolean element of a tuple.
 func testSwitchEnumBoolTuple(b1: Bool, b2: Bool, xi: Int) -> Int {
   var x = xi
-  var Cond = (b1, b2)
+  let Cond = (b1, b2)
   
   switch Cond { // no warning
   default:
@@ -252,11 +251,11 @@ func reachableThroughNonFoldedPredecessor(@autoclosure fn: () -> Bool = false) {
   if !_fastPath(fn()) {
     exit()
   }
-  var x: Int = 0 // no warning
+  var _: Int = 0 // no warning
 }
 
 func intConstantTest() -> Int{
-  var y: Int = 1
+  let y: Int = 1
   if y == 1 { // expected-note {{condition always evaluates to true}}
     return y
   }
@@ -265,8 +264,8 @@ func intConstantTest() -> Int{
 }
 
 func intConstantTest2() -> Int{
-  var y:Int = 1
-  var x:Int = y 
+  let y:Int = 1
+  let x:Int = y
 
   if x != 1 { // expected-note {{condition always evaluates to false}}
     return y // expected-warning {{will never be executed}}
@@ -301,7 +300,7 @@ enum r20097963Test {
 }
 
 class r20097963MyClass {
-  func testStr(t: r20097963Test) {
+  func testStr(t: r20097963Test) -> String {
     let str: String
     switch t {
     case .A:
@@ -311,6 +310,7 @@ class r20097963MyClass {
     default:    // expected-warning {{default will never be executed}}
       str = "unknown"  // Should not be rejected.
     }
+    return str
   }
 }
 
@@ -324,7 +324,7 @@ func testRequire(a : Int) {
   guard case 4 = a else { die() }  // ok
   guard case 4 = a else { fatalError("baaad") }  // ok
 
-  for i in 0...100 {
+  for _ in 0...100 {
     guard case 4 = a else { continue } // ok
   }
 }

@@ -27,6 +27,7 @@ func three() {
   do {
     throw opaque_error() // expected-error {{error is not handled because the enclosing catch is not exhaustive}}
   } catch let e as MSV {
+    _ = e
   }
 }
 
@@ -34,6 +35,7 @@ func four() {
   do {
     throw opaque_error()
   } catch let e {
+    _ = e
   }
 }
 
@@ -41,6 +43,7 @@ func five() {
   do {
     throw opaque_error()
   } catch let e as MSV {
+    _ = e
   } catch _ {
   }
 }
@@ -50,6 +53,7 @@ func six() {
     do {
       throw opaque_error()
     } catch let e as MSV {
+      _ = e
     }
   } catch _ {
   }

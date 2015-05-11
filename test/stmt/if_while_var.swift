@@ -88,12 +88,12 @@ func testIfCase(a : Int?) {
   
   if let case (b?) = a where b != 42 {}  // expected-error {{pattern matching binding is spelled with 'case let', not 'let case'}} {{6-9=}} {{14-14= let}}
   
-  if a != nil, let c = a, case nil = a { }
+  if a != nil, let c = a, case nil = a { _ = c}
   
-  if let p? = a {}  // expected-error {{pattern matching in a condition implicitly unwraps optionals}} {{11-12=}}
+  if let p? = a {_ = p}  // expected-error {{pattern matching in a condition implicitly unwraps optionals}} {{11-12=}}
   
   
-  if let .Some(x) = a {}  // expected-error {{pattern matching in a condition requires the 'case' keyword}} {{6-6=case }}
+  if let .Some(x) = a {_ = x}  // expected-error {{pattern matching in a condition requires the 'case' keyword}} {{6-6=case }}
 
   if case _ = a {}  // expected-warning {{'if' condition is always true}}
   while case _ = a {}  // expected-warning {{'while' condition is always true}}
@@ -102,8 +102,8 @@ func testIfCase(a : Int?) {
 
 // <rdar://problem/20883147> Type annotation for 'let' condition still expected to be optional
 func testTypeAnnotations() {
-  if let x: Int = Optional(1) {}
-  if let x: Int = .Some(1) {}
+  if let x: Int = Optional(1) {_ = x}
+  if let x: Int = .Some(1) {_ = x}
 
   if case _ : Int8 = 19 {}  // expected-warning {{'if' condition is always true}}
 }

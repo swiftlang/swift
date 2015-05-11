@@ -132,5 +132,5 @@ var fnr: @noreturn (_: Int) -> () = exit
 var fpr: (_: Int) -> () = exit
 
 func testWitnessMethod<T: TestProtocol>(t: T) {
-  let f = T.neverReturnsStatic
+  let _ = T.neverReturnsStatic
 }

@@ -413,10 +413,11 @@ func shadowbug() {
   }
 }
 func scopebug() {
-  var Foo = 10
+  let Foo = 10
   struct S {
     typealias Foo = Int
   }
+  _ = Foo
 }
 struct Ordering {
   var x : Foo
@@ -454,9 +455,10 @@ protocol MyProto {
 // <rdar://problem/14488311>
 struct DefaultArgumentFromExtension {
   func g(x: (DefaultArgumentFromExtension) -> () -> () = f) {
-    var f = 42
+    let f = 42
     var x2 = x
     x2 = f // expected-error{{cannot assign a value of type 'Int' to a value of type '(DefaultArgumentFromExtension) -> () -> ()'}}
+    _ = x2
   }
   var x : (DefaultArgumentFromExtension) -> () -> () = f
 }

@@ -1,7 +1,8 @@
 // RUN: %target-parse-verify-swift
 
 func statement_starts() {
-  var f = { (x : Int) -> () in }
+  var f : Int-> ()
+  f = { (x : Int) -> () in }
 
   f(0)
   f (0)
@@ -18,13 +19,13 @@ func statement_starts() {
 // Within a function
 func test(inout i: Int, inout j: Int) {
    // Okay
-   var x : Int; i = j; j = i
+   var _ : Int; i = j; j = i
    if i != j { i = j } 
 
    // Errors
    i = j j = i // expected-error{{consecutive statements}} {{9-9=;}}
-   var y : Int i = j // expected-error{{consecutive statements}} {{15-15=;}}
-   var z : Int var z2 : Int // expected-error{{consecutive statements}} {{15-15=;}}
+   var _ : Int i = j // expected-error{{consecutive statements}} {{15-15=;}}
+   var _ : Int var _ : Int // expected-error{{consecutive statements}} {{15-15=;}}
 }
 
 struct X {
@@ -37,10 +38,11 @@ struct X {
   // Within property accessors
   subscript(i: Int) -> Float {
     get {
-      var x = i x = i + 1 return Float(x) // expected-error{{consecutive statements}} {{16-16=;}} expected-error{{consecutive statements}} {{26-26=;}}
+      var x = i x = i + x return Float(x) // expected-error{{consecutive statements}} {{16-16=;}} expected-error{{consecutive statements}} {{26-26=;}}
     }
     set {
       var x = i x = i + 1 // expected-error{{consecutive statements}} {{16-16=;}}
+      _ = x
     }
   }
 }

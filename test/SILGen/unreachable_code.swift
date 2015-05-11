@@ -12,7 +12,7 @@ func testUnreachableAfterIfReturn(a: Bool) -> Int {
   } else {
     return 0
   }
-  var i: Int = testUnreachableAfterReturn() // expected-warning {{will never be executed}}
+  var _: Int = testUnreachableAfterReturn() // expected-warning {{will never be executed}}
 }
 
 func testUnreachableForAfterContinue(b: Bool) {
@@ -64,6 +64,7 @@ enum Tree {
 func testUnreachableCase1(a : Tree) {
   switch a {
   case let Leaf:
+    _ = Leaf
     return
   case .Branch(_):  // expected-warning {{case will never be executed}}
     return
@@ -73,6 +74,7 @@ func testUnreachableCase1(a : Tree) {
 func testUnreachableCase2(a : Tree) {
   switch a {
   case let Leaf:
+    _ = Leaf
     fallthrough
   case .Branch(_):
     return

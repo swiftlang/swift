@@ -656,9 +656,13 @@ class infer_instanceFunc1 {
   // expected-error@-1 {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
 
-  @objc func func_varParam1(var a: AnyObject) {}
+  @objc func func_varParam1(var a: AnyObject) {
+    let b = a; a = b
+  }
 
-  func func_varParam2(var a: AnyObject) {}
+  func func_varParam2(var a: AnyObject) {
+    let b = a; a = b
+  }
 // CHECK-LABEL: @objc func func_varParam2(a: AnyObject) {
 }
 

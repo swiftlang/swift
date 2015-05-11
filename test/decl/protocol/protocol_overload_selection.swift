@@ -9,7 +9,7 @@ protocol P2 : P1 {
 }
 
 func f<C : P2> (elements: C) {
-  var x: Int = elements.foo() // should not error
+  var _: Int = elements.foo() // should not error
 }
 
 protocol _CollectionType  {
@@ -33,5 +33,5 @@ C: MutableCollectionType
   inout elements: C,
   i: C.Index
 ) {
-  var x: C.Generator.Element = elements[i] // should not error
+  var _: C.Generator.Element = elements[i] // should not error
 }

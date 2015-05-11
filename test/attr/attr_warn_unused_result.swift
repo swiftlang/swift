@@ -9,7 +9,8 @@ func testFuncsNegative() {
   let x = f1()
   let _ = f1()
   _ = f1()
-  for a in f1() { } 
+  for _ in f1() { }
+  _ = x
 }
 
 func testFuncsPositive() {
@@ -44,7 +45,7 @@ struct Inits1 {
 }
 
 func testInitsPositive() {
-  let i1 = Inits1()
+  let _ = Inits1()
   Inits1() // expected-warning{{result of call to 'init()' is unused}}
 }
 
@@ -70,6 +71,7 @@ func testMutating1(m1: Mutating1, var m2: Mutating1) {
 
   m1.bar(1, y: 1) // expected-warning{{result of call to 'bar(_:y:)' is unused: zug zug}}
   m2.bar(1, y: 1) // expected-warning{{result of call to non-mutating function 'bar(_:y:)' is unused; use 'barInPlace(_:y:)' to mutate in-place}}{{6-9=barInPlace}}
+  m2 = m1
 }
 
 // ---------------------------------------------------------------------------

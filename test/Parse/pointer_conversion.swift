@@ -137,6 +137,7 @@ func constVoidPointerArguments(p: UnsafeMutablePointer<Int>,
   x = cfp // expected-error{{}}
   x = ap // expected-error{{}}
   x = afp // expected-error{{}}
+  _ = x
 }
 
 func stringArguments(var s: String) {
@@ -180,8 +181,8 @@ func pointerConstructor(x: UnsafeMutablePointer<Int>) -> UnsafeMutablePointer<Fl
 
 func pointerArithmetic(x: UnsafeMutablePointer<Int>, y: UnsafeMutablePointer<Int>,
                        i: Int) {
-  let p = x + i
-  let d = x - y
+  let _ = x + i
+  let _ = x - y
 }
 
 func genericPointerArithmetic<T>(x: UnsafeMutablePointer<T>, i: Int, t: T) -> UnsafeMutablePointer<T> {
@@ -205,5 +206,5 @@ func arrayComparison(x: [NotEquatable], y: [NotEquatable], p: UnsafeMutablePoint
 }
 
 func addressConversion(p: UnsafeMutablePointer<Int>, var x: Int) {
-  let a: Bool = p == &x
+  let _: Bool = p == &x
 }

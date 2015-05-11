@@ -2,7 +2,7 @@
 
 // Infer bound generic types in closures
 func dict_int_string_indexer(getElement: (Dictionary<Int, String>) -> String) -> String {
-  var dict = [0 : "zero", 1 : "one", 2 : "two"];
+  let dict = [0 : "zero", 1 : "one", 2 : "two"];
   return getElement(dict)
 }
 

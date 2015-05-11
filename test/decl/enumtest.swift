@@ -14,26 +14,28 @@ public enum unionSearchFlags {
 }
 
 func test1() -> unionSearchFlags {
-  var a : unionSearchFlags
+  let _ : unionSearchFlags
   var b = unionSearchFlags.None
   b = unionSearchFlags.Anchored
+  _ = b
 
   return unionSearchFlags.Backwards
 }
 
 func test1a() -> unionSearchFlags {
-  var a : unionSearchFlags
+  var _ : unionSearchFlags
   var b : unionSearchFlags = .None
   b = .Anchored
+  _ = b
 
   // ForwardIndexType use of MaybeInt.
-  var c = MaybeInt.None
+  var _ = MaybeInt.None
 
   return .Backwards
 }
 
 func test1b(b : Bool) {
-  var x = 123
+  var _ = 123
   .description == 1 // expected-error{{could not find member 'description'}}
 }
 
@@ -45,9 +47,9 @@ enum MaybeInt {
 }
 
 func test2(a: Int, _ b: Int, _ c: MaybeInt) {
-  var c = MaybeInt.Some(4)
-  var d = MaybeInt.Some  // expected-error{{partial application of enum constructor is not allowed}}
-  var e = MaybeInt.Some(b)
+  var _ = MaybeInt.Some(4)
+  var _ = MaybeInt.Some  // expected-error{{partial application of enum constructor is not allowed}}
+  var _ = MaybeInt.Some(b)
 
   test2(1, 2, .None)
 }
@@ -65,12 +67,12 @@ enum ZeroOneTwoThree {
 }
 
 func test3(a: ZeroOneTwoThree) {
-  var e = ZeroOneTwoThree.Three(1,2,3)
-  var f = ZeroOneTwoThree.Unknown(MaybeInt.None, MaybeInt.Some(4),
+  var _ = ZeroOneTwoThree.Three(1,2,3)
+  var _ = ZeroOneTwoThree.Unknown(MaybeInt.None, MaybeInt.Some(4),
                                   MaybeInt.Some(32))
-  var f1 = ZeroOneTwoThree(MaybeInt.None, MaybeInt(4), MaybeInt(32))
+  var _ = ZeroOneTwoThree(MaybeInt.None, MaybeInt(4), MaybeInt(32))
 
-  var g : Int =
+  var _ : Int =
      ZeroOneTwoThree.Zero // expected-error {{'ZeroOneTwoThree' is not convertible to 'Int'}}
 
   test3 ZeroOneTwoThree.Zero // expected-error {{expression resolves to an unused function}} expected-error{{consecutive statements}}
@@ -79,9 +81,9 @@ func test3(a: ZeroOneTwoThree) {
   test3 // expected-error {{expression resolves to an unused function}}
   (ZeroOneTwoThree.Zero)
   
-  var h : ZeroOneTwoThree = .One(4)
+  var _ : ZeroOneTwoThree = .One(4)
   
-  var inf : (Int,Int) -> ZeroOneTwoThree = .Two // expected-error{{'((Int, Int) -> ZeroOneTwoThree).Type' does not have a member named 'Two'}}
+  var _ : (Int,Int) -> ZeroOneTwoThree = .Two // expected-error{{'((Int, Int) -> ZeroOneTwoThree).Type' does not have a member named 'Two'}}
 }
 
 func test3a(a: ZeroOneTwoThree) {
@@ -148,22 +150,22 @@ extension CGRect {
 }
 
 func test5(myorigin: CGPoint) {
-  var x1 = CGRect(origin: myorigin, size: CGSize(width: 42, height: 123))
-  var x2 = x1
+  let x1 = CGRect(origin: myorigin, size: CGSize(width: 42, height: 123))
+  let x2 = x1
 
   4+5
 
   // Dot syntax.
-  var x3 = x2.origin.x
-  var x4 = x1.size.area()
-  var x4a = (r : x1.size).r.area()
-  var x5 = x1.size.area()
-  var x5a = (r : x1.size).r.area()
+  var _ = x2.origin.x
+  var _ = x1.size.area()
+  var _ = (r : x1.size).r.area()
+  var _ = x1.size.area()
+  var _ = (r : x1.size).r.area()
   
-  var x5b = x1.area //expected-error{{partial application of struct method is not allowed}}
+  var _ = x1.area //expected-error{{partial application of struct method is not allowed}}
 
-  var x6 = x1.search(42)
-  var x7 = x1.search(42).width
+  var _ = x1.search(42)
+  var _ = x1.search(42).width
 
   // TODO: something like this (name binding on the LHS):
   // var (CGSize(width, height)) = CGSize(1,2)
@@ -204,20 +206,20 @@ struct EmptyStruct {
 }
 
 func f() { 
-  var a : UnionTest1
+  let a : UnionTest1
   a.bar()
   UnionTest1.baz()  // dot syntax access to a static method.
   
   // Test that we can get the "address of a member".
-  var member_ptr_static : () -> () = UnionTest1.baz
-  var member_ptr : (UnionTest1) -> () -> () = UnionTest1.bar
+  var _ : () -> () = UnionTest1.baz
+  var _ : (UnionTest1) -> () -> () = UnionTest1.bar
 }
 
 func union_error(a: ZeroOneTwoThree) {
-  var t1 : ZeroOneTwoThree = .Zero(1) // expected-error {{'(IntegerLiteralConvertible) -> _' is not identical to 'ZeroOneTwoThree'}}
-  var t2 : ZeroOneTwoThree = .One // expected-error {{could not find member 'One'}}
-  var t3 : ZeroOneTwoThree = .foo // expected-error {{'ZeroOneTwoThree.Type' does not have a member named 'foo'}}
-  var t4 : ZeroOneTwoThree = .foo() // expected-error {{'ZeroOneTwoThree.Type' does not have a member named 'foo'}}
+  var _ : ZeroOneTwoThree = .Zero(1) // expected-error {{'(IntegerLiteralConvertible) -> _' is not identical to 'ZeroOneTwoThree'}}
+  var _ : ZeroOneTwoThree = .One // expected-error {{could not find member 'One'}}
+  var _ : ZeroOneTwoThree = .foo // expected-error {{'ZeroOneTwoThree.Type' does not have a member named 'foo'}}
+  var _ : ZeroOneTwoThree = .foo() // expected-error {{'ZeroOneTwoThree.Type' does not have a member named 'foo'}}
 }
 
 func local_struct() {
@@ -270,6 +272,7 @@ func testDirection() {
     i = x.distanceEast
     break;
   }
+  _ = i
 }
 
 enum NestedSingleElementTuple {
@@ -295,9 +298,9 @@ enum SimpleEnum {
 }
 
 func testSimpleEnum() {
-  let a : SimpleEnum = .X
-  let b : SimpleEnum = (.X)
-  let c : SimpleEnum=.X    // expected-error {{postfix '=' is reserved}}
+  let _ : SimpleEnum = .X
+  let _ : SimpleEnum = (.X)
+  let _ : SimpleEnum=.X    // expected-error {{postfix '=' is reserved}}
 }
 
 

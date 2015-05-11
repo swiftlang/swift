@@ -15,6 +15,7 @@ func infer_type(i: Int, f: Float) {
   i3 = i2
   f2 = f
   i_and_f = (i3, f2)
+  _ = i_and_f
 }
 
 func infer_generic_args() {
@@ -28,7 +29,7 @@ func infer_generic_args() {
   i = s[i]
 
   // Function types
-  var f : (Dictionary) -> Array = dict_to_array
-  var asi : [(String, Int)] = f(d)
+  let f : (Dictionary) -> Array = dict_to_array
+  var _ : [(String, Int)] = f(d)
 }
 

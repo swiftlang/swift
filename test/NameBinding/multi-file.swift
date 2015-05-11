@@ -9,11 +9,11 @@ struct SomeStruct {
 
 func test() {
   funcOrVar()
-  var a: Int = funcOrVar // expected-error{{'() -> ()' is not convertible to 'Int'}}
+  var _: Int = funcOrVar // expected-error{{'() -> ()' is not convertible to 'Int'}}
 
-  var s = SomeStruct(value: 42) // use the local SomeStruct
+  var _ = SomeStruct(value: 42) // use the local SomeStruct
   
-  var tilde: Bool = 1 + 2 ~~ 3 + 4 // (1 + 2) ~~ (3 + 4)
+  var _: Bool = 1 + 2 ~~ 3 + 4 // (1 + 2) ~~ (3 + 4)
 }
 
 func conformsToItself(inout x: P3, y: P3) {

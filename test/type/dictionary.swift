@@ -15,7 +15,7 @@ class Derived : Base {
 struct X<T> { }
 
 func testGenericSpec() {
-  let x = X<[Int : Int]>()
+  let _ = X<[Int : Int]>()
 }
 
 // Dictionary types for construction.

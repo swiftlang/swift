@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend %s -emit-sil -verify
 
 func singleBlock() -> Int {
-  var y = 0 
+  var _ = 0
 } // expected-error {{missing return in a function expected to return 'Int'}}
 
 func singleBlock2() -> Int {
@@ -44,7 +44,7 @@ func multipleBlocksAllMissing(x: Int) -> Int {
 }
 
 @noreturn func implicitReturnWithinNoreturn() {
-  var y = 0 
+  var _ = 0
 }// expected-error {{return from a 'noreturn' function}}
 
 func diagnose_missing_return_in_the_else_branch(i: Bool) -> Int {
@@ -87,7 +87,7 @@ func testUnreachableAfterNoReturn(x: Int) -> Int {
 }
 
 func testUnreachableAfterNoReturnInADifferentBlock() -> Int {
-  var x:Int = 5;
+  let x:Int = 5;
   if true {  // expected-note {{condition always evaluates to true}}
     exit(); 
   }
@@ -102,7 +102,7 @@ func testReachableAfterNoReturnInADifferentBlock(x: Int) -> Int {
 }
 
 func testUnreachableAfterNoReturnFollowedByACall() -> Int {
-  var x:Int = 5;
+  let x:Int = 5;
   exit(); // expected-note{{a call to a noreturn function}}
   exit(); // expected-warning {{will never be executed}}
   return x; 

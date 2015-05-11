@@ -44,6 +44,8 @@ class TestClass {
 
   init() {
     lazy var localvar = 42  // expected-error {{lazy is only valid for members of a struct or class}}
+    localvar++
+    _ = localvar
   }
 }
 
@@ -61,6 +63,7 @@ struct StructTest {
   static func testStructInits() {
     let a = StructTest()         // default init
     let b = StructTest(p1: 42)  // Override the lazily init'd value.
+    _ = a; _ = b
   }
 }
 

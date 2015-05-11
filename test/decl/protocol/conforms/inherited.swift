@@ -110,13 +110,13 @@ class B : A {
 }
 
 func testB(b: B) {
-  var p1: P1 = b // expected-error{{has Self or associated type requirements}}
-  var p4: P4 = b // expected-error{{has Self or associated type requirements}}
-  var p5: P5 = b
-  var p6: P6 = b
-  var p7: P7 = b // expected-error{{has Self or associated type requirements}}
-  var p8: P8 = b // okay
-  var p9: P9 = b // expected-error{{has Self or associated type requirements}}
+  var _: P1 = b // expected-error{{has Self or associated type requirements}}
+  var _: P4 = b // expected-error{{has Self or associated type requirements}}
+  var _: P5 = b
+  var _: P6 = b
+  var _: P7 = b // expected-error{{has Self or associated type requirements}}
+  var _: P8 = b // okay
+  var _: P9 = b // expected-error{{has Self or associated type requirements}}
 }
 
 // Class A5 conforms to P5 in an inheritable manner.
@@ -129,7 +129,7 @@ class A5 : P5 {
 class B5 : A5 { }
 
 func testB5(b5: B5) {
-  var p5: P5 = b5 // okay
+  var _: P5 = b5 // okay
 }
 
 // Class A8 conforms to P8 in an inheritable manner.
@@ -142,7 +142,7 @@ class B8 : A8 {
 }
 
 func testB8(b8: B8) {
-  var p8: P8 = b8 // okay
+  var _: P8 = b8 // okay
 }
 
 // Class A9 conforms to everything.

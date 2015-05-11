@@ -42,9 +42,9 @@ extension A {
   func i() {} // expected-note{{overridden declaration is here}}
 }
 func f() {
-  var x = B()
-  var y : () = x.f()
-  var z : Int = x[10]
+  let x = B()
+  var _ : () = x.f()
+  var _ : Int = x[10]
 }
 
 class C<T> {
@@ -56,8 +56,8 @@ class D : C<Int> { // expected-error{{classes derived from generic classes must 
   override func f(v: Int) -> Int { return v+1 }
 }
 func f2() {
-  var x = D()
-  var y = x.f(10)
+  let x = D()
+  _ = x.f(10)
 }
 
 class E<T> {
@@ -72,6 +72,7 @@ class G : F {
 func test_explicit_downcasting(f: F, ei: E<Int>) {
   var g = f as! G
   g = ei as! G
+  _ = g
 }
 
 // Type and instance functions with the same name

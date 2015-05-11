@@ -94,16 +94,16 @@ func arrayToNSArray() {
 // NSArray -> Array
 func nsArrayToArray(nsa: NSArray) {
   var arr1: [AnyObject] = nsa // expected-error{{'NSArray' is not implicitly convertible to '[AnyObject]'; did you mean to use 'as' to explicitly convert?}}
-  var arr2: [BridgedClass] = nsa // expected-error{{'NSArray' is not convertible to '[BridgedClass]'}}
-  var arr3: [OtherClass] = nsa // expected-error{{'NSArray' is not convertible to '[OtherClass]'}}
-  var arr4: [BridgedStruct] = nsa // expected-error{{'NSArray' is not convertible to '[BridgedStruct]'}}
-  var arr5: [NotBridgedStruct] = nsa // expected-error{{'NSArray' is not convertible to '[NotBridgedStruct]'}}
+  var _: [BridgedClass] = nsa // expected-error{{'NSArray' is not convertible to '[BridgedClass]'}}
+  var _: [OtherClass] = nsa // expected-error{{'NSArray' is not convertible to '[OtherClass]'}}
+  var _: [BridgedStruct] = nsa // expected-error{{'NSArray' is not convertible to '[BridgedStruct]'}}
+  var _: [NotBridgedStruct] = nsa // expected-error{{'NSArray' is not convertible to '[NotBridgedStruct]'}}
 
-  var arr1b: [AnyObject] = nsa as [AnyObject]
-  var arr2b: [BridgedClass] = nsa as [BridgedClass] // expected-error{{'NSArray' is not convertible to '[BridgedClass]'; did you mean to use 'as!' to force downcast?}}
-  var arr3b: [OtherClass] = nsa as [OtherClass] // expected-error{{'NSArray' is not convertible to '[OtherClass]'; did you mean to use 'as!' to force downcast?}}
-  var arr4b: [BridgedStruct] = nsa as [BridgedStruct] // expected-error{{'NSArray' is not convertible to '[BridgedStruct]'; did you mean to use 'as!' to force downcast?}}
-  var arr5b: [NotBridgedStruct] = nsa as [NotBridgedStruct] // expected-error{{'NSArray' is not convertible to '[NotBridgedStruct]'}}
+  var _: [AnyObject] = nsa as [AnyObject]
+  var _: [BridgedClass] = nsa as [BridgedClass] // expected-error{{'NSArray' is not convertible to '[BridgedClass]'; did you mean to use 'as!' to force downcast?}}
+  var _: [OtherClass] = nsa as [OtherClass] // expected-error{{'NSArray' is not convertible to '[OtherClass]'; did you mean to use 'as!' to force downcast?}}
+  var _: [BridgedStruct] = nsa as [BridgedStruct] // expected-error{{'NSArray' is not convertible to '[BridgedStruct]'; did you mean to use 'as!' to force downcast?}}
+  var _: [NotBridgedStruct] = nsa as [NotBridgedStruct] // expected-error{{'NSArray' is not convertible to '[NotBridgedStruct]'}}
 
   var arr6: Array = nsa as Array
   arr6 = arr1
@@ -143,6 +143,8 @@ func dictionaryToNSDictionary() {
   // <rdar://problem/17134986>
   var bcOpt: BridgedClass?
   nsd = [BridgedStruct() : bcOpt] // expected-error{{cannot assign a value of type '[BridgedStruct : BridgedClass?]' to a value of type 'NSDictionary'}}
+  bcOpt = nil
+  _ = nsd
 }
 
 // In this case, we should not implicitly convert Dictionary to NSDictionary.
@@ -171,7 +173,7 @@ var i1: Int = 1.5 * 3.5 // expected-error{{'Double' is not convertible to 'Int'}
 
 // rdar://problem/18330319
 func rdar18330319(s: String, d: [String : AnyObject]) {
-  let t = d[s] as! String?
+  let _ = d[s] as! String?
 }
 
 // rdar://problem/19551164
@@ -236,15 +238,17 @@ func rdar19831698() {
 
 // <rdar://problem/19836341> Incorrect fixit for NSString? to String? conversions
 func rdar19836341(ns: NSString?, var vns: NSString?) {
-  let s: String? = ns // expected-error{{'NSString?' is not convertible to 'String?'}}
-  var s2: String? = ns // expected-error{{'NSString?' is not convertible to 'String?'}}
+  let _: String? = ns // expected-error{{'NSString?' is not convertible to 'String?'}}
+  var _: String? = ns // expected-error{{'NSString?' is not convertible to 'String?'}}
   // FIXME: there should be a fixit appending "as String?" to the line; for now
   // it's sufficient that it doesn't suggest appending "as String"
 
   // Important part about below diagnostic is that from-type is described as
   // 'NSString?' and not '@lvalue NSString?':
-  let vs: String? = vns // expected-error{{'NSString?' is not convertible to 'String?'}}
-  var vs2: String? = vns // expected-error{{'NSString?' is not convertible to 'String?'}}
+  let _: String? = vns // expected-error{{'NSString?' is not convertible to 'String?'}}
+  var _: String? = vns // expected-error{{'NSString?' is not convertible to 'String?'}}
+  
+  vns = ns
 }
 
 // <rdar://problem/20029786> Swift compiler sometimes suggests changing "as!" to "as?!"

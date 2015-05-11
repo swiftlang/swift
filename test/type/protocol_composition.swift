@@ -34,35 +34,39 @@ typealias Bogus = protocol<P1, Int> // expected-error{{non-protocol type 'Int' c
 
 func testEquality() {
   // Remove duplicates from protocol-conformance types.
-  var x1 : (_ : protocol<P2, P4>) -> ()
-  var x2 : (_ : protocol<P3, P4, P2, P1>) -> ()
+  let x1 : (_ : protocol<P2, P4>) -> ()
+  let x2 : (_ : protocol<P3, P4, P2, P1>) -> ()
   x1 = x2
+  _ = x1
 
   // Singleton protocol-conformance types, after duplication, are the same as
   // simply naming the protocol type.
-  var x3 : (_ : protocol<P2, P1>) -> ()
-  var x4 : (_ : P2) -> ()
+  let x3 : (_ : protocol<P2, P1>) -> ()
+  let x4 : (_ : P2) -> ()
   x3 = x4
-
+  _ = x3
+  
   // Empty protocol-conformance types are empty.
-  var x5 : (_ : Any) -> ()
-  var x6 : (_ : Any2) -> ()
+  let x5 : (_ : Any) -> ()
+  let x6 : (_ : Any2) -> ()
   x5 = x6
+  _ = x5
 
-  var x7 : (_ : protocol<P1, P3>) -> ()
-  var x8 : (_ : protocol<P2>) -> ()
+  let x7 : (_ : protocol<P1, P3>) -> ()
+  let x8 : (_ : protocol<P2>) -> ()
   x7 = x8 // expected-error{{cannot assign a value of type '(P2) -> ()' to a value of type '(protocol<P1, P3>) -> ()'}}
+  _ = x7
 }
 
 // Name lookup into protocol-conformance types
 func testLookup() {
-  var x1 : protocol<P2, P1, P4>
+  let x1 : protocol<P2, P1, P4>
   x1.p1()
   x1.p2()
   x1.p3()
   x1.p4()
-  var i1 : Int = x1.f(1)
-  var d1 : Double = x1.f(1.0)
+  var _ : Int = x1.f(1)
+  var _ : Double = x1.f(1.0)
 }
 
 protocol REPLPrintable {
@@ -99,7 +103,7 @@ func testConversion() {
   accept_manyPrintable(Struct1())
 
   // Conversions for nominal types that conform to a number of protocols.
-  var sp : SuperPrint
+  let sp : SuperPrint
   x = sp
   accept_manyPrintable(sp)
 
@@ -109,10 +113,10 @@ func testConversion() {
   x = x2
 
   // Subtyping
-  var f1 : () -> protocol<FooProtocol, SuperREPLPrintable> = return_superPrintable
+  var _ : () -> protocol<FooProtocol, SuperREPLPrintable> = return_superPrintable
 
   // FIXME: closures make ABI conversions explicit. rdar://problem/19517003
-  var f2 : () -> protocol<FooProtocol, REPLPrintable> = { return_superPrintable($0) }
+  var _ : () -> protocol<FooProtocol, REPLPrintable> = { return_superPrintable($0) }
 }
 
 // Test the parser's splitting of >= into > and =.

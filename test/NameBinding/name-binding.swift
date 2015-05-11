@@ -28,7 +28,7 @@ func test_shadowing() {
   // Shadow Int.
   enum Int { case xyz; case abc }
   // We get the shadowed version of Int.
-  var x : Int = .abc
+  var _ : Int = .abc
 }
 
 func unknown_member() {
@@ -119,11 +119,11 @@ func ov_fn_result2() -> (Int) -> (Int) -> Int {}
 func ov_fn_result2() -> (Int) -> (a_struct) -> Int {}
 
 func overloadtest(x: Int) {
-  var f1 : Int = ((ov_fn_result))()
-  var f2 : Double = ((ov_fn_result))()
+  var _ : Int = ((ov_fn_result))()
+  var _ : Double = ((ov_fn_result))()
 
   // Test overloaded operators.
-  var s : a_struct
+  let s : a_struct
   4 *** 17     // Resolved to the *** operator that takes ints.
   s *** s     // Resolved to the *** operator that takes a_struct.
   s *** {$0 + 4}     // Closure obviously not a struct.
@@ -148,6 +148,8 @@ func localtest() {
     struct S {
       typealias Foo = Int
     }
+    Foo = 17
+    _ = Foo
   }
   func scopebug2() { 
     struct S1 {}

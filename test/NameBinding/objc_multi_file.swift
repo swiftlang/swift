@@ -40,5 +40,5 @@ class SubSubB2 : SubB {
 
 // rdar://problem/19941580
 func rdar19941580(foo: Foo) {
-  var fp: FooProto = foo
+  var _: FooProto = foo
 }

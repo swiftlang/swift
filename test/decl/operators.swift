@@ -26,8 +26,8 @@ func ++++(lhs: Y, rhs: Y) -> Y {} // okay
 
 func useInt(x: Int) {}
 func test() {
-  var x : Int
-  var y : Int = 42
+  var x : Int  
+  let y : Int = 42
   // Produce a diagnostic for using the result of an assignment as a value.
   // rdar://12961094
   useInt(x = y)  // expected-error{{cannot invoke 'useInt' with an argument list of type '(())'}} expected-note{{expected an argument list of type '(Int)'}}
@@ -133,7 +133,7 @@ x☃⃠y
 
 // rdar://14705150 - crash on invalid
 func test_14705150() {
-  var a = 4
+  let a = 4
   var b! = a  // expected-error {{type annotation missing in pattern}}
   // expected-error @-1 {{consecutive statements on a line must be separated by ';'}}
   // expected-error @-2 {{expected expression}}

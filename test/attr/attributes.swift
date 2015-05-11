@@ -99,7 +99,7 @@ extension binary {
 class transparentOnCalssVar {
   @transparent var max: Int { return 0xFF }; // expected-error {{@transparent is not supported on declarations within classes}}
   func blah () {
-    var x: Int = max
+    var _: Int = max
   }
 };
 
@@ -111,7 +111,7 @@ class transparentOnCalssVar2 {
     }
   }
   func blah () {
-    var x: Int = max
+    var _: Int = max
   }
 };
 

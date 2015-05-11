@@ -22,7 +22,7 @@ class NotInitializable1 { // expected-error{{class 'NotInitializable1' has no in
 }
 
 func localDefaultInit() -> Int? {
-  var i: Int?
+  let i: Int?
   return i
 }
 

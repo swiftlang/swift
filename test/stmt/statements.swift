@@ -45,8 +45,9 @@ func funcdecl5(a: Int, y: Int) {
   (x:1).x = 1 // expected-error {{cannot assign to immutable value of type 'Int'}}
   var tup : (x:Int, y:Int)
   tup.x = 1
+  _ = tup
 
-  var B : Bool
+  let B : Bool
 
   // if/then/else.
   if (B) {
@@ -117,8 +118,8 @@ func for_loop() {
   var z = 10
   for (; z != 0; --z) {}
   for (z = 10; z != 0; --z) {}
-  for var (a,b) = (0,12); a != b; --b {}
-  for (var (a,b) = (0,12); a != b; --b) {}
+  for var (a,b) = (0,12); a != b; --b {++a}
+  for (var (a,b) = (0,12); a != b; --b) {++a}
   var j, k : Int
   for ((j,k) = (0,10); j != k; --k) {}
   for var i = 0, j = 0; i * j < 10; i++, j++ {}
@@ -131,7 +132,7 @@ func for_loop() {
   for @ {}
 
   // <rdar://problem/17462274> Is increment in for loop optional?
-  for (var i = 0; i < 10; ) {}
+  for (let i = 0; i < 10; ) {}
 }
 
 break // expected-error {{'break' is only allowed inside a loop}}
@@ -210,20 +211,20 @@ func VoidReturn3() {
 
 func IfStmt1() {
   if 1 > 0 // expected-error {{expected '{' after 'if' condition}}
-  var x = 42
+  var _ = 42
 }
 
 func IfStmt2() {
   if 1 > 0 {
   } else // expected-error {{expected '{' after 'else'}}
-  var x = 42
+  let _ = 42
 }
 
 //===--- While statement.
 
 func WhileStmt1() {
   while 1 > 0 // expected-error {{expected '{' after 'while' condition}}
-  var x = 42
+  var _ = 42
 }
 
 //===-- Do statement.
@@ -268,7 +269,7 @@ func brokenSwitch(x: Int) -> Int {
 func breakContinue(x : Int) -> Int {
 
 Outer:
-  for a in 0...1000 {
+  for _ in 0...1000 {
 
   Switch:
     switch x {
@@ -282,9 +283,9 @@ Outer:
   
   // <rdar://problem/16692437> shadowing loop labels should be an error
 Loop:  // expected-note {{previously declared here}}
-  for i in 0...2 {
+  for _ in 0...2 {
   Loop:  // expected-error {{label 'Loop' cannot be reused on an inner statement}}
-    for j in 0...2 {
+    for _ in 0...2 {
     }
   }
 
@@ -299,7 +300,7 @@ Loop:  // expected-note {{previously declared here}}
     markUsed("")
   }
   
-  var x : Int? = 42
+  let x : Int? = 42
   
   // <rdar://problem/16879701> Should be able to pattern match 'nil' against optionals
   switch x {

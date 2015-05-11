@@ -15,9 +15,9 @@ class B : A {
 }
 
 func testB() {
-  var b1 = B(int: 5)
-  var b2 = B(double: 2.71828)
-  var b3 = B(float: 3.14159) 
+  var _ = B(int: 5)
+  var _ = B(double: 2.71828)
+  var _ = B(float: 3.14159)
 }
 
 // Okay to have nothing
@@ -25,9 +25,9 @@ class C : B {
 }
 
 func testC() {
-  var c1 = C(int: 5)
-  var c2 = C(double: 2.71828)
-  var c3 = C(float: 3.14159) 
+  var _ = C(int: 5)
+  var _ = C(double: 2.71828)
+  var _ = C(float: 3.14159)
 }
 
 // Okay to add convenience initializers.
@@ -38,10 +38,10 @@ class D : C {
 }
 
 func testD() {
-  var d1 = D(int: 5)
-  var d2 = D(double: 2.71828)
-  var d3 = D(float: 3.14159) 
-  var d4 = D(string: "3.14159") 
+  var _ = D(int: 5)
+  var _ = D(double: 2.71828)
+  var _ = D(float: 3.14159)
+  var _ = D(string: "3.14159")
 }
 
 // Adding a subobject initializer prevents inheritance of subobject
@@ -102,10 +102,10 @@ class SuperUnnamed {
 class SubUnnamed : SuperUnnamed { }
 
 func testSubUnnamed(i: Int, d: Double, s: String, f: Float) {
-  var su1 = SubUnnamed(int: i)
-  var su2 = SubUnnamed(d)
-  var su3 = SubUnnamed(string: s)
-  var su4 = SubUnnamed(f)
+  var _ = SubUnnamed(int: i)
+  var _ = SubUnnamed(d)
+  var _ = SubUnnamed(string: s)
+  var _ = SubUnnamed(f)
 }
 
 // FIXME: <rdar://problem/16331406> Implement inheritance of variadic designated initializers

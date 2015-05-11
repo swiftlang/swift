@@ -24,7 +24,7 @@ class Derived1 : Base1 {
 struct X<T> { }
 
 func testGenericSpec() {
-  let x = X<[Int]>()
+  let _ = X<[Int]>()
 }
 
 // Array types for construction.
@@ -35,7 +35,7 @@ func constructArray(n: Int) {
   var matrix = [[Float]]()
   matrix[1][2] = 3.14159
 
-  var opts: [Int?] = [Int?]()
+  var _: [Int?] = [Int?]()
 }
 
 // Fix-Its from the old syntax to the new.

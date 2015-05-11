@@ -3,11 +3,11 @@
 var t1a: (Int...) = (1) // expected-error{{cannot create a variadic tuple}}
 var t2d: (Double = 0.0) = 1 // expected-error {{default argument not permitted in a tuple type}}
 
-func f1(a: Int...) { for x in a {} }
+func f1(a: Int...) { for _ in a {} }
 f1()
 f1(1)
 f1(1,2)
-func f2(a: Int, _ b: Int...) { for x in b {} }
+func f2(a: Int, _ b: Int...) { for _ in b {} }
 f2(1)
 f2(1,2)
 f2(1,2,3)

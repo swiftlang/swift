@@ -18,7 +18,7 @@ struct X<T: P> {
 }
 
 func f<T : P>(z: T) {
- let x = X<T.A>()
+ let _ = X<T.A>()
 }
 
 
@@ -38,7 +38,7 @@ struct Y2 : P2 {
 }
 
 func f<T : P2>(z: T) {
- let x = X2<T.A>()
+ let _ = X2<T.A>()
 }
 
 
@@ -56,7 +56,7 @@ struct Y3 : DeclaredP {
 struct X3<T:P4> {}
 
 func f2<T:P4>(a: T) {
- let works = X3<T.A>()
+ let _ = X3<T.A>()
 }
 
 f2(Y3())

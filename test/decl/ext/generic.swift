@@ -51,7 +51,7 @@ extension X<A, B, C> {
 
 // Using generic extensions (basic).
 func f1<A, B, C, D, E>(x: X<A, B, C>, a: A, assoc: A.AssocType, _: D, _: E) {
-  var (b, c): (B, C) = x.foo(a)
+  var (_, _): (B, C) = x.foo(a)
   x.bar(assoc)
 }
 

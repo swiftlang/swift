@@ -57,8 +57,8 @@ func optionalPropertyGeneric<T : P1>(t: T) {
   propertyRef = .None
 
   // ... and that we can use it
-  var i = propertyRef!
-  var j : Int = i
+  let i = propertyRef!
+  var _ : Int = i
 }
 
 // Optional subscript references in generics.
@@ -70,8 +70,8 @@ func optionalSubscriptGeneric<T : P1>(t: T) {
   subscriptRef = .None
 
   // ... and that we can use it
-  var i = subscriptRef!
-  var j : Int = i
+  let i = subscriptRef!
+  var _ : Int = i
 }
 
 // Optional method references in existentials.
@@ -95,8 +95,8 @@ func optionalPropertyExistential(t: P1) {
   propertyRef = .None
 
   // ... and that we can use it
-  var i = propertyRef!
-  var j : Int = i
+  let i = propertyRef!
+  var _ : Int = i
 }
 
 // Optional subscript references in existentials.
@@ -108,8 +108,8 @@ func optionalSubscriptExistential(t: P1) {
   subscriptRef = .None
 
   // ... and that we can use it
-  var i = subscriptRef!
-  var j : Int = i
+  let i = subscriptRef!
+  var _ : Int = i
 }
 
 // -----------------------------------------------------------------------

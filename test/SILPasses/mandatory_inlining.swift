@@ -93,7 +93,7 @@ func call_uncurried(x: Int, y: Int) -> Int {
   // CHECK: return
 
 func call_curried(x: Int, y: Int) -> Int {
-  var z = test_curried(x)
+  let z = test_curried(x)
   return z(y: y)
 }
 

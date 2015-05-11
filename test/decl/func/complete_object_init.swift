@@ -72,13 +72,14 @@ class B1 : A {
 }
 
 func testConstructB1(i: Int, f: Float, d: Double) {
-  var b1a = B1(int: i)
-  var b1b = B1(float: f)
-  var b1c = B1(double: d)
+  let b1a = B1(int: i)
+  let b1b = B1(float: f)
+  let b1c = B1(double: d)
 
   var b: B1 = b1a
   b = b1b
   b = b1c
+  _ = b
 }
 
 // does not inherit convenience initializers

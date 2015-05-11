@@ -109,9 +109,11 @@ class InitC1 : InitP1 {
 func testInitP1() {
   var is1 = InitS1(int: 5)
   is1 = InitS1(string: "blah") // check type
+  _ = is1
 
   var ic1 = InitC1(int: 5)
   ic1 = InitC1(string: "blah") // check type
+  _ = ic1
 }
 
 // ----------------------------------------------------------------------------
@@ -141,10 +143,10 @@ struct SubscriptC1 : SubscriptP1 {
 
 func testSubscriptP1(var ss1: SubscriptS1, var sc1: SubscriptC1,
                      i: Int, s: String) {
-  let s1 = ss1[i]
+  let _ = ss1[i]
   ss1[i] = s
 
-  let s2 = sc1[i]
+  let _ = sc1[i]
   sc1[i] = s
 }
 
@@ -216,6 +218,7 @@ func testP4(s4a: S4a, s4b: S4b, s4c: S4c, s4d: S4d) {
   var b1 = s4d.extP4a() // okay, "Bool" version
   b1 = true // checks type above
   s4d.extP4Int() // expected-error{{cannot invoke 'extP4Int' with no arguments}}
+  _ = b1
 }
 
 // ----------------------------------------------------------------------------
@@ -289,6 +292,7 @@ struct P8a : P8, P7 {
 func testP8a(p8a: P8a) {
   var p7 = p8a.getP7Assoc()
   p7 = P7FromP8<Bool>() // okay, check type of above
+  _ = p7
 }
 
 // Okay, P7 requirements explicitly specified
@@ -300,6 +304,7 @@ struct P8b : P8, P7 {
 func testP8b(p8b: P8b) {
   var p7 = p8b.getP7Assoc()
   p7 = 17 // check type of above
+  _ = p7
 }
 
 protocol PConforms1 {
@@ -402,9 +407,11 @@ struct SomeCollection2 : MyCollection {
 func testSomeCollections(sc1: SomeCollection1, sc2: SomeCollection2) {
   var mig = sc1.myGenerate()
   mig = MyIndexedGenerator(container: sc1, index: sc1.myStartIndex)
+  _ = mig
 
   var ig = sc2.myGenerate()
   ig = MyIndexedGenerator(container: sc2, index: sc2.myStartIndex) // expected-error{{cannot assign a value of type 'MyIndexedGenerator<SomeCollection2>' to a value of type 'OtherIndexedGenerator<SomeCollection2>'}}
+  _ = ig
 }
 
 public protocol PConforms3 {}
@@ -503,7 +510,8 @@ struct S1b : P1 {
 func useS1b(s1b: S1b) {
   var x = s1b.extP1a() // uses S1b.extP1a due to partial ordering
   x = 5 // checks that "x" deduced to "Int" above
-  var b: Bool = s1b.extP1a() // still uses P1.ext1Pa due to type annotation
+  _ = x
+  var _: Bool = s1b.extP1a() // still uses P1.ext1Pa due to type annotation
 }
 
 // Partial ordering between members of protocol extensions for
@@ -540,17 +548,21 @@ struct SInherit4 : PInherit4 { }
 func testPInherit(si2 : SInherit2, si3: SInherit3, si4: SInherit4) {
   var b1 = si2.order1() // PInherit2.order1
   b1 = true // check that the above returned Bool
+  _ = b1
 
   var d1 = si3.order1() // PInherit3.order1
   d1 = 3.14159 // check that the above returned Double
+  _ = d1
 
   var s1 = si4.order1() // PInherit4.order1
   s1 = "hello" // check that the above returned String
+  _ = s1
 
   // Other versions are still visible, since they may have different
   // types.
   b1 = si3.order1() // PInherit2.order1
-  var i1: Int = si3.order1() // PInherit1.order1
+  var _: Int = si3.order1() // PInherit1.order1
+
 }
 
 protocol PConstrained1 {
@@ -585,12 +597,15 @@ func testPConstrained1(sc1: SConstrained1, sc2: SConstrained2,
                        sc3: SConstrained3) {
   var i = sc1.pc1() // PConstrained1.pc1
   i = 17 // checks type of above
+  _ = i
 
   var b = sc2.pc1() // PConstrained1 (with PInherit2).pc1
   b = true // checks type of above
+  _ = b
 
   var s = sc3.pc1() // PConstrained1 (with PInherit3).pc1
   s = "hello" // checks type of above
+  _ = s
 }
 
 protocol PConstrained2 {
@@ -619,10 +634,11 @@ struct SConstrained3b : PConstrained3 {
 func testSConstrained3(sc3a: SConstrained3a, sc3b: SConstrained3b) {
   var s = sc3a.pc2() // PConstrained3.pc2
   s = "hello"
+  _ = s
 
   sc3b.pc2() // expected-error{{ambiguous use of 'pc2'}}
   s = sc3b.pc2()
-  var b: Bool = sc3b.pc2()
+  var _: Bool = sc3b.pc2()
 }
 
 extension PConstrained3 where AssocTypePC2 : PInherit1 { }

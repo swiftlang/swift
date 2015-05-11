@@ -63,7 +63,7 @@ class SomeClass {
       func inner() { foo() }
       let inner2 = { foo() } // expected-error {{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}}
       func multi() -> Int { foo(); return 0 }
-      let mulit2: () -> Int = { foo(); return 0 } // expected-error {{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}}
+      let _: () -> Int = { foo(); return 0 } // expected-error {{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}}
       doesEscape { foo() } // expected-error {{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}}
       takesNoEscapeClosure { foo() }
       doesEscape { foo(); return 0 } // expected-error {{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}}
@@ -110,7 +110,7 @@ class SomeClass {
         let plain2 = { bar() } // expected-error {{call to method 'bar' in closure requires explicit 'self.' to make capture semantics explicit}}
 
         func multi() -> Int { bar(); return 0 }
-        let mulit2: () -> Int = { bar(); return 0 } // expected-error {{call to method 'bar' in closure requires explicit 'self.' to make capture semantics explicit}}
+        let _: () -> Int = { bar(); return 0 } // expected-error {{call to method 'bar' in closure requires explicit 'self.' to make capture semantics explicit}}
 
         doesEscape { bar() } // expected-error {{call to method 'bar' in closure requires explicit 'self.' to make capture semantics explicit}}
         takesNoEscapeClosure { bar() } // okay
@@ -131,7 +131,7 @@ class SomeClass {
           let plain2 = { bar() } // expected-error {{call to method 'bar' in closure requires explicit 'self.' to make capture semantics explicit}}
 
           func multi() -> Int { bar(); return 0 }
-          let mulit2: () -> Int = { bar(); return 0 } // expected-error {{call to method 'bar' in closure requires explicit 'self.' to make capture semantics explicit}}
+          let _: () -> Int = { bar(); return 0 } // expected-error {{call to method 'bar' in closure requires explicit 'self.' to make capture semantics explicit}}
 
           doesEscape { bar() } // expected-error {{call to method 'bar' in closure requires explicit 'self.' to make capture semantics explicit}}
           takesNoEscapeClosure { bar() } // okay
@@ -212,7 +212,7 @@ func callerOfDefaultParams(@noescape g: () -> ()) {
 class NoEscapeImmediatelyApplied {
   func f() {
     // Shouldn't require "self.", the closure is obviously @noescape.
-    let x = { return ivar }()
+    let _ = { return ivar }()
   }
   
   final var ivar  = 42

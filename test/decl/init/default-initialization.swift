@@ -12,6 +12,10 @@ struct B {
 func locals() {
   var al : A
   var bl : B
+  
+  al = A(i: 1)
+  bl = B(a: al)
+  _ = bl
 }
 
 var ag : A
@@ -55,7 +59,7 @@ extension B {
 
   // Initializing the whole struct at once.
   init(k : Int, x : Bool, y : Bool, z : Bool) {
-    var b : B     // expected-note {{variable defined here}}
+    let b : B     // expected-note {{variable defined here}}
     self = b      // expected-error {{variable 'b' used before being initialized}}
   }
 }

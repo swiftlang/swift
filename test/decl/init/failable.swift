@@ -27,14 +27,14 @@ class DuplicateDecls {
 
 // Construct via a failable initializer.
 func testConstruction(i: Int, s: String) {
-  var s0Opt = S0(string: s)
+  let s0Opt = S0(string: s)
   assert(s0Opt != nil)
-  var s0: S0 = s0Opt // expected-error{{value of optional type 'S0?' not unwrapped; did you mean to use '!' or '?'?}}
+  var _: S0 = s0Opt // expected-error{{value of optional type 'S0?' not unwrapped; did you mean to use '!' or '?'?}}
   
-  var s0IUO = S0(int: i)
+  let s0IUO = S0(int: i)
   assert(s0IUO != nil)
   
-  s0 = s0IUO
+  _ = s0IUO
 }
 
 // ----------------------------------------------------------------------------

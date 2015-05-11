@@ -165,7 +165,7 @@ func for_loops1(var x: Int, c: Bool) {
   for var i = 0; i < 100; ++i {
   }
   
-  for var i = 0; i < 100; i {
+  for let i = 0; i < 100; i {
   }
 }
 
@@ -176,7 +176,7 @@ func for_loops2() {
   // CHECK-NEXT: alloc_stack $Optional<MyClass>
   // CHECK-NEXT: apply [[NEXT]]<[MyClass]
   // CHECK: class_method [[OBJ:%[0-9]+]] : $MyClass, #MyClass.foo!1
-  var objects = [MyClass(), MyClass() ]
+  let objects = [MyClass(), MyClass() ]
   for obj in objects {
     obj.foo()
   }
@@ -185,7 +185,7 @@ func for_loops2() {
 }
 
 func void_return() {
-  var b:Bool
+  let b:Bool
   if b {
     return
   }
@@ -230,7 +230,7 @@ func for_each_loop(x: [C]) {
   for i in x {
     use(i)
   }
-  var y = 0
+  var _ = 0
 }
 
 // <rdar://problem/16650625>
@@ -355,7 +355,7 @@ func test_if_break(a : Bool) {
 
 // rdar://problem/18643692
 func for_loop_multi_iter() {
-  for (var i = 0, x = 0; i < 10; i++, x) { }
+  for (var i = 0, x = 0; i < 10; i++, x) { --x }
 }
 
 // CHECK-LABEL: sil hidden @_TF10statements7test_doFT_T_
@@ -369,7 +369,8 @@ func test_do() {
     // CHECK: [[CTOR:%.*]] = function_ref @_TFC10statements7MyClassCfMS0_FT_S0_
     // CHECK: [[OBJ:%.*]] = apply [[CTOR]](
     let obj = MyClass()
-
+    _ = obj
+    
     // CHECK: [[BAR:%.*]] = function_ref @_TF10statements3barFSiT_
     // CHECK: integer_literal $Builtin.Int2048, 1
     // CHECK: apply [[BAR]](
@@ -398,6 +399,7 @@ func test_do_labeled() {
     // CHECK: [[CTOR:%.*]] = function_ref @_TFC10statements7MyClassCfMS0_FT_S0_
     // CHECK: [[OBJ:%.*]] = apply [[CTOR]](
     let obj = MyClass()
+    _ = obj
 
     // CHECK: [[BAR:%.*]] = function_ref @_TF10statements3barFSiT_
     // CHECK: integer_literal $Builtin.Int2048, 1
@@ -630,6 +632,7 @@ protocol MyProtocol {}
 func testCleanupEmission<T>(x: T) {
   // SILGen shouldn't crash/verify abort on this example.
   guard let x2 = x as? MyProtocol else { return }
+  _ = x2
 }
 
 
@@ -662,6 +665,7 @@ func let_else_tuple_binding(a : (Int, Int)?) -> Int {
   // CHECK-NEXT:   switch_enum %0 : $Optional<(Int, Int)>, case #Optional.Some!enumelt.1: bb1, default bb2
 
   guard let (x, y) = a else { }
+  _ = y
   return x
 
   // CHECK: bb1(%3 : $(Int, Int)):

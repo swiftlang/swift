@@ -459,7 +459,7 @@ func exprPostfix1(x : Int) {
 }
 
 func exprPostfix2() {
-  var x = .42 // expected-error {{'.42' is not a valid floating point literal; it must be written '0.42'}} {{11-11=0}}
+  var _ = .42 // expected-error {{'.42' is not a valid floating point literal; it must be written '0.42'}} {{11-11=0}}
 }
 
 //===--- Recovery for expr-super.
@@ -488,7 +488,7 @@ struct BracesInsideNominalDecl1 {
 }
 func use_BracesInsideNominalDecl1() {
   // Ensure that the typealias decl is not skipped.
-  var a : BracesInsideNominalDecl1.A // no-error
+  var _ : BracesInsideNominalDecl1.A // no-error
 }
 
 //===--- Recovery for wrong decl introducer keyword.
@@ -589,10 +589,13 @@ func f1() {
 func testMultiPatternConditionRecovery(x: Int?) {
   // expected-error@+1 {{binding ended by previous 'where' clause; use 'let' to introduce a new one}} {{30-30=let }}
   if let y = x where y == 0, z = x {
+    _ = y
+    _ = z
   }
 
   // expected-error@+1 {{binding ended by previous 'where' clause; use 'var' to introduce a new one}} {{30-30=var }}
   if var y = x where y == 0, z = x {
+    z = y; y = z
   }
 }
 

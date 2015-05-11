@@ -111,7 +111,7 @@ struct DeprecatedTypeWithMessage { }
 
 func use_deprecated_with_message() {
   deprecated_func_with_message() // expected-warning{{'deprecated_func_with_message()' is deprecated: message}}
-  var x : DeprecatedTypeWithMessage // expected-warning{{'DeprecatedTypeWithMessage' is deprecated: message}}
+  var _ : DeprecatedTypeWithMessage // expected-warning{{'DeprecatedTypeWithMessage' is deprecated: message}}
 }
 
 @availability(*, deprecated, message="message")
@@ -135,6 +135,6 @@ func use_deprecated_with_renamed() {
   deprecated_func_with_message_renamed() //expected-warning{{'deprecated_func_with_message_renamed()' is deprecated: blarg is your friend}}
   // expected-note@-1{{use 'blarg'}}{{3-39=blarg}}
 
-  var x: DeprecatedTypeWithRename // expected-warning{{'DeprecatedTypeWithRename' is deprecated: renamed to 'wobble'}}
+  var _: DeprecatedTypeWithRename // expected-warning{{'DeprecatedTypeWithRename' is deprecated: renamed to 'wobble'}}
   // expected-note@-1{{use 'wobble'}}{{10-34=wobble}}
 }
