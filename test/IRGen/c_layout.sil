@@ -5,6 +5,9 @@ import c_layout
 import Builtin
 import Swift
 
+// FIXME: No simd module on linux rdar://problem/20795411
+// XFAIL: linux
+
 // TODO: Provide tests for other architectures
 
 // CHECK-x86_64: %VSC11BitfieldOne = type <{ %VSs6UInt32, %VSC6Nested, [1 x i8], [4 x i8], [4 x i8], %Sf, [1 x i8], [7 x i8], %VSs6UInt64, %VSs6UInt32 }>
