@@ -25,7 +25,7 @@
 
 // Qualified.
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=CLANG_QUAL_MACROS_1 -completion-cache-path=%t.ccp > %t.macros.ccp1.compl.txt
-// RUN: FileCheck %s -check-prefix=CLANG_QUAL_MACROS_1 < %t.macros.ccp1.compl.txt
+// RUN: FileCheck %s -check-prefix=CLANG_QUAL_MACROS_1 -check-prefix=CLANG_QUAL_MACROS_1-%target-runtime < %t.macros.ccp1.compl.txt
 // RUN: diff -r -u %t.ccp %t.ccp.bak
 
 // Check the individual cache item.
@@ -34,7 +34,7 @@
 
 // Qualified with dot.
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=CLANG_QUAL_MACROS_2 -completion-cache-path=%t.ccp > %t.macros2.ccp1.compl.txt
-// RUN: FileCheck %s -check-prefix=CLANG_QUAL_MACROS_2 < %t.macros2.ccp1.compl.txt
+// RUN: FileCheck %s -check-prefix=CLANG_QUAL_MACROS_2 -check-prefix=CLANG_QUAL_MACROS_2-%target-runtime < %t.macros2.ccp1.compl.txt
 
 // Check the individual cache item.
 // RUN: %target-swift-ide-test -dump-completion-cache %t.ccp/macros-dot-* | FileCheck %s -check-prefix=CLANG_QUAL_MACROS_2
@@ -81,7 +81,7 @@ func testCompleteModuleQualifiedMacros1() {
 // CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule[macros]: GL_RGB[#Int32#]{{; name=.+$}}
 // CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule[macros]: MINUS_THREE[#Int32#]{{; name=.+$}}
 // CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule[macros]: M_PIf[#Float#]{{; name=.+$}}
-// CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule[macros]: OBJC_STRING[#String#]{{; name=.+$}}
+// CLANG_QUAL_MACROS_1-objc-DAG: Decl[GlobalVar]/OtherModule[macros]: OBJC_STRING[#String#]{{; name=.+$}}
 // CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule[macros]: USES_MACRO_FROM_OTHER_MODULE_1[#Int32#]{{; name=.+$}}
 // CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule[macros]: UTF8_STRING[#String#]{{; name=.+$}}
 // CLANG_QUAL_MACROS_1-DAG: Decl[GlobalVar]/OtherModule[macros]: VERSION_STRING[#String#]{{; name=.+$}}
@@ -99,7 +99,7 @@ func testCompleteModuleQualifiedMacros2() {
 // CLANG_QUAL_MACROS_2-DAG: Decl[GlobalVar]/OtherModule[macros]: .GL_RGB[#Int32#]{{; name=.+$}}
 // CLANG_QUAL_MACROS_2-DAG: Decl[GlobalVar]/OtherModule[macros]: .MINUS_THREE[#Int32#]{{; name=.+$}}
 // CLANG_QUAL_MACROS_2-DAG: Decl[GlobalVar]/OtherModule[macros]: .M_PIf[#Float#]{{; name=.+$}}
-// CLANG_QUAL_MACROS_2-DAG: Decl[GlobalVar]/OtherModule[macros]: .OBJC_STRING[#String#]{{; name=.+$}}
+// CLANG_QUAL_MACROS_2-objc-DAG: Decl[GlobalVar]/OtherModule[macros]: .OBJC_STRING[#String#]{{; name=.+$}}
 // CLANG_QUAL_MACROS_2-DAG: Decl[GlobalVar]/OtherModule[macros]: .USES_MACRO_FROM_OTHER_MODULE_1[#Int32#]{{; name=.+$}}
 // CLANG_QUAL_MACROS_2-DAG: Decl[GlobalVar]/OtherModule[macros]: .UTF8_STRING[#String#]{{; name=.+$}}
 // CLANG_QUAL_MACROS_2-DAG: Decl[GlobalVar]/OtherModule[macros]: .VERSION_STRING[#String#]{{; name=.+$}}
