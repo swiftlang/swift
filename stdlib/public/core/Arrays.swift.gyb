@@ -320,7 +320,7 @@ public struct ${Self}<T>
   func _copyBuffer(inout buffer: _Buffer) {
     let newBuffer = _ContiguousArrayBuffer<T>(
       count: buffer.count, minimumCapacity: buffer.count)
-    let _ = buffer._uninitializedCopy(
+    buffer._uninitializedCopy(
       0..<count, target: newBuffer.baseAddress)
     buffer = _Buffer(newBuffer)
   }
