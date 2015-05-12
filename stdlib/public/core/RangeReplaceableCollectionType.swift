@@ -26,23 +26,6 @@ public protocol _RangeReplaceableCollectionDefaultsType
   mutating func append(x: Generator.Element)
 }
 
-extension _RangeReplaceableCollectionDefaultsType {
-  /// Return a collection of the same type, containing the elements
-  /// of `self`, in order, that satisfy the predicate `includeElement`.
-  final public func _prext_filter(
-    @noescape includeElement: (Generator.Element) -> Bool
-  ) -> Self {
-    var result = Self()
-    for e in self {
-      if includeElement(e) {
-        result.append(e)
-      }
-    }
-    return result
-  }
-}
-
-
 /// A *collection* that supports replacement of an arbitrary subRange
 /// of elements with the elements of another collection.
 public protocol RangeReplaceableCollectionType
@@ -124,12 +107,6 @@ public protocol RangeReplaceableCollectionType
   ///
   ///     Swift.removeAll(&self, keepCapacity: keepCapacity)
   mutating func removeAll(keepCapacity keepCapacity: Bool /*= false*/)
-
-  /// Return a collection of the same type, containing the elements
-  /// of `self`, in order, that satisfy the predicate `includeElement`.
-  func _prext_filter(
-    @noescape includeElement: (Generator.Element) -> Bool
-  ) -> Self
 }
 
 /// Insert `newElement` into `x` at index `i`.

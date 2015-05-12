@@ -671,19 +671,17 @@ extension ${Self} : _ArrayType {
   /// `includeElement(x)` is `true`
   public func filter(@noescape includeElement: (T) -> Bool) -> ${Self} {
     // FIXME(prext): remove this function when protocol extensions land.
-    return self._prext_filter(includeElement)
+    return ${Self}(self._prext_filter(includeElement))
   }
 
-  /// Return ${a_Self} containing the elements `x` of `self` for which
-  /// `includeElement(x)` is `true`
-  public func _prext_filter(
-    @noescape includeElement: (T) -> Bool
-  ) -> ${Self} {
+  /// Return an `Array` containing the elements of `self`,
+  /// in order, that satisfy the predicate `includeElement`.
+  public func _prext_filter(@noescape includeElement: (T) -> Bool) -> [T] {
     // Cast away @noescape.
     typealias IncludeElement = (T) -> Bool
     let escapableIncludeElement =
       unsafeBitCast(includeElement, IncludeElement.self)
-    return ${Self}(lazy(self).filter(escapableIncludeElement))
+    return Array(lazy(self).filter(escapableIncludeElement))
   }
 }
 

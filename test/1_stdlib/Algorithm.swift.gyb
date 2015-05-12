@@ -1363,9 +1363,9 @@ SequenceTypeAlgorithms.test("filter/SequenceType/${dispatch}") {
 func callGenericCollectionFilter<C : RangeReplaceableCollectionType>(
   collection: C,
   @noescape includeElement: (C.Generator.Element) -> Bool
-) -> C {
+) -> [C.Generator.Element] {
   var result = collection._prext_filter(includeElement)
-  expectType(C.self, &result)
+  expectType(Array<C.Generator.Element>.self, &result)
   return result
 }
 
@@ -1463,9 +1463,9 @@ struct ${CollectionType} : RangeReplaceableCollectionType {
 
   func _prext_filter(
     @noescape includeElement: (OpaqueValue<Int>) -> Bool
-  ) -> ${CollectionType} {
+  ) -> [OpaqueValue<Int>] {
     ++RangeReplaceableCollectionWithCustomFilterMethod.timesFilterWasCalled
-    return ${CollectionType}(elements._prext_filter(includeElement))
+    return elements._prext_filter(includeElement)
   }
 
 %   end
@@ -1489,9 +1489,9 @@ struct ${CollectionType} : RangeReplaceableCollectionType {
 func callStaticCollectionFilter(
   collection: ${CollectionType},
   @noescape includeElement: (OpaqueValue<Int>) -> Bool
-) -> ${CollectionType} {
+) -> [OpaqueValue<Int>] {
   var result = collection._prext_filter(includeElement)
-  expectType(${CollectionType}.self, &result)
+  expectType(Array<OpaqueValue<Int>>.self, &result)
   return result
 }
 
@@ -1525,7 +1525,7 @@ SequenceTypeAlgorithms.test("filter/RangeReplaceableCollectionType/${CollectionT
         ++timesClosureWasCalled
         return test.includeElement(element.value)
       }
-      expectType(${CollectionType}.self, &result)
+      expectType(Array<OpaqueValue<Int>>.self, &result)
       expectEqual(
         test.expected, result._prext_map { $0.value },
         stackTrace: test.loc.withCurrentLoc())
@@ -1540,7 +1540,7 @@ SequenceTypeAlgorithms.test("filter/RangeReplaceableCollectionType/${CollectionT
       expectEqual(test.sequence.count, timesClosureWasCalled) {
         "filter() should be eager and should only call its predicate once per element"
       }
-      expectGE(2 * result.count(), result.${'capacity' if CollectionKind == 'StdlibArray' else 'reservedCapacity'}) {
+      expectGE(2 * result.count(), result.capacity) {
         "filter() should not reserve capacity (it does not know how much the predicate will filter out)"
       }
     }

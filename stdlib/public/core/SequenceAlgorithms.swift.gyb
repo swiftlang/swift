@@ -367,28 +367,6 @@ extension CollectionType where Index : RandomAccessIndexType {
 }
 
 //===----------------------------------------------------------------------===//
-// filter()
-//===----------------------------------------------------------------------===//
-
-// We would like to make filter() a protocol requirement, and dynamically
-// dispatched, but Swift generics don't allow us to express this.
-// rdar://20477576
-
-extension SequenceType {
-  /// Return an `Array` containing the elements of `self`,
-  /// in order, that satisfy the predicate `includeElement`.
-  final public func _prext_filter(
-    @noescape includeElement: (${GElement}) -> Bool
-  ) -> [${GElement}] {
-    // Cast away @noescape.
-    typealias IncludeElement = (${GElement}) -> Bool
-    let escapableIncludeElement =
-      unsafeBitCast(includeElement, IncludeElement.self)
-    return Array<${GElement}>(lazy(self).filter(escapableIncludeElement))
-  }
-}
-
-//===----------------------------------------------------------------------===//
 // flatMap()
 //===----------------------------------------------------------------------===//
 
