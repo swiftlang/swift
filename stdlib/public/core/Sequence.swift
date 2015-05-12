@@ -14,7 +14,7 @@
 /// *sequence*.
 ///
 /// - note: While it is safe to copy a *generator*, advancing one
-/// copy may invalidate the others.
+///   copy may invalidate the others.
 ///
 /// Any code that uses multiple generators (or `for`...`in` loops)
 /// over a single *sequence* should have static knowledge that the

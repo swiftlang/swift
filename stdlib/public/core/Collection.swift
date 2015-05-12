@@ -71,7 +71,7 @@ extension _CollectionDefaultsType {
   /// Return the number of elements.
   ///
   /// - complexity: O(1) if `Index` conforms to `RandomAccessIndexType`;
-  /// O(N) otherwise.
+  ///   O(N) otherwise.
   final public func count() -> Index.Distance {
     return distance(startIndex, endIndex)
   }
@@ -82,8 +82,8 @@ extension _CollectionDefaultsType {
   /// O(N) by exploiting collection-specific knowledge.
   ///
   /// - returns: `nil` if a linear search should be attempted instead,
-  /// `Optional(nil)` if the element was not found, or
-  /// `Optional(Optional(index))` if an element was found.
+  ///   `Optional(nil)` if the element was not found, or
+  ///   `Optional(Optional(index))` if an element was found.
   ///
   /// - complexity: O(N)
   final public func _customIndexOfEquatableElement(
@@ -160,7 +160,7 @@ public protocol CollectionType
   /// Return the number of elements.
   ///
   /// - complexity: O(1) if `Index` conforms to `RandomAccessIndexType`;
-  /// O(N) otherwise.
+  ///   O(N) otherwise.
   func count() -> Index.Distance
 
   /// Customization point for `SequenceType.indexOf()`.
@@ -169,8 +169,8 @@ public protocol CollectionType
   /// O(N) by exploiting collection-specific knowledge.
   ///
   /// - returns: `nil` if a linear search should be attempted instead,
-  /// `Optional(nil)` if the element was not found, or
-  /// `Optional(Optional(index))` if an element was found.
+  ///   `Optional(nil)` if the element was not found, or
+  ///   `Optional(Optional(index))` if an element was found.
   ///
   /// - complexity: O(N)
   func _customIndexOfEquatableElement(element: Generator.Element) -> Index??
@@ -393,7 +393,7 @@ public protocol Sliceable : _Sliceable {
   /// indices.
   ///
   /// - complexity: O(1) unless bridging from Objective-C requires an
-  /// O(N) conversion.
+  ///   O(N) conversion.
   subscript(bounds: Range<Index>) -> SubSlice {get}
 }
 
@@ -431,8 +431,8 @@ public func dropLast<
 /// the elements of `s`.
 ///
 /// - complexity: O(1)+K when `S.Index` conforms to
-/// `RandomAccessIndexType` and O(N)+K otherwise, where K is the cost
-/// of slicing `s`.
+///   `RandomAccessIndexType` and O(N)+K otherwise, where K is the cost
+///   of slicing `s`.
 public func prefix<S: Sliceable>(s: S, _ maxLength: Int) -> S.SubSlice {
   let index = advance(s.startIndex, max(0, numericCast(maxLength)), s.endIndex)
   return s[s.startIndex..<index]
@@ -445,8 +445,8 @@ public func prefix<S: Sliceable>(s: S, _ maxLength: Int) -> S.SubSlice {
 /// the elements of `s`.
 ///
 /// - complexity: O(1)+K when `S.Index` conforms to
-/// `RandomAccessIndexType` and O(N)+K otherwise, where K is the cost
-/// of slicing `s`.
+///   `RandomAccessIndexType` and O(N)+K otherwise, where K is the cost
+///   of slicing `s`.
 public func suffix<
   S: Sliceable where S.Index: BidirectionalIndexType
 >(s: S, _ maxLength: Int) -> S.SubSlice {

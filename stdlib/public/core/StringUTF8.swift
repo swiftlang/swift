@@ -221,7 +221,7 @@ extension String {
     /// indices.
     ///
     /// - complexity: O(1) unless bridging from Objective-C requires an
-    /// O(N) conversion.
+    ///   O(N) conversion.
     public subscript(subRange: Range<Index>) -> UTF8View {
       return UTF8View(_core, subRange.startIndex, subRange.endIndex)
     }

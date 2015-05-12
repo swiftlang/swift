@@ -451,8 +451,8 @@ extension String : Hashable {
   /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
   ///
   /// - note: The hash value is not guaranteed to be stable across
-  /// different invocations of the same program.  Do not persist the
-  /// hash value across program runs.
+  ///   different invocations of the same program.  Do not persist the
+  ///   hash value across program runs.
   public var hashValue: Int {
 #if _runtime(_ObjC)
     // Mix random bits into NSString's hash so that clients don't rely on
@@ -574,7 +574,7 @@ extension String {
   /// Access the characters in the given `subRange`
   ///
   /// - complexity: O(1) unless bridging from Objective-C requires an
-  /// O(N) conversion.
+  ///   O(N) conversion.
   public subscript(subRange: Range<Index>) -> String {
     return String(characters[subRange])
   }
@@ -635,7 +635,7 @@ extension String {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - complexity: O(`subRange.count()`) if `subRange.endIndex
-  /// == self.endIndex` and `isEmpty(newElements)`, O(N) otherwise.
+  ///   == self.endIndex` and `isEmpty(newElements)`, O(N) otherwise.
   public mutating func replaceRange<
     C: CollectionType where C.Generator.Element == Character
   >(
@@ -651,7 +651,7 @@ extension String {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - complexity: O(`subRange.count()`) if `subRange.endIndex
-  /// == self.endIndex` and `isEmpty(newElements)`, O(N) otherwise.
+  ///   == self.endIndex` and `isEmpty(newElements)`, O(N) otherwise.
   public mutating func replaceRange(
     subRange: Range<Index>, with newElements: String
   ) {

@@ -62,6 +62,7 @@ extension SequenceType ${"" if preds else "where Generator.Element : Comparable"
   /// Returns the minimum element in `self` or `nil` if the sequence is empty.
   ///
   /// - complexity: O(elements.count())
+  ///
   /// ${orderingRequirement}
   final public func minElement(
 %   if preds:
@@ -83,7 +84,7 @@ extension SequenceType ${"" if preds else "where Generator.Element : Comparable"
   /// Returns the maximum element in `self` or `nil` if the sequence is empty.
   ///
   /// - complexity: O(elements.count())
-  /// ${orderingRequirement}
+  ///   ${orderingRequirement}
   final public func maxElement(
 %   if preds:
     @noescape isOrderedBefore: (${GElement}, ${GElement}) -> Bool
@@ -226,8 +227,8 @@ if preds:
   /// ordering, using `isOrderedBefore` as the comparison between elements.
   ///
   /// - note: This method implements the mathematical notion of lexicographical
-  /// ordering, which has no connection to Unicode.  If you are sorting strings
-  /// to present to the end-user, you should use `String` APIs that perform
+  ///   ordering, which has no connection to Unicode.  If you are sorting strings
+  ///   to present to the end-user, you should use `String` APIs that perform
   /// localized comparison.
   ///
   /// Requires: `isOrderedBefore` is a [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
@@ -238,8 +239,8 @@ else:
   /// ordering, using "<" as the comparison between elements.
   ///
   /// - note: This method implements the mathematical notion of lexicographical
-  /// ordering, which has no connection to Unicode.  If you are sorting strings
-  /// to present to the end-user, you should use `String` APIs that perform
+  ///   ordering, which has no connection to Unicode.  If you are sorting strings
+  ///   to present to the end-user, you should use `String` APIs that perform
   /// localized comparison."""
 }%
 

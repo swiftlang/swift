@@ -122,7 +122,7 @@ public struct FilterCollectionView<Base : CollectionType> : CollectionType {
   /// In an empty collection, `startIndex == endIndex`.
   ///
   /// - complexity: O(N), where N is the ratio between unfiltered and
-  /// filtered collection counts.
+  ///   filtered collection counts.
   public var startIndex: Index {
     var first = _base.startIndex
     while first != _base.endIndex {

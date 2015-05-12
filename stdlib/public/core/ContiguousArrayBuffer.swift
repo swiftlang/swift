@@ -425,7 +425,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
 #if _runtime(_ObjC)
   /// Convert to an NSArray.
   /// - precondition: T is bridged to Objective-C
-  /// O(1).
+  ///   O(1).
   public func _asCocoaArray() -> _NSArrayCoreType {
     _sanityCheck(
         _isBridgedToObjectiveC(T.self),

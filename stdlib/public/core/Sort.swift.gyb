@@ -87,8 +87,8 @@ func _insertionSort<
 /// *p*.
 ///
 /// - postcondition: For all *i* in `range.startIndex..<`*p*, and *j*
-/// in *p*`..<range.endIndex`, `less(elements[`*i*`],
-/// elements[`*j*`]) && !less(elements[`*j*`],
+///   in *p*`..<range.endIndex`, `less(elements[`*i*`],
+///   elements[`*j*`]) && !less(elements[`*j*`],
 /// elements[`*p*`])`.  Only returns `range.endIndex` when
 /// `elements` is empty.
 ${orderingRequirement}

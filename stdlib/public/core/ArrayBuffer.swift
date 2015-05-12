@@ -115,7 +115,7 @@ extension _ArrayBuffer {
 
   /// Convert to an NSArray.
   /// - precondition: _isBridgedToObjectiveC(Element.self)
-  /// O(1) if the element type is bridged verbatim, O(N) otherwise
+  ///   O(1) if the element type is bridged verbatim, O(N) otherwise
   public func _asCocoaArray() -> _NSArrayCoreType {
     _sanityCheck(
       _isBridgedToObjectiveC(T.self),

@@ -74,8 +74,8 @@ extension Bool : Equatable, Hashable {
   /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
   ///
   /// - note: the hash value is not guaranteed to be stable across
-  /// different invocations of the same program.  Do not persist the
-  /// hash value across program runs.
+  ///   different invocations of the same program.  Do not persist the
+  ///   hash value across program runs.
   public var hashValue: Int {
     return self ? 1 : 0
   }

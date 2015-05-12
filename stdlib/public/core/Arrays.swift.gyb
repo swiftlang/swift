@@ -516,7 +516,7 @@ extension ${Self} : _ArrayType {
   /// Reserve enough space to store minimumCapacity elements.
   ///
   /// - postcondition: `capacity >= minimumCapacity` and the array has
-  /// mutable contiguous storage.
+  ///   mutable contiguous storage.
   ///
   /// - complexity: O(`count`)
   @_semantics("array.mutate_unknown")
@@ -924,7 +924,7 @@ extension ${Self} {
   /// Replace the given `subRange` of elements with `newElements`.
   ///
   /// - complexity: O(`subRange.count()`) if `subRange.endIndex
-  /// == self.endIndex` and `isEmpty(newElements)`, O(N) otherwise.
+  ///   == self.endIndex` and `isEmpty(newElements)`, O(N) otherwise.
   @_semantics("array.mutate_unknown")
   public mutating func replaceRange<
     C: CollectionType where C.Generator.Element == _Buffer.Element

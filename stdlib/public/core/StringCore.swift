@@ -361,12 +361,12 @@ public struct _StringCore {
   /// capacity and a null pointer.
   ///
   /// - note: If successful, effectively appends garbage to the String
-  /// until it has newSize UTF-16 code units; you must immediately copy
-  /// valid UTF-16 into that storage.
+  ///   until it has newSize UTF-16 code units; you must immediately copy
+  ///   valid UTF-16 into that storage.
   ///
   /// - note: If unsuccessful because of insufficient space in an
-  /// existing buffer, the suggested new capacity will at least double
-  /// the existing buffer's storage
+  ///   existing buffer, the suggested new capacity will at least double
+  ///   the existing buffer's storage
   mutating func _claimCapacity(
     newSize: Int, minElementWidth: Int) -> (Int, COpaquePointer) {
     if _fastPath((nativeBuffer != nil) && elementWidth >= minElementWidth) {
@@ -464,7 +464,7 @@ public struct _StringCore {
   /// Append `c` to `self`.
   ///
   /// - complexity: O(1) when amortized over repeated appends of equal
-  /// character values
+  ///   character values
   mutating func append(c: UnicodeScalar) {
     let width = UTF16.width(c)
     append(
@@ -638,7 +638,7 @@ extension _StringCore : RangeReplaceableCollectionType {
   /// Replace the given `subRange` of elements with `newElements`.
   ///
   /// - complexity: O(`subRange.count()`) if `subRange.endIndex
-  /// == self.endIndex` and `isEmpty(newElements)`, O(N) otherwise.
+  ///   == self.endIndex` and `isEmpty(newElements)`, O(N) otherwise.
   public mutating func replaceRange<
     C: CollectionType where C.Generator.Element == UTF16.CodeUnit
   >(

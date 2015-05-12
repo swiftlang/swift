@@ -129,8 +129,8 @@ public struct COpaquePointer : Equatable, Hashable, NilLiteralConvertible {
   /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
   ///
   /// - note: The hash value is not guaranteed to be stable across
-  /// different invocations of the same program.  Do not persist the
-  /// hash value across program runs.
+  ///   different invocations of the same program.  Do not persist the
+  ///   hash value across program runs.
   public var hashValue: Int {
     return Int(Builtin.ptrtoint_Word(_rawValue))
   }

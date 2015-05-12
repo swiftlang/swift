@@ -41,8 +41,8 @@ public protocol _ArrayBufferType : MutableCollectionType {
   ///   _SliceBuffer.
   ///
   /// - note: This function must remain mutating; otherwise the buffer
-  /// may acquire spurious extra references, which will cause
-  /// unnecessary reallocation.
+  ///   may acquire spurious extra references, which will cause
+  ///   unnecessary reallocation.
   mutating func requestUniqueMutableBackingBuffer(minimumCapacity: Int)
     -> _ContiguousArrayBuffer<Element>?
 
@@ -50,8 +50,8 @@ public protocol _ArrayBufferType : MutableCollectionType {
   /// _ContiguousArrayBuffer.
   ///
   /// - note: This function must remain mutating; otherwise the buffer
-  /// may acquire spurious extra references, which will cause
-  /// unnecessary reallocation.
+  ///   may acquire spurious extra references, which will cause
+  ///   unnecessary reallocation.
   mutating func isMutableAndUniquelyReferenced() -> Bool
 
   /// If this buffer is backed by a `_ContiguousArrayBuffer`

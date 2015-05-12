@@ -30,7 +30,7 @@ func _stdlib_atomicCompareExchangeStrongPtrImpl(
 /// consistent memory ordering.  Precise semantics are defined in C++11 or C11.
 ///
 /// - warning: This operation is extremely tricky to use correctly because of
-/// writeback semantics.
+///   writeback semantics.
 ///
 /// It is best to use it directly on an
 /// `UnsafeMutablePointer<UnsafeMutablePointer<T>>` that is known to point

@@ -332,7 +332,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   /// Manage the given `buffer`.
   ///
   /// - note: It is an error to use the `value` property of the resulting
-  /// instance unless it has been initialized.
+  ///   instance unless it has been initialized.
   internal init(_ buffer: ManagedProtoBuffer<Value, Element>) {
     _nativeBuffer = Builtin.castToNativeObject(buffer)
   }

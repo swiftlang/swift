@@ -100,11 +100,11 @@ public func max<T : Comparable>(x: T, _ y: T, _ z: T, _ rest: T...) -> T {
 /// don't contain elements satisfying the predicate `isSeparator`.
 ///
 /// - parameter maxSplit: the maximum number of slices to return, minus 1.
-/// If `maxSplit + 1` slices would otherwise be returned, the
-/// algorithm stops splitting and returns a suffix of `elements`
+///   If `maxSplit + 1` slices would otherwise be returned, the
+///   algorithm stops splitting and returns a suffix of `elements`
 ///
 /// - parameter allowEmptySlices: if true, an empty slice is produced in
-/// the result for each pair of consecutive
+///   the result for each pair of consecutive
 public func split<S: Sliceable, R:BooleanType>(
   elements: S,
   maxSplit: Int = Int.max,
@@ -189,7 +189,7 @@ public func startsWith<
 ///     g.next() // nil
 ///
 /// - note: Idiomatic usage is to call `enumerate` instead of
-/// constructing an `EnumerateGenerator` directly.
+///   constructing an `EnumerateGenerator` directly.
 public struct EnumerateGenerator<
   Base: GeneratorType
 > : GeneratorType, SequenceType {
@@ -234,7 +234,7 @@ public struct EnumerateGenerator<
 ///     Array(s) // [(0, "foo"), (1, "bar")]
 ///
 /// - note: Idiomatic usage is to call `enumerate` instead of
-/// constructing an `EnumerateSequence` directly.
+///   constructing an `EnumerateSequence` directly.
 public struct EnumerateSequence<Base : SequenceType> : SequenceType {
   var base: Base
 

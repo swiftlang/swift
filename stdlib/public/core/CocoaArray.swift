@@ -46,8 +46,8 @@ internal struct _CocoaArrayWrapper : CollectionType {
   /// the subRange is stored contiguously. Otherwise, return nil.
   ///
   /// - note: This method should only be used as an optimization; it
-  /// is sometimes conservative and may return nil even when
-  /// contiguous storage exists, e.g., if array doesn't have a smart
+  ///   is sometimes conservative and may return nil even when
+  ///   contiguous storage exists, e.g., if array doesn't have a smart
   /// implementation of countByEnumeratingWithState.
   func contiguousStorage(
     subRange: Range<Int>

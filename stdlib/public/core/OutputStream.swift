@@ -46,8 +46,8 @@ public protocol Streamable {
 /// *output stream*, for example, by `print`.
 ///
 /// - note: `String(instance)` will work for an `instance` of *any*
-/// type, returning its `description` if the `instance` happens to be
-/// `CustomStringConvertible`.  Using `CustomStringConvertible` as a
+///   type, returning its `description` if the `instance` happens to be
+///   `CustomStringConvertible`.  Using `CustomStringConvertible` as a
 /// generic constraint, or accessing a conforming type's `description`
 /// directly, is therefore discouraged.
 ///
@@ -66,14 +66,14 @@ public protocol CustomStringConvertible {
 /// `CustomStringConvertible`'s `description` property.
 ///
 /// - note: `String(reflecting: instance)` will work for an `instance`
-/// of *any* type, returning its `debugDescription` if the `instance`
-/// happens to be `CustomDebugStringConvertible`.  Using
+///   of *any* type, returning its `debugDescription` if the `instance`
+///   happens to be `CustomDebugStringConvertible`.  Using
 /// `CustomDebugStringConvertible` as a generic constraint, or
 /// accessing a conforming type's `debugDescription` directly, is
 /// therefore discouraged.
 ///
 /// - see also: `String.init<T>(reflecting: T)`,
-/// `CustomStringConvertible`
+///   `CustomStringConvertible`
 public protocol CustomDebugStringConvertible {
   /// A textual representation of `self`, suitable for debugging.
   var debugDescription: String { get }
@@ -402,7 +402,7 @@ public func toDebugString<T>(x: T) -> String {
 /// protocols mentioned above.
 ///
 /// - parameter appendNewline: iff `true` (the default), write a trailing
-/// newline.
+///   newline.
 @inline(never)
 @_semantics("stdlib_binary_only")
 public func print<T, TargetStream : OutputStreamType>(
@@ -438,7 +438,7 @@ public func print<T, TargetStream : OutputStreamType>(
 /// protocols mentioned above.
 ///
 /// - parameter appendNewline: iff `true` (the default), write a trailing
-/// newline.
+///   newline.
 @inline(never)
 @_semantics("stdlib_binary_only")
 public func print<T>(value: T, appendNewline: Bool) {
@@ -476,7 +476,7 @@ public func print<T>(value: T) {
 /// protocols mentioned above.
 ///
 /// - parameter appendNewline: iff `true` (the default), write a trailing
-/// newline.
+///   newline.
 @inline(never)
 @_semantics("stdlib_binary_only")
 public func debugPrint<T, TargetStream : OutputStreamType>(
@@ -513,7 +513,7 @@ public func debugPrint<T, TargetStream : OutputStreamType>(
 /// protocols mentioned above.
 ///
 /// - parameter appendNewline: iff `true` (the default), write a trailing
-/// newline.
+///   newline.
 @inline(never)
 @_semantics("stdlib_binary_only")
 public func debugPrint<T>(value: T, appendNewline: Bool) {

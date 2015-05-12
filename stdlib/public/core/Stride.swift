@@ -27,7 +27,7 @@ public protocol _Strideable {
   /// - complexity: O(1).
   ///
   /// - seealso: `RandomAccessIndexType`'s `distanceTo`, which provides a
-  /// stronger semantic guarantee.
+  ///   stronger semantic guarantee.
   func distanceTo(other: Self) -> Stride
 
   /// Returns a `Self` `x` such that `self.distanceTo(x)` approximates
@@ -36,7 +36,7 @@ public protocol _Strideable {
   /// - complexity: O(1).
   ///
   /// - seealso: `RandomAccessIndexType`'s `advancedBy`, which
-  /// provides a stronger semantic guarantee.
+  ///   provides a stronger semantic guarantee.
   func advancedBy(n: Stride) -> Self
 }
 

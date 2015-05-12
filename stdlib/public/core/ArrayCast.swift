@@ -141,7 +141,7 @@ internal func _arrayConditionalDownCastElements<SourceElement, TargetElement>(
 ///
 /// - precondition: SourceElement is a class type.
 /// - precondition: TargetElement is bridged non-verbatim to Objective-C.
-/// O(n), because each element must be bridged separately.
+///   O(n), because each element must be bridged separately.
 internal func _arrayConditionalBridgeElements<SourceElement, TargetElement>(
        source: Array<SourceElement>
      ) -> Array<TargetElement>? {

@@ -129,7 +129,7 @@ extension String {
     /// indices.
     ///
     /// - complexity: O(1) unless bridging from Objective-C requires an
-    /// O(N) conversion.
+    ///   O(N) conversion.
     public subscript(r: Range<Index>) -> UnicodeScalarView {
       return UnicodeScalarView(
         _core[r.startIndex._position..<r.endIndex._position])
@@ -280,7 +280,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollectionType {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - complexity: O(`subRange.count()`) if `subRange.endIndex
-  /// == self.endIndex` and `isEmpty(newElements)`, O(N) otherwise.
+  ///   == self.endIndex` and `isEmpty(newElements)`, O(N) otherwise.
   public mutating func replaceRange<
     C: CollectionType where C.Generator.Element == UnicodeScalar
   >(

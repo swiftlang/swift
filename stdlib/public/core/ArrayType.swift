@@ -64,7 +64,7 @@ protocol _ArrayType
   /// Reserve enough space to store minimumCapacity elements.
   ///
   /// - postcondition: `capacity >= minimumCapacity` and the array has
-  /// mutable contiguous storage.
+  ///   mutable contiguous storage.
   ///
   /// - complexity: O(`count`)
   mutating func reserveCapacity(minimumCapacity: Int)

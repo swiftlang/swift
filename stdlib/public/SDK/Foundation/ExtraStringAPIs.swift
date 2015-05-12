@@ -33,8 +33,8 @@ extension String.UTF16View.Index : RandomAccessIndexType {
   /// Return `self` offset by `n` steps.
   ///
   /// - returns: If `n > 0`, the result of applying `successor` to
-  /// `self` `n` times.  If `n < 0`, the result of applying
-  /// `predecessor` to `self` `-n` times. Otherwise, `self`.
+  ///   `self` `n` times.  If `n < 0`, the result of applying
+  ///   `predecessor` to `self` `-n` times. Otherwise, `self`.
   ///
   /// - complexity: O(1)
   public func advancedBy(x: Int) -> String.UTF16View.Index {

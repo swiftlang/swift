@@ -103,7 +103,7 @@ extension String {
     /// indices.
     ///
     /// - complexity: O(1) unless bridging from Objective-C requires an
-    /// O(N) conversion.
+    ///   O(N) conversion.
     public subscript(subRange: Range<Index>) -> UTF16View {
       return UTF16View(
         _core, offset: _toInternalIndex(subRange.startIndex._offset),

@@ -328,7 +328,7 @@ extension String.CharacterView : RangeReplaceableCollectionType {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - complexity: O(`subRange.count()`) if `subRange.endIndex
-  /// == self.endIndex` and `isEmpty(newElements)`, O(N) otherwise.
+  ///   == self.endIndex` and `isEmpty(newElements)`, O(N) otherwise.
   public mutating func replaceRange<
     C: CollectionType where C.Generator.Element == Character
   >(
@@ -394,7 +394,7 @@ extension String.CharacterView : Sliceable {
   /// Access the characters in the given `subRange`
   ///
   /// - complexity: O(1) unless bridging from Objective-C requires an
-  /// O(N) conversion.
+  ///   O(N) conversion.
   public subscript(subRange: Range<Index>) -> String.CharacterView {
     let unicodeScalarRange =
       subRange.startIndex._base..<subRange.endIndex._base

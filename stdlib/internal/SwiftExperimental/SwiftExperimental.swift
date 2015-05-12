@@ -38,7 +38,7 @@ infix operator ∘ {
 ///     (g ∘ f)(x) == g(f(x))
 ///
 /// - returns: a function that applies ``g`` to the result of applying ``f``
-/// to the argument of the new function.
+///   to the argument of the new function.
 public func ∘<T, U, V>(g: U -> V, f: T -> U) -> (T -> V) {
   return { g(f($0)) }
 }

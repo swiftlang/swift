@@ -89,7 +89,7 @@ public struct UnicodeScalar :
   /// Return a String representation of `self` .
   ///
   /// - parameter forceASCII: if `true`, forces most values into a numeric
-  /// representation.
+  ///   representation.
   public func escape(asASCII forceASCII: Bool) -> String {
     func lowNibbleAsHex(v: UInt32) -> String {
       let nibble = v & 15
@@ -224,8 +224,8 @@ extension UnicodeScalar : Hashable {
   /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
   ///
   /// - note: The hash value is not guaranteed to be stable across
-  /// different invocations of the same program.  Do not persist the
-  /// hash value across program runs.
+  ///   different invocations of the same program.  Do not persist the
+  ///   hash value across program runs.
   public var hashValue: Int {
     return Int(self.value)
   }

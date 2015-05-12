@@ -29,7 +29,7 @@
 /// The pointer can be in one of the following states:
 ///
 /// - memory is not allocated (for example, pointer is null, or memory has
-/// been deallocated previously);
+///   been deallocated previously);
 ///
 /// - memory is allocated, but value has not been initialized;
 ///
@@ -112,8 +112,8 @@ public struct ${Self}<T>
   /// Deallocate `num` objects.
   ///
   /// - parameter num: number of objects to deallocate.  Should match exactly
-  /// the value that was passed to `alloc()` (partial deallocations are not
-  /// possible).
+  ///   the value that was passed to `alloc()` (partial deallocations are not
+  ///   possible).
   ///
   /// - precondition: The memory is not initialized.
   ///
@@ -149,7 +149,7 @@ public struct ${Self}<T>
   /// - precondition: The memory is not initialized.
   ///
   /// - postcondition: The memory is initalized; the value should eventually
-  /// be destroyed or moved from to avoid leaks.
+  ///   be destroyed or moved from to avoid leaks.
   public func initialize(newvalue: T) {
     Builtin.initialize(newvalue, _rawValue)
   }
@@ -163,7 +163,7 @@ public struct ${Self}<T>
   /// - precondition: The memory is initialized.
   ///
   /// - postcondition: The value has been destroyed and the memory must
-  /// be initialized before being used again.
+  ///   be initialized before being used again.
   public func move() -> T {
     return Builtin.take(_rawValue)
   }
@@ -287,7 +287,7 @@ public struct ${Self}<T>
   /// - precondition: The memory is initialized.
   ///
   /// - postcondition: The value has been destroyed and the memory must
-  /// be initialized before being used again.
+  ///   be initialized before being used again.
   public func destroy() {
     Builtin.destroy(T.self, _rawValue)
   }
@@ -296,7 +296,7 @@ public struct ${Self}<T>
   /// - precondition: The memory is initialized.
   ///
   /// - postcondition: The value has been destroyed and the memory must
-  /// be initialized before being used again.
+  ///   be initialized before being used again.
   public func destroy(count: Int) {
     _debugPrecondition(count >= 0, "${Self}.destroy with negative count")
     Builtin.destroyArray(T.self, _rawValue, count._builtinWordValue)
@@ -369,8 +369,8 @@ public struct ${Self}<T>
   /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
   ///
   /// - note: The hash value is not guaranteed to be stable across
-  /// different invocations of the same program.  Do not persist the
-  /// hash value across program runs.
+  ///   different invocations of the same program.  Do not persist the
+  ///   hash value across program runs.
   public var hashValue: Int {
     return Int(Builtin.ptrtoint_Word(_rawValue))
   }
@@ -396,8 +396,8 @@ public struct ${Self}<T>
   /// Return `self` offset by `n` steps.
   ///
   /// - returns: If `n > 0`, the result of applying `successor` to
-  /// `self` `n` times.  If `n < 0`, the result of applying
-  /// `predecessor` to `self` `-n` times. Otherwise, `self`.
+  ///   `self` `n` times.  If `n < 0`, the result of applying
+  ///   `predecessor` to `self` `-n` times. Otherwise, `self`.
   ///
   /// - complexity: O(1)
   public func advancedBy(n: Int) -> ${Self} {
