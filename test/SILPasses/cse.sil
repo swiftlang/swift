@@ -1,5 +1,7 @@
 // RUN: %target-sil-opt %s -cse -verify | FileCheck %s
 
+// XFAIL: linux
+
 import Builtin
 import Swift
 import Foundation
