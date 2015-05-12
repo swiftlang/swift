@@ -123,3 +123,5 @@ struct PrivateTopLevelStruct4 {
 protocol PrivateProto1 {}
 protocol PrivateProto2 {}
 protocol PrivateProto3 {}
+
+struct OtherFileElementType {}

@@ -27,6 +27,8 @@
 // CHECK-NEXT: "V4main10IntWrapper"
 // CHECK-NEXT: "VV4main10IntWrapper16InnerForNoReason"
 // CHECK-NEXT: "C4main8Subclass"
+// CHECK-NEXT: "PSs23ArrayLiteralConvertible"
+// CHECK-NEXT: "PSs23ArrayLiteralConvertible"
 // CHECK-NEXT: "Si"
 // CHECK-NEXT: "VE4mainSi10InnerToInt"
 
@@ -65,6 +67,16 @@ class Subclass : ClassFromOtherFile {}
 
 // CHECK-DAG: "Array"
 typealias MyArray = Array<Bool>
+
+// CHECK-DAG: "ArrayLiteralConvertible"
+extension ArrayLiteralConvertible {
+  final func useless() {}
+}
+
+// CHECK-DAG: OtherFileElementType
+extension ArrayLiteralConvertible where Element == OtherFileElementType {
+  final func useless2() {}
+}
 
 // CHECK-DAG: "IntegerLiteralType"
 let someGlobal = 42
@@ -204,11 +216,11 @@ struct Use4 : TopLevelProto1 {
 }
 
 // CHECK-DAG: - "*"
-print(42 * 30, appendNewline: false)
+print(42 * 30)
 
 // FIXME: Incorrectly marked non-private dependencies
 // CHECK-DAG: - "topLevel6"
-print(topLevel6(), appendNewline: false)
+print(topLevel6())
 // CHECK-DAG: - "topLevel7"
 private var use7 = topLevel7()
 // CHECK-DAG: - "topLevel8"
