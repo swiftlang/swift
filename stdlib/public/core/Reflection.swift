@@ -113,34 +113,40 @@ public enum QuickLookObject {
   /// An attributed string.
   case AttributedString(Any)
 
-  /// A rectangle
+  /// A rectangle.
+  ///
   /// Uses explicit coordinates to avoid coupling a particular Cocoa type.
   case Rectangle(Float64,Float64,Float64,Float64)
 
-  /// A point
+  /// A point.
+  ///
   /// Uses explicit coordinates to avoid coupling a particular Cocoa type.
   case Point(Float64,Float64)
 
-  /// A size
+  /// A size.
+  ///
   /// Uses explicit coordinates to avoid coupling a particular Cocoa type.
   case Size(Float64,Float64)
 
-  /// A logical value
+  /// A logical value.
   case Logical(Bool)
 
-  /// A range
+  /// A range.
+  ///
   /// Uses explicit values to avoid coupling a particular Cocoa type.
   case Range(UInt64, UInt64)
 
-  /// A GUI view
+  /// A GUI view.
+  ///
   /// Uses an Any to avoid coupling a particular Cocoa type.
   case View(Any)
 
-  /// A graphical sprite
+  /// A graphical sprite.
+  ///
   /// Uses an Any to avoid coupling a particular Cocoa type.
   case Sprite(Any)
 
-  /// A Uniform Resource Locator
+  /// A Uniform Resource Locator.
   case URL(String)
 
   /// Raw data that has already been encoded in a format the IDE understands.
@@ -169,24 +175,24 @@ public enum MirrorDisposition {
   case Container
   /// An Optional which can have either zero or one children.
   case Optional
-  /// An Objective-C object imported in Swift
+  /// An Objective-C object imported in Swift.
   case ObjCObject
 }
 
 /// The type returned by `reflect(x)`; supplies an API for runtime
-/// reflection on `x`
+/// reflection on `x`.
 public protocol MirrorType {
-  /// The instance being reflected
+  /// The instance being reflected.
   var value: Any { get }
 
-  /// Identical to `value.dynamicType`
+  /// Identical to `value.dynamicType`.
   var valueType: Any.Type { get }
 
   /// A unique identifier for `value` if it is a class instance; `nil`
   /// otherwise.
   var objectIdentifier: ObjectIdentifier? { get }
 
-  /// The count of `value`'s logical children
+  /// The count of `value`'s logical children.
   var count: Int { get }
 
   /// Get a name and mirror for the `i`th logical child.
