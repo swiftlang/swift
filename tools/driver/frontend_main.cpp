@@ -115,13 +115,14 @@ static bool emitMakeDependencies(DiagnosticEngine &diags,
   return false;
 }
 
-static void findNominals(SmallVectorImpl<const NominalTypeDecl *> &list,
+template <typename V, typename S>
+static void findNominals(llvm::SetVector<const NominalTypeDecl *, V, S> &list,
                          DeclRange members) {
   for (const Decl *D : members) {
     auto nominal = dyn_cast<NominalTypeDecl>(D);
     if (!nominal)
       continue;
-    list.push_back(nominal);
+    list.insert(nominal);
     findNominals(list, nominal->getMembers(/*forceDelayed=*/false));
   }
 }
@@ -154,7 +155,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
 
   out << "### Swift dependencies file v0 ###\n";
 
-  SmallVector<const NominalTypeDecl *, 16> extendedNominals;
+  llvm::SmallSetVector<const NominalTypeDecl *, 16> extendedNominals;
 
   out << "provides:\n";
   for (const Decl *D : SF->Decls) {
@@ -175,7 +176,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
           NTD->getFormalAccess() == Accessibility::Private) {
         break;
       }
-      extendedNominals.push_back(NTD);
+      extendedNominals.insert(NTD);
       findNominals(extendedNominals, ED->getMembers());
       break;
     }
@@ -198,7 +199,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
         break;
       }
       out << "- \"" << escape(NTD->getName()) << "\"\n";
-      extendedNominals.push_back(NTD);
+      extendedNominals.insert(NTD);
       findNominals(extendedNominals, NTD->getMembers());
       break;
     }

@@ -28,7 +28,6 @@
 // CHECK-NEXT: "VV4main10IntWrapper16InnerForNoReason"
 // CHECK-NEXT: "C4main8Subclass"
 // CHECK-NEXT: "PSs23ArrayLiteralConvertible"
-// CHECK-NEXT: "PSs23ArrayLiteralConvertible"
 // CHECK-NEXT: "Si"
 // CHECK-NEXT: "VE4mainSi10InnerToInt"
 
