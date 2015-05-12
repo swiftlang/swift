@@ -1392,23 +1392,8 @@ bool swift::conflicting(const OverloadSignature& sig1,
              (sig2.IsProperty && sig1.Name.getArgumentNames().size() > 0));
   }
   
-  // You cannot overload functions based on whether or not one throws. 
-  auto overloadedOnThrows = false;
-  
-  if (sig1.InterfaceType && sig2.InterfaceType) {
-    if (auto fn1 = sig1.InterfaceType->getAs<AnyFunctionType>()) {
-      if (auto fn2 = sig2.InterfaceType->getAs<AnyFunctionType>()) {
-        if (fn1->throws() != fn2->throws()) {
-          overloadedOnThrows =
-            fn1->getInput()->isEqual(fn2->getInput()) &&
-            fn1->getResult()->isEqual(fn2->getResult());
-        }
-      }
-    }
-  }
-  
   return sig1.Name == sig2.Name &&
-         ((sig1.InterfaceType == sig2.InterfaceType) || overloadedOnThrows) &&
+         sig1.InterfaceType == sig2.InterfaceType &&
          sig1.UnaryOperator == sig2.UnaryOperator &&
          sig1.IsInstanceMember == sig2.IsInstanceMember;
 }
@@ -1440,8 +1425,31 @@ static Type mapSignatureParamType(ASTContext &ctx, Type type) {
   return mapSignatureType(ctx, type);
 }
 
+/// Map an ExtInfo for a function type.
+///
+/// When checking if two signatures should be equivalent for overloading,
+/// we may need to compare the extended information.
+///
+/// In the type of the function declaration, none of the extended information
+/// is relevant. We cannot overload purely on @noreturn, 'throws', or the
+/// calling convention of the declaration itself.
+///
+/// For function parameter types, we do want to be able to overload on
+/// 'throws', since that is part of the mangled symbol name, but not
+/// @noreturn or @noescape.
+static AnyFunctionType::ExtInfo
+mapSignatureExtInfo(AnyFunctionType::ExtInfo info,
+                    bool topLevelFunction) {
+  if (topLevelFunction)
+    return AnyFunctionType::ExtInfo();
+  return AnyFunctionType::ExtInfo()
+      .withRepresentation(info.getRepresentation())
+      .withIsAutoClosure(info.isAutoClosure())
+      .withThrows(info.throws());
+}
+
 /// Map a function's type to the type used for computing signatures,
-/// which involves stripping noreturn, stripping default arguments,
+/// which involves stripping some attributes, stripping default arguments,
 /// transforming implicitly unwrapped optionals into strict optionals,
 /// stripping 'inout' on the 'self' parameter etc.
 static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
@@ -1511,10 +1519,10 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
     ctx, funcTy->getResult(), topLevelFunction, false, isInitializer,
     curryLevels - 1);
 
-  // At the top level, none of the extended information is relevant.
-  AnyFunctionType::ExtInfo info;
-  if (!topLevelFunction)
-    info = funcTy->getExtInfo();
+  // Map various attributes differently depending on if we're looking at
+  // the declaration, or a function parameter type.
+  AnyFunctionType::ExtInfo info = mapSignatureExtInfo(
+      funcTy->getExtInfo(), topLevelFunction);
 
   // Rebuild the resulting function type.
   //

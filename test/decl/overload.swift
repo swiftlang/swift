@@ -215,12 +215,25 @@ func &&(lhs: BooleanType, @autoclosure rhs: ()->BooleanType) -> Bool { // expect
   return lhs.boolValue || rhs().boolValue
 }
 
+// throws
+func throwsFunc(code code: Int) { } // expected-note{{previously declared}}
+@noreturn func throwsFunc(code code: Int) throws { } // expected-error{{invalid redeclaration of 'throwsFunc(code:)'}}
+
+// throws function parameter -- OK
+func throwsFuncParam(fn: () throws -> ()) { }
+func throwsFuncParam(fn: () -> ()) { }
+
 // @noreturn
 func noreturn(code code: Int) { } // expected-note{{previously declared}}
 @noreturn func noreturn(code code: Int) { } // expected-error{{invalid redeclaration of 'noreturn(code:)'}}
 
-func noreturn_1(x x: @noreturn (Int) -> Int) { }
-func noreturn_1(x x: (Int) -> Int) { } 
+// <rdar://problem/19816831>
+func noreturn_1(x x: @noreturn (Int) -> Int) { } // expected-note{{previously declared}}
+func noreturn_1(x x: (Int) -> Int) { } // expected-error{{invalid redeclaration of 'noreturn_1(x:)'}}
+
+// @noescape
+func noescape(@noescape x x: (Int) -> Int) { } // expected-note{{previously declared}}
+func noescape(x x: (Int) -> Int) { } // expected-error{{invalid redeclaration of 'noescape(x:)'}}
 
 // @autoclosure
 func autoclosure(f f: () -> Int) { }
