@@ -26,7 +26,6 @@ import ObjectiveC
 // CHECK-NEXT: @property (nonatomic, copy) NSInteger (^ __nullable savedBlock)(NSInteger);
 // CHECK-NEXT: @property (nonatomic) NSInteger (* __nonnull savedFunctionPointer)(NSInteger);
 // CHECK-NEXT: @property (nonatomic) NSInteger (* __nullable savedFunctionPointer2)(NSInteger);
-// CHECK-NEXT: @property (nonatomic) NSInteger (* __nullable savedFunctionPointer3)(NSInteger);
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Callbacks {
