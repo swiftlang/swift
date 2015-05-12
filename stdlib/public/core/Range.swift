@@ -209,8 +209,9 @@ public func ... <Pos : ForwardIndexType> (
 
 //===--- Prefer Ranges to Intervals, and add checking ---------------------===//
 
-/// Forms a half-open range that contains `start`, but not
-/// `end`.  Requires: `start <= end`
+/// Forms a half-open range that contains `start`, but not `end`.
+///
+/// Requires: `start <= end`
 @transparent
 public func ..< <Pos : ForwardIndexType where Pos : Comparable> (
   start: Pos, end: Pos

@@ -80,8 +80,9 @@ public protocol _ArrayBufferType : MutableCollectionType {
   ) -> R
 
   /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
-  /// over the underlying contiguous storage.  Requires: such
-  /// contiguous storage exists or the buffer is empty
+  /// over the underlying contiguous storage.
+  ///
+  /// Requires: such contiguous storage exists or the buffer is empty
   mutating func withUnsafeMutableBufferPointer<R>(
     @noescape body: (UnsafeMutableBufferPointer<Element>) -> R
   ) -> R

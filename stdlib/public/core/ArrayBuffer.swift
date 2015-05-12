@@ -426,8 +426,9 @@ extension _ArrayBuffer {
   }
   
   /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
-  /// over the underlying contiguous storage.  Requires: such
-  /// contiguous storage exists or the buffer is empty
+  /// over the underlying contiguous storage.
+  ///
+  /// Requires: such contiguous storage exists or the buffer is empty
   public mutating func withUnsafeMutableBufferPointer<R>(
     @noescape body: (UnsafeMutableBufferPointer<T>) -> R
   ) -> R {

@@ -118,8 +118,9 @@ protocol _ArrayType
       S : SequenceType where S.Generator.Element == Self
   >(elements: S) -> Self
 
-  /// Sort `self` in-place according to `isOrderedBefore`.  Requires:
-  /// `isOrderedBefore` induces a [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
+  /// Sort `self` in-place according to `isOrderedBefore`.
+  ///
+  /// Requires: `isOrderedBefore` induces a [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
   /// over the elements.
   mutating func sort(
     isOrderedBefore: (Generator.Element, Generator.Element) -> Bool
