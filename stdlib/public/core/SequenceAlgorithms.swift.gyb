@@ -51,8 +51,9 @@ extension SequenceType {
 %{
 if preds:
   orderingRequirement = """
-  /// Requires: `isOrderedBefore` is a [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings).
-  /// over `self`."""
+  /// - Requires: `isOrderedBefore` is a
+  ///   [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings).
+  ///   over `self`."""
 else:
   orderingRequirement = ""
 }%
@@ -122,7 +123,8 @@ if preds:
   /// `other`, using `isEquivalent` as the equivalence test.  Return true if
   /// `other` is empty.
   ///
-  /// Requires: `isEquivalent` is an [equivalence relation](http://en.wikipedia.org/wiki/Equivalence_relation)"""
+  /// - Requires: `isEquivalent` is an
+  ///   [equivalence relation](http://en.wikipedia.org/wiki/Equivalence_relation)."""
 else:
   comment = """
   /// Return true iff the the initial elements of `self` are equal to `prefix`.
@@ -170,7 +172,8 @@ if preds:
   /// Return true iff `self` and `other` contain equivalent elements, using
   /// `isEquivalent` as the equivalence test.
   ///
-  /// Requires: `isEquivalent` is an [equivalence relation](http://en.wikipedia.org/wiki/Equivalence_relation)"""
+  /// - Requires: `isEquivalent` is an
+  ///   [equivalence relation](http://en.wikipedia.org/wiki/Equivalence_relation)."""
 else:
   comment = """
   /// Return `true` iff `self` and `other` contain the same elements in the
@@ -231,8 +234,9 @@ if preds:
   ///   to present to the end-user, you should use `String` APIs that perform
   /// localized comparison.
   ///
-  /// Requires: `isOrderedBefore` is a [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
-  /// over the elements of `self` and `other`."""
+  /// - Requires: `isOrderedBefore` is a
+  ///   [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
+  ///   over the elements of `self` and `other`."""
 else:
   comment = """
   /// Return true iff `self` precedes `other` in a lexicographical ("dictionary")

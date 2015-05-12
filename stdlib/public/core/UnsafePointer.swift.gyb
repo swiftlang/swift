@@ -186,7 +186,7 @@ public struct ${Self}<T>
   /// Use this for assigning ranges into later memory that may overlap
   /// with the source range.
   ///
-  /// Requires: either `source` precedes `self` or follows `self + count`.
+  /// - Requires: Either `source` precedes `self` or follows `self + count`.
   public func assignBackwardFrom(source: ${Self}, count: Int) {
     _debugPrecondition(
       count >= 0, "${Self}.assignBackwardFrom with negative count")
@@ -219,7 +219,7 @@ public struct ${Self}<T>
   /// the last value to the first.  Use this for copying ranges into
   /// later memory that may overlap with the source range.
   ///
-  /// Requires: either `source` precedes `self` or follows `self + count`.
+  /// - Requires: Either `source` precedes `self` or follows `self + count`.
   public func moveInitializeBackwardFrom(source: ${Self}, count: Int) {
     _debugPrecondition(
       count >= 0, "${Self}.moveInitializeBackwardFrom with negative count")
@@ -240,7 +240,7 @@ public struct ${Self}<T>
   ///
   /// - Precondition: The memory is not initialized.
   ///
-  /// Requires: `self` and `source` may not overlap.
+  /// - Requires: `self` and `source` may not overlap.
   public func initializeFrom(source: ${Self}, count: Int) {
     _debugPrecondition(
       count >= 0, "${Self}.initializeFrom with negative count")
@@ -266,7 +266,7 @@ public struct ${Self}<T>
   /// Assign from `count` values beginning at `source` into initialized
   /// memory, transforming the source values into raw memory.
   ///
-  /// Requires: the `self` and `source` ranges may not overlap.
+  /// - Requires: The `self` and `source` ranges may not overlap.
   public func moveAssignFrom(source: ${Self}, count: Int) {
     _debugPrecondition(
       count >= 0, "moveAssignFrom with negative count")
@@ -376,13 +376,13 @@ public struct ${Self}<T>
   }
   /// Returns the next consecutive value after `self`.
   ///
-  /// Requires: the next value is representable.
+  /// - Requires: The next value is representable.
   public func successor() -> ${Self} {
     return self + 1
   }
   /// Returns the previous consecutive value before `self`.
   ///
-  /// Requires: the previous value is representable.
+  /// - Requires: The previous value is representable.
   public func predecessor() -> ${Self} {
     return self - 1
   }

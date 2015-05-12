@@ -674,9 +674,9 @@ extension DictionaryLiteral : CollectionType {
 
   /// Access the element indicated by `position`.
   ///
-  /// Requires: `position >= 0 && position < endIndex`.
+  /// - Requires: `position >= 0 && position < endIndex`.
   ///
-  /// - Complexity: O(1)
+  /// - complexity: O(1).
   public subscript(position: Int) -> Element {
     return elements[position]
   }

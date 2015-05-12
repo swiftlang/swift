@@ -48,7 +48,7 @@ public struct UnicodeScalar :
 
   /// Create an instance with numeric value `v`.
   ///
-  /// Requires: `v` is a valid Unicode scalar value.
+  /// - Requires: `v` is a valid Unicode scalar value.
   public init(_ v: UInt32) {
     // Unicode 6.3.0:
     //
@@ -69,7 +69,7 @@ public struct UnicodeScalar :
 
   /// Create an instance with numeric value `v`.
   ///
-  /// Requires: `v` is a valid Unicode scalar value.
+  /// - Requires: `v` is a valid Unicode scalar value.
   public init(_ v: UInt16) {
     self = UnicodeScalar(UInt32(v))
   }
@@ -234,7 +234,7 @@ extension UnicodeScalar : Hashable {
 extension UnicodeScalar {
   /// Construct with value `v`.
   ///
-  /// Requires: `v` is a valid unicode scalar value.
+  /// - Requires: `v` is a valid unicode scalar value.
   public init(_ v: Int) {
     self = UnicodeScalar(UInt32(v))
   }
@@ -243,7 +243,7 @@ extension UnicodeScalar {
 extension UInt8 {
   /// Construct with value `v.value`.
   ///
-  /// Requires: `v.value` can be represented as ASCII (0..<128).
+  /// - Requires: `v.value` can be represented as ASCII (0..<128).
   public init(ascii v: UnicodeScalar) {
     _precondition(v.value < 128,
         "Code point value does not fit into ASCII")
@@ -253,7 +253,7 @@ extension UInt8 {
 extension UInt32 {
   /// Construct with value `v.value`.
   ///
-  /// Requires: `v.value` can be represented as UInt32.
+  /// - Requires: `v.value` can be represented as UInt32.
   public init(_ v: UnicodeScalar) {
     self = v.value
   }
@@ -261,7 +261,7 @@ extension UInt32 {
 extension UInt64 {
   /// Construct with value `v.value`.
   ///
-  /// Requires: `v.value` can be represented as UInt64.
+  /// - Requires: `v.value` can be represented as UInt64.
   public init(_ v: UnicodeScalar) {
     self = UInt64(v.value)
   }
@@ -305,8 +305,8 @@ extension UnicodeScalar.UTF16View : CollectionType {
 
   /// Access the code unit at `position`.
   ///
-  /// Requires: `position` is a valid position in `self` and
-  /// `position != endIndex`.
+  /// - Requires: `position` is a valid position in `self` and
+  ///   `position != endIndex`.
   subscript(position: Int) -> UTF16.CodeUnit {
     return position == 0 ? (
       endIndex == 1 ? UTF16.CodeUnit(value.value) : UTF16.leadSurrogate(value)

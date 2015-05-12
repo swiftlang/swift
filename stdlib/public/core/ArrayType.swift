@@ -85,9 +85,9 @@ protocol _ArrayType
 
   /// Remove an element from the end of the Array in O(1).
   ///
-  /// - Returns: the removed element.
+  /// - returns: The removed element.
   ///
-  /// Requires: count > 0
+  /// - Requires: `count > 0`.
   mutating func removeLast() -> Generator.Element
 
   /// Insert `newElement` at index `i`.
@@ -96,16 +96,16 @@ protocol _ArrayType
   ///
   /// - Complexity: O(`self.count()`).
   ///
-  /// Requires: `atIndex` <= `count`
+  /// - Requires: `atIndex <= count`.
   mutating func insert(newElement: Generator.Element, atIndex i: Int)
 
   /// Remove and return the element at the given index.
   ///
-  /// - Returns: the removed element.
+  /// - returns: The removed element.
   ///
   /// - Complexity: Worst case O(N).
   ///
-  /// Requires: `count` > `index`
+  /// - Requires: `count > index`.
   mutating func removeAtIndex(index: Int) -> Generator.Element
 
   /// Erase all the elements.  If `keepCapacity` is `true`, `capacity`
@@ -120,8 +120,9 @@ protocol _ArrayType
 
   /// Sort `self` in-place according to `isOrderedBefore`.
   ///
-  /// Requires: `isOrderedBefore` induces a [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
-  /// over the elements.
+  /// - Requires: `isOrderedBefore` induces a
+  ///   [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
+  ///   over the elements.
   mutating func sort(
     isOrderedBefore: (Generator.Element, Generator.Element) -> Bool
   )

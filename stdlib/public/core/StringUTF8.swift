@@ -121,7 +121,7 @@ extension String {
 
       /// Returns the next consecutive value after `self`.
       ///
-      /// Requires: the next value is representable.
+      /// - Requires: The next value is representable.
       public func successor() -> Index {
         let currentUnit = UTF8.CodeUnit(truncatingBitPattern: _buffer)
         let hiNibble = currentUnit >> 4
@@ -209,8 +209,8 @@ extension String {
 
     /// Access the element at `position`.
     ///
-    /// Requires: `position` is a valid position in `self` and
-    /// `position != endIndex`.
+    /// - Requires: `position` is a valid position in `self` and
+    ///   `position != endIndex`.
     public subscript(position: Index) -> UTF8.CodeUnit {
       let result: UTF8.CodeUnit = numericCast(position._buffer & 0xFF)
       _precondition(result != 0xFF, "can not subscript using endIndex")
@@ -332,8 +332,8 @@ extension String.UTF8View.Index {
   /// Construct the position in `utf8` that corresponds exactly to
   /// `utf16Index`. If no such position exists, the result is `nil`.
   ///
-  /// Requires: `utf8Index` is an element of
-  /// `String(utf16)!.utf8.indices`.
+  /// - Requires: `utf8Index` is an element of
+  ///   `String(utf16)!.utf8.indices`.
   public init?(_ utf16Index: String.UTF16Index, within utf8: String.UTF8View) {
     let utf16 = String.UTF16View(utf8._core)
 
@@ -359,8 +359,8 @@ extension String.UTF8View.Index {
   /// Construct the position in `utf8` that corresponds exactly to
   /// `unicodeScalarIndex`.
   ///
-  /// Requires: `unicodeScalarIndex` is an element of
-  /// `String(utf8)!.unicodeScalars.indices`.
+  /// - Requires: `unicodeScalarIndex` is an element of
+  ///   `String(utf8)!.unicodeScalars.indices`.
   public init(
     _ unicodeScalarIndex: String.UnicodeScalarIndex,
     within utf8: String.UTF8View
@@ -371,8 +371,8 @@ extension String.UTF8View.Index {
   /// Construct the position in `utf8` that corresponds exactly to
   /// `characterIndex`.
   ///
-  /// Requires: `characterIndex` is an element of
-  /// `String(utf8)!.indices`.
+  /// - Requires: `characterIndex` is an element of
+  ///   `String(utf8)!.indices`.
   public init(_ characterIndex: String.Index, within utf8: String.UTF8View) {
     self.init(utf8._core, _utf16Offset: characterIndex._base._position)
   }
@@ -380,7 +380,7 @@ extension String.UTF8View.Index {
   /// Return the position in `utf16` that corresponds exactly
   /// to `self`, or if no such position exists, `nil`.
   ///
-  /// Requires: `self` is an element of `String(utf16)!.utf8.indices`.
+  /// - Requires: `self` is an element of `String(utf16)!.utf8.indices`.
   public func samePositionIn(
     utf16: String.UTF16View
   ) -> String.UTF16View.Index? {
@@ -390,8 +390,8 @@ extension String.UTF8View.Index {
   /// Return the position in `unicodeScalars` that corresponds exactly
   /// to `self`, or if no such position exists, `nil`.
   ///
-  /// Requires: `self` is an element of
-  /// `String(unicodeScalars).utf8.indices`.
+  /// - Requires: `self` is an element of
+  ///   `String(unicodeScalars).utf8.indices`.
   public func samePositionIn(
     unicodeScalars: String.UnicodeScalarView
   ) -> String.UnicodeScalarIndex? {
@@ -401,7 +401,7 @@ extension String.UTF8View.Index {
   /// Return the position in `characters` that corresponds exactly
   /// to `self`, or if no such position exists, `nil`.
   ///
-  /// Requires: `self` is an element of `characters.utf8.indices`.
+  /// - Requires: `self` is an element of `characters.utf8.indices`.
   public func samePositionIn(
     characters: String
   ) -> String.Index? {

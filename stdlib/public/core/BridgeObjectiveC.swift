@@ -323,7 +323,7 @@ public struct AutoreleasingUnsafeMutablePointer<T /* TODO : class */>
   /// Access the `i`th element of the raw array pointed to by
   /// `self`.
   ///
-  /// Requires: `self != nil`
+  /// - Requires: `self != nil`.
   public subscript(i: Int) -> T {
     @transparent
     get {

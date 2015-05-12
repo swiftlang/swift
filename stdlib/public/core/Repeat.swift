@@ -47,8 +47,8 @@ public struct Repeat<T> : CollectionType {
 
   /// Access the element at `position`.
   ///
-  /// Requires: `position` is a valid position in `self` and
-  /// `position != endIndex`.
+  /// - Requires: `position` is a valid position in `self` and
+  ///   `position != endIndex`.
   public subscript(position: Int) -> T {
     _precondition(position >= 0 && position < count, "Index out of range")
     return repeatedValue

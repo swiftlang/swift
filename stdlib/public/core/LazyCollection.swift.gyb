@@ -49,8 +49,8 @@ public struct ${Self}<S : CollectionType ${whereClause}> : CollectionType {
 
   /// Access the element at `position`.
   ///
-  /// Requires: `position` is a valid position in `self` and
-  /// `position != endIndex`.
+  /// - Requires: `position` is a valid position in `self` and
+  ///   `position != endIndex`.
   public
   subscript(position: S.Index) -> S.Generator.Element {
     return _base[position]

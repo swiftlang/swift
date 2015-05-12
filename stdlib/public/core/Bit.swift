@@ -21,7 +21,7 @@ public enum Bit : Int, Comparable, RandomAccessIndexType, Reflectable {
 
   /// Returns the next consecutive value after `self`.
   ///
-  /// Requires: `self == .Zero`.
+  /// - Requires: `self == .Zero`.
   public func successor() -> Bit {
     _precondition(self == .Zero, "Can't increment past one")
     return .One
@@ -29,7 +29,7 @@ public enum Bit : Int, Comparable, RandomAccessIndexType, Reflectable {
 
   /// Returns the previous consecutive value before `self`.
   ///
-  /// Requires: `self != .Zero`.
+  /// - Requires: `self != .Zero`.
   public func predecessor() -> Bit {
     _precondition(self == .One, "Can't decrement past zero")
     return .Zero

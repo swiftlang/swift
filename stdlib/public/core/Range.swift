@@ -114,8 +114,8 @@ public struct Range<
 
   /// Access the element at `position`.
   ///
-  /// Requires: `position` is a valid position in `self` and
-  /// `position != endIndex`.
+  /// - Requires: `position` is a valid position in `self` and
+  ///   `position != endIndex`.
   public subscript(position: T) -> T {
     _debugPrecondition(position != endIndex, "Index out of range")
     return position
@@ -211,7 +211,7 @@ public func ... <Pos : ForwardIndexType> (
 
 /// Forms a half-open range that contains `start`, but not `end`.
 ///
-/// Requires: `start <= end`
+/// - Requires: `start <= end`.
 @transparent
 public func ..< <Pos : ForwardIndexType where Pos : Comparable> (
   start: Pos, end: Pos

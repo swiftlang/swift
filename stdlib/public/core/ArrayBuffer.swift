@@ -37,8 +37,8 @@ public struct _ArrayBuffer<T> : _ArrayBufferType {
 
   /// Returns an `_ArrayBuffer<U>` containing the same elements.
   ///
-  /// Requires: the elements actually have dynamic type `U`, and `U`
-  /// is a class or `@objc` existential.
+  /// - Requires: The elements actually have dynamic type `U`, and `U`
+  ///   is a class or `@objc` existential.
   func castToBufferOf<U>(_: U.Type) -> _ArrayBuffer<U> {
     _sanityCheck(_isClassOrObjCExistential(T.self))
     _sanityCheck(_isClassOrObjCExistential(U.self))
@@ -52,7 +52,7 @@ public struct _ArrayBuffer<T> : _ArrayBufferType {
   /// Returns an `_ArrayBuffer<U>` containing the same elements,
   /// deffering checking each element's `U`-ness until it is accessed.
   ///
-  /// Requires: `U` is a class or `@objc` existential derived from `T`.
+  /// - Requires: `U` is a class or `@objc` existential derived from `T`.
   func downcastToBufferWithDeferredTypeCheckOf<U>(
     _: U.Type
   ) -> _ArrayBuffer<U> {
@@ -161,8 +161,8 @@ extension _ArrayBuffer {
   /// Replace the given `subRange` with the first `newCount` elements of
   /// the given collection.
   ///
-  /// Requires: this buffer is backed by a uniquely-referenced
-  /// _ContiguousArrayBuffer
+  /// - Requires: This buffer is backed by a uniquely-referenced
+  ///   `_ContiguousArrayBuffer`.
   public mutating func replace<
       C: CollectionType where C.Generator.Element == Element
   >(
@@ -428,7 +428,7 @@ extension _ArrayBuffer {
   /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
   /// over the underlying contiguous storage.
   ///
-  /// Requires: such contiguous storage exists or the buffer is empty
+  /// - Requires: Such contiguous storage exists or the buffer is empty.
   public mutating func withUnsafeMutableBufferPointer<R>(
     @noescape body: (UnsafeMutableBufferPointer<T>) -> R
   ) -> R {
@@ -449,7 +449,7 @@ extension _ArrayBuffer {
   
   /// An object that keeps the elements stored in this buffer alive
   ///
-  /// Requires: this buffer is backed by a _ContiguousArrayBuffer
+  /// - Requires: This buffer is backed by a `_ContiguousArrayBuffer`.
   public var nativeOwner: AnyObject {
     _sanityCheck(_isNative, "Expect a native array")
     return _native._storage
@@ -520,7 +520,7 @@ extension _ArrayBuffer {
 
   /// Our native representation.
   ///
-  /// Requires: `_isNative`
+  /// - Requires: `_isNative`.
   var _native: NativeBuffer {
     return NativeBuffer(
       _isClassOrObjCExistential(T.self)
@@ -529,7 +529,7 @@ extension _ArrayBuffer {
 
   /// Fast access to the native representation.
   ///
-  /// Requires:  `_isNativeNoTypeCheck`
+  /// - Requires: `_isNativeNoTypeCheck`.
   var _nativeNoTypeCheck: NativeBuffer {
     return NativeBuffer(_storage.nativeInstance_noSpareBits)
   }

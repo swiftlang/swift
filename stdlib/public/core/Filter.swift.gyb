@@ -18,9 +18,9 @@ public struct FilterGenerator<
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   ///
-  /// Requires: `next()` has not been applied to a copy of `self`
-  /// since the copy was made, and no preceding call to `self.next()`
-  /// has returned `nil`.
+  /// - Requires: `next()` has not been applied to a copy of `self`
+  ///   since the copy was made, and no preceding call to `self.next()`
+  ///   has returned `nil`.
   public mutating func next() -> Base.Element? {
     var n: Base.Element?
     for/*ever*/;; {
@@ -61,7 +61,7 @@ public struct FilterCollectionViewIndex<
 > : ForwardIndexType {
   /// Returns the next consecutive value after `self`.
   ///
-  /// Requires: the next value is representable.
+  /// - Requires: The next value is representable.
   public func successor() -> FilterCollectionViewIndex {
     for nextPos in _pos.successor()..<_end {
       if _include(_base[nextPos]) {
@@ -150,7 +150,7 @@ public struct FilterCollectionView<Base : CollectionType> : CollectionType {
 
   /// Access the element at `position`.
   ///
-  /// Requires: `position` is a valid position in `self` and
+  /// - Requires: `position` is a valid position in `self` and
   /// `position != endIndex`.
   public subscript(position: Index) -> Base.Generator.Element {
     return _base[position._pos]

@@ -368,7 +368,7 @@ public struct ${Self} : ${Traversal}IndexType {
   /// Return the next consecutive value in a discrete sequence of
   /// `${Self}` values.
   ///
-  /// Requires: `self` has a well-defined successor.
+  /// - Requires: `self` has a well-defined successor.
   public func successor() -> ${Self} {
     return ${Self}(_box.successor())
   }
@@ -386,7 +386,7 @@ public struct ${Self} : ${Traversal}IndexType {
   /// Return the previous consecutive value in a discrete sequence of
   /// `${Self}` values.
   ///
-  /// Requires: `self` has a well-defined predecessor.
+  /// - Requires: `self` has a well-defined predecessor.
   public func predecessor() -> ${Self} {
     return ${Self}(_box.predecessor())
   }
@@ -405,7 +405,7 @@ public struct ${Self} : ${Traversal}IndexType {
   /// Return the minimum number of applications of `successor` or
   /// `predecessor` required to reach `other` from `self`.
   ///
-  /// Requires: `self` and `other` wrap instances of the same type.
+  /// - Requires: `self` and `other` wrap instances of the same type.
   public func distanceTo(other: ${Self}) -> Distance {
     return _box._distanceTo(other._box)
   }
@@ -463,8 +463,8 @@ public func ~> (
 /// Return true iff `lhs` and `rhs` wrap equal underlying
 /// `${Self}`s.
 ///
-/// Requires: the types of indices wrapped by `lhs` and `rhs` are
-/// identical.
+/// - Requires: The types of indices wrapped by `lhs` and `rhs` are
+///   identical.
 public func == (lhs: ${Self}, rhs: ${Self}) -> Bool {
   precondition(lhs._typeID == rhs._typeID, "base index types differ.")
   return lhs._box.equals(rhs._box)
@@ -593,8 +593,8 @@ public struct Any${Traversal}Collection<Element> : AnyCollectionType {
 
   /// Access the element indicated by `position`.
   ///
-  /// Requires: `position` indicates a valid position in `self` and
-  /// `position != endIndex`.
+  /// - Requires: `position` indicates a valid position in `self` and
+  ///   `position != endIndex`.
   public subscript(position: Any${Traversal}Index) -> Element {
     return _box[position._box]
   }

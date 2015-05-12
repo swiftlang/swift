@@ -80,7 +80,7 @@ public struct Character :
 
   /// Create an instance from a single-character `String`.
   ///
-  /// Requires: `s` contains exactly one extended grapheme cluster.
+  /// - Requires: `s` contains exactly one extended grapheme cluster.
   public init(_ s: String) {
     // The small representation can accept up to 8 code units as long
     // as the last one is a continuation.  Since the high bit of the
@@ -172,8 +172,8 @@ public struct Character :
 
     /// Access the code unit at `position`.
     ///
-    /// Requires: `position` is a valid position in `self` and
-    /// `position != endIndex`.
+    /// - Requires: `position` is a valid position in `self` and
+    ///   `position != endIndex`.
     subscript(position: Int) -> UTF8.CodeUnit {
       _sanityCheck(position >= 0)
       _sanityCheck(position < Int(count))
@@ -234,8 +234,8 @@ public struct Character :
 
     /// Access the code unit at `position`.
     ///
-    /// Requires: `position` is a valid position in `self` and
-    /// `position != endIndex`.
+    /// - Requires: `position` is a valid position in `self` and
+    ///   `position != endIndex`.
     subscript(position: Int) -> UTF16.CodeUnit {
       _sanityCheck(position >= 0)
       _sanityCheck(position < Int(count))

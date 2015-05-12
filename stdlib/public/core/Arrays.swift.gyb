@@ -308,7 +308,7 @@ public struct ${Self}<T>
     return _buffer.capacity
   }
 
-  // Requires: the array has a native buffer
+  /// - Requires: The array has a native buffer.
   @_semantics("array.owner")
   func _getOwner() -> Builtin.NativeObject {
     return Builtin.castToNativeObject(_buffer.nativeOwner)
@@ -583,7 +583,8 @@ extension ${Self} : _ArrayType {
   }
 
   /// Remove an element from the end of the ${Self} in O(1).
-  /// Requires: count > 0
+  ///
+  /// - Requires: `count > 0`.
   public mutating func removeLast() -> T {
     _precondition(count > 0, "can't removeLast from an empty ${Self}")
     let c = count
@@ -595,7 +596,7 @@ extension ${Self} : _ArrayType {
 
   /// Insert `newElement` at index `i`.
   ///
-  /// Requires: `i <= count`
+  /// - Requires: `i <= count`.
   ///
   /// - Complexity: O(`count`).
   public mutating func insert(newElement: T, atIndex i: Int) {
@@ -640,8 +641,9 @@ extension ${Self} : _ArrayType {
     return Swift.join(self, elements)
   }
 
-  /// Sort `self` in-place according to `isOrderedBefore`.  Requires:
-  /// `isOrderedBefore` induces a [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
+  /// Sort `self` in-place according to `isOrderedBefore`.
+  ///
+  /// - Requires: `isOrderedBefore` induces a [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
   /// over the elements.
   public mutating func sort(isOrderedBefore: (T, T) -> Bool) {
     return withUnsafeMutableBufferPointer {
@@ -651,7 +653,9 @@ extension ${Self} : _ArrayType {
   }
 
   /// Return a copy of `self` that has been sorted according to
-  /// `isOrderedBefore`.  Requires: `isOrderedBefore` induces a
+  /// `isOrderedBefore`.
+  ///
+  /// - Requires: `isOrderedBefore` induces a
   /// [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
   /// over the elements.
   public func sorted(isOrderedBefore: (T, T) -> Bool) -> ${Self} {
@@ -1222,12 +1226,14 @@ public func !=<T : Equatable>(lhs: ${Self}<T>, rhs: ${Self}<T>) -> Bool {
 %end
 
 #if _runtime(_ObjC)
-/// Returns an Array<Base> containing the same elements as a in
-/// O(1). Requires: Base is a base class or base @objc protocol (such
-/// as AnyObject) of Derived.
-/// FIXME: Dynamic casting is currently not possible without the objc runtime:
-/// rdar://problem/18801510
+/// Returns an `Array<Base>` containing the same elements as `a` in
+/// O(1).
+///
+/// - Requires: `Base` is a base class or base `@objc` protocol (such
+/// as `AnyObject`) of `Derived`.
 public func _arrayUpCast<Derived, Base>(a: Array<Derived>) -> Array<Base> {
+  // FIXME: Dynamic casting is currently not possible without the objc runtime:
+  // rdar://problem/18801510
   return Array(a._buffer.castToBufferOf(Base.self))
 }
 #endif

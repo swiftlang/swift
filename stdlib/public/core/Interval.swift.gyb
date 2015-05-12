@@ -60,8 +60,9 @@ public struct ${Self}<T : Comparable>
     self = x
   }
 
-  /// Construct an interval with the given bounds.  Requires: `start`
-  /// <= `end`.
+  /// Construct an interval with the given bounds.
+  ///
+  /// - Requires: `start <= end`.
   public init(_ start: T, _ end: T) {
     _precondition(end >= start, "Invalid ${Self} bounds (end < start)")
     _start = start

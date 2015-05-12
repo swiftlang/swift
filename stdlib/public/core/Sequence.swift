@@ -29,11 +29,11 @@ public protocol GeneratorType {
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   ///
-  /// Requires: `next()` has not been applied to a copy of `self`
-  /// since the copy was made, and no preceding call to `self.next()`
-  /// has returned `nil`.  Specific implementations of this protocol
-  /// are encouraged to respond to violations of this requirement by
-  /// calling `preconditionFailure("...")`.
+  /// - Requires: `next()` has not been applied to a copy of `self`
+  ///   since the copy was made, and no preceding call to `self.next()`
+  ///   has returned `nil`.  Specific implementations of this protocol
+  ///   are encouraged to respond to violations of this requirement by
+  ///   calling `preconditionFailure("...")`.
   mutating func next() -> Element?
 }
 
@@ -235,9 +235,9 @@ public struct GeneratorSequence<
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   ///
-  /// Requires: `next()` has not been applied to a copy of `self`
-  /// since the copy was made, and no preceding call to `self.next()`
-  /// has returned `nil`.
+  /// - Requires: `next()` has not been applied to a copy of `self`
+  ///   since the copy was made, and no preceding call to `self.next()`
+  ///   has returned `nil`.
   public mutating func next() -> G.Element? {
     return _base.next()
   }

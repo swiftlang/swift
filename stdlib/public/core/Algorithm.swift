@@ -12,7 +12,7 @@
 
 /// Returns the minimum element in `elements`.
 ///
-/// Requires: `elements` is non-empty. O(elements.count())
+/// - Requires: `elements` is non-empty. O(`elements.count()`).
 @availability(*, unavailable, message="call the 'minElement()' method on the sequence")
 public func minElement<
      R : SequenceType
@@ -23,7 +23,7 @@ public func minElement<
 
 /// Returns the maximum element in `elements`.
 ///
-/// Requires: `elements` is non-empty. O(elements.count())
+/// - Requires: `elements` is non-empty. O(`elements.count()`).
 @availability(*, unavailable, message="call the 'maxElement()' method on the sequence")
 public func maxElement<
      R : SequenceType
@@ -165,7 +165,7 @@ public func startsWith<
 /// Return true iff `s` begins with elements equivalent to those of
 /// `prefix`, using `isEquivalent` as the equivalence test.
 ///
-/// Requires: `isEquivalent` is an [equivalence relation](http://en.wikipedia.org/wiki/Equivalence_relation)
+/// - Requires: `isEquivalent` is an [equivalence relation](http://en.wikipedia.org/wiki/Equivalence_relation).
 @availability(*, unavailable, message="call the 'startsWith()' method on the sequence")
 public func startsWith<
   S0 : SequenceType, S1 : SequenceType
@@ -207,7 +207,7 @@ public struct EnumerateGenerator<
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   ///
-  /// Requires: no preceding call to `self.next()` has returned `nil`.
+  /// - Requires: No preceding call to `self.next()` has returned `nil`.
   public mutating func next() -> Element? {
     let b = base.next()
     if b == nil { return .None }
@@ -286,7 +286,7 @@ public func equal<
 /// Return true iff `a1` and `a2` contain equivalent elements, using
 /// `isEquivalent` as the equivalence test.
 ///
-/// Requires: `isEquivalent` is an [equivalence relation](http://en.wikipedia.org/wiki/Equivalence_relation)
+/// - Requires: `isEquivalent` is an [equivalence relation](http://en.wikipedia.org/wiki/Equivalence_relation).
 @availability(*, unavailable, message="call the 'equal()' method on the sequence")
 public func equal<
     S1 : SequenceType, S2 : SequenceType
@@ -314,7 +314,7 @@ public func lexicographicalCompare<
 /// Return true iff `a1` precedes `a2` in a lexicographical ("dictionary")
 /// ordering, using `isOrderedBefore` as the comparison between elements.
 ///
-/// Requires: `isOrderedBefore` is a
+/// - Requires: `isOrderedBefore` is a
 /// [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
 /// over the elements of `a1` and `a2`.
 @availability(*, unavailable, message="call the 'lexicographicalCompare()' method on the sequence")

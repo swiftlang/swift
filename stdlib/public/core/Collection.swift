@@ -138,8 +138,8 @@ public protocol CollectionType
 
   /// Access the element indicated by `position`.
   ///
-  /// Requires: `position` indicates a valid position in `self` and
-  /// `position != endIndex`.
+  /// - Requires: `position` indicates a valid position in `self` and
+  ///   `position != endIndex`.
   subscript(position: Index) -> Generator.Element {get}
 
   /// The *collection* type that represents a sub-range of elements.
@@ -264,8 +264,8 @@ public func last<C: CollectionType where C.Index: BidirectionalIndexType>(
 public protocol MutableCollectionType : CollectionType {
   /// Access the element at `position`.
   ///
-  /// Requires: `position` indicates a valid position in `self` and
-  /// `position != endIndex`.
+  /// - Requires: `position` indicates a valid position in `self` and
+  ///   `position != endIndex`.
   subscript(position: Index) -> Generator.Element {get set}
 }
 
@@ -303,7 +303,7 @@ public struct IndexingGenerator<
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   ///
-  /// Requires: no preceding call to `self.next()` has returned `nil`.
+  /// - Requires: No preceding call to `self.next()` has returned `nil`.
   public mutating func next() -> C._Element? {
     return _position == _elements.endIndex
     ? .None : .Some(_elements[_position++])
@@ -340,7 +340,7 @@ public struct PermutationGenerator<
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   ///
-  /// Requires: no preceding call to `self.next()` has returned `nil`.
+  /// - Requires: No preceding call to `self.next()` has returned `nil`.
   public mutating func next() -> Element? {
     let result = indices.next()
     return result != nil ? seq[result!] : .None
@@ -360,7 +360,7 @@ public struct PermutationGenerator<
   /// Construct a *generator* over a permutation of `elements` given
   /// by `indices`.
   ///
-  /// Requires: `elements[i]` is valid for every `i` in `indices`.
+  /// - Requires: `elements[i]` is valid for every `i` in `indices`.
   public init(elements: C, indices: Indices) {
     self.seq = elements
     self.indices = indices.generate()
@@ -409,14 +409,14 @@ public protocol MutableSliceable : Sliceable, MutableCollectionType {
 
 /// Return a slice containing all but the first element of `s`.
 ///
-/// Requires: `s` is non-empty.
+/// - Requires: `s` is non-empty.
 public func dropFirst<Seq : Sliceable>(s: Seq) -> Seq.SubSlice {
   return s[s.startIndex.successor()..<s.endIndex]
 }
 
 /// Return a slice containing all but the last element of `s`.
 ///
-/// Requires: `s` is non-empty.
+/// - Requires: `s` is non-empty.
 public func dropLast<
   S: Sliceable
   where S.Index: BidirectionalIndexType

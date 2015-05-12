@@ -85,7 +85,7 @@ public protocol _IncrementableDefaultsType {
   /// Return the next consecutive value in a discrete sequence of
   /// `Self` values
   ///
-  /// Requires: `self` has a well-defined successor.
+  /// - Requires: `self` has a well-defined successor.
   func successor() -> Self
 }
 
@@ -238,7 +238,7 @@ public protocol _BidirectionalIndexDefaultsType : _ForwardIndexType {
   /// well-defined predecessor, `self.predecessor().successor() ==
   /// self`.
   ///
-  /// Requires: `self` has a well-defined predecessor.
+  /// - Requires: `self` has a well-defined predecessor.
   func predecessor() -> Self
 }
 

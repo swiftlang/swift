@@ -297,8 +297,8 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
   /// Replace the given subRange with the first newCount elements of
   /// the given collection.
   ///
-  /// Requires: this buffer is backed by a uniquely-referenced
-  /// _ContiguousArrayBuffer
+  /// - Requires: This buffer is backed by a uniquely-referenced
+  ///   `_ContiguousArrayBuffer`.
   public mutating func replace<
     C: CollectionType where C.Generator.Element == Element
   >(
@@ -462,7 +462,8 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
   }
 
   /// Return true if the buffer stores only elements of type `U`.
-  /// Requires: `U` is a class or `@objc` existential. O(N)
+  ///
+  /// - Requires: `U` is a class or `@objc` existential. O(N).
   func storesOnlyElementsOfType<U>(
     _: U.Type
   ) -> Bool {

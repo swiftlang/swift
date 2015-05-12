@@ -31,9 +31,9 @@ struct _ConcatenateSequenceGenerator<
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   ///
-  /// Requires: `next()` has not been applied to a copy of `self`
-  /// since the copy was made, and no preceding call to `self.next()`
-  /// has returned `nil`.
+  /// - Requires: `next()` has not been applied to a copy of `self`
+  ///   since the copy was made, and no preceding call to `self.next()`
+  ///   has returned `nil`.
   public // @testable
   mutating func next() -> Outer.Element.Generator.Element? {
     repeat {
@@ -157,7 +157,7 @@ struct ${Index}<
 
   /// Returns the next consecutive value after `self`.
   ///
-  /// Requires: the next value is representable.
+  /// - Requires: the next value is representable.
   public // @testable
   func successor() -> ${Index} {
     return ${Index}.adjustForward(_data, _outer, _inner!.successor())
@@ -166,7 +166,7 @@ struct ${Index}<
   % if traversal == 'Bidirectional':
   /// Returns the previous consecutive value before `self`.
   ///
-  /// Requires: the previous value is representable.
+  /// - Requires: The previous value is representable.
   public // @testable
   func predecessor() -> ${Index} {
 
@@ -233,8 +233,8 @@ struct ${View}<
 
   /// Access the element at `position`.
   ///
-  /// Requires: `position` is a valid position in `self` and
-  /// `position != endIndex`.
+  /// - Requires: `position` is a valid position in `self` and
+  ///   `position != endIndex`.
   public // @testable
   subscript(position: Index) -> C.Generator.Element.Generator.Element {
     return _base[position._outer][position._inner!]

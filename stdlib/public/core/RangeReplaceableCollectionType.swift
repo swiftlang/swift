@@ -200,7 +200,8 @@ public func extend<
 }
 
 /// Remove an element from the end of `x`  in O(1).
-/// Requires: `x` is nonempty
+///
+/// - Requires: `x` is nonempty.
 public func removeLast<
   C: RangeReplaceableCollectionType where C.Index : BidirectionalIndexType
 >(

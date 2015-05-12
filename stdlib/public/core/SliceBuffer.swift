@@ -68,11 +68,9 @@ struct _SliceBuffer<T> : _ArrayBufferType {
   /// Replace the given subRange with the first newCount elements of
   /// the given collection.
   ///
-  /// Requires: this buffer is backed by a uniquely-referenced
-  /// _ContiguousArrayBuffer,
-  ///
-  /// Requires: insertCount <= numericCast(newValues.count())
-  ///
+  /// - Requires: This buffer is backed by a uniquely-referenced
+  ///   `_ContiguousArrayBuffer` and
+  ///   `insertCount <= numericCast(newValues.count())`.
   public
   mutating func replace<C: CollectionType where C.Generator.Element == T>(
     subRange subRange: Range<Int>,
@@ -263,8 +261,8 @@ struct _SliceBuffer<T> : _ArrayBufferType {
 
   /// Access the element at `position`.
   ///
-  /// Requires: `position` is a valid position in `self` and
-  /// `position != endIndex`.
+  /// - Requires: `position` is a valid position in `self` and
+  ///   `position != endIndex`.
   public subscript(position: Int) -> T {
     get {
       return getElement(position, hoistedIsNativeNoTypeCheckBuffer: true)

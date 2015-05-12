@@ -392,7 +392,9 @@ public struct Set<T : Hashable> :
     _variantStorage.removeAll(keepCapacity: keepCapacity)
   }
 
-  /// Remove a member from the set and return it. Requires: `count > 0`.
+  /// Remove a member from the set and return it.
+  ///
+  /// - Requires: `count > 0`.
   public mutating func removeFirst() -> T {
     _precondition(count > 0, "can't removeFirst from an empty Set")
     let member = first!
@@ -778,8 +780,8 @@ internal func _stdlib_NSSet_allObjects(nss: _NSSetType) ->
 #if _runtime(_ObjC)
 /// Perform a non-bridged upcast that always succeeds.
 ///
-/// Requires: `BaseValue` is a base class or base @objc
-/// protocol (such as `AnyObject`) of `DerivedValue`.
+/// - Requires: `BaseValue` is a base class or base `@objc`
+///   protocol (such as `AnyObject`) of `DerivedValue`.
 public func _setUpCast<DerivedValue, BaseValue>(source: Set<DerivedValue>)
   -> Set<BaseValue> {
   _sanityCheck(_isClassOrObjCExistential(BaseValue.self))
@@ -1324,9 +1326,9 @@ internal func _stdlib_NSDictionary_allKeys(nsd: _NSDictionaryType)
 #if _runtime(_ObjC)
 /// Perform a non-bridged upcast that always succeeds.
 ///
-/// Requires: `BaseKey` and `BaseValue` are base classes or base @objc
-/// protocols (such as `AnyObject`) of `DerivedKey` and `DerivedValue`,
-/// respectively.
+/// - Requires: `BaseKey` and `BaseValue` are base classes or base `@objc`
+///   protocols (such as `AnyObject`) of `DerivedKey` and `DerivedValue`,
+///   respectively.
 public func _dictionaryUpCast<DerivedKey, DerivedValue, BaseKey, BaseValue>(
     source: Dictionary<DerivedKey, DerivedValue>
 ) -> Dictionary<BaseKey, BaseValue> {
@@ -3225,7 +3227,7 @@ internal struct _Native${Self}Index<${TypeParametersDecl}> :
 
   /// Returns the next consecutive value after `self`.
   ///
-  /// Requires: the next value is representable.
+  /// - Requires: The next value is representable.
   internal func successor() -> NativeIndex {
     var i = offset + 1
     // FIXME: Can't write the simple code pending
@@ -3306,7 +3308,7 @@ internal struct _Cocoa${Self}Index : ForwardIndexType, Comparable {
 
   /// Returns the next consecutive value after `self`.
   ///
-  /// Requires: the next value is representable.
+  /// - Requires: The next value is representable.
   internal func successor() -> _Cocoa${Self}Index {
     _precondition(
       currentKeyIndex < allKeys.value, "can not increment endIndex")
@@ -3425,7 +3427,7 @@ public struct ${Self}Index<${TypeParametersDecl}> :
 
   /// Returns the next consecutive value after `self`.
   ///
-  /// Requires: the next value is representable.
+  /// - Requires: The next value is representable.
   public func successor() -> Index {
     if _fastPath(_guaranteedNative) {
       return ._Native(_nativeIndex.successor())
@@ -3643,7 +3645,7 @@ public struct ${Self}Generator<${TypeParametersDecl}> : GeneratorType {
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   ///
-  /// Requires: no preceding call to `self.next()` has returned `nil`.
+  /// - Requires: No preceding call to `self.next()` has returned `nil`.
   public mutating func next() -> ${SequenceType}? {
     if _fastPath(_guaranteedNative) {
       return _nativeNext()

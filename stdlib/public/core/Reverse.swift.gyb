@@ -35,14 +35,14 @@ public struct ${Index}<I : ${IndexProtocol}> : ${IndexProtocol} {
 
   /// Returns the next consecutive value after `self`.
   ///
-  /// Requires: the next value is representable.
+  /// - Requires: The next value is representable.
   public func successor() -> ${Index} {
     return ${Index}(_base.predecessor())
   }
 
   /// Returns the previous consecutive value before `self`.
   ///
-  /// Requires: the previous value is representable.
+  /// - Requires: The previous value is representable.
   public func predecessor() -> ${Index} {
     return ${Index}(_base.successor())
   }
@@ -121,8 +121,8 @@ public struct ${View}<
 
   /// Access the element at `position`.
   ///
-  /// Requires: `position` is a valid position in `self` and
-  /// `position != endIndex`.
+  /// - Requires: `position` is a valid position in `self` and
+  ///   `position != endIndex`.
   public subscript(position: Index) -> T.Generator.Element {
     return _base[position._base.predecessor()]
   }

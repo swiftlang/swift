@@ -27,14 +27,15 @@ def cmp(a,b,p):
 %{
 if p:
   orderingRequirement = """\
-/// Requires: `isOrderedBefore` is a [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
-/// over `elements`."""
+/// - Requires: `isOrderedBefore` is a
+///   [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
+///   over `elements`."""
   according = " according to `isOrderedBefore`"
 else:
   orderingRequirement = """\
-/// Requires: The less-than operator (`func <`) defined in the `Comparable`
-/// conformance is a [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
-/// over `elements`."""
+/// - Requires: The less-than operator (`func <`) defined in the `Comparable`
+///   conformance is a [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
+///   over `elements`."""
   according = ""
 }%
 

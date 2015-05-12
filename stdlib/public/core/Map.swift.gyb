@@ -19,9 +19,9 @@ public struct MapSequenceGenerator<
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   ///
-  /// Requires: `next()` has not been applied to a copy of `self`
-  /// since the copy was made, and no preceding call to `self.next()`
-  /// has returned `nil`.
+  /// - Requires: `next()` has not been applied to a copy of `self`
+  ///   since the copy was made, and no preceding call to `self.next()`
+  ///   has returned `nil`.
   public mutating func next() -> T? {
     let x = _base.next()
     if x != nil {
@@ -106,8 +106,8 @@ public struct MapCollectionView<Base : CollectionType, T> : CollectionType {
 
   /// Access the element at `position`.
   ///
-  /// Requires: `position` is a valid position in `self` and
-  /// `position != endIndex`.
+  /// - Requires: `position` is a valid position in `self` and
+  ///   `position != endIndex`.
   public subscript(position: Base.Index) -> T {
     return _transform(_base[position])
   }
