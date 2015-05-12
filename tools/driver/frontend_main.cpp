@@ -408,6 +408,11 @@ private:
   }
 
   bool shouldFix(DiagnosticKind Kind, const DiagnosticInfo &Info) {
+    // Err on the side of caution and don't automatically add bang, which may
+    // lead to crashes.
+    if (Info.ID == diag::missing_unwrap_optional.ID)
+      return false;
+
     if (Kind == DiagnosticKind::Error)
       return true;
     if (Info.ID == diag::parameter_pound_double_up.ID ||
