@@ -845,9 +845,6 @@ public:
   // We generally walk into declarations, other than types and nested functions.
   // FIXME: peek into capture lists of nested functions.
   bool walkToDeclPre(Decl *D) override {
-    if (isa<TypeDecl>(D))
-      return false;
-      
     // If this is a VarDecl, then add it to our list of things to track.
     if (auto *vd = dyn_cast<VarDecl>(D))
       if (shouldTrackVarDecl(vd))
