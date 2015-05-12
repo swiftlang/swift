@@ -94,7 +94,7 @@ bool SemaAnnotator::walkToDeclPre(Decl *D) {
       NameLen = VD->getName().getLength();
 
   } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {
-    SourceRange SR = ED->getExtendedTypeRange();
+    SourceRange SR = ED->getExtendedTypeLoc().getSourceRange();
     Loc = SR.Start;
     if (Loc.isValid())
       NameLen = ED->getASTContext().SourceMgr.getByteDistance(SR.Start, SR.End);

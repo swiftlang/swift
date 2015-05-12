@@ -51,7 +51,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 200; // Last change: associated type xref
+const uint16_t VERSION_MINOR = 201; // Last change: extension decls
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -963,8 +963,7 @@ namespace decls_block {
     TypeIDField, // base type
     DeclContextIDField, // context decl
     BCFixed<1>,  // implicit flag
-    BCVBR<3>, // # of ref-components
-    BCArray<DeclIDField> // protocols and ref-component types
+    BCArray<DeclIDField> // protocols
     // Trailed by the generic parameter lists, members record, and then
     // conformance info (if any).
   >;

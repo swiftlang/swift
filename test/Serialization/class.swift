@@ -86,3 +86,4 @@ class HasNoOptionalReqs : ObjCProtoWithOptional { }
 HasNoOptionalReqs()
 OptionalImplementer().unrelated()
 
+extension def_class.ComputedProperty { }

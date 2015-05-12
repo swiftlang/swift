@@ -871,7 +871,7 @@ NominalTypeDecl::takeConformanceLoaderSlow() {
 }
 
 ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
-                             ArrayRef<RefComponent> refComponents,
+                             TypeLoc extendedType,
                              MutableArrayRef<TypeLoc> inherited,
                              DeclContext *parent,
                              TrailingWhereClause *trailingWhereClause)
@@ -879,40 +879,29 @@ ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
     DeclContext(DeclContextKind::ExtensionDecl, parent),
     IterableDeclContext(IterableDeclContextKind::ExtensionDecl),
     ExtensionLoc(extensionLoc),
+    ExtendedType(extendedType),
     Inherited(inherited),
     TrailingWhere(trailingWhereClause)
 {
   ExtensionDeclBits.Validated = false;
   ExtensionDeclBits.CheckedInheritanceClause = false;
   ExtensionDeclBits.DefaultAccessLevel = 0;
-  ExtensionDeclBits.NumRefComponents = refComponents.size();
   ExtensionDeclBits.HaveConformanceLoader = false;
-
-  std::copy(refComponents.begin(), refComponents.end(),
-            getRefComponents().data());
-
-  for (auto &ref : getRefComponents()) {
-    if (ref.GenericParams)
-      for (auto param : *ref.GenericParams)
-        param->setDeclContext(this);
-  }
 }
 
 ExtensionDecl *ExtensionDecl::create(ASTContext &ctx, SourceLoc extensionLoc,
-                                     ArrayRef<RefComponent> refComponents,
+                                     TypeLoc extendedType,
                                      MutableArrayRef<TypeLoc> inherited,
                                      DeclContext *parent,
                                      TrailingWhereClause *trailingWhereClause,
                                      ClangNode clangNode) {
-  // Determine how much storage we require for this declaration.
-  unsigned size = sizeof(ExtensionDecl)
-                + refComponents.size() * sizeof(RefComponent);
+  unsigned size = sizeof(ExtensionDecl);
 
   void *declPtr = allocateMemoryForDecl<ExtensionDecl>(ctx, size,
                                                        !clangNode.isNull());
 
   // Construct the extension.
-  auto result = ::new (declPtr) ExtensionDecl(extensionLoc, refComponents,
+  auto result = ::new (declPtr) ExtensionDecl(extensionLoc, extendedType,
                                               inherited, parent,
                                               trailingWhereClause);
   if (clangNode)
@@ -921,25 +910,13 @@ ExtensionDecl *ExtensionDecl::create(ASTContext &ctx, SourceLoc extensionLoc,
   return result;
 }
 
-SourceRange ExtensionDecl::getExtendedTypeRange() const {
-  if (!getRefComponents().front().IdentType.getTypeRepr())
-    return SourceRange();
+void ExtensionDecl::setGenericParams(GenericParamList *params) {
+  GenericParams = params;
 
-  SourceRange range;
-  range.Start
-    = getRefComponents().front().IdentType.getTypeRepr()->getStartLoc();
-
-  // If we have generic parameters, use the location of the '>'.
-  if (auto gp = getRefComponents().back().GenericParams) {
-    range.End = gp->getRAngleLoc();
+  if (GenericParams) {
+    for (auto param : *GenericParams)
+      param->setDeclContext(this);
   }
-
-  // If we don't have a location for '>' or we don't have generic parameters,
-  // use the last identifier location.
-  if (range.End.isInvalid())
-    range.End = getRefComponents().back().IdentType.getTypeRepr()->getEndLoc();
-
-  return range;
 }
 
 void ExtensionDecl::setGenericSignature(GenericSignature *sig) {

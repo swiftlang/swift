@@ -709,7 +709,9 @@ ERROR(extension_access_with_conformances,sema_tcd,none,
       "%0 modifier cannot be used with extensions that declare "
       "protocol conformances", (DeclAttribute))
 ERROR(extension_metatype,sema_tcd,none,
-      "cannot extend a metatype of a type", ())
+      "cannot extend a metatype %0", (Type))
+ERROR(extension_specialization,decl_parsing,none,
+      "cannot extend a specialization of %0", (Identifier))
 ERROR(extension_stored_property,sema_tcd,none,
       "extensions may not contain stored properties", ())
 ERROR(extension_generic_extra_requirements,sema_tcd,none,

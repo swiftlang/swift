@@ -1943,19 +1943,16 @@ void Serializer::writeDecl(const Decl *D) {
     // parameters.
     (void)addDeclRef(baseTy->getAnyNominal());
 
-    SmallVector<DeclID, 8> protocolsAndRefTypes;
+    SmallVector<DeclID, 8> protocols;
     for (auto proto : extension->getLocalProtocols())
-      protocolsAndRefTypes.push_back(addDeclRef(proto));
-    for (const auto &ref : extension->getRefComponents())
-      protocolsAndRefTypes.push_back(addTypeRef(ref.IdentType.getType()));
+      protocols.push_back(addDeclRef(proto));
 
     unsigned abbrCode = DeclTypeAbbrCodes[ExtensionLayout::Code];
     ExtensionLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                 addTypeRef(baseTy),
                                 contextID,
                                 extension->isImplicit(),
-                                extension->getRefComponents().size(),
-                                protocolsAndRefTypes);
+                                protocols);
 
     bool isClassExtension = false;
     if (auto baseNominal = baseTy->getAnyNominal()) {
@@ -1963,9 +1960,7 @@ void Serializer::writeDecl(const Decl *D) {
                          isa<ProtocolDecl>(baseNominal);
     }
 
-    for (const auto &ref : extension->getRefComponents())
-      writeGenericParams(ref.GenericParams, DeclTypeAbbrCodes);
-
+    writeGenericParams(extension->getGenericParams(), DeclTypeAbbrCodes);
     writeRequirements(extension->getGenericRequirements());
     writeMembers(extension->getMembers(), isClassExtension);
     writeConformances(extension->getLocalConformances(),

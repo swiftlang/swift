@@ -2977,12 +2977,10 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     TypeID baseID;
     DeclContextID contextID;
     bool isImplicit;
-    unsigned numRefComponents;
-    ArrayRef<uint64_t> rawProtocolAndRefTypeIDs;
+    ArrayRef<uint64_t> rawProtocolIDs;
 
     decls_block::ExtensionLayout::readRecord(scratch, baseID, contextID,
-                                             isImplicit, numRefComponents,
-                                             rawProtocolAndRefTypeIDs);
+                                             isImplicit, rawProtocolIDs);
 
     auto DC = getDeclContext(contextID);
     if (declOrOffset.isComplete())
@@ -2992,49 +2990,45 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     if (declOrOffset.isComplete())
       return declOrOffset;
 
-    unsigned numProtocols = rawProtocolAndRefTypeIDs.size() - numRefComponents;
-    SmallVector<ExtensionDecl::RefComponent, 2> refComponents;
-    for (unsigned i = 0; i != numRefComponents; ++i) {
-      Type identType = getType(rawProtocolAndRefTypeIDs[numProtocols + i]);
-      GenericParamList *genericParams = maybeReadGenericParams(DC,
-                                                               DeclTypeCursor);
-      refComponents.push_back({TypeLoc::withoutLoc(identType), genericParams});
-    }
-
     auto nominal = baseTy->getAnyNominal();
-    auto extension = ExtensionDecl::create(ctx, SourceLoc(), refComponents, { },
+    auto extension = ExtensionDecl::create(ctx, SourceLoc(),
+                                           TypeLoc::withoutLoc(baseTy), { },
                                            DC, nullptr);
     extension->setEarlyAttrValidation();
     declOrOffset = extension;
 
     if (isImplicit)
       extension->setImplicit();
-    extension->setExtendedType(baseTy);
 
+    unsigned numProtocols = rawProtocolIDs.size();
     auto protocols = ctx.Allocate<ProtocolDecl *>(numProtocols);
     for (unsigned i = 0; i != numProtocols; ++i) {
-      protocols[i] = cast<ProtocolDecl>(getDecl(rawProtocolAndRefTypeIDs[i]));
+      protocols[i] = cast<ProtocolDecl>(getDecl(rawProtocolIDs[i]));
     }
     extension->setProtocols(protocols);
 
-    // Conjure up a generic signature from the ref-components and requirements.
-    SmallVector<GenericTypeParamType *, 4> paramTypes;
-    for (const auto &ref : extension->getRefComponents()) {
-      if (ref.GenericParams) {
-        for (auto &genericParam : *ref.GenericParams) {
-          paramTypes.push_back(genericParam->getDeclaredType()
-                               ->castTo<GenericTypeParamType>());
-        }
+    // Generic parameters.
+    GenericParamList *genericParams = maybeReadGenericParams(DC,
+                                                             DeclTypeCursor);
+    extension->setGenericParams(genericParams);
+
+    // Conjure up a generic signature from the generic parameters and
+    // requirements.
+    if (genericParams) {
+      SmallVector<GenericTypeParamType *, 4> paramTypes;
+      for (auto &genericParam : *genericParams) {
+        paramTypes.push_back(genericParam->getDeclaredType()
+                             ->castTo<GenericTypeParamType>());
       }
-    }
 
-    // Read the generic requirements.
-    SmallVector<Requirement, 4> requirements;
-    readGenericRequirements(requirements);
+      // Read the generic requirements.
+      SmallVector<Requirement, 4> requirements;
+      readGenericRequirements(requirements);
 
-    if (!paramTypes.empty()) {
-      GenericSignature *sig = GenericSignature::get(paramTypes, requirements);
-      extension->setGenericSignature(sig);
+      if (!paramTypes.empty()) {
+        GenericSignature *sig = GenericSignature::get(paramTypes, requirements);
+        extension->setGenericSignature(sig);
+      }
     }
 
     extension->setMemberLoader(this, DeclTypeCursor.GetCurrentBitNo());

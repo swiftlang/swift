@@ -264,98 +264,77 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
   if (ED->getExtendedType())
     return;
 
+  // If we didn't parse a type, fill in an error type and bail out.
+  if (!ED->getExtendedTypeLoc().getTypeRepr()) {
+    ED->setInvalid();
+    ED->getExtendedTypeLoc().setInvalidType(TC.Context);
+    return;
+  }
+
   auto dc = ED->getDeclContext();
 
-  // Local function that invalidates all components of the extension.
-  auto invalidateAllComponents = [&] {
-    for (auto &ref : ED->getRefComponents()) {
-      ref.IdentType.setInvalidType(TC.Context);
-    }
-  };
-
-  // Synthesize a type representation for the extended type.
-  SmallVector<ComponentIdentTypeRepr *, 2> components;
-  for (auto &ref : ED->getRefComponents()) {
-    auto *TyR = cast<SimpleIdentTypeRepr>(ref.IdentType.getTypeRepr());
-    // A reference to ".Type" is an attempt to extend the metatype.
-    if (TyR->getIdentifier() == TC.Context.Id_Type && !components.empty()) {
-      TC.diagnose(TyR->getIdLoc(), diag::extension_metatype);
-      ED->setInvalid();
-      ED->setExtendedType(ErrorType::get(TC.Context));
-      invalidateAllComponents();
-      return;
-    }
-
-    components.push_back(TyR);
-  }
-
   // Validate the representation.
-  TypeLoc typeLoc(IdentTypeRepr::create(TC.Context, components));
-  if (TC.validateType(typeLoc, dc, TR_AllowUnboundGenerics)) {
+  // FIXME: Perform some kind of "shallow" validation here?
+  if (TC.validateType(ED->getExtendedTypeLoc(), dc, TR_AllowUnboundGenerics)) {
     ED->setInvalid();
-    ED->setExtendedType(ErrorType::get(TC.Context));
-    invalidateAllComponents();
     return;
   }
 
-  // Check the generic parameter lists for each of the components.
-  GenericParamList *outerGenericParams = nullptr;
-  for (unsigned i = 0, n = components.size(); i != n; ++i) {
-    // Find the type declaration to which the identifier type actually referred.
-    auto ident = components[i];
-    NominalTypeDecl *typeDecl = nullptr;
-    if (auto type = ident->getBoundType()) {
-      if (auto unbound = dyn_cast<UnboundGenericType>(type.getPointer()))
-        typeDecl = unbound->getDecl();
-      else if (auto nominal = dyn_cast<NominalType>(type.getPointer()))
-        typeDecl = nominal->getDecl();
-    } else if (auto decl = ident->getBoundDecl()) {
-      typeDecl = dyn_cast<NominalTypeDecl>(decl);
-    }
+  // Dig out the extended type.
+  auto extendedType = ED->getExtendedType();
 
-    // FIXME: There are more restrictions on what we can refer to, e.g.,
-    // we can't look through a typealias to a bound generic type of any form.
+  // Handle easy cases.
 
-    auto &ref = ED->getRefComponents()[i];
-    ref.IdentType.setType(ident->getBoundType());
-
-    if (!typeDecl) {
-      continue;
-    }
-
-    // The extended type is generic or is a protocol. Clone or create
-    // the generic parameters.
-    if (typeDecl->getGenericParams()) {
-      if (auto proto = dyn_cast<ProtocolDecl>(typeDecl)) {
-        // For a protocol extension, build the generic parameter list.
-        ref.GenericParams = proto->createGenericParams(ED);
-      } else {
-        // Clone the existing generic parameter list.
-        ref.GenericParams = cloneGenericParams(TC.Context, ED,
-                                               typeDecl->getGenericParams(),
-                                               outerGenericParams);
-      }
-
-      outerGenericParams = ref.GenericParams;
-    }
+  // Cannot extend a metatype.
+  if (extendedType->is<AnyMetatypeType>()) {
+    TC.diagnose(ED->getLoc(), diag::extension_metatype, extendedType)
+      .highlight(ED->getExtendedTypeLoc().getSourceRange());
+    ED->setInvalid();
+    ED->getExtendedTypeLoc().setInvalidType(TC.Context);
+    return;
   }
 
-  // Check whether we extended something that is not a nominal type.
-  Type extendedTy = typeLoc.getType();
-  if (!extendedTy->is<NominalType>() && !extendedTy->is<UnboundGenericType>()) {
-    TC.diagnose(ED, diag::non_nominal_extension, extendedTy);
+  // Cannot extend a bound generic type.
+  if (extendedType->isSpecialized()) {
+    TC.diagnose(ED->getLoc(), diag::extension_specialization,
+                extendedType->getAnyNominal()->getName())
+      .highlight(ED->getExtendedTypeLoc().getSourceRange());
     ED->setInvalid();
-    ED->setExtendedType(ErrorType::get(TC.Context));
-    invalidateAllComponents();
+    ED->getExtendedTypeLoc().setInvalidType(TC.Context);
     return;
+  }
+
+  // Dig out the nominal type being extended.
+  NominalTypeDecl *extendedNominal = extendedType->getAnyNominal();
+  if (!extendedNominal) {
+    TC.diagnose(ED->getLoc(), diag::non_nominal_extension, extendedType)
+      .highlight(ED->getExtendedTypeLoc().getSourceRange());
+    ED->setInvalid();
+    ED->getExtendedTypeLoc().setInvalidType(TC.Context);
+    return;
+  }
+  assert(extendedNominal && "Should have the nominal type being extended");
+
+  // If the extended type is generic or is a protocol. Clone or create
+  // the generic parameters.
+  if (extendedNominal->getGenericParams()) {
+    if (auto proto = dyn_cast<ProtocolDecl>(extendedNominal)) {
+      // For a protocol extension, build the generic parameter list.
+      ED->setGenericParams(proto->createGenericParams(ED));
+    } else {
+      // Clone the existing generic parameter list.
+      ED->setGenericParams(cloneGenericParams(TC.Context, ED,
+                                              extendedNominal->getGenericParams(),
+                                              nullptr));
+    }
   }
 
   // If we have a trailing where clause, deal with it now.
   // For now, trailing where clauses are only permitted on protocol extensions.
   if (auto trailingWhereClause = ED->getTrailingWhereClause()) {
-    if (!extendedTy->is<ProtocolType>()) {
+    if (!extendedType->is<ProtocolType>()) {
       // Only protocol types are permitted to have trailing where clauses.
-      TC.diagnose(ED, diag::extension_nonprotocol_trailing_where, extendedTy)
+      TC.diagnose(ED, diag::extension_nonprotocol_trailing_where, extendedType)
         .highlight(trailingWhereClause->getSourceRange());
       ED->setTrailingWhereClause(nullptr);
     } else {
@@ -370,9 +349,7 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
     }
   }
 
-  ED->setExtendedType(extendedTy);
-  if (auto nominal = extendedTy->getAnyNominal())
-    nominal->addExtension(ED);
+  extendedNominal->addExtension(ED);
 }
 
 static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {

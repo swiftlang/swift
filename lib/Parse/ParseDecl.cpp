@@ -2227,65 +2227,19 @@ parseIdentifierDeclName(Parser &P, Identifier &Result, SourceLoc &L,
 ///
 /// \verbatim
 ///   extension:
-///    'extension' attribute-list extension-target inheritance? where-clause?
+///    'extension' attribute-list type inheritance? where-clause?
 ///        '{' decl* '}'
-///
-///   extension-target:
-///     identifier generic-params?
-///     identifier generic-params? '.' extension-target
 /// \endverbatim
 ParserResult<ExtensionDecl>
 Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
-  using RefComponent = ExtensionDecl::RefComponent;
-
   SourceLoc ExtensionLoc = consumeToken(tok::kw_extension);
   
   DebuggerContextChange DCC (*this);
 
+  // Parse the type being extended.
   ParserStatus status;
-  SmallVector<RefComponent, 2> refComponents;
-  while (true) {
-    // Code completion for extensions.
-    if (Tok.is(tok::code_complete)) {
-      // FIXME: Code completion should pass along a type representation, if it
-      // can.
-      status = makeParserCodeCompletionStatus();
-      if (CodeCompletion)
-        CodeCompletion->completeTypeSimpleBeginning();
-      break;
-    }
-
-    // Parse the name.
-    Identifier name;
-    SourceLoc nameLoc;
-    status |=
-    parseIdentifierDeclName(*this, name, nameLoc, tok::colon,
-                            tok::l_brace, TokenProperty::StartsWithLess,
-                            diag::expected_identifier_in_decl, "extension");
-    if (status.isError())
-      break;
-
-    // Skip over a generic parameter or argument list; they are not
-    // permitted on extensions.
-    GenericParamList *genericParams = nullptr;
-    if (startsWithLess(Tok)) {
-      SourceLoc lAngleLoc = consumeStartingLess();
-      skipUntilGreaterInTypeList();
-      SourceLoc rAngleLoc = Tok.getLoc();
-      if (startsWithGreater(Tok))
-        consumeStartingGreater();
-      diagnose(nameLoc, diag::extension_generic_params_args, name)
-        .highlight(SourceRange(lAngleLoc, rAngleLoc));
-    }
-
-    auto TyR = new (Context) SimpleIdentTypeRepr(nameLoc, name);
-    refComponents.push_back(RefComponent{TyR, genericParams});
-
-    if (consumeIf(tok::period))
-      continue;
-    
-    break;
-  }
+  ParserResult<TypeRepr> extendedType = parseType(diag::extension_type_expected);
+  status |= extendedType;
 
   // Parse optional inheritance clause.
   SmallVector<TypeLoc, 2> Inherited;
@@ -2303,16 +2257,8 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     }
   }
 
-  // If we have no ref-components, don't try to continue parsing.
-  if (refComponents.empty()) {
-    if (Tok.is(tok::l_brace))
-      skipSingle();
-
-    return status;
-  }
-
   ExtensionDecl *ext = ExtensionDecl::create(Context, ExtensionLoc,
-                                             refComponents,
+                                             extendedType.getPtrOrNull(),
                                              Context.AllocateCopy(Inherited),
                                              CurDeclContext,
                                              trailingWhereClause);

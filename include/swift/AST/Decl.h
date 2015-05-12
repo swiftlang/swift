@@ -597,11 +597,8 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// Whether there is an active conformance loader for this
     /// extension.
     unsigned HaveConformanceLoader : 1;
-
-    /// The number of ref-components following the ExtensionDecl.
-    unsigned NumRefComponents : 8;
   };
-  enum { NumExtensionDeclBits = NumDeclBits + 13 };
+  enum { NumExtensionDeclBits = NumDeclBits + 5 };
   static_assert(NumExtensionDeclBits <= 32, "fits in an unsigned");
 
 protected:
@@ -1604,21 +1601,14 @@ public:
 /// there are no runtime values of the Extension's type.  
 class ExtensionDecl final : public Decl, public DeclContext,
                             public IterableDeclContext {
-public:
-  /// A single component within the reference to the extended type.
-  struct RefComponent {
-    /// The type being extended.
-    ///
-    /// The type representation is always a \c SimpleIdentTypeRepr.
-    TypeLoc IdentType;
-
-    /// The generic parameters associated with this name.
-    GenericParamList *GenericParams;
-  };
-
-private:
   SourceLoc ExtensionLoc;  // Location of 'extension' keyword.
   SourceRange Braces;
+
+  /// The type being extended.
+  TypeLoc ExtendedType;
+  
+  /// The generic parameters of the extension.
+  GenericParamList *GenericParams = nullptr;
 
   /// \brief The generic signature of this extension.
   ///
@@ -1629,9 +1619,6 @@ private:
   /// \c GenericParams. However, we likely want to make \c GenericParams
   /// the parsed representation, and not part of the module file.
   GenericSignature *GenericSig = nullptr;
-
-  /// The type being extended.
-  Type ExtendedType;
 
   MutableArrayRef<TypeLoc> Inherited;
 
@@ -1660,7 +1647,7 @@ private:
   friend class ConformanceLookupTable;
   friend class IterableDeclContext;
 
-  ExtensionDecl(SourceLoc extensionLoc, ArrayRef<RefComponent> refComponents,
+  ExtensionDecl(SourceLoc extensionLoc, TypeLoc extendedType,
                 MutableArrayRef<TypeLoc> inherited,
                 DeclContext *parent,
                 TrailingWhereClause *trailingWhereClause);
@@ -1683,7 +1670,7 @@ public:
 
   /// Create a new extension declaration.
   static ExtensionDecl *create(ASTContext &ctx, SourceLoc extensionLoc,
-                               ArrayRef<RefComponent> refComponents,
+                               TypeLoc extendedType,
                                MutableArrayRef<TypeLoc> inherited,
                                DeclContext *parent,
                                TrailingWhereClause *trailingWhereClause,
@@ -1698,21 +1685,12 @@ public:
   SourceRange getBraces() const { return Braces; }
   void setBraces(SourceRange braces) { Braces = braces; }
 
-  /// Retrieve the reference components in the
-  ArrayRef<RefComponent> getRefComponents() const {
-    return { reinterpret_cast<const RefComponent *>(this + 1),
-             ExtensionDeclBits.NumRefComponents };
-  }
-
-  MutableArrayRef<RefComponent> getRefComponents() {
-    return { reinterpret_cast<RefComponent *>(this + 1),
-             ExtensionDeclBits.NumRefComponents };
-  }
-
   /// Retrieve the innermost generic parameter list.
   GenericParamList *getGenericParams() const {
-    return getRefComponents().back().GenericParams;
+    return GenericParams;
   }
+
+  void setGenericParams(GenericParamList *params);
 
   /// Retrieve the trailing where clause for this extension, if any.
   TrailingWhereClause *getTrailingWhereClause() const {
@@ -1734,13 +1712,13 @@ public:
   ArrayRef<Requirement> getGenericRequirements() const;
 
   /// Retrieve the type being extended.
-  Type getExtendedType() const { return ExtendedType; }
+  Type getExtendedType() const { return ExtendedType.getType(); }
 
-  /// Set the type being extended.
-  void setExtendedType(Type extended) { ExtendedType = extended; }
+  /// Retrieve the extended type location.
+  TypeLoc &getExtendedTypeLoc() { return ExtendedType; }
 
-  /// Compute the source range that covers the extended type.
-  SourceRange getExtendedTypeRange() const;
+  /// Retrieve the extended type location.
+  const TypeLoc &getExtendedTypeLoc() const { return ExtendedType; }
 
   /// \brief Retrieve the set of protocols that this type inherits (i.e,
   /// explicitly conforms to).

@@ -18,9 +18,15 @@ struct Y {
 
 struct Z<T : P1 where T.AssocType : P3> { }
 
-extension X<T : P1, U : P2, V> { } // expected-error{{cannot extend a specialization of 'X'}}
-extension Z<T : P1 where T.AssocType : P3> { } // expected-error{{cannot extend a specialization of 'Z'}}
-extension X<Int> { } // expected-error{{cannot extend a specialization of 'X'}}
+extension Int : P1 {
+  typealias AssocType = Int
+}
+
+extension Double : P2 { 
+  typealias AssocType = Double
+}
+
+extension X<Int, Double, String> { } // expected-error{{cannot extend a specialization of 'X'}}
 
 // Lvalue check when the archetypes are not the same.
 struct LValueCheck<T> {

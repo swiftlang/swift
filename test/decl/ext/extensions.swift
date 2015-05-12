@@ -43,7 +43,7 @@ struct S1 {
   struct NestedStruct {}
 }
 extension S1 {} // no-error
-extension S1.Type {} // expected-error {{cannot extend a metatype of a type}}
+extension S1.Type {} // expected-error {{cannot extend a metatype 'S1.Type'}}
 extension S1.NestedStruct {} // no-error
 
 typealias TA_S1 = S1
@@ -68,10 +68,7 @@ protocol P1 {}
 
 protocol P2 {}
 
-extension () {} // expected-error {{expected identifier in extension declaration}} expected-error{{type of expression is ambiguous without more context}}
-// expected-error @-1{{braced block of statements is an unused closure}}
-// expected-error @-2{{cannot begin with a closure expression}}
-// expected-note @-3{{explicitly discard the result}}
+extension () {} // expected-error {{non-nominal type '()' cannot be extended}}
 
 typealias TupleAlias = (x: Int, y: Int)
 extension TupleAlias {} // expected-error{{non-nominal type 'TupleAlias' cannot be extended}}

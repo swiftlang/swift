@@ -6151,10 +6151,9 @@ void TypeChecker::validateAccessibility(ValueDecl *D) {
 /// the parameter lists within the extension.
 static Type checkExtensionGenericParams(
               TypeChecker &tc, ExtensionDecl *ext,
-              ArrayRef<ExtensionDecl::RefComponent> refComponents,
-              Type type, GenericSignature *&sig) {
+              Type type, GenericParamList *genericParams,
+              GenericSignature *&sig) {
   // Find the nominal type declaration and its parent type.
-  // FIXME: This scheme doesn't work well with type aliases.
   Type parentType;
   NominalTypeDecl *nominal;
   if (auto unbound = type->getAs<UnboundGenericType>()) {
@@ -6170,22 +6169,28 @@ static Type checkExtensionGenericParams(
   }
 
   // Recurse to check the parent type, if there is one.
+  Type newParentType = parentType;
   if (parentType) {
-    parentType = checkExtensionGenericParams(tc, ext, refComponents.drop_back(),
-                                             parentType, sig);
-    if (!parentType)
+    newParentType = checkExtensionGenericParams(
+                      tc, ext, parentType,
+                      nominal->getGenericParams()
+                        ? genericParams->getOuterParameters()
+                        : genericParams,
+                      sig);
+    if (!newParentType)
       return Type();
   }
 
-  // If we don't need generic parameters, just rebuild the result type with the
-  // new parent.
+  // If we don't need generic parameters, just build the result.
   if (!nominal->getGenericParams()) {
-    assert(!refComponents.back().GenericParams);
-    return NominalType::get(nominal, parentType, tc.Context);
-  }
+    assert(!genericParams);
 
-  // We have generic parameters that need to be checked.
-  auto genericParams = refComponents.back().GenericParams;
+    // If the parent was unchanged, return the original pointer.
+    if (parentType.getPointer() == newParentType.getPointer())
+      return type;
+
+    return NominalType::get(nominal, newParentType, tc.Context);
+  }
 
   // Local function used to infer requirements from the extended type.
   TypeLoc extendedTypeInfer;
@@ -6201,7 +6206,7 @@ static Type checkExtensionGenericParams(
         }
 
         extendedTypeInfer.setType(BoundGenericType::get(nominal,
-                                                        parentType,
+                                                        newParentType,
                                                         genericArgs));
       }
     }
@@ -6239,15 +6244,21 @@ static Type checkExtensionGenericParams(
   inferExtendedTypeReqs(builder);
   finalizeGenericParamList(builder, genericParams, ext, tc);
 
-  if (isa<ProtocolDecl>(nominal))
+  if (isa<ProtocolDecl>(nominal)) {
+    // Retain type sugar if it's there.
+    if (nominal->getDeclaredType()->isEqual(type))
+      return type;
+
     return nominal->getDeclaredType();
+  }
 
   // Compute the final extended type.
   SmallVector<Type, 2> genericArgs;
   for (auto gp : *genericParams) {
     genericArgs.push_back(gp->getArchetype());
   }
-  return BoundGenericType::get(nominal, parentType, genericArgs);
+  Type resultType = BoundGenericType::get(nominal, newParentType, genericArgs);
+  return resultType->isEqual(type) ? type : resultType;
 }
 
 // FIXME: In TypeChecker.cpp; only needed because LLDB creates
@@ -6280,7 +6291,7 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
     auto nominal = unbound->getDecl();
     validateDecl(nominal);
 
-    auto genericParams = ext->getRefComponents().back().GenericParams;
+    auto genericParams = ext->getGenericParams();
 
     // The debugger synthesizes typealiases of unbound generic types
     // to produce its extensions, which subverts bindExtensionDecl's
@@ -6289,23 +6300,24 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
       genericParams = cloneGenericParams(Context, ext,
                                          nominal->getGenericParams(),
                                          nullptr);
-      ext->getRefComponents().back().GenericParams = genericParams;
+      ext->setGenericParams(genericParams);
     }
     assert(genericParams && "bindExtensionDecl didn't set generic params?");
 
     // Check generic parameters.
     GenericSignature *sig = nullptr;
-    extendedType = checkExtensionGenericParams(*this, ext, 
-                                               ext->getRefComponents(),
-                                               extendedType, sig);
+    extendedType = checkExtensionGenericParams(*this, ext,
+                                               ext->getExtendedType(),
+                                               ext->getGenericParams(),
+                                               sig);
     if (!extendedType) {
       ext->setInvalid();
-      ext->setExtendedType(ErrorType::get(Context));
+      ext->getExtendedTypeLoc().setInvalidType(Context);
       return;
     }
 
     ext->setGenericSignature(sig);
-    ext->setExtendedType(extendedType);
+    ext->getExtendedTypeLoc().setType(extendedType);
     return;
   }
 
@@ -6313,16 +6325,17 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
   if (auto protoType = dyn_cast<ProtocolType>(extendedType.getPointer())) {
     GenericSignature *sig = nullptr;
     extendedType = checkExtensionGenericParams(*this, ext,
-                                               ext->getRefComponents(),
-                                               extendedType, sig);
+                                               ext->getExtendedType(),
+                                               ext->getGenericParams(),
+                                               sig);
     if (!extendedType) {
       ext->setInvalid();
-      ext->setExtendedType(ErrorType::get(Context));
+      ext->getExtendedTypeLoc().setInvalidType(Context);
       return;
     }
 
     ext->setGenericSignature(sig);
-    ext->setExtendedType(extendedType);
+    ext->getExtendedTypeLoc().setType(extendedType);
 
     // Speculatively ban extension of AnyObject; it won't be a
     // protocol forever, and we don't want to allow code that we know
@@ -6330,8 +6343,7 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
     if (protoType->getDecl()->isSpecificProtocol(
           KnownProtocolKind::AnyObject)) {
       diagnose(ext, diag::extension_anyobject)
-        .highlight(
-          ext->getRefComponents().back().IdentType.getSourceRange());
+        .highlight(ext->getExtendedTypeLoc().getSourceRange());
     }
     return;
   }
@@ -6340,10 +6352,10 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
   if (auto proto = extendedType->getAs<ProtocolType>()) {
     diagnose(ext->getLoc(), diag::extension_protocol_via_typealias,
              proto, extendedType)
-      .fixItReplace(ext->getRefComponents().back().IdentType.getSourceRange(),
+      .fixItReplace(ext->getExtendedTypeLoc().getSourceRange(),
                     proto->getDecl()->getName().str());
     ext->setInvalid();
-    ext->setExtendedType(ErrorType::get(Context));
+    ext->getExtendedTypeLoc().setInvalidType(Context);
     return;
   }
 }
