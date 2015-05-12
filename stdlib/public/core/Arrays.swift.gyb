@@ -65,7 +65,7 @@ if True:
 /// `ArraySlice` always uses contiguous storage and does not bridge to
 /// Objective-C.
 ///
-/// - warning: Long-term storage of `ArraySlice` instances is discouraged
+/// - Warning: Long-term storage of `ArraySlice` instances is discouraged
 ///
 /// Because a `ArraySlice` presents a *view* onto the storage of some
 /// larger array even after the original array's lifetime ends,
@@ -258,7 +258,7 @@ public struct ${Self}<T>
 
   /// Return a *generator* over the elements.
   ///
-  /// - complexity: O(1)
+  /// - Complexity: O(1)
   public func generate() -> IndexingGenerator<${Self}> {
     return IndexingGenerator(self)
   }
@@ -515,10 +515,10 @@ extension ${Self} : _ArrayType {
 
   /// Reserve enough space to store minimumCapacity elements.
   ///
-  /// - postcondition: `capacity >= minimumCapacity` and the array has
+  /// - Postcondition: `capacity >= minimumCapacity` and the array has
   ///   mutable contiguous storage.
   ///
-  /// - complexity: O(`count`)
+  /// - Complexity: O(`count`)
   @_semantics("array.mutate_unknown")
   public mutating func reserveCapacity(minimumCapacity: Int) {
     if _buffer.requestUniqueMutableBackingBuffer(minimumCapacity) == nil {
@@ -534,7 +534,7 @@ extension ${Self} : _ArrayType {
 
   /// Append newElement to the ${Self}
   ///
-  /// - complexity: amortized ${O1}
+  /// - Complexity: amortized ${O1}
   @_semantics("array.mutate_unknown")
   public mutating func append(newElement: T) {
     // Checking for the isNative fast-path in the outermost if-statement helps
@@ -567,7 +567,7 @@ extension ${Self} : _ArrayType {
 
   /// Append the elements of `newElements` to `self`.
   ///
-  /// - complexity: O(*length of result*)
+  /// - Complexity: O(*length of result*)
   ///
   public mutating func extend<
       S : SequenceType
@@ -597,7 +597,7 @@ extension ${Self} : _ArrayType {
   ///
   /// Requires: `i <= count`
   ///
-  /// - complexity: O(`count`).
+  /// - Complexity: O(`count`).
   public mutating func insert(newElement: T, atIndex i: Int) {
     _checkIndex(i)
     self.replaceRange(i..<i, with: CollectionOfOne(newElement))
@@ -607,7 +607,7 @@ extension ${Self} : _ArrayType {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - complexity: O(`count`).
+  /// - Complexity: O(`count`).
   public mutating func removeAtIndex(index: Int) -> T {
     let result = self[index]
     self.replaceRange(index..<(index + 1), with: EmptyCollection())
@@ -616,7 +616,7 @@ extension ${Self} : _ArrayType {
 
   /// Remove all elements.
   ///
-  /// - postcondition: `capacity == 0` iff `keepCapacity` is `false`.
+  /// - Postcondition: `capacity == 0` iff `keepCapacity` is `false`.
   ///
   /// Complexity: O(`self.count()`).
   public mutating func removeAll(keepCapacity keepCapacity: Bool = false) {
@@ -765,7 +765,7 @@ extension ${Self} {
   /// same algorithm on `body`'s argument lets you trade safety for
   /// speed.
   ///
-  /// - warning: Do not rely on anything about `self` (the `${Self}`
+  /// - Warning: Do not rely on anything about `self` (the `${Self}`
   ///   that is the target of this method) during the execution of
   ///   `body`: it may not appear to have its correct value.  Instead,
   ///   use only the `UnsafeMutableBufferPointer` argument to `body`.
@@ -923,7 +923,7 @@ func _growArrayCapacity(capacity: Int) -> Int {
 extension ${Self} {
   /// Replace the given `subRange` of elements with `newElements`.
   ///
-  /// - complexity: O(`subRange.count()`) if `subRange.endIndex
+  /// - Complexity: O(`subRange.count()`) if `subRange.endIndex
   ///   == self.endIndex` and `isEmpty(newElements)`, O(N) otherwise.
   @_semantics("array.mutate_unknown")
   public mutating func replaceRange<
@@ -953,7 +953,7 @@ extension ${Self} {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - complexity: O(`count + newElements.count()`).
+  /// - Complexity: O(`count + newElements.count()`).
   public mutating func splice<
     S: CollectionType where S.Generator.Element == T
   >(newElements: S, atIndex i: Int) {
@@ -962,7 +962,7 @@ extension ${Self} {
 
   /// Remove the indicated `subRange` of elements
   ///
-  /// - complexity: O(`count`).
+  /// - Complexity: O(`count`).
   public mutating func removeRange(subRange: Range<Int>) {
     Swift.removeRange(&self, subRange)
   }

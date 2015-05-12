@@ -63,10 +63,10 @@ protocol _ArrayType
 
   /// Reserve enough space to store minimumCapacity elements.
   ///
-  /// - postcondition: `capacity >= minimumCapacity` and the array has
+  /// - Postcondition: `capacity >= minimumCapacity` and the array has
   ///   mutable contiguous storage.
   ///
-  /// - complexity: O(`count`)
+  /// - Complexity: O(`count`)
   mutating func reserveCapacity(minimumCapacity: Int)
 
   /// Append newElement to the Array in O(1) (amortized)
@@ -85,7 +85,7 @@ protocol _ArrayType
 
   /// Remove an element from the end of the Array in O(1).
   ///
-  /// - returns: the removed element.
+  /// - Returns: the removed element.
   ///
   /// Requires: count > 0
   mutating func removeLast() -> Generator.Element
@@ -94,16 +94,16 @@ protocol _ArrayType
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - complexity: O(`self.count()`).
+  /// - Complexity: O(`self.count()`).
   ///
   /// Requires: `atIndex` <= `count`
   mutating func insert(newElement: Generator.Element, atIndex i: Int)
 
   /// Remove and return the element at the given index.
   ///
-  /// - returns: the removed element.
+  /// - Returns: the removed element.
   ///
-  /// - complexity: Worst case O(N).
+  /// - Complexity: Worst case O(N).
   ///
   /// Requires: `count` > `index`
   mutating func removeAtIndex(index: Int) -> Generator.Element

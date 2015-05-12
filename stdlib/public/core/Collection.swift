@@ -63,14 +63,14 @@ extension _CollectionDefaultsType {
   /// Return a value less than or equal to the number of elements in
   /// `self`, **nondestructively**.
   ///
-  /// - complexity: O(N)
+  /// - Complexity: O(N)
   final public func underestimateCount() -> Int {
     return numericCast(count())
   }
 
   /// Return the number of elements.
   ///
-  /// - complexity: O(1) if `Index` conforms to `RandomAccessIndexType`;
+  /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndexType`;
   ///   O(N) otherwise.
   final public func count() -> Index.Distance {
     return distance(startIndex, endIndex)
@@ -81,11 +81,11 @@ extension _CollectionDefaultsType {
   /// Define this method if the collection can find an element in less than
   /// O(N) by exploiting collection-specific knowledge.
   ///
-  /// - returns: `nil` if a linear search should be attempted instead,
+  /// - Returns: `nil` if a linear search should be attempted instead,
   ///   `Optional(nil)` if the element was not found, or
   ///   `Optional(Optional(index))` if an element was found.
   ///
-  /// - complexity: O(N)
+  /// - Complexity: O(N)
   final public func _customIndexOfEquatableElement(
     element: Generator.Element
   ) -> Index?? {
@@ -159,7 +159,7 @@ public protocol CollectionType
 
   /// Return the number of elements.
   ///
-  /// - complexity: O(1) if `Index` conforms to `RandomAccessIndexType`;
+  /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndexType`;
   ///   O(N) otherwise.
   func count() -> Index.Distance
 
@@ -168,11 +168,11 @@ public protocol CollectionType
   /// Define this method if the collection can find an element in less than
   /// O(N) by exploiting collection-specific knowledge.
   ///
-  /// - returns: `nil` if a linear search should be attempted instead,
+  /// - Returns: `nil` if a linear search should be attempted instead,
   ///   `Optional(nil)` if the element was not found, or
   ///   `Optional(Optional(index))` if an element was found.
   ///
-  /// - complexity: O(N)
+  /// - Complexity: O(N)
   func _customIndexOfEquatableElement(element: Generator.Element) -> Index??
 }
 
@@ -180,7 +180,7 @@ extension CollectionType {
   /// Return an `Array` containing the results of mapping `transform`
   /// over `self`.
   ///
-  /// - complexity: O(N)
+  /// - Complexity: O(N)
   final public func _prext_map<T>(
     @noescape transform: (Generator.Element) -> T
   ) -> [T] {
@@ -295,7 +295,7 @@ public struct IndexingGenerator<
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - complexity: O(1)
+  /// - Complexity: O(1)
   public func generate() -> IndexingGenerator {
     return self
   }
@@ -352,7 +352,7 @@ public struct PermutationGenerator<
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - complexity: O(1)
+  /// - Complexity: O(1)
   public func generate() -> Generator {
     return self
   }
@@ -392,7 +392,7 @@ public protocol Sliceable : _Sliceable {
   /// Access the elements delimited by the given half-open range of
   /// indices.
   ///
-  /// - complexity: O(1) unless bridging from Objective-C requires an
+  /// - Complexity: O(1) unless bridging from Objective-C requires an
   ///   O(N) conversion.
   subscript(bounds: Range<Index>) -> SubSlice {get}
 }
@@ -430,7 +430,7 @@ public func dropLast<
 /// If `maxLength` exceeds `s.count()`, the result contains all
 /// the elements of `s`.
 ///
-/// - complexity: O(1)+K when `S.Index` conforms to
+/// - Complexity: O(1)+K when `S.Index` conforms to
 ///   `RandomAccessIndexType` and O(N)+K otherwise, where K is the cost
 ///   of slicing `s`.
 public func prefix<S: Sliceable>(s: S, _ maxLength: Int) -> S.SubSlice {
@@ -444,7 +444,7 @@ public func prefix<S: Sliceable>(s: S, _ maxLength: Int) -> S.SubSlice {
 /// If `maxLength` exceeds `s.count()`, the result contains all
 /// the elements of `s`.
 ///
-/// - complexity: O(1)+K when `S.Index` conforms to
+/// - Complexity: O(1)+K when `S.Index` conforms to
 ///   `RandomAccessIndexType` and O(N)+K otherwise, where K is the cost
 ///   of slicing `s`.
 public func suffix<

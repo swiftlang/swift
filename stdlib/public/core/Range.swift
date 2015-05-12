@@ -141,7 +141,7 @@ public struct Range<
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - complexity: O(1)
+  /// - Complexity: O(1)
   public func generate() -> RangeGenerator<T> {
     return Generator(self)
   }

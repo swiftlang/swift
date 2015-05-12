@@ -114,7 +114,7 @@ extension _ArrayBuffer {
   }
 
   /// Convert to an NSArray.
-  /// - precondition: _isBridgedToObjectiveC(Element.self)
+  /// - Precondition: _isBridgedToObjectiveC(Element.self)
   ///   O(1) if the element type is bridged verbatim, O(N) otherwise
   public func _asCocoaArray() -> _NSArrayCoreType {
     _sanityCheck(
@@ -274,7 +274,7 @@ extension _ArrayBuffer {
     return _SliceBuffer(result)
   }
 
-  /// - precondition: _isNative is true.
+  /// - Precondition: _isNative is true.
   internal func _getBaseAddress() -> UnsafeMutablePointer<T> {
     _sanityCheck(_isNative, "must be a native buffer")
     return _native.baseAddress
@@ -486,7 +486,7 @@ extension _ArrayBuffer {
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - complexity: O(1)
+  /// - Complexity: O(1)
   public func generate() -> IndexingGenerator<_ArrayBuffer> {
     return IndexingGenerator(self)
   }

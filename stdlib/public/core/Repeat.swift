@@ -40,7 +40,7 @@ public struct Repeat<T> : CollectionType {
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - complexity: O(1)
+  /// - Complexity: O(1)
   public func generate() -> IndexingGenerator<Repeat> {
     return IndexingGenerator(self)
   }

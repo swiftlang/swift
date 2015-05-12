@@ -59,14 +59,14 @@ public struct CollectionOfOne<T> : CollectionType {
   /// The "past the end" position; always identical to
   /// `startIndex.successor()`.
   ///
-  /// - note: `endIndex` is not a valid argument to `subscript`.
+  /// - Note: `endIndex` is not a valid argument to `subscript`.
   public var endIndex: Index {
     return .One
   }
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - complexity: O(1)
+  /// - Complexity: O(1)
   public func generate() -> GeneratorOfOne<T> {
     return GeneratorOfOne(element)
   }

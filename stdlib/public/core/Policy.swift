@@ -107,7 +107,7 @@ public typealias Any = protocol<>
 /// This protocol *must* not have any method or property requirements.
 /// (Final extension methods are OK though.)
 ///
-/// - seealso: `AnyClass`
+/// - SeeAlso: `AnyClass`
 #if _runtime(_ObjC)
 @objc public protocol AnyObject: class {}
 #else
@@ -137,7 +137,7 @@ public protocol AnyObject: class {}
 ///       return **x.cValue**
 ///     }
 ///
-/// - seealso: `AnyObject`
+/// - SeeAlso: `AnyObject`
 public typealias AnyClass = AnyObject.Type
 
 public func === (lhs: AnyObject?, rhs: AnyObject?) -> Bool {
@@ -258,22 +258,22 @@ public protocol Comparable : _Comparable, Equatable {
 public protocol BitwiseOperationsType {
   /// Returns the intersection of bits set in `lhs` and `rhs`.
   ///
-  /// - complexity: O(1)
+  /// - Complexity: O(1)
   func & (lhs: Self, rhs: Self) -> Self
 
   /// Returns the union of bits set in `lhs` and `rhs`
   ///
-  /// - complexity: O(1)
+  /// - Complexity: O(1)
   func |(lhs: Self, rhs: Self) -> Self
 
   /// Returns the bits that are set in exactly one of `lhs` and `rhs`
   ///
-  /// - complexity: O(1)
+  /// - Complexity: O(1)
   func ^(lhs: Self, rhs: Self) -> Self
 
   /// Returns `x ^ ~Self.allZeros`
   ///
-  /// - complexity: O(1)
+  /// - Complexity: O(1)
   prefix func ~(x: Self) -> Self
 
   /// The empty bitset.
@@ -303,7 +303,7 @@ public protocol Hashable : Equatable {
   ///
   /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
   ///
-  /// - note: The hash value is not guaranteed to be stable across
+  /// - Note: The hash value is not guaranteed to be stable across
   ///   different invocations of the same program.  Do not persist the
   ///   hash value across program runs.
   var hashValue: Int { get }

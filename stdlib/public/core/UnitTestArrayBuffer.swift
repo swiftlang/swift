@@ -252,7 +252,7 @@ public struct _UnitTestArrayBuffer<T> : _ArrayBufferType {
 
 #if _runtime(_ObjC)
   /// Convert to an NSArray.
-  /// - precondition: T is bridged to Objective-C
+  /// - Precondition: T is bridged to Objective-C
   ///   O(1).
   public func _asCocoaArray() -> _NSArrayCoreType {
     _sanityCheck(
@@ -390,7 +390,7 @@ extension _UnitTestArrayBuffer : CollectionType {
   
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - complexity: O(1)
+  /// - Complexity: O(1)
   public func generate() -> IndexingGenerator<_UnitTestArrayBuffer> {
     return IndexingGenerator(self)
   }

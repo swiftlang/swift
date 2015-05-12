@@ -21,7 +21,7 @@ public struct LazySequence<S : SequenceType> : SequenceType {
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - complexity: O(1)
+  /// - Complexity: O(1)
   public func generate() -> S.Generator {
     return self._base.generate()
   }

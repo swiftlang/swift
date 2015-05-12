@@ -160,7 +160,7 @@ extension CGFloat : Reflectable {
   ///
   /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
   ///
-  /// - note: the hash value is not guaranteed to be stable across
+  /// - Note: the hash value is not guaranteed to be stable across
   ///   different invocations of the same program.  Do not persist the
   ///   hash value across program runs.
   public var hashValue: Int {
@@ -232,7 +232,7 @@ public func <(lhs: CGFloat, rhs: CGFloat) -> Bool {
   /// Returns a stride `x` such that `self.advancedBy(x)` approximates
   /// `other`.
   ///
-  /// - complexity: O(1).
+  /// - Complexity: O(1).
   @transparent public
   func distanceTo(other: CGFloat) -> CGFloat {
     return CGFloat(other.native - self.native)
@@ -241,7 +241,7 @@ public func <(lhs: CGFloat, rhs: CGFloat) -> Bool {
   /// Returns a `Self` `x` such that `self.distanceTo(x)` approximates
   /// `n`.
   ///
-  /// - complexity: O(1).
+  /// - Complexity: O(1).
   @transparent public
   func advancedBy(amount: CGFloat) -> CGFloat {
     return CGFloat(self.native + amount.native)

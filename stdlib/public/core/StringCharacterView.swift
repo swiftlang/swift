@@ -42,7 +42,7 @@ extension String {
 
   /// Efficiently mutate `self` by applying `body` to its `characters`.
   ///
-  /// - warning: Do not rely on anything about `self` (the `String`
+  /// - Warning: Do not rely on anything about `self` (the `String`
   ///   that is the target of this method) during the execution of
   ///   `body`: it may not appear to have its correct value.  Instead,
   ///   use only the `String.CharacterView` argument to `body`.
@@ -230,7 +230,7 @@ extension String.CharacterView : CollectionType {
 
   /// Return a *generator* over the `Character`s
   ///
-  /// - complexity: O(1)
+  /// - Complexity: O(1)
   public func generate() -> IndexingGenerator<String.CharacterView> {
     return IndexingGenerator(self)
   }
@@ -270,14 +270,14 @@ extension String.CharacterView : ExtensibleCollectionType {
   
   /// Reserve enough space to store `n` ASCII characters.
   ///
-  /// - complexity: O(`n`)
+  /// - Complexity: O(`n`)
   public mutating func reserveCapacity(n: Int) {
     _core.reserveCapacity(n)
   }
 
   /// Append `c` to `self`.
   ///
-  /// - complexity: Amortized O(1).
+  /// - Complexity: Amortized O(1).
   public mutating func append(c: Character) {
     switch c._representation {
     case .Small(let _63bits):
@@ -327,7 +327,7 @@ extension String.CharacterView : RangeReplaceableCollectionType {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - complexity: O(`subRange.count()`) if `subRange.endIndex
+  /// - Complexity: O(`subRange.count()`) if `subRange.endIndex
   ///   == self.endIndex` and `isEmpty(newElements)`, O(N) otherwise.
   public mutating func replaceRange<
     C: CollectionType where C.Generator.Element == Character
@@ -344,7 +344,7 @@ extension String.CharacterView : RangeReplaceableCollectionType {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - complexity: O(`self.count()`).
+  /// - Complexity: O(`self.count()`).
   public mutating func insert(newElement: Character, atIndex i: Index) {
     Swift.insert(&self, newElement, atIndex: i)
   }
@@ -353,7 +353,7 @@ extension String.CharacterView : RangeReplaceableCollectionType {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - complexity: O(`self.count() + newElements.count()`).
+  /// - Complexity: O(`self.count() + newElements.count()`).
   public mutating func splice<
     S : CollectionType where S.Generator.Element == Character
   >(newElements: S, atIndex i: Index) {
@@ -364,7 +364,7 @@ extension String.CharacterView : RangeReplaceableCollectionType {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - complexity: O(`self.count()`).
+  /// - Complexity: O(`self.count()`).
   public mutating func removeAtIndex(i: Index) -> Character {
     return Swift.removeAtIndex(&self, i)
   }
@@ -373,7 +373,7 @@ extension String.CharacterView : RangeReplaceableCollectionType {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - complexity: O(`self.count()`).
+  /// - Complexity: O(`self.count()`).
   public mutating func removeRange(subRange: Range<Index>) {
     Swift.removeRange(&self, subRange)
   }
@@ -393,7 +393,7 @@ extension String.CharacterView : RangeReplaceableCollectionType {
 extension String.CharacterView : Sliceable {
   /// Access the characters in the given `subRange`
   ///
-  /// - complexity: O(1) unless bridging from Objective-C requires an
+  /// - Complexity: O(1) unless bridging from Objective-C requires an
   ///   O(N) conversion.
   public subscript(subRange: Range<Index>) -> String.CharacterView {
     let unicodeScalarRange =

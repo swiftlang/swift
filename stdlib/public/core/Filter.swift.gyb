@@ -46,7 +46,7 @@ public struct FilterGenerator<
 public struct FilterSequenceView<Base : SequenceType> : SequenceType {
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - complexity: O(1)
+  /// - Complexity: O(1)
   public func generate() -> FilterGenerator<Base.Generator> {
     return FilterGenerator(_base: _base.generate(), _include: _include)
   }
@@ -121,7 +121,7 @@ public struct FilterCollectionView<Base : CollectionType> : CollectionType {
   ///
   /// In an empty collection, `startIndex == endIndex`.
   ///
-  /// - complexity: O(N), where N is the ratio between unfiltered and
+  /// - Complexity: O(N), where N is the ratio between unfiltered and
   ///   filtered collection counts.
   public var startIndex: Index {
     var first = _base.startIndex
@@ -141,7 +141,7 @@ public struct FilterCollectionView<Base : CollectionType> : CollectionType {
   /// reachable from `startIndex` by zero or more applications of
   /// `successor()`.
   ///
-  /// - complexity: O(1)
+  /// - Complexity: O(1)
   public var endIndex: Index {
     return FilterCollectionViewIndex(
       _pos: _base.endIndex, _end: _base.endIndex,
@@ -158,7 +158,7 @@ public struct FilterCollectionView<Base : CollectionType> : CollectionType {
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - complexity: O(1)
+  /// - Complexity: O(1)
   public func generate() -> FilterGenerator<Base.Generator> {
     return FilterGenerator(_base: _base.generate(), _include: _include)
   }

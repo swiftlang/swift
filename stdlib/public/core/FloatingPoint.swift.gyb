@@ -454,7 +454,7 @@ extension ${Self} : Hashable {
   ///
   /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
   ///
-  /// - note: The hash value is not guaranteed to be stable across
+  /// - Note: The hash value is not guaranteed to be stable across
   ///   different invocations of the same program.  Do not persist the
   ///   hash value across program runs.
   public var hashValue: Int {
@@ -569,7 +569,7 @@ extension ${Self} : Strideable {
   /// Returns a stride `x` such that `self.advancedBy(x)` approximates
   /// `other`.
   ///
-  /// - complexity: O(1).
+  /// - Complexity: O(1).
   @transparent public
   func distanceTo(other: ${Self}) -> ${Self} {
     return other - self
@@ -578,7 +578,7 @@ extension ${Self} : Strideable {
   /// Returns a `Self` `x` such that `self.distanceTo(x)` approximates
   /// `n`.
   ///
-  /// - complexity: O(1).
+  /// - Complexity: O(1).
   @transparent public
   func advancedBy(amount: ${Self}) -> ${Self} {
     return self + amount

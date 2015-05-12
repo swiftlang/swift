@@ -63,7 +63,7 @@ extension NSObject : Equatable, Hashable {
   ///
   /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
   ///
-  /// - note: the hash value is not guaranteed to be stable across
+  /// - Note: the hash value is not guaranteed to be stable across
   ///   different invocations of the same program.  Do not persist the
   ///   hash value across program runs.
   public var hashValue: Int {
@@ -743,7 +743,7 @@ extension NSArray : SequenceType {
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - complexity: O(1)
+  /// - Complexity: O(1)
   func generate() -> NSFastGenerator {
     return NSFastGenerator(self)
   }
@@ -784,7 +784,7 @@ extension Set {
 extension NSSet : SequenceType {
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - complexity: O(1)
+  /// - Complexity: O(1)
   public func generate() -> NSFastGenerator {
     return NSFastGenerator(self)
   }
@@ -793,7 +793,7 @@ extension NSSet : SequenceType {
 extension NSOrderedSet : SequenceType {
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - complexity: O(1)
+  /// - Complexity: O(1)
   public func generate() -> NSFastGenerator {
     return NSFastGenerator(self)
   }
@@ -831,7 +831,7 @@ public struct NSIndexSetGenerator : GeneratorType {
 extension NSIndexSet : SequenceType {
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - complexity: O(1)
+  /// - Complexity: O(1)
   public func generate() -> NSIndexSetGenerator {
     return NSIndexSetGenerator(set: self)
   }
@@ -949,7 +949,7 @@ extension NSDictionary : SequenceType {
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - complexity: O(1)
+  /// - Complexity: O(1)
   public func generate() -> Generator {
     return Generator(self)
   }
@@ -958,7 +958,7 @@ extension NSDictionary : SequenceType {
 extension NSEnumerator : SequenceType {
   /// Return a *generator* over the *enumerator*.
   ///
-  /// - complexity: O(1)
+  /// - Complexity: O(1)
   public func generate() -> NSFastGenerator {
     return NSFastGenerator(self)
   }
@@ -1194,7 +1194,7 @@ extension NSArray {
   /// Initializes a newly allocated array by placing in it the objects
   /// contained in a given array.
   ///
-  /// - returns: An array initialized to contain the objects in
+  /// - Returns: An array initialized to contain the objects in
   ///    `anArray``. The returned object might be different than the
   ///    original receiver.
   ///
@@ -1210,7 +1210,7 @@ extension NSString {
   /// Returns an `NSString` object initialized by copying the characters
   /// from another given string.
   ///
-  /// - returns: An `NSString` object initialized by copying the
+  /// - Returns: An `NSString` object initialized by copying the
   ///   characters from `aString`. The returned object may be different
   ///   from the original receiver.
   @objc(_swiftInitWithString_NSString:)
@@ -1223,7 +1223,7 @@ extension NSSet {
   /// Initializes a newly allocated set and adds to it objects from
   /// another given set.
   ///
-  /// - returns: An initialized objects set containing the objects from
+  /// - Returns: An initialized objects set containing the objects from
   ///   `set`. The returned set might be different than the original
   ///   receiver.
   @objc(_swiftInitWithSet_NSSet:)
@@ -1236,7 +1236,7 @@ extension NSDictionary {
   /// Initializes a newly allocated dictionary and adds to it objects from
   /// another given dictionary.
   ///
-  /// - returns: An initialized dictionary—which might be different
+  /// - Returns: An initialized dictionary—which might be different
   ///   than the original receiver—containing the keys and values
   ///   found in `otherDictionary`.
   @objc(_swiftInitWithDictionary_NSDictionary:)

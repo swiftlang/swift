@@ -189,7 +189,7 @@ public func unsafeAddressOf(object: AnyObject) -> UnsafePointer<Void> {
   return UnsafePointer(Builtin.bridgeToRawPointer(object))
 }
 
-/// - returns: `x as T`
+/// - Returns: `x as T`
 ///
 /// Requires: `x is T`.  In particular, in -O builds, no test is
 /// performed to ensure that `x` actually has dynamic type `T`.
@@ -205,7 +205,7 @@ public func unsafeDowncast<T : AnyObject>(x: AnyObject) -> T {
   return Builtin.bridgeFromRawPointer(Builtin.bridgeToRawPointer(x))
 }
 
-/// - returns: `nonEmpty!`
+/// - Returns: `nonEmpty!`
 ///
 /// Requires: `nonEmpty != nil`.  In particular, in -O builds, no test
 /// is performed to ensure that `nonEmpty` actually is non-nil.
@@ -223,7 +223,7 @@ public func unsafeUnwrap<T>(nonEmpty: T?) -> T {
   _debugPreconditionFailure("unsafeUnwrap of nil optional")
 }
 
-/// - returns: `unsafeUnwrap(nonEmpty)`
+/// - Returns: `unsafeUnwrap(nonEmpty)`
 ///
 /// This version is for internal stdlib use; it avoids any checking
 /// overhead for users, even in Debug builds.
@@ -288,7 +288,7 @@ internal func _usesNativeSwiftReferenceCounting(theClass: AnyClass) -> Bool {
 @asmname("_swift_class_getInstancePositiveExtentSize_native")
 func _swift_class_getInstancePositiveExtentSize_native(theClass: AnyClass) -> UInt
 
-/// - returns: `class_getInstanceSize(theClass)`
+/// - Returns: `class_getInstanceSize(theClass)`
 @inline(__always)
 internal func _class_getInstancePositiveExtentSize(theClass: AnyClass) -> Int {
 #if _runtime(_ObjC)

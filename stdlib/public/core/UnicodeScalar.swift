@@ -223,7 +223,7 @@ extension UnicodeScalar : Hashable {
   ///
   /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
   ///
-  /// - note: The hash value is not guaranteed to be stable across
+  /// - Note: The hash value is not guaranteed to be stable across
   ///   different invocations of the same program.  Do not persist the
   ///   hash value across program runs.
   public var hashValue: Int {
@@ -316,7 +316,7 @@ extension UnicodeScalar.UTF16View : CollectionType {
   /// Return a *generator* over the code points that comprise this
   /// *sequence*.
   ///
-  /// - complexity: O(1)
+  /// - Complexity: O(1)
   func generate() -> IndexingGenerator<UnicodeScalar.UTF16View> {
     return IndexingGenerator(self)
   }

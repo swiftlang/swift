@@ -45,13 +45,13 @@ public protocol Streamable {
 /// This textual representation is used when values are written to an
 /// *output stream*, for example, by `print`.
 ///
-/// - note: `String(instance)` will work for an `instance` of *any*
+/// - Note: `String(instance)` will work for an `instance` of *any*
 ///   type, returning its `description` if the `instance` happens to be
 ///   `CustomStringConvertible`.  Using `CustomStringConvertible` as a
 /// generic constraint, or accessing a conforming type's `description`
 /// directly, is therefore discouraged.
 ///
-/// - seealso: `String.init<T>(T)`, `CustomDebugStringConvertible`
+/// - SeeAlso: `String.init<T>(T)`, `CustomDebugStringConvertible`
 public protocol CustomStringConvertible {
   /// A textual representation of `self`.
   var description: String { get }
@@ -65,7 +65,7 @@ public protocol CustomStringConvertible {
 /// typically more verbose than the text provided by a
 /// `CustomStringConvertible`'s `description` property.
 ///
-/// - note: `String(reflecting: instance)` will work for an `instance`
+/// - Note: `String(reflecting: instance)` will work for an `instance`
 ///   of *any* type, returning its `debugDescription` if the `instance`
 ///   happens to be `CustomDebugStringConvertible`.  Using
 /// `CustomDebugStringConvertible` as a generic constraint, or
@@ -346,7 +346,7 @@ public func toString<T>(x: T) -> String {
 /// * Otherwise, if `T` conforms to `Streamable`, write `x`
 /// * Otherwise, fall back to a default textual representation.
 ///
-/// - seealso: `debugPrint(x, &target)`
+/// - SeeAlso: `debugPrint(x, &target)`
 @availability(*, unavailable, message="use debugPrint()")
 @inline(never)
 public func debugPrintln<T, TargetStream : OutputStreamType>(
@@ -366,7 +366,7 @@ public func debugPrintln<T, TargetStream : OutputStreamType>(
 /// * Otherwise, if `T` conforms to `Streamable`, write `x`
 /// * Otherwise, fall back to a default textual representation.
 ///
-/// - seealso: `debugPrint(x)`
+/// - SeeAlso: `debugPrint(x)`
 @availability(*, unavailable, renamed="debugPrint")
 @inline(never)
 public func debugPrintln<T>(x: T) {

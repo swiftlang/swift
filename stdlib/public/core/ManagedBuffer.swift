@@ -81,7 +81,7 @@ public class ManagedProtoBuffer<Value, Element> : NonObjectiveCBase {
 /// there yourself, using the APIs on `UnsafeMutablePointer<Element>`.
 /// Typical usage stores a count and capacity in `Value` and destroys
 /// any live elements in the `deinit` of a subclass.
-/// - note: Subclasses must not have any stored properties; any storage
+/// - Note: Subclasses must not have any stored properties; any storage
 ///   needed should be included in `Value`.
 public class ManagedBuffer<Value, Element>
   : ManagedProtoBuffer<Value, Element> {
@@ -331,7 +331,7 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
 
   /// Manage the given `buffer`.
   ///
-  /// - note: It is an error to use the `value` property of the resulting
+  /// - Note: It is an error to use the `value` property of the resulting
   ///   instance unless it has been initialized.
   internal init(_ buffer: ManagedProtoBuffer<Value, Element>) {
     _nativeBuffer = Builtin.castToNativeObject(buffer)

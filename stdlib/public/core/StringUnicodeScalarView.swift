@@ -128,7 +128,7 @@ extension String {
     /// Access the elements delimited by the given half-open range of
     /// indices.
     ///
-    /// - complexity: O(1) unless bridging from Objective-C requires an
+    /// - Complexity: O(1) unless bridging from Objective-C requires an
     ///   O(N) conversion.
     public subscript(r: Range<Index>) -> UnicodeScalarView {
       return UnicodeScalarView(
@@ -200,7 +200,7 @@ extension String {
     /// Return a *generator* over the `UnicodeScalar`s that comprise
     /// this *sequence*.
     ///
-    /// - complexity: O(1)
+    /// - Complexity: O(1)
     public func generate() -> Generator {
       return Generator(_core)
     }
@@ -251,19 +251,19 @@ extension String.UnicodeScalarView : ExtensibleCollectionType {
   }
   /// Reserve enough space to store `n` ASCII characters.
   ///
-  /// - complexity: O(`n`)
+  /// - Complexity: O(`n`)
   public mutating func reserveCapacity(n: Int) {
     _core.reserveCapacity(n)
   }
   /// Append `x` to `self`.
   ///
-  /// - complexity: Amortized O(1).
+  /// - Complexity: Amortized O(1).
   public mutating func append(x: UnicodeScalar) {
     _core.append(x)
   }
   /// Append the elements of `newElements` to `self`.
   ///
-  /// - complexity: O(*length of result*)
+  /// - Complexity: O(*length of result*)
   public mutating func extend<
     S : SequenceType where S.Generator.Element == UnicodeScalar
   >(newElements: S) {
@@ -279,7 +279,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollectionType {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - complexity: O(`subRange.count()`) if `subRange.endIndex
+  /// - Complexity: O(`subRange.count()`) if `subRange.endIndex
   ///   == self.endIndex` and `isEmpty(newElements)`, O(N) otherwise.
   public mutating func replaceRange<
     C: CollectionType where C.Generator.Element == UnicodeScalar
@@ -296,7 +296,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollectionType {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - complexity: O(`self.count()`).
+  /// - Complexity: O(`self.count()`).
   public mutating func insert(newElement: UnicodeScalar, atIndex i: Index) {
     Swift.insert(&self, newElement, atIndex: i)
   }
@@ -305,7 +305,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollectionType {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - complexity: O(`self.count() + newElements.count()`).
+  /// - Complexity: O(`self.count() + newElements.count()`).
   public mutating func splice<
     S : CollectionType where S.Generator.Element == UnicodeScalar
   >(newElements: S, atIndex i: Index) {
@@ -316,7 +316,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollectionType {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - complexity: O(`self.count()`).
+  /// - Complexity: O(`self.count()`).
   public mutating func removeAtIndex(i: Index) -> UnicodeScalar {
     return Swift.removeAtIndex(&self, i)
   }
@@ -325,7 +325,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollectionType {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - complexity: O(`self.count()`).
+  /// - Complexity: O(`self.count()`).
   public mutating func removeRange(subRange: Range<Index>) {
     Swift.removeRange(&self, subRange)
   }

@@ -102,7 +102,7 @@ extension String {
     /// Access the elements delimited by the given half-open range of
     /// indices.
     ///
-    /// - complexity: O(1) unless bridging from Objective-C requires an
+    /// - Complexity: O(1) unless bridging from Objective-C requires an
     ///   O(N) conversion.
     public subscript(subRange: Range<Index>) -> UTF16View {
       return UTF16View(

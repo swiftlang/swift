@@ -619,7 +619,7 @@ extension String {
   //     remainingRange:(NSRangePointer)leftover
 
   /// Gets a given range of characters as bytes in a specified encoding.
-  /// - note: will get a maximum of `min(buffer.count, maxLength)` bytes.
+  /// - Note: will get a maximum of `min(buffer.count, maxLength)` bytes.
   public func getBytes(
     inout buffer: [UInt8],
     maxLength: Int,
@@ -648,7 +648,7 @@ extension String {
 
   /// Converts the `String`’s content to a given encoding and
   /// stores them in a buffer.
-  /// - note: will store a maximum of `min(buffer.count, maxLength)` bytes.
+  /// - Note: will store a maximum of `min(buffer.count, maxLength)` bytes.
   public func getCString(
     inout buffer: [CChar], maxLength: Int, encoding: NSStringEncoding
   ) -> Bool {
@@ -663,7 +663,7 @@ extension String {
   /// Interprets the `String` as a system-independent path and
   /// fills a buffer with a C-string in a format and encoding suitable
   /// for use with file-system calls.
-  /// - note: will store a maximum of `min(buffer.count, maxLength)` bytes.
+  /// - Note: will store a maximum of `min(buffer.count, maxLength)` bytes.
   public func getFileSystemRepresentation(
     inout buffer: [CChar], maxLength: Int) -> Bool {
     return _ns.getFileSystemRepresentation(

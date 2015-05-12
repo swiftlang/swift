@@ -325,7 +325,7 @@ public protocol _RandomAccessIndexType : _BidirectionalIndexType, Strideable {
   /// Return the minimum number of applications of `successor` or
   /// `predecessor` required to reach `other` from `self`.
   ///
-  /// - complexity: O(1).
+  /// - Complexity: O(1).
   ///
   /// Axioms:
   ///
@@ -336,11 +336,11 @@ public protocol _RandomAccessIndexType : _BidirectionalIndexType, Strideable {
 
   /// Return `self` offset by `n` steps.
   ///
-  /// - returns: If `n > 0`, the result of applying `successor` to
+  /// - Returns: If `n > 0`, the result of applying `successor` to
   ///   `self` `n` times.  If `n < 0`, the result of applying
   ///   `predecessor` to `self` `n` times. Otherwise, `self`.
   ///
-  /// - complexity: O(1)
+  /// - Complexity: O(1)
   ///
   /// Axioms:
   ///

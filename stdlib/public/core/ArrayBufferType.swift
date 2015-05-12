@@ -37,10 +37,10 @@ public protocol _ArrayBufferType : MutableCollectionType {
   /// buffer store minimumCapacity elements, returns that buffer.
   /// Otherwise, returns nil.
   ///
-  /// - note: The result's baseAddress may not match ours, if we are a
+  /// - Note: The result's baseAddress may not match ours, if we are a
   ///   _SliceBuffer.
   ///
-  /// - note: This function must remain mutating; otherwise the buffer
+  /// - Note: This function must remain mutating; otherwise the buffer
   ///   may acquire spurious extra references, which will cause
   ///   unnecessary reallocation.
   mutating func requestUniqueMutableBackingBuffer(minimumCapacity: Int)
@@ -49,7 +49,7 @@ public protocol _ArrayBufferType : MutableCollectionType {
   /// Returns true iff this buffer is backed by a uniquely-referenced mutable
   /// _ContiguousArrayBuffer.
   ///
-  /// - note: This function must remain mutating; otherwise the buffer
+  /// - Note: This function must remain mutating; otherwise the buffer
   ///   may acquire spurious extra references, which will cause
   ///   unnecessary reallocation.
   mutating func isMutableAndUniquelyReferenced() -> Bool

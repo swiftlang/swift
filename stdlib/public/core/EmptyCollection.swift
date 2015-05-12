@@ -19,7 +19,7 @@
 
 /// A generator that never produces an element.
 ///
-/// - seealso: `EmptyCollection<T>`.
+/// - SeeAlso: `EmptyCollection<T>`.
 public struct EmptyGenerator<T> : GeneratorType, SequenceType {
   /// Construct an instance
   public init() {}
@@ -59,7 +59,7 @@ public struct EmptyCollection<T> : CollectionType {
 
   /// Returns an empty *generator*.
   ///
-  /// - complexity: O(1)
+  /// - Complexity: O(1)
   public func generate() -> EmptyGenerator<T> {
     return EmptyGenerator()
   }

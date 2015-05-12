@@ -61,7 +61,7 @@ extension SequenceType ${"" if preds else "where Generator.Element : Comparable"
 
   /// Returns the minimum element in `self` or `nil` if the sequence is empty.
   ///
-  /// - complexity: O(elements.count())
+  /// - Complexity: O(elements.count())
   ///
   /// ${orderingRequirement}
   final public func minElement(
@@ -83,7 +83,7 @@ extension SequenceType ${"" if preds else "where Generator.Element : Comparable"
 
   /// Returns the maximum element in `self` or `nil` if the sequence is empty.
   ///
-  /// - complexity: O(elements.count())
+  /// - Complexity: O(elements.count())
   ///   ${orderingRequirement}
   final public func maxElement(
 %   if preds:
@@ -226,7 +226,7 @@ if preds:
   /// Return true iff `self` precedes `other` in a lexicographical ("dictionary")
   /// ordering, using `isOrderedBefore` as the comparison between elements.
   ///
-  /// - note: This method implements the mathematical notion of lexicographical
+  /// - Note: This method implements the mathematical notion of lexicographical
   ///   ordering, which has no connection to Unicode.  If you are sorting strings
   ///   to present to the end-user, you should use `String` APIs that perform
   /// localized comparison.
@@ -238,7 +238,7 @@ else:
   /// Return true iff `self` precedes `other` in a lexicographical ("dictionary")
   /// ordering, using "<" as the comparison between elements.
   ///
-  /// - note: This method implements the mathematical notion of lexicographical
+  /// - Note: This method implements the mathematical notion of lexicographical
   ///   ordering, which has no connection to Unicode.  If you are sorting strings
   ///   to present to the end-user, you should use `String` APIs that perform
   /// localized comparison."""

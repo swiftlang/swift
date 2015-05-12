@@ -220,7 +220,7 @@ extension String {
     /// Access the elements delimited by the given half-open range of
     /// indices.
     ///
-    /// - complexity: O(1) unless bridging from Objective-C requires an
+    /// - Complexity: O(1) unless bridging from Objective-C requires an
     ///   O(N) conversion.
     public subscript(subRange: Range<Index>) -> UTF8View {
       return UTF8View(_core, subRange.startIndex, subRange.endIndex)
@@ -229,7 +229,7 @@ extension String {
     /// Return a *generator* over the code points that comprise this
     /// *sequence*.
     ///
-    /// - complexity: O(1)
+    /// - Complexity: O(1)
     public func generate() -> IndexingGenerator<UTF8View> {
       return IndexingGenerator(self)
     }

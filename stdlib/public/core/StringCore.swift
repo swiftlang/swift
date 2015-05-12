@@ -180,7 +180,7 @@ public struct _StringCore {
   // Properties
 
   /// The number of elements stored
-  /// - complexity: O(1).
+  /// - Complexity: O(1).
   public var count: Int {
     get {
       return Int(_countAndFlags & _countMask)
@@ -360,11 +360,11 @@ public struct _StringCore {
   /// storage if successful. Otherwise, returns a suggested new
   /// capacity and a null pointer.
   ///
-  /// - note: If successful, effectively appends garbage to the String
+  /// - Note: If successful, effectively appends garbage to the String
   ///   until it has newSize UTF-16 code units; you must immediately copy
   ///   valid UTF-16 into that storage.
   ///
-  /// - note: If unsuccessful because of insufficient space in an
+  /// - Note: If unsuccessful because of insufficient space in an
   ///   existing buffer, the suggested new capacity will at least double
   ///   the existing buffer's storage
   mutating func _claimCapacity(
@@ -463,7 +463,7 @@ public struct _StringCore {
 
   /// Append `c` to `self`.
   ///
-  /// - complexity: O(1) when amortized over repeated appends of equal
+  /// - Complexity: O(1) when amortized over repeated appends of equal
   ///   character values
   mutating func append(c: UnicodeScalar) {
     let width = UTF16.width(c)
@@ -475,7 +475,7 @@ public struct _StringCore {
 
   /// Append `u` to `self`.
   ///
-  /// - complexity: Amortized O(1).
+  /// - Complexity: Amortized O(1).
   public mutating func append(u: UTF16.CodeUnit) {
     append(u, nil)
   }
@@ -637,7 +637,7 @@ var _emptyStringBase: COpaquePointer {
 extension _StringCore : RangeReplaceableCollectionType {
   /// Replace the given `subRange` of elements with `newElements`.
   ///
-  /// - complexity: O(`subRange.count()`) if `subRange.endIndex
+  /// - Complexity: O(`subRange.count()`) if `subRange.endIndex
   ///   == self.endIndex` and `isEmpty(newElements)`, O(N) otherwise.
   public mutating func replaceRange<
     C: CollectionType where C.Generator.Element == UTF16.CodeUnit

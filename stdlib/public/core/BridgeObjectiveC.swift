@@ -62,7 +62,7 @@ public protocol _ObjectiveCBridgeable {
   ///
   /// - parameter result The location where the result is written.
   ///
-  /// - returns: true if bridging succeeded, false otherwise. This redundant
+  /// - Returns: true if bridging succeeded, false otherwise. This redundant
   ///   information is provided for the convenience of the runtime's dynamic_cast
   ///   implementation, so that it need not look into the optional representation
   /// to determine success.
@@ -205,7 +205,7 @@ func _bridgeNonVerbatimFromObjectiveC<T>(
 /// - parameter result: Will be set to the resulting value if bridging succeeds, and
 ///   unchanged otherwise.
 ///
-/// - returns: true to indicate success, false to indicate failure
+/// - Returns: true to indicate success, false to indicate failure
 @asmname("swift_bridgeNonVerbatimFromObjectiveCConditional")
 func _bridgeNonVerbatimFromObjectiveCConditional<T>(
   x: AnyObject,

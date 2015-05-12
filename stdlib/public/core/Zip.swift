@@ -86,7 +86,7 @@ public struct Zip2<Sequence1 : SequenceType, Sequence2 : SequenceType>
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - complexity: O(1)
+  /// - Complexity: O(1)
   public func generate() -> Generator {
     return Generator(
       _sequences.0.generate(),

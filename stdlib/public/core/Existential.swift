@@ -38,7 +38,7 @@ internal struct _CollectionOf<
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - complexity: O(1)
+  /// - Complexity: O(1)
   func generate() -> AnyGenerator<T> {
     var index = startIndex
     return anyGenerator {

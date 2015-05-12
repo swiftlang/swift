@@ -79,7 +79,7 @@ struct _ConcatenateSequenceView<
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - complexity: O(1)
+  /// - Complexity: O(1)
   public func generate() -> _ConcatenateSequenceGenerator<Base.Generator> {
     return _ConcatenateSequenceGenerator(_base.generate())
   }
@@ -207,7 +207,7 @@ struct ${View}<
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - complexity: O(1)
+  /// - Complexity: O(1)
   public // @testable
   func generate() -> _ConcatenateSequenceGenerator<C.Generator> {
     return _ConcatenateSequenceGenerator(_base.generate())

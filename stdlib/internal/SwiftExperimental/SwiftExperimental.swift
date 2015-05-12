@@ -37,7 +37,7 @@ infix operator ∘ {
 ///
 ///     (g ∘ f)(x) == g(f(x))
 ///
-/// - returns: a function that applies ``g`` to the result of applying ``f``
+/// - Returns: a function that applies ``g`` to the result of applying ``f``
 ///   to the argument of the new function.
 public func ∘<T, U, V>(g: U -> V, f: T -> U) -> (T -> V) {
   return { g(f($0)) }
@@ -62,7 +62,7 @@ infix operator ⊅ { associativity left precedence 130 }
 infix operator ⊇ { associativity left precedence 130 }
 infix operator ⊉ { associativity left precedence 130 }
 
-/// - returns: The relative complement of `lhs` with respect to `rhs`.
+/// - Returns: The relative complement of `lhs` with respect to `rhs`.
 public func ∖ <
   T, S: SequenceType where S.Generator.Element == T
   >(lhs: Set<T>, rhs: S) -> Set<T> {
@@ -76,7 +76,7 @@ public func ∖= <
   lhs.subtractInPlace(rhs)
 }
 
-/// - returns: The union of `lhs` and `rhs`.
+/// - Returns: The union of `lhs` and `rhs`.
 public func ∪ <
   T, S: SequenceType where S.Generator.Element == T
   >(lhs: Set<T>, rhs: S) -> Set<T> {
@@ -90,7 +90,7 @@ public func ∪= <
   lhs.unionInPlace(rhs)
 }
 
-/// - returns: The intersection of `lhs` and `rhs`.
+/// - Returns: The intersection of `lhs` and `rhs`.
 public func ∩ <
   T, S: SequenceType where S.Generator.Element == T
   >(lhs: Set<T>, rhs: S) -> Set<T> {
@@ -104,7 +104,7 @@ public func ∩= <
   lhs.intersectInPlace(rhs)
 }
 
-/// - returns: A set with elements in `lhs` or `rhs` but not in both.
+/// - Returns: A set with elements in `lhs` or `rhs` but not in both.
 public func ⨁ <
   T, S: SequenceType where S.Generator.Element == T
   >(lhs: Set<T>, rhs: S) -> Set<T> {
@@ -118,66 +118,66 @@ public func ⨁= <
   lhs.exclusiveOrInPlace(rhs)
 }
 
-/// - returns: True if `x` is in the set.
+/// - Returns: True if `x` is in the set.
 public func ∈ <T>(x: T, rhs: Set<T>) -> Bool {
   return rhs.contains(x)
 }
 
-/// - returns: True if `x` is not in the set.
+/// - Returns: True if `x` is not in the set.
 public func ∉ <T>(x: T, rhs: Set<T>) -> Bool {
   return !rhs.contains(x)
 }
 
-/// - returns: True if `lhs` is a strict subset of `rhs`.
+/// - Returns: True if `lhs` is a strict subset of `rhs`.
 public func ⊂ <
   T, S: SequenceType where S.Generator.Element == T
   >(lhs: Set<T>, rhs: S) -> Bool {
   return lhs.isStrictSubsetOf(rhs)
 }
 
-/// - returns: True if `lhs` is not a strict subset of `rhs`.
+/// - Returns: True if `lhs` is not a strict subset of `rhs`.
 public func ⊄ <
   T, S: SequenceType where S.Generator.Element == T
   >(lhs: Set<T>, rhs: S) -> Bool {
   return !lhs.isStrictSubsetOf(rhs)
 }
 
-/// - returns: True if `lhs` is a subset of `rhs`.
+/// - Returns: True if `lhs` is a subset of `rhs`.
 public func ⊆ <
   T, S: SequenceType where S.Generator.Element == T
   >(lhs: Set<T>, rhs: S) -> Bool {
   return lhs.isSubsetOf(rhs)
 }
 
-/// - returns: True if `lhs` is not a subset of `rhs`.
+/// - Returns: True if `lhs` is not a subset of `rhs`.
 public func ⊈ <
   T, S: SequenceType where S.Generator.Element == T
   >(lhs: Set<T>, rhs: S) -> Bool {
   return !lhs.isSubsetOf(rhs)
 }
 
-/// - returns: True if `lhs` is a strict superset of `rhs`.
+/// - Returns: True if `lhs` is a strict superset of `rhs`.
 public func ⊃ <
   T, S: SequenceType where S.Generator.Element == T
   >(lhs: Set<T>, rhs: S) -> Bool {
   return lhs.isStrictSupersetOf(rhs)
 }
 
-/// - returns: True if `lhs` is not a strict superset of `rhs`.
+/// - Returns: True if `lhs` is not a strict superset of `rhs`.
 public func ⊅ <
   T, S: SequenceType where S.Generator.Element == T
   >(lhs: Set<T>, rhs: S) -> Bool {
   return !lhs.isStrictSupersetOf(rhs)
 }
 
-/// - returns: True if `lhs` is a superset of `rhs`.
+/// - Returns: True if `lhs` is a superset of `rhs`.
 public func ⊇ <
   T, S: SequenceType where S.Generator.Element == T
   >(lhs: Set<T>, rhs: S) -> Bool {
   return lhs.isSupersetOf(rhs)
 }
 
-/// - returns: True if `lhs` is not a superset of `rhs`.
+/// - Returns: True if `lhs` is not a superset of `rhs`.
 public func ⊉ <
   T, S: SequenceType where S.Generator.Element == T
   >(lhs: Set<T>, rhs: S) -> Bool {

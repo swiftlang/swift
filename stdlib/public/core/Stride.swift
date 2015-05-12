@@ -24,18 +24,18 @@ public protocol _Strideable {
   /// Returns a stride `x` such that `self.advancedBy(x)` approximates
   /// `other`.
   ///
-  /// - complexity: O(1).
+  /// - Complexity: O(1).
   ///
-  /// - seealso: `RandomAccessIndexType`'s `distanceTo`, which provides a
+  /// - SeeAlso: `RandomAccessIndexType`'s `distanceTo`, which provides a
   ///   stronger semantic guarantee.
   func distanceTo(other: Self) -> Stride
 
   /// Returns a `Self` `x` such that `self.distanceTo(x)` approximates
   /// `n`.
   ///
-  /// - complexity: O(1).
+  /// - Complexity: O(1).
   ///
-  /// - seealso: `RandomAccessIndexType`'s `advancedBy`, which
+  /// - SeeAlso: `RandomAccessIndexType`'s `advancedBy`, which
   ///   provides a stronger semantic guarantee.
   func advancedBy(n: Stride) -> Self
 }
@@ -52,7 +52,7 @@ public func == <T : _Strideable>(x: T, y: T) -> Bool {
 /// Conforming types are notionally continuous, one-dimensional
 /// values that can be offset and measured.
 ///
-/// - seealso: `stride(from: to: by:)` and `stride(from: through: by:)`
+/// - SeeAlso: `stride(from: to: by:)` and `stride(from: through: by:)`
 public protocol Strideable : Comparable, _Strideable {}
 
 public func + <T : Strideable> (lhs: T, rhs: T.Stride) -> T {
@@ -134,7 +134,7 @@ public struct StrideTo<T : Strideable> : SequenceType {
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - complexity: O(1)
+  /// - Complexity: O(1)
   public func generate() -> StrideToGenerator<T> {
     return StrideToGenerator(current: start, end: end, stride: stride)
   }
@@ -194,7 +194,7 @@ public struct StrideThrough<T : Strideable> : SequenceType {
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - complexity: O(1)
+  /// - Complexity: O(1)
   public func generate() -> StrideThroughGenerator<T> {
     return StrideThroughGenerator(
       current: start, end: end, stride: stride, done: false)
@@ -216,7 +216,7 @@ public struct StrideThrough<T : Strideable> : SequenceType {
 /// stride + stride`, ... *last*) where *last* is the last value in
 /// the progression less than or equal to `end`.
 ///
-/// - note: There is no guarantee that `end` is an element of the sequence.
+/// - Note: There is no guarantee that `end` is an element of the sequence.
 public func stride<
   T : Strideable
 >(from start: T, through end: T, by stride: T.Stride) -> StrideThrough<T> {

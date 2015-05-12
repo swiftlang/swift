@@ -119,7 +119,7 @@ final class _ContiguousArrayStorage<T> : _ContiguousArrayStorage1 {
 
   /// Returns the number of elements in the array.
   ///
-  /// - precondition: `T` is bridged non-verbatim.
+  /// - Precondition: `T` is bridged non-verbatim.
   override internal func _getNonVerbatimBridgedCount(dummy: Void) -> Int {
     _sanityCheck(
       !_isBridgedVerbatimToObjectiveC(T.self),
@@ -129,7 +129,7 @@ final class _ContiguousArrayStorage<T> : _ContiguousArrayStorage1 {
 
   /// Bridge array elements and return a new buffer that owns them.
   ///
-  /// - precondition: `T` is bridged non-verbatim.
+  /// - Precondition: `T` is bridged non-verbatim.
   override internal func _getNonVerbatimBridgedHeapBuffer(dummy: Void) ->
     _HeapBuffer<Int, AnyObject> {
     _sanityCheck(
@@ -424,7 +424,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
 
 #if _runtime(_ObjC)
   /// Convert to an NSArray.
-  /// - precondition: T is bridged to Objective-C
+  /// - Precondition: T is bridged to Objective-C
   ///   O(1).
   public func _asCocoaArray() -> _NSArrayCoreType {
     _sanityCheck(
@@ -534,7 +534,7 @@ extension _ContiguousArrayBuffer : CollectionType {
   
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - complexity: O(1)
+  /// - Complexity: O(1)
   public func generate() -> IndexingGenerator<_ContiguousArrayBuffer> {
     return IndexingGenerator(self)
   }

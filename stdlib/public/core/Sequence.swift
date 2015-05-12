@@ -13,7 +13,7 @@
 /// Encapsulates iteration state and interface for iteration over a
 /// *sequence*.
 ///
-/// - note: While it is safe to copy a *generator*, advancing one
+/// - Note: While it is safe to copy a *generator*, advancing one
 ///   copy may invalidate the others.
 ///
 /// Any code that uses multiple generators (or `for`...`in` loops)
@@ -46,7 +46,7 @@ public protocol _SequenceDefaultsType {
   /// *generator*'s next element is the first element of the
   /// sequence.
   ///
-  /// - complexity: O(1)
+  /// - Complexity: O(1)
   func generate() -> Generator
 }
 
@@ -54,7 +54,7 @@ extension _SequenceDefaultsType {
   /// Return a value less than or equal to the number of elements in
   /// `self`, **nondestructively**.
   ///
-  /// - complexity: O(N)
+  /// - Complexity: O(N)
   final public func underestimateCount() -> Int {
     return 0
   }
@@ -96,19 +96,19 @@ public protocol _Sequence_Type
   /// *generator*'s next element is the first element of the
   /// sequence.
   ///
-  /// - complexity: O(1)
+  /// - Complexity: O(1)
   func generate() -> Generator
 
   /// Return a value less than or equal to the number of elements in
   /// `self`, **nondestructively**.
   ///
-  /// - complexity: O(N)
+  /// - Complexity: O(N)
   func underestimateCount() -> Int
 
   /// Return an `Array` containing the results of mapping `transform`
   /// over `self`.
   ///
-  /// - complexity: O(N)
+  /// - Complexity: O(N)
   func _prext_map<T>(
     @noescape transform: (Generator.Element) -> T
   ) -> [T]
@@ -137,7 +137,7 @@ public protocol SequenceType : _Sequence_Type {
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - complexity: O(1)
+  /// - Complexity: O(1)
   func generate() -> Generator
 
   /// If `self` is multi-pass (i.e., a `CollectionType`), invoke the function
@@ -158,7 +158,7 @@ extension SequenceType {
   /// Return an `Array` containing the results of mapping `transform`
   /// over `self`.
   ///
-  /// - complexity: O(N)
+  /// - Complexity: O(N)
   final public func _prext_map<T>(
     @noescape transform: (Generator.Element) -> T
   ) -> [T] {
@@ -244,7 +244,7 @@ public struct GeneratorSequence<
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - complexity: O(1)
+  /// - Complexity: O(1)
   public func generate() -> GeneratorSequence {
     return self
   }

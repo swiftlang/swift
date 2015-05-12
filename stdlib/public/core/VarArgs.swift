@@ -77,7 +77,7 @@ public func withVaList<R>(builder: VaListBuilder,
 /// Returns a `CVaListPointer` built from `args` that's backed by
 /// autoreleased storage.
 ///
-/// - warning: This function is best avoided in favor of
+/// - Warning: This function is best avoided in favor of
 ///   `withVaList`, but occasionally (i.e. in a `class` initializer) you
 ///   may find that the language rules don't allow you to use
 /// `withVaList` as intended.

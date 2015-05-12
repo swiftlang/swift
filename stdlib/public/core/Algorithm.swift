@@ -35,7 +35,7 @@ public func maxElement<
 /// Returns the first index where `value` appears in `domain` or `nil` if
 /// `value` is not found.
 ///
-/// - complexity: O(`domain.count()`)
+/// - Complexity: O(`domain.count()`)
 @availability(*, unavailable, message="call the 'indexOf()' method on the collection")
 public func find<
   C: CollectionType where C.Generator.Element : Equatable
@@ -188,7 +188,7 @@ public func startsWith<
 ///     g.next() // (1, "bar")
 ///     g.next() // nil
 ///
-/// - note: Idiomatic usage is to call `enumerate` instead of
+/// - Note: Idiomatic usage is to call `enumerate` instead of
 ///   constructing an `EnumerateGenerator` directly.
 public struct EnumerateGenerator<
   Base: GeneratorType
@@ -233,7 +233,7 @@ public struct EnumerateGenerator<
 ///     var s = EnumerateSequence(["foo", "bar"])
 ///     Array(s) // [(0, "foo"), (1, "bar")]
 ///
-/// - note: Idiomatic usage is to call `enumerate` instead of
+/// - Note: Idiomatic usage is to call `enumerate` instead of
 ///   constructing an `EnumerateSequence` directly.
 public struct EnumerateSequence<Base : SequenceType> : SequenceType {
   var base: Base
@@ -245,7 +245,7 @@ public struct EnumerateSequence<Base : SequenceType> : SequenceType {
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - complexity: O(1)
+  /// - Complexity: O(1)
   public func generate() -> EnumerateGenerator<Base.Generator> {
     return EnumerateGenerator(base.generate())
   }

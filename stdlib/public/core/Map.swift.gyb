@@ -49,7 +49,7 @@ public struct MapSequenceGenerator<
 public struct MapSequenceView<Base : SequenceType, T> : SequenceType {
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - complexity: O(1)
+  /// - Complexity: O(1)
   public func generate() -> MapSequenceGenerator<Base.Generator,T> {
     return MapSequenceGenerator(
       _base: _base.generate(), _transform: _transform)
@@ -114,7 +114,7 @@ public struct MapCollectionView<Base : CollectionType, T> : CollectionType {
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - complexity: O(1)
+  /// - Complexity: O(1)
   public func generate() -> MapSequenceView<Base, T>.Generator {
     return MapSequenceGenerator(_base: _base.generate(), _transform: _transform)
   }

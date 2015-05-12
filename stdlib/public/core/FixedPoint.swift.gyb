@@ -306,7 +306,7 @@ extension ${Self} : Hashable {
   ///
   /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
   ///
-  /// - note: The hash value is not guaranteed to be stable across
+  /// - Note: The hash value is not guaranteed to be stable across
   ///   different invocations of the same program.  Do not persist the
   ///   hash value across program runs.
   public var hashValue: Int {
@@ -371,7 +371,7 @@ extension ${Self} : RandomAccessIndexType {
   /// Return the minimum number of applications of `successor` or
   /// `predecessor` required to reach `other` from `self`.
   ///
-  /// - complexity: O(1).
+  /// - Complexity: O(1).
   @transparent public
   func distanceTo(other: ${Self}) -> ${Self}.Distance {
     return numericCast((numericCast(other) as IntMax) &- numericCast(self))
@@ -379,11 +379,11 @@ extension ${Self} : RandomAccessIndexType {
 
   /// Return `self` offset by `n` steps.
   ///
-  /// - returns: If `n > 0`, the result of applying `successor` to
+  /// - Returns: If `n > 0`, the result of applying `successor` to
   ///   `self` `n` times.  If `n < 0`, the result of applying
   ///   `predecessor` to `self` `-n` times. Otherwise, `self`.
   ///
-  /// - complexity: O(1)
+  /// - Complexity: O(1)
   @transparent public
   func advancedBy(amount: ${Self}.Distance) -> ${Self} {
     return numericCast((numericCast(self) as IntMax) &+ numericCast(amount))

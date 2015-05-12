@@ -69,7 +69,7 @@ public struct ${vectype} :
 
   /// Initialize using `arrayLiteral`.
   ///
-  /// - precondition: the array literal must exactly ${cardinal[size]} elements.
+  /// - Precondition: the array literal must exactly ${cardinal[size]} elements.
   public init(arrayLiteral elements: ${type}...) { self.init(elements) }
 
   /// Access individual elements of the vector via subscript.

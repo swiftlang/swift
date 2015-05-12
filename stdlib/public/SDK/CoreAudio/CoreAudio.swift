@@ -41,7 +41,7 @@ extension AudioBuffer {
 }
 
 extension AudioBufferList {
-  /// - returns: the size in bytes of an `AudioBufferList` that can hold up to
+  /// - Returns: the size in bytes of an `AudioBufferList` that can hold up to
   ///   `maximumBuffers` `AudioBuffer`s.
   public static func sizeInBytes(maximumBuffers maximumBuffers: Int) -> Int {
     _precondition(maximumBuffers >= 1,
