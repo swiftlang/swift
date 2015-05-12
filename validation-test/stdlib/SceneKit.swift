@@ -15,7 +15,7 @@ func bytesFromNSData(data: NSData) -> [UInt8] {
     count: data.length))
 }
 
-if #available(iOS >= 8.0, *) {
+if #available(iOS 8.0, *) {
   SceneKitTests.test("SCNGeometryElement.init(indices:primitiveType:)/Int") {
     let element = SCNGeometryElement(
       indices: [ 1, 2, Int.max, 4, 5, 6 ],
