@@ -733,15 +733,50 @@ namespace {
     std::pair<bool, Expr *> walkToDeclRefExpr(DeclRefExpr *DRE) {
       auto *D = DRE->getDecl();
 
-      // Decl references that are within the Capture are local references, ones
-      // from parent context are captures.
+      // DC is the DeclContext where D was defined
+      // CurDC is the DeclContext where D was referenced
+      auto DC = D->getDeclContext();
       auto CurDC = AFR.getAsDeclContext();
-      if (!CurDC->isChildContextOf(D->getDeclContext()))
+
+      // A local reference is not a capture.
+      if (CurDC == DC)
+        return { false, DRE };
+
+      auto TmpDC = CurDC;
+
+      while (TmpDC != nullptr) {
+        if (TmpDC == DC)
+          break;
+
+        // We have an intervening nominal type context that is not the
+        // declaration context, and the declaration context is not global.
+        // This is not supported since nominal types cannot capture values.
+        if (auto NTD = dyn_cast<NominalTypeDecl>(TmpDC)) {
+          if (DC->isLocalContext()) {
+            TC.diagnose(DRE->getLoc(), diag::capture_across_type_decl,
+                        NTD->getDescriptiveKind(),
+                        D->getName());
+
+            TC.diagnose(NTD->getLoc(), diag::type_declared_here);
+
+            TC.diagnose(D->getLoc(), diag::decl_declared_here,
+                        D->getName());
+
+            return { false, DRE };
+          }
+        }
+
+        TmpDC = TmpDC->getParent();
+      }
+
+      // We walked all the way up to the root without finding the declaration,
+      // so this is not a capture.
+      if (TmpDC == nullptr)
         return { false, DRE };
 
       // Only capture var decls at global scope.  Other things can be captured
       // if they are local.
-      if (!isa<VarDecl>(D) && !D->getDeclContext()->isLocalContext())
+      if (!isa<VarDecl>(D) && !DC->isLocalContext())
         return { false, DRE };
 
       // Can only capture a variable that is declared before the capturing

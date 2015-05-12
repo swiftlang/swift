@@ -1628,6 +1628,10 @@ ERROR(decl_closure_noescape_use,tce_sema,none,
       "declaration closing over @noescape parameter %0 may allow it to escape",
       (Identifier))
 
+ERROR(capture_across_type_decl,tce_sema,none,
+      "%0 declaration cannot close over value %1 defined in outer scope",
+      (DescriptiveDeclKind, Identifier))
+
 //------------------------------------------------------------------------------
 // Type Check Statements
 //------------------------------------------------------------------------------
