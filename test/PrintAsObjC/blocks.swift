@@ -21,11 +21,11 @@ import ObjectiveC
 // CHECK-NEXT: - (void (^ __nullable)(NSObject * __nonnull))returnsBlockWithInput;
 // CHECK-NEXT: - (void (^ __nullable)(NSObject * __nonnull))returnsBlockWithParenthesizedInput;
 // CHECK-NEXT: - (void (^ __nullable)(NSObject * __nonnull, NSObject * __nonnull))returnsBlockWithTwoInputs;
-// CHECK-NEXT: - (NSInteger (* __null_unspecified)(NSInteger))functionPointers:(NSInteger (* __null_unspecified)(NSInteger))input;
-// CHECK-NEXT: - (void)functionPointerTakesAndReturnsFunctionPointer:(NSInteger (* __null_unspecified (* __null_unspecified)(NSInteger (* __null_unspecified)(NSInteger)))(NSInteger))input;
+// CHECK-NEXT: - (NSInteger (* __nonnull)(NSInteger))functionPointers:(NSInteger (* __nonnull)(NSInteger))input;
+// CHECK-NEXT: - (void)functionPointerTakesAndReturnsFunctionPointer:(NSInteger (* __nonnull (^ __nonnull (* __nonnull)(NSInteger))(NSInteger))(NSInteger))input;
 // CHECK-NEXT: @property (nonatomic, copy) NSInteger (^ __nullable savedBlock)(NSInteger);
-// CHECK-NEXT: @property (nonatomic) NSInteger (* __null_unspecified savedFunctionPointer)(NSInteger);
-// CHECK-NEXT: @property (nonatomic) NSInteger (* __nonnull savedFunctionPointer2)(NSInteger);
+// CHECK-NEXT: @property (nonatomic) NSInteger (* __nonnull savedFunctionPointer)(NSInteger);
+// CHECK-NEXT: @property (nonatomic) NSInteger (* __nullable savedFunctionPointer2)(NSInteger);
 // CHECK-NEXT: @property (nonatomic) NSInteger (* __nullable savedFunctionPointer3)(NSInteger);
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
@@ -55,19 +55,18 @@ import ObjectiveC
     return nil
   }
 
-  func functionPointers(input: CFunctionPointer<Int -> Int>)
-      -> CFunctionPointer<Int -> Int> {
+  func functionPointers(input: @convention(c) Int -> Int)
+      -> @convention(c) Int -> Int {
     return input
   }
 
   func functionPointerTakesAndReturnsFunctionPointer(
-    input: CFunctionPointer<CFunctionPointer<Int -> Int>
-                              -> CFunctionPointer<Int -> Int>>
+    input: @convention(c) Int -> Int
+                              -> @convention(c) Int -> Int
   ) {
   }
 
   var savedBlock: (Int -> Int)?
-  var savedFunctionPointer: CFunctionPointer<Int -> Int> = nil
-  var savedFunctionPointer2: @convention(c) Int -> Int = { $0 }
-  var savedFunctionPointer3: (@convention(c) Int -> Int)? = { $0 }
+  var savedFunctionPointer: @convention(c) Int -> Int = { $0 }
+  var savedFunctionPointer2: (@convention(c) Int -> Int)? = { $0 }
 }

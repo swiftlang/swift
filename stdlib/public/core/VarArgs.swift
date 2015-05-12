@@ -197,15 +197,6 @@ extension COpaquePointer : CVarArgType {
   }
 }
 
-@availability(*, deprecated, message="use a function type '@convention(c) (T) -> U'")
-extension CFunctionPointer : CVarArgType {
-  /// Transform `self` into a series of machine words that can be
-  /// appropriately interpreted by C varargs
-  public var _cVarArgEncoding: [Word] {
-    return _encodeBitsAsWords(self)
-  }
-}
-
 extension UnsafePointer : CVarArgType {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs

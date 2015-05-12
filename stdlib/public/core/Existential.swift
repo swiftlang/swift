@@ -18,66 +18,13 @@
 // Policy.swift.  Similar components should usually be defined next to
 // their respective protocols.
 
-/// Deprecated; use `AnyGenerator<T>` instead
-@availability(*, deprecated, renamed="AnyGenerator")
-public struct GeneratorOf<T> : GeneratorType, SequenceType {
+/// Unavailable; use `AnyGenerator<T>` instead
+@availability(*, unavailable, renamed="AnyGenerator")
+public struct GeneratorOf<T>  {}
 
-  /// Deprecated; use `anyGenerator { ... }`` instead
-  @availability(*, deprecated, renamed="anyGenerator")
-  public init(_ nextElement: ()->T?) {
-    self._next = nextElement
-  }
-
-  /// Deprecated; use `anyGenerator(base)`` instead
-  @availability(*, deprecated, renamed="anyGenerator")
-  public init<G: GeneratorType where G.Element == T>(var _ base: G) {
-    self._next = { base.next() }
-  }
-
-  /// Advance to the next element and return it, or `nil` if no next
-  /// element exists.
-  ///
-  /// Requires: `next()` has not been applied to a copy of `self`
-  /// since the copy was made, and no preceding call to `self.next()`
-  /// has returned `nil`.
-  public mutating func next() -> T? {
-    return _next()
-  }
-
-  /// `GeneratorOf<T>` is also a `SequenceType`, so it `generate`s
-  /// a copy of itself
-  public func generate() -> GeneratorOf {
-    return self
-  }
-  let _next: ()->T?
-}
-
-/// Deprecated; use `AnySequence<T>` instead
-@availability(*, deprecated, renamed="AnySequence")
-public struct SequenceOf<T> : SequenceType {
-  /// Construct an instance whose `generate()` method forwards to
-  /// `makeUnderlyingGenerator`
-  public init<G: GeneratorType where G.Element == T>(
-    _ makeUnderlyingGenerator: ()->G
-  ) {
-    _generate = { GeneratorOf(makeUnderlyingGenerator()) }
-  }
-
-  /// Construct an instance whose `generate()` method forwards to
-  /// that of `base`.
-  public init<S: SequenceType where S.Generator.Element == T>(_ base: S) {
-    self = SequenceOf({ base.generate() })
-  }
-
-  /// Return a *generator* over the elements of this *sequence*.
-  ///
-  /// - complexity: O(1)
-  public func generate() -> GeneratorOf<T> {
-    return _generate()
-  }
-
-  let _generate: ()->GeneratorOf<T>
-}
+/// Unavailable; use `AnySequence<T>` instead
+@availability(*, unavailable, renamed="AnySequence")
+public struct SequenceOf<T> {}
 
 internal struct _CollectionOf<
   IndexType_ : ForwardIndexType, T

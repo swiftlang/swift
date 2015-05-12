@@ -155,67 +155,10 @@ public func ==(lhs: COpaquePointer, rhs: COpaquePointer) -> Bool {
 
 /// The family of C function pointer types.
 ///
-/// This type is deprecated. Instead of `CFunctionType<(T) -> U>`, a native
+/// This type has been removed. Instead of `CFunctionType<(T) -> U>`, a native
 /// function type with the C convention can be used, `@convention(c) (T) -> U`.
-@availability(*, deprecated, message="use a function type '@convention(c) (T) -> U'")
-public struct CFunctionPointer<T> : Equatable, Hashable, NilLiteralConvertible {
-  var value: COpaquePointer
-
-  /// Create a `nil` instance.
-  public init() {
-    value = COpaquePointer()
-  }
-
-  /// Reinterpret the bits of `value` as `CFunctionPointer<T>`.
-  ///
-  /// - warning: This is a fundamentally unsafe operation, equivalent to
-  /// `unsafeBitCast(value, CFunctionPointer<T>.self)`
-  public init(_ value: COpaquePointer) {
-    self.value = value
-  }
-
-  /// The hash value.
-  ///
-  /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
-  ///
-  /// - note: The hash value is not guaranteed to be stable across
-  /// different invocations of the same program.  Do not persist the
-  /// hash value across program runs.
-  public var hashValue: Int {
-    return value.hashValue
-  }
-
-  /// Create an instance initialized with `nil`.
-  @transparent public
-  init(nilLiteral: ()) {
-    value = COpaquePointer()
-  }
-}
-
-@availability(*, deprecated, message="use a function type '@convention(c) (T) -> U'")
-extension CFunctionPointer : CustomDebugStringConvertible {
-  /// A textual representation of `self`, suitable for debugging.
-  public var debugDescription: String {
-    return value.debugDescription
-  }
-}
-
-@availability(*, deprecated, message="use a function type '@convention(c) (T) -> U'")
-public func ==<T>(lhs: CFunctionPointer<T>, rhs: CFunctionPointer<T>) -> Bool {
-  return lhs.value == rhs.value
-}
-
-extension COpaquePointer {
-  /// Reinterpret the bits of `value` as `COpaquePointer`.
-  ///
-  /// - warning:: This is a fundamentally unsafe operation, equivalent to
-  ///   `unsafeBitCast(value, COpaquePointer.self)`
-  @availability(*, deprecated, message="use a function type '@convention(c) (T) -> U'")
-  public init<T>(_ value: CFunctionPointer<T>) {
-    self = value.value
-  }
-}
-
+@availability(*, unavailable, message="use a function type '@convention(c) (T) -> U'")
+public struct CFunctionPointer<T> {}
 
 /// The corresponding Swift type to `va_list` in imported C APIs.
 public struct CVaListPointer {
