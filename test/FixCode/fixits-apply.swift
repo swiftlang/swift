@@ -3,7 +3,7 @@
 // RUN: c-index-test -read-diagnostics %t.dia > %t.deserialized_diagnostics.txt 2>&1
 // RUN: FileCheck --input-file=%t.deserialized_diagnostics.txt %s
 
-// CHECK: Number of diagnostics: 2
+// CHECK: Number of diagnostics: 3
 
 class Base {}
 class Derived : Base {}
@@ -12,5 +12,4 @@ var b : Base
 b as Derived
 b as Derived
 
-var oi : Int?
-if let uoi = oi {}
+b as! Base
