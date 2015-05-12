@@ -682,7 +682,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     break;
   }
 
-  case DAK_Availability: {
+  case DAK_Available: {
     if (!consumeIf(tok::l_paren)) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
                DeclAttribute::isDeclModifier(DK));
@@ -695,7 +695,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     if (!Tok.is(tok::identifier) &&
         !(Tok.isAnyOperator() && Tok.getText() == "*")) {
         if (Tok.is(tok::code_complete) && CodeCompletion) {
-          CodeCompletion->completeDeclAttrParam(DAK_Availability, 0);
+          CodeCompletion->completeDeclAttrParam(DAK_Available, 0);
           consumeToken(tok::code_complete);
       }
       diagnose(Tok.getLoc(), diag::attr_availability_platform, AttrName)
@@ -746,7 +746,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                  AttrName)
           .highlight(SourceRange(Tok.getLoc()));
         if (Tok.is(tok::code_complete) && CodeCompletion) {
-          CodeCompletion->completeDeclAttrParam(DAK_Availability, ParamIndex);
+          CodeCompletion->completeDeclAttrParam(DAK_Available, ParamIndex);
           consumeToken(tok::code_complete);
         } else {
           consumeIf(tok::identifier);
@@ -866,7 +866,7 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
       auto PlatformKind = platformFromString(Platform);
       if (PlatformKind.hasValue()) {
         Attributes.add(new (Context)
-                       AvailabilityAttr(AtLoc, AttrRange,
+                       AvailableAttr(AtLoc, AttrRange,
                                         PlatformKind.getValue(),
                                         Message, Renamed,
                                         Introduced,

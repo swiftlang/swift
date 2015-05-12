@@ -80,7 +80,7 @@ DECL_ATTR(asmname, Asmname,
           OnFunc | OnConstructor | OnDestructor | LongAttribute |
           UserInaccessible, 0)
 
-DECL_ATTR(availability, Availability,
+DECL_ATTR(available, Available,
           OnFunc | OnStruct | OnEnum | OnClass | OnProtocol | OnVar |
           OnConstructor | OnDestructor | OnTypeAlias | OnSubscript |
           OnEnumElement | OnExtension | AllowMultipleAttributes | LongAttribute, 1)

@@ -13,7 +13,7 @@
 
 /// Return an `Array` containing the elements of `source` in reverse
 /// order.
-@availability(*, unavailable, message="call the 'reverse()' method on the collection")
+@available(*, unavailable, message="call the 'reverse()' method on the collection")
 public func reverse<C:CollectionType where C.Index: BidirectionalIndexType>(
   source: C
 ) -> [C.Generator.Element] {

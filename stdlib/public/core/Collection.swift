@@ -13,7 +13,7 @@
 /// Return the number of elements in x.
 ///
 /// O(1) if T.Index is RandomAccessIndexType; O(N) otherwise.
-@availability(*, unavailable, message="call the 'count()' method on the collection")
+@available(*, unavailable, message="call the 'count()' method on the collection")
 public func count <T : CollectionType>(x: T) -> T.Index.Distance {
   // FIXME(prext): remove this function when protocol extensions land.
   return x.count()
@@ -229,19 +229,19 @@ public func ~> <T : CollectionType, R>(
 }
 
 /// Returns `true` iff `x` is empty.
-@availability(*, unavailable, message="access the 'isEmpty' property on the collection")
+@available(*, unavailable, message="access the 'isEmpty' property on the collection")
 public func isEmpty<C: CollectionType>(x: C) -> Bool {
   return x.isEmpty
 }
 
 /// Returns the first element of `x`, or `nil` if `x` is empty.
-@availability(*, unavailable, message="access the 'first' property on the collection")
+@available(*, unavailable, message="access the 'first' property on the collection")
 public func first<C: CollectionType>(x: C) -> C.Generator.Element? {
   return x.first
 }
 
 /// Returns the last element of `x`, or `nil` if `x` is empty.
-@availability(*, unavailable, message="access the 'last' property on the collection")
+@available(*, unavailable, message="access the 'last' property on the collection")
 public func last<C: CollectionType where C.Index: BidirectionalIndexType>(
   x: C
 ) -> C.Generator.Element? {
@@ -318,7 +318,7 @@ public struct IndexingGenerator<
 /// The result's `endIndex` is the same as that of `x`.  Because
 /// `Range` is half-open, iterating the values of the result produces
 /// all valid subscript arguments for `x`, omitting its `endIndex`.
-@availability(*, unavailable, message="access the 'indices' property on the collection")
+@available(*, unavailable, message="access the 'indices' property on the collection")
 public func indices<
     C : CollectionType>(x: C) -> Range<C.Index> {
   return x.indices

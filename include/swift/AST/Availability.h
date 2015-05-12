@@ -204,7 +204,7 @@ public:
   /// declarations and adds attributes reflecting that availability
   /// to ToDecl.
   static void
-  applyInferredAvailabilityAttrs(Decl *ToDecl,
+  applyInferredAvailableAttrs(Decl *ToDecl,
                                  ArrayRef<const Decl *> InferredFromDecls,
                                  ASTContext &Context);
 };

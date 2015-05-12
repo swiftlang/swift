@@ -73,12 +73,12 @@ bool DeclAttribute::canAttributeAppearOnDeclKind(DeclAttrKind DAK, DeclKind DK) 
   llvm_unreachable("bad DeclKind");
 }
 
-const AvailabilityAttr *DeclAttributes::getUnavailable(
+const AvailableAttr *DeclAttributes::getUnavailable(
                           const ASTContext &ctx) const {
-  const AvailabilityAttr *conditional = nullptr;
+  const AvailableAttr *conditional = nullptr;
 
   for (auto Attr : *this)
-    if (auto AvAttr = dyn_cast<AvailabilityAttr>(Attr)) {
+    if (auto AvAttr = dyn_cast<AvailableAttr>(Attr)) {
       if (AvAttr->isInvalid())
         continue;
 
@@ -105,11 +105,11 @@ const AvailabilityAttr *DeclAttributes::getUnavailable(
   return conditional;
 }
 
-const AvailabilityAttr *
+const AvailableAttr *
 DeclAttributes::getDeprecated(const ASTContext &ctx) const {
-  const AvailabilityAttr *conditional = nullptr;
+  const AvailableAttr *conditional = nullptr;
   for (auto Attr : *this) {
-    if (auto AvAttr = dyn_cast<AvailabilityAttr>(Attr)) {
+    if (auto AvAttr = dyn_cast<AvailableAttr>(Attr)) {
       if (AvAttr->isInvalid())
         continue;
 
@@ -232,9 +232,9 @@ void DeclAttribute::print(ASTPrinter &Printer,
     Printer << "@asmname(\"" << cast<AsmnameAttr>(this)->Name << "\")";
     break;
 
-  case DAK_Availability: {
-    Printer << "@availability(";
-    auto Attr = cast<AvailabilityAttr>(this);
+  case DAK_Available: {
+    Printer << "@available(";
+    auto Attr = cast<AvailableAttr>(this);
     Printer << Attr->platformString();
 
     if (Attr->isUnconditionallyUnavailable())
@@ -364,7 +364,7 @@ StringRef DeclAttribute::getAttrName() const {
     return "_swift_native_objc_runtime_base";
   case DAK_Semantics:
     return "_semantics";
-  case DAK_Availability:
+  case DAK_Available:
     return "availability";
   case DAK_AutoClosure:
     return "autoclosure";
@@ -522,23 +522,23 @@ ObjCAttr *ObjCAttr::clone(ASTContext &context) const {
   return new (context) ObjCAttr(getName(), isNameImplicit());
 }
 
-AvailabilityAttr *
-AvailabilityAttr::createUnconditional(ASTContext &C,
+AvailableAttr *
+AvailableAttr::createUnconditional(ASTContext &C,
                                       StringRef Message,
                                       StringRef Rename,
                                       UnconditionalAvailabilityKind Reason) {
   assert(Reason != UnconditionalAvailabilityKind::None);
   clang::VersionTuple NoVersion;
-  return new (C) AvailabilityAttr(
+  return new (C) AvailableAttr(
     SourceLoc(), SourceRange(), PlatformKind::none, Message, Rename,
     NoVersion, NoVersion, NoVersion, Reason, /* isImplicit */ false);
 }
 
-bool AvailabilityAttr::isActivePlatform(const ASTContext &ctx) const {
+bool AvailableAttr::isActivePlatform(const ASTContext &ctx) const {
   return isPlatformActive(Platform, ctx.LangOpts);
 }
 
-bool AvailabilityAttr::isUnconditionallyUnavailable() const {
+bool AvailableAttr::isUnconditionallyUnavailable() const {
   switch (Unconditional) {
   case UnconditionalAvailabilityKind::None:
   case UnconditionalAvailabilityKind::Deprecated:
@@ -550,7 +550,7 @@ bool AvailabilityAttr::isUnconditionallyUnavailable() const {
   }
 }
 
-bool AvailabilityAttr::isUnconditionallyDeprecated() const {
+bool AvailableAttr::isUnconditionallyDeprecated() const {
   switch (Unconditional) {
   case UnconditionalAvailabilityKind::None:
   case UnconditionalAvailabilityKind::Unavailable:
@@ -562,7 +562,7 @@ bool AvailabilityAttr::isUnconditionallyDeprecated() const {
   }
 }
 
-MinVersionComparison AvailabilityAttr::getMinVersionAvailability(
+MinVersionComparison AvailableAttr::getMinVersionAvailability(
                        clang::VersionTuple minVersion) const {
   // Unconditional unavailability.
   if (isUnconditionallyUnavailable())
@@ -582,7 +582,7 @@ MinVersionComparison AvailabilityAttr::getMinVersionAvailability(
   return MinVersionComparison::Available;
 }
 
-const AvailabilityAttr *AvailabilityAttr::isUnavailable(const Decl *D) {
+const AvailableAttr *AvailableAttr::isUnavailable(const Decl *D) {
   ASTContext &ctx = D->getASTContext();
   return D->getAttrs().getUnavailable(ctx);
 }

@@ -135,10 +135,10 @@ extension CGFloat {
   }
 }
 
-@availability(*,unavailable,message="use CGFloat.min")
+@available(*,unavailable,message="use CGFloat.min")
 public let CGFLOAT_MIN = CGFloat.min
 
-@availability(*,unavailable,message="use CGFloat.max")
+@available(*,unavailable,message="use CGFloat.max")
 public let CGFLOAT_MAX = CGFloat.max
 
 extension CGFloat : Reflectable {

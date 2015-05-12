@@ -1287,8 +1287,8 @@ namespace decls_block {
     BCFixed<1>,\
     BCFixed<1>
 
-  using AvailabilityDeclAttrLayout = BCRecordLayout<
-    Availability_DECL_ATTR,
+  using AvailableDeclAttrLayout = BCRecordLayout<
+    Available_DECL_ATTR,
     BCFixed<1>, // implicit flag
     BCFixed<1>, // is unconditionally unavailable?
     BCFixed<1>, // is unconditionally deprecated?

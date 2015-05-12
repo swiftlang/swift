@@ -79,9 +79,9 @@ public protocol CustomDebugStringConvertible {
   var debugDescription: String { get }
 }
 
-@availability(*, unavailable, renamed="CustomDebugStringConvertible")
+@available(*, unavailable, renamed="CustomDebugStringConvertible")
 public typealias DebugPrintable = CustomDebugStringConvertible
-@availability(*, unavailable, renamed="CustomStringConvertible")
+@available(*, unavailable, renamed="CustomStringConvertible")
 public typealias Printable = CustomStringConvertible
 
 //===----------------------------------------------------------------------===//
@@ -287,7 +287,7 @@ extension UnicodeScalar : Streamable {
 ///
 /// Do not overload this function for your type.  Instead, adopt one of the
 /// protocols mentioned above.
-@availability(*, unavailable, renamed="print")
+@available(*, unavailable, renamed="print")
 @inline(never)
 public func println<T, TargetStream : OutputStreamType>(
     value: T, inout _ target: TargetStream
@@ -307,7 +307,7 @@ public func println<T, TargetStream : OutputStreamType>(
 ///
 /// Do not overload this function for your type.  Instead, adopt one of the
 /// protocols mentioned above.
-@availability(*, unavailable, renamed="print")
+@available(*, unavailable, renamed="print")
 @inline(never)
 @_semantics("stdlib_binary_only")
 public func println<T>(value: T) {
@@ -319,7 +319,7 @@ public func println<T>(value: T) {
 }
 
 /// Writes a single newline character into the standard output.
-@availability(*, unavailable, message="use print(\"\")")
+@available(*, unavailable, message="use print(\"\")")
 @inline(never)
 @_semantics("stdlib_binary_only")
 public func println() {
@@ -330,7 +330,7 @@ public func println() {
 }
 
 /// Returns the result of `print`'ing `x` into a `String`
-@availability(*, unavailable, renamed="String")
+@available(*, unavailable, renamed="String")
 @inline(never)
 public func toString<T>(x: T) -> String {
   var result = ""
@@ -347,7 +347,7 @@ public func toString<T>(x: T) -> String {
 /// * Otherwise, fall back to a default textual representation.
 ///
 /// - SeeAlso: `debugPrint(x, &target)`
-@availability(*, unavailable, message="use debugPrint()")
+@available(*, unavailable, message="use debugPrint()")
 @inline(never)
 public func debugPrintln<T, TargetStream : OutputStreamType>(
     x: T, inout _ target: TargetStream
@@ -367,7 +367,7 @@ public func debugPrintln<T, TargetStream : OutputStreamType>(
 /// * Otherwise, fall back to a default textual representation.
 ///
 /// - SeeAlso: `debugPrint(x)`
-@availability(*, unavailable, renamed="debugPrint")
+@available(*, unavailable, renamed="debugPrint")
 @inline(never)
 public func debugPrintln<T>(x: T) {
   var target = _Stdout()
@@ -378,7 +378,7 @@ public func debugPrintln<T>(x: T) {
 }
 
 /// Returns the result of `debugPrint`'ing `x` into a `String`
-@availability(*, unavailable, message="use String(reflecting:)")
+@available(*, unavailable, message="use String(reflecting:)")
 public func toDebugString<T>(x: T) -> String {
   var result = ""
   debugPrint(x, &result)

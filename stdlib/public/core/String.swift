@@ -544,7 +544,7 @@ extension String {
   ///   and `position != endIndex`.
   public subscript(i: Index) -> Character { return characters[i] }
   
-  @availability(*, unavailable, message="cannot subscript String with an Int")
+  @available(*, unavailable, message="cannot subscript String with an Int")
   public subscript(i: Int) -> Character {
     _fatalErrorMessage(
       "fatal error",
@@ -579,7 +579,7 @@ extension String {
     return String(characters[subRange])
   }
 
-  @availability(
+  @available(
     *, unavailable,
     message="cannot subscript String with a range of Int")
   public subscript(subRange: Range<Int>) -> String {

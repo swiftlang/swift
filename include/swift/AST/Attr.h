@@ -692,13 +692,13 @@ enum class UnconditionalAvailabilityKind {
   Unavailable,
 };
 
-/// Defines the @availability attribute.
-class AvailabilityAttr : public DeclAttribute {
+/// Defines the @available attribute.
+class AvailableAttr : public DeclAttribute {
 public:
 #define INIT_VER_TUPLE(X)\
   X(X.empty() ? Optional<clang::VersionTuple>() : X)
 
-  AvailabilityAttr(SourceLoc AtLoc, SourceRange Range,
+  AvailableAttr(SourceLoc AtLoc, SourceRange Range,
                    PlatformKind Platform,
                    StringRef Message, StringRef Rename,
                    const clang::VersionTuple &Introduced,
@@ -706,7 +706,7 @@ public:
                    const clang::VersionTuple &Obsoleted,
                    UnconditionalAvailabilityKind Unconditional,
                    bool Implicit)
-    : DeclAttribute(DAK_Availability, AtLoc, Range, Implicit),
+    : DeclAttribute(DAK_Available, AtLoc, Range, Implicit),
       Message(Message), Rename(Rename),
       INIT_VER_TUPLE(Introduced),
       INIT_VER_TUPLE(Deprecated),
@@ -754,7 +754,7 @@ public:
   /// the current settings.
   ///
   /// \returns The attribute responsible for making the declaration unavailable.
-  static const AvailabilityAttr *isUnavailable(const Decl *D);
+  static const AvailableAttr *isUnavailable(const Decl *D);
 
   /// Returns true if the availability applies to a specific
   /// platform.
@@ -780,15 +780,15 @@ public:
   MinVersionComparison getMinVersionAvailability(
                          clang::VersionTuple minVersion) const;
 
-  /// Create an AvailabilityAttr that indicates specific availability
+  /// Create an AvailableAttr that indicates specific availability
   /// for all platforms.
-  static AvailabilityAttr *
+  static AvailableAttr *
   createUnconditional(ASTContext &C, StringRef Message, StringRef Rename = "",
                       UnconditionalAvailabilityKind Reason
                         = UnconditionalAvailabilityKind::Unavailable);
 
   static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DAK_Availability;
+    return DA->getKind() == DAK_Available;
   }
 };
 
@@ -1216,13 +1216,13 @@ public:
     return getUnavailable(ctx) != nullptr;
   }
 
-  /// Returns the first @availability attribute that indicates
+  /// Returns the first @available attribute that indicates
   /// a declaration is unavailable, or null otherwise.
-  const AvailabilityAttr *getUnavailable(const ASTContext &ctx) const;
+  const AvailableAttr *getUnavailable(const ASTContext &ctx) const;
 
-  /// Returns the first @availability attribute that indicates
+  /// Returns the first @available attribute that indicates
   /// a declaration is deprecated on all deployment targets, or null otherwise.
-  const AvailabilityAttr *getDeprecated(const ASTContext &ctx) const;
+  const AvailableAttr *getDeprecated(const ASTContext &ctx) const;
 
   void dump() const;
   void print(ASTPrinter &Printer, const PrintOptions &Options) const;

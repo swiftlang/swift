@@ -110,7 +110,7 @@ struct HasX1aProperty {
 }
 
 // rdar://problem/16554496
-@availability(*, unavailable)
+@available(*, unavailable)
 func availTest(x: Int) {}
 func availTest(x: Any) { markUsed("this one") }
 func doAvailTest(x: Int) {

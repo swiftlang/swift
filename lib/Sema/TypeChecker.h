@@ -1471,12 +1471,12 @@ public:
 
   /// Returns the availability attribute indicating deprecation if the
   /// declaration is deprecated or null otherwise.
-  static const AvailabilityAttr *getDeprecated(const Decl *D);
+  static const AvailableAttr *getDeprecated(const Decl *D);
 
   /// Emits a diagnostic for a reference to a declaration that is deprecated.
   void diagnoseDeprecated(SourceRange SourceRange,
                           const DeclContext *ReferenceDC,
-                          const AvailabilityAttr *Attr,
+                          const AvailableAttr *Attr,
                           DeclName Name);
   /// @}
 

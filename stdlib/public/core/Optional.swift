@@ -91,7 +91,7 @@ public func map<T, U>(x: T?, @noescape _ f: (T)->U) -> U? {
 
 
 /// Returns `f(self)!` iff `self` and `f(self)` are not nil.
-@availability(*, unavailable, message="call the 'flatMap()' method on the optional value")
+@available(*, unavailable, message="call the 'flatMap()' method on the optional value")
 public func flatMap<T, U>(x: T?, @noescape _ f: (T)->U?) -> U? {
   switch x {
   case .Some(let y):

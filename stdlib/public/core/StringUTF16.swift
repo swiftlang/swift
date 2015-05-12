@@ -84,14 +84,14 @@ extension String {
 #if _runtime(_ObjC)
     // These may become less important once <rdar://problem/19255291> is addressed.
 
-    @availability(
+    @available(
       *, unavailable,
       message="Indexing a String's UTF16View requires a String.UTF16View.Index, which can be constructed from Int when Foundation is imported")
     public subscript(i: Int) -> UTF16.CodeUnit {
       return self[Index(_offset: i)]
     }
 
-    @availability(
+    @available(
       *, unavailable,
       message="Slicing a String's UTF16View requires a Range<String.UTF16View.Index>, String.UTF16View.Index can be constructed from Int when Foundation is imported")
     public subscript(subRange: Range<Int>) -> UTF16View {

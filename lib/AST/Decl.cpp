@@ -427,7 +427,7 @@ bool Decl::isWeakImported(Module *fromModule) const {
     return clangDecl->isWeakImported();
   }
 
-  // FIXME: Implement using AvailabilityAttr::getMinVersionAvailability().
+  // FIXME: Implement using AvailableAttr::getMinVersionAvailability().
   return false;
 }
 
@@ -2147,7 +2147,7 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
 
   // Check all of the designated initializers in the direct superclass.
   for (auto member : superclassDecl->lookupDirect(ctx.Id_init)) {
-    if (AvailabilityAttr::isUnavailable(member))
+    if (AvailableAttr::isUnavailable(member))
       continue;
 
     // We only care about designated initializers.

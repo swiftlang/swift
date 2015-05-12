@@ -101,7 +101,7 @@
 // FOUNDATION-NEXT: {{^}}}{{$}}
 
 // FOUNDATION-LABEL: {{^}}/// Unavailable Global Functions{{$}}
-// FOUNDATION-NEXT: @availability(*, unavailable)
+// FOUNDATION-NEXT: @available(*, unavailable)
 // FOUNDATION-NEXT: NSSetZoneName(zone: NSZone, _ name: String)
 
 // CTYPESBITS-NOT: FooStruct1

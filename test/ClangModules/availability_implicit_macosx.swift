@@ -37,7 +37,7 @@ func useInSignature(options: NSDeprecatedOptions) { // expected-warning {{'NSDep
 }
 
 class SuperClassWithDeprecatedInitializer {
-  @availability(OSX, introduced=10.9, deprecated=10.10)
+  @available(OSX, introduced=10.9, deprecated=10.10)
   init() { }
 }
 
@@ -52,7 +52,7 @@ func callImplicitInitializerOnSubClassWithSynthesizedDesignedInitializerOverride
   let _ = SubClassWithSynthesizedDesignedInitializerOverride() // expected-warning {{'init()' was deprecated in OS X 10.10}}
 }
 
-@availability(OSX, introduced=10.9, deprecated=10.10)
+@available(OSX, introduced=10.9, deprecated=10.10)
 class DeprecatedSuperClass {
   var i : Int = 7 // Causes initializer to be synthesized
 }
@@ -67,26 +67,26 @@ func callImplicitInitalizerOnNotDeprecatedSubClassOfDeprecatedSuperClass() {
   let _ = NotDeprecatedSubClassOfDeprecatedSuperClass()
 }
 
-@availability(OSX, introduced=10.9, deprecated=10.10)
+@available(OSX, introduced=10.9, deprecated=10.10)
 class DeprecatedSubClassOfDeprecatedSuperClass : DeprecatedSuperClass {
 }
 
 // Tests synthesis of materializeForSet
 class ClassWithLimitedAvailabilityAccessors {
   var limitedGetter: Int {
-    @availability(OSX, introduced=10.11)
+    @available(OSX, introduced=10.11)
     get { return 10 }
     set(newVal) {}
   }
 
   var limitedSetter: Int {
     get { return 10 }
-    @availability(OSX, introduced=10.11)
+    @available(OSX, introduced=10.11)
     set(newVal) {}
   }
 }
 
-@availability(*, unavailable)
+@available(*, unavailable)
 func unavailableFunction() -> Int { return 10 } // expected-note 3{{'unavailableFunction()' has been explicitly marked unavailable here}}
 
 class ClassWithReferencesLazyInitializers {
@@ -95,7 +95,7 @@ class ClassWithReferencesLazyInitializers {
   lazy var lazyPropWithUnavailableInInitializer: Int = unavailableFunction() // expected-error {{'unavailableFunction()' is unavailable}}
 }
 
-@availability(*, unavailable)
+@available(*, unavailable)
 func unavailableUseInUnavailableFunction() {
   // Diagnose references to unavailable functions in non-implicit code
   // as errors

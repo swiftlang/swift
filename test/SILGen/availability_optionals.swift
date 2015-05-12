@@ -48,10 +48,10 @@ func referenceToPotentiallyUnavailableGlobalVariable() {
   // dealloc_stack [[OPT_ADDR]]#0 : $*@local_storage Optional<Int>
 }
 
-@availability(OSX, introduced=10.9)
+@available(OSX, introduced=10.9)
 func funcAvailableOn10_9() -> Int { return 9 }
 
-@availability(OSX, introduced=10.10)
+@available(OSX, introduced=10.10)
 func funcAvailableOn10_10() -> Int { return 10 }
 
 // CHECK-LABEL: sil hidden @_TF22availability_optionals34referenceToAvailableGlobalFunctionFT_T_

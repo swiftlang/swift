@@ -205,9 +205,9 @@ public func autoreleasepool(@noescape code: () -> ()) {
 // Mark YES and NO unavailable.
 //===----------------------------------------------------------------------===//
 
-@availability(*, unavailable, message="Use 'Bool' value 'true' instead") public
+@available(*, unavailable, message="Use 'Bool' value 'true' instead") public
 let YES = ObjCBool(true)
-@availability(*, unavailable, message="Use 'Bool' value 'false' instead") public
+@available(*, unavailable, message="Use 'Bool' value 'false' instead") public
 let NO = ObjCBool(false)
 
 // FIXME: We can't make the fully-generic versions @transparent due to

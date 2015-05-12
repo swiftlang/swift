@@ -19,11 +19,11 @@
 // their respective protocols.
 
 /// Unavailable; use `AnyGenerator<T>` instead
-@availability(*, unavailable, renamed="AnyGenerator")
+@available(*, unavailable, renamed="AnyGenerator")
 public struct GeneratorOf<T>  {}
 
 /// Unavailable; use `AnySequence<T>` instead
-@availability(*, unavailable, renamed="AnySequence")
+@available(*, unavailable, renamed="AnySequence")
 public struct SequenceOf<T> {}
 
 internal struct _CollectionOf<

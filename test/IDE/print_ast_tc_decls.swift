@@ -512,21 +512,21 @@ class d0162_TestNoReturn {
 class d0170_TestAvailability {
 // PASS_COMMON-LABEL: {{^}}class d0170_TestAvailability {{{$}}
 
-  @availability(*, unavailable)
+  @available(*, unavailable)
   func f1() {}
-// PASS_COMMON-NEXT: {{^}}  @availability(*, unavailable){{$}}
+// PASS_COMMON-NEXT: {{^}}  @available(*, unavailable){{$}}
 // PASS_COMMON-NEXT: {{^}}  func f1(){{$}}
 
-  @availability(*, unavailable, message="aaa \"bbb\" ccc\nddd\0eee")
+  @available(*, unavailable, message="aaa \"bbb\" ccc\nddd\0eee")
   func f2() {}
-// PASS_COMMON-NEXT: {{^}}  @availability(*, unavailable, message="aaa \"bbb\" ccc\nddd\0eee"){{$}}
+// PASS_COMMON-NEXT: {{^}}  @available(*, unavailable, message="aaa \"bbb\" ccc\nddd\0eee"){{$}}
 // PASS_COMMON-NEXT: {{^}}  func f2(){{$}}
 
-  @availability(iOS, unavailable)
-  @availability(OSX, unavailable)
+  @available(iOS, unavailable)
+  @available(OSX, unavailable)
   func f3() {}
-// PASS_COMMON-NEXT: {{^}}  @availability(iOS, unavailable){{$}}
-// PASS_COMMON-NEXT: {{^}}  @availability(OSX, unavailable){{$}}
+// PASS_COMMON-NEXT: {{^}}  @available(iOS, unavailable){{$}}
+// PASS_COMMON-NEXT: {{^}}  @available(OSX, unavailable){{$}}
 // PASS_COMMON-NEXT: {{^}}  func f3(){{$}}
 }
 

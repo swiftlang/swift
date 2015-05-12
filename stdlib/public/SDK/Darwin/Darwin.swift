@@ -135,13 +135,13 @@ public let	S_IEXEC  = S_IXUSR
 // unistd.h
 //===----------------------------------------------------------------------===//
 
-@availability(*, unavailable, message="Please use threads or posix_spawn*()")
+@available(*, unavailable, message="Please use threads or posix_spawn*()")
 public func fork() -> Int32 {
   errno = ENOSYS
   return -1
 }
 
-@availability(*, unavailable, message="Please use threads or posix_spawn*()")
+@available(*, unavailable, message="Please use threads or posix_spawn*()")
 public func vfork() -> Int32 {
   errno = ENOSYS
   return -1

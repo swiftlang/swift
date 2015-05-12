@@ -58,7 +58,7 @@ mergeIntoInferredVersion(const Optional<clang::VersionTuple> &Version,
 /// Merge an attribute's availability with an existing inferred availability
 /// so that the new inferred availability is at least as available as
 /// the attribute requires.
-static void mergeWithInferredAvailability(const AvailabilityAttr *Attr,
+static void mergeWithInferredAvailability(const AvailableAttr *Attr,
                                           InferredAvailability &Inferred) {
   Inferred.Unconditional
     = static_cast<UnconditionalAvailabilityKind>(
@@ -75,8 +75,8 @@ static void mergeWithInferredAvailability(const AvailabilityAttr *Attr,
 
 /// Create an implicit availability attribute for the given platform
 /// and with the inferred availability.
-static AvailabilityAttr *
-createAvailabilityAttr(PlatformKind Platform,
+static AvailableAttr *
+createAvailableAttr(PlatformKind Platform,
                        const InferredAvailability &Inferred,
                        ASTContext &Context) {
 
@@ -87,14 +87,14 @@ createAvailabilityAttr(PlatformKind Platform,
   clang::VersionTuple Obsoleted =
       Inferred.Obsoleted.getValueOr(clang::VersionTuple());
 
-  return new (Context) AvailabilityAttr(
+  return new (Context) AvailableAttr(
       SourceLoc(), SourceRange(), Platform,
       /*Message=*/StringRef(),
       /*Rename=*/StringRef(), Introduced, Deprecated, Obsoleted,
       Inferred.Unconditional, /*Implicit=*/true);
 }
 
-void AvailabilityInference::applyInferredAvailabilityAttrs(
+void AvailabilityInference::applyInferredAvailableAttrs(
     Decl *ToDecl, ArrayRef<const Decl *> InferredFromDecls,
     ASTContext &Context) {
 
@@ -103,7 +103,7 @@ void AvailabilityInference::applyInferredAvailabilityAttrs(
   std::map<PlatformKind, InferredAvailability> Inferred;
   for (const Decl *D : InferredFromDecls) {
     for (const DeclAttribute *Attr : D->getAttrs()) {
-      auto *AvAttr = dyn_cast<AvailabilityAttr>(Attr);
+      auto *AvAttr = dyn_cast<AvailableAttr>(Attr);
       if (!AvAttr || AvAttr->isInvalid())
         continue;
 
@@ -115,7 +115,7 @@ void AvailabilityInference::applyInferredAvailabilityAttrs(
   // to ToDecl.
   DeclAttributes &Attrs = ToDecl->getAttrs();
   for (auto &Pair : Inferred) {
-    auto *Attr = createAvailabilityAttr(Pair.first, Pair.second, Context);
+    auto *Attr = createAvailableAttr(Pair.first, Pair.second, Context);
     Attrs.add(Attr);
   }
 }

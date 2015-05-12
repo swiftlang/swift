@@ -19,7 +19,7 @@ let _ = OpenGL.glGetString
 
 import AppKit.NSPanGestureRecognizer
 
-@availability(OSX, introduced=10.10)
+@available(OSX, introduced=10.10)
 typealias PanRecognizer = NSPanGestureRecognizer
 typealias PanRecognizer2 = AppKit.NSPanGestureRecognizer
 

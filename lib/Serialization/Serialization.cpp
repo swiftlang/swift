@@ -1590,7 +1590,7 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
     return;
   }
 
-  case DAK_Availability: {
+  case DAK_Available: {
 #define LIST_VER_TUPLE_PIECES(X)\
   X##_Major, X##_Minor, X##_Subminor, X##_HasMinor, X##_HasSubminor
 #define DEF_VER_TUPLE_PIECES(X, X_Expr)\
@@ -1606,7 +1606,7 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
     X##_HasSubminor = Y.getSubminor().hasValue();\
   }
 
-    auto *theAttr = cast<AvailabilityAttr>(DA);
+    auto *theAttr = cast<AvailableAttr>(DA);
     DEF_VER_TUPLE_PIECES(Introduced, theAttr->Introduced)
     DEF_VER_TUPLE_PIECES(Deprecated, theAttr->Deprecated)
     DEF_VER_TUPLE_PIECES(Obsoleted, theAttr->Obsoleted)
@@ -1614,8 +1614,8 @@ void Serializer::writeDeclAttribute(const DeclAttribute *DA) {
     llvm::SmallString<32> blob;
     blob.append(theAttr->Message);
     blob.append(theAttr->Rename);
-    auto abbrCode = DeclTypeAbbrCodes[AvailabilityDeclAttrLayout::Code];
-    AvailabilityDeclAttrLayout::emitRecord(
+    auto abbrCode = DeclTypeAbbrCodes[AvailableDeclAttrLayout::Code];
+    AvailableDeclAttrLayout::emitRecord(
         Out, ScratchRecord, abbrCode,
         theAttr->isImplicit(),
         theAttr->isUnconditionallyUnavailable(),

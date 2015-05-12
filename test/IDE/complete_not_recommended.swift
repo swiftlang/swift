@@ -5,7 +5,7 @@
 
 class A {
   func foo() {}
-  @availability(*, unavailable) func unavail() {}
+  @available(*, unavailable) func unavail() {}
 }
 
 func glob() {

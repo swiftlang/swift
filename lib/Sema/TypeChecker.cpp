@@ -741,7 +741,7 @@ Optional<VersionRange> TypeChecker::annotatedAvailableRange(const Decl *D,
   Optional<VersionRange> AnnotatedRange;
 
   for (auto Attr : D->getAttrs()) {
-    auto *AvailAttr = dyn_cast<AvailabilityAttr>(Attr);
+    auto *AvailAttr = dyn_cast<AvailableAttr>(Attr);
     if (AvailAttr == NULL || !AvailAttr->Introduced.hasValue() ||
         !AvailAttr->isActivePlatform(Ctx)) {
       continue;
@@ -774,7 +774,7 @@ VersionRange TypeChecker::availableRange(const Decl *D, ASTContext &Ctx) {
   // by name (they don't have one) in the source. For this reason, when checking
   // the available range of a declaration we also need to check to see if it is
   // immediately contained in an extension and use the extension's availability
-  // if the declaration does not have an explicit @availability attribute
+  // if the declaration does not have an explicit @available attribute
   // itself. This check relies on the fact that we cannot have nested
   // extensions.
 
@@ -792,10 +792,10 @@ VersionRange TypeChecker::availableRange(const Decl *D, ASTContext &Ctx) {
 
 /// Returns the first availability attribute on the declaration that is active
 /// on the target platform.
-static const AvailabilityAttr *getActiveAvailabilityAttribute(const Decl *D,
+static const AvailableAttr *getActiveAvailableAttribute(const Decl *D,
                                                               ASTContext &AC) {
   for (auto Attr : D->getAttrs())
-    if (auto AvAttr = dyn_cast<AvailabilityAttr>(Attr)) {
+    if (auto AvAttr = dyn_cast<AvailableAttr>(Attr)) {
       if (!AvAttr->isInvalid() && AvAttr->isActivePlatform(AC)) {
         return AvAttr;
       }
@@ -805,9 +805,9 @@ static const AvailabilityAttr *getActiveAvailabilityAttribute(const Decl *D,
 
 /// Returns true if there is any availability attribute on the declaration
 /// that is active on the target platform.
-static bool hasActiveAvailabilityAttribute(Decl *D,
+static bool hasActiveAvailableAttribute(Decl *D,
                                            ASTContext &AC) {
-  return getActiveAvailabilityAttribute(D, AC);
+  return getActiveAvailableAttribute(D, AC);
 }
 
 namespace {
@@ -951,7 +951,7 @@ private:
     
     // No need to introduce a context if the declaration does not have an
     // availability attribute.
-    if (!hasActiveAvailabilityAttribute(D, AC)) {
+    if (!hasActiveAvailableAttribute(D, AC)) {
       return false;
     }
     
@@ -1583,9 +1583,9 @@ static const Decl *findContainingDeclaration(SourceRange ReferenceRange,
 /// cases and variable declarations) a Fix-It for an added availability
 /// attribute should be suggested for the appropriate concrete location.
 static const Decl *
-concreteSyntaxDeclForAvailabilityAttribute(const Decl *AbstractSyntaxDecl) {
+concreteSyntaxDeclForAvailableAttribute(const Decl *AbstractSyntaxDecl) {
   // This function needs to be kept in sync with its counterpart,
-  // abstractSyntaxDeclForAvailabilityAttribute().
+  // abstractSyntaxDeclForAvailableAttribute().
 
   // The source range for VarDecls does not include 'var ' (and, in any
   // event, multiple variables can be introduced with a single 'var'),
@@ -1609,12 +1609,12 @@ concreteSyntaxDeclForAvailabilityAttribute(const Decl *AbstractSyntaxDecl) {
 /// function to determine whether the concrete syntax already has an
 /// availability attribute.
 static const Decl *
-abstractSyntaxDeclForAvailabilityAttribute(const Decl *ConcreteSyntaxDecl) {
+abstractSyntaxDeclForAvailableAttribute(const Decl *ConcreteSyntaxDecl) {
   // This function needs to be kept in sync with its counterpart,
-  // concreteSyntaxDeclForAvailabilityAttribute().
+  // concreteSyntaxDeclForAvailableAttribute().
 
   if (auto *PBD = dyn_cast<PatternBindingDecl>(ConcreteSyntaxDecl)) {
-    // Existing @availability attributes in the AST are attached to VarDecls
+    // Existing @available attributes in the AST are attached to VarDecls
     // rather than PatternBindingDecls, so we return the first VarDecl for
     // the pattern binding declaration.
     // This is safe, even though there may be multiple VarDecls, because
@@ -1640,29 +1640,29 @@ abstractSyntaxDeclForAvailabilityAttribute(const Decl *ConcreteSyntaxDecl) {
 }
 
 /// Given a declaration, return a better related declaration for which
-/// to suggest an @availability fixit, or the original declaration
+/// to suggest an @available fixit, or the original declaration
 /// if no such related declaration exists.
 static const Decl *relatedDeclForAvailabilityFixit(const Decl *D) {
   if (auto *FD = dyn_cast<FuncDecl>(D)) {
-    // Suggest @availability Fix-Its on property rather than individual
+    // Suggest @available Fix-Its on property rather than individual
     // accessors.
     if (FD->isAccessor()) {
       D = FD->getAccessorStorageDecl();
     }
   }
 
-  return abstractSyntaxDeclForAvailabilityAttribute(D);
+  return abstractSyntaxDeclForAvailableAttribute(D);
 }
 
 /// Walk the DeclContext hierarchy starting from D to find a declaration
 /// at the member level (i.e., declared in a type context) on which to provide
-/// an @availability() Fix-It.
+/// an @available() Fix-It.
 static const Decl *ancestorMemberLevelDeclForAvailabilityFixit(const Decl *D) {
   while (D) {
     D = relatedDeclForAvailabilityFixit(D);
 
     if (D->getDeclContext()->isTypeContext() &&
-        DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::DAK_Availability,
+        DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::DAK_Available,
                                                 D)) {
       break;
     }
@@ -1675,10 +1675,10 @@ static const Decl *ancestorMemberLevelDeclForAvailabilityFixit(const Decl *D) {
 }
 
 /// Returns true if the declaration is at the type level (either a nominal
-/// type, an extension, or a global function) and can support an @availability
+/// type, an extension, or a global function) and can support an @available
 /// attribute.
 static bool isTypeLevelDeclForAvailabilityFixit(const Decl *D) {
-  if (!DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::DAK_Availability,
+  if (!DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::DAK_Available,
                                                D)) {
     return false;
   }
@@ -1708,7 +1708,7 @@ static bool isTypeLevelDeclForAvailabilityFixit(const Decl *D) {
 
 /// Walk the DeclContext hierarchy starting from D to find a declaration
 /// at a member level (i.e., declared in a type context) on which to provide an
-/// @availability() Fix-It.
+/// @available() Fix-It.
 static const Decl *ancestorTypeLevelDeclForAvailabilityFixit(const Decl *D) {
   assert(D);
 
@@ -1730,12 +1730,12 @@ static const Decl *ancestorTypeLevelDeclForAvailabilityFixit(const Decl *D) {
 /// or None if such such a node cannot be found.
 ///
 /// \param FoundMemberLevelDecl Returns memember-level declaration (i.e., the
-///  child of a type DeclContext) for which an @availability attribute would
+///  child of a type DeclContext) for which an @available attribute would
 /// fix the unavailable reference.
 ///
 /// \param FoundTypeLevelDecl returns a type-level declaration (a
 /// a nominal type, an extension, or a global function) for which an
-/// @availability attribute would fix the unavailable reference.
+/// @available attribute would fix the unavailable reference.
 static void findAvailabilityFixItNodes(SourceRange ReferenceRange,
                                        const DeclContext *ReferenceDC,
                                        const SourceManager &SM,
@@ -1789,7 +1789,7 @@ static void findAvailabilityFixItNodes(SourceRange ReferenceRange,
 
   // Find some Decl that contains the reference range. We use this declaration
   // as a starting place to climb the DeclContext hierarchy to find
-  // places to suggest adding @availability() annotations.
+  // places to suggest adding @available() annotations.
   InnermostAncestorFinder::MatchPredicate IsDeclaration = [](
       ASTNode Node, ASTWalker::ParentTy Parent) { return Node.is<Decl *>(); };
 
@@ -1805,7 +1805,7 @@ static void findAvailabilityFixItNodes(SourceRange ReferenceRange,
     ContainingDecl = ReferenceDC->getInnermostMethodContext();
   }
 
-  // Try to find declarations on which @availability attributes can be added.
+  // Try to find declarations on which @available attributes can be added.
   // The heuristics for finding these declarations are biased towards deeper
   // nodes in the AST to limit the scope of suggested availability regions
   // and provide a better IDE experience (it can get jumpy if Fix-It locations
@@ -1819,14 +1819,14 @@ static void findAvailabilityFixItNodes(SourceRange ReferenceRange,
   }
 }
 
-/// Emit a diagnostic note and Fix-It to add an @availability attribute
+/// Emit a diagnostic note and Fix-It to add an @available attribute
 /// on the given declaration for the given version range.
 static void fixAvailabilityForDecl(SourceRange ReferenceRange, const Decl *D,
                                    const VersionRange &RequiredRange,
                                    TypeChecker &TC) {
   assert(D);
 
-  if (getActiveAvailabilityAttribute(D, TC.Context)) {
+  if (getActiveAvailableAttribute(D, TC.Context)) {
     // For QoI, in future should emit a fixit to update the existing attribute.
     return;
   }
@@ -1835,7 +1835,7 @@ static void fixAvailabilityForDecl(SourceRange ReferenceRange, const Decl *D,
   // syntax to suggest the Fix-It may differ from the declaration to which
   // we attach availability attributes in the abstract syntax tree during
   // parsing.
-  D = concreteSyntaxDeclForAvailabilityAttribute(D);
+  D = concreteSyntaxDeclForAvailableAttribute(D);
 
   SourceLoc InsertLoc = D->getAttrs().getStartLoc(/*forModifiers=*/false);
   if (InsertLoc.isInvalid()) {
@@ -1853,7 +1853,7 @@ static void fixAvailabilityForDecl(SourceRange ReferenceRange, const Decl *D,
     llvm::raw_string_ostream Out(AttrText);
 
     PlatformKind Target = targetPlatform(TC.getLangOpts());
-    Out << "@availability(" << platformString(Target)
+    Out << "@available(" << platformString(Target)
         << ", introduced=" << RequiredRange.getLowerEndpoint().getAsString()
         << ")\n" << OriginalIndent;
   }
@@ -1865,7 +1865,7 @@ static void fixAvailabilityForDecl(SourceRange ReferenceRange, const Decl *D,
   // location from the PatternBindingDecl.
   if (KindForDiagnostic == DescriptiveDeclKind::PatternBinding) {
     KindForDiagnostic =
-        abstractSyntaxDeclForAvailabilityAttribute(D)->getDescriptiveKind();
+        abstractSyntaxDeclForAvailableAttribute(D)->getDescriptiveKind();
   }
 
   TC.diagnose(ReferenceRange.Start, diag::availability_add_attribute,
@@ -2004,7 +2004,7 @@ void TypeChecker::diagnosePotentialAccessorUnavailability(
                   Reason.getRequiredOSVersionRange(), *this);
 }
 
-const AvailabilityAttr *TypeChecker::getDeprecated(const Decl *D) {
+const AvailableAttr *TypeChecker::getDeprecated(const Decl *D) {
   if (auto *Attr = D->getAttrs().getDeprecated(D->getASTContext()))
     return Attr;
 
@@ -2083,7 +2083,7 @@ static bool someEnclosingDeclMatches(SourceRange ReferenceRange,
 
   if (FoundDeclarationNode.hasValue()) {
     const Decl *D = FoundDeclarationNode.getValue().get<Decl *>();
-    D = abstractSyntaxDeclForAvailabilityAttribute(D);
+    D = abstractSyntaxDeclForAvailableAttribute(D);
     if (Pred(D)) {
       return true;
     }
@@ -2129,7 +2129,7 @@ static bool isInsideDeprecatedDeclaration(SourceRange ReferenceRange,
 
 void TypeChecker::diagnoseDeprecated(SourceRange ReferenceRange,
                                      const DeclContext *ReferenceDC,
-                                     const AvailabilityAttr *Attr,
+                                     const AvailableAttr *Attr,
                                      DeclName Name) {
   // We match the behavior of clang to not report deprecation warnigs
   // inside declarations that are themselves deprecated on all deployment

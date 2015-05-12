@@ -1504,7 +1504,7 @@ public:
                                          TypeResolver.get(), initializers)) {
       for (auto *init : initializers) {
         if (init->isPrivateStdlibDecl(/*whitelistProtocols*/ false) ||
-            AvailabilityAttr::isUnavailable(init))
+            AvailableAttr::isUnavailable(init))
           continue;
         addConstructorCall(cast<ConstructorDecl>(init), Reason, name);
       }
@@ -1651,7 +1651,7 @@ public:
     // Hide private stdlib declarations.
     if (D->isPrivateStdlibDecl(/*whitelistProtocols*/false))
       return;
-    if (AvailabilityAttr::isUnavailable(D))
+    if (AvailableAttr::isUnavailable(D))
       return;
 
     if (!D->hasType())
@@ -2081,7 +2081,7 @@ public:
   }
 
   void getAttributeDeclParamCompletions(DeclAttrKind AttrKind, int ParamIndex) {
-    if (AttrKind == DAK_Availability) {
+    if (AttrKind == DAK_Available) {
       if (ParamIndex == 0) {
         addDeclAttrParamKeyword("*", "Platform", false);
 #define AVAILABILITY_PLATFORM(X, PrettyName)                                  \

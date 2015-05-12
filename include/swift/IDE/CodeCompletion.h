@@ -72,7 +72,7 @@ public:
       /// such as @"availability"
       DeclAttrKeyword,
 
-      /// such as "unavailable" etc. for @availability
+      /// such as "unavailable" etc. for @available
       DeclAttrParamKeyword,
 
       /// The "override" keyword.

@@ -431,7 +431,7 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
     asAvailableAs.push_back(setter);
   }
 
-  AvailabilityInference::applyInferredAvailabilityAttrs(materializeForSet,
+  AvailabilityInference::applyInferredAvailableAttrs(materializeForSet,
                                                         asAvailableAs, ctx);
 
   // If the property came from ObjC, we need to register this as an external
@@ -2210,7 +2210,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
 
   // Make sure the constructor is only as available as its superclass's
   // constructor.
-  AvailabilityInference::applyInferredAvailabilityAttrs(ctor, superclassCtor,
+  AvailabilityInference::applyInferredAvailableAttrs(ctor, superclassCtor,
                                                         ctx);
 
   // Configure 'self'.

@@ -151,7 +151,7 @@ protocol <loc>FooProtocolBase</loc> {
   <decl:Func>func <loc>fooBaseInstanceFuncOverridden()</loc></decl>
   <decl:Func>class func <loc>fooBaseClassFunc0()</loc></decl>
   <decl:Constructor>/*not inherited*/ <loc>init!(_ x: <ref:Struct>Int32</ref>)</loc></decl>
-  <decl:Func>@availability(*, unavailable, message="use object construction 'FooClassBase(_:)'")
+  <decl:Func>@available(*, unavailable, message="use object construction 'FooClassBase(_:)'")
   class func <loc>fooClassBase(x: <ref:Struct>Int32</ref>)</loc> -> <ref:Class>FooClassBase</ref>!</decl>
 }</decl>
 
@@ -228,37 +228,37 @@ class <loc>FooClassDerived</loc> : <ref:Class>FooClassBase</ref>, <ref:Protocol>
 }</decl>
 <decl:Class>class <loc>FooUnavailableMembers</loc> : <ref:Class>FooClassBase</ref> {
   <decl:Constructor>convenience <loc>init!(int i: <ref:Struct>Int32</ref>)</loc></decl>
-  <decl:Func>@availability(*, unavailable, message="use object construction 'FooUnavailableMembers(int:)'")
+  <decl:Func>@available(*, unavailable, message="use object construction 'FooUnavailableMembers(int:)'")
   class func <loc>unavailableMembersWithInt(i: <ref:Struct>Int32</ref>)</loc> -> Self!</decl>
-  <decl:Func>@availability(*, unavailable, message="x")
+  <decl:Func>@available(*, unavailable, message="x")
   func <loc>unavailable()</loc></decl>
-  <decl:Func>@availability(*, unavailable, message="Not available in Swift")
+  <decl:Func>@available(*, unavailable, message="Not available in Swift")
   func <loc>swiftUnavailable()</loc></decl>
-  <decl:Func>@availability(*, deprecated, message="x")
+  <decl:Func>@available(*, deprecated, message="x")
   func <loc>deprecated()</loc></decl>
-  <decl:Func>@availability(OSX, introduced=10.1)
+  <decl:Func>@available(OSX, introduced=10.1)
   func <loc>availabilityIntroduced()</loc></decl>
-  <decl:Func>@availability(OSX, unavailable, deprecated=10.1, message="APIs deprecated as of OS X 10.9 and earlier are unavailable in Swift")
+  <decl:Func>@available(OSX, unavailable, deprecated=10.1, message="APIs deprecated as of OS X 10.9 and earlier are unavailable in Swift")
   func <loc>availabilityDeprecated()</loc></decl>
-  <decl:Func>@availability(OSX, obsoleted=10.1)
+  <decl:Func>@available(OSX, obsoleted=10.1)
   func <loc>availabilityObsoleted()</loc></decl>
-  <decl:Func>@availability(OSX, unavailable)
+  <decl:Func>@available(OSX, unavailable)
   func <loc>availabilityUnavailable()</loc></decl>
-  <decl:Func>@availability(OSX, introduced=10.1, message="x")
+  <decl:Func>@available(OSX, introduced=10.1, message="x")
   func <loc>availabilityIntroducedMsg()</loc></decl>
-  <decl:Func>@availability(OSX, unavailable, deprecated=10.1, message="x")
+  <decl:Func>@available(OSX, unavailable, deprecated=10.1, message="x")
   func <loc>availabilityDeprecatedMsg()</loc></decl>
-  <decl:Func>@availability(OSX, obsoleted=10.1, message="x")
+  <decl:Func>@available(OSX, obsoleted=10.1, message="x")
   func <loc>availabilityObsoletedMsg()</loc></decl>
-  <decl:Func>@availability(OSX, unavailable, message="x")
+  <decl:Func>@available(OSX, unavailable, message="x")
   func <loc>availabilityUnavailableMsg()</loc></decl>
-  <decl:Func>@availability(*, unavailable, message="'performSelector' methods are unavailable")
+  <decl:Func>@available(*, unavailable, message="'performSelector' methods are unavailable")
   func <loc>performSelectorWithMagic(cmd: <ref:Struct>COpaquePointer</ref>)</loc></decl>
   <decl:Constructor><loc>init!()</loc></decl>
   <decl:Constructor>convenience <loc>init!(float f: <ref:Struct>Float</ref>)</loc></decl>
 }</decl>
 <decl:TypeAlias>typealias <loc>FooCFTypeRef</loc> = <ref:Class>FooCFType</ref></decl>
-<decl:Func>@availability(*, unavailable, message="Core Foundation objects are automatically memory managed")
+<decl:Func>@available(*, unavailable, message="Core Foundation objects are automatically memory managed")
 func <loc>FooCFTypeRelease(_: <ref:Class>FooCFType</ref>!)</loc></decl>
 <decl:Class>class <loc>FooRepeatedMembers</loc> : <ref:Class>FooClassBase</ref> {
   <decl:Func>func <loc>repeatedMethod()</loc></decl>

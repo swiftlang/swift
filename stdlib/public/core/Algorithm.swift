@@ -13,7 +13,7 @@
 /// Returns the minimum element in `elements`.
 ///
 /// - Requires: `elements` is non-empty. O(`elements.count()`).
-@availability(*, unavailable, message="call the 'minElement()' method on the sequence")
+@available(*, unavailable, message="call the 'minElement()' method on the sequence")
 public func minElement<
      R : SequenceType
        where R.Generator.Element : Comparable>(elements: R)
@@ -24,7 +24,7 @@ public func minElement<
 /// Returns the maximum element in `elements`.
 ///
 /// - Requires: `elements` is non-empty. O(`elements.count()`).
-@availability(*, unavailable, message="call the 'maxElement()' method on the sequence")
+@available(*, unavailable, message="call the 'maxElement()' method on the sequence")
 public func maxElement<
      R : SequenceType
        where R.Generator.Element : Comparable>(elements: R)
@@ -36,7 +36,7 @@ public func maxElement<
 /// `value` is not found.
 ///
 /// - Complexity: O(`domain.count()`)
-@availability(*, unavailable, message="call the 'indexOf()' method on the collection")
+@available(*, unavailable, message="call the 'indexOf()' method on the collection")
 public func find<
   C: CollectionType where C.Generator.Element : Equatable
 >(domain: C, _ value: C.Generator.Element) -> C.Index? {
@@ -151,7 +151,7 @@ public func split<S: Sliceable, R:BooleanType>(
 }
 
 /// Return true iff the the initial elements of `s` are equal to `prefix`.
-@availability(*, unavailable, message="call the 'startsWith()' method on the sequence")
+@available(*, unavailable, message="call the 'startsWith()' method on the sequence")
 public func startsWith<
   S0 : SequenceType, S1 : SequenceType
   where
@@ -166,7 +166,7 @@ public func startsWith<
 /// `prefix`, using `isEquivalent` as the equivalence test.
 ///
 /// - Requires: `isEquivalent` is an [equivalence relation](http://en.wikipedia.org/wiki/Equivalence_relation).
-@availability(*, unavailable, message="call the 'startsWith()' method on the sequence")
+@available(*, unavailable, message="call the 'startsWith()' method on the sequence")
 public func startsWith<
   S0 : SequenceType, S1 : SequenceType
   where
@@ -263,7 +263,7 @@ public struct EnumerateSequence<Base : SequenceType> : SequenceType {
 ///     2: 'i'
 ///     3: 'f'
 ///     4: 't'
-@availability(*, unavailable, message="call the 'enumerate()' method on the sequence")
+@available(*, unavailable, message="call the 'enumerate()' method on the sequence")
 public func enumerate<Seq : SequenceType>(
   base: Seq
 ) -> EnumerateSequence<Seq> {
@@ -272,7 +272,7 @@ public func enumerate<Seq : SequenceType>(
 
 /// Return `true` iff `a1` and `a2` contain the same elements in the
 /// same order.
-@availability(*, unavailable, message="call the 'equal()' method on the sequence")
+@available(*, unavailable, message="call the 'equal()' method on the sequence")
 public func equal<
     S1 : SequenceType, S2 : SequenceType
   where
@@ -287,7 +287,7 @@ public func equal<
 /// `isEquivalent` as the equivalence test.
 ///
 /// - Requires: `isEquivalent` is an [equivalence relation](http://en.wikipedia.org/wiki/Equivalence_relation).
-@availability(*, unavailable, message="call the 'equal()' method on the sequence")
+@available(*, unavailable, message="call the 'equal()' method on the sequence")
 public func equal<
     S1 : SequenceType, S2 : SequenceType
   where
@@ -301,7 +301,7 @@ public func equal<
 
 /// Return true iff a1 precedes a2 in a lexicographical ("dictionary")
 /// ordering, using "<" as the comparison between elements.
-@availability(*, unavailable, message="call the 'lexicographicalCompare()' method on the sequence")
+@available(*, unavailable, message="call the 'lexicographicalCompare()' method on the sequence")
 public func lexicographicalCompare<
     S1 : SequenceType, S2 : SequenceType
   where
@@ -317,7 +317,7 @@ public func lexicographicalCompare<
 /// - Requires: `isOrderedBefore` is a
 /// [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
 /// over the elements of `a1` and `a2`.
-@availability(*, unavailable, message="call the 'lexicographicalCompare()' method on the sequence")
+@available(*, unavailable, message="call the 'lexicographicalCompare()' method on the sequence")
 public func lexicographicalCompare<
     S1 : SequenceType, S2 : SequenceType
   where
@@ -331,7 +331,7 @@ public func lexicographicalCompare<
 }
 
 /// Return `true` iff an element in `seq` satisfies `predicate`.
-@availability(*, unavailable, message="call the 'contains()' method on the sequence")
+@available(*, unavailable, message="call the 'contains()' method on the sequence")
 public func contains<
   S : SequenceType, L : BooleanType
 >(seq: S, @noescape _ predicate: (S.Generator.Element) -> L) -> Bool {
@@ -339,7 +339,7 @@ public func contains<
 }
 
 /// Return `true` iff `x` is in `seq`.
-@availability(*, unavailable, message="call the 'contains()' method on the sequence")
+@available(*, unavailable, message="call the 'contains()' method on the sequence")
 public func contains<
   S : SequenceType where S.Generator.Element : Equatable
 >(seq: S, _ x: S.Generator.Element) -> Bool {
@@ -349,7 +349,7 @@ public func contains<
 /// Return the result of repeatedly calling `combine` with an
 /// accumulated value initialized to `initial` and each element of
 /// `sequence`, in turn.
-@availability(*, unavailable, message="call the 'reduce()' method on the sequence")
+@available(*, unavailable, message="call the 'reduce()' method on the sequence")
 public func reduce<S : SequenceType, U>(
   sequence: S, _ initial: U, @noescape _ combine: (U, S.Generator.Element) -> U
 ) -> U {

@@ -1861,7 +1861,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
         break;
       }
 
-      case decls_block::Availability_DECL_ATTR: {
+      case decls_block::Available_DECL_ATTR: {
 #define LIST_VER_TUPLE_PIECES(X)\
   X##_Major, X##_Minor, X##_Subminor, X##_HasMinor, X##_HasSubminor
 #define DEF_VER_TUPLE_PIECES(X) unsigned LIST_VER_TUPLE_PIECES(X)
@@ -1882,7 +1882,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
         DEF_VER_TUPLE_PIECES(Obsoleted);
         unsigned platform, messageSize, renameSize;
         // Decode the record, pulling the version tuple information.
-        serialization::decls_block::AvailabilityDeclAttrLayout::readRecord(
+        serialization::decls_block::AvailableDeclAttrLayout::readRecord(
             scratch, isImplicit, isUnavailable, isDeprecated,
             LIST_VER_TUPLE_PIECES(Introduced),
             LIST_VER_TUPLE_PIECES(Deprecated),
@@ -1905,7 +1905,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
         else
           unconditional = UnconditionalAvailabilityKind::None;
 
-        Attr = new (ctx) AvailabilityAttr(
+        Attr = new (ctx) AvailableAttr(
           SourceLoc(), SourceRange(),
           (PlatformKind)platform, message, rename,
           Introduced, Deprecated, Obsoleted,

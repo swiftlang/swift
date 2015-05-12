@@ -141,11 +141,11 @@ public:
   virtual void completeNominalMemberBeginning(
       SmallVectorImpl<StringRef> &Keywords) = 0;
 
-  /// Complete the keyword in attribute, for instance, @availability.
+  /// Complete the keyword in attribute, for instance, @available.
   virtual void completeDeclAttrKeyword(Decl *D, bool Sil, bool Param) = 0;
 
   /// Complete the parameters in attribute, for instance, version specifier for
-  /// @availability.
+  /// @available.
   virtual void completeDeclAttrParam(DeclAttrKind DK, int Index) = 0;
 
   /// \brief Signals that the AST for the all the delayed-parsed code was

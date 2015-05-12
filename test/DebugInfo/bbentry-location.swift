@@ -3,7 +3,7 @@
 // RUN: %target-swift-frontend -emit-ir -g %s -o - | FileCheck %s
 
 import UIKit
-@availability(iOS, introduced=8.0)
+@available(iOS, introduced=8.0)
 class ActionViewController
 {
   var imageView: UIImageView!

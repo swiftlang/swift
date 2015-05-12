@@ -35,7 +35,7 @@ func useInSignature(options: NSDeprecatedOptions) { // expected-warning {{'NSDep
 
 
 class Super {
-  @availability(OSX, introduced=10.9, deprecated=10.10)
+  @available(OSX, introduced=10.9, deprecated=10.10)
   init() { }
 }
 
@@ -48,16 +48,16 @@ class Sub : Super {
   /// cases.
 }
 
-@availability(OSX, introduced=10.9, deprecated=10.10)
+@available(OSX, introduced=10.9, deprecated=10.10)
 func functionDeprecatedIn10_10() {
   let _ = ClassDeprecatedIn10_10()
 }
 
-@availability(OSX, introduced=10.9, deprecated=10.9)
+@available(OSX, introduced=10.9, deprecated=10.9)
 class ClassDeprecatedIn10_9 {
 }
 
-@availability(OSX, introduced=10.8, deprecated=10.10)
+@available(OSX, introduced=10.8, deprecated=10.10)
 class ClassDeprecatedIn10_10 {
   var other10_10: ClassDeprecatedIn10_10 = ClassDeprecatedIn10_10()
 
@@ -73,7 +73,7 @@ class ClassDeprecatedIn10_10 {
 
 class ClassWithComputedPropertyDeprecatedIn10_10 {
 
-  @availability(OSX, introduced=10.8, deprecated=10.10)
+  @available(OSX, introduced=10.8, deprecated=10.10)
   var annotatedPropertyDeprecatedIn10_10 : ClassDeprecatedIn10_10 {
     get {
       return ClassDeprecatedIn10_10()
@@ -101,7 +101,7 @@ func usesFunctionDeprecatedIn10_10() {
   let _ = ClassDeprecatedIn10_10() // expected-warning {{ClassDeprecatedIn10_10' was deprecated in OS X 10.10}}
 }
 
-@availability(OSX, introduced=10.8, deprecated=10.10)
+@available(OSX, introduced=10.8, deprecated=10.10)
 func annotatedUsesFunctionDeprecatedIn10_10() {
   let _ = ClassDeprecatedIn10_10()
 }
@@ -109,27 +109,27 @@ func annotatedUsesFunctionDeprecatedIn10_10() {
 func hasParameterDeprecatedIn10_10(p: ClassDeprecatedIn10_10) { // expected-warning {{ClassDeprecatedIn10_10' was deprecated in OS X 10.10}}
 }
 
-@availability(OSX, introduced=10.8, deprecated=10.10)
+@available(OSX, introduced=10.8, deprecated=10.10)
 func annotatedHasParameterDeprecatedIn10_10(p: ClassDeprecatedIn10_10) {
 }
 
 func hasReturnDeprecatedIn10_10() -> ClassDeprecatedIn10_10 { // expected-warning {{ClassDeprecatedIn10_10' was deprecated in OS X 10.10}}
 }
 
-@availability(OSX, introduced=10.8, deprecated=10.10)
+@available(OSX, introduced=10.8, deprecated=10.10)
 func annotatedHasReturnDeprecatedIn10_10() -> ClassDeprecatedIn10_10 {
 }
 
 var globalWithDeprecatedType : ClassDeprecatedIn10_10? = nil // expected-warning {{ClassDeprecatedIn10_10' was deprecated in OS X 10.10}}
 
-@availability(OSX, introduced=10.8, deprecated=10.10)
+@available(OSX, introduced=10.8, deprecated=10.10)
 var annotatedGlobalWithDeprecatedType : ClassDeprecatedIn10_10? = nil
 
 
 enum EnumWithDeprecatedCasePayload {
   case WithDeprecatedPayload(p: ClassDeprecatedIn10_10) // expected-warning {{ClassDeprecatedIn10_10' was deprecated in OS X 10.10}}
 
-  @availability(OSX, introduced=10.8, deprecated=10.10)
+  @available(OSX, introduced=10.8, deprecated=10.10)
   case AnnotatedWithDeprecatedPayload(p: ClassDeprecatedIn10_10)
 }
 
@@ -137,7 +137,7 @@ extension ClassDeprecatedIn10_10 { // expected-warning {{'ClassDeprecatedIn10_10
 
 }
 
-@availability(OSX, introduced=10.8, deprecated=10.10)
+@available(OSX, introduced=10.8, deprecated=10.10)
 extension ClassDeprecatedIn10_10 {
   func methodInExtensionOfClassDeprecatedIn10_10() {
   }

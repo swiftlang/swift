@@ -157,7 +157,7 @@ public func ==(lhs: COpaquePointer, rhs: COpaquePointer) -> Bool {
 ///
 /// This type has been removed. Instead of `CFunctionType<(T) -> U>`, a native
 /// function type with the C convention can be used, `@convention(c) (T) -> U`.
-@availability(*, unavailable, message="use a function type '@convention(c) (T) -> U'")
+@available(*, unavailable, message="use a function type '@convention(c) (T) -> U'")
 public struct CFunctionPointer<T> {}
 
 /// The corresponding Swift type to `va_list` in imported C APIs.

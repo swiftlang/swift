@@ -7,7 +7,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD5 | FileCheck %s -check-prefix=KEYWORD5
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD_LAST | FileCheck %s -check-prefix=KEYWORD_LAST
 
-@availability(#^AVAILABILITY1^#)
+@available(#^AVAILABILITY1^#)
 
 // AVAILABILITY1: Begin completions, 9 items
 // AVAILABILITY1-NEXT: Keyword/None:                       *[#Platform#]; name=*{{$}}
@@ -21,7 +21,7 @@
 // AVAILABILITY1-NEXT: Keyword/None:                       OSXApplicationExtension[#Platform#]; name=OSXApplicationExtension{{$}}
 // AVAILABILITY1-NEXT: End completions
 
-@availability(*, #^AVAILABILITY2^#)
+@available(*, #^AVAILABILITY2^#)
 
 // AVAILABILITY2:             Begin completions, 5 items
 // AVAILABILITY2-NEXT:        Keyword/None:                       unavailable; name=unavailable{{$}}
@@ -44,7 +44,7 @@ func method(@#^KEYWORD1^#) {}
 func method(){}
 
 // KEYWORD2:                  Begin completions, 7 items
-// KEYWORD2-NEXT:             Keyword/None:                       availability[#Func Attribute#]; name=availability{{$}}
+// KEYWORD2-NEXT:             Keyword/None:                       available[#Func Attribute#]; name=available{{$}}
 // KEYWORD2-NEXT:             Keyword/None:                       objc[#Func Attribute#]; name=objc{{$}}
 // KEYWORD2-NEXT:             Keyword/None:                       noreturn[#Func Attribute#]; name=noreturn{{$}}
 // KEYWORD2-NEXT:             Keyword/None:                       IBAction[#Func Attribute#]; name=IBAction{{$}}
@@ -57,7 +57,7 @@ func method(){}
 class C {}
 
 // KEYWORD3:                  Begin completions, 7 items
-// KEYWORD3-NEXT:             Keyword/None:                       availability[#Class Attribute#]; name=availability{{$}}
+// KEYWORD3-NEXT:             Keyword/None:                       available[#Class Attribute#]; name=available{{$}}
 // KEYWORD3-NEXT:             Keyword/None:                       objc[#Class Attribute#]; name=objc{{$}}
 // KEYWORD3-NEXT:             Keyword/None:                       IBDesignable[#Class Attribute#]; name=IBDesignable{{$}}
 // KEYWORD3-NEXT:             Keyword/None:                       UIApplicationMain[#Class Attribute#]; name=UIApplicationMain{{$}}
@@ -69,7 +69,7 @@ class C {}
 @#^KEYWORD4^#
 enum E {}
 // KEYWORD4:                  Begin completions, 2 items
-// KEYWORD4-NEXT:             Keyword/None:                       availability[#Enum Attribute#]; name=availability{{$}}
+// KEYWORD4-NEXT:             Keyword/None:                       available[#Enum Attribute#]; name=available{{$}}
 // KEYWORD4-NEXT:             Keyword/None:                       objc[#Enum Attribute#]; name=objc{{$}}
 // KEYWORD4-NEXT:             End completions
 
@@ -77,14 +77,14 @@ enum E {}
 @#^KEYWORD5^#
 struct S{}
 // KEYWORD5:                  Begin completions, 1 items
-// KEYWORD5-NEXT:             Keyword/None:                       availability[#Struct Attribute#]; name=availability{{$}}
+// KEYWORD5-NEXT:             Keyword/None:                       available[#Struct Attribute#]; name=available{{$}}
 // KEYWORD5-NEXT:             End completions
 
 
 @#^KEYWORD_LAST^#
 
 // KEYWORD_LAST:                  Begin completions, 18 items
-// KEYWORD_LAST-NEXT:             Keyword/None:                       availability[#Declaration Attribute#]; name=availability{{$}}
+// KEYWORD_LAST-NEXT:             Keyword/None:                       available[#Declaration Attribute#]; name=available{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       objc[#Declaration Attribute#]; name=objc{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       noreturn[#Declaration Attribute#]; name=noreturn{{$}}
 // KEYWORD_LAST-NEXT:             Keyword/None:                       NSCopying[#Declaration Attribute#]; name=NSCopying{{$}}

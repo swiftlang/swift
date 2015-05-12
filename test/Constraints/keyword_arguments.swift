@@ -247,7 +247,7 @@ class MismatchOverloaded1 {
   func method1(x: Int!, arg: ((Int) -> Int)!) { }
   func method1(x: Int!, secondArg: ((Int) -> Int)!) { }
 
-  @availability(*, unavailable)
+  @available(*, unavailable)
   func method2(x: Int!, arg: ((Int) -> Int)!) { }
 
   func method2(x: Int!, secondArg: ((Int) -> Int)!) { }

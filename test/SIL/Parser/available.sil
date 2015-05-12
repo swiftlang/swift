@@ -1,6 +1,6 @@
 // RUN: %target-sil-opt %s -verify | FileCheck %s
 
-@availability(*,unavailable,message="it has been renamed")
+@available(*,unavailable,message="it has been renamed")
 public struct mmConstUnsafePointer<T> {
 }
 

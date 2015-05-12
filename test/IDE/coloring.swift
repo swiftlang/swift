@@ -85,17 +85,17 @@ class Attributes {
 // CHECK: <attr-builtin>@noreturn</attr-builtin> <kw>func</kw> f0() {}
   @noreturn func f0() {}
 
-// CHECK: <attr-builtin>@availability(*, unavailable)</attr-builtin> <kw>func</kw> f1() {}
-  @availability(*, unavailable) func f1() {}
+// CHECK: <attr-builtin>@available(*, unavailable)</attr-builtin> <kw>func</kw> f1() {}
+  @available(*, unavailable) func f1() {}
 
-// CHECK: <attr-builtin>@availability(*, unavailable)</attr-builtin> <attr-builtin>@IBAction</attr-builtin> <kw>func</kw> f2() {}
-  @availability(*, unavailable) @IBAction func f2() {}
+// CHECK: <attr-builtin>@available(*, unavailable)</attr-builtin> <attr-builtin>@IBAction</attr-builtin> <kw>func</kw> f2() {}
+  @available(*, unavailable) @IBAction func f2() {}
 
-// CHECK: <attr-builtin>@IBAction</attr-builtin> <attr-builtin>@availability(*, unavailable)</attr-builtin> <kw>func</kw> f3() {}
-  @IBAction @availability(*, unavailable) func f3() {}
+// CHECK: <attr-builtin>@IBAction</attr-builtin> <attr-builtin>@available(*, unavailable)</attr-builtin> <kw>func</kw> f3() {}
+  @IBAction @available(*, unavailable) func f3() {}
 
-// CHECK: <attr-builtin>@IBAction</attr-builtin> <attr-builtin>@availability(*, unavailable)</attr-builtin> <attr-builtin>@noreturn</attr-builtin> <kw>func</kw> f4() {}
-  @IBAction @availability(*, unavailable) @noreturn func f4() {}
+// CHECK: <attr-builtin>@IBAction</attr-builtin> <attr-builtin>@available(*, unavailable)</attr-builtin> <attr-builtin>@noreturn</attr-builtin> <kw>func</kw> f4() {}
+  @IBAction @available(*, unavailable) @noreturn func f4() {}
 
 // CHECK: <attr-builtin>mutating</attr-builtin> <kw>func</kw> func_mutating_1() {}
   mutating func func_mutating_1() {}

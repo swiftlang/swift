@@ -908,7 +908,7 @@ static bool checkTypeDeclAvailability(Decl *TypeDecl, IdentTypeRepr *IdType,
                                       TypeChecker &TC) {
 
   if (auto CI = dyn_cast<ComponentIdentTypeRepr>(IdType)) {
-    if (auto Attr = AvailabilityAttr::isUnavailable(TypeDecl)) {
+    if (auto Attr = AvailableAttr::isUnavailable(TypeDecl)) {
       switch (Attr->getUnconditionalAvailability()) {
       case UnconditionalAvailabilityKind::None:
       case UnconditionalAvailabilityKind::Deprecated:

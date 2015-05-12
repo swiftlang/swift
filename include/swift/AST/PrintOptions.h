@@ -101,7 +101,7 @@ struct PrintOptions {
   /// Whether to print destructors.
   bool SkipDeinit = false;
 
-  /// Whether to print a long attribute like '\@availability' on a separate line
+  /// Whether to print a long attribute like '\@available' on a separate line
   /// from the declaration or other attributes.
   bool PrintLongAttrsOnSeparateLines = false;
 

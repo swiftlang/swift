@@ -12,8 +12,8 @@
 
 @exported import SceneKit // Clang module
 
-@availability(iOS, introduced=8.0)
-@availability(OSX, introduced=10.8)
+@available(iOS, introduced=8.0)
+@available(OSX, introduced=10.8)
 extension SCNGeometryElement {
   public convenience init<IndexType : IntegerType>(
     indices: [IndexType], primitiveType: SCNGeometryPrimitiveType
@@ -44,8 +44,8 @@ internal func SCN_Swift_SCNSceneSource_entryWithIdentifier(
   _ uid: NSString,
   _ entryClass: AnyClass) -> AnyObject?
 
-@availability(iOS, introduced=8.0)
-@availability(OSX, introduced=10.8)
+@available(iOS, introduced=8.0)
+@available(OSX, introduced=10.8)
 extension SCNSceneSource {
   public func entryWithIdentifier<T>(uid: String, withClass entryClass: T.Type) -> T? {
     return SCN_Swift_SCNSceneSource_entryWithIdentifier(

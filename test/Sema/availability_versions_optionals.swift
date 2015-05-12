@@ -29,10 +29,10 @@ let ignored1: (Int, Int) = (globalAvailableOn10_10, globalAvailableOn10_11) // e
 
 // Global functions
 
-@availability(OSX, introduced=10.9)
+@available(OSX, introduced=10.9)
 func funcAvailableOn10_9() -> Int { return 9 }
 
-@availability(OSX, introduced=10.10)
+@available(OSX, introduced=10.10)
 func funcAvailableOn10_10() -> Int { return 10 }
 
 func referToFunctions() {
@@ -53,10 +53,10 @@ func callFunctions() {
   let _: Int? = funcAvailableOn10_10?()
 }
 
-@availability(OSX, introduced=10.9)
+@available(OSX, introduced=10.9)
 func overloadedFunction() -> Int { return 42 }
 
-@availability(OSX, introduced=10.10)
+@available(OSX, introduced=10.10)
 func overloadedFunction(on1010: Int) -> Int { return 43 }
 
 func callOverloadedFunctions() {
@@ -71,13 +71,13 @@ func callOverloadedFunctions() {
 // Unavailable methods
 
 class ClassWithUnavailableMethod {
-  @availability(OSX, introduced=10.9)
+  @available(OSX, introduced=10.9)
   func methAvailableOn10_9() -> Int { return 9 }
   
-  @availability(OSX, introduced=10.10)
+  @available(OSX, introduced=10.10)
   func methAvailableOn10_10() -> Int { return 10 }
   
-  @availability(OSX, introduced=10.10)
+  @available(OSX, introduced=10.10)
   class func classMethAvailableOn10_10() -> Int { return 10 }
   
   func someOtherMethod() {
@@ -133,10 +133,10 @@ func callUnavailableClassMethod() {
 }
 
 class ClassWithUnavailableOverloadedMethod {
-  @availability(OSX, introduced=10.9)
+  @available(OSX, introduced=10.9)
   func overloadedMethod() -> Int { return 9 }
 
-  @availability(OSX, introduced=10.10)
+  @available(OSX, introduced=10.10)
   func overloadedMethod(on1010: Int) -> Int { return 10 }
 }
 
@@ -149,7 +149,7 @@ func callUnavailableOverloadedMethod(o: ClassWithUnavailableOverloadedMethod) {
 }
 
 class ClassWithMethodReturningOptional {
-   @availability(OSX, introduced=10.10)
+   @available(OSX, introduced=10.10)
   func methAvailableOn10_10() -> Int? { return 10 }
 }
 
@@ -168,20 +168,20 @@ func callMethodReturningOptional(o: ClassWithMethodReturningOptional) {
 // For the moment, we do not convert unavailable initializers to optionals
 // and instead just diagnose unavailability.
 class ClassWithUnavailableInitializer {
-  @availability(OSX, introduced=10.10)
+  @available(OSX, introduced=10.10)
   required init(_ v: Int) {  }
   
   convenience init(s: String) {
     self.init(5) // expected-error {{'init' is only available on OS X 10.10 or newer}}
-        // expected-note@-1 {{add @availability attribute to enclosing initializer}}
-        // expected-note@-2 {{add @availability attribute to enclosing class}}
+        // expected-note@-1 {{add @available attribute to enclosing initializer}}
+        // expected-note@-2 {{add @available attribute to enclosing class}}
         // expected-note@-3 {{guard with version check}}
   }
 }
 
 func callUnavailableInitializer() {
   ClassWithUnavailableInitializer(5) // expected-error {{'init' is only available on OS X 10.10 or newer}}
-      // expected-note@-1 {{add @availability attribute to enclosing global function}}
+      // expected-note@-1 {{add @available attribute to enclosing global function}}
       // expected-note@-2 {{guard with version check}}
 }
 
@@ -189,13 +189,13 @@ func callUnavailableInitializer() {
 // Properties
 
 class ClassWithUnavailableProperties {
-  @availability(OSX, introduced=10.9)
+  @available(OSX, introduced=10.9)
   lazy var availableOn10_9Stored: Int = 9
   
-  @availability(OSX, introduced=10.10)
+  @available(OSX, introduced=10.10)
   lazy var availableOn10_10Stored : Int = 10
 
-  @availability(OSX, introduced=10.9)
+  @available(OSX, introduced=10.9)
   var availableOn10_9Computed: Int {
     get {
       let _: Int = availableOn10_10Stored // expected-error {{value of optional type 'Int?' not unwrapped; did you mean to use '!' or '?'?}}
@@ -208,7 +208,7 @@ class ClassWithUnavailableProperties {
     }
   }
   
-  @availability(OSX, introduced=10.10)
+  @available(OSX, introduced=10.10)
   var availableOn10_10Computed: Int {
     get {
       return availableOn10_10Stored

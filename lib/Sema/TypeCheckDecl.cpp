@@ -4896,7 +4896,7 @@ public:
 
 #undef UNINTERESTING_ATTR
 
-    void visitAvailabilityAttr(AvailabilityAttr *attr) {
+    void visitAvailableAttr(AvailableAttr *attr) {
       // FIXME: Check that this declaration is at least as available as the
       // one it overrides.
     }
@@ -6761,7 +6761,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
       auto member = memberResult.Decl;
 
       // Skip unavailable superclass initializers.
-      if (AvailabilityAttr::isUnavailable(member))
+      if (AvailableAttr::isUnavailable(member))
         continue;
 
       // Skip invalid superclass initializers.

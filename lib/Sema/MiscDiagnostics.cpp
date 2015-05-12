@@ -485,7 +485,7 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
 static bool diagnoseExplicitUnavailability(TypeChecker &TC, const ValueDecl *D,
                                            SourceRange R,
                                            const DeclContext *DC) {
-  auto *Attr = AvailabilityAttr::isUnavailable(D);
+  auto *Attr = AvailableAttr::isUnavailable(D);
   if (!Attr)
     return false;
 
@@ -563,7 +563,7 @@ static bool diagAvailability(TypeChecker &TC, const ValueDecl *D,
     return true;
 
   // Diagnose for deprecation
-  if (const AvailabilityAttr *Attr = TypeChecker::getDeprecated(D)) {
+  if (const AvailableAttr *Attr = TypeChecker::getDeprecated(D)) {
     TC.diagnoseDeprecated(R, DC, Attr, D->getFullName());
   }
   

@@ -48,7 +48,7 @@ public:
 
 #define IGNORED_ATTR(X) void visit##X##Attr(X##Attr *) {}
   IGNORED_ATTR(Asmname)
-  IGNORED_ATTR(Availability)
+  IGNORED_ATTR(Available)
   IGNORED_ATTR(Final)
   IGNORED_ATTR(NSApplicationMain)
   IGNORED_ATTR(NSCopying)
@@ -605,7 +605,7 @@ public:
     IGNORED_ATTR(Testable)
 #undef IGNORED_ATTR
 
-  void visitAvailabilityAttr(AvailabilityAttr *attr);
+  void visitAvailableAttr(AvailableAttr *attr);
 
   void visitFinalAttr(FinalAttr *attr);
   void visitIBActionAttr(IBActionAttr *attr);
@@ -764,7 +764,7 @@ static Decl *getEnclosingDeclForDecl(Decl *D) {
   return D->getDeclContext()->getInnermostDeclarationDeclContext();
 }
 
-void AttributeChecker::visitAvailabilityAttr(AvailabilityAttr *attr) {
+void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
   if (TC.getLangOpts().DisableAvailabilityChecking)
     return;
 
