@@ -95,7 +95,7 @@ func _mixUInt64(value: UInt64) -> UInt64 {
   let seed: UInt64 = _HashingDetail.getExecutionSeed()
   let low: UInt64 = value & 0xffff_ffff
   let high: UInt64 = value >> 32
-  return _HashingDetail.hash16Bytes(seed &+ (low << 3), high);
+  return _HashingDetail.hash16Bytes(seed &+ (low << 3), high)
 }
 
 @transparent
