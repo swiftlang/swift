@@ -214,6 +214,20 @@ enum Hylomorphism {
 // CHECK-NEXT: Hylomorphism
 print(Hylomorphism.Yin(5))
 
+// Multi-payload enum with generic type arguments
+// This one has enough metadata to get the tag and payload out
+enum Transportation<T, S> {
+  case Horse(T)
+  case Motorbike
+  case Roadster(S)
+}
+
+// CHECK-NEXT: Transportation<Swift.Int, Swift.String>.Horse(31337)
+print(Transportation<Int, String>.Horse(31337))
+
+// CHECK-NEXT: Transportation<Swift.Int, Swift.String>.Roadster("Porsche")
+print(Transportation<Int, String>.Roadster("Porsche"))
+
 var justSomeFunction = { (x:Int)->Int in return x + 1 }
 // CHECK-NEXT: (Function)
 print(reflect(justSomeFunction).summary)

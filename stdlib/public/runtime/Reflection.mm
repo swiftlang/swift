@@ -444,8 +444,8 @@ intptr_t swift_EnumMirror_count(HeapObject *owner,
   if (Description.CaseNames == nullptr)
     return 0;
 
-  // No metadata for multi-payload enums yet
-  if (Description.getNumPayloadCases() > 1)
+  // No metadata for multi-payload enums with non-trivial layout yet
+  if (Description.getNumPayloadCases() > 1 && !Enum->hasPayloadSize())
     return 0;
 
   return 1;
@@ -463,6 +463,7 @@ StringMirrorTuple swift_EnumMirror_subscript(intptr_t i,
 
   const Metadata *payloadType;
   unsigned emptyCases = Description.getNumEmptyCases();
+  unsigned payloadCases = Description.getNumPayloadCases();
   bool hasPayload = false;
   int tag;
 
@@ -479,7 +480,10 @@ StringMirrorTuple swift_EnumMirror_subscript(intptr_t i,
     tag++;
     break;
   default:
-    swift::crash("multi-payload enum reflection not implemented");
+    tag = swift_getEnumCaseMultiPayload(value, Enum);
+    payloadType = Description.GetCaseTypes(type)[tag];
+    hasPayload = (static_cast<unsigned>(tag) < payloadCases);
+    break;
   }
 
   // If there's no payload, just show the empty tuple
