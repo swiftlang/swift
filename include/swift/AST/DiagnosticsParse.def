@@ -577,6 +577,10 @@ ERROR(throwing_non_function,type_parsing,PointsToFirstBadToken,
       "only function types may throw", ())
 ERROR(rethrowing_function_type,type_parsing,PointsToFirstBadToken,
       "only function declarations may be marked 'rethrows'", ())
+ERROR(throws_after_function_result,type_parsing,none,
+      "'throws' may only occur before '->'", ())
+ERROR(rethrows_after_function_result,type_parsing,none,
+      "'rethrows' may only occur before '->'", ())
 
 // Enum Types
 ERROR(expected_expr_enum_case_raw_value,type_parsing,PointsToFirstBadToken,

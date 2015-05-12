@@ -381,7 +381,7 @@ namespace swift {
       return fixItReplace(R, {});
     }
 
-    /// \brief Add a token-based removal fix-it to the currently-active
+    /// \brief Add a character-based removal fix-it to the currently-active
     /// diagnostic.
     InFlightDiagnostic &fixItRemoveChars(SourceLoc Start, SourceLoc End) {
       return fixItReplaceChars(Start, End, {});

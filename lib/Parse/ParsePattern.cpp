@@ -629,13 +629,14 @@ Parser::parseFunctionSignature(Identifier SimpleName,
     rethrows = true;
   }
 
+  SourceLoc arrowLoc;
   // If there's a trailing arrow, parse the rest as the result type.
   if (Tok.isAny(tok::arrow, tok::colon)) {
-    if (!consumeIf(tok::arrow)) {
+    if (!consumeIf(tok::arrow, arrowLoc)) {
       // FixIt ':' to '->'.
       diagnose(Tok, diag::func_decl_expected_arrow)
           .fixItReplace(SourceRange(Tok.getLoc()), "->");
-      consumeToken(tok::colon);
+      arrowLoc = consumeToken(tok::colon);
     }
 
     ParserResult<TypeRepr> ResultType =
@@ -650,6 +651,29 @@ Parser::parseFunctionSignature(Identifier SimpleName,
   } else {
     // Otherwise, we leave retType null.
     retType = nullptr;
+  }
+
+  // Check for 'throws' and 'rethrows' after the type and correct it.
+  if (!throwsLoc.isValid()) {
+    if (Tok.is(tok::kw_throws)) {
+      throwsLoc = consumeToken();
+    } else if (Tok.is(tok::kw_rethrows)) {
+      throwsLoc = consumeToken();
+      rethrows = true;
+    }
+
+    if (throwsLoc.isValid()) {
+      assert(arrowLoc.isValid());
+      assert(retType);
+      auto diag = rethrows ? diag::rethrows_after_function_result
+                           : diag::throws_after_function_result;
+      SourceLoc typeEndLoc = Lexer::getLocForEndOfToken(SourceMgr,
+                                                        retType->getEndLoc());
+      SourceLoc throwsEndLoc = Lexer::getLocForEndOfToken(SourceMgr, throwsLoc);
+      diagnose(Tok, diag)
+        .fixItInsert(arrowLoc, rethrows ? "rethrows " : "throws ")
+        .fixItRemoveChars(typeEndLoc, throwsEndLoc);
+    }
   }
 
   return Status;
