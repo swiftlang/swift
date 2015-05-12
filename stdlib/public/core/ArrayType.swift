@@ -83,8 +83,11 @@ protocol _ArrayType
     S: SequenceType where S.Generator.Element == Generator.Element
   >(inout lhs: Self, rhs: S)
 
-  /// Remove an element from the end of the Array in O(1).  Returns:
-  /// the removed element. Requires: count > 0
+  /// Remove an element from the end of the Array in O(1).
+  ///
+  /// - returns: the removed element.
+  ///
+  /// Requires: count > 0
   mutating func removeLast() -> Generator.Element
 
   /// Insert `newElement` at index `i`.

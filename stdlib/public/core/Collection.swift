@@ -81,7 +81,7 @@ extension _CollectionDefaultsType {
   /// Define this method if the collection can find an element in less than
   /// O(N) by exploiting collection-specific knowledge.
   ///
-  /// Returns: `nil` if a linear search should be attempted instead,
+  /// - returns: `nil` if a linear search should be attempted instead,
   /// `Optional(nil)` if the element was not found, or
   /// `Optional(Optional(index))` if an element was found.
   ///
@@ -168,7 +168,7 @@ public protocol CollectionType
   /// Define this method if the collection can find an element in less than
   /// O(N) by exploiting collection-specific knowledge.
   ///
-  /// Returns: `nil` if a linear search should be attempted instead,
+  /// - returns: `nil` if a linear search should be attempted instead,
   /// `Optional(nil)` if the element was not found, or
   /// `Optional(Optional(index))` if an element was found.
   ///
