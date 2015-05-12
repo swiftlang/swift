@@ -1116,7 +1116,7 @@ class infer_instanceVar1 {
   var var_CFunctionPointer_1: @convention(c) () -> ()
   // CHECK-LABEL: @objc var var_CFunctionPointer_invalid_1: Int
   var var_CFunctionPointer_invalid_1: @convention(c) Int // expected-error {{attribute only applies to syntactic function types}}
-  // CHECK-LABEL: {{^}} var var_CFunctionPointer_invalid_2: @conventin(c) PlainStruct -> Int
+  // CHECK-LABEL: {{^}} var var_CFunctionPointer_invalid_2: @convention(c) PlainStruct -> Int
   var var_CFunctionPointer_invalid_2: @convention(c) PlainStruct -> Int // expected-error {{@convention(c) type is not representable in Objective-C}}
 
   weak var var_Weak1: Class_ObjC1?
