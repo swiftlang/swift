@@ -2265,11 +2265,17 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     if (status.isError())
       break;
 
-    // Parse the generic parameter list.
+    // Skip over a generic parameter or argument list; they are not
+    // permitted on extensions.
     GenericParamList *genericParams = nullptr;
-    {
-      Scope scope(this, ScopeKind::Generics);
-      genericParams = maybeParseGenericParams();
+    if (startsWithLess(Tok)) {
+      SourceLoc lAngleLoc = consumeStartingLess();
+      skipUntilGreaterInTypeList();
+      SourceLoc rAngleLoc = Tok.getLoc();
+      if (startsWithGreater(Tok))
+        consumeStartingGreater();
+      diagnose(nameLoc, diag::extension_generic_params_args, name)
+        .highlight(SourceRange(lAngleLoc, rAngleLoc));
     }
 
     auto TyR = new (Context) SimpleIdentTypeRepr(nameLoc, name);

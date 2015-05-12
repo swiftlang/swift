@@ -1105,7 +1105,7 @@ struct LValueCheck<T> {
   let x = 0  // expected-note {{initial value already provided in 'let' declaration}}
 }
 
-extension LValueCheck<A> {
+extension LValueCheck {
   init(newY: Int) {
     x = 42  // expected-error {{immutable value 'self.x' may only be initialized once}}
   }

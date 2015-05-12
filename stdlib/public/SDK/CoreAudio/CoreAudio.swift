@@ -12,7 +12,7 @@
 
 @exported import CoreAudio // Clang module
 
-extension UnsafeBufferPointer<T> {
+extension UnsafeBufferPointer {
   /// Initialize an `UnsafeBufferPointer<T>` from an `AudioBuffer`.
   public init(_ audioBuffer: AudioBuffer) {
     self.init(
@@ -21,7 +21,7 @@ extension UnsafeBufferPointer<T> {
   }
 }
 
-extension UnsafeMutableBufferPointer<T> {
+extension UnsafeMutableBufferPointer {
   /// Initialize an `UnsafeMutableBufferPointer<T>` from an `AudioBuffer`.
   public init(_ audioBuffer: AudioBuffer) {
     self.init(

@@ -714,15 +714,6 @@ ERROR(extension_stored_property,sema_tcd,none,
       "extensions may not contain stored properties", ())
 ERROR(extension_generic_extra_requirements,sema_tcd,none,
       "extension of generic type %0 cannot add requirements", (Type))
-ERROR(extension_generic_wrong_number_of_parameters,sema_tcd,none,
-      "extension of generic type %0 has %select{too few|too many}1 generic "
-      "parameters (have %2, expected %3)", (Type, bool, unsigned, unsigned))
-ERROR(extension_generic_params_for_non_generic,sema_tcd,none,
-      "%0 does not have any generic parameters", (Identifier))
-ERROR(extension_generic_params_for_non_generic_type,sema_tcd,none,
-      "%0 does not have any generic parameters", (Type))
-NOTE(extended_type_here,sema_tcd,none,
-      "extended type %0 declared here", (Type))
 ERROR(extension_nonprotocol_trailing_where,sema_tcd,none,
       "trailing 'where' clause for extension of non-protocol type %0", (Type))
 ERROR(extension_protocol_inheritance,sema_tcd,none,

@@ -269,6 +269,8 @@ ERROR(expected_rbrace_extension,decl_parsing,none,
       "expected '}' at end of extension", ())
 ERROR(expected_ident_type_in_extension,decl_parsing,none,
       "non-nominal type %0 cannot be extended", (TypeLoc))
+ERROR(extension_generic_params_args,decl_parsing,none,
+      "cannot extend a specialization of %0", (Identifier))
 
 // TypeAlias
 ERROR(expected_equal_in_typealias,decl_parsing,PointsToFirstBadToken,
