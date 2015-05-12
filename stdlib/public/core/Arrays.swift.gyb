@@ -1230,7 +1230,7 @@ public func !=<T : Equatable>(lhs: ${Self}<T>, rhs: ${Self}<T>) -> Bool {
 /// O(1).
 ///
 /// - Requires: `Base` is a base class or base `@objc` protocol (such
-/// as `AnyObject`) of `Derived`.
+///   as `AnyObject`) of `Derived`.
 public func _arrayUpCast<Derived, Base>(a: Array<Derived>) -> Array<Base> {
   // FIXME: Dynamic casting is currently not possible without the objc runtime:
   // rdar://problem/18801510
