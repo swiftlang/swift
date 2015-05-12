@@ -19,7 +19,7 @@ extension CIFilter {
   convenience init?(
     name: String!, elements: (NSCopying, AnyObject)...
   ) {
-    var dict =  NSMutableDictionary()
+    let dict =  NSMutableDictionary()
         for (key, value) in elements {
             dict[key] = value
         }

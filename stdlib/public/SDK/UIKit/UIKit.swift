@@ -162,11 +162,11 @@ struct _UIViewMirror : MirrorType {
       
           UIGraphicsBeginImageContextWithOptions(bounds.size, false, 0.0)
       
-          var ctx = UIGraphicsGetCurrentContext()
+          let ctx = UIGraphicsGetCurrentContext()
           UIColor(white:1.0, alpha:0.0).set()
           CGContextFillRect(ctx, bounds)
           _v.layer.renderInContext(ctx)
-          var maybe_image = UIGraphicsGetImageFromCurrentImageContext()
+          let maybe_image = UIGraphicsGetImageFromCurrentImageContext()
       
           UIGraphicsEndImageContext()
       
