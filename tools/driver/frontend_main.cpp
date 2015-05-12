@@ -169,6 +169,8 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
     case DeclKind::Extension: {
       auto *ED = cast<ExtensionDecl>(D);
       auto *NTD = ED->getExtendedType()->getAnyNominal();
+      if (!NTD)
+        break;
       if (NTD->hasAccessibility() &&
           NTD->getFormalAccess() == Accessibility::Private) {
         break;
