@@ -124,7 +124,10 @@ library, but are compatible with the Cocoa guidelines.
 
 * We document the complexity of operations using big-O notation.
 
-* Properties are O(1) to read and write.
+* In API design, when deciding between a nullary function and a property for a
+  specific operation, arguments based on performance characteristics and
+  complexity of operations are not considered.  Reading and writing properties
+  can have any complexity.
 
 * We prefer methods and properties to free functions.  Free functions
   are used when there's no obvious `self` ::
