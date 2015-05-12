@@ -467,12 +467,6 @@ public struct Set<T : Hashable> :
     }
   }
 
-  /// The first element obtained when iterating, or `nil` if `self` is
-  /// empty.  Equivalent to `self.generate().next()`
-  public var first: T? {
-    return count > 0 ? self[startIndex] : .None
-  }
-
   /// Returns true if the set is a subset of a finite sequence as a `Set`.
   public func isSubsetOf<
     S: SequenceType where S.Generator.Element == T
@@ -647,6 +641,12 @@ public struct Set<T : Hashable> :
   /// `true` if the set is empty.
   public var isEmpty: Bool {
     return count == 0
+  }
+
+  /// The first element obtained when iterating, or `nil` if `self` is
+  /// empty.  Equivalent to `self.generate().next()`
+  public var first: T? {
+    return count > 0 ? self[startIndex] : .None
   }
 }
 

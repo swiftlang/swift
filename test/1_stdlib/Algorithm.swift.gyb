@@ -2621,7 +2621,7 @@ func callStaticIsEmpty(
 
 % for dispatch in [ 'Static', 'Generic' ]:
 
-SequenceTypeAlgorithms.test("isEmpty/DefaultImplementation/${dispatch}") {
+SequenceTypeAlgorithms.test("isEmpty/CustomImplementation/${dispatch}") {
   if true {
     let s = MinimalForwardCollectionWithCustomIsEmpty(count: 0)
     MinimalForwardCollectionWithCustomIsEmpty.timesIsEmptyWasColled = 0
@@ -2642,17 +2642,52 @@ SequenceTypeAlgorithms.test("isEmpty/DefaultImplementation/${dispatch}") {
 // first
 //===----------------------------------------------------------------------===//
 
-SequenceTypeAlgorithms.test("first") {
+struct MinimalForwardCollectionWithDefaultFirst : CollectionType {
+  init(_ data: [OpaqueValue<Int>]) {
+    self._data = MinimalForwardCollection(data)
+  }
+
+  var startIndex: MinimalForwardIndex {
+    return _data.startIndex
+  }
+
+  var endIndex: MinimalForwardIndex {
+    return _data.endIndex
+  }
+
+  subscript(i: MinimalForwardIndex) -> OpaqueValue<Int> {
+    expectEqual(startIndex, i)
+    return _data[i]
+  }
+
+  var _data: MinimalForwardCollection<OpaqueValue<Int>>
+}
+
+func callStaticFirst(
+  collection: MinimalForwardCollectionWithDefaultFirst
+) -> OpaqueValue<Int>? {
+  return collection.first
+}
+
+func callGenericFirst<C : CollectionType>(collection: C)
+  -> C.Generator.Element? {
+
+  return collection.first
+}
+
+% for dispatch in [ 'Static', 'Generic' ]:
+
+SequenceTypeAlgorithms.test("first/DefaultImplementation/${dispatch}") {
   if true {
-    let s = MinimalForwardCollection<OpaqueValue<Int>>([])
-    expectEmpty(s.first)
+    let s = MinimalForwardCollectionWithDefaultFirst([])
+    expectEmpty(call${dispatch}First(s))
   }
   if true {
-    let s = MinimalForwardCollection<OpaqueValue<Int>>([
+    let s = MinimalForwardCollectionWithDefaultFirst([
       OpaqueValue<Int>(1, identity: 10),
       OpaqueValue<Int>(2, identity: 20)
     ])
-    if let result = s.first {
+    if let result = call${dispatch}First(s) {
       expectEqual(1, result.value)
       expectEqual(10, result.identity)
     } else {
@@ -2660,6 +2695,72 @@ SequenceTypeAlgorithms.test("first") {
     }
   }
 }
+
+% end
+
+struct MinimalForwardCollectionWithCustomFirst : CollectionType {
+  static var timesFirstWasColled: Int = 0
+
+  init(_ data: [OpaqueValue<Int>]) {
+    self._data = MinimalForwardCollection(data)
+  }
+
+  var startIndex: MinimalForwardIndex {
+    expectUnreachable()
+    return _data.startIndex
+  }
+
+  var endIndex: MinimalForwardIndex {
+    expectUnreachable()
+    return _data.endIndex
+  }
+
+  subscript(i: MinimalForwardIndex) -> OpaqueValue<Int> {
+    expectUnreachable()
+    return _data[i]
+  }
+
+  var first: OpaqueValue<Int>? {
+    ++MinimalForwardCollectionWithCustomFirst.timesFirstWasColled
+    return _data.first
+  }
+
+  var _data: MinimalForwardCollection<OpaqueValue<Int>>
+}
+
+func callStaticFirst(
+  collection: MinimalForwardCollectionWithCustomFirst
+) -> OpaqueValue<Int>? {
+  return collection.first
+}
+
+% for dispatch in [ 'Static', 'Generic' ]:
+
+SequenceTypeAlgorithms.test("first/CustomImplementation/${dispatch}") {
+  if true {
+    let s = MinimalForwardCollectionWithCustomFirst([])
+    MinimalForwardCollectionWithCustomFirst.timesFirstWasColled = 0
+    expectEmpty(call${dispatch}First(s))
+    expectEqual(1, MinimalForwardCollectionWithCustomFirst.timesFirstWasColled)
+  }
+  if true {
+    let s = MinimalForwardCollectionWithCustomFirst([
+      OpaqueValue<Int>(1, identity: 10),
+      OpaqueValue<Int>(2, identity: 20)
+    ])
+    MinimalForwardCollectionWithCustomFirst.timesFirstWasColled = 0
+    if let result = call${dispatch}First(s) {
+      expectEqual(1, result.value)
+      expectEqual(10, result.identity)
+    } else {
+      expectUnreachable()
+    }
+
+    expectEqual(1, MinimalForwardCollectionWithCustomFirst.timesFirstWasColled)
+  }
+}
+
+% end
 
 //===----------------------------------------------------------------------===//
 // last

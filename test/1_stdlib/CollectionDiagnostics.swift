@@ -6,6 +6,7 @@ import StdlibUnittest
 // Check that CollectionType._prext_SubSlice is constrained to CollectionType.
 //
 
+// expected-error@+1 {{type 'CollectionWithBadSubSlice' does not conform to protocol '_CollectionDefaultsType'}}
 // expected-error@+1 {{type 'CollectionWithBadSubSlice' does not conform to protocol 'CollectionType'}}
 struct CollectionWithBadSubSlice : CollectionType {
   var startIndex: MinimalForwardIndex {

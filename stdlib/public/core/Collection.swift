@@ -49,6 +49,9 @@ public protocol _CollectionDefaultsType
   // below), but we have no way of expressing it today.
   typealias _Element
   subscript(_i: Index) -> _Element {get}
+
+  /// Returns the first element of `self`, or `nil` if `self` is empty.
+  var first: Generator.Element? { get }
 }
 
 extension _CollectionDefaultsType {
@@ -190,6 +193,13 @@ extension CollectionType {
     // statically know that `self` is a collection, and `lazy(self)`
     // returns an instance of a different type.
     return Array<T>(lazy(self).map(escapableTransform))
+  }
+}
+
+extension CollectionType {
+  /// Returns the first element of `self`, or `nil` if `self` is empty.
+  final public var first: Generator.Element? {
+    return isEmpty ? nil : self[startIndex]
   }
 }
 

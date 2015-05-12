@@ -19,17 +19,6 @@ GElement = "Generator.Element"
 }%
 
 //===----------------------------------------------------------------------===//
-// first
-//===----------------------------------------------------------------------===//
-
-extension CollectionType {
-  /// Returns the first element of `self`, or `nil` if `self` is empty.
-  final public var first: Generator.Element? {
-    return isEmpty ? nil : self[startIndex]
-  }
-}
-
-//===----------------------------------------------------------------------===//
 // last
 //===----------------------------------------------------------------------===//
 
