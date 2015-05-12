@@ -67,6 +67,9 @@ filterForEnumElement(LookupResult foundElements) {
 
   for (ValueDecl *e : foundElements) {
     assert(e);
+    if (e->isInvalid()) {
+      continue;
+    }
 
     if (auto *oe = dyn_cast<EnumElementDecl>(e)) {
       // Ambiguities should be ruled out by parsing.

@@ -95,7 +95,7 @@ private enum Bar<T> {
 
   mutating func value() -> T {
     switch self {
-    case E(let x):
+    case E(let x): // expected-error{{invalid pattern}}
       return x.value
     }
   }

@@ -313,6 +313,16 @@ enum DuplicateMembers6 {
   case Foo // expected-error {{duplicate definition of enum element}}
 }
 
+// Refs to duplicated enum cases shouldn't crash the compiler.
+// rdar://problem/20922401
+func check20922401() -> String {
+  let x: DuplicateMembers1 = .Foo
+  switch x {
+    case .Foo:
+      return "Foo"
+  }
+}
+
 enum PlaygroundRepresentation : UInt8 {
   case Class = 1
   case Struct = 2
