@@ -1159,7 +1159,7 @@ function(add_swift_library name)
       SHARED IS_STDLIB IS_STDLIB_CORE IS_SDK_OVERLAY TARGET_LIBRARY
       API_NOTES_NON_OVERLAY DONT_EMBED_BITCODE)
   parse_arguments(SWIFTLIB
-    "DEPENDS;LINK_LIBRARIES;SWIFT_MODULE_DEPENDS;SWIFT_MODULE_DEPENDS_OSX;SWIFT_MODULE_DEPENDS_IOS_TVOS;FRAMEWORK_DEPENDS;COMPONENT_DEPENDS;FILE_DEPENDS;TARGET_SDKS;C_COMPILE_FLAGS;SWIFT_COMPILE_FLAGS;LINK_FLAGS;PRIVATE_LINK_LIBRARIES;INTERFACE_LINK_LIBRARIES;INSTALL_IN_COMPONENT"
+    "DEPENDS;LINK_LIBRARIES;SWIFT_MODULE_DEPENDS;SWIFT_MODULE_DEPENDS_OSX;SWIFT_MODULE_DEPENDS_IOS_TVOS;FRAMEWORK_DEPENDS;FRAMEWORK_DEPENDS_OSX;FRAMEWORK_DEPENDS_IOS_TVOS;COMPONENT_DEPENDS;FILE_DEPENDS;TARGET_SDKS;C_COMPILE_FLAGS;SWIFT_COMPILE_FLAGS;LINK_FLAGS;PRIVATE_LINK_LIBRARIES;INTERFACE_LINK_LIBRARIES;INSTALL_IN_COMPONENT"
       "${SWIFTLIB_options}"
       ${ARGN})
   set(SWIFTLIB_SOURCES ${SWIFTLIB_DEFAULT_ARGS})
@@ -1246,6 +1246,15 @@ function(add_swift_library name)
               "swift${mod}${VARIANT_SUFFIX}")
         endforeach()
 
+        set(swiftlib_framework_depends_flattened ${SWIFTLIB_FRAMEWORK_DEPENDS})
+        if("${sdk}" STREQUAL "OSX")
+          list(APPEND swiftlib_framework_depends_flattened
+              ${SWIFTLIB_FRAMEWORK_DEPENDS_OSX})
+        elseif("${sdk}" STREQUAL "IOS" OR "${sdk}" STREQUAL "IOS_SIMULATOR" OR "${sdk}" STREQUAL "TVOS" OR "${sdk}" STREQUAL "TVOS_SIMULATOR")
+          list(APPEND swiftlib_framework_depends_flattened
+              ${SWIFTLIB_FRAMEWORK_DEPENDS_IOS_TVOS})
+        endif()
+
         set(swiftlib_private_link_libraries_targets
             ${swiftlib_module_dependency_targets})
         foreach(lib ${SWIFTLIB_PRIVATE_LINK_LIBRARIES})
@@ -1267,7 +1276,7 @@ function(add_swift_library name)
           ARCHITECTURE ${arch}
           DEPENDS ${SWIFTLIB_DEPENDS}
           LINK_LIBRARIES ${swiftlib_link_libraries}
-          FRAMEWORK_DEPENDS ${SWIFTLIB_FRAMEWORK_DEPENDS}
+          FRAMEWORK_DEPENDS ${swiftlib_framework_depends_flattened}
           COMPONENT_DEPENDS ${SWIFTLIB_COMPONENT_DEPENDS}
           FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS} ${swiftlib_module_dependency_targets}
           C_COMPILE_FLAGS ${SWIFTLIB_C_COMPILE_FLAGS}

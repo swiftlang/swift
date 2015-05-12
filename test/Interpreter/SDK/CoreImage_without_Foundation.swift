@@ -1,7 +1,6 @@
 // RUN: %target-run-simple-swift | FileCheck %s
-// REQUIRES: OS=macosx
 
-import QuartzCore
+import CoreImage
 // Do NOT add anything that publicly imports Foundation here!
 
 var v = CIVector(x:7);
