@@ -1057,7 +1057,7 @@ void Driver::buildActions(const ToolChain &TC,
                                              types::TY_LLVM_BC,
                                              previousBuildState));
           Current.reset(new BackendJobAction(Current.release(),
-                                             OI.CompilerOutputType));
+                                             OI.CompilerOutputType, 0));
         } else
           Current.reset(new CompileJobAction(Current.release(),
                                              OI.CompilerOutputType,
@@ -1119,15 +1119,32 @@ void Driver::buildActions(const ToolChain &TC,
       if (HandledHere) {
         // Create a single CompileJobAction and a single BackendJobAction.
         std::unique_ptr<Action> CA(new CompileJobAction(types::TY_LLVM_BC));
+        int InputIndex = 0;
         for (const InputPair &Input : Inputs) {
           types::ID InputType = Input.first;
           const Arg *InputArg = Input.second;
 
           CA->addInput(new InputAction(*InputArg, InputType));
+          if (OI.isMultiThreading()) {
+            // With multi-threading we need a backend job for each output file
+            // of the compilation.
+            auto *BJA = new BackendJobAction(CA.get(), OI.CompilerOutputType,
+                                             InputIndex);
+            // Only the first backend job owns the compilation job (to prevent
+            // multiple de-allocations of the compilation job).
+            BJA->setOwnsInputs(InputIndex == 0);
+            CompileActions.push_back(BJA);
+          }
+          InputIndex++;
         }
-        CA.reset(new BackendJobAction(CA.release(),
-                                      OI.CompilerOutputType));
-        CompileActions.push_back(CA.release());
+        Action *CAReleased = CA.release();
+        if (!OI.isMultiThreading()) {
+          // No multi-threading: the compilation only produces a single output
+          // file.
+          CA.reset(new BackendJobAction(CAReleased,
+                                        OI.CompilerOutputType, 0));
+          CompileActions.push_back(CA.release());
+        }
         break;
       }
     }
@@ -1443,8 +1460,8 @@ static void addAuxiliaryOutput(Compilation &C, CommandOutput &output,
     llvm::SmallString<128> path;
     if (output.getPrimaryOutputType() != types::TY_Nothing)
       path = output.getPrimaryOutputFilenames()[0];
-    else if (!output.getBaseInput().empty())
-      path = llvm::sys::path::stem(output.getBaseInput());
+    else if (!output.getBaseInput(0).empty())
+      path = llvm::sys::path::stem(output.getBaseInput(0));
     else
       path = OI.ModuleName;
 
@@ -1538,20 +1555,23 @@ Job *Driver::buildJobsForAction(Compilation &C, const Action *A,
     BaseInput = IA->getInputArg().getValue();
   } else if (!InputJobs->empty()) {
     // Use the first Job's BaseInput as our BaseInput.
-    BaseInput = InputJobs->front()->getOutput().getBaseInput();
+    BaseInput = InputJobs->front()->getOutput().getBaseInput(JA->getInputIndex());
   }
 
   const TypeToPathMap *OutputMap = nullptr;
-  if (OFM && isa<CompileJobAction>(JA)) {
-    if (OI.CompilerMode == OutputInfo::Mode::SingleCompile) {
-      OutputMap = OFM->getOutputMapForSingleOutput();
-    } else {
+  if (OFM) {
+    if (isa<CompileJobAction>(JA)) {
+      if (OI.CompilerMode == OutputInfo::Mode::SingleCompile) {
+        OutputMap = OFM->getOutputMapForSingleOutput();
+      } else {
+        OutputMap = OFM->getOutputMapForInput(BaseInput);
+      }
+    } else if (isa<BackendJobAction>(JA)) {
       OutputMap = OFM->getOutputMapForInput(BaseInput);
     }
   }
 
-  std::unique_ptr<CommandOutput> Output(new CommandOutput(JA->getType(),
-                                                          BaseInput));
+  std::unique_ptr<CommandOutput> Output(new CommandOutput(JA->getType()));
   llvm::SmallString<128> Buf;
   StringRef OutputFile;
 
@@ -1567,7 +1587,7 @@ Job *Driver::buildJobsForAction(Compilation &C, const Action *A,
       OutputFile = getOutputFilename(C, JA, OI, OMForInput, C.getArgs(),
                                      AtTopLevel, Input, *InputJobs,
                                      Diags, Buf);
-      Output->addPrimaryOutput(OutputFile);
+      Output->addPrimaryOutput(OutputFile, Input);
     };
     // Add an output file for each input action.
     for (Action *A : InputActions) {
@@ -1577,14 +1597,14 @@ Job *Driver::buildJobsForAction(Compilation &C, const Action *A,
     }
     // Add an output file for each input job.
     for (Job *job : *InputJobs) {
-      OutputFunc(job->getOutput().getBaseInput());
+      OutputFunc(job->getOutput().getBaseInput(0));
     }
   } else {
     // The common case: there is a single output file.
     OutputFile = getOutputFilename(C, JA, OI, OutputMap, C.getArgs(),
                                    AtTopLevel, BaseInput, *InputJobs,
                                    Diags, Buf);
-    Output->addPrimaryOutput(OutputFile);
+    Output->addPrimaryOutput(OutputFile, BaseInput);
   }
 
   // Choose the swiftmodule output path.
@@ -1733,8 +1753,8 @@ Job *Driver::buildJobsForAction(Compilation &C, const Action *A,
       llvm::SmallString<128> Path;
       if (Output->getPrimaryOutputType() != types::TY_Nothing)
         Path = Output->getPrimaryOutputFilenames()[0];
-      else if (!Output->getBaseInput().empty())
-        Path = llvm::sys::path::stem(Output->getBaseInput());
+      else if (!Output->getBaseInput(0).empty())
+        Path = llvm::sys::path::stem(Output->getBaseInput(0));
       else
         Path = OI.ModuleName;
 

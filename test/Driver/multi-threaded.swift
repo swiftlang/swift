@@ -6,9 +6,10 @@
 // RUN: %target-swiftc_driver -parseable-output -module-name=ThisModule -wmo -num-threads 4 %S/Inputs/main.swift %s -c 2> %t/parseable-output
 // RUN: cat %t/parseable-output | FileCheck -check-prefix=PARSEABLE %s
 // RUN: env TMPDIR=/tmp %swiftc_driver -driver-print-jobs -module-name=ThisModule -wmo -num-threads 4 %S/Inputs/main.swift %s -o a.out | FileCheck -check-prefix=EXEC %s
-// RUN: echo "{\"%s\": {\"object\": \"%t/multi-threaded.o\"}, \"%S/Inputs/main.swift\": {\"object\": \"%t/main.o\"}}" > %t/ofmo.json
+// RUN: echo "{\"%s\": {\"llvm-bc\": \"multi-threaded.bc\", \"object\": \"%t/multi-threaded.o\"}, \"%S/Inputs/main.swift\": {\"llvm-bc\": \"main.bc\", \"object\": \"%t/main.o\"}}" > %t/ofmo.json
 // RUN: %target-swiftc_driver -module-name=ThisModule -wmo -num-threads 4 %S/Inputs/main.swift %s  -emit-dependencies -output-file-map %t/ofmo.json -c
 // RUN: cat %t/*.d | FileCheck -check-prefix=DEPENDENCIES %s
+// RUN: %target-swiftc_driver -driver-print-jobs -module-name=ThisModule -embed-bitcode -wmo -num-threads 4 %S/Inputs/main.swift %s -output-file-map %t/ofmo.json -c | FileCheck -check-prefix=BITCODE %s
 
 // MODULE: -frontend
 // MODULE-DAG: -num-threads 4
@@ -27,6 +28,14 @@
 // OBJECT-DAG: {{[^ ]*}}/Inputs/main.swift {{[^ ]*}}/multi-threaded.swift 
 // OBJECT-DAG: -o main.o -o multi-threaded.o 
 // OBJECT-NOT: ld
+
+// BITCODE: -frontend
+// BITCODE-DAG: -num-threads 4
+// BITCODE-DAG: {{[^ ]*}}/Inputs/main.swift {{[^ ]*}}/multi-threaded.swift 
+// BITCODE-DAG: -o main.bc -o multi-threaded.bc
+// BITCODE-DAG: -frontend -c -primary-file main.bc {{.*}} -o {{[^ ]*}}main.o
+// BITCODE-DAG: -frontend -c -primary-file multi-threaded.bc {{.*}} -o {{[^ ]*}}multi-threaded.o
+// BITCODE-NOT: ld
 
 // PARSEABLE: "outputs": [
 // PARSEABLE: "path": "main.o"

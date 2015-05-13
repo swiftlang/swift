@@ -112,6 +112,11 @@ public:
     return (A->getKind() >= ActionClass::JobFirst &&
             A->getKind() <= ActionClass::JobLast);
   }
+  
+  // Returns the index of the Input action's output file which is used as
+  // (single) input to this action. Most actions produce only a single output
+  // file, so we return 0 by default.
+  virtual int getInputIndex() const { return 0; }
 };
 
 class CompileJobAction : public JobAction {
@@ -148,12 +153,20 @@ public:
 class BackendJobAction : public JobAction {
 private:
   virtual void anchor();
+  
+  // In case of multi-threaded compilation, the compile-action produces multiple
+  // output bitcode-files. For each bitcode-file a BackendJobAction is created.
+  // This index specifies which of the files to select for the input.
+  int InputIndex;
 public:
-  BackendJobAction(Action *Input, types::ID OutputType)
-      : JobAction(Action::BackendJob, Input, OutputType) {}
+  BackendJobAction(Action *Input, types::ID OutputType, int InputIndex)
+      : JobAction(Action::BackendJob, Input, OutputType),
+        InputIndex(InputIndex) {}
   static bool classof(const Action *A) {
     return A->getKind() == Action::BackendJob;
   }
+  
+  virtual int getInputIndex() const { return InputIndex; }
 };
 
 class REPLJobAction : public JobAction {

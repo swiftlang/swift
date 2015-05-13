@@ -77,18 +77,21 @@ class CommandOutput {
   /// multi-threaded compilation produces multiple output files.
   SmallVector<std::string, 1> PrimaryOutputFilenames;
 
+  /// For each primary output file there is a base input. This is the input file
+  /// from which the output file is derived.
+  SmallVector<StringRef, 1> BaseInputs;
+
   llvm::SmallDenseMap<types::ID, std::string, 4> AdditionalOutputsMap;
 
-  StringRef BaseInput;
-
 public:
-  CommandOutput(types::ID PrimaryOutputType, StringRef BaseInput)
-      : PrimaryOutputType(PrimaryOutputType), BaseInput(BaseInput) { }
+  CommandOutput(types::ID PrimaryOutputType)
+      : PrimaryOutputType(PrimaryOutputType) { }
 
   types::ID getPrimaryOutputType() const { return PrimaryOutputType; }
 
-  void addPrimaryOutput(StringRef FileName) {
+  void addPrimaryOutput(StringRef FileName, StringRef BaseInput) {
     PrimaryOutputFilenames.push_back(FileName);
+    BaseInputs.push_back(BaseInput);
   }
   
   // This returns a std::string instead of a StringRef so that users can rely
@@ -107,7 +110,7 @@ public:
 
   const std::string &getAnyOutputForType(types::ID type) const;
 
-  StringRef getBaseInput() const { return BaseInput; }
+  StringRef getBaseInput(int Index) const { return BaseInputs[Index]; }
 };
 
 class Job {

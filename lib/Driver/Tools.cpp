@@ -303,8 +303,11 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
       assert(Inputs->size() == 1 && "The Swift backend expects one input!");
       Arguments.push_back("-primary-file");
       const Job *Cmd = Inputs->front();
-      Arguments.push_back(
-        Cmd->getOutput().getPrimaryOutputFilename().c_str());
+      
+      // In multi-threaded compilation, the backend job must select the correct
+      // output file of the compilation job.
+      auto OutNames = Cmd->getOutput().getPrimaryOutputFilenames();
+      Arguments.push_back(OutNames[JA.getInputIndex()].c_str());
       break;
     }
     SWIFT_FALLTHROUGH;
