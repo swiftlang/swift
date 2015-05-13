@@ -1451,6 +1451,9 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
       if (BridgedI) {
         CastedValue = SILValue(BridgedI, 0);
       } else {
+        if (!canUseScalarCheckedCastInstructions(SourceType, TargetType))
+          return nullptr;
+
         CastedValue = emitSuccessfulScalarUnconditionalCast(
           Builder, Mod.getSwiftModule(), Loc, Op, LoweredTargetType,
           SourceType, TargetType, Inst);
