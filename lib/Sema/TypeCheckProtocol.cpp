@@ -3239,9 +3239,11 @@ void ConformanceChecker::resolveTypeWitnesses() {
   // If we found a single solution, take it.
   if (solutions.size() == 1) {
     // Record each of the deduced witnesses.
-    for (const auto &typeWitness : solutions.front().TypeWitnesses) {
-      recordTypeWitness(typeWitness.first, typeWitness.second.first, nullptr,
-                        DC, true);
+    auto &typeWitnesses = solutions.front().TypeWitnesses;
+    for (auto assocType : unresolvedAssocTypes) {
+      assert(typeWitnesses.count(assocType) == 1 && "missing witness");
+      recordTypeWitness(assocType, typeWitnesses[assocType].first, nullptr, DC,
+                        true);
     }
 
     return;
