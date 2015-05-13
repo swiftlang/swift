@@ -20,6 +20,7 @@
 
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Availability.h"
+#include "swift/AST/Stmt.h" // for PoundAvailableInfo
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/STLExtras.h"
