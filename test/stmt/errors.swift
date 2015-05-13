@@ -70,3 +70,17 @@ struct seven {
     }
   }
 }
+
+protocol ThrowingProto {
+  func foo() throws
+  static func bar() throws
+}
+
+func testExistential(p : ThrowingProto) throws {
+  try p.foo()
+  try p.dynamicType.bar()
+}
+func testGeneric<P : ThrowingProto>(p : P) throws {
+  try p.foo()
+  try P.bar()
+}
