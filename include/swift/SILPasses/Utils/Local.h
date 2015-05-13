@@ -102,7 +102,7 @@ void clearBlockBody(SILBasicBlock *BB);
 
 /// \brief Get the linkage to be used for specializations of a function with
 /// the given linkage.
-SILLinkage getSpecializedLinkage(SILLinkage L);
+SILLinkage getSpecializedLinkage(SILFunction *F, SILLinkage L);
 
 /// Tries to optimize a given apply instruction if it is a concatenation of
 /// string literals. Returns a new instruction if optimization was possible.

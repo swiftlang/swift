@@ -43,17 +43,12 @@ SILFunction *GenericCloner::initCloned(SILFunction *Orig,
   assert(!Orig->isGlobalInit() && "Global initializer cannot be cloned");
 
   // Create a new empty function.
-  SILFunction *NewF = SILFunction::create(M,
-                                      getSpecializedLinkage(Orig->getLinkage()),
-                                          NewName, FTy, nullptr,
-                                          Orig->getLocation(), Orig->isBare(),
-                                          Orig->isTransparent(),
-                                          Orig->isFragile(), Orig->isThunk(),
-                                          Orig->getClassVisibility(),
-                                          Orig->getInlineStrategy(),
-                                          Orig->getEffectsKind(), Orig,
-                                          Orig->getDebugScope(),
-                                          Orig->getDeclContext());
+  SILFunction *NewF = SILFunction::create(
+      M, getSpecializedLinkage(Orig, Orig->getLinkage()), NewName, FTy, nullptr,
+      Orig->getLocation(), Orig->isBare(), Orig->isTransparent(),
+      Orig->isFragile(), Orig->isThunk(), Orig->getClassVisibility(),
+      Orig->getInlineStrategy(), Orig->getEffectsKind(), Orig,
+      Orig->getDebugScope(), Orig->getDeclContext());
   NewF->setSemanticsAttr(Orig->getSemanticsAttr());
   return NewF;
 }

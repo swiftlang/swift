@@ -270,7 +270,7 @@ TermInst *swift::addArgumentToBranch(SILValue Val, SILBasicBlock *Dest,
   llvm_unreachable("unsupported terminator");
 }
 
-SILLinkage swift::getSpecializedLinkage(SILLinkage L) {
+SILLinkage swift::getSpecializedLinkage(SILFunction *F, SILLinkage L) {
   switch (L) {
   case SILLinkage::Public:
   case SILLinkage::PublicExternal:
@@ -280,7 +280,11 @@ SILLinkage swift::getSpecializedLinkage(SILLinkage L) {
   case SILLinkage::HiddenExternal:
     // Specializations of public or hidden symbols can be shared by all TUs
     // that specialize the definition.
-    return SILLinkage::Shared;
+    // Treat stdlib_binary_only specially. We don't serialize the body of
+    // stdlib_binary_only functions so we can't mark them as Shared (making
+    // their visibility in the dylib hidden).
+    return F->hasSemanticsString("stdlib_binary_only") ? SILLinkage::Public
+                                                       : SILLinkage::Shared;
 
   case SILLinkage::Private:
   case SILLinkage::PrivateExternal:
