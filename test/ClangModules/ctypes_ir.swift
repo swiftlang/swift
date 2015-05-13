@@ -6,7 +6,7 @@ import ctypes
 
 // CHECK-LABEL: define hidden void @_TF9ctypes_ir9testColorFT_T_
 func testColor() {
-  // CHECK: call i32 @_TFVSC5ColorCfMS_FVSs6UInt32S_(i32 1)
+  // CHECK: store i32 1
   var c : Color = green
 }
 

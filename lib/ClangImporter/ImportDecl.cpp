@@ -1434,6 +1434,10 @@ namespace {
       constructor->setInitializerType(initFnTy);
       constructor->setAccessibility(Accessibility::Public);
 
+      // Mark the constructor transparent so that we inline it away completely.
+      constructor->getAttrs().add(
+                              new (context) TransparentAttr(/*implicit*/ true));
+
       // Use a builtin to produce a zero initializer, and assign it to self.
       constructor->setBodySynthesizer([](AbstractFunctionDecl *constructor) {
         ASTContext &context = constructor->getASTContext();
@@ -1532,6 +1536,10 @@ namespace {
       constructor->setType(allocFnTy);
       constructor->setInitializerType(initFnTy);
       constructor->setAccessibility(Accessibility::Public);
+
+      // Make the constructor transparent so we inline it away completely.
+      constructor->getAttrs().add(
+                              new (context) TransparentAttr(/*implicit*/ true));
 
       if (wantBody) {
         // Assign all of the member variables appropriately.
