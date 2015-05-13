@@ -91,7 +91,8 @@ public:
     ++copy;
     return copy;
   }
-  
+
+  SILSuccessor *getSuccessorRef() const { return Cur; }
   SILBasicBlock *operator*();
 };
   

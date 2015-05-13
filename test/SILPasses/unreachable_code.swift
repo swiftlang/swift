@@ -335,6 +335,18 @@ public func testFailingCast(s:String) -> Int {
    return s as! Int // expected-warning {{cast from 'String' to unrelated type 'Int' always fails}}
 }
 
+enum MyError : ErrorType { case A }
+
+@noreturn func raise() throws { throw MyError.A }
+
+func test_raise_1() throws -> Int {
+  try raise()
+}
+
+func test_raise_2() throws -> Int {
+  try raise() // expected-note {{a call to a noreturn function}}
+  try raise() // expected-warning {{will never be executed}}
+}
 
 while true {
 }

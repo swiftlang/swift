@@ -368,3 +368,60 @@ bb0:
   %z = builtin "unreachable"() : $()
   unreachable
 }
+
+sil @throwing_noreturn : $@convention(thin) @noreturn () -> @error ErrorType
+
+// CHECK-LABEL:sil @try_apply_1
+// CHECK:    bb1(
+// CHECK-NEXT: unreachable
+// CHECK:    bb2(
+// CHECK-NEXT: throw
+sil @try_apply_1 : $@convention(thin) () -> @error ErrorType {
+bb0:
+  %0 = function_ref @throwing_noreturn : $@convention(thin) @noreturn () -> @error ErrorType
+  try_apply %0() : $@convention(thin) @noreturn () -> @error ErrorType, normal bb1, error bb2
+bb1(%1 : $()):
+  %2 = tuple ()
+  return %2 : $()
+bb2(%3 : $ErrorType):
+  throw %3 : $ErrorType
+}
+
+// CHECK-LABEL:sil @try_apply_2
+// CHECK:    bb3(
+// CHECK-NEXT: unreachable
+// CHECK:    bb4(
+// CHECK-NEXT: throw
+sil @try_apply_2 : $@convention(thin) (Builtin.Int1) -> @error ErrorType {
+bb0(%0 : $Builtin.Int1):
+  %1 = function_ref @throwing_noreturn : $@convention(thin) @noreturn () -> @error ErrorType
+  cond_br %0, bb1, bb2
+bb1:
+  try_apply %1() : $@convention(thin) @noreturn () -> @error ErrorType, normal bb3, error bb4
+bb2:
+  try_apply %1() : $@convention(thin) @noreturn () -> @error ErrorType, normal bb3, error bb4
+bb3(%2 : $()):
+  %3 = tuple ()
+  return %3 : $()
+bb4(%4 : $ErrorType):
+  throw %4 : $ErrorType
+}
+
+// This should arguably be ill-formed.
+// CHECK-LABEL:sil @try_apply_3
+// CHECK:      br bb1
+// CHECK:    bb1(
+// CHECK-NOT:  unreachable
+// CHECK:      try_apply
+// CHECK:    bb2(
+// CHECK-NEXT: throw
+sil @try_apply_3 : $@convention(thin) () -> @error ErrorType {
+bb0:
+  %0 = tuple ()
+  br bb1(%0 : $())
+bb1(%1 : $()):
+  %2 = function_ref @throwing_noreturn : $@convention(thin) @noreturn () -> @error ErrorType
+  try_apply %2() : $@convention(thin) @noreturn () -> @error ErrorType, normal bb1, error bb2
+bb2(%3 : $ErrorType):
+  throw %3 : $ErrorType
+}

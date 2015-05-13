@@ -3717,6 +3717,15 @@ public:
     return DestBBs;
   }
 
+  bool isNormalSuccessorRef(SILSuccessor *successor) const {
+    assert(successor == &DestBBs[0] || successor == &DestBBs[1]);
+    return successor == &DestBBs[0];
+  }
+  bool isErrorSuccessorRef(SILSuccessor *successor) const {
+    assert(successor == &DestBBs[0] || successor == &DestBBs[1]);
+    return successor == &DestBBs[1];
+  }  
+
   SILBasicBlock *getNormalBB() { return DestBBs[NormalIdx]; }
   const SILBasicBlock *getNormalBB() const { return DestBBs[NormalIdx]; }
   SILBasicBlock *getErrorBB() { return DestBBs[ErrorIdx]; }

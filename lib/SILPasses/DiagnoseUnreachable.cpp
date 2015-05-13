@@ -407,8 +407,7 @@ static void setOutsideBlockUsesToUndef(SILInstruction *I) {
         Use->set(SILUndef::get(Use->get().getType(), Mod));
 }
 
-static SILInstruction *getAsCallToNoReturn(SILInstruction *I,
-                                           SILBasicBlock &BB) {
+static SILInstruction *getAsCallToNoReturn(SILInstruction *I) {
   if (auto *AI = dyn_cast<ApplyInst>(I))
     if (AI->getOrigCalleeType()->isNoReturn())
       return AI;
@@ -425,6 +424,35 @@ static SILInstruction *getAsCallToNoReturn(SILInstruction *I,
   return nullptr;
 }
 
+static SILInstruction *getPrecedingCallToNoReturn(SILBasicBlock &BB) {
+  // All the predecessors must satisfy this condition; pick the first
+  // as a representative.  SILGen doesn't actually re-use blocks for
+  // the normal edge, but it's good to be prepared.
+  SILInstruction *first = nullptr;
+  for (auto i = BB.pred_begin(), e = BB.pred_end(); i != e; ++i) {
+    SILBasicBlock *predBB = *i;
+
+    // As a precaution, bail out if we have a self-loop.  It's not
+    // clear what transformations (if any) on naive SILGen output
+    // would ever produce that, but still, don't do it.  It's probably
+    // only possible in code that's already otherwise provable to be
+    // unreachable.
+    if (predBB == &BB) return nullptr;
+
+    // The predecessor must be the normal edge from a try_apply
+    // that invokes a noreturn function.
+    if (auto TAI = dyn_cast<TryApplyInst>((*i)->getTerminator())) {
+      if (TAI->getOrigCalleeType()->isNoReturn() &&
+          TAI->isNormalSuccessorRef(i.getSuccessorRef())) {
+        if (!first) first = TAI;
+        continue;
+      }
+    }
+    return nullptr;
+  }
+  return first;
+}
+
 static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB,
                                      UnreachableUserCodeReportingState *State) {
   auto I = BB.begin(), E = BB.end();
@@ -433,6 +461,10 @@ static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB,
 
   // Collection of all instructions that should be deleted.
   llvm::SmallVector<SILInstruction*, 32> ToBeDeleted;
+
+  // If all of the predecessor blocks end in a try_apply to a noreturn
+  // function, the entire block is dead.
+  NoReturnCall = getPrecedingCallToNoReturn(BB);
 
   // Does this block contain a call to a noreturn function?
   while (I != E) {
@@ -476,7 +508,7 @@ static bool simplifyBlocksWithCallsToNoReturn(SILBasicBlock &BB,
 
     // Check if this instruction is the first call to noreturn in this block.
     if (!NoReturnCall) {
-      NoReturnCall = getAsCallToNoReturn(CurrentInst, BB);
+      NoReturnCall = getAsCallToNoReturn(CurrentInst);
     }
   }
 
