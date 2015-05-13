@@ -28,6 +28,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
 #include "swift/ABI/MetadataValues.h"
+#include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/GlobalVariable.h"
@@ -936,6 +937,82 @@ static llvm::Value *emitDirectTypeMetadataRef(IRGenFunction &IGF,
   return EmitTypeMetadataRef(IGF).visit(type);
 }
 
+static Address emitAddressOfSuperclassRefInClassMetadata(IRGenFunction &IGF,
+                                                  llvm::Value *metadata) {
+  // The superclass field in a class type is the first field past the isa.
+  unsigned index = 1;
+
+  Address addr(metadata, IGF.IGM.getPointerAlignment());
+  addr = IGF.Builder.CreateBitCast(addr,
+                                   IGF.IGM.TypeMetadataPtrTy->getPointerTo());
+  return IGF.Builder.CreateConstArrayGEP(addr, index, IGF.IGM.getPointerSize());
+}
+
+static void emitInitializeSuperclassOfMetaclass(IRGenFunction &IGF,
+                                                llvm::Value *metaclass,
+                                                llvm::Value *superMetadata) {
+  assert(IGF.IGM.ObjCInterop && "metaclasses only matter for ObjC interop");
+  
+  // The superclass of the metaclass is the metaclass of the superclass.
+
+  // Read the superclass's metaclass.
+  llvm::Value *superMetaClass = 
+      emitLoadOfObjCHeapMetadataRef(IGF, superMetadata);
+  superMetaClass = IGF.Builder.CreateBitCast(superMetaClass, 
+                                             IGF.IGM.TypeMetadataPtrTy);
+
+  // Write to the new metaclass's superclass field.
+  Address metaSuperField
+    = emitAddressOfSuperclassRefInClassMetadata(IGF, metaclass);
+
+  IGF.Builder.CreateStore(superMetaClass, metaSuperField);
+}
+
+static llvm::Value *emitCallToTypeMetadataAccessFunction(IRGenFunction &IGF,
+                                                  CanType type,
+                                                  ForDefinition_t shouldDefine);
+
+/// Emit runtime initialization that must occur before a type metadata access.
+///
+/// This initialization must be dependency-ordered-before any loads from
+/// the initialized metadata pointer.
+static void emitDirectTypeMetadataInitialization(IRGenFunction &IGF,
+                                                 CanType type) {
+  // Currently only concrete subclasses of generic bases need this.
+  auto classDecl = type->getClassOrBoundGenericClass();
+  if (!classDecl)
+    return;
+  if (classDecl->isGenericContext())
+    return;
+  auto superclass = type->getSuperclass(nullptr);
+  if (!superclass)
+    return;
+  
+  // If any ancestors are generic, we need to trigger the superclass's
+  // initialization.
+  auto ancestor = superclass;
+  while (ancestor) {
+    if (ancestor->getClassOrBoundGenericClass()->isGenericContext())
+      goto initialize_super;
+    
+    ancestor = ancestor->getSuperclass(nullptr);
+  }
+  // No generic ancestors.
+  return;
+
+initialize_super:
+  auto classMetadata = IGF.IGM.getAddrOfTypeMetadata(type, /*indirect*/false,
+                                                     /*pattern*/ false);
+  // Get the superclass metadata.
+  auto superMetadata = IGF.emitTypeMetadataRef(superclass->getCanonicalType());
+  
+  // Ask the runtime to initialize the superclass of the metaclass.
+  // This function will ensure the initialization is dependency-ordered-before
+  // any loads from the base class metadata.
+  auto initFn = IGF.IGM.getInitializeSuperclassFn();
+  IGF.Builder.CreateCall2(initFn, classMetadata, superMetadata);
+}
+
 /// Get or create an accessor function to the given non-dependent type.
 static llvm::Function *getTypeMetadataAccessFunction(IRGenModule &IGM,
                                                      CanType type,
@@ -1000,6 +1077,7 @@ static llvm::Function *getTypeMetadataAccessFunction(IRGenModule &IGM,
 
   // If the load yielded null, emit the type metadata.
   IGF.Builder.emitBlock(isNullBB);
+  emitDirectTypeMetadataInitialization(IGF, type);
   llvm::Value *directResult = emitDirectTypeMetadataRef(IGF, type);
 
   // Store it back to the cache variable.  The direct metadata lookup is
@@ -2493,7 +2571,8 @@ namespace {
       ClassObjectExtents = getSizeOfMetadata(IGM, Target);
     }
 
-
+    bool HasRuntimeBase = false;
+    bool HasRuntimeParent = false;
   public:
     /// The 'metadata flags' field in a class is actually a pointer to
     /// the metaclass object for the class.
@@ -2555,7 +2634,8 @@ namespace {
       // to apply substitutions through.
       Type parentType =
         forClass->getDeclContext()->getDeclaredTypeInContext();
-      addReferenceToType(parentType->getCanonicalType());
+      if (!addReferenceToType(parentType->getCanonicalType()))
+        HasRuntimeParent = true;
     }
 
     void addSuperClass() {
@@ -2579,16 +2659,32 @@ namespace {
       Type superclassTy
         = ArchetypeBuilder::mapTypeIntoContext(Target,
                                                Target->getSuperclass());
-      addReferenceToType(superclassTy->getCanonicalType());
+      // If the class has any generic heritage, wait until runtime to set up
+      // the superclass reference.
+      auto ancestorTy = superclassTy;
+      while (ancestorTy) {
+        if (ancestorTy->getClassOrBoundGenericClass()->isGenericContext()) {
+          // Add a nil placeholder and continue.
+          addWord(llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy));
+          HasRuntimeBase = true;
+          return;
+        }
+        ancestorTy = ancestorTy->getSuperclass(nullptr);
+      }
+      
+      if (!addReferenceToType(superclassTy->getCanonicalType()))
+        HasRuntimeBase = true;
     }
     
-    void addReferenceToType(CanType type) {
+    bool addReferenceToType(CanType type) {
       if (llvm::Constant *metadata
             = tryEmitConstantHeapMetadataRef(IGM, type)) {
         addWord(metadata);
+        return true;
       } else {
         // Leave a null pointer placeholder to be filled at runtime
         addWord(llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy));
+        return false;
       }
     }
 
@@ -2716,6 +2812,10 @@ namespace {
                                 ProtocolDecl *protocol, ClassDecl *forClass) {
       addWord(llvm::Constant::getNullValue(IGM.WitnessTablePtrTy));
     }
+    
+    bool hasRuntimeBase() const {
+      return HasRuntimeBase;
+    }
   };
 
   class ClassMetadataBuilder :
@@ -2730,18 +2830,6 @@ namespace {
                                       IGM.FullHeapMetadataStructTy);
     }
   };
-  
-  Address emitAddressOfSuperclassRefInClassMetadata(IRGenFunction &IGF,
-                                                    ClassDecl *theClass,
-                                                    llvm::Value *metadata) {
-    // The superclass field in a class type is the first field past the isa.
-    unsigned index = 1;
-
-    Address addr(metadata, IGF.IGM.getPointerAlignment());
-    addr = IGF.Builder.CreateBitCast(addr,
-                                     IGF.IGM.TypeMetadataPtrTy->getPointerTo());
-    return IGF.Builder.CreateConstArrayGEP(addr, index, IGF.IGM.getPointerSize());
-  }
   
   Address emitAddressOfFieldOffsetVectorInClassMetadata(IRGenFunction &IGF,
                                                         ClassDecl *theClass,
@@ -3054,7 +3142,7 @@ namespace {
       llvm::Value *superMetadata;
       if (Target->hasSuperclass()) {
         Address superField
-          = emitAddressOfSuperclassRefInClassMetadata(IGF, Target, metadata);
+          = emitAddressOfSuperclassRefInClassMetadata(IGF, metadata);
         superMetadata = IGF.Builder.CreateLoad(superField);
       } else {
         assert(!HasDependentSuperclass
@@ -3066,19 +3154,7 @@ namespace {
       // If the superclass is generic, we need to populate the
       // superclass field of the metaclass.
       if (IGF.IGM.ObjCInterop && HasDependentSuperclass) {
-        // The superclass of the metaclass is the metaclass of the superclass.
-
-        // Read the superclass's metaclass.
-        llvm::Value *superMetaClass = 
-            emitLoadOfObjCHeapMetadataRef(IGF, superMetadata);
-        superMetaClass = IGF.Builder.CreateBitCast(superMetaClass, 
-                                                   IGF.IGM.TypeMetadataPtrTy);
-
-        // Write to the new metaclass's superclass field.
-        Address metaSuperField
-          = emitAddressOfSuperclassRefInClassMetadata(IGF, Target, metaclass);
-
-        IGF.Builder.CreateStore(superMetaClass, metaSuperField);
+        emitInitializeSuperclassOfMetaclass(IGF, metaclass, superMetadata);
       }
 
       // If we have any ancestor generic parameters or field offset vectors,
@@ -3218,16 +3294,19 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
   // TODO: classes nested within generic types
   llvm::Constant *init;
   bool isPattern;
+  bool hasRuntimeBase;
   if (auto *generics = classDecl->getGenericParamsOfContext()) {
     GenericClassMetadataBuilder builder(IGM, classDecl, layout, *generics);
     builder.layout();
     init = builder.getInit();
     isPattern = true;
+    hasRuntimeBase = builder.hasRuntimeBase();
   } else {
     ClassMetadataBuilder builder(IGM, classDecl, layout);
     builder.layout();
     init = builder.getInit();
     isPattern = false;
+    hasRuntimeBase = builder.hasRuntimeBase();
 
     // Force the type metadata access function into existence.
     (void) getTypeMetadataAccessFunction(IGM, declaredType, ForDefinition);
@@ -3249,8 +3328,7 @@ void irgen::emitClassMetadata(IRGenModule &IGM, ClassDecl *classDecl,
   var->setConstant(false);
 
   // Add non-generic classes to the ObjC class list.
-  if (IGM.ObjCInterop && !isPattern && !isIndirect) {
-    
+  if (IGM.ObjCInterop && !isPattern && !isIndirect && !hasRuntimeBase) {    
     // We can't just use 'var' here because it's unadjusted.  Instead
     // of re-implementing the adjustment logic, just pull the metadata
     // pointer again.

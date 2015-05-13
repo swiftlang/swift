@@ -216,7 +216,7 @@ class Foo<T> {
   typealias Nested = T
 }
 
-class Bar : Foo<Int> { // expected-error {{classes derived from generic classes must also be generic}}
+class Bar : Foo<Int> {
   func f(x: Int) -> Nested {
     return x
   }

@@ -36,6 +36,10 @@
 #include "Debug.h"
 #include "Private.h"
 
+#if SWIFT_OBJC_INTEROP
+#include <objc/runtime.h>
+#endif
+
 using namespace swift;
 using namespace metadataimpl;
 
@@ -2438,6 +2442,65 @@ void _swift_debug_verifyTypeLayoutAttribute(Metadata *type,
   }
 }
 #endif
+
+extern "C"
+void swift_initializeSuperclass(ClassMetadata *theClass,
+                                const ClassMetadata *theSuperclass) {
+  // We need a lock in order to ensure the class initialization and ObjC
+  // registration are atomic.
+  // TODO: A global lock for this is lame.
+  // TODO: A lock is also totally unnecessary for the non-objc runtime.
+  //       Without ObjC registration, a release store of the superclass
+  //       reference should be enough to dependency-order the other
+  //       initialization steps.
+  static pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+  
+  pthread_mutex_lock(&mutex);
+  
+  // Bail out if this already happened while we were waiting.
+  if (theClass->SuperClass) {
+    pthread_mutex_unlock(&mutex);
+    return;
+  }
+  
+  // Put the superclass reference in the base class.
+  theClass->SuperClass = theSuperclass;
+  
+  // If any ancestors had generic parameters, inherit them.
+  auto ancestor = theSuperclass;
+  auto *classWords = reinterpret_cast<uintptr_t *>(theClass);
+  auto *superWords = reinterpret_cast<const uintptr_t *>(theSuperclass);
+  while (ancestor && ancestor->isTypeMetadata()) {
+    auto description = ancestor->getDescription();
+    auto &genericParams = description->GenericParams;
+    if (genericParams.hasGenericParams()) {
+      unsigned numParamWords = 0;
+      for (unsigned i = 0; i < genericParams.NumParams; ++i) {
+        // 1 word for the type metadata, and 1 for every protocol witness
+        numParamWords +=
+          1 + genericParams.Parameters[i].NumWitnessTables;
+      }
+      memcpy(classWords + genericParams.Offset,
+             superWords + genericParams.Offset,
+             numParamWords * sizeof(uintptr_t));
+    }
+    ancestor = ancestor->SuperClass;
+  }
+  
+#if SWIFT_OBJC_INTEROP
+  // Set up the superclass of the metaclass, which is the metaclass of the
+  // superclass.
+  auto theMetaclass = (ClassMetadata *)object_getClass((id)theClass);
+  auto theSuperMetaclass
+    = (const ClassMetadata *)object_getClass((id)theSuperclass);
+  theMetaclass->SuperClass = theSuperMetaclass;
+  
+  // Register the class pair with the ObjC runtime.
+  swift_instantiateObjCClass(theClass);
+#endif
+  
+  pthread_mutex_unlock(&mutex);
+}
 
 namespace llvm { namespace hashing { namespace detail {
   // An extern variable expected by LLVM's hashing templates. We don't link any

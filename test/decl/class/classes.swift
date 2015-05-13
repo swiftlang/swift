@@ -51,7 +51,7 @@ class C<T> {
   init() { }
   func f(v: T) -> T { return v }
 }
-class D : C<Int> { // expected-error{{classes derived from generic classes must also be generic}}
+class D : C<Int> {
   override init() { super.init() }
   override func f(v: Int) -> Int { return v+1 }
 }
@@ -63,7 +63,7 @@ func f2() {
 class E<T> {
   func f(v: T) -> T { return v }
 }
-class F : E<Int> {} // expected-error{{classes derived from generic classes must also be generic}}
+class F : E<Int> {}
 class G : F {
     override func f(v: Int) -> Int { return v+1 }
 }

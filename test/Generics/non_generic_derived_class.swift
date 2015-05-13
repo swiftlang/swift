@@ -6,6 +6,6 @@ class Base<T> {
   }
 }
 
-class Derived : Base<Int> {} // expected-error{{classes derived from generic classes must also be generic}}
+class Derived : Base<Int> {}
 
 var a = Derived.f(42)

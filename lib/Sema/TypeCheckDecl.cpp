@@ -3552,16 +3552,6 @@ public:
       }
 
       checkAccessibility(TC, CD);
-
-      // Check for inconsistencies between the initializers of our
-      // superclass and our own initializers.
-      if (auto superclassTy = CD->getSuperclass()) {
-        // Verify that if the super class is generic, the derived class is as
-        // well.
-        if (superclassTy->getAs<BoundGenericClassType>() &&
-            !CD->getDeclaredTypeInContext()->getAs<BoundGenericClassType>())
-          TC.diagnose(CD, diag::non_generic_class_with_generic_superclass);
-      }
     }
     if (!(IsFirstPass || CD->isInvalid())) {
       checkExplicitConformance(CD, CD->getDeclaredTypeInContext());
