@@ -127,44 +127,52 @@ extension SetAlgebraType {
   /// Remove all elements of `other` from `self`.
   ///
   /// - Equivalent to replacing `self` with `self.subtract(other)`.
-  final mutating func subtractInPlace(other: Self) {
+  final
+  mutating func subtractInPlace(other: Self) {
     self.intersectInPlace(self.exclusiveOr(other))
   }
 
   /// Return true iff every element of `self` is contained in `other`.
-  final func isSubsetOf(other: Self) -> Bool {
+  final
+  func isSubsetOf(other: Self) -> Bool {
     return self.intersect(other) == self
   }
 
   /// Return true iff every element of `other` is contained in `self`.
-  final func isSupersetOf(other: Self) -> Bool {
+  final
+  func isSupersetOf(other: Self) -> Bool {
     return other.isSubsetOf(self)
   }
 
   /// Return true iff `self.intersect(other).isEmpty`.
-  final func isDisjointWith(other: Self) -> Bool {
+  final
+  func isDisjointWith(other: Self) -> Bool {
     return self.intersect(other).isEmpty
   }
 
   /// Return true iff `self.intersect(other).isEmpty`.
-  final func subtract(other: Self) -> Self {
+  final
+  func subtract(other: Self) -> Self {
     return self.intersect(self.exclusiveOr(other))
   }
 
   /// Return true iff `self.contains(e)` is `false` for all `e`.
-  final var isEmpty: Bool {
+  final
+  var isEmpty: Bool {
     return self == Self()
   }
 
   /// Return true iff every element of `other` is contained in `self`
   /// and `self` contains an element that is not contained in `other`.
-  final func isStrictSupersetOf(other: Self) -> Bool {
+  final
+  func isStrictSupersetOf(other: Self) -> Bool {
     return self.isSupersetOf(other) && self != other
   }
 
   /// Return true iff every element of `self` is contained in `other`
   /// and `other` contains an element that is not contained in `self`.
-  final func isStrictSubsetOf(other: Self) -> Bool {
+  final
+  func isStrictSubsetOf(other: Self) -> Bool {
     return other.isStrictSupersetOf(self)
   }
 
