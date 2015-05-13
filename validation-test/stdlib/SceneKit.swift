@@ -2,6 +2,8 @@
 
 // REQUIRES: objc_interop
 
+// REQUIRES: rdar20738778
+
 import StdlibUnittest
 import SceneKit
 
