@@ -480,6 +480,11 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
   for (AbstractFunctionDecl *FD : TC.definedFunctions) {
     TC.checkFunctionErrorHandling(FD);
   }
+  for (auto decl : TC.Context.ExternalDefinitions) {
+    if (auto fn = dyn_cast<AbstractFunctionDecl>(decl)) {
+      TC.checkFunctionErrorHandling(fn);
+    }
+  }
 }
 
 void swift::typeCheckExternalDefinitions(SourceFile &SF) {

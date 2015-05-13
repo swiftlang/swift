@@ -793,6 +793,9 @@ public:
     /// The initializer for a global variable.
     GlobalVarInitializer,
 
+    /// The initializer for an enum element.
+    EnumElementInitializer,
+
     /// The pattern of a catch.
     CatchPattern,
 
@@ -852,6 +855,10 @@ public:
     } else {
       return Context(Kind::GlobalVarInitializer);
     }
+  }
+
+  static Context forEnumElementInitializer(EnumElementDecl *elt) {
+    return Context(Kind::EnumElementInitializer);
   }
 
   static Context forClosure(AbstractClosureExpr *E) {
@@ -1000,6 +1007,10 @@ public:
                           diag::tryless_throwing_call_in_nonexhaustive_catch);
       return;
 
+    case Kind::EnumElementInitializer:
+      diagnoseThrowInIllegalContext(TC, E, "an enum case raw value");
+      return;
+
     case Kind::GlobalVarInitializer:
       diagnoseThrowInIllegalContext(TC, E, "a global variable initializer");
       return;
@@ -1040,6 +1051,7 @@ public:
       return;
 
     case Kind::NonThrowingAutoClosure:
+    case Kind::EnumElementInitializer:
     case Kind::GlobalVarInitializer:
     case Kind::IVarInitializer:
     case Kind::DefaultArgument:
@@ -1218,10 +1230,19 @@ private:
   }
 
   ShouldRecurse_t checkApply(ApplyExpr *E) {
+    // HACK: implicitly-generated functions can get queued multiple
+    // times in definedFunctions, so be sure to be idempotent.
+    // Fortunately, such bodies shouldn't have 'try' contexts.
+    if (E->isThrowsSet()) return ShouldRecurse;
+
     // An apply expression is a potential throw site if the function throws.
     // But if the expression didn't type-check, suppress diagnostics.
-    checkThrowSite(E, /*requiresTry*/ true,
-                   Classifier.classifyApply(E));
+    auto classification = Classifier.classifyApply(E);
+
+    E->setThrows(classification.getResult() == ThrowingKind::RethrowingOnly ||
+                 classification.getResult() == ThrowingKind::Throws);
+
+    checkThrowSite(E, /*requiresTry*/ true, classification);
     return ShouldRecurse;
   }
 
@@ -1320,4 +1341,19 @@ void TypeChecker::checkInitializerErrorHandling(Initializer *initCtx,
                                                 Expr *init) {
   CheckErrorCoverage checker(*this, Context::forInitializer(initCtx));
   init->walk(checker);
+}
+
+/// Check the correctness of error handling within the given enum
+/// element's raw value expression.
+///
+/// The syntactic restrictions on such expressions should make it
+/// impossible for errors to ever arise, but checking them anyway (1)
+/// ensures correctness if those restrictions are ever loosened,
+/// perhaps accidentally, and (2) allows the verifier to assert that
+/// all calls have been checked.
+void TypeChecker::checkEnumElementErrorHandling(EnumElementDecl *elt) {
+  if (auto init = elt->getTypeCheckedRawValueExpr()) {
+    CheckErrorCoverage checker(*this, Context::forEnumElementInitializer(elt));
+    init->walk(checker);
+  }
 }

@@ -1496,6 +1496,7 @@ public:
   void checkTopLevelErrorHandling(TopLevelCodeDecl *D);
   void checkFunctionErrorHandling(AbstractFunctionDecl *D);
   void checkInitializerErrorHandling(Initializer *I, Expr *E);
+  void checkEnumElementErrorHandling(EnumElementDecl *D);
 
   void addExprForDiagnosis(Expr *E) {
     DiagnosedExprs.insert(E);

@@ -2672,7 +2672,9 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
     }
     prevValue = elt->getRawValueExpr();
     assert(prevValue && "continued without setting raw value of enum case");
-    
+
+    TC.checkEnumElementErrorHandling(elt);
+
     // Check that the raw value is unique.
     RawValueKey key(elt->getRawValueExpr());
     RawValueSource source{elt, lastExplicitValueElt};
@@ -5252,6 +5254,7 @@ public:
           if (!TC.typeCheckExpression(typeCheckedExpr, ED, rawTy, Type(),
                                       /*inExpression=*/false)) {
             EED->setTypeCheckedRawValueExpr(typeCheckedExpr);
+            TC.checkEnumElementErrorHandling(EED);
           }
         } else {
           // Wait until the second pass, when all the raw value expressions
@@ -6849,6 +6852,7 @@ void TypeChecker::addImplicitEnumConformances(EnumDecl *ED) {
     bool error = typeCheckExpression(typeChecked, ED, rawTy, Type(), false);
     assert(!error); (void)error;
     elt->setTypeCheckedRawValueExpr(typeChecked);
+    checkEnumElementErrorHandling(elt);
   }
   
   // Type-check the protocol conformances of the enum decl to instantiate its

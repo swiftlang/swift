@@ -273,6 +273,15 @@ class alignas(8) Expr {
   };
   enum { NumTupleShuffleExprBits = NumImplicitConversionExprBits + 1 };
 
+  class ApplyExprBitfields {
+    friend class ApplyExpr;
+    unsigned : NumExprBits;
+    unsigned ThrowsIsSet : 1;
+    unsigned Throws : 1;
+  };
+  enum { NumApplyExprBits = NumExprBits + 2 };
+  static_assert(NumApplyExprBits <= 32, "fits in an unsigned");
+
   enum { NumCheckedCastKindBits = 4 };
   class CheckedCastExprBitfields {
     friend class CheckedCastExpr;
@@ -310,6 +319,7 @@ protected:
     AbstractClosureExprBitfields AbstractClosureExprBits;
     ClosureExprBitfields ClosureExprBits;
     BindOptionalExprBitfields BindOptionalExprBits;
+    ApplyExprBitfields ApplyExprBits;
     CheckedCastExprBitfields CheckedCastExprBits;
     CollectionUpcastConversionExprBitfields CollectionUpcastConversionExprBits;
     TupleShuffleExprBitfields TupleShuffleExprBits;
@@ -3125,6 +3135,7 @@ protected:
   ApplyExpr(ExprKind Kind, Expr *Fn, Expr *Arg, bool Implicit, Type Ty = Type())
     : Expr(Kind, Implicit, Ty), Fn(Fn), ArgAndIsSuper(Arg, false) {
     assert(classof((Expr*)this) && "ApplyExpr::classof out of date");
+    ApplyExprBits.ThrowsIsSet = false;
   }
 
 public:
@@ -3141,6 +3152,26 @@ public:
   bool isSuper() const { return ArgAndIsSuper.getInt(); }
   void setIsSuper(bool super) {
     ArgAndIsSuper = {ArgAndIsSuper.getPointer(), super};
+  }
+
+  /// Has the type-checker set the 'throws' bit yet?
+  ///
+  /// In general, this should only be used for debugging purposes.
+  bool isThrowsSet() const { return ApplyExprBits.ThrowsIsSet; }
+
+  /// Does this application throw?  This is only meaningful after
+  /// complete type-checking.
+  ///
+  /// If true, the function expression must have a throwing function
+  /// type.  The converse is not true because of 'rethrows' functions.
+  bool throws() const {
+    assert(ApplyExprBits.ThrowsIsSet);
+    return ApplyExprBits.Throws;
+  }
+  void setThrows(bool throws) {
+    assert(!ApplyExprBits.ThrowsIsSet);
+    ApplyExprBits.ThrowsIsSet = true;
+    ApplyExprBits.Throws = throws;
   }
 
   ValueDecl *getCalledValue() const;

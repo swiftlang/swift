@@ -27,6 +27,7 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/CodeCompletionTypeChecking.h"
 #include "swift/Subsystems.h"
+#include "TypeChecker.h"
 
 #include <forward_list>
 #include <random>
@@ -831,10 +832,12 @@ void swift::performPlaygroundTransform(SourceFile &SF,
       if (AbstractFunctionDecl *FD = llvm::dyn_cast<AbstractFunctionDecl>(D)) {
         if (!FD->isImplicit()) {
           if (BraceStmt *Body = FD->getBody()) {
-            Instrumenter I(FD->getASTContext(), FD, RNG, HighPerformance);
+            ASTContext &ctx = FD->getASTContext();
+            Instrumenter I(ctx, FD, RNG, HighPerformance);
             BraceStmt *NewBody = I.transformBraceStmt(Body);
             if (NewBody != Body) {
               FD->setBody(NewBody);
+              TypeChecker(ctx).checkFunctionErrorHandling(FD);
             }
             return false;
           }
@@ -842,10 +845,12 @@ void swift::performPlaygroundTransform(SourceFile &SF,
       } else if (TopLevelCodeDecl *TLCD = llvm::dyn_cast<TopLevelCodeDecl>(D)) {
         if (!TLCD->isImplicit()) {
           if (BraceStmt *Body = TLCD->getBody()) {
-            Instrumenter I(((Decl*)TLCD)->getASTContext(), TLCD, RNG, HighPerformance);
+            ASTContext &ctx = static_cast<Decl*>(TLCD)->getASTContext();
+            Instrumenter I(ctx, TLCD, RNG, HighPerformance);
             BraceStmt *NewBody = I.transformBraceStmt(Body, true);
             if (NewBody != Body) {
               TLCD->setBody(NewBody);
+              TypeChecker(ctx).checkTopLevelErrorHandling(TLCD);
             }
             return false;
           }

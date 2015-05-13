@@ -286,6 +286,8 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
   auto *BS = BraceStmt::create(Context, Loc, ASTNode(TheCall),
                                EndLoc);
   newTopLevel->setBody(BS);
+  TC.checkTopLevelErrorHandling(newTopLevel);
+
   SF.Decls.push_back(newTopLevel);
 }
 

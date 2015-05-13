@@ -1173,6 +1173,17 @@ struct ASTNodeBase {};
         }
       }
 
+      if (!E->isThrowsSet()) {
+        Out << "apply expression is not marked as throwing or non-throwing\n";
+        E->dump(Out);
+        abort();
+      } else if (E->throws() && !FT->throws()) {
+        Out << "apply expression is marked as throwing, but function operand"
+               "does not have a throwing function type\n";
+        E->dump(Out);
+        abort();
+      }
+
       if (E->isSuper() != E->getArg()->isSuperExpr()) {
         Out << "Function application's isSuper() bit mismatch.\n";
         E->dump(Out);

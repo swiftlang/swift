@@ -1843,6 +1843,8 @@ public:
     printCommon(E, NodeName);
     if (E->isSuper())
       OS << " super";
+    if (E->isThrowsSet())
+      OS << (E->throws() ? " throws" : " nothrow");
     OS << '\n';
     printRec(E->getFn());
     OS << '\n';
