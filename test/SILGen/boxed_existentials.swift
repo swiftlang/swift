@@ -10,8 +10,8 @@ class Document {}
 enum ClericalError: ErrorType {
   case MisplacedDocument(Document)
 
-  var domain: String { return "" }
-  var code: Int { return 0 }
+  var _domain: String { return "" }
+  var _code: Int { return 0 }
 }
 
 func test_concrete_erasure(x: ClericalError) -> ErrorType {
@@ -46,14 +46,14 @@ func test_class_composition_erasure(x: protocol<HairClassType, ErrorType>) -> Er
 // CHECK:         return [[NEW_EXISTENTIAL]]#0
 
 func test_property(x: ErrorType) -> String {
-  return x.domain
+  return x._domain
 }
 // CHECK-LABEL: sil hidden @_TF18boxed_existentials13test_propertyFPSs9ErrorType_SS
 // CHECK:         [[VALUE:%.*]] = open_existential_box %0 : $ErrorType to $*[[VALUE_TYPE:@opened\(.*\) ErrorType]]
 // FIXME: Extraneous copy here
 // CHECK-NEXT: [[COPY:%[0-9]+]] = alloc_stack $[[VALUE_TYPE]]
 // CHECK-NEXT: copy_addr [[VALUE]] to [initialization] [[COPY]]#1 : $*[[VALUE_TYPE]]
-// CHECK:         [[METHOD:%.*]] = witness_method $[[VALUE_TYPE]], #ErrorType.domain!getter.1
+// CHECK:         [[METHOD:%.*]] = witness_method $[[VALUE_TYPE]], #ErrorType._domain!getter.1
 // -- self parameter of witness is @in_guaranteed; no need to copy since
 //    value in box is immutable and box is guaranteed
 // CHECK:         [[RESULT:%.*]] = apply [[METHOD]]<[[VALUE_TYPE]]>([[COPY]]#1)

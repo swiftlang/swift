@@ -13,8 +13,8 @@
 // The protocol for error values that can be thrown.
 // TODO: API review
 public protocol ErrorType {
-  var domain: String { get }
-  var code: Int { get }
+  var _domain: String { get }
+  var _code: Int { get }
 }
 
 #if _runtime(_ObjC)
@@ -23,12 +23,12 @@ public protocol ErrorType {
 @asmname("swift_stdlib_getErrorDomainNSString")
 public func _stdlib_getErrorDomainNSString<T : ErrorType>(x: UnsafePointer<T>)
 -> AnyObject {
-  return x.memory.domain._bridgeToObjectiveCImpl()
+  return x.memory._domain._bridgeToObjectiveCImpl()
 }
 
 @asmname("swift_stdlib_getErrorCode")
 public func _stdlib_getErrorCode<T : ErrorType>(x: UnsafePointer<T>) -> Int {
-  return x.memory.code
+  return x.memory._code
 }
 
 // Known function for the compiler to use to coerce ErrorType instances to

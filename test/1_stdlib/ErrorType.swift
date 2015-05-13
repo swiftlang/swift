@@ -19,8 +19,8 @@ class NoisyError : ErrorType, OtherProtocol, OtherClassProtocol {
   init() { ++NoisyErrorLifeCount }
   deinit { ++NoisyErrorDeathCount }
 
-  let domain = "NoisyError"
-  let code = 123
+  let _domain = "NoisyError"
+  let _code = 123
 
   let otherProperty = "otherProperty"
   let otherClassProperty = "otherClassProperty"
@@ -32,8 +32,8 @@ ErrorTypeTests.test("erasure") {
   do {
     let e: ErrorType = NoisyError()
 
-    expectEqual(e.domain, "NoisyError")
-    expectEqual(e.code, 123)
+    expectEqual(e._domain, "NoisyError")
+    expectEqual(e._code, 123)
   }
   expectEqual(NoisyErrorDeathCount, NoisyErrorLifeCount)
 }
@@ -66,25 +66,25 @@ ErrorTypeTests.test("dynamic casts") {
     expectEqual((e as! OtherProtocol).otherProperty, "otherProperty")
 
     let op: OtherProtocol = ne
-    expectEqual((op as! ErrorType).domain, "NoisyError")
-    expectEqual((op as! ErrorType).code, 123)
+    expectEqual((op as! ErrorType)._domain, "NoisyError")
+    expectEqual((op as! ErrorType)._code, 123)
 
     let ocp: OtherClassProtocol = ne
-    expectEqual((ocp as! ErrorType).domain, "NoisyError")
-    expectEqual((ocp as! ErrorType).code, 123)
+    expectEqual((ocp as! ErrorType)._domain, "NoisyError")
+    expectEqual((ocp as! ErrorType)._code, 123)
 
     // Do the same with rvalues, so we exercise the
     // take-on-success/destroy-on-failure paths.
 
-    expectEqual(((NoisyError() as ErrorType) as! NoisyError).domain, "NoisyError")
+    expectEqual(((NoisyError() as ErrorType) as! NoisyError)._domain, "NoisyError")
     expectEqual(((NoisyError() as ErrorType) as! OtherClassProtocol).otherClassProperty, "otherClassProperty")
     expectEqual(((NoisyError() as ErrorType) as! OtherProtocol).otherProperty, "otherProperty")
 
-    expectEqual(((NoisyError() as OtherProtocol) as! ErrorType).domain, "NoisyError")
-    expectEqual(((NoisyError() as OtherProtocol) as! ErrorType).code, 123)
+    expectEqual(((NoisyError() as OtherProtocol) as! ErrorType)._domain, "NoisyError")
+    expectEqual(((NoisyError() as OtherProtocol) as! ErrorType)._code, 123)
 
-    expectEqual(((NoisyError() as OtherClassProtocol) as! ErrorType).domain, "NoisyError")
-    expectEqual(((NoisyError() as OtherClassProtocol) as! ErrorType).code, 123)
+    expectEqual(((NoisyError() as OtherClassProtocol) as! ErrorType)._domain, "NoisyError")
+    expectEqual(((NoisyError() as OtherClassProtocol) as! ErrorType)._code, 123)
   }
   expectEqual(NoisyErrorDeathCount, NoisyErrorLifeCount)
 }

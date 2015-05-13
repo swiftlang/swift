@@ -1052,8 +1052,8 @@ bb0(%0 : $*Beth):
 }
 
 struct SomeError: ErrorType {
-  var domain: String { get }
-  var code: Int { get }
+  var _domain: String { get }
+  var _code: Int { get }
 }
 
 // CHECK-LABEL: sil public_external [fragile] @existential_box : $@convention(thin) (SomeError) -> () {

@@ -89,7 +89,7 @@ autoreleasepool {
                          encoding: NSUTF8StringEncoding)
     _preconditionFailure("file should not actually exist")
   } catch {
-    print(error.code) // CHECK-NEXT: 260
+    print(error._code) // CHECK-NEXT: 260
     hangCanary(error as NSError)
   }
 }
@@ -111,8 +111,8 @@ autoreleasepool {
   do {
     try DumbString(contentsOfFile: "foo", encoding: NSUTF8StringEncoding)
   } catch {
-    print(error.domain) // CHECK-NEXT: Malicious Mischief
-    print(error.code) // CHECK-NEXT: 594
+    print(error._domain) // CHECK-NEXT: Malicious Mischief
+    print(error._code) // CHECK-NEXT: 594
     hangCanary(error as NSError)
   }
 }

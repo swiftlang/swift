@@ -83,7 +83,7 @@ static ValueDecl *deriveErrorType_enum_domain(TypeChecker &tc,
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
   std::tie(propDecl, pbDecl)
-    = declareDerivedReadOnlyProperty(tc, enumDecl, C.Id_domain,
+    = declareDerivedReadOnlyProperty(tc, enumDecl, C.Id__domain,
                                      stringTy, stringTy,
                                      getterDecl);
   
@@ -202,7 +202,7 @@ static ValueDecl *deriveErrorType_enum_code(TypeChecker &tc,
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
   std::tie(propDecl, pbDecl)
-    = declareDerivedReadOnlyProperty(tc, enumDecl, C.Id_code,
+    = declareDerivedReadOnlyProperty(tc, enumDecl, C.Id__code,
                                      intTy, intTy,
                                      getterDecl);
   
@@ -221,9 +221,9 @@ ValueDecl *DerivedConformance::deriveErrorType(TypeChecker &tc,
   
   auto enumType = cast<EnumDecl>(type);
   
-  if (requirement->getName() == tc.Context.Id_domain)
+  if (requirement->getName() == tc.Context.Id__domain)
     return deriveErrorType_enum_domain(tc, enumType);
-  else if (requirement->getName() == tc.Context.Id_code)
+  else if (requirement->getName() == tc.Context.Id__code)
     return deriveErrorType_enum_code(tc, enumType);
   
   tc.diagnose(requirement->getLoc(),

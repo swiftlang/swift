@@ -26,8 +26,8 @@ entry(%x : $*T):
 }
 
 struct SomeError: ErrorType {
-  let domain: String
-  let code: Int
+  let _domain: String
+  let _code: Int
 }
 
 // CHECK-LABEL: define %swift.error* @alloc_boxed_existential_concrete
@@ -64,7 +64,7 @@ entry(%b : $ErrorType):
   %o = open_existential_box %b : $ErrorType to $*@opened("01234567-89AB-CDEF-0123-000000000000") ErrorType
   // CHECK: [[CODE_ADDR:%.*]] = getelementptr {{.*}} [[WITNESS]], i32 1
   // CHECK: [[CODE:%.*]] = load {{.*}} [[CODE_ADDR]]
-  %m = witness_method $@opened("01234567-89AB-CDEF-0123-000000000000") ErrorType, #ErrorType.code!getter.1, %o : $*@opened("01234567-89AB-CDEF-0123-000000000000") ErrorType : $@convention(witness_method) <Self: ErrorType> (@in_guaranteed Self) -> Int
+  %m = witness_method $@opened("01234567-89AB-CDEF-0123-000000000000") ErrorType, #ErrorType._code!getter.1, %o : $*@opened("01234567-89AB-CDEF-0123-000000000000") ErrorType : $@convention(witness_method) <Self: ErrorType> (@in_guaranteed Self) -> Int
   // CHECK: [[CODE_FN:%.*]] = bitcast i8* [[CODE]] to [[INT:i[0-9]+]] (%swift.opaque*, %swift.type*)*
   // CHECK: [[RESULT:%.*]] = call [[INT]] [[CODE_FN]](%swift.opaque* [[ADDR]], %swift.type* [[TYPE]])
   %c = apply %m<@opened("01234567-89AB-CDEF-0123-000000000000") ErrorType>(%o) : $@convention(witness_method) <Self: ErrorType> (@in_guaranteed Self) -> Int

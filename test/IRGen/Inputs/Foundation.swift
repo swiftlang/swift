@@ -19,4 +19,7 @@ func _convertNSSetToSet<T: NSObject>(s: NSSet?) -> Set<T> {
   return Set<T>()
 }
 
-extension NSError: ErrorType {}
+extension NSError: ErrorType {
+  public var _domain: String { return domain }
+  public var _code: Int { return code }
+}

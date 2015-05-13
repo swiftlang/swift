@@ -10,23 +10,23 @@ enum ClericalErrorDomain: ErrorType {
 let error
   = ClericalErrorDomain.AccidentallyErasedTape(fromMinute: 5, toMinute: 23.5)
 
-let domain: String = error.domain
-let code: Int = error.code
+let domain: String = error._domain
+let code: Int = error._code
 
 struct UseEnumBeforeDeclaration {
-  let errorDomain: String = EnumToUseBeforeDeclaration.A.domain
-  let errorCode: Int = EnumToUseBeforeDeclaration.A.code
+  let errorDomain: String = EnumToUseBeforeDeclaration.A._domain
+  let errorCode: Int = EnumToUseBeforeDeclaration.A._code
 }
 enum EnumToUseBeforeDeclaration: ErrorType {
   case A
 }
 
-let domainFromOtherFile: String = FromOtherFile.A.domain
-let codeFromOtherFile: Int = AlsoFromOtherFile.A.code
+let domainFromOtherFile: String = FromOtherFile.A._domain
+let codeFromOtherFile: Int = AlsoFromOtherFile.A._code
 
 enum NotAnError { case A }
 
-let notAnErrorDomain: String = NotAnError.A.domain // expected-error{{'NotAnError' does not have a member named 'domain'}}
-let notAnErrorCode: Int = NotAnError.A.code // expected-error{{'NotAnError' does not have a member named 'code'}}
+let notAnErrorDomain: String = NotAnError.A._domain // expected-error{{'NotAnError' does not have a member named '_domain'}}
+let notAnErrorCode: Int = NotAnError.A._code // expected-error{{'NotAnError' does not have a member named '_code'}}
 
 enum EmptyErrorDomain: ErrorType {}

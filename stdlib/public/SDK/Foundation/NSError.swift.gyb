@@ -5,14 +5,17 @@ import CoreFoundation
 // magic allows this to be done as a "toll-free" conversion when an NSError
 // or CFError is used as an ErrorType existential.
 
-extension NSError : ErrorType {}
+extension NSError : ErrorType {
+  public var _domain: String { return domain }
+  public var _code: Int { return code }
+}
 
 extension CFError : ErrorType {
-  public var domain: String {
+  public var _domain: String {
     return CFErrorGetDomain(self) as String
   }
 
-  public var code: Int {
+  public var _code: Int {
     return CFErrorGetCode(self)
   }
 }
@@ -103,8 +106,8 @@ public enum ${EnumName} : _ObjectiveCBridgeableErrorType {
   case ${code}
 %  end
 
-  public var domain: String { return ${domain}Domain }
-  public var code: Int {
+  public var _domain: String { return ${domain}Domain }
+  public var _code: Int {
     switch self {
 %  for code in mappedDomains[domain]:
     case ${EnumName}.${code}: return Foundation.${code}
