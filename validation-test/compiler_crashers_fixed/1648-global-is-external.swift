@@ -5,7 +5,7 @@
 // http://www.openradar.me/18850296
 
 func f() {
-    let x = 0 // expected-note {{'x' declared here}}
+    let x = 0 // expected-note {{'x' declared here}} //expected-warning {{initialization of immutable value 'x' was never used}}
     class C { // expected-note {{type declared here}}
         func f() {
             x // expected-error {{class declaration cannot close over value 'x' defined in outer scope}}
