@@ -11,52 +11,12 @@
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-simple-swift
 
-/// Dispatching protocol for `SetAlgebraType`.
-///
-/// For all intents and purposes, you can and should ignore this
-/// protocol.  All of its requirements are restated in the derived
-/// `SetAlgebraType` protocol, either as requirements, or as
-/// implementations in its protocol extension.
-/// `SetAlgebraDispatchType` exists merely so that default generic
-/// algorithms on `SetAlgebraType` will dispatch to more specific
-/// operations given by a type that conforms to `SetAlgebraType`:
-///
-///     /// exercise two SetAlgebraType operations
-///     func differenceIsEmpty<S: SetAlgebraType>(s1: S, s2: S) -> Bool {
-///       return s1.subtract(s2).isEmpty
-///     }
-///
-///     /// A type that supports set algebra
-///     struct MySet : SetAlgebraType {
-///       var isEmpty: Bool { /* specialized isEmpty implementation */ }
-///       ...                 /* no subtract implementation given */
-///     }
-///
-///     // calls the **specialized implementation of isEmpty** given above,
-///     // and the **default implementation of subtract** given in the
-///     // SetAlgebraType protocol extension.
-///     differenceIsEmpty(MySet(), MySet()) 
-///
-/// - SeeAlso: `SetAlgebraType` for details of the APIs required here.
-protocol SetAlgebraDispatchType {
-  typealias Element
-  func subtract(other: Self) -> Self
-  func isSubsetOf(other: Self) -> Bool
-  func isDisjointWith(other: Self) -> Bool
-  func isSupersetOf(other: Self) -> Bool
-  var isEmpty: Bool { get }
-  
-  init<S : SequenceType where S.Generator.Element == Element>(_ sequence: S)
-  mutating func subtractInPlace(other: Self)
-
-  static func element(a: Element, subsumes b: Element) -> Bool  
-}
-
 /// A generalized set whose distinct elements may not be disjoint.
 ///
-/// In an `OptionSetType`, some elements may subsume other elements, where
+/// In a model of `SetAlgebraType`, some elements may subsume other
+/// elements, where
 ///
-/// > `a` **subsumes** `b` iff `[a].isSupersetOf([b] as Self)`
+/// > `a` **subsumes** `b` iff `([a] as Self).isSupersetOf([b])`
 ///
 /// In many models of `SetAlgebraType` such as `Set<T>`, `a`
 /// *subsumes* `b` if and only if `a == b`, but that is not always the
@@ -388,6 +348,47 @@ extension OptionSetType where RawValue : BitwiseOperationsType {
   mutating func exclusiveOrInPlace(other: Self) {
     self = Self(rawValue: self.rawValue ^ other.rawValue)
   }
+}
+
+/// Dispatching protocol for `SetAlgebraType`.
+///
+/// For all intents and purposes, you can and should ignore this
+/// protocol.  All of its requirements are restated in the derived
+/// `SetAlgebraType` protocol, either as requirements, or as
+/// implementations in its protocol extension.
+/// `SetAlgebraDispatchType` exists merely so that default generic
+/// algorithms on `SetAlgebraType` will dispatch to more specific
+/// operations given by a type that conforms to `SetAlgebraType`:
+///
+///     /// exercise two SetAlgebraType operations
+///     func differenceIsEmpty<S: SetAlgebraType>(s1: S, s2: S) -> Bool {
+///       return s1.subtract(s2).isEmpty
+///     }
+///
+///     /// A type that supports set algebra
+///     struct MySet : SetAlgebraType {
+///       var isEmpty: Bool { /* specialized isEmpty implementation */ }
+///       ...                 /* no subtract implementation given */
+///     }
+///
+///     // calls the **specialized implementation of isEmpty** given above,
+///     // and the **default implementation of subtract** given in the
+///     // SetAlgebraType protocol extension.
+///     differenceIsEmpty(MySet(), MySet()) 
+///
+/// - SeeAlso: `SetAlgebraType` for details of the APIs required here.
+protocol SetAlgebraDispatchType {
+  typealias Element
+  func subtract(other: Self) -> Self
+  func isSubsetOf(other: Self) -> Bool
+  func isDisjointWith(other: Self) -> Bool
+  func isSupersetOf(other: Self) -> Bool
+  var isEmpty: Bool { get }
+  
+  init<S : SequenceType where S.Generator.Element == Element>(_ sequence: S)
+  mutating func subtractInPlace(other: Self)
+
+  static func element(a: Element, subsumes b: Element) -> Bool  
 }
 
 //===--- Tests ------------------------------------------------------------===//
