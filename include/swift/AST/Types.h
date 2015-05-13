@@ -76,7 +76,7 @@ namespace swift {
 /// on structural types.
 class RecursiveTypeProperties {
 public:
-  enum { BitWidth = 6 };
+  enum { BitWidth = 7 };
 
   /// A single property.
   ///
@@ -102,6 +102,9 @@ public:
 
     /// This type expression contains an opened existential ArchetypeType.
     HasOpenedExistential = 0x20,
+
+    /// This type expression contains a DynamicSelf type.
+    HasDynamicSelf = 0x40,
   };
 
 private:
@@ -138,6 +141,10 @@ public:
   /// Does a type with these properties structurally contain an
   /// archetype?
   bool hasOpenedExistential() const { return Bits & HasOpenedExistential; }
+
+  /// Does a type with these properties structurally contain a
+  /// reference to DynamicSelf?
+  bool hasDynamicSelf() const { return Bits & HasDynamicSelf; }
 
   /// Returns the set of properties present in either set.
   friend RecursiveTypeProperties operator+(Property lhs, Property rhs) {
@@ -418,6 +425,11 @@ public:
   /// lvalue types as well as tuples or optionals of lvalues.
   bool isLValueType() {
     return getRecursiveProperties().isLValue();
+  }
+
+  /// Determine whether the type is dependent on DynamicSelf.
+  bool hasDynamicSelfType() const {
+    return getRecursiveProperties().hasDynamicSelf();
   }
 
   /// isExistentialType - Determines whether this type is an existential type,
@@ -1852,8 +1864,9 @@ public:
 private:
   DynamicSelfType(Type selfType, const ASTContext &ctx,
                   RecursiveTypeProperties properties)
-    : TypeBase(TypeKind::DynamicSelf, selfType->isCanonical()? &ctx : 0, 
-               properties),
+    : TypeBase(TypeKind::DynamicSelf, selfType->isCanonical()? &ctx : 0,
+               properties + RecursiveTypeProperties(
+                 RecursiveTypeProperties::HasDynamicSelf)),
       SelfType(selfType) { }
 
   friend class TypeDecl;

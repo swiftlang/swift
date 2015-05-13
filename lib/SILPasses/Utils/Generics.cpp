@@ -78,6 +78,10 @@ ApplySite swift::trySpecializeApplyOfGeneric(ApplySite Apply,
     DEBUG(llvm::dbgs() << "    Can not specialize with interface subs.\n");
     return ApplySite();
   }
+  if (hasDynamicSelfTypes(InterfaceSubs)) {
+    DEBUG(llvm::dbgs() << "    Cannot specialize with dynamic self.\n");
+    return ApplySite();
+  }
 
   llvm::SmallString<64> ClonedName;
   {

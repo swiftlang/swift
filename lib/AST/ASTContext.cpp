@@ -2571,6 +2571,21 @@ static RecursiveTypeProperties getFunctionRecursiveProperties(Type Input,
   return properties;
 }
 
+// For now, generic function types cannot be dependent (in fact,
+// they erase dependence) or contain type variables, and they're
+// always materializable.
+static RecursiveTypeProperties
+getGenericFunctionRecursiveProperties(Type Input, Type Result) {
+  checkFunctionRecursiveProperties(Input, Result);
+
+  static_assert(RecursiveTypeProperties::BitWidth == 7,
+                "revisit this if you add new recursive type properties");
+  RecursiveTypeProperties properties;
+  if (Result->getRecursiveProperties().hasDynamicSelf())
+    properties += RecursiveTypeProperties::HasDynamicSelf;
+  return properties;
+}
+
 AnyFunctionType *AnyFunctionType::withExtInfo(ExtInfo info) const {
   if (isa<FunctionType>(this))
     return FunctionType::get(getInput(), getResult(), info);
@@ -2686,14 +2701,7 @@ GenericFunctionType::get(GenericSignature *sig,
   void *mem = ctx.Allocate(sizeof(GenericFunctionType),
                            alignof(GenericFunctionType));
 
-  // For now, generic function types cannot be dependent (in fact,
-  // they erase dependence) or contain type variables, and they're
-  // always materializable.
-  checkFunctionRecursiveProperties(input, output);
-  RecursiveTypeProperties properties;
-  static_assert(RecursiveTypeProperties::BitWidth == 6,
-                "revisit this if you add new recursive type properties");
-
+  auto properties = getGenericFunctionRecursiveProperties(input, output);
   auto result = new (mem) GenericFunctionType(sig, input, output, info,
                                               isCanonical ? &ctx : nullptr,
                                               properties);
@@ -2846,9 +2854,14 @@ CanSILFunctionType SILFunctionType::get(GenericSignature *genericSig,
   // FIXME: If we ever have first-class polymorphic values, we'll need to
   // revisit this.
   RecursiveTypeProperties properties;
-  static_assert(RecursiveTypeProperties::BitWidth == 6,
+  static_assert(RecursiveTypeProperties::BitWidth == 7,
                 "revisit this if you add new recursive type properties");
-  if (!genericSig) {
+  if (genericSig) {
+    // See getGenericFunctionRecursiveProperties.
+    if (interfaceResult.getType()->getRecursiveProperties().hasDynamicSelf())
+      properties += RecursiveTypeProperties::HasDynamicSelf;
+  }
+  else {
     // Nongeneric SIL functions are dependent if they have dependent argument
     // or return types. They still never contain type variables and are always
     // materializable.

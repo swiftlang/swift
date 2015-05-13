@@ -84,6 +84,10 @@ bool hasUnboundGenericTypes(TypeSubstitutionMap &SubsMap);
 /// that is an unbound generic.
 bool hasUnboundGenericTypes(ArrayRef<Substitution> Subs);
 
+/// \brief Return true if the substitution map contains a
+/// substitution that refers to the dynamic Self type.
+bool hasDynamicSelfTypes(TypeSubstitutionMap &SubsMap);
+
 /// \brief Move an ApplyInst's FuncRef so that it dominates the call site.
 void placeFuncRef(ApplyInst *AI, DominanceInfo *DT);
 
