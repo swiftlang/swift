@@ -1,3 +1,5 @@
+%import gyb
+
 import Foundation
 import CoreFoundation
 
@@ -168,113 +170,10 @@ mappedDomainsOSX = {
 }
 }%
 
-%for domain in mappedDomains:
+%TObjectiveCBridgeableError = gyb.parseTemplate("../../common/ObjectiveCBridgeableError.gyb")
+%FoundationErrors = gyb.executeTemplate(TObjectiveCBridgeableError, mappedDomains=mappedDomains, mappedDomainsOSX=mappedDomainsOSX)
 
-// TODO: API review for how to name these enums and cases.
-%{
-EnumName = "_" + domain
-}%
-
-// Non-zero constant values in the table indicate constants that come
-// from another framework (AppKit or CoreData) and need to be copied here.
-%  for (name, availability, id) in mappedDomains[domain]:
-%    if id != 0:
-private let ${name}: Int = ${id}
-%    end
-%  end
-%  if mappedDomainsOSX.has_key(domain):
-#if os(OSX)
-%    for (name, availability, id) in mappedDomainsOSX[domain]:
-%      if id != 0:
-private let ${name}: Int = ${id}
-%      end
-%    end
-#endif
-%  end
-
-public enum ${EnumName} : Int, _ObjectiveCBridgeableErrorType {
-%  for (name, availability, id) in mappedDomains[domain]:
-  case ${name[2:]}
-%  end
-%  if mappedDomainsOSX.has_key(domain):
-#if os(OSX)
-%    for (name, availability, id) in mappedDomainsOSX[domain]:
-  case ${name[2:]}
-%    end
-#endif
-%  end
-
-  public var _domain: String { return ${domain}Domain }
-  public var _code: Int {
-    switch self {
-%  for (name, availability, id) in mappedDomains[domain]:
-    case ${EnumName}.${name[2:]}:
-%    if availability != '':
-      guard #${availability} else {
-        fatalError("${name} not available on this OS version")
-      }
-%    end
-      return ${name}
-%  end
-    default:
-%    if mappedDomainsOSX.has_key(domain):
-#if os(OSX)
-%      for (name, availability, id) in mappedDomainsOSX[domain]:
-%        if availability != '':
-      if #${availability} {
-%        end
-        if self == ${EnumName}.${name[2:]} {
-          return ${name}
-        }
-%        if availability != '':
-      }
-%        end
-%      end
-#endif
-%    end
-      fatalError("unhandled error code in ${EnumName}")
-    }
-  }
-
-  public init?(_bridgedNSError: NSError) {
-    if _bridgedNSError.domain != ${domain}Domain {
-      return nil
-    }
-
-    let code = _bridgedNSError.code
-%  for (name, availability, id) in mappedDomains[domain]:
-%   if availability != '':
-    if #${availability} {
-%   end
-      if code == ${name} {
-        self = ${EnumName}.${name[2:]}
-        return
-      }
-%   if availability != '':
-    }
-%   end
-%  end
-%  if mappedDomainsOSX.has_key(domain):
-#if os(OSX)
-%    for (name, availability, id) in mappedDomainsOSX[domain]:
-%      if availability != '':
-    if #${availability} {
-%      end
-      if code == ${name} {
-        self = ${EnumName}.${name[2:]}
-        return
-      }
-%      if availability != '':
-    }
-%      end
-%    end
-#endif
-%  end
-    return nil
-  }
-}
-
-%end
+${FoundationErrors}
 
 /// A hook for the runtime to use _ObjectiveCBridgeableErrorType in order to
 /// attempt an "errorTypeValue as? SomeError" cast.
