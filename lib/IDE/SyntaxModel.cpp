@@ -215,7 +215,7 @@ private:
   bool handleAttrs(const TypeAttributes &Attrs);
   bool handleAttrRanges(ArrayRef<SourceRange> Ranges);
 
-  bool handleStmtCondition(StmtCondition cond);
+  void handleStmtCondition(StmtCondition cond);
 
   bool shouldPassBraceStructureNode(BraceStmt *S);
 
@@ -401,7 +401,7 @@ Expr *ModelASTWalker::walkToExprPost(Expr *E) {
   return E;
 }
 
-bool ModelASTWalker::handleStmtCondition(StmtCondition cond) {
+void ModelASTWalker::handleStmtCondition(StmtCondition cond) {
   for (const auto &elt : cond) {
     if (elt.getKind() != StmtConditionElement::CK_Availability) continue;
 
