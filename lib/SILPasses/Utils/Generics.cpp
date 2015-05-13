@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "generic-specializer-utility"
+#define DEBUG_TYPE "generic-specializer"
 
 #include "swift/SILPasses/Utils/Generics.h"
 
@@ -62,7 +62,7 @@ ApplySite swift::trySpecializeApplyOfGeneric(ApplySite Apply,
   auto *F = cast<FunctionRefInst>(Apply.getCallee())->getReferencedFunction();
   assert(F->isDefinition() && "Expected definition to specialize!");
 
-  DEBUG(llvm::dbgs() << "        ApplyInst: " << *Apply.getInstruction());
+  DEBUG(llvm::dbgs() << "  ApplyInst: " << *Apply.getInstruction());
 
   // Create the substitution maps.
   TypeSubstitutionMap InterfaceSubs
@@ -87,6 +87,7 @@ ApplySite swift::trySpecializeApplyOfGeneric(ApplySite Apply,
     Mangle::GenericSpecializationMangler Mangler(M, F, Subs);
     Mangler.mangle();
   }
+  DEBUG(llvm::dbgs() << "    Specialized function " << ClonedName << '\n');
 
   SILFunction *NewF;
   auto &M = Apply.getInstruction()->getModule();
@@ -116,6 +117,5 @@ ApplySite swift::trySpecializeApplyOfGeneric(ApplySite Apply,
 
     NewFunction = NewF;
   }
-
   return replaceWithSpecializedFunction(Apply, NewF);
 }
