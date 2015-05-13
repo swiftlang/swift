@@ -766,6 +766,7 @@ public:
   // Patterns
   //===--------------------------------------------------------------------===//
 
+  SILValue emitOSVersionRangeCheck(SILLocation loc, const VersionRange &range);
   void emitStmtCondition(StmtCondition Cond, JumpDest FailDest,
                          SILLocation loc);
 

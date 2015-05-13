@@ -552,10 +552,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;
   }
   
-  Expr *visitAvailabilityQueryExpr(AvailabilityQueryExpr *E) {
-    return E;
-  }
-
   Expr *visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
     return E;
   }
@@ -755,24 +751,29 @@ public:
   
   bool doIt(const StmtCondition &C) {
     for (auto &elt : C) {
-      if (auto E = elt.getConditionOrNull()) {
+      switch (elt.getKind()) {
+      case StmtConditionElement::CK_Availability: break;
+      case StmtConditionElement::CK_Boolean: {
+        auto E = elt.getBoolean();
         // Walk an expression condition normally.
         E = doIt(E);
         if (!E)
           return true;
-        elt.setCondition(E);
-        continue;
+        elt.setBoolean(E);
+        break;
       }
+          
+      case StmtConditionElement::CK_PatternBinding: {
+        auto *P = doIt(elt.getPattern());
+        if (!P) return true;
+        elt.setPattern(P);
 
-      auto *P = doIt(elt.getPattern());
-      if (!P) return true;
-      elt.setPattern(P);
-
-      auto *I = doIt(elt.getInitializer());
-      if (!I) return true;
-      elt.setInitializer(I);
+        auto *I = doIt(elt.getInitializer());
+        if (!I) return true;
+        elt.setInitializer(I);
+      }
+      }
     }
-    
     return false;
   }
 

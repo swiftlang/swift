@@ -3709,64 +3709,6 @@ public:
   }
 };
 
-/// \brief An expression that guards execution based on whether the run-time
-/// configuration supports a given API, e.g.,
-/// #available(OSX >= 10.9, iOS >= 7.0).
-class AvailabilityQueryExpr : public Expr {
-  SourceLoc PoundLoc;
-  SourceLoc RParenLoc;
-
-  unsigned NumQueries;
-
-  /// The version range when this query will return true. This value is
-  /// filled in by Sema.
-  VersionRange AvailableRange;
-
-  AvailabilityQueryExpr(SourceLoc PoundLoc,
-                        ArrayRef<AvailabilitySpec *> queries,
-                        SourceLoc RParenLoc,
-                        VersionRange AvailableRange = VersionRange::empty(),
-                        Type Ty = Type())
-      : Expr(ExprKind::AvailabilityQuery, /*Implicit=*/false, Ty),
-        PoundLoc(PoundLoc), RParenLoc(RParenLoc), NumQueries(queries.size()),
-        AvailableRange(AvailableRange) {
-    memcpy(getQueriesBuf(), queries.data(),
-           queries.size() * sizeof(AvailabilitySpec *));
-  }
-
-public:
-  static AvailabilityQueryExpr *
-  create(ASTContext &ctx, SourceLoc PoundLoc,
-         ArrayRef<AvailabilitySpec *> queries,
-         SourceLoc RParenLoc);
-
-  ArrayRef<AvailabilitySpec *> getQueries() const {
-    return ArrayRef<AvailabilitySpec *>(getQueriesBuf(), NumQueries);
-  }
-
-  SourceLoc getStartLoc() const { return PoundLoc; }
-  SourceLoc getEndLoc() const;
-  SourceLoc getLoc() const { return PoundLoc; }
-
-  const VersionRange &getAvailableRange() const { return AvailableRange; }
-  void setAvailableRange(const VersionRange &Range) { AvailableRange = Range; }
-
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::AvailabilityQuery;
-  }
-
-  void getPlatformKeywordRanges(SmallVectorImpl<CharSourceRange>
-                                &PlatformRanges);
-
-private:
-  AvailabilitySpec **getQueriesBuf() {
-    return reinterpret_cast<AvailabilitySpec **>(this + 1);
-  }
-
-  AvailabilitySpec *const *getQueriesBuf() const {
-    return const_cast<AvailabilityQueryExpr *>(this)->getQueriesBuf();
-  }
-};
 
 /// An editor placeholder (<#such as this#>) that occurred in an expression
 /// context. If the placeholder is a typed one (see \c EditorPlaceholderData)

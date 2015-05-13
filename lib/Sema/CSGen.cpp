@@ -2280,12 +2280,6 @@ namespace {
     Type visitOpenExistentialExpr(OpenExistentialExpr *expr) {
       llvm_unreachable("Already type-checked");
     }
-    
-    Type visitAvailabilityQueryExpr(AvailabilityQueryExpr *expr) {
-      Type BoolType = CS.getTypeChecker().lookupBoolType(CS.DC);
-      expr->setType(BoolType);
-      return BoolType;
-    }
 
     Type visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
       return E->getType();

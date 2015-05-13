@@ -376,7 +376,6 @@ bool Expr::canAppendCallParentheses() const {
   case ExprKind::Assign:
   case ExprKind::DefaultValue:
   case ExprKind::UnresolvedPattern:
-  case ExprKind::AvailabilityQuery:
   case ExprKind::EditorPlaceholder:
     return false;
   }
@@ -809,47 +808,4 @@ ArchetypeType *OpenExistentialExpr::getOpenedArchetype() const {
   if (auto metaTy = type->getAs<MetatypeType>())
     type = metaTy->getInstanceType();
   return type->castTo<ArchetypeType>();
-}
-
-AvailabilityQueryExpr *AvailabilityQueryExpr::create(
-    ASTContext &ctx, SourceLoc PoundLoc,
-    ArrayRef<AvailabilitySpec *> queries,
-    SourceLoc RParenLoc) {
-  unsigned size = sizeof(AvailabilityQueryExpr) +
-                  queries.size() * sizeof(AvailabilitySpec *);
-
-  void *Buffer = ctx.Allocate(size, alignof(AvailabilityQueryExpr));
-  return ::new (Buffer) AvailabilityQueryExpr(PoundLoc, queries, RParenLoc);
-}
-
-SourceLoc AvailabilityQueryExpr::getEndLoc() const {
-  if (RParenLoc.isInvalid()) {
-    if (NumQueries == 0) {
-      return PoundLoc;
-    }
-    return getQueries()[NumQueries - 1]->getSourceRange().End;
-  }
-  return RParenLoc;
-}
-
-void AvailabilityQueryExpr::getPlatformKeywordRanges(
-    SmallVectorImpl<CharSourceRange> &PlatformRanges) {
-  for (unsigned int i = 0; i < NumQueries; i ++) {
-    auto *VersionSpec =
-        dyn_cast<VersionConstraintAvailabilitySpec>(getQueriesBuf()[i]);
-    if (!VersionSpec)
-      continue;
-
-    auto Loc = VersionSpec->getPlatformLoc();
-    auto Platform = VersionSpec->getPlatform();
-    switch (Platform) {
-      case PlatformKind::none:
-        break;
-#define AVAILABILITY_PLATFORM(X, PrettyName)                                   \
-      case PlatformKind::X:                                                    \
-        PlatformRanges.push_back(CharSourceRange(Loc, strlen(#X)));            \
-        break;
-#include "swift/AST/PlatformKinds.def"
-    }
-  }
 }

@@ -215,6 +215,8 @@ private:
   bool handleAttrs(const TypeAttributes &Attrs);
   bool handleAttrRanges(ArrayRef<SourceRange> Ranges);
 
+  bool handleStmtCondition(StmtCondition cond);
+
   bool shouldPassBraceStructureNode(BraceStmt *S);
 
   enum PassNodesBehavior {
@@ -386,13 +388,6 @@ std::pair<bool, Expr *> ModelASTWalker::walkToExprPre(Expr *E) {
     }
     SN.BodyRange = innerCharSourceRangeFromSourceRange(SM, E->getSourceRange());
     pushStructureNode(SN, E);
-  } else if (auto *AQE = dyn_cast<AvailabilityQueryExpr>(E)) {
-    SmallVector<CharSourceRange, 5> PlatformRanges;
-    AQE->getPlatformKeywordRanges(PlatformRanges);
-    std::for_each(PlatformRanges.begin(), PlatformRanges.end(),
-                  [&](CharSourceRange &Range) {
-      passNonTokenNode({SyntaxNodeKind::Keyword, Range});
-    });
   }
 
   return { true, E };
@@ -405,6 +400,20 @@ Expr *ModelASTWalker::walkToExprPost(Expr *E) {
 
   return E;
 }
+
+bool ModelASTWalker::handleStmtCondition(StmtCondition cond) {
+  for (const auto &elt : cond) {
+    if (elt.getKind() != StmtConditionElement::CK_Availability) continue;
+
+    SmallVector<CharSourceRange, 5> PlatformRanges;
+    elt.getAvailability()->getPlatformKeywordRanges(PlatformRanges);
+    std::for_each(PlatformRanges.begin(), PlatformRanges.end(),
+                  [&](CharSourceRange &Range) {
+                    passNonTokenNode({SyntaxNodeKind::Keyword, Range});
+                  });
+  }
+}
+
 
 std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
   auto addExprElem = [&](SyntaxStructureElementKind K, const Expr *Elem,
@@ -468,6 +477,7 @@ std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
                                charSourceRangeFromSourceRange(SM, ElemRange));
     }
     pushStructureNode(SN, S);
+    handleStmtCondition(WhileS->getCond());
 
   } else if (auto *RepeatWhileS = dyn_cast<RepeatWhileStmt>(S)) {
     SyntaxStructureNode SN;
@@ -490,7 +500,8 @@ std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
                                charSourceRangeFromSourceRange(SM, ElemRange));
     }
     pushStructureNode(SN, S);
-    
+    handleStmtCondition(IfS->getCond());
+
   } else if (auto *GS = dyn_cast<GuardStmt>(S)) {
     SyntaxStructureNode SN;
     SN.Kind = SyntaxStructureKind::GuardStatement;
@@ -503,6 +514,7 @@ std::pair<bool, Stmt *> ModelASTWalker::walkToStmtPre(Stmt *S) {
                                charSourceRangeFromSourceRange(SM, ElemRange));
     }
     pushStructureNode(SN, S);
+    handleStmtCondition(GS->getCond());
 
   } else if (auto *SwitchS = dyn_cast<SwitchStmt>(S)) {
     SyntaxStructureNode SN;

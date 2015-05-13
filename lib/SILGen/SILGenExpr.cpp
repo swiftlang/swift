@@ -245,7 +245,6 @@ namespace {
     RValue visitForeignObjectConversionExpr(ForeignObjectConversionExpr *E,
                                             SGFContext C);
     
-    RValue visitAvailabilityQueryExpr(AvailabilityQueryExpr *E, SGFContext C);
     RValue visitUnavailableToOptionalExpr(UnavailableToOptionalExpr *E,
                                           SGFContext C);
   };
@@ -3600,55 +3599,6 @@ RValue RValueEmitter::visitForeignObjectConversionExpr(
   return RValue(SGF, E, E->getType()->getCanonicalType(), result);
 }
 
-/// Emit a check that returns 1 if the running OS version is in
-/// the specified version range and 0 otherwise. The returned SILValue
-/// (which has type Builtin.Int1) represents the result of this check.
-static SILValue emitOSVersionRangeCheck(SILLocation loc,
-                                        const VersionRange &range,
-                                        SILGenFunction &SGF, SGFContext C) {
-  // Emit constants for the checked version range.
-  clang::VersionTuple Vers = range.getLowerEndpoint();
-  unsigned major = Vers.getMajor();
-  unsigned minor =
-      (Vers.getMinor().hasValue() ? Vers.getMinor().getValue() : 0);
-  unsigned subminor =
-      (Vers.getSubminor().hasValue() ? Vers.getSubminor().getValue() : 0);
-
-  SILType wordType = SILType::getBuiltinWordType(SGF.getASTContext());
-
-  SILValue majorValue = SGF.B.createIntegerLiteral(loc, wordType, major);
-  SILValue minorValue = SGF.B.createIntegerLiteral(loc, wordType, minor);
-  SILValue subminorValue = SGF.B.createIntegerLiteral(loc, wordType, subminor);
-
-  // Emit call to _stdlib_isOSVersionAtLeast(major, minor, patch)
-  FuncDecl *versionQueryDecl =
-      SGF.getASTContext().getIsOSVersionAtLeastDecl(nullptr);
-  assert(versionQueryDecl);
-
-  auto silDeclRef = SILDeclRef(versionQueryDecl);
-  SILValue availabilityGTEFn = SGF.emitGlobalFunctionRef(
-      loc, silDeclRef, SGF.getConstantInfo(silDeclRef));
-
-  SILValue args[] = {majorValue, minorValue, subminorValue};
-
-  SILValue queryResult = SGF.B.createApply(loc, availabilityGTEFn, args);
-
-  return queryResult;
-}
-
-RValue RValueEmitter::visitAvailabilityQueryExpr(AvailabilityQueryExpr *E,
-                                                 SGFContext C) {
-  // Check the running OS version to determine whether it is in the range
-  // specified by E.
-  SILValue inRange = emitOSVersionRangeCheck(E, E->getAvailableRange(), SGF, C);
-
-  // Convert Builtin.Int1 result into Bool with the _getBool library intrinsic.
-  ASTContext &ctx = SGF.SGM.M.getASTContext();
-  auto result =
-      SGF.emitApplyOfLibraryIntrinsic(E, ctx.getGetBoolDecl(nullptr), {},
-                                      ManagedValue::forUnmanaged(inRange), C);
-  return RValue(SGF, E, result);
-}
 
 RValue
 RValueEmitter::visitUnavailableToOptionalExpr(UnavailableToOptionalExpr *E,
@@ -3672,8 +3622,8 @@ RValueEmitter::visitUnavailableToOptionalExpr(UnavailableToOptionalExpr *E,
   const UnavailabilityReason &Reason = E->getReason();
   switch (Reason.getReasonKind()) {
   case UnavailabilityReason::Kind::RequiresOSVersionRange:
-    isAvailable = emitOSVersionRangeCheck(
-        loc, Reason.getRequiredOSVersionRange(), SGF, C);
+    isAvailable = SGF.emitOSVersionRangeCheck(loc,
+                                          Reason.getRequiredOSVersionRange());
     break;
 
   case UnavailabilityReason::Kind::ExplicitlyWeakLinked:

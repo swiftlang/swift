@@ -1031,7 +1031,7 @@ private:
   /// of this node.
   void buildIfStmtRefinementContext(IfStmt *IS) {
     Optional<VersionRange> RefinedRange =
-        buildStmtConditionRefinementContext(IS->getCond());
+      buildStmtConditionRefinementContext(IS->getCond());
 
     if (RefinedRange.hasValue()) {
       // Create a new context for the Then branch and traverse it in that new
@@ -1070,11 +1070,10 @@ private:
     // the refined region is not lexically contained inside the construct
     // introducing the refinement context.
     Optional<VersionRange> RefinedRange =
-        buildStmtConditionRefinementContext(GS->getCond());
+      buildStmtConditionRefinementContext(GS->getCond());
 
-    if (Stmt *Body = GS->getBody()) {
+    if (Stmt *Body = GS->getBody())
       build(Body);
-    }
 
     BraceStmt *ParentBrace = dyn_cast<BraceStmt>(Parent.getAsStmt());
     assert(ParentBrace && "Expected parent of GuardStmt to be BraceStmt");
@@ -1091,7 +1090,7 @@ private:
   }
 
   /// Validate the availability query, emitting diagnostics if necessary.
-  void validateAvailabilityQuery(AvailabilityQueryExpr *E) {
+  void validateAvailabilityQuery(PoundAvailableInfo *E) {
     llvm::SmallSet<PlatformKind, 2> Platforms;
     bool HasOtherPlatformSpec = false;
     for (auto *Spec : E->getQueries()) {
@@ -1123,12 +1122,13 @@ private:
     }
   }
 
- /// Build the type refinement context for a StmtCondition and return the
- /// refined range for the true-branch if the statement condition contains
- /// any availability queries. Returns None if the guard condition does not
- /// refine availability.
- Optional<VersionRange>
+  /// Build the type refinement context for a StmtCondition and return the
+  /// refined range for the true-branch if the statement condition contains
+  /// any availability queries. Returns None if the guard condition does not
+  /// refine availability.
+  Optional<VersionRange>
   buildStmtConditionRefinementContext(StmtCondition Cond) {
+
     // Any refinement contexts introduced in the statement condition
     // will end at the end of the last condition element.
     StmtConditionElement LastElement = Cond.back();
@@ -1139,37 +1139,29 @@ private:
     unsigned NestedCount = 0;
     for (StmtConditionElement Element : Cond) {
       // If the element is not a condition, walk it in the current TRC.
-      if (!Element.isCondition()) {
+      if (Element.getKind() != StmtConditionElement::CK_Availability) {
         Element.walk(*this);
         continue;
       }
 
-      // We have a condition: either a basic expression in the first position
-      // of the StmtCondition or a where clause in an optional binding.
-      // In either case, check to see if it is an availability query and, if so,
-      // introduce a new refinement context for the statement condition elements
-      // following it.
-      auto *ConditionExpr = Element.getCondition()->getSemanticsProvidingExpr();
-      auto *QueryExpr = dyn_cast<AvailabilityQueryExpr>(ConditionExpr);
-      if (!QueryExpr) {
-        ConditionExpr->walk(*this);
-        continue;
-      }
+      // #available query: introduce a new refinement context for the statement
+      // condition elements following it.
+      auto *Query = Element.getAvailability();
 
       // If this query expression has no queries, we will not introduce a new
       // refinement context. We do not diagnose here: a diagnostic will already
       // have been emitted by the parser.
-      if (QueryExpr->getQueries().size() == 0)
+      if (Query->getQueries().size() == 0)
         continue;
 
-      validateAvailabilityQuery(QueryExpr);
+      validateAvailabilityQuery(Query);
 
-      AvailabilitySpec *Spec = bestActiveSpecForQuery(QueryExpr);
+      AvailabilitySpec *Spec = bestActiveSpecForQuery(Query);
       if (!Spec) {
         // We couldn't find an appropriate spec for the current platform,
         // so rather than refining, emit a diagnostic and just use the current
         // TRC.
-        AC.Diags.diagnose(QueryExpr->getLoc(),
+        AC.Diags.diagnose(Query->getLoc(),
                           diag::availability_query_required_for_platform,
                           platformString(targetPlatform(AC.LangOpts)));
         
@@ -1177,7 +1169,7 @@ private:
       }
 
       VersionRange Range = rangeForSpec(Spec);
-      QueryExpr->setAvailableRange(Range);
+      Query->setAvailableRange(Range);
       TypeRefinementContext *CurTRC = getCurrentTRC();
 
       // If the version range for the current TRC is completely contained in
@@ -1187,11 +1179,11 @@ private:
           CurTRC->getPotentialVersions().isContainedIn(Range)) {
         DiagnosticEngine &Diags = AC.Diags;
         if (CurTRC->getReason() == TypeRefinementContext::Reason::Root) {
-          Diags.diagnose(QueryExpr->getLoc(),
+          Diags.diagnose(Query->getLoc(),
                          diag::availability_query_useless_min_deployment,
                          platformString(targetPlatform(AC.LangOpts)));
         } else {
-          Diags.diagnose(QueryExpr->getLoc(),
+          Diags.diagnose(Query->getLoc(),
                          diag::availability_query_useless_enclosing_scope,
                          platformString(targetPlatform(AC.LangOpts)));
           Diags.diagnose(CurTRC->getIntroductionLoc(),
@@ -1200,7 +1192,7 @@ private:
       }
 
       auto *TRC = TypeRefinementContext::createForConditionFollowingQuery(
-          AC, QueryExpr, LastElement, getCurrentTRC(), Range);
+          AC, Query, LastElement, getCurrentTRC(), Range);
 
       pushContext(TRC, ParentTy());
       NestedCount++;
@@ -1210,18 +1202,17 @@ private:
       return None;
 
     TypeRefinementContext *NestedTRC = getCurrentTRC();
-    while (NestedCount-- > 0) {
+    while (NestedCount-- > 0)
       ContextStack.pop_back();
-    }
     
     return NestedTRC->getPotentialVersions();
   }
 
   /// Return the best active spec for the target platform or nullptr if no
   /// such spec exists.
-  AvailabilitySpec *bestActiveSpecForQuery(AvailabilityQueryExpr *E) {
+  AvailabilitySpec *bestActiveSpecForQuery(PoundAvailableInfo *available) {
     OtherPlatformAvailabilitySpec *FoundOtherSpec = nullptr;
-    for (auto *Spec : E->getQueries()) {
+    for (auto *Spec : available->getQueries()) {
       if (auto *OtherSpec = dyn_cast<OtherPlatformAvailabilitySpec>(Spec)) {
         FoundOtherSpec = OtherSpec;
         continue;
@@ -1253,22 +1244,6 @@ private:
 
     auto *VersionSpec = cast<VersionConstraintAvailabilitySpec>(Spec);
     return VersionRange::allGTE(VersionSpec->getVersion());
-  }
-  
-  virtual std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-    auto QueryExpr = dyn_cast<AvailabilityQueryExpr>(E);
-    if (!QueryExpr)
-      return std::make_pair(true, E);
-    
-    // If we have gotten here, it means we encountered #available(...)
-    // in a context other than if #available(...) { }, so we emit an error.
-    // We may want to loosen this restriction in the future (to, e.g., IfExprs)
-    // -- but, in general, we don't want #available() to appear where static
-    // analysis cannot easily determine its effect.
-    AC.Diags.diagnose(E->getLoc(),
-                      diag::availability_query_outside_if_stmt_guard);
-    
-    return std::make_pair(false, E);
   }
 
   virtual Expr *walkToExprPost(Expr *E) override {

@@ -725,14 +725,21 @@ struct ASTNodeBase {};
     }
 
     void checkConditionElement(const StmtConditionElement &elt) {
-      if (auto E = elt.getConditionOrNull()) {
+      switch (elt.getKind()) {
+      case StmtConditionElement::CK_Availability: break;
+      case StmtConditionElement::CK_Boolean: {
+        auto *E = elt.getBoolean();
         checkSameType(E->getType(), BuiltinIntegerType::get(1, Ctx),
                       "condition type");
-        return;
+        break;
       }
-      checkSameType(elt.getPattern()->getType(),
-                    elt.getInitializer()->getType(),
-                    "conditional binding type");
+
+      case StmtConditionElement::CK_PatternBinding:
+        checkSameType(elt.getPattern()->getType(),
+                      elt.getInitializer()->getType(),
+                      "conditional binding type");
+        break;
+      }
     }
     
     void checkCondition(StmtCondition C) {

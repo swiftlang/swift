@@ -390,10 +390,7 @@ private:
 
   Expr *getConditionNode(StmtCondition SC) {
     assert(!SC.empty() && "Empty condition");
-    StmtConditionElement SCE = SC.front();
-    if (!SCE.isCondition())
-      return nullptr;
-    return SCE.getCondition();
+    return SC.front().getBooleanOrNull();
   }
 
 public:

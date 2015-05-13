@@ -17,14 +17,10 @@
 #ifndef SWIFT_AST_STMT_H
 #define SWIFT_AST_STMT_H
 
+#include "swift/AST/Availability.h"
+#include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/ASTNode.h"
-#include "swift/AST/Identifier.h"
-#include "swift/Basic/LLVM.h"
 #include "swift/Basic/NullablePtr.h"
-#include "swift/Basic/SourceLoc.h"
-#include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/Optional.h"
-#include "llvm/ADT/PointerUnion.h"
 
 namespace swift {
   class ASTContext;
@@ -229,7 +225,54 @@ public:
   
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Defer; }
 };
- 
+
+  
+/// \brief An expression that guards execution based on whether the run-time
+/// configuration supports a given API, e.g.,
+/// #available(OSX >= 10.9, iOS >= 7.0).
+class alignas(8) PoundAvailableInfo {
+  SourceLoc PoundLoc;
+  SourceLoc RParenLoc;
+
+  // The number of queries tail allocated after this object.
+  unsigned NumQueries;
+  
+  /// The version range when this query will return true. This value is
+  /// filled in by Sema.
+  VersionRange AvailableRange;
+  
+  PoundAvailableInfo(SourceLoc PoundLoc, ArrayRef<AvailabilitySpec *> queries,
+                     SourceLoc RParenLoc)
+   : PoundLoc(PoundLoc), RParenLoc(RParenLoc), NumQueries(queries.size()),
+     AvailableRange(VersionRange::empty()) {
+    memcpy((void*)getQueries().data(), queries.data(),
+           queries.size() * sizeof(AvailabilitySpec *));
+  }
+  
+public:
+  static PoundAvailableInfo *create(ASTContext &ctx, SourceLoc PoundLoc,
+                                    ArrayRef<AvailabilitySpec *> queries,
+                                    SourceLoc RParenLoc);
+  
+  ArrayRef<AvailabilitySpec *> getQueries() const {
+    auto buf = reinterpret_cast<AvailabilitySpec *const*>(this + 1);
+    return ArrayRef<AvailabilitySpec *>(buf, NumQueries);
+  }
+  
+  SourceLoc getStartLoc() const { return PoundLoc; }
+  SourceLoc getEndLoc() const;
+  SourceLoc getLoc() const { return PoundLoc; }
+  SourceRange getSourceRange() const { return SourceRange(getStartLoc(),
+                                                          getEndLoc()); }
+  
+  const VersionRange &getAvailableRange() const { return AvailableRange; }
+  void setAvailableRange(const VersionRange &Range) { AvailableRange = Range; }
+  
+  void getPlatformKeywordRanges(SmallVectorImpl<CharSourceRange>
+                                &PlatformRanges);
+};
+
+  
 
   
 /// This represents an entry in an "if" or "while" condition.  Pattern bindings
@@ -255,65 +298,82 @@ class StmtConditionElement {
   /// to this as an 'implicit' pattern.
   Pattern *ThePattern = nullptr;
 
-  /// This is either the boolean condition or the initializer for a pattern
-  /// binding.
-  Expr *CondOrInit;
+  /// This is either the boolean condition, the initializer for a pattern
+  /// binding, or the #available information.
+  llvm::PointerUnion<PoundAvailableInfo*, Expr *> CondInitOrAvailable;
 
 public:
   StmtConditionElement() {}
   StmtConditionElement(SourceLoc IntroducerLoc, Pattern *ThePattern,
                        Expr *Init)
-    : IntroducerLoc(IntroducerLoc), ThePattern(ThePattern), CondOrInit(Init) {}
-  StmtConditionElement(Expr *cond)
-    : CondOrInit(cond) {}
+    : IntroducerLoc(IntroducerLoc), ThePattern(ThePattern),
+      CondInitOrAvailable(Init) {}
+  StmtConditionElement(Expr *cond) : CondInitOrAvailable(cond) {}
 
+  StmtConditionElement(PoundAvailableInfo *Info) : CondInitOrAvailable(Info) {}
+  
   SourceLoc getIntroducerLoc() const { return IntroducerLoc; }
   void setIntroducerLoc(SourceLoc loc) { IntroducerLoc = loc; }
-  
+
+  /// ConditionKind - This indicates the sort of condition this is.
+  enum ConditionKind {
+    CK_Boolean,
+    CK_PatternBinding,
+    CK_Availability
+  };
+
+  ConditionKind getKind() const {
+    if (ThePattern) return CK_PatternBinding;
+    return CondInitOrAvailable.is<Expr*>() ? CK_Boolean : CK_Availability;
+  }
 
   /// Boolean Condition Accessors.
-  bool isCondition() const {
-    return ThePattern == nullptr;
+  Expr *getBooleanOrNull() const {
+    return getKind() == CK_Boolean ? CondInitOrAvailable.get<Expr*>() : nullptr;
   }
 
-  Expr *getConditionOrNull() const {
-    return isCondition() ? CondOrInit : nullptr;
+  Expr *getBoolean() const {
+    assert(getKind() == CK_Boolean && "Not a condition");
+    return CondInitOrAvailable.get<Expr*>();
   }
-
-  Expr *getCondition() const {
-    assert(isCondition() && "Not a condition");
-    return CondOrInit;
-  }
-  void setCondition(Expr *E) {
-    assert(isCondition() && "Not a condition");
-    CondOrInit = E;
+  void setBoolean(Expr *E) {
+    assert(getKind() == CK_Boolean && "Not a condition");
+    CondInitOrAvailable = E;
   }
 
   /// Pattern Binding Accessors.
-  bool isBinding() const {
-    return ThePattern != nullptr;
-  }
   Pattern *getPatternOrNull() const {
     return ThePattern;
   }
 
   Pattern *getPattern() const {
-    assert(isBinding() && "Not a pattern binding condition");
+    assert(getKind() == CK_PatternBinding && "Not a pattern binding condition");
     return ThePattern;
   }
 
   void setPattern(Pattern *P) {
-    assert(isBinding() && "Not a pattern binding condition");
+    assert(getKind() == CK_PatternBinding && "Not a pattern binding condition");
     ThePattern = P;
   }
 
   Expr *getInitializer() const {
-    assert(isBinding() && "Not a pattern binding condition");
-    return CondOrInit;
+    assert(getKind() == CK_PatternBinding && "Not a pattern binding condition");
+    return CondInitOrAvailable.get<Expr*>();
   }
   void setInitializer(Expr *E) {
-    assert(isBinding() && "Not a pattern binding condition");
-    CondOrInit = E;
+    assert(getKind() == CK_PatternBinding && "Not a pattern binding condition");
+    CondInitOrAvailable = E;
+  }
+  
+  // Availability Accessors
+  PoundAvailableInfo *getAvailability() const {
+    assert(getKind() == CK_Availability && "Not an #available condition");
+    return CondInitOrAvailable.get<PoundAvailableInfo*>();
+  }
+
+  void setAvailability(PoundAvailableInfo *Info) {
+    assert(getKind() == CK_Availability && "Not an #available condition");
+    CondInitOrAvailable = Info;
   }
 
   SourceLoc getStartLoc() const;

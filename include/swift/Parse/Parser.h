@@ -1152,6 +1152,7 @@ public:
   ParserResult<Stmt> parseStmtReturn();
   ParserResult<Stmt> parseStmtDefer();
   ParserStatus parseStmtCondition(StmtCondition &Result, Diag<> ID);
+  ParserResult<PoundAvailableInfo> parseStmtConditionPoundAvailable();
   ParserResult<Stmt> parseStmtIf(LabeledStmtInfo LabelInfo);
   ParserResult<Stmt> parseStmtGuard();
   ParserResult<Stmt> parseStmtIfConfig(BraceItemListKind Kind

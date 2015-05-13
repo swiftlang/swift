@@ -920,55 +920,15 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     Result = parseExprObjectLiteral();
     break;
 
-  case tok::pound_available: {     // #available(...)
-    SourceLoc PoundLoc = consumeToken(tok::pound_available);
-    
-    if (!Tok.isFollowingLParen()) {
-      diagnose(Tok, diag::avail_query_expected_condition);
+  case tok::pound_available: {
+    // For better error recovery, parse but reject #available in an expr
+    // context.
+    diagnose(Tok.getLoc(), diag::availability_query_outside_if_stmt_guard);
+    auto res = parseStmtConditionPoundAvailable();
+    if (res.isParseError() || res.isNull())
       return nullptr;
-    }
-    
-    SourceLoc LParenLoc = Tok.getLoc();
-    StructureMarkerRAII ParsingAvailabilitySpecList(*this, Tok);
-    
-    consumeToken();
-    
-    SmallVector<AvailabilitySpec *, 5> Specs;
-    ParserStatus Status = makeParserSuccess();
-    
-    // Parse a comma-separated list of availability specifications. We don't
-    // use parseList() because we want to provide more specific diagnostics
-    // disallowing operators in version specs.
-    while (true) {
-      auto SpecResult = parseAvailabilitySpec();
-      if (auto *Spec = SpecResult.getPtrOrNull()) {
-        Specs.push_back(Spec);
-      } else {
-        Status.setIsParseError();
-      }
-      
-      // We don't allow binary operators to combine specs.
-      if (Tok.isBinaryOperator()) {
-        diagnose(Tok, diag::avail_query_disallowed_operator, Tok.getText());
-        consumeToken();
-        continue;
-      }
-      
-      if (!Tok.is(tok::comma)) break;
-      
-      consumeToken();
-    }
-    
-    SourceLoc RParenLoc;
-    if (parseMatchingToken(tok::r_paren, RParenLoc,
-                           diag::avail_query_expected_rparen, LParenLoc)) {
-      Status.setIsParseError();
-    }
-    
-    auto *QueryExpr = AvailabilityQueryExpr::create(Context, PoundLoc, Specs,
-                                                    RParenLoc);
-    Result = makeParserResult(Status, QueryExpr);
-    
+    Result = makeParserResult(
+                  new (Context) ErrorExpr(res.get()->getSourceRange()));
     break;
   }
 

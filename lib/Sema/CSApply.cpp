@@ -3432,10 +3432,6 @@ namespace {
       llvm_unreachable("Already type-checked");
     }
     
-    Expr *visitAvailabilityQueryExpr(AvailabilityQueryExpr *expr) {
-      return expr;
-    }
-
     Expr *visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
       return E;
     }

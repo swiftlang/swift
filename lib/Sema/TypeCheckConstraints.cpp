@@ -1512,9 +1512,14 @@ bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
   bool hadError = false;
   bool hadAnyFalsable = false;
   for (auto &elt : cond) {
-    if (auto E = elt.getConditionOrNull()) {
+    if (elt.getKind() == StmtConditionElement::CK_Availability) {
+      hadAnyFalsable = true;
+      continue;
+    }
+
+    if (auto E = elt.getBooleanOrNull()) {
       hadError |= typeCheckCondition(E, dc);
-      elt.setCondition(E);
+      elt.setBoolean(E);
       hadAnyFalsable = true;
       continue;
     }

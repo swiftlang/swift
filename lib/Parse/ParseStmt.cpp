@@ -872,6 +872,54 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
   }
 }
 
+// #available(...)
+ParserResult<PoundAvailableInfo> Parser::parseStmtConditionPoundAvailable() {
+  SourceLoc PoundLoc = consumeToken(tok::pound_available);
+
+  if (!Tok.isFollowingLParen()) {
+    diagnose(Tok, diag::avail_query_expected_condition);
+    return makeParserError();
+  }
+
+  StructureMarkerRAII ParsingAvailabilitySpecList(*this, Tok);
+  SourceLoc LParenLoc = consumeToken(tok::l_paren);
+
+  SmallVector<AvailabilitySpec *, 5> Specs;
+  ParserStatus Status = makeParserSuccess();
+
+  // Parse a comma-separated list of availability specifications. We don't
+  // use parseList() because we want to provide more specific diagnostics
+  // disallowing operators in version specs.
+  while (1) {
+    auto SpecResult = parseAvailabilitySpec();
+    if (auto *Spec = SpecResult.getPtrOrNull()) {
+      Specs.push_back(Spec);
+    } else {
+      Status.setIsParseError();
+    }
+
+    // We don't allow binary operators to combine specs.
+    if (Tok.isBinaryOperator()) {
+      diagnose(Tok, diag::avail_query_disallowed_operator, Tok.getText());
+      consumeToken();
+    } else if (consumeIf(tok::comma)) {
+      // keep going.
+    } else {
+      break;
+    }
+  }
+
+  SourceLoc RParenLoc;
+  if (parseMatchingToken(tok::r_paren, RParenLoc,
+                         diag::avail_query_expected_rparen, LParenLoc))
+    Status.setIsParseError();
+
+  auto *result = PoundAvailableInfo::create(Context, PoundLoc, Specs,RParenLoc);
+  return makeParserResult(Status, result);
+}
+
+
+
 /// Parse the condition of an 'if' or 'while'.
 ///
 ///   condition:
@@ -894,8 +942,25 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
   Condition = StmtCondition();
 
   SmallVector<StmtConditionElement, 4> result;
+
+  // Parse a leading #available condition if present.
+  if (Tok.is(tok::pound_available)) {
+    auto res = parseStmtConditionPoundAvailable();
+    if (res.isNull() || res.hasCodeCompletion()) {
+      Status |= res;
+      return Status;
+    }
+
+    result.push_back({res.get()});
+
+    if (!consumeIf(tok::comma)) {
+      Condition = Context.AllocateCopy(result);
+      return Status;
+    }
+  }
+
   // Parse the leading boolean condition if present.
-  if (Tok.isNot(tok::kw_var, tok::kw_let, tok::kw_case)) {
+  if (Tok.isNot(tok::kw_var, tok::kw_let, tok::kw_case, tok::pound_available)) {
     ParserResult<Expr> CondExpr = parseExprBasic(ID);
     Status |= CondExpr;
     result.push_back(CondExpr.getPtrOrNull());
@@ -910,7 +975,8 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
     
     // If a let-binding doesn't follow, diagnose the problem with a tailored
     // error message.
-    if (Tok.isNot(tok::kw_var, tok::kw_let, tok::kw_case)) {
+    if (Tok.isNot(tok::kw_var, tok::kw_let, tok::kw_case,
+                  tok::pound_available)) {
       // If an { exists after the comma, assume it is a stray comma and this is
       // the start of the if/while body.  If a non-expression thing exists after
       // the comma, then we don't know what is going on.
@@ -953,6 +1019,19 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
  
   // Parse the list of condition-bindings, each of which can have a 'where'.
   do {
+    // Parse a #available condition if present.
+    if (Tok.is(tok::pound_available)) {
+      auto res = parseStmtConditionPoundAvailable();
+      if (res.isNull() || res.hasCodeCompletion()) {
+        Status |= res;
+        return Status;
+      }
+
+      result.push_back({res.get()});
+      continue;
+    }
+
+    // Otherwise it must be a pattern binding.
     SourceLoc VarLoc;
     
     if (Tok.isAny(tok::kw_let, tok::kw_var, tok::kw_case)) {
@@ -1059,7 +1138,8 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
       });
 
     } while (Tok.is(tok::comma) &&
-             peekToken().isNot(tok::kw_let, tok::kw_var, tok::kw_case) &&
+             peekToken().isNot(tok::kw_let, tok::kw_var, tok::kw_case,
+                               tok::pound_available) &&
              consumeIf(tok::comma));
 
     // If there is a where clause on this let/var specification, parse and

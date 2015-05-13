@@ -33,7 +33,6 @@ namespace swift {
   class GuardStmt;
   class SourceFile;
   class Stmt;
-  class AvailabilityQueryExpr;
   class Expr;
   class StmtConditionElement;
 
@@ -75,7 +74,8 @@ public:
     GuardStmtFallthrough,
   };
 
-  using IntroNode = llvm::PointerUnion4<SourceFile *, Decl *, Stmt *, Expr *>;
+  using IntroNode =
+    llvm::PointerUnion4<SourceFile *, Decl *, Stmt *, PoundAvailableInfo *>;
 
 private:
   /// The AST node that introduced this context.
@@ -112,7 +112,7 @@ public:
   /// further StmtConditionElements following a #available() query in
   /// a StmtCondition.
   static TypeRefinementContext *
-  createForConditionFollowingQuery(ASTContext &Ctx, AvailabilityQueryExpr *QE,
+  createForConditionFollowingQuery(ASTContext &Ctx, PoundAvailableInfo *PAI,
                                    const StmtConditionElement &LastElement,
                                    TypeRefinementContext *Parent,
                                    const VersionRange &Versions);

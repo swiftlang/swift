@@ -273,31 +273,92 @@ bool CatchStmt::isSyntacticallyExhaustive() const {
           isa<NamedPattern>(pattern));
 }
 
+
+
+PoundAvailableInfo *PoundAvailableInfo::create(ASTContext &ctx,
+                                               SourceLoc PoundLoc,
+                                       ArrayRef<AvailabilitySpec *> queries,
+                                                     SourceLoc RParenLoc) {
+  unsigned size = sizeof(PoundAvailableInfo) +
+                  queries.size() * sizeof(AvailabilitySpec *);
+  
+  void *Buffer = ctx.Allocate(size, alignof(PoundAvailableInfo));
+  return ::new (Buffer) PoundAvailableInfo(PoundLoc, queries, RParenLoc);
+}
+
+SourceLoc PoundAvailableInfo::getEndLoc() const {
+  if (RParenLoc.isInvalid()) {
+    if (NumQueries == 0) {
+      return PoundLoc;
+    }
+    return getQueries()[NumQueries - 1]->getSourceRange().End;
+  }
+  return RParenLoc;
+}
+
+void PoundAvailableInfo::
+getPlatformKeywordRanges(SmallVectorImpl<CharSourceRange> &PlatformRanges) {
+  for (unsigned int i = 0; i < NumQueries; i ++) {
+    auto *VersionSpec =
+      dyn_cast<VersionConstraintAvailabilitySpec>(getQueries()[i]);
+    if (!VersionSpec)
+      continue;
+    
+    auto Loc = VersionSpec->getPlatformLoc();
+    auto Platform = VersionSpec->getPlatform();
+    switch (Platform) {
+    case PlatformKind::none:
+      break;
+#define AVAILABILITY_PLATFORM(X, PrettyName)                          \
+  case PlatformKind::X:                                               \
+    PlatformRanges.push_back(CharSourceRange(Loc, strlen(#X)));       \
+    break;
+#include "swift/AST/PlatformKinds.def"
+    }
+  }
+}
+
+
+
 SourceRange StmtConditionElement::getSourceRange() const {
-  if (auto *E = getConditionOrNull())
-    return E->getSourceRange();
+  switch (getKind()) {
+  case StmtConditionElement::CK_Boolean:
+    return getBoolean()->getSourceRange();
+  case StmtConditionElement::CK_Availability:
+    return getAvailability()->getSourceRange();
+  case StmtConditionElement::CK_PatternBinding:
+    SourceLoc Start;
+    if (IntroducerLoc.isValid())
+      Start = IntroducerLoc;
+    else
+      Start = getPattern()->getStartLoc();
 
-  SourceLoc Start;
-  if (IntroducerLoc.isValid())
-    Start = IntroducerLoc;
-  else
-    Start = getPattern()->getStartLoc();
-
-  return SourceRange(Start, getInitializer()->getEndLoc());
+    return SourceRange(Start, getInitializer()->getEndLoc());
+  }
 }
 
 SourceLoc StmtConditionElement::getStartLoc() const {
-  if (auto *E = getConditionOrNull())
-    return E->getStartLoc();
-  if (IntroducerLoc.isValid())
-    return IntroducerLoc;
-  return getPattern()->getStartLoc();
+  switch (getKind()) {
+  case StmtConditionElement::CK_Boolean:
+    return getBoolean()->getStartLoc();
+  case StmtConditionElement::CK_Availability:
+    return getAvailability()->getStartLoc();
+  case StmtConditionElement::CK_PatternBinding:
+    if (IntroducerLoc.isValid())
+      return IntroducerLoc;
+    return getPattern()->getStartLoc();
+  }
 }
 
 SourceLoc StmtConditionElement::getEndLoc() const {
-  if (auto *E = getConditionOrNull())
-    return E->getEndLoc();
-  return getInitializer()->getEndLoc();
+  switch (getKind()) {
+  case StmtConditionElement::CK_Boolean:
+    return getBoolean()->getEndLoc();
+  case StmtConditionElement::CK_Availability:
+    return getAvailability()->getEndLoc();
+  case StmtConditionElement::CK_PatternBinding:
+    return getInitializer()->getEndLoc();
+  }
 }
 
 static StmtCondition exprToCond(Expr *C, ASTContext &Ctx) {

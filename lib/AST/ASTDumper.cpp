@@ -1038,17 +1038,37 @@ public:
   }
   
   void printRec(StmtConditionElement C) {
-    if (auto E = C.getConditionOrNull())
-      return printRec(E);
-
-    Indent += 2;
-    OS.indent(Indent) << "(pattern\n";
-
-    printRec(C.getPattern());
-    OS << "\n";
-    printRec(C.getInitializer());
-    OS << ")";
-    Indent -= 2;
+    switch (C.getKind()) {
+    case StmtConditionElement::CK_Boolean:
+      return printRec(C.getBoolean());
+    case StmtConditionElement::CK_PatternBinding:
+      Indent += 2;
+      OS.indent(Indent) << "(pattern\n";
+      
+      printRec(C.getPattern());
+      OS << "\n";
+      printRec(C.getInitializer());
+      OS << ")";
+      Indent -= 2;
+      break;
+    case StmtConditionElement::CK_Availability:
+      Indent += 2;
+      OS.indent(Indent) << "(#available\n";
+      for (auto *Query : C.getAvailability()->getQueries()) {
+        OS << '\n';
+        switch (Query->getKind()) {
+        case AvailabilitySpecKind::VersionConstraint:
+          cast<VersionConstraintAvailabilitySpec>(Query)->print(OS, Indent + 2);
+          break;
+        case AvailabilitySpecKind::OtherPlatform:
+          cast<OtherPlatformAvailabilitySpec>(Query)->print(OS, Indent + 2);
+          break;
+        }
+      }
+      OS << ")";
+      Indent -= 2;
+      break;
+    }
   }
   
   void visitBraceStmt(BraceStmt *S) {
@@ -1954,21 +1974,6 @@ public:
     printRec(E->getExistentialValue());
     OS << '\n';
     printRec(E->getSubExpr());
-    OS << ')';
-  }
-  void visitAvailabilityQueryExpr(AvailabilityQueryExpr *E) {
-    printCommon(E, "availability_query_expr");
-    for (auto *Query : E->getQueries()) {
-      OS << '\n';
-      switch (Query->getKind()) {
-      case AvailabilitySpecKind::VersionConstraint:
-        cast<VersionConstraintAvailabilitySpec>(Query)->print(OS, Indent + 2);
-      break;
-      case AvailabilitySpecKind::OtherPlatform:
-        cast<OtherPlatformAvailabilitySpec>(Query)->print(OS, Indent + 2);
-      break;
-      }
-    }
     OS << ')';
   }
   void visitUnavailableToOptionalExpr(UnavailableToOptionalExpr *E) {

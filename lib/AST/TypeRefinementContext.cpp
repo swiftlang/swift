@@ -70,14 +70,15 @@ TypeRefinementContext::createForIfStmtThen(ASTContext &Ctx, IfStmt *S,
 
 TypeRefinementContext *
 TypeRefinementContext::createForConditionFollowingQuery(ASTContext &Ctx,
-                                 AvailabilityQueryExpr *QE,
+                                 PoundAvailableInfo *PAI,
                                  const StmtConditionElement &LastElement,
                                  TypeRefinementContext *Parent,
                                  const VersionRange &Versions) {
-  assert(QE);
+  assert(PAI);
   assert(Parent);
-  SourceRange Range(QE->getEndLoc(), LastElement.getEndLoc());
-  return new (Ctx) TypeRefinementContext(Ctx, QE, Parent, Range, Versions);
+  SourceRange Range(PAI->getEndLoc(), LastElement.getEndLoc());
+  return new (Ctx) TypeRefinementContext(Ctx, PAI, Parent, Range,
+                                         Versions);
 }
 
 TypeRefinementContext *
@@ -139,7 +140,7 @@ SourceLoc TypeRefinementContext::getIntroductionLoc() const {
     return cast<IfStmt>(Node.get<Stmt *>())->getIfLoc();
 
   case Reason::ConditionFollowingAvailabilityQuery:
-    return cast<AvailabilityQueryExpr>(Node.get<Expr *>())->getLoc();
+    return Node.get<PoundAvailableInfo*>()->getStartLoc();
 
   case Reason::GuardStmtFallthrough:
     return cast<GuardStmt>(Node.get<Stmt *>())->getGuardLoc();
@@ -183,11 +184,8 @@ void TypeRefinementContext::print(raw_ostream &OS, SourceManager &SrcMgr,
 TypeRefinementContext::Reason TypeRefinementContext::getReason() const {
   if (Node.is<Decl *>()) {
     return Reason::Decl;
-  } else if (Node.is<Expr *>()) {
-    Expr *E = Node.get<Expr *>();
-    if (isa<AvailabilityQueryExpr>(E)) {
-      return Reason::ConditionFollowingAvailabilityQuery;
-    }
+  } else if (Node.is<PoundAvailableInfo*>()) {
+    return Reason::ConditionFollowingAvailabilityQuery;
   } else if (Node.is<Stmt *>()) {
     Stmt *S = Node.get<Stmt *>();
     if (isa<IfStmt>(S)) {

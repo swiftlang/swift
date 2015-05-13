@@ -1001,19 +1001,8 @@ func injectToOptional<T>(v: T) -> T? {
   return v
 }
 
-let _ = #available(OSX 10.10, *) // expected-error {{check can only be used as condition or where clause of if statement}}
 
-// For the moment, we don't allow #available() in IfExprs.
-(#available(OSX 10.10) ? 1 : 0) // expected-error {{check can only be used as condition or where clause of if statement}}
-
-if #available(OSX 10.10) && #available(OSX 10.11) { // expected-error 2{{check can only be used as condition or where clause of if statement}}
-}
-
-if !#available(OSX 10.11, *) { // expected-error {{check can only be used as condition or where clause of if statement}}
-}
-
-if let _ = injectToOptional(5) where !#available(OSX 10.11, *) { // expected-error {{check can only be used as condition or where clause of if statement}}
-}
+if let _ = injectToOptional(5), #available(OSX 10.11, *) {}  // ok
 
 
 // Refining context inside guard
@@ -1028,7 +1017,7 @@ if #available(OSX 10.10, *),
         // expected-note@-1 {{guard with version check}}
 }
 
-if let _ = injectToOptional(5) where #available(OSX 10.10, *),
+if let _ = injectToOptional(5), #available(OSX 10.10, *),
    let _ = injectToOptional(globalFuncAvailableOn10_10()),
    let _ = injectToOptional(globalFuncAvailableOn10_11()) { // expected-error {{'globalFuncAvailableOn10_11()' is only available on OS X 10.11 or newer}}
         // expected-note@-1 {{guard with version check}}
@@ -1038,15 +1027,15 @@ if let _ = injectToOptional(5) where #available(OSX 10.10, *),
         // expected-note@-1 {{guard with version check}}
 }
 
-if let _ = injectToOptional(globalFuncAvailableOn10_10()) where #available(OSX 10.10, *), // expected-error {{'globalFuncAvailableOn10_10()' is only available on OS X 10.10 or newer}}
+if let _ = injectToOptional(globalFuncAvailableOn10_10()), #available(OSX 10.10, *), // expected-error {{'globalFuncAvailableOn10_10()' is only available on OS X 10.10 or newer}}
         // expected-note@-1 {{guard with version check}}
    let _ = injectToOptional(globalFuncAvailableOn10_11()) { // expected-error {{'globalFuncAvailableOn10_11()' is only available on OS X 10.11 or newer}}
         // expected-note@-1 {{guard with version check}}
 
 }
 
-if let _ = injectToOptional(5) where #available(OSX 10.10, *), // expected-note {{enclosing scope here}}
-   let _ = injectToOptional(6) where #available(OSX 10.10, *) { // expected-warning {{unnecessary check for 'OSX'; enclosing scope ensures guard will always be true}}
+if let _ = injectToOptional(5), #available(OSX 10.10, *), // expected-note {{enclosing scope here}}
+   let _ = injectToOptional(6), #available(OSX 10.10, *) { // expected-warning {{unnecessary check for 'OSX'; enclosing scope ensures guard will always be true}}
 }
 
 

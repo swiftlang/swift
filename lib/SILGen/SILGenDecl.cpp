@@ -898,6 +898,39 @@ void SILGenFunction::visitPatternBindingDecl(PatternBindingDecl *PBD) {
   }
 }
 
+/// Emit a check that returns 1 if the running OS version is in
+/// the specified version range and 0 otherwise. The returned SILValue
+/// (which has type Builtin.Int1) represents the result of this check.
+SILValue SILGenFunction::emitOSVersionRangeCheck(SILLocation loc,
+                                                 const VersionRange &range) {
+
+  // Emit constants for the checked version range.
+  clang::VersionTuple Vers = range.getLowerEndpoint();
+  unsigned major = Vers.getMajor();
+  unsigned minor =
+      (Vers.getMinor().hasValue() ? Vers.getMinor().getValue() : 0);
+  unsigned subminor =
+      (Vers.getSubminor().hasValue() ? Vers.getSubminor().getValue() : 0);
+
+  SILType wordType = SILType::getBuiltinWordType(getASTContext());
+
+  SILValue majorValue = B.createIntegerLiteral(loc, wordType, major);
+  SILValue minorValue = B.createIntegerLiteral(loc, wordType, minor);
+  SILValue subminorValue = B.createIntegerLiteral(loc, wordType, subminor);
+
+  // Emit call to _stdlib_isOSVersionAtLeast(major, minor, patch)
+  FuncDecl *versionQueryDecl =
+      getASTContext().getIsOSVersionAtLeastDecl(nullptr);
+  assert(versionQueryDecl);
+
+  auto silDeclRef = SILDeclRef(versionQueryDecl);
+  SILValue availabilityGTEFn = emitGlobalFunctionRef(
+      loc, silDeclRef, getConstantInfo(silDeclRef));
+
+  SILValue args[] = {majorValue, minorValue, subminorValue};
+  return B.createApply(loc, availabilityGTEFn, args);
+}
+
 
 /// Emit the boolean test and/or pattern bindings indicated by the specified
 /// stmt condition.  If the condition fails, control flow is transfered to the
@@ -911,35 +944,52 @@ void SILGenFunction::emitStmtCondition(StmtCondition Cond,
          "emitting condition at unreachable point");
   
   for (const auto &elt : Cond) {
-    // Handle boolean conditions.
-    if (auto *expr = elt.getConditionOrNull()) {
-      // Evaluate the condition as an i1 value (guaranteed by Sema).
-      SILValue V;
-      {
-        FullExpr Scope(Cleanups, CleanupLocation(expr));
-        V = emitRValue(expr).forwardAsSingleValue(*this, expr);
-      }
-      assert(V.getType().castTo<BuiltinIntegerType>()->isFixedWidth(1) &&
-             "Sema forces conditions to have Builtin.i1 type");
-      
-      // Just branch on the condition.  On failure, we unwind any active cleanups,
-      // on success we fall through to a new block.
-      SILBasicBlock *ContBB = createBasicBlock();
-      auto FailBB = Cleanups.emitBlockForCleanups(FailDest, loc);
-      B.createCondBranch(expr, V, ContBB, FailBB);
-      
-      // Finally, emit the continue block and keep emitting the rest of the
-      // condition.
-      B.emitBlock(ContBB);
+    SILLocation booleanTestLoc = loc;
+    SILValue booleanTestValue;
+
+    switch (elt.getKind()) {
+    case StmtConditionElement::CK_PatternBinding: {
+      InitializationPtr initialization =
+      InitializationForPattern(*this, FailDest).visit(elt.getPattern());
+
+      // Emit the initial value into the initialization.
+      FullExpr Scope(Cleanups, CleanupLocation(elt.getInitializer()));
+      emitExprInto(elt.getInitializer(), initialization.get());
+      // Pattern bindings handle their own tests, we don't need a boolean test.
       continue;
     }
+
+    case StmtConditionElement::CK_Boolean: { // Handle boolean conditions.
+      auto *expr = elt.getBoolean();
+      // Evaluate the condition as an i1 value (guaranteed by Sema).
+      FullExpr Scope(Cleanups, CleanupLocation(expr));
+      booleanTestValue = emitRValue(expr).forwardAsSingleValue(*this, expr);
+      booleanTestLoc = expr;
+      break;
+    }
+    case StmtConditionElement::CK_Availability:
+      // Check the running OS version to determine whether it is in the range
+      // specified by E.
+      auto *avail = elt.getAvailability();
+      booleanTestValue = emitOSVersionRangeCheck(loc,
+                                                 avail->getAvailableRange());
+      break;
+    }
+
+    // Now that we have a boolean test as a Builtin.i1, emit the branch.
+    assert(booleanTestValue.getType().
+           castTo<BuiltinIntegerType>()->isFixedWidth(1) &&
+           "Sema forces conditions to have Builtin.i1 type");
     
-    InitializationPtr initialization =
-      InitializationForPattern(*this, FailDest).visit(elt.getPattern());
-      
-    // Emit the initial value into the initialization.
-    FullExpr Scope(Cleanups, CleanupLocation(elt.getInitializer()));
-    emitExprInto(elt.getInitializer(), initialization.get());
+    // Just branch on the condition.  On failure, we unwind any active cleanups,
+    // on success we fall through to a new block.
+    SILBasicBlock *ContBB = createBasicBlock();
+    auto FailBB = Cleanups.emitBlockForCleanups(FailDest, loc);
+    B.createCondBranch(booleanTestLoc, booleanTestValue, ContBB, FailBB);
+    
+    // Finally, emit the continue block and keep emitting the rest of the
+    // condition.
+    B.emitBlock(ContBB);
   }
 }
 

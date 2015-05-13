@@ -921,6 +921,9 @@ NOTE(trailing_closure_call_here,expr_parsing,none,
 ERROR(invalid_float_literal_missing_leading_zero,expr_parsing,none,
       "'.%0' is not a valid floating point literal; it must be written '0.%0'",
       (StringRef))
+ERROR(availability_query_outside_if_stmt_guard, expr_parsing, none,
+      "#available may only be used as condition of an 'if', 'guard'"
+      " or 'while' statement", ())
 
 ERROR(expected_identifier_after_dot_expr,expr_parsing,none,
       "expected identifier after '.' expression", ())
