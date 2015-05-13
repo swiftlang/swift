@@ -11,7 +11,8 @@
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-simple-swift
 
-/// A generalized set whose distinct elements may not be disjoint.
+/// A generalized set whose distinct elements are not necessarily
+/// disjoint.
 ///
 /// In a model of `SetAlgebraType`, some elements may subsume other
 /// elements, where
@@ -22,6 +23,8 @@
 /// *subsumes* `b` if and only if `a == b`, but that is not always the
 /// case.  For example, option sets typically do not satisfy that
 /// property.
+///
+/// Two elements are **disjoint** when neither one *subsumes* the other.
 ///
 /// - SeeAlso: `OptionSetType`.
 ///
@@ -100,9 +103,11 @@ protocol SetAlgebraType : Equatable, ArrayLiteralConvertible,
 }
 
 /// `SetAlgebraType` requirements for which default implementations
-/// are supplied.  A type conforming to `SetAlgebraType` can implement
-/// any of these initializers or methods, and those implementations
-/// will be used in lieu of these defaults.
+/// are supplied.
+///
+/// - Note: A type conforming to `SetAlgebraType` can implement any of
+///   these initializers or methods, and those implementations will be
+///   used in lieu of these defaults.
 extension SetAlgebraType {
   /// The set containing all elements of `sequence`.
   init<S : SequenceType where S.Generator.Element == Element>(_ sequence: S) {
@@ -169,6 +174,16 @@ extension SetAlgebraType {
   final
   static func element(a: Element, subsumes b: Element) -> Bool {
     return ([a] as Self).isSupersetOf([b])
+  }
+
+  /// Returns `true` iff `a` is disjoint with `b`.
+  ///
+  /// Two elements are disjoint when neither one subsumes the other.
+  ///
+  /// - SeeAlso: `Self.element(_, subsumes:_)`
+  final
+  static func element(a: Element, isDisjointWith b: Element) -> Bool {
+    return ([a] as Self).isDisjointWith([b])
   }
 }
 
@@ -239,9 +254,9 @@ protocol OptionSetType : SetAlgebraType, RawRepresentable {
 /// `OptionSetType` requirements for which default implementations
 /// are supplied.
 ///
-/// A type conforming to `OptionSetType` can implement any of these
-/// initializers or methods, and those implementations will be used in
-/// lieu of these defaults.
+/// - Note: A type conforming to `OptionSetType` can implement any of
+///  these initializers or methods, and those implementations will be
+///  used in lieu of these defaults.
 extension OptionSetType {
   /// Returns the set of elements contained in `self`, in `other`, or in
   /// both `self` and `other`.
@@ -273,9 +288,9 @@ extension OptionSetType {
 /// `OptionSetType` requirements for which default implementations are
 /// supplied when `Element == Self`, which is the default.
 ///
-/// A type conforming to `OptionSetType` can implement any of these
-/// initializers or methods, and those implementations will be used in
-/// lieu of these defaults.
+/// - Note: A type conforming to `OptionSetType` can implement any of
+///   these initializers or methods, and those implementations will be
+///   used in lieu of these defaults.
 extension OptionSetType where Element == Self {
   /// Returns `true` if `self` contains `member`.
   ///
@@ -308,11 +323,16 @@ extension OptionSetType where Element == Self {
 
 /// `OptionSetType` requirements for which default implementations are
 /// supplied when `RawValue` conforms to `BitwiseOperationsType`,
-/// which is the usual case.
+/// which is the usual case.  Each distinct bit of an option set's
+/// `.rawValue` corresponds to a disjoint element of the option set.
 ///
-/// A type conforming to `OptionSetType` can implement any of these
-/// initializers or methods, and those implementations will be used in
-/// lieu of these defaults.
+/// - `union` is implemented as a bitwise "or" (`|`) of `rawValue`s
+/// - `intersection` is implemented as a bitwise "and" (`|`) of `rawValue`s
+/// - `exclusiveOr` is implemented as a bitwise "exclusive or" (`^`) of `rawValue`s
+///
+/// - Note: A type conforming to `OptionSetType` can implement any of
+///   these initializers or methods, and those implementations will be
+///   used in lieu of these defaults.
 extension OptionSetType where RawValue : BitwiseOperationsType {
   /// Create an empty instance.
   ///
@@ -389,6 +409,7 @@ protocol SetAlgebraDispatchType {
   mutating func subtractInPlace(other: Self)
 
   static func element(a: Element, subsumes b: Element) -> Bool  
+  static func element(a: Element, isDisjointWith b: Element) -> Bool
 }
 
 //===--- Tests ------------------------------------------------------------===//
