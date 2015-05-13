@@ -78,7 +78,7 @@ ErrorTypeBridgingTests.test("NSError-to-enum bridging") {
 
     let isNoSuchFileError: Bool
     switch e {
-    case _NSCocoaError.NSFileNoSuchFileError:
+    case _NSCocoaError.FileNoSuchFileError:
       isNoSuchFileError = true
     default:
       isNoSuchFileError = false

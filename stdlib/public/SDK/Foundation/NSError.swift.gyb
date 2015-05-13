@@ -44,54 +44,128 @@ public protocol _ObjectiveCBridgeableErrorType : ErrorType {
 %{
 
 # Cocoa domains and their mapping information.
+#
+# Each entry in this dictionary is a mapping from the name of the
+# enumeration type to the set of errors in that domain.
 mappedDomains = {
   'NSCocoaError': [
     # TODO: Split this up into subdomains based on the Minimum/Maximum
     # delimited ranges?
-    'NSFileNoSuchFileError',
-    'NSFileLockingError',
-    'NSFileReadUnknownError',
-    'NSFileReadNoPermissionError',
-    'NSFileReadInvalidFileNameError',
-    'NSFileReadCorruptFileError',
-    'NSFileReadNoSuchFileError',
-    'NSFileReadInapplicableStringEncodingError',
-    'NSFileReadUnsupportedSchemeError',
-    'NSFileReadTooLargeError',
-    'NSFileReadUnknownStringEncodingError',
-    'NSFileWriteUnknownError',
-    'NSFileWriteNoPermissionError',
-    'NSFileWriteInvalidFileNameError',
-    'NSFileWriteFileExistsError',
-    'NSFileWriteInapplicableStringEncodingError',
-    'NSFileWriteUnsupportedSchemeError',
-    'NSFileWriteOutOfSpaceError',
-    'NSFileWriteVolumeReadOnlyError',
-    'NSKeyValueValidationError',
-    'NSFormattingError',
-    'NSUserCancelledError',
-    #'NSFileErrorMinimum',
-    #'NSFileErrorMaximum',
-    #'NSValidationErrorMinimum',
-    #'NSValidationErrorMaximum',
-    #'NSFormattingErrorMinimum',
-    #'NSFormattingErrorMaximum',
-    'NSPropertyListReadCorruptError',
-    'NSPropertyListReadUnknownVersionError',
-    'NSPropertyListReadStreamError',
-    'NSPropertyListWriteStreamError',
-    #'NSPropertyListErrorMinimum',
-    #'NSPropertyListErrorMaximum',
-    #'NSExecutableErrorMinimum',
-    'NSExecutableNotLoadableError',
-    'NSExecutableArchitectureMismatchError',
-    'NSExecutableRuntimeMismatchError',
-    'NSExecutableLoadError',
-    'NSExecutableLinkError',
-    #'NSExecutableErrorMaximum',
+
+    # Foundation errors
+    ('NSFileNoSuchFileError', '', 0),
+    ('NSFileLockingError', '', 0),
+    ('NSFileReadUnknownError', '', 0),
+    ('NSFileReadNoPermissionError', '', 0),
+    ('NSFileReadInvalidFileNameError', '', 0),
+    ('NSFileReadCorruptFileError', '', 0),
+    ('NSFileReadNoSuchFileError', '', 0),
+    ('NSFileReadInapplicableStringEncodingError', '', 0),
+    ('NSFileReadUnsupportedSchemeError', '', 0),
+    ('NSFileReadTooLargeError', 'available(OSX 10.5, iOS 2.0, *)', 0),
+    ('NSFileReadUnknownStringEncodingError', 'available(OSX 10.5, iOS 2.0, *)', 0),
+    ('NSFileWriteUnknownError', '', 0),
+    ('NSFileWriteNoPermissionError', '', 0),
+    ('NSFileWriteInvalidFileNameError', '', 0),
+    ('NSFileWriteFileExistsError', 'available(OSX 10.7, iOS 5.0, *)', 0),
+    ('NSFileWriteInapplicableStringEncodingError', '', 0),
+    ('NSFileWriteUnsupportedSchemeError', '', 0),
+    ('NSFileWriteOutOfSpaceError', '', 0),
+    ('NSFileWriteVolumeReadOnlyError', 'available(OSX 10.6, iOS 4.0, *)', 0),
+    ('NSKeyValueValidationError', '', 0),
+    ('NSFormattingError', '', 0),
+    ('NSUserCancelledError', '', 0),
+    ('NSFeatureUnsupportedError', 'available(OSX 10.8, iOS 6.0, *)', 0),
+    ('NSExecutableNotLoadableError', 'available(OSX 10.5, iOS 2.0, *)', 0),
+    ('NSExecutableArchitectureMismatchError', 'available(OSX 10.5, iOS 2.0, *)', 0),
+    ('NSExecutableRuntimeMismatchError', 'available(OSX 10.5, iOS 2.0, *)', 0),
+    ('NSExecutableLoadError', 'available(OSX 10.5, iOS 2.0, *)', 0),
+    ('NSExecutableLinkError', 'available(OSX 10.5, iOS 2.0, *)', 0),
+    ('NSPropertyListReadCorruptError', 'available(OSX 10.6, iOS 4.0, *)', 0),
+    ('NSPropertyListReadUnknownVersionError', 'available(OSX 10.6, iOS 4.0, *)', 0),
+    ('NSPropertyListReadStreamError', 'available(OSX 10.6, iOS 4.0, *)', 0),
+    ('NSPropertyListWriteStreamError', 'available(OSX 10.6, iOS 4.0, *)', 0),
+    ('NSPropertyListWriteInvalidError', 'available(OSX 10.10, iOS 8.0, *)', 0),
+
+    ('NSXPCConnectionInterrupted', 'available(OSX 10.8, iOS 6.0, *)', 0),
+    ('NSXPCConnectionInvalid', 'available(OSX 10.8, iOS 6.0, *)', 0),
+    ('NSXPCConnectionReplyInvalid', 'available(OSX 10.8, iOS 6.0, *)', 0),
+
+    ('NSUbiquitousFileUnavailableError', 'available(OSX 10.9, iOS 7.0, *)', 0),
+    ('NSUbiquitousFileNotUploadedDueToQuotaError', 'available(OSX 10.9, iOS 7.0, *)', 0),
+    ('NSUbiquitousFileUbiquityServerNotAvailable', 'available(OSX 10.9, iOS 7.0, *)', 0),
+
+    ('NSUserActivityHandoffFailedError', 'available(OSX 10.10, iOS 8.0, *)', 0),
+    ('NSUserActivityConnectionUnavailableError', 'available(OSX 10.10, iOS 8.0, *)', 0),
+    ('NSUserActivityRemoteApplicationTimedOutError', 'available(OSX 10.10, iOS 8.0, *)', 0),
+    ('NSUserActivityHandoffUserInfoTooLargeError', 'available(OSX 10.10, iOS 8.0, *)', 0),
+
+    ('NSCoderReadCorruptError', 'available(OSX 10.11, iOS 9.0, *)', 0),
+    ('NSCoderValueNotFoundError', 'available(OSX 10.11, iOS 9.0, *)', 0),
+
+    # CoreData errors.
+    ('NSManagedObjectValidationError', '', 1550),
+    ('NSValidationMultipleErrorsError', '', 1560),
+    ('NSValidationMissingMandatoryPropertyError', '', 1570),
+    ('NSValidationRelationshipLacksMinimumCountError', '', 1580),
+    ('NSValidationRelationshipExceedsMaximumCountError', '', 1590),
+    ('NSValidationRelationshipDeniedDeleteError', '', 1600),
+    ('NSValidationNumberTooLargeError', '', 1610),
+    ('NSValidationNumberTooSmallError', '', 1620),
+    ('NSValidationDateTooLateError', '', 1630),
+    ('NSValidationDateTooSoonError', '', 1640),
+    ('NSValidationInvalidDateError', '', 1650),
+    ('NSValidationStringTooLongError', '', 1660),
+    ('NSValidationStringTooShortError', '', 1670),
+    ('NSValidationStringPatternMatchingError', '', 1680),
+    ('NSManagedObjectContextLockingError', '', 132000),
+    ('NSPersistentStoreCoordinatorLockingError', '', 132010),
+    ('NSManagedObjectReferentialIntegrityError', '', 133000),
+    ('NSManagedObjectExternalRelationshipError', '', 133010,),
+    ('NSManagedObjectMergeError', '', 133020),
+    ('NSManagedObjectConstraintMergeError', '', 133021),
+    ('NSPersistentStoreInvalidTypeError', '', 134000),
+    ('NSPersistentStoreTypeMismatchError', '', 134010),
+    ('NSPersistentStoreIncompatibleSchemaError', '', 134020),
+    ('NSPersistentStoreSaveError', '', 134030),
+    ('NSPersistentStoreIncompleteSaveError', '', 134040),
+    ('NSPersistentStoreSaveConflictsError', '', 134050),
+    ('NSCoreDataError', '', 134060),
+    ('NSPersistentStoreOperationError', '', 134070),
+    ('NSPersistentStoreOpenError', '', 134080),
+    ('NSPersistentStoreTimeoutError', '', 134090),
+    ('NSPersistentStoreUnsupportedRequestTypeError', '', 134091),
+    ('NSPersistentStoreIncompatibleVersionHashError', '', 134100),
+    ('NSMigrationError', '', 134110),
+    ('NSMigrationCancelledError', '', 134120),
+    ('NSMigrationMissingSourceModelError', '', 134130),
+    ('NSMigrationMissingMappingModelError', '', 134140),
+    ('NSMigrationManagerSourceStoreError', '', 134150),
+    ('NSMigrationManagerDestinationStoreError', '', 134160),
+    ('NSEntityMigrationPolicyError', '', 134170),
+    ('NSSQLiteError', '', 134180),
+    ('NSInferredMappingModelError', '', 134190),
+    ('NSExternalRecordImportError', '', 134200),
   ],
 }
 
+mappedDomainsOSX = {
+  'NSCocoaError': [
+    # Foundation errors
+    ('NSFileManagerUnmountUnknownError', 'available(OSX 10.11, *)', 0),
+    ('NSFileManagerUnmountBusyError', 'available(OSX 10.11, *)', 0),
+    # AppKit errors
+    ('NSTextReadInapplicableDocumentTypeError', '', 65806),
+    ('NSTextWriteInapplicableDocumentTypeError', '', 66062),
+    ('NSServiceApplicationNotFoundError', '', 66560),
+    ('NSServiceApplicationLaunchFailedError', '', 66561),
+    ('NSServiceRequestTimedOutError', '', 66562),
+    ('NSServiceInvalidPasteboardDataError', '', 66563),
+    ('NSServiceMalformedServiceDictionaryError', '', 66564),
+    ('NSServiceMiscellaneousError', '', 66800),    
+    ('NSSharingServiceNotConfiguredError', '', 67072),
+  ]
+}
 }%
 
 %for domain in mappedDomains:
@@ -101,17 +175,64 @@ mappedDomains = {
 EnumName = "_" + domain
 }%
 
-public enum ${EnumName} : _ObjectiveCBridgeableErrorType {
-%  for code in mappedDomains[domain]:
-  case ${code}
+// Non-zero constant values in the table indicate constants that come
+// from another framework (AppKit or CoreData) and need to be copied here.
+%  for (name, availability, id) in mappedDomains[domain]:
+%    if id != 0:
+private let ${name}: Int = ${id}
+%    end
+%  end
+%  if mappedDomainsOSX.has_key(domain):
+#if os(OSX)
+%    for (name, availability, id) in mappedDomainsOSX[domain]:
+%      if id != 0:
+private let ${name}: Int = ${id}
+%      end
+%    end
+#endif
+%  end
+
+public enum ${EnumName} : Int, _ObjectiveCBridgeableErrorType {
+%  for (name, availability, id) in mappedDomains[domain]:
+  case ${name[2:]}
+%  end
+%  if mappedDomainsOSX.has_key(domain):
+#if os(OSX)
+%    for (name, availability, id) in mappedDomainsOSX[domain]:
+  case ${name[2:]}
+%    end
+#endif
 %  end
 
   public var _domain: String { return ${domain}Domain }
   public var _code: Int {
     switch self {
-%  for code in mappedDomains[domain]:
-    case ${EnumName}.${code}: return Foundation.${code}
+%  for (name, availability, id) in mappedDomains[domain]:
+    case ${EnumName}.${name[2:]}:
+%    if availability != '':
+      guard #${availability} else {
+        fatalError("${name} not available on this OS version")
+      }
+%    end
+      return ${name}
 %  end
+    default:
+%    if mappedDomainsOSX.has_key(domain):
+#if os(OSX)
+%      for (name, availability, id) in mappedDomainsOSX[domain]:
+%        if availability != '':
+      if #${availability} {
+%        end
+        if self == ${EnumName}.${name[2:]} {
+          return ${name}
+        }
+%        if availability != '':
+      }
+%        end
+%      end
+#endif
+%    end
+      fatalError("unhandled error code in ${EnumName}")
     }
   }
 
@@ -120,12 +241,36 @@ public enum ${EnumName} : _ObjectiveCBridgeableErrorType {
       return nil
     }
 
-    switch _bridgedNSError.code {
-%  for code in mappedDomains[domain]:
-    case Foundation.${code}: self = ${EnumName}.${code}
-%  end
-    default: return nil
+    let code = _bridgedNSError.code
+%  for (name, availability, id) in mappedDomains[domain]:
+%   if availability != '':
+    if #${availability} {
+%   end
+      if code == ${name} {
+        self = ${EnumName}.${name[2:]}
+        return
+      }
+%   if availability != '':
     }
+%   end
+%  end
+%  if mappedDomainsOSX.has_key(domain):
+#if os(OSX)
+%    for (name, availability, id) in mappedDomainsOSX[domain]:
+%      if availability != '':
+    if #${availability} {
+%      end
+      if code == ${name} {
+        self = ${EnumName}.${name[2:]}
+        return
+      }
+%      if availability != '':
+    }
+%      end
+%    end
+#endif
+%  end
+    return nil
   }
 }
 
