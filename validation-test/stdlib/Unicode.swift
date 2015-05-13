@@ -127,7 +127,7 @@ func checkDecodeUTF<Codec : UnicodeCodecType>(
 ) -> AssertionResult {
   if true {
     var decoded = ArraySinkOf<UInt32>()
-    var g = EOFCountingGenerator(utfStr)
+    let g = EOFCountingGenerator(utfStr)
     transcode(codec, UTF32.self, g, &decoded, stopOnError: true)
     expectGE(1, g.numTimesReturnedEOF)
     if expectedHead != decoded.array {
@@ -143,7 +143,7 @@ func checkDecodeUTF<Codec : UnicodeCodecType>(
     expected += expectedRepairedTail
 
     var decoded = ArraySinkOf<UInt32>()
-    var g = EOFCountingGenerator(utfStr)
+    let g = EOFCountingGenerator(utfStr)
     transcode(codec, UTF32.self, g, &decoded, stopOnError: false)
     expectEqual(1, g.numTimesReturnedEOF)
     if expected != decoded.array {
@@ -183,7 +183,7 @@ func checkDecodeUTF32(
 func checkEncodeUTF8(expected: [UInt8],
                      _ scalars: [UInt32]) -> AssertionResult {
   var encoded = ArraySinkOf<UInt8>()
-  var g = EOFCountingGenerator(scalars)
+  let g = EOFCountingGenerator(scalars)
   let hadError =
     transcode(UTF32.self, UTF8.self, g, &encoded, stopOnError: true)
   expectFalse(hadError)
@@ -2129,7 +2129,7 @@ class NonContiguousNSString : NSString {
 
   convenience init(_ utf8: [UInt8]) {
     var encoded = ArraySinkOf<UInt16>()
-    var g = utf8.generate()
+    let g = utf8.generate()
     let hadError =
       transcode(UTF8.self, UTF16.self, g, &encoded, stopOnError: true)
     expectFalse(hadError)
@@ -2143,7 +2143,7 @@ class NonContiguousNSString : NSString {
 
   convenience init(_ scalars: [UInt32]) {
     var encoded = ArraySinkOf<UInt16>()
-    var g = scalars.generate()
+    let g = scalars.generate()
     let hadError =
       transcode(UTF32.self, UTF16.self, g, &encoded, stopOnError: true)
     expectFalse(hadError)
@@ -2353,7 +2353,7 @@ StringCookedViews.test("UTF16") {
 
 StringCookedViews.test("UnicodeScalars") {
   for test in UTF8TestsSmokeTest {
-    let expectedScalars = map(test.scalars) { UnicodeScalar($0) }
+    let expectedScalars = test.scalars.map { UnicodeScalar($0) }
     let subject = NonContiguousNSString(test.scalars) as String
     checkSliceableWithBidirectionalIndex(expectedScalars,
         subject.unicodeScalars, test.loc.withCurrentLoc())
@@ -2361,7 +2361,7 @@ StringCookedViews.test("UnicodeScalars") {
 
   forStringsWithUnpairedSurrogates {
     (test: UTF16Test, subject: String) -> () in
-    let expectedScalars = map(test.scalarsHead + test.scalarsRepairedTail) {
+    let expectedScalars = (test.scalarsHead + test.scalarsRepairedTail).map {
       UnicodeScalar($0)
     }
     checkSliceableWithBidirectionalIndex(expectedScalars,
@@ -2376,7 +2376,7 @@ StringTests.test("StreamableConformance") {
     (test: UTF16Test, subject: String) -> () in
     let expected = test.scalarsHead + test.scalarsRepairedTail
     let printedSubject = String(subject)
-    let actual = map(printedSubject.unicodeScalars) { $0.value }
+    let actual = printedSubject.unicodeScalars.map { $0.value }
     expectEqual(expected, actual)
   }
 }

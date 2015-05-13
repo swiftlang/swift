@@ -207,7 +207,7 @@ tests.test("index-mapping/utf8-to-unicode-scalar") {
   
   expectEqualSequence(
     winterUtf8UnicodeScalars,
-    map(winter.utf8.indices) {
+    winter.utf8.indices.map {
       i in i.samePositionIn(winter.unicodeScalars).map {
         winter.unicodeScalars[$0]
       }
@@ -220,8 +220,8 @@ tests.test("index-mapping/utf8-to-unicode-scalar") {
     winter.utf8.endIndex.samePositionIn(winter.unicodeScalars)!)
   
   expectEqualSequence(
-    map(summerBytes) { UnicodeScalar($0) as UnicodeScalar? },
-    map(summer.utf8.indices) {
+    summerBytes.map { UnicodeScalar($0) as UnicodeScalar? },
+    summer.utf8.indices.map {
       i in i.samePositionIn(summer.unicodeScalars).map {
         summer.unicodeScalars[$0]
       }
@@ -247,7 +247,7 @@ tests.test("index-mapping/utf16-to-unicode-scalar") {
   
   expectEqualSequence(
     winterUtf16UnicodeScalars,
-    map(winter.utf16.indices) {
+    winter.utf16.indices.map {
       i in i.samePositionIn(winter.unicodeScalars).map {
         winter.unicodeScalars[$0]
       }
@@ -260,8 +260,8 @@ tests.test("index-mapping/utf16-to-unicode-scalar") {
     winter.utf16.endIndex.samePositionIn(winter.unicodeScalars)!)
   
   expectEqualSequence(
-    map(summerBytes) { UnicodeScalar($0) as UnicodeScalar? },
-    map(summer.utf16.indices) {
+    summerBytes.map { UnicodeScalar($0) as UnicodeScalar? },
+    summer.utf16.indices.map {
       i in i.samePositionIn(summer.unicodeScalars).map {
         summer.unicodeScalars[$0]
       }
@@ -424,7 +424,7 @@ tests.test("index-mapping/utf8-to-unicode-scalar") {
   
   expectEqualSequence(
     winterUtf8UnicodeScalars,
-    map(winter.utf8.indices) {
+    winter.utf8.indices.map {
       i in i.samePositionIn(winter.unicodeScalars).map {
         winter.unicodeScalars[$0]
       }
@@ -437,8 +437,8 @@ tests.test("index-mapping/utf8-to-unicode-scalar") {
     winter.utf8.endIndex.samePositionIn(winter.unicodeScalars)!)
   
   expectEqualSequence(
-    map(summerBytes) { UnicodeScalar($0) as UnicodeScalar? },
-    map(summer.utf8.indices) {
+    summerBytes.map { UnicodeScalar($0) as UnicodeScalar? },
+    summer.utf8.indices.map {
       i in i.samePositionIn(summer.unicodeScalars).map {
         summer.unicodeScalars[$0]
       }
@@ -465,7 +465,7 @@ tests.test("index-mapping/utf16-to-unicode-scalar") {
   
   expectEqualSequence(
     winterUtf16UnicodeScalars,
-    map(winter.utf16.indices) {
+    winter.utf16.indices.map {
       i in i.samePositionIn(winter.unicodeScalars).map {
         winter.unicodeScalars[$0]
       }
@@ -478,8 +478,8 @@ tests.test("index-mapping/utf16-to-unicode-scalar") {
     winter.utf16.endIndex.samePositionIn(winter.unicodeScalars)!)
   
   expectEqualSequence(
-    map(summerBytes) { UnicodeScalar($0) as UnicodeScalar? },
-    map(summer.utf16.indices) {
+    summerBytes.map { UnicodeScalar($0) as UnicodeScalar? },
+    summer.utf16.indices.map {
       i in i.samePositionIn(summer.unicodeScalars).map {
         summer.unicodeScalars[$0]
       }
@@ -552,7 +552,7 @@ tests.test("index-mapping/utf8-to-character") {
     winter.utf8.endIndex.samePositionIn(winter)!)
   
   expectEqualSequence(
-    map(summerBytes) { Character(UnicodeScalar($0)) },
+    summerBytes.map { Character(UnicodeScalar($0)) },
     summer.utf8.indices.map { summer[$0.samePositionIn(summer)!] }
   )
 
@@ -570,7 +570,7 @@ tests.test("index-mapping/utf16-to-character") {
   
   expectEqualSequence(
     winterUtf16Characters,
-    map(winter.utf16.indices) {
+    winter.utf16.indices.map {
       i in i.samePositionIn(winter).map {
         winter[$0]
       }
@@ -583,8 +583,8 @@ tests.test("index-mapping/utf16-to-character") {
     winter.utf16.endIndex.samePositionIn(winter)!)
   
   expectEqualSequence(
-    map(summerBytes) { Character(UnicodeScalar($0)) },
-    map(summer.utf16.indices) {
+    summerBytes.map { Character(UnicodeScalar($0)) },
+    summer.utf16.indices.map {
       summer[$0.samePositionIn(summer)!]
     }
   )

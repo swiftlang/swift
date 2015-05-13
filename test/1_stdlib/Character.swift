@@ -93,9 +93,9 @@ let testCharacters = [
 ]
 
 func randomGraphemeCluster(minSize: Int, _ maxSize: Int) -> String {
-  var n = pickRandom((minSize + 1)..<maxSize)
+  let n = pickRandom((minSize + 1)..<maxSize)
   var result = pickRandom(baseScalars)
-  for i in 0..<n {
+  for _ in 0..<n {
     result += pickRandom(continuingScalars)
   }
   return result
@@ -169,7 +169,7 @@ CharacterTests.test("Hashable") {
 /// Test that a given `String` can be transformed into a `Character` and back
 /// without loss of information.
 func checkRoundTripThroughCharacter(s: String) {
-  var c = Character(s)
+  let c = Character(s)
   var s2 = String(c)
   expectEqual(Array(s.unicodeScalars), Array(s2.unicodeScalars)) {
     "round-tripping error: \"\(s)\" != \"\(s2)\""
@@ -260,7 +260,7 @@ UnicodeScalarTests.test("UInt8(ascii: UnicodeScalar)/non-ASCII should trap") {
 }
 
 UnicodeScalarTests.test("UInt32(_: UnicodeScalar),UInt64(_: UnicodeScalar)") {
-  for us in map(baseScalars, { $0.unicodeScalars.first! }) {
+  for us in baseScalars.map({ $0.unicodeScalars.first! }) {
     expectEqual(us.value, UInt32(us))
     expectEqual(UInt64(us.value), UInt64(us))
   }

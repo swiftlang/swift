@@ -65,11 +65,11 @@ public struct MapSequenceView<Base : SequenceType, T> : SequenceType {
 
 /// Return an `Array` containing the results of mapping `transform`
 /// over `source`.
+@available(*, unavailable, message="call the 'map()' method on the sequence")
 public func map<S : SequenceType, T>(
   source: S, _ transform: (S.Generator.Element) -> T
 ) -> [T] {
-  // FIXME(prext): remove this function when protocol extensions land.
-  return source._prext_map(transform)
+  return source.map(transform)
 }
 
 /// Return an `Array` containing the results of mapping `transform`
@@ -129,11 +129,11 @@ public struct MapCollectionView<Base : CollectionType, T> : CollectionType {
 
 /// Return an `Array` containing the results of mapping `transform`
 /// over `source`.
+@available(*, unavailable, message="call the 'map()' method on the sequence")
 public func map<C : CollectionType, T>(
   source: C, _ transform: (C.Generator.Element) -> T
 ) -> [T] {
-  // FIXME(prext): remove this function when protocol extensions land.
-  return source._prext_map(transform)
+  return source.map(transform)
 }
 
 /// Return an `Array` containing the results of mapping `transform`

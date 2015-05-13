@@ -664,13 +664,6 @@ extension ${Self} : _ArrayType {
     return result
   }
 
-  /// Return ${a_Self} containing the results of calling
-  /// `transform(x)` on each element `x` of `self`
-  public func map<U>(@noescape transform: (T) -> U) -> ${Self}<U> {
-    // FIXME(prext): remove this function when protocol extensions land.
-    return ${Self}<U>(self._prext_map(transform))
-  }
-
   /// Return ${a_Self} containing the elements `x` of `self` for which
   /// `includeElement(x)` is `true`
   public func filter(@noescape includeElement: (T) -> Bool) -> ${Self} {

@@ -30,7 +30,7 @@ func checkUnicodeScalarViewIteration(
   if true {
     var us = str.unicodeScalars
     var i = us.startIndex
-    var end = us.endIndex
+    let end = us.endIndex
     var decoded: [UInt32] = []
     while i != end {
       expectTrue(i < i.successor()) // Check for Comparable conformance
@@ -41,7 +41,7 @@ func checkUnicodeScalarViewIteration(
   }
   if true {
     var us = str.unicodeScalars
-    var start = us.startIndex
+    let start = us.startIndex
     var i = us.endIndex
     var decoded: [UInt32] = []
     while i != start {
@@ -799,7 +799,7 @@ StringTests.test("toInt") {
   {
     var chars = Array(String(initialValue).utf8)
     modification(chars: &chars)
-    var str = String._fromWellFormedCodeUnitSequence(UTF8.self, input: chars)
+    let str = String._fromWellFormedCodeUnitSequence(UTF8.self, input: chars)
     expectEmpty(Int(str))
   }
 
@@ -1118,7 +1118,7 @@ StringTests.test("String.append(_: Character)") {
     // U+0303 COMBINING TILDE
     "\u{61}\u{0300}\u{0301}\u{0302}\u{0303}",
   ]
-  let baseStrings = [ "" ] + map(baseCharacters) { String($0) }
+  let baseStrings = [ "" ] + baseCharacters.map { String($0) }
 
   for baseIdx in baseStrings.indices {
     for prefix in ["", " "] {

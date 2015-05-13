@@ -203,60 +203,6 @@ Algorithm.test("filter/eager") {
   expectEqual(10, count)
 }
 
-Algorithm.test("map/SequenceType") {
-  // FIXME(prext): remove these tests together with the map() function when
-  // protocol extensions land.  These tests have been migrated to the new API.
-
-  if true {
-    let s = MinimalSequence<Int>([], underestimatedCount: .Precise)
-    var result = map(s) {
-      (x: Int) -> Int16 in
-      expectUnreachable()
-      return 42
-    }
-    expectType([Int16].self, &result)
-    expectEqual([], result)
-    expectEqual([], Array(s))
-  }
-  if true {
-    let s = MinimalSequence(
-      [ 0, 30, 10, 90 ], underestimatedCount: .Value(0))
-    let result = map(s) { $0 + 1 }
-    expectEqual([ 1, 31, 11, 91 ], result)
-    expectEqual([], Array(s))
-  }
-  if true {
-    let s = MinimalSequence(
-      [ 0, 30, 10, 90 ], underestimatedCount: .Precise)
-    let result = map(s) { $0 + 1 }
-    expectEqual([ 1, 31, 11, 91 ], result)
-    expectEqual([], Array(s))
-  }
-}
-
-Algorithm.test("map/CollectionType") {
-  // FIXME(prext): remove these tests together with the map() function when
-  // protocol extensions land.  These tests have been migrated to the new API.
-
-  if true {
-    let c = MinimalForwardCollection<Int>([])
-    var result = map(c) {
-      (x: Int) -> Int16 in
-      expectUnreachable()
-      return 42
-    }
-    expectType([Int16].self, &result)
-    expectEqual([], result)
-    expectLE(c.underestimatedCount, result.capacity)
-  }
-  if true {
-    let c = MinimalForwardCollection(
-      [ 0, 30, 10, 90 ], underestimatedCount: .Value(0))
-    let result = map(c) { $0 + 1 }
-    expectEqual([ 1, 31, 11, 91 ], result)
-  }
-}
-
 Algorithm.test("sorted/strings")
   .xfail(.LinuxAny(reason: "String comparison: ICU vs. Foundation"))
   .code {
@@ -459,19 +405,19 @@ SequenceTypeAlgorithms.test("enumerate") {
 
   for test in enumerateTests {
     let s = MinimalSequence<OpaqueValue<Int>>(
-      test.sequence._prext_map { OpaqueValue($0) })
+      test.sequence.map { OpaqueValue($0) })
     var result = s.enumerate()
     expectType(
       EnumerateSequence<MinimalSequence<OpaqueValue<Int>>>.self,
       &result)
     checkSequence(
-      test.expected._prext_map {
+      test.expected.map {
         (index: $0.0, element: OpaqueValue($0.1))
       } as [Element],
       result, compareElements,
       resiliencyChecks: .none,
       test.loc.withCurrentLoc())
-    expectEqual([], s._prext_map { $0.value }) { "sequence should be consumed" }
+    expectEqual([], s.map { $0.value }) { "sequence should be consumed" }
   }
 }
 
@@ -530,7 +476,7 @@ let minMaxElementTests = [
 SequenceTypeAlgorithms.test("${algorithmKind}Element/WhereElementIsComparable") {
   for test in minMaxElementTests {
     let s = MinimalSequence<MinimalComparableValue>(
-      test.sequence.enumerate()._prext_map {
+      test.sequence.enumerate().map {
         MinimalComparableValue($1, identity: $0)
       })
     var maybeResult = s.${algorithmKind}Element()
@@ -550,14 +496,14 @@ SequenceTypeAlgorithms.test("${algorithmKind}Element/WhereElementIsComparable") 
         test.expected${AlgorithmKind}Index,
         stackTrace: test.loc.withCurrentLoc())
     }
-    expectEqual([], s._prext_map { $0.value }) { "sequence should be consumed" }
+    expectEqual([], s.map { $0.value }) { "sequence should be consumed" }
   }
 }
 
 SequenceTypeAlgorithms.test("${algorithmKind}Element/Predicate") {
   for test in minMaxElementTests {
     let s = MinimalSequence<OpaqueValue<Int>>(
-      test.sequence.enumerate()._prext_map {
+      test.sequence.enumerate().map {
         OpaqueValue($1, identity: $0)
       })
     var timesClosureWasCalled = 0
@@ -582,7 +528,7 @@ SequenceTypeAlgorithms.test("${algorithmKind}Element/Predicate") {
         test.expected${AlgorithmKind}Index,
         stackTrace: test.loc.withCurrentLoc())
     }
-    expectEqual([], s._prext_map { $0.value }) { "sequence should be consumed" }
+    expectEqual([], s.map { $0.value }) { "sequence should be consumed" }
     expectEqual(max(0, test.sequence.count - 1), timesClosureWasCalled) {
       "maxElement() should be eager and should only call its predicate once per element"
     }
@@ -607,10 +553,10 @@ SequenceTypeAlgorithms.test("startsWith/WhereElementIsEquatable") {
         s.startsWith(prefix),
         stackTrace: test.loc.withCurrentLoc())
       expectEqual(
-        test.expectedLeftoverSequence, s._prext_map { $0.value },
+        test.expectedLeftoverSequence, s.map { $0.value },
         stackTrace: test.loc.withCurrentLoc())
       expectEqual(
-        test.expectedLeftoverPrefix, prefix._prext_map { $0.value },
+        test.expectedLeftoverPrefix, prefix.map { $0.value },
         stackTrace: test.loc.withCurrentLoc())
     }
 
@@ -625,10 +571,10 @@ SequenceTypeAlgorithms.test("startsWith/WhereElementIsEquatable") {
         s.startsWith(prefix),
         stackTrace: test.loc.withCurrentLoc())
       expectEqual(
-        test.sequence, s._prext_map { $0.value },
+        test.sequence, s.map { $0.value },
         stackTrace: test.loc.withCurrentLoc())
       expectEqual(
-        test.expectedLeftoverPrefix, prefix._prext_map { $0.value },
+        test.expectedLeftoverPrefix, prefix.map { $0.value },
         stackTrace: test.loc.withCurrentLoc())
     }
   }
@@ -638,52 +584,52 @@ SequenceTypeAlgorithms.test("startsWith/Predicate") {
   for test in startsWithTests {
     if true {
       let s = MinimalSequence<OpaqueValue<Int>>(
-        map(test.sequence) { OpaqueValue($0) })
+        test.sequence.map { OpaqueValue($0) })
       let prefix = MinimalSequence<OpaqueValue<Int>>(
-        map(test.prefix) { OpaqueValue($0) })
+        test.prefix.map { OpaqueValue($0) })
       expectEqual(
         test.expected,
         s.startsWith(prefix) { $0.value == $1.value },
         stackTrace: test.loc.withCurrentLoc())
       expectEqual(
-        test.expectedLeftoverSequence, s._prext_map { $0.value },
+        test.expectedLeftoverSequence, s.map { $0.value },
         stackTrace: test.loc.withCurrentLoc())
       expectEqual(
-        test.expectedLeftoverPrefix, prefix._prext_map { $0.value },
+        test.expectedLeftoverPrefix, prefix.map { $0.value },
         stackTrace: test.loc.withCurrentLoc())
     }
     if true {
       let s = MinimalSequence<OpaqueValue<Int>>(
-        map(test.sequence) { OpaqueValue($0 * 2) })
+        test.sequence.map { OpaqueValue($0 * 2) })
       let prefix = MinimalSequence<OpaqueValue<Int>>(
-        map(test.prefix) { OpaqueValue($0) })
+        test.prefix.map { OpaqueValue($0) })
       expectEqual(
         test.expected,
         s.startsWith(prefix) { $0.value / 2 == $1.value },
         stackTrace: test.loc.withCurrentLoc())
       expectEqual(
-        test.expectedLeftoverSequence, s._prext_map { $0.value / 2 },
+        test.expectedLeftoverSequence, s.map { $0.value / 2 },
         stackTrace: test.loc.withCurrentLoc())
       expectEqual(
-        test.expectedLeftoverPrefix, prefix._prext_map { $0.value },
+        test.expectedLeftoverPrefix, prefix.map { $0.value },
         stackTrace: test.loc.withCurrentLoc())
     }
 
     // Use different types for the sequence and prefix.
     if true {
       let s = MinimalForwardCollection<OpaqueValue<Int>>(
-        map(test.sequence) { OpaqueValue($0) })
+        test.sequence.map { OpaqueValue($0) })
       let prefix = MinimalSequence<OpaqueValue<Int>>(
-        map(test.prefix) { OpaqueValue($0) })
+        test.prefix.map { OpaqueValue($0) })
       expectEqual(
         test.expected,
         s.startsWith(prefix) { $0.value == $1.value },
         stackTrace: test.loc.withCurrentLoc())
       expectEqual(
-        test.sequence, s._prext_map { $0.value },
+        test.sequence, s.map { $0.value },
         stackTrace: test.loc.withCurrentLoc())
       expectEqual(
-        test.expectedLeftoverPrefix, prefix._prext_map { $0.value },
+        test.expectedLeftoverPrefix, prefix.map { $0.value },
         stackTrace: test.loc.withCurrentLoc())
     }
   }
@@ -749,10 +695,10 @@ SequenceTypeAlgorithms.test("elementsEqual/WhereElementIsEquatable") {
         s.elementsEqual(other),
         stackTrace: test.loc.withCurrentLoc())
       expectEqual(
-        test.expectedLeftoverSequence, s._prext_map { $0.value },
+        test.expectedLeftoverSequence, s.map { $0.value },
         stackTrace: test.loc.withCurrentLoc())
       expectEqual(
-        test.expectedLeftoverOther, other._prext_map { $0.value },
+        test.expectedLeftoverOther, other.map { $0.value },
         stackTrace: test.loc.withCurrentLoc())
     }
 
@@ -767,10 +713,10 @@ SequenceTypeAlgorithms.test("elementsEqual/WhereElementIsEquatable") {
         s.elementsEqual(other),
         stackTrace: test.loc.withCurrentLoc())
       expectEqual(
-        test.sequence, s._prext_map { $0.value },
+        test.sequence, s.map { $0.value },
         stackTrace: test.loc.withCurrentLoc())
       expectEqual(
-        test.expectedLeftoverOther, other._prext_map { $0.value },
+        test.expectedLeftoverOther, other.map { $0.value },
         stackTrace: test.loc.withCurrentLoc())
     }
   }
@@ -788,10 +734,10 @@ SequenceTypeAlgorithms.test("elementsEqual/Predicate") {
         s.elementsEqual(other) { $0.value == $1.value },
         stackTrace: test.loc.withCurrentLoc())
       expectEqual(
-        test.expectedLeftoverSequence, s._prext_map { $0.value },
+        test.expectedLeftoverSequence, s.map { $0.value },
         stackTrace: test.loc.withCurrentLoc())
       expectEqual(
-        test.expectedLeftoverOther, other._prext_map { $0.value },
+        test.expectedLeftoverOther, other.map { $0.value },
         stackTrace: test.loc.withCurrentLoc())
     }
 
@@ -806,10 +752,10 @@ SequenceTypeAlgorithms.test("elementsEqual/Predicate") {
         s.elementsEqual(other) { $0.value == $1.value },
         stackTrace: test.loc.withCurrentLoc())
       expectEqual(
-        test.sequence, s._prext_map { $0.value },
+        test.sequence, s.map { $0.value },
         stackTrace: test.loc.withCurrentLoc())
       expectEqual(
-        test.expectedLeftoverOther, other._prext_map { $0.value },
+        test.expectedLeftoverOther, other.map { $0.value },
         stackTrace: test.loc.withCurrentLoc())
     }
   }
@@ -895,10 +841,10 @@ SequenceTypeAlgorithms.test("lexicographicalCompare/WhereElementIsComparable") {
         s.lexicographicalCompare(other),
         stackTrace: test.loc.withCurrentLoc())
       expectEqual(
-        test.expectedLeftoverSequence, s._prext_map { $0.value },
+        test.expectedLeftoverSequence, s.map { $0.value },
         stackTrace: test.loc.withCurrentLoc())
       expectEqual(
-        test.expectedLeftoverOther, other._prext_map { $0.value },
+        test.expectedLeftoverOther, other.map { $0.value },
         stackTrace: test.loc.withCurrentLoc())
     }
 
@@ -913,10 +859,10 @@ SequenceTypeAlgorithms.test("lexicographicalCompare/WhereElementIsComparable") {
         s.lexicographicalCompare(other),
         stackTrace: test.loc.withCurrentLoc())
       expectEqual(
-        test.sequence, s._prext_map { $0.value },
+        test.sequence, s.map { $0.value },
         stackTrace: test.loc.withCurrentLoc())
       expectEqual(
-        test.expectedLeftoverOther, other._prext_map { $0.value },
+        test.expectedLeftoverOther, other.map { $0.value },
         stackTrace: test.loc.withCurrentLoc())
     }
   }
@@ -934,10 +880,10 @@ SequenceTypeAlgorithms.test("lexicographicalCompare/Predicate") {
         s.lexicographicalCompare(other) { $0.value < $1.value },
         stackTrace: test.loc.withCurrentLoc())
       expectEqual(
-        test.expectedLeftoverSequence, s._prext_map { $0.value },
+        test.expectedLeftoverSequence, s.map { $0.value },
         stackTrace: test.loc.withCurrentLoc())
       expectEqual(
-        test.expectedLeftoverOther, other._prext_map { $0.value },
+        test.expectedLeftoverOther, other.map { $0.value },
         stackTrace: test.loc.withCurrentLoc())
     }
 
@@ -952,10 +898,10 @@ SequenceTypeAlgorithms.test("lexicographicalCompare/Predicate") {
         s.lexicographicalCompare(other) { $0.value < $1.value },
         stackTrace: test.loc.withCurrentLoc())
       expectEqual(
-        test.sequence, s._prext_map { $0.value },
+        test.sequence, s.map { $0.value },
         stackTrace: test.loc.withCurrentLoc())
       expectEqual(
-        test.expectedLeftoverOther, other._prext_map { $0.value },
+        test.expectedLeftoverOther, other.map { $0.value },
         stackTrace: test.loc.withCurrentLoc())
     }
   }
@@ -1023,7 +969,7 @@ SequenceTypeAlgorithms.test("contains/WhereElementIsEquatable/${dispatch}") {
       call${dispatch}Contains(s, MinimalEquatableValue(test.element)),
       stackTrace: test.loc.withCurrentLoc())
     expectEqual(
-      test.expectedLeftoverSequence, s._prext_map { $0.value },
+      test.expectedLeftoverSequence, s.map { $0.value },
       stackTrace: test.loc.withCurrentLoc())
   }
 }
@@ -1133,7 +1079,7 @@ SequenceTypeAlgorithms.test("contains/Predicate") {
       s.contains { $0.value == test.element },
       stackTrace: test.loc.withCurrentLoc())
     expectEqual(
-      test.expectedLeftoverSequence, s._prext_map { $0.value },
+      test.expectedLeftoverSequence, s.map { $0.value },
       stackTrace: test.loc.withCurrentLoc())
   }
 }
@@ -1175,7 +1121,7 @@ SequenceTypeAlgorithms.test("reduce") {
       return OpaqueValue<[Int]>(partialResult.value + [ element.value ])
     }
     expectEqual(test.sequence, result.value)
-    expectEqual([], s._prext_map { $0.value }) { "sequence should be consumed" }
+    expectEqual([], s.map { $0.value }) { "sequence should be consumed" }
     expectEqual(test.sequence.count, timesClosureWasCalled) {
       "reduce() should be eager and should only call its predicate once per element"
     }
@@ -1221,7 +1167,7 @@ SequenceTypeAlgorithms.test("reverse/SequenceType") {
     expectEqual(
       test.expected, result.map { $0.value },
       stackTrace: test.loc.withCurrentLoc())
-    expectEqual([], s._prext_map { $0.value }) { "sequence should be consumed" }
+    expectEqual([], s.map { $0.value }) { "sequence should be consumed" }
   }
 }
 
@@ -1234,7 +1180,7 @@ SequenceTypeAlgorithms.test("reverse/WhereIndexIsBidirectional,BidirectionalReve
       BidirectionalReverseView<MinimalBidirectionalCollection<OpaqueValue<Int>>>.self,
       &result)
     expectEqual(
-      test.expected, result._prext_map { $0.value },
+      test.expected, result.map { $0.value },
       stackTrace: test.loc.withCurrentLoc())
 
     // Check BidirectionalReverseView CollectionType conformance.
@@ -1255,7 +1201,7 @@ SequenceTypeAlgorithms.test("reverse/WhereIndexIsRandomAccess,RandomAccessRevers
       RandomAccessReverseView<MinimalRandomAccessCollection<OpaqueValue<Int>>>.self,
       &result)
     expectEqual(
-      test.expected, result._prext_map { $0.value },
+      test.expected, result.map { $0.value },
       stackTrace: test.loc.withCurrentLoc())
 
     // Check RandomAccessReverseView CollectionType conformance.
@@ -1345,8 +1291,8 @@ SequenceTypeAlgorithms.test("filter/SequenceType/${dispatch}") {
         return test.includeElement(element.value)
       }
       expectType([OpaqueValue<Int>].self, &result)
-      expectEqual(test.expected, map(result) { $0.value })
-      expectEqual([], s._prext_map { $0.value }) { "sequence should be consumed" }
+      expectEqual(test.expected, result.map { $0.value })
+      expectEqual([], s.map { $0.value }) { "sequence should be consumed" }
       expectEqual(test.sequence.count, timesClosureWasCalled) {
         "filter() should be eager and should only call its predicate once per element"
       }
@@ -1527,14 +1473,14 @@ SequenceTypeAlgorithms.test("filter/RangeReplaceableCollectionType/${CollectionT
       }
       expectType(Array<OpaqueValue<Int>>.self, &result)
       expectEqual(
-        test.expected, result._prext_map { $0.value },
+        test.expected, result.map { $0.value },
         stackTrace: test.loc.withCurrentLoc())
 %     if CollectionKind == 'CustomImplementation':
       expectEqual(
         1,
         RangeReplaceableCollectionWithCustomFilterMethod.timesFilterWasCalled)
 %     end
-      expectEqual(test.sequence, s._prext_map { $0.value }) {
+      expectEqual(test.sequence, s.map { $0.value }) {
         "collection should not be consumed"
       }
       expectEqual(test.sequence.count, timesClosureWasCalled) {
@@ -1614,11 +1560,11 @@ struct MinimalSequenceWith${Implementation}Map<Element> : SequenceType {
     }
   }
 
-  func _prext_map<T>(
+  func map<T>(
     @noescape transform: (Element) -> T
   ) -> [T] {
     ++MinimalSequenceWithCustomMap.timesMapWasCalled
-    return _data._prext_map(transform)
+    return _data.map(transform)
   }
 
 %   end
@@ -1630,7 +1576,7 @@ func callStaticSequenceMap<T>(
   sequence: MinimalSequenceWithDefaultMap<OpaqueValue<Int>>,
   @noescape transform: (OpaqueValue<Int>) -> T
 ) -> [T] {
-  var result = sequence._prext_map(transform)
+  var result = sequence.map(transform)
   expectType([T].self, &result)
   return result
 }
@@ -1639,7 +1585,7 @@ func callStaticSequenceMap<T>(
   sequence: MinimalSequenceWithCustomMap<OpaqueValue<Int>>,
   @noescape transform: (OpaqueValue<Int>) -> T
 ) -> [T] {
-  var result = sequence._prext_map(transform)
+  var result = sequence.map(transform)
   expectType([T].self, &result)
   return result
 }
@@ -1648,7 +1594,7 @@ func callGenericSequenceMap<S : SequenceType, T>(
   sequence: S,
   @noescape transform: (S.Generator.Element) -> T
 ) -> [T] {
-  var result = sequence._prext_map(transform)
+  var result = sequence.map(transform)
   expectType([T].self, &result)
   return result
 }
@@ -1666,7 +1612,7 @@ SequenceTypeAlgorithms.test("map/SequenceType/${Implementation}Implementation/${
       UnderestimateCountBehavior.Value(0)
     ] {
       let s = MinimalSequenceWith${Implementation}Map<OpaqueValue<Int>>(
-        test.sequence._prext_map { OpaqueValue($0) },
+        test.sequence.map { OpaqueValue($0) },
         underestimatedCount: underestimateCountBehavior)
       let closureLifetimeTracker = LifetimeTracked(0)
       expectEqual(1, LifetimeTracked.instances)
@@ -1681,11 +1627,11 @@ SequenceTypeAlgorithms.test("map/SequenceType/${Implementation}Implementation/${
         return OpaqueValue(Int32(test.transform(element.value)))
       }
       expectType([OpaqueValue<Int32>].self, &result)
-      expectEqual(test.expected, result._prext_map { $0.value })
+      expectEqual(test.expected, result.map { $0.value })
 %     if Implementation == 'Custom':
       expectEqual(1, MinimalSequenceWithCustomMap<OpaqueValue<Int>>.timesMapWasCalled)
 %     end
-      expectEqual([], s._prext_map { $0.value }) { "sequence should be consumed" }
+      expectEqual([], s.map { $0.value }) { "sequence should be consumed" }
       expectEqual(test.sequence.count, timesClosureWasCalled) {
         "map() should be eager and should only call its predicate once per element"
       }
@@ -1740,11 +1686,11 @@ struct MinimalForwardCollectionWith${Implementation}Map<Element>
     }
   }
 
-  func _prext_map<T>(
+  func map<T>(
     @noescape transform: (Element) -> T
   ) -> [T] {
     ++MinimalForwardCollectionWithCustomMap.timesMapWasCalled
-    return _data._prext_map(transform)
+    return _data.map(transform)
   }
 
 %   end
@@ -1757,7 +1703,7 @@ func callStaticCollectionMap<T>(
   collection: MinimalForwardCollectionWithDefaultMap<OpaqueValue<Int>>,
   @noescape transform: (OpaqueValue<Int>) -> T
 ) -> [T] {
-  var result = collection._prext_map(transform)
+  var result = collection.map(transform)
   expectType([T].self, &result)
   return result
 }
@@ -1766,7 +1712,7 @@ func callStaticCollectionMap<T>(
   collection: MinimalForwardCollectionWithCustomMap<OpaqueValue<Int>>,
   @noescape transform: (OpaqueValue<Int>) -> T
 ) -> [T] {
-  var result = collection._prext_map(transform)
+  var result = collection.map(transform)
   expectType([T].self, &result)
   return result
 }
@@ -1775,7 +1721,7 @@ func callGenericCollectionMap<C : CollectionType, T>(
   collection: C,
   @noescape transform: (C.Generator.Element) -> T
 ) -> [T] {
-  var result = collection._prext_map(transform)
+  var result = collection.map(transform)
   expectType([T].self, &result)
   return result
 }
@@ -1808,11 +1754,11 @@ SequenceTypeAlgorithms.test("map/CollectionType/${Implementation}Implementation/
         return OpaqueValue(Int32(test.transform(element.value)))
       }
       expectType([OpaqueValue<Int32>].self, &result)
-      expectEqual(test.expected, result._prext_map { $0.value })
+      expectEqual(test.expected, result.map { $0.value })
 %     if Implementation == 'Custom':
       expectEqual(1, MinimalForwardCollectionWithCustomMap<OpaqueValue<Int>>.timesMapWasCalled)
 %     end
-      expectEqual(test.sequence, s._prext_map { $0.value }) {
+      expectEqual(test.sequence, s.map { $0.value }) {
         "collection should not be consumed"
       }
       expectEqual(test.sequence.count, timesClosureWasCalled) {
@@ -1909,9 +1855,9 @@ SequenceTypeAlgorithms.test("flatMap/SequenceType") {
       }
       expectType([OpaqueValue<Int32>].self, &result)
       expectEqual(
-        test.expected, result._prext_map { $0.value },
+        test.expected, result.map { $0.value },
         stackTrace: test.loc.withCurrentLoc())
-      expectEqual([], s._prext_map { $0.value }) { "sequence should be consumed" }
+      expectEqual([], s.map { $0.value }) { "sequence should be consumed" }
       expectEqual(test.sequence.count, timesClosureWasCalled) {
         "map() should be eager and should only call its predicate once per element"
       }
@@ -1986,9 +1932,9 @@ SequenceTypeAlgorithms.test("flatMap/SequenceType/TransformProducesOptional") {
       }
       expectType([OpaqueValue<Int32>].self, &result)
       expectEqual(
-        test.expected, result._prext_map { $0.value },
+        test.expected, result.map { $0.value },
         stackTrace: test.loc.withCurrentLoc())
-      expectEqual([], s._prext_map { $0.value }) { "sequence should be consumed" }
+      expectEqual([], s.map { $0.value }) { "sequence should be consumed" }
       expectEqual(test.sequence.count, timesClosureWasCalled) {
         "flatMap() should be eager and should only call its predicate once per element"
       }
@@ -2093,7 +2039,7 @@ SequenceTypeAlgorithms.test("zip") {
 
     // Check for expected result and check the Zip2 SequenceType conformance.
     checkSequence(
-      test.expected._prext_map { (OpaqueValue($0), OpaqueValue($1)) },
+      test.expected.map { (OpaqueValue($0), OpaqueValue($1)) },
       result,
       compareElements,
       test.loc.withCurrentLoc())
@@ -2101,10 +2047,10 @@ SequenceTypeAlgorithms.test("zip") {
     // that checkSequence() didn't force us to consume more elements than
     // needed.
     expectEqual(
-      test.expectedLeftoverSequence, s._prext_map { $0.value },
+      test.expectedLeftoverSequence, s.map { $0.value },
       stackTrace: test.loc.withCurrentLoc())
     expectEqual(
-      test.expectedLeftoverOther, other._prext_map { $0.value },
+      test.expectedLeftoverOther, other.map { $0.value },
       stackTrace: test.loc.withCurrentLoc())
   }
 }
@@ -2123,7 +2069,7 @@ struct SequenceWithDefaultUnderestimateCount : SequenceType {
   func generate() -> MinimalSequence<OpaqueValue<Int>>.Generator {
     expectUnreachable()
     return MinimalSequence(
-      [ 1, 2, 3 ]._prext_map { OpaqueValue($0) }
+      [ 1, 2, 3 ].map { OpaqueValue($0) }
     ).generate()
   }
 }
@@ -2141,7 +2087,7 @@ struct SequenceWithCustomUnderestimateCount : SequenceType {
   func generate() -> MinimalSequence<OpaqueValue<Int>>.Generator {
     expectUnreachable()
     return MinimalSequence(
-      [ 0xffff, 0xffff, 0xffff ]._prext_map { OpaqueValue($0) }
+      [ 0xffff, 0xffff, 0xffff ].map { OpaqueValue($0) }
     ).generate()
   }
 
@@ -2251,7 +2197,7 @@ SequenceTypeAlgorithms.test("underestimateCount/CollectionType/CustomImplementat
 
 SequenceTypeAlgorithms.test("_copyToNativeArrayBuffer/OverestimatedCount") {
   let s = MinimalSequence<OpaqueValue<Int>>(
-    [ 1, 2, 3 ]._prext_map { OpaqueValue($0) },
+    [ 1, 2, 3 ].map { OpaqueValue($0) },
     underestimatedCount: .Value(4))
   expectCrashLater()
   let array = s~>_copyToNativeArrayBuffer()
@@ -2308,7 +2254,7 @@ SequenceTypeAlgorithms.test("CollectionType.generate()/DefaultImplementation") {
     }
 
     checkForwardCollection(
-      Array(1..<count+1)._prext_map { OpaqueValue($0) } as [OpaqueValue<Int>],
+      Array(1..<count+1).map { OpaqueValue($0) } as [OpaqueValue<Int>],
       collection,
       { $0.value == $1.value },
       SourceLocStack().withCurrentLoc())
@@ -2325,7 +2271,7 @@ struct MinimalForwardCollectionWithCustomGenerator : CollectionType {
   func generate() -> MinimalGenerator<OpaqueValue<Int>> {
     ++MinimalForwardCollectionWithCustomGenerator.timesGenerateWasCalled
     return MinimalGenerator<OpaqueValue<Int>>(
-      Array(1..<_count+1)._prext_map { OpaqueValue($0) } as [OpaqueValue<Int>]
+      Array(1..<_count+1).map { OpaqueValue($0) } as [OpaqueValue<Int>]
     )
   }
 
@@ -2370,7 +2316,7 @@ SequenceTypeAlgorithms.test("CollectionType.generate()/CustomImplementation") {
     }
 
     checkForwardCollection(
-      Array(1..<count+1)._prext_map { OpaqueValue($0) } as [OpaqueValue<Int>],
+      Array(1..<count+1).map { OpaqueValue($0) } as [OpaqueValue<Int>],
       collection,
       { $0.value == $1.value },
       resiliencyChecks: .none,
@@ -2389,7 +2335,7 @@ struct MinimalForwardCollectionWithDefaultSlicing : CollectionType {
 
   // FIXME: should return MinimalGenerator<OpaqueValue<Int>>
   func generate() -> MinimalGenerator<OpaqueValue<Int>> {
-    return MinimalGenerator((1..<_count+1)._prext_map { OpaqueValue($0) })
+    return MinimalGenerator((1..<_count+1).map { OpaqueValue($0) })
   }
 
   var startIndex: MinimalForwardIndex {
@@ -2440,7 +2386,7 @@ SequenceTypeAlgorithms.test("subscript(range:)/DefaultImplementation") {
 
     // FIXME: improve checkForwardCollection to check the SubSlice type.
     checkForwardCollection(
-      Array(1..<count+1)._prext_map { OpaqueValue($0) } as [OpaqueValue<Int>],
+      Array(1..<count+1).map { OpaqueValue($0) } as [OpaqueValue<Int>],
       collection,
       { $0.value == $1.value },
       resiliencyChecks: .none,
@@ -2524,7 +2470,7 @@ SequenceTypeAlgorithms.test("subscript(range:)/CustomImplementation") {
 
     // FIXME: improve checkForwardCollection to check the SubSlice type.
     checkForwardCollection(
-      Array(1..<count+1)._prext_map { OpaqueValue($0) } as [OpaqueValue<Int>],
+      Array(1..<count+1).map { OpaqueValue($0) } as [OpaqueValue<Int>],
       collection,
       { $0.value == $1.value },
       SourceLocStack().withCurrentLoc())
@@ -2867,7 +2813,7 @@ SequenceTypeAlgorithms.test("CollectionType.count()/${Implementation}Implementat
     }
 
     checkForwardCollection(
-      Array(1..<count+1)._prext_map { OpaqueValue($0) } as [OpaqueValue<Int>],
+      Array(1..<count+1).map { OpaqueValue($0) } as [OpaqueValue<Int>],
       collection,
       { $0.value == $1.value },
       SourceLocStack().withCurrentLoc())
@@ -3120,7 +3066,7 @@ func forAllPermutations<S : SequenceType>(
   let data = Array(sequence)
   forAllPermutations(data.count) {
     (indices: [Int]) in
-    body(indices._prext_map { data[$0] })
+    body(indices.map { data[$0] })
     return ()
   }
 }
@@ -3282,7 +3228,7 @@ SequenceTypeAlgorithms.test("partition/${'Predicate' if predicate else 'WhereEle
       if true {
 %     if predicate:
         var sequenceAsArray: [OpaqueValue<Int>] =
-          zip(sequence, 0..<sequence.count)._prext_map {
+          zip(sequence, 0..<sequence.count).map {
             OpaqueValue($0, identity: $1)
           }
 
@@ -3310,7 +3256,7 @@ SequenceTypeAlgorithms.test("partition/${'Predicate' if predicate else 'WhereEle
         }
 %     else:
         var sequenceAsArray: [CustomComparableValue] =
-          zip(sequence, 0..<sequence.count)._prext_map {
+          zip(sequence, 0..<sequence.count).map {
             CustomComparableValue($0, identity: $1)
           }
 
@@ -3336,12 +3282,12 @@ SequenceTypeAlgorithms.test("partition/${'Predicate' if predicate else 'WhereEle
 %       if slice:
         expectEqual(0xfffe, s.first!.identity)
         expectEqual(0xffff, s.last!.identity)
-        var identities = s._prext_map { $0.identity }
+        var identities = s.map { $0.identity }
         identities.removeLast()
         identities.removeAtIndex(0)
         expectEqualsUnordered(0..<sequence.count, identities)
 %       else:
-        expectEqualsUnordered(0..<sequence.count, s._prext_map { $0.identity })
+        expectEqualsUnordered(0..<sequence.count, s.map { $0.identity })
 %     end
 
         // All the elements in the first partition are less than the pivot
@@ -3372,7 +3318,7 @@ SequenceTypeAlgorithms.test("partition/${'Predicate' if predicate else 'WhereEle
       forAllPermutations(i) { (sequence) in
 %   if predicate:
         var s = MinimalMutableRandomAccessCollection<OpaqueValue<Int>>(
-          sequence._prext_map { OpaqueValue($0) })
+          sequence.map { OpaqueValue($0) })
         let closureLifetimeTracker = LifetimeTracked(0)
         expectEqual(1, LifetimeTracked.instances)
         let pivot = s._prext_partition(s.indices) {
@@ -3382,7 +3328,7 @@ SequenceTypeAlgorithms.test("partition/${'Predicate' if predicate else 'WhereEle
         }
 %    else:
         var s = MinimalMutableRandomAccessCollection<CustomComparableValue>(
-          sequence._prext_map { CustomComparableValue($0) })
+          sequence.map { CustomComparableValue($0) })
         CustomComparableValue.equalImpl = {
           !comparisonPredicate($0, $1) &&
           !comparisonPredicate($1, $0)
@@ -3394,7 +3340,7 @@ SequenceTypeAlgorithms.test("partition/${'Predicate' if predicate else 'WhereEle
 %    end
 
         // Weak postcondition: we didn't lose any values.
-        expectEqualsUnordered(0..<i, s._prext_map { $0.value })
+        expectEqualsUnordered(0..<i, s.map { $0.value })
 
         expectTrue(0 <= s[pivot].value && s[pivot].value < i)
       }

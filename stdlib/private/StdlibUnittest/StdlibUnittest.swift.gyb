@@ -1651,12 +1651,12 @@ public func check${traversal}Collection<
 
       expectEqualSequence(
         expectedArray,
-        allIndices._prext_map { collection[$0] },
+        allIndices.map { collection[$0] },
         sameValue,
         stackTrace: stackTrace.withCurrentLoc())
       expectEqualSequence(
         expectedArray,
-        allIndices2._prext_map { collection[$0] },
+        allIndices2.map { collection[$0] },
         sameValue,
         stackTrace: stackTrace.withCurrentLoc())
     }

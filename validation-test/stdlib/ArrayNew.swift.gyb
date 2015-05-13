@@ -100,7 +100,7 @@ func == (lhs: EnumWithoutPayloads, rhs: EnumWithoutPayloads) -> Bool {
 
 struct SequenceWithCustomUnderestimateCount : SequenceType {
   init(_ data: [Int]) {
-    self._data = MinimalSequence(data._prext_map { OpaqueValue($0) })
+    self._data = MinimalSequence(data.map { OpaqueValue($0) })
   }
 
   func generate() -> MinimalSequence<OpaqueValue<Int>>.Generator {
@@ -127,11 +127,11 @@ ArrayTestSuite.test("${array_type}/init(SequenceType)") {
 
   let result = ${array_type}(base)
 
-  expectEqual([ 0, 30, 10, 90 ], result._prext_map { $0.value })
+  expectEqual([ 0, 30, 10, 90 ], result.map { $0.value })
 
   expectEqual(1, SequenceWithCustomUnderestimateCount.timesUnderestimateCountWasCalled)
 
-  expectEqualSequence([], Array(base)._prext_map { $0.value }) {
+  expectEqualSequence([], Array(base).map { $0.value }) {
     "sequence should be consumed"
   }
 }
@@ -212,7 +212,7 @@ ArrayTestSuite.test("${array_type}/map") {
       expectUnreachable()
       return 42
     }
-    expectType(${array_type}<Int16>.self, &result)
+    expectType(Array<Int16>.self, &result)
     expectEqual([], result)
     expectEqual(0, result.capacity)
   }

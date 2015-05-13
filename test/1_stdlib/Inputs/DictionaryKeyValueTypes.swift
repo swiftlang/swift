@@ -36,7 +36,7 @@ func isCocoaNSDictionary(d: NSDictionary) -> Bool {
 }
 
 func isNativeNSArray(d: NSArray) -> Bool {
-  var className: NSString = NSStringFromClass(d.dynamicType)
+  let className: NSString = NSStringFromClass(d.dynamicType)
   return className.rangeOfString("_SwiftDeferredNSArray").length > 0
 }
 
@@ -591,7 +591,7 @@ func getBridgedNSDictionaryOfRefTypesBridgedVerbatim() -> NSDictionary {
 }
 
 func getBridgedEmptyNSDictionary() -> NSDictionary {
-  var d = Dictionary<TestObjCKeyTy, TestObjCValueTy>()
+  let d = Dictionary<TestObjCKeyTy, TestObjCValueTy>()
 
   let bridged =
     unsafeBitCast(_convertDictionaryToNSDictionary(d), NSDictionary.self)
@@ -625,12 +625,12 @@ func slurpFastEnumerationFromSwift<
   var state = NSFastEnumerationState()
 
   let stackBufLength = 3
-  var stackBuf = _HeapBuffer<(), AnyObject?>(
+  let stackBuf = _HeapBuffer<(), AnyObject?>(
     _HeapBufferStorage<(), AnyObject?>.self, (), stackBufLength)
 
   var itemsReturned = 0
   while true {
-    var returnedCount = fe.countByEnumeratingWithState(
+    let returnedCount = fe.countByEnumeratingWithState(
       &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectNotEqual(0, state.state)
@@ -648,7 +648,7 @@ func slurpFastEnumerationFromSwift<
     }
   }
 
-  for i in 0..<3 {
+  for _ in 0..<3 {
     let returnedCount = fe.countByEnumeratingWithState(
       &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
@@ -669,12 +669,12 @@ func slurpFastEnumerationFromSwift<
   var state = NSFastEnumerationState()
 
   let stackBufLength = 3
-  var stackBuf = _HeapBuffer<(), AnyObject?>(
+  let stackBuf = _HeapBuffer<(), AnyObject?>(
     _HeapBufferStorage<(), AnyObject?>.self, (), stackBufLength)
 
   var itemsReturned = 0
   while true {
-    var returnedCount = fe.countByEnumeratingWithState(
+    let returnedCount = fe.countByEnumeratingWithState(
       &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectNotEqual(0, state.state)
@@ -694,7 +694,7 @@ func slurpFastEnumerationFromSwift<
     }
   }
 
-  for i in 0..<3 {
+  for _ in 0..<3 {
     let returnedCount = fe.countByEnumeratingWithState(
       &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
@@ -805,13 +805,13 @@ func _checkArrayFastEnumerationImpl(
   _ useEnumerator: (NSArray, NSFastEnumeration, (AnyObject)->()) -> (),
   _ convertValue: (AnyObject) -> Int
 ) {
-  var expectedContentsWithoutIdentity =
+  let expectedContentsWithoutIdentity =
     _makeExpectedArrayContents(expected)
   var expectedContents = [ExpectedArrayElement]()
 
   for i in 0..<3 {
     var actualContents = [ExpectedArrayElement]()
-    var sink = SinkOf<AnyObject> {
+    let sink = SinkOf<AnyObject> {
       (value) in
       actualContents.append(ExpectedArrayElement(
         value: convertValue(value),
@@ -940,13 +940,13 @@ func _checkSetFastEnumerationImpl(
   _ useEnumerator: (NSSet, NSFastEnumeration, (AnyObject)->()) -> (),
   _ convertMember: (AnyObject) -> Int
 ) {
-  var expectedContentsWithoutIdentity =
+  let expectedContentsWithoutIdentity =
     _makeExpectedSetContents(expected)
   var expectedContents = [ExpectedSetElement]()
 
   for i in 0..<3 {
     var actualContents = [ExpectedSetElement]()
-    var sink = SinkOf<AnyObject> {
+    let sink = SinkOf<AnyObject> {
       (value) in
       actualContents.append(ExpectedSetElement(
         value: convertMember(value),
@@ -1001,12 +1001,12 @@ func slurpFastEnumerationFromSwift<
   var state = NSFastEnumerationState()
 
   let stackBufLength = 3
-  var stackBuf = _HeapBuffer<(), AnyObject?>(
+  let stackBuf = _HeapBuffer<(), AnyObject?>(
     _HeapBufferStorage<(), AnyObject?>.self, (), stackBufLength)
 
   var itemsReturned = 0
   while true {
-    var returnedCount = fe.countByEnumeratingWithState(
+    let returnedCount = fe.countByEnumeratingWithState(
       &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
     expectNotEqual(0, state.state)
@@ -1024,7 +1024,7 @@ func slurpFastEnumerationFromSwift<
     }
   }
 
-  for i in 0..<3 {
+  for _ in 0..<3 {
     let returnedCount = fe.countByEnumeratingWithState(
       &state, objects: AutoreleasingUnsafeMutablePointer(stackBuf.baseAddress),
       count: stackBufLength)
@@ -1169,13 +1169,13 @@ func _checkDictionaryFastEnumerationImpl(
   _ convertKey: (AnyObject) -> Int,
   _ convertValue: (AnyObject) -> Int
 ) {
-  var expectedContentsWithoutIdentity =
+  let expectedContentsWithoutIdentity =
     _makeExpectedDictionaryContents(expected)
   var expectedContents = [ExpectedDictionaryElement]()
 
   for i in 0..<3 {
     var actualContents = [ExpectedDictionaryElement]()
-    var sink = SinkOf<AnyObjectTuple2> {
+    let sink = SinkOf<AnyObjectTuple2> {
       (key, value) in
       actualContents.append(ExpectedDictionaryElement(
         key: convertKey(key),

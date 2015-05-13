@@ -75,7 +75,7 @@ internal func _toMsgPackVariant<
     return .Binary(byteBlob)
   }
 %   end
-  return .Array(MsgPackVariantArray(map(value) {
+  return .Array(MsgPackVariantArray(value.map {
     (var element) -> MsgPackVariant in
     var serializerImpl = _MsgPackSerializerImpl()
     element.serializeDeserialize(&serializerImpl)

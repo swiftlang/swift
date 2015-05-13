@@ -17,9 +17,10 @@ import Foundation
 // For experimental Set operators
 import SwiftExperimental
 
-let hugeNumberArray = map(Array(0..<500), {
+let hugeNumberArray = (0..<500).map {
   (i: Int) -> Int in
-      return random() })
+  return random()
+}
 
 var SetTestSuite = TestSuite("Set")
 
@@ -90,18 +91,18 @@ func isNativeSet<T : Hashable>(s: Set<T>) -> Bool {
 }
 
 func isNativeNSSet(s: NSSet) -> Bool {
-  var className: NSString = NSStringFromClass(s.dynamicType)
+  let className: NSString = NSStringFromClass(s.dynamicType)
   return className.rangeOfString("NativeSetStorage").length > 0
 }
 
 func isCocoaNSSet(s: NSSet) -> Bool {
-  var className: NSString = NSStringFromClass(s.dynamicType)
+  let className: NSString = NSStringFromClass(s.dynamicType)
   return className.rangeOfString("NSSet").length > 0 ||
     className.rangeOfString("NSCFSet").length > 0
 }
 
 func getBridgedEmptyNSSet() -> NSSet {
-  var s = Set<TestObjCKeyTy>()
+  let s = Set<TestObjCKeyTy>()
 
   let bridged = unsafeBitCast(_convertSetToNSSet(s), NSSet.self)
   expectTrue(isNativeNSSet(bridged))
@@ -141,7 +142,7 @@ func getAsNSMutableSet(members: [Int] = [1010, 2020, 3030]) -> NSMutableSet {
 /// Get a Set<NSObject> (Set<TestObjCKeyTy>) backed by Cocoa storage
 func getBridgedVerbatimSet(members: [Int] = [1010, 2020, 3030])
   -> Set<NSObject> {
-  var nss = getAsNSSet(members)
+  let nss = getAsNSSet(members)
   let result: Set<NSObject> = _convertNSSetToSet(nss)
   expectTrue(isCocoaSet(result))
   return result
@@ -157,7 +158,7 @@ func getNativeBridgedVerbatimSet(members: [Int] = [1010, 2020, 3030]) ->
 
 /// Get a Set<NSObject> (Set<TestObjCKeyTy>) backed by Cocoa storage
 func getHugeBridgedVerbatimSet() -> Set<NSObject> {
-  var nss = getAsNSSet(hugeNumberArray)
+  let nss = getAsNSSet(hugeNumberArray)
   let result: Set<NSObject> = _convertNSSetToSet(nss)
   expectTrue(isCocoaSet(result))
   return result
@@ -166,7 +167,7 @@ func getHugeBridgedVerbatimSet() -> Set<NSObject> {
 /// Get a Set<TestBridgedKeyTy> backed by native storage
 func getBridgedNonverbatimSet(members: [Int] = [1010, 2020, 3030]) ->
   Set<TestBridgedKeyTy> {
-  var nss = getAsNSSet(members)
+  let nss = getAsNSSet(members)
   let identity1 = unsafeBitCast(nss, Word.self)
   let result: Set<TestBridgedKeyTy> =
     Swift._forceBridgeFromObjectiveC(nss, Set.self)
@@ -176,7 +177,7 @@ func getBridgedNonverbatimSet(members: [Int] = [1010, 2020, 3030]) ->
 
 /// Get a larger Set<TestBridgedKeyTy> backed by native storage
 func getHugeBridgedNonverbatimSet() -> Set<TestBridgedKeyTy> {
-  var nss = getAsNSSet(hugeNumberArray)
+  let nss = getAsNSSet(hugeNumberArray)
   let identity1 = unsafeBitCast(nss, Word.self)
   let result: Set<TestBridgedKeyTy> =
     Swift._forceBridgeFromObjectiveC(nss, Set.self)
@@ -185,13 +186,13 @@ func getHugeBridgedNonverbatimSet() -> Set<TestBridgedKeyTy> {
 }
 
 func getBridgedVerbatimSetAndNSMutableSet() -> (Set<NSObject>, NSMutableSet) {
-  var nss = getAsNSMutableSet()
+  let nss = getAsNSMutableSet()
   return (_convertNSSetToSet(nss), nss)
 }
 
 func getBridgedNonverbatimSetAndNSMutableSet()
     -> (Set<TestBridgedKeyTy>, NSMutableSet) {
-  var nss = getAsNSMutableSet()
+  let nss = getAsNSMutableSet()
   return (Swift._forceBridgeFromObjectiveC(nss, Set.self), nss)
 }
 
@@ -233,9 +234,9 @@ func getRoundtripBridgedNSSet() -> NSSet {
   items.addObject(TestObjCKeyTy(2020))
   items.addObject(TestObjCKeyTy(3030))
 
-  var nss = NSSet(array: items as [AnyObject])
+  let nss = NSSet(array: items as [AnyObject])
 
-  var s: Set<NSObject> = _convertNSSetToSet(nss)
+  let s: Set<NSObject> = _convertNSSetToSet(nss)
 
   let bridgedBack = _convertSetToNSSet(s)
   expectTrue(isCocoaNSSet(bridgedBack))
@@ -2325,7 +2326,7 @@ SetTestSuite.test("SetToNSSetConversion") {
   }
   let nss: NSSet = s
 
-  expectTrue(equalsUnordered(map(Array(s), { $0.value }), [1010, 2020, 3030]))
+  expectTrue(equalsUnordered(Array(s).map { $0.value }, [1010, 2020, 3030]))
 }
 
 //

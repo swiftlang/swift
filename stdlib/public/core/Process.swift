@@ -16,7 +16,7 @@ public enum Process {
   public static let arguments: [String] = {
     // Use lazy initialization of static properties to safely initialize the
     // public 'arguments' property on first use.
-    map(0..<Int(argc)) { i in
+    (0..<Int(argc)).map { i in
       String.fromCStringRepairingIllFormedUTF8(unsafeArgv[i]).0 ?? ""
     }
   }()

@@ -40,7 +40,7 @@ LazyTestSuite.test("firstLast") {
 
 LazyTestSuite.test("LazySequence<Sequence>/underestimateCount") {
   let s = MinimalSequence(
-    [ 0, 30, 10, 90 ]._prext_map { OpaqueValue($0) },
+    [ 0, 30, 10, 90 ].map { OpaqueValue($0) },
     underestimatedCount: .Value(42))
   var lazySeq = lazy(s)
   expectType(LazySequence<MinimalSequence<OpaqueValue<Int>>>.self, &lazySeq)
@@ -51,7 +51,7 @@ LazyTestSuite.test("LazySequence<Sequence>/underestimateCount") {
 
 LazyTestSuite.test("LazySequence<${traversal}Collection>/underestimateCount") {
   let s = Minimal${traversal}Collection(
-    [ 0, 30, 10, 90 ]._prext_map { OpaqueValue($0) },
+    [ 0, 30, 10, 90 ].map { OpaqueValue($0) },
     underestimatedCount: .Value(42))
   var lazySeq = lazy(s)
   expectType(
@@ -70,7 +70,7 @@ LazyTestSuite.test("LazySequence<${traversal}Collection>/underestimateCount") {
 
 LazyTestSuite.test("MapSequenceView<Sequence>/underestimateCount") {
   let s = MinimalSequence(
-    [ 0, 30, 10, 90 ]._prext_map { OpaqueValue($0) },
+    [ 0, 30, 10, 90 ].map { OpaqueValue($0) },
     underestimatedCount: .Value(42))
   var lazyMap = lazy(s).map { OpaqueValue(Int32($0.value)) }
   expectType(
@@ -86,7 +86,7 @@ LazyTestSuite.test("MapSequenceView<Sequence>/underestimateCount") {
 
 struct SequenceWithCustomUnderestimateCount : SequenceType {
   init(_ data: [Int]) {
-    self._data = MinimalSequence(data._prext_map { OpaqueValue($0) })
+    self._data = MinimalSequence(data.map { OpaqueValue($0) })
   }
 
   func generate() -> MinimalSequence<OpaqueValue<Int>>.Generator {
@@ -110,13 +110,13 @@ LazyTestSuite.test("LazySequence.array") {
   let lazySequence = LazySequence(base)
   let arrayFromLazy = lazySequence.array
 
-  expectEqual([ 0, 30, 10, 90 ], arrayFromLazy._prext_map { $0.value })
+  expectEqual([ 0, 30, 10, 90 ], arrayFromLazy.map { $0.value })
 
   // Lazy sequences should use underestimated count to preallocate array
   // storage.
   expectEqual(1, SequenceWithCustomUnderestimateCount.timesUnderestimateCountWasCalled)
 
-  expectEqualSequence([], Array(base)._prext_map { $0.value }) {
+  expectEqualSequence([], Array(base).map { $0.value }) {
     "sequence should be consumed"
   }
 }
@@ -125,7 +125,7 @@ LazyTestSuite.test("LazySequence.array") {
 
 LazyTestSuite.test("MapCollectionView<${traversal}Collection>/underestimateCount") {
   let s = Minimal${traversal}Collection(
-    [ 0, 30, 10, 90 ]._prext_map { OpaqueValue($0) },
+    [ 0, 30, 10, 90 ].map { OpaqueValue($0) },
     underestimatedCount: .Value(42))
   var lazyMap = lazy(s).map { OpaqueValue(Int32($0.value)) }
   expectType(

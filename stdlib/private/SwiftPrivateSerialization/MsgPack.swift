@@ -658,8 +658,8 @@ public struct MsgPackVariantMap : CollectionType {
   }
 
   public init(_ data: [String: MsgPackVariant]) {
-    self._data = map(data, { (key, value) in
-      (MsgPackVariant.String(key), value) })
+    self._data = data.map { (key, value) in
+      (MsgPackVariant.String(key), value) }
   }
 
   public func generate() -> IndexingGenerator<MsgPackVariantMap> {

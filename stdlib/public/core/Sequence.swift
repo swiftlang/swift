@@ -109,7 +109,7 @@ public protocol _Sequence_Type
   /// over `self`.
   ///
   /// - Complexity: O(N)
-  func _prext_map<T>(
+  func map<T>(
     @noescape transform: (Generator.Element) -> T
   ) -> [T]
 
@@ -159,7 +159,7 @@ extension SequenceType {
   /// over `self`.
   ///
   /// - Complexity: O(N)
-  final public func _prext_map<T>(
+  final public func map<T>(
     @noescape transform: (Generator.Element) -> T
   ) -> [T] {
     // Cast away @noescape.

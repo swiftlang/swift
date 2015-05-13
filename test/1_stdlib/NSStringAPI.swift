@@ -503,14 +503,14 @@ NSStringAPIs.test("fastestEncoding") {
 
 NSStringAPIs.test("fileSystemRepresentation()") {
   if true {
-    let expectedStr = map("abc\0".utf8) { Int8(bitPattern: $0) }
+    let expectedStr = "abc\0".utf8.map { Int8(bitPattern: $0) }
     expectEqual(expectedStr, "abc".fileSystemRepresentation())
   }
 
   // On OSX file system representation is Unicode NFD.
   // This test might need to be adjusted for other systems.
   if true {
-    let expectedStr = map("\u{305f}\u{3099}くてん\0".utf8) { Int8(bitPattern: $0) }
+    let expectedStr = "\u{305f}\u{3099}くてん\0".utf8.map { Int8(bitPattern: $0) }
     expectEqual(expectedStr, "だくてん".fileSystemRepresentation())
   }
 }
@@ -616,7 +616,7 @@ NSStringAPIs.test("getCString(_:maxLength:encoding:)") {
   if true {
     // The smallest buffer where the result can fit.
     let bufferLength = 17
-    var expectedStr = map("abc あかさた\0".utf8) { CChar(bitPattern: $0) }
+    var expectedStr = "abc あかさた\0".utf8.map { CChar(bitPattern: $0) }
     while (expectedStr.count != bufferLength) {
       expectedStr.append(CChar(bitPattern: 0xff))
     }
@@ -663,7 +663,7 @@ NSStringAPIs.test("getFileSystemRepresentation(_:maxLength:)") {
   if true {
     // The smallest buffer where the result can fit.
     let bufferLength = 20
-    var expectedStr = map("abc \u{305f}\u{3099}くてん\0".utf8) {
+    var expectedStr = "abc \u{305f}\u{3099}くてん\0".utf8.map {
       CChar(bitPattern: $0)
     }
     while (expectedStr.count != bufferLength) {
@@ -1807,11 +1807,11 @@ func checkHasPrefixHasSuffix(
   // To determine the expected results, compare grapheme clusters,
   // scalar-to-scalar, of the NFD form of the strings.
   let lhsNFDGraphemeClusters =
-    map(lhs.decomposedStringWithCanonicalMapping.characters) {
+    lhs.decomposedStringWithCanonicalMapping.characters.map {
       Array(String($0).unicodeScalars)
     }
   let rhsNFDGraphemeClusters =
-    map(rhs.decomposedStringWithCanonicalMapping.characters) {
+    rhs.decomposedStringWithCanonicalMapping.characters.map {
       Array(String($0).unicodeScalars)
     }
   let expectHasPrefix = lhsNFDGraphemeClusters.startsWith(

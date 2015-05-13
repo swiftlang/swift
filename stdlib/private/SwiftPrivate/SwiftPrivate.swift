@@ -59,7 +59,7 @@ public func gather<
 >(
   collection: C, _ indices: IndicesSequence
 ) -> _UnitTestArray<C.Generator.Element> {
-  return _UnitTestArray(indices._prext_map { collection[$0] })
+  return _UnitTestArray(indices.map { collection[$0] })
 }
 
 public func scatter<T>(a: _UnitTestArray<T>, _ idx: _UnitTestArray<Int>) -> _UnitTestArray<T> {
@@ -74,7 +74,7 @@ public func withArrayOfCStrings<R>(
   args: _UnitTestArray<String>, _ body: (Array<UnsafeMutablePointer<CChar>>) -> R
 ) -> R {
 
-  let argsLengths = _UnitTestArray(map(args) { $0.utf8.count() + 1 })
+  let argsLengths = _UnitTestArray(args.map { $0.utf8.count() + 1 })
   let argsOffsets = [ 0 ] + scan(argsLengths, 0, +)
   let argsBufferSize = argsOffsets.last!
 
@@ -88,7 +88,7 @@ public func withArrayOfCStrings<R>(
   return argsBuffer.withUnsafeBufferPointer {
     (argsBuffer) in
     let ptr = UnsafeMutablePointer<CChar>(argsBuffer.baseAddress)
-    var cStrings = map(argsOffsets) { ptr + $0 }
+    var cStrings = argsOffsets.map { ptr + $0 }
     cStrings[cStrings.count - 1] = nil
     return body(cStrings)
   }
