@@ -52,3 +52,13 @@ func testConflict3(obj: ErrorProne) throws {
 func testConflict3_error(obj: ErrorProne) throws {
   try obj.conflict3(nil, error: ())
 }
+
+// Same as above but with an initializer.
+// <rdar://problem/20922973>
+func testConflict4() throws {
+  try ErrorProne(newtonMessagePad: "Dilbert") // expected-warning {{no calls to throwing functions occur within 'try'}}
+}
+
+func testConflict4_error() throws {
+  try ErrorProne(newtonMessagePad: "Dilbert", error: ())
+}

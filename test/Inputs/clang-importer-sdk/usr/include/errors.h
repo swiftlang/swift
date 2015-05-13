@@ -9,6 +9,9 @@
 
 + (BOOL) consume: (id) object error: (NSError**) error;
 
+- (instancetype) initWithNewtonMessagePad: (NSString *) assistant;
+- (instancetype) initWithNewtonMessagePad: (NSString *) assistant error: (NSError**) error;
+
 - (instancetype) initWithOne: (nullable id) other error: (NSError**) error;
 + (instancetype) errorProneWithTwo: (nullable id) other error: (NSError**) error;
 

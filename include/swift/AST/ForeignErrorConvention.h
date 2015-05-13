@@ -79,7 +79,7 @@ private:
                          IsOwned_t isOwned, IsReplaced_t isReplaced,
                          Type parameterType, Type resultType = Type())
     : TheKind(unsigned(kind)), ErrorIsOwned(bool(isOwned)),
-      ErrorParameterIsReplaced(bool(isOwned)),
+      ErrorParameterIsReplaced(bool(isReplaced)),
       ErrorParameterIndex(parameterIndex), ErrorParameterType(parameterType),
       ResultType(resultType) {
   }
