@@ -49,11 +49,13 @@ internal let ${name}: Int = ${id}
 
 public enum ${EnumName} : Int, _ObjectiveCBridgeableErrorType {
 %  for (name, availability, id) in mappedDomains[domain]:
+  // FIXME: include availability
   case ${name[2:]}
 %  end
 %  if mappedDomainsOSX.has_key(domain):
 #if os(OSX)
 %    for (name, availability, id) in mappedDomainsOSX[domain]:
+  // FIXME: include availability
   case ${name[2:]}
 %    end
 #endif
@@ -75,15 +77,14 @@ public enum ${EnumName} : Int, _ObjectiveCBridgeableErrorType {
 %    if mappedDomainsOSX.has_key(domain):
 #if os(OSX)
 %      for (name, availability, id) in mappedDomainsOSX[domain]:
-%        if availability != '':
-      if #${availability} {
-%        end
-        if self == ${EnumName}.${name[2:]} {
-          return ${name}
+      if self == ${EnumName}.${name[2:]} {
+ %        if availability != '':
+        guard #${availability} else {
+          fatalError("${name} not available on this OS version")
         }
-%        if availability != '':
-      }
 %        end
+       return ${name}
+      }
 %      end
 #endif
 %    end
