@@ -286,6 +286,21 @@ public:
             && aa.isBridgeableObjectType())
           continue;
         
+        // Optional thick metatypes are ABI-interchangeable with non-optionals
+        // too.
+        if (aObject)
+          if (auto aObjMeta = aObject.getAs<MetatypeType>())
+            if (auto bMeta = bb.getAs<MetatypeType>())
+              if (aObjMeta->getRepresentation() == bMeta->getRepresentation()
+                  && bMeta->getRepresentation() != MetatypeRepresentation::Thin)
+                continue;
+        if (bObject)
+          if (auto aMeta = aa.getAs<MetatypeType>())
+            if (auto bObjMeta = bObject.getAs<MetatypeType>())
+              if (aMeta->getRepresentation() == bObjMeta->getRepresentation()
+                  && aMeta->getRepresentation() != MetatypeRepresentation::Thin)
+                continue;
+        
         // Function types are interchangeable if they're also ABI-compatible.
         if (auto aFunc = aa.getAs<SILFunctionType>())
           if (auto bFunc = bb.getAs<SILFunctionType>()) {

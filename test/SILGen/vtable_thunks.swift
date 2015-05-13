@@ -84,6 +84,14 @@ class F: D {
 
 }
 
+class ThrowVariance {
+  func mightThrow() throws {}
+}
+
+class NoThrowVariance: ThrowVariance {
+  override func mightThrow() {}
+}
+
 // CHECK-LABEL: sil private @_TTVFC13vtable_thunks1D3iuofS0_FTGSqCS_1B_1yS1_1zS1__S1_
 // CHECK:         [[WRAP_X:%.*]] = enum $Optional<B>
 // CHECK:         [[FORCE_UNWRAP_FN:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueurFGSQq__q_
@@ -94,12 +102,16 @@ class F: D {
 // CHECK:         return [[WRAP_RES]]
 
 // CHECK-LABEL: sil private @_TTVFC13vtable_thunks1D1gfS0_FTGSqPS_8AddrOnly__1yPS1___PS1__
-// CHECK:         [[RES_ADDR:%.*]] = init_enum_data_addr [[WRAP_RES_ADDR:%.*]] :
-// CHECK:         [[WRAPPED_X_ADDR:%.*]] = init_enum_data_addr [[WRAP_X_ADDR:%.*]] :
-// CHECK:         copy_addr [take] %1 to [initialization] [[WRAPPED_X_ADDR]]
-// CHECK:         inject_enum_addr [[WRAP_X_ADDR]]
-// CHECK:         apply {{%.*}}([[RES_ADDR]], [[WRAP_X_ADDR]], %2, %3)
-// CHECK:         inject_enum_addr [[WRAP_RES_ADDR]]
+// TODO: extra copies here
+// CHECK:         [[WRAPPED_X_ADDR_1:%.*]] = init_enum_data_addr [[WRAP_X_ADDR_1:%.*]] :
+// CHECK:         copy_addr [take] {{%.*}} to [initialization] [[WRAPPED_X_ADDR_1]]
+// CHECK:         inject_enum_addr [[WRAP_X_ADDR_1]]
+// CHECK:         copy_addr [take] [[WRAP_X_ADDR_1]] to [initialization] [[WRAP_X_ADDR:%.*]] :
+// CHECK:         [[RES_ADDR:%.*]] = alloc_stack
+// CHECK:         apply {{%.*}}([[RES_ADDR]]#1, [[WRAP_X_ADDR]], %2, %3)
+// CHECK:         [[DEST_ADDR:%.*]] = init_enum_data_addr %0
+// CHECK:         copy_addr [take] [[RES_ADDR]]#1 to [initialization] [[DEST_ADDR]]
+// CHECK:         inject_enum_addr %0
 
 // CHECK-LABEL: sil_vtable D {
 // CHECK:         #B.iuo!1: _TTVF{{[A-Z0-9a-z_]*}}1D
@@ -157,4 +169,7 @@ class F: D {
 // CHECK:         #B.i2!1: _TTVF{{[A-Z0-9a-z_]*}}1F
 // CHECK:         #B.i3!1: _TTVF{{[A-Z0-9a-z_]*}}1F
 // CHECK:         #B.i4!1: _TF{{[A-Z0-9a-z_]*}}1F
+
+// CHECK-LABEL: sil_vtable NoThrowVariance {
+// CHECK:         #ThrowVariance.mightThrow!1: _TF
 

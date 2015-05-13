@@ -374,6 +374,9 @@ template <class X> inline bool isa(CanType type) {
 template <class X> inline CanTypeWrapper<X> cast(CanType type) {
   return CanTypeWrapper<X>(cast<X>(type.getPointer()));
 }
+template <class X> inline CanTypeWrapper<X> cast_or_null(CanType type) {
+  return CanTypeWrapper<X>(cast_or_null<X>(type.getPointer()));
+}
 template <class X> inline CanTypeWrapper<X> dyn_cast(CanType type) {
   return CanTypeWrapper<X>(dyn_cast<X>(type.getPointer()));
 }

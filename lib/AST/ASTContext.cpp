@@ -550,6 +550,17 @@ NominalTypeDecl *ASTContext::getDictionaryDecl() const {
   return Impl.DictionaryDecl;
 }
 
+EnumDecl *ASTContext::getOptionalDecl(OptionalTypeKind kind) const {
+  switch (kind) {
+  case OTK_None:
+    llvm_unreachable("not optional");
+  case OTK_ImplicitlyUnwrappedOptional:
+    return getImplicitlyUnwrappedOptionalDecl();
+  case OTK_Optional:
+    return getOptionalDecl();
+  }
+}
+
 EnumDecl *ASTContext::getOptionalDecl() const {
   if (!Impl.OptionalDecl)
     Impl.OptionalDecl

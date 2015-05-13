@@ -24,6 +24,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "swift/SIL/SILAllocated.h"
 #include "llvm/ADT/Hashing.h"
+#include "swift/SIL/SILDeclRef.h"
 
 namespace swift {
   class ASTContext;
@@ -529,9 +530,11 @@ NON_SIL_TYPE(LValue)
 #undef NON_SIL_TYPE
 
 CanSILFunctionType getNativeSILFunctionType(SILModule &M,
-                                            Lowering::AbstractionPattern orig,
-                                            CanAnyFunctionType subst,
-                                            CanAnyFunctionType substInterface);
+                        Lowering::AbstractionPattern orig,
+                        CanAnyFunctionType subst,
+                        CanAnyFunctionType substInterface,
+                        CanAnyFunctionType substOverride = CanAnyFunctionType(),
+                        SILDeclRef::Kind kind = SILDeclRef::Kind::Func);
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILType T) {
   T.print(OS);

@@ -20,6 +20,7 @@
 #define SWIFT_SIL_SILDeclRef_H
 
 #include "swift/AST/Decl.h"
+#include "swift/AST/Expr.h"
 #include "swift/AST/ResilienceExpansion.h"
 #include "swift/AST/Types.h"
 #include "llvm/ADT/DenseMap.h"

@@ -595,9 +595,10 @@ public:
                                CanSILFunctionType funcTy);
   
   /// Thunk between a derived and base class.
-  void emitVTableThunk(SILDeclRef derived, SILDeclRef base,
-                       ArrayRef<VTableParamThunk> paramThunks,
-                       VTableResultThunk resultThunk);
+  void emitVTableThunk(SILDeclRef derived,
+                       AbstractionPattern origPattern,
+                       CanAnyFunctionType substTy,
+                       CanAnyFunctionType substOverrideTy);
   
   //===--------------------------------------------------------------------===//
   // Control flow
