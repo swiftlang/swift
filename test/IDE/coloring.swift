@@ -1,6 +1,9 @@
 // RUN: %target-swift-ide-test -syntax-coloring -source-filename %s | FileCheck %s
 // RUN: %target-swift-ide-test -syntax-coloring -typecheck -source-filename %s | FileCheck %s
 
+// FIXME: rdar://20946478 swift-ide-test crashes on Linux
+// XFAIL: linux
+
 // CHECK: <kw>struct</kw> S {
 struct S {
   // CHECK: <kw>var</kw> x : <type>Int</type>
