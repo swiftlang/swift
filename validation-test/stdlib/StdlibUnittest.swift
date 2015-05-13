@@ -325,7 +325,7 @@ AssertionsTestSuite.test("expectCrashLater/Pass") {
 }
 // CHECK: [ RUN      ] Assertions.expectCrashLater/Pass
 // CHECK: err>>> fatal error: Array index out of range
-// CHECK: err>>> CRASHED: SIGILL
+// CHECK: err>>> CRASHED: SIG{{.*}}
 // CHECK: [       OK ] Assertions.expectCrashLater/Pass
 
 AssertionsTestSuite.test("expectCrashLater/UXPass")
@@ -337,7 +337,7 @@ AssertionsTestSuite.test("expectCrashLater/UXPass")
 }
 // CHECK: [ RUN      ] Assertions.expectCrashLater/UXPass (XFAIL: [Custom(reason: test)])
 // CHECK: err>>> fatal error: Array index out of range
-// CHECK: err>>> CRASHED: SIGILL
+// CHECK: err>>> CRASHED: SIG{{.*}}
 // CHECK: [   UXPASS ] Assertions.expectCrashLater/UXPass
 
 AssertionsTestSuite.test("expectCrashLater/Fail") {
@@ -362,7 +362,7 @@ AssertionsTestSuite.test("UnexpectedCrash/RuntimeTrap") {
 }
 // CHECK: [ RUN      ] Assertions.UnexpectedCrash/RuntimeTrap
 // CHECK: err>>> fatal error: Array index out of range
-// CHECK: err>>> CRASHED: SIGILL
+// CHECK: err>>> CRASHED: SIG{{.*}}
 // CHECK: the test crashed unexpectedly
 // CHECK: [     FAIL ] Assertions.UnexpectedCrash/RuntimeTrap
 
