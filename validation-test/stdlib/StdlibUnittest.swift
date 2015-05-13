@@ -319,23 +319,25 @@ AssertionsTestSuite.test("expectUnreachable") {
 // CHECK: [     FAIL ] Assertions.expectUnreachable
 
 AssertionsTestSuite.test("expectCrashLater/Pass") {
-  let ptr = _opaqueIdentity(UnsafePointer<Int>())
+  let array: [Int] = _opaqueIdentity([])
   expectCrashLater()
-  _blackHole(ptr.memory)
+  _blackHole(array[0])
 }
 // CHECK: [ RUN      ] Assertions.expectCrashLater/Pass
-// CHECK: err>>> CRASHED: SIGSEGV
+// CHECK: err>>> fatal error: Array index out of range
+// CHECK: err>>> CRASHED: SIGILL
 // CHECK: [       OK ] Assertions.expectCrashLater/Pass
 
 AssertionsTestSuite.test("expectCrashLater/UXPass")
   .xfail(.Custom({ true }, reason: "test"))
   .code {
-  let ptr = _opaqueIdentity(UnsafePointer<Int>())
+  let array: [Int] = _opaqueIdentity([])
   expectCrashLater()
-  _blackHole(ptr.memory)
+  _blackHole(array[0])
 }
 // CHECK: [ RUN      ] Assertions.expectCrashLater/UXPass (XFAIL: [Custom(reason: test)])
-// CHECK: err>>> CRASHED: SIGSEGV
+// CHECK: err>>> fatal error: Array index out of range
+// CHECK: err>>> CRASHED: SIGILL
 // CHECK: [   UXPASS ] Assertions.expectCrashLater/UXPass
 
 AssertionsTestSuite.test("expectCrashLater/Fail") {
@@ -354,14 +356,24 @@ AssertionsTestSuite.test("expectCrashLater/XFail")
 // CHECK: expecting a crash, but the test did not crash
 // CHECK: [    XFAIL ] Assertions.expectCrashLater/XFail
 
-AssertionsTestSuite.test("UnexpectedCrash") {
+AssertionsTestSuite.test("UnexpectedCrash/RuntimeTrap") {
+  let array: [Int] = _opaqueIdentity([])
+  _blackHole(array[0])
+}
+// CHECK: [ RUN      ] Assertions.UnexpectedCrash/RuntimeTrap
+// CHECK: err>>> fatal error: Array index out of range
+// CHECK: err>>> CRASHED: SIGILL
+// CHECK: the test crashed unexpectedly
+// CHECK: [     FAIL ] Assertions.UnexpectedCrash/RuntimeTrap
+
+AssertionsTestSuite.test("UnexpectedCrash/NullPointerDereference") {
   let ptr = _opaqueIdentity(UnsafePointer<Int>())
   _blackHole(ptr.memory)
 }
-// CHECK: [ RUN      ] Assertions.UnexpectedCrash
-// CHECK: err>>> CRASHED: SIGSEGV
+// CHECK: [ RUN      ] Assertions.UnexpectedCrash/NullPointerDereference
+// CHECK: err>>> CRASHED: SIG{{.*}}
 // CHECK: the test crashed unexpectedly
-// CHECK: [     FAIL ] Assertions.UnexpectedCrash
+// CHECK: [     FAIL ] Assertions.UnexpectedCrash/NullPointerDereference
 
 runAllTests()
 
