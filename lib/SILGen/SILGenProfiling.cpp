@@ -435,6 +435,9 @@ public:
   }
 
   std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+    if (S->isImplicit())
+      return {true, S};
+
     if (!RegionStack.empty())
       extendRegion(S);
 
@@ -496,6 +499,9 @@ public:
   }
 
   Stmt *walkToStmtPost(Stmt *S) override {
+    if (S->isImplicit())
+      return S;
+
     if (isa<BraceStmt>(S)) {
       if (hasCounter(S)) {
         CounterExpr *Adjust = setExitCount(S);

@@ -48,4 +48,15 @@ func foo() -> Int32 {
   return x
 }
 
+struct S {
+  // CHECK-LABEL: sil_coverage_map {{.*}}// coverage_catch.S.init
+  init() {
+    do {
+      throw SomeErr.Err1
+    } catch {
+      // CHECK: [[@LINE-1]]:13 -> [[@LINE+1]]:6 : 2
+    } // CHECK: [[@LINE]]:6 -> [[@LINE+1]]:4 : 1
+  }
+}
+
 foo()
