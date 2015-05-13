@@ -34,14 +34,14 @@ EnumName = "_" + domain
 // from another framework (AppKit or CoreData) and need to be copied here.
 %  for (name, availability, id) in mappedDomains[domain]:
 %    if id != 0:
-private let ${name}: Int = ${id}
+internal let ${name}: Int = ${id}
 %    end
 %  end
 %  if mappedDomainsOSX.has_key(domain):
 #if os(OSX)
 %    for (name, availability, id) in mappedDomainsOSX[domain]:
 %      if id != 0:
-private let ${name}: Int = ${id}
+internal let ${name}: Int = ${id}
 %      end
 %    end
 #endif
