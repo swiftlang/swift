@@ -39,23 +39,6 @@ function(compute_library_subdir result_var_name sdk arch)
 endfunction()
 
 
-# Use 16K segment alignment on 32-bit arm.
-# The linker does this by default for iOS 8+ deployment,
-# but we deploy to iOS 7.
-function(append_darwin_segalign_link_flags
-    arch result_var_name)
-  set(result ${${result_var_name}})
-
-  string(FIND "${arch}" "arm" armprefix)
-  if ("${armprefix}" STREQUAL "0" AND NOT "${arch}" STREQUAL "arm64")
-    # arch starts with "arm" and is not "arm64"
-    list(APPEND result "-Xlinker" "-segalign" "-Xlinker" "0x4000")
-  endif()
-
-  set("${result_var_name}" "${result}" PARENT_SCOPE)
-endfunction()
-
-
 function(_add_variant_c_compile_link_flags
     sdk arch build_type enable_assertions result_var_name)
   set(result ${${result_var_name}})
@@ -70,8 +53,6 @@ function(_add_variant_c_compile_link_flags
         "-F" "${SWIFT_SDK_${sdk}_PATH}/../../../Developer/Library/Frameworks"
         "-F" "${SWIFT_SDK_${sdk}_PATH}/../../../Developer/AppleInternal/Library/Frameworks"
         "-m${SWIFT_SDK_${sdk}_VERSION_MIN_NAME}-version-min=${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION}")
-
-    append_darwin_segalign_link_flags("${arch}" result)
   endif()
 
   set("${result_var_name}" "${result}" PARENT_SCOPE)
@@ -128,8 +109,6 @@ function(_add_variant_swift_compile_flags
     list(APPEND result
         "-F" "${SWIFT_SDK_${sdk}_PATH}/../../../Developer/Library/Frameworks"
         "-F" "${SWIFT_SDK_${sdk}_PATH}/../../../Developer/AppleInternal/Library/Frameworks")
-
-    append_darwin_segalign_link_flags("${arch}" result)
   endif()
 
   is_build_type_optimized("${build_type}" optimized)
