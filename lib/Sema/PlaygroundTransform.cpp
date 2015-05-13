@@ -426,19 +426,28 @@ public:
           if (DeclRefExpr *DRE = llvm::dyn_cast<DeclRefExpr>(AE->getFn())) {
             AbstractFunctionDecl *FnD =
               llvm::dyn_cast<AbstractFunctionDecl>(DRE->getDecl());
-            ParenExpr *PE = llvm::dyn_cast<ParenExpr>(AE->getArg());
-            if (FnD && PE &&
-                FnD->getModuleContext() == Context.TheStdlibModule) {
+            if (FnD && FnD->getModuleContext() == Context.TheStdlibModule) {
               StringRef FnName = FnD->getNameStr();
-              if (FnName.equals("print")) {
-                Expr *S = PE->getSubExpr();
-                std::pair<PatternBindingDecl *, VarDecl *> PV =
-                  buildPatternAndVariable(S);
-                Expr *Log = logPrint(PV.second, AE->getSourceRange());
-                Elements[EI] = PV.first;
-                Elements.insert(Elements.begin() + (EI + 1), PV.second);
-                Elements.insert(Elements.begin() + (EI + 2), Log);
-                EI += 2;
+              if (FnName.equals("print") || FnName.equals("debugPrint")) {
+                Expr *S = nullptr;
+                Expr *B = nullptr; // FIXME pass B to the logger when it supports it
+                if (ParenExpr *PE = llvm::dyn_cast<ParenExpr>(AE->getArg())) {
+                  S = PE->getSubExpr();
+                } else if (TupleExpr *TE = llvm::dyn_cast<TupleExpr>(AE->getArg())) {
+                  if (TE->getNumElements() == 2) {
+                    S = TE->getElement(0);
+                    B = TE->getElement(1);
+                  }
+                }
+                if (S) {
+                  std::pair<PatternBindingDecl *, VarDecl *> PV =
+                    buildPatternAndVariable(S);
+                  Expr *Log = logPrint(PV.second, AE->getSourceRange());
+                  Elements[EI] = PV.first;
+                  Elements.insert(Elements.begin() + (EI + 1), PV.second);
+                  Elements.insert(Elements.begin() + (EI + 2), Log);
+                  EI += 2;
+                }
                 Handled = true;
               }
             }

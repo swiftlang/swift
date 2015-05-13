@@ -2,17 +2,17 @@ class LogRecord {
   let text : String
   init(api : String, object : Any, name : String, id : Int) {
     var object_description : String = ""
-    print(object, &object_description, appendNewline: false)
+    print(object, &object_description, appendNewline:false)
     text = api + "[" + name + "='" + object_description + "']"
   }
   init(api : String, object : Any, name : String) {
     var object_description : String = ""
-    print(object, &object_description, appendNewline: false)
+    print(object, &object_description, appendNewline:false)
     text = api + "[" + name + "='" + object_description + "']"
   }
   init(api : String, object: Any) {
     var object_description : String = ""
-    print(object, &object_description, appendNewline: false)
+    print(object, &object_description, appendNewline:false)
     text = api + "['" + object_description + "']"
   }
   init(api: String) {
