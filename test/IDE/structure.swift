@@ -1,8 +1,5 @@
 // RUN: %swift-ide-test -structure -source-filename %s | FileCheck %s
 
-// FIXME: rdar://20946478 swift-ide-test crashes on Linux
-// XFAIL: linux
-
 // CHECK: <class>class <name>MyCls</name> : <inherited><elem-typeref>OtherClass</elem-typeref></inherited> {
 // CHECK:   <property>var <name>bar</name> : Int</property>
 // CHECK:   <property>var <name>anotherBar</name> : Int = 42</property>
