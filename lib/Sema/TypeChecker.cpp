@@ -674,8 +674,31 @@ bool swift::typeCheckCompletionDecl(Decl *D) {
   return true;
 }
 
-bool swift::typeCheckCompletionContextExpr(ASTContext &Ctx, DeclContext *DC,
-                                           Expr *&parsedExpr) {
+/// \brief Return the type of an expression parsed during code completion, or
+/// a null \c Type on error.
+Optional<Type> swift::getTypeOfCompletionContextExpr(ASTContext &Ctx,
+                                                     DeclContext *DC,
+                                                     Expr *&parsedExpr) {
+  // Set up a diagnostics engine that swallows diagnostics.
+  DiagnosticEngine diags(Ctx.SourceMgr);
+
+  TypeChecker TC(Ctx, diags);
+  // Try to solve for the actual type of the expression.
+  if (auto T = TC.getTypeOfExpressionWithoutApplying(
+          parsedExpr, DC, Type(), Type(), /*discardedExpr=*/true,
+          FreeTypeVariableBinding::GenericParameters))
+    return T;
+
+  // Try to recover by using the original unchecked type.
+  if (parsedExpr && !isa<ErrorExpr>(parsedExpr) && parsedExpr->getType() &&
+      !parsedExpr->getType()->is<ErrorType>())
+    return parsedExpr->getType();
+
+  return None;
+}
+
+bool swift::typeCheckContextExpr(ASTContext &Ctx, DeclContext *DC,
+                                 Expr *&parsedExpr) {
   // Set up a diagnostics engine that swallows diagnostics.
   DiagnosticEngine diags(Ctx.SourceMgr);
 

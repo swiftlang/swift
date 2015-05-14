@@ -104,6 +104,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_UNSOLVED_VARIABLES_1 | FileCheck %s -check-prefix=TC_UNSOLVED_VARIABLES_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_UNSOLVED_VARIABLES_2 | FileCheck %s -check-prefix=TC_UNSOLVED_VARIABLES_2
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_UNSOLVED_VARIABLES_3 | FileCheck %s -check-prefix=TC_UNSOLVED_VARIABLES_3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TC_UNSOLVED_VARIABLES_4 | FileCheck %s -check-prefix=TC_UNSOLVED_VARIABLES_4
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RESOLVE_MODULES_1 | FileCheck %s -check-prefix=RESOLVE_MODULES_1
 
@@ -750,7 +751,8 @@ func testInsideFunctionCall2() {
   var a = FooStruct()
   a.instanceFunc1(#^INSIDE_FUNCTION_CALL_2^#
 // INSIDE_FUNCTION_CALL_2: Begin completions
-// INSIDE_FUNCTION_CALL_2-DAG: Pattern/ExprSpecific:       ['(']{#(a): Int#})[#Void#]{{; name=.+$}}
+// FIXME: we should print the non-API param name rdar://20962472
+// INSIDE_FUNCTION_CALL_2-DAG: Pattern/ExprSpecific:       ['(']{#Int#})[#Void#]{{; name=.+$}}
 // INSIDE_FUNCTION_CALL_2-DAG: Decl[GlobalVar]/CurrModule: fooObject[#FooStruct#]{{; name=.+$}}
 // INSIDE_FUNCTION_CALL_2: End completions
 }
@@ -768,7 +770,8 @@ func testInsideFunctionCall4() {
   var a = FooStruct()
   a.instanceFunc2(#^INSIDE_FUNCTION_CALL_4^#
 // INSIDE_FUNCTION_CALL_4: Begin completions
-// INSIDE_FUNCTION_CALL_4-DAG: Pattern/ExprSpecific:       ['(']{#(a): Int#}, {#b: &Double#})[#Void#]{{; name=.+$}}
+// FIXME: we should print the non-API param name rdar://20962472
+// INSIDE_FUNCTION_CALL_4-DAG: Pattern/ExprSpecific:       ['(']{#Int#}, {#b: &Double#})[#Void#]{{; name=.+$}}
 // INSIDE_FUNCTION_CALL_4-DAG: Decl[GlobalVar]/CurrModule: fooObject[#FooStruct#]{{; name=.+$}}
 // INSIDE_FUNCTION_CALL_4: End completions
 }
@@ -792,7 +795,8 @@ func testInsideFunctionCall7() {
   var a = FooStruct()
   a.instanceFunc8(#^INSIDE_FUNCTION_CALL_7^#
 // INSIDE_FUNCTION_CALL_7: Begin completions
-// INSIDE_FUNCTION_CALL_7: Pattern/ExprSpecific: ['(']{#(a): (Int, Int)#})[#Void#]{{; name=.+$}}
+// FIXME: we should print the non-API param name rdar://20962472
+// INSIDE_FUNCTION_CALL_7: Pattern/ExprSpecific: ['(']{#(Int, Int)#})[#Void#]{{; name=.+$}}
 // INSIDE_FUNCTION_CALL_7: End completions
 }
 
@@ -800,7 +804,8 @@ func testInsideVarargFunctionCall1() {
   var a = FooStruct()
   a.varargInstanceFunc0(#^INSIDE_VARARG_FUNCTION_CALL_1^#
 // INSIDE_VARARG_FUNCTION_CALL_1: Begin completions
-// INSIDE_VARARG_FUNCTION_CALL_1-DAG: Pattern/ExprSpecific:       ['(']{#(v): Int...#})[#Void#]{{; name=.+$}}
+// FIXME: we should print the non-API param name rdar://20962472
+// INSIDE_VARARG_FUNCTION_CALL_1-DAG: Pattern/ExprSpecific:       ['(']{#Int...#})[#Void#]{{; name=.+$}}
 // INSIDE_VARARG_FUNCTION_CALL_1-DAG: Decl[GlobalVar]/CurrModule: fooObject[#FooStruct#]{{; name=.+$}}
 // INSIDE_VARARG_FUNCTION_CALL_1: End completions
 }
@@ -839,7 +844,8 @@ func testInsideCurriedFunctionCall1() {
 func testInsideFunctionCallOnClassInstance1(a: FooClass) {
   a.fooClassInstanceFunc1(#^INSIDE_FUNCTION_CALL_ON_CLASS_INSTANCE_1^#
 // INSIDE_FUNCTION_CALL_ON_CLASS_INSTANCE_1: Begin completions
-// INSIDE_FUNCTION_CALL_ON_CLASS_INSTANCE_1-DAG: Pattern/ExprSpecific:       ['(']{#(a): Int#})[#Void#]{{; name=.+$}}
+// FIXME: we should print the non-API param name rdar://20962472
+// INSIDE_FUNCTION_CALL_ON_CLASS_INSTANCE_1-DAG: Pattern/ExprSpecific:       ['(']{#Int#})[#Void#]{{; name=.+$}}
 // INSIDE_FUNCTION_CALL_ON_CLASS_INSTANCE_1-DAG: Decl[GlobalVar]/CurrModule: fooObject[#FooStruct#]{{; name=.+$}}
 // INSIDE_FUNCTION_CALL_ON_CLASS_INSTANCE_1: End completions
 }
@@ -1339,6 +1345,11 @@ func testTypeCheckWithUnsolvedVariables3() {
 // TC_UNSOLVED_VARIABLES_3-NEXT: Decl[InstanceMethod]/CurrNominal: add({#(t): Int#})[#BuilderStyle<Int>#]{{; name=.+$}}
 // TC_UNSOLVED_VARIABLES_3-NEXT: Decl[InstanceMethod]/CurrNominal: get()[#Int#]{{; name=.+$}}
 // TC_UNSOLVED_VARIABLES_3-NEXT: End completions
+
+func testTypeCheckNil() {
+  nil#^TC_UNSOLVED_VARIABLES_4^#
+}
+// TC_UNSOLVED_VARIABLES_4-NOT: Begin completions
 
 //===--- Check that we can look up into modules
 

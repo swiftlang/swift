@@ -741,20 +741,18 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     return typeCheckCompletionDecl(DelayedParsedDecl);
   }
 
-  /// \returns true on success, false on failure.
-  bool typecheckParsedExpr() {
+  Optional<Type> getTypeOfParsedExpr() {
     assert(ParsedExpr && "should have an expression");
-
-    Expr *TypecheckedExpr = ParsedExpr;
-    if (!typeCheckCompletionContextExpr(P.Context, CurDeclContext,
-                                        TypecheckedExpr))
-      return false;
-
-    if (TypecheckedExpr->getType()->is<ErrorType>())
-      return false;
-
-    ParsedExpr = TypecheckedExpr;
-    return true;
+    Expr *ModifiedExpr = ParsedExpr;
+    if (auto T = getTypeOfCompletionContextExpr(P.Context, CurDeclContext,
+                                                ModifiedExpr)) {
+      // FIXME: even though we don't apply the solution, the type checker may
+      // modify the original expression. We should understand what effect that
+      // may have on code completion.
+      ParsedExpr = ModifiedExpr;
+      return T;
+    }
+    return None;
   }
 
   /// \returns true on success, false on failure.
@@ -2600,8 +2598,10 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   if (auto *AFD = dyn_cast_or_null<AbstractFunctionDecl>(DelayedParsedDecl))
     CurDeclContext = AFD;
 
-  if (ParsedExpr && !typecheckParsedExpr()) {
-    if (Kind != CompletionKind::PostfixExprParen)
+  Optional<Type> ExprType;
+  if (ParsedExpr) {
+    ExprType = getTypeOfParsedExpr();
+    if (!ExprType && Kind != CompletionKind::PostfixExprParen)
       return;
   }
 
@@ -2625,7 +2625,7 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
   case CompletionKind::DotExpr: {
     Lookup.setHaveDot(DotLoc);
-    Type OriginalType = ParsedExpr->getType();
+    Type OriginalType = *ExprType;
     Type ExprType = OriginalType;
 
     // If there is no nominal type in the expr, try to find nominal types
@@ -2651,10 +2651,9 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
 
   case CompletionKind::PostfixExpr: {
-    Type ExprType = ParsedExpr->getType();
-    if (isDynamicLookup(ExprType))
+    if (isDynamicLookup(*ExprType))
       Lookup.setIsDynamicLookup();
-    Lookup.getValueExprCompletions(ExprType);
+    Lookup.getValueExprCompletions(*ExprType);
     break;
   }
 
@@ -2665,8 +2664,8 @@ void CodeCompletionCallbacksImpl::doneParsing() {
       if (auto *DRE = dyn_cast<DeclRefExpr>(AE->getFn()))
         VD = DRE->getDecl();
     }
-    if (ParsedExpr->getType())
-      Lookup.getValueExprCompletions(ParsedExpr->getType(), VD);
+    if (ExprType)
+      Lookup.getValueExprCompletions(*ExprType, VD);
 
     if (!Lookup.FoundFunctionCalls ||
         (Lookup.FoundFunctionCalls &&
@@ -2679,14 +2678,14 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
   case CompletionKind::SuperExpr: {
     Lookup.setIsSuperRefExpr();
-    Lookup.getValueExprCompletions(ParsedExpr->getType());
+    Lookup.getValueExprCompletions(*ExprType);
     break;
   }
 
   case CompletionKind::SuperExprDot: {
     Lookup.setIsSuperRefExpr();
     Lookup.setHaveDot(SourceLoc());
-    Lookup.getValueExprCompletions(ParsedExpr->getType());
+    Lookup.getValueExprCompletions(*ExprType);
     break;
   }
 

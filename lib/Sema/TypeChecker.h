@@ -869,6 +869,19 @@ public:
   /// which must be lazy.
   void completeLazyVarImplementation(VarDecl *lazyVar);
 
+  /// Sets up and solves the constraint system \p cs to type check the given
+  /// expression.
+  ///
+  /// \returns true if an error occurred, false otherwise.
+  ///
+  /// \see typeCheckExpression
+  bool solveForExpression(Expr *&expr, DeclContext *dc, Type convertType,
+                          Type contextualType, bool discardedExpr,
+                          FreeTypeVariableBinding allowFreeTypeVariables,
+                          ExprTypeCheckListener *listener,
+                          constraints::ConstraintSystem &cs,
+                          SmallVectorImpl<constraints::Solution> &viable);
+
   /// \name Name lookup
   ///
   /// Routines that perform name lookup.
@@ -881,7 +894,7 @@ public:
   /// @{
 private:
   Optional<Type> boolType;
-  
+
 public:
   /// \brief Define the default constructor for the given struct or class.
   void defineDefaultConstructor(NominalTypeDecl *decl);
@@ -921,6 +934,37 @@ public:
                            FreeTypeVariableBinding allowFreeTypeVariables
                              = FreeTypeVariableBinding::Disallow,
                            ExprTypeCheckListener *listener = nullptr);
+
+  /// \brief Type check the given expression and return its type without
+  /// applying the solution.
+  ///
+  /// \param expr The expression to type-check.
+  ///
+  /// \param convertType The type that the expression is being converted to,
+  /// or null if the expression is standalone.
+  ///
+  /// \param contextualType Contextual type information that can be applied to
+  /// the expression. (This is distinct from convertType in that while it can
+  /// inform the type of the expression, it won't result in a conversion
+  /// constraint being applied to the expression.)
+  ///
+  /// \param discardedExpr True if the result of this expression will be
+  /// discarded.
+  ///
+  /// \param allowFreeTypeVariables Whether free type variables are allowed in
+  /// the solution, and what to do with them.
+  ///
+  /// \param listener If non-null, a listener that will be notified of important
+  /// events in the type checking of this expression, and which can introduce
+  /// additional constraints.
+  ///
+  /// \returns the type of \p expr on success, None otherwise.
+  /// FIXME: expr may still be modified...
+  Optional<Type> getTypeOfExpressionWithoutApplying(
+      Expr *&expr, DeclContext *dc, Type convertType, Type contextualType,
+      bool discardedExpr, FreeTypeVariableBinding allowFreeTypeVariables =
+                              FreeTypeVariableBinding::Disallow,
+      ExprTypeCheckListener *listener = nullptr);
 
   /// \brief Type check the given expression assuming that its children
   /// have already been fully type-checked.

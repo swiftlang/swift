@@ -860,29 +860,21 @@ static void diagnoseExpr(TypeChecker &TC, const Expr *E,
   performExprDiagnostics(TC, E, DC);
 }
 
-#pragma mark High-level entry points
-bool TypeChecker::typeCheckExpression(
-       Expr *&expr, DeclContext *dc,
-       Type convertType,
-       Type contextualType,
-       bool discardedExpr,
-       FreeTypeVariableBinding allowFreeTypeVariables,
-       ExprTypeCheckListener *listener) {
-  PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
+bool TypeChecker::solveForExpression(
+    Expr *&expr, DeclContext *dc, Type convertType, Type contextualType,
+    bool discardedExpr, FreeTypeVariableBinding allowFreeTypeVariables,
+    ExprTypeCheckListener *listener, ConstraintSystem &cs,
+    SmallVectorImpl<Solution> &viable) {
 
   // First, pre-check the expression, validating any types that occur in the
   // expression and folding sequence expressions.
   if (preCheckExpression(*this, expr, dc))
     return true;
 
-  // Construct a constraint system from this expression.
-  ConstraintSystem cs(*this, dc, ConstraintSystemFlags::AllowFixes);
-  
   if (!contextualType.isNull()) {
     cs.setContextualType(expr, &contextualType);
   }
-  
-  CleanupIllFormedExpressionRAII cleanup(cs, expr);
+
   if (auto generatedExpr = cs.generateConstraints(expr))
     expr = generatedExpr;
   else {
@@ -911,7 +903,6 @@ bool TypeChecker::typeCheckExpression(
   }
 
   // Attempt to solve the constraint system.
-  SmallVector<Solution, 4> viable;
   if (cs.solve(viable, allowFreeTypeVariables)) {
     if (listener && listener->suppressDiagnostics())
       return true;
@@ -937,7 +928,31 @@ bool TypeChecker::typeCheckExpression(
     listener->solvedConstraints(solution);
   }
 
+  return false;
+}
+
+#pragma mark High-level entry points
+bool TypeChecker::typeCheckExpression(
+       Expr *&expr, DeclContext *dc,
+       Type convertType,
+       Type contextualType,
+       bool discardedExpr,
+       FreeTypeVariableBinding allowFreeTypeVariables,
+       ExprTypeCheckListener *listener) {
+  PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
+
+  // Construct a constraint system from this expression.
+  ConstraintSystem cs(*this, dc, ConstraintSystemFlags::AllowFixes);
+  CleanupIllFormedExpressionRAII cleanup(cs, expr);
+
+  // Attempt to solve the constraint system.
+  SmallVector<Solution, 4> viable;
+  if (solveForExpression(expr, dc, convertType, contextualType, discardedExpr,
+                         allowFreeTypeVariables, listener, cs, viable))
+    return true;
+
   // Apply the solution to the expression.
+  auto &solution = viable[0];
   auto result = cs.applySolution(solution, expr, convertType, discardedExpr,
                                  listener && listener->suppressDiagnostics());
   if (!result) {
@@ -966,6 +981,33 @@ bool TypeChecker::typeCheckExpression(
   expr = result;
   cleanup.disable();
   return false;
+}
+
+Optional<Type> TypeChecker::getTypeOfExpressionWithoutApplying(
+    Expr *&expr, DeclContext *dc, Type convertType, Type contextualType,
+    bool discardedExpr, FreeTypeVariableBinding allowFreeTypeVariables,
+    ExprTypeCheckListener *listener) {
+  PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
+
+  // Construct a constraint system from this expression.
+  ConstraintSystem cs(*this, dc, ConstraintSystemFlags::AllowFixes);
+  CleanupIllFormedExpressionRAII cleanup(cs, expr);
+
+  // Attempt to solve the constraint system.
+  SmallVector<Solution, 4> viable;
+  if (solveForExpression(expr, dc, convertType, contextualType, discardedExpr,
+                         allowFreeTypeVariables, listener, cs, viable))
+    return None;
+
+  // Get the expression's simplified type.
+  auto &solution = viable[0];
+  Type exprType = solution.simplifyType(*this, expr->getType());
+
+  assert(exprType && !exprType->is<ErrorType>() && "erroneous solution?");
+  assert(!exprType->hasTypeVariable() &&
+         "free type variable with FreeTypeVariableBinding::GenericParameters?");
+
+  return exprType;
 }
 
 /// Private class to "cleanse" an expression tree of types. This is done in the

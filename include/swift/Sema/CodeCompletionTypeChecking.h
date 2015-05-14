@@ -33,11 +33,18 @@ namespace swift {
   /// \returns true on success, false on error.
   bool typeCheckCompletionDecl(Decl *D);
 
-  /// \brief Typecheck an expression parsed during code completion.
+  /// \brief Return the type of an expression parsed during code completion, or
+  /// None on error.
+  Optional<Type> getTypeOfCompletionContextExpr(ASTContext &Ctx,
+                                                DeclContext *DC,
+                                                Expr *&parsedExpr);
+
+  /// \brief Typecheck a single parsed expression.
   ///
   /// \returns true on success, false on error.
-  bool typeCheckCompletionContextExpr(ASTContext &Ctx, DeclContext *DC,
-                                      Expr *&parsedExpr);
+  // FIXME: this is not used by code completion; we should probably move it.
+  bool typeCheckContextExpr(ASTContext &Ctx, DeclContext *DC,
+                            Expr *&parsedExpr);
 
   /// Partially typecheck the specified function body.
   bool typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,

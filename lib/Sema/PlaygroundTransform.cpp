@@ -818,7 +818,7 @@ public:
     Expr *SendDataCall = new (Context) CallExpr(SendDataRef, SendDataArgs, true,
                                                 Type());
 
-    if (!typeCheckCompletionContextExpr(Context, TypeCheckDC, SendDataCall)) {
+    if (!typeCheckContextExpr(Context, TypeCheckDC, SendDataCall)) {
       return nullptr;
     }
 
