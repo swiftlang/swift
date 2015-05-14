@@ -1004,7 +1004,9 @@ func _stdlib_getSystemVersionPlistProperty(propertyName: String) -> String? {
 public enum OSVersion : CustomStringConvertible {
   case OSX(major: Int, minor: Int, bugFix: Int)
   case iOS(major: Int, minor: Int, bugFix: Int)
+  case TVOS(major: Int, minor: Int, bugFix: Int)
   case iOSSimulator
+  case TVOSSimulator
   case Linux
 
   public var description: String {
@@ -1013,8 +1015,12 @@ public enum OSVersion : CustomStringConvertible {
       return "OS X \(major).\(minor).\(bugFix)"
     case iOS(let major, let minor, let bugFix):
       return "iOS \(major).\(minor).\(bugFix)"
+    case TVOS(let major, let minor, let bugFix):
+      return "TVOS \(major).\(minor).\(bugFix)"
     case iOSSimulator:
       return "iOSSimulator"
+    case TVOSSimulator:
+      return "TVOSSimulator"
     case Linux:
       return "Linux"
     }
@@ -1043,6 +1049,8 @@ func _getOSVersion() -> OSVersion {
   //
   // FIXME: how to get the simulator version *without* UIKit?
   return .iOSSimulator
+#elseif os(iOS) && (arch(i386) || arch(x86_64))
+  return .TVOSSimulator
 #elseif os(Linux)
   return .Linux
 #else
@@ -1054,6 +1062,8 @@ func _getOSVersion() -> OSVersion {
     return .OSX(major: major, minor: minor, bugFix: bugFix)
   case "iPhone OS":
     return .iOS(major: major, minor: minor, bugFix: bugFix)
+  case "tvOS":
+    return .TVOS(major: major, minor: minor, bugFix: bugFix)
   default:
     fatalError("could not determine OS version")
   }
@@ -1092,6 +1102,15 @@ public enum TestRunPredicate : CustomStringConvertible {
 
   case iOSSimulatorAny(/*reason:*/ String)
 
+  case TVOSAny(/*reason:*/ String)
+  case TVOSMajor(Int, reason: String)
+  case TVOSMinor(Int, Int, reason: String)
+  case TVOSMinorRange(Int, Range<Int>, reason: String)
+  case TVOSBugFix(Int, Int, Int, reason: String)
+  case TVOSBugFixRange(Int, Int, Range<Int>, reason: String)
+
+  case TVOSSimulatorAny(/*reason:*/ String)
+
   case LinuxAny(reason: String)
 
   public var description: String {
@@ -1126,6 +1145,22 @@ public enum TestRunPredicate : CustomStringConvertible {
 
     case iOSSimulatorAny(let reason):
       return "iOSSimulatorAny(*, reason: \(reason))"
+
+    case TVOSAny(let reason):
+      return "TVOS(*, reason: \(reason))"
+    case TVOSMajor(let major, let reason):
+      return "TVOS(\(major).*, reason: \(reason))"
+    case TVOSMinor(let major, let minor, let reason):
+      return "TVOS(\(major).\(minor), reason: \(reason))"
+    case TVOSMinorRange(let major, let minorRange, let reason):
+      return "TVOS(\(major).[\(minorRange)], reason: \(reason))"
+    case TVOSBugFix(let major, let minor, let bugFix, let reason):
+      return "TVOS(\(major).\(minor).\(bugFix), reason: \(reason))"
+    case TVOSBugFixRange(let major, let minor, let bugFixRange, let reason):
+      return "TVOS(\(major).\(minor).[\(bugFixRange)], reason: \(reason))"
+
+    case TVOSSimulatorAny(let reason):
+      return "TVOSSimulatorAny(*, reason: \(reason))"
 
     case LinuxAny(reason: let reason):
       return "LinuxAny(*, reason: \(reason))"
@@ -1236,6 +1271,62 @@ public enum TestRunPredicate : CustomStringConvertible {
     case iOSSimulatorAny:
       switch _getRunningOSVersion() {
       case .iOSSimulator:
+        return true
+      default:
+        return false
+      }
+
+    case TVOSAny:
+      switch _getRunningOSVersion() {
+      case .TVOS:
+        return true
+      default:
+        return false
+      }
+
+    case TVOSMajor(let major, _):
+      switch _getRunningOSVersion() {
+      case .TVOS(major, _, _):
+        return true
+      default:
+        return false
+      }
+
+    case TVOSMinor(let major, let minor, _):
+      switch _getRunningOSVersion() {
+      case .TVOS(major, minor, _):
+        return true
+      default:
+        return false
+      }
+
+    case TVOSMinorRange(let major, let minorRange, _):
+      switch _getRunningOSVersion() {
+      case .TVOS(major, let runningMinor, _):
+        return minorRange.contains(runningMinor)
+      default:
+        return false
+      }
+
+    case TVOSBugFix(let major, let minor, let bugFix, _):
+      switch _getRunningOSVersion() {
+      case .TVOS(major, minor, bugFix):
+        return true
+      default:
+        return false
+      }
+
+    case TVOSBugFixRange(let major, let minor, let bugFixRange, _):
+      switch _getRunningOSVersion() {
+      case .TVOS(major, minor, let runningBugFix):
+        return bugFixRange.contains(runningBugFix)
+      default:
+        return false
+      }
+
+    case TVOSSimulatorAny:
+      switch _getRunningOSVersion() {
+      case .TVOSSimulator:
         return true
       default:
         return false

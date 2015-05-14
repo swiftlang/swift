@@ -4,6 +4,9 @@
 
 // REQUIRES: objc_interop
 
+// <rdar://problem/20946270> Interpreter/SDK/c_pointers.swift fails on TVOS
+// XFAIL: OS=tvos
+
 import Foundation
 #if os(OSX)
 import AppKit
