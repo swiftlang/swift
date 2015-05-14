@@ -266,18 +266,14 @@ struct SILDeclRef {
   bool operator==(SILDeclRef rhs) const {
     return loc.getOpaqueValue() == rhs.loc.getOpaqueValue()
       && kind == rhs.kind
+      && Expansion == rhs.Expansion
       && uncurryLevel == rhs.uncurryLevel
       && isForeign == rhs.isForeign
       && isDirectReference == rhs.isDirectReference
       && defaultArgIndex == rhs.defaultArgIndex;
   }
   bool operator!=(SILDeclRef rhs) const {
-    return loc.getOpaqueValue() != rhs.loc.getOpaqueValue()
-      || kind != rhs.kind
-      || uncurryLevel != rhs.uncurryLevel
-      || isForeign != rhs.isForeign
-      || isDirectReference != rhs.isDirectReference
-      || defaultArgIndex != rhs.defaultArgIndex;
+    return !(*this == rhs);
   }
   
   void print(llvm::raw_ostream &os) const;
@@ -294,7 +290,7 @@ struct SILDeclRef {
     // Curry thunks are never foreign.
     bool willBeForeign = isForeign && !willBeCurried;
     bool willBeDirect = isDirectReference;
-    return SILDeclRef(loc.getOpaqueValue(), kind, level,
+    return SILDeclRef(loc.getOpaqueValue(), kind, Expansion, level,
                       willBeCurried, willBeDirect, willBeForeign,
                       defaultArgIndex);
   }
@@ -302,8 +298,8 @@ struct SILDeclRef {
   /// Returns the foreign (or native) entry point corresponding to the same
   /// decl.
   SILDeclRef asForeign(bool foreign = true) const {
-    return SILDeclRef(loc.getOpaqueValue(), kind, uncurryLevel, isCurried,
-                      isDirectReference, foreign, defaultArgIndex);
+    return SILDeclRef(loc.getOpaqueValue(), kind, Expansion, uncurryLevel,
+                      isCurried, isDirectReference, foreign, defaultArgIndex);
   }
   
   SILDeclRef asDirectReference(bool direct = true) const {
@@ -321,22 +317,7 @@ struct SILDeclRef {
   /// True if the decl ref references a thunk from a natively Swift declaration
   /// to foreign C or ObjC calling convention.
   bool isNativeToForeignThunk() const;
-  
-  /// Produces a SILDeclRef from an opaque value.
-  explicit SILDeclRef(void *opaqueLoc,
-                       Kind kind,
-                       unsigned uncurryLevel,
-                       bool isCurried,
-                       bool isDirectReference,
-                       bool isForeign,
-                       unsigned defaultArgIndex)
-    : loc(Loc::getFromOpaqueValue(opaqueLoc)),
-      kind(kind), uncurryLevel(uncurryLevel),
-      isCurried(isCurried),
-      isForeign(isForeign), isDirectReference(isDirectReference),
-      defaultArgIndex(defaultArgIndex)
-  {}
-  
+
   /// Return a SILDeclRef to the declaration overridden by this one, or
   /// a null SILDeclRef if there is no override.
   SILDeclRef getOverridden() const {
@@ -353,7 +334,25 @@ struct SILDeclRef {
   /// overrides. This may be different from "getOverridden" because some
   /// declarations do not always have vtable entries.
   SILDeclRef getOverriddenVTableEntry() const;
-  
+
+private:
+  friend struct llvm::DenseMapInfo<swift::SILDeclRef>;
+  /// Produces a SILDeclRef from an opaque value.
+  explicit SILDeclRef(void *opaqueLoc,
+                       Kind kind,
+                       unsigned rawExpansion,
+                       unsigned uncurryLevel,
+                       bool isCurried,
+                       bool isDirectReference,
+                       bool isForeign,
+                       unsigned defaultArgIndex)
+    : loc(Loc::getFromOpaqueValue(opaqueLoc)),
+      kind(kind), uncurryLevel(uncurryLevel), Expansion(rawExpansion),
+      isCurried(isCurried),
+      isForeign(isForeign), isDirectReference(isDirectReference),
+      defaultArgIndex(defaultArgIndex)
+  {}
+
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILDeclRef C) {
@@ -370,16 +369,17 @@ template<> struct DenseMapInfo<swift::SILDeclRef> {
   using SILDeclRef = swift::SILDeclRef;
   using Kind = SILDeclRef::Kind;
   using Loc = SILDeclRef::Loc;
+  using ResilienceExpansion = swift::ResilienceExpansion;
   using PointerInfo = DenseMapInfo<void*>;
   using UnsignedInfo = DenseMapInfo<unsigned>;
 
   static SILDeclRef getEmptyKey() {
-    return SILDeclRef(PointerInfo::getEmptyKey(), Kind::Func, 0,
-                      false, false, false, 0);
+    return SILDeclRef(PointerInfo::getEmptyKey(), Kind::Func,
+                      0, 0, false, false, false, 0);
   }
   static SILDeclRef getTombstoneKey() {
-    return SILDeclRef(PointerInfo::getTombstoneKey(), Kind::Func, 0,
-                      false, false, false, 0);
+    return SILDeclRef(PointerInfo::getTombstoneKey(), Kind::Func,
+                      0, 0, false, false, false, 0);
   }
   static unsigned getHashValue(swift::SILDeclRef Val) {
     unsigned h1 = PointerInfo::getHashValue(Val.loc.getOpaqueValue());
