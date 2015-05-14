@@ -59,7 +59,47 @@ public func _stdlib_bridgeNSErrorToErrorType<
   }
 }
 
-@objc public enum _NSCocoaError : Int, _ObjectiveCBridgeableErrorType {
+/// Helper protocol for _BridgedNSError, which used used to provide
+/// default implementations.
+public protocol __BridgedNSError : RawRepresentable {
+  static var _NSErrorDomain: String { get }
+}
+
+public extension __BridgedNSError where RawValue == Int {
+  public final var _domain: String { return Self._NSErrorDomain }
+  public final var _code: Int { return rawValue }
+
+  public init?(rawValue: Int) {
+    self = unsafeBitCast(rawValue, Self.self)
+  }
+
+  public init?(_bridgedNSError: NSError) {
+    if _bridgedNSError.domain != Self._NSErrorDomain {
+      return nil
+    }
+
+    if let result = Self(rawValue: _bridgedNSError.code) {
+      self = result
+    } else {
+      return nil
+    }
+  }
+}
+
+/// Describes a raw representable type that is bridged to a particular
+/// NSError domain.
+///
+/// This protocol is used primarily to generate the conformance to
+/// _ObjectiveCBridgeableErrorType for such an enum.
+public protocol _BridgedNSError : __BridgedNSError,
+                                  _ObjectiveCBridgeableErrorType {
+  /// The NSError domain to which this type is bridged.
+  static var _NSErrorDomain: String { get }
+}
+
+/// Enumeration that describes the error codes within the Cocoa error
+/// domain.
+@objc public enum _NSCocoaError : Int, _BridgedNSError {
   // Foundation errors
   case FileNoSuchFileError = 4
   case FileLockingError = 255
@@ -282,27 +322,12 @@ public func _stdlib_bridgeNSErrorToErrorType<
   }
 #endif
 
-  public var _domain: String { return NSCocoaErrorDomain }
-  public var _code: Int { return rawValue }
-
-  public init?(rawValue: Int) {
-    self = unsafeBitCast(rawValue, _NSCocoaError.self)
-  }
-
-  public init?(_bridgedNSError: NSError) {
-    if _bridgedNSError.domain != NSCocoaErrorDomain {
-      return nil
-    }
-
-    if let result = _NSCocoaError(rawValue: _bridgedNSError.code) {
-      self = result
-    } else {
-      return nil
-    }
-  }
+  public static var _NSErrorDomain: String { return NSCocoaErrorDomain }
 }
 
-@objc public enum _NSURLError : Int, _ObjectiveCBridgeableErrorType {
+/// Enumeration that describes the error codes within the NSURL error
+/// domain.
+@objc public enum _NSURLError : Int, _BridgedNSError {
   case Unknown = -1
   case Cancelled = -999
   case BadURL = -1000
@@ -364,22 +389,5 @@ public func _stdlib_bridgeNSErrorToErrorType<
   @available(OSX, introduced=10.10) @available(iOS, introduced=8.0)
   case BackgroundSessionWasDisconnected = -997
 
-  public var _domain: String { return NSURLErrorDomain }
-  public var _code: Int { return rawValue }
-
-  public init?(rawValue: Int) {
-    self = unsafeBitCast(rawValue, _NSURLError.self)
-  }
-
-  public init?(_bridgedNSError: NSError) {
-    if _bridgedNSError.domain != NSURLErrorDomain {
-      return nil
-    }
-
-    if let result = _NSURLError(rawValue: _bridgedNSError.code) {
-      self = result
-    } else {
-      return nil
-    }
-  }
+  public static var _NSErrorDomain: String { return NSURLErrorDomain }
 }
