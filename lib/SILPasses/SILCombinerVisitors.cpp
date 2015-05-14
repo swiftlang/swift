@@ -721,7 +721,7 @@ SILInstruction *PartialApplyCombiner::combine() {
   for (auto Use : PAI->getUses()) {
     auto User = Use->getUser();
     // If this use of a partial_apply is not
-    // an apply which uses it as a calle, bail.
+    // an apply which uses it as a callee, bail.
     auto AI = dyn_cast<ApplyInst>(User);
     if (!AI)
       continue;
