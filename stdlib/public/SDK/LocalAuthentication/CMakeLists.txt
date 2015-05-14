@@ -1,0 +1,3 @@
+add_swift_library(swiftLocalAuthentication IS_SDK_OVERLAY
+  LocalAuthentication.swift
+  SWIFT_MODULE_DEPENDS Foundation)

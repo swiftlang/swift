@@ -1,0 +1,4 @@
+add_swift_library(swiftPassKit IS_SDK_OVERLAY
+  PassKit.swift
+  TARGET_SDKS IOS IOS_SIMULATOR WATCHOS WATCHOS_SIMULATOR
+  SWIFT_MODULE_DEPENDS Foundation)

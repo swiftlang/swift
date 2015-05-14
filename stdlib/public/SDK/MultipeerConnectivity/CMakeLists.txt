@@ -1,0 +1,3 @@
+add_swift_library(swiftMultipeerConnectivity IS_SDK_OVERLAY
+  MultipeerConnectivity.swift
+  SWIFT_MODULE_DEPENDS Foundation)

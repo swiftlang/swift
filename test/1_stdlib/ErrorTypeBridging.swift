@@ -3,6 +3,7 @@
 
 import StdlibUnittest
 import Foundation
+import CoreLocation
 
 var ErrorTypeBridgingTests = TestSuite("ErrorTypeBridging")
 
@@ -103,6 +104,21 @@ ErrorTypeBridgingTests.test("NSError-to-enum bridging") {
     }
 
     expectTrue(isBadURLError)
+
+    // CoreLocation error domain
+    let nsCL = NSError(domain: kCLErrorDomain,
+                       code: CLError.HeadingFailure.rawValue,
+                       userInfo: [:])
+    let eCL: ErrorType = nsCL
+    let isHeadingFailure: Bool
+    switch eCL {
+    case CLError.HeadingFailure:
+      isHeadingFailure = true
+    default:
+      isHeadingFailure = false
+    }
+
+    expectTrue(isHeadingFailure)
   }
   expectEqual(NoisyErrorDeathCount, NoisyErrorLifeCount)
 }

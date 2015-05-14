@@ -1,0 +1,5 @@
+add_swift_library(swiftWebKit IS_SDK_OVERLAY
+  WebKit.swift
+  TARGET_SDKS OSX IOS IOS_SIMULATOR
+  SWIFT_MODULE_DEPENDS Foundation
+  FRAMEWORK_DEPENDS WebKit)
