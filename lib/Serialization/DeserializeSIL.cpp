@@ -251,11 +251,12 @@ SILValue SILDeserializer::getLocalValue(ValueID Id, unsigned ResultNum,
 
 /// Return the SILBasicBlock of a given ID.
 SILBasicBlock *SILDeserializer::getBBForDefinition(SILFunction *Fn,
+                                                   SILBasicBlock *Prev,
                                                    unsigned ID) {
   SILBasicBlock *&BB = BlocksByID[ID];
   // If the block has never been named yet, just create it.
   if (BB == nullptr)
-    return BB = new (SILMod) SILBasicBlock(Fn);
+    return BB = new (SILMod) SILBasicBlock(Fn, Prev);
 
   // If it already exists, it was either a forward reference or a redefinition.
   // The latter should never happen.
@@ -263,6 +264,8 @@ SILBasicBlock *SILDeserializer::getBBForDefinition(SILFunction *Fn,
   assert(wasForwardReferenced);
   (void)wasForwardReferenced;
 
+  if (Prev)
+    BB->moveAfter(Prev);
   return BB;
 }
 
@@ -531,7 +534,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
          kind != SIL_WITNESSTABLE) {
     if (kind == SIL_BASIC_BLOCK)
       // Handle a SILBasicBlock record.
-      CurrentBB = readSILBasicBlock(fn, scratch);
+      CurrentBB = readSILBasicBlock(fn, CurrentBB, scratch);
     else {
       // If CurrentBB is empty, just return fn. The code in readSILInstruction
       // assumes that such a situation means that fn is a declaration. Thus it
@@ -570,13 +573,14 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
 }
 
 SILBasicBlock *SILDeserializer::readSILBasicBlock(SILFunction *Fn,
+                                                  SILBasicBlock *Prev,
                                     SmallVectorImpl<uint64_t> &scratch) {
   ArrayRef<uint64_t> Args;
   SILBasicBlockLayout::readRecord(scratch, Args);
 
   // Args should be a list of pairs, the first number is a TypeID, the
   // second number is a ValueID.
-  SILBasicBlock *CurrentBB = getBBForDefinition(Fn, BasicBlockID++);
+  SILBasicBlock *CurrentBB = getBBForDefinition(Fn, Prev, BasicBlockID++);
   for (unsigned I = 0, E = Args.size(); I < E; I += 3) {
     TypeID TyID = Args[I];
     if (!TyID) return nullptr;

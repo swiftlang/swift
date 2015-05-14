@@ -76,11 +76,10 @@ bb1:
 // CHECK-LABEL: sil public_external [fragile] @test2 : $@convention(thin) (Int) -> ()
 sil [fragile] @test2 : $@convention(thin) (Int) -> () {
   // CHECK: bb1:
-  // CHECK: %2 = tuple ()
-  // CHECK: br bb2
+  // CHECK: return %5 : $()
   // CHECK: bb2:
-  // FIXME: should be %2
-  // CHECK: return %{{.*}} : $()
+  // CHECK: %5 = tuple ()
+  // CHECK: br bb1
 bb0(%0 : $Int):
   br bb2
 bb1:

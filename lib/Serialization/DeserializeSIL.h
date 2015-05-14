@@ -65,7 +65,8 @@ namespace swift {
 
     /// Return the SILBasicBlock of a given ID.
     SILBasicBlock *getBBForReference(SILFunction *Fn, unsigned ID);
-    SILBasicBlock *getBBForDefinition(SILFunction *Fn, unsigned ID);
+    SILBasicBlock *getBBForDefinition(SILFunction *Fn, SILBasicBlock *Prev,
+                                      unsigned ID);
 
     /// Read a SIL function.
     SILFunction *readSILFunction(serialization::DeclID, SILFunction *InFunc,
@@ -73,6 +74,7 @@ namespace swift {
                                  bool errorIfEmptyBody = true);
     /// Read a SIL basic block within a given SIL function.
     SILBasicBlock *readSILBasicBlock(SILFunction *Fn,
+                                     SILBasicBlock *Prev,
                                      SmallVectorImpl<uint64_t> &scratch);
     /// Read a SIL instruction within a given SIL basic block.
     bool readSILInstruction(SILFunction *Fn, SILBasicBlock *BB,
