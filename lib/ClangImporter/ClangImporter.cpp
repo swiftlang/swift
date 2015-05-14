@@ -1929,6 +1929,22 @@ void ClangImporter::lookupValue(Identifier name, VisibleDeclConsumer &consumer){
   bool FoundType = false;
   bool FoundAny = false;
   auto processResults = [&](clang::LookupResult &result) {
+    SmallVector<const clang::NamedDecl *, 16> sortedResults{result.begin(),
+                                                            result.end()};
+    const clang::SourceManager &srcMgr = pp.getSourceManager();
+    std::sort(sortedResults.begin(), sortedResults.end(),
+              [&](const clang::NamedDecl *lhs,
+                  const clang::NamedDecl *rhs) -> bool {
+      clang::SourceLocation lhsLoc = lhs->getLocStart();
+      clang::SourceLocation lhsExpLoc = srcMgr.getExpansionLoc(lhsLoc);
+      clang::SourceLocation rhsLoc = rhs->getLocStart();
+      clang::SourceLocation rhsExpLoc = srcMgr.getExpansionLoc(rhsLoc);
+      if (lhsExpLoc == rhsExpLoc)
+        return srcMgr.isBeforeInTranslationUnit(srcMgr.getSpellingLoc(lhsLoc),
+                                                srcMgr.getSpellingLoc(rhsLoc));
+      return srcMgr.isBeforeInTranslationUnit(lhsExpLoc, rhsExpLoc);
+    });
+
     // FIXME: Filter based on access path? C++ access control?
     for (auto decl : result) {
       if (auto swiftDecl = Impl.importDeclReal(decl->getUnderlyingDecl())) {
