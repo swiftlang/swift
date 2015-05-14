@@ -65,21 +65,6 @@ extension _SequenceDefaultsType {
     return nil
   }
 }
-
-extension SequenceType {
-  /// Return an `Array` containing the elements of `self`,
-  /// in order, that satisfy the predicate `includeElement`.
-  final public func _prext_filter(
-    @noescape includeElement: (Generator.Element) -> Bool
-  ) -> [Generator.Element] {
-    // Cast away @noescape.
-    typealias IncludeElement = (Generator.Element) -> Bool
-    let escapableIncludeElement =
-      unsafeBitCast(includeElement, IncludeElement.self)
-    return Array(lazy(self).filter(escapableIncludeElement))
-  }
-}
-
 /// This protocol is an implementation detail of `SequenceType`; do
 /// not use it directly.
 ///
@@ -113,15 +98,15 @@ public protocol _Sequence_Type
     @noescape transform: (Generator.Element) -> T
   ) -> [T]
 
-  func _customContainsEquatableElement(
-    element: Generator.Element
-  ) -> Bool?
-
   /// Return an `Array` containing the elements of `self`,
   /// in order, that satisfy the predicate `includeElement`.
   func _prext_filter(
     @noescape includeElement: (Generator.Element) -> Bool
   ) -> [Generator.Element]
+
+  func _customContainsEquatableElement(
+    element: Generator.Element
+  ) -> Bool?
 }
 
 /// A type that can be iterated with a `for`...`in` loop.
@@ -166,6 +151,20 @@ extension SequenceType {
     typealias Transform = (Generator.Element) -> T
     let escapableTransform = unsafeBitCast(transform, Transform.self)
     return Array<T>(lazy(self).map(escapableTransform))
+  }
+}
+
+extension SequenceType {
+  /// Return an `Array` containing the elements of `self`,
+  /// in order, that satisfy the predicate `includeElement`.
+  final public func _prext_filter(
+    @noescape includeElement: (Generator.Element) -> Bool
+  ) -> [Generator.Element] {
+    // Cast away @noescape.
+    typealias IncludeElement = (Generator.Element) -> Bool
+    let escapableIncludeElement =
+      unsafeBitCast(includeElement, IncludeElement.self)
+    return Array(lazy(self).filter(escapableIncludeElement))
   }
 }
 
