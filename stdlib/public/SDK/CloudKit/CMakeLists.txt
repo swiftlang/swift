@@ -1,3 +1,4 @@
 add_swift_library(swiftCloudKit IS_SDK_OVERLAY
   CloudKit.swift
+  TARGET_SDKS OSX IOS IOS_SIMULATOR TVOS TVOS_SIMULATOR
   SWIFT_MODULE_DEPENDS Foundation)
