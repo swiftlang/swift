@@ -87,6 +87,20 @@ ErrorTypeBridgingTests.test("NSError-to-enum bridging") {
 
     expectTrue(isNoSuchFileError)
 
+    // NSURLError domain
+    let nsURL = NSError(domain: NSURLErrorDomain,
+                        code: NSURLErrorBadURL,
+                        userInfo: nil)
+    let eURL: ErrorType = nsURL
+    let isBadURLError: Bool
+    switch eURL {
+    case _NSURLError.BadURL:
+      isBadURLError = true
+    default:
+      isBadURLError = false
+    }
+
+    expectTrue(isBadURLError)
   }
   expectEqual(NoisyErrorDeathCount, NoisyErrorLifeCount)
 }

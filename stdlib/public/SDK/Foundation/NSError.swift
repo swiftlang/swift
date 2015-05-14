@@ -301,3 +301,85 @@ public func _stdlib_bridgeNSErrorToErrorType<
     }
   }
 }
+
+@objc public enum _NSURLError : Int, _ObjectiveCBridgeableErrorType {
+  case Unknown = -1
+  case Cancelled = -999
+  case BadURL = -1000
+  case TimedOut = -1001
+  case UnsupportedURL = -1002
+  case CannotFindHost = -1003
+  case CannotConnectToHost = -1004
+  case NetworkConnectionLost = -1005
+  case DNSLookupFailed = -1006
+  case HTTPTooManyRedirects = -1007
+  case ResourceUnavailable = -1008
+  case NotConnectedToInternet = -1009
+  case RedirectToNonExistentLocation = -1010
+  case BadServerResponse = -1011
+  case UserCancelledAuthentication = -1012
+  case UserAuthenticationRequired = -1013
+  case ZeroByteResource = -1014
+  case CannotDecodeRawData = -1015
+  case CannotDecodeContentData = -1016
+  case CannotParseResponse = -1017
+  case FileDoesNotExist = -1100
+  case FileIsDirectory = -1101
+  case NoPermissionsToReadFile = -1102
+  case SecureConnectionFailed = -1200
+  case ServerCertificateHasBadDate = -1201
+  case ServerCertificateUntrusted = -1202
+  case ServerCertificateHasUnknownRoot = -1203
+  case ServerCertificateNotYetValid = -1204
+  case ClientCertificateRejected = -1205
+  case ClientCertificateRequired = -1206
+  case CannotLoadFromNetwork = -2000
+  case CannotCreateFile = -3000
+  case CannotOpenFile = -3001
+  case CannotCloseFile = -3002
+  case CannotWriteToFile = -3003
+  case CannotRemoveFile = -3004
+  case CannotMoveFile = -3005
+  case DownloadDecodingFailedMidStream = -3006
+  case DownloadDecodingFailedToComplete = -3007
+
+  @available(OSX, introduced=10.7) @available(iOS, introduced=3.0)
+  case InternationalRoamingOff = -1018
+
+  @available(OSX, introduced=10.7) @available(iOS, introduced=3.0)
+  case CallIsActive = -1019
+
+  @available(OSX, introduced=10.7) @available(iOS, introduced=3.0)
+  case DataNotAllowed = -1020
+
+  @available(OSX, introduced=10.7) @available(iOS, introduced=3.0)
+  case RequestBodyStreamExhausted = -1021
+
+  @available(OSX, introduced=10.10) @available(iOS, introduced=8.0)
+  case BackgroundSessionRequiresSharedContainer = -995
+
+  @available(OSX, introduced=10.10) @available(iOS, introduced=8.0)
+  case BackgroundSessionInUseByAnotherProcess = -996
+
+  @available(OSX, introduced=10.10) @available(iOS, introduced=8.0)
+  case BackgroundSessionWasDisconnected = -997
+
+  public var _domain: String { return NSURLErrorDomain }
+  public var _code: Int { return rawValue }
+
+  public init?(rawValue: Int) {
+    self = unsafeBitCast(rawValue, _NSURLError.self)
+  }
+
+  public init?(_bridgedNSError: NSError) {
+    if _bridgedNSError.domain != NSURLErrorDomain {
+      return nil
+    }
+
+    if let result = _NSURLError(rawValue: _bridgedNSError.code) {
+      self = result
+    } else {
+      return nil
+    }
+  }
+}
