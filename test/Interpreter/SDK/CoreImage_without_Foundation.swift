@@ -1,6 +1,6 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 
-// UNSUPPORTED: linux
+// REQUIRES: objc_interop
 
 import CoreImage
 // Do NOT add anything that publicly imports Foundation here!
