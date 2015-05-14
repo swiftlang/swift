@@ -1631,11 +1631,26 @@ namespace {
 
       case PatternKind::Named: {
         auto var = cast<NamedPattern>(pattern)->getDecl();
+        
+        auto boundExpr = locator.trySimplifyToExpr();
+        auto haveBoundCollectionLiteral = boundExpr &&
+                                            !var->hasNonPatternBindingInit() &&
+                                            (isa<ArrayExpr>(boundExpr) ||
+                                             isa<DictionaryExpr>(boundExpr));
 
         // For a named pattern without a type, create a new type variable
         // and use it as the type of the variable.
-        Type ty = CS.createTypeVariable(CS.getConstraintLocator(locator),
-                                        /*options=*/0);
+        //
+        // FIXME: For now, substitute in the bound type for literal collection
+        // exprs that would otherwise result in a simple conversion constraint
+        // being placed between two type variables. (The bound type and the
+        // collection type, which will always be the same in this case.)
+        // This will avoid exponential typecheck behavior in the case of nested
+        // array and dictionary literals.
+        Type ty = haveBoundCollectionLiteral ?
+                    boundExpr->getType() :
+                    CS.createTypeVariable(CS.getConstraintLocator(locator),
+                                          /*options=*/0);
 
         // For weak variables, use Optional<T>.
         if (auto *OA = var->getAttrs().getAttribute<OwnershipAttr>())
