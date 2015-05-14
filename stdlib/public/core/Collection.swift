@@ -197,6 +197,20 @@ extension CollectionType {
 }
 
 extension CollectionType {
+  /// Return an `Array` containing the elements of `self`,
+  /// in order, that satisfy the predicate `includeElement`.
+  final public func _prext_filter(
+    @noescape includeElement: (Generator.Element) -> Bool
+  ) -> [Generator.Element] {
+    // Cast away @noescape.
+    typealias IncludeElement = (Generator.Element) -> Bool
+    let escapableIncludeElement =
+      unsafeBitCast(includeElement, IncludeElement.self)
+    return Array(lazy(self).filter(escapableIncludeElement))
+  }
+}
+
+extension CollectionType {
   /// Returns the first element of `self`, or `nil` if `self` is empty.
   final public var first: Generator.Element? {
     return isEmpty ? nil : self[startIndex]
