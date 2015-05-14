@@ -140,6 +140,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_P4_DOT_1 | FileCheck %s -check-prefix=PROTOCOL_EXT_P4_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_P4_DOT_2 | FileCheck %s -check-prefix=PROTOCOL_EXT_P4_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_P4_T_DOT_1 | FileCheck %s -check-prefix=PROTOCOL_EXT_P4_T_DOT_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_UNUSABLE_EXISTENTIAL | FileCheck %s -check-prefix=PROTOCOL_EXT_UNUSABLE_EXISTENTIAL
 
 // Test code completion of expressions that produce a value.
 
@@ -1646,3 +1647,24 @@ extension P4 where Self.T == WillConformP1 {
 // PROTOCOL_EXT_P4_T_DOT_1-DAG: Decl[InstanceMethod]/CurrNominal:   reqP1({#self: WillConformP1#})[#() -> Void#]{{; name=.+$}}
 // PROTOCOL_EXT_P4_T_DOT_1-DAG: Decl[InstanceMethod]/Super:   extP1({#self: Self#})[#() -> Void#]{{; name=.+$}}
 // PROTOCOL_EXT_P4_T_DOT_1: End completions
+
+protocol PWithT {
+  typealias T
+  func foo(x: T) -> T
+}
+
+extension PWithT {
+  final func bar(x: T) -> T {
+    return x
+  }
+}
+
+// Note: PWithT cannot actually be used as an existential type because it has
+// an associated type.  But we should still be able to give code completions.
+func testUnusableProtExt(x: PWithT) {
+  x.#^PROTOCOL_EXT_UNUSABLE_EXISTENTIAL^#
+}
+// PROTOCOL_EXT_UNUSABLE_EXISTENTIAL: Begin completions
+// PROTOCOL_EXT_UNUSABLE_EXISTENTIAL: Decl[InstanceMethod]/CurrNominal:   foo({#(x): `Self`.T#})[#`Self`.T#]{{; name=.+}}
+// PROTOCOL_EXT_UNUSABLE_EXISTENTIAL: Decl[InstanceMethod]/CurrNominal:   bar({#(x): Self.T#})[#Self.T#]{{; name=.+}}
+// PROTOCOL_EXT_UNUSABLE_EXISTENTIAL: End completions

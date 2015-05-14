@@ -1048,9 +1048,11 @@ public:
       if (ContextTy) {
         Type MaybeNominalType = ExprType->getRValueInstanceType();
         if (ContextTy->getAnyNominal() == MaybeNominalType->getAnyNominal() &&
-            !isBoringBoundGenericType(MaybeNominalType))
-          return MaybeNominalType->getTypeOfMember(
-              CurrDeclContext->getParentModule(), VD, TypeResolver.get());
+            !isBoringBoundGenericType(MaybeNominalType)) {
+          if (Type T = MaybeNominalType->getTypeOfMember(
+              CurrDeclContext->getParentModule(), VD, TypeResolver.get()))
+            return T;
+        }
       }
     }
 
@@ -1371,6 +1373,7 @@ public:
     if (!IsImplicitlyCurriedInstanceMethod && FD->getImplicitSelfDecl())
       FirstIndex = 1;
     Type FunctionType = getTypeOfMember(FD);
+    assert(FunctionType);
 
     if (FirstIndex != 0 && !FunctionType->is<ErrorType>())
       FunctionType = FunctionType->castTo<AnyFunctionType>()->getResult();

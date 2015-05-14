@@ -6,10 +6,15 @@
 // RUN: FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_1 < %t.members1.txt
 // RUN: FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members1.txt
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PRIVATE_NOMINAL_MEMBERS_2 > %t.members2.txt
-// RUN: FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_2 < %t.members2.txt
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PRIVATE_NOMINAL_MEMBERS_2B > %t.members2a.txt
+// RUN: FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_2 < %t.members2a.txt
 // FIXME: _prext_filter?
-// RUN-disabled: FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members2.txt
+// RUN-disabled: FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members2a.txt
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PRIVATE_NOMINAL_MEMBERS_2B > %t.members2b.txt
+// RUN: FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_2 < %t.members2b.txt
+// FIXME: _prext_filter?
+// RUN-disabled: FileCheck %s -check-prefix=NO_STDLIB_PRIVATE < %t.members2b.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PRIVATE_NOMINAL_MEMBERS_3 > %t.members3.txt
 // RUN: FileCheck %s -check-prefix=PRIVATE_NOMINAL_MEMBERS_3 < %t.members3.txt
@@ -41,9 +46,12 @@ func privateNominalMembers(a: String) {
 // PRIVATE_NOMINAL_MEMBERS_1-DAG: Decl[InstanceVar]/CurrNominal: startIndex[#Index#]{{; name=.+$}}
 // PRIVATE_NOMINAL_MEMBERS_1: End completions
 
-// FIXME: if we change this to (a: CollectionType) it crashes.
-func protocolExtCollection1<C : CollectionType>(a: C) {
-  a.#^PRIVATE_NOMINAL_MEMBERS_2^#
+func protocolExtCollection1a<C : CollectionType>(a: C) {
+  a.#^PRIVATE_NOMINAL_MEMBERS_2A^#
+}
+
+func protocolExtCollection1b(a: CollectionType) {
+  a.#^PRIVATE_NOMINAL_MEMBERS_2B^#
 }
 
 // PRIVATE_NOMINAL_MEMBERS_2: Begin completions
