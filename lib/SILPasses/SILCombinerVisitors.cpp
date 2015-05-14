@@ -488,16 +488,6 @@ static bool useDoesNotKeepClosureAlive(const SILInstruction *I) {
   case ValueKind::ReleaseValueInst:
   case ValueKind::DebugValueInst:
     return true;
-  /*
-  case ValueKind::ApplyInst: {
-    if (auto *AI = dyn_cast<ApplyInst>(I)) {
-      if (auto *PAI = dyn_cast<PartialApplyInst>(AI->getCallee())) {
-        return canCombineApplyOfPartialApply(AI, PAI);
-      }
-    }
-    return false;
-  }
-  */
   default:
     return false;
   }
