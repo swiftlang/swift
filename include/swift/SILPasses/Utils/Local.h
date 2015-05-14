@@ -155,6 +155,12 @@ void releasePartialApplyCapturedArg(
 /// This helper class represents the lifetime of a single
 /// SILValue. The value itself is held and the lifetime endpoints of
 /// that value are computed.
+///
+/// This does not compute a set of jointly postdominating use points. Instead it
+/// assumes that the value's existing uses already jointly postdominate the
+/// definition. This makes sense for values that are returned +1 from an
+/// instruction, like partial_apply, and therefore must be released on all paths
+/// via strong_release or apply.
 class LifetimeTracker {
   SILValue TheValue;
 
