@@ -142,7 +142,7 @@ extension NSString {
   func nsstrArg(#s: NSString) { }
 }
 
-class Bas : NSObject, Hashable {
+class Bas : NSObject {
   // CHECK: define internal [[OPAQUE:.*]]* @_TToFC11objc_bridge3Basg11strRealPropSS([[OPAQUE:.*]]*, i8*) unnamed_addr {{.*}} {
   // CHECK: define internal void @_TToFC11objc_bridge3Bass11strRealPropSS([[OPAQUE:.*]]*, i8*, [[OPAQUE:.*]]*) unnamed_addr {{.*}} {
   var strRealProp : String
@@ -187,7 +187,7 @@ class Bas : NSObject, Hashable {
 
   deinit { var x = 10 }
 
-  var hashValue: Int { return 0 }
+  override var hashValue: Int { return 0 }
 
   func acceptSet(set: Set<Bas>) { }
 }

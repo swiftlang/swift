@@ -224,6 +224,44 @@ clang::CanQualType GenClangType::visitBoundGenericClassType(
   return getClangIdType(getClangASTContext());
 }
 
+static clang::CanQualType
+getClangFoundationClassType(IRGenModule &IGM, StringRef name) {
+  auto &ctx = IGM.getClangASTContext();
+  // Fallback to returning the "id" type if the class type cannot be found.
+  auto id = [&]() -> clang::CanQualType {
+    return getClangIdType(ctx);
+  };
+
+  auto *Foundation = IGM.Context.getLoadedModule(IGM.Context.Id_Foundation);
+  if (!Foundation)
+    return id();
+  
+  auto identifier = IGM.Context.getIdentifier(name);
+  SmallVector<ValueDecl *, 1> results;
+  Foundation->lookupQualified(Foundation->getType(),
+                                              identifier,
+                                              NL_QualifiedDefault, nullptr,
+                                              results);
+  for (auto result : results) {
+    // If we found a type with a clang node, get its declared class type.
+    auto clangNode = result->getClangNode();
+    if (!clangNode)
+      continue;
+    
+    auto clangInterface = dyn_cast_or_null<clang::ObjCInterfaceDecl>
+      (clangNode.getAsDecl());
+
+    if (!clangInterface)
+      continue;
+    
+    auto type = ctx.getObjCInterfaceType(clangInterface);
+    type = ctx.getObjCObjectPointerType(type);
+    return ctx.getCanonicalType(type);
+  }
+  
+  return id();
+}
+
 clang::CanQualType
 GenClangType::visitBoundGenericType(CanBoundGenericType type) {
   // We only expect *Pointer<T>, ImplicitlyUnwrappedOptional<T>, and Optional<T>.
@@ -284,9 +322,11 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
   }
 
   case StructKind::Array:
+    return getClangFoundationClassType(IGM, "NSArray");
   case StructKind::Dictionary:
+    return getClangFoundationClassType(IGM, "NSDictionary");
   case StructKind::Set:
-    return getClangIdType(getClangASTContext());
+    return getClangFoundationClassType(IGM, "NSSet");
       
   case StructKind::CFunctionPointer: {
     auto &clangCtx = getClangASTContext();
@@ -593,8 +633,8 @@ void ClangTypeConverter::fillSpeciallyImportedTypeCache(IRGenModule &IGM) {
   //        probably be const char* for type encoding.
   CACHE_STDLIB_TYPE("CString", ctx.VoidPtrTy);
 
-  // We import NSString* (an Obj-C object pointer) as String.
-  CACHE_STDLIB_TYPE("String", getClangIdType(ctx));
+  // We import NSString* as String.
+  CACHE_STDLIB_TYPE("String", getClangFoundationClassType(IGM, "NSString"));
 
   CACHE_STDLIB_TYPE("CVaListPointer", getClangDecayedVaListType(ctx));
 

@@ -48,9 +48,9 @@ class Foo: NSManagedObject {
   // -- Bridged value types
 
   // nonatomic, copy, ivar k
-  // CHECK: private unnamed_addr constant {{.*}} c"T@,N,C,Vk\00"
+  // CHECK: private unnamed_addr constant {{.*}} c"T@\22NSString\22,N,C,Vk\00"
   var k: String = ""
   // nonatomic, readonly, ivar l
-  // CHECK: private unnamed_addr constant {{.*}} c"T@,N,R,Vl\00"
+  // CHECK: private unnamed_addr constant {{.*}} c"T@\22NSString\22,N,R,Vl\00"
   let l: String? = nil
 }

@@ -3,12 +3,29 @@
 
 @exported import ObjectiveC
 
+extension NSObject: Hashable {
+  public var hashValue: Int { return 0 }
+}
+public func ==(x: NSObject, y: NSObject) -> Bool { return x === y }
+
 // String/NSString bridging functions.
 @asmname("swift_StringToNSString") internal
 func _convertStringToNSString(string: String) -> NSString
 
 @asmname("swift_NSStringToString") internal
 func _convertNSStringToString(nsstring: NSString?) -> String
+
+@asmname("swift_ArrayToNSArray") internal
+func _convertArrayToNSArray<T>(array: Array<T>) -> NSArray
+
+@asmname("swift_NSArrayToArray") internal
+func _convertNSArrayToArray<T>(nsstring: NSArray?) -> Array<T>
+
+@asmname("swift_DictionaryToNSDictionary") internal
+func _convertDictionaryToNSDictionary<K: Hashable, V>(array: Dictionary<K, V>) -> NSDictionary
+
+@asmname("swift_NSDictionaryToDictionary") internal
+func _convertNSDictionaryToDictionary<K: Hashable, V>(nsstring: NSDictionary?) -> Dictionary<K, V>
 
 // NSSet bridging entry points
 func _convertSetToNSSet<T: Hashable>(s: Set<T>) -> NSSet {
