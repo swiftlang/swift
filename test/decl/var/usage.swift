@@ -133,3 +133,12 @@ func testTuple() {
   var tup : (x:Int, y:Int)  // expected-warning {{variable 'tup' was written to, but never read}}
   tup.x = 1
 }
+
+
+/// <rdar://problem/20911927> False positive in the "variable was never mutated" warning with IUO
+func testForceValueExpr() {
+  var a: X! = nil  // no warning, mutated through the !
+  a!.g()
+}
+
+

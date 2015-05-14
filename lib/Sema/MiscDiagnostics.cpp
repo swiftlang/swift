@@ -1068,6 +1068,8 @@ markBaseOfAbstractStorageDeclStore(Expr *base, ConcreteDeclRef decl) {
    if (auto *TEE = dyn_cast<TupleElementExpr>(E))
      return markStoredOrInOutExpr(TEE->getBase(), Flags);
 
+   if (auto *FVE = dyn_cast<ForceValueExpr>(E))
+     return markStoredOrInOutExpr(FVE->getSubExpr(), Flags);
 
    // If we don't know what kind of expression this is, assume it's a reference
    // and mark it as a read.
