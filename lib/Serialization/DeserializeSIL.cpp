@@ -258,12 +258,11 @@ SILBasicBlock *SILDeserializer::getBBForDefinition(SILFunction *Fn,
     return BB = new (SILMod) SILBasicBlock(Fn);
 
   // If it already exists, it was either a forward reference or a redefinition.
-  // If it is a forward reference, it should be in our undefined set.
-  if (!UndefinedBlocks.erase(BB)) {
-    // If we have a redefinition, return a new BB to avoid inserting
-    // instructions after the terminator.
-    return new (SILMod) SILBasicBlock(Fn);
-  }
+  // The latter should never happen.
+  bool wasForwardReferenced = UndefinedBlocks.erase(BB);
+  assert(wasForwardReferenced);
+  (void)wasForwardReferenced;
+
   return BB;
 }
 
