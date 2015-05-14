@@ -1110,7 +1110,6 @@ public:
 
   SILBasicBlock *getTryApplyErrorDest(SILLocation loc,
                                       SILResultInfo exnResult);
-  void emitTryApplyErrorBranch(SILLocation loc, ManagedValue error);
 
   /// Emit a dynamic member reference.
   RValue emitDynamicMemberRefExpr(DynamicMemberRefExpr *e, SGFContext c);
@@ -1280,6 +1279,10 @@ public:
                                        SILType bridgedResultType,
                                        SILValue foreignErrorSlot,
                                  const ForeignErrorConvention &foreignError);
+
+  void emitForeignErrorBlock(SILLocation loc,
+                             SILBasicBlock *errorBB,
+                             ManagedValue errorSlot);
 
   ManagedValue emitForeignErrorCheck(SILLocation loc,
                                      ManagedValue result,

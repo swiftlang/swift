@@ -260,24 +260,25 @@ emitBridgeReturnValueForForeignError(SILLocation loc,
 
 /// Step out of the current control flow to emit a foreign error block,
 /// which loads from the error slot and jumps to the error slot.
-static void emitForeignErrorBlock(SILGenFunction &gen, SILLocation loc,
-                                  SILBasicBlock *errorBB,
-                                  ManagedValue errorSlot) {
-  SavedInsertionPoint savedIP(gen, errorBB, FunctionSection::Postmatter);
+void SILGenFunction::emitForeignErrorBlock(SILLocation loc,
+                                           SILBasicBlock *errorBB,
+                                           ManagedValue errorSlot) {
+  SavedInsertionPoint savedIP(*this, errorBB, FunctionSection::Postmatter);
 
   // Load the error (taking responsibility for it).  In theory, this
   // is happening within conditional code, so we need to be only
   // conditionally claiming the value.  In practice, claiming it
   // unconditionally is fine because we want to assume it's nil in the
   // other path.
-  SILValue errorV = gen.B.createLoad(loc, errorSlot.forward(gen));
-  ManagedValue error = gen.emitManagedRValueWithCleanup(errorV);
+  SILValue errorV = B.createLoad(loc, errorSlot.forward(*this));
+  ManagedValue error = emitManagedRValueWithCleanup(errorV);
 
   // Turn the error into an ErrorType value.
-  error = gen.emitBridgedToNativeError(loc, error);
+  error = emitBridgedToNativeError(loc, error);
 
   // Propagate.
-  gen.emitTryApplyErrorBranch(loc, error);
+  FullExpr scope(Cleanups, CleanupLocation::get(loc));
+  emitThrow(loc, error);
 }
 
 /// Unwrap a value of a wrapped integer type to get at the juicy
@@ -318,7 +319,7 @@ emitResultIsZeroErrorCheck(SILGenFunction &gen, SILLocation loc,
   SILBasicBlock *contBB = gen.createBasicBlock();
   gen.B.createCondBranch(loc, resultIsError, errorBB, contBB);
 
-  emitForeignErrorBlock(gen, loc, errorBB, errorSlot);
+  gen.emitForeignErrorBlock(loc, errorBB, errorSlot);
 
   gen.B.emitBlock(contBB);
   return ManagedValue::forUnmanaged(gen.emitEmptyTuple(loc));
@@ -345,7 +346,7 @@ emitResultIsNilErrorCheck(SILGenFunction &gen, SILLocation loc,
                            { ctx.getOptionalNoneDecl(optKind), errorBB } });
 
   // Emit the error block.
-  emitForeignErrorBlock(gen, loc, errorBB, errorSlot);
+  gen.emitForeignErrorBlock(loc, errorBB, errorSlot);
 
   // In the continuation block, take ownership of the now non-optional
   // result value.
@@ -373,7 +374,7 @@ emitErrorIsNonNilErrorCheck(SILGenFunction &gen, SILLocation loc,
                            { ctx.getOptionalNoneDecl(optKind), contBB } });
 
   // Emit the error block.  Just be lazy and reload the error there.
-  emitForeignErrorBlock(gen, loc, errorBB, errorSlot);
+  gen.emitForeignErrorBlock(loc, errorBB, errorSlot);
 
   // Return the result.
   return origResult;

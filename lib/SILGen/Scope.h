@@ -40,6 +40,7 @@ class LLVM_LIBRARY_VISIBILITY Scope {
     Cleanups.InnermostScope = SavedInnermostScope;
     Cleanups.endScope(Depth, Loc);
     Cleanups.Stack.checkIterator(Cleanups.InnermostScope);
+    Cleanups.popTopDeadCleanups(Cleanups.InnermostScope);
   }
 
 public:

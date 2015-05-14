@@ -279,3 +279,57 @@ func testForceTry(fn: () -> Int) {
 // CHECK: return
 // CHECK: builtin "unexpectedError"
 // CHECK: unreachable
+
+// Make sure we balance scopes correctly inside a switch.
+// <rdar://problem/20923654>
+enum CatFood {
+  case Canned
+  case Dry
+}
+
+// Something we can switch on that throws.
+func preferredFood() throws -> CatFood {
+  return CatFood.Canned
+}
+
+func feedCat() throws -> Int {
+  switch try preferredFood() {
+  case .Canned:
+    return 0
+  case .Dry:
+    return 1
+  }
+}
+// CHECK-LABEL: sil hidden @_TF6errors7feedCatFzT_Si : $@convention(thin) () -> (Int, @error ErrorType)
+// CHECK:   %0 = function_ref @_TF6errors13preferredFoodFzT_OS_7CatFood : $@convention(thin) () -> (CatFood, @error ErrorType)
+// CHECK:   try_apply %0() : $@convention(thin) () -> (CatFood, @error ErrorType), normal bb1, error bb5
+// CHECK: bb1([[VAL:%.*]] : $CatFood):
+// CHECK:   switch_enum [[VAL]] : $CatFood, case #CatFood.Canned!enumelt: bb2, case #CatFood.Dry!enumelt: bb3
+// CHECK: bb5([[ERROR:%.*]] : $ErrorType)
+// CHECK:   throw [[ERROR]] : $ErrorType
+
+// Throwing statements inside cases.
+func getHungryCat(food: CatFood) throws -> Cat {
+  switch food {
+  case .Canned:
+    return try make_a_cat()
+  case .Dry:
+    return try dont_make_a_cat()
+  }
+}
+// errors.getHungryCat  throws (errors.CatFood) -> errors.Cat
+// CHECK-LABEL: sil hidden @_TF6errors12getHungryCatFzOS_7CatFoodCS_3Cat : $@convention(thin) (CatFood) -> (@owned Cat, @error ErrorType)
+// CHECK: bb0(%0 : $CatFood):
+// CHECK:   switch_enum %0 : $CatFood, case #CatFood.Canned!enumelt: bb1, case #CatFood.Dry!enumelt: bb3
+// CHECK: bb1:
+// CHECK:   [[FN:%.*]] = function_ref @_TF6errors10make_a_catFzT_CS_3Cat : $@convention(thin) () -> (@owned Cat, @error ErrorType)
+// CHECK:   try_apply [[FN]]() : $@convention(thin) () -> (@owned Cat, @error ErrorType), normal bb2, error bb6
+// CHECK: bb3:
+// CHECK:   [[FN:%.*]] = function_ref @_TF6errors15dont_make_a_catFzT_CS_3Cat : $@convention(thin) () -> (@owned Cat, @error ErrorType)
+// CHECK:   try_apply [[FN]]() : $@convention(thin) () -> (@owned Cat, @error ErrorType), normal bb4, error bb7
+// CHECK: bb6([[ERROR:%.*]] : $ErrorType):
+// CHECK:   br bb8([[ERROR:%.*]] : $ErrorType)
+// CHECK: bb7([[ERROR:%.*]] : $ErrorType):
+// CHECK:   br bb8([[ERROR]] : $ErrorType)
+// CHECK: bb8([[ERROR:%.*]] : $ErrorType):
+// CHECK:   throw [[ERROR]] : $ErrorType
