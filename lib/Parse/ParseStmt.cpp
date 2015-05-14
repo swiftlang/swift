@@ -924,10 +924,12 @@ ParserResult<PoundAvailableInfo> Parser::parseStmtConditionPoundAvailable() {
 ///
 ///   condition:
 ///     expr-basic
-///     expr-basic ',' conditional-binding (',' conditional-binding)*
-///     conditional-binding (',' conditional-binding)*
-///   condition-binding:
+///     expr-basic ',' bind-or-available (',' bind-or-available)*
+///     bind-or-available (',' bind-or-available)*
+///   bind-or-available:
 ///     ('var' | 'let') condition-bind (',' condition-bind)* condition-where
+///     'case' condition-bind
+///     '#available' '(' availability-spec (',' availability-spec)* ')'
 ///   condition-bind:
 ///     pattern '=' expr-basic
 ///   condition-where:
