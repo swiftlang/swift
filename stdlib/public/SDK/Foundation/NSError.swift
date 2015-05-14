@@ -59,7 +59,7 @@ public func _stdlib_bridgeNSErrorToErrorType<
   }
 }
 
-public enum _NSCocoaError : Int, _ObjectiveCBridgeableErrorType {
+@objc public enum _NSCocoaError : Int, _ObjectiveCBridgeableErrorType {
   // Foundation errors
   case FileNoSuchFileError = 4
   case FileLockingError = 255
@@ -74,6 +74,7 @@ public enum _NSCocoaError : Int, _ObjectiveCBridgeableErrorType {
   @available(OSX, introduced=10.5) @available(iOS, introduced=2.0)
   case FileReadTooLargeError = 263
 
+  @available(OSX, introduced=10.5) @available(iOS, introduced=2.0)
   case FileReadUnknownStringEncodingError = 264
 
   case FileWriteUnknownError = 512
@@ -90,8 +91,10 @@ public enum _NSCocoaError : Int, _ObjectiveCBridgeableErrorType {
   @available(OSX, introduced=10.6) @available(iOS, introduced=4.0)
   case FileWriteVolumeReadOnlyError = 642
 
+  @available(OSX, introduced=10.11) @available(iOS, unavailable)
   case FileManagerUnmountUnknownError = 768
 
+  @available(OSX, introduced=10.11) @available(iOS, unavailable)
   case FileManagerUnmountBusyError = 769
 
   case KeyValueValidationError = 1024
@@ -101,48 +104,70 @@ public enum _NSCocoaError : Int, _ObjectiveCBridgeableErrorType {
   @available(OSX, introduced=10.8) @available(iOS, introduced=6.0)
   case FeatureUnsupportedError = 3328
 
+  @available(OSX, introduced=10.5) @available(iOS, introduced=2.0)
   case ExecutableNotLoadableError = 3584
 
+  @available(OSX, introduced=10.5) @available(iOS, introduced=2.0)
   case ExecutableArchitectureMismatchError = 3585
 
+  @available(OSX, introduced=10.5) @available(iOS, introduced=2.0)
   case ExecutableRuntimeMismatchError = 3586
 
+  @available(OSX, introduced=10.5) @available(iOS, introduced=2.0)
   case ExecutableLoadError = 3587
 
+  @available(OSX, introduced=10.5) @available(iOS, introduced=2.0)
   case ExecutableLinkError = 3588
 
+  @available(OSX, introduced=10.6) @available(iOS, introduced=4.0)
   case PropertyListReadCorruptError = 3840
 
+  @available(OSX, introduced=10.6) @available(iOS, introduced=4.0)
   case PropertyListReadUnknownVersionError = 3841
 
+  @available(OSX, introduced=10.6) @available(iOS, introduced=4.0)
   case PropertyListReadStreamError = 3842
 
+  @available(OSX, introduced=10.6) @available(iOS, introduced=4.0)
   case PropertyListWriteStreamError = 3851
 
+  @available(OSX, introduced=10.10) @available(iOS, introduced=8.0)
   case PropertyListWriteInvalidError = 3852
 
+  @available(OSX, introduced=10.8) @available(iOS, introduced=6.0)
   case XPCConnectionInterrupted = 4097
 
+  @available(OSX, introduced=10.8) @available(iOS, introduced=6.0)
   case XPCConnectionInvalid = 4099
 
+  @available(OSX, introduced=10.8) @available(iOS, introduced=6.0)
   case XPCConnectionReplyInvalid = 4101
 
+  @available(OSX, introduced=10.9) @available(iOS, introduced=7.0)
   case UbiquitousFileUnavailableError = 4353
 
+  @available(OSX, introduced=10.9) @available(iOS, introduced=7.0)
   case UbiquitousFileNotUploadedDueToQuotaError = 4354
 
+  @available(OSX, introduced=10.9) @available(iOS, introduced=7.0)
   case UbiquitousFileUbiquityServerNotAvailable = 4355
 
+  @available(OSX, introduced=10.10) @available(iOS, introduced=8.0)
   case UserActivityHandoffFailedError = 4608
 
+  @available(OSX, introduced=10.10) @available(iOS, introduced=8.0)
   case UserActivityConnectionUnavailableError = 4609
 
+  @available(OSX, introduced=10.10) @available(iOS, introduced=8.0)
   case UserActivityRemoteApplicationTimedOutError = 4610
 
+  @available(OSX, introduced=10.10) @available(iOS, introduced=8.0)
   case UserActivityHandoffUserInfoTooLargeError = 4611
 
+  @available(OSX, introduced=10.11) @available(iOS, introduced=9.0)
   case CoderReadCorruptError = 4864
 
+  @available(OSX, introduced=10.11) @available(iOS, introduced=9.0)
   case CoderValueNotFoundError = 4865
 
 
@@ -259,6 +284,10 @@ public enum _NSCocoaError : Int, _ObjectiveCBridgeableErrorType {
 
   public var _domain: String { return NSCocoaErrorDomain }
   public var _code: Int { return rawValue }
+
+  public init?(rawValue: Int) {
+    self = unsafeBitCast(rawValue, _NSCocoaError.self)
+  }
 
   public init?(_bridgedNSError: NSError) {
     if _bridgedNSError.domain != NSCocoaErrorDomain {

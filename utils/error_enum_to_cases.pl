@@ -3,6 +3,7 @@ use English;
 
 sub translateAvailability($) {
   my $version = shift;
+  $version =~ s/^\s+|\s+$//g;
   if ($version eq "NA") { return "unavailable"; }
   $version =~ /([0-9]+)_([0-9]+)/;
   return "introduced=$1.$2";
@@ -15,16 +16,17 @@ my %rangeAvailability = ();
 my $prev_had_availability = 0;
 foreach $line (<STDIN>) {
   chomp $line;
-  if ($line =~ /([A-Za-z_][A-Za-z_0-9]+).*=[^0-9]((0x)?[0-9]+)/) {
+  if ($line =~ /([A-Za-z_][A-Za-z_0-9]+).*=[^0-9A-Za-z_-]*([A-Za-z0-9_-]+)/) {
     my $fullname = $1;
     my $value = $2;
     my $has_availability = 0;
     
     my $availability = "";
-    if ($line =~ /AVAILABLE\((([0-9]+_[0-9]+)|(NA))\s*,\s*(([0-9]+_[0-9]+)|(NA))\)/) {
+#    if ($line =~ /AVAILABLE\s*[(](([0-9]+_[0-9]+)|(NA))[ ]*,[ ]*(([0-9]+_[0-9]+)|(NA))[)]/) {
+    if ($line =~ /AVAILABLE[ ]*[(]([^),]*),([^)]*)[)]/) {
       $has_availability = 1;
       $osx = $1;
-      $ios = $4;
+      $ios = $2;
       $osx = translateAvailability($osx);
       $ios = translateAvailability($ios);
       $availability = "  \@available(OSX, $osx) \@available(iOS, $ios)\n";
@@ -41,8 +43,11 @@ foreach $line (<STDIN>) {
       }
       $rangeAvailability{$rangeName} = $availability;
     } else {
-      if ($availability ne "" && $prev_had_availability == 0) {
-        print("\n$availability");
+      if ($availability ne "") {
+        if ($prev_had_availability == 0) {
+          print("\n");
+        }
+        print("$availability");
       }
       $casename = substr $fullname, $prefixLength;
       print("  case $casename = $value\n");
