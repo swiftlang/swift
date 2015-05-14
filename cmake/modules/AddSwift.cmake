@@ -1177,7 +1177,7 @@ function(add_swift_library name)
   if((NOT "${SWIFT_BUILD_STDLIB}") AND
      (NOT "${SWIFTLIB_SWIFT_MODULE_DEPENDS}" STREQUAL ""))
     list(REMOVE_ITEM SWIFTLIB_SWIFT_MODULE_DEPENDS
-        Core SwiftPrivate)
+        Core)
   endif()
 
   translate_flags(SWIFTLIB "${SWIFTLIB_options}")
@@ -1580,7 +1580,7 @@ function(add_swift_target_executable name)
 
   if(NOT "${SWIFT_BUILD_STDLIB}")
     list(REMOVE_ITEM SWIFTEXE_TARGET_LINK_FAT_LIBRARIES
-        swiftCore swiftSwiftPrivate)
+        swiftCore)
   endif()
 
   foreach(sdk ${SWIFT_SDKS})
