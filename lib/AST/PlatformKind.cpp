@@ -96,8 +96,11 @@ PlatformKind swift::targetPlatform(LangOptions &LangOpts) {
             : PlatformKind::tvOS);
   }
 
-  // We need to handle watchOS here, as well.
-  // rdar://problem/20774229
+  if (LangOpts.Target.isWatchOS()) {
+    return (LangOpts.EnableAppExtensionRestrictions
+            ? PlatformKind::watchOSApplicationExtension
+            : PlatformKind::watchOS);
+  }
 
   if (LangOpts.Target.isiOS()) {
     return (LangOpts.EnableAppExtensionRestrictions

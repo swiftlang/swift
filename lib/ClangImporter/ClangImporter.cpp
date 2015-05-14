@@ -903,8 +903,6 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
   // applies in Swift, and if so, what is the cutoff for deprecated
   // declarations that are now considered unavailable in Swift.
 
-  // We need to handle watchOS here, as well.
-  // rdar://problem/20774229
   if (ctx.LangOpts.Target.isiOS() && !ctx.LangOpts.Target.isTvOS()) {
     if (!ctx.LangOpts.EnableAppExtensionRestrictions) {
       PlatformAvailabilityFilter =
@@ -938,6 +936,22 @@ ClangImporter::Implementation::Implementation(ASTContext &ctx,
       [](unsigned major, llvm::Optional<unsigned> minor) { return major <= 7; };
     DeprecatedAsUnavailableMessage =
       "APIs deprecated as of iOS 7 and earlier are unavailable in Swift";
+  }
+  else if (ctx.LangOpts.Target.isWatchOS()) {
+    if (!ctx.LangOpts.EnableAppExtensionRestrictions) {
+      PlatformAvailabilityFilter =
+        [](StringRef Platform) { return Platform == "watchos"; };
+    }
+    else {
+      PlatformAvailabilityFilter =
+        [](StringRef Platform) {
+          return Platform == "watchos" ||
+                 Platform == "watchos_app_extension"; };
+    }
+    // No deprecation filter on watchOS
+    DeprecatedAsUnavailableFilter =
+      [](unsigned major, llvm::Optional<unsigned> minor) { return false; };
+    DeprecatedAsUnavailableMessage = "";
   }
   else if (ctx.LangOpts.Target.isMacOSX()) {
     if (!ctx.LangOpts.EnableAppExtensionRestrictions) {
