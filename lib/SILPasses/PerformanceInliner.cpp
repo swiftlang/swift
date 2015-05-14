@@ -1238,6 +1238,10 @@ void SILPerformanceInliner::inlineDevirtualizeAndSpecialize(
           NewFuncs.clear();
           assert(WorkItemApplies.empty() &&
                  "Expected all applies to be processed!");
+        } else if (WorkItem == Initial) {
+          break;
+        } else {
+          WorkList.pop_back();
         }
       } else if (WorkItem == Initial) {
         break;
