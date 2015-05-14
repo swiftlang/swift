@@ -1023,7 +1023,16 @@ void Serializer::writeNormalConformance(
     return false;
   });
 
-  for (auto defaulted : conformance->getDefaultedDefinitions()) {
+  SmallVector<ValueDecl *, 4> defaultedDefinitions{
+    conformance->getDefaultedDefinitions().begin(),
+    conformance->getDefaultedDefinitions().end()
+  };
+  llvm::array_pod_sort(defaultedDefinitions.begin(), defaultedDefinitions.end(),
+                       [](ValueDecl * const *left, ValueDecl * const *right) {
+    return (*left)->getFullName().compare((*right)->getFullName());
+  });
+
+  for (auto defaulted : defaultedDefinitions) {
     data.push_back(addDeclRef(defaulted));
     ++numDefaultedDefinitions;
   }

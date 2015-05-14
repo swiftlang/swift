@@ -22,6 +22,7 @@
 #include "swift/Subsystems.h"
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/LLVM.h"
+#include "llvm/ADT/MapVector.h"
 #include <array>
 #include <queue>
 #include <tuple>
@@ -110,7 +111,7 @@ public:
   using DeclTableData = SmallVector<std::pair<uint8_t, DeclID>, 4>;
   /// The in-memory representation of what will eventually be an on-disk hash
   /// table.
-  using DeclTable = llvm::DenseMap<Identifier, DeclTableData>;
+  using DeclTable = llvm::MapVector<Identifier, DeclTableData>;
 
   /// Returns the declaration the given generic parameter list is associated
   /// with.

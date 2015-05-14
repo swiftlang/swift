@@ -18,6 +18,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
 
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/CommandLine.h"
@@ -123,7 +124,7 @@ namespace {
 
   public:
     using TableData = FuncTableInfo::data_type;
-    using Table = llvm::DenseMap<FuncTableInfo::key_type, TableData>;
+    using Table = llvm::MapVector<FuncTableInfo::key_type, TableData>;
   private:
     /// FuncTable maps function name to an ID.
     Table FuncTable;
