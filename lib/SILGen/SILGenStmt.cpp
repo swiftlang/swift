@@ -269,7 +269,7 @@ namespace {
   public:
     DeferEscapeCheckerCleanup(SourceLoc deferLoc) : deferLoc(deferLoc) {}
     void emit(SILGenFunction &SGF, CleanupLocation l) override {
-      SGF.SGM.diagnose(deferLoc, diag::defer_cannot_be_exited);
+      assert(false && "Sema didn't catch exit out of a defer?");
     }
   };
 }
@@ -840,18 +840,8 @@ SILGenFunction::getTryApplyErrorDest(SILLocation loc,
 /// from a try_apply instruction.
 void SILGenFunction::emitTryApplyErrorBranch(SILLocation loc,
                                              ManagedValue exn) {
-  if (ThrowDest.isValid()) {
-    FullExpr scope(Cleanups, CleanupLocation::get(loc));
-    emitThrow(loc, exn);
-  } else {
-    // Claim the exception so that the cleanup doesn't end being
-    // emitted in the normal control flow (which we're likely to
-    // resume after this).
-    exn.forward(*this);
-
-    SGM.diagnose(loc, diag::unhandled_throw_from_apply);
-    B.createUnreachable(loc);
-  }
+  FullExpr scope(Cleanups, CleanupLocation::get(loc));
+  emitThrow(loc, exn);
 }
 
 void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,

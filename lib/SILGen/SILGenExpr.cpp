@@ -924,20 +924,9 @@ RValue RValueEmitter::visitThrowExpr(ThrowExpr *E, SGFContext C) {
   // Expression emission isn't allowed to not have an insertion point.
   auto contBB = SGF.createBasicBlock();
 
-  // If we have a valid throw destination, emit the exception and jump there.
-  if (SGF.ThrowDest.isValid()) {
-    ManagedValue exn = SGF.emitRValueAsSingleValue(E->getSubExpr());
+  ManagedValue exn = SGF.emitRValueAsSingleValue(E->getSubExpr());
 
-    SGF.emitThrow(E, exn, /* emit a call to willThrow */ true);
-    
-  // Otherwise, diagnose.
-  } else {
-    SGF.SGM.diagnose(E, diag::unhandled_throw);
-
-    // The diagnostic above is an error, so we don't care about leaks,
-    // but we do need to not produce invalid SIL.
-    SGF.B.createUnreachable(E);
-  }
+  SGF.emitThrow(E, exn, /* emit a call to willThrow */ true);
 
   // Emit an empty tuple in the result.
   SGF.B.emitBlock(contBB);

@@ -2147,19 +2147,15 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
   ConsumableManagedValue subject = { exn, CastConsumptionKind::TakeOnSuccess };
   auto failure = [&](SILLocation location) {
     // If we fail to match anything, just rethrow the exception.
-    if (ThrowDest.isValid()) {
-      // Don't actually kill the exception's cleanup.
-      CleanupStateRestorationScope scope(Cleanups);
-      if (exn.hasCleanup()) {
-        scope.pushCleanupState(exn.getCleanup(),
-                               CleanupState::PersistentlyActive);
-      }
-      emitThrow(S, exn);
-      return;
-    }
+    assert(ThrowDest.isValid());
 
-    SGM.diagnose(S, diag::nonexhaustive_catch);
-    B.createUnreachable(location);
+    // Don't actually kill the exception's cleanup.
+    CleanupStateRestorationScope scope(Cleanups);
+    if (exn.hasCleanup()) {
+      scope.pushCleanupState(exn.getCleanup(),
+                             CleanupState::PersistentlyActive);
+    }
+    emitThrow(S, exn);
   };
 
   // Recursively specialize and emit the clause matrix.
