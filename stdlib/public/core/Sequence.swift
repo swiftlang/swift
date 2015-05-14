@@ -50,21 +50,6 @@ public protocol _SequenceDefaultsType {
   func generate() -> Generator
 }
 
-extension _SequenceDefaultsType {
-  /// Return a value less than or equal to the number of elements in
-  /// `self`, **nondestructively**.
-  ///
-  /// - Complexity: O(N)
-  final public func underestimateCount() -> Int {
-    return 0
-  }
-
-  final public func _customContainsEquatableElement(
-    element: Generator.Element
-  ) -> Bool? {
-    return nil
-  }
-}
 /// This protocol is an implementation detail of `SequenceType`; do
 /// not use it directly.
 ///
@@ -140,6 +125,16 @@ public protocol SequenceType : _Sequence_Type {
 }
 
 extension SequenceType {
+  /// Return a value less than or equal to the number of elements in
+  /// `self`, **nondestructively**.
+  ///
+  /// - Complexity: O(N)
+  final public func underestimateCount() -> Int {
+    return 0
+  }
+}
+
+extension SequenceType {
   /// Return an `Array` containing the results of mapping `transform`
   /// over `self`.
   ///
@@ -165,6 +160,14 @@ extension SequenceType {
     let escapableIncludeElement =
       unsafeBitCast(includeElement, IncludeElement.self)
     return Array(lazy(self).filter(escapableIncludeElement))
+  }
+}
+
+extension SequenceType {
+  final public func _customContainsEquatableElement(
+    element: Generator.Element
+  ) -> Bool? {
+    return nil
   }
 }
 
