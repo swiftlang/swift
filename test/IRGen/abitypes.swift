@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %S/Inputs/abi %s -emit-ir | FileCheck -check-prefix=%target-cpu-%target-os %s
 
 // FIXME: rdar://problem/19648117 Needs splitting objc parts out
-// UNSUPPORTED: OS=tvos
 // XFAIL: linux
 
 import gadget
@@ -14,6 +13,7 @@ import Foundation
 }
 
 // arm64-ios: [[ARM64MYRECT:%.*]] = type { float, float, float, float }
+// arm64-tvos: [[ARM64MYRECT:%.*]] = type { float, float, float, float }
 
 class Foo {
   // x86_64-macosx: define hidden void @_TFC8abitypes3Foo3barfS0_FT_VSC6MyRect(%VSC6MyRect* noalias sret, %C8abitypes3Foo*) {{.*}} {
@@ -26,6 +26,10 @@ class Foo {
   // armv7-ios: define hidden void @_TToFC8abitypes3Foo3barfS0_FT_VSC6MyRect(%VSC6MyRect* noalias sret, i8*, i8*) unnamed_addr {{.*}} {
   // arm64-ios: define hidden void @_TFC8abitypes3Foo3barfS0_FT_VSC6MyRect(%VSC6MyRect* noalias sret, %C8abitypes3Foo*) {{.*}} {
   // arm64-ios: define hidden [[ARM64MYRECT]] @_TToFC8abitypes3Foo3barfS0_FT_VSC6MyRect(i8*, i8*) unnamed_addr {{.*}} {
+  // x86_64-tvos: define hidden void @_TFC8abitypes3Foo3barfS0_FT_VSC6MyRect(%VSC6MyRect* noalias sret, %C8abitypes3Foo*) {{.*}} {
+  // x86_64-tvos: define hidden { <2 x float>, <2 x float> } @_TToFC8abitypes3Foo3barfS0_FT_VSC6MyRect(i8*, i8*) unnamed_addr {{.*}} {
+  // arm64-tvos: define hidden void @_TFC8abitypes3Foo3barfS0_FT_VSC6MyRect(%VSC6MyRect* noalias sret, %C8abitypes3Foo*) {{.*}} {
+  // arm64-tvos: define hidden [[ARM64MYRECT]] @_TToFC8abitypes3Foo3barfS0_FT_VSC6MyRect(i8*, i8*) unnamed_addr {{.*}} {
   dynamic func bar() -> MyRect {
     return MyRect(x: 1, y: 2, width: 3, height: 4)
   }
@@ -208,6 +212,18 @@ class Foo {
   // i386-ios-fixme:     [[R2:%[0-9]+]] = call i1 @_TFC8abitypes3Foo6negate{{.*}}(i1 [[R1]]
   // i386-ios-fixme:     [[R3:%[0-9]+]] = call i8 @_TF10ObjectiveC22_convertBoolToObjCBool{{.*}}(i1 [[R2]]
   // i386-ios-fixme:     ret i8 [[R3]]
+  //
+  // x86_64-tvos-fixme:          define hidden i1 @_TFC8abitypes3Foo6negatefS0_FTSb_Sb(i1, %C8abitypes3Foo*) {{.*}} {
+  // x86_64-tvos-fixme:          define internal zeroext i1 @_TToFC8abitypes3Foo6negatefS0_FT
+  // x86_64-tvos-fixme:          [[R1:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertObjCBoolToBoolFT1xVS_8ObjCBool_Sb(i1 %2)
+  // x86_64-tvos-fixme:          [[R2:%[0-9]+]] = call i1 @_TFC8abitypes3Foo6negatefS0_FTSb_Sb(i1 [[R1]]
+  // x86_64-tvos-fixme:          [[R3:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertBoolToObjCBoolFT1xSb_VS_8ObjCBool(i1 [[R2]])
+  // x86_64-tvos-fixme:          ret i1 [[R3]]
+  //
+  // arm64-tvos-fixme:     define hidden i1 @_TFC8abitypes3Foo6negate{{.*}}(i1, %C8abitypes3Foo*) {{.*}} {
+  // arm64-tvos-fixme:     define internal zeroext i1 @_TToFC8abitypes3Foo6negate
+  // arm64-tvos-fixme:     [[R2:%[0-9]+]] = call i1 @_TFC8abitypes3Foo6negate
+  // arm64-tvos-fixme:     ret i1 [[R2]]
   dynamic func negate(b: Bool) -> Bool {
     return !b
   }
@@ -271,6 +287,26 @@ class Foo {
   // i386-ios: [[TOOBJCBOOL:%[0-9]+]] = call i8 @_TF10ObjectiveC22_convertBoolToObjCBool{{.*}}(i1 [[NEG]])
   // i386-ios: ret i8 [[TOOBJCBOOL]]
   //
+  // x86_64-tvos: define hidden i1 @_TFC8abitypes3Foo7negate2{{.*}}(i1, %C8abitypes3Foo*) {{.*}} {
+  // x86_64-tvos: [[SEL:%[0-9]+]] = load i8*, i8** @"\01L_selector(negate:)", align 8
+  // x86_64-tvos: [[NEG:%[0-9]+]] = call zeroext i1 bitcast (void ()* @objc_msgSend to i1 ([[RECEIVER:.*]]*, i8*, i1)*)([[RECEIVER]]* {{%[0-9]+}}, i8* [[SEL]], i1 zeroext %0)
+  // x86_64-tvos: ret i1 [[NEG]]
+  //
+  // x86_64-tvos: define hidden zeroext i1 @_TToFC8abitypes3Foo7negate2{{.*}}(i8*, i8*, i1 zeroext)
+  // x86_64-tvos: [[NEG:%[0-9]+]] = call i1 @_TFC8abitypes3Foo7negate2{{.*}}(i1
+  // x86_64-tvos: [[TOOBJCBOOL:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertBoolToObjCBool{{.*}}(i1 [[NEG]])
+  // x86_64-tvos: ret i1 [[TOOBJCBOOL]]
+  //
+  // arm64-tvos: define hidden i1 @_TFC8abitypes3Foo7negate2{{.*}}(i1, %C8abitypes3Foo*) {{.*}} {
+  // arm64-tvos: [[SEL:%[0-9]+]] = load i8*, i8** @"\01L_selector(negate:)", align 8
+  // arm64-tvos: [[NEG:%[0-9]+]] = call zeroext i1 bitcast (void ()* @objc_msgSend to i1 ([[RECEIVER:.*]]*, i8*, i1)*)([[RECEIVER]]* {{%[0-9]+}}, i8* [[SEL]], i1 zeroext %0)
+  // arm64-tvos: ret i1 [[NEG]]
+  //
+  // arm64-tvos: define hidden zeroext i1 @_TToFC8abitypes3Foo7negate2{{.*}}(i8*, i8*, i1 zeroext)
+  // arm64-tvos: [[NEG:%[0-9]+]] = call i1 @_TFC8abitypes3Foo7negate2{{.*}}(i1
+  // arm64-tvos: [[TOOBJCBOOL:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertBoolToObjCBool{{.*}}(i1 [[NEG]])
+  // arm64-tvos: ret i1 [[TOOBJCBOOL]]
+  //
   dynamic func negate2(b: Bool) -> Bool {
     var g = Gadget()
     return g.negate(b)
@@ -327,6 +363,9 @@ class Foo {
 
   // arm64-ios: define hidden void @_TFC8abitypes3Foo14callJustReturn{{.*}}(%VSC9BigStruct* noalias sret, %CSo13StructReturns*, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, %C8abitypes3Foo*) {{.*}} {
   // arm64-ios: define hidden void @_TToFC8abitypes3Foo14callJustReturnfS0_FTCSo13StructReturns4withVSC9BigStruct_S2_(%VSC9BigStruct* noalias sret, i8*, i8*, [[OPAQUE:.*]]*, %VSC9BigStruct*) unnamed_addr {{.*}} {
+  //
+  // arm64-tvos: define hidden void @_TFC8abitypes3Foo14callJustReturn{{.*}}(%VSC9BigStruct* noalias sret, %CSo13StructReturns*, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, i8, %C8abitypes3Foo*) {{.*}} {
+  // arm64-tvos: define hidden void @_TToFC8abitypes3Foo14callJustReturnfS0_FTCSo13StructReturns4withVSC9BigStruct_S2_(%VSC9BigStruct* noalias sret, i8*, i8*, [[OPAQUE:.*]]*, %VSC9BigStruct*) unnamed_addr {{.*}} {
   dynamic func callJustReturn(r: StructReturns, with v: BigStruct) -> BigStruct {
     return r.justReturn(v)
   }
