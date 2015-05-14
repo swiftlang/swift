@@ -1131,6 +1131,14 @@ SILCombiner::propagateConcreteTypeOfInitExistential(ApplyInst *AI,
   if (!Conformance)
     return nullptr;
 
+  // Don't specialize Apply instructions that return the Self type. Notice that
+  // it is sufficient to compare the return type to the substituted type because
+  // types that depend on the Self type are not allowed (for example [Self] is
+  // not allowed).
+  if (AI->getType().getSwiftType().getLValueOrInOutObjectType() ==
+      WMI->getLookupType())
+    return nullptr;
+
   SmallVector<SILValue, 8> Args;
   for (auto Arg : AI->getArgumentsWithoutSelf()) {
     Args.push_back(Arg);
