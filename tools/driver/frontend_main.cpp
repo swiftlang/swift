@@ -416,6 +416,10 @@ private:
     if (Info.ID == diag::missing_unwrap_optional.ID)
       return false;
 
+    // Do not add a semi as it is wrong in most cases during migration
+    if (Info.ID == diag::statement_same_line_without_semi.ID)
+      return false;
+
     if (Kind == DiagnosticKind::Error)
       return true;
     if (Info.ID == diag::parameter_pound_double_up.ID ||
