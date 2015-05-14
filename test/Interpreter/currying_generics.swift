@@ -4,6 +4,69 @@ func curry<T, U, V>(f: (T, U) -> V)(_ x: T)(_ y: U) -> V {
   return f(x, y)
 }
 
+func curry<T1, T2, T3, T4>(f: (T1, T2, T3) -> T4)(_ x: T1)(_ y: T2)(_ z: T3) -> T4 {
+  return f(x, y, z)
+}
+
+func concat(x: String, _ y: String, _ z: String) -> String {
+  return x + y + z
+}
+
+@inline(never)
+public func test_concat_closure(var x: Int) -> String {
+  let insult = curry(concat)("one ")(" two ")
+  var gs = insult(" three ")
+  if (x > 0) {
+    gs = gs + insult(" four ")
+    gs = gs + insult(" five ")
+  } else {
+    gs = gs + insult(" six ")
+    gs = gs + insult(" seven ")
+  }
+  if (x > 10) {
+     x += 100
+  }
+  return gs
+}
+
+public protocol P {
+  func val() -> Int32
+}
+
+struct CP: P {
+  let v: Int32
+
+  func val() -> Int32 {
+     return v
+  }
+
+  init(_ v: Int32) {
+    self.v = v
+  }
+}
+
+func compose(x: P, _ y: P, _ z: P) -> Int32 {
+  return x.val() + y.val() + z.val()
+}
+
+
+@inline(never)
+public func test_compose_closure(var x:Int) -> Int32 {
+  let insult = curry(compose)(CP(1))(CP(2))
+  var gs = insult(CP(3))
+  if (x > 0) {
+    gs = gs + insult(CP(4))
+    gs = gs + insult(CP(5))
+  } else {
+    gs = gs + insult(CP(6))
+    gs = gs + insult(CP(7))
+  }
+  if (x > 10) {
+     x += 100
+  }
+  return gs
+}
+
 let insult = curry(+)("I'm with stupid ☞ ")
 print(insult("😡")) // CHECK: I'm with stupid ☞ 😡
 
@@ -14,6 +77,14 @@ let plus5 = curry(+)(5)
 print(plus5(5)) // CHECK-NEXT: 10
 
 print(insult("😰")) // CHECK-NEXT: I'm with stupid ☞ 😰
+
+
+let concat_one_two = curry(concat)("one ")(" two ")
+print(concat_one_two(" three ")) // CHECK-NEXT: one two three
+
+print(test_concat_closure(20)) // CHECK-NEXT: one  two  three one  two  four one  two  five
+
+print(test_compose_closure(20)) // CHECK-NEXT: 21
 
 // rdar://problem/18988428
 

@@ -18,10 +18,13 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILAnalysis/AliasAnalysis.h"
+#include "swift/SILAnalysis/ARCAnalysis.h"
+#include "swift/SILAnalysis/CFG.h"
 #include "swift/SILAnalysis/ValueTracking.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/DenseMap.h"
 
 using namespace swift;
 using namespace swift::PatternMatch;
@@ -447,6 +450,8 @@ SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
                                                           PAI->getCallee(),
                                                           PAI->getType());
 
+  tryOptimizeApplyOfPartialApply(PAI);
+
   // Try to delete dead closures.
   tryDeleteDeadClosure(
       PAI, InstModCallbacks(
@@ -457,64 +462,237 @@ SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
   return nullptr;
 }
 
-SILInstruction *
-SILCombiner::optimizeApplyOfPartialApply(ApplyInst *AI, PartialApplyInst *PAI) {
+static bool canCombineApplyOfPartialApply(const ApplyInst *AI, const PartialApplyInst *PAI) {
   // Don't handle generic applys.
   if (AI->hasSubstitutions())
-    return nullptr;
+    return false;
 
   // Make sure that the substitution list of the PAI does not contain any
   // archetypes.
   ArrayRef<Substitution> Subs = PAI->getSubstitutions();
   for (Substitution S : Subs)
     if (S.getReplacement()->getCanonicalType()->hasArchetype())
-      return nullptr;
+      return false;
 
   FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(PAI->getCallee());
   if (!FRI)
-    return nullptr;
+    return false;
+  return true;
+}
 
-  // Prepare the args.
-  SmallVector<SILValue, 8> Args;
-  // First the ApplyInst args.
-  for (auto Op : AI->getArguments())
-    Args.push_back(Op);
-  // Next, the partial apply args.
-  for (auto Op : PAI->getArguments())
-    Args.push_back(Op);
+static bool useDoesNotKeepClosureAlive(const SILInstruction *I) {
+  switch (I->getKind()) {
+  case ValueKind::StrongRetainInst:
+  case ValueKind::StrongReleaseInst:
+  case ValueKind::RetainValueInst:
+  case ValueKind::ReleaseValueInst:
+  case ValueKind::DebugValueInst:
+    return true;
+  /*
+  case ValueKind::ApplyInst: {
+    if (auto *AI = dyn_cast<ApplyInst>(I)) {
+      if (auto *PAI = dyn_cast<PartialApplyInst>(AI->getCallee())) {
+        return canCombineApplyOfPartialApply(AI, PAI);
+      }
+    }
+    return false;
+  }
+  */
+  default:
+    return false;
+  }
+}
 
-  // The thunk that implements the partial apply calls the closure function
-  // that expects all arguments to be consumed by the function. However, the
-  // captured arguments are not arguments of *this* apply, so they are not
-  // pre-incremented. When we combine the partial_apply and this apply into
-  // a new apply we need to retain all of the closure non-address type
-  // arguments.
-  for (auto Arg : PAI->getArguments())
-    if (!Arg.getType().isAddress())
-      Builder->emitRetainValueOperation(PAI->getLoc(), Arg);
+/// Iterate over all uses of a given partial_apply and check
+/// if any of those uses are apply instructions. Try to
+/// combine those applies with this partial_apply.
+SILInstruction *
+SILCombiner::tryOptimizeApplyOfPartialApply(PartialApplyInst *PAI) {
+  ArrayRef<Substitution> Subs = PAI->getSubstitutions();
+  // Temporaries created as copies of alloc_stack arguments of
+  // the partial_apply.
+  SmallVector<SILValue, 8> AllocStackArgs;
 
-  SILFunction *F = FRI->getReferencedFunction();
-  SILType FnType = F->getLoweredType();
-  SILType ResultTy = F->getLoweredFunctionType()->getSILResult();
-  if (!Subs.empty()) {
-    FnType = FnType.substGenericArgs(PAI->getModule(), Subs);
-    ResultTy = FnType.getAs<SILFunctionType>()->getSILResult();
+  // Mapping from the original argument of partial_apply to
+  // the temporary containing its copy.
+  llvm::DenseMap<SILValue, SILValue> ArgToTmp;
+
+  // Set of lifetime endpoints for this partial_apply.
+  SmallPtrSet<SILInstruction *, 8> EndPoints;
+  LifetimeTracker lifetimeTracker(PAI, [](const SILInstruction *I) -> bool {
+    return !useDoesNotKeepClosureAlive(I);
+  });
+
+  bool isFirstTime = true;
+
+  for (auto Use : PAI->getUses()) {
+    auto User = Use->getUser();
+    auto AI = dyn_cast<ApplyInst>(User);
+    if (!AI)
+      continue;
+
+    if (AI->getCallee() != PAI)
+      continue;
+
+    // Skip any applies that cannot be processed.
+    if (!canCombineApplyOfPartialApply(AI, PAI))
+      continue;
+
+    FunctionRefInst *FRI = dyn_cast<FunctionRefInst>(PAI->getCallee());
+
+    Builder->setInsertionPoint(AI);
+
+    // Prepare the args.
+    SmallVector<SILValue, 8> Args;
+    // First the ApplyInst args.
+    for (auto Op : AI->getArguments())
+      Args.push_back(Op);
+
+    SILInstruction *InsertionPoint = Builder->getInsertionPoint();
+    // Next, the partial apply args.
+
+    // Pre-process partial_apply arguments once.
+    if (isFirstTime) {
+      // Copy non-inout alloc_stack arguments of the partial_apply into
+      // newly created temporaries and use these temporaries instead of
+      // the original arguments afterwards.
+      // This is done to "extend" the life-time of original alloc_stack
+      // arguments, as they may be deallocated before the last use by one
+      // of the apply instructions.
+      // TODO:
+      // Copy arguments of the partial_apply into new temporaries
+      // only if the lifetime of arguments ends before their uses
+      // by apply instructions.
+      isFirstTime = false;
+      bool needsReleases = false;
+      CanSILFunctionType PAITy =
+          dyn_cast<SILFunctionType>(PAI->getCallee().getType().getSwiftType());
+
+      // Emit a destroy value for each captured closure argument.
+      ArrayRef<SILParameterInfo> Params = PAITy->getParameters();
+      auto Args = PAI->getArguments();
+      unsigned Delta = Params.size() - Args.size();
+
+      for (unsigned AI = 0, AE = Args.size(); AI != AE; ++AI) {
+        SILValue Arg = Args[AI];
+        SILParameterInfo Param = Params[AI + Delta];
+        if (Param.isIndirectInOut())
+          continue;
+        if (isa<AllocStackInst>(Arg)) {
+          Builder->setInsertionPoint(PAI->getFunction()->begin()->begin());
+          // Create a new temporary at the beginning of a function.
+          auto *Tmp = Builder->createAllocStack(PAI->getLoc(), Arg.getType());
+          Builder->setInsertionPoint(PAI);
+          // Copy argument into this temporary.
+          Builder->createCopyAddr(PAI->getLoc(), Arg, SILValue(Tmp, 1),
+                                  IsTake_t::IsNotTake,
+                                  IsInitialization_t::IsInitialization);
+
+          AllocStackArgs.push_back(SILValue(Tmp, 0));
+          if (!Arg.getType().isTrivial(PAI->getModule()))
+            needsReleases = true;
+          ArgToTmp.insert(std::make_pair(Arg, SILValue(Tmp, 0)));
+        }
+      }
+
+      if (needsReleases) {
+        // Compute the set of endpoints, which will be used
+        // to insert releases of temporaries.
+        lifetimeTracker.getEndpoints();
+        for (auto *EndPoint : lifetimeTracker.getEndpoints()) {
+          EndPoints.insert(EndPoint);
+        }
+      }
+    }
+
+    for (auto Op : PAI->getArguments()) {
+      auto Arg = Op;
+      if (isa<AllocStackInst>(Arg)) {
+        if (ArgToTmp.count(Arg)) {
+          // Use the new temporary as the argument of the new apply instruction.
+          // auto Tmp = TrivialArgs[idx++];
+          auto Tmp = ArgToTmp.lookup(Arg);
+          Op = SILValue(Tmp.getDef(), 1);
+        }
+      }
+      Args.push_back(Op);
+    }
+
+    Builder->setInsertionPoint(InsertionPoint);
+
+    // The thunk that implements the partial apply calls the closure function
+    // that expects all arguments to be consumed by the function. However, the
+    // captured arguments are not arguments of *this* apply, so they are not
+    // pre-incremented. When we combine the partial_apply and this apply into
+    // a new apply we need to retain all of the closure non-address type
+    // arguments.
+    for (auto Arg : PAI->getArguments())
+      if (!Arg.getType().isAddress())
+        Builder->emitRetainValueOperation(PAI->getLoc(), Arg);
+
+    SILFunction *F = FRI->getReferencedFunction();
+    SILType FnType = F->getLoweredType();
+    SILType ResultTy = F->getLoweredFunctionType()->getSILResult();
+    if (!Subs.empty()) {
+      FnType = FnType.substGenericArgs(PAI->getModule(), Subs);
+      ResultTy = FnType.getAs<SILFunctionType>()->getSILResult();
+    }
+
+    ApplyInst *NAI =
+        Builder->createApply(AI->getLoc(), FRI, FnType, ResultTy, Subs, Args);
+    NAI->setDebugScope(AI->getDebugScope());
+
+    if (CG)
+      CG->addEdgesForApply(NAI);
+
+    // We also need to release the partial_apply instruction itself because it
+    // is consumed by the apply_instruction.
+    Builder->createStrongRelease(AI->getLoc(), PAI)
+        ->setDebugScope(AI->getDebugScope());
+
+    if (EndPoints.count(AI)) {
+      EndPoints.erase(AI);
+      EndPoints.insert(NAI);
+    }
+
+    replaceInstUsesWith(*AI, NAI);
+    eraseInstFromFunction(*AI);
   }
 
-  ApplyInst *NAI = Builder->createApply(AI->getLoc(), FRI, FnType, ResultTy,
-                                        Subs, Args);
-  NAI->setDebugScope(AI->getDebugScope());
+  if (!AllocStackArgs.empty()) {
+    // Insert releases and destroy_addrs as early as possible,
+    // because we don't want to keep objects alive longer than
+    // its really needed.
+    for (auto Op : AllocStackArgs) {
+      auto TmpType = Op.getType().getObjectType();
+      if (TmpType.isTrivial(PAI->getModule()))
+        continue;
+      for (auto *EndPoint : EndPoints) {
+        Builder->setInsertionPoint(next(SILBasicBlock::iterator(EndPoint)));
+        auto TmpAddr = SILValue(Op.getDef(), 1);
+        if (!TmpType.isAddressOnly(PAI->getModule())) {
+          auto *Load = Builder->createLoad(PAI->getLoc(), TmpAddr);
+          Builder->createReleaseValue(PAI->getLoc(), Load);
+        } else {
+          Builder->createDestroyAddr(PAI->getLoc(), TmpAddr);
+        }
+      }
+    }
 
-  if (CG)
-    CG->addEdgesForApply(NAI);
+    // Insert dealloc_stack instructions.
+    TinyPtrVector<SILBasicBlock *> ExitBBs;
+    findAllNonFailureExitBBs(PAI->getFunction(), ExitBBs);
 
-  // We also need to release the partial_apply instruction itself because it
-  // is consumed by the apply_instruction.
-  Builder->createStrongRelease(AI->getLoc(), PAI)
-    ->setDebugScope(AI->getDebugScope());
+    for (auto Op : AllocStackArgs) {
+      for (auto *ExitBB : ExitBBs) {
+        auto *Term = ExitBB->getTerminator();
+        Builder->setInsertionPoint(Term);
+        Builder->createDeallocStack(PAI->getLoc(), Op);
+      }
+    }
+  }
 
-  replaceInstUsesWith(*AI, NAI);
-  return eraseInstFromFunction(*AI);
+  return nullptr;
 }
 
 SILInstruction *SILCombiner::optimizeBuiltinCanBeObjCClass(BuiltinInst *BI) {
@@ -1452,9 +1630,10 @@ bool SILCombiner::optimizeIdentityCastComposition(ApplyInst *FInverse,
 }
 
 SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
-  // Optimize apply{partial_apply(x,y)}(z) -> apply(z,x,y).
-  if (auto *PAI = dyn_cast<PartialApplyInst>(AI->getCallee()))
-    return optimizeApplyOfPartialApply(AI, PAI);
+  // apply{partial_apply(x,y)}(z) -> apply(z,x,y) is triggered
+  // from visitPartialApplyInst(), so bail here.
+  if (isa<PartialApplyInst>(AI->getCallee()))
+    return nullptr;
 
   if (auto *CFI = dyn_cast<ConvertFunctionInst>(AI->getCallee()))
     return optimizeApplyOfConvertFunctionInst(AI, CFI);

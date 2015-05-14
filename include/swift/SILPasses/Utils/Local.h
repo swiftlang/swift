@@ -160,10 +160,15 @@ class LifetimeTracker {
 
   llvm::SmallPtrSet<SILInstruction *, 4> Endpoints;
 
+  std::function<bool(SILInstruction *)> AcceptableUserQuery;
+
   bool LifetimeComputed = false;
 
   public:
-  LifetimeTracker(SILValue Value) : TheValue(Value) { }
+    LifetimeTracker(SILValue Value,
+                    std::function<bool(SILInstruction *)> AcceptableUserQuery =
+                        [](SILInstruction *) -> bool { return true; })
+        : TheValue(Value), AcceptableUserQuery(AcceptableUserQuery) {}
 
   using EndpointRange =
     Range<llvm::SmallPtrSetImpl<SILInstruction *>::iterator>;
@@ -175,6 +180,10 @@ class LifetimeTracker {
       computeLifetime();
 
     return EndpointRange(Endpoints.begin(), Endpoints.end());
+  }
+
+  bool isUserAcceptable(SILInstruction *User) const {
+    return AcceptableUserQuery(User);
   }
 
   private:

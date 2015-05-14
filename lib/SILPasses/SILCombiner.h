@@ -249,8 +249,8 @@ public:
   // the result bit.
   SILInstruction *optimizeBuiltinCompareEq(BuiltinInst *AI, bool NegateResult);
 
-  SILInstruction *optimizeApplyOfPartialApply(ApplyInst *AI,
-                                              PartialApplyInst *PAI);
+  SILInstruction *tryOptimizeApplyOfPartialApply(PartialApplyInst *PAI);
+
   SILInstruction *optimizeApplyOfConvertFunctionInst(ApplyInst *AI,
                                                      ConvertFunctionInst *CFI);
   // Optimize concatenation of string literals.

@@ -605,15 +605,19 @@ static bool useDoesNotKeepClosureAlive(const SILInstruction *I) {
 void swift::releasePartialApplyCapturedArg(SILBuilder &Builder, SILLocation Loc,
                                            SILValue Arg, SILParameterInfo PInfo,
                                            InstModCallbacks Callbacks) {
-  // If we have a trivial type, we do not need to put in any extra releases.
-  if (Arg.getType().isTrivial(Builder.getModule()))
-    return;
-
   // If we have a non-trivial type and the argument is passed in @inout, we do
   // not need to destroy it here. This is something that is implicit in the
   // partial_apply design that will be revisited when partial_apply is
   // redesigned.
   if (PInfo.isIndirectInOut())
+    return;
+
+  if (isa<AllocStackInst>(Arg)) {
+    return;
+  }
+
+  // If we have a trivial type, we do not need to put in any extra releases.
+  if (Arg.getType().isTrivial(Builder.getModule()))
     return;
 
   // Otherwise, we need to destroy the argument.
@@ -787,6 +791,9 @@ void LifetimeTracker::computeLifetime() {
 
   for (auto UI : TheValue.getUses()) {
     auto *BB = UI->getUser()->getParent();
+
+    if (!isUserAcceptable(UI->getUser()))
+      continue;
 
     UseBlocks.insert(BB);
     if (BB != DefBB)
