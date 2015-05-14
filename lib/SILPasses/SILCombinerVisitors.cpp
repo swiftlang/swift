@@ -1119,78 +1119,86 @@ SILCombiner::propagateConcreteTypeOfInitExistential(ApplyInst *AI,
   if (Conformances.empty())
     return nullptr;
 
+  ProtocolConformance *Conformance = nullptr;
+
   // Find the conformance related to witness_method
-  for (auto Conformance : Conformances) {
-    if (Conformance->getProtocol() == WMI->getLookupProtocol()) {
-      SmallVector<SILValue, 8> Args;
-      for (auto Arg : AI->getArgumentsWithoutSelf()) {
-        Args.push_back(Arg);
-
-
-        // Below we have special handling for the 'LastArg', which is the self
-        // parameter. However, we also need to handle the Self return type.
-        // In here we find arguments that are not the 'self' argument and if
-        // they are of the Self type then we abort the optimization.
-        if (Arg.getType().getSwiftType().getLValueOrInOutObjectType() ==
-            WMI->getLookupType())
-          return nullptr;
-      }
-
-      Args.push_back(LastArg);
-
-      SILValue OptionalExistential =
-          WMI->hasOperand() ? WMI->getOperand() : SILValue();
-      auto *NewWMI = Builder->createWitnessMethod(
-          WMI->getLoc(), ConcreteType, Conformance, WMI->getMember(),
-          WMI->getType(), OptionalExistential, WMI->isVolatile());
-
-      replaceInstUsesWith(*WMI, NewWMI, 0);
-      eraseInstFromFunction(*WMI);
-
-      SmallVector<Substitution, 8> Substitutions;
-      for (auto Subst : AI->getSubstitutions()) {
-        if (Subst.getArchetype()->isSelfDerived()) {
-          Substitution NewSubst(Subst.getArchetype(), ConcreteType,
-                                Subst.getConformances());
-          Substitutions.push_back(NewSubst);
-        } else
-          Substitutions.push_back(Subst);
-      }
-
-      SILType SubstCalleeType = AI->getSubstCalleeSILType();
-
-      SILType NewSubstCalleeType;
-
-      auto FnTy = AI->getCallee().getType().getAs<SILFunctionType>();
-      if (FnTy && FnTy->isPolymorphic())
-        // Handle polymorphic functions by properly substituting
-        // their parameter types.
-        NewSubstCalleeType =
-            SILType::getPrimitiveObjectType(FnTy->substGenericArgs(
-                AI->getModule(), AI->getModule().getSwiftModule(),
-                Substitutions));
-      else {
-        TypeSubstitutionMap TypeSubstitutions;
-        TypeSubstitutions[InstanceType.getSwiftType().getPointer()] = ConcreteType;
-        NewSubstCalleeType = SubstCalleeType.subst(
-            AI->getModule(), AI->getModule().getSwiftModule(),
-            TypeSubstitutions);
-      }
-
-      auto NewAI = Builder->createApply(
-          AI->getLoc(), AI->getCallee(), NewSubstCalleeType,
-          AI->getType(), Substitutions, Args);
-      NewAI->setDebugScope(AI->getDebugScope());
-
-      replaceInstUsesWith(*AI, NewAI, 0);
-      eraseInstFromFunction(*AI);
-
-      if (CG)
-        CG->addEdgesForApply(NewAI);
-
-      return nullptr;
+  for (auto Con : Conformances) {
+    if (Con->getProtocol() == WMI->getLookupProtocol()) {
+      Conformance = Con;
+      break;
     }
   }
+  if (!Conformance)
+    return nullptr;
+
+  SmallVector<SILValue, 8> Args;
+  for (auto Arg : AI->getArgumentsWithoutSelf()) {
+    Args.push_back(Arg);
+
+    // Below we have special handling for the 'LastArg', which is the self
+    // parameter. However, we also need to handle the Self return type.
+    // In here we find arguments that are not the 'self' argument and if
+    // they are of the Self type then we abort the optimization.
+    if (Arg.getType().getSwiftType().getLValueOrInOutObjectType() ==
+        WMI->getLookupType())
+      return nullptr;
+  }
+
+  Args.push_back(LastArg);
+
+  SILValue OptionalExistential =
+  WMI->hasOperand() ? WMI->getOperand() : SILValue();
+  auto *NewWMI = Builder->createWitnessMethod(WMI->getLoc(),
+                                              ConcreteType,
+                                              Conformance, WMI->getMember(),
+                                              WMI->getType(),
+                                              OptionalExistential,
+                                              WMI->isVolatile());
+  replaceInstUsesWith(*WMI, NewWMI, 0);
+  eraseInstFromFunction(*WMI);
+
+  SmallVector<Substitution, 8> Substitutions;
+  for (auto Subst : AI->getSubstitutions()) {
+    if (Subst.getArchetype()->isSelfDerived()) {
+      Substitution NewSubst(Subst.getArchetype(), ConcreteType,
+                            Subst.getConformances());
+      Substitutions.push_back(NewSubst);
+    } else
+      Substitutions.push_back(Subst);
+  }
+
+  SILType SubstCalleeType = AI->getSubstCalleeSILType();
+
+  SILType NewSubstCalleeType;
+
+  auto FnTy = AI->getCallee().getType().getAs<SILFunctionType>();
+  if (FnTy && FnTy->isPolymorphic()) {
+    // Handle polymorphic functions by properly substituting
+    // their parameter types.
+    CanSILFunctionType SFT = FnTy->substGenericArgs(
+                                        AI->getModule(),
+                                        AI->getModule().getSwiftModule(),
+                                        Substitutions);
+    NewSubstCalleeType = SILType::getPrimitiveObjectType(SFT);
+  } else {
+    TypeSubstitutionMap TypeSubstitutions;
+    TypeSubstitutions[InstanceType.getSwiftType().getPointer()] = ConcreteType;
+    NewSubstCalleeType = SubstCalleeType.subst(AI->getModule(),
+                                               AI->getModule().getSwiftModule(),
+                                               TypeSubstitutions);
+  }
+
+  auto NewAI = Builder->createApply(AI->getLoc(), AI->getCallee(),
+                                    NewSubstCalleeType,
+                                    AI->getType(), Substitutions, Args);
+
+  NewAI->setDebugScope(AI->getDebugScope());
+
+  replaceInstUsesWith(*AI, NewAI, 0);
+  eraseInstFromFunction(*AI);
+
+  if (CG)
+    CG->addEdgesForApply(NewAI);
 
   return nullptr;
 }
