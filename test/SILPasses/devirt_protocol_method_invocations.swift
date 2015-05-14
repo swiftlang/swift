@@ -45,3 +45,21 @@ public func test_devirt_protocol_method_invocation(c: C)->Int {
   return callfoo(c)
 }
 
+// Make sure that we are not crashing with an assertion due to specialization
+// of methods with the Self return type.
+// rdar://20868966
+protocol Proto {
+  func f() -> Self
+}
+
+class CC : Proto {
+  func f() -> Self { return self }
+}
+
+func callDynamicSelfExistential(p: Proto) {
+  p.f()
+}
+
+public func testSelfReturnType() {
+  callDynamicSelfExistential(CC())
+}

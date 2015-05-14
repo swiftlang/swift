@@ -1125,6 +1125,15 @@ SILCombiner::propagateConcreteTypeOfInitExistential(ApplyInst *AI,
       SmallVector<SILValue, 8> Args;
       for (auto Arg : AI->getArgumentsWithoutSelf()) {
         Args.push_back(Arg);
+
+
+        // Below we have special handling for the 'LastArg', which is the self
+        // parameter. However, we also need to handle the Self return type.
+        // In here we find arguments that are not the 'self' argument and if
+        // they are of the Self type then we abort the optimization.
+        if (Arg.getType().getSwiftType().getLValueOrInOutObjectType() ==
+            WMI->getLookupType())
+          return nullptr;
       }
 
       Args.push_back(LastArg);
