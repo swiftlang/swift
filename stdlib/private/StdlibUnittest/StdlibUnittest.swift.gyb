@@ -1049,7 +1049,7 @@ func _getOSVersion() -> OSVersion {
   //
   // FIXME: how to get the simulator version *without* UIKit?
   return .iOSSimulator
-#elseif os(iOS) && (arch(i386) || arch(x86_64))
+#elseif os(tvOS) && (arch(i386) || arch(x86_64))
   return .TVOSSimulator
 #elseif os(Linux)
   return .Linux
