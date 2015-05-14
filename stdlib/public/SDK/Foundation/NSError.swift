@@ -65,6 +65,14 @@ public protocol __BridgedNSError : RawRepresentable {
   static var _NSErrorDomain: String { get }
 }
 
+// Allow two bridged NSError types to be compared.
+public func ==<T: __BridgedNSError where T.RawValue == Int>(
+  lhs: T,
+  rhs: T
+) -> Bool {
+  return lhs.rawValue == rhs.rawValue
+}
+
 public extension __BridgedNSError where RawValue == Int {
   public final var _domain: String { return Self._NSErrorDomain }
   public final var _code: Int { return rawValue }
@@ -84,6 +92,8 @@ public extension __BridgedNSError where RawValue == Int {
       return nil
     }
   }
+
+  public final var hashValue: Int { return rawValue }
 }
 
 /// Describes a raw representable type that is bridged to a particular
@@ -92,7 +102,8 @@ public extension __BridgedNSError where RawValue == Int {
 /// This protocol is used primarily to generate the conformance to
 /// _ObjectiveCBridgeableErrorType for such an enum.
 public protocol _BridgedNSError : __BridgedNSError,
-                                  _ObjectiveCBridgeableErrorType {
+                                  _ObjectiveCBridgeableErrorType,
+                                  Hashable {
   /// The NSError domain to which this type is bridged.
   static var _NSErrorDomain: String { get }
 }

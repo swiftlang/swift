@@ -68,6 +68,8 @@ ErrorTypeBridgingTests.test("NSError-to-enum bridging") {
     case let x as _NSCocoaError:
       cocoaCode = x._code
       expectTrue(x.isFileError)
+      expectEqual(x, _NSCocoaError.FileNoSuchFileError)
+      expectEqual(x.hashValue, NSFileNoSuchFileError)
     default:
       cocoaCode = nil
     }
