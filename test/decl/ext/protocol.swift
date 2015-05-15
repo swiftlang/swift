@@ -667,6 +667,50 @@ extension PConstrained4 where Self : Superclass {
   }
 }
 
+protocol PConstrained5 { }
+protocol PConstrained6 { typealias Assoc }
+protocol PConstrained7 { }
+
+extension PConstrained6 {
+  final var prop1: Int { return 0 }
+  final var prop2: Int { return 0 } // expected-note{{'prop2' previously declared here}}
+
+  final subscript (key: Int) -> Int { return key }
+  final subscript (key: Double) -> Double { return key } // expected-note{{'subscript' previously declared here}}
+}
+
+extension PConstrained6 {
+  final var prop2: Int { return 0 } // expected-error{{invalid redeclaration of 'prop2'}}
+  final subscript (key: Double) -> Double { return key } // expected-error{{invalid redeclaration of 'subscript'}}
+}
+
+extension PConstrained6 where Assoc : PConstrained5 {
+  final var prop1: Int { return 0 } // okay
+  final var prop3: Int { return 0 } // expected-note{{'prop3' previously declared here}}
+  final subscript (key: Int) -> Int { return key } // ok
+  final subscript (key: String) -> String { return key } // expected-note{{'subscript' previously declared here}}
+}
+
+extension PConstrained6 where Assoc : PConstrained5 {
+  final var prop3: Int { return 0 } // expected-error{{invalid redeclaration of 'prop3'}}
+  final subscript (key: String) -> String { return key } // expected-error{{invalid redeclaration of 'subscript'}}
+}
+
+extension PConstrained6 where Assoc : PConstrained7 {
+  final var prop1: Int { return 0 } // okay
+  final subscript (key: Int) -> Int { return key } // okay
+}
+
+extension PConstrained6 where Assoc == Int {
+  final var prop4: Int { return 0 }
+  final subscript (key: Character) -> Character { return key }
+}
+
+extension PConstrained6 where Assoc == Double {
+  final var prop4: Int { return 0 } // okay
+  final subscript (key: Character) -> Character { return key } // okay
+}
+
 // ----------------------------------------------------------------------------
 // Semantic restrictions
 // ----------------------------------------------------------------------------

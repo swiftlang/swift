@@ -2448,6 +2448,8 @@ Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
     // base is resolved to a non-dependent type.
     if (auto depMemTy = type->getAs<DependentMemberType>()) {
       auto newBase = depMemTy->getBase().subst(module, substitutions, options);
+      if (!newBase)
+        return failed(type);
       
       if (Type r = getMemberForBaseType(module, newBase,
                                         depMemTy->getAssocType(),

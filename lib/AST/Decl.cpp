@@ -1563,10 +1563,37 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
   } else if (isa<SubscriptDecl>(this)) {
     signature.InterfaceType
       = getInterfaceType()->getWithoutDefaultArgs(getASTContext())
-          ->getCanonicalType();    
+          ->getCanonicalType();
+
+    // If the subscript occurs within a protocol extension context,
+    // consider the generic signature of the extension context.
+    if (getDeclContext()->isProtocolExtensionContext()) {
+      auto funcTy = signature.InterfaceType->castTo<AnyFunctionType>();
+      auto genericSig = getDeclContext()->getGenericSignatureOfContext();
+      signature.InterfaceType
+        = GenericFunctionType::get(genericSig,
+                                   funcTy->getInput(),
+                                   funcTy->getResult(),
+                                   funcTy->getExtInfo())
+            ->getCanonicalType();
+    }
+
   } else if (isa<VarDecl>(this)) {
     signature.IsProperty = true;
     signature.IsInstanceMember = isInstanceMember();
+
+    // If the property occurs within a protocol extension context,
+    // consider the generic signature of the extension context.
+    if (getDeclContext()->isProtocolExtensionContext()) {
+      ASTContext &ctx = getASTContext();
+      auto genericSig = getDeclContext()->getGenericSignatureOfContext();
+      signature.InterfaceType
+        = GenericFunctionType::get(genericSig,
+                                   TupleType::getEmpty(ctx),
+                                   TupleType::getEmpty(ctx),
+                                   AnyFunctionType::ExtInfo())
+            ->getCanonicalType();
+    }
   }
 
   return signature;
