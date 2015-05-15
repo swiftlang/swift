@@ -4,6 +4,7 @@
 import StdlibUnittest
 import Foundation
 import CoreLocation
+import Darwin
 
 var ErrorTypeBridgingTests = TestSuite("ErrorTypeBridging")
 
@@ -134,6 +135,21 @@ ErrorTypeBridgingTests.test("NSError-to-enum bridging") {
     }
 
     expectTrue(isDeadlock)
+
+    // NSMachError domain
+    let nsMach = NSError(domain: NSMachErrorDomain,
+                         code: Int(KERN_MEMORY_FAILURE),
+                         userInfo: [:])
+    let eMach: ErrorType = nsMach
+    let isMemoryFailure: Bool
+    switch eMach {
+    case _MachError.KERN_MEMORY_FAILURE:
+      isMemoryFailure = true
+    default:
+      isMemoryFailure = false
+    }
+
+    expectTrue(isMemoryFailure)
   }
   
   expectEqual(NoisyErrorDeathCount, NoisyErrorLifeCount)

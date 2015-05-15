@@ -460,3 +460,7 @@ public protocol _BridgedNSErrorCInt : __BridgedNSErrorCInt,
 extension _POSIXError : _BridgedNSErrorCInt {
   public static var _NSErrorDomain: String { return NSPOSIXErrorDomain }
 }
+
+extension _MachError : _BridgedNSErrorCInt {
+  public static var _NSErrorDomain: String { return NSMachErrorDomain }
+}
