@@ -861,7 +861,7 @@ static void diagnoseExpr(TypeChecker &TC, const Expr *E,
 }
 
 bool TypeChecker::solveForExpression(
-    Expr *&expr, DeclContext *dc, Type convertType, Type contextualType,
+    Expr *&expr, DeclContext *dc, Type convertType, Type &contextualType,
     bool discardedExpr, FreeTypeVariableBinding allowFreeTypeVariables,
     ExprTypeCheckListener *listener, ConstraintSystem &cs,
     SmallVectorImpl<Solution> &viable) {

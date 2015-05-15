@@ -876,7 +876,7 @@ public:
   ///
   /// \see typeCheckExpression
   bool solveForExpression(Expr *&expr, DeclContext *dc, Type convertType,
-                          Type contextualType, bool discardedExpr,
+                          Type &contextualType, bool discardedExpr,
                           FreeTypeVariableBinding allowFreeTypeVariables,
                           ExprTypeCheckListener *listener,
                           constraints::ConstraintSystem &cs,
