@@ -41,6 +41,7 @@ namespace swift {
     SourceLoc getEndLoc() const;
 
     void walk(ASTWalker &Walker);
+    void walk(ASTWalker &&walker) { walk(walker); }
   };
   
 } // namespace swift

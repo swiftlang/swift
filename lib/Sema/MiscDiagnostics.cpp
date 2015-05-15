@@ -899,6 +899,19 @@ public:
   
   /// The heavy lifting happens when visiting expressions.
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override;
+
+  /// handle #if directives.
+  void handleIfConfig(IfConfigStmt *ICS);
+
+  /// Custom handling for statements.
+  std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+    // The body of #if statements are not walked into, we need custom processing
+    // for them.
+    if (auto *ICS = dyn_cast<IfConfigStmt>(S))
+      handleIfConfig(ICS);
+    return { true, S };
+  }
+
 };
 }
 
@@ -1138,7 +1151,32 @@ std::pair<bool, Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
   return { true, E };
 }
 
+/// handle #if directives.  All of the active clauses are already walked by the
+/// AST walker, but we also want to handle the inactive ones to avoid false
+/// positives.
+void VarDeclUsageChecker::handleIfConfig(IfConfigStmt *ICS) {
+  struct ConservativeDeclMarker : public ASTWalker {
+    VarDeclUsageChecker &VDUC;
+    ConservativeDeclMarker(VarDeclUsageChecker &VDUC) : VDUC(VDUC) {}
 
+    Expr *walkToExprPost(Expr *E) override {
+      // If we see a bound reference to a decl in an inactive #if block, then
+      // conservatively mark it read and written.  This will silence "variable
+      // unused" and "could be marked let" warnings for it.
+      if (auto *DRE = dyn_cast<DeclRefExpr>(E))
+        VDUC.addMark(DRE->getDecl(), RK_Read|RK_Written);
+      return E;
+    }
+  };
+
+  for (auto &clause : ICS->getClauses()) {
+    // Active clauses are handled by the normal AST walk.
+    if (clause.isActive) continue;
+
+    for (auto elt : clause.Elements)
+      elt.walk(ConservativeDeclMarker(*this));
+  }
+}
 
 /// Perform diagnostics for func/init/deinit declarations.
 void swift::performAbstractFuncDeclDiagnostics(TypeChecker &TC,

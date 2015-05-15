@@ -146,4 +146,13 @@ func testForceValueExpr() {
   a!.g()
 }
 
+// <rdar://problem/20894455> "variable was never mutated" diagnostic does not take #if into account
+func testBuildConfigs() {
+  let abc = 42    // no warning.
+  var mut = 18    // no warning.
+#if false
+  mut = abc    // These uses prevent abc/mut from being unused/unmutated.
+#endif
+}
+
 
