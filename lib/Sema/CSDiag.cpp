@@ -1571,8 +1571,8 @@ bool GeneralFailureDiagnosis::diagnoseGeneralConversionFailure() {
     
     auto toType = CS->getConversionType(expr);
     
-    if (!toType && CS->getContextualType(expr))
-      toType = CS->getContextualType(expr)->getPointer();
+    if (!toType)
+      toType = CS->getContextualType(expr);
     
     if (!toType)
       toType = types.second.getPointer();
@@ -1670,10 +1670,10 @@ bool GeneralFailureDiagnosis::diagnoseContextualConversionError(Expr *expr) {
   TypeBase *contextualType = CS->getConversionType(expr);
   
   if (!contextualType) {
-    if (!CS->getContextualType(expr)) {
+    contextualType = CS->getContextualType(expr);
+    if (!contextualType) {
       return false;
     }
-    contextualType = CS->getContextualType(expr)->getPointer();
   }
   
   auto subExprTy = getTypeOfIndependentSubExpression(expr);

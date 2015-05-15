@@ -1303,7 +1303,7 @@ private:
   bool HandlingFavoredConstraint = false;
 
   SmallVector<TypeVariableType *, 16> TypeVariables;
-  llvm::DenseMap<Expr *, Type *> ContextualTypes;
+  llvm::DenseMap<Expr *, TypeBase *> ContextualTypes;
   llvm::DenseMap<Expr *, TypeBase *> FavoredTypes;
   llvm::DenseMap<Expr *, TypeBase *> ConversionTypes;
 
@@ -1569,7 +1569,7 @@ public:
     return TypeVariables;
   }
   
-  Type* getContextualType(Expr *E) {
+  TypeBase* getContextualType(Expr *E) {
     return this->ContextualTypes[E];
   }
   TypeBase* getFavoredType(Expr *E) {
@@ -1579,7 +1579,7 @@ public:
     return this->ConversionTypes[E];
   }
 
-  void setContextualType(Expr *E, Type *T) {
+  void setContextualType(Expr *E, TypeBase *T) {
     this->ContextualTypes[E] = T;
   }
   void setFavoredType(Expr *E, TypeBase *T) {

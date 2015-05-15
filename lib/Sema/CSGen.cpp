@@ -585,7 +585,7 @@ namespace {
       auto contextualTy = CS.getContextualType(expr);
       
       return isFavoredParamAndArg(CS, paramTy, argTy, Type()) &&
-      (!contextualTy || (*contextualTy)->isEqual(resultTy));
+      (!contextualTy || contextualTy->isEqual(resultTy));
     };
     
     favorCallOverloads(expr, CS, isFavoredDecl);
@@ -732,7 +732,7 @@ namespace {
         (isFavoredParamAndArg(CS, firstParamTy, firstArgTy, secondArgTy) ||
          isFavoredParamAndArg(CS, secondParamTy, secondArgTy, firstArgTy)) &&
         firstParamTy->isEqual(secondParamTy) &&
-        (!contextualTy || (*contextualTy)->isEqual(resultTy));
+        (!contextualTy || contextualTy->isEqual(resultTy));
     };
     
     auto createReplacements
@@ -1475,17 +1475,17 @@ namespace {
 
       auto locator = CS.getConstraintLocator(expr);
       auto contextualType = CS.getContextualType(expr);
-      Type *contextualArrayType = nullptr;
+      Type contextualArrayType = nullptr;
       Type contextualArrayElementType = nullptr;
       
       // If a contextual type exists for this expression, apply it directly.
-      if (contextualType && CS.isArrayType(*contextualType)) {
+      if (contextualType && CS.isArrayType(contextualType)) {
         // Is the array type a contextual type
         contextualArrayType = contextualType;
         contextualArrayElementType =
-            CS.getBaseTypeForArrayType(contextualType->getPointer());
+            CS.getBaseTypeForArrayType(contextualType);
         
-        CS.addConstraint(ConstraintKind::ConformsTo, *contextualType,
+        CS.addConstraint(ConstraintKind::ConformsTo, contextualType,
                          arrayProto->getDeclaredType(),
                          locator);
         
@@ -1499,7 +1499,7 @@ namespace {
                                                     getTupleElement(index++)));
         }
         
-        return *contextualArrayType;
+        return contextualArrayType;
       }
       
       auto arrayTy = CS.createTypeVariable(locator, TVO_PrefersSubtypeBinding);
@@ -1808,7 +1808,7 @@ namespace {
       Type crt;
       
       if (contextualType) {
-        if (auto cft = (*contextualType)->getAs<AnyFunctionType>()) {
+        if (auto cft = contextualType->getAs<AnyFunctionType>()) {
           crt = cft->getResult();
         }
       }
