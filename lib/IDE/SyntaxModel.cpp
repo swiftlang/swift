@@ -784,6 +784,35 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     if (!passNonTokenNode({ SyntaxNodeKind::Keyword,
           CharSourceRange(OperD->getOperatorLoc(), strlen("operator")) }))
       return false;
+
+  } else if (auto *EnumCaseD = dyn_cast<EnumCaseDecl>(D)) {
+    SyntaxStructureNode SN;
+    SN.Dcl = D;
+    SN.Kind = SyntaxStructureKind::EnumCase;
+    SN.Range = charSourceRangeFromSourceRange(SM, D->getSourceRange());
+    if (pushStructureNode(SN, D)) {
+      // FIXME: ASTWalker walks enum elements as members of the enum decl, not
+      // as members of the enum case decl. Walk them manually here so that they
+      // end up as child nodes of enum case.
+      for (auto *EnumElemD : EnumCaseD->getElements()) {
+        if (EnumElemD->getName().empty())
+          continue;
+        SyntaxStructureNode SN;
+        SN.Dcl = EnumElemD;
+        SN.Kind = SyntaxStructureKind::EnumElement;
+        SN.Range = charSourceRangeFromSourceRange(SM,
+                                                  EnumElemD->getSourceRange());
+        SN.NameRange = CharSourceRange(EnumElemD->getNameLoc(),
+                                       EnumElemD->getName().getLength());
+        if (auto *E = EnumElemD->getRawValueExpr()) {
+          SourceRange ElemRange = E->getSourceRange();
+          SN.Elements.emplace_back(SyntaxStructureElementKind::InitExpr,
+                                 charSourceRangeFromSourceRange(SM, ElemRange));
+        }
+        pushStructureNode(SN, EnumElemD);
+        popStructureNode();
+      }
+    }
   }
 
   return true;

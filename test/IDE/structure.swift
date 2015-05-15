@@ -143,3 +143,25 @@ struct I: _ImageLiteralConvertible {
 
 // CHECK: <gvar>let <name>z</name>: I? = <object-literal-expression>[#<name>Image</name>(<param><name>imageLiteral</name>: </param>"hello.png")#]</object-literal-expression></gvar>
 let z: I? = [#Image(imageLiteral: "hello.png")#]
+
+// CHECK: <enum>enum <name>SomeEnum</name> {
+// CHECK:   <enum-case>case <enum-elem><name>North</name></enum-elem></enum-case>
+// CHECK:   <enum-case>case <enum-elem><name>South</name></enum-elem>, <enum-elem><name>East</name></enum-elem></enum-case>
+// CHECK:   <enum-case>case <enum-elem><name>QRCode</name>(String)</enum-elem></enum-case>
+// CHECK:   <enum-case>case</enum-case>
+// CHECK: }</enum>
+enum SomeEnum {
+  case North
+  case South, East
+  case QRCode(String)
+  case
+}
+
+// CHECK: <enum>enum <name>Rawness</name> : <inherited><elem-typeref>Int</elem-typeref></inherited> {
+// CHECK:   <enum-case>case <enum-elem><name>One</name> = <elem-initexpr>1</elem-initexpr></enum-elem></enum-case>
+// CHECK:   <enum-case>case <enum-elem><name>Two</name> = <elem-initexpr>2</elem-initexpr></enum-elem>, <enum-elem><name>Three</name> = <elem-initexpr>3</elem-initexpr></enum-elem></enum-case>
+// CHECK: }</enum>
+enum Rawness : Int {
+  case One = 1
+  case Two = 2, Three = 3
+}

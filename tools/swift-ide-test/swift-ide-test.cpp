@@ -888,6 +888,7 @@ class StructureAnnotator : public ide::SyntaxModelWalker {
   unsigned BufferID;
   clang::RewriteBuffer RewriteBuf;
   std::vector<SyntaxStructureNode> NodeStack;
+  CharSourceRange LastPoppedNodeRange;
 
 public:
   StructureAnnotator(SourceManager &SM, unsigned BufID)
@@ -950,6 +951,8 @@ private:
       case SyntaxStructureKind::InstanceVariable: return "property";
       case SyntaxStructureKind::StaticVariable: return "svar";
       case SyntaxStructureKind::ClassVariable: return "cvar";
+      case SyntaxStructureKind::EnumCase: return "enum-case";
+      case SyntaxStructureKind::EnumElement: return "enum-elem";
       case SyntaxStructureKind::Parameter: return "param";
       case SyntaxStructureKind::ForEachStatement: return "foreach";
       case SyntaxStructureKind::ForStatement: return "for";
@@ -982,20 +985,27 @@ private:
   }
 
   bool walkToSubStructurePost(SyntaxStructureNode Node) override {
+    assert(!NodeStack.empty());
+    LastPoppedNodeRange = NodeStack.back().Range;
     NodeStack.pop_back();
     return true;
   }
 
-  static void checkNode(const SyntaxStructureNode &Node,
+  void checkNode(const SyntaxStructureNode &Node,
                  const SyntaxStructureNode *Parent) {
     checkRange(Node.Range, Parent);
   }
 
-  static void checkRange(CharSourceRange Range,
-                         const SyntaxStructureNode *Parent) {
+  void checkRange(CharSourceRange Range, const SyntaxStructureNode *Parent) {
     assert(Range.isValid());
     if (Parent) {
       assert(Parent->Range.contains(Range));
+    }
+    if (LastPoppedNodeRange.isValid()) {
+      // FIXME: Initializer expressions (like array literals) are not contained
+      // within the global variables nodes.
+      // assert(!SM.isBeforeInBuffer(Range.getStart(),
+      //                             LastPoppedNodeRange.getEnd()));
     }
   }
 
