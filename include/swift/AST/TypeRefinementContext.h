@@ -73,6 +73,9 @@ public:
     /// The context was introduced for the fallthrough flow of a guard
     /// statement.
     GuardStmtFallthrough,
+
+    // The context was introduced for the body of a while statement.
+    WhileStmtBody
   };
 
   using IntroNode =
@@ -124,6 +127,12 @@ public:
                                   BraceStmt *ContainingBraceStmt,
                                   TypeRefinementContext *Parent,
                                   const VersionRange &Versions);
+
+  /// Create a refinement context for the body of a WhileStmt.
+  static TypeRefinementContext *
+  createForWhileStmtBody(ASTContext &Ctx, WhileStmt *WS,
+                         TypeRefinementContext *Parent,
+                          const VersionRange &Versions);
 
   /// Returns the reason this context was introduced.
   Reason getReason() const;

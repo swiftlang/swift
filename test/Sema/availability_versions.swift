@@ -1073,6 +1073,29 @@ func useGuardAvailable() {
 
 }
 
+// Refining while loops
+
+while globalFuncAvailableOn10_10() > 10 { } // expected-error {{'globalFuncAvailableOn10_10()' is only available on OS X 10.10 or newer}}
+        // expected-note@-1 {{guard with version check}}
+
+while #available(OSX 10.10, *), // expected-note {{enclosing scope here}}
+      globalFuncAvailableOn10_10() > 10 {
+
+  let _ = globalFuncAvailableOn10_10()
+
+  let _ = globalFuncAvailableOn10_11() // expected-error {{'globalFuncAvailableOn10_11()' is only available on OS X 10.11 or newer}}
+        // expected-note@-1 {{guard with version check}}
+
+  while globalFuncAvailableOn10_10() > 11,
+        let _ = injectToOptional(5),
+        #available(OSX 10.11, *) {
+    let _ = globalFuncAvailableOn10_11();
+  }
+
+  while #available(OSX 10.10, *) { // expected-warning {{unnecessary check for 'OSX'; enclosing scope ensures guard will always be true}}
+  }
+}
+
 // Tests for Fix-It replacement text
 // The whitespace in the replacement text is particularly important here -- it reflects the level
 // of indentation for the added if #available() or @available attribute. Note that, for the moment, we hard

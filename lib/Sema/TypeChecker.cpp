@@ -1037,6 +1037,11 @@ private:
       return std::make_pair(false, S);
     }
 
+    if (auto *WS = dyn_cast<WhileStmt>(S)) {
+      buildWhileStmtRefinementContext(WS);
+      return std::make_pair(false, S);
+    }
+
     return std::make_pair(true, S);
   }
 
@@ -1073,6 +1078,25 @@ private:
       // Once we add a more precise version range lattice (i.e., one that can
       // support "<") we should create a TRC for the Else branch.
       build(IS->getElseStmt());
+    }
+  }
+
+  /// Builds the type refinement hierarchy for the WhileStmt if the guard
+  /// introduces a new refinement context for the body branch.
+  /// There is no need for the caller to explicitly traverse the children
+  /// of this node.
+  void buildWhileStmtRefinementContext(WhileStmt *WS) {
+    Optional<VersionRange> RefinedRange =
+      buildStmtConditionRefinementContext(WS->getCond());
+
+    if (RefinedRange.hasValue()) {
+      // Create a new context for the branch and traverse it in the new
+      // context.
+      auto *ThenTRC = TypeRefinementContext::createForWhileStmtBody(
+          AC, WS, getCurrentTRC(), RefinedRange.getValue());
+      TypeRefinementContextBuilder(ThenTRC, AC).build(WS->getBody());
+    } else {
+      build(WS->getBody());
     }
   }
 

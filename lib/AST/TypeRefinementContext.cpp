@@ -94,6 +94,16 @@ TypeRefinementContext::createForGuardStmtFallthrough(ASTContext &Ctx,
   return new (Ctx) TypeRefinementContext(Ctx, RS, Parent, Range, Versions);
 }
 
+TypeRefinementContext *
+TypeRefinementContext::createForWhileStmtBody(ASTContext &Ctx, WhileStmt *S,
+                                              TypeRefinementContext *Parent,
+                                              const VersionRange &Versions) {
+  assert(S);
+  assert(Parent);
+  return new (Ctx) TypeRefinementContext(
+      Ctx, S, Parent, S->getBody()->getSourceRange(), Versions);
+}
+
 // Only allow allocation of TypeRefinementContext using the allocator in
 // ASTContext.
 void *TypeRefinementContext::operator new(size_t Bytes, ASTContext &C,
@@ -144,6 +154,9 @@ SourceLoc TypeRefinementContext::getIntroductionLoc() const {
 
   case Reason::GuardStmtFallthrough:
     return cast<GuardStmt>(Node.get<Stmt *>())->getGuardLoc();
+
+  case Reason::WhileStmtBody:
+    return cast<WhileStmt>(Node.get<Stmt *>())->getStartLoc();
 
   case Reason::Root:
     return SourceLoc();
@@ -197,6 +210,10 @@ TypeRefinementContext::Reason TypeRefinementContext::getReason() const {
     if (isa<GuardStmt>(S)) {
       return Reason::GuardStmtFallthrough;
     }
+
+    if (isa<WhileStmt>(S)) {
+      return Reason::WhileStmtBody;
+    }
   } else if (Node.is<SourceFile *>()) {
     return Reason::Root;
   }
@@ -219,5 +236,8 @@ StringRef TypeRefinementContext::getReasonName(Reason R) {
 
   case Reason::GuardStmtFallthrough:
     return "guard_fallthrough";
+
+  case Reason::WhileStmtBody:
+    return "while_body";
   }
 }
