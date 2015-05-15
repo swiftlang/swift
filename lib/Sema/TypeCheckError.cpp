@@ -1034,7 +1034,7 @@ public:
     llvm_unreachable("bad context kind");
   }
 
-  void diagnoseUnhandledTry(TypeChecker &TC, Expr *E) {
+  void diagnoseUnhandledTry(TypeChecker &TC, TryExpr *E) {
     switch (getKind()) {
     case Kind::Handled:
     case Kind::RethrowingFunction:
@@ -1042,12 +1042,12 @@ public:
 
     case Kind::NonThrowingFunction:
       if (DiagnoseErrorOnTry)
-        TC.diagnose(E->getLoc(), diag::try_unhandled);
+        TC.diagnose(E->getTryLoc(), diag::try_unhandled);
       return;
 
     case Kind::NonExhaustiveCatch:
       if (DiagnoseErrorOnTry)
-        TC.diagnose(E->getLoc(), diag::try_unhandled_in_nonexhaustive_catch);
+        TC.diagnose(E->getTryLoc(), diag::try_unhandled_in_nonexhaustive_catch);
       return;
 
     case Kind::NonThrowingAutoClosure:
@@ -1295,7 +1295,7 @@ private:
 
     // Warn about 'try' expressions that weren't actually needed.
     if (!HasTryThrowSite) {
-      TC.diagnose(E->getLoc(), diag::no_throw_in_try);
+      TC.diagnose(E->getTryLoc(), diag::no_throw_in_try);
 
     // Diagnose all the call sites within a single unhandled 'try'
     // at the same time.
