@@ -8,6 +8,6 @@ import Foundation
 // were inherited.
 // CHECK-LABEL: sil shared @_TFCSo3FooCfMS_FT_S_ : $@convention(thin) (@thick Foo.Type) -> @owned Foo {
 func foo() {
-  var _ = Foo()
+  _ = Foo()
 }
 

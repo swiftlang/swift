@@ -7,4 +7,4 @@
 
 import Foo
 
-let _ = Foo.x
+_ = Foo.x

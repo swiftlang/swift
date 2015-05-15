@@ -17,20 +17,20 @@ func useClassThatTriggersImportOfDeprecatedEnum() {
   // when importing deprecated enums do not themselves trigger deprecation
   // warnings in the synthesized code.
 
-  let _ = NSClassWithDeprecatedOptionsInMethodSignature.sharedInstance()
+  _ = NSClassWithDeprecatedOptionsInMethodSignature.sharedInstance()
 }
 
 func useClassThatTriggersImportOExplicitlyUnavailableOptions() {
-  let _ = NSClassWithPotentiallyUnavailableOptionsInMethodSignature.sharedInstance()
+  _ = NSClassWithPotentiallyUnavailableOptionsInMethodSignature.sharedInstance()
 }
 
 func useClassThatTriggersImportOfPotentiallyUnavailableOptions() {
-  let _ = NSClassWithExplicitlyUnavailableOptionsInMethodSignature.sharedInstance()
+  _ = NSClassWithExplicitlyUnavailableOptionsInMethodSignature.sharedInstance()
 }
 
 func directUseShouldStillTriggerDeprecationWarning() {
-  let _ = NSDeprecatedOptions.First // expected-warning {{'NSDeprecatedOptions' was deprecated in OS X 10.10: Use a different API}}
-  let _ = NSDeprecatedEnum.First    // expected-warning {{'NSDeprecatedEnum' was deprecated in OS X 10.10: Use a different API}}
+  _ = NSDeprecatedOptions.First // expected-warning {{'NSDeprecatedOptions' was deprecated in OS X 10.10: Use a different API}}
+  _ = NSDeprecatedEnum.First    // expected-warning {{'NSDeprecatedEnum' was deprecated in OS X 10.10: Use a different API}}
 }
 
 func useInSignature(options: NSDeprecatedOptions) { // expected-warning {{'NSDeprecatedOptions' was deprecated in OS X 10.10: Use a different API}}
@@ -49,7 +49,7 @@ class SubClassWithSynthesizedDesignedInitializerOverride : SuperClassWithDepreca
 }
 
 func callImplicitInitializerOnSubClassWithSynthesizedDesignedInitializerOverride() {
-  let _ = SubClassWithSynthesizedDesignedInitializerOverride() // expected-warning {{'init()' was deprecated in OS X 10.10}}
+  _ = SubClassWithSynthesizedDesignedInitializerOverride() // expected-warning {{'init()' was deprecated in OS X 10.10}}
 }
 
 @available(OSX, introduced=10.9, deprecated=10.10)
@@ -64,7 +64,7 @@ func callImplicitInitalizerOnNotDeprecatedSubClassOfDeprecatedSuperClass() {
   // We do not expect a warning here because the synthesized initializer
   // in NotDeprecatedSubClassOfDeprecatedSuperClass is not itself marked
   // deprecated.
-  let _ = NotDeprecatedSubClassOfDeprecatedSuperClass()
+  _ = NotDeprecatedSubClassOfDeprecatedSuperClass()
 }
 
 @available(OSX, introduced=10.9, deprecated=10.10)

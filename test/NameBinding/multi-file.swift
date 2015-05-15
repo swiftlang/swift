@@ -11,7 +11,7 @@ func test() {
   funcOrVar()
   var _: Int = funcOrVar // expected-error{{'() -> ()' is not convertible to 'Int'}}
 
-  var _ = SomeStruct(value: 42) // use the local SomeStruct
+  _ = SomeStruct(value: 42) // use the local SomeStruct
   
   var _: Bool = 1 + 2 ~~ 3 + 4 // (1 + 2) ~~ (3 + 4)
 }

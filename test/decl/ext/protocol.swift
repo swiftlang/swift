@@ -143,10 +143,10 @@ struct SubscriptC1 : SubscriptP1 {
 
 func testSubscriptP1(var ss1: SubscriptS1, var sc1: SubscriptC1,
                      i: Int, s: String) {
-  let _ = ss1[i]
+  _ = ss1[i]
   ss1[i] = s
 
-  let _ = sc1[i]
+  _ = sc1[i]
   sc1[i] = s
 }
 

@@ -43,8 +43,8 @@ extension A {
 }
 func f() {
   let x = B()
-  var _ : () = x.f()
-  var _ : Int = x[10]
+  _ = x.f() as ()
+  _ = x[10] as Int
 }
 
 class C<T> {

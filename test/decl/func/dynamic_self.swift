@@ -220,7 +220,7 @@ func testGenericCall<T: P>(var t: T) {
 // ----------------------------------------------------------------------------
 // Existential uses of Self methods.
 func testExistentialCall(p: P) {
-  let _ = p.f()
+  _ = p.f()
 }
 
 // ----------------------------------------------------------------------------

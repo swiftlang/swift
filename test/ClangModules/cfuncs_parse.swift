@@ -11,34 +11,34 @@ func test_cfunc1(i: Int) {
 
 func test_cfunc2(i: Int) {
   let f = cfunc2(i, 17)
-  var _ : Float = f
+  _ = f as Float
   // FIXME: Should report this error: {{cannot convert the expression's type '$T3' to type 'CLong'}}
   cfunc2(b:17, a:i) // expected-error{{cannot invoke 'cfunc2' with an argument list of type '(b: Int, a: Int)'}} expected-note {{expected an argument list of type '(Int, Int32)'}}
 }
 
 func test_cfunc3_a() {
   let b = cfunc3( { (a : Double, b : Double) -> Double in a + b } )
-  var _ : Double = b(1.5, 2.5)
-  var _ : Double = b // expected-error{{'double_bin_op_block' is not convertible to 'Double'}}
+  _ = b(1.5, 2.5) as Double
+  _ = b as Double// expected-error{{'double_bin_op_block!' is not convertible to 'Double'}}
 }
 
 func test_cfunc3_b() {
   let b = cfunc3( { a, b in a + b } )
-  var _ : Double = b(1.5, 2.5)
-  var _ : Double = b // expected-error{{'double_bin_op_block' is not convertible to 'Double'}}
+  _ = b(1.5, 2.5) as Double
+  _ = b as Double// expected-error{{'double_bin_op_block!' is not convertible to 'Double'}}
 }
 
 func test_cfunc3_c() {
   let b = cfunc3({ $0 + $1 })
-  var _ : Double = b(1.5, 2.5)
-  var _ : Double = b // expected-error{{'double_bin_op_block' is not convertible to 'Double'}}
+  _ = b(1.5, 2.5) as Double
+  _ = b as Double// expected-error{{'double_bin_op_block!' is not convertible to 'Double'}}
 }
 
 func test_cfunc3_d() {
   let x: Double = 0
   let y: Double = 0
-  var _: Double? = cfunc3(nil)?(x, y)
-  var _: Double = cfunc3(nil)!(x, y)
+  _ = cfunc3(nil)?(x, y) as Double?
+  _ = cfunc3(nil)!(x, y) as Double
 }
 
 func test_cfunc4() {
@@ -51,7 +51,7 @@ func test_pow() {
 }
 
 func test_puts(s: String) {
-  var _ = s.withCString { puts($0) + 32 };
+  _ = s.withCString { puts($0) + 32 };
 }
 
 func test_fopen(filename: String) -> CInt {

@@ -5,17 +5,17 @@
 
 import OpenAL.AL
 
-let _ = alGetError
-let _ = OpenAL.alGetError
+_ = alGetError
+_ = OpenAL.alGetError
 
 #if !NO_ERROR
-let _ = alcCreateContext // expected-error{{use of unresolved identifier 'alcCreateContext'}}
+_ = alcCreateContext // expected-error{{use of unresolved identifier 'alcCreateContext'}}
 #endif
 
 #if os(OSX)
 import OpenGL.GL3
-let _ = glGetString
-let _ = OpenGL.glGetString
+_ = glGetString
+_ = OpenGL.glGetString
 
 import AppKit.NSPanGestureRecognizer
 
@@ -26,5 +26,5 @@ typealias PanRecognizer2 = AppKit.NSPanGestureRecognizer
 #endif
 
 #if !NO_ERROR
-let _ = glVertexPointer // expected-error{{use of unresolved identifier 'glVertexPointer'}}
+_ = glVertexPointer // expected-error{{use of unresolved identifier 'glVertexPointer'}}
 #endif

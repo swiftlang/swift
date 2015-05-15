@@ -11,7 +11,7 @@ func test2() {
   funcOrVar = 1
   var _: () -> () = funcOrVar // expected-error{{'Int' is not convertible to '() -> ()'}}
 
-  var _ = SomeStruct(value: 42) // use the SomeStruct from multi-file.swift
+  _ = SomeStruct(value: 42) // use the SomeStruct from multi-file.swift
 
   var _: Bool = true && 1 ~~ 2 && false // true && (1 ~~ 2) && false
 }

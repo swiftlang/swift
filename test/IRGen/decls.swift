@@ -16,7 +16,7 @@ func test1() {
       b = 0
     }
   }
-  var _ : a, _ : b
+  let x : a, y : b
 }
 
 // Check that we emit nominal type descriptors for all types.

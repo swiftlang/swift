@@ -29,13 +29,13 @@ func test1a() -> unionSearchFlags {
   _ = b
 
   // ForwardIndexType use of MaybeInt.
-  var _ = MaybeInt.None
+  _ = MaybeInt.None
 
   return .Backwards
 }
 
 func test1b(b : Bool) {
-  var _ = 123
+  _ = 123
   .description == 1 // expected-error{{could not find member 'description'}}
 }
 
@@ -47,9 +47,9 @@ enum MaybeInt {
 }
 
 func test2(a: Int, _ b: Int, _ c: MaybeInt) {
-  var _ = MaybeInt.Some(4)
-  var _ = MaybeInt.Some  // expected-error{{partial application of enum constructor is not allowed}}
-  var _ = MaybeInt.Some(b)
+  _ = MaybeInt.Some(4)
+  _ = MaybeInt.Some  // expected-error{{partial application of enum constructor is not allowed}}
+  _ = MaybeInt.Some(b)
 
   test2(1, 2, .None)
 }
@@ -67,10 +67,10 @@ enum ZeroOneTwoThree {
 }
 
 func test3(a: ZeroOneTwoThree) {
-  var _ = ZeroOneTwoThree.Three(1,2,3)
-  var _ = ZeroOneTwoThree.Unknown(MaybeInt.None, MaybeInt.Some(4),
+  _ = ZeroOneTwoThree.Three(1,2,3)
+  _ = ZeroOneTwoThree.Unknown(MaybeInt.None, MaybeInt.Some(4),
                                   MaybeInt.Some(32))
-  var _ = ZeroOneTwoThree(MaybeInt.None, MaybeInt(4), MaybeInt(32))
+  _ = ZeroOneTwoThree(MaybeInt.None, MaybeInt(4), MaybeInt(32))
 
   var _ : Int =
      ZeroOneTwoThree.Zero // expected-error {{'ZeroOneTwoThree' is not convertible to 'Int'}}
@@ -156,16 +156,16 @@ func test5(myorigin: CGPoint) {
   4+5
 
   // Dot syntax.
-  var _ = x2.origin.x
-  var _ = x1.size.area()
-  var _ = (r : x1.size).r.area()
-  var _ = x1.size.area()
-  var _ = (r : x1.size).r.area()
+  _ = x2.origin.x
+  _ = x1.size.area()
+  _ = (r : x1.size).r.area()
+  _ = x1.size.area()
+  _ = (r : x1.size).r.area()
   
-  var _ = x1.area //expected-error{{partial application of struct method is not allowed}}
+  _ = x1.area //expected-error{{partial application of struct method is not allowed}}
 
-  var _ = x1.search(42)
-  var _ = x1.search(42).width
+  _ = x1.search(42)
+  _ = x1.search(42).width
 
   // TODO: something like this (name binding on the LHS):
   // var (CGSize(width, height)) = CGSize(1,2)

@@ -16,7 +16,7 @@ import ClangModuleUser
 import IndirectFrameworkImporter
 import UsesSubmodule
 
-var _ = LinkFramework.IComeFromLinkFramework
+_ = LinkFramework.IComeFromLinkFramework
 UsesSubmodule.useSomethingFromSubmodule()
 
 // CHECK: !{{[0-9]+}} = !{i32 6, !"Linker Options", ![[LINK_LIST:[0-9]+]]}

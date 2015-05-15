@@ -4,8 +4,8 @@ typealias IntegerLiteralType = Int32
 
 // Simple coercion of literals.
 func simple() {
-  var _ : Int8 = 1
-  var _ : Int16 = 1
+  _ = 1 as Int8
+  _ = 1 as Int16
 }
 
 
@@ -13,8 +13,8 @@ func simple() {
 func operators(x1: Int8) {
   let x2 : Int8 = 1 + 2
   let x3 : Int8 = 1 + x1
-  var _ : Int8 = x2 + 1
-  var _ : Int8 = x1 + x2 + 1 + 4 + x3 + 5
+  _ = x2 + 1 as Int8
+  _ = x1 + x2 + 1 + 4 + x3 + 5 as Int8
 }
 
 // Check coercion failure due to overflow.

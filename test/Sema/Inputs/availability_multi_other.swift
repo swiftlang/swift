@@ -15,7 +15,7 @@ class OtherIntroduced10_10 {
     // PrivateIntroduced10_12 is not available on 10.11. But since we only
     // run the first pass of the type checker on these declarations,
     // the body is not checked.
-    let _ = PrivateIntroduced10_11()
+    _ = PrivateIntroduced10_11()
   }
 
   // This method uses a 10_11 only type in its signature, so validating

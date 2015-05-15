@@ -14,12 +14,12 @@ import ObjCParseExtrasToo
 func markUsed<T>(t: T) {}
 
 func testAnyObject(obj: AnyObject) {
-  var _ = obj.nsstringProperty
+  _ = obj.nsstringProperty
 }
 
 // Construction
 func construction() {
-  var _ = B()
+  _ = B()
 }
 
 // Subtyping
@@ -160,7 +160,7 @@ func newConstruction(a: A, aproxy: AProxy) {
 // Indexed subscripting
 func indexedSubscripting(b: B, idx: Int, a: A) {
   b[idx] = a
-  var _ = b[idx] as! A
+  _ = b[idx] as! A
 }
 
 // Keyed subscripting
@@ -173,7 +173,8 @@ func keyedSubscripting(b: B, idx: A, a: A) {
   let value = dict[NSString()]
 
   dict[nil] = a // expected-error {{cannot assign a value of type 'A' to a value of type 'AnyObject?'}}
-  let _ = dict[nil]  // expected-error {{type 'NSCopying' does not conform to protocol 'NilLiteralConvertible'}}
+  let q = dict[nil]  // expected-error {{type 'NSCopying' does not conform to protocol 'NilLiteralConvertible'}}
+  _ = q
 }
 
 // Typed indexed subscripting
@@ -361,7 +362,7 @@ func testPreferClassMethodToCurriedInstanceMethod(obj: NSObject) {
   // FIXME: We shouldn't need the ": Bool" type annotation here.
   // <rdar://problem/18006008>
   let _: Bool = NSObject.isEqual(obj)
-  let _ = NSObject.isEqual(obj) as (NSObject!) -> Bool // no-warning
+  _ = NSObject.isEqual(obj) as (NSObject!) -> Bool // no-warning
 }
 
 
@@ -379,22 +380,22 @@ func testPropertyAndMethodCollision(obj: PropertyAndMethodCollision,
 }
 
 func testSubscriptAndPropertyRedeclaration(obj: SubscriptAndProperty) {
-  let _ = obj.x
+  _ = obj.x
   obj.x = 5
   obj.objectAtIndexedSubscript(5) // expected-error{{'objectAtIndexedSubscript' is unavailable: use subscripting}}
   obj.setX(5) // expected-error{{'SubscriptAndProperty' does not have a member named 'setX'}}
 
-  let _ = obj[0]
+  _ = obj[0]
   obj[1] = obj
   obj.setObject(obj, atIndexedSubscript: 2) // expected-error{{'setObject(_:atIndexedSubscript:)' is unavailable: use subscripting}}
 }
 
 func testSubscriptAndPropertyWithProtocols(obj: SubscriptAndPropertyWithProto) {
-  let _ = obj.x
+  _ = obj.x
   obj.x = 5
   obj.setX(5) // expected-error{{'SubscriptAndPropertyWithProto' does not have a member named 'setX'}}
 
-  let _ = obj[0]
+  _ = obj[0]
   obj[1] = obj
   obj.setObject(obj, atIndexedSubscript: 2) // expected-error{{'setObject(_:atIndexedSubscript:)' is unavailable: use subscripting}}
 }
@@ -402,7 +403,7 @@ func testSubscriptAndPropertyWithProtocols(obj: SubscriptAndPropertyWithProto) {
 func testProtocolMappingSameModule(obj: AVVideoCompositionInstruction, p: AVVideoCompositionInstructionProtocol) {
   markUsed(p.enablePostProcessing)
   markUsed(obj.enablePostProcessing)
-  let _ = obj.backgroundColor
+  _ = obj.backgroundColor
 }
 
 func testProtocolMappingDifferentModules(obj: ObjCParseExtrasToo.ProtoOrClass, p: ObjCParseExtras.ProtoOrClass) {
@@ -411,10 +412,10 @@ func testProtocolMappingDifferentModules(obj: ObjCParseExtrasToo.ProtoOrClass, p
 
   let _: ProtoOrClass? // expected-error{{'ProtoOrClass' is ambiguous for type lookup in this context}}
 
-  let _ = ObjCParseExtrasToo.ClassInHelper() // expected-error{{'ClassInHelper' cannot be constructed because it has no accessible initializers}}
-  let _ = ObjCParseExtrasToo.ProtoInHelper()
-  let _ = ObjCParseExtrasTooHelper.ClassInHelper()
-  let _ = ObjCParseExtrasTooHelper.ProtoInHelper() // expected-error{{'ProtoInHelper' cannot be constructed because it has no accessible initializers}}
+  _ = ObjCParseExtrasToo.ClassInHelper() // expected-error{{'ClassInHelper' cannot be constructed because it has no accessible initializers}}
+  _ = ObjCParseExtrasToo.ProtoInHelper()
+  _ = ObjCParseExtrasTooHelper.ClassInHelper()
+  _ = ObjCParseExtrasTooHelper.ProtoInHelper() // expected-error{{'ProtoInHelper' cannot be constructed because it has no accessible initializers}}
 }
 
 func testProtocolClassShadowing(obj: ClassInHelper, p: ProtoInHelper) {
@@ -457,7 +458,7 @@ func testNullarySelectorPieces(obj: AnyObject) {
 }
 
 func testFactoryMethodAvailability() {
-  let _ = DeprecatedFactoryMethod() // expected-warning{{'init()' is deprecated: use something newer}}
+  _ = DeprecatedFactoryMethod() // expected-warning{{'init()' is deprecated: use something newer}}
 }
 
 func testRepeatedMembers(obj: RepeatedMembers) {
@@ -479,6 +480,6 @@ class ProtoAdopter : NSObject, ExplicitSetterProto, OptionalSetterProto {
 }
 
 func testUnusedResults(ur: UnusedResults) {
-  let _ = ur.producesResult()
+  _ = ur.producesResult()
   ur.producesResult() // expected-warning{{result of call to 'producesResult()' is unused}}
 }

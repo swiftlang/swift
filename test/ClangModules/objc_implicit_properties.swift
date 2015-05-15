@@ -61,8 +61,8 @@ func doSomethingBase<T: PropertiesProto>(obj: T) {}
 func doSomethingSub<T: SubProto>(obj: T) {}
 
 func protocols(obj: Sub) {
-  let _: PropertiesProto = obj
-  let _: SubProto = obj
+  _ = obj as PropertiesProto
+  _ = obj as SubProto
   doSomethingBase(obj)
   doSomethingSub(obj)
 }

@@ -18,14 +18,16 @@ func statement_starts() {
 
 // Within a function
 func test(inout i: Int, inout j: Int) {
-   // Okay
-   var _ : Int; i = j; j = i
-   if i != j { i = j } 
+  // Okay
+  let q : Int; i = j; j = i; _ = q
 
-   // Errors
-   i = j j = i // expected-error{{consecutive statements}} {{9-9=;}}
-   var _ : Int i = j // expected-error{{consecutive statements}} {{15-15=;}}
-   var _ : Int var _ : Int // expected-error{{consecutive statements}} {{15-15=;}}
+  if i != j { i = j }
+
+  // Errors
+  i = j j = i // expected-error{{consecutive statements}} {{8-8=;}}
+  let r : Int i = j // expected-error{{consecutive statements}} {{14-14=;}}
+  let s : Int let t : Int // expected-error{{consecutive statements}} {{14-14=;}}
+  _ = r; _ = s; _ = t
 }
 
 struct X {

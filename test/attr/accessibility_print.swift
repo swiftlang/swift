@@ -206,7 +206,7 @@ func GA_localTypes() {
     // CHECK-SRC: /*private*/ let x
     let x = 0
   }
-  let _ = Local()
+  _ = Local()
 
   // CHECK-SRC: /*private*/ enum LocalEnum {
   enum LocalEnum {

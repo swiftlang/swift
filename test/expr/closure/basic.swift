@@ -31,7 +31,7 @@ func variadic() {
 
 // Closures with attributes in the parameter list.
 func attrs() {
-  var _ = {(inout z: Int) -> Int in z }
+  _ = {(inout z: Int) -> Int in z }
 }
 
 // Closures with argument and parameter names.

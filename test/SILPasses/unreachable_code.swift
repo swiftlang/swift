@@ -8,7 +8,7 @@ func ifFalse() -> Int {
 }
 
 func ifTrue() -> Int {
-  var _ = 0
+  _ = 0
   if true { // expected-note {{always evaluates to true}}
     return 1
   }
@@ -69,7 +69,7 @@ func unreachableBranch() -> Int {
 // We should not report unreachable user code inside inlined transparent function.
 @transparent
 func ifTrueTransparent(b: Bool) -> Int {
-  var _ = 0
+  _ = 0
   if b {
     return 1
   }

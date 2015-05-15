@@ -74,7 +74,7 @@ class MyInterestingDesignated : NSInterestingDesignatedSub {
 }
 
 func createMyInterestingDesignated() {
-  var _ = MyInterestingDesignated(URL: "http://llvm.org")
+  _ = MyInterestingDesignated(URL: "http://llvm.org")
 }
 
 func testNoReturn(a : NSAwesomeDocument) -> Int {
@@ -150,7 +150,7 @@ class View: NSView {
 // rdar://problem/19726164
 class NonNullDefaultInitSubSub : NonNullDefaultInitSub {
   func foo() {
-    var _: NonNullDefaultInitSubSub? = NonNullDefaultInitSubSub()
+    _ = NonNullDefaultInitSubSub() as NonNullDefaultInitSubSub?
   }
 }
 

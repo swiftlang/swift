@@ -55,7 +55,7 @@ class Y<T> : X<[T]> {
 
 func testGenericInherit() {
   let yi : Y<Int>
-  var _ : [Int] = yi.f()
+  _ = yi.f() as [Int] 
 }
 
 

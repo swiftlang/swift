@@ -181,8 +181,8 @@ func pointerConstructor(x: UnsafeMutablePointer<Int>) -> UnsafeMutablePointer<Fl
 
 func pointerArithmetic(x: UnsafeMutablePointer<Int>, y: UnsafeMutablePointer<Int>,
                        i: Int) {
-  let _ = x + i
-  let _ = x - y
+  _ = x + i
+  _ = x - y
 }
 
 func genericPointerArithmetic<T>(x: UnsafeMutablePointer<T>, i: Int, t: T) -> UnsafeMutablePointer<T> {

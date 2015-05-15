@@ -93,13 +93,13 @@ func testUpcastBridge() {
 func testDowncastBridge() {
   let dictRR = Dictionary<Root, Root>()
   let dictRO = Dictionary<Root, ObjC>()
-  let _ = Dictionary<ObjC, Root>()
-  let _ = Dictionary<ObjC, ObjC>()
-  let _ = Dictionary<ObjC, DerivesObjC>()
+  _ = Dictionary<ObjC, Root>()
+  _ = Dictionary<ObjC, ObjC>()
+  _ = Dictionary<ObjC, DerivesObjC>()
   let dictDO = Dictionary<DerivesObjC, ObjC>()
-  let _ = Dictionary<DerivesObjC, DerivesObjC>()
+  _ = Dictionary<DerivesObjC, DerivesObjC>()
 
-  let _ = Dictionary<BridgedToObjC, BridgedToObjC>()
+  _ = Dictionary<BridgedToObjC, BridgedToObjC>()
   let dictBO = Dictionary<BridgedToObjC, ObjC>()
   let dictOB = Dictionary<ObjC, BridgedToObjC>()
 

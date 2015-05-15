@@ -4,6 +4,7 @@
 
 import CoreMIDI
 
-func test() {
-  let _: String = MIDIGetNumberOfDevices() // expected-error {{'Int' is not convertible to 'String'}}
+func test() -> String {
+  let s: String = MIDIGetNumberOfDevices() // expected-error {{'Int' is not convertible to 'String'}}
+  return s
 }

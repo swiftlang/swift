@@ -136,13 +136,13 @@ class NonObjC {}
   @IBOutlet weak var outlet2: Infer!
 
   func testOptionalNess() {
-   let _ = outlet1!
-   let _ = outlet2!
+   _ = outlet1!
+   _ = outlet2!
   }
 
   func testUnchecked() {
-   let _ = outlet1
-   let _ = outlet2
+   _ = outlet1
+   _ = outlet2
   }
   
   // This outlet is strong and optional.

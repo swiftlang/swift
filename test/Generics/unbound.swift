@@ -67,7 +67,7 @@ extension GS {
   }
 
   func h() {
-    var _ : GS<Int> = GS() // expected-error{{'GS<T>' is not convertible to 'GS<Int>'}}
+    _ = GS() as GS<Int> // expected-error{{'GS<T>' is not convertible to 'GS<Int>'}}
   }
 }
 

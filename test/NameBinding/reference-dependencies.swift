@@ -162,11 +162,11 @@ func lookUpManyTopLevelNames() {
     break
   }
 
-  let _ = .Value as OtherFileEnumWrapper.Enum
+  _ = .Value as OtherFileEnumWrapper.Enum
   let _: OtherFileEnumWrapper.Enum = .Value
-  let _ = OtherFileEnumWrapper.Enum.Value
+  _ = OtherFileEnumWrapper.Enum.Value
 
-  let _ = { (_: PrivateTopLevelStruct.ValueType) -> PrivateTopLevelStruct2.ValueType? in
+  _ = { (_: PrivateTopLevelStruct.ValueType) -> PrivateTopLevelStruct2.ValueType? in
     return nil
   }
   

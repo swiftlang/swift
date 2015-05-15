@@ -94,20 +94,20 @@ func test2() {
   
   // Weak
   weak var w1 : SomeClass?
-  var _ = w1                // ok: default-initialized
+  _ = w1                // ok: default-initialized
 
   weak var w2 = SomeClass()
-  var _ = w2                // ok
+  _ = w2                // ok
   
   
   // Unowned.  This is immediately crashing code (it causes a retain of a
   // released object) so it should be diagnosed with a warning someday.
   // expected-warning @+1 {{variable 'u1' was never mutated; consider changing to 'let' constant}}
   unowned var u1 : SomeClass // expected-note {{variable defined here}}
-  var _ = u1                // expected-error {{variable 'u1' used before being initialized}}
+  _ = u1                // expected-error {{variable 'u1' used before being initialized}}
 
   unowned let u2 = SomeClass()
-  var _ = u2                // ok
+  _ = u2                // ok
 }
 
 
@@ -136,7 +136,7 @@ func test4() {
   // Partially set, wholey read.
   var t4 : (Int, Int, Int)   // expected-note 1 {{variable defined here}}
   t4.0 = 1; t4.2 = 42
-  var _ = t4            // expected-error {{variable 't4.1' used before being initialized}}
+  _ = t4            // expected-error {{variable 't4.1' used before being initialized}}
   
 
   // Subelement sets.
@@ -1045,7 +1045,7 @@ class MyClassTestExample {
 
   init(){
     clientFormat = MyClassWithAnInt()
-    let _ = clientFormat.channelCount
+    _ = clientFormat.channelCount
   }
 }
 

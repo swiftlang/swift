@@ -44,5 +44,5 @@ import BrokenClangModule
 // CHECK-BRIDGING-HEADER: error: failed to import bridging header '{{.*}}/BrokenClangModule.h'
 
 
-let _ = BrokenClangModule.x
-// CHECK: broken-modules.swift:[[@LINE-1]]:9: error: use of unresolved identifier 'BrokenClangModule'
+_ = BrokenClangModule.x
+// CHECK: broken-modules.swift:[[@LINE-1]]:5: error: use of unresolved identifier 'BrokenClangModule'

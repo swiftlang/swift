@@ -4,7 +4,7 @@
 // Refer to members of literals
 //===----------------------------------------------------------------------===//
 func testLiteralMembers() {
-  var _ = 0.value
+  _ = 0.value
   Int(0.value)
 }
 

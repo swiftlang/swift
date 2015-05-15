@@ -23,7 +23,7 @@ struct X2 : P { // expected-error{{type 'X2' does not conform to protocol 'P'}}
 }
 
 func testP<T:P>(t: T) {
-  let _: C = t.getAssoc()
+  _ = t.getAssoc() as C
   t.getAssoc().f()
 }
 

@@ -5,5 +5,5 @@
 import Foundation
 
 func test_unavailable_app_extension() {
-  let _ = SomeCrazyAppExtensionForbiddenAPI() // expected-error {{'SomeCrazyAppExtensionForbiddenAPI()' is unavailable: Not available in App Extensions}}
+  _ = SomeCrazyAppExtensionForbiddenAPI() // expected-error {{'SomeCrazyAppExtensionForbiddenAPI()' is unavailable: Not available in App Extensions}}
 }

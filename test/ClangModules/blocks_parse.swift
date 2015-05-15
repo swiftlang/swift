@@ -23,5 +23,5 @@ func testNoEscape(@noescape f: @convention(block) () -> Void, nsStr: NSString,
   // rdar://problem/19818617
   nsStr.enumerateLinesUsingBlock(fStr) // okay due to @noescape
 
-  var _: Int = nsStr.enumerateLinesUsingBlock // expected-error{{'(@noescape (String!) -> Void) -> Void' is not convertible}}
+  _ = nsStr.enumerateLinesUsingBlock as Int // expected-error{{'(@noescape (String!) -> Void) -> Void' is not convertible}}
 }

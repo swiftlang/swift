@@ -4,14 +4,14 @@
 
 import Darwin
 
-let _: Fract? = nil // expected-error{{use of undeclared type 'Fract'}}
-let _: Darwin.Fract? = nil // okay
+_ = nil as Fract? // expected-error{{use of undeclared type 'Fract'}}
+_ = nil as Darwin.Fract? // okay
 
-let _: OSErr = 0
-let _: OSStatus = noErr // noErr is from the overlay
-let _: UniChar = 0
+_ = 0 as OSErr
+_ = noErr as OSStatus // noErr is from the overlay
+_ = 0 as UniChar
 
-let _ = ProcessSerialNumber()
+_ = ProcessSerialNumber()
 
-let _: Byte = 0 // expected-error {{use of undeclared type 'Byte'}}
+_ = 0 as Byte // expected-error {{use of undeclared type 'Byte'}}
 Darwin.fakeAPIUsingByteInDarwin() as Int // expected-error {{'UInt8' is not convertible to 'Int'}}

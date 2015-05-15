@@ -55,7 +55,7 @@ let f22 = partialApply2(1)
 let f23 = partialApply2(1)(b: 2)
 
 func partialApply4<T: Parallelogram>(t: T) {
-  let _ = T.partialApply3
+  _ = T.partialApply3
 }
 
 // Overload resolution/////////////////////////////////////////////////////////

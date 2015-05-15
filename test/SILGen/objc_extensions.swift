@@ -35,7 +35,7 @@ testOverrideProperty(Sub())
 // CHECK:       sil shared [transparent] @_TTDFC15objc_extensions3Sub3foofS0_FT_T_
 // CHECK:         class_method [volatile] %0 : $Sub, #Sub.foo!1.foreign
 func testCurry(x: Sub) {
-  let _ = x.foo
+  _ = x.foo
 }
 
 extension Sub {

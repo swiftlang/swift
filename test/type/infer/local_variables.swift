@@ -30,6 +30,6 @@ func infer_generic_args() {
 
   // Function types
   let f : (Dictionary) -> Array = dict_to_array
-  var _ : [(String, Int)] = f(d)
+  _ = f(d) as [(String, Int)]
 }
 

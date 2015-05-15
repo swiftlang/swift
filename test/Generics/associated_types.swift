@@ -18,7 +18,7 @@ struct Z : Fooable {
   func foo(x: Float) {}
 
   func blah() {
-    var _ : AssocType
+    var a : AssocType // expected-warning {{variable 'a' was never used; consider replacing with '_' or removing it}}
   }
 
   // FIXME: We should be able to find this.

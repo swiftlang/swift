@@ -131,13 +131,13 @@ protocol P2 {
 
 
 func generic<T: P>(t: T) {
-  var _ = t.bar // expected-error{{partial application of generic method is not allowed}}
+  _ = t.bar // expected-error{{partial application of generic method is not allowed}}
   var _ : () = t.bar(0)
 }
 
 func existential(p: P, p2 : P2) {
-  var _ = p.bar // expected-error{{partial application of protocol method is not allowed}}
-  var _ = p2.bar // expected-error{{partial application of protocol method is not allowed}}
+  _ = p.bar // expected-error{{partial application of protocol method is not allowed}}
+  _ = p2.bar // expected-error{{partial application of protocol method is not allowed}}
   var _ : () = p.bar(0)
 }
 
@@ -146,12 +146,12 @@ protocol ClassP : class {
 }
 
 func genericClassP<T: ClassP>(t: T) {
-  var _ = t.bas
+  _ = t.bas
   var _ : () = t.bas(0)
 }
 
 func existentialClassP(p: ClassP) {
-  var _ = p.bas  // expected-error{{partial application of protocol method is not allowed}}
+  _ = p.bas  // expected-error{{partial application of protocol method is not allowed}}
   var _ : () = p.bas(0)
 }
 

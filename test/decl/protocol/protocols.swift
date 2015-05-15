@@ -93,7 +93,7 @@ struct Circle {
 func testCircular(circle: Circle) {
   // FIXME: It would be nice if this failure were suppressed because the protocols
   // have circular definitions.
-  var _ : CircleStart = circle // expected-error{{type 'Circle' does not conform to protocol 'CircleStart'}}
+  _ = circle as CircleStart // expected-error{{'Circle' is not convertible to 'CircleStart'; did you mean to use 'as!' to force downcast?}}
 }
 
 // <rdar://problem/14750346>

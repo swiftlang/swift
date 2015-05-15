@@ -13,7 +13,7 @@ func typealias_decl() {
 
 // CHECK-LABEL: sil hidden @_TF5decls15simple_patternsFT_T_
 func simple_patterns() {
-  var _ = 4
+  _ = 4
   var _ : Int
 }
 

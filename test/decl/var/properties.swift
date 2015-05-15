@@ -1066,40 +1066,40 @@ extension rdar17391625derived {
 struct r19874152S1 {
   let number : Int = 42
 }
-let _ = r19874152S1(number:64)  // expected-error {{extra argument 'number' in call}}
-let _ = r19874152S1()  // Ok
+_ = r19874152S1(number:64)  // expected-error {{extra argument 'number' in call}}
+_ = r19874152S1()  // Ok
 
 struct r19874152S2 {
   var number : Int = 42
 }
-let _ = r19874152S2(number:64)  // Ok, property is a var.
-let _ = r19874152S2()  // Ok
+_ = r19874152S2(number:64)  // Ok, property is a var.
+_ = r19874152S2()  // Ok
 
 struct r19874152S3 {
   let number : Int = 42
   let flavour : Int
 }
-let _ = r19874152S3(number:64)  // expected-error {{incorrect argument label in call (have 'number:', expected 'flavour:')}}
-let _ = r19874152S3(number:64, flavour: 17)  // expected-error {{extra argument 'number' in call}}
-let _ = r19874152S3(flavour: 17)  // ok
-let _ = r19874152S3()  // expected-error {{missing argument for parameter 'flavour' in call}}
+_ = r19874152S3(number:64)  // expected-error {{incorrect argument label in call (have 'number:', expected 'flavour:')}}
+_ = r19874152S3(number:64, flavour: 17)  // expected-error {{extra argument 'number' in call}}
+_ = r19874152S3(flavour: 17)  // ok
+_ = r19874152S3()  // expected-error {{missing argument for parameter 'flavour' in call}}
 
 struct r19874152S4 {
   let number : Int? = nil
 }
-let _ = r19874152S4(number:64)  // expected-error {{extra argument 'number' in call}}
-let _ = r19874152S4()  // Ok
+_ = r19874152S4(number:64)  // expected-error {{extra argument 'number' in call}}
+_ = r19874152S4()  // Ok
 
 
 struct r19874152S5 {
 }
-let _ = r19874152S5()  // ok
+_ = r19874152S5()  // ok
 
 
 struct r19874152S6 {
   let (a,b) = (1,2)   // Cannot handle implicit synth of this yet.
 }
-let _ = r19874152S5()  // ok
+_ = r19874152S5()  // ok
 
 
 

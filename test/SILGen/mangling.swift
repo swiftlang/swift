@@ -55,7 +55,7 @@ func «+»(a: Int, b: Int) -> Int { return a + b }
 // CHECK-LABEL: sil hidden @_TF8mangling7curriedfT1aSi_FT1bSS_T_ : $@convention(thin) (@owned String, Int) -> ()
 // CHECK-LABEL: sil shared @_TF8mangling7curriedFT1aSi_FT1bSS_T_ : $@convention(thin) (Int) -> @owned @callee_owned (@owned String) -> ()
 func curried(#a: Int)(b: String) {}
-var _ = curried(a: 1)
+_ = curried(a: 1)
 
 protocol Foo {}
 protocol Bar {}

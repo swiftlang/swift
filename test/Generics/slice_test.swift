@@ -20,8 +20,8 @@ infix operator != {
 func testslice(s: Array<Int>) {
   for i in 0..<s.count { print(s[i]+1) }
   for i in s { print(i+1) }
-  var _ = s[0..<2]
-  var _ = s[0...1]
+  _ = s[0..<2]
+  _ = s[0...1]
 }
 
 @asmname("malloc") func c_malloc(size: Int) -> UnsafeMutablePointer<Void>

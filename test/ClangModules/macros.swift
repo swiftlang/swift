@@ -105,10 +105,10 @@ func testNil() {
 }
 
 func testBitwiseOps() {
-  let _: CUnsignedLongLong = DISPATCH_TIME_FOREVER
-  let _: CInt = BIT_SHIFT_1 | BIT_SHIFT_2
-  let _: CLongLong = BIT_SHIFT_3
-  let _: CUnsignedInt = BIT_SHIFT_4
+  _ = DISPATCH_TIME_FOREVER as CUnsignedLongLong
+  _ = (BIT_SHIFT_1 | BIT_SHIFT_2) as CInt
+  _ = BIT_SHIFT_3 as CLongLong
+  _ = BIT_SHIFT_4 as CUnsignedInt
 }
 
 func testRecursion() {

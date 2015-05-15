@@ -167,7 +167,7 @@ func doREPLPrint(p: MyREPLPrintable) {
 
 func testREPLPrintable() {
   let i : Int = 1
-  var _ : MyREPLPrintable = i
+  _ = i as MyREPLPrintable
   doREPLPrint(i)
   doREPLPrint(1)
   doREPLPrint("foo")

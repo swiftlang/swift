@@ -58,7 +58,7 @@ struct X<T> {
 
   mutating func replace<C: CollectionType where C.Generator.Element == T>(a: C) {
     for i in a.startIndex..<a.endIndex {
-      var _: T = a[i]
+      _ = a[i] as T
     }
   }
 }

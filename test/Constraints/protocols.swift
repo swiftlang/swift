@@ -74,7 +74,7 @@ func castToClass(object: Any) -> SomeArbitraryClass? {
 getAnyObject().map(castToClass) // expected-error{{function signature '(Any) -> SomeArbitraryClass?' is not compatible with expected type 'AnyObject -> SomeArbitraryClass?'}} expected-note {{use a closure to safely wrap calls to the function}} {{20-20={ }} {{31-31=($0) }}}
 
 
-let _ = { (_: Any) -> Void in // expected-error {{function signature 'Any -> Void' is not compatible with expected type '(Int) -> Void'}}
+_ = { (_: Any) -> Void in // expected-error {{function signature 'Any -> Void' is not compatible with expected type '(Int) -> Void'}}
   return
 } as ((Int) -> Void)
 

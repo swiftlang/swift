@@ -89,10 +89,10 @@ var x3 = [1, 2, 3]
 x3[0] = 4
 
 func trailingComma() {
-  var _ = [1, ]
-  var _ = [1, 2, ]
-  var _ = ["a": 1, ]
-  var _ = ["a": 1, "b": 2, ]
+  _ = [1, ]
+  _ = [1, 2, ]
+  _ = ["a": 1, ]
+  _ = ["a": 1, "b": 2, ]
 }
 
 func longArray() {

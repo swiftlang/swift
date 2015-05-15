@@ -44,28 +44,28 @@ struct Gen<T> {
 }
 
 func unqualifiedType() {
-  let _ = Foo.self
-  let _ = Foo.self
-  let _ = Foo()
-  let _ = Foo.prop
-  let _ = Foo.meth
+  _ = Foo.self
+  _ = Foo.self
+  _ = Foo()
+  _ = Foo.prop
+  _ = Foo.meth
   let _ : () = Foo.meth()
-  let _ = Foo.instMeth
+  _ = Foo.instMeth
 
-  let _ = Foo // expected-error{{expected member name or constructor call after type name}} expected-note{{add arguments}} expected-note{{use '.self'}}
-  let _ = Foo.dynamicType // expected-error{{'.dynamicType' is not allowed after a type name}}
+  _ = Foo // expected-error{{expected member name or constructor call after type name}} expected-note{{add arguments}} expected-note{{use '.self'}}
+  _ = Foo.dynamicType // expected-error{{'.dynamicType' is not allowed after a type name}}
 }
 
 func qualifiedType() {
-  let _ = Foo.Bar.self
-  let _ = Foo.Bar()
-  let _ = Foo.Bar.prop
-  let _ = Foo.Bar.meth
+  _ = Foo.Bar.self
+  _ = Foo.Bar()
+  _ = Foo.Bar.prop
+  _ = Foo.Bar.meth
   let _ : () = Foo.Bar.meth()
-  let _ = Foo.Bar.instMeth
+  _ = Foo.Bar.instMeth
 
-  let _ = Foo.Bar // expected-error{{expected member name or constructor call after type name}} expected-note{{add arguments}} expected-note{{use '.self'}}
-  let _ = Foo.Bar.dynamicType // expected-error{{'.dynamicType' is not allowed after a type name}}
+  _ = Foo.Bar // expected-error{{expected member name or constructor call after type name}} expected-note{{add arguments}} expected-note{{use '.self'}}
+  _ = Foo.Bar.dynamicType // expected-error{{'.dynamicType' is not allowed after a type name}}
 }
 
 /* TODO allow '.Type' in expr context
@@ -79,51 +79,51 @@ func metaType() {
  */
 
 func genType() {
-  let _ = Gen<Foo>.self
-  let _ = Gen<Foo>()
-  let _ = Gen<Foo>.prop
-  let _ = Gen<Foo>.meth
+  _ = Gen<Foo>.self
+  _ = Gen<Foo>()
+  _ = Gen<Foo>.prop
+  _ = Gen<Foo>.meth
   let _ : () = Gen<Foo>.meth()
-  let _ = Gen<Foo>.instMeth
+  _ = Gen<Foo>.instMeth
 
   // Misparses because generic parameter disambiguation rejects '>' not
   // followed by '.' or '('
-  let _ = Gen<Foo> // expected-error{{not a postfix unary operator}}
-  let _ = Gen<Foo>.dynamicType // expected-error{{'.dynamicType' is not allowed after a type name}}
+  _ = Gen<Foo> // expected-error{{not a postfix unary operator}}
+  _ = Gen<Foo>.dynamicType // expected-error{{'.dynamicType' is not allowed after a type name}}
 }
 
 func genQualifiedType() {
-  let _ = Gen<Foo>.Bar.self
-  let _ = Gen<Foo>.Bar()
-  let _ = Gen<Foo>.Bar.prop
-  let _ = Gen<Foo>.Bar.meth
+  _ = Gen<Foo>.Bar.self
+  _ = Gen<Foo>.Bar()
+  _ = Gen<Foo>.Bar.prop
+  _ = Gen<Foo>.Bar.meth
   let _ : () = Gen<Foo>.Bar.meth()
-  let _ = Gen<Foo>.Bar.instMeth
+  _ = Gen<Foo>.Bar.instMeth
 
-  let _ = Gen<Foo>.Bar // expected-error{{expected member name or constructor call after type name}} expected-note{{add arguments}} expected-note{{use '.self'}}
-  let _ = Gen<Foo>.Bar.dynamicType // expected-error{{'.dynamicType' is not allowed after a type name}}
+  _ = Gen<Foo>.Bar // expected-error{{expected member name or constructor call after type name}} expected-note{{add arguments}} expected-note{{use '.self'}}
+  _ = Gen<Foo>.Bar.dynamicType // expected-error{{'.dynamicType' is not allowed after a type name}}
 }
 
 func archetype<T: Zim>(_: T) {
-  let _ = T.self
-  let _ = T()
+  _ = T.self
+  _ = T()
   // TODO let prop = T.prop
-  let _ = T.meth
+  _ = T.meth
   let _ : () = T.meth()
 
-  let _ = T // expected-error{{expected member name or constructor call after type name}} expected-note{{add arguments}} expected-note{{use '.self'}}
-  let _ = T.dynamicType // expected-error{{'.dynamicType' is not allowed after a type name}}
+  _ = T // expected-error{{expected member name or constructor call after type name}} expected-note{{add arguments}} expected-note{{use '.self'}}
+  _ = T.dynamicType // expected-error{{'.dynamicType' is not allowed after a type name}}
 }
 
 func assocType<T: Zim where T.Zang: Zim>(_: T) {
-  let _ = T.Zang.self
-  let _ = T.Zang()
-  // TODO let _ = T.Zang.prop
-  let _ = T.Zang.meth
+  _ = T.Zang.self
+  _ = T.Zang()
+  // TODO _ = T.Zang.prop
+  _ = T.Zang.meth
   let _ : () = T.Zang.meth()
 
-  let _ = T.Zang // expected-error{{expected member name or constructor call after type name}} expected-note{{add arguments}} expected-note{{use '.self'}}
-  let _ = T.Zang.dynamicType // expected-error{{'.dynamicType' is not allowed after a type name}}
+  _ = T.Zang // expected-error{{expected member name or constructor call after type name}} expected-note{{add arguments}} expected-note{{use '.self'}}
+  _ = T.Zang.dynamicType // expected-error{{'.dynamicType' is not allowed after a type name}}
 }
 
 class B {
@@ -135,11 +135,11 @@ class D: B {
 
 func derivedType() {
   let _: B.Type = D.self
-  let _ = D.baseMethod
+  _ = D.baseMethod
   let _ : () = D.baseMethod()
 
   let _: D.Type = D.self
-  let _ = D.derivedMethod
+  _ = D.derivedMethod
   let _ : () = D.derivedMethod()
 
   let _: B.Type = D // expected-error{{expected member name or constructor call after type name}} expected-note{{add arguments}} expected-note{{use '.self'}}
@@ -159,9 +159,9 @@ protocol P {}
 
 func meta_metatypes() {
   let _: P.Protocol = P.self
-  let _ = P.Type.self
-  let _ = P.Protocol.self
-  let _ = P.Protocol.Protocol.self // expected-error{{'Protocol' type only applies to existential types}}
-  let _ = P.Protocol.Type.self
-  let _ = B.Type.self
+  _ = P.Type.self
+  _ = P.Protocol.self
+  _ = P.Protocol.Protocol.self // expected-error{{'Protocol' type only applies to existential types}}
+  _ = P.Protocol.Type.self
+  _ = B.Type.self
 }

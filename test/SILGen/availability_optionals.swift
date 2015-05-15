@@ -5,7 +5,7 @@
 // CHECK-LABEL: sil hidden @_TF22availability_optionals34referenceToAvailableGlobalVariableFT_T_
 func referenceToAvailableGlobalVariable() {
   // A definitely available global variable gets loaded as usual.
-  let _ = globalAvailableOn10_9
+  _ = globalAvailableOn10_9
 
   // CHECK: [[GLOBAL_ADDRESSOR:%.*]] = function_ref @_TF22availability_optionalsau21globalAvailableOn10_9Si : $@convention(thin) () -> Builtin.RawPointer
   // CHECK: [[GLOBAL_POINTER:%.*]] = apply [[GLOBAL_ADDRESSOR]]() : $@convention(thin) () -> Builtin.RawPointer
@@ -16,7 +16,7 @@ func referenceToAvailableGlobalVariable() {
 // CHECK-LABEL: sil hidden @_TF22availability_optionals47referenceToPotentiallyUnavailableGlobalVariableFT_T_
 func referenceToPotentiallyUnavailableGlobalVariable() {
   // A potentially unavailable global variable gets injected into an optional.
-  let _ = globalAvailableOn10_10
+  _ = globalAvailableOn10_10
  
   // Check the required availability.
   // CHECK: [[OPT_ADDR:%.*]] = alloc_stack $Optional<Int> 
@@ -57,7 +57,7 @@ func funcAvailableOn10_10() -> Int { return 10 }
 // CHECK-LABEL: sil hidden @_TF22availability_optionals34referenceToAvailableGlobalFunctionFT_T_
 func referenceToAvailableGlobalFunction() {
   // A definitely available global function gets treated as usual.
-  let _ = funcAvailableOn10_9()
+  _ = funcAvailableOn10_9()
   
   // CHECK: [[FUNC_REF:%.*]] = function_ref @_TF22availability_optionals19funcAvailableOn10_9FT_Si : $@convention(thin) () -> Int // user: %1
   // [[IGNORED:%.*]] = apply [[FUNC_REF]]() : $@convention(thin) () -> Int
@@ -66,7 +66,7 @@ func referenceToAvailableGlobalFunction() {
 // CHECK-LABEL: sil hidden @_TF22availability_optionals47referenceToPotentiallyUnavailableGlobalFunctionFT_T_
 func referenceToPotentiallyUnavailableGlobalFunction() {
   // A potentially unavailable global function gets treated as having optional type.
-  let _ = funcAvailableOn10_10
+  _ = funcAvailableOn10_10
   
   // Check the required availability.
   // CHECK: [[OPT_ADDR:%.*]] = alloc_stack $Optional<() -> Int> 

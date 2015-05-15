@@ -174,7 +174,7 @@ var i1: Int = 1.5 * 3.5 // expected-error{{'Double' is not convertible to 'Int'}
 
 // rdar://problem/18330319
 func rdar18330319(s: String, d: [String : AnyObject]) {
-  let _ = d[s] as! String?
+  _ = d[s] as! String?
 }
 
 // rdar://problem/19551164

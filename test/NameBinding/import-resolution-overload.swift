@@ -33,7 +33,7 @@ localVar = 42 // expected-error {{cannot assign a value of type 'Int' to a value
 localVar(42)  // expected-error {{cannot invoke 'localVar' with an argument list of type '(Int)'}}
 var _ : localVar // should still work
 
-var _ = scopedVar // no-warning
+_ = scopedVar // no-warning
 scopedVar(42) // expected-error {{cannot invoke 'scopedVar' with an argument list of type '(Int)'}}
 
 var _ : Bool = scopedFunction(true)

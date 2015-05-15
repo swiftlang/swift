@@ -24,7 +24,7 @@ class Derived1 : Base1 {
 struct X<T> { }
 
 func testGenericSpec() {
-  let _ = X<[Int]>()
+  _ = X<[Int]>()
 }
 
 // Array types for construction.

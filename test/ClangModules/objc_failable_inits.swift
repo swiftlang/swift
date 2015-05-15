@@ -13,16 +13,16 @@ func testDictionary() {
 func testString() throws {
   // Optional
   let stringOpt = NSString(path: "blah", encoding: 0)
-  let _: NSString = stringOpt // expected-error{{value of optional type 'NSString?' not unwrapped; did you mean to use '!' or '?'?}}
+  _ = stringOpt as NSString // expected-error{{'NSString?' is not convertible to 'NSString'}}
 
   // Implicitly unwrapped optional
   let stringIUO = NSString(path: "blah")
   if stringIUO == nil { }
-  var _: NSString = stringIUO
+  _ = stringIUO as NSString
 }
 
 func testHive() {
   let hiveIUO = Hive()
   if hiveIUO == nil { }
-  var _: Hive = hiveIUO
+  _ = hiveIUO as Hive
 }

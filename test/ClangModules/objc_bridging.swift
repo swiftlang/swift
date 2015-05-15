@@ -26,20 +26,20 @@ extension Set {
 }
 
 func foo() {
-  var _ : (String!) -> String? = NSStringToNSString
-  var _ : String = NSArray().nsstringProperty.onlyOnString()
+  _  = NSStringToNSString as (String!) -> String?
+  _ = NSArray().nsstringProperty.onlyOnString() as String
 
-  var _ : (Bool) -> Bool = BOOLtoBOOL
-  var _ : Bool = NSArray().boolProperty.onlyOnBool()
+  _  = BOOLtoBOOL as (Bool) -> Bool
+  _  = NSArray().boolProperty.onlyOnBool() as Bool
 
-  var _: (Array<AnyObject>!) -> (Array<AnyObject>!) = arrayToArray
+  _  = arrayToArray as (Array<AnyObject>!) -> (Array<AnyObject>!)
   NSArray().arrayProperty.onlyOnArray()
 
-  var _: (Dictionary<NSObject, AnyObject>!) -> Dictionary<NSObject, AnyObject>!
-    = dictToDict
+  _ = dictToDict as (Dictionary<NSObject, AnyObject>!) -> Dictionary<NSObject, AnyObject>!
+
   NSArray().dictProperty.onlyOnDictionary()
 
-  var _ : (Set<NSObject>!) -> Set<NSObject>! = setToSet
+  _ = setToSet as (Set<NSObject>!) -> Set<NSObject>!
   NSArray().setProperty.onlyOnSet()
 }
 
@@ -57,5 +57,5 @@ func mutablePointerToObjC(path: String) throws -> NSString {
 
 func objcStructs(s: StructOfNSStrings) {
   // Struct fields must not be bridged.
-  let _: NSString = s.nsstr!
+  _ = s.nsstr! as NSString
 }

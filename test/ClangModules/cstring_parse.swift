@@ -12,5 +12,5 @@
 import cfuncs
 
 func test_puts(s: String) {
-  var _ = puts(s) + 32
+  _ = puts(s) + 32
 }

@@ -52,5 +52,5 @@ func nonTrivialNested() {
 
   f1 = { f2($0) } // okay
   f1 = f3 // expected-error{{annot assign a value of type '(() -> FormattedPrintable) -> CustomStringConvertible' to a value of type '(() -> CustomStringConvertible) -> CustomStringConvertible'}}
-  let _ = f1
+  _ = f1
 }

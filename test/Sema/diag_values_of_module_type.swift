@@ -36,7 +36,7 @@ protocol GoodProtocol1 : diag_values_of_module_type_foo.SomeProtocol {
 typealias GoodTypealias1 = Swift.Int
 
 func goodTest1() {
-  var _ = Swift.Int(zero)
+  _ = Swift.Int(zero)
 
   var _ : diag_values_of_module_type_foo.SomeClass
   var _ : diag_values_of_module_type_foo.SomeClass.NestedClass
@@ -45,21 +45,21 @@ func goodTest1() {
   var _ : diag_values_of_module_type_foo.SomeExistential
   var _ : diag_values_of_module_type_foo.SomeTypealias
 
-  var _ = diag_values_of_module_type_foo.SomeClass()
-  var _ = diag_values_of_module_type_foo.SomeClass.NestedClass()
-  var _ = diag_values_of_module_type_foo.SomeClass.staticFunc1
-  var _ = diag_values_of_module_type_foo.SomeClass.staticFunc1()
-  var _ = diag_values_of_module_type_foo.SomeClass.staticVar1
-  var _ = diag_values_of_module_type_foo.SomeStruct()
-  var _ = diag_values_of_module_type_foo.SomeEnum.Foo
+  _ = diag_values_of_module_type_foo.SomeClass()
+  _ = diag_values_of_module_type_foo.SomeClass.NestedClass()
+  _ = diag_values_of_module_type_foo.SomeClass.staticFunc1
+  _ = diag_values_of_module_type_foo.SomeClass.staticFunc1()
+  _ = diag_values_of_module_type_foo.SomeClass.staticVar1
+  _ = diag_values_of_module_type_foo.SomeStruct()
+  _ = diag_values_of_module_type_foo.SomeEnum.Foo
   // Can not default-construct a protocol.
-  // var _ = diag_values_of_module_type_foo.SomeExistential()
-  var _ = diag_values_of_module_type_foo.SomeTypealias()
+  // _ = diag_values_of_module_type_foo.SomeExistential()
+  _ = diag_values_of_module_type_foo.SomeTypealias()
 
-  var _ = diag_values_of_module_type_foo.someGlobal
+  _ = diag_values_of_module_type_foo.someGlobal
   diag_values_of_module_type_foo.someGlobal = 42
 
-  var _ = diag_values_of_module_type_foo.someFunc
+  _ = diag_values_of_module_type_foo.someFunc
   diag_values_of_module_type_foo.someFunc()
 }
 
@@ -105,10 +105,10 @@ func badTest5() {
 }
 func badTest6() {
   // FIXME: should be only a single diagnostic.
-  var _ = { () -> Int in
-            var _ = Swift // expected-error 2{{expected module member name after module name}}
+  _ = { () -> Int in
+            _ = Swift // expected-error 2{{expected module member name after module name}}
             return 42 }()
-  var _ = { Swift }() // expected-error {{expected module member name after module name}}
-  var _ = { { Swift }() }() // expected-error {{expected module member name after module name}}
+  _ = { Swift }() // expected-error {{expected module member name after module name}}
+  _ = { { Swift }() }() // expected-error {{expected module member name after module name}}
 }
 

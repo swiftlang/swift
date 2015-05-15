@@ -28,7 +28,7 @@ struct Yes {}
 func isRandomAccessIndex<T : ForwardIndexType>(_: T) -> No { return No() }
 func isRandomAccessIndex<T : RandomAccessIndexType>(_: T) -> Yes { return Yes() }
 let no = isRandomAccessIndex("".utf16.startIndex)
-let _: No = no
+_ = no as No
 
 //===--- Tests ------------------------------------------------------------===//
 

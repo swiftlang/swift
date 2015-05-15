@@ -205,7 +205,7 @@ extension SomeClass {
 
   func strong_in_capture_list() {
     // <rdar://problem/18819742> QOI: "[strong self]" in capture list generates unhelpful error message
-    var _ = {[strong self] () -> () in return }  // expected-error {{expected 'weak', 'unowned', or no specifier in capture list}}
+    _ = {[strong self] () -> () in return }  // expected-error {{expected 'weak', 'unowned', or no specifier in capture list}}
   }
 }
 
@@ -214,10 +214,10 @@ extension SomeClass {
 var closureWithObservedProperty: () -> () = {
   var a: Int = 42 {
   willSet {
-    let _ = "Will set a to \(newValue)"
+    _ = "Will set a to \(newValue)"
   }
   didSet {
-    let _ = "Did set a with old value of \(oldValue)"
+    _ = "Did set a with old value of \(oldValue)"
   }
   }
 }
@@ -251,7 +251,7 @@ takesVoidFunc({()->Int in 0}) // expected-error {{cannot invoke 'takesVoidFunc' 
 
 // These used to crash the compiler, but were fixed to support the implemenation of rdar://problem/17228969
 Void(0) // expected-error{{cannot invoke initializer for type 'Void' with an argument list of type '(Int)'}}
-var _ = {0}
+_ = {0}
 
 let samples = { // expected-error{{unable to infer closure type in the current context}} expected-note{{multi-statement closures require an explicit return type}}
           if (i > 10) { return true }

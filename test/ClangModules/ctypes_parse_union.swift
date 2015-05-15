@@ -48,8 +48,8 @@ func useStructWithBitfields(mrm: ModRM) -> ModRM {
 // Incompletely imported structs shouldn't have elementwise initializers.
 // They can still be zero-initialized using the default initializer.
 func constructStructWithBitfields(x: CUnsignedInt) {
-  let _: StructWithBitfields = StructWithBitfields()
-  let _: StructWithBitfields = StructWithBitfields(First: x) // expected-error{{}}
+  _ = StructWithBitfields() as StructWithBitfields
+  _ = StructWithBitfields(First: x) as StructWithBitfields// expected-error{{}}
   // TODO: Fully import bitfields.
-  let _: StructWithBitfields = StructWithBitfields(First: x, Second: x, Third: x) // expected-error{{}}
+  _ = StructWithBitfields(First: x, Second: x, Third: x) as StructWithBitfields// expected-error{{}}
 }

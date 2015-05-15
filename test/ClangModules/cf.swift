@@ -37,7 +37,7 @@ func test4() {
 func test5() {
   let power: Unmanaged<CCPowerSupply> = .passUnretained(kCCPowerStandard)
   assertUnmanaged(power)
-  let _ = CCRefrigeratorCreate(power.takeUnretainedValue())
+  _ = CCRefrigeratorCreate(power.takeUnretainedValue())
 }
 
 func test6() {
@@ -51,8 +51,8 @@ func test7() {
 }
 
 func test8(f: CCRefrigerator) {
-  let _: CFTypeRef = f
-  let _: AnyObject = f
+  _ = f as CFTypeRef
+  _ = f as AnyObject
 }
 
 func test9() {
@@ -73,24 +73,24 @@ func testProperty(k: Kitchen) {
 }
 
 func testTollFree0(mduct: MutableDuct) {
-  let _: CCMutableDuct = mduct
+  _ = mduct as CCMutableDuct
 
-  let duct: Duct = mduct
-  let _: CCDuct = duct
+  let duct = mduct as Duct
+  _ = duct as CCDuct
 }
 
 func testTollFree1(ccmduct: CCMutableDuct) {
-  let _: MutableDuct = ccmduct
+  _ = ccmduct as MutableDuct
 
   let ccduct: CCDuct = ccmduct
-  let _: Duct = ccduct
+  _ = ccduct as Duct
 }
 
 func testChainedAliases(fridge: CCRefrigerator) {
-  let _: CCRefrigeratorRef = fridge
+  _ = fridge as CCRefrigeratorRef
 
-  let _: CCFridge = fridge
-  let _: CCFridgeRef = fridge
+  _ = fridge as CCFridge
+  _ = fridge as CCFridgeRef
 }
 
 func testBannedImported(object: CCOpaqueTypeRef) {

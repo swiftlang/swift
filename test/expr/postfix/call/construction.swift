@@ -41,21 +41,21 @@ func getMetatype<T>(m : T.Type) -> T.Type { return m }
 
 // Construction from a struct Type value
 func constructStructMetatypeValue() {
-  var _ = getMetatype(S.self)(i: 5)
-  var _ = getMetatype(S.self)
+  _ = getMetatype(S.self)(i: 5)
+  _ = getMetatype(S.self)
 }
 
 // Construction from a struct Type value
 func constructEnumMetatypeValue() {
-  var _ = getMetatype(E.self)(i: 5)
+  _ = getMetatype(E.self)(i: 5)
 }
 
 // Construction from a class Type value.
 func constructClassMetatypeValue() {
   // Only permitted with a @required constructor.
-  var _ = getMetatype(C.self)(d: 1.5) // okay
-  var _ = getMetatype(C.self)(i: 5) // expected-error{{constructing an object of class type 'C' with a metatype value must use a 'required' initializer}}
-  var _ = getMetatype(D.self)(i: 5)
+  _ = getMetatype(C.self)(d: 1.5) // okay
+  _ = getMetatype(C.self)(i: 5) // expected-error{{constructing an object of class type 'C' with a metatype value must use a 'required' initializer}}
+  _ = getMetatype(D.self)(i: 5)
 }
 
 // --------------------------------------------------------------------------
@@ -83,12 +83,12 @@ protocol P2 {
 }
 
 func constructExistentialValue(pm: P.Type) {
-  var _ = pm()
-  var _ = P() // expected-error{{constructing an object of protocol type 'P' requires a metatype value}}
+  _ = pm()
+  _ = P() // expected-error{{constructing an object of protocol type 'P' requires a metatype value}}
 }
 
 typealias P1_and_P2 = protocol<P, P2>
 func constructExistentialCompositionValue(pm: protocol<P, P2>.Type) {
-  var _ = pm(int: 5)
-  var _ = P1_and_P2(int: 5) // expected-error{{constructing an object of protocol type 'P1_and_P2' requires a metatype value}}
+  _ = pm(int: 5)
+  _ = P1_and_P2(int: 5) // expected-error{{constructing an object of protocol type 'P1_and_P2' requires a metatype value}}
 }

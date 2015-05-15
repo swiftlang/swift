@@ -7,7 +7,7 @@
 
 func testFuncsNegative() {
   let x = f1()
-  let _ = f1()
+  _ = f1()
   _ = f1()
   for _ in f1() { }
   _ = x
@@ -45,7 +45,7 @@ struct Inits1 {
 }
 
 func testInitsPositive() {
-  let _ = Inits1()
+  _ = Inits1()
   Inits1() // expected-warning{{result of call to 'init()' is unused}}
 }
 

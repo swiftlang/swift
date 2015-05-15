@@ -212,7 +212,7 @@ func callerOfDefaultParams(@noescape g: () -> ()) {
 class NoEscapeImmediatelyApplied {
   func f() {
     // Shouldn't require "self.", the closure is obviously @noescape.
-    let _ = { return ivar }()
+    _ = { return ivar }()
   }
   
   final var ivar  = 42

@@ -15,23 +15,23 @@ func checkRawRepresentable<T: RawRepresentable>(_: T) {}
 func testColor() {
   var c: Color = red
   c = blue
-  let _ = c.rawValue
+  _ = c.rawValue
   checkRawRepresentable(c)
 }
 
 func testTribool() {
   var b = Indeterminate
   b = True
-  let _ = b.rawValue
+  _ = b.rawValue
 }
 
 func testAnonEnum() {
   var a = AnonConst1
   a = AnonConst2
 #if arch(i386) || arch(arm)
-  var _: CUnsignedLongLong = a
+  _ = a as CUnsignedLongLong
 #elseif arch(x86_64) || arch(arm64)
-  var _: CUnsignedLong = a
+  _ = a as CUnsignedLong
 #else
   __portMe()
 #endif
@@ -40,7 +40,7 @@ func testAnonEnum() {
 func testAnonEnumSmall() {
   var a = AnonConstSmall1
   a = AnonConstSmall2
-  var _: Int = a
+  _ = a as Int
 }
 
 func testPoint() -> Float {
@@ -56,8 +56,8 @@ func testAnonStructs() {
   a_s.c = 7.5
 }
 
-func testBitfieldMembers() {
-  var _: StructWithBitfields
+func testBitfieldMembers() -> StructWithBitfields {
+  return StructWithBitfields()
   // TODO: Expose the bitfields as properties.
 }
 
@@ -81,9 +81,9 @@ func testArrays() {
 // FIXME: Import pointers to opaque types as unique types.
 
 func testPointers() {
-  var _: HWND = nil
+  _ = nil as HWND
   let cfstr: CFString? = nil
-  var _: CFTypeRef? = cfstr
+  _ = cfstr as CFTypeRef?
 }
 
 // Ensure that imported structs can be extended, even if typedef'ed on the C
@@ -178,19 +178,19 @@ func testImportStddefTypes() {
   let t2_unqual: Int = size_t_test
   let t3_unqual: Int = rsize_t_test
 
-  let _: ctypes.ptrdiff_t = t1_unqual
-  let _: ctypes.size_t = t2_unqual
-  var _: ctypes.rsize_t = t3_unqual
+  _ = t1_unqual as ctypes.ptrdiff_t
+  _ = t2_unqual as ctypes.size_t
+  _ = t3_unqual as ctypes.rsize_t
 }
 
 func testImportSysTypesTypes() {
   let t1_unqual: Int = ssize_t_test
-  var _: ctypes.ssize_t = t1_unqual
+  _ = t1_unqual as ctypes.ssize_t
 }
 
 func testImportCFTypes() {
   let t1_unqual: Int = CFIndex_test
-  var _: CoreFoundation.CFIndex = t1_unqual
+  _ = t1_unqual as CoreFoundation.CFIndex
 }
 
 func testImportOSTypesTypes() {
@@ -245,12 +245,12 @@ func testFunctionPointers() {
   let fp = getFunctionPointer()
   useFunctionPointer(fp)
 
-  let _: @convention(c) (CInt) -> CInt = fp
+  _ = fp as (@convention(c) (CInt) -> CInt)
 
   let wrapper: FunctionPointerWrapper = FunctionPointerWrapper(a: nil, b: nil)
-  let _ = FunctionPointerWrapper(a: fp, b: fp)
+  _ = FunctionPointerWrapper(a: fp, b: fp)
   useFunctionPointer(wrapper.a)
-  let _: @convention(c) (CInt) -> CInt = wrapper.b
+  _ = wrapper.b as (@convention(c) (CInt) -> CInt)
 
   var anotherFP: @convention(c) (CInt, CLong, UnsafeMutablePointer<Void>) -> Void
     = getFunctionPointer2()

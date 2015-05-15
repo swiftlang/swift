@@ -5,7 +5,7 @@
 
 func foo() { // expected-note {{to match this opening '{'}}
 #if BLAH
-  var _ = 123;
+  _ = 123
 #elseif !BLAH
 #else
 // expected-error@+2{{expected '}' at end of brace statement}}

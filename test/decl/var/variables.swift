@@ -12,7 +12,7 @@ var (x = 123, // expected-error 2 {{expected ',' separator}} expected-error {{ex
      y = 456) : (Int,Int) // expected-error 2 {{expected ',' separator}} expected-error {{expected pattern}}
 var bfx : Int, bfy : Int
 
-var _ = 10
+_ = 10
 
 func _(x: Int) {} // expected-error {{expected identifier in function declaration}}
 

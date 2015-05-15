@@ -25,7 +25,7 @@ func test_unavailable_func(x : NSObject) {
 }
 
 func test_deprecated_imported_as_unavailable(s:UnsafeMutablePointer<CChar>) {
-  let _ = tmpnam(s) // expected-warning {{'tmpnam' is deprecated: Due to security concerns inherent in the design of tmpnam(3), it is highly recommended that you use mkstemp(3) instead.}}
+  _ = tmpnam(s) // expected-warning {{'tmpnam' is deprecated: Due to security concerns inherent in the design of tmpnam(3), it is highly recommended that you use mkstemp(3) instead.}}
 }
 
 func test_NSInvocation(x: NSInvocation,         // expected-error {{'NSInvocation' is unavailable}}
@@ -40,7 +40,7 @@ func test_class_avail(x:NSObject, obj: AnyObject) {
 
 func test_unavailable_app_extension() {
   // No expected error here.  See corresponding App extension test.
-  let _ = SomeCrazyAppExtensionForbiddenAPI() // no-error
+  _ = SomeCrazyAppExtensionForbiddenAPI() // no-error
 }
 
 func test_swift_unavailable() {

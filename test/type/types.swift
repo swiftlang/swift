@@ -48,21 +48,21 @@ func bad_io2(a: (inout Int, Int)) {}    // expected-error {{'inout' is only vali
 
 // <rdar://problem/15588967> Array type sugar default construction syntax doesn't work
 func test_array_construct<T>(_: T) {
-  var _ = [T]()   // 'T' is a local name
-  var _ = [Int]()  // 'Int is a global name'
-  var _ = [UnsafeMutablePointer<Int>]()  // UnsafeMutablePointer<Int> is a specialized name.
-  var _ = [UnsafeMutablePointer<Int?>]()  // Nesting.
-  var _ = [([UnsafeMutablePointer<Int>])]()
-  var _ = [(String, Float)]()
+  _ = [T]()   // 'T' is a local name
+  _ = [Int]()  // 'Int is a global name'
+  _ = [UnsafeMutablePointer<Int>]()  // UnsafeMutablePointer<Int> is a specialized name.
+  _ = [UnsafeMutablePointer<Int?>]()  // Nesting.
+  _ = [([UnsafeMutablePointer<Int>])]()
+  _ = [(String, Float)]()
 
   
 }
 
 // <rdar://problem/15295763> default constructing an optional fails to typecheck
 func test_optional_construct<T>(_: T) {
-  var _ = T?()    // Local name.
-  var _ = Int?()  // Global name
-  var _ = (Int?)() // Parenthesized name.
+  _ = T?()    // Local name.
+  _ = Int?()  // Global name
+  _ = (Int?)() // Parenthesized name.
 }
 
 // Test disambiguation of generic parameter lists in expression context.

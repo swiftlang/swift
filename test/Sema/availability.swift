@@ -44,7 +44,7 @@ func testInit() {
 }
 
 func testSuvscript(cwu: ClassWithUnavailable) {
-  let _ = cwu[5] // expected-error{{'subscript' is unavailable}}
+  _ = cwu[5] // expected-error{{'subscript' is unavailable}}
 }
 
 /* FIXME 'nil == a' fails to type-check with a bogus error message

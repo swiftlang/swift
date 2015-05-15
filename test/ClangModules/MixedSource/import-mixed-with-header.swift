@@ -17,14 +17,14 @@
 import MixedWithHeader
 
 func testReexportedClangModules(foo : FooProto) {
-  let _: CInt = foo.bar
-  let _: CInt = ExternIntX.x
+  _ = foo.bar as CInt
+  _ = ExternIntX.x as CInt
 }
 
 func testCrossReferences(derived: Derived) {
   let obj: Base = derived
-  let _: NSObject = obj.safeOverride(ForwardClass())
-  let _: NSObject = obj.safeOverrideProto(ForwardProtoAdopter())
+  _ = obj.safeOverride(ForwardClass()) as NSObject
+  _ = obj.safeOverrideProto(ForwardProtoAdopter()) as NSObject
 
   testProtocolWrapper(ProtoConformer())
   testStruct(Point(x: 2,y: 3))

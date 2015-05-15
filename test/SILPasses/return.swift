@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend %s -emit-sil -verify
 
 func singleBlock() -> Int {
-  var _ = 0
+  _ = 0
 } // expected-error {{missing return in a function expected to return 'Int'}}
 
 func singleBlock2() -> Int {
@@ -44,7 +44,7 @@ func multipleBlocksAllMissing(x: Int) -> Int {
 }
 
 @noreturn func implicitReturnWithinNoreturn() {
-  var _ = 0
+  _ = 0
 }// expected-error {{return from a 'noreturn' function}}
 
 func diagnose_missing_return_in_the_else_branch(i: Bool) -> Int {

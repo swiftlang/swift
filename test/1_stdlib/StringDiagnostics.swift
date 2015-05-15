@@ -6,17 +6,17 @@ import Foundation
 
 // Common pitfall: trying to subscript a string with integers.
 func testIntSubscripting(s: String, i: Int) {
-  let _ = s[i] // expected-error{{'subscript' is unavailable: cannot subscript String with an Int}}
-  let _ = s[17] // expected-error{{'subscript' is unavailable: cannot subscript String with an Int}}
-  let _ = s[i...i] // expected-error{{subscript' is unavailable: cannot subscript String with a range of Int}}
-  let _ = s[17..<20] // expected-error{{subscript' is unavailable: cannot subscript String with a range of Int}}
-  let _ = s[17...20] // expected-error{{subscript' is unavailable: cannot subscript String with a range of Int}}
+  _ = s[i] // expected-error{{'subscript' is unavailable: cannot subscript String with an Int}}
+  _ = s[17] // expected-error{{'subscript' is unavailable: cannot subscript String with an Int}}
+  _ = s[i...i] // expected-error{{subscript' is unavailable: cannot subscript String with a range of Int}}
+  _ = s[17..<20] // expected-error{{subscript' is unavailable: cannot subscript String with a range of Int}}
+  _ = s[17...20] // expected-error{{subscript' is unavailable: cannot subscript String with a range of Int}}
 }
 
 func testNonAmbiguousStringComparisons() {
   let names = ["Chris", "Alex", "Ewa", "Barry", "Daniella"]
-  var _ = sorted(names, { s1, s2 in s1 > s2 })
-  var _ = sorted(names, { s1, s2 in s1 as String > s2 })
+  _ = sorted(names, { s1, s2 in s1 > s2 })
+  _ = sorted(names, { s1, s2 in s1 as String > s2 })
 }
 
 func testAmbiguousStringComparisons(s: String) {

@@ -4,9 +4,9 @@
 
 import Security
 
-let _: CFStringRef = kSecClass
-let _: CFStringRef = kSecClassGenericPassword
-let _: CFDictionaryRef = kSecClassGenericPassword // expected-error {{'CFStringRef' is not convertible to 'CFDictionaryRef'}}
+_ = kSecClass as CFStringRef
+_ = kSecClassGenericPassword as CFStringRef
+_ = kSecClassGenericPassword as CFDictionaryRef // expected-error {{'CFStringRef' is not convertible to 'CFDictionaryRef'}}
 
 func testIntegration() {
   // Based on code in <rdar://problem/17162475>.

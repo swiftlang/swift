@@ -63,16 +63,16 @@ func testBridgeIsa(obj: AnyObject, objOpt: AnyObject?,
 func testBridgeDowncastSuperclass(obj: NSObject, objOpt: NSObject?,
                                   objImplicitOpt: NSObject!) 
        -> BridgedStruct? {
-  var _ = obj as? BridgedStruct
-  var _ = objOpt as? BridgedStruct
-  var _ = objImplicitOpt as? BridgedStruct
+  _ = obj as? BridgedStruct
+  _ = objOpt as? BridgedStruct
+  _ = objImplicitOpt as? BridgedStruct
 }
 
 func testBridgeDowncastExact(obj: BridgedClass, objOpt: BridgedClass?,
                              objImplicitOpt: BridgedClass!) -> BridgedStruct? {
-  var _ = obj as? BridgedStruct // expected-warning{{conditional cast from 'BridgedClass' to 'BridgedStruct' always succeeds}}
-  var _ = objOpt as? BridgedStruct
-  var _ = objImplicitOpt as? BridgedStruct // expected-warning{{conditional cast from 'BridgedClass!' to 'BridgedStruct' always succeeds}}
+  _ = obj as? BridgedStruct // expected-warning{{conditional cast from 'BridgedClass' to 'BridgedStruct' always succeeds}}
+  _ = objOpt as? BridgedStruct
+  _ = objImplicitOpt as? BridgedStruct // expected-warning{{conditional cast from 'BridgedClass!' to 'BridgedStruct' always succeeds}}
 }
 
 func testExplicitBridging(var object: BridgedClass, var value: BridgedStruct) {
@@ -81,6 +81,6 @@ func testExplicitBridging(var object: BridgedClass, var value: BridgedStruct) {
 }
 
 func testBridgingFromSubclass(obj: SubclassOfBridgedClass) {
-  var _ = obj as! BridgedStruct // expected-warning{{forced cast from 'SubclassOfBridgedClass' to 'BridgedStruct' always succeeds; did you mean to use 'as'?}}
-  var _ = obj as BridgedStruct
+  _ = obj as! BridgedStruct // expected-warning{{forced cast from 'SubclassOfBridgedClass' to 'BridgedStruct' always succeeds; did you mean to use 'as'?}}
+  _ = obj as BridgedStruct
 }

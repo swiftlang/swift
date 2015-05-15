@@ -49,7 +49,7 @@ struct X3<T> {
 }
 
 func testX3(var x: Int) {
-  var _ = X3({ x = $0 })
+  _ = X3({ x = $0 })
 }
 
 // <rdar://problem/13811882>

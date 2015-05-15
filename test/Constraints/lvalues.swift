@@ -129,7 +129,7 @@ d = z[0]
 
 // regressions with subscripts that return generic types
 var xs:[X]
-var _ = xs[0].property
+_ = xs[0].property
 
 struct A<T> {
     subscript(i: Int) -> T { get {} }
@@ -141,7 +141,7 @@ struct B {
 
 var a:A<B>
 
-var _ = a[0][0]
+_ = a[0][0]
 
 // Instance members of struct metatypes.
 struct FooStruct {

@@ -32,19 +32,19 @@ func extensionReferences(x: Foo) {
   // CHECK: function_ref @_TFC10extensions3Foo4zangfS0_FT_T_
   x.zang()
   // CHECK: function_ref @_TFC10extensions3Foog7zippitySi
-  let _ = x.zippity
+  _ = x.zippity
 
   // dynamic extension methods are still dynamically dispatched.
   // CHECK: class_method [volatile] %0 : $Foo, #Foo.kay!1.foreign
   x.kay()
   // CHECK: class_method [volatile] %0 : $Foo, #Foo.cox!getter.1.foreign
-  let _ = x.cox
+  _ = x.cox
 
 }
 
 func extensionMethodCurrying(x: Foo) {
-  let _ = x.zang
-  let _ = x.kay
+  _ = x.zang
+  _ = x.kay
 }
 
 // CHECK-LABEL: sil shared @_TFC10extensions3Foo4zangFS0_FT_T_

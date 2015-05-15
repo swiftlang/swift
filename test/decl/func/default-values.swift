@@ -88,4 +88,4 @@ class SomeClass3 {
   init(x: Int = 5, y: Int = 5) {}
 }
 class SomeDerivedClass3 : SomeClass3 {}
-let _ = SomeDerivedClass3()
+_ = SomeDerivedClass3()

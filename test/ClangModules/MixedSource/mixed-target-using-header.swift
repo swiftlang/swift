@@ -3,8 +3,8 @@
 // REQUIRES: objc_interop
 
 func test(foo : FooProto) {
-  let _: CInt = foo.bar
-  let _: CInt = ExternIntX.x
+  _ = foo.bar as CInt
+  _ = ExternIntX.x as CInt
 }
 
 
@@ -50,10 +50,10 @@ func testSuppressed() {
 }
 
 func testMacro() {
-  let _: CInt = CONSTANT
+  _ = CONSTANT as CInt
 }
 
 func testFoundationOverlay() {
-  let _ = NSUTF8StringEncoding // no ambiguity
-  let _: UInt = NSUTF8StringEncoding // and we should get the overlay version
+  _ = NSUTF8StringEncoding // no ambiguity
+  _ = NSUTF8StringEncoding as UInt // and we should get the overlay version
 }

@@ -230,7 +230,7 @@ func for_each_loop(x: [C]) {
   for i in x {
     use(i)
   }
-  var _ = 0
+  _ = 0
 }
 
 // <rdar://problem/16650625>

@@ -239,8 +239,8 @@ func test_lambda2() {
 }
 
 func test_floating_point() {
-  var _ = 0.0
-  var _ = 100.1
+  _ = 0.0
+  _ = 100.1
   var _: Float = 0.0
   var _: Double = 0.0
 }
@@ -312,10 +312,10 @@ markUsed((tupleelemvar, tupleelemvar).1)
 
 func int_literals() {
   // Fits exactly in 64-bits - rdar://11297273
-  var _ = 1239123123123123
+  _ = 1239123123123123
   // Overly large integer.
   // FIXME: Should warn about it. <rdar://problem/14070127>
-  var _ = 123912312312312312312
+  _ = 123912312312312312312
   
 }
 
@@ -540,8 +540,8 @@ func..<(x: Double, y: Double) -> Double {
 }
 
 func iterators() {
-  var _ = 0..<42
-  var _ = 0.0..<42.0
+  _ = 0..<42
+  _ = 0.0..<42.0
 }
 
 //===----------------------------------------------------------------------===//

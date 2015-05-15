@@ -14,8 +14,8 @@ func f4<T>(x: T, y: T) { }
 func f5<T, U>(x: T, y: U) {
   struct Local { // expected-error {{type 'Local' nested in generic function 'f5' is not allowed}}
     func f() {
-      var _ : T = 17 // expected-error{{'Int' is not convertible to 'T'}}
-      var _ : U = 17 // okay: refers to 'U' declared within the local class
+      _ = 17 as T // expected-error{{'Int' is not convertible to 'T'}}
+      _ = 17 as U // okay: refers to 'U' declared within the local class
     }
     typealias U = Int
   }

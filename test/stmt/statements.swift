@@ -211,20 +211,20 @@ func VoidReturn3() {
 
 func IfStmt1() {
   if 1 > 0 // expected-error {{expected '{' after 'if' condition}}
-  var _ = 42
+  _ = 42
 }
 
 func IfStmt2() {
   if 1 > 0 {
   } else // expected-error {{expected '{' after 'else'}}
-  let _ = 42
+  _ = 42
 }
 
 //===--- While statement.
 
 func WhileStmt1() {
   while 1 > 0 // expected-error {{expected '{' after 'while' condition}}
-  var _ = 42
+  _ = 42
 }
 
 //===-- Do statement.

@@ -7,7 +7,7 @@
 func basicTests() -> Int {
   let x = 42 // expected-warning {{immutable value 'x' was never used; consider replacing with assignment to '_' or removing it}}
   var y = 12 // expected-warning {{variable 'y' was never mutated; consider changing to 'let' constant}}
-  let _ = 42 // ok
+  _ = 42 // ok
   _ = 42 // ok
   return y
 }
