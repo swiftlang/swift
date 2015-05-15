@@ -34,6 +34,7 @@ class ClangModuleUnit final : public LoadedFile {
   ClangImporter &owner;
   const clang::Module *clangModule;
   llvm::PointerIntPair<ModuleDecl *, 1, bool> adapterModule;
+  mutable ArrayRef<Module::ImportedModule> importedModulesForLookup;
 
   ~ClangModuleUnit() = default;
 
@@ -79,6 +80,9 @@ public:
   virtual void
   getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &imports,
                      ModuleDecl::ImportFilter filter) const override;
+
+  virtual void getImportedModulesForLookup(
+      SmallVectorImpl<ModuleDecl::ImportedModule> &imports) const override;
 
   virtual void
   collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const override;

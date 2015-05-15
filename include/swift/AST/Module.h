@@ -422,6 +422,14 @@ public:
   void getImportedModules(SmallVectorImpl<ImportedModule> &imports,
                           ImportFilter filter = ImportFilter::Public) const;
 
+  /// Looks up which modules are imported by this module, ignoring any that
+  /// won't contain top-level decls.
+  ///
+  /// This is a performance hack. Do not use for anything but name lookup.
+  /// May go away in the future.
+  void
+  getImportedModulesForLookup(SmallVectorImpl<ImportedModule> &imports) const;
+
   /// Finds all top-level decls of this module.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
@@ -451,6 +459,9 @@ public:
   ///
   /// This only includes modules with at least one declaration visible: if two
   /// import access paths are incompatible, the indirect module will be skipped.
+  /// Modules that can't be used for lookup (including Clang submodules at the
+  /// time this comment was written) are also skipped under certain
+  /// circumstances.
   ///
   /// \param topLevelAccessPath If present, include the top-level module in the
   ///        results, with the given access path.
@@ -674,6 +685,12 @@ public:
   virtual void
   getImportedModules(SmallVectorImpl<ModuleDecl::ImportedModule> &imports,
                      ModuleDecl::ImportFilter filter) const {}
+
+  /// \see Module::getImportedModulesForLookup
+  virtual void getImportedModulesForLookup(
+      SmallVectorImpl<ModuleDecl::ImportedModule> &imports) const {
+    return getImportedModules(imports, ModuleDecl::ImportFilter::Public);
+  }
 
   /// Generates the list of libraries needed to link this file, based on its
   /// imports.

@@ -2584,77 +2584,6 @@ static int pointerPODSortComparator(T * const *lhs, T * const *rhs) {
 }
 
 
-void ClangModuleUnit::getImportedModules(
-    SmallVectorImpl<Module::ImportedModule> &imports,
-    Module::ImportFilter filter) const {
-  if (filter != Module::ImportFilter::Public)
-    imports.push_back({Module::AccessPathTy(),
-                       getASTContext().getStdlibModule()});
-
-  if (!clangModule) {
-    // This is the special "imported headers" module.
-    if (filter != Module::ImportFilter::Private) {
-      imports.append(owner.Impl.ImportedHeaderExports.begin(),
-                     owner.Impl.ImportedHeaderExports.end());
-    }
-    return;
-  }
-
-  auto topLevelAdapter = getAdapterModule();
-
-  SmallVector<clang::Module *, 8> imported;
-  clangModule->getExportedModules(imported);
-  if (filter != Module::ImportFilter::Public) {
-    if (filter == Module::ImportFilter::All) {
-      llvm::SmallPtrSet<clang::Module *, 8> knownModules;
-      imported.append(clangModule->Imports.begin(), clangModule->Imports.end());
-      imported.erase(std::remove_if(imported.begin(), imported.end(),
-                                    [&](clang::Module *mod) -> bool {
-                                      return !knownModules.insert(mod).second;
-                                    }),
-                     imported.end());
-    } else {
-      llvm::SmallPtrSet<clang::Module *, 8> knownModules(imported.begin(),
-                                                         imported.end());
-      SmallVector<clang::Module *, 8> privateImports;
-      std::copy_if(clangModule->Imports.begin(), clangModule->Imports.end(),
-                   std::back_inserter(privateImports), [&](clang::Module *mod) {
-                     return knownModules.count(mod) == 0;
-      });
-      imported.swap(privateImports);
-    }
-
-    // FIXME: The parent module isn't exactly a private import, but it is
-    // needed for link dependencies.
-    if (clangModule->Parent)
-      imported.push_back(clangModule->Parent);
-  }
-
-  for (auto importMod : imported) {
-    auto wrapper = owner.Impl.getWrapperForModule(owner, importMod);
-
-    auto actualMod = wrapper->getAdapterModule();
-    if (!actualMod) {
-      // HACK: Deal with imports of submodules by importing the top-level module
-      // as well.
-      auto importTopLevel = importMod->getTopLevelModule();
-      if (importTopLevel != importMod &&
-          importTopLevel != clangModule->getTopLevelModule()) {
-        auto topLevelWrapper = owner.Impl.getWrapperForModule(owner,
-                                                              importTopLevel);
-        imports.push_back({ Module::AccessPathTy(),
-                            topLevelWrapper->getParentModule() });
-      }
-      actualMod = wrapper->getParentModule();
-    } else if (actualMod == topLevelAdapter) {
-      actualMod = wrapper->getParentModule();
-    }
-
-    assert(actualMod && "Missing imported adapter module");
-    imports.push_back({Module::AccessPathTy(), actualMod});
-  }
-}
-
 static void lookupClassMembersImpl(ClangImporter::Implementation &Impl,
                                    VisibleDeclConsumer &consumer,
                                    DeclName name) {
@@ -2937,3 +2866,151 @@ Module *ClangModuleUnit::getAdapterModule() const {
 
   return adapterModule.getPointer();
 }
+
+void ClangModuleUnit::getImportedModules(
+    SmallVectorImpl<Module::ImportedModule> &imports,
+    Module::ImportFilter filter) const {
+  if (filter != Module::ImportFilter::Public)
+    imports.push_back({Module::AccessPathTy(),
+                       getASTContext().getStdlibModule()});
+
+  if (!clangModule) {
+    // This is the special "imported headers" module.
+    if (filter != Module::ImportFilter::Private) {
+      imports.append(owner.Impl.ImportedHeaderExports.begin(),
+                     owner.Impl.ImportedHeaderExports.end());
+    }
+    return;
+  }
+
+  auto topLevelAdapter = getAdapterModule();
+
+  SmallVector<clang::Module *, 8> imported;
+  clangModule->getExportedModules(imported);
+  if (filter != Module::ImportFilter::Public) {
+    if (filter == Module::ImportFilter::All) {
+      llvm::SmallPtrSet<clang::Module *, 8> knownModules;
+      imported.append(clangModule->Imports.begin(), clangModule->Imports.end());
+      imported.erase(std::remove_if(imported.begin(), imported.end(),
+                                    [&](clang::Module *mod) -> bool {
+                                      return !knownModules.insert(mod).second;
+                                    }),
+                     imported.end());
+    } else {
+      llvm::SmallPtrSet<clang::Module *, 8> knownModules(imported.begin(),
+                                                         imported.end());
+      SmallVector<clang::Module *, 8> privateImports;
+      std::copy_if(clangModule->Imports.begin(), clangModule->Imports.end(),
+                   std::back_inserter(privateImports), [&](clang::Module *mod) {
+                     return knownModules.count(mod) == 0;
+      });
+      imported.swap(privateImports);
+    }
+
+    // FIXME: The parent module isn't exactly a private import, but it is
+    // needed for link dependencies.
+    if (clangModule->Parent)
+      imported.push_back(clangModule->Parent);
+  }
+
+  for (auto importMod : imported) {
+    auto wrapper = owner.Impl.getWrapperForModule(owner, importMod);
+
+    auto actualMod = wrapper->getAdapterModule();
+    if (!actualMod) {
+      // HACK: Deal with imports of submodules by importing the top-level module
+      // as well.
+      auto importTopLevel = importMod->getTopLevelModule();
+      if (importTopLevel != importMod &&
+          importTopLevel != clangModule->getTopLevelModule()) {
+        auto topLevelWrapper = owner.Impl.getWrapperForModule(owner,
+                                                              importTopLevel);
+        imports.push_back({ Module::AccessPathTy(),
+                            topLevelWrapper->getParentModule() });
+      }
+      actualMod = wrapper->getParentModule();
+    } else if (actualMod == topLevelAdapter) {
+      actualMod = wrapper->getParentModule();
+    }
+
+    assert(actualMod && "Missing imported adapter module");
+    imports.push_back({Module::AccessPathTy(), actualMod});
+  }
+}
+
+void ClangModuleUnit::getImportedModulesForLookup(
+    SmallVectorImpl<Module::ImportedModule> &imports) const {
+
+  if (!clangModule) {
+    // This is the special "imported headers" module.
+    imports.append(owner.Impl.ImportedHeaderExports.begin(),
+                   owner.Impl.ImportedHeaderExports.end());
+    return;
+  }
+
+  // Reuse our cached list of imports if we have one.
+  if (!importedModulesForLookup.empty()) {
+    imports.append(importedModulesForLookup.begin(),
+                   importedModulesForLookup.end());
+    return;
+  }
+
+  size_t firstImport = imports.size();
+  auto topLevel = clangModule->getTopLevelModule();
+  auto topLevelAdapter = getAdapterModule();
+
+  SmallVector<clang::Module *, 8> imported;
+  clangModule->getExportedModules(imported);
+  if (imported.empty())
+    return;
+
+  SmallPtrSet<clang::Module *, 32> seen{imported.begin(), imported.end()};
+  SmallVector<clang::Module *, 8> tmpBuf;
+  llvm::SmallSetVector<clang::Module *, 8> topLevelImported;
+
+  // Get the transitive set of top-level imports. That is, if a particular
+  // import is a top-level import, add it. Otherwise, keep searching.
+  while (!imported.empty()) {
+    clang::Module *next = imported.pop_back_val();
+
+    // HACK: Deal with imports of submodules by importing the top-level module
+    // as well, unless it's the top-level module we're currently in.
+    clang::Module *nextTopLevel = next->getTopLevelModule();
+    if (nextTopLevel != topLevel) {
+      topLevelImported.insert(nextTopLevel);
+
+      // Don't continue looking through submodules of modules that have
+      // overlays. The overlay might shadow things.
+      auto wrapper = owner.Impl.getWrapperForModule(owner, nextTopLevel);
+      if (wrapper->getAdapterModule())
+        continue;
+    }
+
+    // Only look through the current module if it's not top-level.
+    if (nextTopLevel == next)
+      continue;
+
+    next->getExportedModules(tmpBuf);
+    for (clang::Module *nextImported : tmpBuf) {
+      if (seen.insert(nextImported).second)
+        imported.push_back(nextImported);
+    }
+    tmpBuf.clear();
+  }
+
+  for (auto importMod : topLevelImported) {
+    auto wrapper = owner.Impl.getWrapperForModule(owner, importMod);
+
+    auto actualMod = wrapper->getAdapterModule();
+    if (!actualMod || actualMod == topLevelAdapter)
+      actualMod = wrapper->getParentModule();
+
+    assert(actualMod && "Missing imported adapter module");
+    imports.push_back({Module::AccessPathTy(), actualMod});
+  }
+
+  // Cache our results for use next time.
+  auto importsToCache = llvm::makeArrayRef(imports).slice(firstImport);
+  importedModulesForLookup = getASTContext().AllocateCopy(importsToCache);
+}
+

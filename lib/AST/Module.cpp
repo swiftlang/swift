@@ -1076,8 +1076,6 @@ LOOKUP_OPERATOR(Postfix)
 
 void Module::getImportedModules(SmallVectorImpl<ImportedModule> &modules,
                                 Module::ImportFilter filter) const {
-  // FIXME: Audit uses of this function and make sure they make sense in a
-  // multi-file world.
   FORWARD(getImportedModules, (modules, filter));
 }
 
@@ -1101,6 +1099,11 @@ SourceFile::getImportedModules(SmallVectorImpl<Module::ImportedModule> &modules,
 
     modules.push_back(importPair.first);
   }
+}
+
+void Module::getImportedModulesForLookup(
+    SmallVectorImpl<ImportedModule> &modules) const {
+  FORWARD(getImportedModulesForLookup, (modules));
 }
 
 bool Module::isSameAccessPath(AccessPathTy lhs, AccessPathTy rhs) {
@@ -1288,7 +1291,11 @@ static bool forAllImportedModules(Module *topLevel,
 
     if (!fn(next))
       return false;
-    next.second->getImportedModules(stack, filter);
+
+    if (respectVisibility)
+      next.second->getImportedModulesForLookup(stack);
+    else
+      next.second->getImportedModules(stack, filter);
   }
 
   return true;

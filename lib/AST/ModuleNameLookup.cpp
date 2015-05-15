@@ -190,7 +190,7 @@ static void lookupInModule(Module *module, Module::AccessPathTy accessPath,
   if (!foundDecls || !canReturnEarly ||
       resolutionKind == ResolutionKind::Overloadable) {
     SmallVector<Module::ImportedModule, 8> reexports;
-    module->getImportedModules(reexports, Module::ImportFilter::Public);
+    module->getImportedModulesForLookup(reexports);
     reexports.append(extraImports.begin(), extraImports.end());
 
     // Prefer scoped imports (import func Swift.max) to whole-module imports.
