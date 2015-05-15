@@ -65,13 +65,17 @@ ApplySite swift::trySpecializeApplyOfGeneric(ApplySite Apply,
   DEBUG(llvm::dbgs() << "  ApplyInst: " << *Apply.getInstruction());
 
   // Create the substitution maps.
-  TypeSubstitutionMap InterfaceSubs
-    = F->getLoweredFunctionType()->getGenericSignature()
-    ->getSubstitutionMap(Apply.getSubstitutions());
+  TypeSubstitutionMap InterfaceSubs;
+  TypeSubstitutionMap ContextSubs;
 
-  TypeSubstitutionMap ContextSubs
-    = F->getContextGenericParams()
-    ->getSubstitutionMap(Apply.getSubstitutions());
+  if (F->getLoweredFunctionType()->getGenericSignature())
+    InterfaceSubs = F->getLoweredFunctionType()->getGenericSignature()
+      ->getSubstitutionMap(Apply.getSubstitutions());
+
+
+  if (F->getContextGenericParams())
+    ContextSubs = F->getContextGenericParams()
+      ->getSubstitutionMap(Apply.getSubstitutions());
 
   // We do not support partial specialization.
   if (hasUnboundGenericTypes(InterfaceSubs)) {

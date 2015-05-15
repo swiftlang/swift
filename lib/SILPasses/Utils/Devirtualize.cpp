@@ -319,8 +319,9 @@ SILInstruction *swift::devirtualizeClassMethod(ApplyInst *AI,
 
   auto Subs = getSubstitutionsForCallee(Mod, GenCalleeType,
                                         ClassOrMetatypeType, AI);
-  auto SubstCalleeType =
-    GenCalleeType->substGenericArgs(Mod, Mod.getSwiftModule(), Subs);
+  CanSILFunctionType SubstCalleeType = GenCalleeType;
+  if (GenCalleeType->isPolymorphic())
+    SubstCalleeType = GenCalleeType->substGenericArgs(Mod, Mod.getSwiftModule(), Subs);
 
   SILBuilderWithScope<16> B(AI);
   FunctionRefInst *FRI = B.createFunctionRef(AI->getLoc(), F);
