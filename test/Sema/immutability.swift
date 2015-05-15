@@ -433,3 +433,16 @@ struct F {
   }
 }
 
+protocol SingleIntProperty {
+  var i: Int { get }
+}
+
+struct SingleIntStruct : SingleIntProperty {
+  let i: Int
+}
+
+extension SingleIntStruct {
+  init(_ other: SingleIntStruct) {
+    other.i = 999 // expected-error {{cannot assign to 'i' in 'other'}}
+  }
+}

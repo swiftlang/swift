@@ -424,9 +424,10 @@ bool TypeChecker::requireArrayLiteralIntrinsics(SourceLoc loc) {
 ///   a type member
 static bool doesStorageProduceLValue(TypeChecker &TC,
                                      AbstractStorageDecl *storage,
-                                     Type baseType, DeclContext *useDC) {
+                                     Type baseType, DeclContext *useDC,
+                                     Optional<DeclRefExpr *> base = None) {
   // Unsettable storage decls always produce rvalues.
-  if (!storage->isSettable(useDC))
+  if (!storage->isSettable(useDC, base))
     return false;
   
   if (TC.Context.LangOpts.EnableAccessControl &&
@@ -474,6 +475,7 @@ static bool doesStorageProduceLValue(TypeChecker &TC,
 
 Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
                                              DeclContext *UseDC,
+                                             Optional<DeclRefExpr *> base,
                                              bool wantInterfaceType) {
   validateDecl(value);
   if (value->isInvalid())
@@ -484,7 +486,7 @@ Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
   // Qualify storage declarations with an lvalue when appropriate.
   // Otherwise, they yield rvalues (and the access must be a load).
   if (auto *storage = dyn_cast<AbstractStorageDecl>(value)) {
-    if (doesStorageProduceLValue(*this, storage, baseType, UseDC)) {
+    if (doesStorageProduceLValue(*this, storage, baseType, UseDC, base)) {
       // Vars are simply lvalues of their rvalue type.
       if (isa<VarDecl>(storage))
         return LValueType::get(requestedType);

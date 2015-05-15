@@ -2004,6 +2004,7 @@ public:
                           bool isTypeReference,
                           bool isSpecialized,
                           ConstraintLocatorBuilder locator,
+                          Optional<DeclRefExpr *> = None,
                           DependentTypeOpener *opener = nullptr);
 
   /// Replace the 'Self' type in the archetype with the appropriate
@@ -2031,6 +2032,7 @@ public:
                           bool isTypeReference,
                           bool isDynamicResult,
                           ConstraintLocatorBuilder locator,
+                          Optional<DeclRefExpr *> base = None,
                           DependentTypeOpener *opener = nullptr);
 
   /// \brief Add a new overload set to the list of unresolved overload

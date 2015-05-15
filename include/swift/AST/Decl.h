@@ -63,6 +63,7 @@ namespace swift {
   class DynamicSelfType;
   class Type;
   class Expr;
+  class DeclRefExpr;
   class ForeignErrorConvention;
   class LiteralExpr;
   class FuncDecl;
@@ -2237,7 +2238,7 @@ public:
   /// isSettable - Determine whether references to this decl may appear
   /// on the left-hand side of an assignment or as the operand of a
   /// `&` or 'inout' operator.
-  bool isSettable(DeclContext *UseDC) const;
+  bool isSettable(DeclContext *UseDC, Optional<DeclRefExpr *> base = None) const;
   
   /// isInstanceMember - Determine whether this value is an instance member
   /// of an enum or protocol.
@@ -4178,7 +4179,7 @@ public:
   /// is a let member in an initializer.
   ///
   /// Pass a null context to check if it's always settable.
-  bool isSettable(DeclContext *UseDC) const;
+  bool isSettable(DeclContext *UseDC, Optional<DeclRefExpr *> base = None) const;
 
   /// Return the parent pattern binding that may provide an initializer for this
   /// VarDecl.  This returns null if there is none associated with the VarDecl.
@@ -5622,9 +5623,10 @@ public:
   }
 };
 
-inline bool ValueDecl::isSettable(DeclContext *UseDC) const {
+inline bool ValueDecl::isSettable(DeclContext *UseDC,
+                                  Optional<DeclRefExpr *> base) const {
   if (auto vd = dyn_cast<VarDecl>(this)) {
-    return vd->isSettable(UseDC);
+    return vd->isSettable(UseDC, base);
   } else if (auto sd = dyn_cast<SubscriptDecl>(this)) {
     return sd->isSettable();
   } else

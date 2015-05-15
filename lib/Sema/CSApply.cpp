@@ -832,7 +832,11 @@ namespace {
         // No substitutions required; the declaration reference is simple.
         containerTy = member->getDeclContext()->getDeclaredTypeOfContext();
         memberRef = member;
-        refTy = tc.getUnopenedTypeOfReference(member, Type(), dc,
+        auto baseDeclRefExpr = dyn_cast<DeclRefExpr>(base);
+        auto optionalBase = baseDeclRefExpr
+          ? Optional<DeclRefExpr *>(baseDeclRefExpr)
+          : None;
+        refTy = tc.getUnopenedTypeOfReference(member, Type(), dc, optionalBase,
                                               /*wantInterfaceType=*/true);
       }
 
@@ -2202,7 +2206,7 @@ namespace {
         return MetatypeType::get(type);
       }
 
-      return cs.TC.getUnopenedTypeOfReference(decl, Type(), dc,
+      return cs.TC.getUnopenedTypeOfReference(decl, Type(), dc, None,
                                               /*wantInterfaceType=*/true);
     }
 

@@ -826,6 +826,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
                                      bool isTypeReference,
                                      bool isSpecialized,
                                      ConstraintLocatorBuilder locator,
+                                     Optional<DeclRefExpr *> base,
                                      DependentTypeOpener *opener) {
   llvm::DenseMap<CanType, TypeVariableType *> replacements;
 
@@ -889,7 +890,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
   }
 
   // Determine the type of the value, opening up that type if necessary.
-  Type valueType = TC.getUnopenedTypeOfReference(value, Type(), DC,
+  Type valueType = TC.getUnopenedTypeOfReference(value, Type(), DC, base,
                                                  /*wantInterfaceType=*/true);
 
   // Adjust the type of the reference.
@@ -1052,6 +1053,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
                                            bool isTypeReference,
                                            bool isDynamicResult,
                                            ConstraintLocatorBuilder locator,
+                                           Optional<DeclRefExpr *> base,
                                            DependentTypeOpener *opener) {
   // Figure out the instance type used for the base.
   TypeVariableType *baseTypeVar = nullptr;
@@ -1066,7 +1068,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
   // If the base is a module type, just use the type of the decl.
   if (baseObjTy->is<ModuleType>()) {
     return getTypeOfReference(value, isTypeReference, /*isSpecialized=*/false,
-                              locator, opener);
+                              locator, base, opener);
   }
 
   // Handle associated type lookup as a special case, horribly.
@@ -1118,7 +1120,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     openedType = openType(genericFn, locator, replacements, dc,
                           /*skipProtocolSelfConstraint=*/true, opener);
   } else {
-    openedType = TC.getUnopenedTypeOfReference(value, baseTy, DC,
+    openedType = TC.getUnopenedTypeOfReference(value, baseTy, DC, base,
                                                /*wantInterfaceType=*/true);
 
     Type selfTy;
@@ -1343,10 +1345,26 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       = choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
     // Retrieve the type of a reference to the specific declaration choice.
     if (choice.getBaseType()) {
+      auto getDotBase = [](const Expr *E) -> Optional<DeclRefExpr *> {
+        switch (E->getKind()) {
+        case ExprKind::MemberRef: {
+          auto Base = cast<MemberRefExpr>(E)->getBase();
+          return dyn_cast<DeclRefExpr>(Base);
+        }
+        case ExprKind::UnresolvedDot: {
+          auto Base = cast<UnresolvedDotExpr>(E)->getBase();
+          return dyn_cast<DeclRefExpr>(Base);
+        }
+        default:
+          return None;
+        }
+      };
+      auto anchor = locator ? locator->getAnchor() : nullptr;
+      auto base = anchor ? getDotBase(anchor) : None;
       std::tie(openedFullType, refType)
         = getTypeOfMemberReference(choice.getBaseType(), choice.getDecl(),
                                    isTypeReference, isDynamicResult,
-                                   locator, nullptr);
+                                   locator, base, nullptr);
     } else {
       std::tie(openedFullType, refType)
         = getTypeOfReference(choice.getDecl(), isTypeReference,

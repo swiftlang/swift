@@ -2843,7 +2843,8 @@ static bool isSettable(const AbstractStorageDecl *decl) {
 /// \brief Returns whether the var is settable in the specified context: this
 /// is either because it is a stored var, because it has a custom setter, or
 /// is a let member in an initializer.
-bool VarDecl::isSettable(DeclContext *UseDC) const {
+bool VarDecl::isSettable(DeclContext *UseDC,
+                         Optional<DeclRefExpr *> base) const {
   // 'let' properties are immutable, but enforcement of this is enforced by
   // SIL level passes.  If the 'let' property has an initializer, it can never
   // be reassigned, so we model it as not settable here.
@@ -2870,6 +2871,12 @@ bool VarDecl::isSettable(DeclContext *UseDC) const {
       if (CDC->isTypeContext() &&
           CDC->getDeclaredTypeInContext()->getAnyNominal() ==
           getDeclContext()->getDeclaredTypeInContext()->getAnyNominal()) {
+
+        if (base.hasValue()) {
+          auto baseDecl = base.getValue()->getDecl();
+          if (CD->getImplicitSelfDecl() != baseDecl)
+            return false;
+        }
         // If this is a convenience initializer (i.e. one that calls
         // self.init), then let properties are never mutable in it.  They are
         // only mutable in designated initializers.

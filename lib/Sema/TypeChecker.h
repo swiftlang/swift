@@ -1126,9 +1126,12 @@ public:
   /// \param UseDC The context of the access.  Some variables have different
   ///   types depending on where they are used.
   ///
+  /// \param base The optional base expression of this value reference
+  ///
   /// \param wantInterfaceType Whether we want the interface type, if available.
   Type getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
                                   DeclContext *UseDC,
+                                  Optional<DeclRefExpr *> base = None,
                                   bool wantInterfaceType = false);
 
   /// Return the non-lvalue type-of-reference of the given value.

@@ -1250,6 +1250,7 @@ matchWitness(ConformanceChecker &cc, TypeChecker &tc,
                                      /*isTypeReference=*/false,
                                      /*isDynamicResult=*/false,
                                      locator,
+                                     /*base*/None,
                                      &reqTypeOpener);
     reqType = reqType->getRValueType();
 
