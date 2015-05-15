@@ -2,6 +2,7 @@ add_swift_library(swiftSceneKit IS_SDK_OVERLAY
   SceneKit.swift
   Thunks.mm
 
+  TARGET_SDKS OSX IOS IOS_SIMULATOR TVOS TVOS_SIMULATOR
   SWIFT_MODULE_DEPENDS Foundation GLKit simd
   SWIFT_MODULE_DEPENDS_OSX CoreImage AppKit
   SWIFT_MODULE_DEPENDS_IOS_TVOS CoreImage UIKit
