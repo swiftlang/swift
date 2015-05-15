@@ -89,7 +89,14 @@ tests.test("Sequence") {
   expectEqual(fib, Array(AnySequence(fib)))
   // AnyGenerator is a Sequence
   expectEqual(fib, Array(AnySequence(fib).generate()))
-  expectCrashLater()
+
+  // The assertion that is expected to be triggered by instantiating
+  // AnyGenerator is a _debugPrecondition() and there for will only trigger in
+  // -Onone mode.
+  if _isDebugAssertConfiguration() {
+    expectCrashLater()
+  }
+
   let x = AnyGenerator<Int>()
 }
 
@@ -117,9 +124,10 @@ tests.test("BidirectionalIndex") {
   --i
   expectEqual(1, callCounts["predecessor"])
   expectEqual(1, callCounts["_predecessorInPlace"])
-  i--
+  var x = i--
   expectEqual(2, callCounts["predecessor"])
   expectEqual(1, callCounts["_predecessorInPlace"])
+  _blackHole(x)
 }
 
 tests.test("ForwardCollection") {
