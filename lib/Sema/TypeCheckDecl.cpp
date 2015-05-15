@@ -1229,9 +1229,9 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
     }
   } else {
     // Look within a module context.
-    currentDC->getParentModule()->lookupValue({ }, current->getBaseName(),
-                                              NLKind::QualifiedLookup,
-                                              otherDefinitionsVec);
+    currentFile->getParentModule()->lookupValue({ }, current->getBaseName(),
+                                                NLKind::QualifiedLookup,
+                                                otherDefinitionsVec);
     otherDefinitions = otherDefinitionsVec;
   }
 
