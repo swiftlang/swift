@@ -1187,7 +1187,11 @@ public:
 
   //===--------------------------------------------------------------------===//
   // Availability Specification Parsing
-  
+
+  /// Parse a comma-separated list of availability specifications.
+  ParserStatus
+  parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs);
+
   ParserResult<AvailabilitySpec> parseAvailabilitySpec();
   ParserResult<VersionConstraintAvailabilitySpec> parseVersionConstraintSpec();
 };

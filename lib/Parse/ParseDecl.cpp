@@ -708,6 +708,49 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     // parsed more of the attribute.
     StringRef Platform = Tok.getText();
 
+    if (Platform != "*" &&
+        peekToken().isAny(tok::integer_literal, tok::floating_literal)) {
+      // We have the short form of available: @available(iOS 8.0.1, *)
+      SmallVector<AvailabilitySpec *, 5> Specs;
+      ParserStatus Status = parseAvailabilitySpecList(Specs);
+
+      if (Status.isError())
+        return false;
+
+      AttrRange = SourceRange(Loc, Tok.getLoc());
+      // For each platform version spec in the spec list, create an
+      // implicit AvailableAttr for the platform with the introduced
+      // version from the spec. For example, if we have
+      //   @available(iOS 8.0, OSX 10.10, *):
+      // we will synthesize:
+      //  @available(iOS, introduced=8.0)
+      //  @available(OSX, introduced=10.10)
+      for (auto *Spec : Specs) {
+        auto *VersionSpec = dyn_cast<VersionConstraintAvailabilitySpec>(Spec);
+        if (!VersionSpec)
+          continue;
+
+        Attributes.add(new (Context)
+                       AvailableAttr(AtLoc, AttrRange,
+                                     VersionSpec->getPlatform(),
+                                     /*Message=*/StringRef(),
+                                     /*Renamed=*/StringRef(),
+                                     /*Introduced=*/VersionSpec->getVersion(),
+                                     /*Deprecated=*/clang::VersionTuple(),
+                                     /*Obsoleted=*/clang::VersionTuple(),
+                                     UnconditionalAvailabilityKind::None,
+                                     /*Implicit=*/true));
+      }
+
+      if (!consumeIf(tok::r_paren)) {
+        diagnose(Tok.getLoc(), diag::attr_expected_rparen, AttrName,
+                 DeclAttribute::isDeclModifier(DK));
+        return false;
+      }
+
+      break;
+    }
+
     consumeToken();
 
     StringRef Message, Renamed;

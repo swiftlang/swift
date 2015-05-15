@@ -916,11 +916,23 @@ ParserResult<PoundAvailableInfo> Parser::parseStmtConditionPoundAvailable() {
   SourceLoc LParenLoc = consumeToken(tok::l_paren);
 
   SmallVector<AvailabilitySpec *, 5> Specs;
+  ParserStatus Status = parseAvailabilitySpecList(Specs);
+
+  SourceLoc RParenLoc;
+  if (parseMatchingToken(tok::r_paren, RParenLoc,
+                         diag::avail_query_expected_rparen, LParenLoc))
+    Status.setIsParseError();
+
+  auto *result = PoundAvailableInfo::create(Context, PoundLoc, Specs,RParenLoc);
+  return makeParserResult(Status, result);
+}
+
+ParserStatus
+Parser::parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs) {
   ParserStatus Status = makeParserSuccess();
 
-  // Parse a comma-separated list of availability specifications. We don't
-  // use parseList() because we want to provide more specific diagnostics
-  // disallowing operators in version specs.
+  // We don't use parseList() because we want to provide more specific
+  // diagnostics disallowing operators in version specs.
   while (1) {
     auto SpecResult = parseAvailabilitySpec();
     if (auto *Spec = SpecResult.getPtrOrNull()) {
@@ -944,13 +956,7 @@ ParserResult<PoundAvailableInfo> Parser::parseStmtConditionPoundAvailable() {
   if (Status.isSuccess())
     validateAvailabilitySpecList(*this, Specs);
 
-  SourceLoc RParenLoc;
-  if (parseMatchingToken(tok::r_paren, RParenLoc,
-                         diag::avail_query_expected_rparen, LParenLoc))
-    Status.setIsParseError();
-
-  auto *result = PoundAvailableInfo::create(Context, PoundLoc, Specs,RParenLoc);
-  return makeParserResult(Status, result);
+  return Status;
 }
 
 

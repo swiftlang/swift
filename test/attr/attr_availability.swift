@@ -138,3 +138,35 @@ func use_deprecated_with_renamed() {
   var _: DeprecatedTypeWithRename // expected-warning{{'DeprecatedTypeWithRename' is deprecated: renamed to 'wobble'}}
   // expected-note@-1{{use 'wobble'}}{{10-34=wobble}}
 }
+
+// Short form of @available()
+
+@available(iOS 8.0, *)
+func functionWithShortFormIOSAvailable() {}
+
+@available(iOS 8, *)
+func functionWithShortFormIOSVersionNoPointAvailable() {}
+
+@available(iOS 8.0, OSX 10.10.3, *)
+func functionWithShortFormIOSOSXAvailable() {}
+
+@available(iOS 8.0 // expected-error {{must handle potential future platforms with '*'}}
+func shortFormMissingParen() { // expected-error {{expected ')' in 'available' attribute}}
+}
+
+@available(iOS 8.0, // expected-error {{expected platform name}}
+func shortFormMissingPlatform() {
+}
+
+@available(iOS 8.0, *
+func shortFormMissingParenAfterWildcard() { // expected-error {{expected ')' in 'available' attribute}}
+}
+
+@available(*) // expected-error {{expected ',' in 'available' attribute}}
+func onlyWildcardInAvailable() {}
+
+@available(iOS 8.0, *, OSX 10.10.3)
+func shortFormWithWildcardInMiddle() {}
+
+@available(iOS 8.0, OSX 10.10.3) // expected-error {{must handle potential future platforms with '*'}}
+func shortFormMissingWildcard() {}

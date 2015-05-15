@@ -1851,8 +1851,8 @@ static void fixAvailabilityForDecl(SourceRange ReferenceRange, const Decl *D,
 
     PlatformKind Target = targetPlatform(TC.getLangOpts());
     Out << "@available(" << platformString(Target)
-        << ", introduced=" << RequiredRange.getLowerEndpoint().getAsString()
-        << ")\n" << OriginalIndent;
+        << " " << RequiredRange.getLowerEndpoint().getAsString()
+        << ", *)\n" << OriginalIndent;
   }
 
   DescriptiveDeclKind KindForDiagnostic = D->getDescriptiveKind();
