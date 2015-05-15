@@ -41,7 +41,7 @@ class OtherIntroduced10_10 {
   }
 
   var propOf10_11: OtherIntroduced10_11 = // expected-error {{'OtherIntroduced10_11' is only available on OS X 10.11 or newer}}
-      // expected-note@-1 {{add @available attribute to enclosing var}}
+
 
       OtherIntroduced10_11() // We don't expect an error here because the initializer is not type checked (by design).
 

@@ -307,14 +307,18 @@ class SubOfClassWithUnavailableInitializer : SuperWithWithUnavailableInitializer
 class ClassWithUnavailableProperties {
 
   @available(OSX, introduced=10.9) // expected-error {{stored properties cannot be marked potentially unavailable with 'introduced='}}
-    var nonLazyAvailableOn10_9Stored: Int = 9 // Non-standard indentation here is intentional to make sure Fix-It in the test above is getting the right line
+  var nonLazyAvailableOn10_9Stored: Int = 9
 
   @available(OSX, introduced=10.10) // expected-error {{stored properties cannot be marked potentially unavailable with 'introduced='}}
   var nonLazyAvailableOn10_10Stored : Int = 10
 
-  // We don't expect a Fix-It to add a lazy attribute below because let does not support lazy (for now).
   @available(OSX, introduced=10.10) // expected-error {{stored properties cannot be marked potentially unavailable with 'introduced='}}
   let nonLazyLetAvailableOn10_10Stored : Int = 10
+
+  // Make sure that we don't emit a Fix-It to mark a stored property as potentially unavailable.
+  // We don't support potentially unavailable stored properties yet.
+  var storedPropertyOfUnavailableType: ClassAvailableOn10_10? = nil // expected-error {{'ClassAvailableOn10_10' is only available on OS X 10.10 or newer}}
+      // expected-note@-1 {{add @available attribute to enclosing class}}
 
   @available(OSX, introduced=10.9)
   lazy var availableOn10_9Stored: Int = 9
@@ -412,7 +416,6 @@ class ClassWithReferencesInInitializers {
   var propWithInitializer10_10: Int = globalFuncAvailableOn10_10()
 
   var propWithInitializer10_11: Int = globalFuncAvailableOn10_11() // expected-error {{'globalFuncAvailableOn10_11()' is only available on OS X 10.11 or newer}}
-      // expected-note@-1 {{add @available attribute to enclosing var}}
 
   lazy var lazyPropWithInitializer10_10: Int = globalFuncAvailableOn10_10()
 
@@ -727,8 +730,7 @@ class ClassWithDeclarationsOfUnavailableClasses {
 
   var propertyOfUnavailableType: ClassAvailableOn10_10 // expected-error {{'ClassAvailableOn10_10' is only available on OS X 10.10 or newer}}
       // expected-note@-1 {{add @available attribute to enclosing class}}
-      // expected-note@-2 {{add @available attribute to enclosing var}}
-  
+
   @available(OSX, introduced=10.10)
   lazy var unavailablePropertyOfUnavailableType: ClassAvailableOn10_10 = ClassAvailableOn10_10()
   
@@ -1155,15 +1157,24 @@ class ClassForFixit {
     }
   }
 
-  var fixitForReferenceInPropertyAccessorType: ClassAvailableOn10_10? = nil
+  var fixitForReferenceInPropertyType: ClassAvailableOn10_10? = nil
       // expected-error@-1 {{'ClassAvailableOn10_10' is only available on OS X 10.10 or newer}}
-      // expected-note@-2 {{add @available attribute to enclosing var}} {{3-3=@available(OSX, introduced=10.10)\n  }}
+      // expected-note@-2 {{add @available attribute to enclosing class}} {{1-1=@available(OSX, introduced=10.10)\n}}
+
+  // We should really suggest a Fix-It adding @available() to the lazy var.
+  // rdar://problem/20968204
+  lazy var fixitForReferenceInLazyPropertyType: ClassAvailableOn10_10? = nil
+      // expected-error@-1 {{'ClassAvailableOn10_10' is only available on OS X 10.10 or newer}}
+      // expected-note@-2 {{add @available attribute to enclosing class}} {{1-1=@available(OSX, introduced=10.10)\n}}
+
+  static var fixitForReferenceInLazyPropertyType: ClassAvailableOn10_10? = nil
+      // expected-error@-1 {{'ClassAvailableOn10_10' is only available on OS X 10.10 or newer}}
+      // expected-note@-2 {{add @available attribute to enclosing class var}} {{3-3=@available(OSX, introduced=10.10)\n  }}
       // expected-note@-3 {{add @available attribute to enclosing class}} {{1-1=@available(OSX, introduced=10.10)\n}}
 
-  var fixitForReferenceInPropertyAccessorTypeMultiple: ClassAvailableOn10_10? = nil, other: Int = 7
+  var fixitForReferenceInPropertyTypeMultiple: ClassAvailableOn10_10? = nil, other: Int = 7
       // expected-error@-1 {{'ClassAvailableOn10_10' is only available on OS X 10.10 or newer}}
-      // expected-note@-2 {{add @available attribute to enclosing var}} {{3-3=@available(OSX, introduced=10.10)\n  }}
-      // expected-note@-3 {{add @available attribute to enclosing class}} {{1-1=@available(OSX, introduced=10.10)\n}}
+      // expected-note@-2 {{add @available attribute to enclosing class}} {{1-1=@available(OSX, introduced=10.10)\n}}
 
   func fixitForRefInGuardOfIf() {
     if (globalFuncAvailableOn10_10() > 1066) {

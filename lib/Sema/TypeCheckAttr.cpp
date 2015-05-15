@@ -773,29 +773,10 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
 
   SourceLoc attrLoc = attr->getLocation();
 
-  DeclContext *DC = D->getDeclContext();
-  // Do not permit potential availability of script-mode global variables;
-  // their initializer expression is not lazily evaluated, so this would
-  // not be safe.
-  if (isa<VarDecl>(D) && DC->isModuleScopeContext() &&
-      DC->getParentSourceFile()->isScriptMode()) {
-    TC.diagnose(attrLoc, diag::availability_global_script_no_potential);
-    return;
-  }
-
-  // For now, we don't allow stored properties to be potentially unavailable.
-  // We will want to support these eventually, but we haven't figured out how
-  // this will interact with Definite Initialization, deinitializers and
-  // resilience yet.
-  if (auto *varDecl = dyn_cast<VarDecl>(D)) {
-    // Globals and statics are lazily initialized, so they are safe
-    // for potentialy unavailability.
-    bool lazilyInitializedStored =
-        varDecl->isStatic() || DC->isModuleScopeContext();
-
-    if (varDecl->hasStorage() && !lazilyInitializedStored) {
-      TC.diagnose(attrLoc, diag::availability_stored_property_no_potential);
-    }
+  Optional<Diag<>> MaybeNotAllowed =
+      TC.diagnosticIfDeclCannotBePotentiallyUnavailable(D);
+  if (MaybeNotAllowed.hasValue()) {
+    TC.diagnose(attrLoc, MaybeNotAllowed.getValue());
   }
 
   // Find the innermost enclosing declaration with an availability
@@ -1489,4 +1470,34 @@ TypeChecker::applyFunctionTypeAttributes(AbstractFunctionDecl *func,
   }
 
   return info;
+}
+
+Optional<Diag<>>
+TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
+  DeclContext *DC = D->getDeclContext();
+  // Do not permit potential availability of script-mode global variables;
+  // their initializer expression is not lazily evaluated, so this would
+  // not be safe.
+  if (isa<VarDecl>(D) && DC->isModuleScopeContext() &&
+      DC->getParentSourceFile()->isScriptMode()) {
+    return diag::availability_global_script_no_potential;
+  }
+
+  // For now, we don't allow stored properties to be potentially unavailable.
+  // We will want to support these eventually, but we haven't figured out how
+  // this will interact with Definite Initialization, deinitializers and
+  // resilience yet.
+  if (auto *VD = dyn_cast<VarDecl>(D)) {
+    // Globals and statics are lazily initialized, so they are safe
+    // for potential unavailability. Note that if D is a global in script
+    // mode (which are not lazy) then we will already have returned
+    // a diagnosis above.
+    bool lazilyInitializedStored = VD->isStatic() || DC->isModuleScopeContext();
+
+    if (VD->hasStorage() && !lazilyInitializedStored) {
+      return diag::availability_stored_property_no_potential;
+    }
+  }
+
+  return None;
 }

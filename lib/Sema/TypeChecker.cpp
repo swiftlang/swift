@@ -1829,6 +1829,11 @@ static void fixAvailabilityForDecl(SourceRange ReferenceRange, const Decl *D,
                                    TypeChecker &TC) {
   assert(D);
 
+  // Don't suggest adding an @available() to a declaration where we would
+  // emit a diagnostic saying it is not allowed.
+  if (TC.diagnosticIfDeclCannotBePotentiallyUnavailable(D).hasValue())
+    return;
+
   if (getActiveAvailableAttribute(D, TC.Context)) {
     // For QoI, in future should emit a fixit to update the existing attribute.
     return;

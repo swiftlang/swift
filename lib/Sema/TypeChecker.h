@@ -1462,6 +1462,12 @@ public:
   /// TypeRefinementContext for the source file.
   static TypeRefinementContext *getOrBuildTypeRefinementContext(SourceFile *SF);
 
+  /// Returns a diagnostic indicating why the declaration cannot be annotated
+  /// with an @available() attribute indicating it is potentially unavailable
+  /// or None if this is allowed.
+  Optional<Diag<>>
+  diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D);
+
   /// Checks whether a declaration is available when referred to at the given
   /// location (this reference location must be in the passed-in
   /// reference DeclContext).
