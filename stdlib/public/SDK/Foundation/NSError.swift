@@ -1,6 +1,5 @@
 import Foundation
 import CoreFoundation
-import Darwin
 
 // NSError and CFError conform to the standard ErrorType protocol. Compiler
 // magic allows this to be done as a "toll-free" conversion when an NSError
@@ -402,61 +401,4 @@ public protocol _BridgedNSError : __BridgedNSError,
   case BackgroundSessionWasDisconnected = -997
 
   public static var _NSErrorDomain: String { return NSURLErrorDomain }
-}
-
-/// Helper protocol for _BridgedNSErrorCInt, which used used to provide
-/// default implementations.
-///
-/// FIXME: Should not be needed, but RawValue inference is causing
-/// problems with having multiple constrained extensions of
-/// _BridgedNSError with different RawValue types.
-public protocol __BridgedNSErrorCInt : RawRepresentable {
-  static var _NSErrorDomain: String { get }
-}
-
-// Allow two bridged NSError types to be compared.
-public func ==<T: __BridgedNSErrorCInt where T.RawValue == CInt>(
-  lhs: T,
-  rhs: T
-) -> Bool {
-  return lhs.rawValue == rhs.rawValue
-}
-
-public extension __BridgedNSErrorCInt where RawValue == CInt {
-  public final var _domain: String { return Self._NSErrorDomain }
-  public final var _code: Int { return Int(rawValue) }
-
-  public init?(rawValue: CInt) {
-    self = unsafeBitCast(rawValue, Self.self)
-  }
-
-  public init?(_bridgedNSError: NSError) {
-    if _bridgedNSError.domain != Self._NSErrorDomain {
-      return nil
-    }
-
-    if let result = Self(rawValue: CInt(_bridgedNSError.code)) {
-      self = result
-    } else {
-      return nil
-    }
-  }
-
-  public final var hashValue: Int { return Int(rawValue) }
-}
-
-/// Describes a raw representable type that is bridged to a particular
-/// NSError domain.
-///
-/// This protocol is used primarily to generate the conformance to
-/// _ObjectiveCBridgeableErrorType for such an enum.
-public protocol _BridgedNSErrorCInt : __BridgedNSErrorCInt,
-                                      _ObjectiveCBridgeableErrorType,
-                                      Hashable {
-  /// The NSError domain to which this type is bridged.
-  static var _NSErrorDomain: String { get }
-}
-
-extension _POSIXError : _BridgedNSErrorCInt {
-  public static var _NSErrorDomain: String { return NSPOSIXErrorDomain }
 }
