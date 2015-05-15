@@ -1,5 +1,4 @@
 // RUN: rm -rf %t && mkdir -p %t
-// REQUIRES: objc_interop
 // Clang-import a module.
 import ClangModule
 

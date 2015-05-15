@@ -1,2 +1,1 @@
-@interface Foo
-@end
+struct Foo {};
