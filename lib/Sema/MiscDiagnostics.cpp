@@ -809,7 +809,26 @@ public:
   // After we have scanned the entire region, diagnose variables that could be
   // declared with a narrower usage kind.
   ~VarDeclUsageChecker();
-  
+
+  /// Check to see if the specified VarDecl is part of a larger
+  /// PatternBindingDecl, where some other bound variable was mutated.  In this
+  /// case we don't want to generate a "variable never mutated" warning, because
+  /// it would require splitting up the destructuring of the tuple, which is
+  ///  more code turmoil than the warning is worth.
+  bool isVarDeclPartOfPBDThatHadSomeMutation(VarDecl *VD) {
+    auto *PBD = VD->getParentPatternBinding();
+    if (!PBD) return false;
+
+    bool sawMutation = false;
+    for (const auto &PBE : PBD->getPatternList()) {
+      PBE.ThePattern->forEachVariable([&](VarDecl *VD) {
+        auto it = VarDecls.find(VD);
+        sawMutation |= it != VarDecls.end() && (it->second & RK_Written);
+      });
+    }
+    return sawMutation;
+  }
+
   bool shouldTrackVarDecl(VarDecl *VD) {
     // If the variable is implicit, ignore it.
     if (VD->isImplicit() || VD->getLoc().isInvalid())
@@ -949,7 +968,10 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
     
     // If this is a mutable 'var', and it was never written to, suggest
     // upgrading to 'let'.  We do this even for a parameter.
-    if (!var->isLet() && (access & RK_Written) == 0) {
+    if (!var->isLet() && (access & RK_Written) == 0 &&
+        // Don't warn if we have something like "let (x,y) = ..." and 'y' was
+        // never mutated, but 'x' was.
+        !isVarDeclPartOfPBDThatHadSomeMutation(var)) {
       SourceLoc FixItLoc;
       
       // Try to find the location of the 'var' so we can produce a fixit.  If
