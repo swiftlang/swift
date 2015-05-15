@@ -254,8 +254,6 @@ func emptyStructTest() {
   let a : EmptyStruct  // expected-note {{variable defined here}}
   useEmptyStruct(a)    // expected-error {{variable 'a' used before being initialized}}
 
-  // expected-warning @+2 {{variable 'b' was never mutated}}
-  // expected-warning @+1 {{variable 'd' was never mutated}}
   var (b,c,d) : (EmptyStruct,EmptyStruct,EmptyStruct) // expected-note 2 {{variable defined here}}
   
   c = EmptyStruct()
