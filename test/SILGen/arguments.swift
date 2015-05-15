@@ -12,6 +12,8 @@ func _allocateUninitializedArray<T>(_: Builtin.Word)
   Builtin.int_trap()
 }
 
+func _deallocateUninitializedArray<T>(_: Array<T>) {}
+
 var i:Int, f:Float, c:UnicodeScalar
 
 func arg_tuple(#x: Int, y: Float) {}

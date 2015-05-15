@@ -50,6 +50,8 @@ FUNC_DECL(ConvertConstStringToUTF8PointerArgument,
           "_convertConstStringToUTF8PointerArgument")
 FUNC_DECL(AllocateUninitializedArray,
           "_allocateUninitializedArray")
+FUNC_DECL(DeallocateUninitializedArray,
+          "_deallocateUninitializedArray")
 
 FUNC_DECL(ForceBridgeFromObjectiveC,
           "_forceBridgeFromObjectiveC")

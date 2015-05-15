@@ -2635,7 +2635,6 @@ void ArgEmitter::emitShuffle(Expr *inner,
   SILParameterInfo variadicParamInfo; // innerExtents will point at this
   Optional<SmallVector<ArgSpecialDest, 8>> innerSpecialDests;
 
-
   // First, construct an abstraction pattern and parameter sequence
   // which we can use to emit the inner tuple.
   {
@@ -3381,6 +3380,43 @@ SILGenFunction::emitUninitializedArrayAllocation(Type ArrayTy,
   std::move(resultTuple).getAll(resultElts);
 
   return {resultElts[0], resultElts[1].getUnmanagedValue()};
+}
+
+/// Deallocate an uninitialized array.
+void SILGenFunction::emitUninitializedArrayDeallocation(SILLocation loc,
+                                                        SILValue array) {
+  auto &Ctx = getASTContext();
+  auto deallocate = Ctx.getDeallocateUninitializedArray(nullptr);
+  auto archetypes = deallocate->getGenericParams()->getAllArchetypes();
+
+  CanType arrayElementTy =
+    array.getType().castTo<BoundGenericType>().getGenericArgs()[0];
+
+  // Invoke the intrinsic.
+  Substitution sub{archetypes[0], arrayElementTy, {}};
+  emitApplyOfLibraryIntrinsic(loc, deallocate, sub,
+                              ManagedValue::forUnmanaged(array),
+                              SGFContext());
+}
+
+namespace {
+  /// A cleanup that deallocates an uninitialized array.
+  class DeallocateUninitializedArray: public Cleanup {
+    SILValue Array;
+  public:
+    DeallocateUninitializedArray(SILValue array)
+      : Array(array) {}
+
+    void emit(SILGenFunction &gen, CleanupLocation l) override {
+      gen.emitUninitializedArrayDeallocation(l, Array);
+    }
+  };
+}
+
+CleanupHandle
+SILGenFunction::enterDeallocateUninitializedArrayCleanup(SILValue array) {
+  Cleanups.pushCleanup<DeallocateUninitializedArray>(array);
+  return Cleanups.getTopCleanup();
 }
 
 static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,

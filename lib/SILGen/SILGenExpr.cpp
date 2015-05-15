@@ -1609,19 +1609,33 @@ VarargsInfo Lowering::emitBeginVarargs(SILGenFunction &gen, SILLocation loc,
   std::tie(array, basePtr)
     = gen.emitUninitializedArrayAllocation(arrayTy, numEltsVal, loc);
 
+  // Temporarily deactivate the main array cleanup.
+  if (array.hasCleanup())
+    gen.Cleanups.setCleanupState(array.getCleanup(), CleanupState::Dormant);
+
+  // Push a new cleanup to deallocate the array.
+  auto abortCleanup =
+    gen.enterDeallocateUninitializedArrayCleanup(array.getValue());
+
   auto &baseTL = gen.getTypeLowering(baseAbstraction, baseTy);
 
   // Turn the pointer into an address.
   basePtr = gen.B.createPointerToAddress(loc, basePtr,
                                      baseTL.getLoweredType().getAddressType());
 
-  return VarargsInfo(array, basePtr, baseTL, baseAbstraction);
+  return VarargsInfo(array, abortCleanup, basePtr, baseTL, baseAbstraction);
 }
 
 ManagedValue Lowering::emitEndVarargs(SILGenFunction &gen, SILLocation loc,
                                       VarargsInfo &&varargs) {
-  // TODO: maybe do something to finalize the array value here?
-  return varargs.getArray();
+  // Kill the abort cleanup.
+  gen.Cleanups.setCleanupState(varargs.getAbortCleanup(), CleanupState::Dead);
+
+  // Reactivate the result cleanup.
+  auto result = varargs.getArray();
+  if (result.hasCleanup())
+    gen.Cleanups.setCleanupState(result.getCleanup(), CleanupState::Active);
+  return result;
 }
 
 static ManagedValue emitVarargs(SILGenFunction &gen,

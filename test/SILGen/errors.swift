@@ -333,3 +333,78 @@ func getHungryCat(food: CatFood) throws -> Cat {
 // CHECK:   br bb8([[ERROR]] : $ErrorType)
 // CHECK: bb8([[ERROR:%.*]] : $ErrorType):
 // CHECK:   throw [[ERROR]] : $ErrorType
+
+func take_many_cats(cats: Cat...) throws {}
+func test_variadic(cat: Cat) throws {
+  try take_many_cats(make_a_cat(), cat, make_a_cat(), make_a_cat())
+}
+// CHECK-LABEL: sil hidden @_TF6errors13test_variadicFzCS_3CatT_
+// CHECK:       [[TAKE_FN:%.*]] = function_ref @_TF6errors14take_many_catsFztGSaCS_3Cat__T_ : $@convention(thin) (@owned Array<Cat>) -> @error ErrorType
+// CHECK:       [[N:%.*]] = integer_literal $Builtin.Word, 4
+// CHECK:       [[T0:%.*]] = function_ref @_TFSs27_allocateUninitializedArrayurFBwTGSaq__Bp_
+// CHECK:       [[T1:%.*]] = apply [[T0]]<Cat>([[N]])
+// CHECK:       [[ARRAY:%.*]] = tuple_extract [[T1]] :  $(Array<Cat>, Builtin.RawPointer), 0
+// CHECK:       [[T2:%.*]] = tuple_extract [[T1]] :  $(Array<Cat>, Builtin.RawPointer), 1
+// CHECK:       [[ELT0:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to $*Cat
+//   Element 0.
+// CHECK:       [[T0:%.*]] = function_ref @_TF6errors10make_a_catFzT_CS_3Cat : $@convention(thin) () -> (@owned Cat, @error ErrorType)
+// CHECK:       try_apply [[T0]]() : $@convention(thin) () -> (@owned Cat, @error ErrorType), normal [[NORM_0:bb[0-9]+]], error [[ERR_0:bb[0-9]+]]
+// CHECK:     [[NORM_0]]([[CAT0:%.*]] : $Cat):
+// CHECK-NEXT:  store [[CAT0]] to [[ELT0]]
+//   Element 1.
+// CHECK-NEXT:  [[T0:%.*]] = integer_literal $Builtin.Word, 1
+// CHECK-NEXT:  [[ELT1:%.*]] = index_addr [[ELT0]] : $*Cat, [[T0]]
+// CHECK-NEXT:  strong_retain %0
+// CHECK-NEXT:  store %0 to [[ELT1]]
+//   Element 2.
+// CHECK-NEXT:  [[T0:%.*]] = integer_literal $Builtin.Word, 2
+// CHECK-NEXT:  [[ELT2:%.*]] = index_addr [[ELT0]] : $*Cat, [[T0]]
+// CHECK-NEXT:  // function_ref
+// CHECK-NEXT:  [[T0:%.*]] = function_ref @_TF6errors10make_a_catFzT_CS_3Cat : $@convention(thin) () -> (@owned Cat, @error ErrorType)
+// CHECK-NEXT:  try_apply [[T0]]() : $@convention(thin) () -> (@owned Cat, @error ErrorType), normal [[NORM_2:bb[0-9]+]], error [[ERR_2:bb[0-9]+]]
+// CHECK:     [[NORM_2]]([[CAT2:%.*]] : $Cat):
+// CHECK-NEXT:  store [[CAT2]] to [[ELT2]]
+//   Element 3.
+// CHECK-NEXT:  [[T0:%.*]] = integer_literal $Builtin.Word, 3
+// CHECK-NEXT:  [[ELT3:%.*]] = index_addr [[ELT0]] : $*Cat, [[T0]]
+// CHECK-NEXT:  // function_ref
+// CHECK-NEXT:  [[T0:%.*]] = function_ref @_TF6errors10make_a_catFzT_CS_3Cat : $@convention(thin) () -> (@owned Cat, @error ErrorType)
+// CHECK-NEXT:  try_apply [[T0]]() : $@convention(thin) () -> (@owned Cat, @error ErrorType), normal [[NORM_3:bb[0-9]+]], error [[ERR_3:bb[0-9]+]]
+// CHECK:     [[NORM_3]]([[CAT3:%.*]] : $Cat):
+// CHECK-NEXT:  store [[CAT3]] to [[ELT3]]
+//   Complete the call and return.
+// CHECK-NEXT:  try_apply [[TAKE_FN]]([[ARRAY]]) : $@convention(thin) (@owned Array<Cat>) -> @error ErrorType, normal [[NORM_CALL:bb[0-9]+]], error [[ERR_CALL:bb[0-9]+]]
+// CHECK:     [[NORM_CALL]]([[T0:%.*]] : $()):
+// CHECK-NEXT:  strong_release %0 : $Cat
+// CHECK-NEXT:  [[T0:%.*]] = tuple ()
+// CHECK-NEXT:  return
+//   Failure from element 0.
+// CHECK:     [[ERR_0]]([[ERROR:%.*]] : $ErrorType):
+// CHECK-NEXT:  // function_ref
+// CHECK-NEXT:  [[T0:%.*]] = function_ref @_TFSs29_deallocateUninitializedArrayurFGSaq__T_
+// CHECK-NEXT:  apply [[T0]]<Cat>([[ARRAY]])
+// CHECK-NEXT:  br [[RETHROW:.*]]([[ERROR]] : $ErrorType)
+//   Failure from element 2.
+// CHECK:     [[ERR_2]]([[ERROR:%.*]] : $ErrorType):
+// CHECK-NEXT:  destroy_addr [[ELT1]]
+// CHECK-NEXT:  destroy_addr [[ELT0]]
+// CHECK-NEXT:  // function_ref
+// CHECK-NEXT:  [[T0:%.*]] = function_ref @_TFSs29_deallocateUninitializedArrayurFGSaq__T_
+// CHECK-NEXT:  apply [[T0]]<Cat>([[ARRAY]])
+// CHECK-NEXT:  br [[RETHROW]]([[ERROR]] : $ErrorType)
+//   Failure from element 3.
+// CHECK:     [[ERR_3]]([[ERROR:%.*]] : $ErrorType):
+// CHECK-NEXT:  destroy_addr [[ELT2]]
+// CHECK-NEXT:  destroy_addr [[ELT1]]
+// CHECK-NEXT:  destroy_addr [[ELT0]]
+// CHECK-NEXT:  // function_ref
+// CHECK-NEXT:  [[T0:%.*]] = function_ref @_TFSs29_deallocateUninitializedArrayurFGSaq__T_
+// CHECK-NEXT:  apply [[T0]]<Cat>([[ARRAY]])
+// CHECK-NEXT:  br [[RETHROW]]([[ERROR]] : $ErrorType)
+//   Failure from call.
+// CHECK:     [[ERR_CALL]]([[ERROR:%.*]] : $ErrorType):
+// CHECK-NEXT:  br [[RETHROW]]([[ERROR]] : $ErrorType)
+//   Rethrow.
+// CHECK:     [[RETHROW]]([[ERROR:%.*]] : $ErrorType):
+// CHECK-NEXT:  strong_release %0 : $Cat
+// CHECK-NEXT:  throw [[ERROR]]

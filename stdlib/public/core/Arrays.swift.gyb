@@ -437,6 +437,15 @@ public func _allocateUninitialized${Self}<T>(count: Builtin.Word)
   return (array, ptr._rawValue)
 }
 
+%if Self == 'Array':
+// Referenced by the compiler to deallocate array literals on the
+// error path.
+@_semantics("array.dealloc_uninitialized")
+public func _deallocateUninitialized${Self}<T>(var array: ${Self}<T>) {
+   array._deallocateUninitialized()
+}
+%end
+
 extension ${Self} : _ArrayType {
   /// Construct an empty ${Self}
   @_semantics("array.init")
@@ -482,6 +491,16 @@ extension ${Self} : _ArrayType {
     let result = ${Self}(_uninitializedCount: count)
     return (result, result._buffer.baseAddress)
   }
+
+%if Self == 'Array':
+  /// Entry point for aborting literal construction: deallocates
+  /// a ${Self} containing only uninitialized elements.
+  internal mutating func _deallocateUninitialized() {
+    // Set the count to zero and just release as normal.
+    // Somewhat of a hack.
+    _buffer.count = 0
+  }
+%end
 
   /// How many elements the ${Self} stores
   public var count: Int {

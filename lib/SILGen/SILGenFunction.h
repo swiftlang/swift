@@ -811,6 +811,9 @@ public:
                                    SILValue Length,
                                    SILLocation Loc);
 
+  CleanupHandle enterDeallocateUninitializedArrayCleanup(SILValue array);
+  void emitUninitializedArrayDeallocation(SILLocation loc, SILValue array);
+
   SILValue emitConversionToSemanticRValue(SILLocation loc, SILValue value,
                                           const TypeLowering &valueTL);
 

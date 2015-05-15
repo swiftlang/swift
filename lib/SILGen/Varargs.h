@@ -31,20 +31,23 @@ class TypeLowering;
 /// Information about a varargs emission.
 class VarargsInfo {
   ManagedValue Array;
+  CleanupHandle AbortCleanup;
   SILValue BaseAddress;
   AbstractionPattern BasePattern;
   const TypeLowering &BaseTL;
 public:
-  VarargsInfo(ManagedValue array, SILValue baseAddress,
-              const TypeLowering &baseTL, AbstractionPattern basePattern)
-    : Array(array), BaseAddress(baseAddress), BasePattern(basePattern),
-      BaseTL(baseTL) {}
+  VarargsInfo(ManagedValue array, CleanupHandle abortCleanup,
+              SILValue baseAddress, const TypeLowering &baseTL,
+              AbstractionPattern basePattern)
+    : Array(array), AbortCleanup(abortCleanup),
+      BaseAddress(baseAddress), BasePattern(basePattern), BaseTL(baseTL) {}
 
   /// Return the array value.  emitEndVarargs() is really the only
   /// function that should be accessing this directly.
   ManagedValue getArray() const {
     return Array;
   }
+  CleanupHandle getAbortCleanup() const { return AbortCleanup; }
 
   /// An address of the lowered type.
   SILValue getBaseAddress() const { return BaseAddress; }
