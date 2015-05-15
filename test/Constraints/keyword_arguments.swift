@@ -243,6 +243,12 @@ trailingclosure3(x: 5) { return 5 }
 func trailingclosure4(f f: () -> Int) {}
 trailingclosure4 { 5 }
 
+func trailingClosure5<T>(file: String = __FILE__, line: UInt = __LINE__, expression: () -> T?) { }
+func trailingClosure6<T>(value value: Int, expression: () -> T?) { }
+
+trailingClosure5(file: "hello", line: 17) { return Optional.Some(5) } // expected-error{{extraneous argument label 'file:' in call}}{{18-24=}}
+trailingClosure6(5) { return Optional.Some(5) } // expected-error{{missing argument label 'value:' in call}}{{18-18=value: }}
+
 class MismatchOverloaded1 {
   func method1(x: Int!, arg: ((Int) -> Int)!) { }
   func method1(x: Int!, secondArg: ((Int) -> Int)!) { }

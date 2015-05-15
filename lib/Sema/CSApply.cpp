@@ -5650,7 +5650,7 @@ static bool diagnoseRelabel(TypeChecker &tc, Expr *expr,
     if (i < newNames.size())
       newName = newNames[i];
 
-    if (oldName == newName)
+    if (oldName == newName || (i == n-1 && tuple->hasTrailingClosure()))
       continue;
 
     if (newName.empty()) {
