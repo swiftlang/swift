@@ -1,5 +1,5 @@
 // RUN: rm -rf %t && mkdir -p %t
-
+// REQUIRES: objc_interop
 // Clang-import a module.
 import ClangModule
 
@@ -16,7 +16,7 @@ import ClangModule
 
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %target-swift-frontend %s -c -g -o %t.o -module-cache-path %t -I %S/Inputs
-// RUN: file %t/*/ClangModule-*.pcm | grep Mach-O
+// RUN: file %t/*/ClangModule-*.pcm | egrep '(Mach-O|ELF)'
 
 // 3. Test that swift-ide-check will not share swiftc's module cache.
 
