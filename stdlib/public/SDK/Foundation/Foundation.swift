@@ -442,16 +442,23 @@ public func _convertArrayToNSArray<T>(arr: [T]) -> NSArray {
 
 extension Array : _ObjectiveCBridgeable {
 
-  /// Construct from the given `NSArray`.  If `noCopy` is `true`,
-  /// either `source` must be known to be immutable, or the resulting
-  /// `Array` must not survive across code that could mutate `source`.
-  internal init(_fromNSArray source: NSArray, noCopy: Bool = false) {
-    // _NSArrayCoreType has selectors compatible with those
-    // of NSArray; we use it to decouple the core stdlib from Foundation.
-    // Bit-cast our NSArray to _NSArrayCoreType so it can be
-    // adopted by an _ArrayBuffer.
-    let cocoa = unsafeBitCast(source, _NSArrayCoreType.self)
-    self = Array(_fromCocoaArray: cocoa, noCopy: noCopy)
+  /// Private initializer used for bridging.
+  ///
+  /// The provided `NSArray` will be copied to ensure that the copy can
+  /// not be mutated by other code.
+  internal init(_cocoaArray: NSArray) {
+    _sanityCheck(_isBridgedVerbatimToObjectiveC(T.self),
+      "Array can be backed by NSArray only when the element type can be bridged verbatim to Objective-C")
+    // FIXME: We would like to call CFArrayCreateCopy() to avoid doing an
+    // objc_msgSend() for instances of CoreFoundation types.  We can't do that
+    // today because CFArrayCreateCopy() copies array contents unconditionally,
+    // resulting in O(n) copies even for immutable arrays.
+    //
+    // <rdar://problem/19773555> CFArrayCreateCopy() is >10x slower than
+    // -[NSArray copyWithZone:]
+    self = Array(
+      _immutableCocoaArray:
+        unsafeBitCast(_cocoaArray.copyWithZone(nil), _NSArrayCoreType.self))
   }
 
   public static func _isBridgedToObjectiveC() -> Bool {
@@ -483,11 +490,11 @@ extension Array : _ObjectiveCBridgeable {
 
     if _fastPath(_isBridgedVerbatimToObjectiveC(T.self)) {
       // Forced down-cast (possible deferred type-checking)
-      result = Array(_fromNSArray: source)
+      result = Array(_cocoaArray: source)
       return
     }
 
-    result = _arrayForceCast([AnyObject](_fromNSArray: source))
+    result = _arrayForceCast([AnyObject](_cocoaArray: source))
   }
 
   public static func _conditionallyBridgeFromObjectiveC(
@@ -495,7 +502,7 @@ extension Array : _ObjectiveCBridgeable {
     inout result: Array?
   ) -> Bool {
     // Construct the result array by conditionally bridging each element.
-    let anyObjectArr = [AnyObject](_fromNSArray: source)
+    let anyObjectArr = [AnyObject](_cocoaArray: source)
 
     result = _arrayConditionalCast(anyObjectArr)
     return result != nil

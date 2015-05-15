@@ -64,7 +64,7 @@ public func _arrayForceCast<SourceElement, TargetElement>(
           TargetElement.self))
     }
     // All non-native buffers use deferred element typechecking
-    return Array(_fromCocoaArray: source._buffer._asCocoaArray())
+    return Array(_immutableCocoaArray: source._buffer._asCocoaArray())
     
   case (.Reference, .Explicit):
     let result: [TargetElement]? = _arrayConditionalBridgeElements(source)

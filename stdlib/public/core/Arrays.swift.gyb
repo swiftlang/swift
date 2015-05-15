@@ -1233,21 +1233,15 @@ extension Array {
     return nil
   }
 
-  /// Construct from the given `_NSArrayCoreType`.
+  /// Private initializer used for bridging.
   ///
-  /// If `noCopy` is `true`, either `source` must be known to be immutable,
-  /// or the resulting `Array` must not survive across code that could mutate
-  /// `source`.
-  public init(
-    _fromCocoaArray source: _NSArrayCoreType,
-    noCopy: Bool = false) {
-    let selectedSource: _NSArrayCoreType =
-      noCopy ?
-        source :
-        unsafeBitCast(
-          source.copyWithZone(nil),
-          _NSArrayCoreType.self)
-    self = Array(_ArrayBuffer(nsArray: selectedSource))
+  /// Only use this initializer when both conditions are true:
+  ///
+  /// * it is statically known that the given `NSArray` is immutable;
+  /// * `T` is bridged verbatim to Objective-C (i.e.,
+  ///   is a reference type).
+  public init(_immutableCocoaArray: _NSArrayCoreType) {
+    self = Array(_ArrayBuffer(nsArray: _immutableCocoaArray))
   }
 }
 #endif
