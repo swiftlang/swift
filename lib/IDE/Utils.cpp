@@ -535,7 +535,6 @@ static const char *OSXModuleList[] = {
   "Metal",
   "MetalKit",
   "ModelIO",
-  "ModelKit",
   "MultipeerConnectivity",
   "NetFS",
   //  "NetworkExtension",
