@@ -68,7 +68,8 @@ StaticStringTestSuite.test("PointerRepresentation/NonASCII") {
 }
 
 StaticStringTestSuite.test("PointerRepresentation/unicodeScalar")
-  .crashOutputMatches("StaticString should have Unicode scalar representation")
+  .crashOutputMatches(_isDebugAssertConfiguration() ?
+    "StaticString should have Unicode scalar representation" : "")
   .code {
   let str: StaticString = "abc"
   let strOpaque = _opaqueIdentity(str)
@@ -114,7 +115,8 @@ StaticStringTestSuite.test("UnicodeScalarRepresentation/NonASCII") {
 }
 
 StaticStringTestSuite.test("UnicodeScalarRepresentation/utf8Start")
-  .crashOutputMatches("StaticString should have pointer representation")
+  .crashOutputMatches(_isDebugAssertConfiguration() ?
+    "StaticString should have pointer representation" : "")
   .code {
   let str = StaticString(_builtinUnicodeScalarLiteral: UInt32(0x5a).value)
   let strOpaque = _opaqueIdentity(str)
@@ -123,7 +125,8 @@ StaticStringTestSuite.test("UnicodeScalarRepresentation/utf8Start")
 }
 
 StaticStringTestSuite.test("UnicodeScalarRepresentation/byteSize")
-  .crashOutputMatches("StaticString should have pointer representation")
+  .crashOutputMatches(_isDebugAssertConfiguration() ?
+    "StaticString should have pointer representation" : "")
   .code {
   let str = StaticString(_builtinUnicodeScalarLiteral: UInt32(0x5a).value)
   let strOpaque = _opaqueIdentity(str)
