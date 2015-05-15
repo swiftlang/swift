@@ -580,26 +580,20 @@ private:
     if (printKind == NullabilityPrintKind::After)
       os << ' ';
 
+    if (printKind != NullabilityPrintKind::ContextSensitive)
+      os << "__";
+
     switch (*kind) {
     case OTK_None:
-      if (printKind == NullabilityPrintKind::ContextSensitive)
-        os << "SWIFT_NULLABILITY(nonnull)";
-      else
-        os << "__nonnull";
+      os << "nonnull";
       break;
 
     case OTK_Optional:
-      if (printKind == NullabilityPrintKind::ContextSensitive)
-        os << "SWIFT_NULLABILITY(nullable)";
-      else
-        os << "__nullable";
+      os << "nullable";
       break;
 
     case OTK_ImplicitlyUnwrappedOptional:
-      if (printKind == NullabilityPrintKind::ContextSensitive)
-        os << "SWIFT_NULLABILITY(null_unspecified)";
-      else
-        os << "__null_unspecified";
+      os << "null_unspecified";
       break;
     }
 
@@ -1526,20 +1520,6 @@ public:
            "# define SWIFT_ENUM(_type, _name) "
              "enum _name : _type _name; "
              "enum SWIFT_ENUM_EXTRA _name : _type\n"
-           "#endif\n"
-           "#if __has_feature(nullability)\n"
-           "#  define SWIFT_NULLABILITY(X) X\n"
-           "#else\n"
-           "# if !defined(__nonnull)\n"
-           "#  define __nonnull\n"
-           "# endif\n"
-           "# if !defined(__nullable)\n"
-           "#  define __nullable\n"
-           "# endif\n"
-           "# if !defined(__null_unspecified)\n"
-           "#  define __null_unspecified\n"
-           "# endif\n"
-           "#  define SWIFT_NULLABILITY(X)\n"
            "#endif\n"
 #define MAP_SIMD_TYPE(C_TYPE, _) \
            "typedef " #C_TYPE " swift_" #C_TYPE "2"       \

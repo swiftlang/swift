@@ -1,6 +1,6 @@
 SWIFT_CLASS("_TtC8comments4A000")
 @interface A000
-- (SWIFT_NULLABILITY(nonnull) instancetype)init OBJC_DESIGNATED_INITIALIZER;
+- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -10,7 +10,7 @@ SWIFT_CLASS("_TtC8comments21A010_AttachToEntities")
 @interface A010_AttachToEntities
 
 /// Aaa.  init().
-- (SWIFT_NULLABILITY(nonnull) instancetype)init OBJC_DESIGNATED_INITIALIZER;
+- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 - (NSInteger)objectAtIndexedSubscript:(NSInteger)i;
 - (void)setObject:(NSInteger)newValue atIndexedSubscript:(NSInteger)i;
 
@@ -35,7 +35,7 @@ SWIFT_CLASS("_TtC8comments10ATXHeaders")
 /// <h1>LEVEL ONE</h1>
 /// <h2>LEVEL TWO</h2>
 - (void)f0;
-- (SWIFT_NULLABILITY(nonnull) instancetype)init OBJC_DESIGNATED_INITIALIZER;
+- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -46,7 +46,7 @@ SWIFT_CLASS("_TtC8comments13AutomaticLink")
 ///
 /// <a href="http://developer.apple.com/swift/">http://developer.apple.com/swift/</a>
 - (void)f0;
-- (SWIFT_NULLABILITY(nonnull) instancetype)init OBJC_DESIGNATED_INITIALIZER;
+- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -58,7 +58,7 @@ SWIFT_CLASS("_TtC8comments10BlockQuote")
 /// <blockquote>Bbb.</blockquote>
 /// <blockquote>Ccc.</blockquote>
 - (void)f0;
-- (SWIFT_NULLABILITY(nonnull) instancetype)init OBJC_DESIGNATED_INITIALIZER;
+- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -82,7 +82,7 @@ SWIFT_CLASS("_TtC8comments5Brief")
 ///
 /// Bbb.
 - (void)f3;
-- (SWIFT_NULLABILITY(nonnull) instancetype)init OBJC_DESIGNATED_INITIALIZER;
+- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -97,7 +97,7 @@ SWIFT_CLASS("_TtC8comments9CodeBlock")
 /// 
 /// </code>
 - (void)f0;
-- (SWIFT_NULLABILITY(nonnull) instancetype)init OBJC_DESIGNATED_INITIALIZER;
+- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -106,7 +106,7 @@ SWIFT_CLASS("_TtC8comments8Emphasis")
 
 /// Aaa *bbb* ccc. Aaa *bbb* ccc.
 - (void)f0;
-- (SWIFT_NULLABILITY(nonnull) instancetype)init OBJC_DESIGNATED_INITIALIZER;
+- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -124,7 +124,7 @@ SWIFT_CLASS("_TtC8comments13EmptyComments")
 
 /// Aaa.
 - (void)f4;
-- (SWIFT_NULLABILITY(nonnull) instancetype)init OBJC_DESIGNATED_INITIALIZER;
+- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -136,7 +136,7 @@ SWIFT_CLASS("_TtC8comments15HorizontalRules")
 /// <hr/>
 /// The end.
 - (void)f0;
-- (SWIFT_NULLABILITY(nonnull) instancetype)init OBJC_DESIGNATED_INITIALIZER;
+- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -145,7 +145,7 @@ SWIFT_CLASS("_TtC8comments16ImplicitNameLink")
 
 /// Apple
 - (void)f0;
-- (SWIFT_NULLABILITY(nonnull) instancetype)init OBJC_DESIGNATED_INITIALIZER;
+- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -179,7 +179,7 @@ SWIFT_CLASS("_TtC8comments20IndentedBlockComment")
 /// 
 /// </code>
 - (void)f2;
-- (SWIFT_NULLABILITY(nonnull) instancetype)init OBJC_DESIGNATED_INITIALIZER;
+- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -188,7 +188,7 @@ SWIFT_CLASS("_TtC8comments10InlineCode")
 
 /// Aaa ``bbb`` ccc.
 - (void)f0;
-- (SWIFT_NULLABILITY(nonnull) instancetype)init OBJC_DESIGNATED_INITIALIZER;
+- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -197,7 +197,7 @@ SWIFT_CLASS("_TtC8comments10InlineLink")
 
 /// Aaa bbb ccc.
 - (void)f0;
-- (SWIFT_NULLABILITY(nonnull) instancetype)init OBJC_DESIGNATED_INITIALIZER;
+- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -208,7 +208,7 @@ SWIFT_CLASS("_TtC8comments14MultiLineBrief")
 ///
 /// Some paragraph text.
 - (void)f0;
-- (SWIFT_NULLABILITY(nonnull) instancetype)init OBJC_DESIGNATED_INITIALIZER;
+- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -218,7 +218,7 @@ SWIFT_CLASS("_TtC8comments11OrderedList")
 /// <ol><li>Aaa.</li><li>Bbb.
 /// Ccc.</li></ol>
 - (void)f0;
-- (SWIFT_NULLABILITY(nonnull) instancetype)init OBJC_DESIGNATED_INITIALIZER;
+- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -267,7 +267,7 @@ SWIFT_CLASS("_TtC8comments15ParamAndReturns")
 /// \returns  Eee.
 /// Fff.
 - (void)f4;
-- (SWIFT_NULLABILITY(nonnull) instancetype)init OBJC_DESIGNATED_INITIALIZER;
+- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -280,7 +280,7 @@ SWIFT_CLASS("_TtC8comments16ParameterOutline")
 ///
 /// \param z A number
 - (void)f0:(NSInteger)x y:(NSInteger)y z:(NSInteger)z;
-- (SWIFT_NULLABILITY(nonnull) instancetype)init OBJC_DESIGNATED_INITIALIZER;
+- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -294,13 +294,13 @@ SWIFT_CLASS("_TtC8comments22ParameterOutlineMiddle")
 ///
 /// \param z A number
 - (void)f0:(NSInteger)x y:(NSInteger)y z:(NSInteger)z;
-- (SWIFT_NULLABILITY(nonnull) instancetype)init OBJC_DESIGNATED_INITIALIZER;
+- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
 SWIFT_CLASS("_TtC8comments13ReferenceLink")
 @interface ReferenceLink
-- (SWIFT_NULLABILITY(nonnull) instancetype)init OBJC_DESIGNATED_INITIALIZER;
+- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -309,7 +309,7 @@ SWIFT_CLASS("_TtC8comments7Returns")
 
 /// \returns  A number
 - (NSInteger)f0;
-- (SWIFT_NULLABILITY(nonnull) instancetype)init OBJC_DESIGNATED_INITIALIZER;
+- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -318,7 +318,7 @@ SWIFT_CLASS("_TtC8comments18SeparateParameters")
 
 /// \param x A number
 - (void)f0:(NSInteger)x y:(NSInteger)y;
-- (SWIFT_NULLABILITY(nonnull) instancetype)init OBJC_DESIGNATED_INITIALIZER;
+- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -332,7 +332,7 @@ SWIFT_CLASS("_TtC8comments13SetextHeaders")
 /// <h5>LEVEL FIVE</h5>
 /// <h5>LEVEL SIX</h5>
 - (void)f0;
-- (SWIFT_NULLABILITY(nonnull) instancetype)init OBJC_DESIGNATED_INITIALIZER;
+- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -341,7 +341,7 @@ SWIFT_CLASS("_TtC8comments14StrongEmphasis")
 
 /// Aaa **bbb** ccc. Aaa **bbb** ccc.
 - (void)f0;
-- (SWIFT_NULLABILITY(nonnull) instancetype)init OBJC_DESIGNATED_INITIALIZER;
+- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 
@@ -352,7 +352,7 @@ SWIFT_CLASS("_TtC8comments13UnorderedList")
 /// Ccc.</li></ul>
 /// <ul><li>Ddd.</li><li>Eee.<ul><li>Fff.</li></ul></li></ul>
 - (void)f0;
-- (SWIFT_NULLABILITY(nonnull) instancetype)init OBJC_DESIGNATED_INITIALIZER;
+- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
 
 #pragma clang diagnostic pop

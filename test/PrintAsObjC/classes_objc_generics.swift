@@ -63,19 +63,19 @@ import CoreFoundation
 
 // CHECK-LABEL: @interface ClassWithNSObjectProtocol <NSObject>
 // CHECK-NEXT: @property (nonatomic, readonly, copy) NSString * __nonnull description;
-// CHECK-NEXT: - (SWIFT_NULLABILITY(nonnull) instancetype)init OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: @end
 @objc class ClassWithNSObjectProtocol : NSObjectProtocol {
   var description: String { return "me" }
 }
 
 // CHECK-LABEL: @interface Initializers
-// CHECK-NEXT: - (SWIFT_NULLABILITY(nonnull) instancetype)init OBJC_DESIGNATED_INITIALIZER;
-// CHECK-NEXT: - (SWIFT_NULLABILITY(nonnull) instancetype)initWithInt:(NSInteger)_;
-// CHECK-NEXT: - (SWIFT_NULLABILITY(nonnull) instancetype)initWithFloat:(float)f;
-// CHECK-NEXT: - (SWIFT_NULLABILITY(nonnull) instancetype)initWithString:(NSString * __nonnull)s boolean:(BOOL)b;
-// CHECK-NEXT: - (SWIFT_NULLABILITY(nullable) instancetype)initWithBoolean:(BOOL)b;
-// CHECK-NEXT: - (SWIFT_NULLABILITY(nonnull) instancetype)initForFun OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: - (nonnull instancetype)initWithInt:(NSInteger)_;
+// CHECK-NEXT: - (nonnull instancetype)initWithFloat:(float)f;
+// CHECK-NEXT: - (nonnull instancetype)initWithString:(NSString * __nonnull)s boolean:(BOOL)b;
+// CHECK-NEXT: - (nullable instancetype)initWithBoolean:(BOOL)b;
+// CHECK-NEXT: - (nonnull instancetype)initForFun OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: @end
 @objc class Initializers {
   init() {}
@@ -107,7 +107,7 @@ class NotObjC {}
 // CHECK-NEXT: - (void)testSizedSignedTypes:(int8_t)a b:(int16_t)b c:(int32_t)c d:(int64_t)d;
 // CHECK-NEXT: - (void)testSizedUnsignedTypes:(uint8_t)a b:(uint16_t)b c:(uint32_t)c d:(uint64_t)d;
 // CHECK-NEXT: - (void)testSizedFloats:(float)a b:(double)b;
-// CHECK-NEXT: - (SWIFT_NULLABILITY(nonnull) instancetype)getDynamicSelf;
+// CHECK-NEXT: - (nonnull instancetype)getDynamicSelf;
 // CHECK-NEXT: + (SWIFT_METATYPE(Methods) __nonnull)getSelf;
 // CHECK-NEXT: - (Methods * __nullable)maybeGetSelf;
 // CHECK-NEXT: + (SWIFT_METATYPE(Methods) __nullable)maybeGetSelf;
@@ -395,7 +395,7 @@ public class NonObjCClass { }
 
 // CHECK-LABEL: @interface PropertiesOverridden
 // CHECK-NEXT: @property (nonatomic, copy, getter=bees, setter=setBees:) NS_ARRAY(Bee *) __nonnull bees;
-// CHECK-NEXT: - (SWIFT_NULLABILITY(null_unspecified) instancetype)init
+// CHECK-NEXT: - (null_unspecified instancetype)init
 // CHECK-NEXT: @end
 @objc class PropertiesOverridden : Hive {
   override var bees : [Bee] {
@@ -483,10 +483,10 @@ public class NonObjCClass { }
 // CHECK-NEXT: - (BOOL)method1WithError:(NSError * __nullable * __null_unspecified)error;
 // CHECK-NEXT: - (Throwing1 * __nullable)method2WithError:(NSError * __nullable * __null_unspecified)error;
 // CHECK-NEXT: - (NS_ARRAY(NSString *) __nullable)method3:(NSInteger)x error:(NSError * __nullable * __null_unspecified)error;
-// CHECK-NEXT: - (SWIFT_NULLABILITY(nullable) instancetype)method4WithError:(NSError * __nullable * __null_unspecified)error;
-// CHECK-NEXT: - (SWIFT_NULLABILITY(nullable) instancetype)initWithError:(NSError * __nullable * __null_unspecified)error OBJC_DESIGNATED_INITIALIZER;
-// CHECK-NEXT: - (SWIFT_NULLABILITY(nullable) instancetype)initWithString:(NSString * __nonnull)string error:(NSError * __nullable * __null_unspecified)error OBJC_DESIGNATED_INITIALIZER;
-// CHECK-NEXT: - (SWIFT_NULLABILITY(nullable) instancetype)initWithError:(NSError * __nullable * __null_unspecified)error fn:(NSInteger (^ __nonnull)(NSInteger))fn OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: - (nullable instancetype)method4WithError:(NSError * __nullable * __null_unspecified)error;
+// CHECK-NEXT: - (nullable instancetype)initWithError:(NSError * __nullable * __null_unspecified)error OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: - (nullable instancetype)initWithString:(NSString * __nonnull)string error:(NSError * __nullable * __null_unspecified)error OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: - (nullable instancetype)initWithError:(NSError * __nullable * __null_unspecified)error fn:(NSInteger (^ __nonnull)(NSInteger))fn OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: @end
 @objc class Throwing1 {
   func method1() throws { }

@@ -33,7 +33,7 @@ class A_Child : Base {
   // CHECK-NEXT: - (NSUInteger)foo:(NSUInteger)x y:(NSUInteger)y;
   override func foo(x: Int, y: Int) -> Int { return x + y }
 
-  // CHECK-NEXT: - (SWIFT_NULLABILITY(nonnull) instancetype)init OBJC_DESIGNATED_INITIALIZER;
+  // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 } // CHECK-NEXT: @end
 
 // CHECK-LABEL: @interface A_Grandchild : A_Child
@@ -50,7 +50,7 @@ class A_Grandchild : A_Child {
   // CHECK-NEXT: - (NSUInteger)foo:(NSUInteger)x y:(NSUInteger)y;
   override func foo(x: Int, y: Int) -> Int { return x + y }
 
-  // CHECK-NEXT: - (SWIFT_NULLABILITY(nonnull) instancetype)init OBJC_DESIGNATED_INITIALIZER;
+  // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 } // CHECK-NEXT: @end
 
 
@@ -80,7 +80,7 @@ class B_GrandchildViaEmpty : B_EmptyChild {
   // CHECK-NEXT: - (NSUInteger)foo:(NSUInteger)x y:(NSUInteger)y;
   override func foo(x: Int, y: Int) -> Int { return x + y }
 
-  // CHECK-NEXT: - (SWIFT_NULLABILITY(nonnull) instancetype)init OBJC_DESIGNATED_INITIALIZER;
+  // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 } // CHECK-NEXT: @end
 
 // The output in this class doesn't yet preserve NSUInteger correctly.
@@ -90,7 +90,7 @@ class FixMe : Base {
   // CLANG: error: conflicting parameter types in declaration of 'callback:'
   override func callback(fn: (() -> Int)?) {}
 
-  // CHECK-NEXT: - (SWIFT_NULLABILITY(nonnull) instancetype)init OBJC_DESIGNATED_INITIALIZER;
+  // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 } // CHECK-NEXT: @end
 
 // No more errors from Clang.
