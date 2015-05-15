@@ -153,3 +153,138 @@ bb0(%0 : $*Int):
   return %9999 : $()
 }
 
+// Closure specialization currently does not handle partial_apply arguments
+// correctly if the partial apply is not executed the same number of times as
+// the function that takes it as argument.
+
+//
+// fun_using_pa(…, @owned %closure: ()->()) {
+//    …
+//    = apply %closure
+//
+//    release %closure
+// }
+//
+// good_function() {
+//   // a partial apply consumes its arguments.
+//   %f = partial_apply %fun(%arg1, %arg2)
+//
+//   for () {
+//      retain %f
+//      apply %fun_using_pa(…, %f)
+//   }
+//   release %f
+// }
+//
+// We used to specializes to =>
+//
+// fun_using_pa(…, @owned %closure_arg1, @owned %closure_arg2) {
+//    …
+//    // The partial apply takes owner ship of its args!
+//    %closure = partial_apply(%closure_arg1, %closure_arg2)
+//
+//    = apply %closure
+//
+//    release %closure
+// }
+//
+// bad_function() {
+//    // retain args for the new partial apply that we specialized into %fun_using_pa
+//    retain %arg1
+//    retain %arg2
+//   %f = partial_apply %fun(%arg1, %arg2)
+//    ..
+//    for (i in 0..<N) {
+//      retain %f
+//      // NOTE: arg1, arg2 are release N times
+//      apply %fun_using_pa_specialize(…, %arg1, %arg2)
+//      release %f
+//    }
+//    release %f // (a)
+// }
+//
+// Note that the retains {%arg1, %arg2} do not match the releases executed by the
+// N executions of %fun_using_pa_specialize.
+//
+// What should happen is that we keep %arg1, %arg2 alive until the “set of post
+// dominating releases of the closure (%f) we are specializing on. In this
+// example this is (a). And, for every application of the specialized function
+// (%fun_using_pa_specialize) we have to insert retains for these arguments to
+// match the release executed by the partial apply (%closure) in this
+// specialized_function.
+//
+// bad_function_corrected() {
+//    // retain args for the new partial apply that we specialized into %fun_using_pa
+//    retain %arg1
+//    retain %arg2
+//   %f = partial_apply %fun(%arg1, %arg2)
+//    ..
+//    for (i in 0..<N) {
+//      retain %f
+//
+//      retain %arg1
+//      retain %arg2
+//      apply %fun_using_pa_specialize(…, %arg1, %arg2)
+//      release %f
+//    }
+//    release %arg1
+//    release %arg2
+//    release %f // (a)
+// }
+
+// For now we just make sure that we only specialize closures if the
+// partial_apply and the user apply are in the same block.
+
+class A {}
+
+sil hidden [noinline] @closure : $@convention(thin) (@owned A, @owned A) -> () {
+bb0(%0 : $A, %1 : $A):
+  strong_release %1 : $A
+  strong_release %0 : $A
+  %4 = tuple ()
+  return %4 : $()
+}
+
+sil hidden [noinline] @use_closure : $@convention(thin) (@owned @callee_owned (@owned A) -> ()) -> () {
+bb0(%0 : $@callee_owned (@owned A) -> ()):
+  %1 = alloc_ref $A
+  %2 = apply %0(%1) : $@callee_owned (@owned A) -> ()
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil {{.*}} @different_execution_counts
+// CHECK:  [[CLOSURE_FUN:%.*]] = function_ref @closure
+// CHECK:  [[CLOSURE:%.*]] = partial_apply [[CLOSURE_FUN]]
+// CHECK:  [[CLOSURE_USER:%.*]] = function_ref @use_closure
+// CHECK: apply [[CLOSURE_USER]]([[CLOSURE]])
+
+sil hidden [noinline] @different_execution_counts : $@convention(thin) (@guaranteed A) -> () {
+bb0(%0 : $A):
+  strong_retain %0 : $A
+  %2 = function_ref @closure : $@convention(thin) (@owned A, @owned A) -> ()
+  %3 = partial_apply %2(%0) : $@convention(thin) (@owned A, @owned A) -> ()
+  %4 = integer_literal $Builtin.Int64, 0
+  %5 = integer_literal $Builtin.Int64, 5
+  %6 = integer_literal $Builtin.Int64, 1
+  %7 = integer_literal $Builtin.Int1, 0
+  %8 = function_ref @use_closure : $@convention(thin) (@owned @callee_owned (@owned A) -> ()) -> ()
+  br bb2(%4 : $Builtin.Int64)
+
+bb1:
+  strong_release %3 : $@callee_owned (@owned A) -> ()
+  %11 = tuple ()
+  return %11 : $()
+
+bb2(%13 : $Builtin.Int64):
+  %14 = builtin "sadd_with_overflow_Int64"(%13 : $Builtin.Int64, %6 : $Builtin.Int64, %7 : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %15 = tuple_extract %14 : $(Builtin.Int64, Builtin.Int1), 0
+  strong_retain %3 : $@callee_owned (@owned A) -> ()
+  %17 = apply %8(%3) : $@convention(thin) (@owned @callee_owned (@owned A) -> ()) -> ()
+  %18 = builtin "cmp_eq_Int64"(%15 : $Builtin.Int64, %5 : $Builtin.Int64) : $Builtin.Int1
+  cond_br %18, bb1, bb3
+
+bb3:
+  br bb2(%15 : $Builtin.Int64)
+}
+

@@ -622,7 +622,7 @@ void ClosureSpecializer::gatherCallSites(
         // substitutions, there is nothing interesting for us to do, so
         // continue...
         auto *AI = dyn_cast<ApplyInst>(Use->getUser());
-        if (!AI || AI->hasSubstitutions())
+        if (!AI || AI->hasSubstitutions() || AI->getParent() != II.getParent())
           continue;
 
         // Check if we have already associated this apply inst with a closure to
