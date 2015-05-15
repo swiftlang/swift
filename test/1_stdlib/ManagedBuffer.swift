@@ -216,6 +216,8 @@ tests.test("isUniquelyReferenced") {
   var s2 = s
   expectFalse(isUniquelyReferenced(&s))
   expectFalse(isUniquelyReferenced(&s2))
+  _fixLifetime(s)
+  _fixLifetime(s2)
 }
 
 tests.test("isUniquelyReferencedNonObjC") {
@@ -226,6 +228,8 @@ tests.test("isUniquelyReferencedNonObjC") {
   expectFalse(isUniquelyReferencedNonObjC(&s2))
   var s3 = NSArray()
   expectFalse(isUniquelyReferencedNonObjC(&s3))
+  _fixLifetime(s)
+  _fixLifetime(s2)
 }
 
 runAllTests()
