@@ -1,0 +1,3 @@
+module ClangModule {
+  header "ClangModule.h"
+}
