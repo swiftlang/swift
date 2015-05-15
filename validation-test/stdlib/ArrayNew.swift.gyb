@@ -180,7 +180,7 @@ ArrayTestSuite.test("${array_type}/filter") {
       expectUnreachable()
       return true
     }
-    expectType(${array_type}<Int>.self, &result)
+    expectType(Array<Int>.self, &result)
     expectEqual([], result)
     expectEqual(0, result.capacity)
   }

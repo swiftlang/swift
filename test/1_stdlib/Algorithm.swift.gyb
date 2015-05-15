@@ -105,104 +105,6 @@ Algorithm.test("min,max") {
   // condition.
 }
 
-Algorithm.test("filter/SequenceType") {
-  // FIXME(prext): remove these tests together with the filter() function when
-  // protocol extensions land.  These tests have been migrated to the new API.
-  if true {
-    let s = MinimalSequence<Int>([], underestimatedCount: .Precise)
-    var result = filter(s) {
-      (x: Int) -> Bool in
-      expectUnreachable()
-      return true
-    }
-    expectType([Int].self, &result)
-    expectEqual([], result)
-    expectEqual([], Array(s)) { "sequence should be consumed" }
-    expectEqual(0, result.capacity)
-  }
-  if true {
-    let s = MinimalSequence(
-      [ 0, 30, 10, 90 ], underestimatedCount: .Value(0))
-    let result = filter(s) { (x: Int) -> Bool in false }
-    expectEqual([], result)
-    expectEqual([], Array(s)) { "sequence should be consumed" }
-    expectEqual(0, result.capacity)
-  }
-  if true {
-    let s = MinimalSequence(
-      [ 0, 30, 10, 90 ], underestimatedCount: .Value(0))
-    let result = filter(s) { (x: Int) -> Bool in true }
-    expectEqual([ 0, 30, 10, 90 ], result)
-    expectEqual([], Array(s)) { "sequence should be consumed" }
-    expectGE(2 * result.count, result.capacity)
-  }
-  if true {
-    let s = MinimalSequence(
-      [ 0, 30, 10, 90 ], underestimatedCount: .Value(0))
-    let result = filter(s) { $0 % 3 == 0 }
-    expectEqual([ 0, 30, 90 ], result)
-    expectEqual([], Array(s)) { "sequence should be consumed" }
-    expectGE(2 * result.count, result.capacity)
-  }
-  if true {
-    let s = MinimalSequence(
-      [ 0, 30, 10, 90 ], underestimatedCount: .Precise)
-    let result = filter(s) { $0 % 3 == 0 }
-    expectEqual([ 0, 30, 90 ], result)
-    expectEqual([], Array(s)) { "sequence should be consumed" }
-    expectGE(2 * result.count, result.capacity)
-  }
-}
-
-Algorithm.test("filter/CollectionType") {
-  // FIXME(prext): remove these tests together with the filter() function when
-  // protocol extensions land.  These tests have been migrated to the new API.
-  if true {
-    let c = MinimalForwardCollection<Int>([])
-    var result = filter(c) {
-      (x: Int) -> Bool in
-      expectUnreachable()
-      return true
-    }
-    expectEqual([], result)
-    expectType([Int].self, &result)
-    expectEqual(0, result.capacity)
-  }
-  if true {
-    let c = MinimalForwardCollection([ 0, 30, 10, 90 ])
-    let result = filter(c) { (x: Int) -> Bool in false }
-    expectEqual([], result)
-    expectEqual(0, result.capacity)
-  }
-  if true {
-    let c = MinimalForwardCollection([ 0, 30, 10, 90 ])
-    let result = filter(c) { (x: Int) -> Bool in true }
-    expectEqual([ 0, 30, 10, 90 ], result)
-    expectGE(2 * result.count, result.capacity)
-  }
-  if true {
-    let c = MinimalForwardCollection([ 0, 30, 10, 90 ])
-    let result = filter(c) { $0 % 3 == 0 }
-    expectEqual([ 0, 30, 90 ], result)
-    expectGE(2 * result.count, result.capacity)
-  }
-}
-
-Algorithm.test("filter/eager") {
-  // Make sure filter is eager and only calls its predicate once per element.
-
-  // FIXME(prext): remove these tests together with the filter() function when
-  // protocol extensions land.  These tests have been migrated to the new API.
-  var count = 0
-  let one = filter(0..<10) {
-    (x: Int)->Bool in ++count; return x == 1
-  }
-  for x in one {}
-  expectEqual(10, count)
-  for x in one {}
-  expectEqual(10, count)
-}
-
 Algorithm.test("sorted/strings")
   .xfail(.LinuxAny(reason: "String comparison: ICU vs. Foundation"))
   .code {
@@ -1278,11 +1180,11 @@ struct MinimalSequenceWith${Implementation}Filter<Element> : SequenceType {
     }
   }
 
-  func _prext_filter(
+  func filter(
     @noescape transform: (Element) -> Bool
   ) -> [Element] {
     ++MinimalSequenceWithCustomFilter.timesFilterWasCalled
-    return _data._prext_filter(transform)
+    return _data.filter(transform)
   }
 
 %   end
@@ -1294,7 +1196,7 @@ func callStaticSequenceFilter(
   sequence: MinimalSequenceWithDefaultFilter<OpaqueValue<Int>>,
   @noescape includeElement: (OpaqueValue<Int>) -> Bool
 ) -> [OpaqueValue<Int>] {
-  var result = sequence._prext_filter(includeElement)
+  var result = sequence.filter(includeElement)
   expectType([OpaqueValue<Int>].self, &result)
   return result
 }
@@ -1303,7 +1205,7 @@ func callStaticSequenceFilter(
   sequence: MinimalSequenceWithCustomFilter<OpaqueValue<Int>>,
   @noescape includeElement: (OpaqueValue<Int>) -> Bool
 ) -> [OpaqueValue<Int>] {
-  var result = sequence._prext_filter(includeElement)
+  var result = sequence.filter(includeElement)
   expectType([OpaqueValue<Int>].self, &result)
   return result
 }
@@ -1312,7 +1214,7 @@ func callGenericSequenceFilter<S : SequenceType>(
   sequence: S,
   @noescape includeElement: (S.Generator.Element) -> Bool
 ) -> [S.Generator.Element] {
-  var result = sequence._prext_filter(includeElement)
+  var result = sequence.filter(includeElement)
   expectType(Array<S.Generator.Element>.self, &result)
   return result
 }
@@ -1407,11 +1309,11 @@ struct MinimalForwardCollectionWith${Implementation}Filter<Element>
     }
   }
 
-  func _prext_filter(
+  func filter(
     @noescape transform: (Element) -> Bool
   ) -> [Element] {
     ++MinimalForwardCollectionWithCustomFilter.timesFilterWasCalled
-    return _data._prext_filter(transform)
+    return _data.filter(transform)
   }
 
 %   end
@@ -1424,7 +1326,7 @@ func callStaticCollectionFilter(
   sequence: MinimalForwardCollectionWithDefaultFilter<OpaqueValue<Int>>,
   @noescape includeElement: (OpaqueValue<Int>) -> Bool
 ) -> [OpaqueValue<Int>] {
-  var result = sequence._prext_filter(includeElement)
+  var result = sequence.filter(includeElement)
   expectType([OpaqueValue<Int>].self, &result)
   return result
 }
@@ -1433,7 +1335,7 @@ func callStaticCollectionFilter(
   sequence: MinimalForwardCollectionWithCustomFilter<OpaqueValue<Int>>,
   @noescape includeElement: (OpaqueValue<Int>) -> Bool
 ) -> [OpaqueValue<Int>] {
-  var result = sequence._prext_filter(includeElement)
+  var result = sequence.filter(includeElement)
   expectType([OpaqueValue<Int>].self, &result)
   return result
 }
@@ -1442,7 +1344,7 @@ func callGenericCollectionFilter<S : CollectionType>(
   sequence: S,
   @noescape includeElement: (S.Generator.Element) -> Bool
 ) -> [S.Generator.Element] {
-  var result = sequence._prext_filter(includeElement)
+  var result = sequence.filter(includeElement)
   expectType(Array<S.Generator.Element>.self, &result)
   return result
 }

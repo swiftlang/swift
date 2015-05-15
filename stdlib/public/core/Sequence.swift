@@ -85,7 +85,7 @@ public protocol _Sequence_Type
 
   /// Return an `Array` containing the elements of `self`,
   /// in order, that satisfy the predicate `includeElement`.
-  func _prext_filter(
+  func filter(
     @noescape includeElement: (Generator.Element) -> Bool
   ) -> [Generator.Element]
 
@@ -152,7 +152,7 @@ extension SequenceType {
 extension SequenceType {
   /// Return an `Array` containing the elements of `self`,
   /// in order, that satisfy the predicate `includeElement`.
-  final public func _prext_filter(
+  final public func filter(
     @noescape includeElement: (Generator.Element) -> Bool
   ) -> [Generator.Element] {
     // Cast away @noescape.

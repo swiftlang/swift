@@ -920,11 +920,11 @@ public class TestSuite {
     }
 
     func getActiveXFailPredicates() -> _UnitTestArray<TestRunPredicate> {
-      return xfail.filter { $0.evaluate() }
+      return _UnitTestArray(xfail.filter { $0.evaluate() })
     }
 
     func getActiveSkipPredicates() -> _UnitTestArray<TestRunPredicate> {
-      return skip.filter { $0.evaluate() }
+      return _UnitTestArray(skip.filter { $0.evaluate() })
     }
   }
 
