@@ -425,7 +425,7 @@ bool TypeChecker::requireArrayLiteralIntrinsics(SourceLoc loc) {
 static bool doesStorageProduceLValue(TypeChecker &TC,
                                      AbstractStorageDecl *storage,
                                      Type baseType, DeclContext *useDC,
-                                     Optional<DeclRefExpr *> base = None) {
+                                     const DeclRefExpr *base = nullptr) {
   // Unsettable storage decls always produce rvalues.
   if (!storage->isSettable(useDC, base))
     return false;
@@ -475,7 +475,7 @@ static bool doesStorageProduceLValue(TypeChecker &TC,
 
 Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
                                              DeclContext *UseDC,
-                                             Optional<DeclRefExpr *> base,
+                                             const DeclRefExpr *base,
                                              bool wantInterfaceType) {
   validateDecl(value);
   if (value->isInvalid())

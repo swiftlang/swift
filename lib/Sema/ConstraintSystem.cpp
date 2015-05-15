@@ -826,7 +826,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
                                      bool isTypeReference,
                                      bool isSpecialized,
                                      ConstraintLocatorBuilder locator,
-                                     Optional<DeclRefExpr *> base,
+                                     const DeclRefExpr *base,
                                      DependentTypeOpener *opener) {
   llvm::DenseMap<CanType, TypeVariableType *> replacements;
 
@@ -1053,7 +1053,7 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
                                            bool isTypeReference,
                                            bool isDynamicResult,
                                            ConstraintLocatorBuilder locator,
-                                           Optional<DeclRefExpr *> base,
+                                           const DeclRefExpr *base,
                                            DependentTypeOpener *opener) {
   // Figure out the instance type used for the base.
   TypeVariableType *baseTypeVar = nullptr;
@@ -1345,22 +1345,23 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       = choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
     // Retrieve the type of a reference to the specific declaration choice.
     if (choice.getBaseType()) {
-      auto getDotBase = [](const Expr *E) -> Optional<DeclRefExpr *> {
+      auto getDotBase = [](const Expr *E) -> const DeclRefExpr * {
+        if (E == nullptr) return nullptr;
         switch (E->getKind()) {
         case ExprKind::MemberRef: {
           auto Base = cast<MemberRefExpr>(E)->getBase();
-          return dyn_cast<DeclRefExpr>(Base);
+          return dyn_cast<const DeclRefExpr>(Base);
         }
         case ExprKind::UnresolvedDot: {
           auto Base = cast<UnresolvedDotExpr>(E)->getBase();
-          return dyn_cast<DeclRefExpr>(Base);
+          return dyn_cast<const DeclRefExpr>(Base);
         }
         default:
-          return None;
+          return nullptr;
         }
       };
       auto anchor = locator ? locator->getAnchor() : nullptr;
-      auto base = anchor ? getDotBase(anchor) : None;
+      auto base = getDotBase(anchor);
       std::tie(openedFullType, refType)
         = getTypeOfMemberReference(choice.getBaseType(), choice.getDecl(),
                                    isTypeReference, isDynamicResult,
@@ -1368,7 +1369,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
     } else {
       std::tie(openedFullType, refType)
         = getTypeOfReference(choice.getDecl(), isTypeReference,
-                             choice.isSpecialized(), locator, nullptr);
+                             choice.isSpecialized(), locator);
     }
 
     if (choice.isPotentiallyUnavailable()) {

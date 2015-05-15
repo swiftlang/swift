@@ -1131,7 +1131,7 @@ public:
   /// \param wantInterfaceType Whether we want the interface type, if available.
   Type getUnopenedTypeOfReference(ValueDecl *value, Type baseType,
                                   DeclContext *UseDC,
-                                  Optional<DeclRefExpr *> base = None,
+                                  const DeclRefExpr *base = nullptr,
                                   bool wantInterfaceType = false);
 
   /// Return the non-lvalue type-of-reference of the given value.

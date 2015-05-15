@@ -833,10 +833,8 @@ namespace {
         containerTy = member->getDeclContext()->getDeclaredTypeOfContext();
         memberRef = member;
         auto baseDeclRefExpr = dyn_cast<DeclRefExpr>(base);
-        auto optionalBase = baseDeclRefExpr
-          ? Optional<DeclRefExpr *>(baseDeclRefExpr)
-          : None;
-        refTy = tc.getUnopenedTypeOfReference(member, Type(), dc, optionalBase,
+        refTy = tc.getUnopenedTypeOfReference(member, Type(), dc,
+                                              baseDeclRefExpr,
                                               /*wantInterfaceType=*/true);
       }
 
@@ -2206,7 +2204,8 @@ namespace {
         return MetatypeType::get(type);
       }
 
-      return cs.TC.getUnopenedTypeOfReference(decl, Type(), dc, None,
+      return cs.TC.getUnopenedTypeOfReference(decl, Type(), dc,
+                                              /*base=*/nullptr,
                                               /*wantInterfaceType=*/true);
     }
 

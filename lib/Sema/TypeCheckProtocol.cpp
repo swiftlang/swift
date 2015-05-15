@@ -1229,6 +1229,7 @@ matchWitness(ConformanceChecker &cc, TypeChecker &tc,
                                       /*isTypeReference=*/false,
                                       /*isDynamicResult=*/false,
                                       witnessLocator,
+                                      /*base=*/nullptr,
                                       /*opener=*/nullptr);
     } else {
       std::tie(openedFullWitnessType, openWitnessType) 
@@ -1236,6 +1237,7 @@ matchWitness(ConformanceChecker &cc, TypeChecker &tc,
                                 /*isTypeReference=*/false,
                                 /*isDynamicResult=*/false,
                                 witnessLocator,
+                                /*base=*/nullptr,
                                 /*opener=*/nullptr);
     }
     openWitnessType = openWitnessType->getRValueType();
@@ -1250,7 +1252,7 @@ matchWitness(ConformanceChecker &cc, TypeChecker &tc,
                                      /*isTypeReference=*/false,
                                      /*isDynamicResult=*/false,
                                      locator,
-                                     /*base*/None,
+                                     /*base=*/nullptr,
                                      &reqTypeOpener);
     reqType = reqType->getRValueType();
 
