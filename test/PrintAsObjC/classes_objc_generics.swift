@@ -20,9 +20,6 @@
 // RUN: %check-in-clang-objc-generics %t/classes.h
 // RUN: not %check-in-clang-objc-generics -fno-modules %t/classes.h
 // RUN: %check-in-clang-objc-generics -fno-modules %t/classes.h -include Foundation.h -include CoreFoundation.h
-// RUN: %check-in-clang %t/classes.h
-// RUN: not %check-in-clang -fno-modules %t/classes.h
-// RUN: %check-in-clang -fno-modules %t/classes.h -include Foundation.h -include CoreFoundation.h
 
 // CHECK-NOT: AppKit;
 // CHECK-NOT: Properties;
@@ -31,7 +28,6 @@
 // CHECK-NEXT: @import CoreGraphics;
 // CHECK-NOT: AppKit;
 // CHECK-NOT: Swift;
-// CHECK: define NS_ARRAY
 import Foundation
 import AppKit // only used in implementations
 import CoreFoundation
@@ -116,12 +112,12 @@ class NotObjC {}
 // CHECK-NEXT: - (void)testParens:(NSInteger)a;
 // CHECK-NEXT: - (void)testIgnoredParam:(NSInteger)_;
 // CHECK-NEXT: - (void)testIgnoredParams:(NSInteger)_ again:(NSInteger)_;
-// CHECK-NEXT: - (void)testArrayBridging:(NS_ARRAY(Methods *) __nonnull)a;
+// CHECK-NEXT: - (void)testArrayBridging:(NSArray<Methods *> * __nonnull)a;
 // CHECK-NEXT: - (void)testArrayBridging2:(NSArray * __nonnull)a;
-// CHECK-NEXT: - (void)testArrayBridging3:(NS_ARRAY(NSString *) __nonnull)a;
+// CHECK-NEXT: - (void)testArrayBridging3:(NSArray<NSString *> * __nonnull)a;
 // CHECK-NEXT: - (void)testDictionaryBridging:(NSDictionary * __nonnull)a;
-// CHECK-NEXT: - (void)testDictionaryBridging2:(NS_DICTIONARY(NSNumber *, Methods *) __nonnull)a;
-// CHECK-NEXT: - (void)testDictionaryBridging3:(NS_DICTIONARY(NSString *, NSString *) __nonnull)a;
+// CHECK-NEXT: - (void)testDictionaryBridging2:(NSDictionary<NSNumber *, Methods *> * __nonnull)a;
+// CHECK-NEXT: - (void)testDictionaryBridging3:(NSDictionary<NSString *, NSString *> * __nonnull)a;
 // CHECK-NEXT: - (void)testSetBridging:(NSSet * __nonnull)a;
 // CHECK-NEXT: - (IBAction)actionMethod:(id __nonnull)_;
 // CHECK-NEXT: init
@@ -331,11 +327,11 @@ public class NonObjCClass { }
 // CHECK-NEXT: @property (nonatomic, copy) NSString * __nonnull string;
 // CHECK-NEXT: @property (nonatomic, copy) NSArray * __nonnull array;
 // CHECK-NEXT: @property (nonatomic, copy) NSArray * __nonnull arrayOfClasses;
-// CHECK-NEXT: @property (nonatomic, copy) NS_DICTIONARY(NSString *, NSString *) __nonnull dictionary;
-// CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(Properties) NS_ARRAY(Properties *) __null_unspecified outletCollection;
-// CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(Properties) NS_ARRAY(Properties *)  __nullable outletCollectionOptional;
+// CHECK-NEXT: @property (nonatomic, copy) NSDictionary<NSString *, NSString *> * __nonnull dictionary;
+// CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(Properties) NSArray<Properties *> * __null_unspecified outletCollection;
+// CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(Properties) NSArray<Properties *> *  __nullable outletCollectionOptional;
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(id) NSArray * __nullable outletCollectionAnyObject;
-// CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(id) NS_ARRAY(id <NSObject>) __nullable outletCollectionProto;
+// CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(id) NSArray<id <NSObject>> * __nullable outletCollectionProto;
 // CHECK-NEXT: + (NSInteger)staticInt;
 // CHECK-NEXT: + (NSString * __nonnull)staticString;
 // CHECK-NEXT: + (void)setStaticString:(NSString * __nonnull)value;
@@ -394,7 +390,7 @@ public class NonObjCClass { }
 }
 
 // CHECK-LABEL: @interface PropertiesOverridden
-// CHECK-NEXT: @property (nonatomic, copy, getter=bees, setter=setBees:) NS_ARRAY(Bee *) __nonnull bees;
+// CHECK-NEXT: @property (nonatomic, copy, getter=bees, setter=setBees:) NSArray<Bee *> * __nonnull bees;
 // CHECK-NEXT: - (null_unspecified instancetype)init
 // CHECK-NEXT: @end
 @objc class PropertiesOverridden : Hive {
@@ -439,7 +435,7 @@ public class NonObjCClass { }
 // CHECK-NEXT: - (void)setObject:(Subscripts2 * __nonnull)newValue atIndexedSubscript:(int16_t)i;
 // CHECK-NEXT: - (NSObject * __nonnull)objectForKeyedSubscript:(NSObject * __nonnull)o;
 // CHECK-NEXT: - (void)setObject:(NSObject * __nonnull)newValue forKeyedSubscript:(NSObject * __nonnull)o;
-// CHECK-NEXT: @property (nonatomic, copy) NS_ARRAY(NSString *) __nonnull cardPaths;
+// CHECK-NEXT: @property (nonatomic, copy) NSArray<NSString *> * __nonnull cardPaths;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Subscripts2 {
@@ -482,7 +478,7 @@ public class NonObjCClass { }
 // CHECK-LABEL: @interface Throwing1
 // CHECK-NEXT: - (BOOL)method1WithError:(NSError * __nullable * __null_unspecified)error;
 // CHECK-NEXT: - (Throwing1 * __nullable)method2WithError:(NSError * __nullable * __null_unspecified)error;
-// CHECK-NEXT: - (NS_ARRAY(NSString *) __nullable)method3:(NSInteger)x error:(NSError * __nullable * __null_unspecified)error;
+// CHECK-NEXT: - (NSArray<NSString *> * __nullable)method3:(NSInteger)x error:(NSError * __nullable * __null_unspecified)error;
 // CHECK-NEXT: - (nullable instancetype)method4WithError:(NSError * __nullable * __null_unspecified)error;
 // CHECK-NEXT: - (nullable instancetype)initWithError:(NSError * __nullable * __null_unspecified)error OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: - (nullable instancetype)initWithString:(NSString * __nonnull)string error:(NSError * __nullable * __null_unspecified)error OBJC_DESIGNATED_INITIALIZER;

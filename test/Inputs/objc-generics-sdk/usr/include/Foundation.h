@@ -21,7 +21,6 @@ typedef double NSTimeInterval;
 
 @class NSString, NSArray, NSDictionary, NSSet, NSEnumerator;
 
-#define NS_ARRAY(...) NSArray<__VA_ARGS__> *
 @interface NSArray<ObjectType> : NSObject
 - (ObjectType)objectAtIndexedSubscript:(NSUInteger)idx;
 - description;
@@ -44,7 +43,6 @@ typedef double NSTimeInterval;
 - (id)copyWithZone:(NSZone *)zone;
 @end
 
-#define NS_DICTIONARY(...) NSDictionary<__VA_ARGS__> *
 @interface NSDictionary<KeyType : id<NSCopying>, ObjectType> : NSObject /*<NSCopying, NSMutableCopying, NSSecureCoding, NSFastEnumeration>*/
 @property (readonly) NSUInteger count;
 - (nullable ObjectType)objectForKey:(KeyType)aKey;
@@ -67,7 +65,6 @@ typedef double NSTimeInterval;
 - (void)setObject:(ObjectType)obj forKeyedSubscript:(KeyType)key;
 @end
 
-#define NS_SET(...) NSSet<__VA_ARGS__> *
 @interface NSSet<KeyType> : NSObject
 - (instancetype)init;
 - (NSUInteger)count;
