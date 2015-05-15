@@ -1750,11 +1750,12 @@ sil_vtable ZZZ {
   #ZZZ.init!initializer.1: _TFC4main3ZZZcfMS0_FT_S0_	// main.ZZZ.init (main.ZZZ.Type)() -> main.ZZZ
 }
 
+// FIXME: <rdar://problem/20980377> Add dead array elimination to DeadObjectElimination
 // CHECK-LABEL: test_dead_array
 // CHECK: bb0(%0 : $ZZZ):
-// CHECK-NEXT: strong_release %0
-// CHECK-NEXT: tuple
-// CHECK-NEXT: return
+// DISABLED-CHECK-NEXT: strong_release %0
+// DISABLED-CHECK-NEXT: tuple
+// DISABLED-CHECK-NEXT: return
 sil @test_dead_array : $@convention(thin) (@owned ZZZ) -> () {
 bb0(%0 : $ZZZ):
   %1 = integer_literal $Builtin.Word, 1
@@ -2478,4 +2479,53 @@ bb0(%0 : $Builtin.Int1):
   %1 = integer_literal $Builtin.Int1, -1
   %2 = builtin "cmp_eq_Int1"(%0 : $Builtin.Int1, %1 : $Builtin.Int1) : $Builtin.Int1
   return %2 : $Builtin.Int1
+}
+
+// dead_array test helpers
+sil [thunk] @dead_array_run_closure : $@convention(thin) (@owned @callee_owned () -> Bool) -> () {
+bb0(%0 : $@callee_owned () -> Bool):
+  %1 = apply %0() : $@callee_owned () -> Bool
+  %2 = tuple ()
+  return %2 : $()
+}
+
+sil @dead_array_closure : $@convention(thin) (@inout _HeapBuffer<C, Int>) -> Bool {
+bb0(%0 : $*_HeapBuffer<C, Int>):
+  %1 = struct_element_addr %0 : $*_HeapBuffer<C, Int>, #_HeapBuffer._storage // user: %2
+  %2 = is_unique %1 : $*Optional<Builtin.NativeObject> // user: %3
+  %3 = struct $Bool (%2 : $Builtin.Int1)          // user: %4
+  return %3 : $Bool                               // id: %4
+}
+
+// Mimicks Swift._allocateUninitializedArray
+sil [_semantics "array.uninitialized"] @dead_array_alloc : $@convention(thin) <τ_0_0> (Builtin.Word) -> @owned (Array<τ_0_0>, Builtin.RawPointer)
+
+// <rdar://problem/20980377> HeapBuffer.swift test case spuriously reports a "unique" buffer
+// CHECK-LABEL: sil @dead_array
+// CHECK-NOT: release
+// CHECK: retain_value %{{[0-9]+}} : $Optional<Builtin.NativeObject>
+// CHECK: apply
+// CHECK: strong_release %{{[0-9]+}} : $Builtin.BridgeObject
+sil @dead_array : $@convention(thin) (@inout _HeapBuffer<C, Int>) -> () {
+bb0(%0 : $*_HeapBuffer<C, Int>):
+  %1 = integer_literal $Builtin.Word, 1           // user: %3
+  %2 = function_ref @dead_array_alloc : $@convention(thin) <τ_0_0> (Builtin.Word) -> @owned (Array<τ_0_0>, Builtin.RawPointer)
+  %3 = apply %2<_HeapBuffer<C, Int>>(%1) : $@convention(thin) <τ_0_0> (Builtin.Word) -> @owned (Array<τ_0_0>, Builtin.RawPointer)
+  %4 = tuple_extract %3 : $(Array<_HeapBuffer<C, Int>>, Builtin.RawPointer), 0 // user: %15
+  %5 = tuple_extract %3 : $(Array<_HeapBuffer<C, Int>>, Builtin.RawPointer), 1 // user: %6
+  %6 = pointer_to_address %5 : $Builtin.RawPointer to $*_HeapBuffer<C, Int> // user: %9
+  %7 = load %0 : $*_HeapBuffer<C, Int>            // users: %8, %9
+  %8 = struct_extract %7 : $_HeapBuffer<C, Int>, #_HeapBuffer._storage // user: %13
+  store %7 to %6 : $*_HeapBuffer<C, Int>          // id: %9
+  %10 = function_ref @dead_array_run_closure : $@convention(thin) (@owned @callee_owned () -> Bool) -> () // user: %14
+  %11 = function_ref @dead_array_closure : $@convention(thin) (@inout _HeapBuffer<C, Int>) -> Bool // user: %12
+  %12 = partial_apply %11(%0) : $@convention(thin) (@inout _HeapBuffer<C, Int>) -> Bool // user: %14
+  retain_value %8 : $Optional<Builtin.NativeObject> // id: %13
+  %14 = apply %10(%12) : $@convention(thin) (@owned @callee_owned () -> Bool) -> ()
+  %15 = struct_extract %4 : $Array<_HeapBuffer<C, Int>>, #Array._buffer // user: %16
+  %16 = struct_extract %15 : $_ArrayBuffer<_HeapBuffer<C, Int>>, #_ArrayBuffer._storage // user: %17
+  %17 = struct_extract %16 : $_BridgeStorage<_ContiguousArrayStorageBase, _NSArrayCoreType>, #_BridgeStorage.rawValue // user: %18
+  strong_release %17 : $Builtin.BridgeObject      // id: %18
+  %19 = tuple ()                                  // user: %20
+  return %19 : $()                                // id: %20
 }

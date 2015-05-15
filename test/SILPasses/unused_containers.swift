@@ -24,18 +24,20 @@ func unused_string_test() {
   let unused : String = ""
 }
 
+// FIXME: <rdar://problem/20980377> Add dead array elimination to DeadObjectElimination
 //CHECK-LABEL: array_of_strings_test
 //CHECK: bb0:
-//CHECK-NEXT: tuple
-//CHECK-NEXT: return
+//DISABLED-CHECK-NEXT: tuple
+//DISABLED-CHECK-NEXT: return
 func array_of_strings_test() {
   let x = [""]
 }
 
+// FIXME: <rdar://problem/20980377> Add dead array elimination to DeadObjectElimination
 //CHECK-LABEL: string_interpolation
 //CHECK: bb0:
-//CHECK-NEXT: tuple
-//CHECK-NEXT: return
+//DISABLED-CHECK-NEXT: tuple
+//DISABLED-CHECK-NEXT: return
 func string_interpolation() {
   // Int
   let x : Int = 2
@@ -59,10 +61,11 @@ func string_interpolation() {
   "\(UInt32(4))"
 }
 
+// FIXME: <rdar://problem/20980377> Add dead array elimination to DeadObjectElimination
 //CHECK-LABEL: string_interpolation2
 //CHECK: bb0:
-//CHECK-NEXT: tuple
-//CHECK-NEXT: return
+//DISABLED-CHECK-NEXT: tuple
+//DISABLED-CHECK-NEXT: return
 func string_interpolation2() {
   "\(false) \(true)"
 }

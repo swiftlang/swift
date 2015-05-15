@@ -890,8 +890,11 @@ static bool recursivelyCollectARCUsers(UserListTy &Uses, SILInstruction *Inst) {
       Uses.push_back(Inst->getUser());
       continue;
     }
-    if (auto SI = dyn_cast<StructExtractInst>(Inst->getUser()))
-      if (recursivelyCollectARCUsers(Uses, SI))
+    SILInstruction *Proj;
+    if ((Proj = dyn_cast<TupleExtractInst>(Inst->getUser())) ||
+        (Proj = dyn_cast<StructExtractInst>(Inst->getUser())) ||
+        (Proj = dyn_cast<PointerToAddressInst>(Inst->getUser())))
+      if (recursivelyCollectARCUsers(Uses, Proj))
         continue;
 
     return false;
@@ -906,35 +909,6 @@ SILInstruction *
 SILCombiner::optimizeConcatenationOfStringLiterals(ApplyInst *AI) {
   // String literals concatenation optimizer.
   return tryToConcatenateStrings(AI, *Builder);
-}
-
-/// \brief Returns a list of instructions that only write into the uninitialized
-/// array \p Inst.
-static bool recursivelyCollectArrayWritesInstr(UserListTy &Uses,
-                                               SILInstruction *Inst) {
-  Uses.push_back(Inst);
-  for (auto Op : Inst->getUses()) {
-    if (isa<RefCountingInst>(Op->getUser()) ||
-        // The store must not store the array but only to the array.
-        (isa<StoreInst>(Op->getUser()) &&
-         dyn_cast<StoreInst>(Op->getUser())->getSrc().getDef() != Inst) ||
-        isa<DebugValueInst>(Op->getUser())) {
-      Uses.push_back(Op->getUser());
-      continue;
-    }
-
-    SILInstruction *Proj;
-    if ((Proj = dyn_cast<TupleExtractInst>(Op->getUser())) ||
-        (Proj = dyn_cast<StructExtractInst>(Op->getUser())) ||
-        (Proj = dyn_cast<IndexAddrInst>(Op->getUser())) ||
-        (Proj = dyn_cast<PointerToAddressInst>(Op->getUser())))
-      if (recursivelyCollectArrayWritesInstr(Uses, Proj))
-        continue;
-
-    return false;
-  }
-
-  return true;
 }
 
 /// Optimize builtins which receive the same value in their first and second
@@ -1748,20 +1722,11 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
     if (SF->hasSemanticsString("array.uninitialized")) {
       UserListTy Users;
       // If the uninitialized array is only written into then it can be removed.
-      if (recursivelyCollectArrayWritesInstr(Users, AI)) {
-        // Erase all of the stores to the dead array, the reference counting
-        // instructions on the array and the allocation-apply itself.
-        for (auto rit = Users.rbegin(), re = Users.rend(); rit != re; ++rit) {
-          SILInstruction *I = *rit;
-          if (StoreInst *SI = dyn_cast<StoreInst>(I)) {
-            // We must release all stored values (because they are not stored
-            // anymore).
-            SILValue V = SI->getSrc();
-            SILBuilder BuilderAtStore(SI);
-            BuilderAtStore.emitReleaseValueOperation(SI->getLoc(), V);
-          }
-          eraseInstFromFunction(*I);
-        }
+      if (recursivelyCollectARCUsers(Users, AI)) {
+        // Erase all of the reference counting instructions on the array and the
+        // allocation-apply itself.
+        for (auto rit = Users.rbegin(), re = Users.rend(); rit != re; ++rit)
+          eraseInstFromFunction(**rit);
       }
     }
   }
