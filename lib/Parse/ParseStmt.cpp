@@ -872,6 +872,37 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
   }
 }
 
+/// Validate availability spec list, emitting diagnostics if necessary.
+static void validateAvailabilitySpecList(Parser &P,
+                                         ArrayRef<AvailabilitySpec *> Specs) {
+  llvm::SmallSet<PlatformKind, 4> Platforms;
+  bool HasOtherPlatformSpec = false;
+  for (auto *Spec : Specs) {
+    if (isa<OtherPlatformAvailabilitySpec>(Spec)) {
+      HasOtherPlatformSpec = true;
+      continue;
+    }
+
+    auto *VersionSpec = cast<VersionConstraintAvailabilitySpec>(Spec);
+    bool Inserted = Platforms.insert(VersionSpec->getPlatform()).second;
+    if (!Inserted) {
+      // Rule out multiple version specs referring to the same platform.
+      // For example, we emit an error for
+      /// #available(OSX 10.10, OSX 10.11, *)
+      PlatformKind Platform = VersionSpec->getPlatform();
+      P.diagnose(VersionSpec->getPlatformLoc(),
+                 diag::availability_query_repeated_platform,
+                 platformString(Platform));
+    }
+  }
+
+  if (!HasOtherPlatformSpec) {
+    SourceLoc InsertWildcardLoc = Specs.back()->getSourceRange().End;
+    P.diagnose(InsertWildcardLoc, diag::availability_query_wildcard_required)
+        .fixItInsertAfter(InsertWildcardLoc, ", *");
+  }
+}
+
 // #available(...)
 ParserResult<PoundAvailableInfo> Parser::parseStmtConditionPoundAvailable() {
   SourceLoc PoundLoc = consumeToken(tok::pound_available);
@@ -902,12 +933,16 @@ ParserResult<PoundAvailableInfo> Parser::parseStmtConditionPoundAvailable() {
     if (Tok.isBinaryOperator()) {
       diagnose(Tok, diag::avail_query_disallowed_operator, Tok.getText());
       consumeToken();
+      Status.setIsParseError();
     } else if (consumeIf(tok::comma)) {
       // keep going.
     } else {
       break;
     }
   }
+
+  if (Status.isSuccess())
+    validateAvailabilitySpecList(*this, Specs);
 
   SourceLoc RParenLoc;
   if (parseMatchingToken(tok::r_paren, RParenLoc,

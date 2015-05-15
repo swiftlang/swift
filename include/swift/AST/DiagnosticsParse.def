@@ -1198,6 +1198,11 @@ ERROR(avail_query_disallowed_operator,parsing, PointsToFirstBadToken,
 ERROR(avail_query_version_comparison_not_needed,parsing,
       none,"version comparison not needed", ())
 
+ERROR(availability_query_wildcard_required, parsing, none,
+      "must handle potential future platforms with '*'", ())
+
+ERROR(availability_query_repeated_platform, parsing, none,
+      "version for '%0' already specified", (StringRef))
 
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)

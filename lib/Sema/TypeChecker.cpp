@@ -1136,39 +1136,6 @@ private:
     pushContext(FallthroughTRC, ParentBrace);
   }
 
-  /// Validate the availability query, emitting diagnostics if necessary.
-  void validateAvailabilityQuery(PoundAvailableInfo *E) {
-    llvm::SmallSet<PlatformKind, 2> Platforms;
-    bool HasOtherPlatformSpec = false;
-    for (auto *Spec : E->getQueries()) {
-      if (isa<OtherPlatformAvailabilitySpec>(Spec)) {
-        HasOtherPlatformSpec = true;
-        continue;
-      }
-
-      auto *VersionSpec = cast<VersionConstraintAvailabilitySpec>(Spec);
-      bool Inserted = Platforms.insert(VersionSpec->getPlatform()).second;
-      if (!Inserted) {
-        // Rule out multiple version specs referring to the same platform.
-        // For example, we emit an error for
-        /// #available(OSX >= 10.10, OSX >= 10.11, *)
-        PlatformKind Platform = VersionSpec->getPlatform();
-        AC.Diags.diagnose(VersionSpec->getPlatformLoc(),
-                          diag::availability_query_repeated_platform,
-                          platformString(Platform));
-      }
-    }
-
-    if (!HasOtherPlatformSpec) {
-      ArrayRef<AvailabilitySpec *> Queries = E->getQueries();
-      assert(Queries.size() > 0);
-      AvailabilitySpec *LastQuery = Queries[Queries.size() - 1];
-      SourceLoc InsertWildcardLoc = LastQuery->getSourceRange().End;
-      AC.Diags.diagnose(E->getLoc(), diag::availability_query_wildcard_required)
-          .fixItInsertAfter(InsertWildcardLoc, ", *");
-    }
-  }
-
   /// Build the type refinement context for a StmtCondition and return the
   /// refined range for the true-branch if the statement condition contains
   /// any availability queries. Returns None if the guard condition does not
@@ -1200,8 +1167,6 @@ private:
       // have been emitted by the parser.
       if (Query->getQueries().size() == 0)
         continue;
-
-      validateAvailabilityQuery(Query);
 
       AvailabilitySpec *Spec = bestActiveSpecForQuery(Query);
       if (!Spec) {

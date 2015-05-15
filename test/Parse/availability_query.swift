@@ -10,14 +10,14 @@ if (#available(OSX 10.10, *)) {}  // expected-error {{#available may only be use
 
 let x = #available(OSX 10.10, *)  // expected-error {{#available may only be used as condition of}}
 
-(#available(OSX 10.10) ? 1 : 0) // expected-error {{#available may only be used as condition of an}}
+(#available(OSX 10.10, *) ? 1 : 0) // expected-error {{#available may only be used as condition of an}}
 
 if !#available(OSX 10.11, *) { // expected-error {{#available may only be used as condition of an}}
 }
 if let _ = Optional(5) where !#available(OSX 10.11, *) { // expected-error {{#available may only be used as condition}}
 }
 
-if #available(OSX 10.10) && #available(OSX 10.11) { // expected-error {{expected '{' after 'if' condition}} expected-error 3 {{}} expected-note {{}}
+if #available(OSX 10.10, *) && #available(OSX 10.11, *) { // expected-error {{expected '{' after 'if' condition}} expected-error 3 {{}} expected-note {{}}
 }
 
 
@@ -36,7 +36,7 @@ if #available(OSX { // expected-error {{expected version number}} expected-error
 if #available(OSX) { // expected-error {{expected version number}}
 }
 
-if #available(OSX 10.10 { // expected-error {{expected ')'}} expected-note {{to match this opening '('}} expected-error {{check must handle potential future platforms with '*'}}
+if #available(OSX 10.10 { // expected-error {{expected ')'}} expected-note {{to match this opening '('}} expected-error {{must handle potential future platforms with '*'}}
 }
 
 if #available(iDishwasherOS 10.10) { // expected-error {{unrecognized platform name 'iDishwasherOS'}}
@@ -44,6 +44,13 @@ if #available(iDishwasherOS 10.10) { // expected-error {{unrecognized platform n
 
 if #available(iDishwasherOS 10.10, *) { // expected-error {{unrecognized platform name 'iDishwasherOS'}}
 }
+
+if #available(OSX 10.10, OSX 10.11, *) {  // expected-error {{version for 'OSX' already specified}}
+}
+
+if #available(OSX 10.11) { }  // expected-error {{must handle potential future platforms with '*'}} {{24-24=, *}}
+
+if #available(OSX 10.10, iOS 8.0) { }  // expected-error {{must handle potential future platforms with '*'}} {{33-33=, *}}
 
 if #available(iOS 8.0, *) {
 }
@@ -59,26 +66,23 @@ if #available(* { // expected-error {{expected ')' in availability query}} expec
 if #available(OSX 10.10, iOS 8.0, *) {
 }
 
-if #available(OSX 10.10, iOS 8.0) { // expected-error {{check must handle potential future platforms with '*'}}
+
+if #available(OSX 10.10, { // expected-error {{expected platform name}} // expected-error {{expected ')'}} expected-note {{to match this opening '('}}
 }
 
-
-if #available(OSX 10.10, { // expected-error {{expected platform name}} // expected-error {{expected ')'}} expected-note {{to match this opening '('}} expected-error {{check must handle potential future platforms with '*'}}
+if #available(OSX 10.10,) { // expected-error {{expected platform name}}
 }
 
-if #available(OSX 10.10,) { // expected-error {{expected platform name}} expected-error {{check must handle potential future platforms with '*'}}
+if #available(OSX 10.10, iOS { // expected-error {{expected version number}} // expected-error {{expected ')'}} expected-note {{to match this opening '('}}
 }
 
-if #available(OSX 10.10, iOS { // expected-error {{expected version number}} // expected-error {{expected ')'}} expected-note {{to match this opening '('}} expected-error {{check must handle potential future platforms with '*'}}
+if #available(OSX 10.10, iOS 8.0, iDishwasherOS 10.10) { // expected-error {{unrecognized platform name 'iDishwasherOS'}}
 }
 
-if #available(OSX 10.10, iOS 8.0, iDishwasherOS 10.10) { // expected-error {{unrecognized platform name 'iDishwasherOS'}} expected-error {{check must handle potential future platforms with '*'}}
+if #available(iDishwasherOS 10.10, OSX 10.10) { // expected-error {{unrecognized platform name 'iDishwasherOS'}}
 }
 
-if #available(iDishwasherOS 10.10, OSX 10.10) { // expected-error {{unrecognized platform name 'iDishwasherOS'}} expected-error {{check must handle potential future platforms with '*'}}
-}
-
-if #available(OSX 10.10 || iOS 8.0) {// expected-error {{'||' cannot be used in an availability condition}} expected-error {{check must handle potential future platforms with '*'}}
+if #available(OSX 10.10 || iOS 8.0) {// expected-error {{'||' cannot be used in an availability condition}}
 }
 
 // Emit Fix-It removing un-needed >=, for the moment.

@@ -90,16 +90,11 @@ if #available(OSX 10.10, iOS 8.0, *) {
   let _: Int = globalFuncAvailableOnOSX10_10AndiOS8_0()
 }
 
-if #available(OSX 10.10, OSX 10.11, *) {  // expected-error {{conditions for 'OSX' already specified for this query}}
-}
-
-if #available(iOS 9.0) {  // expected-error {{condition required for target platform 'OSX'}} expected-error {{check must handle potential future platforms with '*'}} {{22-22=, *}}
+if #available(iOS 9.0, *) {
   let _: Int = globalFuncAvailableOnOSX10_10AndiOS8_0() // expected-error {{'globalFuncAvailableOnOSX10_10AndiOS8_0()' is only available on OS X 10.10 or newer}}
       // expected-note@-1 {{guard with version check}}
 }
 
-if #available(OSX 10.10, iOS 9.0) {  // expected-error {{check must handle potential future platforms with '*'}} {{33-33=, *}}
-}
 // Multiple unavailable references in a single statement
 
 let ignored4: (Int, Int) = (globalFuncAvailableOn10_10(), globalFuncAvailableOn10_11()) // expected-error {{'globalFuncAvailableOn10_10()' is only available on OS X 10.10 or newer}}  expected-error {{'globalFuncAvailableOn10_11()' is only available on OS X 10.11 or newer}}

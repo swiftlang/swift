@@ -2242,12 +2242,6 @@ ERROR(availability_inout_accessor_only_version_newer, sema_avail, none,
       "available on %2 %3 or newer",
       (/*AccessorKind*/unsigned, DeclName, StringRef, clang::VersionTuple))
 
-ERROR(availability_query_repeated_platform, sema_avail, none,
-      "conditions for '%0' already specified for this query", (StringRef))
-
-ERROR(availability_query_wildcard_required, sema_avail, none,
-      "check must handle potential future platforms with '*'", ())
-
 ERROR(availability_query_required_for_platform, sema_avail, none,
       "condition required for target platform '%0'", (StringRef))
 
