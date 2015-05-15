@@ -1230,19 +1230,19 @@ private:
   }
 
   ShouldRecurse_t checkApply(ApplyExpr *E) {
-    // HACK: implicitly-generated functions can get queued multiple
-    // times in definedFunctions, so be sure to be idempotent.
-    // Fortunately, such bodies shouldn't have 'try' contexts.
-    if (E->isThrowsSet()) return ShouldRecurse;
-
     // An apply expression is a potential throw site if the function throws.
     // But if the expression didn't type-check, suppress diagnostics.
     auto classification = Classifier.classifyApply(E);
 
-    E->setThrows(classification.getResult() == ThrowingKind::RethrowingOnly ||
-                 classification.getResult() == ThrowingKind::Throws);
-
     checkThrowSite(E, /*requiresTry*/ true, classification);
+
+    // HACK: functions can get queued multiple times in
+    // definedFunctions, so be sure to be idempotent.
+    if (!E->isThrowsSet()) {
+      E->setThrows(classification.getResult() == ThrowingKind::RethrowingOnly ||
+                   classification.getResult() == ThrowingKind::Throws);
+    }
+
     return ShouldRecurse;
   }
 
@@ -1271,6 +1271,10 @@ private:
     case ThrowingKind::Throws:
       HasAnyThrowSite = true;
       HasTryThrowSite |= requiresTry;
+
+      if (auto apply = dyn_cast<ApplyExpr>(E))
+        if (apply->isThrowsSet())
+          return;
 
       bool isTryCovered = (!requiresTry || IsInTry);
       if (!CurContext.handles(classification.getResult())) {

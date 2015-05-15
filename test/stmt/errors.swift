@@ -71,6 +71,16 @@ struct seven {
   }
 }
 
+class eight {
+  lazy var bar: Int = {
+    do {
+      return try seven_helper()
+    } catch {
+      return 0
+    }
+  }()
+}
+
 protocol ThrowingProto {
   func foo() throws
   static func bar() throws
