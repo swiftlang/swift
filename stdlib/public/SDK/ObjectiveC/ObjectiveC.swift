@@ -227,3 +227,37 @@ public func || <T : BooleanType>(
   return lhs.boolValue ? true : rhs().boolValue
 }
 
+//===----------------------------------------------------------------------===//
+// NSObject
+//===----------------------------------------------------------------------===//
+
+// NSObject implements Equatable's == as -[NSObject isEqual:]
+// NSObject implements Hashable's hashValue() as -[NSObject hash]
+// FIXME: what about NSObjectProtocol?
+
+extension NSObject : Equatable, Hashable {
+  /// The hash value.
+  ///
+  /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
+  ///
+  /// - Note: the hash value is not guaranteed to be stable across
+  ///   different invocations of the same program.  Do not persist the
+  ///   hash value across program runs.
+  public var hashValue: Int {
+    return hash
+  }
+}
+
+public func == (lhs: NSObject, rhs: NSObject) -> Bool {
+  return lhs.isEqual(rhs)
+}
+
+extension NSObject : CVarArgType {
+  /// Transform `self` into a series of machine words that can be
+  /// appropriately interpreted by C varargs
+  public var _cVarArgEncoding: [Word] {
+    _autorelease(self)
+    return _encodeBitsAsWords(self)
+  }
+}
+

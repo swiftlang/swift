@@ -49,32 +49,12 @@ public let NSUTF32StringEncoding: UInt = 0x8c000100
 public let NSUTF32BigEndianStringEncoding: UInt = 0x98000100
 public let NSUTF32LittleEndianStringEncoding: UInt = 0x9c000100
 
-
 //===----------------------------------------------------------------------===//
 // NSObject
 //===----------------------------------------------------------------------===//
 
-// NSObject implements Equatable's == as -[NSObject isEqual:]
-// NSObject implements Hashable's hashValue() as -[NSObject hash]
-// FIXME: what about NSObjectProtocol?
-
-extension NSObject : Equatable, Hashable {
-  /// The hash value.
-  ///
-  /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
-  ///
-  /// - Note: the hash value is not guaranteed to be stable across
-  ///   different invocations of the same program.  Do not persist the
-  ///   hash value across program runs.
-  public var hashValue: Int {
-    return hash
-  }
-}
-
-public func == (lhs: NSObject, rhs: NSObject) -> Bool {
-  return lhs.isEqual(rhs)
-}
-
+// This conformance should be located in the `ObjectiveC` module, but it can't
+// be placed there because string bridging is not available there.
 extension NSObject : CustomStringConvertible {}
 
 //===----------------------------------------------------------------------===//
@@ -668,22 +648,8 @@ extension Dictionary : _ObjectiveCBridgeable {
 }
 
 //===----------------------------------------------------------------------===//
-// General objects
-//===----------------------------------------------------------------------===//
-
-extension NSObject : CVarArgType {
-  /// Transform `self` into a series of machine words that can be
-  /// appropriately interpreted by C varargs
-  public var _cVarArgEncoding: [Word] {
-    _autorelease(self)
-    return _encodeBitsAsWords(self)
-  }
-}
-
-//===----------------------------------------------------------------------===//
 // Fast enumeration
 //===----------------------------------------------------------------------===//
-
 
 // NB: This is a class because fast enumeration passes around interior pointers
 // to the enumeration state, so the state cannot be moved in memory. We will
