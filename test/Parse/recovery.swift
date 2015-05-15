@@ -597,6 +597,9 @@ func testMultiPatternConditionRecovery(x: Int?) {
   if var y = x where y == 0, z = x {
     z = y; y = z
   }
+
+  // <rdar://problem/20883210> QoI: Following a "let" condition with boolean condition spouts nonsensical errors
+  guard let x: Int? = 1, x == 1 else {  } // expected-error {{boolean condition requires 'where' to separate it from variable binding}}
 }
 
 // rdar://20866942
@@ -606,4 +609,3 @@ func testRefutableLet() {
   // expected-error @-1 {{expected expression}}
   // expected-error @-2 {{type annotation missing in pattern}}
 }
-

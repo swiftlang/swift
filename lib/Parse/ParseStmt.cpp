@@ -1070,9 +1070,10 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
     // The first pattern entry we parse will record the location of the
     // let/var/case into the StmtCondition.
     SourceLoc IntroducerLoc = VarLoc;
+    bool hadIncorrectlyWrittenWhereClause = false;
 
     // Parse the list of name bindings within a let/var clauses.
-    do {
+    while (1) {
       ParserResult<Pattern> ThePattern;
 
       if (BindingKind == BK_Case) {
@@ -1139,14 +1140,57 @@ ParserStatus Parser::parseStmtCondition(StmtCondition &Condition,
         VD->setHasNonPatternBindingInit();
       });
 
-    } while (Tok.is(tok::comma) &&
-             peekToken().isNot(tok::kw_let, tok::kw_var, tok::kw_case,
-                               tok::pound_available) &&
-             consumeIf(tok::comma));
+      // We're done if there is a 'where' clause, 'else' or any other noncomma.
+      if (Tok.isNot(tok::comma)) break;
+
+      // If we have a comma, we could be continuing to another pattern as in:
+      //    let x = foo(), y = bar()
+      // Alternatively, this could be start of another clause, as in:
+      //    let x = foo(), let y = bar()
+      if (peekToken().isAny(tok::kw_let, tok::kw_var, tok::kw_case,
+                            tok::pound_available))
+        break;
+
+      // At this point, we know that the next thing should be a pattern to
+      // follow in the series.  However, it is fairly common for people to
+      // forget a 'where' clause and write something like:
+      //
+      //   let x = foo(), x != 42
+      //
+      // instead of:
+      //
+      //   let x = foo() where x != 42
+      //
+      // It is hard to tell whether the next clause is a pattern or an invalid
+      // expression, because 'case' patterns can have expressions embedded in
+      // them.  As such, if we're continuing a non-case pattern, do a bit more
+      // lookahead to disambiguate this.
+      if (BindingKind == BK_Let || BindingKind == BK_Var) {
+        // Determine whether this was an invalid pattern or if the pattern has
+        // no trailing "=".
+        {
+          Parser::BacktrackingScope Backtrack(*this);
+          consumeToken(tok::comma);
+          hadIncorrectlyWrittenWhereClause =
+            !canParseTypedPattern() || Tok.isNot(tok::equal);
+        }
+
+        if (hadIncorrectlyWrittenWhereClause) {
+          diagnose(Tok, diag::comma_should_be_where)
+            .fixItReplace(Tok.getLoc(), " where");
+          consumeToken(tok::comma);
+          break;
+        }
+      }
+
+      // Otherwise, it really does look like this comma continues the pattern
+      // clause, so eat it and parse the next clause.
+      consumeToken(tok::comma);
+    }
 
     // If there is a where clause on this let/var specification, parse and
     // remember it.
-    if (consumeIf(tok::kw_where)) {
+    if (hadIncorrectlyWrittenWhereClause || consumeIf(tok::kw_where)) {
       ParserResult<Expr> WhereExpr
         = parseExprBasic(diag::expected_expr_conditional_where);
       Status |= WhereExpr;

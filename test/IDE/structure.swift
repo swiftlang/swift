@@ -72,8 +72,8 @@ for var i = 0, i2 = 1; i == 0; ++i {}
 for var (i,i2) = (0,0), i3 = 1; i == 0; ++i {}
 
 for i = 0; i == 0; ++i {}
-// CHECK: <while>while <elem-condexpr>var v? = o, z? = o where v > z</elem-condexpr> <brace>{}</brace></while>
-while var v? = o, z? = o where v > z {}
+// CHECK: <while>while <elem-condexpr>var v = o, z = o where v > z</elem-condexpr> <brace>{}</brace></while>
+while var v = o, z = o where v > z {}
 // CHECK: <while>while <elem-condexpr>v == 0</elem-condexpr> <brace>{}</brace></while>
 while v == 0 {}
 // CHECK: <repeat-while>repeat <brace>{}</brace> while <elem-expr>v == 0</elem-expr></repeat-while>
