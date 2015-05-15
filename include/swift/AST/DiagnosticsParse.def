@@ -722,7 +722,7 @@ ERROR(expected_expr_return,stmt_parsing,PointsToFirstBadToken,
 ERROR(expected_lbrace_after_defer,stmt_parsing,PointsToFirstBadToken,
       "expected '{' after 'defer'", ())
 
-// If/While/Guard Conditions
+// If/While Conditions
 ERROR(expected_expr_conditional_letbinding,stmt_parsing,none,
       "expected 'let' or 'var' in conditional", ())
 ERROR(expected_expr_conditional_letbinding_bool_conditions,stmt_parsing,none,
@@ -742,9 +742,6 @@ ERROR(wrong_condition_case_location,stmt_parsing,none,
 ERROR(where_end_of_binding_use_letvar,stmt_parsing,none,
       "binding ended by previous 'where' clause; "
       "use '%0' to introduce a new one", (StringRef))
-ERROR(comma_should_be_where,stmt_parsing,none,
-      "boolean condition requires 'where' to separate it from variable binding",
-      ())
 
 // If Statement
 ERROR(expected_condition_if,stmt_parsing,PointsToFirstBadToken,
