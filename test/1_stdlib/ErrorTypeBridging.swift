@@ -119,7 +119,23 @@ ErrorTypeBridgingTests.test("NSError-to-enum bridging") {
     }
 
     expectTrue(isHeadingFailure)
+
+    // NSPOSIXError domain
+    let nsPOSIX = NSError(domain: NSPOSIXErrorDomain,
+                          code: Int(EDEADLK),
+                          userInfo: [:])
+    let ePOSIX: ErrorType = nsPOSIX
+    let isDeadlock: Bool
+    switch ePOSIX {
+    case _POSIXError.EDEADLK:
+      isDeadlock = true
+    default:
+      isDeadlock = false
+    }
+
+    expectTrue(isDeadlock)
   }
+  
   expectEqual(NoisyErrorDeathCount, NoisyErrorLifeCount)
 }
 
