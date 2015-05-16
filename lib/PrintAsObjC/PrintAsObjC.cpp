@@ -1434,6 +1434,24 @@ public:
     
     seenTypes[ED] = {EmissionState::Defined, true};
     printer.print(ED);
+
+    ASTContext &ctx = M.getASTContext();
+
+    auto protos = ED->getAllProtocols();
+    auto errorTypeProto = ctx.getProtocol(KnownProtocolKind::ErrorType);
+    if (std::find(protos.begin(), protos.end(), errorTypeProto) !=
+        protos.end()) {
+      bool hasDomainCase = std::any_of(ED->getAllElements().begin(),
+                                       ED->getAllElements().end(),
+                                       [](const EnumElementDecl *elem) {
+        return elem->getName().str() == "Domain";
+      });
+      if (!hasDomainCase) {
+        os << "static NSString * const " << ED->getName() << "Domain = @\""
+           << M.getName() << "." << ED->getName() << "\";\n";
+      }
+    }
+
     return true;
   }
 

@@ -68,6 +68,9 @@ static ValueDecl *deriveErrorType_enum_domain(TypeChecker &tc,
   //     return "\(self.dynamicType)"
   //   }
   // }
+
+  // Note that for @objc enums the format is assumed to be "MyModule.SomeEnum".
+  // If this changes, please change PrintAsObjC as well.
   
   ASTContext &C = tc.Context;
   

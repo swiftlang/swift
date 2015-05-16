@@ -31,6 +31,7 @@ import Foundation
 // CHECK-NEXT:   ExplicitValuesZang = 219,
 // CHECK-NEXT:   ExplicitValuesZung = 220,
 // CHECK-NEXT: };
+// NEGATIVE-NOT: ExplicitValuesDomain
 
 @objc enum ExplicitValues: CUnsignedInt {
   case Zim, Zang = 219, Zung
@@ -61,6 +62,24 @@ import Foundation
   case Zang = -219, Zung
 
   func methodNotExportedToObjC() {}
+}
+
+// CHECK-LABEL: typedef SWIFT_ENUM(NSInteger, SomeErrorType) {
+// CHECK-NEXT:   SomeErrorTypeBadness = 9001,
+// CHECK-NEXT:   SomeErrorTypeWorseness = 9002,
+// CHECK-NEXT: };
+// CHECK-NEXT: static NSString * const SomeErrorTypeDomain = @"enums.SomeErrorType";
+@objc enum SomeErrorType: Int, ErrorType {
+  case Badness = 9001
+  case Worseness
+}
+
+// CHECK-LABEL: typedef SWIFT_ENUM(NSInteger, SomeOtherErrorType) {
+// CHECK-NEXT:   SomeOtherErrorTypeDomain = 0,
+// CHECK-NEXT: };
+// NEGATIVE-NOT: NSString * const SomeOtherErrorTypeDomain
+@objc enum SomeOtherErrorType: Int, ErrorType {
+  case Domain // collision!
 }
 
 // CHECK-NOT: enum {{[A-Z]+}}
