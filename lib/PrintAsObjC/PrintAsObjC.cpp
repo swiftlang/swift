@@ -803,9 +803,9 @@ private:
 #ifndef SWIFT_DISABLE_OBJC_GENERICS
       if (!BGT->getGenericArgs()[0]->isAnyObject() &&
           !containsNonObjCType(BGT->getGenericArgs()[0])) {
-        os << "NSArray<";
+        os << "NS_ARRAY(";
         visitPart(BGT->getGenericArgs()[0], None);
-        os << "> *";
+        os << ")";
       } else {
         os << "NSArray *";
       }
@@ -823,11 +823,11 @@ private:
            !BGT->getGenericArgs()[1]->isAnyObject()) &&
           !containsNonObjCType(BGT->getGenericArgs()[0]) &&
           !containsNonObjCType(BGT->getGenericArgs()[1])) {
-        os << "NSDictionary<";
+        os << "NS_DICTIONARY(";
         visitPart(BGT->getGenericArgs()[0], None);
         os << ", ";
         visitPart(BGT->getGenericArgs()[1], None);
-        os << "> *";
+        os << ")";
       } else {
         os << "NSDictionary *";
       }
@@ -843,9 +843,9 @@ private:
 #ifndef SWIFT_DISABLE_OBJC_GENERICS
       if (!isNSObject(BGT->getGenericArgs()[0]) &&
           !containsNonObjCType(BGT->getGenericArgs()[0])) {
-        os << "NSSet<";
+        os << "NS_SET(";
         visitPart(BGT->getGenericArgs()[0], None);
-        os << "> *";
+        os << ")";
       } else {
         os << "NSSet *";
       }
@@ -1602,6 +1602,29 @@ public:
       else
         out << "#import \"" << bridgingHeader << "\"\n\n";
     }
+
+#ifndef SWIFT_DISABLE_OBJC_GENERICS
+    // Once we've printed out the imports, deal with Foundations that
+    // don't provide NS_ARRAY/NS_DICTIONARY/NS_SET.
+    out << "#ifndef NS_ARRAY\n"
+           "#  pragma clang diagnostic push\n"
+           "#  pragma clang diagnostic ignored \"-Wvariadic-macros\"\n"
+           "#  define NS_ARRAY(...) NSArray *\n"
+           "#  pragma clang diagnostic pop\n"
+           "#endif\n"
+           "#ifndef NS_DICTIONARY\n"
+           "#  pragma clang diagnostic push\n"
+           "#  pragma clang diagnostic ignored \"-Wvariadic-macros\"\n"
+           "#  define NS_DICTIONARY(...) NSDictionary *\n"
+           "#  pragma clang diagnostic pop\n"
+           "#endif\n"
+           "#ifndef NS_SET\n"
+           "#  pragma clang diagnostic push\n"
+           "#  pragma clang diagnostic ignored \"-Wvariadic-macros\"\n"
+           "#  define NS_SET(...) NSSet *\n"
+           "#  pragma clang diagnostic pop\n"
+           "#endif\n";
+#endif
   }
 
   bool writeToStream(raw_ostream &out) {
