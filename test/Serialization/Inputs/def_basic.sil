@@ -605,7 +605,7 @@ sil [fragile] @test_autorelease_return : $@convention(objc_method) (Bas) -> NSSt
 sil [fragile] @test_super_method : $@convention(method) (@guaranteed Bas) -> Bas
 
 sil [fragile] @swift_StringToNSString : $@convention(thin) (@inout String) -> @owned NSString
-sil [fragile] @_TFSSCfMSSFT_SS : $@convention(thin) (@thin String.Type) -> String
+sil [fragile] @_TFSSCfMSSFT_SS : $@convention(thin) (@thin String.Type) -> @owned String
 
 // CHECK-LABEL: sil public_external [fragile] @test_builtin_func_ref
 sil [fragile] @test_builtin_func_ref : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> Builtin.Int1 {
