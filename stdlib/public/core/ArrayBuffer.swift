@@ -509,7 +509,7 @@ extension _ArrayBuffer {
     }
   }
 
-  `true`, if the array is native and does not need a deferred type check.
+  /// `true`, if the array is native and does not need a deferred type check.
   var _isNativeNoTypeCheck: Bool {
     if !_isClassOrObjCExistential(T.self) {
       return true
