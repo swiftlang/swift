@@ -26,6 +26,7 @@
 #include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/OptionSet.h"
+#include "swift/Parse/Lexer.h"
 #include "llvm/ADT/SetVector.h"
 #include <functional>
 
@@ -1576,6 +1577,22 @@ public:
   void disable() {
     expr = nullptr;
   }
+};
+
+/// Temporary on-stack storage and unescaping for for encoded diagnostic
+/// messages.
+///
+///
+class EncodedDiagnosticMessage {
+  llvm::SmallString<128> Buf;
+
+public:
+  /// \param S A string with an encoded message
+  EncodedDiagnosticMessage(StringRef S)
+      : Message(Lexer::getEncodedStringSegment(S, Buf)) {}
+
+  /// The unescaped message to display to the user.
+  const StringRef Message;
 };
 
 } // end namespace swift

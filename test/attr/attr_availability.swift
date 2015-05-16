@@ -35,6 +35,14 @@ typealias float = Float // expected-note {{'float' has been explicitly marked un
 var x : int // expected-error {{'int' is unavailable: oh no you dont}}
 var y : float // expected-error {{'float' has been renamed to Float}}{{9-14=Float}}
 
+// Encoded message
+@available(*, unavailable, message="This message has a double quote \"")
+func unavailableWithDoubleQuoteInMessage() {} // expected-note {{'unavailableWithDoubleQuoteInMessage()' has been explicitly marked unavailable here}}
+
+func useWithEscapedMessage() {
+  unavailableWithDoubleQuoteInMessage() // expected-error {{'unavailableWithDoubleQuoteInMessage()' is unavailable: This message has a double quote \"}}
+}
+
 
 // More complicated parsing.
 @available(OSX, message="x", unavailable)
@@ -103,15 +111,17 @@ let _: Int
 @available(*, deprecated, unavailable, message="message") // expected-error{{'available' attribute cannot be both unconditionally 'unavailable' and 'deprecated'}}
 struct BadUnconditionalAvailability { };
 
-@available(*, deprecated, message="message")
+// Encoding in messages
+@available(*, deprecated, message="Say \"Hi\"")
 func deprecated_func_with_message() {}
 
-@available(*, deprecated, message="message")
+// 'PANDA FACE' (U+1F43C)
+@available(*, deprecated, message="Pandas \u{1F43C} are cute")
 struct DeprecatedTypeWithMessage { }
 
 func use_deprecated_with_message() {
-  deprecated_func_with_message() // expected-warning{{'deprecated_func_with_message()' is deprecated: message}}
-  var _ : DeprecatedTypeWithMessage // expected-warning{{'DeprecatedTypeWithMessage' is deprecated: message}}
+  deprecated_func_with_message() // expected-warning{{'deprecated_func_with_message()' is deprecated: Say \"Hi\"}}
+  var _: DeprecatedTypeWithMessage // expected-warning{{'DeprecatedTypeWithMessage' is deprecated: Pandas \u{1F43C} are cute}}
 }
 
 @available(*, deprecated, message="message")

@@ -16,6 +16,7 @@
 
 #include "swift/Frontend/DiagnosticVerifier.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Parse/Lexer.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
 using namespace swift;
@@ -244,7 +245,9 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
 
     ExpectedDiagnosticInfo Expected;
     Expected.Classification = ExpectedClassification;
-    Expected.Str = MatchStart.slice(2, End);
+
+    llvm::SmallString<256> Buf;
+    Expected.Str = Lexer::getEncodedStringSegment(MatchStart.slice(2, End), Buf);
     if (PrevExpectedContinuationLine)
       Expected.LineNo = PrevExpectedContinuationLine;
     else

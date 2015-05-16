@@ -514,8 +514,9 @@ static bool diagnoseExplicitUnavailability(TypeChecker &TC, const ValueDecl *D,
     } else if (Attr->Message.empty()) {
       TC.diagnose(Loc, diag::availability_decl_unavailable, Name).highlight(R);
     } else {
+      EncodedDiagnosticMessage EncodedMessage(Attr->Message);
       TC.diagnose(Loc, diag::availability_decl_unavailable_msg, Name,
-                  Attr->Message).highlight(R);
+                  EncodedMessage.Message).highlight(R);
     }
     break;
 
@@ -524,8 +525,9 @@ static bool diagnoseExplicitUnavailability(TypeChecker &TC, const ValueDecl *D,
       TC.diagnose(Loc, diag::availability_decl_unavailable_in_swift, Name)
           .highlight(R);
     } else {
+      EncodedDiagnosticMessage EncodedMessage(Attr->Message);
       TC.diagnose(Loc, diag::availability_decl_unavailable_in_swift_msg, Name,
-                  Attr->Message).highlight(R);
+                  EncodedMessage.Message).highlight(R);
     }
     break;
   }

@@ -924,8 +924,9 @@ static bool checkTypeDeclAvailability(Decl *TypeDecl, IdentTypeRepr *IdType,
                       CI->getIdentifier())
             .highlight(Loc);
         } else {
+          EncodedDiagnosticMessage EncodedMessage(Attr->Message);
           TC.diagnose(Loc, diag::availability_decl_unavailable_msg,
-                      CI->getIdentifier(), Attr->Message)
+                      CI->getIdentifier(), EncodedMessage.Message)
             .highlight(Loc);
         }
         break;
@@ -936,8 +937,9 @@ static bool checkTypeDeclAvailability(Decl *TypeDecl, IdentTypeRepr *IdType,
                       CI->getIdentifier())
             .highlight(Loc);
         } else {
+          EncodedDiagnosticMessage EncodedMessage(Attr->Message);
           TC.diagnose(Loc, diag::availability_decl_unavailable_in_swift_msg,
-                      CI->getIdentifier(), Attr->Message)
+                      CI->getIdentifier(), EncodedMessage.Message)
             .highlight(Loc);
         }
         break;

@@ -2154,9 +2154,10 @@ void TypeChecker::diagnoseDeprecated(SourceRange ReferenceRange,
              DeprecatedVersion, Attr->Rename)
       .highlight(Attr->getRange());
   } else {
+    EncodedDiagnosticMessage EncodedMessage(Attr->Message);
     diagnose(ReferenceRange.Start, diag::availability_deprecated_msg, Name,
              Attr->hasPlatform(), Platform, Attr->Deprecated.hasValue(),
-             DeprecatedVersion, Attr->Message)
+             DeprecatedVersion, EncodedMessage.Message)
       .highlight(Attr->getRange());
   }
 
