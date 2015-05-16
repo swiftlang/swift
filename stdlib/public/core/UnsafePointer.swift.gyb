@@ -125,9 +125,17 @@ public struct ${Self}<T>
   }
 %  end
 
-  /// Access the underlying raw memory, getting and
-  /// setting values.
-  public var memory : T {
+%{
+if mutable:
+    comment = """\
+  /// Access the underlying raw memory, getting and setting values."""
+else:
+    comment = """\
+  /// Access the underlying raw memory, getting values."""
+}%
+
+${comment}
+  public var memory: T {
 %  if mutable:
     @transparent unsafeAddress {
       return UnsafePointer(self)
