@@ -356,7 +356,7 @@ public func sorted<
 % end
 // for p in preds
 
-/// Exchange the values of `a` and `b`
+/// Exchange the values of `a` and `b`.
 public func swap<T>(inout a : T, inout _ b : T) {
   // Semantically equivalent to (a, b) = (b, a).
   // Microoptimized to avoid retain/release traffic.

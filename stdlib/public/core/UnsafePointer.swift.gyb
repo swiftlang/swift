@@ -53,7 +53,7 @@ public struct ${Self}<T>
     self._rawValue = _rawValue
   }
 
-  /// Convert from an opaque C pointer to a typed pointer
+  /// Convert from an opaque C pointer to a typed pointer.
   ///
   /// This is a fundamentally unsafe conversion.
   @transparent
@@ -77,7 +77,7 @@ public struct ${Self}<T>
     self._rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
 
-  /// Convert from an UnsafeMutablePointer of a different type.
+  /// Convert from an `UnsafeMutablePointer` of a different type.
   ///
   /// This is a fundamentally unsafe conversion.
   @transparent
@@ -85,7 +85,7 @@ public struct ${Self}<T>
     _rawValue = from._rawValue
   }
 
-  /// Convert from a UnsafePointer of a different type.
+  /// Convert from a `UnsafePointer` of a different type.
   ///
   /// This is a fundamentally unsafe conversion.
   @transparent
@@ -206,7 +206,7 @@ ${comment}
     }
   }
 
-  /// Move count values beginning at source into raw memory,
+  /// Move `count` values beginning at source into raw memory,
   /// transforming the source values into raw memory.
   public func moveInitializeFrom(source: ${Self}, count: Int) {
     _debugPrecondition(
@@ -244,7 +244,7 @@ ${comment}
     // }
   }
 
-  /// Copy count values beginning at source into raw memory.
+  /// Copy `count` values beginning at source into raw memory.
   ///
   /// - Precondition: The memory is not initialized.
   ///
@@ -336,8 +336,8 @@ ${comment}
   }
 
 % if mutable:
-  /// If self was converted from nil, writes the result of invoking body into
-  /// the pointee
+  /// If self was converted from `nil`, writes the result of invoking body into
+  /// the pointee.
   public // SPI(Foundation)
   func _setIfNonNil(@noescape body: () -> T) {
     if self != nil {
@@ -348,7 +348,7 @@ ${comment}
 #if _runtime(_ObjC)
   /// Return the result of invoking body.  If self was converted from
   /// nil, passes nil as the argument.  Otherwise, passes the address
-  /// of a T which is written into buffer before this method returns
+  /// of a `T` which is written into buffer before this method returns.
   @transparent public
   func _withBridgeObject<U : AnyObject, R>(
     inout buffer: U?, @noescape body: AutoreleasingUnsafeMutablePointer<U?> -> R
@@ -358,8 +358,8 @@ ${comment}
 #endif
 
   /// Return the result of invoking body.  If self was converted from
-  /// nil, passes nil as the argument.  Otherwise, passes the address
-  /// of buffer
+  /// `nil`, passes `nil` as the argument.  Otherwise, passes the address
+  /// of buffer.
   @transparent public
   func _withBridgeValue<U, R>(
     inout buffer: U, @noescape body: UnsafeMutablePointer<U> -> R
@@ -374,7 +374,7 @@ ${comment}
 
   /// The hash value.
   ///
-  /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
+  /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`.
   ///
   /// - Note: The hash value is not guaranteed to be stable across
   ///   different invocations of the same program.  Do not persist the
@@ -407,7 +407,7 @@ ${comment}
   ///   `self` `n` times.  If `n < 0`, the result of applying
   ///   `predecessor` to `self` `-n` times. Otherwise, `self`.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public func advancedBy(n: Int) -> ${Self} {
     return self + n
   }
@@ -502,7 +502,7 @@ extension UnsafeMutablePointer : SinkType {
 }
 
 /// A byte-sized thing that isn't designed to interoperate with
-/// any other types; it makes a decent parameter to UnsafeMutablePointer when
+/// any other types; it makes a decent parameter to `UnsafeMutablePointer` when
 /// you just want to do bytewise pointer arithmetic.
 public struct RawByte {
   let _inaccessible: UInt8

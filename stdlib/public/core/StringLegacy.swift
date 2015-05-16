@@ -13,7 +13,7 @@
 
 extension String {
   /// Construct an instance that is the concatenation of `count` copies
-  /// of `repeatedValue`
+  /// of `repeatedValue`.
   public init(count: Int, repeatedValue c: Character) {
     let s = String(c)
     self = String(_storage: _StringBuffer(
@@ -26,7 +26,7 @@ extension String {
   }
 
   /// Construct an instance that is the concatenation of `count` copies
-  /// of `Character(repeatedValue)`
+  /// of `Character(repeatedValue)`.
   public init(count: Int, repeatedValue c: UnicodeScalar) {
     self = String._fromWellFormedCodeUnitSequence(UTF32.self,
         input: Repeat(count: count, repeatedValue: c.value))
@@ -75,13 +75,13 @@ func _stdlib_NSStringHasPrefixNFD(theString: AnyObject, _ prefix: AnyObject) -> 
 func _stdlib_NSStringHasSuffixNFD(theString: AnyObject, _ suffix: AnyObject) -> Bool
 
 extension String {
-  /// Return `true` iff `self` begins with `prefix`
+  /// Returns `true` iff `self` begins with `prefix`.
   public func hasPrefix(prefix: String) -> Bool {
     return _stdlib_NSStringHasPrefixNFD(
       self._bridgeToObjectiveCImpl(), prefix._bridgeToObjectiveCImpl())
   }
 
-  /// Return `true` iff `self` ends with `suffix`
+  /// Returns `true` iff `self` ends with `suffix`.
   public func hasSuffix(suffix: String) -> Bool {
     return _stdlib_NSStringHasSuffixNFD(
       self._bridgeToObjectiveCImpl(), suffix._bridgeToObjectiveCImpl())

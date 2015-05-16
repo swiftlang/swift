@@ -65,7 +65,7 @@ if True:
 /// `ArraySlice` always uses contiguous storage and does not bridge to
 /// Objective-C.
 ///
-/// - Warning: Long-term storage of `ArraySlice` instances is discouraged
+/// - Warning: Long-term storage of `ArraySlice` instances is discouraged.
 ///
 /// Because a `ArraySlice` presents a *view* onto the storage of some
 /// larger array even after the original array's lifetime ends,
@@ -100,7 +100,7 @@ if True:
 ///     print("a=\(a), b=\(b)")     // a=[1, 2, 3], b=[4, 2, 3]
 ///
 /// (Of course, if the array stores `class` references, the objects
-/// are shared; only the values of the references are independent)
+/// are shared; only the values of the references are independent.)
 ///
 /// Arrays use Copy-on-Write so that their storage and elements are
 /// only copied lazily, upon mutation, when more than one array
@@ -172,7 +172,7 @@ public struct ${Self}<T>
   : CollectionType, MutableCollectionType, Sliceable,
   _DestructorSafeContainer {
 
-  /// The type of element stored by this `${Self}`
+  /// The type of element stored by this `${Self}`.
   public typealias Element = T
 
   /// Always zero, which is the index of the first element when non-empty.
@@ -258,16 +258,16 @@ public struct ${Self}<T>
 
   /// Return a *generator* over the elements.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public func generate() -> IndexingGenerator<${Self}> {
     return IndexingGenerator(self)
   }
 
-  /// A type that can represent a sub-range of ${a_Self}
+  /// A type that can represent a sub-range of ${a_Self}.
   public typealias SubSlice = ArraySlice<T>
 
   /// Access the elements indicated by the given half-open
-  /// `subRange`.  O(1)
+  /// `subRange`.  O(1).
   public subscript(subRange: Range<Int>) -> SubSlice {
     get {
       _checkIndex(subRange.startIndex)
@@ -340,7 +340,7 @@ public struct ${Self}<T>
   }
 
   /// Check that the given `index` is valid for subscripting, i.e. `0
-  /// ≤ index < count`
+  /// ≤ index < count`.
   @_semantics("array.check_subscript")
   public // @testable
   func _checkSubscript(index: Int, hoistedIsNativeBuffer: Bool) {
@@ -351,7 +351,7 @@ public struct ${Self}<T>
 
 %if Self == 'Array':
   /// Check that the given `index` is valid for subscripting, i.e. `0
-  /// ≤ index < count`
+  /// ≤ index < count`.
   @_semantics("array.check_subscript")
   public // @testable
   func _checkSubscript(index: Int, hoistedIsNativeNoTypeCheckBuffer: Bool) {
@@ -364,7 +364,7 @@ public struct ${Self}<T>
   }
 %end
 
-  /// Check that the given `index` is valid, i.e. `0 ≤ index ≤ count`
+  /// Check that the given `index` is valid, i.e. `0 ≤ index ≤ count`.
   @_semantics("array.check_index")
   func _checkIndex(index: Int) {
     _precondition(index <= count, "${Self} index out of range")
@@ -447,13 +447,13 @@ public func _deallocateUninitialized${Self}<T>(var array: ${Self}<T>) {
 %end
 
 extension ${Self} : _ArrayType {
-  /// Construct an empty ${Self}
+  /// Construct an empty ${Self}.
   @_semantics("array.init")
   public init() {
     _buffer = _Buffer()
   }
 
-  /// Construct from an arbitrary sequence with elements of type `T`
+  /// Construct from an arbitrary sequence with elements of type `T`.
   public init<
     S: SequenceType where S.Generator.Element == _Buffer.Element
   >(_ s: S) {
@@ -471,7 +471,7 @@ extension ${Self} : _ArrayType {
     }
   }
 
-  /// Construct a ${Self} of `count` uninitialized elements
+  /// Construct a ${Self} of `count` uninitialized elements.
   internal init(_uninitializedCount count: Int) {
     _precondition(count >= 0, "Can't construct ${Self} with count < 0")
     _buffer = _Buffer()
@@ -484,7 +484,7 @@ extension ${Self} : _ArrayType {
   }
 
   /// Entry point for `Array` literal construction; builds and returns
-  /// a ${Self} of `count` uninitialized elements
+  /// a ${Self} of `count` uninitialized elements.
   internal static func _allocateUninitialized(
     count: Int
   ) -> (${Self}, UnsafeMutablePointer<T>) {
@@ -502,24 +502,24 @@ extension ${Self} : _ArrayType {
   }
 %end
 
-  /// How many elements the ${Self} stores
+  /// The number of elements the ${Self} stores.
   public var count: Int {
     return _getCount()
   }
 
-  /// How many elements the `${Self}` can store without reallocation
+  /// The number of elements the `${Self}` can store without reallocation.
   public var capacity: Int {
     return _getCapacity()
   }
 
-  /// An object that guarantees the lifetime of this array's elements
+  /// An object that guarantees the lifetime of this array's elements.
   public
   var _owner: AnyObject? {
     return _buffer.owner
   }
 
   /// If the elements are stored contiguously, a pointer to the first
-  /// element. Otherwise, nil.
+  /// element. Otherwise, `nil`.
   public var _baseAddressIfContiguous: UnsafeMutablePointer<Element> {
     return _buffer.baseAddress
   }
@@ -532,12 +532,12 @@ extension ${Self} : _ArrayType {
   //===--- basic mutations ------------------------------------------------===//
 
 
-  /// Reserve enough space to store minimumCapacity elements.
+  /// Reserve enough space to store `minimumCapacity` elements.
   ///
   /// - Postcondition: `capacity >= minimumCapacity` and the array has
   ///   mutable contiguous storage.
   ///
-  /// - Complexity: O(`count`)
+  /// - Complexity: O(`count`).
   @_semantics("array.mutate_unknown")
   public mutating func reserveCapacity(minimumCapacity: Int) {
     if _buffer.requestUniqueMutableBackingBuffer(minimumCapacity) == nil {
@@ -551,9 +551,9 @@ extension ${Self} : _ArrayType {
     _sanityCheck(capacity >= minimumCapacity)
   }
 
-  /// Append newElement to the ${Self}
+  /// Append `newElement` to the ${Self}.
   ///
-  /// - Complexity: amortized ${O1}
+  /// - Complexity: Amortized ${O1}.
   @_semantics("array.mutate_unknown")
   public mutating func append(newElement: T) {
     // Checking for the isNative fast-path in the outermost if-statement helps
@@ -586,8 +586,7 @@ extension ${Self} : _ArrayType {
 
   /// Append the elements of `newElements` to `self`.
   ///
-  /// - Complexity: O(*length of result*)
-  ///
+  /// - Complexity: O(*length of result*).
   public mutating func extend<
       S : SequenceType
       where S.Generator.Element == T
@@ -623,7 +622,7 @@ extension ${Self} : _ArrayType {
     self.replaceRange(i..<i, with: CollectionOfOne(newElement))
   }
 
-  /// Remove and return the element at index `i`
+  /// Remove and return the element at index `i`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
@@ -638,7 +637,7 @@ extension ${Self} : _ArrayType {
   ///
   /// - Postcondition: `capacity == 0` iff `keepCapacity` is `false`.
   ///
-  /// Complexity: O(`self.count()`).
+  /// - Complexity: O(`self.count()`).
   public mutating func removeAll(keepCapacity keepCapacity: Bool = false) {
     if !keepCapacity {
       _buffer = _Buffer()
@@ -653,7 +652,7 @@ extension ${Self} : _ArrayType {
   /// Interpose `self` between each consecutive pair of `elements`,
   /// and concatenate the elements of the resulting sequence.  For
   /// example, `[-1, -2].join([[1, 2, 3], [4, 5, 6], [7, 8, 9]])`
-  /// yields `[1, 2, 3, -1, -2, 4, 5, 6, -1, -2, 7, 8, 9]`
+  /// yields `[1, 2, 3, -1, -2, 4, 5, 6, -1, -2, 7, 8, 9]`.
   public func join<
       S : SequenceType where S.Generator.Element == ${Self}<T>
   >(elements: S) -> ${Self}<T> {
@@ -671,7 +670,7 @@ extension ${Self} : _ArrayType {
     }
   }
 
-  /// Return a copy of `self` that has been sorted according to
+  /// Returns a copy of `self` that has been sorted according to
   /// `isOrderedBefore`.
   ///
   /// - Requires: `isOrderedBefore` induces a
@@ -948,7 +947,7 @@ extension ${Self} {
     }
   }
 
-  /// Insert `newElements` at index `i`
+  /// Insert `newElements` at index `i`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
@@ -959,7 +958,7 @@ extension ${Self} {
     Swift.splice(&self, newElements, atIndex: i)
   }
 
-  /// Remove the indicated `subRange` of elements
+  /// Remove the indicated `subRange` of elements.
   ///
   /// - Complexity: O(`count`).
   public mutating func removeRange(subRange: Range<Int>) {
@@ -967,7 +966,7 @@ extension ${Self} {
   }
 }
 
-/// Extend `lhs` with the elements of `rhs`
+/// Extend `lhs` with the elements of `rhs`.
 public
 func += <
   T, S: SequenceType
@@ -984,7 +983,7 @@ where S.Generator.Element == T
   _arrayAppendSequence(&lhs._buffer, rhs)
 }
 
-/// Extend `lhs` with the elements of `rhs`
+/// Extend `lhs` with the elements of `rhs`.
 public
 func += <
   T, C: CollectionType
@@ -1031,7 +1030,7 @@ protocol _PointerFunctionType {
   func call(UnsafeMutablePointer<Element>, count: Int)
 }
 
-/// initialize the elements of dest by copying the first headCount
+/// Initialize the elements of dest by copying the first headCount
 /// items from source, calling initializeNewElements on the next
 /// uninitialized element, and finally by copying the last N items
 /// from source into the N remaining uninitialized elements of dest.
@@ -1149,7 +1148,7 @@ public func _extractOrCopyToNativeArrayBuffer<
   return _copyCollectionToNativeArrayBuffer(source)
 }
 
-/// Append items from newItems to buffer
+/// Append items from `newItems` to `buffer`.
 func _arrayAppendSequence<
   Buffer : _ArrayBufferType,
   S : SequenceType where S.Generator.Element == Buffer.Element

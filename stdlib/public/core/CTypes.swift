@@ -126,7 +126,7 @@ public struct COpaquePointer : Equatable, Hashable, NilLiteralConvertible {
 
   /// The hash value.
   ///
-  /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
+  /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`.
   ///
   /// - Note: The hash value is not guaranteed to be stable across
   ///   different invocations of the same program.  Do not persist the

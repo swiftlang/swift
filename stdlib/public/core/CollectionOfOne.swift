@@ -19,7 +19,7 @@ public struct GeneratorOfOne<T> : GeneratorType, SequenceType {
   }
 
   /// `GeneratorOfOne` is also a `SequenceType`, so it `generate`s a
-  /// copy of itself
+  /// copy of itself.
   public func generate() -> GeneratorOfOne {
     return self
   }
@@ -66,7 +66,7 @@ public struct CollectionOfOne<T> : CollectionType {
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public func generate() -> GeneratorOfOne<T> {
     return GeneratorOfOne(element)
   }

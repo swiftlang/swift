@@ -27,27 +27,27 @@ public typealias Void = ()
 // FIXME: it should be the other way round, Float = Float32, Double = Float64,
 // but the type checker loses sugar currently, and ends up displaying 'FloatXX'
 // in diagnostics.
-/// A 32-bit floating point type
+/// A 32-bit floating point type.
 public typealias Float32 = Float
-/// A 64-bit floating point type
+/// A 64-bit floating point type.
 public typealias Float64 = Double
 
 //===----------------------------------------------------------------------===//
 // Default types for unconstrained literals
 //===----------------------------------------------------------------------===//
-/// The default type for an otherwise-unconstrained integer literal
+/// The default type for an otherwise-unconstrained integer literal.
 public typealias IntegerLiteralType = Int
-/// The default type for an otherwise-unconstrained floating point literal
+/// The default type for an otherwise-unconstrained floating point literal.
 public typealias FloatLiteralType = Double
-/// The default type for an otherwise-unconstrained boolean literal
+/// The default type for an otherwise-unconstrained Boolean literal.
 public typealias BooleanLiteralType = Bool
 // typealias CharacterLiteralType = ?
-/// The default type for an otherwise-unconstrained unicode scalar literal
+/// The default type for an otherwise-unconstrained unicode scalar literal.
 public typealias UnicodeScalarType = String
-/// The default type for an otherwise-unconstrained unicode extended
-/// grapheme cluster literal
+/// The default type for an otherwise-unconstrained Unicode extended
+/// grapheme cluster literal.
 public typealias ExtendedGraphemeClusterType = String
-/// The default type for an otherwise-unconstrained string literal
+/// The default type for an otherwise-unconstrained string literal.
 public typealias StringLiteralType = String
 
 //===----------------------------------------------------------------------===//
@@ -71,7 +71,7 @@ public typealias _MaxBuiltinFloatType = Builtin.FPIEEE64
 // Standard protocols
 //===----------------------------------------------------------------------===//
 
-/// The protocol to which all types implicitly conform
+/// The protocol to which all types implicitly conform.
 public typealias Any = protocol<>
 
 /// The protocol to which all classes implicitly conform.
@@ -187,7 +187,7 @@ public protocol Equatable {
   /// - `x == y` and `y == z` implies `x == z`
   ///
   /// **Inequality is the inverse of equality**, i.e. `!(x == y)` iff
-  /// `x != y`
+  /// `x != y`.
   func == (lhs: Self, rhs: Self) -> Bool
 }
 
@@ -206,7 +206,7 @@ public func != <T : Equatable>(lhs: T, rhs: T) -> Bool {
 /// be satisfied by types conforming to that protocol.
 public protocol _Comparable {
   /// A [strict total order](http://en.wikipedia.org/wiki/Total_order#Strict_total_order)
-  /// over instances of `Self`
+  /// over instances of `Self`.
   func <(lhs: Self, rhs: Self) -> Bool
 }
 
@@ -246,7 +246,7 @@ public protocol Comparable : _Comparable, Equatable {
 
 /// A set type with O(1) standard bitwise operators.
 ///
-/// Each instance is a subset of `~Self.allZeros`
+/// Each instance is a subset of `~Self.allZeros`.
 ///
 /// **Axioms**, where `x` is an instance of `Self`:
 ///
@@ -258,22 +258,22 @@ public protocol Comparable : _Comparable, Equatable {
 public protocol BitwiseOperationsType {
   /// Returns the intersection of bits set in `lhs` and `rhs`.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   func & (lhs: Self, rhs: Self) -> Self
 
-  /// Returns the union of bits set in `lhs` and `rhs`
+  /// Returns the union of bits set in `lhs` and `rhs`.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   func |(lhs: Self, rhs: Self) -> Self
 
-  /// Returns the bits that are set in exactly one of `lhs` and `rhs`
+  /// Returns the bits that are set in exactly one of `lhs` and `rhs`.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   func ^(lhs: Self, rhs: Self) -> Self
 
-  /// Returns `x ^ ~Self.allZeros`
+  /// Returns `x ^ ~Self.allZeros`.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   prefix func ~(x: Self) -> Self
 
   /// The empty bitset.
@@ -301,7 +301,7 @@ public func ^= <T : BitwiseOperationsType>(inout lhs: T, rhs: T) {
 public protocol Hashable : Equatable {
   /// The hash value.
   ///
-  /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
+  /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`.
   ///
   /// - Note: The hash value is not guaranteed to be stable across
   ///   different invocations of the same program.  Do not persist the

@@ -197,14 +197,14 @@ internal class _${Kind}Box<S : ${Kind}Type>
 public struct AnySequence<T> : SequenceType {
   public typealias Element = T
 
-  /// Wrap and forward operations to to `base`
+  /// Wrap and forward operations to to `base`.
   public init<S: SequenceType where S.Generator.Element == T>(_ base: S) {
     _box = _SequenceBox(base)
   }
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public func generate() -> AnyGenerator<Element> {
     return unsafeDowncast(_box.generate())
   }
@@ -507,7 +507,7 @@ public func === <
   return lhs._underlyingCollectionID == rhs._underlyingCollectionID
 }
 
-/// Return false iff `lhs` and `rhs` store the same underlying collection.
+/// Returns false iff `lhs` and `rhs` store the same underlying collection.
 public func !== <
   L: AnyCollectionType, R: AnyCollectionType
 >(lhs: L, rhs: R) -> Bool {
@@ -530,7 +530,7 @@ public struct Any${Traversal}Collection<Element> : AnyCollectionType {
   /// Create an `Any${Traversal}Collection` that stores `base` as its
   /// underlying collection.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public init<
     C: CollectionType
       where C.Index: ${SubTraversal}IndexType, C.Generator.Element == Element
@@ -546,7 +546,7 @@ public struct Any${Traversal}Collection<Element> : AnyCollectionType {
   ///
   /// - Postcondition: The result is `===` to `other`.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public init(_ other: Any${SubTraversal}Collection<Element>) {
     self._box = other._box
   }
@@ -558,7 +558,7 @@ public struct Any${Traversal}Collection<Element> : AnyCollectionType {
   /// `Any${Traversal}Collection` having the same underlying
   /// collection as `other`.  Otherwise, the result is `nil`.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public init?(_ other: Any${SuperTraversal}Collection<Element>) {
     if !(other._box.startIndex is _${Traversal}IndexBoxType) {
       return nil
@@ -568,9 +568,9 @@ public struct Any${Traversal}Collection<Element> : AnyCollectionType {
   }
 %   end
 
-  /// Return a *generator* over the elements of this *collection*.
+  /// Returns a *generator* over the elements of this *collection*.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public func generate() -> AnyGenerator<Element> {
     return unsafeDowncast(_box.generate())
   }
@@ -601,7 +601,7 @@ public struct Any${Traversal}Collection<Element> : AnyCollectionType {
 
   /// Return the number of elements.
   ///
-  /// - Complexity: ${'O(1)' if Traversal == 'RandomAccess' else 'O(N)'}
+  /// - Complexity: ${'O(1)' if Traversal == 'RandomAccess' else 'O(N)'}.
   public func count() -> IntMax {
     return _box._count()
   }

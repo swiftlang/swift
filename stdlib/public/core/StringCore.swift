@@ -74,19 +74,19 @@ public struct _StringCore {
 #endif
   }
 
-  /// Bitmask for the count part of _countAndFlags
+  /// Bitmask for the count part of `_countAndFlags`.
   var _countMask: UWord {
     return UWord.max >> 2
   }
 
-  /// Bitmask for the flags part of _countAndFlags
+  /// Bitmask for the flags part of `_countAndFlags`.
   var _flagMask: UWord {
     return ~_countMask
   }
 
   /// Value by which to multiply a 2nd byte fetched in order to
   /// assemble a UTF-16 code unit from our contiguous storage.  If we
-  /// store ASCII, this will be zero.  Otherwise, it will be 0x100
+  /// store ASCII, this will be zero.  Otherwise, it will be 0x100.
   var _highByteMultiplier: UTF16.CodeUnit {
     return UTF16.CodeUnit(elementShift) << 8
   }
@@ -168,7 +168,8 @@ public struct _StringCore {
   }
 
   /// Create the implementation of an empty string.
-  /// NOTE: there is no null terminator in an empty string!
+  ///
+  /// - Note: There is no null terminator in an empty string.
   public init() {
     self._baseAddress = _emptyStringBase
     self._countAndFlags = 0
@@ -191,13 +192,14 @@ public struct _StringCore {
     }
   }
 
-  /// left shift amount to apply to an offset N so that when
-  /// added to a UnsafeMutablePointer<RawByte>, it traverses N elements
+  /// Left shift amount to apply to an offset N so that when
+  /// added to a UnsafeMutablePointer<RawByte>, it traverses N elements.
   var elementShift: Int {
     return Int(_countAndFlags >> (UWord._sizeInBits - 1))
   }
 
-  /// the number of bytes per element
+  /// The number of bytes per element.
+  ///
   /// If the string does not have an ASCII buffer available (including the case
   /// when we don't have a utf16 buffer) then it equals 2.
   public var elementWidth: Int {
@@ -212,7 +214,7 @@ public struct _StringCore {
 #endif
   }
 
-  /// are we using an NSString for storage?
+  /// Are we using an `NSString` for storage?
   public var hasCocoaBuffer: Bool {
     return Word((_countAndFlags << 1).value) < 0
   }
@@ -259,7 +261,7 @@ public struct _StringCore {
   //===--------------------------------------------------------------------===//
   // slicing
 
-  /// Return the given sub-_StringCore
+  /// Returns the given sub-`_StringCore`.
   public subscript(subRange: Range<Int>) -> _StringCore {
     _precondition(
       subRange.startIndex >= 0,
@@ -285,7 +287,7 @@ public struct _StringCore {
 #endif
   }
 
-  /// Get the Nth UTF-16 Code Unit stored
+  /// Get the Nth UTF-16 Code Unit stored.
   func _nthContiguous(position: Int) -> UTF16.CodeUnit {
     let p = UnsafeMutablePointer<UInt8>(_pointerToNth(position)._rawValue)
     // Always dereference two bytes, but when elements are 8 bits we
@@ -295,7 +297,7 @@ public struct _StringCore {
       + UTF16.CodeUnit((p + 1).memory) * _highByteMultiplier
   }
 
-  /// Get the Nth UTF-16 Code Unit stored
+  /// Get the Nth UTF-16 Code Unit stored.
   public subscript(position: Int) -> UTF16.CodeUnit {
     _precondition(
       position >= 0,
@@ -366,7 +368,7 @@ public struct _StringCore {
   ///
   /// - Note: If unsuccessful because of insufficient space in an
   ///   existing buffer, the suggested new capacity will at least double
-  ///   the existing buffer's storage
+  ///   the existing buffer's storage.
   mutating func _claimCapacity(
     newSize: Int, minElementWidth: Int) -> (Int, COpaquePointer) {
     if _fastPath((nativeBuffer != nil) && elementWidth >= minElementWidth) {
@@ -464,7 +466,7 @@ public struct _StringCore {
   /// Append `c` to `self`.
   ///
   /// - Complexity: O(1) when amortized over repeated appends of equal
-  ///   character values
+  ///   character values.
   mutating func append(c: UnicodeScalar) {
     let width = UTF16.width(c)
     append(
@@ -534,7 +536,9 @@ public struct _StringCore {
   }
 
   /// Return true iff the contents of this string can be
-  /// represented as pure ASCII. O(N) in the worst case
+  /// represented as pure ASCII.
+  ///
+  /// - Complexity: O(N) in the worst case.
   func representableAsASCII() -> Bool {
     if _slowPath(!hasContiguousStorage) {
       return false

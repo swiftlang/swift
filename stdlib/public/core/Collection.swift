@@ -10,9 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// Return the number of elements in x.
+/// Return the number of elements in `x`.
 ///
-/// O(1) if T.Index is RandomAccessIndexType; O(N) otherwise.
+/// O(1) if `T.Index` is `RandomAccessIndexType`; O(N) otherwise.
 @available(*, unavailable, message="call the 'count()' method on the collection")
 public func count <T : CollectionType>(x: T) -> T.Index.Distance {
   // FIXME(prext): remove this function when protocol extensions land.
@@ -60,15 +60,15 @@ extension _CollectionDefaultsType {
     return startIndex == endIndex
   }
 
-  /// Return a value less than or equal to the number of elements in
-  /// `self`, **nondestructively**.
+  /// Returns a value less than or equal to the number of elements in
+  /// `self`, *nondestructively*.
   ///
-  /// - Complexity: O(N)
+  /// - Complexity: O(N).
   final public func underestimateCount() -> Int {
     return numericCast(count())
   }
 
-  /// Return the number of elements.
+  /// Returns the number of elements.
   ///
   /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndexType`;
   ///   O(N) otherwise.
@@ -85,7 +85,7 @@ extension _CollectionDefaultsType {
   ///   `Optional(nil)` if the element was not found, or
   ///   `Optional(Optional(index))` if an element was found.
   ///
-  /// - Complexity: O(N)
+  /// - Complexity: O(N).
   final public func _customIndexOfEquatableElement(
     element: Generator.Element
   ) -> Index?? {
@@ -157,7 +157,7 @@ public protocol CollectionType
   /// Returns `true` iff `self` is empty.
   var isEmpty: Bool { get }
 
-  /// Return the number of elements.
+  /// Returns the number of elements.
   ///
   /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndexType`;
   ///   O(N) otherwise.
@@ -172,7 +172,7 @@ public protocol CollectionType
   ///   `Optional(nil)` if the element was not found, or
   ///   `Optional(Optional(index))` if an element was found.
   ///
-  /// - Complexity: O(N)
+  /// - Complexity: O(N).
   func _customIndexOfEquatableElement(element: Generator.Element) -> Index??
 }
 
@@ -180,7 +180,7 @@ extension CollectionType {
   /// Return an `Array` containing the results of mapping `transform`
   /// over `self`.
   ///
-  /// - Complexity: O(N)
+  /// - Complexity: O(N).
   final public func map<T>(
     @noescape transform: (Generator.Element) -> T
   ) -> [T] {
@@ -197,7 +197,7 @@ extension CollectionType {
 }
 
 extension CollectionType {
-  /// Return an `Array` containing the elements of `self`,
+  /// Returns an `Array` containing the elements of `self`,
   /// in order, that satisfy the predicate `includeElement`.
   final public func filter(
     @noescape includeElement: (Generator.Element) -> Bool
@@ -235,7 +235,7 @@ public func ~> <T : protocol<_Sequence_Type, _ArrayType>>(
 }
 
 // Default implementation of `preprocessingPass` for *collections*.  Do not
-// use this operator directly; call `_preprocessingPass(s)` instead
+// use this operator directly; call `_preprocessingPass(s)` instead.
 public func ~> <T : CollectionType, R>(
   s: T, args: (_PreprocessingPass, ( (T)->R ))
 ) -> R? {
@@ -301,15 +301,15 @@ public struct IndexingGenerator<
   // Because of <rdar://problem/14396120> we've had to factor
   // _CollectionType out of CollectionType to make it useful.
 
-  /// Create a *generator* over the given collection
+  /// Create a *generator* over the given collection.
   public init(_ seq: C) {
     self._elements = seq
     self._position = seq.startIndex
   }
 
-  /// Return a *generator* over the elements of this *sequence*.
+  /// Returns a *generator* over the elements of this *sequence*.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public func generate() -> IndexingGenerator {
     return self
   }
@@ -327,7 +327,7 @@ public struct IndexingGenerator<
   var _position: C.Index
 }
 
-/// Return the range of `x`'s valid index values.
+/// Returns the range of `x`'s valid index values.
 ///
 /// The result's `endIndex` is the same as that of `x`.  Because
 /// `Range` is half-open, iterating the values of the result produces
@@ -366,7 +366,7 @@ public struct PermutationGenerator<
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public func generate() -> Generator {
     return self
   }
@@ -421,14 +421,14 @@ public protocol MutableSliceable : Sliceable, MutableCollectionType {
   subscript(_: Range<Index>) -> SubSlice {get set}
 }
 
-/// Return a slice containing all but the first element of `s`.
+/// Returns a slice containing all but the first element of `s`.
 ///
 /// - Requires: `s` is non-empty.
 public func dropFirst<Seq : Sliceable>(s: Seq) -> Seq.SubSlice {
   return s[s.startIndex.successor()..<s.endIndex]
 }
 
-/// Return a slice containing all but the last element of `s`.
+/// Returns a slice containing all but the last element of `s`.
 ///
 /// - Requires: `s` is non-empty.
 public func dropLast<
@@ -438,7 +438,7 @@ public func dropLast<
   return s[s.startIndex..<s.endIndex.predecessor()]
 }
 
-/// Return a slice, up to `maxLength` in length, containing the
+/// Returns a slice, up to `maxLength` in length, containing the
 /// initial elements of `s`.
 ///
 /// If `maxLength` exceeds `s.count()`, the result contains all
@@ -452,7 +452,7 @@ public func prefix<S: Sliceable>(s: S, _ maxLength: Int) -> S.SubSlice {
   return s[s.startIndex..<index]
 }
 
-/// Return a slice, up to `maxLength` in length, containing the
+/// Returns a slice, up to `maxLength` in length, containing the
 /// final elements of `s`.
 ///
 /// If `maxLength` exceeds `s.count()`, the result contains all

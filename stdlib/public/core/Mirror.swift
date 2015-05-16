@@ -642,7 +642,7 @@ public protocol CustomPlaygroundQuickLookable {
 ///     let x = IntPairs([1:2, 1:1, 3:4, 2:1])
 ///     print(x.elements)  // [(1, 2), (1, 1), (3, 4), (2, 1)]
 public struct DictionaryLiteral<Key, Value> : DictionaryLiteralConvertible {
-  /// Store `elements`
+  /// Store `elements`.
   public init(dictionaryLiteral elements: (Key, Value)...) {
     self.elements = elements
   }
@@ -656,7 +656,7 @@ extension DictionaryLiteral : CollectionType {
   ///
   /// Identical to `endIndex` in an empty `DictionaryLiteral`.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public var startIndex: Int { return 0 }
 
   /// The `DictionaryLiteral`'s "past the end" position.
@@ -665,7 +665,7 @@ extension DictionaryLiteral : CollectionType {
   /// reachable from `startIndex` by zero or more applications of
   /// `successor()`.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public var endIndex: Int { return elements.endIndex }
 
   // FIXME: a typealias is needed to prevent <rdar://20248032>
@@ -685,7 +685,7 @@ extension DictionaryLiteral : CollectionType {
   /// *generator*'s next element is the first element of the
   /// sequence.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public func generate() -> IndexingGenerator<DictionaryLiteral> {
     return IndexingGenerator(self)
   }
@@ -713,10 +713,10 @@ extension String {
   /// `subject`, suitable for debugging.
   ///
   /// * If `T` conforms to `CustomDebugStringConvertible`, the result
-  ///   is `subject`'s `debugDescription`
+  ///   is `subject`'s `debugDescription`.
   ///
   /// * Otherwise, if `T` conforms to `CustomStringConvertible`, the result
-  ///   is `subject`'s `description`
+  ///   is `subject`'s `description`.
   ///
   /// * Otherwise, if `T` conforms to `Streamable`, the result is
   ///   obtained by calling `subject.writeTo(s)` on an empty string s.
@@ -731,7 +731,7 @@ extension String {
   }
 }
 
-/// Reflection for Mirror itself
+/// Reflection for `Mirror` itself.
 extension Mirror : CustomStringConvertible {
   public var description: String {
     return "Mirror for \(self.subjectType)"

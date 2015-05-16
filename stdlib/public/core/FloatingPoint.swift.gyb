@@ -243,7 +243,7 @@ extension ${Self} : FloatingPointType {
     return _fromBitPattern(${getQuietNaNBitPattern(bits)})
   }
 
-  /// `true` iff `self` is negative
+  /// `true` iff `self` is negative.
   public var isSignMinus: Bool {
     return __getSignBit() == 1
   }
@@ -452,7 +452,7 @@ extension ${Self} : Comparable, Equatable {
 extension ${Self} : Hashable {
   /// The hash value.
   ///
-  /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
+  /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`.
   ///
   /// - Note: The hash value is not guaranteed to be stable across
   ///   different invocations of the same program.  Do not persist the
@@ -487,7 +487,7 @@ extension ${Self} : Hashable {
 
 @transparent
 extension ${Self} : AbsoluteValuable {
-  /// Returns the absolute value of `x`
+  /// Returns the absolute value of `x`.
   @transparent
   public static func abs(x: ${Self}) -> ${Self} {
     return ${Self}(_bits: Builtin.int_fabs_FPIEEE${bits}(x.value))

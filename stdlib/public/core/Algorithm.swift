@@ -35,7 +35,7 @@ public func maxElement<
 /// Returns the first index where `value` appears in `domain` or `nil` if
 /// `value` is not found.
 ///
-/// - Complexity: O(`domain.count()`)
+/// - Complexity: O(`domain.count()`).
 @available(*, unavailable, message="call the 'indexOf()' method on the collection")
 public func find<
   C: CollectionType where C.Generator.Element : Equatable
@@ -44,7 +44,7 @@ public func find<
   return domain.indexOf(value)
 }
 
-/// Return the lesser of `x` and `y`
+/// Returns the lesser of `x` and `y`.
 public func min<T : Comparable>(x: T, _ y: T) -> T {
   var r = x
   if y < x {
@@ -53,7 +53,7 @@ public func min<T : Comparable>(x: T, _ y: T) -> T {
   return r
 }
 
-/// Return the least argument passed
+/// Returns the least argument passed.
 public func min<T : Comparable>(x: T, _ y: T, _ z: T, _ rest: T...) -> T {
   var r = x
   if y < x {
@@ -70,7 +70,7 @@ public func min<T : Comparable>(x: T, _ y: T, _ z: T, _ rest: T...) -> T {
   return r
 }
 
-/// Return the greater of `x` and `y`
+/// Returns the greater of `x` and `y`.
 public func max<T : Comparable>(x: T, _ y: T) -> T {
   var r = y
   if y < x {
@@ -79,7 +79,7 @@ public func max<T : Comparable>(x: T, _ y: T) -> T {
   return r
 }
 
-/// Return the greatest argument passed
+/// Returns the greatest argument passed.
 public func max<T : Comparable>(x: T, _ y: T, _ z: T, _ rest: T...) -> T {
   var r = y
   if y < x {
@@ -96,15 +96,15 @@ public func max<T : Comparable>(x: T, _ y: T, _ z: T, _ rest: T...) -> T {
   return r
 }
 
-/// Return the result of slicing `elements` into sub-sequences that
+/// Returns the result of slicing `elements` into sub-sequences that
 /// don't contain elements satisfying the predicate `isSeparator`.
 ///
-/// - parameter maxSplit: the maximum number of slices to return, minus 1.
+/// - parameter maxSplit: The maximum number of slices to return, minus 1.
 ///   If `maxSplit + 1` slices would otherwise be returned, the
-///   algorithm stops splitting and returns a suffix of `elements`
+///   algorithm stops splitting and returns a suffix of `elements`.
 ///
-/// - parameter allowEmptySlices: if true, an empty slice is produced in
-///   the result for each pair of consecutive
+/// - parameter allowEmptySlices: If `true`, an empty slice is produced in
+///   the result for each pair of consecutive.
 public func split<S: Sliceable, R:BooleanType>(
   elements: S,
   maxSplit: Int = Int.max,
@@ -150,7 +150,7 @@ public func split<S: Sliceable, R:BooleanType>(
   return result
 }
 
-/// Return true iff the the initial elements of `s` are equal to `prefix`.
+/// Returns `true` iff the the initial elements of `s` are equal to `prefix`.
 @available(*, unavailable, message="call the 'startsWith()' method on the sequence")
 public func startsWith<
   S0 : SequenceType, S1 : SequenceType
@@ -162,7 +162,7 @@ public func startsWith<
   return s.startsWith(prefix)
 }
 
-/// Return true iff `s` begins with elements equivalent to those of
+/// Returns `true` iff `s` begins with elements equivalent to those of
 /// `prefix`, using `isEquivalent` as the equivalence test.
 ///
 /// - Requires: `isEquivalent` is an [equivalence relation](http://en.wikipedia.org/wiki/Equivalence_relation).
@@ -198,7 +198,7 @@ public struct EnumerateGenerator<
   var base: Base
   var count: Int
 
-  /// Construct from a `Base` generator
+  /// Construct from a `Base` generator.
   public init(_ base: Base) {
     self.base = base
     count = 0
@@ -219,7 +219,7 @@ public struct EnumerateGenerator<
   public typealias Generator = EnumerateGenerator<Base>
 
   /// `EnumerateGenerator` is also a `SequenceType`, so it
-  /// `generate`s a copy of itself
+  /// `generate`s a copy of itself.
   public func generate() -> Generator {
     return self
   }
@@ -238,20 +238,20 @@ public struct EnumerateGenerator<
 public struct EnumerateSequence<Base : SequenceType> : SequenceType {
   var base: Base
 
-  /// Construct from a `Base` sequence
+  /// Construct from a `Base` sequence.
   public init(_ base: Base) {
     self.base = base
   }
 
-  /// Return a *generator* over the elements of this *sequence*.
+  /// Returns a *generator* over the elements of this *sequence*.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public func generate() -> EnumerateGenerator<Base.Generator> {
     return EnumerateGenerator(base.generate())
   }
 }
 
-/// Return a lazy `SequenceType` containing pairs (*n*, *x*), where
+/// Returns a lazy `SequenceType` containing pairs (*n*, *x*), where
 /// *n*s are consecutive `Int`s starting at zero, and *x*s are
 /// the elements of `base`:
 ///
@@ -270,7 +270,7 @@ public func enumerate<Seq : SequenceType>(
   return base.enumerate()
 }
 
-/// Return `true` iff `a1` and `a2` contain the same elements in the
+/// Returns `true` iff `a1` and `a2` contain the same elements in the
 /// same order.
 @available(*, unavailable, message="call the 'equal()' method on the sequence")
 public func equal<
@@ -283,7 +283,7 @@ public func equal<
   return a1.elementsEqual(a2)
 }
 
-/// Return true iff `a1` and `a2` contain equivalent elements, using
+/// Returns `true` iff `a1` and `a2` contain equivalent elements, using
 /// `isEquivalent` as the equivalence test.
 ///
 /// - Requires: `isEquivalent` is an [equivalence relation](http://en.wikipedia.org/wiki/Equivalence_relation).
@@ -299,7 +299,7 @@ public func equal<
   return a1.elementsEqual(a2, isEquivalent: isEquivalent)
 }
 
-/// Return true iff a1 precedes a2 in a lexicographical ("dictionary")
+/// Returns `true` iff `a1` precedes `a2` in a lexicographical ("dictionary")
 /// ordering, using "<" as the comparison between elements.
 @available(*, unavailable, message="call the 'lexicographicalCompare()' method on the sequence")
 public func lexicographicalCompare<
@@ -311,7 +311,7 @@ public func lexicographicalCompare<
   return a1.lexicographicalCompare(a2)
 }
 
-/// Return true iff `a1` precedes `a2` in a lexicographical ("dictionary")
+/// Returns `true` iff `a1` precedes `a2` in a lexicographical ("dictionary")
 /// ordering, using `isOrderedBefore` as the comparison between elements.
 ///
 /// - Requires: `isOrderedBefore` is a
@@ -330,7 +330,7 @@ public func lexicographicalCompare<
   return a1.lexicographicalCompare(a2, isOrderedBefore: less)
 }
 
-/// Return `true` iff an element in `seq` satisfies `predicate`.
+/// Returns `true` iff an element in `seq` satisfies `predicate`.
 @available(*, unavailable, message="call the 'contains()' method on the sequence")
 public func contains<
   S : SequenceType, L : BooleanType
@@ -338,7 +338,7 @@ public func contains<
   return seq.contains({ predicate($0).boolValue })
 }
 
-/// Return `true` iff `x` is in `seq`.
+/// Returns `true` iff `x` is in `seq`.
 @available(*, unavailable, message="call the 'contains()' method on the sequence")
 public func contains<
   S : SequenceType where S.Generator.Element : Equatable
@@ -346,7 +346,7 @@ public func contains<
   return seq.contains(x)
 }
 
-/// Return the result of repeatedly calling `combine` with an
+/// Returns the result of repeatedly calling `combine` with an
 /// accumulated value initialized to `initial` and each element of
 /// `sequence`, in turn.
 @available(*, unavailable, message="call the 'reduce()' method on the sequence")

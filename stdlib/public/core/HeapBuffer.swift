@@ -41,7 +41,7 @@ class _HeapBufferStorage<Value,Element> : NonObjectiveCBase {
   public override init() {}
 
   /// The type used to actually manage instances of
-  /// `_HeapBufferStorage<Value,Element>`
+  /// `_HeapBufferStorage<Value,Element>`.
   typealias Buffer = _HeapBuffer<Value, Element>
   deinit {
     Buffer(self)._value.destroy()
@@ -53,7 +53,7 @@ class _HeapBufferStorage<Value,Element> : NonObjectiveCBase {
 
 /// Management API for `_HeapBufferStorage<Value, Element>`
 internal struct _HeapBuffer<Value, Element> : Equatable {
-  /// A default type to use as a backing store
+  /// A default type to use as a backing store.
   typealias Storage = _HeapBufferStorage<Value, Element>
 
   // _storage is passed inout to _isUnique.  Although its value
@@ -168,7 +168,7 @@ internal struct _HeapBuffer<Value, Element> : Equatable {
     }
   }
 
-  /// True if storage is non-`nil`
+  /// `true` if storage is non-`nil`.
   var hasStorage: Bool {
     return _storage != nil
   }

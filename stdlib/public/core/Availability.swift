@@ -14,6 +14,7 @@ import SwiftShims
 
 /// Returns 1 if the running OS version is greater than or equal to
 /// major.minor.patchVersion and 0 otherwise.
+///
 /// This is a magic entrypoint known to the compiler. It is called in
 /// generated code for API availability checking.
 @_semantics("availability.osversion")
@@ -53,7 +54,6 @@ public func ==(
 }
 
 /// Lexicographic comparison of version components.
-
 public func <(
   left: _SwiftNSOperatingSystemVersion,
   right: _SwiftNSOperatingSystemVersion

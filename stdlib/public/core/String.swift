@@ -357,7 +357,7 @@ extension String {
   }
 #endif
 
-  /// Compares two strings with the Unicode Collation Algorithm
+  /// Compares two strings with the Unicode Collation Algorithm.
   @inline(never) @_semantics("stdlib_binary_only") // Hide the CF/ICU dependency
   public  // @testable
   func _compareDeterministicUnicodeCollation(rhs: String) -> Int {
@@ -448,7 +448,7 @@ func _stdlib_NSStringASCIIHashValue(str: AnyObject) -> Int
 extension String : Hashable {
   /// The hash value.
   ///
-  /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
+  /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`.
   ///
   /// - Note: The hash value is not guaranteed to be stable across
   ///   different invocations of the same program.  Do not persist the
@@ -531,7 +531,7 @@ extension String {
   /// `self` is non-empty; identical to `endIndex` otherwise.
   public var startIndex: Index { return characters.startIndex }
   
-  /// The "past the end" position in `self.characters`
+  /// The "past the end" position in `self.characters`.
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
@@ -554,9 +554,9 @@ extension String {
     )
   }
 
-  /// Return a *generator* over the `Character`s
+  /// Return a *generator* over the `Character`s.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public func generate() -> IndexingGenerator<String.CharacterView> {
     return characters.generate()
   }
@@ -571,7 +571,7 @@ public func < (lhs: String.Index, rhs: String.Index) -> Bool {
 }
 
 extension String {
-  /// Access the characters in the given `subRange`
+  /// Access the characters in the given `subRange`.
   ///
   /// - Complexity: O(1) unless bridging from Objective-C requires an
   ///   O(N) conversion.
@@ -669,7 +669,7 @@ extension String {
     }
   }
 
-  /// Insert `newElements` at index `i`
+  /// Insert `newElements` at index `i`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
@@ -682,7 +682,7 @@ extension String {
     }
   }
 
-  /// Remove and return the element at index `i`
+  /// Remove and return the element at index `i`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
@@ -693,7 +693,7 @@ extension String {
     }
   }
 
-  /// Remove the indicated `subRange` of characters
+  /// Remove the indicated `subRange` of characters.
   ///
   /// Invalidates all indices with respect to `self`.
   ///

@@ -207,7 +207,7 @@ public protocol _NSStringCoreType :
   // We also override the following methods for efficiency.
 }
 
-/// An NSString built around a slice of contiguous Swift String storage
+/// An `NSString` built around a slice of contiguous Swift `String` storage.
 public final class _NSContiguousString : _SwiftNativeNSString {
   public init(_ _core: _StringCore) {
     _sanityCheck(

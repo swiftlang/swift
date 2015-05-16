@@ -27,7 +27,7 @@ public func reverse<C:CollectionType where C.Index: BidirectionalIndexType>(
 %   IndexProtocol = '%sIndexType' % traversal
 
 /// A wrapper for a `${IndexProtocol}` that reverses its
-/// direction of traversal
+/// direction of traversal.
 public struct ${Index}<I : ${IndexProtocol}> : ${IndexProtocol} {
   var _base: I
 
@@ -66,7 +66,7 @@ public struct ${Index}<I : ${IndexProtocol}> : ${IndexProtocol} {
   ///   `self` `n` times.  If `n < 0`, the result of applying
   ///   `predecessor` to `self` `-n` times. Otherwise, `self`.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public func advancedBy(amount: Distance) -> ${Index} {
     return ${Index}(_base.advancedBy(-amount))
   }
@@ -78,7 +78,7 @@ public func == <I> (lhs: ${Index}<I>, rhs: ${Index}<I>) -> Bool {
 }
 
 /// The lazy `CollectionType` returned by `reverse(c)` where `c` is a
-/// `CollectionType` with an `Index` conforming to `${IndexProtocol}`
+/// `CollectionType` with an `Index` conforming to `${IndexProtocol}`.
 public struct ${View}<
   T : CollectionType where T.Index : ${IndexProtocol}
 > : CollectionType {
@@ -98,7 +98,7 @@ public struct ${View}<
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public func generate() -> IndexingGenerator<${View}> {
     return IndexingGenerator(self)
   }

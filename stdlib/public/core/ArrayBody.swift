@@ -38,7 +38,7 @@ internal struct _ArrayBody {
     _storage = _SwiftArrayBodyStorage(count: 0, _capacityAndFlags: 0)
   }
   
-  /// The number of elements stored in this Array
+  /// The number of elements stored in this Array.
   var count: Int {
     get {
       return _assumeNonNegative(_storage.count)

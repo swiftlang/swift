@@ -10,14 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A generator over the elements of `Range<T>`
+/// A generator over the elements of `Range<T>`.
 public struct RangeGenerator<
   T : ForwardIndexType
 > : GeneratorType, SequenceType {
   /// The type of element returned by `next()`.
   public typealias Element = T
 
-  /// Construct an instance that traverses the elements of `bounds`
+  /// Construct an instance that traverses the elements of `bounds`.
   @transparent
   public init(_ bounds: Range<T>) {
     self.startIndex = bounds.startIndex
@@ -38,7 +38,7 @@ public struct RangeGenerator<
   public typealias Generator = RangeGenerator<T>
 
   /// `RangeGenerator` is also a `SequenceType`, so it
-  /// `generate`'s a copy of itself
+  /// `generate`'s a copy of itself.
   public func generate() -> Generator {
     return self
   }
@@ -84,7 +84,7 @@ public struct Range<
 > : Equatable, CollectionType,
     CustomStringConvertible, CustomDebugStringConvertible {
 
-  /// Construct a copy of `x`
+  /// Construct a copy of `x`.
   public init(_ x: Range) {
     // This initializer exists only so that we can have a
     // debugDescription that actually constructs the right type when
@@ -100,7 +100,7 @@ public struct Range<
     _endIndex = end
   }
 
-  /// `true` iff the range is empty, i.e. `startIndex == endIndex`
+  /// `true` iff the range is empty, i.e. `startIndex == endIndex`.
   public var isEmpty: Bool {
     // FIXME(prext): remove this function when protocol extensions land.
     return startIndex == endIndex
@@ -141,12 +141,12 @@ public struct Range<
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public func generate() -> RangeGenerator<T> {
     return Generator(self)
   }
 
-  /// The range's lower bound
+  /// The range's lower bound.
   ///
   /// Identical to `endIndex` in an empty range.
   public var startIndex: T {
@@ -158,7 +158,7 @@ public struct Range<
     }
   }
 
-  /// The range's upper bound
+  /// The range's upper bound.
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
@@ -221,7 +221,7 @@ public func ..< <Pos : ForwardIndexType where Pos : Comparable> (
 }
 
 /// Forms a closed range that contains both `start` and `end`.
-/// Requres: `start <= end`
+/// - Requires: `start <= end`.
 @transparent
 public func ... <Pos : ForwardIndexType where Pos : Comparable> (
   start: Pos, end: Pos

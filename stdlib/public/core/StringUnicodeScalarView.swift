@@ -48,7 +48,7 @@ extension String {
       }
     }
 
-    /// A position in a `String.UnicodeScalarView`
+    /// A position in a `String.UnicodeScalarView`.
     public struct Index : BidirectionalIndexType, Comparable {
       public init(_ _position: Int, _ _core: _StringCore) {
         self._position = _position
@@ -200,7 +200,7 @@ extension String {
     /// Return a *generator* over the `UnicodeScalar`s that comprise
     /// this *sequence*.
     ///
-    /// - Complexity: O(1)
+    /// - Complexity: O(1).
     public func generate() -> Generator {
       return Generator(_core)
     }
@@ -251,7 +251,7 @@ extension String.UnicodeScalarView : ExtensibleCollectionType {
   }
   /// Reserve enough space to store `n` ASCII characters.
   ///
-  /// - Complexity: O(`n`)
+  /// - Complexity: O(`n`).
   public mutating func reserveCapacity(n: Int) {
     _core.reserveCapacity(n)
   }
@@ -263,7 +263,7 @@ extension String.UnicodeScalarView : ExtensibleCollectionType {
   }
   /// Append the elements of `newElements` to `self`.
   ///
-  /// - Complexity: O(*length of result*)
+  /// - Complexity: O(*length of result*).
   public mutating func extend<
     S : SequenceType where S.Generator.Element == UnicodeScalar
   >(newElements: S) {
@@ -301,7 +301,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollectionType {
     Swift.insert(&self, newElement, atIndex: i)
   }
 
-  /// Insert `newElements` at index `i`
+  /// Insert `newElements` at index `i`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
@@ -312,7 +312,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollectionType {
     Swift.splice(&self, newElements, atIndex: i)
   }
 
-  /// Remove the and return element at index `i`
+  /// Remove the and return element at index `i`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
@@ -321,7 +321,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollectionType {
     return Swift.removeAtIndex(&self, i)
   }
 
-  /// Remove the indicated `subRange` of elements
+  /// Remove the indicated `subRange` of elements.
   ///
   /// Invalidates all indices with respect to `self`.
   ///

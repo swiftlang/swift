@@ -26,7 +26,7 @@ import SwiftShims
 @objc
 public protocol _ShadowProtocol {}
 
-/// A shadow for the `NSFastEnumeration` protocol
+/// A shadow for the `NSFastEnumeration` protocol.
 @objc
 public protocol _NSFastEnumerationType : _ShadowProtocol {
   func countByEnumeratingWithState(
@@ -35,17 +35,17 @@ public protocol _NSFastEnumerationType : _ShadowProtocol {
   ) -> Int
 }
 
-/// A shadow for the `NSEnumerator` class
+/// A shadow for the `NSEnumerator` class.
 @objc
 public protocol _NSEnumeratorType : _ShadowProtocol {
   init()
   func nextObject() -> AnyObject?
 }
 
-/// A token that can be used for `NSZone*`
+/// A token that can be used for `NSZone*`.
 public typealias _SwiftNSZone = COpaquePointer
 
-/// A shadow for the `NSCopying` protocol
+/// A shadow for the `NSCopying` protocol.
 @objc
 public protocol _NSCopyingType : _ShadowProtocol {
   func copyWithZone(zone: _SwiftNSZone) -> AnyObject
@@ -104,8 +104,8 @@ public protocol _NSDictionaryCoreType :
   ) -> Int
 }
 
-/// A shadow for the API of NSDictionary we will use in the core
-/// stdlib
+/// A shadow for the API of `NSDictionary` we will use in the core
+/// stdlib.
 ///
 /// `NSDictionary` operations, in addition to those on
 /// `_NSDictionaryCoreType`, that we need to use from the core stdlib.
@@ -149,7 +149,7 @@ public protocol _NSSetCoreType :
 }
 
 /// A shadow for the API of NSSet we will use in the core
-/// stdlib
+/// stdlib.
 ///
 /// `NSSet` operations, in addition to those on
 /// `_NSSetCoreType`, that we need to use from the core stdlib.

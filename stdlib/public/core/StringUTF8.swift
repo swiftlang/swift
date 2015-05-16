@@ -106,7 +106,7 @@ extension String {
       self._endIndex = e
     }
 
-    /// A position in a `String.UTF8View`
+    /// A position in a `String.UTF8View`.
     public struct Index : ForwardIndexType {
       internal typealias Buffer = _StringCore.UTF8Chunk
 
@@ -226,10 +226,10 @@ extension String {
       return UTF8View(_core, subRange.startIndex, subRange.endIndex)
     }
 
-    /// Return a *generator* over the code points that comprise this
+    /// Returns a *generator* over the code points that comprise this
     /// *sequence*.
     ///
-    /// - Complexity: O(1)
+    /// - Complexity: O(1).
     public func generate() -> IndexingGenerator<UTF8View> {
       return IndexingGenerator(self)
     }

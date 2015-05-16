@@ -46,7 +46,7 @@ public protocol _SequenceDefaultsType {
   /// *generator*'s next element is the first element of the
   /// sequence.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   func generate() -> Generator
 }
 
@@ -66,19 +66,19 @@ public protocol _Sequence_Type
   /// *generator*'s next element is the first element of the
   /// sequence.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   func generate() -> Generator
 
   /// Return a value less than or equal to the number of elements in
   /// `self`, **nondestructively**.
   ///
-  /// - Complexity: O(N)
+  /// - Complexity: O(N).
   func underestimateCount() -> Int
 
   /// Return an `Array` containing the results of mapping `transform`
   /// over `self`.
   ///
-  /// - Complexity: O(N)
+  /// - Complexity: O(N).
   func map<T>(
     @noescape transform: (Generator.Element) -> T
   ) -> [T]
@@ -107,7 +107,7 @@ public protocol SequenceType : _Sequence_Type {
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   func generate() -> Generator
 
   /// If `self` is multi-pass (i.e., a `CollectionType`), invoke the function
@@ -128,7 +128,7 @@ extension SequenceType {
   /// Return a value less than or equal to the number of elements in
   /// `self`, **nondestructively**.
   ///
-  /// - Complexity: O(N)
+  /// - Complexity: O(N).
   final public func underestimateCount() -> Int {
     return 0
   }
@@ -138,7 +138,7 @@ extension SequenceType {
   /// Return an `Array` containing the results of mapping `transform`
   /// over `self`.
   ///
-  /// - Complexity: O(N)
+  /// - Complexity: O(N).
   final public func map<T>(
     @noescape transform: (Generator.Element) -> T
   ) -> [T] {
@@ -180,7 +180,7 @@ public func _copyToNativeArrayBuffer<Args>(args: Args)
 
 /// Return an underestimate of the number of elements in the given
 /// sequence, without consuming the sequence.  For Sequences that are
-/// actually Collections, this will return x.count()
+/// actually Collections, this will return `x.count()`.
 @available(*, unavailable, message="call the 'underestimateCount()' method on the sequence")
 public func underestimateCount<T : SequenceType>(x: T) -> Int {
   return x.underestimateCount()
@@ -244,9 +244,9 @@ public struct GeneratorSequence<
     return _base.next()
   }
 
-  /// Return a *generator* over the elements of this *sequence*.
+  /// Returns a *generator* over the elements of this *sequence*.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public func generate() -> GeneratorSequence {
     return self
   }

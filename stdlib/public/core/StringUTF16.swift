@@ -200,7 +200,7 @@ public func < (
 // We can do some things more efficiently, even if we don't promise to
 // by conforming to RandomAccessIndexType.
 
-/// Do not use this operator directly; call distance(start, end) instead
+/// Do not use this operator directly; call distance(start, end) instead.
 @inline(__always)
 public func ~> (
   start: String.UTF16View.Index, rest:(_Distance, (String.UTF16View.Index))
@@ -209,7 +209,7 @@ public func ~> (
   return start._offset.distanceTo(end._offset)
 }
 
-/// Do not use this operator directly; call advance(start, n) instead
+/// Do not use this operator directly; call advance(start, n) instead.
 @inline(__always)
 public func ~> (
   start: String.UTF16View.Index,
@@ -219,7 +219,7 @@ public func ~> (
   return String.UTF16View.Index(_offset: start._offset.advancedBy(n))
 }
 
-/// Do not use this operator directly; call advance(start, n, end) instead
+/// Do not use this operator directly; call advance(start, n, end) instead.
 @inline(__always)
 public func ~> (
   start: String.UTF16View.Index,

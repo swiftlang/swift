@@ -22,7 +22,7 @@ extension String {
   public struct CharacterView {
     internal var _core: _StringCore
 
-    /// Create a view of the `Character`s in `text`
+    /// Create a view of the `Character`s in `text`.
     public init(_ text: String) {
       self._core = text._core
     }
@@ -64,14 +64,14 @@ extension String {
   }
 }
 
-/// `String.CharacterView` is a collection of `Character`
+/// `String.CharacterView` is a collection of `Character`.
 extension String.CharacterView : CollectionType {
   internal typealias UnicodeScalarView = String.UnicodeScalarView
   internal var unicodeScalars: UnicodeScalarView {
     return UnicodeScalarView(_core)
   }
   
-  /// A character position
+  /// A character position.
   public struct Index : BidirectionalIndexType, Comparable, Reflectable {
     public // SPI(Foundation)    
     init(_base: String.UnicodeScalarView.Index) {
@@ -228,9 +228,9 @@ extension String.CharacterView : CollectionType {
     return Character(String(unicodeScalars[i._base..<i._endBase]))
   }
 
-  /// Return a *generator* over the `Character`s
+  /// Return a *generator* over the `Character`s.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public func generate() -> IndexingGenerator<String.CharacterView> {
     return IndexingGenerator(self)
   }
@@ -263,14 +263,14 @@ extension String.CharacterView : CollectionType {
 }
 
 extension String.CharacterView : ExtensibleCollectionType {
-  /// Create an empty instance
+  /// Create an empty instance.
   public init() {
     self.init("")
   }
   
   /// Reserve enough space to store `n` ASCII characters.
   ///
-  /// - Complexity: O(`n`)
+  /// - Complexity: O(`n`).
   public mutating func reserveCapacity(n: Int) {
     _core.reserveCapacity(n)
   }
@@ -349,7 +349,7 @@ extension String.CharacterView : RangeReplaceableCollectionType {
     Swift.insert(&self, newElement, atIndex: i)
   }
 
-  /// Insert `newElements` at index `i`
+  /// Insert `newElements` at index `i`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
@@ -360,7 +360,7 @@ extension String.CharacterView : RangeReplaceableCollectionType {
     Swift.splice(&self, newElements, atIndex: i)
   }
 
-  /// Remove and return the element at index `i`
+  /// Remove and return the element at index `i`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
@@ -369,7 +369,7 @@ extension String.CharacterView : RangeReplaceableCollectionType {
     return Swift.removeAtIndex(&self, i)
   }
 
-  /// Remove the indicated `subRange` of characters
+  /// Remove the indicated `subRange` of characters.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
@@ -391,7 +391,7 @@ extension String.CharacterView : RangeReplaceableCollectionType {
 }
 
 extension String.CharacterView : Sliceable {
-  /// Access the characters in the given `subRange`
+  /// Access the characters in the given `subRange`.
   ///
   /// - Complexity: O(1) unless bridging from Objective-C requires an
   ///   O(N) conversion.

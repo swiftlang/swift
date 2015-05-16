@@ -47,7 +47,7 @@ public func advance<T : ForwardIndexType>(start: T, _ n: T.Distance, _ end: T) -
   return start~>_advance(n, end)
 }
 
-/// Operation tags for distance and advance
+/// Operation tags for distance and advance.
 ///
 /// Operation tags allow us to use a single operator (~>) for
 /// dispatching every generic function with a default implementation.
@@ -83,7 +83,7 @@ public func _advance<D, I>(n: D, _ end: I) -> (_Advance, (D, I)) {
 /// be satisfied by types conforming to that protocol.
 public protocol _IncrementableDefaultsType {
   /// Return the next consecutive value in a discrete sequence of
-  /// `Self` values
+  /// `Self` values.
   ///
   /// - Requires: `self` has a well-defined successor.
   func successor() -> Self
@@ -169,7 +169,7 @@ public protocol ForwardIndexType : _ForwardIndexType {
 
 // advance and distance implementations
 
-/// Do not use this operator directly; call distance(start, end) instead
+/// Do not use this operator directly; call distance(start, end) instead.
 public
 func ~> <T : _ForwardIndexType>(start:T, rest: (_Distance, T)) -> T.Distance {
   var p = start
@@ -182,7 +182,7 @@ func ~> <T : _ForwardIndexType>(start:T, rest: (_Distance, T)) -> T.Distance {
   return count
 }
 
-/// Do not use this operator directly; call advance(start, n) instead
+/// Do not use this operator directly; call advance(start, n) instead.
 @transparent
 public func ~> <T : _ForwardIndexType>(
   start: T, rest: (_Advance, T.Distance)
@@ -202,7 +202,7 @@ func _advanceForward<T : _ForwardIndexType>(start: T, _ n: T.Distance) -> T {
   return p
 }
 
-/// Do not use this operator directly; call advance(start, n, end) instead
+/// Do not use this operator directly; call advance(start, n, end) instead.
 @transparent
 public func ~> <T : _ForwardIndexType>(
   start:T, rest: ( _Advance, (T.Distance, T))
@@ -280,7 +280,7 @@ public postfix func -- <T : _BidirectionalIndexType> (inout i: T) -> T {
 
 // advance implementation
 
-/// Do not use this operator directly; call advance(start, n) instead
+/// Do not use this operator directly; call advance(start, n) instead.
 @transparent
 public func ~> <T : _BidirectionalIndexType>(
   start:T , rest: (_Advance, T.Distance)
@@ -296,7 +296,7 @@ public func ~> <T : _BidirectionalIndexType>(
   return p
 }
 
-/// Do not use this operator directly; call advance(start, n, end) instead
+/// Do not use this operator directly; call advance(start, n, end) instead.
 @transparent
 public func ~> <T : _BidirectionalIndexType>(
   start:T, rest: (_Advance, (T.Distance, T))
@@ -340,7 +340,7 @@ public protocol _RandomAccessIndexType : _BidirectionalIndexType, Strideable {
   ///   `self` `n` times.  If `n < 0`, the result of applying
   ///   `predecessor` to `self` `n` times. Otherwise, `self`.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   ///
   /// Axioms:
   ///
@@ -360,7 +360,7 @@ public protocol RandomAccessIndexType
 
 // advance and distance implementations
 
-/// Do not use this operator directly; call distance(start, end) instead
+/// Do not use this operator directly; call distance(start, end) instead.
 @transparent
 public func ~> <T : _RandomAccessIndexType>(start:T, rest:(_Distance, (T)))
 -> T.Distance {
@@ -368,7 +368,7 @@ public func ~> <T : _RandomAccessIndexType>(start:T, rest:(_Distance, (T)))
   return start.distanceTo(end)
 }
 
-/// Do not use this operator directly; call advance(start, n) instead
+/// Do not use this operator directly; call advance(start, n) instead.
 @transparent
 public func ~> <T : _RandomAccessIndexType>(
   start:T, rest:(_Advance, (T.Distance))
@@ -377,7 +377,7 @@ public func ~> <T : _RandomAccessIndexType>(
   return start.advancedBy(n)
 }
 
-/// Do not use this operator directly; call advance(start, n, end) instead
+/// Do not use this operator directly; call advance(start, n, end) instead.
 @transparent
 public func ~> <T : _RandomAccessIndexType>(
   start:T, rest:(_Advance, (T.Distance, T))

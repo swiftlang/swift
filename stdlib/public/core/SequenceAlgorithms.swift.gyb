@@ -62,7 +62,7 @@ extension SequenceType ${"" if preds else "where Generator.Element : Comparable"
 
   /// Returns the minimum element in `self` or `nil` if the sequence is empty.
   ///
-  /// - Complexity: O(elements.count())
+  /// - Complexity: O(`elements.count()`).
   ///
   /// ${orderingRequirement}
   final public func minElement(
@@ -84,7 +84,7 @@ extension SequenceType ${"" if preds else "where Generator.Element : Comparable"
 
   /// Returns the maximum element in `self` or `nil` if the sequence is empty.
   ///
-  /// - Complexity: O(elements.count())
+  /// - Complexity: O(`elements.count()`).
   ///   ${orderingRequirement}
   final public func maxElement(
 %   if preds:

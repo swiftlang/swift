@@ -49,7 +49,7 @@ public enum Bit : Int, Comparable, RandomAccessIndexType, Reflectable {
   ///   `self` `n` times.  If `n < 0`, the result of applying
   ///   `predecessor` to `self` `-n` times. Otherwise, `self`.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public func advancedBy(distance: Int) -> Bit {
     return rawValue.advancedBy(distance) > 0 ? One : Zero
   }

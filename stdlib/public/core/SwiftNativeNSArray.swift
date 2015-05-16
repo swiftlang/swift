@@ -21,15 +21,15 @@
 #if _runtime(_ObjC)
 import SwiftShims
 
-/// Return true iff the given `index` is valid as a position, i.e. `0
-/// ≤ index ≤ count`
+/// Returns `true` iff the given `index` is valid as a position, i.e. `0
+/// ≤ index ≤ count`.
 @transparent
 internal func _isValidArrayIndex(index: Int, _ count: Int) -> Bool {
   return (index >= 0) && (index <= count)
 }
 
-/// Return true iff the given `index` is valid for subscripting, i.e.
-/// `0 ≤ index < count`
+/// Returns `true` iff the given `index` is valid for subscripting, i.e.
+/// `0 ≤ index < count`.
 @transparent
 internal func _isValidArraySubscript(index: Int, _ count: Int) -> Bool {
   return (index >= 0) && (index < count)
@@ -204,10 +204,10 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
     while true
   }
 
-  /// Return the number of elements in the array
+  /// Returns the number of elements in the array.
   ///
   /// This override allows the count can be read without triggering
-  /// bridging of array elements
+  /// bridging of array elements.
   @objc
   internal override var count: Int {
     if let bridgedStorage = _heapBufferBridged {

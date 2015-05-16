@@ -716,7 +716,7 @@ extension NSArray : SequenceType {
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   func generate() -> NSFastGenerator {
     return NSFastGenerator(self)
   }
@@ -757,7 +757,7 @@ extension Set {
 extension NSSet : SequenceType {
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public func generate() -> NSFastGenerator {
     return NSFastGenerator(self)
   }
@@ -766,7 +766,7 @@ extension NSSet : SequenceType {
 extension NSOrderedSet : SequenceType {
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public func generate() -> NSFastGenerator {
     return NSFastGenerator(self)
   }
@@ -804,7 +804,7 @@ public struct NSIndexSetGenerator : GeneratorType {
 extension NSIndexSet : SequenceType {
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public func generate() -> NSIndexSetGenerator {
     return NSIndexSetGenerator(set: self)
   }
@@ -922,7 +922,7 @@ extension NSDictionary : SequenceType {
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public func generate() -> Generator {
     return Generator(self)
   }
@@ -931,7 +931,7 @@ extension NSDictionary : SequenceType {
 extension NSEnumerator : SequenceType {
   /// Return a *generator* over the *enumerator*.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public func generate() -> NSFastGenerator {
     return NSFastGenerator(self)
   }

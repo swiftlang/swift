@@ -16,7 +16,7 @@
 /// Its requirements are inherited by `ExtensibleCollectionType` and thus must
 /// be satisfied by types conforming to that protocol.
 public protocol _ExtensibleCollectionType : CollectionType {
-  /// Create an empty instance
+  /// Create an empty instance.
   init()
 
   /// A non-binding request to ensure `n` elements of available storage.
@@ -49,7 +49,7 @@ public protocol _ExtensibleCollectionType : CollectionType {
 
   /// Append the elements of `newElements` to `self`.
   ///
-  /// - Complexity: O(*length of result*)
+  /// - Complexity: O(*length of result*).
   ///
   /// A possible implementation:
   ///

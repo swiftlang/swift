@@ -35,26 +35,26 @@ protocol _ArrayType
     ArrayLiteralConvertible
 {
   //===--- public interface -----------------------------------------------===//
-  /// Construct an empty Array
+  /// Construct an empty Array.
   init()
 
-  /// Construct an array of count elements, each initialized to repeatedValue
+  /// Construct an array of `count` elements, each initialized to `repeatedValue`.
   init(count: Int, repeatedValue: Generator.Element)
 
-  /// How many elements the Array stores
+  /// The number of elements the Array stores.
   var count: Int {get}
 
-  /// How many elements the Array can store without reallocation
+  /// The number of elements the Array can store without reallocation.
   var capacity: Int {get}
 
-  /// true if and only if the Array is empty
+  /// `true` if and only if the Array is empty.
   var isEmpty: Bool {get}
 
-  /// An object that guarantees the lifetime of this array's elements
+  /// An object that guarantees the lifetime of this array's elements.
   var _owner: AnyObject? {get}
 
   /// If the elements are stored contiguously, a pointer to the first
-  /// element. Otherwise, nil.
+  /// element. Otherwise, `nil`.
   var _baseAddressIfContiguous: UnsafeMutablePointer<Element> {get}
 
   subscript(index: Int) -> Generator.Element {get set}
@@ -66,19 +66,19 @@ protocol _ArrayType
   /// - Postcondition: `capacity >= minimumCapacity` and the array has
   ///   mutable contiguous storage.
   ///
-  /// - Complexity: O(`count`)
+  /// - Complexity: O(`count`).
   mutating func reserveCapacity(minimumCapacity: Int)
 
-  /// Append newElement to the Array in O(1) (amortized)
+  /// Append newElement to the Array in O(1) (amortized).
   mutating func append(newElement: Generator.Element)
 
-  /// Append elements from `sequence` to the Array
+  /// Append elements from `sequence` to the Array.
   mutating func extend<
       S : SequenceType
       where S.Generator.Element == Generator.Element
   >(sequence: S)
 
-  /// Operator form of extend
+  /// Operator form of `extend`.
   func += <
     S: SequenceType where S.Generator.Element == Generator.Element
   >(inout lhs: Self, rhs: S)
@@ -109,7 +109,7 @@ protocol _ArrayType
   mutating func removeAtIndex(index: Int) -> Generator.Element
 
   /// Erase all the elements.  If `keepCapacity` is `true`, `capacity`
-  /// will not change
+  /// will not change.
   mutating func removeAll(keepCapacity keepCapacity: Bool)
 
   //===--- algorithms -----------------------------------------------------===//

@@ -58,7 +58,7 @@ public protocol RangeReplaceableCollectionType
   ///     Swift.insert(&self, newElement, atIndex: i)
   mutating func insert(newElement: Generator.Element, atIndex i: Index)
 
-  /// Insert `newElements` at index `i`
+  /// Insert `newElements` at index `i`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
@@ -71,7 +71,7 @@ public protocol RangeReplaceableCollectionType
     S : CollectionType where S.Generator.Element == Generator.Element
   >(newElements: S, atIndex i: Index)
 
-  /// Remove the element at index `i`
+  /// Remove the element at index `i`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
@@ -82,7 +82,7 @@ public protocol RangeReplaceableCollectionType
   ///     Swift.removeAtIndex(&self, i)
   mutating func removeAtIndex(i: Index) -> Generator.Element
 
-  /// Remove the indicated `subRange` of elements
+  /// Remove the indicated `subRange` of elements.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
@@ -93,7 +93,7 @@ public protocol RangeReplaceableCollectionType
   ///     Swift.removeRange(&self, subRange)
   mutating func removeRange(subRange: Range<Index>)
 
-  /// Remove all elements
+  /// Remove all elements.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
@@ -120,7 +120,7 @@ public func insert<
     x.replaceRange(i..<i, with: CollectionOfOne(newElement))
 }
 
-/// Insert `newElements` into `x` at index `i`
+/// Insert `newElements` into `x` at index `i`.
 ///
 /// Invalidates all indices with respect to `x`.
 ///
@@ -144,7 +144,7 @@ internal func _replaceRange<
   x.replaceRange(subRange, with: newElements)
 }
 
-/// Remove from `x` and return the element at index `i`
+/// Remove from `x` and return the element at index `i`.
 ///
 /// Invalidates all indices with respect to `x`.
 ///
@@ -158,7 +158,7 @@ public func removeAtIndex<
   return result
 }
 
-/// Remove from `x` the indicated `subRange` of elements
+/// Remove from `x` the indicated `subRange` of elements.
 ///
 /// Invalidates all indices with respect to `x`.
 ///
@@ -169,7 +169,7 @@ public func removeRange<
   _replaceRange(&x, subRange, with: EmptyCollection())
 }
 
-/// Remove all elements from `x`
+/// Remove all elements from `x`.
 ///
 /// Invalidates all indices with respect to `x`.
 ///
@@ -191,7 +191,7 @@ public func removeAll<
 
 /// Append elements from `newElements` to `x`.
 ///
-/// - Complexity: O(N)
+/// - Complexity: O(N).
 public func extend<
   C: RangeReplaceableCollectionType,
   S : CollectionType where S.Generator.Element == C.Generator.Element

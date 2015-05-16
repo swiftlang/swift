@@ -97,15 +97,15 @@ public struct _UnitTestArrayBuffer<T> : _ArrayBufferType {
   }
 
   //===--- _ArrayBufferType conformance -----------------------------------===//
-  /// The type of elements stored in the buffer
+  /// The type of elements stored in the buffer.
   public typealias Element = T
 
-  /// create an empty buffer
+  /// Create an empty buffer.
   public init() {
     _base = unsafeBitCast(_emptyArrayStorage, _HeapBuffer<_ArrayBody, T>.self)
   }
 
-  /// Adopt the storage of x
+  /// Adopt the storage of x.
   public init(_ buffer: _ContiguousArrayBuffer<Element>) {
     _base = _HeapBuffer(buffer.owner)
   }
@@ -156,7 +156,7 @@ public struct _UnitTestArrayBuffer<T> : _ArrayBufferType {
     return _unsafeElementStorage[i]
   }
 
-  /// Get/set the value of the ith element
+  /// Get or set the value of the ith element.
   public subscript(i: Int) -> T {
     get {
       return getElement(i, hoistedIsNativeNoTypeCheckBuffer: true)
@@ -175,7 +175,7 @@ public struct _UnitTestArrayBuffer<T> : _ArrayBufferType {
     }
   }
 
-  /// How many elements the buffer stores
+  /// The number of elements the buffer stores.
   public var count: Int {
     get {
       return _base.hasStorage ? _base.value.count : 0
@@ -195,8 +195,8 @@ public struct _UnitTestArrayBuffer<T> : _ArrayBufferType {
     }
   }
 
-  /// Return whether the given `index` is valid for subscripting, i.e. `0
-  /// ≤ index < count`
+  /// Returns whether the given `index` is valid for subscripting, i.e. `0
+  /// ≤ index < count`.
   func _isValidSubscript(index : Int, hoistedIsNativeBuffer: Bool) -> Bool {
     /// Instead of returning 0 for no storage, we explicitly check
     /// for the existance of storage.
@@ -207,7 +207,7 @@ public struct _UnitTestArrayBuffer<T> : _ArrayBufferType {
     return (index >= 0) && (index < _base.value.count)
   }
 
-  /// How many elements the buffer can store without reallocation
+  /// The number of elements the buffer can store without reallocation.
   public var capacity: Int {
     return _base.hasStorage ? _base.value.capacity : 0
   }
@@ -266,7 +266,7 @@ public struct _UnitTestArrayBuffer<T> : _ArrayBufferType {
   }
 #endif
 
-  /// An object that keeps the elements stored in this buffer alive
+  /// An object that keeps the elements stored in this buffer alive.
   public var owner: AnyObject {
     return _storage ?? _emptyArrayStorage
   }
@@ -328,7 +328,7 @@ public struct _UnitTestArrayBuffer<T> : _ArrayBufferType {
   var _base: _Base
 }
 
-/// Append the elements of rhs to lhs
+/// Append the elements of `rhs` to `lhs`.
 public func += <
   T, C: CollectionType where C.Generator.Element == T
 > (
@@ -355,7 +355,7 @@ public func += <
   }
 }
 
-/// Append rhs to lhs
+/// Append `rhs` to `lhs`.
 public func += <T> (inout lhs: _UnitTestArrayBuffer<T>, rhs: T) {
   lhs += CollectionOfOne(rhs)
 }
@@ -390,7 +390,7 @@ extension _UnitTestArrayBuffer : CollectionType {
   
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public func generate() -> IndexingGenerator<_UnitTestArrayBuffer> {
     return IndexingGenerator(self)
   }

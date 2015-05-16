@@ -41,9 +41,9 @@ IntMax = 'Int%s' % int_max_bits
 UIntMax = 'UInt%s' % int_max_bits
 }%
 
-/// The largest native signed integer type
+/// The largest native signed integer type.
 public typealias IntMax = ${IntMax}
-/// The largest native unsigned integer type
+/// The largest native unsigned integer type.
 public typealias UIntMax = ${UIntMax}
 
 /// This protocol is an implementation detail of `IntegerType`; do
@@ -304,7 +304,7 @@ public struct ${Self}
 extension ${Self} : Hashable {
   /// The hash value.
   ///
-  /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
+  /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`.
   ///
   /// - Note: The hash value is not guaranteed to be stable across
   ///   different invocations of the same program.  Do not persist the
@@ -383,7 +383,7 @@ extension ${Self} : RandomAccessIndexType {
   ///   `self` `n` times.  If `n < 0`, the result of applying
   ///   `predecessor` to `self` `-n` times. Otherwise, `self`.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   @transparent public
   func advancedBy(amount: ${Self}.Distance) -> ${Self} {
     return numericCast((numericCast(self) as IntMax) &+ numericCast(amount))
@@ -646,10 +646,10 @@ public func _assumeNonNegative(x: ${Self}) -> ${Self} {
 % end
 //===--- End loop over all integer types ----------------------------------===//
 
-/// A signed integer type that occupies one machine word
+/// A signed integer type that occupies one machine word.
 public typealias Word = Int
 
-/// An unsigned integer type that occupies one machine word
+/// An unsigned integer type that occupies one machine word.
 public typealias UWord = UInt
 
 // ${'Local Variables'}:

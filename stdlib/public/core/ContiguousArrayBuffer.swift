@@ -256,16 +256,16 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
   }
 
   //===--- _ArrayBufferType conformance -----------------------------------===//
-  /// The type of elements stored in the buffer
+  /// The type of elements stored in the buffer.
   public typealias Element = T
 
-  /// create an empty buffer
+  /// Create an empty buffer.
   public init() {
     __bufferPointer = ManagedBufferPointer(
       _uncheckedUnsafeBufferObject: _emptyArrayStorage)
   }
 
-  /// Adopt the storage of x
+  /// Adopt the storage of x.
   public init(_ buffer: _ContiguousArrayBuffer) {
     self = buffer
   }
@@ -316,7 +316,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
     return baseAddress[i]
   }
 
-  /// Get/set the value of the ith element
+  /// Get or set the value of the ith element.
   public subscript(i: Int) -> T {
     get {
       return getElement(i, hoistedIsNativeNoTypeCheckBuffer: true)
@@ -335,7 +335,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
     }
   }
 
-  /// How many elements the buffer stores
+  /// The number of elements the buffer stores.
   public var count: Int {
     get {
       return __bufferPointer.value.count
@@ -351,8 +351,8 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
     }
   }
 
-  /// Return whether the given `index` is valid for subscripting, i.e. `0
-  /// ≤ index < count`
+  /// Returns whether the given `index` is valid for subscripting, i.e. `0
+  /// ≤ index < count`.
   func _isValidSubscript(index : Int, hoistedIsNativeBuffer : Bool) -> Bool {
     /// Instead of returning 0 for no storage, we explicitly check
     /// for the existance of storage.
@@ -362,8 +362,8 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
     return (index >= 0) && (index < __bufferPointer.value.count)
   }
 
-  /// Return whether the given `index` is valid for subscripting, i.e. `0
-  /// ≤ index < count`
+  /// Returns whether the given `index` is valid for subscripting, i.e. `0
+  /// ≤ index < count`.
   ///
   /// For ContiguousArrayBuffer, this is equivalent to the
   /// `_isValidSubscript(_:hoistedIsNativeBuffer:)` form, but is necessary
@@ -375,7 +375,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
       hoistedIsNativeNoTypeCheckBuffer : hoistedIsNativeNoTypeCheckBuffer)
   }
 
-  /// How many elements the buffer can store without reallocation
+  /// The number of elements the buffer can store without reallocation.
   public var capacity: Int {
     return __bufferPointer.value.capacity
   }
@@ -396,7 +396,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
     return target + c
   }
 
-  /// Return a _SliceBuffer containing the given subRange of values
+  /// Returns a `_SliceBuffer` containing the given `subRange` of values
   /// from this buffer.
   public subscript(subRange: Range<Int>) -> _SliceBuffer<T>
   {
@@ -407,10 +407,11 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
       hasNativeBuffer: true)
   }
 
-  /// Return true iff this buffer's storage is uniquely-referenced.
-  /// NOTE: this does not mean the buffer is mutable.  Other factors
-  /// may need to be considered, such as whether the buffer could be
-  /// some immutable Cocoa container.
+  /// Returns `true` iff this buffer's storage is uniquely-referenced.
+  ///
+  /// - Note: This does not mean the buffer is mutable.  Other factors
+  ///   may need to be considered, such as whether the buffer could be
+  ///   some immutable Cocoa container.
   public mutating func isUniquelyReferenced() -> Bool {
     return __bufferPointer.holdsUniqueReference()
   }
@@ -424,8 +425,10 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
 
 #if _runtime(_ObjC)
   /// Convert to an NSArray.
-  /// - Precondition: T is bridged to Objective-C
-  ///   O(1).
+  ///
+  /// - Precondition: `T` is bridged to Objective-C.
+  ///
+  /// - Complexity: O(1).
   public func _asCocoaArray() -> _NSArrayCoreType {
     _sanityCheck(
         _isBridgedToObjectiveC(T.self),
@@ -438,18 +441,19 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
   }
 #endif
 
-  /// An object that keeps the elements stored in this buffer alive
+  /// An object that keeps the elements stored in this buffer alive.
   public var owner: AnyObject {
     return _storage
   }
 
-  /// An object that keeps the elements stored in this buffer alive
+  /// An object that keeps the elements stored in this buffer alive.
   public var nativeOwner: AnyObject {
     return _storage
   }
 
-  /// A value that identifies the storage used by the buffer.  Two
-  /// buffers address the same elements when they have the same
+  /// A value that identifies the storage used by the buffer.
+  ///
+  /// Two buffers address the same elements when they have the same
   /// identity and count.
   public var identity: UnsafePointer<Void> {
     return withUnsafeBufferPointer { UnsafePointer($0.baseAddress) }
@@ -463,7 +467,9 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
 
   /// Return true if the buffer stores only elements of type `U`.
   ///
-  /// - Requires: `U` is a class or `@objc` existential. O(N).
+  /// - Requires: `U` is a class or `@objc` existential.
+  ///
+  /// - Complexity: O(N).
   func storesOnlyElementsOfType<U>(
     _: U.Type
   ) -> Bool {
@@ -494,7 +500,7 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
   var __bufferPointer: ManagedBufferPointer<_ArrayBody, T>
 }
 
-/// Append the elements of rhs to lhs
+/// Append the elements of `rhs` to `lhs`.
 public func += <
   T, C: CollectionType where C.Generator.Element == T
 > (inout lhs: _ContiguousArrayBuffer<T>, rhs: C) {
@@ -535,7 +541,7 @@ extension _ContiguousArrayBuffer : CollectionType {
   
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public func generate() -> IndexingGenerator<_ContiguousArrayBuffer> {
     return IndexingGenerator(self)
   }

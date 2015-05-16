@@ -36,7 +36,7 @@ extension CollectionType where ${GElement} : Equatable {
   /// Returns the first index where `value` appears in `self` or `nil` if
   /// `value` is not found.
   ///
-  /// - Complexity: O(`self.count()`)
+  /// - Complexity: O(`self.count()`).
   final public func indexOf(element: ${GElement}) -> Index? {
     if let result = _customIndexOfEquatableElement(element) {
       return result
@@ -55,7 +55,7 @@ extension CollectionType {
   /// Returns the first index where `predicate` returns `true` for the
   /// corresponding value, or `nil` if such value is not found.
   ///
-  /// - Complexity: O(`self.count()`)
+  /// - Complexity: O(`self.count()`).
   final public func indexOf(
     @noescape predicate: (${GElement}) -> Bool
   ) -> Index? {
@@ -97,10 +97,10 @@ partitionDocComment = """\
   /// Re-order the given `range` of elements in `self` and return
   /// a pivot index *p*.
   ///
-  /// Postcondition: for all *i* in `range.startIndex..<`\ *p*, and *j*
-  /// in *p*\ `..<range.endIndex`, `less(self[`\ *i*\ `],
-  /// self[`\ *j*\ `]) && !less(self[`\ *j*\ `], self[`\ *p*\ `])`.
-  /// Only returns `range.endIndex` when `self` is empty."""
+  /// - Postcondition: for all *i* in `range.startIndex..<`\ *p*, and *j*
+  ///   in *p*\ `..<range.endIndex`, `less(self[`\ *i*\ `],
+  ///   self[`\ *j*\ `]) && !less(self[`\ *j*\ `], self[`\ *p*\ `])`.
+  ///   Only returns `range.endIndex` when `self` is empty."""
 
 orderingRequirementForPredicate = """\
   /// - Requires: `isOrderedBefore` is a

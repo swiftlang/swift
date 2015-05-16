@@ -31,7 +31,7 @@ public struct ObjectIdentifier : Hashable, Comparable {
 
   /// Convert to a `UInt` that captures the full value of `self`.
   ///
-  /// Axiom: `a.uintValue == b.uintValue` iff `a == b`
+  /// Axiom: `a.uintValue == b.uintValue` iff `a == b`.
   public var uintValue: UInt {
     return UInt(Builtin.ptrtoint_Word(value))
   }
@@ -39,7 +39,7 @@ public struct ObjectIdentifier : Hashable, Comparable {
   // FIXME: Better hashing algorithm
   /// The hash value.
   ///
-  /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
+  /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`.
   ///
   /// - Note: The hash value is not guaranteed to be stable across
   ///   different invocations of the same program.  Do not persist the

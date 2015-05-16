@@ -143,7 +143,7 @@ public func fatalError(
   _assertionFailed("fatal error", message(), file, line)
 }
 
-/// Library precondition checks
+/// Library precondition checks.
 ///
 /// Library precondition checks are enabled in debug mode and release mode. When
 /// building in fast mode they are disabled.  In release mode they don't print
@@ -195,7 +195,7 @@ public func _overflowChecked<T>(
 }
 
 
-/// Debug library precondition checks
+/// Debug library precondition checks.
 ///
 /// Debug library precondition checks are only on in debug mode. In release and
 /// in fast mode they are disabled. In debug mode they print an error message
@@ -225,7 +225,7 @@ public func _debugPreconditionFailure(
   _conditionallyUnreachable()
 }
 
-/// Internal checks
+/// Internal checks.
 ///
 /// Internal checks are to be used for checking correctness conditions in the
 /// standard library. They are only enable when the standard library is built

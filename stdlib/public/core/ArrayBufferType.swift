@@ -11,15 +11,15 @@
 //===----------------------------------------------------------------------===//
 
 /// The underlying buffer for an ArrayType conforms to
-/// _ArrayBufferType.  This buffer does not provide value semantics.
+/// `_ArrayBufferType`.  This buffer does not provide value semantics.
 public protocol _ArrayBufferType : MutableCollectionType {
-  /// The type of elements stored in the buffer
+  /// The type of elements stored in the buffer.
   typealias Element
 
-  /// create an empty buffer
+  /// Create an empty buffer.
   init()
 
-  /// Adopt the storage of x
+  /// Adopt the storage of x.
   init(_ buffer: _ContiguousArrayBuffer<Element>)
 
   /// Copy the given subRange of this buffer into uninitialized memory
@@ -29,12 +29,12 @@ public protocol _ArrayBufferType : MutableCollectionType {
     subRange: Range<Int>, target: UnsafeMutablePointer<Element>
   ) -> UnsafeMutablePointer<Element>
 
-  /// Get/set the index'th element
+  /// Get or set the index'th element.
   subscript(index: Int) -> Element { get nonmutating set}
 
   /// If this buffer is backed by a uniquely-referenced mutable
-  /// _ContiguousArrayBuffer that can be grown in-place to allow the self
-  /// buffer store minimumCapacity elements, returns that buffer.
+  /// `_ContiguousArrayBuffer` that can be grown in-place to allow the `self`
+  /// buffer store `minimumCapacity` elements, returns that buffer.
   /// Otherwise, returns nil.
   ///
   /// - Note: The result's baseAddress may not match ours, if we are a
@@ -68,7 +68,7 @@ public protocol _ArrayBufferType : MutableCollectionType {
     subRange subRange: Range<Int>, with newCount: Int, elementsOf newValues: C
   )
 
-  /// Return a _SliceBuffer containing the given subRange of values
+  /// Returns a `_SliceBuffer` containing the given `subRange` of values
   /// from this buffer.
   subscript(subRange: Range<Int>) -> _SliceBuffer<Element> {get}
 
@@ -87,17 +87,17 @@ public protocol _ArrayBufferType : MutableCollectionType {
     @noescape body: (UnsafeMutableBufferPointer<Element>) -> R
   ) -> R
 
-  /// How many elements the buffer stores
+  /// The number of elements the buffer stores.
   var count: Int {get set}
 
-  /// How many elements the buffer can store without reallocation
+  /// The number of elements the buffer can store without reallocation.
   var capacity: Int {get}
 
-  /// An object that keeps the elements stored in this buffer alive
+  /// An object that keeps the elements stored in this buffer alive.
   var owner: AnyObject {get}
 
   /// If the elements are stored contiguously, a pointer to the first
-  /// element. Otherwise, nil.
+  /// element. Otherwise, `nil`.
   var baseAddress: UnsafeMutablePointer<Element> {get}
 
   /// A value that identifies the storage used by the buffer.  Two

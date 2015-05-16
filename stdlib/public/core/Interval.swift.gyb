@@ -12,23 +12,27 @@
 
 /// An interval over a `Comparable` type.
 public protocol IntervalType {
-  /// The type of the `Interval`'s endpoints
+  /// The type of the `Interval`'s endpoints.
   typealias Bound : Comparable
 
-  /// Returns `true` iff the interval contains `value`
+  /// Returns `true` iff the interval contains `value`.
   func contains(value: Bound) -> Bool
 
   /// Return `rhs` clamped to `self`.  The bounds of the result, even
-  /// if it is empty, are always within the bounds of `self`
+  /// if it is empty, are always within the bounds of `self`.
   func clamp(intervalToClamp: Self) -> Self
 
-  /// True iff `self` is empty
+  /// `true` iff `self` is empty.
   var isEmpty: Bool {get}
 
 
-  /// The `Interval`'s lower bound. Invariant: `start` <= `end`
+  /// The `Interval`'s lower bound.
+  ///
+  /// Invariant: `start` <= `end`.
   var start: Bound {get}
-  /// The `Interval`'s upper bound. Invariant: `start` <= `end`
+  /// The `Interval`'s upper bound.
+  ///
+  /// Invariant: `start` <= `end`.
   var end: Bound {get}
 }
 
@@ -50,10 +54,10 @@ ${selfDocComment}
 public struct ${Self}<T : Comparable>
   : IntervalType, Equatable, CustomStringConvertible, CustomDebugStringConvertible, Reflectable {
 
-  /// The type of the `Interval`'s endpoints
+  /// The type of the `Interval`'s endpoints.
   public typealias Bound = T
 
-  /// Construct a copy of `x`
+  /// Construct a copy of `x`.
   public init(_ x: ${Self}) {
     // This initializer exists only so that we can have a descriptive
     // debugDescription that actually constructs the right type.
@@ -69,12 +73,16 @@ public struct ${Self}<T : Comparable>
     _end = end
   }
 
-  /// The `Interval`'s lower bound. Invariant: `start` <= `end`
+  /// The `Interval`'s lower bound.
+  ///
+  /// Invariant: `start` <= `end`.
   public var start: T {
     return _start
   }
 
-  /// The `Interval`'s upper bound. Invariant: `start` <= `end`
+  /// The `Interval`'s upper bound.
+  ///
+  /// Invariant: `start` <= `end`.
   public var end: T {
     return _end
   }
@@ -89,14 +97,15 @@ public struct ${Self}<T : Comparable>
     return "${Self}(\(String(reflecting: start))${rangeOperator}\(String(reflecting: end)))"
   }
 
-  /// Returns `true` iff the `Interval` contains `x`
+  /// Returns `true` iff the `Interval` contains `x`.
   public func contains(x: Bound) -> Bool {
     return x >= start && x ${upperBoundCompare} end
   }
 
-  /// Return `intervalToClamp` clamped to `self`.  The bounds of the
-  /// result, even if it is empty, are always limited to the bounds of
-  /// `self`
+  /// Returns `intervalToClamp` clamped to `self`.
+  ///
+  /// The bounds of the result, even if it is empty, are always limited to the bounds of
+  /// `self`.
   public func clamp(intervalToClamp: ${Self}) -> ${Self} {
 
     return ${Self}(
@@ -121,7 +130,7 @@ public struct ${Self}<T : Comparable>
 }
 
 /// Two `${Self}`s are equal if their `start` and `end` are
-/// equal
+/// equal.
 public func == <T : Comparable> (
   lhs: ${Self}<T>, rhs: ${Self}<T>
 ) -> Bool {
@@ -138,7 +147,7 @@ extension HalfOpenInterval {
 
 extension ClosedInterval {
   /// `true` iff the `Interval` is empty.  In the case of
-  /// `ClosedInterval`, always returns `false`
+  /// `ClosedInterval`, always returns `false`.
   public var isEmpty: Bool {
     return false
   }
@@ -146,24 +155,24 @@ extension ClosedInterval {
 
 // FIXME: current language limitations don't allow this as a method in
 // the protocol.
-/// Returns `true` if `lhs` and `rhs` have a non-empty intersection
+/// Returns `true` if `lhs` and `rhs` have a non-empty intersection.
 public func overlaps<
   I0: IntervalType, I1: IntervalType where I0.Bound == I1.Bound
 >(lhs: I0, _ rhs: I1) -> Bool {
   return lhs.contains(rhs.start) || rhs.contains(lhs.start)
 }
 
-/// Returns a half-open interval from `start` to `end`
+/// Returns a half-open interval from `start` to `end`.
 public func ..< <T : Comparable>(start: T, end: T) -> HalfOpenInterval<T> {
   return HalfOpenInterval(start, end)
 }
 
-/// Returns a closed interval from `start` through `end`
+/// Returns a closed interval from `start` through `end`.
 public func ... <T : Comparable>(start: T, end: T) -> ClosedInterval<T> {
   return ClosedInterval(start, end)
 }
 
-/// Returns `true` iff `pattern` contains `value`
+/// Returns `true` iff `pattern` contains `value`.
 public func ~= <I: IntervalType>(pattern: I, value: I.Bound) -> Bool {
   return pattern.contains(value)
 }

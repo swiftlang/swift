@@ -89,9 +89,9 @@ func _canBeClass<T>(_: T.Type) -> Int8 {
 
 /// Returns the the bits of `x`, interpreted as having type `U`.
 ///
-/// Caution: Breaks the guarantees of Swift's type system; use
-/// with extreme care.  There's almost always a better way to do
-/// anything.
+/// - Warning: Breaks the guarantees of Swift's type system; use
+///   with extreme care.  There's almost always a better way to do
+///   anything.
 ///
 @transparent
 public func unsafeBitCast<T, U>(var x: T, _: U.Type) -> U {
@@ -102,7 +102,7 @@ public func unsafeBitCast<T, U>(var x: T, _: U.Type) -> U {
   return UnsafeMutablePointer<U>(Builtin.addressof(&x)).memory
 }
 
-/// `unsafeBitCast` something to `AnyObject`
+/// `unsafeBitCast` something to `AnyObject`.
 @transparent
 public func _reinterpretCastToAnyObject<T>(x: T) -> AnyObject {
   return unsafeBitCast(x, AnyObject.self)
@@ -163,8 +163,8 @@ func _conditionallyUnreachable() {
 @asmname("swift_isClassOrObjCExistential")
 func _swift_isClassOrObjCExistential<T>(x: T.Type) -> Bool
 
-/// Returns true iff T is a class type or an @objc existential such as
-/// AnyObject
+/// Returns `true` iff `T` is a class type or an `@objc` existential such as
+/// `AnyObject`.
 @inline(__always)
 internal func _isClassOrObjCExistential<T>(x: T.Type) -> Bool {
   let tmp = _canBeClass(x)
@@ -181,9 +181,9 @@ internal func _isClassOrObjCExistential<T>(x: T.Type) -> Bool {
   return _swift_isClassOrObjCExistential(x)
 }
 
-/// Return an UnsafePointer to the storage used for `object`.  There's
+/// Returns an `UnsafePointer` to the storage used for `object`.  There's
 /// not much you can do with this other than use it to identify the
-/// object
+/// object.
 @transparent
 public func unsafeAddressOf(object: AnyObject) -> UnsafePointer<Void> {
   return UnsafePointer(Builtin.bridgeToRawPointer(object))
@@ -194,7 +194,7 @@ public func unsafeAddressOf(object: AnyObject) -> UnsafePointer<Void> {
 /// - Requires: `x is T`.  In particular, in -O builds, no test is
 ///   performed to ensure that `x` actually has dynamic type `T`.
 ///
-/// - warning: Trades safety for performance.  Use `unsafeDowncast`
+/// - Warning: Trades safety for performance.  Use `unsafeDowncast`
 ///   only when `x as T` has proven to be a performance problem and you
 ///   are confident that, always, `x is T`.  It is better than an
 ///   `unsafeBitCast` because it's more restrictive, and because
@@ -205,12 +205,12 @@ public func unsafeDowncast<T : AnyObject>(x: AnyObject) -> T {
   return Builtin.bridgeFromRawPointer(Builtin.bridgeToRawPointer(x))
 }
 
-/// - Returns: `nonEmpty!`
+/// - Returns: `nonEmpty!`.
 ///
 /// - Requires: `nonEmpty != nil`.  In particular, in -O builds, no test
 ///   is performed to ensure that `nonEmpty` actually is non-nil.
 ///
-/// - warning: Trades safety for performance.  Use `unsafeUnwrap`
+/// - Warning: Trades safety for performance.  Use `unsafeUnwrap`
 ///   only when `nonEmpty!` has proven to be a performance problem and
 ///   you are confident that, always, `nonEmpty != nil`.  It is better
 ///   than an `unsafeBitCast` because it's more restrictive, and
@@ -223,7 +223,7 @@ public func unsafeUnwrap<T>(nonEmpty: T?) -> T {
   _debugPreconditionFailure("unsafeUnwrap of nil optional")
 }
 
-/// - Returns: `unsafeUnwrap(nonEmpty)`
+/// - Returns: `unsafeUnwrap(nonEmpty)`.
 ///
 /// This version is for internal stdlib use; it avoids any checking
 /// overhead for users, even in Debug builds.
@@ -258,13 +258,13 @@ func _branchHint<C: BooleanType>(actual: C, _ expected: Bool) -> Bool {
   return Bool(Builtin.int_expect_Int1(actual.boolValue.value, expected.value))
 }
 
-/// Optimizer hint that `x` is expected to be `true`
+/// Optimizer hint that `x` is expected to be `true`.
 @transparent @_semantics("fastpath") public
 func _fastPath<C: BooleanType>(x: C) -> Bool {
   return _branchHint(x.boolValue, true)
 }
 
-/// Optimizer hint that `x` is expected to be `false`
+/// Optimizer hint that `x` is expected to be `false`.
 @transparent @_semantics("slowpath") public
 func _slowPath<C: BooleanType>(x: C) -> Bool {
   return _branchHint(x.boolValue, false)
@@ -273,7 +273,7 @@ func _slowPath<C: BooleanType>(x: C) -> Bool {
 //===--- Runtime shim wrappers --------------------------------------------===//
 
 /// Returns `true` iff the class indicated by `theClass` uses native
-/// Swift reference-counting
+/// Swift reference-counting.
 @inline(__always)
 internal func _usesNativeSwiftReferenceCounting(theClass: AnyClass) -> Bool {
 #if _runtime(_ObjC)
@@ -288,7 +288,7 @@ internal func _usesNativeSwiftReferenceCounting(theClass: AnyClass) -> Bool {
 @asmname("_swift_class_getInstancePositiveExtentSize_native")
 func _swift_class_getInstancePositiveExtentSize_native(theClass: AnyClass) -> UInt
 
-/// - Returns: `class_getInstanceSize(theClass)`
+/// - Returns: `class_getInstanceSize(theClass)`.
 @inline(__always)
 internal func _class_getInstancePositiveExtentSize(theClass: AnyClass) -> Int {
 #if _runtime(_ObjC)
@@ -345,13 +345,13 @@ internal var _objCTaggedPointerBits: UInt {
 }
 #endif
 
-/// Extract the raw bits of `x`
+/// Extract the raw bits of `x`.
 @inline(__always)
 internal func _bitPattern(x: Builtin.BridgeObject) -> UInt {
   return UInt(Builtin.castBitPatternFromBridgeObject(x))
 }
 
-/// Extract the raw spare bits of `x`
+/// Extract the raw spare bits of `x`.
 @inline(__always)
 internal func _nonPointerBits(x: Builtin.BridgeObject) -> UInt {
   return _bitPattern(x) & _objectPointerSpareBits

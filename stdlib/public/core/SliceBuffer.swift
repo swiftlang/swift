@@ -110,7 +110,7 @@ struct _SliceBuffer<T> : _ArrayBufferType {
     return UnsafePointer(start)
   }
   
-  /// An object that keeps the elements stored in this buffer alive
+  /// An object that keeps the elements stored in this buffer alive.
   public
   var owner: AnyObject
   var start: UnsafeMutablePointer<T>
@@ -306,7 +306,7 @@ struct _SliceBuffer<T> : _ArrayBufferType {
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public func generate() -> IndexingGenerator<_SliceBuffer> {
     return IndexingGenerator(self)
   }

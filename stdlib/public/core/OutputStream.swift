@@ -36,7 +36,7 @@ public protocol OutputStreamType : _OutputStreamDefaultsType {
 ///
 /// For example: `String`, `Character`, `UnicodeScalar`.
 public protocol Streamable {
-  /// Write a textual representation of `self` into `target`
+  /// Write a textual representation of `self` into `target`.
   func writeTo<Target : OutputStreamType>(inout target: Target)
 }
 
@@ -72,7 +72,7 @@ public protocol CustomStringConvertible {
 /// accessing a conforming type's `debugDescription` directly, is
 /// therefore discouraged.
 ///
-/// - see also: `String.init<T>(reflecting: T)`,
+/// - SeeAlso: `String.init<T>(reflecting: T)`,
 ///   `CustomStringConvertible`
 public protocol CustomDebugStringConvertible {
   /// A textual representation of `self`, suitable for debugging.
@@ -174,7 +174,7 @@ internal func _print_unlocked<T, TargetStream : OutputStreamType>(
   _adHocPrint(value, &target)
 }
 
-/// Returns the result of `print`'ing `x` into a `String`
+/// Returns the result of `print`'ing `x` into a `String`.
 ///
 /// Exactly the same as `String`, but annotated 'readonly' to allow
 /// the optimizer to remove calls where results are unused.
@@ -254,21 +254,21 @@ extension String : OutputStreamType {
 //===----------------------------------------------------------------------===//
 
 extension String : Streamable {
-  /// Write a textual representation of `self` into `target`
+  /// Write a textual representation of `self` into `target`.
   public func writeTo<Target : OutputStreamType>(inout target: Target) {
     target.write(self)
   }
 }
 
 extension Character : Streamable {
-  /// Write a textual representation of `self` into `target`
+  /// Write a textual representation of `self` into `target`.
   public func writeTo<Target : OutputStreamType>(inout target: Target) {
     target.write(String(self))
   }
 }
 
 extension UnicodeScalar : Streamable {
-  /// Write a textual representation of `self` into `target`
+  /// Write a textual representation of `self` into `target`.
   public func writeTo<Target : OutputStreamType>(inout target: Target) {
     target.write(String(Character(self)))
   }
@@ -329,7 +329,7 @@ public func println() {
   target._unlock()
 }
 
-/// Returns the result of `print`'ing `x` into a `String`
+/// Returns the result of `print`'ing `x` into a `String`.
 @available(*, unavailable, renamed="String")
 @inline(never)
 public func toString<T>(x: T) -> String {
@@ -377,7 +377,7 @@ public func debugPrintln<T>(x: T) {
   target._unlock()
 }
 
-/// Returns the result of `debugPrint`'ing `x` into a `String`
+/// Returns the result of `debugPrint`'ing `x` into a `String`.
 @available(*, unavailable, message="use String(reflecting:)")
 public func toDebugString<T>(x: T) -> String {
   var result = ""

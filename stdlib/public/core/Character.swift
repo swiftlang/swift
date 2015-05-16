@@ -117,8 +117,8 @@ public struct Character :
     }
   }
 
-  /// Return the index of the lowest byte that is 0xFF, or 8 if
-  /// there is none
+  /// Returns the index of the lowest byte that is 0xFF, or 8 if
+  /// there is none.
   static func _smallSize(value: UInt64) -> Int {
     var mask: UInt64 = 0xFF
     for var i = 0; i < 8; ++i {
@@ -185,7 +185,7 @@ public struct Character :
 
     /// Return a *generator* over the elements of this *sequence*.
     ///
-    /// - Complexity: O(1)
+    /// - Complexity: O(1).
     func generate() -> IndexingGenerator<_SmallUTF8> {
       return IndexingGenerator(self)
     }
@@ -247,7 +247,7 @@ public struct Character :
 
     /// Return a *generator* over the elements of this *sequence*.
     ///
-    /// - Complexity: O(1)
+    /// - Complexity: O(1).
     func generate() -> IndexingGenerator<_SmallUTF16> {
       return IndexingGenerator(self)
     }
@@ -258,7 +258,7 @@ public struct Character :
 
   /// The hash value.
   ///
-  /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
+  /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`.
   ///
   /// - Note: The hash value is not guaranteed to be stable across
   ///   different invocations of the same program.  Do not persist the

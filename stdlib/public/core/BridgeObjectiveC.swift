@@ -34,7 +34,7 @@ public protocol _ObjectiveCBridgeable {
   /// Must return `_ObjectiveCType.self`.
   static func _getObjectiveCType() -> Any.Type
 
-  /// Convert `self` to Objective-C
+  /// Convert `self` to Objective-C.
   func _bridgeToObjectiveC() -> _ObjectiveCType
 
   /// Bridge from an Objective-C object of the bridged class type to a
@@ -130,9 +130,9 @@ func _bridgeNonVerbatimToObjectiveC<T>(x: T) -> AnyObject?
 ///     verbatim, the function returns `x`;
 /// - otherwise, if `T` conforms to `_ObjectiveCBridgeable`:
 ///   + if the dynamic type of `x` is not `T._getObjectiveCType()`
-///     or a subclass of it, trap
+///     or a subclass of it, trap;
 ///   + otherwise, returns the result of `T._forceBridgeFromObjectiveC(x)`;
-/// - otherwise, trap
+/// - otherwise, trap.
 public func _forceBridgeFromObjectiveC<T>(x: AnyObject, _: T.Type) -> T {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return x as! T
@@ -205,7 +205,7 @@ func _bridgeNonVerbatimFromObjectiveC<T>(
 /// - parameter result: Will be set to the resulting value if bridging succeeds, and
 ///   unchanged otherwise.
 ///
-/// - Returns: true to indicate success, false to indicate failure
+/// - Returns: `true` to indicate success, `false` to indicate failure.
 @asmname("swift_bridgeNonVerbatimFromObjectiveCConditional")
 func _bridgeNonVerbatimFromObjectiveCConditional<T>(
   x: AnyObject,
@@ -218,7 +218,7 @@ func _bridgeNonVerbatimFromObjectiveCConditional<T>(
 ///
 /// - If `T` is a class type, returns `true`;
 /// - otherwise, if `T` conforms to `_ObjectiveCBridgeable`, returns
-///   `T._isBridgedToObjectiveC()`;
+///   `T._isBridgedToObjectiveC()`.
 public func _isBridgedToObjectiveC<T>(_: T.Type) -> Bool {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
     return true

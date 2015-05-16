@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 /// A generator for the elements in the buffer referenced by
-/// `UnsafeBufferPointer` or `UnsafeMutableBufferPointer`
+/// `UnsafeBufferPointer` or `UnsafeMutableBufferPointer`.
 public struct UnsafeBufferPointerGenerator<T>: GeneratorType, SequenceType {
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
@@ -20,7 +20,7 @@ public struct UnsafeBufferPointerGenerator<T>: GeneratorType, SequenceType {
   }
 
   /// `UnsafeBufferPointerGenerator` is also a `SequenceType`, so it
-  /// `generate`'s a copy of itself
+  /// `generate`'s a copy of itself.
   public func generate() -> UnsafeBufferPointerGenerator {
     return self
   }
@@ -76,17 +76,17 @@ public struct Unsafe${Mutable}BufferPointer<T> : ${Mutable}CollectionType {
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public func generate() -> UnsafeBufferPointerGenerator<T> {
     return UnsafeBufferPointerGenerator(position: _position, end: _end)
   }
 
-  /// A pointer to the first element of the buffer
+  /// A pointer to the first element of the buffer.
   public var baseAddress: Unsafe${Mutable}Pointer<T> {
     return _position
   }
 
-  /// The number of elements in the buffer
+  /// The number of elements in the buffer.
   public var count: Int {
     return _end - _position
   }

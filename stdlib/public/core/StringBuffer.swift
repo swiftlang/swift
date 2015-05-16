@@ -125,12 +125,12 @@ public struct _StringBuffer {
     }
   }
 
-  /// a pointer to the start of this buffer's data area
+  /// A pointer to the start of this buffer's data area.
   public var start: UnsafeMutablePointer<RawByte> {
     return UnsafeMutablePointer(_storage.baseAddress)
   }
 
-  /// a past-the-end pointer for this buffer's stored data
+  /// A past-the-end pointer for this buffer's stored data.
   var usedEnd: UnsafeMutablePointer<RawByte> {
     get {
       return _storage.value.usedEnd
@@ -144,22 +144,22 @@ public struct _StringBuffer {
     return (usedEnd - start) >> elementShift
   }
 
-  /// a past-the-end pointer for this buffer's available storage
+  /// A past-the-end pointer for this buffer's available storage.
   var capacityEnd: UnsafeMutablePointer<RawByte> {
     return start + _storage.value.byteCapacity
   }
 
-  /// The number of elements that can be stored in this buffer
+  /// The number of elements that can be stored in this buffer.
   public var capacity: Int {
     return _storage.value.byteCapacity >> elementShift
   }
 
-  /// 1 if the buffer stores UTF-16; 0 otherwise
+  /// 1 if the buffer stores UTF-16; 0 otherwise.
   var elementShift: Int {
     return _storage.value.elementShift
   }
 
-  /// the number of bytes per element
+  /// The number of bytes per element.
   var elementWidth: Int {
     return elementShift + 1
   }

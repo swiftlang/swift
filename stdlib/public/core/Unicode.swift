@@ -14,7 +14,7 @@
 // Conversions between different Unicode encodings.  Note that UTF-16 and
 // UTF-32 decoding are *not* currently resilient to erroneous data.
 
-/// The result of one Unicode decoding step
+/// The result of one Unicode decoding step.
 ///
 /// A unicode scalar value, an indication that no more unicode scalars
 /// are available, or an indication of a decoding error.
@@ -36,7 +36,7 @@ public enum UnicodeDecodingResult {
   }
 }
 
-/// A Unicode [encoding scheme](http://www.unicode.org/glossary/#character_encoding_scheme)
+/// A Unicode [encoding scheme](http://www.unicode.org/glossary/#character_encoding_scheme).
 ///
 /// Consists of an underlying [code unit](http://www.unicode.org/glossary/#code_unit) and functions to
 /// translate between sequences of these code units and [unicode scalar values](http://www.unicode.org/glossary/#unicode_scalar_value).
@@ -474,8 +474,8 @@ public struct UTF8 : UnicodeCodecType {
     output.put(buf3)
   }
 
-  /// Return true if `byte` is a continuation byte of the form
-  /// `0b10xxxxxx`
+  /// Return `true` if `byte` is a continuation byte of the form
+  /// `0b10xxxxxx`.
   public static func isContinuation(byte: CodeUnit) -> Bool {
     return byte & 0b11_00__0000 == 0b10_00__0000
   }

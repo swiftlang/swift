@@ -53,7 +53,7 @@ public func _fixLifetime<T>(x: T) {
 
 /// Invokes `body` with an `UnsafeMutablePointer` to `arg` and returns the
 /// result. Useful for calling Objective-C APIs that take "in/out"
-/// parameters (and default-constructible "out" parameters) by pointer
+/// parameters (and default-constructible "out" parameters) by pointer.
 public func withUnsafeMutablePointer<T, Result>(
   inout arg: T,
   @noescape _ body: UnsafeMutablePointer<T> -> Result
@@ -93,7 +93,7 @@ public func withUnsafeMutablePointers<A0, A1, A2, Result>(
 
 /// Invokes `body` with an `UnsafePointer` to `arg` and returns the
 /// result. Useful for calling Objective-C APIs that take "in/out"
-/// parameters (and default-constructible "out" parameters) by pointer
+/// parameters (and default-constructible "out" parameters) by pointer.
 public func withUnsafePointer<T, Result>(
   inout arg: T,
   @noescape _ body: UnsafePointer<T> -> Result

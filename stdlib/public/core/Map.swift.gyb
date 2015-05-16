@@ -12,7 +12,7 @@
 
 /// The `GeneratorType` used by `MapSequenceView` and `MapCollectionView`.
 /// Produces each element by passing the output of the `Base`
-/// `GeneratorType` through a transform function returning `T`
+/// `GeneratorType` through a transform function returning `T`.
 public struct MapSequenceGenerator<
   Base: GeneratorType, T
 >: GeneratorType, SequenceType {
@@ -31,7 +31,7 @@ public struct MapSequenceGenerator<
   }
 
   /// `MapSequenceGenerator` is also a `SequenceType`, so it
-  /// `generate`'s a copy of itself
+  /// `generate`'s a copy of itself.
   public func generate() -> MapSequenceGenerator {
     return self
   }
@@ -49,7 +49,7 @@ public struct MapSequenceGenerator<
 public struct MapSequenceView<Base : SequenceType, T> : SequenceType {
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public func generate() -> MapSequenceGenerator<Base.Generator,T> {
     return MapSequenceGenerator(
       _base: _base.generate(), _transform: _transform)
@@ -112,9 +112,9 @@ public struct MapCollectionView<Base : CollectionType, T> : CollectionType {
     return _transform(_base[position])
   }
 
-  /// Return a *generator* over the elements of this *sequence*.
+  /// Returns a *generator* over the elements of this *sequence*.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public func generate() -> MapSequenceView<Base, T>.Generator {
     return MapSequenceGenerator(_base: _base.generate(), _transform: _transform)
   }

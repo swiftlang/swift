@@ -23,7 +23,7 @@ struct _ConcatenateSequenceGenerator<
   Outer: GeneratorType where Outer.Element : SequenceType
 >: GeneratorType, SequenceType {
 
-  /// Construct around a generator for the outer sequence
+  /// Construct around a generator for the `outer` sequence.
   init(_ outer: Outer) {
     self._outer = outer
   }
@@ -53,7 +53,7 @@ struct _ConcatenateSequenceGenerator<
   }
 
   /// `_ConcatenateSequenceGenerator` is also a `SequenceType`, so it
-  /// `generate`'s a copy of itself
+  /// `generate`'s a copy of itself.
   public // @testable
   func generate() -> _ConcatenateSequenceGenerator {
     return self
@@ -72,14 +72,14 @@ struct _ConcatenateSequenceView<
   Base: SequenceType where Base.Generator.Element: SequenceType
 > : SequenceType {
 
-  /// Present the elmeents of the elements of `base`
+  /// Present the elmeents of the elements of `base`.
   public init(_ base: Base) {
     self._base = base
   }
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public func generate() -> _ConcatenateSequenceGenerator<Base.Generator> {
     return _ConcatenateSequenceGenerator(_base.generate())
   }
@@ -88,7 +88,7 @@ struct _ConcatenateSequenceView<
 }
 
 /// Return a sequence that is a concatenation of the elements of
-/// `source`'s elements
+/// `source`'s elements.
 public // @testable
 func _lazyConcatenate<
   S:SequenceType
@@ -187,7 +187,7 @@ func == <I> (lhs: ${Index}<I>, rhs: ${Index}<I>) -> Bool {
 }
 
 /// The lazy `CollectionType` returned by `lazyConcatenate(c)` where `c` is a
-/// `CollectionType` having an `Index` conforming to `${IndexProtocol}`
+/// `CollectionType` having an `Index` conforming to `${IndexProtocol}`.
 public // @testable
 struct ${View}<
   C: CollectionType
@@ -207,7 +207,7 @@ struct ${View}<
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public // @testable
   func generate() -> _ConcatenateSequenceGenerator<C.Generator> {
     return _ConcatenateSequenceGenerator(_base.generate())
@@ -244,7 +244,7 @@ struct ${View}<
 }
 
 /// Return a collection that is a concatenation of the elements of
-/// `source`'s elements
+/// `source`'s elements.
 public // @testable
 func _lazyConcatenate<
   C: CollectionType

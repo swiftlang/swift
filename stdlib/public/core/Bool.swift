@@ -49,7 +49,7 @@ extension Bool : BooleanType {
   @transparent public var boolValue: Bool { return self }
 
   /// Construct an instance representing the same logical value as
-  /// `value`
+  /// `value`.
   public init<T : BooleanType>(_ value: T) {
     self = value.boolValue
   }
@@ -71,7 +71,7 @@ func _getBool(v: Builtin.Int1) -> Bool { return Bool(v) }
 extension Bool : Equatable, Hashable {
   /// The hash value.
   ///
-  /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
+  /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`.
   ///
   /// - Note: the hash value is not guaranteed to be stable across
   ///   different invocations of the same program.  Do not persist the

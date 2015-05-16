@@ -12,7 +12,7 @@
 // Intrinsic protocols shared with the compiler
 //===----------------------------------------------------------------------===//
 
-/// A type that represents a boolean value.
+/// A type that represents a Boolean value.
 ///
 /// Types that conform to the `BooleanType` protocol can be used as
 /// the condition in control statements (`if`, `while`, C-style `for`)
@@ -82,7 +82,7 @@ public protocol _OptionSetType {
   // TODO: implementation, API review
 }
 
-/// Protocol for `NS_OPTIONS` imported from Objective-C
+/// Protocol for `NS_OPTIONS` imported from Objective-C.
 public protocol RawOptionSetType : _RawOptionSetType, BitwiseOperationsType,
     NilLiteralConvertible {
   // FIXME: Disabled pending <rdar://problem/14011860> (Default
@@ -102,7 +102,7 @@ public protocol _BuiltinIntegerLiteralConvertible {
   init(_builtinIntegerLiteral value: _MaxBuiltinIntegerType)
 }
 
-/// Conforming types can be initialized with integer literals
+/// Conforming types can be initialized with integer literals.
 public protocol IntegerLiteralConvertible {
   typealias IntegerLiteralType : _BuiltinIntegerLiteralConvertible
   /// Create an instance initialized to `value`.
@@ -113,7 +113,7 @@ public protocol _BuiltinFloatLiteralConvertible {
   init(_builtinFloatLiteral value: _MaxBuiltinFloatType)
 }
 
-/// Conforming types can be initialized with floating point literals
+/// Conforming types can be initialized with floating point literals.
 public protocol FloatLiteralConvertible {
   typealias FloatLiteralType : _BuiltinFloatLiteralConvertible
   /// Create an instance initialized to `value`.
@@ -124,7 +124,7 @@ public protocol _BuiltinBooleanLiteralConvertible {
   init(_builtinBooleanLiteral value: Builtin.Int1)
 }
 
-/// Conforming types can be initialized with the boolean literals
+/// Conforming types can be initialized with the Boolean literals
 /// `true` and `false`.
 public protocol BooleanLiteralConvertible {
   typealias BooleanLiteralType : _BuiltinBooleanLiteralConvertible
@@ -191,7 +191,7 @@ public protocol _BuiltinUTF16StringLiteralConvertible
     numberOfCodeUnits: Builtin.Word)
 }
 
-/// Conforming types can be initialized with arbitrary string literals
+/// Conforming types can be initialized with arbitrary string literals.
 public protocol StringLiteralConvertible
   : ExtendedGraphemeClusterLiteralConvertible {
   // FIXME: when we have default function implementations in protocols, provide
@@ -202,14 +202,14 @@ public protocol StringLiteralConvertible
   init(stringLiteral value: StringLiteralType)
 }
 
-/// Conforming types can be initialized with array literals
+/// Conforming types can be initialized with array literals.
 public protocol ArrayLiteralConvertible {
   typealias Element
   /// Create an instance initialized with `elements`.
   init(arrayLiteral elements: Element...)
 }
 
-/// Conforming types can be initialized with dictionary literals
+/// Conforming types can be initialized with dictionary literals.
 public protocol DictionaryLiteralConvertible {
   typealias Key
   typealias Value
@@ -220,31 +220,31 @@ public protocol DictionaryLiteralConvertible {
 /// Conforming types can be initialized with string interpolations
 /// containing `\(`...`)` clauses.
 public protocol StringInterpolationConvertible {
-  /// Create an instance by concatenating the elements of `strings`
+  /// Create an instance by concatenating the elements of `strings`.
   init(stringInterpolation strings: Self...)
-  /// Create an instance containing `expr`'s `print` representation
+  /// Create an instance containing `expr`'s `print` representation.
   init<T>(stringInterpolationSegment expr: T)
 }
 
 /// Conforming types can be initialized with color literals (e.g.
-/// [#Color(colorLiteralRed: 1, blue: 0, green: 0, alpha: 1)#]).
+/// `[#Color(colorLiteralRed: 1, blue: 0, green: 0, alpha: 1)#]`).
 public protocol _ColorLiteralConvertible {
   init(colorLiteralRed: Float, green: Float, blue: Float, alpha: Float)
 }
 
 /// Optionals of conforming types can be initialized with image literals (e.g.
-/// [#Image(imageLiteral: "hi.png")#]).
+/// `[#Image(imageLiteral: "hi.png")#]`).
 public protocol _ImageLiteralConvertible {
   init?(imageLiteral: String)
 }
 
 /// A container is destructor safe if whether it may store to memory on
 /// destruction only depends on its type parameters.
-/// For example, whether Array<T> may store to memory on destruction depends
-/// only on T.
-/// If T is an Int we know the Array<Int> does not store to memory during
-/// destruction. If T is an arbitrary class Array<MemoryUnsafeDestructorClass>
+/// For example, whether `Array<T>` may store to memory on destruction depends
+/// only on `T`.
+/// If `T` is an `Int` we know the `Array<Int>` does not store to memory during
+/// destruction. If `T` is an arbitrary class `Array<MemoryUnsafeDestructorClass>`
 /// then the compiler will deduce may store to memory on destruction because
-/// MemoryUnsafeDestructorClass' destructor may store to memory on destruction.
+/// `MemoryUnsafeDestructorClass`'s destructor may store to memory on destruction.
 public protocol _DestructorSafeContainer {
 }

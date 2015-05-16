@@ -38,9 +38,9 @@ public struct Repeat<T> : CollectionType {
     return count
   }
 
-  /// Return a *generator* over the elements of this *sequence*.
+  /// Returns a *generator* over the elements of this *sequence*.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public func generate() -> IndexingGenerator<Repeat> {
     return IndexingGenerator(self)
   }

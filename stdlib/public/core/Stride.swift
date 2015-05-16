@@ -18,7 +18,7 @@
 public protocol _Strideable {
   // FIXME: We'd like to name this type "Distance" but for
   // <rdar://problem/17619038>
-  /// A type that can represent the distance between two values of `Self`
+  /// A type that can represent the distance between two values of `Self`.
   typealias Stride : SignedNumberType
 
   /// Returns a stride `x` such that `self.advancedBy(x)` approximates
@@ -40,7 +40,7 @@ public protocol _Strideable {
   func advancedBy(n: Stride) -> Self
 }
 
-/// Compare two Strideables
+/// Compare two `Strideable`s.
 public func < <T : _Strideable>(x: T, y: T) -> Bool {
   return x.distanceTo(y) > 0
 }
@@ -110,7 +110,7 @@ public func -= <T : _UnsignedIntegerType> (inout lhs: T, rhs: T._DisallowMixedSi
 
 //===----------------------------------------------------------------------===//
 
-/// A GeneratorType for StrideTo<T>
+/// A GeneratorType for `StrideTo<T>`.
 public struct StrideToGenerator<T : Strideable> : GeneratorType {
   var current: T
   let end: T
@@ -128,13 +128,13 @@ public struct StrideToGenerator<T : Strideable> : GeneratorType {
   }
 }
 
-/// A `SequenceType` of values formed by striding over a half-open interval
+/// A `SequenceType` of values formed by striding over a half-open interval.
 public struct StrideTo<T : Strideable> : SequenceType {
   // FIXME: should really be a CollectionType, as it is multipass
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public func generate() -> StrideToGenerator<T> {
     return StrideToGenerator(current: start, end: end, stride: stride)
   }
@@ -162,7 +162,7 @@ public func stride<
   return StrideTo(start: start, end: end, stride: stride)
 }
 
-/// A GeneratorType for StrideThrough<T>
+/// A GeneratorType for `StrideThrough<T>`.
 public struct StrideThroughGenerator<T : Strideable> : GeneratorType {
   var current: T
   let end: T
@@ -188,13 +188,13 @@ public struct StrideThroughGenerator<T : Strideable> : GeneratorType {
   }
 }
 
-/// A `SequenceType` of values formed by striding over a closed interval
+/// A `SequenceType` of values formed by striding over a closed interval.
 public struct StrideThrough<T : Strideable> : SequenceType {
   // FIXME: should really be a CollectionType, as it is multipass
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public func generate() -> StrideThroughGenerator<T> {
     return StrideThroughGenerator(
       current: start, end: end, stride: stride, done: false)

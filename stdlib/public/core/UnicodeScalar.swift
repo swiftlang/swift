@@ -221,7 +221,7 @@ extension UnicodeScalar : CustomStringConvertible, CustomDebugStringConvertible 
 extension UnicodeScalar : Hashable {
   /// The hash value.
   ///
-  /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`
+  /// **Axiom:** `x == y` implies `x.hashValue == y.hashValue`.
   ///
   /// - Note: The hash value is not guaranteed to be stable across
   ///   different invocations of the same program.  Do not persist the
@@ -316,7 +316,7 @@ extension UnicodeScalar.UTF16View : CollectionType {
   /// Return a *generator* over the code points that comprise this
   /// *sequence*.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   func generate() -> IndexingGenerator<UnicodeScalar.UTF16View> {
     return IndexingGenerator(self)
   }

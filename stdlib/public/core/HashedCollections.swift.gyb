@@ -404,7 +404,7 @@ public struct Set<T : Hashable> :
 
   /// The number of members in the set.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public var count: Int {
     return _variantStorage.count
   }
@@ -415,14 +415,14 @@ public struct Set<T : Hashable> :
 
   /// Access the member at `position`.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public subscript(position: Index) -> Element {
     return _variantStorage.assertingGet(position)
   }
 
   /// Return a *generator* over the members.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public func generate() -> GeneratorType {
     return _variantStorage.generate()
   }
@@ -646,7 +646,7 @@ public struct Set<T : Hashable> :
   }
 
   /// The first element obtained when iterating, or `nil` if `self` is
-  /// empty.  Equivalent to `self.generate().next()`
+  /// empty.  Equivalent to `self.generate().next()`.
   public var first: T? {
     return count > 0 ? self[startIndex] : .None
   }
@@ -1014,7 +1014,7 @@ public struct Dictionary<Key : Hashable, Value> :
 
   /// The position of the first element in a non-empty dictionary.
   ///
-  /// Identical to `endIndex` in an empty dictionary
+  /// Identical to `endIndex` in an empty dictionary.
   ///
   /// - Complexity: Amortized O(1) if `self` does not wrap a bridged
   ///   `NSDictionary`, O(N) otherwise.
@@ -1044,7 +1044,7 @@ public struct Dictionary<Key : Hashable, Value> :
 
   /// Access the key-value pair at `position`.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public subscript(position: Index) -> Element {
     return _variantStorage.assertingGet(position)
   }
@@ -1118,7 +1118,7 @@ public struct Dictionary<Key : Hashable, Value> :
 
   /// The number of entries in the dictionary.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public var count: Int {
     return _variantStorage.count
   }
@@ -1129,7 +1129,7 @@ public struct Dictionary<Key : Hashable, Value> :
 
   /// Return a *generator* over the (key, value) pairs.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public func generate() -> DictionaryGenerator<Key, Value> {
     return _variantStorage.generate()
   }
@@ -1154,7 +1154,7 @@ public struct Dictionary<Key : Hashable, Value> :
   // API itself.
   //
 
-  /// A collection containing just the keys of `self`
+  /// A collection containing just the keys of `self`.
   ///
   /// Keys appear in the same order as they occur as the `.0` member
   /// of key-value pairs in `self`.  Each key in the result has a
@@ -1164,7 +1164,7 @@ public struct Dictionary<Key : Hashable, Value> :
     return lazy(self).map { $0.0 }
   }
 
-  /// A collection containing just the values of `self`
+  /// A collection containing just the values of `self`.
   ///
   /// Values appear in the same order as they occur as the `.1` member
   /// of key-value pairs in `self`.
@@ -1177,7 +1177,7 @@ public struct Dictionary<Key : Hashable, Value> :
   // CollectionType conformance
   //
 
-  /// True iff `count == 0`
+  /// `true` iff `count == 0`.
   public var isEmpty: Bool {
     return count == 0
   }
@@ -3189,7 +3189,7 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
 
   /// Return a *generator* over the (Key, Value) pairs.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   internal func generate() -> ${Self}Generator<${TypeParameters}> {
     switch self {
     case .Native(let owner):
@@ -3586,7 +3586,7 @@ internal enum ${Self}GeneratorRepresentation<${TypeParametersDecl}> {
   case _Cocoa(_Cocoa${Self}Generator)
 }
 
-/// A generator over the members of a `${Self}<${TypeParameters}>`
+/// A generator over the members of a `${Self}<${TypeParameters}>`.
 public struct ${Self}Generator<${TypeParametersDecl}> : GeneratorType {
   // ${Self} has a separate GeneratorType and Index because of efficiency
   // and implementability reasons.

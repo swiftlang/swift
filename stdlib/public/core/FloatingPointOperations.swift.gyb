@@ -83,7 +83,7 @@ public protocol FloatingPointType : Strideable {
   /// The IEEE 754 "class" of this type.
   var floatingPointClass: FloatingPointClassification { get }
 
-  /// `true` iff `self` is negative
+  /// `true` iff `self` is negative.
   var isSignMinus: Bool { get }
 
   /// `true` iff `self` is normal (not zero, subnormal, infinity, or

@@ -31,8 +31,8 @@ public func _stdlib_getErrorCode<T : ErrorType>(x: UnsafePointer<T>) -> Int {
   return x.memory._code
 }
 
-// Known function for the compiler to use to coerce ErrorType instances to
-// NSError.
+// Known function for the compiler to use to coerce `ErrorType` instances to
+// `NSError`.
 @asmname("swift_bridgeErrorTypeToNSError")
 public func _bridgeErrorTypeToNSError(e: ErrorType) -> AnyObject
 #endif

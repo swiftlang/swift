@@ -19,7 +19,7 @@ public func zip<Sequence1 : SequenceType, Sequence2 : SequenceType>(
   return Zip2(sequence1, sequence2)
 }
 
-/// A generator for the `Zip2` sequence
+/// A generator for the `Zip2` sequence.
 public struct ZipGenerator2<
   Generator1 : GeneratorType, Generator2 : GeneratorType
 > : GeneratorType {
@@ -86,7 +86,7 @@ public struct Zip2<Sequence1 : SequenceType, Sequence2 : SequenceType>
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   public func generate() -> Generator {
     return Generator(
       _sequences.0.generate(),

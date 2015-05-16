@@ -15,7 +15,7 @@ import SwiftShims
 /// A common base class for classes that need to be non-`@objc`,
 /// recognizably in the type system.
 ///
-/// See `isUniquelyReferenced`
+/// - SeeAlso: `isUniquelyReferenced`
 public class NonObjectiveCBase {}
 
 /// A base class of `ManagedBuffer<Value,Element>`, used during
@@ -102,7 +102,7 @@ public class ManagedBuffer<Value, Element>
     return unsafeDowncast(p.buffer)
   }
 
-  /// Destroy the stored Value
+  /// Destroy the stored Value.
   deinit {
     ManagedBufferPointer(self).withUnsafeMutablePointerToValue { $0.destroy() }
   }
@@ -240,8 +240,10 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   }
 
   /// Call `body` with an `UnsafeMutablePointer` to the stored
-  /// `Value`.  **Note**: this pointer is only valid
-  /// for the duration of the call to `body`
+  /// `Value`.
+  ///
+  /// - Note: This pointer is only valid
+  ///   for the duration of the call to `body`.
   public func withUnsafeMutablePointerToValue<R>(
     body: (UnsafeMutablePointer<Value>)->R
   ) -> R {

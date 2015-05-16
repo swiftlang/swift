@@ -55,7 +55,7 @@ public struct StaticString
   ///   ASCII.
   var _flags: Builtin.Int8
 
-  /// A pointer to the beginning of UTF-8 code units
+  /// A pointer to the beginning of UTF-8 code units.
   ///
   /// - Requires: `self` stores a pointer to either ASCII or UTF-8 code
   ///   units.
@@ -67,7 +67,7 @@ public struct StaticString
     return UnsafePointer(_startPtrOrData)
   }
 
-  /// The stored Unicode scalar value
+  /// The stored Unicode scalar value.
   ///
   /// - Requires: `self` stores a single Unicode scalar value.
   @transparent
@@ -91,7 +91,7 @@ public struct StaticString
     return Word(_byteSize)
   }
 
-  /// `true` iff `self` stores a pointer to ASCII or UTF-8 code units
+  /// `true` iff `self` stores a pointer to ASCII or UTF-8 code units.
   @transparent
   public var hasPointerRepresentation: Bool {
     return (UInt8(_flags) & 0x1) == 0

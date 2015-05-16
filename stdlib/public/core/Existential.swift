@@ -18,11 +18,11 @@
 // Policy.swift.  Similar components should usually be defined next to
 // their respective protocols.
 
-/// Unavailable; use `AnyGenerator<T>` instead
+/// Unavailable; use `AnyGenerator<T>` instead.
 @available(*, unavailable, renamed="AnyGenerator")
 public struct GeneratorOf<T>  {}
 
-/// Unavailable; use `AnySequence<T>` instead
+/// Unavailable; use `AnySequence<T>` instead.
 @available(*, unavailable, renamed="AnySequence")
 public struct SequenceOf<T> {}
 
@@ -38,7 +38,7 @@ internal struct _CollectionOf<
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
-  /// - Complexity: O(1)
+  /// - Complexity: O(1).
   func generate() -> AnyGenerator<T> {
     var index = startIndex
     return anyGenerator {
@@ -66,12 +66,12 @@ internal struct _CollectionOf<
 /// Forwards operations to an arbitrary underlying sink with the same
 /// `Element` type, hiding the specifics of the underlying sink type.
 public struct SinkOf<T> : SinkType {
-  /// Construct an instance whose `put(x)` calls `putElement(x)`
+  /// Construct an instance whose `put(x)` calls `putElement(x)`.
   public init(_ putElement: (T)->()) {
     _put = putElement
   }
 
-  /// Construct an instance whose `put(x)` calls `base.put(x)`
+  /// Construct an instance whose `put(x)` calls `base.put(x)`.
   public init<S: SinkType where S.Element == T>(var _ base: S) {
     _put = { base.put($0) }
   }

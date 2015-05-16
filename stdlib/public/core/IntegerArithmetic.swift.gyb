@@ -127,7 +127,7 @@ public func ~> <T : SignedNumberType>(x:T,_:(_Abs, ())) -> T {
 // FIXME: should this be folded into SignedNumberType?
 /// A type that supports an "absolute value" function.
 public protocol AbsoluteValuable : SignedNumberType {
-  /// Returns the absolute value of `x`
+  /// Returns the absolute value of `x`.
   static func abs(x: Self) -> Self
 }
 
