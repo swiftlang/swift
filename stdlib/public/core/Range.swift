@@ -100,12 +100,6 @@ public struct Range<
     _endIndex = end
   }
 
-  /// `true` iff the range is empty, i.e. `startIndex == endIndex`.
-  public var isEmpty: Bool {
-    // FIXME(prext): remove this function when protocol extensions land.
-    return startIndex == endIndex
-  }
-
   /// A type that represents a valid position in the collection.
   ///
   /// Valid indices consist of the position of every element and a

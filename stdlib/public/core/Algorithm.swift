@@ -40,7 +40,6 @@ public func maxElement<
 public func find<
   C: CollectionType where C.Generator.Element : Equatable
 >(domain: C, _ value: C.Generator.Element) -> C.Index? {
-  // FIXME(prext): remove this function when protocol extensions land.
   return domain.indexOf(value)
 }
 
@@ -279,7 +278,6 @@ public func equal<
     S1.Generator.Element == S2.Generator.Element,
     S1.Generator.Element : Equatable
 >(a1: S1, _ a2: S2) -> Bool {
-  // FIXME(prext): remove this function when protocol extensions land.
   return a1.elementsEqual(a2)
 }
 
@@ -295,7 +293,6 @@ public func equal<
 >(a1: S1, _ a2: S2,
   @noescape _ isEquivalent: (S1.Generator.Element, S1.Generator.Element) -> Bool)
   -> Bool {
-  // FIXME(prext): remove this function when protocol extensions land.
   return a1.elementsEqual(a2, isEquivalent: isEquivalent)
 }
 

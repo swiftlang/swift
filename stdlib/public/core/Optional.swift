@@ -79,8 +79,8 @@ extension Optional : CustomDebugStringConvertible {
 //   (x as T).map { ... }
 //
 /// Haskell's fmap for Optionals.
+@available(*, unavailable, message="call the 'map()' method on the optional value")
 public func map<T, U>(x: T?, @noescape _ f: (T)->U) -> U? {
-  // FIXME(prext): remove this function when protocol extensions land.
   switch x {
     case .Some(let y):
       return .Some(f(y))

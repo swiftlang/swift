@@ -192,20 +192,6 @@ extension ${Self} {
 
 % end
 
-/*
-// No overload for collections; see the comment on
-// FilterCollectionView for an explanation.
-
-/// Return a lazy CollectionType containing the elements `x` of `source` for
-/// which `includeElement(x)` is `true`.
-public func filter<C : CollectionType>(
-  source: C, _ includeElement: (C.Generator.Element)->Bool
-) -> FilterCollectionView<C> {
-  // FIXME(prext): remove this function when protocol extensions land.
-  return FilterCollectionView(_base: source, _include: includeElement)
-}
-*/
-
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)
 // End:

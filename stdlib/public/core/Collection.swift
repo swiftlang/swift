@@ -15,7 +15,6 @@
 /// O(1) if `T.Index` is `RandomAccessIndexType`; O(N) otherwise.
 @available(*, unavailable, message="call the 'count()' method on the collection")
 public func count <T : CollectionType>(x: T) -> T.Index.Distance {
-  // FIXME(prext): remove this function when protocol extensions land.
   return x.count()
 }
 
