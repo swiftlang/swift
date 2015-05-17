@@ -158,9 +158,6 @@ SourceLoc ReturnStmt::getEndLoc() const {
   return (Result ? Result->getEndLoc() : ReturnLoc);
 }
 
-SourceLoc ThrowStmt::getEndLoc() const { return SubExpr->getEndLoc(); }
-
-
 SourceLoc DeferStmt::getEndLoc() const {
   return getPatternBinding()->getEndLoc();
 }

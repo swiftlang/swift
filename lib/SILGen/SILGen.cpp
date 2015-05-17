@@ -840,9 +840,7 @@ public:
       };
 
       // Fallthrough should signal a normal exit by returning 0.
-      SILValue returnValue;
-      if (gen.B.hasValidInsertionPoint())
-        returnValue = emitTopLevelReturnValue(0);
+      SILValue returnValue = emitTopLevelReturnValue(0);
 
       // Handle the implicit rethrow block.
       auto rethrowBB = gen.ThrowDest.getBlock();
@@ -855,8 +853,7 @@ public:
       // Otherwise, we need to produce a unified return block.
       } else {
         auto returnBB = gen.createBasicBlock();
-        if (gen.B.hasValidInsertionPoint())
-          gen.B.createBranch(returnLoc, returnBB, returnValue);
+        gen.B.createBranch(returnLoc, returnBB, returnValue);
         returnValue = returnBB->createBBArg(returnType);
         gen.B.emitBlock(returnBB);
 
@@ -876,8 +873,7 @@ public:
       }
 
       // Return.
-      if (gen.B.hasValidInsertionPoint())
-        gen.B.createReturn(returnLoc, returnValue);
+      gen.B.createReturn(returnLoc, returnValue);
 
       // Okay, we're done emitting the top-level function; destroy the
       // emitter and verify the result.

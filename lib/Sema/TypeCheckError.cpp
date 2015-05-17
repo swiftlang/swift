@@ -200,6 +200,8 @@ public:
       recurse = asImpl().checkForceTry(forceTryExpr);
     } else if (auto apply = dyn_cast<ApplyExpr>(E)) {
       recurse = asImpl().checkApply(apply);
+    } else if (auto thr = dyn_cast<ThrowExpr>(E)) {
+      recurse = asImpl().checkThrow(thr);
     }
     return {bool(recurse), E};
   }
@@ -208,8 +210,6 @@ public:
     ShouldRecurse_t recurse = ShouldRecurse;
     if (auto doCatch = dyn_cast<DoCatchStmt>(S)) {
       recurse = asImpl().checkDoCatch(doCatch);
-    } else if (auto thr = dyn_cast<ThrowStmt>(S)) {
-      recurse = asImpl().checkThrow(thr);
     } else {
       assert(!isa<CatchStmt>(S));
     }
@@ -558,7 +558,7 @@ private:
       Result = std::max(Result, Self.classifyApply(E).getResult());
       return ShouldRecurse;
     }
-    ShouldRecurse_t checkThrow(ThrowStmt *E) {
+    ShouldRecurse_t checkThrow(ThrowExpr *E) {
       Result = ThrowingKind::Throws;
       return ShouldRecurse;
     }
@@ -906,19 +906,17 @@ public:
 
   DeclContext *getRethrowsDC() const { return RethrowsDC; }
 
-  static void diagnoseThrowInIllegalContext(TypeChecker &TC, ASTNode node,
+  static void diagnoseThrowInIllegalContext(TypeChecker &TC, Expr *E,
                                             StringRef description) {
-    if (auto *e = node.dyn_cast<Expr*>())
-      if (isa<ApplyExpr>(e)) {
-        TC.diagnose(e->getLoc(), diag::throwing_call_in_illegal_context,
-                    description);
-        return;
-      }
-    TC.diagnose(node.getStartLoc(), diag::throw_in_illegal_context,
-                description);
+    if (isa<ApplyExpr>(E)) {
+      TC.diagnose(E->getLoc(), diag::throwing_call_in_illegal_context,
+                  description);
+    } else {
+      TC.diagnose(E->getLoc(), diag::throw_in_illegal_context, description);
+    }
   }
 
-  static void maybeAddRethrowsNote(TypeChecker &TC, SourceLoc loc,
+  static void maybeAddRethrowsNote(TypeChecker &TC, Expr *E,
                                    const PotentialReason &reason) {
     switch (reason.getKind()) {
     case PotentialReason::Kind::Throw:
@@ -931,27 +929,26 @@ public:
                   diag::because_rethrows_argument_throws);
       return;
     case PotentialReason::Kind::CallRethrowsWithDefaultThrowingArgument:
-      TC.diagnose(loc, diag::because_rethrows_default_argument_throws);
+      TC.diagnose(E->getLoc(),
+                  diag::because_rethrows_default_argument_throws);
       return;
     }
     llvm_unreachable("bad reason kind");
   }
 
-  void diagnoseUncoveredThrowSite(TypeChecker &TC, SourceLoc loc,
+  void diagnoseUncoveredThrowSite(TypeChecker &TC, Expr *E,
                                   const PotentialReason &reason) {
-    TC.diagnose(loc, diag::throwing_call_without_try);
-    maybeAddRethrowsNote(TC, loc, reason);
+    TC.diagnose(E->getLoc(), diag::throwing_call_without_try);
+    maybeAddRethrowsNote(TC, E, reason);
   }
 
-  void diagnoseThrowInLegalContext(TypeChecker &TC, ASTNode node,
-                                   bool isTryCovered,
+  void diagnoseThrowInLegalContext(TypeChecker &TC, Expr *E, bool isTryCovered,
                                    const PotentialReason &reason,
                                    Diag<> diagForThrow,
                                    Diag<> diagForThrowingCall,
                                    Diag<> diagForTrylessThrowingCall) {
-    auto loc = node.getStartLoc();
     if (reason.isThrow()) {
-      TC.diagnose(loc, diagForThrow);
+      TC.diagnose(E->getLoc(), diagForThrow);
       return;
     }
 
@@ -965,14 +962,14 @@ public:
     }
 
     if (isTryCovered) {
-      TC.diagnose(loc, diagForThrowingCall);
+      TC.diagnose(E->getLoc(), diagForThrowingCall);
     } else {
-      TC.diagnose(loc, diagForTrylessThrowingCall);
+      TC.diagnose(E->getLoc(), diagForTrylessThrowingCall);
     }
-    maybeAddRethrowsNote(TC, loc, reason);
+    maybeAddRethrowsNote(TC, E, reason);
   }
 
-  void diagnoseUnhandledThrowSite(TypeChecker &TC, ASTNode E, bool isTryCovered,
+  void diagnoseUnhandledThrowSite(TypeChecker &TC, Expr *E, bool isTryCovered,
                                   const PotentialReason &reason) {
     switch (getKind()) {
     case Kind::Handled:
@@ -1249,13 +1246,13 @@ private:
     return ShouldRecurse;
   }
 
-  ShouldRecurse_t checkThrow(ThrowStmt *S) {
-    checkThrowSite(S, /*requiresTry*/ false,
+  ShouldRecurse_t checkThrow(ThrowExpr *E) {
+    checkThrowSite(E, /*requiresTry*/ false,
                    Classification::forThrow(PotentialReason::forThrow()));
     return ShouldRecurse;
   }
 
-  void checkThrowSite(ASTNode E, bool requiresTry,
+  void checkThrowSite(Expr *E, bool requiresTry,
                       const Classification &classification) {
     switch (classification.getResult()) {
     // Completely ignores sites that don't throw.
@@ -1275,17 +1272,16 @@ private:
       HasAnyThrowSite = true;
       HasTryThrowSite |= requiresTry;
 
-      if (auto expr = E.dyn_cast<Expr*>())
-        if (auto apply = dyn_cast<ApplyExpr>(expr))
-          if (apply->isThrowsSet())
-            return;
+      if (auto apply = dyn_cast<ApplyExpr>(E))
+        if (apply->isThrowsSet())
+          return;
 
       bool isTryCovered = (!requiresTry || IsInTry);
       if (!CurContext.handles(classification.getResult())) {
         CurContext.diagnoseUnhandledThrowSite(TC, E, isTryCovered,
                                               classification.getThrowsReason());
       } else if (!isTryCovered && !TC.Context.LangOpts.EnableThrowWithoutTry) {
-        CurContext.diagnoseUncoveredThrowSite(TC, E.getStartLoc(),
+        CurContext.diagnoseUncoveredThrowSite(TC, E,
                                               classification.getThrowsReason());
       }
       return;

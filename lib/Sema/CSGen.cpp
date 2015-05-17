@@ -1732,8 +1732,9 @@ namespace {
         bool FoundThrow = false;
         
         std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-          // If we've found a 'try', record it and terminate the traversal.
-          if (isa<TryExpr>(expr)) {
+          // If we've found a 'try' or a 'throw', record it and
+          // terminate the traversal.
+          if (isa<TryExpr>(expr) || isa<ThrowExpr>(expr)) {
             FoundThrow = true;
             return { false, nullptr };
           }
@@ -1759,12 +1760,6 @@ namespace {
         }
         
         std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
-          // If we've found a 'throw', record it and terminate the traversal.
-          if (isa<ThrowStmt>(stmt)) {
-            FoundThrow = true;
-            return { false, nullptr };
-          }
-
           // Handle do/catch differently.
           if (auto doCatch = dyn_cast<DoCatchStmt>(stmt)) {
             // Only walk into the 'do' clause of a do/catch statement
@@ -1886,6 +1881,20 @@ namespace {
                        expr->getBase()->getType(),
            CS.getConstraintLocator(expr, ConstraintLocator::RvalueAdjustment));
       return tv;
+    }
+
+    Type visitThrowExpr(ThrowExpr *expr) {
+      // The argument must be convertible to the exception type.
+      if (Type exnType =
+            CS.getTypeChecker().getExceptionType(CS.DC, expr->getThrowLoc())) {
+        CS.addConstraint(ConstraintKind::Conversion,
+                         expr->getSubExpr()->getType(), exnType,
+                         CS.getConstraintLocator(expr,
+                                          ConstraintLocator::ThrownException));
+      }
+
+      // TODO: 'throw' should really have bottom type.
+      return TupleType::getEmpty(CS.TC.Context);
     }
 
     Type visitOpaqueValueExpr(OpaqueValueExpr *expr) {

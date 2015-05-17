@@ -293,6 +293,14 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;
   }
 
+  Expr *visitThrowExpr(ThrowExpr *E) {
+    if (Expr *E2 = doIt(E->getSubExpr())) {
+      E->setSubExpr(E2);
+      return E;
+    }
+    return nullptr;
+  }
+
   Expr *visitTryExpr(TryExpr *E) {
     if (Expr *E2 = doIt(E->getSubExpr())) {
       E->setSubExpr(E2);
@@ -803,14 +811,6 @@ Stmt *Traversal::visitFallthroughStmt(FallthroughStmt *CS) {
 Stmt *Traversal::visitFailStmt(FailStmt *FS) {
   return FS;
 }
-Stmt *Traversal::visitThrowStmt(ThrowStmt *TS) {
-  if (Expr *E = doIt(TS->getSubExpr())) {
-    TS->setSubExpr(E);
-    return TS;
-  }
-  return nullptr;
-}
-
 
 Stmt *Traversal::visitBraceStmt(BraceStmt *BS) {
   for (auto &Elem : BS->getElements()) {

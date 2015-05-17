@@ -1844,11 +1844,6 @@ void PrintAST::visitReturnStmt(ReturnStmt *stmt) {
   }
 }
 
-void PrintAST::visitThrowStmt(ThrowStmt *stmt) {
-  Printer << "throw ";
-  // FIXME: print expression.
-}
-
 void PrintAST::visitDeferStmt(DeferStmt *stmt) {
   Printer << "defer ";
   visit(stmt->getBodyAsWritten());
