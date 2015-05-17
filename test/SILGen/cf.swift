@@ -48,3 +48,18 @@ func useEmAll(model: CCMagnetismModel) {
   // rdar://16846555
   let prop: CCRefrigerator = model.fridgeProp
 }
+
+// Ensure that accessors are emitted for fields used as protocol witnesses.
+protocol ImpedanceType {
+  typealias Component
+  var real: Component { get }
+  var imag: Component { get }
+}
+
+extension CCImpedance: ImpedanceType {}
+
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWVSC11CCImpedance2cf13ImpedanceTypeS0_FS1_g4realqq_S1_9Component
+// CHECK-LABEL: sil shared [transparent] @_TFVSC11CCImpedanceg4realSd
+// CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWVSC11CCImpedance2cf13ImpedanceTypeS0_FS1_g4imagqq_S1_9Component
+// CHECK-LABEL: sil shared [transparent] @_TFVSC11CCImpedanceg4imagSd
+

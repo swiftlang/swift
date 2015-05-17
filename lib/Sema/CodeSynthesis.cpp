@@ -788,6 +788,10 @@ static void synthesizeTrivialGetter(FuncDecl *getter,
   // just want it for abstraction purposes (i.e., to make access to the variable
   // uniform and to be able to put the getter in a vtable).
   getter->getAttrs().add(new (ctx) TransparentAttr(IsImplicit));
+  
+  // Register the accessor as an external decl if the storage was imported.
+  if (storage->hasClangNode())
+    TC.Context.addedExternalDecl(getter);
 }
 
 /// Synthesize the body of a trivial setter.
@@ -808,6 +812,10 @@ static void synthesizeTrivialSetter(FuncDecl *setter,
 
   // Mark it transparent, there is no user benefit to this actually existing.
   setter->getAttrs().add(new (ctx) TransparentAttr(IsImplicit));
+
+  // Register the accessor as an external decl if the storage was imported.
+  if (storage->hasClangNode())
+    TC.Context.addedExternalDecl(setter);
 }
 
 /// Build the result expression of a materializeForSet accessor.
@@ -860,6 +868,10 @@ static void synthesizeStoredMaterializeForSet(FuncDecl *materializeForSet,
   materializeForSet->getAttrs().add(new (ctx) TransparentAttr(IsImplicit));
 
   TC.typeCheckDecl(materializeForSet, true);
+  
+  // Register the accessor as an external decl if the storage was imported.
+  if (storage->hasClangNode())
+    TC.Context.addedExternalDecl(materializeForSet);
 }
 
 /// Does a storage decl currently lacking accessor functions require a
@@ -1221,6 +1233,10 @@ static void synthesizeComputedMaterializeForSet(FuncDecl *materializeForSet,
   materializeForSet->getAttrs().add(new (ctx) TransparentAttr(IsImplicit));
 
   TC.typeCheckDecl(materializeForSet, true);
+  
+  // Register the accessor as an external decl if the storage was imported.
+  if (storage->hasClangNode())
+    TC.Context.addedExternalDecl(materializeForSet);
 }
 
 /// Build a direct call to an addressor from within a
@@ -1397,6 +1413,10 @@ static void synthesizeAddressedMaterializeForSet(FuncDecl *materializeForSet,
   materializeForSet->getAttrs().add(new (ctx) TransparentAttr(IsImplicit));
 
   TC.typeCheckDecl(materializeForSet, true);
+  
+  // Register the accessor as an external decl if the storage was imported.
+  if (storage->hasClangNode())
+    TC.Context.addedExternalDecl(materializeForSet);
 }
 
 void swift::synthesizeMaterializeForSet(FuncDecl *materializeForSet,

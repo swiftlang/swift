@@ -49,3 +49,9 @@ void CCRefrigeratorDestroy(__attribute__((cf_consumed)) CCRefrigeratorRef);
 @property CCRefrigeratorRef fridgeProp;
 - (CCRefrigeratorRef) fridgeProp __attribute__((cf_returns_not_retained));
 @end
+
+typedef double CCFloat;
+
+struct CCImpedance {
+  CCFloat real, imag;
+};
