@@ -181,6 +181,6 @@ if true {
   bo = Builtin.castToBridgeObject(C(), 0._builtinWordValue)
   // CHECK-NEXT: Some
   hitOptionalSpecifically(bo)
-  // CHECK-NEXT: Some
+  // CHECK: Some
   hitOptionalGenerically(bo)
 }
