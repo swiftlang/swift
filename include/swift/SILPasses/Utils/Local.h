@@ -393,7 +393,7 @@ public:
 
   /// Optimize unconditional_checked_cast.
   /// This cannot change the control flow.
-  SILInstruction *
+  ValueBase *
   optimizeUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *Inst);
 
   /// Optimize unconditional_checked_cast_addr.

@@ -49,3 +49,16 @@ bb0(%0 : $*D, %1 : $*E, %2 : $*D):
   %6 = tuple ()
   return %6 : $()
 }
+
+// CHECK-LABEL: sil @test_unconditional_checked_cast_other_use
+// CHECK: bb0([[ARG:%.*]] : $C
+// CHECK-NOT: unconditional_checked_cast
+// CHECK: return [[ARG]]
+
+sil @test_unconditional_checked_cast_other_use : $@convention(thin) (@owned C) -> @owned C {
+bb0(%0 : $C):
+  strong_retain %0 : $C
+  %3 = unconditional_checked_cast %0 : $C to $C
+  strong_release %0 : $C
+  return %3 : $C
+}

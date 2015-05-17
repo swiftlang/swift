@@ -1725,7 +1725,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
   return nullptr;
 }
 
-SILInstruction *
+ValueBase *
 CastOptimizer::
 optimizeUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *Inst) {
   auto LoweredSourceType = Inst->getOperand().getType();
@@ -1800,7 +1800,7 @@ optimizeUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *Inst) {
     ReplaceInstUsesAction(Inst, Result.getDef());
     EraseInstAction(Inst);
     WillSucceedAction();
-    return dyn_cast<SILInstruction>(Result.getDef());
+    return Result.getDef();
   }
 
   return nullptr;

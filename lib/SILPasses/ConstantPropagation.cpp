@@ -862,7 +862,7 @@ static bool CCPFunctionBody(SILFunction &F, bool EnableDiagnostics,
         isa<UnconditionalCheckedCastInst>(I) ||
         isa<UnconditionalCheckedCastAddrInst>(I)) {
       // Try to perform cast optimizations.
-      SILInstruction *Result = nullptr;
+      ValueBase *Result = nullptr;
       switch(I->getKind()) {
       default:
         llvm_unreachable("Unexpected instruction for cast optimizations");
@@ -884,7 +884,7 @@ static bool CCPFunctionBody(SILFunction &F, bool EnableDiagnostics,
         if (isa<CheckedCastBranchInst>(Result) || isa<CheckedCastAddrBranchInst>(Result) ||
                 isa<UnconditionalCheckedCastInst>(Result) ||
                 isa<UnconditionalCheckedCastAddrInst>(Result))
-          WorkList.insert(Result);
+          WorkList.insert(cast<SILInstruction>(Result));
       }
       continue;
     }
