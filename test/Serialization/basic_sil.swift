@@ -11,6 +11,10 @@
 
 // XFAIL: linux
 
+// This test currently is written such that no optimizations are assumed.
+// XFAIL: swift_test_mode_optimize
+// XFAIL: swift_test_mode_optimize_unchecked
+
 // CHECK-NOT: UnknownCode
 
 // Inputs/def_basic.sil is based on basic.sil under test/SIL/Parser.
