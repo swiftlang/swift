@@ -779,16 +779,36 @@ private:
     os << SD->getName();
   }
 
-  /// Determine whether the given type contains a type that cannot be printed
-  /// in Objective-C.
-  static bool containsNonObjCType(Type type) {
-    return type.findIf([&](Type type) -> bool {
-      if (auto classDecl = type->getClassOrBoundGenericClass()) {
-        return classDecl->isForeign() || !classDecl->isObjC();
-      }
+  /// Determine whether the given type is an Objective-C object type
+  /// or a Swift value type that is always bridged to an Objective-C
+  /// object type.
+  bool isAlwaysPrintedAsObjectType(Type type) {
+    // Only @objc class types.
+    if (auto classDecl = type->getClassOrBoundGenericClass())
+      return classDecl->isObjC() && !classDecl->isForeign();
+    
+    if (auto structDecl = type->getStructOrBoundGenericStruct()) {
+      // String always bridges to NSString.
+      if (structDecl == ctx.getStringDecl())
+        return true;
+
+      // Array bridges to NSArray.
+      if (structDecl == ctx.getArrayDecl())
+        return true;
+
+      // Dictionary bridges to NSDictionary.
+      if (structDecl == ctx.getDictionaryDecl())
+        return true;
+
+      // Set bridges to NSSet.
+      if (structDecl == ctx.getSetDecl())
+        return true;
 
       return false;
-    });
+    }
+
+    // Everything else is covered by "bridgeable object type".
+    return type->isBridgeableObjectType();
   }
 
   /// If \p BGT represents a generic struct used to import Clang types, print
@@ -802,10 +822,10 @@ private:
     if (SD == ctx.getArrayDecl()) {
 #ifndef SWIFT_DISABLE_OBJC_GENERICS
       if (!BGT->getGenericArgs()[0]->isAnyObject() &&
-          !containsNonObjCType(BGT->getGenericArgs()[0])) {
-        os << "NS_ARRAY(";
+          isAlwaysPrintedAsObjectType(BGT->getGenericArgs()[0])) {
+        os << "NSArray<";
         visitPart(BGT->getGenericArgs()[0], None);
-        os << ")";
+        os << "> *";
       } else {
         os << "NSArray *";
       }
@@ -821,13 +841,13 @@ private:
 #ifndef SWIFT_DISABLE_OBJC_GENERICS
       if ((!isNSObject(BGT->getGenericArgs()[0]) ||
            !BGT->getGenericArgs()[1]->isAnyObject()) &&
-          !containsNonObjCType(BGT->getGenericArgs()[0]) &&
-          !containsNonObjCType(BGT->getGenericArgs()[1])) {
-        os << "NS_DICTIONARY(";
+          isAlwaysPrintedAsObjectType(BGT->getGenericArgs()[0]) &&
+          isAlwaysPrintedAsObjectType(BGT->getGenericArgs()[1])) {
+        os << "NSDictionary<";
         visitPart(BGT->getGenericArgs()[0], None);
         os << ", ";
         visitPart(BGT->getGenericArgs()[1], None);
-        os << ")";
+        os << "> *";
       } else {
         os << "NSDictionary *";
       }
@@ -842,10 +862,10 @@ private:
     if (SD == ctx.getSetDecl()) {
 #ifndef SWIFT_DISABLE_OBJC_GENERICS
       if (!isNSObject(BGT->getGenericArgs()[0]) &&
-          !containsNonObjCType(BGT->getGenericArgs()[0])) {
-        os << "NS_SET(";
+          isAlwaysPrintedAsObjectType(BGT->getGenericArgs()[0])) {
+        os << "NSSet<";
         visitPart(BGT->getGenericArgs()[0], None);
-        os << ")";
+        os << "> *";
       } else {
         os << "NSSet *";
       }
@@ -1602,29 +1622,6 @@ public:
       else
         out << "#import \"" << bridgingHeader << "\"\n\n";
     }
-
-#ifndef SWIFT_DISABLE_OBJC_GENERICS
-    // Once we've printed out the imports, deal with Foundations that
-    // don't provide NS_ARRAY/NS_DICTIONARY/NS_SET.
-    out << "#ifndef NS_ARRAY\n"
-           "#  pragma clang diagnostic push\n"
-           "#  pragma clang diagnostic ignored \"-Wvariadic-macros\"\n"
-           "#  define NS_ARRAY(...) NSArray *\n"
-           "#  pragma clang diagnostic pop\n"
-           "#endif\n"
-           "#ifndef NS_DICTIONARY\n"
-           "#  pragma clang diagnostic push\n"
-           "#  pragma clang diagnostic ignored \"-Wvariadic-macros\"\n"
-           "#  define NS_DICTIONARY(...) NSDictionary *\n"
-           "#  pragma clang diagnostic pop\n"
-           "#endif\n"
-           "#ifndef NS_SET\n"
-           "#  pragma clang diagnostic push\n"
-           "#  pragma clang diagnostic ignored \"-Wvariadic-macros\"\n"
-           "#  define NS_SET(...) NSSet *\n"
-           "#  pragma clang diagnostic pop\n"
-           "#endif\n";
-#endif
   }
 
   bool writeToStream(raw_ostream &out) {
