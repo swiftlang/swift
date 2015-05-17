@@ -62,3 +62,20 @@ bb0(%0 : $C):
   strong_release %0 : $C
   return %3 : $C
 }
+
+protocol Class : class {
+}
+
+class G : Class {
+}
+
+// CHECK-LABEL: sil @test_unconditional_checked_cast_class_exist
+// CHECK: unconditional_checked_cast
+// CHECK: return
+sil @test_unconditional_checked_cast_class_exist : $@convention(thin) (@owned Class) -> @owned G {
+bb0(%0 : $Class):
+  strong_retain %0 : $Class
+  %2 = unconditional_checked_cast %0 : $Class to $G
+  strong_release %0 : $Class
+  return %2 : $G
+}
