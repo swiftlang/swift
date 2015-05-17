@@ -2749,8 +2749,8 @@ static bool isUnknownObjectType(Type T) {
   if (isClassOrObjCProtocol(T))
     return true;
 
-  if (T->is<DynamicSelfType>())
-    return true;
+  if (auto dynSelf = T->getAs<DynamicSelfType>())
+    return isClassOrObjCProtocol(dynSelf->getSelfType());
 
   return false;
 }

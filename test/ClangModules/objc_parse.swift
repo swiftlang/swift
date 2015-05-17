@@ -265,11 +265,20 @@ func classAnyObject(obj: NSObject) {
 
 // Protocol conformances
 class Wobbler : NSWobbling { // expected-note{{candidate is not '@objc', but protocol requires it}}
+  // expected-error@-1{{type 'Wobbler' does not conform to protocol 'NSWobbling'}}
   @objc func wobble() { }
-  @objc func returnMyself() -> Self { return self }
+  func returnMyself() -> Self { return self } // expected-note{{candidate is not '@objc', but protocol requires it}}
 }
 
 extension Wobbler : NSMaybeInitWobble { // expected-error{{type 'Wobbler' does not conform to protocol 'NSMaybeInitWobble'}}
+}
+
+@objc class Wobbler2 : NSWobbling { // expected-note{{Objective-C method 'init' provided by implicit initializer 'init()' does not match the requirement's selector ('initWithWobble:')}}
+  func wobble() { }
+  func returnMyself() -> Self { return self }
+}
+
+extension Wobbler2 : NSMaybeInitWobble { // expected-error{{type 'Wobbler2' does not conform to protocol 'NSMaybeInitWobble'}}
 }
 
 func optionalMemberAccess(w: NSWobbling) {

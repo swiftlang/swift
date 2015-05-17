@@ -271,6 +271,13 @@ class ConcreteContext2 {
   class subject_inConcreteContext {}
 }
 
+class ConcreteContext3 {
+  func dynamicSelf1() -> Self { return self }
+
+  @objc func dynamicSelf1_() -> Self { return self }
+  // expected-error@-1{{method cannot be marked @objc because its result type cannot be represented in Objective-C}}
+}
+
 func genericContext1<T>(_: T) {
   @objc
   class subject_inGenericContext {} // expected-error{{type 'subject_inGenericContext' nested in generic function 'genericContext1' is not allowed}}
