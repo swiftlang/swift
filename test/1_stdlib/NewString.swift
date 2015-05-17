@@ -2,6 +2,10 @@
 
 // XFAIL: linux
 
+// rdar://20981649 is tracking the fix for compiling this test optimized.
+// XFAIL: swift_test_mode_optimize
+// XFAIL: swift_test_mode_optimize_unchecked
+
 import Foundation
 import Swift
 // ==== Tests =====
