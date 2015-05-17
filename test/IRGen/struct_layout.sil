@@ -1,6 +1,4 @@
-// RUN: %target-build-swift %s -emit-ir -o - | FileCheck -check-prefix=%target-ptrsize %s
-
-// REQUIRES: swift_test_mode_optimize_none
+// RUN: %target-swift-frontend %s -module-name main -emit-ir -o - | FileCheck -check-prefix=%target-ptrsize %s
 
 import Builtin
 import Swift
