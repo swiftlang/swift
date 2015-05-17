@@ -359,6 +359,21 @@ public:
     return RS;
   }
   
+  Stmt *visitThrowStmt(ThrowStmt *TS) {
+    // Coerce the operand to the exception type.
+    auto E = TS->getSubExpr();
+
+    Type exnType = TC.getExceptionType(DC, TS->getThrowLoc());
+    if (!exnType) return TS;
+    
+    auto failed = TC.typeCheckExpression(E, DC, exnType, Type(), false);
+    TS->setSubExpr(E);
+
+    if (failed) return nullptr;
+    
+    return TS;
+  }
+    
   Stmt *visitDeferStmt(DeferStmt *DS) {
     TC.typeCheckDecl(DS->getPatternBinding(), /*isFirstPass*/false);
     TC.typeCheckDecl(DS->getTempDecl(), /*isFirstPass*/false);

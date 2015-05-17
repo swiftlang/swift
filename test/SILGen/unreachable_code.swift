@@ -109,4 +109,9 @@ func testUnreachableCase5(a : Tree) {
 }
 
 
+func testUnreachableAfterThrow(e : ErrorType) throws {
+  throw e
+  return   // expected-warning {{will never be executed}}
+}
+
 

@@ -63,6 +63,7 @@ STMT(Continue, Stmt)
 STMT(Fallthrough, Stmt)
 STMT(IfConfig, Stmt)
 STMT(Fail, Stmt)
+STMT(Throw, Stmt)
 
 #undef STMT_RANGE
 #undef LABELED_STMT

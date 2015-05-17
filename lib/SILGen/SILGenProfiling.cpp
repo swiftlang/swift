@@ -548,7 +548,7 @@ public:
     } else if (isa<DoCatchStmt>(S)) {
       replaceCount(CounterExpr::Ref(getCounter(S)), getEndLoc(S));
 
-    } else if (isa<ReturnStmt>(S) || isa<FailStmt>(S)) {
+    } else if (isa<ReturnStmt>(S) || isa<FailStmt>(S) || isa<ThrowStmt>(S)) {
       terminateRegion(S);
     }
     return S;
@@ -583,9 +583,6 @@ public:
   Expr *walkToExprPost(Expr *E) override {
     if (hasCounter(E))
       popRegions(E);
-
-    if (isa<ThrowExpr>(E))
-      terminateRegion(E);
 
     return E;
   }

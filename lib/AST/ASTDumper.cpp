@@ -1257,6 +1257,13 @@ public:
   void visitFailStmt(FailStmt *S) {
     OS.indent(Indent) << "(fail_stmt)";
   }
+  
+  void visitThrowStmt(ThrowStmt *S) {
+    OS.indent(Indent) << "(throw_stmt\n";
+    printRec(S->getSubExpr());
+    OS << ')';
+  }
+
   void visitDoCatchStmt(DoCatchStmt *S) {
     OS.indent(Indent) << "(do_catch_stmt\n";
     printRec(S->getBody());
@@ -1775,12 +1782,6 @@ public:
     OS << ')';
   }
 
-  void visitThrowExpr(ThrowExpr *E) {
-    printCommon(E, "throw_expr") << '\n';
-    printRec(E->getSubExpr());
-    OS << ')';
-  }
-  
   void visitForceTryExpr(ForceTryExpr *E) {
     printCommon(E, "force_try_expr");
     OS << '\n';

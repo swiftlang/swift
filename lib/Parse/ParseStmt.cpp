@@ -32,6 +32,7 @@ bool Parser::isStartOfStmt() {
   switch (Tok.getKind()) {
   default: return false;
   case tok::kw_return:
+  case tok::kw_throw:
   case tok::kw_defer:
   case tok::kw_if:
   case tok::kw_guard:
@@ -87,11 +88,7 @@ ParserStatus Parser::parseExprOrStmt(ASTNode &Result) {
   if (CodeCompletion)
     CodeCompletion->setExprBeginning(getParserPosition());
 
-  auto parseTopLevelExpr = [&](Diag<> ID) {
-    return (Tok.is(tok::kw_throw) ? parseExprThrow(ID) : parseExpr(ID));
-  };
-
-  ParserResult<Expr> ResultExpr = parseTopLevelExpr(diag::expected_expr);
+  ParserResult<Expr> ResultExpr = parseExpr(diag::expected_expr);
   if (ResultExpr.isNonNull()) {
     Result = ResultExpr.get();
   } else if (!ResultExpr.hasCodeCompletion()) {
@@ -494,6 +491,9 @@ ParserResult<Stmt> Parser::parseStmt() {
   case tok::kw_return:
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
     return parseStmtReturn();
+  case tok::kw_throw:
+    if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
+    return parseStmtThrow();
   case tok::kw_defer:
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
     return parseStmtDefer();
@@ -639,6 +639,22 @@ ParserResult<Stmt> Parser::parseStmtReturn() {
   }
 
   return makeParserResult(new (Context) ReturnStmt(ReturnLoc, nullptr));
+}
+
+/// parseStmtThrow
+///
+/// stmt-throw
+///   'throw' expr
+///
+ParserResult<Stmt> Parser::parseStmtThrow() {
+  SourceLoc throwLoc = consumeToken(tok::kw_throw);
+  
+  ParserResult<Expr> Result = parseExpr(diag::expected_expr_throw);
+  if (Result.isNull())
+    Result = makeParserErrorResult(new (Context) ErrorExpr(throwLoc));
+
+  return makeParserResult(Result,
+              new (Context) ThrowStmt(throwLoc, Result.get()));
 }
 
 /// parseStmtDefer

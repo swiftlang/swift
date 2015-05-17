@@ -56,7 +56,6 @@ void ConstraintLocator::Profile(llvm::FoldingSetNodeID &id, Expr *anchor,
     case SubscriptResult:
     case ConstructorMember:
     case AddressOf:
-    case ThrownException:
     case RvalueAdjustment:
     case ClosureResult:
     case ParentType:
@@ -238,10 +237,6 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
 
     case SubscriptResult:
       out << "subscript result";
-      break;
-
-    case ThrownException:
-      out << "thrown exception of";
       break;
 
     case TupleElement:

@@ -1071,7 +1071,6 @@ public:
   ParserResult<Expr> parseExprImpl(Diag<> ID, bool isExprBasic = false);
   ParserResult<Expr> parseExprIs();
   ParserResult<Expr> parseExprAs();
-  ParserResult<Expr> parseExprThrow(Diag<> ID, bool isExprBasic = false);
   ParserResult<Expr> parseExprSequence(Diag<> ID,
                                        bool isExprBasic,
                                        bool isConfigCondition = false);
@@ -1150,6 +1149,7 @@ public:
   ParserResult<Stmt> parseStmtBreak();
   ParserResult<Stmt> parseStmtContinue();
   ParserResult<Stmt> parseStmtReturn();
+  ParserResult<Stmt> parseStmtThrow();
   ParserResult<Stmt> parseStmtDefer();
   ParserStatus parseStmtCondition(StmtCondition &Result, Diag<> ID);
   ParserResult<PoundAvailableInfo> parseStmtConditionPoundAvailable();
