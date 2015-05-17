@@ -336,3 +336,15 @@ class SubClass: RootClass {
     }
   }
 }
+
+
+// <rdar://problem/20941576> SILGen crash: Failable struct init cannot delegate to another failable initializer
+struct TrivialFailableInit {
+  init?(blah: String) { }
+  init?(wibble: String) {
+    self.init(blah: wibble)
+  }
+}
+
+
+
