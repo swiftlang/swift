@@ -12,8 +12,7 @@
 // XFAIL: linux
 
 // This test currently is written such that no optimizations are assumed.
-// XFAIL: swift_test_mode_optimize
-// XFAIL: swift_test_mode_optimize_unchecked
+// REQUIRES: swift_test_mode_optimize_none
 
 // CHECK-NOT: UnknownCode
 
