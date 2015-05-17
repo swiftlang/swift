@@ -32,3 +32,10 @@ block = funct
 
 var optFunc: (String -> String)! = { $0 }
 var s: String = optFunc("hi")
+
+// <rdar://problem/17652759> Default arguments cause crash with tuple permutation
+func testArgumentShuffle(first: Int = 7, third: Int = 9) {
+}
+testArgumentShuffle(third: 1, 2)
+
+

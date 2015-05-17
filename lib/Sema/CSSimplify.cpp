@@ -115,13 +115,13 @@ SmallVector<CallArgParam, 4> constraints::decomposeArgParamType(Type type) {
   return result;
 }
 
-bool constraints::matchCallArguments(
-       ArrayRef<CallArgParam> args,
-       ArrayRef<CallArgParam> params,
-       bool hasTrailingClosure,
-       bool allowFixes,
-       MatchCallArgumentListener &listener,
-       SmallVectorImpl<ParamBinding> &parameterBindings) {
+bool constraints::
+matchCallArguments(ArrayRef<CallArgParam> args,
+                   ArrayRef<CallArgParam> params,
+                   bool hasTrailingClosure,
+                   bool allowFixes,
+                   MatchCallArgumentListener &listener,
+                   SmallVectorImpl<ParamBinding> &parameterBindings) {
   // Keep track of the parameter we're matching and what argument indices
   // got bound to each parameter.
   unsigned paramIdx, numParams = params.size();
@@ -318,14 +318,6 @@ bool constraints::matchCallArguments(
 
   // If we have any unclaimed arguments, complain about those.
   if (numClaimedArgs != numArgs) {
-    // If we're not allowed to fix anything, or if we don't have any
-    // unfulfilled parameters, fail.
-    if (!haveUnfulfilledParams || !allowFixes) {
-      nextArgIdx = 0;
-      skipClaimedArgs();
-      listener.extraArgument(nextArgIdx);
-      return true;
-    }
 
     // Find all of the named, unclaimed arguments.
     llvm::SmallVector<unsigned, 4> unclaimedNamedArgs;
