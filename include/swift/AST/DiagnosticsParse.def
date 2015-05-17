@@ -718,6 +718,10 @@ ERROR(expected_close_after_else,stmt_parsing,none,
 ERROR(expected_expr_return,stmt_parsing,PointsToFirstBadToken,
       "expected expression in 'return' statement", ())
 
+// Throw Statement
+ERROR(expected_expr_throw,stmt_parsing,PointsToFirstBadToken,
+      "expected expression in 'throw' statement", ())
+
 // Defer Statement
 ERROR(expected_lbrace_after_defer,stmt_parsing,PointsToFirstBadToken,
       "expected '{' after 'defer'", ())

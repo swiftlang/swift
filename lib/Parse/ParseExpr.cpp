@@ -358,28 +358,6 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
   return sub;
 }
 
-/// parseExprThrow
-///
-/// expr-throw(Mode):
-///   'throw' expr-unary(Mode)
-///
-/// Right now, we only allow these in statement positions; we should
-/// weaken this over time.
-ParserResult<Expr> Parser::parseExprThrow(Diag<> message, bool isExprBasic) {
-  SourceLoc throwLoc = consumeToken(tok::kw_throw);
-  ParserResult<Expr> subExpr = parseExprUnary(message, isExprBasic);
-  if (subExpr.hasCodeCompletion()) {
-    if (CodeCompletion)
-      CodeCompletion->completeThrowStmtBeginning();
-    else
-      return makeParserCodeCompletionResult<Expr>();
-  }
-  if (subExpr.isNull())
-    return nullptr;
-  return makeParserResult(
-      new (Context) ThrowExpr(throwLoc, subExpr.get(), Type()));
-}
-
 /// parseExprUnary
 ///
 ///   expr-unary(Mode):

@@ -663,11 +663,11 @@ struct ASTNodeBase {};
       verifyCheckedAlwaysBase(D);
     }
 
-    void verifyChecked(ThrowExpr *E) {
-      checkSameType(E->getSubExpr()->getType(),
+    void verifyChecked(ThrowStmt *S) {
+      checkSameType(S->getSubExpr()->getType(),
                     checkExceptionTypeExists("throw expression"),
                     "throw operand");
-      verifyCheckedBase(E);
+      verifyCheckedBase(S);
     }
 
     void verifyChecked(CatchStmt *S) {

@@ -302,6 +302,7 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
   void visitFallthroughStmt(FallthroughStmt *) {}
   void visitFailStmt(FailStmt *) {}
   void visitReturnStmt(ReturnStmt *) {}
+  void visitThrowStmt(ThrowStmt *) {}
   void visitDeferStmt(DeferStmt *DS) {
     // Nothing should look in the defer itself.
   }

@@ -170,10 +170,9 @@ enum ColorError : ErrorType {
 //CHECK-LABEL: sil hidden @_TF6errors6IThrowFzT_VSs5Int32
 //CHECK: builtin "willThrow"
 //CHECK-NEXT: throw
-//CHECK: return
 func IThrow() throws -> Int32 {
   throw ColorError.Red
-  return 0
+  return 0  // expected-warning {{will never be executed}}
 }
 
 // Make sure that we are not emitting calls to 'willThrow' on rethrow sites.

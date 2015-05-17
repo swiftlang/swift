@@ -156,7 +156,6 @@ namespace {
     RValue visitOtherConstructorDeclRefExpr(OtherConstructorDeclRefExpr *E,
                                             SGFContext C);
 
-    RValue visitThrowExpr(ThrowExpr *E, SGFContext C);
     RValue visitForceTryExpr(ForceTryExpr *E, SGFContext C);
 
     RValue visitNilLiteralExpr(NilLiteralExpr *E, SGFContext C);
@@ -917,20 +916,6 @@ SILGenFunction::ForceTryScope::~ForceTryScope() {
   SGF.B.createBuiltin(Loc, ctx.getIdentifier("unexpectedError"),
                       SGF.SGM.Types.getEmptyTupleType(), {}, {error});
   SGF.B.createUnreachable(Loc);
-}
-
-RValue RValueEmitter::visitThrowExpr(ThrowExpr *E, SGFContext C) {
-  // Create a continuation block to return the result in.
-  // Expression emission isn't allowed to not have an insertion point.
-  auto contBB = SGF.createBasicBlock();
-
-  ManagedValue exn = SGF.emitRValueAsSingleValue(E->getSubExpr());
-
-  SGF.emitThrow(E, exn, /* emit a call to willThrow */ true);
-
-  // Emit an empty tuple in the result.
-  SGF.B.emitBlock(contBB);
-  return SGF.emitEmptyTupleRValue(E, C);
 }
 
 RValue RValueEmitter::visitDerivedToBaseExpr(DerivedToBaseExpr *E,

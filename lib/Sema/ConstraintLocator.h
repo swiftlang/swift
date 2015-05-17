@@ -97,8 +97,6 @@ public:
     ConstructorMember,
     /// \brief Address of subexpression.
     AddressOf,
-    /// \breif Throw exception subexpression.
-    ThrownException,
     /// \brief Rvalue adjustment.
     RvalueAdjustment,
     /// \brief The result of a closure.
@@ -151,7 +149,6 @@ public:
     case SubscriptResult:
     case ConstructorMember:
     case AddressOf:
-    case ThrownException:
     case RvalueAdjustment:
     case ClosureResult:
     case ParentType:
@@ -220,7 +217,6 @@ public:
     case SubscriptIndex:
     case SubscriptMember:
     case SubscriptResult:
-    case ThrownException:
     case IfThen:
     case IfElse:
     case AssignSource:

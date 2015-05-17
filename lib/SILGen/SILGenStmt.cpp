@@ -259,6 +259,12 @@ void StmtEmitter::visitReturnStmt(ReturnStmt *S) {
     SGF.emitReturnExpr(Loc, S->getResult());
 }
 
+void StmtEmitter::visitThrowStmt(ThrowStmt *S) {
+  ManagedValue exn = SGF.emitRValueAsSingleValue(S->getSubExpr());
+  SGF.emitThrow(S, exn, /* emit a call to willThrow */ true);
+}
+
+
 namespace {
   // This is a little cleanup that ensures that there are no jumps out of a
   // defer body.  The cleanup is only active and installed when emitting the

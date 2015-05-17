@@ -1171,6 +1171,32 @@ public:
   }
 };
 
+/// ThrowStmt - Throws an error.
+class ThrowStmt : public Stmt {
+  Expr *SubExpr;
+  SourceLoc ThrowLoc;
+  
+public:
+  explicit ThrowStmt(SourceLoc throwLoc, Expr *subExpr)
+  : Stmt(StmtKind::Throw, /*Implicit=*/false),
+    SubExpr(subExpr), ThrowLoc(throwLoc) {}
+
+  SourceLoc getThrowLoc() const { return ThrowLoc; }
+
+  SourceLoc getStartLoc() const { return ThrowLoc; }
+  SourceLoc getEndLoc() const;
+  SourceRange getSourceRange() const {
+    return SourceRange(ThrowLoc, getEndLoc());
+  }
+  
+  Expr *getSubExpr() const { return SubExpr; }
+  void setSubExpr(Expr *subExpr) { SubExpr = subExpr; }
+  
+  static bool classof(const Stmt *S) {
+    return S->getKind() == StmtKind::Throw;
+  }
+};
+  
 } // end namespace swift
 
 #endif
