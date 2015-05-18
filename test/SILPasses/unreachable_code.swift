@@ -348,6 +348,50 @@ func test_raise_2() throws -> Int {
   try raise() // expected-warning {{will never be executed}}
 }
 
+// If a guaranteed self call requires cleanup, don't warn about
+// release instructions
+struct Algol {
+  var x: [UInt8]
+
+  @noreturn func fail() throws { throw MyError.A }
+
+  mutating func blah() throws -> Int {
+    try fail() // no-warning
+  }
+}
+
+class Lisp {
+  @noreturn func fail() throws { throw MyError.A }
+}
+
+func transform<Scheme : Lisp>(s: Scheme) throws {
+  try s.fail() // no-warning
+}
+
+func deferNoReturn() throws {
+  defer {
+    _ = Lisp() // no-warning
+  }
+
+  die()
+}
+
+func deferTryNoReturn() throws {
+  defer {
+    _ = Lisp() // no-warning
+  }
+
+  try raise()
+}
+
+func noReturnInDefer() {
+  defer {
+    _ = Lisp()
+    die() // expected-note {{a call to a noreturn function}}
+    die() // expected-warning {{will never be executed}}
+  }
+}
+
 while true {
 }
  // no warning!

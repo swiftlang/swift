@@ -1770,15 +1770,19 @@ static SILValue emitRawApply(SILGenFunction &gen,
   // Given any guaranteed arguments that are not being passed at +0, insert the
   // decrement here instead of at the end of scope. Guaranteed just means that
   // we guarantee the lifetime of the object for the duration of the call.
+  // Be sure to use a CleanupLocation so that unreachable code diagnostics don't
+  // trigger.
   for (auto i : indices(args)) {
+
     if (!inputTypes[i].isGuaranteed() || args[i].isPlusZeroRValueOrTrivial())
       continue;
     SILValue argValue = args[i].forward(gen);
     SILType argType = argValue.getType();
+    CleanupLocation cleanupLoc = CleanupLocation::get(loc);
     if (!argType.isAddress())
-      gen.getTypeLowering(argType).emitDestroyRValue(gen.B, loc, argValue);
+      gen.getTypeLowering(argType).emitDestroyRValue(gen.B, cleanupLoc, argValue);
     else
-      gen.getTypeLowering(argType).emitDestroyAddress(gen.B, loc, argValue);
+      gen.getTypeLowering(argType).emitDestroyAddress(gen.B, cleanupLoc, argValue);
   }
 
   return result;
