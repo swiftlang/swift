@@ -649,6 +649,22 @@ extension ${Self} : _ArrayType {
 
   //===--- algorithms -----------------------------------------------------===//
 
+  public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
+    @noescape body: (inout UnsafeMutableBufferPointer<T>) -> R
+  ) -> R? {
+    // FIXME: Can't write simple code because of:
+    // <rdar://problem/20735802> Assertion failure while emitting SIL for
+    // _withUnsafeMutableBufferPointerIfSupported
+
+    //return withUnsafeMutableBufferPointer { body($0) }
+
+    return withUnsafeMutableBufferPointer {
+      (bufferPointer) -> R in
+      let r = body(&bufferPointer)
+      return r
+    }
+  }
+
   /// Interpose `self` between each consecutive pair of `elements`,
   /// and concatenate the elements of the resulting sequence.  For
   /// example, `[-1, -2].join([[1, 2, 3], [4, 5, 6], [7, 8, 9]])`
@@ -779,11 +795,18 @@ extension ${Self} {
     swap(&work, &self)
 
     // Create an UnsafeBufferPointer over work that we can pass to body
-    var a = UnsafeMutableBufferPointer(
-      start: work._buffer.baseAddress, count: work.count)
+    let pointer = work._buffer.baseAddress
+    let count = work.count
+    var inoutBufferPointer = UnsafeMutableBufferPointer(
+      start: pointer, count: count)
 
     // Invoke the body
-    let ret = body(&a)
+    let ret = body(&inoutBufferPointer)
+
+    _precondition(
+      inoutBufferPointer.baseAddress == pointer &&
+      inoutBufferPointer.count == count,
+      "${Self} withUnsafeMutableBufferPointer: replacing the buffer is not allowed")
 
     // Put the working array back before returning.
     swap(&work, &self)
