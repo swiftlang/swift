@@ -271,7 +271,12 @@ llvm::Value *irgen::emitReferenceToObjCProtocol(IRGenFunction &IGF,
 }
 
 /// Emit a helper function to look up \c numProtocols witness tables given
-/// a type metadata reference.
+/// a value and a type metadata reference.
+///
+/// The function's input type is (value, metadataValue, protocol...)
+/// The function's output type is (value, witnessTable...)
+///
+/// The value is NULL if the cast failed.
 static llvm::Function *emitExistentialScalarCastFn(IRGenModule &IGM,
                                                    unsigned numProtocols,
                                                    CheckedCastMode mode) {
@@ -301,17 +306,15 @@ static llvm::Function *emitExistentialScalarCastFn(IRGenModule &IGM,
   
   llvm::SmallVector<llvm::Type *, 4> argTys;
   llvm::SmallVector<llvm::Type *, 4> returnTys;
+  argTys.push_back(IGM.Int8PtrTy);
   argTys.push_back(IGM.TypeMetadataPtrTy);
+  returnTys.push_back(IGM.Int8PtrTy);
   for (unsigned i = 0; i < numProtocols; ++i) {
     argTys.push_back(IGM.ProtocolDescriptorPtrTy);
     returnTys.push_back(IGM.WitnessTablePtrTy);
   }
   
-  llvm::Type *returnTy;
-  if (numProtocols == 1)
-    returnTy = returnTys.front();
-  else
-    returnTy = llvm::StructType::get(IGM.getLLVMContext(), returnTys);
+  llvm::Type *returnTy = llvm::StructType::get(IGM.getLLVMContext(), returnTys);
   
   auto fnTy = llvm::FunctionType::get(returnTy, argTys, /*vararg*/ false);
   auto fn = llvm::Function::Create(fnTy, llvm::GlobalValue::PrivateLinkage,
@@ -320,12 +323,15 @@ static llvm::Function *emitExistentialScalarCastFn(IRGenModule &IGM,
   
   auto IGF = IRGenFunction(IGM, fn);
   Explosion args = IGF.collectParameters();
-  
+
+  auto value = args.claimNext();
   auto ref = args.claimNext();
   auto failBB = IGF.createBasicBlock("fail");
   auto conformsToProtocol = IGM.getConformsToProtocolFn();
   
   Explosion rets;
+  rets.add(value);
+
   // Look up each protocol conformance we want.
   for (unsigned i = 0; i < numProtocols; ++i) {
     auto proto = args.claimNext();
@@ -600,24 +606,32 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
     metadataValue = emitDynamicTypeOfHeapObject(IGF, value, srcType);
   }
 
-  ex.add(resultValue);
-
   // Look up witness tables for the protocols that need them.
   auto fn = emitExistentialScalarCastFn(IGF.IGM, witnessTableProtos.size(),
                                         mode);
+
   llvm::SmallVector<llvm::Value *, 4> args;
+
+  if (resultValue->getType() != IGF.IGM.Int8PtrTy)
+    resultValue = IGF.Builder.CreateBitCast(resultValue, IGF.IGM.Int8PtrTy);
+  args.push_back(resultValue);
+
   args.push_back(metadataValue);
   for (auto proto : witnessTableProtos)
     args.push_back(proto);
-  auto wts = IGF.Builder.CreateCall(fn, args);
-  if (witnessTableProtos.size() == 1)
-    ex.add(wts);
-  else
-    for (unsigned i = 0, e = witnessTableProtos.size(); i < e; ++i) {
-      auto wt = IGF.Builder.CreateExtractValue(wts, i);
-      ex.add(wt);
-    }
-  
+
+  auto valueAndWitnessTables = IGF.Builder.CreateCall(fn, args);
+
+  resultValue = IGF.Builder.CreateExtractValue(valueAndWitnessTables, 0);
+  if (resultValue->getType() != resultType)
+    resultValue = IGF.Builder.CreateBitCast(resultValue, resultType);
+  ex.add(resultValue);
+
+  for (unsigned i = 0, e = witnessTableProtos.size(); i < e; ++i) {
+    auto wt = IGF.Builder.CreateExtractValue(valueAndWitnessTables, i + 1);
+    ex.add(wt);
+  }
+
   // If we had conditional ObjC checks, join the failure paths.
   if (contBB) {
     IGF.Builder.CreateBr(contBB);
