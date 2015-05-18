@@ -87,6 +87,9 @@ ERROR(lex_unprintable_ascii_character,lexing,none,
       "unprintable ASCII character found in source file", ())
 ERROR(lex_invalid_utf8,lexing,none,
       "invalid UTF-8 found in source file", ())
+ERROR(lex_invalid_curly_quote,lexing,none,
+      "unicode curly quote found, replace with '\"'", ())
+
 
 ERROR(lex_unterminated_block_comment,lexing,none,
       "unterminated '/*' comment", ())

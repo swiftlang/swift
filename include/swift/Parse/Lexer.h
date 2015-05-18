@@ -415,6 +415,7 @@ private:
   void lexEscapedIdentifier();
 
   void tryLexEditorPlaceholder();
+  const char *findEndOfCurlyQuoteStringLiteral(const char*);
 };
   
   

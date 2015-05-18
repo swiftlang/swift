@@ -1183,6 +1183,47 @@ void Lexer::lexStringLiteral() {
   }
 }
 
+
+/// We found an opening curly quote in the source file.  Scan ahead until we
+/// find and end-curly-quote (or straight one).  If we find what looks to be a
+/// string literal, diagnose the problem and return a pointer to the end of the
+/// entire string literal.  This helps us avoid parsing the body of the string
+/// as program tokens, which will only lead to massive confusion.
+const char *Lexer::findEndOfCurlyQuoteStringLiteral(const char *Body) {
+  
+  while (true) {
+    // Don't bother with string interpolations.
+    if (*Body == '\\' && *(Body + 1) == '(')
+      return nullptr;
+
+    // We didn't find the end of the string literal if we ran to end of line.
+    if (*Body == '\r' || *Body == '\n' || Body == BufferEnd)
+      return nullptr;
+
+    // Get the next character.
+    const char *CharStart = Body;
+    unsigned CharValue = lexCharacter(Body, false, false);
+    // If the character was incorrectly encoded, give up.
+    if (CharValue == ~1U) return nullptr;
+    
+    // If we found a straight-quote, then we're done.  Just return the spot
+    // to continue.
+    if (CharValue == '"')
+      return Body;
+    
+    // If we found an ending curly quote (common since this thing started with
+    // an opening curly quote) diagnose it with a fixit and then return.
+    if (CharValue == 0x0000201D) {
+      diagnose(CharStart, diag::lex_invalid_curly_quote)
+        .fixItReplaceChars(getSourceLoc(CharStart), getSourceLoc(Body), "\"");
+      return Body;
+    }
+    
+    // Otherwise, keep scanning.
+  }
+}
+
+
 /// lexEscapedIdentifier:
 ///   identifier ::= '`' identifier '`'
 ///
@@ -1349,6 +1390,7 @@ void Lexer::getStringLiteralSegments(
                                 Bytes.end()-SegmentStartPtr));
 }
 
+
 //===----------------------------------------------------------------------===//
 // Main Lexer Loop
 //===----------------------------------------------------------------------===//
@@ -1388,10 +1430,24 @@ Restart:
       while (advanceIfValidContinuationOfIdentifier(tmp, BufferEnd));
     } else {
       // This character isn't allowed in Swift source.
-      if (validateUTF8CharacterAndAdvance(tmp, BufferEnd) == ~0U)
+      uint32_t codepoint = validateUTF8CharacterAndAdvance(tmp, BufferEnd);
+      if (codepoint == ~0U) {
         diagnose(CurPtr-1, diag::lex_invalid_utf8);
-      else
+      } else if (codepoint == 0x0000201D) {
+        // If this is an end curly quote, just diagnose it with a fixit hint.
+        diagnose(CurPtr-1, diag::lex_invalid_curly_quote)
+          .fixItReplaceChars(getSourceLoc(CurPtr-1), getSourceLoc(tmp), "\"");
+      } else if (codepoint == 0x0000201C) {
+        diagnose(CurPtr-1, diag::lex_invalid_curly_quote)
+          .fixItReplaceChars(getSourceLoc(CurPtr-1), getSourceLoc(tmp), "\"");
+        // If this is a start curly quote, do a fuzzy match of a string literal
+        // to improve recovery.
+        if (auto tmp2 = findEndOfCurlyQuoteStringLiteral(tmp))
+          tmp = tmp2;
+        
+      } else {
         diagnose(CurPtr-1, diag::lex_invalid_character);
+      }
     }
 
     CurPtr = tmp;
