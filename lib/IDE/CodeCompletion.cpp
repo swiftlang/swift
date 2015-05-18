@@ -2402,6 +2402,10 @@ static void addStmtKeywords(CodeCompletionResultSink &Sink) {
 #define STMT_KEYWORD(kw) AddKeyword(#kw, StringRef());
 #include "swift/Parse/Tokens.def"
 
+  // Expr keywords.
+  AddKeyword("catch", StringRef());
+  AddKeyword("throw", StringRef());
+  AddKeyword("try", StringRef());
   // FIXME: The pedantically correct way to find the type is to resolve the
   // Swift.StringLiteralType type.
   AddKeyword("__FUNCTION__", "String");
