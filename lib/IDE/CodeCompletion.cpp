@@ -663,8 +663,6 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     TypeIdentifierWithoutDot,
     CaseStmtBeginning,
     CaseStmtDotPrefix,
-    CatchStmtBeginning,
-    ThrowStmtBeginning,
     NominalMemberBeginning,
     AttributeBegin,
     AttributeDeclParen,
@@ -784,8 +782,6 @@ public:
 
   void completeCaseStmtBeginning() override;
   void completeCaseStmtDotPrefix() override;
-  void completeCatchStmtBeginning() override;
-  void completeThrowStmtBeginning() override;
   void completeDeclAttrKeyword(Decl *D, bool Sil, bool Param) override;
   void completeDeclAttrParam(DeclAttrKind DK, int Index) override;
   void completeNominalMemberBeginning(
@@ -1927,48 +1923,6 @@ public:
     RequestedCachedResults = RequestedResultsTy::toplevelResults();
   }
 
-  bool isErrorDecl(ValueDecl *VD) {
-    // This VD is an exception if it conforms the base error type
-    // or, if it has extensions that conform the base error type
-    if (auto TD = dyn_cast<NominalTypeDecl>(VD)) {
-      auto ContainsErrorProtocol = [&](ArrayRef<ProtocolDecl*> Protocols) {
-        auto BaseException = CurrDeclContext->getASTContext().
-          getExceptionTypeDecl();
-        return std::find(Protocols.begin(), Protocols.end(), BaseException) !=
-            Protocols.end();
-      };
-      if (TD->getKind() != DeclKind::Protocol) {
-        return ContainsErrorProtocol(TD->getAllProtocols());
-      }
-    }
-    return false;
-  }
-
-  bool isErrorType(Type Ty) {
-    if (Ty.isNull())
-      return false;
-    if (auto NT = dyn_cast<NominalType>(Ty.getPointer())) {
-      return isErrorDecl(NT->getDecl());
-    }
-    return false;
-  }
-
-  void getThrowStmtCompletion(SourceLoc Loc) {
-    Kind = LookupKind::ValueInDeclContext;
-    NeedLeadingDot = false;
-    auto Consumer = FilteredDeclConsumer([&](ValueDecl *VD,
-                                             DeclVisibilityKind Kind) {
-      auto IsOfErrorType = [&](ValueDecl *VD) {
-        if (!VD->hasType())
-          TypeResolver->resolveDeclSignature(VD);
-        return isErrorType(VD->getType());
-      };
-      return isErrorDecl(VD) || IsOfErrorType(VD);
-    }, *this);
-    lookupVisibleDecls(Consumer, CurrDeclContext, TypeResolver.get(),
-                       /*IncludeTopLevel=*/true, Loc);
-  }
-
   void getTypeContextEnumElementCompletions(SourceLoc Loc) {
     llvm::SaveAndRestore<LookupKind> ChangeLookupKind(
         Kind, LookupKind::EnumElement);
@@ -1999,50 +1953,6 @@ public:
     for (auto Element : TheEnumDecl->getAllElements()) {
       foundDecl(Element, DeclVisibilityKind::MemberOfCurrentNominal);
     }
-  }
-
-  class FilteredDeclConsumer : public VisibleDeclConsumer {
-    llvm::function_ref<bool(ValueDecl *VD, DeclVisibilityKind Reason)> Filter;
-    VisibleDeclConsumer &RealConsumer;
-  public:
-    FilteredDeclConsumer(llvm::function_ref<bool(ValueDecl *VD, DeclVisibilityKind
-      Reason)> Filter, VisibleDeclConsumer &RealConsumer) : Filter(Filter),
-        RealConsumer(RealConsumer) {}
-    virtual void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
-      if (Filter(VD, Reason)) {
-        RealConsumer.foundDecl(VD, Reason);
-      }
-    }
-  };
-
-  void getExceptionCompletions(SourceLoc Loc) {
-    Kind = LookupKind::TypeInDeclContext;
-    FilteredDeclConsumer Consumer([&](ValueDecl *VD, DeclVisibilityKind Reason) {
-      return isErrorDecl(VD);
-    }, *this);
-    lookupVisibleDecls(Consumer, CurrDeclContext, TypeResolver.get(), true, Loc);
-  }
-
-  void getExceptionHandleClauses() {
-    auto AddLet = [&](bool NeedWhere) {
-      CodeCompletionResultBuilder Builder(Sink,
-                                          CodeCompletionResult::ResultKind::
-                                            Keyword,
-                                          SemanticContextKind::None);
-      Builder.addDeclIntroducer("let ");
-      Builder.addTextChunk("e");
-      if (NeedWhere) {
-        // TODO: add where clause
-      }
-      Builder.addBraceStmtWithCursor();
-    };
-    AddLet(false);
-    CodeCompletionResultBuilder Builder(Sink,
-                                        CodeCompletionResult::ResultKind::
-                                          Keyword,
-                                        SemanticContextKind::None);
-    Builder.addTextChunk("_");
-    Builder.addBraceStmtWithCursor();
   }
 
   void getTypeCompletions(Type BaseType) {
@@ -2431,20 +2341,6 @@ void CodeCompletionCallbacksImpl::completeCaseStmtDotPrefix() {
   CurDeclContext = P.CurDeclContext;
 }
 
-void CodeCompletionCallbacksImpl::completeCatchStmtBeginning() {
-  assert(!InEnumElementRawValue);
-
-  Kind = CompletionKind::CatchStmtBeginning;
-  CurDeclContext = P.CurDeclContext;
-}
-
-void CodeCompletionCallbacksImpl::completeThrowStmtBeginning() {
-  assert(!InEnumElementRawValue);
-
-  Kind = CompletionKind::ThrowStmtBeginning;
-  CurDeclContext = P.CurDeclContext;
-}
-
 void CodeCompletionCallbacksImpl::completeNominalMemberBeginning(
     SmallVectorImpl<StringRef> &Keywords) {
   assert(!InEnumElementRawValue);
@@ -2544,8 +2440,6 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink) {
   case CompletionKind::TypeIdentifierWithoutDot:
   case CompletionKind::CaseStmtBeginning:
   case CompletionKind::CaseStmtDotPrefix:
-  case CompletionKind::CatchStmtBeginning:
-  case CompletionKind::ThrowStmtBeginning:
     break;
 
   case CompletionKind::NominalMemberBeginning:
@@ -2706,17 +2600,6 @@ void CodeCompletionCallbacksImpl::doneParsing() {
 
   case CompletionKind::TypeIdentifierWithoutDot: {
     Lookup.getTypeCompletions(ParsedTypeLoc.getType());
-    break;
-  }
-
-  case CompletionKind::CatchStmtBeginning: {
-    Lookup.getExceptionCompletions(P.Context.SourceMgr.getCodeCompletionLoc());
-    Lookup.getExceptionHandleClauses();
-    break;
-  }
-
-  case CompletionKind::ThrowStmtBeginning: {
-    Lookup.getThrowStmtCompletion(P.Context.SourceMgr.getCodeCompletionLoc());
     break;
   }
 

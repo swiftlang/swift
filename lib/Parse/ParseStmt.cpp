@@ -648,15 +648,11 @@ ParserResult<Stmt> Parser::parseStmtReturn() {
 ///
 ParserResult<Stmt> Parser::parseStmtThrow() {
   SourceLoc throwLoc = consumeToken(tok::kw_throw);
-  
+
   ParserResult<Expr> Result = parseExpr(diag::expected_expr_throw);
-  
-  if (Result.hasCodeCompletion()) {
-    if (CodeCompletion)
-      CodeCompletion->completeThrowStmtBeginning();
-    else
-      return makeParserCodeCompletionResult<Stmt>();
-  }
+
+  if (Result.hasCodeCompletion())
+    return makeParserCodeCompletionResult<Stmt>();
 
   if (Result.isNull())
     Result = makeParserErrorResult(new (Context) ErrorExpr(throwLoc));
@@ -791,7 +787,7 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
         P.CodeCompletion->completeCaseStmtBeginning();
         break;
       case GuardedPatternContext::Catch:
-        P.CodeCompletion->completeCatchStmtBeginning();
+        P.CodeCompletion->completePostfixExprBeginning();
         break;
       }
       P.consumeToken();
