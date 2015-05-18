@@ -978,14 +978,8 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     // Look ahead to see if we have '.foo(', '.foo[', '.foo{',
     //   '.foo.1(', '.foo.1[', or '.foo.1{', or if the '.foo' appears on a line
     //   by itself.
-    if (Tok.is(tok::period_prefix) && (peekToken().is(tok::identifier) ||
-                                       peekToken().is(tok::integer_literal))) {
-      BacktrackingScope BS(*this);
-      consumeToken(tok::period_prefix);
-      IsPeriod = peekToken().isFollowingLParen() ||
-                 peekToken().isFollowingLSquare() ||
-                 peekToken().isAtStartOfLine() ||
-                 peekToken().is(tok::l_brace);
+    if (Tok.is(tok::period_prefix)) {
+      IsPeriod = periodPrefixIsFollowedByBuilderPatternLikeExpr();
     }
     if (consumeIf(tok::period) || (IsPeriod && consumeIf(tok::period_prefix))) {
       // Non-identifier cases.
