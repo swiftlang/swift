@@ -23,7 +23,7 @@ public func _stdlib_isOSVersionAtLeast(
   _ minor: Builtin.Word,
   _ patch: Builtin.Word
 ) -> Builtin.Int1 {
-#if os(OSX) || os(iOS) || os(tvOS)
+#if os(OSX) || os(iOS) || os(tvOS) || os(watchOS)
   let runningVersion = _swift_stdlib_operatingSystemVersion()
   let queryVersion = _SwiftNSOperatingSystemVersion(
     majorVersion: Int(major),

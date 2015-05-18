@@ -1786,7 +1786,7 @@ AvailabilityVersionsTestSuite.test("_stdlib_isOSVersionAtLeast") {
 
 // _stdlib_isOSVersionAtLeast is broken for
 // watchOS. rdar://problem/20234735
-#if os(OSX) || os(iOS) || os(tvOS)
+#if os(OSX) || os(iOS) || os(tvOS) || os(watchOS)
   // This test assumes that no version component on an OS we test upon
   // will ever be greater than 1066 and that every major version will always
   // be greater than 1.
