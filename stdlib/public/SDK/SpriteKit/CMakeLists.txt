@@ -3,7 +3,7 @@ add_swift_library(swiftSpriteKit IS_SDK_OVERLAY
   SpriteKitMirrors.swift.gyb
 
   TARGET_SDKS OSX IOS IOS_SIMULATOR TVOS TVOS_SIMULATOR
-  SWIFT_MODULE_DEPENDS Foundation GLKit simd
+  SWIFT_MODULE_DEPENDS Foundation GLKit simd AVFoundation
   SWIFT_MODULE_DEPENDS_OSX AppKit
   SWIFT_MODULE_DEPENDS_IOS_TVOS UIKit
   FRAMEWORK_DEPENDS SpriteKit)
