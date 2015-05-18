@@ -809,19 +809,12 @@ bool swift::canUseScalarCheckedCastInstructions(CanType sourceType,
   if (auto type = sourceObjectType.getAnyOptionalObjectType())
     sourceObjectType = type;
 
-  // Class-to-class casts can be scalar.  The source can be
-  // anything that embeds a class reference; the destination must
-  // be a class type, but (for now) cannot be a class existential
-  // with non-ObjC protocols.
-  if (sourceObjectType.isAnyClassReferenceType() &&
-      (targetType->mayHaveSuperclass() ||
-       targetType.isObjCExistentialType()))
-    return true;
-
-  // Metatype-to-metatype casts can also be scalar. Again, for now,
-  // require the destination to be non-existential.
-  if (isa<AnyMetatypeType>(sourceObjectType) &&
-      isa<MetatypeType>(targetType))
+  // The source and destination can be metatypes or anything that
+  // embeds a class reference.
+  if ((sourceObjectType.isAnyClassReferenceType() ||
+       isa<AnyMetatypeType>(sourceObjectType)) &&
+      (targetType->isAnyClassReferenceType() ||
+       isa<AnyMetatypeType>(targetType)))
     return true;
 
   // Otherwise, we need to use the general indirect-cast functions.
