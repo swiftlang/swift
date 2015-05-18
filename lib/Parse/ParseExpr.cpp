@@ -756,6 +756,19 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
         new (Context) CharacterLiteralExpr(Codepoint, Loc));
     break;
   }
+  
+  case tok::at_sign:
+    // Objective-C programmers habitually type @"foo", so recover gracefully
+    // with a fixit.  If this isn't @"foo", just handle it like an unknown
+    // input.
+    if (peekToken().isNot(tok::string_literal))
+      goto UnknownCharacter;
+    
+    diagnose(Tok.getLoc(), diag::string_literal_no_atsign)
+      .fixItRemove(Tok.getLoc());
+    consumeToken(tok::at_sign);
+    SWIFT_FALLTHROUGH;
+      
   case tok::string_literal:  // "foo"
     Result = makeParserResult(parseExprStringLiteral());
     break;
@@ -923,6 +936,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     return nullptr;
 
   default:
+  UnknownCharacter:
     checkForInputIncomplete();
     // FIXME: offer a fixit: 'Self' -> 'self'
     diagnose(Tok, ID);

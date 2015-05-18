@@ -925,6 +925,9 @@ WARNING(trailing_closure_excess_newlines,expr_parsing,none,
 NOTE(trailing_closure_call_here,expr_parsing,none,
      "parsing trailing closure for this call", ())
 
+ERROR(string_literal_no_atsign,expr_parsing,none,
+      "string literals in Swift are not preceeded by an '@' sign", ())
+
 ERROR(invalid_float_literal_missing_leading_zero,expr_parsing,none,
       "'.%0' is not a valid floating point literal; it must be written '0.%0'",
       (StringRef))
