@@ -806,16 +806,19 @@ bool swift::emitSuccessfulIndirectUnconditionalCast(SILBuilder &B, Module *M,
 bool swift::canUseScalarCheckedCastInstructions(CanType sourceType,
                                                 CanType targetType) {
   // Look through one level of optionality on the source.
-  auto sourceObjectType = sourceType;
-  if (auto type = sourceObjectType.getAnyOptionalObjectType())
-    sourceObjectType = type;
+  auto objectType = sourceType;
+  if (auto type = objectType.getAnyOptionalObjectType())
+    objectType = type;
 
-  // The source and destination can be metatypes or anything that
-  // embeds a class reference.
-  if ((sourceObjectType.isAnyClassReferenceType() ||
-       isa<AnyMetatypeType>(sourceObjectType)) &&
-      (targetType->isAnyClassReferenceType() ||
-       isa<AnyMetatypeType>(targetType)))
+  // Three supported cases:
+  // - metatype to metatype
+  // - metatype to object
+  // - object to object
+  if ((objectType.isAnyClassReferenceType() || isa<AnyMetatypeType>(objectType))
+      && targetType->isAnyClassReferenceType())
+    return true;
+
+  if (isa<AnyMetatypeType>(objectType) && isa<AnyMetatypeType>(targetType))
     return true;
 
   // Otherwise, we need to use the general indirect-cast functions.

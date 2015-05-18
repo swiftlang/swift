@@ -14,7 +14,7 @@ func int_is_t<T>() -> (Bool, T.Type?, T.Type) {
   return (Int.self is T.Type, Int.self as? T.Type, Int.self as! T.Type)
 }
 
-// CHECK-LABEL: sil hidden @_TF14metatype_casts8t_is_inturFq_TSbGSqMSi_MSi_ : $@convention(thin) <T> (@in T) 
+// CHECK-LABEL: sil hidden @_TF14metatype_casts8t_is_inturFq_TSbGSqMSi_MSi_ : $@convention(thin) <T> (@in T)
 func t_is_int<T>(_: T) -> (Bool, Int.Type?, Int.Type) {
   // CHECK: checked_cast_br {{%.*}} : $@thick T.Type to $@thick Int.Type
   // CHECK: checked_cast_br {{%.*}} : $@thick T.Type to $@thick Int.Type
@@ -22,4 +22,19 @@ func t_is_int<T>(_: T) -> (Bool, Int.Type?, Int.Type) {
   return (T.self is Int.Type, T.self as? Int.Type, T.self as! Int.Type)
 }
 
+// Mixed metatype casts take the slow path via *_cast_addr
+protocol Emergency {}
+class Ambulance : Emergency {}
+class FashionPolice {}
 
+// CHECK-LABEL: sil hidden @_TF14metatype_casts30anyObjectToExistentialMetatypeFPSs9AnyObject_GSqPMPS_9Emergency__ : $@convention(thin) (@owned AnyObject) -> Optional<Emergency.Type>
+func anyObjectToExistentialMetatype(o: AnyObject) -> Emergency.Type? {
+  // CHECK: checked_cast_addr_br take_always AnyObject in {{%.*}} : $*AnyObject to Emergency.Type in {{%.*}}
+  return o as? Emergency.Type
+}
+
+// CHECK-LABEL: sil hidden @_TF14metatype_casts19anyObjectToMetatypeFPSs9AnyObject_GSqMCS_13FashionPolice_ : $@convention(thin) (@owned AnyObject) -> Optional<FashionPolice.Type>
+func anyObjectToMetatype(o: AnyObject) -> FashionPolice.Type? {
+  // CHECK: checked_cast_addr_br take_always AnyObject in {{%.*}} : $*AnyObject to FashionPolice.Type in {{%.*}}
+  return o as? FashionPolice.Type
+}

@@ -251,12 +251,12 @@ public:
     return isExistentialTypeImpl(*this, protocols);
   }
 
-  /// Is this type any kind of existential?
+  /// Is this type an existential or an existential metatype?
   bool isAnyExistentialType() const {
     return isAnyExistentialTypeImpl(*this);
   }
 
-  /// Is this type any kind of existential?
+  /// Is this type an existential or an existential metatype?
   bool isAnyExistentialType(SmallVectorImpl<ProtocolDecl *> &protocols) {
     return isAnyExistentialTypeImpl(*this, protocols);
   }
