@@ -65,6 +65,10 @@ class TuringMachine {
   @noreturn func halt() {
     repeat { } while true
   }
+
+  @noreturn func eatTape() {
+    return // expected-error {{return from a 'noreturn' function}}
+  }
 }
 
 func diagnose_missing_return_no_error_after_noreturn_method() -> Int {

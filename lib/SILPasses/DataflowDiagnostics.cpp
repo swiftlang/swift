@@ -37,21 +37,20 @@ static void diagnoseMissingReturn(const UnreachableInst *UI,
   SILLocation FLoc = F->getLocation();
 
   Type ResTy;
-  AnyFunctionType *T = 0;
 
   if (auto *FD = FLoc.getAsASTNode<FuncDecl>()) {
     ResTy = FD->getResultType();
-    T = FD->getType()->castTo<AnyFunctionType>();
   } else if (auto *CE = FLoc.getAsASTNode<ClosureExpr>()) {
     ResTy = CE->getResultType();
-    T = CE->getType()->castTo<AnyFunctionType>();
   } else {
     llvm_unreachable("unhandled case in MissingReturn");
   }
 
+  bool isNoReturn = F->getLoweredFunctionType()->isNoReturn();
+
   // No action required if the function returns 'Void' or that the
   // function is marked 'noreturn'.
-  if (ResTy->isVoid() || (T && T->isNoReturn()))
+  if (ResTy->isVoid() || isNoReturn)
     return;
 
   SILLocation L = UI->getLoc();
@@ -108,20 +107,14 @@ static void diagnoseReturn(const SILInstruction *I, ASTContext &Context) {
 
   const SILBasicBlock *BB = TI->getParent();
   const SILFunction *F = BB->getParent();
-  SILLocation FLoc = F->getLocation();
 
-  if (auto *FD = FLoc.getAsASTNode<FuncDecl>()) {
-    if (AnyFunctionType *T = FD->getType()->castTo<AnyFunctionType>()) {
-
-      // Warn if we reach a return inside a noreturn function.
-      if (T->isNoReturn()) {
-        SILLocation L = TI->getLoc();
-        if (L.is<ReturnLocation>())
-          diagnose(Context, L.getSourceLoc(), diag::return_from_noreturn);
-        if (L.is<ImplicitReturnLocation>())
-          diagnose(Context, L.getSourceLoc(), diag::return_from_noreturn);
-      }
-    }
+  // Warn if we reach a return inside a noreturn function.
+  if (F->getLoweredFunctionType()->isNoReturn()) {
+    SILLocation L = TI->getLoc();
+    if (L.is<ReturnLocation>())
+      diagnose(Context, L.getSourceLoc(), diag::return_from_noreturn);
+    if (L.is<ImplicitReturnLocation>())
+      diagnose(Context, L.getSourceLoc(), diag::return_from_noreturn);
   }
 }
 
