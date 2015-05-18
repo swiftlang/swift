@@ -1,0 +1,219 @@
+_TtBf80_ ---> Builtin.Float80
+_TtBi32_ ---> Builtin.Int32
+_TtBw ---> Builtin.Word
+_TtBO ---> Builtin.UnknownObject
+_TtBo ---> Builtin.NativeObject
+_TtBp ---> Builtin.RawPointer
+_TtBv4Bi8_ ---> Builtin.Vec4xInt8
+_TtBv4Bf16_ ---> Builtin.Vec4xFloat16
+_TtBv4Bp ---> Builtin.Vec4xRawPointer
+_TtSa ---> Array
+_TtSb ---> Bool
+_TtSc ---> UnicodeScalar
+_TtSd ---> Double
+_TtSf ---> Float
+_TtSi ---> Int
+_TtSq ---> Optional
+_TtSS ---> String
+_TtSu ---> UInt
+_TtGSaSS_ ---> [String]
+_TtGSqSS_ ---> String?
+_TtGSQSS_ ---> String!
+_TtGVSs10DictionarySSSi_ ---> [String : Int]
+_TtVSs7CString ---> CString
+_TtCSo8NSObject ---> NSObject
+_TtO6Monads6Either ---> Either
+_TtbSiSu ---> @convention(block) (Int) -> UInt
+_TtcSiSu ---> @convention(c) (Int) -> UInt
+_TtbTSiSc_Su ---> @convention(block) (Int, UnicodeScalar) -> UInt
+_TtcTSiSc_Su ---> @convention(c) (Int, UnicodeScalar) -> UInt
+_TtFSiSu ---> (Int) -> UInt
+_TtKSiSu ---> @autoclosure (Int) -> UInt
+_TtfSiFScSu ---> (UnicodeScalar) -> UInt
+_TtFSiFScSu ---> (Int) -> (UnicodeScalar) -> UInt
+_TtMSi ---> Int.Type
+_TtP_ ---> protocol<>
+_TtP3foo3bar_ ---> bar
+_TtP3foo3barS_3bas_ ---> protocol<bar, bas>
+_TtTP3foo3barS_3bas_PS1__PS1_S_3zimS0___ ---> (protocol<bar, bas>, bas, protocol<bas, zim, bar>)
+_TtRSi ---> inout Int
+_TtTSiSu_ ---> (Int, UInt)
+_TttSiSu_ ---> (Int, UInt...)
+_TtT3fooSi3barSu_ ---> (foo : Int, bar : UInt)
+_TtU__FQ_Si ---> <A>(A) -> Int
+_TtU3foo3bar_S_3basS_3zim__FTQ0_Q__Si ---> <A : bar, B : protocol<bas, zim>>(B, A) -> Int
+_TtU3foo3bar_S_3basS_3zim___FTQ0_Q__Q1_ ---> <A : bar, B : protocol<bas, zim>, C>(B, A) -> C
+_TtU3foo3bar_S_3basS_3zim__US_4zang__FTQ0_Q__Q1_ ---> <A : bar, B : protocol<bas, zim>, C>(B, A) -> C
+_TtU3foo3bar_S_3basS_3zim___US_4zang___FTQ0_Q__Q1_ ---> <A : bar, B : protocol<bas, zim>, C, D>(B, A) -> C
+_TtU___FQ_U____FQ_T_ ---> <A, B>(A) -> <C, D, E>(C) -> ()
+_TtU___FQ_U____FQ0_T_ ---> <A, B>(A) -> <C, D, E>(D) -> ()
+_TtU___FQ_U____FQ1_T_ ---> <A, B>(A) -> <C, D, E>(E) -> ()
+_TtU___FQ_U____FQd__T_ ---> <A, B>(A) -> <C, D, E>(A) -> ()
+_TtU___FQ_U____FQd_0_T_ ---> <A, B>(A) -> <C, D, E>(B) -> ()
+_TtU___FQ_U____FQd_0_T__ASD_foo ---> <A, B>(A) -> <C, D, E>(B) -> () with unmangled suffix "_ASD_foo"
+_TturFq_q_ ---> <A> (A) -> A
+_TtuzrFT_T_ ---> <> () -> ()
+_Ttu__rFq_qd__ ---> <A><B> (A) -> B
+_Ttu_z_rFq_qd0__ ---> <A><><B> (A) -> B
+_Ttu0_rFq_q0_ ---> <A, B> (A) -> B
+_TtuRq_Ss8Runcible_Fq_qq_S_5Mince ---> <A where A: Runcible> (A) -> A.Mince
+_TtuRdq_CSs22AbstractRuncingFactory_Fq_q_ ---> <A where A: AbstractRuncingFactory> (A) -> A
+_TtuRq_Ss8Runciblezqq_S_5Minceq__Fq_q_ ---> <A where A: Runcible, A.Mince == A> (A) -> A
+_Tv3foo3barSi ---> bar : Int
+_TF3fooau3barSi ---> bar.unsafeMutableAddressor : Int
+_TF3foolu3barSi ---> bar.unsafeAddressor : Int
+_TF3fooaO3barSi ---> bar.owningMutableAddressor : Int
+_TF3foolO3barSi ---> bar.owningAddressor : Int
+_TF3fooao3barSi ---> bar.nativeOwningMutableAddressor : Int
+_TF3foolo3barSi ---> bar.nativeOwningAddressor : Int
+_TF3fooap3barSi ---> bar.nativePinningMutableAddressor : Int
+_TF3foolp3barSi ---> bar.nativePinningAddressor : Int
+_TF3foog3barSi ---> bar.getter : Int
+_TF3foos3barSi ---> bar.setter : Int
+_TFC3foo3bar3basfS0_FT3zimCS_3zim_T_ ---> bar.bas(zim : zim) -> ()
+_TToFC3foo3bar3basfS0_FT3zimCS_3zim_T_ ---> @objc bar.bas(zim : zim) -> ()
+_TTDFC3foo3bar3basfS0_FT3zimCS_3zim_T_ ---> dynamic bar.bas(zim : zim) -> ()
+_TFC3foo3bar3basfS0_FT3zimCS_3zim_T_ ---> bar.bas(zim : zim) -> ()
+_TF3foooi1pFTCS_3barVS_3bas_OS_3zim ---> + infix(bar, bas) -> zim
+_TF3foooP1xFTCS_3barVS_3bas_OS_3zim ---> ^ postfix(bar, bas) -> zim
+_TFC3foo3barCfMS0_FT_S0_ ---> bar.__allocating_init() -> bar
+_TFC3foo3barcfMS0_FT_S0_ ---> bar.init() -> bar
+_TFC3foo3barD ---> bar.__deallocating_deinit
+_TFC3foo3bard ---> bar.deinit
+_TMPdC3foo3bar ---> direct generic type metadata pattern for bar
+_TMPiC3foo3bar ---> indirect generic type metadata pattern for bar
+_TMnC3foo3bar ---> nominal type descriptor for bar
+_TMmC3foo3bar ---> metaclass for bar
+_TMdC3foo3bar ---> direct type metadata for bar
+_TwalC3foo3bar ---> allocateBuffer value witness for bar
+_TwcaC3foo3bar ---> assignWithCopy value witness for bar
+_TwtaC3foo3bar ---> assignWithTake value witness for bar
+_TwdeC3foo3bar ---> deallocateBuffer value witness for bar
+_TwxxC3foo3bar ---> destroy value witness for bar
+_TwXXC3foo3bar ---> destroyBuffer value witness for bar
+_TwCPC3foo3bar ---> initializeBufferWithCopyOfBuffer value witness for bar
+_TwCpC3foo3bar ---> initializeBufferWithCopy value witness for bar
+_TwcpC3foo3bar ---> initializeWithCopy value witness for bar
+_TwTKC3foo3bar ---> initializeBufferWithTakeOfBuffer value witness for bar
+_TwTkC3foo3bar ---> initializeBufferWithTake value witness for bar
+_TwtkC3foo3bar ---> initializeWithTake value witness for bar
+_TwprC3foo3bar ---> projectBuffer value witness for bar
+_TWVC3foo3bar ---> value witness table for bar
+_TWoFC3foo3bar3basFSiSi ---> witness table offset for bar.bas(Int) -> Int
+_TWvdvC3foo3bar3basSi ---> direct field offset for bar.bas : Int
+_TWvivC3foo3bar3basSi ---> indirect field offset for bar.bas : Int
+_TWPC3foo3barS_8barrableSs ---> protocol witness table for bar
+_TWZC3foo3barS_8barrableS_ ---> lazy protocol witness table accessor for bar
+_TWzC3foo3barS_8barrableS_ ---> lazy protocol witness table template for bar
+_TWDC3foo3barS_8barrableS_ ---> dependent protocol witness table generator for bar
+_TWdC3foo3barS_8barrableS_ ---> dependent protocol witness table template for bar
+_TFSCg5greenVSC5Color ---> green.getter : Color
+_TIF1t1fFT1iSi1sSS_T_A_ ---> (f(i : Int, s : String) -> ()).(default argument 0)
+_TIF1t1fFT1iSi1sSS_T_A0_ ---> (f(i : Int, s : String) -> ()).(default argument 1)
+_TFSqcU__fMGSqQ__FT_GSqQ__ ---> Optional.init<A>() -> A?
+_TF21class_bound_protocols32class_bound_protocol_compositionFT1xPS_10ClassBoundS_13NotClassBound__PS0_S1__ ---> class_bound_protocol_composition(x : protocol<ClassBound, NotClassBound>) -> protocol<ClassBound, NotClassBound>
+_TtZZ ---> _TtZZ
+_TtB ---> _TtB
+_TtBSi ---> _TtBSi
+_TtBx ---> _TtBx
+_TtC ---> _TtC
+_TtT ---> _TtT
+_TtTSi ---> _TtTSi
+_TtQd_ ---> _TtQd_
+_TtU__FQo_Si ---> _TtU__FQo_Si
+_TtU__FQD__Si ---> _TtU__FQD__Si
+_TtU___FQ_U____FQd0__T_ ---> _TtU___FQ_U____FQd0__T_
+_TtU___FQ_U____FQd_1_T_ ---> _TtU___FQ_U____FQd_1_T_
+_TtU___FQ_U____FQ2_T_ ---> _TtU___FQ_U____FQ2_T_
+_Tw ---> _Tw
+_TWa ---> _TWa
+_Twal ---> _Twal
+_T ---> _T
+_TTo ---> _TTo
+_TC ---> _TC
+_TM ---> _TM
+_TMd ---> _TMd
+_TW ---> _TW
+_TWV ---> _TWV
+_TWo ---> _TWo
+_TWv ---> _TWv
+_TWvd ---> _TWvd
+_TWvi ---> _TWvi
+_TWvx ---> _TWvx
+_TtVCC4main3Foo4Ding3Str ---> Foo.Ding.Str
+_TFVCC6nested6AClass12AnotherClass7AStruct9aFunctionfRS2_FT1aSi_S2_ ---> AClass.AnotherClass.AStruct.aFunction(a : Int) -> AClass.AnotherClass.AStruct
+_TF3foo3barUS_8Barrable__FQ_QQ_3Bar ---> bar<A : Barrable>(A) -> A.Bar
+_TtXwC10attributes10SwiftClass ---> weak SwiftClass
+_TtXoC10attributes10SwiftClass ---> unowned SwiftClass
+_TtERR ---> <ERROR TYPE>
+_TtGSqGSaC5sugar7MyClass__ ---> [MyClass]?
+_TtGSaGSqC5sugar7MyClass__ ---> [MyClass?]
+_TtGV12generic_args7WrapperQq_FS0_4initUS_9AProtocol__FMGS0_Q__US1___FT4fromGS0_Q___GS0_Qd____ ---> Wrapper<(archetype 0 of Wrapper.init<A : AProtocol>(Wrapper<A>.Type) -> <B : AProtocol>(from : Wrapper<B>) -> Wrapper<A>)>
+_TtaC9typealias5DWARF9DIEOffset ---> DWARF.DIEOffset
+_TtaSs3Int ---> Int
+_TTRXFo_dSc_dSb_XFo_iSc_iSb_ ---> reabstraction thunk helper from @callee_owned (@unowned UnicodeScalar) -> (@unowned Bool) to @callee_owned (@in UnicodeScalar) -> (@out Bool)
+_TTRXFo_dSi_dGSqSi__XFo_iSi_iGSqSi__ ---> reabstraction thunk helper from @callee_owned (@unowned Int) -> (@unowned Int?) to @callee_owned (@in Int) -> (@out Int?)
+_TTRGrXFo_iV18switch_abstraction1A_iq__XFo_dS0__iq__ ---> reabstraction thunk helper <A> from @callee_owned (@in A) -> (@out A) to @callee_owned (@unowned A) -> (@out A)
+_TFCF5types1gFT1bSb_T_L0_10Collection3zimfS0_FT_T_ ---> (g(b : Bool) -> ()).(Collection #2).zim() -> ()
+_TFF17capture_promotion22test_capture_promotionFT_FT_SiU_FT_Si_promote0 ---> (test_capture_promotion() -> () -> Int).(closure #1) with unmangled suffix "_promote0"
+_TFIVSs8_Processi10_argumentsGSaSS_U_FT_GSaSS_ ---> _Process.(variable initialization expression)._arguments : [String] with unmangled suffix "U_FT_GSaSS_"
+_TFIvVSs8_Process10_argumentsGSaSS_iU_FT_GSaSS_ ---> _Process.(_arguments : [String]).(variable initialization expression).(closure #1)
+_TFCSo1AE ---> A.__ivar_destroyer
+_TFCSo1Ae ---> A.__ivar_initializer
+_TTWC13call_protocol1CS_1PS_FS1_3fooU_fRQPS1_FT_Si ---> protocol witness for P.foo() -> Int in conformance C
+_TFC12dynamic_self1X1ffDS0_FT_DS0_ ---> X.f() -> Self
+_TTSg5Si___TFSqcU__fMGSqQ__FT_GSqQ__ ---> generic specialization <Int> of Optional.init<A>() -> A?
+_TTSg5SiSiSs3FooSs_Sf___TFSqcU__fMGSqQ__FT_GSqQ__ ---> generic specialization <Int with Int, Float> of Optional.init<A>() -> A?
+_TTSg5Si_Sf___TFSqcU__fMGSqQ__FT_GSqQ__ ---> generic specialization <Int, Float> of Optional.init<A>() -> A?
+_TTSg5Si_Sf___TFSqcU__fMGSqQ__FT_GSqQ__ ---> generic specialization <Int, Float> of Optional.init<A>() -> A?
+_TTSgS ---> _TTSgS
+_TTSg5S ---> _TTSg5S
+_TTSgSi ---> _TTSgSi
+_TTSg5Si ---> _TTSg5Si
+_TTSgSi_ ---> _TTSgSi_
+_TTSgSi__ ---> _TTSgSi__
+_TTSgSiS_ ---> _TTSgSiS_
+_TTSgSi__xyz ---> _TTSgSi__xyz
+_TTSg5Si___TTSg5Si___TFSqcU__fMGSqQ__FT_GSqQ__ ---> generic specialization <Int> of generic specialization <Int> of Optional.init<A>() -> A?
+_TTSg5VSs5UInt8___TFV10specialize3XXXcU__fMGS0_Q__FT1tQ__GS0_Q__ ---> generic specialization <UInt8> of XXX.init<A>(t : A) -> XXX<A>
+_TPA__TTRXFo_oSSoSS_dSb_XFo_iSSiSS_dSb_31 ---> partial apply forwarder for reabstraction thunk helper from @callee_owned (@owned String, @owned String) -> (@unowned Bool) to @callee_owned (@in String, @in String) -> (@unowned Bool) with unmangled suffix "31"
+_TsC4Meow5MyCls9subscriptFT1iSi_Sf ---> MyCls.subscript(i : Int) -> Float
+_TF8manglingX22egbpdajGbuEbxfgehfvwxnFT_T_ ---> ليهمابتكلموشعربي؟() -> ()
+_TF8manglingX24ihqwcrbEcvIaIdqgAFGpqjyeFT_T_ ---> 他们为什么不说中文() -> ()
+_TF8manglingX27ihqwctvzcJBfGFJdrssDxIboAybFT_T_ ---> 他們爲什麽不說中文() -> ()
+_TF8manglingX30Proprostnemluvesky_uybCEdmaEBaFT_T_ ---> Pročprostěnemluvíčesky() -> ()
+_TF8manglingXoi7p_qcaDcFTSiSi_Si ---> «+» infix(Int, Int) -> Int
+_TF8manglingoi2qqFTSiSi_T_ ---> ?? infix(Int, Int) -> ()
+_TFE11ext_structAV11def_structA1A4testfRS1_FT_T_ ---> ext..A.test() -> ()
+_TF13devirt_accessP5_DISC15getPrivateClassFT_CS_P5_DISC12PrivateClass ---> (getPrivateClass in _DISC)() -> (PrivateClass in _DISC)
+_TF4mainP5_mainX3wxaFT_T_ ---> (λ in _main)() -> ()
+_TtPMP_ ---> protocol<>.Type
+_TFCSs13_NSSwiftArray29canStoreElementsOfDynamicTypefS_FPMP_Sb ---> _NSSwiftArray.canStoreElementsOfDynamicType(protocol<>.Type) -> Bool
+_TFCSs13_NSSwiftArrayg17staticElementTypePMP_ ---> _NSSwiftArray.staticElementType.getter : protocol<>.Type
+_TFCSs17_DictionaryMirrorg9valueTypePMP_ ---> _DictionaryMirror.valueType.getter : protocol<>.Type
+_TPA__TFFVSs11GeneratorOfcU__FMGS_Q__USs13GeneratorType__FQ_GS_Qd___U_FT_GSqQd___ ---> partial apply forwarder for GeneratorOf.(init<A>(GeneratorOf<A>.Type) -> <B : GeneratorType>(B) -> GeneratorOf<A>).(closure #1)
+_TPA__TFFVSs10SequenceOfcU__FMGS_Q__USs13GeneratorType__FFT_Q_GS_Qd___U_FT_GVSs11GeneratorOfQd___ ---> partial apply forwarder for SequenceOf.(init<A>(SequenceOf<A>.Type) -> <B : GeneratorType>(() -> B) -> SequenceOf<A>).(closure #1)
+_TPA__TFFVSs6SinkOfcU__FMGS_Q__USs8SinkType__FQ_GS_Qd___U_FQd__T_ ---> partial apply forwarder for SinkOf.(init<A>(SinkOf<A>.Type) -> <B : SinkType>(B) -> SinkOf<A>).(closure #1)
+_TTSf1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TF7specgen12take_closureFFTSiSi_T_T_ ---> function signature specialization <Arg[0] = [Closure Propagated : specgen.(caller (Swift.Int) -> ()).(closure #1), Argument Types : [Int]> of take_closure((Int, Int) -> ()) -> ()
+_TTSf1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TTSg5Si___TF7specgen12take_closureFFTSiSi_T_T_ ---> function signature specialization <Arg[0] = [Closure Propagated : specgen.(caller (Swift.Int) -> ()).(closure #1), Argument Types : [Int]> of generic specialization <Int> of take_closure((Int, Int) -> ()) -> ()
+_TTSg5Si___TTSf1cl35_TFF7specgen6callerFSiT_U_FTSiSi_T_Si___TF7specgen12take_closureFFTSiSi_T_T_ ---> generic specialization <Int> of function signature specialization <Arg[0] = [Closure Propagated : specgen.(caller (Swift.Int) -> ()).(closure #1), Argument Types : [Int]> of take_closure((Int, Int) -> ()) -> ()
+_TTSf1cpfr24_TF8capturep6helperFSiT__n___TTRXFo_dSi_dT__XFo_iSi_dT__ ---> function signature specialization <Arg[0] = [Constant Propagated Function : capturep.helper (Swift.Int) -> ()]> of reabstraction thunk helper from @callee_owned (@unowned Int) -> (@unowned ()) to @callee_owned (@in Int) -> (@unowned ())
+_TTSf1cpi0_cpfl0_cpse0v4u123_cpg53globalinit_33_06E7F1D906492AE070936A9B58CBAE1C_token8_cpfr36_TFtest_capture_propagation2_closure___TF7specgen12take_closureFFTSiSi_T_T_ ---> function signature specialization <Arg[0] = [Constant Propagated Integer : 0], Arg[1] = [Constant Propagated Float : 0], Arg[2] = [Constant Propagated String : u8'u123'], Arg[3] = [Constant Propagated Global : globalinit_33_06E7F1D906492AE070936A9B58CBAE1C_token8], Arg[4] = [Constant Propagated Function : _TFtest_capture_propagation2_closure]> of take_closure((Int, Int) -> ()) -> ()
+_TTSf0s_s_d___TTSg5VSs16_REPLExitHandler___TFVSs22_ContiguousArrayBuffercU__fMGS_Q__FT5countSi15minimumCapacitySi_GS_Q__ ---> function signature specialization <Arg[0] = Exploded, Arg[1] = Exploded, Arg[2] = Dead> of generic specialization <_REPLExitHandler> of _ContiguousArrayBuffer.init<A>(count : Int, minimumCapacity : Int) -> _ContiguousArrayBuffer<A>
+_TTSf0gs___TFVSs11_StringCore15_invariantCheckfS_FT_T_ ---> function signature specialization <Arg[0] = Owned To Guaranteed and Exploded> of _StringCore._invariantCheck() -> ()
+_TTSf1n_n_n_n___TTSf2s_n_n___TTSg5GVSs15EmptyCollectionVSs6UInt16_GS_S0__Ss14CollectionTypeSs_GVSs14EmptyGeneratorS0__GS2_S0__Ss13GeneratorTypeSs_SiSiSs16ForwardIndexTypeSs_SiSiSs18_SignedIntegerTypeSs_SiSiSs33_BuiltinIntegerLiteralConvertibleSs_Si_S0____TFVSs11_StringCore12replaceRangefRS_USs14CollectionType_USs13GeneratorType_Ss16ForwardIndexType_Ss18_SignedIntegerType_Ss33_BuiltinIntegerLiteralConvertible____FTGVSs5RangeSi_4withQ__T_ ---> function signature specialization <> of function signature specialization <Arg[0] = Exploded> of generic specialization <EmptyCollection<UInt16> with EmptyCollection<UInt16>, EmptyGenerator<UInt16> with EmptyGenerator<UInt16>, Int with Int, Int with Int, Int with Int, Int, UInt16> of _StringCore.replaceRange<A : CollectionType>(Range<Int>, with : A) -> ()
+_TTSf2g___TTSf2s_d___TFVSs11_StringCoreCfMS_FVSs13_StringBufferS_ ---> function signature specialization <Arg[0] = Owned To Guaranteed> of function signature specialization <Arg[0] = Exploded, Arg[1] = Dead> of _StringCore.init(_StringBuffer) -> _StringCore
+_TTSf3d_i_d_i_d_i___TFVSs11_StringCoreCfMS_FVSs13_StringBufferS_ ---> function signature specialization <Arg[0] = Dead, Arg[1] = Value Promoted from InOut, Arg[2] = Dead, Arg[3] = Value Promoted from InOut, Arg[4] = Dead, Arg[5] = Value Promoted from InOut> of _StringCore.init(_StringBuffer) -> _StringCore
+_TTSf3d_i_n_i_d_i___TFVSs11_StringCoreCfMS_FVSs13_StringBufferS_ ---> function signature specialization <Arg[0] = Dead, Arg[1] = Value Promoted from InOut, Arg[3] = Value Promoted from InOut, Arg[4] = Dead, Arg[5] = Value Promoted from InOut> of _StringCore.init(_StringBuffer) -> _StringCore
+_TTSg5XPMTP4main9AnyObject____TFVSs22_ContiguousArrayBufferCU__fMGS_Q__FT5countSi15minimumCapacitySi_GS_Q__ ---> generic specialization <@thick AnyObject.Type> of _ContiguousArrayBuffer.init<A>(count : Int, minimumCapacity : Int) -> _ContiguousArrayBuffer<A>
+_TTSg5XPMoP4main9AnyObject____TFVSs22_ContiguousArrayBufferCU__fMGS_Q__FT5countSi15minimumCapacitySi_GS_Q__ ---> generic specialization <@objc_metatype AnyObject.Type> of _ContiguousArrayBuffer.init<A>(count : Int, minimumCapacity : Int) -> _ContiguousArrayBuffer<A>
+_TTSg5XPMtP4main9AnyObject____TFVSs22_ContiguousArrayBufferCU__fMGS_Q__FT5countSi15minimumCapacitySi_GS_Q__ ---> generic specialization <@thin AnyObject.Type> of _ContiguousArrayBuffer.init<A>(count : Int, minimumCapacity : Int) -> _ContiguousArrayBuffer<A>
+_TTSg5XMTBi32____TFVSs22_ContiguousArrayBufferCU__fMGS_Q__FT5countSi15minimumCapacitySi_GS_Q__ ---> generic specialization <@thick Builtin.Int32.Type> of _ContiguousArrayBuffer.init<A>(count : Int, minimumCapacity : Int) -> _ContiguousArrayBuffer<A>
+_TTSg5XMoBi32____TFVSs22_ContiguousArrayBufferCU__fMGS_Q__FT5countSi15minimumCapacitySi_GS_Q__ ---> generic specialization <@objc_metatype Builtin.Int32.Type> of _ContiguousArrayBuffer.init<A>(count : Int, minimumCapacity : Int) -> _ContiguousArrayBuffer<A>
+_TTSg5XMtBi32____TFVSs22_ContiguousArrayBufferCU__fMGS_Q__FT5countSi15minimumCapacitySi_GS_Q__ ---> generic specialization <@thin Builtin.Int32.Type> of _ContiguousArrayBuffer.init<A>(count : Int, minimumCapacity : Int) -> _ContiguousArrayBuffer<A>
+_TFIZvV8mangling10HasVarInit5stateSbiu_KT_Sb ---> static HasVarInit.(state : Bool).(variable initialization expression).(implicit closure #1)
+_TFFV23interface_type_mangling18GenericTypeContext23closureInGenericContextu__rFGS0_q__Fqd__T_L_3fooFTQd__Q__T_ ---> GenericTypeContext.(closureInGenericContext : <A><B> (GenericTypeContext<A>) -> (B) -> ()).(foo #1)(A, B) -> ()
+_TFFV23interface_type_mangling18GenericTypeContextg31closureInGenericPropertyContextq_L_3fooFT_Q_ ---> GenericTypeContext.(closureInGenericPropertyContext.getter : A).(foo #1)() -> A
+_TTWurGV23interface_type_mangling18GenericTypeContextq__S_18GenericWitnessTestS_FS1_23closureInGenericContextu__Rq_S1__fq_Fqd__T_ ---> protocol witness for GenericWitnessTest.closureInGenericContext : <A><B where A: GenericWitnessTest> (B) -> () in conformance <A> GenericTypeContext<A>
+_TTWurGV23interface_type_mangling18GenericTypeContextq__S_18GenericWitnessTestS_FS1_g31closureInGenericPropertyContextqq_S1_3Tee ---> protocol witness for GenericWitnessTest.closureInGenericPropertyContext.getter : A.Tee in conformance <A> GenericTypeContext<A>
+_TTWurGV23interface_type_mangling18GenericTypeContextq__S_18GenericWitnessTestS_FS1_16twoParamsAtDepthu_0_Rq_S1__fq_FTqd__1yqd_0__T_ ---> protocol witness for GenericWitnessTest.twoParamsAtDepth : <A><B, C where A: GenericWitnessTest> (B, y : C) -> () in conformance <A> GenericTypeContext<A>

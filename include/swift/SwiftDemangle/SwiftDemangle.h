@@ -27,7 +27,7 @@
 
 /// Minor version changes when new APIs are added in ABI- and source-compatible
 /// way.
-#define SWIFT_DEMANGLE_VERSION_MINOR 1
+#define SWIFT_DEMANGLE_VERSION_MINOR 2
 
 /// @}
 
@@ -42,6 +42,16 @@ extern "C" {
 /// name (in which cases \p OutputBuffer is left untouched).
 size_t swift_demangle_getDemangledName(const char *MangledName, char *OutputBuffer,
                                        size_t Length);
+
+/// \brief Demangle Swift function names with module names and implicit self
+/// and metatype type names in function signatures stripped.
+///
+/// \returns the length of the demangled function name (even if greater than the
+/// size of the output buffer) or 0 if the input is not a Swift-mangled function
+/// name (in which cases \p OutputBuffer is left untouched).
+size_t swift_demangle_getSimplifiedDemangledName(const char *MangledName,
+                                                 char *OutputBuffer,
+                                                 size_t Length);
 
 #ifdef __cplusplus
 } // extern "C"

@@ -23,16 +23,14 @@ static bool isSwiftPrefixed(const char *MangledName) {
   return (MangledName[0] == '_' && MangledName[1] == 'T');
 }
 
-size_t swift_demangle_getDemangledName(const char *MangledName, char *OutputBuffer,
-                                       size_t Length) {
+size_t swift_demangle_getDemangledName_Options(const char *MangledName,
+    char *OutputBuffer, size_t Length,
+    swift::Demangle::DemangleOptions DemangleOptions) {
   assert(MangledName != nullptr && "null input");
   assert(OutputBuffer != nullptr || Length == 0);
 
   if (!isSwiftPrefixed(MangledName))
     return 0; // Not a mangled name
-
-  swift::Demangle::DemangleOptions DemangleOptions;
-  DemangleOptions.SynthesizeSugarOnTypes = true;
 
   std::string Result = swift::demangle_wrappers::demangleSymbolAsString(
       MangledName, DemangleOptions);
@@ -42,6 +40,25 @@ size_t swift_demangle_getDemangledName(const char *MangledName, char *OutputBuff
 
   // Copy the result to an output buffer.
   return strlcpy(OutputBuffer, Result.c_str(), Length);
+}
+
+size_t swift_demangle_getDemangledName(const char *MangledName,
+                                       char *OutputBuffer,
+                                       size_t Length) {
+  swift::Demangle::DemangleOptions DemangleOptions;
+  DemangleOptions.SynthesizeSugarOnTypes = true;
+  return swift_demangle_getDemangledName_Options(MangledName, OutputBuffer,
+                                                 Length, DemangleOptions);
+}
+
+size_t swift_demangle_getSimplifiedDemangledName(const char *MangledName,
+                                                 char *OutputBuffer,
+                                                 size_t Length) {
+  swift::Demangle::DemangleOptions DemangleOptions;
+  DemangleOptions.SynthesizeSugarOnTypes = true;
+  DemangleOptions.Simplified = true;
+  return swift_demangle_getDemangledName_Options(MangledName, OutputBuffer,
+                                                 Length, DemangleOptions);
 }
 
 size_t fnd_get_demangled_name(const char *MangledName, char *OutputBuffer,

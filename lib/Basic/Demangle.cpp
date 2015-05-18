@@ -2209,7 +2209,7 @@ private:
     }
     return nullptr;
   }
-  
+
   bool typeNeedsColonForDecl(NodePointer type) {
     if (!type)
       return false;
@@ -2548,6 +2548,8 @@ private:
        !isDebuggerGeneratedModule(context))
     {
       print(context, /*asContext*/ true);
+      if (context->getKind() == Node::Kind::Module && Options.Simplified)
+          return;
       Printer << '.';
     }
   }
@@ -2664,7 +2666,8 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
       if (typeNeedsColonForDecl(type))
         Printer << " : ";
       else
-        Printer << " ";
+        if (!Options.Simplified)
+          Printer << " ";
       print(type);
     }
 
@@ -2747,6 +2750,9 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     Printer << " in " << pointer->getChild(0)->getText() << ')';
     return;
   case Node::Kind::Module:
+    if (!Options.Simplified)
+      Printer << pointer->getText();
+    return;
   case Node::Kind::Identifier:
     Printer << pointer->getText();
     return;
@@ -2765,10 +2771,12 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     printChildren(pointer);
     return;
   case Node::Kind::UncurriedFunctionType: {
-    NodePointer metatype = pointer->getChild(0);
-    Printer << "(";
-    print(metatype);
-    Printer << ")";
+    if (!Options.Simplified) {
+      NodePointer metatype = pointer->getChild(0);
+      Printer << "(";
+      print(metatype);
+      Printer << ")";
+    }
     NodePointer real_func = pointer->getChild(1);
     real_func = real_func->getChild(0);
     printChildren(real_func);
@@ -3278,10 +3286,12 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     NodePointer child1 = pointer->getChild(1);
     NodePointer child2 = pointer->getChild(2);
     print(child0);
-    Printer << " : ";
-    print(child1);
-    Printer << " in ";
-    print(child2);
+    if (!Options.Simplified) {
+      Printer << " : ";
+      print(child1);
+      Printer << " in ";
+      print(child2);
+    }
     return;
   }
   case Node::Kind::TypeList:

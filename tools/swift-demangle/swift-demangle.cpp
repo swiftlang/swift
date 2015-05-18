@@ -44,6 +44,10 @@ static llvm::cl::opt<bool>
 DisableSugar("no-sugar",
            llvm::cl::desc("No sugar mode (disable common language idioms such as ? and [] from the output)"));
 
+static llvm::cl::opt<bool>
+Simplified("simplified",
+           llvm::cl::desc("Don't display module names or implicit self types"));
+
 static llvm::cl::list<std::string>
 InputNames(llvm::cl::Positional, llvm::cl::desc("[mangled name...]"),
                llvm::cl::ZeroOrMore);
@@ -98,6 +102,7 @@ int main(int argc, char **argv) {
 
   swift::Demangle::DemangleOptions options;
   options.SynthesizeSugarOnTypes = !DisableSugar;
+  options.Simplified = Simplified;
 
   if (InputNames.empty()) {
     CompactMode = true;
