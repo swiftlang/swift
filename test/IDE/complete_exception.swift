@@ -12,6 +12,8 @@
 // RUNdisabled: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_CATCH2 | FileCheck %s -check-prefix=CATCH2
 // RUNdisabled: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_THROW2 | FileCheck %s -check-prefix=THROW2
 
+// REQUIRES: objc_interop
+
 import Foundation // importer SDK
 
 protocol ErrorPro1 : ErrorType {}
