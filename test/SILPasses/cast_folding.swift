@@ -184,6 +184,31 @@ func cast28(existential: CP1.Type) -> Bool {
   return existential is CP2.Type
 }
 
+func cast29(o: Any) -> Bool {
+  // Succeeds if o is P.Type
+  return o is P.Type
+}
+
+func cast30(o: AnyObject) -> Bool {
+  // Succeeds if o is P.Type
+  return o is P.Type
+}
+
+func cast31(x: X) -> Bool {
+  // Fails always, because a class instance cannot be a metatype
+  return x is P.Type
+}
+
+func cast32(p: P) -> Bool {
+  // Fails always, because a metatype cannot conform to a protocol
+  return p is P.Type
+}
+
+func cast33(p: P) -> Bool {
+  // Same as above, but non-existential metatype
+  return p is X.Type
+}
+
 // CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding5test0FT_Sb : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
@@ -660,6 +685,55 @@ func test28_3() -> Bool {
     return cast28(F.self)
 }
 
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding6test29FT_Sb
+// CHECK: bb0
+// CHECK: checked_cast
+// CHECK: return
+@inline(never)
+func test29() -> Bool {
+    return cast29(X())
+}
+
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding6test30FT_Sb
+// CHECK: bb0
+// CHECK: checked_cast
+// CHECK: return
+@inline(never)
+func test30() -> Bool {
+    return cast30(X())
+}
+
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding6test31FT_Sb
+// CHECK: bb0
+// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: %1 = struct $Bool
+// CHECK-NEXT: return %1
+@inline(never)
+func test31() -> Bool {
+    return cast31(X())
+}
+
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding6test32FT_Sb
+// CHECK: bb0
+// CHECK: checked_cast
+// CHECK: return
+@inline(never)
+func test32() -> Bool {
+    // We don't actually fold this right now, but at least make sure it
+    // doesn't crash
+    return cast32(A())
+}
+
+// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding6test33FT_Sb
+// CHECK: bb0
+// CHECK: checked_cast
+// CHECK: return
+@inline(never)
+func test33() -> Bool {
+    // Ditto...
+    return cast33(A())
+}
+
 
 protocol PP {
   func foo() -> Int
@@ -807,3 +881,13 @@ print("test28_1=\(test28_1())")
 print("test28_2=\(test28_2())")
 
 print("test28_3=\(test28_3))")
+
+print("test29=\(test29())")
+
+print("test30=\(test30())")
+
+print("test31=\(test31())")
+
+print("test32=\(test32())")
+
+print("test33=\(test33())")

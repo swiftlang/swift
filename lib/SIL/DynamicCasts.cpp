@@ -249,7 +249,7 @@ swift::classifyDynamicCast(Module *M,
   }
 
   // Metatype casts.
-  while (auto sourceMetatype = dyn_cast<AnyMetatypeType>(source)) {
+  if (auto sourceMetatype = dyn_cast<AnyMetatypeType>(source)) {
     auto targetMetatype = dyn_cast<AnyMetatypeType>(target);
     if (!targetMetatype) return DynamicCastFeasibility::WillFail;
 
@@ -323,6 +323,10 @@ swift::classifyDynamicCast(Module *M,
     // If we don't know any better, assume that the cast may succeed.
     return DynamicCastFeasibility::MaySucceed;
   }
+
+  // If the source is not existential or an archetype, and the destination
+  // is a metatype, there is no way the cast can succeed.
+  if (target->is<AnyMetatypeType>()) return DynamicCastFeasibility::WillFail;
 
   // Class casts.
   auto sourceClass = source.getClassOrBoundGenericClass();
