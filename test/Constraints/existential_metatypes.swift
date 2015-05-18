@@ -39,3 +39,17 @@ at = pt
 var ap: Any.Protocol
 ap = pp // expected-error{{cannot assign}}
 ap = pt // expected-error{{cannot assign}}
+
+// rdar://problem/20780797
+protocol P2 {
+  init(x: Int)
+  var elements: [P2] {get}
+}
+
+extension P2 {
+  init() { self.init(x: 5) }
+}
+
+func testP2(pt: P2.Type) {
+  pt().elements
+}

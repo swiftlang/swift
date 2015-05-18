@@ -648,6 +648,8 @@ namespace {
       bool isDynamic = false;
       if (auto dotSyntax = dyn_cast<DotSyntaxCallExpr>(result)) {
         keyExpr = dotSyntax->getArg();
+      } else if (auto ctorRef = dyn_cast<ConstructorRefCallExpr>(result)) {
+        keyExpr = ctorRef->getArg();
       } else if (auto apply = dyn_cast<ApplyExpr>(result)) {
         keyExpr = apply->getFn();
       } else if (auto memberRef = dyn_cast<MemberRefExpr>(result)) {
