@@ -217,7 +217,7 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
       if (isa<ReturnStmt>(S))
         StmtType = ReturnStmtType;
       if (isa<BreakStmt>(S))
-        StmtType = BreakStmtType;;
+        StmtType = BreakStmtType;
       if (isa<ContinueStmt>(S))
         StmtType = ContinueStmtType;
       if (isa<ThrowStmt>(S))
