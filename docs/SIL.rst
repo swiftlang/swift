@@ -3728,11 +3728,11 @@ Checked Conversions
 
 Some user-level cast operations can fail and thus require runtime checking.
 
-The `unconditional_checked_cast_addr` and `unconditional_checked_cast`_
+The `unconditional_checked_cast_addr`_ and `unconditional_checked_cast`_
 instructions performs an unconditional checked cast; it is a runtime failure
-if the cast fails. The `checked_cast_addr_br` and `checked_cast_br`_ terminator
-instruction performs a conditional checked cast; it branches to one of two
-destinations based on whether the cast succeeds or not.
+if the cast fails. The `checked_cast_addr_br`_ and `checked_cast_br`_
+terminator instruction performs a conditional checked cast; it branches to one
+of two destinations based on whether the cast succeeds or not.
 
 unconditional_checked_cast
 ``````````````````````````
