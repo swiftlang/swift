@@ -27,6 +27,7 @@
 #include "swift/Basic/Malloc.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SetVector.h"
@@ -174,7 +175,9 @@ public:
   DiagnosticEngine &Diags;
 
   /// The set of top-level modules we have loaded.
-  llvm::DenseMap<Identifier, ModuleDecl*> LoadedModules;
+  /// This map is used for iteration, therefore it's a MapVector and not a
+  /// DenseMap.
+  llvm::MapVector<Identifier, ModuleDecl*> LoadedModules;
 
   /// The builtin module.
   ModuleDecl * const TheBuiltinModule;
