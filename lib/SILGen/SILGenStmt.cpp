@@ -806,7 +806,7 @@ void StmtEmitter::visitContinueStmt(ContinueStmt *S) {
       return;
     }
   }
-  llvm_unreachable("Break has available target block.");
+  llvm_unreachable("Continue has available target block.");
 }
 
 void StmtEmitter::visitSwitchStmt(SwitchStmt *S) {
