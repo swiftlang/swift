@@ -742,8 +742,8 @@ Parser::parseTypeImplicitlyUnwrappedOptional(TypeRepr *base) {
 // Speculative type list parsing
 //===--------------------------------------------------------------------===//
 
-static bool isGenericTypeDisambiguatingToken(Parser &P,
-                                             Token &tok) {
+static bool isGenericTypeDisambiguatingToken(Parser &P) {
+  auto &tok = P.Tok;
   switch (tok.getKind()) {
   default:
     return false;
@@ -768,8 +768,13 @@ static bool isGenericTypeDisambiguatingToken(Parser &P,
       
   case tok::period_prefix:
     // These will be turned into following tokens if they appear unspaced after
-    // a generic angle bracket.
-    return tok.getText().data()[-1] == '>';
+    // a generic angle bracket, or are followed by an identifier in a builder
+    // pattern situation, e.g.:
+    //
+    //   Foo<T>
+    //     .bar
+    return tok.getText().data()[-1] == '>'
+      || P.periodPrefixIsFollowedByBuilderPatternLikeExpr();
       
   case tok::l_paren:
   case tok::l_square:
@@ -785,7 +790,7 @@ bool Parser::canParseAsGenericArgumentList() {
   BacktrackingScope backtrack(*this);
 
   if (canParseGenericArguments())
-    return isGenericTypeDisambiguatingToken(*this, Tok);
+    return isGenericTypeDisambiguatingToken(*this);
 
   return false;
 }

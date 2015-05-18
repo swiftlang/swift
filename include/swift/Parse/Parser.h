@@ -1140,6 +1140,11 @@ public:
 
   UnresolvedDeclRefExpr *parseExprOperator();
 
+  /// Look ahead to see if we have '.foo(', '.foo[', '.foo{', or '.foo.',
+  /// or if '.foo' appears on a line by itself, which is an indication of a
+  /// builder-pattern-like method chain.
+  bool periodPrefixIsFollowedByBuilderPatternLikeExpr();
+  
   //===--------------------------------------------------------------------===//
   // Statement Parsing
 

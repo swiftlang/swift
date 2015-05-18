@@ -100,10 +100,24 @@ func infloopbooltest() {
 
 // test "builder" API style
 extension Int {
-  static func builder() { }
+  static func builder() -> Int { }
+  var builderProp: Int { return 0 }
+  func builder2() {}
 }
 Int
   .builder()
+  .builderProp
+  .builder2()
+
+struct SomeGeneric<T> {
+  static func builder() -> SomeGeneric<T> { }
+  var builderProp: SomeGeneric<T> { return .builder() }
+  func builder2() {}
+}
+SomeGeneric<Int>
+  .builder()
+  .builderProp
+  .builder2()
 
 func for_loop() {
   var x = 0
