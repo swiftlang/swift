@@ -1,9 +1,5 @@
 // RUN: %target-run-simple-swift | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
 
-// rdar://20920874 is tracking the fix for compiling this test optimized.
-// XFAIL: swift_test_mode_optimize
-// XFAIL: swift_test_mode_optimize_unchecked
-
 // Note: JIT mode is checked in Interpreter/protocol_lookup_jit.swift.
 
 protocol Fooable {
