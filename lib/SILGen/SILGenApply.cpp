@@ -497,10 +497,11 @@ public:
   }
 
   std::tuple<ManagedValue, CanSILFunctionType,
-             Optional<ForeignErrorConvention>, bool>
+             Optional<ForeignErrorConvention>, ApplyOptions>
   getAtUncurryLevel(SILGenFunction &gen, unsigned level) const {
     ManagedValue mv;
-    bool transparent = IsTransparent;
+    ApplyOptions options = ApplyOptions::None;
+    if (IsTransparent) options |= ApplyOptions::Transparent;
     SILConstantInfo constantInfo;
     Optional<SILDeclRef> constant = None;
 
@@ -515,7 +516,7 @@ public:
       assert(level <= StandaloneFunction.uncurryLevel
              && "uncurrying past natural uncurry level of standalone function");
       if (level < StandaloneFunction.uncurryLevel)
-        transparent = false;
+        options -= ApplyOptions::Transparent;
       constant = StandaloneFunction.atUncurryLevel(level);
 
       // If we're currying a direct reference to a class-dispatched method,
@@ -540,7 +541,7 @@ public:
       if (level < Method.MethodName.uncurryLevel) {
         SILValue ref = gen.emitGlobalFunctionRef(Loc, *constant, constantInfo);
         mv = ManagedValue::forUnmanaged(ref);
-        transparent = false;
+        options -= ApplyOptions::Transparent;
         break;
       }
 
@@ -583,7 +584,7 @@ public:
       if (level < Method.MethodName.uncurryLevel) {
         SILValue ref = gen.emitGlobalFunctionRef(Loc, *constant, constantInfo);
         mv = ManagedValue::forUnmanaged(ref);
-        transparent = false;
+        options -= ApplyOptions::Transparent;
         break;
       }
 
@@ -641,7 +642,7 @@ public:
                        ->getForeignErrorConvention();
     }
 
-    return std::make_tuple(mv, substFnType, foreignError, transparent);
+    return std::make_tuple(mv, substFnType, foreignError, options);
   }
 
   ArrayRef<Substitution> getSubstitutions() const {
@@ -1704,7 +1705,7 @@ static SILValue emitRawApply(SILGenFunction &gen,
                              ArrayRef<Substitution> subs,
                              ArrayRef<ManagedValue> args,
                              CanSILFunctionType substFnType,
-                             bool transparent,
+                             ApplyOptions options,
                              SILValue resultAddr) {
   // Get the callee value.
   SILValue fnValue = substFnType->isCalleeConsumed()
@@ -1832,7 +1833,7 @@ ManagedValue SILGenFunction::emitApply(
                             CanSILFunctionType substFnType,
                             AbstractionPattern origResultType,
                             CanType substResultType,
-                            bool transparent,
+                            ApplyOptions options,
                             Optional<SILFunctionTypeRepresentation> overrideRep,
                       const Optional<ForeignErrorConvention> &foreignError,
                             SGFContext evalContext) {
@@ -1935,7 +1936,7 @@ ManagedValue SILGenFunction::emitApply(
 
   // Emit the raw application.
   SILValue scalarResult = emitRawApply(*this, loc, fn, subs, args,
-                                       substFnType, transparent, resultAddr);
+                                       substFnType, options, resultAddr);
 
   // If we emitted into the eval context, then it's because there was
   // no abstraction difference *or* bridging to do.  But our caller
@@ -2047,14 +2048,14 @@ ManagedValue SILGenFunction::emitMonomorphicApply(SILLocation loc,
                                                   ManagedValue fn,
                                                   ArrayRef<ManagedValue> args,
                                                   CanType resultType,
-                                                  bool transparent,
+                                                  ApplyOptions options,
                            Optional<SILFunctionTypeRepresentation> overrideRep,
                      const Optional<ForeignErrorConvention> &foreignError){
   auto fnType = fn.getType().castTo<SILFunctionType>();
   assert(!fnType->isPolymorphic());
   return emitApply(loc, fn, {}, args, fnType,
                    AbstractionPattern(resultType), resultType,
-                   transparent, overrideRep, foreignError, SGFContext());
+                   options, overrideRep, foreignError, SGFContext());
 }
 
 /// Count the number of SILParameterInfos that are needed in order to
@@ -3079,7 +3080,7 @@ namespace {
       CanSILFunctionType substFnType;
       ManagedValue mv;
       Optional<ForeignErrorConvention> foreignError;
-      bool transparent;
+      ApplyOptions initialOptions = ApplyOptions::None;
 
       AbstractionPattern origFormalType(callee.getOrigFormalType());
       CanAnyFunctionType formalType = callee.getSubstFormalType();
@@ -3090,9 +3091,8 @@ namespace {
         origFormalType = AbstractionPattern(formalType);
         substFnType = gen.getLoweredType(formalType, uncurryLevel)
           .castTo<SILFunctionType>();
-        transparent = false; // irrelevant
       } else {
-        std::tie(mv, substFnType, foreignError, transparent) =
+        std::tie(mv, substFnType, foreignError, initialOptions) =
           callee.getAtUncurryLevel(gen, uncurryLevel);
       }
 
@@ -3194,7 +3194,7 @@ namespace {
                                  substFnType,
                                  origFormalType,
                                  uncurriedSites.back().getSubstResultType(),
-                                 transparent, None,
+                                 initialOptions, None,
                                  foreignError,
                                  uncurriedContext);
         } else if (specializedEmitter->isLateEmitter()) {
@@ -3252,11 +3252,12 @@ namespace {
 
         SGFContext context = i == size - 1 ? C : SGFContext();
         SILLocation loc = extraSites[i].Loc;
+        ApplyOptions options = ApplyOptions::None;
         result = gen.emitApply(loc, result, {}, siteArgs,
                                substFnType,
                                origFormalType,
                                extraSites[i].getSubstResultType(),
-                               false, None, foreignError, context);
+                               options, None, foreignError, context);
       }
 
       return result;
@@ -3341,8 +3342,8 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
   ManagedValue mv;
   CanSILFunctionType substFnType;
   Optional<ForeignErrorConvention> foreignError;
-  bool transparent;
-  std::tie(mv, substFnType, foreignError, transparent)
+  ApplyOptions options;
+  std::tie(mv, substFnType, foreignError, options)
     = callee.getAtUncurryLevel(*this, 0);
 
   assert(!foreignError);
@@ -3352,7 +3353,7 @@ SILGenFunction::emitApplyOfLibraryIntrinsic(SILLocation loc,
   return emitApply(loc, mv, subs, args, substFnType,
                    AbstractionPattern(origFormalType.getResult()),
                    substFormalType.getResult(),
-                   transparent, None, None, ctx);
+                   options, None, None, ctx);
 }
 
 /// Allocate an uninitialized array of a given size, returning the array

@@ -1884,10 +1884,12 @@ SILGenFunction::emitApplyOfDefaultArgGenerator(SILLocation loc,
   auto fnType = fnRef.getType().castTo<SILFunctionType>();
   auto substFnType = fnType->substGenericArgs(SGM.M, SGM.M.getSwiftModule(),
                                          defaultArgsOwner.getSubstitutions());
+  ApplyOptions options = ApplyOptions::None;
+  if (generator.isTransparent()) options |= ApplyOptions::Transparent;
   return emitApply(loc, fnRef, defaultArgsOwner.getSubstitutions(),
                    {}, substFnType,
                    origResultType, resultType,
-                   generator.isTransparent(), None, None, C);
+                   options, None, None, C);
 }
 
 static void emitTupleShuffleExprInto(RValueEmitter &emitter,

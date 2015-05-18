@@ -201,7 +201,8 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &gen,
          && "block thunking func with indirect result not supported");
   ManagedValue result = gen.emitMonomorphicApply(loc, fn, args,
                          funcTy->getSILResult().getSwiftRValueType(),
-                                                 false, None, None);
+                                                 ApplyOptions::None,
+                                                 None, None);
 
   // Bridge the result back to ObjC.
   result = gen.emitNativeToBridgedValue(loc, result,
@@ -422,7 +423,7 @@ static void buildBlockToFuncThunkBody(SILGenFunction &gen,
          && "block thunking func with indirect result not supported");
   ManagedValue result = gen.emitMonomorphicApply(loc, block, args,
                          funcTy->getSILResult().getSwiftRValueType(),
-                         /*transparent*/ false,
+                         ApplyOptions::None,
                          /*override CC*/ SILFunctionTypeRepresentation::Block,
                          /*foreign error*/ None);
 
@@ -1021,7 +1022,7 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
     result = emitMonomorphicApply(fd, ManagedValue::forUnmanaged(fn),
                                   args,
                                   nativeFormalResultTy,
-                                  false, None, foreignError)
+                                  ApplyOptions::None, None, foreignError)
       .forward(*this);
   }
   B.createReturn(ImplicitReturnLocation::getImplicitReturnLoc(fd), result);

@@ -156,6 +156,29 @@ public:
   }
 };
 
+enum class ApplyOptions : unsigned {
+  /// No special treatment is required.
+  None = 0,
+
+  /// This call is transparent.
+  Transparent = 0x1,
+};
+inline ApplyOptions operator|(ApplyOptions lhs, ApplyOptions rhs) {
+  return ApplyOptions(unsigned(lhs) | unsigned(rhs));
+}
+inline ApplyOptions &operator|=(ApplyOptions &lhs, ApplyOptions rhs) {
+  return (lhs = (lhs | rhs));
+}
+inline bool operator&(ApplyOptions lhs, ApplyOptions rhs) {
+  return ((unsigned(lhs) & unsigned(rhs)) != 0);
+}
+inline ApplyOptions operator-(ApplyOptions lhs, ApplyOptions rhs) {
+  return ApplyOptions(unsigned(lhs) & ~unsigned(rhs));
+}
+inline ApplyOptions &operator-=(ApplyOptions &lhs, ApplyOptions rhs) {
+  return (lhs = (lhs - rhs));
+}
+
 class PatternMatchContext;
 struct LValueWriteback;
 
@@ -1064,7 +1087,7 @@ public:
                          CanSILFunctionType substFnType,
                          AbstractionPattern origResultType,
                          CanType substResultType,
-                         bool transparent,
+                         ApplyOptions options,
                          Optional<SILFunctionTypeRepresentation> overrideRep,
                          const Optional<ForeignErrorConvention> &foreignError,
                          SGFContext evalContext);
@@ -1082,7 +1105,7 @@ public:
                                     ManagedValue fn,
                                     ArrayRef<ManagedValue> args,
                                     CanType resultType,
-                                    bool transparent,
+                                    ApplyOptions options,
                     Optional<SILFunctionTypeRepresentation> overrideRep,
                     const Optional<ForeignErrorConvention> &foreignError);
 
