@@ -1500,7 +1500,7 @@ public:
     return ClonedStartBB;
   }
 
-  llvm::DenseMap<SILBasicBlock *, SILBasicBlock *> &getBBMap() { return BBMap; }
+  llvm::MapVector<SILBasicBlock *, SILBasicBlock *> &getBBMap() { return BBMap; }
 
 protected:
   /// Clone the dominator tree from the original region to the cloned region.
@@ -1691,7 +1691,7 @@ createFastNativeArraysCheck(SmallVectorImpl<ArraySemanticsCall> &ArrayProps,
 /// Collect all array.props calls in the cloned basic blocks stored in the map,
 /// asserting that we found at least one.
 static void collectArrayPropsCalls(
-    llvm::DenseMap<SILBasicBlock *, SILBasicBlock *> &OrigToClonedBBMap,
+    llvm::MapVector<SILBasicBlock *, SILBasicBlock *> &OrigToClonedBBMap,
     SmallVectorImpl<SILBasicBlock *> &ExitBlocks,
     SmallVectorImpl<ArraySemanticsCall> &Calls) {
   for (auto &P : OrigToClonedBBMap) {

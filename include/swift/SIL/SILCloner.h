@@ -244,7 +244,11 @@ protected:
   SILBasicBlock *InsertBeforeBB;
   llvm::DenseMap<SILValue, SILValue> ValueMap;
   llvm::DenseMap<SILInstruction*, SILInstruction*> InstructionMap;
-  llvm::DenseMap<SILBasicBlock*, SILBasicBlock*> BBMap;
+
+  // Use MapVector to ensure that the order of block predecessors is
+  // deterministic.
+  llvm::MapVector<SILBasicBlock*, SILBasicBlock*> BBMap;
+
   TypeSubstitutionMap OpenedExistentialSubs;
   /// Set of basic blocks where unreachable was inserted.
   SmallPtrSet<SILBasicBlock *, 32> BlocksWithUnreachables;
