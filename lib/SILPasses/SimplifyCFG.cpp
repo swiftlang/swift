@@ -539,6 +539,10 @@ static bool tryDominatorBasedSimplifications(
 
       auto *DestBB = CondUserInst->getParent();
 
+      // The user must be the terminator we are trying to jump thread.
+      if (CondUserInst != DestBB->getTerminator())
+        continue;
+
       // Check whether we have seen this destination block already.
       auto CacheEntryIt = CachedThreadable.find(DestBB);
       bool IsThreadable = CacheEntryIt != CachedThreadable.end()
