@@ -437,22 +437,26 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
   SmallVector<ProtocolDecl*, 4> allProtos;
   destType.getSwiftRValueType().getAnyExistentialTypeProtocols(allProtos);
 
-  // Get references to the ObjC Protocol* values for the objc protocols.
+  // Look up witness tables for the protocols that need them and get
+  // references to the ObjC Protocol* values for the objc protocols.
   SmallVector<llvm::Value*, 4> objcProtos;
-  bool requiresWitnessTableLookup = false;
-  bool requiresClassCheck = false;
-  
+  SmallVector<llvm::Value*, 4> witnessTableProtos;
+
   for (auto proto : allProtos) {
-    if (Lowering::TypeConverter::protocolRequiresWitnessTable(proto))
-      requiresWitnessTableLookup = true;
+    if (Lowering::TypeConverter::protocolRequiresWitnessTable(proto)) {
+      auto descriptor = emitProtocolDescriptorRef(IGF, proto);
+      witnessTableProtos.push_back(descriptor);
+    }
+
     if (!proto->isObjC())
       continue;
+
     if (proto->getKnownProtocolKind()
         && *proto->getKnownProtocolKind() == KnownProtocolKind::AnyObject) {
       // Casting an object to AnyObject trivially succeeds.
       continue;
     }
-    
+
     objcProtos.push_back(emitReferenceToObjCProtocol(IGF, proto));
   }
   
@@ -473,11 +477,13 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
     resultType = schema[0].getScalarType();
   }
   
+  llvm::Value *resultValue = value;
+
   // If we don't have any protocols we really need to check, then trivially
   // succeed.
-  if (objcProtos.empty() && !requiresWitnessTableLookup && !requiresClassCheck){
-    value = IGF.Builder.CreateBitCast(value, resultType);
-    ex.add(value);
+  if (objcProtos.empty() && witnessTableProtos.empty()) {
+    resultValue = IGF.Builder.CreateBitCast(value, resultType);
+    ex.add(resultValue);
     return;
   }
   
@@ -546,20 +552,15 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
     objcCast = IGF.Builder.CreateCall3(castFn, objcCastObject,
                                        IGF.IGM.getSize(Size(objcProtos.size())),
                                        protoRefsBuf.getAddress());
+    resultValue = IGF.Builder.CreateBitCast(objcCast, resultType);
   }
 
-  // Add the value to the explosion.
-  llvm::Value *resultValue;
-  if (objcCast)
-    resultValue = IGF.Builder.CreateBitCast(objcCast, resultType);
-  else
-    resultValue = value;
-  ex.add(resultValue);
-  
   // If we don't need to look up any witness tables, we're done.
-  if (!requiresWitnessTableLookup)
+  if (witnessTableProtos.empty()) {
+    ex.add(resultValue);
     return;
-  
+  }
+
   // If we're doing a conditional cast, and the ObjC protocol checks failed,
   // then the cast is done.
   llvm::BasicBlock *origBB = nullptr, *successBB = nullptr, *contBB = nullptr;
@@ -598,32 +599,24 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
     // Get the type metadata for the instance.
     metadataValue = emitDynamicTypeOfHeapObject(IGF, value, srcType);
   }
-  
+
+  ex.add(resultValue);
+
   // Look up witness tables for the protocols that need them.
-  SmallVector<llvm::Value*, 4> witnessTableProtos;
-  for (auto proto : allProtos) {
-    if (!Lowering::TypeConverter::protocolRequiresWitnessTable(proto))
-      continue;
-    auto descriptor = emitProtocolDescriptorRef(IGF, proto);
-    witnessTableProtos.push_back(descriptor);
-  }
-  
-  if (!witnessTableProtos.empty()) {
-    auto fn = emitExistentialScalarCastFn(IGF.IGM, witnessTableProtos.size(),
-                                          mode);
-    llvm::SmallVector<llvm::Value *, 4> args;
-    args.push_back(metadataValue);
-    for (auto proto : witnessTableProtos)
-      args.push_back(proto);
-    auto wts = IGF.Builder.CreateCall(fn, args);
-    if (witnessTableProtos.size() == 1)
-      ex.add(wts);
-    else
-      for (unsigned i = 0, e = witnessTableProtos.size(); i < e; ++i) {
-        auto wt = IGF.Builder.CreateExtractValue(wts, i);
-        ex.add(wt);
-      }
-  }
+  auto fn = emitExistentialScalarCastFn(IGF.IGM, witnessTableProtos.size(),
+                                        mode);
+  llvm::SmallVector<llvm::Value *, 4> args;
+  args.push_back(metadataValue);
+  for (auto proto : witnessTableProtos)
+    args.push_back(proto);
+  auto wts = IGF.Builder.CreateCall(fn, args);
+  if (witnessTableProtos.size() == 1)
+    ex.add(wts);
+  else
+    for (unsigned i = 0, e = witnessTableProtos.size(); i < e; ++i) {
+      auto wt = IGF.Builder.CreateExtractValue(wts, i);
+      ex.add(wt);
+    }
   
   // If we had conditional ObjC checks, join the failure paths.
   if (contBB) {
