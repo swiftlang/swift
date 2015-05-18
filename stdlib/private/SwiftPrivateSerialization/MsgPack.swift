@@ -266,7 +266,7 @@ internal func _safeUInt32ToInt(x: UInt32) -> Int? {
 #endif
 }
 
-enum MsgPackError: ErrorType {
+enum MsgPackError : ErrorType {
   case DecodeFailed
 }
 
