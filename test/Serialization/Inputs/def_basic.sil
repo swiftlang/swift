@@ -977,6 +977,23 @@ entry:
 sil [fragile] @block_invoke : $@convention(c) (@inout @block_storage Int) -> ()
 
 
+// Test try_apply and throws
+// rdar://20925014
+// CHECK-LABEL: sil public_external [fragile] @test_try_apply : $@convention(thin) (@convention(thin) () -> @error ErrorType) -> @error ErrorType {
+sil [fragile]  @test_try_apply : $@convention(thin) (@convention(thin) () -> @error ErrorType) -> @error ErrorType {
+bb0(%0 : $@convention(thin) () -> @error ErrorType):
+  // CHECK: try_apply %0() : $@convention(thin) () -> @error ErrorType, normal bb1, error bb2
+  try_apply %0() : $@convention(thin) () -> @error ErrorType, normal bb1, error bb2
+
+bb1(%1 : $()):
+  %2 = tuple ()
+  return %2 : $()
+
+bb2(%3 : $ErrorType):
+  throw %3 : $ErrorType
+}
+
+
 // rdar://15351123
 // CHECK-LABEL: @test_forward_ref
 sil [fragile]  @test_forward_ref : $@convention(thin) (UInt8, UInt8) -> UInt8
@@ -1278,6 +1295,7 @@ bb0:
   %125 = function_ref @metatype_to_object : $@convention(thin) (@objc_metatype SomeClass.Type, @objc_metatype SomeClassProtocol.Type) -> @owned (AnyObject, AnyObject)
   %127 = function_ref @bitcasts : $@convention(thin) (@owned Class1) -> @owned (Class2, Int)
   %126 = function_ref @protocol_conversion : $@convention(thin) () -> @owned Protocol
+  %133 = function_ref @test_try_apply : $@convention(thin) (@convention(thin) () -> @error ErrorType) -> @error ErrorType
   %120 = function_ref @test_forward_ref : $@convention(thin) (UInt8, UInt8) -> UInt8
   %121 = function_ref @partial_apply : $@convention(thin) (@convention(thin) (@out Int, Int) -> (), Int) -> Int
   %122 = function_ref @partial_apply_with_closure : $@convention(thin) (@owned @callee_owned () -> Bool, @owned String, UnsafePointer<Int8>, Int64) -> ()

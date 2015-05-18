@@ -634,7 +634,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     Args.push_back(BasicBlockMap[AI->getNormalBB()]);
     Args.push_back(BasicBlockMap[AI->getErrorBB()]);
     SILInstApplyLayout::emitRecord(Out, ScratchRecord,
-        SILAbbrCodes[SILInstApplyLayout::Code], 0/*Apply*/,
+        SILAbbrCodes[SILInstApplyLayout::Code], 3/*TryApply*/,
         AI->getSubstitutions().size(),
         S.addTypeRef(AI->getCallee().getType().getSwiftRValueType()),
         S.addTypeRef(AI->getSubstCalleeType()),
