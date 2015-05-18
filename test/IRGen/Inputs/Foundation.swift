@@ -3,11 +3,6 @@
 
 @exported import ObjectiveC
 
-extension NSObject: Hashable {
-  public var hashValue: Int { return 0 }
-}
-public func ==(x: NSObject, y: NSObject) -> Bool { return x === y }
-
 // String/NSString bridging functions.
 @asmname("swift_StringToNSString") internal
 func _convertStringToNSString(string: String) -> NSString

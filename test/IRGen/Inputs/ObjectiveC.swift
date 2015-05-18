@@ -46,3 +46,8 @@ public func _convertObjCBoolToBool(x: ObjCBool) -> Bool {
   return x.boolValue
 }
 
+extension NSObject : Hashable {
+  public var hashValue: Int { return 0 }
+}
+public func ==(x: NSObject, y: NSObject) -> Bool { return x === y }
+
