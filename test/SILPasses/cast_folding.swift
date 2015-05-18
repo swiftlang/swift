@@ -3,40 +3,8 @@
 // - Correctness
 // - That certain "is" checks are eliminated based on static analysis at compile-time
 //
-// In ideal world, all those testNN functions should be simplified down to a single basic block 
-// which returns either true or false, i.e. all type checks should folded statitcally.
-
-// REQUIRES: objc_interop
-
-import Foundation
-
-class ObjCX : NSObject {
-
-}
-
-struct CX: _ObjectiveCBridgeable {
-   static func _isBridgedToObjectiveC() -> Bool {
-	return true
-   }   
-   
-   static func _getObjectiveCType() -> Any.Type {
-      return String.self
-   }
-   
-   func _bridgeToObjectiveC() -> ObjCX {
-	return ObjCX()   
-   }
-   
-   static func _forceBridgeFromObjectiveC(source: ObjCX, inout result: CX?) {
-   
-   }
-   
-   static func _conditionallyBridgeFromObjectiveC(source: ObjCX, inout result: CX?) -> Bool {
-	return false
-   }
-
-}
-
+// In ideal world, all those testNN functions should be simplified down to a single basic block
+// which returns either true or false, i.e. all type checks should folded statically.
 
 protocol P {}
 
@@ -212,20 +180,15 @@ func cast27(existential: CP1.Type) -> Bool {
 }
 
 func cast28(existential: CP1.Type) -> Bool {
-  // Succeds if existential conforms to CP1 and CP2
+  // Succeeds if existential conforms to CP1 and CP2
   return existential is CP2.Type
-}
-
-// Check casts to types which are _ObjectiveCBridgeable
-func cast29(o: AnyObject) -> Bool {
-  return o is CX
 }
 
 // CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding5test0FT_Sb : $@convention(thin) () -> Bool
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test0() -> Bool {
   return cast0(A())
@@ -236,7 +199,7 @@ func test0() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test1() -> Bool {
   return cast1(A())
@@ -246,7 +209,7 @@ func test1() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test2() -> Bool {
   return cast2(A())
@@ -256,7 +219,7 @@ func test2() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test3() -> Bool {
   return cast3(A())
@@ -266,7 +229,7 @@ func test3() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test4() -> Bool {
   return cast4(A())
@@ -276,7 +239,7 @@ func test4() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test5_1() -> Bool {
     return cast5(B.self)
@@ -286,7 +249,7 @@ func test5_1() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test5_2() -> Bool {
     return cast5(AnyObject.self)
@@ -297,7 +260,7 @@ func test5_2() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test6_1() -> Bool {
     return cast6(B.self)
@@ -308,7 +271,7 @@ func test6_1() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test6_2() -> Bool {
     return cast6(AnyObject.self)
@@ -318,7 +281,7 @@ func test6_2() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test7_1() -> Bool {
     return cast7(B.self)
@@ -328,7 +291,7 @@ func test7_1() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test7_2() -> Bool {
     return cast7(AnyObject.self)
@@ -339,7 +302,7 @@ func test7_2() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test8() -> Bool {
   return cast8(A())
@@ -349,7 +312,7 @@ func test8() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test9() -> Bool {
   return cast9(A())
@@ -359,7 +322,7 @@ func test9() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test10() -> Bool {
   return cast10(A())
@@ -369,7 +332,7 @@ func test10() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test11() -> Bool {
   return cast11(A())
@@ -379,7 +342,7 @@ func test11() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test12_1() -> Bool {
     return cast12(A.self)
@@ -390,7 +353,7 @@ func test12_1() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test12_2() -> Bool {
     return cast12(P.self)
@@ -400,7 +363,7 @@ func test12_2() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test13_1() -> Bool {
     return cast13(A.self)
@@ -410,7 +373,7 @@ func test13_1() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test13_2() -> Bool {
     return cast13(P.self)
@@ -420,7 +383,7 @@ func test13_2() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test13_3() -> Bool {
     return cast13(A() as P)
@@ -431,7 +394,7 @@ func test13_3() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test14_1() -> Bool {
     return cast14(A.self)
@@ -441,7 +404,7 @@ func test14_1() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test14_2() -> Bool {
     return cast14(P.self)
@@ -451,7 +414,7 @@ func test14_2() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test15_1() -> Bool {
     return cast15(A())
@@ -461,7 +424,7 @@ func test15_1() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test15_2() -> Bool {
     return cast15(A() as P)
@@ -471,7 +434,7 @@ func test15_2() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test16_1() -> Bool {
     return cast16(A())
@@ -481,7 +444,7 @@ func test16_1() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test16_2() -> Bool {
     return cast16(A() as P)
@@ -492,7 +455,7 @@ func test16_2() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test17_1() -> Bool {
     return cast17(A())
@@ -502,7 +465,7 @@ func test17_1() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test17_2() -> Bool {
     return cast17(A() as AnyObject)
@@ -512,7 +475,7 @@ func test17_2() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test18_1() -> Bool {
     return cast18(A())
@@ -522,7 +485,7 @@ func test18_1() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test18_2() -> Bool {
     return cast18(A() as AnyObject)
@@ -533,7 +496,7 @@ func test18_2() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test19() -> Bool {
     let t: Any.Type = (1 as Any).dynamicType
@@ -550,7 +513,7 @@ func test20_1() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test20_2() -> Bool {
     return cast20(U())
@@ -561,7 +524,7 @@ func test20_2() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test21_1() -> Bool {
     return cast21(S.self)
@@ -571,7 +534,7 @@ func test21_1() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test21_2() -> Bool {
     return cast21(A() as P)
@@ -581,7 +544,7 @@ func test21_2() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test22_1() -> Bool {
     return cast22(T.self)
@@ -591,7 +554,7 @@ func test22_1() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test22_2() -> Bool {
     return cast22(S.self)
@@ -601,7 +564,7 @@ func test22_2() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test23() -> Bool {
     return cast23(P.self)
@@ -611,7 +574,7 @@ func test23() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test24_1() -> Bool {
     return cast24(T.self)
@@ -621,7 +584,7 @@ func test24_1() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test24_2() -> Bool {
     return cast24(S.self)
@@ -631,7 +594,7 @@ func test24_2() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test24_3() -> Bool {
     return cast24(Q.self)
@@ -642,7 +605,7 @@ func test24_3() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test25() -> Bool {
     return cast25(P.self)
@@ -652,7 +615,7 @@ func test25() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test26() -> Bool {
     return cast26(T.self)
@@ -663,7 +626,7 @@ func test26() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test27() -> Bool {
     return cast27(D.self)
@@ -681,7 +644,7 @@ func test28_1() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, -1
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test28_2() -> Bool {
     return cast28(E.self)
@@ -691,22 +654,10 @@ func test28_2() -> Bool {
 // CHECK: bb0
 // CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1 
+// CHECK-NEXT: return %1
 @inline(never)
 func test28_3() -> Bool {
     return cast28(F.self)
-}
-
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding6test29FT_Sb
-// CHECK: bb0
-// Check that cast is not elmiminated even though cast29 is a conversion
-// from a class to struct, because it casts to a struct implementing
-// the _BridgedToObjectiveC protocol
-// CHECK: checked_cast
-// CHECK: return 
-@inline(never)
-func test29() -> Bool {
-  return cast29(NSNumber(integer:1))
 }
 
 
@@ -760,79 +711,6 @@ func callFooGeneric<T : PP>(c: T) -> Int {
 public func callForGenericCC(c: CC) {
   callFoo(c)
 }
-
-// Check that compiler understands that this cast always succeeds.
-// Since it is can be statically proven that NSString is bridgeable to String,
-// _forceBridgeFromObjectiveC from String should be invoked instead of
-// a more general, but less effective swift_bridgeNonVerbatimFromObjectiveC, which
-// also performs conformance checks at runtime.
-// CHECK-LABEL: sil [noinline] @_TF12cast_folding30testBridgedCastFromObjCtoSwiftFCSo8NSStringSS
-// CHECK-NOT: cast
-// CHECK: witness_method $String, #_ObjectiveCBridgeable._forceBridgeFromObjectiveC!1
-// CHECK: metatype $@thick String.Type
-// CHECK: apply
-// CHECK: return
-@inline(never)
-public func testBridgedCastFromObjCtoSwift(ns: NSString) -> String {
-  return ns as String
-} 
-
-// Check that compiler understands that this cast always succeeds
-// CHECK-LABEL: sil [noinline] @_TF12cast_folding30testBridgedCastFromSwiftToObjCFSSCSo8NSString
-// CHECK-NOT: cast
-// CHECK: function_ref @_TFE10FoundationSS19_bridgeToObjectiveCfSSFT_CSo8NSString
-// CHECK: apply
-// CHECK: return
-@inline(never)
-public func testBridgedCastFromSwiftToObjC(s: String) -> NSString {
-  return s as NSString
-} 
-
-// Check that this cast does not get eliminated, because 
-// the compiler does not statically know if this object
-// is NSNumber can can be converted into Int.
-// CHECK-LABEL: sil [noinline] @_TF12cast_folding35testMayBeBridgedCastFromObjCtoSwiftFPSs9AnyObject_Si
-// CHECK: unconditional_checked_cast_addr
-// CHECK: return
-@inline(never)
-public func testMayBeBridgedCastFromObjCtoSwift(o: AnyObject) -> Int {
-  return o as! Int
-} 
-
-// Check that this cast does not get eliminated, because
-// the compiler does not statically know if this object
-// is NSNumber can can be converted into Int.
-// CHECK-LABEL: sil [noinline] @_TF12cast_folding41testConditionalBridgedCastFromObjCtoSwiftFPSs9AnyObject_GSqSS_
-// CHECK: unconditional_checked_cast_addr
-// CHECK: return
-@inline(never)
-public func testConditionalBridgedCastFromObjCtoSwift(o: AnyObject) -> String? {
-  return o as? String
-} 
-
-public func castObjCToSwift<T>(t: T) -> Int {
-  return t as! Int
-}
-
-// Check that compiler understands that this cast always fails
-// CHECK-LABEL: sil [noinline] @_TF12cast_folding37testFailingBridgedCastFromObjCtoSwiftFCSo8NSStringSi
-// CHECK: builtin "int_trap"
-// CHECK-NEXT: unreachable
-// CHECK-NEXT: }
-@inline(never)
-public func testFailingBridgedCastFromObjCtoSwift(ns: NSString) -> Int {
-  return castObjCToSwift(ns)
-} 
-
-// Check that compiler understands that this cast always fails
-// CHECK-LABEL: sil [noinline] @_TF12cast_folding37testFailingBridgedCastFromSwiftToObjCFSSSi
-// CHECK: builtin "int_trap"
-// CHECK-NEXT: unreachable
-// CHECK-NEXT: }
-@inline(never)
-public func testFailingBridgedCastFromSwiftToObjC(s: String) -> NSInteger {
-  return s as! NSInteger
-} 
 
 print("test0=\(test0())")
 
@@ -929,5 +807,3 @@ print("test28_1=\(test28_1())")
 print("test28_2=\(test28_2())")
 
 print("test28_3=\(test28_3))")
-
-print("test29=\(test29())")
