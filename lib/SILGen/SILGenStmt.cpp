@@ -181,9 +181,12 @@ Condition SILGenFunction::emitCondition(SILValue V, SILLocation Loc,
 void StmtEmitter::visitBraceStmt(BraceStmt *S) {
   // Enter a new scope.
   LexicalScope BraceScope(SGF.Cleanups, SGF, CleanupLocation(S));
+  // Keep in sync with DiagnosticsSIL.def.
   const unsigned ReturnStmtType   = 0;
-  const unsigned ContinueStmtType = 1;
-  const unsigned UnknownStmtType  = 2;
+  const unsigned BreakStmtType    = 1;
+  const unsigned ContinueStmtType = 2;
+  const unsigned ThrowStmtType    = 3;
+  const unsigned UnknownStmtType  = 4;
   unsigned StmtType = UnknownStmtType;
   
   for (auto &ESD : S->getElements()) {
@@ -211,11 +214,14 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
     // Process children.
     if (Stmt *S = ESD.dyn_cast<Stmt*>()) {
       visit(S);
-      if (isa<ContinueStmt>(S))
-        StmtType = ContinueStmtType;
       if (isa<ReturnStmt>(S))
         StmtType = ReturnStmtType;
-      
+      if (isa<BreakStmt>(S))
+        StmtType = BreakStmtType;;
+      if (isa<ContinueStmt>(S))
+        StmtType = ContinueStmtType;
+      if (isa<ThrowStmt>(S))
+        StmtType = ThrowStmtType;
     } else if (Expr *E = ESD.dyn_cast<Expr*>()) {
       SGF.emitIgnoredExpr(E);
     } else {

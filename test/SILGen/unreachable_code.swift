@@ -21,6 +21,7 @@ func testUnreachableForAfterContinue(b: Bool) {
     y++;
     if b {
       break;
+      y++; // expected-warning {{code after 'break' will never be executed}}
     }
     continue;
     y--; // expected-warning {{code after 'continue' will never be executed}}
@@ -34,9 +35,10 @@ func testUnreachableWhileAfterContinue(b: Bool) {
     y++;
     if b {
       break;
+      y++; // expected-warning {{code after 'break' will never be executed}}
     }
     continue;
-    i++; // expected-warning {{will never be executed}}
+    i++; // expected-warning {{code after 'continue' will never be executed}}
   }
 }
 
@@ -111,7 +113,7 @@ func testUnreachableCase5(a : Tree) {
 
 func testUnreachableAfterThrow(e : ErrorType) throws {
   throw e
-  return   // expected-warning {{will never be executed}}
+  return   // expected-warning {{code after 'throw' will never be executed}}
 }
 
 

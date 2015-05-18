@@ -132,7 +132,7 @@ public:
   // CFG Manipulation
   //===--------------------------------------------------------------------===//
 
-  /// moveBlockToEnd - Move a block to immediately before the given iterator.
+  /// moveBlockTo - Move a block to immediately before the given iterator.
   void moveBlockTo(SILBasicBlock *BB, SILFunction::iterator IP) {
     assert(SILFunction::iterator(BB) != IP && "moving block before itself?");
     SILFunction *F = BB->getParent();
