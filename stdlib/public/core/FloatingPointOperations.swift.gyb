@@ -77,9 +77,8 @@ public protocol FloatingPointType : Strideable {
   /// A quiet NaN.
   static var quietNaN: Self { get }
 
-  //
-  // IEEE 754-2008 Non-computational operations.
-  //
+  /// @{
+  /// IEEE 754-2008 Non-computational operations.
 
   /// The IEEE 754 "class" of this type.
   var floatingPointClass: FloatingPointClassification { get }
@@ -113,4 +112,6 @@ public protocol FloatingPointType : Strideable {
   // Not implemented, because it only makes sense for decimal floating point.
   // Binary floating point numbers are always canonical.
   // func isCanonical() -> Bool
+
+  /// @}
 }

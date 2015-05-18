@@ -300,12 +300,7 @@ public func sort<
   inout collection: C ${"," if p else ""}
   ${"_ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
 ) {
-  // FIXME(prext): remove this function when protocol extensions land.
-% if p:
-  collection._prext_sortInPlace(isOrderedBefore)
-% else:
-  collection._prext_sortInPlace()
-% end
+  _introSort(&collection, collection.indices ${", isOrderedBefore" if p else ""})
 }
 
 /// Sort `array` in-place${according}.
@@ -337,12 +332,10 @@ public func sort<T>(
 % else:
 public func sort<T : Comparable>(inout array: ContiguousArray<T>) {
 % end
-  // FIXME(prext): remove this function when protocol extensions land.
-% if p:
-  array._prext_sortInPlace(isOrderedBefore)
-% else:
-  array._prext_sortInPlace()
-% end
+  return array.withUnsafeMutableBufferPointer {
+    a in sort(&a ${", isOrderedBefore" if p else ""})
+    return
+  }
 }
 
 /// Return an `Array` containing the sorted elements of `source`{according}.
@@ -356,12 +349,9 @@ public func sorted<
   source: C ${"," if p else ""}
   ${"_ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
 ) -> [C.Generator.Element] {
-  // FIXME(prext): remove this function when protocol extensions land.
-% if p:
-  return source._prext_sort(isOrderedBefore)
-% else:
-  return source._prext_sort()
-% end
+  var result = ContiguousArray(source)
+  sort(&result ${", isOrderedBefore" if p else ""})
+  return Array(result)
 }
 % end
 // for p in preds

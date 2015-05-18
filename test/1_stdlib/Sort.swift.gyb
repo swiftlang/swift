@@ -7,8 +7,6 @@
 import StdlibUnittest
 import SwiftPrivate
 
-// FIXME(prext): fold this test into Algorithm.swift.gyb.
-
 var Algorithm = TestSuite("Algorithm")
 
 // Check if one array is a correctly sorted version of another array.
