@@ -25,6 +25,13 @@
 - (BOOL) conflict3: (id) object error: (NSError**) error;
 
 + (NSArray*) collectionWithCount: (NSInteger) i error: (NSError**) error;
+
++ (BOOL) runWithError: (NSError**) err callback: (void(^)(void)) block;
++ (BOOL) runWithError: (NSError**) err count: (NSInteger) n;
+
++ (BOOL) runSwiftly: (NSInteger) speed error: (NSError**) err callback: (void(^)(void)) block;
+
+- (BOOL) integrate: (NSInteger) spec code: (NSInteger) code error: (NSError**) err;
 @end
 
 @interface ReallyErrorProne : ErrorProne

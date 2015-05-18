@@ -62,3 +62,16 @@ func testConflict4() throws {
 func testConflict4_error() throws {
   try ErrorProne(newtonMessagePad: "Dilbert", error: ())
 }
+
+func testBlockFinal() throws {
+  try ErrorProne.runWithError(callback: {})
+  try ErrorProne.runSwiftly(5000, callback: {})
+}
+
+func testNonBlockFinal() throws {
+  ErrorProne.runWithError(count: 0) // expected-error {{missing argument for parameter #1 in call}}
+}
+
+class VeryErrorProne : ErrorProne {
+  override class func fail() throws {}
+}
