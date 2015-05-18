@@ -3728,10 +3728,11 @@ Checked Conversions
 
 Some user-level cast operations can fail and thus require runtime checking.
 
-The `unconditional_checked_cast`_ instruction performs an unconditional
-checked cast; it is a runtime failure if the cast fails. The `checked_cast_br`_
-terminator instruction performs a conditional checked cast; it branches to one
-of two destinations based on whether the cast succeeds or not.
+The `unconditional_checked_cast_addr` and `unconditional_checked_cast`_
+instructions performs an unconditional checked cast; it is a runtime failure
+if the cast fails. The `checked_cast_addr_br` and `checked_cast_br`_ terminator
+instruction performs a conditional checked cast; it branches to one of two
+destinations based on whether the cast succeeds or not.
 
 unconditional_checked_cast
 ``````````````````````````
@@ -3744,8 +3745,27 @@ unconditional_checked_cast
   // $A and $B must be both objects or both addresses
   // %1 will be of type $B or $*B
 
-Performs a checked conversion, causing a runtime failure if the conversion
-fails.
+Performs a checked scalar conversion, causing a runtime failure if the
+conversion fails.
+
+unconditional_checked_cast_addr
+```````````````````````````````
+::
+
+  sil-instruction ::= 'unconditional_checked_cast_addr'
+                       sil-cast-consumption-kind
+                       sil-type 'in' sil-operand 'to'
+                       sil-type 'in' sil-operand
+  sil-cast-consumption-kind ::= 'take_always'
+  sil-cast-consumption-kind ::= 'take_on_success'
+  sil-cast-consumption-kind ::= 'copy_on_success'
+
+  %1 = unconditional_checked_cast_addr take_on_success $A in %0 : $*@thick A to $B in $*@thick B
+  // $A and $B must be both addresses
+  // %1 will be of type $*B
+
+Performs a checked indirect conversion, causing a runtime failure if the
+conversion fails.
 
 Runtime Failures
 ~~~~~~~~~~~~~~~~
@@ -4080,14 +4100,37 @@ checked_cast_br
   // bb1 must take a single argument of type $B or $*B
   // bb2 must take no arguments
 
-Performs a checked conversion from ``$A`` to ``$B``. If the conversion succeeds,
-control is transferred to ``bb1``, and the result of the cast is passed into
-``bb1`` as an argument. If the conversion fails, control is transferred to
-``bb2``.
+Performs a checked scalar conversion from ``$A`` to ``$B``. If the conversion
+succeeds, control is transferred to ``bb1``, and the result of the cast is
+passed into ``bb1`` as an argument. If the conversion fails, control is
+transferred to ``bb2``.
 
 An exact cast checks whether the dynamic type is exactly the target
 type, not any possible subtype of it.  The source and target types
 must be class types.
+
+checked_cast_addr_br
+````````````````````
+::
+
+  sil-terminator ::= 'checked_cast_addr_br'
+                      sil-cast-consumption-kind
+                      sil-type 'in' sil-operand 'to'
+                      sil-stype 'in' sil-operand ','
+                      sil-identifier ',' sil-identifier
+  sil-cast-consumption-kind ::= 'take_always'
+  sil-cast-consumption-kind ::= 'take_on_success'
+  sil-cast-consumption-kind ::= 'copy_on_success'
+
+  checked_cast_addr_br take_always $A in %0 : $*@thick A to $B in %2 : $*@thick B, bb1, bb2
+  // $A and $B must be both address types
+  // bb1 must take a single argument of type $*B
+  // bb2 must take no arguments
+
+Performs a checked indirect conversion from ``$A`` to ``$B``. If the
+conversion succeeds, control is transferred to ``bb1``, and the result of the
+cast is left in the destination. If the conversion fails, control is
+transferred to ``bb2``.
 
 try_apply
 `````````
