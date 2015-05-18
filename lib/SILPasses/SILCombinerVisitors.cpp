@@ -534,10 +534,8 @@ public:
   PartialApplyCombiner(PartialApplyInst *PAI, SILBuilder *Builder,
                        CallGraph *CG, SILCombiner *SilCombiner)
       : isFirstTime(true), PAI(PAI),
-        lifetimeTracker(PAI, [](const SILInstruction *I) -> bool {
-          // Do not consider releases/retains as uses.
-          return shouldBeConsideredAsUse(I);
-        }), Builder(Builder), CG(CG), FRI(nullptr), SilCombiner(SilCombiner) {}
+        lifetimeTracker(PAI), Builder(Builder), CG(CG),
+        FRI(nullptr), SilCombiner(SilCombiner) {}
   SILInstruction *combine();
 };
 
