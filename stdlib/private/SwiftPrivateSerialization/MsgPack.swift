@@ -266,6 +266,10 @@ internal func _safeUInt32ToInt(x: UInt32) -> Int? {
 #endif
 }
 
+enum MsgPackError: ErrorType {
+  case DecodeFailed
+}
+
 /// A decoder for MessagePack.
 ///
 /// This decoder provides a StAX-like interface.
@@ -288,332 +292,294 @@ public struct MsgPackDecoder {
     self._bytes = bytes
   }
 
-  internal func _haveNBytes(count: Int) -> Bool {
-    return _bytes.count >= _consumedCount + count
+  @noreturn internal func _fail() throws {
+    throw MsgPackError.DecodeFailed
   }
 
-  internal func _lookByte() -> UInt8? {
-    if _haveNBytes(1) {
-      return _bytes[_consumedCount]
+  internal func _failIf(@noescape fn: () throws -> Bool) throws {
+    if try fn() { try _fail() }
+  }
+
+  internal func _unwrapOrFail<T>(maybeValue: Optional<T>) throws -> T {
+    if let value = maybeValue {
+      return value
     }
-    return nil
+    try _fail()
   }
 
-  internal mutating func _consumeByte() -> UInt8? {
-    guard let result = _lookByte() else { return nil }
-    _consumedCount++
+  internal func _haveNBytes(count: Int) throws {
+    try _failIf { _bytes.count < _consumedCount + count }
+  }
+
+  internal mutating func _consumeByte() throws -> UInt8 {
+    try _haveNBytes(1)
+    return _bytes[_consumedCount++]
+  }
+
+  internal mutating func _consumeByteIf(byte: UInt8) throws {
+    try _failIf { try _consumeByte() != byte }
+  }
+
+  internal mutating func _readBigEndianUInt16() throws -> UInt16 {
+    var result: UInt16 = 0
+    for _ in 0..<2 {
+      result <<= 8
+      result |= UInt16(try _consumeByte())
+    }
     return result
   }
 
-  internal mutating func _consumeByteIf(byte: UInt8) -> Bool {
-    if _lookByte() == byte {
-      _consumedCount++
-      return true
+  internal mutating func _readBigEndianUInt32() throws -> UInt32 {
+    var result: UInt32 = 0
+    for _ in 0..<4 {
+      result <<= 8
+      result |= UInt32(try _consumeByte())
     }
-    return false
+    return result
   }
 
-  internal mutating func _readBigEndianUInt16() -> UInt16? {
-    if _haveNBytes(2) {
-      var result: UInt16 = 0
-      for _ in 0..<2 {
-        result <<= 8
-        result |= UInt16(_consumeByte()!)
-      }
-      return result
-    }
-    return nil
+  internal mutating func _readBigEndianInt64() throws -> Int64 {
+    let result = try _readBigEndianUInt64()
+    return Int64(bitPattern: result)
   }
 
-  internal mutating func _readBigEndianUInt32() -> UInt32? {
-    if _haveNBytes(4) {
-      var result: UInt32 = 0
-      for _ in 0..<4 {
-        result <<= 8
-        result |= UInt32(_consumeByte()!)
-      }
-      return result
+  internal mutating func _readBigEndianUInt64() throws -> UInt64 {
+    var result: UInt64 = 0
+    for _ in 0..<8 {
+      result <<= 8
+      result |= UInt64(try _consumeByte())
     }
-    return nil
+    return result
   }
 
-  internal mutating func _readBigEndianInt64() -> Int64? {
-    if let result = _readBigEndianUInt64() {
-      return Int64(bitPattern: result)
-    }
-    return nil
-  }
-
-  internal mutating func _readBigEndianUInt64() -> UInt64? {
-    if _haveNBytes(8) {
-      var result: UInt64 = 0
-      for _ in 0..<8 {
-        result <<= 8
-        result |= UInt64(_consumeByte()!)
-      }
-      return result
-    }
-    return nil
-  }
-
-  internal mutating func _rewindIfReturnsNil<T>(
-    @noescape code: () -> T?
+  internal mutating func _rewind<T>(
+    @noescape code: () throws -> T
   ) -> T? {
     let originalPosition = _consumedCount
-    if let result = code() {
-      return result
+    do {
+      return try code()
+    } catch _ as MsgPackError {
+      _consumedCount = originalPosition
+      return nil
+    } catch let e {
+      preconditionFailure("unexpected error: \(e)")
     }
-    _consumedCount = originalPosition
-    return nil
   }
 
   public mutating func readInt64() -> Int64? {
-    return _rewindIfReturnsNil {
-      if _consumeByteIf(0xd3) {
-        return _readBigEndianInt64()
-      }
-      return nil
+    return _rewind {
+      try _consumeByteIf(0xd3)
+      return try _readBigEndianInt64()
     }
   }
 
   public mutating func readUInt64() -> UInt64? {
-    return _rewindIfReturnsNil {
-      if _consumeByteIf(0xcf) {
-        return _readBigEndianUInt64()
-      }
-      return nil
+    return _rewind {
+      try _consumeByteIf(0xcf)
+      return try _readBigEndianUInt64()
     }
   }
 
   public mutating func readNil() -> Bool {
-    return _consumeByteIf(0xc0)
+    let value: Bool? = _rewind {
+      try _consumeByteIf(0xc0)
+      return true
+    }
+    // .Some(true) means nil, nil means fail...
+    return value != nil
   }
 
   public mutating func readBool() -> Bool? {
-    if _consumeByteIf(0xc3) {
-      return true
+    return _rewind {
+      switch try _consumeByte() {
+      case 0xc2:
+        return false
+      case 0xc3:
+        return true
+      default:
+        try _fail()
+      }
     }
-    if _consumeByteIf(0xc2) {
-      return false
-    }
-    return nil
   }
 
   public mutating func readFloat32() -> Float32? {
-    return _rewindIfReturnsNil {
-      if _consumeByteIf(0xca), let bitPattern = _readBigEndianUInt32() {
-        return Float32._fromBitPattern(bitPattern)
-      }
-      return nil
+    return _rewind {
+      try _consumeByteIf(0xca)
+      let bitPattern = try _readBigEndianUInt32()
+      return Float32._fromBitPattern(bitPattern)
     }
   }
 
   public mutating func readFloat64() -> Float64? {
-    return _rewindIfReturnsNil {
-      if _consumeByteIf(0xcb), let bitPattern = _readBigEndianUInt64() {
-        return Float64._fromBitPattern(bitPattern)
-      }
-      return nil
+    return _rewind {
+      try _consumeByteIf(0xcb)
+      let bitPattern = try _readBigEndianUInt64()
+      return Float64._fromBitPattern(bitPattern)
     }
   }
 
+  internal mutating func _consumeBytes(length: Int) throws -> [UInt8] {
+    try _haveNBytes(length)
+    let result = _bytes[_consumedCount..<_consumedCount + length]
+    _consumedCount += length
+    return [UInt8](result)
+  }
+
   public mutating func readString() -> String? {
-    return _rewindIfReturnsNil {
-      var maybeLength: Int? = nil
-      if let byte = _lookByte() where byte & 0b1110_0000 == 0b1010_0000 {
+    return _rewind {
+      let length: Int
+      switch try _consumeByte() {
+      case let byte where byte & 0b1110_0000 == 0b1010_0000:
         // fixstr
-        _consumeByte()
-        maybeLength = Int(byte & 0b0001_1111)
-      } else if _consumeByteIf(0xd9) {
+        length = Int(byte & 0b0001_1111)
+      case 0xd9:
         // str8
-        if let length = _consumeByte() {
-          if length <= 0x1f {
-            // Reject overlong encodings.
-            return nil
-          }
-          maybeLength = Int(length)
-        }
-      } else if _consumeByteIf(0xda) {
+        let count = try _consumeByte()
+        // Reject overlong encodings.
+        try _failIf { count <= 0x1f }
+        length = Int(count)
+      case 0xda:
         // str16
-        if let length = _readBigEndianUInt16() {
-          if length <= 0xff {
-            // Reject overlong encodings.
-            return nil
-          }
-          maybeLength = Int(length)
-        }
-      } else if _consumeByteIf(0xdb) {
+        let count = try _readBigEndianUInt16()
+        // Reject overlong encodings.
+        try _failIf { count <= 0xff }
+        length = Int(count)
+      case 0xdb:
         // str32
-        if let length = _readBigEndianUInt32() {
-          if length <= 0xffff {
-            // Reject overlong encodings.
-            return nil
-          }
-          maybeLength = Int(length)
-        }
+        let count = try _readBigEndianUInt32()
+        // Reject overlong encodings.
+        try _failIf { count <= 0xffff }
+        length = Int(count)
+      default:
+        try _fail()
       }
-      if let length = maybeLength {
-        if _haveNBytes(length) {
-          let utf8 = _bytes[_consumedCount..<_consumedCount + length]
-          _consumedCount += length
-          return String._fromCodeUnitSequenceWithRepair(UTF8.self, input: utf8).0
-        }
-      }
-      return nil
+      let utf8 = try _consumeBytes(length)
+      return String._fromCodeUnitSequenceWithRepair(UTF8.self, input: utf8).0
     }
   }
 
   public mutating func readBinary() -> [UInt8]? {
-    return _rewindIfReturnsNil {
-      var maybeLength: Int? = nil
-      if _consumeByteIf(0xc4) {
+    return _rewind {
+      let length: Int
+      switch try _consumeByte() {
+      case 0xc4:
         // bin8
-        if let length = _consumeByte() {
-          maybeLength = Int(length)
-        }
-      } else if _consumeByteIf(0xc5) {
+        length = Int(try _consumeByte())
+      case 0xc5:
         // bin16
-        if let length = _readBigEndianUInt16() {
-          if length <= 0xff {
-            // Reject overlong encodings.
-            return nil
-          }
-          maybeLength = Int(length)
-        }
-      } else if _consumeByteIf(0xc6) {
+        let count = try _readBigEndianUInt16()
+        // Reject overlong encodings.
+        try _failIf { count <= 0xff }
+        length = Int(count)
+      case 0xc6:
         // bin32
-        if let length = _readBigEndianUInt32() {
-          if length <= 0xffff {
-            // Reject overlong encodings.
-            return nil
-          }
-          maybeLength = Int(length)
-        }
+        let count = try _readBigEndianUInt32()
+        // Reject overlong encodings.
+        try _failIf { count <= 0xffff }
+        length = Int(count)
+      default:
+        try _fail()
       }
-      if let length = maybeLength {
-        if _haveNBytes(length) {
-          let result = Array(_bytes[_consumedCount..<_consumedCount + length])
-          _consumedCount += length
-          return result
-        }
-      }
-      return nil
+      return try _consumeBytes(length)
     }
   }
 
   public mutating func readBeginArray() -> Int? {
-    return _rewindIfReturnsNil {
-      if let byte = _lookByte() where byte & 0b1111_0000 == 0b1001_0000 {
+    return _rewind {
+      switch try _consumeByte() {
+      case let byte where byte & 0b1111_0000 == 0b1001_0000:
         // fixarray
-        _consumeByte()
         return Int(byte & 0b0000_1111)
-      } else if _consumeByteIf(0xdc) {
+      case 0xdc:
         // array16
-        if let length = _readBigEndianUInt16() {
-          if length <= 0xf {
-            // Reject overlong encodings.
-            return nil
-          }
-          return Int(length)
-        }
-      } else if _consumeByteIf(0xdd) {
+        let length = try _readBigEndianUInt16()
+        // Reject overlong encodings.
+        try _failIf { length <= 0xf }
+        return Int(length)
+      case 0xdd:
         // array32
-        if let length = _readBigEndianUInt32() {
-          if length <= 0xffff {
-            // Reject overlong encodings.
-            return nil
-          }
-          return _safeUInt32ToInt(length)
-        }
+        let length = try _readBigEndianUInt32()
+        // Reject overlong encodings.
+        try _failIf { length <= 0xffff }
+        return try _unwrapOrFail(_safeUInt32ToInt(length))
+      default:
+        try _fail()
       }
-      return nil
     }
   }
 
   public mutating func readBeginMap() -> Int? {
-    return _rewindIfReturnsNil {
-      if let byte = _lookByte() where byte & 0b1111_0000 == 0b1000_0000 {
+    return _rewind {
+      switch try _consumeByte() {
+      case let byte where byte & 0b1111_0000 == 0b1000_0000:
         // fixarray
-        _consumeByte()
         return Int(byte & 0b0000_1111)
-      } else if _consumeByteIf(0xde) {
+      case 0xde:
         // array16
-        if let length = _readBigEndianUInt16() {
-          if length <= 0xf {
-            // Reject overlong encodings.
-            return nil
-          }
-          return Int(length)
-        }
-      } else if _consumeByteIf(0xdf) {
+        let length = try _readBigEndianUInt16()
+        // Reject overlong encodings.
+        try _failIf { length <= 0xf }
+        return Int(length)
+      case 0xdf:
         // array32
-        if let length = _readBigEndianUInt32() {
-          if length <= 0xffff {
-            // Reject overlong encodings.
-            return nil
-          }
-          return _safeUInt32ToInt(length)
-        }
+        let length = try _readBigEndianUInt32()
+        // Reject overlong encodings.
+        try _failIf { length <= 0xffff }
+        return try _unwrapOrFail(_safeUInt32ToInt(length))
+      default:
+        try _fail()
       }
-      return nil
     }
   }
 
   public mutating func readExtended() -> (type: Int8, data: [UInt8])? {
-    return _rewindIfReturnsNil {
-      var maybeLength: Int? = nil
-      if _consumeByteIf(0xd4) {
+    return _rewind {
+      let length: Int
+      switch try _consumeByte() {
+      case 0xd4:
         // fixext1
-        maybeLength = 1
-      } else if _consumeByteIf(0xd5) {
+        length = 1
+      case 0xd5:
         // fixext2
-        maybeLength = 2
-      } else if _consumeByteIf(0xd6) {
+        length = 2
+      case 0xd6:
         // fixext4
-        maybeLength = 4
-      } else if _consumeByteIf(0xd7) {
+        length = 4
+      case 0xd7:
         // fixext8
-        maybeLength = 8
-      } else if _consumeByteIf(0xd8) {
+        length = 8
+      case 0xd8:
         // fixext16
-        maybeLength = 16
-      } else if _consumeByteIf(0xc7) {
+        length = 16
+      case 0xc7:
         // ext8
-        if let length = _consumeByte() {
-          if length == 1 || length == 2 || length == 4 || length == 8 ||
-            length == 16 {
-            // Reject overlong encodings.
-            return nil
-          }
-          maybeLength = Int(length)
+        let count = try _consumeByte()
+        // Reject overlong encodings.
+        try _failIf {
+          count == 1 ||
+          count == 2 ||
+          count == 4 ||
+          count == 8 ||
+          count == 16
         }
-      } else if _consumeByteIf(0xc8) {
+        length = Int(count)
+      case 0xc8:
         // ext16
-        if let length = _readBigEndianUInt16() {
-          if length <= 0xff {
-            // Reject overlong encodings.
-            return nil
-          }
-          maybeLength = Int(length)
-        }
-      } else if _consumeByteIf(0xc9) {
+        let count = try _readBigEndianUInt16()
+        try _failIf { count <= 0xff }
+        length = Int(count)
+      case 0xc9:
         // ext32
-        if let length = _readBigEndianUInt32() {
-          if length <= 0xffff {
-            // Reject overlong encodings.
-            return nil
-          }
-          maybeLength = Int(length)
-        }
+        let count = try _readBigEndianUInt32()
+        // Reject overlong encodings.
+        try _failIf { count <= 0xffff }
+        length = Int(count)
+      default:
+        try _fail()
       }
-      if let length = maybeLength, let type = _consumeByte() {
-        if _haveNBytes(length) {
-          let result = Array(_bytes[_consumedCount..<_consumedCount + length])
-          _consumedCount += length
-          return (Int8(bitPattern: type), result)
-        }
-      }
-      return nil
+      let type = try _consumeByte()
+      let result = try _consumeBytes(length)
+      return (Int8(bitPattern: type), result)
     }
   }
 }
