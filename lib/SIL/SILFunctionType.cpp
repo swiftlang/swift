@@ -2013,6 +2013,12 @@ TypeConverter::getLoweredASTFunctionType(CanAnyFunctionType fnType,
     if (fnType->getExtInfo().throws())
       extInfo = extInfo.withThrows();
 
+    // The @noreturn property of the uncurried function really comes
+    // from the innermost function. It is not meaningful for intermediate
+    // functions to also be @noreturn, but we don't prohibit it here.
+    if (fnType->getExtInfo().isNoReturn())
+      extInfo = extInfo.withIsNoReturn();
+
     if (uncurryLevel-- == 0)
       break;
     fnType = cast<AnyFunctionType>(fnType.getResult());

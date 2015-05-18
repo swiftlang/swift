@@ -61,6 +61,16 @@ func diagnose_missing_return_no_error_after_noreturn(i: Bool) -> Int {
   }
 } // no error
 
+class TuringMachine {
+  @noreturn func halt() {
+    repeat { } while true
+  }
+}
+
+func diagnose_missing_return_no_error_after_noreturn_method() -> Int {
+  TuringMachine().halt()
+} // no error
+
 func whileLoop(flag: Bool) -> Int {
   var b = 1;
   while (flag) {
@@ -106,6 +116,11 @@ func testUnreachableAfterNoReturnFollowedByACall() -> Int {
   exit(); // expected-note{{a call to a noreturn function}}
   exit(); // expected-warning {{will never be executed}}
   return x; 
+}
+
+func testUnreachableAfterNoReturnMethod() -> Int {
+  TuringMachine().halt(); // expected-note{{a call to a noreturn function}}
+  return 0; // expected-warning {{will never be executed}}
 }
 
 func testCleanupCodeEmptyTuple(@autoclosure fn: () -> Bool = false,

@@ -640,6 +640,36 @@ func testNoReturn2(b : Bool) -> Any {
   return a   // expected-error {{variable 'a' used before being initialized}}
 }
 
+class PerpetualMotion {
+  @noreturn func start() {
+    repeat {} while true
+  }
+  @noreturn static func stop() {
+    repeat {} while true
+  }
+}
+
+func testNoReturn3(b : Bool) -> Any {
+  let a : Int
+
+  switch b {
+  default:
+    PerpetualMotion().start()
+  }
+
+  return a
+}
+
+func testNoReturn4(b : Bool) -> Any {
+  let a : Int
+
+  switch b {
+  default:
+    PerpetualMotion.stop()
+  }
+
+  return a
+}
 
 
 // <rdar://problem/16687555> [DI] New convenience initializers cannot call inherited convenience initializers
