@@ -17,6 +17,7 @@
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SIL/SILVTable.h"
 #include "swift/SIL/Dominance.h"
+#include "swift/SIL/DynamicCasts.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
@@ -1827,6 +1828,9 @@ public:
 
     auto fromCanTy = fromTy.getSwiftRValueType();
     auto toCanTy = toTy.getSwiftRValueType();
+
+    require(canUseScalarCheckedCastInstructions(fromCanTy, toCanTy),
+            "invalid value checked cast src or dest types");
 
     // Peel off metatypes. If two types are checked-cast-able, so are their
     // metatypes.
