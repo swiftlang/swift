@@ -531,15 +531,9 @@ class d0170_TestAvailability {
 
   @available(iOS 8.0, OSX 10.10, *)
   func f4() {}
-// PASS_COMMON-NEXT: {{^}}  @available(iOS 8.0, OSX 10.10, *){{$}}
+// PASS_COMMON-NEXT: {{^}}  @available(iOS, introduced=8.0){{$}}
+// PASS_COMMON-NEXT: {{^}}  @available(OSX, introduced=10.10){{$}}
 // PASS_COMMON-NEXT: {{^}}  func f4(){{$}}
-
-// Convert long-form @available() to short form when possible.
-  @available(iOS, introduced=8.0)
-  @available(OSX, introduced=10.10)
-  func f5() {}
-// PASS_COMMON-NEXT: {{^}}  @available(iOS 8.0, OSX 10.10, *){{$}}
-// PASS_COMMON-NEXT: {{^}}  func f5(){{$}}
 }
 
 @objc class d0180_TestIBAttrs {

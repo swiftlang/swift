@@ -34,11 +34,8 @@
 //
 // REQUIRES: OS=macosx
 
-// FOUNDATION-LABEL: {{^}}/// Aaa.  NSAvailableOnOSX10_10AndIOS8_0.  Bbb.
-// FOUNDATION-NEXT: {{^}}@available(OSX 10.10, *){{$}}
-
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSPotentiallyUnavailableOptions.  Bbb.
-// FOUNDATION-NEXT: {{^}}@available(OSX 10.10, *){{$}}
+// FOUNDATION-NEXT: {{^}}@available(OSX, introduced=10.10){{$}}
 // FOUNDATION-NEXT: {{^}}struct NSPotentiallyUnavailableOptions : RawOptionSetType {{{$}}
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSOptionsWithUnavailableElement.  Bbb.
@@ -49,11 +46,11 @@
 // FOUNDATION-NEXT: {{^}}  let rawValue: UInt{{$}}
 // FOUNDATION-NEXT: {{^}}  static var First: NSOptionsWithUnavailableElement { get }{{$}}
 // FOUNDATION-NEXT: {{^}}  static var Second: NSOptionsWithUnavailableElement { get }{{$}}
-// FOUNDATION-NEXT: {{^}}  @available(OSX 10.10, *){{$}}
+// FOUNDATION-NEXT: {{^}}  @available(OSX, introduced=10.10){{$}}
 // FOUNDATION-NEXT: {{^}}  static var Third: NSOptionsWithUnavailableElement { get }{{$}}
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSUnavailableEnum.  Bbb.
-// FOUNDATION-NEXT: {{^}}@available(OSX 10.10, *){{$}}
+// FOUNDATION-NEXT: {{^}}@available(OSX, introduced=10.10){{$}}
 // FOUNDATION-NEXT: {{^}}enum NSUnavailableEnum : UInt {{{$}}
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSEnumWithUnavailableElement.  Bbb.
@@ -62,5 +59,5 @@
 // FOUNDATION-NEXT: {{^}}  var rawValue: UInt { get }{{$}}
 // FOUNDATION-NEXT: {{^}}  case First{{$}}
 // FOUNDATION-NEXT: {{^}}  case Second{{$}}
-// FOUNDATION-NEXT: {{^}}  @available(OSX 10.10, *){{$}}
+// FOUNDATION-NEXT: {{^}}  @available(OSX, introduced=10.10){{$}}
 // FOUNDATION-NEXT: {{^}}  case Third{{$}}

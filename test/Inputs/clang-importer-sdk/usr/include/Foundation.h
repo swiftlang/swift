@@ -71,13 +71,6 @@ __attribute__((availability(macosx,introduced=10.9)))
 - (void)setReadOnlyRedeclaredWithSetterInCategory:(NSInteger)prop __attribute__((availability(macosx,introduced=10.11)));
 @end
 
-/// Aaa.  NSAvailableOnOSX10_10AndIOS8_0.  Bbb.
-__attribute__((availability(macosx,introduced=10.10)))
-__attribute__((availability(ios,introduced=8.0)))
-@interface NSAvailableOnOSX10_10AndIOS8_0 : NSObject
-
-@end
-
 @class NSString, NSArray, NSDictionary, NSSet, NSEnumerator;
 
 /// Aaa.  NSArray.  Bbb.
