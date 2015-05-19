@@ -230,7 +230,7 @@ namespace {
     llvm::DenseMap<FullApplySite, FullApplySite> OriginMap;
     llvm::DenseSet<FullApplySite> RemovedApplies;
 
-    SILFunction *getEligibleFunction(ApplyInst *AI);
+    SILFunction *getEligibleFunction(ApplyInst *AI, CallGraph &CG);
     
     bool isProfitableToInline(ApplyInst *AI, unsigned loopDepthOfAI,
                               DominanceAnalysis *DA,
@@ -238,7 +238,8 @@ namespace {
                               ConstantTracker &constTracker);
     
     void visitColdBlocks(SmallVectorImpl<ApplyInst *> &AppliesToInline,
-                               SILBasicBlock *root, DominanceInfo *DT);
+                         SILBasicBlock *root, DominanceInfo *DT,
+                         CallGraph &CG);
 
     void collectAppliesToInline(SILFunction *Caller,
                                 SmallVectorImpl<ApplyInst *> &Applies,
@@ -564,7 +565,8 @@ bool SILPerformanceInliner::applyTargetsOriginFunction(FullApplySite Apply,
 }
 
 // Returns the callee of an apply_inst if it is basically inlinable.
-SILFunction *SILPerformanceInliner::getEligibleFunction(ApplyInst *AI) {
+SILFunction *SILPerformanceInliner::
+getEligibleFunction(ApplyInst *AI, CallGraph &CG) {
  
   SILFunction *Callee = getReferencedFunction(AI);
   
@@ -612,6 +614,14 @@ SILFunction *SILPerformanceInliner::getEligibleFunction(ApplyInst *AI) {
   // We don't support this yet.
   if (AI->hasSubstitutions()) {
     DEBUG(llvm::dbgs() << "        FAIL: Generic substitutions on " <<
+          Callee->getName() << ".\n");
+    return nullptr;
+  }
+
+  // We don't support inlining a function that binds dynamic self because we
+  // have no mechanism to preserve the original function's local self metadata.
+  if (CG.getCallGraphNode(Callee)->mayBindDynamicSelf()) {
+    DEBUG(llvm::dbgs() << "        FAIL: Binding dynamic Self in " <<
           Callee->getName() << ".\n");
     return nullptr;
   }
@@ -1049,7 +1059,7 @@ void SILPerformanceInliner::collectAppliesToInline(SILFunction *Caller,
 
       DEBUG(llvm::dbgs() << "    Check:" << *AI);
 
-      auto *Callee = getEligibleFunction(AI);
+      auto *Callee = getEligibleFunction(AI, CG);
       if (Callee) {
         if (isProfitableToInline(AI, loopDepth, DA, LA, constTracker))
           InitialCandidates.push_back(AI);
@@ -1058,7 +1068,7 @@ void SILPerformanceInliner::collectAppliesToInline(SILFunction *Caller,
     domOrder.pushChildrenIf(block, [&] (SILBasicBlock *child) {
       if (ColdBlockInfo::isSlowPath(block, child)) {
         // Handle cold blocks separately.
-        visitColdBlocks(InitialCandidates, child, DT);
+        visitColdBlocks(InitialCandidates, child, DT, CG);
         return false;
       }
       return true;
@@ -1275,7 +1285,8 @@ void SILPerformanceInliner::inlineDevirtualizeAndSpecialize(
 void SILPerformanceInliner::visitColdBlocks(SmallVectorImpl<ApplyInst *> &
                                             AppliesToInline,
                                             SILBasicBlock *Root,
-                                            DominanceInfo *DT) {
+                                            DominanceInfo *DT,
+                                            CallGraph &CG) {
   DominanceOrder domOrder(Root, DT);
   while (SILBasicBlock *block = domOrder.getNext()) {
     for (SILInstruction &I : *block) {
@@ -1283,7 +1294,7 @@ void SILPerformanceInliner::visitColdBlocks(SmallVectorImpl<ApplyInst *> &
       if (!AI)
         continue;
 
-      auto *Callee = getEligibleFunction(AI);
+      auto *Callee = getEligibleFunction(AI, CG);
       if (Callee && isProfitableInColdBlock(Callee)) {
         DEBUG(llvm::dbgs() << "    inline in cold block:" <<  *AI);
         AppliesToInline.push_back(AI);
