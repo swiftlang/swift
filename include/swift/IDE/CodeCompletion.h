@@ -78,6 +78,12 @@ public:
       /// The "override" keyword.
       OverrideKeyword,
 
+      /// The "throws" keyword.
+      ThrowsKeyword,
+
+      /// The "rethrows" keyword.
+      RethrowsKeyword,
+
       /// The keyword part of a declaration before the name, like "func".
       DeclIntroducer,
 
@@ -159,6 +165,8 @@ public:
       /// The spelling as always "{}", but clients may choose to insert newline
       /// and indentation in between.
       BraceStmtWithCursor,
+
+      ///
     };
 
     static bool chunkStartsNestedGroup(ChunkKind Kind) {
@@ -170,6 +178,8 @@ public:
     static bool chunkHasText(ChunkKind Kind) {
       return Kind == ChunkKind::AccessControlKeyword ||
              Kind == ChunkKind::OverrideKeyword ||
+             Kind == ChunkKind::ThrowsKeyword ||
+             Kind == ChunkKind::RethrowsKeyword ||
              Kind == ChunkKind::DeclAttrKeyword ||
              Kind == ChunkKind::DeclIntroducer ||
              Kind == ChunkKind::Text ||

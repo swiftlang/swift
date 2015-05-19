@@ -138,6 +138,8 @@ void CodeCompletionString::print(raw_ostream &OS) const {
     case Chunk::ChunkKind::DeclAttrKeyword:
     case Chunk::ChunkKind::DeclAttrParamKeyword:
     case Chunk::ChunkKind::OverrideKeyword:
+    case Chunk::ChunkKind::ThrowsKeyword:
+    case Chunk::ChunkKind::RethrowsKeyword:
     case Chunk::ChunkKind::DeclIntroducer:
     case Chunk::ChunkKind::Text:
     case Chunk::ChunkKind::LeftParen:
@@ -561,6 +563,8 @@ Optional<unsigned> CodeCompletionString::getFirstTextChunkIndex() const {
     case CodeCompletionString::Chunk::ChunkKind::Ampersand:
     case CodeCompletionString::Chunk::ChunkKind::AccessControlKeyword:
     case CodeCompletionString::Chunk::ChunkKind::OverrideKeyword:
+    case CodeCompletionString::Chunk::ChunkKind::ThrowsKeyword:
+    case CodeCompletionString::Chunk::ChunkKind::RethrowsKeyword:
     case CodeCompletionString::Chunk::ChunkKind::DeclIntroducer:
     case CodeCompletionString::Chunk::ChunkKind::CallParameterColon:
     case CodeCompletionString::Chunk::ChunkKind::DeclAttrParamEqual:
@@ -596,12 +600,22 @@ void CodeCompletionString::getName(raw_ostream &OS) const {
       using ChunkKind = CodeCompletionString::Chunk::ChunkKind;
       if (C.getKind() == ChunkKind::BraceStmtWithCursor)
         break;
-      if (C.getKind() == ChunkKind::TypeAnnotation ||
-          C.getKind() == ChunkKind::CallParameterClosureType)
+
+      bool shouldPrint = !C.isAnnotation();
+      switch (C.getKind()) {
+      case ChunkKind::TypeAnnotation:
+      case ChunkKind::CallParameterClosureType:
+      case ChunkKind::DeclAttrParamEqual:
         continue;
-      if (C.getKind() == ChunkKind::DeclAttrParamEqual)
-        continue;
-      if (C.hasText() && !C.isAnnotation()) {
+      case ChunkKind::ThrowsKeyword:
+      case ChunkKind::RethrowsKeyword:
+        shouldPrint = true; // Even when they're annotations.
+        break;
+      default:
+        break;
+      }
+
+      if (C.hasText() && shouldPrint) {
         TextSize += C.getText().size();
         OS << C.getText();
       }
@@ -1306,6 +1320,15 @@ public:
     }
   }
 
+  static void addThrows(CodeCompletionResultBuilder &Builder,
+                        const AnyFunctionType *AFT,
+                        const AbstractFunctionDecl *AFD) {
+    if (AFD && AFD->getAttrs().hasAttribute<RethrowsAttr>())
+      Builder.addAnnotatedRethrows();
+    else if (AFT->throws())
+      Builder.addAnnotatedThrows();
+  }
+
   void addFunctionCallPattern(const AnyFunctionType *AFT,
                               const AbstractFunctionDecl *AFD = nullptr) {
     foundFunction(AFT);
@@ -1323,6 +1346,8 @@ public:
       addParamPatternFromFunction(Builder, AFT, AFD, includeDefaultArgs);
 
       Builder.addRightParen();
+      addThrows(Builder, AFT, AFD);
+
       addTypeAnnotation(Builder, AFT->getResult());
     };
 
@@ -1408,10 +1433,10 @@ public:
         Builder.addRightParen();
       } else {
         Builder.addLeftParen();
-        addParamPatternFromFunction(Builder,
-                                    FunctionType->castTo<AnyFunctionType>(), FD,
-                                    includeDefaultArgs);
+        auto AFT = FunctionType->castTo<AnyFunctionType>();
+        addParamPatternFromFunction(Builder, AFT, FD, includeDefaultArgs);
         Builder.addRightParen();
+        addThrows(Builder, AFT, FD);
       }
 
       Type ResultType = FunctionType->castTo<AnyFunctionType>()->getResult();
@@ -1482,6 +1507,8 @@ public:
                                   includeDefaultArgs);
 
       Builder.addRightParen();
+      addThrows(Builder, ConstructorType, CD);
+
       addTypeAnnotation(Builder, ConstructorType->getResult());
     };
 

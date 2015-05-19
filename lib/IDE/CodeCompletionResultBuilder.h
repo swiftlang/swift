@@ -110,6 +110,28 @@ public:
     addChunkWithText(CodeCompletionString::Chunk::ChunkKind::Text, Text);
   }
 
+  void addAnnotatedThrows() {
+    addThrows();
+    getLastChunk().setIsAnnotation();
+  }
+
+  void addThrows() {
+    addChunkWithTextNoCopy(
+       CodeCompletionString::Chunk::ChunkKind::ThrowsKeyword,
+       " throws");
+  }
+
+  void addAnnotatedRethrows() {
+    addRethrows();
+    getLastChunk().setIsAnnotation();
+  }
+
+  void addRethrows() {
+    addChunkWithTextNoCopy(
+        CodeCompletionString::Chunk::ChunkKind::RethrowsKeyword,
+        " rethrows");
+  }
+
   void addAnnotatedLeftParen() {
     addLeftParen();
     getLastChunk().setIsAnnotation();

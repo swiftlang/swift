@@ -141,6 +141,12 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_P4_DOT_2 | FileCheck %s -check-prefix=PROTOCOL_EXT_P4_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_P4_T_DOT_1 | FileCheck %s -check-prefix=PROTOCOL_EXT_P4_T_DOT_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=PROTOCOL_EXT_UNUSABLE_EXISTENTIAL | FileCheck %s -check-prefix=PROTOCOL_EXT_UNUSABLE_EXISTENTIAL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=THROWS1 | FileCheck %s -check-prefix=THROWS1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=THROWS2 | FileCheck %s -check-prefix=THROWS2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER_THROWS1 | FileCheck %s -check-prefix=MEMBER_THROWS1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER_THROWS2 | FileCheck %s -check-prefix=MEMBER_THROWS2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER_THROWS3 | FileCheck %s -check-prefix=MEMBER_THROWS3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_THROWS1 | FileCheck %s -check-prefix=INIT_THROWS1
 
 // Test code completion of expressions that produce a value.
 
@@ -1668,3 +1674,58 @@ func testUnusableProtExt(x: PWithT) {
 // PROTOCOL_EXT_UNUSABLE_EXISTENTIAL: Decl[InstanceMethod]/CurrNominal:   foo({#(x): `Self`.T#})[#`Self`.T#]{{; name=.+}}
 // PROTOCOL_EXT_UNUSABLE_EXISTENTIAL: Decl[InstanceMethod]/CurrNominal:   bar({#(x): Self.T#})[#Self.T#]{{; name=.+}}
 // PROTOCOL_EXT_UNUSABLE_EXISTENTIAL: End completions
+
+
+//===--- Check calls that may throw
+
+func globalFuncThrows() throws {}
+func globalFuncRethrows(x: () throws -> ()) rethrows {}
+struct HasThrowingMembers {
+  func memberThrows() throws {}
+  func memberRethrows(x: () throws -> ()) rethrows {}
+  init() throws {}
+  init(x: () throws -> ()) rethrows {}
+}
+
+func testThrows001() {
+  globalFuncThrows#^THROWS1^#
+
+// THROWS1: Begin completions
+// THROWS1: Pattern/ExprSpecific:               ()[' throws'][#Void#]; name=() throws
+// THROWS1: End completions
+}
+func testThrows002() {
+  globalFuncRethrows#^THROWS2^#
+
+// THROWS2: Begin completions
+// FIXME: <rdar://problem/21010193> Fix throws => rethrows in call patterns
+// THROWS2: Pattern/ExprSpecific:               ({#() throws -> ()##() throws -> ()#})[' throws'][#Void#]; name=(() throws -> ()) throws
+// THROWS2: End completions
+}
+func testThrows003(x: HasThrowingMembers) {
+  x.#^MEMBER_THROWS1^#
+// MEMBER_THROWS1: Begin completions
+// MEMBER_THROWS1-DAG: Decl[InstanceMethod]/CurrNominal:   memberThrows()[' throws'][#Void#]
+// MEMBER_THROWS1-DAG: Decl[InstanceMethod]/CurrNominal:   memberRethrows({#(x): () throws -> ()##() throws -> ()#})[' rethrows'][#Void#]
+// MEMBER_THROWS1: End completions
+}
+func testThrows004(x: HasThrowingMembers) {
+  x.memberThrows#^MEMBER_THROWS2^#
+// MEMBER_THROWS2: Begin completions
+// MEMBER_THROWS2: Pattern/ExprSpecific:               ()[' throws'][#Void#]; name=() throws
+// MEMBER_THROWS2: End completions
+}
+func testThrows005(x: HasThrowingMembers) {
+  x.memberRethrows#^MEMBER_THROWS3^#
+// MEMBER_THROWS3: Begin completions
+// FIXME: <rdar://problem/21010193> Fix throws => rethrows in call patterns
+// MEMBER_THROWS3: Pattern/ExprSpecific:               ({#() throws -> ()##() throws -> ()#})[' throws'][#Void#]; name=(() throws -> ()) throws
+// MEMBER_THROWS3: End completions
+}
+func testThrows006() {
+  HasThrowingMembers(#^INIT_THROWS1^#
+// INIT_THROWS1: Begin completions
+// INIT_THROWS1: Decl[Constructor]/CurrNominal:      ['('])[' throws'][#HasThrowingMembers#]
+// INIT_THROWS1: Decl[Constructor]/CurrNominal:      ['(']{#x: () throws -> ()##() throws -> ()#})[' rethrows'][#HasThrowingMembers#]
+// INIT_THROWS1: End completions
+}
