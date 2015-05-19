@@ -536,7 +536,7 @@ typedef NS_OPTIONS(NSUInteger, NSExplicitlyUnavailableOnOSXOptions) {
 @end
 
 @interface NSClassWithExplicitlyUnavailableOptionsInMethodSignature (ActuallyUseOptions)
-  - (void)someMethodWithUnavailableOptions:(NSExplicitlyUnavailableOptions)options __attribute__((availability(macosx, introduced=10.10, deprecated=10.10, message="Use a different API")));
+  - (void)someMethodWithUnavailableOptions:(NSExplicitlyUnavailableOptions)options __attribute__((unavailable));
 
   - (void)someMethodWithUnavailableOptionsOnOSX:(NSExplicitlyUnavailableOnOSXOptions)options __attribute__((availability(macosx, unavailable, message="Use a different API")));
 @end
