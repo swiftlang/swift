@@ -42,7 +42,7 @@ public protocol _ObjectiveCBridgeable {
   ///
   /// This bridging operation is used for forced downcasting (e.g.,
   /// via as), and may defer complete checking until later. For
-  /// example, when bridging from NSArray to Array<T>, we can defer
+  /// example, when bridging from `NSArray` to `Array<T>`, we can defer
   /// the checking for the individual elements of the array.
   ///
   /// - parameter result The location where the result is written. The optional
@@ -260,13 +260,13 @@ internal var _nilNativeObject: AnyObject? {
 /// This type has implicit conversions to allow passing any of the following
 /// to a C or ObjC API:
 ///
-/// - 'nil', which gets passed as a null pointer,
+/// - `nil`, which gets passed as a null pointer,
 /// - an inout argument of the referenced type, which gets passed as a pointer
 ///   to a writeback temporary with autoreleasing ownership semantics,
-/// - an UnsafeMutablePointer<T>, which is passed as-is.
+/// - an `UnsafeMutablePointer<T>`, which is passed as-is.
 ///
 /// Passing pointers to mutable arrays of ObjC class pointers is not
-/// directly supported. Unlike UnsafeMutablePointer<T>,
+/// directly supported. Unlike `UnsafeMutablePointer<T>`,
 /// AutoreleasingUnsafeMutablePointer must reference storage that does
 /// not own a reference count to the referenced
 /// value. UnsafeMutablePointer's operations, by contrast, assume that
