@@ -41,6 +41,11 @@ public:
     : Block(block), Depth(depth), CleanupLoc(l) {}
 
   SILBasicBlock *getBlock() const { return Block; }
+  SILBasicBlock *takeBlock() {
+    auto *BB = Block;
+    Block = nullptr;
+    return BB;
+  }
   CleanupsDepth getDepth() const { return Depth; }
   CleanupLocation getCleanupLocation() const { return CleanupLoc; }
 

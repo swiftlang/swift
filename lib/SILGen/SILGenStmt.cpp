@@ -107,10 +107,22 @@ void SILGenFunction::emitStmt(Stmt *S) {
   StmtEmitter(*this).visit(S);
 }
 
-/// emitOrDeleteBlock - If there are branches to the specified basic block,
+/// getOrEraseBlock - If there are branches to the specified JumpDest,
+/// return the block, otherwise return NULL. The JumpDest must be valid.
+static SILBasicBlock *getOrEraseBlock(SILGenFunction &SGF, JumpDest &dest) {
+  SILBasicBlock *BB = dest.takeBlock();
+  if (BB->pred_empty()) {
+    // If the block is unused, we don't need it; just delete it.
+    SGF.eraseBasicBlock(BB);
+    return nullptr;
+  }
+  return BB;
+}
+
+/// emitOrDeleteBlock - If there are branches to the specified JumpDest,
 /// emit it per emitBlock.  If there aren't, then just delete the block - it
 /// turns out to have not been needed. Returns true if the block was emitted.
-static bool emitOrDeleteBlock(SILGenFunction &SGF, SILBasicBlock *BB,
+static bool emitOrDeleteBlock(SILGenFunction &SGF, JumpDest &dest,
                               SILLocation BranchLoc) {
   // If we ever add a single-use optimization here (to just continue
   // the predecessor instead of branching to a separate block), we'll
@@ -118,15 +130,12 @@ static bool emitOrDeleteBlock(SILGenFunction &SGF, SILBasicBlock *BB,
   //   try { throw x } catch _ { }
   // doesn't leave us emitting the rest of the function in the
   // postmatter section.
-
-  if (BB->pred_empty()) {
-    // If the block is unused, we don't need it; just delete it.
-    SGF.eraseBasicBlock(BB);
-    return false;
+  SILBasicBlock *BB = getOrEraseBlock(SGF, dest);
+  if (BB != nullptr) {
+    SGF.B.emitBlock(BB, BranchLoc);
+    return true;
   }
-  // Otherwise, continue emitting code in BB.
-  SGF.B.emitBlock(BB, BranchLoc);
-  return true;
+  return false;
 }
 
 Condition SILGenFunction::emitCondition(Expr *E,
@@ -484,7 +493,7 @@ void StmtEmitter::visitDoStmt(DoStmt *S) {
 
   if (hasLabel) {
     SGF.BreakContinueDestStack.pop_back();
-    emitOrDeleteBlock(SGF, endDest.getBlock(), S);
+    emitOrDeleteBlock(SGF, endDest, S);
   }
 }
 
@@ -552,7 +561,7 @@ void StmtEmitter::visitDoCatchStmt(DoCatchStmt *S) {
   // left in the original function section after this.  So if
   // emitOrDeleteBlock ever learns to just continue in the
   // predecessor, we'll need to suppress that here.
-  if (emitOrDeleteBlock(SGF, endDest.getBlock(), S))
+  if (emitOrDeleteBlock(SGF, endDest, S))
     SGF.emitProfilerIncrement(S);
 }
 
@@ -575,7 +584,7 @@ void StmtEmitter::visitRepeatWhileStmt(RepeatWhileStmt *S) {
 
   // Let's not differ from C99 6.8.5.2: "The evaluation of the controlling
   // expression takes place after each execution of the loop body."
-  emitOrDeleteBlock(SGF, condDest.getBlock(), S);
+  emitOrDeleteBlock(SGF, condDest, S);
 
   if (SGF.B.hasValidInsertionPoint()) {
     // Evaluate the condition with the false edge leading directly
@@ -593,7 +602,7 @@ void StmtEmitter::visitRepeatWhileStmt(RepeatWhileStmt *S) {
     Cond.complete(SGF);
   }
   
-  emitOrDeleteBlock(SGF, endDest.getBlock(), S);
+  emitOrDeleteBlock(SGF, endDest, S);
   SGF.BreakContinueDestStack.pop_back();
 }
 
@@ -639,7 +648,7 @@ void StmtEmitter::visitForStmt(ForStmt *S) {
 
     SGF.BreakContinueDestStack.pop_back();
     
-    emitOrDeleteBlock(SGF, incDest.getBlock(), S);
+    emitOrDeleteBlock(SGF, incDest, S);
     
     if (SGF.B.hasValidInsertionPoint() && S->getIncrement().isNonNull()) {
       FullExpr Scope(SGF.Cleanups, CleanupLocation(S->getIncrement().get()));
@@ -659,7 +668,7 @@ void StmtEmitter::visitForStmt(ForStmt *S) {
   // Complete the conditional execution.
   Cond.complete(SGF);
   
-  emitOrDeleteBlock(SGF, endDest.getBlock(), S);
+  emitOrDeleteBlock(SGF, endDest, S);
 }
 
 void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
@@ -766,7 +775,7 @@ void StmtEmitter::visitForEachStmt(ForEachStmt *S) {
   // Complete the conditional execution.
   Cond.complete(SGF);
   
-  emitOrDeleteBlock(SGF, endDest.getBlock(), S);
+  emitOrDeleteBlock(SGF, endDest, S);
   SGF.BreakContinueDestStack.pop_back();
   
   // We do not need to destroy the value in the 'nextBuf' slot here, because
