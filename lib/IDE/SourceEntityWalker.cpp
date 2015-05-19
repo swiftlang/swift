@@ -376,7 +376,7 @@ TypeDecl *SemaAnnotator::getTypeDecl(Type Ty) {
 }
 
 bool SemaAnnotator::shouldIgnore(Decl *D, bool &ShouldVisitChildren) {
-  if (D->isImplicit()) {
+  if (D->isImplicit() && !isa<PatternBindingDecl>(D)) {
     ShouldVisitChildren = false;
     return true;
   }

@@ -74,6 +74,23 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return inherited::visit(T);
   }
 
+  // A macro for handling the "semantic expressions" that are common
+  // on sugared expression nodes like string interpolation.  The
+  // semantic expression is set up by type-checking to include all the
+  // other children as sub-expressions, so if it exists, we should
+  // just bypass the rest of the visitation.
+#define HANDLE_SEMANTIC_EXPR(NODE)                         \
+  do {                                                     \
+    if (Expr *_semanticExpr = NODE->getSemanticExpr()) {   \
+      if ((_semanticExpr = doIt(_semanticExpr))) {         \
+        NODE->setSemanticExpr(_semanticExpr);              \
+      } else {                                             \
+        return nullptr;                                    \
+      }                                                    \
+      return NODE;                                         \
+    }                                                      \
+  } while(false)
+
   Expr *visitErrorExpr(ErrorExpr *E) { return E; }
   Expr *visitLiteralExpr(LiteralExpr *E) { return E; }
   Expr *visitDiscardAssignmentExpr(DiscardAssignmentExpr *E) { return E; }
@@ -125,6 +142,8 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   Expr *visitOpaqueValueExpr(OpaqueValueExpr *E) { return E; }
 
   Expr *visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E) {
+    HANDLE_SEMANTIC_EXPR(E);
+
     for (auto &Segment : E->getSegments()) {
       if (Expr *Seg = doIt(Segment))
         Segment = Seg;
@@ -135,6 +154,8 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitObjectLiteralExpr(ObjectLiteralExpr *E) {
+    HANDLE_SEMANTIC_EXPR(E);
+
     if (Expr *arg = E->getArg()) {
       if (Expr *arg2 = doIt(arg)) {
         E->setArg(arg2);
@@ -146,6 +167,8 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
   
   Expr *visitCollectionExpr(CollectionExpr *E) {
+    HANDLE_SEMANTIC_EXPR(E);
+
     for (auto &elt : E->getElements())
       if (Expr *Sub = doIt(elt))
         elt = Sub;
@@ -662,6 +685,15 @@ public:
         else
           return true;
       }
+
+      if (auto ctor = dyn_cast<ConstructorDecl>(AFD)) {
+        if (auto superInit = ctor->getSuperInitCall()) {
+          if ((superInit = doIt(superInit)))
+            ctor->setSuperInitCall(superInit);
+          else
+            return true;
+        }
+      }
     } else if (SubscriptDecl *SD = dyn_cast<SubscriptDecl>(D)) {
       if (Pattern *NewPattern = doIt(SD->getIndices()))
         SD->setIndices(NewPattern);
@@ -1027,10 +1059,22 @@ Stmt *Traversal::visitForEachStmt(ForEachStmt *S) {
       return nullptr;
   }
 
+  // The generator decl is built directly on top of the sequence
+  // expression, so don't visit both.
+  if (PatternBindingDecl *Generator = S->getGenerator()) {
+    if (doIt(Generator))
+      return nullptr;
 
-  if (Expr *Sequence = S->getSequence()) {
+  } else if (Expr *Sequence = S->getSequence()) {
     if ((Sequence = doIt(Sequence)))
       S->setSequence(Sequence);
+    else
+      return nullptr;
+  }
+
+  if (auto GeneratorNext = S->getGeneratorNext()) {
+    if ((GeneratorNext = doIt(GeneratorNext)))
+      S->setGeneratorNext(GeneratorNext);
     else
       return nullptr;
   }
