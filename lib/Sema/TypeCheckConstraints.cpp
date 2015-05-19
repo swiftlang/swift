@@ -278,24 +278,24 @@ static bool matchesDeclRefKind(ValueDecl *value, DeclRefKind refKind) {
   llvm_unreachable("bad declaration reference kind");
 }
 
-/// BindName - Bind an UnresolvedDeclRefExpr by performing name lookup and
+/// Bind an UnresolvedDeclRefExpr by performing name lookup and
 /// returning the resultant expression.  Context is the DeclContext used
 /// for the lookup.
-static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
-                      TypeChecker &TC) {
+Expr *TypeChecker::
+resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
   // Process UnresolvedDeclRefExpr by doing an unqualified lookup.
   Identifier Name = UDRE->getName();
   SourceLoc Loc = UDRE->getLoc();
 
   // Perform standard value name lookup.
   NameLookupOptions LookupOptions = defaultUnqualifiedLookupOptions;
-  if (isa<AbstractFunctionDecl>(Context))
+  if (isa<AbstractFunctionDecl>(DC))
     LookupOptions |= NameLookupFlags::KnownPrivate;
-  auto Lookup = TC.lookupUnqualified(Context, Name, Loc, LookupOptions);
+  auto Lookup = lookupUnqualified(DC, Name, Loc, LookupOptions);
 
   if (!Lookup) {
-    TC.diagnose(Loc, diag::use_unresolved_identifier, Name);
-    return new (TC.Context) ErrorExpr(Loc);
+    diagnose(Loc, diag::use_unresolved_identifier, Name);
+    return new (Context) ErrorExpr(Loc);
   }
 
   // FIXME: Need to refactor the way we build an AST node from a lookup result!
@@ -314,10 +314,10 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
     if (!D->hasType()) {
       assert(D->getDeclContext()->isLocalContext());
       if (!D->isInvalid()) {
-        TC.diagnose(Loc, diag::use_local_before_declaration, Name);
-        TC.diagnose(D->getLoc(), diag::decl_declared_here, Name);
+        diagnose(Loc, diag::use_local_before_declaration, Name);
+        diagnose(D->getLoc(), diag::decl_declared_here, Name);
       }
-      return new (TC.Context) ErrorExpr(Loc);
+      return new (Context) ErrorExpr(Loc);
     }
     if (matchesDeclRefKind(D, UDRE->getRefKind()))
       ResultValues.push_back(D);
@@ -331,10 +331,9 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
       isa<TypeDecl>(ResultValues[0])) {
     // FIXME: This is odd.
     if (isa<ModuleDecl>(ResultValues[0])) {
-      return new (TC.Context) DeclRefExpr(ResultValues[0], Loc,
-                                          /*implicit=*/false,
-                                          AccessSemantics::Ordinary,
-                                          ResultValues[0]->getType());
+      return new (Context) DeclRefExpr(ResultValues[0], Loc, /*implicit=*/false,
+                                       AccessSemantics::Ordinary,
+                                       ResultValues[0]->getType());
     }
 
     return TypeExpr::createForDecl(Loc, cast<TypeDecl>(ResultValues[0]));
@@ -344,10 +343,10 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
     // Diagnose uses of operators that found no matching candidates.
     if (ResultValues.empty()) {
       assert(UDRE->getRefKind() != DeclRefKind::Ordinary);
-      TC.diagnose(Loc, diag::use_nonmatching_operator, Name,
-                  UDRE->getRefKind() == DeclRefKind::BinaryOperator ? 0 :
-                  UDRE->getRefKind() == DeclRefKind::PrefixOperator ? 1 : 2);
-      return new (TC.Context) ErrorExpr(Loc);
+      diagnose(Loc, diag::use_nonmatching_operator, Name,
+               UDRE->getRefKind() == DeclRefKind::BinaryOperator ? 0 :
+               UDRE->getRefKind() == DeclRefKind::PrefixOperator ? 1 : 2);
+      return new (Context) ErrorExpr(Loc);
     }
 
     // For operators, sort the results so that non-generic operations come
@@ -372,8 +371,8 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
       });
     }
 
-    return TC.buildRefExpr(ResultValues, Context, Loc, UDRE->isImplicit(),
-                           UDRE->isSpecialized());
+    return buildRefExpr(ResultValues, DC, Loc, UDRE->isImplicit(),
+                        UDRE->isSpecialized());
   }
 
   ResultValues.clear();
@@ -401,17 +400,17 @@ static Expr *BindName(UnresolvedDeclRefExpr *UDRE, DeclContext *Context,
     if (auto NTD = dyn_cast<NominalTypeDecl>(Base)) {
       BaseExpr = TypeExpr::createForDecl(Loc, NTD);
     } else {
-      BaseExpr = new (TC.Context) DeclRefExpr(Base, Loc, /*implicit=*/true);
+      BaseExpr = new (Context) DeclRefExpr(Base, Loc, /*implicit=*/true);
     }
-    return new (TC.Context) UnresolvedDotExpr(BaseExpr, SourceLoc(), Name, Loc,
-                                              UDRE->isImplicit());
+    return new (Context) UnresolvedDotExpr(BaseExpr, SourceLoc(), Name, Loc,
+                                           UDRE->isImplicit());
   }
   
   // FIXME: If we reach this point, the program we're being handed is likely
   // very broken, but it's still conceivable that this may happen due to
   // invalid shadowed declarations.
   // llvm_unreachable("Can't represent lookup result");
-  return new (TC.Context) ErrorExpr(Loc);
+  return new (Context) ErrorExpr(Loc);
 }
 
 namespace {
@@ -444,7 +443,7 @@ namespace {
 
       if (auto unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
         TC.checkForForbiddenPrefix(unresolved);
-        return { true, BindName(unresolved, DC, TC) };
+        return { true, TC.resolveDeclRefExpr(unresolved, DC) };
       }
 
       if (auto PlaceholderE = dyn_cast<EditorPlaceholderExpr>(expr)) {

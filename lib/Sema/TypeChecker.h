@@ -502,6 +502,11 @@ public:
                              bool diagnoseErrors,
                              GenericTypeResolver *resolver);
   
+  /// Bind an UnresolvedDeclRefExpr by performing name lookup and
+  /// returning the resultant expression.  Context is the DeclContext used
+  /// for the lookup.
+  Expr *resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *Context);
+  
   /// \brief Validate the given type.
   ///
   /// Type validation performs name binding, checking of generic arguments,
