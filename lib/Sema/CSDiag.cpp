@@ -159,9 +159,7 @@ void Failure::dump(SourceManager *sm, raw_ostream &out) const {
     break;
 
   case IsNotMaterializable:
-    out << getFirstType().getString()
-        << " bound to non-materializable type "
-        << getSecondType().getString();
+    out << getFirstType().getString() << " is not materializable";
     break;
   }
 
@@ -898,7 +896,8 @@ static bool diagnoseFailure(ConstraintSystem &cs,
   }
 
   case Failure::IsNotMaterializable: {
-    tc.diagnose(loc, diag::type_not_materializable, failure.getFirstType())
+    tc.diagnose(loc, diag::cannot_bind_generic_parameter_to_type,
+                failure.getFirstType())
       .highlight(range1);
     if (!useExprLoc)
       noteTargetOfDiagnostic(cs, failure, locator);
