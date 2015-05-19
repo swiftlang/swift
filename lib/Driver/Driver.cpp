@@ -967,8 +967,10 @@ static bool populateOutOfDateMap(OutOfDateMap &map, StringRef argsHashStr,
   size_t numInputsFromPrevious = 0;
   for (auto &inputPair : inputs) {
     auto iter = previousInputs.find(inputPair.second->getValue());
-    if (iter == previousInputs.end())
+    if (iter == previousInputs.end()) {
+      map[inputPair.second] = BuildState::NewlyAdded;
       continue;
+    }
     ++numInputsFromPrevious;
 
     switch (iter->getValue()) {
@@ -978,6 +980,8 @@ static bool populateOutOfDateMap(OutOfDateMap &map, StringRef argsHashStr,
     case BuildState::NeedsNonCascadingBuild:
       map[inputPair.second] = iter->getValue();
       break;
+    case BuildState::NewlyAdded:
+      llvm_unreachable("previously built files don't use NewlyAdded");
     }
   }
 
@@ -1486,6 +1490,11 @@ handleCompileJobCondition(Job *J,
                           CompileJobAction::BuildState previousBuildState,
                           StringRef input,
                           StringRef output) {
+  if (previousBuildState == CompileJobAction::BuildState::NewlyAdded) {
+    J->setCondition(Job::Condition::NewlyAdded);
+    return;
+  }
+
   llvm::sys::fs::file_status inputStatus;
   if (llvm::sys::fs::status(input, inputStatus))
     return;
@@ -1510,6 +1519,8 @@ handleCompileJobCondition(Job *J,
   case CompileJobAction::BuildState::NeedsNonCascadingBuild:
     condition = Job::Condition::RunWithoutCascading;
     break;
+  case CompileJobAction::BuildState::NewlyAdded:
+    llvm_unreachable("handled above");
   }
   J->setCondition(condition);
 }
@@ -1837,6 +1848,9 @@ Job *Driver::buildJobsForAction(Compilation &C, const Action *A,
       break;
     case Job::Condition::CheckDependencies:
       llvm::outs() << ", condition: check-dependencies";
+      break;
+    case Job::Condition::NewlyAdded:
+      llvm::outs() << ", condition: newly-added";
       break;
     }
 

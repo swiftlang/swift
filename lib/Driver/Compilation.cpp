@@ -151,7 +151,8 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
     Job::Condition Condition = Job::Condition::Always;
     StringRef DependenciesFile =
       Cmd->getOutput().getAdditionalOutputForType(types::TY_SwiftDeps);
-    if (!DependenciesFile.empty()) {
+    if (!DependenciesFile.empty() &&
+        Cmd->getCondition() != Job::Condition::NewlyAdded) {
       switch (DepGraph.loadFromPath(Cmd, DependenciesFile)) {
       case DependencyGraphImpl::LoadResult::HadError:
         disableIncrementalBuild();
@@ -178,6 +179,8 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
     case Job::Condition::CheckDependencies:
       DeferredCommands.insert(Cmd);
       break;
+    case Job::Condition::NewlyAdded:
+      llvm_unreachable("handled above");
     }
   }
 
@@ -407,6 +410,7 @@ int Compilation::performSingleCommand(const Job *Cmd) {
     return 0;
   case Job::Condition::RunWithoutCascading:
   case Job::Condition::Always:
+  case Job::Condition::NewlyAdded:
     break;
   }
 

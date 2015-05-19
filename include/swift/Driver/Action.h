@@ -124,7 +124,8 @@ public:
   enum class BuildState {
     UpToDate,
     NeedsCascadingBuild,
-    NeedsNonCascadingBuild
+    NeedsNonCascadingBuild,
+    NewlyAdded
   };
 
 private:

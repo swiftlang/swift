@@ -118,7 +118,8 @@ public:
   enum class Condition {
     Always,
     RunWithoutCascading,
-    CheckDependencies
+    CheckDependencies,
+    NewlyAdded
   };
 
 private:

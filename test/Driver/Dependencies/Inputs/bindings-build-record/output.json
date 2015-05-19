@@ -11,6 +11,10 @@
     "object": "./yet-another.o",
     "swift-dependencies": "./yet-another.swiftdeps"
   },
+  "./added.swift": {
+    "object": "./added.o",
+    "swift-dependencies": "./added.swiftdeps"
+  },
   "": {
     "swift-dependencies": "./main~buildrecord.swiftdeps"
   }

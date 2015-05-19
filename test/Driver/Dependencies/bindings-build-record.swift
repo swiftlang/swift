@@ -23,6 +23,11 @@
 // BUILD-RECORD: inputs: ["./other.swift"], output: {{[{].*[}]}}, condition: run-without-cascading{{$}}
 // BUILD-RECORD: inputs: ["./yet-another.swift"], output: {{[{].*[}]$}}
 
+// RUN: echo '{version: "'$(%swiftc_driver_plain -version | head -n1)'", inputs: ["./main.swift", !private "./other.swift", !dirty "./yet-another.swift"]}' > %t/main~buildrecord.swiftdeps
+// RUN: cd %t && %swiftc_driver -driver-print-bindings ./main.swift ./other.swift ./yet-another.swift ./added.swift -incremental -output-file-map %t/output.json 2>&1 | FileCheck %s -check-prefix=BUILD-RECORD
+
+// FILE-ADDED: inputs: ["./added.swift"], output: {{[{].*[}]}}, condition: newly-added{{$}}
+
 // RUN: rm %t/main.o
 // RUN: cd %t && %swiftc_driver -driver-print-bindings ./main.swift ./other.swift ./yet-another.swift -incremental -output-file-map %t/output.json 2>&1 | FileCheck %s -check-prefix=BUILD-RECORD-PLUS-CHANGE
 // BUILD-RECORD-PLUS-CHANGE: inputs: ["./main.swift"], output: {{[{].*[}]$}}
