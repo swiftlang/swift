@@ -3,8 +3,6 @@
 
 // REQUIRES: enable_target_appletvos
 
-zzzzzz
-
 #if os(iOS)
 // This block should not parse.
 // os(tvOS) or os(watchOS) does not imply os(iOS).
