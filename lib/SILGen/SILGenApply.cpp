@@ -1755,13 +1755,13 @@ static SILValue emitRawApply(SILGenFunction &gen,
                                resultType, subs, argValues);
 
   // Otherwise, we need to create a try_apply.
-  // TODO: other error patterns.
   } else {
     SILBasicBlock *normalBB = gen.createBasicBlock();
     result = normalBB->createBBArg(resultType);
 
     SILBasicBlock *errorBB =
-      gen.getTryApplyErrorDest(loc, substFnType->getErrorResult());
+      gen.getTryApplyErrorDest(loc, substFnType->getErrorResult(),
+                               options & ApplyOptions::DoesNotThrow);
 
     gen.B.createTryApply(loc, fnValue, calleeType, subs, argValues,
                          normalBB, errorBB);
@@ -1774,9 +1774,9 @@ static SILValue emitRawApply(SILGenFunction &gen,
   // Be sure to use a CleanupLocation so that unreachable code diagnostics don't
   // trigger.
   for (auto i : indices(args)) {
-
     if (!inputTypes[i].isGuaranteed() || args[i].isPlusZeroRValueOrTrivial())
       continue;
+
     SILValue argValue = args[i].forward(gen);
     SILType argType = argValue.getType();
     CleanupLocation cleanupLoc = CleanupLocation::get(loc);
@@ -2024,8 +2024,9 @@ ManagedValue SILGenFunction::emitApply(
     // Force immediate writeback to the error temporary.
     errorTempWriteback.reset();
 
-    managedScalar = emitForeignErrorCheck(loc, managedScalar,
-                                          errorTemp, *foreignError);
+    bool doesNotThrow = (options & ApplyOptions::DoesNotThrow);
+    managedScalar = emitForeignErrorCheck(loc, managedScalar, errorTemp,
+                                          doesNotThrow, *foreignError);
   }
 
   // Fast path: no abstraction differences or bridging.
@@ -2927,21 +2928,23 @@ namespace {
 
   private:
     ArgumentSource ArgValue;
+    bool Throws;
 
   public:
     CallSite(ApplyExpr *apply)
       : Loc(apply), SubstResultType(apply->getType()->getCanonicalType()),
-        ArgValue(apply->getArg()) {
+        ArgValue(apply->getArg()), Throws(apply->throws()) {
     }
 
-    CallSite(SILLocation loc, Expr *expr, Type resultType)
-      : Loc(loc), SubstResultType(resultType->getCanonicalType()),
-        ArgValue(expr) {
+    CallSite(SILLocation loc, ArgumentSource &&value,
+             CanType resultType, bool throws)
+      : Loc(loc), SubstResultType(resultType),
+        ArgValue(std::move(value)), Throws(throws) {
     }
 
-    CallSite(SILLocation loc, ArgumentSource &&value, Type resultType)
-      : Loc(loc), SubstResultType(resultType->getCanonicalType()),
-        ArgValue(std::move(value)) {
+    CallSite(SILLocation loc, ArgumentSource &&value,
+             CanAnyFunctionType fnType)
+      : CallSite(loc, std::move(value), fnType.getResult(), fnType->throws()) {
     }
 
     /// Return the substituted, unlowered AST type of the argument.
@@ -2954,6 +2957,8 @@ namespace {
     CanType getSubstResultType() const {
       return SubstResultType;
     }
+
+    bool throws() const { return Throws; }
 
     void emit(SILGenFunction &gen, AbstractionPattern origParamType,
               ParamLowering &lowering, SmallVectorImpl<ManagedValue> &args,
@@ -3156,6 +3161,10 @@ namespace {
                  (uncurriedSites.size() == 2 &&
                   substFnType->hasSelfParam()));
 
+          if (!uncurriedSites.back().throws()) {
+            initialOptions |= ApplyOptions::DoesNotThrow;
+          }
+
           // Collect the arguments to the uncurried call.
           for (auto &site : uncurriedSites) {
             AbstractionPattern origParamType =
@@ -3305,7 +3314,7 @@ static CallEmission prepareApplyExpr(SILGenFunction &gen, Expr *e) {
   // Apply 'self' if provided.
   if (apply.SelfParam)
     emission.addCallSite(RegularLocation(e), std::move(apply.SelfParam),
-                         apply.SelfType);
+                         apply.SelfType->getCanonicalType(), /*throws*/ false);
 
   // Apply arguments from call sites, innermost to outermost.
   for (auto site = apply.CallSites.rbegin(), end = apply.CallSites.rend();
@@ -3665,7 +3674,7 @@ emitGetAccessor(SILLocation loc, SILDeclRef get,
   CallEmission emission(*this, std::move(getter), std::move(writebackScope));
   // Self ->
   if (selfValue) {
-    emission.addCallSite(loc, std::move(selfValue), accessType.getResult());
+    emission.addCallSite(loc, std::move(selfValue), accessType);
     accessType = cast<AnyFunctionType>(accessType.getResult());
   }
   // Index or () if none.
@@ -3673,7 +3682,7 @@ emitGetAccessor(SILLocation loc, SILDeclRef get,
     subscripts = emitEmptyTupleRValue(loc, SGFContext());
 
   emission.addCallSite(loc, ArgumentSource(loc, std::move(subscripts)),
-                       accessType.getResult());
+                       accessType);
 
   // T
   return emission.apply(c);
@@ -3703,7 +3712,7 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
   CallEmission emission(*this, std::move(setter), std::move(writebackScope));
   // Self ->
   if (selfValue) {
-    emission.addCallSite(loc, std::move(selfValue), accessType.getResult());
+    emission.addCallSite(loc, std::move(selfValue), accessType);
     accessType = cast<AnyFunctionType>(accessType.getResult());
   }
 
@@ -3719,7 +3728,7 @@ void SILGenFunction::emitSetAccessor(SILLocation loc, SILDeclRef set,
     setValue.rewriteType(accessType.getInput());
   }
   emission.addCallSite(loc, ArgumentSource(loc, std::move(setValue)),
-                       accessType.getResult());
+                       accessType);
   // ()
   emission.apply();
 }
@@ -3753,7 +3762,7 @@ emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
   CallEmission emission(*this, std::move(callee), std::move(writebackScope));
   // Self ->
   if (selfValue) {
-    emission.addCallSite(loc, std::move(selfValue), accessType.getResult());
+    emission.addCallSite(loc, std::move(selfValue), accessType);
     accessType = cast<AnyFunctionType>(accessType.getResult());
   }
 
@@ -3774,8 +3783,7 @@ emitMaterializeForSetAccessor(SILLocation loc, SILDeclRef materializeForSet,
     }
     return RValue(elts, accessType.getInput());
   }();
-  emission.addCallSite(loc, ArgumentSource(loc, std::move(args)),
-                       accessType.getResult());
+  emission.addCallSite(loc, ArgumentSource(loc, std::move(args)), accessType);
   // (buffer, optionalCallback)
   SILValue pointerAndOptionalCallback = emission.apply().getUnmanagedValue();
 
@@ -3823,7 +3831,7 @@ emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
   CallEmission emission(*this, std::move(callee), std::move(writebackScope));
   // Self ->
   if (selfValue) {
-    emission.addCallSite(loc, std::move(selfValue), accessType.getResult());
+    emission.addCallSite(loc, std::move(selfValue), accessType);
     accessType = cast<AnyFunctionType>(accessType.getResult());
   }
   // Index or () if none.
@@ -3831,7 +3839,7 @@ emitAddressorAccessor(SILLocation loc, SILDeclRef addressor,
     subscripts = emitEmptyTupleRValue(loc, SGFContext());
 
   emission.addCallSite(loc, ArgumentSource(loc, std::move(subscripts)),
-                       accessType.getResult());
+                       accessType);
 
   // Unsafe{Mutable}Pointer<T> or
   // (Unsafe{Mutable}Pointer<T>, Builtin.UnknownPointer) or
@@ -3896,11 +3904,11 @@ ManagedValue SILGenFunction::emitApplyConversionFunction(SILLocation loc,
   CallEmission emission = prepareApplyExpr(*this, funcExpr);
   // Rewrite the operand type to the expected argument type, to handle tuple
   // conversions etc.
-  operand.rewriteType(funcExpr->getType()->castTo<FunctionType>()->getInput()
-                        ->getCanonicalType());
+  auto funcTy = cast<FunctionType>(funcExpr->getType()->getCanonicalType());
+  operand.rewriteType(funcTy.getInput());
   // Add the operand as the final callsite.
   emission.addCallSite(loc, ArgumentSource(loc, std::move(operand)),
-                       resultType);
+                       resultType->getCanonicalType(), funcTy->throws());
   return emission.apply();
 }
 

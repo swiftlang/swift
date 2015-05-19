@@ -162,6 +162,10 @@ enum class ApplyOptions : unsigned {
 
   /// This call is transparent.
   Transparent = 0x1,
+
+  /// Suppress the error-handling edge out of the call.  This should
+  /// be used carefully; it's used to implement features like 'rethrows'.
+  DoesNotThrow = 0x2,
 };
 inline ApplyOptions operator|(ApplyOptions lhs, ApplyOptions rhs) {
   return ApplyOptions(unsigned(lhs) | unsigned(rhs));
@@ -1135,7 +1139,8 @@ public:
   };
 
   SILBasicBlock *getTryApplyErrorDest(SILLocation loc,
-                                      SILResultInfo exnResult);
+                                      SILResultInfo exnResult,
+                                      bool isSuppressed);
 
   /// Emit a dynamic member reference.
   RValue emitDynamicMemberRefExpr(DynamicMemberRefExpr *e, SGFContext c);
@@ -1313,6 +1318,7 @@ public:
   ManagedValue emitForeignErrorCheck(SILLocation loc,
                                      ManagedValue result,
                                      ManagedValue errorSlot,
+                                     bool suppressErrorCheck,
                                const ForeignErrorConvention &foreignError);
   
   //===--------------------------------------------------------------------===//

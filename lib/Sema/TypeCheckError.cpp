@@ -1343,6 +1343,9 @@ void TypeChecker::checkFunctionErrorHandling(AbstractFunctionDecl *fn) {
   if (auto body = fn->getBody()) {
     body->walk(checker);
   }
+  if (auto ctor = dyn_cast<ConstructorDecl>(fn))
+    if (auto superInit = ctor->getSuperInitCall())
+      superInit->walk(checker);
 }
 
 void TypeChecker::checkInitializerErrorHandling(Initializer *initCtx,
