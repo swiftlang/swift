@@ -236,10 +236,48 @@ void Pattern::forEachNode(const std::function<void(Pattern*)> &f) {
   }
 }
 
+/// Return true if this is a non-resolved ExprPattern which is syntactically
+/// irrefutable.
+static bool isIrrefutableExprPattern(const ExprPattern *EP) {
+  // If the pattern has a registered match expression, it's
+  // a type-checked ExprPattern.
+  if (EP->getMatchExpr()) return false;
+
+  auto expr = EP->getSubExpr();
+  while (true) {
+    // Drill into parens.
+    if (auto parens = dyn_cast<ParenExpr>(expr)) {
+      expr = parens->getSubExpr();
+      continue;
+    }
+
+      // A '_' is an untranslated AnyPattern.
+    if (isa<DiscardAssignmentExpr>(expr))
+      return true;
+
+    // Everything else is non-exhaustive.
+    return false;
+  }
+}
+
 /// Return true if this pattern (or a subpattern) is refutable.
 bool Pattern::isRefutablePattern() const {
   bool foundRefutablePattern = false;
   const_cast<Pattern*>(this)->forEachNode([&](Pattern *Node) {
+
+    // If this is an always matching 'is' pattern, then it isn't refutable.
+    if (auto *is = dyn_cast<IsPattern>(Node))
+      if (is->getCastKind() == CheckedCastKind::Coercion)
+        return;
+
+    // If this is an ExprPattern that isn't resolved yet, do some simple
+    // syntactic checks.
+    // FIXME: This is unsound, since type checking will turn other more
+    // complicated patterns into non-refutable forms.
+    if (auto *ep = dyn_cast<ExprPattern>(Node))
+      if (isIrrefutableExprPattern(ep))
+        return;
+
     switch (Node->getKind()) {
 #define PATTERN(ID, PARENT) case PatternKind::ID: break;
 #define REFUTABLE_PATTERN(ID, PARENT) \

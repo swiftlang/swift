@@ -1227,9 +1227,15 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     case CheckedCastKind::Unresolved:
       return false;
     case CheckedCastKind::Coercion:
-      diagnose(IP->getLoc(), diag::isa_is_always_true,
-               type,
-               IP->getCastTypeLoc().getType());
+      // If this is an 'as' pattern coercing between two different types, then
+      // it is "useful" because it is providing a different type to the
+      // sub-pattern.  If this is an 'is' pattern or an 'as' pattern where the
+      // types are the same, then produce a warning.
+      if (!IP->getSubPattern() ||
+          type->isEqual(IP->getCastTypeLoc().getType())) {
+        diagnose(IP->getLoc(), diag::isa_is_always_true,
+                 IP->getSubPattern() ? "as" : "is");
+      }
       IP->setCastKind(castKind);
       break;
 

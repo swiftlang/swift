@@ -2993,9 +2993,7 @@ namespace {
         return nullptr;
       case CheckedCastKind::Coercion:
         // Check is trivially true.
-        tc.diagnose(expr->getLoc(), diag::isa_is_always_true,
-                    expr->getSubExpr()->getType(),
-                    expr->getCastTypeLoc().getType());
+        tc.diagnose(expr->getLoc(), diag::isa_is_always_true, "is");
         expr->setCastKind(castKind);
         break;
       case CheckedCastKind::ArrayDowncast:

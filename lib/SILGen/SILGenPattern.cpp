@@ -2147,7 +2147,14 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
   ConsumableManagedValue subject = { exn, CastConsumptionKind::TakeOnSuccess };
   auto failure = [&](SILLocation location) {
     // If we fail to match anything, just rethrow the exception.
-    assert(ThrowDest.isValid());
+
+    // If the throw destination is not valid, then the PatternMatchEmission
+    // logic is emitting an unreachable block but didn't prune the failure BB.
+    // Mark it as such.
+    if (!ThrowDest.isValid()) {
+      B.createUnreachable(S);
+      return;
+    }
 
     // Don't actually kill the exception's cleanup.
     CleanupStateRestorationScope scope(Cleanups);

@@ -33,7 +33,11 @@ func one() {
     throw opaque_error()
   } catch MSV { // expected-error {{'is' keyword required to pattern match against type name}} {{11-11=is }}
   } catch {
-    
+  }
+
+  do {
+    throw opaque_error()
+  } catch is ErrorType {  // expected-warning {{'is' test is always true}}
   }
 }
 

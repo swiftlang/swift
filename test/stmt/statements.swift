@@ -390,3 +390,11 @@ func test_require(x : Int, y : Int??, cond : Bool) {
   guard case _ = x else {}  // expected-warning {{'guard' condition is always true, body is unreachable}}
 }
 
+func test_is_as_patterns() {
+  switch 4 {
+  case is Int: break        // expected-warning {{'is' test is always true}}
+  case _ as Int: break  // expected-warning {{'as' test is always true}}
+  case _: break
+  }
+}
+

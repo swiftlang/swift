@@ -10,3 +10,18 @@ import Foundation
 func NSErrorErrorType_erasure(x: NSError) -> ErrorType {
   return x
 }
+
+// Test patterns that are non-trivial, but irrefutable.  SILGen shouldn't crash
+// on these.
+func test_doesnt_throw() {
+  do {
+    throw NSError()
+  } catch is ErrorType {  // expected-warning {{'is' test is always true}}
+  }
+
+  do {
+    throw NSError()
+  } catch let e as NSError {  // ok.
+    _ = e
+  }
+}
