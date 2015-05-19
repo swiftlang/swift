@@ -51,6 +51,8 @@ enum class SyntaxNodeKind : uint8_t {
   AttributeBuiltin,
   /// An editor placeholder string <#like this#>.
   EditorPlaceholder,
+  /// An editor object literal [#like(this)#]
+  ObjectLiteral
 };
 
 struct SyntaxNode {

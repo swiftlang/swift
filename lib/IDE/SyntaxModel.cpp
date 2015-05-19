@@ -56,6 +56,7 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
                                            /*TokenizeInterpolatedString=*/true);
   std::vector<SyntaxNode> Nodes;
   SourceLoc AttrLoc;
+  auto LiteralStartLoc = Optional<SourceLoc>();
   for (unsigned I = 0, E = Tokens.size(); I != E; ++I) {
     auto &Tok = Tokens[I];
     SyntaxNodeKind Kind;
@@ -74,10 +75,22 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
       }
       AttrLoc = SourceLoc();
     }
-    
+
     if (!Loc.isValid()) {
       Loc = Tok.getLoc();
       Length = Tok.getLength();
+
+      if (LiteralStartLoc.hasValue() && Length.hasValue()) {
+        // We are still inside an object literal until we hit a r_square_lit.
+        if (Tok.getKind() != tok::r_square_lit) {
+          continue;
+        }
+        Kind = SyntaxNodeKind::ObjectLiteral;
+        Nodes.emplace_back(Kind, CharSourceRange(SM, LiteralStartLoc.getValue(),
+          Tok.getRange().getEnd()));
+        LiteralStartLoc = Optional<SourceLoc>();
+        continue;
+      }
     
       switch(Tok.getKind()) {
 #define KEYWORD(X) case tok::kw_##X: Kind = SyntaxNodeKind::Keyword; break;
@@ -134,6 +147,11 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
           continue;
         Kind = SyntaxNodeKind::StringInterpolationAnchor;
         break;
+      }
+
+      case tok::l_square_lit: {
+        LiteralStartLoc = Loc;
+        continue;
       }
 
       default:
