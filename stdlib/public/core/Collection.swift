@@ -261,6 +261,16 @@ public func last<C: CollectionType where C.Index: BidirectionalIndexType>(
   return x.last
 }
 
+public protocol _MutableCollectionDefaultsType : _CollectionDefaultsType {}
+
+extension _MutableCollectionDefaultsType {
+  final public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
+    @noescape body: (inout UnsafeMutableBufferPointer<Generator.Element>) -> R
+  ) -> R? {
+    return nil
+  }
+}
+
 /// A *collection* that supports subscript assignment.
 ///
 /// For any instance `a` of a type conforming to
@@ -274,12 +284,28 @@ public func last<C: CollectionType where C.Index: BidirectionalIndexType>(
 ///     a[i] = x
 ///     let y = x
 ///
-public protocol MutableCollectionType : CollectionType {
+public protocol MutableCollectionType
+  : _MutableCollectionDefaultsType, CollectionType {
+
   /// Access the element at `position`.
   ///
   /// - Requires: `position` indicates a valid position in `self` and
   ///   `position != endIndex`.
   subscript(position: Index) -> Generator.Element {get set}
+
+  /// Call `body(p)`, where `p` is a pointer to the collection's
+  /// mutable contiguous storage.  If no such storage exists, it is
+  /// first created.  If the collection does not support an internal
+  /// representation in a form of mutable contiguous storage, `body` is not
+  /// called and `nil` is returned.
+  ///
+  /// Often, the optimizer can eliminate bounds- and uniqueness-checks
+  /// within an algorithm, but when that fails, invoking the
+  /// same algorithm on `body`\ 's argument lets you trade safety for
+  /// speed.
+  mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
+    @noescape body: (inout UnsafeMutableBufferPointer<Generator.Element>) -> R
+  ) -> R?
 }
 
 /// A *generator* for an arbitrary *collection*.  Provided `C`
