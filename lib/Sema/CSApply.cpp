@@ -1155,7 +1155,7 @@ namespace {
     ///
     /// \returns The coerced closure expression.
     ///
-    ClosureExpr *coerceClosureExprToVoid(Expr *expr);
+    ClosureExpr *coerceClosureExprToVoid(ClosureExpr *expr);
     
     /// \brief Coerce the given expression to the given type.
     ///
@@ -4461,11 +4461,10 @@ static bool applyTypeToClosureExpr(Expr *expr, Type toType) {
   return false;
 }
 
-ClosureExpr *ExprRewriter::coerceClosureExprToVoid(Expr *expr) {
+ClosureExpr *ExprRewriter::coerceClosureExprToVoid(ClosureExpr *closureExpr) {
   
   auto &tc = cs.getTypeChecker();
   // Re-write the single-expression closure to return '()'
-  auto closureExpr = cast<ClosureExpr>(expr);
   assert(closureExpr->hasSingleExpressionBody());
   
   auto member = closureExpr->getBody()->getElement(0);
