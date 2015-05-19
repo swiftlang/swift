@@ -254,6 +254,10 @@ public:
     return getLoweredFunctionType()->hasSelfParam();
   }
 
+  /// Returns true if this function either has a self metadata argument or
+  /// object that Self metadata may be derived from.
+  bool hasSelfMetadataParam() const;
+
   /// Return the mangled name of this SILFunction.
   StringRef getName() const { return Name; }
 
@@ -503,6 +507,12 @@ public:
   const SILArgument *getSelfArgument() const {
     assert(hasSelfParam() && "This method can only be called if the "
                              "SILFunction has a self parameter");
+    return getArguments().back();
+  }
+
+  const SILArgument *getSelfMetadataArgument() const {
+    assert(hasSelfMetadataParam() && "This method can only be called if the "
+           "SILFunction has a self-metadata parameter");
     return getArguments().back();
   }
 

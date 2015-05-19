@@ -435,6 +435,24 @@ void SILFunction::viewCFG() const {
 #endif
 }
 
+/// Returns true if this function has either a self metadata argument or
+/// object from which Self metadata may be obtained.
+bool SILFunction::hasSelfMetadataParam() const {
+  auto paramTypes = getLoweredFunctionType()->getParameterSILTypes();
+  if (paramTypes.empty())
+    return false;
+
+  auto silTy = paramTypes.back();
+  if (!silTy.isClassOrClassMetatype())
+    return false;
+
+  auto metaTy = dyn_cast<MetatypeType>(silTy.getSwiftRValueType());
+  (void)metaTy;
+  assert(!metaTy || metaTy->getRepresentation() != MetatypeRepresentation::Thin
+         && "Class metatypes are never thin.");
+  return true;
+}
+
   /// Helper method which returns true if the linkage of the SILFunction
   /// indicates that the objects definition might be required outside the
   /// current SILModule.

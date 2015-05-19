@@ -1158,25 +1158,12 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
 
 /// Get metadata for the dynamic Self type if we have it.
 static void emitLocalSelfMetadata(IRGenSILFunction &IGF) {
-  // Self is the final SIL argument, if any.
-  if (IGF.CurSILFn->begin()->bbarg_empty())
+  if (!IGF.CurSILFn->hasSelfMetadataParam())
     return;
   
-  SILArgument *selfArg = IGF.CurSILFn->begin()->getBBArgs().back();
-  
-  // If the argument is a class or class metatype value, we can use it for Self's
-  // metadata.
-  auto selfSILTy = selfArg->getType();
-  if (!selfSILTy.isObject())
-    return;
-  CanType instanceTy = selfSILTy.getSwiftRValueType();
-  CanMetatypeType metaTy = dyn_cast<MetatypeType>(instanceTy);
-  if (metaTy)
-    instanceTy = metaTy.getInstanceType();
-  
-  if (!instanceTy->getClassOrBoundGenericClass())
-    return;
-
+  const SILArgument *selfArg = IGF.CurSILFn->getSelfMetadataArgument();
+  CanMetatypeType metaTy =
+    dyn_cast<MetatypeType>(selfArg->getType().getSwiftRValueType());
   IRGenFunction::LocalSelfKind selfKind;
   if (!metaTy)
     selfKind = IRGenFunction::ObjectReference;
@@ -1190,7 +1177,6 @@ static void emitLocalSelfMetadata(IRGenSILFunction &IGF) {
     selfKind = IRGenFunction::ObjCMetatype;
     break;
   }
-  
   llvm::Value *value = IGF.getLoweredExplosion(selfArg).claimNext();
   IGF.setLocalSelfMetadata(value, selfKind);
 }
