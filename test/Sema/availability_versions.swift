@@ -1068,6 +1068,22 @@ func useGuardAvailable() {
 
 }
 
+func twoGuardsInSameBlock(p: Int) {
+  if (p > 0) {
+    guard #available(OSX 10.10, *) else { return }
+
+    let _ = globalFuncAvailableOn10_10()
+
+    guard #available(OSX 10.11, *) else { return }
+
+    let _ = globalFuncAvailableOn10_11()
+  }
+
+  let _ = globalFuncAvailableOn10_10() // expected-error {{'globalFuncAvailableOn10_10()' is only available on OS X 10.10 or newer}}
+        // expected-note@-1 {{guard with version check}}
+        // expected-note@-2 {{add @available attribute to enclosing global function}}
+}
+
 // Refining while loops
 
 while globalFuncAvailableOn10_10() > 10 { } // expected-error {{'globalFuncAvailableOn10_10()' is only available on OS X 10.10 or newer}}

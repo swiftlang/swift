@@ -1046,7 +1046,11 @@ private:
   }
 
   virtual Stmt *walkToStmtPost(Stmt *S) override {
-    if (ContextStack.back().ScopeNode.getAsStmt() == S) {
+    // If we have multiple guard statements in the same block
+    // then we may have multiple refinement contexts to pop
+    // after walking that block.
+    while (!ContextStack.empty() &&
+           ContextStack.back().ScopeNode.getAsStmt() == S) {
       ContextStack.pop_back();
     }
 
