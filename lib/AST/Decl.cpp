@@ -3443,13 +3443,13 @@ ObjCSelector AbstractFunctionDecl::getObjCSelector(
     }
 
     // For the first selector piece, attach either the first parameter
-    // or "WithError" to the base name, if appropriate.
+    // or "AndReturnError" to the base name, if appropriate.
     auto firstPiece = getName();
     llvm::SmallString<32> scratch;
     scratch += firstPiece.str();
     if (errorConvention && piece == errorConvention->getErrorParameterIndex()) {
-      // The error is first; append "WithError".
-      camel_case::appendSentenceCase(scratch, "WithError");
+      // The error is first; append "AndReturnError".
+      camel_case::appendSentenceCase(scratch, "AndReturnError");
 
       firstPiece = ctx.getIdentifier(scratch);
       didStringManipulation = true;

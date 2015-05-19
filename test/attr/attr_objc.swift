@@ -1851,26 +1851,26 @@ class ThrowsRedecl1 {
   @objc func method1(x: Int, error: Class_ObjC1) { } // expected-note{{declared here}}
   @objc func method1(x: Int) throws { } // expected-error{{with Objective-C selector 'method1:error:'}}
 
-  @objc func method2WithError(x: Int) { } // expected-note{{declared here}}
-  @objc func method2() throws { } // expected-error{{with Objective-C selector 'method2WithError:'}}
+  @objc func method2AndReturnError(x: Int) { } // expected-note{{declared here}}
+  @objc func method2() throws { } // expected-error{{with Objective-C selector 'method2AndReturnError:'}}
 
   @objc func method3(x: Int, error: Int, closure: Int -> Int) { }  // expected-note{{declared here}}
   @objc func method3(x: Int, closure: Int -> Int) throws { } // expected-error{{with Objective-C selector 'method3:error:closure:'}}
 
-  @objc(initWithError:) func initMethod1(error: Int) { } // expected-note{{declared here}}
-  @objc init() throws { } // expected-error{{with Objective-C selector 'initWithError:'}}
+  @objc(initAndReturnError:) func initMethod1(error: Int) { } // expected-note{{declared here}}
+  @objc init() throws { } // expected-error{{with Objective-C selector 'initAndReturnError:'}}
 
   @objc(initWithString:error:) func initMethod2(string: String, error: Int) { } // expected-note{{declared here}}
   @objc init(string: String) throws { } // expected-error{{with Objective-C selector 'initWithString:error:'}}
 
-  @objc(initWithError:fn:) func initMethod3(error: Int, fn: Int -> Int) { } // expected-note{{declared here}}
-  @objc init(fn: Int -> Int) throws { } // expected-error{{with Objective-C selector 'initWithError:fn:'}}
+  @objc(initAndReturnError:fn:) func initMethod3(error: Int, fn: Int -> Int) { } // expected-note{{declared here}}
+  @objc init(fn: Int -> Int) throws { } // expected-error{{with Objective-C selector 'initAndReturnError:fn:'}}
 }
 
 class ThrowsObjCName {
   @objc(method4:closure:error:) func method4(x: Int, closure: Int -> Int) throws { }
 
-  @objc(method5WithError:x:closure:) func method5(x: Int, closure: Int -> Int) throws { }
+  @objc(method5AndReturnError:x:closure:) func method5(x: Int, closure: Int -> Int) throws { }
 
   @objc(method6) func method6() throws { } // expected-error{{@objc' method name provides names for 0 arguments, but method has one parameter (the error parameter)}}
 
@@ -1881,7 +1881,7 @@ class ThrowsObjCName {
   func method8(s: String, fn1: ((Int) -> Int), fn2: (Int) -> Int) throws { }
 
   // CHECK-DUMP: func_decl "method9(_:fn1:fn2:)"{{.*}}foreign_error=ZeroResult,unowned,param=0,paramtype=AutoreleasingUnsafeMutablePointer<Optional<NSError>>,resulttype=Bool
-  @objc(method9WithError:s:fn1:fn2:)
+  @objc(method9AndReturnError:s:fn1:fn2:)
   func method9(s: String, fn1: ((Int) -> Int), fn2: (Int) -> Int) throws { }
 }
 

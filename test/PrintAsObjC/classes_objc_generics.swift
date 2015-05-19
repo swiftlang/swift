@@ -482,13 +482,13 @@ public class NonObjCClass { }
 }
 
 // CHECK-LABEL: @interface Throwing1
-// CHECK-NEXT: - (BOOL)method1WithError:(NSError * __nullable * __null_unspecified)error;
-// CHECK-NEXT: - (Throwing1 * __nullable)method2WithError:(NSError * __nullable * __null_unspecified)error;
+// CHECK-NEXT: - (BOOL)method1AndReturnError:(NSError * __nullable * __null_unspecified)error;
+// CHECK-NEXT: - (Throwing1 * __nullable)method2AndReturnError:(NSError * __nullable * __null_unspecified)error;
 // CHECK-NEXT: - (NSArray<NSString *> * __nullable)method3:(NSInteger)x error:(NSError * __nullable * __null_unspecified)error;
-// CHECK-NEXT: - (nullable instancetype)method4WithError:(NSError * __nullable * __null_unspecified)error;
-// CHECK-NEXT: - (nullable instancetype)initWithError:(NSError * __nullable * __null_unspecified)error OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: - (nullable instancetype)method4AndReturnError:(NSError * __nullable * __null_unspecified)error;
+// CHECK-NEXT: - (nullable instancetype)initAndReturnError:(NSError * __nullable * __null_unspecified)error OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: - (nullable instancetype)initWithString:(NSString * __nonnull)string error:(NSError * __nullable * __null_unspecified)error OBJC_DESIGNATED_INITIALIZER;
-// CHECK-NEXT: - (nullable instancetype)initWithError:(NSError * __nullable * __null_unspecified)error fn:(NSInteger (^ __nonnull)(NSInteger))fn OBJC_DESIGNATED_INITIALIZER;
+// CHECK-NEXT: - (nullable instancetype)initAndReturnError:(NSError * __nullable * __null_unspecified)error fn:(NSInteger (^ __nonnull)(NSInteger))fn OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: @end
 @objc class Throwing1 {
   func method1() throws { }
