@@ -111,116 +111,130 @@ public protocol _BridgedNSError : __BridgedNSError,
 
 /// Enumeration that describes the error codes within the Cocoa error
 /// domain.
-@objc public enum _NSCocoaError : Int, _BridgedNSError {
-  // Foundation errors
-  case FileNoSuchFileError = 4
-  case FileLockingError = 255
-  case FileReadUnknownError = 256
-  case FileReadNoPermissionError = 257
-  case FileReadInvalidFileNameError = 258
-  case FileReadCorruptFileError = 259
-  case FileReadNoSuchFileError = 260
-  case FileReadInapplicableStringEncodingError = 261
-  case FileReadUnsupportedSchemeError = 262
+public struct _NSCocoaError : RawRepresentable, _BridgedNSError {
+  public let rawValue: Int
+
+  public init(rawValue: Int) {
+    self.rawValue = rawValue
+  }
+
+  public static var _NSErrorDomain: String { return NSCocoaErrorDomain }
+}
+
+public func ~=(match: _NSCocoaError, error: ErrorType) -> Bool {
+  guard let cocoaError = error as? _NSCocoaError else { return false }
+  return match.rawValue == cocoaError.rawValue
+}
+
+public extension _NSCocoaError {
+  static let FileNoSuchFileError = _NSCocoaError(rawValue: 4)
+  static let FileLockingError = _NSCocoaError(rawValue: 255)
+  static let FileReadUnknownError = _NSCocoaError(rawValue: 256)
+  static let FileReadNoPermissionError = _NSCocoaError(rawValue: 257)
+  static let FileReadInvalidFileNameError = _NSCocoaError(rawValue: 258)
+  static let FileReadCorruptFileError = _NSCocoaError(rawValue: 259)
+  static let FileReadNoSuchFileError = _NSCocoaError(rawValue: 260)
+  static let FileReadInapplicableStringEncodingError = _NSCocoaError(rawValue: 261)
+  static let FileReadUnsupportedSchemeError = _NSCocoaError(rawValue: 262)
 
   @available(OSX, introduced=10.5) @available(iOS, introduced=2.0)
-  case FileReadTooLargeError = 263
+  static let FileReadTooLargeError = _NSCocoaError(rawValue: 263)
 
   @available(OSX, introduced=10.5) @available(iOS, introduced=2.0)
-  case FileReadUnknownStringEncodingError = 264
+  static let FileReadUnknownStringEncodingError = _NSCocoaError(rawValue: 264)
 
-  case FileWriteUnknownError = 512
-  case FileWriteNoPermissionError = 513
-  case FileWriteInvalidFileNameError = 514
+  static let FileWriteUnknownError = _NSCocoaError(rawValue: 512)
+  static let FileWriteNoPermissionError = _NSCocoaError(rawValue: 513)
+  static let FileWriteInvalidFileNameError = _NSCocoaError(rawValue: 514)
 
   @available(OSX, introduced=10.7) @available(iOS, introduced=5.0)
-  case FileWriteFileExistsError = 516
+  static let FileWriteFileExistsError = _NSCocoaError(rawValue: 516)
 
-  case FileWriteInapplicableStringEncodingError = 517
-  case FileWriteUnsupportedSchemeError = 518
-  case FileWriteOutOfSpaceError = 640
+  static let FileWriteInapplicableStringEncodingError = _NSCocoaError(rawValue: 517)
+  static let FileWriteUnsupportedSchemeError = _NSCocoaError(rawValue: 518)
+  static let FileWriteOutOfSpaceError = _NSCocoaError(rawValue: 640)
 
   @available(OSX, introduced=10.6) @available(iOS, introduced=4.0)
-  case FileWriteVolumeReadOnlyError = 642
+  static let FileWriteVolumeReadOnlyError = _NSCocoaError(rawValue: 642)
 
   @available(OSX, introduced=10.11) @available(iOS, unavailable)
-  case FileManagerUnmountUnknownError = 768
+  static let FileManagerUnmountUnknownError = _NSCocoaError(rawValue: 768)
 
   @available(OSX, introduced=10.11) @available(iOS, unavailable)
-  case FileManagerUnmountBusyError = 769
+  static let FileManagerUnmountBusyError = _NSCocoaError(rawValue: 769)
 
-  case KeyValueValidationError = 1024
-  case FormattingError = 2048
-  case UserCancelledError = 3072
+  static let KeyValueValidationError = _NSCocoaError(rawValue: 1024)
+  static let FormattingError = _NSCocoaError(rawValue: 2048)
+  static let UserCancelledError = _NSCocoaError(rawValue: 3072)
 
   @available(OSX, introduced=10.8) @available(iOS, introduced=6.0)
-  case FeatureUnsupportedError = 3328
+  static let FeatureUnsupportedError = _NSCocoaError(rawValue: 3328)
 
   @available(OSX, introduced=10.5) @available(iOS, introduced=2.0)
-  case ExecutableNotLoadableError = 3584
+  static let ExecutableNotLoadableError = _NSCocoaError(rawValue: 3584)
 
   @available(OSX, introduced=10.5) @available(iOS, introduced=2.0)
-  case ExecutableArchitectureMismatchError = 3585
+  static let ExecutableArchitectureMismatchError = _NSCocoaError(rawValue: 3585)
 
   @available(OSX, introduced=10.5) @available(iOS, introduced=2.0)
-  case ExecutableRuntimeMismatchError = 3586
+  static let ExecutableRuntimeMismatchError = _NSCocoaError(rawValue: 3586)
 
   @available(OSX, introduced=10.5) @available(iOS, introduced=2.0)
-  case ExecutableLoadError = 3587
+  static let ExecutableLoadError = _NSCocoaError(rawValue: 3587)
 
   @available(OSX, introduced=10.5) @available(iOS, introduced=2.0)
-  case ExecutableLinkError = 3588
+  static let ExecutableLinkError = _NSCocoaError(rawValue: 3588)
 
   @available(OSX, introduced=10.6) @available(iOS, introduced=4.0)
-  case PropertyListReadCorruptError = 3840
+  static let PropertyListReadCorruptError = _NSCocoaError(rawValue: 3840)
 
   @available(OSX, introduced=10.6) @available(iOS, introduced=4.0)
-  case PropertyListReadUnknownVersionError = 3841
+  static let PropertyListReadUnknownVersionError = _NSCocoaError(rawValue: 3841)
 
   @available(OSX, introduced=10.6) @available(iOS, introduced=4.0)
-  case PropertyListReadStreamError = 3842
+  static let PropertyListReadStreamError = _NSCocoaError(rawValue: 3842)
 
   @available(OSX, introduced=10.6) @available(iOS, introduced=4.0)
-  case PropertyListWriteStreamError = 3851
+  static let PropertyListWriteStreamError = _NSCocoaError(rawValue: 3851)
 
   @available(OSX, introduced=10.10) @available(iOS, introduced=8.0)
-  case PropertyListWriteInvalidError = 3852
+  static let PropertyListWriteInvalidError = _NSCocoaError(rawValue: 3852)
 
   @available(OSX, introduced=10.8) @available(iOS, introduced=6.0)
-  case XPCConnectionInterrupted = 4097
+  static let XPCConnectionInterrupted = _NSCocoaError(rawValue: 4097)
 
   @available(OSX, introduced=10.8) @available(iOS, introduced=6.0)
-  case XPCConnectionInvalid = 4099
+  static let XPCConnectionInvalid = _NSCocoaError(rawValue: 4099)
 
   @available(OSX, introduced=10.8) @available(iOS, introduced=6.0)
-  case XPCConnectionReplyInvalid = 4101
+  static let XPCConnectionReplyInvalid = _NSCocoaError(rawValue: 4101)
 
   @available(OSX, introduced=10.9) @available(iOS, introduced=7.0)
-  case UbiquitousFileUnavailableError = 4353
+  static let UbiquitousFileUnavailableError = _NSCocoaError(rawValue: 4353)
 
   @available(OSX, introduced=10.9) @available(iOS, introduced=7.0)
-  case UbiquitousFileNotUploadedDueToQuotaError = 4354
+  static let UbiquitousFileNotUploadedDueToQuotaError = _NSCocoaError(rawValue: 4354)
 
   @available(OSX, introduced=10.9) @available(iOS, introduced=7.0)
-  case UbiquitousFileUbiquityServerNotAvailable = 4355
+  static let UbiquitousFileUbiquityServerNotAvailable = _NSCocoaError(rawValue: 4355)
 
   @available(OSX, introduced=10.10) @available(iOS, introduced=8.0)
-  case UserActivityHandoffFailedError = 4608
+  static let UserActivityHandoffFailedError = _NSCocoaError(rawValue: 4608)
 
   @available(OSX, introduced=10.10) @available(iOS, introduced=8.0)
-  case UserActivityConnectionUnavailableError = 4609
+  static let UserActivityConnectionUnavailableError = _NSCocoaError(rawValue: 4609)
 
   @available(OSX, introduced=10.10) @available(iOS, introduced=8.0)
-  case UserActivityRemoteApplicationTimedOutError = 4610
+  static let UserActivityRemoteApplicationTimedOutError = _NSCocoaError(rawValue: 4610)
 
   @available(OSX, introduced=10.10) @available(iOS, introduced=8.0)
-  case UserActivityHandoffUserInfoTooLargeError = 4611
+  static let UserActivityHandoffUserInfoTooLargeError = _NSCocoaError(rawValue: 4611)
 
   @available(OSX, introduced=10.11) @available(iOS, introduced=9.0)
-  case CoderReadCorruptError = 4864
+  static let CoderReadCorruptError = _NSCocoaError(rawValue: 4864)
 
   @available(OSX, introduced=10.11) @available(iOS, introduced=9.0)
-  case CoderValueNotFoundError = 4865
+  static let CoderValueNotFoundError = _NSCocoaError(rawValue: 4865)
 
 
   @available(OSX, introduced=10.11) @available(iOS, introduced=9.0)
@@ -264,77 +278,6 @@ public protocol _BridgedNSError : __BridgedNSError,
   public var isXPCConnectionError: Bool {
     return rawValue >= 4096 && rawValue <= 4224;
   }
-
-  // CoreData errors
-  case ManagedObjectValidationError = 1550
-  case ValidationMultipleErrorsError = 1560
-  case ValidationMissingMandatoryPropertyError = 1570
-  case ValidationRelationshipLacksMinimumCountError = 1580
-  case ValidationRelationshipExceedsMaximumCountError = 1590
-  case ValidationRelationshipDeniedDeleteError = 1600
-  case ValidationNumberTooLargeError = 1610
-  case ValidationNumberTooSmallError = 1620
-  case ValidationDateTooLateError = 1630
-  case ValidationDateTooSoonError = 1640
-  case ValidationInvalidDateError = 1650
-  case ValidationStringTooLongError = 1660
-  case ValidationStringTooShortError = 1670
-  case ValidationStringPatternMatchingError = 1680
-  case ManagedObjectContextLockingError = 132000
-  case PersistentStoreCoordinatorLockingError = 132010
-  case ManagedObjectReferentialIntegrityError = 133000
-  case ManagedObjectExternalRelationshipError = 133010
-  case ManagedObjectMergeError = 133020
-  case ManagedObjectConstraintMergeError = 133021
-  case PersistentStoreInvalidTypeError = 134000
-  case PersistentStoreTypeMismatchError = 134010
-  case PersistentStoreIncompatibleSchemaError = 134020
-  case PersistentStoreSaveError = 134030
-  case PersistentStoreIncompleteSaveError = 134040
-  case PersistentStoreSaveConflictsError = 134050
-  case CoreDataError = 134060
-  case PersistentStoreOperationError = 134070
-  case PersistentStoreOpenError = 134080
-  case PersistentStoreTimeoutError = 134090
-  case PersistentStoreUnsupportedRequestTypeError = 134091
-  case PersistentStoreIncompatibleVersionHashError = 134100
-  case MigrationError = 134110
-  case MigrationCancelledError = 134120
-  case MigrationMissingSourceModelError = 134130
-  case MigrationMissingMappingModelError = 134140
-  case MigrationManagerSourceStoreError = 134150
-  case MigrationManagerDestinationStoreError = 134160
-  case EntityMigrationPolicyError = 134170
-  case SQLiteError = 134180
-  case InferredMappingModelError = 134190
-  case ExternalRecordImportError = 134200
-
-#if os(OSX)
-  // AppKit errors
-  case TextReadInapplicableDocumentTypeError = 65806
-  case TextWriteInapplicableDocumentTypeError = 66062
-  case ServiceApplicationNotFoundError = 66560
-  case ServiceApplicationLaunchFailedError = 66561
-  case ServiceRequestTimedOutError = 66562
-  case ServiceInvalidPasteboardDataError = 66563
-  case ServiceMalformedServiceDictionaryError = 66564
-  case ServiceMiscellaneousError = 66800
-  case SharingServiceNotConfiguredError = 67072
-
-  public var isServiceError: Bool {
-    return rawValue >= 66560 && rawValue <= 66817;
-  }
-
-  public var isSharingServiceError: Bool {
-    return rawValue >= 67072 && rawValue <= 67327;
-  }
-
-  public var isTextReadWriteError: Bool {
-    return rawValue >= 65792 && rawValue <= 66303;
-  }
-#endif
-
-  public static var _NSErrorDomain: String { return NSCocoaErrorDomain }
 }
 
 /// Enumeration that describes the error codes within the NSURL error
