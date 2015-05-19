@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen -verify %s | FileCheck %s
 
 class Cat {}
 
@@ -137,6 +137,19 @@ func all_together_now(flag: Bool) -> Cat {
   } catch _ {
     return Cat()
   }
+}
+
+//   Catch in non-throwing context.
+// CHECK-LABEL: sil hidden @_TF6errors11catch_a_catFT_CS_3Cat : $@convention(thin) () -> @owned Cat
+// CHECK-NEXT: bb0:
+// CHECK:      [[F:%.*]] = function_ref @_TFC6errors3CatCfMS0_FT_S0_ : $@convention(thin) (@thick Cat.Type) -> @owned Cat
+// CHECK-NEXT: [[M:%.*]] = metatype $@thick Cat.Type
+// CHECK-NEXT: [[V:%.*]] = apply [[F]]([[M]])
+// CHECK-NEXT: return [[V]] : $Cat
+func catch_a_cat() -> Cat {
+  do {
+    return Cat()
+  } catch _ as HomeworkError {}  // expected-warning {{'catch' block is unreachable because no errors are thrown in 'do' block}}
 }
 
 // Initializers.

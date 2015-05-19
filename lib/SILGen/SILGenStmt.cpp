@@ -533,11 +533,14 @@ void StmtEmitter::visitDoCatchStmt(DoCatchStmt *S) {
     visit(S->getBody());
   }
 
-  // Emit the catch clauses.
-  {
+  // Emit the catch clauses, but only if the body of the function
+  // actually throws. This is a consequence of the fact that a
+  // DoCatchStmt with a non-throwing body will type check even in
+  // a non-throwing lexical context. In this case, our local throwDest
+  // has no predecessors, and SGF.ThrowDest may not be valid either.
+  if (auto *BB = getOrEraseBlock(SGF, throwDest)) {
     // Move the insertion point to the throw destination.
-    SavedInsertionPoint savedIP(SGF, throwDest.getBlock(),
-                                FunctionSection::Postmatter);
+    SavedInsertionPoint savedIP(SGF, BB, FunctionSection::Postmatter);
 
     // The exception cleanup should be getting forwarded around
     // correctly anyway, but push a scope to ensure it gets popped.
