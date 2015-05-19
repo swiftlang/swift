@@ -243,7 +243,6 @@ class PrintAST : public ASTVisitor<PrintAST> {
   }
 
   void printAccessibility(Accessibility access, StringRef suffix = "") {
-    Printer << "/*";
     switch (access) {
     case Accessibility::Private:
       Printer << "private";
@@ -255,7 +254,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
       Printer << "public";
       break;
     }
-    Printer << suffix << "*/ ";
+    Printer << suffix << " ";
   }
 
   void printAccessibility(const ValueDecl *D) {
