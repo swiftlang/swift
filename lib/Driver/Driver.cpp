@@ -154,7 +154,8 @@ static void computeArgsHash(SmallString<32> &out, const DerivedArgList &args) {
   interestingArgs.reserve(args.size());
   std::copy_if(args.begin(), args.end(), std::back_inserter(interestingArgs),
                [](const Arg *arg) {
-    return !arg->getOption().hasFlag(options::DoesNotAffectIncrementalBuild);
+    return !arg->getOption().hasFlag(options::DoesNotAffectIncrementalBuild) &&
+           arg->getOption().getKind() != Option::InputClass;
   });
 
   llvm::array_pod_sort(interestingArgs.begin(), interestingArgs.end(),
