@@ -67,18 +67,18 @@ public protocol __BridgedNSError : RawRepresentable {
 }
 
 // Allow two bridged NSError types to be compared.
-public func ==<T: __BridgedNSError where T.RawValue == Int>(
+public func ==<T: __BridgedNSError where T.RawValue: SignedIntegerType>(
   lhs: T,
   rhs: T
 ) -> Bool {
-  return lhs.rawValue == rhs.rawValue
+  return lhs.rawValue.toIntMax() == rhs.rawValue.toIntMax()
 }
 
-public extension __BridgedNSError where RawValue == Int {
+public extension __BridgedNSError where RawValue: SignedIntegerType {
   public final var _domain: String { return Self._NSErrorDomain }
-  public final var _code: Int { return rawValue }
+  public final var _code: Int { return Int(rawValue.toIntMax()) }
 
-  public init?(rawValue: Int) {
+  public init?(rawValue: RawValue) {
     self = unsafeBitCast(rawValue, Self.self)
   }
 
@@ -87,15 +87,44 @@ public extension __BridgedNSError where RawValue == Int {
       return nil
     }
 
-    if let result = Self(rawValue: _bridgedNSError.code) {
-      self = result
-    } else {
-      return nil
-    }
+    self.init(rawValue: RawValue(IntMax(_bridgedNSError.code)))
   }
 
-  public final var hashValue: Int { return rawValue }
+  public final var hashValue: Int { return _code }
 }
+
+#if false
+// Allow two bridged NSError types to be compared.
+public func ==<T: __BridgedNSError where T.RawValue: UnsignedIntegerType>(
+  lhs: T,
+  rhs: T
+) -> Bool {
+  return lhs.rawValue.toUIntMax() == rhs.rawValue.toUIntMax()
+}
+
+
+// rdar://problem/21027215 prevents this
+public extension __BridgedNSError where RawValue: UnsignedIntegerType {
+  public final var _domain: String { return Self._NSErrorDomain }
+  public final var _code: Int {
+    return Int(bitPattern: UInt(rawValue.toUIntMax()))
+  }
+
+  public init?(rawValue: RawValue) {
+    self = unsafeBitCast(rawValue, Self.self)
+  }
+
+  public init?(_bridgedNSError: NSError) {
+    if _bridgedNSError.domain != Self._NSErrorDomain {
+      return nil
+    }
+
+    self.init(rawValue: RawValue(UIntMax(UInt(_bridgedNSError.code))))
+  }
+
+  public final var hashValue: Int { return _code }
+}
+#endif
 
 /// Describes a raw representable type that is bridged to a particular
 /// NSError domain.
@@ -347,63 +376,10 @@ public extension NSCocoaError {
   public static var _NSErrorDomain: String { return NSURLErrorDomain }
 }
 
-/// Helper protocol for _BridgedNSErrorCInt, which used used to provide
-/// default implementations.
-///
-/// FIXME: Should not be needed, but RawValue inference is causing
-/// problems with having multiple constrained extensions of
-/// _BridgedNSError with different RawValue types.
-public protocol __BridgedNSErrorCInt : RawRepresentable {
-  static var _NSErrorDomain: String { get }
-}
-
-// Allow two bridged NSError types to be compared.
-public func ==<T: __BridgedNSErrorCInt where T.RawValue == CInt>(
-  lhs: T,
-  rhs: T
-) -> Bool {
-  return lhs.rawValue == rhs.rawValue
-}
-
-public extension __BridgedNSErrorCInt where RawValue == CInt {
-  public final var _domain: String { return Self._NSErrorDomain }
-  public final var _code: Int { return Int(rawValue) }
-
-  public init?(rawValue: CInt) {
-    self = unsafeBitCast(rawValue, Self.self)
-  }
-
-  public init?(_bridgedNSError: NSError) {
-    if _bridgedNSError.domain != Self._NSErrorDomain {
-      return nil
-    }
-
-    if let result = Self(rawValue: CInt(_bridgedNSError.code)) {
-      self = result
-    } else {
-      return nil
-    }
-  }
-
-  public final var hashValue: Int { return Int(rawValue) }
-}
-
-/// Describes a raw representable type that is bridged to a particular
-/// NSError domain.
-///
-/// This protocol is used primarily to generate the conformance to
-/// _ObjectiveCBridgeableErrorType for such an enum.
-public protocol _BridgedNSErrorCInt : __BridgedNSErrorCInt,
-                                      _ObjectiveCBridgeableErrorType,
-                                      Hashable {
-  /// The NSError domain to which this type is bridged.
-  static var _NSErrorDomain: String { get }
-}
-
-extension POSIXError : _BridgedNSErrorCInt {
+extension POSIXError : _BridgedNSError {
   public static var _NSErrorDomain: String { return NSPOSIXErrorDomain }
 }
 
-extension MachError : _BridgedNSErrorCInt {
+extension MachError : _BridgedNSError {
   public static var _NSErrorDomain: String { return NSMachErrorDomain }
 }
