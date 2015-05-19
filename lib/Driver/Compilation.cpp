@@ -468,9 +468,10 @@ static void writeCompilationRecord(
 }
 
 int Compilation::performJobs() {
-  // We require buffered output if Parseable output was requested.
-  bool RequiresBufferedOutput = (Level == OutputLevel::Parseable);
-  if (!RequiresBufferedOutput) {
+  // If we don't have to do any cleanup work, just exec the subprocess.
+  if (Level < OutputLevel::Parseable &&
+      (SaveTemps || TempFilePaths.empty()) &&
+      CompilationRecordPath.empty()) {
     if (const Job *OnlyCmd = getOnlyCommandInList(Jobs.get()))
       return performSingleCommand(OnlyCmd);
   }
