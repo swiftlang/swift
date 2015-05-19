@@ -84,10 +84,13 @@ struct ArgumentDescriptor {
   /// to the original argument. The reason why we do this is to make sure we
   /// have access to the original argument's state if we modify the argument
   /// when optimizing.
-  ArgumentDescriptor(llvm::BumpPtrAllocator &BPA, SILArgument *A)
+  ArgumentDescriptor(llvm::BumpPtrAllocator &BPA, SILArgument *A,
+                     bool isABIRequired)
     : Arg(A), Index(A->getIndex()), ParameterInfo(A->getParameterInfo()),
-      Decl(A->getDecl()), IsDead(A->use_empty()), CalleeRelease(),
+      Decl(A->getDecl()), CalleeRelease(),
       ProjTree(A->getModule(), BPA, A->getType()) {
+
+    IsDead = A->use_empty() && !isABIRequired;
     ProjTree.computeUsesAndLiveness(A);
   }
 
@@ -319,6 +322,9 @@ class FunctionAnalyzer {
   /// The function that we are analyzing.
   SILFunction *F;
 
+  /// This function's call graph node.
+  CallGraphNode *FNode;
+
   /// Did we ascertain that we can optimize this function?
   bool ShouldOptimize;
 
@@ -335,10 +341,11 @@ public:
   FunctionAnalyzer(const FunctionAnalyzer &) = delete;
   FunctionAnalyzer(FunctionAnalyzer &&) = delete;
 
-  FunctionAnalyzer(llvm::BumpPtrAllocator &Allocator, RCIdentityFunctionInfo *RCIA,
-                   SILFunction *F)
-      : Allocator(Allocator), RCIA(RCIA), F(F), ShouldOptimize(false),
-        HaveModifiedSelfArgument(false), ArgDescList() {}
+  FunctionAnalyzer(llvm::BumpPtrAllocator &Allocator,
+                   RCIdentityFunctionInfo *RCIA,
+                   SILFunction *F, CallGraphNode *FNode)
+    : Allocator(Allocator), RCIA(RCIA), F(F), FNode(FNode),
+      ShouldOptimize(false), HaveModifiedSelfArgument(false), ArgDescList() {}
 
   /// Analyze the given function.
   bool analyze();
@@ -355,6 +362,16 @@ public:
 
   ArrayRef<ArgumentDescriptor> getArgDescList() const { return ArgDescList; }
   MutableArrayRef<ArgumentDescriptor> getArgDescList() { return ArgDescList; }
+
+  /// Is the given argument required by the ABI?
+  ///
+  /// Metadata arguments may be required if dynamic Self is bound to any generic
+  /// parameters within this function's call sites.
+  bool isArgumentABIRequired(SILArgument *Arg) {
+    // This implicitly asserts that a function binding dynamic self has a self
+    // metadata argument or object from which self metadata can be obtained.
+    return FNode->mayBindDynamicSelf() && (F->getSelfMetadataArgument() == Arg);
+  }
 
 private:
   /// Compute the CanSILFunctionType for the optimized function.
@@ -378,7 +395,7 @@ FunctionAnalyzer::analyze() {
   // argument.
   ConsumedArgToEpilogueReleaseMatcher ArgToEpilogueReleaseMap(RCIA, F);
   for (unsigned i = 0, e = Args.size(); i != e; ++i) {
-    ArgumentDescriptor A(Allocator, Args[i]);
+    ArgumentDescriptor A(Allocator, Args[i], isArgumentABIRequired(Args[i]));
     bool HaveOptimizedArg = false;
 
     if (A.IsDead) {
@@ -667,6 +684,7 @@ static bool
 optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
                           RCIdentityFunctionInfo *RCIA,
                           SILFunction *F,
+                          CallGraphNode *FNode,
                         const llvm::SmallPtrSetImpl<CallGraphEdge *> &CallSites,
                           bool CallerSetIsComplete,
                           std::vector<SILFunction *> &DeadFunctions) {
@@ -678,7 +696,7 @@ optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
   llvm::SmallVector<ArgumentDescriptor, 8> Arguments;
 
   // Analyze function arguments. If there is no work to be done, exit early.
-  FunctionAnalyzer Analyzer(BPA, RCIA, F);
+  FunctionAnalyzer Analyzer(BPA, RCIA, F, FNode);
   if (!Analyzer.analyze()) {
     DEBUG(llvm::dbgs() << "    Has no optimizable arguments... "
                           "bailing...\n");
@@ -850,7 +868,7 @@ public:
 
       // Otherwise, try to optimize the function signature of F.
       Changed |= optimizeFunctionSignature(Allocator, RCIA->get(&F),
-                                           &F, CallSites,
+                                           &F, FNode, CallSites,
                                            CallerSetIsComplete,
                                            DeadFunctions);
     }
