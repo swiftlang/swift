@@ -12,9 +12,7 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 //
-// FIXME: -fobjc-abi-version=2 is a band-aid fix for for rdar://16946936
-// 
-// RUN: xcrun -sdk %target-sdk-name clang++ -fobjc-abi-version=2 -arch %target-cpu %S/Inputs/Mirror/Mirror.mm -c -o %t/Mirror.mm.o -g
+// RUN: %target-clang %S/Inputs/Mirror/Mirror.mm -c -o %t/Mirror.mm.o -g
 // RUN: %target-build-swift %s -I %S/Inputs/Mirror/ -Xlinker %t/Mirror.mm.o -o %t/Mirror
 // RUN: %target-run %t/Mirror
 

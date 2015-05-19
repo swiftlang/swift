@@ -1,9 +1,6 @@
 // RUN: rm -rf %t  &&  mkdir %t
 //
-// FIXME: -fobjc-abi-version=2 is a band-aid fix for for rdar://16946936
-//
-// RUN: xcrun -sdk %target-sdk-name clang++ -fobjc-abi-version=2 -arch %target-cpu %S/Inputs/Mirror/Mirror.mm -c -o %t/Mirror.mm.o -g
-//
+// RUN: %target-clang %S/Inputs/Mirror/Mirror.mm -c -o %t/Mirror.mm.o -g
 // RUN: %target-build-swift -parse-stdlib %s -module-name Reflection -I %S/Inputs/Mirror/ -Xlinker %t/Mirror.mm.o -o %t/a.out
 // RUN: %S/timeout.sh 360 %target-run %t/a.out %S/Inputs/shuffle.jpg | FileCheck %s
 // FIXME: timeout wrapper is necessary because the ASan test runs for hours

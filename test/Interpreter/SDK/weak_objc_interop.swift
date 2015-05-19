@@ -1,10 +1,8 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 //
-// FIXME: -fobjc-abi-version=2 is a band-aid fix for for rdar://16946936
-//
 // RUN: cp %s %t/main.swift
-// RUN: xcrun -sdk %target-sdk-name clang++ -fobjc-arc -fobjc-abi-version=2 -arch %target-cpu %S/Inputs/ObjCWeak/ObjCWeak.m -c -o %t/ObjCWeak.o
+// RUN: %target-clang -fobjc-arc %S/Inputs/ObjCWeak/ObjCWeak.m -c -o %t/ObjCWeak.o
 // RUN: %target-build-swift %t/main.swift -I %S/Inputs/ObjCWeak/ -Xlinker %t/ObjCWeak.o -o %t/weak_objc_interop -Xfrontend -disable-access-control
 // RUN: %target-run %t/weak_objc_interop 2>&1 | FileCheck %s
 
