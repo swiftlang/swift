@@ -591,13 +591,32 @@ public:
 
 } // end anonymous namespace
 
+/// Walk the AST of \c Root and related nodes that are relevant for profiling.
+static void walkForProfiling(AbstractFunctionDecl *Root, ASTWalker &Walker) {
+  Root->walk(Walker);
+
+  // We treat class initializers as part of the constructor for profiling.
+  if (auto *CD = dyn_cast<ConstructorDecl>(Root)) {
+    Type DT = CD->getDeclContext()->getDeclaredTypeInContext();
+    auto *NominalType = DT->getNominalOrBoundGenericNominal();
+    for (auto *Member : NominalType->getMembers()) {
+      // Find pattern binding declarations that have initializers.
+      if (auto *PBD = dyn_cast<PatternBindingDecl>(Member))
+        if (!PBD->isStatic())
+          for (auto E : PBD->getPatternList())
+            if (E.Init)
+              E.Init->walk(Walker);
+    }
+  }
+}
+
 void SILGenProfiling::assignRegionCounters(AbstractFunctionDecl *Root) {
   SmallString<128> NameBuffer;
   SILDeclRef(Root).mangle(NameBuffer);
   CurrentFuncName = NameBuffer.str();
 
   MapRegionCounters Mapper(RegionCounterMap);
-  Root->walk(Mapper);
+  walkForProfiling(Root, Mapper);
 
   NumRegionCounters = Mapper.NextCounter;
   // TODO: Mapper needs to calculate a function hash as it goes.
@@ -605,7 +624,7 @@ void SILGenProfiling::assignRegionCounters(AbstractFunctionDecl *Root) {
 
   if (EmitCoverageMapping) {
     CoverageMapping Coverage(SGM.M.getASTContext().SourceMgr);
-    Root->walk(Coverage);
+    walkForProfiling(Root, Coverage);
     Coverage.emitSourceRegions(SGM.M, CurrentFuncName, FunctionHash,
                                RegionCounterMap);
   }
