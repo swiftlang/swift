@@ -182,3 +182,6 @@ func shortFormWithWildcardInMiddle() {}
 
 @available(iOS 8.0, OSX 10.10.3) // expected-error {{must handle potential future platforms with '*'}}
 func shortFormMissingWildcard() {}
+
+@availability(OSX, introduced=10.10) // expected-error {{@availability has been renamed to @available}} {{2-14=available}}
+func someFuncUsingOldAttribute() { }

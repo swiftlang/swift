@@ -1076,6 +1076,9 @@ ERROR(attr_availability_expected_equal,attribute_parsing,none,
 ERROR(attr_availability_expected_version,attribute_parsing,none,
       "expected version number in '%0' attribute", (StringRef))
 
+ERROR(attr_availability_renamed, attribute_parsing, none,
+      "@availability has been renamed to @available", ())
+
 // autoclosure
 ERROR(attr_autoclosure_expected_r_paren,attribute_parsing,PointsToFirstBadToken,
       "expected ')' in @autoclosure", ())

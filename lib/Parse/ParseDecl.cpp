@@ -1247,6 +1247,15 @@ bool Parser::parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc) {
   // If the attribute follows the new representation, switch
   // over to the alternate parsing path.
   DeclAttrKind DK = DeclAttribute::getAttrKindFromString(Tok.getText());
+
+  if (DK == DAK_Count && Tok.getText() == "availability") {
+    // We renamed @availability to @available, so if we see the former,
+    // treat it as the latter and emit a Fix-It.
+    DK = DAK_Available;
+    diagnose(Tok, diag::attr_availability_renamed)
+        .fixItReplace(Tok.getLoc(), "available");
+  }
+
   if (DK != DAK_Count && !DeclAttribute::shouldBeRejectedByParser(DK))
     return parseNewDeclAttribute(Attributes, AtLoc, DK);
 
