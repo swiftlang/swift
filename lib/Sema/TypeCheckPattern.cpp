@@ -620,6 +620,20 @@ Pattern *TypeChecker::resolvePattern(Pattern *P, DeclContext *DC,
 
   if (DiagnosedError) return nullptr;
 
+  // If the entire pattern is "(pattern_expr (type_expr SomeType))", then this
+  // is an invalid pattern.  If it were actually a value comparison (with ~=)
+  // then the metatype would have had to be spelled with "SomeType.self".  What
+  // they actually meant is to write "is SomeType", so we rewrite it to that
+  // pattern for good QoI.
+  if (auto *EP = dyn_cast<ExprPattern>(P))
+    if (auto *TE = dyn_cast<TypeExpr>(EP->getSubExpr())) {
+      diagnose(TE->getStartLoc(), diag::type_pattern_missing_is)
+        .fixItInsert(TE->getStartLoc(), "is ");
+      
+      P = new (Context) IsPattern(TE->getStartLoc(), TE->getTypeLoc(),
+                                  /*subpattern*/nullptr);
+    }
+  
   // Look through a TypedPattern if present.
   auto *InnerP = P;
   if (auto *TP = dyn_cast<TypedPattern>(P))

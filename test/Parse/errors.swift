@@ -27,6 +27,14 @@ func one() {
     let error2 = error
   } catch {
   }
+  
+  // <rdar://problem/20985280> QoI: improve diagnostic on improper pattern match on type
+  do {
+    throw opaque_error()
+  } catch MSV { // expected-error {{'is' keyword required to pattern match against type name}} {{11-11=is }}
+  } catch {
+    
+  }
 }
 
 func takesAutoclosure(@autoclosure fn : () -> Int) {}

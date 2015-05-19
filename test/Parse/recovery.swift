@@ -212,7 +212,7 @@ func missingControllingExprInSwitch() {
   }
 
   switch { // expected-error {{expected expression in 'switch' statement}}
-    case Int: return
+    case Int: return // expected-error {{'is' keyword required to pattern match against type name}} expected-warning {{cast from '<<error type>>' to unrelated type 'Int' always fails}}
     case _: return
   }
 
