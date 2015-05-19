@@ -2763,7 +2763,7 @@ ObjCSelector AbstractStorageDecl::getObjCGetterSelector(
 
   // The getter selector is the property name itself.
   auto var = cast<VarDecl>(this);
-  return ObjCSelector(ctx, 0, var->getObjCPropertyName());
+  return VarDecl::getDefaultObjCGetterSelector(ctx, var->getObjCPropertyName());
 }
 
 ObjCSelector AbstractStorageDecl::getObjCSetterSelector(
@@ -2797,11 +2797,9 @@ ObjCSelector AbstractStorageDecl::getObjCSetterSelector(
   // The setter selector for, e.g., 'fooBar' is 'setFooBar:', with the
   // property name capitalized and preceded by 'set'.
   auto var = cast<VarDecl>(this);
-  llvm::SmallString<16> scratch;
-  scratch += "set";
-  camel_case::appendSentenceCase(scratch, var->getObjCPropertyName().str());
-
-  auto result = ObjCSelector(ctx, 1, ctx.getIdentifier(scratch));
+  auto result = VarDecl::getDefaultObjCSetterSelector(
+                  ctx, 
+                  var->getObjCPropertyName());
 
   // Cache the result, so we don't perform string manipulation again.
   if (objcAttr)
@@ -2991,6 +2989,21 @@ Identifier VarDecl::getObjCPropertyName() const {
   }
 
   return getName();
+}
+
+ObjCSelector VarDecl::getDefaultObjCGetterSelector(ASTContext &ctx,
+                                                   Identifier propertyName) {
+  return ObjCSelector(ctx, 0, propertyName);
+}
+
+
+ObjCSelector VarDecl::getDefaultObjCSetterSelector(ASTContext &ctx,
+                                                   Identifier propertyName) {
+  llvm::SmallString<16> scratch;
+  scratch += "set";
+  camel_case::appendSentenceCase(scratch, propertyName.str());
+
+  return ObjCSelector(ctx, 1, ctx.getIdentifier(scratch));
 }
 
 /// If this is a simple 'let' constant, emit a note with a fixit indicating

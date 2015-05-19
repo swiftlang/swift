@@ -507,18 +507,17 @@ private:
       }
     }
 
-    // Even though Swift doesn't use custom accessor names, we need to be
-    // consistent when an Objective-C property is overridden.
-    // FIXME: Will we ever need to do this for properties that /don't/ come
-    // from Objective-C?
-    const VarDecl *base = findClangBase(VD);
-    if (base) {
-      llvm::SmallString<64> buffer;
+    // Handle custom accessor names.
+    llvm::SmallString<64> buffer;
+    if (VD->getObjCGetterSelector() !=
+          VarDecl::getDefaultObjCGetterSelector(ctx,VD->getObjCPropertyName())){
       os << ", getter=" << VD->getObjCGetterSelector().getString(buffer);
-      if (VD->isSettable(nullptr)) {
-        buffer.clear();
-        os << ", setter=" << VD->getObjCSetterSelector().getString(buffer);
-      }
+    }
+    if (VD->isSettable(nullptr) && 
+        VD->getObjCSetterSelector() !=
+          VarDecl::getDefaultObjCSetterSelector(ctx,VD->getObjCPropertyName())){
+      buffer.clear();
+      os << ", setter=" << VD->getObjCSetterSelector().getString(buffer);
     }
 
     os << ") ";
@@ -528,7 +527,7 @@ private:
     }
 
     clang::QualType clangTy;
-    if (base)
+    if (const VarDecl *base = findClangBase(VD))
       if (auto prop = dyn_cast<clang::ObjCPropertyDecl>(base->getClangDecl()))
         clangTy = prop->getType();
 

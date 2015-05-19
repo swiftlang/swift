@@ -5,7 +5,7 @@
 - (NSUInteger)foo:(NSUInteger)ignored;
 - (NSUInteger)foo:(NSUInteger)x y:(NSUInteger)y;
 
-@property(readonly) NSUInteger prop;
+@property(readonly,getter=getProp) NSUInteger prop;
 
 - (id)objectAtIndexedSubscript:(NSUInteger)idx;
 

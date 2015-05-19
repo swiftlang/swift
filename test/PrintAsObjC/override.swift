@@ -21,7 +21,7 @@ import OverrideBase
 
 // CHECK-LABEL: @interface A_Child : Base
 class A_Child : Base {
-  // CHECK-NEXT: @property (nonatomic, readonly, getter=prop) NSUInteger prop;
+  // CHECK-NEXT: @property (nonatomic, readonly, getter=getProp) NSUInteger prop;
   override var prop: Int { return 0 }
   // CHECK-NEXT: - (id __nullable)objectAtIndexedSubscript:(NSUInteger)x;
   override subscript(x: Int) -> AnyObject? { return nil }
@@ -38,7 +38,7 @@ class A_Child : Base {
 
 // CHECK-LABEL: @interface A_Grandchild : A_Child
 class A_Grandchild : A_Child {
-  // CHECK-NEXT: @property (nonatomic, readonly, getter=prop) NSUInteger prop;
+  // CHECK-NEXT: @property (nonatomic, readonly, getter=getProp) NSUInteger prop;
   override var prop: Int { return 0 }
   // CHECK-NEXT: - (id __nullable)objectAtIndexedSubscript:(NSUInteger)x;
   override subscript(x: Int) -> AnyObject? { return nil }
@@ -60,7 +60,7 @@ class B_EmptyChild : Base {
 
 // CHECK-LABEL: @interface B_GrandchildViaEmpty : B_EmptyChild
 class B_GrandchildViaEmpty : B_EmptyChild {
-  // CHECK-NEXT: @property (nonatomic, getter=prop, setter=setProp:) NSUInteger prop;
+  // CHECK-NEXT: @property (nonatomic, getter=getProp) NSUInteger prop;
   override var prop: Int { 
     get { return 0 }
     set {}

@@ -340,6 +340,7 @@ public class NonObjCClass { }
 // CHECK-NEXT: + (void)setStaticString:(NSString * __nonnull)value;
 // CHECK-NEXT: + (double)staticDouble;
 // CHECK-NEXT: @property (nonatomic) Properties * __nullable wobble;
+// CHECK-NEXT: @property (nonatomic, getter=isEnabled, setter=setIsEnabled:) BOOL enabled;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Properties {
@@ -393,10 +394,15 @@ public class NonObjCClass { }
   }
 
   @objc(wobble) var wibble: Properties?
+
+  var enabled: Bool {
+    @objc(isEnabled) get { return true }
+    @objc(setIsEnabled:) set { }
+  }
 }
 
 // CHECK-LABEL: @interface PropertiesOverridden
-// CHECK-NEXT: @property (nonatomic, copy, getter=bees, setter=setBees:) NSArray<Bee *> * __nonnull bees;
+// CHECK-NEXT: @property (nonatomic, copy) NSArray<Bee *> * __nonnull bees;
 // CHECK-NEXT: - (null_unspecified instancetype)init
 // CHECK-NEXT: @end
 @objc class PropertiesOverridden : Hive {
