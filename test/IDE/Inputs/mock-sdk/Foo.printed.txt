@@ -287,7 +287,7 @@ class FooUnavailableMembers : FooClassBase {
   @available(*, deprecated, message="x")
   func deprecated()
   
-  @available(OSX, introduced=10.1)
+  @available(OSX 10.1, *)
   func availabilityIntroduced()
   @available(OSX, unavailable, deprecated=10.1, message="APIs deprecated as of OS X 10.9 and earlier are unavailable in Swift")
   func availabilityDeprecated()
