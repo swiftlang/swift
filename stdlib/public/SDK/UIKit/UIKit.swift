@@ -166,13 +166,12 @@ struct _UIViewMirror : MirrorType {
           UIColor(white:1.0, alpha:0.0).set()
           CGContextFillRect(ctx, bounds)
           _v.layer.renderInContext(ctx)
-          let maybe_image = UIGraphicsGetImageFromCurrentImageContext()
+
+          var image = UIGraphicsGetImageFromCurrentImageContext()
       
           UIGraphicsEndImageContext()
       
-          if let image = maybe_image {
-            result = .Some(.View(image))
-          }
+          result = .Some(.View(image))
 
           _UIViewMirror._views.removeObject(_v)
           
