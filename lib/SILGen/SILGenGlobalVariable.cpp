@@ -65,6 +65,9 @@ static bool isGlobalLazilyInitialized(VarDecl *var) {
   if (var->hasClangNode())
     return false;
 
+  if (var->isDebuggerVar())
+    return false;
+
   // Top-level global variables in the main source file and in the REPL are not
   // lazily initialized.
   auto sourceFileContext = dyn_cast<SourceFile>(var->getDeclContext());
