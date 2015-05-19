@@ -478,19 +478,6 @@ static bool canCombinePartialApply(const PartialApplyInst *PAI) {
   return true;
 }
 
-static bool shouldBeConsideredAsUse(const SILInstruction *I) {
-  switch (I->getKind()) {
-  case ValueKind::StrongRetainInst:
-  case ValueKind::StrongReleaseInst:
-  case ValueKind::RetainValueInst:
-  case ValueKind::ReleaseValueInst:
-  case ValueKind::DebugValueInst:
-    return false;
-  default:
-    return true;
-  }
-}
-
 // Helper class performing the apply{partial_apply(x,y)}(z) -> apply(z,x,y)
 // peephole.
 class PartialApplyCombiner {
