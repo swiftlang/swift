@@ -1744,6 +1744,36 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
       return nullptr;
     auto LastArg = AI->getArguments().back();
     // Try to derive conformances from the apply_inst
+
+    if (auto *Instance = dyn_cast<AllocStackInst>(LastArg)) {
+      CopyAddrInst *FoundCAI = nullptr;
+      bool isLegal = true;
+      // Check that this alloc_stack is initalized only once
+      // and then used in apply or dealloc/destroy_addr insns.
+      for (auto Use : Instance->getUses()) {
+        auto *User = Use->getUser();
+        if (isa<DeallocStackInst>(User) || isa<DestroyAddrInst>(User) ||
+            isa<ApplyInst>(User))
+          continue;
+        if (auto *CAI = dyn_cast<CopyAddrInst>(User)) {
+          if (!FoundCAI) {
+            FoundCAI = CAI;
+            continue;
+          }
+        }
+        isLegal = false;
+        break;
+      }
+
+      if (isLegal && FoundCAI) {
+        // Try to derive the type from the copy_addr that was used to
+        // initialize the alloc_stack.
+        if (auto *OEAI = dyn_cast<OpenExistentialAddrInst>(FoundCAI->getSrc())) {
+          LastArg = OEAI;
+        }
+      }
+    }
+
     if (auto *Instance = dyn_cast<OpenExistentialAddrInst>(LastArg)) {
       auto Op = Instance->getOperand();
       for (auto Use : Op.getUses()) {
