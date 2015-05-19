@@ -111,7 +111,7 @@ public protocol _BridgedNSError : __BridgedNSError,
 
 /// Enumeration that describes the error codes within the Cocoa error
 /// domain.
-public struct _NSCocoaError : RawRepresentable, _BridgedNSError {
+public struct NSCocoaError : RawRepresentable, _BridgedNSError {
   public let rawValue: Int
 
   public init(rawValue: Int) {
@@ -121,120 +121,120 @@ public struct _NSCocoaError : RawRepresentable, _BridgedNSError {
   public static var _NSErrorDomain: String { return NSCocoaErrorDomain }
 }
 
-public func ~=(match: _NSCocoaError, error: ErrorType) -> Bool {
-  guard let cocoaError = error as? _NSCocoaError else { return false }
+public func ~=(match: NSCocoaError, error: ErrorType) -> Bool {
+  guard let cocoaError = error as? NSCocoaError else { return false }
   return match.rawValue == cocoaError.rawValue
 }
 
-public extension _NSCocoaError {
-  static let FileNoSuchFileError = _NSCocoaError(rawValue: 4)
-  static let FileLockingError = _NSCocoaError(rawValue: 255)
-  static let FileReadUnknownError = _NSCocoaError(rawValue: 256)
-  static let FileReadNoPermissionError = _NSCocoaError(rawValue: 257)
-  static let FileReadInvalidFileNameError = _NSCocoaError(rawValue: 258)
-  static let FileReadCorruptFileError = _NSCocoaError(rawValue: 259)
-  static let FileReadNoSuchFileError = _NSCocoaError(rawValue: 260)
-  static let FileReadInapplicableStringEncodingError = _NSCocoaError(rawValue: 261)
-  static let FileReadUnsupportedSchemeError = _NSCocoaError(rawValue: 262)
+public extension NSCocoaError {
+  static let FileNoSuchFileError = NSCocoaError(rawValue: 4)
+  static let FileLockingError = NSCocoaError(rawValue: 255)
+  static let FileReadUnknownError = NSCocoaError(rawValue: 256)
+  static let FileReadNoPermissionError = NSCocoaError(rawValue: 257)
+  static let FileReadInvalidFileNameError = NSCocoaError(rawValue: 258)
+  static let FileReadCorruptFileError = NSCocoaError(rawValue: 259)
+  static let FileReadNoSuchFileError = NSCocoaError(rawValue: 260)
+  static let FileReadInapplicableStringEncodingError = NSCocoaError(rawValue: 261)
+  static let FileReadUnsupportedSchemeError = NSCocoaError(rawValue: 262)
 
   @available(OSX, introduced=10.5) @available(iOS, introduced=2.0)
-  static let FileReadTooLargeError = _NSCocoaError(rawValue: 263)
+  static let FileReadTooLargeError = NSCocoaError(rawValue: 263)
 
   @available(OSX, introduced=10.5) @available(iOS, introduced=2.0)
-  static let FileReadUnknownStringEncodingError = _NSCocoaError(rawValue: 264)
+  static let FileReadUnknownStringEncodingError = NSCocoaError(rawValue: 264)
 
-  static let FileWriteUnknownError = _NSCocoaError(rawValue: 512)
-  static let FileWriteNoPermissionError = _NSCocoaError(rawValue: 513)
-  static let FileWriteInvalidFileNameError = _NSCocoaError(rawValue: 514)
+  static let FileWriteUnknownError = NSCocoaError(rawValue: 512)
+  static let FileWriteNoPermissionError = NSCocoaError(rawValue: 513)
+  static let FileWriteInvalidFileNameError = NSCocoaError(rawValue: 514)
 
   @available(OSX, introduced=10.7) @available(iOS, introduced=5.0)
-  static let FileWriteFileExistsError = _NSCocoaError(rawValue: 516)
+  static let FileWriteFileExistsError = NSCocoaError(rawValue: 516)
 
-  static let FileWriteInapplicableStringEncodingError = _NSCocoaError(rawValue: 517)
-  static let FileWriteUnsupportedSchemeError = _NSCocoaError(rawValue: 518)
-  static let FileWriteOutOfSpaceError = _NSCocoaError(rawValue: 640)
+  static let FileWriteInapplicableStringEncodingError = NSCocoaError(rawValue: 517)
+  static let FileWriteUnsupportedSchemeError = NSCocoaError(rawValue: 518)
+  static let FileWriteOutOfSpaceError = NSCocoaError(rawValue: 640)
 
   @available(OSX, introduced=10.6) @available(iOS, introduced=4.0)
-  static let FileWriteVolumeReadOnlyError = _NSCocoaError(rawValue: 642)
+  static let FileWriteVolumeReadOnlyError = NSCocoaError(rawValue: 642)
 
   @available(OSX, introduced=10.11) @available(iOS, unavailable)
-  static let FileManagerUnmountUnknownError = _NSCocoaError(rawValue: 768)
+  static let FileManagerUnmountUnknownError = NSCocoaError(rawValue: 768)
 
   @available(OSX, introduced=10.11) @available(iOS, unavailable)
-  static let FileManagerUnmountBusyError = _NSCocoaError(rawValue: 769)
+  static let FileManagerUnmountBusyError = NSCocoaError(rawValue: 769)
 
-  static let KeyValueValidationError = _NSCocoaError(rawValue: 1024)
-  static let FormattingError = _NSCocoaError(rawValue: 2048)
-  static let UserCancelledError = _NSCocoaError(rawValue: 3072)
+  static let KeyValueValidationError = NSCocoaError(rawValue: 1024)
+  static let FormattingError = NSCocoaError(rawValue: 2048)
+  static let UserCancelledError = NSCocoaError(rawValue: 3072)
 
   @available(OSX, introduced=10.8) @available(iOS, introduced=6.0)
-  static let FeatureUnsupportedError = _NSCocoaError(rawValue: 3328)
+  static let FeatureUnsupportedError = NSCocoaError(rawValue: 3328)
 
   @available(OSX, introduced=10.5) @available(iOS, introduced=2.0)
-  static let ExecutableNotLoadableError = _NSCocoaError(rawValue: 3584)
+  static let ExecutableNotLoadableError = NSCocoaError(rawValue: 3584)
 
   @available(OSX, introduced=10.5) @available(iOS, introduced=2.0)
-  static let ExecutableArchitectureMismatchError = _NSCocoaError(rawValue: 3585)
+  static let ExecutableArchitectureMismatchError = NSCocoaError(rawValue: 3585)
 
   @available(OSX, introduced=10.5) @available(iOS, introduced=2.0)
-  static let ExecutableRuntimeMismatchError = _NSCocoaError(rawValue: 3586)
+  static let ExecutableRuntimeMismatchError = NSCocoaError(rawValue: 3586)
 
   @available(OSX, introduced=10.5) @available(iOS, introduced=2.0)
-  static let ExecutableLoadError = _NSCocoaError(rawValue: 3587)
+  static let ExecutableLoadError = NSCocoaError(rawValue: 3587)
 
   @available(OSX, introduced=10.5) @available(iOS, introduced=2.0)
-  static let ExecutableLinkError = _NSCocoaError(rawValue: 3588)
+  static let ExecutableLinkError = NSCocoaError(rawValue: 3588)
 
   @available(OSX, introduced=10.6) @available(iOS, introduced=4.0)
-  static let PropertyListReadCorruptError = _NSCocoaError(rawValue: 3840)
+  static let PropertyListReadCorruptError = NSCocoaError(rawValue: 3840)
 
   @available(OSX, introduced=10.6) @available(iOS, introduced=4.0)
-  static let PropertyListReadUnknownVersionError = _NSCocoaError(rawValue: 3841)
+  static let PropertyListReadUnknownVersionError = NSCocoaError(rawValue: 3841)
 
   @available(OSX, introduced=10.6) @available(iOS, introduced=4.0)
-  static let PropertyListReadStreamError = _NSCocoaError(rawValue: 3842)
+  static let PropertyListReadStreamError = NSCocoaError(rawValue: 3842)
 
   @available(OSX, introduced=10.6) @available(iOS, introduced=4.0)
-  static let PropertyListWriteStreamError = _NSCocoaError(rawValue: 3851)
+  static let PropertyListWriteStreamError = NSCocoaError(rawValue: 3851)
 
   @available(OSX, introduced=10.10) @available(iOS, introduced=8.0)
-  static let PropertyListWriteInvalidError = _NSCocoaError(rawValue: 3852)
+  static let PropertyListWriteInvalidError = NSCocoaError(rawValue: 3852)
 
   @available(OSX, introduced=10.8) @available(iOS, introduced=6.0)
-  static let XPCConnectionInterrupted = _NSCocoaError(rawValue: 4097)
+  static let XPCConnectionInterrupted = NSCocoaError(rawValue: 4097)
 
   @available(OSX, introduced=10.8) @available(iOS, introduced=6.0)
-  static let XPCConnectionInvalid = _NSCocoaError(rawValue: 4099)
+  static let XPCConnectionInvalid = NSCocoaError(rawValue: 4099)
 
   @available(OSX, introduced=10.8) @available(iOS, introduced=6.0)
-  static let XPCConnectionReplyInvalid = _NSCocoaError(rawValue: 4101)
+  static let XPCConnectionReplyInvalid = NSCocoaError(rawValue: 4101)
 
   @available(OSX, introduced=10.9) @available(iOS, introduced=7.0)
-  static let UbiquitousFileUnavailableError = _NSCocoaError(rawValue: 4353)
+  static let UbiquitousFileUnavailableError = NSCocoaError(rawValue: 4353)
 
   @available(OSX, introduced=10.9) @available(iOS, introduced=7.0)
-  static let UbiquitousFileNotUploadedDueToQuotaError = _NSCocoaError(rawValue: 4354)
+  static let UbiquitousFileNotUploadedDueToQuotaError = NSCocoaError(rawValue: 4354)
 
   @available(OSX, introduced=10.9) @available(iOS, introduced=7.0)
-  static let UbiquitousFileUbiquityServerNotAvailable = _NSCocoaError(rawValue: 4355)
+  static let UbiquitousFileUbiquityServerNotAvailable = NSCocoaError(rawValue: 4355)
 
   @available(OSX, introduced=10.10) @available(iOS, introduced=8.0)
-  static let UserActivityHandoffFailedError = _NSCocoaError(rawValue: 4608)
+  static let UserActivityHandoffFailedError = NSCocoaError(rawValue: 4608)
 
   @available(OSX, introduced=10.10) @available(iOS, introduced=8.0)
-  static let UserActivityConnectionUnavailableError = _NSCocoaError(rawValue: 4609)
+  static let UserActivityConnectionUnavailableError = NSCocoaError(rawValue: 4609)
 
   @available(OSX, introduced=10.10) @available(iOS, introduced=8.0)
-  static let UserActivityRemoteApplicationTimedOutError = _NSCocoaError(rawValue: 4610)
+  static let UserActivityRemoteApplicationTimedOutError = NSCocoaError(rawValue: 4610)
 
   @available(OSX, introduced=10.10) @available(iOS, introduced=8.0)
-  static let UserActivityHandoffUserInfoTooLargeError = _NSCocoaError(rawValue: 4611)
+  static let UserActivityHandoffUserInfoTooLargeError = NSCocoaError(rawValue: 4611)
 
   @available(OSX, introduced=10.11) @available(iOS, introduced=9.0)
-  static let CoderReadCorruptError = _NSCocoaError(rawValue: 4864)
+  static let CoderReadCorruptError = NSCocoaError(rawValue: 4864)
 
   @available(OSX, introduced=10.11) @available(iOS, introduced=9.0)
-  static let CoderValueNotFoundError = _NSCocoaError(rawValue: 4865)
+  static let CoderValueNotFoundError = NSCocoaError(rawValue: 4865)
 
 
   @available(OSX, introduced=10.11) @available(iOS, introduced=9.0)
@@ -282,7 +282,7 @@ public extension _NSCocoaError {
 
 /// Enumeration that describes the error codes within the NSURL error
 /// domain.
-@objc public enum _NSURLError : Int, _BridgedNSError {
+@objc public enum NSURLError : Int, _BridgedNSError {
   case Unknown = -1
   case Cancelled = -999
   case BadURL = -1000
@@ -400,10 +400,10 @@ public protocol _BridgedNSErrorCInt : __BridgedNSErrorCInt,
   static var _NSErrorDomain: String { get }
 }
 
-extension _POSIXError : _BridgedNSErrorCInt {
+extension POSIXError : _BridgedNSErrorCInt {
   public static var _NSErrorDomain: String { return NSPOSIXErrorDomain }
 }
 
-extension _MachError : _BridgedNSErrorCInt {
+extension MachError : _BridgedNSErrorCInt {
   public static var _NSErrorDomain: String { return NSMachErrorDomain }
 }

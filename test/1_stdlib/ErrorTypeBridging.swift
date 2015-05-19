@@ -67,10 +67,10 @@ ErrorTypeBridgingTests.test("NSError-to-enum bridging") {
 
     let cocoaCode: Int?
     switch e {
-    case let x as _NSCocoaError:
+    case let x as NSCocoaError:
       cocoaCode = x._code
       expectTrue(x.isFileError)
-      expectEqual(x, _NSCocoaError.FileNoSuchFileError)
+      expectEqual(x, NSCocoaError.FileNoSuchFileError)
       expectEqual(x.hashValue, NSFileNoSuchFileError)
     default:
       cocoaCode = nil
@@ -78,12 +78,12 @@ ErrorTypeBridgingTests.test("NSError-to-enum bridging") {
 
     expectEqual(cocoaCode, NSFileNoSuchFileError)
 
-    let cocoaCode2: Int? = (ns as? _NSCocoaError)?._code
+    let cocoaCode2: Int? = (ns as? NSCocoaError)?._code
     expectEqual(cocoaCode2, NSFileNoSuchFileError)
 
     let isNoSuchFileError: Bool
     switch e {
-    case _NSCocoaError.FileNoSuchFileError:
+    case NSCocoaError.FileNoSuchFileError:
       isNoSuchFileError = true
     default:
       isNoSuchFileError = false
@@ -98,7 +98,7 @@ ErrorTypeBridgingTests.test("NSError-to-enum bridging") {
     let eURL: ErrorType = nsURL
     let isBadURLError: Bool
     switch eURL {
-    case _NSURLError.BadURL:
+    case NSURLError.BadURL:
       isBadURLError = true
     default:
       isBadURLError = false
@@ -128,7 +128,7 @@ ErrorTypeBridgingTests.test("NSError-to-enum bridging") {
     let ePOSIX: ErrorType = nsPOSIX
     let isDeadlock: Bool
     switch ePOSIX {
-    case _POSIXError.EDEADLK:
+    case POSIXError.EDEADLK:
       isDeadlock = true
     default:
       isDeadlock = false
@@ -143,7 +143,7 @@ ErrorTypeBridgingTests.test("NSError-to-enum bridging") {
     let eMach: ErrorType = nsMach
     let isMemoryFailure: Bool
     switch eMach {
-    case _MachError.KERN_MEMORY_FAILURE:
+    case MachError.KERN_MEMORY_FAILURE:
       isMemoryFailure = true
     default:
       isMemoryFailure = false
