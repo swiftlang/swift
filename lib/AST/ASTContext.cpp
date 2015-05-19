@@ -3021,6 +3021,7 @@ SubstitutedType *SubstitutedType::get(Type Original, Type Replacement,
 DependentMemberType *DependentMemberType::get(Type base, Identifier name,
                                               const ASTContext &ctx) {
   auto properties = base->getRecursiveProperties();
+  properties += RecursiveTypeProperties::IsDependent;
   auto arena = getArena(properties);
 
   llvm::PointerUnion<Identifier, AssociatedTypeDecl *> stored(name);
@@ -3038,6 +3039,7 @@ DependentMemberType *DependentMemberType::get(Type base,
                                               AssociatedTypeDecl *assocType,
                                               const ASTContext &ctx) {
   auto properties = base->getRecursiveProperties();
+  properties += RecursiveTypeProperties::IsDependent;
   auto arena = getArena(properties);
 
   llvm::PointerUnion<Identifier, AssociatedTypeDecl *> stored(assocType);

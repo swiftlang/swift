@@ -711,6 +711,20 @@ extension PConstrained6 where Assoc == Double {
   final subscript (key: Character) -> Character { return key } // okay
 }
 
+// Interaction between RawRepresntable and protocol extensions.
+public protocol ReallyRaw : RawRepresentable {
+}
+
+public extension ReallyRaw where RawValue: SignedIntegerType {
+  public init?(rawValue: RawValue) {
+    self = unsafeBitCast(rawValue, Self.self)
+  }
+}
+
+enum Foo : Int, ReallyRaw {
+  case a = 0
+}
+
 // ----------------------------------------------------------------------------
 // Semantic restrictions
 // ----------------------------------------------------------------------------
