@@ -533,7 +533,7 @@ private:
         clangTy = prop->getType();
 
     if (!clangTy.isNull() && isNSUInteger(clangTy)) {
-      os << "NSUInteger " << VD->getName().str();
+      os << "NSUInteger " << VD->getObjCPropertyName().str();
     } else {
       print(ty, OTK_None, VD->getObjCPropertyName().str());
     }
