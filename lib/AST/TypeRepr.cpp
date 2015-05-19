@@ -288,6 +288,8 @@ void CompoundIdentTypeRepr::printImpl(ASTPrinter &Printer,
 void FunctionTypeRepr::printImpl(ASTPrinter &Printer,
                                  const PrintOptions &Opts) const {
   printTypeRepr(ArgsTy, Printer, Opts);
+  if (throws())
+    Printer << " throws";
   Printer << " -> ";
   printTypeRepr(RetTy, Printer, Opts);
 }

@@ -90,6 +90,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=OMIT_KEYWORD3 -code-completion-keywords=false > %t.txt
 // RUN: FileCheck %s -check-prefix=OMIT_KEYWORD3< %t.txt
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=HAS_THROWING -code-completion-keywords=false | FileCheck %s -check-prefix=HAS_THROWING
+
 @objc
 class TagPA {}
 @objc
@@ -357,3 +359,22 @@ class OmitKW3 : ProtocolA {
 //OMIT_KEYWORD3-DAG:     Decl[InstanceMethod]/Super:         protoAFunc() {|}; name=protoAFunc(){{$}}
 //OMIT_KEYWORD3-DAG:     Decl[InstanceMethod]/Super:         protoAFuncOptional() {|}; name=protoAFuncOptional(){{$}}
 //OMIT_KEYWORD3-DAG:     Decl[InstanceMethod]/Super:         protoAFuncWithAttr() {|}; name=protoAFuncWithAttr(){{$}}
+
+protocol HasThrowingProtocol {
+  func foo() throws
+}
+
+class HasThrowing {
+  func bar() throws {}
+  func baz(x: () throws -> ()) rethrows {}
+  init() throws {}
+}
+class TestClassWithThrows : HasThrowing, HasThrowingProtocol {
+  #^HAS_THROWING^#
+}
+// HAS_THROWING: Begin completions
+// HAS_THROWING-DAG: Decl[InstanceMethod]/Super:         func foo() throws {|}; name=foo() throws
+// HAS_THROWING-DAG: Decl[InstanceMethod]/Super:         override func bar() throws {|}; name=bar() throws
+// HAS_THROWING-DAG: Decl[InstanceMethod]/Super:         override func baz(x: () throws -> ()) rethrows {|}; name=baz(x: () throws -> ()) rethrows
+// HAS_THROWING-DAG: Decl[Constructor]/Super:            init() throws {|}; name=init() throws
+// HAS_THROWING: End completions
