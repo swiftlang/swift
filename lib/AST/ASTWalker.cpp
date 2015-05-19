@@ -10,7 +10,46 @@
 //
 //===----------------------------------------------------------------------===//
 //
-//  This file implements Expr::walk and Stmt::walk.
+//  This file implements a recursive traversal of every node in an AST.
+//
+//  It's important to update this traversal whenever the AST is
+//  changed, whether by adding a new node class or adding a new child
+//  to an existing node.  Many walker implementations rely on being
+//  invoked with every node in the AST.
+//
+//  Please follow these general rules when implementing traversal for
+//  a node:
+//
+//    - Every node should be walked.  If a node has both syntactic and
+//      semantic components, you should make you visit every node in
+//      both.
+//
+//    - Nodes should only be walked once.  So if a node has both
+//      syntactic and semantic components, but the type-checker builds
+//      the semantic components directly on top of the syntactic
+//      components, walking the semantic components will be sufficient
+//      to visit all the nodes in both.
+//
+//    - Explicitly-written nodes should be walked in left-to-right
+//      syntactic order.  The ordering of implicit nodes isn't
+//      particularly important.
+//
+//      Note that semantic components will generally preserve the
+//      syntactic order of their children because doing something else
+//      could illegally change order of evaluation.  This is why, for
+//      example, shuffling a TupleExpr creates a TupleShuffleExpr
+//      instead of just making a new TupleExpr with the elements in
+//      different order.
+//
+//    - Sub-expressions and sub-statements should be replaceable.
+//      It's reasonable to expect that the replacement won't be
+//      completely unrelated to the original, but try to avoid making
+//      assumptions about the exact representation type.  For example,
+//      assuming that a child expression is literally a TupleExpr may
+//      only be a reasonable assumption in an unchecked parse tree.
+//
+//    - Avoid relying on the AST being type-checked or even
+//      well-formed during traversal.
 //
 //===----------------------------------------------------------------------===//
 
@@ -28,11 +67,11 @@ namespace {
 /// recursive traverser which queries a user-provided walker class
 /// on every node in an AST.
 class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
-                                    /*Decl*/ void,
+                                    /*Decl*/ bool,
                                     Pattern *, /*TypeRepr*/ bool>
 {
-  friend class ASTVisitor<Traversal, Expr*, Stmt*, void, Pattern*, bool>;
-  typedef ASTVisitor<Traversal, Expr*, Stmt*, void, Pattern*, bool> inherited;
+  friend class ASTVisitor<Traversal, Expr*, Stmt*, bool, Pattern*, bool>;
+  typedef ASTVisitor<Traversal, Expr*, Stmt*, bool, Pattern*, bool> inherited;
 
   ASTWalker &Walker;
   
@@ -53,7 +92,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       Walker.Parent = PriorParent;
     }
   };
-  
+
   Expr *visit(Expr *E) {
     SetParentRAII SetParent(Walker, E);
     return inherited::visit(E);
@@ -68,11 +107,185 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     SetParentRAII SetParent(Walker, P);
     return inherited::visit(P);
   }
+
+  bool visit(Decl *D) {
+    SetParentRAII SetParent(Walker, D);
+    return inherited::visit(D);
+  }
   
   bool visit(TypeRepr *T) {
     SetParentRAII SetParent(Walker, T);
     return inherited::visit(T);
   }
+
+  /***************************************************************************/
+  /********************************** Decls **********************************/
+  /***************************************************************************/
+
+  bool visitImportDecl(ImportDecl *ID) {
+    return false;
+  }
+
+  bool visitExtensionDecl(ExtensionDecl *ED) {
+    if (TypeRepr *T = ED->getExtendedTypeLoc().getTypeRepr()) {
+      if (doIt(T))
+        return true;
+    }
+    for (auto Inherit : ED->getInherited()) {
+      if (TypeRepr *T = Inherit.getTypeRepr())
+        if (doIt(T))
+          return true;
+    }
+    for (Decl *M : ED->getMembers()) {
+      if (doIt(M))
+        return true;
+    }
+    return false;
+  }
+
+  bool visitPatternBindingDecl(PatternBindingDecl *PBD) {
+    unsigned idx = 0U-1;
+    for (auto entry : PBD->getPatternList()) {
+      ++idx;
+      if (Pattern *Pat = doIt(entry.ThePattern))
+        PBD->setPattern(idx, Pat);
+      else
+        return true;
+      if (entry.Init) {
+#ifndef NDEBUG
+        PrettyStackTraceDecl debugStack("walking into initializer for", PBD);
+#endif
+        if (Expr *E2 = doIt(entry.Init))
+          PBD->setInit(idx, E2);
+        else
+          return true;
+      }
+    }
+    return false;
+  }
+
+  bool visitEnumCaseDecl(EnumCaseDecl *ECD) {
+    // We'll visit the EnumElementDecls separately.
+    return false;
+  }
+
+  bool visitTopLevelCodeDecl(TopLevelCodeDecl *TLCD) {
+    if (BraceStmt *S = cast_or_null<BraceStmt>(doIt(TLCD->getBody())))
+      TLCD->setBody(S);
+    return false;
+  }
+
+  bool visitIfConfigDecl(IfConfigDecl *ICD) {
+    // By default, just visit the declarations that are actually
+    // injected into the enclosing context.
+    return false;
+  }
+
+  bool visitOperatorDecl(OperatorDecl *OD) {
+    return false;
+  }
+
+  bool visitTypeAliasDecl(TypeAliasDecl *TAD) {
+    if (TypeRepr *T = TAD->getUnderlyingTypeLoc().getTypeRepr())
+      if (doIt(T))
+        return true;
+    return false;
+  }
+
+  bool visitAbstractTypeParamDecl(AbstractTypeParamDecl *TPD) {
+    return false;
+  }
+
+  bool visitNominalTypeDecl(NominalTypeDecl *NTD) {
+    for (auto Inherit : NTD->getInherited()) {
+      if (TypeRepr *T = Inherit.getTypeRepr())
+        if (doIt(T))
+          return true;
+    }
+    for (Decl *Member : NTD->getMembers())
+      if (doIt(Member))
+        return true;
+    return false;
+  }
+
+  bool visitModuleDecl(ModuleDecl *MD) {
+    // TODO: should we recurse within the module?
+    return false;
+  }
+
+  bool visitVarDecl(VarDecl *VD) {
+    return false;
+  }
+
+  bool visitSubscriptDecl(SubscriptDecl *SD) {
+    if (Pattern *NewPattern = doIt(SD->getIndices()))
+      SD->setIndices(NewPattern);
+    else
+      return true;
+    if (SD->getElementTypeLoc().getTypeRepr())
+      if (doIt(SD->getElementTypeLoc().getTypeRepr()))
+        return true;
+    return false;
+  }
+
+  bool visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
+#ifndef NDEBUG
+    PrettyStackTraceDecl debugStack("walking into body of", AFD);
+#endif
+    for (auto &P : AFD->getBodyParamPatterns()) {
+      if (Pattern *NewPattern = doIt(P))
+        P = NewPattern;
+      else
+        return true;
+    }
+
+    if (auto *FD = dyn_cast<FuncDecl>(AFD))
+      if (!FD->isAccessor() && FD->getBodyResultTypeLoc().getTypeRepr())
+        if (doIt(FD->getBodyResultTypeLoc().getTypeRepr()))
+          return true;
+
+    if (AFD->getBody(/*canSynthesize=*/false)) {
+      AbstractFunctionDecl::BodyKind PreservedKind = AFD->getBodyKind();
+      if (BraceStmt *S = cast_or_null<BraceStmt>(doIt(AFD->getBody())))
+        AFD->setBody(S, PreservedKind);
+      else
+        return true;
+    }
+
+    if (auto ctor = dyn_cast<ConstructorDecl>(AFD)) {
+      if (auto superInit = ctor->getSuperInitCall()) {
+        if ((superInit = doIt(superInit)))
+          ctor->setSuperInitCall(superInit);
+        else
+          return true;
+      }
+    }
+
+    return false;
+  }
+
+  bool visitEnumElementDecl(EnumElementDecl *ED) {
+    // The getRawValueExpr should remain the untouched original LiteralExpr for
+    // serialization and validation purposes. We only traverse the type-checked
+    // form, unless we haven't populated it yet.
+    if (auto *rawValueExpr = ED->getTypeCheckedRawValueExpr()) {
+      if (auto newRawValueExpr = doIt(rawValueExpr))
+        ED->setTypeCheckedRawValueExpr(newRawValueExpr);
+      else
+        return true;
+    } else if (auto *rawLiteralExpr = ED->getRawValueExpr()) {
+      Expr *newRawExpr = doIt(rawLiteralExpr);
+      if (auto newRawLiteralExpr = dyn_cast<LiteralExpr>(newRawExpr))
+        ED->setRawValueExpr(newRawLiteralExpr);
+      else
+        return true;
+    }
+    return false;
+  }
+
+  /***************************************************************************/
+  /********************************** Exprs **********************************/
+  /***************************************************************************/
 
   // A macro for handling the "semantic expressions" that are common
   // on sugared expression nodes like string interpolation.  The
@@ -571,6 +784,10 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     return E;
   }
 
+  /***************************************************************************/
+  /***************************** Everything Else *****************************/
+  /***************************************************************************/
+
 #define STMT(Id, Parent) Stmt *visit##Id##Stmt(Id##Stmt *S);
 #include "swift/AST/StmtNodes.def"
 
@@ -640,120 +857,9 @@ public:
     if (!Walker.walkToDeclPre(D))
       return false;
 
-    auto PrevParent = Walker.Parent;
-    Walker.Parent = D;
+    if (visit(D))
+      return true;
 
-    if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
-      unsigned idx = 0U-1;
-      for (auto entry : PBD->getPatternList()) {
-        ++idx;
-        if (Pattern *Pat = doIt(entry.ThePattern))
-          PBD->setPattern(idx, Pat);
-        else
-          return true;
-        if (entry.Init) {
-#ifndef NDEBUG
-          PrettyStackTraceDecl debugStack("walking into initializer for", PBD);
-#endif
-          if (Expr *E2 = doIt(entry.Init))
-            PBD->setInit(idx, E2);
-          else
-            return true;
-        }
-      }
-            
-    } else if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-#ifndef NDEBUG
-      PrettyStackTraceDecl debugStack("walking into body of", AFD);
-#endif
-      for (auto &P : AFD->getBodyParamPatterns()) {
-        if (Pattern *NewPattern = doIt(P))
-          P = NewPattern;
-        else
-          return true;
-      }
-
-      if (auto *FD = dyn_cast<FuncDecl>(AFD))
-        if (!FD->isAccessor() && FD->getBodyResultTypeLoc().getTypeRepr())
-          if (doIt(FD->getBodyResultTypeLoc().getTypeRepr()))
-            return true;
-
-      if (AFD->getBody(/*canSynthesize=*/false)) {
-        AbstractFunctionDecl::BodyKind PreservedKind = AFD->getBodyKind();
-        if (BraceStmt *S = cast_or_null<BraceStmt>(doIt(AFD->getBody())))
-          AFD->setBody(S, PreservedKind);
-        else
-          return true;
-      }
-
-      if (auto ctor = dyn_cast<ConstructorDecl>(AFD)) {
-        if (auto superInit = ctor->getSuperInitCall()) {
-          if ((superInit = doIt(superInit)))
-            ctor->setSuperInitCall(superInit);
-          else
-            return true;
-        }
-      }
-    } else if (SubscriptDecl *SD = dyn_cast<SubscriptDecl>(D)) {
-      if (Pattern *NewPattern = doIt(SD->getIndices()))
-        SD->setIndices(NewPattern);
-      else
-        return true;
-      if (SD->getElementTypeLoc().getTypeRepr())
-        if (doIt(SD->getElementTypeLoc().getTypeRepr()))
-          return true;
-
-    } else if (ExtensionDecl *ED = dyn_cast<ExtensionDecl>(D)) {
-      if (TypeRepr *T = ED->getExtendedTypeLoc().getTypeRepr()) {
-        if (doIt(T))
-          return true;
-      }
-      for (auto Inherit : ED->getInherited()) {
-        if (TypeRepr *T = Inherit.getTypeRepr())
-          if (doIt(T))
-            return true;
-      }
-      for (Decl *M : ED->getMembers()) {
-        if (doIt(M))
-          return true;
-      }
-    } else if (NominalTypeDecl *NTD = dyn_cast<NominalTypeDecl>(D)) {
-      for (auto Inherit : NTD->getInherited()) {
-        if (TypeRepr *T = Inherit.getTypeRepr())
-          if (doIt(T))
-            return true;
-      }
-      for (Decl *Member : NTD->getMembers())
-        if (doIt(Member))
-          return true;
-
-    } else if (TypeAliasDecl *TAD = dyn_cast<TypeAliasDecl>(D)) {
-      if (TypeRepr *T = TAD->getUnderlyingTypeLoc().getTypeRepr())
-        if (doIt(T))
-          return true;
-
-    } else if (EnumElementDecl *ED = dyn_cast<EnumElementDecl>(D)) {
-      // The getRawValueExpr should remain the untouched original LiteralExpr for
-      // serialization and validation purposes. We only traverse the type-checked
-      // form, unless we haven't populated it yet.
-      if (auto *rawValueExpr = ED->getTypeCheckedRawValueExpr()) {
-        if (auto newRawValueExpr = doIt(rawValueExpr))
-          ED->setTypeCheckedRawValueExpr(newRawValueExpr);
-        else
-          return true;
-      } else if (auto *rawLiteralExpr = ED->getRawValueExpr()) {
-        Expr *newRawExpr = doIt(rawLiteralExpr);
-        if (auto newRawLiteralExpr = dyn_cast<LiteralExpr>(newRawExpr))
-          ED->setRawValueExpr(newRawLiteralExpr);
-        else
-          return true;
-      }
-    } else if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
-      if (BraceStmt *S = cast_or_null<BraceStmt>(doIt(TLCD->getBody())))
-        TLCD->setBody(S);
-    }
-
-    Walker.Parent = PrevParent;
     return !Walker.walkToDeclPost(D);
   }
   
