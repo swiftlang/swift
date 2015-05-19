@@ -127,6 +127,15 @@ struct ExprToIdentTypeRepr : public ASTVisitor<ExprToIdentTypeRepr, bool>
   bool visitExpr(Expr *e) {
     return false;
   }
+  
+  bool visitTypeExpr(TypeExpr *te) {
+    if (auto *TR = te->getTypeRepr())
+      if (auto *CITR = dyn_cast<ComponentIdentTypeRepr>(TR)) {
+        components.push_back(CITR);
+        return true;
+      }
+    return false;
+  }
 
   bool visitDeclRefExpr(DeclRefExpr *dre) {
     assert(components.empty() && "decl ref should be root element of expr");
@@ -449,22 +458,27 @@ public:
                                                nullptr);
   }
   Pattern *visitUnresolvedDeclRefExpr(UnresolvedDeclRefExpr *ude) {
+    // FIXME: This shouldn't be needed.  It is only necessary because of the
+    // poor representation of clang enum aliases and should be removed when
+    // rdar://20879992 is addressed.
+    //
     // Try looking up an enum element in context.
-    EnumElementDecl *referencedElement
-      = lookupUnqualifiedEnumMemberElement(TC, DC, ude->getName());
+    if (EnumElementDecl *referencedElement
+        = lookupUnqualifiedEnumMemberElement(TC, DC, ude->getName())) {
+      auto *enumDecl = referencedElement->getParentEnum();
+      auto enumTy = enumDecl->getDeclaredTypeInContext();
+      TypeLoc loc = TypeLoc::withoutLoc(enumTy);
+      
+      return new (TC.Context) EnumElementPattern(loc, SourceLoc(),
+                                                 ude->getLoc(),
+                                                 ude->getName(),
+                                                 referencedElement,
+                                                 nullptr);
+    }
+      
     
-    if (!referencedElement)
-      return nullptr;
-    
-    auto *enumDecl = referencedElement->getParentEnum();
-    auto enumTy = enumDecl->getDeclaredTypeInContext();
-    TypeLoc loc = TypeLoc::withoutLoc(enumTy);
-    
-    return new (TC.Context) EnumElementPattern(loc, SourceLoc(),
-                                               ude->getLoc(),
-                                               ude->getName(),
-                                               referencedElement,
-                                               nullptr);
+    // Perform unqualified name lookup to find out what the UDRE is.
+    return getSubExprPattern(TC.resolveDeclRefExpr(ude, DC));
   }
   
   // Call syntax forms a pattern if:

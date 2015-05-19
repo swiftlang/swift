@@ -52,7 +52,7 @@ if var x = opt {}
 // <rdar://problem/20800015> Fix error message for invalid if-let
 let someInteger = 1
 if let y = someInteger {}  // expected-error {{initializer for conditional binding must have Optional type, not 'Int'}}
-if case y? = someInteger {}  // expected-error {{'?' pattern cannot match values of type 'Int'}}
+if case let y? = someInteger {}  // expected-error {{'?' pattern cannot match values of type 'Int'}}
 
 // Test multiple clauses on "if let".
 if let x = opt, y = opt where x != y,
