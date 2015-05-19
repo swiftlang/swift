@@ -709,7 +709,7 @@ ParserResult<Stmt> Parser::parseStmtDefer() {
   
   // Create the tmpClosure variable and pattern binding.
   auto tempDecl = new (Context) VarDecl(/*static*/ false, /*let*/ true,
-                                        loc,Context.getIdentifier("tmpClosure"),
+                                      loc,Context.getIdentifier("$tmpClosure"),
                                         Type(), CurDeclContext);
   tempDecl->setImplicit(true);
   auto bindingPattern = new (Context) NamedPattern(tempDecl, /*implicit*/true);
