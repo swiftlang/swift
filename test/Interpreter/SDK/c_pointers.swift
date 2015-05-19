@@ -27,7 +27,11 @@ let cgRed = CGColorCreate(rgb, [1.0, 0.0, 0.0, 1.0])
 let nsRed = XXColor(CGColor: cgRed)
 
 var r: CGFloat = 0.5, g: CGFloat = 0.5, b: CGFloat = 0.5, a: CGFloat = 0.5
+#if os(OSX)
 nsRed!.getRed(&r, green: &g, blue: &b, alpha: &a)
+#else
+nsRed.getRed(&r, green: &g, blue: &b, alpha: &a)
+#endif
 
 // CHECK-LABEL: Red is:
 print("Red is:")
