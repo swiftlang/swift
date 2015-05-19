@@ -37,3 +37,5 @@
 // RUN: not %swift -parse -target x86_64-apple-watchos2 -Xcc -### %s 2>&1 | FileCheck -check-prefix=WATCHSIMULATOR64_CPU %s
 // WATCHSIMULATOR64_CPU: "-target-cpu" "core2"
 
+// REQUIRES: enable_target_appletvos
+
