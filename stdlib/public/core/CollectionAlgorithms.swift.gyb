@@ -188,7 +188,7 @@ ${sortIsUnstableForPredicate}
   ///
 ${orderingRequirementForPredicate}
   final public func _prext_sort(
-    @noescape isOrderedBefore: (Generator.Element, Generator.Element) -> Bool
+    isOrderedBefore: (Generator.Element, Generator.Element) -> Bool
   ) -> [Generator.Element] {
     var result = ContiguousArray(self)
     result._prext_sortInPlace(isOrderedBefore)
@@ -226,7 +226,7 @@ ${sortIsUnstableForPredicate}
   ///
 ${orderingRequirementForPredicate}
   final public mutating func _prext_sortInPlace(
-    @noescape isOrderedBefore: (Generator.Element, Generator.Element) -> Bool
+    isOrderedBefore: (Generator.Element, Generator.Element) -> Bool
   ) {
     let didSortUnsafeBuffer: Void? =
       _withUnsafeMutableBufferPointerIfSupported {
@@ -237,9 +237,7 @@ ${orderingRequirementForPredicate}
     if didSortUnsafeBuffer == nil {
       typealias IsOrderedBefore =
         (Generator.Element, Generator.Element) -> Bool
-      let escapableIsOrderedBefore =
-        unsafeBitCast(isOrderedBefore, IsOrderedBefore.self)
-      _introSort(&self, self.indices, escapableIsOrderedBefore)
+      _introSort(&self, self.indices, isOrderedBefore)
     }
   }
 }
