@@ -12,21 +12,21 @@
 
 #import <GameplayKit/GameplayKit.h>
 
-extern "C" NS_RETURNS_RETAINED __nullable GPComponent *
-GP_Swift_GPEntity_componentForClass(
+extern "C" NS_RETURNS_RETAINED __nullable GKComponent *
+GK_Swift_GKEntity_componentForClass(
     id NS_RELEASES_ARGUMENT __nonnull self_,
     Class __nonnull componentClass) {
-  GPEntity *entity = self_;
+  GKEntity *entity = self_;
   id component = [[entity componentForClass:componentClass] retain];
   [self_ release];
   return component;
 }
 
-extern "C" NS_RETURNS_RETAINED __nullable GPState *
-GP_Swift_GPStateMachine_stateForClass(
+extern "C" NS_RETURNS_RETAINED __nullable GKState *
+GK_Swift_GKStateMachine_stateForClass(
     id NS_RELEASES_ARGUMENT __nonnull self_,
     Class __nonnull stateClass) {
-  GPStateMachine *stateMachine = self_;
+  GKStateMachine *stateMachine = self_;
   id state = [[stateMachine stateForClass:stateClass] retain];
   [self_ release];
   return state;

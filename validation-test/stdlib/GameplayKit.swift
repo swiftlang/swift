@@ -17,14 +17,14 @@ var GamePlayKitTests = TestSuite("GameplayKit")
 
 if #available(OSX 10.11, iOS 9.0, *) {
 
-class TestComponent : GPComponent {}
-class OtherTestComponent : GPComponent {}
+class TestComponent : GKComponent {}
+class OtherTestComponent : GKComponent {}
 
-class TestState1 : GPState {}
-class TestState2 : GPState {}
+class TestState1 : GKState {}
+class TestState2 : GKState {}
 
-GamePlayKitTests.test("GPEntity.componentForClass()") {
-  let entity = GPEntity()
+GamePlayKitTests.test("GKEntity.componentForClass()") {
+  let entity = GKEntity()
   entity.addComponent(TestComponent())
 
   if true {
@@ -55,10 +55,10 @@ GamePlayKitTests.test("GPEntity.componentForClass()") {
   }
 }
 
-GamePlayKitTests.test("GPStateMachine.stateForClass()") {
+GamePlayKitTests.test("GKStateMachine.stateForClass()") {
   if true {
     // Construct a state machine with a custom subclass as the only state.
-    let stateMachine = GPStateMachine(
+    let stateMachine = GKStateMachine(
       states: [TestState1()],
       initialStateClass: TestState1.self)
 
@@ -75,7 +75,7 @@ GamePlayKitTests.test("GPStateMachine.stateForClass()") {
 
   if true {
     // Construct a state machine with a custom subclass as the only state.
-    let stateMachine = GPStateMachine(
+    let stateMachine = GKStateMachine(
       states: [TestState2()],
       initialStateClass: TestState2.self)
 
