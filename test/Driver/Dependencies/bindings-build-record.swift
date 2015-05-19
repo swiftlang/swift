@@ -3,6 +3,7 @@
 
 // RUN: cd %t && %swiftc_driver -driver-print-bindings ./main.swift ./other.swift ./yet-another.swift -incremental -output-file-map %t/output.json 2>&1 | FileCheck %s -check-prefix=MUST-EXEC
 
+// MUST-EXEC-NOT: warning
 // MUST-EXEC: inputs: ["./main.swift"], output: {{[{].*[}]$}}
 // MUST-EXEC: inputs: ["./other.swift"], output: {{[{].*[}]$}}
 // MUST-EXEC: inputs: ["./yet-another.swift"], output: {{[{].*[}]$}}

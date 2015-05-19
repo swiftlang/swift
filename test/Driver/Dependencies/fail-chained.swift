@@ -6,6 +6,7 @@
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path %S/Inputs/update-dependencies.py -output-file-map %t/output.json -incremental ./a.swift ./b.swift ./c.swift ./d.swift ./e.swift ./f.swift ./bad.swift -module-name main -j1 -v 2>&1 | FileCheck -check-prefix=CHECK-FIRST %s
 // RUN: FileCheck -check-prefix=CHECK-RECORD-CLEAN %s < %t/main~buildrecord.swiftdeps
 
+// CHECK-FIRST-NOT: warning
 // CHECK-FIRST: Handled a.swift
 // CHECK-FIRST: Handled b.swift
 // CHECK-FIRST: Handled c.swift

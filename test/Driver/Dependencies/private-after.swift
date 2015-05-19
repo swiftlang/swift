@@ -7,6 +7,7 @@
 
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path %S/Inputs/update-dependencies.py -output-file-map %t/output.json -incremental ./a.swift ./b.swift ./c.swift ./d.swift ./e.swift ./f.swift ./g.swift -module-name main -j1 -v 2>&1 | FileCheck -check-prefix=CHECK-INITIAL %s
 
+// CHECK-INITIAL-NOT: warning
 // CHECK-INITIAL-NOT: Handled
 
 // RUN: rm %t/a.o

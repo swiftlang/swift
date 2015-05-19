@@ -6,5 +6,8 @@
   "./other.swift": {
     "object": "./other.o",
     "swift-dependencies": "./other.swiftdeps"
+  },
+  "": {
+    "swift-dependencies": "./main~buildrecord.swiftdeps"
   }
 }

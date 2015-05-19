@@ -5,6 +5,7 @@
 
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path %S/Inputs/update-dependencies.py -output-file-map %t/output.json -incremental ./main.swift -j1 -v 2>&1 | FileCheck -check-prefix=CHECK-FIRST %s
 
+// CHECK-FIRST-NOT: warning
 // CHECK-FIRST: Handled main.swift
 
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path %S/Inputs/update-dependencies.py -output-file-map %t/output.json -incremental ./main.swift -j1 -v 2>&1 | FileCheck -check-prefix=CHECK-SECOND %s

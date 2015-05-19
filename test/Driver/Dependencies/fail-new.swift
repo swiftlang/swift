@@ -4,6 +4,7 @@
 // RUN: touch -t 201401240005 %t/*
 
 // RUN: cd %t && not %swiftc_driver -c -driver-use-frontend-path %S/Inputs/update-dependencies-bad.py -output-file-map %t/output.json -incremental ./main.swift ./bad.swift ./other.swift -module-name main -j1 -v 2>&1 | FileCheck %s
+// CHECK-NOT: warning
 // CHECK: Handled main.swift
 // CHECK: Handled bad.swift
 // CHECK-NOT: Handled other.swift

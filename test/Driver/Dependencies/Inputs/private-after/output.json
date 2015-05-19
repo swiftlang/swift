@@ -27,4 +27,7 @@
     "object": "./g.o",
     "swift-dependencies": "./g.swiftdeps"
   },
+  "": {
+    "swift-dependencies": "./main~buildrecord.swiftdeps"
+  }
 }

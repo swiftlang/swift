@@ -19,4 +19,7 @@
     "object": "./e.o",
     "swift-dependencies": "./e.swiftdeps"
   },
+  "": {
+    "swift-dependencies": "./main~buildrecord.swiftdeps"
+  }
 }
