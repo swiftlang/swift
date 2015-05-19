@@ -425,6 +425,9 @@ ERROR(unbound_generic_parameter,sema_tcc,none,
 ERROR(generic_parameter_binds_to_non_objc_existential,sema_tcc,none,
       "generic parameter %0 cannot be bound to non-@objc protocol type %1",
       (Type, Type))
+ERROR(type_not_materializable,sema_tcc,none,
+      "type %0 is not materializable",
+      (Type))
 ERROR(throws_functiontype_mismatch,sema_tcc,none,
       "invalid conversion from %select{non-|}0throwing function of type %1 to "
       "%select{non-|}2throwing function type %3",

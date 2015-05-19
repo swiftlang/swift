@@ -120,7 +120,10 @@ enum TypeVariableOptions {
 
   /// Whether a more specific deduction for this type variable implies a
   /// better solution to the constraint system.
-  TVO_PrefersSubtypeBinding = 0x02
+  TVO_PrefersSubtypeBinding = 0x02,
+
+  /// Whether the variable must be bound to a materializable type.
+  TVO_MustBeMaterializable = 0x04
 };
 
 /// \brief The implementation object for a type variable used within the
@@ -132,7 +135,7 @@ enum TypeVariableOptions {
 /// which it is assigned.
 class TypeVariableType::Implementation {
   /// Type variable options.
-  unsigned Options : 2;
+  unsigned Options : 3;
 
   /// \brief The locator that describes where this type variable was generated.
   constraints::ConstraintLocator *locator;
@@ -173,6 +176,10 @@ public:
   /// binding.
   bool prefersSubtypeBinding() const {
     return Options & TVO_PrefersSubtypeBinding;
+  }
+
+  bool mustBeMaterializable() const {
+    return Options & TVO_MustBeMaterializable;
   }
 
   /// \brief Retrieve the type variable associated with this implementation.
@@ -403,6 +410,8 @@ public:
     UnboundGenericParameter,
     /// A generic parameter has been bound to a non-@objc existential type.
     ExistentialGenericParameter,
+    /// The type is not materializable.
+    IsNotMaterializable,
   };
 
 private:
@@ -485,6 +494,7 @@ public:
     case IsForbiddenLValue:
     case IsNotMetatype:
     case ExistentialGenericParameter:
+    case IsNotMaterializable:
       return Profile(id, locator, kind, resolvedOverloadSets, getFirstType(),
                      getSecondType());
 

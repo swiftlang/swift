@@ -157,6 +157,12 @@ void Failure::dump(SourceManager *sm, raw_ostream &out) const {
         << " bound to non-@objc existential type "
         << getSecondType().getString();
     break;
+
+  case IsNotMaterializable:
+    out << getFirstType().getString()
+        << " bound to non-materializable type "
+        << getSecondType().getString();
+    break;
   }
 
   out << ")\n";
@@ -885,6 +891,14 @@ static bool diagnoseFailure(ConstraintSystem &cs,
   case Failure::ExistentialGenericParameter: {
     tc.diagnose(loc, diag::generic_parameter_binds_to_non_objc_existential,
                 failure.getFirstType(), failure.getSecondType())
+      .highlight(range1);
+    if (!useExprLoc)
+      noteTargetOfDiagnostic(cs, failure, locator);
+    break;
+  }
+
+  case Failure::IsNotMaterializable: {
+    tc.diagnose(loc, diag::type_not_materializable, failure.getFirstType())
       .highlight(range1);
     if (!useExprLoc)
       noteTargetOfDiagnostic(cs, failure, locator);

@@ -928,7 +928,8 @@ void ConstraintSystem::openGeneric(
     auto typeVar = createTypeVariable(getConstraintLocator(
                                         locator.withPathElement(
                                           LocatorPathElt(archetype))),
-                                      TVO_PrefersSubtypeBinding);
+                                      TVO_PrefersSubtypeBinding |
+                                      TVO_MustBeMaterializable);
     replacements[gp->getCanonicalType()] = typeVar;
 
     // Note that we opened a generic parameter to a type variable.

@@ -1371,6 +1371,18 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
           return SolutionKind::Error;
         }
 
+        // Check whether the type variable must be bound to a materializable
+        // type.
+        if (typeVar1->getImpl().mustBeMaterializable() &&
+            !type2->isMaterializable()) {
+          if (shouldRecordFailures()) {
+            // TODO: customize error message for closure vs. generic param
+            recordFailure(getConstraintLocator(locator),  
+                          Failure::IsNotMaterializable, type2);
+          }
+          return SolutionKind::Error;
+        }
+
         // A constraint that binds any pointer to a void pointer is
         // ineffective, since any pointer can be converted to a void pointer.
         if (kind == TypeMatchKind::BindToPointerType && desugar2->isVoid() &&
