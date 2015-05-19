@@ -1026,9 +1026,7 @@ void Driver::buildActions(const ToolChain &TC,
         Diags.diagnose(SourceLoc(),
                        diag::incremental_requires_build_record_entry,
                        types::getTypeName(types::TY_SwiftDeps));
-        // FIXME: Some of our dependencies tests still don't have build records.
-        // Allow them to run "incrementally".
-        rebuildEverything = false;
+        rebuildEverything = true;
 
       } else {
         if (populateOutOfDateMap(outOfDateMap, ArgsHash, Inputs,
