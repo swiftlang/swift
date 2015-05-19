@@ -144,12 +144,17 @@ class CallGraphNode {
   /// Do we know all the potential callers of this function?
   bool CallerEdgesComplete;
 
+  /// May this function bind dynamic Self at one of its call sites? This is
+  /// conservatively correct because it may stay on after edges are removed.
+  bool MayBindDynamicSelf;
+
 public:
   friend class CallGraph;
 
   CallGraphNode(SILFunction *Function, unsigned Ordinal)
     : Function(Function), Ordinal(Ordinal),
-      CallerEdgesComplete(!canHaveIndirectUses(Function)) {
+      CallerEdgesComplete(!canHaveIndirectUses(Function)),
+      MayBindDynamicSelf(false) {
     assert(Function &&
            "Cannot build a call graph node with a null function pointer!");
   }
@@ -184,6 +189,11 @@ public:
   /// this function?
   bool isCallerEdgesComplete() const {
     return CallerEdgesComplete;
+  }
+
+  /// May this function bind dynamic Self at one of its call sites?
+  bool mayBindDynamicSelf() const {
+    return MayBindDynamicSelf;
   }
 
   /// Is this call graph node for a function that we can trivially

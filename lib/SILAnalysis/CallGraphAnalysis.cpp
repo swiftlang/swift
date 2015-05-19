@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILAnalysis/CallGraphAnalysis.h"
+#include "swift/SILPasses/Utils/Local.h"
 #include "swift/Basic/Fallthrough.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SetVector.h"
@@ -218,6 +219,8 @@ void CallGraph::addEdgesForApply(FullApplySite AI, CallGraphNode *CallerNode) {
   CallGraphEdge::CalleeSetType CalleeSet;
   bool Complete = false;
 
+  CallerNode->MayBindDynamicSelf |= hasDynamicSelfTypes(AI.getSubstitutions());
+
   if (tryGetCalleeSet(AI.getCallee(), CalleeSet, Complete)) {
     auto *Edge = new (Allocator) CallGraphEdge(AI, CalleeSet, Complete,
                                                EdgeOrdinal++);
@@ -361,11 +364,14 @@ void CallGraphNode::dump() {
 
   llvm::errs() << Ordinal;
   if (isDead())
-    llvm::errs() << " [dead]: ";
-  else if (isCallerEdgesComplete())
-    llvm::errs() << " (all callers known): ";
-  else
-    llvm::errs() << ": ";
+    llvm::errs() << " [dead]";
+  else {
+    if (isCallerEdgesComplete())
+      llvm::errs() << " (all callers known)";
+    if (mayBindDynamicSelf())
+      llvm::errs() << " (binds Self)";
+  }
+  llvm::errs() << ": ";
 
   llvm::errs() << getFunction()->getName() << "\n";
   if (Edges.empty())
