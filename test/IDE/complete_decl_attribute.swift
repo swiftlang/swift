@@ -7,6 +7,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD5 | FileCheck %s -check-prefix=KEYWORD5
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=KEYWORD_LAST | FileCheck %s -check-prefix=KEYWORD_LAST
 
+// REQUIRES: enable_target_appletvos
+
 @available(#^AVAILABILITY1^#)
 
 // AVAILABILITY1: Begin completions, 9 items

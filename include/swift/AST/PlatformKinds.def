@@ -23,11 +23,15 @@
 
 // Reordering these platforms will break serialization.
 AVAILABILITY_PLATFORM(iOS, "iOS")
+#if defined(SWIFT_ENABLE_TARGET_TVOS)
 AVAILABILITY_PLATFORM(tvOS, "tvOS")
+#endif // SWIFT_ENABLE_TARGET_TVOS
 AVAILABILITY_PLATFORM(watchOS, "watchOS")
 AVAILABILITY_PLATFORM(OSX, "OS X")
 AVAILABILITY_PLATFORM(iOSApplicationExtension, "iOS application extension")
+#if defined(SWIFT_ENABLE_TARGET_TVOS)
 AVAILABILITY_PLATFORM(tvOSApplicationExtension, "tvOS application extension")
+#endif // SWIFT_ENABLE_TARGET_TVOS
 AVAILABILITY_PLATFORM(watchOSApplicationExtension, "watchOS application extension")
 AVAILABILITY_PLATFORM(OSXApplicationExtension, "OS X application extension")
 

@@ -24,8 +24,10 @@ namespace swift {
   /// Returns true if the given triple represents iOS running in a simulator.
   bool tripleIsiOSSimulator(const llvm::Triple &triple);
 
+#if defined(SWIFT_ENABLE_TARGET_TVOS)
   /// Returns true if the given triple represents AppleTV running in a simulator.
   bool tripleIsAppleTVSimulator(const llvm::Triple &triple);
+#endif // SWIFT_ENABLE_TARGET_TVOS
 
   /// Returns true if the given triple represents watchOS running in a simulator.
   bool tripleIsWatchSimulator(const llvm::Triple &triple);

@@ -8,3 +8,5 @@
 // CHECK-IOS: Swift requires a minimum deployment target of iOS 7
 // CHECK-tvOS: Swift requires a minimum deployment target of tvOS 9.0
 // CHECK-watchOS: Swift requires a minimum deployment target of watchOS 2.0
+
+// REQUIRES: enable_target_appletvos

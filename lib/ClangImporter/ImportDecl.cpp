@@ -5387,13 +5387,17 @@ void ClangImporter::Implementation::importAttributes(
         llvm::StringSwitch<Optional<PlatformKind>>(Platform)
           .Case("ios", PlatformKind::iOS)
           .Case("macosx", PlatformKind::OSX)
+#if defined(SWIFT_ENABLE_TARGET_TVOS)
           .Case("tvos", PlatformKind::tvOS)
+#endif // SWIFT_ENABLE_TARGET_TVOS
           .Case("watchos", PlatformKind::watchOS)
           .Case("ios_app_extension", PlatformKind::iOSApplicationExtension)
           .Case("macosx_app_extension",
                 PlatformKind::OSXApplicationExtension)
+#if defined(SWIFT_ENABLE_TARGET_TVOS)
           .Case("tvos_app_extension",
                 PlatformKind::tvOSApplicationExtension)
+#endif // SWIFT_ENABLE_TARGET_TVOS
           .Case("watchos_app_extension",
                 PlatformKind::watchOSApplicationExtension)
           .Default(None);

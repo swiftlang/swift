@@ -1,6 +1,10 @@
 // RUN: %swift -parse %s -verify -D FOO -D BAR -target arm64-apple-tvos9.0 -D FOO -parse-stdlib
 // RUN: %swift-ide-test -test-input-complete -source-filename=%s -target arm64-apple-tvos9.0
 
+// REQUIRES: enable_target_appletvos
+
+zzzzzz
+
 #if os(iOS)
 // This block should not parse.
 // os(tvOS) or os(watchOS) does not imply os(iOS).

@@ -153,3 +153,6 @@
 
 // Clean up the test executable because hard links are expensive.
 // RUN: rm -rf %t/DISTINCTIVE-PATH/usr/bin/swiftc
+
+// REQUIRES: enable_target_appletvos
+

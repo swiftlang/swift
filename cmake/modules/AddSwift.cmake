@@ -55,6 +55,11 @@ function(_add_variant_c_compile_link_flags
         "-m${SWIFT_SDK_${sdk}_VERSION_MIN_NAME}-version-min=${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION}")
   endif()
 
+  if(${SWIFT_ENABLE_TARGET_TVOS})
+    list(APPEND result
+        " -DSWIFT_ENABLE_TARGET_TVOS=\"1\"")
+  endif()
+
   set("${result_var_name}" "${result}" PARENT_SCOPE)
 endfunction()
 

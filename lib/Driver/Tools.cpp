@@ -758,9 +758,11 @@ Job *darwin::Linker::constructJob(const JobAction &JA,
 
     StringRef RT;
     if (Triple.isiOS()) {
+#if defined(SWIFT_ENABLE_TARGET_TVOS)
       if (Triple.isTvOS())
         RT = "tvos";
       else
+#endif // SWIFT_ENABLE_TARGET_TVOS
         RT = "ios";
     }
     else if (Triple.isWatchOS())
@@ -781,12 +783,15 @@ Job *darwin::Linker::constructJob(const JobAction &JA,
   assert(Triple.isiOS() || Triple.isWatchOS() || Triple.isMacOSX());
   if (Triple.isiOS()) {
     bool isiOSSimulator = tripleIsiOSSimulator(Triple);
+#if defined(SWIFT_ENABLE_TARGET_TVOS)
     if (Triple.isTvOS()) {
       if (isiOSSimulator)
         Arguments.push_back("-tvos_simulator_version_min");
       else
         Arguments.push_back("-tvos_version_min");
-    } else {
+    } else
+#endif // SWIFT_ENABLE_TARGET_TVOS
+    {
       if (isiOSSimulator)
         Arguments.push_back("-ios_simulator_version_min");
       else

@@ -1,5 +1,7 @@
 // RUN: %target-parse-verify-swift
 
+// REQUIRES: enable_target_appletvos
+
 @available(*, unavailable)
 func unavailable_func() {}
 

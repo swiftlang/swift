@@ -86,3 +86,6 @@
 
 // SDK-TOO-OLD: error: Swift does not support the SDK '{{.+}}.sdk'{{$}}
 // SDK-OKAY: -sdk {{.*}}/{{[^/ ]+}}sdk
+
+// REQUIRES: enable_target_appletvos
+

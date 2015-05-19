@@ -60,8 +60,10 @@ void LangOptions::setTarget(llvm::Triple triple) {
   // Set the "os" target configuration.
   if (Target.isMacOSX())
     addTargetConfigOption("os", "OSX");
+#if defined(SWIFT_ENABLE_TARGET_TVOS)
   else if (triple.isTvOS())
     addTargetConfigOption("os", "tvOS");
+#endif // SWIFT_ENABLE_TARGET_TVOS
   else if (triple.isWatchOS())
     addTargetConfigOption("os", "watchOS");
   else if (triple.isiOS())
