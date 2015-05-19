@@ -146,6 +146,61 @@ void DeclAttributes::dump() const {
   print(P, PO);
 }
 
+/// Returns true if the attribute can be presented as a short form available
+/// attribute (e.g., as @available(iOS 8.0, *). The presentation requires an
+/// introduction version and does not support deprecation, obsoletion, or
+/// messages.
+static bool isShortAvailable(const DeclAttribute *DA) {
+  auto *AvailAttr = dyn_cast<AvailableAttr>(DA);
+  if (!AvailAttr)
+    return false;
+
+  if (!AvailAttr->Introduced.hasValue())
+    return false;
+
+  if (AvailAttr->Deprecated.hasValue())
+    return false;
+
+  if (AvailAttr->Obsoleted.hasValue())
+    return false;
+
+  if (!AvailAttr->Message.empty())
+    return false;
+
+  if (!AvailAttr->Rename.empty())
+    return false;
+
+  if (AvailAttr->Unconditional != UnconditionalAvailabilityKind::None)
+    return false;
+
+  return true;
+}
+
+/// Print the short-form @available() attribute for an array of long-form
+/// AvailableAttrs that can be represented in the short form.
+/// For example, for:
+///   @available(OSX, introduced=10.10)
+///   @available(iOS, introduced=8.0)
+/// this will print:
+///   @available(OSX 10.10, iOS 8.0, *)
+static void printShortFormAvailable(ArrayRef<const DeclAttribute *> Attrs,
+                                    ASTPrinter &Printer,
+                                    const PrintOptions &Options) {
+  assert(!Attrs.empty());
+
+  Printer << "@available(";
+  for (auto *DA : Attrs) {
+    auto *AvailAttr = cast<AvailableAttr>(DA);
+    assert(AvailAttr->Introduced.hasValue());
+
+    Printer << platformString(AvailAttr->Platform) << " "
+            << AvailAttr->Introduced.getValue().getAsString() << ", ";
+  }
+
+  Printer << "*)";
+  Printer.printNewline();
+}
+
 void DeclAttributes::print(ASTPrinter &Printer,
                            const PrintOptions &Options) const {
   if (!DeclAttrs)
@@ -156,6 +211,7 @@ void DeclAttributes::print(ASTPrinter &Printer,
   std::reverse(orderedAttributes.begin(), orderedAttributes.end());
 
   // Process attributes in passes.
+  AttributeVector shortAvailableAttributes;
   AttributeVector longAttributes;
   AttributeVector attributes;
   AttributeVector modifiers;
@@ -178,9 +234,14 @@ void DeclAttributes::print(ASTPrinter &Printer,
     }
 
     AttributeVector &which = DA->isDeclModifier() ? modifiers :
+                             isShortAvailable(DA) ? shortAvailableAttributes :
                              DA->isLongAttribute() ? longAttributes :
                              attributes;
     which.push_back(DA);
+  }
+
+  if (!shortAvailableAttributes.empty()) {
+    printShortFormAvailable(shortAvailableAttributes, Printer, Options);
   }
 
   for (auto DA : longAttributes)
