@@ -1,4 +1,9 @@
-// RUN: %target-build-swift -parse-stdlib -Xfrontend -disable-access-control -module-name a %s -o %t.out
+// RUN: rm -rf %t  &&  mkdir %t
+//
+// FIXME: -fobjc-abi-version=2 is a band-aid fix for for rdar://16946936
+//
+// RUN: xcrun -sdk %target-sdk-name clang++ -fobjc-abi-version=2 -arch %target-cpu %S/Inputs/Mirror/Mirror.mm -c -o %t/Mirror.mm.o -g
+// RUN: %target-build-swift -parse-stdlib -Xfrontend -disable-access-control -module-name a -I %S/Inputs/Mirror/ -Xlinker %t/Mirror.mm.o %s -o %t.out
 // RUN: %target-run %t.out
 
 // XFAIL: linux
@@ -8,6 +13,7 @@ import StdlibUnittest
 import Foundation
 import CoreGraphics
 import SwiftShims
+import MirrorObjC
 
 var nsObjectCanaryCount = 0
 @objc class NSObjectCanary : NSObject {
@@ -861,8 +867,7 @@ Reflection.test("dumpToAStream") {
   expectEqual("▿ 2 elements\n  - [0]: 42\n  - [1]: 4242\n", output)
 }
 
-// A struct type that gets destructured by the default mirror.
-struct Matte {
+struct StructWithDefaultMirror {
   let s: String
 
   init (_ s: String) {
@@ -870,28 +875,57 @@ struct Matte {
   }
 }
 
-Reflection.test("StructMirror") {
+Reflection.test("Struct/NonGeneric/DefaultMirror") {
   if true {
     var output = ""
-    dump(Matte("123"), &output)
-    expectEqual("▿ a.Matte\n  - s: 123\n", output)
+    dump(StructWithDefaultMirror("123"), &output)
+    expectEqual("▿ a.StructWithDefaultMirror\n  - s: 123\n", output)
   }
 
   if true {
     // Build a String around an interpolation as a way of smoke-testing that
     // the internal MirrorType implementation gets memory management right.
     var output = ""
-    dump(Matte("\(456)"), &output)
-    expectEqual("▿ a.Matte\n  - s: 456\n", output)
+    dump(StructWithDefaultMirror("\(456)"), &output)
+    expectEqual("▿ a.StructWithDefaultMirror\n  - s: 456\n", output)
   }
 
   // Structs have no identity and thus no object identifier
-  expectEmpty(reflect(Matte("")).objectIdentifier)
+  expectEmpty(reflect(StructWithDefaultMirror("")).objectIdentifier)
 
   // The default mirror provides no quick look object
-  expectEmpty(reflect(Matte("")).quickLookObject)
+  expectEmpty(reflect(StructWithDefaultMirror("")).quickLookObject)
 
-  expectEqual(.Struct, reflect(Matte("")).disposition)
+  expectEqual(.Struct, reflect(StructWithDefaultMirror("")).disposition)
+}
+
+struct GenericStructWithDefaultMirror<T, U> {
+  let first: T
+  let second: U
+}
+
+Reflection.test("Struct/Generic/DefaultMirror") {
+  if true {
+    var value = GenericStructWithDefaultMirror<Int, [Any?]>(
+      first: 123,
+      second: [ "abc", 456, 789.25 ])
+    var output = ""
+    dump(value, &output)
+
+    let expected =
+      "▿ a.GenericStructWithDefaultMirror<Swift.Int, Swift.Array<Swift.Optional<protocol<>>>>\n" +
+      "  - first: 123\n" +
+      "  ▿ second: 3 elements\n" +
+      "    ▿ [0]: abc\n" +
+      "      - Some: abc\n" +
+      "    ▿ [1]: 456\n" +
+      "      - Some: 456\n" +
+      "    ▿ [2]: 789.25\n" +
+      "      - Some: 789.25\n"
+
+    expectEqual(expected, output)
+
+  }
 }
 
 /// A type that provides its own mirror.
@@ -1066,6 +1100,30 @@ Reflection.test("CustomMirrorIsInherited") {
   }
 }
 
+class SwiftFooMoreDerivedObjCClass : FooMoreDerivedObjCClass {
+  let first: Int = 123
+  let second: String = "abc"
+}
+
+Reflection.test("Class/ObjectiveCBase/Default") {
+  if true {
+    let value = SwiftFooMoreDerivedObjCClass()
+    var output = ""
+    dump(value, &output)
+
+    let expected =
+      "▿ a.SwiftFooMoreDerivedObjCClass #0\n" +
+      "  ▿ super: This is FooObjCClass\n" +
+      "    ▿ FooDerivedObjCClass: This is FooObjCClass\n" +
+      "      ▿ FooObjCClass: This is FooObjCClass\n" +
+      "        - NSObject: This is FooObjCClass\n" +
+      "  - first: 123\n" +
+      "  - second: abc\n"
+
+    expectEqual(expected, output)
+  }
+}
+
 protocol SomeNativeProto {}
 extension Int: SomeNativeProto {}
 
@@ -1135,7 +1193,8 @@ Reflection.test("MetatypeMirror") {
 Reflection.test("TupleMirror") {
   if true {
     var output = ""
-    let tuple = (Brilliant(384, "seven six eight"), Matte("nine"))
+    let tuple =
+      (Brilliant(384, "seven six eight"), StructWithDefaultMirror("nine"))
     dump(tuple, &output)
 
     let expected =
@@ -1144,7 +1203,7 @@ Reflection.test("TupleMirror") {
       "    - first: 384\n" +
       "    - second: seven six eight\n" +
       "    ▿ self: Brilliant(384, seven six eight) #0\n" +
-      "  ▿ .1: a.Matte\n" +
+      "  ▿ .1: a.StructWithDefaultMirror\n" +
       "    - s: nine\n"
 
     expectEqual(expected, output)

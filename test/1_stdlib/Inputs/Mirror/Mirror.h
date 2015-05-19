@@ -9,12 +9,22 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+
 #ifndef SWIFT_TEST_1_STDLIB_INPUTS_MIRROR_H
 #define SWIFT_TEST_1_STDLIB_INPUTS_MIRROR_H
 
-#include <Foundation/NSObject.h>
+#import <Foundation/NSObject.h>
 
 @interface HasIVars : NSObject
+@end
+
+@interface FooObjCClass : NSObject
+@end
+
+@interface FooDerivedObjCClass : FooObjCClass
+@end
+
+@interface FooMoreDerivedObjCClass : FooDerivedObjCClass
 @end
 
 #endif

@@ -1,7 +1,16 @@
 // RUN: rm -rf %t  &&  mkdir %t
-// RUN: %target-build-swift -parse-stdlib %s -module-name Reflection -o %t/a.out
+//
+// FIXME: -fobjc-abi-version=2 is a band-aid fix for for rdar://16946936
+//
+// RUN: xcrun -sdk %target-sdk-name clang++ -fobjc-abi-version=2 -arch %target-cpu %S/Inputs/Mirror/Mirror.mm -c -o %t/Mirror.mm.o -g
+//
+// RUN: %target-build-swift -parse-stdlib %s -module-name Reflection -I %S/Inputs/Mirror/ -Xlinker %t/Mirror.mm.o -o %t/a.out
 // RUN: %S/timeout.sh 360 %target-run %t/a.out %S/Inputs/shuffle.jpg | FileCheck %s
 // FIXME: timeout wrapper is necessary because the ASan test runs for hours
+
+//
+// DO NOT add more tests to this file.  Add them to test/1_stdlib/Runtime.swift.
+//
 
 // XFAIL: linux
 
@@ -197,50 +206,18 @@ switch reflect(MyQLTestClass()).quickLookObject {
   default: print("None")
 }
 
-// CHECK-NEXT nil is good here
+// CHECK-NEXT: nil is good here
 class MyNonQLTestClass {
   func debugQuickLookObject() -> AnyObject {
     return (42 as NSNumber)
   }
 }
 
-switch reflect(MyQLTestClass()).quickLookObject {
+switch reflect(MyNonQLTestClass()).quickLookObject {
   case .Some(.Int(let value)): print(value)
   case .Some(_): print("non-Int object")
   default: print("nil is good here")
 }
-
-// <rdar://problem/17027510>
-struct Pear<T, U> { let fst: T; let snd: U }
-
-class SubScene : SKScene {
-  let foo = 12_131_415
-  let bar = "boom"
-  let bas: Pear<Int, [Any?]> = Pear(fst: 219, snd: ["boom", 123, 456.0])
-  let zim = 20721
-}
-
-// CHECK-LABEL: SKScene subclass:
-// CHECK-NEXT: {{.*}}SubScene
-// CHECK-NEXT:   super: <SKScene>
-// CHECK-NEXT:     ▿ SKEffectNode: <SKScene> name:'(null)' frame:
-// CHECK-NEXT:       ▿ SKNode: <SKScene> name:'(null)' frame:
-// CHECK-NEXT:         ▿ {{(NS|UI)}}Responder: <SKScene> name:'(null)' frame:
-// CHECK-NEXT:           - NSObject: <SKScene> name:'(null)' frame:
-// CHECK-NEXT:   - foo: 12131415
-// CHECK-NEXT:   - bar: boom
-// CHECK-NEXT:   ▿ bas: {{.*}}Pear
-// CHECK-NEXT:     - fst: 219
-// CHECK-NEXT:     ▿ snd: 3 elements
-// CHECK-NEXT:       [0]: boom
-// CHECK-NEXT:         Some: boom
-// CHECK-NEXT:       [1]: 123
-// CHECK-NEXT:         Some: 123
-// CHECK-NEXT:       [2]: 456.0
-// CHECK-NEXT:         Some: 456.0
-// CHECK-NEXT:   zim: 20721
-print("SKScene subclass:")
-dump(SubScene())
 
 // CHECK-NEXT: (3.0, 6.0)
 print(reflect(CGPoint(x: 3,y: 6)).summary)

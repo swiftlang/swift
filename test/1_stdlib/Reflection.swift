@@ -3,6 +3,10 @@
 // RUN: %S/timeout.sh 360 %target-run %t/a.out | FileCheck %s
 // FIXME: timeout wrapper is necessary because the ASan test runs for hours
 
+//
+// DO NOT add more tests to this file.  Add them to test/1_stdlib/Runtime.swift.
+//
+
 import Swift
 
 // A more interesting struct type.
