@@ -171,15 +171,18 @@ namespace swift {
         : Kind(DiagnosticArgumentKind::DeclAttribute),
           DeclAttributeVal(attr) {}
 
-    DiagnosticArgument(diag::RequirementKind kind)
-      : DiagnosticArgument(static_cast<uint8_t>(kind)) { }
-      
-    DiagnosticArgument(Accessibility kind)
-      : DiagnosticArgument(static_cast<uint8_t>(kind)) { }
-
     DiagnosticArgument(clang::VersionTuple version)
       : Kind(DiagnosticArgumentKind::VersionTuple),
         VersionVal(version) { }
+
+    /// Initializes a diagnostic argument using the underlying type of the
+    /// given enum.
+    template<
+        typename EnumType,
+        typename std::enable_if<std::is_enum<EnumType>::value>::type* = nullptr>
+    DiagnosticArgument(EnumType value)
+      : DiagnosticArgument(
+          static_cast<typename std::underlying_type<EnumType>::type>(value)) {}
 
     DiagnosticArgumentKind getKind() const { return Kind; }
 
