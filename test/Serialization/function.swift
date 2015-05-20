@@ -114,3 +114,6 @@ do {
 
 // LLVM: }
 
+mineGold() // expected-warning{{you might want to keep it}}
+var foo = Foo()
+foo.reverse() // expected-warning{{reverseInPlace}}{{5-12=reverseInPlace}}

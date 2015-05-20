@@ -64,3 +64,15 @@ public protocol EqualOperator {
 
 public func throws1() throws {}
 public func throws2<T>(t: T) throws -> T { return t }
+
+@warn_unused_result(message="you might want to keep it")
+public func mineGold() -> Int { return 1 }
+
+public struct Foo {
+  public init() { }
+
+  @warn_unused_result(mutable_variant="reverseInPlace")
+  public func reverse() -> Foo { return self }
+
+  public mutating func reverseInPlace() { }
+}
