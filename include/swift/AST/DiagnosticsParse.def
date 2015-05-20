@@ -668,12 +668,12 @@ WARNING(parameter_backtick_two_names,decl_parsing,none,
 WARNING(parameter_extraneous_double_up,decl_parsing,none,
         "extraneous duplicate parameter name; %0 already has an argument "
         "label", (Identifier))
-WARNING(parameter_extraneous_pound,decl_parsing,none,
+ERROR(parameter_extraneous_pound,decl_parsing,none,
         "'#' has been removed from Swift; %0 already has an argument label",
         (Identifier))
-WARNING(parameter_pound_double_up,decl_parsing,none,
-        "'#' has been removed from Swift; double up '%0 %0' to make the argument label "
-        "the same as the parameter name", (StringRef))
+ERROR(parameter_pound_double_up,decl_parsing,none,
+        "'#' has been removed from Swift; double up '%0 %0' to make the "
+        "argument label the same as the parameter name", (StringRef))
 WARNING(parameter_extraneous_empty_name,decl_parsing,none,
         "extraneous '_' in parameter: %0 has no keyword argument name",
         (Identifier))
