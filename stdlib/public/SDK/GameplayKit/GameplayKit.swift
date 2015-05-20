@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 @exported import GameplayKit
-/*
+
 @asmname("GK_Swift_GKEntity_componentForClass")
 internal func GK_Swift_GKEntity_componentForClass(
   self_: AnyObject,
@@ -45,4 +45,3 @@ extension GKStateMachine {
       self, stateClass as AnyClass) as! StateType?
   }
 }
-*/
