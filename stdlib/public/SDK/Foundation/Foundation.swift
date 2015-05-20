@@ -1218,3 +1218,28 @@ extension NSDictionary {
   }
 }
 
+//===----------------------------------------------------------------------===//
+// NSUndoManager
+//===----------------------------------------------------------------------===//
+
+@asmname("NS_Swift_NSUndoManager_registerUndoWithTargetHandler")
+internal func NS_Swift_NSUndoManager_registerUndoWithTargetHandler(
+  self_: AnyObject,
+  _ target: AnyObject,
+  _ handler: @convention(block) AnyObject -> ())
+
+extension NSUndoManager {
+  @available(OSX 10.11, iOS 9.0, *)
+  public func registerUndoWithTarget<TargetType : NSObject>(
+    target: TargetType, handler: TargetType -> ()
+  ) {
+    // The generic blocks use a different ABI, so we need to wrap the provided
+    // handler in something ObjC compatible.
+    let objcCompatibleHandler: AnyObject -> () = { internalTarget in
+      handler(internalTarget as! TargetType)
+    }
+    NS_Swift_NSUndoManager_registerUndoWithTargetHandler(
+      self as AnyObject, target as AnyObject, objcCompatibleHandler)
+  }
+}
+

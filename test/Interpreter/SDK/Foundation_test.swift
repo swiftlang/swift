@@ -213,5 +213,21 @@ FoundationTestSuite.test("NSRectEdge/constants") {
 }
 #endif
 
+
+if #available(OSX 10.11, iOS 9.0, *) {
+  FoundationTestSuite.test("NSUndoManager") {
+    let UM = NSUndoManager()
+    class Foo : NSObject {
+      var someProperty: String = ""
+    }
+    var f = Foo()
+    UM.registerUndoWithTarget(f) { target in
+      target.someProperty = "expected"
+    }
+    UM.undo()
+    expectEqual(f.someProperty, "expected")
+  }
+}
+
 runAllTests()
 
