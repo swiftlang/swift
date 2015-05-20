@@ -2,14 +2,14 @@
 
 struct S {
   var x: Int = 0
-  let y: Int = 0
+  let y: Int = 0 // expected-note 4 {{change 'let' to 'var' to make it mutable}}
 
   init() {}
 }
 
 struct T {
   var mutS: S? = nil
-  let immS: S? = nil
+  let immS: S? = nil // expected-note 6 {{change 'let' to 'var' to make it mutable}}
 
   init() {}
 }
