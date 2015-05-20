@@ -685,10 +685,10 @@ ParserResult<Stmt> Parser::parseStmtDefer() {
   auto params = TuplePattern::create(Context, SourceLoc(), {}, SourceLoc());
   
   auto closure
-    = new (Context) ClosureExpr(SourceLoc(), params, /*throwsLoc*/SourceLoc(),
+    = new (Context) ClosureExpr(params, /*throwsLoc*/SourceLoc(),
                                 /*arrowLoc*/SourceLoc(), /*inLoc*/SourceLoc(),
                                 /*resultType*/TypeLoc(), discriminator,
-                                SourceLoc(), CurDeclContext);
+                                CurDeclContext);
   closure->setIsDeferBody();
   
   ParserStatus Status;

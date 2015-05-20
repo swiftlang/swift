@@ -239,9 +239,8 @@ void REPLChecker::generatePrintOfExpression(StringRef NameStr, Expr *E) {
   unsigned discriminator = TLC.claimNextClosureDiscriminator();
 
   ClosureExpr *CE =
-      new (Context) ClosureExpr(SourceLoc(),ParamPat, SourceLoc(), SourceLoc(),
-                                SourceLoc(), TypeLoc(), discriminator,
-                                SourceLoc(), newTopLevel);
+      new (Context) ClosureExpr(ParamPat, SourceLoc(), SourceLoc(), SourceLoc(),
+                                TypeLoc(), discriminator, newTopLevel);
 
   Type ParamTy = ParamPat->getType();
   ParamTy = ParamTy->getRelabeledType(TC.Context, { Identifier() });

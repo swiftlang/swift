@@ -1794,7 +1794,7 @@ ParserResult<Expr> Parser::parseExprClosure() {
   assert(Tok.is(tok::l_brace) && "Not at a left brace?");
 
   // Parse the opening left brace.
-  SourceLoc leftBrace = consumeToken(tok::l_brace);
+  SourceLoc leftBrace = consumeToken();
 
   // Parse the closure-signature, if present.
   Pattern *params = nullptr;
@@ -1819,11 +1819,9 @@ ParserResult<Expr> Parser::parseExprClosure() {
   unsigned discriminator = CurLocalContext->claimNextClosureDiscriminator();
 
   // Create the closure expression and enter its context.
-  auto *closure = new (Context) ClosureExpr(leftBrace,
-                                            params, throwsLoc, arrowLoc, inLoc,
+  auto *closure = new (Context) ClosureExpr(params, throwsLoc, arrowLoc, inLoc,
                                             explicitResultType,
-                                            discriminator, SourceLoc(),
-                                            CurDeclContext);
+                                            discriminator, CurDeclContext);
   // The arguments to the func are defined in their own scope.
   Scope S(this, ScopeKind::ClosureParams);
   ParseFunctionBody cc(*this, closure);
@@ -1837,7 +1835,7 @@ ParserResult<Expr> Parser::parseExprClosure() {
     // FIXME: We could do this all the time, and then provide Fix-Its
     // to map $i -> the appropriately-named argument. This might help
     // users who are refactoring code by adding names.
-    AnonClosureVars.emplace_back();
+    AnonClosureVars.push_back({ leftBrace, {}});
   }
   
   // Add capture list variables to scope.
@@ -1853,13 +1851,12 @@ ParserResult<Expr> Parser::parseExprClosure() {
   SourceLoc rightBrace;
   parseMatchingToken(tok::r_brace, rightBrace, diag::expected_closure_rbrace,
                      leftBrace);
-  closure->setRBraceLoc(rightBrace);
 
   // If we didn't have any parameters, create a parameter list from the
   // anonymous closure arguments.
   if (!params) {
     // Create a parameter pattern containing the anonymous variables.
-    auto& anonVars = AnonClosureVars.back();
+    auto &anonVars = AnonClosureVars.back().second;
     SmallVector<TuplePatternElt, 4> elements;
     for (auto anonVar : anonVars) {
       elements.push_back(TuplePatternElt(new (Context) NamedPattern(anonVar)));
@@ -1958,21 +1955,21 @@ Expr *Parser::parseExprAnonClosureArg() {
     return new (Context) ErrorExpr(Loc);
   }
 
-  auto &decls = AnonClosureVars.back();
+  auto leftBraceLoc = AnonClosureVars.back().first;
+  auto &decls = AnonClosureVars.back().second;
   while (ArgNo >= decls.size()) {
     unsigned nextIdx = decls.size();
     SmallVector<char, 4> StrBuf;
     StringRef varName = ("$" + Twine(nextIdx)).toStringRef(StrBuf);
     Identifier ident = Context.getIdentifier(varName);
-    SourceLoc varLoc = closure->getStartLoc();
+    SourceLoc varLoc = leftBraceLoc;
     VarDecl *var = new (Context) ParamDecl(/*IsLet*/ true,
                                            SourceLoc(), Identifier(),
                                            varLoc, ident, Type(), closure);
     decls.push_back(var);
   }
 
-  return new (Context) DeclRefExpr(AnonClosureVars.back()[ArgNo], Loc,
-                                   /*Implicit=*/false);
+  return new (Context) DeclRefExpr(decls[ArgNo], Loc, /*Implicit=*/false);
 }
 
 

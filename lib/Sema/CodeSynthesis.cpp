@@ -1064,11 +1064,9 @@ static Expr *buildMaterializeForSetCallback(ASTContext &ctx,
   args->setImplicit();
 
   // Create the closure expression itself.
-  auto closure = new (ctx) ClosureExpr(SourceLoc(),
-                                       args, SourceLoc(), SourceLoc(),
+  auto closure = new (ctx) ClosureExpr(args, SourceLoc(), SourceLoc(),
                                        SourceLoc(), TypeLoc(),
-                                       /*discriminator*/ 0, SourceLoc(),
-                                       materializeForSet);
+                                       /*discriminator*/ 0, materializeForSet);
 
   // Generate the body of the closure.
   SmallVector<ASTNode, 4> body;

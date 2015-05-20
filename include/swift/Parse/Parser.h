@@ -81,7 +81,7 @@ public:
   DeclContext *CurDeclContext;
   ASTContext &Context;
   CodeCompletionCallbacks *CodeCompletion = nullptr;
-  std::vector<std::vector<VarDecl*>> AnonClosureVars;
+  std::vector<std::pair<SourceLoc, std::vector<VarDecl*>>> AnonClosureVars;
   
   /// DisabledVars is a list of variables for whom local name lookup is
   /// disabled.  This is used when parsing a PatternBindingDecl to reject self

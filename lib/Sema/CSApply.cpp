@@ -4506,14 +4506,12 @@ ClosureExpr *ExprRewriter::coerceClosureExprToVoid(ClosureExpr *closureExpr) {
                                      /*implicit*/true);
 
   auto newClosure = new (tc.Context)
-                      ClosureExpr(closureExpr->getStartLoc(),
-                                  closureExpr->getParams(),
+                      ClosureExpr(closureExpr->getParams(),
                                   SourceLoc(),
                                   SourceLoc(),
                                   closureExpr->getInLoc(),
                                   TypeLoc(),
                                   closureExpr->getDiscriminator(),
-                                  closureExpr->getEndLoc(),
                                   cs.DC);
   
   newClosure->setImplicit();
