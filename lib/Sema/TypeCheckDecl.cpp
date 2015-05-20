@@ -2822,7 +2822,7 @@ public:
 
       TC.diagnose(existingDecl, diag::declared_protocol_conformance_here,
                   D->getDeclaredTypeInContext(),
-                  static_cast<unsigned>(diag.ExistingKind),
+                  diag.ExistingKind,
                   diag.Protocol->getName(),
                   diag.ExistingExplicitProtocol->getName());
     }
