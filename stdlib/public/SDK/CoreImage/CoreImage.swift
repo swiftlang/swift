@@ -24,26 +24,26 @@ extension CIFilter {
   // func apply(k: CIKernel,
   //            arguments args: [AnyObject]?,
   //            options dict: Dictionary<NSObject, AnyObject>?) -> CIImage?
-  func apply(k: CIKernel, args: [AnyObject], options: (NSCopying, AnyObject)...) -> CIImage? {
-    let dict = NSMutableDictionary()
+  func apply(k: CIKernel, args: [AnyObject], options: (String, AnyObject)...) -> CIImage? {
+    var dict: [String : AnyObject] = [:]
     for (key, value) in options {
       dict[key] = value
     }
-    return self.apply(k, arguments: args, options: dict as [NSObject: AnyObject])
+    return self.apply(k, arguments: args, options: dict)
   }
 #endif
 
   @available(iOS, introduced=8.0)
   @available(OSX, introduced=10.10)
   convenience init?(
-    name: String!, elements: (NSCopying, AnyObject)...
+    name: String!, elements: (String, AnyObject)...
   ) {
-    let dict =  NSMutableDictionary()
-        for (key, value) in elements {
-            dict[key] = value
-        }
-    self.init(name: name, withInputParameters: dict as [NSObject : AnyObject])
-  } 
+    var dict: [String : AnyObject] = [:]
+    for (key, value) in elements {
+      dict[key] = value
+    }
+    self.init(name: name, withInputParameters: dict)
+  }
 }
 
 #if os(OSX)

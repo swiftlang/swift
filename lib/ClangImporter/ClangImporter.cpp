@@ -253,7 +253,7 @@ ClangImporter::create(ASTContext &ctx,
       "-DSWIFT_SDK_OVERLAY2_SPRITEKIT_EPOCH=1",
 
       // Request new APIs from CoreImage.
-      "-DSWIFT_SDK_OVERLAY_CORE_IMAGE_EPOCH=1",
+      "-DSWIFT_SDK_OVERLAY_COREIMAGE_EPOCH=1",
     };
     invocationArgStrs.insert(invocationArgStrs.end(), extraArgs.begin(),
                              extraArgs.end());
