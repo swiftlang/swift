@@ -70,7 +70,7 @@ class G : Class {
 }
 
 // CHECK-LABEL: sil @test_unconditional_checked_cast_class_exist
-// CHECK: unchecked_ref_cast
+// CHECK: unconditional_checked_cast
 // CHECK: return
 sil @test_unconditional_checked_cast_class_exist : $@convention(thin) (@owned Class) -> @owned G {
 bb0(%0 : $Class):

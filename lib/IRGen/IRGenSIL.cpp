@@ -3274,9 +3274,6 @@ static void emitPointerCastInst(IRGenSILFunction &IGF,
                                 const TypeInfo &ti) {
   Explosion from = IGF.getLoweredExplosion(src);
   llvm::Value *ptrValue = from.claimNext();
-  // The input may have witness tables or other additional data, but the class
-  // reference is always first.
-  from.claimAll();
   
   auto schema = ti.getSchema();
   assert(schema.size() == 1
@@ -3402,8 +3399,17 @@ void IRGenSILFunction::visitUncheckedRefBitCastInst(
 
 void IRGenSILFunction::visitRefToRawPointerInst(
                                              swift::RefToRawPointerInst *i) {
-  auto &ti = getTypeInfo(i->getType());
-  emitPointerCastInst(*this, i->getOperand(), SILValue(i, 0), ti);
+  Explosion from = getLoweredExplosion(i->getOperand());
+  llvm::Value *ptrValue = from.claimNext();
+  // The input may have witness tables or other additional data, but the class
+  // reference is always first.
+  from.claimAll();
+  
+  ptrValue = Builder.CreateBitCast(ptrValue, IGM.Int8PtrTy);
+  
+  Explosion to;
+  to.add(ptrValue);
+  setLoweredExplosion(SILValue(i, 0), to);
 }
 
 void IRGenSILFunction::visitRawPointerToRefInst(swift::RawPointerToRefInst *i) {

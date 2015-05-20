@@ -2056,8 +2056,8 @@ public:
   void checkUncheckedRefCastInst(UncheckedRefCastInst *AI) {
     require(AI->getOperand().getType().isObject(),
             "unchecked_ref_cast operand must be a value");
-    requireReferenceOrOptionalReferenceValue(AI->getOperand(),
-            "unchecked_ref_cast operand");
+    require(AI->getOperand().getType().isHeapObjectReferenceType(),
+            "unchecked_ref_cast operand must be a heap object reference");
     require(AI->getType().isObject(),
             "unchecked_ref_cast result must be an object");
     require(AI->getType().isHeapObjectReferenceType(),
