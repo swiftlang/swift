@@ -31,6 +31,11 @@ class NoisyError : ErrorType, OtherProtocol, OtherClassProtocol {
   let otherClassProperty = "otherClassProperty"
 }
 
+@objc enum EnumError : Int, ErrorType {
+  case BadError = 9000
+  case ReallyBadError = 9001
+}
+
 ErrorTypeBridgingTests.test("NSError") {
   NoisyErrorLifeCount = 0
   NoisyErrorDeathCount = 0
@@ -44,7 +49,7 @@ ErrorTypeBridgingTests.test("NSError") {
     expectEqual(e._domain, "SomeDomain")
     expectEqual(e._code, 321)
 
-    let ns2 = e as! NSError
+    let ns2 = e as NSError
     expectTrue(ns === ns2)
     expectEqual(ns2._domain, "SomeDomain")
     expectEqual(ns2._code, 321)
@@ -213,6 +218,43 @@ ErrorTypeBridgingTests.test("ErrorType-to-NSError bridging") {
     expectEqual(ns5._code, 4812)
   }
   expectEqual(NoisyErrorDeathCount, NoisyErrorLifeCount)
+}
+
+ErrorTypeBridgingTests.test("enum-to-NSError round trip") {
+  autoreleasepool {
+    // Emulate throwing an error from Objective-C.
+    func throwNSError(error: EnumError) throws {
+      throw NSError(domain: "\(EnumError.self)", code: error.rawValue,
+                    userInfo: [:])
+    }
+
+    var caughtError: Bool
+
+    caughtError = false
+    do {
+      try throwNSError(.BadError)
+      expectUnreachable()
+    } catch let error as EnumError {
+      expectEqual(.BadError, error)
+      caughtError = true
+    } catch _ {
+      expectUnreachable()
+    }
+    expectTrue(caughtError)
+
+    caughtError = false
+    do {
+      try throwNSError(.ReallyBadError)
+      expectUnreachable()
+    } catch EnumError.BadError {
+      expectUnreachable()
+    } catch EnumError.ReallyBadError {
+      caughtError = true
+    } catch _ {
+      expectUnreachable()
+    }
+    expectTrue(caughtError)
+  }
 }
 
 runAllTests()
