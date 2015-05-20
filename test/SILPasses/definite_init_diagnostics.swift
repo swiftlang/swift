@@ -1176,5 +1176,14 @@ class DerivedClassEH : BaseClassEH {
   }
 }
 
+// <rdar://problem/21003797> too-early throw in an init produces "must be initialized before returning nil" diagnostic
+func throwAndReturnsInt() throws -> Int { return 42 }
 
+class ThrowingInitializer {
+  let property: Int // expected-note {{'self.property' not initialized}}
+
+  init() throws {
+    property = try throwAndReturnsInt() // expected-error {{all stored properties of a class instance must be initialized before throwing from an initializer}}
+  }
+}
 

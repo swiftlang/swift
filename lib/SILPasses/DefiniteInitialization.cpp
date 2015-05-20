@@ -1347,7 +1347,7 @@ void LifetimeChecker::processNonTrivialRelease(unsigned ReleaseID) {
   // initializer after all properties are initialized or in a convenience init.
   if (TheMemory.isClassInitSelf() && !TheMemory.isDelegatingInit()) {
     SILLocation loc = Release->getLoc();
-    
+
     // The release is generally a cleanup in a failure block, and is usually the
     // first instruction in the block.  For better QoI, try to rewind back up
     // the CFG a bit to find a source location that is better.
@@ -1361,10 +1361,12 @@ void LifetimeChecker::processNonTrivialRelease(unsigned ReleaseID) {
           loc = pred->getTerminator()->getLoc();
       }
     }
-    
+
+
     // All members must be initialized (including the base class, if
     // present).
-    diagnose(Module, loc, diag::object_not_fully_initialized_before_failure);
+    diagnose(Module, loc, diag::object_not_fully_initialized_before_failure,
+             isa<ThrowInst>(Release->getParent()->getTerminator()));
     
     // Note each of the members that isn't initialized.
     DIMemoryUse Use(Release, DIUseKind::Load, 0, TheMemory.NumElements);
