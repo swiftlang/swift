@@ -79,6 +79,7 @@ namespace {
     public:
       enum class Kind {
         Value,
+        Type,
         Operator,
         OperatorFilter,
         Accessor,
@@ -106,6 +107,9 @@ namespace {
         switch (kind) {
         case Kind::Value:
           os << getDataAs<Identifier>();
+          break;
+        case Kind::Type:
+          os << "with type " << getDataAs<Type>();
           break;
         case Kind::Extension:
           if (getDataAs<Module *>())
@@ -180,6 +184,10 @@ namespace {
 
     void addValue(Identifier name) {
       path.push_back({ PathPiece::Kind::Value, name });
+    }
+
+    void addType(Type ty) {
+      path.push_back({ PathPiece::Kind::Type, ty });
     }
 
     void addOperator(Identifier name) {
@@ -1037,10 +1045,14 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
     Identifier name = getIdentifier(IID);
     pathTrace.addValue(name);
 
+    Type filterTy = getType(TID);
+    if (!isType)
+      pathTrace.addType(filterTy);
+
     M->lookupQualified(ModuleType::get(M), name,
                        NL_QualifiedDefault | NL_KnownNoDependency,
                        /*typeResolver=*/nullptr, values);
-    filterValues(getType(TID), nullptr, nullptr, isType, None, values);
+    filterValues(filterTy, nullptr, nullptr, isType, None, values);
     break;
   }
 
@@ -1141,6 +1153,10 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
 
       pathTrace.addValue(memberName);
 
+      Type filterTy = getType(TID);
+      if (!isType)
+        pathTrace.addType(filterTy);
+
       if (values.size() != 1) {
         error();
         return nullptr;
@@ -1156,7 +1172,7 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
 
       auto members = nominal->lookupDirect(memberName, onlyInNominal);
       values.append(members.begin(), members.end());
-      filterValues(getType(TID), M, genericSig, isType, ctorInit, values);
+      filterValues(filterTy, M, genericSig, isType, ctorInit, values);
       break;
     }
 
