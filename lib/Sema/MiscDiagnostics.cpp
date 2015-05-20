@@ -381,7 +381,9 @@ static void diagnoseImplicitSelfUseInClosure(TypeChecker &TC, const Expr *E,
     static bool isImplicitSelfUse(Expr *E) {
       auto *DRE = dyn_cast<DeclRefExpr>(E);
       return DRE && DRE->isImplicit() && DRE->getDecl()->hasName() &&
-             DRE->getDecl()->getName().str() == "self";
+             DRE->getDecl()->getName().str() == "self" &&
+             // Metatype self captures don't extend the lifetime of an object.
+             !DRE->getType()->is<MetatypeType>();
     }
 
     /// Return true if this is a closure expression that will require "self."

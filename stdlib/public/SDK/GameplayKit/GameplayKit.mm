@@ -12,6 +12,7 @@
 
 #import <GameplayKit/GameplayKit.h>
 
+#if 0
 extern "C" NS_RETURNS_RETAINED __nullable GKComponent *
 GK_Swift_GKEntity_componentForClass(
     id NS_RELEASES_ARGUMENT __nonnull self_,
@@ -31,3 +32,4 @@ GK_Swift_GKStateMachine_stateForClass(
   [self_ release];
   return state;
 }
+#endif

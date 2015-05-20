@@ -262,3 +262,22 @@ let samples = { // expected-error{{unable to infer closure type in the current c
 func f(fp : (Bool, Bool)-> Bool) {}
 f { $0 && !$1 }
 
+
+// <rdar://problem/18123596> unexpected error on self. capture inside class method
+func TakesIntReturnsVoid(fp : (Int -> ())) {}
+
+struct TestStructWithStaticMethod {
+  static func myClassMethod(count: Int) {
+    // Shouldn't require "self."
+    TakesIntReturnsVoid { _ in myClassMethod(0) }
+  }
+}
+
+class TestClassWithStaticMethod {
+  class func myClassMethod(count: Int) {
+    // Shouldn't require "self."
+    TakesIntReturnsVoid { _ in myClassMethod(0) }
+  }
+}
+
+
