@@ -177,6 +177,59 @@ void TypeChecker::contextualizeTopLevelCode(TopLevelContext &TLC,
   TLC.NextAutoClosureDiscriminator = CC.NextDiscriminator;
 }
 
+/// Emits an error with a fixit for the case of unnecessary cast over a
+/// RawOptionSet value. The primary motivation is to help with SDK changes.
+/// Example:
+/// \code
+///   func supported() -> MyMask {
+///     return Int(MyMask.Bingo.rawValue)
+///   }
+/// \endcode
+static void tryDiagnoseUnnecessaryCastOverRawOptionSet(ASTContext &Ctx,
+                                                       Expr *E,
+                                                       Type ResultType) {
+  auto *NTD = ResultType->getAnyNominal();
+  if (!NTD)
+    return;
+  bool IsRawOptionSet = false;
+  for (auto *PD : NTD->getProtocols()) {
+    if (auto KnownP = PD->getKnownProtocolKind()) {
+      if (KnownP.getValue() == KnownProtocolKind::RawOptionSetType) {
+        IsRawOptionSet = true;
+        break;
+      }
+    }
+  }
+  if (!IsRawOptionSet)
+    return;
+
+  CallExpr *CE = dyn_cast<CallExpr>(E);
+  if (!CE)
+    return;
+  if (!isa<ConstructorRefCallExpr>(CE->getFn()))
+    return;
+  ParenExpr *ParenE = dyn_cast<ParenExpr>(CE->getArg());
+  if (!ParenE)
+    return;
+  MemberRefExpr *ME = dyn_cast<MemberRefExpr>(ParenE->getSubExpr());
+  if (!ME)
+    return;
+  ValueDecl *VD = ME->getMember().getDecl();
+  if (!VD || VD->getName() != Ctx.Id_rawValue)
+    return;
+  MemberRefExpr *BME = dyn_cast<MemberRefExpr>(ME->getBase());
+  if (!BME)
+    return;
+  if (BME->getType()->getCanonicalType() != ResultType->getCanonicalType())
+    return;
+
+  Ctx.Diags.diagnose(E->getLoc(), diag::unnecessary_cast_over_rawoptionset,
+                     ResultType)
+    .highlight(E->getSourceRange())
+    .fixItRemoveChars(E->getLoc(), ME->getStartLoc())
+    .fixItRemove(SourceRange(ME->getDotLoc(), E->getEndLoc()));
+}
+
 namespace {
 class StmtChecker : public StmtVisitor<StmtChecker, Stmt*> {
 public:
@@ -353,8 +406,10 @@ public:
     auto failed = TC.typeCheckExpression(E, DC, ResultTy, Type(), false);
     RS->setResult(E);
     
-    if (failed)
+    if (failed) {
+      tryDiagnoseUnnecessaryCastOverRawOptionSet(TC.Context, E, ResultTy);
       return nullptr;
+    }
     
     return RS;
   }
