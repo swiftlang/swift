@@ -194,6 +194,7 @@ struct PrintOptions {
     result.PrintUserInaccessibleAttrs = false;
     result.PrintImplicitAttrs = false;
     result.ExcludeAttrList.push_back(DAK_Exported);
+    result.ExcludeAttrList.push_back(DAK_Inline);
     result.PrintFunctionRepresentationAttrs = false;
     result.PrintOverrideKeyword = false;
     result.AccessibilityFilter = Accessibility::Public;
