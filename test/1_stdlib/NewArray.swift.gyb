@@ -422,7 +422,7 @@ func testInoutViolation() {
   
   // An overload of sort for Arrays uses withUnsafeMutableBufferPointer,
   // which disables bounds checks.
-  sort(&a) { x, y in
+  a.sort { x, y in
     a = []         // Invalidate the whole array during sorting
     return x < y
   }

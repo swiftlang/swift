@@ -14,9 +14,11 @@ func testIntSubscripting(s: String, i: Int) {
 }
 
 func testNonAmbiguousStringComparisons() {
-  let names = ["Chris", "Alex", "Ewa", "Barry", "Daniella"]
-  _ = sorted(names, { s1, s2 in s1 > s2 })
-  _ = sorted(names, { s1, s2 in s1 as String > s2 })
+  let s1 = "a"
+  let s2 = "b"
+  var x = false // expected-warning {{variable 'x' was written to, but never read}}
+  x = s1 > s2
+  x = s1 as String > s2
 }
 
 func testAmbiguousStringComparisons(s: String) {

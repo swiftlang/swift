@@ -2006,10 +2006,10 @@ public func expectEqualsUnordered<
     file: String = __FILE__, line: UWord = __LINE__,
     collectMoreInfo: (()->String)? = nil
 ) {
-  let x: [Expected.Generator.Element] = sorted(
-    Array(expected), compose(compare, { $0.isLT() }))
-  let y: [Actual.Generator.Element] = sorted(
-    Array(actual), compose(compare, { $0.isLT() }))
+  let x: [Expected.Generator.Element] =
+    expected.sort(compose(compare, { $0.isLT() }))
+  let y: [Actual.Generator.Element] =
+    actual.sort(compose(compare, { $0.isLT() }))
   expectEqualSequence(
     x, y, compose(compare, { $0.isEQ() }), stackTrace: stackTrace,
     file: file, line: line, collectMoreInfo: collectMoreInfo)
@@ -2051,8 +2051,8 @@ public func expectEqualsUnordered<T : Comparable>(
   file: String = __FILE__, line: UWord = __LINE__,
   collectMoreInfo: (()->String)? = nil
 ) {
-  let x = sorted(expected)
-  let y = sorted(actual)
+  let x = expected.sort()
+  let y = actual.sort()
   expectEqualSequence(
     x, y, { $0 == $1 }, stackTrace: stackTrace,
     file: file, line: line, collectMoreInfo: collectMoreInfo)
@@ -2087,8 +2087,8 @@ public func expectEqualsUnordered<T : Comparable>(
   file: String = __FILE__, line: UWord = __LINE__,
   collectMoreInfo: (()->String)? = nil
 ) {
-  let x = sorted(expected, { Pair($0.0, $0.1) < Pair($1.0, $1.1) })
-  let y = sorted(actual, { Pair($0.0, $0.1) < Pair($1.0, $1.1) })
+  let x = expected.sort { Pair($0.0, $0.1) < Pair($1.0, $1.1) }
+  let y = actual.sort { Pair($0.0, $0.1) < Pair($1.0, $1.1) }
   expectEqualSequence(
     x, y, { Pair($0.0, $0.1) == Pair($1.0, $1.1) }, stackTrace: stackTrace,
     file: file, line: line, collectMoreInfo: collectMoreInfo)

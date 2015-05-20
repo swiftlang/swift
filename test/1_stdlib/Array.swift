@@ -54,36 +54,6 @@ func testFilter() {
 }
 testFilter()
 
-func testSort() {
-  var a = [3, 1, 9, 7]
-  print(a.sorted { $0 < $1 })
-  // CHECK-NEXT: [1, 3, 7, 9]
-  print(a.sorted { $0 > $1 })
-  // CHECK-NEXT: [9, 7, 3, 1]
-  print(a)
-  // CHECK-NEXT: [3, 1, 9, 7]
-  a.sort { $0 < $1 }
-  print(a)
-  // CHECK-NEXT: [1, 3, 7, 9]
-  a.sort { $0 > $1 }
-  print(a)
-  // CHECK-NEXT: [9, 7, 3, 1]
-
-  // Also make sure the free functions do somethign sane
-  a = [3, 1, 9, 7]
-  print(sorted(a))
-  // CHECK-NEXT: [1, 3, 7, 9]
-  print(sorted(a) { $0 > $1 })
-  // CHECK-NEXT: [9, 7, 3, 1]
-  sort(&a)
-  print(a)
-  // CHECK-NEXT: [1, 3, 7, 9]
-  sort(&a) { $0 > $1 }
-  print(a)
-  // CHECK-NEXT: [9, 7, 3, 1]
-}
-testSort()
-
 func testArrayOfVoid() {
   // This used to crash because it generated an array of void with stride == 0
   // CHECK-NEXT: 123

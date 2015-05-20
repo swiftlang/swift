@@ -110,9 +110,9 @@ Algorithm.test("sorted/strings")
   .code {
   expectEqual(
     [ "Banana", "apple", "cherry" ],
-    sorted([ "apple", "Banana", "cherry" ]))
+    [ "apple", "Banana", "cherry" ].sort())
 
-  let s = sorted(["apple", "Banana", "cherry"]) {
+  let s = ["apple", "Banana", "cherry"].sort() {
     $0.characters.count > $1.characters.count
   }
   expectEqual([ "Banana", "cherry", "apple" ], s)
@@ -182,12 +182,12 @@ func randomArray() -> A<Int> {
 Algorithm.test("invalidOrderings") {
   withInvalidOrderings {
     var a = randomArray()
-    sort(&a, $0)
+    a.sort($0)
   }
   withInvalidOrderings {
     var a: A<Int>
     a = randomArray()
-    partition(&a, a.indices, $0)
+    a.partition(a.indices, isOrderedBefore: $0)
   }
   /*
   // FIXME: Disabled due to <rdar://problem/17734737> Unimplemented:
@@ -226,7 +226,7 @@ func makeQSortKiller(len: Int) -> [Int] {
   var ary = [Int](count: len, repeatedValue:0)
   var ret = [Int](count: len, repeatedValue:0)
   for i in 0..<len { ary[i] = i }
-  ary = sorted(ary, Compare)
+  ary = ary.sort(Compare)
   for i in 0..<len {
     ret[ary[i]] = i
   }
@@ -239,25 +239,25 @@ Algorithm.test("sorted/complexity") {
   // Check performance of sort on array of repeating values
   var comparisons_100 = 0
   ary = [Int](count: 100, repeatedValue: 0)
-  sort(&ary) { comparisons_100++; return $0 < $1 }
+  ary.sortInPlace { comparisons_100++; return $0 < $1 }
   var comparisons_1000 = 0
   ary = [Int](count: 1000, repeatedValue: 0)
-  sort(&ary) { comparisons_1000++; return $0 < $1 }
+  ary.sortInPlace { comparisons_1000++; return $0 < $1 }
   expectTrue(comparisons_1000/comparisons_100 < 20)
 
   // Try to construct 'bad' case for quicksort, on which the algorithm
   // goes quadratic.
   comparisons_100 = 0
   ary = makeQSortKiller(100)
-  sort(&ary) { comparisons_100++; return $0 < $1 }
+  ary.sortInPlace { comparisons_100++; return $0 < $1 }
   comparisons_1000 = 0
   ary = makeQSortKiller(1000)
-  sort(&ary) { comparisons_1000++; return $0 < $1 }
+  ary.sortInPlace { comparisons_1000++; return $0 < $1 }
   expectTrue(comparisons_1000/comparisons_100 < 20)
 }
 
 Algorithm.test("sorted/return type") {
-  let x: Array = sorted([5, 4, 3, 2, 1] as ArraySlice)
+  let x: Array = ([5, 4, 3, 2, 1] as ArraySlice).sort()
 }
 
 var SequenceTypeAlgorithms = TestSuite("SequenceTypeAlgorithms")
@@ -3285,7 +3285,7 @@ SequenceTypeAlgorithms.test("partition/${'Predicate' if predicate else 'WhereEle
 
         let closureLifetimeTracker = LifetimeTracked(0)
         expectEqual(1, LifetimeTracked.instances)
-        let pivot = s._prext_partition(indices) {
+        let pivot = s.partition(indices) {
           (lhs, rhs) in
           _blackHole(closureLifetimeTracker)
           return lhs.value < rhs.value
@@ -3311,7 +3311,7 @@ SequenceTypeAlgorithms.test("partition/${'Predicate' if predicate else 'WhereEle
         let indices = s.indices
 %       end
 
-        let pivot = s._prext_partition(indices)
+        let pivot = s.partition(indices)
 %     end
 
         // Check that we didn't lose any elements.
@@ -3357,7 +3357,7 @@ SequenceTypeAlgorithms.test("partition/${'Predicate' if predicate else 'WhereEle
           sequence.map { OpaqueValue($0) })
         let closureLifetimeTracker = LifetimeTracked(0)
         expectEqual(1, LifetimeTracked.instances)
-        let pivot = s._prext_partition(s.indices) {
+        let pivot = s.partition(s.indices) {
           (lhs, rhs) in
           _blackHole(closureLifetimeTracker)
           return comparisonPredicate(lhs.value, rhs.value)
@@ -3372,7 +3372,7 @@ SequenceTypeAlgorithms.test("partition/${'Predicate' if predicate else 'WhereEle
         CustomComparableValue.lessImpl = {
           comparisonPredicate($0, $1)
         }
-        let pivot = s._prext_partition(s.indices)
+        let pivot = s.partition(s.indices)
 %    end
 
         // Weak postcondition: we didn't lose any elements.
@@ -3411,7 +3411,7 @@ SequenceTypeAlgorithms.test("sort/${'Predicate' if predicate else 'WhereElementI
         var s = MinimalMutableRandomAccessCollection<OpaqueValue<Int>>(
           sequenceAsArray)
 
-        let result = s._prext_sort { $0.value < $1.value }
+        let result = s.sort { $0.value < $1.value }
 %   else:
         var sequenceAsArray: [CustomComparableValue] =
           zip(sequence, 0..<sequence.count).map {
@@ -3421,7 +3421,7 @@ SequenceTypeAlgorithms.test("sort/${'Predicate' if predicate else 'WhereElementI
         var s = MinimalMutableRandomAccessCollection<CustomComparableValue>(
           sequenceAsArray)
 
-        let result = s._prext_sort()
+        let result = s.sort()
 %   end
 
         // Check that we didn't lose any elements.
@@ -3454,9 +3454,9 @@ SequenceTypeAlgorithms.test("sort/CustomImplementation/${'Predicate' if predicat
 %   end
   MinimalMutableForwardCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled = 0
 %   if predicate:
-  let result = collection._prext_sort()
+  let result = collection.sort()
 %   else:
-  let result = collection._prext_sort { $0.value < $1.value }
+  let result = collection.sort { $0.value < $1.value }
 %   end
   // The collection is copied into an array before sorting.
   expectEqual(0, MinimalMutableForwardCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled)
@@ -3475,7 +3475,7 @@ SequenceTypeAlgorithms.test("sort/${'Predicate' if predicate else 'WhereElementI
 %   if predicate:
         var s = MinimalMutableRandomAccessCollection<OpaqueValue<Int>>(
           sequence.map { OpaqueValue($0) })
-        let result = s._prext_sort {
+        let result = s.sort {
           comparisonPredicate($0.value, $1.value)
         }
 %    else:
@@ -3488,7 +3488,7 @@ SequenceTypeAlgorithms.test("sort/${'Predicate' if predicate else 'WhereElementI
         CustomComparableValue.lessImpl = {
           comparisonPredicate($0, $1)
         }
-        let result = s._prext_sort()
+        let result = s.sort()
 %    end
 
         // Weak postcondition: we didn't lose any elements.
@@ -3522,9 +3522,9 @@ SequenceTypeAlgorithms.test("partition/CustomImplementation/${'Predicate' if pre
         sequenceAsArray)
       MinimalMutableRandomAccessCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled = 0
 %   if predicate:
-      let pivot = s._prext_partition(s.indices) { $0.value < $1.value }
+      let pivot = s.partition(s.indices) { $0.value < $1.value }
 %   else:
-      let pivot = s._prext_partition(s.indices)
+      let pivot = s.partition(s.indices)
 %   end
       expectEqual(1, MinimalMutableRandomAccessCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled)
 
@@ -3567,7 +3567,7 @@ SequenceTypeAlgorithms.test("sortInPlace/${'Predicate' if predicate else 'WhereE
         var s = MinimalMutableRandomAccessCollection<OpaqueValue<Int>>(
           sequenceAsArray)
 
-        s._prext_sortInPlace { $0.value < $1.value }
+        s.sortInPlace { $0.value < $1.value }
 %   else:
         var sequenceAsArray: [CustomComparableValue] =
           zip(sequence, 0..<sequence.count).map {
@@ -3577,7 +3577,7 @@ SequenceTypeAlgorithms.test("sortInPlace/${'Predicate' if predicate else 'WhereE
         var s = MinimalMutableRandomAccessCollection<CustomComparableValue>(
           sequenceAsArray)
 
-        s._prext_sortInPlace()
+        s.sortInPlace()
 %   end
 
         // Check that we didn't lose any elements.
@@ -3619,9 +3619,9 @@ SequenceTypeAlgorithms.test("partition/CustomImplementation/${'Predicate' if pre
         sequenceAsArray)
         MinimalMutableRandomAccessCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled = 0
 %   if predicate:
-        let pivot = s._prext_partition(s.indices) { $0.value < $1.value }
+        let pivot = s.partition(s.indices) { $0.value < $1.value }
 %   else:
-        let pivot = s._prext_partition(s.indices)
+        let pivot = s.partition(s.indices)
 %   end
         expectEqual(1, MinimalMutableRandomAccessCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled)
 
@@ -3654,7 +3654,7 @@ SequenceTypeAlgorithms.test("sortInPlace/${'Predicate' if predicate else 'WhereE
 %   if predicate:
         var s = MinimalMutableRandomAccessCollection<OpaqueValue<Int>>(
           sequence.map { OpaqueValue($0) })
-        s._prext_sortInPlace {
+        s.sortInPlace {
           comparisonPredicate($0.value, $1.value)
         }
 %    else:
@@ -3667,7 +3667,7 @@ SequenceTypeAlgorithms.test("sortInPlace/${'Predicate' if predicate else 'WhereE
         CustomComparableValue.lessImpl = {
           comparisonPredicate($0, $1)
         }
-        s._prext_sortInPlace()
+        s.sortInPlace()
 %    end
 
         // Weak postcondition: we didn't lose any elements.

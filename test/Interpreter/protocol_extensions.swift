@@ -95,7 +95,7 @@ extension MutableCollectionType
   where Self.Index: RandomAccessIndexType, Self.Generator.Element : Comparable {
 
   public final mutating func myPartition(range: Range<Index>) -> Index {
-    return Swift.partition(&self, range)
+    return self.partition(range)
   }
 }
 

@@ -114,7 +114,7 @@ func isCocoaSet<T : Hashable>(s: Set<T>) -> Bool {
 }
 
 func equalsUnordered(lhs: Set<Int>, _ rhs: Set<Int>) -> Bool {
-  return sorted(lhs).elementsEqual(sorted(rhs)) {
+  return lhs.sort().elementsEqual(rhs.sort()) {
     $0 == $1
   }
 }

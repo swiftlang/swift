@@ -75,11 +75,6 @@ func test() {
     var arrayPerson = [Person(), Person()]
     var dictionary = [1 : "Kate", 2 : "Sean", 3 : "Barry"]
 
-    var sortedArrayString = sorted(["C", "B", "A"],
-    {
-        $0 < $1
-    })
-
     echo(string)
     echo(tuple)
     echo(point)

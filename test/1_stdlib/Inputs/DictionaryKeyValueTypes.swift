@@ -47,14 +47,14 @@ func equalsUnordered<T : Comparable>(
   func comparePair(lhs: (T, T), _ rhs: (T, T)) -> Bool {
     return [ lhs.0, lhs.1 ].lexicographicalCompare([ rhs.0, rhs.1 ])
   }
-  return sorted(lhs, comparePair).elementsEqual(sorted(rhs, comparePair)) {
+  return lhs.sort(comparePair).elementsEqual(rhs.sort(comparePair)) {
     (lhs: (T, T), rhs: (T, T)) -> Bool in
     lhs.0 == rhs.0 && lhs.1 == rhs.1
   }
 }
 
 func equalsUnordered<T : Comparable>(lhs: [T], _ rhs: [T]) -> Bool {
-  return sorted(lhs).elementsEqual(sorted(rhs))
+  return lhs.sort().elementsEqual(rhs.sort())
 }
 
 var _keyCount = _stdlib_AtomicInt(0)

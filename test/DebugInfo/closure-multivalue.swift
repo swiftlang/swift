@@ -22,7 +22,7 @@ public func sort(a: String, b: String) -> Bool {
 
 public func demo() {
     var names = ["Sean", "Barry", "Kate"]
-    var sortedNames = sorted(names, sort)
+    var sortedNames = names.sort(sort)
     var sortedNamesAsString : String = String()
     for name in sortedNames {
         sortedNamesAsString += ("\(name), ")

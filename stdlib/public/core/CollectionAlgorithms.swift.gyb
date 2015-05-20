@@ -125,7 +125,7 @@ extension MutableCollectionType where Index : RandomAccessIndexType {
 ${partitionDocComment}
   ///
 ${orderingRequirementForPredicate}
-  final public mutating func _prext_partition(
+  final public mutating func partition(
     range: Range<Index>,
     var isOrderedBefore: (${GElement}, ${GElement}) -> Bool
   ) -> Index {
@@ -138,7 +138,7 @@ extension MutableCollectionType
 ${partitionDocComment}
   ///
 ${orderingRequirementForComparable}
-  final public mutating func _prext_partition(range: Range<Index>) -> Index {
+  final public mutating func partition(range: Range<Index>) -> Index {
 
 %   end
 
@@ -152,7 +152,7 @@ ${orderingRequirementForComparable}
       let unsafeBufferEndIndex =
         bufferPointer.startIndex + numericCast(endOffset)
 
-      let unsafeBufferPivot = bufferPointer._prext_partition(
+      let unsafeBufferPivot = bufferPointer.partition(
         unsafeBufferStartIndex..<unsafeBufferEndIndex
 %   if preds:
         , isOrderedBefore: isOrderedBefore
@@ -211,9 +211,9 @@ ${sortDocCommentForComparable}
 ${sortIsUnstableForComparable}
   ///
 ${orderingRequirementForComparable}
-  final public func _prext_sort() -> [Generator.Element] {
+  final public func sort() -> [Generator.Element] {
     var result = ContiguousArray(self)
-    result._prext_sortInPlace()
+    result.sortInPlace()
     return Array(result)
   }
 }
@@ -224,11 +224,11 @@ ${sortDocCommentForPredicate}
 ${sortIsUnstableForPredicate}
   ///
 ${orderingRequirementForPredicate}
-  final public func _prext_sort(
+  final public func sort(
     isOrderedBefore: (Generator.Element, Generator.Element) -> Bool
   ) -> [Generator.Element] {
     var result = ContiguousArray(self)
-    result._prext_sortInPlace(isOrderedBefore)
+    result.sortInPlace(isOrderedBefore)
     return Array(result)
   }
 }
@@ -243,11 +243,11 @@ ${sortInPlaceDocCommentForComparable}
 ${sortIsUnstableForComparable}
   ///
 ${orderingRequirementForComparable}
-  final public mutating func _prext_sortInPlace() {
+  final public mutating func sortInPlace() {
     let didSortUnsafeBuffer: Void? =
       _withUnsafeMutableBufferPointerIfSupported {
       (bufferPointer) -> () in
-      bufferPointer._prext_sortInPlace()
+      bufferPointer.sortInPlace()
       return ()
     }
     if didSortUnsafeBuffer == nil {
@@ -262,13 +262,13 @@ ${sortInPlaceDocCommentForPredicate}
 ${sortIsUnstableForPredicate}
   ///
 ${orderingRequirementForPredicate}
-  final public mutating func _prext_sortInPlace(
+  final public mutating func sortInPlace(
     isOrderedBefore: (Generator.Element, Generator.Element) -> Bool
   ) {
     let didSortUnsafeBuffer: Void? =
       _withUnsafeMutableBufferPointerIfSupported {
       (bufferPointer) -> () in
-      bufferPointer._prext_sortInPlace(isOrderedBefore)
+      bufferPointer.sortInPlace(isOrderedBefore)
       return ()
     }
     if didSortUnsafeBuffer == nil {

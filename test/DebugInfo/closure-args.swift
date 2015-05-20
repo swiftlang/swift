@@ -48,15 +48,6 @@ func main() -> Void
         }
 
     var bool = backward_ptr("a" , "b")
-
-    var my_string = ["a", "b", "c", "d"]
-
-    var new_string = sorted (my_string, backward_ptr )
-
-    print(new_string, appendNewline: false)
-    print("\n", appendNewline: false)
-    print(random_int, appendNewline: false)
-    print("\n", appendNewline: false)
 }
 
 main()

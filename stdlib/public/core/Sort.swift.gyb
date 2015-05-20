@@ -93,6 +93,7 @@ func _insertionSort<
 /// elements[`*p*`])`.  Only returns `range.endIndex` when
 /// `elements` is empty.
 ${orderingRequirement}
+@available(*, unavailable, message="call the 'partition()' method on the collection")
 public func partition<
   C: MutableCollectionType where C.Index: RandomAccessIndexType
   ${"" if p else ", C.Generator.Element : Comparable"}
@@ -101,8 +102,7 @@ public func partition<
   _ range: Range<C.Index> ${"," if p else ""}
   ${"_ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
 ) -> C.Index {
-  // FIXME(prext): remove this function when protocol extensions land.
-  return elements._prext_partition(range ${", isOrderedBefore: isOrderedBefore" if p else ""})
+  return elements.partition(range ${", isOrderedBefore: isOrderedBefore" if p else ""})
 }
 
 func _partition<
@@ -293,6 +293,7 @@ else:
 ${sortIsUnstable}
 ///
 ${orderingRequirement}
+@available(*, unavailable, message="call the 'sortInPlace()' method on the collection")
 public func sort<
   C: MutableCollectionType where C.Index: RandomAccessIndexType
   ${"" if p else ", C.Generator.Element : Comparable"}
@@ -300,11 +301,10 @@ public func sort<
   inout collection: C ${"," if p else ""}
   ${"_ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
 ) {
-  // FIXME(prext): remove this function when protocol extensions land.
 % if p:
-  collection._prext_sortInPlace(isOrderedBefore)
+  collection.sortInPlace(isOrderedBefore)
 % else:
-  collection._prext_sortInPlace()
+  collection.sortInPlace()
 % end
 }
 
@@ -314,12 +314,14 @@ ${sortIsUnstable}
 ///
 ${orderingRequirement}
 % if p:
+@available(*, unavailable, message="call the 'sortInPlace()' method on the collection")
 public func sort<T>(inout array: [T], _ isOrderedBefore: (T, T) -> Bool) {
 % else:
+@available(*, unavailable, message="call the 'sortInPlace()' method on the collection")
 public func sort<T : Comparable>(inout array: [T]) {
 % end
   return array.withUnsafeMutableBufferPointer {
-    a in sort(&a ${", isOrderedBefore" if p else ""})
+    a in a.sortInPlace(${"isOrderedBefore" if p else ""})
     return
   }
 }
@@ -330,6 +332,7 @@ ${sortIsUnstable}
 ///
 ${orderingRequirement}
 % if p:
+@available(*, unavailable, message="call the 'sortInPlace()' method on the collection")
 public func sort<T>(
   inout array: ContiguousArray<T>,
   _ isOrderedBefore: (T, T) -> Bool
@@ -337,11 +340,10 @@ public func sort<T>(
 % else:
 public func sort<T : Comparable>(inout array: ContiguousArray<T>) {
 % end
-  // FIXME(prext): remove this function when protocol extensions land.
 % if p:
-  array._prext_sortInPlace(isOrderedBefore)
+  array.sortInPlace(isOrderedBefore)
 % else:
-  array._prext_sortInPlace()
+  array.sortInPlace()
 % end
 }
 
@@ -350,17 +352,17 @@ public func sort<T : Comparable>(inout array: ContiguousArray<T>) {
 ${sortIsUnstable}
 ///
 ${orderingRequirement}
+@available(*, unavailable, message="call the 'sort()' method on the collection")
 public func sorted<
   C: SequenceType${"" if p else " where C.Generator.Element : Comparable"}
 >(
   source: C ${"," if p else ""}
   ${"_ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
 ) -> [C.Generator.Element] {
-  // FIXME(prext): remove this function when protocol extensions land.
 % if p:
-  return source._prext_sort(isOrderedBefore)
+  return source.sort(isOrderedBefore)
 % else:
-  return source._prext_sort()
+  return source.sort()
 % end
 }
 % end
