@@ -3016,7 +3016,7 @@ func callGenericWithUnsafeMutableBufferPointerIfSupported<
 % for Implementation in [ 'Default', 'Custom' ]:
 
 func callStaticWithUnsafeMutableBufferPointerIfSupported<R>(
-  inout collection: MinimalForwardMutableCollectionWith${Implementation}WithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>,
+  inout collection: MinimalMutableForwardCollectionWith${Implementation}WithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>,
   @noescape body: (inout UnsafeMutableBufferPointer<OpaqueValue<Int>>) -> R
 ) -> R? {
   return collection._withUnsafeMutableBufferPointerIfSupported(body)
@@ -3030,18 +3030,18 @@ func callStaticWithUnsafeMutableBufferPointerIfSupported<R>(
 
 SequenceTypeAlgorithms.test("MutableCollectionType._withUnsafeMutableBufferPointerIfSupported()/${Implementation}Implementation/${dispatch}") {
   let data = [ 1, 2, 3, 4, 5 ]
-  var collection = MinimalForwardMutableCollectionWith${Implementation}WithUnsafeMutableBufferPointerIfSupported(
+  var collection = MinimalMutableForwardCollectionWith${Implementation}WithUnsafeMutableBufferPointerIfSupported(
     data.map { OpaqueValue($0) })
   if true {
 %     if Implementation == 'Custom':
-    MinimalForwardMutableCollectionWith${Implementation}WithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled = 0
+    MinimalMutableForwardCollectionWith${Implementation}WithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled = 0
     var result = collection._withUnsafeMutableBufferPointerIfSupported {
       (inout buffer: UnsafeMutableBufferPointer<OpaqueValue<Int>>) in
       return OpaqueValue(Array(buffer))
     }
     expectType(Optional<OpaqueValue<Array<OpaqueValue<Int>>>>.self, &result)
     expectEqual(data, result!.value.map { $0.value })
-    expectEqual(1, MinimalForwardMutableCollectionWith${Implementation}WithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled)
+    expectEqual(1, MinimalMutableForwardCollectionWith${Implementation}WithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled)
 %     else:
     var result = collection._withUnsafeMutableBufferPointerIfSupported {
       (inout buffer: UnsafeMutableBufferPointer<OpaqueValue<Int>>) -> OpaqueValue<Int> in
@@ -3446,20 +3446,20 @@ SequenceTypeAlgorithms.test("sort/CustomImplementation/${'Predicate' if predicat
 
   let data = [ 5, 4, 3, 2, 1 ]
 %     if predicate:
-  var collection = MinimalForwardMutableCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported(
+  var collection = MinimalMutableForwardCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported(
     data.map { MinimalComparableValue($0) })
 %   else:
-  var collection = MinimalForwardMutableCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported(
+  var collection = MinimalMutableForwardCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported(
     data.map { OpaqueValue($0) })
 %   end
-  MinimalForwardMutableCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled = 0
+  MinimalMutableForwardCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled = 0
 %   if predicate:
   let result = collection._prext_sort()
 %   else:
   let result = collection._prext_sort { $0.value < $1.value }
 %   end
   // The collection is copied into an array before sorting.
-  expectEqual(0, MinimalForwardMutableCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled)
+  expectEqual(0, MinimalMutableForwardCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled)
 
   expectEqual([ 1, 2, 3, 4, 5 ], result.map { $0.value })
 }
@@ -3518,15 +3518,15 @@ SequenceTypeAlgorithms.test("partition/CustomImplementation/${'Predicate' if pre
           MinimalComparableValue($0, identity: $1)
         }
 %   end
-      var s = MinimalRandomAccessMutableCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported(
+      var s = MinimalMutableRandomAccessCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported(
         sequenceAsArray)
-      MinimalRandomAccessMutableCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled = 0
+      MinimalMutableRandomAccessCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled = 0
 %   if predicate:
       let pivot = s._prext_partition(s.indices) { $0.value < $1.value }
 %   else:
       let pivot = s._prext_partition(s.indices)
 %   end
-      expectEqual(1, MinimalRandomAccessMutableCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled)
+      expectEqual(1, MinimalMutableRandomAccessCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled)
 
       // Check that we didn't lose any elements.
       expectEqualsUnordered(0..<sequence.count, s.map { $0.identity })
@@ -3615,15 +3615,15 @@ SequenceTypeAlgorithms.test("partition/CustomImplementation/${'Predicate' if pre
             MinimalComparableValue($0, identity: $1)
           }
 %   end
-        var s = MinimalRandomAccessMutableCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported(
+        var s = MinimalMutableRandomAccessCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported(
         sequenceAsArray)
-        MinimalRandomAccessMutableCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled = 0
+        MinimalMutableRandomAccessCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled = 0
 %   if predicate:
         let pivot = s._prext_partition(s.indices) { $0.value < $1.value }
 %   else:
         let pivot = s._prext_partition(s.indices)
 %   end
-        expectEqual(1, MinimalRandomAccessMutableCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled)
+        expectEqual(1, MinimalMutableRandomAccessCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled)
 
         // Check that we didn't lose any elements.
         expectEqualsUnordered(0..<sequence.count, s.map { $0.identity })
