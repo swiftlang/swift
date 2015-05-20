@@ -82,14 +82,6 @@ class ImplicitSub1 : ImplicitSuper1 { }
 extension ImplicitSub1 : P4 { } // okay, introduces new conformance to P4; the rest are superseded
 
 // ---------------------------------------------------------------------------
-// Implicit conformances superseded by synthesized conformances
-// ---------------------------------------------------------------------------
-
-enum Suit { case Spades, Hearts, Clubs, Diamonds }
-func <(lhs: Suit, rhs: Suit) -> Bool { return false }
-extension Suit : Comparable {} // okay, synthesized conformance to Equatable from before is preferred
-
-// ---------------------------------------------------------------------------
 // Explicit conformances conflicting with inherited conformances
 // ---------------------------------------------------------------------------
 

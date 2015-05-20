@@ -1371,12 +1371,12 @@ bool ConformanceLookupTable::addProtocol(NominalTypeDecl *nominal,
         return false;
 
       case ConformanceEntryKind::Implied:
+        // An implied conformance is better than a synthesized one.
+        if (kind == ConformanceEntryKind::Synthesized)
+          return false;
         break;
 
       case ConformanceEntryKind::Synthesized:
-        // A synthesized conformance is better than an implied one.
-        if (kind == ConformanceEntryKind::Implied)
-          return false;
         break;
       }
     }

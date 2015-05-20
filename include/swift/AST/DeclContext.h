@@ -112,9 +112,6 @@ enum class LocalDeclContextKind : uint8_t {
 /// kinds supersede later conformance kinds, possibly with a
 /// diagnostic (e.g., if an inherited conformance supersedes an
 /// explicit conformance).
-///
-/// This ordering is also used in diagnostics, so make sure to check
-/// DiagnosticsSema if you need to update it.
 enum class ConformanceEntryKind : unsigned {
   /// Inherited from a superclass conformance.
   Inherited,
@@ -122,11 +119,11 @@ enum class ConformanceEntryKind : unsigned {
   /// Explicitly specified.
   Explicit,
 
-  /// Implicitly synthesized.
-  Synthesized,
-
   /// Implied by an explicitly-specified conformance.
   Implied,
+
+  /// Implicitly synthesized.
+  Synthesized,
 };
 
 /// Describes the kind of conformance lookup desired.
