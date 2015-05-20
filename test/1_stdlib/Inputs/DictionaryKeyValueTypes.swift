@@ -523,7 +523,7 @@ func == (lhs: TestBridgedEquatableValueTy, rhs: TestBridgedEquatableValueTy) -> 
 ///
 /// FIXME: Some non-zero `opt` might be cases of missed return-autorelease.
 func expectAutoreleasedKeysAndValues(
-  #opt: (Int, Int) = (0, 0), unopt: (Int, Int) = (0, 0)) {
+  opt opt: (Int, Int) = (0, 0), unopt: (Int, Int) = (0, 0)) {
   var expectedKeys = 0
   var expectedValues = 0
 #if arch(i386)
@@ -545,7 +545,7 @@ func expectAutoreleasedKeysAndValues(
 ///
 /// FIXME: Some non-zero `opt` might be cases of missed return-autorelease.
 func expectAutoreleasedValues(
-  #opt: Int = 0, unopt: Int = 0) {
+  opt opt: Int = 0, unopt: Int = 0) {
   expectAutoreleasedKeysAndValues(opt: (0, opt), unopt: (0, unopt))
 }
 
@@ -601,7 +601,7 @@ func getBridgedEmptyNSDictionary() -> NSDictionary {
 }
 
 func getBridgedNSDictionaryOfKeyValue_ValueTypesCustomBridged(
-  #numElements: Int = 3
+  numElements numElements: Int = 3
 ) -> NSDictionary {
   assert(!_isBridgedVerbatimToObjectiveC(TestBridgedKeyTy.self))
   assert(!_isBridgedVerbatimToObjectiveC(TestBridgedValueTy.self))
@@ -1248,7 +1248,7 @@ func checkDictionaryEnumeratorPartialFastEnumerationFromSwift(
 }
 
 func getBridgedNSArrayOfRefTypeVerbatimBridged(
-  #numElements: Int = 3,
+  numElements numElements: Int = 3,
   capacity: Int? = nil
 ) -> NSArray {
   assert(_isBridgedVerbatimToObjectiveC(TestObjCValueTy.self))
@@ -1268,7 +1268,7 @@ func getBridgedNSArrayOfRefTypeVerbatimBridged(
 }
 
 func getBridgedNSArrayOfValueTypeCustomBridged(
-  #numElements: Int = 3,
+  numElements numElements: Int = 3,
   capacity: Int? = nil
 ) -> NSArray {
   assert(!_isBridgedVerbatimToObjectiveC(TestBridgedValueTy.self))

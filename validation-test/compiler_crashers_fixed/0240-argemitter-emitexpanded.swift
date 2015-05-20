@@ -5,7 +5,7 @@
 
 class A {
     private let a = [B<(AnyObject, AnyObject) -> Void>]()
-    func call(#object1: AnyObject, object2: AnyObject) {
+    func call(object1 object1: AnyObject, object2: AnyObject) {
         for b in a {
             b.c(object1, object2)
         }
