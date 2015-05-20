@@ -9,10 +9,9 @@ func a(arg : Int)
   var local = arg
 }
 
-// Why is c arg: 4?  Note that "b" shows up as both arg 2 and 3.
 // CHECK-DAG: !DILocalVariable(tag: DW_TAG_arg_variable, name: "a", arg: 1,{{.*}} line: [[@LINE+3]]
 // CHECK-DAG: !DILocalVariable(tag: DW_TAG_arg_variable, name: "b", arg: 2,{{.*}} line: [[@LINE+2]]
-// CHECK-DAG: !DILocalVariable(tag: DW_TAG_arg_variable, name: "c", arg: 4,{{.*}} line: [[@LINE+1]]
+// CHECK-DAG: !DILocalVariable(tag: DW_TAG_arg_variable, name: "c", arg: 3,{{.*}} line: [[@LINE+1]]
 func many(a: Int, b: (Int, Int), c: Int) -> Int {
 // CHECK-DAG: !DILocalVariable(tag: DW_TAG_auto_variable, name: "i1",{{.*}} line: [[@LINE+1]]
   var i1 = a

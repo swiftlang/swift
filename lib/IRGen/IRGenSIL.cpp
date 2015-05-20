@@ -489,14 +489,14 @@ public:
     if (!IGM.DebugInfo) return;
     auto N = ArgNo.find(cast<VarDecl>(Ty.getDecl()));
     if (N != ArgNo.end()) {
-      if (DidEmitDebugInfoForArg[N->second])
+      if (DidEmitDebugInfoForArg[N->second - 1])
         return;
 
       PrologueLocation AutoRestore(IGM.DebugInfo, Builder);
       IGM.DebugInfo->
         emitArgVariableDeclaration(Builder, Storage,
                                    Ty, DS, Name, N->second, DirectValue);
-      DidEmitDebugInfoForArg.set(N->second);
+      DidEmitDebugInfoForArg.set(N->second - 1);
     } else
       IGM.DebugInfo->
         emitStackVariableDeclaration(Builder, Storage,
@@ -562,7 +562,7 @@ public:
       return;
 
     auto N = ArgNo.find(Decl);
-    if (N != ArgNo.end() && DidEmitDebugInfoForArg[N->second])
+    if (N != ArgNo.end() && DidEmitDebugInfoForArg[N->second - 1])
       return;
 
     StringRef Name = Decl->getNameStr();
@@ -1327,12 +1327,19 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
   // trivial arguments and any captured and promoted [inout]
   // variables.
   int N = 0;
+  const VarDecl* LastVD = nullptr;
   for (auto I = BB->getBBArgs().begin(), E=BB->getBBArgs().end();
        I != E; ++I) {
     SILArgument *Arg = *I;
-    ++N;
 
-    if (!Arg->getDecl() || DidEmitDebugInfoForArg[N])
+    // Reconstruct the Swift argument numbering.
+    if (auto *VD = dyn_cast_or_null<VarDecl>(Arg->getDecl()))
+      if (VD != LastVD) {
+        ++N;
+        LastVD = VD;
+      }
+
+    if (!Arg->getDecl() || DidEmitDebugInfoForArg[N - 1])
       continue;
 
     // Generic and existential types were already handled in
@@ -1380,7 +1387,7 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
       (Builder, Copy, DTI, getDebugScope(), Name, N,
        IndirectionKind(Deref), RealValue);
 
-    DidEmitDebugInfoForArg.set(N);
+    DidEmitDebugInfoForArg.set(N - 1);
   }
 
   // Emit the artificial error result argument.
@@ -1419,13 +1426,16 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
         CurSILFn->getDebugScope(), IGM.DebugInfo, Builder);
 
   if (InEntryBlock) {
-    // Establish a mapping from VarDecl -> ArgNo to be used by
-    // visitAllocStackInst().
-    unsigned N = 1;
-    for (auto Arg : BB->getBBArgs()) {
-      if (auto VD = dyn_cast_or_null<VarDecl>(Arg->getDecl()))
-        ArgNo.insert( {VD, N} );
-      ++N;
+    // One Swift argument may have been exploded into many SIL
+    // arguments. Establish a mapping from VarDecl -> (Swift) ArgNo.
+    unsigned N = 0;
+    const VarDecl *LastVD = nullptr;
+    for (auto *Arg : BB->getBBArgs()) {
+      if (auto *VD = dyn_cast_or_null<VarDecl>(Arg->getDecl()))
+        if (VD != LastVD) {
+          ArgNo.insert( {VD, ++N} );
+          LastVD = VD;
+        }
     }
     DidEmitDebugInfoForArg.resize(N);
   }
