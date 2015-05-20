@@ -233,3 +233,81 @@ ValueDecl *DerivedConformance::deriveErrorType(TypeChecker &tc,
               diag::broken_errortype_requirement);
   return nullptr;
 }
+
+static void deriveBodyBridgedNSError_enum_NSErrorDomain(
+              AbstractFunctionDecl *domainDecl) {
+  // enum SomeEnum {
+  //   @derived
+  //   static var _NSErrorDomain: String {
+  //     return "\(self)"
+  //   }
+  // }
+
+  auto &C = domainDecl->getASTContext();
+
+  auto selfRef = createSelfDeclRef(domainDecl);
+  Expr *segmentElts[] = { selfRef };
+  auto segments = C.AllocateCopy(segmentElts);
+  auto string = new (C) InterpolatedStringLiteralExpr(SourceLoc(), segments);
+  string->setImplicit();
+
+  auto ret = new (C) ReturnStmt(SourceLoc(), string, /*implicit*/ true);
+  auto body = BraceStmt::create(C, SourceLoc(),
+                                ASTNode(ret),
+                                SourceLoc());
+  domainDecl->setBody(body);
+}
+
+static ValueDecl *deriveBridgedNSError_enum_NSErrorDomain(TypeChecker &tc,
+                                                          EnumDecl *enumDecl) {
+  // enum SomeEnum {
+  //   @derived
+  //   static var _NSErrorDomain: String {
+  //     return "\(self)"
+  //   }
+  // }
+
+  // Note that for @objc enums the format is assumed to be "MyModule.SomeEnum".
+  // If this changes, please change PrintAsObjC as well.
+  
+  ASTContext &C = tc.Context;
+  
+  auto stringTy = C.getStringDecl()->getDeclaredType();
+  Type enumType = enumDecl->getDeclaredTypeInContext();
+
+  // Define the getter.
+  auto getterDecl = declareDerivedPropertyGetter(tc, enumDecl, enumType,
+                                                 stringTy, stringTy,
+                                                 /*isStatic=*/true);
+  getterDecl->setBodySynthesizer(&deriveBodyBridgedNSError_enum_NSErrorDomain);
+  
+  // Define the property.
+  VarDecl *propDecl;
+  PatternBindingDecl *pbDecl;
+  std::tie(propDecl, pbDecl)
+    = declareDerivedReadOnlyProperty(tc, enumDecl, C.Id__NSErrorDomain,
+                                     stringTy, stringTy,
+                                     getterDecl, /*isStatic=*/true);
+  
+  enumDecl->addMember(getterDecl);
+  enumDecl->addMember(propDecl);
+  enumDecl->addMember(pbDecl);
+  return propDecl;
+}
+
+ValueDecl *DerivedConformance::deriveBridgedNSError(TypeChecker &tc,
+                                                    NominalTypeDecl *type,
+                                                    ValueDecl *requirement) {
+  if (!canDeriveConformance(type))
+    return nullptr;
+
+  auto enumType = cast<EnumDecl>(type);
+
+  if (requirement->getName() == tc.Context.Id__NSErrorDomain)
+    return deriveBridgedNSError_enum_NSErrorDomain(tc, enumType);
+
+  tc.diagnose(requirement->getLoc(),
+              diag::broken_errortype_requirement);
+  return nullptr;
+}
+

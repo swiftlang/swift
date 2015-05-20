@@ -78,6 +78,13 @@ ValueDecl *deriveErrorType(TypeChecker &tc,
                            NominalTypeDecl *type,
                            ValueDecl *requirement);
 
+/// Derive a _BridgedNSError requirement for an @objc enum type.
+///
+/// \returns the derived member, which will also be added to the type.
+ValueDecl *deriveBridgedNSError(TypeChecker &tc,
+                                NominalTypeDecl *type,
+                                ValueDecl *requirement);
+
 /// Insert an operator declaration associated with a nominal type. The
 /// declaration is added at global scope.
 void _insertOperatorDecl(NominalTypeDecl *scope, Decl *member);
@@ -95,7 +102,8 @@ FuncDecl *declareDerivedPropertyGetter(TypeChecker &tc,
                                        NominalTypeDecl *typeDecl,
                                        Type contextType,
                                        Type propertyInterfaceType,
-                                       Type propertyContextType);
+                                       Type propertyContextType,
+                                       bool isStatic = false);
 
 /// Declare a read-only property with an existing getter.
 std::pair<VarDecl *, PatternBindingDecl *>
@@ -104,7 +112,8 @@ declareDerivedReadOnlyProperty(TypeChecker &tc,
                                Identifier name,
                                Type propertyInterfaceType,
                                Type propertyContextType,
-                               FuncDecl *getterDecl);
+                               FuncDecl *getterDecl,
+                               bool isStatic = false);
 
 
 /// Build a reference to the 'self' decl of a derived function.

@@ -1389,6 +1389,7 @@ bool ConformanceLookupTable::addProtocol(NominalTypeDecl *nominal,
   // Record this as a conformance within the given declaration
   // context.
   AllConformances[dc].push_back(entry);
+
   return true;
 }
 
@@ -1422,7 +1423,20 @@ void ConformanceLookupTable::expandImpliedConformances(NominalTypeDecl *nominal,
     // implied conformances.
     if (resolver)
       resolver->resolveInheritanceClause(dc);
-      
+
+    // An @objc enum that explicitly conforms to the ErrorType protocol also
+    // implicitly conforms to _ObjectiveCBridgeableErrorType, via the known
+    // protocol _BridgedNSError.
+    if (conformingProtocol->isSpecificProtocol(KnownProtocolKind::ErrorType) &&
+        isa<EnumDecl>(nominal) && nominal->isObjC()) {
+      ASTContext &ctx = nominal->getASTContext();
+      if (auto bridgedNSError
+            = ctx.getProtocol(KnownProtocolKind::_BridgedNSError)) {
+        addProtocol(nominal, bridgedNSError, SourceLoc(),
+                    ConformanceSource::forImplied(conformanceEntry));
+      }
+    }
+
     // FIXME: It's odd that the inheritance clause isn't loaded at all during
     // deserialization, so we have this weird separate path.
     if (!conformingProtocol->getParentSourceFile()) {
@@ -2036,7 +2050,6 @@ void NominalTypeDecl::prepareConformanceTable() const {
     if (resolver)
       resolver->resolveRawType(theEnum);
     if (theEnum->hasRawType()) {
-      // Simple enumerations conform to Equatable and Hashable.
       if (auto rawRepresentable = getASTContext().getProtocol(
                                     KnownProtocolKind::RawRepresentable)) {
         ConformanceTable->addSynthesizedConformance(mutableThis,

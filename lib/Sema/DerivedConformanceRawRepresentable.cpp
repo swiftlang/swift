@@ -154,22 +154,27 @@ FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
                                                  NominalTypeDecl *typeDecl,
                                                  Type contextType,
                                                  Type propertyInterfaceType,
-                                                 Type propertyContextType) {
+                                                 Type propertyContextType,
+                                                 bool isStatic) {
   auto &C = tc.Context;
-  
+
+  Type selfType = contextType;
+  if (isStatic)
+    selfType = MetatypeType::get(selfType);
+
   VarDecl *selfDecl = new (C) ParamDecl(/*IsLet*/true,
                                         SourceLoc(),
                                         Identifier(),
                                         SourceLoc(),
                                         C.Id_self,
-                                        contextType,
+                                        selfType,
                                         typeDecl);
   selfDecl->setImplicit();
   Pattern *selfParam = new (C) NamedPattern(selfDecl, /*implicit*/ true);
-  selfParam->setType(contextType);
+  selfParam->setType(selfType);
   selfParam = new (C) TypedPattern(selfParam,
-                                   TypeLoc::withoutLoc(contextType));
-  selfParam->setType(contextType);
+                                   TypeLoc::withoutLoc(selfType));
+  selfParam->setType(selfType);
   Pattern *methodParam = TuplePattern::create(C, SourceLoc(),{},SourceLoc());
   methodParam->setType(TupleType::getEmpty(C));
   Pattern *params[] = {selfParam, methodParam};
@@ -180,12 +185,13 @@ FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
                      params, TypeLoc::withoutLoc(propertyContextType),
                      typeDecl);
   getterDecl->setImplicit();
-  
+  getterDecl->setStatic(isStatic);
+
   // Compute the type of the getter.
   GenericParamList *genericParams = nullptr;
   Type type = FunctionType::get(TupleType::getEmpty(C),
                                 propertyContextType);
-  Type selfType = getterDecl->computeSelfType(&genericParams);
+  selfType = getterDecl->computeSelfType(&genericParams);
   if (genericParams)
     type = PolymorphicFunctionType::get(selfType, type, genericParams);
   else
@@ -218,10 +224,11 @@ DerivedConformance::declareDerivedReadOnlyProperty(TypeChecker &tc,
                                                    Identifier name,
                                                    Type propertyInterfaceType,
                                                    Type propertyContextType,
-                                                   FuncDecl *getterDecl) {
+                                                   FuncDecl *getterDecl,
+                                                   bool isStatic) {
   auto &C = tc.Context;
   
-  VarDecl *propDecl = new (C) VarDecl(/*static*/ false,
+  VarDecl *propDecl = new (C) VarDecl(isStatic,
                                       /*let*/ false,
                                       SourceLoc(), name,
                                       propertyContextType,

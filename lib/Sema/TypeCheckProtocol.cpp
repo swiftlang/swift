@@ -3852,7 +3852,11 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(NominalTypeDecl *TypeDecl,
     
   case KnownProtocolKind::ErrorType:
     return DerivedConformance::deriveErrorType(*this, TypeDecl, Requirement);
-    
+
+  case KnownProtocolKind::_BridgedNSError:
+    return DerivedConformance::deriveBridgedNSError(*this, TypeDecl,
+                                                    Requirement);
+
   default:
     return nullptr;
   }

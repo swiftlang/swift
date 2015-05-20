@@ -1804,7 +1804,11 @@ bool NominalTypeDecl::derivesProtocolConformance(ProtocolDecl *protocol) const {
     // Enums can explicitly derive their ErrorType conformance.
     case KnownProtocolKind::ErrorType:
       return true;
-    
+
+    // @objc enums can explicitly derive their _BridgedNSError conformance.
+    case KnownProtocolKind::_BridgedNSError:
+      return isObjC();
+
     default:
       return false;
     }

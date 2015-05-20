@@ -740,9 +740,23 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   if (Impl.KnownProtocols[index])
     return Impl.KnownProtocols[index];
 
-  // Find all of the declarations with this name in the Swift module.
+  // Find all of the declarations with this name in the appropriate module.
   SmallVector<ValueDecl *, 1> results;
-  lookupInSwiftModule(getProtocolName(kind), results);
+
+  // _BridgedNSError is in the Foundation module.
+  if (kind == KnownProtocolKind::_BridgedNSError) {
+    Module *foundation = const_cast<ASTContext *>(this)->getModuleByName(
+                           FOUNDATION_MODULE_NAME);
+    if (!foundation)
+      return nullptr;
+
+    auto identifier = getIdentifier(getProtocolName(kind));
+    foundation->lookupValue({ }, identifier, NLKind::UnqualifiedLookup,
+                            results);
+  } else {
+    lookupInSwiftModule(getProtocolName(kind), results);
+  }
+
   for (auto result : results) {
     if (auto protocol = dyn_cast<ProtocolDecl>(result)) {
       Impl.KnownProtocols[index] = protocol;
@@ -1248,7 +1262,9 @@ ASTContext::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> ModulePath) {
   auto moduleID = ModulePath[0];
   for (auto &importer : Impl.ModuleLoaders) {
     if (Module *M = importer->loadModule(moduleID.second, ModulePath)) {
-      if (ModulePath.size() == 1 && ModulePath[0].first == StdlibModuleName)
+      if (ModulePath.size() == 1 &&
+          (ModulePath[0].first == StdlibModuleName ||
+           ModulePath[0].first == Id_Foundation))
         recordKnownProtocols(M);
       return M;
     }
