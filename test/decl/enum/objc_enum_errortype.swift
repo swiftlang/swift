@@ -1,5 +1,7 @@
 // RUN: %target-parse-verify-swift
 
+// REQUIRES: objc_interop
+
 import Foundation
 
 func acceptBridgeableNSError<E : _ObjectiveCBridgeableErrorType>(e: E) { }
