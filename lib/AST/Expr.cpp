@@ -684,6 +684,34 @@ bool AbstractClosureExpr::hasSingleExpressionBody() const {
   return true;
 }
 
+SourceRange ClosureExpr::getSourceRange() const {
+  return SourceRange(getStartLoc(), getEndLoc());
+}
+
+SourceLoc ClosureExpr::getStartLoc() const {
+  if (LBraceLoc.isInvalid())
+    return getBody()->getStartLoc();
+  return LBraceLoc;
+}
+
+SourceLoc ClosureExpr::getEndLoc() const {
+  if (RBraceLoc.isInvalid())
+    return getBody()->getEndLoc();
+  return RBraceLoc;
+}
+
+
+Expr *ClosureExpr::getSingleExpressionBody() const {
+  assert(hasSingleExpressionBody() && "Not a single-expression body");
+  return cast<ReturnStmt>(Body.getPointer()->getElement(0).get<Stmt *>())
+           ->getResult();
+}
+
+void ClosureExpr::setSingleExpressionBody(Expr *NewBody) {
+  cast<ReturnStmt>(Body.getPointer()->getElement(0).get<Stmt *>())
+    ->setResult(NewBody);
+}
+
 #define FORWARD_SOURCE_LOCS_TO(CLASS, NODE) \
   SourceRange CLASS::getSourceRange() const {     \
     return (NODE)->getSourceRange();              \
@@ -697,19 +725,6 @@ bool AbstractClosureExpr::hasSingleExpressionBody() const {
   SourceLoc CLASS::getLoc() const {               \
     return (NODE)->getStartLoc();                 \
   }
-
-FORWARD_SOURCE_LOCS_TO(ClosureExpr, Body.getPointer())
-
-Expr *ClosureExpr::getSingleExpressionBody() const {
-  assert(hasSingleExpressionBody() && "Not a single-expression body");
-  return cast<ReturnStmt>(Body.getPointer()->getElement(0).get<Stmt *>())
-           ->getResult();
-}
-
-void ClosureExpr::setSingleExpressionBody(Expr *NewBody) {
-  cast<ReturnStmt>(Body.getPointer()->getElement(0).get<Stmt *>())
-    ->setResult(NewBody);
-}
 
 FORWARD_SOURCE_LOCS_TO(AutoClosureExpr, Body)
 

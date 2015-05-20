@@ -1794,7 +1794,7 @@ ParserResult<Expr> Parser::parseExprClosure() {
   assert(Tok.is(tok::l_brace) && "Not at a left brace?");
 
   // Parse the opening left brace.
-  SourceLoc leftBrace = consumeToken();
+  SourceLoc leftBrace = consumeToken(tok::l_brace);
 
   // Parse the closure-signature, if present.
   Pattern *params = nullptr;
@@ -1819,9 +1819,11 @@ ParserResult<Expr> Parser::parseExprClosure() {
   unsigned discriminator = CurLocalContext->claimNextClosureDiscriminator();
 
   // Create the closure expression and enter its context.
-  auto *closure = new (Context) ClosureExpr(params, throwsLoc, arrowLoc, inLoc,
+  auto *closure = new (Context) ClosureExpr(leftBrace,
+                                            params, throwsLoc, arrowLoc, inLoc,
                                             explicitResultType,
-                                            discriminator, CurDeclContext);
+                                            discriminator, SourceLoc(),
+                                            CurDeclContext);
   // The arguments to the func are defined in their own scope.
   Scope S(this, ScopeKind::ClosureParams);
   ParseFunctionBody cc(*this, closure);
@@ -1851,6 +1853,7 @@ ParserResult<Expr> Parser::parseExprClosure() {
   SourceLoc rightBrace;
   parseMatchingToken(tok::r_brace, rightBrace, diag::expected_closure_rbrace,
                      leftBrace);
+  closure->setRBraceLoc(rightBrace);
 
   // If we didn't have any parameters, create a parameter list from the
   // anonymous closure arguments.

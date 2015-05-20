@@ -2846,6 +2846,8 @@ public:
 ///     { [weak c] (a : Int) -> Int in a + c!.getFoo() }
 /// \endcode
 class ClosureExpr : public AbstractClosureExpr {
+  /// The location of the {.
+  SourceLoc LBraceLoc;
 
   /// The location of the "throws", if present.
   SourceLoc ThrowsLoc;
@@ -2863,19 +2865,22 @@ class ClosureExpr : public AbstractClosureExpr {
   /// \brief The body of the closure, along with a bit indicating whether it
   /// was originally just a single expression.
   llvm::PointerIntPair<BraceStmt *, 1, bool> Body;
-  
+
+  /// The location of the }.
+  SourceLoc RBraceLoc;
+
   /// True if this is the body of a defer.
   bool IsDeferBody = false;
   
 public:
-  ClosureExpr(Pattern *params, SourceLoc throwsLoc, SourceLoc arrowLoc,
-              SourceLoc inLoc, TypeLoc explicitResultType,
-              unsigned discriminator, DeclContext *parent)
+  ClosureExpr(SourceLoc LBraceLoc, Pattern *params, SourceLoc throwsLoc,
+              SourceLoc arrowLoc, SourceLoc inLoc, TypeLoc explicitResultType,
+              unsigned discriminator, SourceLoc RBraceLoc, DeclContext *parent)
     : AbstractClosureExpr(ExprKind::Closure, Type(), /*Implicit=*/false,
                           discriminator, parent),
-      ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc), InLoc(inLoc),
-      ExplicitResultType(explicitResultType),
-      Body(nullptr) {
+      LBraceLoc(LBraceLoc),  ThrowsLoc(throwsLoc), ArrowLoc(arrowLoc),
+      InLoc(inLoc), ExplicitResultType(explicitResultType),
+      Body(nullptr), RBraceLoc(RBraceLoc) {
     setParams(params);
     ClosureExprBits.HasAnonymousClosureVars = false;
     ClosureExprBits.IsVoidConversionClosure = false;
@@ -2884,7 +2889,6 @@ public:
   SourceRange getSourceRange() const;
   SourceLoc getStartLoc() const;
   SourceLoc getEndLoc() const;
-  SourceLoc getLoc() const;
 
   BraceStmt *getBody() const { return Body.getPointer(); }
   void setBody(BraceStmt *S, bool isSingleExpression) {
@@ -2978,6 +2982,8 @@ public:
   /// This routine cannot change whether a closure has a single expression as
   /// its body; it can only update that expression.
   void setSingleExpressionBody(Expr *NewBody);
+
+  void setRBraceLoc(SourceLoc L) { RBraceLoc = L; }
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::Closure;
