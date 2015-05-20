@@ -110,7 +110,11 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
       case tok::string_literal: Kind = SyntaxNodeKind::String; break;
       case tok::character_literal: Kind = SyntaxNodeKind::Character; break;
       case tok::comment:
-        if (Tok.getText().startswith("//"))
+        if (Tok.getText().startswith("///"))
+          Kind = SyntaxNodeKind::DocCommentLine;
+        else if (Tok.getText().startswith("/**"))
+          Kind = SyntaxNodeKind::DocCommentBlock;
+        else if (Tok.getText().startswith("//"))
           Kind = SyntaxNodeKind::CommentLine;
         else
           Kind = SyntaxNodeKind::CommentBlock;
@@ -191,6 +195,17 @@ static const char *const RegexStrURL =
   "tn3270|urn|vemmi|wais|xcdoc|z39\\.50r|z39\\.50s)://"
   "([a-zA-Z0-9\\-_.]+/)?[a-zA-Z0-9;/?:@\\&=+$,\\-_.!~*'()%#]+";
 
+#define MARKUP_SIMPLE_FIELD(Id, Keyword, XMLKind) \
+  #Keyword "|"
+static const char *const RegexStrDocCommentField =
+  "^[ ]?- ("
+#include "swift/Markup/SimpleFields.def"
+  "returns):";
+
+static const char *const RegexStrParameter = "^[ ]?- (parameter) [^:]*:";
+
+static const char *const RegexStrDocCommentParametersHeading = "^[ ]?- (Parameters):";
+
 static const char *const RegexStrMailURL =
   "(mailto|im):[a-zA-Z0-9\\-_]+@[a-zA-Z0-9\\-_\\.!%]+";
 
@@ -207,6 +222,22 @@ class ModelASTWalker : public ASTWalker {
     std::regex{ RegexStrURL, std::regex::ECMAScript | std::regex::nosubs },
     std::regex{ RegexStrMailURL, std::regex::ECMAScript | std::regex::nosubs },
     std::regex{ RegexStrRadarURL, std::regex::ECMAScript | std::regex::nosubs }};
+
+  std::regex DocCommentRxs[3] = {
+    std::regex {
+      RegexStrParameter,
+      std::regex::egrep | std::regex::icase | std::regex::optimize
+    },
+    std::regex {
+      RegexStrDocCommentParametersHeading,
+      std::regex::egrep | std::regex::icase | std::regex::optimize
+    },
+    std::regex { RegexStrDocCommentField,
+      std::regex::egrep | std::regex::icase | std::regex::optimize
+    }
+  };
+
+  Optional<SyntaxNode> parseFieldNode(StringRef Text, StringRef OrigText, SourceLoc OrigLoc);
 
 public:
   SyntaxModelWalker &Walker;
@@ -255,6 +286,8 @@ private:
 
   bool processComment(CharSourceRange Range);
   bool searchForURL(CharSourceRange Range);
+  bool findFieldsInDocCommentLine(SyntaxNode Node);
+  bool findFieldsInDocCommentBlock(SyntaxNode Node);
 };
 
 SyntaxStructureKind syntaxStructureKindFromNominalTypeDecl(NominalTypeDecl *N) {
@@ -1031,6 +1064,12 @@ bool ModelASTWalker::passNode(const SyntaxNode &Node) {
     if (Node.isComment()) {
       if (!processComment(Node.Range))
         return false;
+    } else if (Node.Kind == SyntaxNodeKind::DocCommentLine) {
+      if (!findFieldsInDocCommentLine(Node))
+        return false;
+    } else if (Node.Kind == SyntaxNodeKind::DocCommentBlock) {
+      if (!findFieldsInDocCommentBlock(Node))
+        return false;
     } else if (Node.Kind == SyntaxNodeKind::CommentMarker) {
       if (!searchForURL(Node.Range))
         return false;
@@ -1146,6 +1185,71 @@ bool ModelASTWalker::searchForURL(CharSourceRange Range) {
       return false;
     Text = Text.substr(Match.data() - Text.data() + Match.size());
   }
+  return true;
+}
 
+Optional<SyntaxNode> ModelASTWalker::parseFieldNode(StringRef Text,
+                                                    StringRef OrigText,
+                                                    SourceLoc OrigLoc) {
+  std::match_results<StringRef::iterator> Matches;
+  for (auto &Rx : DocCommentRxs) {
+    bool HadMatch = std::regex_search(Text.begin(), Text.end(), Matches, Rx);
+    if (HadMatch)
+      break;
+  }
+  if (Matches.empty())
+    return None;
+
+  auto &Match = Matches[1];
+  StringRef MatchStr(Match.first, Match.second - Match.first);
+  auto Loc = OrigLoc.getAdvancedLoc(MatchStr.data() - OrigText.data());
+  CharSourceRange Range(Loc, MatchStr.size());
+  return Optional<SyntaxNode>({ SyntaxNodeKind::DocCommentField, Range });
+}
+
+bool ModelASTWalker::findFieldsInDocCommentLine(SyntaxNode Node) {
+  auto OrigText = SM.extractText(Node.Range, BufferID);
+  auto OrigLoc = Node.Range.getStart();
+
+  auto Text = OrigText.drop_front(3); // Drop "///"
+  if (Text.empty())
+    return true;
+
+  auto FieldNode = parseFieldNode(Text, OrigText, OrigLoc);
+  if (FieldNode.hasValue())
+    passNode(FieldNode.getValue());
+  return true;
+}
+
+bool ModelASTWalker::findFieldsInDocCommentBlock(SyntaxNode Node) {
+  auto OrigText = SM.extractText(Node.Range, BufferID);
+  auto OrigLoc = Node.Range.getStart();
+
+  auto Text = OrigText.drop_front(3).drop_back(2); // Drop "^/**" and "*/$"
+  if (Text.empty())
+    return true;
+
+  auto FirstNewLine = Text.find('\n');
+  if (FirstNewLine == StringRef::npos)
+    return true;
+
+  Text = Text.substr(FirstNewLine + 1);
+  if (Text.empty())
+    return true;
+
+  size_t Indent = Text.ltrim().data() - Text.data();
+  SmallVector<StringRef, 10> Lines;
+  Text.split(Lines, "\n");
+
+  for (auto Line : Lines) {
+    Line = Line.rtrim();
+    if (Line.size() < Indent)
+      continue;
+    auto FieldNode = parseFieldNode(Line.drop_front(Indent), OrigText, OrigLoc);
+    if (FieldNode.hasValue())
+      passNode(FieldNode.getValue());
+  }
+
+  std::match_results<StringRef::iterator> Matches;
   return true;
 }

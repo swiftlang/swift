@@ -288,11 +288,11 @@ postfix operator ~~* {}
 // CHECK:  */</comment-block>
 
 // TODO: blah.
-/// TTODO: blah.
+// TTODO: blah.
 // MARK: blah.
 
 // CHECK: <comment-line>// <comment-marker>TODO: blah.</comment-marker></comment-line>
-// CHECK: <comment-line>/// T<comment-marker>TODO: blah.</comment-marker></comment-line>
+// CHECK: <comment-line>// T<comment-marker>TODO: blah.</comment-marker></comment-line>
 // CHECK: <comment-line>// <comment-marker>MARK: blah.</comment-marker></comment-line>
 
 // CHECK: <kw>func</kw> test5() -> <type>Int</type> {
@@ -316,3 +316,85 @@ func test5() -> Int {
 
 // CHECK: <kw>func</kw> <placeholder><#test1#></placeholder> () {}
 func <#test1#> () {}
+
+/// Brief.
+///
+/// Simple case.
+///
+/// - parameter x: A number
+/// - parameter y: Another number
+/// - returns: `x + y`
+func foo(x: Int, y: Int) -> Int { return x + y }
+// CHECK: <doc-comment-line>/// Brief.
+// CHECK: </doc-comment-line><doc-comment-line>///
+// CHECK: </doc-comment-line><doc-comment-line>/// Simple case.
+// CHECK: </doc-comment-line><doc-comment-line>///
+// CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>parameter</doc-comment-field> x: A number
+// CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>parameter</doc-comment-field> y: Another number
+// CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>returns</doc-comment-field>: `x + y`
+// CHECK: </doc-comment-line><kw>func</kw> foo(x: <type>Int</type>, y: <type>Int</type>) -> <type>Int</type> { <kw>return</kw> x + y }
+
+
+/// Brief.
+///
+/// - Parameters:
+///   - x: A number
+///   - y: Another number
+///
+///- note: NOTE1
+///
+/// - NOTE: NOTE2
+///   - note: Not a Note field (not at top level)
+/// - returns: `x + y`
+func bar(x: Int, y: Int) -> Int { return x + y }
+// CHECK: <doc-comment-line>/// Brief.
+// CHECK: </doc-comment-line><doc-comment-line>///
+// CHECK: </doc-comment-line><doc-comment-line>/// Simple case.
+// CHECK: </doc-comment-line><doc-comment-line>///
+// CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>parameter</doc-comment-field> x: A number
+// CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>parameter</doc-comment-field> y: Another number
+// CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>returns</doc-comment-field>: `x + y`
+// CHECK: </doc-comment-line><kw>func</kw> foo(x: <type>Int</type>, y: <type>Int</type>) -> <type>Int</type> { <kw>return</kw> x + y }
+
+/**
+  Does pretty much nothing.
+
+  Not a parameter list: improper indentation.
+    - Parameters: sdfadsf
+
+  - WARNING: - WARNING: Should only have one field
+
+  - $$$: Not a field.
+
+  Empty field, OK:
+- REQUIRES:
+*/
+func baz() {}
+// CHECK: <doc-comment-block>/**
+// CHECK:   Does pretty much nothing.
+// CHECK:   Not a parameter list: improper indentation.
+// CHECK:     - Parameters: sdfadsf
+// CHECK:   - <doc-comment-field>WARNING</doc-comment-field>: - WARNING: Should only have one field
+// CHECK:   - $$$: Not a field.
+// CHECK:   Empty field, OK:
+// CHECK: - REQUIRES:
+// CHECK: */</doc-comment-block>
+// CHECK: <kw>func</kw> baz() {}
+
+/***/
+func emptyDocBlockComment() {}
+// CHECK: <doc-comment-block>/***/</doc-comment-block>
+// CHECK: <kw>func</kw> emptyDocBlockComment() {}
+
+/**
+*/
+func emptyDocBlockComment2() {}
+// CHECK: <doc-comment-block><doc-comment-block><doc-comment-block><doc-comment-block><doc-comment-block>/**
+// CHECK: */
+// CHECK: <kw>func</kw> emptyDocBlockComment2() {}
+
+/**          */
+func emptyDocBlockComment3() {}
+// CHECK: <doc-comment-block>/**          */
+// CHECK: <kw>func</kw> emptyDocBlockComment3() {}
+

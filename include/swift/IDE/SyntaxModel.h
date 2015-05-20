@@ -37,6 +37,9 @@ enum class SyntaxNodeKind : uint8_t {
   Character,
   CommentLine,
   CommentBlock,
+  DocCommentLine,
+  DocCommentBlock,
+  DocCommentField,
   /// A marker like 'FIXME:' or 'TODO:' inside a comment.
   CommentMarker,
   CommentURL,

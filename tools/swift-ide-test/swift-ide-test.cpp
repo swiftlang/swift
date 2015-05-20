@@ -651,6 +651,9 @@ public:
     case SyntaxNodeKind::CommentBlock: Id = "comment-block"; break;
     case SyntaxNodeKind::CommentMarker: Id = "comment-marker"; break;
     case SyntaxNodeKind::CommentURL: Id = "comment-url"; break;
+    case SyntaxNodeKind::DocCommentLine: Id = "doc-comment-line"; break;
+    case SyntaxNodeKind::DocCommentBlock: Id = "doc-comment-block"; break;
+    case SyntaxNodeKind::DocCommentField: Id = "doc-comment-field"; break;
     case SyntaxNodeKind::TypeId: Id = "type"; break;
     case SyntaxNodeKind::BuildConfigKeyword: Id = "#kw"; break;
     case SyntaxNodeKind::BuildConfigId: Id = "#id"; break;
@@ -678,6 +681,9 @@ public:
     case SyntaxNodeKind::CommentLine: Col = llvm::raw_ostream::GREEN; break;
     case SyntaxNodeKind::CommentBlock: Col = llvm::raw_ostream::GREEN; break;
     case SyntaxNodeKind::CommentMarker: Col = llvm::raw_ostream::MAGENTA; break;
+    case SyntaxNodeKind::DocCommentLine: Col = llvm::raw_ostream::CYAN; break;
+    case SyntaxNodeKind::DocCommentBlock: Col = llvm::raw_ostream::CYAN; break;
+    case SyntaxNodeKind::DocCommentField: Col = llvm::raw_ostream::WHITE; break;
     case SyntaxNodeKind::CommentURL: Col = llvm::raw_ostream::RED; break;
     case SyntaxNodeKind::TypeId: Col = llvm::raw_ostream::CYAN; break;
     case SyntaxNodeKind::BuildConfigKeyword: Col = llvm::raw_ostream::YELLOW; break;
@@ -738,6 +744,7 @@ static int doSyntaxColoring(const CompilerInvocation &InitInvok,
                                      TerminalOutput);
   ColorContext.walk(ColorWalker);
   ColorWalker.finished();
+
   return 0;
 }
 
