@@ -1482,8 +1482,7 @@ public:
   /// Compute the source range containing this trailing where clause.
   SourceRange getSourceRange() const {
     return SourceRange(WhereLoc,
-                       getRequirements().back().getSecondTypeLoc()
-                         .getSourceRange().End);
+                       getRequirements().back().getSourceRange().End);
   }
 };
 

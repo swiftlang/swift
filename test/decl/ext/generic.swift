@@ -76,3 +76,8 @@ extension Array {
     }
   }
 }
+
+// rdar://problem/21001937
+extension Array where T: Hashable { // expected-error{{trailing 'where' clause for extension of non-protocol type 'Array'}}
+
+}
