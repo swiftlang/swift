@@ -1964,7 +1964,7 @@ Expr *Parser::parseExprAnonClosureArg() {
     SmallVector<char, 4> StrBuf;
     StringRef varName = ("$" + Twine(nextIdx)).toStringRef(StrBuf);
     Identifier ident = Context.getIdentifier(varName);
-    SourceLoc varLoc = Loc;
+    SourceLoc varLoc = closure->getStartLoc();
     VarDecl *var = new (Context) ParamDecl(/*IsLet*/ true,
                                            SourceLoc(), Identifier(),
                                            varLoc, ident, Type(), closure);

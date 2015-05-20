@@ -258,3 +258,7 @@ let samples = { // expected-error{{unable to infer closure type in the current c
           else { return false }
         }()
 
+// <rdar://problem/19756953> Swift error: cannot capture '$0' before it is declared
+func f(fp : (Bool, Bool)-> Bool) {}
+f { $0 && !$1 }
+
