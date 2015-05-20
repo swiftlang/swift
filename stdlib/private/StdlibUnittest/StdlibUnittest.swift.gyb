@@ -1967,7 +1967,8 @@ public func expectEqualSequence<
     collectMoreInfo: (()->String)? = nil
 ) {
   expectEqualSequence(
-    expected, actual, { $0.0 == $1.0 && $0.1 == $1.1 },
+    expected, actual,
+    { (lhs: (T, U), rhs: (T, U)) in lhs.0 == rhs.0 && lhs.1 == rhs.1 },
     stackTrace: stackTrace, file: file, line: line,
     collectMoreInfo: collectMoreInfo)
 }
