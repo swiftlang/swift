@@ -1196,4 +1196,23 @@ class DerivedThrowingInitializer : ThrowingInitializer {
 
     try super.init()
   }
+
+  // Throwing + failable init #1
+  init!(a : Float) throws {
+    // expected-note @+1 {{super.init must be called before throwing}}
+    property2 = try throwAndReturnsInt()  // expected-error {{all stored properties of a class instance must be initialized before throwing from an initializer}}
+
+    try super.init()
+  }
+
+  // Throwing + failable init #1
+  init!(a : Int) throws {
+    // expected-note @+2 {{super.init must be called before returning nil}}
+    // expected-error @+1 {{all stored properties of a class instance must be initialized before returning nil from an initializer}}
+    if a == 17 { return nil }
+
+    property2 = 16
+
+    try super.init()
+  }
 }
