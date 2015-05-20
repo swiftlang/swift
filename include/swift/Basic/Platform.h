@@ -32,6 +32,9 @@ namespace swift {
   /// Returns true if the given triple represents watchOS running in a simulator.
   bool tripleIsWatchSimulator(const llvm::Triple &triple);
 
+  /// Return true if the given triple represents any simulator.
+  bool tripleIsAnySimulator(const llvm::Triple &triple);
+
   /// Returns the platform name for a given target triple.
   ///
   /// For example, the iOS simulator has the name "iphonesimulator", while real

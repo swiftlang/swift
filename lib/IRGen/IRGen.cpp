@@ -135,8 +135,8 @@ void setModuleFlags(IRGenModule &IGM) {
                         "Objective-C Garbage Collection",
                         (uint32_t) (swiftVersion << 8));
 
-  // Mark iOS simulator images.
-  if (tripleIsiOSSimulator(IGM.Triple))
+  // Mark simulator images.
+  if (tripleIsAnySimulator(IGM.Triple))
     Module->addModuleFlag(llvm::Module::Error, "Objective-C Is Simulated",
                           eImageInfo_ImageIsSimulated);
 }
