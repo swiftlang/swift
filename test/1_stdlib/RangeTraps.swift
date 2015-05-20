@@ -21,15 +21,23 @@ import StdlibUnittest
 
 var RangeTraps = TestSuite("RangeTraps")
 
-RangeTraps.test("HalfOpen") {
+RangeTraps.test("HalfOpen")
+  .skip(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+  .code {
   var range = 1..<1
   expectType(Range<Int>.self, &range)
-
+  
   expectCrashLater()
   1..<0
 }
 
-RangeTraps.test("Closed") {
+RangeTraps.test("Closed")
+  .skip(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+  .code {
   var range = 1...1
   expectType(Range<Int>.self, &range)
 
@@ -37,7 +45,11 @@ RangeTraps.test("Closed") {
   1...0
 }
 
-RangeTraps.test("OutOfRange") {
+RangeTraps.test("OutOfRange")
+  .skip(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+  .code {
   0..<Int.max // This is a Range
 
   // This works for Intervals, but...

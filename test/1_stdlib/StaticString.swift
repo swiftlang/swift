@@ -68,6 +68,9 @@ StaticStringTestSuite.test("PointerRepresentation/NonASCII") {
 }
 
 StaticStringTestSuite.test("PointerRepresentation/unicodeScalar")
+  .skip(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
   .crashOutputMatches(_isDebugAssertConfiguration() ?
     "StaticString should have Unicode scalar representation" : "")
   .code {
@@ -115,6 +118,9 @@ StaticStringTestSuite.test("UnicodeScalarRepresentation/NonASCII") {
 }
 
 StaticStringTestSuite.test("UnicodeScalarRepresentation/utf8Start")
+  .skip(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
   .crashOutputMatches(_isDebugAssertConfiguration() ?
     "StaticString should have pointer representation" : "")
   .code {
@@ -125,6 +131,9 @@ StaticStringTestSuite.test("UnicodeScalarRepresentation/utf8Start")
 }
 
 StaticStringTestSuite.test("UnicodeScalarRepresentation/byteSize")
+  .skip(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
   .crashOutputMatches(_isDebugAssertConfiguration() ?
     "StaticString should have pointer representation" : "")
   .code {

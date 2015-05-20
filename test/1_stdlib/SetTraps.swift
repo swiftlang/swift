@@ -71,14 +71,22 @@ SetTraps.test("RemoveInvalidIndex2") {
   s.removeAtIndex(index)
 }
 
-SetTraps.test("RemoveInvalidIndex3") {
+SetTraps.test("RemoveInvalidIndex3")
+  .skip(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+  .code {
   var s: Set<Int> = [ 10, 20, 30 ]
   let index = s.endIndex
   expectCrashLater()
   s.removeAtIndex(index)
 }
 
-SetTraps.test("RemoveInvalidIndex4") {
+SetTraps.test("RemoveInvalidIndex4")
+  .skip(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+  .code {
   var s: Set<Int> = [ 10 ]
   let index = s.indexOf(10)!
   s.removeAtIndex(index)
@@ -88,6 +96,9 @@ SetTraps.test("RemoveInvalidIndex4") {
 }
 
 SetTraps.test("RemoveFirstFromEmpty")
+  .skip(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
   .crashOutputMatches(_isDebugAssertConfiguration() ?
     "can't removeFirst from an empty Set" : "")
   .code {
@@ -167,7 +178,11 @@ SetTraps.test("BridgedKeyIsNotNSCopyable1") {
   expectEqual(10, (copiedSet.anyObject() as! TestObjCKeyTy).value)
 }
 
-SetTraps.test("Downcast1") {
+SetTraps.test("Downcast1")
+  .skip(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+  .code {
   let s: Set<NSObject> = [ NSObject(), NSObject() ]
   let s2: Set<TestObjCKeyTy> = _setDownCast(s)
   expectCrashLater()
@@ -178,7 +193,11 @@ SetTraps.test("Downcast1") {
   for m in s2 { }
 }
 
-SetTraps.test("Downcast2") {
+SetTraps.test("Downcast2")
+  .skip(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+  .code {
   let s: Set<NSObject> = [ TestObjCKeyTy(10), NSObject() ]
   expectCrashLater()
   let s2: Set<TestBridgedKeyTy> = _setBridgeFromObjectiveC(s)

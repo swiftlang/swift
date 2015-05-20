@@ -679,7 +679,11 @@ mirrors.test("Addressing") {
   expectEmpty(m.descendant(1, 1, "bork"))
 }
 
-mirrors.test("Invalid Path Type") {
+mirrors.test("Invalid Path Type")
+  .skip(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+  .code {
   struct X : MirrorPathType {}
   let m = Mirror(reflecting: [1, 2, 3])
   expectEqual(1, m.descendant(0) as? Int)

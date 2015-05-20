@@ -57,48 +57,76 @@ DictionaryTraps.test("sanity") {
   var nsd = d as NSDictionary
 }
 
-DictionaryTraps.test("DuplicateKeys1") {
+DictionaryTraps.test("DuplicateKeys1")
+  .skip(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+  .code {
   expectCrashLater()
   let d = Dictionary(dictionaryLiteral:
     (10, 1010), (20, 1020), (30, 1030), (10, 0))
   _blackHole(d)
 }
 
-DictionaryTraps.test("DuplicateKeys2") {
+DictionaryTraps.test("DuplicateKeys2")
+  .skip(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+  .code {
   expectCrashLater()
   let d = Dictionary(dictionaryLiteral:
     (10, 1010), (20, 1020), (30, 1030), (10, 1010))
   _blackHole(d)
 }
 
-DictionaryTraps.test("DuplicateKeys3") {
+DictionaryTraps.test("DuplicateKeys3")
+  .skip(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+  .code {
   expectCrashLater()
   let d = [ 10: 1010, 10: 0 ]
   _blackHole(d)
 }
 
-DictionaryTraps.test("RemoveInvalidIndex1") {
+DictionaryTraps.test("RemoveInvalidIndex1")
+  .skip(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+  .code {
   var d = Dictionary<Int, Int>()
   let index = d.startIndex
   expectCrashLater()
   d.removeAtIndex(index)
 }
 
-DictionaryTraps.test("RemoveInvalidIndex2") {
+DictionaryTraps.test("RemoveInvalidIndex2")
+  .skip(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+  .code {
   var d = Dictionary<Int, Int>()
   let index = d.endIndex
   expectCrashLater()
   d.removeAtIndex(index)
 }
 
-DictionaryTraps.test("RemoveInvalidIndex3") {
+DictionaryTraps.test("RemoveInvalidIndex3")
+  .skip(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+  .code {
   var d = [ 10: 1010, 20: 1020, 30: 1030 ]
   let index = d.endIndex
   expectCrashLater()
   d.removeAtIndex(index)
 }
 
-DictionaryTraps.test("RemoveInvalidIndex4") {
+DictionaryTraps.test("RemoveInvalidIndex4")
+  .skip(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+  .code {
   var d = [ 10: 1010 ]
   let index = d.indexForKey(10)!
   d.removeAtIndex(index)
@@ -168,6 +196,9 @@ func ==(x: TestBridgedKeyTy, y: TestBridgedKeyTy) -> Bool {
 }
 
 DictionaryTraps.test("BridgedKeyIsNotNSCopyable1")
+  .skip(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
   .crashOutputMatches("unrecognized selector sent to instance").code {
   // This Dictionary is bridged in O(1).
   var d = [ TestObjCKeyTy(10): NSObject() ]
@@ -176,7 +207,11 @@ DictionaryTraps.test("BridgedKeyIsNotNSCopyable1")
   nsd.mutableCopy()
 }
 
-DictionaryTraps.test("BridgedKeyIsNotNSCopyable2") {
+DictionaryTraps.test("BridgedKeyIsNotNSCopyable2")
+  .skip(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+  .code {
   // This Dictionary is bridged in O(1).
   var d = [ TestObjCKeyTy(10): 10 ]
   var nsd = d as NSDictionary
@@ -196,7 +231,11 @@ DictionaryTraps.test("Downcast1") {
   for (k, v) in d2 { }
 }
 
-DictionaryTraps.test("Downcast2") {
+DictionaryTraps.test("Downcast2")
+  .skip(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+  .code {
   let d: Dictionary<NSObject, NSObject> = [ TestObjCKeyTy(10): NSObject(),
                                             NSObject() : NSObject() ]
 

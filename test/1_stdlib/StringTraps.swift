@@ -13,7 +13,11 @@ import Foundation
 
 var StringTraps = TestSuite("StringTraps")
 
-StringTraps.test("startIndex/predecessor") {
+StringTraps.test("startIndex/predecessor")
+  .skip(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+  .code {
   var s = "abc"
   var i = s.startIndex
   ++i
@@ -22,7 +26,11 @@ StringTraps.test("startIndex/predecessor") {
   --i
 }
 
-StringTraps.test("endIndex/successor") {
+StringTraps.test("endIndex/successor")
+  .skip(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+  .code {
   var s = "abc"
   var i = s.startIndex
   ++i
@@ -32,7 +40,11 @@ StringTraps.test("endIndex/successor") {
   ++i
 }
 
-StringTraps.test("subscript(_:)/endIndex") {
+StringTraps.test("subscript(_:)/endIndex")
+  .skip(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+  .code {
   var s = "abc"
   var i = s.startIndex
   ++i
@@ -42,7 +54,11 @@ StringTraps.test("subscript(_:)/endIndex") {
   s[i]
 }
 
-StringTraps.test("UTF8ViewEndIndexSuccessor") {
+StringTraps.test("UTF8ViewEndIndexSuccessor")
+  .skip(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+  .code {
   var s = "abc"
   var i = s.utf8.startIndex
   ++i
@@ -52,7 +68,11 @@ StringTraps.test("UTF8ViewEndIndexSuccessor") {
   ++i
 }
 
-StringTraps.test("UTF8ViewSubscript/endIndex") {
+StringTraps.test("UTF8ViewSubscript/endIndex")
+  .skip(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+  .code {
   var s = "abc"
   var i = s.utf8.startIndex
   ++i
@@ -62,7 +82,11 @@ StringTraps.test("UTF8ViewSubscript/endIndex") {
   s.utf8[i]
 }
 
-StringTraps.test("UTF16ViewSubscript/DecrementedStartIndex") {
+StringTraps.test("UTF16ViewSubscript/DecrementedStartIndex")
+  .skip(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+  .code {
   var s = "abc"
   var i = s.utf16.startIndex
   --i
@@ -70,7 +94,11 @@ StringTraps.test("UTF16ViewSubscript/DecrementedStartIndex") {
   s.utf16[i]
 }
 
-StringTraps.test("UTF16ViewSubscript/endIndex") {
+StringTraps.test("UTF16ViewSubscript/endIndex")
+  .skip(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+  .code {
   var s = "abc"
   var i = s.utf16.startIndex
   ++i

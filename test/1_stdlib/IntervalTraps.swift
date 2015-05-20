@@ -21,15 +21,22 @@ import StdlibUnittest
 
 var IntervalTraps = TestSuite("IntervalTraps")
 
-IntervalTraps.test("HalfOpen") {
+IntervalTraps.test("HalfOpen")
+  .skip(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+  .code {
   var interval = 1.0..<1.0
   expectType(HalfOpenInterval<Double>.self, &interval)
-
   expectCrashLater()
   1.0..<0.0
 }
 
-IntervalTraps.test("Closed") {
+IntervalTraps.test("Closed")
+  .skip(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+  .code {
   var interval = 1.0...1.0
   expectType(ClosedInterval<Double>.self, &interval)
 

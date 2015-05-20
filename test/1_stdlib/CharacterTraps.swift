@@ -10,13 +10,21 @@ import StdlibUnittest
 
 var CharacterTraps = TestSuite("CharacterTraps")
 
-CharacterTraps.test("CharacterFromEmptyString") {
+CharacterTraps.test("CharacterFromEmptyString")
+  .skip(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+  .code {
   var s = ""
   expectCrashLater()
   Character(s)
 }
 
-CharacterTraps.test("CharacterFromMoreThanOneGraphemeCluster") {
+CharacterTraps.test("CharacterFromMoreThanOneGraphemeCluster")
+  .skip(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+  .code {
   var s = "ab"
   expectCrashLater()
   Character(s)
