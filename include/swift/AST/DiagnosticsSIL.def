@@ -158,9 +158,11 @@ ERROR(assignment_to_immutable_value,sil_analysis,none,
 
 ERROR(object_not_fully_initialized_before_failure,sil_analysis,none,
       "all stored properties of a class instance must be initialized before "
-      "returning nil from an initializer", ())
+      "%select{returning nil|throwing}0 from an initializer", (bool))
+
 NOTE(must_call_super_init_failable_init,sil_analysis,none,
-      "super.init must be called before returning nil", ())
+      "super.init must be called before %select{returning nil|throwing}0",
+      (bool))
 
 
 // Control flow diagnostics.
