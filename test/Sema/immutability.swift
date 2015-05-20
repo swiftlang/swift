@@ -111,7 +111,7 @@ func let_decls() {
 struct SomeStruct {
   var iv = 32
   
-  static let type_let = 5
+  static let type_let = 5  // expected-note {{change 'let' to 'var' to make it mutable}}
 
   mutating static func f() {  // expected-error {{static functions may not be declared mutating}}
   }
@@ -125,14 +125,14 @@ struct SomeStruct {
   }
 
 
-  func h() {
-    iv = 12      // expected-error {{cannot assign}}
+  func h() {  // expected-note {{change method to 'mutating' to make 'self' mutable}}
+    iv = 12      // expected-error {{cannot assign to 'iv', because 'self' is immutable}}
   }
 
   var p: Int {
     // Getters default to non-mutating.
-    get {
-      iv = 37 // expected-error {{cannot assign to 'iv' in 'self'}}
+    get {          // expected-note {{change accessor to 'mutating' to make 'self' mutable}}
+      iv = 37 // expected-error {{cannot assign to 'iv', because 'self' is immutable}}
       return 42
     }
 
@@ -150,14 +150,14 @@ struct SomeStruct {
       return 42
     }
     nonmutating
-    set {
-      iv = newValue // expected-error {{cannot assign to 'iv' in 'self'}}
+    set {      // expected-note {{change accessor to 'mutating' to make 'self' mutable}}
+      iv = newValue // expected-error {{cannot assign to 'iv', because 'self' is immutable}}
     }
   }
 
   var r : Int {
-    get {
-      iv = 37 // expected-error {{cannot assign to 'iv' in 'self'}}
+    get {        // expected-note {{change accessor to 'mutating' to make 'self' mutable}}
+      iv = 37 // expected-error {{cannot assign to 'iv', because 'self' is immutable}}
       return 42
     }
     mutating // Redundant but OK.
@@ -169,7 +169,7 @@ struct SomeStruct {
 }
 
 markUsed(SomeStruct.type_let)   // ok
-SomeStruct.type_let = 17     // expected-error {{cannot assign to the result of this expression}}
+SomeStruct.type_let = 17     // expected-error {{cannot assign to 'let' property 'type_let'}}
 
 struct TestMutableStruct {
   mutating
@@ -325,8 +325,8 @@ func updateInt(inout x : Int) {}
 
 // rdar://15785677 - allow 'let' declarations in structs/classes be initialized in init()
 class LetClassMembers {
-  let a : Int
-  let b : Int
+  let a : Int       // expected-note {{change 'let' to 'var' to make it mutable}}
+  let b : Int       // expected-note {{change 'let' to 'var' to make it mutable}}
 
   init(arg : Int) {
     a = arg             // ok, a is mutable in init()
@@ -335,14 +335,14 @@ class LetClassMembers {
   }
 
   func f() {
-    a = 42  // expected-error {{cannot assign to 'a' in 'self'}}
-    b = 42  // expected-error {{cannot assign to 'b' in 'self'}}
+    a = 42  // expected-error {{cannot assign to 'let' property 'a'}}
+    b = 42  // expected-error {{cannot assign to 'let' property 'b'}}
     updateInt(&a)   // expected-error {{cannot pass immutable value of type 'Int' as inout argument}}
   }
 }
 struct LetStructMembers {
-  let a : Int
-  let b : Int
+  let a : Int       // expected-note {{change 'let' to 'var' to make it mutable}}
+  let b : Int       // expected-note {{change 'let' to 'var' to make it mutable}}
 
   init(arg : Int) {
     a = arg             // ok, a is mutable in init()
@@ -351,8 +351,8 @@ struct LetStructMembers {
   }
 
   func f() {
-    a = 42  // expected-error {{cannot assign to 'a' in 'self'}}
-    b = 42  // expected-error {{cannot assign to 'b' in 'self'}}
+    a = 42  // expected-error {{cannot assign to 'let' property 'a'}}
+    b = 42  // expected-error {{cannot assign to 'let' property 'b'}}
     updateInt(&a)   // expected-error {{cannot pass immutable value of type 'Int' as inout argument}}
   }
 }
@@ -399,22 +399,22 @@ extension rdar17051675_S2 {
 
 // <rdar://problem/17400366> let properties should not be mutable in convenience initializers
 class ClassWithConvenienceInit {
-  let x : Int
+  let x : Int       // expected-note {{change 'let' to 'var' to make it mutable}}
   init(newX: Int) {
     x = 42
   }
   
   convenience init(newY: Int) {
     self.init(newX: 19)
-    x = 67  // expected-error {{cannot assign to 'x' in 'self'}}
+    x = 67  // expected-error {{cannot assign to 'let' property 'x'}}
   }
 }
 
 struct StructWithDelegatingInit {
-  let x: Int
+  let x: Int       // expected-note {{change 'let' to 'var' to make it mutable}}
   
   init(x: Int) { self.x = x }
-  init() { self.init(x: 0); self.x = 22 } // expected-error {{cannot assign to 'x' in 'self'}}
+  init() { self.init(x: 0); self.x = 22 } // expected-error {{cannot assign to 'let' property 'x'}}
 }
 
 
@@ -438,11 +438,11 @@ protocol SingleIntProperty {
 }
 
 struct SingleIntStruct : SingleIntProperty {
-  let i: Int
+  let i: Int       // expected-note {{change 'let' to 'var' to make it mutable}}
 }
 
 extension SingleIntStruct {
   init(_ other: SingleIntStruct) {
-    other.i = 999 // expected-error {{cannot assign to 'i' in 'other'}}
+    other.i = 999 // expected-error {{cannot assign to 'let' property 'i'}}
   }
 }

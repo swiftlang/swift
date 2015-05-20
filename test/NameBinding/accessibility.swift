@@ -64,7 +64,7 @@ class Sub : Base {
   func test() {
     value = 4 // expected-error {{cannot assign to 'value' in 'self'}}
     self.value = 4 // expected-error {{cannot assign to 'value' in 'self'}}
-    super.value = 4 // expected-error {{cannot assign to the result of this expression}}
+    super.value = 4 // expected-error {{cannot assign to member 'value'}}
     // TESTABLE-NOT: :[[@LINE-3]]:{{[^:]+}}:
     // TESTABLE-NOT: :[[@LINE-3]]:{{[^:]+}}:
     // TESTABLE-NOT: :[[@LINE-3]]:{{[^:]+}}:
@@ -87,7 +87,7 @@ class ObservingOverrider : Base {
 class ReplacingOverrider : Base {
   override var value: Int {
     get { return super.value }
-    set { super.value = newValue } // expected-error {{cannot assign to the result of this expression}}
+    set { super.value = newValue } // expected-error {{cannot assign to member 'value'}}
   }
 }
 

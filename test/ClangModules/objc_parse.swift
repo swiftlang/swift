@@ -111,7 +111,7 @@ func properties(b: B) {
   var i = b.counter
   b.counter = i + 1
   i = i + b.readCounter
-  b.readCounter = i + 1 // expected-error{{cannot assign to 'readCounter' in 'b'}}
+  b.readCounter = i + 1 // expected-error{{cannot assign to a get-only property 'readCounter'}}
 
   b.setCounter(5) // expected-error{{'B' does not have a member named 'setCounter'}}
 

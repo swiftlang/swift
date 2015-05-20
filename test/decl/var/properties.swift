@@ -440,11 +440,11 @@ func test_extension_properties(inout s: S, inout x: X) {
 
   s.x = x
   s.x2 = x
-  s.x3 = x // expected-error{{cannot assign to 'x3' in 's'}}
+  s.x3 = x // expected-error{{cannot assign to a get-only property 'x3'}}
 
-  getS().x = x // expected-error{{cannot assign to the result of this expression}}
-  getS().x2 = x // expected-error{{cannot assign to the result of this expression}}
-  getS().x3 = x // expected-error{{cannot assign to the result of this expression}}
+  getS().x = x // expected-error{{cannot assign to 'x', base has immutable type 'S'}}
+  getS().x2 = x // expected-error{{cannot assign to 'x2', base has immutable type 'S'}}
+  getS().x3 = x // expected-error{{cannot assign to a get-only property 'x3'}}
 
   accept_x_inout(&getS().x) // expected-error{{cannot pass immutable value of type 'X' as inout argument}}
   accept_x_inout(&getS().x2) // expected-error{{cannot pass immutable value of type 'X' as inout argument}}
@@ -464,7 +464,7 @@ extension S {
   func test(inout other_x: X) {
     x = other_x
     x2 = other_x
-    x3 = other_x // expected-error{{cannot assign to 'x3' in 'self'}}
+    x3 = other_x // expected-error{{cannot assign to a get-only property 'x3'}}
 
     other_x = x
     other_x = x2

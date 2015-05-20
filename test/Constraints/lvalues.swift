@@ -81,7 +81,7 @@ non_settable_x += x // expected-error{{cannot pass get-only property 'non_settab
 ++non_settable_x // expected-error{{cannot pass get-only property 'non_settable_x' to mutating unary operator '++'}}
 
 // non-settable property is non-settable:
-z.non_settable_x = x // expected-error{{cannot assign to 'non_settable_x' in 'z'}}
+z.non_settable_x = x // expected-error{{cannot assign to a get-only property 'non_settable_x'}}
 f2(&z.non_settable_x) // expected-error{{cannot pass immutable value of type 'X' as inout argument}}
 f1(&z.non_settable_x) // expected-error{{cannot pass immutable value of type 'X' as inout argument}}
 z.non_settable_x += x // expected-error{{cannot pass immutable value of type 'X' to mutating binary operator '+='}}
@@ -95,7 +95,7 @@ z[0] += 0.0 // expected-error{{cannot pass immutable value of type 'Double' to m
 ++z[0] // expected-error{{cannot pass immutable value of type 'Double' to mutating unary operator '++'}}
 
 // settable property of an rvalue value type is non-settable:
-fz().settable_x = x // expected-error{{cannot assign to the result of this expression}}
+fz().settable_x = x // expected-error{{cannot assign to 'settable_x', base has immutable type 'Z'}}
 f2(&fz().settable_x) // expected-error{{cannot pass immutable value of type 'X' as inout argument}}
 f1(&fz().settable_x) // expected-error{{cannot pass immutable value of type 'X' as inout argument}}
 fz().settable_x += x // expected-error{{cannot pass immutable value of type 'X' to mutating binary operator '+='}}
@@ -109,7 +109,7 @@ fref().property += 0.0
 ++fref().property
 
 // settable property of a non-settable value type is non-settable:
-z.non_settable_x.property = 1.0 // expected-error{{cannot assign to the result of this expression}}
+z.non_settable_x.property = 1.0 // expected-error{{cannot assign to 'property', base has immutable type 'X}}
 f2(&z.non_settable_x.property) // expected-error{{cannot pass immutable value of type 'Double' as inout argument}}
 f1(&z.non_settable_x.property) // expected-error{{cannot pass immutable value of type 'Double' as inout argument}}
 z.non_settable_x.property += 1.0 // expected-error{{cannot pass immutable value of type 'Double' to mutating binary operator '+='}}

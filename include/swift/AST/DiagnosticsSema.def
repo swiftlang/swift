@@ -1687,8 +1687,25 @@ ERROR(assignment_to_self,sema_tcs,none,
 ERROR(assignment_lhs_is_vardecl,sema_tcs,none,
       "cannot assign to %0", (Identifier))
 
+ERROR(assignment_lhs_is_let_property,sema_tcs,none,
+      "cannot assign to 'let' property %0", (Identifier))
+ERROR(assignment_property_has_immutable_base,sema_tcs,none,
+      "cannot assign to %0, base has immutable type %1",
+      (Identifier, Type))
+
+ERROR(assignment_property_has_immutable_self,sema_tcs,none,
+      "cannot assign to %0, because 'self' is immutable",
+      (Identifier))
+NOTE(change_to_mutating,sema_tcs,none,
+     "change %select{method|accessor}0 to 'mutating' to make 'self' mutable",
+     (bool))
+
+
+
 ERROR(assignment_unresolved_expr,sema_tcs,none,
       "cannot assign to %0 in %1", (Identifier, Identifier))
+ERROR(assignment_ude_expr,sema_tcs,none,
+      "cannot assign to member %0", (Identifier))
 
 // ForEach Stmt
 ERROR(sequence_protocol_broken,sema_tcs,none,
