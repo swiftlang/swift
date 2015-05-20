@@ -19,7 +19,7 @@ extension CGColorSpace {
 }
 
 extension CGColor {
-  class func create(#colorSpace: CGColorSpace, #components: [CGFloat])
+  class func create(colorSpace colorSpace: CGColorSpace, components: [CGFloat])
       -> CGColor {
     return CGColorCreate(colorSpace, components)
   }

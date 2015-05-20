@@ -340,7 +340,7 @@ final class IUOPolarBear: Bear, FailableOnDemand {
   }
 }
 
-func tryInitFail<T: FailableOnDemand>(_: T.Type, #fail: Bool) {
+func tryInitFail<T: FailableOnDemand>(_: T.Type, fail: Bool) {
   if let x = T(fail: fail) {
     print("it's alive")
     _fixLifetime(x)

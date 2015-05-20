@@ -26,12 +26,12 @@ protocol AnyProtocol {
   typealias AssocType
   typealias AssocWithReqt: AssocReqt
 
-  func method(#x: Arg, y: Self)
-  func generic<A: ArchetypeReqt>(#x: A, y: Self)
+  func method(x x: Arg, y: Self)
+  func generic<A: ArchetypeReqt>(x x: A, y: Self)
 
-  func assocTypesMethod(#x: AssocType, y: AssocWithReqt)
+  func assocTypesMethod(x x: AssocType, y: AssocWithReqt)
 
-  static func staticMethod(#x: Self)
+  static func staticMethod(x x: Self)
 
   func <~>(x: Self, y: Self)
 }
@@ -40,19 +40,19 @@ protocol ClassProtocol : class {
   typealias AssocType
   typealias AssocWithReqt: AssocReqt
 
-  func method(#x: Arg, y: Self)
-  func generic<B: ArchetypeReqt>(#x: B, y: Self)
+  func method(x x: Arg, y: Self)
+  func generic<B: ArchetypeReqt>(x x: B, y: Self)
 
-  func assocTypesMethod(#x: AssocType, y: AssocWithReqt)
+  func assocTypesMethod(x x: AssocType, y: AssocWithReqt)
 
-  static func staticMethod(#x: Self)
+  static func staticMethod(x x: Self)
 
   func <~>(x: Self, y: Self)
 }
 
 @objc protocol ObjCProtocol {
-  func method(#x: ObjCClass)
-  static func staticMethod(#y: ObjCClass)
+  func method(x x: ObjCClass)
+  static func staticMethod(y y: ObjCClass)
 }
 
 class SomeAssoc {}
@@ -71,12 +71,12 @@ struct ConformingStruct : AnyProtocol {
   typealias AssocType = SomeAssoc
   typealias AssocWithReqt = ConformingAssoc
   
-  func method(#x: Arg, y: ConformingStruct) {}
-  func generic<D: ArchetypeReqt>(#x: D, y: ConformingStruct) {}
+  func method(x x: Arg, y: ConformingStruct) {}
+  func generic<D: ArchetypeReqt>(x x: D, y: ConformingStruct) {}
 
-  func assocTypesMethod(#x: SomeAssoc, y: ConformingAssoc) {}
+  func assocTypesMethod(x x: SomeAssoc, y: ConformingAssoc) {}
 
-  static func staticMethod(#x: ConformingStruct) {}
+  static func staticMethod(x x: ConformingStruct) {}
 }
 func <~>(x: ConformingStruct, y: ConformingStruct) {}
 // TABLE-LABEL: sil_witness_table hidden ConformingStruct: AnyProtocol module witness_tables {
@@ -108,12 +108,12 @@ struct ConformingAddressOnlyStruct : AnyProtocol {
   typealias AssocType = SomeAssoc
   typealias AssocWithReqt = ConformingAssoc
   
-  func method(#x: Arg, y: ConformingAddressOnlyStruct) {}
-  func generic<E: ArchetypeReqt>(#x: E, y: ConformingAddressOnlyStruct) {}
+  func method(x x: Arg, y: ConformingAddressOnlyStruct) {}
+  func generic<E: ArchetypeReqt>(x x: E, y: ConformingAddressOnlyStruct) {}
 
-  func assocTypesMethod(#x: SomeAssoc, y: ConformingAssoc) {}
+  func assocTypesMethod(x x: SomeAssoc, y: ConformingAssoc) {}
 
-  static func staticMethod(#x: ConformingAddressOnlyStruct) {}
+  static func staticMethod(x x: ConformingAddressOnlyStruct) {}
 }
 func <~>(x: ConformingAddressOnlyStruct, y: ConformingAddressOnlyStruct) {}
 // TABLE-LABEL: sil_witness_table hidden ConformingAddressOnlyStruct: AnyProtocol module witness_tables {
@@ -136,12 +136,12 @@ class ConformingClass : AnyProtocol {
   typealias AssocType = SomeAssoc
   typealias AssocWithReqt = ConformingAssoc
   
-  func method(#x: Arg, y: ConformingClass) {}
-  func generic<F: ArchetypeReqt>(#x: F, y: ConformingClass) {}
+  func method(x x: Arg, y: ConformingClass) {}
+  func generic<F: ArchetypeReqt>(x x: F, y: ConformingClass) {}
 
-  func assocTypesMethod(#x: SomeAssoc, y: ConformingAssoc) {}
+  func assocTypesMethod(x x: SomeAssoc, y: ConformingAssoc) {}
 
-  class func staticMethod(#x: ConformingClass) {}
+  class func staticMethod(x x: ConformingClass) {}
 }
 func <~>(x: ConformingClass, y: ConformingClass) {}
 // TABLE-LABEL: sil_witness_table hidden ConformingClass: AnyProtocol module witness_tables {
@@ -165,12 +165,12 @@ extension ConformsByExtension : AnyProtocol {
   typealias AssocType = SomeAssoc
   typealias AssocWithReqt = ConformingAssoc
   
-  func method(#x: Arg, y: ConformsByExtension) {}
-  func generic<G: ArchetypeReqt>(#x: G, y: ConformsByExtension) {}
+  func method(x x: Arg, y: ConformsByExtension) {}
+  func generic<G: ArchetypeReqt>(x x: G, y: ConformsByExtension) {}
 
-  func assocTypesMethod(#x: SomeAssoc, y: ConformingAssoc) {}
+  func assocTypesMethod(x x: SomeAssoc, y: ConformingAssoc) {}
 
-  static func staticMethod(#x: ConformsByExtension) {}
+  static func staticMethod(x x: ConformsByExtension) {}
 }
 func <~>(x: ConformsByExtension, y: ConformsByExtension) {}
 // TABLE-LABEL: sil_witness_table hidden ConformsByExtension: AnyProtocol module witness_tables {
@@ -193,12 +193,12 @@ extension OtherModuleStruct : AnyProtocol {
   typealias AssocType = SomeAssoc
   typealias AssocWithReqt = ConformingAssoc
   
-  func method(#x: Arg, y: OtherModuleStruct) {}
-  func generic<H: ArchetypeReqt>(#x: H, y: OtherModuleStruct) {}
+  func method(x x: Arg, y: OtherModuleStruct) {}
+  func generic<H: ArchetypeReqt>(x x: H, y: OtherModuleStruct) {}
 
-  func assocTypesMethod(#x: SomeAssoc, y: ConformingAssoc) {}
+  func assocTypesMethod(x x: SomeAssoc, y: ConformingAssoc) {}
 
-  static func staticMethod(#x: OtherModuleStruct) {}
+  static func staticMethod(x x: OtherModuleStruct) {}
 }
 func <~>(x: OtherModuleStruct, y: OtherModuleStruct) {}
 // TABLE-LABEL: sil_witness_table hidden OtherModuleStruct: AnyProtocol module witness_tables {
@@ -223,12 +223,12 @@ struct ConformsWithMoreGenericWitnesses : AnyProtocol, OtherProtocol {
   typealias AssocType = SomeAssoc
   typealias AssocWithReqt = ConformingAssoc
   
-  func method<I, J>(#x: I, y: J) {}
-  func generic<K, L>(#x: K, y: L) {}
+  func method<I, J>(x x: I, y: J) {}
+  func generic<K, L>(x x: K, y: L) {}
 
-  func assocTypesMethod<M, N>(#x: M, y: N) {}
+  func assocTypesMethod<M, N>(x x: M, y: N) {}
 
-  static func staticMethod<O>(#x: O) {}
+  static func staticMethod<O>(x x: O) {}
 }
 func <~> <P: OtherProtocol>(x: P, y: P) {}
 // TABLE-LABEL: sil_witness_table hidden ConformsWithMoreGenericWitnesses: AnyProtocol module witness_tables {
@@ -251,12 +251,12 @@ class ConformingClassToClassProtocol : ClassProtocol {
   typealias AssocType = SomeAssoc
   typealias AssocWithReqt = ConformingAssoc
   
-  func method(#x: Arg, y: ConformingClassToClassProtocol) {}
-  func generic<Q: ArchetypeReqt>(#x: Q, y: ConformingClassToClassProtocol) {}
+  func method(x x: Arg, y: ConformingClassToClassProtocol) {}
+  func generic<Q: ArchetypeReqt>(x x: Q, y: ConformingClassToClassProtocol) {}
 
-  func assocTypesMethod(#x: SomeAssoc, y: ConformingAssoc) {}
+  func assocTypesMethod(x x: SomeAssoc, y: ConformingAssoc) {}
 
-  class func staticMethod(#x: ConformingClassToClassProtocol) {}
+  class func staticMethod(x x: ConformingClassToClassProtocol) {}
 }
 func <~>(x: ConformingClassToClassProtocol,
          y: ConformingClassToClassProtocol) {}
@@ -277,8 +277,8 @@ func <~>(x: ConformingClassToClassProtocol,
 // SYMBOL:  sil hidden [transparent] [thunk] @_TTWC14witness_tables30ConformingClassToClassProtocolS_13ClassProtocolS_ZFS1_oi3ltg{{.*}} : $@convention(witness_method) (@owned ConformingClassToClassProtocol, @owned ConformingClassToClassProtocol, @thick ConformingClassToClassProtocol.Type) -> ()
 
 class ConformingClassToObjCProtocol : ObjCProtocol {
-  @objc func method(#x: ObjCClass) {}
-  @objc class func staticMethod(#y: ObjCClass) {}
+  @objc func method(x x: ObjCClass) {}
+  @objc class func staticMethod(y y: ObjCClass) {}
 }
 // TABLE-NOT:  sil_witness_table hidden ConformingClassToObjCProtocol
 
@@ -286,12 +286,12 @@ struct ConformingGeneric<R: AssocReqt> : AnyProtocol {
   typealias AssocType = SomeAssoc
   typealias AssocWithReqt = R
 
-  func method(#x: Arg, y: ConformingGeneric) {}
-  func generic<Q: ArchetypeReqt>(#x: Q, y: ConformingGeneric) {}
+  func method(x x: Arg, y: ConformingGeneric) {}
+  func generic<Q: ArchetypeReqt>(x x: Q, y: ConformingGeneric) {}
 
-  func assocTypesMethod(#x: SomeAssoc, y: R) {}
+  func assocTypesMethod(x x: SomeAssoc, y: R) {}
 
-  static func staticMethod(#x: ConformingGeneric) {}
+  static func staticMethod(x x: ConformingGeneric) {}
 }
 func <~> <R: AssocReqt>(x: ConformingGeneric<R>, y: ConformingGeneric<R>) {}
 // TABLE-LABEL: sil_witness_table hidden <R where R : AssocReqt> ConformingGeneric<R>: AnyProtocol module witness_tables {
@@ -313,12 +313,12 @@ struct ConformingGenericWithMoreGenericWitnesses<S: AssocReqt>
   typealias AssocType = SomeAssoc
   typealias AssocWithReqt = S
 
-  func method<T, U>(#x: T, y: U) {}
-  func generic<V, W>(#x: V, y: W) {}
+  func method<T, U>(x x: T, y: U) {}
+  func generic<V, W>(x x: V, y: W) {}
 
-  func assocTypesMethod<X, Y>(#x: X, y: Y) {}
+  func assocTypesMethod<X, Y>(x x: X, y: Y) {}
 
-  static func staticMethod<Z>(#x: Z) {}
+  static func staticMethod<Z>(x x: Z) {}
 }
 func <~> <AA: AnotherProtocol, BB: AnotherProtocol>(x: AA, y: BB) {}
 // TABLE-LABEL: sil_witness_table hidden <S where S : AssocReqt> ConformingGenericWithMoreGenericWitnesses<S>: AnyProtocol module witness_tables {
@@ -348,12 +348,12 @@ struct InheritedConformance : InheritedProtocol1 {
   typealias AssocType = SomeAssoc
   typealias AssocWithReqt = ConformingAssoc
 
-  func method(#x: Arg, y: InheritedConformance) {}
-  func generic<H: ArchetypeReqt>(#x: H, y: InheritedConformance) {}
+  func method(x x: Arg, y: InheritedConformance) {}
+  func generic<H: ArchetypeReqt>(x x: H, y: InheritedConformance) {}
 
-  func assocTypesMethod(#x: SomeAssoc, y: ConformingAssoc) {}
+  func assocTypesMethod(x x: SomeAssoc, y: ConformingAssoc) {}
 
-  static func staticMethod(#x: InheritedConformance) {}
+  static func staticMethod(x x: InheritedConformance) {}
 
   func inheritedMethod() {}
 }
@@ -377,12 +377,12 @@ struct RedundantInheritedConformance : InheritedProtocol1, AnyProtocol {
   typealias AssocType = SomeAssoc
   typealias AssocWithReqt = ConformingAssoc
 
-  func method(#x: Arg, y: RedundantInheritedConformance) {}
-  func generic<H: ArchetypeReqt>(#x: H, y: RedundantInheritedConformance) {}
+  func method(x x: Arg, y: RedundantInheritedConformance) {}
+  func generic<H: ArchetypeReqt>(x x: H, y: RedundantInheritedConformance) {}
 
-  func assocTypesMethod(#x: SomeAssoc, y: ConformingAssoc) {}
+  func assocTypesMethod(x x: SomeAssoc, y: ConformingAssoc) {}
 
-  static func staticMethod(#x: RedundantInheritedConformance) {}
+  static func staticMethod(x x: RedundantInheritedConformance) {}
 
   func inheritedMethod() {}
 }
@@ -406,12 +406,12 @@ struct DiamondInheritedConformance : InheritedProtocol1, InheritedProtocol2 {
   typealias AssocType = SomeAssoc
   typealias AssocWithReqt = ConformingAssoc
 
-  func method(#x: Arg, y: DiamondInheritedConformance) {}
-  func generic<H: ArchetypeReqt>(#x: H, y: DiamondInheritedConformance) {}
+  func method(x x: Arg, y: DiamondInheritedConformance) {}
+  func generic<H: ArchetypeReqt>(x x: H, y: DiamondInheritedConformance) {}
 
-  func assocTypesMethod(#x: SomeAssoc, y: ConformingAssoc) {}
+  func assocTypesMethod(x x: SomeAssoc, y: ConformingAssoc) {}
 
-  static func staticMethod(#x: DiamondInheritedConformance) {}
+  static func staticMethod(x x: DiamondInheritedConformance) {}
 
   func inheritedMethod() {}
 }
@@ -439,12 +439,12 @@ class ClassInheritedConformance : InheritedClassProtocol {
   typealias AssocType = SomeAssoc
   typealias AssocWithReqt = ConformingAssoc
 
-  func method(#x: Arg, y: ClassInheritedConformance) {}
-  func generic<H: ArchetypeReqt>(#x: H, y: ClassInheritedConformance) {}
+  func method(x x: Arg, y: ClassInheritedConformance) {}
+  func generic<H: ArchetypeReqt>(x x: H, y: ClassInheritedConformance) {}
 
-  func assocTypesMethod(#x: SomeAssoc, y: ConformingAssoc) {}
+  func assocTypesMethod(x x: SomeAssoc, y: ConformingAssoc) {}
 
-  class func staticMethod(#x: ClassInheritedConformance) {}
+  class func staticMethod(x x: ClassInheritedConformance) {}
 
   func inheritedMethod() {}
 }
@@ -499,8 +499,8 @@ protocol InheritedFromObjC : ObjCProtocol {
 }
 
 class ConformsInheritedFromObjC : InheritedFromObjC {
-  @objc func method(#x: ObjCClass) {}
-  @objc class func staticMethod(#y: ObjCClass) {}
+  @objc func method(x x: ObjCClass) {}
+  @objc class func staticMethod(y y: ObjCClass) {}
   func inheritedMethod() {}
 }
 // TABLE-LABEL: sil_witness_table hidden ConformsInheritedFromObjC: InheritedFromObjC module witness_tables {

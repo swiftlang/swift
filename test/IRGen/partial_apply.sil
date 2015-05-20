@@ -11,7 +11,7 @@ import Foundation
 import gizmo
 
 @objc class ObjCClass {
-  func method(#x: Int) {}
+  func method(x x: Int) {}
   
   func initFamily() -> ObjCClass { return self }
 }

@@ -2,7 +2,7 @@ public func getZero() -> Int {
   return 0
 }
 
-public func getInput(#x: Int) -> Int {
+public func getInput(x x: Int) -> Int {
   return x
 }
 
@@ -12,28 +12,28 @@ public func getSecond(Int, y: Int) -> Int {
 
 public func useNested((x: Int, y: Int), n: Int) {}
 
-public func variadic(#x: Double, _ y: Int...) {}
+public func variadic(x x: Double, _ y: Int...) {}
 
-public func slice(#x: [Int]) {}
-public func optional(#x: Int?) {}
+public func slice(x x: [Int]) {}
+public func optional(x x: Int?) {}
 
-public func overloaded(#x: Int) {}
-public func overloaded(#x: Bool) {}
+public func overloaded(x x: Int) {}
+public func overloaded(x x: Bool) {}
 
 // Generic functions.
-public func makePair<A, B>(#a: A, b: B) -> (A, B) {
+public func makePair<A, B>(a a: A, b: B) -> (A, B) {
   return (a, b)
 }
 
-public func different<T : Equatable>(#a: T, b: T) -> Bool {
+public func different<T : Equatable>(a a: T, b: T) -> Bool {
   return a != b
 }
 
-public func different2<T where T : Equatable>(#a: T, b: T) -> Bool {
+public func different2<T where T : Equatable>(a a: T, b: T) -> Bool {
   return a != b
 }
 
-public func selectorFunc1(#a: Int, b x: Int) {}
+public func selectorFunc1(a a: Int, b x: Int) {}
 
 public protocol Wrapped {
   typealias Value : Equatable
@@ -46,14 +46,14 @@ public func differentWrapped<
   T : Wrapped, U : Wrapped
   where
   T.Value == U.Value
->(#a: T, b: U) -> Bool {
+>(a a: T, b: U) -> Bool {
   return a.getValue() != b.getValue()
 }
 
 @noreturn @asmname("exit") public func exit ()->()
 
 @noreturn public func testNoReturnAttr() -> () { exit() }
-@noreturn public func testNoReturnAttrPoly<T>(#x: T) -> () { exit() }
+@noreturn public func testNoReturnAttrPoly<T>(x x: T) -> () { exit() }
 
 
 @asmname("primitive") public func primitive()

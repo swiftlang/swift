@@ -1,12 +1,12 @@
 // RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
-func foo<T: IntegerLiteralConvertible>(#x: T = 0) { }
+func foo<T: IntegerLiteralConvertible>(x x: T = 0) { }
 
 struct Zim<T: IntegerLiteralConvertible> {
   init(x: T = 0) { }
   init<U: FloatLiteralConvertible>(x: T = 0, y: U = 0.5) { }
 
-  static func zim(#x: T = 0) { }
+  static func zim(x x: T = 0) { }
   static func zang<U: FloatLiteralConvertible>(x: T = 0,
                                                y: U = 0.5) { }
 }

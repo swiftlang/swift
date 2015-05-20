@@ -27,7 +27,7 @@ func instanceMethods(b: B) {
 }
 
 // CHECK: define hidden void @_TF7objc_ir16extensionMethodsFT1bCSo1B_T_
-func extensionMethods(#b: B) {
+func extensionMethods(b b: B) {
   // CHECK: load i8*, i8** @"\01L_selector(method:separateExtMethod:)", align 8
   // CHECK: [[T0:%.*]] = call i8* bitcast (void ()* @objc_msgSend to i8*
   // CHECK: [[T1:%.*]] = ptrtoint i8* [[T0]] to i64
@@ -37,7 +37,7 @@ func extensionMethods(#b: B) {
 }
 
 // CHECK: define hidden void @_TF7objc_ir19initCallToAllocInitFT1iVSs5Int32_T_
-func initCallToAllocInit(#i: CInt) {
+func initCallToAllocInit(i i: CInt) {
   // CHECK: call {{.*}} @_TFCSo1BCfMS_FT3intVSs5Int32_GSQS__
  
   B(int: i)
@@ -49,7 +49,7 @@ func initCallToAllocInit(#i: CInt) {
 
 // Indexed subscripting
 // CHECK: define hidden void @_TF7objc_ir19indexedSubscriptingFT1bCSo1B3idxSi1aCSo1A_T_
-func indexedSubscripting(#b: B, #idx: Int, #a: A) {
+func indexedSubscripting(b b: B, idx: Int, a: A) {
   // CHECK: load i8*, i8** @"\01L_selector(setObject:atIndexedSubscript:)", align 8
   b[idx] = a
 
@@ -58,7 +58,7 @@ func indexedSubscripting(#b: B, #idx: Int, #a: A) {
 }
 
 // CHECK: define hidden void @_TF7objc_ir17keyedSubscriptingFT1bCSo1B3idxCSo1A1aS1__T_
-func keyedSubscripting(#b: B, #idx: A, #a: A) {
+func keyedSubscripting(b b: B, idx: A, a: A) {
   // CHECK: load i8*, i8** @"\01L_selector(setObject:forKeyedSubscript:)"
   b[a] = a
   // CHECK: load i8*, i8** @"\01L_selector(objectForKeyedSubscript:)"
@@ -66,14 +66,14 @@ func keyedSubscripting(#b: B, #idx: A, #a: A) {
 }
 
 // CHECK: define hidden void @_TF7objc_ir14propertyAccessFT1bCSo1B_T_
-func propertyAccess(#b: B) {
+func propertyAccess(b b: B) {
    // CHECK: load i8*, i8** @"\01L_selector(counter)"
    // CHECK: load i8*, i8** @"\01L_selector(setCounter:)"
    b.counter = b.counter + 1
 }
 
 // CHECK: define hidden [[B]]* @_TF7objc_ir8downcastFT1aCSo1A_CSo1B(
-func downcast(#a: A) -> B {
+func downcast(a a: A) -> B {
   // CHECK: [[T0:%.*]] = call %objc_class* @swift_getInitializedObjCClass(%objc_class* @"OBJC_CLASS_$_B")
   // CHECK: [[T1:%.*]] = bitcast %objc_class* [[T0]] to i8*
   // CHECK: call i8* @swift_dynamicCastObjCClassUnconditional(i8* [[A:%.*]], i8* [[T1]]) [[NOUNWIND:#[0-9]+]]
@@ -81,12 +81,12 @@ func downcast(#a: A) -> B {
 }
 
 // CHECK: define hidden void @_TF7objc_ir19almostSubscriptableFT3as1CSo19AlmostSubscriptable1aCSo1A_T_
-func almostSubscriptable(#as1: AlmostSubscriptable, #a: A) {
+func almostSubscriptable(as1 as1: AlmostSubscriptable, a: A) {
   as1.objectForKeyedSubscript(a)
 }
 
 // CHECK: define hidden void @_TF7objc_ir13protocolTypesFT1aCSo7NSMince1bPSo9NSRuncing__T_(%CSo7NSMince*, %objc_object*) {{.*}} {
-func protocolTypes(#a: NSMince, #b: NSRuncing) {
+func protocolTypes(a a: NSMince, b: NSRuncing) {
   // - (void)eatWith:(id <NSRuncing>)runcer;
   a.eatWith(b)
   // CHECK: [[SEL:%.*]] = load i8*, i8** @"\01L_selector(eatWith:)", align 8
@@ -94,7 +94,7 @@ func protocolTypes(#a: NSMince, #b: NSRuncing) {
 }
 
 // CHECK-LABEL: define hidden void @_TF7objc_ir6getsetFT1pPSo8FooProto__T_(%objc_object*) {{.*}} {
-func getset(#p: FooProto) {
+func getset(p p: FooProto) {
   // CHECK: load i8*, i8** @"\01L_selector(bar)"
   // CHECK: load i8*, i8** @"\01L_selector(setBar:)"
   let prop = p.bar

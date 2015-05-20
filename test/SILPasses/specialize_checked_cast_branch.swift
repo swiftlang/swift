@@ -17,7 +17,7 @@ var o : AnyObject = c
 // Arch to Arch Casts //
 ////////////////////////
 
-func ArchetypeToArchetypeCast<T1, T2>(#t1 : T1, #t2 : T2) -> T2 {
+func ArchetypeToArchetypeCast<T1, T2>(t1 t1 : T1, t2 : T2) -> T2 {
   if let x = t1 as? T2 {
     return x
   }
@@ -92,28 +92,28 @@ ArchetypeToArchetypeCast(t1: c, t2: e)
 // Archetype To Concrete //
 ///////////////////////////
 
-func ArchetypeToConcreteCastUInt8<T>(#t : T) -> UInt8 {
+func ArchetypeToConcreteCastUInt8<T>(t t : T) -> UInt8 {
   if let x = t as? UInt8 {
     return x
   }
   _preconditionFailure("??? Profit?")
 }
 
-func ArchetypeToConcreteCastC<T>(#t : T) -> C {
+func ArchetypeToConcreteCastC<T>(t t : T) -> C {
   if let x = t as? C {
     return x
   }
   _preconditionFailure("??? Profit?")
 }
 
-func ArchetypeToConcreteCastD<T>(#t : T) -> D {
+func ArchetypeToConcreteCastD<T>(t t : T) -> D {
   if let x = t as? D {
     return x
   }
   _preconditionFailure("??? Profit?")
 }
 
-func ArchetypeToConcreteCastE<T>(#t : T) -> E {
+func ArchetypeToConcreteCastE<T>(t t : T) -> E {
   if let x = t as? E {
     return x
   }
@@ -188,19 +188,19 @@ ArchetypeToConcreteCastE(t: c)
 // Concrete To Archetype //
 ///////////////////////////
 
-func ConcreteToArchetypeCastUInt8<T>(#t: UInt8, #t2: T) -> T {
+func ConcreteToArchetypeCastUInt8<T>(t t: UInt8, t2: T) -> T {
   if let x = t as? T {
     return x
   }
   _preconditionFailure("??? Profit?")
 }
-func ConcreteToArchetypeCastC<T>(#t: C, #t2: T) -> T {
+func ConcreteToArchetypeCastC<T>(t t: C, t2: T) -> T {
   if let x = t as? T {
     return x
   }
   _preconditionFailure("??? Profit?")
 }
-func ConcreteToArchetypeCastD<T>(#t: D, #t2: T) -> T {
+func ConcreteToArchetypeCastD<T>(t t: D, t2: T) -> T {
   if let x = t as? T {
     return x
   }
@@ -260,14 +260,14 @@ ConcreteToArchetypeCastD(t: d, t2: c)
 // Super To Archetype //
 ////////////////////////
 
-func SuperToArchetypeCastC<T>(#c : C, #t : T) -> T {
+func SuperToArchetypeCastC<T>(c c : C, t : T) -> T {
   if let x = c as? T {
     return x
   }
   _preconditionFailure("??? Profit?")
 }
 
-func SuperToArchetypeCastD<T>(#d : D, #t : T) -> T {
+func SuperToArchetypeCastD<T>(d d : D, t : T) -> T {
   if let x = d as? T {
     return x
   }
@@ -309,7 +309,7 @@ SuperToArchetypeCastD(d: d, t: d)
 // Existential To Archetype //
 //////////////////////////////
 
-func ExistentialToArchetypeCast<T>(#o : AnyObject, #t : T) -> T {
+func ExistentialToArchetypeCast<T>(o o : AnyObject, t : T) -> T {
   if let x = o as? T {
     return x
   }

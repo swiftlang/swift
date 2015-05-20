@@ -3,7 +3,7 @@
 protocol Fooable {
   typealias Bar
 
-  func foo<T: Fooable where T.Bar == Self.Bar>(#x: T) -> Self.Bar
+  func foo<T: Fooable where T.Bar == Self.Bar>(x x: T) -> Self.Bar
 }
 
 struct X {}
@@ -14,7 +14,7 @@ struct X {}
 struct Foo: Fooable {
   typealias Bar = X
 
-  func foo<T: Fooable where T.Bar == X>(#x: T) -> X { return X() }
+  func foo<T: Fooable where T.Bar == X>(x x: T) -> X { return X() }
 }
 
 // rdar://problem/19049566

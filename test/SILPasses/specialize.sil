@@ -18,7 +18,7 @@ import Swift
 
 struct XXX<T> {
   init(t: T)
-  mutating func foo(#t: T) -> Int32
+  mutating func foo(t t: T) -> Int32
   var m_t: T
 }
 

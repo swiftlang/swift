@@ -11,9 +11,9 @@ func runced() -> Bool { return true }
 func funged() -> Bool { return true }
 func ansed() -> Bool { return true }
 
-func runced(#x: Int) -> Bool { return true }
-func funged(#x: Int) -> Bool { return true }
-func ansed(#x: Int) -> Bool { return true }
+func runced(x x: Int) -> Bool { return true }
+func funged(x x: Int) -> Bool { return true }
+func ansed(x x: Int) -> Bool { return true }
 
 func foo() -> Int { return 0 }
 func bar() -> Int { return 0 }
@@ -30,17 +30,17 @@ func e() {}
 func f() {}
 func g() {}
 
-func a(#x: Int) {}
-func b(#x: Int) {}
-func c(#x: Int) {}
-func d(#x: Int) {}
+func a(x x: Int) {}
+func b(x x: Int) {}
+func c(x x: Int) {}
+func d(x x: Int) {}
 
-func a(#x: String) {}
-func b(#x: String) {}
+func a(x x: String) {}
+func b(x x: String) {}
 
-func aa(#x: (Int, Int)) {}
-func bb(#x: (Int, Int)) {}
-func cc(#x: (Int, Int)) {}
+func aa(x x: (Int, Int)) {}
+func bb(x x: (Int, Int)) {}
+func cc(x x: (Int, Int)) {}
 
 // CHECK-LABEL: sil hidden  @_TF10switch_var10test_var_1FT_T_
 func test_var_1() {
@@ -172,7 +172,7 @@ struct Y : P { func p() {} }
 struct Z : P { func p() {} }
 
 // CHECK-LABEL: sil hidden  @_TF10switch_var10test_var_4FT1pPS_1P__T_
-func test_var_4(#p: P) {
+func test_var_4(p p: P) {
   // CHECK:   function_ref @_TF10switch_var3fooFT_Si
   switch (p, foo()) {
   // CHECK:   [[PAIR:%.*]] = alloc_stack $(P, Int)

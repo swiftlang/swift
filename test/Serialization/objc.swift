@@ -9,13 +9,13 @@
 import def_objc
 
 // SIL: sil hidden @_TF4objc9testProtoFT3objP8def_objc9ObjCProto__T_ : $@convention(thin) (@owned ObjCProto) -> () {
-func testProto(#obj: ObjCProto) {
+func testProto(obj obj: ObjCProto) {
   // SIL: = witness_method [volatile] $@opened({{.*}}) ObjCProto, #ObjCProto.doSomething!1.foreign
   obj.doSomething()
 }
 
 // SIL: sil hidden @_TF4objc9testClassFT3objC8def_objc9ObjCClass_T_ : $@convention(thin) (@owned ObjCClass) -> () {
-func testClass(#obj: ObjCClass) {
+func testClass(obj obj: ObjCClass) {
   // SIL: = class_method [volatile] %{{.+}} : $ObjCClass, #ObjCClass.implicitlyObjC!1.foreign
   obj.implicitlyObjC()
 
@@ -24,7 +24,7 @@ func testClass(#obj: ObjCClass) {
 }
 
 // SIL: sil hidden @_TF4objc15testNativeClassFT3objC8def_objc12NonObjCClass_T_ : $@convention(thin) (@owned NonObjCClass) -> () {
-func testNativeClass(#obj: NonObjCClass) {
+func testNativeClass(obj obj: NonObjCClass) {
   // SIL: = class_method [volatile] %{{.+}} : $NonObjCClass, #NonObjCClass.doSomething!1.foreign
   // SIL: = class_method [volatile] %{{.+}} : $NonObjCClass, #NonObjCClass.objcMethod!1.foreign
   obj.doSomething()

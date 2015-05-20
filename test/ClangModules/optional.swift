@@ -30,7 +30,7 @@ class A {
 // CHECK:      bb3([[T0:%.*]] : $Optional<NSString>):
 // CHECK-NEXT: autorelease_return [[T0]]
 
-  @objc func bar(#x : String?) {}
+  @objc func bar(x x : String?) {}
 // CHECK-LABEL:    sil hidden @_TToFC8optional1A3barfS0_FT1xGSqSS__T_ : $@convention(objc_method) (Optional<NSString>, A) -> ()
 // CHECK:      [[T1:%.*]] = select_enum %0
 // CHECK-NEXT: cond_br [[T1]]

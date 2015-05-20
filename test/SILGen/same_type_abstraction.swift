@@ -17,6 +17,6 @@ func callClosureWithConcreteTypes<
   T: Associated, U: Associated
   where
   T.Assoc == S1, U.Assoc == S2
->(#x: Abstracted<T, U>, #arg: S1) -> S2 {
+>(x x: Abstracted<T, U>, arg: S1) -> S2 {
   return x.closure(arg)
 }

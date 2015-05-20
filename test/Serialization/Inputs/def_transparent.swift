@@ -1,4 +1,4 @@
-@transparent public func testTransparent(#x: Bool) -> Bool {
+@transparent public func testTransparent(x x: Bool) -> Bool {
   return x
 }
 
@@ -8,13 +8,13 @@
   return y
 }
 
-@transparent public func standalone_function(#x: Int32, #y: Int32) -> Int32 {
+@transparent public func standalone_function(x x: Int32, y: Int32) -> Int32 {
   return x
 }
-@transparent public func curried_function(#x: Int32)(y: Int32) -> Int32 {
+@transparent public func curried_function(x x: Int32)(y: Int32) -> Int32 {
   return standalone_function(x: x, y: y)
 }
-@transparent public func calls(#i: Int32, #j: Int32) {
+@transparent public func calls(i i: Int32, j: Int32) {
   var f1 = curried_function(x: i)
   f1(y: j);
 }
@@ -43,7 +43,7 @@ public enum MaybePair {
   case Right(String)
   case Both(Int32, String)
 }
-public func do_switch(#u: MaybePair) {
+public func do_switch(u u: MaybePair) {
   switch u {
   case .Neither:
     a()
@@ -91,7 +91,7 @@ public protocol CP : class {
 }
 
 @transparent public
-func open_existentials(#p: P, #cp: CP) {
+func open_existentials(p p: P, cp: CP) {
   p.f()
   cp.f()
 }

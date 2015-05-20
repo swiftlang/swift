@@ -39,9 +39,9 @@ var readonly: Foo {
   }
 }
 
-func bar(inout #x: Foo) {}
-func bas(inout #x: Foo)(inout y: Foo) {}
-func zim(inout #x: Foo)(inout y: Foo) -> (inout z: Foo) -> () {
+func bar(inout x x: Foo) {}
+func bas(inout x x: Foo)(inout y: Foo) {}
+func zim(inout x x: Foo)(inout y: Foo) -> (inout z: Foo) -> () {
   return { (inout z: Foo) in }
 }
 
@@ -102,7 +102,7 @@ zim(x: &x)(y: &y)(z: &z)
 // CHECK: [[SET_Z:%.*]] = function_ref @_TF9writebacks1zVS_3Foo : $@convention(thin) (Foo) -> ()
 // CHECK: apply [[SET_Z]]({{%.*}}) : $@convention(thin) (Foo) -> ()
 
-func zang(#x: Foo) {}
+func zang(x x: Foo) {}
 
 // No writeback for pass-by-value argument
 zang(x: x)
@@ -137,7 +137,7 @@ var addressOnly: Fungible {
   set {}
 }
 
-func funge(inout #x: Fungible) {}
+func funge(inout x x: Fungible) {}
 
 funge(x: &addressOnly)
 // CHECK: [[FUNGE:%.*]] = function_ref @_TF9writeback5fungeFT1xRPS_8Fungible__T_ : $@convention(thin) (@inout Fungible) -> ()
@@ -167,7 +167,7 @@ protocol Frobable {
 // CHECK-LABEL: sil hidden @_TF9writeback12test_genericuRq_S_8Runcible_FT5runceRq_4anseqqq_S0_4FrobS_8Frobable4Anse_T_ 
 // CHECK:         witness_method $Runce, #Runcible.frob!materializeForSet.1
 // CHECK:         witness_method $Runce.Frob, #Frobable.anse!setter.1
-func test_generic<Runce: Runcible>(inout #runce: Runce, #anse: Runce.Frob.Anse) {
+func test_generic<Runce: Runcible>(inout runce runce: Runce, anse: Runce.Frob.Anse) {
   runce.frob.anse = anse
 }
 
@@ -185,7 +185,7 @@ func loadAddressOnly() -> Fungible {
 // CHECK:         witness_method $Runce.Frob, #Frobable.anse!getter.1
 // CHECK-NOT:     witness_method $Runce.Frob, #Frobable.anse!setter.1
 // CHECK-NOT:     witness_method $Runce, #Runcible.frob!setter.1
-func loadMember<Runce: Runcible>(#runce: Runce) -> Runce.Frob.Anse {
+func loadMember<Runce: Runcible>(runce runce: Runce) -> Runce.Frob.Anse {
   return runce.frob.anse
 }
 

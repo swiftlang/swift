@@ -21,9 +21,9 @@ func Pročprostěnemluvíčesky() { }
 // non-variadic tuples.
 
 // CHECK-LABEL: sil hidden @_TF8mangling9r13757744FT1xGSaSi__T_
-func r13757744(#x: [Int]) {}
+func r13757744(x x: [Int]) {}
 // CHECK-LABEL: sil hidden @_TF8mangling9r13757744Ft1xGSaSi__T_
-func r13757744(#x: Int...) {}
+func r13757744(x x: Int...) {}
 
 // <rdar://problem/13757750> Prefix, postfix, and infix operators need
 // distinct manglings.
@@ -54,7 +54,7 @@ func «+»(a: Int, b: Int) -> Int { return a + b }
 // their uncurried private SIL types.
 // CHECK-LABEL: sil hidden @_TF8mangling7curriedfT1aSi_FT1bSS_T_ : $@convention(thin) (@owned String, Int) -> ()
 // CHECK-LABEL: sil shared @_TF8mangling7curriedFT1aSi_FT1bSS_T_ : $@convention(thin) (Int) -> @owned @callee_owned (@owned String) -> ()
-func curried(#a: Int)(b: String) {}
+func curried(a a: Int)(b: String) {}
 _ = curried(a: 1)
 
 protocol Foo {}
@@ -80,21 +80,21 @@ class Zim<T> {
 
 // Don't crash mangling single-protocol "composition" types.
 // CHECK-LABEL: sil hidden @_TF8mangling27single_protocol_compositionFT1xPS_3Foo__T_
-func single_protocol_composition(#x: protocol<Foo>) {}
+func single_protocol_composition(x x: protocol<Foo>) {}
 
 // Clang-imported classes and protocols get mangled into a magic 'So' context
 // to make collisions into link errors. <rdar://problem/14221244>
 // CHECK-LABEL: sil hidden @_TF8mangling28uses_objc_class_and_protocolFT1oCSo8NSObject1pPSo8NSAnsing__T_
-func uses_objc_class_and_protocol(#o: NSObject, #p: NSAnsing) {}
+func uses_objc_class_and_protocol(o o: NSObject, p: NSAnsing) {}
 
 // Clang-imported structs get mangled using their Clang module name.
 // FIXME: Temporarily mangles everything into the virtual module __C__
 // <rdar://problem/14221244>
 // CHECK-LABEL: sil hidden @_TF8mangling17uses_clang_structFT1rVSC6NSRect_T_
-func uses_clang_struct(#r: NSRect) {}
+func uses_clang_struct(r r: NSRect) {}
 
 // CHECK-LABEL: sil hidden @_TF8mangling14uses_optionalsFT1xGSqSi__GSqSc_
-func uses_optionals(#x: Int?) -> UnicodeScalar? { return Optional() }
+func uses_optionals(x x: Int?) -> UnicodeScalar? { return Optional() }
 
 enum GenericUnion<T> {
   // CHECK-LABEL: sil hidden [transparent] @_TFO8mangling12GenericUnion3FoourfMGS0_q__FSiGS0_q__
@@ -113,9 +113,9 @@ struct HasVarInit {
 // function type.
 
 // CHECK-LABEL: sil hidden @_TF8mangling19autoClosureOverloadFT1fKT_Si_T_ : $@convention(thin) (@owned @callee_owned () -> Int) -> () {
-func autoClosureOverload(@autoclosure #f: () -> Int) {}
+func autoClosureOverload(@autoclosure f f: () -> Int) {}
 // CHECK-LABEL: sil hidden @_TF8mangling19autoClosureOverloadFT1fFT_Si_T_ : $@convention(thin) (@owned @callee_owned () -> Int) -> () {
-func autoClosureOverload(#f: () -> Int) {}
+func autoClosureOverload(f f: () -> Int) {}
 
 // CHECK-LABEL: sil hidden @_TF8mangling24autoClosureOverloadCallsFT_T_ : $@convention(thin) () -> () {
 func autoClosureOverloadCalls() {

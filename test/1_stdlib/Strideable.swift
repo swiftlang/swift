@@ -44,7 +44,7 @@ StrideTestSuite.test("Double") {
 }
 
 StrideTestSuite.test("HalfOpen") {
-  func check(from start: Int, to end: Int, by stepSize: Int, #sum: Int) {
+  func check(from start: Int, to end: Int, by stepSize: Int, sum: Int) {
     // Work on Ints
     expectEqual(
       sum,
@@ -69,7 +69,7 @@ StrideTestSuite.test("HalfOpen") {
 }
 
 StrideTestSuite.test("Closed") {
-  func check(from start: Int, through end: Int, by stepSize: Int, #sum: Int) {
+  func check(from start: Int, through end: Int, by stepSize: Int, sum: Int) {
     // Work on Ints
     expectEqual(
       sum,

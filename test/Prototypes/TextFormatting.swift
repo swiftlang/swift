@@ -180,7 +180,7 @@ struct _formatArgs {
   var radix: Int, fill: String, width: Int
 }
 
-func format(#radix: Int = 10, fill: String = " ", width: Int = 0) -> _formatArgs {
+func format(radix radix: Int = 10, fill: String = " ", width: Int = 0) -> _formatArgs {
   return _formatArgs(radix: radix, fill: fill, width: width)
 }
 

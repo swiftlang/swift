@@ -90,7 +90,7 @@ var xy = (f1, f2)
 
 var yx = (y:f1, x:f2)
 
-func sub(#x: Int, #y: Int) -> Int { return x - y }
+func sub(x x: Int, y: Int) -> Int { return x - y }
 
 sub(x:1, y:2) // CHECK: Int = -1
 sub(x:f1, y:f2) // CHECK: Foo = -1
@@ -197,7 +197,7 @@ var _ : ([Int]).Type = [4].dynamicType
 // CHECK: : ([Int]).Type
 var _ : (Int -> Int)? = .None
 // CHECK: : (Int -> Int)?
-func chained(#f: Int -> ()) -> Int { return 0 }
+func chained(f f: Int -> ()) -> Int { return 0 }
 chained
 // CHECK: : (f: Int -> ()) -> Int
 [chained]

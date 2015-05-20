@@ -6,27 +6,27 @@
 struct YYY<T> {
   init(t : T) {m_t = t}
   mutating
-  func AAA9(#t : T) -> Int { return AAA8(t: t)}
+  func AAA9(t t : T) -> Int { return AAA8(t: t)}
   mutating
-  func AAA8(#t : T) -> Int { return AAA7(t: t)}
+  func AAA8(t t : T) -> Int { return AAA7(t: t)}
   mutating
-  func AAA7(#t : T) -> Int { return AAA6(t: t)}
+  func AAA7(t t : T) -> Int { return AAA6(t: t)}
   mutating
-  func AAA6(#t : T) -> Int { return AAA5(t: t)}
+  func AAA6(t t : T) -> Int { return AAA5(t: t)}
   mutating
-  func AAA5(#t : T) -> Int { return AAA4(t: t)}
+  func AAA5(t t : T) -> Int { return AAA4(t: t)}
   mutating
-  func AAA4(#t : T) -> Int { return AAA3(t: t)}
+  func AAA4(t t : T) -> Int { return AAA3(t: t)}
   mutating
-  func AAA3(#t : T) -> Int { return AAA2(t: t)}
+  func AAA3(t t : T) -> Int { return AAA2(t: t)}
   mutating
-  func AAA2(#t : T) -> Int { return AAA1(t: t)}
+  func AAA2(t t : T) -> Int { return AAA1(t: t)}
   mutating
-  func AAA1(#t : T) -> Int { return AAA0(t: t)}
+  func AAA1(t t : T) -> Int { return AAA0(t: t)}
   mutating
-  func AAA0(#t : T) -> Int { return foo(t: t)}
+  func AAA0(t t : T) -> Int { return foo(t: t)}
   mutating
-  func foo(#t : T) -> Int {m_t = t; return 4}
+  func foo(t t : T) -> Int {m_t = t; return 4}
   var m_t : T
 }
 

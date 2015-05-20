@@ -5,15 +5,15 @@
 
 protocol Pingable {
   typealias Tp
-  func ping(#x : Tp) -> Tp
+  func ping(x x : Tp) -> Tp
 
 }
 
 class Foo<T> : Pingable {
-  func ping(#x : T) -> T { return x }
+  func ping(x x : T) -> T { return x }
 }
 
-func main_func<T>(#In : T) {
+func main_func<T>(In In : T) {
   var x = Foo<T>()
   x.ping(x: In)
 }

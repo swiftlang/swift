@@ -6,7 +6,7 @@ func inoutWithCallerSideDefaults(inout x: Int, y: Int = __LINE__) {}
 func scalarWithDefaults(x: Int, y: Int = 0, z: Int = 0) {}
 func scalarWithCallerSideDefaults(x: Int, y: Int = __LINE__) {}
 
-func tupleWithDefaults(#x: (Int, Int), y: Int = 0, z: Int = 0) {}
+func tupleWithDefaults(x x: (Int, Int), y: Int = 0, z: Int = 0) {}
 
 func variadicFirst(x: Int...) {}
 func variadicSecond(x: Int, _ y: Int...) {}

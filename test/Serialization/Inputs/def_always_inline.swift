@@ -1,4 +1,4 @@
-@inline(__always) public func testAlwaysInline(#x: Bool) -> Bool {
+@inline(__always) public func testAlwaysInline(x x: Bool) -> Bool {
   return x
 }
 
