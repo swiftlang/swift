@@ -1187,3 +1187,13 @@ class ThrowingInitializer {
   }
 }
 
+class DerivedThrowingInitializer : ThrowingInitializer {
+  var property2: Int?
+
+  override init() throws {
+    // expected-note @+1 {{super.init must be called before throwing}}
+    property2 = try throwAndReturnsInt()  // expected-error {{all stored properties of a class instance must be initialized before throwing from an initializer}}
+
+    try super.init()
+  }
+}

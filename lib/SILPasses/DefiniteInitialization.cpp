@@ -1362,11 +1362,13 @@ void LifetimeChecker::processNonTrivialRelease(unsigned ReleaseID) {
       }
     }
 
+    // Determine if this early exit is because of 'throw' or 'return nil'.
+    bool isThrow = isa<ThrowInst>(Release->getParent()->getTerminator());
 
     // All members must be initialized (including the base class, if
     // present).
     diagnose(Module, loc, diag::object_not_fully_initialized_before_failure,
-             isa<ThrowInst>(Release->getParent()->getTerminator()));
+             isThrow);
     
     // Note each of the members that isn't initialized.
     DIMemoryUse Use(Release, DIUseKind::Load, 0, TheMemory.NumElements);
@@ -1376,7 +1378,7 @@ void LifetimeChecker::processNonTrivialRelease(unsigned ReleaseID) {
     // then report on failure to call super.init as well.
     if (TheMemory.isAnyDerivedClassSelf() &&
         Availability.get(Availability.size()-1) != DIKind::Yes)
-      diagnose(Module, loc, diag::must_call_super_init_failable_init);
+      diagnose(Module, loc, diag::must_call_super_init_failable_init, isThrow);
   }
 
   // If it is all 'no' then we can handle is specially without conditional code.
