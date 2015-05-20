@@ -1290,6 +1290,9 @@ Pattern *Traversal::visitIsPattern(IsPattern *P) {
       return nullptr;
     }
   }
+  if (!P->isImplicit() && P->getCastTypeLoc().getTypeRepr())
+    if (doIt(P->getCastTypeLoc().getTypeRepr()))
+      return nullptr;
   return P;
 }
 

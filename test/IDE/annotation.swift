@@ -288,3 +288,7 @@ func testPH(x: Int) {}
 func testPH(x: AliasPH) {}
 // CHECK: <Func@[[@LINE-1]]:6>testPH</Func>(<#T##x: AliasPH##AliasPH##C12#>)
 testPH(<#T##x: AliasPH##AliasPH##C12#>)
+
+class NumberTooLarge {}
+// CHECK: guard case let <Var>error</Var> as <Class@[[@LINE-1]]:7>NumberTooLarge</Class> = <Ctor@[[@LINE-1]]:7-Class@[[@LINE-1]]:7>NumberTooLarge</Ctor>() else {}
+guard case let error as NumberTooLarge = NumberTooLarge() else {}
