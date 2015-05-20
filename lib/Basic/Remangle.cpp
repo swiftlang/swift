@@ -909,8 +909,11 @@ void Remangler::mangleEntityType(Node *node, EntityContext &ctx) {
   case Node::Kind::FunctionType:
   case Node::Kind::UncurriedFunctionType: {
     Out << (node->getKind() == Node::Kind::FunctionType ? 'F' : 'f');
-    mangle(node->begin()[0].get());
-    auto returnType = node->begin()[1].get();
+    unsigned inputIndex = node->getNumChildren() - 2;
+    assert(inputIndex <= 1);
+    for (unsigned i = 0; i <= inputIndex; ++i)
+      mangle(node->begin()[i].get());
+    auto returnType = node->begin()[inputIndex+1].get();
     assert(returnType->getKind() == Node::Kind::ReturnType);
     assert(returnType->getNumChildren() == 1);
     mangleEntityType(returnType->begin()[0].get(), ctx);

@@ -524,7 +524,7 @@ func testRequireExprPattern(a : Int) {
   // CHECK: [[M1:%[0-9]+]] = function_ref @_TF10statements8marker_1FT_T_ : $@convention(thin) () -> ()
   // CHECK-NEXT: apply [[M1]]() : $@convention(thin) () -> ()
 
-  // CHECK: function_ref static Swift.~= infix : <A where A: Swift.Equatable> (A, A) -> Swift.Bool
+  // CHECK: function_ref static Swift.~= infix <A where A: Swift.Equatable> (A, A) -> Swift.Bool
   // CHECK: cond_br {{.*}}, bb1, bb2
   guard case 4 = a else { marker_2(); return }
 

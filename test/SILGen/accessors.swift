@@ -39,7 +39,7 @@ func test0(ref: A) {
 // CHECK-NEXT: [[T1:%.*]] = apply [[T0]](%0)
 // CHECK-NEXT: store [[T1]] to [[TEMP]]
 // CHECK-NEXT: [[T0:%.*]] = load [[TEMP]]
-// CHECK-NEXT: // function_ref accessors.OrdinarySub.subscript.getter (Swift.Int) -> Swift.Int
+// CHECK-NEXT: // function_ref accessors.OrdinarySub.subscript.getter : (Swift.Int) -> Swift.Int
 // CHECK-NEXT: [[T1:%.*]] = function_ref @_TFV9accessors11OrdinarySubg9subscriptFSiSi
 // CHECK-NEXT: [[VALUE:%.*]] = apply [[T1]]([[INDEX1]], [[T0]])
 // CHECK-NEXT: release_value [[T0]]
@@ -53,7 +53,7 @@ func test0(ref: A) {
 // CHECK-NEXT: [[T4:%.*]] = pointer_to_address [[T3]]
 // CHECK-NEXT: [[OPT_CALLBACK:%.*]] = tuple_extract [[T2]] {{.*}}, 1
 // CHECK-NEXT: [[ADDR:%.*]] = mark_dependence [[T4]] : $*OrdinarySub on %0 : $A
-// CHECK-NEXT: // function_ref accessors.OrdinarySub.subscript.setter (Swift.Int) -> Swift.Int
+// CHECK-NEXT: // function_ref accessors.OrdinarySub.subscript.setter : (Swift.Int) -> Swift.Int
 // CHECK-NEXT: [[T0:%.*]] = function_ref @_TFV9accessors11OrdinarySubs9subscriptFSiSi
 // CHECK-NEXT: apply [[T0]]([[VALUE]], [[INDEX0]], [[ADDR]])
 // CHECK-NEXT: switch_enum [[OPT_CALLBACK]] : $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout A, @thick A.Type) -> ()>, case #Optional.Some!enumelt.1: [[WRITEBACK:bb[0-9]+]], case #Optional.None!enumelt: [[CONT:bb[0-9]+]]
@@ -108,7 +108,7 @@ func test1(ref: B) {
 // CHECK-NEXT: [[T4:%.*]] = pointer_to_address [[T3]]
 // CHECK-NEXT: [[OPT_CALLBACK:%.*]] = tuple_extract [[T2]] {{.*}}, 1
 // CHECK-NEXT: [[ADDR:%.*]] = mark_dependence [[T4]] : $*MutatingSub on %0 : $B
-// CHECK-NEXT: // function_ref accessors.MutatingSub.subscript.getter (Swift.Int) -> Swift.Int
+// CHECK-NEXT: // function_ref accessors.MutatingSub.subscript.getter : (Swift.Int) -> Swift.Int
 // CHECK-NEXT: [[T0:%.*]] = function_ref @_TFV9accessors11MutatingSubg9subscriptFSiSi : $@convention(method) (Int, @inout MutatingSub) -> Int 
 // CHECK-NEXT: [[VALUE:%.*]] = apply [[T0]]([[INDEX1]], [[ADDR]])
 // CHECK-NEXT: switch_enum [[OPT_CALLBACK]] : $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout B, @thick B.Type) -> ()>, case #Optional.Some!enumelt.1: [[WRITEBACK:bb[0-9]+]], case #Optional.None!enumelt: [[CONT:bb[0-9]+]]
@@ -131,7 +131,7 @@ func test1(ref: B) {
 // CHECK-NEXT: [[T4:%.*]] = pointer_to_address [[T3]]
 // CHECK-NEXT: [[OPT_CALLBACK:%.*]] = tuple_extract [[T2]] {{.*}}, 1
 // CHECK-NEXT: [[ADDR:%.*]] = mark_dependence [[T4]] : $*MutatingSub on %0 : $B
-// CHECK-NEXT: // function_ref accessors.MutatingSub.subscript.setter (Swift.Int) -> Swift.Int
+// CHECK-NEXT: // function_ref accessors.MutatingSub.subscript.setter : (Swift.Int) -> Swift.Int
 // CHECK-NEXT: [[T0:%.*]] = function_ref @_TFV9accessors11MutatingSubs9subscriptFSiSi : $@convention(method) (Int, Int, @inout MutatingSub) -> () 
 // CHECK-NEXT: apply [[T0]]([[VALUE]], [[INDEX0]], [[ADDR]])
 // CHECK-NEXT: switch_enum [[OPT_CALLBACK]] : $Optional<@convention(thin) (Builtin.RawPointer, inout Builtin.UnsafeValueBuffer, inout B, @thick B.Type) -> ()>, case #Optional.Some!enumelt.1: [[WRITEBACK:bb[0-9]+]], case #Optional.None!enumelt: [[CONT:bb[0-9]+]]

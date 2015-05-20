@@ -439,12 +439,12 @@ public class Sub : Base {
 // CHECK-LABEL: sil_vtable Foo {
 // CHECK-LABEL:   #Foo.init!initializer.1:   _TFC7dynamic3FoocfMS0_FT6nativeSi_S0_        // dynamic.Foo.init (dynamic.Foo.Type)(native : Swift.Int) -> dynamic.Foo
 // CHECK-LABEL:   #Foo.nativeMethod!1:       _TFC7dynamic3Foo12nativeMethodfS0_FT_T_  // dynamic.Foo.nativeMethod (dynamic.Foo)() -> ()
-// CHECK-LABEL:   #Foo.subscript!getter.1:   _TFC7dynamic3Foog9subscriptFT6nativeSi_Si    // dynamic.Foo.subscript.getter (native : Swift.Int) -> Swift.Int
-// CHECK-LABEL:   #Foo.subscript!setter.1:   _TFC7dynamic3Foos9subscriptFT6nativeSi_Si    // dynamic.Foo.subscript.setter (native : Swift.Int) -> Swift.Int
+// CHECK-LABEL:   #Foo.subscript!getter.1:   _TFC7dynamic3Foog9subscriptFT6nativeSi_Si    // dynamic.Foo.subscript.getter : (native : Swift.Int) -> Swift.Int
+// CHECK-LABEL:   #Foo.subscript!setter.1:   _TFC7dynamic3Foos9subscriptFT6nativeSi_Si    // dynamic.Foo.subscript.setter : (native : Swift.Int) -> Swift.Int
 // CHECK-LABEL:   #Foo.init!initializer.1:   _TFC7dynamic3FoocfMS0_FT4objcSi_S0_  // dynamic.Foo.init (dynamic.Foo.Type)(objc : Swift.Int) -> dynamic.Foo
 // CHECK-LABEL:   #Foo.objcMethod!1:         _TFC7dynamic3Foo10objcMethodfS0_FT_T_      // dynamic.Foo.objcMethod (dynamic.Foo)() -> ()
-// CHECK-LABEL:   #Foo.subscript!getter.1: _TFC7dynamic3Foog9subscriptFT4objcPSs9AnyObject__Si // dynamic.Foo.subscript.getter (objc : Swift.AnyObject) -> Swift.Int
-// CHECK-LABEL:   #Foo.subscript!setter.1: _TFC7dynamic3Foos9subscriptFT4objcPSs9AnyObject__Si // dynamic.Foo.subscript.setter (objc : Swift.AnyObject) -> Swift.Int
+// CHECK-LABEL:   #Foo.subscript!getter.1: _TFC7dynamic3Foog9subscriptFT4objcPSs9AnyObject__Si // dynamic.Foo.subscript.getter : (objc : Swift.AnyObject) -> Swift.Int
+// CHECK-LABEL:   #Foo.subscript!setter.1: _TFC7dynamic3Foos9subscriptFT4objcPSs9AnyObject__Si // dynamic.Foo.subscript.setter : (objc : Swift.AnyObject) -> Swift.Int
 // CHECK-NOT:     dynamic.Foo.init (dynamic.Foo.Type)(dynamic : Swift.Int) -> dynamic.Foo
 // CHECK-NOT:     dynamic.Foo.dynamicMethod
 // CHECK-NOT:     dynamic.Foo.subscript.getter (dynamic : Swift.Int) -> Swift.Int

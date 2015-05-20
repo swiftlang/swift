@@ -1783,17 +1783,7 @@ private:
       return demangleFunctionType(Node::Kind::FunctionType);
     }
     if (c == 'f') {
-      NodePointer in_args = demangleTypeImpl();
-      if (!in_args)
-        return nullptr;
-      NodePointer out_args = demangleType();
-      if (!out_args)
-        return nullptr;
-      NodePointer block =
-          NodeFactory::create(Node::Kind::UncurriedFunctionType);
-      block->addChild(in_args);
-      block->addChild(postProcessReturnTypeNode(out_args));
-      return block;
+      return demangleFunctionType(Node::Kind::UncurriedFunctionType);
     }
     if (c == 'G') {
       NodePointer unboundType = demangleType();
@@ -2210,24 +2200,6 @@ private:
     return nullptr;
   }
 
-  bool typeNeedsColonForDecl(NodePointer type) {
-    if (!type)
-      return false;
-    if (!type->hasChildren())
-      return false;
-    NodePointer child = type->getChild(0);
-    Node::Kind child_kind = child->getKind();
-    switch (child_kind) {
-    case Node::Kind::UncurriedFunctionType:
-    case Node::Kind::FunctionType:
-      return false;
-    case Node::Kind::GenericType:
-      return typeNeedsColonForDecl(getFirstChildOfKind(type, Node::Kind::UncurriedFunctionType));
-    default:
-      return true;
-    }
-  }
-  
   void printBoundGenericNoSugar(NodePointer pointer) {
     if (pointer->getNumChildren() < 2)
       return;
@@ -2509,6 +2481,22 @@ private:
     }
   }
 
+  void printSimplifiedEntityType(NodePointer context, NodePointer entityType);
+
+  void printFunctionType(NodePointer node) {
+    assert(node->getNumChildren() == 2 || node->getNumChildren() == 3);
+    unsigned startIndex = 0;
+    bool throws = false;
+    if (node->getNumChildren() == 3) {
+      assert(node->getChild(0)->getKind() == Node::Kind::ThrowsAnnotation);
+      startIndex++;
+      throws = true;
+    }
+    print(node->getChild(startIndex));
+    if (throws) Printer << " throws";
+    print(node->getChild(startIndex+1));
+  }
+
   void printImplFunctionType(NodePointer fn) {
     enum State { Attrs, Inputs, Results } curState = Attrs;
     auto transitionTo = [&](State newState) {
@@ -2648,6 +2636,97 @@ static bool isClassType(NodePointer pointer) {
   return pointer->getKind() == Node::Kind::Class;
 }
 
+static bool useColonForEntityType(NodePointer entity, NodePointer type) {
+  switch (entity->getKind()) {
+  case Node::Kind::Variable:
+  case Node::Kind::Initializer:
+  case Node::Kind::DefaultArgumentInitializer:
+  case Node::Kind::IVarInitializer:
+  case Node::Kind::Class:
+  case Node::Kind::Structure:
+  case Node::Kind::Enum:
+  case Node::Kind::Protocol:
+  case Node::Kind::TypeAlias:
+  case Node::Kind::OwningAddressor:
+  case Node::Kind::OwningMutableAddressor:
+  case Node::Kind::NativeOwningAddressor:
+  case Node::Kind::NativeOwningMutableAddressor:
+  case Node::Kind::NativePinningAddressor:
+  case Node::Kind::NativePinningMutableAddressor:
+  case Node::Kind::UnsafeAddressor:
+  case Node::Kind::UnsafeMutableAddressor:
+  case Node::Kind::GlobalGetter:
+  case Node::Kind::Getter:
+  case Node::Kind::Setter:
+  case Node::Kind::MaterializeForSet:
+  case Node::Kind::WillSet:
+  case Node::Kind::DidSet:
+    return true;
+
+  case Node::Kind::Subscript:
+  case Node::Kind::Function:
+  case Node::Kind::ExplicitClosure:
+  case Node::Kind::ImplicitClosure:
+  case Node::Kind::Allocator:
+  case Node::Kind::Constructor:
+  case Node::Kind::Destructor:
+  case Node::Kind::Deallocator:
+  case Node::Kind::IVarDestroyer: {
+    // We expect to see a function type here, but if we don't, use the colon.
+    type = type->getChild(0);
+    while (type->getKind() == Node::Kind::GenericType ||
+           type->getKind() == Node::Kind::DependentGenericType)
+      type = type->getChild(1)->getChild(0);
+    return (type->getKind() != Node::Kind::FunctionType &&
+            type->getKind() != Node::Kind::UncurriedFunctionType &&
+            type->getKind() != Node::Kind::CFunctionPointer &&
+            type->getKind() != Node::Kind::ThinFunctionType);
+  }
+
+  default:
+    unreachable("not an entity");
+  }
+}
+
+static bool isMethodContext(const NodePointer &context) {
+  switch (context->getKind()) {
+  case Node::Kind::Structure:
+  case Node::Kind::Enum:
+  case Node::Kind::Class:
+  case Node::Kind::Protocol:
+  case Node::Kind::Extension:
+    return true;
+  default:
+    return false;
+  }
+}
+
+/// Perform any desired type simplifications for an entity in Simplified mode.
+void NodePrinter::printSimplifiedEntityType(NodePointer context,
+                                            NodePointer entityType) {
+  // Only do anything special to methods.
+  if (!isMethodContext(context)) return print(entityType);
+
+  // Strip off a single level of uncurried function type.
+  NodePointer type = entityType;
+  assert(type->getKind() == Node::Kind::Type);
+  type = type->getChild(0);
+
+  NodePointer generics;
+  if (type->getKind() == Node::Kind::GenericType ||
+      type->getKind() == Node::Kind::DependentGenericType) {
+    generics = type->getChild(0);
+    type = type->getChild(1)->getChild(0);
+  }
+
+  if (type->getKind() == Node::Kind::UncurriedFunctionType) {
+    if (generics) print(generics);
+    print(type->getChild(type->getNumChildren() - 1)->getChild(0));
+  } else {
+    print(entityType);
+  }
+}
+
 void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) {
   // Common code for handling entities.
   auto printEntity = [&](bool hasName, bool hasType, StringRef extraName) {
@@ -2663,12 +2742,15 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
 
     if (printType) {
       NodePointer type = pointer->getChild(1 + unsigned(hasName));
-      if (typeNeedsColonForDecl(type))
+      if (useColonForEntityType(pointer, type)) {
         Printer << " : ";
-      else
-        if (!Options.Simplified)
-          Printer << " ";
-      print(type);
+        print(type);
+      } else if (Options.Simplified) {
+        printSimplifiedEntityType(pointer->getChild(0), type);
+      } else {
+        Printer << " ";
+        print(type);
+      }
     }
 
     if (useParens) Printer << ')';      
@@ -2761,27 +2843,19 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     return;
   case Node::Kind::AutoClosureType:
     Printer << "@autoclosure ";
-    printChildren(pointer);
+    printFunctionType(pointer);
     return;
   case Node::Kind::ThinFunctionType:
     Printer << "@convention(thin) ";
-    printChildren(pointer);
+    printFunctionType(pointer);
     return;
   case Node::Kind::FunctionType:
-    printChildren(pointer);
+    printFunctionType(pointer);
     return;
-  case Node::Kind::UncurriedFunctionType: {
-    if (!Options.Simplified) {
-      NodePointer metatype = pointer->getChild(0);
-      Printer << "(";
-      print(metatype);
-      Printer << ")";
-    }
-    NodePointer real_func = pointer->getChild(1);
-    real_func = real_func->getChild(0);
-    printChildren(real_func);
+  case Node::Kind::UncurriedFunctionType:
+    print(pointer->getChild(0));
+    print(pointer->getChild(1)->getChild(0));
     return;
-  }
   case Node::Kind::ArgumentTuple: {
     bool need_parens = false;
     if (pointer->getNumChildren() > 1)
@@ -3103,18 +3177,12 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     return;
   case Node::Kind::CFunctionPointer: {
     Printer << "@convention(c) ";
-    NodePointer tuple = pointer->getChild(0);
-    NodePointer rettype = pointer->getChild(1);
-    print(tuple);
-    print(rettype);
+    printFunctionType(pointer);
     return;
   }
   case Node::Kind::ObjCBlock: {
     Printer << "@convention(block) ";
-    NodePointer tuple = pointer->getChild(0);
-    NodePointer rettype = pointer->getChild(1);
-    print(tuple);
-    print(rettype);
+    printFunctionType(pointer);
     return;
   }
   case Node::Kind::Metatype: {

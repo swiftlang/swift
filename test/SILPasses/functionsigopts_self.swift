@@ -23,7 +23,7 @@ extension C {
 // function signature specialization <Arg[0] = Dead> of static functionsigopts_self.C.factory (functionsigopts_self.C.Type)(Swift.Int) -> Self
 // CHECK-LABEL: sil hidden @_TTSf4d_n___TZFC20functionsigopts_self1C7factoryfMS0_FSiDS0_ : $@convention(thin) (@thick C.Type) -> @owned C
 // CHECK-NEXT: bb0(%0 : $@thick C.Type):
-// CHECK: function_ref functionsigopts_self.gen : <A> () -> A
+// CHECK: function_ref functionsigopts_self.gen <A> () -> A
 // CHECK: apply %{{[0-9]+}}<Self>
 
 // Call the function so the specialization is not dead.

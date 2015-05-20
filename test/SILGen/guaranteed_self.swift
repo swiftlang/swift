@@ -416,7 +416,7 @@ func AO_curryThunk<T>(ao: AO<T>) -> (AO<T> -> Int -> ()/*, Int -> ()*/) {
 // CHECK: [[GUARANTEED_COPY:%.*]] = load [[GUARANTEED_COPY_STACK_SLOT]]#1
 // CHECK: [[TRANSLATION_STACK_SLOT:%.*]] = alloc_stack $FakeArray
 // CHECK: store [[GUARANTEED_COPY]] to [[TRANSLATION_STACK_SLOT:%.*]]#1
-// CHECK: function_ref guaranteed_self.SequenceDefaultsType._constrainElement : <A where A: guaranteed_self.SequenceDefaultsType> (A)(guaranteed_self.FakeElement) -> ()
+// CHECK: function_ref guaranteed_self.SequenceDefaultsType._constrainElement <A where A: guaranteed_self.SequenceDefaultsType> (A)(guaranteed_self.FakeElement) -> ()
 // CHECK: [[FUN:%.*]] = function_ref @_{{.*}}
 // CHECK: apply [[FUN]]<FakeArray, FakeElement, FakeGenerator, FakeElement>([[ARG0]], [[TRANSLATION_STACK_SLOT]]#1)
 // CHECK: destroy_addr [[TRANSLATION_STACK_SLOT]]#1

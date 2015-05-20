@@ -261,7 +261,7 @@ struct ConformsWithMoreGeneric : X, Y {
   // CHECK-NEXT:    %2 = alloc_stack $A2
   // CHECK-NEXT:    store %0 to %2#1 : $*A2
   // CHECK-NEXT:    %4 = alloc_stack $A2
-  // CHECK-NEXT:    // function_ref witnesses.ConformsWithMoreGeneric.classes : <A> (inout witnesses.ConformsWithMoreGeneric)(x : A) -> A
+  // CHECK-NEXT:    // function_ref witnesses.ConformsWithMoreGeneric.classes <A> (inout witnesses.ConformsWithMoreGeneric)(x : A) -> A
   // CHECK-NEXT:    %5 = function_ref @_TFV9witnesses23ConformsWithMoreGeneric7classesurfRS0_FT1xq__q_ : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @inout ConformsWithMoreGeneric) -> ()
   // CHECK-NEXT:    %6 = apply %5<A2>(%4#1, %2#1, %1) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @inout ConformsWithMoreGeneric) -> ()
   // CHECK-NEXT:    %7 = load %4#1 : $*A2

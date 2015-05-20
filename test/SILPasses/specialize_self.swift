@@ -2,7 +2,7 @@
 
 // CHECK-NOT: generic specialization <Swift.AnyObject, Self> of specialize_self.cast <A, B>(A) -> Swift.Optional<B>
 
-// CHECK-LABEL: specialize_self.cast : <A, B> (A) -> Swift.Optional<B>
+// CHECK-LABEL: specialize_self.cast <A, B> (A) -> Swift.Optional<B>
 // CHECK-NEXT: sil hidden @_TF15specialize_self4castu0_rFq_GSqq0__ : $@convention(thin) <T, R> (@out Optional<R>, @in T) -> ()
 func cast<T,R>(x: T) -> R? {
   return x as? R
