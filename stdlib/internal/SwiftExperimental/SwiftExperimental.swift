@@ -183,3 +183,28 @@ public func ⊉ <
   >(lhs: Set<T>, rhs: S) -> Bool {
   return !lhs.isSupersetOf(rhs)
 }
+
+internal struct _ClosureBasedSequence<Generator : GeneratorType>
+  : SequenceType {
+
+  internal init(_ makeUnderlyingGenerator: () -> Generator) {
+    self._makeUnderlyingGenerator = makeUnderlyingGenerator
+  }
+
+  internal func generate() -> Generator {
+    return _makeUnderlyingGenerator()
+  }
+
+  internal var _makeUnderlyingGenerator: () -> Generator
+}
+
+extension AnySequence {
+  /// Create a sequence whose `generate()` method forwards to
+  /// `makeUnderlyingGenerator`.
+  public init<G : GeneratorType where G.Element == T>(
+    _ makeUnderlyingGenerator: () -> G
+  ) {
+    self.init(_ClosureBasedSequence(makeUnderlyingGenerator))
+  }
+}
+

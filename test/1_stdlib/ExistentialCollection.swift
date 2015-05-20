@@ -12,6 +12,7 @@
 // RUN: %target-run-simple-swift
 
 import StdlibUnittest
+import SwiftExperimental // for AnySequence.init()
 
 var tests = TestSuite("ExistentialCollection")
 
@@ -31,6 +32,18 @@ tests.test("AnyGenerator") {
   let g = anyGenerator { x < 15 ? x++ : nil }
   expectEqual([ 7, 8, 9, 10, 11, 12, 13, 14 ], Array(g))
 }
+
+tests.test("AnyGenerator.init()/traps") {
+  // The assertion that is expected to be triggered by instantiating
+  // AnyGenerator is a _debugPrecondition() and there for will only trigger in
+  // -Onone mode.
+  if _isDebugAssertConfiguration() {
+    expectCrashLater()
+  }
+
+  AnyGenerator<OpaqueValue<Int>>()
+}
+
 
 let initialCallCounts = [
   "successor": 0, "predecessor": 0,
@@ -84,20 +97,56 @@ struct InstrumentedIndex<I : RandomAccessIndexType> : RandomAccessIndexType {
   }
 }
 
-tests.test("Sequence") {
-  let fib = [1, 2, 3, 5, 8, 13, 21]
-  expectEqual(fib, Array(AnySequence(fib)))
-  // AnyGenerator is a Sequence
-  expectEqual(fib, Array(AnySequence(fib).generate()))
-
-  // The assertion that is expected to be triggered by instantiating
-  // AnyGenerator is a _debugPrecondition() and there for will only trigger in
-  // -Onone mode.
-  if _isDebugAssertConfiguration() {
-    expectCrashLater()
+tests.test("AnySequence.init(SequenceType)") {
+  if true {
+    let base = MinimalSequence<OpaqueValue<Int>>([])
+    var s = AnySequence(base)
+    expectType(AnySequence<OpaqueValue<Int>>.self, &s)
+    checkSequence(
+      [],
+      s,
+      { $0.value == $1.value },
+      resiliencyChecks: .none)
   }
+  if true {
+    let intData = [ 1, 2, 3, 5, 8, 13, 21 ]
+    let data = intData.map { OpaqueValue($0) }
+    let base = MinimalSequence(data)
+    var s = AnySequence(base)
+    expectType(AnySequence<OpaqueValue<Int>>.self, &s)
+    checkSequence(
+      data,
+      s,
+      { $0.value == $1.value },
+      resiliencyChecks: .none)
+  }
+}
 
-  let x = AnyGenerator<Int>()
+tests.test("AnySequence.init(() -> Generator)") {
+  if true {
+    var s = AnySequence {
+      return MinimalGenerator<OpaqueValue<Int>>([])
+    }
+    expectType(AnySequence<OpaqueValue<Int>>.self, &s)
+    checkSequence(
+      [],
+      s,
+      { $0.value == $1.value },
+      resiliencyChecks: .none)
+  }
+  if true {
+    let intData = [ 1, 2, 3, 5, 8, 13, 21 ]
+    let data = intData.map { OpaqueValue($0) }
+    var s = AnySequence {
+      return MinimalGenerator(data)
+    }
+    expectType(AnySequence<OpaqueValue<Int>>.self, &s)
+    checkSequence(
+      data,
+      s,
+      { $0.value == $1.value },
+      resiliencyChecks: .none)
+  }
 }
 
 tests.test("ForwardIndex") {
