@@ -1561,7 +1561,7 @@ public func checkSequence<
   _ stackTrace: SourceLocStack,
   collectMoreInfo: (()->String)? = nil
 ) {
-  let expectedCount: Int = numericCast(expected.count())
+  let expectedCount: Int = numericCast(expected.count)
   checkGenerator(
     expected, sequence.generate(), sameValue,
     resiliencyChecks: resiliencyChecks,
@@ -1651,8 +1651,8 @@ public func check${traversal}Collection<
   let expectedArray = Array(expected)
 
   expectEqual(
-    expectedArray.count().toIntMax(),
-    collection.count().toIntMax(),
+    expectedArray.count.toIntMax(),
+    collection.count.toIntMax(),
     stackTrace: stackTrace.withCurrentLoc(),
     collectMoreInfo: collectMoreInfo)
 
@@ -1678,7 +1678,7 @@ public func check${traversal}Collection<
       allIndices.append(i)
     }
 
-    if expectedArray.count() >= 2 {
+    if expectedArray.count >= 2 {
       for i in 0..<allIndices.count-1 {
         let successor1 = allIndices[i].successor()
         var successor2 = allIndices[i]
@@ -1913,7 +1913,7 @@ where
         let growth = newCount - oldCount
         
         let expectedCount = source.count + growth
-        let actualCount = numericCast(a.count()) as Int
+        let actualCount = numericCast(a.count) as Int
         if actualCount != expectedCount {
           reportFailure(
             &a, "\(actualCount) != expected count \(expectedCount)")

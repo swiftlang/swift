@@ -920,7 +920,7 @@ extension String {
 
   /// Returns the number of Unicode characters in the `String`.
   @available(*, unavailable,
-    message="Take the count of a UTF-16 view instead, i.e. str.utf16.count()")
+    message="Take the count of a UTF-16 view instead, i.e. str.utf16.count")
   public var utf16Count: Int {
     return _ns.length
   }

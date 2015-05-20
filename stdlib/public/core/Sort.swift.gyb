@@ -163,7 +163,7 @@ func _introSort<
 %   if p:
   var comp = isOrderedBefore
 %   end
-  let len = range.count().toIntMax()
+  let len = range.count.toIntMax()
   if len < 2 {
     return
   }
@@ -184,7 +184,7 @@ func _introSortImpl<
 ) {
 
   // Insertion sort is better at handling smaller regions.
-  if range.count() < 20 {
+  if range.count < 20 {
     _insertionSort(&elements, range ${", &isOrderedBefore" if p else ""})
     return
   }
@@ -213,8 +213,8 @@ func _siftDown<
   _ range: Range<C.Index> ${"," if p else ""}
   ${"inout _ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
 ) {
-  let countToIndex = (range.startIndex..<index).count()
-  let countFromIndex = (index..<range.endIndex).count()
+  let countToIndex = (range.startIndex..<index).count
+  let countFromIndex = (index..<range.endIndex).count
   // Check if left child is within bounds. If not, return, because there are
   // no children of the given node in the heap.
   if countToIndex + 1 >= countFromIndex {
@@ -254,7 +254,7 @@ func _heapify<
   // We skip the rightmost half of the array, because these nodes don't have
   // any children.
   let root = range.startIndex
-  var node = advance(root, C.Index.Distance(range.count().toIntMax()/2))
+  var node = advance(root, C.Index.Distance(range.count.toIntMax()/2))
   while node-- != root {
     _siftDown(&elements, node, range ${", &isOrderedBefore" if p else ""})
   }

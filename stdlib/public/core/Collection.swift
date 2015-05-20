@@ -13,9 +13,9 @@
 /// Return the number of elements in `x`.
 ///
 /// O(1) if `T.Index` is `RandomAccessIndexType`; O(N) otherwise.
-@available(*, unavailable, message="call the 'count()' method on the collection")
+@available(*, unavailable, message="access the 'count' property on the collection")
 public func count <T : CollectionType>(x: T) -> T.Index.Distance {
-  return x.count()
+  return x.count
 }
 
 public protocol _CollectionDefaultsType
@@ -64,14 +64,14 @@ extension _CollectionDefaultsType {
   ///
   /// - Complexity: O(N).
   final public func underestimateCount() -> Int {
-    return numericCast(count())
+    return numericCast(count)
   }
 
   /// Returns the number of elements.
   ///
   /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndexType`;
   ///   O(N) otherwise.
-  final public func count() -> Index.Distance {
+  final public var count: Index.Distance {
     return distance(startIndex, endIndex)
   }
 
@@ -160,7 +160,7 @@ public protocol CollectionType
   ///
   /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndexType`;
   ///   O(N) otherwise.
-  func count() -> Index.Distance
+  var count: Index.Distance { get }
 
   /// Customization point for `SequenceType.indexOf()`.
   ///
@@ -466,7 +466,7 @@ public func dropLast<
 /// Returns a slice, up to `maxLength` in length, containing the
 /// initial elements of `s`.
 ///
-/// If `maxLength` exceeds `s.count()`, the result contains all
+/// If `maxLength` exceeds `s.count`, the result contains all
 /// the elements of `s`.
 ///
 /// - Complexity: O(1)+K when `S.Index` conforms to
@@ -480,7 +480,7 @@ public func prefix<S: Sliceable>(s: S, _ maxLength: Int) -> S.SubSlice {
 /// Returns a slice, up to `maxLength` in length, containing the
 /// final elements of `s`.
 ///
-/// If `maxLength` exceeds `s.count()`, the result contains all
+/// If `maxLength` exceeds `s.count`, the result contains all
 /// the elements of `s`.
 ///
 /// - Complexity: O(1)+K when `S.Index` conforms to

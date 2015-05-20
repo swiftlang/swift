@@ -832,8 +832,8 @@ NSStringAPIs.test("lastPathComponent") {
 }
 
 NSStringAPIs.test("utf16Count") {
-  expectEqual(1, "a".utf16.count())
-  expectEqual(2, "\u{0001F60A}".utf16.count())
+  expectEqual(1, "a".utf16.count)
+  expectEqual(2, "\u{0001F60A}".utf16.count)
 }
 
 NSStringAPIs.test("lengthOfBytesUsingEncoding(_:)") {
@@ -943,17 +943,17 @@ NSStringAPIs.test("lowercaseStringWithLocale(_:)") {
 NSStringAPIs.test("maximumLengthOfBytesUsingEncoding(_:)") {
   if true {
     let s = "abc"
-    expectLE(s.utf8.count(),
+    expectLE(s.utf8.count,
         s.maximumLengthOfBytesUsingEncoding(NSUTF8StringEncoding))
   }
   if true {
     let s = "abc абв"
-    expectLE(s.utf8.count(),
+    expectLE(s.utf8.count,
         s.maximumLengthOfBytesUsingEncoding(NSUTF8StringEncoding))
   }
   if true {
     let s = "\u{1F60A}"
-    expectLE(s.utf8.count(),
+    expectLE(s.utf8.count,
         s.maximumLengthOfBytesUsingEncoding(NSUTF8StringEncoding))
   }
 }
@@ -1779,7 +1779,7 @@ func checkCharacterComparison(
 
 NSStringAPIs.test("Character.{Equatable,Hashable,Comparable}") {
   for test in comparisonTests {
-    if test.lhs.characters.count() == 1 && test.rhs.characters.count() == 1 {
+    if test.lhs.characters.count == 1 && test.rhs.characters.count == 1 {
       let lhsCharacter = Character(test.lhs)
       let rhsCharacter = Character(test.rhs)
       checkCharacterComparison(

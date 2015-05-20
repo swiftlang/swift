@@ -505,7 +505,7 @@ public func += <
   T, C: CollectionType where C.Generator.Element == T
 > (inout lhs: _ContiguousArrayBuffer<T>, rhs: C) {
   let oldCount = lhs.count
-  let newCount = oldCount + numericCast(rhs.count())
+  let newCount = oldCount + numericCast(rhs.count)
 
   if _fastPath(newCount <= lhs.capacity) {
     lhs.count = newCount
@@ -584,7 +584,7 @@ func _copyCollectionToNativeArrayBuffer<
   C : CollectionType
 >(source: C) -> _ContiguousArrayBuffer<C.Generator.Element>
 {
-  let count: Int = numericCast(source.count())
+  let count: Int = numericCast(source.count)
   if count == 0 {
     return _ContiguousArrayBuffer()
   }

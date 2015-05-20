@@ -191,7 +191,7 @@ tests.test("ForwardCollection") {
   }
   for i in fc0.indices {
     expectNotEqual(fc0.endIndex, i)
-    expectEqual(1, fc0.indices.filter { $0 == i }.count())
+    expectEqual(1, fc0.indices.filter { $0 == i }.count)
   }
 }
 
@@ -219,7 +219,7 @@ tests.test("BidirectionalCollection") {
   }
   for i in bc0.indices {
     expectNotEqual(bc0.endIndex, i)
-    expectEqual(1, bc0.indices.filter { $0 == i }.count())
+    expectEqual(1, bc0.indices.filter { $0 == i }.count)
   }
   
   // Can't upgrade a non-random-access collection to random access
@@ -254,7 +254,7 @@ tests.test("RandomAccessCollection") {
   }
   for i in rc0.indices {
     expectNotEqual(rc0.endIndex, i)
-    expectEqual(1, rc0.indices.filter { $0 == i }.count())
+    expectEqual(1, rc0.indices.filter { $0 == i }.count)
   }
 }
 

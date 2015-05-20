@@ -252,7 +252,7 @@ extension _ArrayBuffer {
 
     let nonNative = self._nonNative
 
-    let subRangeCount = subRange.count()
+    let subRangeCount = subRange.count
     
     // Look for contiguous storage in the NSArray
     let cocoa = _CocoaArrayWrapper(nonNative)

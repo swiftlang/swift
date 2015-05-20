@@ -14,7 +14,7 @@ struct S<A: CollectionType where A.Index == Int> : CollectionType {
   }
   
   var endIndex: Index {
-    return baseRange.count()
+    return baseRange.count
   }
 
   subscript(i: Index) -> Element {

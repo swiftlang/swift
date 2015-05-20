@@ -72,7 +72,7 @@ public struct EmptyCollection<T> : CollectionType {
   }
 
   /// Return the number of elements (always zero).
-  public func count() -> Int {
+  public var count: Int {
     return 0
   }
 }

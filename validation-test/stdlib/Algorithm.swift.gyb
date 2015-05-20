@@ -113,7 +113,7 @@ Algorithm.test("sorted/strings")
     sorted([ "apple", "Banana", "cherry" ]))
 
   let s = sorted(["apple", "Banana", "cherry"]) {
-    $0.characters.count() > $1.characters.count()
+    $0.characters.count > $1.characters.count
   }
   expectEqual([ "Banana", "cherry", "apple" ], s)
 }
@@ -1762,7 +1762,7 @@ SequenceTypeAlgorithms.test("flatMap/SequenceType") {
       expectEqual(test.sequence.count, timesClosureWasCalled) {
         "map() should be eager and should only call its predicate once per element"
       }
-      expectGE(2 * result.count(), result.capacity) {
+      expectGE(2 * result.count, result.capacity) {
         "flatMap() should not reserve capacity"
       }
     }
@@ -1839,7 +1839,7 @@ SequenceTypeAlgorithms.test("flatMap/SequenceType/TransformProducesOptional") {
       expectEqual(test.sequence.count, timesClosureWasCalled) {
         "flatMap() should be eager and should only call its predicate once per element"
       }
-      expectGE(2 * result.count(), result.capacity) {
+      expectGE(2 * result.count, result.capacity) {
         "flatMap() should not reserve capacity"
       }
     }
@@ -2636,7 +2636,7 @@ SequenceTypeAlgorithms.test("last") {
 }
 
 //===----------------------------------------------------------------------===//
-// count()
+// count
 //===----------------------------------------------------------------------===//
 
 % for Implementation in [ 'Default', 'Custom' ]:
@@ -2670,7 +2670,7 @@ struct MinimalForwardCollectionWith${Implementation}Count : CollectionType {
 
   static var timesCountWasCalled: Int = 0
 
-  func count() -> Int32 {
+  var count: Int32 {
     ++MinimalForwardCollectionWithCustomCount.timesCountWasCalled
     return Int32(_count)
   }
@@ -2681,12 +2681,12 @@ struct MinimalForwardCollectionWith${Implementation}Count : CollectionType {
 % end
 
 func callGenericCount<C : CollectionType>(collection: C) -> C.Index.Distance {
-  return collection.count()
+  return collection.count
 }
 
 % for Implementation in [ 'Default', 'Custom' ]:
 
-SequenceTypeAlgorithms.test("CollectionType.count()/${Implementation}Implementation") {
+SequenceTypeAlgorithms.test("CollectionType.count/${Implementation}Implementation") {
   for count in [ 0, 5 ] {
     let collection = MinimalForwardCollectionWith${Implementation}Count(count: count)
 
@@ -2695,7 +2695,7 @@ SequenceTypeAlgorithms.test("CollectionType.count()/${Implementation}Implementat
 %   if Implementation == 'Custom':
       MinimalForwardCollectionWithCustomCount.timesCountWasCalled = 0
 %   end
-      var result = collection.count()
+      var result = collection.count
       expectType(Int32.self, &result)
       expectEqual(Int32(count), result)
 %   if Implementation == 'Custom':
@@ -3428,7 +3428,7 @@ SequenceTypeAlgorithms.test("sort/${'Predicate' if predicate else 'WhereElementI
         expectEqualsUnordered(0..<sequence.count, result.map { $0.identity })
 
         // Check that the elements are sorted.
-        if result.count() >= 2 {
+        if result.count >= 2 {
           for i in result.startIndex..<result.endIndex.predecessor() {
             expectLE(result[i].value, result[i.successor()].value)
           }
@@ -3584,7 +3584,7 @@ SequenceTypeAlgorithms.test("sortInPlace/${'Predicate' if predicate else 'WhereE
         expectEqualsUnordered(0..<sequence.count, s.map { $0.identity })
 
         // Check that the elements are sorted.
-        if s.count() >= 2 {
+        if s.count >= 2 {
           for i in s.startIndex..<s.endIndex.predecessor() {
             expectLE(s[i].value, s[i.successor()].value)
           }

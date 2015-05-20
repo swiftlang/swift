@@ -16,7 +16,7 @@ func main () -> Void
     // CHECK: !DILocalVariable(tag: DW_TAG_arg_variable, name: "random_int"
 
             if rhs == random_string
-            || rhs.unicodeScalars.count() == random_int {
+            || rhs.unicodeScalars.count == random_int {
                 var local_var : Int = 10
                 print("I have an int here \(local_var).\n", appendNewline: false)
                 return false

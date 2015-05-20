@@ -634,7 +634,7 @@ extension String {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - Complexity: O(`subRange.count()`) if `subRange.endIndex
+  /// - Complexity: O(`subRange.count`) if `subRange.endIndex
   ///   == self.endIndex` and `isEmpty(newElements)`, O(N) otherwise.
   public mutating func replaceRange<
     C: CollectionType where C.Generator.Element == Character
@@ -650,7 +650,7 @@ extension String {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - Complexity: O(`subRange.count()`) if `subRange.endIndex
+  /// - Complexity: O(`subRange.count`) if `subRange.endIndex
   ///   == self.endIndex` and `isEmpty(newElements)`, O(N) otherwise.
   public mutating func replaceRange(
     subRange: Range<Index>, with newElements: String
@@ -662,7 +662,7 @@ extension String {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - Complexity: O(`self.count()`).
+  /// - Complexity: O(`self.count`).
   public mutating func insert(newElement: Character, atIndex i: Index) {
     withMutableCharacters {
       (inout v: CharacterView) in v.insert(newElement, atIndex: i)
@@ -673,7 +673,7 @@ extension String {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - Complexity: O(`self.count() + newElements.count()`).
+  /// - Complexity: O(`self.count + newElements.count`).
   public mutating func splice<
     S : CollectionType where S.Generator.Element == Character
   >(newElements: S, atIndex i: Index) {
@@ -686,7 +686,7 @@ extension String {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - Complexity: O(`self.count()`).
+  /// - Complexity: O(`self.count`).
   public mutating func removeAtIndex(i: Index) -> Character {
     return withMutableCharacters {
       (inout v: CharacterView) in v.removeAtIndex(i)
@@ -697,7 +697,7 @@ extension String {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - Complexity: O(`self.count()`).
+  /// - Complexity: O(`self.count`).
   public mutating func removeRange(subRange: Range<Index>) {
     withMutableCharacters {
       (inout v: CharacterView) in v.removeRange(subRange)

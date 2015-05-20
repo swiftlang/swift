@@ -46,8 +46,8 @@ mirrors.test("RandomAccessStructure") {
 let letters = "abcdefghijklmnopqrstuvwxyz "
 
 func find(substring: String, within domain: String) -> String.Index? {
-  let domainCount = domain.characters.count()
-  let substringCount = substring.characters.count()
+  let domainCount = domain.characters.count
+  let substringCount = substring.characters.count
 
   if (domainCount < substringCount) { return nil }
   var sliceStart = domain.startIndex
@@ -75,7 +75,7 @@ mirrors.test("ForwardStructure") {
 
   let w = DoubleYou().customMirror()
   expectEqual(.Set, w.displayStyle)
-  expectEqual(letters.characters.count(), numericCast(w.children.count()))
+  expectEqual(letters.characters.count, numericCast(w.children.count))
   
   // Because we don't control the order of a Set, we need to do a
   // fancy dance in order to validate the result.
@@ -169,7 +169,7 @@ mirrors.test("Legacy") {
       stackTrace: stackTrace, file: file, line: line)
     
     expectEqual(
-      1, mb.children.count(),
+      1, mb.children.count,
       stackTrace: stackTrace, file: file, line: line)
     
     expectEqual(
@@ -189,7 +189,7 @@ mirrors.test("Legacy") {
     let md = Mirror(reflecting: D())
     expectTrue(md.subjectType == D.self)
     
-    expectEqual(1, md.children.count())
+    expectEqual(1, md.children.count)
     expectEqual("dx", md.children.first?.label)
     expectEqual(1, md.children.first?.value as? Int)
     
@@ -202,7 +202,7 @@ mirrors.test("Legacy") {
     let md = Mirror(reflecting: D() as B)
     expectTrue(md.subjectType == D.self)
     
-    expectEqual(1, md.children.count())
+    expectEqual(1, md.children.count)
     expectEqual("dx", md.children.first?.label)
     expectEqual(1, md.children.first?.value as? Int)
     
@@ -220,7 +220,7 @@ mirrors.test("Class/Root/Uncustomized") {
   let a = Mirror(reflecting: A())
   expectTrue(a.subjectType == A.self)
   expectEmpty(a.superclassMirror())
-  expectEqual(1, a.children.count())
+  expectEqual(1, a.children.count)
   expectEqual("a", a.children.first!.label)
 }
 
@@ -237,7 +237,7 @@ mirrors.test("Class/Root/superclass:.Generated") {
   let b = Mirror(reflecting: B())
   expectTrue(b.subjectType == B.self)
   expectEmpty(b.superclassMirror())
-  expectEqual(1, b.children.count())
+  expectEqual(1, b.children.count)
   expectEqual("bee", b.children.first!.label)
   expectEqual("two", b.children.first!.value as? String)
 }
@@ -254,7 +254,7 @@ mirrors.test("class/Root/superclass:<default>") {
   let c = Mirror(reflecting: C())
   expectTrue(c.subjectType == C.self)
   expectEmpty(c.superclassMirror())
-  expectEqual(1, c.children.count())
+  expectEqual(1, c.children.count)
   expectEqual("sea", c.children.first!.label)
   expectEqual(4, c.children.first!.value as? UInt)
 }
@@ -469,7 +469,7 @@ mirrors.test("Class/Root/NoSuperclassMirror") {
   let b = Mirror(reflecting: B())
   expectTrue(b.subjectType == B.self)
   expectEmpty(b.superclassMirror())
-  expectEqual(1, b.children.count())
+  expectEqual(1, b.children.count)
   expectEqual("bee", b.children.first!.label)
 }
 
@@ -567,7 +567,7 @@ mirrors.test("class/CustomizedSuper/SuperclassCustomMirror/Indirect") {
     expectTrue(y.subjectType == Y.self)
     if let x = expectNotEmpty(y.superclassMirror()) {
       expectTrue(x.subjectType == X.self)
-      expectEqual(0, x.children.count())
+      expectEqual(0, x.children.count)
       if let a = expectNotEmpty(x.superclassMirror()) {
         expectTrue(a.subjectType == A.self)
         if let aye = expectNotEmpty(a.children.first) {
@@ -729,7 +729,7 @@ mirrors.test("ObjC") {
   // Some Foundation classes lie about their ivars, which would crash
   // a mirror; make sure we are not automatically exposing ivars of
   // Objective-C classes from the default mirror implementation.
-  expectEqual(0, Mirror(reflecting: HasIVars()).children.count())
+  expectEqual(0, Mirror(reflecting: HasIVars()).children.count)
 }
 
 mirrors.test("String.init") {

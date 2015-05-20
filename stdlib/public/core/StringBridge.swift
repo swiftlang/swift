@@ -113,7 +113,7 @@ internal func _cocoaStringSlice(
 
   let cfResult: AnyObject = CFStringCreateWithSubstring(
     nil, cfSelf, _swift_shims_CFRange(
-      location: subRange.startIndex, length: subRange.count()))
+      location: subRange.startIndex, length: subRange.count))
 
   return String(_cocoaString: cfResult)._core
 }

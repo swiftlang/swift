@@ -162,7 +162,7 @@ internal class _${Kind}Box<S : ${Kind}Type>
   }
 %   if Kind == 'Collection':
   override func _count() -> IntMax {
-    return numericCast(_base.count())
+    return numericCast(_base.count)
   }
   override subscript(position: _ForwardIndexBoxType) -> Element {
     if let i = position._unbox() as S.Index? {
@@ -602,7 +602,7 @@ public struct Any${Traversal}Collection<Element> : AnyCollectionType {
   /// Return the number of elements.
   ///
   /// - Complexity: ${'O(1)' if Traversal == 'RandomAccess' else 'O(N)'}.
-  public func count() -> IntMax {
+  public var count: IntMax {
     return _box._count()
   }
 

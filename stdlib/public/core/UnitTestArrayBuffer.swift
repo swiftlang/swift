@@ -335,7 +335,7 @@ public func += <
   inout lhs: _UnitTestArrayBuffer<T>, rhs: C
 ) {
   let oldCount = lhs.count
-  let newCount = oldCount + numericCast(rhs.count())
+  let newCount = oldCount + numericCast(rhs.count)
 
   if _fastPath(newCount <= lhs.capacity) {
     lhs.count = newCount

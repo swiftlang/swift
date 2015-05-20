@@ -137,7 +137,7 @@ func checkGraphemeClusterSegmentation(
   var actualBoundaries: [Int] = [ 0 ]
   var unicodeScalarCount = 0
   for c in subject.characters {
-    let currentClusterSize = String(c).unicodeScalars.count()
+    let currentClusterSize = String(c).unicodeScalars.count
     unicodeScalarCount += currentClusterSize
     actualBoundaries += [ unicodeScalarCount ]
   }

@@ -74,7 +74,7 @@ public func withArrayOfCStrings<R>(
   args: _UnitTestArray<String>, _ body: (Array<UnsafeMutablePointer<CChar>>) -> R
 ) -> R {
 
-  let argsLengths = _UnitTestArray(args.map { $0.utf8.count() + 1 })
+  let argsLengths = _UnitTestArray(args.map { $0.utf8.count + 1 })
   let argsOffsets = [ 0 ] + scan(argsLengths, 0, +)
   let argsBufferSize = argsOffsets.last!
 

@@ -80,7 +80,7 @@ public struct CollectionOfOne<T> : CollectionType {
   }
 
   /// Return the number of elements (always one).
-  public func count() -> Int {
+  public var count: Int {
     return 1
   }
 

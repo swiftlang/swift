@@ -24,7 +24,7 @@ func main() -> Void
     // CHECK-DAG: !DILocalVariable(tag: DW_TAG_arg_variable, name: "out_only",{{.*}} line: 10,
         { (lhs : String, rhs : String) -> Bool in
             if rhs == random_string
-               || rhs.unicodeScalars.count() == random_int
+               || rhs.unicodeScalars.count == random_int
             {
             // Ensure the two local_vars are in different lexical scopes.
             // CHECK-DAG: !DILocalVariable(tag: DW_TAG_auto_variable, name: "local_var", scope: ![[THENSCOPE:[0-9]+]],{{.*}} line: [[@LINE+2]],
