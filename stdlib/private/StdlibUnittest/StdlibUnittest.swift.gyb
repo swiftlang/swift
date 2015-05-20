@@ -2432,6 +2432,11 @@ public func == (
 
 public struct MinimalRandomAccessIndex : RandomAccessIndexType {
   public init(position: Int, startIndex: Int, endIndex: Int) {
+    expectLE(startIndex, position)
+    expectGE(endIndex, position) /*{
+      "position=\(self.position) startIndex=\(self.startIndex) endIndex=\(self.endIndex)"
+    }*/
+
     self.position = position
     self.startIndex = startIndex
     self.endIndex = endIndex
@@ -2454,10 +2459,11 @@ public struct MinimalRandomAccessIndex : RandomAccessIndexType {
   }
 
   public func advancedBy(n: Int) -> MinimalRandomAccessIndex {
-    expectNotEqual(endIndex, position)
     let newPosition = position + n
     expectLE(startIndex, newPosition)
-    expectGE(endIndex, newPosition)
+    expectGE(endIndex, newPosition) { "position=\(self.position) startIndex=\(self.startIndex)" }/*{
+      "position=\(self.position) n=\(n) startIndex=\(self.startIndex) endIndex=\(self.endIndex)"
+    }*/
     return MinimalRandomAccessIndex(
       position: newPosition, startIndex: startIndex, endIndex: endIndex)
   }
