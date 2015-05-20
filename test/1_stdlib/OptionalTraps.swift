@@ -19,7 +19,7 @@ var OptionalTraps = TestSuite("OptionalTraps")
 OptionalTraps.test("UnwrapNone")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
-    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var a: AnyObject? = returnNil()
   expectCrashLater()

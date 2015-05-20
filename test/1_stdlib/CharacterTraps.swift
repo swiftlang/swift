@@ -13,7 +13,7 @@ var CharacterTraps = TestSuite("CharacterTraps")
 CharacterTraps.test("CharacterFromEmptyString")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
-    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var s = ""
   expectCrashLater()
@@ -23,7 +23,7 @@ CharacterTraps.test("CharacterFromEmptyString")
 CharacterTraps.test("CharacterFromMoreThanOneGraphemeCluster")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
-    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var s = "ab"
   expectCrashLater()

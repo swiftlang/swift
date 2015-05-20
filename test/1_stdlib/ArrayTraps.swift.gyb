@@ -34,7 +34,7 @@ var ${ArrayTy}Traps = TestSuite("${ArrayTy}Traps")
 ${ArrayTy}Traps.test("bounds1/${io}")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
-    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var a: ${ArrayTy}<Int> = []
   ${bounds_trap(index='0', expr_to_write='1')}
@@ -43,7 +43,7 @@ ${ArrayTy}Traps.test("bounds1/${io}")
 ${ArrayTy}Traps.test("bounds2/${io}")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
-    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var a: ${ArrayTy}<Int> = []
   ${bounds_trap(index='100', expr_to_write='1')}
@@ -52,7 +52,7 @@ ${ArrayTy}Traps.test("bounds2/${io}")
 ${ArrayTy}Traps.test("bounds3/${io}")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
-    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var a: ${ArrayTy} = [ 10, 20, 30 ]
   ${bounds_trap(index='3', expr_to_write='1')}
@@ -61,7 +61,7 @@ ${ArrayTy}Traps.test("bounds3/${io}")
 ${ArrayTy}Traps.test("sliceBounds0/${io}")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
-    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var a: ${ArrayTy}<Int> = []
   ${bounds_trap(index='-1..<1', expr_to_write='ArraySlice()')}
@@ -70,7 +70,7 @@ ${ArrayTy}Traps.test("sliceBounds0/${io}")
 ${ArrayTy}Traps.test("sliceBounds1/${io}")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
-    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var a: ${ArrayTy} = [ 1 ]
   ${bounds_trap(index='-1..<1', expr_to_write='ArraySlice()')}
@@ -79,7 +79,7 @@ ${ArrayTy}Traps.test("sliceBounds1/${io}")
 ${ArrayTy}Traps.test("sliceBounds2/${io}")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
-    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var a: ${ArrayTy} = [ 1 ]
   ${bounds_trap(index='0..<2', expr_to_write='ArraySlice()')}
@@ -88,7 +88,7 @@ ${ArrayTy}Traps.test("sliceBounds2/${io}")
 ${ArrayTy}Traps.test("sliceBounds3/${io}")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
-    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var a: ${ArrayTy} = [ 1 ]
   ${bounds_trap(index='1..<2', expr_to_write='ArraySlice()')}
@@ -106,7 +106,7 @@ ${ArrayTy}Traps.test("PopFromEmpty") {
 ${ArrayTy}Traps.test("${'insert(_:atIndex:)/%s' % index}")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
-    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var a: ${ArrayTy}<Int> = [42]
   expectCrashLater()
@@ -118,7 +118,7 @@ ${ArrayTy}Traps.test("${'insert(_:atIndex:)/%s' % index}")
 ${ArrayTy}Traps.test("${'removeAtIndex(_:)/%s' % index}")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
-    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var a: ${ArrayTy}<Int> = [42]
   expectCrashLater()
@@ -134,7 +134,7 @@ class Derived2 : Derived { }
 ArrayTraps.test("downcast1")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
-    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   let ba: [Base] = [ Derived(), Base() ]
   let da = ba as! [Derived]
@@ -148,7 +148,7 @@ import Foundation
 ArrayTraps.test("downcast2")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
-    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   let a: [AnyObject] = [ "String", 1 ]
   let sa = a as! [NSString]
@@ -160,7 +160,7 @@ ArrayTraps.test("downcast2")
 ArrayTraps.test("downcast3")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
-    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   let ba: [Base] = [ Derived2(), Derived(), Base() ]
   let d2a = ba as! [Derived2]
@@ -179,7 +179,7 @@ class ObjCDerived : ObjCBase { }
 ArrayTraps.test("downcast4")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
-    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   let ba: [ObjCProto] = [ ObjCDerived(), ObjCBase() ]
   let da = ba as! [ObjCDerived]
@@ -191,7 +191,7 @@ ArrayTraps.test("downcast4")
 ArrayTraps.test("unsafeLength")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
-    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var a = [ 42, 77, 88 ]
 
@@ -207,7 +207,7 @@ ArrayTraps.test("unsafeLength")
 ArrayTraps.test("bounds_with_downcast")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
-    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .crashOutputMatches(_isDebugAssertConfiguration() ?
     "fatal error: Array index out of range" : "")
   .code {
@@ -262,7 +262,7 @@ class ViolateInoutSafeySwitchToObjcBuffer {
 ArraySemanticOptzns.test("inout_rule_violated_isNativeBuffer")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
-    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))  
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))  
   .crashOutputMatches(_isDebugAssertConfiguration() ?
     "fatal error: inout rules were violated: the array was overwritten" : "")
   .code {
@@ -303,7 +303,7 @@ class ViolateInoutSafeyNeedElementTypeCheck {
 ArraySemanticOptzns.test("inout_rule_violated_needsElementTypeCheck")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
-    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))  
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))  
   .crashOutputMatches(_isDebugAssertConfiguration() ?
     "fatal error: inout rules were violated: the array was overwritten" : "")
   .code {

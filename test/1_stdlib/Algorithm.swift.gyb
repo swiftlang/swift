@@ -2098,7 +2098,7 @@ SequenceTypeAlgorithms.test("underestimateCount/CollectionType/CustomImplementat
 SequenceTypeAlgorithms.test("_copyToNativeArrayBuffer/OverestimatedCount")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
-    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   let s = MinimalSequence<OpaqueValue<Int>>(
     [ 1, 2, 3 ].map { OpaqueValue($0) },

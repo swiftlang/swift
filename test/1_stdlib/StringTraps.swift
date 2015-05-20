@@ -16,7 +16,7 @@ var StringTraps = TestSuite("StringTraps")
 StringTraps.test("startIndex/predecessor")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
-    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var s = "abc"
   var i = s.startIndex
@@ -29,7 +29,7 @@ StringTraps.test("startIndex/predecessor")
 StringTraps.test("endIndex/successor")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
-    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var s = "abc"
   var i = s.startIndex
@@ -43,7 +43,7 @@ StringTraps.test("endIndex/successor")
 StringTraps.test("subscript(_:)/endIndex")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
-    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var s = "abc"
   var i = s.startIndex
@@ -57,7 +57,7 @@ StringTraps.test("subscript(_:)/endIndex")
 StringTraps.test("UTF8ViewEndIndexSuccessor")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
-    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var s = "abc"
   var i = s.utf8.startIndex
@@ -71,7 +71,7 @@ StringTraps.test("UTF8ViewEndIndexSuccessor")
 StringTraps.test("UTF8ViewSubscript/endIndex")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
-    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var s = "abc"
   var i = s.utf8.startIndex
@@ -85,7 +85,7 @@ StringTraps.test("UTF8ViewSubscript/endIndex")
 StringTraps.test("UTF16ViewSubscript/DecrementedStartIndex")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
-    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var s = "abc"
   var i = s.utf16.startIndex
@@ -97,7 +97,7 @@ StringTraps.test("UTF16ViewSubscript/DecrementedStartIndex")
 StringTraps.test("UTF16ViewSubscript/endIndex")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
-    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var s = "abc"
   var i = s.utf16.startIndex

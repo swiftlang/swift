@@ -682,7 +682,7 @@ mirrors.test("Addressing") {
 mirrors.test("Invalid Path Type")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
-    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   struct X : MirrorPathType {}
   let m = Mirror(reflecting: [1, 2, 3])

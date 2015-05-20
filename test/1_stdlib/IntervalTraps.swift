@@ -24,7 +24,7 @@ var IntervalTraps = TestSuite("IntervalTraps")
 IntervalTraps.test("HalfOpen")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
-    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var interval = 1.0..<1.0
   expectType(HalfOpenInterval<Double>.self, &interval)
@@ -35,7 +35,7 @@ IntervalTraps.test("HalfOpen")
 IntervalTraps.test("Closed")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
-    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var interval = 1.0...1.0
   expectType(ClosedInterval<Double>.self, &interval)

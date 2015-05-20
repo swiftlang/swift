@@ -24,7 +24,7 @@ var RangeTraps = TestSuite("RangeTraps")
 RangeTraps.test("HalfOpen")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
-    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var range = 1..<1
   expectType(Range<Int>.self, &range)
@@ -36,7 +36,7 @@ RangeTraps.test("HalfOpen")
 RangeTraps.test("Closed")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
-    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   var range = 1...1
   expectType(Range<Int>.self, &range)
@@ -48,7 +48,7 @@ RangeTraps.test("Closed")
 RangeTraps.test("OutOfRange")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
-    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   0..<Int.max // This is a Range
 

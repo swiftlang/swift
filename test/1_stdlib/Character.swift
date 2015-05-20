@@ -256,7 +256,7 @@ UnicodeScalarTests.test("UInt8(ascii: UnicodeScalar)") {
 UnicodeScalarTests.test("UInt8(ascii: UnicodeScalar)/non-ASCII should trap")
   .skip(.Custom(
     { _isFastAssertConfiguration() },
-    reason: "unwrapping nil might or might not cause a crash in -Ounchecked mode"))
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
   let us: UnicodeScalar = "\u{E5}"
   expectCrashLater()
