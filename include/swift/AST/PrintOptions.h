@@ -131,6 +131,10 @@ struct PrintOptions {
   /// Whether to print accessibility information on all value decls.
   bool PrintAccessibility = false;
 
+  /// If \c PrintAccessibility is true, this determines whether to print
+  /// 'internal' keyword.
+  bool PrintInternalAccessibilityKeyword = true;
+
   /// Print all decls that have at least this level of access.
   Accessibility AccessibilityFilter = Accessibility::Private;
 

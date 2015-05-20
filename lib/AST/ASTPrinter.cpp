@@ -248,6 +248,8 @@ class PrintAST : public ASTVisitor<PrintAST> {
       Printer << "private";
       break;
     case Accessibility::Internal:
+      if (!Options.PrintInternalAccessibilityKeyword)
+        return;
       Printer << "internal";
       break;
     case Accessibility::Public:
