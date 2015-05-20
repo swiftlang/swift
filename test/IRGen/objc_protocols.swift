@@ -188,3 +188,18 @@ func instantiateArchetype<T: SettableProperty>(x: T) {
   let y = x.reqt
   x.reqt = y
 }
+
+// rdar://problem/21029254
+
+@objc protocol Appaloosa { }
+
+protocol Palomino {}
+protocol Vanner : Palomino, Appaloosa { }
+
+struct Stirrup<T : Palomino> { }
+
+func canter<T : Palomino>(t: Stirrup<T>) {}
+
+func gallop<T : Vanner>(t: Stirrup<T>) {
+  canter(t)
+}

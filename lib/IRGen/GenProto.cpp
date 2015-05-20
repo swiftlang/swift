@@ -296,6 +296,10 @@ namespace {
       // previous best.
       bool foundBetter = false;
       for (auto base : proto->getInheritedProtocols(nullptr)) {
+        // ObjC protocols do not have witnesses.
+        if (!Lowering::TypeConverter::protocolRequiresWitnessTable(base))
+          continue;
+
         auto &baseEntry = protoInfo.getWitnessEntry(base);
         assert(baseEntry.isBase());
 
