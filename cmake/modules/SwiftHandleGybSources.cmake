@@ -74,6 +74,7 @@ function(handle_gyb_sources dependency_out_var_name sources_var_name arch)
           DEPENDS "${gyb_tool}" "${src}" "${gyb_extra_sources}"
           COMMENT "Generating ${src_sans_gyb} from ${src} with ptr size = ${ptr_size}"
           WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+          SOURCES "${src}"
           IDEMPOTENT)
       list(APPEND dependency_targets "${dependency_target}")
     endif()
