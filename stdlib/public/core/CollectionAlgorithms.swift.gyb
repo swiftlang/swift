@@ -115,17 +115,11 @@ orderingRequirementForComparable = """\
 
 }%
 
-extension MutableCollectionType
-  where Index : RandomAccessIndexType, ${GElement} : Comparable {
+% # Generate two versions: with explicit predicates and with
+% # a Comparable requirement.
+% for preds in [ True, False ]:
 
-${partitionDocComment}
-  ///
-${orderingRequirementForComparable}
-  final public mutating func _prext_partition(range: Range<Index>) -> Index {
-    return _partition(&self, range)
-  }
-}
-
+%   if preds:
 extension MutableCollectionType where Index : RandomAccessIndexType {
 
 ${partitionDocComment}
@@ -135,9 +129,52 @@ ${orderingRequirementForPredicate}
     range: Range<Index>,
     var isOrderedBefore: (${GElement}, ${GElement}) -> Bool
   ) -> Index {
+
+%   else:
+
+extension MutableCollectionType
+  where Index : RandomAccessIndexType, ${GElement} : Comparable {
+
+${partitionDocComment}
+  ///
+${orderingRequirementForComparable}
+  final public mutating func _prext_partition(range: Range<Index>) -> Index {
+
+%   end
+
+    let maybeResult = _withUnsafeMutableBufferPointerIfSupported {
+      (bufferPointer) -> Index in
+      let startOffset = distance(self.startIndex, range.startIndex)
+      let unsafeBufferStartIndex =
+        bufferPointer.startIndex + numericCast(startOffset)
+
+      let endOffset = distance(self.startIndex, range.endIndex)
+      let unsafeBufferEndIndex =
+        bufferPointer.startIndex + numericCast(endOffset)
+
+      let unsafeBufferPivot = bufferPointer._prext_partition(
+        unsafeBufferStartIndex..<unsafeBufferEndIndex
+%   if preds:
+        , isOrderedBefore: isOrderedBefore
+%   end
+        )
+      return advance(
+        self.startIndex,
+        numericCast(unsafeBufferPivot - bufferPointer.startIndex))
+    }
+    if let result = maybeResult {
+      return result
+    }
+
+%   if preds:
     return _partition(&self, range, &isOrderedBefore)
+%   else:
+    return _partition(&self, range)
+%   end
   }
 }
+
+% end
 
 //===----------------------------------------------------------------------===//
 // sort()
