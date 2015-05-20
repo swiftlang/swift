@@ -3952,6 +3952,14 @@ public:
     }
     llvm_unreachable("bad storage kind");
   }
+  
+  /// \brief Return true if the 'getter' is 'mutating', i.e. that it requires an
+  /// lvalue base to be accessed.
+  bool isGetterMutating() const;
+  
+  /// \brief Return true if the 'setter' is 'nonmutating', i.e. that it can be
+  /// called even on an immutable base value.
+  bool isSetterNonMutating() const;
 
   FuncDecl *getAccessorFunction(AccessorKind accessor) const;
 

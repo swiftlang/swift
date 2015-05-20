@@ -204,33 +204,8 @@ static FuncDecl *createGetterPrototype(AbstractStorageDecl *storage,
       TypeLoc::withoutLoc(storageType), storage->getDeclContext());
   getter->setImplicit();
 
-  // Getters for truly stored properties default to non-mutating.
-  // Getters for addressed properties follow the ordinary addressor.
-  auto requiresMutatingGetter = [](const AbstractStorageDecl *storage) {
-    switch (storage->getStorageKind()) {
-    case AbstractStorageDecl::Stored:
-    case AbstractStorageDecl::StoredWithObservers:
-      return false;
-
-    case AbstractStorageDecl::InheritedWithObservers:
-      return storage->getOverriddenDecl()->getGetter()->isMutating();
-
-    case AbstractStorageDecl::Addressed:
-    case AbstractStorageDecl::AddressedWithObservers:
-      return storage->getAddressor()->isMutating();
-
-    case AbstractStorageDecl::ComputedWithMutableAddress:
-    case AbstractStorageDecl::StoredWithTrivialAccessors:
-    case AbstractStorageDecl::AddressedWithTrivialAccessors:
-    case AbstractStorageDecl::Computed:      
-      llvm_unreachable("shouldn't be synthesizing getter for storage"
-                       " already in this state");
-    }
-    llvm_unreachable("bad storage kind!");
-  };
-  if (requiresMutatingGetter(storage)) {
+  if (storage->isGetterMutating())
     getter->setMutating();
-  }
 
   // If the var is marked final, then so is the getter.
   if (storage->isFinal())
@@ -268,33 +243,8 @@ static FuncDecl *createSetterPrototype(AbstractStorageDecl *storage,
       TypeLoc::withoutLoc(setterRetTy), storage->getDeclContext());
   setter->setImplicit();
 
-  // Setters for truly stored properties default to mutating.
-  // Setters for addressed properties follow the mutable addressor.
-  auto requiresMutatingSetter = [](const AbstractStorageDecl *storage) {
-    switch (storage->getStorageKind()) {
-    case AbstractStorageDecl::Stored:
-    case AbstractStorageDecl::StoredWithObservers:
-      return storage->isInstanceMember();
-
-    case AbstractStorageDecl::InheritedWithObservers:
-      return storage->getOverriddenDecl()->getSetter()->isMutating();
-
-    case AbstractStorageDecl::Addressed:
-    case AbstractStorageDecl::AddressedWithObservers:
-      return storage->getMutableAddressor()->isMutating();
-
-    case AbstractStorageDecl::ComputedWithMutableAddress:
-    case AbstractStorageDecl::StoredWithTrivialAccessors:
-    case AbstractStorageDecl::AddressedWithTrivialAccessors:
-    case AbstractStorageDecl::Computed:      
-      llvm_unreachable("shouldn't be synthesizing setter for storage"
-                       " already in this state");
-    }
-    llvm_unreachable("bad storage kind!");
-  };
-  if (requiresMutatingSetter(storage)) {
+  if (!storage->isSetterNonMutating())
     setter->setMutating();
-  }
 
   // If the var is marked final, then so is the getter.
   if (storage->isFinal())

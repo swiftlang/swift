@@ -402,6 +402,10 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
     } else {
       BaseExpr = new (Context) DeclRefExpr(Base, Loc, /*implicit=*/true);
     }
+    
+   
+    // Otherwise, form an UnresolvedDotExpr and sema will resolve it based on
+    // type information.
     return new (Context) UnresolvedDotExpr(BaseExpr, SourceLoc(), Name, Loc,
                                            UDRE->isImplicit());
   }

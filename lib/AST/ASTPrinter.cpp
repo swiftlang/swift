@@ -666,53 +666,6 @@ static StringRef getMutableAddressorLabel(FuncDecl *addressor) {
   llvm_unreachable("bad addressor kind");
 }
 
-/// Is the getter-like accessor for this storage explicitly mutating?
-static bool hasMutatingGetter(AbstractStorageDecl *storage) {
-  switch (storage->getStorageKind()) {
-  case AbstractStorageDecl::Stored:
-    return false;
-
-  case AbstractStorageDecl::StoredWithTrivialAccessors:
-  case AbstractStorageDecl::StoredWithObservers:
-  case AbstractStorageDecl::InheritedWithObservers:
-  case AbstractStorageDecl::ComputedWithMutableAddress:
-  case AbstractStorageDecl::Computed:
-    assert(storage->getGetter());
-    return storage->getGetter()->isMutating();
-
-  case AbstractStorageDecl::Addressed:
-  case AbstractStorageDecl::AddressedWithTrivialAccessors:
-  case AbstractStorageDecl::AddressedWithObservers:
-    assert(storage->getAddressor());
-    return storage->getAddressor()->isMutating();
-  }
-  llvm_unreachable("bad storage kind");
-}
-
-/// Is the setter-like accessor for this storage explicitly nonmutating?
-static bool hasExplicitNonMutatingSetter(AbstractStorageDecl *storage) {
-  assert(storage->isSettable(nullptr));
-  switch (storage->getStorageKind()) {
-  case AbstractStorageDecl::Stored:
-    return false;
-
-  case AbstractStorageDecl::StoredWithTrivialAccessors:
-  case AbstractStorageDecl::StoredWithObservers:
-  case AbstractStorageDecl::InheritedWithObservers:
-  case AbstractStorageDecl::Computed:
-    assert(storage->getSetter());
-    return storage->getSetter()->isExplicitNonMutating();
-
-  case AbstractStorageDecl::Addressed:
-  case AbstractStorageDecl::AddressedWithTrivialAccessors:
-  case AbstractStorageDecl::AddressedWithObservers:
-  case AbstractStorageDecl::ComputedWithMutableAddress:
-    assert(storage->getMutableAddressor());
-    return storage->getMutableAddressor()->isExplicitNonMutating();
-  }
-  llvm_unreachable("bad storage kind");
-}
-
 void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
   auto storageKind = ASD->getStorageKind();
 
@@ -736,11 +689,13 @@ void PrintAST::printAccessors(AbstractStorageDecl *ASD) {
   bool inProtocol = isa<ProtocolDecl>(ASD->getDeclContext());
   if (inProtocol ||
       (Options.AbstractAccessors && !Options.FunctionDefinitions)) {
-    bool mutatingGetter = hasMutatingGetter(ASD);
-
+    bool mutatingGetter = ASD->isGetterMutating();
     bool settable = ASD->isSettable(nullptr);
-    bool nonmutatingSetter =
-      (settable ? hasExplicitNonMutatingSetter(ASD) : false);
+    bool nonmutatingSetter = false;
+    if (settable && ASD->isSetterNonMutating() && ASD->isInstanceMember() &&
+        !ASD->getDeclContext()->getDeclaredTypeInContext()
+            ->hasReferenceSemantics())
+      nonmutatingSetter = true;
 
     // We're about to print something like this:
     //   { mutating? get (nonmutating? set)? }

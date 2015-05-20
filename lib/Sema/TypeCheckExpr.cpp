@@ -448,29 +448,7 @@ static bool doesStorageProduceLValue(TypeChecker &TC,
 
   // If the base is an rvalue, then we only produce an lvalue if both
   // the getter and setter are nonmutating.
-
-  switch (storage->getStorageKind()) {
-  // The setter of a stored decl is implicitly mutating.
-  case AbstractStorageDecl::Stored:
-    return false;
-
-  // For pure-addressed storage, just consider the addressors.
-  case AbstractStorageDecl::Addressed:
-    return !storage->getAddressor()->isMutating() &&
-           !storage->getMutableAddressor()->isMutating();
-
-  // Otherwise, consider the getter and setter.
-  case AbstractStorageDecl::StoredWithObservers:
-  case AbstractStorageDecl::StoredWithTrivialAccessors:
-  case AbstractStorageDecl::InheritedWithObservers:
-  case AbstractStorageDecl::AddressedWithTrivialAccessors:
-  case AbstractStorageDecl::AddressedWithObservers:
-  case AbstractStorageDecl::ComputedWithMutableAddress:
-  case AbstractStorageDecl::Computed:
-    return !storage->getGetter()->isMutating() &&
-           (!storage->getSetter() || !storage->getSetter()->isMutating());
-  }
-  llvm_unreachable("bad storage kind");
+  return !storage->isGetterMutating() && storage->isSetterNonMutating();
 }
 
 Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,

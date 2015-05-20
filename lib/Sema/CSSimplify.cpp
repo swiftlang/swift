@@ -3144,27 +3144,7 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       // Subscripts and computed properties are ok on rvalues so long
       // as the getter is nonmutating.
       if (auto storage = dyn_cast<AbstractStorageDecl>(result)) {
-        auto isGetterMutating = [](AbstractStorageDecl *storage) {
-          switch (storage->getStorageKind()) {
-          case AbstractStorageDecl::Stored:
-            return false;
-
-          case AbstractStorageDecl::StoredWithObservers:
-          case AbstractStorageDecl::StoredWithTrivialAccessors:
-          case AbstractStorageDecl::InheritedWithObservers:
-          case AbstractStorageDecl::ComputedWithMutableAddress:
-          case AbstractStorageDecl::Computed:
-          case AbstractStorageDecl::AddressedWithTrivialAccessors:
-          case AbstractStorageDecl::AddressedWithObservers:
-            return storage->getGetter()->isMutating();
-
-          case AbstractStorageDecl::Addressed:
-            return storage->getAddressor()->isMutating();
-          }
-          llvm_unreachable("bad storage kind");
-        };
-
-        if (isGetterMutating(storage)) {
+        if (storage->isGetterMutating()) {
           FoundMutating = true;
           return;
         }
