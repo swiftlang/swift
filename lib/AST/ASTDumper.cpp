@@ -2601,10 +2601,9 @@ namespace {
       printFlag(T->isNoReturn(), "noreturn");
       printFlag(T->isAutoClosure(), "autoclosure");
       printFlag(T->isNoEscape(), "noescape");
+      printFlag(T->throws(), "throws");
 
       printRec("input", T->getInput());
-      if (T->throws())
-        OS << " throws ";
       printRec("output", T->getResult());
     }
 
