@@ -4501,7 +4501,9 @@ namespace {
       if (!classDecl->hasSuperclass())
         return;
 
-      DeclContext *dc = classDecl;
+      auto curObjCClass
+        = cast<clang::ObjCInterfaceDecl>(classDecl->getClangDecl());
+
       auto inheritConstructors = [&](DeclRange members,
                                      Optional<CtorInitializerKind> kind) {
         for (auto member : members) {
@@ -4542,7 +4544,7 @@ namespace {
             assert(name && "reimporting factory selector failed?");
 
             bool redundant;
-            if (auto newCtor = importConstructor(objcMethod, dc, 
+            if (auto newCtor = importConstructor(objcMethod, classDecl,
                                                  /*implicit=*/true,
                                                  ctor->getInitKind(),
                                                  /*required=*/false, 
@@ -4550,8 +4552,10 @@ namespace {
                                                  name,
                                                  objcMethod->parameters(),
                                                  objcMethod->isVariadic(),
-                                                 redundant))
+                                                 redundant)) {
+              Impl.importAttributes(objcMethod, newCtor, curObjCClass);
               newMembers.push_back(newCtor);
+            }
             continue;
           }
 
@@ -4569,10 +4573,11 @@ namespace {
           }
 
           // Import the constructor into this context.
-          if (auto newCtor = importConstructor(objcMethod, dc,
+          if (auto newCtor = importConstructor(objcMethod, classDecl,
                                                /*implicit=*/true,
                                                myKind,
                                                isRequired)) {
+            Impl.importAttributes(objcMethod, newCtor, curObjCClass);
             newMembers.push_back(newCtor);
           }
         }
@@ -4581,8 +4586,6 @@ namespace {
       // The kind of initializer to import. If this class has designated
       // initializers, everything it imports is a convenience initializer.
       Optional<CtorInitializerKind> kind;
-      auto curObjCClass
-        = cast<clang::ObjCInterfaceDecl>(classDecl->getClangDecl());
       if (Impl.hasDesignatedInitializers(curObjCClass))
         kind = CtorInitializerKind::Convenience;
 
@@ -5308,8 +5311,9 @@ canSkipOverTypedef(ClangImporter::Implementation &Impl,
 
 /// Import Clang attributes as Swift attributes.
 void ClangImporter::Implementation::importAttributes(
-       const clang::NamedDecl *ClangDecl,
-       Decl *MappedDecl)
+    const clang::NamedDecl *ClangDecl,
+    Decl *MappedDecl,
+    const clang::ObjCContainerDecl *NewContext)
 {
   ASTContext &C = SwiftContext;
 
@@ -5454,8 +5458,14 @@ void ClangImporter::Implementation::importAttributes(
       return;
     }
 
+    Optional<api_notes::ObjCMethodInfo> knownMethod;
+    if (NewContext)
+      knownMethod = getKnownObjCMethod(MD, NewContext);
+    if (!knownMethod)
+      knownMethod = getKnownObjCMethod(MD);
+
     // Any knowledge of methods known due to our whitelists.
-    if (auto knownMethod = getKnownObjCMethod(MD)) {
+    if (knownMethod) {
       // Availability.
       if (knownMethod->Unavailable) {
         auto attr = AvailableAttr::createUnconditional(

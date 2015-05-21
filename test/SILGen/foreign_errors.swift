@@ -51,7 +51,7 @@ func test0() throws {
 
 extension NSObject {
   @objc func abort() throws {
-    throw NSError()
+    throw NSError(domain: "", code: 1, userInfo: [:])
   }
 // CHECK-LABEL: sil hidden @_TToFE14foreign_errorsCSo8NSObject5abortfS0_FzT_T_ : $@convention(objc_method) (AutoreleasingUnsafeMutablePointer<Optional<NSError>>, NSObject) -> Bool
 // CHECK: [[T0:%.*]] = function_ref @_TFE14foreign_errorsCSo8NSObject5abortfS0_FzT_T_ : $@convention(method) (@guaranteed NSObject) -> @error ErrorType
@@ -76,7 +76,7 @@ extension NSObject {
 // CHECK:   return [[T0]] : $Bool
 
   @objc func badDescription() throws -> String {
-    throw NSError()
+    throw NSError(domain: "", code: 1, userInfo: [:])
   }
 // CHECK-LABEL: sil hidden @_TToFE14foreign_errorsCSo8NSObject14badDescriptionfS0_FzT_SS : $@convention(objc_method) (AutoreleasingUnsafeMutablePointer<Optional<NSError>>, NSObject) -> @autoreleased Optional<NSString>
 // CHECK: [[T0:%.*]] = function_ref @_TFE14foreign_errorsCSo8NSObject14badDescriptionfS0_FzT_SS : $@convention(method) (@guaranteed NSObject) -> (@owned String, @error ErrorType)
@@ -107,7 +107,7 @@ extension NSObject {
 // CHECK-LABEL: sil hidden @_TToFE14foreign_errorsCSo8NSObject10takeDoublefS0_FzTSd3intSi7closureFSiSi_T_ : $@convention(objc_method) (Double, Int, AutoreleasingUnsafeMutablePointer<Optional<NSError>>, @convention(block) (Int) -> Int, NSObject) -> Bool
 // CHECK: bb0([[D:%[0-9]+]] : $Double, [[INT:%[0-9]+]] : $Int, [[ERROR:%[0-9]+]] : $AutoreleasingUnsafeMutablePointer<Optional<NSError>>, [[CLOSURE:%[0-9]+]] : $@convention(block) (Int) -> Int, [[SELF:%[0-9]+]] : $NSObject):
   @objc func takeDouble(d: Double, int: Int, closure: (Int) -> Int) throws {
-    throw NSError()
+    throw NSError(domain: "", code: 1, userInfo: [:])
   }
 }
 

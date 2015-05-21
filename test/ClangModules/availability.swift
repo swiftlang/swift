@@ -109,3 +109,7 @@ func test_dispatch(object: dispatch_object_t) {
   dispatch_retain(object);  // expected-error {{'dispatch_retain' is unavailable}}
   dispatch_release(object); // expected-error {{'dispatch_release' is unavailable}}
 }
+
+func test_NSError() {
+  _ = NSError() // expected-error {{'init()' is unavailable: use 'init(domain:code:userInfo:)'}}
+}

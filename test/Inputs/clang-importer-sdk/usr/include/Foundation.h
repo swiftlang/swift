@@ -159,6 +159,7 @@ __attribute__((availability(ios,introduced=8.0)))
 @interface NSError : NSObject
 @property (readonly) NSString *domain;
 @property (readonly) NSInteger code;
+- (instancetype)initWithDomain:(NSString *)domain code:(NSInteger)code userInfo:(NSDictionary *)userInfo;
 @end
 
 @interface NSString : NSObject <NSSecureCoding, NSCopying>

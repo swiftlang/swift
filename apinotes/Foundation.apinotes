@@ -3088,6 +3088,10 @@ Classes:
     - S
     - O
     NullabilityOfRet: N
+  - Selector: 'init'
+    MethodKind: Instance
+    Availability: none
+    AvailabilityMsg: use 'init(domain:code:userInfo:)'
   - Selector: 'initWithDomain:code:userInfo:'
     MethodKind: Instance
     Nullability:

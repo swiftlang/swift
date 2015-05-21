@@ -28,7 +28,7 @@ enum Error4 : ErrorType {
 class NoneError1 {}
 
 func getError1() -> Error1 { return Error1() }
-func getNSError() -> NSError { return NSerror() }
+func getNSError() -> NSError { return NSError(domain: "", code: 1, userInfo: [:]) }
 
 func test001() {
   do {} catch #^CATCH1^#

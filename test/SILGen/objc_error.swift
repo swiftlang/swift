@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s | FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen %s | FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -15,12 +15,12 @@ func NSErrorErrorType_erasure(x: NSError) -> ErrorType {
 // on these.
 func test_doesnt_throw() {
   do {
-    throw NSError()
+    throw NSError(domain: "", code: 1, userInfo: [:])
   } catch is ErrorType {  // expected-warning {{'is' test is always true}}
   }
 
   do {
-    throw NSError()
+    throw NSError(domain: "", code: 1, userInfo: [:])
   } catch let e as NSError {  // ok.
     _ = e
   }

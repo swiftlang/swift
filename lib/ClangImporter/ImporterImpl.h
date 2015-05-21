@@ -745,7 +745,13 @@ public:
 
   /// Import attributes from the given Clang declaration to its Swift
   /// equivalent.
-  void importAttributes(const clang::NamedDecl *ClangDecl, Decl *MappedDecl);
+  ///
+  /// \param ClangDecl The decl being imported.
+  /// \param MappedDecl The decl to attach attributes to.
+  /// \param NewContext If present, the Clang node for the context the decl is
+  /// being imported into, which may affect info from API notes.
+  void importAttributes(const clang::NamedDecl *ClangDecl, Decl *MappedDecl,
+                        const clang::ObjCContainerDecl *NewContext = nullptr);
 
   /// If we already imported a given decl, return the corresponding Swift decl.
   /// Otherwise, return nullptr.
