@@ -3600,10 +3600,6 @@ void ConformanceChecker::checkConformance() {
 
   if (AlreadyComplained || invalid) {
     Conformance->setState(ProtocolConformanceState::Invalid);
-    return;
-  }
-  if (AlreadyComplained) {
-    Conformance->setState(ProtocolConformanceState::Invalid);
   } else {
     Conformance->setState(ProtocolConformanceState::Complete);
   }
