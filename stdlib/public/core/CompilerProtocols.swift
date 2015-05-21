@@ -60,6 +60,29 @@ public protocol _RawOptionSetType : RawRepresentable, Equatable {
   init(rawValue: RawValue)
 }
 
+/// Returns `true` iff `lhs.rawValue == rhs.rawValue`.
+public func == <
+  T : RawRepresentable where T.RawValue : Equatable
+>(lhs: T, rhs: T) -> Bool {
+  return lhs.rawValue == rhs.rawValue
+}
+
+/// Returns `true` iff `lhs.rawValue != rhs.rawValue`.
+public func != <
+  T : RawRepresentable where T.RawValue : Equatable
+>(lhs: T, rhs: T) -> Bool {
+  return lhs.rawValue != rhs.rawValue
+}
+
+// This overload is needed for ambiguity resolution against the
+// implementation of != for T : Equatable
+/// Returns `true` iff `lhs.rawValue != rhs.rawValue`.
+public func != <
+  T : Equatable where T : RawRepresentable, T.RawValue : Equatable
+>(lhs: T, rhs: T) -> Bool {
+  return lhs.rawValue != rhs.rawValue
+}
+
 public func == <T : _RawOptionSetType>(a: T, b: T) -> Bool {
   return a.rawValue == b.rawValue
 }
@@ -75,11 +98,6 @@ public func ^ <T : _RawOptionSetType>(a: T, b: T) -> T {
 }
 public prefix func ~ <T : _RawOptionSetType>(a: T) -> T {
   return T(rawValue: ~a.rawValue)
-}
-
-/// Protocol for C-like option sets.
-public protocol _OptionSetType {
-  // TODO: implementation, API review
 }
 
 /// Protocol for `NS_OPTIONS` imported from Objective-C.
