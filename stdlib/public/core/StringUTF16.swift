@@ -88,14 +88,14 @@ extension String {
       *, unavailable,
       message="Indexing a String's UTF16View requires a String.UTF16View.Index, which can be constructed from Int when Foundation is imported")
     public subscript(i: Int) -> UTF16.CodeUnit {
-      return self[Index(_offset: i)]
+      fatalError("unavailable function can't be called")
     }
 
     @available(
       *, unavailable,
       message="Slicing a String's UTF16View requires a Range<String.UTF16View.Index>, String.UTF16View.Index can be constructed from Int when Foundation is imported")
     public subscript(subRange: Range<Int>) -> UTF16View {
-      return self[Index(_offset: subRange.startIndex)..<Index(_offset: subRange.endIndex)]
+      fatalError("unavailable function can't be called")
     }
 #endif
 

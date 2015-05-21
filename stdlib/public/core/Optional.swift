@@ -81,29 +81,14 @@ extension Optional : CustomDebugStringConvertible {
 /// Haskell's fmap for Optionals.
 @available(*, unavailable, message="call the 'map()' method on the optional value")
 public func map<T, U>(x: T?, @noescape _ f: (T)->U) -> U? {
-  switch x {
-    case .Some(let y):
-      return .Some(f(y))
-    case .None:
-      return .None
-  }
+  fatalError("unavailable function can't be called")
 }
 
 
 /// Returns `f(self)!` iff `self` and `f(self)` are not nil.
 @available(*, unavailable, message="call the 'flatMap()' method on the optional value")
 public func flatMap<T, U>(x: T?, @noescape _ f: (T)->U?) -> U? {
-  switch x {
-  case .Some(let y):
-    switch f(y) {
-    case .Some(let z):
-      return .Some(z)
-    case .None:
-      return .None
-    }
-  case .None:
-    return .None
-  }
+  fatalError("unavailable function can't be called")
 }
 
 // Intrinsics for use by language features.

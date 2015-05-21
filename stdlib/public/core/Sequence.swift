@@ -183,7 +183,7 @@ public func _copyToNativeArrayBuffer<Args>(args: Args)
 /// actually Collections, this will return `x.count`.
 @available(*, unavailable, message="call the 'underestimateCount()' method on the sequence")
 public func underestimateCount<T : SequenceType>(x: T) -> Int {
-  return x.underestimateCount()
+  fatalError("unavailable function can't be called")
 }
 
 public struct _InitializeTo {}

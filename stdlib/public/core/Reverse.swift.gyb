@@ -17,7 +17,7 @@
 public func reverse<C:CollectionType where C.Index: BidirectionalIndexType>(
   source: C
 ) -> [C.Generator.Element] {
-  return Array(source.reverse())
+  fatalError("unavailable function can't be called")
 }
 
 % for traversal in ('Bidirectional', 'RandomAccess'):

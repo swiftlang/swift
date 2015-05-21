@@ -102,7 +102,7 @@ public func partition<
   _ range: Range<C.Index> ${"," if p else ""}
   ${"_ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
 ) -> C.Index {
-  return elements.partition(range ${", isOrderedBefore: isOrderedBefore" if p else ""})
+  fatalError("unavailable function can't be called")
 }
 
 func _partition<
@@ -301,11 +301,7 @@ public func sort<
   inout collection: C ${"," if p else ""}
   ${"_ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
 ) {
-% if p:
-  collection.sortInPlace(isOrderedBefore)
-% else:
-  collection.sortInPlace()
-% end
+  fatalError("unavailable function can't be called")
 }
 
 /// Sort `array` in-place${according}.
@@ -320,10 +316,7 @@ public func sort<T>(inout array: [T], _ isOrderedBefore: (T, T) -> Bool) {
 @available(*, unavailable, message="call the 'sortInPlace()' method on the collection")
 public func sort<T : Comparable>(inout array: [T]) {
 % end
-  return array.withUnsafeMutableBufferPointer {
-    a in a.sortInPlace(${"isOrderedBefore" if p else ""})
-    return
-  }
+  fatalError("unavailable function can't be called")
 }
 
 /// Sort `array` in-place${according}.
@@ -340,11 +333,7 @@ public func sort<T>(
 % else:
 public func sort<T : Comparable>(inout array: ContiguousArray<T>) {
 % end
-% if p:
-  array.sortInPlace(isOrderedBefore)
-% else:
-  array.sortInPlace()
-% end
+  fatalError("unavailable function can't be called")
 }
 
 /// Return an `Array` containing the sorted elements of `source`${according}.
@@ -359,11 +348,7 @@ public func sorted<
   source: C ${"," if p else ""}
   ${"_ isOrderedBefore: (C.Generator.Element, C.Generator.Element)->Bool" if p else ""}
 ) -> [C.Generator.Element] {
-% if p:
-  return source.sort(isOrderedBefore)
-% else:
-  return source.sort()
-% end
+  fatalError("unavailable function can't be called")
 }
 % end
 // for p in preds

@@ -683,9 +683,7 @@ extension ${Self} : _ArrayType {
   /// over the elements.
   @available(*, unavailable, message="call the 'sort()' method on the array")
   public func sorted(isOrderedBefore: (T, T) -> Bool) -> ${Self} {
-    var result = self
-    result.sortInPlace(isOrderedBefore)
-    return result
+    fatalError("unavailable function can't be called")
   }
 }
 

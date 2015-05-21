@@ -15,7 +15,7 @@
 /// O(1) if `T.Index` is `RandomAccessIndexType`; O(N) otherwise.
 @available(*, unavailable, message="access the 'count' property on the collection")
 public func count <T : CollectionType>(x: T) -> T.Index.Distance {
-  return x.count
+  fatalError("unavailable function can't be called")
 }
 
 public protocol _CollectionDefaultsType
@@ -244,13 +244,13 @@ public func ~> <T : CollectionType, R>(
 /// Returns `true` iff `x` is empty.
 @available(*, unavailable, message="access the 'isEmpty' property on the collection")
 public func isEmpty<C: CollectionType>(x: C) -> Bool {
-  return x.isEmpty
+  fatalError("unavailable function can't be called")
 }
 
 /// Returns the first element of `x`, or `nil` if `x` is empty.
 @available(*, unavailable, message="access the 'first' property on the collection")
 public func first<C: CollectionType>(x: C) -> C.Generator.Element? {
-  return x.first
+  fatalError("unavailable function can't be called")
 }
 
 /// Returns the last element of `x`, or `nil` if `x` is empty.
@@ -258,7 +258,7 @@ public func first<C: CollectionType>(x: C) -> C.Generator.Element? {
 public func last<C: CollectionType where C.Index: BidirectionalIndexType>(
   x: C
 ) -> C.Generator.Element? {
-  return x.last
+  fatalError("unavailable function can't be called")
 }
 
 public protocol _MutableCollectionDefaultsType : _CollectionDefaultsType {}
@@ -360,7 +360,7 @@ public struct IndexingGenerator<
 @available(*, unavailable, message="access the 'indices' property on the collection")
 public func indices<
     C : CollectionType>(x: C) -> Range<C.Index> {
-  return x.indices
+  fatalError("unavailable function can't be called")
 }
 
 /// A *generator* that adapts a *collection* `C` and any *sequence* of

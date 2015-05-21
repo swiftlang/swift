@@ -69,7 +69,7 @@ public struct MapSequenceView<Base : SequenceType, T> : SequenceType {
 public func map<S : SequenceType, T>(
   source: S, _ transform: (S.Generator.Element) -> T
 ) -> [T] {
-  return source.map(transform)
+  fatalError("unavailable function can't be called")
 }
 
 /// Return an `Array` containing the results of mapping `transform`
@@ -78,7 +78,7 @@ public func map<S : SequenceType, T>(
 public func flatMap<S : SequenceType, T>(
   source: S, @noescape _ transform: (S.Generator.Element) -> [T]
 ) -> [T] {
-  return source.flatMap(transform)
+  fatalError("unavailable function can't be called")
 }
 
 //===--- Collections ------------------------------------------------------===//
@@ -133,7 +133,7 @@ public struct MapCollectionView<Base : CollectionType, T> : CollectionType {
 public func map<C : CollectionType, T>(
   source: C, _ transform: (C.Generator.Element) -> T
 ) -> [T] {
-  return source.map(transform)
+  fatalError("unavailable function can't be called")
 }
 
 /// Return an `Array` containing the results of mapping `transform`
@@ -142,7 +142,7 @@ public func map<C : CollectionType, T>(
 public func flatMap<C : CollectionType, T>(
   source: C, _ transform: (C.Generator.Element) -> [T]
 ) -> [T] {
-  return source.flatMap(transform)
+  fatalError("unavailable function can't be called")
 }
 
 //===--- Support for lazy(s) ----------------------------------------------===//

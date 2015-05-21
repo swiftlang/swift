@@ -18,7 +18,7 @@ public func minElement<
      R : SequenceType
        where R.Generator.Element : Comparable>(elements: R)
   -> R.Generator.Element {
-  return elements.minElement()!
+  fatalError("unavailable function can't be called")
 }
 
 /// Returns the maximum element in `elements`.
@@ -29,7 +29,7 @@ public func maxElement<
      R : SequenceType
        where R.Generator.Element : Comparable>(elements: R)
   -> R.Generator.Element {
-  return elements.maxElement()!
+  fatalError("unavailable function can't be called")
 }
 
 /// Returns the first index where `value` appears in `domain` or `nil` if
@@ -40,7 +40,7 @@ public func maxElement<
 public func find<
   C: CollectionType where C.Generator.Element : Equatable
 >(domain: C, _ value: C.Generator.Element) -> C.Index? {
-  return domain.indexOf(value)
+  fatalError("unavailable function can't be called")
 }
 
 /// Returns the lesser of `x` and `y`.
@@ -158,7 +158,7 @@ public func startsWith<
     S0.Generator.Element : Equatable
 >(s: S0, _ prefix: S1) -> Bool
 {
-  return s.startsWith(prefix)
+  fatalError("unavailable function can't be called")
 }
 
 /// Returns `true` iff `s` begins with elements equivalent to those of
@@ -174,7 +174,7 @@ public func startsWith<
   @noescape _ isEquivalent: (S1.Generator.Element, S1.Generator.Element) -> Bool)
   -> Bool
 {
-  return s.startsWith(prefix, isEquivalent: isEquivalent)
+  fatalError("unavailable function can't be called")
 }
 
 /// The `GeneratorType` for `EnumerateSequence`.  `EnumerateGenerator`
@@ -266,7 +266,7 @@ public struct EnumerateSequence<Base : SequenceType> : SequenceType {
 public func enumerate<Seq : SequenceType>(
   base: Seq
 ) -> EnumerateSequence<Seq> {
-  return base.enumerate()
+  fatalError("unavailable function can't be called")
 }
 
 /// Returns `true` iff `a1` and `a2` contain the same elements in the
@@ -278,7 +278,7 @@ public func equal<
     S1.Generator.Element == S2.Generator.Element,
     S1.Generator.Element : Equatable
 >(a1: S1, _ a2: S2) -> Bool {
-  return a1.elementsEqual(a2)
+  fatalError("unavailable function can't be called")
 }
 
 /// Returns `true` iff `a1` and `a2` contain equivalent elements, using
@@ -293,7 +293,7 @@ public func equal<
 >(a1: S1, _ a2: S2,
   @noescape _ isEquivalent: (S1.Generator.Element, S1.Generator.Element) -> Bool)
   -> Bool {
-  return a1.elementsEqual(a2, isEquivalent: isEquivalent)
+  fatalError("unavailable function can't be called")
 }
 
 /// Returns `true` iff `a1` precedes `a2` in a lexicographical ("dictionary")
@@ -305,7 +305,7 @@ public func lexicographicalCompare<
     S1.Generator.Element == S2.Generator.Element,
     S1.Generator.Element : Comparable>(
   a1: S1, _ a2: S2) -> Bool {
-  return a1.lexicographicalCompare(a2)
+  fatalError("unavailable function can't be called")
 }
 
 /// Returns `true` iff `a1` precedes `a2` in a lexicographical ("dictionary")
@@ -324,7 +324,7 @@ public func lexicographicalCompare<
   @noescape isOrderedBefore less: (S1.Generator.Element, S1.Generator.Element)
   -> Bool
 ) -> Bool {
-  return a1.lexicographicalCompare(a2, isOrderedBefore: less)
+  fatalError("unavailable function can't be called")
 }
 
 /// Returns `true` iff an element in `seq` satisfies `predicate`.
@@ -332,7 +332,7 @@ public func lexicographicalCompare<
 public func contains<
   S : SequenceType, L : BooleanType
 >(seq: S, @noescape _ predicate: (S.Generator.Element) -> L) -> Bool {
-  return seq.contains({ predicate($0).boolValue })
+  fatalError("unavailable function can't be called")
 }
 
 /// Returns `true` iff `x` is in `seq`.
@@ -340,7 +340,7 @@ public func contains<
 public func contains<
   S : SequenceType where S.Generator.Element : Equatable
 >(seq: S, _ x: S.Generator.Element) -> Bool {
-  return seq.contains(x)
+  fatalError("unavailable function can't be called")
 }
 
 /// Returns the result of repeatedly calling `combine` with an
@@ -350,5 +350,5 @@ public func contains<
 public func reduce<S : SequenceType, U>(
   sequence: S, _ initial: U, @noescape _ combine: (U, S.Generator.Element) -> U
 ) -> U {
-  return sequence.reduce(initial, combine: combine)
+  fatalError("unavailable function can't be called")
 }

@@ -173,7 +173,7 @@ public struct FilterCollectionView<Base : CollectionType> : CollectionType {
 public func filter<S : SequenceType>(
   source: S, _ includeElement: (S.Generator.Element) -> Bool
 ) -> [S.Generator.Element] {
-  return source.filter(includeElement)
+  fatalError("unavailable function can't be called")
 }
 
 % traversals = ('Forward', 'Bidirectional', 'RandomAccess')

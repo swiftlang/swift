@@ -140,7 +140,7 @@ extension String {
   /// expression "[-+]?[0-9]+" only.
   @available(*, unavailable, message="Use Int() initializer")
   public func toInt() -> Int? {
-    return nil
+    fatalError("unavailable function can't be called")
   }
 }
 

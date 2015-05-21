@@ -546,12 +546,7 @@ extension String {
   
   @available(*, unavailable, message="cannot subscript String with an Int")
   public subscript(i: Int) -> Character {
-    _fatalErrorMessage(
-      "fatal error",
-      "cannot subscript String with an Int",
-      __FILE__,
-      __LINE__
-    )
+    fatalError("unavailable function can't be called")
   }
 
   /// Return a *generator* over the `Character`s.
@@ -583,7 +578,7 @@ extension String {
     *, unavailable,
     message="cannot subscript String with a range of Int")
   public subscript(subRange: Range<Int>) -> String {
-    return ""
+    fatalError("unavailable function can't be called")
   }
 }
 

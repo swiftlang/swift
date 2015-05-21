@@ -287,10 +287,7 @@ extension UnicodeScalar : Streamable {
 public func println<T, TargetStream : OutputStreamType>(
     value: T, inout _ target: TargetStream
 ) {
-  target._lock()
-  _print_unlocked(value, &target)
-  target.write("\n")
-  target._unlock()
+  fatalError("unavailable function can't be called")
 }
 
 /// Writes the textual representation of `value` and a newline character into
@@ -306,11 +303,7 @@ public func println<T, TargetStream : OutputStreamType>(
 @inline(never)
 @_semantics("stdlib_binary_only")
 public func println<T>(value: T) {
-  var target = _Stdout()
-  target._lock()
-  _print_unlocked(value, &target)
-  target.write("\n")
-  target._unlock()
+  fatalError("unavailable function can't be called")
 }
 
 /// Writes a single newline character into the standard output.
@@ -318,19 +311,14 @@ public func println<T>(value: T) {
 @inline(never)
 @_semantics("stdlib_binary_only")
 public func println() {
-  var target = _Stdout()
-  target._lock()
-  target.write("\n")
-  target._unlock()
+  fatalError("unavailable function can't be called")
 }
 
 /// Returns the result of `print`'ing `x` into a `String`.
 @available(*, unavailable, renamed="String")
 @inline(never)
 public func toString<T>(x: T) -> String {
-  var result = ""
-  print(x, &result, appendNewline: false)
-  return result
+  fatalError("unavailable function can't be called")
 }
 
 /// Write to `target` the textual representation of `x` most suitable
@@ -347,10 +335,7 @@ public func toString<T>(x: T) -> String {
 public func debugPrintln<T, TargetStream : OutputStreamType>(
     x: T, inout _ target: TargetStream
 ) {
-  target._lock()
-  _debugPrint_unlocked(x, &target)
-  target.write("\n")
-  target._unlock()
+  fatalError("unavailable function can't be called")
 }
 
 /// Write to the console the textual representation of `x` most suitable
@@ -365,19 +350,13 @@ public func debugPrintln<T, TargetStream : OutputStreamType>(
 @available(*, unavailable, renamed="debugPrint")
 @inline(never)
 public func debugPrintln<T>(x: T) {
-  var target = _Stdout()
-  target._lock()
-  _debugPrint_unlocked(x, &target)
-  target.write("\n")
-  target._unlock()
+  fatalError("unavailable function can't be called")
 }
 
 /// Returns the result of `debugPrint`'ing `x` into a `String`.
 @available(*, unavailable, message="use String(reflecting:)")
 public func toDebugString<T>(x: T) -> String {
-  var result = ""
-  debugPrint(x, &result)
-  return result
+  fatalError("unavailable function can't be called")
 }
 
 //===----------------------------------------------------------------------===//
