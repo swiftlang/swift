@@ -134,13 +134,8 @@ internal func _adHocPrint<T, TargetStream : OutputStreamType>(
     if mirror.count == 0 {
       return
     }
-    let (tag, payload) = mirror[0]
-    target.write(".")
-    target.write(tag)
+    let (_, payload) = mirror[0]
     if payload is _TupleMirror {
-      if payload.count == 0 {
-        return
-      }
       debugPrint(payload.value, &target, appendNewline: false)
       return
     }

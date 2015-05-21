@@ -380,7 +380,7 @@ StringMirrorTuple swift_TupleMirror_subscript(intptr_t i,
 }
   
 // Get a field name from a doubly-null-terminated list.
-static String getFieldName(const char *fieldNames, size_t i) {
+static const char *getFieldName(const char *fieldNames, size_t i) {
   const char *fieldName = fieldNames;
   for (size_t j = 0; j < i; ++j) {
     size_t len = strlen(fieldName);
@@ -388,7 +388,7 @@ static String getFieldName(const char *fieldNames, size_t i) {
     fieldName += len + 1;
   }
 
-  return String(fieldName);
+  return fieldName;
 }
 
 // -- Struct destructuring.
@@ -420,7 +420,7 @@ StringMirrorTuple swift_StructMirror_subscript(intptr_t i,
   auto bytes = reinterpret_cast<const char*>(value);
   auto fieldData = reinterpret_cast<const OpaqueValue *>(bytes + fieldOffset);
 
-  result.first = getFieldName(Struct->Description->Struct.FieldNames, i);
+  result.first = String(getFieldName(Struct->Description->Struct.FieldNames, i));
 
   // This matches the -1 in swift_unsafeReflectAny.
   swift_retain(owner);
@@ -433,22 +433,88 @@ StringMirrorTuple swift_StructMirror_subscript(intptr_t i,
 
 // -- Enum destructuring.
 
-extern "C"
-intptr_t swift_EnumMirror_count(HeapObject *owner,
-                                const OpaqueValue *value,
-                                const Metadata *type) {
+static bool isEnumReflectable(const Metadata *type) {
   const auto Enum = static_cast<const EnumMetadata *>(type);
   const auto &Description = Enum->Description->Enum;
 
   // No metadata for C and @objc enums yet
   if (Description.CaseNames == nullptr)
-    return 0;
+    return false;
 
   // No metadata for multi-payload enums with non-trivial layout yet
   if (Description.getNumPayloadCases() > 1 && !Enum->hasPayloadSize())
+    return false;
+
+  return true;
+}
+
+static void getEnumMirrorInfo(HeapObject *owner,
+                              const OpaqueValue *value,
+                              const Metadata *type,
+                              const Metadata **payloadTypePtr,
+                              int *tagPtr) {
+  const auto Enum = static_cast<const EnumMetadata *>(type);
+  const auto &Description = Enum->Description->Enum;
+
+  unsigned emptyCases = Description.getNumEmptyCases();
+  unsigned payloadCases = Description.getNumPayloadCases();
+
+  const Metadata *payloadType;
+  int tag;
+
+  switch (Description.getNumPayloadCases()) {
+  case 0:
+    payloadType = nullptr;
+    tag = swift_getEnumCaseSimple(value, emptyCases);
+    break;
+  case 1:
+    payloadType = Description.GetCaseTypes(type)[0];
+    tag = swift_getEnumCaseSinglePayload(value, payloadType, emptyCases);
+    if (tag != -1) payloadType = nullptr;
+    tag++;
+    break;
+  default:
+    tag = swift_getEnumCaseMultiPayload(value, Enum);
+    payloadType = Description.GetCaseTypes(type)[tag];
+    if (static_cast<unsigned>(tag) >= payloadCases)
+      payloadType = nullptr;
+    break;
+  }
+
+  *payloadTypePtr = payloadType;
+  *tagPtr = tag;
+}
+
+extern "C"
+const char *swift_EnumMirror_caseName(HeapObject *owner,
+                                      const OpaqueValue *value,
+                                      const Metadata *type) {
+  if (!isEnumReflectable(type))
+    return NULL;
+
+  const auto Enum = static_cast<const EnumMetadata *>(type);
+  const auto &Description = Enum->Description->Enum;
+
+  const Metadata *payloadType;
+  int tag;
+
+  getEnumMirrorInfo(owner, value, type, &payloadType, &tag);
+  return getFieldName(Description.CaseNames, tag);
+}
+
+extern "C"
+intptr_t swift_EnumMirror_count(HeapObject *owner,
+                                const OpaqueValue *value,
+                                const Metadata *type) {
+  if (!isEnumReflectable(type))
     return 0;
 
-  return 1;
+  const Metadata *payloadType;
+  int tag;
+
+  getEnumMirrorInfo(owner, value, type, &payloadType, &tag);
+
+  return (payloadType != nullptr) ? 1 : 0;
 }
 
 extern "C"
@@ -462,38 +528,14 @@ StringMirrorTuple swift_EnumMirror_subscript(intptr_t i,
   const auto &Description = Enum->Description->Enum;
 
   const Metadata *payloadType;
-  unsigned emptyCases = Description.getNumEmptyCases();
-  unsigned payloadCases = Description.getNumPayloadCases();
-  bool hasPayload = false;
   int tag;
 
-  switch (Description.getNumPayloadCases()) {
-  case 0:
-    payloadType = nullptr;
-    tag = swift_getEnumCaseSimple(value, emptyCases);
-    hasPayload = false;
-    break;
-  case 1:
-    payloadType = Description.GetCaseTypes(type)[0];
-    tag = swift_getEnumCaseSinglePayload(value, payloadType, emptyCases);
-    if (tag == -1) hasPayload = true;
-    tag++;
-    break;
-  default:
-    tag = swift_getEnumCaseMultiPayload(value, Enum);
-    payloadType = Description.GetCaseTypes(type)[tag];
-    hasPayload = (static_cast<unsigned>(tag) < payloadCases);
-    break;
-  }
-
-  // If there's no payload, just show the empty tuple
-  if (!hasPayload)
-    payloadType = &_TMdT_;
+  getEnumMirrorInfo(owner, value, type, &payloadType, &tag);
 
   // This matches the -1 in swift_unsafeReflectAny.
   swift_retain(owner);
 
-  result.first = getFieldName(Description.CaseNames, tag);
+  result.first = String(getFieldName(Description.CaseNames, tag));
   result.second = swift_unsafeReflectAny(owner, value, payloadType);
 
   return result;
@@ -582,7 +624,7 @@ StringMirrorTuple swift_ClassMirror_subscript(intptr_t i,
   auto bytes = *reinterpret_cast<const char * const*>(value);
   auto fieldData = reinterpret_cast<const OpaqueValue *>(bytes + fieldOffset);
   
-  result.first = getFieldName(Clas->getDescription()->Class.FieldNames, i);
+  result.first = String(getFieldName(Clas->getDescription()->Class.FieldNames, i));
   // 'owner' is consumed by this call.
   result.second = swift_unsafeReflectAny(owner, fieldData, fieldType);
   return result;

@@ -174,13 +174,19 @@ print("\(intArrayMirror[4].0): \(intArrayMirror[4].1.summary)")
 
 // Simple enum with no payload
 
-enum JustSomeEnum {case A,B}
+// CHECK-NEXT: Enum tests
+print("Enum tests")
+
+enum JustSomeEnum {case A,ß}
 
 // CHECK-NEXT: JustSomeEnum.A
 print(JustSomeEnum.A)
 
-// CHECK-NEXT: JustSomeEnum.B
-print(JustSomeEnum.B)
+// CHECK-NEXT: JustSomeEnum.ß
+print(JustSomeEnum.ß)
+
+// CHECK-NEXT: 0
+print(reflect(JustSomeEnum.A).count)
 
 enum Highlander {case ThereCanOnlyBeOne}
 
@@ -201,6 +207,9 @@ print(Pet.Cat)
 // CHECK-NEXT: Pet.Volleyball("Wilson", 2000)
 print(Pet.Volleyball("Wilson", 2000))
 
+// CHECK-NEXT: 1
+print(reflect(Pet.Volleyball("Wilson", 2000)).count)
+
 // Single payload enum with single case
 enum Exaggeration<T> {
   case Claim(T)
@@ -208,6 +217,9 @@ enum Exaggeration<T> {
 
 // CHECK-NEXT: Exaggeration<Swift.Array<Swift.Int>>.Claim([])
 print(Exaggeration<Array<Int>>.Claim([]))
+
+// CHECK-NEXT: 1
+print(reflect(Exaggeration<Array<Int>>.Claim([])).count)
 
 // Multi-payload enum
 enum Hylomorphism {
@@ -217,6 +229,9 @@ enum Hylomorphism {
 
 // CHECK-NEXT: Hylomorphism
 print(Hylomorphism.Yin(5))
+
+// CHECK-NEXT: 0
+print(reflect(Hylomorphism.Yin(5)).count)
 
 // Multi-payload enum with generic type arguments
 // This one has enough metadata to get the tag and payload out
@@ -228,6 +243,9 @@ enum Transportation<T, S> {
 
 // CHECK-NEXT: Transportation<Swift.Int, Swift.String>.Horse(31337)
 print(Transportation<Int, String>.Horse(31337))
+
+// CHECK-NEXT: 1
+print(reflect(Transportation<Int, String>.Horse(31337)).count)
 
 // CHECK-NEXT: Transportation<Swift.Int, Swift.String>.Roadster("Porsche")
 print(Transportation<Int, String>.Roadster("Porsche"))

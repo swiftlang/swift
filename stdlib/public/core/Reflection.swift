@@ -438,12 +438,19 @@ struct _EnumMirror : MirrorType {
   var count: Int {
     @asmname("swift_EnumMirror_count")get
   }
+  var caseName: UnsafePointer<CChar> {
+    @asmname("swift_EnumMirror_caseName")get
+  }
   subscript(i: Int) -> (String, MirrorType) {
     @asmname("swift_EnumMirror_subscript")get
   }
-
   var summary: String {
-    return _stdlib_getDemangledTypeName(value)
+    let maybeCaseName = String.fromCString(self.caseName)
+    let typeName = _stdlib_getDemangledTypeName(value)
+    if let caseName = maybeCaseName {
+      return typeName + "." + caseName
+    }
+    return typeName
   }
   var quickLookObject: QuickLookObject? { return nil }
   var disposition: MirrorDisposition { return .Enum }
