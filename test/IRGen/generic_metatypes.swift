@@ -12,6 +12,7 @@
 // RUN: %swift -target x86_64-unknown-linux-gnu -disable-objc-interop -emit-ir -parse-stdlib -primary-file %s | FileCheck --check-prefix=CHECK --check-prefix=CHECK-64 %s
 
 // REQUIRES: X86
+// REQUIRES: enable_target_appletvos
 
 // CHECK: define hidden %swift.type* [[GENERIC_TYPEOF:@_TF17generic_metatypes13genericTypeof.*]](%swift.opaque*, %swift.type* [[TYPE:%.*]])
 func genericTypeof<T>(x: T) -> T.Type {
