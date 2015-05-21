@@ -66,9 +66,12 @@ namespace constraints {
 class SavedTypeVariableBinding {
   /// \brief The type variable.
   TypeVariableType *TypeVar;
-
+  
   /// \brief The parent or fixed type.
   llvm::PointerUnion<TypeVariableType *, TypeBase *> ParentOrFixed;
+
+  /// \brief The type variable options.
+  unsigned Options : 3;
 
 public:
   explicit SavedTypeVariableBinding(TypeVariableType *typeVar);
@@ -287,19 +290,20 @@ public:
                                constraints::SavedTypeVariableBindings *record) {
     // Merge the equivalence classes corresponding to these two type
     // variables. Always merge 'up' the constraint stack, because it is simpler.
-    if (getID() < other->getImpl().getID()) {
-      auto rep = other->getImpl().getRepresentative(record);
+    if (getID() > other->getImpl().getID()) {
+      other->getImpl().mergeEquivalenceClasses(getTypeVariable(), record);
+      return;
+    }
+
+    auto otherRep = other->getImpl().getRepresentative(record);
+    if (record)
+      otherRep->getImpl().recordBinding(*record);
+    otherRep->getImpl().ParentOrFixed = getTypeVariable();
+    assert(otherRep->getImpl().canBindToLValue() == canBindToLValue());
+    if (!mustBeMaterializable() && otherRep->getImpl().mustBeMaterializable()) {
       if (record)
-        rep->getImpl().recordBinding(*record);
-      rep->getImpl().ParentOrFixed = getTypeVariable();
-      assert(rep->getImpl().canBindToLValue() == canBindToLValue());
-    } else {
-      auto rep = getRepresentative(record);
-      if (record)
-        rep->getImpl().recordBinding(*record);
-      rep->getImpl().ParentOrFixed = other;
-      assert(rep->getImpl().canBindToLValue()
-               == other->getImpl().canBindToLValue());
+        recordBinding(*record);
+      Options |= TVO_MustBeMaterializable;
     }
   }
 
@@ -333,6 +337,15 @@ public:
     if (record)
       rep->getImpl().recordBinding(*record);
     rep->getImpl().ParentOrFixed = type.getPointer();
+  }
+
+  void setMustBeMaterializable(constraints::SavedTypeVariableBindings *record) {
+    auto rep = getRepresentative(record);
+    if (!rep->getImpl().mustBeMaterializable()) {
+      if (record)
+        rep->getImpl().recordBinding(*record);
+      rep->getImpl().Options |= TVO_MustBeMaterializable;
+    }
   }
 
   /// \brief Print the type variable to the given output stream.
@@ -1908,6 +1921,11 @@ public:
   /// a complete solution from partial solutions.
   void assignFixedType(TypeVariableType *typeVar, Type type,
                        bool updateState = true);
+
+  // \brief Set the TVO_MustBeMaterializable bit on all type variables
+  // necessary to ensure that the type in question is materializable in a
+  // viable solution.
+  void setMustBeMaterializableRecursive(Type type);
   
   /// \brief Determine if the type in question is an Array<T>.
   bool isArrayType(Type t);

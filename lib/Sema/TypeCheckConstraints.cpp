@@ -79,9 +79,11 @@ TypeBase *TypeVariableType::getBaseBeingSubstituted() {
 }
 
 SavedTypeVariableBinding::SavedTypeVariableBinding(TypeVariableType *typeVar)
-  : TypeVar(typeVar), ParentOrFixed(typeVar->getImpl().ParentOrFixed) { }
+  : TypeVar(typeVar), ParentOrFixed(typeVar->getImpl().ParentOrFixed),
+    Options(typeVar->getImpl().Options) { }
 
 void SavedTypeVariableBinding::restore() {
+  TypeVar->getImpl().Options = Options;
   TypeVar->getImpl().ParentOrFixed = ParentOrFixed;
 }
 
@@ -2170,6 +2172,8 @@ void ConstraintSystem::print(raw_ostream &out) {
     tv->getImpl().print(out);
     if (tv->getImpl().canBindToLValue())
       out << " [lvalue allowed]";
+    if (tv->getImpl().mustBeMaterializable())
+      out << " [must be materializable]";
     auto rep = getRepresentative(tv);
     if (rep == tv) {
       if (auto fixed = getFixedType(tv)) {
