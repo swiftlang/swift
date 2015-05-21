@@ -528,6 +528,8 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
   case FieldAccess::NonConstantDirect: {
     Address offsetA = IGF.IGM.getAddrOfFieldOffset(field, /*indirect*/ false,
                                                    NotForDefinition);
+    auto offsetVar = cast<llvm::GlobalVariable>(offsetA.getAddress());
+    offsetVar->setConstant(false);
     auto offset = IGF.Builder.CreateLoad(offsetA, "offset");
     return emitAddressAtOffset(IGF, baseType, base, offset, field);
   }
@@ -543,6 +545,8 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
     Address indirectOffsetA =
       IGF.IGM.getAddrOfFieldOffset(field, /*indirect*/ true,
                                    NotForDefinition);
+    auto offsetVar = cast<llvm::GlobalVariable>(indirectOffsetA.getAddress());
+    offsetVar->setConstant(false);
     auto indirectOffset =
       IGF.Builder.CreateLoad(indirectOffsetA, "indirect-offset");
     auto offsetA =
