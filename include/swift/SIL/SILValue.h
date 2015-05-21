@@ -106,15 +106,10 @@ public:
   bool use_empty() const { return FirstUse == nullptr; }
 
   using use_iterator = ValueBaseUseIterator;
-  using const_use_iterator = const ValueBaseUseIterator;
 
-  inline use_iterator use_begin();
-  inline use_iterator use_end();
-  inline Range<use_iterator> getUses();
-
-  inline const_use_iterator use_begin() const;
-  inline const_use_iterator use_end() const;
-  inline Range<const_use_iterator> getUses() const;
+  inline use_iterator use_begin() const;
+  inline use_iterator use_end() const;
+  inline Range<use_iterator> getUses() const;
 
   inline bool hasOneUse() const;
 
@@ -206,17 +201,12 @@ public:
   }
 
   using use_iterator = ValueUseIterator;
-  using const_use_iterator = const ValueUseIterator;
 
   inline bool use_empty() const;
-  inline use_iterator use_begin();
-  inline use_iterator use_end();
-  inline Range<use_iterator> getUses();
+  inline use_iterator use_begin() const;
+  inline use_iterator use_end() const;
+  inline Range<use_iterator> getUses() const;
   inline bool hasOneUse() const;
-
-  inline const_use_iterator use_begin() const;
-  inline const_use_iterator use_end() const;
-  inline Range<const_use_iterator> getUses() const;
 
   // Return the underlying SILValue after stripping off all casts from the
   // current SILValue.
@@ -478,28 +468,19 @@ public:
     return !(lhs == rhs);
   }
 };
-inline ValueBase::use_iterator ValueBase::use_begin() {
+inline ValueBase::use_iterator ValueBase::use_begin() const {
   return ValueBase::use_iterator(FirstUse);
 }
-inline ValueBase::use_iterator ValueBase::use_end() {
+inline ValueBase::use_iterator ValueBase::use_end() const {
   return ValueBase::use_iterator(nullptr);
 }
-inline Range<ValueBase::use_iterator> ValueBase::getUses() {
+inline Range<ValueBase::use_iterator> ValueBase::getUses() const {
   return { use_begin(), use_end() };
 }
 inline bool ValueBase::hasOneUse() const {
   auto I = use_begin(), E = use_end();
   if (I == E) return false;
   return ++I == E;
-}
-inline ValueBase::const_use_iterator ValueBase::use_begin() const {
-  return ValueBase::const_use_iterator(FirstUse);
-}
-inline ValueBase::const_use_iterator ValueBase::use_end() const {
-  return ValueBase::const_use_iterator(nullptr);
-}
-inline Range<ValueBase::const_use_iterator> ValueBase::getUses() const {
-  return {use_begin(), use_end()};
 }
 
 /// An iterator over all uses of a specific result of a ValueBase.
@@ -552,13 +533,13 @@ public:
     return !(lhs == rhs);
   }
 };
-inline SILValue::use_iterator SILValue::use_begin() {
+inline SILValue::use_iterator SILValue::use_begin() const {
   return SILValue::use_iterator((*this)->FirstUse, getResultNumber());
 }
-inline SILValue::use_iterator SILValue::use_end() {
+inline SILValue::use_iterator SILValue::use_end() const {
   return SILValue::use_iterator(nullptr, 0);
 }
-inline Range<SILValue::use_iterator> SILValue::getUses() {
+inline Range<SILValue::use_iterator> SILValue::getUses() const {
   return { use_begin(), use_end() };
 }
 inline bool SILValue::use_empty() const { return use_begin() == use_end(); }
@@ -566,16 +547,6 @@ inline bool SILValue::hasOneUse() const {
   auto I = use_begin(), E = use_end();
   if (I == E) return false;
   return ++I == E;
-}
-
-inline SILValue::const_use_iterator SILValue::use_begin() const {
-  return SILValue::const_use_iterator((*this)->FirstUse, getResultNumber());
-}
-inline SILValue::const_use_iterator SILValue::use_end() const {
-  return SILValue::const_use_iterator(nullptr, 0);
-}
-inline Range<SILValue::const_use_iterator> SILValue::getUses() const {
-  return {use_begin(), use_end()};
 }
 
 /// A constant-size list of the operands of an instruction.
