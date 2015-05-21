@@ -19,6 +19,7 @@
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/Utils/CFG.h"
+#include "swift/SIL/DebugUtils.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -179,6 +180,10 @@ public:
     Oper = &UserInst->getOperandRef();
     return false;
   }
+  bool visitDebugValueAddrInst(DebugValueAddrInst *UserInst) {
+    Oper = &UserInst->getOperandRef();
+    return false;
+  }
   bool visitInitEnumDataAddrInst(InitEnumDataAddrInst *UserInst) {
     llvm_unreachable("illegal reinitialization");
   }
@@ -294,6 +299,7 @@ class CopyForwarding {
 
   bool HasForwardedToCopy;
   SmallPtrSet<SILInstruction*, 16> SrcUserInsts;
+  SmallPtrSet<DebugValueAddrInst*, 4> SrcDebugValueInsts;
   SmallVector<CopyAddrInst*, 4> TakePoints;
   SmallVector<DestroyAddrInst*, 4> DestroyPoints;
   SmallPtrSet<SILBasicBlock*, 32> DeadInBlocks;
@@ -321,6 +327,7 @@ public:
     IsLoadedFrom = false;
     HasForwardedToCopy = false;
     SrcUserInsts.clear();
+    SrcDebugValueInsts.clear();
     TakePoints.clear();
     DestroyPoints.clear();
     DeadInBlocks.clear();
@@ -394,8 +401,10 @@ bool CopyForwarding::collectUsers() {
     case ValueKind::ExistentialMetatypeInst:
     case ValueKind::InjectEnumAddrInst:
     case ValueKind::StoreInst:
-    case ValueKind::DebugValueAddrInst:
       SrcUserInsts.insert(UserInst);
+      break;
+    case ValueKind::DebugValueAddrInst:
+      SrcDebugValueInsts.insert(cast<DebugValueAddrInst>(UserInst));
       break;
     default:
       // Most likely one of:
@@ -668,13 +677,33 @@ bool CopyForwarding::backwardPropagateCopy(
   // most recent init of CopySrc.
   bool seenInit = false;
   SmallVector<Operand*, 16> ValueUses;
+  SmallVector<DebugValueAddrInst*, 4> DebugValueInstsToDelete;
   SILBasicBlock::iterator SI = CopyInst, SE = CopyInst->getParent()->begin();
   while (SI != SE) {
     --SI;
     SILInstruction *UserInst = &*SI;
+
+    if (auto *DVAI = dyn_cast<DebugValueAddrInst>(UserInst)) {
+      if (DestUserInsts.count(DVAI)) {
+        // The debug_value_addr would not be valid anymore after copy
+        // propagation. We just delete it.
+        DebugValueInstsToDelete.push_back(DVAI);
+        continue;
+      }
+      if (SrcDebugValueInsts.count(DVAI)) {
+        // Replace the operand in this debug_value_addr instruction.
+        ValueUses.push_back(&DVAI->getOperandRef());
+        continue;
+      }
+    }
+
     // If we see another use of Dest, then Dest is live after the Src location
     // is initialized, so we really need the copy.
     if (DestUserInsts.count(UserInst) || UserInst == CopyDestDef) {
+      if (auto *DVAI = dyn_cast<DebugValueAddrInst>(UserInst)) {
+        DebugValueInstsToDelete.push_back(DVAI);
+        continue;
+      }
       DEBUG(llvm::dbgs() << "  Skipping copy" << *CopyInst
             << "    dest used by " << *UserInst);
       return false;
@@ -697,6 +726,9 @@ bool CopyForwarding::backwardPropagateCopy(
   if (!seenInit)
     return false;
 
+  for (auto *DVAI : DebugValueInstsToDelete)
+    DVAI->eraseFromParent();
+  
   // Convert a reinitialization of this address into a destroy, followed by an
   // initialization. Replacing a copy with a destroy+init is not by itself
   // profitable. However, it does allow us to eliminate the later copy, and the
@@ -920,7 +952,7 @@ static bool canNRVO(CopyAddrInst *CopyInst) {
     return false;
 
   SILValue CopyDest = CopyInst->getDest();
-  if (!CopyDest->hasOneUse())
+  if (!hasOneNonDebugUse(CopyDest))
     return false;
 
   SILBasicBlock::iterator SI = CopyInst, SE = BB->end();

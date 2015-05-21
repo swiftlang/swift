@@ -39,6 +39,7 @@ bb3:
 // CHECK-NEXT: return
 sil [fragile] @dead_arg_with_callsites : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
+  debug_value %0 : $Builtin.NativeObject // debug_value of a dead arg should also be deleted.
   cond_br undef, bb1, bb2
 
 bb1:

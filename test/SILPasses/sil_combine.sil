@@ -1157,6 +1157,7 @@ sil @unchecked_addr_cast_forwarding : $@convention(thin) (@inout Builtin.NativeO
 bb0(%0 : $*Builtin.NativeObject):
   %1 = unchecked_addr_cast %0 : $*Builtin.NativeObject to $*Builtin.RawPointer
   %2 = unchecked_addr_cast %1 : $*Builtin.RawPointer to $*Builtin.Word
+  debug_value %2 : $*Builtin.Word // should not prevent the optimization
   %3 = load %2 : $*Builtin.Word
   return %3 : $Builtin.Word
 }
@@ -1230,6 +1231,7 @@ bb0(%0 : $*FakeOptional<B>):
 
 bb1:
   %2 = unchecked_take_enum_data_addr %0 : $*FakeOptional<B>, #FakeOptional.Some!enumelt.1
+  debug_value %2 : $*B  // should not prevent the optimization
   %3 = load %2 : $*B
   return %3 : $B
 
@@ -2528,4 +2530,32 @@ bb0(%0 : $*_HeapBuffer<C, Int>):
   strong_release %17 : $Builtin.BridgeObject      // id: %18
   %19 = tuple ()                                  // user: %20
   return %19 : $()                                // id: %20
+}
+
+struct NStruct {
+	var a:Int
+	var b:Int
+}
+
+final class NClass {
+	init(news: NStruct)
+	var s: NStruct
+}
+
+// CHECK-LABEL: sil @narrow_load_with_debug_value
+// CHECK: bb0(%0 : $NClass):
+// CHECK: debug_value %0
+// CHECK: [[C:%[0-9]+]] = ref_element_addr %0
+// CHECK: [[S:%[0-9]+]] = struct_element_addr [[C]]
+// CHECK: [[R:%[0-9]+]] = load [[S]]
+// CHECK: return [[R]]
+sil @narrow_load_with_debug_value : $@convention(thin) (@owned NClass) -> Int {
+bb0(%0 : $NClass):
+  debug_value %0 : $NClass  // let c             // id: %1
+  %2 = ref_element_addr %0 : $NClass, #NClass.s // user: %3
+  %3 = load %2 : $*NStruct                       // users: %4, %5
+  debug_value %3 : $NStruct  // let xx           // id: %4
+  %5 = struct_extract %3 : $NStruct, #NStruct.a // user: %7
+  strong_release %0 : $NClass                    // id: %6
+  return %5 : $Int                                // id: %7
 }

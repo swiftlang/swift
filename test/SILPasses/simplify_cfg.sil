@@ -323,6 +323,24 @@ bb3(%4 : $Int64):
   return %4 : $Int64
 }
 
+// CHECK-LABEL: @elim_trampoline_debug
+// CHECK-NOT: cond_br %0, bb1(%1 : $Int64), bb1(%1 : $Int64)
+// CHECK: return
+sil @elim_trampoline_debug : $@convention(thin) (Builtin.Int1, Int64) -> Int64 {
+bb0(%0 : $Builtin.Int1, %1 : $Int64):
+  cond_br %0, bb1(%1 : $Int64), bb2(%1 : $Int64)
+
+bb1(%2 : $Int64):
+  debug_value %0 : $Builtin.Int1
+  br bb3(%2 : $Int64)
+
+bb2(%3 : $Int64):
+  br bb3(%3 : $Int64)
+
+bb3(%4 : $Int64):
+  return %4 : $Int64
+}
+
 // CHECK-LABEL: @elim_trampoline3
 // CHECK:  cond_br %0, bb1, bb2
 // CHECK:bb1:

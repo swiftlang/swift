@@ -188,7 +188,9 @@ bb0(%0 : $S1):
 // CHECK: apply [[FN]]([[EXT3]], [[EXT1]])
 sil [fragile] @multiple_level_all_root_fields_used_callee : $@convention(thin) (S2) -> (Builtin.Int16, Builtin.Int64) {
 bb0(%0 : $S2):
+  debug_value %0 : $S2 // debug_value should not prevent function signature optimization
   %1 = struct_extract %0 : $S2, #S2.f1
+  debug_value %1 : $S1 // debug_value should not prevent function signature optimization
   %2 = struct_extract %1 : $S1, #S1.f1
   %3 = struct_extract %0 : $S2, #S2.f2
   %4 = tuple(%2 : $Builtin.Int16, %3 : $Builtin.Int64)

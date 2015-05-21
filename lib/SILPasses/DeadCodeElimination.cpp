@@ -16,6 +16,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILUndef.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SILPasses/Transforms.h"
@@ -44,10 +45,6 @@ static bool seemsUseful(SILInstruction *I) {
 
   if (isa<ReturnInst>(I) || isa<AutoreleaseReturnInst>(I) ||
       isa<UnreachableInst>(I) || isa<ThrowInst>(I))
-    return true;
-
-  if (debugValuesPropagateLiveness() &&
-      (isa<DebugValueInst>(I) || isa<DebugValueAddrInst>(I)))
     return true;
 
   return false;
@@ -255,6 +252,12 @@ void DCE::markTerminatorArgsLive(SILBasicBlock *Pred,
 // Propagate liveness back from Arg to the terminator arguments that
 // supply its value.
 void DCE::propagateLiveBlockArgument(SILArgument *Arg) {
+  // Conceptually, the dependency from a debug instruction to it's definition
+  // is in reverse direction: Only if it's definition (the Arg) is alive, also
+  // the debug_value instruction is alive.
+  for (Operand *DU : getDebugUses(*Arg))
+    markValueLive(DU->getUser());
+
   if (Arg->isFunctionArg())
     return;
 
@@ -271,6 +274,13 @@ void DCE::propagateLiveness(SILInstruction *I) {
   if (!isa<TermInst>(I)) {
     for (auto &O : I->getAllOperands())
       markValueLive(O.get().getDef());
+
+    // Conceptually, the dependency from a debug instruction to it's definition
+    // is in reverse direction: Only if it's definition is alive, also the
+    // debug_value instruction is alive.
+    for (Operand *DU : getDebugUses(*I))
+      markValueLive(DU->getUser());
+
     return;
   }
 

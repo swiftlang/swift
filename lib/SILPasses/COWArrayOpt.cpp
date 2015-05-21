@@ -17,6 +17,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SILAnalysis/ArraySemantic.h"
 #include "swift/SILAnalysis/AliasAnalysis.h"
 #include "swift/SILAnalysis/ARCAnalysis.h"
@@ -700,6 +701,9 @@ bool COWArrayOpt::checkSafeArrayValueUses(UserList &ArrayValueUsers) {
     if (isa<MarkDependenceInst>(UseInst))
       continue;
 
+    if (isDebugInst(UseInst))
+      continue;
+    
     // Found an unsafe or unknown user. The Array may escape here.
     DEBUG(llvm::dbgs() << "    Skipping Array: unsafe Array value use!\n    "
           << *UseInst);
@@ -760,6 +764,9 @@ bool COWArrayOpt::checkSafeArrayElementUse(SILInstruction *UseInst,
   if (isa<MarkDependenceInst>(UseInst))
     return true;
 
+  if (isDebugInst(UseInst))
+    return true;
+  
   // If this is an instruction which is a safe array element use if and only if
   // all of its users are safe array element uses, recursively check its uses
   // and return false if any of them are not transitive escape array element

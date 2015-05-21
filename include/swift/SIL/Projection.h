@@ -532,6 +532,7 @@ public:
                  SILType BaseTy);
 
   /// Compute liveness and use information in this projection tree using Base.
+  /// All debug instructions (debug_value, debug_value_addr) are ignored.
   void computeUsesAndLiveness(SILValue Base);
 
   /// Return the module associated with this tree.

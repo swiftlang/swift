@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-projection"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/DebugUtils.h"
 #include "llvm/ADT/None.h"
 #include "llvm/Support/Debug.h"
 
@@ -543,7 +544,7 @@ processUsersOfValue(ProjectionTree &Tree,
   DEBUG(llvm::dbgs() << "    Looking at Users:\n");
 
   // For all uses of V...
-  for (Operand *Op : Value.getUses()) {
+  for (Operand *Op : getNonDebugUses(Value)) {
     // Grab the User of V.
     SILInstruction *User = Op->getUser();
 

@@ -23,6 +23,7 @@
 #include "SILCombiner.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SILAnalysis/AliasAnalysis.h"
 #include "swift/SILAnalysis/SimplifyInstruction.h"
 #include "swift/SILPasses/Transforms.h"
@@ -77,7 +78,8 @@ void SILCombiner::addReachableCodeToWorklist(SILBasicBlock *BB) {
         // to centralize all instruction removal in SILCombine into this one
         // function. This is important if we want to be able to update analyses
         // in a clean manner.
-        eraseInstFromFunction(*Inst, false /*Don't add operands to worklist*/);
+        eraseInstFromFunction(*Inst, BBI,
+                              false /*Don't add operands to worklist*/);
         continue;
       }
 
@@ -308,10 +310,11 @@ replaceInstUsesWith(SILInstruction &I, ValueBase *V, unsigned IIndex,
 // instruction and upon completion of their peephole return the value returned
 // by this method.
 SILInstruction *SILCombiner::eraseInstFromFunction(SILInstruction &I,
-                                                   bool AddOperandsToWorklist) {
+                                            SILBasicBlock::iterator &InstIter,
+                                            bool AddOperandsToWorklist) {
   DEBUG(llvm::dbgs() << "SC: ERASE " << I << '\n');
 
-  assert(I.use_empty() && "Cannot erase instruction that is used!");
+  assert(hasNoUsesExceptDebug(&I) && "Cannot erase instruction that is used!");
   // Make sure that we reprocess all operands now that we reduced their
   // use counts.
   if (I.getNumOperands() < 8 && AddOperandsToWorklist)
@@ -326,8 +329,11 @@ SILInstruction *SILCombiner::eraseInstFromFunction(SILInstruction &I,
       if (auto *Edge = CG->getCallGraphEdge(AI))
         CG->removeEdge(Edge);
 
+  for (Operand *DU : getDebugUses(I))
+    Worklist.remove(DU->getUser());
+
   Worklist.remove(&I);
-  I.eraseFromParent();
+  eraseFromParentWithDebugInsts(&I, InstIter);
   MadeChange = true;
   return nullptr;  // Don't do anything with I
 }

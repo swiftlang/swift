@@ -27,6 +27,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILDebugScope.h"
+#include "swift/SIL/DebugUtils.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/Statistic.h"
@@ -90,7 +91,7 @@ struct ArgumentDescriptor {
       Decl(A->getDecl()), CalleeRelease(),
       ProjTree(A->getModule(), BPA, A->getType()) {
 
-    IsDead = A->use_empty() && !isABIRequired;
+    IsDead = hasNoUsesExceptDebug(A) && !isABIRequired;
     ProjTree.computeUsesAndLiveness(A);
   }
 
@@ -255,6 +256,13 @@ updateOptimizedBBArgs(SILBuilder &Builder, SILBasicBlock *BB,
                       unsigned ArgOffset) {
   // If this argument is dead delete this argument and return ArgOffset.
   if (IsDead) {
+    // There maybe still debug instructions which we have to delete.
+    SILArgument *Arg = BB->getBBArg(ArgOffset);
+    while (!Arg->use_empty()) {
+      auto *User = Arg->use_begin()->getUser();
+      assert(isDebugInst(User));
+      User->eraseFromParent();
+    }
     BB->eraseBBArg(ArgOffset);
     return ArgOffset;
   }

@@ -19,6 +19,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/SIL/TypeLowering.h"
+#include "swift/SIL/DebugUtils.h"
 #include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -29,20 +30,12 @@
 
 using namespace swift;
 
-llvm::cl::opt<bool>
-DebugValuesPropagateLiveness("debug-values-propagate-liveness",
-                             llvm::cl::init(false));
-
-bool swift::debugValuesPropagateLiveness() {
-  return DebugValuesPropagateLiveness;
-}
-
 /// \brief Perform a fast local check to see if the instruction is dead.
 ///
 /// This routine only examines the state of the instruction at hand.
 bool
 swift::isInstructionTriviallyDead(SILInstruction *I) {
-  if (!I->use_empty() || isa<TermInst>(I))
+  if (!hasNoUsesExceptDebug(I) || isa<TermInst>(I))
     return false;
 
   if (auto *BI = dyn_cast<BuiltinInst>(I)) {
@@ -59,8 +52,7 @@ swift::isInstructionTriviallyDead(SILInstruction *I) {
   if (isa<MarkUninitializedInst>(I))
     return false;
 
-  if (debugValuesPropagateLiveness() &&
-      (isa<DebugValueInst>(I) || isa<DebugValueAddrInst>(I)))
+  if (isa<DebugValueInst>(I) || isa<DebugValueAddrInst>(I))
     return false;
 
   // These invalidate enums so "write" memory, but that is not an essential
@@ -123,7 +115,8 @@ recursivelyDeleteTriviallyDeadInstructions(ArrayRef<SILInstruction *> IA,
 
     for (auto I : DeadInsts) {
       // This will remove this instruction and all its uses.
-      I->eraseFromParent();
+      
+      eraseFromParentWithDebugInsts(I);
     }
 
     NextInsts.swap(DeadInsts);
@@ -1633,7 +1626,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
       bool isLegal = true;
       // init_existental instruction used to initialize this alloc_stack.
       InitExistentialAddrInst *FoundIEI = nullptr;
-      for (auto Use: ASI->getUses()) {
+      for (auto Use: getNonDebugUses(*ASI)) {
         auto *User = Use->getUser();
         if (isa<ExistentialMetatypeInst>(User) ||
             isa<DestroyAddrInst>(User) ||
@@ -1692,7 +1685,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
       // Check if this alloc_stac is is only initialized once by means of
       // a single initt_existential_ref.
       bool isLegal = true;
-      for (auto Use: ASRI->getUses()) {
+      for (auto Use: getNonDebugUses(*ASRI)) {
         auto *User = Use->getUser();
         if (isa<ExistentialMetatypeInst>(User) || isa<StrongReleaseInst>(User))
            continue;

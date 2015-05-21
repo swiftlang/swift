@@ -59,7 +59,7 @@ func callClassMethod() -> Gizmo? {
 
 // OPT-LABEL: sil hidden @_TF21objc_nonnull_lie_hack12loadPropertyFCSo5GizmoGSqS0__ : $@convention(thin) (@owned Gizmo) -> @owned Optional<Gizmo>
 // OPT: [[GETTER:%[0-9]+]] = class_method [volatile] [[OBJ:%[0-9]+]] : $Gizmo, #Gizmo.nonNilGizmoProperty!getter.1.foreign : Gizmo -> () -> Gizmo , $@convention(objc_method) (Gizmo) -> @autoreleased Gizmo
-// OPT: [[NONOPTIONAL:%[0-9]+]] = apply %1(%0) : $@convention(objc_method) (Gizmo) -> @autoreleased Gizmo
+// OPT: [[NONOPTIONAL:%[0-9]+]] = apply [[GETTER]]([[OBJ]]) : $@convention(objc_method) (Gizmo) -> @autoreleased Gizmo
 // OPT: [[OPTIONAL:%[0-9]+]] = unchecked_ref_bit_cast [[NONOPTIONAL]] : $Gizmo to $Optional<Gizmo>
 // OPT: switch_enum [[OPTIONAL]] : $Optional<Gizmo>,
 func loadProperty(gizmo: Gizmo) -> Gizmo? {

@@ -16,6 +16,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SILAnalysis/SimplifyInstruction.h"
 #include "swift/SILPasses/Transforms.h"
@@ -962,18 +963,29 @@ bool SimplifyCFG::simplifyBranchOperands(OperandValueArrayRef Operands) {
       if (SILValue Result = simplifyInstruction(I)) {
         SILValue(I, 0).replaceAllUsesWith(Result.getDef());
         if (isInstructionTriviallyDead(I)) {
-          I->eraseFromParent();
+          eraseFromParentWithDebugInsts(I);
           Simplified = true;
         }
       }
   return Simplified;
 }
 
+static bool onlyHasTerminatorAndDebugInsts(SILBasicBlock *BB) {
+  TermInst *Terminator = BB->getTerminator();
+  SILBasicBlock::iterator Iter = BB->begin();
+  while (&*Iter != Terminator) {
+    if (!isDebugInst(Iter))
+      return false;
+    Iter++;
+  }
+  return true;
+}
+
 /// \return If this basic blocks has a single br instruction passing all of the
 /// arguments in the original order, then returns the destination of that br.
 static SILBasicBlock *getTrampolineDest(SILBasicBlock *SBB) {
   // Ignore blocks with more than one instruction.
-  if (SBB->getTerminator() != SBB->begin())
+  if (!onlyHasTerminatorAndDebugInsts(SBB))
     return nullptr;
 
   BranchInst *BI = dyn_cast<BranchInst>(SBB->getTerminator());
@@ -1011,7 +1023,7 @@ static BranchInst *getTrampolineWithoutBBArgsTerminator(SILBasicBlock *SBB) {
     return nullptr;
 
   // Ignore blocks with more than one instruction.
-  if (SBB->getTerminator() != SBB->begin())
+  if (!onlyHasTerminatorAndDebugInsts(SBB))
     return nullptr;
 
   BranchInst *BI = dyn_cast<BranchInst>(SBB->getTerminator());

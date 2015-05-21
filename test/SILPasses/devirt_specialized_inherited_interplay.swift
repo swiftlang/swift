@@ -10,54 +10,46 @@
 
 // CHECK-LABEL: sil @_TF38devirt_specialized_inherited_interplay6driverFT_T_ : $@convention(thin) () -> () {
 // CHECK: bb0:
-// CHECK-NEXT: alloc_ref $A3<S>
-// CHECK-NEXT: alloc_ref $A4<S>
-// CHECK-NEXT: alloc_ref $A5<S>
-// CHECK-NEXT: alloc_ref $B1<S>
-// CHECK-NEXT: alloc_ref $B2<S>
-// CHECK-NEXT: alloc_ref $B3<S>
-// CHECK-NEXT: alloc_ref $B4<S>
-// CHECK-NEXT: function_ref
-// CHECK-NEXT: function_ref @unknown0 : $@convention(thin) () -> ()
-// CHECK-NEXT: apply
-// CHECK-NEXT: apply
-// CHECK-NEXT: function_ref
-// CHECK-NEXT: function_ref @unknown1 : $@convention(thin) () -> ()
-// CHECK-NEXT: apply
-// CHECK-NEXT: apply
-// CHECK-NEXT: function_ref
-// CHECK-NEXT: function_ref @unknown2 : $@convention(thin) () -> ()
-// CHECK-NEXT: apply
-// CHECK-NEXT: apply
-// CHECK-NEXT: function_ref
-// CHECK-NEXT: function_ref @unknown3 : $@convention(thin) () -> ()
-// CHECK-NEXT: apply
-// CHECK-NEXT: apply
-// CHECK-NEXT: function_ref
-// CHECK-NEXT: function_ref @unknown4 : $@convention(thin) () -> ()
-// CHECK-NEXT: apply
-// CHECK-NEXT: apply
-// CHECK-NEXT: function_ref
-// CHECK-NEXT: function_ref @unknown5 : $@convention(thin) () -> ()
-// CHECK-NEXT: apply
-// CHECK-NEXT: apply
-// CHECK-NEXT: function_ref
-// CHECK-NEXT: function_ref @unknown6 : $@convention(thin) () -> ()
-// CHECK-NEXT: apply
-// CHECK-NEXT: apply
-// CHECK-NEXT: apply
-// CHECK-NEXT: apply
-// CHECK-NEXT: function_ref
-// CHECK-NEXT: function_ref @unknown8 :
-// CHECK-NEXT: apply
-// CHECK-NEXT: apply
-// CHECK-NEXT: strong_release
-// CHECK-NEXT: strong_release
-// CHECK-NEXT: strong_release
-// CHECK-NEXT: strong_release
-// CHECK-NEXT: strong_release
-// CHECK-NEXT: strong_release
-// CHECK-NEXT: strong_release
+// CHECK: [[A1:%[0-9]+]] = alloc_ref $A3<S>
+// CHECK: [[A2:%[0-9]+]] = alloc_ref $A4<S>
+// CHECK: [[A3:%[0-9]+]] = alloc_ref $A5<S>
+// CHECK: [[A4:%[0-9]+]] = alloc_ref $B1<S>
+// CHECK: [[A5:%[0-9]+]] = alloc_ref $B2<S>
+// CHECK: [[A6:%[0-9]+]] = alloc_ref $B3<S>
+// CHECK: [[A7:%[0-9]+]] = alloc_ref $B4<S>
+// CHECK: [[F0:%[0-9]+]] = function_ref @unknown0 : $@convention(thin) () -> ()
+// CHECK: apply [[F0]]
+// CHECK: apply [[F0]]
+// CHECK: [[F1:%[0-9]+]] = function_ref @unknown1 : $@convention(thin) () -> ()
+// CHECK: apply [[F1]]
+// CHECK: apply [[F1]]
+// CHECK: [[F2:%[0-9]+]] = function_ref @unknown2 : $@convention(thin) () -> ()
+// CHECK: apply [[F2]]
+// CHECK: apply [[F2]]
+// CHECK: [[F3:%[0-9]+]] = function_ref @unknown3 : $@convention(thin) () -> ()
+// CHECK: apply [[F3]]
+// CHECK: apply [[F3]]
+// CHECK: [[F4:%[0-9]+]] = function_ref @unknown4 : $@convention(thin) () -> ()
+// CHECK: apply [[F4]]
+// CHECK: apply [[F4]]
+// CHECK: [[F5:%[0-9]+]] = function_ref @unknown5 : $@convention(thin) () -> ()
+// CHECK: apply [[F5]]
+// CHECK: apply [[F5]]
+// CHECK: [[F6:%[0-9]+]] = function_ref @unknown6 : $@convention(thin) () -> ()
+// CHECK: apply [[F6]]
+// CHECK: apply [[F6]]
+// CHECK: apply [[F6]]
+// CHECK: apply [[F6]]
+// CHECK: [[F8:%[0-9]+]] = function_ref @unknown8 :
+// CHECK: apply [[F8]]
+// CHECK: apply [[F8]]
+// CHECK: strong_release [[A7]]
+// CHECK-NEXT: strong_release [[A6]]
+// CHECK-NEXT: strong_release [[A5]]
+// CHECK-NEXT: strong_release [[A4]]
+// CHECK-NEXT: strong_release [[A3]]
+// CHECK-NEXT: strong_release [[A2]]
+// CHECK-NEXT: strong_release [[A1]]
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
 

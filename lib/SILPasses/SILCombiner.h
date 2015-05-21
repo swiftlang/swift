@@ -185,7 +185,14 @@ public:
   // instruction and upon completion of their peephole return the value returned
   // by this method.
   SILInstruction *eraseInstFromFunction(SILInstruction &I,
+                                        SILBasicBlock::iterator &InstIter,
                                         bool AddOperandsToWorklist = true);
+
+  SILInstruction *eraseInstFromFunction(SILInstruction &I,
+                                        bool AddOperandsToWorklist = true) {
+    SILBasicBlock::iterator nullIter;
+    return eraseInstFromFunction(I, nullIter, AddOperandsToWorklist);
+  }
 
   void addInitialGroup(ArrayRef<SILInstruction *> List) {
     Worklist.addInitialGroup(List);

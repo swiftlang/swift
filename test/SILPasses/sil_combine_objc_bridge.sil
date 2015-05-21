@@ -74,6 +74,7 @@ sil @bridge_to_from_owned : $@convention(thin) (@owned AnArray<AnyObject>) -> @o
 bb0(%0 : $AnArray<AnyObject>):
   %1 = function_ref @bridgeToObjectiveC : $@convention(method) <AnyObject> (@owned AnArray<AnyObject>) -> @owned AnNSArray
   %2 = apply %1<AnyObject>(%0) : $@convention(method) <AnyObject> (@owned AnArray<AnyObject>) -> @owned AnNSArray
+  debug_value %2 : $AnNSArray    // should not prevent the optimization
   strong_retain %2 : $AnNSArray
   strong_release %2 : $AnNSArray
   %3 = function_ref @bridgeFromObjectiveC : $@convention(thin) <AnyObject> (@owned AnNSArray) -> @owned AnArray<AnyObject>

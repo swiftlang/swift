@@ -22,6 +22,7 @@
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
@@ -568,7 +569,7 @@ bool CSE::processNode(DominanceInfoNode *Node) {
     // Dead instructions should just be removed.
     if (isInstructionTriviallyDead(Inst)) {
       DEBUG(llvm::dbgs() << "SILCSE DCE: " << *Inst << '\n');
-      Inst->eraseFromParent();
+      eraseFromParentWithDebugInsts(Inst, I);
       Changed = true;
       ++NumSimplify;
       continue;

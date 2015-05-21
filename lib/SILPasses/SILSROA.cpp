@@ -22,6 +22,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILUndef.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SILPasses/Transforms.h"
 #include "swift/SILPasses/Passes.h"
 #include "llvm/ADT/Statistic.h"
@@ -138,7 +139,7 @@ bool SROAMemoryUseAnalyzer::analyze() {
   }
 
   // Go through uses of the memory allocation of AI...
-  for (auto *Operand : SILValue(AI, 1).getUses()) {
+  for (auto *Operand : getNonDebugUses(SILValue(AI, 1))) {
     SILInstruction *User = Operand->getUser();
     DEBUG(llvm::dbgs() << "    Visiting use: " << *User);
 
@@ -255,7 +256,7 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
 
   // Find all dealloc instruction that touch the local storage handle for AI
   // and then chop them up.
-  for (auto *Operand : SILValue(AI, 0).getUses()) {
+  for (auto *Operand : getNonDebugUses(SILValue(AI, 0))) {
     SILInstruction *User = Operand->getUser();
     SILBuilder B(User);
 
@@ -271,7 +272,7 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
     }
   }
 
-  AI->eraseFromParent();
+  eraseFromParentWithDebugInsts(AI);
 }
 
 static bool runSROAOnFunction(SILFunction &Fn) {

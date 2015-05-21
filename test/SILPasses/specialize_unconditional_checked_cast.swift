@@ -95,6 +95,7 @@ func ArchetypeToConcreteConvertE<T>(t t: T) -> E {
 // x -> x where x is not a class.
 // CHECK-LABEL: sil shared @_TTSg5VSs5UInt8___TF37specialize_unconditional_checked_cast31ArchetypeToConcreteConvertUInt8urFT1tq__VSs5UInt8 : $@convention(thin) (@in UInt8) -> UInt8 {
 // CHECK: bb0
+// CHECK-NEXT: debug_value_addr
 // CHECK-NEXT: load
 // CHECK-NEXT: return
 ArchetypeToConcreteConvertUInt8(t: b)
@@ -118,6 +119,7 @@ ArchetypeToConcreteConvertUInt8(t: f)
 // x -> x where x is a class.
 // CHECK-LABEL: sil shared @_TTSg5C37specialize_unconditional_checked_cast1C___TF37specialize_unconditional_checked_cast27ArchetypeToConcreteConvertCurFT1tq__CS_1C : $@convention(thin) (@in C) -> @owned C {
 // CHECK: bb0
+// CHECK-NEXT: debug_value_addr
 // CHECK-NEXT: load
 // CHECK-NEXT: return
 ArchetypeToConcreteConvertC(t: c)
@@ -133,6 +135,7 @@ ArchetypeToConcreteConvertC(t: b)
 // x -> y where x,y are classes and x is a super class of y.
 // CHECK-LABEL: sil shared @_TTSg5C37specialize_unconditional_checked_cast1D___TF37specialize_unconditional_checked_cast27ArchetypeToConcreteConvertCurFT1tq__CS_1C : $@convention(thin) (@in D) -> @owned C {
 // CHECK: bb0
+// CHECK-NEXT: debug_value_addr
 // CHECK-NEXT: load
 // CHECK-NEXT: upcast
 // CHECK-NEXT: return
@@ -149,6 +152,7 @@ ArchetypeToConcreteConvertC(t: e)
 // x -> y where x,y are classes and x is a sub class of y.
 // CHECK-LABEL: sil shared @_TTSg5C37specialize_unconditional_checked_cast1C___TF37specialize_unconditional_checked_cast27ArchetypeToConcreteConvertDurFT1tq__CS_1D : $@convention(thin) (@in C) -> @owned D {
 // CHECK: bb0
+// CHECK-NEXT: debug_value_addr
 // CHECK-NEXT: alloc_stack
 // CHECK-NEXT: unconditional_checked_cast_addr take_always
 // CHECK-NEXT: load
@@ -183,6 +187,7 @@ func ConcreteToArchetypeConvertD<T>(t t: D, t2: T) -> T {
 // x -> x where x is not a class.
 // CHECK-LABEL: sil shared @_TTSg5VSs5UInt8___TF37specialize_unconditional_checked_cast31ConcreteToArchetypeConvertUInt8urFT1tVSs5UInt82t2q__q_ : $@convention(thin) (@out UInt8, UInt8, @in UInt8) -> () {
 // CHECK: bb0
+// CHECK-NEXT: debug_value
 // CHECK-NEXT: store
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
@@ -207,6 +212,8 @@ ConcreteToArchetypeConvertUInt8(t: b, t2: f)
 // x -> x where x is a class.
 // CHECK-LABEL: sil shared @_TTSg5C37specialize_unconditional_checked_cast1C___TF37specialize_unconditional_checked_cast27ConcreteToArchetypeConvertCurFT1tCS_1C2t2q__q_ : $@convention(thin) (@out C, @owned C, @in C) -> () {
 // CHECK: bb0
+// CHECK-NEXT: debug_value
+// CHECK-NEXT: debug_value_addr
 // CHECK-NEXT: store
 // CHECK-NEXT: load
 // CHECK-NEXT: strong_release
@@ -225,6 +232,8 @@ ConcreteToArchetypeConvertC(t: c, t2: b)
 // x -> y where x is a super class of y.
 // CHECK-LABEL: sil shared @_TTSg5C37specialize_unconditional_checked_cast1D___TF37specialize_unconditional_checked_cast27ConcreteToArchetypeConvertCurFT1tCS_1C2t2q__q_ : $@convention(thin) (@out D, @owned C, @in D) -> () {
 // CHECK: bb0
+// CHECK-NEXT: debug_value
+// CHECK-NEXT: debug_value_addr
 // CHECK-NEXT: alloc_stack
 // CHECK-NEXT: store
 // CHECK-NEXT: strong_retain
@@ -240,6 +249,7 @@ ConcreteToArchetypeConvertC(t: c, t2: d)
 // x -> y where x and y are unrelated classes.
 // CHECK-LABEL: sil shared @_TTSg5C37specialize_unconditional_checked_cast1E___TF37specialize_unconditional_checked_cast27ConcreteToArchetypeConvertCurFT1tCS_1C2t2q__q_ : $@convention(thin) (@out E, @owned C, @in E) -> () {
 // CHECK: bb0
+// CHECK-NEXT: debug_value
 // CHECK-NEXT: strong_retain
 // CHECK-NEXT: builtin "int_trap"
 // CHECK: unreachable
@@ -249,6 +259,8 @@ ConcreteToArchetypeConvertC(t: c, t2: e)
 // x -> y where x is a subclass of y.
 // CHECK-LABEL: sil shared @_TTSg5C37specialize_unconditional_checked_cast1C___TF37specialize_unconditional_checked_cast27ConcreteToArchetypeConvertDurFT1tCS_1D2t2q__q_ : $@convention(thin) (@out C, @owned D, @in C) -> () {
 // CHECK: bb0
+// CHECK-NEXT: debug_value
+// CHECK-NEXT: debug_value_addr
 // CHECK-NEXT: upcast
 // CHECK-NEXT: store
 // CHECK-NEXT: load
@@ -272,6 +284,8 @@ func SuperToArchetypeD<T>(d d : D, t : T) -> T {
 // x -> x where x is a class.
 // CHECK-LABEL: sil shared @_TTSg5C37specialize_unconditional_checked_cast1C___TF37specialize_unconditional_checked_cast17SuperToArchetypeCurFT1cCS_1C1tq__q_ : $@convention(thin) (@out C, @owned C, @in C) -> () {
 // CHECK: bb0
+// CHECK-NEXT: debug_value
+// CHECK-NEXT: debug_value_addr
 // CHECK-NEXT: store
 // CHECK-NEXT: load
 // CHECK-NEXT: strong_release
@@ -303,6 +317,8 @@ SuperToArchetypeD(d: d, t: c)
 
 // CHECK-LABEL: sil shared @_TTSg5C37specialize_unconditional_checked_cast1D___TF37specialize_unconditional_checked_cast17SuperToArchetypeDurFT1dCS_1D1tq__q_ : $@convention(thin) (@out D, @owned D, @in D) -> () {
 // CHECK: bb0
+// CHECK-NEXT: debug_value
+// CHECK-NEXT: debug_value_addr
 // CHECK-NEXT: store
 // CHECK-NEXT: load
 // CHECK-NEXT: strong_release
@@ -333,6 +349,8 @@ ExistentialToArchetype(o: o, t: b)
 // AnyObject -> AnyObject
 // CHECK-LABEL: sil shared @_TTSg5PSs9AnyObject____TF37specialize_unconditional_checked_cast22ExistentialToArchetypeurFT1oPSs9AnyObject_1tq__q_ : $@convention(thin) (@out AnyObject, @owned AnyObject, @in AnyObject) -> () {
 // CHECK: bb0
+// CHECK-NEXT: debug_value
+// CHECK-NEXT: debug_value_addr
 // CHECK-NEXT: store
 // CHECK-NEXT: load
 // CHECK-NEXT: strong_release

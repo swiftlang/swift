@@ -17,6 +17,7 @@
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SILAnalysis/AliasAnalysis.h"
 #include "swift/SILAnalysis/ARCAnalysis.h"
 #include "swift/SILAnalysis/CFG.h"
@@ -182,7 +183,7 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
   bool HaveSeenCopyInto = false;
   // Scan all of the uses of the AllocStack and check if it is not used for
   // anything other than the init_existential_addr container.
-  for (Operand *Op: AS->getUses()) {
+  for (Operand *Op: getNonDebugUses(*AS)) {
     // Destroy and dealloc are both fine.
     if (isa<DestroyAddrInst>(Op->getUser()) ||
         isa<DeallocStackInst>(Op->getUser()))
@@ -270,7 +271,8 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
       }
       assert(isa<CopyAddrInst>(Op->getUser()) ||
              isa<DestroyAddrInst>(Op->getUser()) ||
-             isa<DeallocStackInst>(Op->getUser()) && "Unexpected instruction");
+             isa<DeallocStackInst>(Op->getUser()) ||
+             isDebugInst(Op->getUser()) && "Unexpected instruction");
       ToDelete.insert(Op->getUser());
     }
 
@@ -303,7 +305,7 @@ SILInstruction *SILCombiner::visitLoadInst(LoadInst *LI) {
   // Go through the loads uses and add any users that are projections to the
   // projection list.
   llvm::SmallVector<ProjInstPairTy, 8> Projections;
-  for (auto *UI : LI->getUses()) {
+  for (auto *UI : getNonDebugUses(*LI)) {
     auto *User = UI->getUser();
 
     // If we have any non SEI, TEI instruction, don't do anything here.
@@ -1499,7 +1501,7 @@ static ApplyInst *optimizeCastThroughThinFuntionPointer(
 static bool
 hasOnlyRetainReleaseUsers(ApplyInst *AI, SILInstruction *IgnoreUser,
                           SmallVectorImpl<SILInstruction *> &Users) {
-  for (auto *Use : AI->getUses()) {
+  for (auto *Use : getNonDebugUses(*AI)) {
     if (Use->getUser() == IgnoreUser)
       continue;
 
@@ -2294,7 +2296,7 @@ SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
     return nullptr;
 
   // For each user U of the unchecked_addr_cast...
-  for (auto U : UADCI->getUses())
+  for (auto U : getNonDebugUses(*UADCI))
     // Check if it is load. If it is not a load, bail...
     if (!isa<LoadInst>(U->getUser()))
       return nullptr;
@@ -2305,7 +2307,7 @@ SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
 
   // Ok, we have all loads. Lets simplify this. Go back through the loads a
   // second time, rewriting them into a load + bitcast from our source.
-  for (auto U : UADCI->getUses()) {
+  for (auto U : getNonDebugUses(*UADCI)) {
     // Grab the original load.
     LoadInst *L = cast<LoadInst>(U->getUser());
 
@@ -2453,7 +2455,7 @@ visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *TEDAI) {
     return nullptr;
 
   // For each user U of the take_enum_data_addr...
-  for (auto U : TEDAI->getUses())
+  for (auto U : getNonDebugUses(*TEDAI))
     // Check if it is load. If it is not a load, bail...
     if (!isa<LoadInst>(U->getUser()))
       return nullptr;
@@ -2467,7 +2469,7 @@ visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *TEDAI) {
 
   // Go back through a second time now that we know all of our users are
   // loads. Perform the transformation on each load.
-  for (auto U : TEDAI->getUses()) {
+  for (auto U : getNonDebugUses(*TEDAI)) {
     // Grab the load.
     LoadInst *L = cast<LoadInst>(U->getUser());
 

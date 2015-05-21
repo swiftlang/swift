@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -Xllvm -debug-values-propagate-liveness -O %s -disable-llvm-optzns -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend -O %s -disable-llvm-optzns -emit-ir -g -o - | FileCheck %s
 
 func markUsed<T>(t: T) {}
 
