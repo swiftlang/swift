@@ -187,6 +187,20 @@ internal class _${Kind}Box<S : ${Kind}Type>
 }
 % end
 
+internal struct _ClosureBasedSequence<Generator : GeneratorType>
+  : SequenceType {
+
+  internal init(_ makeUnderlyingGenerator: () -> Generator) {
+    self._makeUnderlyingGenerator = makeUnderlyingGenerator
+  }
+
+  internal func generate() -> Generator {
+    return _makeUnderlyingGenerator()
+  }
+
+  internal var _makeUnderlyingGenerator: () -> Generator
+}
+
 /// A type-erased sequence.
 ///
 /// Forwards operations to an arbitrary underlying sequence having the
@@ -200,6 +214,14 @@ public struct AnySequence<T> : SequenceType {
   /// Wrap and forward operations to to `base`.
   public init<S: SequenceType where S.Generator.Element == T>(_ base: S) {
     _box = _SequenceBox(base)
+  }
+
+  /// Create a sequence whose `generate()` method forwards to
+  /// `makeUnderlyingGenerator`.
+  public init<G : GeneratorType where G.Element == T>(
+    _ makeUnderlyingGenerator: () -> G
+  ) {
+    self.init(_ClosureBasedSequence(makeUnderlyingGenerator))
   }
 
   /// Return a *generator* over the elements of this *sequence*.

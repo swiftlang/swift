@@ -12,7 +12,6 @@
 // RUN: %target-run-simple-swift
 
 import StdlibUnittest
-import SwiftExperimental // for AnySequence.init()
 
 var tests = TestSuite("ExistentialCollection")
 
