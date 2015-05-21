@@ -286,7 +286,7 @@ internal struct _SetElement<T> {
 
 /// A collection of unique `T` instances with no defined ordering.
 public struct Set<T : Hashable> :
-  Hashable, CollectionType, ArrayLiteralConvertible, SetAlgebraType {
+  Hashable, CollectionType, ArrayLiteralConvertible {
 
   internal typealias _Self = Set<T>
   internal typealias _VariantStorage = _VariantSetStorage<T>
@@ -3861,8 +3861,3 @@ extension ${Self} {
   }
 }
 #endif
-
-/// `Set` supports set algebra operations.
-// FIXME: error: ambiguous implied conformance of 'Set<T>' to protocol 'Equatable' (via 'SetAlgebraType') requires explicit conformance
-// extension Set : SetAlgebraType {}
-
