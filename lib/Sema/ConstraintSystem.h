@@ -1439,7 +1439,11 @@ public:
   /// function attributes that need to be set invariant of the actual typing of
   /// the solution.
   llvm::SmallDenseMap<FunctionType*, FunctionType::ExtInfo> extraFunctionAttrs;
-  
+
+  ResolvedOverloadSetListItem *getResolvedOverloadSets() const {
+    return resolvedOverloadSets;
+  }
+
 private:
   unsigned assignTypeVariableID() {
     return TypeCounter++;
