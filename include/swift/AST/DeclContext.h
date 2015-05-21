@@ -205,10 +205,6 @@ public:
     return ParentAndKind.getInt();
   }
   
-  /// \brief Obtain the canonical type from a type extension declaration,
-  /// binding any unbound generic types if necessary.
-  static CanType getExtendedType(const ExtensionDecl *ED);
-
   /// Determines whether this context is itself a local scope in a
   /// code block.  A context that appears in such a scope, like a
   /// local type declaration, does not itself become a local context.

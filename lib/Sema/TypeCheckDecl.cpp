@@ -5318,7 +5318,7 @@ public:
     TC.checkDeclAttributesEarly(ED);
 
     if (!IsSecondPass) {
-      CanType ExtendedTy = DeclContext::getExtendedType(ED);
+      CanType ExtendedTy = ED->getExtendedType()->getCanonicalType();
 
       if (!isa<NominalType>(ExtendedTy) &&
           !isa<BoundGenericType>(ExtendedTy) &&

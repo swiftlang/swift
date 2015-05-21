@@ -28,12 +28,6 @@ STATISTIC(NumLazyIterableDeclContexts,
 STATISTIC(NumUnloadedLazyIterableDeclContexts,
           "# of serialized iterable declaration contexts never loaded");
 
-CanType DeclContext::getExtendedType(const ExtensionDecl *ED) {
-  // Unbound generic types should already have been resolved by now.
-  assert(!ED->getExtendedType()->is<UnboundGenericType>());
-  return ED->getExtendedType()->getCanonicalType();
-}
-
 // Only allow allocation of DeclContext using the allocator in ASTContext.
 void *DeclContext::operator new(size_t Bytes, ASTContext &C,
                                 unsigned Alignment) {
@@ -46,10 +40,33 @@ ASTContext &DeclContext::getASTContext() const {
 
 NominalTypeDecl *
 DeclContext::isNominalTypeOrNominalTypeExtensionContext() const {
-  if (auto ctx = getDeclaredTypeInContext())
-    return ctx->getAnyNominal();
+  switch (getContextKind()) {
+  case DeclContextKind::Module:
+  case DeclContextKind::FileUnit:
+  case DeclContextKind::AbstractClosureExpr:
+  case DeclContextKind::TopLevelCodeDecl:
+  case DeclContextKind::AbstractFunctionDecl:
+  case DeclContextKind::Initializer:
+  case DeclContextKind::SerializedLocal:
+    return nullptr;
 
-  return nullptr;
+  case DeclContextKind::ExtensionDecl: {
+    auto ED = cast<ExtensionDecl>(this);
+    auto type = ED->getExtendedType();
+
+    if (auto ND = type->getNominalOrBoundGenericNominal())
+      return ND;
+
+    if (auto unbound = dyn_cast<UnboundGenericType>(type.getPointer())) {
+      return unbound->getDecl();
+    }
+
+    return nullptr;
+  }
+
+  case DeclContextKind::NominalTypeDecl:
+    return const_cast<NominalTypeDecl *>(cast<NominalTypeDecl>(this));
+  }
 }
 
 ClassDecl *DeclContext::isClassOrClassExtensionContext() const {
@@ -89,12 +106,17 @@ Type DeclContext::getDeclaredTypeOfContext() const {
   case DeclContextKind::ExtensionDecl: {
     auto ED = cast<ExtensionDecl>(this);
     auto type = ED->getExtendedType();
-    
+
+    if (isa<UnboundGenericType>(type.getPointer())) {
+      getASTContext().getLazyResolver()->resolveExtension(
+        const_cast<ExtensionDecl *>(ED));
+
+      type = ED->getExtendedType();
+    }
+
     if (auto ND = type->getNominalOrBoundGenericNominal())
       return ND->getDeclaredType();
     
-    if (isa<UnboundGenericType>(type.getPointer()))
-      return getExtendedType(const_cast<ExtensionDecl*>(ED));
     return Type();
   }
 
@@ -115,8 +137,19 @@ Type DeclContext::getDeclaredTypeInContext() const {
   case DeclContextKind::SerializedLocal:
     return Type();
 
-  case DeclContextKind::ExtensionDecl:
-    return getExtendedType(cast<ExtensionDecl>(this));
+  case DeclContextKind::ExtensionDecl: {
+    auto ED = cast<ExtensionDecl>(this);
+    auto type = ED->getExtendedType();
+
+    if (isa<UnboundGenericType>(type.getPointer())) {
+      getASTContext().getLazyResolver()->resolveExtension(
+        const_cast<ExtensionDecl *>(ED));
+
+      type = ED->getExtendedType();
+    }
+
+    return type;
+  }
 
   case DeclContextKind::NominalTypeDecl:
     return cast<NominalTypeDecl>(this)->getDeclaredTypeInContext();

@@ -119,7 +119,7 @@ public:
 
 void AttributeEarlyChecker::visitTransparentAttr(TransparentAttr *attr) {
   if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
-    CanType ExtendedTy = DeclContext::getExtendedType(ED);
+    CanType ExtendedTy = ED->getExtendedType()->getCanonicalType();
     const NominalTypeDecl *ExtendedNominal = ExtendedTy->getAnyNominal();
     // Only Struct and Enum extensions can be transparent.
     if (!isa<StructDecl>(ExtendedNominal) && !isa<EnumDecl>(ExtendedNominal))
@@ -194,7 +194,7 @@ void AttributeEarlyChecker::visitIBActionAttr(IBActionAttr *attr) {
 
 void AttributeEarlyChecker::visitIBDesignableAttr(IBDesignableAttr *attr) {
   if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
-    CanType extendedTy = DeclContext::getExtendedType(ED);
+    CanType extendedTy = ED->getExtendedType()->getCanonicalType();
     if (!isa<ClassDecl>(extendedTy->getAnyNominal()))
       return diagnoseAndRemoveAttr(attr, diag::invalid_ibdesignable_extension);
   }
