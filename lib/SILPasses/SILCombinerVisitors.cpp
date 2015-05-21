@@ -2407,10 +2407,10 @@ visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI) {
       // unconditional_checked_cast -> unchecked_addr_cast
       return new (Mod) UncheckedAddrCastInst(Loc, Op, LoweredTargetType);
     } else if (LoweredTargetType.isHeapObjectReferenceType()) {
-      // UncheckedRefCast does not handle unchecked_ref_cast of class
-      // existential types and neither does irgen.
-      if (Op.getType().getSwiftRValueType()->isClassExistentialType())
+      if (!(Op.getType().isHeapObjectReferenceType() ||
+            Op.getType().isClassExistentialType())) {
         return nullptr;
+      }
       // unconditional_checked_cast -> unchecked_ref_cast
       return new (Mod) UncheckedRefCastInst(Loc, Op, LoweredTargetType);
     }
