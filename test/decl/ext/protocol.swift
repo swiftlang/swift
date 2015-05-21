@@ -668,7 +668,12 @@ extension PConstrained4 where Self : Superclass {
 }
 
 protocol PConstrained5 { }
-protocol PConstrained6 { typealias Assoc }
+protocol PConstrained6 {
+  typealias Assoc
+
+  func foo()
+}
+
 protocol PConstrained7 { }
 
 extension PConstrained6 {
@@ -689,29 +694,35 @@ extension PConstrained6 where Assoc : PConstrained5 {
   final var prop3: Int { return 0 } // expected-note{{'prop3' previously declared here}}
   final subscript (key: Int) -> Int { return key } // ok
   final subscript (key: String) -> String { return key } // expected-note{{'subscript' previously declared here}}
+
+  final func foo() { } // expected-note{{'foo()' previously declared here}}
 }
 
 extension PConstrained6 where Assoc : PConstrained5 {
   final var prop3: Int { return 0 } // expected-error{{invalid redeclaration of 'prop3'}}
   final subscript (key: String) -> String { return key } // expected-error{{invalid redeclaration of 'subscript'}}
+  final func foo() { } // expected-error{{invalid redeclaration of 'foo()'}}
 }
 
 extension PConstrained6 where Assoc : PConstrained7 {
   final var prop1: Int { return 0 } // okay
   final subscript (key: Int) -> Int { return key } // okay
+  final func foo() { } // okay
 }
 
 extension PConstrained6 where Assoc == Int {
   final var prop4: Int { return 0 }
   final subscript (key: Character) -> Character { return key }
+  final func foo() { } // okay
 }
 
 extension PConstrained6 where Assoc == Double {
   final var prop4: Int { return 0 } // okay
   final subscript (key: Character) -> Character { return key } // okay
+  final func foo() { } // okay
 }
 
-// Interaction between RawRepresntable and protocol extensions.
+// Interaction between RawRepresentable and protocol extensions.
 public protocol ReallyRaw : RawRepresentable {
 }
 

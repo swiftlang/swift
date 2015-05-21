@@ -1505,13 +1505,15 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
       argTy = TupleType::get(elements, ctx);
     }
   } else {
+    argTy = mapSignatureParamType(ctx, argTy);
+
     if (isMethod) {
-      // In methods, map 'self' to an empty tuple to allow comparing two
-      // methods from different types to determine if they would conflict when
-      // placed into a single nominal decl.
-      argTy = TupleType::getEmpty(ctx);
-    } else
-      argTy = mapSignatureParamType(ctx, argTy);
+      // In methods, strip the 'inout' off of 'self' so that mutating and
+      // non-mutating methods have the same self parameter type.
+      if (auto inoutTy = argTy->getAs<InOutType>()) {
+        argTy = inoutTy->getObjectType();
+      }
+    }
   }
 
   // Map the result type.
@@ -1525,13 +1527,9 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
       funcTy->getExtInfo(), topLevelFunction);
 
   // Rebuild the resulting function type.
-  //
-  // If the original function was generic, but our transformations removed all
-  // generic parameters from the signature, build a non-generic function type.
-  if (argTy->isDependentType() || resultTy->isDependentType())
-    if (auto genericFuncTy = dyn_cast<GenericFunctionType>(funcTy))
-      return GenericFunctionType::get(genericFuncTy->getGenericSignature(),
-                                      argTy, resultTy, info);
+  if (auto genericFuncTy = dyn_cast<GenericFunctionType>(funcTy))
+    return GenericFunctionType::get(genericFuncTy->getGenericSignature(),
+                                    argTy, resultTy, info);
 
   return FunctionType::get(argTy, resultTy, info);
 }
