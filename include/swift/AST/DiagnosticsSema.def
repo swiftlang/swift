@@ -1681,31 +1681,48 @@ ERROR(assignment_lhs_is_let,sema_tcs,none,
       "cannot assign to 'let' value %0", (Identifier))
 ERROR(assignment_get_only_property,sema_tcs,none,
       "cannot assign to a get-only property %0", (Identifier))
+ERROR(assignment_inaccessible_property,sema_tcs,none,
+      "cannot assign to property %0 with inaccessible setter", (Identifier))
+ERROR(assignment_get_only_subscript,sema_tcs,none,
+      "cannot assign to a get-only subscript", ())
+ERROR(assignment_inaccessible_subscript,sema_tcs,none,
+      "cannot assign to subscript with inaccessible setter", ())
+
 ERROR(assignment_to_self,sema_tcs,none,
       "cannot assign to %0 in a method", (Identifier))
+ERROR(assignment_lhs_setter_inaccessible,sema_tcs,none,
+      "cannot assign to %0: setter is inaccessible", (Identifier))
 
 ERROR(assignment_lhs_is_vardecl,sema_tcs,none,
       "cannot assign to %0", (Identifier))
 
 ERROR(assignment_lhs_is_let_property,sema_tcs,none,
       "cannot assign to 'let' property %0", (Identifier))
-ERROR(assignment_property_has_immutable_base,sema_tcs,none,
-      "cannot assign to %0, base has immutable type %1",
-      (Identifier, Type))
 
-ERROR(assignment_property_has_immutable_self,sema_tcs,none,
-      "cannot assign to %0, because 'self' is immutable",
+ERROR(assignment_property_has_immutable_base,sema_tcs,none,
+      "cannot assign to %0: %1 is immutable",
+      (Identifier, Identifier))
+ERROR(assignment_subscript_has_immutable_base,sema_tcs,none,
+      "cannot assign to subscript: %0 is immutable",
       (Identifier))
+
 NOTE(change_to_mutating,sema_tcs,none,
-     "change %select{method|accessor}0 to 'mutating' to make 'self' mutable",
+     "mark %select{method|accessor}0 'mutating' to make 'self' mutable",
      (bool))
 
+ERROR(assignment_ude_expr_subbase,sema_tcs,none,
+      "cannot assign to %0: base subscript is get-only",
+      (Identifier))
 
+ERROR(assignment_subscript_expr_subbase,sema_tcs,none,
+      "cannot assign to subscript: base subscript is get-only", ())
 
-ERROR(assignment_unresolved_expr,sema_tcs,none,
-      "cannot assign to %0 in %1", (Identifier, Identifier))
 ERROR(assignment_ude_expr,sema_tcs,none,
-      "cannot assign to member %0", (Identifier))
+     "cannot assign to %0, base has immutable type %1",
+     (Identifier, Type))
+
+ERROR(assignment_subscript_expr,sema_tcs,none,
+      "cannot assign to subscript, base has immutable type %0", (Type))
 
 // ForEach Stmt
 ERROR(sequence_protocol_broken,sema_tcs,none,

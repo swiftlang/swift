@@ -1,5 +1,4 @@
-// RUN: %target-swift-frontend -parse -primary-file %s %S/Inputs/accessibility_multi_other.swift -verify -enable-access-control
-
+// RUN: %target-swift-frontend -parse -primary-file %s %S/Inputs/accessibility_multi_other.swift -verify
 func read(value: Int) {}
 func reset(inout value: Int) { value = 0 }
 
@@ -11,12 +10,12 @@ func testGlobals() {
 
 func testProperties(var instance: Members) {
   read(instance.privateSetProp)
-  instance.privateSetProp = 42 // expected-error {{cannot assign to 'privateSetProp' in 'instance'}}
+  instance.privateSetProp = 42 // expected-error {{cannot assign to property 'privateSetProp' with inaccessible setter}}
   reset(&instance.privateSetProp) // expected-error {{cannot pass immutable value of type 'Int' as inout argument}}
 }
 
 func testSubscript(var instance: Members) {
   read(instance[])
-  instance[] = 42 // expected-error {{cannot assign to the result of this expression}}
+  instance[] = 42 // expected-error {{cannot assign to subscript with inaccessible setter}}
   reset(&instance[]) // expected-error {{cannot pass immutable value of type 'Int' as inout argument}}
 }

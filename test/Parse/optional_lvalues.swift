@@ -9,13 +9,13 @@ struct S {
 
 struct T {
   var mutS: S? = nil
-  let immS: S? = nil // expected-note 6 {{change 'let' to 'var' to make it mutable}}
+  let immS: S? = nil // expected-note 8 {{change 'let' to 'var' to make it mutable}}
 
   init() {}
 }
 
 var mutT: T?
-let immT: T? = nil
+let immT: T? = nil  // expected-note 2 {{change 'let' to 'var' to make it mutable}}
 
 let mutTPayload = mutT!
 
@@ -26,30 +26,30 @@ mutT!.mutS!.x = 0
 mutT!.mutS!.y = 0 // expected-error{{cannot assign to 'let' property 'y'}}
 mutT!.immS = S() // expected-error{{cannot assign to 'let' property 'immS'}}
 mutT!.immS! = S() // expected-error{{cannot assign to the result of this expression}}
-mutT!.immS!.x = 0 // expected-error{{cannot assign to 'x', base has immutable type 'S'}}
+mutT!.immS!.x = 0 // expected-error{{cannot assign to 'x': 'immS' is immutable}}
 mutT!.immS!.y = 0 // expected-error{{cannot assign to 'let' property 'y'}}
 
 immT! = T() // expected-error{{cannot assign to the result of this expression}}
-immT!.mutS = S() // expected-error{{cannot assign to 'mutS', base has immutable type 'T'}}
+immT!.mutS = S() // expected-error{{cannot assign to 'mutS': 'immT' is immutable}}
 immT!.mutS! = S() // expected-error{{cannot assign to the result of this expression}}
-immT!.mutS!.x = 0 // expected-error{{cannot assign to 'x', base has immutable type 'S'}}
+immT!.mutS!.x = 0 // expected-error{{cannot assign to 'x': 'immT' is immutable}}
 immT!.mutS!.y = 0 // expected-error{{cannot assign to 'let' property 'y'}}
 immT!.immS = S() // expected-error{{cannot assign to 'let' property 'immS'}}
 immT!.immS! = S() // expected-error{{cannot assign to the result of this expression}}
-immT!.immS!.x = 0 // expected-error{{cannot assign to 'x', base has immutable type 'S'}}
+immT!.immS!.x = 0 // expected-error{{cannot assign to 'x': 'immS' is immutable}}
 immT!.immS!.y = 0 // expected-error{{cannot assign to 'let' property 'y'}}
 
 var mutIUO: T! = nil
-let immIUO: T! = nil
+let immIUO: T! = nil // expected-note 2 {{change 'let' to 'var' to make it mutable}}
 
 mutIUO!.mutS = S()
 mutIUO!.immS = S() // expected-error{{cannot assign to 'let' property 'immS'}}
-immIUO!.mutS = S() // expected-error{{cannot assign to 'mutS', base has immutable type 'T'}}
+immIUO!.mutS = S() // expected-error{{cannot assign to 'mutS': 'immIUO' is immutable}}
 immIUO!.immS = S() // expected-error{{cannot assign to 'let' property 'immS'}}
 
 mutIUO.mutS = S()
 mutIUO.immS = S() // expected-error{{cannot assign to 'let' property 'immS'}}
-immIUO.mutS = S() // expected-error{{cannot assign to 'mutS', base has immutable type 'T!'}}
+immIUO.mutS = S() // expected-error{{cannot assign to 'mutS': 'immIUO' is immutable}}
 immIUO.immS = S() // expected-error{{cannot assign to 'let' property 'immS'}}
 
 func foo(x: Int) {}

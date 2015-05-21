@@ -1413,12 +1413,10 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
 
 /// If an UnresolvedDotExpr has been resolved by the constraint system, return
 /// the decl that it references.
-static ValueDecl *findResolvedMemberRef(UnresolvedDotExpr *UDE,
-                                        ConstraintSystem &CS,
-                        ResolvedOverloadSetListItem *resolvedOverloadSets) {
+static ValueDecl *findResolvedMemberRef(ConstraintLocator *locator,
+                                        ConstraintSystem &CS) {
+  auto *resolvedOverloadSets = CS.getResolvedOverloadSets();
   if (!resolvedOverloadSets) return nullptr;
-
-  auto locator = CS.getConstraintLocator(UDE, ConstraintLocator::Member);
 
   // Search through the resolvedOverloadSets to see if we have a resolution for
   // this member.  This is an O(n) search, but only happens when producing an
@@ -1434,6 +1432,66 @@ static ValueDecl *findResolvedMemberRef(UnresolvedDotExpr *UDE,
   }
 
   return nullptr;
+}
+
+
+/// Given an expression that has a non-lvalue type, dig into it until we find
+/// the part of the expression that prevents the entire subexpression from being
+/// mutable.  For example, in a sequence like "x.v.v = 42" we want to complain
+/// about "x" being a let property if "v.v" are both mutable.
+///
+/// This returns the base subexpression that looks immutable (or that can't be
+/// analyzed any further) along with a decl extracted from it if we could.
+///
+static std::pair<Expr*, ValueDecl*>
+resolveImmutableBase(Expr *expr, ConstraintSystem &CS) {
+  // Provide specific diagnostics for assignment to subscripts whose base expr
+  // is known to be an rvalue.
+  if (auto *SE = dyn_cast<SubscriptExpr>(expr)) {
+    // If we found a decl for the subscript, check to see if it is a set-only
+    // subscript decl.
+    auto loc = CS.getConstraintLocator(SE, ConstraintLocator::SubscriptMember);
+    auto *member =
+      dyn_cast_or_null<SubscriptDecl>(findResolvedMemberRef(loc, CS));
+
+    // If it isn't settable, return it.
+    if (member) {
+      if (!member->isSettable() ||
+          !member->isSetterAccessibleFrom(CS.DC))
+        return { expr, member };
+    }
+
+    // If it is settable, then the base must be the problem, recurse.
+    return resolveImmutableBase(SE->getBase(), CS);
+  }
+
+  // Look through property references.
+  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
+    // If we found a decl for the UDE, check it.
+    auto loc = CS.getConstraintLocator(UDE, ConstraintLocator::Member);
+    auto *member = dyn_cast_or_null<VarDecl>(findResolvedMemberRef(loc, CS));
+
+
+    // If the member isn't settable, then it is the problem: return it.
+    if (member) {
+      if (!member->isSettable(nullptr) ||
+          !member->isSetterAccessibleFrom(CS.DC))
+        return { expr, member };
+    }
+
+    // If we weren't able to resolve a member or if it is mutable, then the
+    // problem must be with the base, recurse.
+    return resolveImmutableBase(UDE->getBase(), CS);
+  }
+
+  if (auto *DRE = dyn_cast<DeclRefExpr>(expr))
+    return { expr, DRE->getDecl() };
+
+  // Look through x!
+  if (auto *FVE = dyn_cast<ForceValueExpr>(expr))
+    return resolveImmutableBase(FVE->getSubExpr(), CS);
+  
+  return { expr, nullptr };
 }
 
 /// \brief Compute the rvalue type of the given expression, which is the
@@ -1457,133 +1515,155 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
   if (destTy->is<ErrorType>())
     return Type();
 
-  if (LValueType *destLV = destTy->getAs<LValueType>()) {
-    destTy = destLV->getObjectType();
-  } else if (auto typeVar = dyn_cast<TypeVariableType>(destTy.getPointer())) {
-    // The destination is a type variable. This type variable must be an
-    // lvalue type, which we enforce via an equality relationship with
-    // @lvalue T, where T is a fresh type variable that
-    // will be the object type of this particular expression type.
+  // If we have already resolved a concrete lvalue destination type, return it.
+  if (LValueType *destLV = destTy->getAs<LValueType>())
+    return destLV->getObjectType();
+
+  // If the destination is a type variable, the type variable must be an
+  // lvalue type, which we enforce via an equality relationship with
+  // @lvalue T, where T is a fresh type variable that will be the object type of
+  // this particular expression type.
+  if (auto typeVar = dyn_cast<TypeVariableType>(destTy.getPointer())) {
     auto objectTv = createTypeVariable(
                       getConstraintLocator(dest,
                                            ConstraintLocator::AssignDest),
                       /*options=*/0);
     auto refTv = LValueType::get(objectTv);
-    addConstraint(ConstraintKind::Bind,
-                  typeVar,
-                  refTv,
-                  this->getConstraintLocator(dest));
-    destTy = objectTv;
-  } else {
-    // Give a more specific diagnostic depending on what we're assigning to.
-    if (auto *DRE = dyn_cast<DeclRefExpr>(dest))
-      if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
-        Diag<Identifier> d;
-        if (VD->isImplicit() && VD->getName() == getASTContext().Id_self)
-          d = diag::assignment_to_self;
-        else if (VD->isLet())
-          d = diag::assignment_lhs_is_let;
-        else if (VD->hasAccessorFunctions() && !VD->getSetter())
-          d = diag::assignment_get_only_property;
-        else
-          d = diag::assignment_lhs_is_vardecl;
-        getTypeChecker().diagnose(equalLoc, d, VD->getName())
-            .highlight(dest->getSourceRange());
-        VD->emitLetToVarNoteIfSimple();
+    addConstraint(ConstraintKind::Bind, typeVar, refTv,
+                  getConstraintLocator(dest));
+    return objectTv;
+  }
+
+  auto &TC = getTypeChecker();
+
+  // Otherwise, we have an invalid destination type.  Give a specific diagnostic
+  // depending on what we're assigning to.
+  if (auto *DRE = dyn_cast<DeclRefExpr>(dest))
+    if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
+      Diag<Identifier> d;
+      if (VD->isImplicit() && VD->getName() == getASTContext().Id_self)
+        d = diag::assignment_to_self;
+      else if (VD->isLet())
+        d = diag::assignment_lhs_is_let;
+      else if (VD->hasAccessorFunctions() && !VD->getSetter())
+        d = diag::assignment_get_only_property;
+      else if (!VD->isSetterAccessibleFrom(DC))
+        d = diag::assignment_lhs_setter_inaccessible;
+      else
+        d = diag::assignment_lhs_is_vardecl;
+      TC.diagnose(equalLoc, d, VD->getName())
+        .highlight(dest->getSourceRange());
+      VD->emitLetToVarNoteIfSimple(DC);
+      return Type();
+    }
+
+  // Provide specific diagnostics for assignment to subscripts whose base expr
+  // is known to be an rvalue.
+  if (auto *SE = dyn_cast<SubscriptExpr>(dest)) {
+    auto immInfo = resolveImmutableBase(SE, *this);
+
+    // If the subscript itself is broken, and it is because the subscript has
+    // no setter, emit a specific error.
+    if (immInfo.first == SE && immInfo.second) {
+      auto *SD = cast<SubscriptDecl>(immInfo.second);
+      
+      if (!SD->getSetter()) {
+        TC.diagnose(equalLoc, diag::assignment_get_only_subscript)
+          .highlight(SE->getBase()->getSourceRange());
         return Type();
       }
-
-    // Provide specific diagnostics for unresolved type expr.
-    if (auto *UDE = dyn_cast<UnresolvedDotExpr>(dest)) {
-      // If the constraint system was able to find a specific member for
-      // this expression, produce a more tailored diagnostic.
-      auto *member = findResolvedMemberRef(UDE, *this, resolvedOverloadSets);
-      auto *memberVD = dyn_cast_or_null<VarDecl>(member);
-
-      auto &TC = getTypeChecker();
-
-      // If we have a successfully resolved member, we can produce more specific
-      // error diagnostics.
-      if (memberVD) {
-        Optional<Diag<Identifier>> diagID;
-        if (memberVD->isLet())
-          diagID = diag::assignment_lhs_is_let_property;
-        else if (memberVD->hasAccessorFunctions() && !memberVD->getSetter())
-          diagID = diag::assignment_get_only_property;
-
-        if (diagID) {
-          TC.diagnose(equalLoc, diagID.getValue(), UDE->getName())
-            .highlight(UDE->getBase()->getSourceRange())
-            .highlight(UDE->getNameLoc());
-          memberVD->emitLetToVarNoteIfSimple();
-          return Type();
-        }
-
-        // Otherwise, the property is settable, it must be the base that is the
-        // problem.  Handle the scenario when the base expression has a known
-        // non-lvalue type and is a non-reference type.
-        auto baseTy = UDE->getBase()->getType();
-        if (baseTy && !baseTy->is<LValueType>() &&
-            !baseTy->is<InOutType>() &&
-            !baseTy->isAnyClassReferenceType()) {
-
-          // If the base expression is "self", then the problem is that we're
-          // trying to assign to a property in a non-mutating method or perhaps
-          // it is in a capture list.
-          if (auto *DRE = dyn_cast<DeclRefExpr>(UDE->getBase())) {
-            if (DRE->getDecl()->getName() == getASTContext().Id_self) {
-              TC.diagnose(equalLoc,
-                          diag::assignment_property_has_immutable_self,
-                          UDE->getName())
-                .highlight(UDE->getBase()->getSourceRange());
-
-              // If we know this is because we're in a non-mutating method, then
-              // suggest adding a mutating keyword to the funcdecl (in a note).
-              auto FD = dyn_cast<FuncDecl>(DC->getInnermostMethodContext());
-              if (FD && !FD->isMutating()) {
-                TC.diagnose(FD->getFuncLoc(), diag::change_to_mutating,
-                            FD->isAccessor())
-                  .fixItInsert(FD->getFuncLoc(), "mutating ");
-              }
-
-              return Type();
-            }
-          }
-
-          // Okay, the problem is that we're trying to store to the property of
-          // a non-mutable value type.  Diagnose this.
-          TC.diagnose(equalLoc, diag::assignment_property_has_immutable_base,
-                      UDE->getName(), baseTy)
-            .highlight(UDE->getBase()->getSourceRange());
-          return Type();
-        }
+      if (!SD->isSetterAccessibleFrom(DC)) {
+        TC.diagnose(equalLoc, diag::assignment_inaccessible_subscript)
+          .highlight(SE->getBase()->getSourceRange());
+        return Type();
       }
+    }
+   
+    // Otherwise, we cannot resolve this because the available setter candidates
+    // are all mutating and the base must be mutating.  If we dug out a
+    // problematic decl, we can produce a nice tailored diagnostic.
+    if (auto *vd = dyn_cast_or_null<VarDecl>(immInfo.second)) {
+      TC.diagnose(equalLoc, diag::assignment_subscript_has_immutable_base,
+                  vd->getName())
+        .highlight(immInfo.first->getSourceRange());
+      vd->emitLetToVarNoteIfSimple(DC);
+      return Type();
+    }
 
-      // If the base is a DRE, we can get a name that is a bit nicer for the
-      // diagnostic.
-      if (auto *DRE = dyn_cast<DeclRefExpr>(UDE->getBase())) {
-        TC.diagnose(equalLoc, diag::assignment_unresolved_expr,
-                    UDE->getName(), DRE->getDecl()->getName())
+    // If the underlying expression was a read-only subscript, diagnose that.
+    if (immInfo.second && isa<SubscriptDecl>(immInfo.second)) {
+      TC.diagnose(equalLoc, diag::assignment_subscript_expr_subbase)
+        .highlight(immInfo.first->getSourceRange());
+      return Type();
+    }
+
+    // Otherwise, this is an assignment to a subscript fails for an unknown
+    // reason.
+    TC.diagnose(equalLoc, diag::assignment_subscript_expr,
+                immInfo.first->getType())
+      .highlight(immInfo.first->getSourceRange());
+    return Type();
+  }
+
+  // Provide specific diagnostics for unresolved type expr.
+  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(dest)) {
+    auto immInfo = resolveImmutableBase(UDE, *this);
+
+    // If the dot expr itself is broken and we were able to resolve a property
+    // out of it, diagnose a specific issue.
+    if (immInfo.first == UDE && immInfo.second && isa<VarDecl>(immInfo.second)){
+      auto *vd = cast<VarDecl>(immInfo.second);
+
+      Optional<Diag<Identifier>> diagID;
+      if (vd->isLet())
+        diagID = diag::assignment_lhs_is_let_property;
+      else if (vd->hasAccessorFunctions() && !vd->getSetter())
+        diagID = diag::assignment_get_only_property;
+      else if (!vd->isSetterAccessibleFrom(DC))
+        diagID = diag::assignment_inaccessible_property;
+
+      if (diagID) {
+        TC.diagnose(equalLoc, diagID.getValue(), UDE->getName())
           .highlight(UDE->getBase()->getSourceRange())
           .highlight(UDE->getNameLoc());
+        vd->emitLetToVarNoteIfSimple(DC);
         return Type();
       }
+    }
 
-      // Otherwise, this is an assignment to an unknown UnresolvedDotExpr.
-      TC.diagnose(equalLoc, diag::assignment_ude_expr, UDE->getName())
-        .highlight(UDE->getBase()->getSourceRange())
+    // Otherwise, we cannot resolve this because the available property
+    // setters require the base to be mutable, but it isn't.  If we dug out a
+    // problematic decl, we can produce a nice tailored diagnostic.
+    if (auto *vd = dyn_cast_or_null<VarDecl>(immInfo.second)) {
+      TC.diagnose(equalLoc, diag::assignment_property_has_immutable_base,
+                  UDE->getName(), vd->getName())
+        .highlight(immInfo.first->getSourceRange())
+        .highlight(UDE->getNameLoc());
+      vd->emitLetToVarNoteIfSimple(DC);
+      return Type();
+    }
+
+    // If the underlying expression was a read-only subscript, diagnose that.
+    if (immInfo.second && isa<SubscriptDecl>(immInfo.second)) {
+      TC.diagnose(equalLoc, diag::assignment_ude_expr_subbase, UDE->getName())
+        .highlight(immInfo.first->getSourceRange())
         .highlight(UDE->getNameLoc());
       return Type();
     }
 
-    // Otherwise, emit an unhelpful message.
-    getTypeChecker().diagnose(equalLoc, diag::assignment_lhs_not_lvalue)
-      .highlight(dest->getSourceRange());
-
+    // Otherwise, this is an assignment to an unknown UnresolvedDotExpr.
+    TC.diagnose(equalLoc, diag::assignment_ude_expr, UDE->getName(),
+                immInfo.first->getType())
+      .highlight(immInfo.first->getSourceRange())
+      .highlight(UDE->getNameLoc());
     return Type();
   }
-  
-  return destTy;
+
+  // Otherwise, emit an unhelpful message.
+  getTypeChecker().diagnose(equalLoc, diag::assignment_lhs_not_lvalue)
+    .highlight(dest->getSourceRange());
+
+  return Type();
 }
 
 bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {

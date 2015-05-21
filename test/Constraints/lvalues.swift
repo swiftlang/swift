@@ -109,7 +109,7 @@ fref().property += 0.0
 ++fref().property
 
 // settable property of a non-settable value type is non-settable:
-z.non_settable_x.property = 1.0 // expected-error{{cannot assign to 'property', base has immutable type 'X}}
+z.non_settable_x.property = 1.0 // expected-error{{cannot assign to 'property': 'non_settable_x' is immutable}}
 f2(&z.non_settable_x.property) // expected-error{{cannot pass immutable value of type 'Double' as inout argument}}
 f1(&z.non_settable_x.property) // expected-error{{cannot pass immutable value of type 'Double' as inout argument}}
 z.non_settable_x.property += 1.0 // expected-error{{cannot pass immutable value of type 'Double' to mutating binary operator '+='}}

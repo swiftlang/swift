@@ -1852,7 +1852,7 @@ bool FailureDiagnosis::diagnoseFailureForBinaryExpr() {
                           diag::cannot_apply_lvalue_binop_to_rvalue_vardecl,
                           overloadName, VD->getName(), DiagCase)
             .highlight(LeftArg->getSourceRange());
-          VD->emitLetToVarNoteIfSimple();
+          VD->emitLetToVarNoteIfSimple(CS->DC);
           return true;
         }
       
@@ -1964,7 +1964,7 @@ bool FailureDiagnosis::diagnoseFailureForUnaryExpr() {
           CS->TC.diagnose(argExpr->getLoc(),
                           diag::cannot_apply_lvalue_unop_to_rvalue_vardecl,
                           overloadName, VD->getName(), DiagCase);
-          VD->emitLetToVarNoteIfSimple();
+          VD->emitLetToVarNoteIfSimple(CS->DC);
           return true;
         }
       
@@ -2302,7 +2302,7 @@ bool FailureDiagnosis::diagnoseFailureForAssignExpr() {
                         diag::cannot_assign_to_rvalue_vardecl,
                         VD->getName(), DiagCase)
             .highlight(LeftArg->getSourceRange());
-        VD->emitLetToVarNoteIfSimple();
+        VD->emitLetToVarNoteIfSimple(CS->DC);
         return true;
       }
     
@@ -2342,7 +2342,7 @@ bool FailureDiagnosis::diagnoseFailureForInOutExpr() {
 
         CS->TC.diagnose(DRE->getLoc(), diag::cannot_pass_rvalue_vardecl_inout,
                         VD->getName(), DiagCase);
-        VD->emitLetToVarNoteIfSimple();
+        VD->emitLetToVarNoteIfSimple(CS->DC);
         return true;
       }
     

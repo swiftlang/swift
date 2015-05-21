@@ -3059,10 +3059,24 @@ ObjCSelector VarDecl::getDefaultObjCSetterSelector(ASTContext &ctx,
 /// If this is a simple 'let' constant, emit a note with a fixit indicating
 /// that it can be rewritten to a 'var'.  This is used in situations where the
 /// compiler detects obvious attempts to mutate a constant.
-void VarDecl::emitLetToVarNoteIfSimple() const {
+void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
   // If it isn't a 'let', don't touch it.
   if (!isLet()) return;
-  
+
+  // If this is the 'self' argument of a non-mutating method in a value type,
+  // suggest adding 'mutating' to the method.
+  if (getName().str() == "self" && UseDC) {
+    // If the problematic decl is 'self', then we might be trying to mutate
+    // a property in a non-mutating method.
+    auto FD = dyn_cast<FuncDecl>(UseDC->getInnermostMethodContext());
+    if (FD && !FD->isMutating() && !FD->isImplicit()) {
+      getASTContext().Diags.diagnose(FD->getFuncLoc(), diag::change_to_mutating,
+                                     FD->isAccessor())
+        .fixItInsert(FD->getFuncLoc(), "mutating ");
+      return;
+    }
+  }
+
   // If it is a multi variable binding, like "let (a,b) = " then don't touch it.
   auto *PBD = getParentPatternBinding();
   if (!PBD || PBD->getSingleVar() != this) return;

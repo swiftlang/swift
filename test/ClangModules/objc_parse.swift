@@ -121,7 +121,7 @@ func properties(b: B) {
   // An informal property cannot be made formal in a subclass. The
   // formal property is simply ignored.
   b.informalMadeFormal()
-  b.informalMadeFormal = i // expected-error{{cannot assign to 'informalMadeFormal' in 'b'}}
+  b.informalMadeFormal = i // expected-error{{cannot assign to 'informalMadeFormal': 'b' is immutable}}
   b.setInformalMadeFormal(5)
 
   b.overriddenProp = 17
@@ -249,13 +249,13 @@ func almostSubscriptableKeyMismatch(bc: BadCollection, key: NSString) {
 func almostSubscriptableKeyMismatchInherited(bc: BadCollectionChild,
                                              key: String) {
   var value : AnyObject = bc[key] // no-warning, inherited from parent
-  bc[key] = value // expected-error{{cannot assign to the result of this expression}}
+  bc[key] = value // expected-error{{cannot assign to a get-only subscript}}
 }
 
 func almostSubscriptableKeyMismatchInherited(roc: ReadOnlyCollectionChild,
                                              key: String) {
   var value : AnyObject = roc[key] // no-warning, inherited from parent
-  roc[key] = value // expected-error{{cannot assign to the result of this expression}}
+  roc[key] = value // expected-error{{cannot assign to a get-only subscript}}
 }
 
 // Use of 'Class' via dynamic lookup.

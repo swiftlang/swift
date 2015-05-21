@@ -52,7 +52,7 @@ class FooClass {
     self = FooClass()  // expected-error {{cannot assign to 'self' in a method}}
   }
   
-  func bar() {
+  func bar() {  // expected-note {{mark method 'mutating' to make 'self' mutable}}
     self = FooClass()  // expected-error {{cannot assign to 'self' in a method}}
   }
   
@@ -83,15 +83,15 @@ class FooClass {
 func let_decls() {
   // <rdar://problem/16927246> provide a fixit to change "let" to "var" if needing to mutate a variable
   let a = 42  // expected-note {{change 'let' to 'var' to make it mutable}}
-  a = 17   // expected-error {{cannot assign}}
+  a = 17   // expected-error {{cannot assign to 'let' value 'a'}}
 
   let (b,c) = (4, "hello")
   markUsed(b); markUsed(c)
-  b = 17   // expected-error {{cannot assign}}
+  b = 17   // expected-error {{cannot assign to 'let' value 'b'}}
 
-  let d = (4, "hello")
+  let d = (4, "hello")  // expected-note {{change 'let' to 'var' to make it mutable}}
   markUsed(d.0); markUsed(d.1)
-  d.0 = 17   // expected-error {{cannot assign}}
+  d.0 = 17   // expected-error {{cannot assign to '0': 'd' is immutable}}
 
   
   let e = 42  // expected-note {{change 'let' to 'var' to make it mutable}}
@@ -125,14 +125,14 @@ struct SomeStruct {
   }
 
 
-  func h() {  // expected-note {{change method to 'mutating' to make 'self' mutable}}
-    iv = 12      // expected-error {{cannot assign to 'iv', because 'self' is immutable}}
+  func h() {  // expected-note {{mark method 'mutating' to make 'self' mutable}}
+    iv = 12      // expected-error {{cannot assign to 'iv': 'self' is immutable}}
   }
 
   var p: Int {
     // Getters default to non-mutating.
-    get {          // expected-note {{change accessor to 'mutating' to make 'self' mutable}}
-      iv = 37 // expected-error {{cannot assign to 'iv', because 'self' is immutable}}
+    get {          // expected-note {{mark accessor 'mutating' to make 'self' mutable}}
+      iv = 37 // expected-error {{cannot assign to 'iv': 'self' is immutable}}
       return 42
     }
 
@@ -150,14 +150,14 @@ struct SomeStruct {
       return 42
     }
     nonmutating
-    set {      // expected-note {{change accessor to 'mutating' to make 'self' mutable}}
-      iv = newValue // expected-error {{cannot assign to 'iv', because 'self' is immutable}}
+    set {      // expected-note {{mark accessor 'mutating' to make 'self' mutable}}
+      iv = newValue // expected-error {{cannot assign to 'iv': 'self' is immutable}}
     }
   }
 
   var r : Int {
-    get {        // expected-note {{change accessor to 'mutating' to make 'self' mutable}}
-      iv = 37 // expected-error {{cannot assign to 'iv', because 'self' is immutable}}
+    get {        // expected-note {{mark accessor 'mutating' to make 'self' mutable}}
+      iv = 37 // expected-error {{cannot assign to 'iv': 'self' is immutable}}
       return 42
     }
     mutating // Redundant but OK.
@@ -444,5 +444,50 @@ struct SingleIntStruct : SingleIntProperty {
 extension SingleIntStruct {
   init(_ other: SingleIntStruct) {
     other.i = 999 // expected-error {{cannot assign to 'let' property 'i'}}
+  }
+}
+
+
+
+// <rdar://problem/19370429> QoI: fixit to add "mutating" when assigning to a member of self in a struct
+// <rdar://problem/17632908> QoI: Modifying struct member in non-mutating function produces difficult to understand error message
+struct TestSubscriptMutability {
+  let let_arr = [1,2,3]  // expected-note 2 {{change 'let' to 'var' to make it mutable}}
+  var var_arr = [1,2,3]
+
+  func nonmutating1() {
+    let_arr[1] = 1  // expected-error {{cannot assign to subscript: 'let_arr' is immutable}}
+  }
+  func nonmutating2() { // expected-note {{mark method 'mutating' to make 'self' mutable}}
+    var_arr[1] = 1  // expected-error {{cannot assign to subscript: 'self' is immutable}}
+  }
+
+  func nonmutating3() { // expected-note {{mark method 'mutating' to make 'self' mutable}}
+    self = TestSubscriptMutability() // expected-error {{cannot assign to 'self' in a method}}
+  }
+
+  subscript(a : Int) -> TestSubscriptMutability {
+    return TestSubscriptMutability()
+  }
+
+  func test() {
+    self[1] = TestSubscriptMutability()  // expected-error {{cannot assign to a get-only subscript}}
+    self[1].var_arr = [] // expected-error {{cannot assign to 'var_arr': base subscript is get-only}}
+    self[1].let_arr = [] // expected-error {{cannot assign to 'let' property 'let_arr'}}
+  }
+}
+
+func f(a : TestSubscriptMutability) {
+  a.var_arr = []  // expected-error {{cannot assign to 'var_arr': 'a' is immutable}}
+}
+
+struct TestSubscriptMutability2 {
+  subscript(a : Int) -> Int {
+    get { return 42 }
+    set {}
+  }
+
+  func test() {  // expected-note {{mark method 'mutating' to make 'self' mutable}}
+    self[1] = 2  // expected-error {{cannot assign to subscript: 'self' is immutable}}
   }
 }

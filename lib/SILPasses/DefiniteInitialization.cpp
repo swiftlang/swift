@@ -790,7 +790,7 @@ void LifetimeChecker::handleStoreUse(unsigned UseID) {
         if (Var->getParentInitializer())
           diagnose(Module, SILLocation(VD),
                    diag::initial_value_provided_in_let_decl);
-        Var->emitLetToVarNoteIfSimple();
+        Var->emitLetToVarNoteIfSimple(nullptr);
       }
       return;
     }

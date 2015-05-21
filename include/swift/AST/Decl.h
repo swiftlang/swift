@@ -4276,7 +4276,7 @@ public:
   /// If this is a simple 'let' constant, emit a note with a fixit indicating
   /// that it can be rewritten to a 'var'.  This is used in situations where the
   /// compiler detects obvious attempts to mutate a constant.
-  void emitLetToVarNoteIfSimple() const;
+  void emitLetToVarNoteIfSimple(DeclContext *UseDC) const;
   
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Decl *D) { 
