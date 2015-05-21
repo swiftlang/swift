@@ -82,6 +82,22 @@ class ImplicitSub1 : ImplicitSuper1 { }
 extension ImplicitSub1 : P4 { } // okay, introduces new conformance to P4; the rest are superseded
 
 // ---------------------------------------------------------------------------
+// Synthesized conformances superseded by implicit conformances
+// ---------------------------------------------------------------------------
+
+enum SuitA { case Spades, Hearts, Clubs, Diamonds }
+func <(lhs: SuitA, rhs: SuitA) -> Bool { return false }
+extension SuitA : Comparable {} // okay, implied conformance to Equatable here is preferred.
+
+enum SuitB: Equatable { case Spades, Hearts, Clubs, Diamonds }
+func <(lhs: SuitB, rhs: SuitB) -> Bool { return false }
+extension SuitB : Comparable {} // okay, explicitly declared earlier.
+
+enum SuitC { case Spades, Hearts, Clubs, Diamonds }
+func <(lhs: SuitC, rhs: SuitC) -> Bool { return false }
+extension SuitC : Equatable, Comparable {} // okay, explicitly declared here.
+
+// ---------------------------------------------------------------------------
 // Explicit conformances conflicting with inherited conformances
 // ---------------------------------------------------------------------------
 

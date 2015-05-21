@@ -561,6 +561,27 @@ class swift::ConformanceLookupTable {
     /// Retrieve the kind of conformance formed from this source.
     ConformanceEntryKind getKind() const { return Storage.getInt(); }
 
+    /// Retrieve kind of the conformance for ranking purposes.
+    ///
+    /// The only difference between the ranking kind and the kind is
+    /// that implied conformances originating from a synthesized
+    /// conformance are considered to be synthesized (which has a
+    /// lower ranking).
+    ConformanceEntryKind getRankingKind() const {
+      switch (auto kind = getKind()) {
+      case ConformanceEntryKind::Explicit:
+      case ConformanceEntryKind::Inherited:
+      case ConformanceEntryKind::Synthesized:
+        return kind;
+
+      case ConformanceEntryKind::Implied:
+        return (getImpliedSource()->getDeclaredConformance()->getKind()
+                  == ConformanceEntryKind::Synthesized)
+                 ? ConformanceEntryKind::Synthesized
+                 : ConformanceEntryKind::Implied;
+      }
+    }
+
     /// For an inherited conformance, retrieve the class declaration
     /// for the inheriting class.
     ClassDecl *getInheritingClass() const {
@@ -654,6 +675,11 @@ class swift::ConformanceLookupTable {
     /// Determine the kind of conformance.
     ConformanceEntryKind getKind() const {
       return Source.getKind();
+    }
+
+    /// Determine the kind of conformance for ranking purposes.
+    ConformanceEntryKind getRankingKind() const {
+      return Source.getRankingKind();
     }
 
     /// Retrieve the declaration context associated with this conformance.
@@ -1482,14 +1508,16 @@ ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
   if (lhs->isFixed() != rhs->isFixed()) {
     // If the non-fixed conformance is not replacable, we have a failure to
     // diagnose.
-    diagnoseSuperseded = (lhs->isFixed() && !isReplaceable(rhs->getKind())) ||
-                         (rhs->isFixed() && !isReplaceable(lhs->getKind()));
+    diagnoseSuperseded = (lhs->isFixed() &&
+                          !isReplaceable(rhs->getRankingKind())) ||
+                         (rhs->isFixed() &&
+                          !isReplaceable(lhs->getRankingKind()));
       
     return lhs->isFixed() ? Ordering::Before : Ordering::After;
   }
 
-  ConformanceEntryKind lhsKind = lhs->getKind();
-  ConformanceEntryKind rhsKind = rhs->getKind();
+  ConformanceEntryKind lhsKind = lhs->getRankingKind();
+  ConformanceEntryKind rhsKind = rhs->getRankingKind();
 
   if (lhsKind != ConformanceEntryKind::Implied ||
       rhsKind != ConformanceEntryKind::Implied) {
@@ -1508,8 +1536,9 @@ ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
 
     // We shouldn't get two synthesized conformances. It's not harmful
     // per se, but it's indicative of redundant logic in the frontend.
-    assert(lhsKind != ConformanceEntryKind::Synthesized &&
-          "Shouldn't ever get two synthesized conformances");
+    assert((lhs->getKind() != ConformanceEntryKind::Synthesized ||
+            rhs->getKind() != ConformanceEntryKind::Synthesized) &&
+          "Shouldn't ever get two truly synthesized conformances");
 
     // FIXME: Deterministic ordering.
     return Ordering::Before;
@@ -2145,7 +2174,7 @@ DeclContext::getLocalProtocols(
   nominal->ConformanceTable->lookupConformances(
     nominal,
     const_cast<DeclContext *>(this),
-    nominal->getASTContext().getLazyResolver(),
+    getASTContext().getLazyResolver(),
     lookupKind,
     &result,
     nullptr,
