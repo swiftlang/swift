@@ -420,3 +420,28 @@ func test_variadic(cat: Cat) throws {
 // CHECK:     [[RETHROW]]([[ERROR:%.*]] : $ErrorType):
 // CHECK-NEXT:  strong_release %0 : $Cat
 // CHECK-NEXT:  throw [[ERROR]]
+
+// rdar://20861374
+// Clear out the self box before delegating.
+class BaseThrowingInit : HasThrowingInit {
+  var subField: Int
+  init(value: Int, subField: Int) throws {
+    self.subField = subField
+    try super.init(value: value)
+  }
+}
+// CHECK: sil hidden @_TFC6errors16BaseThrowingInitcfMS0_FzT5valueSi8subFieldSi_S0_ : $@convention(method) (Int, Int, @owned BaseThrowingInit) -> (@owned BaseThrowingInit, @error ErrorType)
+// CHECK:      [[BOX:%.*]] = alloc_box $BaseThrowingInit
+// CHECK:      [[MARKED_BOX:%.*]] = mark_uninitialized [derivedself] [[BOX]]#1
+//   Initialize subField.
+// CHECK:      [[T0:%.*]] = load [[MARKED_BOX]]
+// CHECK-NEXT: [[T1:%.*]] = ref_element_addr [[T0]] : $BaseThrowingInit, #BaseThrowingInit.subField
+// CHECK-NEXT: assign %1 to [[T1]]
+//   Super delegation.
+// CHECK-NEXT: [[T0:%.*]] = load [[MARKED_BOX]]
+// CHECK-NEXT: [[T1:%.*]] = upcast [[T0]] : $BaseThrowingInit to $HasThrowingInit
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: [[T2:%.*]] = function_ref @_TFC6errors15HasThrowingInitcfMS0_FzT5valueSi_S0_
+// CHECK-NEXT: [[T3:%.*]] = null_class $BaseThrowingInit
+// CHECK-NEXT: store [[T3]] to [[MARKED_BOX]]
+// CHECK-NEXT: apply [[T2]](%0, [[T1]])

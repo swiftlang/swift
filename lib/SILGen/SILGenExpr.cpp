@@ -2155,6 +2155,33 @@ RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
   return visit(E->getSemanticExpr(), C);
 }
 
+static SILValue lookThroughSwitchEnum(SILValue value) {
+  if (auto arg = dyn_cast<SILArgument>(value))
+    if (auto pred = arg->getParent()->getSinglePredecessor())
+      if (auto switchEnum = dyn_cast<SwitchEnumInst>(pred->getTerminator()))
+        return switchEnum->getOperand();
+  return value;
+}
+
+/// Given the result of the delegating init call, find the call instruction.
+static SILInstruction *findDelegatingInitCall(SILValue value) {
+  // Look through switch enums that might destructure an optional
+  // value.  This comes up with foreign error conventions.
+  value = lookThroughSwitchEnum(value);
+
+  // Okay, this should be the actual call.
+
+  if (auto apply = dyn_cast<ApplyInst>(value)) {
+    return apply;
+  }
+
+  auto arg = cast<SILArgument>(value);
+  auto pred = arg->getParent()->getSinglePredecessor();
+  assert(pred && "not a single predecessor!");
+  auto tryApply = cast<TryApplyInst>(pred->getTerminator());
+  return tryApply;
+}
+
 RValue RValueEmitter::visitRebindSelfInConstructorExpr(
                                 RebindSelfInConstructorExpr *E, SGFContext C) {
   auto selfDecl = E->getSelf();
@@ -2187,6 +2214,11 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
   // (e.g. on an error path of a failable init) will not do an extra release of
   // the bit pattern in the box.
   if (SGF.SelfInitDelegationState == SILGenFunction::DidConsumeSelf) {
+    // Do this immediately before the delegating init call.
+    SILInstruction *newIP = findDelegatingInitCall(newSelf.getValue());
+    SavedInsertionPoint savedIP(SGF, newIP->getParent());
+    SGF.B.setInsertionPoint(newIP);
+
     auto Zero = SGF.B.createNullClass(E, selfAddr.getType().getObjectType());
     SGF.B.createStore(E, Zero, selfAddr);
   }

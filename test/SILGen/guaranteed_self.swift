@@ -366,9 +366,9 @@ class D: C {
   // CHECK-NOT:     [[SELF_ADDR]]
   // CHECK-NOT:     [[SELF1]]
   // CHECK-NOT:     [[SUPER1]]
-  // CHECK:         [[SUPER2:%.*]] = apply {{.*}}([[SUPER1]])
-  // CHECK-NEXT:     null_class
-  // CHECK-NEXT:     store
+  // CHECK:         null_class
+  // CHECK-NEXT:    store
+  // CHECK-NEXT:    [[SUPER2:%.*]] = apply {{.*}}([[SUPER1]])
   // CHECK-NEXT:    [[SELF2:%.*]] = unchecked_ref_cast [[SUPER2]]
   // CHECK-NEXT:    store [[SELF2]] to [[SELF_ADDR]]
   // CHECK-NOT:     [[SELF_ADDR]]

@@ -139,3 +139,23 @@ func testBridgedResult() throws {
 }
 // CHECK: sil hidden @_TF14foreign_errors17testBridgedResultFzT_T_ : $@convention(thin) () -> @error ErrorType {
 // CHECK:   class_method [volatile] %0 : $@thick ErrorProne.Type, #ErrorProne.collectionWithCount!1.foreign : ErrorProne.Type -> (Int) throws -> [AnyObject] , $@convention(objc_method) (Int, AutoreleasingUnsafeMutablePointer<Optional<NSError>>, @objc_metatype ErrorProne.Type) -> @autoreleased Optional<NSArray>
+
+// rdar://20861374
+// Clear out the self box before delegating.
+class VeryErrorProne : ErrorProne {
+  init(withTwo two: AnyObject?) throws {
+    try super.init(one: two)
+  }
+}
+// CHECK:    sil hidden @_TFC14foreign_errors14VeryErrorPronecfMS0_FzT7withTwoGSqPSs9AnyObject___S0_
+// CHECK:      [[BOX:%.*]] = alloc_box $VeryErrorProne
+// CHECK:      [[MARKED_BOX:%.*]] = mark_uninitialized [derivedself] [[BOX]]#1
+// CHECK:      [[T0:%.*]] = load [[MARKED_BOX]]
+// CHECK-NEXT: [[T1:%.*]] = upcast [[T0]] : $VeryErrorProne to $ErrorProne
+// CHECK-NEXT: [[T2:%.*]] = super_method [volatile] [[T0]] : $VeryErrorProne, #ErrorProne.init!initializer.1.foreign : ErrorProne.Type -> (one: AnyObject?) throws -> ErrorProne , $@convention(objc_method) (Optional<AnyObject>, AutoreleasingUnsafeMutablePointer<Optional<NSError>>, @owned ErrorProne) -> @owned Optional<ErrorProne>
+// CHECK:      {{$}}
+// CHECK-NOT:  [[BOX]]{{^[0-9]}}
+// CHECK-NOT:  [[MARKED_BOX]]{{^[0-9]}}
+// CHECK:      [[T3:%.*]] = null_class $VeryErrorProne
+// CHECK-NEXT: store [[T3]] to [[MARKED_BOX]]
+// CHECK-NEXT: apply [[T2]](%0, {{%.*}}, [[T1]])
