@@ -57,14 +57,22 @@ SetTraps.test("sanity") {
   var nss = s as NSSet
 }
 
-SetTraps.test("RemoveInvalidIndex1") {
+SetTraps.test("RemoveInvalidIndex1")
+  .skip(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .code {
   var s = Set<Int>()
   let index = s.startIndex
   expectCrashLater()
   s.removeAtIndex(index)
 }
 
-SetTraps.test("RemoveInvalidIndex2") {
+SetTraps.test("RemoveInvalidIndex2")
+  .skip(.Custom(
+    { _isFastAssertConfiguration() },
+    reason: "this trap is not guaranteed to happen in -Ounchecked"))
+  .code {
   var s = Set<Int>()
   let index = s.endIndex
   expectCrashLater()
