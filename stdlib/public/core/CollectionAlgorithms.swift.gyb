@@ -205,12 +205,15 @@ sortIsUnstableForComparable = """\
 
 }%
 
-extension SequenceType where Self.Generator.Element : Comparable {
+% for Self in [ 'SequenceType', 'MutableCollectionType' ]:
+
+extension ${Self} where Self.Generator.Element : Comparable {
 ${sortDocCommentForComparable}
   ///
 ${sortIsUnstableForComparable}
   ///
 ${orderingRequirementForComparable}
+  @warn_unused_result(${'mutable_variant="sortInPlace"' if Self == 'MutableCollectionType' else ''})
   final public func sort() -> [Generator.Element] {
     var result = ContiguousArray(self)
     result.sortInPlace()
@@ -218,12 +221,13 @@ ${orderingRequirementForComparable}
   }
 }
 
-extension SequenceType {
+extension ${Self} {
 ${sortDocCommentForPredicate}
   ///
 ${sortIsUnstableForPredicate}
   ///
 ${orderingRequirementForPredicate}
+  @warn_unused_result(${'mutable_variant="sortInPlace"' if Self == 'MutableCollectionType' else ''})
   final public func sort(
     isOrderedBefore: (Generator.Element, Generator.Element) -> Bool
   ) -> [Generator.Element] {
@@ -232,6 +236,8 @@ ${orderingRequirementForPredicate}
     return Array(result)
   }
 }
+
+% end
 
 extension MutableCollectionType
   where
