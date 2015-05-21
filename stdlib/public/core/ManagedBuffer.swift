@@ -38,8 +38,10 @@ public class ManagedProtoBuffer<Value, Element> : NonObjectiveCBase {
   }
 
   /// Call `body` with an `UnsafeMutablePointer` to the stored
-  /// `Value`.  **Note**: this pointer is only valid
-  /// for the duration of the call to `body`.
+  /// `Value`.
+  ///
+  /// - Note: This pointer is only valid for the duration of the
+  ///   call to `body`.
   public final func withUnsafeMutablePointerToValue<R>(
     body: (UnsafeMutablePointer<Value>)->R
   ) -> R {
@@ -47,8 +49,10 @@ public class ManagedProtoBuffer<Value, Element> : NonObjectiveCBase {
   }
 
   /// Call `body` with an `UnsafeMutablePointer` to the `Element`
-  /// storage.  **Note**: this pointer is only valid
-  /// for the duration of the call to `body`.
+  /// storage.
+  ///
+  /// - Note: This pointer is only valid for the duration of the
+  ///   call to `body`.
   public final func withUnsafeMutablePointerToElements<R>(
     body: (UnsafeMutablePointer<Element>)->R
   ) -> R {
@@ -56,8 +60,10 @@ public class ManagedProtoBuffer<Value, Element> : NonObjectiveCBase {
   }
 
   /// Call `body` with `UnsafeMutablePointer`s to the stored `Value`
-  /// and raw `Element` storage.  **Note**: these pointers are only valid
-  /// for the duration of the call to `body`.
+  /// and raw `Element` storage.
+  ///
+  /// - Note: These pointers are only valid for the duration of the
+  ///   call to `body`.
   public final func withUnsafeMutablePointers<R>(
     body: (_: UnsafeMutablePointer<Value>, _: UnsafeMutablePointer<Element>)->R
   ) -> R {
@@ -158,10 +164,10 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   /// Create with new storage containing an initial `Value` and space
   /// for at least `minimumCapacity` `element`s.
   ///
-  /// - parameter bufferClass: the class of the object used for storage.
-  /// - parameter minimumCapacity: the minimum number of `Element`s that
+  /// - parameter bufferClass: The class of the object used for storage.
+  /// - parameter minimumCapacity: The minimum number of `Element`s that
   ///   must be able to be stored in the new buffer.
-  /// - parameter initialValue: a function that produces the initial
+  /// - parameter initialValue: A function that produces the initial
   ///   `Value` instance stored in the buffer, given the `buffer`
   ///   object and a function that can be called on it to get the actual
   ///   number of allocated elements.
@@ -251,8 +257,10 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   }
 
   /// Call `body` with an `UnsafeMutablePointer` to the `Element`
-  /// storage.  **Note**: this pointer is only valid
-  /// for the duration of the call to `body`.
+  /// storage.
+  ///
+  /// - Note: This pointer is only valid for the duration of the
+  ///   call to `body`.
   public func withUnsafeMutablePointerToElements<R>(
     body: (UnsafeMutablePointer<Element>)->R
   ) -> R {
@@ -260,8 +268,10 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   }
 
   /// Call `body` with `UnsafeMutablePointer`s to the stored `Value`
-  /// and raw `Element` storage.  **Note**: these pointers are only valid
-  /// for the duration of the call to `body`.
+  /// and raw `Element` storage.
+  ///
+  /// - Note: These pointers are only valid for the duration of the
+  ///   call to `body`.
   public func withUnsafeMutablePointers<R>(
     body: (_: UnsafeMutablePointer<Value>, _: UnsafeMutablePointer<Element>)->R
   ) -> R {
@@ -290,8 +300,8 @@ public struct ManagedBufferPointer<Value, Element> : Equatable {
   /// Create with new storage containing space for an initial `Value`
   /// and at least `minimumCapacity` `element`s.
   ///
-  /// - parameter bufferClass: the class of the object used for storage.
-  /// - parameter minimumCapacity: the minimum number of `Element`s that
+  /// - parameter bufferClass: The class of the object used for storage.
+  /// - parameter minimumCapacity: The minimum number of `Element`s that
   ///   must be able to be stored in the new buffer.
   ///
   /// - Requires: `minimumCapacity >= 0`, and the type indicated by

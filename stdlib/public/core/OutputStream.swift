@@ -375,7 +375,7 @@ public func toDebugString<T>(x: T) -> String {
 /// Do not overload this function for your type.  Instead, adopt one of the
 /// protocols mentioned above.
 ///
-/// - parameter appendNewline: iff `true` (the default), write a trailing
+/// - parameter appendNewline: Iff `true` (the default), write a trailing
 ///   newline.
 @inline(never)
 @_semantics("stdlib_binary_only")
@@ -411,7 +411,7 @@ public func print<T, TargetStream : OutputStreamType>(
 /// Do not overload this function for your type.  Instead, adopt one of the
 /// protocols mentioned above.
 ///
-/// - parameter appendNewline: iff `true` (the default), write a trailing
+/// - parameter appendNewline: Iff `true` (the default), write a trailing
 ///   newline.
 @inline(never)
 @_semantics("stdlib_binary_only")
@@ -449,7 +449,7 @@ public func print<T>(value: T) {
 /// Do not overload this function for your type.  Instead, adopt one of the
 /// protocols mentioned above.
 ///
-/// - parameter appendNewline: iff `true` (the default), write a trailing
+/// - parameter appendNewline: Iff `true` (the default), write a trailing
 ///   newline.
 @inline(never)
 @_semantics("stdlib_binary_only")
@@ -486,7 +486,7 @@ public func debugPrint<T, TargetStream : OutputStreamType>(
 /// Do not overload this function for your type.  Instead, adopt one of the
 /// protocols mentioned above.
 ///
-/// - parameter appendNewline: iff `true` (the default), write a trailing
+/// - parameter appendNewline: Iff `true` (the default), write a trailing
 ///   newline.
 @inline(never)
 @_semantics("stdlib_binary_only")

@@ -334,7 +334,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollectionType {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - parameter keepCapacity: if `true`, prevents the release of
+  /// - parameter keepCapacity: If `true`, prevents the release of
   ///   allocated storage, which can be a useful optimization
   ///   when `self` is going to be grown again.
   public mutating func removeAll(keepCapacity keepCapacity: Bool = false) {

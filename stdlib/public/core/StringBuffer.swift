@@ -185,9 +185,9 @@ public struct _StringBuffer {
   /// - the buffer is uniquely-refereced, or
   /// - `oldUsedEnd` points to the end of the currently used capacity.
   ///
-  /// - parameter subRange: range of the substring that the caller tries
+  /// - parameter subRange: Range of the substring that the caller tries
   ///   to extend.
-  /// - parameter newUsedCount: the desired size of the substring.
+  /// - parameter newUsedCount: The desired size of the substring.
   mutating func grow(
     subRange: Range<UnsafePointer<RawByte>>, var newUsedCount: Int
   ) -> Bool {

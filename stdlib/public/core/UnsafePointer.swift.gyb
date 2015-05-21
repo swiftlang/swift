@@ -111,7 +111,7 @@ public struct ${Self}<T>
 
   /// Deallocate `num` objects.
   ///
-  /// - parameter num: number of objects to deallocate.  Should match exactly
+  /// - parameter num: Number of objects to deallocate.  Should match exactly
   ///   the value that was passed to `alloc()` (partial deallocations are not
   ///   possible).
   ///

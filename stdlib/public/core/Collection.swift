@@ -314,9 +314,9 @@ public protocol MutableCollectionType
 /// `generate()` method.  For example:
 ///
 ///      struct MyCollection : CollectionType {
-///        struct Index : ForwardIndexType { *implementation hidden* }
-///        subscript(i: Index) -> MyElement { *implementation hidden* }
-///        func generate() -> **IndexingGenerator<MyCollection>** {
+///        struct Index : ForwardIndexType { /* implementation hidden */ }
+///        subscript(i: Index) -> MyElement { /* implementation hidden */ }
+///        func generate() -> IndexingGenerator<MyCollection> { // <===
 ///          return IndexingGenerator(self)
 ///        }
 ///      }

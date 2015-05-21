@@ -53,7 +53,7 @@ public struct RangeGenerator<
 
 /// A collection of consecutive discrete index values.
 ///
-/// - parameter T: is both the element type and the index type of the
+/// - parameter T: Is both the element type and the index type of the
 ///   collection.
 ///
 /// Like other collections, a range containing one element has an

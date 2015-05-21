@@ -35,7 +35,7 @@ extension String {
 
   /// A collection of `Characters` representing the `String`'s
   /// [extended grapheme
-  /// clusters](http://www.unicode.org/glossary/#extended_grapheme_cluster)).
+  /// clusters](http://www.unicode.org/glossary/#extended_grapheme_cluster).
   public var characters: CharacterView {
     return CharacterView(self)
   }
@@ -382,7 +382,7 @@ extension String.CharacterView : RangeReplaceableCollectionType {
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - parameter keepCapacity: if `true`, prevents the release of
+  /// - parameter keepCapacity: If `true`, prevents the release of
   ///   allocated storage, which can be a useful optimization
   ///   when `self` is going to be grown again.
   public mutating func removeAll(keepCapacity keepCapacity: Bool = false) {

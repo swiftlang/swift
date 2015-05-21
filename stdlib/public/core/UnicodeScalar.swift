@@ -88,7 +88,7 @@ public struct UnicodeScalar :
 
   /// Return a String representation of `self` .
   ///
-  /// - parameter forceASCII: if `true`, forces most values into a numeric
+  /// - parameter forceASCII: If `true`, forces most values into a numeric
   ///   representation.
   public func escape(asASCII forceASCII: Bool) -> String {
     func lowNibbleAsHex(v: UInt32) -> String {

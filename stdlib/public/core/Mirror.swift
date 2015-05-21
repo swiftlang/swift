@@ -510,10 +510,10 @@ internal extension Mirror {
 
   /// Initialize for a view of `subject` as `subjectClass`.
   ///
-  /// - parameter ancestor: a Mirror for a (non-strict) ancestor of
+  /// - parameter ancestor: A Mirror for a (non-strict) ancestor of
   ///   `subjectClass`, to be injected into the resulting hierarchy.
   ///
-  /// - parameter legacy: either `nil`, or a legacy mirror for `subject`
+  /// - parameter legacy: Either `nil`, or a legacy mirror for `subject`
   ///    as `subjectClass`.
   internal init(
     _ subject: AnyObject,

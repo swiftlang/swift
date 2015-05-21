@@ -97,7 +97,7 @@ public protocol RangeReplaceableCollectionType
   ///
   /// Invalidates all indices with respect to `self`.
   ///
-  /// - parameter keepCapacity: if `true`, is a non-binding request to
+  /// - parameter keepCapacity: If `true`, is a non-binding request to
   ///    avoid releasing storage, which can be a useful optimization
   ///    when `self` is going to be grown again.
   ///
@@ -173,7 +173,7 @@ public func removeRange<
 ///
 /// Invalidates all indices with respect to `x`.
 ///
-/// - parameter keepCapacity: if `true`, is a non-binding request to
+/// - parameter keepCapacity: If `true`, is a non-binding request to
 ///    avoid releasing storage, which can be a useful optimization
 ///    when `x` is going to be grown again.
 ///
