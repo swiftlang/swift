@@ -2,6 +2,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RETURN_INT_1 | FileCheck %s -check-prefix=RETURN_INT_1
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=RETURN_INT_2 | FileCheck %s -check-prefix=RETURN_INT_2
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TRY_RETURN_INT | FileCheck %s -check-prefix=RETURN_INT_1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TRY_RETURN_VOID | FileCheck %s -check-prefix=RETURN_VOID_1
+
 struct FooStruct {
   var instanceVar : Int
 }
@@ -31,4 +34,12 @@ func testReturnInt2(fooObject: FooStruct) {
 // RETURN_INT_2: Begin completions
 // RETURN_INT_2-NEXT: Decl[InstanceVar]/CurrNominal: instanceVar[#Int#]{{; name=.+$}}
 // RETURN_INT_2-NEXT: End completions
+}
+
+func testMisplacedTry() throws -> Int {
+  try return #^TRY_RETURN_INT^#
+}
+
+func testMisplacedTryVoid() throws {
+  try return #^TRY_RETURN_VOID^#
 }

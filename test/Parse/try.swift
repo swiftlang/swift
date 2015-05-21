@@ -30,3 +30,25 @@ a = foo() + try! bar() // expected-error {{'try!' cannot appear to the right of 
 
 var b = true ? try! foo() : try! bar() + 0
 var c = true ? try! foo() : try! bar() %%% 0 // expected-error {{'try!' following conditional operator does not cover everything to its right}}
+
+try let singleLet = foo() // expected-error {{'try' must be placed on the initial value expression}} {{1-5=}} {{21-21=try }}
+try var singleVar = foo() // expected-error {{'try' must be placed on the initial value expression}} {{1-5=}} {{21-21=try }}
+try let uninit: Int // expected-error {{'try' must be placed on the initial value expression}}
+try let (destructure1, destructure2) = (foo(), bar()) // expected-error {{'try' must be placed on the initial value expression}} {{1-5=}} {{40-40=try }}
+try let multi1 = foo(), multi2 = bar() // expected-error {{'try' must be placed on the initial value expression}} expected-error 2 {{call can throw but is not marked with 'try'}}
+
+func test() throws -> Int {
+  try while true { // expected-error {{'try' cannot be used with 'while'}}
+    try break // expected-error {{'try' cannot be used with 'break'}}
+  }
+  
+  try throw // expected-error {{'try' must be placed on the thrown expression}} expected-error {{expected expression in 'throw' statement}}
+  ; // Reset parser.
+  
+  try return // expected-error {{'try' cannot be used with 'return'}} expected-error {{non-void function should return a value}}
+  ; // Reset parser.
+
+  try throw foo() // expected-error {{'try' must be placed on the thrown expression}} {{3-7=}} {{13-13=try }}
+  // expected-error@-1 {{does not conform to protocol 'ErrorType'}}
+  try return foo() // expected-error {{'try' must be placed on the returned expression}} {{3-7=}} {{14-14=try }}
+}

@@ -865,6 +865,15 @@ ERROR(case_stmt_without_body,stmt_parsing,none,
       "%select{'case'|'default'}0 label in a 'switch' should have at least one "
       "executable statement", (bool))
 
+// 'try' on statements
+ERROR(try_on_stmt,stmt_parsing,none,
+      "'try' cannot be used with '%0'", (StringRef))
+ERROR(try_on_return_throw,stmt_parsing,none,
+      "'try' must be placed on the %select{returned|thrown}0 expression",
+      (bool))
+ERROR(try_on_var_let,stmt_parsing,none,
+      "'try' must be placed on the initial value expression", ())
+
 //------------------------------------------------------------------------------
 // Expression parsing diagnostics
 //------------------------------------------------------------------------------

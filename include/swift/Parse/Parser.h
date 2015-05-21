@@ -731,7 +731,8 @@ public:
   ParserStatus parseDeclVar(ParseDeclOptions Flags, DeclAttributes &Attributes,
                             SmallVectorImpl<Decl *> &Decls,
                             SourceLoc StaticLoc,
-                            StaticSpellingKind StaticSpelling);
+                            StaticSpellingKind StaticSpelling,
+                            SourceLoc TryLoc);
 
   void consumeGetSetBody(AbstractFunctionDecl *AFD, SourceLoc LBLoc);
 
@@ -1153,8 +1154,8 @@ public:
   ParserStatus parseExprOrStmt(ASTNode &Result);
   ParserResult<Stmt> parseStmtBreak();
   ParserResult<Stmt> parseStmtContinue();
-  ParserResult<Stmt> parseStmtReturn();
-  ParserResult<Stmt> parseStmtThrow();
+  ParserResult<Stmt> parseStmtReturn(SourceLoc tryLoc);
+  ParserResult<Stmt> parseStmtThrow(SourceLoc tryLoc);
   ParserResult<Stmt> parseStmtDefer();
   ParserStatus parseStmtCondition(StmtCondition &Result, Diag<> ID);
   ParserResult<PoundAvailableInfo> parseStmtConditionPoundAvailable();

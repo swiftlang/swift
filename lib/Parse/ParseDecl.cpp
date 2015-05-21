@@ -1594,6 +1594,10 @@ static bool isKeywordPossibleDeclStart(const Token &Tok) {
   case tok::pound_line:
   case tok::identifier:
     return true;
+  case tok::kw_try:
+    // 'try' is not a valid way to start a decl, but we special-case 'try let'
+    // and 'try var' for better recovery.
+    return true;
   default:
     return false;
   }
@@ -1624,6 +1628,11 @@ bool Parser::isStartOfDecl() {
     const Token &Tok2 = peekToken();
     return !Tok2.isAnyOperator() || !Tok2.getText().equals("<");
   }
+
+  // The 'try' case is only for simple local recovery, so we only bother to
+  // check 'let' and 'var' right now.
+  if (Tok.is(tok::kw_try))
+    return peekToken().isAny(tok::kw_let, tok::kw_var);
   
   // Otherwise, the only hard case left is the identifier case.
   if (Tok.isNot(tok::identifier)) return true;
@@ -1732,6 +1741,9 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
   ParserPosition BeginParserPosition;
   if (isCodeCompletionFirstPass())
     BeginParserPosition = getParserPosition();
+
+  SourceLoc tryLoc;
+  (void)consumeIf(tok::kw_try, tryLoc);
 
   // Note that we're parsing a declaration.
   StructureMarkerRAII ParsingDecl(*this, Tok.getLoc(),
@@ -1882,7 +1894,7 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
     case tok::kw_let:
     case tok::kw_var:
       Status = parseDeclVar(Flags, Attributes, Entries, StaticLoc,
-                            StaticSpelling);
+                            StaticSpelling, tryLoc);
       StaticLoc = SourceLoc();   // we handled static if present.
       break;
     case tok::kw_typealias:
@@ -3525,7 +3537,8 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
                                   DeclAttributes &Attributes,
                                   SmallVectorImpl<Decl *> &Decls,
                                   SourceLoc StaticLoc,
-                                  StaticSpellingKind StaticSpelling) {
+                                  StaticSpellingKind StaticSpelling,
+                                  SourceLoc TryLoc) {
   assert(StaticLoc.isInvalid() || StaticSpelling != StaticSpellingKind::None);
 
   if (StaticLoc.isValid()) {
@@ -3759,7 +3772,21 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     diagnose(VarLoc, diag::disallowed_var_multiple_getset);
     Status.setIsParseError();
   }
-  
+
+  if (TryLoc.isValid()) {
+    auto inFlightDiag = diagnose(TryLoc, diag::try_on_var_let);
+
+    if (PBDEntries.size() == 1 && PBDEntries.front().Init &&
+        !isa<ErrorExpr>(PBDEntries.front().Init)) {
+      auto *init = PBDEntries.front().Init;
+      inFlightDiag.fixItRemoveChars(TryLoc, VarLoc);
+      inFlightDiag.fixItInsert(init->getStartLoc(), "try ");
+
+      // Note: We can't use TryLoc here because it's outside the PBD source
+      // range.
+      PBDEntries.front().Init = new (Context) TryExpr(init->getStartLoc(),init);
+    }
+  }
 
   // NOTE: At this point, the DoAtScopeExit object is destroyed and the PBD
   // is added to the program.

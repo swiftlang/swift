@@ -49,8 +49,16 @@ bool Parser::isStartOfStmt() {
   case tok::pound_if:
   case tok::pound_line:
     return true;
+
+  case tok::kw_try: {
+    // "try" cannot actually start any statements, but we parse it there for
+    // better recovery.
+    Parser::BacktrackingScope backtrack(*this);
+    consumeToken(tok::kw_try);
+    return isStartOfStmt();
+  }
       
-  case tok::identifier:
+  case tok::identifier: {
     // "identifier ':' for/while/do/switch" is a label on a loop/switch.
     if (!peekToken().is(tok::colon)) return false;
 
@@ -63,6 +71,7 @@ bool Parser::isStartOfStmt() {
     // For better recovery, we just accept a label on any statement.  We reject
     // putting a label on something inappropriate in parseStmt().
     return isStartOfStmt();
+  }
   }
 }
 
@@ -482,49 +491,69 @@ ParserResult<Stmt> Parser::parseStmt() {
     LabelInfo.Loc = consumeIdentifier(&LabelInfo.Name);
     consumeToken(tok::colon);
   }
-  
+
+  SourceLoc tryLoc;
+  (void)consumeIf(tok::kw_try, tryLoc);
   
   switch (Tok.getKind()) {
   default:
-    diagnose(Tok, diag::expected_stmt);
+    diagnose(Tok, tryLoc.isValid() ? diag::expected_expr : diag::expected_stmt);
     return nullptr;
   case tok::kw_return:
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
-    return parseStmtReturn();
+    return parseStmtReturn(tryLoc);
   case tok::kw_throw:
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
-    return parseStmtThrow();
+    return parseStmtThrow(tryLoc);
   case tok::kw_defer:
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
+    if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
     return parseStmtDefer();
   case tok::kw_if:
+    if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
     return parseStmtIf(LabelInfo);
   case tok::kw_guard:
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
+    if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
     return parseStmtGuard();
   case tok::pound_if:
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
+    if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
     return parseStmtIfConfig();
   case tok::pound_line:
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
+    if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
     return parseLineDirective();
-  case tok::kw_while:  return parseStmtWhile(LabelInfo);
-  case tok::kw_repeat: return parseStmtRepeat(LabelInfo);
-  case tok::kw_do:     return parseStmtDo(LabelInfo);
-  case tok::kw_for:    return parseStmtFor(LabelInfo);
-  case tok::kw_switch: return parseStmtSwitch(LabelInfo);
+  case tok::kw_while:
+    if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
+    return parseStmtWhile(LabelInfo);
+  case tok::kw_repeat:
+    if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
+    return parseStmtRepeat(LabelInfo);
+  case tok::kw_do:
+    if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
+    return parseStmtDo(LabelInfo);
+  case tok::kw_for:
+    if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
+    return parseStmtFor(LabelInfo);
+  case tok::kw_switch:
+    if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
+    return parseStmtSwitch(LabelInfo);
   /// 'case' and 'default' are only valid at the top level of a switch.
   case tok::kw_case:
   case tok::kw_default:
     return recoverFromInvalidCase(*this);
   case tok::kw_break:
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
+    if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
     return parseStmtBreak();
   case tok::kw_continue:
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
+    if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
     return parseStmtContinue();
   case tok::kw_fallthrough:
     if (LabelInfo) diagnose(LabelInfo.Loc, diag::invalid_label_on_stmt);
+    if (tryLoc.isValid()) diagnose(tryLoc, diag::try_on_stmt, Tok.getText());
     return makeParserResult(
         new (Context) FallthroughStmt(consumeToken(tok::kw_fallthrough)));
   }
@@ -616,27 +645,41 @@ ParserResult<Stmt> Parser::parseStmtContinue() {
 ///   stmt-return:
 ///     'return' expr?
 ///   
-ParserResult<Stmt> Parser::parseStmtReturn() {
+ParserResult<Stmt> Parser::parseStmtReturn(SourceLoc tryLoc) {
   SourceLoc ReturnLoc = consumeToken(tok::kw_return);
 
   // Handle the ambiguity between consuming the expression and allowing the
   // enclosing stmt-brace to get it by eagerly eating it unless the return is
   // followed by a '}', ';', statement or decl start keyword sequence.
-  if (Tok.isNot(tok::r_brace) && Tok.isNot(tok::semi) &&
+  if (Tok.isNot(tok::r_brace, tok::semi, tok::eof) &&
       !isStartOfStmt() && !isStartOfDecl()) {
-    SourceLoc ExprLoc;
-    if (Tok.isNot(tok::eof))
-      ExprLoc = Tok.getLoc();
+    SourceLoc ExprLoc = Tok.getLoc();
+
     ParserResult<Expr> Result = parseExpr(diag::expected_expr_return);
-    if (Result.isNull() && ExprLoc.isValid()) {
+    if (Result.isNull()) {
       // Create an ErrorExpr to tell the type checker that this return
       // statement had an expression argument in the source.  This supresses
       // the error about missing return value in a non-void function.
       Result = makeParserErrorResult(new (Context) ErrorExpr(ExprLoc));
     }
+
+    if (tryLoc.isValid()) {
+      diagnose(tryLoc, diag::try_on_return_throw, /*isThrow=*/false)
+        .fixItInsert(ExprLoc, "try ")
+        .fixItRemoveChars(tryLoc, ReturnLoc);
+
+      // Note: We can't use tryLoc here because that's outside the ReturnStmt's
+      // source range.
+      if (Result.isNonNull() && !isa<ErrorExpr>(Result.get()))
+        Result = makeParserResult(new (Context) TryExpr(ExprLoc, Result.get()));
+    }
+
     return makeParserResult(
         Result, new (Context) ReturnStmt(ReturnLoc, Result.getPtrOrNull()));
   }
+
+  if (tryLoc.isValid())
+    diagnose(tryLoc, diag::try_on_stmt, "return");
 
   return makeParserResult(new (Context) ReturnStmt(ReturnLoc, nullptr));
 }
@@ -646,8 +689,11 @@ ParserResult<Stmt> Parser::parseStmtReturn() {
 /// stmt-throw
 ///   'throw' expr
 ///
-ParserResult<Stmt> Parser::parseStmtThrow() {
+ParserResult<Stmt> Parser::parseStmtThrow(SourceLoc tryLoc) {
   SourceLoc throwLoc = consumeToken(tok::kw_throw);
+  SourceLoc exprLoc;
+  if (Tok.isNot(tok::eof))
+    exprLoc = Tok.getLoc();
 
   ParserResult<Expr> Result = parseExpr(diag::expected_expr_throw);
 
@@ -656,6 +702,17 @@ ParserResult<Stmt> Parser::parseStmtThrow() {
 
   if (Result.isNull())
     Result = makeParserErrorResult(new (Context) ErrorExpr(throwLoc));
+
+  if (tryLoc.isValid() && exprLoc.isValid()) {
+    diagnose(tryLoc, diag::try_on_return_throw, /*isThrow=*/true)
+      .fixItInsert(exprLoc, "try ")
+      .fixItRemoveChars(tryLoc, throwLoc);
+
+    // Note: We can't use tryLoc here because that's outside the ThrowStmt's
+    // source range.
+    if (Result.isNonNull() && !isa<ErrorExpr>(Result.get()))
+      Result = makeParserResult(new (Context) TryExpr(exprLoc, Result.get()));
+  }
 
   return makeParserResult(Result,
               new (Context) ThrowStmt(throwLoc, Result.get()));
@@ -1864,7 +1921,8 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc,
 
     ParserStatus VarDeclStatus = parseDeclVar(PD_InLoop, Attributes, FirstDecls,
                                               SourceLoc(),
-                                              StaticSpellingKind::None);
+                                              StaticSpellingKind::None,
+                                              SourceLoc());
     if (VarDeclStatus.isError())
       return VarDeclStatus; // FIXME: better recovery
   } else if (Tok.isNot(tok::semi)) {
