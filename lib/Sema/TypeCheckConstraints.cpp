@@ -79,12 +79,13 @@ TypeBase *TypeVariableType::getBaseBeingSubstituted() {
 }
 
 SavedTypeVariableBinding::SavedTypeVariableBinding(TypeVariableType *typeVar)
-  : TypeVar(typeVar), ParentOrFixed(typeVar->getImpl().ParentOrFixed),
-    Options(typeVar->getImpl().Options) { }
+  : TypeVarAndOptions(typeVar, typeVar->getImpl().Options),
+    ParentOrFixed(typeVar->getImpl().ParentOrFixed) { }
 
 void SavedTypeVariableBinding::restore() {
-  TypeVar->getImpl().Options = Options;
-  TypeVar->getImpl().ParentOrFixed = ParentOrFixed;
+  auto *typeVar = getTypeVariable();
+  typeVar->getImpl().Options = getOptions();
+  typeVar->getImpl().ParentOrFixed = ParentOrFixed;
 }
 
 ArchetypeType *TypeVariableType::Implementation::getArchetype() const {

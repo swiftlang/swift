@@ -26,6 +26,7 @@ namespace swift {
   class DeclContext;
   class OperatorDecl;
   class ArchetypeType;
+  class TypeVariableType;
   class TypeBase;
 
   /// We frequently use three tag bits on all of these types.
@@ -62,5 +63,6 @@ LLVM_DECLARE_TYPE_ALIGNMENT(swift::OperatorDecl, swift::DeclAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::DeclContext, swift::DeclContextAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::TypeBase, swift::TypeAlignInBits)
 LLVM_DECLARE_TYPE_ALIGNMENT(swift::ArchetypeType, swift::TypeAlignInBits)
+LLVM_DECLARE_TYPE_ALIGNMENT(swift::TypeVariableType, swift::TypeAlignInBits)
 
 #endif

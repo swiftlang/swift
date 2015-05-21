@@ -18,7 +18,6 @@
 #include "ConstraintSystem.h"
 #include "ConstraintGraph.h"
 #include "swift/AST/ArchetypeBuilder.h"
-#include "swift/AST/TypeWalker.h"
 #include "llvm/ADT/SmallString.h"
 
 using namespace swift;
@@ -131,31 +130,17 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
 void ConstraintSystem::setMustBeMaterializableRecursive(Type type)
 {
   assert(type->isMaterializable() &&
-         "argument to setMustBeMateriziable may not be inherently "
+         "argument to setMustBeMaterializableRecursive may not be inherently "
          "non-materializable");
-  class Walker : public TypeWalker {
-    ConstraintSystem &CS;
-  public:
-    Walker(ConstraintSystem &CS) : CS(CS) {}
-
-    virtual Action walkToTypePre(Type ty) override {
-      if (auto varTy = dyn_cast<TypeVariableType>(ty.getPointer())) {
-        varTy->getImpl().setMustBeMaterializable(CS.getSavedBindings());
-        return Action::Continue;
-      } else if (isa<FunctionType>(ty.getPointer()) ||
-                 isa<PolymorphicFunctionType>(ty.getPointer()) ||
-                 isa<DynamicSelfType>(ty.getPointer())) {
-        return Action::SkipChildren;
-      } else if (isa<LValueType>(ty.getPointer()) ||
-                 isa<InOutType>(ty.getPointer())) {
-        llvm_unreachable("attempt to setMustBeMaterializableRecursive on "
-                         "non-materializable type");
-      } else {
-        return Action::Continue;
-      }
+  TypeVariableType *typeVar = nullptr;
+  type = getFixedTypeRecursive(type, typeVar, /*wantRValue=*/false);
+  if (typeVar) {
+    typeVar->getImpl().setMustBeMaterializable(getSavedBindings());
+  } else if (auto *tupleTy = type->getAs<TupleType>()) {
+    for (auto elt : tupleTy->getElementTypes()) {
+      setMustBeMaterializableRecursive(elt);
     }
-  };
-  simplifyType(type).walk(Walker(*this));
+  }
 }
 
 void ConstraintSystem::addTypeVariableConstraintsToWorkList(

@@ -64,20 +64,20 @@ namespace constraints {
 /// \brief A handle that holds the saved state of a type variable, which
 /// can be restored.
 class SavedTypeVariableBinding {
-  /// \brief The type variable.
-  TypeVariableType *TypeVar;
+  /// \brief The type variable and type variable options.
+  llvm::PointerIntPair<TypeVariableType *, 3> TypeVarAndOptions;
   
   /// \brief The parent or fixed type.
   llvm::PointerUnion<TypeVariableType *, TypeBase *> ParentOrFixed;
-
-  /// \brief The type variable options.
-  unsigned Options : 3;
 
 public:
   explicit SavedTypeVariableBinding(TypeVariableType *typeVar);
 
   /// \brief Restore the state of the type variable to the saved state.
   void restore();
+
+  TypeVariableType *getTypeVariable() { return TypeVarAndOptions.getPointer(); }
+  unsigned getOptions() { return TypeVarAndOptions.getInt(); }
 };
 
 /// \brief A set of saved type variable bindings.
