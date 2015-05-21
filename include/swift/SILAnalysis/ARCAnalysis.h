@@ -201,8 +201,8 @@ public:
 };
 
 class ReleaseTracker {
-  llvm::SmallPtrSet<SILInstruction *, 4> TrackedUsers;
-  llvm::SmallPtrSet<SILInstruction *, 4> FinalReleases;
+  llvm::SmallSetVector<SILInstruction *, 4> TrackedUsers;
+  llvm::SmallSetVector<SILInstruction *, 4> FinalReleases;
   std::function<bool(SILInstruction *)> AcceptableUserQuery;
 
 public:
@@ -218,7 +218,7 @@ public:
 
   void trackUser(SILInstruction *User) { TrackedUsers.insert(User); }
 
-  using range = Range<llvm::SmallPtrSetImpl<SILInstruction *>::iterator>;
+  using range = Range<llvm::SmallSetVector<SILInstruction *, 4>::iterator>;
 
   range getTrackedUsers() { return {TrackedUsers.begin(), TrackedUsers.end()}; }
 
