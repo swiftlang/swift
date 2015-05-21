@@ -347,7 +347,7 @@ public func sort<T : Comparable>(inout array: ContiguousArray<T>) {
 % end
 }
 
-/// Return an `Array` containing the sorted elements of `source`{according}.
+/// Return an `Array` containing the sorted elements of `source`${according}.
 ///
 ${sortIsUnstable}
 ///
