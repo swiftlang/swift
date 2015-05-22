@@ -459,10 +459,10 @@ struct TestSubscriptMutability {
   var var_arr = [1,2,3]
 
   func nonmutating1() {
-    let_arr[1] = 1  // expected-error {{cannot assign to subscript: 'let_arr' is immutable}}
+    let_arr[1] = 1  // expected-error {{cannot assign through subscript: 'let_arr' is immutable}}
   }
   func nonmutating2() { // expected-note {{mark method 'mutating' to make 'self' mutable}}
-    var_arr[1] = 1  // expected-error {{cannot assign to subscript: 'self' is immutable}}
+    var_arr[1] = 1  // expected-error {{cannot assign through subscript: 'self' is immutable}}
   }
 
   func nonmutating3() { // expected-note {{mark method 'mutating' to make 'self' mutable}}
@@ -491,7 +491,7 @@ struct TestSubscriptMutability2 {
   }
 
   func test() {  // expected-note {{mark method 'mutating' to make 'self' mutable}}
-    self[1] = 2  // expected-error {{cannot assign to subscript: 'self' is immutable}}
+    self[1] = 2  // expected-error {{cannot assign through subscript: 'self' is immutable}}
   }
 }
 
@@ -502,13 +502,13 @@ struct TestBangMutability {
   func nonmutating1() {      // expected-note {{mark method 'mutating' to make 'self' mutable}}
     let_opt! = 1             // expected-error {{cannot assign through '!': 'let_opt' is immutable}}
     var_opt! = 1             // expected-error {{cannot assign through '!': 'self' is immutable}}
-    self[]! = 2              // expected-error {{cannot assign through '!': base subscript is get-only}}
+    self[]! = 2              // expected-error {{cannot assign through '!': subscript is get-only}}
   }
   mutating func nonmutating2() {
     let_opt! = 1             // expected-error {{cannot assign through '!': 'let_opt' is immutable}}
     var_opt! = 1             // ok
 
-    self[]! = 2              // expected-error {{cannot assign through '!': base subscript is get-only}}
+    self[]! = 2              // expected-error {{cannot assign through '!': subscript is get-only}}
   }
 
   subscript() -> Int? { return nil }

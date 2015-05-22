@@ -1855,10 +1855,9 @@ resolveImmutableBase(Expr *expr, ConstraintSystem &CS) {
 }
 
 static bool diagnoseSubElementFailure(std::pair<Expr*, ValueDecl*> immInfo,
-                                      SourceLoc equalLoc,
+                                      SourceLoc loc,
                                       ConstraintSystem &CS,
-                                      Diag<Identifier> varDiag,
-                                      Diag<> subscriptDiag) {
+                                      Diag<StringRef> diagID) {
   if (!immInfo.second) return false;
 
   auto &TC = CS.getTypeChecker();
@@ -1867,7 +1866,10 @@ static bool diagnoseSubElementFailure(std::pair<Expr*, ValueDecl*> immInfo,
   // are all mutating and the base must be mutating.  If we dug out a
   // problematic decl, we can produce a nice tailored diagnostic.
   if (auto *vd = dyn_cast<VarDecl>(immInfo.second)) {
-    TC.diagnose(equalLoc, varDiag, vd->getName())
+    std::string message = "'";
+    message += vd->getName().str().str();
+    message += "' is immutable";
+    TC.diagnose(loc, diagID, message)
       .highlight(immInfo.first->getSourceRange());
     vd->emitLetToVarNoteIfSimple(CS.DC);
     return true;
@@ -1875,7 +1877,7 @@ static bool diagnoseSubElementFailure(std::pair<Expr*, ValueDecl*> immInfo,
 
   // If the underlying expression was a read-only subscript, diagnose that.
   if (isa<SubscriptDecl>(immInfo.second)) {
-    TC.diagnose(equalLoc, subscriptDiag)
+    TC.diagnose(loc, diagID, "subscript is get-only")
       .highlight(immInfo.first->getSourceRange());
     return true;
   }
@@ -1916,8 +1918,7 @@ void FailureDiagnosis::diagnoseAssignmentFailure(Expr *dest, Type destTy,
 
     // Diagnose the case when the failure was due to a determinable subelement.
     if (diagnoseSubElementFailure(immInfo, equalLoc, CS,
-                            diag::assignment_bang_has_immutable_subcomponent,
-                            diag::assignment_bang_has_immutable_subscript))
+                            diag::assignment_bang_has_immutable_subcomponent))
       return;
   }
 
@@ -1945,8 +1946,7 @@ void FailureDiagnosis::diagnoseAssignmentFailure(Expr *dest, Type destTy,
 
     // Diagnose the case when the failure was due to a determinable subelement.
     if (diagnoseSubElementFailure(immInfo, equalLoc, CS,
-                                  diag::assignment_subscript_has_immutable_base,
-                                  diag::assignment_subscript_expr_subbase))
+                                diag::assignment_subscript_has_immutable_base))
       return;
   }
 
