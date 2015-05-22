@@ -1581,13 +1581,13 @@ namespace {
     /// Get the Swift name for an enum constant.
     Identifier getEnumConstantName(const clang::EnumConstantDecl *decl,
                                    const clang::EnumDecl *clangEnum) {
-      // Look up the common name prefix for this enum's constants.
-      StringRef enumPrefix = "";
-      auto foundPrefix = Impl.EnumConstantNamePrefixes.find(clangEnum);
-      if (foundPrefix != Impl.EnumConstantNamePrefixes.end()) {
-        enumPrefix = foundPrefix->second;
+      if (auto *nameAttr = decl->getAttr<clang::SwiftNameAttr>()) {
+        StringRef customName = nameAttr->getName();
+        if (Lexer::isIdentifier(customName))
+          return Impl.SwiftContext.getIdentifier(customName);
       }
-      
+
+      StringRef enumPrefix = Impl.EnumConstantNamePrefixes.lookup(clangEnum);
       return Impl.importName(decl->getDeclName(), /*suffix*/ "", enumPrefix);
     }
 
@@ -1601,7 +1601,11 @@ namespace {
       if (ec == ecEnd)
         return;
 
-      auto isNonDeprecated = [](const clang::EnumConstantDecl *elem) -> bool {
+      auto isNonDeprecatedWithoutCustomName =
+          [](const clang::EnumConstantDecl *elem) -> bool {
+        if (elem->hasAttr<clang::SwiftNameAttr>())
+          return false;
+
         clang::VersionTuple maxVersion{~0U, ~0U, ~0U};
         switch (elem->getAvailability(nullptr, maxVersion)) {
         case clang::AR_Available:
@@ -1623,19 +1627,32 @@ namespace {
         }
       };
 
-      auto firstNonDeprecated = std::find_if(ec, ecEnd, isNonDeprecated);
+      auto firstNonDeprecated = std::find_if(ec, ecEnd,
+                                             isNonDeprecatedWithoutCustomName);
       bool hasNonDeprecated = (firstNonDeprecated != ecEnd);
-      if (hasNonDeprecated)
+      if (hasNonDeprecated) {
         ec = firstNonDeprecated;
+      } else {
+        // Advance to the first case without a custom name, deprecated or not.
+        while (ec != ecEnd && (*ec)->hasAttr<clang::SwiftNameAttr>())
+          ++ec;
+        if (ec == ecEnd)
+          return;
+      }
 
       StringRef commonPrefix = (*ec)->getName();
       bool followedByNonIdentifier = false;
       for (++ec; ec != ecEnd; ++ec) {
-        if (hasNonDeprecated)
-          if (!isNonDeprecated(*ec))
+        const clang::EnumConstantDecl *elem = *ec;
+        if (hasNonDeprecated) {
+          if (!isNonDeprecatedWithoutCustomName(elem))
             continue;
+        } else {
+          if (elem->hasAttr<clang::SwiftNameAttr>())
+            continue;
+        }
 
-        commonPrefix = getCommonWordPrefix(commonPrefix, (*ec)->getName(),
+        commonPrefix = getCommonWordPrefix(commonPrefix, elem->getName(),
                                            followedByNonIdentifier);
         if (commonPrefix.empty())
           break;

@@ -257,6 +257,47 @@ typedef NS_ENUM(NSInteger, NSPrefixWordBreak3) {
   NSPrefixWordBreak1Ben,
 };
 
+typedef NS_ENUM(NSInteger, NSPrefixWordBreakCustom) {
+  PrefixWordBreakProblemCase __attribute__((swift_name("ProblemCase"))),
+  NSPrefixWordBreakDeprecatedGoodCase __attribute__((deprecated)),
+};
+
+typedef NS_ENUM(NSInteger, NSPrefixWordBreak2Custom) {
+  PrefixWordBreak2ProblemCase __attribute__((swift_name("ProblemCase"))),
+  PrefixWordBreak2DeprecatedBadCase __attribute__((deprecated)),
+  NSPrefixWordBreak2DeprecatedGoodCase __attribute__((deprecated)),
+  NSPrefixWordBreak2GoodCase,
+};
+
+typedef NS_ENUM(NSInteger, NSPrefixWordBreakReversedCustom) {
+  NSPrefixWordBreakReversedDeprecatedGoodCase __attribute__((deprecated)),
+  PrefixWordBreakReversedProblemCase __attribute__((swift_name("ProblemCase"))),
+};
+
+typedef NS_ENUM(NSInteger, NSPrefixWordBreakReorderedCustom) {
+  PrefixWordBreakReorderedProblemCase __attribute__((swift_name("ProblemCase"))),
+  NSPrefixWordBreakReorderedGoodCase,
+  PrefixWordBreakReorderedDeprecatedBadCase __attribute__((deprecated)),
+  NSPrefixWordBreakReorderedDeprecatedGoodCase __attribute__((deprecated)),
+};
+
+typedef NS_ENUM(NSInteger, NSPrefixWordBreakReordered2Custom) {
+  PrefixWordBreakReordered2DeprecatedBadCase __attribute__((deprecated)),
+  PrefixWordBreakReordered2ProblemCase __attribute__((swift_name("ProblemCase"))),
+  NSPrefixWordBreakReordered2GoodCase,
+  NSPrefixWordBreakReordered2DeprecatedGoodCase __attribute__((deprecated)),
+};
+
+typedef NS_ENUM(NSInteger, NSSwiftNameAllTheThings) {
+  NSSwiftNameAllTheThingsA __attribute__((swift_name("Foo"))),
+  NSSwiftNameAllTheThingsB __attribute__((swift_name("Bar"))),
+};
+
+typedef NS_ENUM(NSInteger, NSSwiftNameBad) {
+  NSSwiftNameBadA __attribute__((swift_name("class"))),
+};
+
+
 typedef NS_ENUM(NSInteger, NSSingleConstantEnum) {
   NSSingleConstantValue,
 };
@@ -283,6 +324,22 @@ typedef NS_ENUM(NSUInteger, NSPostingStyle) {
   NSPostWhenIdle = 1,
   NSPostASAP = 2,
   NSPostNow = 3
+};
+
+typedef NS_ENUM(NSUInteger, NSXMLNodeKind) {
+	NSXMLInvalidKind = 0,
+	NSXMLDocumentKind,
+	NSXMLElementKind,
+	NSXMLAttributeKind,
+	NSXMLNamespaceKind,
+	NSXMLProcessingInstructionKind,
+	NSXMLCommentKind,
+	NSXMLTextKind,
+	NSXMLDTDKind __attribute__((swift_name("DTDKind"))),
+	NSXMLEntityDeclarationKind,
+	NSXMLAttributeDeclarationKind,
+	NSXMLElementDeclarationKind,
+	NSXMLNotationDeclarationKind
 };
 
 // From CoreFoundation
@@ -376,6 +433,10 @@ typedef NS_OPTIONS(NSUInteger, NSCalendarUnitDeprecated) {
   NSMonthCalendarUnitDeprecated NS_CALENDAR_ENUM_DEPRECATED(10_4, 10_9, 2_0, 7_0, "Use NSCalendarUnitMonth instead") = NSCalendarUnitMonth,
   // snip
   NSCalendarCalendarUnitDeprecated NS_CALENDAR_ENUM_DEPRECATED(10_7, 10_9, 4_0, 7_0, "Use NSCalendarUnitCalendar instead") = NSCalendarUnitCalendar,
+};
+
+typedef NS_OPTIONS(NSUInteger, NSOptionsAlsoGetSwiftName) {
+  ThisIsAnNSOptionsCaseWithSwiftName __attribute__((swift_name("Case")))
 };
 
 // FIXME: update these macros to use availability(swift, unavailable) when we

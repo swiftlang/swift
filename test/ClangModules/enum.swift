@@ -106,6 +106,28 @@ extension NSAliasesEnum {
   }
 }
 
+// Test NS_SWIFT_NAME:
+NSXMLNodeKind.DTDKind == .InvalidKind
+
+NSPrefixWordBreakCustom.ProblemCase == .DeprecatedGoodCase // expected-warning {{deprecated}}
+
+NSPrefixWordBreak2Custom.ProblemCase == .GoodCase
+NSPrefixWordBreak2Custom.ProblemCase == .PrefixWordBreak2DeprecatedBadCase // expected-warning {{deprecated}}
+NSPrefixWordBreak2Custom.ProblemCase == .DeprecatedGoodCase // expected-warning {{deprecated}}
+
+NSPrefixWordBreakReversedCustom.ProblemCase == .DeprecatedGoodCase // expected-warning {{deprecated}}
+
+NSPrefixWordBreakReorderedCustom.ProblemCase == .GoodCase
+NSPrefixWordBreakReorderedCustom.ProblemCase == .PrefixWordBreakReorderedDeprecatedBadCase // expected-warning {{deprecated}}
+NSPrefixWordBreakReorderedCustom.ProblemCase == .DeprecatedGoodCase // expected-warning {{deprecated}}
+
+NSPrefixWordBreakReordered2Custom.ProblemCase == .GoodCase
+NSPrefixWordBreakReordered2Custom.ProblemCase == .PrefixWordBreakReordered2DeprecatedBadCase // expected-warning {{deprecated}}
+NSPrefixWordBreakReordered2Custom.ProblemCase == .DeprecatedGoodCase // expected-warning {{deprecated}}
+
+NSSwiftNameAllTheThings.Foo == .Bar
+_ = NSSwiftNameBad.`class`
+
 
 #if !IRGEN
 var qualifiedName = NSRuncingMode.Mince
@@ -150,3 +172,5 @@ let timeFlags: CMTimeFlags = [.Valid , .HasBeenRounded]
 let timeFlags2: CMTimeFlagsWithNumber = [._Valid, ._888]
 
 let objcFlags: objc_flags = [.taggedPointer, .swiftRefcount]
+
+let optionsWithSwiftName: NSOptionsAlsoGetSwiftName = .Case
