@@ -3379,8 +3379,8 @@ public:
     // Visit each of the members.
     for (Decl *Member : SD->getMembers())
       visit(Member);
-    for (Decl *global : SD->getDerivedGlobalDecls())
-      visit(global);
+    for (Decl *Global : SD->getDerivedGlobalDecls())
+      visit(Global);
 
     if (!(IsFirstPass || SD->isInvalid())) {
       checkExplicitConformance(SD, SD->getDeclaredTypeInContext());
@@ -5341,6 +5341,8 @@ public:
     if (!ED->isInvalid()) {
       for (Decl *Member : ED->getMembers())
         visit(Member);
+      for (Decl *Global : ED->getDerivedGlobalDecls())
+        visit(Global);
     }
     
     if (!IsFirstPass) {

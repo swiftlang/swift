@@ -21,11 +21,11 @@
 using namespace swift;
 using namespace DerivedConformance;
 
-void DerivedConformance::_insertOperatorDecl(NominalTypeDecl *scope,
+void DerivedConformance::_insertOperatorDecl(ASTContext &C,
+                                             IterableDeclContext *scope,
                                              Decl *member) {
   // Find the module.
-  auto &C = scope->getASTContext();
-  auto mod = scope->getModuleContext();
+  auto mod = member->getModuleContext();
 
   // Add it to the module in a DerivedFileUnit.
   mod->getDerivedFileUnit().addDerivedDecl(cast<FuncDecl>(member));

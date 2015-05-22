@@ -2837,11 +2837,7 @@ class NominalTypeDecl : public TypeDecl, public DeclContext,
   ArrayRef<DelayedDecl> DelayedMembers;
   
   GenericParamList *GenericParams;
-  
-  /// Global declarations that were synthesized on this type's behalf, such as
-  /// default operator definitions derived for protocol conformances.
-  ArrayRef<Decl*> DerivedGlobalDecls;
-  
+
   /// \brief The generic signature of this type.
   ///
   /// This is the semantic representation of a generic parameters and the
@@ -3153,14 +3149,6 @@ public:
   /// Return a collection of the stored member variables of this type.
   StoredPropertyRange getStoredProperties() const {
     return StoredPropertyRange(getMembers(), ToStoredProperty());
-  }
-  
-  ArrayRef<Decl *> getDerivedGlobalDecls() const { 
-    return DerivedGlobalDecls;
-  }
-
-  void setDerivedGlobalDecls(MutableArrayRef<Decl*> decls) {
-    DerivedGlobalDecls = decls;
   }
   
   bool hasDelayedMemberDecls() {

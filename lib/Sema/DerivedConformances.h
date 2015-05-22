@@ -85,15 +85,19 @@ ValueDecl *deriveBridgedNSError(TypeChecker &tc,
                                 NominalTypeDecl *type,
                                 ValueDecl *requirement);
 
-/// Insert an operator declaration associated with a nominal type. The
-/// declaration is added at global scope.
-void _insertOperatorDecl(NominalTypeDecl *scope, Decl *member);
+/// Insert an operator declaration associated with a declaration
+/// context. The operator declaration is added at global scope.
+void _insertOperatorDecl(ASTContext &C,
+                         IterableDeclContext *scope,
+                         Decl *member);
   
-/// Insert a declaration as a member of a nominal type. The declaration is
-/// added at file scope as close as possible to the 
+/// Insert an operator declaration associated with a declaration
+/// context. The operator declaration is added at global scope.
 template<typename SomeDecl>
-inline SomeDecl *insertOperatorDecl(NominalTypeDecl *scope, SomeDecl *member) {
-  ::swift::DerivedConformance::_insertOperatorDecl(scope, member);
+inline SomeDecl *insertOperatorDecl(ASTContext &C,
+                                    IterableDeclContext *scope,
+                                    SomeDecl *member) {
+  ::swift::DerivedConformance::_insertOperatorDecl(C, scope, member);
   return member;
 }
 

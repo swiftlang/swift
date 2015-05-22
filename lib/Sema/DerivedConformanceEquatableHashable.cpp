@@ -288,7 +288,7 @@ deriveEquatable_enum_eq(TypeChecker &tc, EnumDecl *enumDecl) {
     tc.implicitlyDefinedFunctions.push_back(eqDecl);
   
   // Since it's an operator we insert the decl after the type at global scope.
-  return insertOperatorDecl(enumDecl, eqDecl);
+  return insertOperatorDecl(C, enumDecl, eqDecl);
 }
 
 ValueDecl *DerivedConformance::deriveEquatable(TypeChecker &tc,

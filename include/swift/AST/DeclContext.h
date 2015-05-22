@@ -533,6 +533,10 @@ class IterableDeclContext {
   /// Lazy member loader context data.
   uint64_t LazyLoaderContextData = 0;
 
+  /// Global declarations that were synthesized on this declaration's behalf,
+  /// such as default operator definitions derived for protocol conformances.
+  ArrayRef<Decl*> DerivedGlobalDecls;
+
   template<class A, class B, class C>
   friend struct ::llvm::cast_convert_val;
 
@@ -576,6 +580,18 @@ public:
 
   /// Load all of the members of this context.
   void loadAllMembers() const;
+
+  /// Retrieve global declarations that were synthesized on this
+  /// declaration's behalf.
+  ArrayRef<Decl *> getDerivedGlobalDecls() const {
+    return DerivedGlobalDecls;
+  }
+
+  /// Set global declarations that were synthesized on this
+  /// declaration's behalf.
+  void setDerivedGlobalDecls(MutableArrayRef<Decl*> decls) {
+    DerivedGlobalDecls = decls;
+  }
 
   // Some Decls are IterableDeclContexts, but not all.
   static bool classof(const Decl *D);
