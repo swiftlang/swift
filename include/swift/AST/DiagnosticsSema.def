@@ -906,6 +906,10 @@ ERROR(ambiguous_conformance,sema_tcd,none,
       (Type, DeclName, DeclName))
 NOTE(protocol_conformance_implied_here,sema_tcd,none,
      "implied protocol conformance %0 here can be made explicit", (Identifier))
+WARNING(optional_req_nonobjc_near_match,sema_tcd,none,
+        "non-@objc %select{initializer %1|method %1|property %1|subscript}0 "
+        "cannot satisfy optional requirement of @objc protocol %2",
+        (RequirementKind, DeclName, DeclName))
 
 // Protocols and existentials
 ERROR(assoc_type_outside_of_protocol,sema_nb,none,

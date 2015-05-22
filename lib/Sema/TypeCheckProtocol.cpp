@@ -126,6 +126,10 @@ namespace {
     /// Record that the given optional requirement has no witness.
     void recordOptionalWitness(ValueDecl *requirement);
 
+    /// Check whether there is a potential non-@objc witness for an
+    /// @objc optional requirement.
+    void checkOptionalWitnessNonObjCMatch(ValueDecl *requirement);
+
     /// Record a type witness.
     ///
     /// \param assocType The associated type whose witness is being recorded.
@@ -1409,6 +1413,22 @@ static Type getRequirementTypeForDisplay(TypeChecker &tc, Module *module,
   return type;
 }
 
+/// Retrieve the location at which '@objc' should be inserted for the
+/// given declaration.
+static SourceLoc getAtObjCInsertionLoc(ValueDecl *vd) {
+  SourceLoc startLoc = vd->getStartLoc();
+  SourceLoc attrStartLoc = vd->getAttrs().getStartLoc();
+  if (attrStartLoc.isValid())
+    startLoc = attrStartLoc;
+  
+  if (auto var = dyn_cast<VarDecl>(vd)) {
+    if (auto patternBinding = var->getParentPatternBinding())
+      startLoc = patternBinding->getStartLoc();
+  }
+
+  return startLoc;
+}
+
 /// \brief Diagnose a requirement match, describing what went wrong (or not).
 static void
 diagnoseMatch(TypeChecker &tc, Module *module,
@@ -1507,15 +1527,7 @@ diagnoseMatch(TypeChecker &tc, Module *module,
     (void)checkObjCWitnessSelector(tc, req, match.Witness, /*complain=*/true);
     break;
   case MatchKind::NotObjC: {
-    SourceLoc witnessStartLoc = match.Witness->getStartLoc();
-    SourceLoc attrStartLoc = match.Witness->getAttrs().getStartLoc();
-    if (attrStartLoc.isValid())
-      witnessStartLoc = attrStartLoc;
-
-    if (auto varWitness = dyn_cast<VarDecl>(match.Witness)) {
-      if (auto patternBinding = varWitness->getParentPatternBinding())
-        witnessStartLoc = patternBinding->getStartLoc();
-    }
+    SourceLoc witnessStartLoc = getAtObjCInsertionLoc(match.Witness);
     tc.diagnose(match.Witness, diag::protocol_witness_not_objc)
       .fixItInsert(witnessStartLoc, "@objc ");
     break;
@@ -1646,6 +1658,11 @@ void ConformanceChecker::recordOptionalWitness(ValueDecl *requirement) {
   // If the requirement is @objc, note that we have an unsatisfied
   // optional @objc requirement.
   if (requirement->isObjC()) {
+    // If we're not suppressing diagnostics, look for a non-@objc near
+    // match.
+    if (!SuppressDiagnostics)
+      checkOptionalWitnessNonObjCMatch(requirement);
+
     if (auto funcReq = dyn_cast<AbstractFunctionDecl>(requirement))
       TC.Context.recordObjCUnsatisfiedOptReq(DC, funcReq);
     else {
@@ -1655,6 +1672,31 @@ void ConformanceChecker::recordOptionalWitness(ValueDecl *requirement) {
       if (auto setter = storageReq->getSetter())
         TC.Context.recordObjCUnsatisfiedOptReq(DC, setter);
     }
+  }
+}
+
+void ConformanceChecker::checkOptionalWitnessNonObjCMatch(
+       ValueDecl *requirement) {
+  for (auto witness : lookupValueWitnesses(requirement, nullptr)) {
+    // If the witness is in a different DeclContext, ignore it.
+    if (witness->getDeclContext() != DC)
+      continue;
+
+    // If the witness is @objc, selector-collision diagnostics will
+    // handle this if there actually is a collision.
+    if (witness->isObjC())
+      continue;
+
+    // Diagnose the non-@objc declaration.
+    TC.diagnose(witness, diag::optional_req_nonobjc_near_match,
+                getRequirementKind(requirement), requirement->getFullName(),
+                Proto->getFullName())
+      .fixItInsert(getAtObjCInsertionLoc(witness), "@objc ");
+    
+    TC.diagnose(requirement, diag::protocol_requirement_here,
+                requirement->getFullName());
+
+    break;
   }
 }
 
@@ -3536,8 +3578,15 @@ void ConformanceChecker::checkConformance() {
       continue;
 
     // If we've already determined this witness, skip it.
-    if (Conformance->hasWitness(requirement))
+    if (Conformance->hasWitness(requirement)) {
+      // If this is an unsatisfied @objc optional requirement,
+      // diagnose it.
+      if (!Conformance->getWitness(requirement, nullptr) &&
+          requirement->isObjC())
+        checkOptionalWitnessNonObjCMatch(requirement);
+
       continue;
+    }
 
     // Make sure we've validated the requirement.
     if (!requirement->hasType())
