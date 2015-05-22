@@ -574,7 +574,7 @@ void Mangler::mangleDeclType(const ValueDecl *decl,
     // Bind the declaration's generic context for nested decls.
     if (decl->getInterfaceType()
         && !decl->getInterfaceType()->is<ErrorType>()) {
-      if (auto context = dyn_cast<DeclContext>(decl)) {
+      if (const auto context = dyn_cast<DeclContext>(decl)) {
         if (auto params = context->getGenericParamsOfContext()) {
           bindAllGenericParameters(*this, params);
         }

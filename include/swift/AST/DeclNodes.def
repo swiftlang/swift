@@ -73,6 +73,13 @@
 #define NOMINAL_TYPE_DECL(Id, Parent) CONTEXT_VALUE_DECL(Id, Parent)
 #endif
 
+/// EXTENSION_DECL(Id, Parent)
+///   Used for subclasses of ExtensionDecl.  The default behavior is
+///   to do the same as for CONTEXT_DECL.
+#ifndef EXTENSION_DECL
+#define EXTENSION_DECL(Id, Parent) CONTEXT_DECL(Id, Parent)
+#endif
+
 /// A convenience for determining the range of declarations.  These will always
 /// appear immediately after the last member.
 #ifndef DECL_RANGE
@@ -80,7 +87,7 @@
 #endif
 
 DECL(Import, Decl)
-CONTEXT_DECL(Extension, Decl)
+EXTENSION_DECL(Extension, Decl)
 DECL(PatternBinding, Decl)
 DECL(EnumCase, Decl)
 CONTEXT_DECL(TopLevelCode, Decl)
@@ -127,4 +134,5 @@ ABSTRACT_DECL(Value, Decl)
 #undef FUNCTION_DECL
 #undef CONTEXT_DECL
 #undef CONTEXT_VALUE_DECL
+#undef EXTENSION_DECL
 #undef DECL

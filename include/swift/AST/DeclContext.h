@@ -191,7 +191,7 @@ class alignas(1 << DeclContextAlignInBits) DeclContext {
   template<class A, class B, class C>
   friend struct ::llvm::cast_convert_val;
   
-  static const DeclContext *castDeclToDeclContext(const ValueDecl *D);
+  static DeclContext *castDeclToDeclContext(const Decl *D);
   
 public:
   DeclContext(DeclContextKind Kind, DeclContext *Parent)
@@ -442,7 +442,7 @@ public:
                      unsigned Alignment = alignof(DeclContext));
   
   // Some Decls are DeclContexts, but not all.
-  static bool classof(const ValueDecl *D);
+  static bool classof(const Decl *D);
 };
 
 /// SerializedLocalDeclContext - the base class for DeclContexts that were
@@ -533,6 +533,11 @@ class IterableDeclContext {
   /// Lazy member loader context data.
   uint64_t LazyLoaderContextData = 0;
 
+  template<class A, class B, class C>
+  friend struct ::llvm::cast_convert_val;
+
+  static IterableDeclContext *castDeclToIterableDeclContext(const Decl *D);
+
 public:
   IterableDeclContext(IterableDeclContextKind kind)
     : LastDeclAndKind(nullptr, kind) { }
@@ -572,6 +577,9 @@ public:
   /// Load all of the members of this context.
   void loadAllMembers() const;
 
+  // Some Decls are IterableDeclContexts, but not all.
+  static bool classof(const Decl *D);
+
 private:
   /// Add a member to the list for iteration purposes, but do not notify the
   /// subclass that we have done so.
@@ -586,8 +594,15 @@ private:
 namespace llvm {
   template<class FromTy>
   struct cast_convert_val< ::swift::DeclContext, FromTy, FromTy> {
-    static const ::swift::DeclContext *doit(const FromTy &Val) {
+    static ::swift::DeclContext *doit(const FromTy &Val) {
       return ::swift::DeclContext::castDeclToDeclContext(Val);
+    }
+  };
+
+  template<class FromTy>
+  struct cast_convert_val< ::swift::IterableDeclContext, FromTy, FromTy> {
+    static ::swift::IterableDeclContext *doit(const FromTy &Val) {
+      return ::swift::IterableDeclContext::castDeclToIterableDeclContext(Val);
     }
   };
 }

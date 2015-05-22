@@ -537,7 +537,7 @@ static unsigned getLineNumber(DCType *DC) {
   return ctx.SourceMgr.getLineAndColumn(loc).first;
 }
 
-bool DeclContext::classof(const ValueDecl *D) {
+bool DeclContext::classof(const Decl *D) {
   switch (D->getKind()) { //
 #define DECL(ID, PARENT)               case DeclKind::ID: return false;
 #define CONTEXT_DECL(ID, PARENT)       case DeclKind::ID: return true;
@@ -546,13 +546,14 @@ bool DeclContext::classof(const ValueDecl *D) {
   }
 }
 
-const DeclContext *DeclContext::castDeclToDeclContext(const ValueDecl *D) {
+DeclContext *DeclContext::castDeclToDeclContext(const Decl *D) {
   switch (D->getKind()) {
 #define DECL(ID, PARENT) \
   case DeclKind::ID: llvm_unreachable("not a decl context");
 #define CONTEXT_DECL(ID, PARENT) \
   case DeclKind::ID: \
-    return static_cast<const DeclContext*>(cast<ID##Decl>(D));
+    return const_cast<DeclContext *>( \
+        static_cast<const DeclContext*>(cast<ID##Decl>(D)));
 #define CONTEXT_VALUE_DECL(ID, PARENT) CONTEXT_DECL(ID, PARENT)
 #include "swift/AST/DeclNodes.def"
   }
@@ -772,4 +773,30 @@ void IterableDeclContext::loadAllMembers() const {
       const_cast<ProtocolDecl *>(proto)->setHasMissingRequirements(true);
 
   --NumUnloadedLazyIterableDeclContexts;
+}
+
+bool IterableDeclContext::classof(const Decl *D) {
+  switch (D->getKind()) {
+#define DECL(ID, PARENT)              case DeclKind::ID: return false;
+#define NOMINAL_TYPE_DECL(ID, PARENT) case DeclKind::ID: return true;
+#define EXTENSION_DECL(ID, PARENT)    case DeclKind::ID: return true;
+#include "swift/AST/DeclNodes.def"
+  }
+}
+
+IterableDeclContext *
+IterableDeclContext::castDeclToIterableDeclContext(const Decl *D) {
+  switch (D->getKind()) {
+#define DECL(ID, PARENT) \
+  case DeclKind::ID: llvm_unreachable("not a decl context");
+#define NOMINAL_TYPE_DECL(ID, PARENT) \
+  case DeclKind::ID: \
+    return const_cast<IterableDeclContext *>( \
+        static_cast<const IterableDeclContext*>(cast<ID##Decl>(D)));
+#define EXTENSION_DECL(ID, PARENT) \
+  case DeclKind::ID: \
+    return const_cast<IterableDeclContext *>( \
+        static_cast<const IterableDeclContext*>(cast<ID##Decl>(D)));
+#include "swift/AST/DeclNodes.def"
+  }
 }
