@@ -384,6 +384,8 @@ public:
   Classification classifyApply(ApplyExpr *E) {
     // An apply expression is a potential throw site if the function throws.
     // But if the expression didn't type-check, suppress diagnostics.
+    if (!E->getType() || E->getType()->is<ErrorType>())
+      return Classification::forInvalidCode();
     auto type = E->getFn()->getType();
     if (!type) return Classification::forInvalidCode();
     auto fnType = type->getAs<AnyFunctionType>();

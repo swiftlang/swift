@@ -94,3 +94,14 @@ func testGeneric<P : ThrowingProto>(p : P) throws {
   try p.foo()
   try P.bar()
 }
+
+// Don't warn about the "useless" try in these cases.
+func nine_helper(x: Int, y: Int) throws {}
+func nine() throws {
+  try nine_helper(y: 0) // expected-error {{missing argument for parameter #1 in call}}
+}
+func ten_helper(x: Int) {}
+func ten_helper(x: Int, y: Int) throws {}
+func ten() throws {
+  try ten_helper(y: 0) // expected-error {{extraneous argument label 'y:' in call}}
+}
