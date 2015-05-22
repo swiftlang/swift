@@ -84,7 +84,7 @@ func nsEncode<CodeUnit>(
     maxLength: buffer.count,
     usedLength: &used,
     encoding: encoding,
-    options: NSStringEncodingConversionOptions(0),
+    options: [],
     range: NSRange(location: 0, length: s.length),
     remainingRange: nil)
 }

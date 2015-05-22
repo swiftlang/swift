@@ -47,17 +47,13 @@ enum FooComparisonResult : Int {
 }
 
 /// Aaa.  FooRuncingOptions.  Bbb.
-struct FooRuncingOptions : RawOptionSetType {
-  init()
-  init(_ rawValue: Int)
+struct FooRuncingOptions : OptionSetType {
   init(rawValue: Int)
   let rawValue: Int
   
   // This is mince.
   static var EnableMince: FooRuncingOptions { get }
   static var EnableQuince: FooRuncingOptions { get } /* But this is quince */
-  static var allZeros: FooRuncingOptions { get }
-  init(nilLiteral _: ())
 }
 
 struct FooStruct1 {

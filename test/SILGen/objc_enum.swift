@@ -9,8 +9,6 @@ import gizmo
 // CHECK-DAG: sil shared @_TFOSC16NSRuncingOptionsg8rawValueSi
 // CHECK-DAG: sil shared @_TFOSC16NSRuncingOptionsg9hashValueSi
 
-// CHECK-DAG: sil shared @_TZF5gizmooi2eeFTOSC16NSRuncingOptionsS0__Sb
-
 // CHECK-DAG: sil shared [transparent] @_TFOSC16NSRuncingOptions5MinceFMS_S_
 // CHECK-DAG: sil shared [transparent] @_TFOSC16NSRuncingOptions12QuinceSlicedFMS_S_
 // CHECK-DAG: sil shared [transparent] @_TFOSC16NSRuncingOptions15QuinceJuliennedFMS_S_

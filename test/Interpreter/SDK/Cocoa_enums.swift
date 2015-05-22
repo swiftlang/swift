@@ -4,12 +4,12 @@
 
 import Foundation
 
-let opts: NSBinarySearchingOptions = .FirstEqual | .InsertionIndex
+let opts: NSBinarySearchingOptions = [.FirstEqual, .InsertionIndex]
 
 // CHECK: true
-print(opts & (.LastEqual | .InsertionIndex) == .InsertionIndex)
+print(opts.intersect([.LastEqual, .InsertionIndex]) == .InsertionIndex)
 // CHECK: false
-print((opts & .LastEqual) != nil)
+print(!opts.intersect(.LastEqual).isEmpty)
 
-// CHECK: {{^}}0 0 0{{$}}
-print("\((nil as NSBinarySearchingOptions).rawValue) \(NSBinarySearchingOptions.allZeros.rawValue) \(NSBinarySearchingOptions(0).rawValue)")
+// CHECK: {{^}}0 0{{$}}
+print("\(([] as NSBinarySearchingOptions).rawValue) \(NSBinarySearchingOptions(rawValue: 0).rawValue)")

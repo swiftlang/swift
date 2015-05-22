@@ -106,7 +106,7 @@ testB()
 class MyNSData : NSData {
   init?(base64EncodedString str: String) {
     super.init(base64EncodedString:str, 
-               options:NSDataBase64DecodingOptions(0))
+               options:[])
     print("MyNSData code should not be executed")
   }
 
@@ -127,7 +127,7 @@ if let myNSData = MyNSData(base64EncodedString:"\n\n\n") {
 extension NSData {
   convenience init?(myString str: String) {
     self.init(base64EncodedString:str, 
-              options:NSDataBase64DecodingOptions(0))
+              options:[])
     print("NSData code should not be executed")
   }
 }

@@ -361,7 +361,7 @@ extension String {
   /// returns the lexical ordering for the range.
   public func compare(
     aString: String,
-    options mask: NSStringCompareOptions = nil,
+    options mask: NSStringCompareOptions = [],
     range: Range<Index>? = nil,
     locale: NSLocale? = nil
   ) -> NSComparisonResult {
@@ -378,7 +378,7 @@ extension String {
       options: mask,
       range: _toNSRange(range ?? self.characters.indices))
 
-    : mask != nil ? _ns.compare(aString, options: mask)
+    : !mask.isEmpty ? _ns.compare(aString, options: mask)
 
     : _ns.compare(aString)
   }
@@ -953,7 +953,7 @@ extension String {
   public func linguisticTagsInRange(
     range: Range<Index>,
     scheme tagScheme: String,
-    options opts: NSLinguisticTaggerOptions = nil,
+    options opts: NSLinguisticTaggerOptions = [],
     orthography: NSOrthography? = nil,
     tokenRanges: UnsafeMutablePointer<[Range<Index>]> = nil // FIXME:Can this be nil?
   ) -> [String] {
@@ -1092,7 +1092,7 @@ extension String {
   /// given options.
   public func rangeOfCharacterFromSet(
     aSet: NSCharacterSet,
-    options mask:NSStringCompareOptions = nil,
+    options mask:NSStringCompareOptions = [],
     range aRange: Range<Index>? = nil
   )-> Range<Index>? {
     return _optionalRange(
@@ -1146,7 +1146,7 @@ extension String {
   /// given options, using the specified locale, if any.
   public func rangeOfString(
     aString: String,
-    options mask: NSStringCompareOptions = nil,
+    options mask: NSStringCompareOptions = [],
     range searchRange: Range<Index>? = nil,
     locale: NSLocale? = nil
   ) -> Range<Index>? {
@@ -1159,7 +1159,7 @@ extension String {
       : searchRange != nil ? _ns.rangeOfString(
         aString, options: mask, range: _toNSRange(searchRange!)
       )
-      : mask != nil ? _ns.rangeOfString(aString, options: mask)
+      : !mask.isEmpty ? _ns.rangeOfString(aString, options: mask)
       : _ns.rangeOfString(aString)
     )
   }
@@ -1347,10 +1347,10 @@ extension String {
   public func stringByReplacingOccurrencesOfString(
     target: String,
     withString replacement: String,
-    options: NSStringCompareOptions = nil,
+    options: NSStringCompareOptions = [],
     range searchRange: Range<Index>? = nil
   ) -> String {
-    return (searchRange != nil) || (options != nil)
+    return (searchRange != nil) || (!options.isEmpty)
     ? _ns.stringByReplacingOccurrencesOfString(
       target,
       withString: replacement, options: options,

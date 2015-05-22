@@ -44,8 +44,8 @@ class Observer : NSObject {
 
   func observeTarget(t: Target) {
     target = t
-    target!.addObserver(self, forKeyPath:"objcValue", 
-      options:NSKeyValueObservingOptions.New | NSKeyValueObservingOptions.Old, 
+    target!.addObserver(self, forKeyPath:"objcValue",
+      options: [.New, .Old],
       context: nil)
   }
 
@@ -88,8 +88,8 @@ class ObserverKVO : NSObject {
   func observeTarget(target: Target) {
     self.target = target
     self.target!.addObserver(self,
-       forKeyPath:"objcValue",
-       options:NSKeyValueObservingOptions.New | NSKeyValueObservingOptions.Old, 
+       forKeyPath: "objcValue",
+       options: [.New, .Old],
        context: &kvoContext)
   }
   

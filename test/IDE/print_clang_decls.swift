@@ -89,15 +89,11 @@
 // FOUNDATION-NEXT: {{^}}}{{$}}
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSRuncingOptions.  Bbb.{{$}}
-// FOUNDATION-NEXT: {{^}}struct NSRuncingOptions : RawOptionSetType {{{$}}
-// FOUNDATION-NEXT: {{^}}  init(){{$}}
-// FOUNDATION-NEXT: {{^}}  init(_ rawValue: UInt){{$}}
+// FOUNDATION-NEXT: {{^}}struct NSRuncingOptions : OptionSetType {{{$}}
 // FOUNDATION-NEXT: {{^}}  init(rawValue: UInt){{$}}
 // FOUNDATION-NEXT: {{^}}  let rawValue: UInt{{$}}
 // FOUNDATION-NEXT: {{^}}  static var EnableMince: NSRuncingOptions { get }{{$}}
 // FOUNDATION-NEXT: {{^}}  static var EnableQuince: NSRuncingOptions { get }{{$}}
-// FOUNDATION-NEXT: {{^}}  static var allZeros: NSRuncingOptions { get }{{$}}
-// FOUNDATION-NEXT: {{^}}  init(nilLiteral _: ()){{$}}
 // FOUNDATION-NEXT: {{^}}}{{$}}
 
 // FOUNDATION-LABEL: {{^}}/// Unavailable Global Functions{{$}}

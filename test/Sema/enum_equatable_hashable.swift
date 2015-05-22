@@ -77,7 +77,7 @@ if .A == getFromOtherFile() {}
 // FIXME: This should work.
 func overloadFromOtherFile() -> YetAnotherFromOtherFile { return .A }
 func overloadFromOtherFile() -> Bool { return false }
-if .A == overloadFromOtherFile() {} // expected-error {{could not find member 'A'}}
+if .A == overloadFromOtherFile() {}
 
 
 // Complex enums are not implicitly Equatable or Hashable.

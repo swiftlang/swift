@@ -137,7 +137,7 @@ namespace swift {
     bool EnableInterfaceTypeMangling = true;
     
     /// Import NS_OPTIONS types using the new OptionSetType interface.
-    bool ImportNSOptionsAsOptionSetType = false;
+    bool ImportNSOptionsAsOptionSetType = true;
 
     /// The target we are building for.
     ///

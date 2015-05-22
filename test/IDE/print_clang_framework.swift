@@ -39,12 +39,10 @@
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSPotentiallyUnavailableOptions.  Bbb.
 // FOUNDATION-NEXT: {{^}}@available(OSX 10.10, *){{$}}
-// FOUNDATION-NEXT: {{^}}struct NSPotentiallyUnavailableOptions : RawOptionSetType {{{$}}
+// FOUNDATION-NEXT: {{^}}struct NSPotentiallyUnavailableOptions : OptionSetType {{{$}}
 
 // FOUNDATION-LABEL: {{^}}/// Aaa.  NSOptionsWithUnavailableElement.  Bbb.
-// FOUNDATION-NEXT: {{^}}struct NSOptionsWithUnavailableElement : RawOptionSetType {{{$}}
-// FOUNDATION-NEXT: {{^}}  init(){{$}}
-// FOUNDATION-NEXT: {{^}}  init(_ rawValue: UInt){{$}}
+// FOUNDATION-NEXT: {{^}}struct NSOptionsWithUnavailableElement : OptionSetType {{{$}}
 // FOUNDATION-NEXT: {{^}}  init(rawValue: UInt){{$}}
 // FOUNDATION-NEXT: {{^}}  let rawValue: UInt{{$}}
 // FOUNDATION-NEXT: {{^}}  static var First: NSOptionsWithUnavailableElement { get }{{$}}

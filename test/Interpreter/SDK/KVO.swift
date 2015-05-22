@@ -16,8 +16,8 @@ class Observer : NSObject {
 
   override init() {
     super.init()
-    model.addObserver(self, forKeyPath: "name", options: nil, context: &kvoContext)
-    self.addObserver(self, forKeyPath: "model.number", options: nil, context: &kvoContext)
+    model.addObserver(self, forKeyPath: "name", options: [], context: &kvoContext)
+    self.addObserver(self, forKeyPath: "model.number", options: [], context: &kvoContext)
   }
 
   deinit {
@@ -50,7 +50,7 @@ class Foo: NSObject {
 }
 
 let foo = Foo()
-foo.addObserver(foo, forKeyPath: "foo", options: nil, context: &kvoContext)
+foo.addObserver(foo, forKeyPath: "foo", options: [], context: &kvoContext)
 let bar = foo.foo
 // CHECK-NEXT: 0
 print(bar)

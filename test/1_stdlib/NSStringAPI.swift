@@ -248,12 +248,12 @@ NSStringAPIs.test("caseInsensitiveCompare(_:)") {
 
 NSStringAPIs.test("commonPrefixWithString(_:options:)") {
   expectEqual("ab",
-      "abcd".commonPrefixWithString("abdc", options: NSStringCompareOptions(0)))
+      "abcd".commonPrefixWithString("abdc", options: []))
   expectEqual("abC",
       "abCd".commonPrefixWithString("abce", options: .CaseInsensitiveSearch))
 
   expectEqual("аб",
-      "абвг".commonPrefixWithString("абгв", options: NSStringCompareOptions(0)))
+      "абвг".commonPrefixWithString("абгв", options: []))
   expectEqual("абВ",
       "абВг".commonPrefixWithString("абвд", options: .CaseInsensitiveSearch))
 }
@@ -442,7 +442,7 @@ NSStringAPIs.test("enumerateLinguisticTagsInRange(_:scheme:options:orthography:_
   var sentences: [String] = []
   s.enumerateLinguisticTagsInRange(startIndex..<endIndex,
       scheme: NSLinguisticTagSchemeTokenType,
-      options: NSLinguisticTaggerOptions(0),
+      options: [],
       orthography: nil) {
     (tag: String, tokenRange: Range<String.Index>, sentenceRange: Range<String.Index>, inout stop: Bool)
   in
@@ -482,8 +482,7 @@ NSStringAPIs.test("enumerateSubstringsInRange(_:options:_:)") {
   if true {
     var substrings: [String] = []
     s.enumerateSubstringsInRange(startIndex..<endIndex,
-      options: NSStringEnumerationOptions.ByComposedCharacterSequences
-        | NSStringEnumerationOptions.SubstringNotRequired) {
+      options: [.ByComposedCharacterSequences, .SubstringNotRequired]) {
       (substring_: String?, substringRange: Range<String.Index>,
        enclosingRange: Range<String.Index>, inout stop: Bool)
     in
@@ -531,7 +530,7 @@ NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remain
     var remainingRange = startIndex..<endIndex
     var result = s.getBytes(&buffer, maxLength: 11, usedLength: &usedLength,
         encoding: NSUTF8StringEncoding,
-        options: NSStringEncodingConversionOptions(0),
+        options: [],
         range: startIndex..<endIndex, remainingRange: &remainingRange)
     expectTrue(result)
     expectEqualSequence(expectedStr, buffer)
@@ -552,7 +551,7 @@ NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remain
     var remainingRange = startIndex..<endIndex
     var result = s.getBytes(&buffer, maxLength: 11, usedLength: &usedLength,
         encoding: NSUTF8StringEncoding,
-        options: NSStringEncodingConversionOptions(0),
+        options: [],
         range: startIndex..<endIndex, remainingRange: &remainingRange)
     expectTrue(result)
     expectEqualSequence(expectedStr, buffer)
@@ -572,7 +571,7 @@ NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remain
     var remainingRange = startIndex..<endIndex
     var result = s.getBytes(&buffer, maxLength: bufferLength,
         usedLength: &usedLength, encoding: NSUTF8StringEncoding,
-        options: NSStringEncodingConversionOptions(0),
+        options: [],
         range: startIndex..<endIndex, remainingRange: &remainingRange)
     expectTrue(result)
     expectEqualSequence(expectedStr, buffer)
@@ -592,7 +591,7 @@ NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remain
     var remainingRange = startIndex..<endIndex
     var result = s.getBytes(&buffer, maxLength: bufferLength,
         usedLength: &usedLength, encoding: NSASCIIStringEncoding,
-        options: NSStringEncodingConversionOptions(0),
+        options: [],
         range: startIndex..<endIndex, remainingRange: &remainingRange)
     expectTrue(result)
     expectEqualSequence(expectedStr, buffer)
@@ -857,7 +856,7 @@ NSStringAPIs.test("linguisticTagsInRange(_:scheme:options:orthography:tokenRange
   var tokenRanges: [Range<String.Index>] = []
   var tags = s.linguisticTagsInRange(startIndex..<endIndex,
       scheme: NSLinguisticTagSchemeTokenType,
-      options: NSLinguisticTaggerOptions(0),
+      options: [],
       orthography: nil, tokenRanges: &tokenRanges)
   expectEqual(
       [ NSLinguisticTagWord, NSLinguisticTagWhitespace,

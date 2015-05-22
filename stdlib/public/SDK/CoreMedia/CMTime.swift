@@ -23,35 +23,32 @@
 // CMTimeConvertScale
 extension CMTime {
   public var isValid: Bool {
-    return (self.flags & CMTimeFlags.Valid) == CMTimeFlags.Valid
+    return self.flags.contains(.Valid)
   }
 
   public var isPositiveInfinity: Bool {
     return self.isValid &&
-      ((self.flags & CMTimeFlags.PositiveInfinity) ==
-        CMTimeFlags.PositiveInfinity)
+      self.flags.contains(.PositiveInfinity)
   }
 
   public var isNegativeInfinity: Bool {
     return self.isValid &&
-      ((self.flags & CMTimeFlags.NegativeInfinity) ==
-        CMTimeFlags.NegativeInfinity)
+      self.flags.contains(.NegativeInfinity)
   }
 
   public var isIndefinite: Bool {
     return self.isValid &&
-      ((self.flags & CMTimeFlags.Indefinite) == CMTimeFlags.Indefinite)
+      self.flags.contains(.Indefinite)
   }
 
   public var isNumeric: Bool {
     return
-      (self.flags & (CMTimeFlags.Valid | CMTimeFlags.ImpliedValueFlagsMask)) ==
-      CMTimeFlags.Valid
+      self.flags.intersect([.Valid, .ImpliedValueFlagsMask]) == .Valid
   }
 
   public var hasBeenRounded: Bool {
     return self.isNumeric &&
-      ((self.flags & CMTimeFlags.HasBeenRounded) == CMTimeFlags.HasBeenRounded)
+      self.flags.contains(.HasBeenRounded)
   }
 
   public var seconds: Double {

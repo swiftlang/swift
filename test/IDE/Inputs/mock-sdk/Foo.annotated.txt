@@ -36,15 +36,11 @@ enum <loc>FooComparisonResult</loc> : <ref:Struct>Int</ref> {
 }</decl>
 
 <decl:Struct>/// Aaa.  FooRuncingOptions.  Bbb.
-struct <loc>FooRuncingOptions</loc> : <ref:Protocol>RawOptionSetType</ref> {
-  <decl:Constructor><loc>init()</loc></decl>
-  <decl:Constructor><loc>init(_ rawValue: <ref:Struct>Int</ref>)</loc></decl>
+struct <loc>FooRuncingOptions</loc> : <ref:Protocol>OptionSetType</ref> {
   <decl:Constructor><loc>init(rawValue: <ref:Struct>Int</ref>)</loc></decl>
   <decl:Var>let <loc>rawValue</loc>: <ref:Struct>Int</ref></decl>
   <decl:Var>static var <loc>EnableMince</loc>: <ref:Struct>FooRuncingOptions</ref> { get }</decl>
   <decl:Var>static var <loc>EnableQuince</loc>: <ref:Struct>FooRuncingOptions</ref> { get }</decl>
-  <decl:Var>static var <loc>allZeros</loc>: <ref:Struct>FooRuncingOptions</ref> { get }</decl>
-  <decl:Constructor><loc>init(nilLiteral _: ())</loc></decl>
 }</decl>
 <decl:Struct>struct <loc>FooStruct1</loc> {
   <decl:Var>var <loc>x</loc>: <ref:Struct>Int32</ref></decl>
