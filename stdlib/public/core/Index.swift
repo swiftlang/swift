@@ -115,24 +115,6 @@ public struct _DisabledRangeIndex_ {
 
 //===----------------------------------------------------------------------===//
 
-/// This protocol is an implementation detail of `ForwardIndexType`; do
-/// not use it directly.
-///
-/// Its requirements are inherited by `ForwardIndexType` and thus must
-/// be satisfied by types conforming to that protocol.
-public protocol _ForwardIndexType : _Incrementable {
-  /// A type that can represent the number of steps between pairs of
-  /// `Self` values where one value is reachable from the other.
-  ///
-  /// Reachability is defined by the ability to produce one value from
-  /// the other via zero or more applications of `successor`.
-  typealias Distance : _SignedIntegerType = Int
-
-  // See the implementation of Range for an explanation of this
-  // associated type
-  typealias _DisabledRangeIndex = _DisabledRangeIndex_
-}
-
 /// Replace `i` with its `successor()` and return the updated value of
 /// `i`.
 @transparent
@@ -153,7 +135,18 @@ public postfix func ++ <T : _Incrementable> (inout i: T) -> T {
 /// Represents a discrete value in a series, where a value's
 /// successor, if any, is reachable by applying the value's
 /// `successor()` method.
-public protocol ForwardIndexType : _ForwardIndexType {
+public protocol ForwardIndexType : _Incrementable {
+  /// A type that can represent the number of steps between pairs of
+  /// `Self` values where one value is reachable from the other.
+  ///
+  /// Reachability is defined by the ability to produce one value from
+  /// the other via zero or more applications of `successor`.
+  typealias Distance : _SignedIntegerType = Int
+
+  // See the implementation of Range for an explanation of this
+  // associated type
+  typealias _DisabledRangeIndex = _DisabledRangeIndex_
+
   // This requirement allows generic distance() to find default
   // implementations.  Only the author of F and the author of a
   // refinement of F having a non-default distance implementation need
@@ -171,7 +164,7 @@ public protocol ForwardIndexType : _ForwardIndexType {
 
 /// Do not use this operator directly; call distance(start, end) instead.
 public
-func ~> <T : _ForwardIndexType>(start:T, rest: (_Distance, T)) -> T.Distance {
+func ~> <T : ForwardIndexType>(start:T, rest: (_Distance, T)) -> T.Distance {
   var p = start
   var count: T.Distance = 0
   let end = rest.1
@@ -184,7 +177,7 @@ func ~> <T : _ForwardIndexType>(start:T, rest: (_Distance, T)) -> T.Distance {
 
 /// Do not use this operator directly; call advance(start, n) instead.
 @transparent
-public func ~> <T : _ForwardIndexType>(
+public func ~> <T : ForwardIndexType>(
   start: T, rest: (_Advance, T.Distance)
 ) -> T {
   let n = rest.1
@@ -192,7 +185,7 @@ public func ~> <T : _ForwardIndexType>(
 }
 
 internal
-func _advanceForward<T : _ForwardIndexType>(start: T, _ n: T.Distance) -> T {
+func _advanceForward<T : ForwardIndexType>(start: T, _ n: T.Distance) -> T {
   _precondition(n >= 0,
       "Only BidirectionalIndexType can be advanced by a negative amount")
   var p = start
@@ -204,14 +197,14 @@ func _advanceForward<T : _ForwardIndexType>(start: T, _ n: T.Distance) -> T {
 
 /// Do not use this operator directly; call advance(start, n, end) instead.
 @transparent
-public func ~> <T : _ForwardIndexType>(
+public func ~> <T : ForwardIndexType>(
   start:T, rest: ( _Advance, (T.Distance, T))
 ) -> T {
   return _advanceForward(start, rest.1.0, rest.1.1)
 }
 
 internal
-func _advanceForward<T : _ForwardIndexType>(
+func _advanceForward<T : ForwardIndexType>(
   start: T, _ n: T.Distance, _ end: T
 ) -> T {
   _precondition(n >= 0,
@@ -230,7 +223,7 @@ func _advanceForward<T : _ForwardIndexType>(
 ///
 /// Its requirements are inherited by `BidirectionalIndexType` and thus must
 /// be satisfied by types conforming to that protocol.
-public protocol _BidirectionalIndexDefaultsType : _ForwardIndexType {
+public protocol _BidirectionalIndexDefaultsType : ForwardIndexType {
   /// Return the previous consecutive value in a discrete sequence.
   ///
   /// If `self` has a well-defined successor,
@@ -250,7 +243,7 @@ extension _BidirectionalIndexDefaultsType {
 /// This protocol is an implementation detail of `BidirectionalIndexType`; do
 /// not use it directly.
 public protocol _BidirectionalIndexType
-: _ForwardIndexType, _BidirectionalIndexDefaultsType {
+: ForwardIndexType, _BidirectionalIndexDefaultsType {
   mutating func _predecessorInPlace()
 }
 
