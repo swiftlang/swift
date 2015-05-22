@@ -215,6 +215,19 @@ func checkFloatingPointComparison_${FloatSelf}(
 }
 
 FloatingPoint.test("${FloatSelf}/{Comparable,Hashable,Equatable}") {
+// On arm we flush subnormals to zero so testing subnormals won't work.
+#if arch(arm)
+  let interestingValues: [${FloatSelf}] = [
+    // Interesting floating point values, sorted.
+    -${FloatSelf}.infinity,
+    -1.0,
+    -0.0,
+    0.0,
+    1.0,
+    ${FloatSelf}.infinity,
+    ${FloatSelf}.quietNaN,
+  ]
+#else
   let interestingValues: [${FloatSelf}] = [
     // Interesting floating point values, sorted.
     -${FloatSelf}.infinity,
@@ -227,6 +240,7 @@ FloatingPoint.test("${FloatSelf}/{Comparable,Hashable,Equatable}") {
     ${FloatSelf}.infinity,
     ${FloatSelf}.quietNaN,
   ]
+#endif
 
   for lhsIdx in interestingValues.indices {
     for rhsIdx in interestingValues.indices {
