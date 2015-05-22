@@ -45,6 +45,13 @@ public struct ${vectype} :
   public init() { self.init(0) }
 
   /// Initialize a vector with the specified elements.
+  public init(${', '.join(map(lambda c: '_ ' + c + ': ' + type, component[:size]))}) {
+% for c in component[:size]:
+    self.${c} = ${c}
+% end
+  }
+
+  /// Initialize a vector with the specified elements.
   public init(${', '.join(map(lambda c: c + ': ' + type, component[:size]))}) {
 % for c in component[:size]:
     self.${c} = ${c}
@@ -53,7 +60,7 @@ public struct ${vectype} :
 
   /// Initialize to a vector with all elements equal to `scalar`.
   public init(_ scalar: ${type}) {
-    self.init(${', '.join(map(lambda c: c + ': scalar', component[:size]))})
+    self.init(${', '.join(['scalar']*size)})
   }
 
   /// Initialize to a vector with elements taken from `array`.
@@ -63,7 +70,7 @@ public struct ${vectype} :
   _precondition(array.count == ${size},
                 "${vectype} requires a ${cardinal[size]}-element array")
     self.init(${', '.join(map(lambda i:
-              component[i] + ': array[' + str(i) + ']',
+              'array[' + str(i) + ']',
               range(size)))})
   }
 
@@ -94,10 +101,12 @@ public struct ${vectype} :
 
   /// Debug string representation
   public var debugDescription: String {
-    return "${vectype}(\(self._descriptionAsArray))"
+    return "${vectype}(${', '.join(map(lambda c:
+                       '\\(' + c + ')',
+                       component[:size]))})"
   }
 
-  /// Helper function for vector and matrix debug representations
+  /// Helper for matrix debug representations
   internal var _descriptionAsArray: String {
     get {
       return "[${', '.join(map(lambda c:
@@ -111,7 +120,7 @@ public struct ${vectype} :
 @inline(__always)
 public func +(lhs: ${vectype}, rhs: ${vectype}) -> ${vectype} {
   return ${vectype}(${', '.join(map(lambda c: \
-                    c + ':lhs.' + c + '+rhs.' + c,
+                    'lhs.' + c + '+rhs.' + c,
                     component[:size]))})
 }
 
@@ -119,7 +128,7 @@ public func +(lhs: ${vectype}, rhs: ${vectype}) -> ${vectype} {
 @inline(__always)
 public func -(lhs: ${vectype}, rhs: ${vectype}) -> ${vectype} {
   return ${vectype}(${', '.join(map(lambda c: \
-                    c + ':lhs.' + c + '-rhs.' + c,
+                    'lhs.' + c + '-rhs.' + c,
                     component[:size]))})
 }
 
@@ -127,7 +136,7 @@ public func -(lhs: ${vectype}, rhs: ${vectype}) -> ${vectype} {
 @inline(__always)
 public prefix func -(rhs: ${vectype}) -> ${vectype} {
   return ${vectype}(${', '.join(map(lambda c: \
-                    c + ':-rhs.' + c,
+                    '-rhs.' + c,
                     component[:size]))})
 }
 
@@ -136,7 +145,7 @@ public prefix func -(rhs: ${vectype}) -> ${vectype} {
 @inline(__always)
 public func *(lhs: ${vectype}, rhs: ${vectype}) -> ${vectype} {
   return ${vectype}(${', '.join(map(lambda c: \
-                    c + ':lhs.' + c + '*rhs.' + c,
+                    'lhs.' + c + '*rhs.' + c,
                     component[:size]))})
 }
 
@@ -145,7 +154,7 @@ public func *(lhs: ${vectype}, rhs: ${vectype}) -> ${vectype} {
 @inline(__always)
 public func /(lhs: ${vectype}, rhs: ${vectype}) -> ${vectype} {
   return ${vectype}(${', '.join(map(lambda c: \
-                    c + ':lhs.' + c + '/rhs.' + c,
+                    'lhs.' + c + '/rhs.' + c,
                     component[:size]))})
 }
 
@@ -196,7 +205,7 @@ public func *=(inout lhs: ${vectype}, rhs: ${type}) -> Void {
 @inline(__always)
 public func abs(x: ${vectype}) -> ${vectype} {
   return ${vectype}(${', '.join(map(lambda c: \
-                    c + ': abs(x.' + c + ')', \
+                    'abs(x.' + c + ')', \
                     component[:size]))})
 }
 
@@ -205,7 +214,7 @@ public func abs(x: ${vectype}) -> ${vectype} {
 @inline(__always)
 public func min(x: ${vectype}, _ y: ${vectype}) -> ${vectype} {
   return ${vectype}(${', '.join(map(lambda c:             \
-                    c + ': min(x.' + c + ',y.' + c + ')', \
+                    'min(x.' + c + ',y.' + c + ')', \
                     component[:size]))})
 }
 
@@ -214,7 +223,7 @@ public func min(x: ${vectype}, _ y: ${vectype}) -> ${vectype} {
 @inline(__always)
 public func max(x: ${vectype}, _ y: ${vectype}) -> ${vectype} {
   return ${vectype}(${', '.join(map(lambda c:             \
-                    c + ': max(x.' + c + ',y.' + c + ')', \
+                    'max(x.' + c + ',y.' + c + ')', \
                     component[:size]))})
 }
 
@@ -279,7 +288,7 @@ public func reduce_max(x: ${vectype}) -> ${type} {
 @inline(__always)
 public func sign(x: ${vectype}) -> ${vectype} {
   return ${vectype}(${', '.join(map(lambda c:  \
-                    c + ': sign(x.' + c + ')', \
+                    'sign(x.' + c + ')', \
                     component[:size]))})
 }
 
@@ -301,7 +310,7 @@ public func mix(x: ${vectype}, _ y: ${vectype}, t: ${type}) -> ${vectype} {
 @inline(__always)
 public func recip(x: ${vectype}) -> ${vectype} {
   return ${vectype}(${', '.join(map(lambda c:  \
-                    c + ': recip(x.' + c + ')', \
+                    'recip(x.' + c + ')', \
                     component[:size]))})
 }
 
@@ -309,7 +318,7 @@ public func recip(x: ${vectype}) -> ${vectype} {
 @inline(__always)
 public func rsqrt(x: ${vectype}) -> ${vectype} {
   return ${vectype}(${', '.join(map(lambda c:  \
-                    c + ': rsqrt(x.' + c + ')', \
+                    'rsqrt(x.' + c + ')', \
                     component[:size]))})
 }
 
@@ -330,7 +339,7 @@ public func fmax(x: ${vectype}, _ y: ${vectype}) -> ${vectype} {
 @inline(__always)
 public func ceil(x: ${vectype}) -> ${vectype} {
   return ${vectype}(${', '.join(map(lambda c:  \
-                    c + ': ceil(x.' + c + ')', \
+                    'ceil(x.' + c + ')', \
                     component[:size]))})
 }
 
@@ -339,7 +348,7 @@ public func ceil(x: ${vectype}) -> ${vectype} {
 @inline(__always)
 public func floor(x: ${vectype}) -> ${vectype} {
   return ${vectype}(${', '.join(map(lambda c:  \
-                    c + ': floor(x.' + c + ')', \
+                    'floor(x.' + c + ')', \
                     component[:size]))})
 }
 
@@ -348,7 +357,7 @@ public func floor(x: ${vectype}) -> ${vectype} {
 @inline(__always)
 public func trunc(x: ${vectype}) -> ${vectype} {
   return ${vectype}(${', '.join(map(lambda c:  \
-                    c + ': trunc(x.' + c + ')', \
+                    'trunc(x.' + c + ')', \
                     component[:size]))})
 }
 
@@ -364,7 +373,7 @@ public func fract(x: ${vectype}) -> ${vectype} {
 @inline(__always)
 public func step(x: ${vectype}, edge: ${vectype}) -> ${vectype} {
   return ${vectype}(${', '.join(map(lambda c:                 \
-                    c + ': step(x.' + c + ', edge: edge.' + c + ')', \
+                    'step(x.' + c + ', edge: edge.' + c + ')', \
                     component[:size]))})
 }
 
@@ -438,7 +447,7 @@ public func distance(x: ${vectype}, y: ${vectype}) -> ${type} {
   return length(x - y)
 }
 
-/// Unit vector pointing in the same direction as `x`.  normalize(0) is 0.
+/// Unit vector pointing in the same direction as `x`.
 @inline(__always)
 public func normalize(x: ${vectype}) -> ${vectype} {
   return x * rsqrt(length_squared(x))
@@ -497,7 +506,7 @@ public func step(x: ${type}, edge: ${type}) -> ${type} {
 public func cross(x: ${ctype[type]}2,
                        _ y: ${ctype[type]}2)
                          -> ${ctype[type]}3 {
-  return ${ctype[type]}3(x: 0, y: 0, z: x.x*y.y - x.y*y.x)
+  return ${ctype[type]}3(0, 0, x.x*y.y - x.y*y.x)
 }
 
 /// Cross-product of two three-dimensional vectors.  The resulting vector is
@@ -507,9 +516,7 @@ public func cross(x: ${ctype[type]}2,
 public func cross(x: ${ctype[type]}3,
                        _ y: ${ctype[type]}3)
                          -> ${ctype[type]}3 {
-  return ${ctype[type]}3(x: x.y*y.z - x.z*y.y,
-                     y: x.z*y.x - x.x*y.z,
-                     z: x.x*y.y - x.y*y.x)
+  return ${ctype[type]}3(x.y*y.z - x.z*y.y, x.z*y.x - x.x*y.z, x.x*y.y - x.y*y.x)
 }
 %   end # type in floating_types
 % end # for type in scalar_types
@@ -705,7 +712,7 @@ public func *(lhs: ${mattype}, rhs: ${rowtype}) -> ${coltype} {
 /// Vector-Matrix multiplication.
 public func *(lhs: ${coltype}, rhs: ${mattype}) -> ${rowtype} {
   return ${rowtype}(${', '.join(map(lambda i: \
-                    component[i]+': dot(lhs, rhs._columns.'+str(i)+')', \
+                    'dot(lhs, rhs._columns.'+str(i)+')', \
                     range(cols)))})
 }
 
