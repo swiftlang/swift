@@ -162,8 +162,11 @@ UnsafeMutablePointerTestSuite.test("moveAssignFrom") {
 
 UnsafeMutablePointerTestSuite.test("moveAssignFrom.Right") {
   let check = checkPtr(UnsafeMutablePointer.moveAssignFrom, true)
-  expectCrashLater()
-  check(Check.RightOverlap)
+  // This check relies on _debugPrecondition() so will only trigger in -Onone mode.
+  if _isDebugAssertConfiguration() {
+    expectCrashLater()
+    check(Check.RightOverlap)
+  }
 }
 
 UnsafeMutablePointerTestSuite.test("assignFrom") {
