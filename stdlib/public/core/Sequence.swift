@@ -37,26 +37,12 @@ public protocol GeneratorType {
   mutating func next() -> Element?
 }
 
-public protocol _SequenceDefaultsType {
-  /// A type that provides the *sequence*'s iteration interface and
-  /// encapsulates its iteration state.
-  typealias Generator : GeneratorType
-
-  /// Return a *generator* over the elements of this *sequence*.  The
-  /// *generator*'s next element is the first element of the
-  /// sequence.
-  ///
-  /// - Complexity: O(1).
-  func generate() -> Generator
-}
-
 /// This protocol is an implementation detail of `SequenceType`; do
 /// not use it directly.
 ///
 /// Its requirements are inherited by `SequenceType` and thus must
 /// be satisfied by types conforming to that protocol.
-public protocol _Sequence_Type
-  : _SequenceDefaultsType {
+public protocol _Sequence_Type {
 
   /// A type whose instances can produce the elements of this
   /// sequence, in order.

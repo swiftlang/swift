@@ -18,8 +18,7 @@ public func count <T : CollectionType>(x: T) -> T.Index.Distance {
   fatalError("unavailable function can't be called")
 }
 
-public protocol _CollectionDefaultsType
-  : SequenceType, _SequenceDefaultsType {
+public protocol _CollectionDefaultsType : SequenceType {
   /// A type that represents a valid position in the collection.
   ///
   /// Valid indices consist of the position of every element and a
