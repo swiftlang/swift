@@ -174,8 +174,12 @@ std::pair<bool, Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
     return { true, E };
 
   if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(E)) {
-    if (!passReference(DRE->getDecl(), E->getLoc()))
+    if (auto *module = dyn_cast<ModuleDecl>(DRE->getDecl())) {
+      if (!passReference(ModuleEntity(module), std::make_pair(module->getName(), E->getLoc())))
+        return { false, nullptr };
+    } else if (!passReference(DRE->getDecl(), E->getLoc())) {
       return { false, nullptr };
+    }
   } else if (MemberRefExpr *MRE = dyn_cast<MemberRefExpr>(E)) {
     // Visit in source order.
     if (!MRE->getBase()->walk(*this))
