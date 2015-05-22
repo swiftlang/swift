@@ -2258,6 +2258,10 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
   }
 
   Expr *superCall = new (ctx) CallExpr(ctorRef, ctorArgs, /*Implicit=*/true);
+  if (superclassCtor->isBodyThrowing()) {
+    superCall = new (ctx) TryExpr(SourceLoc(), superCall, Type(),
+                                  /*Implicit=*/true);
+  }
   superCall = new (ctx) RebindSelfInConstructorExpr(superCall, selfDecl);
   ctor->setBody(BraceStmt::create(tc.Context, SourceLoc(),
                                   ASTNode(superCall),

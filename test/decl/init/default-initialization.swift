@@ -108,3 +108,13 @@ class MultipleInitDerived : MultipleInitBase {
   override init() { } // expected-error{{super.init isn't called before returning from initializer}}
 }
 
+// rdar://20944100
+// Include a 'try' when synthesizing an override of a throwing constructor.
+public class HasThrowingInit {
+  public init() throws { }
+}
+public class AlsoHasThrowingInit : HasThrowingInit {
+  public convenience init(flag: Bool) throws {
+    try self.init()
+  }
+}
