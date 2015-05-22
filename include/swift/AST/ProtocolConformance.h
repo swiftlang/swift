@@ -295,7 +295,7 @@ class NormalProtocolConformance : public ProtocolConformance,
 
   /// The declaration context containing the ExtensionDecl or
   /// NominalTypeDecl that declared the conformance.
-  mutable DeclContext *DC;
+  DeclContext *DC;
 
   /// \brief The mapping of individual requirements in the protocol over to
   /// the declarations that satisfy those requirements.
@@ -333,10 +333,6 @@ public:
   /// Get the declaration context that contains the conforming extension or
   /// nominal type declaration.
   DeclContext *getDeclContext() const { return DC; }
-
-  /// Set the declaration context that contains the conforming extension or
-  /// nominal type declaration.
-  void setDeclContext(DeclContext *dc) { DC = dc; }
 
   /// Retrieve the state of this conformance.
   ProtocolConformanceState getState() const {
