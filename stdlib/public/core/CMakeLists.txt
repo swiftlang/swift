@@ -68,7 +68,6 @@ set(SWIFTLIB_ESSENTIAL
   Misc.swift
   ObjCMirrors.swift
   Optional.swift
-  OptionSet.swift
   OutputStream.swift
   Pointer.swift
   Policy.swift
@@ -82,7 +81,6 @@ set(SWIFTLIB_ESSENTIAL
   Runtime.swift.gyb
   Sequence.swift
   SequenceAlgorithms.swift.gyb
-  SetAlgebra.swift
   ShadowProtocols.swift
   Shims.swift
   Slice.swift

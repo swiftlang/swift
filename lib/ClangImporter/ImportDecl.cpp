@@ -1799,7 +1799,7 @@ namespace {
       // Note that this is a raw option set type.
       structDecl->getAttrs().add(
         new (Impl.SwiftContext) SynthesizedProtocolAttr(
-                                  KnownProtocolKind::OptionSetType));
+                                  KnownProtocolKind::_OptionSetType));
 
       
       // Create a field to store the underlying value.
@@ -1830,7 +1830,7 @@ namespace {
 
       // Build an OptionSetType conformance for the type.
       ProtocolDecl *protocols[]
-        = {cxt.getProtocol(KnownProtocolKind::OptionSetType)};
+        = {cxt.getProtocol(KnownProtocolKind::_OptionSetType)};
       structDecl->setProtocols(Impl.SwiftContext.AllocateCopy(protocols));
 
       structDecl->addMember(labeledValueConstructor);

@@ -15,7 +15,7 @@ var withQuince: NSRuncingOptions = .EnableQuince
 var singleValue: NSSingleOptions = .Value
 
 // Check OptionSetType conformance.
-func useOptionSet<T: OptionSetType>(x: T) {}
+func useOptionSet<T: _OptionSetType>(x: T) {}
 useOptionSet(singleValue)
 useOptionSet(withMince)
 useOptionSet(withQuince)
