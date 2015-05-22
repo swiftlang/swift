@@ -335,7 +335,8 @@ private:
                                           CanSILFunctionType origFnType,
                                           CanAnyFunctionType origLoweredType,
                                           unsigned uncurryLevel,
-                                          Optional<SILDeclRef> constant) const {
+                                          Optional<SILDeclRef> constant,
+                 const Optional<ForeignErrorConvention> &foreignError) const {
     if (!HasSubstitutions) return origFnType;
 
     assert(origLoweredType);
@@ -347,9 +348,11 @@ private:
       SGM.Types.getLoweredASTFunctionType(SubstFormalType, uncurryLevel,
                                           origLoweredType->getExtInfo(),
                                           constant);
+
     return SGM.Types.substFunctionType(origFnType, origLoweredType,
                                        substLoweredType,
-                                       substLoweredInterfaceType);
+                                       substLoweredInterfaceType,
+                                       foreignError);
   }
 
   /// Add the 'self' clause back to the substituted formal type of
@@ -632,15 +635,16 @@ public:
     }
     }
 
-    CanSILFunctionType substFnType =
-      getSubstFunctionType(gen.SGM, mv.getType().castTo<SILFunctionType>(),
-                           constantInfo.LoweredType, level, constant);
-
     Optional<ForeignErrorConvention> foreignError;
     if (constant && constant->isForeign) {
       foreignError = cast<AbstractFunctionDecl>(constant->getDecl())
                        ->getForeignErrorConvention();
     }
+
+    CanSILFunctionType substFnType =
+      getSubstFunctionType(gen.SGM, mv.getType().castTo<SILFunctionType>(),
+                           constantInfo.LoweredType, level, constant,
+                           foreignError);
 
     return std::make_tuple(mv, substFnType, foreignError, options);
   }

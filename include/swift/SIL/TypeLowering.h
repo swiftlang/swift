@@ -687,7 +687,8 @@ public:
   CanSILFunctionType substFunctionType(CanSILFunctionType origFnType,
                                  CanAnyFunctionType origLoweredType,
                                  CanAnyFunctionType substLoweredType,
-                                 CanAnyFunctionType substLoweredInterfaceType);
+                                 CanAnyFunctionType substLoweredInterfaceType,
+                         const Optional<ForeignErrorConvention> &foreignError);
   
   /// Get the empty tuple type as a SILType.
   SILType getEmptyTupleType() {

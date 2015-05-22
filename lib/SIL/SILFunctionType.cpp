@@ -1498,13 +1498,16 @@ namespace {
     TypeConverter &TC;
     CanSILFunctionType OrigFnType;
     ArrayRef<SILParameterInfo> OrigParams;
+    unsigned NextOrigParamIndex = 0;
     SmallVector<SILParameterInfo, 8> SubstParams;
+    const Optional<ForeignErrorConvention> &ForeignError;
 
   public:
     SILFunctionTypeSubstituter(TypeConverter &TC,
-                               CanSILFunctionType origFnType)
+                               CanSILFunctionType origFnType,
+                         const Optional<ForeignErrorConvention> &foreignError)
       : TC(TC), OrigFnType(origFnType),
-        OrigParams(origFnType->getParameters())
+        OrigParams(origFnType->getParameters()), ForeignError(foreignError)
     {}
 
     SILResultInfo substResult(AbstractionPattern origResultType,
@@ -1533,6 +1536,16 @@ namespace {
         return origResult;
       }
 
+      // If we have a foreign-error convention that strips result
+      // optionality, we need to wrap both the original and
+      // substituted types in a level of optionality.
+      if (ForeignError && ForeignError->stripsResultOptionality()) {
+        origResultType =
+          AbstractionPattern::getOptional(origResultType, OTK_Optional);
+        substResultType =
+          OptionalType::get(substResultType)->getCanonicalType();
+      }
+
       // Otherwise, we'll need to SIL-lower the substituted result
       // using the abstraction patterns of the original result.
       auto &substResultTL = TC.getTypeLowering(origResultType, substResultType);
@@ -1558,11 +1571,14 @@ namespace {
     }
 
     ArrayRef<SILParameterInfo> getSubstParams() const {
-      assert(OrigParams.empty() && "didn't claim all parameters?!");
+      assert(NextOrigParamIndex == OrigParams.size() &&
+             "didn't claim all parameters?!");
       return SubstParams;
     }
 
     void substInputs(AbstractionPattern origType, CanType substType) {
+      maybeSkipForeignErrorParameter();
+
       // Decompose tuples.
       if (origType.isTuple()) {
         auto substTuple = cast<TupleType>(substType);
@@ -1602,10 +1618,15 @@ namespace {
 
   private:
     SILParameterInfo claimNextOrigParam() {
-      assert(!OrigParams.empty());
-      auto temp = OrigParams[0];
-      OrigParams = OrigParams.slice(1);
-      return temp;
+      maybeSkipForeignErrorParameter();
+      return OrigParams[NextOrigParamIndex++];
+    }
+
+    void maybeSkipForeignErrorParameter() {
+      if (!ForeignError ||
+          NextOrigParamIndex != ForeignError->getErrorParameterIndex())
+        return;
+      SubstParams.push_back(OrigParams[NextOrigParamIndex++]);
     }
 
     void addSubstParam(CanType type, ParameterConvention conv) {
@@ -1649,7 +1670,8 @@ CanSILFunctionType
 TypeConverter::substFunctionType(CanSILFunctionType origFnType,
                                  CanAnyFunctionType origLoweredType,
                                  CanAnyFunctionType substLoweredType,
-                                 CanAnyFunctionType substLoweredInterfaceType) {
+                                 CanAnyFunctionType substLoweredInterfaceType,
+                         const Optional<ForeignErrorConvention> &foreignError) {
   if (origLoweredType == substLoweredType)
     return origFnType;
 
@@ -1659,7 +1681,7 @@ TypeConverter::substFunctionType(CanSILFunctionType origFnType,
     genericSig = genSubstFn.getGenericSignature();
 
   GenericContextScope scope(*this, genericSig);
-  SILFunctionTypeSubstituter substituter(*this, origFnType);
+  SILFunctionTypeSubstituter substituter(*this, origFnType, foreignError);
 
   // Map the result.
   SILResultInfo substResult =

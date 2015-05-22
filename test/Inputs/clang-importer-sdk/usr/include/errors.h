@@ -36,3 +36,8 @@
 
 @interface ReallyErrorProne : ErrorProne
 @end
+
+@protocol ErrorProneProtocol
+- (BOOL) obliterate: (NSError**) error;
+- (BOOL) invigorate: (NSError**) error callback: (void(^)(void)) block;
+@end

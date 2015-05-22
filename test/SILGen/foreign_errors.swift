@@ -159,3 +159,18 @@ class VeryErrorProne : ErrorProne {
 // CHECK:      [[T3:%.*]] = null_class $VeryErrorProne
 // CHECK-NEXT: store [[T3]] to [[MARKED_BOX]]
 // CHECK-NEXT: apply [[T2]](%0, {{%.*}}, [[T1]])
+
+// rdar://21051021
+// CHECK: sil hidden @_TF14foreign_errors12testProtocolFzPSo18ErrorProneProtocol_T_
+func testProtocol(p: ErrorProneProtocol) throws {
+  // CHECK:   [[T0:%.*]] = open_existential_ref %0 : $ErrorProneProtocol to $[[OPENED:@opened(.*) ErrorProneProtocol]]
+  // CHECK:   [[T1:%.*]] = witness_method [volatile] $[[OPENED]], #ErrorProneProtocol.obliterate!1.foreign, [[T0]] : $[[OPENED]] :
+  // CHECK:   apply [[T1]]<[[OPENED]]>({{%.*}}, [[T0]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : ErrorProneProtocol> (AutoreleasingUnsafeMutablePointer<Optional<NSError>>, τ_0_0) -> Bool
+  try p.obliterate()
+
+  // CHECK:   [[T0:%.*]] = open_existential_ref %0 : $ErrorProneProtocol to $[[OPENED:@opened(.*) ErrorProneProtocol]]
+  // CHECK:   [[T1:%.*]] = witness_method [volatile] $[[OPENED]], #ErrorProneProtocol.invigorate!1.foreign, [[T0]] : $[[OPENED]] :
+  // CHECK:   apply [[T1]]<[[OPENED]]>({{%.*}}, {{%.*}}, [[T0]]) : $@convention(objc_method) <τ_0_0 where τ_0_0 : ErrorProneProtocol> (AutoreleasingUnsafeMutablePointer<Optional<NSError>>, ImplicitlyUnwrappedOptional<@convention(block) () -> ()>, τ_0_0) -> Bool
+  try p.invigorate(callback: {})
+}
+
