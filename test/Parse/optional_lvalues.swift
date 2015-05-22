@@ -9,13 +9,13 @@ struct S {
 
 struct T {
   var mutS: S? = nil
-  let immS: S? = nil // expected-note 8 {{change 'let' to 'var' to make it mutable}}
+  let immS: S? = nil // expected-note 10 {{change 'let' to 'var' to make it mutable}}
 
   init() {}
 }
 
 var mutT: T?
-let immT: T? = nil  // expected-note 2 {{change 'let' to 'var' to make it mutable}}
+let immT: T? = nil  // expected-note 4 {{change 'let' to 'var' to make it mutable}}
 
 let mutTPayload = mutT!
 
@@ -25,17 +25,17 @@ mutT!.mutS! = S()
 mutT!.mutS!.x = 0
 mutT!.mutS!.y = 0 // expected-error{{cannot assign to 'let' property 'y'}}
 mutT!.immS = S() // expected-error{{cannot assign to 'let' property 'immS'}}
-mutT!.immS! = S() // expected-error{{cannot assign to the result of this expression}}
+mutT!.immS! = S() // expected-error{{cannot assign through '!': 'immS' is immutable}}
 mutT!.immS!.x = 0 // expected-error{{cannot assign to 'x': 'immS' is immutable}}
 mutT!.immS!.y = 0 // expected-error{{cannot assign to 'let' property 'y'}}
 
-immT! = T() // expected-error{{cannot assign to the result of this expression}}
+immT! = T() // expected-error{{cannot assign through '!': 'immT' is immutable}}
 immT!.mutS = S() // expected-error{{cannot assign to 'mutS': 'immT' is immutable}}
-immT!.mutS! = S() // expected-error{{cannot assign to the result of this expression}}
+immT!.mutS! = S() // expected-error{{cannot assign through '!': 'immT' is immutable}}
 immT!.mutS!.x = 0 // expected-error{{cannot assign to 'x': 'immT' is immutable}}
 immT!.mutS!.y = 0 // expected-error{{cannot assign to 'let' property 'y'}}
 immT!.immS = S() // expected-error{{cannot assign to 'let' property 'immS'}}
-immT!.immS! = S() // expected-error{{cannot assign to the result of this expression}}
+immT!.immS! = S() // expected-error{{cannot assign through '!': 'immS' is immutable}}
 immT!.immS!.x = 0 // expected-error{{cannot assign to 'x': 'immS' is immutable}}
 immT!.immS!.y = 0 // expected-error{{cannot assign to 'let' property 'y'}}
 

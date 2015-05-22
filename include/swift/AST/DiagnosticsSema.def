@@ -1709,6 +1709,11 @@ ERROR(assignment_property_has_immutable_base,sema_tcs,none,
 ERROR(assignment_subscript_has_immutable_base,sema_tcs,none,
       "cannot assign to subscript: %0 is immutable",
       (Identifier))
+ERROR(assignment_bang_has_immutable_subcomponent,sema_tcs,none,
+      "cannot assign through '!': %0 is immutable",
+      (DeclName))
+ERROR(assignment_bang_has_immutable_subscript,sema_tcs,none,
+      "cannot assign through '!': base subscript is get-only", ())
 
 NOTE(change_to_mutating,sema_tcs,none,
      "mark %select{method|accessor}0 'mutating' to make 'self' mutable",

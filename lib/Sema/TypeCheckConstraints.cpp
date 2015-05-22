@@ -1662,6 +1662,27 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
     return Type();
   }
 
+  // special case assignment into "some.optional!"
+  if (auto *FVE = dyn_cast<ForceValueExpr>(dest)) {
+    auto immInfo = resolveImmutableBase(FVE, *this);
+
+    // If we dug out a problematic decl, we can produce a nice tailored
+    // diagnostic.
+    if (auto *vd = dyn_cast_or_null<VarDecl>(immInfo.second)) {
+      TC.diagnose(equalLoc, diag::assignment_bang_has_immutable_subcomponent,
+                  vd->getFullName())
+        .highlight(immInfo.first->getSourceRange())
+        .highlight(vd->getNameLoc());
+      vd->emitLetToVarNoteIfSimple(DC);
+      return Type();
+    }
+    if (immInfo.second && isa<SubscriptDecl>(immInfo.second)) {
+      TC.diagnose(equalLoc, diag::assignment_bang_has_immutable_subscript)
+        .highlight(immInfo.first->getSourceRange());
+      return Type();
+    }
+  }
+
   // Otherwise, emit an unhelpful message.
   getTypeChecker().diagnose(equalLoc, diag::assignment_lhs_not_lvalue)
     .highlight(dest->getSourceRange());
