@@ -114,8 +114,14 @@ public:
     }
 
     for (const Job *J : Cmd.getInputs()) {
-      Inputs.push_back(
-            CommandInput(J->getOutput().getPrimaryOutputFilename()));
+      ArrayRef<std::string> OutFiles = J->getOutput().getPrimaryOutputFilenames();
+      if (const auto *BJAction = dyn_cast<BackendJobAction>(&Cmd.getSource())) {
+        Inputs.push_back(CommandInput(OutFiles[BJAction->getInputIndex()]));
+      } else {
+        for (const std::string &FileName : OutFiles) {
+          Inputs.push_back(CommandInput(FileName));
+        }
+      }
     }
 
     // TODO: set up Outputs appropriately.
