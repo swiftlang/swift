@@ -107,7 +107,7 @@ func dynamicLookupMethod(b: AnyObject) {
 }
 
 // Properties
-func properties(b: B) {
+func properties(b: B) {  // expected-note {{mark parameter with 'var' to make it mutable}}
   var i = b.counter
   b.counter = i + 1
   i = i + b.readCounter

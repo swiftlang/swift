@@ -36,7 +36,7 @@ func passClosure() {
     42
   }
   
-  takeClosure { (a : Int) -> Int in
+  takeClosure { (a : Int) -> Int in // expected-note {{mark parameter with 'var' to make it mutable}}
     a = 42     // expected-error{{cannot assign to 'let' value 'a'}}
     return 42
   }
@@ -52,7 +52,7 @@ class FooClass {
     self = FooClass()  // expected-error {{cannot assign to 'self' in a method}}
   }
   
-  func bar() {  // expected-note {{mark method 'mutating' to make 'self' mutable}}
+  func bar() {
     self = FooClass()  // expected-error {{cannot assign to 'self' in a method}}
   }
   
@@ -85,7 +85,7 @@ func let_decls() {
   let a = 42  // expected-note {{change 'let' to 'var' to make it mutable}}
   a = 17   // expected-error {{cannot assign to 'let' value 'a'}}
 
-  let (b,c) = (4, "hello")
+  let (b,c) = (4, "hello")   // expected-note {{change 'let' to 'var' to make it mutable}}
   markUsed(b); markUsed(c)
   b = 17   // expected-error {{cannot assign to 'let' value 'b'}}
 
@@ -215,7 +215,9 @@ func test_mutability() {
 }
 
 
-func test_arguments(a : Int, var b : Int, let c : Int) {
+func test_arguments(a : Int,       // expected-note {{mark parameter with 'var' to make it mutable}} {{21-21=var}}
+                    var b : Int,
+                    let c : Int) {   // expected-note {{change 'let' parameter to 'var' to make it mutable}}  {{21-24=var}}
   a = 1  // expected-error {{cannot assign to 'let' value 'a'}}
   b = 2  // ok.
   c = 3  // expected-error {{cannot assign to 'let' value 'c'}}
@@ -311,7 +313,8 @@ func testSelectorStyleArguments1(var x: Int, var bar y: Int) {
   ++x; ++y
 }
 
-func testSelectorStyleArguments2(let x: Int, let bar y: Int) {
+func testSelectorStyleArguments2(let x: Int,  // expected-note {{change 'let' parameter to 'var' to make it mutable}}
+                                 let bar y: Int) { // expected-note {{change 'let' parameter to 'var' to make it}}
   ++x  // expected-error {{cannot pass 'let' value 'x' to mutating unary operator '++'}}
   ++y  // expected-error {{cannot pass 'let' value 'y' to mutating unary operator '++'}}
 }
@@ -477,7 +480,7 @@ struct TestSubscriptMutability {
   }
 }
 
-func f(a : TestSubscriptMutability) {
+func f(a : TestSubscriptMutability) { // expected-note {{mark parameter with 'var' to make it mutable}}
   a.var_arr = []  // expected-error {{cannot assign to 'var_arr': 'a' is immutable}}
 }
 

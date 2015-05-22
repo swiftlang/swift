@@ -82,6 +82,10 @@ ERROR(new_array_syntax,type_parsing,none,
 
 NOTE(convert_let_to_var,sema,none,
      "change 'let' to 'var' to make it mutable", ())
+NOTE(change_let_to_var_param,sema,none,
+     "change 'let' parameter to 'var' to make it mutable", ())
+NOTE(mark_param_var,sema,none,
+     "mark parameter with 'var' to make it mutable", ())
 
 
 #ifndef DIAG_NO_UNDEF

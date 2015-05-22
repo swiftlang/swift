@@ -3079,24 +3079,50 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
     // If the problematic decl is 'self', then we might be trying to mutate
     // a property in a non-mutating method.
     auto FD = dyn_cast<FuncDecl>(UseDC->getInnermostMethodContext());
-    if (FD && !FD->isMutating() && !FD->isImplicit()) {
-      getASTContext().Diags.diagnose(FD->getFuncLoc(), diag::change_to_mutating,
-                                     FD->isAccessor())
-        .fixItInsert(FD->getFuncLoc(), "mutating ");
+    if (FD && !FD->isMutating() && !FD->isImplicit() && FD->isInstanceMember()&&
+        !FD->getDeclContext()->getDeclaredTypeInContext()
+                 ->hasReferenceSemantics()) {
+      auto &d = getASTContext().Diags;
+      d.diagnose(FD->getFuncLoc(), diag::change_to_mutating, FD->isAccessor())
+       .fixItInsert(FD->getFuncLoc(), "mutating ");
       return;
     }
   }
 
-  // If it is a multi variable binding, like "let (a,b) = " then don't touch it.
-  auto *PBD = getParentPatternBinding();
-  if (!PBD || PBD->getSingleVar() != this) return;
-  
-  // Don't touch generated code.
-  if (PBD->getLoc().isInvalid() || PBD->isImplicit())
+  // If this is a normal variable definition, then we can change 'let' to 'var'.
+  // We even are willing to suggest this for multi-variable binding, like
+  //   "let (a,b) = "
+  // since the user has to choose to apply this anyway.
+  if (auto *PBD = getParentPatternBinding()) {
+    // Don't touch generated or invalid code.
+    if (PBD->getLoc().isInvalid() || PBD->isImplicit())
+      return;
+
+    auto &d = getASTContext().Diags;
+    d.diagnose(PBD->getLoc(), diag::convert_let_to_var)
+     .fixItReplace(PBD->getLoc(), "var");
     return;
-  
-  getASTContext().Diags.diagnose(PBD->getLoc(), diag::convert_let_to_var)
-   .fixItReplace(PBD->getLoc(), "var");
+  }
+
+  // If this is an argument pattern, suggest adding 'var' to the pattern.
+  if (auto *PD = dyn_cast<ParamDecl>(this)) {
+    if (auto *P = PD->getParamParentPattern()) {
+      if (P->getStartLoc().isValid() && !PD->isImplicit()) {
+        // The pattern is: (pattern_let (pattern_typed (pattern_named)))
+        // where the outside let pattern may be missing.  If present, this is a
+        // change, otherwise this is an addition of "var"
+        auto &d = getASTContext().Diags;
+        if (auto *VP = dyn_cast<VarPattern>(P)) {
+          d.diagnose(VP->getLoc(), diag::change_let_to_var_param)
+           .fixItReplace(VP->getLoc(), "var");
+        } else {
+          d.diagnose(P->getStartLoc(), diag::mark_param_var)
+           .fixItInsert(P->getStartLoc(), "var");
+        }
+        return;
+      }
+    }
+  }
 }
 
 

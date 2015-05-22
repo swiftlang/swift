@@ -885,6 +885,7 @@ extension Int {
 struct LetProperties {
   // expected-note @+1 {{change 'let' to 'var' to make it mutable}}
   let arr : [Int]
+  // expected-note @+1 2 {{change 'let' to 'var' to make it mutable}}
   let (u, v) : (Int, Int)
   // expected-note @+1 2 {{change 'let' to 'var' to make it mutable}}
   let w : (Int, Int)

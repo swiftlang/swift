@@ -11,7 +11,7 @@ func min<T : Comparable>(x: T, y: T) -> T {
   return x
 }
 
-func weirdConcat<T : ConcatToAnything, U>(t: T, u: U) {
+func weirdConcat<T : ConcatToAnything, U>(t: T, u: U) {  // expected-note {{mark parameter with 'var' to make it mutable}}
   t +++ u
   t +++ 1
   u +++ t // expected-error{{cannot pass 'let' value 'u' to mutating binary operator '+++'}}

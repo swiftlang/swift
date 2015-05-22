@@ -219,7 +219,7 @@ class ClassWithUnavailableProperties {
   }
 }
 
-func accessUnavailableProperties(o: ClassWithUnavailableProperties) {
+func accessUnavailableProperties(o: ClassWithUnavailableProperties) { // expected-note 2 {{mark parameter with 'var' to make it mutable}}
   // Stored properties
   let _: Int = o.availableOn10_9Stored
   let _: Int = o.availableOn10_10Stored // expected-error {{value of optional type 'Int?' not unwrapped; did you mean to use '!' or '?'?}}
