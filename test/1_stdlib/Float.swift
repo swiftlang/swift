@@ -147,7 +147,12 @@ func testSubnormal() {
 
   print("testSubnormal done")
 }
-testSubnormal()
+
+#if arch(arm)
+  print("testSubnormal done")
+#else
+  testSubnormal()
+#endif
 // CHECK: testSubnormal done
 
 //===---
