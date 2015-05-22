@@ -151,10 +151,12 @@ public func vfork() -> Int32 {
 // signal.h
 //===----------------------------------------------------------------------===//
 
+#if os(OSX) || os(iOS) || os(watchOS) || os(tvOS)
 public let SIG_DFL: sig_t? = nil
 public let SIG_IGN = unsafeBitCast(1, sig_t.self)
-public let SIG_HOLD = unsafeBitCast(5, sig_t.self)
 public let SIG_ERR = unsafeBitCast(-1, sig_t.self)
+public let SIG_HOLD = unsafeBitCast(5, sig_t.self)
+#endif
 
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)

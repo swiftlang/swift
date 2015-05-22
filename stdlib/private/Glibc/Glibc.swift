@@ -24,3 +24,15 @@ public var errno: Int32 {
     return __errno_location().memory = val
   }
 }
+
+//===----------------------------------------------------------------------===//
+// signal.h
+//===----------------------------------------------------------------------===//
+
+#if os(Linux)
+public let SIG_DFL: __sighandler_t? = nil
+public let SIG_IGN = unsafeBitCast(1, __sighandler_t.self)
+public let SIG_ERR = unsafeBitCast(-1, __sighandler_t.self)
+public let SIG_HOLD = unsafeBitCast(2, __sighandler_t.self)
+#endif
+
