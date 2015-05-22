@@ -156,9 +156,10 @@ tests.test("ForwardIndex") {
   ++i
   expectEqual(1, callCounts["successor"])
   expectEqual(1, callCounts["_successorInPlace"])
-  i++
+  var x = i++
   expectEqual(2, callCounts["successor"])
   expectEqual(1, callCounts["_successorInPlace"])
+  _blackHole(x)
 }
 
 tests.test("BidirectionalIndex") {
