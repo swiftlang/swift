@@ -147,6 +147,14 @@ public func vfork() -> Int32 {
   return -1
 }
 
+//===----------------------------------------------------------------------===//
+// signal.h
+//===----------------------------------------------------------------------===//
+
+public let SIG_DFL: sig_t? = nil
+public let SIG_IGN = unsafeBitCast(1, sig_t.self)
+public let SIG_HOLD = unsafeBitCast(5, sig_t.self)
+public let SIG_ERR = unsafeBitCast(-1, sig_t.self)
 
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)
