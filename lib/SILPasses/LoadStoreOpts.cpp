@@ -832,7 +832,7 @@ invalidateAliasingLoads(LSContext &Ctx, SILInstruction *Inst,
   }
 }
 
-static bool WriteAliasesStoreInList(AliasAnalysis *AA,
+static bool writeAliasesStoreInList(AliasAnalysis *AA,
                                     SILInstruction *Writer,
                                     ArrayRef<StoreInst *> Stores) {
   for (auto *S : Stores)
@@ -853,7 +853,7 @@ invalidateWriteToStores(LSContext &Ctx, SILInstruction *Inst,
       InvalidatedStoreList.push_back(P.first);
 
   for (auto &P : StoreMap)
-    if (WriteAliasesStoreInList(AA, Inst, P.second))
+    if (writeAliasesStoreInList(AA, Inst, P.second))
       InvalidatedStoreList.push_back(P.first);
 
   for (SILValue SIOp : InvalidatedStoreList) {
