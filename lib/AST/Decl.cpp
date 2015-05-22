@@ -2451,10 +2451,19 @@ GenericParamList *ProtocolDecl::createGenericParams(DeclContext *dc) {
   else
     loc = getLoc();
 
+  // Find the depth of the 'Self' parameter. This is zero in all valid
+  // code; however, we compute it nonetheless to maintain the AST
+  // invariants around generic parameter depths.
+  unsigned depth = 0;
+  GenericParamList *outerGenericParams
+    = dc->getParent()->getGenericParamsOfContext();
+  if (outerGenericParams)
+    depth = outerGenericParams->getDepth() + 1;
+
   // The generic parameter 'Self'.
   auto &ctx = getASTContext();
   auto selfId = ctx.Id_Self;
-  auto selfDecl = new (ctx) GenericTypeParamDecl(dc, selfId, loc, 0, 0);
+  auto selfDecl = new (ctx) GenericTypeParamDecl(dc, selfId, loc, depth, 0);
   auto protoRef = new (ctx) SimpleIdentTypeRepr(loc, getName());
   protoRef->setValue(this);
   TypeLoc selfInherited[1] = { TypeLoc(protoRef) };
@@ -2463,7 +2472,10 @@ GenericParamList *ProtocolDecl::createGenericParams(DeclContext *dc) {
   selfDecl->setImplicit();
 
   // The generic parameter list itself.
-  return GenericParamList::create(ctx, SourceLoc(), selfDecl, SourceLoc());
+  auto result = GenericParamList::create(ctx, SourceLoc(), selfDecl,
+                                         SourceLoc());
+  result->setOuterParameters(outerGenericParams);
+  return result;
 }
 
 /// \brief Return true if the 'getter' is mutating, i.e. that it requires an
