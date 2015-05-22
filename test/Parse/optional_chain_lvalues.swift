@@ -40,6 +40,6 @@ mutT?.mutS?.x += 0
 _ = mutT?.mutS?.x + 0 // expected-error{{value of optional type 'Int?' not unwrapped}}
 mutT?.mutS?.y -= 0 // expected-error{{could not find an overload for '-=' that accepts the supplied arguments}}
 mutT?.immS = S() // expected-error{{cannot assign to 'let' property 'immS'}}
-mutT?.immS? = S() // expected-error{{cannot assign to the result of this expression}}
+mutT?.immS? = S() // expected-error{{cannot assign to expression with non-lvalue type 'S'}}
 mutT?.immS?.x += 0 // expected-error{{could not find an overload for '+=' that accepts the supplied arguments}}
 mutT?.immS?.y -= 0 // expected-error{{could not find an overload for '-=' that accepts the supplied arguments}}

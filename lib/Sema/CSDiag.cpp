@@ -1770,6 +1770,246 @@ void FailureDiagnosis::suggestPotentialOverloads(
                   suggestionText);
 }
 
+
+/// If an UnresolvedDotExpr has been resolved by the constraint system, return
+/// the decl that it references.
+static ValueDecl *findResolvedMemberRef(ConstraintLocator *locator,
+                                        ConstraintSystem &CS) {
+  auto *resolvedOverloadSets = CS.getResolvedOverloadSets();
+  if (!resolvedOverloadSets) return nullptr;
+
+  // Search through the resolvedOverloadSets to see if we have a resolution for
+  // this member.  This is an O(n) search, but only happens when producing an
+  // error diagnostic.
+  for (auto resolved = resolvedOverloadSets;
+       resolved; resolved = resolved->Previous) {
+    if (resolved->Locator != locator) continue;
+
+    // We only handle the simplest decl binding.
+    if (resolved->Choice.getKind() != OverloadChoiceKind::Decl)
+      return nullptr;
+    return resolved->Choice.getDecl();
+  }
+
+  return nullptr;
+}
+
+
+/// Given an expression that has a non-lvalue type, dig into it until we find
+/// the part of the expression that prevents the entire subexpression from being
+/// mutable.  For example, in a sequence like "x.v.v = 42" we want to complain
+/// about "x" being a let property if "v.v" are both mutable.
+///
+/// This returns the base subexpression that looks immutable (or that can't be
+/// analyzed any further) along with a decl extracted from it if we could.
+///
+static std::pair<Expr*, ValueDecl*>
+resolveImmutableBase(Expr *expr, ConstraintSystem &CS) {
+  // Provide specific diagnostics for assignment to subscripts whose base expr
+  // is known to be an rvalue.
+  if (auto *SE = dyn_cast<SubscriptExpr>(expr)) {
+    // If we found a decl for the subscript, check to see if it is a set-only
+    // subscript decl.
+    auto loc = CS.getConstraintLocator(SE, ConstraintLocator::SubscriptMember);
+    auto *member =
+      dyn_cast_or_null<SubscriptDecl>(findResolvedMemberRef(loc, CS));
+
+    // If it isn't settable, return it.
+    if (member) {
+      if (!member->isSettable() ||
+          !member->isSetterAccessibleFrom(CS.DC))
+        return { expr, member };
+    }
+
+    // If it is settable, then the base must be the problem, recurse.
+    return resolveImmutableBase(SE->getBase(), CS);
+  }
+
+  // Look through property references.
+  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
+    // If we found a decl for the UDE, check it.
+    auto loc = CS.getConstraintLocator(UDE, ConstraintLocator::Member);
+    auto *member = dyn_cast_or_null<VarDecl>(findResolvedMemberRef(loc, CS));
+
+
+    // If the member isn't settable, then it is the problem: return it.
+    if (member) {
+      if (!member->isSettable(nullptr) ||
+          !member->isSetterAccessibleFrom(CS.DC))
+        return { expr, member };
+    }
+
+    // If we weren't able to resolve a member or if it is mutable, then the
+    // problem must be with the base, recurse.
+    return resolveImmutableBase(UDE->getBase(), CS);
+  }
+
+  if (auto *DRE = dyn_cast<DeclRefExpr>(expr))
+    return { expr, DRE->getDecl() };
+
+  // Look through x!
+  if (auto *FVE = dyn_cast<ForceValueExpr>(expr))
+    return resolveImmutableBase(FVE->getSubExpr(), CS);
+  
+  return { expr, nullptr };
+}
+
+static bool diagnoseSubElementFailure(std::pair<Expr*, ValueDecl*> immInfo,
+                                      SourceLoc equalLoc,
+                                      ConstraintSystem &CS,
+                                      Diag<Identifier> varDiag,
+                                      Diag<> subscriptDiag) {
+  if (!immInfo.second) return false;
+
+  auto &TC = CS.getTypeChecker();
+
+  // Otherwise, we cannot resolve this because the available setter candidates
+  // are all mutating and the base must be mutating.  If we dug out a
+  // problematic decl, we can produce a nice tailored diagnostic.
+  if (auto *vd = dyn_cast<VarDecl>(immInfo.second)) {
+    TC.diagnose(equalLoc, varDiag, vd->getName())
+      .highlight(immInfo.first->getSourceRange());
+    vd->emitLetToVarNoteIfSimple(CS.DC);
+    return true;
+  }
+
+  // If the underlying expression was a read-only subscript, diagnose that.
+  if (isa<SubscriptDecl>(immInfo.second)) {
+    TC.diagnose(equalLoc, subscriptDiag)
+      .highlight(immInfo.first->getSourceRange());
+    return true;
+  }
+  return false;
+}
+
+
+void FailureDiagnosis::diagnoseAssignmentFailure(Expr *dest, Type destTy,
+                                                 SourceLoc equalLoc,
+                                                 ConstraintSystem &CS) {
+
+  auto &TC = CS.getTypeChecker();
+
+  // Otherwise, we have an invalid destination type.  Give a specific diagnostic
+  // depending on what we're assigning to.
+  if (auto *DRE = dyn_cast<DeclRefExpr>(dest))
+    if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
+      Diag<Identifier> d;
+      if (VD->isImplicit() && VD->getName().str() == "self")
+        d = diag::assignment_to_self;
+      else if (VD->isLet())
+        d = diag::assignment_lhs_is_let;
+      else if (VD->hasAccessorFunctions() && !VD->getSetter())
+        d = diag::assignment_get_only_property;
+      else if (!VD->isSetterAccessibleFrom(CS.DC))
+        d = diag::assignment_lhs_setter_inaccessible;
+      else
+        d = diag::assignment_lhs_is_vardecl;
+      TC.diagnose(equalLoc, d, VD->getName())
+        .highlight(dest->getSourceRange());
+      VD->emitLetToVarNoteIfSimple(CS.DC);
+      return;
+    }
+
+  // Special case assignment into "some.optional!"
+  if (auto *FVE = dyn_cast<ForceValueExpr>(dest)) {
+    auto immInfo = resolveImmutableBase(FVE, CS);
+
+    // Diagnose the case when the failure was due to a determinable subelement.
+    if (diagnoseSubElementFailure(immInfo, equalLoc, CS,
+                            diag::assignment_bang_has_immutable_subcomponent,
+                            diag::assignment_bang_has_immutable_subscript))
+      return;
+  }
+
+  // Provide specific diagnostics for assignment to subscripts whose base expr
+  // is known to be an rvalue.
+  if (auto *SE = dyn_cast<SubscriptExpr>(dest)) {
+    auto immInfo = resolveImmutableBase(SE, CS);
+
+    // If the subscript itself is broken, and it is because the subscript has
+    // no setter, emit a specific error.
+    if (immInfo.first == SE && immInfo.second) {
+      auto *SD = cast<SubscriptDecl>(immInfo.second);
+      
+      if (!SD->getSetter()) {
+        TC.diagnose(equalLoc, diag::assignment_get_only_subscript)
+          .highlight(SE->getBase()->getSourceRange());
+        return;
+      }
+      if (!SD->isSetterAccessibleFrom(CS.DC)) {
+        TC.diagnose(equalLoc, diag::assignment_inaccessible_subscript)
+          .highlight(SE->getBase()->getSourceRange());
+        return;
+      }
+    }
+
+    // Diagnose the case when the failure was due to a determinable subelement.
+    if (diagnoseSubElementFailure(immInfo, equalLoc, CS,
+                                  diag::assignment_subscript_has_immutable_base,
+                                  diag::assignment_subscript_expr_subbase))
+      return;
+  }
+
+  // Provide specific diagnostics for unresolved type expr.
+  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(dest)) {
+    auto immInfo = resolveImmutableBase(UDE, CS);
+
+    // If the dot expr itself is broken and we were able to resolve a property
+    // out of it, diagnose a specific issue.
+    if (immInfo.first == UDE && immInfo.second && isa<VarDecl>(immInfo.second)){
+      auto *vd = cast<VarDecl>(immInfo.second);
+
+      Optional<Diag<Identifier>> diagID;
+      if (vd->isLet())
+        diagID = diag::assignment_lhs_is_let_property;
+      else if (vd->hasAccessorFunctions() && !vd->getSetter())
+        diagID = diag::assignment_get_only_property;
+      else if (!vd->isSetterAccessibleFrom(CS.DC))
+        diagID = diag::assignment_inaccessible_property;
+
+      if (diagID) {
+        TC.diagnose(equalLoc, diagID.getValue(), UDE->getName())
+          .highlight(UDE->getBase()->getSourceRange())
+          .highlight(UDE->getNameLoc());
+        vd->emitLetToVarNoteIfSimple(CS.DC);
+        return;
+      }
+    }
+
+    // Otherwise, we cannot resolve this because the available property
+    // setters require the base to be mutable, but it isn't.  If we dug out a
+    // problematic decl, we can produce a nice tailored diagnostic.
+    if (auto *vd = dyn_cast_or_null<VarDecl>(immInfo.second)) {
+      TC.diagnose(equalLoc, diag::assignment_property_has_immutable_base,
+                  UDE->getName(), vd->getName())
+        .highlight(immInfo.first->getSourceRange())
+        .highlight(UDE->getNameLoc());
+      vd->emitLetToVarNoteIfSimple(CS.DC);
+      return;
+    }
+
+    // If the underlying expression was a read-only subscript, diagnose that.
+    if (immInfo.second && isa<SubscriptDecl>(immInfo.second)) {
+      TC.diagnose(equalLoc, diag::assignment_ude_expr_subbase, UDE->getName())
+        .highlight(immInfo.first->getSourceRange())
+        .highlight(UDE->getNameLoc());
+      return;
+    }
+
+    // Otherwise, this is an assignment to an unknown UnresolvedDotExpr.
+    TC.diagnose(equalLoc, diag::assignment_ude_expr, UDE->getName(),
+                immInfo.first->getType())
+      .highlight(immInfo.first->getSourceRange())
+      .highlight(UDE->getNameLoc());
+    return;
+  }
+
+  // Otherwise, emit an unhelpful message.
+  TC.diagnose(equalLoc, diag::assignment_lhs_not_lvalue, destTy)
+    .highlight(dest->getSourceRange());
+}
+
+
 bool FailureDiagnosis::diagnoseFailureForBinaryExpr() {
   assert(expr->getKind() == ExprKind::Binary);
   

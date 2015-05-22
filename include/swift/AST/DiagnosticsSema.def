@@ -1680,7 +1680,7 @@ WARNING(expression_unused_result_nonmutating,sema_tcs,none,
         "result of call to non-mutating function %0 is unused; "
         "use %1 to mutate in-place", (DeclName, DeclName))
 ERROR(assignment_lhs_not_lvalue,sema_tcs,none,
-      "cannot assign to the result of this expression", ())
+      "cannot assign to expression with non-lvalue type %0", (Type))
 ERROR(assignment_lhs_is_let,sema_tcs,none,
       "cannot assign to 'let' value %0", (Identifier))
 ERROR(assignment_get_only_property,sema_tcs,none,
@@ -1711,7 +1711,7 @@ ERROR(assignment_subscript_has_immutable_base,sema_tcs,none,
       (Identifier))
 ERROR(assignment_bang_has_immutable_subcomponent,sema_tcs,none,
       "cannot assign through '!': %0 is immutable",
-      (DeclName))
+      (Identifier))
 ERROR(assignment_bang_has_immutable_subscript,sema_tcs,none,
       "cannot assign through '!': base subscript is get-only", ())
 
@@ -1729,9 +1729,6 @@ ERROR(assignment_subscript_expr_subbase,sema_tcs,none,
 ERROR(assignment_ude_expr,sema_tcs,none,
      "cannot assign to %0, base has immutable type %1",
      (Identifier, Type))
-
-ERROR(assignment_subscript_expr,sema_tcs,none,
-      "cannot assign to subscript, base has immutable type %0", (Type))
 
 // ForEach Stmt
 ERROR(sequence_protocol_broken,sema_tcs,none,

@@ -1206,7 +1206,13 @@ public:
   /// Attempt to diagnose a specific failure from the info we've collected from
   /// the failed constraint system.
   bool diagnoseFailure();
-  
+
+  /// When an assignment to an expression is detected and the destination is
+  /// invalid, emit a detailed error about the condition.
+  static void diagnoseAssignmentFailure(Expr *dest, Type destTy,
+                                        SourceLoc equalLoc,
+                                        ConstraintSystem &CS);
+
 private:
   
   /// Given a set of parameter lists from an overload group, and a list of
