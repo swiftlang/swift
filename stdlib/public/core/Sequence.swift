@@ -37,20 +37,18 @@ public protocol GeneratorType {
   mutating func next() -> Element?
 }
 
-/// This protocol is an implementation detail of `SequenceType`; do
-/// not use it directly.
+/// A type that can be iterated with a `for`...`in` loop.
 ///
-/// Its requirements are inherited by `SequenceType` and thus must
-/// be satisfied by types conforming to that protocol.
-public protocol _Sequence_Type {
-
-  /// A type whose instances can produce the elements of this
-  /// sequence, in order.
+/// `SequenceType` makes no requirement on conforming types regarding
+/// whether they will be destructively "consumed" by iteration.  To
+/// ensure non-destructive iteration, constrain your *sequence* to
+/// `CollectionType`.
+public protocol SequenceType {
+  /// A type that provides the *sequence*'s iteration interface and
+  /// encapsulates its iteration state.
   typealias Generator : GeneratorType
 
-  /// Return a *generator* over the elements of this *sequence*.  The
-  /// *generator*'s next element is the first element of the
-  /// sequence.
+  /// Return a *generator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
   func generate() -> Generator
@@ -78,27 +76,11 @@ public protocol _Sequence_Type {
   func _customContainsEquatableElement(
     element: Generator.Element
   ) -> Bool?
-}
-
-/// A type that can be iterated with a `for`...`in` loop.
-///
-/// `SequenceType` makes no requirement on conforming types regarding
-/// whether they will be destructively "consumed" by iteration.  To
-/// ensure non-destructive iteration, constrain your *sequence* to
-/// `CollectionType`.
-public protocol SequenceType : _Sequence_Type {
-  /// A type that provides the *sequence*'s iteration interface and
-  /// encapsulates its iteration state.
-  typealias Generator : GeneratorType
-
-  /// Return a *generator* over the elements of this *sequence*.
-  ///
-  /// - Complexity: O(1).
-  func generate() -> Generator
-
-  /// If `self` is multi-pass (i.e., a `CollectionType`), invoke the function
-  /// on `self` and return its result.  Otherwise, return `nil`.
-  func ~> <R>(_: Self, _: (_PreprocessingPass, ((Self)->R))) -> R?
+  
+  /// If `self` is multi-pass (i.e., a `CollectionType`), invoke
+  /// `preprocess` on `self` and return its result.  Otherwise, return
+  /// `nil`.
+  func _preprocessingPass<R>(preprocess: (Self)->R) -> R?
 
   /// Create a native array buffer containing the elements of `self`,
   /// in the same order.
@@ -117,6 +99,10 @@ extension SequenceType {
   /// - Complexity: O(N).
   final public func underestimateCount() -> Int {
     return 0
+  }
+
+  final public func _preprocessingPass<R>(preprocess: (Self)->R) -> R? {
+    return nil
   }
 }
 
@@ -177,30 +163,12 @@ internal func _initializeTo<Args>(a: Args) -> (_InitializeTo, Args) {
   return (_InitializeTo(), a)
 }
 
-public func ~> <T : _Sequence_Type>(
+public func ~> <T : SequenceType>(
   source: T, ptr: (_InitializeTo, UnsafeMutablePointer<T.Generator.Element>)) {
   var p = UnsafeMutablePointer<T.Generator.Element>(ptr.1)
   for x in GeneratorSequence(source.generate()) {
     p++.initialize(x)
   }
-}
-
-// Operation tags for preprocessingPass.  See Index.swift for an
-// explanation of operation tags.
-public struct _PreprocessingPass {}
-
-// Default implementation of `_preprocessingPass` for Sequences.  Do not
-// use this operator directly; call `_preprocessingPass(s)` instead
-public func ~> <
-  T : _Sequence_Type, R
->(s: T, _: (_PreprocessingPass, ( (T)->R ))) -> R? {
-  return nil
-}
-
-internal func _preprocessingPass<Args>(args: Args)
-  -> (_PreprocessingPass, Args)
-{
-  return (_PreprocessingPass(), args)
 }
 
 // Pending <rdar://problem/14011860> and <rdar://problem/14396120>,

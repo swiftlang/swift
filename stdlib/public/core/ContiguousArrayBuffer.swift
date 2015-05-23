@@ -548,7 +548,7 @@ extension _ContiguousArrayBuffer : CollectionType {
 }
 
 public func ~> <
-  S : _Sequence_Type
+  S : SequenceType
 >(
   source: S, _: (_CopyToNativeArrayBuffer,())
 ) -> _ContiguousArrayBuffer<S.Generator.Element>

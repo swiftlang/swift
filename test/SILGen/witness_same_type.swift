@@ -18,7 +18,7 @@ struct Foo: Fooable {
 }
 
 // rdar://problem/19049566
-// CHECK-LABEL: sil [transparent] [thunk] @_TTWu0_Rq_Ss12SequenceTypezq0_qqq_S_9GeneratorSs13GeneratorType7Element_GV17witness_same_type14LazySequenceOfq_q0__Ss14_Sequence_TypeS1_FS3_8generateuRq_S3__fq_FT_qq_S3_9Generator
+// CHECK-LABEL: sil [transparent] [thunk] @_TTWu0_Rq_Ss12SequenceTypezq0_qqq_S_9GeneratorSs13GeneratorType7Element_GV17witness_same_type14LazySequenceOfq_q0__S_S1_FS_8generateuRq_S__fq_FT_qq_S_9Generator
 public struct LazySequenceOf<SS : SequenceType, A where SS.Generator.Element == A> : SequenceType {
 	public func generate() -> AnyGenerator<A> { 
     var opt: AnyGenerator<A>?

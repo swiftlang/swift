@@ -216,7 +216,7 @@ extension CollectionType {
 }
 
 // A fast implementation for when you are backed by a contiguous array.
-public func ~> <T : protocol<_Sequence_Type, _ArrayType>>(
+public func ~> <T : protocol<SequenceType, _ArrayType>>(
   source: T, ptr: (_InitializeTo, UnsafeMutablePointer<T.Generator.Element>)) {
   let s = source._baseAddressIfContiguous
   if s != nil {
@@ -232,12 +232,10 @@ public func ~> <T : protocol<_Sequence_Type, _ArrayType>>(
   }
 }
 
-// Default implementation of `preprocessingPass` for *collections*.  Do not
-// use this operator directly; call `_preprocessingPass(s)` instead.
-public func ~> <T : CollectionType, R>(
-  s: T, args: (_PreprocessingPass, ( (T)->R ))
-) -> R? {
-  return args.1(s)
+extension CollectionType {
+  final public func _preprocessingPass<R>(preprocess: (Self)->R) -> R? {
+    return preprocess(self)
+  }
 }
 
 /// Returns `true` iff `x` is empty.
