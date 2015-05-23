@@ -160,6 +160,44 @@ public:
 };
 }
 
+static clang::CanQualType
+getClangFoundationClassType(IRGenModule &IGM, StringRef name) {
+  auto &ctx = IGM.getClangASTContext();
+  // Fallback to returning the "id" type if the class type cannot be found.
+  auto id = [&]() -> clang::CanQualType {
+    return getClangIdType(ctx);
+  };
+
+  auto *Foundation = IGM.Context.getLoadedModule(IGM.Context.Id_Foundation);
+  if (!Foundation)
+    return id();
+  
+  auto identifier = IGM.Context.getIdentifier(name);
+  SmallVector<ValueDecl *, 1> results;
+  Foundation->lookupQualified(Foundation->getType(),
+                                              identifier,
+                                              NL_QualifiedDefault, nullptr,
+                                              results);
+  for (auto result : results) {
+    // If we found a type with a clang node, get its declared class type.
+    auto clangNode = result->getClangNode();
+    if (!clangNode)
+      continue;
+    
+    auto clangInterface = dyn_cast_or_null<clang::ObjCInterfaceDecl>
+      (clangNode.getAsDecl());
+
+    if (!clangInterface)
+      continue;
+    
+    auto type = ctx.getObjCInterfaceType(clangInterface);
+    type = ctx.getObjCObjectPointerType(type);
+    return ctx.getCanonicalType(type);
+  }
+  
+  return id();
+}
+
 clang::CanQualType GenClangType::visitStructType(CanStructType type) {
   auto swiftDecl = type->getDecl();
   auto &swiftCtx = type->getASTContext();
@@ -171,6 +209,8 @@ clang::CanQualType GenClangType::visitStructType(CanStructType type) {
     return Converter.convert(IGM,
                              underlyingTypeDecl->getDeclaredType()
                                ->getCanonicalType());
+  } else if (swiftDecl->getName().str() == "String") {
+    return getClangFoundationClassType(IGM, "NSString");
   }
 
   // Everything else should have been handled as an imported type
@@ -222,44 +262,6 @@ clang::CanQualType GenClangType::visitBoundGenericClassType(
   // Any @objc class type in Swift that shows up in an @objc method maps 1-1 to
   // "id <SomeProto>"; with clang's encoding ignoring the protocol list.
   return getClangIdType(getClangASTContext());
-}
-
-static clang::CanQualType
-getClangFoundationClassType(IRGenModule &IGM, StringRef name) {
-  auto &ctx = IGM.getClangASTContext();
-  // Fallback to returning the "id" type if the class type cannot be found.
-  auto id = [&]() -> clang::CanQualType {
-    return getClangIdType(ctx);
-  };
-
-  auto *Foundation = IGM.Context.getLoadedModule(IGM.Context.Id_Foundation);
-  if (!Foundation)
-    return id();
-  
-  auto identifier = IGM.Context.getIdentifier(name);
-  SmallVector<ValueDecl *, 1> results;
-  Foundation->lookupQualified(Foundation->getType(),
-                                              identifier,
-                                              NL_QualifiedDefault, nullptr,
-                                              results);
-  for (auto result : results) {
-    // If we found a type with a clang node, get its declared class type.
-    auto clangNode = result->getClangNode();
-    if (!clangNode)
-      continue;
-    
-    auto clangInterface = dyn_cast_or_null<clang::ObjCInterfaceDecl>
-      (clangNode.getAsDecl());
-
-    if (!clangInterface)
-      continue;
-    
-    auto type = ctx.getObjCInterfaceType(clangInterface);
-    type = ctx.getObjCObjectPointerType(type);
-    return ctx.getCanonicalType(type);
-  }
-  
-  return id();
 }
 
 clang::CanQualType
@@ -632,9 +634,6 @@ void ClangTypeConverter::fillSpeciallyImportedTypeCache(IRGenModule &IGM) {
   // FIXME: This is sufficient for ABI type generation, but should
   //        probably be const char* for type encoding.
   CACHE_STDLIB_TYPE("CString", ctx.VoidPtrTy);
-
-  // We import NSString* as String.
-  CACHE_STDLIB_TYPE("String", getClangFoundationClassType(IGM, "NSString"));
 
   CACHE_STDLIB_TYPE("CVaListPointer", getClangDecayedVaListType(ctx));
 
