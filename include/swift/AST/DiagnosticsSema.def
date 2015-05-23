@@ -91,16 +91,11 @@ ERROR(cannot_apply_unop_to_arg,sema,none,
       (StringRef, StringRef))
 
 ERROR(cannot_apply_lvalue_unop_to_subelement,sema_tcs,none,
-      "cannot use immutable value with mutating unary operator: %0",
+      "cannot pass immutable value to mutating operator: %0",
       (StringRef))
 ERROR(cannot_apply_lvalue_unop_to_rvalue,sema,none,
-      "cannot pass immutable value of type '%1' to mutating unary operator '%0'",
+      "cannot pass immutable value of type '%1' to mutating operator '%0'",
       (StringRef, StringRef))
-
-ERROR(cannot_apply_lvalue_unop_to_rvalue_vardecl,sema_tcs,none,
-      "cannot pass %select{'let' value|get-only property|immutable value}2 %1"
-      " to mutating unary operator '%0'",
-      (StringRef, Identifier, unsigned))
 
 ERROR(cannot_apply_lvalue_binop_to_rvalue,sema,none,
       "cannot pass immutable value of type '%1' to mutating binary operator '%0'",
@@ -108,12 +103,6 @@ ERROR(cannot_apply_lvalue_binop_to_rvalue,sema,none,
 
 ERROR(cannot_apply_lvalue_binop_to_subelement,sema_tcs,none,
       "left side of mutating operator isn't mutable: %0", (StringRef))
-
-
-ERROR(cannot_apply_lvalue_binop_to_rvalue_vardecl,sema_tcs,none,
-      "cannot pass %select{'let' value|get-only property|immutable value}2 %1"
-      " to mutating binary operator '%0'",
-      (StringRef, Identifier, unsigned))
 
 ERROR(cannot_subscript_with_index,sema,none,
       "cannot subscript a value of type '%0' with an index of type '%1'",
@@ -129,11 +118,6 @@ ERROR(cannot_pass_rvalue_inout_subelement,sema_tcs,none,
 ERROR(cannot_pass_rvalue_inout,sema_tcs,none,
       "cannot pass immutable value of type '%0' as inout argument",
       (StringRef))
-
-ERROR(cannot_pass_rvalue_vardecl_inout,sema_tcs,none,
-      "cannot pass %select{'let' value|get-only property|immutable value}1 %0"
-      " as inout argument",
-      (Identifier, unsigned))
 
 ERROR(cannot_assign_to_literal,sema,none,
       "cannot assign to a literal value", ())
@@ -1693,10 +1677,6 @@ ERROR(assignment_get_only_property,sema_tcs,none,
       "cannot assign to a get-only property %0", (Identifier))
 ERROR(assignment_inaccessible_property,sema_tcs,none,
       "cannot assign to property %0 with inaccessible setter", (Identifier))
-ERROR(assignment_get_only_subscript,sema_tcs,none,
-      "cannot assign to a get-only subscript", ())
-ERROR(assignment_inaccessible_subscript,sema_tcs,none,
-      "cannot assign to subscript with inaccessible setter", ())
 
 ERROR(assignment_to_self,sema_tcs,none,
       "cannot assign to %0 in a method", (Identifier))

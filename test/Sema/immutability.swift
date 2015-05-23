@@ -95,17 +95,17 @@ func let_decls() {
 
   
   let e = 42  // expected-note {{change 'let' to 'var' to make it mutable}}
-  ++e         // expected-error {{cannot pass 'let' value 'e' to mutating unary operator '++'}}
+  ++e         // expected-error {{cannot pass immutable value to mutating operator: 'e' is a 'let' constant}}
   
   // <rdar://problem/16306600> QoI: passing a 'let' value as an inout results in an unfriendly diagnostic
   let f = 96 // expected-note {{change 'let' to 'var' to make it mutable}}
   var v = 1
-  swap(&f, &v)  // expected-error {{cannot pass 'let' value 'f' as inout argument}}
+  swap(&f, &v)  // expected-error {{cannot pass immutable value as inout argument: 'f' is a 'let' constant}}
 
   
   // <rdar://problem/19711233> QoI: poor diagnostic for operator-assignment involving immutable operand
   let g = 14 // expected-note {{change 'let' to 'var' to make it mutable}}
-  g /= 2  // expected-error {{cannot pass 'let' value 'g' to mutating binary operator '/='}}
+  g /= 2  // expected-error {{left side of mutating operator isn't mutable: 'g' is a 'let' constant}}
 }
 
 struct SomeStruct {
@@ -315,8 +315,8 @@ func testSelectorStyleArguments1(var x: Int, var bar y: Int) {
 
 func testSelectorStyleArguments2(let x: Int,  // expected-note {{change 'let' parameter to 'var' to make it mutable}}
                                  let bar y: Int) { // expected-note {{change 'let' parameter to 'var' to make it}}
-  ++x  // expected-error {{cannot pass 'let' value 'x' to mutating unary operator '++'}}
-  ++y  // expected-error {{cannot pass 'let' value 'y' to mutating unary operator '++'}}
+  ++x  // expected-error {{cannot pass immutable value to mutating operator: 'x' is a 'let' constant}}
+  ++y  // expected-error {{cannot pass immutable value to mutating operator: 'y' is a 'let' constant}}
 }
 
 func invalid_inout(inout var x : Int) { // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}}
@@ -340,7 +340,7 @@ class LetClassMembers {
   func f() {
     a = 42  // expected-error {{cannot assign to 'let' property 'a'}}
     b = 42  // expected-error {{cannot assign to 'let' property 'b'}}
-    updateInt(&a)   // expected-error {{cannot pass immutable value as inout argument: 'a' is immutable}}
+    updateInt(&a)   // expected-error {{cannot pass immutable value as inout argument: 'a' is a 'let' constant}}
   }
 }
 struct LetStructMembers {
@@ -356,7 +356,7 @@ struct LetStructMembers {
   func f() {
     a = 42  // expected-error {{cannot assign to 'let' property 'a'}}
     b = 42  // expected-error {{cannot assign to 'let' property 'b'}}
-    updateInt(&a)   // expected-error {{cannot pass immutable value as inout argument: 'a' is immutable}}
+    updateInt(&a)   // expected-error {{cannot pass immutable value as inout argument: 'a' is a 'let' constant}}
   }
 }
 
@@ -459,7 +459,7 @@ struct TestSubscriptMutability {
   var var_arr = [1,2,3]
 
   func nonmutating1() {
-    let_arr[1] = 1  // expected-error {{cannot assign through subscript: 'let_arr' is immutable}}
+    let_arr[1] = 1  // expected-error {{cannot assign through subscript: 'let_arr' is a 'let' constant}}
   }
   func nonmutating2() { // expected-note {{mark method 'mutating' to make 'self' mutable}}
     var_arr[1] = 1  // expected-error {{cannot assign through subscript: 'self' is immutable}}
@@ -474,7 +474,7 @@ struct TestSubscriptMutability {
   }
 
   func test() {
-    self[1] = TestSubscriptMutability()  // expected-error {{cannot assign to a get-only subscript}}
+    self[1] = TestSubscriptMutability()  // expected-error {{cannot assign through subscript: subscript is get-only}}
     self[1].var_arr = [] // expected-error {{cannot assign to 'var_arr': base subscript is get-only}}
     self[1].let_arr = [] // expected-error {{cannot assign to 'let' property 'let_arr'}}
   }
@@ -500,12 +500,12 @@ struct TestBangMutability {
   var var_opt = Optional(1)
 
   func nonmutating1() {      // expected-note {{mark method 'mutating' to make 'self' mutable}}
-    let_opt! = 1             // expected-error {{cannot assign through '!': 'let_opt' is immutable}}
+    let_opt! = 1             // expected-error {{cannot assign through '!': 'let_opt' is a 'let' constant}}
     var_opt! = 1             // expected-error {{cannot assign through '!': 'self' is immutable}}
     self[]! = 2              // expected-error {{cannot assign through '!': subscript is get-only}}
   }
   mutating func nonmutating2() {
-    let_opt! = 1             // expected-error {{cannot assign through '!': 'let_opt' is immutable}}
+    let_opt! = 1             // expected-error {{cannot assign through '!': 'let_opt' is a 'let' constant}}
     var_opt! = 1             // ok
 
     self[]! = 2              // expected-error {{cannot assign through '!': subscript is get-only}}

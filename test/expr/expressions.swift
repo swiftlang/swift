@@ -521,14 +521,14 @@ func unaryOps(inout i8: Int8, inout i64: Int64) {
   ++i64
   --i8
 
-  ++Int64(5) // expected-error{{cannot use immutable value with mutating unary operator: function call returns r-value}}
+  ++Int64(5) // expected-error{{cannot pass immutable value to mutating operator: function call returns immutable value}}
   
   // <rdar://problem/17691565> attempt to modify a 'let' variable with ++ results in typecheck error not being able to apply ++ to Float
   let a = i8 // expected-note {{change 'let' to 'var' to make it mutable}}
-  ++a // expected-error {{cannot pass 'let' value 'a' to mutating unary operator '++'}}
+  ++a // expected-error {{cannot pass immutable value to mutating operator: 'a' is a 'let' constant}}
   
   var b : Int { get { }}
-  ++b  // expected-error {{cannot pass get-only property 'b' to mutating unary operator '++'}}
+  ++b  // expected-error {{cannot pass immutable value to mutating operator: 'b' is a get-only property}}
 }
 
 //===----------------------------------------------------------------------===//

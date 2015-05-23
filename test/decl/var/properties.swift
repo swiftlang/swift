@@ -81,7 +81,7 @@ func test_global_properties(x: X) {
   a4 = x
   a5 = x
 
-  accept_x_inout(&a1) // expected-error {{cannot pass get-only property 'a1' as inout argument}}
+  accept_x_inout(&a1) // expected-error {{cannot pass immutable value as inout argument: 'a1' is a get-only property}}
   accept_x_inout(&a2)
   accept_x_inout(&a3)
   accept_x_inout(&a4)
@@ -448,7 +448,7 @@ func test_extension_properties(inout s: S, inout x: X) {
 
   accept_x_inout(&getS().x) // expected-error{{cannot pass immutable value as inout argument: 'getS' returns immutable value}}
   accept_x_inout(&getS().x2) // expected-error{{cannot pass immutable value as inout argument: 'getS' returns immutable value}}
-  accept_x_inout(&getS().x3) // expected-error{{cannot pass immutable value as inout argument: 'x3' is immutable}}
+  accept_x_inout(&getS().x3) // expected-error{{cannot pass immutable value as inout argument: 'x3' is a get-only property}}
 
   x = getS().x
   x = getS().x2
@@ -456,7 +456,7 @@ func test_extension_properties(inout s: S, inout x: X) {
 
   accept_x_inout(&s.x)
   accept_x_inout(&s.x2)
-  accept_x_inout(&s.x3) // expected-error{{cannot pass immutable value as inout argument: 'x3' is immutable}}
+  accept_x_inout(&s.x3) // expected-error{{cannot pass immutable value as inout argument: 'x3' is a get-only property}}
 }
 
 extension S {
@@ -495,7 +495,7 @@ func test_settable_of_nonsettable(a: Aleph) {
   _ = x
 
   accept_int(a.b.c)
-  accept_int_inout(&a.b.c) // expected-error {{cannot pass immutable value as inout argument: 'b' is immutable}}
+  accept_int_inout(&a.b.c) // expected-error {{cannot pass immutable value as inout argument: 'b' is a get-only property}}
 }
 
 // TODO: Static properties are only implemented for nongeneric structs yet.

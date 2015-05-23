@@ -1876,19 +1876,39 @@ static bool diagnoseSubElementFailure(std::pair<Expr*, ValueDecl*> immInfo,
   // Otherwise, we cannot resolve this because the available setter candidates
   // are all mutating and the base must be mutating.  If we dug out a
   // problematic decl, we can produce a nice tailored diagnostic.
-  if (auto *vd = dyn_cast_or_null<VarDecl>(immInfo.second)) {
+  if (auto *VD = dyn_cast_or_null<VarDecl>(immInfo.second)) {
     std::string message = "'";
-    message += vd->getName().str().str();
-    message += "' is immutable";
+    message += VD->getName().str().str();
+    message += "'";
+ 
+    if (VD->isImplicit())
+      message += " is immutable";
+    else if (VD->isLet())
+      message += " is a 'let' constant";
+    else if (VD->hasAccessorFunctions() && !VD->getSetter())
+      message += " is a get-only property";
+    else if (!VD->isSetterAccessibleFrom(CS.DC))
+      message += " setter is inaccessible";
+    else {
+      message += " is immutable";
+    }
     TC.diagnose(loc, diagID, message)
       .highlight(immInfo.first->getSourceRange());
-    vd->emitLetToVarNoteIfSimple(CS.DC);
+    VD->emitLetToVarNoteIfSimple(CS.DC);
     return true;
   }
 
   // If the underlying expression was a read-only subscript, diagnose that.
-  if (immInfo.second && isa<SubscriptDecl>(immInfo.second)) {
-    TC.diagnose(loc, diagID, "subscript is get-only")
+  if (auto *SD = dyn_cast_or_null<SubscriptDecl>(immInfo.second)) {
+    StringRef message;
+    if (!SD->getSetter())
+      message = "subscript is get-only";
+    else if (!SD->isSetterAccessibleFrom(CS.DC))
+      message = "subscript setter is inaccessible";
+    else
+      message = "subscript is immutable";
+
+    TC.diagnose(loc, diagID, message)
       .highlight(immInfo.first->getSourceRange());
     return true;
   }
@@ -1926,6 +1946,7 @@ void FailureDiagnosis::diagnoseAssignmentFailure(Expr *dest, Type destTy,
 
   // Otherwise, we have an invalid destination type.  Give a specific diagnostic
   // depending on what we're assigning to.
+#if 1
   if (auto *DRE = dyn_cast<DeclRefExpr>(dest))
     if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
       Diag<Identifier> d;
@@ -1944,42 +1965,22 @@ void FailureDiagnosis::diagnoseAssignmentFailure(Expr *dest, Type destTy,
       VD->emitLetToVarNoteIfSimple(CS.DC);
       return;
     }
+#endif
+  
+  // Special case known-reasonable lvalues.
+  if (isa<ForceValueExpr>(dest) || isa<SubscriptExpr>(dest)) {
+    auto immInfo = resolveImmutableBase(dest, CS);
 
-  // Special case assignment into "some.optional!"
-  if (auto *FVE = dyn_cast<ForceValueExpr>(dest)) {
-    auto immInfo = resolveImmutableBase(FVE, CS);
-
-    // Diagnose the case when the failure was due to a determinable subelement.
-    if (diagnoseSubElementFailure(immInfo, equalLoc, CS,
-                            diag::assignment_bang_has_immutable_subcomponent))
-      return;
-  }
-
-  // Provide specific diagnostics for assignment to subscripts whose base expr
-  // is known to be an rvalue.
-  if (auto *SE = dyn_cast<SubscriptExpr>(dest)) {
-    auto immInfo = resolveImmutableBase(SE, CS);
-
-    // If the subscript itself is broken, and it is because the subscript has
-    // no setter, emit a specific error.
-    if (immInfo.first == SE && immInfo.second) {
-      auto *SD = cast<SubscriptDecl>(immInfo.second);
-      
-      if (!SD->getSetter()) {
-        TC.diagnose(equalLoc, diag::assignment_get_only_subscript)
-          .highlight(SE->getBase()->getSourceRange());
-        return;
-      }
-      if (!SD->isSetterAccessibleFrom(CS.DC)) {
-        TC.diagnose(equalLoc, diag::assignment_inaccessible_subscript)
-          .highlight(SE->getBase()->getSourceRange());
-        return;
-      }
+    Diag<StringRef> diagID;
+    if (isa<ForceValueExpr>(dest))
+      diagID = diag::assignment_bang_has_immutable_subcomponent;
+    else {
+      assert(isa<SubscriptExpr>(dest));
+      diagID = diag::assignment_subscript_has_immutable_base;
     }
-
+    
     // Diagnose the case when the failure was due to a determinable subelement.
-    if (diagnoseSubElementFailure(immInfo, equalLoc, CS,
-                                diag::assignment_subscript_has_immutable_base))
+    if (diagnoseSubElementFailure(immInfo, equalLoc, CS, diagID))
       return;
   }
 
@@ -2115,28 +2116,10 @@ bool FailureDiagnosis::diagnoseFailureForBinaryExpr() {
     if (allAreLValues) {
       // Ok, that's the problem.  Special case it further based on what the
       // actual expression is.
-      auto LeftArg = argExpr->getElement(0)->getSemanticsProvidingExpr();
-      if (auto *DRE = dyn_cast<DeclRefExpr>(LeftArg))
-        if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
-          unsigned DiagCase;
-          
-          if (VD->isLet())
-            DiagCase = 0;
-          else if (VD->hasAccessorFunctions() && !VD->getSetter())
-            DiagCase = 1;
-          else
-            DiagCase = 2;
-          
-          CS->TC.diagnose(binop->getLoc(),
-                          diag::cannot_apply_lvalue_binop_to_rvalue_vardecl,
-                          overloadName, VD->getName(), DiagCase)
-            .highlight(LeftArg->getSourceRange());
-          VD->emitLetToVarNoteIfSimple(CS->DC);
-          return true;
-        }
+      auto LeftArg = argExpr->getElement(0);
 
       // Figure out what part of the subexpression is the problem.
-      auto immInfo = resolveImmutableBase(argExpr->getElement(0), *CS);
+      auto immInfo = resolveImmutableBase(LeftArg, *CS);
 
       // Diagnose the case when the failure was due to a determinable
       // sub-expression.
@@ -2237,28 +2220,7 @@ bool FailureDiagnosis::diagnoseFailureForUnaryExpr() {
     if (allAreLValues) {
       // Ok, that's the problem.  Special case it further based on what the
       // actual expression is.
-      auto arg = argExpr->getSemanticsProvidingExpr();
-      if (auto *DRE = dyn_cast<DeclRefExpr>(arg))
-        if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
-          unsigned DiagCase;
-          
-          if (VD->isLet())
-            DiagCase = 0;
-          else if (VD->hasAccessorFunctions() && !VD->getSetter())
-            DiagCase = 1;
-          else
-            DiagCase = 2;
-          
-          CS->TC.diagnose(argExpr->getLoc(),
-                          diag::cannot_apply_lvalue_unop_to_rvalue_vardecl,
-                          overloadName, VD->getName(), DiagCase);
-          VD->emitLetToVarNoteIfSimple(CS->DC);
-          return true;
-        }
-
-
-      // Figure out what part of the subexpression is the problem.
-      auto immInfo = resolveImmutableBase(arg, *CS);
+      auto immInfo = resolveImmutableBase(argExpr, *CS);
 
       // Diagnose the case when the failure was due to a determinable
       // sub-expression.
@@ -2597,22 +2559,6 @@ bool FailureDiagnosis::diagnoseFailureForInOutExpr() {
   
   // The common cause is that the operand is not an lvalue.
   if (!subExprType->isLValueType()) {
-    if (auto DRE = dyn_cast<DeclRefExpr>(addressedExpr))
-      if (auto VD = dyn_cast<VarDecl>(DRE->getDecl())) {
-        unsigned DiagCase;
-        if (VD->isLet())
-          DiagCase = 0;
-        else if (VD->hasAccessorFunctions() && !VD->getSetter())
-          DiagCase = 1;
-        else
-          DiagCase = 2;
-
-        CS->TC.diagnose(DRE->getLoc(), diag::cannot_pass_rvalue_vardecl_inout,
-                        VD->getName(), DiagCase);
-        VD->emitLetToVarNoteIfSimple(CS->DC);
-        return true;
-      }
-
     // Figure out what part of the subexpression is the problem.
     auto immInfo = resolveImmutableBase(addressedExpr, *CS);
 

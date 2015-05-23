@@ -249,13 +249,13 @@ func almostSubscriptableKeyMismatch(bc: BadCollection, key: NSString) {
 func almostSubscriptableKeyMismatchInherited(bc: BadCollectionChild,
                                              key: String) {
   var value : AnyObject = bc[key] // no-warning, inherited from parent
-  bc[key] = value // expected-error{{cannot assign to a get-only subscript}}
+  bc[key] = value // expected-error{{cannot assign through subscript: subscript is get-only}}
 }
 
 func almostSubscriptableKeyMismatchInherited(roc: ReadOnlyCollectionChild,
                                              key: String) {
   var value : AnyObject = roc[key] // no-warning, inherited from parent
-  roc[key] = value // expected-error{{cannot assign to a get-only subscript}}
+  roc[key] = value // expected-error{{cannot assign through subscript: subscript is get-only}}
 }
 
 // Use of 'Class' via dynamic lookup.

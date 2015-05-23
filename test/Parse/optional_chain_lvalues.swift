@@ -29,8 +29,8 @@ mutT?.mutS?.x++
 mutT?.mutS?.y++ // expected-error{{could not find an overload for '++' that accepts the supplied arguments}}
 
 // Prefix operators don't chain
-++mutT?.mutS?.x // expected-error{{cannot pass immutable value of type 'Int?' to mutating unary operator '++'}}
-++mutT?.mutS?.y // expected-error{{cannot pass immutable value of type 'Int?' to mutating unary operator '++'}}
+++mutT?.mutS?.x // expected-error{{cannot pass immutable value of type 'Int?' to mutating operator '++'}}
+++mutT?.mutS?.y // expected-error{{cannot pass immutable value of type 'Int?' to mutating operator '++'}}
 
 // TODO: assignment operators
 mutT? = T()

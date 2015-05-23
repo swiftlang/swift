@@ -143,7 +143,7 @@ func testIntSubscripting(inout i_s: IntSubscriptable,
                          ids: IsDoubleSubscriptable,
                          iiss: IsIntToStringSubscriptable) {
   var x = i_s[17]
-  i_s[5] = 7 // expected-error{{cannot assign to a get-only subscript}}
+  i_s[5] = 7 // expected-error{{cannot assign through subscript: subscript is get-only}}
 
   i_s = iis
   i_s = ids // expected-error{{cannot assign a value of type 'IsDoubleSubscriptable' to a value of type 'IntSubscriptable'}}

@@ -25,17 +25,17 @@ mutT!.mutS! = S()
 mutT!.mutS!.x = 0
 mutT!.mutS!.y = 0 // expected-error{{cannot assign to 'let' property 'y'}}
 mutT!.immS = S() // expected-error{{cannot assign to 'let' property 'immS'}}
-mutT!.immS! = S() // expected-error{{cannot assign through '!': 'immS' is immutable}}
+mutT!.immS! = S() // expected-error{{cannot assign through '!': 'immS' is a 'let' constant}}
 mutT!.immS!.x = 0 // expected-error{{cannot assign to 'x': 'immS' is immutable}}
 mutT!.immS!.y = 0 // expected-error{{cannot assign to 'let' property 'y'}}
 
-immT! = T() // expected-error{{cannot assign through '!': 'immT' is immutable}}
+immT! = T() // expected-error{{cannot assign through '!': 'immT' is a 'let' constant}}
 immT!.mutS = S() // expected-error{{cannot assign to 'mutS': 'immT' is immutable}}
-immT!.mutS! = S() // expected-error{{cannot assign through '!': 'immT' is immutable}}
+immT!.mutS! = S() // expected-error{{cannot assign through '!': 'immT' is a 'let' constant}}
 immT!.mutS!.x = 0 // expected-error{{cannot assign to 'x': 'immT' is immutable}}
 immT!.mutS!.y = 0 // expected-error{{cannot assign to 'let' property 'y'}}
 immT!.immS = S() // expected-error{{cannot assign to 'let' property 'immS'}}
-immT!.immS! = S() // expected-error{{cannot assign through '!': 'immS' is immutable}}
+immT!.immS! = S() // expected-error{{cannot assign through '!': 'immS' is a 'let' constant}}
 immT!.immS!.x = 0 // expected-error{{cannot assign to 'x': 'immS' is immutable}}
 immT!.immS!.y = 0 // expected-error{{cannot assign to 'let' property 'y'}}
 
