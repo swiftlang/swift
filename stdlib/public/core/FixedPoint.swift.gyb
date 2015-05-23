@@ -85,8 +85,12 @@ public protocol _SignedIntegerType : _IntegerType, SignedNumberType {
 public protocol SignedIntegerType : _SignedIntegerType, IntegerType {
 }
 
-/// A set of common requirements for Swift's unsigned integer types.
-public protocol UnsignedIntegerType : _IntegerType, IntegerType {
+/// This protocol is an implementation detail of `SignedIntegerType`;
+/// do not use it directly.
+///
+/// Its requirements are inherited by `SignedIntegerType` and thus
+/// must be satisfied by types conforming to that protocol.
+public protocol _UnsignedIntegerType : _IntegerType {
   // Used to create a deliberate ambiguity in cases like UInt(1) +
   // Int(1), which would otherwise compile due to the arithmetic
   // operators defined for Strideable types (unsigned types are
@@ -100,6 +104,10 @@ public protocol UnsignedIntegerType : _IntegerType, IntegerType {
   /// Convert from Swift's widest unsigned integer type, trapping on
   /// overflow.
   init(UIntMax)
+}
+
+/// A set of common requirements for Swift's unsigned integer types.
+public protocol UnsignedIntegerType : _UnsignedIntegerType, IntegerType {
 }
 
 /// Convert `x` to type `U`, trapping on overflow in -Onone and -O
@@ -125,7 +133,7 @@ public func numericCast<
 ///     func f(x: UInt32) {}
 ///     func g(x: UInt64) { f(numericCast(x)) }
 public func numericCast<
-  T : UnsignedIntegerType, U : UnsignedIntegerType
+  T : _UnsignedIntegerType, U : _UnsignedIntegerType
 >(x: T) -> U {
   return U(x.toUIntMax())
 }
@@ -139,7 +147,7 @@ public func numericCast<
 ///     func f(x: UInt32) {}
 ///     func g(x: Int64) { f(numericCast(x)) }
 public func numericCast<
-  T : _SignedIntegerType, U : UnsignedIntegerType
+  T : _SignedIntegerType, U : _UnsignedIntegerType
 >(x: T) -> U {
   return U(UIntMax(x.toIntMax()))
 }
@@ -153,7 +161,7 @@ public func numericCast<
 ///     func f(x: Int32) {}
 ///     func g(x: UInt64) { f(numericCast(x)) }
 public func numericCast<
-T : UnsignedIntegerType, U : _SignedIntegerType
+T : _UnsignedIntegerType, U : _SignedIntegerType
 >(x: T) -> U {
   return U(IntMax(x.toUIntMax()))
 }
