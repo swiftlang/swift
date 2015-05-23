@@ -285,6 +285,8 @@ private:
 
   /// Tracks macro definitions from the bridging header.
   std::vector<clang::IdentifierInfo *> BridgeHeaderMacros;
+  /// Tracks included headers from the bridging header.
+  llvm::DenseSet<const clang::FileEntry *> BridgeHeaderFiles;
 
   /// The active type checker, or null if there is no active type checker.
   ///

@@ -554,17 +554,20 @@ class BridgingPPTracker : public clang::PPCallbacks {
   DeclContext *SwiftDC;
   std::vector<ImportDecl *> &BridgeHeaderTopLevelImports;
   std::vector<clang::IdentifierInfo *> &BridgeHeaderMacros;
+  llvm::DenseSet<const clang::FileEntry *> &BridgeHeaderFiles;
 
 public:
   BridgingPPTracker(clang::ASTContext &ClangCtx,
                     DeclContext *SwiftDC,
                     std::vector<ImportDecl *> &BridgeHeaderTopLevelImports,
-      std::vector<clang::IdentifierInfo *> &BridgeHeaderMacros)
+      std::vector<clang::IdentifierInfo *> &BridgeHeaderMacros,
+                    llvm::DenseSet<const clang::FileEntry *> &BridgeHeaderFiles)
   : ClangCtx(ClangCtx),
     SwiftCtx(SwiftDC->getASTContext()),
     SwiftDC(SwiftDC),
     BridgeHeaderTopLevelImports(BridgeHeaderTopLevelImports),
-    BridgeHeaderMacros(BridgeHeaderMacros) {}
+    BridgeHeaderMacros(BridgeHeaderMacros),
+    BridgeHeaderFiles(BridgeHeaderFiles) {}
 
 private:
   static unsigned getNumModuleIdentifiers(const clang::Module *Mod) {
@@ -585,8 +588,11 @@ private:
                           StringRef SearchPath,
                           StringRef RelativePath,
                           const clang::Module *Imported) override {
-    if (!Imported)
+    if (!Imported) {
+      if (File)
+        BridgeHeaderFiles.insert(File);
       return;
+    }
     // Synthesize identifier locations.
     SmallVector<clang::SourceLocation, 4> IdLocs;
     for (unsigned I = 0, E = getNumModuleIdentifiers(Imported); I != E; ++I)
@@ -645,7 +651,8 @@ void ClangImporter::Implementation::importHeader(
     auto ppTracker = llvm::make_unique<BridgingPPTracker>(ClangCtx,
                                                           adapter,
                                                     BridgeHeaderTopLevelImports,
-                                                    BridgeHeaderMacros);
+                                                    BridgeHeaderMacros,
+                                                    BridgeHeaderFiles);
     pp.addPPCallbacks(std::move(ppTracker));
   }
   
@@ -2302,6 +2309,85 @@ void ClangImporter::lookupBridgingHeaderDecls(
         receiver(imported);
     }
   }
+}
+
+bool ClangImporter::lookupDeclsFromHeader(StringRef Filename,
+                              llvm::function_ref<bool(ClangNode)> filter,
+                              llvm::function_ref<void(Decl*)> receiver) const {
+  const clang::FileEntry *File =
+    getClangPreprocessor().getFileManager().getFile(Filename);
+  if (!File)
+    return true;
+
+  ASTContext &Ctx = Impl.SwiftContext;
+  auto &ClangCtx = getClangASTContext();
+  auto &ClangSM = ClangCtx.getSourceManager();
+  auto &ClangPP = getClangPreprocessor();
+
+  // Look up the header in the includes of the bridging header.
+  if (Impl.BridgeHeaderFiles.count(File)) {
+    auto headerFilter = [&](ClangNode ClangN) -> bool {
+      if (ClangN.isNull())
+        return false;
+
+      auto ClangLoc = ClangSM.getFileLoc(ClangN.getLocation());
+      if (ClangLoc.isInvalid())
+        return false;
+
+      return ClangSM.getFileEntryForID(ClangSM.getFileID(ClangLoc)) == File;
+    };
+
+    lookupBridgingHeaderDecls(headerFilter, receiver);
+    return false;
+  }
+
+  clang::FileID FID = ClangSM.translateFile(File);
+  if (FID.isInvalid())
+    return false;
+
+  // Look up the header in the ASTReader.
+  if (ClangSM.isLoadedFileID(FID)) {
+    // Decls.
+    SmallVector<clang::Decl *, 32> Decls;
+    unsigned Length = ClangSM.getFileIDSize(FID);
+    ClangCtx.getExternalSource()->FindFileRegionDecls(FID, 0, Length, Decls);
+    for (auto *ClangD : Decls) {
+      if (filter(ClangD)) {
+        if (auto *ND = dyn_cast<clang::NamedDecl>(ClangD)) {
+          if (Decl *imported = Impl.importDeclReal(ND))
+            receiver(imported);
+        }
+      }
+    }
+
+    // Macros.
+    if (auto *ppRec = ClangPP.getPreprocessingRecord()) {
+      clang::SourceLocation B = ClangSM.getLocForStartOfFile(FID);
+      clang::SourceLocation E = ClangSM.getLocForEndOfFile(FID);
+      clang::SourceRange R(B, E);
+      const auto &Entities = ppRec->getPreprocessedEntitiesInRange(R);
+      for (auto I = Entities.begin(), E = Entities.end(); I != E; ++I) {
+        if (!ppRec->isEntityInFileID(I, FID))
+          continue;
+        clang::PreprocessedEntity *PPE = *I;
+        if (!PPE)
+          continue;
+        if (auto *MD = dyn_cast<clang::MacroDefinition>(PPE)) {
+          auto *II = const_cast<clang::IdentifierInfo*>(MD->getName());
+          if (auto *MI = ClangPP.getMacroInfo(II)) {
+            Identifier Name = Ctx.getIdentifier(II->getName());
+            if (Decl *imported = Impl.importMacro(Name, MI))
+              receiver(imported);
+          }
+        }
+      }
+
+      // FIXME: Module imports inside that header.
+    }
+    return false;
+  }
+
+  return true; // no info found about that header.
 }
 
 void ClangImporter::lookupVisibleDecls(VisibleDeclConsumer &Consumer) const {

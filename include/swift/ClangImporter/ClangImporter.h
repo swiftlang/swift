@@ -130,6 +130,22 @@ public:
   void lookupBridgingHeaderDecls(llvm::function_ref<bool(ClangNode)> filter,
                                 llvm::function_ref<void(Decl*)> receiver) const;
 
+  /// Look for declarations from a particular header. The header may be part of
+  /// a clang module or included from the bridging header.
+  ///
+  /// \param filename path to the header
+  /// \param filter returns true if the given clang decl/macro should be
+  /// imported and fed to the consumer
+  /// \param receiver will be fed decls as they are found and imported.
+  ///
+  /// \c receiver is not a VisibleDeclConsumer so that it is not limited to
+  /// accepting ValueDecls only.
+  ///
+  /// \returns true if there was a problem, e.g. the file does not exist.
+  bool lookupDeclsFromHeader(StringRef filename,
+                             llvm::function_ref<bool(ClangNode)> filter,
+                             llvm::function_ref<void(Decl*)> receiver) const;
+
   /// \brief Load extensions to the given nominal type.
   ///
   /// \param nominal The nominal type whose extensions should be loaded.

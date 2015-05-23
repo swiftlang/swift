@@ -406,18 +406,9 @@ void swift::ide::printHeaderInterface(
 
   auto &Importer = static_cast<ClangImporter &>(*Ctx.getClangModuleLoader());
   auto &ClangSM = Importer.getClangASTContext().getSourceManager();
-  const clang::FileEntry *File =
-    Importer.getClangPreprocessor().getFileManager().getFile(Filename);
 
   auto headerFilter = [&](ClangNode ClangN) -> bool {
-    if (ClangN.isNull())
-      return false;
-
-    auto ClangLoc = ClangSM.getFileLoc(ClangN.getLocation());
-    if (ClangLoc.isInvalid())
-      return false;
-
-    return ClangSM.getFileEntryForID(ClangSM.getFileID(ClangLoc)) == File;
+    return true; // no need for filtering.
   };
 
   SmallVector<Decl *, 32> ClangDecls;
@@ -429,7 +420,7 @@ void swift::ide::printHeaderInterface(
     ClangDecls.push_back(D);
   };
 
-  Importer.lookupBridgingHeaderDecls(headerFilter, headerReceiver);
+  Importer.lookupDeclsFromHeader(Filename, headerFilter, headerReceiver);
 
   // Sort imported declarations in source order.
   std::sort(ClangDecls.begin(), ClangDecls.end(),

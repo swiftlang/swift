@@ -285,6 +285,11 @@ bool ide::initInvocationByClangArguments(ArrayRef<const char *> ArgList,
     CCArgs.push_back(ClangInvok->getLangOpts()->ImplementationOfModule);
   }
 
+  if (PPOpts.DetailedRecord) {
+    CCArgs.push_back("-Xclang");
+    CCArgs.push_back("-detailed-preprocessing-record");
+  }
+
   if (!ClangInvok->getFrontendOpts().Inputs.empty()) {
     Invok.getFrontendOptions().ImplicitObjCHeaderPath =
       ClangInvok->getFrontendOpts().Inputs[0].getFile();
