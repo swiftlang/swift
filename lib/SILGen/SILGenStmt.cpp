@@ -200,16 +200,21 @@ void StmtEmitter::visitBraceStmt(BraceStmt *S) {
   
   for (auto &ESD : S->getElements()) {
     
-    if (auto S = ESD.dyn_cast<Stmt*>()) {
-      if (isa<IfConfigStmt>(S)) {
+    if (auto S = ESD.dyn_cast<Stmt*>())
+      if (isa<IfConfigStmt>(S))
         continue;
-      }
-    }
     
     // If we ever reach an unreachable point, stop emitting statements and issue
-    // an unreachable code diagnostic. This will need revision if we ever add
-    // goto.
+    // an unreachable code diagnostic.
     if (!SGF.B.hasValidInsertionPoint()) {
+      // If this is an implicit statement or expression, just skip over it,
+      // don't emit a diagnostic here.
+      if (Stmt *S = ESD.dyn_cast<Stmt*>()) {
+        if (S->isImplicit()) continue;
+      } else if (Expr *E = ESD.dyn_cast<Expr*>()) {
+        if (E->isImplicit()) continue;
+      }
+      
       if (StmtType != UnknownStmtType) {
         diagnose(getASTContext(), ESD.getStartLoc(),
                  diag::unreachable_code_after_stmt, StmtType);

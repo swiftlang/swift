@@ -116,4 +116,8 @@ func testUnreachableAfterThrow(e : ErrorType) throws {
   return   // expected-warning {{code after 'throw' will never be executed}}
 }
 
-
+class TestThrowInInit {
+  required init(e : ErrorType) throws {
+    throw e  // no unreachable code diagnostic for the implicit return.
+  }
+}
