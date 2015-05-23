@@ -229,7 +229,7 @@ func accessUnavailableProperties(o: ClassWithUnavailableProperties) { // expecte
   o.availableOn10_9Stored = 9
   
   // We don't support unavailable optionals as lvals yet.
-  o.availableOn10_10Stored = 10 // expected-error {{cannot assign to property: 'o' is a 'let' constant}}
+  o.availableOn10_10Stored = 10 // expected-error {{cannot assign to 'availableOn10_10Stored': 'o' is immutable}}
   
   // Computed Properties
   let _: Int = o.availableOn10_9Computed
@@ -240,5 +240,5 @@ func accessUnavailableProperties(o: ClassWithUnavailableProperties) { // expecte
   o.availableOn10_9Computed = 9
   
   // We don't support unavailable optionals as lvals yet.
-  o.availableOn10_10Computed = 10 // expected-error {{cannot assign to property: 'o' is a 'let' constant}}
+  o.availableOn10_10Computed = 10 // expected-error {{cannot assign to 'availableOn10_10Computed': 'o' is immutable}}
 }

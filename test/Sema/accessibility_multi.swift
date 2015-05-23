@@ -10,7 +10,7 @@ func testGlobals() {
 
 func testProperties(var instance: Members) {
   read(instance.privateSetProp)
-  instance.privateSetProp = 42 // expected-error {{cannot assign to property: 'privateSetProp' setter is inaccessible}}
+  instance.privateSetProp = 42 // expected-error {{cannot assign to property 'privateSetProp' with inaccessible setter}}
   reset(&instance.privateSetProp) // expected-error {{cannot pass immutable value as inout argument: 'privateSetProp' setter is inaccessible}}
 }
 

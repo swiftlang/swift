@@ -34,7 +34,7 @@ func test1() {
   var s: String 
   
   v1.setTitle(s)
-  v1.creator = "Me"                   // expected-error {{cannot assign to property: 'creator' is a get-only property}}
+  v1.creator = "Me"                   // expected-error {{cannot assign to a get-only property 'creator'}}
 }
 
 protocol Bogus : Int {} // expected-error{{inheritance from non-protocol type 'Int'}}

@@ -176,7 +176,7 @@ obj.generic4!(5) // expected-error{{'Id' does not have a member named 'generic4'
 // Find properties via dynamic lookup.
 var prop1Result : Int = obj.prop1!
 var prop2Result : String = obj.prop2!
-obj.prop2 = "hello" // expected-error{{cannot assign to property: 'obj' is immutable}}
+obj.prop2 = "hello" // expected-error{{cannot assign to 'prop2': 'obj' is immutable}}
 var protoPropResult : Int = obj.protoProp!
 
 // Find subscripts via dynamic lookup

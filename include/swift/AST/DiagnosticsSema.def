@@ -1673,20 +1673,25 @@ ERROR(assignment_lhs_not_lvalue,sema_tcs,none,
       "cannot assign to expression with non-lvalue type %0", (Type))
 ERROR(assignment_lhs_is_let,sema_tcs,none,
       "cannot assign to 'let' value %0", (Identifier))
+ERROR(assignment_get_only_property,sema_tcs,none,
+      "cannot assign to a get-only property %0", (Identifier))
+ERROR(assignment_inaccessible_property,sema_tcs,none,
+      "cannot assign to property %0 with inaccessible setter", (Identifier))
 
 ERROR(assignment_to_self,sema_tcs,none,
       "cannot assign to %0 in a method", (Identifier))
 ERROR(assignment_lhs_setter_inaccessible,sema_tcs,none,
       "cannot assign to %0: setter is inaccessible", (Identifier))
-ERROR(assignment_get_only_property,sema_tcs,none,
-      "cannot assign to a get-only property %0", (Identifier))
 
 ERROR(assignment_lhs_is_vardecl,sema_tcs,none,
       "cannot assign to %0", (Identifier))
 
-ERROR(assignment_lhs_is_immutable_property,sema_tcs,none,
-      "cannot assign to property: %0", (StringRef))
+ERROR(assignment_lhs_is_let_property,sema_tcs,none,
+      "cannot assign to 'let' property %0", (Identifier))
 
+ERROR(assignment_property_has_immutable_base,sema_tcs,none,
+      "cannot assign to %0: %1 is immutable",
+      (Identifier, Identifier))
 ERROR(assignment_subscript_has_immutable_base,sema_tcs,none,
       "cannot assign through subscript: %0", (StringRef))
 ERROR(assignment_bang_has_immutable_subcomponent,sema_tcs,none,
@@ -1695,6 +1700,14 @@ ERROR(assignment_bang_has_immutable_subcomponent,sema_tcs,none,
 NOTE(change_to_mutating,sema_tcs,none,
      "mark %select{method|accessor}0 'mutating' to make 'self' mutable",
      (bool))
+
+ERROR(assignment_ude_expr_subbase,sema_tcs,none,
+      "cannot assign to %0: base subscript is get-only",
+      (Identifier))
+
+ERROR(assignment_ude_expr,sema_tcs,none,
+     "cannot assign to %0, base has immutable type %1",
+     (Identifier, Type))
 
 // ForEach Stmt
 ERROR(sequence_protocol_broken,sema_tcs,none,

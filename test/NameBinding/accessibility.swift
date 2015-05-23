@@ -58,13 +58,13 @@ PrivateInit() // expected-error {{'PrivateInit' cannot be constructed because it
 // TESTABLE: :[[@LINE-1]]:{{[^:]+}}: error: 'PrivateInit' cannot be constructed because it has no accessible initializers
 
 var s = StructWithPrivateSetter()
-s.x = 42 // expected-error {{cannot assign to property: 'x' setter is inaccessible}}
+s.x = 42 // expected-error {{cannot assign to property 'x' with inaccessible setter}}
 
 class Sub : Base {
   func test() {
-    value = 4 // expected-error {{cannot assign to property: 'value' setter is inaccessible}}
-    self.value = 4 // expected-error {{cannot assign to property: 'value' setter is inaccessible}}
-    super.value = 4 // expected-error {{cannot assign to property: 'value' setter is inaccessible}}
+    value = 4 // expected-error {{cannot assign to property 'value' with inaccessible setter}}
+    self.value = 4 // expected-error {{cannot assign to property 'value' with inaccessible setter}}
+    super.value = 4 // expected-error {{cannot assign to property 'value' with inaccessible setter}}
     // TESTABLE-NOT: :[[@LINE-3]]:{{[^:]+}}:
     // TESTABLE-NOT: :[[@LINE-3]]:{{[^:]+}}:
     // TESTABLE-NOT: :[[@LINE-3]]:{{[^:]+}}:
@@ -87,7 +87,7 @@ class ObservingOverrider : Base {
 class ReplacingOverrider : Base {
   override var value: Int {
     get { return super.value }
-    set { super.value = newValue } // expected-error {{cannot assign to property: 'value' setter is inaccessible}}
+    set { super.value = newValue } // expected-error {{cannot assign to property 'value' with inaccessible setter}}
   }
 }
 

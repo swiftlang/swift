@@ -5,6 +5,6 @@ import Foundation
 
 class RV {
 	init() {
-		NSPrefixWordBreak2.BreakBarBas.rawValue = 0 // expected-error{{cannot assign to property: 'rawValue' is immutable}}
+		NSPrefixWordBreak2.BreakBarBas.rawValue = 0 // expected-error{{cannot assign to a get-only property 'rawValue'}}
 	}
 }
