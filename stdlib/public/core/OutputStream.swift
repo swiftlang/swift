@@ -16,19 +16,18 @@ import SwiftShims // for putchar
 // Input/Output interfaces
 //===----------------------------------------------------------------------===//
 
-public protocol _OutputStreamDefaultsType {}
-extension _OutputStreamDefaultsType {
-  final public mutating func _lock() {}
-  final public mutating func _unlock() {}
-}
-
 /// A target of text streaming operations.
-public protocol OutputStreamType : _OutputStreamDefaultsType {
+public protocol OutputStreamType {
   mutating func _lock()
   mutating func _unlock()
 
   /// Append the given `string` to this stream.
   mutating func write(string: String)
+}
+
+extension OutputStreamType {
+  final public mutating func _lock() {}
+  final public mutating func _unlock() {}
 }
 
 /// A source of text streaming operations.  `Streamable` instances can
