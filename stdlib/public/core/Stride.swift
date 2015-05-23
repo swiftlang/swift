@@ -84,27 +84,27 @@ public func -= <T : Strideable> (inout lhs: T, rhs: T.Stride) {
 // overloads, expressions such as UInt(2) + Int(3) would compile.             //
 //===----------------------------------------------------------------------===//
 
-public func + <T : _UnsignedIntegerType> (lhs: T, rhs: T._DisallowMixedSignArithmetic) -> T {
+public func + <T : UnsignedIntegerType> (lhs: T, rhs: T._DisallowMixedSignArithmetic) -> T {
   _sanityCheckFailure("Should not be callable.")
 }
 
-public func + <T : _UnsignedIntegerType> (lhs: T._DisallowMixedSignArithmetic, rhs: T) -> T {
+public func + <T : UnsignedIntegerType> (lhs: T._DisallowMixedSignArithmetic, rhs: T) -> T {
   _sanityCheckFailure("Should not be callable.")
 }
 
-public func - <T : _UnsignedIntegerType> (lhs: T, rhs: T._DisallowMixedSignArithmetic) -> T {
+public func - <T : UnsignedIntegerType> (lhs: T, rhs: T._DisallowMixedSignArithmetic) -> T {
   _sanityCheckFailure("Should not be callable.")
 }
 
-public func - <T : _UnsignedIntegerType> (lhs: T, rhs: T) -> T._DisallowMixedSignArithmetic {
+public func - <T : UnsignedIntegerType> (lhs: T, rhs: T) -> T._DisallowMixedSignArithmetic {
   _sanityCheckFailure("Should not be callable.")
 }
 
-public func += <T : _UnsignedIntegerType> (inout lhs: T, rhs: T._DisallowMixedSignArithmetic) {
+public func += <T : UnsignedIntegerType> (inout lhs: T, rhs: T._DisallowMixedSignArithmetic) {
   _sanityCheckFailure("Should not be callable.")
 }
 
-public func -= <T : _UnsignedIntegerType> (inout lhs: T, rhs: T._DisallowMixedSignArithmetic) {
+public func -= <T : UnsignedIntegerType> (inout lhs: T, rhs: T._DisallowMixedSignArithmetic) {
   _sanityCheckFailure("Should not be callable.")
 }
 
