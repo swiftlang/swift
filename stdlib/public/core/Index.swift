@@ -283,12 +283,10 @@ public func ~> <T : BidirectionalIndexType>(
 
 //===----------------------------------------------------------------------===//
 //===--- RandomAccessIndexType --------------------------------------------===//
-/// This protocol is an implementation detail of `RandomAccessIndexType`; do
-/// not use it directly.
-///
-/// Its requirements are inherited by `RandomAccessIndexType` and thus must
-/// be satisfied by types conforming to that protocol.
-public protocol _RandomAccessIndexType : BidirectionalIndexType, Strideable {
+
+/// An *index* that can be offset by an arbitrary number of positions,
+/// and can measure the distance to any reachable value, in O(1).
+public protocol RandomAccessIndexType : BidirectionalIndexType, Strideable {
   /// Return the minimum number of applications of `successor` or
   /// `predecessor` required to reach `other` from `self`.
   ///
@@ -318,18 +316,11 @@ public protocol _RandomAccessIndexType : BidirectionalIndexType, Strideable {
   func advancedBy(n: Distance) -> Self
 }
 
-/// An *index* that can be offset by an arbitrary number of positions,
-/// and can measure the distance to any reachable value, in O(1).
-public protocol RandomAccessIndexType
-  : BidirectionalIndexType, _RandomAccessIndexType {
-  /* typealias Distance : IntegerArithmeticType*/
-}
-
 // advance and distance implementations
 
 /// Do not use this operator directly; call distance(start, end) instead.
 @transparent
-public func ~> <T : _RandomAccessIndexType>(start:T, rest:(_Distance, (T)))
+public func ~> <T : RandomAccessIndexType>(start:T, rest:(_Distance, (T)))
 -> T.Distance {
   let end = rest.1
   return start.distanceTo(end)
@@ -337,7 +328,7 @@ public func ~> <T : _RandomAccessIndexType>(start:T, rest:(_Distance, (T)))
 
 /// Do not use this operator directly; call advance(start, n) instead.
 @transparent
-public func ~> <T : _RandomAccessIndexType>(
+public func ~> <T : RandomAccessIndexType>(
   start:T, rest:(_Advance, (T.Distance))
 ) -> T {
   let n = rest.1
@@ -346,7 +337,7 @@ public func ~> <T : _RandomAccessIndexType>(
 
 /// Do not use this operator directly; call advance(start, n, end) instead.
 @transparent
-public func ~> <T : _RandomAccessIndexType>(
+public func ~> <T : RandomAccessIndexType>(
   start:T, rest:(_Advance, (T.Distance, T))
 ) -> T {
   let n = rest.1.0
