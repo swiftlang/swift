@@ -69,38 +69,24 @@ public func _advance<D, I>(n: D, _ end: I) -> (_Advance, (D, I)) {
 //===----------------------------------------------------------------------===//
 //===--- ForwardIndexType -------------------------------------------------===//
 
-// Protocols with default implementations are broken into two parts, a
-// base and a more-refined part.  From the user's point-of-view,
-// however, _ForwardIndexType and ForwardIndexType should look like a single
-// protocol.  This technique gets used throughout the standard library
-// to break otherwise-cyclic protocol dependencies, which the compiler
-// isn't yet smart enough to handle.
-
 /// This protocol is an implementation detail of `ForwardIndexType`; do
 /// not use it directly.
 ///
 /// Its requirements are inherited by `ForwardIndexType` and thus must
 /// be satisfied by types conforming to that protocol.
-public protocol _IncrementableDefaultsType {
+public protocol _Incrementable : Equatable {
   /// Return the next consecutive value in a discrete sequence of
   /// `Self` values.
   ///
   /// - Requires: `self` has a well-defined successor.
   func successor() -> Self
+
+  mutating func _successorInPlace()
 }
 
-extension _IncrementableDefaultsType {
+extension _Incrementable {
   @inline(__always)
   final public mutating func _successorInPlace() { self = self.successor() }
-}
-
-/// This protocol is an implementation detail of `ForwardIndexType`; do
-/// not use it directly.
-///
-/// Its requirements are inherited by `ForwardIndexType` and thus must
-/// be satisfied by types conforming to that protocol.
-public protocol _Incrementable : Equatable, _IncrementableDefaultsType {
-  mutating func _successorInPlace()
 }
 
 //===----------------------------------------------------------------------===//
@@ -218,12 +204,10 @@ func _advanceForward<T : ForwardIndexType>(
 
 //===----------------------------------------------------------------------===//
 //===--- BidirectionalIndexType -------------------------------------------===//
+
 /// This protocol is an implementation detail of `BidirectionalIndexType`; do
 /// not use it directly.
-///
-/// Its requirements are inherited by `BidirectionalIndexType` and thus must
-/// be satisfied by types conforming to that protocol.
-public protocol _BidirectionalIndexDefaultsType : ForwardIndexType {
+public protocol _BidirectionalIndexType : ForwardIndexType {
   /// Return the previous consecutive value in a discrete sequence.
   ///
   /// If `self` has a well-defined successor,
@@ -233,18 +217,13 @@ public protocol _BidirectionalIndexDefaultsType : ForwardIndexType {
   ///
   /// - Requires: `self` has a well-defined predecessor.
   func predecessor() -> Self
+
+  mutating func _predecessorInPlace()
 }
 
-extension _BidirectionalIndexDefaultsType {
+extension _BidirectionalIndexType {
   @inline(__always)
   final public mutating func _predecessorInPlace() { self = self.predecessor() }
-}
-
-/// This protocol is an implementation detail of `BidirectionalIndexType`; do
-/// not use it directly.
-public protocol _BidirectionalIndexType
-: ForwardIndexType, _BidirectionalIndexDefaultsType {
-  mutating func _predecessorInPlace()
 }
 
 /// An *index* that can step backwards via application of its
