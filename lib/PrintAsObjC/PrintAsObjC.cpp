@@ -654,8 +654,6 @@ private:
       MAP(Bool, "BOOL", false);
 
       MAP(COpaquePointer, "void *", true);
-      MAP(CMutableVoidPointer, "void *", true);
-      MAP(CConstVoidPointer, "void const *", true);
 
       Identifier ID_ObjectiveC = ctx.Id_ObjectiveC;
       specialNames[{ID_ObjectiveC, ctx.getIdentifier("ObjCBool")}] 

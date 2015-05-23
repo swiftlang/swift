@@ -627,14 +627,6 @@ void ClangTypeConverter::fillSpeciallyImportedTypeCache(IRGenModule &IGM) {
 #include "swift/ClangImporter/BuiltinMappedTypes.def"
 
   CACHE_STDLIB_TYPE("COpaquePointer", ctx.VoidPtrTy);
-  CACHE_STDLIB_TYPE("CConstVoidPointer",
-             ctx.getCanonicalType(ctx.VoidPtrTy.withConst()));
-  CACHE_STDLIB_TYPE("CMutableVoidPointer", ctx.VoidPtrTy);
-
-  // FIXME: This is sufficient for ABI type generation, but should
-  //        probably be const char* for type encoding.
-  CACHE_STDLIB_TYPE("CString", ctx.VoidPtrTy);
-
   CACHE_STDLIB_TYPE("CVaListPointer", getClangDecayedVaListType(ctx));
 
   // These types come from the ObjectiveC module.
