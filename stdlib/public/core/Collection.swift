@@ -260,16 +260,6 @@ public func last<C: CollectionType where C.Index: BidirectionalIndexType>(
   fatalError("unavailable function can't be called")
 }
 
-public protocol _MutableCollectionDefaultsType : _CollectionDefaultsType {}
-
-extension _MutableCollectionDefaultsType {
-  final public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    @noescape body: (inout UnsafeMutableBufferPointer<Generator.Element>) -> R
-  ) -> R? {
-    return nil
-  }
-}
-
 /// A *collection* that supports subscript assignment.
 ///
 /// For any instance `a` of a type conforming to
@@ -283,8 +273,7 @@ extension _MutableCollectionDefaultsType {
 ///     a[i] = x
 ///     let y = x
 ///
-public protocol MutableCollectionType
-  : _MutableCollectionDefaultsType, CollectionType {
+public protocol MutableCollectionType : CollectionType {
 
   /// Access the element at `position`.
   ///
@@ -305,6 +294,14 @@ public protocol MutableCollectionType
   mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     @noescape body: (inout UnsafeMutableBufferPointer<Generator.Element>) -> R
   ) -> R?
+}
+
+extension MutableCollectionType {
+  final public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
+  @noescape body: (inout UnsafeMutableBufferPointer<Generator.Element>) -> R
+  ) -> R? {
+    return nil
+  }
 }
 
 /// A *generator* for an arbitrary *collection*.  Provided `C`
