@@ -74,6 +74,11 @@ ClassDecl *DeclContext::isClassOrClassExtensionContext() const {
            isNominalTypeOrNominalTypeExtensionContext());
 }
 
+EnumDecl *DeclContext::isEnumOrEnumExtensionContext() const {
+  return dyn_cast_or_null<EnumDecl>(
+           isNominalTypeOrNominalTypeExtensionContext());
+}
+
 ProtocolDecl *DeclContext::isProtocolOrProtocolExtensionContext() const {
   return dyn_cast_or_null<ProtocolDecl>(
            isNominalTypeOrNominalTypeExtensionContext());

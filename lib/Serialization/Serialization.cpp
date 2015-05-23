@@ -3493,31 +3493,32 @@ static void addOperatorsAndTopLevel(Serializer &S, Range members,
                                     bool isDerivedTopLevel,
                                     bool isLocal = false) {
   for (const Decl *member : members) {
-    auto memberValue = dyn_cast<ValueDecl>(member);
-    if (!memberValue)
-      continue;
+    if (auto memberValue = dyn_cast<ValueDecl>(member)) {
+      if (!memberValue->hasName())
+        continue;
 
-    if (isDerivedTopLevel) {
-      topLevelDecls[memberValue->getName()].push_back({
-        /*ignored*/0,
-        S.addDeclRef(memberValue, /*force=*/true)
-      });
-    } else if (memberValue->isOperator()) {
-      // Add operator methods.
-      // Note that we don't have to add operators that are already in the
-      // top-level list.
-      operatorMethodDecls[memberValue->getName()].push_back({
-        /*ignored*/0,
-        S.addDeclRef(memberValue)
-      });
+      if (isDerivedTopLevel) {
+        topLevelDecls[memberValue->getName()].push_back({
+          /*ignored*/0,
+          S.addDeclRef(memberValue, /*force=*/true)
+        });
+      } else if (memberValue->isOperator()) {
+        // Add operator methods.
+        // Note that we don't have to add operators that are already in the
+        // top-level list.
+        operatorMethodDecls[memberValue->getName()].push_back({
+          /*ignored*/0,
+          S.addDeclRef(memberValue)
+        });
+      }
     }
 
-    // Recurse into nested types.
-    if (auto nominal = dyn_cast<NominalTypeDecl>(member)) {
-      addOperatorsAndTopLevel(S, nominal->getMembers(),
+    // Recurse into nested declarations.
+    if (auto iterable = dyn_cast<IterableDeclContext>(member)) {
+      addOperatorsAndTopLevel(S, iterable->getMembers(),
                              operatorMethodDecls, topLevelDecls, objcMethods,
                              false);
-      addOperatorsAndTopLevel(S, nominal->getDerivedGlobalDecls(),
+      addOperatorsAndTopLevel(S, iterable->getDerivedGlobalDecls(),
                              operatorMethodDecls, topLevelDecls, objcMethods,
                              true);
     }
@@ -3531,7 +3532,7 @@ static void addOperatorsAndTopLevel(Serializer &S, Range members,
           objcMethods[func->getObjCSelector()].push_back(
             std::make_tuple(owningTypeID,
                             func->isObjCInstanceMethod(),
-                            S.addDeclRef(memberValue)));
+                            S.addDeclRef(func)));
         }
       }
     }
@@ -3558,35 +3559,29 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
     for (auto D : fileDecls) {
       if (isa<ImportDecl>(D))
         continue;
-      else if (auto VD = dyn_cast<ValueDecl>(D)) {
+
+      if (auto VD = dyn_cast<ValueDecl>(D)) {
         if (!VD->hasName())
           continue;
         topLevelDecls[VD->getName()]
           .push_back({ getKindForTable(D), addDeclRef(D) });
-
-        // Add operator methods from nominal types.
-        if (auto nominal = dyn_cast<NominalTypeDecl>(VD)) {
-          addOperatorsAndTopLevel(*this, nominal->getMembers(),
-                                  operatorMethodDecls, topLevelDecls,
-                                  objcMethods, false);
-          addOperatorsAndTopLevel(*this, nominal->getDerivedGlobalDecls(),
-                                  operatorMethodDecls, topLevelDecls,
-                                  objcMethods, true);
-        }
       } else if (auto ED = dyn_cast<ExtensionDecl>(D)) {
         Type extendedTy = ED->getExtendedType();
         const NominalTypeDecl *extendedNominal = extendedTy->getAnyNominal();
         extensionDecls[extendedNominal->getName()]
           .push_back({ getKindForTable(extendedNominal), addDeclRef(D) });
-
-        // Add operator methods from extensions.
-        addOperatorsAndTopLevel(*this, ED->getMembers(),
-                                operatorMethodDecls, topLevelDecls, objcMethods,
-                                false);
-
       } else if (auto OD = dyn_cast<OperatorDecl>(D)) {
         operatorDecls[OD->getName()]
           .push_back({ getStableFixity(OD->getKind()), addDeclRef(D) });
+      }
+
+      if (auto IDC = dyn_cast<IterableDeclContext>(D)) {
+        addOperatorsAndTopLevel(*this, IDC->getMembers(),
+                                operatorMethodDecls, topLevelDecls,
+                                objcMethods, false);
+        addOperatorsAndTopLevel(*this, IDC->getDerivedGlobalDecls(),
+                                operatorMethodDecls, topLevelDecls,
+                                objcMethods, true);
       }
     }
 
@@ -3607,11 +3602,11 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
         addDeclRef(TD), TD->getLocalDiscriminator()
       });
 
-      if (auto nominal = dyn_cast<NominalTypeDecl>(TD)) {
-        addOperatorsAndTopLevel(*this, nominal->getMembers(),
+      if (auto IDC = dyn_cast<IterableDeclContext>(TD)) {
+        addOperatorsAndTopLevel(*this, IDC->getMembers(),
                                 operatorMethodDecls, topLevelDecls,
                                 objcMethods, false, /*isLocal=*/true);
-        addOperatorsAndTopLevel(*this, nominal->getDerivedGlobalDecls(),
+        addOperatorsAndTopLevel(*this, IDC->getDerivedGlobalDecls(),
                                 operatorMethodDecls, topLevelDecls,
                                 objcMethods, true, /*isLocal=*/true);
       }

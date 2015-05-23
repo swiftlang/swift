@@ -1253,19 +1253,23 @@ public:
   /// Derive an implicit declaration to satisfy a requirement of a derived
   /// protocol conformance.
   ///
+  /// \param DC           The declaration context where the conformance was
+  ///                     defined, either the type itself or an extension
   /// \param TypeDecl     The type for which the requirement is being derived.
   /// \param Requirement  The protocol requirement.
   ///
   /// \returns nullptr if the derivation failed, or the derived declaration
   ///          if it succeeded. If successful, the derived declaration is added
   ///          to TypeDecl's body.
-  ValueDecl *deriveProtocolRequirement(NominalTypeDecl *TypeDecl,
+  ValueDecl *deriveProtocolRequirement(DeclContext *DC,
+                                       NominalTypeDecl *TypeDecl,
                                        ValueDecl *Requirement);
   
   /// Derive an implicit type witness for the given associated type in
   /// the conformance of the given nominal type to some known
   /// protocol.
-  Type deriveTypeWitness(NominalTypeDecl *nominal,
+  Type deriveTypeWitness(DeclContext *DC,
+                         NominalTypeDecl *nominal,
                          AssociatedTypeDecl *assocType);
 
   /// \brief Given a set of archetype substitutions, verify and record all of

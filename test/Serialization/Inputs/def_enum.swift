@@ -31,3 +31,9 @@ public enum Lazy<T> : Computable {
 //    }
   }
 }
+
+public enum Breakfast<Champions> : Int {
+  case Eggs
+  case Bacon
+  case Coffee
+}
