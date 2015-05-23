@@ -328,7 +328,7 @@ func updateInt(inout x : Int) {}
 
 // rdar://15785677 - allow 'let' declarations in structs/classes be initialized in init()
 class LetClassMembers {
-  let a : Int       // expected-note {{change 'let' to 'var' to make it mutable}}
+  let a : Int       // expected-note 2 {{change 'let' to 'var' to make it mutable}}
   let b : Int       // expected-note {{change 'let' to 'var' to make it mutable}}
 
   init(arg : Int) {
@@ -340,11 +340,11 @@ class LetClassMembers {
   func f() {
     a = 42  // expected-error {{cannot assign to 'let' property 'a'}}
     b = 42  // expected-error {{cannot assign to 'let' property 'b'}}
-    updateInt(&a)   // expected-error {{cannot pass immutable value of type 'Int' as inout argument}}
+    updateInt(&a)   // expected-error {{cannot pass immutable value as inout argument: 'a' is immutable}}
   }
 }
 struct LetStructMembers {
-  let a : Int       // expected-note {{change 'let' to 'var' to make it mutable}}
+  let a : Int       // expected-note 2 {{change 'let' to 'var' to make it mutable}}
   let b : Int       // expected-note {{change 'let' to 'var' to make it mutable}}
 
   init(arg : Int) {
@@ -356,7 +356,7 @@ struct LetStructMembers {
   func f() {
     a = 42  // expected-error {{cannot assign to 'let' property 'a'}}
     b = 42  // expected-error {{cannot assign to 'let' property 'b'}}
-    updateInt(&a)   // expected-error {{cannot pass immutable value of type 'Int' as inout argument}}
+    updateInt(&a)   // expected-error {{cannot pass immutable value as inout argument: 'a' is immutable}}
   }
 }
 

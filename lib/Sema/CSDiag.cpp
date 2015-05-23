@@ -1805,6 +1805,8 @@ static ValueDecl *findResolvedMemberRef(ConstraintLocator *locator,
 ///
 static std::pair<Expr*, ValueDecl*>
 resolveImmutableBase(Expr *expr, ConstraintSystem &CS) {
+  expr = expr->getSemanticsProvidingExpr();
+
   // Provide specific diagnostics for assignment to subscripts whose base expr
   // is known to be an rvalue.
   if (auto *SE = dyn_cast<SubscriptExpr>(expr)) {
@@ -1831,7 +1833,6 @@ resolveImmutableBase(Expr *expr, ConstraintSystem &CS) {
     auto loc = CS.getConstraintLocator(UDE, ConstraintLocator::Member);
     auto *member = dyn_cast_or_null<VarDecl>(findResolvedMemberRef(loc, CS));
 
-
     // If the member isn't settable, then it is the problem: return it.
     if (member) {
       if (!member->isSettable(nullptr) ||
@@ -1842,6 +1843,18 @@ resolveImmutableBase(Expr *expr, ConstraintSystem &CS) {
     // If we weren't able to resolve a member or if it is mutable, then the
     // problem must be with the base, recurse.
     return resolveImmutableBase(UDE->getBase(), CS);
+  }
+
+  if (auto *MRE = dyn_cast<MemberRefExpr>(expr)) {
+    // If the member isn't settable, then it is the problem: return it.
+    if (auto member = dyn_cast<AbstractStorageDecl>(MRE->getMember().getDecl()))
+      if (!member->isSettable(nullptr) ||
+          !member->isSetterAccessibleFrom(CS.DC))
+        return { expr, member };
+
+    // If we weren't able to resolve a member or if it is mutable, then the
+    // problem must be with the base, recurse.
+    return resolveImmutableBase(MRE->getBase(), CS);
   }
 
   if (auto *DRE = dyn_cast<DeclRefExpr>(expr))
@@ -1858,14 +1871,12 @@ static bool diagnoseSubElementFailure(std::pair<Expr*, ValueDecl*> immInfo,
                                       SourceLoc loc,
                                       ConstraintSystem &CS,
                                       Diag<StringRef> diagID) {
-  if (!immInfo.second) return false;
-
   auto &TC = CS.getTypeChecker();
 
   // Otherwise, we cannot resolve this because the available setter candidates
   // are all mutating and the base must be mutating.  If we dug out a
   // problematic decl, we can produce a nice tailored diagnostic.
-  if (auto *vd = dyn_cast<VarDecl>(immInfo.second)) {
+  if (auto *vd = dyn_cast_or_null<VarDecl>(immInfo.second)) {
     std::string message = "'";
     message += vd->getName().str().str();
     message += "' is immutable";
@@ -1876,11 +1887,34 @@ static bool diagnoseSubElementFailure(std::pair<Expr*, ValueDecl*> immInfo,
   }
 
   // If the underlying expression was a read-only subscript, diagnose that.
-  if (isa<SubscriptDecl>(immInfo.second)) {
+  if (immInfo.second && isa<SubscriptDecl>(immInfo.second)) {
     TC.diagnose(loc, diagID, "subscript is get-only")
       .highlight(immInfo.first->getSourceRange());
     return true;
   }
+
+  // If the expression is the result of a call, it is an rvalue, not a mutable
+  // lvalue.
+  if (auto *AE = dyn_cast<ApplyExpr>(immInfo.first)) {
+    std::string name = "call";
+    if (isa<PrefixUnaryExpr>(AE) || isa<PostfixUnaryExpr>(AE))
+      name = "unary operator";
+    else if (isa<BinaryExpr>(AE))
+      name = "binary operator";
+    else if (isa<CallExpr>(AE))
+      name = "function call";
+    else if (isa<DotSyntaxCallExpr>(AE) || isa<DotSyntaxBaseIgnoredExpr>(AE))
+      name = "method call";
+
+    if (auto *DRE =
+          dyn_cast<DeclRefExpr>(AE->getFn()->getSemanticsProvidingExpr()))
+      name = std::string("'") + DRE->getDecl()->getName().str().str() + "'";
+
+    TC.diagnose(loc, diagID, name + " returns r-value")
+      .highlight(AE->getSourceRange());
+    return true;
+  }
+
   return false;
 }
 
@@ -2095,7 +2129,16 @@ bool FailureDiagnosis::diagnoseFailureForBinaryExpr() {
           VD->emitLetToVarNoteIfSimple(CS->DC);
           return true;
         }
-      
+
+      // Figure out what part of the subexpression is the problem.
+      auto immInfo = resolveImmutableBase(argExpr->getElement(0), *CS);
+
+      // Diagnose the case when the failure was due to a determinable
+      // sub-expression.
+      if (diagnoseSubElementFailure(immInfo, binop->getLoc(), *CS,
+                          diag::cannot_apply_lvalue_binop_to_subelement))
+        return true;
+
       CS->TC.diagnose(binop->getLoc(),
                       diag::cannot_apply_lvalue_binop_to_rvalue,
                       overloadName, argTyName1)
@@ -2189,8 +2232,8 @@ bool FailureDiagnosis::diagnoseFailureForUnaryExpr() {
     if (allAreLValues) {
       // Ok, that's the problem.  Special case it further based on what the
       // actual expression is.
-      if (auto *DRE =
-            dyn_cast<DeclRefExpr>(argExpr->getSemanticsProvidingExpr()))
+      auto arg = argExpr->getSemanticsProvidingExpr();
+      if (auto *DRE = dyn_cast<DeclRefExpr>(arg))
         if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
           unsigned DiagCase;
           
@@ -2207,7 +2250,17 @@ bool FailureDiagnosis::diagnoseFailureForUnaryExpr() {
           VD->emitLetToVarNoteIfSimple(CS->DC);
           return true;
         }
-      
+
+
+      // Figure out what part of the subexpression is the problem.
+      auto immInfo = resolveImmutableBase(arg, *CS);
+
+      // Diagnose the case when the failure was due to a determinable
+      // sub-expression.
+      if (diagnoseSubElementFailure(immInfo, applyExpr->getFn()->getLoc(), *CS,
+                                diag::cannot_apply_lvalue_unop_to_subelement))
+        return true;
+
       CS->TC.diagnose(argExpr->getLoc(),
                       diag::cannot_apply_lvalue_unop_to_rvalue,
                       overloadName, argTyName);
@@ -2545,7 +2598,18 @@ bool FailureDiagnosis::diagnoseFailureForAssignExpr() {
         VD->emitLetToVarNoteIfSimple(CS->DC);
         return true;
       }
-    
+
+
+    // Figure out what part of the subexpression is the problem.
+    auto immInfo = resolveImmutableBase(LeftArg, *CS);
+
+    // Diagnose the case when the failure was due to a determinable
+    // sub-expression.
+    if (diagnoseSubElementFailure(immInfo, assignExpr->getLoc(), *CS,
+                                  diag::cannot_assign_to_immutable_subelement))
+      return true;
+
+
     CS->TC.diagnose(assignExpr->getLoc(),
                     diag::cannot_assign_to_immutable_expr, destTypeName)
       .highlight(LeftArg->getSourceRange());
@@ -2585,6 +2649,16 @@ bool FailureDiagnosis::diagnoseFailureForInOutExpr() {
         VD->emitLetToVarNoteIfSimple(CS->DC);
         return true;
       }
+
+    // Figure out what part of the subexpression is the problem.
+    auto immInfo = resolveImmutableBase(addressedExpr, *CS);
+
+    // Diagnose the case when the failure was due to a determinable
+    // sub-expression.
+    if (diagnoseSubElementFailure(immInfo, inoutExpr->getLoc(), *CS,
+                                  diag::cannot_pass_rvalue_inout_subelement))
+      return true;
+
     
     // For now, keep the UDE distinct from the above to allow for potentially
     // better diagnostics.

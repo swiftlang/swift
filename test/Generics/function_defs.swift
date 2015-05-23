@@ -142,15 +142,16 @@ protocol IntSubscriptable {
   subscript (index : Int) -> ElementType { get  }
 }
 
+// expected-note @+1 2 {{mark parameter with 'var' to make it mutable}}
 func subscripting<T : protocol<Subscriptable, IntSubscriptable>>(t: T) {
   var index = t.getIndex()
   var value = t.getValue()
   var element = t.getElement()
 
   value = t[index]
-  t[index] = value // expected-error{{cannot assign to immutable value of type 'T.Value'}}
+  t[index] = value // expected-error{{cannot assign to immutable value: 't' is immutable}}
   element = t[17]
-  t[42] = element // expected-error{{cannot assign to immutable value of type 'T.ElementType'}}
+  t[42] = element // expected-error{{cannot assign to immutable value: 't' is immutable}}
 
   t[value] = 17 // expected-error{{cannot subscript a value of type 'T' with an index of type 'T.Value'}}
 }

@@ -11,11 +11,11 @@ func testGlobals() {
 func testProperties(var instance: Members) {
   read(instance.privateSetProp)
   instance.privateSetProp = 42 // expected-error {{cannot assign to property 'privateSetProp' with inaccessible setter}}
-  reset(&instance.privateSetProp) // expected-error {{cannot pass immutable value of type 'Int' as inout argument}}
+  reset(&instance.privateSetProp) // expected-error {{cannot pass immutable value as inout argument: 'privateSetProp' is immutable}}
 }
 
 func testSubscript(var instance: Members) {
   read(instance[])
   instance[] = 42 // expected-error {{cannot assign to subscript with inaccessible setter}}
-  reset(&instance[]) // expected-error {{cannot pass immutable value of type 'Int' as inout argument}}
+  reset(&instance[]) // expected-error {{cannot pass immutable value as inout argument: subscript is get-only}}
 }
