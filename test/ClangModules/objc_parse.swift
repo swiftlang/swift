@@ -111,7 +111,7 @@ func properties(b: B) {  // expected-note {{mark parameter with 'var' to make it
   var i = b.counter
   b.counter = i + 1
   i = i + b.readCounter
-  b.readCounter = i + 1 // expected-error{{cannot assign to a get-only property 'readCounter'}}
+  b.readCounter = i + 1 // expected-error{{cannot assign to property: 'readCounter' is a get-only property}}
 
   b.setCounter(5) // expected-error{{'B' does not have a member named 'setCounter'}}
 
@@ -121,7 +121,7 @@ func properties(b: B) {  // expected-note {{mark parameter with 'var' to make it
   // An informal property cannot be made formal in a subclass. The
   // formal property is simply ignored.
   b.informalMadeFormal()
-  b.informalMadeFormal = i // expected-error{{cannot assign to 'informalMadeFormal': 'b' is immutable}}
+  b.informalMadeFormal = i // expected-error{{cannot assign to property: 'b' is a 'let' constant}}
   b.setInformalMadeFormal(5)
 
   b.overriddenProp = 17
@@ -448,9 +448,9 @@ func testConstantGlobals() {
   markUsed(SomeImageName)
   markUsed(SomeNumber.description)
 
-  MAX = 5 // expected-error{{cannot assign to 'let' value 'MAX'}}
-  SomeImageName = "abc" // expected-error{{cannot assign to 'let' value 'SomeImageName'}}
-  SomeNumber = nil // expected-error{{cannot assign to 'let' value 'SomeNumber'}}
+  MAX = 5 // expected-error{{cannot assign to variable: 'MAX' is a 'let' constant}}
+  SomeImageName = "abc" // expected-error{{cannot assign to variable: 'SomeImageName' is a 'let' constant}}
+  SomeNumber = nil // expected-error{{cannot assign to variable: 'SomeNumber' is a 'let' constant}}
 }
 
 func testWeakVariable() {

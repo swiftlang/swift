@@ -94,15 +94,14 @@ ERROR(cannot_apply_lvalue_unop_to_subelement,sema_tcs,none,
       "cannot pass immutable value to mutating operator: %0",
       (StringRef))
 ERROR(cannot_apply_lvalue_unop_to_rvalue,sema,none,
-      "cannot pass immutable value of type '%1' to mutating operator '%0'",
-      (StringRef, StringRef))
+      "cannot pass immutable value of type %0 to mutating operator",
+      (Type))
 
-ERROR(cannot_apply_lvalue_binop_to_rvalue,sema,none,
-      "cannot pass immutable value of type '%1' to mutating binary operator '%0'",
-      (StringRef, StringRef))
 
 ERROR(cannot_apply_lvalue_binop_to_subelement,sema_tcs,none,
       "left side of mutating operator isn't mutable: %0", (StringRef))
+ERROR(cannot_apply_lvalue_binop_to_rvalue,sema,none,
+      "left side of mutating operator has immutable type %0", (Type))
 
 ERROR(cannot_subscript_with_index,sema,none,
       "cannot subscript a value of type '%0' with an index of type '%1'",
@@ -117,7 +116,7 @@ ERROR(cannot_pass_rvalue_inout_subelement,sema_tcs,none,
       (StringRef))
 ERROR(cannot_pass_rvalue_inout,sema_tcs,none,
       "cannot pass immutable value of type '%0' as inout argument",
-      (StringRef))
+      (Type))
 
 ERROR(cannot_assign_to_literal,sema,none,
       "cannot assign to a literal value", ())
@@ -1667,28 +1666,12 @@ WARNING(expression_unused_result_nonmutating,sema_tcs,none,
         "result of call to non-mutating function %0 is unused; "
         "use %1 to mutate in-place", (DeclName, DeclName))
 ERROR(assignment_lhs_not_lvalue,sema_tcs,none,
-      "cannot assign to expression with non-lvalue type %0", (Type))
-ERROR(assignment_lhs_is_let,sema_tcs,none,
-      "cannot assign to 'let' value %0", (Identifier))
-ERROR(assignment_get_only_property,sema_tcs,none,
-      "cannot assign to a get-only property %0", (Identifier))
-ERROR(assignment_inaccessible_property,sema_tcs,none,
-      "cannot assign to property %0 with inaccessible setter", (Identifier))
+      "cannot assign to immutable expression of type %0", (Type))
 
-ERROR(assignment_to_self,sema_tcs,none,
-      "cannot assign to %0 in a method", (Identifier))
-ERROR(assignment_lhs_setter_inaccessible,sema_tcs,none,
-      "cannot assign to %0: setter is inaccessible", (Identifier))
-
-ERROR(assignment_lhs_is_vardecl,sema_tcs,none,
-      "cannot assign to %0", (Identifier))
-
-ERROR(assignment_lhs_is_let_property,sema_tcs,none,
-      "cannot assign to 'let' property %0", (Identifier))
-
-ERROR(assignment_property_has_immutable_base,sema_tcs,none,
-      "cannot assign to %0: %1 is immutable",
-      (Identifier, Identifier))
+ERROR(assignment_lhs_is_immutable_variable,sema_tcs,none,
+      "cannot assign to variable: %0", (StringRef))
+ERROR(assignment_lhs_is_immutable_property,sema_tcs,none,
+      "cannot assign to property: %0", (StringRef))
 ERROR(assignment_subscript_has_immutable_base,sema_tcs,none,
       "cannot assign through subscript: %0", (StringRef))
 ERROR(assignment_bang_has_immutable_subcomponent,sema_tcs,none,
@@ -1697,14 +1680,6 @@ ERROR(assignment_bang_has_immutable_subcomponent,sema_tcs,none,
 NOTE(change_to_mutating,sema_tcs,none,
      "mark %select{method|accessor}0 'mutating' to make 'self' mutable",
      (bool))
-
-ERROR(assignment_ude_expr_subbase,sema_tcs,none,
-      "cannot assign to %0: base subscript is get-only",
-      (Identifier))
-
-ERROR(assignment_ude_expr,sema_tcs,none,
-     "cannot assign to %0, base has immutable type %1",
-     (Identifier, Type))
 
 // ForEach Stmt
 ERROR(sequence_protocol_broken,sema_tcs,none,

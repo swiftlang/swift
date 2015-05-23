@@ -71,7 +71,7 @@ func fref() -> Reftype {}
 
 // non-settable var is non-settable:
 // - assignment
-non_settable_x = x // expected-error{{cannot assign to a get-only property 'non_settable_x'}}
+non_settable_x = x // expected-error{{cannot assign to variable: 'non_settable_x' is a get-only property}}
 // - inout (mono)
 f2(&non_settable_x) // expected-error{{cannot pass immutable value as inout argument: 'non_settable_x' is a get-only property}}
 // - inout (generic)
@@ -81,7 +81,7 @@ non_settable_x += x // expected-error{{left side of mutating operator isn't muta
 ++non_settable_x // expected-error{{cannot pass immutable value to mutating operator: 'non_settable_x' is a get-only property}}
 
 // non-settable property is non-settable:
-z.non_settable_x = x // expected-error{{cannot assign to a get-only property 'non_settable_x'}}
+z.non_settable_x = x // expected-error{{cannot assign to property: 'non_settable_x' is a get-only property}}
 f2(&z.non_settable_x) // expected-error{{cannot pass immutable value as inout argument: 'non_settable_x' is a get-only property}}
 f1(&z.non_settable_x) // expected-error{{cannot pass immutable value as inout argument: 'non_settable_x' is a get-only property}}
 z.non_settable_x += x // expected-error{{left side of mutating operator isn't mutable: 'non_settable_x' is a get-only property}}
@@ -91,11 +91,11 @@ z.non_settable_x += x // expected-error{{left side of mutating operator isn't mu
 z[0] = 0.0 // expected-error{{cannot assign through subscript: 'z' is immutable}}
 f2(&z[0]) // expected-error{{cannot pass immutable value as inout argument: 'z' is immutable}}
 f1(&z[0]) // expected-error{{cannot pass immutable value as inout argument: 'z' is immutable}}
-z[0] += 0.0 // expected-error{{cannot pass immutable value of type 'Double' to mutating binary operator '+='}}
+z[0] += 0.0 // expected-error{{left side of mutating operator has immutable type 'Double'}}
 ++z[0] // expected-error{{cannot pass immutable value to mutating operator: 'z' is immutable}}
 
 // settable property of an rvalue value type is non-settable:
-fz().settable_x = x // expected-error{{cannot assign to 'settable_x', base has immutable type 'Z'}}
+fz().settable_x = x // expected-error{{cannot assign to property: 'fz' returns immutable value}}
 f2(&fz().settable_x) // expected-error{{cannot pass immutable value as inout argument: 'fz' returns immutable value}}
 f1(&fz().settable_x) // expected-error{{cannot pass immutable value as inout argument: 'fz' returns immutable value}}
 fz().settable_x += x // expected-error{{left side of mutating operator isn't mutable: 'fz' returns immutable value}}
@@ -109,7 +109,7 @@ fref().property += 0.0
 ++fref().property
 
 // settable property of a non-settable value type is non-settable:
-z.non_settable_x.property = 1.0 // expected-error{{cannot assign to 'property': 'non_settable_x' is immutable}}
+z.non_settable_x.property = 1.0 // expected-error{{cannot assign to property: 'non_settable_x' is a get-only property}}
 f2(&z.non_settable_x.property) // expected-error{{cannot pass immutable value as inout argument: 'non_settable_x' is a get-only property}}
 f1(&z.non_settable_x.property) // expected-error{{cannot pass immutable value as inout argument: 'non_settable_x' is a get-only property}}
 z.non_settable_x.property += 1.0 // expected-error{{left side of mutating operator isn't mutable: 'non_settable_x' is a get-only property}}

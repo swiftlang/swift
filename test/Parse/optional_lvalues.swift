@@ -23,34 +23,34 @@ mutT! = T()
 mutT!.mutS = S()
 mutT!.mutS! = S()
 mutT!.mutS!.x = 0
-mutT!.mutS!.y = 0 // expected-error{{cannot assign to 'let' property 'y'}}
-mutT!.immS = S() // expected-error{{cannot assign to 'let' property 'immS'}}
+mutT!.mutS!.y = 0 // expected-error{{cannot assign to property: 'y' is a 'let' constant}}
+mutT!.immS = S() // expected-error{{cannot assign to property: 'immS' is a 'let' constant}}
 mutT!.immS! = S() // expected-error{{cannot assign through '!': 'immS' is a 'let' constant}}
-mutT!.immS!.x = 0 // expected-error{{cannot assign to 'x': 'immS' is immutable}}
-mutT!.immS!.y = 0 // expected-error{{cannot assign to 'let' property 'y'}}
+mutT!.immS!.x = 0 // expected-error{{cannot assign to property: 'immS' is a 'let' constant}}
+mutT!.immS!.y = 0 // expected-error{{cannot assign to property: 'y' is a 'let' constant}}
 
 immT! = T() // expected-error{{cannot assign through '!': 'immT' is a 'let' constant}}
-immT!.mutS = S() // expected-error{{cannot assign to 'mutS': 'immT' is immutable}}
+immT!.mutS = S() // expected-error{{cannot assign to property: 'immT' is a 'let' constant}}
 immT!.mutS! = S() // expected-error{{cannot assign through '!': 'immT' is a 'let' constant}}
-immT!.mutS!.x = 0 // expected-error{{cannot assign to 'x': 'immT' is immutable}}
-immT!.mutS!.y = 0 // expected-error{{cannot assign to 'let' property 'y'}}
-immT!.immS = S() // expected-error{{cannot assign to 'let' property 'immS'}}
+immT!.mutS!.x = 0 // expected-error{{cannot assign to property: 'immT' is a 'let' constant}}
+immT!.mutS!.y = 0 // expected-error{{cannot assign to property: 'y' is a 'let' constant}}
+immT!.immS = S() // expected-error{{cannot assign to property: 'immS' is a 'let' constant}}
 immT!.immS! = S() // expected-error{{cannot assign through '!': 'immS' is a 'let' constant}}
-immT!.immS!.x = 0 // expected-error{{cannot assign to 'x': 'immS' is immutable}}
-immT!.immS!.y = 0 // expected-error{{cannot assign to 'let' property 'y'}}
+immT!.immS!.x = 0 // expected-error{{cannot assign to property: 'immS' is a 'let' constant}}
+immT!.immS!.y = 0 // expected-error{{cannot assign to property: 'y' is a 'let' constant}}
 
 var mutIUO: T! = nil
 let immIUO: T! = nil // expected-note 2 {{change 'let' to 'var' to make it mutable}}
 
 mutIUO!.mutS = S()
-mutIUO!.immS = S() // expected-error{{cannot assign to 'let' property 'immS'}}
-immIUO!.mutS = S() // expected-error{{cannot assign to 'mutS': 'immIUO' is immutable}}
-immIUO!.immS = S() // expected-error{{cannot assign to 'let' property 'immS'}}
+mutIUO!.immS = S() // expected-error{{cannot assign to property: 'immS' is a 'let' constant}}
+immIUO!.mutS = S() // expected-error{{cannot assign to property: 'immIUO' is a 'let' constant}}
+immIUO!.immS = S() // expected-error{{cannot assign to property: 'immS' is a 'let' constant}}
 
 mutIUO.mutS = S()
-mutIUO.immS = S() // expected-error{{cannot assign to 'let' property 'immS'}}
-immIUO.mutS = S() // expected-error{{cannot assign to 'mutS': 'immIUO' is immutable}}
-immIUO.immS = S() // expected-error{{cannot assign to 'let' property 'immS'}}
+mutIUO.immS = S() // expected-error{{cannot assign to property: 'immS' is a 'let' constant}}
+immIUO.mutS = S() // expected-error{{cannot assign to property: 'immIUO' is a 'let' constant}}
+immIUO.immS = S() // expected-error{{cannot assign to property: 'immS' is a 'let' constant}}
 
 func foo(x: Int) {}
 
