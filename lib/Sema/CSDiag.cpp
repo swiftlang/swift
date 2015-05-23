@@ -1946,7 +1946,6 @@ void FailureDiagnosis::diagnoseAssignmentFailure(Expr *dest, Type destTy,
 
   // Otherwise, we have an invalid destination type.  Give a specific diagnostic
   // depending on what we're assigning to.
-#if 1
   if (auto *DRE = dyn_cast<DeclRefExpr>(dest))
     if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
       Diag<Identifier> d;
@@ -1965,77 +1964,24 @@ void FailureDiagnosis::diagnoseAssignmentFailure(Expr *dest, Type destTy,
       VD->emitLetToVarNoteIfSimple(CS.DC);
       return;
     }
-#endif
   
   // Special case known-reasonable lvalues.
-  if (isa<ForceValueExpr>(dest) || isa<SubscriptExpr>(dest)) {
-    auto immInfo = resolveImmutableBase(dest, CS);
-
+  if (isa<ForceValueExpr>(dest) || isa<SubscriptExpr>(dest) ||
+      isa<UnresolvedDotExpr>(dest) || isa<MemberRefExpr>(dest)) {
     Diag<StringRef> diagID;
     if (isa<ForceValueExpr>(dest))
       diagID = diag::assignment_bang_has_immutable_subcomponent;
+    else if (isa<UnresolvedDotExpr>(dest) || isa<MemberRefExpr>(dest))
+      diagID = diag::assignment_lhs_is_immutable_property;
     else {
       assert(isa<SubscriptExpr>(dest));
       diagID = diag::assignment_subscript_has_immutable_base;
     }
     
     // Diagnose the case when the failure was due to a determinable subelement.
+    auto immInfo = resolveImmutableBase(dest, CS);
     if (diagnoseSubElementFailure(immInfo, equalLoc, CS, diagID))
       return;
-  }
-
-  // Provide specific diagnostics for unresolved type expr.
-  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(dest)) {
-    auto immInfo = resolveImmutableBase(UDE, CS);
-
-    // If the dot expr itself is broken and we were able to resolve a property
-    // out of it, diagnose a specific issue.
-    if (immInfo.first == UDE && immInfo.second && isa<VarDecl>(immInfo.second)){
-      auto *vd = cast<VarDecl>(immInfo.second);
-
-      Optional<Diag<Identifier>> diagID;
-      if (vd->isLet())
-        diagID = diag::assignment_lhs_is_let_property;
-      else if (vd->hasAccessorFunctions() && !vd->getSetter())
-        diagID = diag::assignment_get_only_property;
-      else if (!vd->isSetterAccessibleFrom(CS.DC))
-        diagID = diag::assignment_inaccessible_property;
-
-      if (diagID) {
-        TC.diagnose(equalLoc, diagID.getValue(), UDE->getName())
-          .highlight(UDE->getBase()->getSourceRange())
-          .highlight(UDE->getNameLoc());
-        vd->emitLetToVarNoteIfSimple(CS.DC);
-        return;
-      }
-    }
-
-    // Otherwise, we cannot resolve this because the available property
-    // setters require the base to be mutable, but it isn't.  If we dug out a
-    // problematic decl, we can produce a nice tailored diagnostic.
-    if (auto *vd = dyn_cast_or_null<VarDecl>(immInfo.second)) {
-      TC.diagnose(equalLoc, diag::assignment_property_has_immutable_base,
-                  UDE->getName(), vd->getName())
-        .highlight(immInfo.first->getSourceRange())
-        .highlight(UDE->getNameLoc());
-      vd->emitLetToVarNoteIfSimple(CS.DC);
-      return;
-    }
-
-    // If the underlying expression was a read-only subscript, diagnose that.
-    if (immInfo.second && isa<SubscriptDecl>(immInfo.second)) {
-      TC.diagnose(equalLoc, diag::assignment_ude_expr_subbase, UDE->getName())
-        .highlight(immInfo.first->getSourceRange())
-        .highlight(UDE->getNameLoc());
-      return;
-    }
-
-    // Otherwise, this is an assignment to an unknown UnresolvedDotExpr.
-    TC.diagnose(equalLoc, diag::assignment_ude_expr, UDE->getName(),
-                immInfo.first->getType())
-      .highlight(immInfo.first->getSourceRange())
-      .highlight(UDE->getNameLoc());
-    return;
   }
 
   // Diagnose obvious assignments to literals.

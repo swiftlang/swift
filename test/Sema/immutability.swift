@@ -91,7 +91,7 @@ func let_decls() {
 
   let d = (4, "hello")  // expected-note {{change 'let' to 'var' to make it mutable}}
   markUsed(d.0); markUsed(d.1)
-  d.0 = 17   // expected-error {{cannot assign to '0': 'd' is immutable}}
+  d.0 = 17   // expected-error {{cannot assign to property: 'd' is a 'let' constant}}
 
   
   let e = 42  // expected-note {{change 'let' to 'var' to make it mutable}}
@@ -126,13 +126,13 @@ struct SomeStruct {
 
 
   func h() {  // expected-note {{mark method 'mutating' to make 'self' mutable}}
-    iv = 12      // expected-error {{cannot assign to 'iv': 'self' is immutable}}
+    iv = 12      // expected-error {{cannot assign to property: 'self' is immutable}}
   }
 
   var p: Int {
     // Getters default to non-mutating.
     get {          // expected-note {{mark accessor 'mutating' to make 'self' mutable}}
-      iv = 37 // expected-error {{cannot assign to 'iv': 'self' is immutable}}
+      iv = 37 // expected-error {{cannot assign to property: 'self' is immutable}}
       return 42
     }
 
@@ -151,13 +151,13 @@ struct SomeStruct {
     }
     nonmutating
     set {      // expected-note {{mark accessor 'mutating' to make 'self' mutable}}
-      iv = newValue // expected-error {{cannot assign to 'iv': 'self' is immutable}}
+      iv = newValue // expected-error {{cannot assign to property: 'self' is immutable}}
     }
   }
 
   var r : Int {
     get {        // expected-note {{mark accessor 'mutating' to make 'self' mutable}}
-      iv = 37 // expected-error {{cannot assign to 'iv': 'self' is immutable}}
+      iv = 37 // expected-error {{cannot assign to property: 'self' is immutable}}
       return 42
     }
     mutating // Redundant but OK.
@@ -169,7 +169,7 @@ struct SomeStruct {
 }
 
 markUsed(SomeStruct.type_let)   // ok
-SomeStruct.type_let = 17     // expected-error {{cannot assign to 'let' property 'type_let'}}
+SomeStruct.type_let = 17     // expected-error {{cannot assign to property: 'type_let' is a 'let' constant}}
 
 struct TestMutableStruct {
   mutating
@@ -338,8 +338,8 @@ class LetClassMembers {
   }
 
   func f() {
-    a = 42  // expected-error {{cannot assign to 'let' property 'a'}}
-    b = 42  // expected-error {{cannot assign to 'let' property 'b'}}
+    a = 42  // expected-error {{cannot assign to property: 'a' is a 'let' constant}}
+    b = 42  // expected-error {{cannot assign to property: 'b' is a 'let' constant}}
     updateInt(&a)   // expected-error {{cannot pass immutable value as inout argument: 'a' is a 'let' constant}}
   }
 }
@@ -354,8 +354,8 @@ struct LetStructMembers {
   }
 
   func f() {
-    a = 42  // expected-error {{cannot assign to 'let' property 'a'}}
-    b = 42  // expected-error {{cannot assign to 'let' property 'b'}}
+    a = 42  // expected-error {{cannot assign to property: 'a' is a 'let' constant}}
+    b = 42  // expected-error {{cannot assign to property: 'b' is a 'let' constant}}
     updateInt(&a)   // expected-error {{cannot pass immutable value as inout argument: 'a' is a 'let' constant}}
   }
 }
@@ -409,7 +409,7 @@ class ClassWithConvenienceInit {
   
   convenience init(newY: Int) {
     self.init(newX: 19)
-    x = 67  // expected-error {{cannot assign to 'let' property 'x'}}
+    x = 67  // expected-error {{cannot assign to property: 'x' is a 'let' constant}}
   }
 }
 
@@ -417,7 +417,7 @@ struct StructWithDelegatingInit {
   let x: Int       // expected-note {{change 'let' to 'var' to make it mutable}}
   
   init(x: Int) { self.x = x }
-  init() { self.init(x: 0); self.x = 22 } // expected-error {{cannot assign to 'let' property 'x'}}
+  init() { self.init(x: 0); self.x = 22 } // expected-error {{cannot assign to property: 'x' is a 'let' constant}}
 }
 
 
@@ -446,7 +446,7 @@ struct SingleIntStruct : SingleIntProperty {
 
 extension SingleIntStruct {
   init(_ other: SingleIntStruct) {
-    other.i = 999 // expected-error {{cannot assign to 'let' property 'i'}}
+    other.i = 999 // expected-error {{cannot assign to property: 'i' is a 'let' constant}}
   }
 }
 
@@ -475,13 +475,13 @@ struct TestSubscriptMutability {
 
   func test() {
     self[1] = TestSubscriptMutability()  // expected-error {{cannot assign through subscript: subscript is get-only}}
-    self[1].var_arr = [] // expected-error {{cannot assign to 'var_arr': base subscript is get-only}}
-    self[1].let_arr = [] // expected-error {{cannot assign to 'let' property 'let_arr'}}
+    self[1].var_arr = [] // expected-error {{cannot assign to property: subscript is get-only}}
+    self[1].let_arr = [] // expected-error {{cannot assign to property: 'let_arr' is a 'let' constant}}
   }
 }
 
 func f(a : TestSubscriptMutability) { // expected-note {{mark parameter with 'var' to make it mutable}}
-  a.var_arr = []  // expected-error {{cannot assign to 'var_arr': 'a' is immutable}}
+  a.var_arr = []  // expected-error {{cannot assign to property: 'a' is a 'let' constant}}
 }
 
 struct TestSubscriptMutability2 {
