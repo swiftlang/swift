@@ -36,8 +36,20 @@ func $builtin_log_scope_exit() -> AnyObject? {
   return LogRecord(api:"$builtin_log_scope_exit")
 }
 
-func $builtin_print<T>(object: T) -> AnyObject? {
-  return LogRecord(api:"$builtin_print", object:object)
+func $builtin_print<T>(object: T, _ appendNewline: Bool) -> AnyObject? {
+  if (appendNewline) {
+    return LogRecord(api: "$builtin_print<appendNewline=true>", object: object)
+  } else {
+    return LogRecord(api: "$builtin_print<appendNewline=false>", object: object)
+  }
+}
+
+func $builtin_debugPrint<T>(object: T, _ appendNewline: Bool) -> AnyObject? {
+  if (appendNewline) {
+    return LogRecord(api: "$builtin_debugPrint<appendNewline=true>", object: object)
+  } else {
+    return LogRecord(api: "$builtin_debugPrint<appendNewline=false>", object: object)
+  }
 }
 
 func $builtin_send_data(object:AnyObject?, _ sl: Int, _ el: Int, _ sc: Int, _ ec: Int) {

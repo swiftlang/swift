@@ -429,24 +429,39 @@ public:
             if (FnD && FnD->getModuleContext() == Context.TheStdlibModule) {
               StringRef FnName = FnD->getNameStr();
               if (FnName.equals("print") || FnName.equals("debugPrint")) {
-                Expr *S = nullptr;
-                Expr *B = nullptr; // FIXME pass B to the logger when it supports it
+                const bool isDebugPrint = FnName.equals("debugPrint");
+                Expr *object = nullptr;
+                Expr *appendNewline = nullptr;
                 if (ParenExpr *PE = llvm::dyn_cast<ParenExpr>(AE->getArg())) {
-                  S = PE->getSubExpr();
-                } else if (TupleExpr *TE = llvm::dyn_cast<TupleExpr>(AE->getArg())) {
+                  object = PE->getSubExpr();
+                  appendNewline =
+                    new (Context) BooleanLiteralExpr(true, SourceLoc(), true);
+                  typeCheckContextExpr(Context, TypeCheckDC, appendNewline);
+                } else if (TupleExpr *TE =
+                          llvm::dyn_cast<TupleExpr>(AE->getArg())) {
                   if (TE->getNumElements() == 2) {
-                    S = TE->getElement(0);
-                    B = TE->getElement(1);
+                    object = TE->getElement(0);
+                    appendNewline = TE->getElement(1);
                   }
                 }
-                if (S) {
-                  std::pair<PatternBindingDecl *, VarDecl *> PV =
-                    buildPatternAndVariable(S);
-                  Expr *Log = logPrint(PV.second, AE->getSourceRange());
-                  Elements[EI] = PV.first;
-                  Elements.insert(Elements.begin() + (EI + 1), PV.second);
-                  Elements.insert(Elements.begin() + (EI + 2), Log);
-                  EI += 2;
+                if (object && appendNewline) {
+                  std::pair<PatternBindingDecl *, VarDecl *> objectPV =
+                    buildPatternAndVariable(object);
+                  std::pair<PatternBindingDecl *, VarDecl *> appendNewlinePV =
+                    buildPatternAndVariable(appendNewline);
+                  Expr *Log = logPrint(isDebugPrint,
+                                       objectPV.second, appendNewlinePV.second,
+                                       AE->getSourceRange());
+                  Elements[EI] = objectPV.first;
+                  Elements.insert(Elements.begin() + (EI + 1),
+                                  objectPV.second);
+                  Elements.insert(Elements.begin() + (EI + 2),
+                                  appendNewlinePV.first);
+                  Elements.insert(Elements.begin() + (EI + 3),
+                                  appendNewlinePV.second);
+                  Elements.insert(Elements.begin() + (EI + 4),
+                                  Log);
+                  EI += 4;
                 }
                 Handled = true;
               }
@@ -652,15 +667,23 @@ public:
     }
   }
 
-  Expr *logPrint(VarDecl *VD, SourceRange SR) {
-    const char *LoggerName = "$builtin_print";
-    DeclRefExpr *DRE = 
-      new (Context) DeclRefExpr(ConcreteDeclRef(VD),
+  Expr *logPrint(bool isDebugPrint, VarDecl *object, VarDecl *appendNewline,
+                 SourceRange SR) {
+    const char *LoggerName = isDebugPrint ? "$builtin_debugPrint" :
+                                            "$builtin_print";
+    DeclRefExpr *object_DRE = 
+      new (Context) DeclRefExpr(ConcreteDeclRef(object),
                                 SourceLoc(),
                                 true, // implicit
                                 AccessSemantics::Ordinary,
                                 Type());
-    Expr *Args[] = { DRE };
+    DeclRefExpr *appendNewline_DRE = 
+      new (Context) DeclRefExpr(ConcreteDeclRef(appendNewline),
+                                SourceLoc(),
+                                true, // implicit
+                                AccessSemantics::Ordinary,
+                                Type());
+    Expr *Args[] = { object_DRE, appendNewline_DRE };
     return buildLoggerCallWithArgs(LoggerName, Args, SR);
   }
 
