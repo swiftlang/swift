@@ -720,8 +720,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableAppExtensionRestrictions |= Args.hasArg(OPT_enable_app_extension);
 
   llvm::Triple Target = Opts.Target;
-  if (const Arg *A = Args.getLastArg(OPT_target))
+  StringRef TargetArg;
+  if (const Arg *A = Args.getLastArg(OPT_target)) {
     Target = llvm::Triple(A->getValue());
+    TargetArg = A->getValue();
+  }
 
   Opts.EnableObjCInterop = Target.isOSDarwin();
   if (auto A = Args.getLastArg(OPT_enable_objc_interop,
@@ -732,9 +735,23 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   // Must be processed after any other language options that could affect
   // target configuration options.
-  Opts.setTarget(Target);
+  bool UnsupportedOS, UnsupportedArch;
+  std::tie(UnsupportedOS, UnsupportedArch) = Opts.setTarget(Target);
 
-  return false;
+  SmallVector<StringRef, 3> TargetComponents;
+  TargetArg.split(TargetComponents, "-");
+
+  if (UnsupportedArch) {
+    auto TargetArgArch = TargetComponents.size() ? TargetComponents[0] : "";
+    Diags.diagnose(SourceLoc(), diag::error_unsupported_target_arch, TargetArgArch);
+  }
+
+  if (UnsupportedOS) {
+    auto TargetArgOS = TargetComponents.size() > 2 ? TargetComponents.back() : "";
+    Diags.diagnose(SourceLoc(), diag::error_unsupported_target_os, TargetArgOS);
+  }
+
+  return UnsupportedOS || UnsupportedArch;
 }
 
 static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,

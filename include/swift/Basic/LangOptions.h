@@ -146,7 +146,10 @@ namespace swift {
 
     /// Sets the target we are building for and updates configuration options
     /// to match.
-    void setTarget(llvm::Triple triple);
+    ///
+    /// \returns A pair - the first element is true if the OS was invalid.
+    /// The second element is true if the Arch was invalid.
+    std::pair<bool, bool> setTarget(llvm::Triple triple);
 
     /// Returns the minimum platform version to which code will be deployed.
     ///

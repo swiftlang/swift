@@ -36,7 +36,7 @@ bool LangOptions::hasBuildConfigOption(StringRef Name) const {
       != BuildConfigOptions.end();
 }
 
-void LangOptions::setTarget(llvm::Triple triple) {
+std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   clearAllTargetConfigOptions();
 
   if (triple.getOS() == llvm::Triple::Darwin &&
@@ -57,6 +57,8 @@ void LangOptions::setTarget(llvm::Triple triple) {
   }
   Target = std::move(triple);
 
+  bool UnsupportedOS = false;
+
   // Set the "os" target configuration.
   if (Target.isMacOSX())
     addTargetConfigOption("os", "OSX");
@@ -70,8 +72,11 @@ void LangOptions::setTarget(llvm::Triple triple) {
     addTargetConfigOption("os", "iOS");
   else if (triple.isOSLinux())
     addTargetConfigOption("os", "Linux");
-  else
-    llvm_unreachable("Unsupported target OS");
+  else {
+    UnsupportedOS = true;
+  }
+
+  bool UnsupportedArch = false;
 
   // Set the "arch" target configuration.
   switch (Target.getArch()) {
@@ -88,12 +93,17 @@ void LangOptions::setTarget(llvm::Triple triple) {
     addTargetConfigOption("arch", "x86_64");
     break;
   default:
-    llvm_unreachable("Unsupported target architecture");
+    UnsupportedArch = true;
   }
+
+  if (UnsupportedOS || UnsupportedArch)
+    return { UnsupportedOS, UnsupportedArch };
 
   // Set the "runtime" target configuration.
   if (EnableObjCInterop)
     addTargetConfigOption("_runtime", "_ObjC");
   else
     addTargetConfigOption("_runtime", "_Native");
+
+  return { false, false };
 }

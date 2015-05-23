@@ -46,6 +46,12 @@ ERROR(error_no_frontend_args, frontend, none,
 ERROR(error_no_such_file_or_directory,frontend,none,
   "no such file or directory: '%0'", (StringRef))
 
+ERROR(error_unsupported_target_os, frontend, none,
+  "unsupported target OS: '%0'", (StringRef))
+
+ERROR(error_unsupported_target_arch, frontend, none,
+  "unsupported target architecture: '%0'", (StringRef))
+
 ERROR(cannot_open_file,frontend,none,
   "cannot open file '%0' (%1)", (StringRef, StringRef))
 ERROR(cannot_open_serialized_file,frontend,none,
