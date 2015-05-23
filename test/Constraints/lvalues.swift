@@ -96,10 +96,10 @@ z[0] += 0.0 // expected-error{{cannot pass immutable value of type 'Double' to m
 
 // settable property of an rvalue value type is non-settable:
 fz().settable_x = x // expected-error{{cannot assign to 'settable_x', base has immutable type 'Z'}}
-f2(&fz().settable_x) // expected-error{{cannot pass immutable value as inout argument: 'fz' returns r-value}}
-f1(&fz().settable_x) // expected-error{{cannot pass immutable value as inout argument: 'fz' returns r-value}}
-fz().settable_x += x // expected-error{{left side of mutating operator isn't mutable: 'fz' returns r-value}}
-++fz().settable_x // expected-error{{cannot use immutable value with mutating unary operator: 'fz' returns r-value}}
+f2(&fz().settable_x) // expected-error{{cannot pass immutable value as inout argument: 'fz' returns immutable value}}
+f1(&fz().settable_x) // expected-error{{cannot pass immutable value as inout argument: 'fz' returns immutable value}}
+fz().settable_x += x // expected-error{{left side of mutating operator isn't mutable: 'fz' returns immutable value}}
+++fz().settable_x // expected-error{{cannot use immutable value with mutating unary operator: 'fz' returns immutable value}}
 
 // settable property of an rvalue reference type IS SETTABLE:
 fref().property = 0.0

@@ -1910,7 +1910,7 @@ static bool diagnoseSubElementFailure(std::pair<Expr*, ValueDecl*> immInfo,
           dyn_cast<DeclRefExpr>(AE->getFn()->getSemanticsProvidingExpr()))
       name = std::string("'") + DRE->getDecl()->getName().str().str() + "'";
 
-    TC.diagnose(loc, diagID, name + " returns r-value")
+    TC.diagnose(loc, diagID, name + " returns immutable value")
       .highlight(AE->getSourceRange());
     return true;
   }
