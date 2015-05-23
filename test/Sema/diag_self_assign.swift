@@ -64,7 +64,7 @@ class SA4 {
       return foo // expected-warning {{attempting to access 'foo' within its own getter}} expected-note{{access 'self' explicitly to silence this warning}}
     }
     set(value) {
-      value = value // expected-error {{cannot assign to variable: 'value' is a 'let' constant}}
+      value = value // expected-error {{cannot assign to value: 'value' is a 'let' constant}}
     }
   }
 }

@@ -71,7 +71,7 @@ func fref() -> Reftype {}
 
 // non-settable var is non-settable:
 // - assignment
-non_settable_x = x // expected-error{{cannot assign to variable: 'non_settable_x' is a get-only property}}
+non_settable_x = x // expected-error{{cannot assign to value: 'non_settable_x' is a get-only property}}
 // - inout (mono)
 f2(&non_settable_x) // expected-error{{cannot pass immutable value as inout argument: 'non_settable_x' is a get-only property}}
 // - inout (generic)

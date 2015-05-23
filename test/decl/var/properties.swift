@@ -75,7 +75,7 @@ func test_global_properties(x: X) {
   accept_x(a4)
   accept_x(a5)
 
-  a1 = x // expected-error {{cannot assign to variable: 'a1' is a get-only property}}
+  a1 = x // expected-error {{cannot assign to value: 'a1' is a get-only property}}
   a2 = x
   a3 = x
   a4 = x

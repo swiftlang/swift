@@ -1669,7 +1669,7 @@ ERROR(assignment_lhs_not_lvalue,sema_tcs,none,
       "cannot assign to immutable expression of type %0", (Type))
 
 ERROR(assignment_lhs_is_immutable_variable,sema_tcs,none,
-      "cannot assign to variable: %0", (StringRef))
+      "cannot assign to value: %0", (StringRef))
 ERROR(assignment_lhs_is_immutable_property,sema_tcs,none,
       "cannot assign to property: %0", (StringRef))
 ERROR(assignment_subscript_has_immutable_base,sema_tcs,none,
