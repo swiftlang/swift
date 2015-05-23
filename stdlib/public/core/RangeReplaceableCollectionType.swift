@@ -14,8 +14,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-public protocol _RangeReplaceableCollectionDefaultsType
-  : ExtensibleCollectionType {
+/// A *collection* that supports replacement of an arbitrary subRange
+/// of elements with the elements of another collection.
+public protocol RangeReplaceableCollectionType : ExtensibleCollectionType {
 
   /// Append `x` to `self`.
   ///
@@ -24,12 +25,6 @@ public protocol _RangeReplaceableCollectionDefaultsType
   ///
   /// - Complexity: Amortized O(1).
   mutating func append(x: Generator.Element)
-}
-
-/// A *collection* that supports replacement of an arbitrary subRange
-/// of elements with the elements of another collection.
-public protocol RangeReplaceableCollectionType
-  : ExtensibleCollectionType, _RangeReplaceableCollectionDefaultsType {
 
   //===--- Fundamental Requirements ---------------------------------------===//
 
