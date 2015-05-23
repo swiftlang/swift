@@ -448,9 +448,9 @@ func testConstantGlobals() {
   markUsed(SomeImageName)
   markUsed(SomeNumber.description)
 
-  MAX = 5 // expected-error{{cannot assign to 'let' value 'MAX'}}
-  SomeImageName = "abc" // expected-error{{cannot assign to 'let' value 'SomeImageName'}}
-  SomeNumber = nil // expected-error{{cannot assign to 'let' value 'SomeNumber'}}
+  MAX = 5 // expected-error{{cannot assign to variable: 'MAX' is a 'let' constant}}
+  SomeImageName = "abc" // expected-error{{cannot assign to variable: 'SomeImageName' is a 'let' constant}}
+  SomeNumber = nil // expected-error{{cannot assign to variable: 'SomeNumber' is a 'let' constant}}
 }
 
 func testWeakVariable() {

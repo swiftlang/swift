@@ -71,7 +71,7 @@ func fref() -> Reftype {}
 
 // non-settable var is non-settable:
 // - assignment
-non_settable_x = x // expected-error{{cannot assign to a get-only property 'non_settable_x'}}
+non_settable_x = x // expected-error{{cannot assign to variable: 'non_settable_x' is a get-only property}}
 // - inout (mono)
 f2(&non_settable_x) // expected-error{{cannot pass immutable value as inout argument: 'non_settable_x' is a get-only property}}
 // - inout (generic)
@@ -91,7 +91,7 @@ z.non_settable_x += x // expected-error{{left side of mutating operator isn't mu
 z[0] = 0.0 // expected-error{{cannot assign through subscript: 'z' is immutable}}
 f2(&z[0]) // expected-error{{cannot pass immutable value as inout argument: 'z' is immutable}}
 f1(&z[0]) // expected-error{{cannot pass immutable value as inout argument: 'z' is immutable}}
-z[0] += 0.0 // expected-error{{cannot pass immutable value of type 'Double' to mutating binary operator '+='}}
+z[0] += 0.0 // expected-error{{left side of mutating operator has immutable type 'Double'}}
 ++z[0] // expected-error{{cannot pass immutable value to mutating operator: 'z' is immutable}}
 
 // settable property of an rvalue value type is non-settable:
