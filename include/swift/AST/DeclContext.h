@@ -38,7 +38,6 @@ namespace swift {
   class CanType;
   class Decl;
   class DeclContext;
-  class EnumDecl;
   class ExtensionDecl;
   class Expr;
   class GenericParamList;
@@ -244,10 +243,6 @@ public:
   /// If this DeclContext is a class, or an extension on a class, return the
   /// ClassDecl, otherwise return null.
   ClassDecl *isClassOrClassExtensionContext() const;
-
-  /// If this DeclContext is a enum, or an extension on a enum, return the
-  /// EnumDecl, otherwise return null.
-  EnumDecl *isEnumOrEnumExtensionContext() const;
 
   /// If this DeclContext is a protocol, or an extension on a
   /// protocol, return the ProtocolDecl, otherwise return null.

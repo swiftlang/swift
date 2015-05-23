@@ -53,7 +53,6 @@ DerivedConformance::createSelfDeclRef(AbstractFunctionDecl *fn) {
 }
 
 FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
-                                                 Decl *parentDecl,
                                                  NominalTypeDecl *typeDecl,
                                                  Type contextType,
                                                  Type propertyInterfaceType,
@@ -65,15 +64,13 @@ FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
   if (isStatic)
     selfType = MetatypeType::get(selfType);
 
-  auto parentDC = cast<DeclContext>(parentDecl);
-
   VarDecl *selfDecl = new (C) ParamDecl(/*IsLet*/true,
                                         SourceLoc(),
                                         Identifier(),
                                         SourceLoc(),
                                         C.Id_self,
                                         selfType,
-                                        parentDC);
+                                        typeDecl);
   selfDecl->setImplicit();
   Pattern *selfParam = new (C) NamedPattern(selfDecl, /*implicit*/ true);
   selfParam->setType(selfType);
@@ -88,7 +85,7 @@ FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
     FuncDecl::create(C, SourceLoc(), StaticSpellingKind::None, SourceLoc(),
                      DeclName(), SourceLoc(), SourceLoc(), nullptr, Type(),
                      params, TypeLoc::withoutLoc(propertyContextType),
-                     parentDC);
+                     typeDecl);
   getterDecl->setImplicit();
   getterDecl->setStatic(isStatic);
 
@@ -108,7 +105,7 @@ FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
   Type interfaceType = FunctionType::get(TupleType::getEmpty(C),
                                          propertyInterfaceType);
   Type selfInterfaceType = getterDecl->computeInterfaceSelfType(false);
-  if (auto sig = parentDC->getGenericSignatureOfContext())
+  if (auto sig = typeDecl->getGenericSignatureOfContext())
     interfaceType = GenericFunctionType::get(sig, selfInterfaceType,
                                              interfaceType,
                                              FunctionType::ExtInfo());
@@ -125,7 +122,6 @@ FuncDecl *DerivedConformance::declareDerivedPropertyGetter(TypeChecker &tc,
 
 std::pair<VarDecl *, PatternBindingDecl *>
 DerivedConformance::declareDerivedReadOnlyProperty(TypeChecker &tc,
-                                                   Decl *parentDecl,
                                                    NominalTypeDecl *typeDecl,
                                                    Identifier name,
                                                    Type propertyInterfaceType,
@@ -133,13 +129,12 @@ DerivedConformance::declareDerivedReadOnlyProperty(TypeChecker &tc,
                                                    FuncDecl *getterDecl,
                                                    bool isStatic) {
   auto &C = tc.Context;
-  auto parentDC = cast<DeclContext>(parentDecl);
 
   VarDecl *propDecl = new (C) VarDecl(isStatic,
                                       /*let*/ false,
                                       SourceLoc(), name,
                                       propertyContextType,
-                                      parentDC);
+                                      typeDecl);
   propDecl->setImplicit();
   propDecl->makeComputed(SourceLoc(), getterDecl, nullptr, nullptr,
                          SourceLoc());
@@ -155,7 +150,7 @@ DerivedConformance::declareDerivedReadOnlyProperty(TypeChecker &tc,
   auto pbDecl = PatternBindingDecl::create(C, SourceLoc(),
                                            StaticSpellingKind::None,
                                            SourceLoc(), propPat, nullptr,
-                                           parentDC);
+                                           typeDecl);
   pbDecl->setImplicit();
 
   return {propDecl, pbDecl};

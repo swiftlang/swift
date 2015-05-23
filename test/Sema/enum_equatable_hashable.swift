@@ -34,7 +34,7 @@ enum CustomHashable {
 
   var hashValue: Int { return 0 }
 }
-func ==(x: CustomHashable, y: CustomHashable) -> Bool { // expected-note{{non-matching type}}
+func ==(x: CustomHashable, y: CustomHashable) -> Bool {
   return true
 }
 
@@ -49,7 +49,7 @@ enum InvalidCustomHashable {
 
   var hashValue: String { return "" } // expected-note{{previously declared here}}
 }
-func ==(x: InvalidCustomHashable, y: InvalidCustomHashable) -> String { // expected-note{{non-matching type}}
+func ==(x: InvalidCustomHashable, y: InvalidCustomHashable) -> String {
   return ""
 }
 if InvalidCustomHashable.A == .B { }
@@ -100,27 +100,3 @@ private enum Bar<T> {
     }
   }
 }
-
-// Equatable extension -- rdar://20981254
-enum Instrument {
-  case Piano
-  case Violin
-  case Guitar
-}
-
-extension Instrument : Equatable {}
-
-// Explicit conformance should work too
-public enum Medicine {
-  case Antibiotic
-  case Antihistamine
-}
-
-extension Medicine : Equatable {}
-
-public func ==(lhs: Medicine, rhs: Medicine) -> Bool { // expected-note{{non-matching type}}
-  return true
-}
-
-// No explicit conformance and cannot be derived
-extension Complex : Hashable {} // expected-error 2 {{does not conform}}

@@ -5338,20 +5338,17 @@ public:
       validateAttributes(TC, ED);
     }
 
-    // Check conformances before visiting members, since we might
-    // synthesize bodies for derived conformances
-    if (!IsFirstPass) {
-      computeDefaultAccessibility(TC, ED);
-      checkExplicitConformance(ED, ED->getExtendedType());
-    }
-
     if (!ED->isInvalid()) {
       for (Decl *Member : ED->getMembers())
         visit(Member);
       for (Decl *Global : ED->getDerivedGlobalDecls())
         visit(Global);
     }
-
+    
+    if (!IsFirstPass) {
+      computeDefaultAccessibility(TC, ED);
+      checkExplicitConformance(ED, ED->getExtendedType());
+    }
     TC.checkDeclAttributes(ED);
  }
 

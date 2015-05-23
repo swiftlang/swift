@@ -2380,7 +2380,7 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDerivation(
   }
 
   // Attempt to derive the witness.
-  auto derived = TC.deriveProtocolRequirement(DC, derivingTypeDecl, requirement);
+  auto derived = TC.deriveProtocolRequirement(derivingTypeDecl, requirement);
   if (!derived)
     return ResolveWitnessResult::ExplicitFailed;
 
@@ -3090,7 +3090,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
       return Type();
 
     // Try to derive the type witness.
-    Type derivedType = TC.deriveTypeWitness(DC, derivingTypeDecl, assocType);
+    Type derivedType = TC.deriveTypeWitness(derivingTypeDecl, assocType);
     if (!derivedType)
       return Type();
 
@@ -3875,8 +3875,7 @@ void TypeChecker::resolveWitness(const NormalProtocolConformance *conformance,
   checker.resolveSingleWitness(requirement);
 }
 
-ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
-                                                  NominalTypeDecl *TypeDecl,
+ValueDecl *TypeChecker::deriveProtocolRequirement(NominalTypeDecl *TypeDecl,
                                                   ValueDecl *Requirement) {
   auto *protocol = cast<ProtocolDecl>(Requirement->getDeclContext());
 
@@ -3885,24 +3884,22 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
   if (!knownKind)
     return nullptr;
 
-  auto Decl = DC->getInnermostDeclarationDeclContext();
-
   switch (*knownKind) {
   case KnownProtocolKind::RawRepresentable:
-    return DerivedConformance::deriveRawRepresentable(*this, Decl,
+    return DerivedConformance::deriveRawRepresentable(*this,
                                                       TypeDecl, Requirement);
 
   case KnownProtocolKind::Equatable:
-    return DerivedConformance::deriveEquatable(*this, Decl, TypeDecl, Requirement);
+    return DerivedConformance::deriveEquatable(*this, TypeDecl, Requirement);
   
   case KnownProtocolKind::Hashable:
-    return DerivedConformance::deriveHashable(*this, Decl, TypeDecl, Requirement);
+    return DerivedConformance::deriveHashable(*this, TypeDecl, Requirement);
     
   case KnownProtocolKind::ErrorType:
-    return DerivedConformance::deriveErrorType(*this, Decl, TypeDecl, Requirement);
+    return DerivedConformance::deriveErrorType(*this, TypeDecl, Requirement);
 
   case KnownProtocolKind::_BridgedNSError:
-    return DerivedConformance::deriveBridgedNSError(*this, Decl, TypeDecl,
+    return DerivedConformance::deriveBridgedNSError(*this, TypeDecl,
                                                     Requirement);
 
   default:
@@ -3910,22 +3907,19 @@ ValueDecl *TypeChecker::deriveProtocolRequirement(DeclContext *DC,
   }
 }
 
-Type TypeChecker::deriveTypeWitness(DeclContext *DC,
-                                    NominalTypeDecl *TypeDecl,
-                                    AssociatedTypeDecl *AssocType) {
-  auto *protocol = cast<ProtocolDecl>(AssocType->getDeclContext());
+Type TypeChecker::deriveTypeWitness(NominalTypeDecl *nominal,
+                                    AssociatedTypeDecl *assocType) {
+  auto *protocol = cast<ProtocolDecl>(assocType->getDeclContext());
 
   auto knownKind = protocol->getKnownProtocolKind();
   
   if (!knownKind)
     return nullptr;
 
-  auto Decl = DC->getInnermostDeclarationDeclContext();
-
   switch (*knownKind) {
   case KnownProtocolKind::RawRepresentable:
-    return DerivedConformance::deriveRawRepresentable(*this, Decl,
-                                                      TypeDecl, AssocType);
+    return DerivedConformance::deriveRawRepresentable(*this, nominal,
+                                                      assocType);
         
   default:
     return nullptr;
