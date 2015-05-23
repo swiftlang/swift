@@ -41,7 +41,7 @@ func funcdecl5(a: Int, y: Int) {
 
   1 = x        // expected-error {{cannot assign to a literal value}}
   (1) = x      // expected-error {{cannot assign to a literal value}}
-  (x:1).x = 1 // expected-error {{cannot assign to immutable expression of type 'Int'}}
+  (x:1).x = 1 // expected-error {{cannot assign to 'x', base has immutable type '(x: Int)'}}
   var tup : (x:Int, y:Int)
   tup.x = 1
   _ = tup

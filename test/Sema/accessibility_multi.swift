@@ -4,7 +4,7 @@ func reset(inout value: Int) { value = 0 }
 
 func testGlobals() {
   read(privateSetGlobal)
-  privateSetGlobal = 42 // expected-error {{cannot assign to variable: 'privateSetGlobal' setter is inaccessible}}
+  privateSetGlobal = 42 // expected-error {{cannot assign to 'privateSetGlobal'}}
   reset(&privateSetGlobal) // expected-error {{cannot pass immutable value as inout argument: 'privateSetGlobal' setter is inaccessible}}
 }
 

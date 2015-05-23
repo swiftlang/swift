@@ -500,7 +500,7 @@ class WrongDeclIntroducerKeyword1 {
 }
 
 // <rdar://problem/18502220> [swift-crashes 078] parser crash on invalid cast in sequence expr
-Base=1 as Base=1  // expected-error {{cannot assign to immutable expression of type 'Base'}}
+Base=1 as Base=1  // expected-error {{cannot assign to expression with non-lvalue type 'Base'}}
 
 
 
