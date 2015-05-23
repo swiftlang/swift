@@ -1,3 +1,4 @@
 framework module Foo {
   header "header-to-print.h"
+  header "other-header.h"
 }

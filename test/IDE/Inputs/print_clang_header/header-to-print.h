@@ -1,5 +1,6 @@
 #import <Foundation.h>
 @import Dispatch;
+#include "other-header.h"
 
 #define MACRO_GOT_UNDEFINED 1
 #undef MACRO_GOT_UNDEFINED

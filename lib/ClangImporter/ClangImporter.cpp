@@ -2304,9 +2304,11 @@ void ClangImporter::lookupBridgingHeaderDecls(
   auto &ClangPP = Impl.getClangPreprocessor();
   for (clang::IdentifierInfo *II : Impl.BridgeHeaderMacros) {
     if (auto *MI = ClangPP.getMacroInfo(II)) {
-      Identifier Name = Ctx.getIdentifier(II->getName());
-      if (Decl *imported = Impl.importMacro(Name, MI))
-        receiver(imported);
+      if (filter(MI)) {
+        Identifier Name = Ctx.getIdentifier(II->getName());
+        if (Decl *imported = Impl.importMacro(Name, MI))
+          receiver(imported);
+      }
     }
   }
 }
@@ -2334,7 +2336,10 @@ bool ClangImporter::lookupDeclsFromHeader(StringRef Filename,
       if (ClangLoc.isInvalid())
         return false;
 
-      return ClangSM.getFileEntryForID(ClangSM.getFileID(ClangLoc)) == File;
+      if (ClangSM.getFileEntryForID(ClangSM.getFileID(ClangLoc)) != File)
+        return false;
+
+      return filter(ClangN);
     };
 
     lookupBridgingHeaderDecls(headerFilter, receiver);
@@ -2375,9 +2380,11 @@ bool ClangImporter::lookupDeclsFromHeader(StringRef Filename,
         if (auto *MD = dyn_cast<clang::MacroDefinition>(PPE)) {
           auto *II = const_cast<clang::IdentifierInfo*>(MD->getName());
           if (auto *MI = ClangPP.getMacroInfo(II)) {
-            Identifier Name = Ctx.getIdentifier(II->getName());
-            if (Decl *imported = Impl.importMacro(Name, MI))
-              receiver(imported);
+            if (filter(MI)) {
+              Identifier Name = Ctx.getIdentifier(II->getName());
+              if (Decl *imported = Impl.importMacro(Name, MI))
+                receiver(imported);
+            }
           }
         }
       }

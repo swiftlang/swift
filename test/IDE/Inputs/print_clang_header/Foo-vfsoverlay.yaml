@@ -9,6 +9,9 @@
               'contents': [
                 { 'name': 'header-to-print.h', 'type': 'file',
                   'external-contents': 'INPUT_DIR/header-to-print.h'
+                },
+                { 'name': 'other-header.h', 'type': 'file',
+                  'external-contents': 'INPUT_DIR/other-header.h'
                 }
               ]
             },
