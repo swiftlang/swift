@@ -971,6 +971,7 @@ getActualCtorInitializerKind(uint8_t raw) {
 /// from Clang can also appear in any module.
 static void filterValues(Type expectedTy, Module *expectedModule,
                          CanGenericSignature expectedGenericSig, bool isType,
+                         bool inProtocolExt,
                          Optional<swift::CtorInitializerKind> ctorInit,
                          SmallVectorImpl<ValueDecl *> &values) {
   CanType canTy;
@@ -994,6 +995,15 @@ static void filterValues(Type expectedTy, Module *expectedModule,
     if (expectedGenericSig &&
         value->getDeclContext()->getGenericSignatureOfContext()
           ->getCanonicalSignature() != expectedGenericSig)
+      return true;
+
+    // If we're looking at members of a protocol or protocol extension,
+    // filter by whether we expect to find something in a protocol extension or
+    // not. This lets us distinguish between a protocol member and a protocol
+    // extension member that have the same type.
+    if (value->getDeclContext()->isProtocolOrProtocolExtensionContext() &&
+        (bool)value->getDeclContext()->isProtocolExtensionContext()
+          != inProtocolExt)
       return true;
 
     // If we're expecting an initializer with a specific kind, and this is not
@@ -1037,10 +1047,11 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
     TypeID TID = 0;
     bool isType = (recordID == XREF_TYPE_PATH_PIECE);
     bool onlyInNominal = false;
+    bool inProtocolExt = false;
     if (isType)
       XRefTypePathPieceLayout::readRecord(scratch, IID, onlyInNominal);
     else
-      XRefValuePathPieceLayout::readRecord(scratch, TID, IID);
+      XRefValuePathPieceLayout::readRecord(scratch, TID, IID, inProtocolExt);
 
     Identifier name = getIdentifier(IID);
     pathTrace.addValue(name);
@@ -1052,7 +1063,8 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
     M->lookupQualified(ModuleType::get(M), name,
                        NL_QualifiedDefault | NL_KnownNoDependency,
                        /*typeResolver=*/nullptr, values);
-    filterValues(filterTy, nullptr, nullptr, isType, None, values);
+    filterValues(filterTy, nullptr, nullptr, isType, inProtocolExt, None,
+                 values);
     break;
   }
 
@@ -1123,6 +1135,7 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
       Optional<swift::CtorInitializerKind> ctorInit;
       bool isType = false;
       bool onlyInNominal = false;
+      bool inProtocolExt = false;
       switch (recordID) {
       case XREF_TYPE_PATH_PIECE: {
         IdentifierID IID;
@@ -1134,14 +1147,15 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
 
       case XREF_VALUE_PATH_PIECE: {
         IdentifierID IID;
-        XRefValuePathPieceLayout::readRecord(scratch, TID, IID);
+        XRefValuePathPieceLayout::readRecord(scratch, TID, IID, inProtocolExt);
         memberName = getIdentifier(IID);
         break;
       }
 
       case XREF_INITIALIZER_PATH_PIECE: {
         uint8_t kind;
-        XRefInitializerPathPieceLayout::readRecord(scratch, TID, kind);
+        XRefInitializerPathPieceLayout::readRecord(scratch, TID, inProtocolExt,
+                                                   kind);
         memberName = getContext().Id_init;
         ctorInit = getActualCtorInitializerKind(kind);
         break;
@@ -1172,7 +1186,8 @@ Decl *ModuleFile::resolveCrossReference(Module *M, uint32_t pathLen) {
 
       auto members = nominal->lookupDirect(memberName, onlyInNominal);
       values.append(members.begin(), members.end());
-      filterValues(filterTy, M, genericSig, isType, ctorInit, values);
+      filterValues(filterTy, M, genericSig, isType, inProtocolExt, ctorInit,
+                   values);
       break;
     }
 

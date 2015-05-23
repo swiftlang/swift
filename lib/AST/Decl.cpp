@@ -1381,6 +1381,11 @@ ValueDecl *ValueDecl::getOverriddenDecl() const {
 
 bool swift::conflicting(const OverloadSignature& sig1,
                         const OverloadSignature& sig2) {
+  // A member of a protocol extension never conflicts with a member of a
+  // protocol.
+  if (sig1.InProtocolExtension != sig2.InProtocolExtension)
+    return false;
+
   // If the base names are different, they can't conflict.
   if (sig1.Name.getBaseName() != sig2.Name.getBaseName())
     return false;
@@ -1538,6 +1543,8 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
   OverloadSignature signature;
 
   signature.Name = getFullName();
+  signature.InProtocolExtension
+    = getDeclContext()->isProtocolExtensionContext();
 
   // Functions, initializers, and de-initializers include their
   // interface types in their signatures as well as whether they are

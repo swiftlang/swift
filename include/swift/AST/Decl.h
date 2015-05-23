@@ -265,6 +265,9 @@ struct OverloadSignature {
 
   /// Whether this is a property.
   bool IsProperty = false;
+
+  /// Whether this signature is part of a protocol extension.
+  bool InProtocolExtension = false;
 };
 
 /// Determine whether two overload signatures conflict.

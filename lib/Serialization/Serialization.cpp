@@ -1330,9 +1330,11 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
 
         Type ty = storage->getInterfaceType()->getCanonicalType();
         auto nameID = addIdentifierRef(storage->getName());
+        bool isProtocolExt = fn->getDeclContext()->isProtocolExtensionContext();
         abbrCode = DeclTypeAbbrCodes[XRefValuePathPieceLayout::Code];
         XRefValuePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
-                                             addTypeRef(ty), nameID);
+                                             addTypeRef(ty), nameID,
+                                             isProtocolExt);
 
         abbrCode =
           DeclTypeAbbrCodes[XRefOperatorOrAccessorPathPieceLayout::Code];
@@ -1356,14 +1358,17 @@ void Serializer::writeCrossReference(const DeclContext *DC, uint32_t pathLen) {
       abbrCode = DeclTypeAbbrCodes[XRefInitializerPathPieceLayout::Code];
       XRefInitializerPathPieceLayout::emitRecord(
         Out, ScratchRecord, abbrCode, addTypeRef(ty),
+        (bool)ctor->getDeclContext()->isProtocolExtensionContext(),
         getStableCtorInitializerKind(ctor->getInitKind()));
       break;
     }
 
     abbrCode = DeclTypeAbbrCodes[XRefValuePathPieceLayout::Code];
+    bool isProtocolExt = fn->getDeclContext()->isProtocolExtensionContext();
     XRefValuePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                          addTypeRef(ty),
-                                         addIdentifierRef(fn->getName()));
+                                         addIdentifierRef(fn->getName()),
+                                         isProtocolExt);
 
     if (fn->isOperator()) {
       // Encode the fixity as a filter on the func decls, to distinguish prefix
@@ -1427,10 +1432,12 @@ void Serializer::writeCrossReference(const Decl *D) {
 
   auto val = cast<ValueDecl>(D);
   auto ty = val->getInterfaceType()->getCanonicalType();
+  bool isProtocolExt = D->getDeclContext()->isProtocolExtensionContext();
   abbrCode = DeclTypeAbbrCodes[XRefValuePathPieceLayout::Code];
   XRefValuePathPieceLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                        addTypeRef(ty),
-                                       addIdentifierRef(val->getName()));
+                                       addIdentifierRef(val->getName()),
+                                       isProtocolExt);
 }
 
 /// Translate from the AST associativity enum to the Serialization enum

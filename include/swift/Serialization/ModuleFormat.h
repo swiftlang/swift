@@ -51,7 +51,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 201; // Last change: extension decls
+const uint16_t VERSION_MINOR = 202; // Last change: xref protocol vs. ext
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -1155,13 +1155,15 @@ namespace decls_block {
 
   using XRefValuePathPieceLayout = BCRecordLayout<
     XREF_VALUE_PATH_PIECE,
-    TypeIDField,      // type
-    IdentifierIDField // name
+    TypeIDField,       // type
+    IdentifierIDField, // name
+    BCFixed<1>         // restrict to protocol extension
   >;
 
   using XRefInitializerPathPieceLayout = BCRecordLayout<
     XREF_INITIALIZER_PATH_PIECE,
     TypeIDField,             // type
+    BCFixed<1>,              // restrict to protocol extension
     CtorInitializerKindField // initializer kind
   >;
 

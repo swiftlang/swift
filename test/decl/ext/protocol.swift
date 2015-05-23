@@ -443,6 +443,116 @@ func test<T: PConforms6>(x: T) -> Int { return x.f() }
 
 struct PConforms6Impl : PConforms6 { }
 
+// Extensions of a protocol that directly satify requirements (i.e.,
+// default implementations hack N+1).
+protocol PConforms7 {
+  func method()
+
+  var property: Int { get }
+
+  subscript (i: Int) -> Int { get }
+}
+
+extension PConforms7 {
+  final func method() { }
+  final var property: Int { return 5 }
+  final subscript (i: Int) -> Int { return i }
+}
+
+struct SConforms7a : PConforms7 { }
+
+protocol PConforms8 {
+  typealias Assoc
+
+  func method() -> Assoc
+  var property: Assoc { get }
+  subscript (i: Assoc) -> Assoc { get }
+}
+
+extension PConforms8 {
+  final func method() -> Int { return 5 }
+  final var property: Int { return 5 }
+  final subscript (i: Int) -> Int { return i }
+}
+
+struct SConforms8a : PConforms8 { }
+
+struct SConforms8b : PConforms8 { 
+  func method() -> String { return "" }
+  var property: String { return "" }
+  subscript (i: String) -> String { return i }
+}
+
+func testSConforms8b() {
+  let s: SConforms8b.Assoc = "hello"
+  _ = s
+}
+
+struct SConforms8c : PConforms8 { 
+  func method() -> String { return "" }
+}
+
+func testSConforms8c() {
+  let s: SConforms8c.Assoc = "hello" // expected-error{{'String' is not convertible to 'Assoc'}}
+  _ = s
+  let i: SConforms8c.Assoc = 5
+  _ = i
+}
+
+protocol DefaultInitializable {
+  init()
+}
+
+extension String : DefaultInitializable { }
+extension Int : DefaultInitializable { }
+
+protocol PConforms9 {
+  typealias Assoc : DefaultInitializable // expected-note{{protocol requires nested type 'Assoc'}}
+
+  func method() -> Assoc
+  var property: Assoc { get }
+  subscript (i: Assoc) -> Assoc { get }
+}
+
+extension PConforms9 {
+  final func method() -> Self.Assoc { return Assoc() }
+  final var property: Self.Assoc { return Assoc() }
+  final subscript (i: Self.Assoc) -> Self.Assoc { return Assoc() }
+}
+
+struct SConforms9a : PConforms9 { // expected-error{{type 'SConforms9a' does not conform to protocol 'PConforms9'}}
+}
+
+struct SConforms9b : PConforms9 {
+  typealias Assoc = Int
+}
+
+func testSConforms9b(s9b: SConforms9b) {
+  var p = s9b.property
+  p = 5
+  _ = p
+}
+
+struct SConforms9c : PConforms9 {
+  typealias Assoc = String
+}
+
+func testSConforms9c(s9c: SConforms9c) {
+  var p = s9c.property
+  p = "hello"
+  _ = p
+}
+
+struct SConforms9d : PConforms9 {
+  func method() -> Int { return 5 }
+}
+
+func testSConforms9d(s9d: SConforms9d) {
+  var p = s9d.property
+  p = 6
+  _ = p
+}
+
 // ----------------------------------------------------------------------------
 // Typealiases in protocol extensions.
 // ----------------------------------------------------------------------------
