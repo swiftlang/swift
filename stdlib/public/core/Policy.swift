@@ -199,24 +199,13 @@ public func != <T : Equatable>(lhs: T, rhs: T) -> Bool {
 // Comparable
 //
 
-/// This protocol is an implementation detail of `Comparable`; do
-/// not use it directly.
-///
-/// Its requirements are inherited by `Comparable` and thus must
-/// be satisfied by types conforming to that protocol.
-public protocol _Comparable {
-  /// A [strict total order](http://en.wikipedia.org/wiki/Total_order#Strict_total_order)
-  /// over instances of `Self`.
-  func <(lhs: Self, rhs: Self) -> Bool
-}
-
-public func > <T : _Comparable>(lhs: T, rhs: T) -> Bool {
+public func > <T : Comparable>(lhs: T, rhs: T) -> Bool {
   return rhs < lhs
 }
-public func <= <T : _Comparable>(lhs: T, rhs: T) -> Bool {
+public func <= <T : Comparable>(lhs: T, rhs: T) -> Bool {
   return !(rhs < lhs)
 }
-public func >= <T : _Comparable>(lhs: T, rhs: T) -> Bool {
+public func >= <T : Comparable>(lhs: T, rhs: T) -> Bool {
   return !(lhs < rhs)
 }
 
@@ -238,7 +227,10 @@ public func >= <T : _Comparable>(lhs: T, rhs: T) -> Bool {
 /// - `x > y` implies `x >= y` and `y < x`
 /// - `x <= y` implies `y >= x`
 /// - `x >= y` implies `y <= x`
-public protocol Comparable : _Comparable, Equatable {
+public protocol Comparable : Equatable {
+  /// A [strict total order](http://en.wikipedia.org/wiki/Total_order#Strict_total_order)
+  /// over instances of `Self`.
+  func <(lhs: Self, rhs: Self) -> Bool
   func <=(lhs: Self, rhs: Self) -> Bool
   func >=(lhs: Self, rhs: Self) -> Bool
   func >(lhs: Self, rhs: Self) -> Bool

@@ -236,7 +236,7 @@ internal struct _OptionalMirror<T> : MirrorType {
 }
 
 
-public func < <T : _Comparable> (lhs: T?, rhs: T?) -> Bool {
+public func < <T : Comparable> (lhs: T?, rhs: T?) -> Bool {
   switch (lhs,rhs) {
   case let (l?, r?):
     return l < r
@@ -247,7 +247,7 @@ public func < <T : _Comparable> (lhs: T?, rhs: T?) -> Bool {
   }
 }
 
-public func > <T : _Comparable>(lhs: T?, rhs: T?) -> Bool {
+public func > <T : Comparable>(lhs: T?, rhs: T?) -> Bool {
   switch (lhs,rhs) {
   case let (l?, r?):
     return l > r
@@ -256,7 +256,7 @@ public func > <T : _Comparable>(lhs: T?, rhs: T?) -> Bool {
   }
 }
 
-public func <= <T : _Comparable>(lhs: T?, rhs: T?) -> Bool {
+public func <= <T : Comparable>(lhs: T?, rhs: T?) -> Bool {
   switch (lhs,rhs) {
   case let (l?, r?):
     return l <= r
@@ -265,7 +265,7 @@ public func <= <T : _Comparable>(lhs: T?, rhs: T?) -> Bool {
   }
 }
 
-public func >= <T : _Comparable>(lhs: T?, rhs: T?) -> Bool {
+public func >= <T : Comparable>(lhs: T?, rhs: T?) -> Bool {
   switch (lhs,rhs) {
   case let (l?, r?):
     return l >= r

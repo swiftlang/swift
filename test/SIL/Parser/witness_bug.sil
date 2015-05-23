@@ -10,6 +10,5 @@ bb0:
   return %91 : $()                                // id: %93
 }
 sil_witness_table public_external Int: Comparable module Swift {
-  base_protocol _Comparable: Int: _Comparable module Swift
   base_protocol Equatable: Int: Equatable module Swift
 }
