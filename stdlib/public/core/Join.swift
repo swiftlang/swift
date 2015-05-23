@@ -10,12 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// This protocol is an implementation detail of `ExtensibleCollectionType`; do
-/// not use it directly.
-///
-/// Its requirements are inherited by `ExtensibleCollectionType` and thus must
-/// be satisfied by types conforming to that protocol.
-public protocol _ExtensibleCollectionType : CollectionType {
+/// A collection type that can be efficiently appended-to.
+public protocol ExtensibleCollectionType : CollectionType {
   /// Create an empty instance.
   init()
 
@@ -61,11 +57,8 @@ public protocol _ExtensibleCollectionType : CollectionType {
       S : SequenceType
       where S.Generator.Element == Generator.Element
   >(newElements: S)
-}
 
-/// A collection type that can be efficiently appended-to.
-public protocol ExtensibleCollectionType : _ExtensibleCollectionType {
-/*
+  /*
   We could have these operators with default implementations, but the compiler
   crashes:
 
@@ -95,7 +88,7 @@ public protocol ExtensibleCollectionType : _ExtensibleCollectionType {
 }
 
 public func +<
-    C : _ExtensibleCollectionType,
+    C : ExtensibleCollectionType,
     S : SequenceType
     where S.Generator.Element == C.Generator.Element
 >(var lhs: C, rhs: S) -> C {
@@ -105,7 +98,7 @@ public func +<
 }
 
 public func +<
-    C : _ExtensibleCollectionType,
+    C : ExtensibleCollectionType,
     S : SequenceType
     where S.Generator.Element == C.Generator.Element
 >(lhs: S, rhs: C) -> C {
@@ -117,7 +110,7 @@ public func +<
 }
 
 public func +<
-    C : _ExtensibleCollectionType,
+    C : ExtensibleCollectionType,
     S : CollectionType
     where S.Generator.Element == C.Generator.Element
 >(var lhs: C, rhs: S) -> C {
@@ -128,8 +121,8 @@ public func +<
 }
 
 public func +<
-    EC1 : _ExtensibleCollectionType,
-    EC2 : _ExtensibleCollectionType
+    EC1 : ExtensibleCollectionType,
+    EC2 : ExtensibleCollectionType
     where EC1.Generator.Element == EC2.Generator.Element
 >(var lhs: EC1, rhs: EC2) -> EC1 {
   // FIXME: what if lhs is a reference type?  This will mutate it.
