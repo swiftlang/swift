@@ -1922,7 +1922,6 @@ static bool diagnoseSubElementFailure(std::pair<Expr*, ValueDecl*> immInfo,
 void FailureDiagnosis::diagnoseAssignmentFailure(Expr *dest, Type destTy,
                                                  SourceLoc equalLoc,
                                                  ConstraintSystem &CS) {
-
   auto &TC = CS.getTypeChecker();
 
   // Otherwise, we have an invalid destination type.  Give a specific diagnostic
@@ -2035,6 +2034,12 @@ void FailureDiagnosis::diagnoseAssignmentFailure(Expr *dest, Type destTy,
                 immInfo.first->getType())
       .highlight(immInfo.first->getSourceRange())
       .highlight(UDE->getNameLoc());
+    return;
+  }
+
+  // Diagnose obvious assignments to literals.
+  if (isa<LiteralExpr>(dest->getSemanticsProvidingExpr())) {
+    TC.diagnose(equalLoc, diag::cannot_assign_to_literal);
     return;
   }
 
@@ -2565,57 +2570,15 @@ bool FailureDiagnosis::diagnoseFailureForAssignExpr() {
   if (isErrorTypeKind(srcType) || isErrorTypeKind(destType))
     return true;
 
-  
-  auto destTypeName = getUserFriendlyTypeName(destType);
-  auto srcTypeName = getUserFriendlyTypeName(srcType);
-  
-  // Diagnose the error with as specific of an issue as possible.
-  if (isa<LiteralExpr>(destExpr->getSemanticsProvidingExpr())) {
-    CS->TC.diagnose(destExpr->getLoc(), diag::cannot_assign_to_literal);
-    return true;
-  }
-  
   // If the result type is a non-lvalue, then we are failing because it is
   // immutable and that's not a great thing to assign to.
   if (!destType->isLValueType()) {
-    // Special case it further based on what the actual expression is.
-    auto LeftArg = destExpr->getSemanticsProvidingExpr();
-    if (auto *DRE = dyn_cast<DeclRefExpr>(LeftArg))
-      if (auto *VD = dyn_cast<VarDecl>(DRE->getDecl())) {
-        unsigned DiagCase;
-        
-        if (VD->isLet())
-          DiagCase = 0;
-        else if (VD->hasAccessorFunctions() && !VD->getSetter())
-          DiagCase = 1;
-        else
-          DiagCase = 2;
-        
-        CS->TC.diagnose(assignExpr->getLoc(),
-                        diag::cannot_assign_to_rvalue_vardecl,
-                        VD->getName(), DiagCase)
-            .highlight(LeftArg->getSourceRange());
-        VD->emitLetToVarNoteIfSimple(CS->DC);
-        return true;
-      }
-
-
-    // Figure out what part of the subexpression is the problem.
-    auto immInfo = resolveImmutableBase(LeftArg, *CS);
-
-    // Diagnose the case when the failure was due to a determinable
-    // sub-expression.
-    if (diagnoseSubElementFailure(immInfo, assignExpr->getLoc(), *CS,
-                                  diag::cannot_assign_to_immutable_subelement))
-      return true;
-
-
-    CS->TC.diagnose(assignExpr->getLoc(),
-                    diag::cannot_assign_to_immutable_expr, destTypeName)
-      .highlight(LeftArg->getSourceRange());
+    diagnoseAssignmentFailure(destExpr, destType, assignExpr->getLoc(), *CS);
     return true;
   }
-  
+
+  auto destTypeName = getUserFriendlyTypeName(destType);
+  auto srcTypeName = getUserFriendlyTypeName(srcType);
   CS->TC.diagnose(srcExpr->getLoc(), diag::cannot_assign_values, srcTypeName,
                   destTypeName);
   return true;

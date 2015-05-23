@@ -123,15 +123,6 @@ ERROR(cannot_assign_values,sema,none,
       "cannot assign a value of type '%0' to a value of type '%1'",
       (StringRef, StringRef))
 
-ERROR(cannot_assign_to_immutable_subelement,sema_tcs,none,
-      "cannot assign to immutable value: %0", (StringRef))
-ERROR(cannot_assign_to_immutable_expr,sema,none,
-      "cannot assign to immutable value of type '%0'", (StringRef))
-
-ERROR(cannot_assign_to_rvalue_vardecl,sema_tcs,none,
-      "cannot assign to %select{'let' value|get-only property|immutable value}1"
-      " %0", (Identifier, unsigned))
-
 ERROR(cannot_pass_rvalue_inout_subelement,sema_tcs,none,
       "cannot pass immutable value as inout argument: %0",
       (StringRef))
