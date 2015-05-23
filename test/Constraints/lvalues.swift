@@ -88,7 +88,7 @@ z.non_settable_x += x // expected-error{{left side of mutating operator isn't mu
 ++z.non_settable_x // expected-error{{cannot use immutable value with mutating unary operator: 'non_settable_x' is immutable}}
 
 // non-settable subscript is non-settable:
-z[0] = 0.0 // expected-error{{cannot assign to immutable value: 'z' is immutable}}
+z[0] = 0.0 // expected-error{{cannot assign through subscript: 'z' is immutable}}
 f2(&z[0]) // expected-error{{cannot pass immutable value as inout argument: 'z' is immutable}}
 f1(&z[0]) // expected-error{{cannot pass immutable value as inout argument: 'z' is immutable}}
 z[0] += 0.0 // expected-error{{cannot pass immutable value of type 'Double' to mutating binary operator '+='}}
