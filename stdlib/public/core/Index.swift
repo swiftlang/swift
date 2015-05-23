@@ -205,9 +205,10 @@ func _advanceForward<T : ForwardIndexType>(
 //===----------------------------------------------------------------------===//
 //===--- BidirectionalIndexType -------------------------------------------===//
 
-/// This protocol is an implementation detail of `BidirectionalIndexType`; do
-/// not use it directly.
-public protocol _BidirectionalIndexType : ForwardIndexType {
+
+/// An *index* that can step backwards via application of its
+/// `predecessor()` method.
+public protocol BidirectionalIndexType : ForwardIndexType {
   /// Return the previous consecutive value in a discrete sequence.
   ///
   /// If `self` has a well-defined successor,
@@ -221,21 +222,15 @@ public protocol _BidirectionalIndexType : ForwardIndexType {
   mutating func _predecessorInPlace()
 }
 
-extension _BidirectionalIndexType {
+extension BidirectionalIndexType {
   @inline(__always)
   final public mutating func _predecessorInPlace() { self = self.predecessor() }
-}
-
-/// An *index* that can step backwards via application of its
-/// `predecessor()` method.
-public protocol BidirectionalIndexType
-  : ForwardIndexType, _BidirectionalIndexType {
 }
 
 /// Replace `i` with its `predecessor()` and return the updated value
 /// of `i`.
 @transparent
-public prefix func -- <T : _BidirectionalIndexType> (inout i: T) -> T {
+public prefix func -- <T : BidirectionalIndexType> (inout i: T) -> T {
   i._predecessorInPlace()
   return i
 }
@@ -244,7 +239,7 @@ public prefix func -- <T : _BidirectionalIndexType> (inout i: T) -> T {
 /// Replace `i` with its `predecessor()` and return the original
 /// value of `i`.
 @transparent
-public postfix func -- <T : _BidirectionalIndexType> (inout i: T) -> T {
+public postfix func -- <T : BidirectionalIndexType> (inout i: T) -> T {
   let ret = i
   i._predecessorInPlace()
   return ret
@@ -254,7 +249,7 @@ public postfix func -- <T : _BidirectionalIndexType> (inout i: T) -> T {
 
 /// Do not use this operator directly; call advance(start, n) instead.
 @transparent
-public func ~> <T : _BidirectionalIndexType>(
+public func ~> <T : BidirectionalIndexType>(
   start:T , rest: (_Advance, T.Distance)
 ) -> T {
   let n = rest.1
@@ -270,7 +265,7 @@ public func ~> <T : _BidirectionalIndexType>(
 
 /// Do not use this operator directly; call advance(start, n, end) instead.
 @transparent
-public func ~> <T : _BidirectionalIndexType>(
+public func ~> <T : BidirectionalIndexType>(
   start:T, rest: (_Advance, (T.Distance, T))
 ) -> T {
   let n = rest.1.0
@@ -293,7 +288,7 @@ public func ~> <T : _BidirectionalIndexType>(
 ///
 /// Its requirements are inherited by `RandomAccessIndexType` and thus must
 /// be satisfied by types conforming to that protocol.
-public protocol _RandomAccessIndexType : _BidirectionalIndexType, Strideable {
+public protocol _RandomAccessIndexType : BidirectionalIndexType, Strideable {
   /// Return the minimum number of applications of `successor` or
   /// `predecessor` required to reach `other` from `self`.
   ///
