@@ -63,6 +63,10 @@ RangeTestSuite.test("Pattern matching") {
   expectTrue(x ~= 10)
   expectFalse(x ~= 20)
   expectFalse(x ~= -1)
+
+  // <rdar://21091371>.  Timeouts should make this test fail if this
+  // ends up doing a linear search.
+  expectFalse(1_000_000..<(1_000_000_000_000 as Int64) ~= 1)
 }
 
 RangeTestSuite.test("stride") {
