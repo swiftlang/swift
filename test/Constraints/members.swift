@@ -138,8 +138,7 @@ func generic<T: P>(var t: T) {
   var _ : () = t.bar(0)
 }
 
-// FIXME: Warning is bogus rdar://problem/21091625
-func existential(var p: P, p2 : P2) { //expected-warning{{}}
+func existential(var p: P, p2 : P2) {
   p.mut(1)
   _ = p.bar
   _ = p.mut // expected-error{{partial application of 'mutating' protocol method is not allowed}}
