@@ -223,68 +223,15 @@ NSStringAPIs.test("capitalizedString") {
   expectEqual("Жжж", "жжж".capitalizedString)
 }
 
-NSStringAPIs.test("localizedCapitalizedString") {
-  if #available(OSX 10.11, iOS 9.0, *) {
-    withOverriddenNSLocaleCurrentLocale("en") { () -> () in
-      expectEqual(
-        "Foo Foo Foo Foo",
-        "foo Foo fOO FOO".localizedCapitalizedString)
-      expectEqual("Жжж", "жжж".localizedCapitalizedString)
-      return ()
-    }
-
-    //
-    // Special casing.
-    //
-
-    // U+0069 LATIN SMALL LETTER I
-    // to upper case:
-    // U+0049 LATIN CAPITAL LETTER I
-    withOverriddenNSLocaleCurrentLocale("en") {
-      expectEqual("Iii Iii", "iii III".localizedCapitalizedString)
-    }
-
-    // U+0069 LATIN SMALL LETTER I
-    // to upper case in Turkish locale:
-    // U+0130 LATIN CAPITAL LETTER I WITH DOT ABOVE
-    withOverriddenNSLocaleCurrentLocale("tr") {
-      expectEqual("\u{0130}ii Iıı", "iii III".localizedCapitalizedString)
-    }
-  }
-}
-
 NSStringAPIs.test("capitalizedStringWithLocale(_:)") {
-  expectEqual(
-    "Foo Foo Foo Foo",
-    "foo Foo fOO FOO".capitalizedStringWithLocale(NSLocale.currentLocale()))
-  expectEqual(
-    "Жжж",
-    "жжж".capitalizedStringWithLocale(NSLocale.currentLocale()))
+  expectEqual("Foo Foo Foo Foo",
+      "foo Foo fOO FOO".capitalizedStringWithLocale(NSLocale.currentLocale()))
+  expectEqual("Жжж",
+      "жжж".capitalizedStringWithLocale(NSLocale.currentLocale()))
 
-  expectEqual(
-    "Foo Foo Foo Foo",
-    "foo Foo fOO FOO".capitalizedStringWithLocale(nil))
+  expectEqual("Foo Foo Foo Foo",
+      "foo Foo fOO FOO".capitalizedStringWithLocale(nil))
   expectEqual("Жжж", "жжж".capitalizedStringWithLocale(nil))
-
-  //
-  // Special casing.
-  //
-
-  // U+0069 LATIN SMALL LETTER I
-  // to upper case:
-  // U+0049 LATIN CAPITAL LETTER I
-  expectEqual(
-    "Iii Iii",
-    "iii III".capitalizedStringWithLocale(
-      NSLocale(localeIdentifier: "en")))
-
-  // U+0069 LATIN SMALL LETTER I
-  // to upper case in Turkish locale:
-  // U+0130 LATIN CAPITAL LETTER I WITH DOT ABOVE
-  expectEqual(
-    "İii Iıı",
-    "iii III".capitalizedStringWithLocale(
-      NSLocale(localeIdentifier: "tr")))
 }
 
 NSStringAPIs.test("caseInsensitiveCompare(_:)") {
@@ -947,63 +894,6 @@ NSStringAPIs.test("localizedStandardCompare(_:)") {
       "абвг".localizedStandardCompare("АбВг"))
 }
 
-NSStringAPIs.test("localizedLowercaseString") {
-  if #available(OSX 10.11, iOS 9.0, *) {
-    withOverriddenNSLocaleCurrentLocale("en") {
-      expectEqual("abcd", "abCD".localizedLowercaseString)
-    }
-
-    withOverriddenNSLocaleCurrentLocale("en") {
-      expectEqual("абвг", "абВГ".localizedLowercaseString)
-    }
-    withOverriddenNSLocaleCurrentLocale("ru") {
-      expectEqual("абвг", "абВГ".localizedLowercaseString)
-    }
-
-    withOverriddenNSLocaleCurrentLocale("ru") {
-      expectEqual("たちつてと", "たちつてと".localizedLowercaseString)
-    }
-
-    //
-    // Special casing.
-    //
-
-    // U+0130 LATIN CAPITAL LETTER I WITH DOT ABOVE
-    // to lower case:
-    // U+0069 LATIN SMALL LETTER I
-    // U+0307 COMBINING DOT ABOVE
-    withOverriddenNSLocaleCurrentLocale("en") {
-      expectEqual("\u{0069}\u{0307}", "\u{0130}".localizedLowercaseString)
-    }
-
-    // U+0130 LATIN CAPITAL LETTER I WITH DOT ABOVE
-    // to lower case in Turkish locale:
-    // U+0069 LATIN SMALL LETTER I
-    withOverriddenNSLocaleCurrentLocale("tr") {
-      expectEqual("\u{0069}", "\u{0130}".localizedLowercaseString)
-    }
-
-    // U+0049 LATIN CAPITAL LETTER I
-    // U+0307 COMBINING DOT ABOVE
-    // to lower case:
-    // U+0069 LATIN SMALL LETTER I
-    // U+0307 COMBINING DOT ABOVE
-    withOverriddenNSLocaleCurrentLocale("en") {
-      expectEqual(
-        "\u{0069}\u{0307}",
-        "\u{0049}\u{0307}".localizedLowercaseString)
-    }
-
-    // U+0049 LATIN CAPITAL LETTER I
-    // U+0307 COMBINING DOT ABOVE
-    // to lower case in Turkish locale:
-    // U+0069 LATIN SMALL LETTER I
-    withOverriddenNSLocaleCurrentLocale("tr") {
-      expectEqual("\u{0069}", "\u{0049}\u{0307}".localizedLowercaseString)
-    }
-  }
-}
-
 NSStringAPIs.test("lowercaseStringWithLocale(_:)") {
   expectEqual("abcd", "abCD".lowercaseStringWithLocale(
       NSLocale(localeIdentifier: "en")))
@@ -1190,16 +1080,6 @@ NSStringAPIs.test("rangeOfComposedCharacterSequencesForRange(_:)") {
       advance(s.startIndex, 8)..<advance(s.startIndex, 10))])
 }
 
-func toIntRange(
-  string: String, _ maybeRange: Range<String.Index>?
-) -> Range<Int>? {
-  guard let range = maybeRange else { return nil }
-
-  return
-    distance(string.startIndex, range.startIndex) ..<
-    distance(string.startIndex, range.endIndex)
-}
-
 NSStringAPIs.test("rangeOfString(_:options:range:locale:)") {
   if true {
     let s = ""
@@ -1210,12 +1090,12 @@ NSStringAPIs.test("rangeOfString(_:options:range:locale:)") {
     let s = "abc"
     expectEmpty(s.rangeOfString(""))
     expectEmpty(s.rangeOfString("def"))
-    expectOptionalEqual(0..<3, toIntRange(s, s.rangeOfString("abc")))
+    expectOptionalEqual(s.startIndex..<s.endIndex, s.rangeOfString("abc"))
   }
   if true {
     let s = "さ\u{3099}し\u{3099}す\u{3099}せ\u{3099}そ\u{3099}"
-    expectOptionalEqual(2..<3, toIntRange(s, s.rangeOfString("す\u{3099}")))
-    expectOptionalEqual(2..<3, toIntRange(s, s.rangeOfString("\u{305a}")))
+    expectEqual("す\u{3099}", s[s.rangeOfString("す\u{3099}")!])
+    expectEqual("す\u{3099}", s[s.rangeOfString("\u{305a}")!])
 
     expectEmpty(s.rangeOfString("\u{3099}す"))
     expectEmpty(s.rangeOfString("す"))
@@ -1230,83 +1110,14 @@ NSStringAPIs.test("rangeOfString(_:options:range:locale:)") {
   }
   if true {
     let s = "а\u{0301}б\u{0301}в\u{0301}г\u{0301}"
-    expectOptionalEqual(0..<1, toIntRange(s, s.rangeOfString("а\u{0301}")))
-    expectOptionalEqual(1..<2, toIntRange(s, s.rangeOfString("б\u{0301}")))
+    expectEqual("а\u{0301}", s[s.rangeOfString("а\u{0301}")!])
+    expectEqual("б\u{0301}", s[s.rangeOfString("б\u{0301}")!])
 
     expectEmpty(s.rangeOfString("б"))
     expectEmpty(s.rangeOfString("\u{0301}б"))
 
-    // FIXME: Again, indexes that don't correspond to grapheme
-    // cluster boundaries.
+    // Again, indexes that don't correspond to grapheme cluster boundaries.
     expectEqual("\u{0301}", s[s.rangeOfString("\u{0301}")!])
-  }
-}
-
-NSStringAPIs.test("localizedStandardContainsString(_:)") {
-  if #available(OSX 10.11, iOS 9.0, *) {
-    withOverriddenNSLocaleCurrentLocale("en") { () -> () in
-      expectFalse("".localizedStandardContainsString(""))
-      expectFalse("".localizedStandardContainsString("a"))
-      expectFalse("a".localizedStandardContainsString(""))
-      expectFalse("a".localizedStandardContainsString("b"))
-      expectTrue("a".localizedStandardContainsString("a"))
-      expectTrue("a".localizedStandardContainsString("A"))
-      expectTrue("A".localizedStandardContainsString("a"))
-      expectTrue("a".localizedStandardContainsString("a\u{0301}"))
-      expectTrue("a\u{0301}".localizedStandardContainsString("a\u{0301}"))
-      expectTrue("a\u{0301}".localizedStandardContainsString("a"))
-      expectTrue("a\u{0301}".localizedStandardContainsString("\u{0301}"))
-      expectFalse("a".localizedStandardContainsString("\u{0301}"))
-
-      expectTrue("i".localizedStandardContainsString("I"))
-      expectTrue("I".localizedStandardContainsString("i"))
-      expectTrue("\u{0130}".localizedStandardContainsString("i"))
-      expectTrue("i".localizedStandardContainsString("\u{0130}"))
-
-      return ()
-    }
-
-    withOverriddenNSLocaleCurrentLocale("tr") {
-      expectTrue("\u{0130}".localizedStandardContainsString("ı"))
-    }
-  }
-}
-
-NSStringAPIs.test("localizedStandardRangeOfString(_:)") {
-  if #available(OSX 10.11, iOS 9.0, *) {
-    func rangeOfString(string: String, _ substring: String) -> Range<Int>? {
-      return toIntRange(
-        string, string.localizedStandardRangeOfString(substring))
-    }
-    withOverriddenNSLocaleCurrentLocale("en") { () -> () in
-      expectEmpty(rangeOfString("", ""))
-      expectEmpty(rangeOfString("", "a"))
-      expectEmpty(rangeOfString("a", ""))
-      expectEmpty(rangeOfString("a", "b"))
-      expectEqual(0..<1, rangeOfString("a", "a"))
-      expectEqual(0..<1, rangeOfString("a", "A"))
-      expectEqual(0..<1, rangeOfString("A", "a"))
-      expectEqual(0..<1, rangeOfString("a", "a\u{0301}"))
-      expectEqual(0..<1, rangeOfString("a\u{0301}", "a\u{0301}"))
-      expectEqual(0..<1, rangeOfString("a\u{0301}", "a"))
-      if true {
-        // FIXME: Indices that don't correspond to grapheme cluster boundaries.
-        let s = "a\u{0301}"
-        expectEqual(
-          "\u{0301}", s[s.localizedStandardRangeOfString("\u{0301}")!])
-      }
-      expectEmpty(rangeOfString("a", "\u{0301}"))
-
-      expectEqual(0..<1, rangeOfString("i", "I"))
-      expectEqual(0..<1, rangeOfString("I", "i"))
-      expectEqual(0..<1, rangeOfString("\u{0130}", "i"))
-      expectEqual(0..<1, rangeOfString("i", "\u{0130}"))
-      return ()
-    }
-
-    withOverriddenNSLocaleCurrentLocale("tr") {
-      expectEqual(0..<1, rangeOfString("\u{0130}", "ı"))
-    }
   }
 }
 
@@ -1689,64 +1500,6 @@ NSStringAPIs.test("substringWithRange(_:)") {
   expectEqual(
     "さ\u{3099}し\u{3099}す\u{3099}",
     s.substringWithRange(advance(s.startIndex, 5)..<advance(s.startIndex, 8)))
-}
-
-NSStringAPIs.test("localizedUppercaseString") {
-  if #available(OSX 10.11, iOS 9.0, *) {
-    withOverriddenNSLocaleCurrentLocale("en") {
-      expectEqual("ABCD", "abCD".localizedUppercaseString)
-    }
-
-    withOverriddenNSLocaleCurrentLocale("en") {
-      expectEqual("АБВГ", "абВГ".localizedUppercaseString)
-    }
-
-    withOverriddenNSLocaleCurrentLocale("ru") {
-      expectEqual("АБВГ", "абВГ".localizedUppercaseString)
-    }
-
-    withOverriddenNSLocaleCurrentLocale("ru") {
-      expectEqual("たちつてと", "たちつてと".localizedUppercaseString)
-    }
-
-    //
-    // Special casing.
-    //
-
-    // U+0069 LATIN SMALL LETTER I
-    // to upper case:
-    // U+0049 LATIN CAPITAL LETTER I
-    withOverriddenNSLocaleCurrentLocale("en") {
-      expectEqual("\u{0049}", "\u{0069}".localizedUppercaseString)
-    }
-
-    // U+0069 LATIN SMALL LETTER I
-    // to upper case in Turkish locale:
-    // U+0130 LATIN CAPITAL LETTER I WITH DOT ABOVE
-    withOverriddenNSLocaleCurrentLocale("tr") {
-      expectEqual("\u{0130}", "\u{0069}".localizedUppercaseString)
-    }
-
-    // U+00DF LATIN SMALL LETTER SHARP S
-    // to upper case:
-    // U+0053 LATIN CAPITAL LETTER S
-    // U+0073 LATIN SMALL LETTER S
-    // But because the whole string is converted to uppercase, we just get two
-    // U+0053.
-    withOverriddenNSLocaleCurrentLocale("en") {
-      expectEqual("\u{0053}\u{0053}", "\u{00df}".localizedUppercaseString)
-    }
-
-    // U+FB01 LATIN SMALL LIGATURE FI
-    // to upper case:
-    // U+0046 LATIN CAPITAL LETTER F
-    // U+0069 LATIN SMALL LETTER I
-    // But because the whole string is converted to uppercase, we get U+0049
-    // LATIN CAPITAL LETTER I.
-    withOverriddenNSLocaleCurrentLocale("ru") {
-      expectEqual("\u{0046}\u{0049}", "\u{fb01}".localizedUppercaseString)
-    }
-  }
 }
 
 NSStringAPIs.test("uppercaseStringWithLocale(_:)") {
