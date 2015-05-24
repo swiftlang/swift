@@ -136,27 +136,40 @@ namespace {
     }
 
     // This is dead code in NonFixedTupleTypeInfo.
-    APInt getFixedExtraInhabitantValue(IRGenModule &IGM,
-                                       unsigned bits,
-                                       unsigned index) const {
+    llvm::ConstantInt *getFixedExtraInhabitantValue(IRGenModule &IGM,
+                                                    unsigned bits,
+                                                    unsigned index) const {
       auto &eltTI = cast<FixedTypeInfo>(asImpl().getFields()[0].getTypeInfo());
       return eltTI.getFixedExtraInhabitantValue(IGM, bits, index);
     }
+
+    // This is dead code in NonFixedTupleTypeInfo.
+    llvm::Value *maskFixedExtraInhabitant(IRGenFunction &IGF,
+                                          llvm::Value *tupleValue) const {
+      // Truncate down to the width of the element, mask it recursively,
+      // and then zext back out to the payload size.
+      auto &eltTI = cast<FixedTypeInfo>(asImpl().getFields()[0].getTypeInfo());
+      unsigned eltWidth = eltTI.getFixedSize().getValueInBits();
+      auto eltTy = llvm::IntegerType::get(IGF.IGM.getLLVMContext(), eltWidth);
+      auto eltValue = IGF.Builder.CreateTrunc(tupleValue, eltTy);      
+      eltValue = eltTI.maskFixedExtraInhabitant(IGF, eltValue);
+      return IGF.Builder.CreateZExt(eltValue, tupleValue->getType());
+    }
         
     // This is dead code in NonFixedTupleTypeInfo.
-    APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const {
+    SpareBitVector getFixedExtraInhabitantMask(IRGenModule &IGM) const {
       if (asImpl().getFields().empty())
-        return APInt();
+        return {};
       
       const FixedTypeInfo &fieldTI
         = cast<FixedTypeInfo>(asImpl().getFields()[0].getTypeInfo());
-      auto size = asImpl().getFixedSize().getValueInBits();
       
-      if (fieldTI.isKnownEmpty())
-        return APInt(size, 0);
-      
-      APInt firstMask = fieldTI.getFixedExtraInhabitantMask(IGM);
-      return firstMask.zextOrTrunc(size);
+      SpareBitVector mask;
+      auto firstFieldSize = fieldTI.getFixedSize().getValueInBits();
+      mask.appendSetBits(firstFieldSize);
+      mask.appendClearBits(asImpl().getFixedSize().getValueInBits()
+                             - firstFieldSize);
+      return mask;
     }
 
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,

@@ -313,9 +313,9 @@ public:
     return getHeapObjectExtraInhabitantCount(IGM);
   }
 
-  APInt getFixedExtraInhabitantValue(IRGenModule &IGM,
-                                     unsigned bits,
-                                     unsigned index) const override {
+  llvm::ConstantInt *getFixedExtraInhabitantValue(IRGenModule &IGM,
+                                                unsigned bits,
+                                                unsigned index) const override {
     return getHeapObjectFixedExtraInhabitantValue(IGM, bits, index, 0);
   }
 

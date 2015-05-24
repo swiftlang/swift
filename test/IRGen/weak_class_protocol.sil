@@ -6,10 +6,13 @@ import Swift
 
 protocol Foo: class { }
 
-// CHECK-LABEL: define void @store_weak({ %swift.weak, i8** }* noalias sret, i64, i64) {{.*}} {
+// CHECK-LABEL: define void @store_weak({ %swift.weak, i8** }* noalias sret, i128) {{.*}} {
 // CHECK:       entry:
-// CHECK:         [[INSTANCE:%.*]] = inttoptr i64 %1 to %objc_object*
-// CHECK:         [[WTABLE:%.*]] = inttoptr i64 %2 to i8**
+// CHECK:         [[INSTANCE_BITS:%.*]] = trunc i128 %1 to i64
+// CHECK:         [[INSTANCE:%.*]] = inttoptr i64 [[INSTANCE_BITS]] to %objc_object*
+// CHECK:         [[WTABLE_SHIFT:%.*]] = lshr i128 %1, 64
+// CHECK:         [[WTABLE_BITS:%.*]] = trunc i128 [[WTABLE_SHIFT]] to i64
+// CHECK:         [[WTABLE:%.*]] = inttoptr i64 [[WTABLE_BITS]] to i8**
 // CHECK:         [[WTABLE_SLOT:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* %0, i32 0, i32 1
 // CHECK:         store i8** [[WTABLE]], i8*** [[WTABLE_SLOT]], align 8
 // CHECK:         [[INSTANCE_SLOT:%.*]] = getelementptr inbounds { %swift.weak, i8** }, { %swift.weak, i8** }* %0, i32 0, i32 0

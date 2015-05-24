@@ -23,7 +23,6 @@
 
 namespace swift {
 namespace irgen {
-  class EnumPayload;
 
 struct LoadedRef {
   llvm::PointerIntPair<llvm::Value*, 1> ValAndNonNull;
@@ -67,7 +66,7 @@ protected:
 public:
   // This is useful for metaprogramming.
   static bool isLoadable() { return true; }
-  
+
   /// Return the number of elements in an explosion of this type.
   virtual unsigned getExplosionSize() const = 0;
 
@@ -115,17 +114,17 @@ public:
   virtual void fixLifetime(IRGenFunction &IGF, Explosion &explosion) const = 0;
   
   /// Pack the source explosion into an enum payload.
-  virtual void packIntoEnumPayload(IRGenFunction &IGF,
-                                   EnumPayload &payload,
-                                   Explosion &sourceExplosion,
-                                   unsigned offset) const = 0;
+  virtual llvm::Value *packEnumPayload(IRGenFunction &IGF,
+                                        Explosion &sourceExplosion,
+                                        unsigned bitWidth,
+                                        unsigned offset) const = 0;
   
   /// Unpack an enum payload containing a valid value of the type into the
   /// destination explosion.
-  virtual void unpackFromEnumPayload(IRGenFunction &IGF,
-                                     const EnumPayload &payload,
-                                     Explosion &targetExplosion,
-                                     unsigned offset) const = 0;
+  virtual void unpackEnumPayload(IRGenFunction &IGF,
+                                  llvm::Value *payload,
+                                  Explosion &targetExplosion,
+                                  unsigned offset) const = 0;
 
   /// Load a a reference counted pointer from an address.
   /// Return the loaded pointer value.

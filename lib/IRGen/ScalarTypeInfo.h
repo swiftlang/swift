@@ -19,7 +19,6 @@
 #ifndef SWIFT_IRGEN_SCALARTYPEINFO_H
 #define SWIFT_IRGEN_SCALARTYPEINFO_H
 
-#include "EnumPayload.h"
 #include "Explosion.h"
 #include "TypeInfo.h"
 #include "IRGenFunction.h"
@@ -184,18 +183,21 @@ public:
     }
   }
   
-  void packIntoEnumPayload(IRGenFunction &IGF,
-                           EnumPayload &payload,
-                           Explosion &src,
-                           unsigned offset) const override {
-    payload.insertValue(IGF, src.claimNext(), offset);
+  llvm::Value *packEnumPayload(IRGenFunction &IGF,
+                                Explosion &src,
+                                unsigned bitWidth,
+                                unsigned offset) const override {
+    PackEnumPayload pack(IGF, bitWidth);
+    pack.addAtOffset(src.claimNext(), offset);
+    return pack.get();
   }
   
-  void unpackFromEnumPayload(IRGenFunction &IGF,
-                             const EnumPayload &payload,
-                             Explosion &dest,
-                             unsigned offset) const override {
-    dest.add(payload.extractValue(IGF, asDerived().getScalarType(), offset));
+  void unpackEnumPayload(IRGenFunction &IGF,
+                          llvm::Value *payload,
+                          Explosion &dest,
+                          unsigned offset) const override {
+    UnpackEnumPayload unpack(IGF, payload);
+    dest.add(unpack.claimAtOffset(asDerived().getScalarType(), offset));
   }
 };
 

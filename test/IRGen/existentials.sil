@@ -88,7 +88,7 @@ entry(%s : $CP):
   return %z : $CP
 }
 
-// CHECK-DAG: define void @class_existential_weak({ %swift.weak, i8** }* noalias sret, i64, i64)
+// CHECK-DAG: define void @class_existential_weak({ %swift.weak, i8** }* noalias sret, i128)
 sil @class_existential_weak : $@convention(thin) (@out @sil_weak CP?, @owned CP?) -> () {
 entry(%w : $*@sil_weak CP?, %a : $CP?):
   // CHECK: [[V:%.*]] = alloca { %swift.weak, i8** }

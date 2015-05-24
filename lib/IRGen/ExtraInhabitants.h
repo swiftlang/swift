@@ -18,7 +18,6 @@
 #define SWIFT_IRGEN_EXTRAINHABITANTS_H
 
 namespace llvm {
-class APInt;
 class ConstantInt;
 class Value;
 }
@@ -44,10 +43,10 @@ unsigned getHeapObjectExtraInhabitantCount(IRGenModule &IGM);
 /// If the pointer appears within a larger aggregate, the 'bits' and 'offset'
 /// arguments can be used to position the inhabitant within the larger integer
 /// constant.
-llvm::APInt getHeapObjectFixedExtraInhabitantValue(IRGenModule &IGM,
-                                                   unsigned bits,
-                                                   unsigned index,
-                                                   unsigned offset);
+llvm::ConstantInt *getHeapObjectFixedExtraInhabitantValue(IRGenModule &IGM,
+                                                          unsigned bits,
+                                                          unsigned index,
+                                                          unsigned offset);
   
 /// Calculate the index of a heap object extra inhabitant representation stored
 /// in memory.
@@ -74,10 +73,10 @@ unsigned getFunctionPointerExtraInhabitantCount(IRGenModule &IGM);
 /// If the pointer appears within a larger aggregate, the 'bits' and 'offset'
 /// arguments can be used to position the inhabitant within the larger integer
 /// constant.
-llvm::APInt getFunctionPointerFixedExtraInhabitantValue(IRGenModule &IGM,
-                                                        unsigned bits,
-                                                        unsigned index,
-                                                        unsigned offset);
+llvm::ConstantInt *getFunctionPointerFixedExtraInhabitantValue(IRGenModule &IGM,
+                                                               unsigned bits,
+                                                               unsigned index,
+                                                               unsigned offset);
   
 /// Calculate the index of a function pointer extra inhabitant
 /// representation stored in memory.

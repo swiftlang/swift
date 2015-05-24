@@ -24,10 +24,8 @@ import Swift
 //      case x(i64): X0 X1 X2 ... X63 | 0, where X0...X63 are the payload bits
 //      case y:      0  0  0  ... 0   | 1
 //      case z:      1  0  0  ... 0   | 1
-// CHECK-64: %O4enum17SinglePayloadNoXI = type <{ [8 x i8], [1 x i8] }>
-// CHECK-64: %O4enum18SinglePayloadNoXI2 = type <{ [8 x i8], [1 x i8] }>
-// CHECK-32: %O4enum17SinglePayloadNoXI = type <{ [4 x i8], [1 x i8] }>
-// CHECK-32: %O4enum18SinglePayloadNoXI2 = type <{ [4 x i8], [1 x i8] }>
+// CHECK: %O4enum17SinglePayloadNoXI = type <{ [8 x i8], [1 x i8] }>
+// CHECK: %O4enum18SinglePayloadNoXI2 = type <{ [8 x i8], [1 x i8] }>
 
 // -- Single-payload enum, spare bits. The representation uses a tag bit
 //    out of the payload to distinguish payload from enum tag:
@@ -78,10 +76,9 @@ import Swift
 //      case c:     0  1  0  0  0  0  1  1
 // CHECK: %O4enum24MultiPayloadTwoSpareBits = type <{ [8 x i8] }>
 
-// CHECK-64: %O4enum30MultiPayloadSpareBitAggregates = type <{ [16 x i8] }>
+// CHECK: %O4enum30MultiPayloadSpareBitAggregates = type <{ [16 x i8] }>
 
-// CHECK-64: %O4enum18MultiPayloadNested = type <{ [9 x i8] }>
-// CHECK-32: %O4enum18MultiPayloadNested = type <{ [5 x i8] }>
+// CHECK: %O4enum18MultiPayloadNested = type <{ [9 x i8] }>
 
 // 32-bit object references don't have enough spare bits.
 // CHECK-64: %O4enum27MultiPayloadNestedSpareBits = type <{ [8 x i8] }>
@@ -254,9 +251,9 @@ entry(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
 // CHECK: entry:
 // CHECK:   [[DATA_ADDR:%.*]] = bitcast %O4enum9Singleton* %2 to <{ i64, i64 }>*
 // CHECK:   [[DATA_0_ADDR:%.*]] = getelementptr inbounds <{ i64, i64 }>, <{ i64, i64 }>* [[DATA_ADDR]], i32 0, i32 0
-// CHECK:   store i64 %0, i64* [[DATA_0_ADDR]]
+// CHECK:   store i64 %0, i64* [[DATA_0_ADDR]], align 8
 // CHECK:   [[DATA_1_ADDR:%.*]] = getelementptr inbounds <{ i64, i64 }>, <{ i64, i64 }>* [[DATA_ADDR]], i32 0, i32 1
-// CHECK:   store i64 %1, i64* [[DATA_1_ADDR]]
+// CHECK:   store i64 %1, i64* [[DATA_1_ADDR]], align 8
 // CHECK:   ret void
 // CHECK: }
 sil @singleton_inject_indirect : $(Builtin.Int64, Builtin.Int64, @inout Singleton) -> () {
@@ -378,7 +375,7 @@ entry:
 // CHECK: define void @no_payload_inject_z_indirect(%O4enum10NoPayloads*) {{.*}} {
 // CHECK: entry:
 // CHECK:   [[TAG_ADDR:%.*]] = getelementptr inbounds %O4enum10NoPayloads, %O4enum10NoPayloads* %0, i32 0, i32 0
-// CHECK:   store i2 -2, i2* [[TAG_ADDR]]
+// CHECK:   store i2 -2, i2* [[TAG_ADDR]], align 1
 // CHECK:   ret void
 // CHECK: }
 sil @no_payload_inject_z_indirect : $(@inout NoPayloads) -> () {
@@ -432,12 +429,12 @@ end:
 
 
 enum SinglePayloadNoXI {
-  case x(Builtin.Word)
+  case x(Builtin.Int64)
   case y
 }
 
 enum SinglePayloadNoXI2 {
-  case x(Builtin.Word)
+  case x(Builtin.Int64)
   case y
   case z
   case w
@@ -445,8 +442,7 @@ enum SinglePayloadNoXI2 {
   case u
 }
 
-// CHECK-64: define void @single_payload_no_xi_switch([[WORD:i64]], i1) {{.*}} {
-// CHECK-32: define void @single_payload_no_xi_switch([[WORD:i32]], i1) {{.*}} {
+// CHECK: define void @single_payload_no_xi_switch(i64, i1) {{.*}} {
 sil @single_payload_no_xi_switch : $@convention(thin) (SinglePayloadNoXI2) -> () {
 // CHECK: entry:
 entry(%u : $SinglePayloadNoXI2):
@@ -455,12 +451,12 @@ entry(%u : $SinglePayloadNoXI2):
 // CHECK:     i1 true, label %[[TAGS:[0-9]+]]
 // CHECK:   ]
 // CHECK: ; <label>:[[TAGS]]
-// CHECK:   switch [[WORD]] %0, label %[[DFLT]] [
-// CHECK:     [[WORD]] 0, label %[[Y_DEST:[0-9]+]]
-// CHECK:     [[WORD]] 1, label %[[Z_DEST:[0-9]+]]
-// CHECK:     [[WORD]] 2, label %[[W_DEST:[0-9]+]]
-// CHECK:     [[WORD]] 3, label %[[V_DEST:[0-9]+]]
-// CHECK:     [[WORD]] 4, label %[[U_DEST:[0-9]+]]
+// CHECK:   switch i64 %0, label %[[DFLT]] [
+// CHECK:     i64 0, label %[[Y_DEST:[0-9]+]]
+// CHECK:     i64 1, label %[[Z_DEST:[0-9]+]]
+// CHECK:     i64 2, label %[[W_DEST:[0-9]+]]
+// CHECK:     i64 3, label %[[V_DEST:[0-9]+]]
+// CHECK:     i64 4, label %[[U_DEST:[0-9]+]]
 // CHECK:   ]
 // CHECK: ; <label>:[[DFLT]]
 // CHECK:   unreachable
@@ -522,7 +518,7 @@ end:
   return %x : $()
 }
 
-// CHECK: define void @single_payload_no_xi_switch_arg([[WORD]], i1) {{.*}} {
+// CHECK: define void @single_payload_no_xi_switch_arg(i64, i1) {{.*}} {
 sil @single_payload_no_xi_switch_arg : $@convention(thin) (SinglePayloadNoXI2) -> () {
 // CHECK: entry:
 entry(%u : $SinglePayloadNoXI2):
@@ -531,12 +527,12 @@ entry(%u : $SinglePayloadNoXI2):
 // CHECK:     i1 true, label %[[TAGS:[0-9]+]]
 // CHECK:   ]
 // CHECK: ; <label>:[[TAGS]]
-// CHECK:   switch [[WORD]] %0, label %[[DFLT:[0-9]+]] [
-// CHECK:     [[WORD]] 0, label %[[Y_DEST:[0-9]+]]
-// CHECK:     [[WORD]] 1, label %[[Z_DEST:[0-9]+]]
-// CHECK:     [[WORD]] 2, label %[[SPLITEDGE:[0-9]+]]
-// CHECK:     [[WORD]] 3, label %[[SPLITEDGE]]
-// CHECK:     [[WORD]] 4, label %[[SPLITEDGE]]
+// CHECK:   switch i64 %0, label %[[DFLT:[0-9]+]] [
+// CHECK:     i64 0, label %[[Y_DEST:[0-9]+]]
+// CHECK:     i64 1, label %[[Z_DEST:[0-9]+]]
+// CHECK:     i64 2, label %[[SPLITEDGE:[0-9]+]]
+// CHECK:     i64 3, label %[[SPLITEDGE]]
+// CHECK:     i64 4, label %[[SPLITEDGE]]
 // CHECK:   ]
 // CHECK: ; <label>:[[DFLT]]
 // CHECK:   unreachable
@@ -547,8 +543,8 @@ entry(%u : $SinglePayloadNoXI2):
 // CHECK: ; <label>:[[SPLITEDGE]]
 // CHECK:   br label %[[END:[0-9]+]]
 // CHECK: ; <label>:[[X_DEST]]
-// CHECK:   {{%.*}} = phi [[WORD]] [ %0, %[[X_PREDEST]] ]
-x_dest(%u2 : $Builtin.Word):
+// CHECK:   {{%.*}} = phi i64 [ %0, %[[X_PREDEST]] ]
+x_dest(%u2 : $Builtin.Int64):
 // CHECK:   call void @a()
 // CHECK:   br label %[[END]]
   %a = function_ref @a : $@convention(thin) () -> ()
@@ -578,39 +574,39 @@ end:
   return %x : $()
 }
 
-// CHECK: define { [[WORD]], i1 } @single_payload_no_xi_inject_x([[WORD]]) {{.*}} {
+// CHECK: define { i64, i1 } @single_payload_no_xi_inject_x(i64) {{.*}} {
 // CHECK: entry:
-// CHECK:   [[A:%.*]] = insertvalue { [[WORD]], i1 } undef, [[WORD]] %0, 0
-// CHECK:   [[B:%.*]] = insertvalue { [[WORD]], i1 } [[A]], i1 false, 1
-// CHECK:   ret { [[WORD]], i1 } [[B]]
+// CHECK:   [[A:%.*]] = insertvalue { i64, i1 } undef, i64 %0, 0
+// CHECK:   [[B:%.*]] = insertvalue { i64, i1 } [[A]], i1 false, 1
+// CHECK:   ret { i64, i1 } [[B]]
 // CHECK: }
-sil @single_payload_no_xi_inject_x : $(Builtin.Word) -> SinglePayloadNoXI2 {
-entry(%0 : $Builtin.Word):
-  %u = enum $SinglePayloadNoXI2, #SinglePayloadNoXI2.x!enumelt.1, %0 : $Builtin.Word
+sil @single_payload_no_xi_inject_x : $(Builtin.Int64) -> SinglePayloadNoXI2 {
+entry(%0 : $Builtin.Int64):
+  %u = enum $SinglePayloadNoXI2, #SinglePayloadNoXI2.x!enumelt.1, %0 : $Builtin.Int64
   return %u : $SinglePayloadNoXI2
 }
 
-// CHECK: define void @single_payload_no_xi_inject_x_indirect([[WORD]], %O4enum18SinglePayloadNoXI2*) {{.*}} {
+// CHECK: define void @single_payload_no_xi_inject_x_indirect(i64, %O4enum18SinglePayloadNoXI2*) {{.*}} {
 // CHECK: entry:
-// CHECK:   [[DATA_ADDR:%.*]] = bitcast %O4enum18SinglePayloadNoXI2* %1 to [[WORD]]*
-// CHECK:   store [[WORD]] %0, [[WORD]]* [[DATA_ADDR]]
+// CHECK:   [[DATA_ADDR:%.*]] = bitcast %O4enum18SinglePayloadNoXI2* %1 to i64*
+// CHECK:   store i64 %0, i64* [[DATA_ADDR]], align 8
 // CHECK:   [[T0:%.*]] = getelementptr inbounds %O4enum18SinglePayloadNoXI2, %O4enum18SinglePayloadNoXI2* %1, i32 0, i32 1
 // CHECK:   [[TAG_ADDR:%.*]] = bitcast [1 x i8]* [[T0]] to i1*
-// CHECK:   store i1 false, i1* [[TAG_ADDR]]
+// CHECK:   store i1 false, i1* [[TAG_ADDR]], align 8
 // CHECK:   ret void
 // CHECK: }
-sil @single_payload_no_xi_inject_x_indirect : $(Builtin.Word, @inout SinglePayloadNoXI2) -> () {
-entry(%0 : $Builtin.Word, %1 : $*SinglePayloadNoXI2):
+sil @single_payload_no_xi_inject_x_indirect : $(Builtin.Int64, @inout SinglePayloadNoXI2) -> () {
+entry(%0 : $Builtin.Int64, %1 : $*SinglePayloadNoXI2):
   %a = init_enum_data_addr %1 : $*SinglePayloadNoXI2, #SinglePayloadNoXI2.x!enumelt.1
-  store %0 to %a : $*Builtin.Word
+  store %0 to %a : $*Builtin.Int64
   inject_enum_addr %1 : $*SinglePayloadNoXI2, #SinglePayloadNoXI2.x!enumelt.1
   %v = tuple ()
   return %v : $()
 }
 
-// CHECK: define { [[WORD]], i1 } @single_payload_no_xi_inject_y() {{.*}} {
+// CHECK: define { i64, i1 } @single_payload_no_xi_inject_y() {{.*}} {
 // CHECK: entry:
-// CHECK:   ret { [[WORD]], i1 } { [[WORD]] 0, i1 true }
+// CHECK:   ret { i64, i1 } { i64 0, i1 true }
 // CHECK: }
 sil @single_payload_no_xi_inject_y : $() -> SinglePayloadNoXI2 {
 entry:
@@ -620,11 +616,11 @@ entry:
 
 // CHECK: define void @single_payload_no_xi_inject_y_indirect(%O4enum18SinglePayloadNoXI2*) {{.*}} {
 // CHECK: entry:
-// CHECK:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum18SinglePayloadNoXI2* %0 to [[WORD]]*
-// CHECK:   store [[WORD]] 0, [[WORD]]* [[PAYLOAD_ADDR]]
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum18SinglePayloadNoXI2* %0 to i64*
+// CHECK:   store i64 0, i64* [[PAYLOAD_ADDR]], align 8
 // CHECK:   [[T0:%.*]] = getelementptr inbounds %O4enum18SinglePayloadNoXI2, %O4enum18SinglePayloadNoXI2* %0, i32 0, i32 1
 // CHECK:   [[TAG_ADDR:%.*]] = bitcast [1 x i8]* [[T0]] to i1*
-// CHECK:   store i1 true, i1* [[TAG_ADDR]]
+// CHECK:   store i1 true, i1* [[TAG_ADDR]], align 8
 // CHECK:   ret void
 // CHECK: }
 sil @single_payload_no_xi_inject_y_indirect : $(@inout SinglePayloadNoXI2) -> () {
@@ -634,9 +630,9 @@ entry(%0 : $*SinglePayloadNoXI2):
   return %v : $()
 }
 
-// CHECK: define { [[WORD]], i1 } @single_payload_no_xi_inject_z() {{.*}} {
+// CHECK-LABEL: define { i64, i1 } @single_payload_no_xi_inject_z() {{.*}} {
 // CHECK: entry:
-// CHECK:   ret { [[WORD]], i1 } { [[WORD]] 1, i1 true }
+// CHECK:   ret { i64, i1 } { i64 1, i1 true }
 // CHECK: }
 sil @single_payload_no_xi_inject_z : $() -> SinglePayloadNoXI2 {
 entry:
@@ -648,30 +644,20 @@ entry:
 // -- Test packing and unpacking aggregates.
 
 enum AggregateSinglePayload {
-  case x(Builtin.Word, Builtin.Word)
+  case x(Builtin.Int64, Builtin.Int64)
   case y
   case z
 }
 
-sil @int21_sink : $@convention(thin) (Builtin.Int21) -> ()
-sil @int64_sink : $@convention(thin) (Builtin.Word) -> ()
-
-// CHECK-LABEL: define void @aggregate_single_payload_unpack
-// CHECK:         ([[WORD]], [[WORD]], i1) {{.*}} {
+// CHECK-LABEL: define void @aggregate_single_payload_unpack(i128, i1) {{.*}} {
 sil @aggregate_single_payload_unpack : $@convention(thin) (AggregateSinglePayload) -> () {
 entry(%u : $AggregateSinglePayload):
   switch_enum %u : $AggregateSinglePayload, case #AggregateSinglePayload.x!enumelt.1: x_dest, default end
 
-  // CHECK: [[FIRST:%.*]] = phi [[WORD]] [ %0
-  // CHECK: [[SECOND:%.*]] = phi [[WORD]] [ %1
-  // CHECK: call void @int64_sink([[WORD]] [[FIRST]])
-  // CHECK: call void @int64_sink([[WORD]] [[SECOND]])
-x_dest(%v : $(Builtin.Word, Builtin.Word)):
-  %f = function_ref @int64_sink : $@convention(thin) (Builtin.Word) -> ()
-  %a = tuple_extract %v : $(Builtin.Word, Builtin.Word), 0
-  %b = tuple_extract %v : $(Builtin.Word, Builtin.Word), 1
-  %c = apply %f(%a) : $@convention(thin) (Builtin.Word) -> ()
-  %d = apply %f(%b) : $@convention(thin) (Builtin.Word) -> ()
+// CHECK:   {{%.*}} = trunc i128 %0 to i64
+// CHECK:   [[SHIFT_1:%.*]] = lshr i128 %0, 64
+// CHECK:   {{%.*}} = trunc i128 [[SHIFT_1]] to i64
+x_dest(%v : $(Builtin.Int64, Builtin.Int64)):
   br end
 
 end:
@@ -679,33 +665,39 @@ end:
   return %x : $()
 }
 
-// CHECK: define { [[WORD]], [[WORD]] } @aggregate_single_payload_unsafe_unpack([[WORD]], [[WORD]], i1) {{.*}} {
-// CHECK:  [[A:%.*]] = insertvalue { [[WORD]], [[WORD]] } undef, [[WORD]] %0, 0
-// CHECK:  [[B:%.*]] = insertvalue { [[WORD]], [[WORD]] } [[A]], [[WORD]] %1, 1
-// CHECK:  ret { [[WORD]], [[WORD]] } [[B]]
-sil @aggregate_single_payload_unsafe_unpack : $@convention(thin) (AggregateSinglePayload) -> (Builtin.Word, Builtin.Word) {
+// CHECK-LABEL: define { i64, i64 } @aggregate_single_payload_unsafe_unpack(i128, i1) {{.*}} {
+// CHECK:  %2 = trunc i128 %0 to i64
+// CHECK:  %3 = lshr i128 %0, 64
+// CHECK:  %4 = trunc i128 %3 to i64
+// CHECK:  %5 = insertvalue { i64, i64 } undef, i64 %2, 0
+// CHECK:  %6 = insertvalue { i64, i64 } %5, i64 %4, 1
+// CHECK:  ret { i64, i64 } %6
+sil @aggregate_single_payload_unsafe_unpack : $@convention(thin) (AggregateSinglePayload) -> (Builtin.Int64, Builtin.Int64) {
 entry(%u : $AggregateSinglePayload):
   %x = unchecked_enum_data %u : $AggregateSinglePayload, #AggregateSinglePayload.x!enumelt.1
-  return %x : $(Builtin.Word, Builtin.Word)
+  return %x : $(Builtin.Int64, Builtin.Int64)
 }
 
-// CHECK: define { [[WORD]], [[WORD]], i1 } @aggregate_single_payload_inject([[WORD]], [[WORD]]) {{.*}} {
+// CHECK-LABEL: define { i128, i1 } @aggregate_single_payload_inject(i64, i64) {{.*}} {
 // CHECK: entry:
-// CHECK:   [[RES_0:%.*]] = insertvalue { [[WORD]], [[WORD]], i1 } undef, [[WORD]] %0, 0
-// CHECK:   [[RES_1:%.*]] = insertvalue { [[WORD]], [[WORD]], i1 } [[RES_0]], [[WORD]] %1, 1
-// CHECK:   [[RES:%.*]] = insertvalue { [[WORD]], [[WORD]], i1 } [[RES_1]], i1 false, 2
-// CHECK:   ret { [[WORD]], [[WORD]], i1 } [[RES]]
+// CHECK:   [[ZEXT_0:%.*]] = zext i64 %0 to i128
+// CHECK:   [[ZEXT_1:%.*]] = zext i64 %1 to i128
+// CHECK:   [[SHIFT_1:%.*]] = shl i128 [[ZEXT_1]], 64
+// CHECK:   [[PAYLOAD:%.*]] = or i128 [[ZEXT_0]], [[SHIFT_1]]
+// CHECK:   [[RES_0:%.*]] = insertvalue { i128, i1 } undef, i128 [[PAYLOAD]], 0
+// CHECK:   [[RES:%.*]] = insertvalue { i128, i1 } [[RES_0]], i1 false, 1
+// CHECK:   ret { i128, i1 } [[RES]]
 // CHECK: }
-sil @aggregate_single_payload_inject : $(Builtin.Word, Builtin.Word) -> AggregateSinglePayload {
-entry(%0 : $Builtin.Word, %1 : $Builtin.Word):
-  %t = tuple (%0 : $Builtin.Word, %1 : $Builtin.Word)
-  %u = enum $AggregateSinglePayload, #AggregateSinglePayload.x!enumelt.1, %t : $(Builtin.Word, Builtin.Word)
+sil @aggregate_single_payload_inject : $(Builtin.Int64, Builtin.Int64) -> AggregateSinglePayload {
+entry(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
+  %t = tuple (%0 : $Builtin.Int64, %1 : $Builtin.Int64)
+  %u = enum $AggregateSinglePayload, #AggregateSinglePayload.x!enumelt.1, %t : $(Builtin.Int64, Builtin.Int64)
   return %u : $AggregateSinglePayload
 }
 
 struct CharLike { var value : Builtin.Int21 }
-struct IntLike { var value : Builtin.Word }
-struct RangeLike { var from, to : Builtin.Word }
+struct IntLike { var value : Builtin.Int64 }
+struct RangeLike { var from, to : Builtin.Int64 }
 
 enum AggregateSinglePayload2 {
   case x(CharLike, IntLike, RangeLike)
@@ -713,16 +705,18 @@ enum AggregateSinglePayload2 {
   case z
 }
 
-// CHECK: define void @aggregate_single_payload_unpack_2([[WORD]], [[WORD]], [[WORD]], [[WORD]]) {{.*}} {
+// CHECK: define void @aggregate_single_payload_unpack_2(i256) {{.*}} {
 sil @aggregate_single_payload_unpack_2 : $@convention(thin) (AggregateSinglePayload2) -> () {
 entry(%u : $AggregateSinglePayload2):
   switch_enum %u : $AggregateSinglePayload2, case #AggregateSinglePayload2.x!enumelt.1: x_dest, default end
 
-// CHECK:   [[TRUNC:%.*]] = trunc [[WORD]] %0 to i21
-// CHECK:   phi i21 [ [[TRUNC]]
-// CHECK:   phi [[WORD]] [ %1
-// CHECK:   phi [[WORD]] [ %2
-// CHECK:   phi [[WORD]] [ %3
+// CHECK:   {{%.*}} = trunc i256 %0 to i21
+// CHECK:   [[SHIFT_1:%.*]] = lshr i256 %0, 64
+// CHECK:   {{%.*}} = trunc i256 [[SHIFT_1]] to i64
+// CHECK:   [[SHIFT_2_FROM:%.*]] = lshr i256 %0, 128
+// CHECK:   {{%.*}} = trunc i256 [[SHIFT_2_FROM]] to i64
+// CHECK:   [[SHIFT_2_TO:%.*]] = lshr i256 %0, 192
+// CHECK:   {{%.*}} = trunc i256 [[SHIFT_2_TO]] to i64
 x_dest(%v : $(CharLike, IntLike, RangeLike)):
   br end
 
@@ -731,13 +725,19 @@ end:
   return %x : $()
 }
 
-// CHECK: define void @aggregate_single_payload_2_inject(%O4enum23AggregateSinglePayload2* noalias sret, i21, [[WORD]], [[WORD]], [[WORD]]) {{.*}} {
+// CHECK: define i256 @aggregate_single_payload_2_inject(i21, i64, i64, i64) {{.*}} {
 // CHECK: entry:
-// CHECK:   [[ZEXT_0:%.*]] = zext i21 %1 to [[WORD]]
-// CHECK:   store [[WORD]] [[ZEXT_0]]
-// CHECK:   store [[WORD]] %2
-// CHECK:   store [[WORD]] %3
-// CHECK:   store [[WORD]] %4
+// CHECK:   [[ZEXT_0:%.*]] = zext i21 %0 to i256
+// CHECK:   [[ZEXT_1:%.*]] = zext i64 %1 to i256
+// CHECK:   [[SHIFT_1:%.*]] = shl i256 [[ZEXT_1]], 64
+// CHECK:   [[PAYLOAD_0_1:%.*]] = or i256 [[ZEXT_0]], [[SHIFT_1]]
+// CHECK:   [[ZEXT_2_FROM:%.*]] = zext i64 %2 to i256
+// CHECK:   [[SHIFT_2_FROM:%.*]] = shl i256 [[ZEXT_2_FROM]], 128
+// CHECK:   [[ZEXT_2_TO:%.*]] = zext i64 %3 to i256
+// CHECK:   [[SHIFT_2_TO:%.*]] = shl i256 [[ZEXT_2_TO]], 192
+// CHECK:   [[PAYLOAD_2:%.*]] = or i256 [[SHIFT_2_FROM]], [[SHIFT_2_TO]]
+// CHECK:   [[PAYLOAD:%.*]] = or i256 [[PAYLOAD_0_1]], [[PAYLOAD_2]]
+// CHECK:   ret i256 [[PAYLOAD]]
 // CHECK: }
 sil @aggregate_single_payload_2_inject : $(CharLike, IntLike, RangeLike) -> AggregateSinglePayload2 {
 entry(%0 : $CharLike, %1 : $IntLike, %2 : $RangeLike):
@@ -747,28 +747,20 @@ entry(%0 : $CharLike, %1 : $IntLike, %2 : $RangeLike):
 }
 
 enum AggregateSinglePayload3 {
-  case x(Builtin.Int21, Builtin.Word)
+  case x(Builtin.Int21, Builtin.Int64)
   case y
   case z
 }
 
-// CHECK: define void @aggregate_single_payload_unpack_3([[WORD]], [[WORD]]) {{.*}} {
+// CHECK-LABEL: define void @aggregate_single_payload_unpack_3(i128) {{.*}} {
 sil @aggregate_single_payload_unpack_3 : $@convention(thin) (AggregateSinglePayload3) -> () {
 entry(%u : $AggregateSinglePayload3):
   switch_enum %u : $AggregateSinglePayload3, case #AggregateSinglePayload3.x!enumelt.1: x_dest, default end
 
-  // CHECK: [[TRUNC:%.*]] = trunc [[WORD]] %0 to i21
-  // CHECK: [[FIRST:%.*]] = phi i21 [ [[TRUNC]]
-  // CHECK: [[SECOND:%.*]] = phi [[WORD]] [ %1
-  // CHECK: call void @int21_sink(i21 [[FIRST]])
-  // CHECK: call void @int64_sink([[WORD]] [[SECOND]])
-x_dest(%v : $(Builtin.Int21, Builtin.Word)):
-  %f = function_ref @int21_sink : $@convention(thin) (Builtin.Int21) -> ()
-  %g = function_ref @int64_sink : $@convention(thin) (Builtin.Word) -> ()
-  %a = tuple_extract %v : $(Builtin.Int21, Builtin.Word), 0
-  %b = tuple_extract %v : $(Builtin.Int21, Builtin.Word), 1
-  %c = apply %f(%a) : $@convention(thin) (Builtin.Int21) -> ()
-  %d = apply %g(%b) : $@convention(thin) (Builtin.Word) -> ()
+// CHECK:   {{%.*}} = trunc i128 %0 to i21
+// CHECK:   [[SHIFT_1:%.*]] = lshr i128 %0, 64
+// CHECK:   {{%.*}} = trunc i128 [[SHIFT_1]] to i64
+x_dest(%v : $(Builtin.Int21, Builtin.Int64)):
   br end
 
 end:
@@ -776,23 +768,24 @@ end:
   return %x : $()
 }
 
-// CHECK: define { [[WORD]], [[WORD]] } @aggregate_single_payload_inject_x3(i21, [[WORD]]) {{.*}} {
+// CHECK-LABEL: define i128 @aggregate_single_payload_inject_x3(i21, i64) {{.*}} {
 // CHECK: entry:
-// CHECK:   [[ZEXT_0:%.*]] = zext i21 %0 to [[WORD]]
-// CHECK:   [[A:%.*]] = insertvalue { [[WORD]], [[WORD]] } undef, [[WORD]] [[ZEXT_0]], 0
-// CHECK:   [[B:%.*]] = insertvalue { [[WORD]], [[WORD]] } [[A]], [[WORD]] %1, 1
-// CHECK:   ret { [[WORD]], [[WORD]] } [[B]]
+// CHECK:   [[ZEXT_0:%.*]] = zext i21 %0 to i128
+// CHECK:   [[ZEXT_1:%.*]] = zext i64 %1 to i128
+// CHECK:   [[SHIFT_1:%.*]] = shl i128 [[ZEXT_1]], 64
+// CHECK:   [[PAYLOAD:%.*]] = or i128 [[ZEXT_0]], [[SHIFT_1]]
+// CHECK:   ret i128 [[PAYLOAD]]
 // CHECK: }
-sil @aggregate_single_payload_inject_x3 : $(Builtin.Int21, Builtin.Word) -> AggregateSinglePayload3 {
-entry(%0 : $Builtin.Int21, %1 : $Builtin.Word):
-  %t = tuple (%0 : $Builtin.Int21, %1 : $Builtin.Word)
-  %u = enum $AggregateSinglePayload3, #AggregateSinglePayload3.x!enumelt.1, %t : $(Builtin.Int21, Builtin.Word)
+sil @aggregate_single_payload_inject_x3 : $(Builtin.Int21, Builtin.Int64) -> AggregateSinglePayload3 {
+entry(%0 : $Builtin.Int21, %1 : $Builtin.Int64):
+  %t = tuple (%0 : $Builtin.Int21, %1 : $Builtin.Int64)
+  %u = enum $AggregateSinglePayload3, #AggregateSinglePayload3.x!enumelt.1, %t : $(Builtin.Int21, Builtin.Int64)
   return %u : $AggregateSinglePayload3
 }
 
-// CHECK: define { [[WORD]], [[WORD]] } @aggregate_single_payload_inject_y3() {{.*}} {
+// CHECK-LABEL: define i128 @aggregate_single_payload_inject_y3() {{.*}} {
 // CHECK: entry:
-// CHECK:   ret { [[WORD]], [[WORD]] } { [[WORD]] 2097152, [[WORD]] 0 }
+// CHECK:   ret i128 2097152
 // CHECK: }
 //   2097152 == 0x200000
 sil @aggregate_single_payload_inject_y3 : $() -> AggregateSinglePayload3 {
@@ -807,28 +800,16 @@ enum SinglePayloadSpareBit {
   case z
 }
 
-// CHECK-64: define void @single_payload_spare_bit_switch(i64) {{.*}} {
-// CHECK-32: define void @single_payload_spare_bit_switch(i32, i32) {{.*}} {
+// CHECK: define void @single_payload_spare_bit_switch(i64) {{.*}} {
 sil @single_payload_spare_bit_switch : $@convention(thin) (SinglePayloadSpareBit) -> () {
 // CHECK: entry:
 entry(%u : $SinglePayloadSpareBit):
-// CHECK-64:  switch i64 %0, label %[[X_DEST:[0-9]+]] [
-// --              0x8000_0000_0000_0000
-// CHECK-64:    i64 -9223372036854775808, label %[[Y_DEST:[0-9]+]]
-// --              0x8000_0000_0000_0001
-// CHECK-64:    i64 -9223372036854775807, label %[[Z_DEST:[0-9]+]]
-// CHECK-64:  ]
-
-// CHECK-32:  switch i32 %0, label %[[X_DEST:[0-9]+]] [
-// CHECK-32:    i32 0, label %[[Y_HIGH:[0-9]+]]
-// CHECK-32:    i32 1, label %[[Z_HIGH:[0-9]+]]
-// CHECK-32:  ]
-// CHECK-32: ; <label>:[[Y_HIGH]]
-// CHECK-32:  [[IS_Y:%.*]] = icmp eq i32 %1, -2147483648
-// CHECK-32:  br i1 [[IS_Y]], label %[[Y_DEST:[0-9]+]], label %[[X_DEST]]
-// CHECK-32: ; <label>:[[Z_HIGH]]
-// CHECK-32:  [[IS_Z:%.*]] = icmp eq i32 %1, -2147483648
-// CHECK-32:  br i1 [[IS_Z]], label %[[Z_DEST:[0-9]+]], label %[[X_DEST]]
+// CHECK:  switch i64 %0, label %[[X_DEST:[0-9]+]] [
+// --           0x8000_0000_0000_0000
+// CHECK:    i64 -9223372036854775808, label %[[Y_DEST:[0-9]+]]
+// --           0x8000_0000_0000_0001
+// CHECK:    i64 -9223372036854775807, label %[[Z_DEST:[0-9]+]]
+// CHECK:  ]
   switch_enum %u : $SinglePayloadSpareBit, case #SinglePayloadSpareBit.x!enumelt.1: x_dest, case #SinglePayloadSpareBit.y!enumelt: y_dest, case #SinglePayloadSpareBit.z!enumelt: z_dest
 
 // CHECK: ; <label>:[[X_DEST]]
@@ -862,62 +843,62 @@ end:
   return %x : $()
 }
 
-// CHECK-64: define void @single_payload_spare_bit_switch_arg(i64) {{.*}} {
+// CHECK: define void @single_payload_spare_bit_switch_arg(i64) {{.*}} {
 sil @single_payload_spare_bit_switch_arg : $@convention(thin) (SinglePayloadSpareBit) -> () {
 // CHECK: entry:
 entry(%u : $SinglePayloadSpareBit):
-// CHECK-64:  switch i64 %0, label %[[X_PREDEST:[0-9]+]] [
+// CHECK:  switch i64 %0, label %[[X_PREDEST:[0-9]+]] [
 // --           0x8000_0000_0000_0000
-// CHECK-64:    i64 -9223372036854775808, label %[[Y_DEST:[0-9]+]]
+// CHECK:    i64 -9223372036854775808, label %[[Y_DEST:[0-9]+]]
 // --           0x8000_0000_0000_0001
-// CHECK-64:    i64 -9223372036854775807, label %[[Z_DEST:[0-9]+]]
-// CHECK-64:  ]
+// CHECK:    i64 -9223372036854775807, label %[[Z_DEST:[0-9]+]]
+// CHECK:  ]
   switch_enum %u : $SinglePayloadSpareBit, case #SinglePayloadSpareBit.x!enumelt.1: x_dest, case #SinglePayloadSpareBit.y!enumelt: y_dest, case #SinglePayloadSpareBit.z!enumelt: z_dest
 
-// CHECK-64: ; <label>:[[X_PREDEST]]
-// CHECK-64:   [[TRUNC_PAYLOAD:%.*]] = trunc i64 %0 to i63
-// CHECK-64:   br label %[[X_DEST:[0-9]+]]
-// CHECK-64: ; <label>:[[X_DEST]]
-// CHECK-64:   {{%.*}} = phi i63 [ [[TRUNC_PAYLOAD]], %[[X_PREDEST]] ]
+// CHECK: ; <label>:[[X_PREDEST]]
+// CHECK:   [[TRUNC_PAYLOAD:%.*]] = trunc i64 %0 to i63
+// CHECK:   br label %[[X_DEST:[0-9]+]]
+// CHECK: ; <label>:[[X_DEST]]
+// CHECK:   {{%.*}} = phi i63 [ [[TRUNC_PAYLOAD]], %[[X_PREDEST]] ]
 x_dest(%u2 : $Builtin.Int63):
-// CHECK-64:   call void @a()
+// CHECK:   call void @a()
   %a = function_ref @a : $@convention(thin) () -> ()
   apply %a() : $@convention(thin) () -> ()
-// CHECK-64:   br label %[[END:[0-9]+]]
+// CHECK:   br label %[[END:[0-9]+]]
   br end
 
-// CHECK-64: ; <label>:[[Y_DEST]]
+// CHECK: ; <label>:[[Y_DEST]]
 y_dest:
-// CHECK-64:   call void @b()
+// CHECK:   call void @b()
   %b = function_ref @b : $@convention(thin) () -> ()
   apply %b() : $@convention(thin) () -> ()
-// CHECK-64:   br label %[[END]]
+// CHECK:   br label %[[END]]
   br end
 
-// CHECK-64: ; <label>:[[Z_DEST]]
+// CHECK: ; <label>:[[Z_DEST]]
 z_dest:
-// CHECK-64:   call void @c()
+// CHECK:   call void @c()
   %c = function_ref @c : $@convention(thin) () -> ()
   apply %c() : $@convention(thin) () -> ()
-// CHECK-64:   br label %[[END]]
+// CHECK:   br label %[[END]]
   br end
 
-// CHECK-64: ; <label>:[[END]]
+// CHECK: ; <label>:[[END]]
 end:
-// CHECK-64:   ret void
+// CHECK:   ret void
   %x = tuple ()
   return %x : $()
 }
 
 sil @single_payload_spare_bit_switch_indirect : $@convention(thin) (@inout SinglePayloadSpareBit) -> () {
 entry(%u : $*SinglePayloadSpareBit):
-// CHECK-64:  [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum21SinglePayloadSpareBit* %0 to i64*
-// CHECK-64:  [[PAYLOAD:%.*]] = load i64, i64* [[PAYLOAD_ADDR]]
-// CHECK-64:  switch i64 [[PAYLOAD]]
+// CHECK:  [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum21SinglePayloadSpareBit* %0 to i64*
+// CHECK:  [[PAYLOAD:%.*]] = load i64, i64* [[PAYLOAD_ADDR]]
+// CHECK:  switch i64 [[PAYLOAD]]
   switch_enum_addr %u : $*SinglePayloadSpareBit, case #SinglePayloadSpareBit.x!enumelt.1: x_dest, case #SinglePayloadSpareBit.y!enumelt: y_dest, case #SinglePayloadSpareBit.z!enumelt: z_dest
 
-// CHECK-64: ; <label>:
-// CHECK-64:   [[DATA_ADDR:%.*]] = bitcast %O4enum21SinglePayloadSpareBit* %0 to i63*
+// CHECK: ; <label>:
+// CHECK:   [[DATA_ADDR:%.*]] = bitcast %O4enum21SinglePayloadSpareBit* %0 to i63*
 x_dest:
   %u2 = unchecked_take_enum_data_addr %u : $*SinglePayloadSpareBit, #SinglePayloadSpareBit.x!enumelt.1
   %a = function_ref @a : $@convention(thin) () -> ()
@@ -935,23 +916,23 @@ end:
   return %x : $()
 }
 
-// CHECK-64: define i64 @single_payload_spare_bit_inject_x(i63) {{.*}} {
-// CHECK-64: entry:
-// CHECK-64:   [[A:%.*]] = zext i63 %0 to i64
-// CHECK-64:   ret i64 [[A]]
-// CHECK-64: }
+// CHECK: define i64 @single_payload_spare_bit_inject_x(i63) {{.*}} {
+// CHECK: entry:
+// CHECK:   [[A:%.*]] = zext i63 %0 to i64
+// CHECK:   ret i64 [[A]]
+// CHECK: }
 sil @single_payload_spare_bit_inject_x : $(Builtin.Int63) -> SinglePayloadSpareBit {
 entry(%0 : $Builtin.Int63):
   %u = enum $SinglePayloadSpareBit, #SinglePayloadSpareBit.x!enumelt.1, %0 : $Builtin.Int63
   return %u : $SinglePayloadSpareBit
 }
 
-// CHECK-64: define void @single_payload_spare_bit_inject_x_indirect(i63, %O4enum21SinglePayloadSpareBit*) {{.*}} {
-// CHECK-64: entry:
-// CHECK-64:   [[DATA_ADDR:%.*]] = bitcast %O4enum21SinglePayloadSpareBit* %1 to i63*
-// CHECK-64:   store i63 %0, i63* [[DATA_ADDR]]
-// CHECK-64:   ret void
-// CHECK-64: }
+// CHECK: define void @single_payload_spare_bit_inject_x_indirect(i63, %O4enum21SinglePayloadSpareBit*) {{.*}} {
+// CHECK: entry:
+// CHECK:   [[DATA_ADDR:%.*]] = bitcast %O4enum21SinglePayloadSpareBit* %1 to i63*
+// CHECK:   store i63 %0, i63* [[DATA_ADDR]], align 8
+// CHECK:   ret void
+// CHECK: }
 sil @single_payload_spare_bit_inject_x_indirect : $(Builtin.Int63, @inout SinglePayloadSpareBit) -> () {
 entry(%0 : $Builtin.Int63, %1 : $*SinglePayloadSpareBit):
   %a = init_enum_data_addr %1 : $*SinglePayloadSpareBit, #SinglePayloadSpareBit.x!enumelt.1
@@ -961,24 +942,24 @@ entry(%0 : $Builtin.Int63, %1 : $*SinglePayloadSpareBit):
   return %v : $()
 }
 
-// CHECK-64: define i64 @single_payload_spare_bit_inject_y() {{.*}} {
-// CHECK-64: entry:
+// CHECK: define i64 @single_payload_spare_bit_inject_y() {{.*}} {
+// CHECK: entry:
 // --              0x8000_0000_0000_0000
-// CHECK-64:   ret i64 -9223372036854775808
-// CHECK-64: }
+// CHECK:   ret i64 -9223372036854775808
+// CHECK: }
 sil @single_payload_spare_bit_inject_y : $() -> SinglePayloadSpareBit {
 entry:
   %u = enum $SinglePayloadSpareBit, #SinglePayloadSpareBit.y!enumelt
   return %u : $SinglePayloadSpareBit
 }
 
-// CHECK-64: define void @single_payload_spare_bit_inject_y_indirect(%O4enum21SinglePayloadSpareBit*) {{.*}} {
-// CHECK-64: entry:
-// CHECK-64:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum21SinglePayloadSpareBit* %0 to i64*
+// CHECK: define void @single_payload_spare_bit_inject_y_indirect(%O4enum21SinglePayloadSpareBit*) {{.*}} {
+// CHECK: entry:
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum21SinglePayloadSpareBit* %0 to i64*
 // --                0x8000_0000_0000_0000
-// CHECK-64:   store i64 -9223372036854775808, i64* [[PAYLOAD_ADDR]]
-// CHECK-64:   ret void
-// CHECK-64: }
+// CHECK:   store i64 -9223372036854775808, i64* [[PAYLOAD_ADDR]], align 8
+// CHECK:   ret void
+// CHECK: }
 sil @single_payload_spare_bit_inject_y_indirect : $(@inout SinglePayloadSpareBit) -> () {
 entry(%0 : $*SinglePayloadSpareBit):
   inject_enum_addr %0 : $*SinglePayloadSpareBit, #SinglePayloadSpareBit.y!enumelt
@@ -986,11 +967,11 @@ entry(%0 : $*SinglePayloadSpareBit):
   return %v : $()
 }
 
-// CHECK-64: define i64 @single_payload_spare_bit_inject_z() {{.*}} {
-// CHECK-64: entry:
+// CHECK: define i64 @single_payload_spare_bit_inject_z() {{.*}} {
+// CHECK: entry:
 //                 0x8000_0000_0000_0001
-// CHECK-64:   ret i64 -9223372036854775807
-// CHECK-64: }
+// CHECK:   ret i64 -9223372036854775807
+// CHECK: }
 sil @single_payload_spare_bit_inject_z : $() -> SinglePayloadSpareBit {
 entry:
   %u = enum $SinglePayloadSpareBit, #SinglePayloadSpareBit.z!enumelt
@@ -1130,25 +1111,35 @@ enum SinglePayloadObjCProtocol {
   case y, z, w
 }
 
-// CHECK-64: define void @single_payload_class_protocol_switch(i64, i64) {{.*}} {
-// CHECK-64:   switch i64 %0, label {{%.*}} [
-// CHECK-64:     i64 0, label {{%.*}}
-// CHECK-64:     i64 2, label {{%.*}}
-// CHECK-64:     i64 4, label {{%.*}}
+// CHECK-64: define void @single_payload_class_protocol_switch(i128) {{.*}} {
+// CHECK-64:   %1 = trunc i128 %0 to i64
+// CHECK-64:   %2 = zext i64 %1 to i128
+// CHECK-64:   switch i128 %2, label {{%.*}} [
+// CHECK-64:     i128 0, label {{%.*}}
+// CHECK-64:     i128 2, label {{%.*}}
+// CHECK-64:     i128 4, label {{%.*}}
 // CHECK-64:   ]
 
-// CHECK-64:   inttoptr i64 %0 to %objc_object*
-// CHECK-64:   inttoptr i64 %1 to i8**
+// CHECK-64:   [[OBJECT_INT:%.*]] = trunc i128 %0 to i64
+// CHECK-64:   inttoptr i64 [[OBJECT_INT]] to %objc_object*
+// CHECK-64:   [[WITNESS_SHR:%.*]] = lshr i128 %0, 64
+// CHECK-64:   [[WITNESS_INT:%.*]] = trunc i128 [[WITNESS_SHR]] to i64
+// CHECK-64:   inttoptr i64 [[WITNESS_INT]] to i8**
 
-// CHECK-32: define void @single_payload_class_protocol_switch(i32, i32) {{.*}} {
-// CHECK-32:   switch i32 %0, label {{%.*}} [
-// CHECK-32:     i32 0, label {{%.*}}
-// CHECK-32:     i32 1, label {{%.*}}
-// CHECK-32:     i32 2, label {{%.*}}
+// CHECK-32: define void @single_payload_class_protocol_switch(i64) {{.*}} {
+// CHECK-32:   %1 = trunc i64 %0 to i32
+// CHECK-32:   %2 = zext i32 %1 to i64
+// CHECK-32:   switch i64 %2, label {{%.*}} [
+// CHECK-32:     i64 0, label {{%.*}}
+// CHECK-32:     i64 1, label {{%.*}}
+// CHECK-32:     i64 2, label {{%.*}}
 // CHECK-32:   ]
 
-// CHECK-32:   inttoptr i32 %0 to %objc_object*
-// CHECK-32:   inttoptr i32 %1 to i8**
+// CHECK-32:   [[OBJECT_INT:%.*]] = trunc i64 %0 to i32
+// CHECK-32:   inttoptr i32 [[OBJECT_INT]] to %objc_object*
+// CHECK-32:   [[WITNESS_SHR:%.*]] = lshr i64 %0, 32
+// CHECK-32:   [[WITNESS_INT:%.*]] = trunc i64 [[WITNESS_SHR]] to i32
+// CHECK-32:   inttoptr i32 [[WITNESS_INT]] to i8**
 
 sil @single_payload_class_protocol_switch : $(SinglePayloadClassProtocol) -> () {
 entry(%c : $SinglePayloadClassProtocol):
@@ -1289,7 +1280,7 @@ end(%z : $()):
 // CHECK: define i2 @dynamic_single_payload_empty_payload_load([[DYNAMIC_SINGLE_EMPTY_PAYLOAD]]*) {{.*}} {
 // CHECK: entry:
 // CHECK:   %1 = bitcast [[DYNAMIC_SINGLE_EMPTY_PAYLOAD]]* %0 to i2*
-// CHECK:   %2 = load i2, i2* %1
+// CHECK:   %2 = load i2, i2* %1, align 1
 // CHECK:   ret i2 %2
 // CHECK: }
 sil @dynamic_single_payload_empty_payload_load : $(@inout DynamicSinglePayload<()>) -> DynamicSinglePayload<()> {
@@ -1301,7 +1292,7 @@ entry(%p : $*DynamicSinglePayload<()>):
 // CHECK: define void @dynamic_single_payload_empty_payload_store([[DYNAMIC_SINGLE_EMPTY_PAYLOAD]]*, i2) {{.*}} {
 // CHECK: entry:
 // CHECK:   %2 = bitcast [[DYNAMIC_SINGLE_EMPTY_PAYLOAD]]* %0 to i2*
-// CHECK:   store i2 %1, i2* %2
+// CHECK:   store i2 %1, i2* %2, align 1
 // CHECK:   ret void
 // CHECK: }
 sil @dynamic_single_payload_empty_payload_store : $(@inout DynamicSinglePayload<()>, DynamicSinglePayload<()>) -> () {
@@ -1352,68 +1343,68 @@ enum MultiPayloadNoSpareBits {
   case c
 }
 
-// CHECK-64: define void @multi_payload_no_spare_bits_switch(i64, i2) {{.*}} {
+// CHECK: define void @multi_payload_no_spare_bits_switch(i64, i2) {{.*}} {
 sil @multi_payload_no_spare_bits_switch : $(MultiPayloadNoSpareBits) -> () {
 entry(%u : $MultiPayloadNoSpareBits):
-// CHECK-64:   switch i2 %1, label %[[UNREACHABLE:[0-9]+]] [
-// CHECK-64:     i2 0, label %[[X_PREDEST:[0-9]+]]
-// CHECK-64:     i2 1, label %[[Y_PREDEST:[0-9]+]]
-// CHECK-64:     i2 -2, label %[[Z_PREDEST:[0-9]+]]
-// CHECK-64:     i2 -1, label %[[EMPTY:[0-9]+]]
-// CHECK-64:   ]
-// CHECK-64: ; <label>:[[EMPTY]]
-// CHECK-64:   switch i64 %0, label %[[UNREACHABLE]] [
-// CHECK-64:     i64 0, label %[[A_DEST:[0-9]+]]
-// CHECK-64:     i64 1, label %[[B_DEST:[0-9]+]]
-// CHECK-64:     i64 2, label %[[C_DEST:[0-9]+]]
-// CHECK-64:   ]
-// CHECK-64: ; <label>:[[UNREACHABLE]]
-// CHECK-64:   unreachable
+// CHECK:   switch i2 %1, label %[[UNREACHABLE:[0-9]+]] [
+// CHECK:     i2 0, label %[[X_PREDEST:[0-9]+]]
+// CHECK:     i2 1, label %[[Y_PREDEST:[0-9]+]]
+// CHECK:     i2 -2, label %[[Z_PREDEST:[0-9]+]]
+// CHECK:     i2 -1, label %[[EMPTY:[0-9]+]]
+// CHECK:   ]
+// CHECK: ; <label>:[[EMPTY]]
+// CHECK:   switch i64 %0, label %[[UNREACHABLE]] [
+// CHECK:     i64 0, label %[[A_DEST:[0-9]+]]
+// CHECK:     i64 1, label %[[B_DEST:[0-9]+]]
+// CHECK:     i64 2, label %[[C_DEST:[0-9]+]]
+// CHECK:   ]
+// CHECK: ; <label>:[[UNREACHABLE]]
+// CHECK:   unreachable
   switch_enum %u : $MultiPayloadNoSpareBits, case #MultiPayloadNoSpareBits.x!enumelt.1: x_dest, case #MultiPayloadNoSpareBits.y!enumelt.1: y_dest, case #MultiPayloadNoSpareBits.z!enumelt.1: z_dest, case #MultiPayloadNoSpareBits.a!enumelt: a_dest, case #MultiPayloadNoSpareBits.b!enumelt: b_dest, case #MultiPayloadNoSpareBits.c!enumelt: c_dest
 
-// CHECK-64: ; <label>:[[X_PREDEST]]
-// CHECK-64:   br label %[[X_DEST:[0-9]+]]
-// CHECK-64: ; <label>:[[Y_PREDEST]]
-// CHECK-64:   [[Y_VALUE:%.*]] = trunc i64 %0 to i32
-// CHECK-64:   br label %[[Y_DEST:[0-9]+]]
-// CHECK-64: ; <label>:[[Z_PREDEST]]
-// CHECK-64:   [[Z_VALUE:%.*]] = trunc i64 %0 to i63
-// CHECK-64:   br label %[[Z_DEST:[0-9]+]]
+// CHECK: ; <label>:[[X_PREDEST]]
+// CHECK:   br label %[[X_DEST:[0-9]+]]
+// CHECK: ; <label>:[[Y_PREDEST]]
+// CHECK:   [[Y_VALUE:%.*]] = trunc i64 %0 to i32
+// CHECK:   br label %[[Y_DEST:[0-9]+]]
+// CHECK: ; <label>:[[Z_PREDEST]]
+// CHECK:   [[Z_VALUE:%.*]] = trunc i64 %0 to i63
+// CHECK:   br label %[[Z_DEST:[0-9]+]]
 
-// CHECK-64: ; <label>:[[X_DEST]]
-// CHECK-64:   phi i64 [ %0, %[[X_PREDEST]] ]
+// CHECK: ; <label>:[[X_DEST]]
+// CHECK:   phi i64 [ %0, %[[X_PREDEST]] ]
 x_dest(%x : $Builtin.Int64):
   %a = function_ref @a : $@convention(thin) () -> ()
   apply %a() : $@convention(thin) () -> ()
   br end
 
-// CHECK-64: ; <label>:[[Y_DEST]]
-// CHECK-64:   phi i32 [ [[Y_VALUE]], %[[Y_PREDEST]] ]
+// CHECK: ; <label>:[[Y_DEST]]
+// CHECK:   phi i32 [ [[Y_VALUE]], %[[Y_PREDEST]] ]
 y_dest(%y : $Builtin.Int32):
   %b = function_ref @b : $@convention(thin) () -> ()
   apply %b() : $@convention(thin) () -> ()
   br end
 
-// CHECK-64: ; <label>:[[Z_DEST]]
-// CHECK-64:   phi i63 [ [[Z_VALUE]], %[[Z_PREDEST]] ]
+// CHECK: ; <label>:[[Z_DEST]]
+// CHECK:   phi i63 [ [[Z_VALUE]], %[[Z_PREDEST]] ]
 z_dest(%z : $Builtin.Int63):
   %c = function_ref @c : $@convention(thin) () -> ()
   apply %c() : $@convention(thin) () -> ()
   br end
 
-// CHECK-64: ; <label>:[[A_DEST]]
+// CHECK: ; <label>:[[A_DEST]]
 a_dest:
   %d = function_ref @d : $@convention(thin) () -> ()
   apply %d() : $@convention(thin) () -> ()
   br end
 
-// CHECK-64: ; <label>:[[B_DEST]]
+// CHECK: ; <label>:[[B_DEST]]
 b_dest:
   %e = function_ref @e : $@convention(thin) () -> ()
   apply %e() : $@convention(thin) () -> ()
   br end
 
-// CHECK-64: ; <label>:[[C_DEST]]
+// CHECK: ; <label>:[[C_DEST]]
 c_dest:
   %f = function_ref @f : $@convention(thin) () -> ()
   apply %f() : $@convention(thin) () -> ()
@@ -1424,26 +1415,26 @@ end:
   return %v : $()
 }
 
-// CHECK-64: define void @multi_payload_no_spare_bits_switch_indirect(%O4enum23MultiPayloadNoSpareBits*) {{.*}} {
+// CHECK: define void @multi_payload_no_spare_bits_switch_indirect(%O4enum23MultiPayloadNoSpareBits*) {{.*}} {
 sil @multi_payload_no_spare_bits_switch_indirect : $(@inout MultiPayloadNoSpareBits) -> () {
 entry(%u : $*MultiPayloadNoSpareBits):
-// CHECK-64:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum23MultiPayloadNoSpareBits* %0 to i64*
-// CHECK-64:   [[PAYLOAD:%.*]] = load i64, i64* [[PAYLOAD_ADDR]]
-// CHECK-64:   [[T0:%.*]] = getelementptr inbounds %O4enum23MultiPayloadNoSpareBits, %O4enum23MultiPayloadNoSpareBits* %0, i32 0, i32 1
-// CHECK-64:   [[TAG_ADDR:%.*]] = bitcast [1 x i8]* [[T0]] to i2*
-// CHECK-64:   [[TAG:%.*]] = load i2, i2* [[TAG_ADDR]]
-// CHECK-64:   switch i2 [[TAG]]
-// CHECK-64:   switch i64 [[PAYLOAD]]
-// CHECK-64: ; <label>:
-// CHECK-64:   unreachable
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum23MultiPayloadNoSpareBits* %0 to i64*
+// CHECK:   [[PAYLOAD:%.*]] = load i64, i64* [[PAYLOAD_ADDR]], align 8
+// CHECK:   [[T0:%.*]] = getelementptr inbounds %O4enum23MultiPayloadNoSpareBits, %O4enum23MultiPayloadNoSpareBits* %0, i32 0, i32 1
+// CHECK:   [[TAG_ADDR:%.*]] = bitcast [1 x i8]* [[T0]] to i2*
+// CHECK:   [[TAG:%.*]] = load i2, i2* [[TAG_ADDR]], align 8
+// CHECK:   switch i2 [[TAG]]
+// CHECK:   switch i64 [[PAYLOAD]]
+// CHECK: ; <label>:
+// CHECK:   unreachable
   switch_enum_addr %u : $*MultiPayloadNoSpareBits, case #MultiPayloadNoSpareBits.x!enumelt.1: x_dest, case #MultiPayloadNoSpareBits.y!enumelt.1: y_dest, case #MultiPayloadNoSpareBits.z!enumelt.1: z_dest, case #MultiPayloadNoSpareBits.a!enumelt: a_dest, case #MultiPayloadNoSpareBits.b!enumelt: b_dest, case #MultiPayloadNoSpareBits.c!enumelt: c_dest
 
-// CHECK-64: ; <label>:[[X_DEST:[0-9]+]]
-// CHECK-64:   bitcast %O4enum23MultiPayloadNoSpareBits* %0 to i64*
-// CHECK-64: ; <label>:[[Y_DEST:[0-9]+]]
-// CHECK-64:   bitcast %O4enum23MultiPayloadNoSpareBits* %0 to i32*
-// CHECK-64: ; <label>:[[Z_DEST:[0-9]+]]
-// CHECK-64:   bitcast %O4enum23MultiPayloadNoSpareBits* %0 to i63*
+// CHECK: ; <label>:[[X_DEST:[0-9]+]]
+// CHECK:   bitcast %O4enum23MultiPayloadNoSpareBits* %0 to i64*
+// CHECK: ; <label>:[[Y_DEST:[0-9]+]]
+// CHECK:   bitcast %O4enum23MultiPayloadNoSpareBits* %0 to i32*
+// CHECK: ; <label>:[[Z_DEST:[0-9]+]]
+// CHECK:   bitcast %O4enum23MultiPayloadNoSpareBits* %0 to i63*
 
 x_dest:
   %x = unchecked_take_enum_data_addr %u : $*MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.x!enumelt.1
@@ -1471,27 +1462,27 @@ end:
   return %v : $()
 }
 
-// CHECK-64: define { i64, i2 } @multi_payload_no_spare_bit_inject_x(i64) {{.*}} {
-// CHECK-64: entry:
-// CHECK-64:   [[RES_0:%.*]] = insertvalue { i64, i2 } undef, i64 %0, 0
-// CHECK-64:   [[RES:%.*]] = insertvalue { i64, i2 } [[RES_0]], i2 0, 1
-// CHECK-64:   ret { i64, i2 } [[RES]]
-// CHECK-64: }
+// CHECK: define { i64, i2 } @multi_payload_no_spare_bit_inject_x(i64) {{.*}} {
+// CHECK: entry:
+// CHECK:   [[RES_0:%.*]] = insertvalue { i64, i2 } undef, i64 %0, 0
+// CHECK:   [[RES:%.*]] = insertvalue { i64, i2 } [[RES_0]], i2 0, 1
+// CHECK:   ret { i64, i2 } [[RES]]
+// CHECK: }
 sil @multi_payload_no_spare_bit_inject_x : $(Builtin.Int64) -> MultiPayloadNoSpareBits {
 entry(%0 : $Builtin.Int64):
   %u = enum $MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.x!enumelt.1, %0 : $Builtin.Int64
   return %u : $MultiPayloadNoSpareBits
 }
 
-// CHECK-64: define void @multi_payload_no_spare_bit_inject_x_indirect(i64, %O4enum23MultiPayloadNoSpareBits*) {{.*}} {
-// CHECK-64: entry:
-// CHECK-64:   [[DATA_ADDR:%.*]] = bitcast %O4enum23MultiPayloadNoSpareBits* %1 to i64*
-// CHECK-64:   store i64 %0, i64* [[DATA_ADDR]]
-// CHECK-64:   [[T0:%.*]] = getelementptr inbounds %O4enum23MultiPayloadNoSpareBits, %O4enum23MultiPayloadNoSpareBits* %1, i32 0, i32 1
-// CHECK-64:   [[TAG_ADDR:%.*]] = bitcast [1 x i8]* [[T0]] to i2*
-// CHECK-64:   store i2 0, i2* [[TAG_ADDR]]
-// CHECK-64:   ret void
-// CHECK-64: }
+// CHECK: define void @multi_payload_no_spare_bit_inject_x_indirect(i64, %O4enum23MultiPayloadNoSpareBits*) {{.*}} {
+// CHECK: entry:
+// CHECK:   [[DATA_ADDR:%.*]] = bitcast %O4enum23MultiPayloadNoSpareBits* %1 to i64*
+// CHECK:   store i64 %0, i64* [[DATA_ADDR]], align 8
+// CHECK:   [[T0:%.*]] = getelementptr inbounds %O4enum23MultiPayloadNoSpareBits, %O4enum23MultiPayloadNoSpareBits* %1, i32 0, i32 1
+// CHECK:   [[TAG_ADDR:%.*]] = bitcast [1 x i8]* [[T0]] to i2*
+// CHECK:   store i2 0, i2* [[TAG_ADDR]], align 8
+// CHECK:   ret void
+// CHECK: }
 sil @multi_payload_no_spare_bit_inject_x_indirect : $(Builtin.Int64, @inout MultiPayloadNoSpareBits) -> () {
 entry(%0 : $Builtin.Int64, %1 : $*MultiPayloadNoSpareBits):
   %a = init_enum_data_addr %1 : $*MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.x!enumelt.1
@@ -1501,51 +1492,51 @@ entry(%0 : $Builtin.Int64, %1 : $*MultiPayloadNoSpareBits):
   return %v : $()
 }
 
-// CHECK-64: define { i64, i2 } @multi_payload_no_spare_bit_inject_y(i32) {{.*}} {
-// CHECK-64: entry:
-// CHECK-64:   [[ZEXT:%.*]] = zext i32 %0 to i64
-// CHECK-64:   [[RES_0:%.*]] = insertvalue { i64, i2 } undef, i64 [[ZEXT]], 0
-// CHECK-64:   [[RES:%.*]] = insertvalue { i64, i2 } [[RES_0]], i2 1, 1
-// CHECK-64:   ret { i64, i2 } [[RES]]
-// CHECK-64: }
+// CHECK: define { i64, i2 } @multi_payload_no_spare_bit_inject_y(i32) {{.*}} {
+// CHECK: entry:
+// CHECK:   [[ZEXT:%.*]] = zext i32 %0 to i64
+// CHECK:   [[RES_0:%.*]] = insertvalue { i64, i2 } undef, i64 [[ZEXT]], 0
+// CHECK:   [[RES:%.*]] = insertvalue { i64, i2 } [[RES_0]], i2 1, 1
+// CHECK:   ret { i64, i2 } [[RES]]
+// CHECK: }
 sil @multi_payload_no_spare_bit_inject_y : $(Builtin.Int32) -> MultiPayloadNoSpareBits {
 entry(%0 : $Builtin.Int32):
   %u = enum $MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.y!enumelt.1, %0 : $Builtin.Int32
   return %u : $MultiPayloadNoSpareBits
 }
 
-// CHECK-64: define { i64, i2 } @multi_payload_no_spare_bit_inject_z(i63) {{.*}} {
-// CHECK-64: entry:
-// CHECK-64:   [[ZEXT:%.*]] = zext i63 %0 to i64
-// CHECK-64:   [[RES_0:%.*]] = insertvalue { i64, i2 } undef, i64 [[ZEXT]], 0
-// CHECK-64:   [[RES:%.*]] = insertvalue { i64, i2 } [[RES_0]], i2 -2, 1
-// CHECK-64:   ret { i64, i2 } [[RES]]
-// CHECK-64: }
+// CHECK: define { i64, i2 } @multi_payload_no_spare_bit_inject_z(i63) {{.*}} {
+// CHECK: entry:
+// CHECK:   [[ZEXT:%.*]] = zext i63 %0 to i64
+// CHECK:   [[RES_0:%.*]] = insertvalue { i64, i2 } undef, i64 [[ZEXT]], 0
+// CHECK:   [[RES:%.*]] = insertvalue { i64, i2 } [[RES_0]], i2 -2, 1
+// CHECK:   ret { i64, i2 } [[RES]]
+// CHECK: }
 sil @multi_payload_no_spare_bit_inject_z : $(Builtin.Int63) -> MultiPayloadNoSpareBits {
 entry(%0 : $Builtin.Int63):
   %u = enum $MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.z!enumelt.1, %0 : $Builtin.Int63
   return %u : $MultiPayloadNoSpareBits
 }
 
-// CHECK-64: define { i64, i2 } @multi_payload_no_spare_bit_inject_a() {{.*}} {
-// CHECK-64: entry:
-// CHECK-64:   ret { i64, i2 } { i64 0, i2 -1 }
-// CHECK-64: }
+// CHECK: define { i64, i2 } @multi_payload_no_spare_bit_inject_a() {{.*}} {
+// CHECK: entry:
+// CHECK:   ret { i64, i2 } { i64 0, i2 -1 }
+// CHECK: }
 sil @multi_payload_no_spare_bit_inject_a : $() -> MultiPayloadNoSpareBits {
 entry:
   %u = enum $MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.a!enumelt
   return %u : $MultiPayloadNoSpareBits
 }
 
-// CHECK-64: define void @multi_payload_no_spare_bit_inject_a_indirect(%O4enum23MultiPayloadNoSpareBits*) {{.*}} {
-// CHECK-64: entry:
-// CHECK-64:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum23MultiPayloadNoSpareBits* %0 to i64*
-// CHECK-64:   store i64 0, i64* [[PAYLOAD_ADDR]]
-// CHECK-64:   [[T0:%.*]] = getelementptr inbounds %O4enum23MultiPayloadNoSpareBits, %O4enum23MultiPayloadNoSpareBits* %0, i32 0, i32 1
-// CHECK-64:   [[TAG_ADDR:%.*]] = bitcast [1 x i8]* [[T0]] to i2*
-// CHECK-64:   store i2 -1, i2* [[TAG_ADDR]]
-// CHECK-64:   ret void
-// CHECK-64: }
+// CHECK: define void @multi_payload_no_spare_bit_inject_a_indirect(%O4enum23MultiPayloadNoSpareBits*) {{.*}} {
+// CHECK: entry:
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum23MultiPayloadNoSpareBits* %0 to i64*
+// CHECK:   store i64 0, i64* [[PAYLOAD_ADDR]], align 8
+// CHECK:   [[T0:%.*]] = getelementptr inbounds %O4enum23MultiPayloadNoSpareBits, %O4enum23MultiPayloadNoSpareBits* %0, i32 0, i32 1
+// CHECK:   [[TAG_ADDR:%.*]] = bitcast [1 x i8]* [[T0]] to i2*
+// CHECK:   store i2 -1, i2* [[TAG_ADDR]], align 8
+// CHECK:   ret void
+// CHECK: }
 sil @multi_payload_no_spare_bit_inject_a_indirect : $(@inout MultiPayloadNoSpareBits) -> () {
 entry(%0 : $*MultiPayloadNoSpareBits):
   inject_enum_addr %0 : $*MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.a!enumelt
@@ -1553,20 +1544,20 @@ entry(%0 : $*MultiPayloadNoSpareBits):
   return %v : $()
 }
 
-// CHECK-64: define { i64, i2 } @multi_payload_no_spare_bit_inject_b() {{.*}} {
-// CHECK-64: entry:
-// CHECK-64:   ret { i64, i2 } { i64 1, i2 -1 }
-// CHECK-64: }
+// CHECK: define { i64, i2 } @multi_payload_no_spare_bit_inject_b() {{.*}} {
+// CHECK: entry:
+// CHECK:   ret { i64, i2 } { i64 1, i2 -1 }
+// CHECK: }
 sil @multi_payload_no_spare_bit_inject_b : $() -> MultiPayloadNoSpareBits {
 entry:
   %u = enum $MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.b!enumelt
   return %u : $MultiPayloadNoSpareBits
 }
 
-// CHECK-64: define { i64, i2 } @multi_payload_no_spare_bit_inject_c() {{.*}} {
-// CHECK-64: entry:
-// CHECK-64:   ret { i64, i2 } { i64 2, i2 -1 }
-// CHECK-64: }
+// CHECK: define { i64, i2 } @multi_payload_no_spare_bit_inject_c() {{.*}} {
+// CHECK: entry:
+// CHECK:   ret { i64, i2 } { i64 2, i2 -1 }
+// CHECK: }
 sil @multi_payload_no_spare_bit_inject_c : $() -> MultiPayloadNoSpareBits {
 entry:
   %u = enum $MultiPayloadNoSpareBits, #MultiPayloadNoSpareBits.c!enumelt
@@ -1582,82 +1573,82 @@ enum MultiPayloadOneSpareBit {
   case c
 }
 
-// CHECK-64: define void @multi_payload_one_spare_bit_switch(i64, i1) {{.*}} {
+// CHECK: define void @multi_payload_one_spare_bit_switch(i64, i1) {{.*}} {
 sil @multi_payload_one_spare_bit_switch : $(MultiPayloadOneSpareBit) -> () {
 entry(%u : $MultiPayloadOneSpareBit):
-// CHECK-64:   [[SPARE_TAG_LSHR:%.*]] = lshr i64 %0, 63
-// CHECK-64:   [[SPARE_TAG_TRUNC:%.*]] = trunc i64 [[SPARE_TAG_LSHR]] to i2
-// CHECK-64:   [[SPARE_TAG:%.*]] = and i2 [[SPARE_TAG_TRUNC]], 1
-// CHECK-64:   [[EXTRA_TAG_ZEXT:%.*]] = zext i1 %1 to i2
-// CHECK-64:   [[EXTRA_TAG:%.*]] = shl i2 [[EXTRA_TAG_ZEXT]], 1
-// CHECK-64:   [[TAG:%.*]] = or i2 [[SPARE_TAG]], [[EXTRA_TAG]]
-// CHECK-64:   switch i2 [[TAG]], label %[[UNREACHABLE:[0-9]+]] [
-// CHECK-64:     i2 0, label %[[X_PREDEST:[0-9]+]]
-// CHECK-64:     i2 1, label %[[Y_PREDEST:[0-9]+]]
-// CHECK-64:     i2 -2, label %[[Z_PREDEST:[0-9]+]]
-// CHECK-64:     i2 -1, label %[[EMPTY_DEST:[0-9]+]]
-// CHECK-64:   ]
+// CHECK:   [[SPARE_TAG_LSHR:%.*]] = lshr i64 %0, 63
+// CHECK:   [[SPARE_TAG_TRUNC:%.*]] = trunc i64 [[SPARE_TAG_LSHR]] to i2
+// CHECK:   [[SPARE_TAG:%.*]] = and i2 [[SPARE_TAG_TRUNC]], 1
+// CHECK:   [[EXTRA_TAG_ZEXT:%.*]] = zext i1 %1 to i2
+// CHECK:   [[EXTRA_TAG:%.*]] = shl i2 [[EXTRA_TAG_ZEXT]], 1
+// CHECK:   [[TAG:%.*]] = or i2 [[SPARE_TAG]], [[EXTRA_TAG]]
+// CHECK:   switch i2 [[TAG]], label %[[UNREACHABLE:[0-9]+]] [
+// CHECK:     i2 0, label %[[X_PREDEST:[0-9]+]]
+// CHECK:     i2 1, label %[[Y_PREDEST:[0-9]+]]
+// CHECK:     i2 -2, label %[[Z_PREDEST:[0-9]+]]
+// CHECK:     i2 -1, label %[[EMPTY_DEST:[0-9]+]]
+// CHECK:   ]
 
-// CHECK-64: ; <label>:[[EMPTY_DEST]]
-// CHECK-64:   switch i64 %0, label %[[UNREACHABLE]] [
+// CHECK: ; <label>:[[EMPTY_DEST]]
+// CHECK:   switch i64 %0, label %[[UNREACHABLE]] [
 // --            0x8000_0000_0000_0000
-// CHECK-64:     i64 -9223372036854775808, label %[[A_DEST:[0-9]+]]
+// CHECK:     i64 -9223372036854775808, label %[[A_DEST:[0-9]+]]
 // --            0x8000_0000_0000_0001
-// CHECK-64:     i64 -9223372036854775807, label %[[B_DEST:[0-9]+]]
+// CHECK:     i64 -9223372036854775807, label %[[B_DEST:[0-9]+]]
 // --            0x8000_0000_0000_0002
-// CHECK-64:     i64 -9223372036854775806, label %[[C_DEST:[0-9]+]]
-// CHECK-64:   ]
+// CHECK:     i64 -9223372036854775806, label %[[C_DEST:[0-9]+]]
+// CHECK:   ]
 
-// CHECK-64: ; <label>:[[UNREACHABLE]]
-// CHECK-64:   unreachable
+// CHECK: ; <label>:[[UNREACHABLE]]
+// CHECK:   unreachable
   switch_enum %u : $MultiPayloadOneSpareBit, case #MultiPayloadOneSpareBit.x!enumelt.1: x_dest, case #MultiPayloadOneSpareBit.y!enumelt.1: y_dest, case #MultiPayloadOneSpareBit.z!enumelt.1: z_dest, case #MultiPayloadOneSpareBit.a!enumelt: a_dest, case #MultiPayloadOneSpareBit.b!enumelt: b_dest, case #MultiPayloadOneSpareBit.c!enumelt: c_dest
 
-// CHECK-64: ; <label>:[[X_PREDEST]]
-// CHECK-64:   [[X_VALUE:%.*]] = trunc i64 %0 to i62
-// CHECK-64:   br label %[[X_DEST:[0-9]+]]
-// CHECK-64: ; <label>:[[Y_PREDEST]]
+// CHECK: ; <label>:[[X_PREDEST]]
+// CHECK:   [[X_VALUE:%.*]] = trunc i64 %0 to i62
+// CHECK:   br label %[[X_DEST:[0-9]+]]
+// CHECK: ; <label>:[[Y_PREDEST]]
 // --                                    0x7FFF_FFFF_FFFF_FFFF
-// CHECK-64:   [[Y_MASKED:%.*]] = and i64 %0, 9223372036854775807
-// CHECK-64:   [[Y_VALUE:%.*]] = trunc i64 [[Y_MASKED]] to i63
-// CHECK-64:   br label %[[Y_DEST:[0-9]+]]
-// CHECK-64: ; <label>:[[Z_PREDEST]]
-// CHECK-64:   [[Z_VALUE:%.*]] = trunc i64 %0 to i61
-// CHECK-64:   br label %[[Z_DEST:[0-9]+]]
+// CHECK:   [[Y_MASKED:%.*]] = and i64 %0, 9223372036854775807
+// CHECK:   [[Y_VALUE:%.*]] = trunc i64 [[Y_MASKED]] to i63
+// CHECK:   br label %[[Y_DEST:[0-9]+]]
+// CHECK: ; <label>:[[Z_PREDEST]]
+// CHECK:   [[Z_VALUE:%.*]] = trunc i64 %0 to i61
+// CHECK:   br label %[[Z_DEST:[0-9]+]]
 
-// CHECK-64: ; <label>:[[X_DEST]]
-// CHECK-64:   phi i62 [ [[X_VALUE]], %[[X_PREDEST]] ]
+// CHECK: ; <label>:[[X_DEST]]
+// CHECK:   phi i62 [ [[X_VALUE]], %[[X_PREDEST]] ]
 x_dest(%x : $Builtin.Int62):
   %a = function_ref @a : $@convention(thin) () -> ()
   apply %a() : $@convention(thin) () -> ()
   br end
 
-// CHECK-64: ; <label>:[[Y_DEST]]
-// CHECK-64:   phi i63 [ [[Y_VALUE]], %[[Y_PREDEST]] ]
+// CHECK: ; <label>:[[Y_DEST]]
+// CHECK:   phi i63 [ [[Y_VALUE]], %[[Y_PREDEST]] ]
 y_dest(%y : $Builtin.Int63):
   %b = function_ref @b : $@convention(thin) () -> ()
   apply %b() : $@convention(thin) () -> ()
   br end
 
-// CHECK-64: ; <label>:[[Z_DEST]]
-// CHECK-64:   phi i61 [ [[Z_VALUE]], %[[Z_PREDEST]] ]
+// CHECK: ; <label>:[[Z_DEST]]
+// CHECK:   phi i61 [ [[Z_VALUE]], %[[Z_PREDEST]] ]
 z_dest(%z : $Builtin.Int61):
   %c = function_ref @c : $@convention(thin) () -> ()
   apply %c() : $@convention(thin) () -> ()
   br end
 
-// CHECK-64: ; <label>:[[A_DEST]]
+// CHECK: ; <label>:[[A_DEST]]
 a_dest:
   %d = function_ref @d : $@convention(thin) () -> ()
   apply %d() : $@convention(thin) () -> ()
   br end
 
-// CHECK-64: ; <label>:[[B_DEST]]
+// CHECK: ; <label>:[[B_DEST]]
 b_dest:
   %e = function_ref @e : $@convention(thin) () -> ()
   apply %e() : $@convention(thin) () -> ()
   br end
 
-// CHECK-64: ; <label>:[[C_DEST]]
+// CHECK: ; <label>:[[C_DEST]]
 c_dest:
   %f = function_ref @f : $@convention(thin) () -> ()
   apply %f() : $@convention(thin) () -> ()
@@ -1670,31 +1661,30 @@ end:
 
 sil @multi_payload_one_spare_bit_switch_indirect : $(@inout MultiPayloadOneSpareBit) -> () {
 entry(%u : $*MultiPayloadOneSpareBit):
-// CHECK-64:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum23MultiPayloadOneSpareBit* %0 to i64*
-// CHECK-64:   [[PAYLOAD:%.*]] = load i64, i64* [[PAYLOAD_ADDR]]
-// CHECK-64:   [[T0:%.*]] = getelementptr inbounds %O4enum23MultiPayloadOneSpareBit, %O4enum23MultiPayloadOneSpareBit* %0, i32 0, i32 1
-// CHECK-64:   [[TAG_ADDR:%.*]] = bitcast [1 x i8]* [[T0]] to i1*
-// CHECK-64:   [[TAG:%.*]] = load i1, i1* [[TAG_ADDR]]
-// CHECK-64:   switch i2 {{%.*}}
-// CHECK-64:   switch i64 [[PAYLOAD]]
-// CHECK-64: ; <label>:
-// CHECK-64:   unreachable
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum23MultiPayloadOneSpareBit* %0 to i64*
+// CHECK:   [[PAYLOAD:%.*]] = load i64, i64* [[PAYLOAD_ADDR]], align 8
+// CHECK:   [[T0:%.*]] = getelementptr inbounds %O4enum23MultiPayloadOneSpareBit, %O4enum23MultiPayloadOneSpareBit* %0, i32 0, i32 1
+// CHECK:   [[TAG_ADDR:%.*]] = bitcast [1 x i8]* [[T0]] to i1*
+// CHECK:   [[TAG:%.*]] = load i1, i1* [[TAG_ADDR]], align 8
+// CHECK:   switch i2 {{%.*}}
+// CHECK:   switch i64 [[PAYLOAD]]
+// CHECK: ; <label>:
+// CHECK:   unreachable
   switch_enum_addr %u : $*MultiPayloadOneSpareBit, case #MultiPayloadOneSpareBit.x!enumelt.1: x_dest, case #MultiPayloadOneSpareBit.y!enumelt.1: y_dest, case #MultiPayloadOneSpareBit.z!enumelt.1: z_dest, case #MultiPayloadOneSpareBit.a!enumelt: a_dest, case #MultiPayloadOneSpareBit.b!enumelt: b_dest, case #MultiPayloadOneSpareBit.c!enumelt: c_dest
 
-// CHECK-64: ; <label>:[[X_PREDEST:[0-9]+]]
-// CHECK-64:   bitcast %O4enum23MultiPayloadOneSpareBit* %0 to i62*
+// CHECK: ; <label>:[[X_PREDEST:[0-9]+]]
+// CHECK:   bitcast %O4enum23MultiPayloadOneSpareBit* %0 to i62*
 
-// CHECK-64: ; <label>:[[Y_PREDEST:[0-9]+]]
-// CHECK-64:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum23MultiPayloadOneSpareBit* %0 to i64*
-// CHECK-64:   [[PAYLOAD:%.*]] = load i64, i64* [[PAYLOAD_ADDR]]
+// CHECK: ; <label>:[[Y_PREDEST:[0-9]+]]
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum23MultiPayloadOneSpareBit* %0 to i64*
+// CHECK:   [[PAYLOAD:%.*]] = load i64, i64* [[PAYLOAD_ADDR]]
 // --                                                   0x7FFF_FFFF_FFFF_FFFF
-// CHECK-64:   [[PAYLOAD_MASKED:%.*]] = and i64 [[PAYLOAD]], 9223372036854775807
-// CHECK-64:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum23MultiPayloadOneSpareBit* %0 to i64*
-// CHECK-64:   store i64 [[PAYLOAD_MASKED]], i64* [[PAYLOAD_ADDR]]
-// CHECK-64:   bitcast %O4enum23MultiPayloadOneSpareBit* %0 to i63*
+// CHECK:   [[PAYLOAD_MASKED:%.*]] = and i64 [[PAYLOAD]], 9223372036854775807
+// CHECK:   store i64 [[PAYLOAD_MASKED]], i64* [[PAYLOAD_ADDR]], align 8
+// CHECK:   bitcast %O4enum23MultiPayloadOneSpareBit* %0 to i63*
 
-// CHECK-64: ; <label>:[[Z_PREDEST:[0-9]+]]
-// CHECK-64:   bitcast %O4enum23MultiPayloadOneSpareBit* %0 to i61*
+// CHECK: ; <label>:[[Z_PREDEST:[0-9]+]]
+// CHECK:   bitcast %O4enum23MultiPayloadOneSpareBit* %0 to i61*
 
 x_dest:
   %x = unchecked_take_enum_data_addr %u : $*MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.x!enumelt.1
@@ -1722,34 +1712,33 @@ end:
   return %v : $()
 }
 
-// CHECK-64: define { i64, i1 } @multi_payload_one_spare_bit_inject_x(i62) {{.*}} {
-// CHECK-64: entry:
-// CHECK-64:   [[ZEXT:%.*]] = zext i62 %0 to i64
-// CHECK-64:   [[RES_0:%.*]] = insertvalue { i64, i1 } undef, i64 [[ZEXT]], 0
-// CHECK-64:   [[RES:%.*]] = insertvalue { i64, i1 } [[RES_0]], i1 false, 1
-// CHECK-64:   ret { i64, i1 } [[RES]]
-// CHECK-64: }
+// CHECK: define { i64, i1 } @multi_payload_one_spare_bit_inject_x(i62) {{.*}} {
+// CHECK: entry:
+// CHECK:   [[ZEXT:%.*]] = zext i62 %0 to i64
+// CHECK:   [[RES_0:%.*]] = insertvalue { i64, i1 } undef, i64 [[ZEXT]], 0
+// CHECK:   [[RES:%.*]] = insertvalue { i64, i1 } [[RES_0]], i1 false, 1
+// CHECK:   ret { i64, i1 } [[RES]]
+// CHECK: }
 sil @multi_payload_one_spare_bit_inject_x : $(Builtin.Int62) -> MultiPayloadOneSpareBit {
 entry(%0 : $Builtin.Int62):
   %u = enum $MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.x!enumelt.1, %0 : $Builtin.Int62
   return %u : $MultiPayloadOneSpareBit
 }
 
-// CHECK-64: define void @multi_payload_one_spare_bit_inject_x_indirect(i62, %O4enum23MultiPayloadOneSpareBit*) {{.*}} {
-// CHECK-64: entry:
-// CHECK-64:   [[DATA_ADDR:%.*]] = bitcast %O4enum23MultiPayloadOneSpareBit* %1 to i62*
-// CHECK-64:   store i62 %0, i62* [[DATA_ADDR]]
-// CHECK-64:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum23MultiPayloadOneSpareBit* %1 to i64*
-// CHECK-64:   [[PAYLOAD:%.*]] = load i64, i64* [[PAYLOAD_ADDR]]
+// CHECK: define void @multi_payload_one_spare_bit_inject_x_indirect(i62, %O4enum23MultiPayloadOneSpareBit*) {{.*}} {
+// CHECK: entry:
+// CHECK:   [[DATA_ADDR:%.*]] = bitcast %O4enum23MultiPayloadOneSpareBit* %1 to i62*
+// CHECK:   store i62 %0, i62* [[DATA_ADDR]], align 8
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum23MultiPayloadOneSpareBit* %1 to i64*
+// CHECK:   [[PAYLOAD:%.*]] = load i64, i64* [[PAYLOAD_ADDR]], align 8
 // --                                                   0x7FFF_FFFF_FFFF_FFFF
-// CHECK-64:   [[PAYLOAD_MASKED:%.*]] = and i64 [[PAYLOAD]], 9223372036854775807
-// CHECK-64:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum23MultiPayloadOneSpareBit* %1 to i64*
-// CHECK-64:   store i64 [[PAYLOAD_MASKED]], i64* [[PAYLOAD_ADDR]]
-// CHECK-64:   [[T0:%.*]] = getelementptr inbounds %O4enum23MultiPayloadOneSpareBit, %O4enum23MultiPayloadOneSpareBit* %1, i32 0, i32 1
-// CHECK-64:   [[TAG_ADDR:%.*]] = bitcast [1 x i8]* [[T0]] to i1*
-// CHECK-64:   store i1 false, i1* [[TAG_ADDR]]
-// CHECK-64:   ret void
-// CHECK-64: }
+// CHECK:   [[PAYLOAD_MASKED:%.*]] = and i64 [[PAYLOAD]], 9223372036854775807
+// CHECK:   store i64 [[PAYLOAD_MASKED]], i64* [[PAYLOAD_ADDR]], align 8
+// CHECK:   [[T0:%.*]] = getelementptr inbounds %O4enum23MultiPayloadOneSpareBit, %O4enum23MultiPayloadOneSpareBit* %1, i32 0, i32 1
+// CHECK:   [[TAG_ADDR:%.*]] = bitcast [1 x i8]* [[T0]] to i1*
+// CHECK:   store i1 false, i1* [[TAG_ADDR]], align 8
+// CHECK:   ret void
+// CHECK: }
 sil @multi_payload_one_spare_bit_inject_x_indirect : $(Builtin.Int62, @inout MultiPayloadOneSpareBit) -> () {
 entry(%0 : $Builtin.Int62, %1 : $*MultiPayloadOneSpareBit):
   %a = init_enum_data_addr %1 : $*MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.x!enumelt.1
@@ -1759,38 +1748,37 @@ entry(%0 : $Builtin.Int62, %1 : $*MultiPayloadOneSpareBit):
   return %v : $()
 }
 
-// CHECK-64: define { i64, i1 } @multi_payload_one_spare_bit_inject_y(i63) {{.*}} {
-// CHECK-64: entry:
-// CHECK-64:   [[ZEXT:%.*]] = zext i63 %0 to i64
+// CHECK: define { i64, i1 } @multi_payload_one_spare_bit_inject_y(i63) {{.*}} {
+// CHECK: entry:
+// CHECK:   [[ZEXT:%.*]] = zext i63 %0 to i64
 // --                                        0x8000_0000_0000_0000
-// CHECK-64:   [[TAGGED:%.*]] = or i64 [[ZEXT]], -9223372036854775808
-// CHECK-64:   [[RES_0:%.*]] = insertvalue { i64, i1 } undef, i64 [[TAGGED]], 0
-// CHECK-64:   [[RES:%.*]] = insertvalue { i64, i1 } [[RES_0]], i1 false, 1
-// CHECK-64:   ret { i64, i1 } [[RES]]
-// CHECK-64: }
+// CHECK:   [[TAGGED:%.*]] = or i64 [[ZEXT]], -9223372036854775808
+// CHECK:   [[RES_0:%.*]] = insertvalue { i64, i1 } undef, i64 [[TAGGED]], 0
+// CHECK:   [[RES:%.*]] = insertvalue { i64, i1 } [[RES_0]], i1 false, 1
+// CHECK:   ret { i64, i1 } [[RES]]
+// CHECK: }
 sil @multi_payload_one_spare_bit_inject_y : $(Builtin.Int63) -> MultiPayloadOneSpareBit {
 entry(%0 : $Builtin.Int63):
   %u = enum $MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.y!enumelt.1, %0 : $Builtin.Int63
   return %u : $MultiPayloadOneSpareBit
 }
 
-// CHECK-64: define void @multi_payload_one_spare_bit_inject_y_indirect(i63, %O4enum23MultiPayloadOneSpareBit*) {{.*}} {
-// CHECK-64: entry:
-// CHECK-64:   [[DATA_ADDR:%.*]] = bitcast %O4enum23MultiPayloadOneSpareBit* %1 to i63*
-// CHECK-64:   store i63 %0, i63* [[DATA_ADDR]]
-// CHECK-64:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum23MultiPayloadOneSpareBit* %1 to i64*
-// CHECK-64:   [[PAYLOAD:%.*]] = load i64, i64* [[PAYLOAD_ADDR]]
+// CHECK: define void @multi_payload_one_spare_bit_inject_y_indirect(i63, %O4enum23MultiPayloadOneSpareBit*) {{.*}} {
+// CHECK: entry:
+// CHECK:   [[DATA_ADDR:%.*]] = bitcast %O4enum23MultiPayloadOneSpareBit* %1 to i63*
+// CHECK:   store i63 %0, i63* [[DATA_ADDR]], align 8
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum23MultiPayloadOneSpareBit* %1 to i64*
+// CHECK:   [[PAYLOAD:%.*]] = load i64, i64* [[PAYLOAD_ADDR]], align 8
 // --                                                   0x7FFF_FFFF_FFFF_FFFF
-// CHECK-64:   [[PAYLOAD_MASKED:%.*]] = and i64 [[PAYLOAD]], 9223372036854775807
+// CHECK:   [[PAYLOAD_MASKED:%.*]] = and i64 [[PAYLOAD]], 9223372036854775807
 // --                                                          0x8000_0000_0000_0000
-// CHECK-64:   [[PAYLOAD_TAGGED:%.*]] = or i64 [[PAYLOAD_MASKED]], -9223372036854775808
-// CHECK-64:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum23MultiPayloadOneSpareBit* %1 to i64*
-// CHECK-64:   store i64 [[PAYLOAD_TAGGED]], i64* [[PAYLOAD_ADDR]]
-// CHECK-64:   [[T0:%.*]] = getelementptr inbounds %O4enum23MultiPayloadOneSpareBit, %O4enum23MultiPayloadOneSpareBit* %1, i32 0, i32 1
-// CHECK-64:   [[TAG_ADDR:%.*]] = bitcast [1 x i8]* [[T0]] to i1*
-// CHECK-64:   store i1 false, i1* [[TAG_ADDR]]
-// CHECK-64:   ret void
-// CHECK-64: }
+// CHECK:   [[PAYLOAD_TAGGED:%.*]] = or i64 [[PAYLOAD_MASKED]], -9223372036854775808
+// CHECK:   store i64 [[PAYLOAD_TAGGED]], i64* [[PAYLOAD_ADDR]], align 8
+// CHECK:   [[T0:%.*]] = getelementptr inbounds %O4enum23MultiPayloadOneSpareBit, %O4enum23MultiPayloadOneSpareBit* %1, i32 0, i32 1
+// CHECK:   [[TAG_ADDR:%.*]] = bitcast [1 x i8]* [[T0]] to i1*
+// CHECK:   store i1 false, i1* [[TAG_ADDR]], align 8
+// CHECK:   ret void
+// CHECK: }
 
 sil @multi_payload_one_spare_bit_inject_y_indirect : $(Builtin.Int63, @inout MultiPayloadOneSpareBit) -> () {
 entry(%0 : $Builtin.Int63, %1 : $*MultiPayloadOneSpareBit):
@@ -1801,40 +1789,40 @@ entry(%0 : $Builtin.Int63, %1 : $*MultiPayloadOneSpareBit):
   return %v : $()
 }
 
-// CHECK-64: define { i64, i1 } @multi_payload_one_spare_bit_inject_z(i61) {{.*}} {
-// CHECK-64: entry:
-// CHECK-64:   [[ZEXT:%.*]] = zext i61 %0 to i64
-// CHECK-64:   [[RES_0:%.*]] = insertvalue { i64, i1 } undef, i64 [[ZEXT]], 0
-// CHECK-64:   [[RES:%.*]] = insertvalue { i64, i1 } [[RES_0]], i1 true, 1
-// CHECK-64:   ret { i64, i1 } [[RES]]
-// CHECK-64: }
+// CHECK: define { i64, i1 } @multi_payload_one_spare_bit_inject_z(i61) {{.*}} {
+// CHECK: entry:
+// CHECK:   [[ZEXT:%.*]] = zext i61 %0 to i64
+// CHECK:   [[RES_0:%.*]] = insertvalue { i64, i1 } undef, i64 [[ZEXT]], 0
+// CHECK:   [[RES:%.*]] = insertvalue { i64, i1 } [[RES_0]], i1 true, 1
+// CHECK:   ret { i64, i1 } [[RES]]
+// CHECK: }
 sil @multi_payload_one_spare_bit_inject_z : $(Builtin.Int61) -> MultiPayloadOneSpareBit {
 entry(%0 : $Builtin.Int61):
   %u = enum $MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.z!enumelt.1, %0 : $Builtin.Int61
   return %u : $MultiPayloadOneSpareBit
 }
 
-// CHECK-64: define { i64, i1 } @multi_payload_one_spare_bit_inject_a() {{.*}} {
-// CHECK-64: entry:
+// CHECK: define { i64, i1 } @multi_payload_one_spare_bit_inject_a() {{.*}} {
+// CHECK: entry:
 // --                            0x8000_0000_0000_0000
-// CHECK-64:   ret { i64, i1 } { i64 -9223372036854775808, i1 true }
-// CHECK-64: }
+// CHECK:   ret { i64, i1 } { i64 -9223372036854775808, i1 true }
+// CHECK: }
 sil @multi_payload_one_spare_bit_inject_a : $() -> MultiPayloadOneSpareBit {
 entry:
   %u = enum $MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.a!enumelt
   return %u : $MultiPayloadOneSpareBit
 }
 
-// CHECK-64: define void @multi_payload_one_spare_bit_inject_a_indirect(%O4enum23MultiPayloadOneSpareBit*) {{.*}} {
-// CHECK-64: entry:
-// CHECK-64:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum23MultiPayloadOneSpareBit* %0 to i64*
+// CHECK: define void @multi_payload_one_spare_bit_inject_a_indirect(%O4enum23MultiPayloadOneSpareBit*) {{.*}} {
+// CHECK: entry:
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum23MultiPayloadOneSpareBit* %0 to i64*
 // --                0x8000_0000_0000_0000
-// CHECK-64:   store i64 -9223372036854775808, i64* [[PAYLOAD_ADDR]]
-// CHECK-64:   [[T0:%.*]] = getelementptr inbounds %O4enum23MultiPayloadOneSpareBit, %O4enum23MultiPayloadOneSpareBit* %0, i32 0, i32 1
-// CHECK-64:   [[TAG_ADDR:%.*]] = bitcast [1 x i8]* [[T0]] to i1*
-// CHECK-64:   store i1 true, i1* [[TAG_ADDR]]
-// CHECK-64:   ret void
-// CHECK-64: }
+// CHECK:   store i64 -9223372036854775808, i64* [[PAYLOAD_ADDR]], align 8
+// CHECK:   [[T0:%.*]] = getelementptr inbounds %O4enum23MultiPayloadOneSpareBit, %O4enum23MultiPayloadOneSpareBit* %0, i32 0, i32 1
+// CHECK:   [[TAG_ADDR:%.*]] = bitcast [1 x i8]* [[T0]] to i1*
+// CHECK:   store i1 true, i1* [[TAG_ADDR]], align 8
+// CHECK:   ret void
+// CHECK: }
 sil @multi_payload_one_spare_bit_inject_a_indirect : $(@inout MultiPayloadOneSpareBit) -> () {
 entry(%0 : $*MultiPayloadOneSpareBit):
   inject_enum_addr %0 : $*MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.a!enumelt
@@ -1842,22 +1830,22 @@ entry(%0 : $*MultiPayloadOneSpareBit):
   return %v : $()
 }
 
-// CHECK-64: define { i64, i1 } @multi_payload_one_spare_bit_inject_b() {{.*}} {
-// CHECK-64: entry:
+// CHECK: define { i64, i1 } @multi_payload_one_spare_bit_inject_b() {{.*}} {
+// CHECK: entry:
 // --                            0x8000_0000_0000_0001
-// CHECK-64:   ret { i64, i1 } { i64 -9223372036854775807, i1 true }
-// CHECK-64: }
+// CHECK:   ret { i64, i1 } { i64 -9223372036854775807, i1 true }
+// CHECK: }
 sil @multi_payload_one_spare_bit_inject_b : $() -> MultiPayloadOneSpareBit {
 entry:
   %u = enum $MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.b!enumelt
   return %u : $MultiPayloadOneSpareBit
 }
 
-// CHECK-64: define { i64, i1 } @multi_payload_one_spare_bit_inject_c() {{.*}} {
-// CHECK-64: entry:
+// CHECK: define { i64, i1 } @multi_payload_one_spare_bit_inject_c() {{.*}} {
+// CHECK: entry:
 // --                            0x8000_0000_0000_0002
-// CHECK-64:   ret { i64, i1 } { i64 -9223372036854775806, i1 true }
-// CHECK-64: }
+// CHECK:   ret { i64, i1 } { i64 -9223372036854775806, i1 true }
+// CHECK: }
 sil @multi_payload_one_spare_bit_inject_c : $() -> MultiPayloadOneSpareBit {
 entry:
   %u = enum $MultiPayloadOneSpareBit, #MultiPayloadOneSpareBit.c!enumelt
@@ -1874,80 +1862,80 @@ enum MultiPayloadTwoSpareBits {
   case c
 }
 
-// CHECK-64: define void @multi_payload_two_spare_bits_switch(i64) {{.*}} {
+// CHECK: define void @multi_payload_two_spare_bits_switch(i64) {{.*}} {
 sil @multi_payload_two_spare_bits_switch : $(MultiPayloadTwoSpareBits) -> () {
 entry(%u : $MultiPayloadTwoSpareBits):
-// CHECK-64:   [[TAG_LSHR:%.*]] = lshr i64 %0, 62
-// CHECK-64:   [[TAG:%.*]] = trunc i64 [[TAG_LSHR]] to i2
-// CHECK-64:   switch i2 [[TAG]], label %[[UNREACHABLE:[0-9]+]] [
-// CHECK-64:     i2 0, label %[[X_PREDEST:[0-9]+]]
-// CHECK-64:     i2 1, label %[[Y_PREDEST:[0-9]+]]
-// CHECK-64:     i2 -2, label %[[Z_PREDEST:[0-9]+]]
-// CHECK-64:     i2 -1, label %[[EMPTY_DEST:[0-9]+]]
-// CHECK-64:   ]
-// CHECK-64: ; <label>:[[EMPTY_DEST]]
-// CHECK-64:   switch i64 %0, label %[[UNREACHABLE]] [
+// CHECK:   [[TAG_LSHR:%.*]] = lshr i64 %0, 62
+// CHECK:   [[TAG:%.*]] = trunc i64 [[TAG_LSHR]] to i2
+// CHECK:   switch i2 [[TAG]], label %[[UNREACHABLE:[0-9]+]] [
+// CHECK:     i2 0, label %[[X_PREDEST:[0-9]+]]
+// CHECK:     i2 1, label %[[Y_PREDEST:[0-9]+]]
+// CHECK:     i2 -2, label %[[Z_PREDEST:[0-9]+]]
+// CHECK:     i2 -1, label %[[EMPTY_DEST:[0-9]+]]
+// CHECK:   ]
+// CHECK: ; <label>:[[EMPTY_DEST]]
+// CHECK:   switch i64 %0, label %[[UNREACHABLE]] [
 // --            0xC000_0000_0000_0000
-// CHECK-64:     i64 -4611686018427387904, label %[[A_DEST:[0-9]+]]
+// CHECK:     i64 -4611686018427387904, label %[[A_DEST:[0-9]+]]
 // --            0xC000_0000_0000_0001
-// CHECK-64:     i64 -4611686018427387903, label %[[B_DEST:[0-9]+]]
+// CHECK:     i64 -4611686018427387903, label %[[B_DEST:[0-9]+]]
 // --            0xC000_0000_0000_0002
-// CHECK-64:     i64 -4611686018427387902, label %[[C_DEST:[0-9]+]]
-// CHECK-64:   ]
-// CHECK-64: ; <label>:[[UNREACHABLE]]
-// CHECK-64:   unreachable
+// CHECK:     i64 -4611686018427387902, label %[[C_DEST:[0-9]+]]
+// CHECK:   ]
+// CHECK: ; <label>:[[UNREACHABLE]]
+// CHECK:   unreachable
   switch_enum %u : $MultiPayloadTwoSpareBits, case #MultiPayloadTwoSpareBits.x!enumelt.1: x_dest, case #MultiPayloadTwoSpareBits.y!enumelt.1: y_dest, case #MultiPayloadTwoSpareBits.z!enumelt.1: z_dest, case #MultiPayloadTwoSpareBits.a!enumelt: a_dest, case #MultiPayloadTwoSpareBits.b!enumelt: b_dest, case #MultiPayloadTwoSpareBits.c!enumelt: c_dest
 
-// CHECK-64: ; <label>:[[X_PREDEST]]
-// CHECK-64:   [[X_VALUE:%.*]] = trunc i64 %0 to i62
-// CHECK-64:   br label %[[X_DEST:[0-9]+]]
+// CHECK: ; <label>:[[X_PREDEST]]
+// CHECK:   [[X_VALUE:%.*]] = trunc i64 %0 to i62
+// CHECK:   br label %[[X_DEST:[0-9]+]]
 
-// CHECK-64: ; <label>:[[Y_PREDEST]]
+// CHECK: ; <label>:[[Y_PREDEST]]
 // --                                    0x3FFF_FFFF_FFFF_FFFF
-// CHECK-64:   [[Y_MASKED:%.*]] = and i64 %0, 4611686018427387903
-// CHECK-64:   [[Y_VALUE:%.*]] = trunc i64 [[Y_MASKED]] to i60
-// CHECK-64:   br label %[[Y_DEST:[0-9]+]]
+// CHECK:   [[Y_MASKED:%.*]] = and i64 %0, 4611686018427387903
+// CHECK:   [[Y_VALUE:%.*]] = trunc i64 [[Y_MASKED]] to i60
+// CHECK:   br label %[[Y_DEST:[0-9]+]]
 
-// CHECK-64: ; <label>:[[Z_PREDEST]]
+// CHECK: ; <label>:[[Z_PREDEST]]
 // --                                    0x3FFF_FFFF_FFFF_FFFF
-// CHECK-64:   [[Z_MASKED:%.*]] = and i64 %0, 4611686018427387903
-// CHECK-64:   [[Z_VALUE:%.*]] = trunc i64 [[Z_MASKED]] to i61
-// CHECK-64:   br label %[[Z_DEST:[0-9]+]]
+// CHECK:   [[Z_MASKED:%.*]] = and i64 %0, 4611686018427387903
+// CHECK:   [[Z_VALUE:%.*]] = trunc i64 [[Z_MASKED]] to i61
+// CHECK:   br label %[[Z_DEST:[0-9]+]]
 
-// CHECK-64: ; <label>:[[X_DEST]]
-// CHECK-64:   phi i62 [ [[X_VALUE]], %[[X_PREDEST]] ]
+// CHECK: ; <label>:[[X_DEST]]
+// CHECK:   phi i62 [ [[X_VALUE]], %[[X_PREDEST]] ]
 x_dest(%x : $Builtin.Int62):
   %a = function_ref @a : $@convention(thin) () -> ()
   apply %a() : $@convention(thin) () -> ()
   br end
 
-// CHECK-64: ; <label>:[[Y_DEST]]
-// CHECK-64:   phi i60 [ [[Y_VALUE]], %[[Y_PREDEST]] ]
+// CHECK: ; <label>:[[Y_DEST]]
+// CHECK:   phi i60 [ [[Y_VALUE]], %[[Y_PREDEST]] ]
 y_dest(%y : $Builtin.Int60):
   %b = function_ref @b : $@convention(thin) () -> ()
   apply %b() : $@convention(thin) () -> ()
   br end
 
-// CHECK-64: ; <label>:[[Z_DEST]]
-// CHECK-64:   phi i61 [ [[Z_VALUE]], %[[Z_PREDEST]] ]
+// CHECK: ; <label>:[[Z_DEST]]
+// CHECK:   phi i61 [ [[Z_VALUE]], %[[Z_PREDEST]] ]
 z_dest(%z : $Builtin.Int61):
   %c = function_ref @c : $@convention(thin) () -> ()
   apply %c() : $@convention(thin) () -> ()
   br end
 
-// CHECK-64: ; <label>:[[A_DEST]]
+// CHECK: ; <label>:[[A_DEST]]
 a_dest:
   %d = function_ref @d : $@convention(thin) () -> ()
   apply %d() : $@convention(thin) () -> ()
   br end
 
-// CHECK-64: ; <label>:[[B_DEST]]
+// CHECK: ; <label>:[[B_DEST]]
 b_dest:
   %e = function_ref @e : $@convention(thin) () -> ()
   apply %e() : $@convention(thin) () -> ()
   br end
 
-// CHECK-64: ; <label>:[[C_DEST]]
+// CHECK: ; <label>:[[C_DEST]]
 c_dest:
   %f = function_ref @f : $@convention(thin) () -> ()
   apply %f() : $@convention(thin) () -> ()
@@ -1958,29 +1946,28 @@ end:
   return %v : $()
 }
 
-// CHECK-64: define i64 @multi_payload_two_spare_bits_inject_x(i62) {{.*}} {
-// CHECK-64: entry:
-// CHECK-64:   [[ZEXT:%.*]] = zext i62 %0 to i64
-// CHECK-64:   ret i64 [[ZEXT]]
-// CHECK-64: }
+// CHECK: define i64 @multi_payload_two_spare_bits_inject_x(i62) {{.*}} {
+// CHECK: entry:
+// CHECK:   [[ZEXT:%.*]] = zext i62 %0 to i64
+// CHECK:   ret i64 [[ZEXT]]
+// CHECK: }
 sil @multi_payload_two_spare_bits_inject_x : $(Builtin.Int62) -> MultiPayloadTwoSpareBits {
 entry(%0 : $Builtin.Int62):
   %u = enum $MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.x!enumelt.1, %0 : $Builtin.Int62
   return %u : $MultiPayloadTwoSpareBits
 }
 
-// CHECK-64: define void @multi_payload_two_spare_bits_inject_x_indirect(i62, %O4enum24MultiPayloadTwoSpareBits*) {{.*}} {
-// CHECK-64: entry:
-// CHECK-64:   [[DATA_ADDR:%.*]] = bitcast %O4enum24MultiPayloadTwoSpareBits* %1 to i62*
-// CHECK-64:   store i62 %0, i62* [[DATA_ADDR]]
-// CHECK-64:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum24MultiPayloadTwoSpareBits* %1 to i64*
-// CHECK-64:   [[PAYLOAD:%.*]] = load i64, i64* [[PAYLOAD_ADDR]]
+// CHECK: define void @multi_payload_two_spare_bits_inject_x_indirect(i62, %O4enum24MultiPayloadTwoSpareBits*) {{.*}} {
+// CHECK: entry:
+// CHECK:   [[DATA_ADDR:%.*]] = bitcast %O4enum24MultiPayloadTwoSpareBits* %1 to i62*
+// CHECK:   store i62 %0, i62* [[DATA_ADDR]], align 8
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum24MultiPayloadTwoSpareBits* %1 to i64*
+// CHECK:   [[PAYLOAD:%.*]] = load i64, i64* [[PAYLOAD_ADDR]], align 8
 // --                                                   0x3FFF_FFFF_FFFF_FFFF
-// CHECK-64:   [[PAYLOAD_MASKED:%.*]] = and i64 [[PAYLOAD]], 4611686018427387903
-// CHECK-64:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum24MultiPayloadTwoSpareBits* %1 to i64*
-// CHECK-64:   store i64 [[PAYLOAD_MASKED]], i64* [[PAYLOAD_ADDR]]
-// CHECK-64:   ret void
-// CHECK-64: }
+// CHECK:   [[PAYLOAD_MASKED:%.*]] = and i64 [[PAYLOAD]], 4611686018427387903
+// CHECK:   store i64 [[PAYLOAD_MASKED]], i64* [[PAYLOAD_ADDR]], align 8
+// CHECK:   ret void
+// CHECK: }
 sil @multi_payload_two_spare_bits_inject_x_indirect : $(Builtin.Int62, @inout MultiPayloadTwoSpareBits) -> () {
 entry(%0 : $Builtin.Int62, %1 : $*MultiPayloadTwoSpareBits):
   %a = init_enum_data_addr %1 : $*MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.x!enumelt.1
@@ -1990,33 +1977,32 @@ entry(%0 : $Builtin.Int62, %1 : $*MultiPayloadTwoSpareBits):
   return %v : $()
 }
 
-// CHECK-64: define i64 @multi_payload_two_spare_bits_inject_y(i60) {{.*}} {
-// CHECK-64: entry:
-// CHECK-64:   [[ZEXT:%.*]] = zext i60 %0 to i64
+// CHECK: define i64 @multi_payload_two_spare_bits_inject_y(i60) {{.*}} {
+// CHECK: entry:
+// CHECK:   [[ZEXT:%.*]] = zext i60 %0 to i64
 // --                     0x4000_0000_0000_0000
-// CHECK-64:   [[TAGGED:%.*]] = or i64 [[ZEXT]], 4611686018427387904
-// CHECK-64:   ret i64 [[TAGGED]]
-// CHECK-64: }
+// CHECK:   [[TAGGED:%.*]] = or i64 [[ZEXT]], 4611686018427387904
+// CHECK:   ret i64 [[TAGGED]]
+// CHECK: }
 sil @multi_payload_two_spare_bits_inject_y : $(Builtin.Int60) -> MultiPayloadTwoSpareBits {
 entry(%0 : $Builtin.Int60):
   %u = enum $MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.y!enumelt.1, %0 : $Builtin.Int60
   return %u : $MultiPayloadTwoSpareBits
 }
 
-// CHECK-64: define void @multi_payload_two_spare_bits_inject_y_indirect(i60, %O4enum24MultiPayloadTwoSpareBits*) {{.*}} {
-// CHECK-64: entry:
-// CHECK-64:   [[DATA_ADDR:%.*]] = bitcast %O4enum24MultiPayloadTwoSpareBits* %1 to i60*
-// CHECK-64:   store i60 %0, i60* [[DATA_ADDR]]
-// CHECK-64:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum24MultiPayloadTwoSpareBits* %1 to i64*
-// CHECK-64:   [[PAYLOAD:%.*]] = load i64, i64* [[PAYLOAD_ADDR]]
+// CHECK: define void @multi_payload_two_spare_bits_inject_y_indirect(i60, %O4enum24MultiPayloadTwoSpareBits*) {{.*}} {
+// CHECK: entry:
+// CHECK:   [[DATA_ADDR:%.*]] = bitcast %O4enum24MultiPayloadTwoSpareBits* %1 to i60*
+// CHECK:   store i60 %0, i60* [[DATA_ADDR]], align 8
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum24MultiPayloadTwoSpareBits* %1 to i64*
+// CHECK:   [[PAYLOAD:%.*]] = load i64, i64* [[PAYLOAD_ADDR]], align 8
 // --                                                   0x3FFF_FFFF_FFFF_FFFF
-// CHECK-64:   [[PAYLOAD_MASKED:%.*]] = and i64 [[PAYLOAD]], 4611686018427387903
+// CHECK:   [[PAYLOAD_MASKED:%.*]] = and i64 [[PAYLOAD]], 4611686018427387903
 // --                                                         0x4000_0000_0000_0000
-// CHECK-64:   [[PAYLOAD_TAGGED:%.*]] = or i64 [[PAYLOAD_MASKED]], 4611686018427387904
-// CHECK-64:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum24MultiPayloadTwoSpareBits* %1 to i64*
-// CHECK-64:   store i64 [[PAYLOAD_TAGGED]], i64* [[PAYLOAD_ADDR]]
-// CHECK-64:   ret void
-// CHECK-64: }
+// CHECK:   [[PAYLOAD_TAGGED:%.*]] = or i64 [[PAYLOAD_MASKED]], 4611686018427387904
+// CHECK:   store i64 [[PAYLOAD_TAGGED]], i64* [[PAYLOAD_ADDR]], align 8
+// CHECK:   ret void
+// CHECK: }
 sil @multi_payload_two_spare_bits_inject_y_indirect : $(Builtin.Int60, @inout MultiPayloadTwoSpareBits) -> () {
 entry(%0 : $Builtin.Int60, %1 : $*MultiPayloadTwoSpareBits):
   %a = init_enum_data_addr %1 : $*MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.y!enumelt.1
@@ -2026,37 +2012,37 @@ entry(%0 : $Builtin.Int60, %1 : $*MultiPayloadTwoSpareBits):
   return %v : $()
 }
 
-// CHECK-64: define i64 @multi_payload_two_spare_bits_inject_z(i61) {{.*}} {
-// CHECK-64: entry:
-// CHECK-64:   [[ZEXT:%.*]] = zext i61 %0 to i64
+// CHECK: define i64 @multi_payload_two_spare_bits_inject_z(i61) {{.*}} {
+// CHECK: entry:
+// CHECK:   [[ZEXT:%.*]] = zext i61 %0 to i64
 // --                      0x8000_0000_0000_0000
-// CHECK-64:   [[TAGGED:%.*]] = or i64 [[ZEXT]], -9223372036854775808
-// CHECK-64:   ret i64 [[TAGGED]]
-// CHECK-64: }
+// CHECK:   [[TAGGED:%.*]] = or i64 [[ZEXT]], -9223372036854775808
+// CHECK:   ret i64 [[TAGGED]]
+// CHECK: }
 sil @multi_payload_two_spare_bits_inject_z : $(Builtin.Int61) -> MultiPayloadTwoSpareBits {
 entry(%0 : $Builtin.Int61):
   %u = enum $MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.z!enumelt.1, %0 : $Builtin.Int61
   return %u : $MultiPayloadTwoSpareBits
 }
 
-// CHECK-64: define i64 @multi_payload_two_spare_bits_inject_a() {{.*}} {
-// CHECK-64: entry:
+// CHECK: define i64 @multi_payload_two_spare_bits_inject_a() {{.*}} {
+// CHECK: entry:
 // --              0xC000_0000_0000_0000
-// CHECK-64:   ret i64 -4611686018427387904
-// CHECK-64: }
+// CHECK:   ret i64 -4611686018427387904
+// CHECK: }
 sil @multi_payload_two_spare_bits_inject_a : $() -> MultiPayloadTwoSpareBits {
 entry:
   %u = enum $MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.a!enumelt
   return %u : $MultiPayloadTwoSpareBits
 }
 
-// CHECK-64: define void @multi_payload_two_spare_bits_inject_a_indirect(%O4enum24MultiPayloadTwoSpareBits*) {{.*}} {
-// CHECK-64: entry:
-// CHECK-64:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum24MultiPayloadTwoSpareBits* %0 to i64*
+// CHECK: define void @multi_payload_two_spare_bits_inject_a_indirect(%O4enum24MultiPayloadTwoSpareBits*) {{.*}} {
+// CHECK: entry:
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum24MultiPayloadTwoSpareBits* %0 to i64*
 // --                0xC000_0000_0000_0000
-// CHECK-64:   store i64 -4611686018427387904, i64* [[PAYLOAD_ADDR]]
-// CHECK-64:   ret void
-// CHECK-64: }
+// CHECK:   store i64 -4611686018427387904, i64* [[PAYLOAD_ADDR]], align 8
+// CHECK:   ret void
+// CHECK: }
 sil @multi_payload_two_spare_bits_inject_a_indirect : $(@inout MultiPayloadTwoSpareBits) -> () {
 entry(%0 : $*MultiPayloadTwoSpareBits):
   inject_enum_addr %0 : $*MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.a!enumelt
@@ -2064,22 +2050,22 @@ entry(%0 : $*MultiPayloadTwoSpareBits):
   return %v : $()
 }
 
-// CHECK-64: define i64 @multi_payload_two_spare_bits_inject_b() {{.*}} {
-// CHECK-64: entry:
+// CHECK: define i64 @multi_payload_two_spare_bits_inject_b() {{.*}} {
+// CHECK: entry:
 // --              0xC000_0000_0000_0001
-// CHECK-64:   ret i64 -4611686018427387903
-// CHECK-64: }
+// CHECK:   ret i64 -4611686018427387903
+// CHECK: }
 sil @multi_payload_two_spare_bits_inject_b : $() -> MultiPayloadTwoSpareBits {
 entry:
   %u = enum $MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.b!enumelt
   return %u : $MultiPayloadTwoSpareBits
 }
 
-// CHECK-64: define i64 @multi_payload_two_spare_bits_inject_c() {{.*}} {
-// CHECK-64: entry:
+// CHECK: define i64 @multi_payload_two_spare_bits_inject_c() {{.*}} {
+// CHECK: entry:
 // --              0xC000_0000_0000_0002
-// CHECK-64:   ret i64 -4611686018427387902
-// CHECK-64: }
+// CHECK:   ret i64 -4611686018427387902
+// CHECK: }
 sil @multi_payload_two_spare_bits_inject_c : $() -> MultiPayloadTwoSpareBits {
 entry:
   %u = enum $MultiPayloadTwoSpareBits, #MultiPayloadTwoSpareBits.c!enumelt
@@ -2170,25 +2156,59 @@ enum MultiPayloadSpareBitAggregates {
   case z(S)
 }
 
-// CHECK-64-LABEL: define void @multi_payload_spare_bit_aggregate_switch(i64, i64) {{.*}} {
-// CHECK-64:   [[T0:%.*]] = lshr i64 %0, 62
-// CHECK-64:   [[TAG:%.*]] = trunc i64 [[T0]] to i2
+// CHECK-64-LABEL: define void @multi_payload_spare_bit_aggregate_switch(i128) {{.*}} {
+// CHECK-64:   [[T0:%.*]] = lshr i128 %0, 62
+// CHECK-64:   [[TAG:%.*]] = trunc i128 [[T0]] to i2
 // CHECK-64:   switch i2 [[TAG]], label {{%.*}} [
 // CHECK-64:     i2 0, label %[[X_DEST:[0-9]+]]
 // CHECK-64:     i2 1, label %[[Y_DEST:[0-9]+]]
 // CHECK-64:     i2 -2, label %[[Z_DEST:[0-9]+]]
 // CHECK-64:   ]
 // CHECK-64: ; <label>:[[X_DEST]]
-// CHECK-64:   [[X_0:%.*]] = trunc i64 %0 to i32
+// CHECK-64:   [[X_0:%.*]] = trunc i128 %0 to i32
+// CHECK-64:   [[T1:%.*]] = lshr i128 %0, 64
+// CHECK-64:   [[X_1:%.*]] = trunc i128 [[T1]] to i64
 // CHECK-64: ; <label>:[[Y_DEST]]
 // --                                        0x3fffffffffffffff
-// CHECK-64:   [[Y_MASKED:%.*]] = and i64 %0, 4611686018427387903
-// CHECK-64:   [[Y_0:%.*]] = inttoptr i64 [[Y_MASKED]] to %C4enum1C*
-// CHECK-64:   [[Y_1:%.*]] = inttoptr i64 %1 to %C4enum1C*
+// CHECK-64:   [[Y_MASKED:%.*]] = and i128 %0, -13835058055282163713
+// CHECK-64:   [[T2:%.*]] = trunc i128 [[Y_MASKED]] to i64
+// CHECK-64:   [[Y_0:%.*]] = inttoptr i64 [[T2]] to %C4enum1C*
+// CHECK-64:   [[T3:%.*]] = lshr i128 [[Y_MASKED]], 64
+// CHECK-64:   [[T4:%.*]] = trunc i128 [[T3]] to i64
+// CHECK-64:   [[Y_1:%.*]] = inttoptr i64 [[T4]] to %C4enum1C*
 // CHECK-64: ; <label>:[[Z_DEST]]
 // --                                        0x3fffffffffffffff
-// CHECK-64:   [[Z_MASKED:%.*]] = and i64 %0, 4611686018427387903
-// CHECK-64:   [[Z_A:%.*]] = trunc i64 [[Z_MASKED]] to i21
+// CHECK-64:   [[Z_MASKED:%.*]] = and i128 %0, -13835058055282163713
+// CHECK-64:   [[Z_A:%.*]] = trunc i128 [[Z_MASKED]] to i21
+// CHECK-64:   [[T5:%.*]] = lshr i128 [[Z_MASKED]], 64
+// CHECK-64:   [[Z_B:%.*]] = trunc i128 [[T5]] to i64
+
+// CHECK-32-LABEL: define void @multi_payload_spare_bit_aggregate_switch(i128) {{.*}} {
+// CHECK-32:   [[T0:%.*]] = lshr i128 %0, 32
+// CHECK-32:   [[TAG:%.*]] = trunc i128 [[T0]] to i2
+// CHECK-32:   switch i2 [[TAG]], label {{%.*}} [
+// CHECK-32:     i2 0, label %[[X_DEST:[0-9]+]]
+// CHECK-32:     i2 1, label %[[Y_DEST:[0-9]+]]
+// CHECK-32:     i2 -2, label %[[Z_DEST:[0-9]+]]
+// CHECK-32:   ]
+// CHECK-32: ; <label>:[[X_DEST]]
+// CHECK-32:   [[X_0:%.*]] = trunc i128 %0 to i32
+// CHECK-32:   [[T1:%.*]] = lshr i128 %0, 64
+// CHECK-32:   [[X_1:%.*]] = trunc i128 [[T1]] to i64
+// CHECK-32: ; <label>:[[Y_DEST]]
+// --                                        0xffff_fffc_ffff_ffff
+// CHECK-32:   [[Y_MASKED:%.*]] = and i128 %0, -12884901889
+// CHECK-32:   [[T2:%.*]] = trunc i128 [[Y_MASKED]] to i32
+// CHECK-32:   [[Y_0:%.*]] = inttoptr i32 [[T2]] to %C4enum1C*
+// CHECK-32:   [[T3:%.*]] = lshr i128 [[Y_MASKED]], 32
+// CHECK-32:   [[T4:%.*]] = trunc i128 [[T3]] to i32
+// CHECK-32:   [[Y_1:%.*]] = inttoptr i32 [[T4]] to %C4enum1C*
+// CHECK-32: ; <label>:[[Z_DEST]]
+// --                                        0xffff_fffc_ffff_ffff
+// CHECK-32:   [[Z_MASKED:%.*]] = and i128 %0, -12884901889
+// CHECK-32:   [[Z_A:%.*]] = trunc i128 [[Z_MASKED]] to i21
+// CHECK-32:   [[T5:%.*]] = lshr i128 [[Z_MASKED]], 64
+// CHECK-32:   [[Z_B:%.*]] = trunc i128 [[T5]] to i64
 
 sil @multi_payload_spare_bit_aggregate_switch : $(MultiPayloadSpareBitAggregates) -> () {
 entry(%c : $MultiPayloadSpareBitAggregates):
@@ -2209,8 +2229,8 @@ end:
 
 // <rdar://problem/15759464>
 enum MultiPayloadInner {
-  case A(Builtin.Word)
-  case B(Builtin.Word)
+  case A(Builtin.Int64)
+  case B(Builtin.Int64)
 }
 
 enum MultiPayloadNested {
@@ -2219,14 +2239,11 @@ enum MultiPayloadNested {
 }
 
 // CHECK-LABEL: define void @multi_payload_nested_switch
-// CHECK:   %1 = bitcast %O4enum18MultiPayloadNested* %0 to { [[WORD]], i8 }*
-// CHECK:   %2 = getelementptr
-// CHECK:   %3 = load [[WORD]], [[WORD]]* %2
-// CHECK:   %4 = getelementptr
-// CHECK:   %5 = load i8, i8* %4
-// CHECK:   %6 = lshr i8 %5, 7
-// CHECK:   %7 = trunc i8 %6 to i1
-// CHECK:   switch i1 %7, label {{%.*}} [
+// CHECK:   %1 = bitcast %O4enum18MultiPayloadNested* %0 to i72*
+// CHECK:   %2 = load i72, i72* %1, align 8
+// CHECK:   %3 = lshr i72 %2, 71
+// CHECK:   %4 = trunc i72 %3 to i1
+// CHECK:   switch i1 %4, label {{%.*}} [
 // CHECK:     i1 false, label {{%.*}}
 // CHECK:     i1 true, label {{%.*}}
 // CHECK:   ]
@@ -2258,10 +2275,10 @@ enum MultiPayloadNestedSpareBits {
 
 // CHECK-64-LABEL: define void @multi_payload_nested_spare_bits_switch(%O4enum27MultiPayloadNestedSpareBits*) {{.*}} {
 // CHECK-64: entry:
-// CHECK-64:   %1 = bitcast %O4enum27MultiPayloadNestedSpareBits* %0 to [[WORD]]*
-// CHECK-64:   %2 = load [[WORD]], [[WORD]]* %1
-// CHECK-64:   %3 = lshr [[WORD]] %2, 61
-// CHECK-64:   %4 = trunc [[WORD]] %3 to i1
+// CHECK-64:   %1 = bitcast %O4enum27MultiPayloadNestedSpareBits* %0 to i64*
+// CHECK-64:   %2 = load i64, i64* %1
+// CHECK-64:   %3 = lshr i64 %2, 61
+// CHECK-64:   %4 = trunc i64 %3 to i1
 // CHECK-64:   switch i1 %4, label {{%.*}} [
 // CHECK-64:     i1 false, label {{%.*}}
 // CHECK-64:     i1 true, label {{%.*}}
@@ -2311,15 +2328,15 @@ enum MultiPayloadClassGeneric<T: AnyObject> {
   case B(T)
 }
 
-// CHECK-64-LABEL: define { i64, i64, i1 } @multi_payload_class_generic_no_spare_bits(i64, i64, i1, %swift.type* %T)
-// CHECK-32-LABEL: define { i32, i32, i1 } @multi_payload_class_generic_no_spare_bits(i32, i32, i1, %swift.type* %T)
+// CHECK-64-LABEL: define { i128, i1 } @multi_payload_class_generic_no_spare_bits(i128, i1, %swift.type* %T)
+// CHECK-32-LABEL: define { i64, i1 } @multi_payload_class_generic_no_spare_bits(i64, i1, %swift.type* %T)
 sil @multi_payload_class_generic_no_spare_bits : $@convention(thin) <T: AnyObject> (@owned MultiPayloadClassGeneric<T>) -> MultiPayloadClassGeneric<T> {
 entry(%e : $MultiPayloadClassGeneric<T>):
   return %e : $MultiPayloadClassGeneric<T>
 }
 
-// CHECK-64-LABEL: define { i64, i64, i1 } @multi_payload_class_instance_no_spare_bits(i64, i64, i1)
-// CHECK-32-LABEL: define { i32, i32, i1 } @multi_payload_class_instance_no_spare_bits(i32, i32, i1)
+// CHECK-64-LABEL: define { i128, i1 } @multi_payload_class_instance_no_spare_bits(i128, i1)
+// CHECK-32-LABEL: define { i64, i1 } @multi_payload_class_instance_no_spare_bits(i64, i1)
 sil @multi_payload_class_instance_no_spare_bits : $@convention(thin) (@owned MultiPayloadClassGeneric<C>) -> MultiPayloadClassGeneric<C> {
 entry(%e : $MultiPayloadClassGeneric<C>):
   return %e : $MultiPayloadClassGeneric<C>
@@ -2393,10 +2410,14 @@ entry(%0 : $DynamicSingleton<NoPayloads>):
 
 // Check that payloads get properly masked in nested single-payload enums.
 // rdar://problem/18841262
-// CHECK-64-LABEL: define i1 @optional_optional_class_protocol(i64, i64)
-// CHECK-64:         icmp eq i64 %0, 2
-// CHECK-32-LABEL: define i1 @optional_optional_class_protocol(i32, i32)
-// CHECK-32:         icmp eq i32 %0, 1
+// CHECK-64-LABEL: define i1 @optional_optional_class_protocol(i128)
+// CHECK-64:         %1 = trunc i128 %0 to i64
+// CHECK-64:         %2 = zext i64 %1 to i128
+// CHECK-64:         %3 = icmp eq i128 %2, 2
+// CHECK-32-LABEL: define i1 @optional_optional_class_protocol(i64)
+// CHECK-32:         %1 = trunc i64 %0 to i32
+// CHECK-32:         %2 = zext i32 %1 to i64
+// CHECK-32:         %3 = icmp eq i64 %2, 1
 enum Optionable<T> {
   case Some(T), None
 }
@@ -2435,27 +2456,21 @@ entry:
   return %t : $(Optionable<ContainsUnownedObjC>, Optionable<Optionable<ContainsUnownedObjC>>)
 }
 
-// CHECK-64-LABEL: define { i64, i1 } @empty_payload_enum_in_enum(i32)
+// CHECK-LABEL: define { i64, i1 } @empty_payload_enum_in_enum(i32)
 sil @empty_payload_enum_in_enum : $@convention(thin) (Int32) -> Optional<(Optional<()>, Int32)> {
 entry(%x : $Int32):
   %a = tuple ()
   %b = enum $Optional<()>, #Optional.Some!enumelt.1, %a : $()
   %c = tuple (%b : $Optional<()>, %x : $Int32)
-  // CHECK-64: [[INT_ZEXT:%.*]] = zext i32 %0 to i64
-  // CHECK-64: [[INT_SHL:%.*]] = shl i64 [[INT_ZEXT]], 32
-  // CHECK-64: [[COMBINE:%.*]] = or i64 0, [[INT_SHL]]
+  // CHECK: [[INT_ZEXT:%.*]] = zext i32 %0 to i64
+  // CHECK: [[INT_SHL:%.*]] = shl i64 [[INT_ZEXT]], 32
+  // CHECK: [[COMBINE:%.*]] = or i64 0, [[INT_SHL]]
   %d = enum $Optional<(Optional<()>, Int32)>, #Optional.Some!enumelt.1, %c : $(Optional<()>, Int32)
-  // CHECK-64: [[BIT:%.*]] = trunc i64 [[COMBINE]] to i1
-  // CHECK-64: [[INT_SHR:%.*]] = lshr i64 [[COMBINE]], 32
-  // CHECK-64: [[INT:%.*]] = trunc i64 [[INT_SHR]] to i32
+  // CHECK: [[BIT:%.*]] = trunc i64 [[COMBINE]] to i1
+  // CHECK: [[INT_SHR:%.*]] = lshr i64 [[COMBINE]], 32
+  // CHECK: [[INT:%.*]] = trunc i64 [[INT_SHR]] to i32
   %e = unchecked_enum_data %d : $Optional<(Optional<()>, Int32)>, #Optional.Some!enumelt.1
   return %d : $Optional<(Optional<()>, Int32)>
-}
-
-sil @optional_float80 : $@convention(thin) Float80 -> () {
-entry(%x : $Float80):
-  %y = enum $Optional<Float80>, #Optional.Some!enumelt.1, %x : $Float80
-  return undef : $()
 }
 
 sil @force_global_variables_to_materialize : $() -> () {

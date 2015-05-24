@@ -46,7 +46,6 @@
 #include "llvm/IR/Module.h"
 
 #include "CallEmission.h"
-#include "EnumPayload.h"
 #include "Explosion.h"
 #include "FixedTypeInfo.h"
 #include "GenClass.h"
@@ -651,38 +650,54 @@ namespace {
       IGF.emitUnknownWeakDestroy(valueAddr);
     }
 
-    /// Given an explosion with multiple pointer elements in them, pack them
-    /// into an enum payload explosion.
-    /// FIXME: Assumes the explosion is broken into word-sized integer chunks.
-    /// Should use EnumPayload.
-    void mergeExplosion(Explosion &In, Explosion &Out, IRGenFunction &IGF)
-    const {
-      // We always have at least one entry.
-      auto *part = In.claimNext();
-      Out.add(IGF.Builder.CreatePtrToInt(part, IGF.IGM.IntPtrTy));
+    /// Given an explosion with multiple pointer elements in them, merge them
+    /// together into a single huge integer.  This is used for mapping to
+    /// Swift.Optional and ImplicitlyUnwrappedOptional types, which have a known
+    /// layout.
+    static llvm::Value *mergeExplosion(Explosion &E, IRGenFunction &IGF) {
+      unsigned PointerBitwidth = IGF.IGM.getPointerSize().getValueInBits();
+      unsigned NumWords = E.size();
+      auto *BigType = IGF.Builder.getIntNTy(PointerBitwidth*NumWords);
 
-      for (unsigned i = 0; i != getNumStoredProtocols(); ++i) {
-        part = In.claimNext();
-        Out.add(IGF.Builder.CreatePtrToInt(part, IGF.IGM.IntPtrTy));
+      // We always have at least one entry.
+      auto *part = E.claimNext();
+      part = IGF.Builder.CreatePtrToInt(part, IGF.IGM.IntPtrTy);
+      auto *result = IGF.Builder.CreateZExtOrBitCast(part, BigType);
+
+      for (unsigned i = 1; i != NumWords; ++i) {
+        part = E.claimNext();
+        part = IGF.Builder.CreatePtrToInt(part, IGF.IGM.IntPtrTy);
+        part = IGF.Builder.CreateZExtOrBitCast(part, BigType);
+        part = IGF.Builder.CreateShl(part, PointerBitwidth*i);
+        result = IGF.Builder.CreateOr(result, part);
       }
+
+      return result;
     }
 
 
-    // Given an exploded enum payload consisting of consecutive word-sized
-    // chunks, cast them to their underlying component types.
-    // FIXME: Assumes the payload is word-chunked. Should use
-    void decomposeExplosion(Explosion &InE, Explosion &OutE,
-                            IRGenFunction &IGF) const {
+    // Given a large integer type which contains the weak pointer and the
+    // witness table pointers, consume the input explosion and generate a result
+    // one.
+    static void decomposeExplosion(Explosion &InE, Explosion &OutE,
+                                   IRGenFunction &IGF) {
+      llvm::Value *inValue = InE.claimNext();
+
+      unsigned InputBitwidth = inValue->getType()->getIntegerBitWidth();
+      unsigned PointerBitwidth = IGF.IGM.getPointerSize().getValueInBits();
+      unsigned NumElements = InputBitwidth / PointerBitwidth;
+      assert((InputBitwidth % PointerBitwidth) == 0 &&
+             "explosion not a multiple of the word size");
+
       // The first entry is always the weak*.
-      llvm::Value *weak = InE.claimNext();
-      OutE.add(IGF.Builder.CreateBitOrPointerCast(weak,
+      auto *entry = IGF.Builder.CreateTruncOrBitCast(inValue, IGF.IGM.IntPtrTy);
+      OutE.add(IGF.Builder.CreateIntToPtr(entry,
                                           IGF.IGM.UnknownRefCountedPtrTy));
 
-      // Collect the witness tables.
-      for (unsigned i = 0, e = getNumStoredProtocols(); i != e; ++i) {
-        llvm::Value *witness = InE.claimNext();
-        OutE.add(IGF.Builder.CreateBitOrPointerCast(witness,
-                                                    IGF.IGM.WitnessTablePtrTy));
+      for (unsigned i = 1; i != NumElements; ++i) {
+        entry = IGF.Builder.CreateLShr(inValue, PointerBitwidth*i);
+        entry = IGF.Builder.CreateTruncOrBitCast(entry, IGF.IGM.IntPtrTy);
+        OutE.add(IGF.Builder.CreateIntToPtr(entry, IGF.IGM.WitnessTablePtrTy));
       }
     }
 
@@ -696,7 +711,7 @@ namespace {
       temp.add(IGF.emitUnknownWeakLoadStrong(valueAddr,
                                             IGF.IGM.UnknownRefCountedPtrTy));
       emitLoadOfTables(IGF, existential, temp);
-      mergeExplosion(temp, out, IGF);
+      out.add(mergeExplosion(temp, IGF));
     }
 
     void weakTakeStrong(IRGenFunction &IGF, Address existential,
@@ -706,7 +721,7 @@ namespace {
       temp.add(IGF.emitUnknownWeakTakeStrong(valueAddr,
                                             IGF.IGM.UnknownRefCountedPtrTy));
       emitLoadOfTables(IGF, existential, temp);
-      mergeExplosion(temp, out, IGF);
+      out.add(mergeExplosion(temp, IGF));
     }
 
     void weakInit(IRGenFunction &IGF, Explosion &in,
@@ -907,30 +922,29 @@ namespace {
       asDerived().emitPayloadRelease(IGF, value);
     }
 
-    void packIntoEnumPayload(IRGenFunction &IGF,
-                             EnumPayload &payload,
-                             Explosion &src,
-                             unsigned offset) const override {
-      payload.insertValue(IGF, src.claimNext(), offset);
-      auto wordSize = IGF.IGM.getPointerSize().getValueInBits();
-      for (unsigned i = 0; i < getNumStoredProtocols(); ++i) {
-        offset += wordSize;
-        payload.insertValue(IGF, src.claimNext(), offset);
-      }
+    llvm::Value *packEnumPayload(IRGenFunction &IGF,
+                                  Explosion &src,
+                                  unsigned bitWidth,
+                                  unsigned offset) const override {
+      PackEnumPayload pack(IGF, bitWidth);
+      pack.moveToOffset(offset);
+      pack.add(src.claimNext());
+      for (unsigned i = 0; i < getNumStoredProtocols(); ++i)
+        pack.add(src.claimNext());
+      return pack.get();
     }
 
-    void unpackFromEnumPayload(IRGenFunction &IGF,
-                               const EnumPayload &payload,
-                               Explosion &dest,
-                               unsigned offset) const override {
+    void unpackEnumPayload(IRGenFunction &IGF,
+                            llvm::Value *payload,
+                            Explosion &dest,
+                            unsigned offset) const override {
+      UnpackEnumPayload unpack(IGF, payload);
+      unpack.moveToOffset(offset);
       ExplosionSchema schema;
       getSchema(schema);
-      dest.add(payload.extractValue(IGF, schema[0].getScalarType(), offset));
-      auto wordSize = IGF.IGM.getPointerSize().getValueInBits();
-      for (unsigned i = 0; i < getNumStoredProtocols(); ++i) {
-        offset += wordSize;
-        dest.add(payload.extractValue(IGF, IGF.IGM.WitnessTablePtrTy, offset));
-      }
+      dest.add(unpack.claim(schema[0].getScalarType()));
+      for (unsigned i = 0; i < getNumStoredProtocols(); ++i)
+        dest.add(unpack.claim(IGF.IGM.WitnessTablePtrTy));
     }
 
 
@@ -950,9 +964,9 @@ namespace {
                         .getFixedExtraInhabitantCount(IGM);
     }
 
-    APInt getFixedExtraInhabitantValue(IRGenModule &IGM,
-                                       unsigned bits,
-                                       unsigned index) const override {
+    llvm::ConstantInt *getFixedExtraInhabitantValue(IRGenModule &IGM,
+                                              unsigned bits,
+                                              unsigned index) const override {
       // Note that we pass down the original bit-width.
       return asDerived().getPayloadTypeInfoForExtraInhabitants(IGM)
                         .getFixedExtraInhabitantValue(IGM, bits, index);
@@ -975,13 +989,18 @@ namespace {
                  .storeExtraInhabitant(IGF, index, valueDest, SILType());
     }
 
-    APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const override {
-      // Ask the payload type for its mask.
-      APInt bits = asDerived().getPayloadTypeInfoForExtraInhabitants(IGM)
-                              .getFixedExtraInhabitantMask(IGM);
-      
+    llvm::Value *maskFixedExtraInhabitant(IRGenFunction &IGF,
+                                          llvm::Value *bits) const override {
+      // Truncate down to the payload type.
+      llvm::Type *originalType = bits->getType();
+      bits = IGF.Builder.CreateTrunc(bits, IGF.IGM.IntPtrTy);
+
+      // Ask the payload type to apply a mask, in case that matters.
+      bits = asDerived().getPayloadTypeInfoForExtraInhabitants(IGF.IGM)
+                        .maskFixedExtraInhabitant(IGF, bits);
+
       // Zext out to the size of the existential.
-      bits = bits.zextOrTrunc(asDerived().getFixedSize().getValueInBits());
+      bits = IGF.Builder.CreateZExt(bits, originalType);
       return bits;
     }
   };

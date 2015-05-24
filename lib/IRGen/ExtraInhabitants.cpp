@@ -58,7 +58,7 @@ unsigned irgen::getFunctionPointerExtraInhabitantCount(IRGenModule &IGM) {
 
 /*****************************************************************************/
 
-static APInt
+static llvm::ConstantInt *
 getPointerFixedExtraInhabitantValue(IRGenModule &IGM, unsigned bits,
                                     unsigned index, unsigned offset,
                                     unsigned numReservedLowBits) {
@@ -69,13 +69,14 @@ getPointerFixedExtraInhabitantValue(IRGenModule &IGM, unsigned bits,
   if (offset > 0)
     apValue = apValue.shl(offset);
   
-  return apValue;
+  return llvm::ConstantInt::get(IGM.getLLVMContext(), apValue);
 }
 
-APInt irgen::getHeapObjectFixedExtraInhabitantValue(IRGenModule &IGM,
-                                                    unsigned bits,
-                                                    unsigned index,
-                                                    unsigned offset) {
+llvm::ConstantInt *irgen::getHeapObjectFixedExtraInhabitantValue(
+                                                       IRGenModule &IGM,
+                                                       unsigned bits,
+                                                       unsigned index,
+                                                       unsigned offset) {
   // This must be consistent with the extra inhabitant calculation implemented
   // in the runtime's storeHeapObjectExtraInhabitant and
   // getHeapObjectExtraInhabitantIndex functions in KnownMetadata.cpp.
@@ -83,10 +84,11 @@ APInt irgen::getHeapObjectFixedExtraInhabitantValue(IRGenModule &IGM,
                                              getNumLowObjCReservedBits(IGM));
 }
 
-APInt irgen::getFunctionPointerFixedExtraInhabitantValue(IRGenModule &IGM,
-                                                         unsigned bits,
-                                                         unsigned index,
-                                                         unsigned offset) {
+llvm::ConstantInt *irgen::getFunctionPointerFixedExtraInhabitantValue(
+                                                       IRGenModule &IGM,
+                                                       unsigned bits,
+                                                       unsigned index,
+                                                       unsigned offset) {
   return getPointerFixedExtraInhabitantValue(IGM, bits, index, offset, 0);
 }
 

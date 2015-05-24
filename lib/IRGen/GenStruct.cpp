@@ -180,31 +180,40 @@ namespace {
     }
 
     // This is dead code in NonFixedStructTypeInfo.
-    APInt getFixedExtraInhabitantValue(IRGenModule &IGM,
-                                       unsigned bits,
-                                       unsigned index) const {
+    llvm::ConstantInt *getFixedExtraInhabitantValue(IRGenModule &IGM,
+                                                    unsigned bits,
+                                                    unsigned index) const {
       auto &fieldTI = cast<FixedTypeInfo>(asImpl().getFields()[0].getTypeInfo());
       return fieldTI.getFixedExtraInhabitantValue(IGM, bits, index);
     }
 
     // This is dead code in NonFixedStructTypeInfo.
-    APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const {
+    llvm::Value *maskFixedExtraInhabitant(IRGenFunction &IGF,
+                                          llvm::Value *structValue) const {
+      // Truncate down to the width of the field, mask it recursively,
+      // and then zext back out to the payload size.
+      auto &fieldTI = cast<FixedTypeInfo>(asImpl().getFields()[0].getTypeInfo());
+      unsigned fieldWidth = fieldTI.getFixedSize().getValueInBits();
+      auto fieldTy = llvm::IntegerType::get(IGF.IGM.getLLVMContext(), fieldWidth);
+      auto fieldValue = IGF.Builder.CreateTrunc(structValue, fieldTy);
+      fieldValue = fieldTI.maskFixedExtraInhabitant(IGF, fieldValue);
+      return IGF.Builder.CreateZExt(fieldValue, structValue->getType());
+    }
+       
+    // This is dead code in NonFixedStructTypeInfo.
+    SpareBitVector getFixedExtraInhabitantMask(IRGenModule &IGM) const {
       if (asImpl().getFields().empty())
-        return APInt();
+        return {};
       
-      // Currently we only use the first field's extra inhabitants. The other
-      // fields can be ignored.
       const FixedTypeInfo &fieldTI
         = cast<FixedTypeInfo>(asImpl().getFields()[0].getTypeInfo());
-      auto targetSize = asImpl().getFixedSize().getValueInBits();
-      
-      if (fieldTI.isKnownEmpty())
-        return APInt(targetSize, 0);
-      
-      APInt fieldMask = fieldTI.getFixedExtraInhabitantMask(IGM);
-      if (targetSize > fieldMask.getBitWidth())
-        fieldMask = fieldMask.zext(targetSize);
-      return fieldMask;
+      auto firstFieldSize = fieldTI.getFixedSize().getValueInBits();
+
+      SpareBitVector mask;
+      mask.appendSetBits(firstFieldSize);
+      mask.appendClearBits(asImpl().getFixedSize().getValueInBits()
+                             - firstFieldSize);
+      return mask;
     }
 
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
