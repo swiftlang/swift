@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -gnone -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend %s -gnone -emit-ir | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 // REQUIRES: CPU=x86_64
 
@@ -12,32 +12,23 @@ bb0:
   return %0 : $()
 }
 
-// CHECK:  define hidden void @test1(i128)
+// CHECK-64:  define hidden void @test1([[WORD:i64]], [[WORD]])
+// CHECK-32:  define hidden void @test1([[WORD:i32]], [[WORD]])
 sil hidden @test1 : $@convention(thin) (@owned Optional<() -> ()>) -> () {
 bb0(%0 : $Optional<() -> ()>):
-  // CHECK: [[T0:%.*]] = trunc i128 [[FN:%0]] to i64
-  // CHECK: [[T1:%.*]] = zext i64 [[T0]] to i128
-  // CHECK: switch i128 [[T1]],
-  // CHECK:   i128 0, label
-  // CHECK: [[T0:%.*]] = trunc i128 [[FN]] to i64
-  // CHECK: [[FNPTR:%.*]] = inttoptr i64 [[T0]] to i8*
-  // CHECK: [[T0:%.*]] = lshr i128 [[FN]], 64
-  // CHECK: [[T1:%.*]] = trunc i128 [[T0]] to i64
-  // CHECK: [[CTX:%.*]] = inttoptr i64 [[T1]] to %swift.refcounted*
+  // CHECK: [[T0:%.*]] = icmp eq [[WORD]] %0, 0
+  // CHECK: br i1 [[T0]], label
+  // CHECK: [[FNPTR:%.*]] = inttoptr [[WORD]] %0 to i8*
+  // CHECK: [[CTX:%.*]] = inttoptr [[WORD]] %1 to %swift.refcounted*
   // CHECK: call void @swift_retain_noresult(%swift.refcounted* [[CTX]])
   // CHECK: br label
   retain_value %0 : $Optional<() -> ()>
   
-  // CHECK: [[T0:%.*]] = trunc i128 [[FN]] to i64
-  // CHECK: [[T1:%.*]] = zext i64 [[T0]] to i128
-  // CHECK: icmp eq i128 [[T1]], 0
+  // CHECK: icmp eq i64 %0, 0
   switch_enum %0 : $Optional<() -> ()>, case #Optional.Some!enumelt.1: bb1, case #Optional.None!enumelt: bb2
 
-  // CHECK: [[T0:%.*]] = trunc i128 [[FN]] to i64
-  // CHECK: [[FNPTR:%.*]] = inttoptr i64 [[T0]] to i8*
-  // CHECK: [[T0:%.*]] = lshr i128 [[FN]], 64
-  // CHECK: [[T1:%.*]] = trunc i128 [[T0]] to i64
-  // CHECK: [[CTX:%.*]] = inttoptr i64 [[T1]] to %swift.refcounted*
+  // CHECK: [[FNPTR:%.*]] = inttoptr [[WORD]] %0 to i8*
+  // CHECK: [[CTX:%.*]] = inttoptr [[WORD]] %1 to %swift.refcounted*
   // CHECK: br label
   // CHECK: [[FNPTR2:%.*]] = phi i8* [ [[FNPTR]], {{%.*}} ]
   // CHECK: [[CTX2:%.*]] = phi %swift.refcounted* [ [[CTX]], {{%.*}} ]

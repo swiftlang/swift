@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -gnone -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend %s -gnone -emit-ir | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 // REQUIRES: CPU=x86_64
 
@@ -180,8 +180,11 @@ enum MultiPayloadNontrivial {
 // CHECK: define linkonce_odr hidden void @_TwxxO20enum_value_semantics22MultiPayloadNontrivial(%swift.opaque* [[OBJ:%.*]], %swift.type* %Self) {{.*}} {
 // CHECK: entry:
 // CHECK:   [[ADDR:%.*]] = bitcast %swift.opaque* [[OBJ]] to %O20enum_value_semantics22MultiPayloadNontrivial*
-// CHECK:   [[PAYLOAD_ADDR:%.*]] = bitcast %O20enum_value_semantics22MultiPayloadNontrivial* [[ADDR]] to i128*
-// CHECK:   [[PAYLOAD:%.*]] = load i128, i128* [[PAYLOAD_ADDR]], align 8
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = bitcast %O20enum_value_semantics22MultiPayloadNontrivial* [[ADDR]] to { i64, i64 }*
+// CHECK:   [[PAYLOAD_0_ADDR:%.*]] = getelementptr
+// CHECK:   [[PAYLOAD_0:%.*]] = load i64, i64* [[PAYLOAD_0_ADDR]], align 8
+// CHECK:   [[PAYLOAD_1_ADDR:%.*]] = getelementptr
+// CHECK:   [[PAYLOAD_1:%.*]] = load i64, i64* [[PAYLOAD_1_ADDR]], align 8
 // CHECK:   [[T0:%.*]] = getelementptr inbounds %O20enum_value_semantics22MultiPayloadNontrivial, %O20enum_value_semantics22MultiPayloadNontrivial* %0, i32 0, i32 1
 // CHECK:   [[TAG_ADDR:%.*]] = bitcast [1 x i8]* [[T0]] to i3*
 // CHECK:   [[TAG:%.*]] = load i3, i3* [[TAG_ADDR]], align 8
@@ -190,14 +193,11 @@ enum MultiPayloadNontrivial {
 // CHECK:     i3 2, label %[[PAYLOAD3_DESTROY:[0-9]+]]
 // CHECK:   ]
 // CHECK: ; <label>:[[PAYLOAD1_DESTROY]]
-// CHECK:   [[PAYLOAD1_TRUNC:%.*]] = trunc i128 [[PAYLOAD]] to i64
-// CHECK:   [[PAYLOAD1_VAL:%.*]] = inttoptr i64 [[PAYLOAD1_TRUNC]] to %swift.refcounted*
+// CHECK:   [[PAYLOAD1_VAL:%.*]] = inttoptr i64 [[PAYLOAD_0]] to %swift.refcounted*
 // CHECK:   call void @swift_release(%swift.refcounted* [[PAYLOAD1_VAL]])
 // CHECK:   br label %[[END]]
 // CHECK: ; <label>:[[PAYLOAD3_DESTROY]]
-// CHECK:   [[PAYLOAD3_1_LSHR:%.*]] = lshr i128 [[PAYLOAD]], 64
-// CHECK:   [[PAYLOAD3_1_TRUNC:%.*]] = trunc i128 [[PAYLOAD3_1_LSHR]] to i64
-// CHECK:   [[PAYLOAD3_1_VAL:%.*]] = inttoptr i64 [[PAYLOAD3_1_TRUNC]] to %objc_object*
+// CHECK:   [[PAYLOAD3_1_VAL:%.*]] = inttoptr i64 [[PAYLOAD_1]] to %objc_object*
 // CHECK:   call void @objc_release(%objc_object* [[PAYLOAD3_1_VAL]])
 // CHECK:   br label %[[END]]
 // CHECK: ; <label>:[[END]]
@@ -217,22 +217,22 @@ enum MultiPayloadNontrivialSpareBits {
 // CHECK: define linkonce_odr hidden void @_TwxxO20enum_value_semantics31MultiPayloadNontrivialSpareBits(%swift.opaque* [[OBJ:%.*]], %swift.type* %Self) {{.*}} {
 // CHECK: entry:
 // CHECK:   [[ADDR:%.*]] = bitcast %swift.opaque* [[OBJ]] to %O20enum_value_semantics31MultiPayloadNontrivialSpareBits*
-// CHECK:   [[PAYLOAD_ADDR:%.*]] = bitcast %O20enum_value_semantics31MultiPayloadNontrivialSpareBits* [[ADDR]] to i128*
-// CHECK:   [[PAYLOAD:%.*]] = load i128, i128* [[PAYLOAD_ADDR]], align 8
+// CHECK:   [[PAYLOAD_ADDR:%.*]] = bitcast %O20enum_value_semantics31MultiPayloadNontrivialSpareBits* [[ADDR]] to { i64, i64 }*
+// CHECK:   [[PAYLOAD_0_ADDR:%.*]] = getelementptr
+// CHECK:   [[PAYLOAD_0:%.*]] = load i64, i64* [[PAYLOAD_0_ADDR]], align 8
+// CHECK:   [[PAYLOAD_1_ADDR:%.*]] = getelementptr
+// CHECK:   [[PAYLOAD_1:%.*]] = load i64, i64* [[PAYLOAD_1_ADDR]], align 8
 // CHECK:   switch i2 [[SPARE_BITS:%.*]], label %[[END:[0-9]+]] [
 // CHECK:     i2 0, label %[[PAYLOAD1_DESTROY:[0-9]+]]
 // CHECK:     i2 -2, label %[[PAYLOAD3_DESTROY:[0-9]+]]
 // CHECK:   ]
 // CHECK: ; <label>:[[PAYLOAD1_DESTROY]]
-// CHECK:   [[PAYLOAD1_TRUNC:%.*]] = trunc i128 [[PAYLOAD]] to i64
-// CHECK:   [[PAYLOAD1_VAL:%.*]] = inttoptr i64 [[PAYLOAD1_TRUNC]] to %swift.refcounted*
+// CHECK:   [[PAYLOAD1_VAL:%.*]] = inttoptr i64 [[PAYLOAD_0]] to %swift.refcounted*
 // CHECK:   call void @swift_release(%swift.refcounted* [[PAYLOAD1_VAL]])
 // CHECK:   br label %[[END]]
 // CHECK: ; <label>:[[PAYLOAD3_DESTROY]]
-// CHECK:   [[PAYLOAD3_MASKED:%.*]] = and i128 [[PAYLOAD]]
-// CHECK:   [[PAYLOAD3_1_LSHR:%.*]] = lshr i128 [[PAYLOAD3_MASKED]], 64
-// CHECK:   [[PAYLOAD3_1_TRUNC:%.*]] = trunc i128 [[PAYLOAD3_1_LSHR]] to i64
-// CHECK:   [[PAYLOAD3_1_VAL:%.*]] = inttoptr i64 [[PAYLOAD3_1_TRUNC]] to %objc_object*
+// CHECK:   [[MASKED:%.*]] = and i64 [[PAYLOAD_1]]
+// CHECK:   [[PAYLOAD3_1_VAL:%.*]] = inttoptr i64 [[MASKED]] to %objc_object*
 // CHECK:   call void @objc_release(%objc_object* [[PAYLOAD3_1_VAL]])
 // CHECK:   br label %[[END]]
 // CHECK: ; <label>:[[END]]

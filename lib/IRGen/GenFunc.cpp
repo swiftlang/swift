@@ -96,6 +96,7 @@
 #include "IndirectTypeInfo.h"
 #include "CallingConvention.h"
 #include "CallEmission.h"
+#include "EnumPayload.h"
 #include "Explosion.h"
 #include "GenClass.h"
 #include "GenHeap.h"
@@ -349,9 +350,9 @@ namespace {
       return getFunctionPointerExtraInhabitantCount(IGM);
     }
 
-    llvm::ConstantInt *getFixedExtraInhabitantValue(IRGenModule &IGM,
-                                                  unsigned bits,
-                                                  unsigned index) const override {
+    APInt getFixedExtraInhabitantValue(IRGenModule &IGM,
+                                       unsigned bits,
+                                       unsigned index) const override {
       return getFunctionPointerFixedExtraInhabitantValue(IGM, bits, index, 0);
     }
 
@@ -511,25 +512,23 @@ namespace {
       IGF.emitRelease(IGF.Builder.CreateLoad(projectData(IGF, addr)));
     }
     
-    llvm::Value *packEnumPayload(IRGenFunction &IGF,
-                                  Explosion &src,
-                                  unsigned bitWidth,
-                                  unsigned offset) const override {
-      PackEnumPayload pack(IGF, bitWidth);
-      pack.addAtOffset(src.claimNext(), offset);
-      pack.add(src.claimNext());
-      return pack.get();
+    void packIntoEnumPayload(IRGenFunction &IGF,
+                             EnumPayload &payload,
+                             Explosion &src,
+                             unsigned offset) const override {
+      payload.insertValue(IGF, src.claimNext(), offset);
+      payload.insertValue(IGF, src.claimNext(),
+                          offset + IGF.IGM.getPointerSize().getValueInBits());
     }
     
-    void unpackEnumPayload(IRGenFunction &IGF,
-                            llvm::Value *payload,
-                            Explosion &dest,
-                            unsigned offset) const override {
-      UnpackEnumPayload unpack(IGF, payload);
+    void unpackFromEnumPayload(IRGenFunction &IGF,
+                               const EnumPayload &payload,
+                               Explosion &dest,
+                               unsigned offset) const override {
       auto storageTy = getStorageType();
-      dest.add(unpack.claimAtOffset(storageTy->getElementType(0),
-                                    offset));
-      dest.add(unpack.claim(storageTy->getElementType(1)));
+      dest.add(payload.extractValue(IGF, storageTy->getElementType(0), offset));
+      dest.add(payload.extractValue(IGF, storageTy->getElementType(1),
+                          offset + IGF.IGM.getPointerSize().getValueInBits()));
     }
 
     bool mayHaveExtraInhabitants(IRGenModule &IGM) const override {
@@ -540,9 +539,9 @@ namespace {
       return getFunctionPointerExtraInhabitantCount(IGM);
     }
 
-    llvm::ConstantInt *getFixedExtraInhabitantValue(IRGenModule &IGM,
-                                                    unsigned bits,
-                                                    unsigned index) const override {
+    APInt getFixedExtraInhabitantValue(IRGenModule &IGM,
+                                       unsigned bits,
+                                       unsigned index) const override {
       return getFunctionPointerFixedExtraInhabitantValue(IGM, bits, index, 0);
     }
 
@@ -552,20 +551,11 @@ namespace {
       return getFunctionPointerExtraInhabitantIndex(IGF, src);
     }
 
-    SpareBitVector
-    getFixedExtraInhabitantMask(IRGenModule &IGM) const override {
-      SpareBitVector mask;
-      mask.appendSetBits(IGM.getPointerSize().getValueInBits());
-      mask.appendClearBits(IGM.getPointerSize().getValueInBits());
-      return mask;
-    }
-
-    llvm::Value *maskFixedExtraInhabitant(IRGenFunction &IGF,
-                                          llvm::Value *bits) const override {
-      // Truncate down to the function-pointer type and zext back again.
-      llvm::Type *originalType = bits->getType();
-      bits = IGF.Builder.CreateTrunc(bits, IGF.IGM.IntPtrTy);
-      bits = IGF.Builder.CreateZExt(bits, originalType);
+    APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const override {
+      // Only the function pointer value is used for extra inhabitants.
+      auto pointerSize = IGM.getPointerSize().getValueInBits();
+      APInt bits = APInt::getAllOnesValue(pointerSize);
+      bits = bits.zext(pointerSize * 2);
       return bits;
     }
 

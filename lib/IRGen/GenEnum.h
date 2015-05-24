@@ -30,8 +30,6 @@
 
 #include "TypeInfo.h"
 
-#include "llvm/IR/DerivedTypes.h"
-
 namespace llvm {
   class BasicBlock;
   class ConstantInt;
@@ -44,75 +42,9 @@ namespace swift {
   class EnumElementDecl;
   
 namespace irgen {
+  class EnumPayload;
   class IRGenFunction;
   class TypeConverter;
-  
-/// Utility class for packing enum payloads. The payload of a fixed-size, non-
-/// trivial enum is represented as an LLVM integer type large enough to
-/// hold the largest member of the enum. This class collects individual
-/// scalar values, such as from an explosion, into an enum payload.
-class PackEnumPayload {
-  IRGenFunction &IGF;
-  unsigned packedBits = 0;
-  unsigned bitSize;
-  llvm::Value *packedValue = nullptr;
-
-public:
-  PackEnumPayload(IRGenFunction &IGF, unsigned bitSize);
-  
-  /// Insert a value into the packed value after the previously inserted value,
-  /// or at offset zero if this is the first value.
-  void add(llvm::Value *v);
-
-  /// Make further insertions with 'add' start at the given offset.
-  void moveToOffset(unsigned bitOffset) {
-    assert(bitOffset < bitSize);
-    packedBits = bitOffset;
-  }
-  
-  /// Insert a value into the packed value at a specific offset.
-  void addAtOffset(llvm::Value *v, unsigned bitOffset) {
-    moveToOffset(bitOffset);
-    add(v);
-  }
-  
-  /// Combine a partially packed payload at a different offset into our packing.
-  void combine(llvm::Value *v);
-  
-  /// Get the packed value.
-  llvm::Value *get();
-  
-  /// Get an empty payload value of the given bit size.
-  static llvm::Value *getEmpty(IRGenModule &IGM, unsigned bitSize);
-};
-
-/// Utility class for packing enum payloads. The payload of a fixed-size, non-
-/// trivial enum is represented as an LLVM integer type large enough to
-/// hold the largest member of the enum. This class extracts individual
-/// scalar values from an enum payload.
-class UnpackEnumPayload {
-  IRGenFunction &IGF;
-  llvm::Value *packedValue;
-  unsigned unpackedBits = 0;
-
-public:
-  UnpackEnumPayload(IRGenFunction &IGF, llvm::Value *packedValue);
-  
-  /// Extract a value of the given type that was packed after the previously
-  /// claimed value, or at offset zero if this is the first claimed value.
-  llvm::Value *claim(llvm::Type *ty);
-
-  /// Extract further values from the given offset.
-  void moveToOffset(unsigned bitOffset) {
-    unpackedBits = bitOffset;
-  }
-  
-  /// Claim a value at a specific offset inside the value.
-  llvm::Value *claimAtOffset(llvm::Type *ty, unsigned bitOffset) {
-    moveToOffset(bitOffset);
-    return claim(ty);
-  }
-};
 
 /// \brief Emit the dispatch branch(es) for an address-only enum.
 void emitSwitchAddressOnlyEnumDispatch(IRGenFunction &IGF,
@@ -198,20 +130,21 @@ protected:
   std::vector<Element> ElementsWithPayload;
   std::vector<Element> ElementsWithRecursivePayload;
   std::vector<Element> ElementsWithNoPayload;
+  IRGenModule &IGM;
   const TypeInfo *TI = nullptr;
   TypeInfoKind TIK;
   unsigned NumElements;
   
   EnumImplStrategy(IRGenModule &IGM,
                    TypeInfoKind tik,
-                    unsigned NumElements,
-                    std::vector<Element> &&ElementsWithPayload,
-                    std::vector<Element> &&ElementsWithRecursivePayload,
-                    std::vector<Element> &&ElementsWithNoPayload)
+                   unsigned NumElements,
+                   std::vector<Element> &&ElementsWithPayload,
+                   std::vector<Element> &&ElementsWithRecursivePayload,
+                   std::vector<Element> &&ElementsWithNoPayload)
   : ElementsWithPayload(std::move(ElementsWithPayload)),
     ElementsWithRecursivePayload(std::move(ElementsWithRecursivePayload)),
     ElementsWithNoPayload(std::move(ElementsWithNoPayload)),
-    TIK(tik),
+    IGM(IGM), TIK(tik),
     NumElements(NumElements)
   {}
   
@@ -422,14 +355,13 @@ public:
   
   virtual unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const = 0;
   
-  virtual llvm::ConstantInt *
+  virtual APInt
   getFixedExtraInhabitantValue(IRGenModule &IGM,
                                unsigned bits,
                                unsigned index) const = 0;
   
-  virtual llvm::Value *
-  maskFixedExtraInhabitant(IRGenFunction &IGF,
-                           llvm::Value *payload) const = 0;
+  virtual APInt
+  getFixedExtraInhabitantMask(IRGenModule &IGM) const = 0;
   
   /// \group Delegated LoadableTypeInfo operations
   
@@ -448,15 +380,15 @@ public:
                     Explosion &dest) const = 0;
   virtual void consume(IRGenFunction &IGF, Explosion &src) const = 0;
   virtual void fixLifetime(IRGenFunction &IGF, Explosion &src) const = 0;
-  virtual llvm::Value *packEnumPayload(IRGenFunction &IGF,
-                                        Explosion &in,
-                                        unsigned bitWidth,
-                                        unsigned offset) const = 0;
+  virtual void packIntoEnumPayload(IRGenFunction &IGF,
+                                   EnumPayload &payload,
+                                   Explosion &in,
+                                   unsigned offset) const = 0;
   
-  virtual void unpackEnumPayload(IRGenFunction &IGF,
-                                  llvm::Value *payload,
-                                  Explosion &dest,
-                                  unsigned offset) const = 0;
+  virtual void unpackFromEnumPayload(IRGenFunction &IGF,
+                                     const EnumPayload &payload,
+                                     Explosion &dest,
+                                     unsigned offset) const = 0;
   
   virtual bool needsPayloadSizeInMetadata() const = 0;
   

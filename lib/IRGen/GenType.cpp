@@ -24,6 +24,7 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
 
+#include "EnumPayload.h"
 #include "LoadableTypeInfo.h"
 #include "GenMeta.h"
 #include "GenType.h"
@@ -463,7 +464,7 @@ void FixedTypeInfo::applyFixedSpareBitsMask(SpareBitVector &mask) const {
   return applyFixedSpareBitsMask(mask, SpareBits);
 }
 
-llvm::ConstantInt *
+APInt
 FixedTypeInfo::getSpareBitFixedExtraInhabitantValue(IRGenModule &IGM,
                                                     unsigned bits,
                                                     unsigned index) const {
@@ -486,9 +487,7 @@ FixedTypeInfo::getSpareBitFixedExtraInhabitantValue(IRGenModule &IGM,
     spareIndex = (index >> occupiedBitCount) + 1;
   }
 
-  APInt val
-    = interleaveSpareBits(IGM, SpareBits, bits, spareIndex, occupiedIndex);
-  return llvm::ConstantInt::get(IGM.getLLVMContext(), val);
+  return interleaveSpareBits(IGM, SpareBits, bits, spareIndex, occupiedIndex);
 }
 
 llvm::Value *
@@ -623,14 +622,14 @@ namespace {
     void consume(IRGenFunction &IGF, Explosion &src) const override {}
     void fixLifetime(IRGenFunction &IGF, Explosion &src) const override {}
     void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {}
-    llvm::Value *packEnumPayload(IRGenFunction &IGF, Explosion &src,
-                                  unsigned bitWidth,
-                                  unsigned offset) const override {
-      return PackEnumPayload::getEmpty(IGF.IGM, bitWidth);
-    }
-    void unpackEnumPayload(IRGenFunction &IGF, llvm::Value *payload,
-                            Explosion &dest,
-                            unsigned offset) const override {}
+    void packIntoEnumPayload(IRGenFunction &IGF,
+                             EnumPayload &payload,
+                             Explosion &src,
+                             unsigned offset) const override {}
+    void unpackFromEnumPayload(IRGenFunction &IGF,
+                               const EnumPayload &payload,
+                               Explosion &dest,
+                               unsigned offset) const override {}
   };
 
   /// A TypeInfo implementation for types represented as a single
@@ -717,21 +716,18 @@ namespace {
       schema.add(ExplosionSchema::Element::forScalar(ScalarType));
     }
     
-    llvm::Value *packEnumPayload(IRGenFunction &IGF,
-                                 Explosion &source,
-                                 unsigned bitWidth,
-                                 unsigned offset) const override {
-      PackEnumPayload pack(IGF, bitWidth);
-      pack.addAtOffset(source.claimNext(), offset);
-      return pack.get();
+    void packIntoEnumPayload(IRGenFunction &IGF,
+                             EnumPayload &payload,
+                             Explosion &source,
+                             unsigned offset) const override {
+      payload.insertValue(IGF, source.claimNext(), offset);
     }
     
-    void unpackEnumPayload(IRGenFunction &IGF,
-                           llvm::Value *payload,
-                           Explosion &target,
-                           unsigned offset) const override {
-      UnpackEnumPayload unpack(IGF, payload);
-      target.add(unpack.claimAtOffset(ScalarType, offset));
+    void unpackFromEnumPayload(IRGenFunction &IGF,
+                               const EnumPayload &payload,
+                               Explosion &target,
+                               unsigned offset) const override {
+      target.add(payload.extractValue(IGF, ScalarType, offset));
     }
   };
 
