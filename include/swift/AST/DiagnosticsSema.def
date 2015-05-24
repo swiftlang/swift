@@ -1141,6 +1141,9 @@ NOTE(enum_raw_value_incrementing_from_here,sema_tcd,none,
      "raw value auto-incremented from here",())
 NOTE(enum_raw_value_incrementing_from_zero,sema_tcd,none,
      "raw value implicitly auto-incremented from zero",())
+
+// Derived conformances
+
 ERROR(broken_raw_representable_requirement,sema_tcd,none,
       "RawRepresentable protocol is broken: unexpected requirement", ())
 ERROR(broken_equatable_requirement,sema_tcd,none,

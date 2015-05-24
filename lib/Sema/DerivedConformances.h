@@ -35,6 +35,7 @@ namespace DerivedConformance {
 ///
 /// \returns the derived member, which will also be added to the type.
 ValueDecl *deriveRawRepresentable(TypeChecker &tc,
+                                  Decl *parentDecl,
                                   NominalTypeDecl *type,
                                   ValueDecl *requirement);
 
@@ -43,6 +44,7 @@ ValueDecl *deriveRawRepresentable(TypeChecker &tc,
 ///
 /// \returns the derived member, which will also be added to the type.
 Type deriveRawRepresentable(TypeChecker &tc,
+                            Decl *parentDecl,
                             NominalTypeDecl *type,
                             AssociatedTypeDecl *assocType);
 
@@ -54,6 +56,7 @@ Type deriveRawRepresentable(TypeChecker &tc,
 ///
 /// \returns the derived member, which will also be added to the type.
 ValueDecl *deriveEquatable(TypeChecker &tc,
+                           Decl *parentDecl,
                            NominalTypeDecl *type,
                            ValueDecl *requirement);
   
@@ -65,6 +68,7 @@ ValueDecl *deriveEquatable(TypeChecker &tc,
 ///
 /// \returns the derived member, which will also be added to the type.
 ValueDecl *deriveHashable(TypeChecker &tc,
+                          Decl *parentDecl,
                           NominalTypeDecl *type,
                           ValueDecl *requirement);
   
@@ -75,6 +79,7 @@ ValueDecl *deriveHashable(TypeChecker &tc,
 ///
 /// \returns the derived member, which will also be added to the type.
 ValueDecl *deriveErrorType(TypeChecker &tc,
+                           Decl *parentDecl,
                            NominalTypeDecl *type,
                            ValueDecl *requirement);
 
@@ -82,6 +87,7 @@ ValueDecl *deriveErrorType(TypeChecker &tc,
 ///
 /// \returns the derived member, which will also be added to the type.
 ValueDecl *deriveBridgedNSError(TypeChecker &tc,
+                                Decl *parentDecl,
                                 NominalTypeDecl *type,
                                 ValueDecl *requirement);
 
@@ -103,6 +109,7 @@ inline SomeDecl *insertOperatorDecl(ASTContext &C,
 
 /// Declare a getter for a derived property.
 FuncDecl *declareDerivedPropertyGetter(TypeChecker &tc,
+                                       Decl *parentDecl,
                                        NominalTypeDecl *typeDecl,
                                        Type contextType,
                                        Type propertyInterfaceType,
@@ -112,6 +119,7 @@ FuncDecl *declareDerivedPropertyGetter(TypeChecker &tc,
 /// Declare a read-only property with an existing getter.
 std::pair<VarDecl *, PatternBindingDecl *>
 declareDerivedReadOnlyProperty(TypeChecker &tc,
+                               Decl *parentDecl,
                                NominalTypeDecl *typeDecl,
                                Identifier name,
                                Type propertyInterfaceType,
