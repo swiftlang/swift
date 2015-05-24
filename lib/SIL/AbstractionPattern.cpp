@@ -227,12 +227,15 @@ AbstractionPattern::getTupleElementType(unsigned index) const {
     auto paramIndex = index;
     if (errorInfo.hasErrorParameter()) {
       auto errorParamIndex = errorInfo.getErrorParameterIndex();
-      if (paramIndex == errorParamIndex &&
-          errorInfo.isErrorParameterReplacedWithVoid()) {
-        assert(isVoidLike(swiftEltType));
-        return AbstractionPattern(swiftEltType);
-      } else if (paramIndex >= errorParamIndex) {
-        paramIndex++;
+      if (errorInfo.isErrorParameterReplacedWithVoid()) {
+        if (paramIndex == errorParamIndex) {
+          assert(isVoidLike(swiftEltType));
+          return AbstractionPattern(swiftEltType);
+        }
+      } else {
+        if (paramIndex >= errorParamIndex) {
+          paramIndex++;
+        }
       }
     }
 
