@@ -240,11 +240,10 @@ namespace {
     unsigned getFixedExtraInhabitantCount(IRGenModule &IGM) const override {
       return 1;
     }
-    llvm::ConstantInt *getFixedExtraInhabitantValue(IRGenModule &IGM,
-                                                unsigned bits,
-                                                unsigned index) const override {
-      return llvm::ConstantInt::get(
-                         llvm::IntegerType::get(IGM.getLLVMContext(), bits), 0);
+    APInt getFixedExtraInhabitantValue(IRGenModule &IGM,
+                                       unsigned bits,
+                                       unsigned index) const override {
+      return APInt(bits, 0);
     }
     llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF, Address src,
                                          SILType T) const override {

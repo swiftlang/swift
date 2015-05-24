@@ -64,7 +64,7 @@ bb0(%0 : $*B, %1 : $Optional<P>):
   %4 = tuple ()
   return %4 : $()
 }
-// CHECK:    define void @test_weak_load_store_proto([[B]]*, i128)
+// CHECK:    define void @test_weak_load_store_proto([[B]]*, i64, i64)
 // CHECK:      [[X:%.*]] = getelementptr inbounds [[B]], [[B]]* %0, i32 0, i32 0
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds { [[WEAK]], i8** }, { [[WEAK]], i8** }* [[X]], i32 0, i32 0
 // CHECK-NEXT: [[T1:%.*]] = call [[UNKNOWN]]* @swift_unknownWeakLoadStrong([[WEAK]]* [[T0]])
@@ -88,7 +88,7 @@ bb0(%0 : $Optional<P>):
   %4 = tuple ()
   return %4 : $()
 }
-// CHECK:    define void @test_weak_alloc_stack(i128)
+// CHECK:    define void @test_weak_alloc_stack(i64, i64)
 // CHECK:      [[X:%.*]] = alloca { [[WEAK]], i8** }, align 8
 // CHECK: [[TMPOBJ:%.*]] = inttoptr {{.*}} to %objc_object*
 // CHECK: [[TMPTAB:%.*]] = inttoptr {{.*}} to i8**

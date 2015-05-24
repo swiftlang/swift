@@ -141,36 +141,25 @@ public:
     return getFixedExtraInhabitantCount(IGM) > 0;
   }
 
-  /// Given a payload value that might be an extra enhabitant, return
-  /// a value that can be compared for bitwise equality with an extra
-  /// inhabitant.
-  ///
-  /// This is necessary because we don't want to promise to initialize
-  /// every bit in the value when setting up an extra inhabitant.
-  virtual llvm::Value *maskFixedExtraInhabitant(IRGenFunction &IGF,
-                                                llvm::Value *payload) const {
-    return payload;
-  }
-  
   /// Get the bit mask that must be applied before testing an extra inhabitant.
-  virtual SpareBitVector getFixedExtraInhabitantMask(IRGenModule &IGM) const {
-    return SpareBitVector::getConstant(getFixedSize().getValueInBits(), true);
+  virtual APInt getFixedExtraInhabitantMask(IRGenModule &IGM) const {
+    return APInt::getAllOnesValue(getFixedSize().getValueInBits());
   }
 
   /// Create a constant of the given bit width holding one of the extra
   /// inhabitants of the type.
   /// The index must be less than the value returned by
   /// getFixedExtraInhabitantCount().
-  virtual llvm::ConstantInt *getFixedExtraInhabitantValue(IRGenModule &IGM,
-                                                       unsigned bits,
-                                                       unsigned index) const {
+  virtual APInt getFixedExtraInhabitantValue(IRGenModule &IGM,
+                                             unsigned bits,
+                                             unsigned index) const {
     return getSpareBitFixedExtraInhabitantValue(IGM, bits, index);
   }
   
   /// Create an extra inhabitant constant using the spare bits of the type.
-  llvm::ConstantInt *getSpareBitFixedExtraInhabitantValue(IRGenModule &IGM,
-                                                       unsigned bits,
-                                                       unsigned index) const;
+  APInt getSpareBitFixedExtraInhabitantValue(IRGenModule &IGM,
+                                             unsigned bits,
+                                             unsigned index) const;
   
   /// Map an extra inhabitant representation in memory to a unique 31-bit
   /// identifier, and map a valid representation of the type to -1.

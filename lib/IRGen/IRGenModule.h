@@ -391,8 +391,6 @@ private:
   
   llvm::DenseMap<llvm::Type *, SpareBitVector> SpareBitsForTypes;
   
-  std::unique_ptr<const EnumImplStrategy> TheUnimplementedEnumImplStrategy;
-
 //--- Types -----------------------------------------------------------------
 public:
   const ProtocolInfo &getProtocolInfo(ProtocolDecl *D);
@@ -429,8 +427,6 @@ public:
   clang::CanQual<clang::Type> getClangType(CanType type);
   clang::CanQual<clang::Type> getClangType(SILType type);
   
-  const EnumImplStrategy &getUnimplementedEnumImplStrategy();
-
   const clang::ASTContext &getClangASTContext() {
     assert(ClangASTContext &&
            "requesting clang AST context without clang importer!");

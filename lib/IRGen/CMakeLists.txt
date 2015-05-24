@@ -1,5 +1,6 @@
 add_swift_library(swiftIRGen
   DebugTypeInfo.cpp
+  EnumPayload.cpp
   ExtraInhabitants.cpp
   GenCast.cpp
   GenClangDecl.cpp
