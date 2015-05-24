@@ -155,4 +155,14 @@ func testBuildConfigs() {
 #endif
 }
 
+// <rdar://problem/21091625> Bogus 'never mutated' warning when protocol variable is mutated only by mutating method
+protocol Fooable {
+  mutating func mutFoo()
+  func immutFoo()
+}
+func testOpenExistential(var x: Fooable,
+                         var y: Fooable) {  // expected-warning {{parameter 'y' was never mutated; consider changing to 'let' constant}}
+  x.mutFoo()
+  y.immutFoo()
+}
 

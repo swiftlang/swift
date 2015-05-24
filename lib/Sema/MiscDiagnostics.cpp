@@ -797,7 +797,10 @@ class VarDeclUsageChecker : public ASTWalker {
   /// to this when the declaration is seen.  We use a MapVector to keep the
   /// diagnostics emission in deterministic order.
   llvm::SmallMapVector<VarDecl*, unsigned, 32> VarDecls;
-  
+
+  /// This is a mapping from an OpaqueValue to the expression that initialized
+  /// it.
+  llvm::SmallDenseMap<OpaqueValueExpr*, Expr*> OpaqueValueMap;
   bool sawError = false;
   
 public:
@@ -1107,6 +1110,12 @@ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
   if (auto *FVE = dyn_cast<ForceValueExpr>(E))
     return markStoredOrInOutExpr(FVE->getSubExpr(), Flags);
   
+  // If this is an OapqueValueExpr that we've seen a mapping for, jump to the
+  // mapped value.
+  if (auto *OVE = dyn_cast<OpaqueValueExpr>(E))
+    if (auto *expr = OpaqueValueMap[OVE])
+      return markStoredOrInOutExpr(expr, Flags);
+
   // If we don't know what kind of expression this is, assume it's a reference
   // and mark it as a read.
   E->walk(*this);
@@ -1144,6 +1153,11 @@ std::pair<bool, Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
     // Don't bother walking into this.
     return { false, E };
   }
+  
+  // If we see an OpenExistentialExpr, remember the mapping for its OpaqueValue.
+  if (auto *oee = dyn_cast<OpenExistentialExpr>(E))
+    OpaqueValueMap[oee->getOpaqueValue()] = oee->getExistentialValue();
+
   
   // If we saw an ErrorExpr, take note of this.
   if (isa<ErrorExpr>(E))
