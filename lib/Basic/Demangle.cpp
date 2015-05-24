@@ -2532,16 +2532,8 @@ private:
 
   void printContext(NodePointer context) {
     // TODO: parenthesize local contexts?
-    bool actuallyPrintContext = true;
-
-    if (false == Options.DisplayDebuggerGeneratedModule &&
-      isDebuggerGeneratedModule(context))
-        actuallyPrintContext = false;
-    else if (false == Options.DisplayStandardLibraryModule &&
-      isSwiftModule(context))
-        actuallyPrintContext = false;
-
-    if (actuallyPrintContext)
+    if (Options.DisplayDebuggerGeneratedModule ||
+       !isDebuggerGeneratedModule(context))
     {
       print(context, /*asContext*/ true);
       if (context->getKind() == Node::Kind::Module && Options.Simplified)

@@ -838,7 +838,7 @@ func test_ArbitraryStructPrinting() {
 
   printedIs(
     ValuesWithoutDescription(1.25, "abc", [ 1, 2, 3 ]),
-    "a.ValuesWithoutDescription<Double, String, Array<Int>>(t: 1.25, u: \"abc\", v: [1, 2, 3])")
+    "a.ValuesWithoutDescription<Swift.Double, Swift.String, Swift.Array<Swift.Int>>(t: 1.25, u: \"abc\", v: [1, 2, 3])")
 
   print("test_ArbitraryStructPrinting done")
 }
@@ -846,7 +846,7 @@ test_ArbitraryStructPrinting()
 // CHECK: test_ArbitraryStructPrinting done
 
 func test_MetatypePrinting() {
-  printedIs(Int.self, "Int")
+  printedIs(Int.self, "Swift.Int")
 
   print("test_MetatypePrinting done")
 }

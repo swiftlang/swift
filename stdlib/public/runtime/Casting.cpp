@@ -92,7 +92,6 @@ static void _buildNominalTypeName(const NominalTypeDescriptor *ntd,
                                   std::string &result) {
   auto options = Demangle::DemangleOptions();
   options.DisplayDebuggerGeneratedModule = false;
-  options.DisplayStandardLibraryModule = false;
 
   // Demangle the basic type name.
   result += Demangle::demangleTypeAsString(ntd->Name,
@@ -129,7 +128,6 @@ static void _buildExistentialTypeName(const ProtocolDescriptorList *protocols,
                                       std::string &result) {
   auto options = Demangle::DemangleOptions();
   options.DisplayDebuggerGeneratedModule = false;
-  options.DisplayStandardLibraryModule = false;
 
   // If there's only one protocol, the existential type name is the protocol
   // name.
@@ -207,7 +205,6 @@ static void _buildNameForMetadata(const Metadata *type,
                            std::string &result) {
   auto options = Demangle::DemangleOptions();
   options.DisplayDebuggerGeneratedModule = false;
-  options.DisplayStandardLibraryModule = false;
                              
   switch (type->getKind()) {
   case MetadataKind::Class: {
