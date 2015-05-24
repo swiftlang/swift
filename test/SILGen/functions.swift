@@ -622,3 +622,28 @@ func testNoescape2() {
 // CHECK: // functions.(testNoescape2 () -> ()).(closure #1).(closure #1)
 // CHECK-NEXT: sil shared @_TFFF9functions13testNoescape2FT_T_U_FT_T_U_FT_T_ : $@convention(thin) (@owned Builtin.NativeObject, @inout Int) -> () {
 
+enum PartialApplyEnumPayload<T, U> {
+  case Left(T)
+  case Right(U)
+}
+
+struct S {}
+struct C {}
+
+func partialApplyEnumCases(x: S, y: C) {
+  let left = PartialApplyEnumPayload<S, C>.Left
+  let left2 = left(S())
+
+  let right = PartialApplyEnumPayload<S, C>.Right
+  let right2 = right(C())
+}
+
+// CHECK-LABEL: sil shared [transparent] @_TFO9functions23PartialApplyEnumPayload4Leftu0_rFMGS0_q_q0__Fq_GS0_q_q0__
+// CHECK:         [[UNCURRIED:%.*]] = function_ref @_TFO9functions23PartialApplyEnumPayload4Leftu0_rfMGS0_q_q0__Fq_GS0_q_q0__
+// CHECK:         [[CLOSURE:%.*]] = partial_apply [[UNCURRIED]]<T, U>(%0)
+// CHECK:         return [[CLOSURE]]
+
+// CHECK-LABEL: sil shared [transparent] @_TFO9functions23PartialApplyEnumPayload5Rightu0_rFMGS0_q_q0__Fq0_GS0_q_q0__
+// CHECK:         [[UNCURRIED:%.*]] = function_ref @_TFO9functions23PartialApplyEnumPayload5Rightu0_rfMGS0_q_q0__Fq0_GS0_q_q0__
+// CHECK:         [[CLOSURE:%.*]] = partial_apply [[UNCURRIED]]<T, U>(%0)
+// CHECK:         return [[CLOSURE]]

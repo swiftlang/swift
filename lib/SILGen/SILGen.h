@@ -200,7 +200,7 @@ public:
   /// Emits the curry thunk between two uncurry levels of a function.
   void emitCurryThunk(SILDeclRef entryPoint,
                       SILDeclRef nextEntryPoint,
-                      FuncDecl *fd);
+                      ValueDecl *fd);
   
   /// Emits a thunk from a foreign function to the native Swift convention.
   void emitForeignToNativeThunk(SILDeclRef thunk);

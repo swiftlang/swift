@@ -2499,7 +2499,6 @@ namespace {
       enum : unsigned {
         Struct,
         Enum,
-        EnumCase,
         Archetype,
         Protocol
       };
@@ -2597,13 +2596,7 @@ namespace {
             kind = MemberPartialApplication::Struct;
           else if (selfTy->getEnumOrBoundGenericEnum())
             kind = MemberPartialApplication::Enum;
-          else if (auto theCase = dyn_cast<EnumElementDecl>(fnDeclRef->getDecl())) {
-            if (theCase->hasArgumentType()) {
-              eed = theCase;
-              kind = MemberPartialApplication::EnumCase;
-            } else
-              goto not_value_type_member;
-          } else
+          else
             goto not_value_type_member;
         } else if (auto pmRef = dyn_cast<MemberRefExpr>(member)) {
           auto baseTy = pmRef->getBase()->getType();

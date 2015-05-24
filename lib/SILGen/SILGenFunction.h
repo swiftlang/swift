@@ -576,7 +576,8 @@ public:
                                   CleanupLocation cleanupLoc);
   /// Generates code for a curry thunk from one uncurry level
   /// of a function to another.
-  void emitCurryThunk(FuncDecl *fd, SILDeclRef fromLevel, SILDeclRef toLevel);
+  void emitCurryThunk(ValueDecl *fd,
+                      SILDeclRef fromLevel, SILDeclRef toLevel);
   /// Generates a thunk from a foreign function to the native Swift convention.
   void emitForeignToNativeThunk(SILDeclRef thunk);
   /// Generates a thunk from a native function to the  conventions.

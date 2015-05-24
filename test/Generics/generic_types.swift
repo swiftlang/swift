@@ -45,7 +45,7 @@ enum Optional<T> {
   init(_ t: T) { self = .Element(t) }
 }
 typealias OptionalInt = Optional<Int>
-var uniontest1 : (Int) -> Optional<Int> = OptionalInt.Element // expected-error{{partial application of enum constructor}}
+var uniontest1 : (Int) -> Optional<Int> = OptionalInt.Element
 var uniontest2 : Optional<Int> = OptionalInt.None
 var uniontest3 = OptionalInt(1)
 

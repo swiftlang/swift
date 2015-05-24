@@ -32,7 +32,7 @@ c = .Green
 c = .Grayscale(255)
 c = .Blue
 
-let partialApplication = Color.Grayscale // expected-error{{partial application of enum constructor is not allowed}}
+let partialApplication = Color.Grayscale
 
 // Cases are excluded from non-enums.
 case FloatingCase // expected-error{{enum 'case' is not allowed outside of an enum}}

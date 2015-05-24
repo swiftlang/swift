@@ -361,7 +361,7 @@ void SILGenModule::emitFunction(FuncDecl *fd) {
 
 void SILGenModule::emitCurryThunk(SILDeclRef entryPoint,
                                   SILDeclRef nextEntryPoint,
-                                  FuncDecl *fd) {
+                                  ValueDecl *fd) {
   SILFunction *f = preEmitFunction(entryPoint, fd, fd);
   PrettyStackTraceSILFunction X("silgen emitCurryThunk", f);
 

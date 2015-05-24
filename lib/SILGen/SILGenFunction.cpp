@@ -138,37 +138,21 @@ SILValue SILGenFunction::emitGlobalFunctionRef(SILLocation loc,
   // If the constant is a thunk we haven't emitted yet, emit it.
   if (!SGM.hasFunction(constant)) {
     if (constant.isCurried) {
-      // Non-functions can't be referenced uncurried.
-      FuncDecl *fd = cast<FuncDecl>(constant.getDecl());
-
-      // Getters and setters can't be referenced uncurried.
-      assert(!fd->isAccessor());
-
-      // FIXME: Thunks for instance methods of generics.
-      assert(!(fd->isInstanceMember() &&
-               isa<ProtocolDecl>(fd->getDeclContext()))
-             && "currying generic method not yet supported");
-
-      // FIXME: Curry thunks for generic methods don't work right yet, so skip
-      // emitting thunks for them
-      assert(!(fd->getType()->is<AnyFunctionType>() &&
-               fd->getType()->castTo<AnyFunctionType>()->getResult()
-                 ->is<PolymorphicFunctionType>()));
-
+      auto vd = constant.getDecl();
       // Reference the next uncurrying level of the function.
-      SILDeclRef next = SILDeclRef(fd, SILDeclRef::Kind::Func,
+      SILDeclRef next = SILDeclRef(vd, constant.kind,
                                  SILDeclRef::ConstructAtBestResilienceExpansion,
                                  constant.uncurryLevel + 1);
       // If the function is fully uncurried and natively foreign, reference its
       // foreign entry point.
-      if (!next.isCurried && fd->hasClangNode())
+      if (!next.isCurried && vd->hasClangNode())
         next = next.asForeign();
       
       // Preserve whether the curry thunks lead to a direct reference to the
       // method implementation.
       next = next.asDirectReference(constant.isDirectReference);
 
-      SGM.emitCurryThunk(constant, next, fd);
+      SGM.emitCurryThunk(constant, next, vd);
     }
     // Otherwise, if this is a calling convention thunk we haven't emitted yet,
     // emit it.
@@ -661,28 +645,45 @@ static SILValue getNextUncurryLevelRef(SILGenFunction &gen,
   return gen.emitGlobalFunctionRef(loc, next);
 }
 
-void SILGenFunction::emitCurryThunk(FuncDecl *fd,
+void SILGenFunction::emitCurryThunk(ValueDecl *vd,
                                     SILDeclRef from, SILDeclRef to) {
   SmallVector<SILValue, 8> curriedArgs;
 
   unsigned paramCount = from.uncurryLevel + 1;
 
-  // Forward implicit closure context arguments.
-  bool hasCaptures = fd->getCaptureInfo().hasLocalCaptures();
-  if (hasCaptures)
-    --paramCount;
+  if (auto fd = dyn_cast<AbstractFunctionDecl>(vd)) {
+    // Forward implicit closure context arguments.
+    bool hasCaptures = fd->getCaptureInfo().hasLocalCaptures();
+    if (hasCaptures)
+      --paramCount;
 
-  // Forward the curried formal arguments.
-  auto forwardedPatterns = fd->getBodyParamPatterns().slice(0, paramCount);
-  for (auto *paramPattern : reversed(forwardedPatterns))
-    bindParametersForForwarding(paramPattern, curriedArgs);
+    // Forward the curried formal arguments.
+    auto forwardedPatterns = fd->getBodyParamPatterns().slice(0, paramCount);
+    for (auto *paramPattern : reversed(forwardedPatterns))
+      bindParametersForForwarding(paramPattern, curriedArgs);
 
-  // Forward captures.
-  if (hasCaptures) {
-    ArrayRef<CapturedValue> LocalCaptures
-      = SGM.Types.getLoweredLocalCaptures(fd);
-    for (auto capture : LocalCaptures)
-      forwardCaptureArgs(*this, curriedArgs, capture);
+    // Forward captures.
+    if (hasCaptures) {
+      ArrayRef<CapturedValue> LocalCaptures
+        = SGM.Types.getLoweredLocalCaptures(fd);
+      for (auto capture : LocalCaptures)
+        forwardCaptureArgs(*this, curriedArgs, capture);
+    }
+  } else if (isa<EnumElementDecl>(vd)) {
+    // FIXME: An EnumElementDecl probably ought to be an AbstractFunctionDecl.
+    // For now, enum elements only ever have one curry level, consisting only
+    // of the Self metatype.
+    assert(from.uncurryLevel == 0 && to.uncurryLevel == 1
+           && "currying enum elt at level other than one?!");
+    F.setBare(IsBare);
+    auto selfTy = vd->getDeclContext()->getDeclaredTypeInContext();
+    auto thinMetaTy = MetatypeType::get(selfTy, MetatypeRepresentation::Thin);
+    
+    auto metatypeVal = new (F.getModule()) SILArgument(F.begin(),
+               SILType::getPrimitiveObjectType(thinMetaTy->getCanonicalType()));
+    curriedArgs.push_back(metatypeVal);
+  } else {
+    llvm_unreachable("don't know how to curry this decl");
   }
 
   // Forward substitutions.
@@ -691,7 +692,7 @@ void SILGenFunction::emitCurryThunk(FuncDecl *fd,
     subs = gp->getForwardingSubstitutions(getASTContext());
   }
 
-  SILValue toFn = getNextUncurryLevelRef(*this, fd, to, from.isDirectReference,
+  SILValue toFn = getNextUncurryLevelRef(*this, vd, to, from.isDirectReference,
                                          curriedArgs, subs);
   SILType resultTy
     = SGM.getConstantType(from).castTo<SILFunctionType>()
@@ -711,10 +712,10 @@ void SILGenFunction::emitCurryThunk(FuncDecl *fd,
     SILBuilder::getPartialApplyResultType(toFn.getType(), curriedArgs.size(),
                                           SGM.M, subs);
   SILInstruction *toClosure =
-    B.createPartialApply(fd, toFn, toTy, subs, curriedArgs, closureTy);
+    B.createPartialApply(vd, toFn, toTy, subs, curriedArgs, closureTy);
   if (resultTy != closureTy)
-    toClosure = B.createConvertFunction(fd, toClosure, resultTy);
-  B.createReturn(ImplicitReturnLocation::getImplicitReturnLoc(fd), toClosure);
+    toClosure = B.createConvertFunction(vd, toClosure, resultTy);
+  B.createReturn(ImplicitReturnLocation::getImplicitReturnLoc(vd), toClosure);
 }
 
 void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value) {

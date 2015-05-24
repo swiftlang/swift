@@ -48,7 +48,7 @@ enum MaybeInt {
 
 func test2(a: Int, _ b: Int, _ c: MaybeInt) {
   _ = MaybeInt.Some(4)
-  _ = MaybeInt.Some  // expected-error{{partial application of enum constructor is not allowed}}
+  _ = MaybeInt.Some
   _ = MaybeInt.Some(b)
 
   test2(1, 2, .None)
