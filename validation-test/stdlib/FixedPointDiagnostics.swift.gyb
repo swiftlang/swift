@@ -101,6 +101,7 @@ func testMixedSignArithmetic() {
     // disabled by the ambiguity trick.
     //===------------------------------------------------------------------===//
 
+    (x + x) as Stride   // expected-error {{is not convertible to 'Stride'}}
     Stride(1) - ${T}(0) // expected-error {{binary operator '-' cannot be applied to operands of type 'Stride' and}} expected-note {{overloads for '-' exist with these partially matching parameter lists:}}
 
     // These tests are expected to start failing when we get improved diagnostics.

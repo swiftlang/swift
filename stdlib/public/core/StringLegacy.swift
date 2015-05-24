@@ -104,7 +104,7 @@ extension String {
   }
   
   /// Create an instance representing `v` in base 10.
-  public init<T : _UnsignedIntegerType>(_ v: T)  {
+  public init<T : UnsignedIntegerType>(_ v: T)  {
     self = _uint64ToString(v.toUIntMax())
   }
 
@@ -124,7 +124,7 @@ extension String {
   ///
   /// Numerals greater than 9 are represented as roman letters,
   /// starting with `a` if `uppercase` is `false` or `A` otherwise.
-  public init<T : _UnsignedIntegerType>(
+  public init<T : UnsignedIntegerType>(
     _ v: T, radix: Int, uppercase: Bool = false
   )  {
     _precondition(radix > 1, "Radix must be greater than 1")
