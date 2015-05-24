@@ -2965,7 +2965,7 @@ namespace {
             nullability = Impl.translateNullability(known->getReturnTypeInfo());
           }
         }
-        if (nullability != OTK_None) {
+        if (nullability != OTK_None && !errorConvention.hasValue()) {
           resultTy = OptionalType::get(nullability, resultTy);
           interfaceSelfTy = OptionalType::get(nullability, interfaceSelfTy);
         }
