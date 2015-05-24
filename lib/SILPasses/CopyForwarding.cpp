@@ -276,6 +276,10 @@ public:
     UncheckedTakeEnumDataAddrInst *UserInst) {
     llvm_unreachable("illegal deinitialization");
   }
+  bool visitDebugValueAddrInst(DebugValueAddrInst *UserInst) {
+    Oper = &UserInst->getOperandRef();
+    return false;
+  }
   bool visitSILInstruction(SILInstruction *UserInst) {
     return false;
   }
@@ -683,20 +687,6 @@ bool CopyForwarding::backwardPropagateCopy(
     --SI;
     SILInstruction *UserInst = &*SI;
 
-    if (auto *DVAI = dyn_cast<DebugValueAddrInst>(UserInst)) {
-      if (DestUserInsts.count(DVAI)) {
-        // The debug_value_addr would not be valid anymore after copy
-        // propagation. We just delete it.
-        DebugValueInstsToDelete.push_back(DVAI);
-        continue;
-      }
-      if (SrcDebugValueInsts.count(DVAI)) {
-        // Replace the operand in this debug_value_addr instruction.
-        ValueUses.push_back(&DVAI->getOperandRef());
-        continue;
-      }
-    }
-
     // If we see another use of Dest, then Dest is live after the Src location
     // is initialized, so we really need the copy.
     if (DestUserInsts.count(UserInst) || UserInst == CopyDestDef) {
@@ -709,7 +699,9 @@ bool CopyForwarding::backwardPropagateCopy(
       return false;
     }
     // Early check to avoid scanning unrelated instructions.
-    if (!SrcUserInsts.count(UserInst))
+    if (!SrcUserInsts.count(UserInst)
+        && !(isa<DebugValueAddrInst>(UserInst)
+             && SrcDebugValueInsts.count(cast<DebugValueAddrInst>(UserInst))))
       continue;
 
     AnalyzeBackwardUse AnalyzeUse(CopySrc);
