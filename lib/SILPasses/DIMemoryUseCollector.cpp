@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "definite-init"
 #include "DIMemoryUseCollector.h"
+#include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -992,6 +993,20 @@ static bool isSelfInitUse(SILInstruction *I) {
   return true;
 }
 
+
+/// Return true if this SILBBArgument is the result of a call to self.init.
+static bool isSelfInitUse(SILArgument *Arg) {
+  // We only handle a very simple pattern here where there is a single
+  // predecessor to the block, and the predecessor instruction is a try_apply
+  // of a throwing delegated init.
+  auto *BB = Arg->getParent();
+  auto *Pred = BB->getSinglePredecessor();
+  if (!Pred || !isa<TryApplyInst>(Pred->getTerminator()))
+    return false;
+  return isSelfInitUse(Pred->getTerminator());
+}
+
+
 /// Determine if this value_metatype instruction is part of a call to
 /// self.init when delegating to a factory initializer.
 ///
@@ -1238,6 +1253,10 @@ void ElementUseCollector::collectDelegatingValueTypeInitSelfUses() {
       if (auto *AssignSource = dyn_cast<SILInstruction>(AI->getOperand(0)))
         if (isSelfInitUse(AssignSource))
           Kind = DIUseKind::SelfInit;
+      if (auto *AssignSource = dyn_cast<SILArgument>(AI->getOperand(0)))
+        if (AssignSource->getParent() == AI->getParent())
+          if (isSelfInitUse(AssignSource))
+            Kind = DIUseKind::SelfInit;
     }
     
     if (auto *CAI = dyn_cast<CopyAddrInst>(User)) {

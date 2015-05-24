@@ -145,3 +145,24 @@ class SubClass: RootClass {
     return nil // OK
   }
 }
+
+// <rdar://problem/21087069> Unexpected Error calling delegating initializer from delegating initializer marked with throws
+struct ThrowStruct {
+  var x : String
+  init() throws { x = "" }
+  
+  init(a : Int) throws {
+    try self.init()
+  }
+}
+
+enum Err : ErrorType { case X }
+
+struct ThrowAddrOnlyStruct<T> {
+  var x : T
+  init() throws { throw Err.X }
+  
+  init(a : Int) throws {
+    try self.init()
+  }
+}
