@@ -33,7 +33,7 @@ class GC2<T : AssociatedTypes, U : AssociatedTypes> {}
 
 func printTypeName(t: Any.Type) { print(_typeName(t)) }
 
-printTypeName(Int.self) // CHECK: Swift.Int
+printTypeName(Int.self) // CHECK: Int
 printTypeName(C.self) // CHECK-NEXT: [[THIS:.*]].C
 printTypeName(S.self) // CHECK-NEXT: [[THIS]].S
 printTypeName(E.self) // CHECK-NEXT: [[THIS]].E
@@ -68,9 +68,9 @@ printTypeName(C.Type.self) // CHECK-NEXT: [[THIS]].C.Type
 printTypeName(C.Type.Type.self) // CHECK-NEXT: [[THIS]].C.Type.Type
 printTypeName(Any.Type.self) // CHECK-NEXT: protocol<>.Type
 printTypeName(Any.Protocol.self) // CHECK-NEXT: protocol<>.Protocol
-printTypeName(AnyObject.self) // CHECK-NEXT: {{^}}Swift.AnyObject{{$}}
-printTypeName(AnyClass.self) // CHECK-NEXT: {{^}}Swift.AnyObject.Type{{$}}
-printTypeName((AnyObject?).self) // CHECK-NEXT: {{^}}Swift.Optional<Swift.AnyObject>{{$}}
+printTypeName(AnyObject.self) // CHECK-NEXT: {{^}}AnyObject{{$}}
+printTypeName(AnyClass.self) // CHECK-NEXT: {{^}}AnyObject.Type{{$}}
+printTypeName((AnyObject?).self) // CHECK-NEXT: {{^}}Optional<AnyObject>{{$}}
 
 printTypeName(Void.self) // CHECK-NEXT: ()
 typealias Tup = (Any, F, C)
@@ -82,18 +82,18 @@ typealias IF3 = (inout Int -> ()) -> ()
 typealias IF4 = inout (() -> ()) -> ()
 typealias IF5 = (inout Int, Any) -> ()
 
-printTypeName(IF.self) // CHECK-NEXT: inout Swift.Int -> ()
-printTypeName(IF2.self) // CHECK-NEXT: inout Swift.Int -> inout Swift.Int -> ()
+printTypeName(IF.self) // CHECK-NEXT: inout Int -> ()
+printTypeName(IF2.self) // CHECK-NEXT: inout Int -> inout Int -> ()
 
-// FIXME: this is wrong.  Should be: "(inout Swift.Int -> ()) -> ()"
+// FIXME: this is wrong.  Should be: "(inout Int -> ()) -> ()"
 // <rdar://problem/20133773> Demangling of function types that include 'inout' is wrong
-printTypeName(IF3.self) // CHECK-NEXT: inout (Swift.Int -> ()) -> ()
+printTypeName(IF3.self) // CHECK-NEXT: inout (Int -> ()) -> ()
 
 // FIXME: this is wrong.  Should be: "inout (() -> ()) -> ()"
 // <rdar://problem/20133773> Demangling of function types that include 'inout' is wrong
 printTypeName(IF4.self) // CHECK-NEXT: (() -> ()) -> ()
 
-printTypeName(IF5.self) // CHECK-NEXT: (inout Swift.Int, protocol<>) -> ()
+printTypeName(IF5.self) // CHECK-NEXT: (inout Int, protocol<>) -> ()
 
 func curry1() {
 

@@ -30,6 +30,7 @@ struct DemangleOptions {
   bool SynthesizeSugarOnTypes = false;
   bool DisplayTypeOfIVarFieldOffset = true;
   bool DisplayDebuggerGeneratedModule = true;
+  bool DisplayStandardLibraryModule = true;
   bool Simplified = false;
 
   DemangleOptions() {}

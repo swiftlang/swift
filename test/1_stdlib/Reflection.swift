@@ -15,19 +15,19 @@ struct Complex<T> {
 }
 // CHECK-LABEL: Complex:
 print("Complex:")
-// CHECK-NEXT:    Reflection.Complex<Swift.Double>
+// CHECK-NEXT:    Reflection.Complex<Double>
 // CHECK-NEXT:      real: 1.5
 // CHECK-NEXT:      imag: 0.75
 dump(Complex<Double>(real: 1.5, imag: 0.75))
-// CHECK-NEXT:    Reflection.Complex<Swift.Double>
+// CHECK-NEXT:    Reflection.Complex<Double>
 // CHECK-NEXT:      real: -1.5
 // CHECK-NEXT:      imag: -0.75
 dump(Complex<Double>(real: -1.5, imag: -0.75))
-// CHECK-NEXT:    Reflection.Complex<Swift.Int>
+// CHECK-NEXT:    Reflection.Complex<Int>
 // CHECK-NEXT:      real: 22
 // CHECK-NEXT:      imag: 44
 dump(Complex<Int>(real: 22, imag: 44))
-// CHECK-NEXT:    Reflection.Complex<Swift.String>
+// CHECK-NEXT:    Reflection.Complex<String>
 // CHECK-NEXT:      real: is this the real life?
 // CHECK-NEXT:      imag: is it just fantasy?
 dump(Complex<String>(real: "is this the real life?", 
@@ -215,7 +215,7 @@ enum Exaggeration<T> {
   case Claim(T)
 }
 
-// CHECK-NEXT: Exaggeration<Swift.Array<Swift.Int>>.Claim([])
+// CHECK-NEXT: Exaggeration<Array<Int>>.Claim([])
 print(Exaggeration<Array<Int>>.Claim([]))
 
 // CHECK-NEXT: 1
@@ -241,20 +241,20 @@ enum Transportation<T, S> {
   case Roadster(S)
 }
 
-// CHECK-NEXT: Transportation<Swift.Int, Swift.String>.Horse(31337)
+// CHECK-NEXT: Transportation<Int, String>.Horse(31337)
 print(Transportation<Int, String>.Horse(31337))
 
 // CHECK-NEXT: 1
 print(reflect(Transportation<Int, String>.Horse(31337)).count)
 
-// CHECK-NEXT: Transportation<Swift.Int, Swift.String>.Roadster("Porsche")
+// CHECK-NEXT: Transportation<Int, String>.Roadster("Porsche")
 print(Transportation<Int, String>.Roadster("Porsche"))
 
 var justSomeFunction = { (x:Int)->Int in return x + 1 }
 // CHECK-NEXT: (Function)
 print(reflect(justSomeFunction).summary)
 
-// CHECK-NEXT: Swift.String
+// CHECK-NEXT: String
 print(reflect(String.self).summary)
 
 // CHECK-NEXT: CollectionOfOne(Howdy Swift!)

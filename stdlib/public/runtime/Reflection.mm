@@ -1304,6 +1304,8 @@ extern "C" void swift_stdlib_demangleName(const char *mangledName,
                                           String *demangledName) {
   auto options = Demangle::DemangleOptions();
   options.DisplayDebuggerGeneratedModule = false;
+  options.DisplayStandardLibraryModule = false;
+  
   auto result =
       Demangle::demangleSymbolAsString(mangledName,
                                        mangledNameLength,

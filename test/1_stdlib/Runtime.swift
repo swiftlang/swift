@@ -608,9 +608,9 @@ Runtime.test("getDemangledTypeName") {
   expectEqual("a.SomeStruct", _stdlib_getDemangledTypeName(SomeStruct()))
   expectEqual("a.SomeEnum", _stdlib_getDemangledTypeName(SomeEnum()))
   expectEqual("protocol<>.Protocol", _stdlib_getDemangledTypeName(Any.self))
-  expectEqual("Swift.AnyObject.Protocol", _stdlib_getDemangledTypeName(AnyObject.self))
-  expectEqual("Swift.AnyObject.Type.Protocol", _stdlib_getDemangledTypeName(AnyClass.self))
-  expectEqual("Swift.Optional<Swift.AnyObject>.Type", _stdlib_getDemangledTypeName((AnyObject?).self))
+  expectEqual("AnyObject.Protocol", _stdlib_getDemangledTypeName(AnyObject.self))
+  expectEqual("AnyObject.Type.Protocol", _stdlib_getDemangledTypeName(AnyClass.self))
+  expectEqual("Optional<AnyObject>.Type", _stdlib_getDemangledTypeName((AnyObject?).self))
 
   var a: Any = SomeClass()
   expectEqual("a.SomeClass", _stdlib_getDemangledTypeName(a))
@@ -631,13 +631,13 @@ Runtime.test("getDemangledTypeName") {
   expectEqual("a.SomeEnum", _stdlib_getDemangledTypeName(a))
 
   a = AnyObject.self
-  expectEqual("Swift.AnyObject.Protocol", _stdlib_getDemangledTypeName(a))
+  expectEqual("AnyObject.Protocol", _stdlib_getDemangledTypeName(a))
 
   a = AnyClass.self
-  expectEqual("Swift.AnyObject.Type.Protocol", _stdlib_getDemangledTypeName(a))
+  expectEqual("AnyObject.Type.Protocol", _stdlib_getDemangledTypeName(a))
 
   a = (AnyObject?).self
-  expectEqual("Swift.Optional<Swift.AnyObject>.Type",
+  expectEqual("Optional<AnyObject>.Type",
     _stdlib_getDemangledTypeName(a))
 
   a = Any.self
@@ -648,8 +648,8 @@ Runtime.test("demangleName") {
   expectEqual("", _stdlib_demangleName(""))
   expectEqual("abc", _stdlib_demangleName("abc"))
   expectEqual("\0", _stdlib_demangleName("\0"))
-  expectEqual("Swift.Double", _stdlib_demangleName("_TtSd"))
-  expectEqual("x.a : x.Foo<x.Foo<x.Foo<Swift.Int, Swift.Int>, x.Foo<Swift.Int, Swift.Int>>, x.Foo<x.Foo<Swift.Int, Swift.Int>, x.Foo<Swift.Int, Swift.Int>>>",
+  expectEqual("Double", _stdlib_demangleName("_TtSd"))
+  expectEqual("x.a : x.Foo<x.Foo<x.Foo<Int, Int>, x.Foo<Int, Int>>, x.Foo<x.Foo<Int, Int>, x.Foo<Int, Int>>>",
       _stdlib_demangleName("_Tv1x1aGCS_3FooGS0_GS0_SiSi_GS0_SiSi__GS0_GS0_SiSi_GS0_SiSi___"))
   expectEqual("Foobar", _stdlib_demangleName("_TtC13__lldb_expr_46Foobar"))
 }
@@ -911,7 +911,7 @@ Reflection.test("Struct/Generic/DefaultMirror") {
     dump(value, &output)
 
     let expected =
-      "▿ a.GenericStructWithDefaultMirror<Swift.Int, Swift.Array<Swift.Optional<protocol<>>>>\n" +
+      "▿ a.GenericStructWithDefaultMirror<Int, Array<Optional<protocol<>>>>\n" +
       "  - first: 123\n" +
       "  ▿ second: 3 elements\n" +
       "    ▿ [0]: abc\n" +
@@ -1134,7 +1134,7 @@ Reflection.test("MetatypeMirror") {
     let concreteMetatype = Int.self
     dump(concreteMetatype, &output)
 
-    let expectedInt = "- Swift.Int #0\n"
+    let expectedInt = "- Int #0\n"
     expectEqual(expectedInt, output)
 
     let anyMetatype: Any.Type = Int.self
@@ -1593,8 +1593,8 @@ Reflection.test("Unmanaged/not-nil") {
   dump(optionalURL, &output)
 
   let expected =
-    "▿ Swift.Unmanaged<ObjectiveC.CFURL>\n" +
-    "  ▿ Some: Swift.Unmanaged<ObjectiveC.CFURL>\n" +
+    "▿ Unmanaged<ObjectiveC.CFURL>\n" +
+    "  ▿ Some: Unmanaged<ObjectiveC.CFURL>\n" +
     "    ▿ _value: http://llvm.org/ #0\n" +
     "      - NSObject: http://llvm.org/\n"
 
