@@ -1056,60 +1056,60 @@ markBaseOfAbstractStorageDeclStore(Expr *base, ConcreteDeclRef decl) {
 }
 
 
- void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
-   // Sema leaves some subexpressions null, which seems really unfortunate.  It
-   // should replace them with ErrorExpr.
-   if (E == nullptr || !E->getType() || E->getType()->is<ErrorType>()) {
-     sawError = true;
-     return;
-   }
-   
-   // Ignore parens and other easy cases.
-   E = E->getSemanticsProvidingExpr();
-   
-   // If we found a decl that is being assigned to, then mark it.
-   if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
-     addMark(DRE->getDecl(), Flags);
-     return;
-   }
-
-   if (auto *TE = dyn_cast<TupleExpr>(E)) {
-     for (auto &elt : TE->getElements())
-       markStoredOrInOutExpr(elt, Flags);
-     return;
-   }
-   
-   // If this is an assignment into a mutating subscript lvalue expr, then we
-   // are mutating the base expression.  We also need to visit the index
-   // expressions as loads though.
-   if (auto *SE = dyn_cast<SubscriptExpr>(E)) {
-     // The index of the subscript is evaluted as an rvalue.
-     SE->getIndex()->walk(*this);
-     if (SE->hasDecl())
-       markBaseOfAbstractStorageDeclStore(SE->getBase(), SE->getDecl());
-     else  // FIXME: Should not be needed!
-       markStoredOrInOutExpr(SE->getBase(), RK_Written|RK_Read);
-     
-     return;
-   }
-   
-   if (auto *ioe = dyn_cast<InOutExpr>(E))
-     return markStoredOrInOutExpr(ioe->getSubExpr(), RK_Written|RK_Read);
-   
-   if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
-     markBaseOfAbstractStorageDeclStore(MRE->getBase(), MRE->getMember());
-     return;
-   }
-   
-   if (auto *TEE = dyn_cast<TupleElementExpr>(E))
-     return markStoredOrInOutExpr(TEE->getBase(), Flags);
-
-   if (auto *FVE = dyn_cast<ForceValueExpr>(E))
-     return markStoredOrInOutExpr(FVE->getSubExpr(), Flags);
-
-   // If we don't know what kind of expression this is, assume it's a reference
-   // and mark it as a read.
-   E->walk(*this);
+void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
+  // Sema leaves some subexpressions null, which seems really unfortunate.  It
+  // should replace them with ErrorExpr.
+  if (E == nullptr || !E->getType() || E->getType()->is<ErrorType>()) {
+    sawError = true;
+    return;
+  }
+  
+  // Ignore parens and other easy cases.
+  E = E->getSemanticsProvidingExpr();
+  
+  // If we found a decl that is being assigned to, then mark it.
+  if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
+    addMark(DRE->getDecl(), Flags);
+    return;
+  }
+  
+  if (auto *TE = dyn_cast<TupleExpr>(E)) {
+    for (auto &elt : TE->getElements())
+      markStoredOrInOutExpr(elt, Flags);
+    return;
+  }
+  
+  // If this is an assignment into a mutating subscript lvalue expr, then we
+  // are mutating the base expression.  We also need to visit the index
+  // expressions as loads though.
+  if (auto *SE = dyn_cast<SubscriptExpr>(E)) {
+    // The index of the subscript is evaluted as an rvalue.
+    SE->getIndex()->walk(*this);
+    if (SE->hasDecl())
+      markBaseOfAbstractStorageDeclStore(SE->getBase(), SE->getDecl());
+    else  // FIXME: Should not be needed!
+      markStoredOrInOutExpr(SE->getBase(), RK_Written|RK_Read);
+    
+    return;
+  }
+  
+  if (auto *ioe = dyn_cast<InOutExpr>(E))
+    return markStoredOrInOutExpr(ioe->getSubExpr(), RK_Written|RK_Read);
+  
+  if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
+    markBaseOfAbstractStorageDeclStore(MRE->getBase(), MRE->getMember());
+    return;
+  }
+  
+  if (auto *TEE = dyn_cast<TupleElementExpr>(E))
+    return markStoredOrInOutExpr(TEE->getBase(), Flags);
+  
+  if (auto *FVE = dyn_cast<ForceValueExpr>(E))
+    return markStoredOrInOutExpr(FVE->getSubExpr(), Flags);
+  
+  // If we don't know what kind of expression this is, assume it's a reference
+  // and mark it as a read.
+  E->walk(*this);
 }
 
    
