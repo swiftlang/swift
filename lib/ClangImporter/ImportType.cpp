@@ -1596,8 +1596,9 @@ Type ClangImporter::Implementation::importMethodType(
        Optional<ForeignErrorConvention> &foreignErrorInfo,
        SpecialMethodKind kind) {
 
-  // Cannot import variadic types.
-  if (isVariadic)
+  // Cannot import variadic types unless specially handled before calling this
+  // function.
+  if (isVariadic || clangDecl->sel_param_end() != clangDecl->param_end())
     return Type();
 
   // Clang doesn't provide pragmas for auditing the CF behavior of

@@ -492,3 +492,7 @@ func testUnusedResults(ur: UnusedResults) {
   _ = ur.producesResult()
   ur.producesResult() // expected-warning{{result of call to 'producesResult()' is unused}}
 }
+
+func testCStyle() {
+  ExtraSelectors.cStyle(0, 1, 2) // expected-error{{'ExtraSelectors.Type' does not have a member named 'cStyle'}}
+}

@@ -87,6 +87,7 @@ __weak id globalWeakVar;
 
 @interface ExtraSelectors
 - (void)foo:(int)a bar:(int)b :(int)c;
++ (void)cStyle:(int)a, int b, int c;
 @end
 
 @interface DeprecatedFactoryMethod
