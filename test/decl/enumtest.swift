@@ -162,7 +162,7 @@ func test5(myorigin: CGPoint) {
   _ = x1.size.area()
   _ = (r : x1.size).r.area()
   
-  _ = x1.area //expected-error{{partial application of struct method is not allowed}}
+  _ = x1.area
 
   _ = x1.search(42)
   _ = x1.search(42).width

@@ -463,19 +463,6 @@ namespace {
         if (!result)
           return nullptr;;
 
-        // Track the partial application of an operator here. This is the
-        // only case where a non-member reference can find a member.
-        auto fn = cast<FuncDecl>(decl);
-        InvalidPartialApplications.insert({
-          result,
-          {
-            fn->getNaturalArgumentCount() - 1,
-            baseTy->getRValueInstanceType()->isAnyExistentialType()
-              ? MemberPartialApplication::Protocol
-              : MemberPartialApplication::Archetype
-          }
-        });
-
         return result;
       }
 
@@ -2581,33 +2568,38 @@ namespace {
                                                 isDynamic,
                                                 reason);
         
-        // If this is an application of a value type method or enum constructor,
+        // If this is an application of a mutating method,
         // arrange for us to check that it gets fully applied.
-        EnumElementDecl *eed = nullptr;
         FuncDecl *fn = nullptr;
         Optional<unsigned> kind;
         if (auto apply = dyn_cast<ApplyExpr>(member)) {
-          auto selfTy = apply->getArg()->getType()->getRValueType();
+          auto selfInoutTy = apply->getArg()->getType()->getAs<InOutType>();
+          if (!selfInoutTy)
+            goto not_mutating_member;
+          auto selfTy = selfInoutTy->getObjectType();
           auto fnDeclRef = dyn_cast<DeclRefExpr>(apply->getFn());
           if (!fnDeclRef)
-            goto not_value_type_member;
+            goto not_mutating_member;
           fn = dyn_cast<FuncDecl>(fnDeclRef->getDecl());
           if (selfTy->getStructOrBoundGenericStruct())
             kind = MemberPartialApplication::Struct;
           else if (selfTy->getEnumOrBoundGenericEnum())
             kind = MemberPartialApplication::Enum;
           else
-            goto not_value_type_member;
+            goto not_mutating_member;
         } else if (auto pmRef = dyn_cast<MemberRefExpr>(member)) {
-          auto baseTy = pmRef->getBase()->getType();
+          auto baseInoutTy = pmRef->getBase()->getType()->getAs<InOutType>();
+          if (!baseInoutTy)
+            goto not_mutating_member;
+          auto baseTy = baseInoutTy->getObjectType();
           if (baseTy->getRValueType()->isOpenedExistential()) {
             kind = MemberPartialApplication::Protocol;
           } else if (baseTy->hasReferenceSemantics()) {
-            goto not_value_type_member;
+            goto not_mutating_member;
           } else if (isa<FuncDecl>(pmRef->getMember().getDecl()))
             kind = MemberPartialApplication::Archetype;
           else
-            goto not_value_type_member;
+            goto not_mutating_member;
           fn = dyn_cast<FuncDecl>(pmRef->getMember().getDecl());
         }
         
@@ -2617,15 +2609,7 @@ namespace {
             // We need to apply all of the non-self argument clauses.
             {fn->getNaturalArgumentCount() - 1, kind.getValue() },
           });
-        else if (eed) {
-          InvalidPartialApplications.insert({
-            member,
-            // Enum elements need to have the constructor applied.
-            { 1, kind.getValue() },
-          });
-        }
-
-      not_value_type_member:
+      not_mutating_member:
         return member;
       }
 

@@ -46,6 +46,7 @@ func doGetLogicValue<T : BooleanType>(t: T) {
 struct Z {
   var i : Int
   func getI() -> Int { return i }
+  mutating func incI() {}
 
   func curried(x: Int)(y: Int) -> Int { return x + y }
 
@@ -89,19 +90,19 @@ enum W {
   func curried(x: Int)(y: Int) {}
 }
 
-// Partial applications of struct or enum methods are not allowed
 var z = Z(i: 0)
-var getI = z.getI // expected-error{{partial application of struct method is not allowed}}
+var getI = z.getI
+var incI = z.incI // expected-error{{partial application of 'mutating'}}
 var zi = z.getI()
-var zcurried1 = z.curried // expected-error{{partial application of struct method is not allowed}}
-var zcurried2 = z.curried(0) // expected-error{{partial application of struct method is not allowed}}
+var zcurried1 = z.curried
+var zcurried2 = z.curried(0)
 var zcurriedFull = z.curried(0)(y: 1)
 
 var w = W.Omega
-var foo = w.foo // expected-error{{partial application of enum method is not allowed}}
+var foo = w.foo
 var fooFull : () = w.foo(0)
-var wcurried1 = w.curried // expected-error{{partial application of enum method is not allowed}}
-var wcurried2 = w.curried(0) // expected-error{{partial application of enum method is not allowed}}
+var wcurried1 = w.curried
+var wcurried2 = w.curried(0)
 var wcurriedFull : () = w.curried(0)(y: 1)
 
 // Member of enum Type
@@ -122,6 +123,7 @@ func goo() {
 
 protocol P {
   func bar(x: Int)
+  mutating func mut(x: Int)
 }
 
 @objc
@@ -130,14 +132,18 @@ protocol P2 {
 }
 
 
-func generic<T: P>(t: T) {
-  _ = t.bar // expected-error{{partial application of generic method is not allowed}}
+func generic<T: P>(var t: T) {
+  _ = t.bar
+  _ = t.mut // expected-error{{partial application of 'mutating' generic method is not allowed}}
   var _ : () = t.bar(0)
 }
 
-func existential(p: P, p2 : P2) {
-  _ = p.bar // expected-error{{partial application of protocol method is not allowed}}
-  _ = p2.bar // expected-error{{partial application of protocol method is not allowed}}
+// FIXME: Warning is bogus rdar://problem/21091625
+func existential(var p: P, p2 : P2) { //expected-warning{{}}
+  p.mut(1)
+  _ = p.bar
+  _ = p.mut // expected-error{{partial application of 'mutating' protocol method is not allowed}}
+  _ = p2.bar
   var _ : () = p.bar(0)
 }
 
@@ -151,7 +157,7 @@ func genericClassP<T: ClassP>(t: T) {
 }
 
 func existentialClassP(p: ClassP) {
-  _ = p.bas  // expected-error{{partial application of protocol method is not allowed}}
+  _ = p.bas
   var _ : () = p.bas(0)
 }
 
@@ -184,7 +190,7 @@ protocol Numeric {
 func acceptBinaryFunc<T>(x: T, _ fn: (T, T) -> T) { }
 
 func testNumeric<T : Numeric>(x: T) {
-  acceptBinaryFunc(x, +) // expected-error{{partial application of generic method is not allowed}}
+  acceptBinaryFunc(x, +)
 }
 
 /* FIXME: We can't check this directly, but it can happen with

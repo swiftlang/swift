@@ -1551,7 +1551,7 @@ ERROR(ambiguous_operator_ref,tce_sema,none,
       "ambiguous use of operator %0", (Identifier))
 
 ERROR(partial_application_of_method_invalid,tce_sema,none,
-      "partial application of %select{struct method|enum method|"
+      "partial application of 'mutating' %select{struct method|enum method|"
       "generic method|protocol method}0 is not allowed",
       (unsigned))
 

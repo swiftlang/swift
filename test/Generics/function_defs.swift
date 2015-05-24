@@ -108,17 +108,17 @@ func testOverload<Ovl : Overload, OtherOvl : Overload>(ovl: Ovl, ovl2: Ovl,
   other.f1(a) // expected-error{{cannot invoke 'f1' with an argument list of type '(Ovl.A)'}}
   
   // Overloading based on context
-  var f3i : (Int) -> Int = ovl.f3 // expected-error{{partial application of generic method is not allowed}}
-  var f3f : (Float) -> Float = ovl.f3 // expected-error{{partial application of generic method is not allowed}}
-  var f3ovl_1 : (Ovl) -> Ovl = ovl.f3 // expected-error{{partial application of generic method is not allowed}}
-  var f3ovl_2 : (Ovl) -> Ovl = ovl2.f3 // expected-error{{partial application of generic method is not allowed}}
+  var f3i : (Int) -> Int = ovl.f3
+  var f3f : (Float) -> Float = ovl.f3
+  var f3ovl_1 : (Ovl) -> Ovl = ovl.f3
+  var f3ovl_2 : (Ovl) -> Ovl = ovl2.f3
   var f3ovl_3 : (Ovl) -> Ovl = other.f3 // expected-error{{could not find an overload for 'f3' that accepts the supplied arguments}}
 
-  var f3i_unbound : (Ovl) -> (Int) -> Int = Ovl.f3       // expected-error{{partial application of generic method is not allowed}}
-  var f3f_unbound : (Ovl) -> (Float) -> Float = Ovl.f3   // expected-error{{partial application of generic method is not allowed}}
-  var f3f_unbound2 : (OtherOvl) -> (Float) -> Float = OtherOvl.f3 // expected-error{{partial application of generic method is not allowed}}
-  var f3ovl_unbound_1 : (Ovl) -> (Ovl) -> Ovl = Ovl.f3  // expected-error{{partial application of generic method is not allowed}}
-  var f3ovl_unbound_2 : (OtherOvl) -> (OtherOvl) -> OtherOvl = OtherOvl.f3 // expected-error{{partial application of generic method is not allowed}}
+  var f3i_unbound : (Ovl) -> (Int) -> Int = Ovl.f3
+  var f3f_unbound : (Ovl) -> (Float) -> Float = Ovl.f3
+  var f3f_unbound2 : (OtherOvl) -> (Float) -> Float = OtherOvl.f3
+  var f3ovl_unbound_1 : (Ovl) -> (Ovl) -> Ovl = Ovl.f3
+  var f3ovl_unbound_2 : (OtherOvl) -> (OtherOvl) -> OtherOvl = OtherOvl.f3
 }
 
 //===----------------------------------------------------------------------===//

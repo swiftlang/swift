@@ -157,9 +157,9 @@ func testMemberDeduction(sti: SomeType, ii: Int, fi: Float) {
   f = st.identity2(f) // expected-error{{ambiguous use of 'identity2'}}
   i = st.returnAs()
   f = st.returnAs()
-  acceptFnFloatFloat(st.identity) // expected-error{{partial application of struct method is not allowed}}
+  acceptFnFloatFloat(st.identity)
   acceptFnFloatFloat(st.identity2) // expected-error{{ambiguous use of 'identity2'}}
-  acceptFnDoubleDouble(st.identity2) // expected-error{{partial application of struct method is not allowed}}
+  acceptFnDoubleDouble(st.identity2)
 }
 
 struct StaticFuncs {
