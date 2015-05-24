@@ -26,6 +26,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Fallthrough.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Parse/Lexer.h"
 #include "clang/AST/ASTContext.h"
@@ -2760,6 +2761,43 @@ namespace {
       return result;
     }
 
+    /// Parse a stringified Swift DeclName, e.g. "init(frame:)".
+    DeclName parseDeclName(StringRef Name) {
+      if (Name.back() != ')')
+        return {};
+
+      StringRef BaseName, Parameters;
+      std::tie(BaseName, Parameters) = Name.split('(');
+      if (!Lexer::isIdentifier(BaseName) || BaseName == "_")
+        return {};
+
+      if (Parameters.empty())
+        return {};
+      Parameters = Parameters.drop_back(); // ')'
+
+      Identifier BaseID = Impl.SwiftContext.getIdentifier(BaseName);
+      if (Parameters.empty())
+        return DeclName(Impl.SwiftContext, BaseID, {});
+
+      if (Parameters.back() != ':')
+        return {};
+
+      SmallVector<Identifier, 4> ParamIDs;
+      do {
+        StringRef NextParam;
+        std::tie(NextParam, Parameters) = Parameters.split(':');
+
+        if (!Lexer::isIdentifier(NextParam))
+          return {};
+        Identifier NextParamID;
+        if (NextParam != "_")
+          NextParamID = Impl.SwiftContext.getIdentifier(NextParam);
+        ParamIDs.push_back(NextParamID);
+      } while (!Parameters.empty());
+
+      return DeclName(Impl.SwiftContext, BaseID, ParamIDs);
+    }
+
     /// If the given method is a factory method, import it as a constructor
     Optional<ConstructorDecl *>
     importFactoryMethodAsConstructor(Decl *member,
@@ -2775,25 +2813,30 @@ namespace {
       if (!objcClass)
         return None;
 
+      DeclName initName;
+
       // Check whether we're allowed to try.
       switch (Impl.getFactoryAsInit(objcClass, decl)) {
+      case FactoryAsInitKind::AsInitializer:
+        if (auto *customNameAttr = decl->getAttr<clang::SwiftNameAttr>()) {
+          initName = parseDeclName(customNameAttr->getName());
+          break;
+        }
+        // FIXME: We probably should stop using this codepath. It won't ever
+        // succeed.
+        SWIFT_FALLTHROUGH;
+
       case FactoryAsInitKind::Infer:
+        // Check whether the name fits the pattern.
+        initName =
+            Impl.mapFactorySelectorToInitializerName(selector,
+                                                     objcClass->getName());
         break;
 
-      case FactoryAsInitKind::AsInitializer:
-        // FIXME: Should allow this to provide the name of the
-        // initializer, since we'll almost surely need remapping for
-        // this to work.
-        break;
-          
       case FactoryAsInitKind::AsClassMethod:
         return None;
       }
 
-      // Check whether the name fits the pattern.
-      DeclName initName
-        = Impl.mapFactorySelectorToInitializerName(selector,
-                                                   objcClass->getName());
       if (!initName)
         return None;
 
@@ -2880,8 +2923,12 @@ namespace {
       if (methodAlreadyImported(selector, isInstance, dc))
         return nullptr;
 
-      DeclName name = Impl.mapSelectorToDeclName(selector,
-                                                 /*isInitializer=*/false);
+      DeclName name;
+      if (auto *customNameAttr = decl->getAttr<clang::SwiftNameAttr>())
+        if (!customNameAttr->getName().startswith("init("))
+          name = parseDeclName(customNameAttr->getName());
+      if (!name)
+        name = Impl.mapSelectorToDeclName(selector, /*isInitializer=*/false);
       if (!name)
         return nullptr;
 
@@ -4551,22 +4598,13 @@ namespace {
             assert(ctor->getInitKind() ==
                      CtorInitializerKind::ConvenienceFactory);
 
-            // Re-import the declaration name so that we can re-apply
-            // the transformations done by importMethodType.
-            ObjCSelector selector = ctor->getObjCSelector();
-            auto objcClass = objcMethod->getClassInterface();
-            assert(objcClass && "imported factory initializer from protocol?");
-            DeclName name = Impl.mapFactorySelectorToInitializerName(selector,
-                                                         objcClass->getName());
-            assert(name && "reimporting factory selector failed?");
-
             bool redundant;
             if (auto newCtor = importConstructor(objcMethod, classDecl,
                                                  /*implicit=*/true,
                                                  ctor->getInitKind(),
                                                  /*required=*/false, 
-                                                 selector,
-                                                 name,
+                                                 ctor->getObjCSelector(),
+                                                 ctor->getFullName(),
                                                  objcMethod->parameters(),
                                                  objcMethod->isVariadic(),
                                                  redundant)) {

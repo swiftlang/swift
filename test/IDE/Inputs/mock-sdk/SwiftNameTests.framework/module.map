@@ -1,0 +1,5 @@
+framework module SwiftNameTests {
+  umbrella header "SwiftNameTests.h"
+  export *
+}
+

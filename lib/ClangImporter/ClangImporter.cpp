@@ -1878,6 +1878,13 @@ FactoryAsInitKind ClangImporter::Implementation::getFactoryAsInit(
   if (auto info = getKnownObjCMethod(method, classDecl))
     return info->getFactoryAsInitKind();
 
+  if (auto *customNameAttr = method->getAttr<clang::SwiftNameAttr>()) {
+    if (customNameAttr->getName().startswith("init("))
+      return FactoryAsInitKind::AsInitializer;
+    else
+      return FactoryAsInitKind::AsClassMethod;
+  }
+
   return FactoryAsInitKind::Infer;
 }
 

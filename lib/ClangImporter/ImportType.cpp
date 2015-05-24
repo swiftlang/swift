@@ -1474,7 +1474,9 @@ considerErrorImport(ClangImporter::Implementation &importer,
   // list (e.g. if the method has C-style parameter declarations),
   // don't try to apply error conventions.
   auto paramNames = methodName.getArgumentNames();
-  if (paramNames.size() < params.size()) return None;
+  bool expectsToRemoveError = paramNames.size() + 1 == params.size();
+  if (!expectsToRemoveError && paramNames.size() != params.size())
+    return None;
 
   for (unsigned index = params.size(); index-- != 0; ) {
     // Allow an arbitrary number of trailing blocks.
@@ -1492,13 +1494,11 @@ considerErrorImport(ClangImporter::Implementation &importer,
 
     // Consider adjusting the imported declaration name to remove the
     // parameter.
-    bool adjustName = true;
-    auto replaceWithVoid = ForeignErrorConvention::IsNotReplaced;
+    bool adjustName = !expectsToRemoveError;
 
     // Never do this if it's the first parameter of a constructor.
     if (methodKind == SpecialMethodKind::Constructor && index == 0) {
       adjustName = false;
-      replaceWithVoid = ForeignErrorConvention::IsReplaced;
     }
 
     // If the error parameter is the first parameter, try removing the
@@ -1511,7 +1511,6 @@ considerErrorImport(ClangImporter::Implementation &importer,
         baseNameStr = baseNameStr.drop_back(sizeof(ErrorSuffix) - 1);
         if (baseNameStr.empty() || importer.isSwiftReservedName(baseNameStr)) {
           adjustName = false;
-          replaceWithVoid = ForeignErrorConvention::IsReplaced;
         } else {
           newBaseName = importer.SwiftContext.getIdentifier(baseNameStr);
           stripErrorSuffix = true;
@@ -1540,10 +1539,12 @@ considerErrorImport(ClangImporter::Implementation &importer,
       // Otherwise, give up on adjusting the name.
       } else {
         adjustName = false;
-        replaceWithVoid = ForeignErrorConvention::IsReplaced;
       }
     }
-    
+
+    auto replaceWithVoid = ForeignErrorConvention::IsNotReplaced;
+    if (!adjustName && !expectsToRemoveError)
+      replaceWithVoid = ForeignErrorConvention::IsReplaced;
     ErrorImportInfo errorInfo = {
       *errorKind, isErrorOwned, replaceWithVoid, index, CanType(),
       importedResultType->getCanonicalType()
