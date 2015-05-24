@@ -1,4 +1,4 @@
-//===--- EnumPayload.h - Payload management for 'enum' Types ------* C++ *-===//
+//===--- EnumPayload.cpp - Payload management for 'enum' Types -----------===//
 //
 // This source file is part of the Swift.org open source project
 //

@@ -13,8 +13,6 @@
 #ifndef SWIFT_IRGEN_ENUMPAYLOAD_H
 #define SWIFT_IRGEN_ENUMPAYLOAD_H
 
-#include <utility>
-
 #include "IRGenModule.h"
 #include "Explosion.h"
 #include "TypeInfo.h"
@@ -22,6 +20,7 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/ADT/Fixnum.h"
 #include "llvm/ADT/PointerUnion.h"
+#include <utility>
 
 namespace swift {
 namespace irgen {
