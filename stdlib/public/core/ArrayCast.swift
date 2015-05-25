@@ -20,29 +20,30 @@
 // FIXME: These need to be implemented even for non-objc:
 // rdar://problem/18881196
 
-enum _ValueOrReference {
-case Reference, Value
-  init<T>(_: T.Type) {
+internal enum _ValueOrReference {
+  case Reference, Value
+
+  internal init<T>(_: T.Type) {
     self = _isClassOrObjCExistential(T.self) ? .Reference : .Value
   }
 }
 
-enum _BridgeStyle {
-case Verbatim, Explicit
-  init<T>(_: T.Type) {
+internal enum _BridgeStyle {
+  case Verbatim, Explicit
+
+  internal init<T>(_: T.Type) {
    self = _isBridgedVerbatimToObjectiveC(T.self) ? .Verbatim : .Explicit
   }
 }
 
-
-//===--- Forced casts: [T] as [U] -----------------------------------------===//
+//===--- Forced casts: [T] as! [U] ----------------------------------------===//
 
 /// Implements `source as [TargetElement]`.
 ///
 /// - Requires: At least one of `SourceElement` and `TargetElement` is a
-/// class type or ObjC existential.  May trap for other "valid" inputs
-/// when `TargetElement` is not bridged verbatim, if an element can't
-/// be converted.
+///   class type or ObjC existential.  May trap for other "valid" inputs
+///   when `TargetElement` is not bridged verbatim, if an element can't
+///   be converted.
 public func _arrayForceCast<SourceElement, TargetElement>(
   source: Array<SourceElement>
 ) -> Array<TargetElement> {

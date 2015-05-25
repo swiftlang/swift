@@ -300,24 +300,24 @@ public struct ${Self}<T>
   }
 
   @_semantics("array.get_count")
-  func _getCount() -> Int {
+  internal func _getCount() -> Int {
     return _buffer.count
   }
   @_semantics("array.get_capacity")
-  func _getCapacity() -> Int {
+  internal func _getCapacity() -> Int {
     return _buffer.capacity
   }
 
   /// - Requires: The array has a native buffer.
   @_semantics("array.owner")
-  func _getOwner() -> Builtin.NativeObject {
+  internal func _getOwner() -> Builtin.NativeObject {
     return Builtin.castToNativeObject(_buffer.nativeOwner)
   }
 
   // Don't inline copyBuffer - this would inline the copy loop into the current
   // path preventing retains/releases to be matched accross that region.
   @inline(never)
-  func _copyBuffer(inout buffer: _Buffer) {
+  internal func _copyBuffer(inout buffer: _Buffer) {
     let newBuffer = _ContiguousArrayBuffer<T>(
       count: buffer.count, minimumCapacity: buffer.count)
     buffer._uninitializedCopy(
@@ -326,14 +326,14 @@ public struct ${Self}<T>
   }
 
   @_semantics("array.make_mutable")
-  mutating func _makeMutableAndUnique() {
+  internal mutating func _makeMutableAndUnique() {
     if _slowPath(!_buffer.isMutableAndUniquelyReferenced()) {
       _copyBuffer(&_buffer)
     }
   }
 
   @_semantics("array.make_mutable")
-  mutating func _makeMutableAndUniqueOrPinned() {
+  internal mutating func _makeMutableAndUniqueOrPinned() {
     if _slowPath(!_buffer.isMutableAndUniquelyReferencedOrPinned()) {
       _copyBuffer(&_buffer)
     }
@@ -366,7 +366,7 @@ public struct ${Self}<T>
 
   /// Check that the given `index` is valid, i.e. `0 ≤ index ≤ count`.
   @_semantics("array.check_index")
-  func _checkIndex(index: Int) {
+  internal func _checkIndex(index: Int) {
     _precondition(index <= count, "${Self} index out of range")
     _precondition(index >= 0, "Negative ${Self} index is out of range")
   }
@@ -381,7 +381,7 @@ public struct ${Self}<T>
   }
 
   @_semantics("array.get_element_address")
-  func _getElementAddress(index: Int) -> UnsafeMutablePointer<Element> {
+  internal func _getElementAddress(index: Int) -> UnsafeMutablePointer<Element> {
     return _buffer._getBaseAddress() + index
   }
 
@@ -399,8 +399,7 @@ public struct ${Self}<T>
 
   /// Initialization from an existing buffer does not have "array.init"
   /// semantics because the caller may retain an alias to buffer.
-  public
-  init(_ buffer: _Buffer) {
+  public init(_ buffer: _Buffer) {
     self._buffer = buffer
   }
 
@@ -512,7 +511,7 @@ extension ${Self} : _ArrayType {
   }
 
   /// An object that guarantees the lifetime of this array's elements.
-  public
+  public // @testable
   var _owner: AnyObject? {
     return _buffer.owner
   }
@@ -524,7 +523,7 @@ extension ${Self} : _ArrayType {
   }
 
 %if Self != 'Array': # // Array does not necessarily have contiguous storage
-  var _baseAddress: UnsafeMutablePointer<Element> {
+  internal var _baseAddress: UnsafeMutablePointer<Element> {
     return _buffer.baseAddress
   }
 %end
@@ -570,7 +569,7 @@ extension ${Self} : _ArrayType {
   }
 
   @inline(never)
-  func _arrayAppendSlowPath<_Buffer: _ArrayBufferType>(
+  internal func _arrayAppendSlowPath<_Buffer: _ArrayBufferType>(
     inout buffer: _Buffer, initializePointer: _InitializePointer<_Buffer.Element>
   ) {
     let oldCount = buffer.count
@@ -686,7 +685,7 @@ extension ${Self} : _ArrayType {
   }
 }
 
-func _${Self}Extend<
+internal func _${Self}Extend<
     T, S : SequenceType
     where S.Generator.Element == T
 >(inout a: ${Self}<T>, sequence: S) {
@@ -701,7 +700,7 @@ extension ${Self} : Reflectable {
 }
 
 extension ${Self} : CustomStringConvertible, CustomDebugStringConvertible {
-  func _makeDescription(isDebug isDebug: Bool) -> String {
+  internal func _makeDescription(isDebug isDebug: Bool) -> String {
     var result = "["
     var first = true
     for item in self {
@@ -733,7 +732,7 @@ extension ${Self} : CustomStringConvertible, CustomDebugStringConvertible {
 
 extension ${Self} {
   @transparent
-  func _cPointerArgs() -> (AnyObject?, Builtin.RawPointer) {
+  internal func _cPointerArgs() -> (AnyObject?, Builtin.RawPointer) {
     let p = _baseAddressIfContiguous
     if _fastPath(p != nil || isEmpty) {
       return (_owner, p._rawValue)
@@ -802,7 +801,7 @@ extension ${Self} {
 }
 %end
 
-struct _InitializeMemoryFromCollection<
+internal struct _InitializeMemoryFromCollection<
   C: CollectionType
 > : _PointerFunctionType {
   func call(rawMemory: UnsafeMutablePointer<C.Generator.Element>, count: Int) {
@@ -822,8 +821,8 @@ struct _InitializeMemoryFromCollection<
 }
 
 @inline(never)
-func _arrayOutOfPlaceReplace<
-  B: _ArrayBufferType, C: CollectionType
+internal func _arrayOutOfPlaceReplace<
+  B : _ArrayBufferType, C : CollectionType
     where C.Generator.Element == B.Element, B.Index == Int
 >(
   inout source: B, _ subRange: Range<Int>, _ newValues: C, _ insertCount: Int
@@ -852,8 +851,8 @@ internal func _expectEnd<C : CollectionType>(
     )
 }
 
-func _arrayNonSliceInPlaceReplace<
-  B: _ArrayBufferType, C: CollectionType
+internal func _arrayNonSliceInPlaceReplace<
+  B : _ArrayBufferType, C : CollectionType
   where C.Generator.Element == B.Element, B.Index == Int
 >(inout target: B, _ subRange: Range<Int>, _ insertCount: Int, _ newValues: C) {
   let oldCount = target.count
@@ -923,7 +922,7 @@ func _arrayNonSliceInPlaceReplace<
   }
 }
 
-func _growArrayCapacity(capacity: Int) -> Int {
+internal func _growArrayCapacity(capacity: Int) -> Int {
   return capacity * 2
 }
 
@@ -963,7 +962,7 @@ extension ${Self} {
   ///
   /// - Complexity: O(`count + newElements.count`).
   public mutating func splice<
-    S: CollectionType where S.Generator.Element == T
+    S : CollectionType where S.Generator.Element == T
   >(newElements: S, atIndex i: Int) {
     Swift.splice(&self, newElements, atIndex: i)
   }
@@ -977,10 +976,9 @@ extension ${Self} {
 }
 
 /// Extend `lhs` with the elements of `rhs`.
-public
-func += <
-  T, S: SequenceType
-where S.Generator.Element == T
+public func += <
+  T, S : SequenceType
+  where S.Generator.Element == T
 >(inout lhs: ${Self}<T>, rhs: S) {
   let oldCount = lhs.count
   let capacity = lhs.capacity
@@ -994,10 +992,9 @@ where S.Generator.Element == T
 }
 
 /// Extend `lhs` with the elements of `rhs`.
-public
-func += <
-  T, C: CollectionType
-where C.Generator.Element == T
+public func += <
+  T, C : CollectionType
+  where C.Generator.Element == T
 >(inout lhs: ${Self}<T>, rhs: C) {
   let rhsCount = numericCast(rhs.count) as Int
 
@@ -1020,7 +1017,7 @@ where C.Generator.Element == T
 //===--- generic helpers --------------------------------------------------===//
 
 @inline(never)
-func _forceCreateUniqueMutableBuffer<_Buffer: _ArrayBufferType>(
+internal func _forceCreateUniqueMutableBuffer<_Buffer : _ArrayBufferType>(
   inout source: _Buffer, _ newCount: Int, _ requiredCapacity: Int
 ) -> _ContiguousArrayBuffer<_Buffer.Element> {
   _sanityCheck(newCount >= 0)
@@ -1035,7 +1032,7 @@ func _forceCreateUniqueMutableBuffer<_Buffer: _ArrayBufferType>(
     count: newCount, minimumCapacity: minimumCapacity)
 }
 
-protocol _PointerFunctionType {
+internal protocol _PointerFunctionType {
   typealias Element
   func call(UnsafeMutablePointer<Element>, count: Int)
 }
@@ -1047,9 +1044,9 @@ protocol _PointerFunctionType {
 ///
 /// As an optimization, may move elements out of source rather than
 /// copying when it isUniquelyReferenced.
-func _arrayOutOfPlaceUpdate<
-  _Buffer: _ArrayBufferType, Initializer: _PointerFunctionType
-    where Initializer.Element == _Buffer.Element
+internal func _arrayOutOfPlaceUpdate<
+  _Buffer : _ArrayBufferType, Initializer : _PointerFunctionType
+  where Initializer.Element == _Buffer.Element
 >(
   inout source: _Buffer,
   inout _ dest: _ContiguousArrayBuffer<_Buffer.Element>?,
@@ -1108,28 +1105,28 @@ func _arrayOutOfPlaceUpdate<
   source = _Buffer(dest!)
 }
 
-struct _InitializePointer<T> : _PointerFunctionType {
-  func call(rawMemory: UnsafeMutablePointer<T>, count: Int) {
+internal struct _InitializePointer<T> : _PointerFunctionType {
+  internal func call(rawMemory: UnsafeMutablePointer<T>, count: Int) {
     _sanityCheck(count == 1)
     // FIXME: it would be better if we could find a way to move, here
     rawMemory.initialize(newValue)
   }
 
   @transparent
-  init(_ newValue: T) {
+  internal init(_ newValue: T) {
     self.newValue = newValue
   }
 
-  var newValue: T
+  internal var newValue: T
 }
 
-struct _IgnorePointer<T> : _PointerFunctionType {
-  func call(_:UnsafeMutablePointer<T>, count: Int) {
+internal struct _IgnorePointer<T> : _PointerFunctionType {
+  internal func call(_: UnsafeMutablePointer<T>, count: Int) {
     _sanityCheck(count == 0)
   }
 }
 
-func _arrayReserve<_Buffer: _ArrayBufferType>(
+internal func _arrayReserve<_Buffer : _ArrayBufferType>(
   inout buffer: _Buffer, _ minimumCapacity: Int
 ) {
   let count = buffer.count
@@ -1145,7 +1142,8 @@ func _arrayReserve<_Buffer: _ArrayBufferType>(
   _arrayOutOfPlaceUpdate(&buffer, &newBuffer, count, 0, _IgnorePointer())
 }
 
-public func _extractOrCopyToNativeArrayBuffer<
+public // SPI(Foundation)
+func _extractOrCopyToNativeArrayBuffer<
   Buffer : _ArrayBufferType
   where
   Buffer.Generator.Element == Buffer.Element
@@ -1159,7 +1157,7 @@ public func _extractOrCopyToNativeArrayBuffer<
 }
 
 /// Append items from `newItems` to `buffer`.
-func _arrayAppendSequence<
+internal func _arrayAppendSequence<
   Buffer : _ArrayBufferType,
   S : SequenceType where S.Generator.Element == Buffer.Element
 >(
