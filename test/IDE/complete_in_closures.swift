@@ -36,6 +36,10 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_TRAILING_CLOSURE_13 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_TRAILING_CLOSURE_14 | FileCheck %s -check-prefix=FOO_OBJECT_DOT
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_TRAILING_CLOSURE_15 | FileCheck %s -check-prefix=FOO_OBJECT_DOT
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_TRAILING_CLOSURE_16 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_TRAILING_CLOSURE_17 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_TRAILING_CLOSURE_18 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=IN_TRAILING_CLOSURE_19 | FileCheck %s -check-prefix=WITH_GLOBAL_DECLS
 
 // ERROR_COMMON: found code completion token
 // ERROR_COMMON-NOT: Begin completions
@@ -225,4 +229,33 @@ acceptsListAndTrailingClosureTVoid(
   item in
   item.instanceFunc0()
   item.#^IN_TRAILING_CLOSURE_15^#
+}
+
+func getInt() -> Int? { return 0 }
+func testAcceptsTrailingClosureInt1() {
+  acceptsTrailingClosureFooVoid { #^IN_TRAILING_CLOSURE_16^# in
+    if let myvar = getInt() {
+    }
+  }
+}
+func testAcceptsTrailingClosureInt2() {
+  acceptsTrailingClosureFooVoid {
+    #^IN_TRAILING_CLOSURE_17^#
+    if let myvar = getInt() {
+    }
+  }
+}
+func testAcceptsTrailingClosureInt3() {
+  acceptsTrailingClosureFooVoid {
+    if let myvar = getInt() {
+    }
+    #^IN_TRAILING_CLOSURE_18^#
+  }
+}
+func testAcceptsTrailingClosureInt4() {
+  acceptsTrailingClosureFooVoid {
+    if let myvar = getInt() {
+      #^IN_TRAILING_CLOSURE_19^#
+    }
+  }
 }

@@ -5955,7 +5955,9 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         // FIXME: This case is hit when code completion occurs in a function
         // parameter list. Previous parameters are definitely in scope, but
         // we don't really know how to type-check them.
+        // We can also hit this when code-completing in a closure body.
         assert(isa<AbstractFunctionDecl>(D->getDeclContext()) ||
+               isa<AbstractClosureExpr>(D->getDeclContext()) ||
                isa<TopLevelCodeDecl>(D->getDeclContext()));
         D->setType(ErrorType::get(Context));
       }
