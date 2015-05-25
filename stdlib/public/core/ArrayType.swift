@@ -19,12 +19,12 @@ public protocol __ArrayType : CollectionType {
   func _doCopyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Generator.Element>
 }
 
-public func ~> <
-  A : __ArrayType
->(
-  source: A, _: (_CopyToNativeArrayBuffer,())
-) -> _ContiguousArrayBuffer<A.Generator.Element> {
-  return source._doCopyToNativeArrayBuffer()
+extension __ArrayType {
+  final
+  public func _copyToNativeArrayBuffer(
+  ) -> _ContiguousArrayBuffer<Generator.Element> {
+    return _doCopyToNativeArrayBuffer()
+  }
 }
 
 public // @testable

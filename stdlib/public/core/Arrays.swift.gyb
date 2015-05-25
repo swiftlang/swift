@@ -457,7 +457,7 @@ extension ${Self} : _ArrayType {
   public init<
     S: SequenceType where S.Generator.Element == _Buffer.Element
   >(_ s: S) {
-    self = ${Self}(_Buffer(s~>_copyToNativeArrayBuffer()))
+    self = ${Self}(_Buffer(s._copyToNativeArrayBuffer()))
   }
 
   /// Construct a ${Self} of `count` elements, each initialized to

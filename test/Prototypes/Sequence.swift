@@ -156,7 +156,7 @@ public protocol Q_CollectionType : Q_CollectionDefaultsType {
 
 public struct MyArray<Element> : Q_CollectionType {
   public func copyToContiguousArray() -> ContiguousArray<Element> {
-    return ContiguousArray(self._data~>_copyToNativeArrayBuffer())
+    return ContiguousArray(self._data._copyToNativeArrayBuffer())
   }
 
   public var startIndex: Int {

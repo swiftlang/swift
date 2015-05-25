@@ -14,7 +14,6 @@
 
 //===--- Definitions needed only while experimental -----------------------===//
 extension _InitializeTo {  }
-extension _CopyToNativeArrayBuffer {  }
 extension _ContiguousArrayBuffer {
 }
 
@@ -120,36 +119,36 @@ public func ~> <Element>(
   ptr: (_InitializeTo, UnsafeMutablePointer<Element>)
 ) 
 
-public func ~> <Element>(
-  source: AnySequence<Element>, _: (_CopyToNativeArrayBuffer,())
-) -> _ContiguousArrayBuffer<Element> 
+extension AnySequence {
+  public func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element> 
+}
 
 public func ~> <Element>(
   source: AnyForwardCollection<Element>,
   ptr: (_InitializeTo, UnsafeMutablePointer<Element>)
 ) 
 
-public func ~> <Element>(
-  source: AnyForwardCollection<Element>, _: (_CopyToNativeArrayBuffer,())
-) -> _ContiguousArrayBuffer<Element> 
+extension AnyForwardCollection {
+  public func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element> 
+}
 
 public func ~> <Element>(
   source: AnyBidirectionalCollection<Element>,
   ptr: (_InitializeTo, UnsafeMutablePointer<Element>)
 ) 
 
-public func ~> <Element>(
-  source: AnyBidirectionalCollection<Element>, _: (_CopyToNativeArrayBuffer,())
-) -> _ContiguousArrayBuffer<Element> 
+extension AnyBidirectionalCollection {
+  public func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element> 
+}
 
 public func ~> <Element>(
   source: AnyRandomAccessCollection<Element>,
   ptr: (_InitializeTo, UnsafeMutablePointer<Element>)
 ) 
 
-public func ~> <Element>(
-  source: AnyRandomAccessCollection<Element>, _: (_CopyToNativeArrayBuffer,())
-) -> _ContiguousArrayBuffer<Element> 
+extension AnyRandomAccessCollection {
+  public func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element> 
+}
 
 //===--- ForwardIndex -----------------------------------------------------===//
 //===----------------------------------------------------------------------===//

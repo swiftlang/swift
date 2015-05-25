@@ -2104,7 +2104,7 @@ SequenceTypeAlgorithms.test("_copyToNativeArrayBuffer/OverestimatedCount")
     [ 1, 2, 3 ].map { OpaqueValue($0) },
     underestimatedCount: .Value(4))
   expectCrashLater()
-  let array = s~>_copyToNativeArrayBuffer()
+  let array = s._copyToNativeArrayBuffer()
   _blackHole(array)
 }
 

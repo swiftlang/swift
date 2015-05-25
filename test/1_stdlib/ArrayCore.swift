@@ -142,14 +142,14 @@ print("testing...")
 func test() {
   //===--- Sequences can be converted -------------------------------------===//
 
-  let n0 = ((Tracked(10)..<Tracked(27)).generate())~>_copyToNativeArrayBuffer()
+  let n0 = ((Tracked(10)..<Tracked(27)).generate())._copyToNativeArrayBuffer()
   // CHECK-NEXT: <10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26>
   printSequence(n0)
 
   //===--- Collections get measured ---------------------------------------===//
 
   // CHECK-NEXT: using collection API
-  let n1 = MrMcRange(3..<23)~>_copyToNativeArrayBuffer()
+  let n1 = MrMcRange(3..<23)._copyToNativeArrayBuffer()
   // CHECK: <3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22>
   printSequence(n1)
 
@@ -157,8 +157,7 @@ func test() {
 
   let a0 = MrMcArray<Tracked>(n1)
 
-  let cp = _copyToNativeArrayBuffer()
-  let n2 = a0~>cp
+  let n2 = a0._copyToNativeArrayBuffer()
 
   // CHECK-NEXT: true
   print(n1.identity == n2.identity)

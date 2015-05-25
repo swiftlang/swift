@@ -547,37 +547,34 @@ extension _ContiguousArrayBuffer : CollectionType {
   }
 }
 
-public func ~> <
-  S : SequenceType
->(
-  source: S, _: (_CopyToNativeArrayBuffer,())
-) -> _ContiguousArrayBuffer<S.Generator.Element>
-{
-  let initialCapacity = source.underestimateCount()
-  var result = _ContiguousArrayBuffer<S.Generator.Element>(
-    count: initialCapacity, minimumCapacity: initialCapacity)
+extension SequenceType {
+  public final func _copyToNativeArrayBuffer()
+    -> _ContiguousArrayBuffer<Generator.Element>
+  {
+    let initialCapacity = self.underestimateCount()
+    var result = _ContiguousArrayBuffer<Generator.Element>(
+      count: initialCapacity, minimumCapacity: initialCapacity)
 
-  var generator = source.generate()
+    var generator = self.generate()
 
-  var p = result.baseAddress
-  for _ in 0..<initialCapacity {
-    (p++).initialize(generator.next()!)
+    var p = result.baseAddress
+    for _ in 0..<initialCapacity {
+      (p++).initialize(generator.next()!)
+    }
+
+    while let element = generator.next() {
+      result += CollectionOfOne(element)
+    }
+
+    return result
   }
-
-  while let element = generator.next() {
-    result += CollectionOfOne(element)
-  }
-
-  return result
 }
 
-public func ~> <
-  C : CollectionType
->(
-  source: C, _:(_CopyToNativeArrayBuffer, ())
-) -> _ContiguousArrayBuffer<C.Generator.Element>
-{
-  return _copyCollectionToNativeArrayBuffer(source)
+extension CollectionType {
+  public final func _copyToNativeArrayBuffer(
+  ) -> _ContiguousArrayBuffer<Generator.Element> {
+    return _copyCollectionToNativeArrayBuffer(self)
+  }
 }
 
 func _copyCollectionToNativeArrayBuffer<

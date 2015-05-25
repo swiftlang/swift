@@ -158,7 +158,7 @@ internal class _${Kind}Box<S : ${Kind}Type>
     _base~>(_InitializeTo(), UnsafeMutablePointer(ptr))
   }
   override func _copyToNativeArrayBuffer() -> _ContiguousArrayStorageBase {
-    return (_base~>(_CopyToNativeArrayBuffer(), ()))._storage
+    return _base._copyToNativeArrayBuffer()._storage
   }
 %   if Kind == 'Collection':
   override func _count() -> IntMax {
@@ -248,10 +248,10 @@ public func ~> <Element>(
   source._box._initializeTo(UnsafeMutablePointer(ptr.1))
 }
 
-public func ~> <Element>(
-  source: Any${Kind}<Element>, _: (_CopyToNativeArrayBuffer,())
-) -> _ContiguousArrayBuffer<Element> {
-  return _ContiguousArrayBuffer(source._box._copyToNativeArrayBuffer())
+extension Any${Kind} {
+  public func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element> {
+    return _ContiguousArrayBuffer(self._box._copyToNativeArrayBuffer())
+  }
 }
 
 % end

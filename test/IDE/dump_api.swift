@@ -15,7 +15,6 @@
 //===--- Definitions needed only while experimental -----------------------===//
 internal typealias _ContiguousArrayStorageBase = AnyObject
 extension _InitializeTo { init() {} }
-extension _CopyToNativeArrayBuffer { init() {} }
 extension _ContiguousArrayBuffer {
   var _storage: _ContiguousArrayStorageBase { return owner }
   init(_ owner: _ContiguousArrayStorageBase) {
@@ -163,7 +162,7 @@ internal class _SequenceBox<S: SequenceType>
     _base~>(_InitializeTo(), UnsafeMutablePointer(ptr))
   }
   override func _copyToNativeArrayBuffer() -> _ContiguousArrayStorageBase {
-    return (_base~>(_CopyToNativeArrayBuffer(), ()))._storage
+    return _base._copyToNativeArrayBuffer()._storage
   }
   init(_ base: S) {
     self._base = base
@@ -185,7 +184,7 @@ internal class _CollectionBox<S: CollectionType>
     _base~>(_InitializeTo(), UnsafeMutablePointer(ptr))
   }
   override func _copyToNativeArrayBuffer() -> _ContiguousArrayStorageBase {
-    return (_base~>(_CopyToNativeArrayBuffer(), ()))._storage
+    return _base._copyToNativeArrayBuffer()._storage
   }
   override func _count() -> IntMax {
     return 0
@@ -239,10 +238,10 @@ public func ~> <Element>(
   source._box._initializeTo(UnsafeMutablePointer(ptr.1))
 }
 
-public func ~> <Element>(
-  source: AnySequence<Element>, _: (_CopyToNativeArrayBuffer,())
-) -> _ContiguousArrayBuffer<Element> {
-  return _ContiguousArrayBuffer(source._box._copyToNativeArrayBuffer())
+extension AnySequence {
+  public func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element> {
+    return _ContiguousArrayBuffer(self._box._copyToNativeArrayBuffer())
+  }
 }
 
 public func ~> <Element>(
@@ -252,10 +251,10 @@ public func ~> <Element>(
   source._box._initializeTo(UnsafeMutablePointer(ptr.1))
 }
 
-public func ~> <Element>(
-  source: AnyForwardCollection<Element>, _: (_CopyToNativeArrayBuffer,())
-) -> _ContiguousArrayBuffer<Element> {
-  return _ContiguousArrayBuffer(source._box._copyToNativeArrayBuffer())
+extension AnyForwardCollection {
+  public func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element> {
+    return _ContiguousArrayBuffer(self._box._copyToNativeArrayBuffer())
+  }
 }
 
 public func ~> <Element>(
@@ -265,10 +264,10 @@ public func ~> <Element>(
   source._box._initializeTo(UnsafeMutablePointer(ptr.1))
 }
 
-public func ~> <Element>(
-  source: AnyBidirectionalCollection<Element>, _: (_CopyToNativeArrayBuffer,())
-) -> _ContiguousArrayBuffer<Element> {
-  return _ContiguousArrayBuffer(source._box._copyToNativeArrayBuffer())
+extension AnyBidirectionalCollection {
+  public func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element> {
+    return _ContiguousArrayBuffer(self._box._copyToNativeArrayBuffer())
+  }
 }
 
 public func ~> <Element>(
@@ -278,10 +277,10 @@ public func ~> <Element>(
   source._box._initializeTo(UnsafeMutablePointer(ptr.1))
 }
 
-public func ~> <Element>(
-  source: AnyRandomAccessCollection<Element>, _: (_CopyToNativeArrayBuffer,())
-) -> _ContiguousArrayBuffer<Element> {
-  return _ContiguousArrayBuffer(source._box._copyToNativeArrayBuffer())
+extension AnyRandomAccessCollection {
+  public func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element> {
+    return _ContiguousArrayBuffer(self._box._copyToNativeArrayBuffer())
+  }
 }
 
 //===--- ForwardIndex -----------------------------------------------------===//

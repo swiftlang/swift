@@ -84,9 +84,7 @@ public protocol SequenceType {
 
   /// Create a native array buffer containing the elements of `self`,
   /// in the same order.
-  func ~>(
-    _:Self, _: (_CopyToNativeArrayBuffer, ())
-  ) -> _ContiguousArrayBuffer<Generator.Element>
+  func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Generator.Element>
 
   /// Copy a Sequence into an array.
   func ~> (source:Self, ptr:(_InitializeTo, UnsafeMutablePointer<Generator.Element>))
@@ -141,13 +139,6 @@ extension SequenceType {
   ) -> Bool? {
     return nil
   }
-}
-
-public struct _CopyToNativeArrayBuffer {}
-public func _copyToNativeArrayBuffer<Args>(args: Args)
-  -> (_CopyToNativeArrayBuffer, Args)
-{
-  return (_CopyToNativeArrayBuffer(), args)
 }
 
 /// Return an underestimate of the number of elements in the given
