@@ -1680,7 +1680,6 @@ namespace {
                                                  PayloadSchema);
       payload.explode(IGF.IGM, out);
       if (ExtraTagBitCount > 0) {
-        assert(extraTag);
         out.add(llvm::ConstantInt::get(IGF.IGM.getLLVMContext(), extraTag));
       }
     }
@@ -3164,7 +3163,6 @@ namespace {
                                                  PayloadSchema);
       payload.explode(IGF.IGM, out);
       if (ExtraTagBitCount > 0) {
-        assert(extraTag);
         out.add(llvm::ConstantInt::get(IGF.IGM.getLLVMContext(), extraTag));
       }
     }
@@ -3664,7 +3662,6 @@ namespace {
                                                  PayloadSchema);
       payload.store(IGF, projectPayload(IGF, enumAddr));
       if (ExtraTagBitCount > 0) {
-        assert(extraTag);
         IGF.Builder.CreateStore(
                     llvm::ConstantInt::get(IGF.IGM.getLLVMContext(), extraTag),
                     projectExtraTagBits(IGF, enumAddr));
