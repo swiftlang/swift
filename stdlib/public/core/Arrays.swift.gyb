@@ -385,17 +385,16 @@ public struct ${Self}<T>
     return _buffer._getBaseAddress() + index
   }
 
-  public
 %if Self == 'Array':
 #if _runtime(_ObjC)
-  typealias _Buffer = _ArrayBuffer<T>
+  public typealias _Buffer = _ArrayBuffer<T>
 #else
-  typealias _Buffer = _ContiguousArrayBuffer<T>
+  public typealias _Buffer = _ContiguousArrayBuffer<T>
 #endif
 %elif Self == 'ArraySlice':
-  typealias _Buffer = _SliceBuffer<T>
+  public typealias _Buffer = _SliceBuffer<T>
 %else:
-  typealias _Buffer = _${Self.strip('_')}Buffer<T>
+  public typealias _Buffer = _${Self.strip('_')}Buffer<T>
 %end
 
   /// Initialization from an existing buffer does not have "array.init"
