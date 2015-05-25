@@ -155,7 +155,7 @@ internal class _${Kind}Box<S : ${Kind}Type>
     return _base.underestimateCount()
   }
   override func _initializeTo(ptr: UnsafeMutablePointer<Void>) {
-    _base~>(_InitializeTo(), UnsafeMutablePointer(ptr))
+    _base._initializeTo(UnsafeMutablePointer(ptr))
   }
   override func _copyToNativeArrayBuffer() -> _ContiguousArrayStorageBase {
     return _base._copyToNativeArrayBuffer()._storage
@@ -239,16 +239,11 @@ extension Any${Kind} {
   public func underestimateCount() -> Int {
     return _box._underestimateCount()
   }
-}
-
-public func ~> <Element>(
-  source: Any${Kind}<Element>,
-  ptr: (_InitializeTo, UnsafeMutablePointer<Element>)
-) {
-  source._box._initializeTo(UnsafeMutablePointer(ptr.1))
-}
-
-extension Any${Kind} {
+  
+  public func _initializeTo(ptr: UnsafeMutablePointer<Element>) {
+    _box._initializeTo(UnsafeMutablePointer(ptr))
+  }
+  
   public func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element> {
     return _ContiguousArrayBuffer(self._box._copyToNativeArrayBuffer())
   }

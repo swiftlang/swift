@@ -268,7 +268,7 @@ ${comment}
   /// - Precondition: The memory is not initialized.
   public func initializeFrom<C: CollectionType where C.Generator.Element == T>(
     source: C) {
-    source~>_initializeTo(self)
+    source._initializeTo(self)
   }
 
   /// Assign from `count` values beginning at `source` into initialized

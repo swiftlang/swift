@@ -87,7 +87,7 @@ public protocol SequenceType {
   func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Generator.Element>
 
   /// Copy a Sequence into an array.
-  func ~> (source:Self, ptr:(_InitializeTo, UnsafeMutablePointer<Generator.Element>))
+  func _initializeTo(ptr: UnsafeMutablePointer<Generator.Element>)
 }
 
 extension SequenceType {
@@ -149,16 +149,13 @@ public func underestimateCount<T : SequenceType>(x: T) -> Int {
   fatalError("unavailable function can't be called")
 }
 
-public struct _InitializeTo {}
-internal func _initializeTo<Args>(a: Args) -> (_InitializeTo, Args) {
-  return (_InitializeTo(), a)
-}
-
-public func ~> <T : SequenceType>(
-  source: T, ptr: (_InitializeTo, UnsafeMutablePointer<T.Generator.Element>)) {
-  var p = UnsafeMutablePointer<T.Generator.Element>(ptr.1)
-  for x in GeneratorSequence(source.generate()) {
-    p++.initialize(x)
+extension SequenceType {
+  final
+  public func _initializeTo(ptr: UnsafeMutablePointer<Generator.Element>) {
+    var p = UnsafeMutablePointer<Generator.Element>(ptr)
+    for x in GeneratorSequence(self.generate()) {
+      p++.initialize(x)
+    }
   }
 }
 

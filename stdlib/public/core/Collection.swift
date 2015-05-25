@@ -215,19 +215,21 @@ extension CollectionType {
   }
 }
 
-// A fast implementation for when you are backed by a contiguous array.
-public func ~> <T : protocol<SequenceType, _ArrayType>>(
-  source: T, ptr: (_InitializeTo, UnsafeMutablePointer<T.Generator.Element>)) {
-  let s = source._baseAddressIfContiguous
-  if s != nil {
-    let p = UnsafeMutablePointer<T.Element>(ptr.1)
-    p.initializeFrom(s, count: source.count)
-    _fixLifetime(source._owner)
-  } else {
-    var p = UnsafeMutablePointer<T.Generator.Element>(ptr.1)
-    var g = source.generate()
-    while let x = g.next() {
-      p++.initialize(x)
+extension SequenceType where Self : _ArrayType {
+  // A fast implementation for when you are backed by a contiguous array.
+  final
+  public func _initializeTo(ptr: UnsafeMutablePointer<Generator.Element>) {
+    let s = self._baseAddressIfContiguous
+    if s != nil {
+      let p = UnsafeMutablePointer<Element>(ptr)
+      p.initializeFrom(s, count: self.count)
+      _fixLifetime(self._owner)
+    } else {
+      var p = UnsafeMutablePointer<Generator.Element>(ptr)
+      var g = self.generate()
+      while let x = g.next() {
+        p++.initialize(x)
+      }
     }
   }
 }

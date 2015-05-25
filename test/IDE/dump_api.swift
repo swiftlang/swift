@@ -14,6 +14,7 @@
 
 //===--- Definitions needed only while experimental -----------------------===//
 internal typealias _ContiguousArrayStorageBase = AnyObject
+public struct _InitializeTo {}
 extension _InitializeTo { init() {} }
 extension _ContiguousArrayBuffer {
   var _storage: _ContiguousArrayStorageBase { return owner }
