@@ -13,6 +13,7 @@
 // RUN: diff -du %S/Inputs/dumped_api.swift %t.swift
 
 //===--- Definitions needed only while experimental -----------------------===//
+public struct _Distance {}
 public struct _InitializeTo {}
 extension _InitializeTo {  }
 extension _ContiguousArrayBuffer {

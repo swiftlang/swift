@@ -28,7 +28,7 @@
 /// incrementation, and executes in O(N), where N is the function's
 /// result.
 public func distance<T : ForwardIndexType>(start: T, _ end: T) -> T.Distance {
-  return start~>_distanceTo(end)
+  return start._distanceTo(end)
 }
 
 /// Return the result of advancing `start` by `n` positions.  If `T`
@@ -45,17 +45,6 @@ public func advance<T : ForwardIndexType>(start: T, _ n: T.Distance) -> T {
 /// `BidirectionalIndexType`, requires that `n` is non-negative.
 public func advance<T : ForwardIndexType>(start: T, _ n: T.Distance, _ end: T) -> T {
   return start~>_advance(n, end)
-}
-
-/// Operation tags for distance and advance.
-///
-/// Operation tags allow us to use a single operator (~>) for
-/// dispatching every generic function with a default implementation.
-/// Only authors of specialized distance implementations need to touch
-/// this tag.
-public struct _Distance {}
-public func _distanceTo<I>(end: I) -> (_Distance, (I)) {
-  return (_Distance(), (end))
 }
 
 public struct _Advance {}
@@ -141,24 +130,26 @@ public protocol ForwardIndexType : _Incrementable {
 
   // Do not use these operators directly; call distance(start, end)
   // and advance(start, n) instead
-  func ~> (start:Self, _ : (_Distance, Self)) -> Distance
+  func _distanceTo(Self) -> Distance
   func ~> (start:Self, _ : (_Advance, Distance)) -> Self
   func ~> (start:Self, _ : (_Advance, (Distance, Self))) -> Self
 }
 
 // advance and distance implementations
 
-/// Do not use this operator directly; call distance(start, end) instead.
-public
-func ~> <T : ForwardIndexType>(start:T, rest: (_Distance, T)) -> T.Distance {
-  var p = start
-  var count: T.Distance = 0
-  let end = rest.1
-  while p != end {
-    ++count
-    ++p
+extension ForwardIndexType {
+  /// Do not use this operator directly; call distance(start, end) instead.
+  final
+  public func _distanceTo(other: Self) -> Distance {
+    var p = self
+    var count: Distance = 0
+    let end = other
+    while p != end {
+      ++count
+      ++p
+    }
+    return count
   }
-  return count
 }
 
 /// Do not use this operator directly; call advance(start, n) instead.
@@ -318,13 +309,16 @@ public protocol RandomAccessIndexType : BidirectionalIndexType, Strideable {
 
 // advance and distance implementations
 
-/// Do not use this operator directly; call distance(start, end) instead.
-@transparent
-public func ~> <T : RandomAccessIndexType>(start:T, rest:(_Distance, (T)))
--> T.Distance {
-  let end = rest.1
-  return start.distanceTo(end)
+extension RandomAccessIndexType {
+  /// Do not use this operator directly; call distance(start, end) instead.
+  @transparent
+  final
+  public func _distanceTo(other: Self) -> Distance {
+    let end = other
+    return self.distanceTo(end)
+  }
 }
+
 
 /// Do not use this operator directly; call advance(start, n) instead.
 @transparent

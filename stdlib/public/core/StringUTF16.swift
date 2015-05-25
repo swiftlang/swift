@@ -201,12 +201,14 @@ public func < (
 // by conforming to RandomAccessIndexType.
 
 /// Do not use this operator directly; call distance(start, end) instead.
-@inline(__always)
-public func ~> (
-  start: String.UTF16View.Index, rest:(_Distance, (String.UTF16View.Index))
-) -> String.UTF16View.Index.Distance {
-  let end = rest.1
-  return start._offset.distanceTo(end._offset)
+extension String.UTF16View.Index {
+  @inline(__always)
+  public func _distanceTo(
+    other: String.UTF16View.Index
+  ) -> String.UTF16View.Index.Distance {
+    let end = other
+    return self._offset.distanceTo(end._offset)
+  }
 }
 
 /// Do not use this operator directly; call advance(start, n) instead.
