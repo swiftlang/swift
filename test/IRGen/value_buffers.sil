@@ -56,28 +56,24 @@ entry(%b : $*Builtin.UnsafeValueBuffer, %v : $BigStruct):
   %r = tuple ()
   return %r : $()
 }
-// CHECK-LABEL: define void @alloc_big([24 x i8]*, %V13value_buffers9BigStruct* byval align {{4|8}})
+// CHECK-LABEL: define void @alloc_big([24 x i8]*, i64, i64, i64, i64)
 // CHECK-NEXT: entry:
-// CHECK: [[SLOT0:%.*]] = load i64
-// CHECK: [[SLOT1:%.*]] = load i64
-// CHECK: [[SLOT2:%.*]] = load i64
-// CHECK: [[SLOT3:%.*]] = load i64
 // CHECK-NEXT: [[T0:%.*]] = call noalias i8* @swift_slowAlloc(i64 32, i64 7)
 // CHECK-NEXT: [[T1:%.*]] = bitcast [24 x i8]* %0 to i8**
 // CHECK-NEXT: store i8* [[T0]], i8** [[T1]], align 8
 // CHECK-NEXT: [[ADDR:%.*]] = bitcast i8* [[T0]] to %V13value_buffers9BigStruct*
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds %V13value_buffers9BigStruct, %V13value_buffers9BigStruct* [[ADDR]], i32 0, i32 0
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds %Si, %Si* [[T0]], i32 0, i32 0
-// CHECK-NEXT: store i64 [[SLOT0]], i64* [[T1]], align 8
+// CHECK-NEXT: store i64 %1, i64* [[T1]], align 8
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds %V13value_buffers9BigStruct, %V13value_buffers9BigStruct* [[ADDR]], i32 0, i32 1
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds %Si, %Si* [[T0]], i32 0, i32 0
-// CHECK-NEXT: store i64 [[SLOT1]], i64* [[T1]], align 8
+// CHECK-NEXT: store i64 %2, i64* [[T1]], align 8
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds %V13value_buffers9BigStruct, %V13value_buffers9BigStruct* [[ADDR]], i32 0, i32 2
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds %Si, %Si* [[T0]], i32 0, i32 0
-// CHECK-NEXT: store i64 [[SLOT2]], i64* [[T1]], align 8
+// CHECK-NEXT: store i64 %3, i64* [[T1]], align 8
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds %V13value_buffers9BigStruct, %V13value_buffers9BigStruct* [[ADDR]], i32 0, i32 3
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds %Si, %Si* [[T0]], i32 0, i32 0
-// CHECK-NEXT: store i64 [[SLOT3]], i64* [[T1]], align 8
+// CHECK-NEXT: store i64 %4, i64* [[T1]], align 8
 // CHECK-NEXT: ret void
 
 sil @project_big : $(@inout Builtin.UnsafeValueBuffer, BigStruct) -> () {
@@ -87,26 +83,22 @@ entry(%b : $*Builtin.UnsafeValueBuffer, %v : $BigStruct):
   %r = tuple ()
   return %r : $()
 }
-// CHECK-LABEL: define void @project_big([24 x i8]*, %V13value_buffers9BigStruct* byval align 8)
+// CHECK-LABEL: define void @project_big([24 x i8]*, i64, i64, i64, i64)
 // CHECK-NEXT: entry:
-// CHECK: [[SLOT0:%.*]] = load i64
-// CHECK: [[SLOT1:%.*]] = load i64
-// CHECK: [[SLOT2:%.*]] = load i64
-// CHECK: [[SLOT3:%.*]] = load i64
 // CHECK-NEXT: [[T0:%.*]] = bitcast [24 x i8]* %0 to %V13value_buffers9BigStruct**
 // CHECK-NEXT: [[ADDR:%.*]] = load %V13value_buffers9BigStruct*, %V13value_buffers9BigStruct** [[T0]], align 8
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds %V13value_buffers9BigStruct, %V13value_buffers9BigStruct* [[ADDR]], i32 0, i32 0
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds %Si, %Si* [[T0]], i32 0, i32 0
-// CHECK-NEXT: store i64 [[SLOT0]], i64* [[T1]], align 8
+// CHECK-NEXT: store i64 %1, i64* [[T1]], align 8
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds %V13value_buffers9BigStruct, %V13value_buffers9BigStruct* [[ADDR]], i32 0, i32 1
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds %Si, %Si* [[T0]], i32 0, i32 0
-// CHECK-NEXT: store i64 [[SLOT1]], i64* [[T1]], align 8
+// CHECK-NEXT: store i64 %2, i64* [[T1]], align 8
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds %V13value_buffers9BigStruct, %V13value_buffers9BigStruct* [[ADDR]], i32 0, i32 2
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds %Si, %Si* [[T0]], i32 0, i32 0
-// CHECK-NEXT: store i64 [[SLOT2]], i64* [[T1]], align 8
+// CHECK-NEXT: store i64 %3, i64* [[T1]], align 8
 // CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds %V13value_buffers9BigStruct, %V13value_buffers9BigStruct* [[ADDR]], i32 0, i32 3
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds %Si, %Si* [[T0]], i32 0, i32 0
-// CHECK-NEXT: store i64 [[SLOT3]], i64* [[T1]], align 8
+// CHECK-NEXT: store i64 %4, i64* [[T1]], align 8
 // CHECK-NEXT: ret void
 
 sil @dealloc_big : $(@inout Builtin.UnsafeValueBuffer) -> () {

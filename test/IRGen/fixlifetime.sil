@@ -2,7 +2,7 @@
 
 // REQUIRES: CPU=i386_or_x86_64
 
-// CHECK-LABEL: define void @test(%C11fixlifetime1C*, %objc_object*, i8**, i8*, %swift.refcounted*, %V11fixlifetime3Agg* byval align {{4|8}}) {{.*}} {
+// CHECK-LABEL: define void @test(%C11fixlifetime1C*, %objc_object*, i8**, i8*, %swift.refcounted*, %C11fixlifetime1C*, %objc_object*, i8**, i8*, %swift.refcounted*) {{.*}} {
 // CHECK: entry:
 // CHECK:  call void bitcast (void (%swift.refcounted*)* @swift_fixLifetime to void (%C11fixlifetime1C*)*)(%C11fixlifetime1C*
 // CHECK:  call void bitcast (void (%swift.refcounted*)* @swift_fixLifetime to void (%objc_object*)*)(%objc_object*

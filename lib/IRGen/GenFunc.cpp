@@ -121,12 +121,6 @@ bool ExplosionSchema::requiresIndirectResult(IRGenModule &IGM) const {
          size() > IGM.TargetInfo.MaxScalarsForDirectResult;
 }
 
-bool ExplosionSchema::requiresIndirectParameter(IRGenModule &IGM) const {
-  // For now, use the same condition as requiresIndirectSchema. We may want
-  // to diverge at some point.
-  return requiresIndirectResult(IGM);
-}
-
 llvm::Type *ExplosionSchema::getScalarResultType(IRGenModule &IGM) const {
   if (size() == 0) {
     return IGM.VoidTy;
@@ -140,19 +134,7 @@ llvm::Type *ExplosionSchema::getScalarResultType(IRGenModule &IGM) const {
 }
 
 void ExplosionSchema::addToArgTypes(IRGenModule &IGM,
-                                    const TypeInfo &TI,
-                                    llvm::AttributeSet &Attrs,
                                     SmallVectorImpl<llvm::Type*> &types) const {
-  // Pass indirect arguments as byvals.
-  if (requiresIndirectParameter(IGM)) {
-    // If the type requires more than pointer alignment, we can't reliably
-    // put it in the callstack, so we can't use byval.
-    if (TI.getBestKnownAlignment() <= IGM.getPointerAlignment())
-      addByvalArgumentAttributes(IGM, Attrs, types.size(),
-                                 TI.getBestKnownAlignment());
-    types.push_back(TI.getStorageType()->getPointerTo());
-    return;
-  }
   for (auto &elt : *this) {
     if (elt.isAggregate())
       types.push_back(elt.getAggregateType()->getPointerTo());
@@ -1289,9 +1271,8 @@ void SignatureExpansion::expand(SILParameterInfo param) {
       return;
     }
     case SILFunctionLanguage::Swift: {
-      auto &ti = IGM.getTypeInfo(param.getSILType());
-      auto schema = ti.getSchema();
-      schema.addToArgTypes(IGM, ti, Attrs, ParamIRTypes);
+      auto schema = IGM.getSchema(param.getSILType());
+      schema.addToArgTypes(IGM, ParamIRTypes);
       return;
     }
     }
@@ -2843,45 +2824,17 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
   }
 }
 
-static void addNativeArgument(IRGenFunction &IGF,
-                              Explosion &in,
-                              const TypeInfo &ti,
-                              ParameterConvention convention,
-                              Explosion &out) {
-  // Addresses consist of a single pointer argument.
-  if (isIndirectParameter(convention)) {
-    out.add(in.claimNext());
-    return;
-  }
-
-  auto &loadableTI = cast<LoadableTypeInfo>(ti);
-  auto schema = ti.getSchema();
-  
-  if (schema.requiresIndirectParameter(IGF.IGM)) {
-    // Pass the argument indirectly.
-    auto buf = IGF.createAlloca(ti.getStorageType(),
-                                loadableTI.getFixedAlignment(), "");
-    loadableTI.initialize(IGF, in, buf);
-    out.add(buf.getAddress());
-  } else {
-    // Pass the argument explosion directly.
-    loadableTI.reexplode(IGF, in, out);
-  }
-}
-
 /// Add a new set of arguments to the function.
-void CallEmission::setArgs(Explosion &arg,
-                           ArrayRef<SILParameterInfo> params,
-                           WitnessMetadata *witnessMetadata) {
+void CallEmission::setArgs(Explosion &arg, WitnessMetadata *witnessMetadata) {
   // Convert arguments to a representation appropriate to the calling
   // convention.
-  Explosion adjustedArg;
-  
   switch (getCallee().getRepresentation()) {
   case SILFunctionTypeRepresentation::CFunctionPointer:
   case SILFunctionTypeRepresentation::ObjCMethod:
   case SILFunctionTypeRepresentation::Block: {
-    externalizeArguments(IGF, getCallee(), arg, adjustedArg);
+    Explosion externalized;
+    externalizeArguments(IGF, getCallee(), arg, externalized);
+    arg = std::move(externalized);
     break;
   }
 
@@ -2895,26 +2848,19 @@ void CallEmission::setArgs(Explosion &arg,
   case SILFunctionTypeRepresentation::Method:
   case SILFunctionTypeRepresentation::Thin:
   case SILFunctionTypeRepresentation::Thick:
-    // Check for value arguments that need to be passed indirectly.
-    for (auto param : params) {
-      addNativeArgument(IGF, arg,
-                        IGF.getTypeInfoForLowered(param.getType()),
-                        param.getConvention(),
-                        adjustedArg);
-    }
-    adjustedArg.add(arg.claimAll());
+    // Nothing to do.
     break;
   }
 
   // Add the given number of arguments.
-  assert(LastArgWritten >= adjustedArg.size());
+  assert(LastArgWritten >= arg.size());
 
-  size_t targetIndex = LastArgWritten - adjustedArg.size();
+  size_t targetIndex = LastArgWritten - arg.size();
   assert(targetIndex <= 1);
   LastArgWritten = targetIndex;
   
   auto argIterator = Args.begin() + targetIndex;
-  for (auto value : adjustedArg.claimAll()) {
+  for (auto value : arg.claimAll()) {
     *argIterator++ = value;
   }
 }
@@ -3234,23 +3180,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     
     // Reemit the parameters as unsubstituted.
     for (unsigned i = 0; i < outType->getParameters().size(); ++i) {
-      Explosion arg;
-      auto origParamInfo = origType->getParameters()[i];
-      auto &ti = IGM.getTypeInfoForLowered(origParamInfo.getType());
-      auto schema = ti.getSchema();
-      
-      // Forward the address of indirect value params.
-      if (!isIndirectParameter(origParamInfo.getConvention())
-          && schema.requiresIndirectParameter(IGM)) {
-        auto addr = origParams.claimNext();
-        if (addr->getType() != ti.getStorageType()->getPointerTo())
-          addr = subIGF.Builder.CreateBitCast(addr,
-                                           ti.getStorageType()->getPointerTo());
-        args.add(addr);
-        continue;
-      }
-      
-      emitApplyArgument(subIGF, origParamInfo,
+      emitApplyArgument(subIGF, origType->getParameters()[i],
                         outType->getParameters()[i],
                         origParams, args);
     }
@@ -3330,7 +3260,6 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       auto fieldConvention = conventions[nextCapturedField];
       Address fieldAddr = fieldLayout.project(subIGF, data, offsets);
       auto &fieldTI = fieldLayout.getType();
-      auto fieldSchema = fieldTI.getSchema();
       
       Explosion param;
       switch (fieldConvention) {
@@ -3385,21 +3314,14 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
       
       // Reemit the capture params as unsubstituted.
       if (origParamI < origType->getParameters().size()) {
-        Explosion origParam;
-        auto origParamInfo = origType->getParameters()[origParamI];
-        emitApplyArgument(subIGF, origParamInfo,
+        emitApplyArgument(subIGF,
+                          origType->getParameters()[origParamI],
                           substType->getParameters()[origParamI],
-                          param, origParam);
-
-        addNativeArgument(subIGF, origParam,
-                          IGM.getTypeInfoForLowered(origParamInfo.getType()),
-                          origParamInfo.getConvention(),
-                          args);
+                          param, args);
         ++origParamI;
       } else {
         args.add(param.claimAll());
       }
-      
     }
     
     // If the parameters can live independent of the context, release it now

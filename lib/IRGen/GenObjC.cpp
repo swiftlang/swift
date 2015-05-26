@@ -726,7 +726,7 @@ llvm::Value *irgen::emitObjCAllocObjectCall(IRGenFunction &IGF,
     args.add(self);
     args.add(IGF.emitObjCSelectorRefLoad("allocWithZone:"));
     args.add(llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy));
-    emission.setArgs(args, {});
+    emission.setArgs(args);
   }
 
   // Emit the call.
@@ -824,7 +824,7 @@ static llvm::Function *emitObjCPartialApplicationForwarder(IRGenModule &IGM,
   Explosion args;
   addObjCMethodCallImplicitArguments(subIGF, args, method, self, SILType());
   args.add(params.claimAll());
-  emission.setArgs(args, {});
+  emission.setArgs(args);
   
   // Cleanup that always has to occur after the function call.
   auto cleanup = [&]{

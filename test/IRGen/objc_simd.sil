@@ -20,12 +20,12 @@ entry(%x : $float4):
   return %x : $float4
 }
 
-// x86_64-LABEL: define void @simd_native_args(%V4simd6float4* noalias sret, %V4simd6float4*)
-// i386-LABEL: define void @simd_native_args(%V4simd6float4* noalias sret, %V4simd6float4*)
-// arm64-LABEL: define void @simd_native_args(%V4simd6float4* noalias sret, %V4simd6float4*)
-// armv7-LABEL: define void @simd_native_args(%V4simd6float4* noalias sret, %V4simd6float4*)
-// armv7s-LABEL: define void @simd_native_args(%V4simd6float4* noalias sret, %V4simd6float4*)
-// armv7k-LABEL: define void @simd_native_args(%V4simd6float4* noalias sret, %V4simd6float4*)
+// x86_64-LABEL: define void @simd_native_args(%V4simd6float4* noalias sret, float, float, float, float)
+// i386-LABEL: define void @simd_native_args(%V4simd6float4* noalias sret, float, float, float, float)
+// arm64-LABEL: define void @simd_native_args(%V4simd6float4* noalias sret, float, float, float, float)
+// armv7-LABEL: define void @simd_native_args(%V4simd6float4* noalias sret, float, float, float, float)
+// armv7s-LABEL: define void @simd_native_args(%V4simd6float4* noalias sret, float, float, float, float)
+// armv7k-LABEL: define void @simd_native_args(%V4simd6float4* noalias sret, float, float, float, float)
 sil @simd_native_args : $@convention(thin) (float4) -> float4 {
 entry(%x : $float4):
   %f = function_ref @simd_c_args : $@convention(c) (float4) -> float4

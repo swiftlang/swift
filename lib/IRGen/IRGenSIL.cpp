@@ -946,22 +946,11 @@ static void bindParameter(IRGenSILFunction &IGF,
   auto &paramTI = IGF.getTypeInfo(param->getType());
 
   // If the SIL parameter isn't passed indirectly, we need to map it
-  // to an explosion.
+  // to an explosion.  Fortunately, in this case we have a guarantee
+  // that it's passed directly in IR.
   if (param->getType().isObject()) {
     Explosion paramValues;
-    auto &loadableTI = cast<LoadableTypeInfo>(paramTI);
-    // If the explosion must be passed indirectly, load the value from the
-    // indirect address.
-    if (loadableTI.getSchema().requiresIndirectParameter(IGF.IGM)) {
-      Address paramAddr
-        = loadableTI.getAddressForPointer(allParamValues.claimNext());
-      loadableTI.loadAsTake(IGF, paramAddr, paramValues);
-    } else {
-      // Otherwise, we can just take the exploded arguments.
-      // FIXME: It doesn't necessarily make sense to pass all types using their
-      // explosion schema.
-      loadableTI.reexplode(IGF, allParamValues, paramValues);
-    }
+    cast<LoadableTypeInfo>(paramTI).reexplode(IGF, allParamValues, paramValues);
     IGF.setLoweredExplosion(SILValue(param, 0), paramValues);
     return;
   }
@@ -969,8 +958,8 @@ static void bindParameter(IRGenSILFunction &IGF,
   // Okay, the type is passed indirectly in SIL, so we need to map
   // it to an address.
   // FIXME: that doesn't mean we should physically pass it
-  // indirectly at this resilience expansion. An @in or @in_guaranteed parameter
-  // could be passed by value in the right resilience domain.
+  // indirectly at this explosion level, but SIL currently gives us
+  // no ability to distinguish between an l-value and a byval argument.
   Address paramAddr
     = paramTI.getAddressForPointer(allParamValues.claimNext());
   IGF.setLoweredAddress(SILValue(param, 0), paramAddr);
@@ -1893,7 +1882,7 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
   }
 
   // Add all those arguments.
-  emission.setArgs(llArgs, params, &witnessMetadata);
+  emission.setArgs(llArgs, &witnessMetadata);
 
   SILInstruction *i = site.getInstruction();
   
