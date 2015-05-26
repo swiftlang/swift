@@ -23,7 +23,7 @@ GElement = "Generator.Element"
 //===----------------------------------------------------------------------===//
 
 extension CollectionType where Index : BidirectionalIndexType {
-  final public var last: Generator.Element? {
+  public var last: Generator.Element? {
     return isEmpty ? nil : self[endIndex.predecessor()]
   }
 }
@@ -37,7 +37,7 @@ extension CollectionType where ${GElement} : Equatable {
   /// `value` is not found.
   ///
   /// - Complexity: O(`self.count`).
-  final public func indexOf(element: ${GElement}) -> Index? {
+  public func indexOf(element: ${GElement}) -> Index? {
     if let result = _customIndexOfEquatableElement(element) {
       return result
     }
@@ -56,7 +56,7 @@ extension CollectionType {
   /// corresponding value, or `nil` if such value is not found.
   ///
   /// - Complexity: O(`self.count`).
-  final public func indexOf(
+  public func indexOf(
     @noescape predicate: (${GElement}) -> Bool
   ) -> Index? {
     for i in self.indices {
@@ -78,7 +78,7 @@ extension CollectionType {
   /// The result's `endIndex` is the same as that of `self`.  Because
   /// `Range` is half-open, iterating the values of the result produces
   /// all valid subscript arguments for `self`, omitting its `endIndex`.
-  final public var indices: Range<Index> {
+  public var indices: Range<Index> {
     return Range(start: startIndex, end: endIndex)
   }
 }
@@ -125,7 +125,7 @@ extension MutableCollectionType where Index : RandomAccessIndexType {
 ${partitionDocComment}
   ///
 ${orderingRequirementForPredicate}
-  final public mutating func partition(
+  public mutating func partition(
     range: Range<Index>,
     var isOrderedBefore: (${GElement}, ${GElement}) -> Bool
   ) -> Index {
@@ -138,7 +138,7 @@ extension MutableCollectionType
 ${partitionDocComment}
   ///
 ${orderingRequirementForComparable}
-  final public mutating func partition(range: Range<Index>) -> Index {
+  public mutating func partition(range: Range<Index>) -> Index {
 
 %   end
 
@@ -214,7 +214,7 @@ ${sortIsUnstableForComparable}
   ///
 ${orderingRequirementForComparable}
   @warn_unused_result(${'mutable_variant="sortInPlace"' if Self == 'MutableCollectionType' else ''})
-  final public func sort() -> [Generator.Element] {
+  public func sort() -> [Generator.Element] {
     var result = ContiguousArray(self)
     result.sortInPlace()
     return Array(result)
@@ -228,7 +228,7 @@ ${sortIsUnstableForPredicate}
   ///
 ${orderingRequirementForPredicate}
   @warn_unused_result(${'mutable_variant="sortInPlace"' if Self == 'MutableCollectionType' else ''})
-  final public func sort(
+  public func sort(
     isOrderedBefore: (Generator.Element, Generator.Element) -> Bool
   ) -> [Generator.Element] {
     var result = ContiguousArray(self)
@@ -249,7 +249,7 @@ ${sortInPlaceDocCommentForComparable}
 ${sortIsUnstableForComparable}
   ///
 ${orderingRequirementForComparable}
-  final public mutating func sortInPlace() {
+  public mutating func sortInPlace() {
     let didSortUnsafeBuffer: Void? =
       _withUnsafeMutableBufferPointerIfSupported {
       (bufferPointer) -> () in
@@ -268,7 +268,7 @@ ${sortInPlaceDocCommentForPredicate}
 ${sortIsUnstableForPredicate}
   ///
 ${orderingRequirementForPredicate}
-  final public mutating func sortInPlace(
+  public mutating func sortInPlace(
     isOrderedBefore: (Generator.Element, Generator.Element) -> Bool
   ) {
     let didSortUnsafeBuffer: Void? =
