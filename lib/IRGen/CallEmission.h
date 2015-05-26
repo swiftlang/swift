@@ -77,7 +77,9 @@ public:
   }
 
   /// Set the arguments to the function from an explosion.
-  void setArgs(Explosion &arg, WitnessMetadata *witnessMetadata = nullptr);
+  void setArgs(Explosion &arg,
+               ArrayRef<SILParameterInfo> params,
+               WitnessMetadata *witnessMetadata = nullptr);
   
   void addAttribute(unsigned Index, llvm::Attribute::AttrKind Attr);
 

@@ -58,7 +58,7 @@
 // CHECK:   %swift.opaque* {{(@_objc_empty_vtable|null)}},
 // CHECK:   i64 add (i64 ptrtoint ({{.*}}* @_DATA__TtC17objc_class_export3Foo to i64), i64 1),
 // CHECK:   [[FOO]]* (%swift.type*)* @_TZFC17objc_class_export3Foo6createfMS0_FT_S0_,
-// CHECK:   void (double, double, double, double, [[FOO]]*)* @_TFC17objc_class_export3Foo10drawInRectfS0_FT5dirtyVSC6NSRect_T_
+// CHECK:   void (%VSC6NSRect*, [[FOO]]*)* @_TFC17objc_class_export3Foo10drawInRectfS0_FT5dirtyVSC6NSRect_T_
 // CHECK: }, section "__DATA,__objc_data, regular, no_dead_strip"
 // -- TODO: The OBJC_CLASS symbol should reflect the qualified runtime name of
 //    Foo.
@@ -83,7 +83,7 @@ struct BigStructWithNativeObjects {
   }
   // CHECK: define internal void @_TToFC17objc_class_export3Foo10drawInRectfS0_FT5dirtyVSC6NSRect_T_([[OPAQUE:%.*]]*, i8*, [[NSRECT]]* byval align 8) unnamed_addr {{.*}} {
   // CHECK:   [[CAST:%[a-zA-Z0-9]+]] = bitcast [[OPAQUE]]* %0 to [[FOO]]*
-  // CHECK:   call void @_TFC17objc_class_export3Foo10drawInRectfS0_FT5dirtyVSC6NSRect_T_(double {{.*}}, double {{.*}}, double {{.*}}, double {{.*}}, [[FOO]]* [[CAST]])
+  // CHECK:   call void @_TFC17objc_class_export3Foo10drawInRectfS0_FT5dirtyVSC6NSRect_T_(%VSC6NSRect* {{.*}}, [[FOO]]* [[CAST]])
   // CHECK: }
 
   func bounds() -> NSRect {
@@ -99,7 +99,7 @@ struct BigStructWithNativeObjects {
   }
   // CHECK: define internal void @_TToFC17objc_class_export3Foo20convertRectToBackingfS0_FT1rVSC6NSRect_S1_([[NSRECT]]* noalias sret, [[OPAQUE5:%.*]]*, i8*, [[NSRECT]]* byval align 8) unnamed_addr {{.*}} {
   // CHECK:   [[CAST:%[a-zA-Z0-9]+]] = bitcast [[OPAQUE5]]* %1 to [[FOO]]*
-  // CHECK:   call void @_TFC17objc_class_export3Foo20convertRectToBackingfS0_FT1rVSC6NSRect_S1_([[NSRECT]]* noalias sret {{.*}}, double {{.*}}, double {{.*}}, double {{.*}}, double {{.*}}, [[FOO]]* [[CAST]])
+  // CHECK:   call void @_TFC17objc_class_export3Foo20convertRectToBackingfS0_FT1rVSC6NSRect_S1_([[NSRECT]]* noalias sret {{.*}}, %VSC6NSRect* {{.*}}, [[FOO]]* [[CAST]])
 
   func doStuffToSwiftSlice(f f: [Int]) {
   }

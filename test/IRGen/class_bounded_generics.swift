@@ -229,7 +229,7 @@ func class_generic_field_struct_fields<T : ClassBound>
   return (x.x, x.y, x.z)
 }
 
-// CHECK-LABEL: define hidden void @_TF22class_bounded_generics34class_protocol_field_struct_fields{{.*}}(<{ %Si, %P22class_bounded_generics10ClassBound_, %Si }>* noalias sret, i64, %objc_object*, i8**, i64)
+// CHECK-LABEL: define hidden void @_TF22class_bounded_generics34class_protocol_field_struct_fields{{.*}}(<{ %Si, %P22class_bounded_generics10ClassBound_, %Si }>* noalias sret, %V22class_bounded_generics24ClassProtocolFieldStruct*)
 func class_protocol_field_struct_fields
 (x:ClassProtocolFieldStruct) -> (Int, ClassBound, Int) {
   return (x.x, x.y, x.z)

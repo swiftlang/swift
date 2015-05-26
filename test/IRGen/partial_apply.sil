@@ -290,7 +290,7 @@ sil public_external @indirect_consumed_captured_class_param : $@convention(thin)
 // CHECK:         retain{{.*}}[[X_BITCAST]]
 // CHECK:         store %C13partial_apply10SwiftClass* [[X]], %C13partial_apply10SwiftClass** [[X_TMP]]
 // CHECK:         release{{.*}}%1)
-// CHECK:         [[RESULT:%.*]] = tail call i64 @indirect_consumed_captured_class_param(i64 %0, %C13partial_apply10SwiftClass** [[X_TMP]])
+// CHECK:         [[RESULT:%.*]] = call i64 @indirect_consumed_captured_class_param(i64 %0, %C13partial_apply10SwiftClass** [[X_TMP]])
 // CHECK:         ret i64 [[RESULT]]
 
 sil @partial_apply_indirect_consumed_class_param : $@convention(thin) (@in SwiftClass) -> @callee_owned (Int) -> Int {
