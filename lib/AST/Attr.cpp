@@ -375,12 +375,12 @@ void DeclAttribute::print(ASTPrinter &Printer,
         Printer << ", ";
       else
         Printer << "(";
-      Printer << ", mutable_variant=\"" << attr->getMutableVariant() << "\"";
+      Printer << "mutable_variant=\"" << attr->getMutableVariant() << "\"";
       printedParens = true;
     }
     if (printedParens)
       Printer << ")";
-    return;
+    break;
   }
 
   case DAK_Count:
