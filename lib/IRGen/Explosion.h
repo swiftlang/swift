@@ -233,6 +233,7 @@ public:
     return Elements[index];
   }
 
+  bool requiresIndirectParameter(IRGenModule &IGM) const;
   bool requiresIndirectResult(IRGenModule &IGM) const;
 
   typedef SmallVectorImpl<Element>::iterator iterator;
@@ -258,6 +259,8 @@ public:
   /// Treating the types in this schema as potential arguments to a
   /// function call, add them to the end of the given vector of types.
   void addToArgTypes(IRGenModule &IGM,
+                     const TypeInfo &TI,
+                     llvm::AttributeSet &Attrs,
                      SmallVectorImpl<llvm::Type*> &types) const;
 };
 

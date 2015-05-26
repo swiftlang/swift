@@ -713,16 +713,20 @@ enum AggregateSinglePayload2 {
   case z
 }
 
-// CHECK: define void @aggregate_single_payload_unpack_2([[WORD]], [[WORD]], [[WORD]], [[WORD]]) {{.*}} {
+// CHECK: define void @aggregate_single_payload_unpack_2(%O4enum23AggregateSinglePayload2* byval align {{4|8}}) {{.*}} {
 sil @aggregate_single_payload_unpack_2 : $@convention(thin) (AggregateSinglePayload2) -> () {
 entry(%u : $AggregateSinglePayload2):
+// CHECK: [[CHUNK0:%.*]] = load [[WORD]]
+// CHECK: [[CHUNK1:%.*]] = load [[WORD]]
+// CHECK: [[CHUNK2:%.*]] = load [[WORD]]
+// CHECK: [[CHUNK3:%.*]] = load [[WORD]]
   switch_enum %u : $AggregateSinglePayload2, case #AggregateSinglePayload2.x!enumelt.1: x_dest, default end
 
-// CHECK:   [[TRUNC:%.*]] = trunc [[WORD]] %0 to i21
+// CHECK:   [[TRUNC:%.*]] = trunc [[WORD]] [[CHUNK0]] to i21
 // CHECK:   phi i21 [ [[TRUNC]]
-// CHECK:   phi [[WORD]] [ %1
-// CHECK:   phi [[WORD]] [ %2
-// CHECK:   phi [[WORD]] [ %3
+// CHECK:   phi [[WORD]] [ [[CHUNK1]]
+// CHECK:   phi [[WORD]] [ [[CHUNK2]]
+// CHECK:   phi [[WORD]] [ [[CHUNK3]]
 x_dest(%v : $(CharLike, IntLike, RangeLike)):
   br end
 
