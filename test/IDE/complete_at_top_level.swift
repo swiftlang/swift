@@ -48,6 +48,7 @@
 // RUN: FileCheck %s -check-prefix=TOP_LEVEL_STMT_8 < %t.toplevel.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_STMT_9 | FileCheck %s -check-prefix=PLAIN_TOP_LEVEL
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_STMT_10 | FileCheck %s -check-prefix=PLAIN_TOP_LEVEL
 
 // Test code completion in top-level code.
 //
@@ -278,3 +279,10 @@ extension FooStruct {
 
 var varAtEOF : Int
 // NEGATIVE-NOT: varAtEOF
+
+// rdar://20738314
+if true {
+    var z = #^TOP_LEVEL_STMT_10^#
+} else {
+    assertionFailure("Shouldn't be here")
+}
