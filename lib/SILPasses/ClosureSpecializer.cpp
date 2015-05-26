@@ -26,12 +26,11 @@
 //     that can be specialized, we need to ensure that any captured values have
 //     their reference counts adjusted properly. This implies for every
 //     specialized call site, we insert an additional retain for each captured
-//     argument with reference semantics before the old partial apply. We will
-//     pass them in as extra @owned to the specialized function. This @owned
-//     will be consumed by the "copy" partial apply that is in the specialized
-//     function. Now the partial apply will own those ref counts. This is
-//     unapplicable to thin_to_thick_function since they do not have any
-//     captured args.
+//     argument with reference semantics. We will pass them in as extra @owned
+//     to the specialized function. This @owned will be consumed by the "copy"
+//     partial apply that is in the specialized function. Now the partial apply
+//     will own those ref counts. This is unapplicable to thin_to_thick_function
+//     since they do not have any captured args.
 //
 //  2. If the closure was passed in @owned vs if the closure was passed in
 //     @guaranteed. If the original closure was passed in @owned, then we know
@@ -152,13 +151,19 @@ class CallSiteDescriptor {
   // have only one element, a return inst.
   llvm::TinyPtrVector<SILBasicBlock *> NonFailureExitBBs;
 
+  // The points where the closure is ultimately released.
+  llvm::SmallPtrSet<SILInstruction *, 4> JointlyPostDomReleasePoints;
+
 public:
   CallSiteDescriptor(SILInstruction *ClosureInst, ApplyInst *AI,
                      unsigned ClosureIndex, SILParameterInfo ClosureParamInfo,
-                     llvm::TinyPtrVector<SILBasicBlock *> &&NonFailureExitBBs)
+                     llvm::TinyPtrVector<SILBasicBlock *> &&NonFailureExitBBs,
+                     llvm::SmallPtrSet<SILInstruction *, 4> &ReleasePoints)
       : Closure(ClosureInst), AI(AI), ClosureIndex(ClosureIndex),
         ClosureParamInfo(ClosureParamInfo),
-        NonFailureExitBBs(NonFailureExitBBs) {}
+        NonFailureExitBBs(NonFailureExitBBs),
+        JointlyPostDomReleasePoints(ReleasePoints.begin(),
+                                    ReleasePoints.end()) {}
 
   static bool isSupportedClosure(const SILInstruction *Closure);
 
@@ -238,6 +243,9 @@ public:
   ArrayRef<SILBasicBlock *> getNonFailureExitBBs() const {
     return NonFailureExitBBs;
   }
+
+  /// Extend the lifetime of 'Arg' to the lifetime of the closure.
+  void extendArgumentLifetime(SILValue Arg) const;
 };
 
 } // end anonymous namespace
@@ -276,7 +284,54 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
 
     // TODO: When we support address types, this code path will need to be
     // updated.
-    Builder.createRetainValue(Closure->getLoc(), Arg);
+
+    // We need to balance the consumed argument of the new partial_apply in the
+    // specialized callee by a retain. If both the original partial_apply and
+    // the apply of the callee are in the same basic block we can assume they
+    // are executed the same number of times. Therefore it is sufficient to just
+    // retain the argument at the site of the original partial_apply.
+    //
+    //    %closure = partial_apply (%arg)
+    //             = apply %callee(%closure)
+    //  =>
+    //             retain %arg
+    //    %closure = partial_apply (%arg)
+    //               apply %specialized_callee(..., %arg)
+    //
+    // However, if they are not in the same basic block the callee might be
+    // executed more frequenly than the closure (for example, if the closure is
+    // created in a loop preheader and the callee taking the closure is executed
+    // in the loop). In such a case we must keep the argument live accross the
+    // call site of the callee and emit a matching retain for every innvocation
+    // of the callee.
+    //
+    //    %closure = partial_apply (%arg)
+    //
+    //    while () {
+    //             = %callee(%closure)
+    //    }
+    // =>
+    //               retain %arg
+    //    %closure = partial_apply (%arg)
+    //
+    //    while () {
+    //               retain %arg
+    //               apply %specialized_callee(.., %arg)
+    //    }
+    //               release %arg
+    //
+    if (AI->getParent() != Closure->getParent()) {
+      // Emit the retain and release that keeps the argument life across the
+      // callee using the closure.
+      CSDesc.extendArgumentLifetime(Arg);
+
+      // Emit the retain that matches the captured argument by the partial_apply
+      // in the callee that is consumed by the partial_apply.
+      Builder.setInsertionPoint(AI);
+      Builder.createRetainValue(Closure->getLoc(), Arg);
+    } else {
+      Builder.createRetainValue(Closure->getLoc(), Arg);
+    }
   }
 
   SILType LoweredType = NewF->getLoweredType();
@@ -317,6 +372,20 @@ void CallSiteDescriptor::createName(llvm::SmallString<64> &NewName) const {
   auto *TTTFI = cast<ThinToThickFunctionInst>(Closure);
   FSSM.setArgumentClosureProp(getClosureIndex(), TTTFI);
   FSSM.mangle();
+}
+
+void CallSiteDescriptor::extendArgumentLifetime(SILValue Arg) const {
+  assert(!JointlyPostDomReleasePoints.empty() &&
+         "Need a post-dominating release(s)");
+
+  // Extend the lifetime of a captured argument to cover the callee.
+  SILBuilderWithScope<2> Builder(Closure);
+  Builder.createRetainValue(Closure->getLoc(), Arg);
+  for (auto *I : JointlyPostDomReleasePoints) {
+    auto It = SILBasicBlock::iterator(*I);
+    Builder.setInsertionPoint(++It);
+    Builder.createReleaseValue(Closure->getLoc(), Arg);
+  }
 }
 
 void CallSiteDescriptor::specializeClosure(CallGraph &CG) const {
@@ -610,6 +679,9 @@ void ClosureSpecializer::gatherCallSites(
 
   // For each basic block BB in Caller...
   for (auto &BB : *Caller) {
+
+    llvm::SmallPtrSet<SILInstruction *, 4> JointlyPostDomReleasePoints;
+
     // For each instruction II in BB...
     for (auto &II : BB) {
       // If II is not a closure that we support specializing, skip it...
@@ -622,7 +694,7 @@ void ClosureSpecializer::gatherCallSites(
         // substitutions, there is nothing interesting for us to do, so
         // continue...
         auto *AI = dyn_cast<ApplyInst>(Use->getUser());
-        if (!AI || AI->hasSubstitutions() || AI->getParent() != II.getParent())
+        if (!AI || AI->hasSubstitutions())
           continue;
 
         // Check if we have already associated this apply inst with a closure to
@@ -688,11 +760,21 @@ void ClosureSpecializer::gatherCallSites(
           continue;
         }
 
+        // Compute the final release points of the closure. We will insert
+        // release of the captured arguments here.
+        if (JointlyPostDomReleasePoints.empty()) {
+          LifetimeTracker Lifetime(&II);
+          auto Endpoints = Lifetime.getEndpoints();
+          JointlyPostDomReleasePoints.insert(Endpoints.begin(),
+                                             Endpoints.end());
+        }
+
         // Now we know that CSDesc is profitable to specialize. Add it to our call
         // site list.
         CallSites.push_back(CallSiteDescriptor(&II, AI, ClosureIndex.getValue(),
                                                ClosureParamInfo,
-                                               std::move(NonFailureExitBBs)));
+                                               std::move(NonFailureExitBBs),
+                                               JointlyPostDomReleasePoints));
       }
     }
   }
