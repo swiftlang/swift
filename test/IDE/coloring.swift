@@ -398,3 +398,19 @@ func emptyDocBlockComment3() {}
 // CHECK: <doc-comment-block>/**          */
 // CHECK: <kw>func</kw> emptyDocBlockComment3() {}
 
+
+/**/
+func malformedBlockComment() {}
+// CHECK: <doc-comment-block>/**/</doc-comment-block>
+// CHECK: <kw>func</kw> malformedBlockComment() {}
+
+// Keep this as the last test
+// CHECK: <comment-line>// Keep this as the last test</comment-line>
+/**
+  Trailing off ...
+func unterminatedBlockComment() {}
+// CHECK: <comment-line>// Keep this as the last test</comment-line>
+// CHECK: <doc-comment-block>/**
+// CHECK:  Trailing off ...
+// CHECK:  func unterminatedBlockComment() {}
+// CHECK:  </doc-comment-block>

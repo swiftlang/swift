@@ -203,6 +203,15 @@ protocol decl_protocol_1 {
 extension decl_extension_1 {
 }
 
+/***/
+func emptyBlockDocComment() {}
+
+/**/
+func weirdBlockDocComment() {}
+
+/**
+func unterminatedBlockDocComment() {}
+
 // RUN: %target-swift-ide-test -print-comments -source-filename %s > %t.txt
 // RUN: FileCheck %s -check-prefix=WRONG < %t.txt
 // RUN: FileCheck %s < %t.txt
@@ -284,4 +293,5 @@ extension decl_extension_1 {
 // CHECK-NEXT: comment_attach.swift:196:7: Var/decl_protocol_1.propertyWithGetSet RawComment=[/// propertyWithGetSet Aaa.\n]
 // CHECK-NEXT: comment_attach.swift:196:33: Func/decl_protocol_1.<getter for decl_protocol_1.propertyWithGetSet> RawComment=none
 // CHECK-NEXT: comment_attach.swift:196:37: Func/decl_protocol_1.<setter for decl_protocol_1.propertyWithGetSet> RawComment=none
-
+// CHECK-NEXT: comment_attach.swift:207:6: Func/emptyBlockDocComment RawComment=[/***/]
+// CHECK-NEXT: comment_attach.swift:210:6: Func/weirdBlockDocComment RawComment=[/**/]

@@ -1225,7 +1225,16 @@ bool ModelASTWalker::findFieldsInDocCommentBlock(SyntaxNode Node) {
   auto OrigText = SM.extractText(Node.Range, BufferID);
   auto OrigLoc = Node.Range.getStart();
 
-  auto Text = OrigText.drop_front(3).drop_back(2); // Drop "^/**" and "*/$"
+  if (!OrigText.startswith("/**"))
+    return true;
+
+  auto Text = OrigText.drop_front(3); // Drop "^/**"
+
+  if (!Text.endswith("*/"))
+    return true;
+
+  Text = Text.drop_back(2); // Drop "*/"
+
   if (Text.empty())
     return true;
 
