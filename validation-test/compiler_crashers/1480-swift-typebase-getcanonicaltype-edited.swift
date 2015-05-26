@@ -5,6 +5,10 @@
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
+// This test was tweaked slightly from the original
+// 1480-swift-typebase-getcanonicaltype.swift, because an unrelated change
+// happened to avoid the crash.
+
 func a(a: a {
 return x in c {
 }
@@ -22,7 +26,7 @@ case c: a {
 }
 protocol c : b where d: b: a {
 return ")
-case .c<c>(n: String {
+case ..c<c>(n: String {
 }
 typealias b : d
 init(i(self] {
