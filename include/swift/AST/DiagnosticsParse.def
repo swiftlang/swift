@@ -198,6 +198,9 @@ ERROR(autoclosure_is_decl_attribute,attribute_parsing,none,
 ERROR(autoclosure_not_on_enums,attribute_parsing,none,
       "@autoclosure is only allowed on parameters, not on enum cases", ())
 
+ERROR(enum_case_dot_prefix,decl_parsing,none,
+      "extraneous '.' in enum case declaration", ())
+
 
 // Variable getters/setters
 ERROR(static_var_decl_global_scope,decl_parsing,none,

@@ -4154,6 +4154,10 @@ ParserStatus Parser::parseDeclEnumCase(ParseDeclOptions Flags,
     Identifier Name;
     SourceLoc NameLoc;
 
+    // Consume an extraneous '.' so we can recover the case name.
+    SourceLoc DotLoc;
+    consumeIf(tok::period_prefix, DotLoc);
+
     const bool NameIsNotIdentifier = Tok.isNot(tok::identifier);
     if (parseIdentifierDeclName(*this, Name, NameLoc, tok::l_paren,
                                 tok::kw_case, tok::colon, tok::r_brace,
@@ -4183,6 +4187,9 @@ ParserStatus Parser::parseDeclEnumCase(ParseDeclOptions Flags,
         return Status;
       }
       diagnose(CaseLoc, diag::expected_identifier_in_decl, "enum case");
+    } else if (DotLoc.isValid()) {
+      diagnose(DotLoc, diag::enum_case_dot_prefix)
+        .fixItRemove(DotLoc);
     }
 
     // See if there's a following argument type.
