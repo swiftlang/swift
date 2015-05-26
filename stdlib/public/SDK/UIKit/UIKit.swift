@@ -15,6 +15,11 @@ import Foundation
 
 // These are un-imported macros in UIKit.
 
+//===----------------------------------------------------------------------===//
+// UIDeviceOrientation
+//===----------------------------------------------------------------------===//
+
+#if !os(watchOS)
 public extension UIDeviceOrientation {
   var isLandscape: Bool { 
     get { return self == .LandscapeLeft  ||  self == .LandscapeRight } 
@@ -40,24 +45,30 @@ public extension UIDeviceOrientation {
   }
 }
 
-public
-func UIDeviceOrientationIsLandscape(orientation: UIDeviceOrientation) -> Bool {
+public func UIDeviceOrientationIsLandscape(
+  orientation: UIDeviceOrientation
+) -> Bool {
   return orientation.isLandscape
 }
 
-public
-func UIDeviceOrientationIsPortrait(orientation: UIDeviceOrientation) -> Bool {
+public func UIDeviceOrientationIsPortrait(
+  orientation: UIDeviceOrientation
+) -> Bool {
   return orientation.isPortrait 
 }
 
-public
-func UIDeviceOrientationIsValidInterfaceOrientation(
-  orientation: UIDeviceOrientation) -> Bool 
+public func UIDeviceOrientationIsValidInterfaceOrientation(
+  orientation: UIDeviceOrientation) -> Bool
 {
   return orientation.isValidInterfaceOrientation
 }
+#endif
 
+//===----------------------------------------------------------------------===//
+// UIInterfaceOrientation
+//===----------------------------------------------------------------------===//
 
+#if !os(watchOS)
 public extension UIInterfaceOrientation {
   var isLandscape: Bool { 
     get { return self == .LandscapeLeft  ||  self == .LandscapeRight } 
@@ -68,22 +79,21 @@ public extension UIInterfaceOrientation {
   }
 }
 
-public
-func UIInterfaceOrientationIsPortrait(orientation: UIInterfaceOrientation) 
-  -> Bool 
-{
+public func UIInterfaceOrientationIsPortrait(
+  orientation: UIInterfaceOrientation) -> Bool {
   return orientation.isPortrait
 }
 
-public
-func UIInterfaceOrientationIsLandscape(orientation: UIInterfaceOrientation) 
-  -> Bool 
-{
+public func UIInterfaceOrientationIsLandscape(
+  orientation: UIInterfaceOrientation
+) -> Bool {
   return orientation.isLandscape
 }
+#endif
 
 // Overlays for variadic initializers.
 
+#if !os(watchOS)
 public extension UIActionSheet {
   convenience init(title: String?,
        delegate: UIActionSheetDelegate?,
@@ -103,7 +113,9 @@ public extension UIActionSheet {
     }
   }
 }
+#endif
 
+#if !os(watchOS)
 public extension UIAlertView {
   convenience init(title: String,
        message: String,
@@ -123,7 +135,9 @@ public extension UIAlertView {
     }
   }
 }
+#endif
 
+#if !os(watchOS)
 struct _UIViewMirror : MirrorType {
   static var _views = NSMutableSet()
 
@@ -191,6 +205,7 @@ extension UIView : Reflectable {
     return _UIViewMirror(self)
   }
 }
+#endif
 
 extension UIColor : _ColorLiteralConvertible {
   public required convenience init(colorLiteralRed red: Float, green: Float,
