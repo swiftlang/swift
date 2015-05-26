@@ -1393,37 +1393,6 @@ namespace {
       llvm::BasicBlock *payloadDest = blockForCase(getPayloadElement());
       unsigned extraInhabitantCount = getNumExtraInhabitantTagValues();
 
-      // If there are extra tag bits, switch over them first.
-      SmallVector<llvm::BasicBlock*, 2> tagBitBlocks;
-      if (ExtraTagBitCount > 0) {
-        llvm::Value *tagBits = value.claimNext();
-
-        auto *swi = IGF.Builder.CreateSwitch(tagBits, unreachableBB,
-                                             NumExtraTagValues);
-
-        // If we have extra inhabitants, we need to check for them in the
-        // zero-tag case. Otherwise, we switch directly to the payload case.
-        if (extraInhabitantCount > 0) {
-          auto bb = llvm::BasicBlock::Create(C);
-          tagBitBlocks.push_back(bb);
-          swi->addCase(llvm::ConstantInt::get(C,APInt(ExtraTagBitCount,0)), bb);
-        } else {
-          tagBitBlocks.push_back(payloadDest);
-          swi->addCase(llvm::ConstantInt::get(C,APInt(ExtraTagBitCount,0)),
-                       payloadDest);
-        }
-
-        for (unsigned i = 1; i < NumExtraTagValues; ++i) {
-          auto bb = llvm::BasicBlock::Create(C);
-          tagBitBlocks.push_back(bb);
-          swi->addCase(llvm::ConstantInt::get(C,APInt(ExtraTagBitCount,i)), bb);
-        }
-
-        // Continue by emitting the extra inhabitant dispatch, if any.
-        if (extraInhabitantCount > 0)
-          IGF.Builder.emitBlock(tagBitBlocks[0]);
-      }
-
       auto elements = getPayloadElement()->getParentEnum()->getAllElements();
       auto elti = elements.begin(), eltEnd = elements.end();
       if (*elti == getPayloadElement())
@@ -1438,12 +1407,73 @@ namespace {
           ++elti;
         return result;
       };
+      
+      // If there are extra tag bits, switch over them first.
+      SmallVector<llvm::BasicBlock*, 2> tagBitBlocks;
+      if (ExtraTagBitCount > 0) {
+        llvm::Value *tagBits = value.claimNext();
+        assert(NumExtraTagValues > 1
+               && "should have more than two tag values if there are extra "
+                  "tag bits!");
+
+        llvm::BasicBlock *zeroDest;
+        // If we have extra inhabitants, we need to check for them in the
+        // zero-tag case. Otherwise, we switch directly to the payload case.
+        if (extraInhabitantCount > 0)
+          zeroDest = llvm::BasicBlock::Create(C);
+        else
+          zeroDest = payloadDest;
+
+        // If there are only two interesting cases, do a cond_br instead of
+        // a switch.
+        if (ExtraTagBitCount == 1) {
+          tagBitBlocks.push_back(zeroDest);
+          llvm::BasicBlock *oneDest;
+          
+          // If there's only one no-payload case, we can jump to it directly.
+          if (ElementsWithNoPayload.size() == 1) {
+            oneDest = blockForCase(nextCase());
+          } else {
+            oneDest = llvm::BasicBlock::Create(C);
+            tagBitBlocks.push_back(oneDest);
+          }
+          IGF.Builder.CreateCondBr(tagBits, oneDest, zeroDest);
+        } else {
+          auto *swi = IGF.Builder.CreateSwitch(tagBits, unreachableBB,
+                                               NumExtraTagValues);
+
+          // If we have extra inhabitants, we need to check for them in the
+          // zero-tag case. Otherwise, we switch directly to the payload case.
+          tagBitBlocks.push_back(zeroDest);
+          swi->addCase(llvm::ConstantInt::get(C,APInt(ExtraTagBitCount,0)),
+                       zeroDest);
+          
+          for (unsigned i = 1; i < NumExtraTagValues; ++i) {
+            // If there's only one no-payload case, or the payload is empty,
+            // we can jump directly to cases without more branching.
+            llvm::BasicBlock *bb;
+            
+            if (ElementsWithNoPayload.size() == 1
+                || PayloadBitCount == 0) {
+              bb = blockForCase(nextCase());
+            } else {
+              bb = llvm::BasicBlock::Create(C);
+              tagBitBlocks.push_back(bb);
+            }
+            swi->addCase(llvm::ConstantInt::get(C, APInt(ExtraTagBitCount, i)),
+                         bb);
+          }
+
+          // Continue by emitting the extra inhabitant dispatch, if any.
+          if (extraInhabitantCount > 0)
+            IGF.Builder.emitBlock(tagBitBlocks[0]);
+        }
+      }
 
       // If there are no extra tag bits, or they're set to zero, then we either
       // have a payload, or an empty case represented using an extra inhabitant.
       // Check the extra inhabitant cases if we have any.
       auto &fpTypeInfo = getFixedPayloadTypeInfo();
-      unsigned payloadBits = fpTypeInfo.getFixedSize().getValueInBits();
       if (extraInhabitantCount > 0) {
         // Switch over the extra inhabitant patterns we used.
         APInt mask = fpTypeInfo.getFixedExtraInhabitantMask(IGF.IGM);
@@ -1451,12 +1481,13 @@ namespace {
         SmallVector<std::pair<APInt, llvm::BasicBlock *>, 4> cases;
         for (auto i = 0U; i < extraInhabitantCount && elti != eltEnd; ++i) {
           cases.push_back({
-            fpTypeInfo.getFixedExtraInhabitantValue(IGF.IGM, payloadBits, i),
+            fpTypeInfo.getFixedExtraInhabitantValue(IGF.IGM, PayloadBitCount,i),
             blockForCase(nextCase())
           });
         }
         
-        payload.emitSwitch(IGF, mask, cases, payloadDest);
+        payload.emitSwitch(IGF, mask, cases,
+                           SwitchDefaultDest(payloadDest, IsNotUnreachable));
       }
 
       // We should have handled the payload case either in extra inhabitant
@@ -1464,19 +1495,12 @@ namespace {
       assert(IGF.Builder.hasPostTerminatorIP() &&
              "did not handle payload case");
 
-      // If there's an empty payload, each tag value corresponds to a single
-      // empty case.
-      // TODO: Skip the waypoint blocks here.
-      if (payloadBits == 0) {
-        for (unsigned i = 1, e = tagBitBlocks.size(); i < e; ++i) {
-          assert(elti != eltEnd &&
-                 "ran out of cases before running out of extra tags?");
-          IGF.Builder.emitBlock(tagBitBlocks[i]);
-          IGF.Builder.CreateBr(blockForCase(nextCase()));
-        }
-      } else {
-        // Handle the cases covered by each tag bit value.
-        unsigned casesPerTag = payloadBits >= 32 ? UINT_MAX : 1U << payloadBits;
+      // Handle the cases covered by each tag bit value.
+      // If there was only one no-payload case, or the payload is empty, we
+      // already branched in the first switch.
+      if (PayloadBitCount > 0 && ElementsWithNoPayload.size() > 1) {
+        unsigned casesPerTag = PayloadBitCount >= 32
+          ? UINT_MAX : 1U << PayloadBitCount;
         for (unsigned i = 1, e = tagBitBlocks.size(); i < e; ++i) {
           assert(elti != eltEnd &&
                  "ran out of cases before running out of extra tags?");
@@ -1484,15 +1508,19 @@ namespace {
           
           SmallVector<std::pair<APInt, llvm::BasicBlock *>, 4> cases;
           for (unsigned tag = 0; tag < casesPerTag && elti != eltEnd; ++tag) {
-            cases.push_back({APInt(payloadBits, tag),
+            cases.push_back({APInt(PayloadBitCount, tag),
                              blockForCase(nextCase())});
           }
           
-          // FIXME: Provide a mask for 
-          payload.emitSwitch(IGF, APInt::getAllOnesValue(payloadBits), cases,
-                             unreachableBB);
+          // FIXME: Provide a mask to only match the bits in the payload
+          // whose extra inhabitants differ.
+          payload.emitSwitch(IGF, APInt::getAllOnesValue(PayloadBitCount),
+                             cases,
+                             SwitchDefaultDest(unreachableBB, IsUnreachable));
         }
       }
+      
+      assert(elti == eltEnd && "did not branch to all cases?!");
 
       // Delete the unreachable default block if we didn't use it, or emit it
       // if we did.
@@ -1692,22 +1720,26 @@ namespace {
     testFixedEnumContainsPayload(IRGenFunction &IGF,
                                  const EnumPayload &payload,
                                  llvm::Value *extraBits) const {
-      auto *falseBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
-
+      auto *nonzeroBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
       // We only need to apply the payload operation if the enum contains a
       // value of the payload case.
 
       // If we have extra tag bits, they will be zero if we contain a payload.
       if (ExtraTagBitCount > 0) {
         assert(extraBits);
-        llvm::Value *zero = llvm::ConstantInt::get(extraBits->getType(), 0);
-        llvm::Value *isZero = IGF.Builder.CreateICmp(llvm::CmpInst::ICMP_EQ,
-                                                     extraBits, zero);
+        llvm::Value *isNonzero;
+        if (ExtraTagBitCount == 1) {
+          isNonzero = extraBits;
+        } else {
+          llvm::Value *zero = llvm::ConstantInt::get(extraBits->getType(), 0);
+          isNonzero = IGF.Builder.CreateICmp(llvm::CmpInst::ICMP_NE,
+                                         extraBits, zero);
+        }
 
-        auto *trueBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
-        IGF.Builder.CreateCondBr(isZero, trueBB, falseBB);
+        auto *zeroBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
+        IGF.Builder.CreateCondBr(isNonzero, nonzeroBB, zeroBB);
 
-        IGF.Builder.emitBlock(trueBB);
+        IGF.Builder.emitBlock(zeroBB);
       }
 
       // If we used extra inhabitants to represent empty case discriminators,
@@ -1728,16 +1760,17 @@ namespace {
              ++i, ++inhabitant) {
           auto xi = getFixedPayloadTypeInfo()
             .getFixedExtraInhabitantValue(IGF.IGM, bitWidth, inhabitant);
-          cases.push_back({xi, falseBB});
+          cases.push_back({xi, nonzeroBB});
         }
         
         auto mask
           = getFixedPayloadTypeInfo().getFixedExtraInhabitantMask(IGF.IGM);
-        payload.emitSwitch(IGF, mask, cases, payloadBB);
+        payload.emitSwitch(IGF, mask, cases,
+                           SwitchDefaultDest(payloadBB, IsNotUnreachable));
         IGF.Builder.emitBlock(payloadBB);
       }
 
-      return falseBB;
+      return nonzeroBB;
     }
 
     /// Emits the test(s) that determine whether the enum contains a payload
@@ -2916,7 +2949,8 @@ namespace {
         }
 
         parts.payload.emitSwitch(IGF, APInt::getAllOnesValue(PayloadBitCount),
-                                 cases, unreachableBB);
+                               cases,
+                               SwitchDefaultDest(unreachableBB, IsUnreachable));
         ++tagIndex;
       }
 
