@@ -1614,17 +1614,25 @@ void ConformanceChecker::recordWitness(ValueDecl *requirement,
     return;
   }
 
+  VersionRange requiredRange = VersionRange::all();
+
   if (!TC.getLangOpts().DisableAvailabilityChecking &&
       !TC.isAvailabilitySafeForConformance(match.Witness, requirement,
-                                           Conformance)) {
+                                           Conformance, requiredRange)) {
     auto witness = match.Witness;
     diagnoseOrDefer(requirement, false,
-      [witness, requirement](TypeChecker &tc,
-                             NormalProtocolConformance *conformance) {
+      [witness, requirement, requiredRange](
+          TypeChecker &tc, NormalProtocolConformance *conformance) {
         tc.diagnose(witness,
-                    diag::availability_declaration_less_available_than_protocol,
-                    witness->getFullName());
+                    diag::availability_protocol_requires_version,
+                    conformance->getProtocol()->getFullName(),
+                    witness->getFullName(),
+                    prettyPlatformString(targetPlatform(tc.getLangOpts())),
+                    requiredRange.getLowerEndpoint()
+                    );
         tc.diagnose(requirement, diag::availability_protocol_requirement_here);
+        tc.diagnose(conformance->getLoc(),
+                    diag::availability_conformance_introduced_here);
       });
   }
 

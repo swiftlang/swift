@@ -1452,10 +1452,12 @@ public:
 
   /// \brief Returns true if the availability of the witness
   /// is sufficient to safely conform to the requirement in the context
-  /// the provided conformance.
+  /// the provided conformance. On return, requiredRange holds the range
+  /// required for conformance.
   bool isAvailabilitySafeForConformance(ValueDecl *witness,
                                         ValueDecl *requirement,
-                                        NormalProtocolConformance *conformance);
+                                        NormalProtocolConformance *conformance,
+                                        VersionRange &requiredRange);
 
   /// Returns an over-approximation of the range of operating system versions
   /// that could  the passed-in location location could be executing upon for

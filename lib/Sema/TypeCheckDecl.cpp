@@ -5657,7 +5657,8 @@ bool TypeChecker::isAvailabilitySafeForOverride(ValueDecl *override,
 
 bool TypeChecker::isAvailabilitySafeForConformance(
     ValueDecl *witness, ValueDecl *requirement,
-    NormalProtocolConformance *conformance) {
+    NormalProtocolConformance *conformance,
+    VersionRange &requiredRange) {
   DeclContext *DC = conformance->getDeclContext();
 
   // We assume conformances in
@@ -5678,17 +5679,16 @@ bool TypeChecker::isAvailabilitySafeForConformance(
   // intersection of the witnesses's available range with the conforming
   // type's available range.
   VersionRange witnessRange = TypeChecker::availableRange(witness, Context);
-  VersionRange requirementRange =
-      TypeChecker::availableRange(requirement, Context);
+  requiredRange = TypeChecker::availableRange(requirement, Context);
 
   VersionRange rangeOfConformingDecl = overApproximateOSVersionsAtLocation(
       conformingDecl->getLoc(), conformingDecl);
 
   // Constrain over-approximates intersection of version ranges.
   witnessRange.constrainWith(rangeOfConformingDecl);
-  requirementRange.constrainWith(rangeOfConformingDecl);
+  requiredRange.constrainWith(rangeOfConformingDecl);
 
-  return requirementRange.isContainedIn(witnessRange);
+  return requiredRange.isContainedIn(witnessRange);
 }
 
 void TypeChecker::typeCheckDecl(Decl *D, bool isFirstPass) {
