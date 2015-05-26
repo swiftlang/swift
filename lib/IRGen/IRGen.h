@@ -159,10 +159,6 @@ enum class ConstructorKind : uint8_t {
   Initializing
 };
 
-/// getResultType - Drill through N levels of function type to get to
-/// a formal result type.
-CanType getResultType(CanType fnType, unsigned uncurryLevel);
-
 /// An alignment value, in eight-bit units.
 class Alignment {
 public:

@@ -45,11 +45,6 @@ namespace irgen {
   /// for self parameters?
   bool isSelfContextParameter(SILParameterInfo parameter);
 
-  /// Return the natural level at which to uncurry this function.  This
-  /// is the number of additional parameter clauses that are uncurried
-  /// in the function body.
-  unsigned getDeclNaturalUncurryLevel(ValueDecl *val);
-  
   /// Emit a partial application thunk for a function pointer applied to a
   /// partial set of argument values.
   void emitFunctionPartialApplication(IRGenFunction &IGF,

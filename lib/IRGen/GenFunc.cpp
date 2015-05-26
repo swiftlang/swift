@@ -143,31 +143,6 @@ void ExplosionSchema::addToArgTypes(IRGenModule &IGM,
   }
 }
 
-/// Return the natural level at which to uncurry this function.  This
-/// is the number of additional parameter clauses that are uncurried
-/// in the function body.
-unsigned irgen::getDeclNaturalUncurryLevel(ValueDecl *val) {
-  if (FuncDecl *FD = dyn_cast<FuncDecl>(val)) {
-    return FD->getNaturalArgumentCount() - 1;
-  }
-  if (isa<ConstructorDecl>(val) || isa<EnumElementDecl>(val)) {
-    return 1;
-  }
-  if (isa<DestructorDecl>(val)) {
-    return 0;
-  }
-  llvm_unreachable("Unexpected ValueDecl");
-}
-
-/// Given a function type, return the formal result type at the given
-/// uncurrying level.  For 'a -> b -> c', this is 'b' at 0 and 'c' at 1.
-CanType irgen::getResultType(CanType type, unsigned uncurryLevel) {
-  do {
-    type = CanType(cast<AnyFunctionType>(type)->getResult());
-  } while (uncurryLevel--);
-  return type;
-}
-
 static llvm::CallingConv::ID getFreestandingConvention(IRGenModule &IGM) {
   // TODO: use a custom CC that returns three scalars efficiently
   return llvm::CallingConv::C;
