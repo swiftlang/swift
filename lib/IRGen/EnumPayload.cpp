@@ -357,7 +357,7 @@ static void emitSubSwitch(IRGenFunction &IGF,
                     MutableArrayRef<EnumPayload::LazyValue> values,
                     APInt mask,
                     MutableArrayRef<std::pair<APInt, llvm::BasicBlock *>> cases,
-                    SwitchDefaultDest dflt) {
+                    llvm::BasicBlock *dflt) {
 recur:
   assert(!values.empty() && "didn't exit out when exhausting all values?!");
   
@@ -432,28 +432,21 @@ recur:
   // If there's only one case, do a cond_br.
   if (subCases.size() == 1) {
     auto &subCase = *subCases.begin();
-    llvm::BasicBlock *block = blockForCases(subCase.second);
-    // If the default case is unreachable, we don't need to conditionally
-    // branch.
-    if (dflt.getInt()) {
-      IGF.Builder.CreateBr(block);
-      goto next;
-    }
-  
     auto &valuePiece = subCase.first;
     llvm::Value *valueConstant = llvm::ConstantInt::get(payloadIntTy,
                                                         valuePiece);
     valueConstant = IGF.Builder.CreateBitOrPointerCast(valueConstant,
                                                        v->getType());
     auto cmp = IGF.Builder.CreateICmpEQ(v, valueConstant);
-    IGF.Builder.CreateCondBr(cmp, block, dflt.getPointer());
+    llvm::BasicBlock *block = blockForCases(subCase.second);
+    IGF.Builder.CreateCondBr(cmp, block, dflt);
     goto next;
   }
   
   // Otherwise, do a switch.
   {
     v = IGF.Builder.CreateBitOrPointerCast(v, payloadIntTy);
-    auto swi = IGF.Builder.CreateSwitch(v, dflt.getPointer(), subCases.size());
+    auto swi = IGF.Builder.CreateSwitch(v, dflt, subCases.size());
     
     for (auto &subCase : subCases) {
       auto &valuePiece = subCase.first;
@@ -475,17 +468,11 @@ next:
 void EnumPayload::emitSwitch(IRGenFunction &IGF,
                            APInt mask,
                            ArrayRef<std::pair<APInt, llvm::BasicBlock *>> cases,
-                           SwitchDefaultDest dflt) const {
+                           llvm::BasicBlock *dflt) const {
   // If there's only one case to test, do a simple compare and branch.
   if (cases.size() == 1) {
-    // If the default case is unreachable, don't bother branching at all.
-    if (dflt.getInt()) {
-      IGF.Builder.CreateBr(cases[0].second);
-      return;
-    }
-  
     auto *cmp = emitCompare(IGF, mask, cases[0].first);
-    IGF.Builder.CreateCondBr(cmp, cases[0].second, dflt.getPointer());
+    IGF.Builder.CreateCondBr(cmp, cases[0].second, dflt);
     return;
   }
 

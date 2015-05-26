@@ -80,15 +80,6 @@ public:
   }
 };
 
-/// Is a switch default destination unreachable?
-enum IsUnreachable_t: bool {
-  IsNotUnreachable = false,
-  IsUnreachable = true,
-};
-
-using SwitchDefaultDest
-  = llvm::PointerIntPair<llvm::BasicBlock*, 1, IsUnreachable_t>;
-
 /// An enum payload value. The payload is represented as an explosion of
 /// integers and pointers that together represent the bit pattern of
 /// the payload.
@@ -152,7 +143,7 @@ public:
   void emitSwitch(IRGenFunction &IGF,
                   APInt mask,
                   ArrayRef<std::pair<APInt, llvm::BasicBlock*>> cases,
-                  SwitchDefaultDest dflt) const;
+                  llvm::BasicBlock *dflt) const;
   
   /// Emit an equality comparison operation that payload & mask == value.
   llvm::Value *emitCompare(IRGenFunction &IGF,
