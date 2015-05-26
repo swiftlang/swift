@@ -64,6 +64,8 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_QUAL_DOT_5 > %t.enum.txt
 // RUN: FileCheck %s -check-prefix=QUX_ENUM_DOT < %t.enum.txt
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=WITH_INVALID_DOT_1 | FileCheck %s -check-prefix=WITH_INVALID_DOT
+
 //===---
 //===--- Test that we can complete enum elements.
 //===---
@@ -341,4 +343,25 @@ func testQualifiedDot4() {
 }
 func testQualifiedDot5() {
   var e = QuxEnum.#^ENUM_QUAL_DOT_5^#
+}
+
+// ===--- Complete in the presence of invalid enum elements.
+
+enum WithInvalid {
+  case Okay
+  case NotOkay.
+  case .AlsoNotOkay
+  case
+  case JustFine
+}
+
+func testWithInvalid1() {
+  let x = WithInvalid.#^WITH_INVALID_DOT_1^#
+
+// WITH_INVALID_DOT: Begin completions
+// WITH_INVALID_DOT-DAG: Decl[EnumElement]/CurrNominal:      Okay[#WithInvalid#]; name=Okay
+// WITH_INVALID_DOT-DAG: Decl[EnumElement]/CurrNominal:      NotOkay[#WithInvalid#]; name=NotOkay
+// FIXME: we could handle AlsoNotOkay as a special case
+// WITH_INVALID_DOT-DAG: Decl[EnumElement]/CurrNominal:      JustFine[#WithInvalid#]; name=JustFine
+// WITH_INVALID_DOT: End completions
 }
