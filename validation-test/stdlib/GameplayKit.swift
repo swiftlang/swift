@@ -7,6 +7,9 @@
 // The availability check below is not enough because of:
 // <rdar://problem/20924154> No backward deployment story for overlays for new frameworks
 
+// FIXME: iOS test devices need to be updated.
+// XFAIL: OS=ios
+
 import StdlibUnittest
 import GameplayKit
 
