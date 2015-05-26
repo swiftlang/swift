@@ -1246,6 +1246,9 @@ private:
 
   /// Diagnose a failed forced downcast expr.
   bool diagnoseFailureForForcedCheckedCastExpr();
+  
+  /// Diagnose a failed tuple expression, by examining its element expressions.
+  bool diagnoseFailureForTupleExpr();
 };
 
 /// An intrusive, doubly-linked list of constraints.

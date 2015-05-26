@@ -661,7 +661,7 @@ func testOptionalChaining(a : Int?, b : Int!, c : Int??) {
 func testNilCoalescePrecedence(cond: Bool, a: Int?, r: Range<Int>?) {
   // ?? should have higher precedence than logical operators like || and comparisons.
   if cond || (a ?? 42 > 0) {}  // Ok.
-  if (cond || a) ?? 42 > 0 {}  // Not ok: expected-error {{could not find an overload for '??' that accepts the supplied arguments}}
+  if (cond || a) ?? 42 > 0 {}  // Not ok: expected-error {{cannot be used as a boolean}}
   if (cond || a) ?? (42 > 0) {}  // Not ok: expected-error {{cannot be used as a boolean}}
 
   if cond || a ?? 42 > 0 {}    // Parses as the first one, not the others.

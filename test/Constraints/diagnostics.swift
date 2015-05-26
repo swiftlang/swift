@@ -100,3 +100,8 @@ func rdar20142523() {
     return x
   })
 }
+
+func rdar21080030() {
+  var s = "Hello"
+  if s.characters.count() == 0 {} // expected-error{{cannot invoke 'count' with no arguments}}
+}

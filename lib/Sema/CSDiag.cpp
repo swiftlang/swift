@@ -2539,6 +2539,20 @@ bool FailureDiagnosis::diagnoseFailureForForcedCheckedCastExpr() {
   return diagnoseGeneralFailure();
 }
 
+bool FailureDiagnosis::diagnoseFailureForTupleExpr() {
+  assert(expr->getKind() == ExprKind::Tuple);
+  
+  auto tupleExpr = cast<TupleExpr>(expr);
+
+  // Stop at the first failed sub-expression.
+  for (auto elt : tupleExpr->getElements()) {
+    if (getTypeOfIndependentSubExpression(elt)->getAs<ErrorType>())
+      return true;
+  }
+  
+  return diagnoseGeneralFailure();
+}
+
 bool FailureDiagnosis::diagnoseFailure() {
   assert(CS && expr);
   
