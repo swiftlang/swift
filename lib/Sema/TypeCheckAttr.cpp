@@ -25,7 +25,7 @@ using namespace swift;
 
 namespace {
 /// This visits each attribute on a decl early, before the majority of type
-/// checking has been performed for the deocl.  The visitor should return true if
+/// checking has been performed for the decl.  The visitor should return true if
 /// the attribute is invalid and should be marked as such.
 class AttributeEarlyChecker : public AttributeVisitor<AttributeEarlyChecker> {
   TypeChecker &TC;
