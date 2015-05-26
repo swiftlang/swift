@@ -308,6 +308,15 @@ extension String {
     return _ns.capitalizedString as String
   }
 
+  // @property (readonly, copy) NSString *localizedCapitalizedString NS_AVAILABLE(10_11, 9_0);
+
+  /// A capitalized representation of the `String` that is produced
+  /// using the current locale.
+  @available(OSX 10.11, iOS 9.0, *)
+  public var localizedCapitalizedString: String {
+    return _ns.localizedCapitalizedString
+  }
+
   // - (NSString *)capitalizedStringWithLocale:(NSLocale *)locale
 
   /// Returns a capitalized representation of the `String`
@@ -315,7 +324,6 @@ extension String {
   public func capitalizedStringWithLocale(locale: NSLocale?) -> String{
     return _ns.capitalizedStringWithLocale(locale) as String
   }
-
 
   // - (NSComparisonResult)caseInsensitiveCompare:(NSString *)aString
 
@@ -1000,6 +1008,15 @@ extension String {
   //===--- Omitted for consistency with API review results 5/20/2014 ------===//
   // @property long long longLongValue
 
+  // @property (readonly, copy) NSString *localizedLowercaseString NS_AVAILABLE(10_11, 9_0);
+
+  /// A lowercase version of the string that is produced using the current
+  /// locale.
+  @available(OSX 10.11, iOS 9.0, *)
+  public var localizedLowercaseString: String {
+    return _ns.localizedLowercaseString
+  }
+
   // - (NSString *)lowercaseStringWithLocale:(NSLocale *)locale
 
   /// Returns a version of the string with all letters
@@ -1162,6 +1179,35 @@ extension String {
       : !mask.isEmpty ? _ns.rangeOfString(aString, options: mask)
       : _ns.rangeOfString(aString)
     )
+  }
+
+  // - (BOOL)localizedStandardContainsString:(NSString *)str NS_AVAILABLE(10_11, 9_0);
+
+  /// Returns `true` if `self` contains `string`, taking the current locale
+  /// into account.
+  ///
+  /// This is the most appropriate method for doing user-level string searches,
+  /// similar to how searches are done generally in the system.  The search is
+  /// locale-aware, case and diacritic insensitive.  The exact list of search
+  /// options applied may change over time.
+  @available(OSX 10.11, iOS 9.0, *)
+  public func localizedStandardContainsString(string: String) -> Bool {
+    return _ns.localizedStandardContainsString(string)
+  }
+
+  // - (NSRange)localizedStandardRangeOfString:(NSString *)str NS_AVAILABLE(10_11, 9_0);
+
+  /// Finds and returns the range of the first occurrence of a given string,
+  /// taking the current locale into account.  Returns `nil` if the string was
+  /// not found.
+  ///
+  /// This is the most appropriate method for doing user-level string searches,
+  /// similar to how searches are done generally in the system.  The search is
+  /// locale-aware, case and diacritic insensitive.  The exact list of search
+  /// options applied may change over time.
+  @available(OSX 10.11, iOS 9.0, *)
+  public func localizedStandardRangeOfString(string: String) -> Range<Index>? {
+    return _optionalRange(_ns.localizedStandardRangeOfString(string))
   }
 
   // @property NSStringEncoding smallestEncoding;
@@ -1427,6 +1473,14 @@ extension String {
     return _ns.substringWithRange(_toNSRange(aRange))
   }
 
+  // @property (readonly, copy) NSString *localizedUppercaseString NS_AVAILABLE(10_11, 9_0);
+
+  /// An uppercase version of the string that is produced using the current
+  /// locale.
+  @available(OSX 10.11, iOS 9.0, *)
+  public var localizedUppercaseString: String {
+    return _ns.localizedUppercaseString as String
+  }
 
   // - (NSString *)uppercaseStringWithLocale:(NSLocale *)locale
 
@@ -1472,8 +1526,10 @@ extension String {
       url, atomically: useAuxiliaryFile, encoding: enc)
   }
 
-  @available(iOS, introduced=9.0)
-  @available(OSX, introduced=10.11)
+  // - (nullable NSString *)stringByApplyingTransform:(NSString *)transform reverse:(BOOL)reverse NS_AVAILABLE(10_11, 9_0);
+
+  /// Perform string transliteration.
+  @available(OSX 10.11, iOS 9.0, *)
   public func stringByApplyingTransform(
     transform: String, reverse: Bool
   ) -> String? {
