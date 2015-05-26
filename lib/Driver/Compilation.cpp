@@ -151,20 +151,23 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
     Job::Condition Condition = Job::Condition::Always;
     StringRef DependenciesFile =
       Cmd->getOutput().getAdditionalOutputForType(types::TY_SwiftDeps);
-    if (!DependenciesFile.empty() &&
-        Cmd->getCondition() != Job::Condition::NewlyAdded) {
-      switch (DepGraph.loadFromPath(Cmd, DependenciesFile)) {
-      case DependencyGraphImpl::LoadResult::HadError:
-        disableIncrementalBuild();
-        for (const Job *Cmd : DeferredCommands)
-          scheduleCommandIfNecessaryAndPossible(Cmd);
-        DeferredCommands.clear();
-        break;
-      case DependencyGraphImpl::LoadResult::UpToDate:
-        Condition = Cmd->getCondition();
-        break;
-      case DependencyGraphImpl::LoadResult::AffectsDownstream:
-        llvm_unreachable("we haven't marked anything in this graph yet");
+    if (!DependenciesFile.empty()) {
+      if (Cmd->getCondition() == Job::Condition::NewlyAdded) {
+        DepGraph.addIndependentNode(Cmd);
+      } else {
+        switch (DepGraph.loadFromPath(Cmd, DependenciesFile)) {
+        case DependencyGraphImpl::LoadResult::HadError:
+          disableIncrementalBuild();
+          for (const Job *Cmd : DeferredCommands)
+            scheduleCommandIfNecessaryAndPossible(Cmd);
+          DeferredCommands.clear();
+          break;
+        case DependencyGraphImpl::LoadResult::UpToDate:
+          Condition = Cmd->getCondition();
+          break;
+        case DependencyGraphImpl::LoadResult::AffectsDownstream:
+          llvm_unreachable("we haven't marked anything in this graph yet");
+        }
       }
     }
 

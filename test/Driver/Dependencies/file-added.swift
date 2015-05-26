@@ -12,3 +12,8 @@
 
 // CHECK-SECOND-NOT: Handled
 
+// RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path %S/Inputs/update-dependencies.py -output-file-map %t/output.json -incremental ./other.swift ./main.swift -module-name main -j1 -v 2>&1 | FileCheck -check-prefix=CHECK-THIRD %s
+
+// CHECK-THIRD-NOT: Handled other.swift
+// CHECK-THIRD: Handled main.swift
+// CHECK-THIRD-NOT: Handled other.swift

@@ -139,6 +139,12 @@ protected:
   LoadResult loadFromString(const void *node, StringRef data);
   LoadResult loadFromPath(const void *node, StringRef path);
 
+  void addIndependentNode(const void *node) {
+    bool newlyInserted = Provides.insert({node, {}}).second;
+    assert(newlyInserted && "node is already in graph");
+    (void)newlyInserted;
+  }
+
   void markTransitive(SmallVectorImpl<const void *> &visited,
                       const void *node);
   bool markIntransitive(const void *node) {
@@ -210,6 +216,14 @@ public:
   LoadResult loadFromString(T node, StringRef data) {
     return DependencyGraphImpl::loadFromString(Traits::getAsVoidPointer(node),
                                                data);
+  }
+
+  /// Adds \p node to the dependency graph without any connections.
+  ///
+  /// This can be used for new nodes that may be updated later.
+  void addIndependentNode(T node) {
+    return
+        DependencyGraphImpl::addIndependentNode(Traits::getAsVoidPointer(node));
   }
 
   /// Marks \p node and all nodes that depend on \p node, and places any nodes
