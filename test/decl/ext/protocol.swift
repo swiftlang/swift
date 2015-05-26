@@ -863,9 +863,9 @@ extension BadProto2 {
 }
 
 extension BadProto1 {
-  func foo() { } // expected-error{{method 'foo()' in protocol extension must be marked 'final'}}{{3-3=final }}
-  var prop: Int { return 0 } // expected-error{{property 'prop' in protocol extension must be marked 'final'}}{{3-3=final }}
-  subscript (i: Int) -> String { // expected-error{{subscript in protocol extension must be marked 'final'}}{{3-3=final }}
+  func foo() { }
+  var prop: Int { return 0 }
+  subscript (i: Int) -> String {
     return "hello"
   }
 }

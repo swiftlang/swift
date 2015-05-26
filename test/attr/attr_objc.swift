@@ -1767,7 +1767,7 @@ extension PlainProtocol {
 extension Protocol_ObjC1 {
   // Don't infer @objc for extensions of @objc protocols.
 
-  // CHECK: {{^}} final var property: Int
+  // CHECK: {{^}} var property: Int
   final var property: Int { return 5 }
 }
 

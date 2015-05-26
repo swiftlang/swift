@@ -25,7 +25,7 @@ using namespace swift;
 
 namespace {
 /// This visits each attribute on a decl early, before the majority of type
-/// checking has been performed for the decl.  The visitor should return true if
+/// checking has been performed for the deocl.  The visitor should return true if
 /// the attribute is invalid and should be marked as such.
 class AttributeEarlyChecker : public AttributeVisitor<AttributeEarlyChecker> {
   TypeChecker &TC;
@@ -49,7 +49,6 @@ public:
 #define IGNORED_ATTR(X) void visit##X##Attr(X##Attr *) {}
   IGNORED_ATTR(Asmname)
   IGNORED_ATTR(Available)
-  IGNORED_ATTR(Final)
   IGNORED_ATTR(NSApplicationMain)
   IGNORED_ATTR(NSCopying)
   IGNORED_ATTR(NoReturn)
@@ -100,6 +99,14 @@ public:
 
   void visitOwnershipAttr(OwnershipAttr *attr) {
     TC.checkOwnershipAttr(cast<VarDecl>(D), attr);
+  }
+
+  void visitFinalAttr(FinalAttr *attr) {
+    // Accept and remove the 'final' attribute from members of protocol
+    // extensions.
+    if (D->getDeclContext()->isProtocolExtensionContext()) {
+      D->getAttrs().removeAttribute(attr);
+    }
   }
 
   void visitIBActionAttr(IBActionAttr *attr);

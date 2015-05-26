@@ -2856,15 +2856,6 @@ public:
 
     TC.validateDecl(VD);
 
-    // Make sure that we have 'final' on members of protocol extensions.
-    if (VD->getDeclContext()->isProtocolExtensionContext() &&
-        !VD->getAttrs().hasAttribute<FinalAttr>()) {
-      TC.diagnose(VD, diag::extension_protocol_member_nonfinal,
-                  1, VD->getFullName())
-        .fixItInsert(VD->getAttributeInsertionLoc(true), "final ");
-      VD->getAttrs().add(new (TC.Context) FinalAttr(true));
-    }
-
     // WARNING: Anything you put in this function will only be run when the
     // VarDecl is fully type-checked within its own file. It will NOT be run
     // when the VarDecl is merely used from another file.
@@ -3065,15 +3056,6 @@ public:
 
     assert(SD->getDeclContext()->isTypeContext() &&
            "Decl parsing must prevent subscripts outside of types!");
-
-    // Make sure that we have 'final' on members of protocol extensions.
-    if (SD->getDeclContext()->isProtocolExtensionContext() &&
-        !SD->getAttrs().hasAttribute<FinalAttr>()) {
-      TC.diagnose(SD, diag::extension_protocol_member_nonfinal,
-                  2, SD->getFullName())
-        .fixItInsert(SD->getAttributeInsertionLoc(true), "final ");
-      SD->getAttrs().add(new (TC.Context) FinalAttr(true));
-    }
 
     TC.checkDeclAttributesEarly(SD);
     TC.computeAccessibility(SD);
@@ -4039,15 +4021,6 @@ public:
       FD->setMutating(false);
 
     bool isInvalid = false;
-
-    // Make sure that we have 'final' on members of protocol extensions.
-    if (FD->getDeclContext()->isProtocolExtensionContext() &&
-        !FD->isAccessor() && !FD->getAttrs().hasAttribute<FinalAttr>()) {
-      TC.diagnose(FD, diag::extension_protocol_member_nonfinal,
-                  0, FD->getFullName())
-        .fixItInsert(FD->getAttributeInsertionLoc(true), "final ");
-      FD->getAttrs().add(new (TC.Context) FinalAttr(true));
-    }
 
     // Check whether the return type is dynamic 'Self'.
     if (checkDynamicSelfReturn(FD))
