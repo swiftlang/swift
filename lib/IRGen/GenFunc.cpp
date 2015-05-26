@@ -2475,6 +2475,8 @@ void CallEmission::setFromCallee() {
   LastArgWritten = numArgs;
 
   auto fnType = CurCallee.getOrigFunctionType();
+  auto sig = FuncSignatureInfo(fnType);
+  Attrs = sig.getSignature(IGF.IGM).getAttributes();
 
   if (fnType->getRepresentation()
         == SILFunctionTypeRepresentation::WitnessMethod) {
@@ -2706,8 +2708,7 @@ void irgen::emitClangExpandedParameter(IRGenFunction &IGF,
 }
 
 static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
-                                 Explosion &in, Explosion &out,
-                                 llvm::AttributeSet &attrs) {
+                                 Explosion &in, Explosion &out) {
   auto fnType = callee.getOrigFunctionType();
   auto params = fnType->getParameters();
 
@@ -2781,7 +2782,6 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
     bool signExt = clangResultTy->hasSignedIntegerRepresentation();
     assert((signExt || clangResultTy->hasUnsignedIntegerRepresentation()) &&
            "Invalid attempt to add extension attribute to argument!");
-    addExtendAttribute(IGF.IGM, attrs, llvm::AttributeSet::ReturnIndex, signExt);
   }
 
   for (auto i : indices(paramTys).slice(firstParam)) {
@@ -2797,7 +2797,6 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
       bool signExt = paramTys[i]->hasSignedIntegerRepresentation();
       assert((signExt || paramTys[i]->hasUnsignedIntegerRepresentation()) &&
              "Invalid attempt to add extension attribute to argument!");
-      addExtendAttribute(IGF.IGM, attrs, attrBase + out.size() + 1, signExt);
       SWIFT_FALLTHROUGH;
     }
     case clang::CodeGen::ABIArgInfo::Direct:
@@ -2809,9 +2808,6 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
                                       "indirect-temporary").getAddress();
       ti.initialize(IGF, in, addr);
 
-      if (AI.getIndirectByVal())
-        addByvalArgumentAttributes(IGF.IGM, attrs, attrBase + out.size(),
-                                   addr.getAlignment());
       out.add(addr.getAddress());
       break;
     }
@@ -2837,7 +2833,7 @@ void CallEmission::setArgs(Explosion &arg, WitnessMetadata *witnessMetadata) {
   case SILFunctionTypeRepresentation::ObjCMethod:
   case SILFunctionTypeRepresentation::Block: {
     Explosion externalized;
-    externalizeArguments(IGF, getCallee(), arg, externalized, Attrs);
+    externalizeArguments(IGF, getCallee(), arg, externalized);
     arg = std::move(externalized);
     break;
   }
