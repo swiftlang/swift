@@ -672,6 +672,14 @@ static bool isiOS(TypeChecker &TC) {
   return TC.getLangOpts().Target.isiOS();
 }
 
+static bool iswatchOS(TypeChecker &TC) {
+  return TC.getLangOpts().Target.isWatchOS();
+}
+
+static bool isRelaxedIBAction(TypeChecker &TC) {
+  return isiOS(TC) || iswatchOS(TC);
+}
+
 void AttributeChecker::visitIBActionAttr(IBActionAttr *attr) {
   // IBActions instance methods must have type Class -> (...) -> ().
   auto *FD = cast<FuncDecl>(D);
@@ -687,8 +695,8 @@ void AttributeChecker::visitIBActionAttr(IBActionAttr *attr) {
   auto ArgTuple = dyn_cast<TuplePattern>(Arguments);
 
   auto checkSingleArgument = [this](const Pattern *argPattern) -> bool {
-    // One argument. May be a scalar on iOS (because of WatchKit).
-    if (isiOS(TC)) {
+    // One argument. May be a scalar on iOS/watchOS (because of WatchKit).
+    if (isRelaxedIBAction(TC)) {
       // Do a rough check to allow any ObjC-representable struct or enum type
       // on iOS.
       Type ty = argPattern->getType();
@@ -701,15 +709,15 @@ void AttributeChecker::visitIBActionAttr(IBActionAttr *attr) {
     return checkObjectOrOptionalObjectType(TC, D, argPattern);
   };
 
-  bool iOSOnlyUsedOnOSX = false;
+  bool relaxedIBActionUsedOnOSX = false;
   bool Valid = true;
   if (ArgTuple) {
     auto fields = ArgTuple->getElements();
     switch (ArgTuple->getNumElements()) {
     case 0:
       // (iOS only) No arguments.
-      if (!isiOS(TC)) {
-        iOSOnlyUsedOnOSX = true;
+      if (!isRelaxedIBAction(TC)) {
+        relaxedIBActionUsedOnOSX = true;
         break;
       }
       break;
@@ -719,10 +727,10 @@ void AttributeChecker::visitIBActionAttr(IBActionAttr *attr) {
         Valid = false;
       break;
     case 2:
-      // (iOS only) Two arguments, the second of which is a UIEvent.
+      // (iOS/watchOS only) Two arguments, the second of which is a UIEvent.
       // We don't currently enforce the UIEvent part.
-      if (!isiOS(TC)) {
-        iOSOnlyUsedOnOSX = true;
+      if (!isRelaxedIBAction(TC)) {
+        relaxedIBActionUsedOnOSX = true;
         break;
       }
       if (checkObjectOrOptionalObjectType(TC, D, fields[0].getPattern()))
@@ -732,7 +740,8 @@ void AttributeChecker::visitIBActionAttr(IBActionAttr *attr) {
       break;
     default:
       // No platform allows an action signature with more than two arguments.
-      TC.diagnose(D, diag::invalid_ibaction_argument_count, isiOS(TC));
+      TC.diagnose(D, diag::invalid_ibaction_argument_count,
+                  isRelaxedIBAction(TC));
       Valid = false;
       break;
     }
@@ -742,8 +751,9 @@ void AttributeChecker::visitIBActionAttr(IBActionAttr *attr) {
       Valid = false;
   }
 
-  if (iOSOnlyUsedOnOSX) {
-    TC.diagnose(D, diag::invalid_ibaction_argument_count, /*iOS=*/false);
+  if (relaxedIBActionUsedOnOSX) {
+    TC.diagnose(D, diag::invalid_ibaction_argument_count,
+                /*relaxedIBAction=*/false);
     Valid = false;
   }
 

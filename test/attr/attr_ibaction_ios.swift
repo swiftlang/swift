@@ -8,6 +8,7 @@ class IBActionWrapperTy {
   @IBAction func nullary() {}
   // CHECK-ios-NOT: attr_ibaction_ios.swift:[[@LINE-1]]
   // CHECK-macosx: attr_ibaction_ios.swift:[[@LINE-2]]:18: error: @IBAction methods must have a single argument
+  // CHECK-watchos-NOT: attr_ibaction_ios.swift:[[@LINE-3]]
   
   @IBAction func reqReq(_: AnyObject, _: AnyObject) {}
   @IBAction func reqOpt(_: AnyObject, _: AnyObject?) {}
@@ -36,10 +37,20 @@ class IBActionWrapperTy {
   // CHECK-macosx: attr_ibaction_ios.swift:[[@LINE-18]]:18: error: @IBAction methods must have a single argument
   // CHECK-macosx: attr_ibaction_ios.swift:[[@LINE-18]]:18: error: @IBAction methods must have a single argument
   // CHECK-macosx: attr_ibaction_ios.swift:[[@LINE-18]]:18: error: @IBAction methods must have a single argument
+  // CHECK-watchos-NOT: attr_ibaction_ios.swift:[[@LINE-27]]
+  // CHECK-watchos-NOT: attr_ibaction_ios.swift:[[@LINE-27]]
+  // CHECK-watchos-NOT: attr_ibaction_ios.swift:[[@LINE-27]]
+  // CHECK-watchos-NOT: attr_ibaction_ios.swift:[[@LINE-27]]
+  // CHECK-watchos-NOT: attr_ibaction_ios.swift:[[@LINE-27]]
+  // CHECK-watchos-NOT: attr_ibaction_ios.swift:[[@LINE-27]]
+  // CHECK-watchos-NOT: attr_ibaction_ios.swift:[[@LINE-27]]
+  // CHECK-watchos-NOT: attr_ibaction_ios.swift:[[@LINE-27]]
+  // CHECK-watchos-NOT: attr_ibaction_ios.swift:[[@LINE-27]]
 
   @IBAction func reqBad(_: AnyObject, _: IBActionWrapperTy) {}
   // CHECK-ios: attr_ibaction_ios.swift:[[@LINE-1]]:18: error: argument to @IBAction method cannot have non-'@objc' class type
   // CHECK-macosx: attr_ibaction_ios.swift:[[@LINE-2]]:18: error: @IBAction methods must have a single argument
+  // CHECK-watch: attr_ibaction_ios.swift:[[@LINE-3]]:18: error: argument to @IBAction method cannot have non-'@objc' class type
 
   @IBAction func badReq(_: Int, _: AnyObject) {}
   // CHECK-ios: attr_ibaction_ios.swift:[[@LINE-1]]:18: error: argument to @IBAction method cannot have non-object type
