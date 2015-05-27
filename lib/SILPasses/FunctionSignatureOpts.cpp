@@ -485,12 +485,11 @@ createEmptyFunctionWithOptimizedSig(llvm::SmallString<64> &NewFName) {
   CanSILFunctionType NewFTy = createOptimizedSILFunctionType();
 
   // Create the new function.
-  auto *NewDebugScope = new (M) SILDebugScope(*F->getDebugScope());
   SILFunction *NewF = SILFunction::create(
       M, F->getLinkage(), NewFName, NewFTy, nullptr, F->getLocation(),
       F->isBare(), F->isTransparent(), F->isFragile(), F->isThunk(),
       F->getClassVisibility(),
-      F->getInlineStrategy(), F->getEffectsKind(), 0, NewDebugScope,
+      F->getInlineStrategy(), F->getEffectsKind(), 0, F->getDebugScope(),
       F->getDeclContext());
 
   // Array semantic clients rely on the signature being as in the original
@@ -498,7 +497,11 @@ createEmptyFunctionWithOptimizedSig(llvm::SmallString<64> &NewFName) {
   if (!F->getSemanticsAttr().startswith("array."))
     NewF->setSemanticsAttr(F->getSemanticsAttr());
 
-  NewDebugScope->SILFn = NewF;
+  // All instructions will be moved to NewF later, so move the old
+  // function's SILDebugScope over to NewF.
+  NewF->getDebugScope()->SILFn = NewF;
+  auto *NewScope = new (M) SILDebugScope(F->getDebugScope()->Loc, *F);
+  F->setDebugScope(NewScope);
 
   return NewF;
 }

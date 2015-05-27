@@ -398,6 +398,11 @@ public:
     }
 
     Dominance = new DominanceInfo(const_cast<SILFunction*>(&F));
+
+    auto *DebugScope = F.getDebugScope();
+    require(DebugScope, "All SIL functions must have a debug scope");
+    require(DebugScope && DebugScope->SILFn == &F,
+            "Scope of SIL function points to different function");
   }
 
   ~SILVerifier() {
@@ -485,7 +490,24 @@ public:
     }
   }
 
+  /// Return the SIL function of a SILDebugScope's ancestor.
+  static SILFunction *getFunction(SILDebugScope *DS) {
+    if (DS->InlinedCallSite)
+      return getFunction(DS->InlinedCallSite);
+    if (DS->Parent)
+      return getFunction(DS->Parent);
+    return DS->SILFn;
+  }
+
   void checkInstructionsSILLocation(SILInstruction *I) {
+    // Check the debug scope.
+    if (!maybeScopeless(*I)) {
+      require(I->getDebugScope(), "instruction has a location, but no scope");
+      require(getFunction(I->getDebugScope()) == I->getParent()->getParent(),
+              "SILDebugScope of instruction points to a different function");
+    }
+
+    // Check the location kind.
     SILLocation L = I->getLoc();
     SILLocation::LocationKind LocKind = L.getKind();
     ValueKind InstKind = I->getKind();
@@ -512,9 +534,6 @@ public:
     if (LocKind == SILLocation::ArtificialUnreachableKind)
       require(InstKind == ValueKind::UnreachableInst,
         "artificial locations are only allowed on Unreachable instructions");
-
-    if (!maybeScopeless(*I))
-      require(I->getDebugScope(), "instruction has a location, but no scope");
   }
 
   /// Check that the types of this value producer are all legal in the function
