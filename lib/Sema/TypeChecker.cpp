@@ -1619,7 +1619,7 @@ abstractSyntaxDeclForAvailableAttribute(const Decl *ConcreteSyntaxDecl) {
     // binding.
     ArrayRef<PatternBindingEntry> Entries = PBD->getPatternList();
     if (Entries.size() > 0) {
-      VarDecl *VD = Entries.front().ThePattern->getSingleVar();
+      VarDecl *VD = Entries.front().getPattern()->getSingleVar();
       if (VD)
         return VD;
     }

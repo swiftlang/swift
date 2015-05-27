@@ -659,10 +659,10 @@ namespace {
       
       for (auto entry : PBD->getPatternList()) {
         OS << '\n';
-        printRec(entry.ThePattern);
-        if (entry.Init) {
+        printRec(entry.getPattern());
+        if (entry.getInit()) {
           OS << '\n';
-          printRec(entry.Init);
+          printRec(entry.getInit());
         }
       }
       OS << ')';

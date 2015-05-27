@@ -147,15 +147,15 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     unsigned idx = 0U-1;
     for (auto entry : PBD->getPatternList()) {
       ++idx;
-      if (Pattern *Pat = doIt(entry.ThePattern))
+      if (Pattern *Pat = doIt(entry.getPattern()))
         PBD->setPattern(idx, Pat);
       else
         return true;
-      if (entry.Init) {
+      if (entry.getInit()) {
 #ifndef NDEBUG
         PrettyStackTraceDecl debugStack("walking into initializer for", PBD);
 #endif
-        if (Expr *E2 = doIt(entry.Init))
+        if (Expr *E2 = doIt(entry.getInit()))
           PBD->setInit(idx, E2);
         else
           return true;

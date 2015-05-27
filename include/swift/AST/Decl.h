@@ -1854,11 +1854,20 @@ public:
 /// This represents one entry in a PatternBindingDecl, which are pairs of
 /// Pattern and Initialization expression.  The pattern is always present, but
 /// the initializer can be null if there is none.
-struct PatternBindingEntry {
+class PatternBindingEntry {
   Pattern *ThePattern;
-  Expr *Init;
+  llvm::PointerIntPair<Expr *, 1, bool> InitAndChecked;
   
-  PatternBindingEntry(Pattern *P, Expr *E) : ThePattern(P), Init(E) {}
+public:
+  PatternBindingEntry(Pattern *P, Expr *E)
+    : ThePattern(P), InitAndChecked(E, false) {}
+
+  Pattern *getPattern() const { return ThePattern; }
+  void setPattern(Pattern *P) { ThePattern = P; }
+  Expr *getInit() const { return InitAndChecked.getPointer(); }
+  void setInit(Expr *E) { InitAndChecked.setPointer(E); }
+  bool isInitializerChecked() const { return InitAndChecked.getInt(); }
+  void setInitializerChecked() { InitAndChecked.setInt(true); }
 };
 
 /// \brief This decl contains a pattern and optional initializer for a set
@@ -1877,8 +1886,7 @@ class PatternBindingDecl : public Decl {
   SourceLoc StaticLoc; ///< Location of the 'static/class' keyword, if present.
   SourceLoc VarLoc;    ///< Location of the 'var' keyword.
 
-  bool isInitializerTypeChecked : 1;
-  unsigned numPatternEntries : 31;
+  unsigned numPatternEntries;
 
   friend class Decl;
   
@@ -1916,15 +1924,15 @@ public:
   }
 
   Expr *getInit(unsigned i) const {
-    return getPatternList()[i].Init;
+    return getPatternList()[i].getInit();
   }
   
   void setInit(unsigned i, Expr *E) {
-    getMutablePatternList()[i].Init = E;
+    getMutablePatternList()[i].setInit(E);
   }
 
   Pattern *getPattern(unsigned i) const {
-    return getPatternList()[i].ThePattern;
+    return getPatternList()[i].getPattern();
   }
   
   void setPattern(unsigned i, Pattern *Pat);
@@ -1944,9 +1952,13 @@ public:
     return getPatternList()[getPatternEntryIndexForVarDecl(VD)];
   }
   
-  bool isInitializerChecked() const { return isInitializerTypeChecked; }
-  void setInitializerChecked() { isInitializerTypeChecked = true; }
+  bool isInitializerChecked(unsigned i) const {
+    return getPatternList()[i].isInitializerChecked();
+  }
 
+  void setInitializerChecked(unsigned i) {
+    getMutablePatternList()[i].setInitializerChecked();
+  }
   
   /// Does this binding declare something that requires storage?
   bool hasStorage() const;
@@ -4198,7 +4210,7 @@ public:
   ///
   Pattern *getParentPattern() const {
     if (auto *PBD = getParentPatternBinding())
-      return PBD->getPatternEntryForVarDecl(this).ThePattern;
+      return PBD->getPatternEntryForVarDecl(this).getPattern();
     return nullptr;
   }
 
@@ -4213,7 +4225,7 @@ public:
   ///
   Expr *getParentInitializer() const {
     if (auto *PBD = getParentPatternBinding())
-      return PBD->getPatternEntryForVarDecl(this).Init;
+      return PBD->getPatternEntryForVarDecl(this).getInit();
     return nullptr;
   }
   

@@ -166,3 +166,8 @@ struct StructWithLazyField {
   let someProp = "Some value"
 }
 
+// <rdar://problem/21057425> Crash while compiling attached test-app.
+// CHECK-LABEL: // decls.test21057425
+func test21057425() {
+  var x = 0, y: Int = 0
+}

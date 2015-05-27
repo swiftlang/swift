@@ -2587,7 +2587,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
     patterns.reserve(numPatterns);
     for (unsigned i = 0; i != numPatterns; ++i) {
       patterns.push_back({ maybeReadPattern(), nullptr });
-      assert(patterns.back().ThePattern);
+      assert(patterns.back().getPattern());
     }
 
     auto StaticSpelling = getActualStaticSpellingKind(RawStaticSpelling);

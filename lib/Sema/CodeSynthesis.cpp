@@ -1664,8 +1664,9 @@ static FuncDecl *completeLazyPropertyGetter(VarDecl *VD, VarDecl *Storage,
   //   lazy var (a,b) = foo()
   auto *InitValue = VD->getParentInitializer();
   auto PBD = VD->getParentPatternBinding();
-  PBD->setInit(PBD->getPatternEntryIndexForVarDecl(VD), nullptr);
-  PBD->setInitializerChecked();
+  unsigned entryIndex = PBD->getPatternEntryIndexForVarDecl(VD);
+  PBD->setInit(entryIndex, nullptr);
+  PBD->setInitializerChecked(entryIndex);
 
   // Recontextualize any closure declcontexts nested in the initializer to
   // realize that they are in the getter function.

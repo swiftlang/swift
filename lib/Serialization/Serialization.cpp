@@ -2002,7 +2002,7 @@ void Serializer::writeDecl(const Decl *D) {
                                      binding->getNumPatternEntries());
 
     for (auto entry : binding->getPatternList()) {
-      writePattern(entry.ThePattern);
+      writePattern(entry.getPattern());
       // Ignore initializer; external clients don't need to know about it.
     }
 

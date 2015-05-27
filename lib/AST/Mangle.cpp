@@ -184,7 +184,7 @@ namespace {
 /// not be adequately enforced.
 static VarDecl *findFirstVariable(PatternBindingDecl *binding) {
   for (auto entry : binding->getPatternList()) {
-    auto var = FindFirstVariable().visit(entry.ThePattern);
+    auto var = FindFirstVariable().visit(entry.getPattern());
     if (var) return var;
   }
   llvm_unreachable("pattern-binding bound no variables?");

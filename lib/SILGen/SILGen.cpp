@@ -470,7 +470,7 @@ static bool requiresIVarInitialization(SILGenModule &SGM, ClassDecl *cd) {
     if (!pbd) continue;
 
     for (auto entry : pbd->getPatternList())
-      if (entry.Init)
+      if (entry.getInit())
         return true;
   }
 

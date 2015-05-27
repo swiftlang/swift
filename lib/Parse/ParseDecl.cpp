@@ -3711,7 +3711,8 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
       
       
       // Remember this init for the PatternBindingDecl.
-      PBDEntries.back().Init = PatternInit = init.getPtrOrNull();
+      PatternInit = init.getPtrOrNull();
+      PBDEntries.back().setInit(PatternInit);
 
       // If we allocated an initContext and the expression had a closure in it,
       // we'll need to keep the initContext around.
@@ -3750,8 +3751,8 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
     if (TypedPattern *TP = dyn_cast<TypedPattern>(pattern)) {
       if (isa<NamedPattern>(TP->getSubPattern()) && PatternInit == nullptr) {
         for (unsigned i = PBDEntries.size() - 1; i != 0; --i) {
-          Pattern *PrevPat = PBDEntries[i-1].ThePattern;
-          if (!isa<NamedPattern>(PrevPat) || PBDEntries[i-1].Init)
+          Pattern *PrevPat = PBDEntries[i-1].getPattern();
+          if (!isa<NamedPattern>(PrevPat) || PBDEntries[i-1].getInit())
             break;
           if (HasAccessors) {
             // FIXME -- offer a fixit to explicitly specify the type
@@ -3762,7 +3763,7 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
           TypedPattern *NewTP = new (Context) TypedPattern(PrevPat,
                                                            TP->getTypeLoc());
           NewTP->setPropagatedType();
-          PBDEntries[i-1].ThePattern = NewTP;
+          PBDEntries[i-1].setPattern(NewTP);
         }
       }
     }
@@ -3776,15 +3777,16 @@ ParserStatus Parser::parseDeclVar(ParseDeclOptions Flags,
   if (TryLoc.isValid()) {
     auto inFlightDiag = diagnose(TryLoc, diag::try_on_var_let);
 
-    if (PBDEntries.size() == 1 && PBDEntries.front().Init &&
-        !isa<ErrorExpr>(PBDEntries.front().Init)) {
-      auto *init = PBDEntries.front().Init;
+    if (PBDEntries.size() == 1 && PBDEntries.front().getInit() &&
+        !isa<ErrorExpr>(PBDEntries.front().getInit())) {
+      auto *init = PBDEntries.front().getInit();
       inFlightDiag.fixItRemoveChars(TryLoc, VarLoc);
       inFlightDiag.fixItInsert(init->getStartLoc(), "try ");
 
       // Note: We can't use TryLoc here because it's outside the PBD source
       // range.
-      PBDEntries.front().Init = new (Context) TryExpr(init->getStartLoc(),init);
+      PBDEntries.front().setInit(new (Context) TryExpr(init->getStartLoc(),
+                                                       init));
     }
   }
 

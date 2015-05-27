@@ -1155,11 +1155,11 @@ static bool isDefaultInitializable(PatternBindingDecl *pbd) {
   
   for (auto entry : pbd->getPatternList()) {
     // If it has an initializer, this is trivially true.
-    if (entry.Init)
+    if (entry.getInit())
       continue;
 
     // If the pattern is typed as optional (or tuples thereof), it is true.
-    if (auto typedPattern = dyn_cast<TypedPattern>(entry.ThePattern)) {
+    if (auto typedPattern = dyn_cast<TypedPattern>(entry.getPattern())) {
       if (auto typeRepr = typedPattern->getTypeLoc().getTypeRepr())
         if (isDefaultInitializable(typeRepr))
           continue;
@@ -1892,7 +1892,7 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
 
     llvm::DenseSet<const VarDecl *> seenVars;
     for (auto entry : PBD->getPatternList())
-    entry.ThePattern->forEachNode([&](const Pattern *P) {
+    entry.getPattern()->forEachNode([&](const Pattern *P) {
       if (auto *NP = dyn_cast<NamedPattern>(P)) {
         // Only check individual variables if we didn't check an enclosing
         // TypedPattern.
@@ -2934,9 +2934,9 @@ public:
       return;
 
     // If the initializers in the PBD aren't checked yet, do so now.
-    if (!IsFirstPass && !PBD->isInitializerChecked()) {
+    if (!IsFirstPass) {
       for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i) {
-        if (PBD->getInit(i))
+        if (!PBD->isInitializerChecked(i) && PBD->getInit(i))
           TC.typeCheckPatternBinding(PBD, i);
       }
     }
@@ -2993,9 +2993,9 @@ public:
     for (unsigned i = 0, e = PBD->getNumPatternEntries(); i != e; ++i) {
       auto entry = PBD->getPatternList()[i];
     
-      if (entry.Init || isInSILMode) continue;
+      if (entry.getInit() || isInSILMode) continue;
       
-      entry.ThePattern->forEachVariable([&](VarDecl *var) {
+      entry.getPattern()->forEachVariable([&](VarDecl *var) {
         // If the variable has no storage, it never needs an initializer.
         if (!var->hasStorage())
           return;
@@ -3414,7 +3414,7 @@ public:
       pbd->setInvalid();
       SmallVector<VarDecl *, 4> vars;
       for (auto entry : pbd->getPatternList())
-        entry.ThePattern->collectVariables(vars);
+        entry.getPattern()->collectVariables(vars);
       bool suggestNSManaged = propertiesCanBeNSManaged(cd, vars);
       switch (vars.size()) {
       case 0:
@@ -6445,10 +6445,10 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
       continue;
    
     for (auto entry : pbd->getPatternList()) {
-      if (entry.Init) continue;
+      if (entry.getInit()) continue;
       
       SmallVector<VarDecl *, 4> vars;
-      entry.ThePattern->collectVariables(vars);
+      entry.getPattern()->collectVariables(vars);
       if (vars.empty()) continue;
 
       auto varLoc = vars[0]->getLoc();
@@ -6476,8 +6476,8 @@ static void diagnoseClassWithoutInitializers(TypeChecker &tc,
       }
 
       if (auto defaultValueSuggestion
-             = buildDefaultInitializerString(tc, classDecl, entry.ThePattern))
-        diag->fixItInsertAfter(entry.ThePattern->getEndLoc(),
+             = buildDefaultInitializerString(tc, classDecl, entry.getPattern()))
+        diag->fixItInsertAfter(entry.getPattern()->getEndLoc(),
                                " = " + *defaultValueSuggestion);
     }
   }
@@ -6675,7 +6675,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
     if (auto pbd = dyn_cast<PatternBindingDecl>(member)) {
       if (pbd->hasStorage() && !pbd->isStatic() && !pbd->isImplicit())
         for (auto entry : pbd->getPatternList()) {
-          if (entry.Init) continue;
+          if (entry.getInit()) continue;
           
           // If we cannot create a default initializer, we cannot make a default
           // init.
@@ -6685,7 +6685,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
           // If one of the bound variables is a let constant, suppress the default
           // initializer.  Synthesizing an initializer that initializes the
           // constant to nil isn't useful.
-          entry.ThePattern->forEachVariable([&](VarDecl *vd) {
+          entry.getPattern()->forEachVariable([&](VarDecl *vd) {
             SuppressDefaultInitializer |= vd->isLet();
           });
         }

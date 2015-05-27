@@ -1082,7 +1082,7 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
   // handle the 'let x = 4' case properly at least.
   const VarDecl *anyVar = nullptr;
   for (auto entry : decl->getPatternList()) {
-    entry.ThePattern->forEachVariable([&](VarDecl *V) {
+    entry.getPattern()->forEachVariable([&](VarDecl *V) {
       anyVar = V;
     });
     if (anyVar) break;
@@ -1106,7 +1106,7 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
     else
       Printer << ", ";
     
-    printPattern(entry.ThePattern);
+    printPattern(entry.getPattern());
     if (Options.VarInitializers) {
       // FIXME: Implement once we can pretty-print expressions.
     }
@@ -2002,7 +2002,7 @@ bool Decl::shouldPrintInContext(const PrintOptions &PO) const {
     if (auto pbd = dyn_cast<PatternBindingDecl>(this)) {
       if (pbd->getPatternList().size() == 1) {
         auto pattern =
-          pbd->getPatternList()[0].ThePattern->getSemanticsProvidingPattern();
+          pbd->getPatternList()[0].getPattern()->getSemanticsProvidingPattern();
         if (auto named = dyn_cast<NamedPattern>(pattern)) {
           auto StorageKind = named->getDecl()->getStorageKind();
           if (StorageKind == VarDecl::Computed ||

@@ -604,8 +604,8 @@ static void walkForProfiling(AbstractFunctionDecl *Root, ASTWalker &Walker) {
       if (auto *PBD = dyn_cast<PatternBindingDecl>(Member))
         if (!PBD->isStatic())
           for (auto E : PBD->getPatternList())
-            if (E.Init)
-              E.Init->walk(Walker);
+            if (E.getInit())
+              E.getInit()->walk(Walker);
     }
   }
 }

@@ -1277,7 +1277,7 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
     PBD->setInvalid();
    }
 
-  PBD->setInitializerChecked();
+  PBD->setInitializerChecked(patternNumber);
   return hadError;
 }
 

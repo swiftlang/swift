@@ -974,7 +974,6 @@ PatternBindingDecl::PatternBindingDecl(SourceLoc StaticLoc,
                                        DeclContext *Parent)
   : Decl(DeclKind::PatternBinding, Parent),
     StaticLoc(StaticLoc), VarLoc(VarLoc),
-    isInitializerTypeChecked(false),
     numPatternEntries(NumPatternEntries) {
   PatternBindingDeclBits.IsStatic = StaticLoc.isValid();
   PatternBindingDeclBits.StaticSpelling =
@@ -1000,8 +999,8 @@ PatternBindingDecl::create(ASTContext &Ctx, SourceLoc StaticLoc,
   for (auto pe : PatternList) {
     ++elt;
     auto &newEntry = entries[elt];
-    newEntry = { nullptr, pe.Init };
-    PBD->setPattern(elt, pe.ThePattern);
+    newEntry = { nullptr, pe.getInit() };
+    PBD->setPattern(elt, pe.getPattern());
   }
   return PBD;
 }
@@ -1019,14 +1018,14 @@ unsigned PatternBindingDecl::getPatternEntryIndexForVarDecl(const VarDecl *VD) c
   
   auto List = getPatternList();
   if (List.size() == 1) {
-    assert(patternContainsVarDeclBinding(List[0].ThePattern, VD) &&
+    assert(patternContainsVarDeclBinding(List[0].getPattern(), VD) &&
            "Single entry PatternBindingDecl is set up wrong");
     return 0;
   }
   
   unsigned Result = 0;
   for (auto entry : List) {
-    if (patternContainsVarDeclBinding(entry.ThePattern, VD))
+    if (patternContainsVarDeclBinding(entry.getPattern(), VD))
       return Result;
     ++Result;
   }
@@ -1040,13 +1039,13 @@ SourceRange PatternBindingDecl::getSourceRange() const {
   SourceLoc startLoc = getStartLoc();
 
    // Take the init of the last pattern in the list.
-  if (auto init = getPatternList().back().Init) {
+  if (auto init = getPatternList().back().getInit()) {
     SourceLoc EndLoc = init->getEndLoc();
     if (EndLoc.isValid())
       return { startLoc, EndLoc };
   }
   // If the last pattern had no init, we take the end of its pattern.
-  return { startLoc, getPatternList().back().ThePattern->getEndLoc() };
+  return { startLoc, getPatternList().back().getPattern()->getEndLoc() };
 }
 
 static StaticSpellingKind getCorrectStaticSpellingForDecl(const Decl *D) {
@@ -1073,7 +1072,7 @@ bool PatternBindingDecl::hasStorage() const {
   // have storage.
   bool HasStorage = false;
   for (auto entry : getPatternList())
-    entry.ThePattern->forEachVariable([&](VarDecl *VD) {
+    entry.getPattern()->forEachVariable([&](VarDecl *VD) {
       if (VD->hasStorage())
         HasStorage = true;
     });
@@ -1083,7 +1082,7 @@ bool PatternBindingDecl::hasStorage() const {
 
 void PatternBindingDecl::setPattern(unsigned i, Pattern *P) {
   auto PatternList = getMutablePatternList();
-  PatternList[i].ThePattern = P;
+  PatternList[i].setPattern(P);
   
   // Make sure that any VarDecl's contained within the pattern know about this
   // PatternBindingDecl as their parent.
@@ -1096,7 +1095,7 @@ void PatternBindingDecl::setPattern(unsigned i, Pattern *P) {
 
 VarDecl *PatternBindingDecl::getSingleVar() const {
   if (getNumPatternEntries() == 1)
-    return getPatternList()[0].ThePattern->getSingleVar();
+    return getPatternList()[0].getPattern()->getSingleVar();
   return nullptr;
 }
 

@@ -784,12 +784,12 @@ void SILGenFunction::emitMemberInitializers(VarDecl *selfDecl,
     if (!pbd || pbd->isStatic()) continue;
 
     for (auto entry : pbd->getPatternList()) {
-      auto init = entry.Init;
+      auto init = entry.getInit();
       if (!init) continue;
 
       // Cleanup after this initialization.
-      FullExpr scope(Cleanups, entry.ThePattern);
-      emitMemberInit(*this, selfDecl, entry.ThePattern, emitRValue(init));
+      FullExpr scope(Cleanups, entry.getPattern());
+      emitMemberInit(*this, selfDecl, entry.getPattern(), emitRValue(init));
     }
   }
 }

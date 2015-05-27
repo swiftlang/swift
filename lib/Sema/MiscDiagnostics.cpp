@@ -828,7 +828,7 @@ public:
 
     bool sawMutation = false;
     for (const auto &PBE : PBD->getPatternList()) {
-      PBE.ThePattern->forEachVariable([&](VarDecl *VD) {
+      PBE.getPattern()->forEachVariable([&](VarDecl *VD) {
         auto it = VarDecls.find(VD);
         sawMutation |= it != VarDecls.end() && (it->second & RK_Written);
       });

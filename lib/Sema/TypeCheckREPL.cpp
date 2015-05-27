@@ -345,12 +345,12 @@ void REPLChecker::processREPLTopLevelPatternBinding(PatternBindingDecl *PBD) {
   unsigned entryIdx = 0U-1;
   for (auto patternEntry : PBD->getPatternList()) {
     ++entryIdx;
-    if (!patternEntry.Init) {
+    if (!patternEntry.getInit()) {
       TC.diagnose(PBD->getStartLoc(), diag::repl_must_be_initialized);
       continue;
     }
 
-    auto pattern = patternEntry.ThePattern;
+    auto pattern = patternEntry.getPattern();
     
     llvm::SmallString<16> PatternString;
     PatternBindingPrintLHS(PatternString).visit(pattern);
@@ -393,7 +393,7 @@ void REPLChecker::processREPLTopLevelPatternBinding(PatternBindingDecl *PBD) {
       = PatternBindingDecl::create(Context, SourceLoc(),
                                    StaticSpellingKind::None,
                                    PBD->getStartLoc(), metavarPat,
-                                   patternEntry.Init, &SF);
+                                   patternEntry.getInit(), &SF);
     
     auto MVBrace = BraceStmt::create(Context, metavarBinding->getStartLoc(),
                                      ASTNode(metavarBinding),
