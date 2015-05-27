@@ -293,3 +293,50 @@ bb1:
   %9999 = tuple()
   return %9999 : $()
 }
+
+// CHECK: sil @remove_pins_mark_dependence
+// CHECK-NOT: strong_pin
+// CHECK-NOT: strong_unpin
+// CHECK: return
+
+sil @remove_pins_mark_dependence : $@convention(thin) (@inout MyArray<MyInt>, MyInt) -> () {
+bb0(%0 : $*MyArray<MyInt>, %1 : $MyInt):
+  %2 = integer_literal $Builtin.Word, 16
+  %3 = load %0 : $*MyArray<MyInt>
+  %4 = struct_extract %3 : $MyArray<MyInt>, #MyArray.buffer
+  %5 = struct_extract %4 : $MyArrayBuffer, #MyArrayBuffer.storage
+  %6 = unchecked_trivial_bit_cast %5 : $Builtin.NativeObject to $Builtin.RawPointer
+  %7 = index_raw_pointer %6 : $Builtin.RawPointer, %2 : $Builtin.Word
+  %8 = strong_pin %5 : $Builtin.NativeObject
+  %9 = pointer_to_address %7 : $Builtin.RawPointer to $*MyInt
+  %10 = integer_literal $Builtin.Word, 2
+  %11 = index_addr %9 : $*MyInt, %10 : $Builtin.Word
+  %12 = mark_dependence %11 : $*MyInt on %8 : $Optional<Builtin.NativeObject>
+  store %1 to %12 : $*MyInt
+  strong_unpin %8 : $Optional<Builtin.NativeObject>
+  %15 = tuple ()
+  return %15 : $()
+}
+
+// CHECK: sil @dont_remove_pins_mark_dependence
+// CHECK: strong_pin
+// CHECK: strong_unpin
+// CHECK: return
+
+sil @dont_remove_pins_mark_dependence : $@convention(thin) (@inout MyArray<MyInt>, MyInt, Optional<Builtin.NativeObject>) -> () {
+bb0(%0 : $*MyArray<MyInt>, %1 : $MyInt, %16 : $Optional<Builtin.NativeObject>):
+  %2 = integer_literal $Builtin.Word, 16
+  %3 = load %0 : $*MyArray<MyInt>
+  %4 = struct_extract %3 : $MyArray<MyInt>, #MyArray.buffer
+  %5 = struct_extract %4 : $MyArrayBuffer, #MyArrayBuffer.storage
+  %6 = unchecked_trivial_bit_cast %5 : $Builtin.NativeObject to $Builtin.RawPointer
+  %7 = index_raw_pointer %6 : $Builtin.RawPointer, %2 : $Builtin.Word
+  %8 = strong_pin %5 : $Builtin.NativeObject
+  %9 = pointer_to_address %7 : $Builtin.RawPointer to $*MyInt
+  %10 = integer_literal $Builtin.Word, 2
+  %11 = index_addr %9 : $*MyInt, %10 : $Builtin.Word
+  %12 = mark_dependence %8 : $Optional<Builtin.NativeObject> on %16 : $Optional<Builtin.NativeObject>
+  strong_unpin %8 : $Optional<Builtin.NativeObject>
+  %15 = tuple ()
+  return %15 : $()
+}

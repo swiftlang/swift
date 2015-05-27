@@ -182,10 +182,15 @@ public:
     RCIA->getRCUsers(SILValue(Pin), Users);
 
     for (auto *U : Users) {
-      if (auto *MD = dyn_cast<MarkDependenceInst>(U)) {
-        MarkDeps.push_back(MD);
-        continue;
-      }
+      // A mark_dependence is safe if it is marking a dependence on a base that
+      // is the strong_pinned value.
+      if (auto *MD = dyn_cast<MarkDependenceInst>(U))
+        if (Pin == MD->getBase().getDef() ||
+            std::find(Users.begin(), Users.end(), MD->getBase().getDef()) !=
+                Users.end()) {
+          MarkDeps.push_back(MD);
+          continue;
+        }
 
       if (dyn_cast<StrongUnpinInst>(U) == Unpin)
         continue;
