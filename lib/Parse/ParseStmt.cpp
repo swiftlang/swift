@@ -1740,13 +1740,14 @@ ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo) {
     do {
       ParserResult<CatchStmt> clause = parseStmtCatch();
       status |= clause;
-      if (status.hasCodeCompletion())
+      if (status.hasCodeCompletion() && clause.isNull())
         return makeParserResult<Stmt>(status, nullptr);
 
-      // parseStmtCatch promises to return non-null.
+      // parseStmtCatch promises to return non-null unless we are
+      // completing inside the catch's pattern.
       assert(!clause.isNull());
       allClauses.push_back(clause.get());
-    } while (Tok.is(tok::kw_catch));
+    } while (Tok.is(tok::kw_catch) && !status.hasCodeCompletion());
 
     // Recover from all of the clauses failing to parse by returning a
     // normal do-statement.
@@ -1798,7 +1799,7 @@ ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo) {
 /// appear following a 'do' statement.
 ///
 /// This routine promises to return a non-null result unless there was
-/// a code-completion token.
+/// a code-completion token in the pattern.
 ParserResult<CatchStmt> Parser::parseStmtCatch() {
   // A catch block has its own scope for variables bound out of the pattern.
   Scope S(this, ScopeKind::CatchVars);
@@ -1818,9 +1819,7 @@ ParserResult<CatchStmt> Parser::parseStmtCatch() {
   SourceLoc startOfBody = Tok.getLoc();
   auto bodyResult = parseBraceItemList(diag::expected_lbrace_after_catch);
   status |= bodyResult;
-  if (status.hasCodeCompletion()) {
-    return makeParserCodeCompletionResult<CatchStmt>();
-  } else if (bodyResult.isNull()) {
+  if (bodyResult.isNull()) {
     bodyResult = makeParserErrorResult(BraceStmt::create(Context, startOfBody,
                                                          {}, PreviousLoc,
                                                          /*implicit=*/ true));
