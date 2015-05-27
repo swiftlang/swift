@@ -126,20 +126,20 @@ ${getMirrorConformance("NSRange")}
 ${getMirrorConformance("NSDate")}
 ${getMirrorConformance("NSSet","MembershipContainer")}
 
-extension NSArray : Reflectable {
+extension NSArray : _Reflectable {
   /// Returns a mirror that reflects `self`.
   public func getMirror() -> MirrorType {
     return reflect(self as [AnyObject])
   }
 }
-extension NSDictionary : Reflectable {
+extension NSDictionary : _Reflectable {
   /// Returns a mirror that reflects `self`.
   public func getMirror() -> MirrorType {
     let dict: [NSObject : AnyObject] = _convertNSDictionaryToDictionary(self)
     return reflect(dict)
   }
 }
-extension NSString : Reflectable {
+extension NSString : _Reflectable {
   /// Returns a mirror that reflects `self`.
   public func getMirror() -> MirrorType {
     return reflect(self as String)

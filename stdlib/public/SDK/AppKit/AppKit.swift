@@ -59,7 +59,7 @@ struct _NSCursorMirror : MirrorType {
   var disposition : MirrorDisposition { return .Aggregate }
 }
 
-extension NSCursor : Reflectable {
+extension NSCursor : _Reflectable {
   public func getMirror() -> MirrorType {
     return _NSCursorMirror(self)
   }
@@ -119,7 +119,7 @@ struct _NSViewMirror : MirrorType {
   var disposition : MirrorDisposition { get { return .Aggregate } }
 }
 
-extension NSView : Reflectable {
+extension NSView : _Reflectable {
   /// Returns a mirror that reflects `self`.
   public func getMirror() -> MirrorType {
     return _NSViewMirror(self)

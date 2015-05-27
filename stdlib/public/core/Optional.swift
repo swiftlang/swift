@@ -12,7 +12,7 @@
 
 // The compiler has special knowledge of Optional<T>, including the fact that
 // it is an enum with cases named 'None' and 'Some'.
-public enum Optional<T> : Reflectable, NilLiteralConvertible {
+public enum Optional<T> : _Reflectable, NilLiteralConvertible {
   case None
   case Some(T)
 

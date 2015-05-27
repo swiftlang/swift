@@ -692,7 +692,7 @@ internal func _${Self}Extend<
   a += sequence
 }
 
-extension ${Self} : Reflectable {
+extension ${Self} : _Reflectable {
   /// Returns a mirror that reflects `self`.
   public func getMirror() -> MirrorType {
     return _ArrayTypeMirror(self)
@@ -823,7 +823,7 @@ internal struct _InitializeMemoryFromCollection<
 @inline(never)
 internal func _arrayOutOfPlaceReplace<
   B : _ArrayBufferType, C : CollectionType
-    where C.Generator.Element == B.Element, B.Index == Int
+    where C.Generator.Element == B.Element
 >(
   inout source: B, _ subRange: Range<Int>, _ newValues: C, _ insertCount: Int
 ) {
@@ -853,7 +853,7 @@ internal func _expectEnd<C : CollectionType>(
 
 internal func _arrayNonSliceInPlaceReplace<
   B : _ArrayBufferType, C : CollectionType
-  where C.Generator.Element == B.Element, B.Index == Int
+  where C.Generator.Element == B.Element
 >(inout target: B, _ subRange: Range<Int>, _ insertCount: Int, _ newValues: C) {
   let oldCount = target.count
   let eraseCount = subRange.count

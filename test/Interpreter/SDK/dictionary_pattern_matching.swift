@@ -85,7 +85,7 @@ struct Country {
   let population: Int
 }
 
-enum Statistic: Reflectable {
+enum Statistic: _Reflectable {
   case ForState(State)
   case ForCountry(Country)
 

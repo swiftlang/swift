@@ -12,7 +12,7 @@
 
 /// Customizes the result of `reflect(x)`, where `x` is a conforming
 /// type.
-public protocol Reflectable {
+public protocol _Reflectable {
   // The runtime has inappropriate knowledge of this protocol and how its
   // witness tables are laid out. Changing this protocol requires a
   // corresponding change to Reflection.cpp.
@@ -217,7 +217,7 @@ func _getSummary<T>(out: UnsafeMutablePointer<String>, x: T) {
   out.initialize(reflect(x).summary)
 }
 
-/// Produce a mirror for any value. If the value's type conforms to Reflectable,
+/// Produce a mirror for any value. If the value's type conforms to _Reflectable,
 /// invoke its getMirror() method; otherwise, fall back to an implementation
 /// in the runtime that structurally reflects values of any type.
 @asmname("swift_reflectAny")public func reflect<T>(x: T) -> MirrorType

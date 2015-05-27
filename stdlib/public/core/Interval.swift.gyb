@@ -52,7 +52,7 @@ selfDocComment = """
 
 ${selfDocComment}
 public struct ${Self}<T : Comparable>
-  : IntervalType, Equatable, CustomStringConvertible, CustomDebugStringConvertible, Reflectable {
+  : IntervalType, Equatable, CustomStringConvertible, CustomDebugStringConvertible, _Reflectable {
 
   /// The type of the `Interval`'s endpoints.
   public typealias Bound = T

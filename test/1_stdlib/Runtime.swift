@@ -976,7 +976,7 @@ struct BrilliantMirror : MirrorType {
   }
 }
 
-class Brilliant : Reflectable {
+class Brilliant : _Reflectable {
   let first: Int
   let second: String
 

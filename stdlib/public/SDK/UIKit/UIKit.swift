@@ -199,7 +199,7 @@ struct _UIViewMirror : MirrorType {
   var disposition : MirrorDisposition { get { return .Aggregate } }
 }
 
-extension UIView : Reflectable {
+extension UIView : _Reflectable {
   /// Returns a mirror that reflects `self`.
   public func getMirror() -> MirrorType {
     return _UIViewMirror(self)

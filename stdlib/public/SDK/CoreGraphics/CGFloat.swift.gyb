@@ -141,7 +141,7 @@ public let CGFLOAT_MIN = CGFloat.min
 @available(*,unavailable,message="use CGFloat.max")
 public let CGFLOAT_MAX = CGFloat.max
 
-extension CGFloat : Reflectable {
+extension CGFloat : _Reflectable {
   /// Returns a mirror that reflects `self`.
   public func getMirror() -> MirrorType {
     return reflect(native)

@@ -141,11 +141,11 @@ dump(barrable)
 print("second verse same as the first:")
 dump(barrable)
 
-// With Reflectable protocols we extract the witness table from the container.
-// CHECK-LABEL: Reflectable int:
+// With _Reflectable protocols we extract the witness table from the container.
+// CHECK-LABEL: _Reflectable int:
 // CHECK-NEXT:   1
-print("Reflectable int:")
-var reflectable: Reflectable = 1
+print("_Reflectable int:")
+var reflectable: _Reflectable = 1
 dump(reflectable)
 
 // CHECK-NEXT: Logical: true

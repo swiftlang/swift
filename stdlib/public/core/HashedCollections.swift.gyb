@@ -3768,7 +3768,7 @@ internal class ${Self}Mirror<${TypeParametersDecl}> : MirrorType {
 %end
 }
 
-extension ${Self} : Reflectable {
+extension ${Self} : _Reflectable {
   /// Returns a mirror that reflects `self`.
   public func getMirror() -> MirrorType {
     return ${Self}Mirror(self)
