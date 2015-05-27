@@ -1546,7 +1546,6 @@ LValue SILGenLValue::visitDiscardAssignmentExpr(DiscardAssignmentExpr *e,
                                                 AccessKind accessKind) {
   SILType tempType = gen.getLoweredType(getSubstFormalRValueType(e));
 
-  // FIXME: this is a leak?
   SILValue address = gen.emitTemporaryAllocation(e, tempType.getObjectType());
   address = gen.B.createMarkUninitialized(e, address,
                                           MarkUninitializedInst::Var);
