@@ -87,6 +87,7 @@ func tuplePatternDestructuring(x : Int, y : Int) {
 }
 
 // <rdar://problem/21057425> Crash while compiling attached test-app.
-func test21057425() {
-  var x: Int = "not an int!", y = 0 // expected-error{{'String' is not convertible to 'Int'}}
+func test21057425() -> (Int, Int) {
+  let x: Int = "not an int!", y = 0 // expected-error{{'String' is not convertible to 'Int'}}
+  return (x, y)
 }
