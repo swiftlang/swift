@@ -47,8 +47,6 @@
 ///   - `x.isStrictSubsetOf(y)` iff `x.isSubsetOf(y) && x != y`
 public protocol SetAlgebraType : Equatable, ArrayLiteralConvertible {
 
-  typealias DefaultImplementations = ()
-
   /// A type for which `Self` provides a containment test.
   typealias Element
   
@@ -145,7 +143,7 @@ public protocol SetAlgebraType : Equatable, ArrayLiteralConvertible {
 /// - Note: A type conforming to `SetAlgebraType` can implement any of
 ///   these initializers or methods, and those implementations will be
 ///   used in lieu of these defaults.
-extension SetAlgebraType where DefaultImplementations == () {
+extension SetAlgebraType {
   /// Creates the set containing all elements of `sequence`.
   public init<
     S : SequenceType where S.Generator.Element == Element
