@@ -186,13 +186,21 @@ public:
   void foundDecl(ValueDecl *D, DeclVisibilityKind reason) override;
 };
 
+/// \brief Remove any declarations in the given set that were overridden by
+/// other declarations in that set.
+///
+/// \returns true if any declarations were removed, false otherwise.
+bool removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls);
+
 /// \brief Remove any declarations in the given set that are shadowed by
 /// other declarations in that set.
 ///
 /// \param decls The set of declarations being considered.
 /// \param curModule The current module.
 /// \param typeResolver Used to resolve overload types.
-void removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
+///
+/// \returns true if any shadowed declarations were removed.
+bool removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
                          const Module *curModule,
                          LazyResolver *typeResolver);
 

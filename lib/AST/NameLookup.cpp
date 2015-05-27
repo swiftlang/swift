@@ -53,8 +53,51 @@ static void forAllVisibleModules(const DeclContext *DC, const Fn &fn) {
     cast<Module>(moduleScope)->forAllVisibleModules(Module::AccessPathTy(), fn);
 }
 
+bool swift::removeOverriddenDecls(SmallVectorImpl<ValueDecl*> &decls) {
+  if (decls.empty())
+    return false;
 
-void swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
+  ASTContext &ctx = decls.front()->getASTContext();
+  llvm::SmallPtrSet<ValueDecl*, 8> overridden;
+  for (auto decl : decls) {
+    while (auto overrides = decl->getOverriddenDecl()) {
+      overridden.insert(overrides);
+
+      // Because initializers from Objective-C base classes have greater
+      // visibility than initializers written in Swift classes, we can
+      // have a "break" in the set of declarations we found, where
+      // C.init overrides B.init overrides A.init, but only C.init and
+      // A.init are in the chain. Make sure we still remove A.init from the
+      // set in this case.
+      if (decl->getFullName().getBaseName() == ctx.Id_init) {
+        decl = overrides;
+        continue;
+      }
+
+      break;
+    }
+  }
+
+  // If no methods were overridden, we're done.
+  if (overridden.empty()) return false;
+
+  // Erase any overridden declarations
+  bool anyOverridden = false;
+  decls.erase(std::remove_if(decls.begin(), decls.end(),
+                             [&](ValueDecl *decl) -> bool {
+                               if (overridden.count(decl) > 0) {
+                                 anyOverridden = true;
+                                 return true;
+                               }
+
+                               return false;
+                             }),
+              decls.end());
+
+  return anyOverridden;
+}
+
+bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
                                 const Module *curModule,
                                 LazyResolver *typeResolver) {
   // Category declarations by their signatures.
@@ -117,7 +160,7 @@ void swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
 
   // If there were no signature collisions, there is nothing to do.
   if (!anyCollisions)
-    return;
+    return false;
 
   // Determine the set of declarations that are shadowed by other declarations.
   llvm::SmallPtrSet<ValueDecl *, 4> shadowed;
@@ -215,14 +258,22 @@ void swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
 
   // If none of the declarations were shadowed, we're done.
   if (shadowed.empty())
-    return;
+    return false;
 
   // Remove shadowed declarations from the list of declarations.
+  bool anyRemoved = false;
   decls.erase(std::remove_if(decls.begin(), decls.end(),
                              [&](ValueDecl *vd) {
-                               return shadowed.count(vd) > 0;
+                               if (shadowed.count(vd) > 0) {
+                                 anyRemoved = true;
+                                 return true;
+                               }
+
+                               return false;
                              }),
               decls.end());
+
+  return anyRemoved;
 }
 
 struct FindLocalVal : public StmtVisitor<FindLocalVal> {
@@ -1429,44 +1480,13 @@ bool DeclContext::lookupQualified(Type type,
   }
 
   // If we're supposed to remove overridden declarations, do so now.
-  if (options & NL_RemoveOverridden) {
-    // Find all of the overridden declarations.
-    llvm::SmallPtrSet<ValueDecl*, 8> overridden;
-    for (auto decl : decls) {
-      while (auto overrides = decl->getOverriddenDecl()) {
-        overridden.insert(overrides);
-
-        // Because initializers from Objective-C base classes have greater
-        // visibility than initializers written in Swift classes, we can
-        // have a "break" in the set of declarations we found, where
-        // C.init overrides B.init overrides A.init, but only C.init and
-        // A.init are in the chain. Make sure we still remove A.init from the
-        // set in this case.
-        if (member.getBaseName() == ctx.Id_init) {
-          decl = overrides;
-          continue;
-        }
-
-        break;
-      }
-    }
-
-    // If any methods were overridden, remove them from the results.
-    if (!overridden.empty()) {
-      decls.erase(std::remove_if(decls.begin(), decls.end(),
-                                 [&](ValueDecl *decl) -> bool {
-                                   return overridden.count(decl);
-                                 }),
-                  decls.end());
-    }
-  }
-
-  Module *M = getParentModule();
+  if (options & NL_RemoveOverridden)
+    removeOverriddenDecls(decls);
 
   // If we're supposed to remove shadowed/hidden declarations, do so now.
-  if (options & NL_RemoveNonVisible) {
+  Module *M = getParentModule();
+  if (options & NL_RemoveNonVisible)
     removeShadowedDecls(decls, M, typeResolver);
-  }
 
   if (auto *debugClient = M->getDebugClient())
     filterForDiscriminator(decls, debugClient);
