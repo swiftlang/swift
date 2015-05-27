@@ -1,6 +1,3 @@
-// FIXME: this test fails on 32-bit
-// REQUIRES: jigawatts
-
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=CATCH1 | FileCheck %s -check-prefix=CATCH1
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=THROW1 > %t.throw1
 // RUN: FileCheck %s -check-prefix=THROW1 < %t.throw1
@@ -63,7 +60,7 @@ class Error3 {}
 extension Error3 : ErrorType{}
 enum Error4 : ErrorType {
   case E1
-  case E2(Int)
+  case E2(Int32)
 }
 class NoneError1 {}
 
@@ -111,7 +108,7 @@ func test003() {
   do {} catch Error4.#^CATCH2^#
 // CATCH2: Begin completions
 // CATCH2: Decl[EnumElement]/CurrNominal: E1[#Error4#]{{; name=.+$}}
-// CATCH2: Decl[EnumElement]/CurrNominal: E2({#Int#})[#(Int) -> Error4#]{{; name=.+$}}
+// CATCH2: Decl[EnumElement]/CurrNominal: E2({#Int32#})[#(Int32) -> Error4#]{{; name=.+$}}
 // CATCH2: End completions
 }
 
@@ -119,14 +116,14 @@ func test004() {
   throw Error4.#^THROW2^#
 // THROW2: Begin completions
 // THROW2: Decl[EnumElement]/CurrNominal: E1[#Error4#]{{; name=.+$}}
-// THROW2: Decl[EnumElement]/CurrNominal: E2({#Int#})[#(Int) -> Error4#]{{; name=.+$}}
+// THROW2: Decl[EnumElement]/CurrNominal: E2({#Int32#})[#(Int32) -> Error4#]{{; name=.+$}}
 // THROW2: End completions
 }
 
 func test005() {
   do {} catch Error4.E2#^CATCH3^#
 // CATCH3: Begin completions
-// CATCH3: Pattern/ExprSpecific:               ({#Int#})[#Error4#]{{; name=.+$}}
+// CATCH3: Pattern/ExprSpecific:               ({#Int32#})[#Error4#]{{; name=.+$}}
 // CATCH3: End completions
 }
 
@@ -175,7 +172,7 @@ func test009() {
   }
 
 // FIXME: we're getting parentheses around the type when it's unnamed...
-// EXPLICIT_ERROR_PAYLOAD_I: Decl[LocalVar]/Local: i[#(Int)#]; name=i
+// EXPLICIT_ERROR_PAYLOAD_I: Decl[LocalVar]/Local: i[#(Int32)#]; name=i
 }
 func test010() {
   do {
@@ -235,9 +232,9 @@ func test015() {
 }
 // Check that we can complete on the bound value; Not exhaustive..
 // INT_DOT: Begin completions
-// INT_DOT-DAG: Decl[InstanceVar]/CurrNominal:      value[#Int64#]; name=value
-// INT_DOT-DAG: Decl[InstanceVar]/CurrNominal:      bigEndian[#Int#]; name=bigEndian
-// INT_DOT-DAG: Decl[InstanceVar]/CurrNominal:      littleEndian[#Int#]; name=littleEndian
+// INT_DOT-DAG: Decl[InstanceVar]/CurrNominal:      value[#Int32#]; name=value
+// INT_DOT-DAG: Decl[InstanceVar]/CurrNominal:      bigEndian[#Int32#]; name=bigEndian
+// INT_DOT-DAG: Decl[InstanceVar]/CurrNominal:      littleEndian[#Int32#]; name=littleEndian
 // INT_DOT: End completions
 
 //===--- Inside catch body top-level
