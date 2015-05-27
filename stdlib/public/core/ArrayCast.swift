@@ -38,7 +38,7 @@ internal enum _BridgeStyle {
 
 //===--- Forced casts: [T] as! [U] ----------------------------------------===//
 
-/// Implements `source as [TargetElement]`.
+/// Implements `source as! [TargetElement]`.
 ///
 /// - Requires: At least one of `SourceElement` and `TargetElement` is a
 ///   class type or ObjC existential.  May trap for other "valid" inputs
