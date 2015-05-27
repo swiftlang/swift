@@ -1092,7 +1092,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
       // the label for the tuple type being matched.
       // TODO: detect and diagnose shuffling
       // TODO: permit shuffling
-      if (!elt.getLabel().empty() &&
+      if (!elt.getLabel().empty() && i < tupleTy->getNumElements() &&
           elt.getLabel() != tupleTy->getElement(i).getName()) {
         diagnose(elt.getLabelLoc(), diag::tuple_pattern_label_mismatch,
                  elt.getLabel(), tupleTy->getElement(i).getName());

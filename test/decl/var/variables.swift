@@ -91,3 +91,8 @@ func test21057425() -> (Int, Int) {
   let x: Int = "not an int!", y = 0 // expected-error{{'String' is not convertible to 'Int'}}
   return (x, y)
 }
+
+// rdar://problem/21081340
+func test21081340() {
+  let (x: a, y: b): () = foo() // expected-error{{tuple pattern has the wrong length for tuple type '()'}}
+}
