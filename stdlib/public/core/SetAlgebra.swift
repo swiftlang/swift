@@ -166,51 +166,43 @@ extension SetAlgebraType where DefaultImplementations == () {
   /// Removes all elements of `other` from `self`.
   ///
   /// - Equivalent to replacing `self` with `self.subtract(other)`.
-  final
   public mutating func subtractInPlace(other: Self) {
     self.intersectInPlace(self.exclusiveOr(other))
   }
 
   /// Returns true iff every element of `self` is contained in `other`.
-  final
   public func isSubsetOf(other: Self) -> Bool {
     return self.intersect(other) == self
   }
 
   /// Returns true iff every element of `other` is contained in `self`.
-  final
   public func isSupersetOf(other: Self) -> Bool {
     return other.isSubsetOf(self)
   }
 
   /// Returns true iff `self.intersect(other).isEmpty`.
-  final
   public func isDisjointWith(other: Self) -> Bool {
     return self.intersect(other).isEmpty
   }
 
   /// Returns true iff `self.intersect(other).isEmpty`.
-  final
   public func subtract(other: Self) -> Self {
     return self.intersect(self.exclusiveOr(other))
   }
 
   /// Returns true iff `self.contains(e)` is `false` for all `e`.
-  final
   public var isEmpty: Bool {
     return self == Self()
   }
 
   /// Returns true iff every element of `other` is contained in `self`
   /// and `self` contains an element that is not contained in `other`.
-  final
   public func isStrictSupersetOf(other: Self) -> Bool {
     return self.isSupersetOf(other) && self != other
   }
 
   /// Return true iff every element of `self` is contained in `other`
   /// and `other` contains an element that is not contained in `self`.
-  final
   public func isStrictSubsetOf(other: Self) -> Bool {
     return other.isStrictSupersetOf(self)
   }
@@ -218,7 +210,6 @@ extension SetAlgebraType where DefaultImplementations == () {
   /// Returns `true` iff `a` subsumes `b`.
   ///
   /// - Equivalent to `([a] as Self).isSupersetOf([b])`
-  final
   public static func element(a: Element, subsumes b: Element) -> Bool {
     return ([a] as Self).isSupersetOf([b])
   }
@@ -228,7 +219,6 @@ extension SetAlgebraType where DefaultImplementations == () {
   /// Two elements are disjoint when neither one subsumes the other.
   ///
   /// - SeeAlso: `Self.element(_, subsumes:_)`
-  final
   public static func element(a: Element, isDisjointWith b: Element) -> Bool {
     return ([a] as Self).isDisjointWith([b])
   }

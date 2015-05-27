@@ -548,7 +548,7 @@ extension _ContiguousArrayBuffer : CollectionType {
 }
 
 extension SequenceType {
-  public final func _copyToNativeArrayBuffer()
+  public func _copyToNativeArrayBuffer()
     -> _ContiguousArrayBuffer<Generator.Element>
   {
     let initialCapacity = self.underestimateCount()
@@ -571,7 +571,7 @@ extension SequenceType {
 }
 
 extension CollectionType {
-  public final func _copyToNativeArrayBuffer(
+  public func _copyToNativeArrayBuffer(
   ) -> _ContiguousArrayBuffer<Generator.Element> {
     return _copyCollectionToNativeArrayBuffer(self)
   }

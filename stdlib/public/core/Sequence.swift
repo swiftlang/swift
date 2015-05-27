@@ -95,11 +95,11 @@ extension SequenceType {
   /// `self`, **nondestructively**.
   ///
   /// - Complexity: O(N).
-  final public func underestimateCount() -> Int {
+  public func underestimateCount() -> Int {
     return 0
   }
 
-  final public func _preprocessingPass<R>(preprocess: (Self)->R) -> R? {
+  public func _preprocessingPass<R>(preprocess: (Self)->R) -> R? {
     return nil
   }
 }
@@ -109,7 +109,7 @@ extension SequenceType {
   /// over `self`.
   ///
   /// - Complexity: O(N).
-  final public func map<T>(
+  public func map<T>(
     @noescape transform: (Generator.Element) -> T
   ) -> [T] {
     // Cast away @noescape.
@@ -122,7 +122,7 @@ extension SequenceType {
 extension SequenceType {
   /// Return an `Array` containing the elements of `self`,
   /// in order, that satisfy the predicate `includeElement`.
-  final public func filter(
+  public func filter(
     @noescape includeElement: (Generator.Element) -> Bool
   ) -> [Generator.Element] {
     // Cast away @noescape.
@@ -134,7 +134,7 @@ extension SequenceType {
 }
 
 extension SequenceType {
-  final public func _customContainsEquatableElement(
+  public func _customContainsEquatableElement(
     element: Generator.Element
   ) -> Bool? {
     return nil
@@ -150,7 +150,6 @@ public func underestimateCount<T : SequenceType>(x: T) -> Int {
 }
 
 extension SequenceType {
-  final
   public func _initializeTo(ptr: UnsafeMutablePointer<Generator.Element>) {
     var p = UnsafeMutablePointer<Generator.Element>(ptr)
     for x in GeneratorSequence(self.generate()) {
