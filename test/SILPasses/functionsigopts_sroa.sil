@@ -1,5 +1,8 @@
 // RUN: %target-sil-opt -function-signature-opts -verify %s | FileCheck %s
 
+// FIXME: Un-XFAIL when rdar://problem/21114206 is resolved.
+// XFAIL: *
+
 import Builtin
 
 /////////////////////

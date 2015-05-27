@@ -129,7 +129,9 @@ struct ArgumentDescriptor {
   }
 
   bool canExplodeValue() const {
-    return ProjTree.canExplodeValue() && canOptimizeLiveArg();
+    return false;
+    // FIXME: rdar://problem/21114206
+    // return ProjTree.canExplodeValue() && canOptimizeLiveArg()
   }
 };
 
