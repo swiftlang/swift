@@ -3992,9 +3992,6 @@ namespace {
     void destroy(IRGenFunction &IGF, Address addr, SILType T) const override {
       return Strategy.destroy(IGF, addr, T);
     }
-    bool isIndirectArgument() const override {
-      return Strategy.isIndirectArgument();
-    }
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
                               Address dest, SILType T) const override {
       return Strategy.initializeFromParams(IGF, params, dest, T);

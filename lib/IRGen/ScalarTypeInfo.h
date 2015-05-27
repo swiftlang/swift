@@ -42,9 +42,6 @@ protected:
   }
 
 public:
-  /// Efficiently-scalarizable types are always passed directly.
-  bool isIndirectArgument() const override { return false; }
-
   void initializeFromParams(IRGenFunction &IGF, Explosion &params,
                             Address dest, SILType T) const override {
     asDerived().Derived::initialize(IGF, params, dest);

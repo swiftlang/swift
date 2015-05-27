@@ -51,10 +51,6 @@ public:
                                               this->getBestKnownAlignment()));
   }
 
-  bool isIndirectArgument() const override {
-    return true;
-  }
-
   void initializeFromParams(IRGenFunction &IGF, Explosion &params,
                             Address dest, SILType T) const override {
     Address src = this->getAddressForPointer(params.claimNext());

@@ -113,9 +113,6 @@ namespace {
       return field.projectAddress(IGF, tuple, offsets);
     }
 
-    bool isIndirectArgument() const override {
-      llvm_unreachable("unexploded tuple as argument?");
-    }
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
                               Address src, SILType T) const override {
       llvm_unreachable("unexploded tuple as argument?");

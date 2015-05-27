@@ -244,9 +244,6 @@ namespace {
                            align, IsPOD) {
     }
 
-    bool isIndirectArgument() const override {
-      return false;
-    }
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
                               Address addr, SILType T) const override {
       ClangRecordTypeInfo::initialize(IGF, params, addr);
@@ -276,7 +273,6 @@ namespace {
                            align, isPOD)
     {}
 
-    bool isIndirectArgument() const override { return false; }
     void initializeFromParams(IRGenFunction &IGF, Explosion &params,
                               Address addr, SILType T) const override {
       LoadableStructTypeInfo::initialize(IGF, params, addr);

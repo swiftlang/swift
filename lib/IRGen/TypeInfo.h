@@ -231,9 +231,6 @@ public:
   /// it is not known.
   virtual llvm::Constant *getStaticStride(IRGenModule &IGM) const = 0;
 
-  /// Is this type passed indirectly as an argument?
-  virtual bool isIndirectArgument() const = 0;
-  
   /// Add the information for exploding values of this type to the
   /// given schema.
   virtual void getSchema(ExplosionSchema &schema) const = 0;
