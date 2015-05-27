@@ -496,10 +496,6 @@ extension _ArrayBuffer {
   typealias Storage = _ContiguousArrayStorage<T>
   typealias NativeBuffer = _ContiguousArrayBuffer<T>
 
-  func _invariantCheck() -> Bool {
-    return true
-  }
-
   var _isNative: Bool {
     if !_isClassOrObjCExistential(T.self) {
       return true
