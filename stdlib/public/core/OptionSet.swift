@@ -57,6 +57,7 @@ public protocol OptionSetType : SetAlgebraType, RawRepresentable {
 extension OptionSetType {
   /// Returns the set of elements contained in `self`, in `other`, or in
   /// both `self` and `other`.
+  final
   public func union(other: Self) -> Self {
     var r: Self = Self(rawValue: self.rawValue)
     r.unionInPlace(other)
@@ -64,6 +65,7 @@ extension OptionSetType {
   }
   
   /// Returns the set of elements contained in both `self` and `other`.
+  final
   public func intersect(other: Self) -> Self {
     var r = Self(rawValue: self.rawValue)
     r.intersectInPlace(other)
@@ -72,6 +74,7 @@ extension OptionSetType {
   
   /// Returns the set of elements contained in `self` or in `other`,
   /// but not in both `self` and `other`.
+  final
   public func exclusiveOr(other: Self) -> Self {
     var r = Self(rawValue: self.rawValue)
     r.exclusiveOrInPlace(other)
@@ -89,6 +92,7 @@ extension OptionSetType where Element == Self {
   /// Returns `true` if `self` contains `member`.
   ///
   /// - Equivalent to `self.intersect([member]) == [member]`
+  final
   public func contains(member: Self) -> Bool {
     return self.isSupersetOf(member)
   }
@@ -97,6 +101,7 @@ extension OptionSetType where Element == Self {
   ///
   /// - Equivalent to `self.unionInPlace([member])`
   /// - Postcondition: `self.contains(member)`
+  final
   public mutating func insert(member: Element) {
     self.unionInPlace(member)
   }
@@ -105,6 +110,7 @@ extension OptionSetType where Element == Self {
   /// Otherwise, return `nil`.
   ///
   /// - Postcondition: `self.intersect([member]).isEmpty`
+  final
   public mutating func remove(member: Element) -> Element? {
     let r = isSupersetOf(member) ? Optional(member) : nil
     self.subtractInPlace(member)
@@ -136,6 +142,7 @@ extension OptionSetType where RawValue : BitwiseOperationsType {
   ///
   /// - Equivalent to replacing `self` with `self.union(other)`.
   /// - Postcondition: `self.isSupersetOf(other)`
+  final
   public mutating func unionInPlace(other: Self) {
     self = Self(rawValue: self.rawValue | other.rawValue)
   }
@@ -145,6 +152,7 @@ extension OptionSetType where RawValue : BitwiseOperationsType {
   ///
   /// - Equivalent to replacing `self` with `self.intersect(other)`
   /// - Postcondition: `self.isSubsetOf(other)`
+  final
   public mutating func intersectInPlace(other: Self) {
     self = Self(rawValue: self.rawValue & other.rawValue)
   }
@@ -153,6 +161,7 @@ extension OptionSetType where RawValue : BitwiseOperationsType {
   /// either `self` or `other`, but not both.
   ///
   /// - Equivalent to replacing `self` with `self.exclusiveOr(other)`
+  final
   public mutating func exclusiveOrInPlace(other: Self) {
     self = Self(rawValue: self.rawValue ^ other.rawValue)
   }

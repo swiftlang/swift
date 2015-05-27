@@ -75,7 +75,7 @@ public protocol _Incrementable : Equatable {
 
 extension _Incrementable {
   @inline(__always)
-  public mutating func _successorInPlace() { self = self.successor() }
+  final public mutating func _successorInPlace() { self = self.successor() }
 }
 
 //===----------------------------------------------------------------------===//
@@ -139,6 +139,7 @@ public protocol ForwardIndexType : _Incrementable {
 
 extension ForwardIndexType {
   /// Do not use this operator directly; call distance(start, end) instead.
+  final
   public func _distanceTo(other: Self) -> Distance {
     var p = self
     var count: Distance = 0
@@ -214,7 +215,7 @@ public protocol BidirectionalIndexType : ForwardIndexType {
 
 extension BidirectionalIndexType {
   @inline(__always)
-  public mutating func _predecessorInPlace() { self = self.predecessor() }
+  final public mutating func _predecessorInPlace() { self = self.predecessor() }
 }
 
 /// Replace `i` with its `predecessor()` and return the updated value
@@ -311,6 +312,7 @@ public protocol RandomAccessIndexType : BidirectionalIndexType, Strideable {
 extension RandomAccessIndexType {
   /// Do not use this operator directly; call distance(start, end) instead.
   @transparent
+  final
   public func _distanceTo(other: Self) -> Distance {
     let end = other
     return self.distanceTo(end)

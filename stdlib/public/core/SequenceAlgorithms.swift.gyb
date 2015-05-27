@@ -35,7 +35,7 @@ extension SequenceType {
   ///     2: 'i'
   ///     3: 'f'
   ///     4: 't'
-  public func enumerate() -> EnumerateSequence<Self> {
+  final public func enumerate() -> EnumerateSequence<Self> {
     return EnumerateSequence(self)
   }
 }
@@ -65,7 +65,7 @@ extension SequenceType ${"" if preds else "where Generator.Element : Comparable"
   /// - Complexity: O(`elements.count`).
   ///
   /// ${orderingRequirement}
-  public func minElement(
+  final public func minElement(
 %   if preds:
     @noescape isOrderedBefore: (${GElement}, ${GElement}) -> Bool
 %   end
@@ -86,7 +86,7 @@ extension SequenceType ${"" if preds else "where Generator.Element : Comparable"
   ///
   /// - Complexity: O(`elements.count`).
   ///   ${orderingRequirement}
-  public func maxElement(
+  final public func maxElement(
 %   if preds:
     @noescape isOrderedBefore: (${GElement}, ${GElement}) -> Bool
 %   end
@@ -131,7 +131,7 @@ else:
   /// Return true if `other` is empty."""
 }%
   ${comment}
-  public func startsWith<
+  final public func startsWith<
     OtherSequence : SequenceType where OtherSequence.${GElement} == ${GElement}
   >(
     other: OtherSequence${"," if preds else ""}
@@ -181,7 +181,7 @@ else:
 }%
 
   ${comment}
-  public func elementsEqual<
+  final public func elementsEqual<
     OtherSequence : SequenceType where OtherSequence.${GElement} == ${GElement}
   >(
     other: OtherSequence${"," if preds else ""}
@@ -249,7 +249,7 @@ else:
 }%
 
   ${comment}
-  public func lexicographicalCompare<
+  final public func lexicographicalCompare<
     OtherSequence : SequenceType where OtherSequence.${GElement} == ${GElement}
   >(
     other: OtherSequence${"," if preds else ""}
@@ -286,7 +286,7 @@ else:
 
 extension SequenceType where Generator.Element : Equatable {
   /// Return `true` iff `x` is in `self`.
-  public func contains(element: ${GElement}) -> Bool {
+  final public func contains(element: ${GElement}) -> Bool {
     if let result = _customContainsEquatableElement(element) {
       return result
     }
@@ -302,7 +302,7 @@ extension SequenceType where Generator.Element : Equatable {
 
 extension SequenceType {
   /// Return `true` iff an element in `self` satisfies `predicate`.
-  public func contains(
+  final public func contains(
     @noescape predicate: (${GElement}) -> Bool
   ) -> Bool {
     for e in self {
@@ -324,7 +324,7 @@ extension SequenceType {
   /// `self`, in turn, i.e. return
   /// `combine(combine(...combine(combine(initial, self[0]),
   /// self[1]),...self[count-2]), self[count-1])`.
-  public func reduce<T>(
+  final public func reduce<T>(
     initial: T, @noescape combine: (T, ${GElement}) -> T
   ) -> T {
     var result = initial
@@ -342,7 +342,7 @@ extension SequenceType {
 extension SequenceType {
   /// Return an `Array` containing the elements of `self` in reverse
   /// order.
-  public func reverse() -> [${GElement}] {
+  final public func reverse() -> [${GElement}] {
     // FIXME(performance): optimize to 1 pass?  But Array(self) can be
     // optimized to a memcpy() sometimes.  Those cases are usually collections,
     // though.
@@ -358,7 +358,7 @@ extension SequenceType {
 extension CollectionType where Index : BidirectionalIndexType {
   /// Return a lazy `CollectionType` containing the elements of `self`
   /// in reverse order.
-  public func reverse() -> BidirectionalReverseView<Self> {
+  final public func reverse() -> BidirectionalReverseView<Self> {
     return BidirectionalReverseView(self)
   }
 }
@@ -366,7 +366,7 @@ extension CollectionType where Index : BidirectionalIndexType {
 extension CollectionType where Index : RandomAccessIndexType {
   /// Return a lazy `CollectionType` containing the elements of `self`
   /// in reverse order.
-  public func reverse() -> RandomAccessReverseView<Self> {
+  final public func reverse() -> RandomAccessReverseView<Self> {
     return RandomAccessReverseView(self)
   }
 }
@@ -378,7 +378,7 @@ extension CollectionType where Index : RandomAccessIndexType {
 extension SequenceType {
   /// Return an `Array` containing concatenated results of mapping `transform`
   /// over `self`.
-  public func flatMap<S : SequenceType>(
+  final public func flatMap<S : SequenceType>(
     @noescape transform: (${GElement}) -> S
   ) -> [S.${GElement}] {
     var result: [S.${GElement}] = []
@@ -392,7 +392,7 @@ extension SequenceType {
 extension SequenceType {
   /// Return an `Array` containing the non-nil results of mapping `transform`
   /// over `self`.
-  public func flatMap<T>(
+  final public func flatMap<T>(
     @noescape transform: (${GElement}) -> T?
   ) -> [T] {
     var result: [T] = []

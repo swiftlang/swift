@@ -26,8 +26,8 @@ public protocol OutputStreamType {
 }
 
 extension OutputStreamType {
-  public mutating func _lock() {}
-  public mutating func _unlock() {}
+  final public mutating func _lock() {}
+  final public mutating func _unlock() {}
 }
 
 /// A source of text streaming operations.  `Streamable` instances can

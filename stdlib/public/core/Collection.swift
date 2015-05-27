@@ -54,7 +54,7 @@ public protocol _CollectionDefaultsType : SequenceType {
 
 extension _CollectionDefaultsType {
   /// Returns `true` iff `self` is empty.
-  public var isEmpty: Bool {
+  final public var isEmpty: Bool {
     return startIndex == endIndex
   }
 
@@ -62,7 +62,7 @@ extension _CollectionDefaultsType {
   /// `self`, *nondestructively*.
   ///
   /// - Complexity: O(N).
-  public func underestimateCount() -> Int {
+  final public func underestimateCount() -> Int {
     return numericCast(count)
   }
 
@@ -70,7 +70,7 @@ extension _CollectionDefaultsType {
   ///
   /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndexType`;
   ///   O(N) otherwise.
-  public var count: Index.Distance {
+  final public var count: Index.Distance {
     return distance(startIndex, endIndex)
   }
 
@@ -84,7 +84,7 @@ extension _CollectionDefaultsType {
   ///   `Optional(Optional(index))` if an element was found.
   ///
   /// - Complexity: O(N).
-  public func _customIndexOfEquatableElement(
+  final public func _customIndexOfEquatableElement(
     element: Generator.Element
   ) -> Index?? {
     return nil
@@ -105,13 +105,13 @@ public protocol _CollectionGeneratorDefaultsType {
 }
 
 extension _CollectionGeneratorDefaultsType {
-  public func generate() -> IndexingGenerator<Self> {
+  final public func generate() -> IndexingGenerator<Self> {
     return IndexingGenerator(self)
   }
 }
 
 extension _CollectionDefaultsType {
-  public subscript(_prext_bounds: Range<Index>) -> _prext_Slice<Self> {
+  final public subscript(_prext_bounds: Range<Index>) -> _prext_Slice<Self> {
     return _prext_Slice(_collection: self, bounds: _prext_bounds)
   }
 }
@@ -179,7 +179,7 @@ extension CollectionType {
   /// over `self`.
   ///
   /// - Complexity: O(N).
-  public func map<T>(
+  final public func map<T>(
     @noescape transform: (Generator.Element) -> T
   ) -> [T] {
     // Cast away @noescape.
@@ -197,7 +197,7 @@ extension CollectionType {
 extension CollectionType {
   /// Returns an `Array` containing the elements of `self`,
   /// in order, that satisfy the predicate `includeElement`.
-  public func filter(
+  final public func filter(
     @noescape includeElement: (Generator.Element) -> Bool
   ) -> [Generator.Element] {
     // Cast away @noescape.
@@ -210,13 +210,14 @@ extension CollectionType {
 
 extension CollectionType {
   /// Returns the first element of `self`, or `nil` if `self` is empty.
-  public var first: Generator.Element? {
+  final public var first: Generator.Element? {
     return isEmpty ? nil : self[startIndex]
   }
 }
 
 extension SequenceType where Self : _ArrayType {
   // A fast implementation for when you are backed by a contiguous array.
+  final
   public func _initializeTo(ptr: UnsafeMutablePointer<Generator.Element>) {
     let s = self._baseAddressIfContiguous
     if s != nil {
@@ -234,7 +235,7 @@ extension SequenceType where Self : _ArrayType {
 }
 
 extension CollectionType {
-  public func _preprocessingPass<R>(preprocess: (Self)->R) -> R? {
+  final public func _preprocessingPass<R>(preprocess: (Self)->R) -> R? {
     return preprocess(self)
   }
 }
@@ -296,7 +297,7 @@ public protocol MutableCollectionType : CollectionType {
 }
 
 extension MutableCollectionType {
-  public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
+  final public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
   @noescape body: (inout UnsafeMutableBufferPointer<Generator.Element>) -> R
   ) -> R? {
     return nil

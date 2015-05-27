@@ -461,7 +461,7 @@ internal func _isClassSuperMirror(t: Any.Type) -> Bool {
 }
 
 extension MirrorType {
-  internal func _superMirror() -> MirrorType? {
+  internal final func _superMirror() -> MirrorType? {
     if self.count > 0 {
       let childMirror = self[0].1
       if _isClassSuperMirror(childMirror.dynamicType) {

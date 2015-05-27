@@ -20,6 +20,7 @@ public protocol __ArrayType : CollectionType {
 }
 
 extension __ArrayType {
+  final
   public func _copyToNativeArrayBuffer(
   ) -> _ContiguousArrayBuffer<Generator.Element> {
     return _doCopyToNativeArrayBuffer()

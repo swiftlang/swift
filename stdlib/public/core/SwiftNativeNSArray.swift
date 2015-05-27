@@ -55,7 +55,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
     return withUnsafeBufferOfObjects { $0.count }
   }
 
-  @objc internal func objectAtIndex(index: Int) -> AnyObject {
+  @objc internal final func objectAtIndex(index: Int) -> AnyObject {
     return withUnsafeBufferOfObjects {
       objects in
       _precondition(
