@@ -252,8 +252,8 @@ void DCE::markTerminatorArgsLive(SILBasicBlock *Pred,
 // Propagate liveness back from Arg to the terminator arguments that
 // supply its value.
 void DCE::propagateLiveBlockArgument(SILArgument *Arg) {
-  // Conceptually, the dependency from a debug instruction to it's definition
-  // is in reverse direction: Only if it's definition (the Arg) is alive, also
+  // Conceptually, the dependency from a debug instruction to its definition
+  // is in reverse direction: Only if its definition (the Arg) is alive, also
   // the debug_value instruction is alive.
   for (Operand *DU : getDebugUses(*Arg))
     markValueLive(DU->getUser());
@@ -275,8 +275,8 @@ void DCE::propagateLiveness(SILInstruction *I) {
     for (auto &O : I->getAllOperands())
       markValueLive(O.get().getDef());
 
-    // Conceptually, the dependency from a debug instruction to it's definition
-    // is in reverse direction: Only if it's definition is alive, also the
+    // Conceptually, the dependency from a debug instruction to its definition
+    // is in reverse direction: Only if its definition is alive, also the
     // debug_value instruction is alive.
     for (Operand *DU : getDebugUses(*I))
       markValueLive(DU->getUser());
