@@ -998,12 +998,7 @@ replaceValueUsesWithLeafUses(SILBuilder &Builder, SILLocation Loc,
 
     DEBUG(llvm::dbgs() << "    Visiting leaf: " << Leaf);
 
-    // If the Leaf is dead, skip it.
-    if (!Node->IsLive) {
-      DEBUG(llvm::dbgs() << "        Leaf is dead, skipping it...\n");
-      continue;
-    }
-    DEBUG(llvm::dbgs() << "        Leaf is alive!\n");
+    assert(Node->IsLive && "Unexpected dead node in LeafIndices!");
 
     // Otherwise replace all uses at this level of the tree with uses of the
     // Leaf value.
