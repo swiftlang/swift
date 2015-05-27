@@ -456,6 +456,9 @@ extension Array : _ObjectiveCBridgeable {
     //
     // <rdar://problem/19773555> CFArrayCreateCopy() is >10x slower than
     // -[NSArray copyWithZone:]
+    //
+    // The bug is fixed in: OS X 10.11.0, iOS 9.0, all versions of tvOS
+    // and watchOS.
     self = Array(
       _immutableCocoaArray:
         unsafeBitCast(_cocoaArray.copyWithZone(nil), _NSArrayCoreType.self))
@@ -540,6 +543,9 @@ extension Dictionary {
     // unconditionally, resulting in O(n) copies even for immutable dictionaries.
     //
     // <rdar://problem/20690755> CFDictionaryCreateCopy() does not call copyWithZone:
+    //
+    // The bug is fixed in: OS X 10.11.0, iOS 9.0, all versions of tvOS
+    // and watchOS.
     self = Dictionary(
       _immutableCocoaDictionary:
         unsafeBitCast(_cocoaDictionary.copyWithZone(nil), _NSDictionaryType.self))
@@ -748,6 +754,9 @@ extension Set {
     // unconditionally, resulting in O(n) copies even for immutable dictionaries.
     //
     // <rdar://problem/20697680> CFSetCreateCopy() does not call copyWithZone:
+    //
+    // The bug is fixed in: OS X 10.11.0, iOS 9.0, all versions of tvOS
+    // and watchOS.
     self = Set(
       _immutableCocoaSet:
         unsafeBitCast(_cocoaSet.copyWithZone(nil), _NSSetType.self))
