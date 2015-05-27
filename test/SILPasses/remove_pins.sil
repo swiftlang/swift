@@ -10,17 +10,24 @@ import Builtin
 // Utility //
 /////////////
 
-struct ArrayIntBuffer {
+struct MyArrayBuffer {
   var storage : Builtin.NativeObject
 }
 
-struct ArrayInt{
-  var buffer : ArrayIntBuffer
+struct MyInt {}
+class MyClass {}
+
+struct MyArray<T>{
+  var buffer : MyArrayBuffer
 }
 
-sil [_semantics "array.make_mutable"] @make_mutable : $@convention(method) (@inout ArrayInt) -> Bool
+sil [_semantics "array.make_mutable"] @make_mutable : $@convention(method) (@inout MyArray<MyInt>) -> Bool
 
-sil [_semantics "array.get_count"] @get_count : $@convention(method) (@guaranteed ArrayInt) -> ()
+sil [_semantics "array.get_count"] @get_count : $@convention(method) (@guaranteed MyArray<MyInt>) -> ()
+
+sil [_semantics "array.make_mutable"] @make_mutable_class : $@convention(method) (@inout MyArray<MyClass>) -> Bool
+
+sil [_semantics "array.get_count"] @get_count_class : $@convention(method) (@guaranteed MyArray<MyClass>) -> ()
 
 sil @user : $@convention(thin) (Builtin.NativeObject) -> Bool
 
@@ -68,15 +75,37 @@ bb0(%0 : $Builtin.NativeObject):
 // CHECK-NOT: strong_unpin
 // CHECK: return
 
-sil @remove_pins_across_make_mutable : $@convention(thin) (@inout ArrayInt) -> () {
-bb0(%0 : $*ArrayInt):
-  %1 = load %0: $*ArrayInt
-  %2 = struct_extract %1 : $ArrayInt, #ArrayInt.buffer
-  %3 = struct_extract %2 : $ArrayIntBuffer, #ArrayIntBuffer.storage
-  %4 = function_ref @make_mutable : $@convention(method) (@inout ArrayInt) -> Bool
-  %5 = apply %4(%0) : $@convention(method) (@inout ArrayInt) -> Bool
+sil @remove_pins_across_make_mutable : $@convention(thin) (@inout MyArray<MyInt>) -> () {
+bb0(%0 : $*MyArray<MyInt>):
+  %1 = load %0: $*MyArray<MyInt>
+  %2 = struct_extract %1 : $MyArray<MyInt>, #MyArray.buffer
+  %3 = struct_extract %2 : $MyArrayBuffer, #MyArrayBuffer.storage
+  %4 = function_ref @make_mutable : $@convention(method) (@inout MyArray<MyInt>) -> Bool
+  %5 = apply %4(%0) : $@convention(method) (@inout MyArray<MyInt>) -> Bool
   %6 = strong_pin %3 : $Builtin.NativeObject
-  %7 = apply %4(%0) : $@convention(method) (@inout ArrayInt) -> Bool
+  %7 = apply %4(%0) : $@convention(method) (@inout MyArray<MyInt>) -> Bool
+  strong_unpin %6 : $Optional<Builtin.NativeObject>
+  %8 = tuple()
+  return %8 : $()
+}
+
+// CHECK-LABEL: sil @remove_pins_across_make_mutable_class
+// CHECK: [[MAKE_MUTABLE:%.*]] = function_ref @make_mutable_class
+// CHECK: apply [[MAKE_MUTABLE]]
+// CHECK-NOT: strong_pin
+// CHECK: apply [[MAKE_MUTABLE]]
+// CHECK-NOT: strong_unpin
+// CHECK: return
+
+sil @remove_pins_across_make_mutable_class : $@convention(thin) (@inout MyArray<MyClass>) -> () {
+bb0(%0 : $*MyArray<MyClass>):
+  %1 = load %0: $*MyArray<MyClass>
+  %2 = struct_extract %1 : $MyArray<MyClass>, #MyArray.buffer
+  %3 = struct_extract %2 : $MyArrayBuffer, #MyArrayBuffer.storage
+  %4 = function_ref @make_mutable_class : $@convention(method) (@inout MyArray<MyClass>) -> Bool
+  %5 = apply %4(%0) : $@convention(method) (@inout MyArray<MyClass>) -> Bool
+  %6 = strong_pin %3 : $Builtin.NativeObject
+  %7 = apply %4(%0) : $@convention(method) (@inout MyArray<MyClass>) -> Bool
   strong_unpin %6 : $Optional<Builtin.NativeObject>
   %8 = tuple()
   return %8 : $()
@@ -87,27 +116,27 @@ bb0(%0 : $*ArrayInt):
 // CHECK: is_unique_or_pinned
 // CHECK: strong_unpin
 
-sil @dont_remove_pins_across_pin_read : $@convention(thin) (@inout ArrayInt) -> Builtin.Int1 {
-bb0(%0 : $*ArrayInt):
-  %1 = load %0: $*ArrayInt
-  %2 = struct_element_addr %0 : $*ArrayInt, #ArrayInt.buffer
-  %3 = struct_element_addr %2 : $*ArrayIntBuffer, #ArrayIntBuffer.storage
-  %4 = struct_extract %1 : $ArrayInt, #ArrayInt.buffer
-  %5 = struct_extract %4 : $ArrayIntBuffer, #ArrayIntBuffer.storage
+sil @dont_remove_pins_across_pin_read : $@convention(thin) (@inout MyArray<MyInt>) -> Builtin.Int1 {
+bb0(%0 : $*MyArray<MyInt>):
+  %1 = load %0: $*MyArray<MyInt>
+  %2 = struct_element_addr %0 : $*MyArray<MyInt>, #MyArray.buffer
+  %3 = struct_element_addr %2 : $*MyArrayBuffer, #MyArrayBuffer.storage
+  %4 = struct_extract %1 : $MyArray<MyInt>, #MyArray.buffer
+  %5 = struct_extract %4 : $MyArrayBuffer, #MyArrayBuffer.storage
   %6 = strong_pin %5 : $Builtin.NativeObject
   %7 = is_unique_or_pinned %3 : $*Builtin.NativeObject
   strong_unpin %6 : $Optional<Builtin.NativeObject>
   return %7 : $Builtin.Int1
 }
 
-// CHECK-LABEL: sil @remove_pins_with_inert_rcidentity_uses : $@convention(thin) (@inout ArrayInt) -> () {
+// CHECK-LABEL: sil @remove_pins_with_inert_rcidentity_uses : $@convention(thin) (@inout MyArray<MyInt>) -> () {
 // CHECK-NOT: strong_pin
 // CHECK-NOT: strong_unpin
-sil @remove_pins_with_inert_rcidentity_uses : $@convention(thin) (@inout ArrayInt) -> () {
-bb0(%0 : $*ArrayInt):
-  %1 = load %0: $*ArrayInt
-  %2 = struct_extract %1 : $ArrayInt, #ArrayInt.buffer
-  %3 = struct_extract %2 : $ArrayIntBuffer, #ArrayIntBuffer.storage
+sil @remove_pins_with_inert_rcidentity_uses : $@convention(thin) (@inout MyArray<MyInt>) -> () {
+bb0(%0 : $*MyArray<MyInt>):
+  %1 = load %0: $*MyArray<MyInt>
+  %2 = struct_extract %1 : $MyArray<MyInt>, #MyArray.buffer
+  %3 = struct_extract %2 : $MyArrayBuffer, #MyArrayBuffer.storage
   %4 = unchecked_trivial_bit_cast %3 : $Builtin.NativeObject to $UnsafePointer<HeapObject>
   %6 = strong_pin %3 : $Builtin.NativeObject
   %7 = integer_literal $Builtin.Int1, 0
@@ -118,14 +147,14 @@ bb0(%0 : $*ArrayInt):
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil @cant_remove_pins_with_escaping_rcidentity_use : $@convention(thin) (@inout ArrayInt) -> Bool {
+// CHECK-LABEL: sil @cant_remove_pins_with_escaping_rcidentity_use : $@convention(thin) (@inout MyArray<MyInt>) -> Bool {
 // CHECK: strong_pin
 // CHECK: strong_unpin
-sil @cant_remove_pins_with_escaping_rcidentity_use : $@convention(thin) (@inout ArrayInt) -> Bool {
-bb0(%0 : $*ArrayInt):
-  %1 = load %0: $*ArrayInt
-  %4 = struct_extract %1 : $ArrayInt, #ArrayInt.buffer
-  %5 = struct_extract %4 : $ArrayIntBuffer, #ArrayIntBuffer.storage
+sil @cant_remove_pins_with_escaping_rcidentity_use : $@convention(thin) (@inout MyArray<MyInt>) -> Bool {
+bb0(%0 : $*MyArray<MyInt>):
+  %1 = load %0: $*MyArray<MyInt>
+  %4 = struct_extract %1 : $MyArray<MyInt>, #MyArray.buffer
+  %5 = struct_extract %4 : $MyArrayBuffer, #MyArrayBuffer.storage
   %6 = strong_pin %5 : $Builtin.NativeObject
   %7 = integer_literal $Builtin.Int1, 0
   %8 = tuple(%6 : $Optional<Builtin.NativeObject>, %7 : $Builtin.Int1)
@@ -142,14 +171,14 @@ bb0(%0 : $*ArrayInt):
 // This is safe to do since the value we are extracting has nothing to do really
 // with the RCIdentity of the tuple we are extracting from.
 
-// CHECK-LABEL: sil @remove_pins_with_inert_rcidentity_uses3 : $@convention(thin) (@inout ArrayInt) -> (Builtin.Int1, Builtin.Int1) {
+// CHECK-LABEL: sil @remove_pins_with_inert_rcidentity_uses3 : $@convention(thin) (@inout MyArray<MyInt>) -> (Builtin.Int1, Builtin.Int1) {
 // CHECK-NOT: strong_pin
 // CHECK-NOT: strong_unpin
-sil @remove_pins_with_inert_rcidentity_uses3 : $@convention(thin) (@inout ArrayInt) -> (Builtin.Int1, Builtin.Int1) {
-bb0(%0 : $*ArrayInt):
-  %1 = load %0: $*ArrayInt
-  %2 = struct_extract %1 : $ArrayInt, #ArrayInt.buffer
-  %3 = struct_extract %2 : $ArrayIntBuffer, #ArrayIntBuffer.storage
+sil @remove_pins_with_inert_rcidentity_uses3 : $@convention(thin) (@inout MyArray<MyInt>) -> (Builtin.Int1, Builtin.Int1) {
+bb0(%0 : $*MyArray<MyInt>):
+  %1 = load %0: $*MyArray<MyInt>
+  %2 = struct_extract %1 : $MyArray<MyInt>, #MyArray.buffer
+  %3 = struct_extract %2 : $MyArrayBuffer, #MyArrayBuffer.storage
   %4 = unchecked_trivial_bit_cast %3 : $Builtin.NativeObject to $UnsafePointer<HeapObject>
   %6 = strong_pin %3 : $Builtin.NativeObject
   %7 = integer_literal $Builtin.Int1, 0
@@ -162,14 +191,14 @@ bb0(%0 : $*ArrayInt):
   return %12 : $(Builtin.Int1, Builtin.Int1)
 }
 
-// CHECK-LABEL: sil @do_not_remove_pins_non_inert_rcidentity_uses : $@convention(thin) (@inout ArrayInt) -> Bool {
+// CHECK-LABEL: sil @do_not_remove_pins_non_inert_rcidentity_uses : $@convention(thin) (@inout MyArray<MyInt>) -> Bool {
 // CHECK: strong_pin
 // CHECK: strong_unpin
-sil @do_not_remove_pins_non_inert_rcidentity_uses : $@convention(thin) (@inout ArrayInt) -> Bool {
-bb0(%0 : $*ArrayInt):
-  %1 = load %0: $*ArrayInt
-  %2 = struct_extract %1 : $ArrayInt, #ArrayInt.buffer
-  %3 = struct_extract %2 : $ArrayIntBuffer, #ArrayIntBuffer.storage
+sil @do_not_remove_pins_non_inert_rcidentity_uses : $@convention(thin) (@inout MyArray<MyInt>) -> Bool {
+bb0(%0 : $*MyArray<MyInt>):
+  %1 = load %0: $*MyArray<MyInt>
+  %2 = struct_extract %1 : $MyArray<MyInt>, #MyArray.buffer
+  %3 = struct_extract %2 : $MyArrayBuffer, #MyArrayBuffer.storage
   %4 = unchecked_trivial_bit_cast %3 : $Builtin.NativeObject to $UnsafePointer<HeapObject>
   %6 = strong_pin %3 : $Builtin.NativeObject
   %7 = integer_literal $Builtin.Int1, 0
@@ -189,24 +218,24 @@ bb0(%0 : $*ArrayInt):
 // call with guaranteed self and the instruction before that a retain on self
 // again. In such a case, we ignore the release.
 //
-// CHECK-LABEL: sil @pins_and_guaranteed_self : $@convention(thin) (@inout ArrayInt) -> () {
+// CHECK-LABEL: sil @pins_and_guaranteed_self : $@convention(thin) (@inout MyArray<MyInt>) -> () {
 // CHECK: bb0
 // CHECK-NOT: strong_pin
 // CHECK-NOT: strong_unpin
 // CHECK: bb1
 // CHECK: strong_pin
 // CHECK: strong_unpin
-sil @pins_and_guaranteed_self : $@convention(thin) (@inout ArrayInt) -> () {
-bb0(%0 : $*ArrayInt):
-  %1 = load %0: $*ArrayInt
-  %2 = struct_extract %1 : $ArrayInt, #ArrayInt.buffer
-  %3 = struct_extract %2 : $ArrayIntBuffer, #ArrayIntBuffer.storage
+sil @pins_and_guaranteed_self : $@convention(thin) (@inout MyArray<MyInt>) -> () {
+bb0(%0 : $*MyArray<MyInt>):
+  %1 = load %0: $*MyArray<MyInt>
+  %2 = struct_extract %1 : $MyArray<MyInt>, #MyArray.buffer
+  %3 = struct_extract %2 : $MyArrayBuffer, #MyArrayBuffer.storage
   %4 = unchecked_trivial_bit_cast %3 : $Builtin.NativeObject to $UnsafePointer<HeapObject>
-  %6 = function_ref @get_count : $@convention(method) (@guaranteed ArrayInt) -> ()
+  %6 = function_ref @get_count : $@convention(method) (@guaranteed MyArray<MyInt>) -> ()
   %7 = strong_pin %3 : $Builtin.NativeObject
-  retain_value %1 : $ArrayInt
-  apply %6(%1) : $@convention(method) (@guaranteed ArrayInt) -> ()
-  release_value %1 : $ArrayInt
+  retain_value %1 : $MyArray<MyInt>
+  apply %6(%1) : $@convention(method) (@guaranteed MyArray<MyInt>) -> ()
+  release_value %1 : $MyArray<MyInt>
   strong_unpin %7 : $Optional<Builtin.NativeObject>
 
   // We take advantage of pins being single BB here.
@@ -214,10 +243,51 @@ bb0(%0 : $*ArrayInt):
 
 bb1:
   %8 = strong_pin %3 : $Builtin.NativeObject
-  retain_value %1 : $ArrayInt
-  apply %6(%1) : $@convention(method) (@guaranteed ArrayInt) -> ()
-  apply %6(%1) : $@convention(method) (@guaranteed ArrayInt) -> ()
-  release_value %1 : $ArrayInt
+  retain_value %1 : $MyArray<MyInt>
+  apply %6(%1) : $@convention(method) (@guaranteed MyArray<MyInt>) -> ()
+  apply %6(%1) : $@convention(method) (@guaranteed MyArray<MyInt>) -> ()
+  release_value %1 : $MyArray<MyInt>
+  strong_unpin %8 : $Optional<Builtin.NativeObject>
+
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Arrays that could be backed by an NSArray may call NSArray methods which
+// might have arbitrary side effects including a release on the array.
+
+// CHECK-LABEL: sil @pins_and_guaranteed_self_class
+// CHECK: bb0({{.*}}):
+// CHECK: strong_pin
+// CHECK: strong_unpin
+// CHECK: br bb1
+// CHECK: bb1:
+// CHECK: strong_pin
+// CHECK: strong_unpin
+// CHECK: return
+
+sil @pins_and_guaranteed_self_class : $@convention(thin) (@inout MyArray<MyClass>) -> () {
+bb0(%0 : $*MyArray<MyClass>):
+  %1 = load %0: $*MyArray<MyClass>
+  %2 = struct_extract %1 : $MyArray<MyClass>, #MyArray.buffer
+  %3 = struct_extract %2 : $MyArrayBuffer, #MyArrayBuffer.storage
+  %4 = unchecked_trivial_bit_cast %3 : $Builtin.NativeObject to $UnsafePointer<HeapObject>
+  %6 = function_ref @get_count_class : $@convention(method) (@guaranteed MyArray<MyClass>) -> ()
+  %7 = strong_pin %3 : $Builtin.NativeObject
+  retain_value %1 : $MyArray<MyClass>
+  apply %6(%1) : $@convention(method) (@guaranteed MyArray<MyClass>) -> ()
+  release_value %1 : $MyArray<MyClass>
+  strong_unpin %7 : $Optional<Builtin.NativeObject>
+
+  // We take advantage of pins being single BB here.
+  br bb1
+
+bb1:
+  %8 = strong_pin %3 : $Builtin.NativeObject
+  retain_value %1 : $MyArray<MyClass>
+  apply %6(%1) : $@convention(method) (@guaranteed MyArray<MyClass>) -> ()
+  apply %6(%1) : $@convention(method) (@guaranteed MyArray<MyClass>) -> ()
+  release_value %1 : $MyArray<MyClass>
   strong_unpin %8 : $Optional<Builtin.NativeObject>
 
   %9999 = tuple()

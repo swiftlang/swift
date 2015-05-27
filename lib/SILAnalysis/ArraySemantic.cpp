@@ -456,3 +456,33 @@ SILValue swift::ArraySemanticsCall::getArrayPropertyNeedsTypeCheck() const {
 
   return SemanticsCall->getArgument(ArgIdx);
 }
+
+bool swift::ArraySemanticsCall::mayHaveBridgedObjectElementType() const {
+  assert(hasSelf() && "Need self parameter");
+
+  auto Ty = getSelf().getType().getSwiftRValueType();
+  auto Cannonical = Ty.getCanonicalTypeOrNull();
+  if (Cannonical.isNull())
+    return true;
+
+  auto *Struct = Cannonical->getStructOrBoundGenericStruct();
+  assert(Struct && "Array must be a struct !?");
+  if (Struct) {
+    auto BGT = dyn_cast<BoundGenericType>(Ty);
+    if (!BGT)
+      return true;
+
+    // Check the array element type parameter.
+    bool isClass = true;
+    for (auto TP : BGT->getGenericArgs()) {
+      auto EltTy = TP.getCanonicalTypeOrNull();
+      if (EltTy.isNull())
+        return true;
+      if (EltTy->isBridgeableObjectType())
+        return true;
+      isClass = false;
+    }
+    return isClass;
+  }
+  return true;
+}

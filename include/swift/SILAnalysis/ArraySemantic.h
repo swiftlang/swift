@@ -111,6 +111,9 @@ public:
   /// Is this an semantics call.
   operator bool() const { return SemanticsCall != nullptr; }
 
+  /// Could this array be backed by an NSArray.
+  bool mayHaveBridgedObjectElementType() const;
+
 protected:
   /// Validate the signature of this call.
   bool isValidSignature();

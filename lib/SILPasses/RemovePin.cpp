@@ -205,15 +205,20 @@ public:
     default:
       return false;
 
-    case ArrayCallKind::kArrayPropsIsNative:
-    case ArrayCallKind::kArrayPropsIsNativeNoTypeCheck:
     case ArrayCallKind::kCheckSubscript:
     case ArrayCallKind::kCheckIndex:
     case ArrayCallKind::kGetCount:
     case ArrayCallKind::kGetCapacity:
     case ArrayCallKind::kGetElement:
+      // Only arrays that cannot be backed by NSArrays are safe. A method on
+      // NSArray may do arbitrary things including releasing the array.
+      return !Call.mayHaveBridgedObjectElementType();
+
+    case ArrayCallKind::kArrayPropsIsNative:
+    case ArrayCallKind::kArrayPropsIsNativeNoTypeCheck:
     case ArrayCallKind::kGetElementAddress:
     case ArrayCallKind::kMakeMutable:
+      // These do not call NSArray methods.
       return true;
     }
   }
