@@ -1452,7 +1452,8 @@ emitSerialCastOperand(SILGenFunction &SGF, SILLocation loc,
   bool requiresAddress = false;
   for (auto &row : rows) {
     CanType targetType = getTargetType(row);
-    if (!canUseScalarCheckedCastInstructions(sourceType, targetType)) {
+    if (!canUseScalarCheckedCastInstructions(SGF.SGM.M,
+                                             sourceType, targetType)) {
       requiresAddress = true;
       break;
     }

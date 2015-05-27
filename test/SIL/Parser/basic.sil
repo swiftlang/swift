@@ -724,13 +724,6 @@ bb0(%t : $T):
 
 protocol ClassP : class {}
 
-sil @test_downcast_existential_ref : $@convention(thin) <U : ClassP> (ClassP) -> () {
-bb0(%t : $ClassP):
-  %0 = unconditional_checked_cast %t : $ClassP to $U
-  %1 = tuple ()
-  return %1 : $()
-}
-
 enum MaybePair {
   case Neither
   case Left(Int)

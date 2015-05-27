@@ -1473,7 +1473,7 @@ CastOptimizer::simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
       if (BridgedI) {
         CastedValue = SILValue(BridgedI, 0);
       } else {
-        if (!canUseScalarCheckedCastInstructions(SourceType, TargetType))
+        if (!canUseScalarCheckedCastInstructions(Mod, SourceType, TargetType))
           return nullptr;
 
         CastedValue = emitSuccessfulScalarUnconditionalCast(

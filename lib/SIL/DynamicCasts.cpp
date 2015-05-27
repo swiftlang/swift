@@ -13,8 +13,8 @@
 #include "swift/AST/Types.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
-
 #include "swift/SIL/DynamicCasts.h"
+#include "swift/SIL/TypeLowering.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -807,13 +807,41 @@ bool swift::emitSuccessfulIndirectUnconditionalCast(SILBuilder &B, Module *M,
 /// things handleable by the scalar checked casts --- and that's not
 /// totally unreasonable --- you will need to make the scalar checked
 /// casts take a cast consumption kind.
-bool swift::canUseScalarCheckedCastInstructions(CanType sourceType,
+bool swift::canUseScalarCheckedCastInstructions(SILModule &M,
+                                                CanType sourceType,
                                                 CanType targetType) {
   // Look through one level of optionality on the source.
   auto objectType = sourceType;
   if (auto type = objectType.getAnyOptionalObjectType())
     objectType = type;
 
+  // Casting to NSError needs to go through the indirect-cast case,
+  // since it may conform to ErrorType and require ErrorType-to-NSError
+  // bridging, unless we can statically see that the source type inherits
+  // NSError.
+  
+  // A class-constrained archetype may be bound to NSError, unless it has a
+  // non-NSError superclass constraint. Casts to archetypes thus must always be
+  // indirect.
+  if (auto archetype = targetType->getAs<ArchetypeType>()) {
+    auto super = archetype->getSuperclass();
+    if (super.isNull())
+      return false;
+    // A base class constraint that isn't NSError rules out the archetype being
+    // bound to NSError.
+    if (auto nserror = M.Types.getNSErrorType())
+      return !super->isEqual(nserror);
+    // If NSError wasn't loaded, any base class constraint must not be NSError.
+    return true;
+  }
+  
+  if (targetType == M.Types.getNSErrorType()) {
+    // If we statically know the target is an NSError subclass, then the cast
+    // can go through the scalar path (and it's trivially true so can be
+    // killed).
+    return targetType->isSuperclassOf(objectType, nullptr);
+  }
+  
   // Three supported cases:
   // - metatype to metatype
   // - metatype to object
@@ -824,7 +852,7 @@ bool swift::canUseScalarCheckedCastInstructions(CanType sourceType,
 
   if (isa<AnyMetatypeType>(objectType) && isa<AnyMetatypeType>(targetType))
     return true;
-
+  
   // Otherwise, we need to use the general indirect-cast functions.
   return false;
 }
@@ -839,7 +867,8 @@ emitIndirectConditionalCastWithScalar(SILBuilder &B, Module *M,
                                       SILValue dest, CanType targetType,
                                       SILBasicBlock *indirectSuccBB,
                                       SILBasicBlock *indirectFailBB) {
-  assert(canUseScalarCheckedCastInstructions(sourceType, targetType));
+  assert(canUseScalarCheckedCastInstructions(B.getModule(),
+                                             sourceType, targetType));
 
   // We only need a different failure block if the cast consumption
   // requires us to destroy the source value.

@@ -57,7 +57,8 @@ func opaque_archetype_is_class_archetype
 func class_archetype_to_class_archetype
 <T:ClassBound, U:ClassBound>(t:T) -> U {
   return t as! U
-  // CHECK: [[DOWNCAST:%.*]] = unconditional_checked_cast {{%.*}} : {{.*}} to $U
+  // CHECK: unconditional_checked_cast_addr {{.*}} T in {{%.*}} : $*T to U in [[DOWNCAST_ADDR:%.*]] : $*U
+  // CHECK: [[DOWNCAST:%.*]] = load [[DOWNCAST_ADDR]]
   // CHECK: return [[DOWNCAST]] : $U
 }
 
@@ -65,7 +66,7 @@ func class_archetype_to_class_archetype
 func class_archetype_is_class_archetype
 <T:ClassBound, U:ClassBound>(t:T, u:U.Type) -> Bool {
   return t is U
-  // CHECK: checked_cast_br [[VAL:%.*]] : {{.*}} to $U
+  // CHECK: checked_cast_addr_br {{.*}} T in {{%.*}} : $*T to U in {{%.*}} : $*U
 }
 
 // CHECK-LABEL: sil hidden @_TF13generic_casts38opaque_archetype_to_addr_only_concrete{{.*}}
@@ -155,7 +156,8 @@ func opaque_existential_is_class_archetype
 func class_existential_to_class_archetype
 <T:ClassBound>(p:ClassBound) -> T {
   return p as! T
-  // CHECK: [[DOWNCAST:%.*]] = unconditional_checked_cast {{%.*}} to $T
+  // CHECK: unconditional_checked_cast_addr {{.*}} ClassBound in {{%.*}} : $*ClassBound to T in [[DOWNCAST_ADDR:%.*]] : $*T
+  // CHECK: [[DOWNCAST:%.*]] = load [[DOWNCAST_ADDR]]
   // CHECK: return [[DOWNCAST]] : $T
 }
 
@@ -163,7 +165,7 @@ func class_existential_to_class_archetype
 func class_existential_is_class_archetype
 <T:ClassBound>(p:ClassBound, _: T) -> Bool {
   return p is T
-  // CHECK: checked_cast_br {{%.*}} to $T
+  // CHECK: checked_cast_addr_br {{.*}} ClassBound in {{%.*}} : $*ClassBound to T in {{%.*}} : $*T
 }
 
 // CHECK-LABEL: sil hidden @_TF13generic_casts40opaque_existential_to_addr_only_concrete{{.*}}
@@ -182,7 +184,7 @@ func opaque_existential_is_addr_only_concrete(p: NotClassBound) -> Bool {
 // CHECK-LABEL: sil hidden @_TF13generic_casts39opaque_existential_to_loadable_concrete{{.*}}
 func opaque_existential_to_loadable_concrete(p: NotClassBound) -> S {
   return p as! S
-  // CHECK:   unconditional_checked_cast_addr take_always NotClassBound in {{%.*}} : $*NotClassBound to S in [[DOWNCAST_ADDR]] : $*S
+  // CHECK:   unconditional_checked_cast_addr take_always NotClassBound in {{%.*}} : $*NotClassBound to S in [[DOWNCAST_ADDR:%.*]] : $*S
   // CHECK: [[DOWNCAST:%.*]] = load [[DOWNCAST_ADDR]] : $*S
   // CHECK: return [[DOWNCAST]] : $S
 }

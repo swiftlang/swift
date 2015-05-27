@@ -239,7 +239,8 @@ protected:
     SILBuilderWithPostProcess<TypeSubstCloner, 16> B(this, inst);
 
     // Try to use the scalar cast instruction.
-    if (canUseScalarCheckedCastInstructions(sourceType, targetType)) {
+    if (canUseScalarCheckedCastInstructions(B.getModule(),
+                                            sourceType, targetType)) {
       emitIndirectConditionalCastWithScalar(B, SwiftMod, loc,
                                             inst->getConsumptionKind(),
                                             src, sourceType,

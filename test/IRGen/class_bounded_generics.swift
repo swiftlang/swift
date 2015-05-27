@@ -169,17 +169,6 @@ func class_bounded_archetype_cast<T : ClassBound>(x: T) -> ConcreteClass {
   // CHECK: ret %C22class_bounded_generics13ConcreteClass* [[OUT]]
 }
 
-// CHECK-LABEL: define hidden %objc_object* @_TF22class_bounded_generics38class_bounded_archetype_archetype_cast{{.*}}(%objc_object*, %swift.type* %T, i8** %T.ClassBound, %swift.type* %U, i8** %U.ClassBound)
-func class_bounded_archetype_archetype_cast
-<T:ClassBound, U:ClassBound>(x:T) -> U {
-  return x as! U
-  // CHECK: [[IN_PTR:%.*]] = bitcast %objc_object* {{%.*}} to i8*
-  // CHECK: [[OUT_TYPE:%.*]] = bitcast %swift.type* %U to i8*
-  // CHECK: [[OUT_PTR:%.*]] = call i8* @swift_dynamicCastUnknownClassUnconditional(i8* [[IN_PTR]], i8* [[OUT_TYPE]])
-  // CHECK: [[OUT:%.*]] = bitcast i8* [[OUT_PTR]] to %objc_object*
-  // CHECK: ret %objc_object* [[OUT]]
-}
-
 // CHECK-LABEL: define hidden %C22class_bounded_generics13ConcreteClass* @_TF22class_bounded_generics27class_bounded_protocol_cast{{.*}}(%objc_object*, i8**)
 func class_bounded_protocol_cast(x: ClassBound) -> ConcreteClass {
   return x as! ConcreteClass

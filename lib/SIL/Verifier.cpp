@@ -1848,7 +1848,8 @@ public:
     auto fromCanTy = fromTy.getSwiftRValueType();
     auto toCanTy = toTy.getSwiftRValueType();
 
-    require(canUseScalarCheckedCastInstructions(fromCanTy, toCanTy),
+    require(canUseScalarCheckedCastInstructions(F.getModule(),
+                                                fromCanTy, toCanTy),
             "invalid value checked cast src or dest types");
 
     // Peel off metatypes. If two types are checked-cast-able, so are their
