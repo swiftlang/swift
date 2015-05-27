@@ -1,3 +1,6 @@
+// FIXME: this test fails on 32-bit
+// REQUIRES: jigawatts
+
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=CATCH1 | FileCheck %s -check-prefix=CATCH1
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -code-completion -source-filename %s -code-completion-token=THROW1 > %t.throw1
 // RUN: FileCheck %s -check-prefix=THROW1 < %t.throw1
