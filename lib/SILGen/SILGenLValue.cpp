@@ -1548,6 +1548,9 @@ LValue SILGenLValue::visitDiscardAssignmentExpr(DiscardAssignmentExpr *e,
 
   // FIXME: this is a leak?
   SILValue address = gen.emitTemporaryAllocation(e, tempType.getObjectType());
+  address = gen.B.createMarkUninitialized(e, address,
+                                          MarkUninitializedInst::Var);
+  gen.enterDestroyCleanup(address);
   LValue lv;
   lv.add<ValueComponent>(ManagedValue::forUnmanaged(address),
                          getValueTypeData(tempType, gen.SGM.M));
