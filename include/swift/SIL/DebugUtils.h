@@ -13,6 +13,24 @@
 // This file contains utilities to work with debug-info related instructions:
 // debug_value and debug_value_addr.
 //
+// SIL optimizations should deal with debug-info related instructions when
+// looking at the uses of a value.
+// When performing an analysis, the usual thing is to just ignore all debug-info
+// instructions.
+// When transforming the SIL, a pass must decide what to do with debug-info
+// instructions. Either delete them (if their value is no longer available),
+// keep them (if the transformation has no effect on debug-info values) or
+// update them.
+//
+// To ignore debug-info instructions during an analysis, this file provides
+// some utility functions, which can be used instead of the relevant member
+// functions in ValueBase and SILValue:
+//
+// V->use_empty()        ->  hasNoUsesExceptDebug(V)
+// V.hasOneUse()         ->  hasOneNonDebugUse(V)
+// V.getUses()           ->  getNonDebugUses(V)
+// I->eraseFromParent()  ->  eraseFromParentWithDebugInsts(I)
+//
 //===----------------------------------------------------------------------===//
 
 #ifndef SWIFT_SIL_DEBUGUTILS_H

@@ -103,14 +103,24 @@ public:
   /// SILValue::replaceAllUsesWith.
   void replaceAllUsesWith(ValueBase *RHS);
 
+  /// Returns true if this value has no uses.
+  /// To ignore debug-info instructions use swift::hasNoUsesExceptDebug instead
+  /// (see comment in DebugUtils.h).
   bool use_empty() const { return FirstUse == nullptr; }
 
   using use_iterator = ValueBaseUseIterator;
 
   inline use_iterator use_begin() const;
   inline use_iterator use_end() const;
+  
+  /// Returns a range of all uses, which is useful for iterating over all uses.
+  /// To ignore debug-info instructions use swift::getNonDebugUses instead
+  // (see comment in DebugUtils.h).
   inline Range<use_iterator> getUses() const;
 
+  /// Returns true if this value has exactly one use.
+  /// To ignore debug-info instructions use swift::hasOneNonDebugUse instead
+  /// (see comment in DebugUtils.h).
   inline bool hasOneUse() const;
 
   /// Pretty-print the value.
@@ -202,10 +212,22 @@ public:
 
   using use_iterator = ValueUseIterator;
 
+  /// Returns true if this value has no uses.
+  /// To ignore debug-info instructions use swift::hasNoUsesExceptDebug instead
+  /// (see comment in DebugUtils.h).
   inline bool use_empty() const;
+
   inline use_iterator use_begin() const;
   inline use_iterator use_end() const;
+
+  /// Returns a range of all uses, which is useful for iterating over all uses.
+  /// To ignore debug-info instructions use swift::getNonDebugUses instead
+  /// (see comment in DebugUtils.h).
   inline Range<use_iterator> getUses() const;
+
+  /// Returns true if this value has exactly one use.
+  /// To ignore debug-info instructions use swift::hasOneNonDebugUse instead
+  /// (see comment in DebugUtils.h).
   inline bool hasOneUse() const;
 
   // Return the underlying SILValue after stripping off all casts from the
