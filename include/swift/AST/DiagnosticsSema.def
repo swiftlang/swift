@@ -1711,7 +1711,7 @@ ERROR(fallthrough_into_case_with_var_binding,sema_tcs,none,
       "'fallthrough' cannot transfer control to a case label that declares variables",
       ())
 
-ERROR(unnecessary_cast_over_rawoptionset,sema_tcs,none,
+ERROR(unnecessary_cast_over_optionset,sema_tcs,none,
       "unnecessary cast over raw value of %0", (Type))
 
 //------------------------------------------------------------------------------

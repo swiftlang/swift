@@ -4510,7 +4510,6 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::GeneratorType:
   case KnownProtocolKind::BooleanType:
   case KnownProtocolKind::RawRepresentable:
-  case KnownProtocolKind::RawOptionSetType:
   case KnownProtocolKind::Equatable:
   case KnownProtocolKind::Hashable:
   case KnownProtocolKind::Comparable:

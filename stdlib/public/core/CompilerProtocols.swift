@@ -46,20 +46,6 @@ public protocol RawRepresentable {
   var rawValue: RawValue { get }
 }
 
-// Workaround for our lack of circular conformance checking. Allow == to be
-// defined on _RawOptionSetType in order to satisfy the Equatable requirement of
-// RawOptionSetType without a circularity our type-checker can't yet handle.
-
-/// This protocol is an implementation detail of `RawOptionSetType`; do
-/// not use it directly.
-///
-/// Its requirements are inherited by `RawOptionSetType` and thus must
-/// be satisfied by types conforming to that protocol.
-public protocol _RawOptionSetType : RawRepresentable, Equatable {
-  typealias RawValue : BitwiseOperationsType, Equatable
-  init(rawValue: RawValue)
-}
-
 /// Returns `true` iff `lhs.rawValue == rhs.rawValue`.
 public func == <
   T : RawRepresentable where T.RawValue : Equatable
@@ -81,33 +67,6 @@ public func != <
   T : Equatable where T : RawRepresentable, T.RawValue : Equatable
 >(lhs: T, rhs: T) -> Bool {
   return lhs.rawValue != rhs.rawValue
-}
-
-public func == <T : _RawOptionSetType>(a: T, b: T) -> Bool {
-  return a.rawValue == b.rawValue
-}
-
-public func & <T : _RawOptionSetType>(a: T, b: T) -> T {
-  return T(rawValue: a.rawValue & b.rawValue)
-}
-public func | <T : _RawOptionSetType>(a: T, b: T) -> T {
-  return T(rawValue: a.rawValue | b.rawValue)
-}
-public func ^ <T : _RawOptionSetType>(a: T, b: T) -> T {
-  return T(rawValue: a.rawValue ^ b.rawValue)
-}
-public prefix func ~ <T : _RawOptionSetType>(a: T) -> T {
-  return T(rawValue: ~a.rawValue)
-}
-
-/// Protocol for `NS_OPTIONS` imported from Objective-C.
-public protocol RawOptionSetType : _RawOptionSetType, BitwiseOperationsType,
-    NilLiteralConvertible {
-  // FIXME: Disabled pending <rdar://problem/14011860> (Default
-  // implementations in protocols)
-  // The Clang importer synthesizes these for imported NS_OPTIONS.
-
-  /* init?(rawValue: RawValue) { self.init(rawValue) } */
 }
 
 /// Conforming types can be initialized with `nil`.

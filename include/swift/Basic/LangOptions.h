@@ -136,9 +136,6 @@ namespace swift {
     /// Mangle declarations using their interface types.
     bool EnableInterfaceTypeMangling = true;
     
-    /// Import NS_OPTIONS types using the new OptionSetType interface.
-    bool ImportNSOptionsAsOptionSetType = true;
-
     /// The target we are building for.
     ///
     /// This represents the minimum deployment target.

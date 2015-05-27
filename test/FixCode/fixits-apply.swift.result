@@ -16,7 +16,7 @@ var i : Int = opti
 // But remove unecessary bang.
 var i2 : Int = i
 
-struct MyMask : RawOptionSetType {
+struct MyMask : OptionSetType {
   init(_ rawValue: UInt) {}
   init(rawValue: UInt) {}
   init(nilLiteral: ()) {}

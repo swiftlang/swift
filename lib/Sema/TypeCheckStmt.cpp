@@ -178,29 +178,29 @@ void TypeChecker::contextualizeTopLevelCode(TopLevelContext &TLC,
 }
 
 /// Emits an error with a fixit for the case of unnecessary cast over a
-/// RawOptionSet value. The primary motivation is to help with SDK changes.
+/// OptionSetType value. The primary motivation is to help with SDK changes.
 /// Example:
 /// \code
 ///   func supported() -> MyMask {
 ///     return Int(MyMask.Bingo.rawValue)
 ///   }
 /// \endcode
-static void tryDiagnoseUnnecessaryCastOverRawOptionSet(ASTContext &Ctx,
+static void tryDiagnoseUnnecessaryCastOverOptionSet(ASTContext &Ctx,
                                                        Expr *E,
                                                        Type ResultType) {
   auto *NTD = ResultType->getAnyNominal();
   if (!NTD)
     return;
-  bool IsRawOptionSet = false;
+  bool IsOptionSet = false;
   for (auto *PD : NTD->getProtocols()) {
     if (auto KnownP = PD->getKnownProtocolKind()) {
-      if (KnownP.getValue() == KnownProtocolKind::RawOptionSetType) {
-        IsRawOptionSet = true;
+      if (KnownP.getValue() == KnownProtocolKind::OptionSetType) {
+        IsOptionSet = true;
         break;
       }
     }
   }
-  if (!IsRawOptionSet)
+  if (!IsOptionSet)
     return;
 
   CallExpr *CE = dyn_cast<CallExpr>(E);
@@ -223,7 +223,7 @@ static void tryDiagnoseUnnecessaryCastOverRawOptionSet(ASTContext &Ctx,
   if (BME->getType()->getCanonicalType() != ResultType->getCanonicalType())
     return;
 
-  Ctx.Diags.diagnose(E->getLoc(), diag::unnecessary_cast_over_rawoptionset,
+  Ctx.Diags.diagnose(E->getLoc(), diag::unnecessary_cast_over_optionset,
                      ResultType)
     .highlight(E->getSourceRange())
     .fixItRemoveChars(E->getLoc(), ME->getStartLoc())
@@ -407,7 +407,7 @@ public:
     RS->setResult(E);
     
     if (failed) {
-      tryDiagnoseUnnecessaryCastOverRawOptionSet(TC.Context, E, ResultTy);
+      tryDiagnoseUnnecessaryCastOverOptionSet(TC.Context, E, ResultTy);
       return nullptr;
     }
     
