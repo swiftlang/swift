@@ -474,12 +474,8 @@ public struct _ContiguousArrayBuffer<T> : _ArrayBufferType {
     _: U.Type
   ) -> Bool {
     _sanityCheck(_isClassOrObjCExistential(U.self))
-    
-    // Start with the base class so that optimizations based on
-    // 'final' don't bypass dynamic type check.
-    let s: _ContiguousArrayStorageBase = _storage
-    
-    if _fastPath(s.staticElementType is U.Type) {
+
+    if _fastPath(_storage.staticElementType is U.Type) {
       // Done in O(1)
       return true
     }
