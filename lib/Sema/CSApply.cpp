@@ -4622,6 +4622,10 @@ maybeDiagnoseUnsupportedFunctionConversion(TypeChecker &tc, Expr *expr,
         return maybeDiagnoseFunctionRef(fn);
       }
     }
+
+    // Unwrap closures with explicit capture lists.
+    if (auto capture = dyn_cast<CaptureListExpr>(semanticExpr))
+      semanticExpr = capture->getClosureBody();
     
     // Can convert a literal closure that doesn't capture context.
     if (auto closure = dyn_cast<ClosureExpr>(semanticExpr)) {

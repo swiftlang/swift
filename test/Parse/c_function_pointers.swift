@@ -22,6 +22,7 @@ if true {
 
   // Can't convert a closure with context to a C function pointer
   let d: @convention(c) () -> Int = { x } // expected-error{{cannot be formed from a closure that captures context}}
+  let d2: @convention(c) () -> Int = { [x] in x } // expected-error{{cannot be formed from a closure that captures context}}
   let e: @convention(c) () -> Int = localWithContext // expected-error{{cannot be formed from a local function that captures context}}
 
   // Can't convert a closure value to a C function pointer
