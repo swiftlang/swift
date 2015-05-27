@@ -1745,7 +1745,6 @@ ParserResult<Stmt> Parser::parseStmtDo(LabeledStmtInfo labelInfo) {
 
       // parseStmtCatch promises to return non-null unless we are
       // completing inside the catch's pattern.
-      assert(!clause.isNull());
       allClauses.push_back(clause.get());
     } while (Tok.is(tok::kw_catch) && !status.hasCodeCompletion());
 

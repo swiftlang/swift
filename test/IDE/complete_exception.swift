@@ -176,20 +176,20 @@ func test009() {
 }
 func test010() {
   do {
-  } catch let a {
+  } catch let awesomeError {
   } catch let e {
     #^INSIDE_CATCH5^#
   } catch {}
-// NO_ERROR_AND_A-NOT: Decl[LocalVar]/Local: a
+// NO_ERROR_AND_A-NOT: awesomeError
 // NO_ERROR_AND_A-NOT: Decl[LocalVar]/Local: error
 }
 func test011() {
   do {
-  } catch let a {
-  } catch let e {
+  } catch let awesomeError {
+  } catch let excellentError {
   } catch {}
   #^INSIDE_CATCH6^#
-// NO_E-NOT: Decl[LocalVar]/Local: e
+// NO_E-NOT: excellentError
 }
 func test012() {
   do {
