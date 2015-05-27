@@ -514,12 +514,10 @@ namespace {
     }
 
     ImportResult VisitTypedefType(const clang::TypedefType *type) {
-#ifndef SWIFT_DISABLE_OBJC_GENERICS
       // If the underlying declaration is an Objective-C type parameter,
       // import the underlying sugar instead.
       if (isa<clang::ObjCTypeParamDecl>(type->getDecl()))
         return Visit(type->desugar());
-#endif
 
       // Import the underlying declaration.
       auto decl = dyn_cast_or_null<TypeDecl>(Impl.importDecl(type->getDecl()));
@@ -650,7 +648,6 @@ namespace {
         }
 
         if (imported->hasName() && imported->getName().str() == "NSArray") {
-#ifndef SWIFT_DISABLE_OBJC_GENERICS
           // If we have type arguments, import them.
           ArrayRef<clang::QualType> typeArgs = type->getTypeArgs();
           if (typeArgs.size() == 1) {
@@ -661,13 +658,11 @@ namespace {
             return { importedType,
                      ImportHint(ImportHint::NSArray, elementType) };
           }
-#endif
 
           return { importedType, ImportHint(ImportHint::NSArray, Type()) };
         }
 
         if (imported->hasName() && imported->getName().str() == "NSDictionary") {
-#ifndef SWIFT_DISABLE_OBJC_GENERICS
           // If we have type arguments, import them.
           ArrayRef<clang::QualType> typeArgs = type->getTypeArgs();
           if (typeArgs.size() == 2) {
@@ -688,13 +683,11 @@ namespace {
                      ImportHint(ImportHint::NSDictionary,
                                 keyType, objectType) };
           }
-#endif
           return { importedType,
                    ImportHint(ImportHint::NSDictionary, Type(), Type()) };
         }
 
         if (imported->hasName() && imported->getName().str() == "NSSet") {
-#ifndef SWIFT_DISABLE_OBJC_GENERICS
           // If we have type arguments, import them.
           ArrayRef<clang::QualType> typeArgs = type->getTypeArgs();
           if (typeArgs.size() == 1) {
@@ -705,7 +698,6 @@ namespace {
             return { importedType,
                      ImportHint(ImportHint::NSSet, elementType) };
           }
-#endif
 
           return { importedType, ImportHint(ImportHint::NSSet, Type()) };
         }

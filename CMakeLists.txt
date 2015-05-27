@@ -246,19 +246,6 @@ if(NOT EXISTS "${CLANG_MAIN_INCLUDE_DIR}/clang/AST/Decl.h")
   message(FATAL_ERROR "Clang is missing from llvm/tools subdirectory.")
 endif()
 
-# If the underlying Clang does not have support for Objective-C
-# generics, disable support for them in Swift.
-file(STRINGS "${CLANG_MAIN_INCLUDE_DIR}/clang/AST/DeclObjC.h"
-  CLANG_OBJC_TYPE_PARAM_DECL REGEX "ObjCTypeParamDecl")
-if ("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin" AND CLANG_OBJC_TYPE_PARAM_DECL)
-  message(STATUS "Underlying Clang supports Objective-C generics")
-  set(CLANG_OBJC_GENERICS TRUE)
-else()
-  message(STATUS "Underlying Clang does NOT support Objective-C generics")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DSWIFT_DISABLE_OBJC_GENERICS")
-  set(CLANG_OBJC_GENERICS FALSE)
-endif()
-
 # This could be computed using ${CMAKE_CFG_INTDIR} if we want to link Swift
 # against a mathing LLVM build configuration.  However, we usually want to be
 # flexible and allow linking a debug Swift against optimized LLVM.

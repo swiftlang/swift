@@ -44,11 +44,6 @@ else:
 if "@SWIFT_OPTIMIZED@" == "TRUE":
     config.available_features.add("optimized_stdlib")
 
-if "@CLANG_OBJC_GENERICS@" == "TRUE":
-    config.available_features.add('objc_generics')
-else:
-    config.available_features.add('objc_no_generics')
-
 # Let the main config do the real work.
 if config.test_exec_root is None:
     config.test_exec_root = os.path.dirname(os.path.realpath(__file__))

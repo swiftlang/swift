@@ -34,7 +34,6 @@
 
 using namespace swift;
 
-#ifndef SWIFT_DISABLE_OBJC_GENERICS
 static bool isNSObject(Type type) {
   if (auto classDecl = type->getClassOrBoundGenericClass()) {
     return !classDecl->getName().empty() &&
@@ -45,7 +44,6 @@ static bool isNSObject(Type type) {
 
   return false;
 }
-#endif
 
 namespace {
 class ObjCPrinter : private DeclVisitor<ObjCPrinter>,
@@ -817,7 +815,6 @@ private:
       return false;
 
     if (SD == ctx.getArrayDecl()) {
-#ifndef SWIFT_DISABLE_OBJC_GENERICS
       if (!BGT->getGenericArgs()[0]->isAnyObject() &&
           isAlwaysPrintedAsObjectType(BGT->getGenericArgs()[0])) {
         os << "NSArray<";
@@ -826,16 +823,12 @@ private:
       } else {
         os << "NSArray *";
       }
-#else
-      os << "NSArray *";
-#endif
 
       printNullability(optionalKind);
       return true;
     }
 
     if (SD == ctx.getDictionaryDecl()) {
-#ifndef SWIFT_DISABLE_OBJC_GENERICS
       if ((!isNSObject(BGT->getGenericArgs()[0]) ||
            !BGT->getGenericArgs()[1]->isAnyObject()) &&
           isAlwaysPrintedAsObjectType(BGT->getGenericArgs()[0]) &&
@@ -848,16 +841,12 @@ private:
       } else {
         os << "NSDictionary *";
       }
-#else
-      os << "NSDictionary *";
-#endif
 
       printNullability(optionalKind);
       return true;
     }
 
     if (SD == ctx.getSetDecl()) {
-#ifndef SWIFT_DISABLE_OBJC_GENERICS
       if (!isNSObject(BGT->getGenericArgs()[0]) &&
           isAlwaysPrintedAsObjectType(BGT->getGenericArgs()[0])) {
         os << "NSSet<";
@@ -866,9 +855,6 @@ private:
       } else {
         os << "NSSet *";
       }
-#else
-      os << "NSSet *";
-#endif
 
       printNullability(optionalKind);
       return true;

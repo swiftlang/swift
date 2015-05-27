@@ -1,6 +1,4 @@
 // Please keep this file in alphabetical order!
-// Note: this is equivalent to classes.swift, but with Objective-C generics
-// REQUIRES: objc_generics
 
 // RUN: rm -rf %t
 // RUN: mkdir %t
