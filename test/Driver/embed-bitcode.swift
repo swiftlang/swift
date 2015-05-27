@@ -39,12 +39,31 @@
 // CHECK-SINGLE: -embed-bitcode
 // CHECK-SINGLE: -disable-llvm-optzns
 
-// RUN: %target-swiftc_driver -embed-bitcode -c -parse-as-library -emit-module -force-single-frontend-invocation %s -parse-stdlib -module-name Swift 2>&1 -### | FileCheck %s -check-prefix=CHECK-LIB
-// CHECK-LIB: -frontend
+// RUN: %target-swiftc_driver -embed-bitcode -c -parse-as-library -emit-module -force-single-frontend-invocation %s -parse-stdlib -module-name Swift 2>&1 -### | FileCheck %s -check-prefix=CHECK-LIB-WMO
+// CHECK-LIB-WMO: -frontend
+// CHECK-LIB-WMO: -emit-bc
+// CHECK-LIB-WMO: -parse-stdlib
+// CHECK-LIB-WMO: -frontend
+// CHECK-LIB-WMO: -c
+// CHECK-LIB-WMO: -parse-stdlib
+// CHECK-LIB-WMO: -embed-bitcode
+// CHECK-LIB-WMO: -disable-llvm-optzns
+
+// RUN: %target-swiftc_driver -embed-bitcode -c -parse-as-library -emit-module %s %S/../Inputs/empty.swift -module-name ABC 2>&1 -### | FileCheck %s -check-prefix=CHECK-LIB
+// CHECK-LIB: swift -frontend
 // CHECK-LIB: -emit-bc
-// CHECK-LIB: -parse-stdlib
-// CHECK-LIB: -frontend
+// CHECK-LIB: -primary-file
+// CHECK-LIB: swift -frontend
 // CHECK-LIB: -c
-// CHECK-LIB: -parse-stdlib
 // CHECK-LIB: -embed-bitcode
 // CHECK-LIB: -disable-llvm-optzns
+// CHECK-LIB: swift -frontend
+// CHECK-LIB: -emit-bc
+// CHECK-LIB: -primary-file
+// CHECK-LIB: swift -frontend
+// CHECK-LIB: -c
+// CHECK-LIB: -embed-bitcode
+// CHECK-LIB: -disable-llvm-optzns
+// CHECK-LIB: swift -frontend
+// CHECK-LIB: -emit-module
+// CHECK-LIB-NOT: swift -frontend
