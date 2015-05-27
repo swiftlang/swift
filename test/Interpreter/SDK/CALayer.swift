@@ -27,10 +27,10 @@ func hangCanary(o: AnyObject) {
 
 class FooLayer: CALayer {
   var black: CGColor
-  var white: CGColor = CGColorGetConstantColor(kCGColorWhite)
+  var white: CGColor = CGColorGetConstantColor(kCGColorWhite)!
 
   override init() {
-    black = CGColorGetConstantColor(kCGColorBlack)
+    black = CGColorGetConstantColor(kCGColorBlack)!
     super.init()
     hangCanary(self)
   }
