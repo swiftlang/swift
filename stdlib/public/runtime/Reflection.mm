@@ -49,8 +49,8 @@ namespace {
 /// The layout of protocol<>.
 using Any = OpaqueExistentialContainer;
   
-/// A _Reflectable witness table.
-struct _ReflectableWitnessTable {
+/// A Reflectable witness table.
+struct ReflectableWitnessTable {
   /// func getMirror() -> Mirror
   Mirror (*getMirror)(OpaqueValue *self, const Metadata *Self);
 };
@@ -189,8 +189,8 @@ struct OptionalQuickLookObject {
 /// A Mirror witness table for use by MagicMirror.
 struct MirrorWitnessTable;
   
-/// The protocol descriptor for _Reflectable from the stdlib.
-extern "C" const ProtocolDescriptor _TMpSs12_Reflectable;
+/// The protocol descriptor for Reflectable from the stdlib.
+extern "C" const ProtocolDescriptor _TMpSs11Reflectable;
   
 // This structure needs to mirror _MagicMirrorData in the stdlib.
 struct MagicMirrorData {
@@ -1107,7 +1107,7 @@ MagicMirror::MagicMirror(HeapObject *owner,
   Data = {owner, value, T};
 }
   
-static std::tuple<const _ReflectableWitnessTable *, const Metadata *,
+static std::tuple<const ReflectableWitnessTable *, const Metadata *,
                   const OpaqueValue *>
 getReflectableConformance(const Metadata *T, const OpaqueValue *Value) {
   // If the value is an existential container, look through it to reflect the
@@ -1128,13 +1128,13 @@ getReflectableConformance(const Metadata *T, const OpaqueValue *Value) {
     auto existential
       = static_cast<const ExistentialTypeMetadata *>(T);
     
-    // If the existential happens to include the _Reflectable protocol, use
+    // If the existential happens to include the Reflectable protocol, use
     // the witness table from the container.
     unsigned wtOffset = 0;
     for (unsigned i = 0; i < existential->Protocols.NumProtocols; ++i) {
-      if (existential->Protocols[i] == &_TMpSs12_Reflectable) {
+      if (existential->Protocols[i] == &_TMpSs11Reflectable) {
         return std::make_tuple(
-            reinterpret_cast<const _ReflectableWitnessTable*>(
+            reinterpret_cast<const ReflectableWitnessTable*>(
               existential->getWitnessTable(Value, wtOffset)),
             existential->getDynamicType(Value),
             existential->projectValue(Value));
@@ -1162,8 +1162,8 @@ getReflectableConformance(const Metadata *T, const OpaqueValue *Value) {
   }
   
   return std::make_tuple(
-      reinterpret_cast<const _ReflectableWitnessTable*>(
-        swift_conformsToProtocol(T, &_TMpSs12_Reflectable)),
+      reinterpret_cast<const ReflectableWitnessTable*>(
+        swift_conformsToProtocol(T, &_TMpSs11Reflectable)),
       T,
       Value);
 }
@@ -1172,14 +1172,14 @@ getReflectableConformance(const Metadata *T, const OpaqueValue *Value) {
 
 /// func reflect<T>(x: T) -> Mirror
 ///
-/// Produce a mirror for any value. If the value's type conforms to _Reflectable,
+/// Produce a mirror for any value. If the value's type conforms to Reflectable,
 /// invoke its getMirror() method; otherwise, fall back to an implementation
 /// in the runtime that structurally reflects values of any type.
 ///
 /// This function consumes 'value', following Swift's +1 convention for "in"
 /// arguments.
 Mirror swift::swift_reflectAny(OpaqueValue *value, const Metadata *T) {
-  const _ReflectableWitnessTable *witness;
+  const ReflectableWitnessTable *witness;
   const Metadata *mirrorType;
   const OpaqueValue *cMirrorValue;
   std::tie(witness, mirrorType, cMirrorValue)
@@ -1187,7 +1187,7 @@ Mirror swift::swift_reflectAny(OpaqueValue *value, const Metadata *T) {
   
   OpaqueValue *mirrorValue = const_cast<OpaqueValue*>(cMirrorValue);
   
-  // Use the _Reflectable conformance if the object has one.
+  // Use the Reflectable conformance if the object has one.
   if (witness) {
     auto result = witness->getMirror(mirrorValue, mirrorType);
     // 'self' of witnesses is passed at +0, so we still need to consume the
@@ -1217,13 +1217,13 @@ Mirror swift::swift_reflectAny(OpaqueValue *value, const Metadata *T) {
 Mirror swift::swift_unsafeReflectAny(HeapObject *owner,
                                      const OpaqueValue *value,
                                      const Metadata *T) {
-  const _ReflectableWitnessTable *witness;
+  const ReflectableWitnessTable *witness;
   const Metadata *mirrorType;
   const OpaqueValue *mirrorValue;
   std::tie(witness, mirrorType, mirrorValue)
     = getReflectableConformance(T, value);
   
-  // Use the _Reflectable conformance if the object has one.
+  // Use the Reflectable conformance if the object has one.
   if (witness) {
     auto result =
         witness->getMirror(const_cast<OpaqueValue*>(mirrorValue), mirrorType);

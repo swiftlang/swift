@@ -25,7 +25,7 @@
 # this template, which is probably reasonable since those are "the meat" of every Mirror
 }%
 
-extension ${introspecteeType} : _Reflectable {
+extension ${introspecteeType} : Reflectable {
   /// Returns a mirror that reflects `self`.
   public func getMirror() -> MirrorType {
     return _${introspecteeType}Mirror(self)
