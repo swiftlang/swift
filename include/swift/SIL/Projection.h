@@ -557,8 +557,8 @@ public:
     return ProjectionTreeNodes[i];
   }
 
-  bool canExplodeValue() const {
-    return ProjectionTreeNodes.size() > 1;
+  bool isSingleton() const {
+    return ProjectionTreeNodes.size() == 1;
   }
 
   void getLeafTypes(llvm::SmallVectorImpl<SILType> &OutArray) const {
@@ -567,6 +567,11 @@ public:
       assert(Node->IsLive && "We are only interested in leafs that are live");
       OutArray.push_back(Node->getType());
     }
+  }
+
+  /// Return the number of live leafs in the projection.
+  size_t liveLeafCount() const {
+    return LeafIndices.size();
   }
 
   void createTreeFromValue(SILBuilder &B, SILLocation Loc, SILValue NewBase,

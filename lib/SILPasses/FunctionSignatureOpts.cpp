@@ -128,10 +128,18 @@ struct ArgumentDescriptor {
     return ParameterInfo.getSILType().isObject();
   }
 
-  bool canExplodeValue() const {
-    return false;
-    // FIXME: rdar://problem/21114206
-    // return ProjTree.canExplodeValue() && canOptimizeLiveArg()
+  /// Return true if it's both legal and a good idea to explode this argument.
+  bool shouldExplode() const {
+    // We cannot optimize the argument.
+    if (!canOptimizeLiveArg())
+      return false;
+
+    // We should not bother with single element aggregates.
+    if (ProjTree.isSingleton())
+      return false;
+
+    size_t explosionSize = ProjTree.liveLeafCount();
+    return explosionSize >= 1 && explosionSize <= 3;
   }
 };
 
@@ -155,7 +163,7 @@ computeOptimizedInterfaceParams(SmallVectorImpl<SILParameterInfo> &Out) const {
   }
 
   // If we can not explode this value, handle callee release and return.
-  if (!canExplodeValue()) {
+  if (!shouldExplode()) {
     DEBUG(llvm::dbgs() << "            ProjTree can not explode arg.\n");
     // If we found a release in the callee in the last BB on an @owned
     // parameter, change the parameter to @guaranteed and continue...
@@ -227,7 +235,7 @@ addCallerArgs(SILBuilder &B, ApplyInst *AI,
   if (IsDead)
     return;
 
-  if (!canExplodeValue()) {
+  if (!shouldExplode()) {
     NewArgs.push_back(AI->getArgument(Index));
     return;
   }
@@ -243,7 +251,7 @@ addThunkArgs(SILBuilder &Builder, SILBasicBlock *BB,
   if (IsDead)
     return;
 
-  if (!canExplodeValue()) {
+  if (!shouldExplode()) {
     NewArgs.push_back(BB->getBBArg(Index));
     return;
   }
@@ -271,7 +279,7 @@ updateOptimizedBBArgs(SILBuilder &Builder, SILBasicBlock *BB,
 
   // If this argument is not dead and we did not perform SROA, increment the
   // offset and return.
-  if (!canExplodeValue()) {
+  if (!shouldExplode()) {
     return ArgOffset + 1;
   }
 
@@ -423,7 +431,7 @@ FunctionAnalyzer::analyze() {
       }
     }
 
-    if (A.canExplodeValue()) {
+    if (A.shouldExplode()) {
       HaveOptimizedArg = true;
       ++NumSROAArguments;
     }
@@ -532,7 +540,7 @@ llvm::SmallString<64> FunctionAnalyzer::getOptimizedName() {
         FSSM.setArgumentOwnedToGuaranteed(i);
       }
 
-      if (Arg.canExplodeValue()) {
+      if (Arg.shouldExplode()) {
         FSSM.setArgumentSROA(i);
       }
     }
