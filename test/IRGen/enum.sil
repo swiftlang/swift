@@ -2462,6 +2462,34 @@ entry(%x : $Float80):
   return undef : $()
 }
 
+// rdar://problem/21126703
+
+protocol delegateProtocol : AnyObject { }
+
+struct StructWithWeakVar {
+weak var delegate: delegateProtocol?
+}
+
+// CHECK-64-LABEL: define void @weak_optional(%Sq{{.*}}*)
+sil @weak_optional : $@convention(thin) (@in StructWithWeakVar?) -> () {
+entry(%x : $*StructWithWeakVar?):
+  // CHECK-64:      icmp eq [[WORD]] {{%.*}}, 0
+  // CHECK-64-NEXT: icmp eq [[WORD]] {{%.*}}, 1
+  switch_enum_addr %x : $*StructWithWeakVar?,
+    case #Optional.Some!enumelt.1: a,
+    case #Optional.None!enumelt:   b
+a:
+  br x
+b:
+  // CHECK-64:      store [[WORD]] 0
+  // CHECK-64:      store [[WORD]] 1
+  inject_enum_addr %x : $*StructWithWeakVar?, #Optional.None!enumelt
+  br x
+
+x:
+  return undef : $()
+}
+
 sil @force_global_variables_to_materialize : $() -> () {
 entry:
   // Force the global variables to materialize.

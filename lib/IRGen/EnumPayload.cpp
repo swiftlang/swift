@@ -71,7 +71,7 @@ EnumPayload EnumPayload::fromBitPattern(IRGenModule &IGM,
     result.PayloadValues.push_back(val);
     
     // Shift the remaining bits down.
-    bitPattern = bitPattern.lshr(bits);
+    bitPattern = bitPattern.lshr(bitSize);
   });
     
   return result;
