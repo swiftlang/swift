@@ -1430,6 +1430,10 @@ bool getApplySubstitutionsFromParsed(
                              SmallVectorImpl<Substitution> &subs) {
   // The replacement is for the corresponding archetype by ordering.
   for (auto subArchetype : gp->getAllNestedArchetypes()) {
+    if (parses.empty()) {
+      SP.P.diagnose(gp->getRAngleLoc(), diag::sil_missing_substitutions);
+      return true;
+    }
     auto parsed = parses.front();
     parses = parses.slice(1);
 
@@ -1442,7 +1446,10 @@ bool getApplySubstitutionsFromParsed(
     subs.push_back({subArchetype, parsed.replacement,
                     SP.P.Context.AllocateCopy(conformances)});
   }
-  assert(parses.empty() && "did not use all substitutions?");
+  if (!parses.empty()) {
+    SP.P.diagnose(gp->getRAngleLoc(), diag::sil_too_many_substitutions);
+    return true;
+  }
   return false;
 }
 

@@ -479,6 +479,10 @@ ERROR(sil_member_decl_type_mismatch, decl_parsing,none,
       "member defined with mismatching type %0 (expected %1)", (Type, Type))
 ERROR(sil_substitution_mismatch,decl_parsing,none,
       "substitution conformances dont match archetype", ())
+ERROR(sil_missing_substitutions,decl_parsing,none,
+      "missing substitutions", ())
+ERROR(sil_too_many_substitutions,decl_parsing,none,
+      "too many substitutions", ())
 
 // SIL Basic Blocks
 ERROR(expected_sil_block_name, decl_parsing,none,
