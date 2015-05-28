@@ -6198,21 +6198,6 @@ static Type checkExtensionGenericParams(
     return nullptr;
   }
 
-  // For an extension of a non-protocol type, if the generic extension
-  // signature is not equivalent to that of the nominal type, there
-  // are extraneous requirements.
-  // Note that we cannot have missing requirements due to requirement
-  // inference.
-  // FIXME: Figure out an extraneous requirement to point to.
-  if (!isa<ProtocolDecl>(nominal) &&
-      sig->getCanonicalSignature() !=
-        nominal->getGenericSignature()->getCanonicalSignature()) {
-    tc.diagnose(ext->getLoc(), diag::extension_generic_extra_requirements,
-                nominal->getDeclaredType())
-      .highlight(genericParams->getSourceRange());
-    return nullptr;
-  }
-
   // Validate the generic parameters for the last time.
   tc.revertGenericParamList(genericParams);
   ArchetypeBuilder builder = tc.createArchetypeBuilder(ext->getModuleContext());

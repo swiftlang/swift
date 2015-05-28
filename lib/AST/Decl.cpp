@@ -1569,34 +1569,35 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
       = getInterfaceType()->getWithoutDefaultArgs(getASTContext())
           ->getCanonicalType();
 
-    // If the subscript occurs within a protocol extension context,
-    // consider the generic signature of the extension context.
-    if (getDeclContext()->isProtocolExtensionContext()) {
-      auto funcTy = signature.InterfaceType->castTo<AnyFunctionType>();
-      auto genericSig = getDeclContext()->getGenericSignatureOfContext();
-      signature.InterfaceType
-        = GenericFunctionType::get(genericSig,
-                                   funcTy->getInput(),
-                                   funcTy->getResult(),
-                                   funcTy->getExtInfo())
-            ->getCanonicalType();
+    // If the subscript occurs within a generic extension context,
+    // consider the generic signature of the extension.
+    if (auto ext = dyn_cast<ExtensionDecl>(getDeclContext())) {
+      if (auto genericSig = ext->getGenericSignature()) {
+        auto funcTy = signature.InterfaceType->castTo<AnyFunctionType>();
+        signature.InterfaceType
+          = GenericFunctionType::get(genericSig,
+                                     funcTy->getInput(),
+                                     funcTy->getResult(),
+                                     funcTy->getExtInfo())
+              ->getCanonicalType();
+      }
     }
-
   } else if (isa<VarDecl>(this)) {
     signature.IsProperty = true;
     signature.IsInstanceMember = isInstanceMember();
 
-    // If the property occurs within a protocol extension context,
-    // consider the generic signature of the extension context.
-    if (getDeclContext()->isProtocolExtensionContext()) {
-      ASTContext &ctx = getASTContext();
-      auto genericSig = getDeclContext()->getGenericSignatureOfContext();
-      signature.InterfaceType
-        = GenericFunctionType::get(genericSig,
-                                   TupleType::getEmpty(ctx),
-                                   TupleType::getEmpty(ctx),
-                                   AnyFunctionType::ExtInfo())
-            ->getCanonicalType();
+    // If the property occurs within a generic extension context,
+    // consider the generic signature of the extension.
+    if (auto ext = dyn_cast<ExtensionDecl>(getDeclContext())) {
+      if (auto genericSig = ext->getGenericSignature()) {
+        ASTContext &ctx = getASTContext();
+        signature.InterfaceType
+          = GenericFunctionType::get(genericSig,
+                                     TupleType::getEmpty(ctx),
+                                     TupleType::getEmpty(ctx),
+                                     AnyFunctionType::ExtInfo())
+              ->getCanonicalType();
+      }
     }
   }
 

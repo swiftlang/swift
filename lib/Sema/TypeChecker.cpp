@@ -323,18 +323,20 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
       ED->setGenericParams(proto->createGenericParams(ED));
     } else {
       // Clone the existing generic parameter list.
-      ED->setGenericParams(cloneGenericParams(TC.Context, ED,
-                                              extendedNominal->getGenericParams(),
-                                              nullptr));
+      ED->setGenericParams(
+        cloneGenericParams(TC.Context, ED,
+                           extendedNominal->getGenericParams(),
+                           nullptr));
     }
   }
 
   // If we have a trailing where clause, deal with it now.
   // For now, trailing where clauses are only permitted on protocol extensions.
   if (auto trailingWhereClause = ED->getTrailingWhereClause()) {
-    if (!extendedType->is<ProtocolType>()) {
-      // Only protocol types are permitted to have trailing where clauses.
-      TC.diagnose(ED, diag::extension_nonprotocol_trailing_where, extendedType)
+    if (!extendedNominal->getGenericParams()) {
+      // Only generic and protocol types are permitted to have
+      // trailing where clauses.
+      TC.diagnose(ED, diag::extension_nongeneric_trailing_where, extendedType)
         .highlight(trailingWhereClause->getSourceRange());
       ED->setTrailingWhereClause(nullptr);
     } else {

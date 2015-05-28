@@ -78,6 +78,50 @@ extension Array {
 }
 
 // rdar://problem/21001937
-extension Array where T: Hashable { // expected-error{{trailing 'where' clause for extension of non-protocol type 'Array'}}
+struct GenericOverloads<T, U> {
+  var t: T
+  var u: U
 
+  init(t: T, u: U) { self.t = t; self.u = u }
+
+  func foo() { }
+
+  var prop: Int { return 0 }
+
+  subscript (i: Int) -> Int { return i }
 }
+
+extension GenericOverloads where T : P1, U : P2 {
+  init(t: T, u: U) { self.t = t; self.u = u }
+
+  func foo() { }
+
+  var prop: Int { return 1 }
+
+  subscript (i: Int) -> Int { return i }
+}
+
+extension Array where T : Hashable {
+  var worseHashEver: Int {
+    var result = 0
+    for elt in self {
+      result = (result << 1) ^ elt.hashValue
+    }
+    return result
+  }
+}
+
+func notHashableArray<T>(x: [T]) {
+  x.worseHashEver // expected-error{{'Int' is not convertible to 'Hashable'}}
+}
+
+func hashableArray<T : Hashable>(x: [T]) {
+  x.worseHashEver // okay
+}
+
+func intArray(x: [Int]) {
+  x.worseHashEver
+}
+
+// FIXME: Future direction
+extension Array where T == String { } // expected-error{{same-type requirement makes generic parameter 'T' non-generic}}
