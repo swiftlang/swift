@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend -sdk %S/../Inputs/objc-generics-sdk -I %S/../Inputs/objc-generics-sdk/swift-modules -enable-source-import -parse -parse-as-library -verify %s
 
+// REQUIRES: objc_interop
+
 import Foundation
 
 func testNSArrayBridging(hive: Hive) {

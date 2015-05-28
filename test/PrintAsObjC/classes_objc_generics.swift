@@ -1,5 +1,7 @@
 // Please keep this file in alphabetical order!
 
+// REQUIRES: objc_interop
+
 // RUN: rm -rf %t
 // RUN: mkdir %t
 
