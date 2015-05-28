@@ -553,6 +553,15 @@ func testSConforms9d(s9d: SConforms9d) {
   _ = p
 }
 
+protocol PConforms10 {}
+extension PConforms10 {
+ final func f() {}
+}
+protocol PConforms11 {
+ func f()
+}
+struct SConforms11 : PConforms10, PConforms11 {}
+
 // ----------------------------------------------------------------------------
 // Typealiases in protocol extensions.
 // ----------------------------------------------------------------------------
