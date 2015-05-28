@@ -269,6 +269,10 @@ sil @useSomeClass : $@convention(thin) (@owned SomeClass) -> ()
 // strong_releases into destroy_addr/dealloc_stack pairs.  However, it needs to
 // make sure to use the MUI result for the destroy addr.
 
+public protocol My_Incrementable { }
+
+struct Int : My_Incrementable { }
+
 // CHECK-LABEL: sil @test_mui
 sil @test_mui : $@convention(thin) (Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1):
@@ -353,9 +357,9 @@ bb0(%0 : $Int):
 sil private @_TFF6struct8useStackFT1tSi_T_U_FT_Si : $@convention(thin) (@owned Builtin.NativeObject, @inout Int) -> Int {
 bb0(%0 : $Builtin.NativeObject, %1 : $*Int):
   // function_ref Swift.++ @postfix <A : Swift._Incrementable>(x : @inout A) -> A
-  %2 = function_ref @_TFSsoP2ppUSs14_Incrementable__FT1xRQ__Q_ : $@convention(thin) <τ_0_0 where τ_0_0 : _Incrementable> (@out τ_0_0, @inout τ_0_0) -> () // user: %4
+  %2 = function_ref @_TFSsoP2ppUSs14_Incrementable__FT1xRQ__Q_ : $@convention(thin) <τ_0_0 where τ_0_0 : My_Incrementable> (@out τ_0_0, @inout τ_0_0) -> () // user: %4
   %3 = alloc_stack $Int                           // users: %4, %5, %6
-  %4 = apply %2<Int>(%3#1, %1) : $@convention(thin) <τ_0_0 where τ_0_0 : _Incrementable> (@out τ_0_0, @inout τ_0_0) -> ()
+  %4 = apply %2<Int>(%3#1, %1) : $@convention(thin) <τ_0_0 where τ_0_0 : My_Incrementable> (@out τ_0_0, @inout τ_0_0) -> ()
   %5 = load %3#1 : $*Int                          // user: %8
   dealloc_stack %3#0 : $*@local_storage Int       // id: %6
   strong_release %0 : $Builtin.NativeObject      // id: %7
@@ -363,7 +367,7 @@ bb0(%0 : $Builtin.NativeObject, %1 : $*Int):
 }
 
 // Swift.++ @postfix <A : Swift._Incrementable>(x : @inout A) -> A
-sil [transparent] @_TFSsoP2ppUSs14_Incrementable__FT1xRQ__Q_ : $@convention(thin) <τ_0_0 where τ_0_0 : _Incrementable> (@out τ_0_0, @inout τ_0_0) -> ()
+sil [transparent] @_TFSsoP2ppUSs14_Incrementable__FT1xRQ__Q_ : $@convention(thin) <τ_0_0 where τ_0_0 : My_Incrementable> (@out τ_0_0, @inout τ_0_0) -> ()
 
 // CHECK-LABEL: sil @_TF6struct6useBoxFT1tSi_T_
 // struct.useBox (t : Swift.Int) -> ()
@@ -391,9 +395,9 @@ bb0(%0 : $Int):
 sil private @_TFF6struct6useBoxFT1tSi_T_U_FT_Si : $@convention(thin) (@owned Builtin.NativeObject, @inout Int) -> Int {
 bb0(%0 : $Builtin.NativeObject, %1 : $*Int):
   // function_ref Swift.++ @postfix <A : Swift._Incrementable>(x : @inout A) -> A
-  %2 = function_ref @_TFSsoP2ppUSs14_Incrementable__FT1xRQ__Q_ : $@convention(thin) <τ_0_0 where τ_0_0 : _Incrementable> (@out τ_0_0, @inout τ_0_0) -> () // user: %4
+  %2 = function_ref @_TFSsoP2ppUSs14_Incrementable__FT1xRQ__Q_ : $@convention(thin) <τ_0_0 where τ_0_0 : My_Incrementable> (@out τ_0_0, @inout τ_0_0) -> () // user: %4
   %3 = alloc_stack $Int                           // users: %4, %5, %6
-  %4 = apply %2<Int>(%3#1, %1) : $@convention(thin) <τ_0_0 where τ_0_0 : _Incrementable> (@out τ_0_0, @inout τ_0_0) -> ()
+  %4 = apply %2<Int>(%3#1, %1) : $@convention(thin) <τ_0_0 where τ_0_0 : My_Incrementable> (@out τ_0_0, @inout τ_0_0) -> ()
   %5 = load %3#1 : $*Int                          // user: %8
   dealloc_stack %3#0 : $*@local_storage Int       // id: %6
   strong_release %0 : $Builtin.NativeObject      // id: %7
