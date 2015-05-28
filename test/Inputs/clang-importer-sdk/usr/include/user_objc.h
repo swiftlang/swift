@@ -17,3 +17,8 @@ typedef NS_ENUM(NSInteger, ALL_CAPS_ENUM2) {
   ALL_CAPS_CASE_ONE,
   ALL_CAPS_CASE_TWO
 };
+
+typedef NS_ENUM(NSInteger, SomeRandomEnum) {
+  SomeRandomA,
+  SomeRandomB
+};
