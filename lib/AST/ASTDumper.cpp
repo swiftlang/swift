@@ -534,6 +534,8 @@ namespace {
 
       if (VD->isFinal())
         OS << " final";
+      if (VD->isObjC())
+        OS << " @objc";
     }
 
     void visitSourceFile(const SourceFile &SF) {
