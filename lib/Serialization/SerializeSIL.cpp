@@ -1644,15 +1644,17 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
   // Go through all SILVTables in SILMod and write them if we should
   // serialize everything.
   // FIXME: Resilience: could write out vtable for fragile classes.
+  const DeclContext *assocDC = SILMod->getAssociatedContext();
   for (const SILVTable &vt : SILMod->getVTables()) {
     if (ShouldSerializeAll &&
-        vt.getClass()->getModuleContext() == SILMod->getSwiftModule())
+        vt.getClass()->isChildContextOf(assocDC))
       writeSILVTable(vt);
   }
 
   // Write out WitnessTables. For now, write out only if EnableSerializeAll.
   for (const SILWitnessTable &wt : SILMod->getWitnessTables()) {
-    if (ShouldSerializeAll)
+    if (ShouldSerializeAll &&
+        wt.getConformance()->getDeclContext()->isChildContextOf(assocDC))
       writeSILWitnessTable(wt);
   }
 
