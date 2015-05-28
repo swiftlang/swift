@@ -358,6 +358,10 @@ struct InheritedConformance : InheritedProtocol1 {
   func inheritedMethod() {}
 }
 func <~>(x: InheritedConformance, y: InheritedConformance) {}
+// TABLE-LABEL: sil_witness_table hidden InheritedConformance: InheritedProtocol1 module witness_tables {
+// TABLE-NEXT:    base_protocol AnyProtocol: InheritedConformance: AnyProtocol module witness_tables
+// TABLE-NEXT:    method #InheritedProtocol1.inheritedMethod!1: @_TTWV14witness_tables20InheritedConformanceS_18InheritedProtocol1S_FS1_15inheritedMethoduRq_S1__fq_FT_T_
+// TABLE-NEXT:  }
 // TABLE-LABEL: sil_witness_table hidden InheritedConformance: AnyProtocol module witness_tables {
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
 // TABLE-NEXT:    associated_type AssocWithReqt: ConformingAssoc
@@ -367,10 +371,6 @@ func <~>(x: InheritedConformance, y: InheritedConformance) {}
 // TABLE-NEXT:    method #AnyProtocol.assocTypesMethod!1: @_TTWV14witness_tables20InheritedConformanceS_11AnyProtocolS_FS1_16assocTypesMethoduRq_S1__fq_FT1xqq_S1_9AssocType1yqq_S1_13AssocWithReqt_T_
 // TABLE-NEXT:    method #AnyProtocol.staticMethod!1: @_TTWV14witness_tables20InheritedConformanceS_11AnyProtocolS_ZFS1_12staticMethoduRq_S1__fMq_FT1xq__T_
 // TABLE-NEXT:    method #AnyProtocol."<~>"!1: @_TTWV14witness_tables20InheritedConformanceS_11AnyProtocolS_ZFS1_oi3ltguRq_S1__fMq_FTq_q__T_
-// TABLE-NEXT:  }
-// TABLE-LABEL: sil_witness_table hidden InheritedConformance: InheritedProtocol1 module witness_tables {
-// TABLE-NEXT:    base_protocol AnyProtocol: InheritedConformance: AnyProtocol module witness_tables
-// TABLE-NEXT:    method #InheritedProtocol1.inheritedMethod!1: @_TTWV14witness_tables20InheritedConformanceS_18InheritedProtocol1S_FS1_15inheritedMethoduRq_S1__fq_FT_T_
 // TABLE-NEXT:  }
 
 struct RedundantInheritedConformance : InheritedProtocol1, AnyProtocol {
@@ -387,6 +387,10 @@ struct RedundantInheritedConformance : InheritedProtocol1, AnyProtocol {
   func inheritedMethod() {}
 }
 func <~>(x: RedundantInheritedConformance, y: RedundantInheritedConformance) {}
+// TABLE-LABEL: sil_witness_table hidden RedundantInheritedConformance: InheritedProtocol1 module witness_tables {
+// TABLE-NEXT:    base_protocol AnyProtocol: RedundantInheritedConformance: AnyProtocol module witness_tables
+// TABLE-NEXT:    method #InheritedProtocol1.inheritedMethod!1: @_TTWV14witness_tables29RedundantInheritedConformanceS_18InheritedProtocol1S_FS1_15inheritedMethoduRq_S1__fq_FT_T_
+// TABLE-NEXT:  }
 // TABLE-LABEL: sil_witness_table hidden RedundantInheritedConformance: AnyProtocol module witness_tables {
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
 // TABLE-NEXT:    associated_type AssocWithReqt: ConformingAssoc
@@ -396,10 +400,6 @@ func <~>(x: RedundantInheritedConformance, y: RedundantInheritedConformance) {}
 // TABLE-NEXT:    method #AnyProtocol.assocTypesMethod!1: @_TTWV14witness_tables29RedundantInheritedConformanceS_11AnyProtocolS_FS1_16assocTypesMethoduRq_S1__fq_FT1xqq_S1_9AssocType1yqq_S1_13AssocWithReqt_T_
 // TABLE-NEXT:    method #AnyProtocol.staticMethod!1: @_TTWV14witness_tables29RedundantInheritedConformanceS_11AnyProtocolS_ZFS1_12staticMethoduRq_S1__fMq_FT1xq__T_
 // TABLE-NEXT:    method #AnyProtocol."<~>"!1: @_TTWV14witness_tables29RedundantInheritedConformanceS_11AnyProtocolS_ZFS1_oi3ltguRq_S1__fMq_FTq_q__T_
-// TABLE-NEXT:  }
-// TABLE-LABEL: sil_witness_table hidden RedundantInheritedConformance: InheritedProtocol1 module witness_tables {
-// TABLE-NEXT:    base_protocol AnyProtocol: RedundantInheritedConformance: AnyProtocol module witness_tables
-// TABLE-NEXT:    method #InheritedProtocol1.inheritedMethod!1: @_TTWV14witness_tables29RedundantInheritedConformanceS_18InheritedProtocol1S_FS1_15inheritedMethoduRq_S1__fq_FT_T_
 // TABLE-NEXT:  }
 
 struct DiamondInheritedConformance : InheritedProtocol1, InheritedProtocol2 {
@@ -416,6 +416,14 @@ struct DiamondInheritedConformance : InheritedProtocol1, InheritedProtocol2 {
   func inheritedMethod() {}
 }
 func <~>(x: DiamondInheritedConformance, y: DiamondInheritedConformance) {}
+// TABLE-LABEL: sil_witness_table hidden DiamondInheritedConformance: InheritedProtocol1 module witness_tables {
+// TABLE-NEXT:    base_protocol AnyProtocol: DiamondInheritedConformance: AnyProtocol module witness_tables
+// TABLE-NEXT:    method #InheritedProtocol1.inheritedMethod!1: @_TTWV14witness_tables27DiamondInheritedConformanceS_18InheritedProtocol1S_FS1_15inheritedMethoduRq_S1__fq_FT_T_
+// TABLE-NEXT:  }
+// TABLE-LABEL: sil_witness_table hidden DiamondInheritedConformance: InheritedProtocol2 module witness_tables {
+// TABLE-NEXT:    base_protocol AnyProtocol: DiamondInheritedConformance: AnyProtocol module witness_tables
+// TABLE-NEXT:    method #InheritedProtocol2.inheritedMethod!1: @_TTWV14witness_tables27DiamondInheritedConformanceS_18InheritedProtocol2S_FS1_15inheritedMethoduRq_S1__fq_FT_T_
+// TABLE-NEXT:  }
 // TABLE-LABEL: sil_witness_table hidden DiamondInheritedConformance: AnyProtocol module witness_tables {
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
 // TABLE-NEXT:    associated_type AssocWithReqt: ConformingAssoc
@@ -425,14 +433,6 @@ func <~>(x: DiamondInheritedConformance, y: DiamondInheritedConformance) {}
 // TABLE-NEXT:    method #AnyProtocol.assocTypesMethod!1: @_TTWV14witness_tables27DiamondInheritedConformanceS_11AnyProtocolS_FS1_16assocTypesMethoduRq_S1__fq_FT1xqq_S1_9AssocType1yqq_S1_13AssocWithReqt_T_
 // TABLE-NEXT:    method #AnyProtocol.staticMethod!1: @_TTWV14witness_tables27DiamondInheritedConformanceS_11AnyProtocolS_ZFS1_12staticMethoduRq_S1__fMq_FT1xq__T_
 // TABLE-NEXT:    method #AnyProtocol."<~>"!1: @_TTWV14witness_tables27DiamondInheritedConformanceS_11AnyProtocolS_ZFS1_oi3ltguRq_S1__fMq_FTq_q__T_
-// TABLE-NEXT:  }
-// TABLE-LABEL: sil_witness_table hidden DiamondInheritedConformance: InheritedProtocol1 module witness_tables {
-// TABLE-NEXT:    base_protocol AnyProtocol: DiamondInheritedConformance: AnyProtocol module witness_tables
-// TABLE-NEXT:    method #InheritedProtocol1.inheritedMethod!1: @_TTWV14witness_tables27DiamondInheritedConformanceS_18InheritedProtocol1S_FS1_15inheritedMethoduRq_S1__fq_FT_T_
-// TABLE-NEXT:  }
-// TABLE-LABEL: sil_witness_table hidden DiamondInheritedConformance: InheritedProtocol2 module witness_tables {
-// TABLE-NEXT:    base_protocol AnyProtocol: DiamondInheritedConformance: AnyProtocol module witness_tables
-// TABLE-NEXT:    method #InheritedProtocol2.inheritedMethod!1: @_TTWV14witness_tables27DiamondInheritedConformanceS_18InheritedProtocol2S_FS1_15inheritedMethoduRq_S1__fq_FT_T_
 // TABLE-NEXT:  }
 
 class ClassInheritedConformance : InheritedClassProtocol {
@@ -449,6 +449,10 @@ class ClassInheritedConformance : InheritedClassProtocol {
   func inheritedMethod() {}
 }
 func <~>(x: ClassInheritedConformance, y: ClassInheritedConformance) {}
+// TABLE-LABEL: sil_witness_table hidden ClassInheritedConformance: InheritedClassProtocol module witness_tables {
+// TABLE-NEXT:    base_protocol AnyProtocol: ClassInheritedConformance: AnyProtocol module witness_tables
+// TABLE-NEXT:    method #InheritedClassProtocol.inheritedMethod!1: @_TTWC14witness_tables25ClassInheritedConformanceS_22InheritedClassProtocolS_FS1_15inheritedMethoduRq_S1__fq_FT_T_
+// TABLE-NEXT:  }
 // TABLE-LABEL: sil_witness_table hidden ClassInheritedConformance: AnyProtocol module witness_tables {
 // TABLE-NEXT:    associated_type AssocType: SomeAssoc
 // TABLE-NEXT:    associated_type AssocWithReqt: ConformingAssoc
@@ -459,16 +463,12 @@ func <~>(x: ClassInheritedConformance, y: ClassInheritedConformance) {}
 // TABLE-NEXT:    method #AnyProtocol.staticMethod!1: @_TTWC14witness_tables25ClassInheritedConformanceS_11AnyProtocolS_ZFS1_12staticMethoduRq_S1__fMq_FT1xq__T_
 // TABLE-NEXT:    method #AnyProtocol."<~>"!1: @_TTWC14witness_tables25ClassInheritedConformanceS_11AnyProtocolS_ZFS1_oi3ltguRq_S1__fMq_FTq_q__T_
 // TABLE-NEXT:  }
-// TABLE-LABEL: sil_witness_table hidden ClassInheritedConformance: InheritedClassProtocol module witness_tables {
-// TABLE-NEXT:    base_protocol AnyProtocol: ClassInheritedConformance: AnyProtocol module witness_tables
-// TABLE-NEXT:    method #InheritedClassProtocol.inheritedMethod!1: @_TTWC14witness_tables25ClassInheritedConformanceS_22InheritedClassProtocolS_FS1_15inheritedMethoduRq_S1__fq_FT_T_
-// TABLE-NEXT:  }
 // -- Witnesses have the 'self' abstraction level of their protocol.
 //    AnyProtocol has no class bound, so its witnesses treat Self as opaque.
 //    InheritedClassProtocol has a class bound, so its witnesses treat Self as
 //    a reference value.
-// SYMBOL:      sil hidden [transparent] [thunk] @_TTWC14witness_tables25ClassInheritedConformanceS_11AnyProtocolS_FS1_6method{{.*}} : $@convention(witness_method) (Arg, @in ClassInheritedConformance, @in_guaranteed ClassInheritedConformance) -> ()
 // SYMBOL:      sil hidden [transparent] [thunk] @_TTWC14witness_tables25ClassInheritedConformanceS_22InheritedClassProtocolS_FS1_15inheritedMethoduRq_S1__fq_FT_T_ : $@convention(witness_method) (@guaranteed ClassInheritedConformance) -> ()
+// SYMBOL:      sil hidden [transparent] [thunk] @_TTWC14witness_tables25ClassInheritedConformanceS_11AnyProtocolS_FS1_6method{{.*}} : $@convention(witness_method) (Arg, @in ClassInheritedConformance, @in_guaranteed ClassInheritedConformance) -> ()
 
 struct GenericAssocType<T> : AssocReqt {
   func requiredMethod() {}

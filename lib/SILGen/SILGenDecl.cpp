@@ -1260,11 +1260,8 @@ public:
       conformance,
     });
 
-    // Emit the witness table for the base conformance if it belongs to this
-    // module or is shared.
-    if (conformance->getDeclContext()->getParentModule()
-          == SGM.SwiftModule
-        || SGM.Types.getLinkageForProtocolConformance(
+    // Emit the witness table for the base conformance if it is shared.
+    if (SGM.Types.getLinkageForProtocolConformance(
                                         conformance->getRootNormalConformance(),
                                         NotForDefinition)
           == SILLinkage::Shared)

@@ -419,19 +419,19 @@ final class FailableClassModel: FailableClassRequirement, IUOFailableClassRequir
 }
 
 final class IUOFailableClassModel: NonFailableClassRefinement, IUOFailableClassRequirement {
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses21IUOFailableClassModelS_24FailableClassRequirementS_FS1_CuRq_S1__fMq_FT3fooSi_GSqq__
-  // CHECK: select_enum_addr
-  // CHECK: unchecked_take_enum_data_addr
-  // CHECK: enum $Optional{{.*}}Some
-  // CHECK: enum $Optional{{.*}}None
-  // CHECK: return {{.*}} : $Optional<IUOFailableClassModel>
-
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses21IUOFailableClassModelS_26NonFailableClassRefinementS_FS1_CuRq_S1__fMq_FT3fooSi_q_
   // CHECK: function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueurFGSQq__q_
   // CHECK: return [[RESULT:%[0-9]+]] : $IUOFailableClassModel
 
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses21IUOFailableClassModelS_27IUOFailableClassRequirementS_FS1_CuRq_S1__fMq_FT3fooSi_GSQq__
   init!(foo: Int) {}
+
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses21IUOFailableClassModelS_24FailableClassRequirementS_FS1_CuRq_S1__fMq_FT3fooSi_GSqq__
+  // CHECK: select_enum_addr
+  // CHECK: unchecked_take_enum_data_addr
+  // CHECK: enum $Optional{{.*}}Some
+  // CHECK: enum $Optional{{.*}}None
+  // CHECK: return {{.*}} : $Optional<IUOFailableClassModel>
 }
 
 protocol HasAssoc {
