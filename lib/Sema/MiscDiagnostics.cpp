@@ -996,10 +996,14 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       
       // Try to find the location of the 'var' so we can produce a fixit.  If
       // this is a simple PatternBinding, use its location.
-      if (auto *PBD = var->getParentPatternBinding())
+      if (auto *PBD = var->getParentPatternBinding()) {
         if (PBD->getSingleVar() == var)
           FixItLoc = PBD->getLoc();
-      
+      } else if (auto *pattern = var->getPlainParentPattern()) {
+        if (auto *vp = dyn_cast<VarPattern>(pattern))
+          FixItLoc = vp->getLoc();
+      }
+
       // If this is a parameter explicitly marked 'var', remove it.
       if (auto *param = dyn_cast<ParamDecl>(var))
         if (auto *pattern = param->getParamParentPattern())

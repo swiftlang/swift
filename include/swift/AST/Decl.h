@@ -4214,6 +4214,16 @@ public:
     return nullptr;
   }
 
+  /// Return the plain (non pattern-binding-decl) pattern associated with this
+  // var, if one exists.
+  Pattern *getPlainParentPattern() const {
+    return ParentPattern.dyn_cast<Pattern *>();
+  }
+  void setPlainParentPattern(Pattern *Pat) {
+    assert(!getParentPatternBinding() && "already set to a pattern binding");
+    ParentPattern = Pat;
+  }
+
   /// Return the initializer involved in this VarDecl.  However, Recall that the
   /// initializer may be involved in initializing more than just this one
   /// vardecl though.  For example, if this is a VarDecl for "x", the pattern

@@ -997,8 +997,11 @@ ParserResult<Pattern> Parser::parseMatchingPatternAsLetOrVar(bool isLet,
   ParserResult<Pattern> subPattern = parseMatchingPattern(isExprBasic);
   if (subPattern.isNull())
     return nullptr;
-  return makeParserResult(new (Context) VarPattern(varLoc, isLet,
-                                                   subPattern.get()));
+  auto *varP = new (Context) VarPattern(varLoc, isLet, subPattern.get());
+  if (auto *namedP = dyn_cast<NamedPattern>(subPattern.get()))
+    if (auto *VD = namedP->getDecl())
+      VD->setPlainParentPattern(varP);
+  return makeParserResult(varP);
 }
 
 

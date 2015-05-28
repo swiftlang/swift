@@ -30,3 +30,12 @@ struct MyMask : OptionSetType {
 func supported() -> MyMask {
   return MyMask.Bingo
 }
+
+func foo() -> Int {
+  do {
+  } catch let err {
+    goo(err)
+  }
+}
+
+func goo(e : ErrorType) {}
