@@ -875,3 +875,10 @@ typealias BadProto4 = BadProto3
 extension BadProto4 { } // expected-error{{protocol 'BadProto3' cannot be extended via typealias 'BadProto4'}}{{11-20=BadProto3}}
 
 extension AnyObject { } // expected-error{{'AnyObject' protocol cannot be extended}}
+
+// Members of protocol extensions cannot be overridden.
+// rdar://problem/21075287
+class BadClass1 : BadProto1 {
+  func foo() { }
+  override var prop: Int { return 5 } // expected-error{{property does not override any property from its superclass}}
+}

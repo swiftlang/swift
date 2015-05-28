@@ -4519,6 +4519,9 @@ public:
       if (member->getKind() != decl->getKind())
         continue;
 
+      if (!member->getDeclContext()->isClassOrClassExtensionContext())
+        continue;
+
       auto parentDecl = cast<ValueDecl>(member);
 
       // Check whether there are any obvious reasons why the two given
