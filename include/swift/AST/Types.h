@@ -2904,10 +2904,11 @@ public:
 
   /// Get the parameters, ignoring any indirect-result parameter.
   ArrayRef<SILParameterInfo>
-  getParametersWithoutIndirectResult() const  {
+  getParametersWithoutIndirectResult() const {
     auto params = getParameters();
-    if (hasIndirectResult()) params = params.slice(1);
-      return params;
+    if (hasIndirectResult())
+      params = params.slice(1);
+    return params;
   }
 
   using ParameterSILTypeArrayRef
