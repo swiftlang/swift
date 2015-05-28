@@ -490,10 +490,8 @@ namespace {
 
       OS << ' ';
       printDeclName(VD);
-      if (FuncDecl *FD = dyn_cast<FuncDecl>(VD))
-        printGenericParameters(OS, FD->getGenericParams());
-      if (ConstructorDecl *CD = dyn_cast<ConstructorDecl>(VD))
-        printGenericParameters(OS, CD->getGenericParams());
+      if (AbstractFunctionDecl *AFD = dyn_cast<AbstractFunctionDecl>(VD))
+        printGenericParameters(OS, AFD->getGenericParams());
       if (NominalTypeDecl *NTD = dyn_cast<NominalTypeDecl>(VD))
         printGenericParameters(OS, NTD->getGenericParams());
 

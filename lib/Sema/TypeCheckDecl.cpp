@@ -2391,137 +2391,134 @@ static void checkBridgedFunctions(TypeChecker &TC) {
 void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
                        Optional<ObjCReason> isObjC,
                        Optional<ForeignErrorConvention> errorConvention) {
+  D->setIsObjC(isObjC.hasValue());
+
   // By now, the caller will have handled the case where an implicit @objc
   // could be overridden by @nonobjc. If we see a @nonobjc and we are trying
   // to add an @objc for whatever reason, diagnose an error.
-  if (isObjC) {
-    if (auto *attr = D->getAttrs().getAttribute<NonObjCAttr>()) {
-      ObjCReason Reason = *isObjC;
-
-      // FIXME: this is for cases where we don't want to diagnose a
-      // "X cannot be represented in Objective-C" error, but still
-      // complain if the user specifies @nonobjc.
-      if (Reason == ObjCReason::DoNotDiagnose)
-        Reason = ObjCReason::ImplicitlyObjC;
-
-      TC.diagnose(D->getStartLoc(), diag::nonobjc_not_allowed,
-                  getObjCDiagnosticAttrKind(Reason));
-
+  if (!isObjC) {
+    // FIXME: For now, only @objc declarations can be dynamic.
+    if (auto attr = D->getAttrs().getAttribute<DynamicAttr>(D))
       attr->setInvalid();
-    }
+    return;
   }
 
-  D->setIsObjC(isObjC.hasValue());
+  if (auto *attr = D->getAttrs().getAttribute<NonObjCAttr>()) {
+    ObjCReason Reason = *isObjC;
 
-  if (isObjC) {
-    // Make sure we have the appropriate bridging operations.
-    checkBridgedFunctions(TC);
+    // FIXME: this is for cases where we don't want to diagnose a
+    // "X cannot be represented in Objective-C" error, but still
+    // complain if the user specifies @nonobjc.
+    if (Reason == ObjCReason::DoNotDiagnose)
+      Reason = ObjCReason::ImplicitlyObjC;
 
-    // Record the name of this Objective-C method in its class.
-    if (auto classDecl
-          = D->getDeclContext()->isClassOrClassExtensionContext()) {
-      if (auto method = dyn_cast<AbstractFunctionDecl>(D)) {
-        // If we are overriding another method, make sure the
-        // selectors line up.
-        if (auto baseMethod = method->getOverriddenDecl()) {
-          // If the overridden method has a foreign error convention,
-          // adopt it.  Set the foreign error convention for a
-          // throwing method.  Note that the foreign error convention
-          // affects the selector, so we perform this first.
-          if (method->isBodyThrowing()) {
-            if (auto baseErrorConvention
-                  = baseMethod->getForeignErrorConvention()) {
-              errorConvention = baseErrorConvention;
-            }
+    TC.diagnose(D->getStartLoc(), diag::nonobjc_not_allowed,
+                getObjCDiagnosticAttrKind(Reason));
 
-            assert(errorConvention && "Missing error convention");
-            method->setForeignErrorConvention(*errorConvention);
+    attr->setInvalid();
+  }
+
+  // Make sure we have the appropriate bridging operations.
+  checkBridgedFunctions(TC);
+
+  // Record the name of this Objective-C method in its class.
+  if (auto classDecl
+        = D->getDeclContext()->isClassOrClassExtensionContext()) {
+    if (auto method = dyn_cast<AbstractFunctionDecl>(D)) {
+      // If we are overriding another method, make sure the
+      // selectors line up.
+      if (auto baseMethod = method->getOverriddenDecl()) {
+        // If the overridden method has a foreign error convention,
+        // adopt it.  Set the foreign error convention for a
+        // throwing method.  Note that the foreign error convention
+        // affects the selector, so we perform this first.
+        if (method->isBodyThrowing()) {
+          if (auto baseErrorConvention
+                = baseMethod->getForeignErrorConvention()) {
+            errorConvention = baseErrorConvention;
           }
 
-          ObjCSelector baseSelector = baseMethod->getObjCSelector(&TC);
-          if (baseSelector != method->getObjCSelector(&TC)) {
-            // The selectors differ. If the method's selector was
-            // explicitly specified, this is an error. Otherwise, we
-            // inherit the selector.
-            if (auto attr = method->getAttrs().getAttribute<ObjCAttr>()) {
-              if (attr->hasName() && !attr->isNameImplicit()) {
-                llvm::SmallString<64> baseScratch;
-                TC.diagnose(attr->AtLoc,
-                            diag::objc_override_method_selector_mismatch,
-                            *attr->getName(), baseSelector)
-                  .fixItReplaceChars(attr->getNameLocs().front(),
-                                     attr->getRParenLoc(),
-                                     baseSelector.getString(baseScratch));
-                TC.diagnose(baseMethod, diag::overridden_here);
-              }
-
-              // Override the name on the attribute.
-              const_cast<ObjCAttr *>(attr)->setName(baseSelector,
-                                                    /*implicit=*/true);
-            } else {
-              method->getAttrs().add(ObjCAttr::create(TC.Context,
-                                                      baseSelector,
-                                                      true));
-            }
-          }
-        } else if (method->isBodyThrowing()) {
-          // Attach the foreign error convention.
           assert(errorConvention && "Missing error convention");
           method->setForeignErrorConvention(*errorConvention);
         }
 
-        classDecl->recordObjCMethod(method);
+        ObjCSelector baseSelector = baseMethod->getObjCSelector(&TC);
+        if (baseSelector != method->getObjCSelector(&TC)) {
+          // The selectors differ. If the method's selector was
+          // explicitly specified, this is an error. Otherwise, we
+          // inherit the selector.
+          if (auto attr = method->getAttrs().getAttribute<ObjCAttr>()) {
+            if (attr->hasName() && !attr->isNameImplicit()) {
+              llvm::SmallString<64> baseScratch;
+              TC.diagnose(attr->AtLoc,
+                          diag::objc_override_method_selector_mismatch,
+                          *attr->getName(), baseSelector)
+                .fixItReplaceChars(attr->getNameLocs().front(),
+                                   attr->getRParenLoc(),
+                                   baseSelector.getString(baseScratch));
+              TC.diagnose(baseMethod, diag::overridden_here);
+            }
 
-        // Swift does not permit class methods named "load".
-        if (!method->isInstanceMember()) {
-          auto selector = method->getObjCSelector(&TC);
-          if (selector.getNumArgs() == 0 &&
-              selector.getSelectorPieces()[0] == TC.Context.Id_load) {
-            auto diagInfo = getObjCMethodDiagInfo(method);
-            TC.diagnose(method, diag::objc_class_method_load,
-                        diagInfo.first, diagInfo.second);
+            // Override the name on the attribute.
+            const_cast<ObjCAttr *>(attr)->setName(baseSelector,
+                                                  /*implicit=*/true);
+          } else {
+            method->getAttrs().add(ObjCAttr::create(TC.Context,
+                                                    baseSelector,
+                                                    true));
           }
         }
-      } else if (auto var = dyn_cast<VarDecl>(D)) {
-        // If we are overriding a property, make sure that the
-        // Objective-C names of the properties match.
-        if (auto baseVar = var->getOverriddenDecl()) {
-          if (var->getObjCPropertyName() != baseVar->getObjCPropertyName()) {
-            Identifier baseName = baseVar->getObjCPropertyName();
-            ObjCSelector baseSelector(TC.Context, 0, baseName);
+      } else if (method->isBodyThrowing()) {
+        // Attach the foreign error convention.
+        assert(errorConvention && "Missing error convention");
+        method->setForeignErrorConvention(*errorConvention);
+      }
 
-            // If not, see whether we can implicitly adjust.
-            if (auto attr = var->getAttrs().getAttribute<ObjCAttr>()) {
-              if (attr->hasName() && !attr->isNameImplicit()) {
-                TC.diagnose(attr->AtLoc,
-                            diag::objc_override_property_name_mismatch,
-                            attr->getName()->getSelectorPieces()[0],
-                            baseName)
-                  .fixItReplaceChars(attr->getNameLocs().front(),
-                                     attr->getRParenLoc(),
-                                     baseName.str());
-                TC.diagnose(baseVar, diag::overridden_here);
-              }
+      classDecl->recordObjCMethod(method);
 
-              // Override the name on the attribute.
-              const_cast<ObjCAttr *>(attr)->setName(baseSelector,
-                                                    /*implicit=*/true);
-            } else {
-              var->getAttrs().add(ObjCAttr::create(TC.Context,
-                                                   baseSelector,
-                                                   true));
+      // Swift does not permit class methods named "load".
+      if (!method->isInstanceMember()) {
+        auto selector = method->getObjCSelector(&TC);
+        if (selector.getNumArgs() == 0 &&
+            selector.getSelectorPieces()[0] == TC.Context.Id_load) {
+          auto diagInfo = getObjCMethodDiagInfo(method);
+          TC.diagnose(method, diag::objc_class_method_load,
+                      diagInfo.first, diagInfo.second);
+        }
+      }
+    } else if (auto var = dyn_cast<VarDecl>(D)) {
+      // If we are overriding a property, make sure that the
+      // Objective-C names of the properties match.
+      if (auto baseVar = var->getOverriddenDecl()) {
+        if (var->getObjCPropertyName() != baseVar->getObjCPropertyName()) {
+          Identifier baseName = baseVar->getObjCPropertyName();
+          ObjCSelector baseSelector(TC.Context, 0, baseName);
+
+          // If not, see whether we can implicitly adjust.
+          if (auto attr = var->getAttrs().getAttribute<ObjCAttr>()) {
+            if (attr->hasName() && !attr->isNameImplicit()) {
+              TC.diagnose(attr->AtLoc,
+                          diag::objc_override_property_name_mismatch,
+                          attr->getName()->getSelectorPieces()[0],
+                          baseName)
+                .fixItReplaceChars(attr->getNameLocs().front(),
+                                   attr->getRParenLoc(),
+                                   baseName.str());
+              TC.diagnose(baseVar, diag::overridden_here);
             }
+
+            // Override the name on the attribute.
+            const_cast<ObjCAttr *>(attr)->setName(baseSelector,
+                                                  /*implicit=*/true);
+          } else {
+            var->getAttrs().add(ObjCAttr::create(TC.Context,
+                                                 baseSelector,
+                                                 true));
           }
         }
       }
     }
-
-    return;
-  } 
-
-  // FIXME: For now, only @objc declarations can be dynamic.
-  if (auto attr = D->getAttrs().getAttribute<DynamicAttr>(D))
-    attr->setInvalid();
+  }
 }
 
 /// Given the raw value literal expression for an enum case, produces the

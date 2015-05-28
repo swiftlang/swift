@@ -1983,11 +1983,11 @@ ERROR(attr_used_without_required_module, sema_tcd, none,
   "%0 attribute used without importing module %1", (DeclAttribute, Identifier))
 
 ERROR(invalid_objc_decl,sema_tcd,none,
-      "only classes, protocols, methods, properties, and subscript "
-      "declarations can be declared @objc", ())
+      "only classes, protocols, methods, initializers, properties, and "
+      "subscript declarations can be declared @objc", ())
 ERROR(invalid_nonobjc_decl,sema_tcd,none,
-      "only methods, properties and subscript declarations can be "
-      "declared @nonobjc", ())
+      "only methods, initializers, properties and subscript declarations can "
+      "be declared @nonobjc", ())
 ERROR(objc_in_generic_context,sema_objc,none,
       "%select{method|initializer|variable|subscript}0 in a "
       "%select{generic class|protocol extension}1 cannot be represented in "
@@ -2028,6 +2028,9 @@ ERROR(objc_invalid_subscript_key_type,sema_objc,none,
 ERROR(objc_invalid_on_subscript,sema_objc,none,
       "subscript cannot be %" OBJC_ATTR_SELECT "0 because its type "
       "cannot be represented in Objective-C", (unsigned))
+ERROR(objc_invalid_with_generic_params,sema_objc,none,
+      "method cannot be %" OBJC_ATTR_SELECT "0 because it has generic "
+      "parameters", (unsigned))
 ERROR(objc_convention_invalid,sema_objc,none,
       "@convention(%0) type is not representable in Objective-C", (StringRef))
 NOTE(not_objc_empty_protocol_composition,sema_objc,none,
