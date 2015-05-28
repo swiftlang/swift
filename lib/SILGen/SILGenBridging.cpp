@@ -681,15 +681,23 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &gen,
                                                SILValue &foreignErrorSlot,
                               Optional<ForeignErrorConvention> &foreignError) {
   SILDeclRef native = thunk.asForeign(false);
-  auto objcInfo = gen.SGM.Types.getConstantFunctionType(thunk);
-  auto swiftInfo = gen.SGM.Types.getConstantFunctionType(native);
 
-  // Borrow the context archetypes from the unthunked function.
-  SILFunction *orig = gen.SGM.getFunction(native, NotForDefinition);
-  gen.F.setContextGenericParams(orig->getContextGenericParams());
+  auto mod = gen.SGM.M.getSwiftModule();
+  auto subs = gen.F.getForwardingSubstitutions();
+
+  auto objcInfo = gen.SGM.Types.getConstantInfo(thunk);
+  auto objcFnTy = objcInfo.SILFnType->substGenericArgs(gen.SGM.M, mod, subs);
+
+  auto swiftInfo = gen.SGM.Types.getConstantInfo(native);
+  auto swiftFnTy = swiftInfo.SILFnType->substGenericArgs(gen.SGM.M, mod, subs);
+
+  // We must have the same context archetypes as the unthunked function.
+  assert(objcInfo.ContextGenericParams == swiftInfo.ContextGenericParams);
 
   SmallVector<ManagedValue, 8> bridgedArgs;
-  bridgedArgs.reserve(objcInfo->getParameters().size());
+  bridgedArgs.reserve(objcFnTy->getParameters().size());
+
+  SILFunction *orig = gen.SGM.getFunction(native, NotForDefinition);
 
   // Find the foreign error convention if we have one.
   if (orig->getLoweredFunctionType()->hasErrorResult()) {
@@ -699,16 +707,16 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &gen,
   }
 
   // Emit the indirect return argument, if any.
-  if (objcInfo->hasIndirectResult()) {
+  if (objcFnTy->hasIndirectResult()) {
     SILType argTy = gen.F.mapTypeIntoContext(
-                           objcInfo->getIndirectResult().getSILType());
+                           objcFnTy->getIndirectResult().getSILType());
     auto arg = new (gen.F.getModule()) SILArgument(gen.F.begin(), argTy);
     bridgedArgs.push_back(ManagedValue::forUnmanaged(arg));
   }
 
   // Emit the other arguments, taking ownership of arguments if necessary.
-  auto inputs = objcInfo->getParametersWithoutIndirectResult();
-  auto nativeInputs = swiftInfo->getParametersWithoutIndirectResult();
+  auto inputs = objcFnTy->getParametersWithoutIndirectResult();
+  auto nativeInputs = swiftFnTy->getParametersWithoutIndirectResult();
   assert(inputs.size() ==
            nativeInputs.size() + unsigned(foreignError.hasValue()));
   for (unsigned i = 0, e = inputs.size(); i < e; ++i) {
@@ -750,9 +758,9 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &gen,
   }
 
   assert(bridgedArgs.size() + unsigned(foreignError.hasValue())
-           == objcInfo->getParameters().size() &&
+           == objcFnTy->getParameters().size() &&
          "objc inputs don't match number of arguments?!");
-  assert(bridgedArgs.size() == swiftInfo->getParameters().size() &&
+  assert(bridgedArgs.size() == swiftFnTy->getParameters().size() &&
          "swift inputs don't match number of arguments?!");
   assert((foreignErrorSlot || !foreignError) &&
          "didn't find foreign error slot");
@@ -762,7 +770,7 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &gen,
   assert(bridgedArgs.size() == nativeInputs.size());
   for (unsigned i = 0, size = bridgedArgs.size(); i < size; ++i) {
     SILType argTy = gen.F.mapTypeIntoContext(
-                           swiftInfo->getParameters()[i].getSILType());
+                           swiftFnTy->getParameters()[i].getSILType());
     ManagedValue native =
       gen.emitBridgedToNativeValue(loc,
                                    bridgedArgs[i],
@@ -778,7 +786,7 @@ static SILFunctionType *emitObjCThunkArguments(SILGenFunction &gen,
     args.push_back(argValue);
   }
 
-  return objcInfo;
+  return objcFnTy;
 }
 
 void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
@@ -804,8 +812,8 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
   // Call the native entry point.
   SILValue nativeFn = emitGlobalFunctionRef(loc, native, nativeInfo);
   auto subs = F.getForwardingSubstitutions();
-  auto substTy = nativeFn.getType().castTo<SILFunctionType>()
-    ->substGenericArgs(SGM.M, SGM.M.getSwiftModule(), subs);
+  auto substTy = nativeInfo.SILFnType->substGenericArgs(
+    SGM.M, SGM.M.getSwiftModule(), subs);
   SILType substSILTy = SILType::getPrimitiveObjectType(substTy);
 
   CanType substNativeResultType = nativeInfo.LoweredType.getResult();
