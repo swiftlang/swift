@@ -168,6 +168,10 @@ class subject_genericClass<T> { // no-error
   func subject_instanceFunc() {} // expected-error{{method in a generic class cannot be represented in Objective-C}}
 }
 
+extension subject_genericClass where T : Hashable {
+  @objc var prop: Int { return 0 } // expected-error{{variable in a generic class cannot be represented in Objective-C}}
+}
+
 @objc
 enum subject_enum: Int {
   @objc   // expected-error {{@objc cannot be applied to this declaration}}
