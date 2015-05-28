@@ -283,9 +283,6 @@ namespace {
     /// \brief The witness did not match due to static/non-static differences.
     StaticNonStaticConflict,
     
-    /// \brief The witness did not match due to ownership differences.
-    OwnershipConflict,
-
     /// \brief The witness is not settable, but the requirement is.
     SettableConflict,
 
@@ -464,7 +461,6 @@ namespace {
       case MatchKind::KindConflict:
       case MatchKind::TypeConflict:
       case MatchKind::StaticNonStaticConflict:
-      case MatchKind::OwnershipConflict:
       case MatchKind::SettableConflict:
       case MatchKind::PrefixNonPrefixConflict:
       case MatchKind::PostfixNonPostfixConflict:
@@ -490,7 +486,6 @@ namespace {
       case MatchKind::WitnessInvalid:
       case MatchKind::KindConflict:
       case MatchKind::StaticNonStaticConflict:
-      case MatchKind::OwnershipConflict:
       case MatchKind::SettableConflict:
       case MatchKind::PrefixNonPrefixConflict:
       case MatchKind::PostfixNonPostfixConflict:
@@ -1030,17 +1025,10 @@ matchWitness(TypeChecker &tc, NormalProtocolConformance *conformance,
   } else if (auto *witnessASD = dyn_cast<AbstractStorageDecl>(witness)) {
     auto *reqASD = cast<AbstractStorageDecl>(req);
     
-    // Check aspects of property requirements and witnesses.
+    // If this is a property requirement, check that the static-ness matches.
     if (auto *vdWitness = dyn_cast<VarDecl>(witness)) {
-      auto vdReq = cast<VarDecl>(req);
-
-      // static-ness must match
-      if (vdReq->isStatic() != vdWitness->isStatic())
+      if (cast<VarDecl>(req)->isStatic() != vdWitness->isStatic())
         return RequirementMatch(witness, MatchKind::StaticNonStaticConflict);
-
-      // ownership
-      if (vdReq->getOwnership() != vdWitness->getOwnership())
-        return RequirementMatch(witness, MatchKind::OwnershipConflict);
     }
     
     // If the requirement is settable and the witness is not, reject it.
@@ -1504,13 +1492,6 @@ diagnoseMatch(TypeChecker &tc, Module *module,
     // FIXME: Could emit a Fix-It here.
     tc.diagnose(match.Witness, diag::protocol_witness_static_conflict,
                 !req->isInstanceMember());
-    break;
-
-  case MatchKind::OwnershipConflict:
-    // FIXME: Could emit a Fix-It here.
-    tc.diagnose(match.Witness, diag::protocol_witness_ownership_conflict,
-                cast<VarDecl>(match.Witness)->getOwnership(),
-                cast<VarDecl>(req)->getOwnership());
     break;
       
   case MatchKind::SettableConflict:

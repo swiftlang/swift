@@ -3131,16 +3131,6 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
   }
 }
 
-Ownership VarDecl::getOwnership() const {
-  auto type = getInterfaceType()->getLValueOrInOutObjectType();
-
-  // ReferenceStorageType is used to describe weak/unowned/unmanaged.
-  if (auto refStorage = type->getAs<ReferenceStorageType>())
-    return refStorage->getOwnership();
-
-  return Ownership::Strong;
-}
-
 
 /// Determine whether the given Swift type is an integral type, i.e.,
 /// a type that wraps a builtin integer.
