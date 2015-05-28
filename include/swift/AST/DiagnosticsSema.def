@@ -848,6 +848,11 @@ WARNING(warn_protocol_witness_optionality,sema_tcd,none,
 NOTE(protocol_witness_static_conflict,sema_tcd,none,
      "candidate operates on %select{a type|an instance}0, not "
      "%select{an instance|a type}0 as required", (bool))
+NOTE(protocol_witness_ownership_conflict,sema_tcd,none,
+     "candidate has %select{strong|'weak'|'unowned'|'unowned(unsafe)'}0 "
+     "ownership, not %select{strong|'weak'|'unowned'|'unowned(unsafe)'}1 "
+     "as required", (Ownership, Ownership))
+
 NOTE(protocol_witness_prefix_postfix_conflict,sema_tcd,none,
      "candidate is %select{|prefix, |postfix, }1not "
      "%select{prefix|postfix}0 as required", (bool, unsigned))
