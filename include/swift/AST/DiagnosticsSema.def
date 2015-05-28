@@ -1881,8 +1881,6 @@ ERROR(bool_intrinsics_not_found,sema_tct,none,
 ERROR(self_in_nominal,sema_tct,none,
       "'Self' is only available in a protocol or as the result of a "
       "method in a class; did you mean %0?", (Identifier))
-ERROR(non_generic_class_with_generic_superclass,sema_tct,none,
-      "classes derived from generic classes must also be generic", ())
 ERROR(class_super_access,sema_tcd,none,
       "class %select{must be declared %select{private|internal|PUBLIC}2"
       "|cannot be declared %select{PRIVATE|internal|public}1}0 because its "
