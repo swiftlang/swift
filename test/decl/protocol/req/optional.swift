@@ -87,6 +87,21 @@ extension C5 {
   }
 }
 
+class C6 { }
+
+extension C6 : P1 {
+  @nonobjc func method(x: Int) { } 
+
+  @nonobjc var prop: Int { return 5 }
+
+  @nonobjc subscript (i: Int) -> ObjCClass? {
+    get {
+      return nil
+    }
+    set {}
+  }
+}
+
 // -----------------------------------------------------------------------
 // Using optional requirements
 // -----------------------------------------------------------------------

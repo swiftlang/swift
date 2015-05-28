@@ -1694,6 +1694,10 @@ void ConformanceChecker::checkOptionalWitnessNonObjCMatch(
     // handle this if there actually is a collision.
     if (witness->isObjC())
       continue;
+    
+    // This is silenced by writing @nonobjc.
+    if (witness->getAttrs().hasAttribute<NonObjCAttr>())
+      continue;
 
     // Diagnose the non-@objc declaration.
     TC.diagnose(witness, diag::optional_req_nonobjc_near_match,
