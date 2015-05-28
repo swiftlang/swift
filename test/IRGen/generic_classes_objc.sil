@@ -13,7 +13,9 @@ import gizmo
 // CHECK: @_TMPdC20generic_classes_objc20GenericInheritsObjC2
 
 class GenericInheritsObjC<D> : Gizmo {
+  var a : Int
   var x : D
+  var z : Int
 
   override init()
 }

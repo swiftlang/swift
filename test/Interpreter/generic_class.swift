@@ -1,8 +1,6 @@
 // RUN: rm -rf %t  &&  mkdir %t
-// RUN: %target-build-swift -Xfrontend -enable-dynamic-value-type-layout %s -o %t/a.out
+// RUN: %target-build-swift %s -o %t/a.out
 // RUN: %target-run %t/a.out | FileCheck %s
-
-// TODO: Nongeneric subclasses of generic classes
 
 protocol MyPrintable {
   func myPrint()
@@ -174,3 +172,17 @@ var t = SemiConcreteTriple(121, 231, "California's Canada")
 printConcretePair(t)
 // CHECK: 121 231 "California\'s Canada"
 printSemiTriple(t)
+
+class MoreConcreteQuadruple : SemiConcreteTriple<State> {
+  var fourth: String
+
+  init(_ first: UInt8, _ second: UInt8, _ third: State, _ fourth: String) {
+    self.fourth = fourth
+    super.init(first, second, third)
+  }
+}
+
+var u = MoreConcreteQuadruple(10, 17, State.CA, "Hella")
+
+// CHECK: 10 17
+printConcretePair(u)

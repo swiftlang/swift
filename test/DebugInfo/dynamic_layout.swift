@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-dynamic-value-type-layout %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
 
 func markUsed<T>(t: T) {}
 
