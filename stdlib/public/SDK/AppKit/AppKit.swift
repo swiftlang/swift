@@ -129,7 +129,7 @@ extension NSView : _Reflectable {
 // Overlays for variadics.
 
 public extension NSGradient {
-  convenience init(colorsAndLocations objects: (NSColor, CGFloat)...) {
+  convenience init?(colorsAndLocations objects: (NSColor, CGFloat)...) {
     self.init(
       colors: objects.map { $0.0 },
       atLocations: objects.map { $0.1 },
