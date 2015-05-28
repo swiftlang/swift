@@ -54,6 +54,9 @@ OutputFilename("o", llvm::cl::desc("output filename"));
 static llvm::cl::list<std::string>
 ImportPaths("I", llvm::cl::desc("add a directory to the import search path"));
 
+static llvm::cl::list<std::string>
+FrameworkPaths("F", llvm::cl::desc("add a directory to the framework search path"));
+
 static llvm::cl::opt<std::string>
 ModuleName("module-name", llvm::cl::desc("The name of the module if processing"
                                          " a module. Necessary for processing "
@@ -366,6 +369,7 @@ int main(int argc, char **argv) {
 
   // Give the context the list of search paths to use for modules.
   Invocation.setImportSearchPaths(ImportPaths);
+  Invocation.setFrameworkSearchPaths(FrameworkPaths);
   // Set the SDK path and target if given.
   if (SDKPath.getNumOccurrences() == 0) {
     const char *SDKROOT = getenv("SDKROOT");
