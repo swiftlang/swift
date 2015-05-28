@@ -123,5 +123,20 @@ func intArray(x: [Int]) {
   x.worseHashEver
 }
 
+class GenericClass<T> { }
+
+extension GenericClass where T : Equatable {
+  func foo(x: T, y: T) -> Bool { return x == y }
+}
+
+func genericClassEquatable<T : Equatable>(gc: GenericClass<T>, x: T, y: T) {
+  gc.foo(x, y: y)
+}
+
+func genericClassNotEquatable<T>(gc: GenericClass<T>, x: T, y: T) {
+  gc.foo(x, y: y) // expected-error{{cannot invoke 'foo' with an argument list of type '(T, y: T)'}}
+}
+
+
 // FIXME: Future direction
 extension Array where T == String { } // expected-error{{same-type requirement makes generic parameter 'T' non-generic}}
