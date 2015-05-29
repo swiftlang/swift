@@ -23,7 +23,7 @@ import ObjectiveC
 /// bool. Elsewhere, it is "signed char". The Clang importer imports it as
 /// ObjCBool.
 public struct ObjCBool : BooleanType, BooleanLiteralConvertible {
-#if os(OSX) || (os(iOS) && (arch(i386) || arch(arm)))
+#if os(OSX) || (os(iOS) && (arch(i386) || arch(arm))) || (os(watchOS) && arch(i386))
   // On OS X and 32-bit iOS, Objective-C's BOOL type is a "signed char".
   var value: Int8
 
@@ -46,7 +46,7 @@ public struct ObjCBool : BooleanType, BooleanLiteralConvertible {
 
   /// The value of `self`, expressed as a `Bool`.
   public var boolValue: Bool {
-#if os(OSX) || (os(iOS) && (arch(i386) || arch(arm)))
+#if os(OSX) || (os(iOS) && (arch(i386) || arch(arm))) || (os(watchOS) && arch(i386))
     return value != 0
 #else
     return value
