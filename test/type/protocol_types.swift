@@ -39,3 +39,15 @@ struct CompoAliasTypeRequirement<T: Compo> {}
 struct CompoTypeWhereRequirement<T where T: protocol<HasSelfRequirements, Bar>> {}
 struct CompoAliasTypeWhereRequirement<T where T: Compo> {}
 
+
+// rdar://problem/20593294
+protocol HasAssoc {
+  typealias Assoc
+  func foo()
+}
+
+func testHasAssoc(x: Any) {
+  if let p = x as? HasAssoc { // expected-error 2{{protocol 'HasAssoc' can only be used as a generic constraint}}
+    p.foo() // don't crash here.
+  }
+}

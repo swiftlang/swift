@@ -1,13 +1,15 @@
-// RUN: not --crash %target-swift-frontend %s -parse
-// XFAIL: asan
+// RUN: not %target-swift-frontend %s -parse
+
 
 // Distributed under the terms of the MIT license
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-protocol b {
-init() {
+protocol c {
+convenience init()
+typealias B<T
 }
-typealias F>) -> S<c
+class func f<T.Type) {
+let h == {
 }
-b()
+let g = c()
