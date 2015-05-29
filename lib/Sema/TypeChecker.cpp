@@ -275,7 +275,10 @@ static void bindExtensionDecl(ExtensionDecl *ED, TypeChecker &TC) {
 
   // Validate the representation.
   // FIXME: Perform some kind of "shallow" validation here?
-  if (TC.validateType(ED->getExtendedTypeLoc(), dc, TR_AllowUnboundGenerics)) {
+  TypeResolutionOptions options;
+  options |= TR_AllowUnboundGenerics;
+  options |= TR_ExtensionBinding;
+  if (TC.validateType(ED->getExtendedTypeLoc(), dc, options)) {
     ED->setInvalid();
     return;
   }

@@ -814,6 +814,8 @@ static Type resolveIdentTypeComponent(
       NameLookupOptions lookupOptions = defaultMemberLookupOptions;
       if (isKnownNonCascading)
         lookupOptions |= NameLookupFlags::KnownPrivate;
+      if (options.contains(TR_ExtensionBinding))
+        lookupOptions -= NameLookupFlags::ProtocolMembers;
       auto memberTypes = TC.lookupMemberType(DC, parentTy,
                                              comp->getIdentifier(),
                                              lookupOptions);

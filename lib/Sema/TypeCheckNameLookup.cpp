@@ -103,6 +103,10 @@ namespace {
     /// \param foundInType The type through which we found the
     /// declaration.
     void add(ValueDecl *found, ValueDecl *base, Type foundInType) {
+      // If we only want types and we didn't get one, bail out.
+      if (Options.contains(NameLookupFlags::OnlyTypes) && !isa<TypeDecl>(found))
+        return;
+
       ConformanceCheckOptions conformanceOptions;
       if (Options.contains(NameLookupFlags::KnownPrivate))
         conformanceOptions |= ConformanceCheckFlags::InExpression;
@@ -251,7 +255,8 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
 
   /// Whether to consider protocol members or not.
   bool considerProtocolMembers
-    = nominalLookupType && !isa<ProtocolDecl>(nominalLookupType);
+    = nominalLookupType && !isa<ProtocolDecl>(nominalLookupType) &&
+      options.contains(NameLookupFlags::ProtocolMembers);
   if (considerProtocolMembers)
     subOptions |= NL_ProtocolMembers;
 

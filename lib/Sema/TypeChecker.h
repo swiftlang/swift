@@ -291,6 +291,10 @@ enum TypeResolutionFlags {
   
   /// Whether this is the payload subpattern of an enum pattern.
   TR_EnumPatternPayload = 0x20000,
+
+  /// Whether we are binding an extension declaration, which limits
+  /// the lookup.
+  TR_ExtensionBinding = 0x40000,
 };
 
 /// Option set describing how type resolution should work.

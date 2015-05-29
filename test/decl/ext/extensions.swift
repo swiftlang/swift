@@ -85,3 +85,17 @@ var c = C()
 var x = c.p1
 c.p1 = 1
 
+protocol P3 {
+  typealias Assoc
+  func foo() -> Assoc
+}
+
+struct X3 : P3 {
+}
+
+extension X3.Assoc { // expected-error{{'Assoc' is not a member type of 'X3'}}
+}
+
+extension X3 {
+  func foo() -> Int { return 0 }
+}
