@@ -1223,6 +1223,32 @@ for (step, evilBoundsCheck) in [ (1, true), (-1, false), (-1, true) ] {
   }
 }
 
+//===----------------------------------------------------------------------===//
+// Special cases and one-off tests
+//===----------------------------------------------------------------------===//
+
+% for array_type in all_array_types:
+
+ArrayTestSuite.test("${array_type}<Void>/map") {
+  // This code used to crash because it generated an array of Void with
+  // stride == 0.
+  if true {
+    let input: ${array_type}<Void> = [ (), (), () ]
+    let result = input.map { (_) -> () in return () }
+    expectEqual(3, result.count)
+  }
+
+  if true {
+    let input: ${array_type}<OpaqueValue<Int>> = [
+      OpaqueValue(10), OpaqueValue(20), OpaqueValue(30)
+    ]
+    let result = input.map { (_) -> () in return () }
+    expectEqual(3, result.count)
+  }
+}
+
+% end
+
 ArrayTestSuite.setUp {
   resetLeaksOfDictionaryKeysValues()
   TestBridgedValueTy.bridgeOperations = 0

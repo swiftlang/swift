@@ -544,7 +544,14 @@ let x: NSArray = arrayAsID(bases)!
 print(x.objectAtIndex(0) as Base)
 */
 
-
+func testMutableArray() {
+  var m = NSMutableArray(array: ["fu", "bar", "buzz"])
+  let a = m as NSArray as! [NSString]
+  print(a) // CHECK-NEXT: [fu, bar, buzz]
+  m.addObject("goop")
+  print(a) // CHECK-NEXT: [fu, bar, buzz]
+}
+testMutableArray()
 
 // CHECK-NEXT: done.
 print("done.")
