@@ -16,6 +16,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "ConstraintLocator.h"
+#include "ConstraintSystem.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Types.h"
@@ -253,3 +254,23 @@ void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
   out << ']';
 }
 
+SourceLoc ConstraintLocator::getNearestLoc() const {
+  // Simplify the locator.
+  auto path = getPath();
+  auto anchor = getAnchor();
+  Expr *targetAnchor = nullptr;
+  SmallVector<LocatorPathElt, 2> targetPath;
+  SourceRange range1, range2;
+  simplifyLocator(anchor, path, targetAnchor, targetPath, range1, range2);
+
+  if (anchor)
+    return anchor->getLoc();
+
+  if (path.empty())
+    return SourceLoc();
+
+  if (path[0].getKind() == Witness)
+    return path[0].getWitness()->getLoc();
+
+  return SourceLoc();
+}

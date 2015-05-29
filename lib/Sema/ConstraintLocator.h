@@ -482,6 +482,9 @@ public:
     discardFailures = shouldDiscard;
   }
 
+  /// Retrieve the source location nearest to this locator.
+  SourceLoc getNearestLoc() const;
+
   /// \brief Produce a debugging dump of this locator.
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump(SourceManager *SM) LLVM_ATTRIBUTE_USED,

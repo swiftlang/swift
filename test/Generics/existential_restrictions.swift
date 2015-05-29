@@ -20,3 +20,16 @@ func testPassExistential(p: P, op: OP, opp: protocol<P, OP>, any: Any) {
 
   f3(any)
 }
+
+// rdar://problem/21087341
+protocol Mine {}
+class M1: Mine {}
+class M2: Mine {}
+extension CollectionType where Generator.Element : Mine {
+    final func takeAll() {}
+}
+
+func foo() {
+  let allMine: [Mine] = [M1(), M2(), M1()]
+  allMine.takeAll() // expected-error{{protocol type 'Mine' cannot be used as a generic argument conforming to non-@objc protocol 'Mine'}}
+}

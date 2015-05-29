@@ -264,6 +264,9 @@ ERROR(use_local_before_declaration,sema_nb,none,
 ERROR(unsupported_existential_type,sema_nb,none,
       "protocol %0 can only be used as a generic constraint because it has "
       "Self or associated type requirements", (Identifier))
+ERROR(unsupported_existential_generic_req,sema_nb,none,
+      "protocol type %0 cannot be used as a generic argument conforming to "
+      "non-@objc protocol %1", (Type, Type))
 
 ERROR(no_decl_in_module,sema_nb,none,
       "no such decl in module", ())

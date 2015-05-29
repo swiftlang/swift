@@ -150,6 +150,17 @@ Type Solution::computeSubstitutions(
 
         assert(conformance || replacement->hasDependentProtocolConformances());
         currentConformances.push_back(conformance);
+
+        // An existential type cannot provide witness tables.
+        // FIXME: This is routing around damage. We should be opening
+        // the existential within the solver, so we have access to the
+        // witness tables.
+        if (replacement->isAnyExistentialType() &&
+            !protoType->isObjCExistentialType()) {
+          tc.diagnose(locator->getNearestLoc(),
+                      diag::unsupported_existential_generic_req,
+                      replacement, protoType);
+        }
         break;
       }
       break;
