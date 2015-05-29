@@ -2595,7 +2595,7 @@ static RecursiveTypeProperties
 getGenericFunctionRecursiveProperties(Type Input, Type Result) {
   checkFunctionRecursiveProperties(Input, Result);
 
-  static_assert(RecursiveTypeProperties::BitWidth == 7,
+  static_assert(RecursiveTypeProperties::BitWidth == 8,
                 "revisit this if you add new recursive type properties");
   RecursiveTypeProperties properties;
   if (Result->getRecursiveProperties().hasDynamicSelf())
@@ -2871,7 +2871,7 @@ CanSILFunctionType SILFunctionType::get(GenericSignature *genericSig,
   // FIXME: If we ever have first-class polymorphic values, we'll need to
   // revisit this.
   RecursiveTypeProperties properties;
-  static_assert(RecursiveTypeProperties::BitWidth == 7,
+  static_assert(RecursiveTypeProperties::BitWidth == 8,
                 "revisit this if you add new recursive type properties");
   if (genericSig) {
     // See getGenericFunctionRecursiveProperties.

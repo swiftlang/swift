@@ -76,7 +76,7 @@ namespace swift {
 /// on structural types.
 class RecursiveTypeProperties {
 public:
-  enum { BitWidth = 7 };
+  enum { BitWidth = 8 };
 
   /// A single property.
   ///
@@ -105,6 +105,9 @@ public:
 
     /// This type expression contains a DynamicSelf type.
     HasDynamicSelf = 0x40,
+
+    /// Whether this type expression contains an unbound generic type.
+    HasUnboundGeneric = 0x80,
   };
 
 private:
@@ -145,6 +148,10 @@ public:
   /// Does a type with these properties structurally contain a
   /// reference to DynamicSelf?
   bool hasDynamicSelf() const { return Bits & HasDynamicSelf; }
+
+  /// Does a type with these properties structurally contain an unbound
+  /// generic type?
+  bool hasUnboundGeneric() const { return Bits & HasUnboundGeneric; }
 
   /// Returns the set of properties present in either set.
   friend RecursiveTypeProperties operator+(Property lhs, Property rhs) {
@@ -430,6 +437,11 @@ public:
   /// Determine whether the type is dependent on DynamicSelf.
   bool hasDynamicSelfType() const {
     return getRecursiveProperties().hasDynamicSelf();
+  }
+
+  /// Determine whether the type contains an unbound generic type.
+  bool hasUnboundGenericType() const {
+    return getRecursiveProperties().hasUnboundGeneric();
   }
 
   /// isExistentialType - Determines whether this type is an existential type,
@@ -1295,7 +1307,7 @@ private:
                      RecursiveTypeProperties properties)
     : TypeBase(TypeKind::UnboundGeneric,
                (!Parent || Parent->isCanonical())? &C : nullptr,
-               properties),
+               properties + RecursiveTypeProperties::HasUnboundGeneric),
       TheDecl(TheDecl), Parent(Parent) { }
 
 public:

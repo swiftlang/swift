@@ -279,3 +279,8 @@ class Test<C: Bool_> : MetaFunction {
 typealias Inty = Test<True>.Result 
 var iy : Inty = 5 // okay, because we picked the first <*>
 var iy2 : Inty = "hello" // expected-error{{'String' is not convertible to 'Inty'}}
+
+// rdar://problem/20577950
+class DeducePropertyParams {
+  let badSet: Set = ["Hello"]
+}

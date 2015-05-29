@@ -682,8 +682,9 @@ static bool validateTypedPattern(TypeChecker &TC, DeclContext *DC,
                                  TypedPattern *TP,
                                  TypeResolutionOptions options,
                                  GenericTypeResolver *resolver) {
-  if (TP->hasType())
+  if (TP->hasType()) {
     return TP->getType()->is<ErrorType>();
+  }
 
   bool hadError = false;
   TypeLoc &TL = TP->getTypeLoc();

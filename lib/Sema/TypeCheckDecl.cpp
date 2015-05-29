@@ -1382,9 +1382,9 @@ static void validatePatternBindingDecl(TypeChecker &tc,
     return;
   }
 
-  // If the pattern didn't get a type, it's because we ran into some
-  // unknown types along the way. We'll need to check the initializer.
-  if (!pattern->hasType())
+  // If the pattern didn't get a type or if it contains an unbound generic type,
+  // we'll need to check the initializer.
+  if (!pattern->hasType() || pattern->getType()->hasUnboundGenericType())
     if (tc.typeCheckPatternBinding(binding, entryNumber))
       return;
 
