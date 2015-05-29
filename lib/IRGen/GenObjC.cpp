@@ -1386,7 +1386,11 @@ bool irgen::requiresObjCMethodDescriptor(FuncDecl *method) {
   // Property accessors should be generated alongside the property.
   if (method->isAccessor())
     return false;
-
+    
+    // We don't export generic methods or subclasses to IRGen yet.
+  if (method->getGenericParamsOfContext())
+    return false;
+  
   if (method->isObjC() || method->getAttrs().hasAttribute<IBActionAttr>())
     return true;
   if (auto override = method->getOverriddenDecl())
@@ -1395,11 +1399,21 @@ bool irgen::requiresObjCMethodDescriptor(FuncDecl *method) {
 }
 
 bool irgen::requiresObjCMethodDescriptor(ConstructorDecl *constructor) {
+  // We don't export generic methods or subclasses to IRGen yet.
+  // FIXME: Total hack. Sema should filter these out.
+  if (constructor->getGenericParamsOfContext())
+    return false;
+
   return constructor->isObjC();
 }
 
 bool irgen::requiresObjCPropertyDescriptor(IRGenModule &IGM,
                                            VarDecl *property) {
+  // We don't export generic methods or subclasses to IRGen yet.
+  if (property->getDeclContext()->getDeclaredTypeInContext()
+          ->is<BoundGenericType>())
+    return false;
+
   if (auto override = property->getOverriddenDecl())
     return requiresObjCPropertyDescriptor(IGM, override);
 
@@ -1423,6 +1437,11 @@ bool irgen::requiresObjCPropertyDescriptor(IRGenModule &IGM,
 
 bool irgen::requiresObjCSubscriptDescriptor(IRGenModule &IGM,
                                             SubscriptDecl *subscript) {
+  // We don't export generic methods or subclasses to IRGen yet.
+  if (subscript->getDeclContext()->getDeclaredTypeInContext()
+          ->is<BoundGenericType>())
+    return false;
+
   if (auto override = subscript->getOverriddenDecl())
     return requiresObjCSubscriptDescriptor(IGM, override);
 

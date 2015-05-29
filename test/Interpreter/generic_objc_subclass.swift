@@ -16,18 +16,9 @@ class A<T> : HasHiddenIvars {
   var x: Int = 16
   var t: T? = nil
   var y: Int = 61
-
-  override var description: String {
-    return "Grilled artichokes"
-  }
 }
 
 let a = A<Int>()
-
-// CHECK: Grilled artichokes
-// CHECK: Grilled artichokes
-print(a.description)
-print((a as NSObject).description)
 
 // CHECK: 0
 // CHECK: 16
