@@ -54,9 +54,6 @@ static void configureARM64(IRGenModule &IGM, const llvm::Triple &triple,
 
   // arm64 requires ISA-masking.
   target.ObjCUseISAMask = true;
-  
-  // BOOL is _Bool on arm64.
-  target.ObjCBoolTypeSize = 1;
 }
 
 /// Configures target-specific information for x86-64 platforms.

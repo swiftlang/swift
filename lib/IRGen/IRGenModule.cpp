@@ -119,11 +119,17 @@ IRGenModule::IRGenModule(IRGenModuleDispatcher &dispatcher, SourceFile *SF,
   Int16Ty = llvm::Type::getInt16Ty(getLLVMContext());
   Int32Ty = llvm::Type::getInt32Ty(getLLVMContext());
   Int64Ty = llvm::Type::getInt64Ty(getLLVMContext());
-  ObjCBoolTy = llvm::IntegerType::get(getLLVMContext(),
-                                      TargetInfo.ObjCBoolTypeSize);
   Int8PtrTy = llvm::Type::getInt8PtrTy(getLLVMContext());
   Int8PtrPtrTy = Int8PtrTy->getPointerTo(0);
   SizeTy = DataLayout.getIntPtrType(getLLVMContext(), /*addrspace*/ 0);
+
+  auto CI = static_cast<ClangImporter*>(&*Context.getClangModuleLoader());
+  assert(CI && "no clang module loader");
+  auto &clangASTContext = CI->getClangASTContext();
+
+  ObjCBoolTy = Int1Ty;
+  if (clangASTContext.getTargetInfo().useSignedCharForObjCBool())
+    ObjCBoolTy = Int8Ty;
 
   RefCountedStructTy =
     llvm::StructType::create(getLLVMContext(), "swift.refcounted");
@@ -286,10 +292,6 @@ IRGenModule::IRGenModule(IRGenModuleDispatcher &dispatcher, SourceFile *SF,
   // TODO: use "tinycc" on platforms that support it
   RuntimeCC = llvm::CallingConv::C;
 
-  auto CI = static_cast<ClangImporter*>(&*Context.getClangModuleLoader());
-  assert(CI && "no clang module loader");
-
-  auto &clangASTContext = CI->getClangASTContext();
   ABITypes = new CodeGenABITypes(clangASTContext, Module, DataLayout);
 
   if (Opts.DebugInfoKind != IRGenDebugInfoKind::None) {

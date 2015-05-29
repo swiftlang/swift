@@ -77,9 +77,6 @@ public:
 
   /// Inline assembly to mark a call to objc_retainAutoreleasedReturnValue.
   llvm::StringRef ObjCRetainAutoreleasedReturnValueMarker;
-
-  /// The integer size of ObjC's BOOL type, i8 or i1.
-  unsigned ObjCBoolTypeSize = 8;
   
   /// Some architectures have specialized objc_msgSend variants.
   bool ObjCUseStret = true;
