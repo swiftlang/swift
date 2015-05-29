@@ -1,5 +1,3 @@
 // RUN: for x in %platform-sdk-overlay-dir/*.swiftmodule; do [[ $(basename "$x") = Swift.swiftmodule ]] && continue; llvm-bcanalyzer $x | FileCheck %s; %target-sil-opt -verify $x -sdk $(xcrun -show-sdk-path -sdk macosx) > /dev/null; done
 
-// REQUIRES: objc_interop
-
 // CHECK-NOT: Unknown
