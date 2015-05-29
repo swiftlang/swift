@@ -2,7 +2,7 @@
 // RUN: mkdir -p %t
 //
 // RUN: %target-clang -fobjc-arc %S/Inputs/ObjCClasses/ObjCClasses.m -c -o %t/ObjCClasses.o
-// RUN: %target-build-swift -Xfrontend -enable-dynamic-value-type-layout -I %S/Inputs/ObjCClasses/ -Xlinker %t/ObjCClasses.o %s -o %t/a.out
+// RUN: %target-build-swift -I %S/Inputs/ObjCClasses/ -Xlinker %t/ObjCClasses.o %s -o %t/a.out
 // RUN: %target-run %t/a.out | FileCheck %s
 
 // XFAIL: linux
