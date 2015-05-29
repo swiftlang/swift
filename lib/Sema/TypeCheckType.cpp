@@ -2270,29 +2270,31 @@ static bool isParamPatternRepresentableInObjC(TypeChecker &TC,
   return true;
 }
 
-/// Check whether the given declaration occurs within a generic protocol
-/// extension context and, therefore, is not representable in Objective-C.
-static bool checkObjCInExtensionContext(TypeChecker &tc,
-                                        const ValueDecl *value,
-                                        bool diagnose) {
-  auto DC = value->getDeclContext();
+/// Check whether the given declaration occurs within a generic context
+/// and, therefore, is not representable in Objective-C.
+static bool checkObjCInGenericContext(TypeChecker &tc,
+                                      const ValueDecl *value,
+                                      bool diagnose) {
+  // Non-generic contexts are okay.
+  auto dc = value->getDeclContext();
+  if (!dc->isGenericContext())
+    return false;
 
-  if (auto ED = dyn_cast<ExtensionDecl>(DC)) {
-    if (ED->getGenericParams()) {
-      // Diagnose this problem, if asked to.
-      if (diagnose) {
-        int kind = isa<SubscriptDecl>(value)? 3
-                 : isa<VarDecl>(value)? 2
-                 : isa<ConstructorDecl>(value)? 1
-                 : 0;
-        tc.diagnose(value->getLoc(), diag::objc_in_extension_context, kind);
-      }
+  // Protocol contexts are okay.
+  if (isa<ProtocolDecl>(dc))
+    return false;
 
-      return true;
-    }
+  // Diagnose this problem, if asked to.
+  if (diagnose) {
+    int kind = isa<SubscriptDecl>(value)? 3
+             : isa<VarDecl>(value)? 2
+             : isa<ConstructorDecl>(value)? 1
+             : 0;
+    tc.diagnose(value->getLoc(), diag::objc_in_generic_context, kind,
+                dc->isProtocolExtensionContext());
   }
 
-  return false;
+  return true;
 }
 
 /// Check whether the given declaration contains its own generic parameters,
@@ -2489,7 +2491,7 @@ bool TypeChecker::isRepresentableInObjC(
   if (checkObjCWithGenericParams(*this, AFD, Reason))
     return false;
 
-  if (checkObjCInExtensionContext(*this, AFD, Diagnose))
+  if (checkObjCInGenericContext(*this, AFD, Diagnose))
     return false;
 
   // Throwing functions must map to a particular error convention.
@@ -2681,7 +2683,7 @@ bool TypeChecker::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
   bool Result = isRepresentableInObjC(VD->getDeclContext(), T);
   bool Diagnose = (Reason != ObjCReason::DoNotDiagnose);
 
-  if (Result && checkObjCInExtensionContext(*this, VD, Diagnose))
+  if (Result && checkObjCInGenericContext(*this, VD, Diagnose))
     return false;
 
   if (checkObjCInForeignClassContext(*this, VD, Reason))
@@ -2722,7 +2724,7 @@ bool TypeChecker::isRepresentableInObjC(const SubscriptDecl *SD,
                                              SD->getElementType());
   bool Result = IndicesResult && ElementResult;
 
-  if (Result && checkObjCInExtensionContext(*this, SD, Diagnose))
+  if (Result && checkObjCInGenericContext(*this, SD, Diagnose))
     return false;
 
   // Make sure we know how to map the selector appropriately.

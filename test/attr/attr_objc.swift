@@ -159,17 +159,17 @@ class subject_class2 : Protocol_Class1, PlainProtocol { // no-error
 @objc
 class subject_genericClass<T> { // no-error
   @objc
-  var subject_instanceVar: Int // no-error
+  var subject_instanceVar: Int // expected-error{{variable in a generic class cannot be represented in Objective-C}}
 
   @objc
-  init() {} // no-error
+  init() {} // expected-error{{initializer in a generic class cannot be represented in Objective-C}}
 
   @objc
-  func subject_instanceFunc() {} // no_error
+  func subject_instanceFunc() {} // expected-error{{method in a generic class cannot be represented in Objective-C}}
 }
 
 extension subject_genericClass where T : Hashable {
-  @objc var prop: Int { return 0 } // expected-error{{variable in a protocol extension cannot be represented in Objective-C}}
+  @objc var prop: Int { return 0 } // expected-error{{variable in a generic class cannot be represented in Objective-C}}
 }
 
 @objc
@@ -291,17 +291,17 @@ func genericContext1<T>(_: T) {
 
   class subject_constructor_inGenericContext { // expected-error{{type 'subject_constructor_inGenericContext' nested in generic function 'genericContext1' is not allowed}}
     @objc
-    init() {} // no-error
+    init() {} // expected-error{{initializer in a generic class cannot be represented in Objective-C}}
   }
 
   class subject_var_inGenericContext { // expected-error{{type 'subject_var_inGenericContext' nested in generic function 'genericContext1' is not allowed}}
     @objc
-    var subject_instanceVar: Int = 0 // no-error
+    var subject_instanceVar: Int = 0 // expected-error{{variable in a generic class cannot be represented in Objective-C}}
   }
 
   class subject_func_inGenericContext { // expected-error{{type 'subject_func_inGenericContext' nested in generic function 'genericContext1' is not allowed}}
     @objc
-    func f() {} // no-error
+    func f() {} // expected-error{{method in a generic class cannot be represented in Objective-C}}
   }
 }
 
@@ -310,7 +310,7 @@ class GenericContext2<T> {
   class subject_inGenericContext {} // expected-error{{nested in generic type}}
 
   @objc
-  func f() {} // no-error
+  func f() {} // expected-error{{method in a generic class cannot be represented in Objective-C}}
 }
 
 class GenericContext3<T> {
@@ -319,7 +319,7 @@ class GenericContext3<T> {
     class subject_inGenericContext {} // expected-error{{nested in generic type}}
 
     @objc
-    func f() {} // no-error
+    func f() {} // expected-error{{method in a generic class cannot be represented in Objective-C}}
   }
 }
 
@@ -386,22 +386,14 @@ class subject_subscriptKeyed7 {
   }
 }
 
+
+
 class subject_subscriptBridgedFloat {
   @objc
   subscript(a: Float32) -> Int {
     get { return 0 }
   }
 }
-
-class subject_subscriptGeneric<T> {
-  @objc
-  subscript(a: Int) -> Int { // no-error
-    get { return 0 }
-  }
-}
-
-
-
 class subject_subscriptInvalid2 {
   @objc
   subscript(a: PlainClass) -> Int {
@@ -448,6 +440,12 @@ class subject_subscriptInvalid8 {
   @objc
   subscript(a: protocol<Protocol_Class1, Protocol_Class2>) -> Int { // expected-error {{subscript cannot be marked @objc because its type cannot be represented in Objective-C}}
     // expected-note@-1{{protocol 'Protocol_Class1' is not '@objc'}}
+    get { return 0 }
+  }
+}
+class subject_subscriptInvalid9<T> {
+  @objc
+  subscript(a: Int) -> Int { // expected-error{{subscript in a generic class cannot be represented in Objective-C}}
     get { return 0 }
   }
 }
@@ -1360,6 +1358,7 @@ class infer_instanceVar2<
   @objc func func_GP_Unconstrained_(a: GP_Unconstrained) {}
   // expected-error@-1 {{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}}
   // expected-note@-2 {{generic type parameters cannot be represented in Objective-C}}
+  // expected-error@-3 {{method in a generic class cannot be represented in Objective-C}}
 }
 
 class infer_instanceVar3 : Class_ObjC1 {

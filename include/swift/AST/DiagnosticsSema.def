@@ -1991,10 +1991,10 @@ ERROR(invalid_objc_decl,sema_tcd,none,
 ERROR(invalid_nonobjc_decl,sema_tcd,none,
       "only methods, initializers, properties and subscript declarations can "
       "be declared @nonobjc", ())
-ERROR(objc_in_extension_context,sema_objc,none,
+ERROR(objc_in_generic_context,sema_objc,none,
       "%select{method|initializer|variable|subscript}0 in a "
-      "protocol extension cannot be represented in "
-      "Objective-C", (int))
+      "%select{generic class|protocol extension}1 cannot be represented in "
+      "Objective-C", (int, bool))
 ERROR(objc_getter_for_nonobjc_property,sema_tcd,none,
       "'@objc' getter for non-'@objc' property", ())
 ERROR(objc_getter_for_nonobjc_subscript,sema_tcd,none,
