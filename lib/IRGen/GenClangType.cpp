@@ -27,7 +27,6 @@
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/AST/Type.h"
-#include "clang/Basic/TargetInfo.h"
 #include "IRGenModule.h"
 
 using namespace swift;
@@ -572,8 +571,7 @@ clang::CanQualType GenClangType::visitType(CanType type) {
 clang::CanQualType ClangTypeConverter::convert(IRGenModule &IGM, CanType type) {
   // Try to do this without making cache entries for obvious cases.
   if (auto nominal = dyn_cast<NominalType>(type)) {
-    auto decl = nominal->getDecl();
-    if (auto clangDecl = decl->getClangDecl()) {
+    if (auto clangDecl = nominal->getDecl()->getClangDecl()) {
       if (auto clangTypeDecl = dyn_cast<clang::TypeDecl>(clangDecl)) {
         auto &ctx = IGM.getClangASTContext();
         return ctx.getCanonicalType(ctx.getTypeDeclType(clangTypeDecl));
@@ -582,13 +580,6 @@ clang::CanQualType ClangTypeConverter::convert(IRGenModule &IGM, CanType type) {
         auto clangType  = ctx.getObjCInterfaceType(ifaceDecl);
         auto ptrTy = ctx.getObjCObjectPointerType(clangType);
         return ctx.getCanonicalType(ptrTy);
-      }
-    } else if (decl == IGM.Context.getBoolDecl()) {
-      // FIXME: rdar://problem/21131808
-      auto &ctx = IGM.getClangASTContext();
-      auto &TI = ctx.getTargetInfo();
-      if (TI.useSignedCharForObjCBool()) {
-        return ctx.SignedCharTy;
       }
     }
   }
