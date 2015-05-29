@@ -1503,6 +1503,9 @@ Type swift::configureImplicitSelf(TypeChecker &tc,
   Type selfTy = func->computeSelfType(&outerGenericParams);
   assert(selfDecl && selfTy && "Not a method");
 
+  if (selfDecl->hasType())
+    return selfDecl->getType();
+
   // 'self' is 'let' for reference types (i.e., classes) or when 'self' is
   // neither inout.
   selfDecl->setLet(!selfTy->is<InOutType>());
@@ -4025,8 +4028,7 @@ public:
 
     // Before anything else, set up the 'self' argument correctly if present.
     GenericParamList *outerGenericParams = nullptr;
-    if (FD->getDeclContext()->isTypeContext() &&
-        !FD->getImplicitSelfDecl()->hasType())
+    if (FD->getDeclContext()->isTypeContext())
       configureImplicitSelf(TC, FD, outerGenericParams);
 
     // If we have generic parameters, check the generic signature now.
