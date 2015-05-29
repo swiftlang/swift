@@ -2999,13 +2999,6 @@ SourceRange VarDecl::getTypeSourceRangeForDiagnostics() const {
 /// Return true if this stored property needs to be accessed with getters and
 /// setters for Objective-C.
 bool AbstractStorageDecl::hasObjCGetterAndSetter() const {
-  // We don't export generic methods or subclasses to IRGen yet.
-  auto *DC = getDeclContext();
-  if (DC->getDeclaredTypeInContext() &&
-      DC->getDeclaredTypeInContext()->is<BoundGenericType>() &&
-      !isa<ProtocolDecl>(DC))
-    return false;
-
   if (auto override = getOverriddenDecl())
     return override->hasObjCGetterAndSetter();
 
