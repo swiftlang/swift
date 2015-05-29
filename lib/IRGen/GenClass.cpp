@@ -367,9 +367,23 @@ namespace {
 
     void addDirectFieldsFromClass(ClassDecl *theClass,
                                   SILType classType) {
+      bool complainedAboutUnimplementedLayout = false;
       for (VarDecl *var : theClass->getStoredProperties()) {
         SILType type = classType.getFieldType(var, *IGM.SILMod);
         auto &eltType = IGM.getTypeInfo(type);
+
+        // FIXME: Type-parameter-dependent field layout isn't fully
+        // implemented yet for ObjC-derived classes.
+        if (theClass->isObjC()
+            && !eltType.isFixedSize()
+            && !IGM.Opts.EnableDynamicValueTypeLayout) {
+          if (!complainedAboutUnimplementedLayout) {
+            IGM.unimplemented(var->getLoc(),
+                              "non-fixed class layout in ObjC-derived classes");
+            complainedAboutUnimplementedLayout = true;
+          }
+        }
+        
         Elements.push_back(ElementLayout::getIncomplete(eltType));
         AllStoredProperties.push_back(var);
       }
