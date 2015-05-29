@@ -3602,9 +3602,13 @@ llvm::Value *irgen::emitArgumentWitnessTableRef(IRGenFunction &IGF,
   llvm_unreachable("bad decl kind!");
 }
 
-irgen::Size irgen::getClassFieldOffset(IRGenModule &IGM,
-                                       ClassDecl *theClass,
-                                       VarDecl *field) {
+/// Given a reference to class metadata of the given type,
+/// derive a reference to the field offset for a stored property.
+/// The type must have dependent generic layout.
+llvm::Value *irgen::emitClassFieldOffset(IRGenFunction &IGF,
+                                         ClassDecl *theClass,
+                                         VarDecl *field,
+                                         llvm::Value *metadata) {
   /// A class for finding a field offset in a class metadata object.
   BEGIN_METADATA_SEARCHER_1(FindClassFieldOffset, Class,
                             VarDecl *, TargetField)
@@ -3615,18 +3619,7 @@ irgen::Size irgen::getClassFieldOffset(IRGenModule &IGM,
     }
   END_METADATA_SEARCHER()
 
-  return FindClassFieldOffset(IGM, theClass, field).getTargetOffset();
-}
-
-/// Given a reference to class metadata of the given type,
-/// derive a reference to the field offset for a stored property.
-/// The type must have dependent generic layout.
-llvm::Value *irgen::emitClassFieldOffset(IRGenFunction &IGF,
-                                         ClassDecl *theClass,
-                                         VarDecl *field,
-                                         llvm::Value *metadata) {
-  irgen::Size offset = getClassFieldOffset(IGF.IGM, theClass, field);
-  int index = getOffsetInWords(IGF.IGM, offset);
+  int index = FindClassFieldOffset(IGF.IGM, theClass, field).getTargetIndex();
   llvm::Value *val = emitLoadOfWitnessTableRefAtIndex(IGF, metadata, index);
   return IGF.Builder.CreatePtrToInt(val, IGF.IGM.SizeTy);
 }

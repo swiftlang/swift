@@ -134,11 +134,6 @@ namespace irgen {
                                            ProtocolDecl *targetProtocol,
                                            llvm::Value *metadata);
 
-  /// Get the offset of a field in the class type metadata.
-  Size getClassFieldOffset(IRGenModule &IGM,
-                           ClassDecl *theClass,
-                           VarDecl *field);
-
   /// Given a reference to class type metadata of the given type,
   /// decide the offset to the given field.  This assumes that the
   /// offset is stored in the metadata, i.e. its offset is potentially

@@ -1045,6 +1045,7 @@ namespace {
       // two values.  If the instanceSize of the superclass equals the
       // stored instanceStart of the subclass, the ivar offsets
       // will not be changed.
+      // FIXME: This is totally bogus for generic classes with dynamic layout.
       Size instanceStart;
       Size instanceSize;
       if (forMeta) {
@@ -1062,6 +1063,7 @@ namespace {
           // FIXME: assumes layout is always sequential!
           instanceStart = FieldLayout->getElement(FirstFieldIndex).getByteOffset();
         } else {
+          // FIXME: arrange to initialize this at runtime
           instanceStart = Size(0);
         }
       }
@@ -1417,18 +1419,8 @@ namespace {
         
         offsetPtr = offsetVar;
       } else {
-        // Emit an indirect field offset variable with the field index.
-        auto offsetAddr = IGM.getAddrOfFieldOffset(ivar, /*indirect*/ true,
-                                                   ForDefinition);
-        auto offsetVar = cast<llvm::GlobalVariable>(offsetAddr.getAddress());
-        offsetVar->setConstant(false);
-        auto offset =
-          getClassFieldOffset(IGM, getClass(), ivar).getValue();
-        auto offsetVal =
-          llvm::ConstantInt::get(IGM.IntPtrTy, offset);
-        offsetVar->setInitializer(offsetVal);
-
         // We need to set this up when the metadata is instantiated.
+        // FIXME: set something up to fill at runtime
         offsetPtr
           = llvm::ConstantPointerNull::get(IGM.IntPtrTy->getPointerTo());
       }
