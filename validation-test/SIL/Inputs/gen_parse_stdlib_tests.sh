@@ -6,7 +6,7 @@ process_id_max=$(($process_count - 1))
 for id in $(seq 0 $process_id_max); do
 
   cat > parse_stdlib_$id.sil <<__EOF__
-//// Automatically Generated From validation-test/parser/Inputs/gen_parse_stdlib_tests.sh
+//// Automatically Generated From validation-test/SIL/Inputs/gen_parse_stdlib_tests.sh
 ////// Do Not Edit Directly!
 
 // Make sure that we can parse the stdlib.sil deserialized from Swift.swiftmodule.
