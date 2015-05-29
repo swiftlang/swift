@@ -249,8 +249,16 @@ class Hoozit : Gizmo {
   }
 }
 
-// Don't export generics to ObjC yet
 class Wotsit<T> : Gizmo {
+  // CHECK-LABEL: sil hidden @_TToFC11objc_thunks6Wotsit5plainurfGS0_q__FT_T_ : $@convention(objc_method) <T> (Wotsit<T>) -> () {
+  // CHECK-NEXT: bb0([[SELF:%.*]] : $Wotsit<T>):
+  // CHECK-NEXT: strong_retain [[SELF]] : $Wotsit<T>
+  // CHECK-NEXT: // function_ref
+  // CHECK-NEXT: [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Wotsit5plainurfGS0_q__FT_T_ : $@convention(method) <τ_0_0> (@guaranteed Wotsit<τ_0_0>) -> ()
+  // CHECK-NEXT: [[RESULT:%.*]] = apply [[NATIVE]]<T>([[SELF]]) : $@convention(method) <τ_0_0> (@guaranteed Wotsit<τ_0_0>) -> ()
+  // CHECK-NEXT: strong_release [[SELF]] : $Wotsit<T>
+  // CHECK-NEXT: return [[RESULT]] : $()
+  // CHECK-NEXT: }
   func plain() { }
 
   func generic<U>(x: U) {}
@@ -261,11 +269,27 @@ class Wotsit<T> : Gizmo {
     self.property = t
     super.init()
   }
+
+  // CHECK-LABEL: sil hidden @_TToFC11objc_thunks6Wotsitg11descriptionSS : $@convention(objc_method) <T> (Wotsit<T>) -> @autoreleased NSString {
+  // CHECK-NEXT: bb0([[SELF:%.*]] : $Wotsit<T>):
+  // CHECK-NEXT:   strong_retain [[SELF]] : $Wotsit<T>
+  // CHECK-NEXT:   // function_ref
+  // CHECK-NEXT:   [[NATIVE:%.*]] = function_ref @_TFC11objc_thunks6Wotsitg11descriptionSS : $@convention(method) <τ_0_0> (@guaranteed Wotsit<τ_0_0>) -> @owned String
+  // CHECK-NEXT:   [[RESULT:%.*]] = apply [[NATIVE:%.*]]<T>([[SELF]]) : $@convention(method) <τ_0_0> (@guaranteed Wotsit<τ_0_0>) -> @owned String
+  // CHECK-NEXT:   strong_release [[SELF]] : $Wotsit<T>
+  // CHECK-NEXT:   // function_ref
+  // CHECK-NEXT:   [[BRIDGE:%.*]] = function_ref @swift_StringToNSString : $@convention(thin) (@owned String) -> @owned NSString
+  // CHECK-NEXT:   [[NSRESULT:%.*]] = apply [[BRIDGE]]([[RESULT]]) : $@convention(thin) (@owned String) -> @owned NSString
+  // CHECK-NEXT:   autorelease_return [[NSRESULT]] : $NSString
+  // CHECK-NEXT: }
+  override var description : String {
+    return "Hello, world."
+  }
+
+  // Ivar destroyer
+  // CHECK: sil hidden @_TToF{{.*}}WotsitE
 }
-// We should emit no @objc symbols except for the deallocator and ivar
-// destroyer.
-// CHECK-NOT: sil hidden @_TToF{{.*}}Wotsit{{.*}}
-// CHECK: sil hidden @_TToF{{.*}}WotsitE
+
 // CHECK-NOT: sil hidden @_TToF{{.*}}Wotsit{{.*}}
 
 // Extension initializers, properties and methods need thunks too.
