@@ -5,6 +5,9 @@ sil_stage canonical
 import Builtin
 import Swift
 
+class A {}
+sil_vtable A {}
+
 sil @create_error : $@convention(thin) () -> @owned ErrorType {
 entry:
   unreachable
@@ -83,3 +86,18 @@ bb0(%0 : $ErrorType):
   throw %0 : $ErrorType                        // id: %3
 }
 
+// rdar://21084084 - Partial application of throwing functions.
+
+// CHECK-LABEL: define { i8*, %swift.refcounted* } @partial_apply_single(%C6errors1A*)
+// CHECK:       insertvalue { i8*, %swift.refcounted* } { i8* bitcast (void (%swift.refcounted*, %swift.error**)* @_TPA_partial_apply_single_helper to i8*), %swift.refcounted* undef },
+// CHECK-LABEL: define internal void @_TPA_partial_apply_single_helper(%swift.refcounted*, %swift.error**)
+// CHECK:       [[T0:%.*]] = bitcast %swift.refcounted* {{%.*}} to %C6errors1A*
+// CHECK-NEXT:  tail call void @partial_apply_single_helper(%C6errors1A* [[T0]], %swift.refcounted* undef, %swift.error** {{%.*}})
+// CHECK-NEXT:  ret void
+sil @partial_apply_single : $@convention(thin) (@owned A) -> @callee_owned () -> @error ErrorType {
+entry(%0 : $A):
+  %1 = function_ref @partial_apply_single_helper : $@convention(thin) (@owned A) -> @error ErrorType
+  %2 = partial_apply %1(%0) : $@convention(thin) (@owned A) -> @error ErrorType
+  return %2 : $@callee_owned () -> @error ErrorType
+}
+sil @partial_apply_single_helper : $@convention(thin) (@owned A) -> (@error ErrorType)

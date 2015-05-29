@@ -221,21 +221,23 @@ entry(%a : $*T):
   return %p : $@callee_owned (@out T, @in T) -> ()
 }
 
+/*****************************************************************************/
+/* Swift-refcounted class captures.  Optimizable by using the reference      */
+/* as the partial apply context.                                             */
+/*****************************************************************************/
+
 sil public_external @guaranteed_captured_class_param : $@convention(thin) (Int, @guaranteed SwiftClass) -> Int
 
 // CHECK-LABEL: define { i8*, %swift.refcounted* } @partial_apply_guaranteed_class_param(%C13partial_apply10SwiftClass*)
-// CHECK:         [[CONTEXT_OBJ:%.*]] = call noalias %swift.refcounted* @swift_allocObject
-// CHECK:         [[X_ADDR:%.*]] = getelementptr
-// CHECK:         store %C13partial_apply10SwiftClass* %0, %C13partial_apply10SwiftClass** [[X_ADDR]]
+// CHECK:         [[CONTEXT_OBJ:%.*]] = bitcast %C13partial_apply10SwiftClass* {{%.*}} to %swift.refcounted*
 // CHECK:         [[T0:%.*]] = insertvalue {{.*}} [[PARTIAL_APPLY_FORWARDER:@_TPA_[A-Za-z0-9_]+]] {{.*}} [[CONTEXT_OBJ]]
 // CHECK:         ret {{.*}} [[T0]]
 
 // CHECK:       define internal i64 [[PARTIAL_APPLY_FORWARDER]]
-// CHECK:         [[X_ADDR:%.*]] = getelementptr
-// CHECK:         [[X:%.*]] = load %C13partial_apply10SwiftClass*, %C13partial_apply10SwiftClass** [[X_ADDR]]
+// CHECK:         [[X:%.*]] = bitcast %swift.refcounted* %1 to %C13partial_apply10SwiftClass*
 // CHECK-NOT:     retain
 // CHECK:         [[RESULT:%.*]] = call i64 @guaranteed_captured_class_param(i64 %0, %C13partial_apply10SwiftClass* [[X]])
-// CHECK:         release{{.*}}%1)
+// CHECK:         release{{.*}} %1)
 // CHECK:         ret i64 [[RESULT]]
 
 sil @partial_apply_guaranteed_class_param : $@convention(thin) (@owned SwiftClass) -> @callee_owned (Int) -> Int {
@@ -248,20 +250,23 @@ bb0(%x : $SwiftClass):
 sil public_external @indirect_guaranteed_captured_class_param : $@convention(thin) (Int, @in_guaranteed SwiftClass) -> Int
 
 // CHECK-LABEL: define { i8*, %swift.refcounted* } @partial_apply_indirect_guaranteed_class_param(%C13partial_apply10SwiftClass**)
-// CHECK:         [[CONTEXT_OBJ:%.*]] = call noalias %swift.refcounted* @swift_allocObject
 // CHECK-NOT:     {{retain|release}}
-// CHECK:         [[X_ADDR:%.*]] = getelementptr
-// CHECK-NEXT:    [[X:%.*]] = load %C13partial_apply10SwiftClass*, %C13partial_apply10SwiftClass** %0
-// CHECK-NEXT:    store %C13partial_apply10SwiftClass* [[X]], %C13partial_apply10SwiftClass** [[X_ADDR]]
+// CHECK:         [[X:%.*]] = load %C13partial_apply10SwiftClass*, %C13partial_apply10SwiftClass** %0
+// CHECK-NEXT:    [[CONTEXT_OBJ:%.*]] = bitcast %C13partial_apply10SwiftClass* [[X]] to %swift.refcounted*
+// CHECK-NOT:     {{retain|release}}
 // CHECK:         [[T0:%.*]] = insertvalue {{.*}} [[PARTIAL_APPLY_FORWARDER:@_TPA_[A-Za-z0-9_]+]] {{.*}} [[CONTEXT_OBJ]]
 // CHECK:         ret {{.*}} [[T0]]
 
 // CHECK:       define internal i64 [[PARTIAL_APPLY_FORWARDER]]
-// CHECK:         [[X_ADDR:%.*]] = getelementptr
+// CHECK:         [[X_TMP:%.*]] = alloca %C13partial_apply10SwiftClass*
+// CHECK-NEXT:    [[X:%.*]] = bitcast %swift.refcounted* %1 to %C13partial_apply10SwiftClass*
+// CHECK-NEXT:    store %C13partial_apply10SwiftClass* [[X]], %C13partial_apply10SwiftClass** [[X_TMP]], align
 // CHECK-NOT:     load
 // CHECK-NOT:     retain
-// CHECK:         [[RESULT:%.*]] = call i64 @indirect_guaranteed_captured_class_param(i64 %0, %C13partial_apply10SwiftClass** [[X_ADDR]])
-// CHECK:         release{{.*}}%1)
+// CHECK-NOT:     release
+// CHECK:         [[RESULT:%.*]] = call i64 @indirect_guaranteed_captured_class_param(i64 %0, %C13partial_apply10SwiftClass** [[X_TMP]])
+// CHECK-NOT:     retain
+// CHECK:         call void @swift_release(%swift.refcounted* %1)
 // CHECK:         ret i64 [[RESULT]]
 
 sil @partial_apply_indirect_guaranteed_class_param : $@convention(thin) (@in SwiftClass) -> @callee_owned (Int) -> Int {
@@ -274,29 +279,114 @@ bb0(%x : $*SwiftClass):
 sil public_external @indirect_consumed_captured_class_param : $@convention(thin) (Int, @in SwiftClass) -> Int
 
 // CHECK-LABEL: define { i8*, %swift.refcounted* } @partial_apply_indirect_consumed_class_param(%C13partial_apply10SwiftClass**)
-// CHECK:         [[CONTEXT_OBJ:%.*]] = call noalias %swift.refcounted* @swift_allocObject
 // CHECK-NOT:     {{retain|release}}
-// CHECK:         [[X_ADDR:%.*]] = getelementptr
-// CHECK-NEXT:    [[X:%.*]] = load %C13partial_apply10SwiftClass*, %C13partial_apply10SwiftClass** %0
-// CHECK-NEXT:    store %C13partial_apply10SwiftClass* [[X]], %C13partial_apply10SwiftClass** [[X_ADDR]]
+// CHECK:         [[X:%.*]] = load %C13partial_apply10SwiftClass*, %C13partial_apply10SwiftClass** %0
+// CHECK-NEXT:    [[CONTEXT_OBJ:%.*]] = bitcast %C13partial_apply10SwiftClass* [[X]] to %swift.refcounted*
+// CHECK-NOT:     {{retain|release}}
 // CHECK:         [[T0:%.*]] = insertvalue {{.*}} [[PARTIAL_APPLY_FORWARDER:@_TPA_[A-Za-z0-9_]+]] {{.*}} [[CONTEXT_OBJ]]
 // CHECK:         ret {{.*}} [[T0]]
 
 // CHECK:       define internal i64 [[PARTIAL_APPLY_FORWARDER]]
-// CHECK:         [[X_TMP:%.*]] = alloca
-// CHECK:         [[X_ADDR:%.*]] = getelementptr
-// CHECK:         [[X:%.*]] = load %C13partial_apply10SwiftClass*, %C13partial_apply10SwiftClass** [[X_ADDR]]
-// CHECK:         [[X_BITCAST:%.*]] = bitcast %C13partial_apply10SwiftClass* [[X]]
-// CHECK:         retain{{.*}}[[X_BITCAST]]
-// CHECK:         store %C13partial_apply10SwiftClass* [[X]], %C13partial_apply10SwiftClass** [[X_TMP]]
-// CHECK:         release{{.*}}%1)
-// CHECK:         [[RESULT:%.*]] = call i64 @indirect_consumed_captured_class_param(i64 %0, %C13partial_apply10SwiftClass** [[X_TMP]])
+// CHECK:         [[X_TMP:%.*]] = alloca %C13partial_apply10SwiftClass*
+// CHECK-NEXT:    [[X:%.*]] = bitcast %swift.refcounted* %1 to %C13partial_apply10SwiftClass*
+// CHECK-NEXT:    store %C13partial_apply10SwiftClass* [[X]], %C13partial_apply10SwiftClass** [[X_TMP]], align
+// CHECK-NOT:     load
+// CHECK-NOT:     retain
+// CHECK-NOT:     release
+// CHECK:         [[RESULT:%.*]] = tail call i64 @indirect_consumed_captured_class_param(i64 %0, %C13partial_apply10SwiftClass** [[X_TMP]])
+// CHECK-NOT:     retain
+// CHECK-NOT:     release
 // CHECK:         ret i64 [[RESULT]]
 
 sil @partial_apply_indirect_consumed_class_param : $@convention(thin) (@in SwiftClass) -> @callee_owned (Int) -> Int {
 bb0(%x : $*SwiftClass):
   %f = function_ref @indirect_consumed_captured_class_param : $@convention(thin) (Int, @in SwiftClass) -> Int
   %p = partial_apply %f(%x) : $@convention(thin) (Int, @in SwiftClass) -> Int
+  return %p : $@callee_owned (Int) -> Int
+}
+
+/*****************************************************************************/
+/* A non-trivial capture.  Indirect applications can directly reference the  */
+/* field from the partial apply context.                                     */
+/*****************************************************************************/
+
+struct SwiftClassPair { var x: SwiftClass, y: SwiftClass }
+
+sil public_external @guaranteed_captured_class_pair_param : $@convention(thin) (Int, @guaranteed SwiftClassPair) -> Int
+
+// CHECK-LABEL: define { i8*, %swift.refcounted* } @partial_apply_guaranteed_class_pair_param(%C13partial_apply10SwiftClass*, %C13partial_apply10SwiftClass*)
+// CHECK:         [[CONTEXT_OBJ:%.*]] = call noalias %swift.refcounted* @swift_allocObject
+// CHECK:         [[PAIR_ADDR:%.*]] = getelementptr
+// CHECK-NEXT:    [[X_ADDR:%.*]] = getelementptr inbounds %V13partial_apply14SwiftClassPair, %V13partial_apply14SwiftClassPair* [[PAIR_ADDR]], i32 0, i32 0
+// CHECK-NEXT:    store %C13partial_apply10SwiftClass* %0, %C13partial_apply10SwiftClass** [[X_ADDR]], align
+// CHECK-NEXT:    [[Y_ADDR:%.*]] = getelementptr inbounds %V13partial_apply14SwiftClassPair, %V13partial_apply14SwiftClassPair* [[PAIR_ADDR]], i32 0, i32 1
+// CHECK-NEXT:    store %C13partial_apply10SwiftClass* %1, %C13partial_apply10SwiftClass** [[Y_ADDR]], align
+// CHECK-NOT:     {{retain|release}}
+// CHECK:         [[T0:%.*]] = insertvalue {{.*}} [[PARTIAL_APPLY_FORWARDER:@_TPA_[A-Za-z0-9_]+]] {{.*}} [[CONTEXT_OBJ]]
+// CHECK:         ret {{.*}} [[T0]]
+
+// CHECK:       define internal i64 [[PARTIAL_APPLY_FORWARDER]]
+// CHECK:         [[PAIR_ADDR:%.*]] = getelementptr
+// CHECK-NEXT:    [[X_ADDR:%.*]] = getelementptr inbounds %V13partial_apply14SwiftClassPair, %V13partial_apply14SwiftClassPair* [[PAIR_ADDR]], i32 0, i32 0
+// CHECK-NEXT:    [[X:%.*]] = load %C13partial_apply10SwiftClass*, %C13partial_apply10SwiftClass** [[X_ADDR]], align
+// CHECK-NEXT:    [[Y_ADDR:%.*]] = getelementptr inbounds %V13partial_apply14SwiftClassPair, %V13partial_apply14SwiftClassPair* [[PAIR_ADDR]], i32 0, i32 1
+// CHECK-NEXT:    [[Y:%.*]] = load %C13partial_apply10SwiftClass*, %C13partial_apply10SwiftClass** [[Y_ADDR]], align
+// CHECK-NOT:     retain
+// CHECK:         [[RESULT:%.*]] = call i64 @guaranteed_captured_class_pair_param(i64 %0, %C13partial_apply10SwiftClass* [[X]], %C13partial_apply10SwiftClass* [[Y]])
+// CHECK:         release{{.*}}%1)
+// CHECK:         ret i64 [[RESULT]]
+
+sil @partial_apply_guaranteed_class_pair_param : $@convention(thin) (@owned SwiftClassPair) -> @callee_owned (Int) -> Int {
+bb0(%x : $SwiftClassPair):
+  %f = function_ref @guaranteed_captured_class_pair_param : $@convention(thin) (Int, @guaranteed SwiftClassPair) -> Int
+  %p = partial_apply %f(%x) : $@convention(thin) (Int, @guaranteed SwiftClassPair) -> Int
+  return %p : $@callee_owned (Int) -> Int
+}
+
+sil public_external @indirect_guaranteed_captured_class_pair_param : $@convention(thin) (Int, @in_guaranteed SwiftClassPair) -> Int
+
+// CHECK-LABEL: define { i8*, %swift.refcounted* } @partial_apply_indirect_guaranteed_class_pair_param(%V13partial_apply14SwiftClassPair*)
+// CHECK:         [[CONTEXT_OBJ:%.*]] = call noalias %swift.refcounted* @swift_allocObject
+// CHECK-NOT:     {{retain|release}}
+// CHECK:         [[T0:%.*]] = insertvalue {{.*}} [[PARTIAL_APPLY_FORWARDER:@_TPA_[A-Za-z0-9_]+]] {{.*}} [[CONTEXT_OBJ]]
+// CHECK:         ret {{.*}} [[T0]]
+
+// CHECK:       define internal i64 [[PARTIAL_APPLY_FORWARDER]]
+// CHECK:         [[PAIR_ADDR:%.*]] = getelementptr
+// CHECK-NOT:     load
+// CHECK-NOT:     retain
+// CHECK:         [[RESULT:%.*]] = call i64 @indirect_guaranteed_captured_class_pair_param(i64 %0, %V13partial_apply14SwiftClassPair* [[PAIR_ADDR]])
+// CHECK:         release{{.*}}%1)
+// CHECK:         ret i64 [[RESULT]]
+
+sil @partial_apply_indirect_guaranteed_class_pair_param : $@convention(thin) (@in SwiftClassPair) -> @callee_owned (Int) -> Int {
+bb0(%x : $*SwiftClassPair):
+  %f = function_ref @indirect_guaranteed_captured_class_pair_param : $@convention(thin) (Int, @in_guaranteed SwiftClassPair) -> Int
+  %p = partial_apply %f(%x) : $@convention(thin) (Int, @in_guaranteed SwiftClassPair) -> Int
+  return %p : $@callee_owned (Int) -> Int
+}
+
+sil public_external @indirect_consumed_captured_class_pair_param : $@convention(thin) (Int, @in SwiftClassPair) -> Int
+
+// CHECK-LABEL: define { i8*, %swift.refcounted* } @partial_apply_indirect_consumed_class_pair_param(%V13partial_apply14SwiftClassPair*)
+// CHECK:         [[CONTEXT_OBJ:%.*]] = call noalias %swift.refcounted* @swift_allocObject
+// CHECK-NOT:     {{retain|release}}
+// CHECK:         [[T0:%.*]] = insertvalue {{.*}} [[PARTIAL_APPLY_FORWARDER:@_TPA_[A-Za-z0-9_]+]] {{.*}} [[CONTEXT_OBJ]]
+// CHECK:         ret {{.*}} [[T0]]
+
+// CHECK:       define internal i64 [[PARTIAL_APPLY_FORWARDER]]
+// CHECK:         [[X_TMP:%.*]] = alloca
+// CHECK:         retain
+// CHECK:         retain
+// CHECK-NOT:     retain
+// CHECK:         release{{.*}}%1)
+// CHECK:         [[RESULT:%.*]] = call i64 @indirect_consumed_captured_class_pair_param(i64 %0, %V13partial_apply14SwiftClassPair* [[X_TMP]])
+// CHECK:         ret i64 [[RESULT]]
+
+sil @partial_apply_indirect_consumed_class_pair_param : $@convention(thin) (@in SwiftClassPair) -> @callee_owned (Int) -> Int {
+bb0(%x : $*SwiftClassPair):
+  %f = function_ref @indirect_consumed_captured_class_pair_param : $@convention(thin) (Int, @in SwiftClassPair) -> Int
+  %p = partial_apply %f(%x) : $@convention(thin) (Int, @in SwiftClassPair) -> Int
   return %p : $@callee_owned (Int) -> Int
 }
 

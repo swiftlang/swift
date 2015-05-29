@@ -3184,6 +3184,10 @@ static void emitApplyArgument(IRGenFunction &IGF,
 }
 
 /// Emit the forwarding stub function for a partial application.
+///
+/// If 'layout' is null, there is a single captured value of
+/// Swift-refcountable type that is being used directly as the
+/// context object.
 static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
                                    llvm::Function *staticFnPtr,
                                    bool calleeHasContext,
@@ -3193,7 +3197,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
                                    CanSILFunctionType substType,
                                    CanSILFunctionType outType,
                                    ArrayRef<Substitution> subs,
-                                   HeapLayout const &layout,
+                                   HeapLayout const *layout,
                                    ArrayRef<ParameterConvention> conventions) {
   llvm::AttributeSet outAttrs;
 
@@ -3295,17 +3299,19 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
   llvm::Value *rawData = nullptr;
   Address data;
   unsigned nextCapturedField = 0;
-  if (!layout.isKnownEmpty()) {
+  if (!layout) {
     rawData = origParams.claimNext();
-    data = layout.emitCastTo(subIGF, rawData);
+  } else if (!layout->isKnownEmpty()) {
+    rawData = origParams.claimNext();
+    data = layout->emitCastTo(subIGF, rawData);
 
     // Restore type metadata bindings, if we have them.
-    if (layout.hasBindings()) {
-      auto bindingLayout = layout.getElement(nextCapturedField++);
+    if (layout->hasBindings()) {
+      auto bindingLayout = layout->getElement(nextCapturedField++);
       // The bindings should be fixed-layout inside the object, so we can
       // pass None here. If they weren't, we'd have a chicken-egg problem.
       auto bindingsAddr = bindingLayout.project(subIGF, data, /*offsets*/ None);
-      layout.getBindings().restore(subIGF, bindingsAddr);
+      layout->getBindings().restore(subIGF, bindingsAddr);
     }
 
   // There's still a placeholder to claim if the target type is thick
@@ -3316,22 +3322,75 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     assert(contextPtr->getType() == IGM.RefCountedPtrTy);
   }
 
-  // Calculate non-fixed field offsets.
-  HeapNonFixedOffsets offsets(subIGF, layout);
+  // If there's a data pointer required, but it's a swift-retainable
+  // value being passed as the context, just forward it down.
+  if (!layout) {
+    assert(conventions.size() == 1);
+
+    // We need to retain the parameter if:
+    //   - we received at +0 (either) and are passing as owned
+    //   - we received as unowned and are passing as guaranteed
+    auto argConvention = conventions[nextCapturedField++];
+    switch (argConvention) {
+    case ParameterConvention::Indirect_In:
+    case ParameterConvention::Direct_Owned:
+      if (!consumesContext) subIGF.emitRetainCall(rawData);
+      break;
+
+    case ParameterConvention::Indirect_In_Guaranteed:
+    case ParameterConvention::Direct_Guaranteed:
+      dependsOnContextLifetime = true;
+      if (outType->getCalleeConvention() ==
+            ParameterConvention::Direct_Unowned) {
+        subIGF.emitRetainCall(rawData);
+        consumesContext = true;
+      }
+      break;
+
+    case ParameterConvention::Direct_Unowned:
+      // Make sure we release later if we received at +1.
+      if (consumesContext)
+        dependsOnContextLifetime = true;
+      break;
+
+    case ParameterConvention::Direct_Deallocating:
+    case ParameterConvention::Indirect_Inout:
+    case ParameterConvention::Indirect_Out:
+      llvm_unreachable("should never happen!");
+    }
+
+    llvm::Type *expectedArgTy =
+      fnTy->getPointerElementType()->getFunctionParamType(args.size());
+    llvm::Value *argValue;
+    if (isIndirectParameter(argConvention)) {
+      expectedArgTy = expectedArgTy->getPointerElementType();
+      auto temporary = subIGF.createAlloca(expectedArgTy,
+                                           subIGF.IGM.getPointerAlignment(),
+                                           "partial-apply.context");
+      argValue = subIGF.Builder.CreateBitCast(rawData, expectedArgTy);
+      subIGF.Builder.CreateStore(argValue, temporary);
+      argValue = temporary.getAddress();
+    } else {
+      argValue = subIGF.Builder.CreateBitCast(rawData, expectedArgTy);
+    }
+    args.add(argValue);
 
   // If there's a data pointer required, grab it and load out the
   // extra, previously-curried parameters.
-  if (!layout.isKnownEmpty()) {
+  } else if (!layout->isKnownEmpty()) {
     unsigned origParamI = outType->getParameters().size();
-    assert(layout.getElements().size() == conventions.size()
+    assert(layout->getElements().size() == conventions.size()
            && "conventions don't match context layout");
 
+    // Calculate non-fixed field offsets.
+    HeapNonFixedOffsets offsets(subIGF, *layout);
+
     // Perform the loads.
-    for (unsigned n = layout.getElements().size();
+    for (unsigned n = layout->getElements().size();
          nextCapturedField < n;
          ++nextCapturedField) {
-      auto &fieldLayout = layout.getElement(nextCapturedField);
-      auto &fieldTy = layout.getElementTypes()[nextCapturedField];
+      auto &fieldLayout = layout->getElement(nextCapturedField);
+      auto &fieldTy = layout->getElementTypes()[nextCapturedField];
       auto fieldConvention = conventions[nextCapturedField];
       Address fieldAddr = fieldLayout.project(subIGF, data, offsets);
       auto &fieldTI = fieldLayout.getType();
@@ -3537,7 +3596,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
                                            Explosion &out) {
   // If we have a single Swift-refcounted context value, we can adopt it
   // directly as our closure context without creating a box and thunk.
-  enum HasSingleSwiftRefcountedContext { Maybe, Yes, No }
+  enum HasSingleSwiftRefcountedContext { Maybe, Yes, No, Thunkable }
     hasSingleSwiftRefcountedContext = Maybe;
   Optional<ParameterConvention> singleRefcountedConvention;
   
@@ -3604,7 +3663,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
     
     // Adding nonempty values when we already have a single refcounted pointer
     // means we don't have a single value anymore.
-    if (hasSingleSwiftRefcountedContext == Yes) {
+    if (hasSingleSwiftRefcountedContext != Maybe) {
       hasSingleSwiftRefcountedContext = No;
       continue;
     }
@@ -3615,6 +3674,30 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
     } else {
       hasSingleSwiftRefcountedContext = No;
     }
+  }
+
+  // We can't just bitcast if there's an error parameter to forward.
+  // This is an unfortunate restriction arising from the fact that a
+  // thin throwing function will have the signature:
+  //   %result (%arg*, %context*, %error*)
+  // but the output signature needs to be
+  //   %result (%context*, %error*)
+  //
+  // 'swifterror' fixes this physically, but there's still a risk of
+  // miscompiles because the LLVM optimizer may forward arguments
+  // positionally without considering 'swifterror'.
+  //
+  // Note, however, that we will override this decision below if the
+  // only thing we have to forward is already a context pointer.
+  // That's fine.
+  //
+  // The proper long-term fix is that closure functions should be
+  // emitted with a convention that takes the closure box as the
+  // context parameter.  When we do that, all of this code will
+  // disappear.
+  if (hasSingleSwiftRefcountedContext == Yes &&
+      origType->hasErrorResult()) {
+    hasSingleSwiftRefcountedContext = Thunkable;
   }
   
   // Include the context pointer, if any, in the function arguments.
@@ -3627,6 +3710,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
     // If this is the only context argument we end up with, we can just share
     // it.
     if (args.size() == 1) {
+      assert(bindings.empty());
       hasSingleSwiftRefcountedContext = Yes;
       singleRefcountedConvention = origType->getCalleeConvention();
     }
@@ -3636,8 +3720,9 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
   // to capture), and the dest ownership semantics match the parameter's,
   // skip building the box and thunk and just take the pointer as
   // context.
-  if (args.size() == 1 && hasSingleSwiftRefcountedContext == Yes
+  if (hasSingleSwiftRefcountedContext == Yes
       && outType->getCalleeConvention() == *singleRefcountedConvention) {
+    assert(args.size() == 1);
     fnPtr = IGF.Builder.CreateBitCast(fnPtr, IGF.IGM.Int8PtrTy);
     out.add(fnPtr);
     llvm::Value *ctx = args.claimNext();
@@ -3655,6 +3740,35 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
     argTypeInfos.push_back(
          &IGF.getTypeInfoForLowered(IGF.IGM.Context.TheRawPointerType));
     argConventions.push_back(ParameterConvention::Direct_Unowned);
+    hasSingleSwiftRefcountedContext = No;
+  }
+
+  // If we only need to capture a single Swift-refcounted object, we
+  // still need to build a thunk, but we don't need to allocate anything.
+  if ((hasSingleSwiftRefcountedContext == Yes ||
+       hasSingleSwiftRefcountedContext == Thunkable) &&
+      *singleRefcountedConvention != ParameterConvention::Indirect_Inout) {
+    assert(bindings.empty());
+    assert(args.size() == 1);
+
+    llvm::AttributeSet attrs;
+    auto fnPtrTy = IGF.IGM.getFunctionType(origType, attrs)
+      ->getPointerTo();
+
+    llvm::Function *forwarder =
+      emitPartialApplicationForwarder(IGF.IGM, staticFn, fnContext != nullptr,
+                                      fnPtrTy, attrs, origType, substType,
+                                      outType, subs, nullptr, argConventions);
+    llvm::Value *forwarderValue =
+      IGF.Builder.CreateBitCast(forwarder, IGF.IGM.Int8PtrTy);
+    out.add(forwarderValue);
+
+    llvm::Value *ctx = args.claimNext();
+    if (isIndirectParameter(*singleRefcountedConvention))
+      ctx = IGF.Builder.CreateLoad(ctx, IGF.IGM.getPointerAlignment());
+    ctx = IGF.Builder.CreateBitCast(ctx, IGF.IGM.RefCountedPtrTy);
+    out.add(ctx);
+    return;
   }
 
   // Store the context arguments on the heap.
@@ -3728,7 +3842,7 @@ void irgen::emitFunctionPartialApplication(IRGenFunction &IGF,
                                                               substType,
                                                               outType,
                                                               subs,
-                                                              layout,
+                                                              &layout,
                                                               argConventions);
   llvm::Value *forwarderValue = IGF.Builder.CreateBitCast(forwarder,
                                                           IGF.IGM.Int8PtrTy);
