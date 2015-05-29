@@ -2551,16 +2551,3 @@ entry:
 //    calculate the size.
 // CHECK: define private %swift.type* [[DYNAMIC_SINGLE_PAYLOAD_CREATE]](%swift.type_pattern*, i8**) {{.*}} {
 // CHECK:   call void @swift_initEnumValueWitnessTableSinglePayload
-
-// CHECK-LABEL: define linkonce_odr hidden void @_TwxsV4enum17StructWithWeakVar(%swift.opaque* %dest, i32 %index, %swift.type* %Self)
-// -- TODO: some pointless masking here.
-// -- TODO: should use EnumPayload word-chunking.
-// CHECK:         %1 = zext i32 %index to i128
-// --                             0xFFFF_FFFF_FFFF_FFFF
-// CHECK:         %2 = and i128 %1, 18446744073709551615
-// CHECK:         %3 = shl i128 %1, 3
-// --                             0xFFFF_FFFF_FFFF_FFF8__0000_0000_0000_0000
-// CHECK:         %4 = and i128 %3, 1329227995784915725329854470603931648
-// CHECK:         %5 = or i128 %2, %4
-// --                             0x1__0000_0000_0000_0000
-// CHECK:         %6 = or i128 %5, 18446744073709551616
