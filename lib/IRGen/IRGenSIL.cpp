@@ -1165,6 +1165,19 @@ static void emitEntryPointArgumentsCOrObjC(IRGenSILFunction &IGF,
       llvm_unreachable("Need to handle InAlloca during signature expansion");
     }
   }
+
+  assert(params.empty() && "didn't claim all parameters!");
+
+  // Bind polymorphic arguments.  This can only be done after binding
+  // all the value parameters.
+  if (hasPolymorphicParameters(funcTy)) {
+    emitPolymorphicParameters(IGF, *IGF.CurSILFn, params,
+                              NULL,
+      [&](unsigned paramIndex) -> llvm::Value* {
+        SILValue parameter = entry->getBBArgs()[paramIndex];
+        return IGF.getLoweredSingletonExplosion(parameter);
+      });
+  }
 }
 
 /// Get metadata for the dynamic Self type if we have it.

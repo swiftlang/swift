@@ -3552,15 +3552,11 @@ bool irgen::hasPolymorphicParameters(CanSILFunctionType ty) {
     // Should never be polymorphic.
     assert(!ty->isPolymorphic() && "polymorphic C function?!");
     return false;
-  case SILFunctionTypeRepresentation::ObjCMethod:
-    // An ObjC witness_method reference will notionally have polymorphic type
-    // <Self: P> (...) -> (...), but there are no polymorphic parameters that
-    // can't be solved from the usual ObjC metadata.
-    return false;
 
   case SILFunctionTypeRepresentation::Thick:
   case SILFunctionTypeRepresentation::Thin:
   case SILFunctionTypeRepresentation::Method:
+  case SILFunctionTypeRepresentation::ObjCMethod:
     return ty->isPolymorphic();
 
   case SILFunctionTypeRepresentation::WitnessMethod:
@@ -3670,6 +3666,9 @@ namespace {
         : FnType(fnType), ParamArchetypes(M, M.getASTContext().Diags) {
       assert(hasPolymorphicParameters(fnType));
 
+      auto params = fnType->getParameters();
+      unsigned selfIndex = ~0U;
+
       // Build archetypes from the generic signature so we can consult the
       // protocol requirements on the parameters and dependent types.
       //
@@ -3677,53 +3676,38 @@ namespace {
       ParamArchetypes.addGenericSignature(fnType->getGenericSignature(),
                                           false);
 
-      // Protocol witnesses always derive all polymorphic parameter information
-      // from the Self argument. We also *cannot* consider other arguments;
-      // doing so would potentially make the signature incompatible with other
-      // witnesses for the same method.
-      if (fnType->getRepresentation()
-            == SILFunctionTypeRepresentation::WitnessMethod) {
-        // The metadata for a witness is provided from the type of the
-        // self argument.
-        Sources.emplace_back(SourceKind::WitnessSelf,
-                             InvalidSourceIndex);
+      auto rep = fnType->getRepresentation();
 
-        // Testify to generic parameters in the Self type.
-        CanType selfTy = fnType->getSelfParameter().getType();
-        if (auto metaTy = dyn_cast<AnyMetatypeType>(selfTy))
-          selfTy = metaTy.getInstanceType();
-
-        if (auto nomTy = dyn_cast<NominalType>(selfTy))
-          considerNominalType(nomTy, 0);
-        else if (auto bgTy = dyn_cast<BoundGenericType>(selfTy))
-          considerBoundGenericType(bgTy, 0);
-        else if (auto param = dyn_cast<GenericTypeParamType>(selfTy))
-          considerWitnessParamType(param);
-        else if (isa<ArchetypeType>(selfTy))
-          // A bound Self archetype from a protocol. Nothing to do.
-          (void)0;
-        else
-          llvm_unreachable("witness for non-nominal type?!");
-
-        return;
-      }
-
-      // We don't need to pass anything extra as long as all of the
-      // archetypes (and their requirements) are producible from
-      // arguments.
-      auto params = fnType->getParameters();
-      unsigned selfIndex = ~0U;
-
-      // Consider 'self' first.
-      if (fnType->hasSelfParam()) {
+      if (rep == SILFunctionTypeRepresentation::WitnessMethod) {
+        // Protocol witnesses always derive all polymorphic parameter
+        // information from the Self argument. We also *cannot* consider other
+        // arguments; doing so would potentially make the signature
+        // incompatible with other witnesses for the same method.
         selfIndex = params.size() - 1;
-        considerParameter(params[selfIndex], selfIndex, true);
-      }
+        Sources.emplace_back(SourceKind::WitnessSelf, InvalidSourceIndex);
+        considerWitnessSelf(params[selfIndex], selfIndex);
+      } else if (rep == SILFunctionTypeRepresentation::ObjCMethod) {
+        // Objective-C methods also always derive all polymorphic parameter
+        // information from the Self argument.
+        selfIndex = params.size() - 1;
+        Sources.emplace_back(SourceKind::ClassPointer, selfIndex);
+        considerWitnessSelf(params[selfIndex], selfIndex);
+      } else {
+        // We don't need to pass anything extra as long as all of the
+        // archetypes (and their requirements) are producible from
+        // arguments.
 
-      // Now consider the rest of the parameters.
-      for (auto index : indices(params)) {
-        if (index != selfIndex)
-          considerParameter(params[index], index, false);
+        // Consider 'self' first.
+        if (fnType->hasSelfParam()) {
+          selfIndex = params.size() - 1;
+          considerParameter(params[selfIndex], selfIndex, true);
+        }
+
+        // Now consider the rest of the parameters.
+        for (auto index : indices(params)) {
+          if (index != selfIndex)
+            considerParameter(params[index], index, false);
+        }
       }
     }
 
@@ -3799,6 +3783,22 @@ namespace {
         considerNewSource(kind, paramIndex,
                           [&] { considerBoundGenericType(boundTy, 0); });
       }
+    }
+
+    /// Testify to generic parameters in the Self type.
+    void considerWitnessSelf(SILParameterInfo param, unsigned paramIndex) {
+      CanType selfTy = param.getType();
+      if (auto metaTy = dyn_cast<AnyMetatypeType>(selfTy))
+        selfTy = metaTy.getInstanceType();
+
+      if (auto nomTy = dyn_cast<NominalType>(selfTy))
+        considerNominalType(nomTy, 0);
+      else if (auto bgTy = dyn_cast<BoundGenericType>(selfTy))
+        considerBoundGenericType(bgTy, 0);
+      else if (auto paramTy = dyn_cast<GenericTypeParamType>(selfTy))
+        considerWitnessParamType(paramTy);
+      else
+        llvm_unreachable("witness for non-nominal type?!");
     }
 
     void considerParameter(SILParameterInfo param, unsigned paramIndex,
