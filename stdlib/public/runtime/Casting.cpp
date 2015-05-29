@@ -1329,6 +1329,20 @@ static bool _dynamicCastUnknownClass(OpaqueValue *dest,
   return true;
 }
 
+#if SWIFT_OBJC_INTEROP
+extern "C" const ProtocolDescriptor _TMpSs9ErrorType;
+
+static const WitnessTable *findErrorTypeWitness(const Metadata *srcType) {
+  return swift_conformsToProtocol(srcType, &_TMpSs9ErrorType);
+}
+
+static const Metadata *getNSErrorTypeMetadata() {
+  static auto TheNSErrorMetadata
+  = swift_getObjCClassMetadata((const ClassMetadata *)getNSErrorClass());
+  return TheNSErrorMetadata;
+}
+#endif
+
 /// Perform a dynamic cast from an existential type to some kind of
 /// class type.
 static bool _dynamicCastToUnknownClassFromExistential(OpaqueValue *dest,
@@ -1341,6 +1355,14 @@ static bool _dynamicCastToUnknownClassFromExistential(OpaqueValue *dest,
     auto classContainer =
       reinterpret_cast<ClassExistentialContainer*>(src);
     void *obj = classContainer->Value;
+#if SWIFT_OBJC_INTEROP
+    // If we're casting to NSError, we may need a representation change,
+    // so fall into the general swift_dynamicCast path.
+    if (targetType == getNSErrorTypeMetadata()) {
+      return swift_dynamicCast(dest, src, swift_getObjectType((HeapObject*)obj),
+                               targetType, flags);
+    }
+#endif
     return _dynamicCastUnknownClass(dest, obj, targetType, flags);
   }
   case ExistentialTypeRepresentation::Opaque: {
@@ -1743,18 +1765,6 @@ static bool _dynamicCastToExistentialMetatype(OpaqueValue *dest,
 }
 
 #if SWIFT_OBJC_INTEROP
-extern "C" const ProtocolDescriptor _TMpSs9ErrorType;
-
-static const WitnessTable *findErrorTypeWitness(const Metadata *srcType) {
-  return swift_conformsToProtocol(srcType, &_TMpSs9ErrorType);
-}
-
-static const Metadata *getNSErrorTypeMetadata() {
-  static auto TheNSErrorMetadata
-    = swift_getObjCClassMetadata((const ClassMetadata *)getNSErrorClass());
-  return TheNSErrorMetadata;
-}
-
 static id dynamicCastValueToNSError(OpaqueValue *src,
                                     const Metadata *srcType,
                                     const WitnessTable *srcErrorTypeWitness,
@@ -1781,6 +1791,20 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
   // Casts to class type.
   case MetadataKind::Class:
   case MetadataKind::ObjCClassWrapper:
+#if SWIFT_OBJC_INTEROP
+    // If the destination type is an NSError, and the source type is an
+    // ErrorType, then the cast can succeed by NSError bridging.
+    if (targetType == getNSErrorTypeMetadata()) {
+      if (auto srcErrorTypeWitness = findErrorTypeWitness(srcType)) {
+        auto error = dynamicCastValueToNSError(src, srcType,
+                                               srcErrorTypeWitness, flags);
+        *reinterpret_cast<id *>(dest) = error;
+        return true;
+      }
+    }
+    SWIFT_FALLTHROUGH;
+#endif
+
   case MetadataKind::ForeignClass:
     switch (srcType->getKind()) {
     case MetadataKind::Class:
@@ -1808,16 +1832,6 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
                                                          targetType,
                                                          srcBridgeWitness,
                                                          flags);
-      }
-      // If the destination type is an NSError, and the source type is an
-      // ErrorType, then the cast can succeed by NSError bridging.
-      if (targetType == getNSErrorTypeMetadata()) {
-        if (auto srcErrorTypeWitness = findErrorTypeWitness(srcType)) {
-          auto error = dynamicCastValueToNSError(src, srcType,
-                                                 srcErrorTypeWitness, flags);
-          *reinterpret_cast<id *>(dest) = error;
-          return true;
-        }
       }
 #endif
       return _fail(src, srcType, targetType, flags);

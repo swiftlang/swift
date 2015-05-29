@@ -199,23 +199,20 @@ ErrorTypeBridgingTests.test("ErrorType-to-NSError bridging") {
     expectEqual(nativeNS2._domain, NSCocoaErrorDomain)
     expectEqual(nativeNS2._code, NSFileNoSuchFileError)
 
-    /* TODO: Because of rdar://problem/20507075, we can't support rc-identity-
-     * changing dynamic casts between class types.
     let any: Any = NoisyError()
-    let ns3 = any as! NSError
-    expectEqual(ns3._domain, "NoisyError")
-    expectEqual(ns3._code, 123)
-
-    let ao: AnyObject = NoisyError()
-    let ns4 = ao as! NSError
+    let ns4 = any as! NSError
     expectEqual(ns4._domain, "NoisyError")
     expectEqual(ns4._code, 123)
-     */
+
+    let ao: AnyObject = NoisyError()
+    let ns5 = ao as! NSError
+    expectEqual(ns5._domain, "NoisyError")
+    expectEqual(ns5._code, 123)
 
     let any2: Any = StructError()
-    let ns5 = any2 as! NSError
-    expectEqual(ns5._domain, "StructError")
-    expectEqual(ns5._code, 4812)
+    let ns6 = any2 as! NSError
+    expectEqual(ns6._domain, "StructError")
+    expectEqual(ns6._code, 4812)
   }
   expectEqual(NoisyErrorDeathCount, NoisyErrorLifeCount)
 }
