@@ -152,18 +152,17 @@ class CallSiteDescriptor {
   llvm::TinyPtrVector<SILBasicBlock *> NonFailureExitBBs;
 
   // The points where the closure is ultimately released.
-  llvm::SmallPtrSet<SILInstruction *, 4> JointlyPostDomReleasePoints;
+  llvm::SmallSetVector<SILInstruction *, 4> JointlyPostDomReleasePoints;
 
 public:
   CallSiteDescriptor(SILInstruction *ClosureInst, ApplyInst *AI,
                      unsigned ClosureIndex, SILParameterInfo ClosureParamInfo,
                      llvm::TinyPtrVector<SILBasicBlock *> &&NonFailureExitBBs,
-                     llvm::SmallPtrSet<SILInstruction *, 4> &ReleasePoints)
+                     ValueLifetime &ClosureLifetime)
       : Closure(ClosureInst), AI(AI), ClosureIndex(ClosureIndex),
         ClosureParamInfo(ClosureParamInfo),
         NonFailureExitBBs(NonFailureExitBBs),
-        JointlyPostDomReleasePoints(ReleasePoints.begin(),
-                                    ReleasePoints.end()) {}
+        JointlyPostDomReleasePoints(ClosureLifetime.LastUsers) {}
 
   static bool isSupportedClosure(const SILInstruction *Closure);
 
@@ -680,7 +679,7 @@ void ClosureSpecializer::gatherCallSites(
   // For each basic block BB in Caller...
   for (auto &BB : *Caller) {
 
-    llvm::SmallPtrSet<SILInstruction *, 4> JointlyPostDomReleasePoints;
+    ValueLifetime ClosureLifetime;
 
     // For each instruction II in BB...
     for (auto &II : BB) {
@@ -763,11 +762,9 @@ void ClosureSpecializer::gatherCallSites(
 
         // Compute the final release points of the closure. We will insert
         // release of the captured arguments here.
-        if (JointlyPostDomReleasePoints.empty()) {
-          LifetimeTracker Lifetime(&II);
-          auto Endpoints = Lifetime.getEndpoints();
-          JointlyPostDomReleasePoints.insert(Endpoints.begin(),
-                                             Endpoints.end());
+        if (ClosureLifetime.getLastUsers().empty()) {
+          ValueLifetimeAnalysis VLA(&II);
+          ClosureLifetime = VLA.computeFromDirectUses();
         }
 
         // Now we know that CSDesc is profitable to specialize. Add it to our
@@ -775,7 +772,7 @@ void ClosureSpecializer::gatherCallSites(
         CallSites.push_back(CallSiteDescriptor(&II, AI, ClosureIndex.getValue(),
                                                ClosureParamInfo,
                                                std::move(NonFailureExitBBs),
-                                               JointlyPostDomReleasePoints));
+                                               ClosureLifetime));
       }
     }
   }

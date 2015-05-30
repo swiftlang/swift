@@ -498,12 +498,11 @@ class PartialApplyCombiner {
   llvm::DenseMap<SILValue, SILValue> ArgToTmp;
 
   // Set of lifetime endpoints for this partial_apply.
-  SmallPtrSet<SILInstruction *, 8> EndPoints;
-
-  // Used to find the last uses of partial_apply, which
-  // is need to insert releases/destroys of temporaries
-  // as early as possible.
-  LifetimeTracker lifetimeTracker;
+  //
+  // Used to find the last uses of partial_apply, which is need to insert
+  // releases/destroys of temporaries as early as possible.  If no releases are
+  // needed, Lifetime remains empty.
+  ValueLifetime Lifetime;
 
   SILBuilder *Builder;
 
@@ -522,8 +521,7 @@ class PartialApplyCombiner {
 public:
   PartialApplyCombiner(PartialApplyInst *PAI, SILBuilder *Builder,
                        CallGraph *CG, SILCombiner *SilCombiner)
-      : isFirstTime(true), PAI(PAI),
-        lifetimeTracker(PAI), Builder(Builder), CG(CG),
+      : isFirstTime(true), PAI(PAI), Builder(Builder), CG(CG),
         FRI(nullptr), SilCombiner(SilCombiner) {}
   SILInstruction *combine();
 };
@@ -573,10 +571,8 @@ void PartialApplyCombiner::allocateTemporaries() {
   if (needsReleases) {
     // Compute the set of endpoints, which will be used
     // to insert releases of temporaries.
-    lifetimeTracker.getEndpoints();
-    for (auto *EndPoint : lifetimeTracker.getEndpoints()) {
-      EndPoints.insert(EndPoint);
-    }
+    ValueLifetimeAnalysis VLA(PAI);
+    Lifetime = VLA.computeFromDirectUses();
   }
 }
 
@@ -604,7 +600,7 @@ void PartialApplyCombiner::releaseTemporaries() {
     auto TmpType = Op.getType().getObjectType();
     if (TmpType.isTrivial(PAI->getModule()))
       continue;
-    for (auto *EndPoint : EndPoints) {
+    for (auto *EndPoint : Lifetime.LastUsers) {
       Builder->setInsertionPoint(next(SILBasicBlock::iterator(EndPoint)));
       auto TmpAddr = SILValue(Op.getDef(), 1);
       if (!TmpType.isAddressOnly(PAI->getModule())) {
@@ -684,9 +680,9 @@ void PartialApplyCombiner::processSingleApply(ApplyInst *AI) {
       ->setDebugScope(AI->getDebugScope());
 
   // Update the set endpoints.
-  if (EndPoints.count(AI)) {
-    EndPoints.erase(AI);
-    EndPoints.insert(NAI);
+  if (Lifetime.LastUsers.count(AI)) {
+    Lifetime.LastUsers.remove(AI);
+    Lifetime.LastUsers.insert(NAI);
   }
 
   SilCombiner->replaceInstUsesWith(*AI, NAI);

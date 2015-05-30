@@ -723,41 +723,23 @@ bool swift::tryDeleteDeadClosure(SILInstruction *Closure,
   return true;
 }
 
-// Is any successor of BB in the LiveIn set?
-static bool successorHasLiveIn(SILBasicBlock *BB,
-                         const llvm::SmallPtrSetImpl<SILBasicBlock *> &LiveIn) {
-  for (auto &Succ : BB->getSuccessors())
-    if (LiveIn.count(Succ))
-      return true;
+//===----------------------------------------------------------------------===//
+//                             Value Lifetime
+//===----------------------------------------------------------------------===//
 
-  return false;
+// Record a use by marking it's block and adding it to the initial LiveIn set.
+void ValueLifetimeAnalysis::visitUser(SILInstruction *User) {
+  auto *BB = User->getParent();
+  UseBlocks.insert(BB);
+  if (BB != DefValue->getParentBB())
+    LiveIn.insert(BB);
 }
 
-
-// Walk backwards in BB looking for last use of value V and adding the
-// instruction using the value to LastUsers.
-static void addLastUser(SILValue V, SILBasicBlock *BB,
-                        llvm::SmallPtrSetImpl<SILInstruction *> &LastUsers) {
-  for (auto I = BB->rbegin(); I != BB->rend(); ++I) {
-    assert(V.getDef() != &*I && "Found def before finding use!");
-
-    for (auto &O : I->getAllOperands()) {
-      if (O.get() != V)
-        continue;
-
-      LastUsers.insert(&*I);
-      return;
-    }
-  }
-
-  llvm_unreachable("Expected to find use of value in block!");
-}
-
+// Generate ValueLifetimeAnalysis::liveIn.
+//
 // Propagate liveness backwards from an initial set of blocks in our
-// LiveIn set.
-static void propagateLiveness(llvm::SmallPtrSetImpl<SILBasicBlock*> &LiveIn,
-                              SILBasicBlock *DefBB) {
-
+// liveIn set.
+void ValueLifetimeAnalysis::propagateLiveness() {
   // First populate a worklist of predecessors.
   llvm::SmallVector<SILBasicBlock *, 64> Worklist;
   for (auto *BB : LiveIn)
@@ -766,6 +748,7 @@ static void propagateLiveness(llvm::SmallPtrSetImpl<SILBasicBlock*> &LiveIn,
 
   // Now propagate liveness backwards until we hit the block that
   // defines the value.
+  auto DefBB = DefValue->getParentBB();
   while (!Worklist.empty()) {
     auto *BB = Worklist.pop_back_val();
 
@@ -779,36 +762,56 @@ static void propagateLiveness(llvm::SmallPtrSetImpl<SILBasicBlock*> &LiveIn,
   }
 }
 
-void LifetimeTracker::computeLifetime() {
-  llvm::SmallPtrSet<SILBasicBlock *, 16> LiveIn;
-  llvm::SmallPtrSet<SILBasicBlock *, 16> UseBlocks;
+// Is any successor of BB in the LiveIn set?
+bool ValueLifetimeAnalysis::successorHasLiveIn(SILBasicBlock *BB) {
 
-  auto *DefInst = cast<SILInstruction>(TheValue.getDef());
-  auto *DefBB = DefInst->getParent();
+  for (auto &Succ : BB->getSuccessors())
+    if (LiveIn.count(Succ))
+      return true;
 
-  if (TheValue->hasOneUse()) {
-    Endpoints.insert(TheValue->use_begin().getUser());
-    return;
+  return false;
+}
+
+// Walk backwards in BB looking for last use of value DefValue.
+SILInstruction *ValueLifetimeAnalysis::
+findLastDirectUseInBlock(SILBasicBlock *BB) {
+  for (auto II = BB->rbegin(); II != BB->rend(); ++II) {
+    assert(DefValue.getDef() != &*II && "Found def before finding use!");
+
+    for (auto &Oper : II->getAllOperands()) {
+      if (Oper.get() != DefValue)
+        continue;
+
+      return &*II;
+    }
   }
+  llvm_unreachable("Expected to find use of value in block!");
+}
 
-  for (auto UI : TheValue.getUses()) {
-    auto *BB = UI->getUser()->getParent();
+// Walk backwards in BB looking for last use specified in the provided use
+// list. This likely includes transitive uses of defValue.
+SILInstruction *ValueLifetimeAnalysis::
+findLastSpecifiedUseInBlock(SILBasicBlock *BB) {
+  for (auto II = BB->rbegin(); II != BB->rend(); ++II) {
+    assert(DefValue.getDef() != &*II && "Found def before finding use!");
 
-    if (!isUserAcceptable(UI->getUser()))
+    if (UserSet.count(&*II))
+      return &*II;
+  }
+  llvm_unreachable("Expected to find use of value in block!");
+}
+
+/// Generate ValueLifetime::lastUsers from ValueLifetimeAnalysis.
+ValueLifetime ValueLifetimeAnalysis::computeLastUsers() {
+  ValueLifetime Lifetime;
+  for (auto *BB : UseBlocks) {
+    if (successorHasLiveIn(BB))
       continue;
-
-    UseBlocks.insert(BB);
-    if (BB != DefBB)
-      LiveIn.insert(BB);
+    Lifetime.LastUsers.insert(UserSet.empty()
+                              ? findLastDirectUseInBlock(BB)
+                              : findLastSpecifiedUseInBlock(BB));
   }
-
-  propagateLiveness(LiveIn, DefBB);
-
-  for (auto *BB : UseBlocks)
-    if (!successorHasLiveIn(BB, LiveIn))
-        addLastUser(TheValue, BB, Endpoints);
-
-  LifetimeComputed = true;
+  return Lifetime;
 }
 
 //===----------------------------------------------------------------------===//

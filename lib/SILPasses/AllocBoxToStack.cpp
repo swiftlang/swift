@@ -622,6 +622,37 @@ static void emitStrongReleaseAfter(SILValue V, SILInstruction *I) {
   Builder.emitStrongReleaseAndFold(I->getLoc(), V);
 }
 
+namespace {
+class LifetimeTracker {
+  SILValue TheValue;
+  Optional<ValueLifetime> Lifetime;
+
+  public:
+    LifetimeTracker(SILValue Value): TheValue(Value) {}
+
+  using EndpointRange =
+    Range<llvm::SmallVectorImpl<SILInstruction *>::const_iterator>;
+
+  SILValue getStart() { return TheValue; }
+
+  EndpointRange getEndpoints();
+};
+}
+
+LifetimeTracker::EndpointRange LifetimeTracker::getEndpoints() {
+  if (!Lifetime) {
+    if (TheValue->hasOneUse()) {
+      Lifetime = ValueLifetime();
+      Lifetime->LastUsers.insert(TheValue->use_begin().getUser());
+    }
+    else {
+      ValueLifetimeAnalysis VLA(TheValue);
+      Lifetime = VLA.computeFromDirectUses();
+    }
+  }
+  return EndpointRange(Lifetime->LastUsers.begin(), Lifetime->LastUsers.end());
+}
+
 /// Specialize a partial_apply by removing the parameters indicated by
 /// indices. We expect these parameters to be either dead, or used
 /// only by retains and releases.

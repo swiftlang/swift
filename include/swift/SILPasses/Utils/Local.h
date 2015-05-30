@@ -25,6 +25,24 @@ namespace swift {
 
 class DominanceInfo;
 
+/// Transform a Use Range (Operand*) into a User Range (SILInstruction*)
+using UserTransform = std::function<SILInstruction *(Operand *)>;
+using ValueBaseUserRange =
+  TransformRange<IteratorRange<ValueBase::use_iterator>, UserTransform>;
+using ValueUserRange =
+  TransformRange<IteratorRange<SILValue::use_iterator>, UserTransform>;
+
+inline ValueBaseUserRange makeUserRange(Range<ValueBase::use_iterator> R) {
+  auto toUser = [](Operand *O) { return O->getUser(); };
+  return makeTransformRange(makeIteratorRange(R.begin(), R.end()),
+                            UserTransform(toUser));
+}
+inline ValueUserRange makeUserRange(Range<SILValue::use_iterator> R) {
+  auto toUser = [](Operand *O) { return O->getUser(); };
+  return makeTransformRange(makeIteratorRange(R.begin(), R.end()),
+                            UserTransform(toUser));
+}
+
 /// \brief For each of the given instructions, if they are dead delete them
 /// along with their dead operands.
 ///
@@ -149,49 +167,73 @@ void releasePartialApplyCapturedArg(
     SILBuilder &Builder, SILLocation Loc, SILValue Arg, SILParameterInfo PInfo,
     InstModCallbacks Callbacks = InstModCallbacks());
 
-/// This helper class represents the lifetime of a single
-/// SILValue. The value itself is held and the lifetime endpoints of
-/// that value are computed.
+/// This represents the lifetime of a single SILValue.
+struct ValueLifetime {
+  llvm::SmallSetVector<SILInstruction *, 4> LastUsers;
+
+  ValueLifetime() {}
+  ValueLifetime(ValueLifetime &&Ref) { LastUsers = std::move(Ref.LastUsers); }
+  ValueLifetime &operator=(ValueLifetime &&Ref) {
+    LastUsers = std::move(Ref.LastUsers);
+    return *this;
+  }
+
+  ArrayRef<SILInstruction*> getLastUsers() const {
+    return ArrayRef<SILInstruction*>(LastUsers.begin(), LastUsers.end());
+  }
+};
+
+/// This computes the lifetime of a single SILValue.
 ///
 /// This does not compute a set of jointly postdominating use points. Instead it
 /// assumes that the value's existing uses already jointly postdominate the
 /// definition. This makes sense for values that are returned +1 from an
 /// instruction, like partial_apply, and therefore must be released on all paths
 /// via strong_release or apply.
-class LifetimeTracker {
-  SILValue TheValue;
+class ValueLifetimeAnalysis {
+public:
+  SILValue DefValue;
+  llvm::SmallPtrSet<SILBasicBlock *, 16> LiveIn;
+  llvm::SmallSetVector<SILBasicBlock *, 16> UseBlocks;
+  // UserSet is nonempty if the client provides a user list. Otherwise we only
+  // consider direct uses.
+  llvm::SmallPtrSet<SILInstruction*, 16> UserSet;
 
-  llvm::SmallPtrSet<SILInstruction *, 4> Endpoints;
+  ValueLifetimeAnalysis(SILValue DefValue): DefValue(DefValue) {}
 
-  std::function<bool(SILInstruction *)> AcceptableUserQuery;
-
-  bool LifetimeComputed = false;
-
-  public:
-    LifetimeTracker(SILValue Value,
-                    std::function<bool(SILInstruction *)> AcceptableUserQuery =
-                        [](SILInstruction *) -> bool { return true; })
-        : TheValue(Value), AcceptableUserQuery(AcceptableUserQuery) {}
-
-  using EndpointRange =
-    Range<llvm::SmallPtrSetImpl<SILInstruction *>::iterator>;
-
-  SILValue getStart() { return TheValue; }
-
-  EndpointRange getEndpoints() {
-    if (!LifetimeComputed)
-      computeLifetime();
-
-    return EndpointRange(Endpoints.begin(), Endpoints.end());
+  template<typename UserList>
+  ValueLifetime computeFromUserList(UserList Users) {
+    return computeFromUserList(Users, std::true_type());
   }
 
-  bool isUserAcceptable(SILInstruction *User) const {
-    return AcceptableUserQuery(User);
+  ValueLifetime computeFromDirectUses() {
+    return computeFromUserList(makeUserRange(DefValue.getUses()),
+                               std::false_type());
   }
 
-  private:
-  void computeLifetime();
+  bool successorHasLiveIn(SILBasicBlock *BB);
+  SILInstruction *findLastDirectUseInBlock(SILBasicBlock *BB);
+  SILInstruction *findLastSpecifiedUseInBlock(SILBasicBlock *BB);
+
+private:
+  template<typename UserList, typename RecordUser>
+  ValueLifetime computeFromUserList(UserList Users, RecordUser);
+  void visitUser(SILInstruction *User);
+  void propagateLiveness();
+  ValueLifetime computeLastUsers();
 };
+
+template<typename UserList, typename RecordUser>
+ValueLifetime ValueLifetimeAnalysis::
+computeFromUserList(UserList Users, RecordUser RU) {
+  for (SILInstruction *User : Users) {
+    visitUser(User);
+    if (RecordUser::value)
+      UserSet.insert(User);
+  }
+  propagateLiveness();
+  return computeLastUsers();
+}
 
 /// Base class for BB cloners.
 class BaseThreadingCloner : public SILClonerWithScopes<BaseThreadingCloner> {
