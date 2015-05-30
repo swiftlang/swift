@@ -1718,6 +1718,56 @@ TypeConverter::substFunctionType(CanSILFunctionType origFnType,
                               Context);
 }
 
+/// Returns the SILFunctionType the given declaration must use to override.
+/// Will be the same as getConstantFunctionType if the declaration does
+/// not override.
+CanSILFunctionType TypeConverter::getConstantOverrideType(SILDeclRef derived,
+                                                          SILDeclRef base) {
+  // Foreign overrides currently don't need reabstraction.
+  if (derived.isForeign)
+    return getConstantFunctionType(derived);
+  
+  assert(base.getOverriddenVTableEntry().isNull()
+         && "base must not be an override");
+
+  // TODO: Cache this in the constant info?
+  
+  auto baseInfo = getConstantInfo(base);
+  auto derivedInfo = getConstantInfo(derived);
+  auto basePattern = AbstractionPattern(baseInfo.LoweredType);
+
+  // Substitute the bound base class parameters into the signature to get the
+  // expected substituted signature.
+  auto baseClass = base.getDecl()->getDeclContext()
+    ->getDeclaredTypeInContext()->getClassOrBoundGenericClass();
+  
+  auto superclass = derived.getDecl()->getDeclContext()
+    ->getDeclaredTypeInContext();
+  while (superclass->getClassOrBoundGenericClass() != baseClass)
+    superclass = superclass->getSuperclass(nullptr);
+  
+  ArrayRef<Type> typeParams;
+  if (auto genSuperclass = superclass->getAs<BoundGenericClassType>()) {
+    typeParams = genSuperclass->getGenericArgs();
+  }
+
+  CanAnyFunctionType overrideInterfaceType = baseInfo.LoweredInterfaceType;
+  if (!typeParams.empty()) {
+    overrideInterfaceType = cast<AnyFunctionType>(
+      cast<GenericFunctionType>(overrideInterfaceType)
+        ->partialSubstGenericArgs(M.getSwiftModule(), typeParams)
+        ->getCanonicalType());
+  }
+  
+  assert(derived.kind == base.kind
+         && "override can't change decl kind?!");
+  return getNativeSILFunctionType(M, basePattern,
+                                  derivedInfo.LoweredType,
+                                  derivedInfo.LoweredInterfaceType,
+                                  overrideInterfaceType,
+                                  derived.kind);
+}
+
 namespace {
   /// Given a lowered SIL type, apply a substitution to it to produce another
   /// lowered SIL type which uses the same abstraction conventions.

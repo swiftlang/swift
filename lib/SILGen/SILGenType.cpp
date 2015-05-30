@@ -77,37 +77,9 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
   auto baseInfo = Types.getConstantInfo(base);
   auto derivedInfo = Types.getConstantInfo(derived);
   auto basePattern = AbstractionPattern(baseInfo.LoweredType);
-  
-  // Substitute the bound base class parameters into the signature to get the
-  // expected substituted signature.
-  auto baseClass = base.getDecl()->getDeclContext()
-    ->getDeclaredTypeInContext()->getClassOrBoundGenericClass();
-  
-  auto superclass = derived.getDecl()->getDeclContext()
-    ->getDeclaredTypeInContext();
-  while (superclass->getClassOrBoundGenericClass() != baseClass)
-    superclass = superclass->getSuperclass(nullptr);
-  
-  ArrayRef<Type> typeParams;
-  if (auto genSuperclass = superclass->getAs<BoundGenericClassType>()) {
-    typeParams = genSuperclass->getGenericArgs();
-  }
-  
   CanAnyFunctionType overrideInterfaceType = baseInfo.LoweredInterfaceType;
-  if (!typeParams.empty()) {
-    overrideInterfaceType = cast<AnyFunctionType>(
-      cast<GenericFunctionType>(overrideInterfaceType)
-        ->partialSubstGenericArgs(SwiftModule, typeParams)
-        ->getCanonicalType());
-  }
   
-  assert(derived.kind == base.kind
-         && "override can't change decl kind?!");
-  auto derivedOrigTy = getNativeSILFunctionType(M, basePattern,
-                                             derivedInfo.LoweredType,
-                                             derivedInfo.LoweredInterfaceType,
-                                             overrideInterfaceType,
-                                             derived.kind);
+  auto derivedOrigTy = M.Types.getConstantOverrideType(derived, base);
 
   // Check the signature for changes that require thunking.
   auto derivedSubstTy = derivedInfo.getSILType()

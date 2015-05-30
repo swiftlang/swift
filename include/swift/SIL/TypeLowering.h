@@ -681,6 +681,22 @@ public:
   CanSILFunctionType getConstantFunctionType(SILDeclRef constant) {
     return getConstantInfo(constant).SILFnType;
   }
+  
+  /// Returns the SILFunctionType the given declaration must use to override.
+  /// Will be the same as getConstantFunctionType if the declaration does
+  /// not override.
+  CanSILFunctionType getConstantOverrideType(SILDeclRef constant) {
+    // Fast path if the constant isn't overridden.
+    if (constant.getOverriddenVTableEntry().isNull())
+      return getConstantFunctionType(constant);
+    SILDeclRef base = constant;
+    while (SILDeclRef overridden = base.getOverridden())
+      base = overridden;
+    
+    return getConstantOverrideType(constant, base);
+  }
+  CanSILFunctionType getConstantOverrideType(SILDeclRef constant,
+                                             SILDeclRef base);
 
   /// Substitute the given function type so that it implements the
   /// given substituted type.

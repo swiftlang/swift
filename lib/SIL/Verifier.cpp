@@ -1544,8 +1544,10 @@ public:
   }
 
   void checkClassMethodInst(ClassMethodInst *CMI) {
-    require(CMI->getType() == TC.getConstantType(CMI->getMember()),
-            "result type of class_method must match type of method");
+    auto overrideTy = TC.getConstantOverrideType(CMI->getMember());
+    requireSameType(CMI->getType(),
+                    SILType::getPrimitiveObjectType(overrideTy),
+        "result type of class_method must match abstracted type of method");
     auto methodType = requireObjectType(SILFunctionType, CMI,
                                         "result of class_method");
     require(!methodType->getExtInfo().hasContext(),

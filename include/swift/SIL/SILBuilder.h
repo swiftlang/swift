@@ -745,6 +745,13 @@ public:
                     ClassMethodInst(Loc, Operand, Member, MethodTy, Volatile));
   }
   
+  /// Emit a class_method reference to the least derived overridden decl for
+  /// the given method, and upcast the "self" pointer to the matching superclass
+  /// type.
+  std::pair<ClassMethodInst *, SILValue>
+  emitClassMethod(SILLocation Loc, SILValue Self, SILDeclRef Member,
+                  bool Volatile = false);
+  
   SuperMethodInst *createSuperMethod(SILLocation Loc, SILValue Operand,
                                      SILDeclRef Member, SILType MethodTy,
                                      bool Volatile = false) {
