@@ -744,6 +744,15 @@ public:
     return insert(new (F.getModule())
                     ClassMethodInst(Loc, Operand, Member, MethodTy, Volatile));
   }
+
+  ClassMethodInst *createClassMethod(SILLocation Loc, SILValue Operand,
+                                     SILDeclRef Member,
+                                     bool Volatile = false) {
+    auto MethodTy = getModule().Types.getConstantOverrideType(Member);
+    return createClassMethod(Loc, Operand, Member,
+                             SILType::getPrimitiveObjectType(MethodTy),
+                             Volatile);
+  }
   
   /// Emit a class_method reference to the least derived overridden decl for
   /// the given method, and upcast the "self" pointer to the matching superclass

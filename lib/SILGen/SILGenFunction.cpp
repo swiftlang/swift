@@ -622,8 +622,7 @@ static SILValue getNextUncurryLevelRef(SILGenFunction &gen,
       return gen.B.createFunctionRef(loc, dynamicThunk);
     }
 
-    return gen.B.createClassMethod(loc, thisArg, next,
-                                   constantInfo.getSILType());
+    return gen.B.createClassMethod(loc, thisArg, next);
   }
 
   // If the fully-uncurried reference is to a generic method, look up the

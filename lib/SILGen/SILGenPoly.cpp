@@ -1725,7 +1725,7 @@ static SILValue getWitnessFunctionRef(SILGenFunction &gen,
                                       SILDeclRef witness,
                                       bool isFree,
                                    SmallVectorImpl<ManagedValue> &witnessParams,
-                                      SILType witnessSILTy, SILLocation loc) {
+                                   SILLocation loc) {
   SILGenModule &SGM = gen.SGM;
   
   // Free functions are always statically dispatched...
@@ -1766,9 +1766,7 @@ static SILValue getWitnessFunctionRef(SILGenFunction &gen,
 
   // Otherwise emit a class method.
   SILValue selfPtr = witnessParams.back().getValue();
-  return gen.B.createClassMethod(loc, selfPtr, witness,
-                                 SGM.getConstantType(witness),
-                                 /*volatile*/ false);
+  return gen.B.createClassMethod(loc, selfPtr, witness);
 }
 
 void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
@@ -1899,20 +1897,29 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
   SILValue witnessSubstResultAddr
     = getThunkInnerResultAddr(*this, loc, witnessSubstFTy, reqtResultAddr);
   
+  SILValue witnessFnRef = getWitnessFunctionRef(*this, conformance,
+                                                witness, isFree,
+                                                witnessParams, loc);
+
+  auto witnessFTy = witnessFnRef.getType().getAs<SILFunctionType>();
+  
+  if (!witnessSubs.empty())
+    witnessFTy = witnessFTy->substGenericArgs(SGM.M, SGM.M.getSwiftModule(),
+                                              witnessSubs);
+
+  auto witnessSILTy = SILType::getPrimitiveObjectType(witnessFTy);
+
   // If the witness is generic, re-abstract to its original signature.
   // TODO: Implement some sort of "abstraction path" mechanism to efficiently
   // compose these two abstraction changes.
-  auto witnessSILTy = witnessSubstSILTy;
-  auto witnessFTy = witnessSubstFTy;
+  // Invoke the witness function calling a class method if we have a class and
+  // calling the static function otherwise.
+  // TODO: Collect forwarding substitutions from outer context of method.
+
   auto witnessResultAddr = witnessSubstResultAddr;
   AbstractionPattern witnessOrigTy(witnessFormalTy);
-  if (!witnessSubs.empty()) {
+  if (witnessFTy != witnessSubstFTy) {
     SmallVector<ManagedValue, 8> genParams;
-    witnessSILTy
-      = SGM.Types.getLoweredType(witnessOrigTy, witnessSubstTy);
-    witnessFTy
-      = witnessSILTy.castTo<SILFunctionType>();
-    
     TranslateArguments(*this, loc, TranslationKind::SubstToOrig,
                        witnessParams, genParams,
                        witnessFTy->getParametersWithoutIndirectResult())
@@ -1930,12 +1937,6 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
     args.push_back(witnessResultAddr);
   forwardFunctionArguments(*this, loc, witnessFTy, witnessParams, args);
   
-  // Invoke the witness function calling a class method if we have a class and
-  // calling the static function otherwise.
-  // TODO: Collect forwarding substitutions from outer context of method.
-  SILValue witnessFnRef = getWitnessFunctionRef(*this, conformance,
-                                                witness, isFree,
-                                                witnessParams, witnessSILTy, loc);
   SILValue witnessResultValue =
     emitApplyWithRethrow(loc, witnessFnRef, witnessSILTy, witnessSubs, args);
 
@@ -1944,7 +1945,7 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
   // Reabstract the result value:
   
   // If the witness is generic, reabstract to the concrete witness signature.
-  if (!witnessSubs.empty()) {
+  if (witnessFTy != witnessSubstFTy) {
     witnessResultValue = getThunkResult(*this, loc,
                                         TranslationKind::OrigToSubst,
                                         witnessFTy,

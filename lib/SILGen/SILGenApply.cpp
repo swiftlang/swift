@@ -552,7 +552,6 @@ public:
       SILValue methodVal = gen.B.createClassMethod(Loc,
                                                    Method.SelfValue,
                                                    *constant,
-                                                   constantInfo.getSILType(),
                                                    /*volatile*/
                                                      constant->isForeign);
 

@@ -220,17 +220,17 @@ struct ConformsWithMoreGeneric : X, Y {
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses23ConformsWithMoreGenericS_1XS_FS1_9selfTypesuRq_S1__fRq_FT1xq__q_ : $@convention(witness_method) (@out ConformsWithMoreGeneric, @in ConformsWithMoreGeneric, @inout ConformsWithMoreGeneric) -> () {
   // CHECK-NEXT:  bb0(%0 : $*ConformsWithMoreGeneric, %1 : $*ConformsWithMoreGeneric, %2 : $*ConformsWithMoreGeneric):
   // CHECK-NEXT:    %3 = load %1 : $*ConformsWithMoreGeneric
-  // CHECK-NEXT:    %4 = alloc_stack $ConformsWithMoreGeneric
-  // CHECK-NEXT:    store %3 to %4#1 : $*ConformsWithMoreGeneric
-  // CHECK-NEXT:    %6 = alloc_stack $ConformsWithMoreGeneric
   // CHECK-NEXT:    // function_ref
-  // CHECK-NEXT:    %7 = function_ref @_TFV9witnesses23ConformsWithMoreGeneric9selfTypesurfRS0_FT1xq__q_ : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @inout ConformsWithMoreGeneric) -> ()
-  // CHECK-NEXT:    %8 = apply %7<ConformsWithMoreGeneric>(%6#1, %4#1, %2) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @inout ConformsWithMoreGeneric) -> ()
-  // CHECK-NEXT:    %9 = load %6#1 : $*ConformsWithMoreGeneric
+  // CHECK-NEXT:    %4 = function_ref @_TFV9witnesses23ConformsWithMoreGeneric9selfTypesurfRS0_FT1xq__q_ : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @inout ConformsWithMoreGeneric) -> ()
+  // CHECK-NEXT:    %5 = alloc_stack $ConformsWithMoreGeneric
+  // CHECK-NEXT:    store %3 to %5#1 : $*ConformsWithMoreGeneric
+  // CHECK-NEXT:    %7 = alloc_stack $ConformsWithMoreGeneric
+  // CHECK-NEXT:    %8 = apply %4<ConformsWithMoreGeneric>(%7#1, %5#1, %2) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @inout ConformsWithMoreGeneric) -> ()
+  // CHECK-NEXT:    %9 = load %7#1 : $*ConformsWithMoreGeneric
   // CHECK-NEXT:    store %9 to %0 : $*ConformsWithMoreGeneric
   // CHECK-NEXT:    %11 = tuple ()
-  // CHECK-NEXT:    dealloc_stack %6#0 : $*@local_storage ConformsWithMoreGeneric
-  // CHECK-NEXT:    dealloc_stack %4#0 : $*@local_storage ConformsWithMoreGeneric
+  // CHECK-NEXT:    dealloc_stack %7#0 : $*@local_storage ConformsWithMoreGeneric
+  // CHECK-NEXT:    dealloc_stack %5#0 : $*@local_storage ConformsWithMoreGeneric
   // CHECK-NEXT:    return %11 : $()
   // CHECK-NEXT:  }
   func loadable<F>(x x: F) -> F { return x }
@@ -258,15 +258,15 @@ struct ConformsWithMoreGeneric : X, Y {
   func classes<I>(x x: I) -> I { return x }
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses23ConformsWithMoreGenericS_1XS_FS1_7classesu__Rq_S1_qd__S_7Classes_fRq_FT1xqd___qd__ : $@convention(witness_method) <A2 where A2 : Classes> (@owned A2, @inout ConformsWithMoreGeneric) -> @owned A2 {
   // CHECK-NEXT:  bb0(%0 : $A2, %1 : $*ConformsWithMoreGeneric):
-  // CHECK-NEXT:    %2 = alloc_stack $A2
-  // CHECK-NEXT:    store %0 to %2#1 : $*A2
-  // CHECK-NEXT:    %4 = alloc_stack $A2
   // CHECK-NEXT:    // function_ref witnesses.ConformsWithMoreGeneric.classes <A> (inout witnesses.ConformsWithMoreGeneric)(x : A) -> A
-  // CHECK-NEXT:    %5 = function_ref @_TFV9witnesses23ConformsWithMoreGeneric7classesurfRS0_FT1xq__q_ : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @inout ConformsWithMoreGeneric) -> ()
-  // CHECK-NEXT:    %6 = apply %5<A2>(%4#1, %2#1, %1) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @inout ConformsWithMoreGeneric) -> ()
-  // CHECK-NEXT:    %7 = load %4#1 : $*A2
-  // CHECK-NEXT:    dealloc_stack %4#0 : $*@local_storage A2
-  // CHECK-NEXT:    dealloc_stack %2#0 : $*@local_storage A2
+  // CHECK-NEXT:    %2 = function_ref @_TFV9witnesses23ConformsWithMoreGeneric7classesurfRS0_FT1xq__q_ : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @inout ConformsWithMoreGeneric) -> ()
+  // CHECK-NEXT:    %3 = alloc_stack $A2
+  // CHECK-NEXT:    store %0 to %3#1 : $*A2
+  // CHECK-NEXT:    %5 = alloc_stack $A2
+  // CHECK-NEXT:    %6 = apply %2<A2>(%5#1, %3#1, %1) : $@convention(method) <τ_0_0> (@out τ_0_0, @in τ_0_0, @inout ConformsWithMoreGeneric) -> ()
+  // CHECK-NEXT:    %7 = load %5#1 : $*A2
+  // CHECK-NEXT:    dealloc_stack %5#0 : $*@local_storage A2
+  // CHECK-NEXT:    dealloc_stack %3#0 : $*@local_storage A2
   // CHECK-NEXT:    return %7 : $A2
   // CHECK-NEXT:  }
 }
@@ -275,20 +275,20 @@ func <~> <J: Y, K: Y>(x: J, y: K) -> K { return y }
 // CHECK-NEXT:  bb0(%0 : $*ConformsWithMoreGeneric, %1 : $*ConformsWithMoreGeneric, %2 : $*ConformsWithMoreGeneric, %3 : $@thick ConformsWithMoreGeneric.Type):
 // CHECK-NEXT:    %4 = load %1 : $*ConformsWithMoreGeneric
 // CHECK-NEXT:    %5 = load %2 : $*ConformsWithMoreGeneric
-// CHECK-NEXT:    %6 = alloc_stack $ConformsWithMoreGeneric
-// CHECK-NEXT:    store %4 to %6#1 : $*ConformsWithMoreGeneric
-// CHECK-NEXT:    %8 = alloc_stack $ConformsWithMoreGeneric
-// CHECK-NEXT:    store %5 to %8#1 : $*ConformsWithMoreGeneric
-// CHECK-NEXT:    %10 = alloc_stack $ConformsWithMoreGeneric
 // CHECK-NEXT:    // function_ref
-// CHECK-NEXT:    %11 = function_ref @_TZF9witnessesoi3ltgu0_Rq_S_1Yq0_S0__FTq_q0__q0_ : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Y, τ_0_1 : Y> (@out τ_0_1, @in τ_0_0, @in τ_0_1) -> ()
-// CHECK-NEXT:    %12 = apply %11<ConformsWithMoreGeneric, ConformsWithMoreGeneric>(%10#1, %6#1, %8#1) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Y, τ_0_1 : Y> (@out τ_0_1, @in τ_0_0, @in τ_0_1) -> ()
-// CHECK-NEXT:    %13 = load %10#1 : $*ConformsWithMoreGeneric
+// CHECK-NEXT:    %6 = function_ref @_TZF9witnessesoi3ltgu0_Rq_S_1Yq0_S0__FTq_q0__q0_ : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Y, τ_0_1 : Y> (@out τ_0_1, @in τ_0_0, @in τ_0_1) -> ()
+// CHECK-NEXT:    %7 = alloc_stack $ConformsWithMoreGeneric
+// CHECK-NEXT:    store %4 to %7#1 : $*ConformsWithMoreGeneric
+// CHECK-NEXT:    %9 = alloc_stack $ConformsWithMoreGeneric
+// CHECK-NEXT:    store %5 to %9#1 : $*ConformsWithMoreGeneric
+// CHECK-NEXT:    %11 = alloc_stack $ConformsWithMoreGeneric
+// CHECK-NEXT:    %12 = apply %6<ConformsWithMoreGeneric, ConformsWithMoreGeneric>(%11#1, %7#1, %9#1) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : Y, τ_0_1 : Y> (@out τ_0_1, @in τ_0_0, @in τ_0_1) -> ()
+// CHECK-NEXT:    %13 = load %11#1 : $*ConformsWithMoreGeneric
 // CHECK-NEXT:    store %13 to %0 : $*ConformsWithMoreGeneric
 // CHECK-NEXT:    %15 = tuple ()
-// CHECK-NEXT:    dealloc_stack %10#0 : $*@local_storage ConformsWithMoreGeneric
-// CHECK-NEXT:    dealloc_stack %8#0 : $*@local_storage ConformsWithMoreGeneric
-// CHECK-NEXT:    dealloc_stack %6#0 : $*@local_storage ConformsWithMoreGeneric
+// CHECK-NEXT:    dealloc_stack %11#0 : $*@local_storage ConformsWithMoreGeneric
+// CHECK-NEXT:    dealloc_stack %9#0 : $*@local_storage ConformsWithMoreGeneric
+// CHECK-NEXT:    dealloc_stack %7#0 : $*@local_storage ConformsWithMoreGeneric
 // CHECK-NEXT:    return %15 : $()
 // CHECK-NEXT:  }
 
