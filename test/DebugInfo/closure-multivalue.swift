@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -O %s -disable-llvm-optzns -emit-ir -g -o - | FileCheck %s
 
-func markUsed<T>(t: T) {}
+import StdlibUnittest
 
 // CHECK: define {{.*}}4main4demo
 // CHECK: define {{.*}}hidden i1 {{.*}}4main4sort
@@ -16,7 +16,7 @@ func markUsed<T>(t: T) {}
 // CHECK-DAG: ![[P2]] = !DIExpression(DW_OP_bit_piece, {{(32, 32|64, 64)}})
 // CHECK-DAG: ![[P3]] = !DIExpression(DW_OP_bit_piece, {{(64, 32|128, 64)}})
 public func sort(a: String, b: String) -> Bool {
-  markUsed("Sorting..\(a) & \(b)")
+  _blackHole("Sorting..\(a) & \(b)")
   return (a < b)
 }
 
@@ -27,7 +27,7 @@ public func demo() {
     for name in sortedNames {
         sortedNamesAsString += ("\(name), ")
     }
-    markUsed(sortedNamesAsString)
+    _blackHole(sortedNamesAsString)
 }
 demo()
 

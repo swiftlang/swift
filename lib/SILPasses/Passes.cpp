@@ -251,6 +251,7 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   AddHighLevelLoopOptPasses(PM);
   
   PM.addDeadFunctionElimination();
+  PM.addDeadObjectElimination();
   PM.addGlobalPropertyOpt();
   
   PM.runOneIteration();
