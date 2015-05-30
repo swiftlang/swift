@@ -714,8 +714,8 @@ void ClosureSpecializer::gatherCallSites(
         if (ApplyCallee->isExternalDeclaration())
           continue;
 
-        // Ok, we know that we can perform the optimization but not whether or not
-        // the optimization is profitable. Find the index of the argument
+        // Ok, we know that we can perform the optimization but not whether or
+        // not the optimization is profitable. Find the index of the argument
         // corresponding to our partial apply.
         Optional<unsigned> ClosureIndex;
         for (unsigned i = 0, e = AI->getNumArguments(); i != e; ++i) {
@@ -727,7 +727,8 @@ void ClosureSpecializer::gatherCallSites(
           break;
         }
 
-        // If we did not find an index, there is nothing further to do, continue.
+        // If we did not find an index, there is nothing further to do,
+        // continue.
         if (!ClosureIndex.hasValue())
           continue;
 
@@ -769,8 +770,8 @@ void ClosureSpecializer::gatherCallSites(
                                              Endpoints.end());
         }
 
-        // Now we know that CSDesc is profitable to specialize. Add it to our call
-        // site list.
+        // Now we know that CSDesc is profitable to specialize. Add it to our
+        // call site list.
         CallSites.push_back(CallSiteDescriptor(&II, AI, ClosureIndex.getValue(),
                                                ClosureParamInfo,
                                                std::move(NonFailureExitBBs),
