@@ -1338,7 +1338,7 @@ static const WitnessTable *findErrorTypeWitness(const Metadata *srcType) {
 
 static const Metadata *getNSErrorTypeMetadata() {
   static auto TheNSErrorMetadata
-  = swift_getObjCClassMetadata((const ClassMetadata *)getNSErrorClass());
+    = swift_getObjCClassMetadata((const ClassMetadata *)getNSErrorClass());
   return TheNSErrorMetadata;
 }
 #endif
