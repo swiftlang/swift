@@ -140,9 +140,10 @@ private:
 //===----------------------------------------------------------------------===//
 
 namespace {
+struct ClosureInfo;
 
 class CallSiteDescriptor {
-  SILInstruction *Closure;
+  ClosureInfo *CInfo;
   ApplyInst *AI;
   unsigned ClosureIndex;
   SILParameterInfo ClosureParamInfo;
@@ -151,35 +152,31 @@ class CallSiteDescriptor {
   // have only one element, a return inst.
   llvm::TinyPtrVector<SILBasicBlock *> NonFailureExitBBs;
 
-  // The points where the closure is ultimately released.
-  llvm::SmallSetVector<SILInstruction *, 4> JointlyPostDomReleasePoints;
-
 public:
-  CallSiteDescriptor(SILInstruction *ClosureInst, ApplyInst *AI,
+  CallSiteDescriptor(ClosureInfo *CInfo, ApplyInst *AI,
                      unsigned ClosureIndex, SILParameterInfo ClosureParamInfo,
-                     llvm::TinyPtrVector<SILBasicBlock *> &&NonFailureExitBBs,
-                     ValueLifetime &ClosureLifetime)
-      : Closure(ClosureInst), AI(AI), ClosureIndex(ClosureIndex),
-        ClosureParamInfo(ClosureParamInfo),
-        NonFailureExitBBs(NonFailureExitBBs),
-        JointlyPostDomReleasePoints(ClosureLifetime.LastUsers) {}
+                     llvm::TinyPtrVector<SILBasicBlock *> &&NonFailureExitBBs)
+    : CInfo(CInfo), AI(AI), ClosureIndex(ClosureIndex),
+      ClosureParamInfo(ClosureParamInfo),
+      NonFailureExitBBs(NonFailureExitBBs) {}
 
-  static bool isSupportedClosure(const SILInstruction *Closure);
+  CallSiteDescriptor(CallSiteDescriptor&&) =default;
+  CallSiteDescriptor &operator=(CallSiteDescriptor &&) =default;
 
   SILFunction *getApplyCallee() const {
     return cast<FunctionRefInst>(AI->getCallee())->getReferencedFunction();
   }
 
   SILFunction *getClosureCallee() const {
-    if (auto *PAI = dyn_cast<PartialApplyInst>(Closure))
+    if (auto *PAI = dyn_cast<PartialApplyInst>(getClosure()))
       return cast<FunctionRefInst>(PAI->getCallee())->getReferencedFunction();
 
-    auto *TTTFI = cast<ThinToThickFunctionInst>(Closure);
+    auto *TTTFI = cast<ThinToThickFunctionInst>(getClosure());
     return cast<FunctionRefInst>(TTTFI->getCallee())->getReferencedFunction();
   }
 
   bool closureHasRefSemanticContext() const {
-    return isa<PartialApplyInst>(Closure);
+    return isa<PartialApplyInst>(getClosure());
   }
 
   unsigned getClosureIndex() const { return ClosureIndex; }
@@ -189,40 +186,38 @@ public:
   SILInstruction *
   createNewClosure(SILBuilder &B, SILValue V,
                    llvm::SmallVectorImpl<SILValue> &Args) const {
-    if (isa<PartialApplyInst>(Closure))
-      return B.createPartialApply(Closure->getLoc(), V, V.getType(), {}, Args,
-                                  Closure->getType(0));
+    if (isa<PartialApplyInst>(getClosure()))
+      return B.createPartialApply(getClosure()->getLoc(), V, V.getType(), {},
+                                  Args, getClosure()->getType(0));
 
-    assert(isa<ThinToThickFunctionInst>(Closure) &&
+    assert(isa<ThinToThickFunctionInst>(getClosure()) &&
            "We only support partial_apply and thin_to_thick_function");
-    return B.createThinToThickFunction(Closure->getLoc(), V,
-                                       Closure->getType(0));
+    return B.createThinToThickFunction(getClosure()->getLoc(), V,
+                                       getClosure()->getType(0));
   }
 
   ApplyInst *getApplyInst() const { return AI; }
 
-  void specializeClosure(CallGraph &CG) const;
-
   void createName(llvm::SmallString<64> &NewName) const;
 
   OperandValueArrayRef getArguments() const {
-    if (auto *PAI = dyn_cast<PartialApplyInst>(Closure))
+    if (auto *PAI = dyn_cast<PartialApplyInst>(getClosure()))
       return PAI->getArguments();
 
     // Thin to thick function has no non-callee arguments.
-    assert(isa<ThinToThickFunctionInst>(Closure) &&
+    assert(isa<ThinToThickFunctionInst>(getClosure()) &&
            "We only support partial_apply and thin_to_thick_function");
     return OperandValueArrayRef(ArrayRef<Operand>());
   }
 
-  SILInstruction *getClosure() const { return Closure; }
+  inline SILInstruction *getClosure() const;
 
   unsigned getNumArguments() const {
-    if (auto *PAI = dyn_cast<PartialApplyInst>(Closure))
+    if (auto *PAI = dyn_cast<PartialApplyInst>(getClosure()))
       return PAI->getNumArguments();
 
     // Thin to thick function has no non-callee arguments.
-    assert(isa<ThinToThickFunctionInst>(Closure) &&
+    assert(isa<ThinToThickFunctionInst>(getClosure()) &&
            "We only support partial_apply and thin_to_thick_function");
     return 0;
   }
@@ -235,7 +230,7 @@ public:
     return getClosureParameterInfo().isConsumed();
   }
 
-  SILLocation getLoc() const { return Closure->getLoc(); }
+  SILLocation getLoc() const { return getClosure()->getLoc(); }
 
   SILModule &getModule() const { return AI->getModule(); }
 
@@ -246,8 +241,24 @@ public:
   /// Extend the lifetime of 'Arg' to the lifetime of the closure.
   void extendArgumentLifetime(SILValue Arg) const;
 };
-
 } // end anonymous namespace
+
+namespace {
+struct ClosureInfo {
+  SILInstruction *Closure;
+  ValueLifetime Lifetime;
+  llvm::SmallVector<CallSiteDescriptor, 8> CallSites;
+
+  ClosureInfo(SILInstruction *Closure): Closure(Closure) {}
+
+  ClosureInfo(ClosureInfo &&) =default;
+  ClosureInfo &operator=(ClosureInfo &&) =default;
+};
+} // end anonymous namespace
+
+SILInstruction *CallSiteDescriptor::getClosure() const {
+  return CInfo->Closure;
+}
 
 /// Update the callsite to pass in the correct arguments.
 static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
@@ -362,45 +373,46 @@ void CallSiteDescriptor::createName(llvm::SmallString<64> &NewName) const {
   Mangle::Mangler M(buffer);
   auto P = Mangle::SpecializationPass::ClosureSpecializer;
   Mangle::FunctionSignatureSpecializationMangler FSSM(P, M, getApplyCallee());
-  if (auto *PAI = dyn_cast<PartialApplyInst>(Closure)) {
+  if (auto *PAI = dyn_cast<PartialApplyInst>(getClosure())) {
     FSSM.setArgumentClosureProp(getClosureIndex(), PAI);
     FSSM.mangle();
     return;
   }
 
-  auto *TTTFI = cast<ThinToThickFunctionInst>(Closure);
+  auto *TTTFI = cast<ThinToThickFunctionInst>(getClosure());
   FSSM.setArgumentClosureProp(getClosureIndex(), TTTFI);
   FSSM.mangle();
 }
 
 void CallSiteDescriptor::extendArgumentLifetime(SILValue Arg) const {
-  assert(!JointlyPostDomReleasePoints.empty() &&
+  assert(!CInfo->Lifetime.getLastUsers().empty() &&
          "Need a post-dominating release(s)");
 
   // Extend the lifetime of a captured argument to cover the callee.
-  SILBuilderWithScope<2> Builder(Closure);
-  Builder.createRetainValue(Closure->getLoc(), Arg);
-  for (auto *I : JointlyPostDomReleasePoints) {
+  SILBuilderWithScope<2> Builder(getClosure());
+  Builder.createRetainValue(getClosure()->getLoc(), Arg);
+  for (auto *I : CInfo->Lifetime.getLastUsers()) {
     auto It = SILBasicBlock::iterator(*I);
     Builder.setInsertionPoint(++It);
-    Builder.createReleaseValue(Closure->getLoc(), Arg);
+    Builder.createReleaseValue(getClosure()->getLoc(), Arg);
   }
 }
 
-void CallSiteDescriptor::specializeClosure(CallGraph &CG) const {
+static void specializeClosure(CallGraph &CG, ClosureInfo &CInfo,
+                              CallSiteDescriptor &CallDesc) {
   llvm::SmallString<64> NewFName;
-  createName(NewFName);
+  CallDesc.createName(NewFName);
   DEBUG(llvm::dbgs() << "    Perform optimizations with new name " << NewFName
                      << '\n');
 
   // Then see if we already have a specialized version of this function in our
   // module.
-  SILFunction *NewF = getModule().lookUpFunction(NewFName);
+  SILFunction *NewF = CInfo.Closure->getModule().lookUpFunction(NewFName);
 
   // If not, create a specialized version of ApplyCallee calling the closure
   // directly.
   if (!NewF) {
-    NewF = ClosureSpecCloner::cloneFunction(*this, NewFName);
+    NewF = ClosureSpecCloner::cloneFunction(CallDesc, NewFName);
 
     // Update the call graph with the newly created function.
     CallGraphEditor Editor(CG);
@@ -408,10 +420,10 @@ void CallSiteDescriptor::specializeClosure(CallGraph &CG) const {
   }
 
   // Rewrite the call
-  rewriteApplyInst(*this, NewF, CG);
+  rewriteApplyInst(CallDesc, NewF, CG);
 }
 
-bool CallSiteDescriptor::isSupportedClosure(const SILInstruction *Closure) {
+static bool isSupportedClosure(const SILInstruction *Closure) {
   if (!isSupportedClosureKind(Closure))
     return false;
 
@@ -651,7 +663,7 @@ public:
   ClosureSpecializer() = default;
 
   void gatherCallSites(SILFunction *Caller,
-                       llvm::SmallVectorImpl<CallSiteDescriptor> &CallSites,
+                       llvm::SmallVectorImpl<ClosureInfo*> &ClosureCandidates,
                        llvm::SmallPtrSet<ApplyInst *, 4> &MultipleClosureAI);
   bool specialize(SILFunction *Caller, CallGraph &CG);
 
@@ -669,7 +681,8 @@ public:
 } // end anonymous namespace
 
 void ClosureSpecializer::gatherCallSites(
-    SILFunction *Caller, llvm::SmallVectorImpl<CallSiteDescriptor> &CallSites,
+    SILFunction *Caller,
+    llvm::SmallVectorImpl<ClosureInfo*> &ClosureCandidates,
     llvm::SmallPtrSet<ApplyInst *, 4> &MultipleClosureAI) {
 
   // A set of apply inst that we have associated with a closure. We use this to
@@ -679,13 +692,13 @@ void ClosureSpecializer::gatherCallSites(
   // For each basic block BB in Caller...
   for (auto &BB : *Caller) {
 
-    ValueLifetime ClosureLifetime;
-
     // For each instruction II in BB...
     for (auto &II : BB) {
       // If II is not a closure that we support specializing, skip it...
-      if (!CallSiteDescriptor::isSupportedClosure(&II))
+      if (!isSupportedClosure(&II))
         continue;
+
+      ClosureInfo *CInfo = nullptr;
 
       // Go through all uses of our closure.
       for (auto *Use : II.getUses()) {
@@ -762,18 +775,20 @@ void ClosureSpecializer::gatherCallSites(
 
         // Compute the final release points of the closure. We will insert
         // release of the captured arguments here.
-        if (ClosureLifetime.getLastUsers().empty()) {
-          ValueLifetimeAnalysis VLA(&II);
-          ClosureLifetime = VLA.computeFromDirectUses();
+        if (!CInfo) {
+          CInfo = new ClosureInfo(&II);
+          ValueLifetimeAnalysis VLA(CInfo->Closure);
+          CInfo->Lifetime = VLA.computeFromDirectUses();
         }
 
         // Now we know that CSDesc is profitable to specialize. Add it to our
         // call site list.
-        CallSites.push_back(CallSiteDescriptor(&II, AI, ClosureIndex.getValue(),
-                                               ClosureParamInfo,
-                                               std::move(NonFailureExitBBs),
-                                               ClosureLifetime));
+        CInfo->CallSites.push_back(
+          CallSiteDescriptor(CInfo, AI, ClosureIndex.getValue(),
+                             ClosureParamInfo, std::move(NonFailureExitBBs)));
       }
+      if (CInfo)
+        ClosureCandidates.push_back(CInfo);
     }
   }
 }
@@ -785,22 +800,24 @@ bool ClosureSpecializer::specialize(SILFunction *Caller,
 
   // Collect all of the PartialApplyInsts that are used as arguments to
   // ApplyInsts. Check the profitability of specializing the closure argument.
-  llvm::SmallVector<CallSiteDescriptor, 8> CallSites;
+  llvm::SmallVector<ClosureInfo*, 8> ClosureCandidates;
   llvm::SmallPtrSet<ApplyInst *, 4> MultipleClosureAI;
-  gatherCallSites(Caller, CallSites, MultipleClosureAI);
+  gatherCallSites(Caller, ClosureCandidates, MultipleClosureAI);
 
   bool Changed = false;
-  for (auto &CSDesc : CallSites) {
-    // Do not specialize apply insts that take in multiple closures. This pass
-    // does not know how to do this yet.
-    if (MultipleClosureAI.count(CSDesc.getApplyInst()))
-      continue;
+  for (auto *CInfo : ClosureCandidates) {
+    for (auto &CSDesc : CInfo->CallSites) {
+      // Do not specialize apply insts that take in multiple closures. This pass
+      // does not know how to do this yet.
+      if (MultipleClosureAI.count(CSDesc.getApplyInst()))
+        continue;
 
-    CSDesc.specializeClosure(CG);
-    PropagatedClosures.push_back(CSDesc.getClosure());
-    Changed = true;
+      specializeClosure(CG, *CInfo, CSDesc);
+      PropagatedClosures.push_back(CSDesc.getClosure());
+      Changed = true;
+    }
+    delete CInfo;
   }
-
   return Changed;
 }
 
