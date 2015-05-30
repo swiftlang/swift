@@ -82,6 +82,9 @@ Projection::addressProjectionForInstruction(SILInstruction *I) {
   case ValueKind::TupleElementAddrInst:
     assert(isAddrProjection(I) && "isAddrProjection out of sync");
     return Projection(cast<TupleElementAddrInst>(I));
+  case ValueKind::IndexAddrInst:
+    assert(isAddrProjection(I) && "isAddrProjection out of sync");
+    return Projection(cast<IndexAddrInst>(I));
   case ValueKind::RefElementAddrInst:
     assert(isAddrProjection(I) && "isAddrProjection out of sync");
     return Projection(cast<RefElementAddrInst>(I));
@@ -147,6 +150,19 @@ static unsigned getIndexForValueDecl(ValueDecl *Decl) {
   llvm_unreachable("Failed to find Decl in its decl context?!");
 }
 
+/// We do not support symbolic projections yet, only 32-bit unsigned integers.
+bool swift::getIntegerIndex(SILValue IndexVal, unsigned &IndexConst) {
+  if (auto *IndexLiteral = dyn_cast<IntegerLiteralInst>(IndexVal)) {
+    APInt ConstInt = IndexLiteral->getValue();
+    // IntegerLiterals are signed.
+    if (ConstInt.isIntN(32) && ConstInt.isNonNegative()) {
+      IndexConst = (unsigned)ConstInt.getSExtValue();
+      return true;
+    }
+  }
+  return false;
+}
+
 Projection::Projection(StructElementAddrInst *SEA)
     : Type(SEA->getType()), Decl(SEA->getField()),
       Index(getIndexForValueDecl(Decl)),
@@ -155,6 +171,14 @@ Projection::Projection(StructElementAddrInst *SEA)
 Projection::Projection(TupleElementAddrInst *TEA)
     : Type(TEA->getType()), Decl(nullptr), Index(TEA->getFieldNo()),
       Kind(unsigned(ProjectionKind::Tuple)) {}
+
+Projection::Projection(IndexAddrInst *IA)
+    : Type(IA->getType()), Decl(nullptr),
+      Kind(unsigned(ProjectionKind::Index)) {
+  bool valid = getIntegerIndex(IA->getIndex(), Index);
+  (void)valid;
+  assert(valid && "only index_addr taking integer literal is supported");
+}
 
 Projection::Projection(RefElementAddrInst *REA)
     : Type(REA->getType()), Decl(REA->getField()),
@@ -210,6 +234,8 @@ createValueProjection(SILBuilder &B, SILLocation Loc, SILValue Base) const {
     return B.createStructExtract(Loc, Base, cast<VarDecl>(getDecl()));
   case ProjectionKind::Tuple:
     return B.createTupleExtract(Loc, Base, getIndex());
+  case ProjectionKind::Index:
+    return nullptr;
   case ProjectionKind::Enum:
     return B.createUncheckedEnumData(Loc, Base,
                                      cast<EnumElementDecl>(getDecl()));
@@ -247,6 +273,11 @@ createAddrProjection(SILBuilder &B, SILLocation Loc, SILValue Base) const {
     return B.createStructElementAddr(Loc, Base, cast<VarDecl>(getDecl()));
   case ProjectionKind::Tuple:
     return B.createTupleElementAddr(Loc, Base, getIndex());
+  case ProjectionKind::Index: {
+    auto Ty = SILType::getBuiltinIntegerType(32, B.getASTContext());
+    auto *IntLiteral = B.createIntegerLiteral(Loc, Ty, getIndex());
+    return B.createIndexAddr(Loc, Base, IntLiteral);
+  }
   case ProjectionKind::Enum:
     return B.createUncheckedTakeEnumDataAddr(Loc, Base,
                                              cast<EnumElementDecl>(getDecl()));
@@ -264,6 +295,8 @@ SILValue Projection::getOperandForAggregate(SILInstruction *I) const {
     case ProjectionKind::Tuple:
       if (isa<TupleInst>(I))
         return I->getOperand(getIndex());
+      break;
+    case ProjectionKind::Index:
       break;
     case ProjectionKind::Enum:
       if (EnumInst *EI = dyn_cast<EnumInst>(I)) {
@@ -306,9 +339,11 @@ ProjectionPath::getAddrProjectionPath(SILValue Start, SILValue End,
   auto Iter = End;
   if (IgnoreCasts)
     Iter = Iter.stripCasts();
+  bool NextAddrIsIndex = false;
   while (Projection::isAddrProjection(Iter) && Start != Iter) {
     Projection AP = *Projection::addressProjectionForValue(Iter);
     P.Path.push_back(AP);
+    NextAddrIsIndex = (AP.getKind() == ProjectionKind::Index);
 
     Iter = cast<SILInstruction>(*Iter).getOperand(0);
     if (IgnoreCasts)
@@ -316,7 +351,9 @@ ProjectionPath::getAddrProjectionPath(SILValue Start, SILValue End,
   }
 
   // Return None if we have an empty projection list or if Start == Iter.
-  if (P.empty() || Start != Iter)
+  // If the next project is index_addr, then Start and End actually point to
+  // disjoint locations (the value at Start has an implicit index_addr #0).
+  if (P.empty() || Start != Iter || NextAddrIsIndex)
     return llvm::NoneType::None;
 
   // Otherwise, return P.

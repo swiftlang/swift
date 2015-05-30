@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "cowarray-opts"
 #include "swift/SILPasses/Passes.h"
 #include "swift/SIL/CFG.h"
+#include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
@@ -37,50 +38,20 @@
 #include "llvm/Support/Debug.h"
 using namespace swift;
 
-/// Given a SIL value, capture its element index and the value of the aggregate
-/// that immeditely contains it. (This is a simple projection over a value.)
-struct AccessPathComponent {
-  SILValue Aggregate;
-  unsigned Index;
-  AccessPathComponent(ValueBase *V) :Index(~0U) {
-    switch (V->getKind()) {
-    default:
-      break;
-    case ValueKind::StructElementAddrInst: {
-      StructElementAddrInst *SEA = cast<StructElementAddrInst>(V);
-      Index = SEA->getFieldNo();
-      Aggregate = SEA->getOperand();
-      break;
-    }
-    case ValueKind::RefElementAddrInst: {
-      RefElementAddrInst *REA = cast<RefElementAddrInst>(V);
-      Index = REA->getFieldNo();
-      Aggregate = REA->getOperand();
-      break;
-    }
-    case ValueKind::TupleElementAddrInst: {
-      TupleElementAddrInst *TEA = cast<TupleElementAddrInst>(V);
-      Index = TEA->getFieldNo();
-      Aggregate = TEA->getOperand();
-      break;
-    }
-    }
-  }
-  bool isValid() const { return Aggregate.isValid(); }
-};
-
 /// \return a sequence of integers representing the access path of this element
 /// within a Struct/Ref/Tuple.
 ///
-/// IndexedEntity is not handled because it would add complexity.
+/// Do not form a path with an IndexAddrInst because we have no way to
+/// distinguish between indexing and subelement access. The same index could
+/// either refer to the next element (indexed) or a subelement.
 static SILValue getAccessPath(SILValue V, SmallVectorImpl<unsigned>& Path) {
   V = V.stripCasts();
-  AccessPathComponent APC(V.getDef());
-  if (!APC.isValid())
+  ProjectionIndex PI(V.getDef());
+  if (!PI.isValid() || V->getKind() == ValueKind::IndexAddrInst)
     return V;
 
-  SILValue UnderlyingObject = getAccessPath(APC.Aggregate, Path);
-  Path.push_back(APC.Index);
+  SILValue UnderlyingObject = getAccessPath(PI.Aggregate, Path);
+  Path.push_back(PI.Index);
   return UnderlyingObject;
 }
 
@@ -224,20 +195,22 @@ protected:
         continue;
       }
 
-      AccessPathComponent APC(UseInst);
-      if (!APC.isValid()) {
+      ProjectionIndex PI(UseInst);
+      // Do not form a path from an IndexAddrInst without otherwise
+      // distinguishing it from subelement addressing.
+      if (!PI.isValid() || V->getKind() == ValueKind::IndexAddrInst) {
         // Found a use of an aggregate containing the given element.
         AggregateAddressUsers.push_back(UseInst);
         continue;
       }
 
-      if (APC.Index != AccessPathSuffix[0]) {
+      if (PI.Index != AccessPathSuffix[0]) {
         // Ignore uses of disjoint elements.
         continue;
       }
 
       // An alloc_stack returns its address as the second value.
-      assert((APC.Aggregate == V || APC.Aggregate == SILValue(V, 1)) &&
+      assert((PI.Aggregate == V || PI.Aggregate == SILValue(V, 1)) &&
              "Expected unary element addr inst.");
 
       // Recursively check for users after stripping this component from the

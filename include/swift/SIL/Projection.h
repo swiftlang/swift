@@ -32,10 +32,70 @@ namespace swift {
 
 class SILBuilder;
 
+/// Extract an integer index from a SILValue.
+///
+/// Return true if IndexVal is a constant index representable as unsigned
+/// int. We do not support symbolic projections yet.
+bool getIntegerIndex(SILValue IndexVal, unsigned &IndexConst);
+
+/// Given a SIL value, capture its element index and the value of the aggregate
+/// that immeditely contains it.
+///
+/// This lightweight utility maps a SIL address projection to an index.
+struct ProjectionIndex {
+  SILValue Aggregate;
+  unsigned Index;
+
+  explicit ProjectionIndex(SILValue V) :Index(~0U) {
+    switch (V->getKind()) {
+    default:
+      break;
+    case ValueKind::IndexAddrInst: {
+      IndexAddrInst *IA = cast<IndexAddrInst>(V);
+      if (getIntegerIndex(IA->getIndex(), Index))
+        Aggregate = IA->getBase();
+      break;
+    }
+    case ValueKind::StructElementAddrInst: {
+      StructElementAddrInst *SEA = cast<StructElementAddrInst>(V);
+      Index = SEA->getFieldNo();
+      Aggregate = SEA->getOperand();
+      break;
+    }
+    case ValueKind::RefElementAddrInst: {
+      RefElementAddrInst *REA = cast<RefElementAddrInst>(V);
+      Index = REA->getFieldNo();
+      Aggregate = REA->getOperand();
+      break;
+    }
+    case ValueKind::TupleElementAddrInst: {
+      TupleElementAddrInst *TEA = cast<TupleElementAddrInst>(V);
+      Index = TEA->getFieldNo();
+      Aggregate = TEA->getOperand();
+      break;
+    }
+    case ValueKind::StructExtractInst: {
+      StructExtractInst *SEA = cast<StructExtractInst>(V);
+      Index = SEA->getFieldNo();
+      Aggregate = SEA->getOperand();
+      break;
+    }
+    case ValueKind::TupleExtractInst: {
+      TupleExtractInst *TEA = cast<TupleExtractInst>(V);
+      Index = TEA->getFieldNo();
+      Aggregate = TEA->getOperand();
+      break;
+    }
+    }
+  }
+  bool isValid() const { return Aggregate.isValid(); }
+};
+
 /// The kind of projection that we are representing.
 enum class ProjectionKind : uint8_t {
   Struct,
   Tuple,
+  Index,
   Class,
   Enum,
   LastProjectionKind = Enum,
@@ -58,15 +118,12 @@ class Projection {
   ValueDecl *Decl;
 
   /// The index associated with the projection if the projection is representing
-  /// a tuple type or the decl's index in its parent. We assume no more than 64
-  /// indices so we can merge this with Kind into two pointers. We can lose a
-  /// bit here and be ok.
-  unsigned Index : 6;
+  /// a tuple type or the decl's index in its parent
+  unsigned Index;
 
   /// The kind of projection that we are processing.
-  unsigned Kind : 2;
-  static_assert(unsigned(ProjectionKind::LastProjectionKind) == 3,
-                "Need to update size of kind");
+  /// There are plenty of extra bits here which could be stolen for flags.
+  unsigned Kind;
 
 public:
   Projection(const Projection &P)
@@ -120,13 +177,11 @@ public:
 
   /// Helper method that returns isAddrProjection(I->getKind());
   static bool isAddrProjection(SILValue V) {
-    return isAddrProjection(V->getKind());
-  }
-
-  /// Returns true if K is a ValueKind that Projection recognizes as an address
-  /// projection.
-  static bool isAddrProjection(ValueKind K) {
-    switch (K) {
+    switch (V->getKind()) {
+    case ValueKind::IndexAddrInst: {
+      unsigned Scalar;
+      return getIntegerIndex(cast<IndexAddrInst>(V)->getIndex(), Scalar);
+    }
     case ValueKind::StructElementAddrInst:
     case ValueKind::TupleElementAddrInst:
     case ValueKind::RefElementAddrInst:
@@ -193,6 +248,7 @@ public:
     case ProjectionKind::Enum:
       return true;
     case ProjectionKind::Tuple:
+    case ProjectionKind::Index:
       return false;
     }
   }
@@ -204,6 +260,7 @@ public:
   bool isIndexedKind() const {
     switch (getKind()) {
     case ProjectionKind::Tuple:
+    case ProjectionKind::Index:
       return true;
     case ProjectionKind::Struct:
     case ProjectionKind::Class:
@@ -247,6 +304,7 @@ private:
 
   explicit Projection(StructElementAddrInst *SEA);
   explicit Projection(TupleElementAddrInst *TEA);
+  explicit Projection(IndexAddrInst *SEA);
   explicit Projection(RefElementAddrInst *REA);
   explicit Projection(UncheckedTakeEnumDataAddrInst *UTEDAI);
   explicit Projection(StructExtractInst *SEI);
