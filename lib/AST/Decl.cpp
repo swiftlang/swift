@@ -378,10 +378,33 @@ bool Decl::isPrivateStdlibDecl(bool whitelistProtocols) const {
   if (FU->getKind() != FileUnitKind::SerializedAST)
     return false;
 
+  auto hasInternalParameter = [](ArrayRef<const Pattern *> Pats) -> bool {
+    bool hasInternalParam = false;
+    for (auto Pat : Pats) {
+      Pat->forEachVariable([&](VarDecl *Param) {
+        if (Param->hasName() && Param->getNameStr() != "_" &&
+            Param->getNameStr().startswith("_")) {
+          hasInternalParam = true;
+        }
+      });
+    }
+    return hasInternalParam;
+  };
+
   if (auto AFD = dyn_cast<AbstractFunctionDecl>(D)) {
     // Hide '~>' functions (but show the operator, because it defines
     // precedence).
     if (AFD->getNameStr() == "~>")
+      return true;
+
+    // If it's a function with a parameter with leading underscore, it's a
+    // private function.
+    if (hasInternalParameter(AFD->getBodyParamPatterns()))
+      return true;
+  }
+
+  if (auto SubscriptD = dyn_cast<SubscriptDecl>(D)) {
+    if (hasInternalParameter(SubscriptD->getIndices()))
       return true;
   }
 
@@ -391,9 +414,6 @@ bool Decl::isPrivateStdlibDecl(bool whitelistProtocols) const {
     if (whitelistProtocols)
       return false;
   }
-  if (isa<ProtocolDecl>(D->getDeclContext()))
-    return false;
-
 
   auto VD = dyn_cast<ValueDecl>(D);
   if (!VD || !VD->hasName())
@@ -402,21 +422,6 @@ bool Decl::isPrivateStdlibDecl(bool whitelistProtocols) const {
   // If the name has leading underscore then it's a private symbol.
   if (VD->getNameStr().startswith("_"))
     return true;
-
-  // If it's a constructor with a parameter with leading underscore, it's a
-  // private function.
-  if (auto CD = dyn_cast<ConstructorDecl>(VD)) {
-    bool hasInternalParameter = false;
-    for (auto Pat : CD->getBodyParamPatterns()) {
-      Pat->forEachVariable([&](VarDecl *Param) {
-        if (Param->hasName() && Param->getNameStr().startswith("_")) {
-          hasInternalParameter = true;
-        }
-      });
-      if (hasInternalParameter)
-        return true;
-    }
-  }
 
   return false;
 }

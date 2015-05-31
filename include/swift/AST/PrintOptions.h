@@ -201,6 +201,20 @@ struct PrintOptions {
     return result;
   }
 
+  /// Retrieve the set of options suitable for interface generation for
+  /// documentation purposes.
+  static PrintOptions printDocInterface() {
+    PrintOptions result = PrintOptions::printInterface();
+    result.SkipUnavailable = false;
+    result.ExcludeAttrList.push_back(DAK_Available);
+    result.ArgAndParamPrinting =
+      PrintOptions::ArgAndParamPrintingMode::BothAlways;
+    result.PrintDocumentationComments = false;
+    result.PrintRegularClangComments = false;
+    result.PrintAccessibility = false;
+    return result;
+  }
+
   /// Retrieve the set of options suitable for printing SIL functions.
   static PrintOptions printSIL() {
     PrintOptions result;

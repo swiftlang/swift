@@ -196,10 +196,7 @@ func test012() {
   } catch {
     error.#^INSIDE_CATCH_ERR_DOT1^#
   }
-// ERROR_DOT: Begin completions
-// ERROR_DOT-DAG: Decl[InstanceVar]/CurrNominal:      _domain[#String#]; name=_domain
-// ERROR_DOT-DAG: Decl[InstanceVar]/CurrNominal:      _code[#Int#]; name=_code
-// ERROR_DOT: End completions
+// ERROR_DOT-NOT: Begin completions
 }
 func test013() {
   do {
@@ -213,8 +210,6 @@ func test014() {
     e.#^INSIDE_CATCH_ERR_DOT3^#
   }
 // NSERROR_DOT: Begin completions
-// NSERROR_DOT-DAG: Decl[InstanceVar]/CurrNominal:      _domain[#String#]; name=_domain
-// NSERROR_DOT-DAG: Decl[InstanceVar]/CurrNominal:      _code[#Int#]; name=_code
 // NSERROR_DOT-DAG: Decl[InstanceVar]/CurrNominal:      domain[#String#]; name=domain
 // NSERROR_DOT-DAG: Decl[InstanceVar]/CurrNominal:      code[#Int#]; name=code
 // NSERROR_DOT-DAG: Decl[InstanceVar]/Super:            hashValue[#Int#]; name=hashValue

@@ -375,6 +375,18 @@ AnnotatePrint("annotate-print",
 // AST and module printing options.
 
 static llvm::cl::opt<bool>
+PrintInterface("print-interface",
+               llvm::cl::desc("Print with options set for interface printing, "
+                              "overrides any other printing option"),
+               llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
+PrintInterfaceForDoc("print-interface-doc",
+               llvm::cl::desc("Print with options set for interface printing, "
+                        "for doc support; overrides any other printing option"),
+               llvm::cl::init(false));
+
+static llvm::cl::opt<bool>
 PrintImplicitAttrs("print-implicit-attrs",
                    llvm::cl::desc("Print implicit attributes"),
                    llvm::cl::init(false));
@@ -2420,18 +2432,25 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  PrintOptions PrintOpts = PrintOptions::printEverything();
-  PrintOpts.FullyQualifiedTypesIfAmbiguous =
-    options::FullyQualifiedTypesIfAmbiguous;
-  PrintOpts.SynthesizeSugarOnTypes = options::SynthesizeSugarOnTypes;
-  PrintOpts.AbstractAccessors = options::AbstractAccessors;
-  PrintOpts.PrintImplicitAttrs = options::PrintImplicitAttrs;
-  PrintOpts.PrintAccessibility = options::PrintAccessibility;
-  PrintOpts.AccessibilityFilter = options::AccessibilityFilter;
-  PrintOpts.PrintRegularClangComments = options::PrintRegularComments;
-  PrintOpts.SkipPrivateStdlibDecls = options::SkipPrivateStdlibDecls;
-  PrintOpts.SkipUnavailable = options::SkipUnavailable;
-  PrintOpts.SkipDeinit = options::SkipDeinit;
+  PrintOptions PrintOpts;
+  if (options::PrintInterface) {
+    PrintOpts = PrintOptions::printInterface();
+  } else if (options::PrintInterfaceForDoc) {
+    PrintOpts = PrintOptions::printDocInterface();
+  } else {
+    PrintOpts = PrintOptions::printEverything();
+    PrintOpts.FullyQualifiedTypesIfAmbiguous =
+      options::FullyQualifiedTypesIfAmbiguous;
+    PrintOpts.SynthesizeSugarOnTypes = options::SynthesizeSugarOnTypes;
+    PrintOpts.AbstractAccessors = options::AbstractAccessors;
+    PrintOpts.PrintImplicitAttrs = options::PrintImplicitAttrs;
+    PrintOpts.PrintAccessibility = options::PrintAccessibility;
+    PrintOpts.AccessibilityFilter = options::AccessibilityFilter;
+    PrintOpts.PrintRegularClangComments = options::PrintRegularComments;
+    PrintOpts.SkipPrivateStdlibDecls = options::SkipPrivateStdlibDecls;
+    PrintOpts.SkipUnavailable = options::SkipUnavailable;
+    PrintOpts.SkipDeinit = options::SkipDeinit;
+  }
 
   int ExitCode;
 
