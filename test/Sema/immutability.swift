@@ -514,3 +514,10 @@ struct TestBangMutability {
   subscript() -> Int? { return nil }
 
 }
+
+// <rdar://problem/21176945> mutation through ? not considered a mutation
+func testBindOptional() {
+  var a : TestStruct2? = nil  // Mutated through optional chaining.
+  a?.mutatingfunc()
+}
+

@@ -1113,6 +1113,9 @@ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
   
   if (auto *FVE = dyn_cast<ForceValueExpr>(E))
     return markStoredOrInOutExpr(FVE->getSubExpr(), Flags);
+
+  if (auto *BOE = dyn_cast<BindOptionalExpr>(E))
+    return markStoredOrInOutExpr(BOE->getSubExpr(), Flags);
   
   // If this is an OapqueValueExpr that we've seen a mapping for, jump to the
   // mapped value.
