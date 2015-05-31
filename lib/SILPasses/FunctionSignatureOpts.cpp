@@ -507,12 +507,6 @@ createEmptyFunctionWithOptimizedSig(llvm::SmallString<64> &NewFName) {
   if (!F->getSemanticsAttr().startswith("array."))
     NewF->setSemanticsAttr(F->getSemanticsAttr());
 
-  // All instructions will be moved to NewF later, so move the old
-  // function's SILDebugScope over to NewF.
-  NewF->getDebugScope()->SILFn = NewF;
-  auto *NewScope = new (M) SILDebugScope(F->getDebugScope()->Loc, *F);
-  F->setDebugScope(NewScope);
-
   return NewF;
 }
 
