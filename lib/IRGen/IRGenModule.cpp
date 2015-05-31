@@ -590,7 +590,45 @@ static int pointerPODSortComparator(T * const *lhs, T * const *rhs) {
   return 0;
 }
 
+static bool replaceModuleFlagsEntry(llvm::LLVMContext &Ctx,
+                                    llvm::Module &Module, StringRef EntryName,
+                                    llvm::Module::ModFlagBehavior Behavior,
+                                    llvm::Metadata *Val) {
+  auto *ModuleFlags = Module.getModuleFlagsMetadata();
+
+  for (unsigned I = 0, E = ModuleFlags->getNumOperands(); I != E; ++I) {
+    llvm::MDNode *Op = ModuleFlags->getOperand(I);
+    llvm::MDString *ID = cast<llvm::MDString>(Op->getOperand(1));
+
+    if (ID->getString().equals(EntryName)) {
+
+      // Create the new entry.
+      llvm::Type *Int32Ty = llvm::Type::getInt32Ty(Ctx);
+      llvm::Metadata *Ops[3] = {llvm::ConstantAsMetadata::get(
+                                    llvm::ConstantInt::get(Int32Ty, Behavior)),
+                                llvm::MDString::get(Ctx, EntryName), Val};
+
+      ModuleFlags->setOperand(I, llvm::MDNode::get(Ctx, Ops));
+      return true;
+    }
+  }
+  llvm_unreachable("Could not replace old linker options entry?");
+}
+
 void IRGenModule::emitAutolinkInfo() {
+
+  // FIXME: This constant should be vended by LLVM somewhere.
+  static const char * const LinkerOptionsFlagName = "Linker Options";
+
+  // Collect the linker options already in the module (from ClangCodeGen).
+  auto *LinkerOptions = Module.getModuleFlag(LinkerOptionsFlagName);
+  if (LinkerOptions) {
+    for (auto &LinkOption : cast<llvm::MDNode>(LinkerOptions)->operands()) {
+      LinkOption->dump();
+      AutolinkEntries.push_back(LinkOption);
+    }
+  }
+
   // Remove duplicates.
   llvm::SmallPtrSet<llvm::Metadata*, 4> knownAutolinkEntries;
   AutolinkEntries.erase(std::remove_if(AutolinkEntries.begin(),
@@ -603,13 +641,21 @@ void IRGenModule::emitAutolinkInfo() {
 
   switch (TargetInfo.OutputObjectFormat) {
   case llvm::Triple::MachO: {
-    // FIXME: This constant should be vended by LLVM somewhere.
-    static const char * const LinkerOptionsFlagName = "Linker Options";
-
     llvm::LLVMContext &ctx = Module.getContext();
-    Module.addModuleFlag(llvm::Module::AppendUnique, LinkerOptionsFlagName,
-                         llvm::MDNode::get(ctx, AutolinkEntries));
 
+    if (!LinkerOptions) {
+      // Create a new linker flag entry.
+      Module.addModuleFlag(llvm::Module::AppendUnique, LinkerOptionsFlagName,
+                           llvm::MDNode::get(ctx, AutolinkEntries));
+    } else {
+      // Replace the old linker flag entry.
+      bool FoundOldEntry = replaceModuleFlagsEntry(
+          ctx, Module, LinkerOptionsFlagName, llvm::Module::AppendUnique,
+          llvm::MDNode::get(ctx, AutolinkEntries));
+
+      (void)FoundOldEntry;
+      assert(FoundOldEntry && "Could not replace old linker options entry?");
+    }
     break;
   }
   case llvm::Triple::ELF: {
@@ -652,11 +698,40 @@ void IRGenModule::emitAutolinkInfo() {
   }
 }
 
+void IRGenModule::cleanupClangCodeGenMetadata() {
+  // Remove llvm.ident that ClangCodeGen might have left in the module.
+  auto *LLVMIdent = Module.getNamedMetadata("llvm.ident");
+  if (LLVMIdent)
+    Module.eraseNamedMetadata(LLVMIdent);
+
+  // LLVM's object-file emission collects a fixed set of keys for the
+  // image info.
+  // Using "Objective-C Garbage Collection" as the key here is a hack,
+  // but LLVM's object-file emission isn't general enough to collect
+  // arbitrary keys to put in the
+
+  const char *ObjectiveCGarbageCollection = "Objective-C Garbage Collection";
+  if (Module.getModuleFlag(ObjectiveCGarbageCollection)) {
+    bool FoundOldEntry = replaceModuleFlagsEntry(
+        Module.getContext(), Module, ObjectiveCGarbageCollection,
+        llvm::Module::Override,
+        llvm::ConstantAsMetadata::get(
+            llvm::ConstantInt::get(Int32Ty, (uint32_t)(swiftVersion << 8))));
+
+    (void)FoundOldEntry;
+    assert(FoundOldEntry && "Could not replace old module flag entry?");
+  } else
+    Module.addModuleFlag(llvm::Module::Override,
+                         ObjectiveCGarbageCollection,
+                         (uint32_t)(swiftVersion << 8));
+}
+
 void IRGenModule::finalize() {
   emitAutolinkInfo();
   emitGlobalLists();
   if (DebugInfo)
     DebugInfo->finalize();
+  cleanupClangCodeGenMetadata();
 }
 
 void IRGenModule::unimplemented(SourceLoc loc, StringRef message) {

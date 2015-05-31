@@ -136,8 +136,8 @@ class WeakObjC {
 
 // rdar://17528908
 // CHECK:  i32 1, !"Objective-C Version", i32 2}
-// CHECK:  i32 1, !"Swift Version", i32 3}
 // CHECK:  i32 1, !"Objective-C Image Info Version", i32 0}
 // CHECK:  i32 1, !"Objective-C Image Info Section", !"__DATA, __objc_imageinfo, regular, no_dead_strip"}
 //   512 == (2 << 8).  2 is the Swift ABI version.
 // CHECK:  i32 4, !"Objective-C Garbage Collection", i32 768}
+// CHECK:  i32 1, !"Swift Version", i32 3}

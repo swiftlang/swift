@@ -69,3 +69,7 @@ void IRGenModule::emitClangDecl(clang::Decl *decl) {
   }
 }
 
+void IRGenModule::finalizeClangCodeGen() {
+  ClangCodeGen->HandleTranslationUnit(
+      *const_cast<clang::ASTContext *>(ClangASTContext));
+}

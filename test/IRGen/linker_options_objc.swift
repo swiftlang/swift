@@ -10,6 +10,6 @@ import Empty
 // Check that libobjc is always autolinked together with libswiftCore on
 // platforms that support Objective-C.
 
-// CHECK: !{{.*}} = !{i32 6, !"Linker Options", !3}
+// CHECK: !{{.*}} = !{i32 6, !"Linker Options", !{{.*}}}
 // CHECK-DAG: !{{.*}} = !{!"-lswiftCore"}
 // CHECK-DAG: !{{.*}} = !{!"-lobjc"}

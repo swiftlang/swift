@@ -688,6 +688,19 @@ void IRGenModule::emitGlobalLists() {
   }
   
   // @llvm.used
+
+  // Collect llvm.used globals already in the module (coming from ClangCodeGen).
+  auto *ExistingLLVMUsed = Module.getGlobalVariable("llvm.used");
+  if (ExistingLLVMUsed) {
+    auto *Globals =
+        cast<llvm::ConstantArray>(ExistingLLVMUsed->getInitializer());
+    for (auto &Use : Globals->operands()) {
+      auto *Global = Use.get();
+      LLVMUsed.push_back(Global);
+    }
+    ExistingLLVMUsed->eraseFromParent();
+  }
+
   assert(std::all_of(LLVMUsed.begin(), LLVMUsed.end(),
                      [](const llvm::WeakVH &global) {
     return !isa<llvm::GlobalValue>(global) ||
@@ -764,6 +777,10 @@ void IRGenModule::finishEmitAfterTopLevel() {
   for (auto def : Context.ExternalDefinitions) {
     emitExternalDefinition(def);
   }
+
+  // Let ClangCodeGen emit its global data structures (llvm.used, debug info,
+  // etc.)
+  finalizeClangCodeGen();
 }
 
 static void emitLazyTypeMetadata(IRGenModule &IGM, CanType type) {
