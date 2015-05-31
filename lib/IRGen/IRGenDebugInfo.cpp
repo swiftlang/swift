@@ -1659,7 +1659,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
         Scope, MangledName, File, L.Line, SizeInBits, AlignInBits, Flags,
         DerivedFrom, DBuilder.getOrCreateArray(Protocols),
         llvm::dwarf::DW_LANG_Swift, nullptr,
-        StringRef() /*don't unique*/);
+        MangledName);
 
     FwdDecl->replaceAllUsesWith(DITy);
     llvm::MDNode::deleteTemporary(FwdDecl);
@@ -1898,15 +1898,8 @@ llvm::DIType *IRGenDebugInfo::getOrCreateType(DebugTypeInfo DbgTy) {
     }
   }
 
-  // After the specializer did its work, archetypes may have different
-  // storage types so we can't cache them based on their Swift type.
-  if (DbgTy.getType()->hasArchetype())
-    // In order to create recursive data structures we temporarily
-    // still insert them into the cache, so remove them.
-    DITypeCache.erase(DbgTy.getType());
-  else
-    // Store it in the cache.
-    DITypeCache.insert({DbgTy.getType(), llvm::TrackingMDNodeRef(DITy)});
+  // Store it in the cache.
+  DITypeCache.insert({DbgTy.getType(), llvm::TrackingMDNodeRef(DITy)});
 
   return DITy;
 }
