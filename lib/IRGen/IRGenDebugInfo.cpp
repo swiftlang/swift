@@ -49,6 +49,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Transforms/Utils/Local.h"
 
 using namespace swift;
 using namespace irgen;
@@ -1141,6 +1142,10 @@ void IRGenDebugInfo::emitDbgIntrinsic(llvm::BasicBlock *BB,
     InlinedAt = createInlinedAt(DS);
   }
   auto DL = llvm::DebugLoc::get(Line, Col, Scope, InlinedAt);
+  // An alloca may only be described by exactly one dbg.declare.
+  if (isa<llvm::AllocaInst>(Storage) && llvm::FindAllocaDbgDeclare(Storage))
+    return;
+
   // A dbg.declare is only meaningful if there is a single alloca for
   // the variable that is live throughout the function. With SIL
   // optimizations this is not guranteed and a variable can end up in
