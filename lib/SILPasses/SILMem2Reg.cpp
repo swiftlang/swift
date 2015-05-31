@@ -269,7 +269,8 @@ static void
 promoteDebugValueAddr(DebugValueAddrInst *DVAI, SILValue Value, SILBuilder &B) {
   assert(Value.isValid() && "Expected valid value");
   B.setInsertionPoint(DVAI);
-  B.createDebugValue(DVAI->getLoc(), Value);
+  B.createDebugValue(DVAI->getLoc(), Value)
+    ->setDebugScope(DVAI->getDebugScope());
   DVAI->eraseFromParent();
 }
 

@@ -503,11 +503,12 @@ bool swift::rotateLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI,
   // The other instructions are just cloned to the preheader.
   TermInst *PreheaderBranch = Preheader->getTerminator();
   for (auto &Inst : *Header) {
-    SILInstruction *I = Inst.clone(PreheaderBranch);
-    mapOperands(I, ValueMap);
+    if (SILInstruction *I = Inst.clone(PreheaderBranch)) {
+      mapOperands(I, ValueMap);
 
-    // The actual operand will sort out which result idx to use.
-    ValueMap[&Inst] = SILValue(I, 0);
+      // The actual operand will sort out which result idx to use.
+      ValueMap[&Inst] = SILValue(I, 0);
+    }
   }
 
   PreheaderBranch->dropAllReferences();

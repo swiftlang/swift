@@ -643,6 +643,12 @@ SILCloner<ImplClass>::visitMarkFunctionEscapeInst(MarkFunctionEscapeInst *Inst){
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitDebugValueInst(DebugValueInst *Inst) {
+  // We cannot inline/clone debug intrinsics without a scope. If they
+  // describe function arguments there is no way to determine which
+  // function they belong to.
+  if (!Inst->getDebugScope())
+    return;
+
   // Since we want the debug info to survive, we do not remap the location here.
   doPostProcess(Inst,
                 getBuilder().createDebugValue(Inst->getLoc(),
@@ -651,6 +657,12 @@ SILCloner<ImplClass>::visitDebugValueInst(DebugValueInst *Inst) {
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
+  // We cannot inline/clone debug intrinsics without a scope. If they
+  // describe function arguments there is no way to determine which
+  // function they belong to.
+  if (!Inst->getDebugScope())
+    return;
+
   // Do not remap the location for a debug instruction.
   SILValue OpValue = getOpValue(Inst->getOperand());
   doPostProcess(Inst,
