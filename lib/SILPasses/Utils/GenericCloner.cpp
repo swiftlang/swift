@@ -49,6 +49,7 @@ SILFunction *GenericCloner::initCloned(SILFunction *Orig,
       Orig->isFragile(), Orig->isThunk(), Orig->getClassVisibility(),
       Orig->getInlineStrategy(), Orig->getEffectsKind(), Orig,
       Orig->getDebugScope(), Orig->getDeclContext());
+  NewF->setDeclCtx(Orig->getDeclContext());
   NewF->setSemanticsAttr(Orig->getSemanticsAttr());
   return NewF;
 }

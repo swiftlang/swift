@@ -17,9 +17,9 @@ class AnotherClass : AProtocol {
 // CHECK-DAG: ![[INHERIT]] = !DIDerivedType(tag: DW_TAG_inheritance,{{.*}} baseType: ![[PROTOCOL:"[^"]+"]]
 // CHECK-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "_TtMP12generic_args9AProtocol_",{{.*}} identifier: [[PROTOCOL]]
 // CHECK-DAG: !DILocalVariable(tag: DW_TAG_arg_variable, name: "x", arg: 1,{{.*}} type: ![[T:.*]])
-// CHECK-DAG: ![[T]] = !DICompositeType(tag: DW_TAG_structure_type, name: "_TtQq_F12generic_args9aFunction{{.*}}
+// CHECK-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "_TtQq_F12generic_args9aFunction{{.*}}, identifier: [[T]])
 // CHECK-DAG: !DILocalVariable(tag: DW_TAG_arg_variable, name: "y", arg: 2,{{.*}} type: ![[Q:.*]])
-// CHECK-DAG: ![[Q]] = !DICompositeType(tag: DW_TAG_structure_type, name: "_TtQq0_F12generic_args9aFunction{{.*}}
+// CHECK-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "_TtQq0_F12generic_args9aFunction{{.*}}, identifier: [[Q]])
 func aFunction<T : AProtocol, Q : AProtocol>(x: T, _ y: Q, _ z: String) {
    markUsed("I am in \(z): \(x.f()) \(y.f())")
 }
@@ -36,10 +36,9 @@ struct Wrapper<T: AProtocol> {
   }
 
   func passthrough(t: T) -> T {
-    // CHECK-DAG: !DILocalVariable(tag: DW_TAG_auto_variable, name: "local",{{.*}} line: [[@LINE+1]],{{.*}} type: ![[LOCAL_T:[0-9]+]]
-    var local = t
     // The type of local should have the context Wrapper<T>.
-    // CHECK-DAG: ![[LOCAL_T]] = !DICompositeType(tag: DW_TAG_structure_type, name: "_TtQq_V12generic_args7Wrapper"
+    // CHECK-DAG: !DILocalVariable(tag: DW_TAG_auto_variable, name: "local",{{.*}} line: [[@LINE+1]],{{.*}} type: !"_TtQq_V12generic_args7Wrapper"
+    var local = t
     local = t
     return local
   }

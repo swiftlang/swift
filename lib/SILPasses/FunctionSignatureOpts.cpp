@@ -500,16 +500,12 @@ createEmptyFunctionWithOptimizedSig(llvm::SmallString<64> &NewFName) {
       F->getInlineStrategy(), F->getEffectsKind(), 0, F->getDebugScope(),
       F->getDeclContext());
 
+  NewF->setDeclCtx(F->getDeclContext());
+
   // Array semantic clients rely on the signature being as in the original
   // version.
   if (!F->getSemanticsAttr().startswith("array."))
     NewF->setSemanticsAttr(F->getSemanticsAttr());
-
-  // All instructions will be moved to NewF later, so move the old
-  // function's SILDebugScope over to NewF.
-  NewF->getDebugScope()->SILFn = NewF;
-  auto *NewScope = new (M) SILDebugScope(F->getDebugScope()->Loc, *F);
-  F->setDebugScope(NewScope);
 
   return NewF;
 }
@@ -691,6 +687,7 @@ moveFunctionBodyToNewFunctionWithName(SILFunction *F,
   createThunkBody(ThunkBody, NewF, Analyzer);
   
   F->setThunk(IsThunk);
+  assert(F->getDebugScope()->SILFn != NewF->getDebugScope()->SILFn);
 
   return NewF;
 }

@@ -265,8 +265,12 @@ public:
   llvm::DenseMap<SILValue, LoweredValue> LoweredValues;
   llvm::DenseMap<SILType, LoweredValue> LoweredUndefs;
   llvm::MapVector<SILBasicBlock *, LoweredBB> LoweredBBs;
+  // These could also be cached for the entire module which could pay
+  // off in optimized code with lots of inlining of the same functions.
+  // Or, probably even better, stored in the AST.
   llvm::SmallDenseMap<const VarDecl *, unsigned, 8> ArgNo;
-  llvm::SmallBitVector DidEmitDebugInfoForArg;
+  llvm::SmallDenseMap<const DeclContext *, unsigned> NumArgs;
+  llvm::SmallDenseMap<const VarDecl *, bool, 8> ArgEmitted;
   
   // Destination basic blocks for condfail traps.
   llvm::SmallVector<llvm::BasicBlock *, 8> FailBBs;
@@ -479,6 +483,36 @@ public:
     Copy.push_back(Alloca.getAddress());
   }
 
+  /// Determine the Swift argument ordering for a given parameter and
+  /// the total number of arguments per function.
+  // TODO: It would be more efficient to determine this earlier and
+  // store the number in the AST instead.
+  unsigned getArgNo(const VarDecl *D) {
+    unsigned N = 0;
+    if (auto *param = dyn_cast<ParamDecl>(D)) {
+      auto countArgs = [&](const DeclContext *DC, ArrayRef<Pattern*> Patterns) {
+        if (!NumArgs.lookup(DC)) {
+          unsigned I = 0;
+          for (auto p : reversed(Patterns))
+            p->forEachVariable([&](VarDecl *VD) {
+                ArgNo[VD] = ++I;
+                if (VD == D)
+                  N = I;
+            });
+          NumArgs[DC] = I;
+        }
+      };
+      auto *dc = param->getDeclContext();
+      if (auto *fn = dyn_cast<AbstractFunctionDecl>(dc))
+        countArgs(dc, fn->getBodyParamPatterns());
+      else if (auto *closure = dyn_cast<ClosureExpr>(dc))
+        countArgs(dc, closure->getParamPatterns());
+      if (!N)
+        N = ArgNo.lookup(D);
+    }
+    return N;
+  }
+
   /// Emit debug info for a function argument or a local variable.
   template <typename StorageType>
   void emitDebugVariableDeclaration(IRBuilder &Builder,
@@ -487,16 +521,14 @@ public:
                                     SILDebugScope *DS,
                                     StringRef Name) {
     if (!IGM.DebugInfo) return;
-    auto N = ArgNo.find(cast<VarDecl>(Ty.getDecl()));
-    if (N != ArgNo.end()) {
-      if (DidEmitDebugInfoForArg[N->second - 1])
-        return;
-
+    auto VD = cast<VarDecl>(Ty.getDecl());
+    auto N = getArgNo(VD);
+    if (N) {
       PrologueLocation AutoRestore(IGM.DebugInfo, Builder);
       IGM.DebugInfo->
         emitArgVariableDeclaration(Builder, Storage,
-                                   Ty, DS, Name, N->second, DirectValue);
-      DidEmitDebugInfoForArg.set(N->second - 1);
+                                   Ty, DS, Name, N, DirectValue);
+      ArgEmitted[VD] = true;
     } else
       IGM.DebugInfo->
         emitStackVariableDeclaration(Builder, Storage,
@@ -561,10 +593,6 @@ public:
     if (!Decl)
       return;
 
-    auto N = ArgNo.find(Decl);
-    if (N != ArgNo.end() && DidEmitDebugInfoForArg[N->second - 1])
-      return;
-
     StringRef Name = Decl->getNameStr();
     auto SILVal = i->getOperand();
     Explosion e = getLoweredExplosion(SILVal);
@@ -576,16 +604,17 @@ public:
                                  i->getDebugScope(), Name);
   }
   void visitDebugValueAddrInst(DebugValueAddrInst *i) {
-    if (!IGM.DebugInfo) return;
+    if (!IGM.DebugInfo)
+      return;
     VarDecl *Decl = i->getDecl();
-    if (!Decl) return;
+    if (!Decl)
+      return;
+
     StringRef Name = Decl->getName().str();
     auto SILVal = i->getOperand();
     auto Val = getLoweredAddress(SILVal).getAddress();
-    emitDebugVariableDeclaration
-      (Builder, Val,
-       DebugTypeInfo(Decl, Decl->getType(), getTypeInfo(SILVal.getType())),
-       i->getDebugScope(), Name);
+    DebugTypeInfo DbgTy(Decl, Decl->getType(), getTypeInfo(SILVal.getType()));
+    emitDebugVariableDeclaration(Builder, Val, DbgTy, i->getDebugScope(), Name);
   }
   void visitLoadWeakInst(LoadWeakInst *i);
   void visitStoreWeakInst(StoreWeakInst *i);
@@ -1337,20 +1366,23 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
   // This is the prologue of a function. Emit debug info for all
   // trivial arguments and any captured and promoted [inout]
   // variables.
-  int N = 0;
+  unsigned NMax = NumArgs.lookup(CurSILFn->getDeclContext());
   const VarDecl* LastVD = nullptr;
   for (auto I = BB->getBBArgs().begin(), E=BB->getBBArgs().end();
        I != E; ++I) {
     SILArgument *Arg = *I;
+    unsigned N = 0;
 
     // Reconstruct the Swift argument numbering.
     if (auto *VD = dyn_cast_or_null<VarDecl>(Arg->getDecl()))
       if (VD != LastVD) {
-        ++N;
+        N = getArgNo(VD);
+        if (!NMax)
+          NMax = NumArgs.lookup(CurSILFn->getDeclContext());
         LastVD = VD;
       }
 
-    if (!Arg->getDecl() || DidEmitDebugInfoForArg[N - 1])
+    if (!Arg->getDecl())
       continue;
 
     // Generic and existential types were already handled in
@@ -1358,6 +1390,9 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
     if (Arg->getType().isExistentialType() ||
         Arg->getType().getSwiftRValueType()->isDependentType() ||
         Arg->getType().is<ArchetypeType>())
+      continue;
+
+    if (ArgEmitted.lookup(LastVD))
       continue;
 
     auto Name = Arg->getDecl()->getNameStr();
@@ -1394,11 +1429,15 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
     // Emit -O0 shadow copies for by-value parameters to ensure they
     // are visible until the end of the function.
     emitShadowCopy(Vals, Name, Copy);
-    IGM.DebugInfo->emitArgVariableDeclaration
-      (Builder, Copy, DTI, getDebugScope(), Name, N,
-       IndirectionKind(Deref), RealValue);
-
-    DidEmitDebugInfoForArg.set(N - 1);
+    // Captures are pointing to the decl of the captured variable.
+    if (LastVD->getDeclContext() != CurSILFn->getDeclContext())
+      IGM.DebugInfo->emitArgVariableDeclaration
+        (Builder, Copy, DTI, getDebugScope(), Name, ++NMax,
+         IndirectionKind(Deref), ArtificialValue);
+    else if (N)
+      IGM.DebugInfo->emitArgVariableDeclaration
+        (Builder, Copy, DTI, getDebugScope(), Name, N,
+         IndirectionKind(Deref), RealValue);
   }
 
   // Emit the artificial error result argument.
@@ -1414,7 +1453,8 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
     StringRef Name("$error");
     IGM.DebugInfo->emitArgVariableDeclaration(
       Builder, emitShadowCopy(ErrorResultSlot.getAddress(), Name), DTI,
-      getDebugScope(), Name, N+1, IndirectValue, ArtificialValue);
+      getDebugScope(), Name, ++NMax,
+      IndirectValue, ArtificialValue);
   }
 
 }
@@ -1435,21 +1475,6 @@ void IRGenSILFunction::visitSILBasicBlock(SILBasicBlock *BB) {
   else
     ScopedLoc = llvm::make_unique<ArtificialLocation>(
         CurSILFn->getDebugScope(), IGM.DebugInfo, Builder);
-
-  if (InEntryBlock) {
-    // One Swift argument may have been exploded into many SIL
-    // arguments. Establish a mapping from VarDecl -> (Swift) ArgNo.
-    unsigned N = 0;
-    const VarDecl *LastVD = nullptr;
-    for (auto *Arg : BB->getBBArgs()) {
-      if (auto *VD = dyn_cast_or_null<VarDecl>(Arg->getDecl()))
-        if (VD != LastVD) {
-          ArgNo.insert( {VD, ++N} );
-          LastVD = VD;
-        }
-    }
-    DidEmitDebugInfoForArg.resize(N);
-  }
 
   // Generate the body.
   bool InCleanupBlock = false;
@@ -3141,10 +3166,11 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
                                  type);
       auto Name = Decl->getName().empty() ? "_" : Decl->getName().str();
       auto DS = i->getDebugScope();
-      if (!DS) DS = CurSILFn->getDebugScope();
-      assert(DS->SILFn == CurSILFn || DS->InlinedCallSite);
-      emitDebugVariableDeclaration(Builder, addr.getAddress().getAddress(),
-                                   DbgTy, DS, Name);
+      if (DS) {
+        assert(DS->SILFn == CurSILFn || DS->InlinedCallSite);
+        emitDebugVariableDeclaration(Builder, addr.getAddress().getAddress(),
+                                     DbgTy, DS, Name);
+      }
     }
   }
   

@@ -496,6 +496,7 @@ DeadParamCloner::DeadParamCloner(SILFunction *Orig,
   : SILClonerWithScopes<DeadParamCloner>(*initCloned(Orig, DeadParamIndices,
                                                      ClonedName)),
     Orig(Orig), DeadParamIndices(DeadParamIndices) {
+  assert(Orig->getDebugScope()->SILFn != getCloned()->getDebugScope()->SILFn);
 }
 
 static void getClonedName(SILFunction *F,
@@ -554,6 +555,7 @@ DeadParamCloner::initCloned(SILFunction *Orig,
                           Orig->getClassVisibility(), Orig->getInlineStrategy(),
                           Orig->getEffectsKind(), Orig, Orig->getDebugScope());
   Fn->setSemanticsAttr(Orig->getSemanticsAttr());
+  Fn->setDeclCtx(Orig->getDeclContext());
   return Fn;
 }
 
