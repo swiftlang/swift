@@ -1061,7 +1061,9 @@ void IRGenDebugInfo::emitVariableDeclaration(
     // FIXME: assert(Flags == 0 && "Complex variables cannot have flags");
   }
   Var = DBuilder.createLocalVariable(
-        Tag, Scope, Name, Unit, Line, DITy, Opts.Optimize, Flags, ArgNo);
+    Tag, Scope, Name, Unit, Line, DITy,
+    false /* could be Opts.Optimize if we also unique DIVariables here */,
+    Flags, ArgNo);
 
   // Insert a debug intrinsic into the current block.
   unsigned OffsetInBits = 0;
