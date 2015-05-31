@@ -73,38 +73,6 @@ public:
 bool maybeScopeless(SILInstruction &I);
 #endif
 
-/// Knows how to make a deep copy of a debug scope.
-class ScopeCloner {
-  llvm::SmallDenseMap<SILDebugScope *, SILDebugScope *> ClonedScopeCache;
-  SILFunction &NewFn;
-public:
-  ScopeCloner(SILFunction &Fn) : NewFn(Fn) {
-    auto *OrigScope = Fn.getDebugScope();
-    Fn.setDebugScope(getOrCreateClonedScope(OrigScope));
-    OrigScope->SILFn->setInlined();
-  }
-  SILDebugScope *getOrCreateClonedScope(SILDebugScope *OrigScope) {
-    if (!OrigScope)
-      return nullptr;
-
-    auto it = ClonedScopeCache.find(OrigScope);
-    if (it != ClonedScopeCache.end())
-      return it->second;
-
-    auto CloneScope = new (NewFn.getModule()) SILDebugScope(*OrigScope);
-    if (OrigScope->InlinedCallSite) {
-      // For inlined functions, we need to rewrite the inlined call site.
-      CloneScope->InlinedCallSite =
-        getOrCreateClonedScope(OrigScope->InlinedCallSite);
-    } else {
-      CloneScope->SILFn = &NewFn;
-      CloneScope->Parent = getOrCreateClonedScope(OrigScope->Parent);
-    }    // Create an inline scope for the cloned instruction.
-    ClonedScopeCache.insert({OrigScope, CloneScope});
-    return CloneScope;
-  }
-};
-
 }
 
 #endif

@@ -747,7 +747,7 @@ namespace {
 SILInstruction *SILInstruction::clone(SILInstruction *InsertPt) {
   SILInstruction *NewInst = TrivialCloner::doIt(this);
 
-  if (NewInst && InsertPt)
+  if (InsertPt)
     InsertPt->getParent()->getInstList().insert(InsertPt, NewInst);
   return NewInst;
 }

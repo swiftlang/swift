@@ -1061,9 +1061,7 @@ void IRGenDebugInfo::emitVariableDeclaration(
     // FIXME: assert(Flags == 0 && "Complex variables cannot have flags");
   }
   Var = DBuilder.createLocalVariable(
-    Tag, Scope, Name, Unit, Line, DITy,
-    false /* could be Opts.Optimize if we also unique DIVariables here */,
-    Flags, ArgNo);
+        Tag, Scope, Name, Unit, Line, DITy, Opts.Optimize, Flags, ArgNo);
 
   // Insert a debug intrinsic into the current block.
   unsigned OffsetInBits = 0;
@@ -1141,13 +1139,8 @@ void IRGenDebugInfo::emitDbgIntrinsic(llvm::BasicBlock *BB,
     InlinedAt = createInlinedAt(DS);
   }
   auto DL = llvm::DebugLoc::get(Line, Col, Scope, InlinedAt);
-  // A dbg.declare is only meaningful if there is a single alloca for
-  // the variable that is live throughout the function. With SIL
-  // optimizations this is not guranteed and a variable can end up in
-  // two allocas (for example, one function inlined twice).
-  if (!Opts.Optimize &&
-      (isa<llvm::AllocaInst>(Storage) ||
-       isa<llvm::UndefValue>(Storage)))
+  if (isa<llvm::AllocaInst>(Storage) ||
+      isa<llvm::UndefValue>(Storage))
     DBuilder.insertDeclare(Storage, Var, Expr, DL, BB);
   else
     DBuilder.insertDbgValueIntrinsic(Storage, 0, Var, Expr, DL, BB);
@@ -1659,7 +1652,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
         Scope, MangledName, File, L.Line, SizeInBits, AlignInBits, Flags,
         DerivedFrom, DBuilder.getOrCreateArray(Protocols),
         llvm::dwarf::DW_LANG_Swift, nullptr,
-        MangledName);
+        StringRef() /*don't unique*/);
 
     FwdDecl->replaceAllUsesWith(DITy);
     llvm::MDNode::deleteTemporary(FwdDecl);
@@ -1898,8 +1891,15 @@ llvm::DIType *IRGenDebugInfo::getOrCreateType(DebugTypeInfo DbgTy) {
     }
   }
 
-  // Store it in the cache.
-  DITypeCache.insert({DbgTy.getType(), llvm::TrackingMDNodeRef(DITy)});
+  // After the specializer did its work, archetypes may have different
+  // storage types so we can't cache them based on their Swift type.
+  if (DbgTy.getType()->hasArchetype())
+    // In order to create recursive data structures we temporarily
+    // still insert them into the cache, so remove them.
+    DITypeCache.erase(DbgTy.getType());
+  else
+    // Store it in the cache.
+    DITypeCache.insert({DbgTy.getType(), llvm::TrackingMDNodeRef(DITy)});
 
   return DITy;
 }

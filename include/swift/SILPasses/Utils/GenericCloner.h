@@ -42,9 +42,7 @@ public:
                 ArrayRef<Substitution> ApplySubs,
                 FullApplyCollector::CallbackType Callback)
   : TypeSubstCloner(*initCloned(F, InterfaceSubs, NewName), *F, ContextSubs,
-                    ApplySubs), Callback(Callback) {
-    assert(F->getDebugScope()->SILFn != getCloned()->getDebugScope()->SILFn);
-  }
+                    ApplySubs), Callback(Callback) {}
   /// Clone and remap the types in \p F according to the substitution
   /// list in \p Subs.
   static SILFunction *cloneFunction(SILFunction *F,

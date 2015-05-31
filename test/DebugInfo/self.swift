@@ -19,5 +19,5 @@ public func f() {
 // CHECK: call void @llvm.dbg.declare(metadata %V4self11stuffStruct* %[[ALLOCA]], metadata ![[SELF:.*]], metadata !{{[0-9]+}}), !dbg
 // CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "stuffStruct",
 // CHECK-SAME:             identifier: [[STUFFSTRUCT:"[^"]+"]]
-// CHECK: ![[SELF]] = !DILocalVariable(tag: DW_TAG_arg_variable, name: "self",{{.*}} type: ![[STUFFSTRUCT]]
+// CHECK: ![[SELF]] = !DILocalVariable(tag: DW_TAG_auto_variable, name: "self",{{.*}} type: ![[STUFFSTRUCT]]
 

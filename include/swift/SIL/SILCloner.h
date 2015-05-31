@@ -286,7 +286,7 @@ template<typename ImplClass>
 class SILClonerWithScopes : public SILCloner<ImplClass> {
   friend class SILCloner<ImplClass>;
 public:
-  SILClonerWithScopes(SILFunction &To, bool Inlining = false)
+  SILClonerWithScopes(SILFunction &To, bool Inlining =false)
     : SILCloner<ImplClass>(To) {
 
     // We only want to do this when we generate cloned functions, not
@@ -299,17 +299,58 @@ public:
     if (Inlining)
       return;
 
-    scopeCloner.reset(new ScopeCloner(To));
-  }
+    auto OrigScope = To.getDebugScope();
+    assert(OrigScope && "function without scope");
+    if (!OrigScope || OrigScope->SILFn == &To)
+      // Cloning into the same function, nothing to do.
+      return;
+
+    // If we are cloning the entire function, the scope of the cloned
+    // function needs to hash to a different value than the original
+    // scope, so create a copy.
+    auto ClonedScope = new (To.getModule()) SILDebugScope(*OrigScope);
+    ClonedScope->SILFn = &To;
+    To.setDebugScope(ClonedScope);
+
+    if (OrigScope->SILFn)
+      OrigScope->SILFn->setInlined();
+}
 
 private:
-  std::unique_ptr<ScopeCloner> scopeCloner;
+  llvm::SmallDenseMap<SILDebugScope *, SILDebugScope *> ClonedScopeCache;
+  SILDebugScope *getOrCreateClonedScope(SILDebugScope *OrigScope) {
+    auto &NewFn = SILCloner<ImplClass>::getBuilder().getFunction();
+    // Reparent top-level nodes into the new function.
+    if (!OrigScope || (!OrigScope->Parent && !OrigScope->InlinedCallSite)) {
+      assert(NewFn.getDebugScope()->SILFn == &NewFn);
+      return NewFn.getDebugScope();
+    }
+
+    auto it = ClonedScopeCache.find(OrigScope);
+    if (it != ClonedScopeCache.end())
+      return it->second;
+
+    // Create an inline scope for the cloned instruction.
+    auto CloneScope = new (NewFn.getModule()) SILDebugScope(*OrigScope);
+
+    if (OrigScope->InlinedCallSite) {
+      // For inlined functions, we need to rewrite the inlined call site.
+      CloneScope->InlinedCallSite =
+        getOrCreateClonedScope(OrigScope->InlinedCallSite);
+    } else {
+      CloneScope->SILFn = &NewFn;
+      CloneScope->Parent = getOrCreateClonedScope(OrigScope->Parent);
+    }
+
+    ClonedScopeCache.insert({OrigScope, CloneScope});
+    return CloneScope;
+  }
+
 protected:
   /// Clone the SILDebugScope for the cloned function.
   void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
-    assert(scopeCloner && "should not be called when inlining");
-    Cloned->setDebugScope(
-      scopeCloner->getOrCreateClonedScope(Orig->getDebugScope()));
+    auto ClonedScope = getOrCreateClonedScope(Orig->getDebugScope());
+    Cloned->setDebugScope(ClonedScope);
     SILCloner<ImplClass>::postProcess(Orig, Cloned);
   }
 };
@@ -643,12 +684,6 @@ SILCloner<ImplClass>::visitMarkFunctionEscapeInst(MarkFunctionEscapeInst *Inst){
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitDebugValueInst(DebugValueInst *Inst) {
-  // We cannot inline/clone debug intrinsics without a scope. If they
-  // describe function arguments there is no way to determine which
-  // function they belong to.
-  if (!Inst->getDebugScope())
-    return;
-
   // Since we want the debug info to survive, we do not remap the location here.
   doPostProcess(Inst,
                 getBuilder().createDebugValue(Inst->getLoc(),
@@ -657,12 +692,6 @@ SILCloner<ImplClass>::visitDebugValueInst(DebugValueInst *Inst) {
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitDebugValueAddrInst(DebugValueAddrInst *Inst) {
-  // We cannot inline/clone debug intrinsics without a scope. If they
-  // describe function arguments there is no way to determine which
-  // function they belong to.
-  if (!Inst->getDebugScope())
-    return;
-
   // Do not remap the location for a debug instruction.
   SILValue OpValue = getOpValue(Inst->getOperand());
   doPostProcess(Inst,

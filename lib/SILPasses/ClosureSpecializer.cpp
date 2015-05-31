@@ -540,7 +540,6 @@ ClosureSpecCloner::initCloned(const CallSiteDescriptor &CallSiteDesc,
       ClosureUser->isThunk(), ClosureUser->getClassVisibility(),
       ClosureUser->getInlineStrategy(), ClosureUser->getEffectsKind(),
       ClosureUser, ClosureUser->getDebugScope());
-  Fn->setDeclCtx(ClosureUser->getDeclContext());
   Fn->setSemanticsAttr(ClosureUser->getSemanticsAttr());
   return Fn;
 }
