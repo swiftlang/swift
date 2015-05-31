@@ -313,6 +313,7 @@ ClosureCloner::ClosureCloner(SILFunction *Orig, StringRef ClonedName,
                                        PromotableIndices),
                            *Orig, ContextSubs, ApplySubs),
     Orig(Orig), PromotableIndices(PromotableIndices) {
+  assert(Orig->getDebugScope()->SILFn != getCloned()->getDebugScope()->SILFn);
 }
 
 /// Compute the SILParameterInfo list for the new cloned closure.

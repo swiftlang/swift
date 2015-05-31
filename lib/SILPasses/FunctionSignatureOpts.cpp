@@ -693,6 +693,7 @@ moveFunctionBodyToNewFunctionWithName(SILFunction *F,
   createThunkBody(ThunkBody, NewF, Analyzer);
   
   F->setThunk(IsThunk);
+  assert(F->getDebugScope()->SILFn != NewF->getDebugScope()->SILFn);
 
   return NewF;
 }

@@ -496,6 +496,7 @@ DeadParamCloner::DeadParamCloner(SILFunction *Orig,
   : SILClonerWithScopes<DeadParamCloner>(*initCloned(Orig, DeadParamIndices,
                                                      ClonedName)),
     Orig(Orig), DeadParamIndices(DeadParamIndices) {
+  assert(Orig->getDebugScope()->SILFn != getCloned()->getDebugScope()->SILFn);
 }
 
 static void getClonedName(SILFunction *F,
