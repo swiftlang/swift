@@ -1141,8 +1141,13 @@ void IRGenDebugInfo::emitDbgIntrinsic(llvm::BasicBlock *BB,
     InlinedAt = createInlinedAt(DS);
   }
   auto DL = llvm::DebugLoc::get(Line, Col, Scope, InlinedAt);
-  if (isa<llvm::AllocaInst>(Storage) ||
-      isa<llvm::UndefValue>(Storage))
+  // A dbg.declare is only meaningful if there is a single alloca for
+  // the variable that is live throughout the function. With SIL
+  // optimizations this is not guranteed and a variable can end up in
+  // two allocas (for example, one function inlined twice).
+  if (!Opts.Optimize &&
+      (isa<llvm::AllocaInst>(Storage) ||
+       isa<llvm::UndefValue>(Storage)))
     DBuilder.insertDeclare(Storage, Var, Expr, DL, BB);
   else
     DBuilder.insertDbgValueIntrinsic(Storage, 0, Var, Expr, DL, BB);
