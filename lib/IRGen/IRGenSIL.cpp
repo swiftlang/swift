@@ -593,11 +593,8 @@ public:
     if (!Decl)
       return;
 
-    auto SILVal = i->getOperand();
-    if (isa<SILUndef>(SILVal))
-      return;
-
     StringRef Name = Decl->getNameStr();
+    auto SILVal = i->getOperand();
     Explosion e = getLoweredExplosion(SILVal);
     DebugTypeInfo DbgTy(Decl, Decl->getType(), getTypeInfo(SILVal.getType()));
     // Emit an -O0 shadow copy for the explosion.
@@ -613,11 +610,8 @@ public:
     if (!Decl)
       return;
 
-    auto SILVal = i->getOperand();
-    if (isa<SILUndef>(SILVal))
-      return;
-
     StringRef Name = Decl->getName().str();
+    auto SILVal = i->getOperand();
     auto Val = getLoweredAddress(SILVal).getAddress();
     DebugTypeInfo DbgTy(Decl, Decl->getType(), getTypeInfo(SILVal.getType()));
     emitDebugVariableDeclaration(Builder, Val, DbgTy, i->getDebugScope(), Name);
