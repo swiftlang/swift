@@ -314,6 +314,7 @@ public:
   DeclContext *getDeclContext() const { return DeclCtx; }
   void setDeclContext(Decl *D);
   void setDeclContext(Expr *E);
+  void setDeclCtx(DeclContext *D) { DeclCtx = D; }
 
   /// \returns True if the function is marked with the @_semantics attribute
   /// and has special semantics that the optimizer can use to optimize the

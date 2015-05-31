@@ -500,6 +500,8 @@ createEmptyFunctionWithOptimizedSig(llvm::SmallString<64> &NewFName) {
       F->getInlineStrategy(), F->getEffectsKind(), 0, F->getDebugScope(),
       F->getDeclContext());
 
+  NewF->setDeclCtx(F->getDeclContext());
+
   // Array semantic clients rely on the signature being as in the original
   // version.
   if (!F->getSemanticsAttr().startswith("array."))

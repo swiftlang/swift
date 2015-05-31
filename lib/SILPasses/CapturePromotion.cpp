@@ -458,6 +458,7 @@ ClosureCloner::initCloned(SILFunction *Orig, StringRef ClonedName,
                           Orig->getClassVisibility(), Orig->getInlineStrategy(),
                           Orig->getEffectsKind(), Orig, Orig->getDebugScope());
   Fn->setSemanticsAttr(Orig->getSemanticsAttr());
+  Fn->setDeclCtx(Orig->getDeclContext());
   return Fn;
 }
 
