@@ -93,7 +93,6 @@ public extension __BridgedNSError where RawValue: SignedIntegerType {
   public final var hashValue: Int { return _code }
 }
 
-#if false
 // Allow two bridged NSError types to be compared.
 public func ==<T: __BridgedNSError where T.RawValue: UnsignedIntegerType>(
   lhs: T,
@@ -103,7 +102,6 @@ public func ==<T: __BridgedNSError where T.RawValue: UnsignedIntegerType>(
 }
 
 
-// rdar://problem/21027215 prevents this
 public extension __BridgedNSError where RawValue: UnsignedIntegerType {
   public final var _domain: String { return Self._NSErrorDomain }
   public final var _code: Int {
@@ -124,7 +122,6 @@ public extension __BridgedNSError where RawValue: UnsignedIntegerType {
 
   public final var hashValue: Int { return _code }
 }
-#endif
 
 /// Describes a raw representable type that is bridged to a particular
 /// NSError domain.
