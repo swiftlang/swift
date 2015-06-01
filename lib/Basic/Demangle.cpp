@@ -1132,7 +1132,8 @@ private:
   NodePointer demangleContext() {
     // context ::= module
     // context ::= entity
-    // context ::= E module (extension defined in a different module)
+    // context ::= 'E' module context (extension defined in a different module)
+    // context ::= 'e' generic-signature module context (generic extension)
     if (!Mangled) return nullptr;
     if (Mangled.nextIf('E')) {
       NodePointer ext = NodeFactory::create(Node::Kind::Extension);
@@ -1141,6 +1142,23 @@ private:
       NodePointer type = demangleContext();
       ext->addChild(def_module);
       ext->addChild(type);
+      return ext;
+    }
+    if (Mangled.nextIf('e')) {
+      NodePointer ext = NodeFactory::create(Node::Kind::Extension);
+      NodePointer sig = demangleGenericSignature();
+      // The generic context is currently re-specified by the type mangling.
+      // If we ever remove 'self' from manglings, we should stop resetting the
+      // context here.
+      resetGenericContext();
+      if (!sig) return nullptr;
+      NodePointer def_module = demangleModule();
+      if (!def_module) return nullptr;
+      NodePointer type = demangleContext();
+      
+      ext->addChild(def_module);
+      ext->addChild(type);
+      ext->addChild(sig);
       return ext;
     }
     if (Mangled.nextIf('S'))
@@ -2766,12 +2784,15 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     Printer << toString(Directness(pointer->getIndex())) << " ";
     return;
   case Node::Kind::Extension:
-    assert(pointer->getNumChildren() == 2 && "Extension expects 2 children.");
+    assert((pointer->getNumChildren() == 2 || pointer->getNumChildren() == 3)
+           && "Extension expects 2 or 3 children.");
     Printer << "ext.";
     // Print the module where extension is defined.
-    print(pointer->getChild(0), true); 
+    print(pointer->getChild(0), true);
     Printer << ".";
     print(pointer->getChild(1), asContext);
+    if (pointer->getNumChildren() == 3)
+      print(pointer->getChild(2), true);
     return;
   case Node::Kind::Variable:
   case Node::Kind::Function:

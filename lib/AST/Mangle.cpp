@@ -237,10 +237,25 @@ void Mangler::mangleContext(const DeclContext *ctx, BindGenerics shouldBind) {
 
     auto decl = ExtTy->getAnyNominal();
     assert(decl && "extension of non-nominal type?");
-    // Mangle the module name if extension is defined in a different module from
-    // the actual nominal type decl.
-    if (ExtD->getParentModule() != decl->getParentModule()) {
-      Buffer << 'E';
+    // Mangle the module name if:
+    // - the extension is defined in a different module from the actual nominal
+    //   type decl,
+    // - the extension is constrained, or
+    // - the extension is to a protocol.
+    // FIXME: In a world where protocol extensions are dynamically dispatched,
+    // "extension is to a protocol" would no longer be a reason to use the
+    // extension mangling, because an extension method implementation could be
+    // resiliently moved into the original protocol itself.
+    if (ExtD->getParentModule() != decl->getParentModule()
+        || ExtD->isConstrainedExtension()
+        || ExtD->getDeclaredInterfaceType()->isExistentialType()) {
+      if (auto sig = ExtD->getGenericSignature()) {
+        Buffer << 'e';
+        Mod = ExtD->getModuleContext();
+        mangleGenericSignature(sig, ResilienceExpansion::Minimal);
+      } else {
+        Buffer << 'E';
+      }
       mangleModule(ExtD->getParentModule());
     }
     mangleNominalType(decl, ResilienceExpansion::Minimal, shouldBind,

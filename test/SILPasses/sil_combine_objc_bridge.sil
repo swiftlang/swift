@@ -177,7 +177,7 @@ bb0(%0 : $AnNSArray):
 }
 
 // CHECK-LABEL: sil shared @bridge_from_swift_array_to_NSObject_cast
-// CHECK: function_ref @_TFE10FoundationSa19_bridgeToObjectiveCurfGSaq__FT_CSo7NSArray
+// CHECK: function_ref @_TFer10FoundationSa19_bridgeToObjectiveCurfGSaq__FT_CSo7NSArray
 // CHECK: retain_value
 // CHECK: apply
 // CHECK: release_value
