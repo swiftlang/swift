@@ -525,6 +525,11 @@ bool CheckedCastBrJumpThreading::areEquivalentConditionsAlongSomePaths() {
           SuccessDominates, FailureDominates);
       idx++;
     }
+  } else {
+    // ArgBB is the entry block. Check that conditions are the equivalent in this
+    // case as well.
+    if (!isArgValueEquivalentToCondition(Condition, DomBB, DomCondition, DT))
+      return false;
   }
 
 

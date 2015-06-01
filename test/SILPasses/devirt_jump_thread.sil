@@ -349,5 +349,99 @@ sil_vtable FooClass {
   #FooClass.value!setter.1: _TFC18devirt_jump_thread8FooClasss5valueSi	// devirt_jump_thread.FooClass.value.setter : Swift.Int32
 }
 
+class C {
+   deinit 
+   init()
+}
+
+// Check that checked_cast_br jump-threading works properly when both
+// condititions are arguments of the function's entry block.
+// CHECK: sil @test_checked_cast_br_jump_threading_with_entry_bb_arguments
+// CHECK: checked_cast_br %0
+// CHECK: checked_cast_br %1
+// CHECK: return
+sil @test_checked_cast_br_jump_threading_with_entry_bb_arguments : $@convention(thin) (@owned AnyObject, @owned AnyObject) -> Int32 {
+bb0(%0 : $AnyObject, %1 : $AnyObject):
+  strong_retain %0 : $AnyObject
+  checked_cast_br %0 : $AnyObject to $C, bb1, bb2
+
+bb1(%4 : $C):
+  %5 = enum $Optional<C>, #Optional.Some!enumelt.1, %4 : $C
+  br bb3(%5 : $Optional<C>)
+
+bb2:
+  strong_release %0 : $AnyObject
+  %8 = enum $Optional<C>, #Optional.None!enumelt
+  br bb3(%8 : $Optional<C>)
+
+bb3(%10 : $Optional<C>):
+  switch_enum %10 : $Optional<C>, case #Optional.Some!enumelt.1: bb5, default bb4
+
+bb4:
+  br bb13
+
+bb5(%13 : $C):
+  strong_retain %1 : $AnyObject
+  checked_cast_br %1 : $AnyObject to $C, bb6, bb7
+
+bb6(%16 : $C):
+  %17 = enum $Optional<C>, #Optional.Some!enumelt.1, %16 : $C
+  br bb8(%17 : $Optional<C>)
+
+bb7:
+  strong_release %1 : $AnyObject
+  %20 = enum $Optional<C>, #Optional.None!enumelt
+  br bb8(%20 : $Optional<C>)
+
+bb8(%22 : $Optional<C>):
+  switch_enum %22 : $Optional<C>, case #Optional.Some!enumelt.1: bb10, default bb9
+
+bb9:
+  strong_release %13 : $C
+  br bb13
+
+bb10(%26 : $C):
+
+  %27 = function_ref @_TZFSsoi3eeeFTGSqPSs9AnyObject__GSqPS____Sb : $@convention(thin) (@owned Optional<AnyObject>, @owned Optional<AnyObject>) -> Bool
+  strong_retain %13 : $C
+  %29 = init_existential_ref %13 : $C : $C, $AnyObject
+  %30 = enum $Optional<AnyObject>, #Optional.Some!enumelt.1, %29 : $AnyObject
+  strong_retain %26 : $C
+  %32 = init_existential_ref %26 : $C : $C, $AnyObject
+  %33 = enum $Optional<AnyObject>, #Optional.Some!enumelt.1, %32 : $AnyObject
+  %34 = apply %27(%30, %33) : $@convention(thin) (@owned Optional<AnyObject>, @owned Optional<AnyObject>) -> Bool
+  %35 = struct_extract %34 : $Bool, #Bool.value
+  cond_br %35, bb11, bb12
+
+bb11:
+  %37 = integer_literal $Builtin.Int32, 1
+  %38 = struct $Int32 (%37 : $Builtin.Int32)
+  strong_release %26 : $C
+  strong_release %13 : $C
+  br bb14(%38 : $Int32)
+
+bb12:
+  strong_release %26 : $C
+  strong_release %13 : $C
+  br bb13
+
+bb13:
+  %45 = integer_literal $Builtin.Int32, 0
+  %46 = struct $Int32 (%45 : $Builtin.Int32)
+  br bb14(%46 : $Int32)
+
+bb14(%48 : $Int32):
+  strong_release %1 : $AnyObject
+  strong_release %0 : $AnyObject
+  return %48 : $Int32
+}
+
+
+sil [transparent] [fragile] @_TFSb21_getBuiltinLogicValuefSbFT_Bi1_ : $@convention(method) (Bool) -> Builtin.Int1
+
+
+sil [fragile] @_TZFSsoi3eeeFTGSqPSs9AnyObject__GSqPS____Sb : $@convention(thin) (@owned Optional<AnyObject>, @owned Optional<AnyObject>) -> Bool
+
+sil_witness_table C: AnyObject module main
 
 
