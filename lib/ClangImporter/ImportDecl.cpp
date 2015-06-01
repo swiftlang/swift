@@ -2582,6 +2582,11 @@ namespace {
     Decl *VisitObjCMethodDecl(const clang::ObjCMethodDecl *decl,
                               DeclContext *dc,
                               bool forceClassMethod = false) {
+      // HACK: Ban a few deprecated NSDocument methods that would interfere
+      // with modern versions that differ only in 'throws'.
+      if (Impl.methodIsKnownOverloadOnThrows(decl))
+        return nullptr;
+
       // If we have an init method, import it as an initializer.
       if (decl->getMethodFamily() == clang::OMF_init &&
           isReallyInitMethod(decl)) {
@@ -5823,4 +5828,35 @@ ClangImporter::Implementation::getSpecialTypedefKind(clang::TypedefNameDecl *dec
   if (iter == SpecialTypedefNames.end())
     return None;
   return iter->second;
+}
+
+static bool isNonNullarySelector(clang::Selector sel,
+                                 ArrayRef<StringRef> pieces) {
+  if (sel.getNumArgs() != pieces.size())
+    return false;
+
+  for (size_t i = 0, e = pieces.size(); i < e; ++i)
+    if (sel.getNameForSlot(i) != pieces[i])
+      return false;
+
+  return true;
+}
+
+bool ClangImporter::Implementation::methodIsKnownOverloadOnThrows(
+    const clang::ObjCMethodDecl *method) const {
+  // HACK: Ban a few deprecated NSDocument methods that would interfere
+  // with modern versions that differ only in 'throws'.
+  assert(method);
+  if (!method->isInstanceMethod() || !method->isDeprecated())
+    return false;
+
+  auto classContext = method->getClassInterface();
+  if (!classContext || classContext->getName() != "NSDocument")
+    return false;
+
+  clang::Selector sel = method->getSelector();
+
+  return isNonNullarySelector(sel, {"initWithContentsOfURL", "ofType"}) ||
+         isNonNullarySelector(sel, {"readFromURL", "ofType"}) ||
+         isNonNullarySelector(sel, {"writeToURL", "ofType"});
 }

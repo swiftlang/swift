@@ -1029,6 +1029,10 @@ public:
   /// 'let' declaration as opposed to 'var'.
   bool shouldImportGlobalAsLet(clang::QualType type);
 
+  /// Checks to see if this method is a known overload of a method that throws,
+  /// so that we can prefer the throwing one.
+  bool methodIsKnownOverloadOnThrows(const clang::ObjCMethodDecl *decl) const;
+
   LazyResolver *getTypeResolver() const {
     return typeResolver.getPointer();
   }
