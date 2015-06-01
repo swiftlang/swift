@@ -1,6 +1,3 @@
-// Also run this test in optimize test modes.
-// REQUIRES: optimize_test
-
 // RUN: rm -rf %t
 // RUN: mkdir %t
 // RUN: %target-build-swift -emit-module -module-name Foo -o %t -F %S/Inputs/mock-sdk %s
@@ -16,6 +13,7 @@
 
 // RUN: %target-swift-ide-test -print-module -source-filename %s -I %t -F %S/Inputs/mock-sdk -module-to-print=Foo -accessibility-filter-public -annotate-print > %t.annotated.txt
 // RUN: FileCheck %s -check-prefix=PASS_ANNOTATED -strict-whitespace < %t.annotated.txt
+// REQUIRES: executable_test
 
 @exported import Foo
 

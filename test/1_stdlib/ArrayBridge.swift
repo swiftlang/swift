@@ -1,6 +1,3 @@
-// Also run this test in optimize test modes.
-// REQUIRES: optimize_test
-
 //===--- ArrayBridge.swift - Tests of Array casting and bridging ----------===//
 //
 // This source file is part of the Swift.org open source project
@@ -21,6 +18,7 @@
 
 // RUN: %target-run %t/ArrayBridge > %t.txt
 // RUN: FileCheck %s < %t.txt
+// REQUIRES: executable_test
 
 // XFAIL: linux
 

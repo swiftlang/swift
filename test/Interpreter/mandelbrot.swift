@@ -1,7 +1,5 @@
-// Also run this test in optimize test modes.
-// REQUIRES: optimize_test
-
 // RUN: %target-jit-run -I %S -enable-source-import %s | FileCheck %s
+// REQUIRES: executable_test
 // REQUIRES: swift_interpreter
 
 // FIXME: iOS: -enable-source-import plus %target-build-swift equals link errors

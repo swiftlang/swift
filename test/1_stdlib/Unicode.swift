@@ -1,6 +1,3 @@
-// Also run this test in optimize test modes.
-// REQUIRES: optimize_test
-
 //===--- Unicode.swift ----------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
@@ -13,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-stdlib-swift
+// REQUIRES: executable_test
 
 import Swift
 import StdlibUnittest

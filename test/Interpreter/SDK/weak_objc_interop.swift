@@ -1,6 +1,3 @@
-// Also run this test in optimize test modes.
-// REQUIRES: optimize_test
-
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 //
@@ -8,6 +5,7 @@
 // RUN: %target-clang -fobjc-arc %S/Inputs/ObjCWeak/ObjCWeak.m -c -o %t/ObjCWeak.o
 // RUN: %target-build-swift %t/main.swift -I %S/Inputs/ObjCWeak/ -Xlinker %t/ObjCWeak.o -o %t/weak_objc_interop -Xfrontend -disable-access-control
 // RUN: %target-run %t/weak_objc_interop 2>&1 | FileCheck %s
+// REQUIRES: executable_test
 
 // REQUIRES: objc_interop
 

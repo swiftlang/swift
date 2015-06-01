@@ -1,6 +1,3 @@
-// Also run this test in optimize test modes.
-// REQUIRES: optimize_test
-
 //===--- InputStream.swift.gyb --------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
@@ -17,6 +14,7 @@
 // RUN: %S/../../utils/gyb %s -o %t/InputStream.swift
 // RUN: %S/../../utils/line-directive %t/InputStream.swift -- %target-build-swift %t/InputStream.swift -o %t/a.out
 // RUN: %S/../../utils/line-directive %t/InputStream.swift -- %target-run %t/a.out
+// REQUIRES: executable_test
 
 // XFAIL: interpret
 

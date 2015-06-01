@@ -1,6 +1,3 @@
-// Also run this test in optimize test modes.
-// REQUIRES: optimize_test
-
 //===--- Mirror.swift -----------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
@@ -18,6 +15,7 @@
 // RUN: %target-clang %S/Inputs/Mirror/Mirror.mm -c -o %t/Mirror.mm.o -g
 // RUN: %target-build-swift %s -I %S/Inputs/Mirror/ -Xlinker %t/Mirror.mm.o -o %t/Mirror
 // RUN: %target-run %t/Mirror
+// REQUIRES: executable_test
 
 // XFAIL: linux
 

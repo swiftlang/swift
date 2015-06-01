@@ -1,6 +1,3 @@
-// Also run this test in optimize test modes.
-// REQUIRES: optimize_test
-
 // RUN: rm -rf %t &&mkdir %t
 // RUN: cp %s %t/main.swift
 
@@ -11,6 +8,7 @@
 // RUN: echo "typealias TestFloat = Double" > %t/double_type.swift
 // RUN: %target-build-swift %t/main.swift %t/double_type.swift -o %t/double.out
 // RUN: %target-run %t/double.out | FileCheck %s
+// REQUIRES: executable_test
 
 //===---
 // Helpers

@@ -1,11 +1,9 @@
-// Also run this test in optimize test modes.
-// REQUIRES: optimize_test
-
 // RUN: rm -rf %t  &&  mkdir %t
 //
 // RUN: %target-clang %S/Inputs/Mirror/Mirror.mm -c -o %t/Mirror.mm.o -g
 // RUN: %target-build-swift -parse-stdlib -Xfrontend -disable-access-control -module-name a -I %S/Inputs/Mirror/ -Xlinker %t/Mirror.mm.o %s -o %t.out
 // RUN: %target-run %t.out
+// REQUIRES: executable_test
 
 // XFAIL: linux
 

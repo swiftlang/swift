@@ -1,10 +1,8 @@
-// Also run this test in optimize test modes.
-// REQUIRES: optimize_test
-
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %target-build-swift %s -o %t/a.out
 // RUN: %target-run %t/a.out | FileCheck %s
 // RUN: %target-swift-frontend -primary-file %s -emit-ir | FileCheck -check-prefix=CHECKIR %s
+// REQUIRES: executable_test
 
 protocol Proto {
 }

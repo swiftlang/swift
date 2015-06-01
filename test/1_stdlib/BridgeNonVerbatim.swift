@@ -1,6 +1,3 @@
-// Also run this test in optimize test modes.
-// REQUIRES: optimize_test
-
 //===--- BridgeNonVerbatim.swift - Array bridging implementation test -----===//
 //
 // This source file is part of the Swift.org open source project
@@ -20,6 +17,7 @@
 //
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-stdlib-swift %s | FileCheck %s
+// REQUIRES: executable_test
 //
 // XFAIL: interpret
 // REQUIRES: objc_interop

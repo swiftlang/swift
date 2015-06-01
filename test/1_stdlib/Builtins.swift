@@ -1,6 +1,3 @@
-// Also run this test in optimize test modes.
-// REQUIRES: optimize_test
-
 //===--- Builtins.swift - Tests for our Builtin wrappers ------------------===//
 //
 // This source file is part of the Swift.org open source project
@@ -16,6 +13,7 @@
 //   note: building with -Onone to test debug-mode-only safety checks
 // RUN: %target-build-swift %s -parse-stdlib -Xfrontend -disable-access-control -Onone -o %t/Builtins
 // RUN: %target-run %t/Builtins
+// REQUIRES: executable_test
 
 // XFAIL: interpret
 

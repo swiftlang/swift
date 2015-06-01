@@ -1,7 +1,5 @@
-// Also run this test in optimize test modes.
-// REQUIRES: optimize_test
-
 // RUN: %target-run-stdlib-swift | FileCheck %s
+// REQUIRES: executable_test
 //
 // Parts of this test depend on memory allocator specifics.  The test
 // should be rewritten soon so it doesn't expose legacy components

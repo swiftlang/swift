@@ -1,6 +1,3 @@
-// Also run this test in optimize test modes.
-// REQUIRES: optimize_test
-
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 // RUN: %S/../../utils/gyb %s -o %t/ArrayTraps.swift
@@ -9,6 +6,7 @@
 //
 // RUN: %S/../../utils/line-directive %t/ArrayTraps.swift -- %target-run %t/a.out_Debug
 // RUN: %S/../../utils/line-directive %t/ArrayTraps.swift -- %target-run %t/a.out_Release
+// REQUIRES: executable_test
 
 // XFAIL: linux
 

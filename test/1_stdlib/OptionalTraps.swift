@@ -1,6 +1,3 @@
-// Also run this test in optimize test modes.
-// REQUIRES: optimize_test
-
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 // RUN: %target-build-swift %s -o %t/Assert_Debug -Onone
@@ -10,6 +7,7 @@
 // RUN: %target-run %t/Assert_Debug
 // RUN: %target-run %t/Assert_Release
 // RUN: %target-run %t/Assert_Unchecked
+// REQUIRES: executable_test
 
 import StdlibUnittest
 

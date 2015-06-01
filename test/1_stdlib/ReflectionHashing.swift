@@ -1,8 +1,6 @@
-// Also run this test in optimize test modes.
-// REQUIRES: optimize_test
-
 // RUN: %target-build-swift -module-name a %s -o %t.out
 // RUN: %target-run %t.out
+// REQUIRES: executable_test
 
 // XFAIL: linux
 

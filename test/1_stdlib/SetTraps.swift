@@ -1,6 +1,3 @@
-// Also run this test in optimize test modes.
-// REQUIRES: optimize_test
-
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 // RUN: %target-build-swift %s -o %t/a.out_Debug
@@ -8,6 +5,7 @@
 //
 // RUN: %target-run %t/a.out_Debug
 // RUN: %target-run %t/a.out_Release
+// REQUIRES: executable_test
 
 // FIXME: rdar://problem/19648117 Needs splitting objc parts out
 // XFAIL: linux

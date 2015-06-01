@@ -1,6 +1,3 @@
-// Also run this test in optimize test modes.
-// REQUIRES: optimize_test
-
 //===--- RangeTraps.swift -------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
@@ -19,6 +16,7 @@
 //
 // RUN: %target-run %t/a.out_Debug
 // RUN: %target-run %t/a.out_Release
+// REQUIRES: executable_test
 
 import StdlibUnittest
 

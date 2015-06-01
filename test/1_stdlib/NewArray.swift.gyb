@@ -1,6 +1,3 @@
-// Also run this test in optimize test modes.
-// REQUIRES: optimize_test
-
 %# -*- mode: swift -*-
 //===--- Array.swift ------------------------------------------------------===//
 //
@@ -17,6 +14,7 @@
 // RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/NewArray.swift
 // RUN: %S/../../utils/line-directive %t/NewArray.swift -- %target-build-swift %t/NewArray.swift -o %t/a.out -Xfrontend -disable-access-control
 // RUN: %target-run %t/a.out 2>&1 | %S/../../utils/line-directive %t/NewArray.swift -- FileCheck %t/NewArray.swift
+// REQUIRES: executable_test
 
 // XFAIL: linux
 

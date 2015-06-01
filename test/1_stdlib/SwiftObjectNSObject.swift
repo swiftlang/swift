@@ -1,6 +1,3 @@
-// Also run this test in optimize test modes.
-// REQUIRES: optimize_test
-
 //===--- SwiftObjectNSObject.swift - Test SwiftObject's NSObject interop --===//
 //
 // This source file is part of the Swift.org open source project
@@ -18,6 +15,7 @@
 // RUN: %target-clang %S/Inputs/SwiftObjectNSObject/SwiftObjectNSObject.m -c -o %t/SwiftObjectNSObject.o -g
 // RUN: %target-build-swift %s -I %S/Inputs/SwiftObjectNSObject/ -Xlinker %t/SwiftObjectNSObject.o -o %t/SwiftObjectNSObject
 // RUN: %target-run %t/SwiftObjectNSObject
+// REQUIRES: executable_test
 
 // REQUIRES: objc_interop
 

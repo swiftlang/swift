@@ -1,11 +1,9 @@
-// Also run this test in optimize test modes.
-// REQUIRES: optimize_test
-
 // -*- swift -*-
 // RUN: rm -rf %t ; mkdir -p %t
 // RUN: %S/../../utils/gyb %s -o %t/CastTraps.swift
 // RUN: %S/../../utils/line-directive %t/CastTraps.swift -- %target-build-swift %t/CastTraps.swift -o %t/a.out
 // RUN: %S/../../utils/line-directive %t/CastTraps.swift -- %target-run %t/a.out
+// REQUIRES: executable_test
 
 // FIXME: Casting.cpp has dozens of places to fail a cast. This test does not 
 // attempt to enumerate them all.

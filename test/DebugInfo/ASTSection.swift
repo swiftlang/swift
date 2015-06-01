@@ -1,6 +1,3 @@
-// Also run this test in optimize test modes.
-// REQUIRES: optimize_test
-
 // RUN: rm -rf %t && mkdir %t
 
 // RUN: %target-build-swift -emit-executable %s -g -o %t/ASTSection -emit-module
@@ -15,6 +12,7 @@
 
 // RUN: %target-build-swift -emit-executable %s -gline-tables-only -o %t/ASTSection -emit-module
 // RUN: %lldb-moduleimport-test %t/ASTSection | FileCheck %s --allow-empty --check-prefix=LINETABLE-CHECK
+// REQUIRES: executable_test
 
 // UNSUPPORTED: OS=linux-gnu
 

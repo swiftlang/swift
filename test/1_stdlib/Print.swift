@@ -1,10 +1,8 @@
-// Also run this test in optimize test modes.
-// REQUIRES: optimize_test
-
 // RUN: mkdir -p %t
 // RUN: %target-build-swift %s -parse-stdlib -Xfrontend -disable-access-control -o %t/a.out -Xlinker -dead_strip
 // RUN: %target-run %t/a.out env | FileCheck %s
 // RUN: %target-run %t/a.out ru_RU.UTF-8 | FileCheck %s
+// REQUIRES: executable_test
 
 // XFAIL: linux
 

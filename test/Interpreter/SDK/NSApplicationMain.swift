@@ -1,7 +1,5 @@
-// Also run this test in optimize test modes.
-// REQUIRES: optimize_test
-
 // RUN: %target-build-swift -parse %s
+// REQUIRES: executable_test
 // REQUIRES: OS=macosx
 
 import AppKit

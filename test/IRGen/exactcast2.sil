@@ -1,7 +1,5 @@
-// Also run this test in optimize test modes.
-// REQUIRES: optimize_test
-
 // RUN: %target-build-swift %s -emit-ir -o - 
+// REQUIRES: executable_test
 
 // Make sure we are not crashing here.
 

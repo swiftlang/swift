@@ -1,7 +1,5 @@
-// Also run this test in optimize test modes.
-// REQUIRES: optimize_test
-
 // RUN: %target-run-stdlib-swift
+// REQUIRES: executable_test
 
 // XFAIL: interpret
 

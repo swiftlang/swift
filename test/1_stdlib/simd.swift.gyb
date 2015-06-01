@@ -1,11 +1,9 @@
-// Also run this test in optimize test modes.
-// REQUIRES: optimize_test
-
 // RUN: rm -f %t.swift %t.out
 
 // RUN: %S/../../utils/gyb %s -o %t.swift
 // RUN: %S/../../utils/line-directive %t.swift -- %target-build-swift %t.swift -o %t.out
 // RUN: %S/../../utils/line-directive %t.swift -- %target-run %t.out
+// REQUIRES: executable_test
 
 // FIXME: No simd module on linux rdar://problem/20795411
 // XFAIL: linux

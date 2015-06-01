@@ -1,6 +1,3 @@
-// Also run this test in optimize test modes.
-// REQUIRES: optimize_test
-
 //===--- NumericParsing.swift.gyb ----------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
@@ -17,6 +14,7 @@
 // RUN: %S/../../utils/gyb -DCMAKE_SIZEOF_VOID_P=%target-ptrsize %s -o %t/NumericParsing.swift
 // RUN: %S/../../utils/line-directive %t/NumericParsing.swift -- %target-build-swift %t/NumericParsing.swift -o %t/a.out
 // RUN: %S/../../utils/line-directive %t/NumericParsing.swift -- %target-run %t/a.out
+// REQUIRES: executable_test
 %{
 from SwiftIntTypes import *
 

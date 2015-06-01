@@ -1,7 +1,5 @@
-// Also run this test in optimize test modes.
-// REQUIRES: optimize_test
-
 // RUN: %target-build-swift -emit-ir %s | FileCheck -check-prefix=%target-cpu %s
+// REQUIRES: executable_test
 var globalFloat32 : Float32 = 0.0
 var globalFloat64 : Float64 = 0.0
 #if arch(i386) || arch(x86_64)

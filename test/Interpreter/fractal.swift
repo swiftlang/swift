@@ -1,8 +1,6 @@
-// Also run this test in optimize test modes.
-// REQUIRES: optimize_test
-
 // RUN: rm -rf %t  &&  mkdir %t
 // RUN: ulimit -c unlimited && %target-jit-run %s -I %S -enable-source-import | FileCheck %s
+// REQUIRES: executable_test
 
 // REQUIRES: swift_interpreter
 

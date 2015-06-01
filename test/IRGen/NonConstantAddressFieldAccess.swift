@@ -1,7 +1,5 @@
-// Also run this test in optimize test modes.
-// REQUIRES: optimize_test
-
 // RUN: %target-build-swift %S/Inputs/ObjcSuperClass.swift %s -module-name a -emit-ir 2>&1 | FileCheck %s
+// REQUIRES: executable_test
 
 // REQUIRES: objc_interop
 
