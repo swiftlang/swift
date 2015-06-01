@@ -215,17 +215,34 @@ FoundationTestSuite.test("NSRectEdge/constants") {
 
 
 if #available(OSX 10.11, iOS 9.0, *) {
-  FoundationTestSuite.test("NSUndoManager") {
+  FoundationTestSuite.test("NSUndoManager/ObjCClass") {
     let UM = NSUndoManager()
-    class Foo : NSObject {
+
+    // Confirm with an ObjC class.
+    class ObjCClass : NSObject {
       var someProperty: String = ""
     }
-    var f = Foo()
+    let f = ObjCClass()
     UM.registerUndoWithTarget(f) { target in
       target.someProperty = "expected"
     }
     UM.undo()
     expectEqual(f.someProperty, "expected")
+  }
+
+  FoundationTestSuite.test("NSUndoManager/SwiftClass") {
+    let UM = NSUndoManager()
+
+    // Confirm with a Swift class.
+    class SwiftClass {
+      var someOtherProperty: String = ""
+    }
+    var b = SwiftClass()
+    UM.registerUndoWithTarget(b) { target in
+      target.someOtherProperty = "expected"
+    }
+    UM.undo()
+    expectEqual(b.someOtherProperty, "expected")
   }
 }
 
