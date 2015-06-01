@@ -450,12 +450,9 @@ enum SinglePayloadNoXI2 {
 sil @single_payload_no_xi_switch : $@convention(thin) (SinglePayloadNoXI2) -> () {
 // CHECK: entry:
 entry(%u : $SinglePayloadNoXI2):
-// CHECK:   switch i1 %1, label %[[DFLT:[0-9]+]] [
-// CHECK:     i1 false, label %[[X_DEST:[0-9]+]]
-// CHECK:     i1 true, label %[[TAGS:[0-9]+]]
-// CHECK:   ]
+// CHECK:   br i1 %1, label %[[TAGS:[0-9]+]], label %[[X_DEST:[0-9]+]]
 // CHECK: ; <label>:[[TAGS]]
-// CHECK:   switch [[WORD]] %0, label %[[DFLT]] [
+// CHECK:   switch [[WORD]] %0, label %[[DFLT:[0-9]+]] [
 // CHECK:     [[WORD]] 0, label %[[Y_DEST:[0-9]+]]
 // CHECK:     [[WORD]] 1, label %[[Z_DEST:[0-9]+]]
 // CHECK:     [[WORD]] 2, label %[[W_DEST:[0-9]+]]
@@ -526,10 +523,7 @@ end:
 sil @single_payload_no_xi_switch_arg : $@convention(thin) (SinglePayloadNoXI2) -> () {
 // CHECK: entry:
 entry(%u : $SinglePayloadNoXI2):
-// CHECK:   switch i1 %1, label %[[DFLT:[0-9]+]] [
-// CHECK:     i1 false, label %[[X_PREDEST:[0-9]+]]
-// CHECK:     i1 true, label %[[TAGS:[0-9]+]]
-// CHECK:   ]
+// CHECK:   br i1 %1, label %[[TAGS:[0-9]+]], label %[[X_PREDEST:[0-9]+]]
 // CHECK: ; <label>:[[TAGS]]
 // CHECK:   switch [[WORD]] %0, label %[[DFLT:[0-9]+]] [
 // CHECK:     [[WORD]] 0, label %[[Y_DEST:[0-9]+]]
