@@ -1369,6 +1369,10 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
   if (!IGM.DebugInfo)
     return;
 
+  // We cannot deduce the correct argument ordering without a DeclContent.
+  if (!CurSILFn->getDeclContext())
+    return;
+  
   // This is the prologue of a function. Emit debug info for all
   // trivial arguments and any captured and promoted [inout]
   // variables.
