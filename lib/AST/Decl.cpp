@@ -382,8 +382,7 @@ bool Decl::isPrivateStdlibDecl(bool whitelistProtocols) const {
     bool hasInternalParam = false;
     for (auto Pat : Pats) {
       Pat->forEachVariable([&](VarDecl *Param) {
-        if (Param->hasName() && Param->getNameStr() != "_" &&
-            Param->getNameStr().startswith("_")) {
+        if (Param->hasName() && Param->getNameStr().startswith("_")) {
           hasInternalParam = true;
         }
       });
