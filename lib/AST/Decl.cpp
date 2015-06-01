@@ -2985,11 +2985,11 @@ SourceRange VarDecl::getSourceRange() const {
 
 SourceRange VarDecl::getTypeSourceRangeForDiagnostics() const {
   Pattern *Pat = nullptr;
-  if (ParentPattern.is<PatternBindingDecl *>())
-    Pat = getParentPattern();
-  else
+  if (ParentPattern.is<Pattern*>())
     Pat = ParentPattern.dyn_cast<Pattern *>();
-
+  else
+    Pat = getParentPattern();
+  
   if (!Pat || Pat->isImplicit())
     return getSourceRange();
 
@@ -2999,6 +2999,58 @@ SourceRange VarDecl::getTypeSourceRangeForDiagnostics() const {
     return TP->getTypeLoc().getTypeRepr()->getSourceRange();
   return getSourceRange();
 }
+
+static bool isVarInPattern(const VarDecl *VD, Pattern *P) {
+  bool foundIt = false;
+  P->forEachVariable([&](VarDecl *FoundFD) {
+    foundIt |= FoundFD == VD;
+  });
+  return foundIt;
+}
+
+/// Return the Pattern involved in initializing this VarDecl.  Recall that the
+/// Pattern may be involved in initializing more than just this one vardecl
+/// though.  For example, if this is a VarDecl for "x", the pattern may be
+/// "(x, y)" and the initializer on the PatternBindingDecl may be "(1,2)" or
+/// "foo()".
+///
+/// If this has no parent pattern binding decl or statement associated, it
+/// returns null.
+///
+Pattern *VarDecl::getParentPattern() const {
+  // If this has a PatternBindingDecl parent, use its pattern.
+  if (auto *PBD = getParentPatternBinding())
+    return PBD->getPatternEntryForVarDecl(this).getPattern();
+  
+  // If this is a statement parent, dig the pattern out of it.
+  if (auto *stmt = getParentPatternStmt()) {
+    if (auto *FES = dyn_cast<ForEachStmt>(stmt))
+      return FES->getPattern();
+    
+    if (auto *CS = dyn_cast<CatchStmt>(stmt))
+      return CS->getErrorPattern();
+    
+    if (auto *cs = dyn_cast<CaseStmt>(stmt)) {
+      // In a case statement, search for the pattern that contains it.  This is
+      // a bit silly, because you can't have something like "case x, y:" anyway.
+      for (auto items : cs->getCaseLabelItems()) {
+        if (isVarInPattern(this, items.getPattern()))
+          return items.getPattern();
+      }
+    } else if (auto *LCS = dyn_cast<LabeledConditionalStmt>(stmt)) {
+      for (auto &elt : LCS->getCond())
+        if (auto pat = elt.getPatternOrNull())
+          if (isVarInPattern(this, pat))
+            return pat;
+    }
+    
+    //stmt->dump();
+    assert(0 && "Unknown parent pattern statement?");
+  }
+  
+  return nullptr;
+}
+
 
 /// Return true if this stored property needs to be accessed with getters and
 /// setters for Objective-C.

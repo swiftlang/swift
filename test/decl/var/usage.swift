@@ -166,3 +166,27 @@ func testOpenExistential(var x: Fooable,
   y.immutFoo()
 }
 
+
+func couldThrow() throws {}
+
+func testFixitsInStatementsWithPatterns(a : Int?) {
+  if var b = a,    // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}} {{6-9=let}}
+      var b2 = a {   // expected-warning {{variable 'b2' was never mutated; consider changing to 'let' constant}} {{7-10=let}}
+    _ = b
+    _ = b2
+  }
+  
+  for var b in [42] {   // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}} {{7-10=let}}
+    _ = b
+  }
+
+  do {
+    try couldThrow()
+  } catch var err {  // expected-warning {{variable 'err' was never mutated; consider changing to 'let' constant}} {{11-14=let}}
+    _ = err
+  }
+
+  switch a {
+    case var b: _ = b  // expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}} {{10-13=let}}
+  }
+}

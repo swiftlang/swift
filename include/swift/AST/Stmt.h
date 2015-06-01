@@ -471,7 +471,9 @@ public:
             Optional<bool> implicit = None)
     : Stmt(StmtKind::Catch, getDefaultImplicitFlag(implicit, catchLoc)),
       CatchLoc(catchLoc), WhereLoc(whereLoc),
-      ErrorPattern(errorPattern), GuardExpr(guardExpr), CatchBody(body) {}
+      ErrorPattern(nullptr), GuardExpr(guardExpr), CatchBody(body) {
+    setErrorPattern(errorPattern);
+  }
 
   SourceLoc getCatchLoc() const { return CatchLoc; }
 
@@ -486,7 +488,7 @@ public:
 
   Pattern *getErrorPattern() { return ErrorPattern; }
   const Pattern *getErrorPattern() const { return ErrorPattern; }
-  void setErrorPattern(Pattern *pattern) { ErrorPattern = pattern; }
+  void setErrorPattern(Pattern *pattern);
 
   /// Is this catch clause "syntactically exhaustive"?
   bool isSyntacticallyExhaustive() const;
@@ -567,10 +569,12 @@ class LabeledConditionalStmt : public LabeledStmt {
 public:
   LabeledConditionalStmt(StmtKind Kind, bool Implicit,
                          LabeledStmtInfo LabelInfo, StmtCondition Cond)
-    : LabeledStmt(Kind, Implicit, LabelInfo), Cond(Cond) {}
+    : LabeledStmt(Kind, Implicit, LabelInfo) {
+    setCond(Cond);
+  }
 
   StmtCondition getCond() const { return Cond; }
-  void setCond(StmtCondition e) { Cond = e; }
+  void setCond(StmtCondition e);
 
   static bool classof(const Stmt *S) {
     return S->getKind() >= StmtKind::First_LabeledConditionalStmt &&
@@ -847,8 +851,10 @@ public:
               Optional<bool> implicit = None)
     : LabeledStmt(StmtKind::ForEach, getDefaultImplicitFlag(implicit, ForLoc),
                   LabelInfo),
-      ForLoc(ForLoc), Pat(Pat), InLoc(InLoc), Sequence(Sequence),
-      WhereExpr(WhereExpr), Body(Body) { }
+      ForLoc(ForLoc), Pat(nullptr), InLoc(InLoc), Sequence(Sequence),
+      WhereExpr(WhereExpr), Body(Body) {
+    setPattern(Pat);
+  }
   
   /// getForLoc - Retrieve the location of the 'for' keyword.
   SourceLoc getForLoc() const { return ForLoc; }
@@ -859,8 +865,8 @@ public:
   /// getPattern - Retrieve the pattern describing the iteration variables.
   /// These variables will only be visible within the body of the loop.
   Pattern *getPattern() const { return Pat; }
-  void setPattern(Pattern *p) { Pat = p; }
-
+  void setPattern(Pattern *p);
+  
   Expr *getWhere() const { return WhereExpr; }
   void setWhere(Expr *W) { WhereExpr = W; }
 
@@ -940,7 +946,7 @@ public:
 ///   case 2 where foo(), 3 where bar():
 ///   default:
 /// \endcode
-
+///
 class CaseStmt : public Stmt {
   SourceLoc CaseLoc;
   SourceLoc ColonLoc;

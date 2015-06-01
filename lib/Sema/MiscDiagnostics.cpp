@@ -999,9 +999,15 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       if (auto *PBD = var->getParentPatternBinding()) {
         if (PBD->getSingleVar() == var)
           FixItLoc = PBD->getLoc();
-      } else if (auto *pattern = var->getPlainParentPattern()) {
-        if (auto *vp = dyn_cast<VarPattern>(pattern))
-          FixItLoc = vp->getLoc();
+      } else if (auto *pattern = var->getParentPattern()) {
+        VarPattern *foundVP = nullptr;
+        pattern->forEachNode([&](Pattern *P) {
+          if (auto *VP = dyn_cast<VarPattern>(P))
+            foundVP = VP;
+        });
+        
+        if (foundVP && !foundVP->isLet())
+          FixItLoc = foundVP->getLoc();
       }
 
       // If this is a parameter explicitly marked 'var', remove it.

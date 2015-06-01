@@ -122,7 +122,8 @@ public:
   Identifier getBoundName() const;
 
   /// Returns the name directly bound by this pattern within the body of
-  /// a function, or the null identifier if the pattern does not bind a name directly.
+  /// a function, or the null identifier if the pattern does not bind a name
+  /// directly.
   Identifier getBodyName() const;
 
   /// If this pattern binds a single variable without any
@@ -162,6 +163,13 @@ public:
     });
   }
   
+  /// \brief Mark all vardecls in this pattern as having an owning statement for
+  /// the pattern.
+  void markOwnedByStatement(Stmt *S) {
+    forEachVariable([&](VarDecl *VD) {
+      VD->setParentPatternStmt(S);
+    });
+  }
   
   /// Return the number of "top-level" variables in the given pattern,
   /// which looks into one level of tuple pattern to determine the #

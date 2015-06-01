@@ -4148,7 +4148,7 @@ public:
 /// VarDecl - 'var' and 'let' declarations.
 class VarDecl : public AbstractStorageDecl {
 protected:
-  llvm::PointerUnion<PatternBindingDecl *, Pattern *> ParentPattern;
+  llvm::PointerUnion3<PatternBindingDecl*, Pattern*, Stmt*> ParentPattern;
 
   VarDecl(DeclKind Kind, bool IsStatic, bool IsLet, SourceLoc NameLoc,
           Identifier Name, Type Ty, DeclContext *DC)
@@ -4206,22 +4206,18 @@ public:
   /// "(x, y)" and the initializer on the PatternBindingDecl may be "(1,2)" or
   /// "foo()".
   ///
-  /// If this has no parent pattern binding decl associated, it returns null.
+  /// If this has no parent pattern binding decl or statement associated, it
+  /// returns null.
   ///
-  Pattern *getParentPattern() const {
-    if (auto *PBD = getParentPatternBinding())
-      return PBD->getPatternEntryForVarDecl(this).getPattern();
-    return nullptr;
+  Pattern *getParentPattern() const;
+  
+  /// Return the statement that owns the pattern associated with this VarDecl,
+  /// if one exists.
+  Stmt *getParentPatternStmt() const {
+    return ParentPattern.dyn_cast<Stmt*>();
   }
-
-  /// Return the plain (non pattern-binding-decl) pattern associated with this
-  // var, if one exists.
-  Pattern *getPlainParentPattern() const {
-    return ParentPattern.dyn_cast<Pattern *>();
-  }
-  void setPlainParentPattern(Pattern *Pat) {
-    assert(!getParentPatternBinding() && "already set to a pattern binding");
-    ParentPattern = Pat;
+  void setParentPatternStmt(Stmt *S) {
+    ParentPattern = S;
   }
 
   /// Return the initializer involved in this VarDecl.  However, Recall that the

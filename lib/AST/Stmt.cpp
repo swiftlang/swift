@@ -219,6 +219,17 @@ bool LabeledStmt::requiresLabelOnJump() const {
   llvm_unreachable("statement kind unhandled!");
 }
 
+void ForEachStmt::setPattern(Pattern *p) {
+  Pat = p;
+  Pat->markOwnedByStatement(this);
+}
+
+void CatchStmt::setErrorPattern(Pattern *pattern) {
+  ErrorPattern = pattern;
+  ErrorPattern->markOwnedByStatement(this);
+}
+
+
 DoCatchStmt *DoCatchStmt::create(ASTContext &ctx, LabeledStmtInfo labelInfo,
                                  SourceLoc doLoc, Stmt *body,
                                  ArrayRef<CatchStmt*> catches,
@@ -237,11 +248,23 @@ bool DoCatchStmt::isSyntacticallyExhaustive() const {
   return false;
 }
 
+void LabeledConditionalStmt::setCond(StmtCondition e) {
+  // When set set a condition into a Conditional Statement, inform each of the
+  // variables bound in any patterns that this is the owning statement for the
+  // pattern.
+  for (auto &elt : e)
+    if (auto pat = elt.getPatternOrNull())
+      pat->markOwnedByStatement(this);
+  
+  Cond = e;
+}
+
 bool CatchStmt::isSyntacticallyExhaustive() const {
   // It cannot have a guard expression and the pattern cannot be refutable.
   return getGuardExpr() == nullptr &&
          !getErrorPattern()->isRefutablePattern();
 }
+
 
 PoundAvailableInfo *PoundAvailableInfo::create(ASTContext &ctx,
                                                SourceLoc PoundLoc,
@@ -377,6 +400,7 @@ CaseStmt::CaseStmt(SourceLoc CaseLoc, ArrayRef<CaseLabelItem> CaseLabelItems,
 
   for (unsigned i = 0; i < NumPatterns; ++i) {
     new (&Items[i]) CaseLabelItem(CaseLabelItems[i]);
+    Items[i].getPattern()->markOwnedByStatement(this);
   }
 }
 
