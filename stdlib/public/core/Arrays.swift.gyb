@@ -399,8 +399,8 @@ public struct ${Self}<T>
 
   /// Initialization from an existing buffer does not have "array.init"
   /// semantics because the caller may retain an alias to buffer.
-  public init(_ buffer: _Buffer) {
-    self._buffer = buffer
+  public init(_ _buffer: _Buffer) {
+    self._buffer = _buffer
   }
 
   public var _buffer: _Buffer

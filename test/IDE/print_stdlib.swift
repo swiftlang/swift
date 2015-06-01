@@ -19,6 +19,7 @@
 // CHECK-NOT: _StringCore
 // CHECK-NOT: _ArrayBody
 // CHECK-NOT: _prext_
+// CHECK-NOT: buffer: _ArrayBuffer
 // CHECK-NOT: func ~>
 // FIXME: Builtin.
 // FIXME: RawPointer
