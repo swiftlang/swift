@@ -1,3 +1,6 @@
+// Also run this test in optimize test modes.
+// REQUIRES: optimize_test
+
 // RUN: rm -rf %t && mkdir %t
 // RUN: cp %s %t/main.swift
 // RUN: %target-build-swift -Xfrontend -playground -Xfrontend -debugger-support -o %t/main %S/Inputs/PlaygroundsRuntime.swift %t/main.swift

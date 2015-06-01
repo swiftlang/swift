@@ -1,3 +1,6 @@
+// Also run this test in optimize test modes.
+// REQUIRES: optimize_test
+
 // RUN: %target-build-swift %s
 
 // FIXME: iOS does not have Cocoa.framework

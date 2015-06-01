@@ -1,3 +1,6 @@
+// Also run this test in optimize test modes.
+// REQUIRES: optimize_test
+
 // RUN: rm -rf %t  &&  mkdir %t
 //
 // RUN: %target-clang %S/Inputs/Mirror/Mirror.mm -c -o %t/Mirror.mm.o -g

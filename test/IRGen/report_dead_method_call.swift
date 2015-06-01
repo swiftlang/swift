@@ -1,3 +1,6 @@
+// Also run this test in optimize test modes.
+// REQUIRES: optimize_test
+
 // RUN: rm -rf %t && mkdir -p %t
 // RUN: %target-build-swift %S/Inputs/report_dead_method_call/main.swift %s -O -Xfrontend -disable-access-control -o %t/a.out
 // RUN: %target-run %t/a.out 2> %t/err1.log; FileCheck %s < %t/err1.log

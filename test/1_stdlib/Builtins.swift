@@ -1,3 +1,6 @@
+// Also run this test in optimize test modes.
+// REQUIRES: optimize_test
+
 //===--- Builtins.swift - Tests for our Builtin wrappers ------------------===//
 //
 // This source file is part of the Swift.org open source project

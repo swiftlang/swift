@@ -1,3 +1,6 @@
+// Also run this test in optimize test modes.
+// REQUIRES: optimize_test
+
 // RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/UnsafePointer.swift
 // RUN: %S/../../utils/line-directive %t/UnsafePointer.swift -- %target-build-swift %t/UnsafePointer.swift -o %t/a.out
 // RUN: %S/../../utils/line-directive %t/UnsafePointer.swift -- %target-run %t/a.out

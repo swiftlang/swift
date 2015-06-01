@@ -1,3 +1,6 @@
+// Also run this test in optimize test modes.
+// REQUIRES: optimize_test
+
 // RUN: %target-build-swift -parse-stdlib -Xfrontend -disable-access-control %s -o %t.out
 // RUN: %target-run %t.out | FileCheck %s
 

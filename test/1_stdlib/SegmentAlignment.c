@@ -1,3 +1,6 @@
+// Also run this test in optimize test modes.
+// REQUIRES: optimize_test
+
 // RUN: rm -rf %t  &&  mkdir -p %t
 // RUN: xcrun -sdk %target-sdk-name %clang -c -arch %target-cpu %s -o %t/SegmentAlignment.o
 // RUN: %target-build-swift %S/Inputs/SegmentAlignment.swift -Xlinker %t/SegmentAlignment.o -o %t/a.out

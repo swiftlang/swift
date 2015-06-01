@@ -1,3 +1,6 @@
+// Also run this test in optimize test modes.
+// REQUIRES: optimize_test
+
 %# -*- mode: swift -*-
 //===--- Array.swift ------------------------------------------------------===//
 //

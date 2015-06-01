@@ -1,3 +1,6 @@
+// Also run this test in optimize test modes.
+// REQUIRES: optimize_test
+
 //===--- SwiftObjectNSObject.swift - Test SwiftObject's NSObject interop --===//
 //
 // This source file is part of the Swift.org open source project

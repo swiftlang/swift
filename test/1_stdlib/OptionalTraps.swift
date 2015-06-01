@@ -1,3 +1,6 @@
+// Also run this test in optimize test modes.
+// REQUIRES: optimize_test
+
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 // RUN: %target-build-swift %s -o %t/Assert_Debug -Onone

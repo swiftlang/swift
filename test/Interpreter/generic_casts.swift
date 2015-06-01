@@ -1,3 +1,6 @@
+// Also run this test in optimize test modes.
+// REQUIRES: optimize_test
+
 // RUN: %target-run-simple-swift | FileCheck %s
 // RUN: %target-build-swift -O %s -o %t/a.out.optimized
 // RUN: %target-run %t/a.out.optimized | FileCheck %s

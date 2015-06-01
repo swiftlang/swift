@@ -1,3 +1,6 @@
+// Also run this test in optimize test modes.
+// REQUIRES: optimize_test
+
 // RUN: rm -rf %t  &&  mkdir %t
 // RUN: %target-build-swift -parse-stdlib %s -module-name Reflection -o %t/a.out
 // RUN: %S/timeout.sh 360 %target-run %t/a.out | FileCheck %s

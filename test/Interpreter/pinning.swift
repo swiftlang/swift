@@ -1,3 +1,6 @@
+// Also run this test in optimize test modes.
+// REQUIRES: optimize_test
+
 // RUN: rm -rf %t  &&  mkdir -p %t
 // RUN: %target-build-swift -parse-stdlib %s -o %t/a.out
 // RUN: %target-run %t/a.out | FileCheck %s

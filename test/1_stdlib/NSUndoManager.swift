@@ -1,3 +1,6 @@
+// Also run this test in optimize test modes.
+// REQUIRES: optimize_test
+
 // TODO: Relies on AnyObject lvalues <rdar://problem/17755906>
 // R/UN: %target-run-simple-swift | FileCheck %s
 // RUN: not %target-build-swift -parse
