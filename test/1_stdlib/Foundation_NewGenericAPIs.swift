@@ -1,5 +1,7 @@
 // RUN: %target-parse-verify-swift
 
+// REQUIRES: objc_interop
+
 import Foundation
 
 func expectType<T>(_: T.Type, inout _ x: T) {}
