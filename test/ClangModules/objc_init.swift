@@ -24,13 +24,13 @@ func testNSInterestingDesignated() {
   NSInterestingDesignatedSub(string:"hello")
 }
 
-extension URLDocument {
+extension NSDocument {
   convenience init(string: String) {
     self.init(URL: string)
   }
 }
 
-class MyDocument1 : URLDocument {
+class MyDocument1 : NSDocument {
   override init() { 
     super.init()
   }
@@ -45,9 +45,9 @@ func createMyDocument1() {
   _ = md
 }
 
-class MyDocument2 : URLDocument {
+class MyDocument2 : NSDocument {
   init(URL url: String) {
-    super.init(URL: url) // expected-error{{must call a designated initializer of the superclass 'URLDocument'}}
+    super.init(URL: url) // expected-error{{must call a designated initializer of the superclass 'NSDocument'}}
   }
 }
 
@@ -57,9 +57,9 @@ class MyDocument3 : NSAwesomeDocument {
   }
 }
 
-func createMyDocument3(URL: NSURL) {
+func createMyDocument3() {
   var md = MyDocument3()
-  md = try! MyDocument3(contentsOfURL: URL, ofType:"")
+  md = MyDocument3(URL: "http://llvm.org")
   _ = md
 }
 

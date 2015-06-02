@@ -13,7 +13,7 @@ protocol URLInitializable {
   init?(URL: String!)
 }
 
-extension URLDocument : URLInitializable { }
+extension NSDocument : URLInitializable { }
 
 // Okay to satisfy an 'init' requirement with an 'init!'.
 protocol IntInitializable {

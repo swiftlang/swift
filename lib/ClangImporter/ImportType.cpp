@@ -1415,8 +1415,7 @@ static const char ErrorSuffix[] = "AndReturnError";
 /// Look for a method that will import to have the same name as the
 /// given method after importing the Nth parameter as an elided error
 /// parameter.
-static bool hasErrorMethodNameCollision(ClangImporter::Implementation &importer,
-                                        const clang::ObjCMethodDecl *method,
+static bool hasErrorMethodNameCollision(const clang::ObjCMethodDecl *method,
                                         unsigned paramIndex,
                                         bool stripErrorSuffix) {
   // Copy the existing selector pieces into an array.
@@ -1449,10 +1448,7 @@ static bool hasErrorMethodNameCollision(ClangImporter::Implementation &importer,
     conflict = protocol->getMethod(newSelector, method->isInstanceMethod());
   }
 
-  if (conflict == nullptr)
-    return false;
-
-  return !importer.methodIsKnownOverloadOnThrows(conflict);
+  return (conflict != nullptr);
 }
 
 
@@ -1518,8 +1514,7 @@ considerErrorImport(ClangImporter::Implementation &importer,
     // TODO: this logic doesn't really work with init methods
     // TODO: this privileges the old API over the new one
     if (adjustName &&
-        hasErrorMethodNameCollision(importer, clangDecl, index,
-                                    stripErrorSuffix)) {
+        hasErrorMethodNameCollision(clangDecl, index, stripErrorSuffix)) {
       // If there was a conflict on the first argument, and this was
       // the first argument and we're not stripping error suffixes, just
       // give up completely on error import.
