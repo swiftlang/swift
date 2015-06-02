@@ -2,7 +2,7 @@
 
 // REQUIRES: executable_test
 
-// XFAIL: swift_test_mode_optimize_armv7
+// XFAIL: optimized_stdlib_armv7
 
 struct Structure {
   var a: UInt8
