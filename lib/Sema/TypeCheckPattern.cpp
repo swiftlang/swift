@@ -1160,12 +1160,8 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
       // The type is Bool.
       // Check if the pattern is a Bool literal
       auto EP = cast<ExprPattern>(P);
-      // Dig into ParenExprs.
-      auto *SubExpr = EP->getSubExpr();
-      while (auto *PE = dyn_cast<ParenExpr>(SubExpr)) {
-        SubExpr = PE->getSubExpr();
-      }
-      if (auto *BLE = dyn_cast<BooleanLiteralExpr>(SubExpr)) {
+      if (auto *BLE = dyn_cast<BooleanLiteralExpr>(
+              EP->getSubExpr()->getSemanticsProvidingExpr())) {
         P = new (Context) BoolPattern(BLE->getLoc(), BLE->getValue());
         P->setType(type);
         return false;
