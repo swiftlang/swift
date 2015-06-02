@@ -1,17 +1,14 @@
-// RUN: %target-jit-run -parse-stdlib %s | FileCheck %s
+// RUN: %target-run-stdlib-swift -parse-stdlib %s | FileCheck %s
 // REQUIRES: executable_test
 
-// REQUIRES: swift_interpreter
 // XFAIL: linux
-
-// FIXME: iOS fails: target-run-stdlib-swift gets 'unknown identifier VarArgs'
 
 import Swift
 
 @asmname("vprintf")
 func c_vprintf(format: UnsafePointer<Int8>, _ args: CVaListPointer)
 
-func printf(format: String, _ arguments: CVarArgType...) {
+func my_printf(format: String, _ arguments: CVarArgType...) {
   withVaList(arguments) {
     c_vprintf(format, $0)
   }
@@ -19,7 +16,7 @@ func printf(format: String, _ arguments: CVarArgType...) {
 
 func test_varArgs0() {
   // CHECK: The answer to life and everything is 42, 42, -42, 3.14
-  VarArgs.printf(
+  my_printf(
     "The answer to life and everything is %ld, %u, %d, %f\n",
     42, UInt32(42), Int16(-42), 3.14159279)
 }
