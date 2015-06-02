@@ -1005,8 +1005,10 @@ public enum OSVersion : CustomStringConvertible {
   case OSX(major: Int, minor: Int, bugFix: Int)
   case iOS(major: Int, minor: Int, bugFix: Int)
   case TVOS(major: Int, minor: Int, bugFix: Int)
+  case watchOS(major: Int, minor: Int, bugFix: Int)
   case iOSSimulator
   case TVOSSimulator
+  case watchOSSimulator
   case Linux
 
   public var description: String {
@@ -1017,10 +1019,14 @@ public enum OSVersion : CustomStringConvertible {
       return "iOS \(major).\(minor).\(bugFix)"
     case TVOS(let major, let minor, let bugFix):
       return "TVOS \(major).\(minor).\(bugFix)"
+    case watchOS(let major, let minor, let bugFix):
+      return "watchOS \(major).\(minor).\(bugFix)"
     case iOSSimulator:
       return "iOSSimulator"
     case TVOSSimulator:
       return "TVOSSimulator"
+    case watchOSSimulator:
+      return "watchOSSimulator"
     case Linux:
       return "Linux"
     }
@@ -1051,6 +1057,8 @@ func _getOSVersion() -> OSVersion {
   return .iOSSimulator
 #elseif os(tvOS) && (arch(i386) || arch(x86_64))
   return .TVOSSimulator
+#elseif os(watchOS) && (arch(i386) || arch(x86_64))
+  return .watchOSSimulator
 #elseif os(Linux)
   return .Linux
 #else
@@ -1064,6 +1072,8 @@ func _getOSVersion() -> OSVersion {
     return .iOS(major: major, minor: minor, bugFix: bugFix)
   case "tvOS":
     return .TVOS(major: major, minor: minor, bugFix: bugFix)
+  case "Watch OS":
+    return .watchOS(major: major, minor: minor, bugFix: bugFix)
   default:
     fatalError("could not determine OS version")
   }
@@ -1110,6 +1120,15 @@ public enum TestRunPredicate : CustomStringConvertible {
   case TVOSBugFixRange(Int, Int, Range<Int>, reason: String)
 
   case TVOSSimulatorAny(/*reason:*/ String)
+
+  case watchOSAny(/*reason:*/ String)
+  case watchOSMajor(Int, reason: String)
+  case watchOSMinor(Int, Int, reason: String)
+  case watchOSMinorRange(Int, Range<Int>, reason: String)
+  case watchOSBugFix(Int, Int, Int, reason: String)
+  case watchOSBugFixRange(Int, Int, Range<Int>, reason: String)
+
+  case watchOSSimulatorAny(/*reason:*/ String)
 
   case LinuxAny(reason: String)
 
@@ -1161,6 +1180,22 @@ public enum TestRunPredicate : CustomStringConvertible {
 
     case TVOSSimulatorAny(let reason):
       return "TVOSSimulatorAny(*, reason: \(reason))"
+
+    case watchOSAny(let reason):
+      return "watchOS(*, reason: \(reason))"
+    case watchOSMajor(let major, let reason):
+      return "watchOS(\(major).*, reason: \(reason))"
+    case watchOSMinor(let major, let minor, let reason):
+      return "watchOS(\(major).\(minor), reason: \(reason))"
+    case watchOSMinorRange(let major, let minorRange, let reason):
+      return "watchOS(\(major).[\(minorRange)], reason: \(reason))"
+    case watchOSBugFix(let major, let minor, let bugFix, let reason):
+      return "watchOS(\(major).\(minor).\(bugFix), reason: \(reason))"
+    case watchOSBugFixRange(let major, let minor, let bugFixRange, let reason):
+      return "watchOS(\(major).\(minor).[\(bugFixRange)], reason: \(reason))"
+
+    case watchOSSimulatorAny(let reason):
+      return "watchOSSimulatorAny(*, reason: \(reason))"
 
     case LinuxAny(reason: let reason):
       return "LinuxAny(*, reason: \(reason))"
@@ -1327,6 +1362,62 @@ public enum TestRunPredicate : CustomStringConvertible {
     case TVOSSimulatorAny:
       switch _getRunningOSVersion() {
       case .TVOSSimulator:
+        return true
+      default:
+        return false
+      }
+
+    case watchOSAny:
+      switch _getRunningOSVersion() {
+      case .watchOS:
+        return true
+      default:
+        return false
+      }
+
+    case watchOSMajor(let major, _):
+      switch _getRunningOSVersion() {
+      case .watchOS(major, _, _):
+        return true
+      default:
+        return false
+      }
+
+    case watchOSMinor(let major, let minor, _):
+      switch _getRunningOSVersion() {
+      case .watchOS(major, minor, _):
+        return true
+      default:
+        return false
+      }
+
+    case watchOSMinorRange(let major, let minorRange, _):
+      switch _getRunningOSVersion() {
+      case .watchOS(major, let runningMinor, _):
+        return minorRange.contains(runningMinor)
+      default:
+        return false
+      }
+
+    case watchOSBugFix(let major, let minor, let bugFix, _):
+      switch _getRunningOSVersion() {
+      case .watchOS(major, minor, bugFix):
+        return true
+      default:
+        return false
+      }
+
+    case watchOSBugFixRange(let major, let minor, let bugFixRange, _):
+      switch _getRunningOSVersion() {
+      case .watchOS(major, minor, let runningBugFix):
+        return bugFixRange.contains(runningBugFix)
+      default:
+        return false
+      }
+
+    case watchOSSimulatorAny:
+      switch _getRunningOSVersion() {
+      case .watchOSSimulator:
         return true
       default:
         return false
