@@ -615,10 +615,13 @@ let myString = @"foo" // expected-error {{string literals in Swift are not prece
 
 
 // <rdar://problem/16990885> support curly quotes for string literals
-// expected-error @+1 {{unicode curly quote found, replace with '"'}} {{20-23="}}
-let curlyQuotes1 = “hello world!” // expected-error {{unicode curly quote found, replace with '"'}} {{35-38="}}
+// expected-error @+1 {{unicode curly quote found, replace with '"'}} {{35-38="}}
+let curlyQuotes1 = “hello world!” // expected-error {{unicode curly quote found, replace with '"'}} {{20-23="}}
 
 // expected-error @+1 {{unicode curly quote found, replace with '"'}} {{20-23="}}
 let curlyQuotes2 = “hello world!"
 
+
+// <rdar://problem/21196171> compiler should recover better from "unicode Specials" characters
+let ￼tryx  = 123        // expected-error 2 {{invalid character in source file}}  {{5-8= }}
 

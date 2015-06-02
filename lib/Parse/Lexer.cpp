@@ -436,7 +436,7 @@ static bool isValidIdentifierContinuationCodePoint(uint32_t c) {
     || (c >= 0xF900 && c <= 0xFD3D)
     || (c >= 0xFD40 && c <= 0xFDCF)
     || (c >= 0xFDF0 && c <= 0xFE44)
-    || (c >= 0xFE47 && c <= 0xFFFD)
+    || (c >= 0xFE47 && c <= 0xFFF8)
   
     || (c >= 0x10000 && c <= 0x1FFFD)
     || (c >= 0x20000 && c <= 0x2FFFD)
@@ -461,17 +461,16 @@ static bool isValidIdentifierStartCodePoint(uint32_t c) {
 
   // N1518: Recommendations for extended identifier characters for C and C++
   // Proposed Annex X.2: Ranges of characters disallowed initially
-  if ((c >= 0x0300 && c <= 0x036F)
-      || (c >= 0x1DC0 && c <= 0x1DFF)
-      || (c >= 0x20D0 && c <= 0x20FF)
-      || (c >= 0xFE20 && c <= 0xFE2F))
+  if ((c >= 0x0300 && c <= 0x036F) ||
+      (c >= 0x1DC0 && c <= 0x1DFF) ||
+      (c >= 0x20D0 && c <= 0x20FF) ||
+      (c >= 0xFE20 && c <= 0xFE2F))
     return false;
   
   return true;
 }
 
-static bool advanceIf(char const *&ptr,
-                      char const *end,
+static bool advanceIf(char const *&ptr, char const *end,
                       bool (*predicate)(uint32_t)) {
   char const *next = ptr;
   uint32_t c = validateUTF8CharacterAndAdvance(next, end);
@@ -1432,21 +1431,34 @@ Restart:
       // This character isn't allowed in Swift source.
       uint32_t codepoint = validateUTF8CharacterAndAdvance(tmp, BufferEnd);
       if (codepoint == ~0U) {
-        diagnose(CurPtr-1, diag::lex_invalid_utf8);
+        diagnose(CurPtr-1, diag::lex_invalid_utf8)
+          .fixItReplaceChars(getSourceLoc(CurPtr-1), getSourceLoc(tmp), " ");
+        CurPtr = tmp;
+        goto Restart;  // Skip presumed whitespace.
       } else if (codepoint == 0x0000201D) {
         // If this is an end curly quote, just diagnose it with a fixit hint.
         diagnose(CurPtr-1, diag::lex_invalid_curly_quote)
           .fixItReplaceChars(getSourceLoc(CurPtr-1), getSourceLoc(tmp), "\"");
       } else if (codepoint == 0x0000201C) {
-        diagnose(CurPtr-1, diag::lex_invalid_curly_quote)
-          .fixItReplaceChars(getSourceLoc(CurPtr-1), getSourceLoc(tmp), "\"");
+        auto endPtr = tmp;
         // If this is a start curly quote, do a fuzzy match of a string literal
         // to improve recovery.
         if (auto tmp2 = findEndOfCurlyQuoteStringLiteral(tmp))
           tmp = tmp2;
-        
+
+        // Note, we intentionally diagnose the end quote before the start quote,
+        // so that the IDE suggests fixing the end quote before the start quote.
+        // This, in turn, works better with our error recovery because we won't
+        // diagnose an end curly quote in the middle of a straight quoted
+        // literal.
+        diagnose(CurPtr-1, diag::lex_invalid_curly_quote)
+          .fixItReplaceChars(getSourceLoc(CurPtr-1), getSourceLoc(endPtr),"\"");
+
       } else {
-        diagnose(CurPtr-1, diag::lex_invalid_character);
+        diagnose(CurPtr-1, diag::lex_invalid_character)
+          .fixItReplaceChars(getSourceLoc(CurPtr-1), getSourceLoc(tmp), " ");
+        CurPtr = tmp;
+        goto Restart;  // Skip presumed whitespace.
       }
     }
 
