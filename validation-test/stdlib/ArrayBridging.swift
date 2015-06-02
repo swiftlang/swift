@@ -7,6 +7,8 @@
 // RUN: %target-run %t.out
 
 // REQUIRES: objc_interop
+// REQUIRES: executable_test
+
 
 import StdlibUnittest
 import Foundation
