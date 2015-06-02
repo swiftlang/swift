@@ -36,14 +36,28 @@
 
 @interface NSDocument : NSObject
 - (instancetype)init;
-- (instancetype)initWithURL:(NSString*)url;
+- (instancetype)initWithContentsOfURL:(NSURL *)url ofType:(NSString *)type error:(NSError **)error;
+
+- (BOOL)readFromURL:(NSURL *)url ofType:(NSString *)typeName error:(NSError **)outError;
+- (BOOL)writeToURL:(NSURL *)url ofType:(NSString *)typeName error:(NSError **)outError;
 
 - (void)copyDocumentFromURL:(NSURL*)fromURL toURL:(NSURL*)toURL;
 - (void)scaleXBy:(NSInteger)value;
 @end
 
+@interface NSDocument (NSDeprecated)
+- (nullable id)initWithContentsOfURL:(NSURL *)url ofType:(NSString *)typeName __attribute__((availability(macosx, introduced=10.0, deprecated=10.4)));
+- (BOOL)readFromURL:(NSURL *)url ofType:(NSString *)type __attribute__((availability(macosx, introduced=10.0, deprecated=10.4)));
+- (BOOL)writeToURL:(NSURL *)url ofType:(NSString *)type __attribute__((availability(macosx, introduced=10.0, deprecated=10.4)));
+@end
+
 @interface NSAwesomeDocument : NSDocument
 -(void)noReturnMethod:(int)arg  __attribute__((noreturn));
+@end
+
+@interface URLDocument : NSObject
+- (instancetype)init NS_DESIGNATED_INITIALIZER;
+- (instancetype)initWithURL:(NSString *)urlString;
 @end
 
 @interface NSInterestingDesignated : NSObject

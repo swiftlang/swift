@@ -17,7 +17,7 @@ class X {
 
 
 func testInitWith(url: String) {
-  _ = NSDocument(URL: url)
+  _ = NSInterestingDesignated(URL: url)
 }
 
 func testInstanceTypeFactoryMethod(queen: B) {
