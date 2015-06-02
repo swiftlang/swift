@@ -59,13 +59,12 @@ GamePlayKitTests.test("GKStateMachine.stateForClass()") {
   if true {
     // Construct a state machine with a custom subclass as the only state.
     let stateMachine = GKStateMachine(
-      states: [TestState1()],
-      initialStateClass: TestState1.self)
+      states: [TestState1()])
 
     var stateForTestState1 =
-    stateMachine.stateForClass(TestState1.self)
+      stateMachine.stateForClass(TestState1.self)
     var stateForTestState2_nil =
-    stateMachine.stateForClass(TestState2.self)
+      stateMachine.stateForClass(TestState2.self)
 
     expectNotEmpty(stateForTestState1)
     expectType(Optional<TestState1>.self, &stateForTestState1)
@@ -76,13 +75,12 @@ GamePlayKitTests.test("GKStateMachine.stateForClass()") {
   if true {
     // Construct a state machine with a custom subclass as the only state.
     let stateMachine = GKStateMachine(
-      states: [TestState2()],
-      initialStateClass: TestState2.self)
+      states: [TestState2()])
 
     var stateForTestState2 =
-    stateMachine.stateForClass(TestState2.self)
+      stateMachine.stateForClass(TestState2.self)
     var stateForTestState1_nil =
-    stateMachine.stateForClass(TestState1.self)
+      stateMachine.stateForClass(TestState1.self)
 
     expectNotEmpty(stateForTestState2)
     expectType(Optional<TestState2>.self, &stateForTestState2)
