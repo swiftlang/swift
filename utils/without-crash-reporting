@@ -1,7 +1,0 @@
-#!/bin/sh
-
-if [ -x /bin/launchctl ] ; then
-  launchctl unload -w /System/Library/LaunchAgents/com.apple.ReportCrash.plist
-  trap "launchctl load -w /System/Library/LaunchAgents/com.apple.ReportCrash.plist" 0 1 2 3 15
-fi
-$@
