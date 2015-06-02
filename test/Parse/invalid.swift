@@ -2,9 +2,8 @@
 
 func foo(a: Int) {
   foo(<\a\>) // expected-error 2 {{invalid character in source file}} \
-             // expected-error 3 {{expected ',' separator}} \
-             // expected-error {{operator with postfix spacing cannot start a subexpression}} \
-             // expected-error {{expected expression in list of expressions}}
+             // expected-error {{'<' is not a prefix unary operator}} \
+             // expected-error {{'>' is not a postfix unary operator}}
 }
 
 // rdar://15946844
