@@ -190,6 +190,8 @@ public:
         TargetKindSetter TKS(BracePairs, BracePair::TargetKinds::Fallthrough);
         return transformSwitchStmt(llvm::cast<SwitchStmt>(S));
       }
+    case StmtKind::DoCatch:
+      return transformDoCatchStmt(llvm::cast<DoCatchStmt>(S));
     }
   }
     
@@ -276,6 +278,24 @@ public:
     }
       
     return SS;
+  }
+
+  DoCatchStmt *transformDoCatchStmt(DoCatchStmt *DCS) {
+    if (BraceStmt *B = dyn_cast_or_null<BraceStmt>(DCS->getBody())) {
+      BraceStmt *NB = transformBraceStmt(B);
+      if (NB != B) {
+        DCS->setBody(NB);
+      }
+    }
+    for (CatchStmt *C : DCS->getCatches()) {
+      if (BraceStmt *CB = dyn_cast_or_null<BraceStmt>(C->getBody())) {
+        BraceStmt *NCB = transformBraceStmt(CB);
+        if (NCB != CB) {
+          C->setBody(NCB);
+        }
+      }
+    }
+    return DCS;
   }
   
   Decl *transformDecl(Decl *D) {
