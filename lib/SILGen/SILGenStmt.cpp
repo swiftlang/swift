@@ -498,7 +498,7 @@ void StmtEmitter::visitDoStmt(DoStmt *S) {
 
   if (hasLabel) {
     SGF.BreakContinueDestStack.pop_back();
-    emitOrDeleteBlock(SGF, endDest, S);
+    emitOrDeleteBlock(SGF, endDest, CleanupLocation(S));
   }
 }
 
@@ -569,7 +569,7 @@ void StmtEmitter::visitDoCatchStmt(DoCatchStmt *S) {
   // left in the original function section after this.  So if
   // emitOrDeleteBlock ever learns to just continue in the
   // predecessor, we'll need to suppress that here.
-  if (emitOrDeleteBlock(SGF, endDest, S))
+  if (emitOrDeleteBlock(SGF, endDest, CleanupLocation(S->getBody())))
     SGF.emitProfilerIncrement(S);
 }
 
