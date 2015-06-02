@@ -14,7 +14,6 @@
 
 import Swift
 import Foundation
-import SpriteKit
 
 #if os(OSX)
 import AppKit
@@ -24,7 +23,7 @@ typealias OSColor = NSColor
 typealias OSBezierPath = NSBezierPath
 #endif
 
-#if os(iOS) || os(tvOS)
+#if os(iOS) || os(tvOS) || os(watchOS)
 import UIKit
 
 typealias OSImage = UIImage

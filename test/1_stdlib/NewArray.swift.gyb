@@ -490,13 +490,19 @@ func rdar16958865() {
 }
 rdar16958865()
 
-import SpriteKit
+#if os(OSX)
+import Foundation
+typealias OSColor = NSColor
+#else
+import UIKit
+typealias OSColor = UIColor
+#endif
 
 class Rdar16914909 : NSObject {
-  var basicColorSet = [SKColor]()
+  var basicColorSet = [OSColor]()
   
   func doColorStuff() {
-    basicColorSet.append(SKColor.lightGrayColor())
+    basicColorSet.append(OSColor.lightGrayColor())
     print("appended")
   }
 }

@@ -2,6 +2,9 @@
 
 // REQUIRES: objc_interop
 
+// watchOS does not have SpriteKit.
+// UNSUPPORTED: OS=watchos
+
 import Foundation
 import SpriteKit
 
