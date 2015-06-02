@@ -654,10 +654,16 @@ public func yn(n: Int, _ x: CGFloat) -> CGFloat {
 }
 
 @transparent
-extension CGFloat : _CVarArgPassedAsDouble {
+extension CGFloat : _CVarArgPassedAsDouble, _CVarArgAlignedType {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs
   public var _cVarArgEncoding: [Word] {
     return native._cVarArgEncoding
+  }
+
+  /// Return the required alignment in bytes of 
+  /// the value returned by `_cVarArgEncoding`.
+  public var _cVarArgAlignment: Int { 
+    return native._cVarArgAlignment
   }
 }

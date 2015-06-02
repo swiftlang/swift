@@ -49,6 +49,14 @@ public protocol CVarArgType {
 public // SPI(CoreGraphics)
 protocol _CVarArgPassedAsDouble : CVarArgType {}
 
+/// Some types require alignment greater than Word on some architectures.
+public // SPI(CoreGraphics)
+protocol _CVarArgAlignedType : CVarArgType {
+  /// Return the required alignment in bytes of 
+  /// the value returned by `_cVarArgEncoding`.
+  var _cVarArgAlignment: Int { get }
+}
+
 #if arch(x86_64)
 let _x86_64CountGPRegisters = 6
 let _x86_64CountSSERegisters = 8
@@ -116,11 +124,18 @@ extension Int : CVarArgType {
   }
 }
 
-extension Int64 : CVarArgType {
+extension Int64 : CVarArgType, _CVarArgAlignedType {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   public var _cVarArgEncoding: [Word] {
     return _encodeBitsAsWords(self)
+  }
+
+  /// Return the required alignment in bytes of 
+  /// the value returned by `_cVarArgEncoding`.
+  public var _cVarArgAlignment: Int {
+    // FIXME: alignof differs from the ABI alignment on some architectures
+    return alignofValue(self)
   }
 }
 
@@ -157,11 +172,18 @@ extension UInt : CVarArgType {
   }
 }
 
-extension UInt64 : CVarArgType {
+extension UInt64 : CVarArgType, _CVarArgAlignedType {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   public var _cVarArgEncoding: [Word] {
     return _encodeBitsAsWords(self)
+  }
+
+  /// Return the required alignment in bytes of 
+  /// the value returned by `_cVarArgEncoding`.
+  public var _cVarArgAlignment: Int {
+    // FIXME: alignof differs from the ABI alignment on some architectures
+    return alignofValue(self)
   }
 }
 
@@ -221,19 +243,33 @@ extension AutoreleasingUnsafeMutablePointer : CVarArgType {
   }
 }
 
-extension Float : _CVarArgPassedAsDouble {
+extension Float : _CVarArgPassedAsDouble, _CVarArgAlignedType {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   public var _cVarArgEncoding: [Word] {
     return _encodeBitsAsWords(Double(self))
   }
+
+  /// Return the required alignment in bytes of 
+  /// the value returned by `_cVarArgEncoding`.
+  public var _cVarArgAlignment: Int {
+    // FIXME: alignof differs from the ABI alignment on some architectures
+    return alignofValue(Double(self))
+  }
 }
 
-extension Double : _CVarArgPassedAsDouble {
+extension Double : _CVarArgPassedAsDouble, _CVarArgAlignedType {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
   public var _cVarArgEncoding: [Word] {
     return _encodeBitsAsWords(self)
+  }
+
+  /// Return the required alignment in bytes of 
+  /// the value returned by `_cVarArgEncoding`.
+  public var _cVarArgAlignment: Int {
+    // FIXME: alignof differs from the ABI alignment on some architectures
+    return alignofValue(self)
   }
 }
 
@@ -244,18 +280,87 @@ extension Double : _CVarArgPassedAsDouble {
 final public class VaListBuilder {
 
   func append(arg: CVarArgType) {
-    for x in arg._cVarArgEncoding {
-      storage.append(x)
+    // Write alignment padding if necessary.
+    // This is needed on architectures where the ABI alignment of some 
+    // supported vararg type is greater than the alignment of Word.
+    // FIXME: this implementation is not portable because
+    // alignof differs from the ABI alignment on some architectures
+#if os(watchOS) && arch(arm)   // FIXME: rdar://21203036 should be arch(armv7k)
+    if let arg = arg as? _CVarArgAlignedType {
+      let alignmentInWords = arg._cVarArgAlignment / sizeof(Word)
+      let misalignmentInWords = count % alignmentInWords
+      if misalignmentInWords != 0 {
+        let paddingInWords = alignmentInWords - misalignmentInWords
+        appendWords([Word](count: paddingInWords, repeatedValue: -1))
+      }
     }
+#endif
+
+    // Write the argument's value itself.
+    appendWords(arg._cVarArgEncoding)
   }
 
   func va_list() -> CVaListPointer {
-    return CVaListPointer(
-      _fromUnsafeMutablePointer: UnsafeMutablePointer<Void>(
-        storage._baseAddressIfContiguous))
+    return CVaListPointer(_fromUnsafeMutablePointer: storage)
   }
 
-  var storage = [Word]()
+  // Manage storage that is accessed as Words 
+  // but possibly more aligned than that.
+  // FIXME: this should be packaged into a better storage type
+
+  func appendWords(words: [Word]) {
+    let newCount = count + words.count
+    if newCount > allocated {
+      let oldAllocated = allocated
+      let oldStorage = storage
+      let oldCount = count
+
+      allocated = max(newCount, allocated * 2)
+      storage = allocStorage(wordCount: allocated)
+      // count is updated below
+
+      if oldStorage != nil {
+        storage.moveInitializeFrom(oldStorage, count:oldCount)
+        deallocStorage(wordCount: oldAllocated, 
+          storage: oldStorage)
+      }
+    }
+
+    for word in words {
+      storage[count++] = word
+    }
+  }
+
+  func rawSizeAndAlignment(wordCount: Int) 
+    -> (Builtin.Word, Builtin.Word) {
+    return ((wordCount * strideof(Word.self))._builtinWordValue, 
+      requiredAlignmentInBytes._builtinWordValue)
+  }
+
+  func allocStorage(wordCount wordCount: Int) 
+    -> UnsafeMutablePointer<Word> {
+    let (rawSize, rawAlignment) = rawSizeAndAlignment(wordCount)
+    let rawStorage = Builtin.allocRaw(rawSize, rawAlignment)
+    return UnsafeMutablePointer<Word>(rawStorage)
+  }
+
+  func deallocStorage(wordCount wordCount: Int, 
+    storage: UnsafeMutablePointer<Word>) {
+    let (rawSize, rawAlignment) = rawSizeAndAlignment(wordCount)
+    Builtin.deallocRaw(storage._rawValue, rawSize, rawAlignment)
+  }
+
+  deinit {
+    if storage != nil {
+      deallocStorage(wordCount: allocated, storage: storage)
+    }
+  }
+
+  // FIXME: alignof differs from the ABI alignment on some architectures
+  let requiredAlignmentInBytes = alignof(Double.self)
+  var count = 0
+  var allocated = 0
+  var storage: UnsafeMutablePointer<Word> = nil
 }
 
 #else
