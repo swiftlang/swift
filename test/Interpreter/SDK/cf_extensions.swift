@@ -14,14 +14,14 @@ import UIKit
 
 extension CGColorSpace {
   class func deviceRGB() -> CGColorSpace {
-    return CGColorSpaceCreateDeviceRGB()
+    return CGColorSpaceCreateDeviceRGB()!
   }
 }
 
 extension CGColor {
   class func create(colorSpace colorSpace: CGColorSpace, components: [CGFloat])
       -> CGColor {
-    return CGColorCreate(colorSpace, components)
+    return CGColorCreate(colorSpace, components)!
   }
 
   var r: CGFloat { return CGColorGetComponents(self)[0] }

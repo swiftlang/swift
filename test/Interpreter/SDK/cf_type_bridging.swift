@@ -9,7 +9,7 @@ import AppKit
 import UIKit
 #endif
 
-let foo: [CGColor] = [CGColorCreate(CGColorSpaceCreateDeviceRGB(), [1.0, 0.0, 0.0, 1.0])]
+let foo: [CGColor] = [CGColorCreate(CGColorSpaceCreateDeviceRGB(), [1.0, 0.0, 0.0, 1.0])!]
 
 let bar = foo as NSArray
 
