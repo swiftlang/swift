@@ -491,7 +491,7 @@ func rdar16958865() {
 rdar16958865()
 
 #if os(OSX)
-import Foundation
+import AppKit
 typealias OSColor = NSColor
 #else
 import UIKit
