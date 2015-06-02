@@ -104,7 +104,7 @@ SWIFT_CLASS("_TtC8comments9CodeBlock")
 SWIFT_CLASS("_TtC8comments8Emphasis")
 @interface Emphasis
 
-/// Aaa *bbb* ccc. Aaa *bbb* ccc.
+/// Aaa bbb ccc. Aaa bbb ccc.
 - (void)f0;
 - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
@@ -186,7 +186,7 @@ SWIFT_CLASS("_TtC8comments20IndentedBlockComment")
 SWIFT_CLASS("_TtC8comments10InlineCode")
 @interface InlineCode
 
-/// Aaa ``bbb`` ccc.
+/// Aaa bbb ccc.
 - (void)f0;
 - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end
@@ -339,7 +339,7 @@ SWIFT_CLASS("_TtC8comments13SetextHeaders")
 SWIFT_CLASS("_TtC8comments14StrongEmphasis")
 @interface StrongEmphasis
 
-/// Aaa **bbb** ccc. Aaa **bbb** ccc.
+/// Aaa bbb ccc. Aaa bbb ccc.
 - (void)f0;
 - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 @end

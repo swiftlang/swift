@@ -710,7 +710,8 @@ MarkupASTNode *createSimpleField(MarkupContext &MC, StringRef Tag,
 bool isAFieldTag(StringRef Tag);
 
 void dump(const MarkupASTNode *Node, llvm::raw_ostream &OS, unsigned indent = 0);
-void printInlinesUnder(const MarkupASTNode *Node, llvm::raw_ostream &OS);
+void printInlinesUnder(const MarkupASTNode *Node, llvm::raw_ostream &OS,
+                       bool PrintDecorators = false);
 } // namespace markup
 } // namespace llvm
 

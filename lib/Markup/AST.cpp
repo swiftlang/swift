@@ -243,7 +243,8 @@ return cast<Id>(this)->getChildren();
 }
 
 void llvm::markup::printInlinesUnder(const MarkupASTNode *Node,
-                                     llvm::raw_ostream &OS) {
+                                     llvm::raw_ostream &OS,
+                                     bool PrintDecorators) {
   auto printChildren = [](const ArrayRef<const MarkupASTNode *> Children,
                           llvm::raw_ostream &OS) {
     for (auto Child = Children.begin(); Child != Children.end(); Child++)
@@ -262,7 +263,7 @@ void llvm::markup::printInlinesUnder(const MarkupASTNode *Node,
     break;
   }
   case llvm::markup::ASTNodeKind::HRule:
-    OS << "\n";
+    OS << '\n';
     break;
   case llvm::markup::ASTNodeKind::Text: {
     auto T = cast<Text>(Node);
@@ -270,33 +271,45 @@ void llvm::markup::printInlinesUnder(const MarkupASTNode *Node,
     break;
   }
   case llvm::markup::ASTNodeKind::SoftBreak:
-    OS << " ";
+    OS << ' ';
     break;
   case llvm::markup::ASTNodeKind::LineBreak:
-    OS << "\n";
+    OS << '\n';
     break;
   case llvm::markup::ASTNodeKind::Code: {
     auto C = cast<Code>(Node);
-    OS << "``" << C->getLiteralContent() << "``";
+    if (PrintDecorators)
+      OS << '`';
+
+    OS << C->getLiteralContent();
+
+    if (PrintDecorators)
+      OS << '`';
+
     break;
   }
   case llvm::markup::ASTNodeKind::CodeBlock: {
     auto CB = cast<CodeBlock>(Node);
-    OS << "``" << CB->getLiteralContent() << "``";
+    if (PrintDecorators) OS << "``";
+
+    OS << CB->getLiteralContent();
+
+    if (PrintDecorators) OS << "``";
+
     break;
   }
   case llvm::markup::ASTNodeKind::Emphasis: {
     auto E = cast<Emphasis>(Node);
-    OS << "*";
+    if (PrintDecorators) OS << '*';
     printChildren(E->getChildren(), OS);
-    OS << "*";
+    if (PrintDecorators) OS << '*';
     break;
   }
   case llvm::markup::ASTNodeKind::Strong: {
     auto S = cast<Strong>(Node);
-    OS << "**";
+    if (PrintDecorators) OS << "**";
     printChildren(S->getChildren(), OS);
-    OS << "**";
+    if (PrintDecorators) OS << "**";
     break;
   }
   default:
