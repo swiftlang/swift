@@ -43,6 +43,7 @@ else:
 
 if "@SWIFT_OPTIMIZED@" == "TRUE":
     config.available_features.add("optimized_stdlib")
+    config.available_features.add("optimized_stdlib_" + run_cpu)
 
 # Let the main config do the real work.
 if config.test_exec_root is None:
