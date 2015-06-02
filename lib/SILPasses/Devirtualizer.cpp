@@ -369,6 +369,27 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
   // Collect the direct subclasses for the class.
   auto &Subs = CHA->getDirectSubClasses(CD);
 
+  if (isa<BoundGenericClassType>(ClassType.getSwiftRValueType())) {
+    // Filter out any subclassses that do not inherit from this
+    // specific bound class.
+    auto RemovedIt = std::remove_if(Subs.begin(),
+        Subs.end(),
+        [&ClassType, &M](ClassDecl *Sub){
+          auto SubCanTy = Sub->getDeclaredType()->getCanonicalType();
+          // Unbound generic type can override a method from
+          // a bound generic class, but this unbound generic
+          // class is not considered to be a subclass of a
+          // bound generic class in a general case.
+          if (isa<UnboundGenericType>(SubCanTy))
+            return false;
+          // Handle the ususal case here: the class in question
+          // should be a real subclass of a bound generic class.
+          return !ClassType.isSuperclassOf(
+              SILType::getPrimitiveObjectType(SubCanTy));
+        });
+    Subs.erase(RemovedIt, Subs.end());
+  }
+
   if (Subs.size() > MaxNumPolymorphicInlineCaches) {
     DEBUG(llvm::dbgs() << "Class " << CD->getName() << " has too many (" <<
           Subs.size() << ") subclasses. Not inserting inline caches.\n");
