@@ -9,6 +9,9 @@
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
 
+// rdar://21204610 This test is not really unsupported but rather just locking
+// up so we don't want to xfail it and then wait forever for it to finish.
+// UNSUPPORTED: optimized_stdlib_armv7
 
 import StdlibUnittest
 import Foundation
