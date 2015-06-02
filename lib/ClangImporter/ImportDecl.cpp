@@ -5119,6 +5119,60 @@ void ClangImporter::Implementation::importAttributes(
 
       // Is this our special "availability(swift, unavailable)" attribute?
       if (Platform == "swift") {
+        if (auto *OCD = dyn_cast<clang::ObjCContainerDecl>(
+                ClangDecl->getDeclContext())) {
+          StringRef Name = "";
+          if (auto *II = OCD->getIdentifier())
+            Name = II->getName();
+          if (Name == "NSExtendedCoder") {
+            // Ignore the attribute on:
+            //
+            // NSCoder.h
+            // - (nullable id)decodeObject;
+            // - (nullable id)decodeObjectForKey:(NSString *)key;
+            // - (nullable id)decodeObjectOfClass:(Class)aClass
+            //     forKey:(NSString *)key NS_AVAILABLE(10_8, 6_0);
+            // - (nullable id)
+            //     decodeObjectOfClasses:(nullable NSSet<Class> *)classes
+            //     forKey:(NSString *)key NS_AVAILABLE(10_8, 6_0);
+            if (auto MD = dyn_cast<clang::ObjCMethodDecl>(ClangDecl)) {
+              auto Sel = MD->getSelector();
+              switch (Sel.getNumArgs()) {
+              case 0:
+                if (Sel.getNameForSlot(0).equals("decodeObject"))
+                  continue;
+                break;
+              case 1:
+                if (Sel.getNameForSlot(0).equals("decodeObjectForKey"))
+                  continue;
+                break;
+              case 2:
+                if (Sel.getNameForSlot(0).equals("decodeObjectOfClass") &&
+                    Sel.getNameForSlot(1).equals("forKey"))
+                  continue;
+                if (Sel.getNameForSlot(0).equals("decodeObjectOfClasses") &&
+                    Sel.getNameForSlot(1).equals("forKey"))
+                  continue;
+                break;
+              default:
+                break;
+              }
+            }
+          } else if (Name == "NSKeyedUnarchiver") {
+            // Ignore the attribute on:
+            //
+            // NSKeyedUnarchiver.h
+            // - (nullable id)decodeObjectForKey:(NSString *)key;
+            // + (nullable id)unarchiveObjectWithData:(NSData *)data;
+            if (auto MD = dyn_cast<clang::ObjCMethodDecl>(ClangDecl)) {
+              auto Sel = MD->getSelector();
+              if ((Sel.getNumArgs() == 1) &&
+                  (Sel.getNameForSlot(0).equals("decodeObjectForKey") ||
+                   Sel.getNameForSlot(0).equals("unarchiveObjectWithData")))
+                continue;
+            }
+          }
+        }
         auto attr = AvailableAttr::createUnconditional(
             C, avail->getMessage(), /*renamed*/"",
             UnconditionalAvailabilityKind::UnavailableInSwift);
