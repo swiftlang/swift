@@ -206,6 +206,27 @@ func testSwitchEnumBool(b: Bool, xi: Int) -> Int {
   return x
 }
 
+func testSwitchOptionalBool (b:Bool?, xi: Int) -> Int {
+  var x = xi
+  switch b { // No warning
+  case .Some(true):
+    x++
+  case .Some(false):
+    x++
+  case .None:
+    x--
+  }
+
+  switch b {
+  case .Some(true):
+    x++
+  case .None:
+    x-- 
+  } // expected-error{{switch must be exhaustive}}
+
+  return xi
+}
+
 // Do not emit false non-exhaustive warnings if both 
 // true and false are covered for a boolean element of a tuple.
 func testSwitchEnumBoolTuple(b1: Bool, b2: Bool, xi: Int) -> Int {
