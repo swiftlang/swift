@@ -38,11 +38,11 @@
    `(,(regexp-opt '("class" "init" "deinit" "extension" "func"
                     "import" "let" "protocol" "static" "struct" "subscript"
                     "typealias" "enum" "var" "where"
-                    "private" "public" "internal" "override")
+                    "private" "public" "internal" "override" "throws")
                   'words) . font-lock-keyword-face)
    ;; Statements
    `(,(regexp-opt '("if" "guard" "in" "else" "for" "do" "repeat" "while" "return"
-                    "break" "continue" "switch" "case" "throw" "try")
+                    "break" "continue" "switch" "case" "throw" "try" "catch")
                   'words) . font-lock-keyword-face)
    ;; Expressions
    `(,(regexp-opt '("new") 'words) . font-lock-keyword-face)
