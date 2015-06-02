@@ -2309,7 +2309,9 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Empty") {
   var d2 = getBridgedVerbatimEquatableDictionary([:])
   var identity2 = unsafeBitCast(d2, Word.self)
   assert(isCocoaDictionary(d2))
-  assert(identity1 != identity2)
+
+  // We can't check that `identity1 != identity2` because Foundation might be
+  // returning the same singleton NSDictionary for empty dictionaries.
 
   assert(d1 == d2)
   assert(identity1 == unsafeBitCast(d1, Word.self))
