@@ -1,7 +1,8 @@
-// Also run this test in optimize test modes.
+// RUN: %target-run-simple-swift | FileCheck %s
+
 // REQUIRES: executable_test
 
-// RUN: %target-run-simple-swift | FileCheck %s
+// XFAIL: swift_test_mode_optimize_armv7
 
 struct Structure {
   var a: UInt8
