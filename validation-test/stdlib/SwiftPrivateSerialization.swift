@@ -1,6 +1,9 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
+// rdar://21231525
+// XFAIL: swift_test_mode_optimize
+
 import SwiftPrivateSerialization
 import StdlibUnittest
 
