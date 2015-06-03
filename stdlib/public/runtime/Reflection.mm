@@ -48,7 +48,17 @@ namespace {
   
 /// The layout of protocol<>.
 using Any = OpaqueExistentialContainer;
-  
+
+// Swift assumes Any is returned in memory. 
+// Use AnyReturn to guarantee that even on architectures 
+// where Any would be returned in registers.
+struct AnyReturn {
+  Any any;
+  AnyReturn(Any a) : any(a) { }
+  operator Any() { return any; }
+  ~AnyReturn() { }
+};
+
 /// A _Reflectable witness table.
 struct _ReflectableWitnessTable {
   /// func getMirror() -> Mirror
@@ -247,16 +257,16 @@ static_assert(offsetof(MagicMirror, MirrorWitness) ==
 // -- Build an Any from an arbitrary value unowned-referenced by a mirror.
   
 extern "C"
-Any swift_MagicMirrorData_value(HeapObject *owner,
-                                const OpaqueValue *value,
-                                const Metadata *type) {
+AnyReturn swift_MagicMirrorData_value(HeapObject *owner,
+                                      const OpaqueValue *value,
+                                      const Metadata *type) {
   Any result;
   
   result.Type = type;
   type->vw_initializeBufferWithCopy(&result.Buffer,
                                     const_cast<OpaqueValue*>(value));
 
-  return result;
+  return AnyReturn(result);
 }
 extern "C"
 const Metadata *swift_MagicMirrorData_valueType(HeapObject *owner,
@@ -267,16 +277,16 @@ const Metadata *swift_MagicMirrorData_valueType(HeapObject *owner,
 
 #if SWIFT_OBJC_INTEROP
 extern "C"
-Any swift_MagicMirrorData_objcValue(HeapObject *owner,
-                                    const OpaqueValue *value,
-                                    const Metadata *type) {
+AnyReturn swift_MagicMirrorData_objcValue(HeapObject *owner,
+                                          const OpaqueValue *value,
+                                          const Metadata *type) {
   Any result;
     
   void *object = *reinterpret_cast<void * const *>(value);
   auto isa = _swift_getClass(object);
   result.Type = swift_getObjCClassMetadata(isa);
   *reinterpret_cast<void **>(&result.Buffer) = swift_unknownRetain(object);
-  return result;
+  return AnyReturn(result);
 }
 #endif
 
@@ -1178,7 +1188,7 @@ getReflectableConformance(const Metadata *T, const OpaqueValue *Value) {
 ///
 /// This function consumes 'value', following Swift's +1 convention for "in"
 /// arguments.
-Mirror swift::swift_reflectAny(OpaqueValue *value, const Metadata *T) {
+MirrorReturn swift::swift_reflectAny(OpaqueValue *value, const Metadata *T) {
   const _ReflectableWitnessTable *witness;
   const Metadata *mirrorType;
   const OpaqueValue *cMirrorValue;
@@ -1193,7 +1203,7 @@ Mirror swift::swift_reflectAny(OpaqueValue *value, const Metadata *T) {
     // 'self' of witnesses is passed at +0, so we still need to consume the
     // value.
     T->vw_destroy(value);
-    return result;
+    return MirrorReturn(result);
   }
   
   // Otherwise, fall back to MagicMirror.
@@ -1205,7 +1215,7 @@ Mirror swift::swift_reflectAny(OpaqueValue *value, const Metadata *T) {
   // Destroy the whole original value if we couldn't take it.
   if (!take)
     T->vw_destroy(value);
-  return result;
+  return MirrorReturn(result);
 }
 
 /// Produce a mirror for any value, like swift_reflectAny, but do not consume
@@ -1214,9 +1224,9 @@ Mirror swift::swift_reflectAny(OpaqueValue *value, const Metadata *T) {
 ///
 /// \param owner passed at +1, consumed.
 /// \param value passed unowned.
-Mirror swift::swift_unsafeReflectAny(HeapObject *owner,
-                                     const OpaqueValue *value,
-                                     const Metadata *T) {
+MirrorReturn swift::swift_unsafeReflectAny(HeapObject *owner,
+                                           const OpaqueValue *value,
+                                           const Metadata *T) {
   const _ReflectableWitnessTable *witness;
   const Metadata *mirrorType;
   const OpaqueValue *mirrorValue;
@@ -1228,13 +1238,13 @@ Mirror swift::swift_unsafeReflectAny(HeapObject *owner,
     auto result =
         witness->getMirror(const_cast<OpaqueValue*>(mirrorValue), mirrorType);
     swift_release(owner);
-    return result;
+    return MirrorReturn(result);
   }
   // Otherwise, fall back to MagicMirror.
   // Consumes 'owner'.
   Mirror result;
   ::new (&result) MagicMirror(owner, mirrorValue, mirrorType);
-  return result;
+  return MirrorReturn(result);
 }
 
 extern "C" void

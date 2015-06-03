@@ -26,13 +26,24 @@ struct Mirror {
   OpaqueExistentialContainer Header;
   const MirrorWitnessTable *MirrorWitness;
 };
+
+// Swift assumes Mirror is returned in memory. 
+// Use MirrorReturn to guarantee that even on architectures 
+// where Mirror would be returned in registers.
+struct MirrorReturn {
+  Mirror mirror;
+  MirrorReturn(Mirror m) : mirror(m) { }
+  operator Mirror() { return mirror; }
+  ~MirrorReturn() { }
+};
+
   
 /// func reflect<T>(x: T) -> Mirror
 ///
 /// Produce a mirror for any value. If the value's type conforms to _Reflectable,
 /// invoke its getMirror() method; otherwise, fall back to an implementation
 /// in the runtime that structurally reflects values of any type.
-extern "C" Mirror
+extern "C" MirrorReturn
 swift_reflectAny(OpaqueValue *value, const Metadata *T);
   
 /// func unsafeReflect<T>(owner: Builtin.NativeObject,
@@ -41,7 +52,7 @@ swift_reflectAny(OpaqueValue *value, const Metadata *T);
 /// Produce a mirror for any value. If the value's type conforms to _Reflectable,
 /// invoke its getMirror() method; otherwise, fall back to an implementation
 /// in the runtime that structurally reflects values of any type.
-extern "C" Mirror
+extern "C" MirrorReturn
 swift_unsafeReflectAny(HeapObject *owner,
                        const OpaqueValue *value, const Metadata *T);
   
