@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift | FileCheck %s
+// REQUIRES: executable_test
 
 // CHECK: 123ABCD
 // CHECK: Hello ☃

@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift | FileCheck %s
+// REQUIRES: executable_test
 
 struct BigStruct { var a,b,c,d,e,f,g,h:Int }
 

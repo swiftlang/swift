@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift | FileCheck %s
+// REQUIRES: executable_test
 
 // From http://rosettacode.org/wiki/Factorial
 func factorial(x: Int) -> Int {

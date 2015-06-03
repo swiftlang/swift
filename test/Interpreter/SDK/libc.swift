@@ -3,6 +3,7 @@
 
 // RUN: rm -rf %t  &&  mkdir -p %t
 // RUN: %target-run-simple-swift %s %t | FileCheck %s
+// REQUIRES: executable_test
 
 // XFAIL: linux
 

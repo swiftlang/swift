@@ -7,6 +7,7 @@
 // RUN: %target-swift-frontend -c %t/test.bc -o %t/test.o
 // RUN: %target-build-swift %t/test.o -o %t/test
 // RUN: %target-run %t/test | FileCheck %s
+// REQUIRES: executable_test
 
 
 // CHECK: The number: 1504

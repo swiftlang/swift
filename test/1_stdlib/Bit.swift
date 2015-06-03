@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-simple-swift | FileCheck %s
+// REQUIRES: executable_test
 
 let zero: Bit = .Zero
 let one: Bit = .One

@@ -13,6 +13,7 @@
 // RUN: %target-build-swift -c %t.sib -o %t.o
 // RUN: %target-build-swift %t.o -o %t
 // RUN: %target-run %t | FileCheck %s
+// REQUIRES: executable_test
 
 // CHECK: Hello World
 // CHECK: Hello Bob, today is Tuesday.

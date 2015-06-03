@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift | FileCheck %s
+// REQUIRES: executable_test
 
 // <rdar://problem/13995785> We were using the wrong type metadata pointer for the empty
 // tuple.

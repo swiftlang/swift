@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift | FileCheck %s
+// REQUIRES: executable_test
 
 // Create a new array
 var a = [Int](count: 10, repeatedValue: 0)

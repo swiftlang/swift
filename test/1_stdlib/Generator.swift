@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift | FileCheck %s
+// REQUIRES: executable_test
 
 // Check to make sure we are actually getting Optionals out of this
 // GeneratorType

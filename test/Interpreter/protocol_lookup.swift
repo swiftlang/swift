@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// REQUIRES: executable_test
 
 // Note: JIT mode is checked in Interpreter/protocol_lookup_jit.swift.
 

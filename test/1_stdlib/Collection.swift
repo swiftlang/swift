@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift | FileCheck %s
+// REQUIRES: executable_test
 
 struct X : CollectionType {
   typealias Element = String.CharacterView.Generator.Element

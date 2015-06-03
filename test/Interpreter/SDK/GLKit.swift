@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift | FileCheck %s
+// REQUIRES: executable_test
 
 // FIXME: Clang miscompiles GLKit functions on i386. rdar://problem/19184403
 // XFAIL: CPU=i386

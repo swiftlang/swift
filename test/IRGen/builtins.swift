@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -parse-stdlib -primary-file %s -emit-ir -o - -disable-objc-attr-requires-foundation-module | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-runtime
+// REQUIRES: executable_test
 
 // REQUIRES: CPU=x86_64
 

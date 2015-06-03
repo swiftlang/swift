@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift
+// REQUIRES: executable_test
 
 // NSButtonType (from AppKit) and UIViewAnimationCurve (from UIKit) both have
 // private enumerators, so we preserve their values through raw value

@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift
+// REQUIRES: executable_test
 //
 // vU1024Divide() is only available on OS X.
 // REQUIRES: OS=macosx

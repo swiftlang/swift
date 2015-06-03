@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift | FileCheck %s
+// REQUIRES: executable_test
 
 class B {     func foo() { print("foo") } }
 class D : B {    func bar() { print("bar") } }

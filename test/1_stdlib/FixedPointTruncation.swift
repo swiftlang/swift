@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift
+// REQUIRES: executable_test
 
 // Unsigned to signed truncation.
 var maxInt8_u16: UInt16 = 127

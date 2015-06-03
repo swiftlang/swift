@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift | FileCheck %s
+// REQUIRES: executable_test
 
 // FIXME: rdar://16168414 big int interpolation isn't working on 32-bit
 // XFAIL: PTRSIZE=32

@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift | FileCheck %s
+// REQUIRES: executable_test
 // rdar://16726530
 
 // REQUIRES: objc_interop

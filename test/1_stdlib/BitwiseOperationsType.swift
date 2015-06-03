@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift | FileCheck %s
+// REQUIRES: executable_test
 struct MyInt32 : BitwiseOperationsType {
   var underlying: Int32
 

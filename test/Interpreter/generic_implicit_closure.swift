@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift | FileCheck %s
+// REQUIRES: executable_test
 
 func andc<T : BooleanType>(x: Bool, _ y: T) -> Bool {
   return x && !y.boolValue

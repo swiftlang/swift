@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift | FileCheck %s
+// REQUIRES: executable_test
 
 func curry<T, U, V>(f: (T, U) -> V)(_ x: T)(_ y: U) -> V {
   return f(x, y)

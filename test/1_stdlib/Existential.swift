@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift | FileCheck %s
+// REQUIRES: executable_test
 
 func pipe<T>(input: AnySequence<T>, _ output: SinkOf<T>) {
   for x in input {

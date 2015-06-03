@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift | FileCheck %s
+// REQUIRES: executable_test
 
 protocol P {
   func scale(x : Int)(y : Int) -> Int

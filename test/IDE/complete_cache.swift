@@ -41,6 +41,7 @@
 
 // Ensure the testable import showed up mangled correctly.
 // RUN: ls %t.ccp/Darwin-testable*
+// REQUIRES: executable_test
 
 import macros
 import ctypes

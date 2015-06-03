@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift | FileCheck %s
+// REQUIRES: executable_test
 
 func divide(a: Int, byDividend b: Int) -> Int { return a / b }
 
