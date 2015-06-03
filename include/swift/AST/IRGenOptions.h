@@ -86,9 +86,6 @@ public:
   /// \brief Whether we're generating IR for the JIT.
   unsigned UseJIT : 1;
   
-  /// \brief Whether we allow dynamic value type layout.
-  unsigned EnableDynamicValueTypeLayout : 1;
-
   /// \brief Whether we should run LLVM optimizations after IRGen.
   unsigned DisableLLVMOptzns : 1;
 
@@ -122,9 +119,8 @@ public:
 
   IRGenOptions() : OutputKind(IRGenOutputKind::LLVMAssembly), Verify(true),
                    Optimize(false), DebugInfoKind(IRGenDebugInfoKind::None),
-                   UseJIT(false), EnableDynamicValueTypeLayout(false),
-                   DisableLLVMOptzns(false), DisableLLVMARCOpts(false),
-                   DisableLLVMSLPVectorizer(false),
+                   UseJIT(false), DisableLLVMOptzns(false),
+                   DisableLLVMARCOpts(false), DisableLLVMSLPVectorizer(false),
                    DisableFPElim(true), HasUnderlyingModule(false),
                    Playground(false), GenerateProfile(false),
                    EmbedMode(IRGenEmbedMode::None) {}
