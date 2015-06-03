@@ -1,4 +1,7 @@
 // RUN: %target-run-simple-swift | FileCheck %s
+// REQUIRES: executable_test
+
+// REQUIRES: swift_test_mode_optimize_none
 
 import SwiftPrivate
 import StdlibUnittest
@@ -371,7 +374,6 @@ AssertionsTestSuite.test("UnexpectedCrash/NullPointerDereference") {
   _blackHole(ptr.memory)
 }
 // CHECK: [ RUN      ] Assertions.UnexpectedCrash/NullPointerDereference
-// REQUIRES: executable_test
 // CHECK: err>>> CRASHED: SIG{{.*}}
 // CHECK: the test crashed unexpectedly
 // CHECK: [     FAIL ] Assertions.UnexpectedCrash/NullPointerDereference
