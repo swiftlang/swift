@@ -24,6 +24,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/SILOptions.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/SILArgument.h"
@@ -263,18 +264,46 @@ static Pattern *getSimilarSpecializingPattern(Pattern *p, Pattern *first) {
   // Map down to the semantics-providing pattern.
   p = p->getSemanticsProvidingPattern();
 
-  // If the patterns are exactly the same kind, they can be treated similarly.
-  if (p->getKind() == first->getKind())
-    return p;
-
-  // If one is an OptionalSomePattern and one is an EnumElementPattern, then
-  // they are the same since the OptionalSomePattern is just sugar for .Some(x).
-  if ((isa<OptionalSomePattern>(p) && isa<EnumElementPattern>(first)) ||
-      (isa<OptionalSomePattern>(first) && isa<EnumElementPattern>(p)))
-    return p;
-
-  // Otherwise, they are different.
-  return nullptr;
+  // If the patterns are exactly the same kind, we might be able to treat them
+  // similarly.
+  switch (p->getKind()) {
+  case PatternKind::EnumElement:
+  case PatternKind::OptionalSome: {
+    // If one is an OptionalSomePattern and one is an EnumElementPattern, then
+    // they are the same since the OptionalSomePattern is just sugar for
+    // .Some(x).
+    if ((isa<OptionalSomePattern>(p) && isa<EnumElementPattern>(first)) ||
+        (isa<OptionalSomePattern>(first) && isa<EnumElementPattern>(p)))
+      return p;
+    SWIFT_FALLTHROUGH;
+  }
+  case PatternKind::Tuple:
+  case PatternKind::Named:
+  case PatternKind::Any:
+  case PatternKind::NominalType:
+  case PatternKind::Bool:
+  case PatternKind::Expr: {
+    // These kinds are only similar to the same kind.
+    if (p->getKind() == first->getKind())
+      return p;
+    return nullptr;
+  }
+  case PatternKind::Is: {
+    auto pIs = cast<IsPattern>(p);
+    // 'is' patterns are only similar to matches to the same type.
+    if (auto firstIs = dyn_cast<IsPattern>(first)) {
+      if (firstIs->getCastTypeLoc().getType()
+            ->isEqual(pIs->getCastTypeLoc().getType()))
+        return p;
+    }
+    return nullptr;
+  }
+    
+  case PatternKind::Paren:
+  case PatternKind::Var:
+  case PatternKind::Typed:
+    llvm_unreachable("not semantic");
+  }
 }
 
 namespace {
@@ -991,7 +1020,8 @@ void PatternMatchEmission::emitWildcardDispatch(ClauseMatrix &clauses,
                                                 unsigned row,
                                                 const FailureHandler &failure) {
   // Get appropriate arguments.
-  ArgForwarder forwarder(SGF, matrixArgs, row + 1 == clauses.rows());
+  ArgForwarder forwarder(SGF, matrixArgs,
+                         /*isFinalUse*/ row + 1 == clauses.rows());
   ArgArray args = forwarder.getForwardedArgs();
 
   // Bind all the refutable patterns first.  We want to do this first
@@ -1441,23 +1471,16 @@ static CanType getTargetType(const RowToSpecialize &row) {
 }
 
 static ConsumableManagedValue
-emitSerialCastOperand(SILGenFunction &SGF, SILLocation loc,
+emitCastOperand(SILGenFunction &SGF, SILLocation loc,
                       ConsumableManagedValue src, CanType sourceType,
-                      ArrayRef<RowToSpecialize> rows,
+                      CanType targetType,
                       SmallVectorImpl<ConsumableManagedValue> &borrowedValues) {
   // Reabstract to the most general abstraction, and put it into a
   // temporary if necessary.
 
   // Figure out if we need the value to be in a temporary.
-  bool requiresAddress = false;
-  for (auto &row : rows) {
-    CanType targetType = getTargetType(row);
-    if (!canUseScalarCheckedCastInstructions(SGF.SGM.M,
-                                             sourceType, targetType)) {
-      requiresAddress = true;
-      break;
-    }
-  }
+  bool requiresAddress = !canUseScalarCheckedCastInstructions(SGF.SGM.M,
+                                                        sourceType, targetType);
 
   AbstractionPattern abstraction = SGF.SGM.M.Types.getMostGeneralAbstraction();
   auto &srcAbstractTL = SGF.getTypeLowering(abstraction, sourceType);
@@ -1503,73 +1526,59 @@ emitSerialCastOperand(SILGenFunction &SGF, SILLocation loc,
 
 /// Perform specialized dispatch for a sequence of IsPatterns.
 void PatternMatchEmission::emitIsDispatch(ArrayRef<RowToSpecialize> rows,
-                                          ConsumableManagedValue src,
-                                       const SpecializationHandler &handleCase,
-                                          const FailureHandler &failure) {
-  // Collect the types to which we're going to cast.
+                                      ConsumableManagedValue src,
+                                      const SpecializationHandler &handleCase,
+                                      const FailureHandler &failure) {
   CanType sourceType = rows[0].Pattern->getType()->getCanonicalType();
-
-  // Make any abstraction modifications necessary for casting a bunch
-  // of times.
+  CanType targetType = getTargetType(rows[0]);
+  
+  // Make any abstraction modifications necessary for casting.
   SmallVector<ConsumableManagedValue, 4> borrowedValues;
   ConsumableManagedValue operand =
-    emitSerialCastOperand(SGF, rows[0].Pattern, src, sourceType, rows,
+    emitCastOperand(SGF, rows[0].Pattern, src, sourceType, targetType,
                           borrowedValues);
 
-  // Emit all of the 'is' checks.
-  for (unsigned specBegin = 0, numRows = rows.size(); specBegin != numRows; ) {
-    CanType targetType = getTargetType(rows[specBegin]);
+  // Emit the 'is' check.
 
-    // Find all the immediately following rows that are checking for
-    // exactly the same type.
-    unsigned specEnd = specBegin + 1;
-    for (; specEnd != numRows; ++specEnd) {
-      if (getTargetType(rows[specEnd]) != targetType)
-        break;
-    }
-
-    // Build the specialized-rows array.
-    SmallVector<SpecializedRow, 4> specializedRows;
-    specializedRows.resize(specEnd - specBegin);
-    for (unsigned i = specBegin; i != specEnd; ++i) {
-      auto &specRow = specializedRows[i - specBegin];
-      auto is = cast<IsPattern>(rows[i].Pattern);
-      specRow.RowIndex = rows[i].RowIndex;
-      specRow.Patterns.push_back(is->getSubPattern());
-    }
-
-    SILLocation loc = rows[specBegin].Pattern;
-    auto cleanupLoc = CleanupLocation::get(loc);
-
-    CleanupStateRestorationScope forwardingScope(SGF.Cleanups);
-    ConsumableManagedValue castOperand = operand.asBorrowedOperand();
-    
-    // Enter an exitable scope.  On failure, we'll just go on to the next case.
-    ExitableFullExpr scope(SGF, cleanupLoc);
-    FailureHandler innerFailure = [&](SILLocation loc) {
-      // The cleanup for the cast operand was pushed outside of this
-      // jump dest, so we don't have to undo any cleanup-splitting here.
-      SGF.Cleanups.emitBranchAndCleanups(scope.getExitDest(), loc);
-    };
-
-    // Perform a conditional cast branch.
-    SGF.emitCheckedCastBranch(loc, castOperand,
-                              sourceType, targetType, SGFContext(),
-      // Success block: recurse.
-      [&](ManagedValue castValue) {
-        handleCase(ConsumableManagedValue::forOwned(castValue),
-                   specializedRows, innerFailure);
-        assert(!SGF.B.hasValidInsertionPoint() && "did not end block");
-      },
-      // Failure block: branch out to the continuation block.
-      [&] { innerFailure(loc); });
-
-    // Dispatch continues on the "false" block.
-    scope.exit();
-
-    // Continue where we left off.
-    specBegin = specEnd;
+  // Build the specialized-rows array.
+  SmallVector<SpecializedRow, 4> specializedRows;
+  specializedRows.reserve(rows.size());
+  for (auto &row : rows) {
+    assert(getTargetType(row) == targetType
+           && "can only specialize on one type at a time");
+    auto is = cast<IsPattern>(row.Pattern);
+    specializedRows.push_back({});
+    specializedRows.back().RowIndex = row.RowIndex;
+    specializedRows.back().Patterns.push_back(is->getSubPattern());
   }
+
+  SILLocation loc = rows[0].Pattern;
+  auto cleanupLoc = CleanupLocation::get(loc);
+
+  ConsumableManagedValue castOperand = operand.asBorrowedOperand();
+  
+  // Enter an exitable scope.  On failure, we'll just go on to the next case.
+  ExitableFullExpr scope(SGF, cleanupLoc);
+  FailureHandler innerFailure = [&](SILLocation loc) {
+    // The cleanup for the cast operand was pushed outside of this
+    // jump dest, so we don't have to undo any cleanup-splitting here.
+    SGF.Cleanups.emitBranchAndCleanups(scope.getExitDest(), loc);
+  };
+
+  // Perform a conditional cast branch.
+  SGF.emitCheckedCastBranch(loc, castOperand,
+                            sourceType, targetType, SGFContext(),
+    // Success block: recurse.
+    [&](ManagedValue castValue) {
+      handleCase(ConsumableManagedValue::forOwned(castValue),
+                 specializedRows, innerFailure);
+      assert(!SGF.B.hasValidInsertionPoint() && "did not end block");
+    },
+    // Failure block: branch out to the continuation block.
+    [&] { innerFailure(loc); });
+
+  // Dispatch continues on the "false" block.
+  scope.exit();
 
   ArgUnforwarder unforwarder(SGF);
   if (ArgUnforwarder::requiresUnforwarding(src)) {
