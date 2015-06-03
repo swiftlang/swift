@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-simple-swift
+// REQUIRES: executable_test
 
 import Swift
 import StdlibUnittest

@@ -371,6 +371,7 @@ AssertionsTestSuite.test("UnexpectedCrash/NullPointerDereference") {
   _blackHole(ptr.memory)
 }
 // CHECK: [ RUN      ] Assertions.UnexpectedCrash/NullPointerDereference
+// REQUIRES: executable_test
 // CHECK: err>>> CRASHED: SIG{{.*}}
 // CHECK: the test crashed unexpectedly
 // CHECK: [     FAIL ] Assertions.UnexpectedCrash/NullPointerDereference

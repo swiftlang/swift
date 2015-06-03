@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift
+// REQUIRES: executable_test
 // REQUIRES: OS=macosx
 
 // Translated from standard OpenCL hello.c program

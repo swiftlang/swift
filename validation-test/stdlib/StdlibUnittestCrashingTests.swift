@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift 2>&1 | FileCheck %s
+// REQUIRES: executable_test
 
 import StdlibUnittest
 
