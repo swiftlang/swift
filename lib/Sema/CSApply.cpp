@@ -786,7 +786,6 @@ namespace {
       if (!Implicit) {
         if (auto objTy = cs.lookThroughImplicitlyUnwrappedOptionalType(baseTy)) {
           base = coerceImplicitlyUnwrappedOptionalToValue(base, objTy, locator);
-          if (!base) return nullptr;
           baseTy = objTy;
         }
       }
@@ -1224,7 +1223,6 @@ namespace {
       // Handle accesses that implicitly look through ImplicitlyUnwrappedOptional<T>.
       if (auto objTy = cs.lookThroughImplicitlyUnwrappedOptionalType(baseTy)) {
         base = coerceImplicitlyUnwrappedOptionalToValue(base, objTy, locator);
-        if (!base) return nullptr;
         baseTy = base->getType();
       }
 
@@ -2539,7 +2537,6 @@ namespace {
         if (auto objTy = cs.lookThroughImplicitlyUnwrappedOptionalType(baseTy)){
           base = coerceImplicitlyUnwrappedOptionalToValue(base, objTy,
                                          cs.getConstraintLocator(base));
-          if (!base) return nullptr;
 
           baseTy = base->getType()->getRValueType();
         }
@@ -2629,7 +2626,6 @@ namespace {
         if (auto objTy = cs.lookThroughImplicitlyUnwrappedOptionalType(baseTy)) {
           base = coerceImplicitlyUnwrappedOptionalToValue(base, objTy,
                                          cs.getConstraintLocator(base));
-          if (!base) return nullptr;
         }
 
         return new (cs.getASTContext()) TupleElementExpr(
@@ -2838,7 +2834,6 @@ namespace {
       if (auto objTy = cs.lookThroughImplicitlyUnwrappedOptionalType(baseTy)) {
         base = coerceImplicitlyUnwrappedOptionalToValue(base, objTy,
                                               cs.getConstraintLocator(base));
-        if (!base) return nullptr;
         expr->setBase(base);
       }
 
@@ -4003,7 +3998,6 @@ Expr *ExprRewriter::coerceExistential(Expr *expr, Type toType,
   // Handle existential coercions that implicitly look through ImplicitlyUnwrappedOptional<T>.
   if (auto ty = cs.lookThroughImplicitlyUnwrappedOptionalType(fromType)) {
     expr = coerceImplicitlyUnwrappedOptionalToValue(expr, ty, locator);
-    if (!expr) return nullptr;
     
     fromType = expr->getType();
     
@@ -4844,7 +4838,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       auto valueTy = fromType->getImplicitlyUnwrappedOptionalObjectType();
       assert(valueTy);
       expr = coerceImplicitlyUnwrappedOptionalToValue(expr, valueTy, locator);
-      if (!expr) return nullptr;
       return coerceToType(expr, toType, locator);
     }
 
@@ -4852,7 +4845,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // Look through implicitly unwrapped optionals.
       if (auto objTy= cs.lookThroughImplicitlyUnwrappedOptionalType(fromType)) {
         expr = coerceImplicitlyUnwrappedOptionalToValue(expr, objTy, locator);
-        if (!expr) return nullptr;
       }
 
       // Form the upcast.
@@ -4867,7 +4859,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       if (auto objTy
             = cs.lookThroughImplicitlyUnwrappedOptionalType(expr->getType())) {
         expr = coerceImplicitlyUnwrappedOptionalToValue(expr, objTy, locator);
-        if (!expr) return nullptr;
       }
 
       // If the source key and value types are object types, this is an upcast.
@@ -4886,7 +4877,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       if (auto objTy
             = cs.lookThroughImplicitlyUnwrappedOptionalType(expr->getType())) {
         expr = coerceImplicitlyUnwrappedOptionalToValue(expr, objTy, locator);
-        if (!expr) return nullptr;
       }
 
       bool isBridged = !cs.getBaseTypeForSetType(fromType.getPointer())
@@ -5360,7 +5350,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   // Handle applications that implicitly look through ImplicitlyUnwrappedOptional<T>.
   if (auto fnTy = cs.lookThroughImplicitlyUnwrappedOptionalType(fn->getType())) {
     fn = coerceImplicitlyUnwrappedOptionalToValue(fn, fnTy, locator);
-    if (!fn) return nullptr;
   }
 
   // If we're applying a function that resulted from a covariant
