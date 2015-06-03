@@ -98,6 +98,9 @@ namespace irgen {
                                                          ClassDecl *theClass,
                                                          VarDecl *field);
   
+  /// Get the type encoding for an ObjC property.
+  void getObjCEncodingForPropertyType(IRGenModule &IGM, Type t, std::string &s);
+  
   /// What reference counting mechanism does a class use?
   ReferenceCounting getReferenceCountingForClass(IRGenModule &IGM,
                                                  ClassDecl *theClass);

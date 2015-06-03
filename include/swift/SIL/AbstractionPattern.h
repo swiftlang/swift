@@ -146,17 +146,13 @@ class AbstractionPattern {
     if (auto arch = dyn_cast<ArchetypeType>(type))
       return !arch->requiresClass();
     // FIXME: Check class constraint of dependent types in their originating
-    // context.  Even for direct parameters this requires a more principled
-    // check than this.
-    if (auto paramType = dyn_cast<GenericTypeParamType>(type))
-      return isOpaqueType(signature, paramType);
+    // context
+    if (isa<GenericTypeParamType>(type))
+      return true;
     if (isa<DependentMemberType>(type))
       return true;
     return false;
   }
-
-  static bool isOpaqueType(CanGenericSignature signature,
-                           CanGenericTypeParamType type);
 
   Kind getKind() const { return Kind(TheKind); }
 

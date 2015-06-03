@@ -1065,25 +1065,14 @@ namespace {
       
       // Lower Self? as if it were Whatever? and Self! as if it were Whatever!.
       if (auto genericEnum = dyn_cast<BoundGenericEnumType>(enumType)) {
-        if (auto dynamicSelfType =
+        if (auto dynamicSelf =
               dyn_cast<DynamicSelfType>(genericEnum.getGenericArgs()[0])) {
-          if (auto optKind = D->classifyAsOptionalType()) {
-            CanType selfType = dynamicSelfType.getSelfType();
-            selfType = OptionalType::get(optKind, selfType)->getCanonicalType();
-
-            // Remove the DynamicSelfType from OrigType, too.
-            if (OrigType == enumType) {
-              OrigType = selfType;
-            } else {
-              CanType origDynamicSelfType =
-                cast<BoundGenericEnumType>(OrigType).getGenericArgs()[0];
-              CanType origSelfType =
-                cast<DynamicSelfType>(origDynamicSelfType).getSelfType();
-              OrigType =
-                OptionalType::get(optKind, origSelfType)->getCanonicalType();
-            }
-
-            return visitAnyEnumType(selfType, D);
+          CanType selfType = dynamicSelf.getSelfType();
+          if (D == TC.Context.getOptionalDecl()) {
+            return &TC.getTypeLowering(OptionalType::get(selfType));
+          } else if (D == TC.Context.getImplicitlyUnwrappedOptionalDecl()) {
+            return &TC.getTypeLowering(
+                                ImplicitlyUnwrappedOptionalType::get(selfType));
           }
         }
       }

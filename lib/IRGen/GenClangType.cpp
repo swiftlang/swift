@@ -43,8 +43,9 @@ class swift::irgen::ClangTypeConverter {
 public:
   ClangTypeConverter() = default;
   clang::CanQualType convert(IRGenModule &IGM, CanType type);
-  clang::CanQualType reverseBuiltinTypeMapping(IRGenModule &IGM,
-                                               CanStructType type);
+
+private:
+  void fillSpeciallyImportedTypeCache(IRGenModule &IGM);
 };
 
 static CanType getNamedSwiftType(Module *stdlib, StringRef name) {
@@ -143,7 +144,6 @@ public:
                                                CanProtocolCompositionType type);
   clang::CanQualType visitBuiltinRawPointerType(CanBuiltinRawPointerType type);
   clang::CanQualType visitBuiltinIntegerType(CanBuiltinIntegerType type);
-  clang::CanQualType visitBuiltinFloatType(CanBuiltinFloatType type);
   clang::CanQualType visitBuiltinUnknownObjectType(
                                                 CanBuiltinUnknownObjectType type);
   clang::CanQualType visitArchetypeType(CanArchetypeType type);
@@ -158,118 +158,65 @@ public:
   clang::CanQualType getCanonicalType(clang::QualType type) {
     return getClangASTContext().getCanonicalType(type);
   }
-
-  clang::CanQualType convertMemberType(NominalTypeDecl *DC,
-                                       StringRef memberName);
 };
 }
 
-clang::CanQualType
-GenClangType::convertMemberType(NominalTypeDecl *DC, StringRef memberName) {
-  auto memberTypeDecl = cast<TypeDecl>(
-    DC->lookupDirect(IGM.Context.getIdentifier(memberName))[0]);
-  auto memberType = memberTypeDecl->getDeclaredType()->getCanonicalType();
-  return Converter.convert(IGM, memberType);
-}
+static clang::CanQualType
+getClangFoundationClassType(IRGenModule &IGM, StringRef name) {
+  auto &ctx = IGM.getClangASTContext();
+  // Fallback to returning the "id" type if the class type cannot be found.
+  auto id = [&]() -> clang::CanQualType {
+    return getClangIdType(ctx);
+  };
 
-static clang::CanQualType getClangVectorType(const clang::ASTContext &ctx,
-                                             clang::BuiltinType::Kind eltKind,
-                                        clang::VectorType::VectorKind vecKind,
-                                             StringRef numEltsString) {
-  unsigned numElts;
-  bool failedParse = numEltsString.getAsInteger<unsigned>(10, numElts);
-  assert(!failedParse && "vector type name didn't end in count?");
-  (void) failedParse;
+  auto *Foundation = IGM.Context.getLoadedModule(IGM.Context.Id_Foundation);
+  if (!Foundation)
+    return id();
+  
+  auto identifier = IGM.Context.getIdentifier(name);
+  SmallVector<ValueDecl *, 1> results;
+  Foundation->lookupQualified(Foundation->getType(),
+                                              identifier,
+                                              NL_QualifiedDefault, nullptr,
+                                              results);
+  for (auto result : results) {
+    // If we found a type with a clang node, get its declared class type.
+    auto clangNode = result->getClangNode();
+    if (!clangNode)
+      continue;
+    
+    auto clangInterface = dyn_cast_or_null<clang::ObjCInterfaceDecl>
+      (clangNode.getAsDecl());
 
-  auto eltTy = getClangBuiltinTypeFromKind(ctx, eltKind);
-  auto vecTy = ctx.getVectorType(eltTy, numElts, vecKind);
-  return ctx.getCanonicalType(vecTy);
+    if (!clangInterface)
+      continue;
+    
+    auto type = ctx.getObjCInterfaceType(clangInterface);
+    type = ctx.getObjCObjectPointerType(type);
+    return ctx.getCanonicalType(type);
+  }
+  
+  return id();
 }
 
 clang::CanQualType GenClangType::visitStructType(CanStructType type) {
-  auto &ctx = IGM.getClangASTContext();
-
   auto swiftDecl = type->getDecl();
-  StringRef name = swiftDecl->getName().str();
-
-  // We assume that the importer translates all of the following types
-  // directly to structs in the standard library.
-
-  // We want to recognize most of these types by name.
-#define CHECK_NAMED_TYPE(NAME, CLANG_TYPE) do {                         \
-    if (name == (NAME)) return CLANG_TYPE;                              \
-  } while (false)
-
-  CHECK_NAMED_TYPE("CGFloat", convertMemberType(swiftDecl, "NativeType"));
-  CHECK_NAMED_TYPE("COpaquePointer", ctx.VoidPtrTy);
-  CHECK_NAMED_TYPE("CVaListPointer", getClangDecayedVaListType(ctx));
-  CHECK_NAMED_TYPE("NSZone", ctx.VoidPtrTy);
-  CHECK_NAMED_TYPE("ObjCBool", ctx.ObjCBuiltinBoolTy);
-  CHECK_NAMED_TYPE("Selector", getClangSelectorType(ctx));
-#undef CHECK_NAMED_TYPE
-
-  // Map vector types to the corresponding C vectors.
-#define MAP_SIMD_TYPE(TYPE_NAME, CLANG_KIND)                           \
-  if (name.startswith(#TYPE_NAME)) {                                   \
-    return getClangVectorType(ctx, clang::BuiltinType::CLANG_KIND,     \
-                              clang::VectorType::GenericVector,        \
-                              name.drop_front(sizeof(#TYPE_NAME)-1));  \
+  auto &swiftCtx = type->getASTContext();
+  if (swiftDecl->getName().str() == "CGFloat") {
+    // Dig out the underlying type.
+    auto underlyingTypeDecl
+      = cast<TypeDecl>(
+          swiftDecl->lookupDirect(swiftCtx.getIdentifier("NativeType"))[0]);
+    return Converter.convert(IGM,
+                             underlyingTypeDecl->getDeclaredType()
+                               ->getCanonicalType());
+  } else if (swiftDecl->getName().str() == "String") {
+    return getClangFoundationClassType(IGM, "NSString");
   }
-#include "swift/ClangImporter/SIMDMappedTypes.def"
 
-  // Everything else we see here ought to be a translation of a builtin.
-  return Converter.reverseBuiltinTypeMapping(IGM, type);
-}
-
-clang::CanQualType
-ClangTypeConverter::reverseBuiltinTypeMapping(IRGenModule &IGM,
-                                              CanStructType type) {
-  // Handle builtin types by adding entries to the cache that reverse
-  // the mapping done by the importer.  We could try to look at the
-  // members of the struct instead, but even if that's ABI-equivalent
-  // (which it had better be!), it might erase interesting semantic
-  // differences like integers vs. characters.  This is important
-  // because CC lowering isn't the only purpose of this conversion.
-  //
-  // The importer maps builtin types like 'int' to named types like
-  // 'CInt', which are generally typealiases.  So what we do here is
-  // map the underlying types of those typealiases back to the builtin
-  // type.  These typealiases frequently create a many-to-one mapping,
-  // so just use the first type that mapped to a particular underlying
-  // type.
-  //
-  // This is the last thing that happens before asserting that the
-  // struct type doesn't have a mapping.  Furthermore, all of the
-  // builtin types are pre-built in the clang ASTContext.  So it's not
-  // really a significant performance problem to just cache all them
-  // right here; it makes making a few more entries in the cache than
-  // we really need, but it also means we won't end up repeating these
-  // stdlib lookups multiple times, and we have to perform multiple
-  // lookups anyway because the MAP_BUILTIN_TYPE database uses
-  // typealias names (like 'CInt') that aren't obviously associated
-  // with the underlying C library type.
-
-  auto stdlib = IGM.Context.getStdlibModule();
-  assert(stdlib && "translating stdlib type to C without stdlib module?");
-  auto &ctx = IGM.getClangASTContext();
-  auto cacheStdlibType = [&](StringRef swiftName,
-                             clang::BuiltinType::Kind builtinKind) {
-    CanType swiftType = getNamedSwiftType(stdlib, swiftName);
-    if (!swiftType) return;
-
-    Cache.insert({swiftType, getClangBuiltinTypeFromKind(ctx, builtinKind)});
-  };
-
-#define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME)          \
-  cacheStdlibType(#SWIFT_TYPE_NAME, clang::BuiltinType::CLANG_BUILTIN_KIND);
-#include "swift/ClangImporter/BuiltinMappedTypes.def"
-
-  // The above code sets up a bunch of mappings in the cache; just
-  // assume that we hit one of them.
-  auto it = Cache.find(type);
-  assert(it != Cache.end() &&
-         "cannot translate Swift type to C! type is not specially known");
-  return it->second;
+  // Everything else should have been handled as an imported type
+  // or an importer-primitive type.
+  llvm_unreachable("Unhandled struct type in Clang type generation");
 }
 
 clang::CanQualType GenClangType::visitTupleType(CanTupleType type) {
@@ -335,6 +282,9 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
     UnsafeMutablePointer,
     UnsafePointer,
     AutoreleasingUnsafeMutablePointer,
+    Array,
+    Dictionary,
+    Set,
     Unmanaged,
     CFunctionPointer,
   } kind = llvm::StringSwitch<StructKind>(swiftStructDecl->getName().str())
@@ -343,6 +293,9 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
     .Case(
       "AutoreleasingUnsafeMutablePointer",
         StructKind::AutoreleasingUnsafeMutablePointer)
+    .Case("Array", StructKind::Array)
+    .Case("Dictionary", StructKind::Dictionary)
+    .Case("Set", StructKind::Set)
     .Case("Unmanaged", StructKind::Unmanaged)
     .Case("CFunctionPointer", StructKind::CFunctionPointer)
     .Default(StructKind::Invalid);
@@ -371,6 +324,13 @@ GenClangType::visitBoundGenericType(CanBoundGenericType type) {
     return getCanonicalType(getClangASTContext().getPointerType(clangTy));
   }
 
+  case StructKind::Array:
+    return getClangFoundationClassType(IGM, "NSArray");
+  case StructKind::Dictionary:
+    return getClangFoundationClassType(IGM, "NSDictionary");
+  case StructKind::Set:
+    return getClangFoundationClassType(IGM, "NSSet");
+      
   case StructKind::CFunctionPointer: {
     auto &clangCtx = getClangASTContext();
 
@@ -556,27 +516,27 @@ clang::CanQualType GenClangType::visitBuiltinRawPointerType(
 clang::CanQualType GenClangType::visitBuiltinIntegerType(
                                                    CanBuiltinIntegerType type) {
   auto &ctx = getClangASTContext();
+  // Map certain known integer sizes to signed integer types.
   if (type->getWidth().isPointerWidth()) {
-    return ctx.getCanonicalType(ctx.getUIntPtrType());
+    return getClangBuiltinTypeFromKind(ctx, clang::BuiltinType::Long);
   }
   if (type->getWidth().isFixedWidth()) {
-    auto width = type->getWidth().getFixedWidth();
-    if (width == 1) return ctx.BoolTy;
-    return ctx.getCanonicalType(ctx.getIntTypeForBitwidth(width, /*signed*/ 0));
+    switch (type->getWidth().getFixedWidth()) {
+    case 8:
+      return getClangBuiltinTypeFromKind(ctx, clang::BuiltinType::SChar);
+    case 16:
+      return getClangBuiltinTypeFromKind(ctx, clang::BuiltinType::Short);
+    case 32:
+      return getClangBuiltinTypeFromKind(ctx, clang::BuiltinType::Int);
+    case 64:
+      return getClangBuiltinTypeFromKind(ctx, clang::BuiltinType::LongLong);
+    case 128:
+      return getClangBuiltinTypeFromKind(ctx, clang::BuiltinType::Int128);
+    default:
+      break;
+    }
   }
   llvm_unreachable("");
-}
-
-clang::CanQualType GenClangType::visitBuiltinFloatType(
-                                                     CanBuiltinFloatType type) {
-  auto &ctx = getClangASTContext();
-  auto &clangTargetInfo = ctx.getTargetInfo();
-  const llvm::fltSemantics *format = &type->getAPFloatSemantics();
-  if (format == &clangTargetInfo.getHalfFormat()) return ctx.HalfTy;
-  if (format == &clangTargetInfo.getFloatFormat()) return ctx.FloatTy;
-  if (format == &clangTargetInfo.getDoubleFormat()) return ctx.DoubleTy;
-  if (format == &clangTargetInfo.getLongDoubleFormat()) return ctx.LongDoubleTy;
-  llvm_unreachable("cannot translate floating-point format to C");
 }
 
 clang::CanQualType GenClangType::visitBuiltinUnknownObjectType(
@@ -633,6 +593,11 @@ clang::CanQualType ClangTypeConverter::convert(IRGenModule &IGM, CanType type) {
     }
   }
 
+  // If the cache is empty, fill it the builtin cases.
+  if (Cache.empty()) {
+    fillSpeciallyImportedTypeCache(IGM);
+  }
+
   // Look in the cache.
   auto it = Cache.find(type);
   if (it != Cache.end()) {
@@ -643,6 +608,63 @@ clang::CanQualType ClangTypeConverter::convert(IRGenModule &IGM, CanType type) {
   clang::CanQualType result = GenClangType(IGM, *this).visit(type);
   Cache.insert({type, result});
   return result;
+}
+
+/// Fill the cache with entries for the fundamental types that are
+/// special-cased by the importer.
+void ClangTypeConverter::fillSpeciallyImportedTypeCache(IRGenModule &IGM) {
+  // Do nothing if there isn't a stdlib module.
+  auto stdlib = IGM.Context.getStdlibModule();
+  if (!stdlib) return;
+
+  auto &ctx = IGM.getClangASTContext();
+
+#define CACHE_TYPE(MODULE, NAME, CLANG_TYPE)                            \
+  do {                                                                  \
+    if (CanType type = getNamedSwiftType(MODULE, NAME)) {               \
+      Cache.insert({type, CLANG_TYPE});                                 \
+    }                                                                   \
+  } while (0)
+#define CACHE_STDLIB_TYPE(NAME, CLANG_TYPE)                             \
+  CACHE_TYPE(stdlib, NAME, CLANG_TYPE)
+
+  // Handle all the builtin types.  This can be many-to-one; let the
+  // first entry that corresponds to a type win.
+#define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME)           \
+  CACHE_STDLIB_TYPE(#SWIFT_TYPE_NAME, getClangBuiltinTypeFromKind(ctx,  \
+                              clang::BuiltinType::CLANG_BUILTIN_KIND));
+#include "swift/ClangImporter/BuiltinMappedTypes.def"
+
+  CACHE_STDLIB_TYPE("COpaquePointer", ctx.VoidPtrTy);
+  CACHE_STDLIB_TYPE("CVaListPointer", getClangDecayedVaListType(ctx));
+
+  // These types come from the ObjectiveC module.
+  if (auto objcModule =
+        IGM.Context.getLoadedModule(IGM.Context.Id_ObjectiveC)) {
+    CACHE_TYPE(objcModule, "ObjCBool", ctx.ObjCBuiltinBoolTy);
+    CACHE_TYPE(objcModule, "Selector", getClangSelectorType(ctx));
+    CACHE_TYPE(objcModule, "NSZone", ctx.VoidPtrTy);
+  }
+  
+  // Handle SIMD types.
+  if (auto SIMDModule = IGM.Context.getLoadedModule(IGM.Context.Id_simd)) {
+#define MAP_SIMD_TYPE(TYPE_NAME, CLANG_KIND)                                   \
+    {                                                                          \
+      char name[] = #TYPE_NAME "0";                                            \
+      for (unsigned i = 2; i <= SWIFT_MAX_IMPORTED_SIMD_ELEMENTS; ++i) {       \
+        *(std::end(name) - 2) = '0' + i;                                       \
+        auto eltTy = getClangBuiltinTypeFromKind(ctx,                          \
+                                               clang::BuiltinType::CLANG_KIND);\
+        auto vecTy = ctx.getVectorType(eltTy,                                  \
+                                       i, clang::VectorType::GenericVector);   \
+        CACHE_TYPE(SIMDModule, name, ctx.getCanonicalType(vecTy));             \
+      }                                                                        \
+    }
+#include "swift/ClangImporter/SIMDMappedTypes.def"
+  }
+
+#undef CACHE_STDLIB_TYPE
+#undef CACHE_TYPE
 }
 
 clang::CanQualType IRGenModule::getClangType(SILType type) {

@@ -25,8 +25,8 @@
 // CHECK-64: [[GETTER_ENCODING:@.*]] = private unnamed_addr constant [8 x i8] c"@16@0:8\00"
 // CHECK-32: [[INIT_ENCODING:@.*]] = private unnamed_addr constant [13 x i8] c"@16@0:4l8@12\00"
 // CHECK-64: [[INIT_ENCODING:@.*]] = private unnamed_addr constant [14 x i8] c"@32@0:8q16@24\00"
-// CHECK-32: [[DEALLOC_ENCODING:@.*]] = private unnamed_addr constant [7 x i8] c"v8@0:4\00"
-// CHECK-64: [[DEALLOC_ENCODING:@.*]] = private unnamed_addr constant [8 x i8] c"v16@0:8\00"
+// CHECK-32: [[DEALLOC_ENCODING:@.*]] = private unnamed_addr constant [10 x i8] c"v12@0:4@8\00"
+// CHECK-64: [[DEALLOC_ENCODING:@.*]] = private unnamed_addr constant [11 x i8] c"v24@0:8@16\00"
 // CHECK: [[STRING_SWIFTGIZMO:@.*]] = private unnamed_addr constant [32 x i8] c"_TtC13objc_subclass10SwiftGizmo\00"
 
 // CHECK-32: @_METACLASS_DATA__TtC13objc_subclass10SwiftGizmo = private constant { {{.*}}* } {
@@ -85,7 +85,7 @@
 // CHECK-32:     i8* bitcast (%0* (%0*, i8*, i32, %2*)* @_TToFC13objc_subclass10SwiftGizmocfMS0_FT3intSi6stringSS_S0_ to i8*)
 // CHECK-32:   }, { i8*, i8*, i8* } {
 // CHECK-32:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* @"\01L_selector_data(dealloc)", i32 0, i32 0),
-// CHECK-32:     i8* getelementptr inbounds ([7 x i8], [7 x i8]* [[DEALLOC_ENCODING]], i32 0, i32 0),
+// CHECK-32:     i8* getelementptr inbounds ([10 x i8], [10 x i8]* {{@[0-9]+}}, i32 0, i32 0),
 // CHECK-32:     i8* bitcast (void (%0*, i8*)* @_TToFC13objc_subclass10SwiftGizmoD to i8*)
 // CHECK-32:   }, { i8*, i8*, i8* } {
 // CHECK-32:     i8* getelementptr inbounds ([10 x i8], [10 x i8]* @"\01L_selector_data(isEnabled)", i32 0, i32 0),
@@ -135,7 +135,7 @@
 // CHECK-64:     i8* bitcast ([[OPAQUE7:%.*]]* ([[OPAQUE8:%.*]]*, i8*, i64, [[OPAQUEONE:.*]]*)* @_TToFC13objc_subclass10SwiftGizmocfMS0_FT3intSi6stringSS_S0_ to i8*)
 // CHECK-64:   }, {
 // CHECK-64:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* @"\01L_selector_data(dealloc)", i64 0, i64 0),
-// CHECK-64:     i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[DEALLOC_ENCODING]], i64 0, i64 0),
+// CHECK-64:     i8* getelementptr inbounds ([11 x i8], [11 x i8]* {{@[0-9]+}}, i64 0, i64 0),
 // CHECK-64:     i8* bitcast (void ([[OPAQUE10:%.*]]*, i8*)* @_TToFC13objc_subclass10SwiftGizmoD to i8*)
 // CHECK-64:   }, {
 // CHECK-64:     i8* getelementptr inbounds ([10 x i8], [10 x i8]* @"\01L_selector_data(isEnabled)", i64 0, i64 0),
@@ -209,9 +209,6 @@
 
 // CHECK: @_INSTANCE_METHODS__TtC13objc_subclass12GenericGizmo
 
-// CHECK-32: [[SETTER_ENCODING:@.*]] = private unnamed_addr constant [10 x i8] c"v12@0:4@8\00"
-// CHECK-64: [[SETTER_ENCODING:@.*]] = private unnamed_addr constant [11 x i8] c"v24@0:8@16\00"
-
 // CHECK-32: @_INSTANCE_METHODS__TtC13objc_subclass11SwiftGizmo2 = private constant { i32, i32, [5 x { i8*, i8*, i8* }] } {
 // CHECK-32:   i32 12,
 // CHECK-32:   i32 5,
@@ -222,7 +219,7 @@
 // CHECK-32:       i8* bitcast (%0* (%3*, i8*)* @_TToFC13objc_subclass11SwiftGizmo2g2sgCS_10SwiftGizmo to i8*)
 // CHECK-32:     }, {
 // CHECK-32:       i8* getelementptr inbounds ([7 x i8], [7 x i8]* @"\01L_selector_data(setSg:)", i32 0, i32 0),
-// CHECK-32:       i8* getelementptr inbounds ([10 x i8], [10 x i8]* [[SETTER_ENCODING]], i32 0, i32 0),
+// CHECK-32:       i8* getelementptr inbounds ([10 x i8], [10 x i8]* [[DEALLOC_ENCODING]], i32 0, i32 0),
 // CHECK-32:       i8* bitcast (void (%3*, i8*, %0*)* @_TToFC13objc_subclass11SwiftGizmo2s2sgCS_10SwiftGizmo to i8*)
 // CHECK-32:     }, {
 // CHECK-32:       i8* getelementptr inbounds ([5 x i8], [5 x i8]* @"\01L_selector_data(init)", i32 0, i32 0),
@@ -250,7 +247,7 @@
 // CHECK-64:       i8* bitcast ([[OPAQUE13:%.*]]* ([[OPAQUE14:%.*]]*, i8*)* @_TToFC13objc_subclass11SwiftGizmo2g2sgCS_10SwiftGizmo to i8*)
 // CHECK-64:     }, {
 // CHECK-64:       i8* getelementptr inbounds ([7 x i8], [7 x i8]* @"\01L_selector_data(setSg:)", i64 0, i64 0),
-// CHECK-64:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* [[SETTER_ENCODING]], i64 0, i64 0),
+// CHECK-64:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* [[DEALLOC_ENCODING]], i64 0, i64 0),
 // CHECK-64:       i8* bitcast (void ([[OPAQUE15:%.*]]*, i8*, [[OPAQUE16:%.*]]*)* @_TToFC13objc_subclass11SwiftGizmo2s2sgCS_10SwiftGizmo to i8*)
 // CHECK-64:     }, {
 // CHECK-64:       i8* getelementptr inbounds ([5 x i8], [5 x i8]* @"\01L_selector_data(init)", i64 0, i64 0),

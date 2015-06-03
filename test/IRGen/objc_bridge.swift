@@ -9,7 +9,6 @@ import Foundation
 
 // CHECK: [[GETTER_SIGNATURE:@.*]] = private unnamed_addr constant [8 x i8] c"@16@0:8\00"
 // CHECK: [[SETTER_SIGNATURE:@.*]] = private unnamed_addr constant [11 x i8] c"v24@0:8@16\00"
-// CHECK: [[DEALLOC_SIGNATURE:@.*]] = private unnamed_addr constant [8 x i8] c"v16@0:8\00"
 
 // CHECK: @_INSTANCE_METHODS__TtC11objc_bridge3Bas = private constant { i32, i32, [17 x { i8*, i8*, i8* }] } {
 // CHECK:   i32 24,
@@ -82,7 +81,7 @@ import Foundation
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } { 
 // CHECK:       i8* getelementptr inbounds ([8 x i8], [8 x i8]* @"\01L_selector_data(dealloc)", i64 0, i64 0), 
-// CHECK:       i8* getelementptr inbounds ([8 x i8], [8 x i8]* [[DEALLOC_SIGNATURE]], i64 0, i64 0),
+// CHECK:       i8* getelementptr inbounds ([11 x i8], [11 x i8]* [[SETTER_SIGNATURE]], i64 0, i64 0),
 // CHECK:       i8* bitcast (void ([[OPAQUE:.*]]*, i8*)* @_TToFC11objc_bridge3BasD to i8*)
 // CHECK:     },
 // CHECK:     { i8*, i8*, i8* } {

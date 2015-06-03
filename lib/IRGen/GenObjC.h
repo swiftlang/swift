@@ -144,10 +144,6 @@ namespace irgen {
   Optional<llvm::Constant*> emitObjCIVarInitDestroyDescriptor(IRGenModule &IGM,
                                                               ClassDecl *cd,
                                                               bool isDestroyer);
-
-  /// Get the type encoding for an ObjC property.
-  void getObjCEncodingForPropertyType(IRGenModule &IGM, VarDecl *property,
-                                      std::string &s);
   
   /// Produces extended encoding of ObjC block signature.
   /// \returns the encoded type.

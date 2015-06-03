@@ -42,19 +42,6 @@ AbstractionPattern TypeConverter::getAbstractionPattern(SubscriptDecl *decl) {
   return AbstractionPattern(decl->getElementType());
 }
 
-bool AbstractionPattern::isOpaqueType(CanGenericSignature signature,
-                                      CanGenericTypeParamType type) {
-  // Enormous hack!  We need to be asking the signature about this
-  // in a more principled way.
-  for (auto &reqt : signature->getRequirements()) {
-    if (reqt.getKind() != RequirementKind::Conformance) continue;
-    if (CanType(reqt.getFirstType()) != type) continue;
-    if (reqt.getSecondType()->isClassExistentialType())
-      return false;
-  }
-  return true;
-}
-
 static const clang::Type *getClangType(const clang::Decl *decl) {
   if (auto valueDecl = dyn_cast<clang::ValueDecl>(decl)) {
     return valueDecl->getType().getTypePtr();

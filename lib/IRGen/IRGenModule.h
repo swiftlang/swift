@@ -247,7 +247,8 @@ private:
 
   /// SIL functions that we need to emit lazily.
   llvm::SmallVector<SILFunction*, 4> LazyFunctionDefinitions;
-
+  
+  
   /// The order in which all the SIL function definitions should
   /// appear in the translation unit.
   llvm::DenseMap<SILFunction*, unsigned> FunctionOrder;
@@ -513,15 +514,11 @@ private:
   };
   
   llvm::DenseMap<ProtocolDecl*, ObjCProtocolPair> ObjCProtocols;
-  llvm::SmallVector<ProtocolDecl*, 4> LazyObjCProtocolDefinitions;  
-
   /// A mapping from order numbers to the LLVM functions which we
   /// created for the SIL functions with those orders.
   SuccessorMap<unsigned, llvm::Function*> EmittedFunctionsByOrder;
 
   ObjCProtocolPair getObjCProtocolGlobalVars(ProtocolDecl *proto);
-  void emitLazyObjCProtocolDefinitions();
-  void emitLazyObjCProtocolDefinition(ProtocolDecl *proto);
 
   llvm::Constant *emitProtocolConformances();
   void emitGlobalLists();
@@ -653,9 +650,6 @@ public:
   // Get the ArchetypeBuilder for the currently active generic context. Crashes
   // if there is no generic context.
   ArchetypeBuilder &getContextArchetypes();
-
-private:
-  void emitLazyPrivateDefinitions();
 
 //--- Global context emission --------------------------------------------------
 public:

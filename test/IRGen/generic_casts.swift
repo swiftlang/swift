@@ -19,17 +19,17 @@ import gizmo
 // CHECK: @"\01l_OBJC_LABEL_PROTOCOL_$_NSRuncing" = weak hidden global i8* bitcast ({{.*}} @_PROTOCOL_NSRuncing to i8*), section "__DATA,__objc_protolist,coalesced,no_dead_strip"
 // CHECK: @"\01l_OBJC_PROTOCOL_REFERENCE_$_NSRuncing" = weak hidden global i8* bitcast ({{.*}} @_PROTOCOL_NSRuncing to i8*), section "__DATA,__objc_protorefs,coalesced,no_dead_strip"
 
+// CHECK: @_PROTOCOL_PROTOCOLS__TtP13generic_casts10ObjCProto2_ = private constant { i64, [1 x i8*] } {
+// CHECK:   i64 1, 
+// CHECK:   @_PROTOCOL__TtP13generic_casts10ObjCProto1_
+// CHECK: }
+
 // CHECK: @_PROTOCOLS__TtC13generic_casts10ObjCClass2 = private constant { i64, [1 x i8*] } {
 // CHECK:   i64 1, 
 // CHECK:   @_PROTOCOL__TtP13generic_casts10ObjCProto2_
 // CHECK: }
 
 // CHECK: @_DATA__TtC13generic_casts10ObjCClass2 = private constant {{.*}} @_PROTOCOLS__TtC13generic_casts10ObjCClass2
-
-// CHECK: @_PROTOCOL_PROTOCOLS__TtP13generic_casts10ObjCProto2_ = private constant { i64, [1 x i8*] } {
-// CHECK:   i64 1, 
-// CHECK:   @_PROTOCOL__TtP13generic_casts10ObjCProto1_
-// CHECK: }
 
 // CHECK: define hidden i64 @_TF13generic_casts8allToInt{{.*}}(%swift.opaque*, %swift.type* %T)
 func allToInt<T>(x: T) -> Int {

@@ -1536,7 +1536,7 @@ namespace {
       outs << 'T';
       
       std::string typeEnc;
-      getObjCEncodingForPropertyType(IGM, prop, typeEnc);
+      getObjCEncodingForPropertyType(IGM, propTy, typeEnc);
       outs << typeEnc;
       
       // Emit other attributes.

@@ -372,17 +372,15 @@ IRGenModule::getObjCProtocolGlobalVars(ProtocolDecl *proto) {
     return found->second;
   }
   
-  // Create a placeholder protocol record.
-  llvm::Constant *protocolRecord =
-    new llvm::GlobalVariable(Module, Int8Ty, /*constant*/ false,
-                             llvm::GlobalValue::PrivateLinkage, nullptr);
-  LazyObjCProtocolDefinitions.push_back(proto);
+  // Emit the protocol record.
+  llvm::Constant *protocolRecord = emitObjCProtocolData(*this, proto);
+  protocolRecord = llvm::ConstantExpr::getBitCast(protocolRecord, Int8PtrTy);
 
   // Introduce a variable to label the protocol.
   llvm::SmallString<64> nameBuffer;
   StringRef protocolName = proto->getObjCRuntimeName(nameBuffer);
   auto *protocolLabel
-    = new llvm::GlobalVariable(Module, Int8PtrTy,
+    = new llvm::GlobalVariable(Module, protocolRecord->getType(),
                                /*constant*/ false,
                                llvm::GlobalValue::WeakAnyLinkage,
                                protocolRecord,
@@ -394,7 +392,7 @@ IRGenModule::getObjCProtocolGlobalVars(ProtocolDecl *proto) {
   
   // Introduce a variable to reference the protocol.
   auto *protocolRef
-    = new llvm::GlobalVariable(Module, Int8PtrTy,
+    = new llvm::GlobalVariable(Module, protocolRecord->getType(),
                                /*constant*/ false,
                                llvm::GlobalValue::WeakAnyLinkage,
                                protocolRecord,
@@ -408,36 +406,6 @@ IRGenModule::getObjCProtocolGlobalVars(ProtocolDecl *proto) {
   ObjCProtocols.insert({proto, pair});
   
   return pair;
-}
-
-void IRGenModule::emitLazyObjCProtocolDefinition(ProtocolDecl *proto) {
-  // Emit the real definition.
-  auto record = cast<llvm::GlobalVariable>(emitObjCProtocolData(*this, proto));
-
-  // Find the placeholder.  It should always still be a placeholder,
-  // because it was created as an anonymous symbol and nobody should
-  // ever be randomly messing with those.
-  auto placeholder =
-    cast<llvm::GlobalVariable>(ObjCProtocols.find(proto)->second.record);
-
-  // Move the new record to the placeholder's position.
-  Module.getGlobalList().remove(record);
-  Module.getGlobalList().insertAfter(placeholder, record);
-
-  // Replace and destroy the placeholder.
-  placeholder->replaceAllUsesWith(
-                            llvm::ConstantExpr::getBitCast(record, Int8PtrTy));
-  placeholder->eraseFromParent();
-}
-
-void IRGenModule::emitLazyObjCProtocolDefinitions() {
-  // Emit any lazy ObjC protocol definitions we require.  Try to do
-  // this in the order in which we needed them, since they can require
-  // other protocol definitions recursively.
-  for (size_t i = 0; i != LazyObjCProtocolDefinitions.size(); ++i) {
-    ProtocolDecl *protocol = LazyObjCProtocolDefinitions[i];
-    emitLazyObjCProtocolDefinition(protocol);
-  }
 }
 
 namespace {
@@ -1037,35 +1005,12 @@ static llvm::Constant *getObjCMethodPointer(IRGenModule &IGM,
   return findSwiftAsObjCThunk(IGM, declRef);
 }
 
-static SILDeclRef getObjCMethodRef(AbstractFunctionDecl *method) {
-  if (isa<ConstructorDecl>(method))
-    return SILDeclRef(method, SILDeclRef::Kind::Initializer).asForeign();
-  if (isa<DestructorDecl>(method))
-    return SILDeclRef(method, SILDeclRef::Kind::Deallocator).asForeign();
-  return SILDeclRef(method, SILDeclRef::Kind::Func).asForeign();
-}
-
-static CanSILFunctionType getObjCMethodType(IRGenModule &IGM,
-                                            AbstractFunctionDecl *method) {  
-  return IGM.SILMod->Types.getConstantFunctionType(getObjCMethodRef(method));
-}
-
-static clang::CanQualType getObjCPropertyType(IRGenModule &IGM,
-                                              VarDecl *property) {
-  // Use the lowered return type of the foreign getter.
-  auto getter = property->getGetter();
-  assert(getter);
-  CanSILFunctionType methodTy = getObjCMethodType(IGM, getter);
-  return IGM.getClangType(
-                  methodTy->getSemanticResultSILType().getSwiftRValueType());
-}
-
 void irgen::getObjCEncodingForPropertyType(IRGenModule &IGM,
-                                           VarDecl *property, std::string &s) {
+                                           Type t, std::string &s) {
   // FIXME: Property encoding differs in slight ways that aren't publicly
   // exposed from Clang.
   IGM.getClangASTContext()
-    .getObjCEncodingForPropertyType(getObjCPropertyType(IGM, property), s);
+    .getObjCEncodingForPropertyType(IGM.getClangType(t->getCanonicalType()), s);
 }
 
 static void
@@ -1077,63 +1022,64 @@ HelperGetObjCEncodingForType(const clang::ASTContext &Context,
                                             T, S, Extended);
 }
 
-static llvm::Constant *getObjCEncodingForTypes(IRGenModule &IGM,
-                                               SILType resultType,
-                                               ArrayRef<SILParameterInfo> params,
-                                               StringRef fixedParamsString,
-                                               Size::int_type parmOffset,
-                                               bool useExtendedEncoding) {
+static llvm::Constant *GetObjCEncodingForTypes(IRGenModule &IGM,
+                                               CanType Result,
+                                               ArrayRef<CanType> Args,
+                                               StringRef FixedArgs,
+                                               Size::int_type ParmOffset,
+                                               bool Extended) {
   auto &clangASTContext = IGM.getClangASTContext();
   
-  std::string encodingString;
-
-  // Return type.
-  {
-    auto clangType = IGM.getClangType(resultType.getSwiftRValueType());
-    if (clangType.isNull())
-      return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
-    HelperGetObjCEncodingForType(clangASTContext, clangType, encodingString,
-                                 useExtendedEncoding);
-  }
-
-  // Parameter types.
   // TODO. Encode type qualifer, 'in', 'inout', etc. for the parameter.
-  std::string paramsString;
-  for (auto param : params) {
-    auto clangType = IGM.getClangType(param.getType());
-    if (clangType.isNull())
+  std::string EncodeStr;
+  auto clangType = IGM.getClangType(Result->getCanonicalType());
+  if (clangType.isNull())
+    return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+  HelperGetObjCEncodingForType(clangASTContext, clangType, EncodeStr, Extended);
+  std::string ArgsStr;
+  
+  // Argument types.
+  for (auto ArgType : Args) {
+    auto PType = IGM.getClangType(ArgType->getCanonicalType());
+    if (PType.isNull())
       return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
     
     // TODO. Some stuff related to Array and Function type is missing.
     // TODO. Encode type qualifer, 'in', 'inout', etc. for the parameter.
-    HelperGetObjCEncodingForType(clangASTContext, clangType, paramsString,
-                                 useExtendedEncoding);
-    paramsString += llvm::itostr(parmOffset);
-    clang::CharUnits sz = clangASTContext.getObjCEncodingTypeSize(clangType);
-    parmOffset += sz.getQuantity();
+    HelperGetObjCEncodingForType(clangASTContext, PType, ArgsStr, Extended);
+    ArgsStr += llvm::itostr(ParmOffset);
+    clang::CharUnits sz = clangASTContext.getObjCEncodingTypeSize(PType);
+    ParmOffset += sz.getQuantity();
   }
   
-  encodingString += llvm::itostr(parmOffset);
-  encodingString += fixedParamsString;
-  encodingString += paramsString;
-  return IGM.getAddrOfGlobalString(encodingString);
+  EncodeStr += llvm::itostr(ParmOffset);
+  EncodeStr += FixedArgs;
+  EncodeStr += ArgsStr;
+  return IGM.getAddrOfGlobalString(StringRef(EncodeStr));
 }
 
-static llvm::Constant *getObjCEncodingForMethodType(IRGenModule &IGM,
-                                                    CanSILFunctionType fnType,
-                                                    bool useExtendedEncoding) {
-  SILType resultType = fnType->getSemanticResultSILType();
-
-  // Get the inputs without 'self'.
-  auto inputs = fnType->getParametersWithoutIndirectResult().drop_back();
-
+static llvm::Constant * GetObjCEncodingForMethodType(IRGenModule &IGM,
+                                                     CanAnyFunctionType T,
+                                                     bool Extended) {
+  CanType Result = T.getResult();
+  CanType Input = T.getInput();
+  SmallVector<CanType, 4> Inputs;
+  
+  // Unravel one level of tuple.
+  if (auto tuple = dyn_cast<TupleType>(Input)) {
+    for (unsigned i = 0, e = tuple->getNumElements(); i < e; ++i)
+      Inputs.push_back(tuple.getElementType(i));
+  } else {
+    Inputs.push_back(Input);
+  }
+  
   // Include the encoding for 'self' and '_cmd'.
   llvm::SmallString<8> specialParams;
   specialParams += "@0:";
   auto ptrSize = IGM.getPointerSize().getValue();
   specialParams += llvm::itostr(ptrSize);
-  return getObjCEncodingForTypes(IGM, resultType, inputs, specialParams,
-                                 ptrSize * 2, useExtendedEncoding);
+  return GetObjCEncodingForTypes(IGM, Result, Inputs, specialParams,
+                                 ptrSize * 2, Extended);
 }
 
 /// Emit the components of an Objective-C method descriptor: its selector,
@@ -1151,8 +1097,14 @@ void irgen::emitObjCMethodDescriptorParts(IRGenModule &IGM,
   selectorRef = IGM.getAddrOfObjCMethodName(selector.str());
   
   /// The second element is the type @encoding.
-  CanSILFunctionType methodType = getObjCMethodType(IGM, method);
-  atEncoding = getObjCEncodingForMethodType(IGM, methodType, extendedEncoding);
+  CanAnyFunctionType methodType
+    = cast<AnyFunctionType>(method->getType()->getCanonicalType());
+  
+  if (!isa<DestructorDecl>(method)) {
+    // Account for the 'self' pointer being curried.
+    methodType = cast<AnyFunctionType>(methodType.getResult());
+  }
+  atEncoding = GetObjCEncodingForMethodType(IGM, methodType, extendedEncoding);
   
   /// The third element is the method implementation pointer.
   if (!concrete) {
@@ -1178,14 +1130,14 @@ void irgen::emitObjCGetterDescriptorParts(IRGenModule &IGM,
   Selector getterSel(property, Selector::ForGetter);
   selectorRef = IGM.getAddrOfObjCMethodName(getterSel.str());
   
-  auto clangType = getObjCPropertyType(IGM, property);
+  auto &clangASTContext = IGM.getClangASTContext();
+  std::string TypeStr;
+  auto swiftType = property->getType()->getReferenceStorageReferent();
+  auto clangType = IGM.getClangType(swiftType->getCanonicalType());
   if (clangType.isNull()) {
     atEncoding = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
     return;
   }
-
-  auto &clangASTContext = IGM.getClangASTContext();
-  std::string TypeStr;
   clangASTContext.getObjCEncodingForType(clangType, TypeStr);
   
   Size PtrSize = IGM.getPointerSize();
@@ -1248,7 +1200,8 @@ void irgen::emitObjCSetterDescriptorParts(IRGenModule &IGM,
   Size PtrSize = IGM.getPointerSize();
   Size::int_type ParmOffset = 2 * PtrSize.getValue();
 
-  clangType = getObjCPropertyType(IGM, property);
+  Type ArgType = property->getType()->getReferenceStorageReferent();
+  clangType = IGM.getClangType(ArgType->getCanonicalType());
   if (clangType.isNull()) {
     atEncoding = llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
     return;
@@ -1351,20 +1304,30 @@ irgen::emitObjCIVarInitDestroyDescriptor(IRGenModule &IGM, ClassDecl *cd,
 llvm::Constant *
 irgen::getMethodTypeExtendedEncoding(IRGenModule &IGM,
                                      AbstractFunctionDecl *method) {
-  CanSILFunctionType methodType = getObjCMethodType(IGM, method);
-  return getObjCEncodingForMethodType(IGM, methodType, true/*Extended*/);
+  CanAnyFunctionType methodType
+    = cast<AnyFunctionType>(method->getType()->getCanonicalType());
+  if (!isa<DestructorDecl>(method)) {
+    // Account for the 'self' pointer being curried.
+    methodType = cast<AnyFunctionType>(methodType.getResult());
+  }
+  return GetObjCEncodingForMethodType(IGM, methodType, true/*Extended*/);
 }
 
 llvm::Constant *
 irgen::getBlockTypeExtendedEncoding(IRGenModule &IGM,
                                     CanSILFunctionType invokeTy) {
-  SILType resultType = invokeTy->getSemanticResultSILType();
-
+  CanType resultType = invokeTy->getResult().getType();
+  SmallVector<CanType, 4> paramTypes;
+  
   // Skip the storage pointer, which is encoded as '@?' to avoid the infinite
   // recursion of the usual '@?<...>' rule for blocks.
-  auto paramTypes = invokeTy->getParametersWithoutIndirectResult().slice(1);
+  for (auto param : invokeTy->getParameters().slice(1)) {
+    assert(!param.isIndirect()
+           && "indirect C arguments not supported");
+    paramTypes.push_back(param.getType());
+  }
   
-  return getObjCEncodingForTypes(IGM, resultType, paramTypes,
+  return GetObjCEncodingForTypes(IGM, resultType, paramTypes,
                                  "@?0", IGM.getPointerSize().getValue(),
                                  /*extended*/ true);
 }
