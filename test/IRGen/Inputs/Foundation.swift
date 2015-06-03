@@ -35,3 +35,7 @@ extension NSError: ErrorType {
   public var _domain: String { return domain }
   public var _code: Int { return code }
 }
+
+public func _convertErrorTypeToNSError(x: ErrorType) -> NSError {
+  return x as NSError
+}

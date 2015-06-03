@@ -12,8 +12,8 @@ import gizmo
 // gets emitted concretely.
 // CHECK: @_TWPOE15objc_extensionsCSo8NSObjectP33_1F05E59585E0BB585FCA206FBFF1A92D8SomeEnumSs9EquatableS_ =
 
-// CHECK: [[METHOD_TYPE:@.*]] = private unnamed_addr constant [8 x i8] c"v16@0:8\00"
 // CHECK: [[CATEGORY_NAME:@.*]] = private unnamed_addr constant [16 x i8] c"objc_extensions\00"
+// CHECK: [[METHOD_TYPE:@.*]] = private unnamed_addr constant [8 x i8] c"v16@0:8\00"
 
 // CHECK-LABEL: @"_CATEGORY_PROTOCOLS_Gizmo_$_objc_extensions" = private constant
 // CHECK:   i64 1,
