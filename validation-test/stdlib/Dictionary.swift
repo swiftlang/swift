@@ -1425,12 +1425,14 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.ImmutableDictionaryIsCopie
   CustomImmutableNSDictionary.timesObjectForKeyWasCalled = 0
   CustomImmutableNSDictionary.timesKeyEnumeratorWasCalled = 0
   CustomImmutableNSDictionary.timesCountWasCalled = 0
+  TestBridgedValueTy.bridgeOperations = 0
   var d: [TestBridgedKeyTy : TestBridgedValueTy] =
     _convertNSDictionaryToDictionary(nsd)
   expectEqual(0, CustomImmutableNSDictionary.timesCopyWithZoneWasCalled)
   expectEqual(3, CustomImmutableNSDictionary.timesObjectForKeyWasCalled)
   expectEqual(1, CustomImmutableNSDictionary.timesKeyEnumeratorWasCalled)
   expectNotEqual(0, CustomImmutableNSDictionary.timesCountWasCalled)
+  expectEqual(3, TestBridgedValueTy.bridgeOperations)
 
   var bridgedBack: NSDictionary = _convertDictionaryToNSDictionary(d)
   expectNotEqual(
