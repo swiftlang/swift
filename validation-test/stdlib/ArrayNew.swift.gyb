@@ -551,18 +551,243 @@ ArrayTestSuite.test("${array_type}<${element_type}>/subscript(_: Range<Int>)/COW
 %   end
 % end
 
+// FIXME: all the tests below are applicable to ArraySlice, too.
+
 //===----------------------------------------------------------------------===//
 // NSArray -> Array bridging tests
 // FIXME: incomplete.
 //===----------------------------------------------------------------------===//
 
+func isNativeArray<Element>(a: Array<Element>) -> Bool {
+  return a._getArrayPropertyIsNative()
+}
+
+func isCocoaArray<Element>(a: Array<Element>) -> Bool {
+  return !isNativeArray(a)
+}
+
+func getAsImmutableNSArray(a: Array<Int>) -> NSArray {
+  var elements = a.map { TestObjCValueTy($0) as AnyObject? }
+  return NSArray(objects: &elements, count: elements.count)
+}
+
+func getAsNSArray(a: Array<Int>) -> NSArray {
+  // Return an `NSMutableArray` to make sure that it has a unique
+  // pointer identity.
+  return getAsNSMutableArray(a)
+}
+
+func getAsNSMutableArray(a: Array<Int>) -> NSMutableArray {
+  let result = NSMutableArray()
+  for element in a {
+    result.addObject(TestObjCValueTy(element))
+  }
+  return result
+}
+
+@objc
+class CustomImmutableNSArray : NSArray {
+  init(_privateInit: ()) {
+    super.init()
+  }
+
+  override init() {
+    expectUnreachable()
+    super.init()
+  }
+
+  override init(objects: UnsafePointer<AnyObject?>, count: Int) {
+    super.init(objects: objects, count: count)
+  }
+
+  required init(coder aDecoder: NSCoder) {
+    fatalError("init(coder:) not implemented by CustomImmutableNSArray")
+  }
+
+  @objc
+  override func copyWithZone(zone: NSZone) -> AnyObject {
+    ++CustomImmutableNSArray.timesCopyWithZoneWasCalled
+    return self
+  }
+
+  override func objectAtIndex(index: Int) -> AnyObject {
+    ++CustomImmutableNSArray.timesObjectAtIndexWasCalled
+    return getAsNSArray([ 10, 20, 30 ]).objectAtIndex(index)
+  }
+
+  override var count: Int {
+    ++CustomImmutableNSArray.timesCountWasCalled
+    return getAsNSArray([ 10, 20, 30 ]).count
+  }
+
+  static var timesCopyWithZoneWasCalled = 0
+  static var timesObjectAtIndexWasCalled = 0
+  static var timesCountWasCalled = 0
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Verbatim.BridgeUsingAs") {
+  if true {
+    let source = [ 10, 20, 30 ]
+    let nsa = getAsNSArray(source)
+    var result = nsa as Array
+    expectTrue(isCocoaArray(result))
+    expectType(Array<AnyObject>.self, &result)
+    checkSequence(
+      source.map { TestObjCValueTy($0) as AnyObject },
+      result,
+      { ($0 as! TestObjCValueTy).value == ($1 as! TestObjCValueTy).value })
+  }
+  if true {
+    let source = [ 10, 20, 30 ]
+    let nsa = getAsNSArray(source)
+    var result = nsa as! Array<TestObjCValueTy>
+    expectTrue(isCocoaArray(result))
+    expectType(Array<TestObjCValueTy>.self, &result)
+    checkSequence(
+      source.map { TestObjCValueTy($0) },
+      result,
+      { $0.value == $1.value })
+  }
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.BridgeUsingAs") {
+  let source = [ 10, 20, 30 ]
+  let nsa = getAsNSArray(source)
+  var result = nsa as! Array<TestBridgedValueTy>
+  expectTrue(isNativeArray(result))
+  expectType(Array<TestBridgedValueTy>.self, &result)
+  checkSequence(
+    source.map { TestBridgedValueTy($0) },
+    result,
+    { $0.value == $1.value })
+}
+
+
+ArrayTestSuite.test("BridgedFromObjC.Verbatim.ArrayIsCopied") {
+  let source = [ 10, 20, 30 ]
+  let nsa = getAsNSMutableArray(source)
+  let result = nsa as Array<AnyObject>
+  expectTrue(isCocoaArray(result))
+
+  // Delete the value from NSMutableArray.
+  expectEqual(20, (nsa[1] as! TestObjCValueTy).value)
+  nsa.removeObjectAtIndex(1)
+  expectEqual(30, (nsa[1] as! TestObjCValueTy).value)
+
+  // Check that the Array is not affected.
+  expectEqual(20, result[1].value)
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayIsCopied") {
+  let source = [ 10, 20, 30 ]
+  let nsa = getAsNSMutableArray(source)
+  var result = nsa as! Array<TestBridgedValueTy>
+  expectTrue(isNativeArray(result))
+
+  // Delete the value from NSMutableArray.
+  expectEqual(20, (nsa[1] as! TestObjCValueTy).value)
+  nsa.removeObjectAtIndex(1)
+  expectEqual(30, (nsa[1] as! TestObjCValueTy).value)
+
+  // Check that the Array is not affected.
+  expectEqual(20, result[1].value)
+}
+
+
+ArrayTestSuite.test("BridgedFromObjC.Verbatim.NSArrayIsRetained") {
+  let nsa = NSArray(array: getAsNSArray([ 10, 20, 30 ]))
+  var a: Array<AnyObject> = _convertNSArrayToArray(nsa)
+  var bridgedBack: NSArray = _convertArrayToNSArray(a)
+
+  expectEqual(
+    unsafeBitCast(nsa, Word.self),
+    unsafeBitCast(bridgedBack, Word.self))
+
+  _fixLifetime(nsa)
+  _fixLifetime(a)
+  _fixLifetime(bridgedBack)
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.NSArrayIsCopied") {
+  let nsa = NSArray(array: getAsNSArray([ 10, 20, 30 ]))
+  var a: Array<TestBridgedValueTy> = _convertNSArrayToArray(nsa)
+  var bridgedBack: NSArray = _convertArrayToNSArray(a)
+
+  expectNotEqual(
+    unsafeBitCast(nsa, Word.self),
+    unsafeBitCast(bridgedBack, Word.self))
+
+  _fixLifetime(nsa)
+  _fixLifetime(a)
+  _fixLifetime(bridgedBack)
+}
+
+
+ArrayTestSuite.test("BridgedFromObjC.Verbatim.ImmutableArrayIsRetained") {
+  let nsa: NSArray = CustomImmutableNSArray(_privateInit: ())
+
+  CustomImmutableNSArray.timesCopyWithZoneWasCalled = 0
+  CustomImmutableNSArray.timesObjectAtIndexWasCalled = 0
+  CustomImmutableNSArray.timesCountWasCalled = 0
+  let a: Array<AnyObject> = _convertNSArrayToArray(nsa)
+  expectEqual(1, CustomImmutableNSArray.timesCopyWithZoneWasCalled)
+  expectEqual(0, CustomImmutableNSArray.timesObjectAtIndexWasCalled)
+  expectEqual(0, CustomImmutableNSArray.timesCountWasCalled)
+
+  let bridgedBack: NSArray = _convertArrayToNSArray(a)
+
+  expectEqual(
+    unsafeBitCast(nsa, Word.self),
+    unsafeBitCast(bridgedBack, Word.self))
+
+  _fixLifetime(nsa)
+  _fixLifetime(a)
+  _fixLifetime(bridgedBack)
+}
+
+ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.ImmutableArrayIsCopied") {
+  let nsa: NSArray = CustomImmutableNSArray(_privateInit: ())
+
+  CustomImmutableNSArray.timesCopyWithZoneWasCalled = 0
+  CustomImmutableNSArray.timesObjectAtIndexWasCalled = 0
+  CustomImmutableNSArray.timesCountWasCalled = 0
+  TestBridgedValueTy.bridgeOperations = 0
+  let a: Array<TestBridgedValueTy> = _convertNSArrayToArray(nsa)
+  expectEqual(1, CustomImmutableNSArray.timesCopyWithZoneWasCalled)
+  expectEqual(3, CustomImmutableNSArray.timesObjectAtIndexWasCalled)
+  expectNotEqual(0, CustomImmutableNSArray.timesCountWasCalled)
+  expectEqual(3, TestBridgedValueTy.bridgeOperations)
+
+  let bridgedBack: NSArray = _convertArrayToNSArray(a)
+
+  expectNotEqual(
+    unsafeBitCast(nsa, Word.self),
+    unsafeBitCast(bridgedBack, Word.self))
+
+  _fixLifetime(nsa)
+  _fixLifetime(a)
+  _fixLifetime(bridgedBack)
+}
+
+// FIXME: test API calls on the BridgedFromObjC arrays.
+
 //===----------------------------------------------------------------------===//
 // Array -> NSArray bridging tests
 //
-// Key and Value are bridged verbatim.
+// Element is bridged verbatim.
 //
 // FIXME: incomplete.
 //===----------------------------------------------------------------------===//
+
+ArrayTestSuite.test("BridgedToObjC.Verbatim.BridgeUsingAs") {
+  let source = [ 10, 20, 30 ].map { TestObjCValueTy($0) }
+  let result = source as NSArray
+  expectTrue(isNativeNSArray(result))
+  expectEqual(3, result.count)
+  expectEqual(10, (result[0] as! TestObjCValueTy).value)
+  expectEqual(20, (result[1] as! TestObjCValueTy).value)
+  expectEqual(30, (result[2] as! TestObjCValueTy).value)
+}
 
 ArrayTestSuite.test("BridgedToObjC/Verbatim/count/empty") {
   let a = getBridgedNSArrayOfRefTypeVerbatimBridged(numElements: 0)
@@ -818,10 +1043,20 @@ ArrayTestSuite.test("BridgedToObjC/Verbatim/BridgeBack/Adopt") {
 //===----------------------------------------------------------------------===//
 // Array -> NSArray bridging tests
 //
-// Key and Value are bridged non-verbatim.
+// Element is bridged non-verbatim.
 //
 // FIXME: incomplete.
 //===----------------------------------------------------------------------===//
+
+ArrayTestSuite.test("BridgedToObjC.Nonverbatim.BridgeUsingAs") {
+  let source = [ 10, 20, 30 ].map { TestBridgedValueTy($0) }
+  var result = source as NSArray
+  expectTrue(isNativeNSArray(result))
+  expectEqual(3, result.count)
+  expectEqual(10, (result[0] as! TestBridgedValueTy).value)
+  expectEqual(20, (result[1] as! TestBridgedValueTy).value)
+  expectEqual(30, (result[2] as! TestBridgedValueTy).value)
+}
 
 ArrayTestSuite.test("BridgedToObjC/Custom/count/empty") {
   let a = getBridgedNSArrayOfValueTypeCustomBridged(numElements: 0)
@@ -1129,6 +1364,61 @@ ArrayTestSuite.test("BridgedToObjC/Custom/BridgeBack/Adopt") {
 }
 
 //===----------------------------------------------------------------------===//
+// NSArray -> Array -> NSArray bridging tests.
+//===----------------------------------------------------------------------===//
+
+ArrayTestSuite.test("BridgedToObjC.Verbatim.RoundtripThroughSwiftArray") {
+% for (MiddleType, AsCast) in [
+%     ('Array<AnyObject>', 'as'),
+%     ('Array<TestObjCValueTy>', 'as!'),
+% ]:
+  if true {
+    let nsa: NSArray = getAsImmutableNSArray([ 10, 20, 30 ])
+    let a: ${MiddleType} = _convertNSArrayToArray(nsa)
+    let bridgedBack = _convertArrayToNSArray(a)
+
+    expectEqual(
+      unsafeBitCast(nsa, Word.self),
+      unsafeBitCast(bridgedBack, Word.self))
+
+    _fixLifetime(nsa)
+    _fixLifetime(a)
+    _fixLifetime(bridgedBack)
+  }
+  if true {
+    let nsa: NSArray = getAsImmutableNSArray([ 10, 20, 30 ])
+    let a = nsa ${AsCast} ${MiddleType}
+    let bridgedBack: NSArray = a as NSArray
+
+    expectEqual(
+      unsafeBitCast(nsa, Word.self),
+      unsafeBitCast(bridgedBack, Word.self))
+
+    _fixLifetime(nsa)
+    _fixLifetime(a)
+    _fixLifetime(bridgedBack)
+  }
+% end
+}
+
+ArrayTestSuite.test("BridgedToObjC.Nonverbatim.RoundtripThroughSwiftArray") {
+  if true {
+    TestBridgedValueTy.bridgeOperations = 0
+    let nsa: NSArray = getAsImmutableNSArray([ 10, 20, 30 ])
+    let a: Array<TestBridgedValueTy> = _convertNSArrayToArray(nsa)
+    let bridgedBack = _convertArrayToNSArray(a)
+    expectEqual(3, TestBridgedValueTy.bridgeOperations)
+  }
+  if true {
+    TestBridgedValueTy.bridgeOperations = 0
+    let nsa: NSArray = getAsImmutableNSArray([ 10, 20, 30 ])
+    let a = nsa as! Array<TestBridgedValueTy>
+    let bridgedBack: NSArray = a as NSArray
+    expectEqual(3, TestBridgedValueTy.bridgeOperations)
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // Array and EvilCollection that changes its size while we are not looking
 //===----------------------------------------------------------------------===//
 
@@ -1226,7 +1516,7 @@ for (step, evilBoundsCheck) in [ (1, true), (-1, false), (-1, true) ] {
 }
 
 //===----------------------------------------------------------------------===//
-// Special cases and one-off tests
+// Special cases and one-off tests.
 //===----------------------------------------------------------------------===//
 
 % for array_type in all_array_types:
