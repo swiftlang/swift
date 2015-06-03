@@ -21,7 +21,18 @@ class GenericInheritsObjC<D> : Gizmo {
   override init()
 }
 sil_vtable GenericInheritsObjC {}
-sil @_TFC15generic_classes19GenericInheritsObjCD : $@convention(method) <T> (GenericInheritsObjC<T>) -> ()
+
+// __deallocating_deinit
+sil @_TFC20generic_classes_objc19GenericInheritsObjCD : $@convention(method) <T> (GenericInheritsObjC<T>) -> () {
+bb0(%0 : $GenericInheritsObjC<T>):
+  unreachable
+}
+
+// @objc init
+sil @_TToFC20generic_classes_objc19GenericInheritsObjCcurfMGS0_q__FT_GS0_q__ : $@convention(objc_method) <T> (@owned GenericInheritsObjC<T>) -> @owned GenericInheritsObjC<T> {
+bb0(%0 : $GenericInheritsObjC<T>):
+  unreachable
+}
 
 // CHECK: @_TMPdC20generic_classes_objc20GenericInheritsObjC2
 // CHECK: @_TWvivC20generic_classes_objc20GenericInheritsObjC21yq_
@@ -35,6 +46,15 @@ class GenericInheritsObjC2<E> : Gizmo {
   override init()
 }
 sil_vtable GenericInheritsObjC2 {}
-sil @_TFC15generic_classes20GenericInheritsObjC2D : $@convention(method) <T> (GenericInheritsObjC2<T>) -> ()
 
+// __deallocating_deinit
+sil @_TFC20generic_classes_objc20GenericInheritsObjC2D : $@convention(method) <T> (GenericInheritsObjC2<T>) -> () {
+bb0(%0 : $GenericInheritsObjC2<T>):
+  unreachable
+}
 
+// @objc init
+sil @_TToFC20generic_classes_objc20GenericInheritsObjC2curfMGS0_q__FT_GS0_q__ : $@convention(objc_method) <T> (@owned GenericInheritsObjC2<T>) -> @owned GenericInheritsObjC2<T> {
+bb0(%0 : $GenericInheritsObjC2<T>):
+  unreachable
+}
