@@ -5,6 +5,7 @@
 // RUN: %target-clang -fobjc-arc %S/Inputs/SlurpFastEnumeration/SlurpFastEnumeration.m -c -o %t/SlurpFastEnumeration.o
 // RUN: %S/../../utils/line-directive %t/main.swift -- %target-build-swift %S/Inputs/DictionaryKeyValueTypes.swift %t/main.swift -I %S/Inputs/SlurpFastEnumeration/ -Xlinker %t/SlurpFastEnumeration.o -o %t/Array -Xfrontend -disable-access-control
 // RUN: %S/../../utils/line-directive %t/main.swift -- %target-run %t/Array
+// REQUIRES: executable_test
 
 // REQUIRES: swift_test_mode_optimize_none
 

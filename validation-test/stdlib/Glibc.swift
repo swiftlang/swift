@@ -1,4 +1,5 @@
 // RUN: %target-run-stdlib-swift
+// REQUIRES: executable_test
 
 // REQUIRES: OS=linux-gnu
 

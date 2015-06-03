@@ -4,6 +4,7 @@
 // RUN: ls %t/Swift.swiftmodule
 // RUN: ls %t/Swift.swiftdoc
 // RUN: ls %t/Swift.o
+// REQUIRES: executable_test
 
 //
 // A bare-bones Swift standard library

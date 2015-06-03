@@ -1,4 +1,5 @@
 // RUN: %target-build-swift -module-name main %s
+// REQUIRES: executable_test
 
 // REQUIRES: objc_interop
 

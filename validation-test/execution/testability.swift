@@ -12,3 +12,4 @@
 
 // RUN: %target-build-swift -O %S/../../test/Interpreter/testability.swift -I %t -Xlinker %t/testability_helper.o -o %t/main
 // RUN: %target-run %t/main | FileCheck %S/../../test/Interpreter/testability.swift
+// REQUIRES: executable_test

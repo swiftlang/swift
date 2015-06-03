@@ -6,6 +6,7 @@
 //
 // RUN: %S/../../utils/line-directive %t/FloatingPointConversionTraps.swift -- %target-run %t/a.out_Debug
 // RUN: %S/../../utils/line-directive %t/FloatingPointConversionTraps.swift -- %target-run %t/a.out_Release
+// REQUIRES: executable_test
 
 import StdlibUnittest
 

@@ -13,6 +13,7 @@
 // RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb -DunicodeGraphemeBreakPropertyFile=%S/../../utils/UnicodeData/GraphemeBreakProperty.txt -DunicodeGraphemeBreakTestFile=%S/../../utils/UnicodeData/GraphemeBreakTest.txt %s -o %t/UnicodeTrie.swift
 // RUN: %S/../../utils/line-directive %t/UnicodeTrie.swift -- %target-build-swift %t/UnicodeTrie.swift -o %t/a.out -g -Xfrontend -disable-access-control
 // RUN: %S/../../utils/line-directive %t/UnicodeTrie.swift -- %target-run %t/a.out
+// REQUIRES: executable_test
 
 // FIXME: rdar://problem/19648117 Needs splitting objc parts out
 // XFAIL: linux

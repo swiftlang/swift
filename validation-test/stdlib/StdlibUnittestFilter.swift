@@ -12,6 +12,7 @@
 // CHECK-XYZ: StdlibUnittest: using filter: xyz{{$}}
 // CHECK-XYZ-NOT: abc
 // CHECK-XYZ: [ RUN      ] Filter.xyz{{$}}
+// REQUIRES: executable_test
 // CHECK-XYZ: [       OK ] Filter.xyz{{$}}
 // CHECK-XYZ-NOT: abc
 // CHECK-XYZ-NOT: xyz

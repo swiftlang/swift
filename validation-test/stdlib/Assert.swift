@@ -7,6 +7,7 @@
 // RUN: %target-run %t/Assert_Debug
 // RUN: %target-run %t/Assert_Release
 // RUN: %target-run %t/Assert_Unchecked
+// REQUIRES: executable_test
 
 import StdlibUnittest
 

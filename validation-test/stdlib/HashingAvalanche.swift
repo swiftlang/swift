@@ -1,5 +1,6 @@
 // RUN: %target-build-swift -Xfrontend -disable-access-control -module-name a %s -o %t.out -O
 // RUN: %target-run %t.out
+// REQUIRES: executable_test
 
 import SwiftPrivate
 import StdlibUnittest

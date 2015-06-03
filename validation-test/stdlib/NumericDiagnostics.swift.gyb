@@ -1,5 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/main.swift
 // RUN: %S/../../utils/line-directive %t/main.swift -- %target-build-swift -parse -Xfrontend -verify %t/main.swift
+// REQUIRES: executable_test
 
 % from SwiftIntTypes import all_numeric_type_names, numeric_type_names_Macintosh_only,  \
 %   all_integer_type_names,all_integer_binary_operator_names, all_integer_or_real_binary_operator_names, \
