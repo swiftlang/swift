@@ -1387,11 +1387,7 @@ bool irgen::requiresObjCMethodDescriptor(FuncDecl *method) {
   if (method->isAccessor())
     return false;
 
-  if (method->isObjC() || method->getAttrs().hasAttribute<IBActionAttr>())
-    return true;
-  if (auto override = method->getOverriddenDecl())
-    return requiresObjCMethodDescriptor(override);
-  return false;
+  return method->isObjC();
 }
 
 bool irgen::requiresObjCMethodDescriptor(ConstructorDecl *constructor) {
@@ -1400,12 +1396,9 @@ bool irgen::requiresObjCMethodDescriptor(ConstructorDecl *constructor) {
 
 bool irgen::requiresObjCPropertyDescriptor(IRGenModule &IGM,
                                            VarDecl *property) {
-  if (auto override = property->getOverriddenDecl())
-    return requiresObjCPropertyDescriptor(IGM, override);
-
   if (!property->isObjC())
     return false;
-  
+
   // Don't expose objc properties for function types we can't bridge.
   if (auto ft = property->getType()->getAs<AnyFunctionType>())
     switch (ft->getRepresentation()) {
@@ -1423,9 +1416,6 @@ bool irgen::requiresObjCPropertyDescriptor(IRGenModule &IGM,
 
 bool irgen::requiresObjCSubscriptDescriptor(IRGenModule &IGM,
                                             SubscriptDecl *subscript) {
-  if (auto override = subscript->getOverriddenDecl())
-    return requiresObjCSubscriptDescriptor(IGM, override);
-
   if (!subscript->isObjC())
     return false;
   

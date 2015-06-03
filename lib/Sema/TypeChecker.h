@@ -321,12 +321,14 @@ enum class ObjCReason {
   ExplicitlyIBOutlet,
   ExplicitlyNSManaged,
   MemberOfObjCProtocol,
-  ImplicitlyObjC
+  ImplicitlyObjC,
+  OverridesObjC
 };
 
 /// Return the %select discriminator for the OBJC_ATTR_SELECT macro used to
 /// complain about the correct attribute during @objc inference.
 static inline unsigned getObjCDiagnosticAttrKind(ObjCReason Reason) {
+  assert(Reason != ObjCReason::DoNotDiagnose);
   return static_cast<unsigned>(Reason) - 1;
 }
 

@@ -1680,11 +1680,15 @@ class BadClass2 {
 class Super {
   @objc(renamedFoo)
   var foo: Int { get { return 3 } } // expected-note 2{{overridden declaration is here}}
+
+  @objc func process(i: Int) -> Int { } // expected-note {{overriding '@objc' method 'process' here}}
 }
 
 class Sub1 : Super {
   @objc(foo) // expected-error{{Objective-C property has a different name from the property it overrides ('foo' vs. 'renamedFoo')}}{{9-12=renamedFoo}}
   override var foo: Int { get { return 5 } }
+
+  override func process(i: Int?) -> Int { } // expected-error{{method cannot be an @objc override because the type of the parameter cannot be represented in Objective-C}}
 }
 
 class Sub2 : Super {

@@ -2020,7 +2020,7 @@ ERROR(objc_name_func_mismatch,sema_objc,none,
       (bool, unsigned, bool, unsigned, bool, bool))
 
 // If you change this, also change enum ObjCReason
-#define OBJC_ATTR_SELECT "select{marked dynamic|marked @objc|marked @IBOutlet|marked @NSManaged|a member of an @objc protocol|implicitly @objc}"
+#define OBJC_ATTR_SELECT "select{marked dynamic|marked @objc|marked @IBOutlet|marked @NSManaged|a member of an @objc protocol|implicitly @objc|an @objc override}"
 
 ERROR(objc_invalid_on_var,sema_objc,none,
       "property cannot be %" OBJC_ATTR_SELECT "0 "
@@ -2061,6 +2061,9 @@ NOTE(not_objc_function_type_throwing,sema_objc,none,
 NOTE(objc_inferring_on_objc_protocol_member,sema_objc,none,
      "inferring '@objc' because the declaration is a member of "
      "an '@objc' protocol", ())
+NOTE(objc_overriding_objc_decl,sema_objc,none,
+     "overriding '@objc' %select{property|subscript|initializer|method}0 %1 "
+     "here", (unsigned, DeclName))
 
 ERROR(objc_invalid_on_func_curried,sema_objc,none,
       "method cannot be %" OBJC_ATTR_SELECT "0 because curried functions "

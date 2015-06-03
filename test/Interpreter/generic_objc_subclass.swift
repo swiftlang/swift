@@ -13,13 +13,21 @@
 import Foundation
 import ObjCClasses
 
-class A<T> : HasHiddenIvars {
+@objc protocol P {
+  func calculatePrice() -> Int
+}
+
+class A<T> : HasHiddenIvars, P {
   var x: Int = 16
   var t: T? = nil
   var y: Int = 61
 
   override var description: String {
     return "Grilled artichokes"
+  }
+
+  func calculatePrice() -> Int {
+    return 400
   }
 }
 
@@ -92,3 +100,33 @@ print(aa.count)
 print(aa.x)
 print(aa.t)
 print(aa.y)
+
+class B : A<(Int, Int)> {
+  override var description: String {
+    return "Salmon"
+  }
+
+  @nonobjc override func calculatePrice() -> Int {
+    return 1675
+  }
+}
+
+class C : A<(Int, Int)> {
+  @nonobjc override var description: String {
+    return "Invisible Chicken"
+  }
+
+  override func calculatePrice() -> Int {
+    return 650
+  }
+}
+
+// CHECK: 400
+// CHECK: 650
+print((B() as P).calculatePrice())
+print((C() as P).calculatePrice())
+
+// CHECK: Salmon
+// CHECK: Grilled artichokes
+print((B() as NSObject).description)
+print((C() as NSObject).description)

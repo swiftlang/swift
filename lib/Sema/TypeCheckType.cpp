@@ -2149,8 +2149,20 @@ static void lookupLibraryTypes(TypeChecker &TC,
 /// decl, if this is not obvious from the decl itself.
 static void describeObjCReason(TypeChecker &TC, const ValueDecl *VD,
                                ObjCReason Reason) {
-  if (Reason == ObjCReason::MemberOfObjCProtocol)
+  if (Reason == ObjCReason::MemberOfObjCProtocol) {
     TC.diagnose(VD->getLoc(), diag::objc_inferring_on_objc_protocol_member);
+  } else if (Reason == ObjCReason::OverridesObjC) {
+    unsigned kind = isa<VarDecl>(VD) ? 0
+                  : isa<SubscriptDecl>(VD) ? 1
+                  : isa<ConstructorDecl>(VD) ? 2
+                  : 3;
+
+    auto overridden = VD->getOverriddenDecl();
+    if (overridden->getLoc().isValid()) {
+      TC.diagnose(overridden->getLoc(), diag::objc_overriding_objc_decl,
+                  kind, VD->getOverriddenDecl()->getFullName());
+    }
+  }
 }
 
 static bool isClassOrObjCProtocol(Type T) {

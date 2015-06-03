@@ -30,7 +30,7 @@ import Foundation
 }
 
 class BlueLightSaber : LightSaber {
-  @nonobjc override func defeatEnemy(b: Bool) -> Bool { } // expected-error {{declaration is implicitly @objc, and cannot be marked @nonobjc}}
+  @nonobjc override func defeatEnemy(b: Bool) -> Bool { }
 }
 
 @objc class InchoateToad {
@@ -54,7 +54,13 @@ class NonObjCDeallocNotAllowed {
 
   @nonobjc subscript(index: Int) -> Int { get } // expected-error {{declaration is a member of an @objc protocol, and cannot be marked @nonobjc}}
 
+  var surfaceArea: Float { @nonobjc get } // expected-error {{declaration is implicitly @objc, and cannot be marked @nonobjc}}
+
   var displacement: Float { get }
+}
+
+class SillyClass {
+  @objc var description: String { @nonobjc get { return "" } } // expected-error {{declaration is implicitly @objc, and cannot be marked @nonobjc}}
 }
 
 class ObjCAndNonObjCNotAllowed {
@@ -87,6 +93,12 @@ class NSManagedAndNonObjCNotAllowed {
   var displacement: Float {
     @nonobjc get { // expected-error {{declaration is implicitly @objc, and cannot be marked @nonobjc}}
       return Float(self[10])
+    }
+  }
+
+  var surfaceArea: Float {
+    get {
+      return Float(100)
     }
   }
 }

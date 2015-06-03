@@ -31,6 +31,8 @@ protocol AddrOnly {}
   func i2(x: Int, y: Int) -> Int? {}
   func i3(x: Int, y: Int) -> Int {}
   func i4(x: Int, y: Int) -> Int {}
+
+  // Note: i3, i4 are implicitly @objc
 }
 
 class D: B {
@@ -53,7 +55,9 @@ class D: B {
 
   override func i(x: Int?, y: Int) -> Int {}
   override func i2(x: Int, y: Int) -> Int {}
-  override func i3(x: Int?, y: Int) -> Int {}
+  // Int? cannot be represented in ObjC so the override has to be
+  // explicitly @nonobjc
+  @nonobjc override func i3(x: Int?, y: Int) -> Int {}
   override func i4(x: Int, y: Int) -> Int {}
 }
 
@@ -79,9 +83,10 @@ class F: D {
 
   override func i(x: Int?, y: Int) -> Int {}
   override func i2(x: Int, y: Int) -> Int {}
-  override func i3(x: Int?, y: Int) -> Int {}
+  // Int? cannot be represented in ObjC so the override has to be
+  // explicitly @nonobjc
+  @nonobjc override func i3(x: Int?, y: Int) -> Int {}
   override func i4(x: Int, y: Int) -> Int {}
-
 }
 
 class ThrowVariance {

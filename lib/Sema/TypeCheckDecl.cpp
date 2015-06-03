@@ -2257,41 +2257,31 @@ static Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
     return ObjCReason::ExplicitlyIBOutlet;
   else if (VD->getAttrs().hasAttribute<NSManagedAttr>())
     return ObjCReason::ExplicitlyNSManaged;
-  // if this declaration is a member of an @objc protocol, it is
-  // implicitly @objc.
+  // A member of an @objc protocol is implicitly @objc.
   else if (isMemberOfObjCProtocol)
     return ObjCReason::MemberOfObjCProtocol;
-
-  if (VD->isInvalid())
+  // A @nonobjc is not @objc, even if it is an override of an @objc, so check
+  // for @nonobjc first.
+  else if (VD->getAttrs().hasAttribute<NonObjCAttr>())
+    return None;
+  // An override of an @objc declaration is implicitly @objc.
+  else if (VD->getOverriddenDecl() && VD->getOverriddenDecl()->isObjC())
+    return ObjCReason::OverridesObjC;
+  else if (VD->isInvalid())
+    return None;
+  // Implicitly generated declarations are not @objc, except for constructors.
+  else if (!allowImplicit && VD->isImplicit())
+    return None;
+  else if (VD->getFormalAccess() == Accessibility::Private)
     return None;
 
-  if (!allowImplicit && VD->isImplicit())
-    return None;
-
-  // If this declaration overrides an @objc declaration, it is implicitly
-  // @objc. However, there is a subtlety with \p allowImplicit -- an
-  // implicit override of an @objc declaration is not implicitly @objc.
-  if (auto overridden = VD->getOverriddenDecl()) {
-    if (overridden->isObjC()) {
-      return ObjCReason::DoNotDiagnose;
-    }
-
-    // Overriding @nonobjc from an @objc class should not mark the
-    // override @objc unless it was explicit above.
-    if (overridden->getAttrs().hasAttribute<NonObjCAttr>())
-      return None;
-  }
-
-  if (!VD->getAttrs().hasAttribute<NonObjCAttr>() &&
-      VD->getFormalAccess() != Accessibility::Private) {
-    // If this declaration is part of an @objc class and is itself not
-    // @nonobjc, mark it implicitly @objc. However, if the declaration
-    // cannot be represented as @objc, don't complain.
-    Type contextTy = VD->getDeclContext()->getDeclaredTypeInContext();
-    auto classContext = contextTy->getClassOrBoundGenericClass();
-    if (classContext && classContext->isObjC())
-      return ObjCReason::DoNotDiagnose;
-  }
+  // If this declaration is part of an @objc class, make it implicitly
+  // @objc. However, if the declaration cannot be represented as @objc,
+  // don't diagnose.
+  Type contextTy = VD->getDeclContext()->getDeclaredTypeInContext();
+  auto classContext = contextTy->getClassOrBoundGenericClass();
+  if (classContext && classContext->isObjC())
+    return ObjCReason::DoNotDiagnose;
 
   return None;
 }
@@ -2396,9 +2386,6 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
                        Optional<ForeignErrorConvention> errorConvention) {
   D->setIsObjC(isObjC.hasValue());
 
-  // By now, the caller will have handled the case where an implicit @objc
-  // could be overridden by @nonobjc. If we see a @nonobjc and we are trying
-  // to add an @objc for whatever reason, diagnose an error.
   if (!isObjC) {
     // FIXME: For now, only @objc declarations can be dynamic.
     if (auto attr = D->getAttrs().getAttribute<DynamicAttr>(D))
@@ -2406,17 +2393,15 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
     return;
   }
 
+  // By now, the caller will have handled the case where an implicit @objc
+  // could be overridden by @nonobjc. If we see a @nonobjc and we are trying
+  // to add an @objc for whatever reason, diagnose an error.
   if (auto *attr = D->getAttrs().getAttribute<NonObjCAttr>()) {
-    ObjCReason Reason = *isObjC;
-
-    // FIXME: this is for cases where we don't want to diagnose a
-    // "X cannot be represented in Objective-C" error, but still
-    // complain if the user specifies @nonobjc.
-    if (Reason == ObjCReason::DoNotDiagnose)
-      Reason = ObjCReason::ImplicitlyObjC;
+    if (*isObjC == ObjCReason::DoNotDiagnose)
+      isObjC = ObjCReason::ImplicitlyObjC;
 
     TC.diagnose(D->getStartLoc(), diag::nonobjc_not_allowed,
-                getObjCDiagnosticAttrKind(Reason));
+                getObjCDiagnosticAttrKind(*isObjC));
 
     attr->setInvalid();
   }
@@ -4129,7 +4114,7 @@ public:
           isObjC = ObjCReason::DoNotDiagnose;
       }
 
-      if (!isObjC && FD->isGetterOrSetter()) {
+      if (FD->isGetterOrSetter()) {
         // If the property decl is an instance property, its accessors will
         // be instance methods and the above condition will mark them ObjC.
         // The only additional condition we need to check is if the var decl
@@ -4140,17 +4125,16 @@ public:
         // checked yet.
         if (isa<SubscriptDecl>(prop))
           TC.validateDecl(prop);
-        else if (auto pat = cast<VarDecl>(prop)->getParentPatternBinding()) {
-          for (unsigned i = 0, e = pat->getNumPatternEntries(); i != e; ++i)
-            validatePatternBindingDecl(TC, pat, i);
-        }
+        else if (isa<VarDecl>(prop))
+          TC.validateDecl(prop);
 
-        if (prop->isObjC() || prop->isDynamic() ||
-            prop->getAttrs().hasAttribute<IBOutletAttr>())
+        if (prop->getAttrs().hasAttribute<NonObjCAttr>())
+          isObjC = None;
+        else if (!isObjC && prop->isObjC())
           isObjC = ObjCReason::DoNotDiagnose;
 
         // If the property is dynamic, propagate to this accessor.
-        if (prop->isDynamic() && !FD->isDynamic())
+        if (isObjC && prop->isDynamic() && !FD->isDynamic())
           FD->getAttrs().add(new (TC.Context) DynamicAttr(/*implicit*/ true));
       }
 
