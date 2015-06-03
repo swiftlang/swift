@@ -61,8 +61,8 @@ class Contrarian : Blammo {
 }
 
 class Octogenarian : Contrarian {
-  // Override of @nonobjc should be @nonobjc by default.
-  override func disharmonize() {}
+  // Override of @nonobjc is @objc again unless made @nonobjc.
+  @nonobjc override func disharmonize() {}
 
   // Override of @nonobjc can be @objc.
   @objc override func eviscerate() {}
