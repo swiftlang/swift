@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir %t
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir | FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) -primary-file %s -emit-ir | FileCheck --check-prefix=CHECK --check-prefix=CHECK-%target-os %s
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
@@ -37,7 +37,8 @@ class Foo: Fooable {
 // CHECK: [[BAZ_SIGNATURE:@.*]] = private unnamed_addr constant [8 x i8] c"v16@0:8\00"
 // CHECK: [[GARPLY_SIGNATURE:@.*]] = private unnamed_addr constant [11 x i8] c"v24@0:8@16\00"
 // CHECK: [[BLOCK_SIGNATURE_TRAD:@.*]] = private unnamed_addr constant [12 x i8] c"v24@0:8@?16\00"
-// CHECK: [[FAIL_SIGNATURE:@.*]] = private unnamed_addr constant [12 x i8] c"c24@0:8^@16\00"
+// CHECK-macosx: [[FAIL_SIGNATURE:@.*]] = private unnamed_addr constant [12 x i8] c"c24@0:8^@16\00"
+// CHECK-ios: [[FAIL_SIGNATURE:@.*]] = private unnamed_addr constant [12 x i8] c"B24@0:8^@16\00"
 // CHECK: @_INSTANCE_METHODS__TtC12objc_methods3Foo = private constant { {{.*}}] } {
 // CHECK:   i32 24,
 // CHECK:   i32 9,
@@ -60,7 +61,8 @@ class Foo: Fooable {
 // CHECK:   }, {
 // CHECK:     i8* getelementptr inbounds ([20 x i8], [20 x i8]* @"\01L_selector_data(failAndReturnError:)", i64 0, i64 0),
 // CHECK:     i8* getelementptr inbounds ([12 x i8], [12 x i8]* [[FAIL_SIGNATURE]], i64 0, i64 0),
-// CHECK:     i8* bitcast (i8 (i8*, i8*, %4**)* @_TToFC12objc_methods3Foo4failfS0_FzT_T_ to i8*)
+// CHECK-macosx:     i8* bitcast (i8 (i8*, i8*, %4**)* @_TToFC12objc_methods3Foo4failfS0_FzT_T_ to i8*)
+// CHECK-ios:     i8* bitcast (i1 (i8*, i8*, %4**)* @_TToFC12objc_methods3Foo4failfS0_FzT_T_ to i8*)
 // CHECK:   }]
 // CHECK: }, section "__DATA, __objc_const", align 8
 // CHECK: [[BLOCK_SIGNATURE_EXT_1:@.*]] = private unnamed_addr constant [18 x i8] c"v24@0:8@?<q@?q>16\00"
