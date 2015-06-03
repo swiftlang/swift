@@ -436,8 +436,8 @@ public func _convertNSArrayToArray<T>(source: NSArray?) -> [T] {
 ///     func f() -> [NSView] { return [] }
 ///
 /// to Objective-C code as a method that returns an `NSArray`.
-public func _convertArrayToNSArray<T>(arr: [T]) -> NSArray {
-  return arr._bridgeToObjectiveC()
+public func _convertArrayToNSArray<T>(array: [T]) -> NSArray {
+  return array._bridgeToObjectiveC()
 }
 
 extension Array : _ObjectiveCBridgeable {
