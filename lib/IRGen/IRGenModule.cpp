@@ -727,11 +727,18 @@ void IRGenModule::cleanupClangCodeGenMetadata() {
 }
 
 void IRGenModule::finalize() {
+  emitLazyPrivateDefinitions();
   emitAutolinkInfo();
   emitGlobalLists();
   if (DebugInfo)
     DebugInfo->finalize();
   cleanupClangCodeGenMetadata();
+}
+
+/// Emit lazy definitions that have to be emitted in this specific
+/// IRGenModule.
+void IRGenModule::emitLazyPrivateDefinitions() {
+  emitLazyObjCProtocolDefinitions();
 }
 
 void IRGenModule::unimplemented(SourceLoc loc, StringRef message) {
