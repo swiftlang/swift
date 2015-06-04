@@ -104,6 +104,7 @@ lookupUnqualifiedEnumMemberElement(TypeChecker &TC, DeclContext *DC,
 static EnumElementDecl *
 lookupEnumMemberElement(TypeChecker &TC, DeclContext *DC, Type ty,
                         Identifier name) {
+  assert(ty->getAnyNominal());
   // Look up the case inside the enum.
   // FIXME: We should be able to tell if this is a private lookup.
   NameLookupOptions lookupOptions
@@ -1278,8 +1279,9 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     
     Type enumTy;
     if (!EEP->getElementDecl()) {
-      EnumElementDecl *element
-        = lookupEnumMemberElement(*this, dc, type, EEP->getName());
+      EnumElementDecl *element = nullptr;
+      if (type->getAnyNominal())
+        element = lookupEnumMemberElement(*this, dc, type, EEP->getName());
       if (!element) {
         diagnose(EEP->getLoc(), diag::enum_element_pattern_member_not_found,
                  EEP->getName().str(), type);
