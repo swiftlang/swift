@@ -1225,6 +1225,44 @@ void PatternMatchEmission::emitSpecializedDispatch(ClauseMatrix &clauses,
                                                    unsigned &lastRow,
                                                    unsigned column,
                                                const FailureHandler &failure) {
+  // HEY! LISTEN!
+  //
+  // When a pattern specializes its submatrix (like an 'as' or enum element
+  // pattern), it *must* chain the FailureHandler for its inner submatrixes
+  // through our `failure` handler if it manipulates any cleanup state.
+  // Here's an example from emitEnumElementDispatch:
+  //
+  //       const FailureHandler *innerFailure = &failure;
+  //       FailureHandler specializedFailure = [&](SILLocation loc) {
+  //         ArgUnforwarder unforwarder(SGF);
+  //         unforwarder.unforwardBorrowedValues(src, origCMV);
+  //         failure(loc);
+  //       };
+  //
+  //       if (ArgUnforwarder::requiresUnforwarding(src))
+  //         innerFailure = &specializedFailure;
+  //
+  // Note that the inner failure handler either is exactly the outer failure
+  // or performs the work necessary to clean up after the failed specialized
+  // decision tree immediately before chaining onto the outer failure.
+  // It is specifically NOT correct to do something like this:
+  //
+  //       /* DON'T DO THIS */
+  //       ExitableFullExpr scope;
+  //       FailureHandler innerFailure = [&](SILLocation loc) {
+  //         emitBranchAndCleanups(scope, loc);
+  //       };
+  //       ...
+  //       /* DON'T DO THIS */
+  //       scope.exit();
+  //       ArgUnforwarder unforwarder(SGF);
+  //       unforwarder.unforwardBorrowedValues(src, origCMV);
+  //       failure(loc);
+  //       /* DON'T DO THIS */
+  //
+  // since the cleanup state changes performed by ArgUnforwarder will
+  // occur too late.
+  
   unsigned firstRow = lastRow;
 
   // Collect the rows to specialize.
@@ -1553,39 +1591,30 @@ void PatternMatchEmission::emitIsDispatch(ArrayRef<RowToSpecialize> rows,
   }
 
   SILLocation loc = rows[0].Pattern;
-  auto cleanupLoc = CleanupLocation::get(loc);
 
   ConsumableManagedValue castOperand = operand.asBorrowedOperand();
   
-  // Enter an exitable scope.  On failure, we'll just go on to the next case.
-  ExitableFullExpr scope(SGF, cleanupLoc);
-  FailureHandler innerFailure = [&](SILLocation loc) {
-    // The cleanup for the cast operand was pushed outside of this
-    // jump dest, so we don't have to undo any cleanup-splitting here.
-    SGF.Cleanups.emitBranchAndCleanups(scope.getExitDest(), loc);
+  // Chain inner failures onto the outer failure.
+  const FailureHandler *innerFailure = &failure;
+  FailureHandler specializedFailure = [&](SILLocation loc) {
+    ArgUnforwarder unforwarder(SGF);
+    unforwarder.unforwardBorrowedValues(src, borrowedValues);
+    failure(loc);
   };
-
+  if (ArgUnforwarder::requiresUnforwarding(src))
+    innerFailure = &specializedFailure;
+  
   // Perform a conditional cast branch.
   SGF.emitCheckedCastBranch(loc, castOperand,
                             sourceType, targetType, SGFContext(),
     // Success block: recurse.
     [&](ManagedValue castValue) {
       handleCase(ConsumableManagedValue::forOwned(castValue),
-                 specializedRows, innerFailure);
+                 specializedRows, *innerFailure);
       assert(!SGF.B.hasValidInsertionPoint() && "did not end block");
     },
     // Failure block: branch out to the continuation block.
-    [&] { innerFailure(loc); });
-
-  // Dispatch continues on the "false" block.
-  scope.exit();
-
-  ArgUnforwarder unforwarder(SGF);
-  if (ArgUnforwarder::requiresUnforwarding(src)) {
-    unforwarder.unforwardBorrowedValues(src, borrowedValues);
-  }
-
-  failure(rows.back().Pattern);
+    [&] { (*innerFailure)(loc); });
 }
 
 /// Perform specialized dispatch for a sequence of EnumElementPattern or an

@@ -102,17 +102,16 @@ func dont_return<T>(argument: T) throws -> T {
 //   Catch other HomeworkErrors.
 // CHECK:    [[NO_MATCH]]:
 // CHECK-NEXT: dealloc_stack [[DEST_TEMP]]#0
+// CHECK-NEXT: dealloc_stack [[SRC_TEMP]]#0
 // CHECK-NEXT: br [[CATCHALL:bb[0-9]+]]
 
 //   Catch other types.
 // CHECK:    [[NOT_HWE]]:
 // CHECK-NEXT: dealloc_stack [[DEST_TEMP]]#0
+// CHECK-NEXT: dealloc_stack [[SRC_TEMP]]#0
 // CHECK-NEXT: br [[CATCHALL:bb[0-9]+]]
 
 //   Catch all.
-// CHECK:    [[CATCHALL]]:
-// CHECK-NEXT: dealloc_stack [[SRC_TEMP]]#0
-// CHECK-NEXT: br [[CATCHALL:bb[0-9]+]]
 // CHECK:    [[CATCHALL]]:
 // CHECK:      [[T0:%.*]] = function_ref @_TFC6errors3CatCfMS0_FT_S0_ : $@convention(thin) (@thick Cat.Type) -> @owned Cat
 // CHECK-NEXT: [[T1:%.*]] = metatype $@thick Cat.Type

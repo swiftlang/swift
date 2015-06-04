@@ -42,3 +42,32 @@ func testSwitchEnumOnExistential(value: Any) {
 // CHECK:   checked_cast_addr_br copy_on_success protocol<> in {{%.*}} : $*protocol<> to Foo
 // CHECK:   checked_cast_addr_br copy_on_success protocol<> in {{%.*}} : $*protocol<> to Bar<Int>
 // CHECK:   checked_cast_addr_br copy_on_success protocol<> in {{%.*}} : $*protocol<> to Bar<Foo>
+
+class B {}
+class D: B {}
+
+func guardFn(l: D, _ r: D) -> Bool { return true }
+
+// rdar://problem/21087371
+// CHECK-LABEL: sil hidden @_TF10switch_isa32testSwitchTwoIsPatternsWithGuardFTCS_1B1rS0__T_
+// CHECK:         checked_cast_br {{%.*}} : $B to $D, [[R_CAST_YES:bb[0-9]+]], [[R_CAST_NO:bb[0-9]+]]
+// CHECK:       [[R_CAST_YES]]({{.*}}):
+// CHECK:         checked_cast_br {{%.*}} : $B to $D, [[L_CAST_YES:bb[0-9]+]], [[L_CAST_NO:bb[0-9]+]]
+// CHECK:       [[L_CAST_YES]]({{.*}}):
+// CHECK:         function_ref @_TF10switch_isa7guardFnFTCS_1DS0__Sb
+// CHECK:         cond_br {{%.*}}, [[GUARD_YES:bb[0-9]+]], [[GUARD_NO:bb[0-9]+]]
+// CHECK:       [[GUARD_NO]]:
+// CHECK-NEXT:    strong_release [[R2:%.*]] : $D
+// CHECK-NEXT:    strong_release [[L2:%.*]] : $D
+// CHECK-NEXT:    br [[CONT:bb[0-9]+]]
+// CHECK:       [[L_CAST_NO]]:
+// CHECK-NEXT:    strong_release [[R2:%.*]] : $D
+// CHECK-NEXT:    br [[CONT]]
+func testSwitchTwoIsPatternsWithGuard(l: B, r: B) {
+  switch (l, r) {
+  case (let l2 as D, let r2 as D) where guardFn(l2, r2):
+    break
+  default:
+    break
+  }
+}
