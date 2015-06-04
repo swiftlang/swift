@@ -57,3 +57,20 @@ public func withOverriddenNSLocaleCurrentLocale<Result>(
   return withOverriddenNSLocaleCurrentLocale(
     NSLocale(localeIdentifier: temporaryLocaleIdentifier), body)
 }
+
+/// Executes the `body` in an autorelease pool if the platform does not
+/// implement the return-autoreleased optimization.
+///
+/// (Currently, only the i386 iOS and watchOS simulators don't implement the
+/// return-autoreleased optimization.)
+@inline(never)
+public func autoreleasepoolIfUnoptimizedReturnAutoreleased(
+  @noescape body: () -> ()
+) {
+#if arch(i386) && (os(iOS) || os(watchOS))
+  autoreleasepool(body)
+#else
+  body()
+#endif
+}
+
