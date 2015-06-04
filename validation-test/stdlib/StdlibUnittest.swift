@@ -1,8 +1,6 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 // REQUIRES: executable_test
 
-// REQUIRES: swift_test_mode_optimize_none
-
 import SwiftPrivate
 import StdlibUnittest
 
@@ -327,7 +325,6 @@ AssertionsTestSuite.test("expectCrashLater/Pass") {
   _blackHole(array[0])
 }
 // CHECK: [ RUN      ] Assertions.expectCrashLater/Pass
-// CHECK: err>>> fatal error: Array index out of range
 // CHECK: err>>> CRASHED: SIG{{.*}}
 // CHECK: [       OK ] Assertions.expectCrashLater/Pass
 
@@ -339,7 +336,6 @@ AssertionsTestSuite.test("expectCrashLater/UXPass")
   _blackHole(array[0])
 }
 // CHECK: [ RUN      ] Assertions.expectCrashLater/UXPass (XFAIL: [Custom(reason: test)])
-// CHECK: err>>> fatal error: Array index out of range
 // CHECK: err>>> CRASHED: SIG{{.*}}
 // CHECK: [   UXPASS ] Assertions.expectCrashLater/UXPass
 
@@ -364,7 +360,6 @@ AssertionsTestSuite.test("UnexpectedCrash/RuntimeTrap") {
   _blackHole(array[0])
 }
 // CHECK: [ RUN      ] Assertions.UnexpectedCrash/RuntimeTrap
-// CHECK: err>>> fatal error: Array index out of range
 // CHECK: err>>> CRASHED: SIG{{.*}}
 // CHECK: the test crashed unexpectedly
 // CHECK: [     FAIL ] Assertions.UnexpectedCrash/RuntimeTrap
