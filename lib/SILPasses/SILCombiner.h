@@ -234,7 +234,6 @@ public:
   SILInstruction *visitSelectEnumInst(SelectEnumInst *EIT);
   SILInstruction *visitSelectEnumAddrInst(SelectEnumAddrInst *EIT);
   SILInstruction *visitStructExtractInst(StructExtractInst *SEI);
-  SILInstruction *visitUncheckedEnumDataInst(UncheckedEnumDataInst *UEDI);
   SILInstruction *visitThickToObjCMetatypeInst(ThickToObjCMetatypeInst *TTOCMI);
   SILInstruction *visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *OCTTMI);
   SILInstruction *visitTupleExtractInst(TupleExtractInst *TEI);

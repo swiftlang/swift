@@ -63,44 +63,6 @@ SILInstruction *SILCombiner::visitStructExtractInst(StructExtractInst *SEI) {
                                                         SEI->getType());
 }
 
-static bool isFirstPayloadedCase(EnumDecl *E, EnumElementDecl *Elt) {
-  for (EnumElementDecl *Iter : E->getAllElements())
-    if (Iter->hasArgumentType())
-      return Iter == Elt;
-  return false;
-}
-
-SILInstruction *
-SILCombiner::
-visitUncheckedEnumDataInst(UncheckedEnumDataInst *UEDI) {
-  // First to be safe, do not perform this optimization on unchecked_enum_data
-  // on bounded generic nominal types.
-  SILValue Op = UEDI->getOperand();
-  SILType OpType = Op.getType();
-  if (OpType.hasArchetype() || OpType.isTrivial(UEDI->getModule()))
-    return nullptr;
-
-  // (unchecked_enum_data (unchecked_ref_bit_cast X->Y x) #z)
-  //    ->
-  // (unchecked_ref_bit_cast X->Z x)
-  //
-  // Where #z is the payload of type Z of the first payloaded case of the enum
-  // Y.
-  auto *URBCI = dyn_cast<UncheckedRefBitCastInst>(Op);
-  if (!URBCI)
-    return nullptr;
-
-  // A UEDI performs a layout compatible operation if it is extracting the first
-  // argument case of the enum.
-  EnumDecl *E = OpType.getEnumOrBoundGenericEnum();
-  if (!isFirstPayloadedCase(E, UEDI->getElement()))
-    return nullptr;
-
-  return new (UEDI->getModule()) UncheckedRefBitCastInst(UEDI->getLoc(),
-                                                         URBCI->getOperand(),
-                                                         UEDI->getType());
-}
-
 SILInstruction *SILCombiner::visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI) {
   // Promote switch_enum_addr to switch_enum if the enum is loadable.
   //   switch_enum_addr %ptr : $*Optional<SomeClass>, case ...

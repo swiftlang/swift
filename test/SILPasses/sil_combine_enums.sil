@@ -206,3 +206,56 @@ bb2:
   br bb1
 }
 
+public class C {}
+public struct S {}
+public struct T {
+  @sil_stored let c: C
+  @sil_stored let s: S
+}
+public enum X {
+  case None
+  case Some(T)
+}
+public enum Y {
+  case None
+  case Some(T)
+}
+
+// Verify that we do not optimize
+//   (unchecked_enum_data (unchecked_ref_bit_cast V : $X to $Y), #Case)
+// where Case holds of a payload of type P into:
+//   (unchecked_ref_bit_cast V : $X to $P)
+// even for single-payload enums, since we cannot know the layouts of
+// the types involved, and we'll generate a trap at IRGen-time if the
+// bitcasted types are not the same size.
+
+// CHECK-LABEL: sil @keep_unchecked_enum_data
+sil @keep_unchecked_enum_data : $@convention(thin) (@owned X, @owned T) -> @owned T {
+// CHECK: bb0
+bb0(%0 : $X, %1 : $T):
+// CHECK: [[CAST:%.*]] = unchecked_ref_bit_cast %0 : $X to $Y
+  %4 = unchecked_ref_bit_cast %0 : $X to $Y
+  switch_enum %4 : $Y, case #Y.None!enumelt: bb1, case #Y.Some!enumelt.1: bb2
+
+// CHECK: bb1
+bb1:
+  %7 = struct_extract %1 : $T, #T.c
+  strong_retain %7 : $C
+  br bb3(%7 : $C)
+
+// CHECK: bb2
+bb2(%10 : $T):
+// CHECK: unchecked_enum_data [[CAST]] : $Y, #Y.Some!enumelt.1
+  %11 = unchecked_enum_data %4 : $Y, #Y.Some!enumelt.1
+  %12 = struct_extract %11 : $T, #T.c
+  br bb3(%12 : $C)
+
+// CHECK: bb3
+bb3(%14 : $C):
+  %15 = struct $S ()
+  %16 = struct $T (%14 : $C, %15 : $S)
+  %17 = struct_extract %1 : $T, #T.c
+  strong_release %17 : $C
+// CHECK: return
+  return %16 : $T
+}

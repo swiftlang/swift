@@ -1777,10 +1777,12 @@ bb0(%0 : $ZZZ):
 
 sil [_semantics "array.uninitialized"] @_allocate_uninitialized_ZZZ : $@convention(thin) (Builtin.Word) -> @owned (Array<ZZZ>, Builtin.RawPointer)
 
-// CHECK-LABEL: sil @merge_structextract_uncheckedenumdata_and_ref_bitcasts : $@convention(thin) (Builtin.NativeObject) -> Builtin.NativeObject {
-// CHECK: bb0({{%[0-9]+}} : $Builtin.NativeObject):
-// CHECK-NEXT: return
-sil @merge_structextract_uncheckedenumdata_and_ref_bitcasts : $@convention(thin) (Builtin.NativeObject) -> Builtin.NativeObject {
+// CHECK-LABEL: sil @merge_structextract_and_ref_bitcasts : $@convention(thin) (Builtin.NativeObject) -> Builtin.NativeObject {
+// CHECK: bb0([[ARG:%.*]] : $Builtin.NativeObject):
+// CHECK-NEXT: [[CAST:%.*]] = unchecked_ref_bit_cast [[ARG]]
+// CHECK-NEXT: [[DATA:%.*]] = unchecked_enum_data [[CAST]]
+// CHECK-NEXT: return [[DATA]]
+sil @merge_structextract_and_ref_bitcasts : $@convention(thin) (Builtin.NativeObject) -> Builtin.NativeObject {
 bb0(%0 : $Builtin.NativeObject):
   %1 = unchecked_ref_bit_cast %0 : $Builtin.NativeObject to $PointerStorage
   %2 = struct_extract %1 : $PointerStorage, #PointerStorage.ptr
