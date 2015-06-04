@@ -472,7 +472,7 @@ namespace {
                                      locator, locator, implicit, semantics,
                                      /*isDynamic=*/false);
         if (!result)
-          return nullptr;;
+          return nullptr;
 
         return result;
       }
@@ -967,11 +967,11 @@ namespace {
         return ref;
       }
 
-      // For types, properties, and members of archetypes, build
-      // member references.
-      if (isDependentConformingRef || isa<TypeDecl>(member) ||
-          isa<VarDecl>(member)) {
+      // For types and properties, build member references.
+      if (isa<TypeDecl>(member) || isa<VarDecl>(member)) {
         assert(!dynamicSelfFnType && "Converted type doesn't make sense here");
+        assert(baseIsInstance || !member->isInstanceMember());
+
         auto memberRefExpr
           = new (context) MemberRefExpr(base, dotLoc, memberRef,
                                         memberLoc, Implicit, semantics);
@@ -2226,7 +2226,9 @@ namespace {
         newRef = convertUnavailableToOptional(newRef,decl, expr->getLoc(),
                                               choice.getReasonUnavailable(cs));
       }
-      
+
+      recordUnsupportedPartialApply(expr, newRef);
+
       return newRef;
     }
 
@@ -2360,7 +2362,10 @@ namespace {
                                   locator, expr->isSpecialized(),
                                   expr->isImplicit(),
                                   AccessSemantics::Ordinary);
-      
+
+      if (auto newDeclRef = dyn_cast<DeclRefExpr>(newRef))
+        recordUnsupportedPartialApply(newDeclRef, newDeclRef);
+
       if (choice.isPotentiallyUnavailable()) {
         newRef = convertUnavailableToOptional(newRef, decl, expr->getLoc(),
                                               choice.getReasonUnavailable(cs));
@@ -2488,23 +2493,22 @@ namespace {
     }
     
   private:
-    struct MemberPartialApplication {
+    // Selector for the partial_application_of_function_invalid diagnostic
+    // message.
+    struct PartialApplication {
       unsigned level : 29;
-      // Selector for the partial_application_of_method_invalid diagnostic
-      // message.
       enum : unsigned {
-        Struct,
-        Enum,
-        Archetype,
-        Protocol
+        Function,
+        MutatingMethod,
+        ObjCProtocolMethod
       };
       unsigned kind : 3;
     };
-    
-    // A map used to track partial applications of methods to require that they
-    // be fully applied. Partial applications of value types would capture
-    // 'self' as an inout and hide any mutation of 'self', which is surprising.
-    llvm::SmallDenseMap<Expr*, MemberPartialApplication, 2>
+
+    // Partial applications of functions with inout parameters is not permitted,
+    // so we track them to ensure they are fully applied. The map value is the
+    // number of remaining applications.
+    llvm::SmallDenseMap<Expr*, PartialApplication, 2>
       InvalidPartialApplications;
     
     /// A list of "suspicious" optional injections that come from
@@ -2575,49 +2579,10 @@ namespace {
                                                 AccessSemantics::Ordinary,
                                                 isDynamic,
                                                 reason);
-        
-        // If this is an application of a mutating method,
-        // arrange for us to check that it gets fully applied.
-        FuncDecl *fn = nullptr;
-        Optional<unsigned> kind;
-        if (auto apply = dyn_cast<ApplyExpr>(member)) {
-          auto selfInoutTy = apply->getArg()->getType()->getAs<InOutType>();
-          if (!selfInoutTy)
-            goto not_mutating_member;
-          auto selfTy = selfInoutTy->getObjectType();
-          auto fnDeclRef = dyn_cast<DeclRefExpr>(apply->getFn());
-          if (!fnDeclRef)
-            goto not_mutating_member;
-          fn = dyn_cast<FuncDecl>(fnDeclRef->getDecl());
-          if (selfTy->getStructOrBoundGenericStruct())
-            kind = MemberPartialApplication::Struct;
-          else if (selfTy->getEnumOrBoundGenericEnum())
-            kind = MemberPartialApplication::Enum;
-          else
-            goto not_mutating_member;
-        } else if (auto pmRef = dyn_cast<MemberRefExpr>(member)) {
-          auto baseInoutTy = pmRef->getBase()->getType()->getAs<InOutType>();
-          if (!baseInoutTy)
-            goto not_mutating_member;
-          auto baseTy = baseInoutTy->getObjectType();
-          if (baseTy->getRValueType()->isOpenedExistential()) {
-            kind = MemberPartialApplication::Protocol;
-          } else if (baseTy->hasReferenceSemantics()) {
-            goto not_mutating_member;
-          } else if (isa<FuncDecl>(pmRef->getMember().getDecl()))
-            kind = MemberPartialApplication::Archetype;
-          else
-            goto not_mutating_member;
-          fn = dyn_cast<FuncDecl>(pmRef->getMember().getDecl());
-        }
-        
-        if (fn && fn->isInstanceMember())
-          InvalidPartialApplications.insert({
-            member,
-            // We need to apply all of the non-self argument clauses.
-            {fn->getNaturalArgumentCount() - 1, kind.getValue() },
-          });
-      not_mutating_member:
+
+        if (auto applyExpr = dyn_cast<ApplyExpr>(member))
+          advancePartialApplyExpr(applyExpr, applyExpr);
+
         return member;
       }
 
@@ -2884,29 +2849,107 @@ namespace {
       llvm_unreachable("Already type-checked");
     }
 
+    /// If this is an application of a function that cannot be partially
+    /// applied, arrange for us to check that it gets fully applied.
+    void recordUnsupportedPartialApply(DeclRefExpr *expr, Expr *fnExpr) {
+      bool requiresFullApply = false;
+      unsigned kind;
+
+      auto fn = dyn_cast<FuncDecl>(expr->getDecl());
+      if (!fn)
+        return;
+
+      // @objc protocol methods cannot be partially applied.
+      if (auto proto = fn->getDeclContext()->isProtocolOrProtocolExtensionContext()) {
+        if (proto->isObjC()) {
+          requiresFullApply = true;
+          kind = PartialApplication::ObjCProtocolMethod;
+        }
+      }
+
+      if (requiresFullApply) {
+        // We need to apply all argument clauses.
+        InvalidPartialApplications.insert({
+          fnExpr, {fn->getNaturalArgumentCount(), kind}
+        });
+      }
+    }
+
+    /// If this is an application of a function that cannot be partially
+    /// applied, arrange for us to check that it gets fully applied.
+    void recordUnsupportedPartialApply(ApplyExpr *expr, Expr *fnExpr) {
+      bool requiresFullApply = false;
+      unsigned kind;
+
+      auto fnDeclRef = dyn_cast<DeclRefExpr>(fnExpr);
+      if (!fnDeclRef)
+        return;
+
+      recordUnsupportedPartialApply(fnDeclRef, fnExpr);
+
+      auto fn = dyn_cast<FuncDecl>(fnDeclRef->getDecl());
+      if (!fn)
+        return;
+
+      if (fn->isInstanceMember())
+        kind = PartialApplication::MutatingMethod;
+      else
+        kind = PartialApplication::Function;
+
+      // Functions with inout parameters cannot be partially applied.
+      auto argTy = expr->getArg()->getType();
+      if (auto tupleTy = argTy->getAs<TupleType>()) {
+        for (auto eltTy : tupleTy->getElementTypes()) {
+          if (eltTy->getAs<InOutType>()) {
+            requiresFullApply = true;
+            break;
+          }
+        }
+      } else if (argTy->getAs<InOutType>()) {
+        requiresFullApply = true;
+      }
+
+      if (requiresFullApply) {
+        // We need to apply all argument clauses.
+        InvalidPartialApplications.insert({
+          fnExpr, {fn->getNaturalArgumentCount(), kind}
+        });
+      }
+    }
+
+    /// See if this application advanced a partial value type application.
+    void advancePartialApplyExpr(ApplyExpr *expr, Expr *result) {
+      Expr *fnExpr = expr->getFn()->getSemanticsProvidingExpr();
+      if (auto forceExpr = dyn_cast<ForceValueExpr>(fnExpr))
+        fnExpr = forceExpr->getSubExpr()->getSemanticsProvidingExpr();
+      if (auto dotSyntaxExpr = dyn_cast<DotSyntaxBaseIgnoredExpr>(fnExpr))
+        fnExpr = dotSyntaxExpr->getRHS();
+
+      recordUnsupportedPartialApply(expr, fnExpr);
+
+      auto foundApplication = InvalidPartialApplications.find(fnExpr);
+      if (foundApplication == InvalidPartialApplications.end())
+        return;
+
+      unsigned level = foundApplication->second.level;
+      assert(level > 0);
+      InvalidPartialApplications.erase(foundApplication);
+      if (level > 1) {
+        // We have remaining argument clauses.
+        InvalidPartialApplications.insert({
+          result, {level - 1, foundApplication->second.kind}
+        });
+      }
+    }
+
     Expr *visitApplyExpr(ApplyExpr *expr) {
       auto result = finishApply(expr, expr->getType(),
                          ConstraintLocatorBuilder(
                            cs.getConstraintLocator(expr)));
 
-      // See if this application advanced a partial value type application.
-      Expr *fn = expr->getFn()->getSemanticsProvidingExpr();
-      if (auto force = dyn_cast<ForceValueExpr>(fn))
-        fn = force->getSubExpr()->getSemanticsProvidingExpr();
-      auto foundApplication = InvalidPartialApplications.find(fn);
-      if (foundApplication != InvalidPartialApplications.end()) {
-        unsigned level = foundApplication->second.level;
-        assert(level > 0);
-        InvalidPartialApplications.erase(foundApplication);
-        if (level > 1)
-          InvalidPartialApplications.insert({
-            result, {
-              level - 1,
-              foundApplication->second.kind
-            }
-          });
-      }
-      
+      // Record a partial value type application, if necessary.
+      advancePartialApplyExpr(expr, result);
+
       return result;
     }
 
@@ -3412,7 +3455,7 @@ namespace {
       for (auto &unapplied : InvalidPartialApplications) {
         unsigned kind = unapplied.second.kind;
         tc.diagnose(unapplied.first->getLoc(),
-                    diag::partial_application_of_method_invalid,
+                    diag::partial_application_of_function_invalid,
                     kind);
       }
 

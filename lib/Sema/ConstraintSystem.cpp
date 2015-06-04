@@ -1010,14 +1010,7 @@ void ConstraintSystem::openGeneric(
 /// declared.
 static void addSelfConstraint(ConstraintSystem &cs, Type objectTy, Type selfTy,
                               ConstraintLocatorBuilder locator){
-  // When referencing a protocol member, we need the object type to be usable
-  // as the Self type of the protocol, which covers anything that conforms to
-  // the protocol as well as existentials that include that protocol.
-  if (selfTy->is<ProtocolType>()) {
-    cs.addConstraint(ConstraintKind::SelfObjectOfProtocol, objectTy, selfTy,
-                     cs.getConstraintLocator(locator));
-    return;
-  }
+  assert(!selfTy->is<ProtocolType>());
 
   // Otherwise, use a subtype constraint for classes to cope with inheritance.
   if (selfTy->getClassOrBoundGenericClass()) {

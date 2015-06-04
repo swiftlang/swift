@@ -1548,9 +1548,11 @@ ERROR(ambiguous_decl_ref,tce_sema,none,
 ERROR(ambiguous_operator_ref,tce_sema,none,
       "ambiguous use of operator %0", (Identifier))
 
-ERROR(partial_application_of_method_invalid,tce_sema,none,
-      "partial application of 'mutating' %select{struct method|enum method|"
-      "generic method|protocol method}0 is not allowed",
+// Cannot capture inout-ness of a parameter
+// Partial application of foreign functions not supported
+ERROR(partial_application_of_function_invalid,tce_sema,none,
+      "partial application of %select{function with 'inout' parameters|"
+      "'mutating' method|method in @objc protocol}0 is not allowed",
       (unsigned))
 
 ERROR(self_assignment_var,tce_sema,none,

@@ -1803,13 +1803,6 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E, SGFContext C) {
       SGF.B.createMetatype(E, SGF.getLoweredLoadableType(E->getType()));
     return RValue(SGF, E, ManagedValue::forUnmanaged(MT));
   }
-  
-  if (isa<AbstractFunctionDecl>(E->getMember().getDecl())) {
-    // Method references into generics are represented as member refs instead
-    // of apply exprs for some reason. Send this down the correct path to be
-    // treated as a curried method application.
-    return SGF.emitApplyExpr(E, C);
-  }
 
   // If we have a nominal type decl as our base, try to use special logic to
   // emit the base rvalue's member using special logic that will let us avoid

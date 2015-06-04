@@ -126,23 +126,16 @@ protocol P {
   mutating func mut(x: Int)
 }
 
-@objc
-protocol P2 {
-  func bar(x: Int)
-}
-
-
 func generic<T: P>(var t: T) {
   _ = t.bar
-  _ = t.mut // expected-error{{partial application of 'mutating' generic method is not allowed}}
+  _ = t.mut // expected-error{{partial application of 'mutating' method is not allowed}}
   var _ : () = t.bar(0)
 }
 
-func existential(var p: P, p2 : P2) {
+func existential(var p: P) {
   p.mut(1)
   _ = p.bar
-  _ = p.mut // expected-error{{partial application of 'mutating' protocol method is not allowed}}
-  _ = p2.bar
+  _ = p.mut // expected-error{{partial application of 'mutating' method is not allowed}}
   var _ : () = p.bar(0)
 }
 

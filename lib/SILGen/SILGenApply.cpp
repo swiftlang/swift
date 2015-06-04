@@ -708,7 +708,7 @@ namespace {
 static Callee prepareArchetypeCallee(SILGenFunction &gen, SILLocation loc,
                                      SILDeclRef constant,
                                      ArgumentSource &selfValue,
-                                     CanAnyFunctionType substAccessorType,
+                                     CanAnyFunctionType substFnType,
                                      ArrayRef<Substitution> &substitutions) {
   auto fd = cast<AbstractFunctionDecl>(constant.getDecl());
   auto protocol = cast<ProtocolDecl>(fd->getDeclContext());
@@ -798,8 +798,11 @@ static Callee prepareArchetypeCallee(SILGenFunction &gen, SILLocation loc,
 
   materializeSelfIfNecessary();
 
+  // The protocol self is implicitly decurried.
+  substFnType = cast<AnyFunctionType>(substFnType.getResult());
+
   return Callee::forArchetype(gen, openingSite, selfTy,
-                              constant, substAccessorType, loc);
+                              constant, substFnType, loc);
 }
 
 /// An ASTVisitor for building SIL function calls.
@@ -915,7 +918,8 @@ public:
     for (auto callSite : CallSites) {
       addSite(callSite, false);
     }
-    // The self application might be a MemberRefExpr if "self" is an archetype.
+
+    // The self application might be a DynamicMemberRefExpr.
     if (auto selfApply = dyn_cast_or_null<ApplyExpr>(SelfApplyExpr)) {
       addSite(selfApply, otherCtorRefUsesAllocating);
     }
@@ -1022,6 +1026,68 @@ public:
       bool requiresAllocRefDynamic = false;
 
       // Determine whether the method is dynamically dispatched.
+      if (auto *proto = dyn_cast<ProtocolDecl>(afd->getDeclContext())) {
+        // We have four cases to deal with here:
+        //
+        //  1) for a "static" / "type" method, the base is a metatype.
+        //  2) for a classbound protocol, the base is a class-bound protocol rvalue,
+        //     which is loadable.
+        //  3) for a mutating method, the base has inout type.
+        //  4) for a nonmutating method, the base is a general archetype
+        //     rvalue, which is address-only.  The base is passed at +0, so it isn't
+        //     consumed.
+        //
+        // In the last case, the AST has this call typed as being applied
+        // to an rvalue, but the witness is actually expecting a pointer
+        // to the +0 value in memory.  We just pass in the address since
+        // archetypes are address-only.
+
+        CanAnyFunctionType substFnType = getSubstFnType();
+        assert(!CallSites.empty());
+        ApplyExpr *thisCallSite = CallSites.back();
+        CallSites.pop_back();
+
+        ArgumentSource selfValue = thisCallSite->getArg();
+
+        ArrayRef<Substitution> subs = e->getDeclRef().getSubstitutions();
+
+        SILDeclRef::Kind kind = SILDeclRef::Kind::Func;
+        if (isa<ConstructorDecl>(afd)) {
+          if (proto->isObjC()) {
+            SILLocation loc = thisCallSite->getArg();
+
+            // For Objective-C initializers, we only have an initializing
+            // initializer. We need to allocate the object ourselves.
+            kind = SILDeclRef::Kind::Initializer;
+
+            auto metatype = std::move(selfValue).getAsSingleValue(SGF);
+            auto allocated = allocateObjCObject(metatype, loc);
+            auto allocatedType = allocated.getType().getSwiftRValueType();
+            selfValue = ArgumentSource(loc, RValue(allocated, allocatedType));
+          } else {
+            // For non-Objective-C initializers, we have an allocating
+            // initializer to call.
+            kind = SILDeclRef::Kind::Allocator;
+          }
+        }
+
+        SILDeclRef constant = SILDeclRef(afd, kind);
+
+        // Prepare the callee.  This can modify both selfValue and subs.
+        Callee theCallee = prepareArchetypeCallee(SGF, e, constant, selfValue,
+                                                  substFnType, subs);
+
+        setSelfParam(std::move(selfValue), thisCallSite);
+        setCallee(std::move(theCallee));
+
+        // If there are substitutions, add them now.
+        if (!subs.empty()) {
+          ApplyCallee->setSubstitutions(SGF, e, subs, CallDepth);
+        }
+
+        return;
+      }
+
       if (e->getAccessSemantics() != AccessSemantics::Ordinary) {
         isDynamicallyDispatched = false;
       } else {
@@ -1220,78 +1286,6 @@ public:
     }
 
     return subs.slice(innerIdx);
-  }
-
-  void visitMemberRefExpr(MemberRefExpr *e) {
-    auto *fd = dyn_cast<AbstractFunctionDecl>(e->getMember().getDecl());
-
-    // If the base is a non-protocol, non-archetype type, then this is a load of
-    // a function pointer out of a vardecl.  Just emit it as an rvalue.
-    if (!fd)
-      return visitExpr(e);
-
-    // We have four cases to deal with here:
-    //
-    //  1) for a "static" / "type" method, the base is a metatype.
-    //  2) for a classbound protocol, the base is a class-bound protocol rvalue,
-    //     which is loadable.
-    //  3) for a mutating method, the base has inout type.
-    //  4) for a nonmutating method, the base is a general archetype
-    //     rvalue, which is address-only.  The base is passed at +0, so it isn't
-    //     consumed.
-    //
-    // In the last case, the AST has this call typed as being applied
-    // to an rvalue, but the witness is actually expecting a pointer
-    // to the +0 value in memory.  We just pass in the address since
-    // archetypes are address-only.
-
-    ArgumentSource selfValue = e->getBase();
-
-    auto *proto = cast<ProtocolDecl>(fd->getDeclContext());
-    ArrayRef<Substitution> subs = e->getMember().getSubstitutions();
-
-    // Figure out the kind of declaration reference we're working with.
-    SILDeclRef::Kind kind = SILDeclRef::Kind::Func;
-    if (isa<ConstructorDecl>(fd)) {
-      if (proto->isObjC()) {
-        // For Objective-C initializers, we only have an initializing
-        // initializer. We need to allocate the object ourselves.
-        kind = SILDeclRef::Kind::Initializer;
-
-        auto metatype = std::move(selfValue).getAsSingleValue(SGF);
-        auto allocated = allocateObjCObject(metatype, e->getBase());
-        auto allocatedType = allocated.getType().getSwiftRValueType();
-        selfValue = ArgumentSource(e->getBase(),
-                                   RValue(allocated, allocatedType));
-
-      } else {
-        // For non-Objective-C initializers, we have an allocating
-        // initializer to call.
-        kind = SILDeclRef::Kind::Allocator;
-      }
-    }
-    SILDeclRef constant = SILDeclRef(fd, kind);
-
-    // Gross. We won't have any call sites if this is a curried generic method
-    // application, because it doesn't look like a call site in the AST, but a
-    // member ref.
-    CanFunctionType substFnType;
-    if (!CallSites.empty() || dyn_cast_or_null<ApplyExpr>(SelfApplyExpr))
-      substFnType = getSubstFnType();
-    else
-      substFnType = cast<FunctionType>(e->getType()->getCanonicalType());
-
-    // Prepare the callee.  This can modify both selfValue and subs.
-    Callee theCallee = prepareArchetypeCallee(SGF, e, constant, selfValue,
-                                              substFnType, subs);
-
-    setSelfParam(std::move(selfValue), e);
-    setCallee(std::move(theCallee));
-
-    // If there are substitutions, add them now.
-    if (!subs.empty()) {
-      ApplyCallee->setSubstitutions(SGF, e, subs, CallDepth);
-    }
   }
 
   void visitFunctionConversionExpr(FunctionConversionExpr *e) {
@@ -3450,9 +3444,6 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &gen,
   if (isa<ProtocolDecl>(decl->getDeclContext())) {
     assert(!isDirectUse && "direct use of protocol accessor?");
     assert(!isSuper && "super call to protocol method?");
-
-    // The protocol self is implicitly decurried.
-    substAccessorType = cast<AnyFunctionType>(substAccessorType.getResult());
 
     return prepareArchetypeCallee(gen, loc, constant, selfValue,
                                   substAccessorType, substitutions);
