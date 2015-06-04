@@ -118,6 +118,8 @@
   (require 'electric)
   (set (make-local-variable 'indent-line-function) 'swift-indent-line)
   (set (make-local-variable 'parse-sexp-ignore-comments) t)
+  (set (make-local-variable 'comment-use-syntax) nil) ;; don't use the syntax table; use our regexp
+  (set (make-local-variable 'comment-start-skip) "\\(?:/\\)\\(?:/[:/]?\\|[*]+\\)[ \t]*")
   (set (make-local-variable 'comment-start) "// ")
   (set (make-local-variable 'comment-end) "")
 
@@ -151,7 +153,7 @@
       (beginning-of-line)
       (skip-syntax-forward " ")
       (setq target-column
-            (if (equal (char-after) ?\#) 0
+            (if (or (equal (char-after) ?\#) (looking-at "//:")) 0
               (* 2
                  (- indent-level
                     (cond ((= (char-syntax (or (char-after) ?\X)) ?\))
