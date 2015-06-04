@@ -15,23 +15,20 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef IDENTIFIER
-#  error Must define IDENTIFIER(Id) before including this x-macro file
-#endif
-
 #ifndef IDENTIFIER_WITH_NAME
 #  error Must define IDENTIFIER_WITH_NAME(Name, IdStr) before including this x-macro file
 #endif
 
+#define IDENTIFIER(name) IDENTIFIER_WITH_NAME(name, #name)
+#define IDENTIFIER_(name) IDENTIFIER_WITH_NAME(name, "_" #name)
+
 IDENTIFIER(atIndexedSubscript)
-IDENTIFIER_WITH_NAME(forceBridgeFromObjectiveC, "_forceBridgeFromObjectiveC")
-IDENTIFIER_WITH_NAME(conditionallyBridgeFromObjectiveC,
-                     "_conditionallyBridgeFromObjectiveC")
-IDENTIFIER_WITH_NAME(bridgeToObjectiveC, "_bridgeToObjectiveC")
-IDENTIFIER(_code)
+IDENTIFIER_(bridgeToObjectiveC)
+IDENTIFIER_WITH_NAME(code_, "_code")
+IDENTIFIER(CVarArgType)
 IDENTIFIER(dealloc)
 IDENTIFIER(deinit)
-IDENTIFIER(_domain)
+IDENTIFIER_WITH_NAME(domain_, "_domain")
 IDENTIFIER(Element)
 IDENTIFIER(error)
 IDENTIFIER(forKeyedSubscript)
@@ -44,11 +41,12 @@ IDENTIFIER(init)
 IDENTIFIER(load)
 IDENTIFIER(next)
 IDENTIFIER(NSError)
-IDENTIFIER(_NSErrorDomain)
+IDENTIFIER_(NSErrorDomain)
 IDENTIFIER(NSObject)
 IDENTIFIER(objectAtIndexedSubscript)
 IDENTIFIER(objectForKeyedSubscript)
 IDENTIFIER(ObjectiveC)
+IDENTIFIER(OptionalNilComparisonType)
 IDENTIFIER(Protocol)
 IDENTIFIER(rawValue)
 IDENTIFIER(RawValue)
@@ -63,54 +61,47 @@ IDENTIFIER(toRaw)
 IDENTIFIER(Type)
 IDENTIFIER(value)
 
-IDENTIFIER_WITH_NAME(Underscore, "_")
+// Operators
 IDENTIFIER_WITH_NAME(MatchOperator, "~=")
 IDENTIFIER_WITH_NAME(EqualsOperator, "==")
-IDENTIFIER_WITH_NAME(NotEqualsOperator, "!=")
 
-// Built-in identifiers
-IDENTIFIER_WITH_NAME(MaxBuiltinIntegerType, "_MaxBuiltinIntegerType")
+// Builtins and literals
+IDENTIFIER_(MaxBuiltinIntegerType)
 IDENTIFIER(IntegerLiteralType)
-IDENTIFIER_WITH_NAME(AllZeros, "allZeros")
-IDENTIFIER_WITH_NAME(BoolValue, "boolValue")
-IDENTIFIER_WITH_NAME(NilLiteral, "nilLiteral")
-IDENTIFIER_WITH_NAME(IntegerLiteral, "integerLiteral")
-IDENTIFIER_WITH_NAME(BuiltinIntegerLiteral, "_builtinIntegerLiteral")
-IDENTIFIER_WITH_NAME(MaxBuiltinFloatType, "_MaxBuiltinFloatType")
+IDENTIFIER(boolValue)
+IDENTIFIER(nilLiteral)
+IDENTIFIER(integerLiteral)
+IDENTIFIER_(builtinIntegerLiteral)
+IDENTIFIER_(MaxBuiltinFloatType)
 IDENTIFIER(FloatLiteralType)
-IDENTIFIER_WITH_NAME(FloatLiteral, "floatLiteral")
-IDENTIFIER_WITH_NAME(BuiltinFloatLiteral, "_builtinFloatLiteral")
+IDENTIFIER(floatLiteral)
+IDENTIFIER_(builtinFloatLiteral)
 IDENTIFIER(BooleanLiteralType)
-IDENTIFIER_WITH_NAME(BuiltinBooleanLiteral, "_builtinBooleanLiteral")
-IDENTIFIER_WITH_NAME(BooleanLiteral, "booleanLiteral")
+IDENTIFIER_(builtinBooleanLiteral)
+IDENTIFIER(booleanLiteral)
 
 IDENTIFIER(CharacterLiteralType)
-IDENTIFIER_WITH_NAME(CharacterLiteral, "characterLiteral")
-IDENTIFIER_WITH_NAME(BuiltinCharacterLiteral, "_builtinCharacterLiteral")
+IDENTIFIER(characterLiteral)
+IDENTIFIER_(builtinCharacterLiteral)
 
 IDENTIFIER(ExtendedGraphemeClusterLiteralType)
-IDENTIFIER_WITH_NAME(BuiltinExtendedGraphemeClusterLiteral,
-                     "_builtinExtendedGraphemeClusterLiteral")
-IDENTIFIER_WITH_NAME(ExtendedGraphemeClusterLiteral,
-                     "extendedGraphemeClusterLiteral")
+IDENTIFIER_(builtinExtendedGraphemeClusterLiteral)
+IDENTIFIER(extendedGraphemeClusterLiteral)
 
 IDENTIFIER(UnicodeScalarLiteralType)
-IDENTIFIER_WITH_NAME(BuiltinUnicodeScalarLiteral,
-                     "_builtinUnicodeScalarLiteral")
-IDENTIFIER_WITH_NAME(UnicodeScalarLiteral, "unicodeScalarLiteral")
+IDENTIFIER_(builtinUnicodeScalarLiteral)
+IDENTIFIER(unicodeScalarLiteral)
 
-IDENTIFIER_WITH_NAME(StringLiteral, "stringLiteral")
-IDENTIFIER_WITH_NAME(BuiltinUTF16StringLiteral, "_builtinUTF16StringLiteral")
-IDENTIFIER_WITH_NAME(BuiltinStringLiteral, "_builtinStringLiteral")
+IDENTIFIER(stringLiteral)
+IDENTIFIER_(builtinUTF16StringLiteral)
+IDENTIFIER_(builtinStringLiteral)
 IDENTIFIER(StringLiteralType)
-IDENTIFIER_WITH_NAME(StringInterpolation, "stringInterpolation")
-IDENTIFIER_WITH_NAME(StringInterpolationSegment, "stringInterpolationSegment")
-IDENTIFIER_WITH_NAME(ArrayLiteral, "arrayLiteral")
-IDENTIFIER_WITH_NAME(DictionaryLiteral, "dictionaryLiteral")
-IDENTIFIER_WITH_NAME(GetBuiltinLogicValue, "_getBuiltinLogicValue")
-
-IDENTIFIER_WITH_NAME(CVarArgType, "CVarArgType")
-IDENTIFIER_WITH_NAME(OptionalNilComparisonType, "_OptionalNilComparisonType")
+IDENTIFIER(stringInterpolation)
+IDENTIFIER(stringInterpolationSegment)
+IDENTIFIER(arrayLiteral)
+IDENTIFIER(dictionaryLiteral)
+IDENTIFIER_(getBuiltinLogicValue)
 
 #undef IDENTIFIER
+#undef IDENTIFIER_
 #undef IDENTIFIER_WITH_NAME

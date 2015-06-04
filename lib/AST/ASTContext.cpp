@@ -382,7 +382,6 @@ ASTContext::ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
                     BuiltinFloatType(BuiltinFloatType::PPC128,*this)) {
 
   // Initialize all of the known identifiers.
-#define IDENTIFIER(Id) Id_##Id = getIdentifier(#Id);
 #define IDENTIFIER_WITH_NAME(Name, IdStr) Id_##Name = getIdentifier(IdStr);
 #include "swift/AST/KnownIdentifiers.def"
 

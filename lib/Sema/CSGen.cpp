@@ -1023,7 +1023,7 @@ namespace {
                                             Identifier(),
                                             locator));
 
-        DeclName segmentName(C, C.Id_init, { C.Id_StringInterpolationSegment });
+        DeclName segmentName(C, C.Id_init, { C.Id_stringInterpolationSegment });
         CS.addConstraint(Constraint::create(CS, ConstraintKind::ValueMember,
                                             tvMeta,
                                             methodTy,

@@ -196,7 +196,6 @@ public:
   llvm::DenseMap<ArchetypeType *, DeclContext *> ArchetypeContexts;
 
   // Define the set of known identifiers.
-#define IDENTIFIER(Id) Identifier Id_##Id;
 #define IDENTIFIER_WITH_NAME(Name, IdStr) Identifier Id_##Name;
 #include "swift/AST/KnownIdentifiers.def"
 

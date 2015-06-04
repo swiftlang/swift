@@ -1644,9 +1644,9 @@ namespace {
       auto maxType = MaxIntegerTypeDecl->getUnderlyingType();
 
       DeclName initName(tc.Context, tc.Context.Id_init,
-                        { tc.Context.Id_IntegerLiteral });
+                        { tc.Context.Id_integerLiteral });
       DeclName builtinInitName(tc.Context, tc.Context.Id_init,
-                               { tc.Context.Id_BuiltinIntegerLiteral });
+                               { tc.Context.Id_builtinIntegerLiteral });
 
       return convertLiteral(
                expr,
@@ -1667,7 +1667,7 @@ namespace {
       auto &tc = cs.getTypeChecker();
       auto *protocol = tc.getProtocol(expr->getLoc(),
                                       KnownProtocolKind::NilLiteralConvertible);
-      
+
       // For type-sugar reasons, prefer the spelling of the default literal
       // type.
       auto type = simplifyType(expr->getType());
@@ -1677,7 +1677,7 @@ namespace {
       }
 
       DeclName initName(tc.Context, tc.Context.Id_init,
-                        { tc.Context.Id_NilLiteral });
+                        { tc.Context.Id_nilLiteral });
       return convertLiteral(expr, type, expr->getType(), protocol,
                             Identifier(), initName,
                             nullptr, Identifier(),
@@ -1736,9 +1736,9 @@ namespace {
       auto maxType = MaxFloatTypeDecl->getUnderlyingType();
 
       DeclName initName(tc.Context, tc.Context.Id_init,
-                        { tc.Context.Id_FloatLiteral });
+                        { tc.Context.Id_floatLiteral });
       DeclName builtinInitName(tc.Context, tc.Context.Id_init,
-                               { tc.Context.Id_BuiltinFloatLiteral });
+                               { tc.Context.Id_builtinFloatLiteral });
 
       return convertLiteral(
                expr,
@@ -1772,9 +1772,9 @@ namespace {
 
       auto type = simplifyType(expr->getType());
       DeclName initName(tc.Context, tc.Context.Id_init,
-                        { tc.Context.Id_BooleanLiteral });
+                        { tc.Context.Id_booleanLiteral });
       DeclName builtinInitName(tc.Context, tc.Context.Id_init,
-                               { tc.Context.Id_BuiltinBooleanLiteral });
+                               { tc.Context.Id_builtinBooleanLiteral });
       return convertLiteral(
                expr,
                type,
@@ -1809,9 +1809,9 @@ namespace {
       }
 
       DeclName initName(tc.Context, tc.Context.Id_init,
-                        { tc.Context.Id_CharacterLiteral });
+                        { tc.Context.Id_characterLiteral });
       DeclName builtinInitName(tc.Context, tc.Context.Id_init,
-                               { tc.Context.Id_BuiltinCharacterLiteral });
+                               { tc.Context.Id_builtinCharacterLiteral });
       return convertLiteral(
                expr,
                type,
@@ -1900,7 +1900,7 @@ namespace {
         literalType = tc.Context.Id_StringLiteralType;
 
         literalFuncName = DeclName(tc.Context, tc.Context.Id_init,
-                                   { tc.Context.Id_StringLiteral });
+                                   { tc.Context.Id_stringLiteral });
 
         // If the string contains non-ASCII and the type can handle
         // UTF-16 string literals, prefer them.
@@ -1912,12 +1912,12 @@ namespace {
                                   ConformanceCheckFlags::InExpression)) {
           builtinLiteralFuncName 
             = DeclName(tc.Context, tc.Context.Id_init,
-                       { tc.Context.Id_BuiltinUTF16StringLiteral,
+                       { tc.Context.Id_builtinUTF16StringLiteral,
                          tc.Context.getIdentifier("numberOfCodeUnits") });
 
           elements.push_back(
             TupleTypeElt(tc.Context.TheRawPointerType,
-                         tc.Context.Id_BuiltinUTF16StringLiteral));
+                         tc.Context.Id_builtinUTF16StringLiteral));
           elements.push_back(
             TupleTypeElt(BuiltinIntegerType::getWordType(tc.Context),
                          tc.Context.getIdentifier("numberOfCodeUnits")));
@@ -1932,11 +1932,11 @@ namespace {
               KnownProtocolKind::_BuiltinStringLiteralConvertible);
           builtinLiteralFuncName 
             = DeclName(tc.Context, tc.Context.Id_init,
-                       { tc.Context.Id_BuiltinStringLiteral,
+                       { tc.Context.Id_builtinStringLiteral,
                          tc.Context.getIdentifier("byteSize"),
                          tc.Context.getIdentifier("isASCII") });
           elements.push_back(TupleTypeElt(tc.Context.TheRawPointerType,
-                                         tc.Context.Id_BuiltinStringLiteral));
+                                         tc.Context.Id_builtinStringLiteral));
           elements.push_back(
             TupleTypeElt(BuiltinIntegerType::getWordType(tc.Context),
                          tc.Context.getIdentifier("byteSize")));
@@ -1954,10 +1954,10 @@ namespace {
         literalType = tc.Context.Id_ExtendedGraphemeClusterLiteralType;
         literalFuncName
           = DeclName(tc.Context, tc.Context.Id_init,
-                     {tc.Context.Id_ExtendedGraphemeClusterLiteral});
+                     {tc.Context.Id_extendedGraphemeClusterLiteral});
         builtinLiteralFuncName
           = DeclName(tc.Context, tc.Context.Id_init,
-                     { tc.Context.Id_BuiltinExtendedGraphemeClusterLiteral,
+                     { tc.Context.Id_builtinExtendedGraphemeClusterLiteral,
                        tc.Context.getIdentifier("byteSize"),
                        tc.Context.getIdentifier("isASCII") });
 
@@ -1966,7 +1966,7 @@ namespace {
             KnownProtocolKind::_BuiltinExtendedGraphemeClusterLiteralConvertible);
         elements.push_back(
           TupleTypeElt(tc.Context.TheRawPointerType,
-                       tc.Context.Id_BuiltinExtendedGraphemeClusterLiteral));
+                       tc.Context.Id_builtinExtendedGraphemeClusterLiteral));
         elements.push_back(
           TupleTypeElt(BuiltinIntegerType::getWordType(tc.Context),
                        tc.Context.getIdentifier("byteSize")));
@@ -1983,10 +1983,10 @@ namespace {
 
         literalFuncName
           = DeclName(tc.Context, tc.Context.Id_init,
-                     {tc.Context.Id_UnicodeScalarLiteral});
+                     {tc.Context.Id_unicodeScalarLiteral});
         builtinLiteralFuncName
           = DeclName(tc.Context, tc.Context.Id_init,
-                     {tc.Context.Id_BuiltinUnicodeScalarLiteral});
+                     {tc.Context.Id_builtinUnicodeScalarLiteral});
 
         builtinProtocol = tc.getProtocol(
             expr->getLoc(),
@@ -2037,7 +2037,7 @@ namespace {
       assert(interpolationProto && "Missing string interpolation protocol?");
 
       DeclName name(tc.Context, tc.Context.Id_init,
-                    { tc.Context.Id_StringInterpolation });
+                    { tc.Context.Id_stringInterpolation });
       auto member
         = findNamedWitnessImpl<ConstructorDecl>(
             tc, dc, type,
@@ -2045,7 +2045,7 @@ namespace {
             diag::interpolation_broken_proto);
 
       DeclName segmentName(tc.Context, tc.Context.Id_init,
-                           { tc.Context.Id_StringInterpolationSegment });
+                           { tc.Context.Id_stringInterpolationSegment });
       auto segmentMember
         = findNamedWitnessImpl<ConstructorDecl>(
             tc, dc, type, interpolationProto, segmentName,
@@ -2082,13 +2082,13 @@ namespace {
 
         auto arg = TupleExpr::create(
                      tc.Context, SourceLoc(), { segment },
-                     { tc.Context.Id_StringInterpolationSegment },
+                     { tc.Context.Id_stringInterpolationSegment },
                      { }, SourceLoc(), /*HasTrailingClosure=*/false,
                      /*Implicit=*/true,
                      TupleType::get(
                        { TupleTypeElt(
                            segment->getType(),
-                           tc.Context.Id_StringInterpolationSegment) },
+                           tc.Context.Id_stringInterpolationSegment) },
                        tc.Context));
 
         auto memberRef = buildMemberRef(
@@ -2110,8 +2110,8 @@ namespace {
         if (index == 1) {
           typeElements.push_back(
             TupleTypeElt(converted->getType(),
-                         tc.Context.Id_StringInterpolation));
-          names.push_back(tc.Context.Id_StringInterpolation);
+                         tc.Context.Id_stringInterpolation));
+          names.push_back(tc.Context.Id_stringInterpolation);
         } else {
           typeElements.push_back(converted->getType());
           names.push_back(Identifier());
@@ -2713,7 +2713,7 @@ namespace {
       Expr *typeRef = TypeExpr::createImplicitHack(expr->getLoc(),
                                                    arrayTy, tc.Context);
       DeclName name(tc.Context, tc.Context.Id_init,
-                    { tc.Context.Id_ArrayLiteral });
+                    { tc.Context.Id_arrayLiteral });
 
       // Restructure the argument to provide the appropriate labels in the
       // tuple.
@@ -2723,8 +2723,8 @@ namespace {
       for (auto elt : expr->getElements()) {
         if (first) {
           typeElements.push_back(TupleTypeElt(elt->getType(),
-                                              tc.Context.Id_ArrayLiteral));
-          names.push_back(tc.Context.Id_ArrayLiteral);
+                                              tc.Context.Id_arrayLiteral));
+          names.push_back(tc.Context.Id_arrayLiteral);
 
           first = false;
           continue;
@@ -2779,7 +2779,7 @@ namespace {
                                                    dictionaryTy, tc.Context);
 
       DeclName name(tc.Context, tc.Context.Id_init,
-                    { tc.Context.Id_DictionaryLiteral });
+                    { tc.Context.Id_dictionaryLiteral });
 
       // Restructure the argument to provide the appropriate labels in the
       // tuple.
@@ -2789,8 +2789,8 @@ namespace {
       for (auto elt : expr->getElements()) {
         if (first) {
           typeElements.push_back(TupleTypeElt(elt->getType(),
-                                              tc.Context.Id_DictionaryLiteral));
-          names.push_back(tc.Context.Id_DictionaryLiteral);
+                                              tc.Context.Id_dictionaryLiteral));
+          names.push_back(tc.Context.Id_dictionaryLiteral);
 
           first = false;
           continue;
@@ -6582,8 +6582,8 @@ Solution::convertBooleanTypeToBuiltinI1(Expr *expr, ConstraintLocator *locator) 
                   *this, expr, locator,
                   tc.getProtocol(expr->getLoc(),
                                  KnownProtocolKind::BooleanType),
-                  tc.Context.Id_BoolValue,
-                  tc.Context.Id_GetBuiltinLogicValue,
+                  tc.Context.Id_boolValue,
+                  tc.Context.Id_getBuiltinLogicValue,
                   diag::condition_broken_proto,
                   diag::broken_bool);
   if (result && !result->getType()->isBuiltinIntegerType(1)) {
