@@ -206,7 +206,7 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
 
   /// Returns the number of elements in the array.
   ///
-  /// This override allows the count can be read without triggering
+  /// This override allows the count to be read without triggering
   /// bridging of array elements.
   @objc
   internal override var count: Int {
