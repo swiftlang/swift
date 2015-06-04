@@ -124,4 +124,54 @@ bb4(%15 : $E):                                    // Preds: bb1 bb2 bb3
   return %15 : $E                                 // id: %16
 }
 
+public enum F {
+  case F1(Int32, Int32)
+  case F2(Int32, String)
+  case F3(Float, Float, Float)
+}
 
+// CHECK-LABEL: sil @_TF10fold_enums13recreate_enumFOS_1FS0_
+// CHECK: bb0(%0 : $F)
+// CHECK-NOT: bb1
+// CHECK: return %0 : $F
+sil @_TF10fold_enums13recreate_enumFOS_1FS0_ : $@convention(thin) (@owned F) -> @owned F {
+bb0(%0 : $F):
+  debug_value %0 : $F  // let e                   // id: %1
+  retain_value %0 : $F                            // id: %2
+  switch_enum %0 : $F, case #F.F1!enumelt.1: bb1, case #F.F2!enumelt.1: bb2, case #F.F3!enumelt.1: bb3 // id: %3
+
+bb1(%4 : $(Int32, Int32)):                        // Preds: bb0
+  %5 = tuple_extract %4 : $(Int32, Int32), 0      // users: %7, %9
+  %6 = tuple_extract %4 : $(Int32, Int32), 1      // users: %8, %9
+  debug_value %5 : $Int32  // let x               // id: %7
+  debug_value %6 : $Int32  // let y               // id: %8
+  %9 = tuple (%5 : $Int32, %6 : $Int32)           // user: %10
+  %10 = enum $F, #F.F1!enumelt.1, %9 : $(Int32, Int32) // user: %11
+  br bb4(%10 : $F)                                // id: %11
+
+bb2(%12 : $(Int32, String)):                      // Preds: bb0
+  %13 = tuple_extract %12 : $(Int32, String), 0   // users: %15, %18
+  %14 = tuple_extract %12 : $(Int32, String), 1   // users: %16, %17, %18, %20
+  debug_value %13 : $Int32  // let x              // id: %15
+  debug_value %14 : $String  // let y             // id: %16
+  retain_value %14 : $String                      // id: %17
+  %18 = tuple (%13 : $Int32, %14 : $String)       // user: %19
+  %19 = enum $F, #F.F2!enumelt.1, %18 : $(Int32, String) // user: %21
+  release_value %14 : $String                     // id: %20
+  br bb4(%19 : $F)                                // id: %21
+
+bb3(%22 : $(Float, Float, Float)):                // Preds: bb0
+  %23 = tuple_extract %22 : $(Float, Float, Float), 0 // users: %26, %29
+  %24 = tuple_extract %22 : $(Float, Float, Float), 1 // users: %27, %29
+  %25 = tuple_extract %22 : $(Float, Float, Float), 2 // users: %28, %29
+  debug_value %23 : $Float  // let x              // id: %26
+  debug_value %24 : $Float  // let y              // id: %27
+  debug_value %25 : $Float  // let z              // id: %28
+  %29 = tuple (%23 : $Float, %24 : $Float, %25 : $Float) // user: %30
+  %30 = enum $F, #F.F3!enumelt.1, %29 : $(Float, Float, Float) // user: %31
+  br bb4(%30 : $F)                                // id: %31
+
+bb4(%32 : $F):                                    // Preds: bb1 bb2 bb3
+  release_value %0 : $F                           // id: %33
+  return %32 : $F                                 // id: %34
+}
