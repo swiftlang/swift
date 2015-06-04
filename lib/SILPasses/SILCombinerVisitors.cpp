@@ -2775,3 +2775,35 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
   }
   return nullptr;
 }
+
+SILInstruction *SILCombiner::visitEnumInst(EnumInst *EI) {
+  // switch_enum %e : $EnumTy, case %casex: bbX,...
+  // bbX(%arg):
+  // enum $EnumTy, EnumTy::casex, %arg
+  // ->
+  // replace enum $EnumTy, EnumTy::casex, %arg by %e
+  if (!EI->hasOperand())
+    return nullptr;
+
+  auto Op = EI->getOperand();
+
+  if (!isa<SILArgument>(Op))
+    return nullptr;
+
+  auto *Pred = EI->getParent()->getSinglePredecessor();
+  if (!Pred)
+    return nullptr;
+
+  auto *SEI = dyn_cast<SwitchEnumInst>(Pred->getTerminator());
+  if (!SEI)
+    return nullptr;
+
+  auto Case = SEI->getUniqueCaseForDestination(EI->getParent());
+
+  if (Case && Case.getPtrOrNull() == EI->getElement() &&
+      SEI->getOperand().getType() == EI->getType()) {
+    SILValue(EI, 0).replaceAllUsesWith(SEI->getOperand());
+    eraseInstFromFunction(*EI);
+  }
+  return nullptr;
+}
