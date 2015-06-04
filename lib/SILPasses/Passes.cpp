@@ -328,6 +328,10 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   PM.addDeadFunctionElimination();
   PM.addMergeCondFails();
   PM.addCropOverflowChecks();
+  // Remove dead code.
+  PM.addDCE();
+  // Clean-up after DCE.
+  PM.addSimplifyCFG();
   PM.runOneIteration();
 
   // Call the CFG viewer.
