@@ -1077,7 +1077,7 @@ void AttributeChecker::checkApplicationMainAttribute(DeclAttribute *attr,
   for (const auto &result : lookupMain) {
     TC.validateDecl(result.Decl);
   }
-  auto Foundation = TC.Context.getLoadedModule(C.getIdentifier("Foundation"));
+  auto Foundation = TC.Context.getLoadedModule(C.Id_Foundation);
   if (Foundation) {
     auto lookupString = TC.lookupUnqualified(
                           Foundation,

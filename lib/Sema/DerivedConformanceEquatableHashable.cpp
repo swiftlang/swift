@@ -337,7 +337,7 @@ deriveBodyHashable_enum_hashValue(AbstractFunctionDecl *hashValueDecl) {
                                              selfDecl, hashValueDecl, "index");
   
   auto memberRef = new (C) UnresolvedDotExpr(indexRef, SourceLoc(),
-                                             C.getIdentifier("hashValue"),
+                                             C.Id_hashValue,
                                              SourceLoc(),
                                              /*implicit*/true);
   auto returnStmt = new (C) ReturnStmt(SourceLoc(), memberRef);

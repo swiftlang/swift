@@ -27,10 +27,6 @@ namespace swift {
   static const char LLVM_IR_EXTENSION[] = "ll";
   /// The name of the standard library, which is a reserved module name.
   static const char STDLIB_NAME[] = "Swift";
-  /// The name of the ObjectiveC module.
-  static const char OBJC_MODULE_NAME[] = "ObjectiveC";
-  /// The name of the Foundation module.
-  static const char FOUNDATION_MODULE_NAME[] = "Foundation";
   /// The prefix of module names used by LLDB to capture Swift expressions
   static const char LLDB_EXPRESSIONS_MODULE_NAME_PREFIX[] = "__lldb_expr_";
 } // end namespace swift

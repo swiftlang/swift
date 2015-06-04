@@ -1391,8 +1391,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     // If the element decl was not resolved (because it was spelled without a
     // type as `.Foo`), resolve it now that we have a type.
     if (!OP->getElementDecl()) {
-      auto *element = lookupEnumMemberElement(*this, dc, type,
-                                              Context.getIdentifier("Some"));
+      auto *element = lookupEnumMemberElement(*this, dc, type, Context.Id_Some);
       if (!element) {
         diagnose(OP->getLoc(), diag::enum_element_pattern_member_not_found,
                  "Some", type);

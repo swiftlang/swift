@@ -25,7 +25,6 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/Support/CommandLine.h"
-#include "swift/Strings.h"
 #include <deque>
 
 using namespace swift;
@@ -1140,7 +1139,7 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
   auto BridgeFuncDecl = Members.front();
   auto BridgeFuncDeclRef = SILDeclRef(BridgeFuncDecl);
   Module *Mod = M.getASTContext().getLoadedModule(
-      M.getASTContext().getIdentifier(FOUNDATION_MODULE_NAME));
+      M.getASTContext().Id_Foundation);
   if (!Mod)
     return nullptr;
   SmallVector<ValueDecl *, 2> Results;

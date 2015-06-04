@@ -511,7 +511,6 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
 
   bool ImportsFoundationModule = false;
   auto &Ctx = SF.getASTContext();
-  auto FoundationModuleName = Ctx.getIdentifier(FOUNDATION_MODULE_NAME);
   {
     // NOTE: The type checker is scoped to be torn down before AST
     // verification.
@@ -538,7 +537,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     // FIXME: The current source file needs to be handled specially, because of
     // private extensions.
     SF.forAllVisibleModules([&](Module::ImportedModule import) {
-      if (import.second->getName() == FoundationModuleName)
+      if (import.second->getName() == Ctx.Id_Foundation)
         ImportsFoundationModule = true;
 
       // FIXME: Respect the access path?
@@ -618,7 +617,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
       SF.FirstObjCAttr && SF.Kind != SourceFileKind::SIL) {
     SourceLoc L = SF.FirstObjCAttr->getLocation();
     Ctx.Diags.diagnose(L, diag::attr_used_without_required_module,
-                       SF.FirstObjCAttr, FoundationModuleName)
+                       SF.FirstObjCAttr, Ctx.Id_Foundation)
       .highlight(SF.FirstObjCAttr->getRangeWithAt());
   }
 

@@ -871,7 +871,7 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
   if (parsingContext == GuardedPatternContext::Catch &&
       P.Tok.isAny(tok::l_brace, tok::kw_where)) {
     auto loc = P.Tok.getLoc();
-    auto errorName = P.Context.getIdentifier("error");
+    auto errorName = P.Context.Id_error;
     auto var = new (P.Context) VarDecl(/*static*/ false, /*IsLet*/true,
                                        loc, errorName, Type(),
                                        P.CurDeclContext);

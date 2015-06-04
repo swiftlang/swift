@@ -1894,7 +1894,7 @@ emitBoolDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
 
   // Extract the i1 from the Bool struct.
   StructDecl *BoolStruct = cast<StructDecl>(Context.getBoolDecl());
-  auto Members = BoolStruct->lookupDirect(Context.getIdentifier("value"));
+  auto Members = BoolStruct->lookupDirect(Context.Id_value);
   assert(Members.size() == 1 &&
          "Bool should have only one property with name 'value'");
   auto Member = dyn_cast<VarDecl>(Members[0]);

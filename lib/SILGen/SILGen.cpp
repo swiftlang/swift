@@ -48,7 +48,7 @@ SILGenModule::~SILGenModule() {
 static SILDeclRef
 getBridgingFn(Optional<SILDeclRef> &cacheSlot,
               SILGenModule &SGM,
-              StringRef moduleName,
+              Identifier moduleName,
               StringRef functionName,
               Optional<std::initializer_list<Type>> inputTypes,
               Optional<Type> outputType) {
@@ -58,10 +58,10 @@ getBridgingFn(Optional<SILDeclRef> &cacheSlot,
 
   if (!cacheSlot) {
     ASTContext &ctx = SGM.M.getASTContext();
-    Module *mod = ctx.getLoadedModule(ctx.getIdentifier(moduleName));
+    Module *mod = ctx.getLoadedModule(moduleName);
     if (!mod) {
       SGM.diagnose(SourceLoc(), diag::bridging_module_missing,
-                   moduleName, functionName);
+                   moduleName.str(), functionName);
       llvm::report_fatal_error("unable to set up the ObjC bridge!");
     }
 
@@ -70,19 +70,19 @@ getBridgingFn(Optional<SILDeclRef> &cacheSlot,
                      NLKind::QualifiedLookup, decls);
     if (decls.empty()) {
       SGM.diagnose(SourceLoc(), diag::bridging_function_missing,
-                   moduleName, functionName);
+                   moduleName.str(), functionName);
       llvm::report_fatal_error("unable to set up the ObjC bridge!");
     }
     if (decls.size() != 1) {
       SGM.diagnose(SourceLoc(), diag::bridging_function_overloaded,
-                   moduleName, functionName);
+                   moduleName.str(), functionName);
       llvm::report_fatal_error("unable to set up the ObjC bridge!");
     }
 
     auto *fd = dyn_cast<FuncDecl>(decls.front());
     if (!fd) {
       SGM.diagnose(SourceLoc(), diag::bridging_function_not_function,
-                   moduleName, functionName);
+                   moduleName.str(), functionName);
       llvm::report_fatal_error("unable to set up the ObjC bridge!");
     }
 
@@ -101,7 +101,7 @@ getBridgingFn(Optional<SILDeclRef> &cacheSlot,
                          makeTransformIterator(inputTypes->begin(),
                                                toSILType))) {
         SGM.diagnose(fd->getLoc(), diag::bridging_function_not_correct_type,
-                     moduleName, functionName);
+                     moduleName.str(), functionName);
         llvm::report_fatal_error("unable to set up the ObjC bridge!");
       }
     }
@@ -109,7 +109,7 @@ getBridgingFn(Optional<SILDeclRef> &cacheSlot,
     if (outputType &&
         funcInfo->getResult().getSILType() != SGM.getLoweredType(*outputType)){
       SGM.diagnose(fd->getLoc(), diag::bridging_function_not_correct_type,
-                   moduleName, functionName);
+                   moduleName.str(), functionName);
       llvm::report_fatal_error("unable to set up the ObjC bridge!");
     }
 
@@ -131,27 +131,24 @@ getBridgingFn(Optional<SILDeclRef> &cacheSlot,
 #define GET_BRIDGING_FN(Module, FromKind, FromTy, ToKind, ToTy) \
   SILDeclRef SILGenModule::get##FromTy##To##ToTy##Fn() { \
     return getBridgingFn(FromTy##To##ToTy##Fn, *this, \
-                         Module, "_convert" #FromTy "To" #ToTy, \
+                         getASTContext().Id_##Module, \
+                         "_convert" #FromTy "To" #ToTy, \
                          FromKind(FromTy), \
                          ToKind(ToTy)); \
   }
 
-GET_BRIDGING_FN(OBJC_MODULE_NAME, REQUIRED, Bool, REQUIRED, ObjCBool)
-GET_BRIDGING_FN(OBJC_MODULE_NAME, REQUIRED, ObjCBool, REQUIRED, Bool)
-GET_BRIDGING_FN(FOUNDATION_MODULE_NAME, OPTIONAL, NSError, REQUIRED, ErrorType)
-GET_BRIDGING_FN(FOUNDATION_MODULE_NAME, REQUIRED, ErrorType, REQUIRED, NSError)
-GET_BRIDGING_FN(FOUNDATION_MODULE_NAME, REQUIRED, String, REQUIRED, NSString)
-GET_BRIDGING_FN(FOUNDATION_MODULE_NAME, OPTIONAL, NSString, REQUIRED, String)
-GET_BRIDGING_FN(FOUNDATION_MODULE_NAME, GENERIC, Array, REQUIRED, NSArray)
-GET_BRIDGING_FN(FOUNDATION_MODULE_NAME, OPTIONAL, NSArray, GENERIC, Array)
-GET_BRIDGING_FN(FOUNDATION_MODULE_NAME, GENERIC, Set, REQUIRED, NSSet)
-GET_BRIDGING_FN(FOUNDATION_MODULE_NAME, OPTIONAL, NSSet, GENERIC, Set)
-GET_BRIDGING_FN(FOUNDATION_MODULE_NAME,
-                GENERIC, Dictionary,
-                REQUIRED, NSDictionary)
-GET_BRIDGING_FN(FOUNDATION_MODULE_NAME,
-                OPTIONAL, NSDictionary,
-                GENERIC, Dictionary)
+GET_BRIDGING_FN(ObjectiveC, REQUIRED, Bool, REQUIRED, ObjCBool)
+GET_BRIDGING_FN(ObjectiveC, REQUIRED, ObjCBool, REQUIRED, Bool)
+GET_BRIDGING_FN(Foundation, OPTIONAL, NSError, REQUIRED, ErrorType)
+GET_BRIDGING_FN(Foundation, REQUIRED, ErrorType, REQUIRED, NSError)
+GET_BRIDGING_FN(Foundation, REQUIRED, String, REQUIRED, NSString)
+GET_BRIDGING_FN(Foundation, OPTIONAL, NSString, REQUIRED, String)
+GET_BRIDGING_FN(Foundation, GENERIC, Array, REQUIRED, NSArray)
+GET_BRIDGING_FN(Foundation, OPTIONAL, NSArray, GENERIC, Array)
+GET_BRIDGING_FN(Foundation, GENERIC, Set, REQUIRED, NSSet)
+GET_BRIDGING_FN(Foundation, OPTIONAL, NSSet, GENERIC, Set)
+GET_BRIDGING_FN(Foundation, GENERIC, Dictionary, REQUIRED, NSDictionary)
+GET_BRIDGING_FN(Foundation, OPTIONAL, NSDictionary, GENERIC, Dictionary)
 
 #undef GET_BRIDGING_FN
 #undef REQURIED

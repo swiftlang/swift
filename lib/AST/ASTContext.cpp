@@ -354,7 +354,6 @@ ASTContext::ASTContext(LangOptions &langOpts, SearchPathOptions &SearchPathOpts,
     Diags(Diags),
     TheBuiltinModule(createBuiltinModule(*this)),
     StdlibModuleName(getIdentifier(STDLIB_NAME)),
-    ObjCModuleName(getIdentifier(OBJC_MODULE_NAME)),
     TypeCheckerDebug(new StderrTypeCheckerDebugConsumer()),
     TheErrorType(new (*this, AllocationArena::Permanent) ErrorType(*this)),
     TheEmptyTupleType(TupleType::get(ArrayRef<TupleTypeElt>(), *this)),
@@ -744,8 +743,8 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
 
   // _BridgedNSError is in the Foundation module.
   if (kind == KnownProtocolKind::_BridgedNSError) {
-    Module *foundation = const_cast<ASTContext *>(this)->getModuleByName(
-                           FOUNDATION_MODULE_NAME);
+    Module *foundation = const_cast<ASTContext *>(this)->getModule(
+                           {{Id_Foundation, SourceLoc()}});
     if (!foundation)
       return nullptr;
 

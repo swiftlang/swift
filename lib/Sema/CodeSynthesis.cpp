@@ -615,7 +615,7 @@ static Expr *createPropertyLoadOrCallSuperclassGetter(FuncDecl *accessor,
 static ProtocolDecl *getNSCopyingProtocol(TypeChecker &TC,
                                           DeclContext *DC) {
   ASTContext &ctx = TC.Context;
-  auto foundation = ctx.getLoadedModule(ctx.getIdentifier("Foundation"));
+  auto foundation = ctx.getLoadedModule(ctx.Id_Foundation);
   if (!foundation)
     return nullptr;
 

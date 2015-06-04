@@ -295,7 +295,8 @@ namespace {
             pointeeQualType->getAsStructureType()) {
         if (pointee && !pointee->getDecl()->isCompleteDefinition() &&
             pointee->getDecl()->getName() == "_NSZone") {
-          Module *objCModule = Impl.getNamedModule(OBJC_MODULE_NAME);
+          Identifier Id_ObjectiveC = Impl.SwiftContext.Id_ObjectiveC;
+          Module *objCModule = Impl.SwiftContext.getLoadedModule(Id_ObjectiveC);
           Type wrapperTy = Impl.getNamedSwiftType(objCModule, "NSZone");
           if (wrapperTy)
             return wrapperTy;
