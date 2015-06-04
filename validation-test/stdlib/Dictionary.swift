@@ -13,6 +13,7 @@
 import Darwin
 import StdlibUnittest
 import Foundation
+import StdlibUnittestFoundationExtras
 
 var DictionaryTestSuite = TestSuite("Dictionary")
 
@@ -2252,7 +2253,7 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_Huge") {
 
 
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.Generate_ParallelArray") {
-autoreleasepool {
+autoreleasepoolIfUnoptimizedReturnAutoreleased {
   // Add an autorelease pool because ParallelArrayDictionary autoreleases
   // values in objectForKey.
 
@@ -2278,7 +2279,7 @@ autoreleasepool {
 }
 
 DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.Generate_ParallelArray") {
-autoreleasepool {
+autoreleasepoolIfUnoptimizedReturnAutoreleased {
   // Add an autorelease pool because ParallelArrayDictionary autoreleases
   // values in objectForKey.
 
