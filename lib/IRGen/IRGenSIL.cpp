@@ -524,11 +524,13 @@ public:
     auto VD = cast<VarDecl>(Ty.getDecl());
     auto N = getArgNo(VD);
     if (N) {
-      PrologueLocation AutoRestore(IGM.DebugInfo, Builder);
-      IGM.DebugInfo->
-        emitArgVariableDeclaration(Builder, Storage,
-                                   Ty, DS, Name, N, DirectValue);
-      ArgEmitted[VD] = true;
+      if (!ArgEmitted.lookup(VD)) {
+        PrologueLocation AutoRestore(IGM.DebugInfo, Builder);
+        IGM.DebugInfo->
+          emitArgVariableDeclaration(Builder, Storage,
+                                     Ty, DS, Name, N, DirectValue);
+        ArgEmitted[VD] = true;
+      }
     } else
       IGM.DebugInfo->
         emitStackVariableDeclaration(Builder, Storage,
@@ -1453,14 +1455,17 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
     // are visible until the end of the function.
     emitShadowCopy(Vals, Name, Copy);
     // Captures are pointing to the decl of the captured variable.
-    if (LastVD->getDeclContext() != CurSILFn->getDeclContext())
+    if (LastVD->getDeclContext() != CurSILFn->getDeclContext()) {
       IGM.DebugInfo->emitArgVariableDeclaration
         (Builder, Copy, DTI, getDebugScope(), Name, ++NMax,
          IndirectionKind(Deref), ArtificialValue);
-    else if (N)
+      ArgEmitted[LastVD] = true;
+    } else if (N) {
       IGM.DebugInfo->emitArgVariableDeclaration
         (Builder, Copy, DTI, getDebugScope(), Name, N,
          IndirectionKind(Deref), RealValue);
+      ArgEmitted[LastVD] = true;
+    }
   }
 
   // Emit the artificial error result argument.
