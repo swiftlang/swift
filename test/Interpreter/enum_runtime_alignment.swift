@@ -2,8 +2,6 @@
 
 // REQUIRES: executable_test
 
-// XFAIL: optimized_stdlib_armv7
-
 struct Structure {
   var a: UInt8
   var b: UInt8

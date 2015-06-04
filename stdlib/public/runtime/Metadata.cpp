@@ -1019,11 +1019,16 @@ swift::swift_getTupleTypeMetadata(size_t numElements,
           // into something better).
         } else if (layout.flags.isInlineStorage()
                    && layout.flags.isPOD()) {
-          if (layout.size == 8) proposedWitnesses = &_TWVBi64_;
-          else if (layout.size == 4) proposedWitnesses = &_TWVBi32_;
-          else if (layout.size == 2) proposedWitnesses = &_TWVBi16_;
-          else if (layout.size == 1) proposedWitnesses = &_TWVBi8_;
-          else proposedWitnesses = &tuple_witnesses_pod_inline;
+          if (layout.size == 8 && layout.flags.getAlignmentMask() == 7)
+            proposedWitnesses = &_TWVBi64_;
+          else if (layout.size == 4 && layout.flags.getAlignmentMask() == 3)
+            proposedWitnesses = &_TWVBi32_;
+          else if (layout.size == 2 && layout.flags.getAlignmentMask() == 1)
+            proposedWitnesses = &_TWVBi16_;
+          else if (layout.size == 1)
+            proposedWitnesses = &_TWVBi8_;
+          else
+            proposedWitnesses = &tuple_witnesses_pod_inline;
         } else if (layout.flags.isInlineStorage()
                    && !layout.flags.isPOD()) {
           proposedWitnesses = &tuple_witnesses_nonpod_inline;
