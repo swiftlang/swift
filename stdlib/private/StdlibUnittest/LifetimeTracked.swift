@@ -9,19 +9,20 @@
 // See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
-var trackedCount = 0
-var nextTrackedSerialNumber = 0
+
+internal var _trackedCount = 0
+internal var _nextTrackedSerialNumber = 0
 
 public final class LifetimeTracked : ForwardIndexType, CustomStringConvertible {
   public init(_ value: Int) {
-    ++trackedCount
-    serialNumber = ++nextTrackedSerialNumber
+    ++_trackedCount
+    serialNumber = ++_nextTrackedSerialNumber
     self.value = value
   }
-  
+
   deinit {
     assert(serialNumber > 0, "double destruction!")
-    --trackedCount
+    --_trackedCount
     serialNumber = -serialNumber
   }
 
@@ -38,9 +39,9 @@ public final class LifetimeTracked : ForwardIndexType, CustomStringConvertible {
   }
 
   public class var instances: Int {
-    return trackedCount
+    return _trackedCount
   }
-  
+
   public let value: Int
   public var serialNumber: Int = 0
 }
