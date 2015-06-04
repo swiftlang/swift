@@ -1,4 +1,3 @@
-// RUN: %target-swift-frontend -emit-silgen %s > /tmp/x.sil
 // RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
 protocol Foo {
