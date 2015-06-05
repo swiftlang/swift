@@ -24,6 +24,10 @@ if (SWIFT_RUNTIME_ENABLE_DTRACE)
       "-DSWIFT_RUNTIME_ENABLE_DTRACE=1")
 endif()
 
+# Acknowledge that the following sources are known.
+set(LLVM_OPTIONAL_SOURCES
+    Remangle.cpp)
+
 set(swift_runtime_objc_sources)
 set(swift_runtime_unicode_normalization_sources)
 set(swift_runtime_link_libraries)
