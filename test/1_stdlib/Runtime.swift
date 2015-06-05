@@ -661,7 +661,7 @@ Runtime.test("_stdlib_atomicCompareExchangeStrongPtr") {
   var origP2 = IntPtr(bitPattern: 0x20202020)
   var origP3 = IntPtr(bitPattern: 0x30303030)
 
-  if true {
+  do {
     var object = origP1
     var expected = origP1
     let r = _stdlib_atomicCompareExchangeStrongPtr(
@@ -670,7 +670,7 @@ Runtime.test("_stdlib_atomicCompareExchangeStrongPtr") {
     expectEqual(origP2, object)
     expectEqual(origP1, expected)
   }
-  if true {
+  do {
     var object = origP1
     var expected = origP2
     let r = _stdlib_atomicCompareExchangeStrongPtr(
@@ -691,7 +691,7 @@ Runtime.test("_stdlib_atomicCompareExchangeStrongPtr") {
       self.expected = expected
     }
   }
-  if true {
+  do {
     var foo = FooStruct(origP1, origP1)
     let r = _stdlib_atomicCompareExchangeStrongPtr(
       object: &foo.object, expected: &foo.expected, desired: origP2)
@@ -699,7 +699,7 @@ Runtime.test("_stdlib_atomicCompareExchangeStrongPtr") {
     expectEqual(origP2, foo.object)
     expectEqual(origP1, foo.expected)
   }
-  if true {
+  do {
     var foo = FooStruct(origP1, origP2)
     let r = _stdlib_atomicCompareExchangeStrongPtr(
       object: &foo.object, expected: &foo.expected, desired: origP3)
@@ -932,13 +932,13 @@ struct StructWithDefaultMirror {
 }
 
 Reflection.test("Struct/NonGeneric/DefaultMirror") {
-  if true {
+  do {
     var output = ""
     dump(StructWithDefaultMirror("123"), &output)
     expectEqual("▿ a.StructWithDefaultMirror\n  - s: 123\n", output)
   }
 
-  if true {
+  do {
     // Build a String around an interpolation as a way of smoke-testing that
     // the internal MirrorType implementation gets memory management right.
     var output = ""
@@ -961,7 +961,7 @@ struct GenericStructWithDefaultMirror<T, U> {
 }
 
 Reflection.test("Struct/Generic/DefaultMirror") {
-  if true {
+  do {
     var value = GenericStructWithDefaultMirror<Int, [Any?]>(
       first: 123,
       second: [ "abc", 456, 789.25 ])
@@ -1056,7 +1056,7 @@ class Irradiant : Brilliant {
 }
 
 Reflection.test("CustomMirror") {
-  if true {
+  do {
     var output = ""
     dump(Brilliant(123, "four five six"), &output)
 
@@ -1069,13 +1069,13 @@ Reflection.test("CustomMirror") {
     expectEqual(expected, output)
   }
 
-  if true {
+  do {
     var output = ""
     dump(Brilliant(123, "four five six"), &output, maxDepth: 0)
     expectEqual("▹ Brilliant(123, four five six) #0\n", output)
   }
 
-  if true {
+  do {
     var output = ""
     dump(Brilliant(123, "four five six"), &output, maxItems: 3)
 
@@ -1088,7 +1088,7 @@ Reflection.test("CustomMirror") {
     expectEqual(expected, output)
   }
 
-  if true {
+  do {
     var output = ""
     dump(Brilliant(123, "four five six"), &output, maxItems: 2)
 
@@ -1100,7 +1100,7 @@ Reflection.test("CustomMirror") {
     expectEqual(expected, output)
   }
 
-  if true {
+  do {
     var output = ""
     dump(Brilliant(123, "four five six"), &output, maxItems: 1)
 
@@ -1113,7 +1113,7 @@ Reflection.test("CustomMirror") {
 
   expectEqual(.Container, reflect(Brilliant(123, "four five six")).disposition)
 
-  if true {
+  do {
     // Check that object identifiers are unique to class instances.
     let a = Brilliant(1, "")
     let b = Brilliant(2, "")
@@ -1142,7 +1142,7 @@ Reflection.test("CustomMirror") {
 }
 
 Reflection.test("CustomMirrorIsInherited") {
-  if true {
+  do {
     var output = ""
     dump(Irradiant(), &output)
 
@@ -1162,7 +1162,7 @@ class SwiftFooMoreDerivedObjCClass : FooMoreDerivedObjCClass {
 }
 
 Reflection.test("Class/ObjectiveCBase/Default") {
-  if true {
+  do {
     let value = SwiftFooMoreDerivedObjCClass()
     var output = ""
     dump(value, &output)
@@ -1187,7 +1187,7 @@ extension Int: SomeNativeProto {}
 extension SomeClass: SomeObjCProto {}
 
 Reflection.test("MetatypeMirror") {
-  if true {
+  do {
     var output = ""
     let concreteMetatype = Int.self
     dump(concreteMetatype, &output)
@@ -1247,7 +1247,7 @@ Reflection.test("MetatypeMirror") {
 }
 
 Reflection.test("TupleMirror") {
-  if true {
+  do {
     var output = ""
     let tuple =
       (Brilliant(384, "seven six eight"), StructWithDefaultMirror("nine"))
@@ -1268,7 +1268,7 @@ Reflection.test("TupleMirror") {
     expectEqual(.Tuple, reflect(tuple).disposition)
   }
 
-  if true {
+  do {
     // A tuple of stdlib types with mirrors.
     var output = ""
     let tuple = (1, 2.5, false, "three")
@@ -1284,7 +1284,7 @@ Reflection.test("TupleMirror") {
     expectEqual(expected, output)
   }
 
-  if true {
+  do {
     // A nested tuple.
     var output = ""
     let tuple = (1, ("Hello", "World"))
@@ -1328,7 +1328,7 @@ Reflection.test("ObjectIdentity") {
 }
 
 Reflection.test("String/Mirror") {
-  if true {
+  do {
     var output = ""
     dump("", &output)
 
@@ -1338,7 +1338,7 @@ Reflection.test("String/Mirror") {
     expectEqual(expected, output)
   }
 
-  if true {
+  do {
     // U+0061 LATIN SMALL LETTER A
     // U+304B HIRAGANA LETTER KA
     // U+3099 COMBINING KATAKANA-HIRAGANA VOICED SOUND MARK
@@ -1411,7 +1411,7 @@ Reflection.test("String.UnicodeScalarView/Mirror") {
 }
 
 Reflection.test("Character/Mirror") {
-  if true {
+  do {
     // U+0061 LATIN SMALL LETTER A
     let input: Character = "\u{61}"
     var output = ""
@@ -1423,7 +1423,7 @@ Reflection.test("Character/Mirror") {
     expectEqual(expected, output)
   }
 
-  if true {
+  do {
     // U+304B HIRAGANA LETTER KA
     // U+3099 COMBINING KATAKANA-HIRAGANA VOICED SOUND MARK
     let input: Character = "\u{304b}\u{3099}"
@@ -1436,7 +1436,7 @@ Reflection.test("Character/Mirror") {
     expectEqual(expected, output)
   }
 
-  if true {
+  do {
     // U+1F425 FRONT-FACING BABY CHICK
     let input: Character = "\u{1f425}"
     var output = ""
@@ -1450,7 +1450,7 @@ Reflection.test("Character/Mirror") {
 }
 
 Reflection.test("UnicodeScalar") {
-  if true {
+  do {
     // U+0061 LATIN SMALL LETTER A
     let input: UnicodeScalar = "\u{61}"
     var output = ""
@@ -1462,7 +1462,7 @@ Reflection.test("UnicodeScalar") {
     expectEqual(expected, output)
   }
 
-  if true {
+  do {
     // U+304B HIRAGANA LETTER KA
     let input: UnicodeScalar = "\u{304b}"
     var output = ""
@@ -1474,7 +1474,7 @@ Reflection.test("UnicodeScalar") {
     expectEqual(expected, output)
   }
 
-  if true {
+  do {
     // U+3099 COMBINING KATAKANA-HIRAGANA VOICED SOUND MARK
     let input: UnicodeScalar = "\u{3099}"
     var output = ""
@@ -1486,7 +1486,7 @@ Reflection.test("UnicodeScalar") {
     expectEqual(expected, output)
   }
 
-  if true {
+  do {
     // U+1F425 FRONT-FACING BABY CHICK
     let input: UnicodeScalar = "\u{1f425}"
     var output = ""
@@ -1500,7 +1500,7 @@ Reflection.test("UnicodeScalar") {
 }
 
 Reflection.test("Bool") {
-  if true {
+  do {
     var output = ""
     dump(false, &output)
 
@@ -1510,7 +1510,7 @@ Reflection.test("Bool") {
     expectEqual(expected, output)
   }
 
-  if true {
+  do {
     var output = ""
     dump(true, &output)
 
@@ -1525,7 +1525,7 @@ Reflection.test("Bool") {
 // FIXME: these tests should be automatically generated from the list of
 // available floating point types.
 Reflection.test("Float") {
-  if true {
+  do {
     var output = ""
     dump(Float.NaN, &output)
 
@@ -1535,7 +1535,7 @@ Reflection.test("Float") {
     expectEqual(expected, output)
   }
 
-  if true {
+  do {
     var output = ""
     dump(Float.infinity, &output)
 
@@ -1545,7 +1545,7 @@ Reflection.test("Float") {
     expectEqual(expected, output)
   }
 
-  if true {
+  do {
     var input: Float = 42.125
     var output = ""
     dump(input, &output)
@@ -1558,7 +1558,7 @@ Reflection.test("Float") {
 }
 
 Reflection.test("Double") {
-  if true {
+  do {
     var output = ""
     dump(Double.NaN, &output)
 
@@ -1568,7 +1568,7 @@ Reflection.test("Double") {
     expectEqual(expected, output)
   }
 
-  if true {
+  do {
     var output = ""
     dump(Double.infinity, &output)
 
@@ -1578,7 +1578,7 @@ Reflection.test("Double") {
     expectEqual(expected, output)
   }
 
-  if true {
+  do {
     var input: Double = 42.125
     var output = ""
     dump(input, &output)
@@ -1662,7 +1662,7 @@ Reflection.test("Unmanaged/not-nil") {
 }
 
 Reflection.test("TupleMirror/NoLeak") {
-  if true {
+  do {
     nsObjectCanaryCount = 0
     autoreleasepool {
       var tuple = (1, NSObjectCanary())
@@ -1672,7 +1672,7 @@ Reflection.test("TupleMirror/NoLeak") {
     }
     expectEqual(0, nsObjectCanaryCount)
   }
-  if true {
+  do {
     nsObjectCanaryCount = 0
     autoreleasepool {
       var tuple = (1, NSObjectCanaryStruct())
@@ -1682,7 +1682,7 @@ Reflection.test("TupleMirror/NoLeak") {
     }
     expectEqual(0, nsObjectCanaryCount)
   }
-  if true {
+  do {
     swiftObjectCanaryCount = 0
     autoreleasepool {
       var tuple = (1, SwiftObjectCanary())
@@ -1692,7 +1692,7 @@ Reflection.test("TupleMirror/NoLeak") {
     }
     expectEqual(0, swiftObjectCanaryCount)
   }
-  if true {
+  do {
     swiftObjectCanaryCount = 0
     autoreleasepool {
       var tuple = (1, SwiftObjectCanaryStruct())
@@ -1715,7 +1715,7 @@ class EightByteFieldNamesClass {
 }
 
 Reflection.test("FieldNamesBug") {
-  if true {
+  do {
     let expected =
       "▿ a.EightByteFieldNamesStruct\n" +
       "  - abcdef: 42\n"
@@ -1724,7 +1724,7 @@ Reflection.test("FieldNamesBug") {
     expectEqual(expected, output)
   }
 
-  if true {
+  do {
     let expected =
       "▿ a.EightByteFieldNamesClass #0\n" +
       "  - abcdef: 42\n"
@@ -1751,7 +1751,7 @@ Reflection.test("COpaquePointer/null") {
 }
 
 Reflection.test("StaticString/Mirror") {
-  if true {
+  do {
     var output = ""
     dump("" as StaticString, &output)
 
@@ -1761,7 +1761,7 @@ Reflection.test("StaticString/Mirror") {
     expectEqual(expected, output)
   }
 
-  if true {
+  do {
     // U+0061 LATIN SMALL LETTER A
     // U+304B HIRAGANA LETTER KA
     // U+3099 COMBINING KATAKANA-HIRAGANA VOICED SOUND MARK
