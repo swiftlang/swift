@@ -277,6 +277,7 @@ void CommentToXMLConverter::visitDocComment(const DocComment *DC) {
     PO.SkipImplicit = true;
     PO.PrintImplicitAttrs = false;
     PO.PrintFunctionRepresentationAttrs = false;
+    PO.SkipPrivateStdlibDecls = true;
     OS << "<Declaration>";
     llvm::SmallString<32> DeclSS;
     {
