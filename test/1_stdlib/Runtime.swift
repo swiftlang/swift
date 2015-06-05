@@ -1776,6 +1776,21 @@ Reflection.test("StaticString/Mirror") {
   }
 }
 
+class TestArtificialSubclass: NSObject {
+  dynamic var foo = "foo"
+}
+
+var KVOHandle = 0
+
+Reflection.test("Name of metatype of artificial subclass") {
+  let obj = TestArtificialSubclass()
+  // Trigger the creation of a KVO subclass for TestArtificialSubclass.
+  obj.addObserver(obj, forKeyPath: "foo", options: [.New], context: &KVOHandle)
+  obj.removeObserver(obj, forKeyPath: "foo")
+
+  expectEqual("\(obj.dynamicType)", "a.TestArtificialSubclass")
+}
+
 var BitTwiddlingTestSuite = TestSuite("BitTwiddling")
 
 func computeCountLeadingZeroes(var x: Int64) -> Int64 {

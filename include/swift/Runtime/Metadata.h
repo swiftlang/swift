@@ -1164,7 +1164,7 @@ struct ClassMetadata : public HeapMetadata {
 
   /// Is this object a valid swift type metadata?
   bool isTypeMetadata() const {
-    return Data & 1;
+    return (Data & 1);
   }
   /// A different perspective on the same bit
   bool isPureObjC() const {
@@ -1202,7 +1202,7 @@ private:
 
   /// An out-of-line Swift-specific description of the type, or null
   /// if this is an artificial subclass.  We currently provide no
-  /// supported mechanism for making a non-artifical subclass
+  /// supported mechanism for making a non-artificial subclass
   /// dynamically.
   const NominalTypeDescriptor *Description;
 
