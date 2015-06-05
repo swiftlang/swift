@@ -176,6 +176,22 @@ bb0:
 // CHECK-armv7-LABEL: declare i32 @ints(i32)
 // CHECK-armv7-LABEL: declare i32 @unsigneds(i32)
 
+// CHECK-armv7k-LABEL: define void @testIntegerExtension
+// CHECK-armv7k:         call signext i8 @chareth(i8 signext %0)
+// CHECK-armv7k:         call signext i8 @signedChareth(i8 signext %1)
+// CHECK-armv7k:         call zeroext i8 @unsignedChareth(i8 zeroext %2)
+// CHECK-armv7k:         call signext i16 @eatMyShorts(i16 signext %3)
+// CHECK-armv7k:         call zeroext i16 @eatMyUnsignedShorts(i16 zeroext %4)
+// CHECK-armv7k:         call i32 @ints(i32 %5)
+// CHECK-armv7k:         call i32 @unsigneds(i32 %6)
+// CHECK-armv7k-LABEL: declare signext i8 @chareth(i8 signext)
+// CHECK-armv7k-LABEL: declare signext i8 @signedChareth(i8 signext)
+// CHECK-armv7k-LABEL: declare zeroext i8 @unsignedChareth(i8 zeroext)
+// CHECK-armv7k-LABEL: declare signext i16 @eatMyShorts(i16 signext)
+// CHECK-armv7k-LABEL: declare zeroext i16 @eatMyUnsignedShorts(i16 zeroext)
+// CHECK-armv7k-LABEL: declare i32 @ints(i32)
+// CHECK-armv7k-LABEL: declare i32 @unsigneds(i32)
+
 // CHECK-arm64-LABEL: define void @testIntegerExtension
 // CHECK-arm64:         call signext i8 @chareth(i8 signext %0)
 // CHECK-arm64:         call signext i8 @signedChareth(i8 signext %1)

@@ -90,11 +90,11 @@
 // CHECK-32:   }, { i8*, i8*, i8* } {
 // CHECK-32:     i8* getelementptr inbounds ([10 x i8], [10 x i8]* @"\01L_selector_data(isEnabled)", i32 0, i32 0),
 // CHECK-32:     i8* getelementptr inbounds ([7 x i8], [7 x i8]* {{@[0-9]+}}, i32 0, i32 0),
-// CHECK-32:     i8* bitcast (i8 (%0*, i8*)* @_TToFC13objc_subclass10SwiftGizmog7enabledSb to i8*)
+// CHECK-32:     i8* bitcast ({{(i8|i1)}} (%0*, i8*)* @_TToFC13objc_subclass10SwiftGizmog7enabledSb to i8*)
 // CHECK-32:   }, { i8*, i8*, i8* } {
 // CHECK-32:     i8* getelementptr inbounds ([14 x i8], [14 x i8]* @"\01L_selector_data(setIsEnabled:)", i32 0, i32 0),
 // CHECK-32:     i8* getelementptr inbounds ([10 x i8], [10 x i8]* {{@[0-9]+}}, i32 0, i32 0),
-// CHECK-32:     i8* bitcast (void (%0*, i8*, i8)* @_TToFC13objc_subclass10SwiftGizmos7enabledSb to i8*)
+// CHECK-32:     i8* bitcast (void (%0*, i8*, {{(i8|i1)}})* @_TToFC13objc_subclass10SwiftGizmos7enabledSb to i8*)
 // CHECK-32:   }, { i8*, i8*, i8* } {
 // CHECK-32:     i8* getelementptr inbounds ([17 x i8], [17 x i8]* @"\01L_selector_data(initWithBellsOn:)", i32 0, i32 0),
 // CHECK-32:     i8* getelementptr inbounds ([10 x i8], [10 x i8]* {{@[0-9]+}}, i32 0, i32 0),

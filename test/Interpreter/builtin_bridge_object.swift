@@ -96,7 +96,6 @@ if true {
 // CHECK-NEXT: deallocated
 // CHECK-NEXT: deallocated
 
-#if os(OSX) || os(iOS) || os(tvOS)
 
 import Foundation
 
@@ -147,7 +146,6 @@ if true {
   _fixLifetime(bo3)
 }
 
-#endif
 
 func hitOptionalGenerically<T>(x: T?) {
   switch x {
