@@ -272,12 +272,12 @@ void CommentToXMLConverter::visitDocComment(const DocComment *DC) {
   }
 
   {
-    PrintOptions PO;
-    PO.PrintDefaultParameterPlaceholder = true;
-    PO.SkipImplicit = true;
-    PO.PrintImplicitAttrs = false;
-    PO.PrintFunctionRepresentationAttrs = false;
-    PO.SkipPrivateStdlibDecls = true;
+    PrintOptions PO = PrintOptions::printInterface();
+    PO.AccessibilityFilter = Accessibility::Private;
+    PO.PrintDocumentationComments = false;
+    PO.TypeDefinitions = false;
+    PO.VarInitializers = false;
+
     OS << "<Declaration>";
     llvm::SmallString<32> DeclSS;
     {
