@@ -1,6 +1,8 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
+// -- FIXME: Make work on iOS/simulator
+// REQUIRES: OS=macosx
 
 import Foundation
 
