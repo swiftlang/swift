@@ -530,12 +530,11 @@ FUNCTION(GetExistentialMetadata,
               ProtocolDescriptorPtrTy->getPointerTo()),
          ATTRS(NoUnwind, ReadOnly))
 
-// const char *swift_getGenericClassObjCName(Metadata *self,
-//                                           const char *basename);
+// const char *swift_getGenericClassObjCName(Metadata *self);
 FUNCTION(GetGenericClassObjCName,
          swift_getGenericClassObjCName, RuntimeCC,
          RETURNS(Int8PtrTy),
-         ARGS(TypeMetadataPtrTy, Int8PtrTy),
+         ARGS(TypeMetadataPtrTy),
          ATTRS(NoUnwind))
 
 // struct FieldInfo { size_t Size; size_t AlignMask; };

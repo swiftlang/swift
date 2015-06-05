@@ -25,6 +25,8 @@
 #include <objc/objc-internal.h>
 #endif
 #endif
+#include "llvm/ADT/StringRef.h"
+#include "swift/Basic/Demangle.h"
 #include "swift/Runtime/Heap.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
@@ -42,6 +44,7 @@
 # import <CoreFoundation/CFBase.h> // for CFTypeID
 # include <malloc/malloc.h>
 # include <dispatch/dispatch.h>
+# include <objc/runtime.h>
 #endif
 #if SWIFT_RUNTIME_ENABLE_DTRACE
 # include "SwiftRuntimeDTraceProbes.h"
@@ -1017,18 +1020,241 @@ swift::swift_dynamicCastObjCClassMetatypeUnconditional(
   swift_dynamicCastFailure(source, dest);
 }
 
-extern "C" const char *swift_getGenericClassObjCName(const ClassMetadata *clas,
-                                                     const char *basename) {
-  // FIXME: We should use a runtime mangler to form the real mangled name of the
-  // generic instance. Since we don't have a runtime mangler yet, just tack the
-  // address of the class onto the basename, which is totally lame but at least
-  // gives a unique name to the ObjC runtime.
-  size_t baseLen = strlen(basename);
-  size_t alignMask = alignof(char) - 1;
-  auto fullName = (char*)swift_slowAlloc(baseLen + 17, alignMask);
-  snprintf(fullName, baseLen + 17, "%s%016llX", basename,
-           (unsigned long long)clas);
-  return fullName;
+static Demangle::NodePointer _buildDemanglingForMetadata(const Metadata *type);
+
+// Build a demangled type tree for a nominal type.
+static Demangle::NodePointer
+_buildDemanglingForNominalType(Demangle::Node::Kind boundGenericKind,
+                               const Metadata *type,
+                               const NominalTypeDescriptor *description) {
+  using namespace Demangle;
+  
+  // Demangle the base name.
+  auto node = demangleTypeAsNode(description->Name,
+                                     strlen(description->Name));
+  // If generic, demangle the type parameters.
+  if (description->GenericParams.NumPrimaryParams > 0) {
+    auto typeParams = NodeFactory::create(Node::Kind::TypeList);
+    auto typeBytes = reinterpret_cast<const char *>(type);
+    auto genericParam = reinterpret_cast<const Metadata * const *>(
+                 typeBytes + sizeof(void*) * description->GenericParams.Offset);
+    for (unsigned i = 0, e = description->GenericParams.NumPrimaryParams;
+         i < e; ++i, ++genericParam) {
+      typeParams->addChild(_buildDemanglingForMetadata(*genericParam));
+    }
+
+    auto genericNode = NodeFactory::create(boundGenericKind);
+    genericNode->addChild(node);
+    genericNode->addChild(typeParams);
+    return genericNode;
+  }
+  return node;
+}
+
+// Build a demangled type tree for a type.
+static Demangle::NodePointer _buildDemanglingForMetadata(const Metadata *type) {
+  using namespace Demangle;
+
+  switch (type->getKind()) {
+  case MetadataKind::Class: {
+    auto classType = static_cast<const ClassMetadata *>(type);
+    return _buildDemanglingForNominalType(Node::Kind::BoundGenericClass,
+                                          type, classType->getDescription());
+  }
+  case MetadataKind::Enum: {
+    auto structType = static_cast<const EnumMetadata *>(type);
+    return _buildDemanglingForNominalType(Node::Kind::BoundGenericEnum,
+                                          type, structType->Description);
+  }
+  case MetadataKind::Struct: {
+    auto structType = static_cast<const StructMetadata *>(type);
+    return _buildDemanglingForNominalType(Node::Kind::BoundGenericStructure,
+                                          type, structType->Description);
+  }
+  case MetadataKind::ObjCClassWrapper: {
+#if SWIFT_OBJC_INTEROP
+    auto objcWrapper = static_cast<const ObjCClassWrapperMetadata *>(type);
+    const char *className = class_getName((Class)objcWrapper->Class);
+    
+    // ObjC classes mangle as being in the magic "ObjectiveC" module.
+    auto module = NodeFactory::create(Node::Kind::Module, "ObjectiveC");
+    
+    auto node = NodeFactory::create(Node::Kind::Class);
+    node->addChild(module);
+    node->addChild(NodeFactory::create(Node::Kind::Identifier,
+                                       llvm::StringRef(className)));
+    
+    return node;
+#else
+    assert(false && "no ObjC interop");
+    return nullptr;
+#endif
+  }
+  case MetadataKind::ForeignClass: {
+    auto foreign = static_cast<const ForeignClassMetadata *>(type);
+    return Demangle::demangleTypeAsNode(foreign->getName(),
+                                        strlen(foreign->getName()));
+  }
+  case MetadataKind::Existential: {
+    auto exis = static_cast<const ExistentialTypeMetadata *>(type);
+    NodePointer proto_list = NodeFactory::create(Node::Kind::ProtocolList);
+    NodePointer type_list = NodeFactory::create(Node::Kind::TypeList);
+
+    proto_list->addChild(type_list);
+    
+    std::vector<const ProtocolDescriptor *> protocols;
+    protocols.reserve(exis->Protocols.NumProtocols);
+    for (unsigned i = 0, e = exis->Protocols.NumProtocols; i < e; ++i)
+      protocols.push_back(exis->Protocols[i]);
+    
+    // Sort the protocols by their mangled names.
+    // The ordering in the existential type metadata is by metadata pointer,
+    // which isn't necessarily stable across invocations.
+    std::sort(protocols.begin(), protocols.end(),
+          [](const ProtocolDescriptor *a, const ProtocolDescriptor *b) -> bool {
+            return strcmp(a->Name, b->Name) < 0;
+          });
+    
+    for (auto *protocol : protocols) {
+      // The protocol name is mangled as a type symbol, with the _Tt prefix.
+      auto protocolNode = demangleSymbolAsNode(protocol->Name,
+                                               strlen(protocol->Name));
+      
+      // ObjC protocol names aren't mangled.
+      if (!protocolNode) {
+        auto module = NodeFactory::create(Node::Kind::Module, "ObjectiveC");
+        auto node = NodeFactory::create(Node::Kind::Protocol);
+        node->addChild(module);
+        node->addChild(NodeFactory::create(Node::Kind::Identifier,
+                                           llvm::StringRef(protocol->Name)));
+        auto typeNode = NodeFactory::create(Node::Kind::Type);
+        typeNode->addChild(node);
+        type_list->addChild(typeNode);
+        continue;
+      }
+
+      // FIXME: We have to dig through a ridiculous number of nodes to get
+      // to the Protocol node here.
+      protocolNode = protocolNode->getChild(0); // Global -> TypeMangling
+      protocolNode = protocolNode->getChild(0); // TypeMangling -> Type
+      protocolNode = protocolNode->getChild(0); // Type -> ProtocolList
+      protocolNode = protocolNode->getChild(0); // ProtocolList -> TypeList
+      protocolNode = protocolNode->getChild(0); // TypeList -> Type
+      
+      assert(protocolNode->getKind() == Node::Kind::Type);
+      assert(protocolNode->getChild(0)->getKind() == Node::Kind::Protocol);
+      type_list->addChild(protocolNode);
+    }
+    
+    return proto_list;
+  }
+  case MetadataKind::ExistentialMetatype: {
+    auto metatype = static_cast<const ExistentialMetatypeMetadata *>(type);
+    auto instance = _buildDemanglingForMetadata(metatype->InstanceType);
+    auto node = NodeFactory::create(Node::Kind::ExistentialMetatype);
+    node->addChild(instance);
+    return node;
+  }
+  case MetadataKind::Function: {
+    auto func = static_cast<const FunctionTypeMetadata *>(type);
+
+    Node::Kind kind;
+    switch (func->getConvention()) {
+    case FunctionMetadataConvention::Swift:
+      kind = Node::Kind::FunctionType;
+      break;
+    case FunctionMetadataConvention::Block:
+      kind = Node::Kind::ObjCBlock;
+      break;
+    case FunctionMetadataConvention::CFunctionPointer:
+      kind = Node::Kind::CFunctionPointer;
+      break;
+    case FunctionMetadataConvention::Thin:
+      kind = Node::Kind::ThinFunctionType;
+      break;
+    }
+    
+    std::vector<NodePointer> inputs;
+    for (unsigned i = 0, e = func->getNumArguments(); i < e; ++i) {
+      auto arg = func->getArguments()[i];
+      auto input = _buildDemanglingForMetadata(arg.getPointer());
+      if (arg.getFlag()) {
+        NodePointer inout = NodeFactory::create(Node::Kind::InOut);
+        inout->addChild(input);
+        input = inout;
+      }
+      inputs.push_back(input);
+    }
+
+    NodePointer totalInput;
+    if (inputs.size() > 1) {
+      auto tuple = NodeFactory::create(Node::Kind::NonVariadicTuple);
+      for (auto &input : inputs)
+        tuple->addChild(input);
+      totalInput = tuple;
+    } else {
+      totalInput = inputs.front();
+    }
+    
+    NodePointer args = NodeFactory::create(Node::Kind::ArgumentTuple);
+    args->addChild(totalInput);
+    
+    NodePointer resultTy = _buildDemanglingForMetadata(func->ResultType);
+    NodePointer result = NodeFactory::create(Node::Kind::ReturnType);
+    result->addChild(resultTy);
+    
+    auto funcNode = NodeFactory::create(kind);
+    if (func->throws())
+      funcNode->addChild(NodeFactory::create(Node::Kind::ThrowsAnnotation));
+    funcNode->addChild(args);
+    funcNode->addChild(result);
+    return funcNode;
+  }
+  case MetadataKind::Metatype: {
+    auto metatype = static_cast<const MetatypeMetadata *>(type);
+    auto instance = _buildDemanglingForMetadata(metatype->InstanceType);
+    auto node = NodeFactory::create(Node::Kind::Metatype);
+    node->addChild(instance);
+    return node;
+  }
+  case MetadataKind::Tuple: {
+    auto tuple = static_cast<const TupleTypeMetadata *>(type);
+    auto tupleNode = NodeFactory::create(Node::Kind::NonVariadicTuple);
+    for (unsigned i = 0, e = tuple->NumElements; i < e; ++i) {
+      auto elt = _buildDemanglingForMetadata(tuple->getElement(i).Type);
+      tupleNode->addChild(elt);
+    }
+    return tupleNode;
+  }
+  case MetadataKind::Opaque:
+    // FIXME: Some opaque types do have manglings, but we don't have enough info
+    // to figure them out.
+  case MetadataKind::HeapLocalVariable:
+  case MetadataKind::ErrorObject:
+    break;
+  }
+  // Not a type.
+  return nullptr;
+}
+
+extern "C" const char *
+swift_getGenericClassObjCName(const ClassMetadata *clas) {
+  // Use the remangler to generate a mangled name from the type metadata.
+  auto demangling = _buildDemanglingForMetadata(clas);
+
+  // Remangle that into a new type mangling string.
+  auto typeNode
+    = Demangle::NodeFactory::create(Demangle::Node::Kind::TypeMangling);
+  typeNode->addChild(demangling);
+  auto globalNode
+    = Demangle::NodeFactory::create(Demangle::Node::Kind::Global);
+  globalNode->addChild(typeNode);
+  
+  auto string = Demangle::mangleNode(globalNode);
+  
+  auto fullNameBuf = (char*)swift_slowAlloc(string.size() + 1, 0);
+  memcpy(fullNameBuf, string.c_str(), string.size() + 1);
+  return fullNameBuf;
 }
 #endif
 

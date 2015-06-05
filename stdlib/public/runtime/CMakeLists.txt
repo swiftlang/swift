@@ -33,6 +33,7 @@ if(SWIFT_HOST_VARIANT MATCHES "${SWIFT_DARWIN_VARIANTS}")
       ErrorObject.mm
       SwiftObject.mm
       SwiftNativeNSXXXBase.mm.gyb
+      Remangle.cpp
       Reflection.mm)
   set(LLVM_OPTIONAL_SOURCES
       UnicodeNormalization.cpp)

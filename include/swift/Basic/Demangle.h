@@ -18,6 +18,7 @@
 #include <vector>
 #include <cassert>
 #include <iosfwd>
+#include "llvm/ADT/StringRef.h"
 
 namespace llvm {
   class raw_ostream;
@@ -320,6 +321,25 @@ void mangleNode(NodePointer root, std::ostream &out);
 ///
 std::string nodeToString(NodePointer Root,
                          const DemangleOptions &Options = DemangleOptions());
+
+struct NodeFactory {
+  static NodePointer create(Node::Kind K) {
+    return NodePointer(new Node(K));
+  }
+  static NodePointer create(Node::Kind K, Node::IndexType Index) {
+    return NodePointer(new Node(K, Index));
+  }
+  static NodePointer create(Node::Kind K, llvm::StringRef Text) {
+    return NodePointer(new Node(K, Text));
+  }
+  static NodePointer create(Node::Kind K, std::string &&Text) {
+    return NodePointer(new Node(K, std::move(Text)));
+  }
+  template <size_t N>
+  static NodePointer create(Node::Kind K, const char (&Text)[N]) {
+    return NodePointer(new Node(K, llvm::StringRef(Text)));
+  }
+};
 
 } // end namespace Demangle
 } // end namespace swift

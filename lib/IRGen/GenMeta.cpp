@@ -3127,8 +3127,8 @@ namespace {
         llvm::SmallString<32> buf;
         auto basename = IGM.getAddrOfGlobalString(
                                               Target->getObjCRuntimeName(buf));
-        auto name = IGF.Builder.CreateCall2(IGM.getGetGenericClassObjCNameFn(),
-                                            metadata, basename);
+        auto name = IGF.Builder.CreateCall(IGM.getGetGenericClassObjCNameFn(),
+                                           metadata);
         name->setDoesNotThrow();
         Size nameOffset(IGM.getPointerAlignment().getValue() > 4 ? 24 : 16);
         for (Address rodataPtr : {classRODataPtr, metaclassRODataPtr}) {
