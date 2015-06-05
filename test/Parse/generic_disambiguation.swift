@@ -69,4 +69,4 @@ A<B, D>.c() // expected-error{{generic type 'A' specialized with too many type p
 A<B?>(x: 0) // parses as type
 a < b ? c : d
 
-
+A<B throws -> D>(x: 0)

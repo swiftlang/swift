@@ -734,11 +734,8 @@ Runtime.test("Generic class ObjC runtime names") {
   expectEqual("_TtGC1a12GenericClassFMVS_11PlainStructS1__",
               NSStringFromClass(GenericClass<PlainStruct.Type -> PlainStruct>.self))
 
-  // FIXME: rdar://problem/21254633 prevents us from using "throws" in generic arguments in an
-  // expression.
-  typealias ThrowingFn = PlainStruct.Type throws -> PlainStruct
   expectEqual("_TtGC1a12GenericClassFzMVS_11PlainStructS1__",
-              NSStringFromClass(GenericClass<ThrowingFn>.self))
+              NSStringFromClass(GenericClass<PlainStruct.Type throws -> PlainStruct>.self))
   expectEqual("_TtGC1a12GenericClassFTVS_11PlainStructROS_9PlainEnum_Si_",
               NSStringFromClass(GenericClass<(PlainStruct, inout PlainEnum) -> Int>.self))
 

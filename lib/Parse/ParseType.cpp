@@ -875,7 +875,15 @@ bool Parser::canParseType() {
     break;
   }
   
-  // Handle type-function if we have an arrow.
+  // Handle type-function if we have an arrow or 'throws'/'rethrows' modifier.
+  if (Tok.isAny(tok::kw_throws, tok::kw_rethrows)) {
+    consumeToken();
+    // "throws" or "rethrows" isn't a valid type without being followed by
+    // a return.
+    if (!Tok.is(tok::arrow))
+      return false;
+  }
+  
   if (consumeIf(tok::arrow)) {
     if (!canParseType())
       return false;
