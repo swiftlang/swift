@@ -82,7 +82,7 @@ __attribute__((availability(ios,introduced=8.0)))
 
 /// Aaa.  NSArray.  Bbb.
 @interface NSArray : NSObject
-- (id)objectAtIndexedSubscript:(NSUInteger)idx;
+- (nonnull id)objectAtIndexedSubscript:(NSUInteger)idx;
 - description;
 
 @property NSString *nsstringProperty;
@@ -91,7 +91,7 @@ __attribute__((availability(ios,introduced=8.0)))
 @property NSDictionary *dictProperty;
 @property NSSet *setProperty;
 
-+ (instancetype)arrayWithObjects:(const id[])objects count:(NSUInteger)count;
++ (nonnull instancetype)arrayWithObjects:(const id __nonnull[__nullable])objects count:(NSUInteger)count;
 - (void)makeObjectsPerformSelector:(SEL)aSelector;
 - (void)makeObjectsPerformSelector:(SEL)aSelector withObject:(id)anObject;
 @end
@@ -104,7 +104,7 @@ __attribute__((availability(ios,introduced=8.0)))
 @end
 
 @protocol NSCoding
-- (instancetype)initWithCoder:(NSCoder *)aCoder;
+- (instancetype)initWithCoder:(nonnull NSCoder *)aCoder;
 @end
 
 @protocol NSSecureCoding <NSCoding>
@@ -116,36 +116,36 @@ __attribute__((availability(ios,introduced=8.0)))
 
 @interface NSDictionary : NSObject /*<NSCopying, NSMutableCopying, NSSecureCoding, NSFastEnumeration>*/
 @property (readonly) NSUInteger count;
-- (id)objectForKey:(id)aKey;
-- (NSEnumerator *)keyEnumerator;
+- (nullable id)objectForKey:(nonnull id)aKey;
+- (nonnull NSEnumerator *)keyEnumerator;
 @end
 @interface NSDictionary (NSExtendedDictionary)
-- (id)objectForKeyedSubscript:(id)key /*NS_AVAILABLE(10_8, 6_0)*/;
+- (nullable id)objectForKeyedSubscript:(nonnull id)key /*NS_AVAILABLE(10_8, 6_0)*/;
 @end
 
 @interface NSDictionary (Inits)
-- (instancetype)init;
+- (nonnull instancetype)init;
 @end
 
 @interface NSMutableDictionary : NSDictionary
-- (void)removeObjectForKey:(id)aKey;
-- (void)setObject:(id)anObject forKey:(id <NSCopying>)aKey;
+- (void)removeObjectForKey:(nonnull id)aKey;
+- (void)setObject:(nonnull id)anObject forKey:(nonnull id <NSCopying>)aKey;
 @end
 
 @interface NSMutableDictionary (NSExtendedMutableDictionary)
-- (void)setObject:(id)obj forKeyedSubscript:(id <NSCopying>)key /*NS_AVAILABLE(10_8, 6_0)*/;
+- (void)setObject:(nullable id)obj forKeyedSubscript:(nonnull id <NSCopying>)key /*NS_AVAILABLE(10_8, 6_0)*/;
 @end
 
 @interface NSSet : NSObject
-- (instancetype)init;
+- (nonnull instancetype)init;
 - (NSUInteger)count;
-- (id)anyObject;
-- (instancetype)initWithArray:(NSArray *)array;
+- (nonnull id)anyObject;
+- (nonnull instancetype)initWithArray:(nonnull NSArray *)array;
 @end
 
 @interface NSMutableSet : NSSet
-- (void)addObject:(id)obj;
-- (void)removeObject:(id)obj;
+- (void)addObject:(nonnull id)obj;
+- (void)removeObject:(nonnull id)obj;
 @end
 
 @interface NSNumber : NSObject
@@ -157,9 +157,9 @@ __attribute__((availability(ios,introduced=8.0)))
 @end
 
 @interface NSError : NSObject
-@property (readonly) NSString *domain;
+@property (readonly, nonnull) NSString *domain;
 @property (readonly) NSInteger code;
-- (instancetype)initWithDomain:(NSString *)domain code:(NSInteger)code userInfo:(NSDictionary *)userInfo;
+- (nonnull instancetype)initWithDomain:(nonnull NSString *)domain code:(NSInteger)code userInfo:(nullable NSDictionary *)userInfo;
 @end
 
 @interface NSString : NSObject <NSSecureCoding, NSCopying>
@@ -439,9 +439,7 @@ typedef NS_OPTIONS(NSUInteger, NSOptionsAlsoGetSwiftName) {
   ThisIsAnNSOptionsCaseWithSwiftName __attribute__((swift_name("Case")))
 };
 
-// FIXME: update these macros to use availability(swift, unavailable) when we
-// phase out swift1_unavailable.
-#define CF_SWIFT_UNAVAILABLE(_msg) __attribute__((annotate("swift1_unavailable")))
+#define CF_SWIFT_UNAVAILABLE(_msg) __attribute__((availability(swift, unavailable, message=_msg)))
 #define NS_SWIFT_UNAVAILABLE(_msg) CF_SWIFT_UNAVAILABLE(_msg)
 
 typedef NS_ENUM(NSUInteger, NSRectEdge) {
@@ -644,6 +642,7 @@ typedef struct _NSRange {
 - (NSAttributedString *)sliceAttributedString:(NSInteger)startIndex;
 @end
 
+NS_SWIFT_UNAVAILABLE("NSInvocation and related APIs not available")
 @interface NSInvocation : NSObject
 @end
 
@@ -666,11 +665,10 @@ NSSet *setToSet(NSSet *dict);
 
 @interface NSExtensionContext : NSObject
 - (void)openURL:(NSURL *)URL completionHandler:(void (^)(BOOL success))completionHandler;
-- (void)openURL:(NSURL *)URL completion:(void (^)(BOOL success))handler;
 @end
 
 @interface NSProcessInfo : NSObject
-+ (NSProcessInfo *)processInfo;
++ (nonnull NSProcessInfo *)processInfo;
 @end
 
 @interface NSString(FoundationExts)
@@ -686,7 +684,7 @@ typedef struct {
 
 @protocol NSFastEnumeration
 
-- (NSUInteger)countByEnumeratingWithState:(NSFastEnumerationState *)state objects:(id __unsafe_unretained [])buffer count:(NSUInteger)len;
+- (NSUInteger)countByEnumeratingWithState:(nonnull NSFastEnumerationState *)state objects:(id __unsafe_unretained [])buffer count:(NSUInteger)len;
 
 @end
 
@@ -702,40 +700,54 @@ extern CGColorRef CGColorRetain(CGColorRef color) __attribute__((availability(ma
 extern void CGColorRelease(CGColorRef color) __attribute__((availability(macosx,introduced=10.3)));
 
 @interface NSObject (NSDistributedObjects)
-@property (readonly) Class classForPortCoder;
+@property (readonly) Class classForPortCoder NS_SWIFT_UNAVAILABLE("Use NSXPCConnection instead");
 @end
 
+NS_SWIFT_UNAVAILABLE("Use NSXPCConnection instead")
 extern NSString * const NSConnectionReplyMode;
+NS_SWIFT_UNAVAILABLE("Use NSXPCConnection instead")
 extern NSString * const NSConnectionDidDieNotification;
+NS_SWIFT_UNAVAILABLE("Use NSXPCConnection instead")
 @interface NSConnection : NSObject {
 }
 @end
+NS_SWIFT_UNAVAILABLE("Use NSXPCConnection instead")
 @interface NSPortCoder : NSCoder
 @end
+NS_SWIFT_UNAVAILABLE("Use NSXPCConnection instead")
 @protocol NSConnectionDelegate <NSObject>
 @end
+NS_SWIFT_UNAVAILABLE("Use NSXPCConnection instead")
 @interface NSDistantObjectRequest : NSObject
 @end
+NS_SWIFT_UNAVAILABLE("Use NSXPCConnection instead")
 @interface NSDistantObject
 @end
+NS_SWIFT_UNAVAILABLE("Use NSXPCConnection instead")
 @interface NSPortNameServer : NSObject
 @end
+NS_SWIFT_UNAVAILABLE("Use NSXPCConnection instead")
 @interface NSMachBootstrapServer : NSPortNameServer
 @end
+NS_SWIFT_UNAVAILABLE("Use NSXPCConnection instead")
 @interface NSMessagePortNameServer : NSPortNameServer
 @end
+NS_SWIFT_UNAVAILABLE("Use NSXPCConnection instead")
 @interface NSSocketPortNameServer : NSPortNameServer
 @end
+NS_SWIFT_UNAVAILABLE("Use NSCalendar and NSDateComponents and NSDateFormatter instead")
 @interface NSCalendarDate : NSDate
 @end
-@interface NSInvocationOperation
+NS_SWIFT_UNAVAILABLE("NSInvocation and related APIs not available")
+@interface NSInvocationOperation : NSObject
 @end
+NS_SWIFT_UNAVAILABLE("NSInvocation and related APIs not available")
 @interface NSMethodSignature : NSObject
 @end
 /// Unavailable Global Functions
-extern void NSSetZoneName(NSZone *zone, NSString *name);
-extern NSString *NSZoneName(NSZone *zone);
-extern NSZone *NSCreateZone(NSUInteger startSize, NSUInteger granularity, BOOL canFree);
+extern void NSSetZoneName(NSZone * __nonnull zone, NSString * __nonnull name) NS_SWIFT_UNAVAILABLE("Zone-based memory management is unavailable");
+extern NSString *NSZoneName(NSZone *zone) NS_SWIFT_UNAVAILABLE("Zone-based memory management is unavailable");
+extern NSZone *NSCreateZone(NSUInteger startSize, NSUInteger granularity, BOOL canFree) NS_SWIFT_UNAVAILABLE("Zone-based memory management is unavailable");
 
 @interface NSXPCInterface : NSObject
 + (NSXPCInterface *)interfaceWithProtocol:(Protocol *)protocol;

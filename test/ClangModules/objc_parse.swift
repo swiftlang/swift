@@ -433,10 +433,6 @@ func testProtocolClassShadowing(obj: ClassInHelper, p: ProtoInHelper) {
 }
 
 
-func testNSExtensionContext(url: NSURL, extensionContext: NSExtensionContext) {
-  extensionContext.openURL(url) { success in return }
-}
-
 func testDealloc(obj: NSObject) {
   // dealloc is subsumed by deinit.
   // FIXME: Special-case diagnostic in the type checker?

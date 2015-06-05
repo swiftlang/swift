@@ -88,22 +88,22 @@ func test_NSZone(z : NSZone) {
 }
 
 func test_DistributedObjects(o: NSObject,
-                             a: NSConnection,           // expected-error {{'NSConnection' is unavailable: you may be able to use XPC instead}}
-                             b: NSConnectionDelegate,   // expected-error {{'NSConnectionDelegate' is unavailable: you may be able to use XPC instead}}
-                             c: NSDistantObjectRequest, // expected-error {{'NSDistantObjectRequest' is unavailable: you may be able to use XPC instead}}
-                             d: NSDistantObject,        // expected-error {{'NSDistantObject' is unavailable: you may be able to use XPC instead}}
-                             e: NSPortNameServer,       // expected-error {{'NSPortNameServer' is unavailable: you may be able to use XPC instead}}
-                             f: NSMachBootstrapServer,  // expected-error {{'NSMachBootstrapServer' is unavailable: you may be able to use XPC instead}}
-                             g: NSMessagePortNameServer, // expected-error {{'NSMessagePortNameServer' is unavailable: you may be able to use XPC instead}}
-                             h: NSSocketPortNameServer, // expected-error {{'NSSocketPortNameServer' is unavailable: you may be able to use XPC instead}}
-                             i: NSPortCoder) {          // expected-error {{'NSPortCoder' is unavailable: you may be able to use XPC instead}}
+                             a: NSConnection,           // expected-error {{'NSConnection' is unavailable in Swift: Use NSXPCConnection instead}}
+                             b: NSConnectionDelegate,   // expected-error {{'NSConnectionDelegate' is unavailable in Swift: Use NSXPCConnection instead}}
+                             c: NSDistantObjectRequest, // expected-error {{'NSDistantObjectRequest' is unavailable in Swift: Use NSXPCConnection instead}}
+                             d: NSDistantObject,        // expected-error {{'NSDistantObject' is unavailable in Swift: Use NSXPCConnection instead}}
+                             e: NSPortNameServer,       // expected-error {{'NSPortNameServer' is unavailable in Swift: Use NSXPCConnection instead}}
+                             f: NSMachBootstrapServer,  // expected-error {{'NSMachBootstrapServer' is unavailable in Swift: Use NSXPCConnection instead}}
+                             g: NSMessagePortNameServer, // expected-error {{'NSMessagePortNameServer' is unavailable in Swift: Use NSXPCConnection instead}}
+                             h: NSSocketPortNameServer, // expected-error {{'NSSocketPortNameServer' is unavailable in Swift: Use NSXPCConnection instead}}
+                             i: NSPortCoder) {          // expected-error {{'NSPortCoder' is unavailable in Swift: Use NSXPCConnection instead}}
 
-  let ca = NSConnectionDidDieNotification // expected-error {{'NSConnectionDidDieNotification' is unavailable: you may be able to use XPC instead}}
-  let cc = NSConnectionReplyMode // expected-error {{'NSConnectionReplyMode' is unavailable: you may be able to use XPC instead}}
-  o.classForPortCoder // expected-error {{'classForPortCoder' is unavailable: you may be able to use XPC instead}}
+  let ca = NSConnectionDidDieNotification // expected-error {{'NSConnectionDidDieNotification' is unavailable in Swift: Use NSXPCConnection instead}}
+  let cc = NSConnectionReplyMode // expected-error {{'NSConnectionReplyMode' is unavailable in Swift: Use NSXPCConnection instead}}
+  o.classForPortCoder // expected-error {{'classForPortCoder' is unavailable in Swift: Use NSXPCConnection instead}}
 }
 
-func test_NSCalendarDate(o: NSCalendarDate) {} // expected-error {{'NSCalendarDate' is unavailable: use NSCalendar, NSDateComponents, and NSDateFormatter instead}}
+func test_NSCalendarDate(o: NSCalendarDate) {} // expected-error {{'NSCalendarDate' is unavailable in Swift: Use NSCalendar and NSDateComponents and NSDateFormatter instead}}
 
 func test_dispatch(object: dispatch_object_t) {
   dispatch_retain(object);  // expected-error {{'dispatch_retain' is unavailable}}

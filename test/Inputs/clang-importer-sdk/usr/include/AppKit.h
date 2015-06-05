@@ -126,20 +126,20 @@
 @end
 
 @interface NSView : NSObject <NSCoding, NSAccessibility>
-- (instancetype)initWithCoder:(NSCoder *)aDecoder;
-- (BOOL)isDescendantOf:(NSView *)aView;
-- (NSView *)ancestorSharedWithView:(NSView *)aView;
-- (void)setSubviews:(NSArray *)newSubviews;
-- (void)addSubview:(NSView *)aView;
-- (void)addSubview:(NSView *)aView positioned:(unsigned)place relativeTo:(NSView *)otherView;
-@property (readonly, assign) NSView *superview;
-@property (strong) CALayer *layer;
-@property (readonly, copy) NSArray *trackingAreas;
-@property (copy) NSArray *subviews;
+- (nullable instancetype)initWithCoder:(nonnull NSCoder *)aDecoder;
+- (BOOL)isDescendantOf:(nonnull NSView *)aView;
+- (nullable NSView *)ancestorSharedWithView:(nonnull NSView *)aView;
+- (void)setSubviews:(nonnull NSArray *)newSubviews;
+- (void)addSubview:(nonnull NSView *)aView;
+- (void)addSubview:(nonnull NSView *)aView positioned:(unsigned)place relativeTo:(nullable NSView *)otherView;
+@property (readonly, assign, nullable) NSView *superview;
+@property (strong, nullable) CALayer *layer;
+@property (readonly, copy, nonnull) NSArray *trackingAreas;
+@property (copy, nonnull) NSArray *subviews;
 @end
 
 @interface NSView(NSKeyboardUI)
-@property (assign) NSView *nextKeyView;
+@property (assign, nullable) NSView *nextKeyView;
 @end
 
 @interface NSMenu : NSObject <NSCopying, NSCoding>
@@ -148,10 +148,10 @@
 
 @interface NSMenuItem : NSObject <NSCopying, NSCoding>
 // Setter is only for subclassers.
-@property (assign) NSMenu *menu;
+@property (assign, nullable) NSMenu *menu;
 
-@property (copy) NSString *title;
-@property (copy) NSAttributedString *attributedTitle;
+@property (copy, nonnull) NSString *title;
+@property (copy, nullable) NSAttributedString *attributedTitle;
 
 @property (weak) id target;
 @property SEL action;
