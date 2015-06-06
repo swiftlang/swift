@@ -1,8 +1,6 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
-// -- FIXME: Make work on iOS/simulator
-// REQUIRES: OS=macosx
 
 import Foundation
 
@@ -26,12 +24,20 @@ final class Foo<T: NSCoding>: NSObject, NSCoding {
   }
 }
 
-// FIXME: Should be in the Darwin/Glibc overlay
+// FIXME: W* macro equivalents should be in the Darwin/Glibc overlay
 func WIFEXITED(status: Int32) -> Bool {
   return (status & 0o177) == 0
 }
 func WEXITSTATUS(status: Int32) -> Int32 {
   return (status >> 8) & 0xFF
+}
+
+// FIXME: "environ" should be in the Darwin overlay too
+@asmname("_NSGetEnviron")
+func _NSGetEnviron() -> UnsafeMutablePointer<UnsafeMutablePointer<UnsafeMutablePointer<CChar>>>
+
+var environ: UnsafeMutablePointer<UnsafeMutablePointer<CChar>> {
+  return _NSGetEnviron().memory
 }
 
 func driver() {
@@ -42,6 +48,8 @@ func driver() {
   let pipeRead = pipes[0], pipeWrite = pipes[1]
 
   var archiver: pid_t = 0, unarchiver: pid_t = 0
+
+  let envp = environ
 
   do {
     // Set up the archiver's stdout to feed into our pipe.
@@ -67,7 +75,7 @@ func driver() {
     ]
     guard posix_spawn(&archiver, Process.unsafeArgv[0],
                       &archiverActions, nil,
-                      archiverArgv, nil) == 0 else {
+                      archiverArgv, envp) == 0 else {
       fatalError("posix_spawn failed")
     }
   }
@@ -97,7 +105,7 @@ func driver() {
     ]
     guard posix_spawn(&unarchiver, Process.unsafeArgv[0],
                       &unarchiverActions, nil,
-                      unarchiverArgv, nil) == 0 else {
+                      unarchiverArgv, envp) == 0 else {
       fatalError("posix_spawn failed")
     }
   }
