@@ -211,7 +211,7 @@ static void _buildNameForMetadata(const Metadata *type,
     auto classType = static_cast<const ClassMetadata *>(type);
 #if SWIFT_OBJC_INTEROP
     // Look through artificial subclasses.
-    while (classType->isArtificialSubclass())
+    while (classType->isTypeMetadata() && classType->isArtificialSubclass())
       classType = classType->SuperClass;
     
     // Ask the Objective-C runtime to name ObjC classes.
