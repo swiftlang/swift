@@ -1599,6 +1599,7 @@ void PrintAST::printEnumElement(EnumElementDecl *elt) {
 }
 
 void PrintAST::visitEnumCaseDecl(EnumCaseDecl *decl) {
+  printDocumentationComment(decl);
   printAttributes(decl);
   Printer << "case ";
 
@@ -1613,6 +1614,7 @@ void PrintAST::visitEnumElementDecl(EnumElementDecl *decl) {
   if (!decl->shouldPrintInContext(Options))
     return;
 
+  printDocumentationComment(decl);
   // In cases where there is no parent EnumCaseDecl (such as imported or
   // deserialized elements), print the element independently.
   printAttributes(decl);

@@ -42,3 +42,10 @@ public struct BarGenericSwiftStruct2<T: BarProtocol, U> {
   public func bar2InstanceFunc() {}
 }
 
+/// rdar://18457785
+public enum MyQuickLookObject {
+  /// A rectangle.
+  ///
+  /// Uses explicit coordinates to avoid coupling a particular Cocoa type.
+  case Rectangle(Float64,Float64,Float64,Float64)
+}
