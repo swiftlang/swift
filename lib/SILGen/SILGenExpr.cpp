@@ -643,8 +643,8 @@ ManagedValue SILGenFunction::emitRValueForPropertyLoad(
   // Check for an abstraction difference.
   AbstractionPattern origFormalType = getOrigFormalRValueType(*this, field);
   bool hasAbstractionChange = false;
+  auto &abstractedTL = getTypeLowering(origFormalType, substFormalType);
   if (!origFormalType.isExactType(substFormalType)) {
-    auto &abstractedTL = getTypeLowering(origFormalType, substFormalType);
     hasAbstractionChange =
         (abstractedTL.getLoweredType() != lowering.getLoweredType());
   }
@@ -688,7 +688,7 @@ ManagedValue SILGenFunction::emitRValueForPropertyLoad(
     SILValue ElementPtr =
       B.createStructElementAddr(loc, base.getValue(), field);
 
-    Result = emitLoad(loc, ElementPtr, lowering,
+    Result = emitLoad(loc, ElementPtr, abstractedTL,
                       hasAbstractionChange ? SGFContext() : C, IsNotTake);
   }
 

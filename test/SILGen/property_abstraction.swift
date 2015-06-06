@@ -58,8 +58,23 @@ func noAbstractionDifference(var x: Foo<Int, Int>) {
   x.g.foo()
 }
 
-/*
- TODO
+protocol P {}
+
+struct AddressOnlyLet<T> {
+  let f: T -> T
+  let makeAddressOnly: P
+}
+
+// CHECK-LABEL: sil hidden @_TF20property_abstraction34getAddressOnlyReabstractedPropertyFGVS_14AddressOnlyLetVS_3Int_FS1_S1_ : $@convention(thin) (@in AddressOnlyLet<Int>) -> @owned @callee_owned (Int) -> Int
+// CHECK:         [[CLOSURE_ADDR:%.*]] = struct_element_addr {{%.*}} : $*AddressOnlyLet<Int>, #AddressOnlyLet.f
+// CHECK:         [[CLOSURE_ORIG:%.*]] = load [[CLOSURE_ADDR]]
+// CHECK:         [[REABSTRACT:%.*]] = function_ref
+// CHECK:         [[CLOSURE_SUBST:%.*]] = partial_apply [[REABSTRACT]]([[CLOSURE_ORIG]])
+// CHECK:         return [[CLOSURE_SUBST]]
+func getAddressOnlyReabstractedProperty(x: AddressOnlyLet<Int>) -> Int -> Int {
+  return x.f
+}
+
 enum Bar<T, U> {
   case F(T -> U)
 }
@@ -74,5 +89,3 @@ func getF(x: Bar<Int, Int>) -> Int -> Int {
 func makeF(f: Int -> Int) -> Bar<Int, Int> {
   return Bar.F(f)
 }
-
-*/
