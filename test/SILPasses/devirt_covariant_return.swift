@@ -171,3 +171,43 @@ final class PolarBear: Bear {
   }
 }
 
+public class D {
+  let v: Int32 = 0
+}
+
+public class D1 : D {
+
+  public func foo() -> D? {
+    return nil
+  }
+
+  public func boo() -> Int32 {
+    return foo()!.v
+  }
+}
+
+let sD = D()
+
+public class D2: D1 {
+   // Override base method, but return a non-optional result
+   override public func foo() -> D {
+     return sD
+   }
+}
+
+// Check that the boo call gets properly devirtualized and that
+// that D2.foo() is inlined thanks to this.
+// CHECK-LABEL: sil hidden @_TF23devirt_covariant_return7driver2FCS_2D2VSs5Int32
+// CHECK-NOT: class_method
+// CHECK: checked_cast_br [exact] %{{.*}} : $D1 to $D2
+// CHECK: bb2
+// CHECK: global_addr
+// CHECK: load
+// CHECK: ref_element_addr
+// CHECK: bb3
+// CHECK: class_method
+// CHECK: }
+func driver2(d: D2) -> Int32 {
+  return d.boo()
+}
+

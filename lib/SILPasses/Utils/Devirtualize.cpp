@@ -372,6 +372,7 @@ SILInstruction *swift::devirtualizeClassMethod(ApplyInst *AI,
   // Check if the return type is an optional of the apply_inst type
   // or the other way around
   bool UnwrapOptionalResult = false;
+  bool WrapOptionalResult = false;
   OptionalTypeKind OTK;
   OptionalTypeKind AI_OTK;
 
@@ -395,9 +396,13 @@ SILInstruction *swift::devirtualizeClassMethod(ApplyInst *AI,
     UnwrapOptionalResult = true;
   }
 
+  if (OptionalAIType == ReturnType.getSwiftRValueType()) {
+    WrapOptionalResult = true;
+  }
+
   assert((ReturnType.isAddress() ||
           ReturnType.isHeapObjectReferenceType() ||
-          UnwrapOptionalResult) &&
+          UnwrapOptionalResult || WrapOptionalResult) &&
          "Only addresses and refs can have their types changed due to "
          "covariant return types or contravariant argument types.");
 
@@ -407,6 +412,10 @@ SILInstruction *swift::devirtualizeClassMethod(ApplyInst *AI,
     // We need to extract the actual result from the optional.
     auto *SomeDecl = B.getASTContext().getOptionalSomeDecl(OTK);
     CastedAI = B.createUncheckedEnumData(AI->getLoc(), NewAI, SomeDecl);
+  } else if (WrapOptionalResult) {
+    // The devirtualized method returns a non-optional result.
+    // We need to wrap it into an optional.
+    CastedAI = B.createOptionalSome(AI->getLoc(), NewAI, AI_OTK, AI->getType());
   } else if (ReturnType.isAddress()) {
     CastedAI = B.createUncheckedAddrCast(AI->getLoc(), NewAI, AI->getType());
   } else {
