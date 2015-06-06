@@ -174,3 +174,9 @@ func testProtocol(p: ErrorProneProtocol) throws {
   try p.invigorate(callback: {})
 }
 
+// rdar://21144509 - Ensure that overrides of replace-with-() imports are possible.
+class ExtremelyErrorProne : ErrorProne {
+  override func conflict3(obj: AnyObject, error: ()) throws {}
+}
+// CHECK: sil hidden @_TFC14foreign_errors19ExtremelyErrorProne9conflict3fS0_FzTPSs9AnyObject_5errorT__T_
+// CHECK: sil hidden @_TToFC14foreign_errors19ExtremelyErrorProne9conflict3fS0_FzTPSs9AnyObject_5errorT__T_ : $@convention(objc_method) (AnyObject, AutoreleasingUnsafeMutablePointer<Optional<NSError>>, ExtremelyErrorProne) -> Bool

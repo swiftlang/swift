@@ -2263,6 +2263,21 @@ static bool isParamPatternRepresentableInObjC(TypeChecker &TC,
     for (unsigned ParamIndex = 0; ParamIndex != NumParams; ParamIndex++) {
       auto &TupleElt = Fields[ParamIndex];
       if (!isParamRepresentableInObjC(TC, AFD, TupleElt.getPattern())) {
+        // Permit '()' when this method overrides a method with a
+        // foreign error convention that replaces NSErrorPointer with ()
+        // and this is the replaced parameter.
+        AbstractFunctionDecl *overridden;
+        if (TupleElt.getPattern()->getType()->isVoid() &&
+            AFD->isBodyThrowing() &&
+            (overridden = AFD->getOverriddenDecl())) {
+          auto foreignError = overridden->getForeignErrorConvention();
+          if (foreignError &&
+              foreignError->isErrorParameterReplacedWithVoid() &&
+              foreignError->getErrorParameterIndex() == ParamIndex) {
+            continue;
+          }
+        }
+
         IsObjC = false;
         if (!Diagnose) {
           // Save some work and return as soon as possible if we are not
