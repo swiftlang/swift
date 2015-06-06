@@ -60,7 +60,7 @@ func driver() {
     defer { posix_spawn_file_actions_destroy(&archiverActions) }
     guard posix_spawn_file_actions_adddup2(&archiverActions,
                                            pipeWrite,
-                                           Int32(STDOUT_FILENO)) == 0
+                                           STDOUT_FILENO) == 0
        && posix_spawn_file_actions_addclose(&archiverActions,
                                             pipeRead) == 0
        else {
@@ -89,7 +89,7 @@ func driver() {
     defer { posix_spawn_file_actions_destroy(&unarchiverActions) }
     guard posix_spawn_file_actions_adddup2(&unarchiverActions,
                                            pipeRead,
-                                           Int32(STDIN_FILENO)) == 0
+                                           STDIN_FILENO) == 0
        && posix_spawn_file_actions_addclose(&unarchiverActions,
                                             pipeWrite) == 0
        else {
@@ -146,7 +146,7 @@ func archive() {
   // Output the archived data over stdout, which should be piped to stdin
   // on the unarchiver process.
   while true {
-    let status = write(Int32(STDOUT_FILENO), data.bytes, data.length)
+    let status = write(STDOUT_FILENO, data.bytes, data.length)
     if status == data.length { break }
     if errno == EINTR { continue }
     fatalError("write failed")
@@ -166,7 +166,7 @@ func unarchive() {
   var buffer = [UInt8](count: 4096, repeatedValue: 0)
 
   while true {
-    let count = read(Int32(STDIN_FILENO), &buffer, 4096)
+    let count = read(STDIN_FILENO, &buffer, 4096)
     if count == 0 { break }
     if count == -1 {
       if errno == EINTR { continue }
