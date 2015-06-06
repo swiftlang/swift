@@ -166,31 +166,60 @@ static void buildFuncToBlockInvokeBody(SILGenFunction &gen,
     SILValue v = new (gen.SGM.M) SILArgument(entry, param.getSILType());
 
     ManagedValue mv;
-    switch (param.getConvention()) {
-    case ParameterConvention::Direct_Owned:
-      // Consume owned parameters at +1.
-      mv = gen.emitManagedRValueWithCleanup(v);
-      break;
+    
+    // If the parameter is a block, we need to copy it to ensure it lives on
+    // the heap. The adapted closure value might outlive the block's original
+    // scope.
+    if (isa<SILFunctionType>(param.getType())
+        && cast<SILFunctionType>(param.getType())->getRepresentation()
+             == SILFunctionTypeRepresentation::Block) {
+      // We still need to consume the original block if it was owned.
+      switch (param.getConvention()) {
+      case ParameterConvention::Direct_Owned:
+        gen.emitManagedRValueWithCleanup(v);
+        break;
+        
+      case ParameterConvention::Direct_Deallocating:
+      case ParameterConvention::Direct_Guaranteed:
+      case ParameterConvention::Direct_Unowned:
+        break;
+        
+      case ParameterConvention::Indirect_In:
+      case ParameterConvention::Indirect_In_Guaranteed:
+      case ParameterConvention::Indirect_Inout:
+      case ParameterConvention::Indirect_Out:
+        llvm_unreachable("indirect params to blocks not supported");
+      }
+      
+      SILValue blockCopy = gen.B.createCopyBlock(loc, v);
+      mv = gen.emitManagedRValueWithCleanup(blockCopy);
+    } else {
+      switch (param.getConvention()) {
+      case ParameterConvention::Direct_Owned:
+        // Consume owned parameters at +1.
+        mv = gen.emitManagedRValueWithCleanup(v);
+        break;
 
-    case ParameterConvention::Direct_Guaranteed:
-    case ParameterConvention::Direct_Unowned:
-      // We need to independently retain the value.
-      mv = gen.emitManagedRetain(loc, v);
-      break;
+      case ParameterConvention::Direct_Guaranteed:
+      case ParameterConvention::Direct_Unowned:
+        // We need to independently retain the value.
+        mv = gen.emitManagedRetain(loc, v);
+        break;
 
-    case ParameterConvention::Direct_Deallocating:
-      // We do not need to retain the value since the value is already being
-      // deallocated.
-      mv = ManagedValue::forUnmanaged(v);
-      break;
+      case ParameterConvention::Direct_Deallocating:
+        // We do not need to retain the value since the value is already being
+        // deallocated.
+        mv = ManagedValue::forUnmanaged(v);
+        break;
 
-    case ParameterConvention::Indirect_In_Guaranteed:
-    case ParameterConvention::Indirect_In:
-    case ParameterConvention::Indirect_Inout:
-    case ParameterConvention::Indirect_Out:
-      llvm_unreachable("indirect arguments to blocks not supported");
+      case ParameterConvention::Indirect_In_Guaranteed:
+      case ParameterConvention::Indirect_In:
+      case ParameterConvention::Indirect_Inout:
+      case ParameterConvention::Indirect_Out:
+        llvm_unreachable("indirect arguments to blocks not supported");
+      }
     }
-
+    
     args.push_back(gen.emitBridgedToNativeValue(loc, mv,
                                 SILFunctionTypeRepresentation::CFunctionPointer,
                                 funcParam.getType()));
