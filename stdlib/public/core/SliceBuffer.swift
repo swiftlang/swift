@@ -81,7 +81,7 @@ struct _SliceBuffer<T> : _ArrayBufferType {
     // FIXME: <rdar://problem/17464946> with
     // -DSWIFT_STDLIB_ASSERTIONS=FALSE, enabling this sanityCheck
     // actually causes leaks in the stdlib/NewArray.swift.gyb test
-    /* _sanityCheck(insertCount <= numericCast(newValues.count)) */
+    _sanityCheck(insertCount <= numericCast(newValues.count))
     
     _sanityCheck(_hasNativeBuffer && isUniquelyReferenced())
 
