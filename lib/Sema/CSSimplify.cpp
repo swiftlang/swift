@@ -1263,7 +1263,8 @@ static bool canBindGenericParamToExistential(ConstraintSystem &cs,
   // We are going to shoehorn this existential into an archetype. It better
   // not have any witness tables.
   for (auto proto : protocols) {
-    if (!proto->isObjC()) {
+    if (!proto->isObjC() &&
+        !proto->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
       if (cs.shouldRecordFailures()) {
         cs.recordFailure(cs.getConstraintLocator(locator),
                          Failure::ExistentialIsNotObjC,
