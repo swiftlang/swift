@@ -84,11 +84,11 @@ protocol P2 {
 
 func constructExistentialValue(pm: P.Type) {
   _ = pm()
-  _ = P() // expected-error{{constructing an object of protocol type 'P' requires a metatype value}}
+  _ = P() // expected-error{{constructing an object of protocol type 'P' requires a conforming metatype}}
 }
 
 typealias P1_and_P2 = protocol<P, P2>
 func constructExistentialCompositionValue(pm: protocol<P, P2>.Type) {
   _ = pm(int: 5)
-  _ = P1_and_P2(int: 5) // expected-error{{constructing an object of protocol type 'P1_and_P2' requires a metatype value}}
+  _ = P1_and_P2(int: 5) // expected-error{{constructing an object of protocol type 'P1_and_P2' requires a conforming metatype}}
 }

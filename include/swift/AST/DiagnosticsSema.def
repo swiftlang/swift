@@ -1387,7 +1387,7 @@ NOTE(note_nonrequired_initializer,sema_tce,none,
       "selected %select{non-required|implicit}0 initializer %1", 
      (bool, DeclName))
 ERROR(static_construct_existential,sema_tce,none,
-      "constructing an object of protocol type %0 requires a metatype value",
+      "constructing an object of protocol type %0 requires a conforming metatype",
       (Type))
 
 // Operators

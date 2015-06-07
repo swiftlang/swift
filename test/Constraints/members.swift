@@ -122,8 +122,10 @@ func goo() {
 }
 
 protocol P {
+  init()
   func bar(x: Int)
   mutating func mut(x: Int)
+  static func tum()
 }
 
 func generic<T: P>(var t: T) {
@@ -137,6 +139,15 @@ func existential(var p: P) {
   _ = p.bar
   _ = p.mut // expected-error{{partial application of 'mutating' method is not allowed}}
   var _ : () = p.bar(0)
+}
+
+func staticExistential(p: P.Type, pp: P.Protocol) {
+  _ = p()
+  _ = pp() // expected-error{{constructing an object of protocol type 'P' requires a conforming metatype}}
+  _ = P() // expected-error{{constructing an object of protocol type 'P' requires a conforming metatype}}
+  _ = p.tum
+  _ = pp.tum // expected-error{{'P.Protocol' does not have a member named 'tum'}}
+  _ = P.tum // expected-error{{'P.Protocol' does not have a member named 'tum'}}
 }
 
 protocol ClassP : class {

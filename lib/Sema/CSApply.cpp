@@ -5490,9 +5490,10 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   declRef->setImplicit(apply->isImplicit());
   apply->setFn(declRef);
 
-  // If we're constructing a class object, either the metatype must be
-  // statically derived (rather than an arbitrary value of metatype type) or
-  // the referenced constructor must be required.
+  // Non-required constructors may not be not inherited. Therefore when
+  // constructing a class object, either the metatype must be statically
+  // derived (rather than an arbitrary value of metatype type) or the referenced
+  // constructor must be required.
   // FIXME: The "hasClangNode" check here is a complete hack.
   if (isNonFinalClass(ty) &&
       !fn->isStaticallyDerivedMetatype() &&
@@ -5507,8 +5508,12 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     auto ctor = cast<ConstructorDecl>(decl);
     tc.diagnose(decl, diag::note_nonrequired_initializer,
                 ctor->isImplicit(), ctor->getFullName());
-  } else if (isa<ConstructorDecl>(decl) && ty->isExistentialType() &&
-             fn->isStaticallyDerivedMetatype()) {
+
+  // Constructors cannot be called on a protocol metatype, because there is no
+  // metatype to witness it.
+  } else if (isa<ConstructorDecl>(decl) &&
+             isa<MetatypeType>(metaTy) &&
+             ty->isExistentialType()) {
     tc.diagnose(apply->getLoc(), diag::static_construct_existential, ty)
       .highlight(fn->getSourceRange());
   }

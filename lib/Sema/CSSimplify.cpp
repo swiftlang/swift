@@ -2739,10 +2739,16 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
 
   // Dig out the instance type.
   bool isMetatype = false;
+  bool hasStaticMembers = false;
   Type instanceTy = baseObjTy;
   if (auto baseObjMeta = baseObjTy->getAs<AnyMetatypeType>()) {
     instanceTy = baseObjMeta->getInstanceType();
     isMetatype = true;
+    // Protocol metatypes do not have static members because there is no
+    // metatype to witness it.
+    if (baseObjTy->getAs<ExistentialMetatypeType>() ||
+        !instanceTy->isExistentialType())
+      hasStaticMembers = true;
   }
 
   bool isUnresolvedMember;
@@ -3129,16 +3135,15 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     if (isExistential && isUnavailableInExistential(getTypeChecker(), result))
       return;
 
-    // If we are looking for a metatype member, don't include members that can
-    // only be accessed on an instance of the object.
-    // FIXME: Mark as 'unavailable' somehow.
-    if (isMetatype && !(isa<FuncDecl>(result) || !result->isInstanceMember())) {
+    // If we are looking for a metatype member, include instance methods,
+    // static methods, and static members.
+    // FIXME: Mark this as 'unavailable'.
+    if (isMetatype && !(isa<FuncDecl>(result) || !result->isInstanceMember()))
       return;
-    }
 
-    // If we aren't looking in a metatype, ignore static functions, static
-    // variables, and enum elements.
-    if (!isMetatype && !baseObjTy->is<ModuleType>() &&
+    // If we are looking for an instance member or protocol metatype member,
+    // ignore static functions, static variables, and enum elements.
+    if (!hasStaticMembers && !baseObjTy->is<ModuleType>() &&
         !result->isInstanceMember())
       return;
 
