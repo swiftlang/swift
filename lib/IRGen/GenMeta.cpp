@@ -3124,9 +3124,6 @@ namespace {
       
       if (IGF.IGM.ObjCInterop) {
         // Generate the runtime name for the class and poke it into the rodata.
-        llvm::SmallString<32> buf;
-        auto basename = IGM.getAddrOfGlobalString(
-                                              Target->getObjCRuntimeName(buf));
         auto name = IGF.Builder.CreateCall(IGM.getGetGenericClassObjCNameFn(),
                                            metadata);
         name->setDoesNotThrow();
