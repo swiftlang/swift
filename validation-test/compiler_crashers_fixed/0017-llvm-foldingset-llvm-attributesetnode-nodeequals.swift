@@ -6,4 +6,4 @@
 
 func f<T : BooleanType>(b: T) { // expected-note {{in call to function 'f'}}
 }
-f(true as BooleanType) // expected-error {{generic parameter 'T' cannot be bound to non-@objc protocol type 'BooleanType'}}
+f(true as BooleanType) // expected-error {{generic parameter 'T' is constrained to a non-@objc protocol type 'BooleanType' and cannot be bound to an existential type}}

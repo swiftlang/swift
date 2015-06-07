@@ -490,6 +490,12 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// Whether the existential of this protocol conforms to itself.
     unsigned ExistentialConformsToSelf : 1;
 
+    /// Whether the \c ExistentialTypeSupported bit is valid.
+    unsigned ExistentialTypeSupportedValid : 1;
+
+    /// Whether the existential of this protocol can be represented.
+    unsigned ExistentialTypeSupported : 1;
+
     /// If this is a compiler-known protocol, this will be a KnownProtocolKind
     /// value, plus one. Otherwise, it will be 0.
     unsigned KnownProtocol : 6;
@@ -3505,7 +3511,9 @@ class ProtocolDecl : public NominalTypeDecl {
 
   bool requiresClassSlow();
 
-  bool existentialConformsToSelfSlow(LazyResolver *resolver);
+  bool existentialConformsToSelfSlow();
+
+  bool existentialTypeSupportedSlow(LazyResolver *resolver);
 
 public:
   ProtocolDecl(DeclContext *DC, SourceLoc ProtocolLoc, SourceLoc NameLoc,
@@ -3547,14 +3555,29 @@ public:
     ProtocolDeclBits.RequiresClass = true;
   }
 
-  /// Determine whether an existential value conforming to just this protocol
-  /// conforms to the protocol itself.
-  bool existentialConformsToSelf(LazyResolver *resolver) const {
+  /// Determine whether an existential conforming to this protocol can be
+  /// matched with a generic type parameter constrained to this protocol.
+  /// This is only permitted if there is nothing "non-trivial" that we
+  /// can do with the metatype, which means the protocol must not have
+  /// any static methods and must be declared @objc.
+  bool existentialConformsToSelf() const {
     if (ProtocolDeclBits.ExistentialConformsToSelfValid)
       return ProtocolDeclBits.ExistentialConformsToSelf;
 
     return const_cast<ProtocolDecl *>(this)
-             ->existentialConformsToSelfSlow(resolver);
+             ->existentialConformsToSelfSlow();
+  }
+
+  /// Determine whether we are allowed to refer to an existential type
+  /// conforming to this protocol. This is only permitted if the types of
+  /// all the members are rank-1, that is, do not have Self or associated
+  /// type requirements that may depend on the existential's opened type.
+  bool existentialTypeSupported(LazyResolver *resolver) const {
+    if (ProtocolDeclBits.ExistentialTypeSupportedValid)
+      return ProtocolDeclBits.ExistentialTypeSupported;
+
+    return const_cast<ProtocolDecl *>(this)
+             ->existentialTypeSupportedSlow(resolver);
   }
 
   /// If this is known to be a compiler-known protocol, returns the kind.

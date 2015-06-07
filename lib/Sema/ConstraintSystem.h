@@ -421,8 +421,10 @@ public:
     NoPublicInitializers,
     /// A generic parameter that cannot be bound to a specific type.
     UnboundGenericParameter,
-    /// A generic parameter has been bound to a non-@objc existential type.
-    ExistentialGenericParameter,
+    /// A protocol does not conform to itself.
+    IsNotSelfConforming,
+    /// An existential contains a non-@objc protocol.
+    ExistentialIsNotObjC,
     /// The type is not materializable.
     IsNotMaterializable,
   };
@@ -506,10 +508,14 @@ public:
     case DoesNotConformToProtocol:
     case IsForbiddenLValue:
     case IsNotMetatype:
-    case ExistentialGenericParameter:
     case IsNotMaterializable:
+    case ExistentialIsNotObjC:
       return Profile(id, locator, kind, resolvedOverloadSets, getFirstType(),
                      getSecondType());
+
+    case IsNotSelfConforming:
+      return Profile(id, locator, kind, resolvedOverloadSets, getFirstType(),
+                     getSecondType(), value);
 
     case DoesNotHaveMember:
     case DoesNotHaveNonMutatingMember:

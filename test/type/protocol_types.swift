@@ -14,6 +14,12 @@ protocol Bar {
 
 func useBarAsType(x: Bar) {}
 
+protocol Pub : Bar { }
+
+func refinementErasure(p: Pub) {
+  useBarAsType(p)
+}
+
 typealias Compo = protocol<HasSelfRequirements, Bar>
 
 struct CompoAssocType {

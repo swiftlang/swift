@@ -1499,10 +1499,11 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
       
       if (dyn_cast<LiteralExpr>(innerExpr))
         cs.setConversionType(expr, logicValueType);
-      
-      cs.addConstraint(ConstraintKind::ConformsTo, expr->getType(),
-                       logicValueType,
-                       cs.getConstraintLocator(OrigExpr));
+
+      // We use SelfObjectOfProtocol because an existential BooleanType is
+      // allowed as a condition, but BooleanType is not self-conforming.
+      cs.addConstraint(ConstraintKind::SelfObjectOfProtocol, expr->getType(),
+                       logicValueType, cs.getConstraintLocator(OrigExpr));
       return false;
     }
 

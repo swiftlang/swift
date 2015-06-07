@@ -151,16 +151,6 @@ Type Solution::computeSubstitutions(
         assert(conformance || replacement->hasDependentProtocolConformances());
         currentConformances.push_back(conformance);
 
-        // An existential type cannot provide witness tables.
-        // FIXME: This is routing around damage. We should be opening
-        // the existential within the solver, so we have access to the
-        // witness tables.
-        if (replacement->isAnyExistentialType() &&
-            !protoType->isObjCExistentialType()) {
-          tc.diagnose(locator->getNearestLoc(),
-                      diag::unsupported_existential_generic_req,
-                      replacement, protoType);
-        }
         break;
       }
       break;
@@ -4012,6 +4002,10 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
 }
 
 /// Collect the conformances for all the protocols of an existential type.
+/// If the source type is also existential, we don't want to check conformance
+/// because most protocols do not conform to themselves -- however we still
+/// allow the conversion here, except the ErasureExpr ends up with trivial
+/// conformances.
 static ArrayRef<ProtocolConformance*>
 collectExistentialConformances(TypeChecker &tc, Type fromType, Type toType,
                                DeclContext *DC) {
@@ -4020,11 +4014,11 @@ collectExistentialConformances(TypeChecker &tc, Type fromType, Type toType,
 
   SmallVector<ProtocolConformance *, 4> conformances;
   for (auto proto : protocols) {
-    ProtocolConformance *conformance = nullptr;
-    bool conforms = tc.conformsToProtocol(fromType, proto, DC,
-                                          (ConformanceCheckFlags::InExpression|
-                                           ConformanceCheckFlags::Used),
-                                          &conformance);
+    ProtocolConformance *conformance;
+    bool conforms = tc.containsProtocol(fromType, proto, DC,
+                                        (ConformanceCheckFlags::InExpression|
+                                         ConformanceCheckFlags::Used),
+                                        &conformance);
     assert(conforms && "Type does not conform to protocol?");
     (void)conforms;
     conformances.push_back(conformance);

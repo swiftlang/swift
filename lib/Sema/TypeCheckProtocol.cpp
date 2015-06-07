@@ -3801,6 +3801,43 @@ checkConformsToProtocol(TypeChecker &TC,
   return conformance;
 }
 
+bool TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto,
+                                   DeclContext *DC,
+                                   ConformanceCheckOptions options,
+                                   ProtocolConformance **Conformance,
+                                   SourceLoc ComplainLoc) {
+  // Existential types don't need to conform, i.e., they only need to
+  // contain the protocol.
+  if (T->isExistentialType()) {
+    SmallVector<ProtocolDecl *, 4> protocols;
+    T->getAnyExistentialTypeProtocols(protocols);
+
+    for (auto P : protocols) {
+      // Special case -- any class-bound protocol can be passed as an
+      // AnyObject argument.
+      if (P->requiresClass() &&
+          Proto->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
+        if (Conformance)
+          *Conformance = nullptr;
+        return true;
+      }
+
+      // If this isn't the protocol we're looking for, continue looking.
+      if (P == Proto || P->inheritsFrom(Proto)) {
+        if (Conformance)
+          *Conformance = nullptr;
+        return true;
+      }
+    }
+  } else {
+    // Check whether this type conforms to the protocol.
+    if (conformsToProtocol(T, Proto, DC, options, Conformance, ComplainLoc))
+      return true;
+  }
+
+  return false;
+}
+
 bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
                                      DeclContext *DC,
                                      ConformanceCheckOptions options,

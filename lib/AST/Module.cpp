@@ -769,9 +769,10 @@ LookupConformanceResult Module::lookupConformance(Type type,
   // existential's list of conformances and the existential conforms to
   // itself.
   if (type->isExistentialType()) {
-    // If the protocol doesn't conform to itself, there's no point in looking
-    // further.
-    if (!protocol->existentialConformsToSelf(resolver))
+    // If the existential type cannot be represented or the protocol does not
+    // conform to itself, there's no point in looking further.
+    if (!protocol->existentialConformsToSelf() ||
+        !protocol->existentialTypeSupported(resolver))
       return { nullptr, ConformanceKind::DoesNotConform };
 
     // Special-case AnyObject, which may not be in the list of conformances.
@@ -830,7 +831,7 @@ LookupConformanceResult Module::lookupConformance(Type type,
   auto conformance = conformances.front();
 
   // Rebuild inherited conformances based on the root normal conformance.
-  // FIXME: This is a hack to work around our inability ot handle multiple
+  // FIXME: This is a hack to work around our inability to handle multiple
   // levels of substitution through inherited conformances elsewhere in the
   // compiler.
   if (auto inherited = dyn_cast<InheritedProtocolConformance>(conformance)) {

@@ -3156,7 +3156,7 @@ public:
       SmallVector<ProtocolDecl*, 2> protocols;
       if (type->isExistentialType(protocols)) {
         for (auto *proto : protocols) {
-          if (proto->existentialConformsToSelf(&TC))
+          if (proto->existentialTypeSupported(&TC))
             continue;
 
           TC.diagnose(T->getComponentRange().back()->getIdLoc(),

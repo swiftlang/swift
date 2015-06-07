@@ -2372,17 +2372,56 @@ bool ProtocolDecl::requiresClassSlow() {
   return false;
 }
 
-bool ProtocolDecl::existentialConformsToSelfSlow(LazyResolver *resolver) {
+bool ProtocolDecl::existentialConformsToSelfSlow() {
   // Assume for now that the existential conforms to itself; this
   // prevents circularity issues.
   ProtocolDeclBits.ExistentialConformsToSelfValid = true;
   ProtocolDeclBits.ExistentialConformsToSelf = true;
 
+  if (isSpecificProtocol(KnownProtocolKind::AnyObject))
+    return true;
+
+  if (!isObjC()) {
+    ProtocolDeclBits.ExistentialConformsToSelf = false;
+    return false;
+  }
+
+  // Check whether this protocol conforms to itself.
+  for (auto member : getMembers()) {
+    if (member->isInvalid())
+      continue;
+
+    if (auto vd = dyn_cast<ValueDecl>(member)) {
+      if (!vd->isInstanceMember()) {
+        // A protocol cannot conform to itself if it has static members.
+        ProtocolDeclBits.ExistentialConformsToSelf = false;
+        return false;
+      }
+    }
+  }
+
+  // Check whether any of the inherited protocols fail to conform to
+  // themselves.
+  // FIXME: does this need a resolver?
+  for (auto proto : getInheritedProtocols(nullptr)) {
+    if (!proto->existentialConformsToSelf()) {
+      ProtocolDeclBits.ExistentialConformsToSelf = false;
+      return false;
+    }
+  }
+  return true;
+}
+
+bool ProtocolDecl::existentialTypeSupportedSlow(LazyResolver *resolver) {
+  // Assume for now that the existential type is supported; this
+  // prevents circularity issues.
+  ProtocolDeclBits.ExistentialTypeSupportedValid = true;
+  ProtocolDeclBits.ExistentialTypeSupported = true;
+
   // Resolve the protocol's type.
   if (resolver && !hasType())
     resolver->resolveDeclSignature(this);
 
-  // Check whether this protocol conforms to itself.
   auto selfType = getProtocolSelf()->getArchetype();
   for (auto member : getMembers()) {
     if (auto vd = dyn_cast<ValueDecl>(member)) {
@@ -2395,8 +2434,9 @@ bool ProtocolDecl::existentialConformsToSelfSlow(LazyResolver *resolver) {
 
     // Check for associated types.
     if (isa<AssociatedTypeDecl>(member)) {
-      // A protocol cannot conform to itself if it has an associated type.
-      ProtocolDeclBits.ExistentialConformsToSelf = false;
+      // An existential type cannot be used if the protocol has an
+      // associated type.
+      ProtocolDeclBits.ExistentialTypeSupported = false;
       return false;
     }
 
@@ -2417,8 +2457,8 @@ bool ProtocolDecl::existentialConformsToSelfSlow(LazyResolver *resolver) {
       memberTy = memberTy->castTo<AnyFunctionType>()->getInput();
     }
 
-    // If we find 'Self' anywhere in the member's type, the protocol
-    // does not conform to itself.
+    // If we find 'Self' anywhere in the member's type, we cannot use the
+    // existential type.
     if (memberTy.findIf([&](Type type) -> bool {
           // If we found our archetype, return null.
           if (auto archetype = type->getAs<ArchetypeType>()) {
@@ -2427,16 +2467,16 @@ bool ProtocolDecl::existentialConformsToSelfSlow(LazyResolver *resolver) {
 
           return false;
         })) {
-      ProtocolDeclBits.ExistentialConformsToSelf = false;
+      ProtocolDeclBits.ExistentialTypeSupported = false;
       return false;
     }
   }
 
-  // Check whether any of the inherited protocols fail to conform to
-  // themselves.
+  // Check whether all of the inherited protocols can have existential
+  // types themselves.
   for (auto proto : getInheritedProtocols(resolver)) {
-    if (!proto->existentialConformsToSelf(resolver)) {
-      ProtocolDeclBits.ExistentialConformsToSelf = false;
+    if (!proto->existentialTypeSupported(resolver)) {
+      ProtocolDeclBits.ExistentialTypeSupported = false;
       return false;
     }
   }

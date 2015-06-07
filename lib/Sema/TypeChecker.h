@@ -1227,8 +1227,40 @@ public:
                     DeclName name,
                     MutableArrayRef<Expr *> arguments,
                     Diag<> brokenProtocolDiag);
-  
+
+  /// \brief Determine whether the given type contains the given protocol.
+  ///
+  /// \param DC The context in which to check conformance. This affects, for
+  /// example, extension visibility.
+  ///
+  /// \param options Options that control the conformance check.
+  ///
+  /// \param Conformance If non-NULL, and the type does conform to the given
+  /// protocol, this will be set to the protocol conformance mapping that
+  /// maps the given type \c T to the protocol \c Proto. The mapping may be
+  /// NULL, if the mapping is trivial due to T being either an archetype or
+  /// an existential type that directly implies conformance to \c Proto.
+  ///
+  /// \param ComplainLoc If valid, then this function will emit diagnostics if
+  /// T does not conform to the given protocol. The primary diagnostic will
+  /// be placed at this location, with notes for each of the protocol
+  /// requirements not satisfied.
+  ///
+  /// \returns true if T conforms to the protocol Proto, false otherwise.
+  ///
+  /// \note If this method returns 'true', it only means that there exists a
+  /// declared conformance of \c T to \c Proto. It does not mean that this
+  /// conformance is valid. Check \c (*Conformance)->getState() for that.
+  bool containsProtocol(Type T, ProtocolDecl *Proto,
+                        DeclContext *DC,
+                        ConformanceCheckOptions options,
+                        ProtocolConformance **Conformance = nullptr,
+                        SourceLoc ComplainLoc = SourceLoc());
+
   /// \brief Determine whether the given type conforms to the given protocol.
+  ///
+  /// Unlike subTypeOfProtocol(), this will return false for existentials of
+  /// non-self conforming protocols.
   ///
   /// \param DC The context in which to check conformance. This affects, for
   /// example, extension visibility.
@@ -1253,7 +1285,7 @@ public:
   /// conformance is valid. Check \c (*Conformance)->getState() for that.
   bool conformsToProtocol(Type T, ProtocolDecl *Proto, DeclContext *DC,
                           ConformanceCheckOptions options,
-                          ProtocolConformance **Conformance = 0,
+                          ProtocolConformance **Conformance = nullptr,
                           SourceLoc ComplainLoc = SourceLoc());
 
   /// Derive an implicit declaration to satisfy a requirement of a derived

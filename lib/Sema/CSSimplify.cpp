@@ -1139,7 +1139,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
   type2->getAnyExistentialTypeProtocols(protocols);
 
   for (auto proto : protocols) {
-    switch (simplifyConformsToConstraint(type1, proto, locator, flags, false)) {
+    switch (simplifyConformsToConstraint(type1, proto, locator, flags, true)) {
       case SolutionKind::Solved:
         break;
 
@@ -1222,37 +1222,58 @@ static bool allowsBridgingFromObjC(TypeChecker &tc, DeclContext *dc,
   return true;
 }
 
-/// Determine whether this type variable represents a "non-trivial"
-/// generic parameter, meaning that the generic parameter has a
-/// non-Objective-C protocol requirement.
+/// Determine whether this type variable represents a generic parameter
+/// that may be bound to an existential conforming to the given protocols.
 ///
-/// FIXME: This matches a limitation of our generics system, where we
-/// cannot pass the witness tables from
-///
-/// \returns the archetype for the generic parameter.
-static Type representsNonTrivialGenericParameter(TypeVariableType *typeVar) {
+/// This is only possible if the metatype is "trivial" in the sense that
+/// there is nothing interesting the code can do with it, like calling
+/// static methods. It also dovetails with an IRGen limitation, where
+/// witness tables cannot be passed from an existential to an archetype
+/// parameter, so for now we also restrict this to @objc protocols.
+static bool canBindGenericParamToExistential(ConstraintSystem &cs,
+                              TypeVariableType *typeVar,
+                              const SmallVector<ProtocolDecl *, 2> &protocols) {
   auto locator = typeVar->getImpl().getLocator();
   if (!locator || locator->getPath().empty() ||
       locator->getPath().back().getKind() != ConstraintLocator::Archetype)
-    return nullptr;
+    return true;
 
   auto archetype = locator->getPath().back().getArchetype();
+
+  // If the archetype has no protocol requirements, there is nothing to
+  // check. In particular, we don't care if the existential has any
+  // problematic conformances.
+  if (archetype->getConformsTo().empty())
+    return true;
+
+  // Check archetype conformances.
   for (auto proto : archetype->getConformsTo()) {
-    // AnyObject is always trivially representable as a generic parameter;
-    // there is no runtime witness.
-    if (proto->isSpecificProtocol(KnownProtocolKind::AnyObject))
-      continue;
-    
-    // ObjC protocols are trivially representable as a generic parameter;
-    // they are witnessed by the ObjC runtime.
-    if (proto->isObjC())
-      continue;
-    
-    // Other protocols would need Swift runtime support to self-conform.
-    return archetype;
+    if (!proto->existentialConformsToSelf()) {
+      if (cs.shouldRecordFailures()) {
+        cs.recordFailure(cs.getConstraintLocator(locator),
+                         Failure::IsNotSelfConforming,
+                         archetype, proto->getDeclaredType(),
+                         // value is for diag::protocol_not_self_conforming
+                         proto->isObjC() ? 1 : 0);
+      }
+      return false;
+    }
   }
 
-  return nullptr;
+  // We are going to shoehorn this existential into an archetype. It better
+  // not have any witness tables.
+  for (auto proto : protocols) {
+    if (!proto->isObjC()) {
+      if (cs.shouldRecordFailures()) {
+        cs.recordFailure(cs.getConstraintLocator(locator),
+                         Failure::ExistentialIsNotObjC,
+                         archetype, proto->getDeclaredType());
+      }
+      return false;
+    }
+  }
+
+  return true;
 }
 
 /// Check whether the given value type is one of a few specific
@@ -1360,14 +1381,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
         // type if the existential type is compatible with
         // Objective-C.
         Type archetype;
-        if (type2->isExistentialType() && 
-            (archetype = representsNonTrivialGenericParameter(typeVar1))) {
-          if (shouldRecordFailures()) {
-            recordFailure(getConstraintLocator(locator),
-                          Failure::ExistentialGenericParameter, 
-                          archetype, type2);
-          }
+        SmallVector<ProtocolDecl *, 2> protocols;
 
+        if (type2->isExistentialType(protocols) &&
+            !canBindGenericParamToExistential(*this, typeVar1, protocols)) {
           return SolutionKind::Error;
         }
 
@@ -1834,8 +1851,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       
       // Bridging from an ErrorType to an Objective-C NSError.
       auto errorType = TC.Context.getProtocol(KnownProtocolKind::ErrorType);
-      if (TC.conformsToProtocol(type1, errorType, DC,
-                                ConformanceCheckFlags::InExpression))
+      if (TC.containsProtocol(type1, errorType, DC,
+                              ConformanceCheckFlags::InExpression))
         if (auto NSErrorTy = TC.getNSErrorType(DC))
           if (type2->isEqual(NSErrorTy))
             conversionsOrFixes.push_back(
@@ -2305,17 +2322,13 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   if (typeVar)
     return SolutionKind::Unsolved;
 
-  // If existential types don't need to conform (i.e., they only need to
-  // contain the protocol), check that separately.
-  if (allowNonConformingExistential && type->isExistentialType()) {
-    SmallVector<ProtocolDecl *, 4> protocols;
-    type->getAnyExistentialTypeProtocols(protocols);
-
-    for (auto ap : protocols) {
-      // If this isn't the protocol we're looking for, continue looking.
-      if (ap == protocol || ap->inheritsFrom(protocol))
-        return SolutionKind::Solved;
-    }
+  // For purposes of argument type matching, existential types don't need to
+  // conform -- they only need to contain the protocol, so check that
+  // separately.
+  if (allowNonConformingExistential) {
+    if (TC.containsProtocol(type, protocol, DC,
+                            ConformanceCheckFlags::InExpression))
+      return SolutionKind::Solved;
   } else {
     // Check whether this type conforms to the protocol.
     if (TC.conformsToProtocol(type, protocol, DC,
@@ -2334,9 +2347,11 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   }
   
   // There's nothing more we can do; fail.
-  recordFailure(getConstraintLocator(locator),
-                Failure::DoesNotConformToProtocol, type,
-                protocol->getDeclaredType());
+  if (shouldRecordFailures()) {
+    recordFailure(getConstraintLocator(locator),
+                  Failure::DoesNotConformToProtocol, type,
+                  protocol->getDeclaredType());
+  }
   return SolutionKind::Error;
 }
 

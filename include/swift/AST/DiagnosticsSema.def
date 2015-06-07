@@ -264,9 +264,6 @@ ERROR(use_local_before_declaration,sema_nb,none,
 ERROR(unsupported_existential_type,sema_nb,none,
       "protocol %0 can only be used as a generic constraint because it has "
       "Self or associated type requirements", (Identifier))
-ERROR(unsupported_existential_generic_req,sema_nb,none,
-      "protocol type %0 cannot be used as a generic argument conforming to "
-      "non-@objc protocol %1", (Type, Type))
 
 ERROR(no_decl_in_module,sema_nb,none,
       "no such decl in module", ())
@@ -411,8 +408,14 @@ ERROR(no_accessible_initializers,sema_tcc,none,
       (Type))
 ERROR(unbound_generic_parameter,sema_tcc,none,
       "argument for generic parameter %0 could not be inferred", (Type))
-ERROR(generic_parameter_binds_to_non_objc_existential,sema_tcc,none,
-      "generic parameter %0 cannot be bound to non-@objc protocol type %1",
+ERROR(protocol_not_self_conforming,sema_tcc,none,
+      "generic parameter %0 is constrained to a %select{non-@objc protocol type|"
+      "protocol type with static methods}2 %1 and cannot be bound to an "
+      "existential type",
+      (Type, Type, unsigned))
+ERROR(existential_non_objc,sema_tcc,none,
+      "generic parameter %0 cannot be bound to an existential type containing "
+      "a non-@objc protocol type %1",
       (Type, Type))
 ERROR(cannot_bind_generic_parameter_to_type,sema_tcc,none,
       "cannot bind generic parameter to type %0",
