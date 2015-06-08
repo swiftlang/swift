@@ -889,11 +889,8 @@ public:
   /// The list of local type declarations in the source file.
   TinyPtrVector<TypeDecl*> LocalTypeDecls;
 
-  /// A set of special declaration attributes which require the
-  /// Foundation module to be imported to work. If the foundation
-  /// module is still not imported by the time type checking is
-  /// complete, we diagnose.
-  llvm::DenseSet<const DeclAttribute *> AttrsRequiringFoundation;
+  /// The first location where an @objc attribute appeared.
+  const DeclAttribute *FirstObjCAttr = nullptr;
 
   template <typename T>
   using OperatorMap = llvm::DenseMap<Identifier,llvm::PointerIntPair<T,1,bool>>;

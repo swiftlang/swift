@@ -499,30 +499,6 @@ void swift::typeCheckExternalDefinitions(SourceFile &SF) {
   typeCheckFunctionsAndExternalDecls(TC);
 }
 
-static void diagnoseAttrsRequiringFoundation(SourceFile &SF) {
-  auto &Ctx = SF.getASTContext();
-  bool ImportsFoundationModule = false;
-
-  if (SF.Kind == SourceFileKind::SIL ||
-      !Ctx.LangOpts.EnableObjCAttrRequiresFoundation)
-    return;
-
-  SF.forAllVisibleModules([&](Module::ImportedModule import) {
-    if (import.second->getName() == Ctx.Id_Foundation)
-      ImportsFoundationModule = true;
-  });
-
-  if (ImportsFoundationModule)
-    return;
-
-  for (auto Attr : SF.AttrsRequiringFoundation) {
-    SourceLoc L = Attr->getLocation();
-    Ctx.Diags.diagnose(L, diag::attr_used_without_required_module,
-                       Attr, Ctx.Id_Foundation)
-    .highlight(Attr->getRangeWithAt());
-  }
-}
-
 void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
                                 OptionSet<TypeCheckingFlags> Options,
                                 unsigned StartElem) {
@@ -533,6 +509,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   // checking.
   performNameBinding(SF, StartElem);
 
+  bool ImportsFoundationModule = false;
   auto &Ctx = SF.getASTContext();
   {
     // NOTE: The type checker is scoped to be torn down before AST
@@ -546,7 +523,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     // protocols in the AST.
     (void) TC.getStdlibModule(&SF);
 
-    if (!Ctx.LangOpts.DisableAvailabilityChecking) {
+    if (!Ctx.LangOpts.DisableAvailabilityChecking ) {
       // Build the type refinement hierarchy for the primary
       // file before type checking.
       TypeChecker::buildTypeRefinementContextHierarchy(SF, StartElem);
@@ -560,6 +537,9 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     // FIXME: The current source file needs to be handled specially, because of
     // private extensions.
     SF.forAllVisibleModules([&](Module::ImportedModule import) {
+      if (import.second->getName() == Ctx.Id_Foundation)
+        ImportsFoundationModule = true;
+
       // FIXME: Respect the access path?
       for (auto file : import.second->getFiles()) {
         auto SF = dyn_cast<SourceFile>(file);
@@ -630,7 +610,16 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
   // Verify that we've checked types correctly.
   SF.ASTStage = SourceFile::TypeChecked;
 
-  diagnoseAttrsRequiringFoundation(SF);
+  // Emit an error if there is a declaration with the @objc attribute
+  // but we have not imported the Foundation module.
+  if (!ImportsFoundationModule && StartElem == 0 &&
+      Ctx.LangOpts.EnableObjCAttrRequiresFoundation &&
+      SF.FirstObjCAttr && SF.Kind != SourceFileKind::SIL) {
+    SourceLoc L = SF.FirstObjCAttr->getLocation();
+    Ctx.Diags.diagnose(L, diag::attr_used_without_required_module,
+                       SF.FirstObjCAttr, Ctx.Id_Foundation)
+      .highlight(SF.FirstObjCAttr->getRangeWithAt());
+  }
 
   // Verify the SourceFile.
   verify(SF);
