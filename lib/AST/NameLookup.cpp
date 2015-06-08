@@ -667,6 +667,9 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         if (AllowProtocolMembers)
           options |= NL_ProtocolMembers;
 
+        if (!ExtendedType)
+          ExtendedType = ErrorType::get(Ctx);
+
         SmallVector<ValueDecl *, 4> Lookup;
         DC->lookupQualified(ExtendedType, Name, options, TypeResolver, Lookup);
         bool isMetatypeType = ExtendedType->is<AnyMetatypeType>();
