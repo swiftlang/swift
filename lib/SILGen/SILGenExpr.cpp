@@ -678,7 +678,7 @@ ManagedValue SILGenFunction::emitRValueForPropertyLoad(
       // If we have an abstraction change or if we have to produce a result at
       // +1, then emit a RetainValue. If we know that our base will stay alive,
       // we can emit at +0 for a guaranteed consumer. Otherwise, since we do not
-      // hav eenough information, we can only emit at +0 for immediate clients.
+      // have enough information, we can only emit at +0 for immediate clients.
       Result = Result.copyUnmanaged(*this, loc);
     }
   } else {
