@@ -957,7 +957,9 @@ public:
     /// A closure.
     Closure,
     /// A subscript.
-    Subscript
+    Subscript,
+    /// A curried argument clause.
+    Curried,
   };
 
   /// Parse a parameter-clause.

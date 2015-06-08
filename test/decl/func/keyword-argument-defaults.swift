@@ -111,6 +111,12 @@ func testSubscripts(i: Int, s: String, x: Y) {
   var s3 = x[s]  // expected-error{{missing argument label 'y:' in subscript}}
 }
 
+// Operators
+func +(_ a: String,  // expected-warning{{extraneous '_' in parameter: 'a' has no keyword argument name}}{{8-10=}}
+       b b: Double) { } // expected-error{{operator cannot have keyword arguments}}
+
+func +(a: Double, b: String)(_ c: Int)(d e: Int) { } // okay
+
 // # is being removed
 func pound(#a: Int, // expected-error{{'#' has been removed from Swift; double up 'a a' to make the argument label the same as the parameter name}}{{12-13=a }}
            #b: Int) { } // expected-error{{'#' has been removed from Swift; 'b' already has an argument label}}{{12-13=}}

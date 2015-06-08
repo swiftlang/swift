@@ -237,6 +237,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
 
       // Operators can not have API names.
       if (paramContext == ParameterContextKind::Operator &&
+          !param.FirstName.empty() &&
           param.SecondNameLoc.isValid()) {
         diagnose(param.FirstNameLoc, 
                  diag::parameter_operator_keyword_argument)
@@ -407,6 +408,10 @@ mapParsedParameters(Parser &parser,
     case Parser::ParameterContextKind::Function:
       isKeywordArgumentByDefault = !isFirstParameterClause || !isFirstParameter;
       break;
+
+    case Parser::ParameterContextKind::Curried:
+      isKeywordArgumentByDefault = true;
+      break;
     }
 
     // Create the pattern.
@@ -563,6 +568,7 @@ Parser::parseFunctionArguments(SmallVectorImpl<Identifier> &NamePieces,
                                        paramContext);
     BodyPatterns.push_back(pattern);
     isFirstParameterClause = false;
+    paramContext = ParameterContextKind::Curried;
   }
 
   return status;
