@@ -122,7 +122,7 @@ class Z5 : Z4 {
 // Ill-formed initialization: failure to call initializer.
 class Z6 {
   convenience init() {
-    var _ : () -> Z6 = self.init // expected-error{{initializer cannot be referenced without arguments}}
+    var _ : () -> Z6 = self.init // expected-error{{partial application of 'self.init' initializer delegation is not allowed}}
   }
 
   init(other: Z6) { }

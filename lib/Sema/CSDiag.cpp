@@ -2306,6 +2306,8 @@ bool FailureDiagnosis::diagnoseFailureForCallExpr() {
     }
   } else if (auto UDE = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
     overloadName = UDE->getName().str().str();
+  } else if (isa<UnresolvedConstructorExpr>(fnExpr)) {
+    overloadName = "init";
   } else {
     isClosureInvocation = true;
     

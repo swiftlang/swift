@@ -19,7 +19,11 @@ class D : B {
   }
 
   override init(x:Int) {
-    super.init //  expected-error {{'super.init' cannot be referenced without arguments}} expected-error {{could not find an overload for 'init' that accepts the supplied arguments}}
+    let _: () -> B = super.init // expected-error {{partial application of 'super.init' initializer chain is not allowed}}
+  }
+
+  convenience init(y:Int) {
+    let _: () -> D = self.init // expected-error {{partial application of 'self.init' initializer delegation is not allowed}}
   }
 
   func super_calls() {

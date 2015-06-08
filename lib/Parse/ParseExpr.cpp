@@ -485,8 +485,7 @@ static VarDecl *getImplicitSelfDeclForSuperContext(Parser &P,
 ///   expr-super-member:
 ///     'super' '.' identifier
 ///   expr-super-init:
-///     'super' '.' 'init' expr-paren?
-///     'super' '.' 'init' identifier expr-call-suffix
+///     'super' '.' 'init'
 ///   expr-super-subscript:
 ///     'super' '[' expr ']'
 ParserResult<Expr> Parser::parseExprSuper() {
@@ -531,26 +530,7 @@ ParserResult<Expr> Parser::parseExprSuper() {
       Expr *result = new (Context) UnresolvedConstructorExpr(superRef,
                                      dotLoc, ctorLoc,
                                      /*Implicit=*/false);
-      if (Tok.isFollowingLParen()) {
-        // Parse initializer arguments.
-        ParserResult<Expr> arg = parseExprList(tok::l_paren, tok::r_paren);
-        if (arg.hasCodeCompletion())
-          return makeParserCodeCompletionResult<Expr>();
-
-        if (arg.isParseError())
-          return makeParserError();
-        
-        result = new (Context) CallExpr(result, arg.get(), /*Implicit=*/false);
-      } else {
-        // It's invalid to refer to an uncalled initializer.
-        diagnose(ctorLoc, diag::super_initializer_must_be_called);
-        result->setType(ErrorType::get(Context));
-        return makeParserErrorResult(result);
-      }
-
-      // The result of the called initializer is used to rebind 'self'.
-      return makeParserResult(
-          new (Context) RebindSelfInConstructorExpr(result, selfDecl));
+      return makeParserResult(result);
     } else if (Tok.is(tok::code_complete)) {
       if (CodeCompletion) {
         if (auto *SRE = dyn_cast<SuperRefExpr>(superRef))
@@ -889,8 +869,13 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     
     Identifier Name;
     SourceLoc NameLoc;
-    if (parseIdentifier(Name, NameLoc,diag::expected_identifier_after_dot_expr))
+    if (Tok.is(tok::kw_init)) {
+      Name = Context.Id_init;
+      NameLoc = consumeToken(tok::kw_init);
+    } else if (parseIdentifier(Name, NameLoc,
+                               diag::expected_identifier_after_dot_expr)) {
       return nullptr;
+    }
 
     ParserResult<Expr> Arg;
 
@@ -1018,37 +1003,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
                                           TokLoc,
                                           Tok.getLoc(),
                                           /*Implicit=*/false);
-          SourceLoc initLoc = consumeToken(tok::kw_init);
-
-          // FIXME: This is really a semantic restriction for 'self.init'
-          // masquerading as a parser restriction.
-          if (Tok.isFollowingLParen()) {
-            // Parse initializer arguments.
-            ParserResult<Expr> arg = parseExprList(tok::l_paren, tok::r_paren);
-            if (arg.hasCodeCompletion())
-              return makeParserCodeCompletionResult<Expr>();
-            // FIXME: Unfortunate recovery here.
-            if (arg.isNull())
-              return nullptr;
-
-            initRef = new (Context) CallExpr(initRef, arg.get(),
-                                             /*Implicit=*/false);
-
-            // Dig out the 'self' declaration we're using so we can rebind it.
-            // FIXME: Should be in the type checker, not here.
-            if (auto func = dyn_cast<ConstructorDecl>(CurDeclContext)) {
-              if (auto selfDecl = func->getImplicitSelfDecl()) {
-                initRef = new (Context) RebindSelfInConstructorExpr(initRef,
-                                                                    selfDecl);
-              }
-            }
-          } else {
-            // It's invalid to refer to an uncalled initializer.
-            diagnose(initLoc, diag::init_ref_must_be_called);
-            initRef->setType(ErrorType::get(Context));
-          }
-
-
+          consumeToken(tok::kw_init);
           Result = makeParserResult(initRef);
           continue;
         }

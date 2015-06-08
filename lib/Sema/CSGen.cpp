@@ -1183,8 +1183,7 @@ namespace {
       auto resultTy = CS.createTypeVariable(CS.getConstraintLocator(expr),
                                             /*options=*/0);
       auto methodTy = FunctionType::get(argsTy, resultTy);
-      CS.addValueMemberConstraint(baseTy,
-                                  C.Id_init,
+      CS.addValueMemberConstraint(baseTy, C.Id_init,
         methodTy,
         CS.getConstraintLocator(expr, ConstraintLocator::ConstructorMember));
       

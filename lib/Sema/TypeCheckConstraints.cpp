@@ -501,6 +501,35 @@ namespace {
         assert(DC == ce && "DeclContext imbalance");
         DC = ce->getParent();
       }
+      
+      // A 'self.init' or 'super.init' application inside a constructor will
+      // evaluate to void, with the initializer's result implicitly rebound
+      // to 'self'. Wrap (apply (unresolved_constructor)) in a RebindSelf expr
+      // to represent this.
+      if (auto apply = dyn_cast<ApplyExpr>(expr)) {
+      
+        if (auto nestedCtor
+              = dyn_cast<UnresolvedConstructorExpr>(apply->getFn())){
+          if (DC->getInnermostMethodContext()) {
+            if (auto ctorContext
+                 = dyn_cast<ConstructorDecl>(DC->getInnermostMethodContext())) {
+              auto rebindSelf = [&]() -> Expr * {
+                return new (TC.Context) RebindSelfInConstructorExpr(expr,
+                                            ctorContext->getImplicitSelfDecl());
+              };
+
+              auto nestedArg = nestedCtor->getSubExpr();
+              if (auto inout = dyn_cast<InOutExpr>(nestedArg))
+                nestedArg = inout->getSubExpr();
+              if (nestedArg->isSuperExpr())
+                return rebindSelf();
+              if (auto declRef = dyn_cast<DeclRefExpr>(nestedArg))
+                if (declRef->getDecl()->getName() == TC.Context.Id_self)
+                  return rebindSelf();
+            }
+          }
+        }
+      }
 
       // If this is a sugared type that needs to be folded into a single
       // TypeExpr, do it.

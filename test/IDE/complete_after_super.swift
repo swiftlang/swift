@@ -11,7 +11,6 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=CONSTRUCTOR_SUPER_INIT_PAREN_1 > %t.super.txt
 // RUN: FileCheck %s -check-prefix=CONSTRUCTOR_SUPER_INIT_PAREN_1 < %t.super.txt
-// RUN: FileCheck %s -check-prefix=NO_EXPR_SPECIFIC < %t.super.txt
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=DESTRUCTOR_SUPER_NO_DOT_1 > %t.super.txt
 // RUN: FileCheck %s -check-prefix=COMMON_BASE_A_NO_DOT < %t.super.txt
@@ -106,8 +105,6 @@
 // NO_CONSTRUCTORS-NOT: init(
 
 // NO_SUPER_DECLS-NOT: Decl/Super
-
-// NO_EXPR_SPECIFIC-NOT: ExprSpecific
 
 //===---
 //===--- Tests for code completion after 'super'.
@@ -229,7 +226,7 @@ class SuperDerivedA : SuperBaseA {
   init (a: Float) {
     super.init(#^CONSTRUCTOR_SUPER_INIT_PAREN_1^#
 // CONSTRUCTOR_SUPER_INIT_PAREN_1: Begin completions
-// CONSTRUCTOR_SUPER_INIT_PAREN_1-DAG: Decl[LocalVar]/Local: a[#Float#]{{; name=.+$}}
+// CONSTRUCTOR_SUPER_INIT_PAREN_1-DAG: Pattern/ExprSpecific: ['('])[#SuperBaseA#]; name=)
 // CONSTRUCTOR_SUPER_INIT_PAREN_1: End completions
   }
 

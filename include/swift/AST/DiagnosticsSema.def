@@ -1554,8 +1554,13 @@ ERROR(ambiguous_operator_ref,tce_sema,none,
 // Cannot capture inout-ness of a parameter
 // Partial application of foreign functions not supported
 ERROR(partial_application_of_function_invalid,tce_sema,none,
-      "partial application of %select{function with 'inout' parameters|"
-      "'mutating' method|method in @objc protocol}0 is not allowed",
+      "partial application of %select{"
+        "function with 'inout' parameters|"
+        "'mutating' method|"
+        "method in @objc protocol|"
+        "'super.init' initializer chain|"
+        "'self.init' initializer delegation"
+      "}0 is not allowed",
       (unsigned))
 
 ERROR(self_assignment_var,tce_sema,none,

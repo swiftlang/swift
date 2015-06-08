@@ -2263,7 +2263,6 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
     superCall = new (ctx) TryExpr(SourceLoc(), superCall, Type(),
                                   /*Implicit=*/true);
   }
-  superCall = new (ctx) RebindSelfInConstructorExpr(superCall, selfDecl);
   ctor->setBody(BraceStmt::create(tc.Context, SourceLoc(),
                                   ASTNode(superCall),
                                   SourceLoc(),

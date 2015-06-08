@@ -1234,7 +1234,6 @@ Expr* TypeChecker::constructCallToSuperInit(ConstructorDecl *ctor,
   Expr *args = TupleExpr::createEmpty(Context, SourceLoc(), SourceLoc(),
                                       /*Implicit=*/true);
   r = new (Context) CallExpr(r, args, /*Implicit=*/true);
-  r = new (Context) RebindSelfInConstructorExpr(r, ctor->getImplicitSelfDecl());
 
   /// Expression type checking listener for the generated call to super ensures
   /// that we suppress diagnostics.

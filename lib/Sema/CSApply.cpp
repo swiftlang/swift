@@ -2319,7 +2319,7 @@ namespace {
         diagnoseIfOverloadChoiceUnavailable(choice, expr->getConstructorLoc());
       }
       
-      // Build a partial application of the initializer.
+      // Build a partial application of the delegated initializer.
       Expr *ctorRef = buildOtherConstructorRef(
                         selected.openedFullType,
                         ctor, expr->getConstructorLoc(),
@@ -2332,6 +2332,15 @@ namespace {
         = new (cs.getASTContext()) DotSyntaxCallExpr(ctorRef,
                                                      expr->getDotLoc(),
                                                      expr->getSubExpr());
+      
+      // Partial applications of delegated initializers aren't allowed, and
+      // don't really make sense to begin with.
+      InvalidPartialApplications.insert({
+        call,
+        {1, arg->isSuperExpr() ? PartialApplication::SuperInit
+                               : PartialApplication::SelfInit}
+      });
+      
       return finishApply(call, expr->getType(),
                          ConstraintLocatorBuilder(
                            cs.getConstraintLocator(expr)));
@@ -2490,7 +2499,9 @@ namespace {
       enum : unsigned {
         Function,
         MutatingMethod,
-        ObjCProtocolMethod
+        ObjCProtocolMethod,
+        SuperInit,
+        SelfInit,
       };
       unsigned kind : 3;
     };
