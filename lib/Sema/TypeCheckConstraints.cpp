@@ -420,6 +420,26 @@ resolveDeclRefExpr(UnresolvedDeclRefExpr *UDRE, DeclContext *DC) {
   return new (Context) ErrorExpr(Loc);
 }
 
+/// If an expression references 'self.init' or 'super.init' in an
+/// initializer context, returns the implicit 'self' decl of the constructor.
+/// Otherwise, return nil.
+VarDecl *
+TypeChecker::getSelfForInitDelegationInConstructor(DeclContext *DC,
+                                           UnresolvedConstructorExpr *ctorRef) {
+  if (auto ctorContext
+        = dyn_cast_or_null<ConstructorDecl>(DC->getInnermostMethodContext())) {
+    auto nestedArg = ctorRef->getSubExpr();
+    if (auto inout = dyn_cast<InOutExpr>(nestedArg))
+      nestedArg = inout->getSubExpr();
+    if (nestedArg->isSuperExpr())
+      return ctorContext->getImplicitSelfDecl();
+    if (auto declRef = dyn_cast<DeclRefExpr>(nestedArg))
+      if (declRef->getDecl()->getName() == Context.Id_self)
+        return ctorContext->getImplicitSelfDecl();
+  }
+  return nullptr;
+}
+
 namespace {
   class PreCheckExpression : public ASTWalker {
     TypeChecker &TC;
@@ -507,26 +527,11 @@ namespace {
       // to 'self'. Wrap (apply (unresolved_constructor)) in a RebindSelf expr
       // to represent this.
       if (auto apply = dyn_cast<ApplyExpr>(expr)) {
-      
         if (auto nestedCtor
-              = dyn_cast<UnresolvedConstructorExpr>(apply->getFn())){
-          if (DC->getInnermostMethodContext()) {
-            if (auto ctorContext
-                 = dyn_cast<ConstructorDecl>(DC->getInnermostMethodContext())) {
-              auto rebindSelf = [&]() -> Expr * {
-                return new (TC.Context) RebindSelfInConstructorExpr(expr,
-                                            ctorContext->getImplicitSelfDecl());
-              };
-
-              auto nestedArg = nestedCtor->getSubExpr();
-              if (auto inout = dyn_cast<InOutExpr>(nestedArg))
-                nestedArg = inout->getSubExpr();
-              if (nestedArg->isSuperExpr())
-                return rebindSelf();
-              if (auto declRef = dyn_cast<DeclRefExpr>(nestedArg))
-                if (declRef->getDecl()->getName() == TC.Context.Id_self)
-                  return rebindSelf();
-            }
+              = dyn_cast<UnresolvedConstructorExpr>(apply->getFn())) {
+          if (auto self
+                = TC.getSelfForInitDelegationInConstructor(DC, nestedCtor)) {
+            return new (TC.Context) RebindSelfInConstructorExpr(expr, self);
           }
         }
       }

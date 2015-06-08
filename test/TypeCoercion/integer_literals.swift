@@ -61,7 +61,7 @@ func chaining() {
 }
 
 func memberaccess() {
-  Int32(5.value)
+  Int32(5.value) // expected-warning{{unused}}
   // FIXME: This should work
   var x : Int32 = 7.value // expected-error{{could not find member 'value'}}
 }

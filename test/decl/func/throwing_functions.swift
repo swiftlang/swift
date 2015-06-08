@@ -141,7 +141,7 @@ struct A {
 }
 
 func fi1() throws {
-    A(doomed: ()) // expected-error {{call can throw but is not marked with 'try'}}
+    A(doomed: ()) // expected-error {{call can throw but is not marked with 'try'}} // expected-warning{{unused}}
 }
 
 struct B {
@@ -149,4 +149,4 @@ struct B {
  init(foo: Int) {}
 }
 
-B(foo: 0)
+B(foo: 0) // expected-warning{{unused}}

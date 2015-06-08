@@ -1608,6 +1608,20 @@ public:
     return DiagnosedExprs.count(E) != 0;
   }
 
+  /// If an expression references 'self.init' or 'super.init' in an
+  /// initializer context, returns the implicit 'self' decl of the constructor.
+  /// Otherwise, return nil.
+  VarDecl *getSelfForInitDelegationInConstructor(DeclContext *DC,
+                                            UnresolvedConstructorExpr *ctorRef);
+
+  /// When referencing a class initializer, check that the base expression is
+  /// either a static metatype or that the initializer is 'required'.
+  bool
+  diagnoseInvalidDynamicConstructorReferences(Expr *base,
+                                              SourceLoc memberRefLoc,
+                                              AnyMetatypeType *metaTy,
+                                              ConstructorDecl *ctorDecl,
+                                              bool SuppressDiagnostics);
 };
 
 /// \brief RAII object that cleans up the given expression if not explicitly

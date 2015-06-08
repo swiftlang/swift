@@ -44,7 +44,7 @@ A<(Int, UnicodeScalar)>.c()
 A<(a:Int, b:UnicodeScalar)>.c()
 A<protocol<Runcible, Fungible>>.c()
 
-A<B>(x: 0)
+A<B>(x: 0) // expected-warning{{unused}}
 
 meta(A<B>.self)
 
@@ -66,7 +66,7 @@ meta2(A<B>.C<D>.self, 0)
 
 A<B, D>.c() // expected-error{{generic type 'A' specialized with too many type parameters (got 2, but expected 1)}} expected-error {{'<<error type>>.Type' does not have a member named 'c'}}
 
-A<B?>(x: 0) // parses as type
+A<B?>(x: 0) // parses as type // expected-warning{{unused}}
 a < b ? c : d
 
-A<B throws -> D>(x: 0)
+A<B throws -> D>(x: 0) // expected-warning{{unused}}

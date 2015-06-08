@@ -40,7 +40,7 @@ class ClassWithOverride : ClassWithUnavailable {
 }
 
 func testInit() {
-  ClassWithUnavailable(int: 0) // expected-error {{'init(int:)' is unavailable}}
+  ClassWithUnavailable(int: 0) // expected-error {{'init(int:)' is unavailable}} // expected-warning{{unused}}
 }
 
 func testSuvscript(cwu: ClassWithUnavailable) {

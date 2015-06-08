@@ -786,6 +786,13 @@ namespace {
       if (auto baseMeta = baseTy->getAs<AnyMetatypeType>()) {
         baseIsInstance = false;
         baseTy = baseMeta->getInstanceType();
+        // If the member is a constructor, verify that it can be legally
+        // referenced from this base.
+        if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
+          if (!tc.diagnoseInvalidDynamicConstructorReferences(base, memberLoc,
+                                           baseMeta, ctor, SuppressDiagnostics))
+            return nullptr;
+        }
       }
 
       // Produce a reference to the member, the type of the container it
@@ -2245,8 +2252,18 @@ namespace {
       auto ctorLocator = cs.getConstraintLocator(
                            expr,
                            ConstraintLocator::ConstructorMember);
-      auto selected = getOverloadChoice(ctorLocator);
-      auto choice = selected.choice;
+      
+      auto selected = getOverloadChoiceIfAvailable(ctorLocator);
+      
+      // If we didn't form a ConstructorMember constraint, then it
+      // acts like a normal member reference to '.init'.
+      if (!selected) {
+        return applyMemberRefExpr(expr, expr->getSubExpr(), expr->getDotLoc(),
+                                expr->getConstructorLoc(), expr->isImplicit());
+      }
+        
+      
+      auto choice = selected->choice;
       auto *ctor = cast<ConstructorDecl>(choice.getDecl());
 
       auto arg = expr->getSubExpr()->getSemanticsProvidingExpr();
@@ -2256,7 +2273,7 @@ namespace {
       // constructor.
       if (arg->getType()->is<AnyMetatypeType>()) {
         return buildMemberRef(expr->getSubExpr(),
-                              selected.openedFullType,
+                              selected->openedFullType,
                               expr->getDotLoc(),
                               ctor,
                               expr->getConstructorLoc(),
@@ -2321,7 +2338,7 @@ namespace {
       
       // Build a partial application of the delegated initializer.
       Expr *ctorRef = buildOtherConstructorRef(
-                        selected.openedFullType,
+                        selected->openedFullType,
                         ctor, expr->getConstructorLoc(),
                         cs.getConstraintLocator(
                           expr,
@@ -2617,7 +2634,6 @@ namespace {
       return applyMemberRefExpr(expr, expr->getBase(), expr->getDotLoc(),
                                 expr->getNameRange().Start,
                                 expr->isImplicit());
-      llvm_unreachable("not implemented");
     }
     
     
@@ -5380,7 +5396,51 @@ static bool isNonFinalClass(Type type) {
   if (auto classDecl = type->getClassOrBoundGenericClass())
     return !classDecl->isFinal();
 
+  if (auto archetype = type->getAs<ArchetypeType>())
+    if (auto super = archetype->getSuperclass())
+      return isNonFinalClass(super);
+
   return false;
+}
+
+// Non-required constructors may not be not inherited. Therefore when
+// constructing a class object, either the metatype must be statically
+// derived (rather than an arbitrary value of metatype type) or the referenced
+// constructor must be required.
+bool
+TypeChecker::diagnoseInvalidDynamicConstructorReferences(Expr *base,
+                                                     SourceLoc memberRefLoc,
+                                                     AnyMetatypeType *metaTy,
+                                                     ConstructorDecl *ctorDecl,
+                                                     bool SuppressDiagnostics) {
+  auto ty = metaTy->getInstanceType();
+  
+  // FIXME: The "hasClangNode" check here is a complete hack.
+  if (isNonFinalClass(ty) &&
+      !base->isStaticallyDerivedMetatype() &&
+      !ctorDecl->hasClangNode() &&
+      !(ctorDecl->isRequired() ||
+        ctorDecl->getDeclContext()->isProtocolOrProtocolExtensionContext())) {
+    if (SuppressDiagnostics)
+      return false;
+
+    diagnose(memberRefLoc, diag::dynamic_construct_class, ty)
+      .highlight(base->getSourceRange());
+    auto ctor = cast<ConstructorDecl>(ctorDecl);
+    diagnose(ctorDecl, diag::note_nonrequired_initializer,
+             ctor->isImplicit(), ctor->getFullName());
+  // Constructors cannot be called on a protocol metatype, because there is no
+  // metatype to witness it.
+  } else if (isa<ConstructorDecl>(ctorDecl) &&
+             isa<MetatypeType>(metaTy) &&
+             ty->isExistentialType()) {
+    if (SuppressDiagnostics)
+      return false;
+
+    diagnose(memberRefLoc, diag::static_construct_existential, ty)
+      .highlight(base->getSourceRange());
+  }
+  return true;
 }
 
 Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
@@ -5413,7 +5473,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     // Use the subexpression as the function.
     fn = covariant->getSubExpr();
   }
-
+  
   apply->setFn(fn);
 
   // Check whether the argument is 'super'.
@@ -5498,36 +5558,10 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
                                  ctorLocator,
                                  /*Implicit=*/true, AccessSemantics::Ordinary,
                                  isDynamic);
+  if (!declRef)
+    return nullptr;
   declRef->setImplicit(apply->isImplicit());
   apply->setFn(declRef);
-
-  // Non-required constructors may not be not inherited. Therefore when
-  // constructing a class object, either the metatype must be statically
-  // derived (rather than an arbitrary value of metatype type) or the referenced
-  // constructor must be required.
-  // FIXME: The "hasClangNode" check here is a complete hack.
-  if (isNonFinalClass(ty) &&
-      !fn->isStaticallyDerivedMetatype() &&
-      !decl->hasClangNode() &&
-      !(cast<ConstructorDecl>(decl)->isRequired() ||
-        decl->getDeclContext()->isProtocolExtensionContext())) {
-    if (SuppressDiagnostics)
-      return nullptr;
-
-    tc.diagnose(apply->getLoc(), diag::dynamic_construct_class, ty)
-      .highlight(fn->getSourceRange());
-    auto ctor = cast<ConstructorDecl>(decl);
-    tc.diagnose(decl, diag::note_nonrequired_initializer,
-                ctor->isImplicit(), ctor->getFullName());
-
-  // Constructors cannot be called on a protocol metatype, because there is no
-  // metatype to witness it.
-  } else if (isa<ConstructorDecl>(decl) &&
-             isa<MetatypeType>(metaTy) &&
-             ty->isExistentialType()) {
-    tc.diagnose(apply->getLoc(), diag::static_construct_existential, ty)
-      .highlight(fn->getSourceRange());
-  }
 
   // Tail-recur to actually call the constructor.
   return finishApply(apply, openedType, locator);

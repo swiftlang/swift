@@ -243,12 +243,10 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
   // Dig out the type that we'll actually be looking into, and determine
   // whether it is a nominal type.
   Type lookupType = type;
-  bool isMetatype = false;
   if (auto lvalueType = lookupType->getAs<LValueType>()) {
     lookupType = lvalueType->getObjectType();
   }
   if (auto metaType = lookupType->getAs<MetatypeType>()) {
-    isMetatype = true;
     lookupType = metaType->getInstanceType();
   }
   NominalTypeDecl *nominalLookupType = lookupType->getAnyNominal();

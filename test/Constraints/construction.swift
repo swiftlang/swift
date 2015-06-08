@@ -43,19 +43,19 @@ func acceptString(s: String) {}
 
 Point(1, 2)
 var db : Base = d
-X(i: 1, j: 2)
-Y(1, 2, "hello")
+X(i: 1, j: 2) // expected-warning{{unused}}
+Y(1, 2, "hello") // expected-warning{{unused}}
 
 // Unions
-Z(UnicodeScalar("a"))
-Z(1, 2)
+Z(UnicodeScalar("a")) // expected-warning{{unused}}
+Z(1, 2) // expected-warning{{unused}}
 
 acceptZ(.none)
 acceptZ(.char("a"))
 acceptString("\(hello), \(world) #\(i)!")
 
-Optional<Int>(1)
-Optional(1)
+Optional<Int>(1) // expected-warning{{unused}}
+Optional(1) // expected-warning{{unused}}
 .none as Optional<Int>
 Optional(.none) // expected-error{{could not find member 'none'}}
 
@@ -91,7 +91,7 @@ b as! Derived
 // Construction doesn't permit conversion.
 // NOTE: Int and other integer-literal convertible types
 //  are special cased in the library.
-Int(i) // no-warning
+Int(i) // expected-warning{{unused}}
 i as Int
 Z(z) // expected-error{{cannot find an initializer for type 'Z' that accepts an argument list of type '(Z)'}}
 z as Z
@@ -104,8 +104,8 @@ struct BarRef {
 }
 var f = FooRef()
 var x = 0
-BarRef(x: &f)
-BarRef(x: &x)
+BarRef(x: &f) // expected-warning{{unused}}
+BarRef(x: &x) // expected-warning{{unused}}
 
 // Construction from a Type value not immediately resolved.
 struct S1 {
@@ -127,7 +127,7 @@ s2 = S2(i: 5)
 
 // rdar://problem/19254404
 let i32 = Int32(123123123)
-Int(i32 - 2 + 1)
+Int(i32 - 2 + 1) // expected-warning{{unused}}
 
 // rdar://problem/19459079
 let xx: UInt64 = 100

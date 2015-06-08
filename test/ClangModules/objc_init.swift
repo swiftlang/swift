@@ -18,10 +18,10 @@ extension NSSet {
 
 // Subclassing and designated initializers
 func testNSInterestingDesignated() {
-  NSInterestingDesignated()
-  NSInterestingDesignated(string:"hello")
-  NSInterestingDesignatedSub()
-  NSInterestingDesignatedSub(string:"hello")
+  NSInterestingDesignated() // expected-warning{{unused}}
+  NSInterestingDesignated(string:"hello") // expected-warning{{unused}}
+  NSInterestingDesignatedSub() // expected-warning{{unused}}
+  NSInterestingDesignatedSub(string:"hello") // expected-warning{{unused}}
 }
 
 extension URLDocument {
@@ -114,12 +114,12 @@ class MyThirdTableViewController : NSTableViewController {
 }
 
 func checkInitWithCoder(coder: NSCoder) {
-  NSViewController(coder: coder)
-  NSTableViewController(coder: coder)
-  MyViewController(coder: coder)
-  MyTableViewController(coder: coder)
+  NSViewController(coder: coder) // expected-warning{{unused}}
+  NSTableViewController(coder: coder) // expected-warning{{unused}}
+  MyViewController(coder: coder) // expected-warning{{unused}}
+  MyTableViewController(coder: coder) // expected-warning{{unused}}
   MyOtherTableViewController(coder: coder) // expected-error{{cannot invoke initializer for type 'MyOtherTableViewController' with an argument list of type '(coder: NSCoder)'}} expected-note{{expected an argument list of type '(int: Int)'}}
-  MyThirdTableViewController(coder: coder)
+  MyThirdTableViewController(coder: coder) // expected-warning{{unused}}
 }
 
 // <rdar://problem/16838409>

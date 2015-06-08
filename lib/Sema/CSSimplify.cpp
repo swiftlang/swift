@@ -2295,7 +2295,7 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType,
   // The constructor will have function type T -> T2, for a fresh type
   // variable T. T2 is the result type provided via the construction
   // constraint itself.
-  addValueMemberConstraint(valueType, name,
+  addValueMemberConstraint(MetatypeType::get(valueType, TC.Context), name,
                            FunctionType::get(tv, resultType),
                            getConstraintLocator(
                              locator, 
@@ -2855,11 +2855,17 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     NameLookupOptions lookupOptions = defaultConstructorLookupOptions;
     if (isa<AbstractFunctionDecl>(DC))
       lookupOptions |= NameLookupFlags::KnownPrivate;
-    auto ctors = TC.lookupConstructors(DC, baseObjTy, lookupOptions);
+    LookupResult ctors = TC.lookupConstructors(DC, baseObjTy, lookupOptions);
     if (!ctors) {
       recordFailure(constraint.getLocator(), Failure::DoesNotHaveMember,
                     baseObjTy, name);
 
+      return SolutionKind::Error;
+    }
+    // The constructors are only found on the metatype.
+    if (!isMetatype) {
+      recordFailure(constraint.getLocator(), Failure::DoesNotHaveInitOnInstance,
+                    baseObjTy, name);
       return SolutionKind::Error;
     }
     

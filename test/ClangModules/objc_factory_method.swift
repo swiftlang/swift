@@ -53,8 +53,8 @@ func testURL() {
   let url = NSURL(string: "http://www.llvm.org")
   NSURL.URLWithString("http://www.llvm.org") // expected-error{{'URLWithString' is unavailable: use object construction 'NSURL(string:)'}}
 
-  NSURLRequest(string: "http://www.llvm.org")
-  NSURLRequest(URL: url)
+  NSURLRequest(string: "http://www.llvm.org") // expected-warning{{unused}}
+  NSURLRequest(URL: url) // expected-warning{{unused}}
 
   NSURLRequest.requestWithString("http://www.llvm.org") // expected-error{{'requestWithString' is unavailable: use object construction 'NSURLRequest(string:)'}}
   NSURLRequest.URLRequestWithURL(url) // expected-error{{'URLRequestWithURL' is unavailable: use object construction 'NSURLRequest(URL:)'}}

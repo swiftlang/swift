@@ -14,7 +14,7 @@ struct G<T> {
 
 typealias GInt = G<Int>
 typealias GChar = G<UnicodeScalar>
-GInt(x: GChar())
+GInt(x: GChar()) // expected-warning{{unused}}
 
 GInt().foo(GChar())
 GInt().bar(0)

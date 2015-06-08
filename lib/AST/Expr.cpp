@@ -195,6 +195,14 @@ bool Expr::isStaticallyDerivedMetatype() const {
   if (!getType()->is<AnyMetatypeType>())
     return false;
 
+  // If we've established that this expression is a direct reference to a type,
+  // determine whether that type statically resolves to a known type.
+  // This is true of concrete type names, but not of archetypes.
+  auto isStaticType = [&]() -> bool {
+    return !getType()->getAs<AnyMetatypeType>()->getInstanceType()
+      ->is<ArchetypeType>();
+  };
+
   const Expr *expr = this;
   do {
     // Skip syntax.
@@ -202,9 +210,10 @@ bool Expr::isStaticallyDerivedMetatype() const {
 
     // Direct reference to a type.
     if (auto declRef = dyn_cast<DeclRefExpr>(expr))
-      return isa<TypeDecl>(declRef->getDecl());
+      if (isa<TypeDecl>(declRef->getDecl()))
+        return isStaticType();
     if (isa<TypeExpr>(expr))
-      return true;
+      return isStaticType();
 
     // A "." expression that refers to a member.
     if (auto memberRef = dyn_cast<MemberRefExpr>(expr))

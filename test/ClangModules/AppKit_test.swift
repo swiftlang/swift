@@ -15,6 +15,6 @@ class MyDocument : NSDocument {
 }
 
 func test(URL: NSURL) {
-  try! NSDocument(contentsOfURL: URL, ofType: "")
+  try! NSDocument(contentsOfURL: URL, ofType: "") // expected-warning{{unused}}
   try! MyDocument(contentsOfURL: URL, ofType: "")
 }

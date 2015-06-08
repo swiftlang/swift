@@ -46,6 +46,10 @@ void Failure::dump(SourceManager *sm, raw_ostream &out) const {
         << getName() << "'";
     break;
 
+  case DoesNotHaveInitOnInstance:
+    out << getFirstType().getString() << " instance does not have initializers";
+    break;
+    
   case FunctionTypesMismatch:
     out << "function type " << getFirstType().getString() << " is not equal to "
     << getSecondType().getString();
@@ -757,6 +761,31 @@ static bool diagnoseFailure(ConstraintSystem &cs,
         .highlight(range1).highlight(range2);
     }
     break;
+    
+  case Failure::DoesNotHaveInitOnInstance: {
+    // Diagnose 'super.init', which can only appear inside another initializer,
+    // specially.
+    auto ctorRef = dyn_cast<UnresolvedConstructorExpr>(locator->getAnchor());
+    if (isa<SuperRefExpr>(ctorRef->getSubExpr())) {
+      tc.diagnose(loc, diag::super_initializer_not_in_initializer);
+      break;
+    }
+  
+    // Suggest inserting '.dynamicType' to construct another object of the same
+    // dynamic type.
+    SourceLoc fixItLoc;
+    if (ctorRef) {
+      // Place the '.dynamicType' right before the init.
+      fixItLoc = ctorRef->getConstructorLoc().getAdvancedLoc(-1);
+    }
+    
+    auto diag = tc.diagnose(loc, diag::init_not_instance_member);
+    if (fixItLoc.isValid())
+      diag.fixItInsert(fixItLoc, ".dynamicType");
+    diag.flush();
+    
+    break;
+  }
 
   case Failure::DoesNotConformToProtocol:
     // FIXME: Probably want to do this within the actual solver, because at

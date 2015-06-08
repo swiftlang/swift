@@ -96,8 +96,8 @@ class NoInitBase {
 
 class NoInitDerived : NoInitBase { }
 
-Base()
-Derived()
+Base() // expected-warning{{unused}}
+Derived() // expected-warning{{unused}}
 
 class MultipleInitBase {
   init() { }

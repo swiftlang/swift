@@ -52,7 +52,7 @@ Foo.a()
 Foo.b()
 Foo.c() // expected-error {{'Foo.Type' does not have a member named 'c'}}
 
-Foo() // expected-error {{'Foo' cannot be constructed because it has no accessible initializers}}
+_ = Foo() // expected-error {{'Foo' cannot be constructed because it has no accessible initializers}}
 // TESTABLE-NOT: :[[@LINE-1]]:{{[^:]+}}:
 PrivateInit() // expected-error {{'PrivateInit' cannot be constructed because it has no accessible initializers}}
 // TESTABLE: :[[@LINE-1]]:{{[^:]+}}: error: 'PrivateInit' cannot be constructed because it has no accessible initializers

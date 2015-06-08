@@ -14,7 +14,7 @@ extension Int32 {
 }
 
 func indirectBuiltin() {
-  Int(Int32(import_builtin.x))
+  Int(Int32(import_builtin.x)) // expected-warning{{unused}}
 }
 
 func f0() {

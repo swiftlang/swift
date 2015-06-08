@@ -969,8 +969,6 @@ ERROR(super_in_closure_with_capture,expr_parsing,none,
       "not yet supported", ())
 NOTE(super_in_closure_with_capture_here,expr_parsing,none,
      "'self' explicitly captured here", ())
-ERROR(super_initializer_not_in_initializer,expr_parsing,none,
-      "'super.init' cannot be called outside of an initializer", ())
 
 // Tuples and parenthesized expressions
 ERROR(expected_expr_in_expr_list,expr_parsing,none,

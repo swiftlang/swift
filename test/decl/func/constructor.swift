@@ -5,7 +5,7 @@ struct X {
   init() {}
 }
 
-X()
+X() // expected-warning{{unused}}
 
 // User-written memberwise constructor
 struct Y {
@@ -13,7 +13,7 @@ struct Y {
   init(i : Int, f : Float) {}
 }
 
-Y(i: 1, f: 1.5)
+Y(i: 1, f: 1.5) // expected-warning{{unused}}
 
 // User-written memberwise constructor with default
 struct Z {
@@ -26,7 +26,7 @@ struct Z {
   }
 }
 
-Z(a: 1, b: 2)
+Z(a: 1, b: 2) // expected-warning{{unused}}
 
 // User-written init suppresses implicit constructors.
 struct A {
@@ -39,7 +39,7 @@ struct A {
 }
 
 A() // expected-error{{missing argument for parameter 'x'}}
-A(x: 1)
+A(x: 1) // expected-warning{{unused}}
 A(1, 1) // expected-error{{extra argument in call}}
 
 // No user-written constructors; implicit constructors are available.
@@ -52,9 +52,9 @@ extension B {
     self.j = 1.5
   }
 }
-B()
-B(x: 1)
-B(i: 1, j: 2.5)
+B() // expected-warning{{unused}}
+B(x: 1) // expected-warning{{unused}}
+B(i: 1, j: 2.5) // expected-warning{{unused}}
 
 
 struct F {
@@ -78,8 +78,8 @@ extension D {
 }
 
 F() // expected-error{{missing argument for parameter 'd'}}
-D() // okay
-B() // okay
+D() // okay // expected-warning{{unused}}
+B() // okay // expected-warning{{unused}}
 C() // expected-error{{missing argument for parameter 'd'}}
 
 struct E {

@@ -18,11 +18,11 @@ func testAndReturnError() throws {
 }
 
 func testInheritedInit() throws {
-  try ReallyErrorProne(one: nil)
+  try ReallyErrorProne(one: nil) // expected-warning{{unused}}
 }
 
 func testInheritedFactory() throws {
-  try ReallyErrorProne(two: nil)
+  try ReallyErrorProne(two: nil) // expected-warning{{unused}}
 }
 
 // Resolve a conflict between -foo and -foo: by just not
@@ -56,11 +56,11 @@ func testConflict3_error(obj: ErrorProne) throws {
 // Same as above but with an initializer.
 // <rdar://problem/20922973>
 func testConflict4() throws {
-  try ErrorProne(newtonMessagePad: "Dilbert") // expected-warning {{no calls to throwing functions occur within 'try'}}
+  try ErrorProne(newtonMessagePad: "Dilbert") // expected-warning {{no calls to throwing functions occur within 'try'}} // expected-warning{{unused}}
 }
 
 func testConflict4_error() throws {
-  try ErrorProne(newtonMessagePad: "Dilbert", error: ())
+  try ErrorProne(newtonMessagePad: "Eat Up Martha", error: ()) // expected-warning{{unused}}
 }
 
 func testBlockFinal() throws {

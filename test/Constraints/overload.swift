@@ -56,7 +56,7 @@ struct X1b {
   init<T : P1>(x : T) { }
 }
 
-X1b(x: X1a())
+X1b(x: X1a()) // expected-warning{{unused}}
 
 // Overload resolution for subscript operators.
 class X2a { }

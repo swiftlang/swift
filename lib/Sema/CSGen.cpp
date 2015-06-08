@@ -1169,27 +1169,39 @@ namespace {
     Type visitUnresolvedConstructorExpr(UnresolvedConstructorExpr *expr) {
       ASTContext &C = CS.getASTContext();
       
-      // Open a member constraint for constructors on the subexpr type.
-      // FIXME: the getRValueInstanceType() here is a hack to make the
-      //   T.init withFoo(foo)
-      // syntax type-check. We shouldn't rely on any kinds of adjustments to
-      // the subexpression's type here, but dealing with this requires us to
-      // clarify when we can refer to constructors with ".init".
-      auto baseTy = expr->getSubExpr()->getType()
-                      ->getLValueOrInOutObjectType()->getRValueInstanceType();
-      auto argsTy = CS.createTypeVariable(
-                      CS.getConstraintLocator(expr),
-                      TVO_CanBindToLValue|TVO_PrefersSubtypeBinding);
-      auto resultTy = CS.createTypeVariable(CS.getConstraintLocator(expr),
-                                            /*options=*/0);
-      auto methodTy = FunctionType::get(argsTy, resultTy);
-      CS.addValueMemberConstraint(baseTy, C.Id_init,
-        methodTy,
-        CS.getConstraintLocator(expr, ConstraintLocator::ConstructorMember));
+      // Open a member constraint for constructor delegations on the subexpr
+      // type.
+      if (CS.TC.getSelfForInitDelegationInConstructor(CS.DC, expr)){
+        auto baseTy = expr->getSubExpr()->getType()
+                        ->getLValueOrInOutObjectType();
+        // 'self' or 'super' will reference an instance, but the constructor
+        // is semantically a member of the metatype. This:
+        //   self.init()
+        //   super.init()
+        // is really more like:
+        //   self = Self.init()
+        //   self.super = Super.init()
+        baseTy = MetatypeType::get(baseTy, CS.getASTContext());
+        
+        auto argsTy = CS.createTypeVariable(
+                        CS.getConstraintLocator(expr),
+                        TVO_CanBindToLValue|TVO_PrefersSubtypeBinding);
+        auto resultTy = CS.createTypeVariable(CS.getConstraintLocator(expr),
+                                              /*options=*/0);
+        auto methodTy = FunctionType::get(argsTy, resultTy);
+        CS.addValueMemberConstraint(baseTy, C.Id_init,
+          methodTy,
+          CS.getConstraintLocator(expr, ConstraintLocator::ConstructorMember));
+        
+        // The result of the expression is the partial application of the
+        // constructor to the subexpression.
+        return methodTy;
+      }
       
-      // The result of the expression is the partial application of the
-      // constructor to the subexpression.
-      return methodTy;
+      // If we aren't delegating from within an initializer, then 'x.init' is
+      // just a reference to the constructor as a member of the metatype value
+      // 'x'.
+      return addMemberRefConstraints(expr, expr->getSubExpr(), C.Id_init);
     }
     
     Type visitDotSyntaxBaseIgnoredExpr(DotSyntaxBaseIgnoredExpr *expr) {

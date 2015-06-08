@@ -149,14 +149,14 @@ func testConvertOverflow() {
   let _ /*ssint8_zero2*/  = Int8(uint8_zero)
   
   // Check signed to unsigned extending size conversions.
-  UInt16(Int8(-1)) // expected-error{{negative integer cannot be converted to unsigned type 'UInt16'}}
-  UInt64(Int16(-200)) // expected-error{{negative integer cannot be converted to unsigned type 'UInt64'}}
-  UInt64(Int32(-200)) // expected-error{{negative integer cannot be converted to unsigned type 'UInt64'}}
-  Int16(Int8(-1))
-  Int64(Int16(-200))
-  Int64(Int32(-200))
-  Int64(UInt32(200))
-  UInt64(UInt32(200))
+  UInt16(Int8(-1)) // expected-error{{negative integer cannot be converted to unsigned type 'UInt16'}} // expected-warning{{unused}}
+  UInt64(Int16(-200)) // expected-error{{negative integer cannot be converted to unsigned type 'UInt64'}} // expected-warning{{unused}}
+  UInt64(Int32(-200)) // expected-error{{negative integer cannot be converted to unsigned type 'UInt64'}} // expected-warning{{unused}}
+  Int16(Int8(-1)) // expected-warning{{unused}}
+  Int64(Int16(-200)) // expected-warning{{unused}}
+  Int64(Int32(-200)) // expected-warning{{unused}}
+  Int64(UInt32(200)) // expected-warning{{unused}}
+  UInt64(UInt32(200)) // expected-warning{{unused}}
 
   // IEEE binary32 max value = 2^128 * (2^23-1)/2^23
   var _ /*float32_max*/                     : Float32 = (340282326356119256160033759537265639424)

@@ -5,7 +5,7 @@
 //===----------------------------------------------------------------------===//
 func testLiteralMembers() {
   _ = 0.value
-  Int(0.value)
+  Int(0.value) // expected-warning{{unused}}
 }
 
 

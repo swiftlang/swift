@@ -516,16 +516,6 @@ ParserResult<Expr> Parser::parseExprSuper() {
       // super.init
       SourceLoc ctorLoc = consumeToken();
       
-      // Check that we're actually in an initializer
-      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(CurDeclContext)) {
-        if (!isa<ConstructorDecl>(AFD)) {
-          diagnose(ctorLoc, diag::super_initializer_not_in_initializer);
-          // No need to indicate error to the caller because this is not a parse
-          // error.
-          return makeParserResult(new (Context) ErrorExpr(
-              SourceRange(superLoc, ctorLoc), ErrorType::get(Context)));
-        }
-      }
       // The constructor decl will be resolved by sema.
       Expr *result = new (Context) UnresolvedConstructorExpr(superRef,
                                      dotLoc, ctorLoc,

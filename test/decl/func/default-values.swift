@@ -40,9 +40,9 @@ struct Ctor {
   init (i : Int = 17, f : Float = 1.5) { }
 }
 
-Ctor()
-Ctor(i: 12)
-Ctor(f:12.5)
+Ctor() // expected-warning{{unused}}
+Ctor(i: 12) // expected-warning{{unused}}
+Ctor(f:12.5) // expected-warning{{unused}}
 
 // Default arguments for nested constructors/functions.
 struct Outer<T> {
@@ -54,9 +54,9 @@ struct Outer<T> {
     }
   }
 }
-Outer<Int>.Inner.VeryInner()
-Outer<Int>.Inner.VeryInner(i: 12)
-Outer<Int>.Inner.VeryInner(f:12.5)
+Outer<Int>.Inner.VeryInner() // expected-warning{{unused}}
+Outer<Int>.Inner.VeryInner(i: 12) // expected-warning{{unused}}
+Outer<Int>.Inner.VeryInner(f:12.5) // expected-warning{{unused}}
 Outer<Int>.Inner.VeryInner.f()
 Outer<Int>.Inner.VeryInner.f(i: 12)
 Outer<Int>.Inner.VeryInner.f(f:12.5)

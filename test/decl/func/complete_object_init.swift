@@ -169,5 +169,5 @@ class Child2 : Parent2 {
 }
 
 func testOverride(int: Int) {
-  Child2(int: int) // okay, picks Child2.init
+  Child2(int: int) // okay, picks Child2.init // expected-warning{{unused}}
 }

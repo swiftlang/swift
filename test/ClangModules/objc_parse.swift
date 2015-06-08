@@ -154,7 +154,7 @@ func newConstruction(a: A, aproxy: AProxy) {
   b.initWithInt(17) // expected-error{{'B' does not have a member named 'initWithInt'}}
 
   // init methods on non-NSObject-rooted classes
-  AProxy(int: 5)
+  AProxy(int: 5) // expected-warning{{unused}}
 }
 
 // Indexed subscripting

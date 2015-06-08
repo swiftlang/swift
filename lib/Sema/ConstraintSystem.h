@@ -397,6 +397,9 @@ public:
     /// \brief The first type does not have a non mutating member with the given
     /// name.
     DoesNotHaveNonMutatingMember,
+    /// \brief The first type has the given initializer, but it's available only
+    /// on the metatype, not the instance.
+    DoesNotHaveInitOnInstance,
     /// \brief The type is not an archetype.
     IsNotArchetype,
     /// \brief The type is not a class.
@@ -519,6 +522,7 @@ public:
 
     case DoesNotHaveMember:
     case DoesNotHaveNonMutatingMember:
+    case DoesNotHaveInitOnInstance:
       return Profile(id, locator, kind, resolvedOverloadSets, getFirstType(),
                      getName());
 

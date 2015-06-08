@@ -1045,6 +1045,9 @@ static void diagnoseIgnoredExpr(TypeChecker &TC, Expr *E) {
                     callee->getFullName());
         return;
       }
+      if (isa<ConstructorDecl>(callee) && !call->isImplicit()) {
+        TC.diagnose(fn->getLoc(), diag::expression_unused_init_result);
+      }
     }
   }
 }

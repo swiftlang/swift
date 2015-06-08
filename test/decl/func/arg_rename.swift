@@ -12,12 +12,12 @@ struct S {
   init(a x: Int, b y: Int) { }
 }
 
-S(a: 5, b: 7)
+S(a: 5, b: 7) // expected-warning{{unused}}
 
 struct GS {
   init<T>(a x: T, b y: T) { }
 }
-GS(a: 5, b: 7)
+GS(a: 5, b: 7) // expected-warning{{unused}}
 
 // Using the hash to make a name API.
 func f1(a a: Int, b: Int) { }
