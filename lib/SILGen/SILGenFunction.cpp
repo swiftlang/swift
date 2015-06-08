@@ -603,7 +603,6 @@ static SILValue getNextUncurryLevelRef(SILGenFunction &gen,
   // If the fully-uncurried reference is to a native dynamic class method, emit
   // the dynamic dispatch.
   auto fullyAppliedMethod = !next.isCurried && !next.isForeign && !direct &&
-    next.kind == SILDeclRef::Kind::Func &&
     next.hasDecl();
 
   auto constantInfo = gen.SGM.Types.getConstantInfo(next);
@@ -612,6 +611,7 @@ static SILValue getNextUncurryLevelRef(SILGenFunction &gen,
       thisArg = curriedArgs.back();
 
   if (fullyAppliedMethod &&
+      isa<AbstractFunctionDecl>(next.getDecl()) &&
       gen.getMethodDispatch(cast<AbstractFunctionDecl>(next.getDecl()))
         == MethodDispatch::Class) {
     SILValue thisArg = curriedArgs.back();
@@ -650,7 +650,19 @@ void SILGenFunction::emitCurryThunk(ValueDecl *vd,
 
   unsigned paramCount = from.uncurryLevel + 1;
 
-  if (auto fd = dyn_cast<AbstractFunctionDecl>(vd)) {
+  if (isa<ConstructorDecl>(vd) || isa<EnumElementDecl>(vd)) {
+    // The first body parameter pattern for a constructor specifies the
+    // "self" instance, but the constructor is invoked from outside on a
+    // metatype.
+    assert(from.uncurryLevel == 0 && to.uncurryLevel == 1
+           && "currying constructor at level other than one?!");
+    F.setBare(IsBare);
+    auto selfMetaTy = vd->getType()->getAs<AnyFunctionType>()->getInput();
+    auto metatypeVal = new (F.getModule()) SILArgument(F.begin(),
+                                            getLoweredLoadableType(selfMetaTy));
+    curriedArgs.push_back(metatypeVal);
+
+  } else if (auto fd = dyn_cast<AbstractFunctionDecl>(vd)) {
     // Forward implicit closure context arguments.
     bool hasCaptures = fd->getCaptureInfo().hasLocalCaptures();
     if (hasCaptures)
@@ -668,19 +680,6 @@ void SILGenFunction::emitCurryThunk(ValueDecl *vd,
       for (auto capture : LocalCaptures)
         forwardCaptureArgs(*this, curriedArgs, capture);
     }
-  } else if (isa<EnumElementDecl>(vd)) {
-    // FIXME: An EnumElementDecl probably ought to be an AbstractFunctionDecl.
-    // For now, enum elements only ever have one curry level, consisting only
-    // of the Self metatype.
-    assert(from.uncurryLevel == 0 && to.uncurryLevel == 1
-           && "currying enum elt at level other than one?!");
-    F.setBare(IsBare);
-    auto selfTy = vd->getDeclContext()->getDeclaredTypeInContext();
-    auto thinMetaTy = MetatypeType::get(selfTy, MetatypeRepresentation::Thin);
-    
-    auto metatypeVal = new (F.getModule()) SILArgument(F.begin(),
-               SILType::getPrimitiveObjectType(thinMetaTy->getCanonicalType()));
-    curriedArgs.push_back(metatypeVal);
   } else {
     llvm_unreachable("don't know how to curry this decl");
   }
