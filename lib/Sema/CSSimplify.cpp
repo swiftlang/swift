@@ -581,6 +581,7 @@ matchCallArguments(ConstraintSystem &cs, TypeMatchKind kind,
   case TypeMatchKind::BindType:
   case TypeMatchKind::BindToPointerType:
   case TypeMatchKind::SameType:
+  case TypeMatchKind::ConformsTo:
   case TypeMatchKind::Subtype:
     llvm_unreachable("Not an call argument constraint");
   }
@@ -778,6 +779,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case TypeMatchKind::BindToPointerType:
   case TypeMatchKind::SameType:
   case TypeMatchKind::Subtype:
+  case TypeMatchKind::ConformsTo:
     llvm_unreachable("Not a conversion");
   }
 
@@ -982,6 +984,9 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
     subKind = kind;
     break;
 
+  case TypeMatchKind::ConformsTo:
+    llvm_unreachable("Not sure if we can end up here");
+
   case TypeMatchKind::Subtype:
   case TypeMatchKind::Conversion:
   case TypeMatchKind::ExplicitConversion:
@@ -1030,7 +1035,8 @@ static Failure::FailureKind getRelationalFailureKind(TypeMatchKind kind) {
   case TypeMatchKind::BindToPointerType:
   case TypeMatchKind::SameType:
     return Failure::TypesNotEqual;
-
+  case TypeMatchKind::ConformsTo:
+    return Failure::DoesNotConformToProtocol;
   case TypeMatchKind::Subtype:
     return Failure::TypesNotSubtypes;
 
@@ -1133,20 +1139,20 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
 
 ConstraintSystem::SolutionKind
 ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
-                                        TypeMatchKind kind, unsigned flags,
+                                        ConstraintKind kind, unsigned flags,
                                         ConstraintLocatorBuilder locator) {
   SmallVector<ProtocolDecl *, 4> protocols;
   type2->getAnyExistentialTypeProtocols(protocols);
 
   for (auto proto : protocols) {
-    switch (simplifyConformsToConstraint(type1, proto, locator, flags, true)) {
+    switch (simplifyConformsToConstraint(type1, proto, kind, locator, flags)) {
       case SolutionKind::Solved:
         break;
 
       case SolutionKind::Unsolved:
         // Add the constraint.
-        addConstraint(ConstraintKind::ConformsTo, type1,
-                      proto->getDeclaredType(), getConstraintLocator(locator));
+        addConstraint(kind, type1, proto->getDeclaredType(),
+                      getConstraintLocator(locator));
         break;
 
       case SolutionKind::Error:
@@ -1166,6 +1172,9 @@ static ConstraintKind getConstraintKind(TypeMatchKind kind) {
 
   case TypeMatchKind::SameType:
     return ConstraintKind::Equal;
+
+  case TypeMatchKind::ConformsTo:
+    return ConstraintKind::ConformsTo;
 
   case TypeMatchKind::Subtype:
     return ConstraintKind::Subtype;
@@ -1312,7 +1321,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
   auto desugar2 = type2->getDesugaredType();
 
   // If the types are obviously equivalent, we're done.
-  if (desugar1->isEqual(desugar2))
+  if (kind != TypeMatchKind::ConformsTo && desugar1->isEqual(desugar2))
     return SolutionKind::Solved;
 
   // If either (or both) types are type variables, unify the type variables.
@@ -1449,6 +1458,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
       return SolutionKind::Solved;
     }
 
+    case TypeMatchKind::ConformsTo:
     case TypeMatchKind::Subtype:
     case TypeMatchKind::Conversion:
     case TypeMatchKind::ExplicitConversion:
@@ -1962,27 +1972,29 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     }
   }
 
-  // For a subtyping relation involving a conversion to an existential
-  // metatype, match the child types.
+  // A subtyping relation between a metatype and an existential
+  // metatype is actually equivalent to a conformance relationship
+  // on the instance types.
   if (concrete && kind >= TypeMatchKind::Subtype) {
     if (auto meta1 = type1->getAs<MetatypeType>()) {
       if (auto meta2 = type2->getAs<ExistentialMetatypeType>()) {
         return matchTypes(meta1->getInstanceType(),
                           meta2->getInstanceType(),
-                          TypeMatchKind::Subtype, subFlags,
+                          TypeMatchKind::ConformsTo, subFlags,
                           locator.withPathElement(
                                   ConstraintLocator::InstanceType));
       }
     }
   }
   
-  // For a subtyping relation involving two existential types or subtyping of
-  // a class existential type, or a conversion from any type to an
-  // existential type, check whether the first type conforms to each of the
-  // protocols in the second type.
-  if (concrete && kind >= TypeMatchKind::Subtype &&
-      type2->isExistentialType()) {
-    conversionsOrFixes.push_back(ConversionRestrictionKind::Existential);
+  // Instance type check for the above. We are going to check conformance once
+  // we hit commit_to_conversions below, but we have to add a token restriction
+  // to ensure we wrap the metatype value in a metatype erasure.
+  if (concrete && type2->isExistentialType()) {
+    if (kind == TypeMatchKind::ConformsTo)
+      conversionsOrFixes.push_back(ConversionRestrictionKind::MetatypeToExistentialMetatype);
+    else if (kind >= TypeMatchKind::Subtype)
+      conversionsOrFixes.push_back(ConversionRestrictionKind::Existential);
   }
 
   // A value of type T can be converted to type U? if T is convertible to U.
@@ -2310,10 +2322,24 @@ ConstraintSystem::simplifyConstructionConstraint(Type valueType,
 
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
                                  Type type,
-                                 ProtocolDecl *protocol,
+                                 Type protocol,
+                                 ConstraintKind kind,
                                  ConstraintLocatorBuilder locator,
-                                 unsigned flags,
-                                 bool allowNonConformingExistential) {
+                                 unsigned flags) {
+  if (auto proto = protocol->getAs<ProtocolType>()) {
+    return simplifyConformsToConstraint(type, proto->getDecl(), kind,
+                                        locator, flags);
+  }
+
+  return matchExistentialTypes(type, protocol, kind, flags, locator);
+}
+
+ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
+                                 Type type,
+                                 ProtocolDecl *protocol,
+                                 ConstraintKind kind,
+                                 ConstraintLocatorBuilder locator,
+                                 unsigned flags) {
   // Dig out the fixed type to which this type refers.
   TypeVariableType *typeVar;
   type = getFixedTypeRecursive(type, typeVar, /*wantRValue=*/true);
@@ -2326,15 +2352,20 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
   // For purposes of argument type matching, existential types don't need to
   // conform -- they only need to contain the protocol, so check that
   // separately.
-  if (allowNonConformingExistential) {
+  switch (kind) {
+  case ConstraintKind::SelfObjectOfProtocol:
     if (TC.containsProtocol(type, protocol, DC,
                             ConformanceCheckFlags::InExpression))
       return SolutionKind::Solved;
-  } else {
+    break;
+  case ConstraintKind::ConformsTo:
     // Check whether this type conforms to the protocol.
     if (TC.conformsToProtocol(type, protocol, DC,
                               ConformanceCheckFlags::InExpression))
       return SolutionKind::Solved;
+    break;
+  default:
+    llvm_unreachable("bad constraint kind");
   }
   
   if (!type->getAnyOptionalObjectType().isNull() &&
@@ -3743,7 +3774,19 @@ ConstraintSystem::simplifyRestrictedConstraint(ConversionRestrictionKind restric
   case ConversionRestrictionKind::Existential:
     addContextualScore();
     return matchExistentialTypes(type1, type2,
-                                 matchKind, subFlags, locator);
+                                 ConstraintKind::SelfObjectOfProtocol,
+                                 subFlags, locator);
+
+  // for $< in { <, <c, <oc }:
+  //   for T protocol,
+  //     T : S ===> T.Protocol $< S.Type
+  //   else,
+  //     T : S ===> T.Type $< S.Type
+  case ConversionRestrictionKind::MetatypeToExistentialMetatype:
+    addContextualScore();
+    return matchExistentialTypes(type1, type2,
+                                 ConstraintKind::ConformsTo,
+                                 subFlags, locator);
 
   // for $< in { <, <c, <oc }:
   //   T $< U ===> T $< U?
@@ -4459,10 +4502,10 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
   case ConstraintKind::SelfObjectOfProtocol:
     return simplifyConformsToConstraint(
              constraint.getFirstType(),
-             constraint.getProtocol(),
+             constraint.getSecondType(),
+             constraint.getKind(),
              constraint.getLocator(),
-             TMF_None,
-             constraint.getKind() == ConstraintKind::SelfObjectOfProtocol);
+             TMF_None);
 
   case ConstraintKind::CheckedCast: {
     auto result = simplifyCheckedCastConstraint(constraint.getFirstType(),

@@ -678,6 +678,9 @@ enum class TypeMatchKind : char {
   /// \brief Require the types to match exactly, but strips lvalueness from
   /// a type when binding to a type variable.
   SameType,
+  /// \brief Require that the first type conform to the second type (which
+  /// must be a protocol).
+  ConformsTo,
   /// \brief Require the first type to be a subtype of the second type
   /// (or be an exact match or trivial subtype).
   Subtype,
@@ -2226,8 +2229,13 @@ private:
 
   /// \brief Subroutine of \c matchTypes(), which matches up a value to an
   /// existential type.
+  ///
+  /// \param kind Either ConstraintKind::SelfObjectOfProtocol or
+  /// ConstraintKind::ConformsTo. Usually this uses SelfObjectOfProtocol,
+  /// but when matching the instance type of a metatype with the instance type
+  /// of an existential metatype, since we want an actual conformance check.
   SolutionKind matchExistentialTypes(Type type1, Type type2,
-                                     TypeMatchKind kind, unsigned flags,
+                                     ConstraintKind kind, unsigned flags,
                                      ConstraintLocatorBuilder locator);
 
 public: // FIXME: public due to statics in CSSimplify.cpp
@@ -2304,15 +2312,28 @@ private:
   ///
   /// \param type The type being testing.
   /// \param protocol The protocol to which the type should conform.
+  /// \param kind Either ConstraintKind::SelfObjectOfProtocol or
+  /// ConstraintKind::ConformsTo.
+  /// \param locator Locator describing where this constraint occurred.
+  SolutionKind simplifyConformsToConstraint(Type type, ProtocolDecl *protocol,
+                                            ConstraintKind kind,
+                                            ConstraintLocatorBuilder locator,
+                                            unsigned flags);
+
+  /// \brief Attempt to simplify the given conformance constraint.
+  ///
+  /// \param type The type being testing.
+  /// \param protocol The protocol or protocol composition type to which the
+  /// type should conform.
   /// \param locator Locator describing where this constraint occurred.
   ///
-  /// \param allowNonConformingExistential Allow an existential type that
-  /// contains the protocol but does not conform to it (i.e., due to associated
-  /// types).
-  SolutionKind simplifyConformsToConstraint(Type type, ProtocolDecl *protocol,
+  /// \param kind If this is SelfTypeOfProtocol, we allow an existential type
+  /// that contains the protocol but does not conform to it (eg, due to
+  /// associated types).
+  SolutionKind simplifyConformsToConstraint(Type type, Type protocol,
+                                            ConstraintKind kind,
                                             ConstraintLocatorBuilder locator,
-                                            unsigned flags,
-                                            bool allowNonConformingExistential);
+                                            unsigned flags);
 
   /// Attempt to simplify a checked-cast constraint.
   SolutionKind simplifyCheckedCastConstraint(Type fromType, Type toType,

@@ -347,6 +347,8 @@ StringRef swift::constraints::getName(ConversionRestrictionKind kind) {
     return "[lvalue-to-rvalue]";
   case ConversionRestrictionKind::Existential:
     return "[existential]";
+  case ConversionRestrictionKind::MetatypeToExistentialMetatype:
+    return "[metatype-to-existential-metatype]";
   case ConversionRestrictionKind::ValueToOptional:
     return "[value-to-optional]";
   case ConversionRestrictionKind::OptionalToOptional:

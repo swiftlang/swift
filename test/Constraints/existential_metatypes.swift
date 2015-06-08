@@ -9,14 +9,12 @@ protocol PP: P {}
 var qp: Q.Protocol
 var pp: P.Protocol = qp // expected-error{{'Q' is not identical to 'P'}}
 
-// TODO: P.Protocol -> P.Type conversion is allowed because we think P: P,
-//   but it likely breaks at codegen time.
 var qt: Q.Type
-qt = qp // todo-error{{..}}
-qp = qt // expected-error{{cannot assign}}
+qt = qp // expected-error{{cannot assign a value of type 'Q.Protocol' to a value of type 'Q.Type'}}
+qp = qt // expected-error{{cannot assign a value of type 'Q.Type' to a value of type 'Q.Protocol'}}
 var pt: P.Type = qt // expected-error{{type 'Q' does not conform to protocol 'P'}}
-pt = pp // todo-error{{..}}
-pp = pt // expected-error{{cannot assign}}
+pt = pp // expected-error{{cannot assign a value of type 'P.Protocol' to a value of type 'P.Type'}}
+pp = pt // expected-error{{cannot assign a value of type 'P.Type' to a value of type 'P.Protocol'}}
 
 var pqt: protocol<P, Q>.Type
 pt = pqt

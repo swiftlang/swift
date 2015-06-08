@@ -175,8 +175,10 @@ enum class ConversionRestrictionKind {
   PointerToPointer,
   /// Lvalue-to-rvalue conversion.
   LValueToRValue,
-  /// Value to existential value conversion.
+  /// Value to existential value conversion, or existential erasure.
   Existential,
+  /// Metatype to existential metatype conversion.
+  MetatypeToExistentialMetatype,
   /// T -> U? value to optional conversion (or to implicitly unwrapped optional).
   ValueToOptional,
   /// T? -> U? optional to optional conversion (or unchecked to unchecked).
