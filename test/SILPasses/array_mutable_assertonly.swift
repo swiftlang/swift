@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -O -emit-sil -Xllvm -debug-only=cowarray-opts -primary-file %s 2>&1 | FileCheck %s
-// REQUIRES: asserts swift_stdlib_no_asserts optimized_stdlib
+// REQUIRES: asserts,swift_stdlib_no_asserts,optimized_stdlib
 
 // CHECK-LABEL: COW Array Opts in Func {{.*}}inoutarr{{.*}}
 // CHECK: Hoisting make_mutable
@@ -36,7 +36,6 @@ class ArrayInClass {
 
   // CHECK-LABEL: COW Array Opts in Func {{.*}}hoistInClass{{.*}}
   // CHECK: Hoisting make_mutable
-  // CHECK: COW Array Opts
   func hoistInClass() {
     for i in 0..<A.count {
       A[i] = 0
@@ -45,7 +44,6 @@ class ArrayInClass {
 
   // CHECK-LABEL: COW Array Opts in Func {{.*}}hoistInClass2Arr{{.*}}
   // CHECK: Hoisting make_mutable
-  // CHECK: COW Array Opts
   func hoistInClass2Arr() {
     for i in 0..<A.count {
       A[i] = 0
@@ -92,7 +90,7 @@ class AClass {}
 // CHECK: Hoisting make_mutable
 // CHECK: COW Array Opts
 
-func hoistArrayOfClasses(inout : A[AClass], x: AClass) {
+func hoistArrayOfClasses(inout A : [AClass], x: AClass) {
   for i in 0 ..< A.count {
     A[i] = x
   }
