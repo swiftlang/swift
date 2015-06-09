@@ -139,12 +139,63 @@ llvm::Type *ExplosionSchema::getScalarResultType(IRGenModule &IGM) const {
   }
 }
 
+static void addDereferenceableAttributeToBuilder(IRGenModule &IGM,
+                                                 llvm::AttrBuilder &b,
+                                                 const TypeInfo &ti) {
+  // The addresses of empty values are undefined, so we can't safely mark them
+  // dereferenceable.
+  if (ti.isKnownEmpty())
+    return;
+  
+  // If we know the type to have a fixed nonempty size, then the pointer is
+  // dereferenceable to at least that size.
+  // TODO: Would be nice to have a "getMinimumKnownSize" on TypeInfo for
+  // dynamic-layout aggregates.
+  if (auto fixedTI = dyn_cast<FixedTypeInfo>(&ti)) {
+    b.addAttribute(
+      llvm::Attribute::getWithDereferenceableBytes(IGM.LLVMContext,
+                                         fixedTI->getFixedSize().getValue()));
+  }
+}
+
+static void addIndirectValueParameterAttributes(IRGenModule &IGM,
+                                                llvm::AttributeSet &attrs,
+                                                const TypeInfo &ti,
+                                                unsigned argIndex) {
+  llvm::AttrBuilder b;
+  // Value parameter pointers can't alias or be captured.
+  b.addAttribute(llvm::Attribute::NoAlias);
+  b.addAttribute(llvm::Attribute::NoCapture);
+  // The parameter must reference dereferenceable memory of the type.
+  addDereferenceableAttributeToBuilder(IGM, b, ti);
+
+  auto resultAttrs = llvm::AttributeSet::get(IGM.LLVMContext, argIndex+1, b);
+  attrs = attrs.addAttributes(IGM.LLVMContext, argIndex+1, resultAttrs);
+}
+
+static void addInoutParameterAttributes(IRGenModule &IGM,
+                                        llvm::AttributeSet &attrs,
+                                        const TypeInfo &ti,
+                                        unsigned argIndex) {
+  llvm::AttrBuilder b;
+  // Aliasing inouts is unspecified, but we still want aliasing to be memory-
+  // safe, so we can't mark inouts as noalias at the LLVM level.
+  // They can't be captured without doing unsafe stuff, though.
+  b.addAttribute(llvm::Attribute::NoCapture);
+  // The inout must reference dereferenceable memory of the type.
+  addDereferenceableAttributeToBuilder(IGM, b, ti);
+
+  auto resultAttrs = llvm::AttributeSet::get(IGM.LLVMContext, argIndex+1, b);
+  attrs = attrs.addAttributes(IGM.LLVMContext, argIndex+1, resultAttrs);
+}
+
 void ExplosionSchema::addToArgTypes(IRGenModule &IGM,
                                     const TypeInfo &TI,
                                     llvm::AttributeSet &Attrs,
                                     SmallVectorImpl<llvm::Type*> &types) const {
-  // Pass indirect arguments as byvals.
+  // Pass large arguments as indirect value parameters.
   if (requiresIndirectParameter(IGM)) {
+    addIndirectValueParameterAttributes(IGM, Attrs, TI, types.size());
     types.push_back(TI.getStorageType()->getPointerTo());
     return;
   }
@@ -706,7 +757,8 @@ void irgen::addIndirectReturnAttributes(IRGenModule &IGM,
                                         llvm::AttributeSet &attrs) {
   static const llvm::Attribute::AttrKind attrKinds[] = {
     llvm::Attribute::StructRet,
-    llvm::Attribute::NoAlias
+    llvm::Attribute::NoAlias,
+    llvm::Attribute::NoCapture,
   };
   auto resultAttrs = llvm::AttributeSet::get(IGM.LLVMContext, 1, attrKinds);
   attrs = attrs.addAttributes(IGM.LLVMContext, 1, resultAttrs);
@@ -1251,16 +1303,23 @@ llvm::Type *SignatureExpansion::expandExternalSignatureTypes() {
 }
 
 void SignatureExpansion::expand(SILParameterInfo param) {
+  auto &ti = IGM.getTypeInfo(param.getSILType());
   switch (param.getConvention()) {
-  case ParameterConvention::Indirect_In:
-  case ParameterConvention::Indirect_Inout:
   case ParameterConvention::Indirect_Out:
+    assert(ParamIRTypes.empty());
+    addIndirectReturnAttributes(IGM, Attrs);
+    HasIndirectResult = true;
+    addPointerParameter(IGM.getStorageType(param.getSILType()));
+    return;
+
+  case ParameterConvention::Indirect_In:
   case ParameterConvention::Indirect_In_Guaranteed:
-    if (param.isIndirectResult()) {
-      assert(ParamIRTypes.empty());
-      addIndirectReturnAttributes(IGM, Attrs);
-      HasIndirectResult = true;
-    }
+    addIndirectValueParameterAttributes(IGM, Attrs, ti, ParamIRTypes.size());
+    addPointerParameter(IGM.getStorageType(param.getSILType()));
+    return;
+
+  case ParameterConvention::Indirect_Inout:
+    addInoutParameterAttributes(IGM, Attrs, ti, ParamIRTypes.size());
     addPointerParameter(IGM.getStorageType(param.getSILType()));
     return;
 
@@ -1284,7 +1343,6 @@ void SignatureExpansion::expand(SILParameterInfo param) {
       return;
     }
     case SILFunctionLanguage::Swift: {
-      auto &ti = IGM.getTypeInfo(param.getSILType());
       auto schema = ti.getSchema();
       schema.addToArgTypes(IGM, ti, Attrs, ParamIRTypes);
       return;

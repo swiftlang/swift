@@ -36,13 +36,13 @@ class Hoozit : Gizmo {
   }
   // CHECK: }
 
-  // CHECK: define hidden void @_TFC10objc_super6Hoozit5framefS0_FT_VSC6NSRect(%VSC6NSRect* noalias sret, %C10objc_super6Hoozit*) {{.*}} {
+  // CHECK: define hidden void @_TFC10objc_super6Hoozit5framefS0_FT_VSC6NSRect(%VSC6NSRect* noalias nocapture sret, %C10objc_super6Hoozit*) {{.*}} {
   override func frame() -> NSRect {
     // CHECK: [[T0:%.*]] = call [[TYPE]]* @_TMaC10objc_super6Hoozit()
     // CHECK: [[T1:%.*]] = bitcast [[TYPE]]* [[T0]] to [[CLASS]]*
     // CHECK: store [[CLASS]]* [[T1]], [[CLASS]]** {{.*}}, align 8
     // CHECK: load i8*, i8** @"\01L_selector(frame)"
-    // CHECK: call void bitcast (void ()* @objc_msgSendSuper2_stret to void ([[NSRECT]]*, [[SUPER]]*, i8*)*)([[NSRECT]]* noalias sret {{.*}}, [[SUPER]]* {{.*}}, i8* {{.*}})
+    // CHECK: call void bitcast (void ()* @objc_msgSendSuper2_stret to void ([[NSRECT]]*, [[SUPER]]*, i8*)*)([[NSRECT]]* noalias nocapture sret {{.*}}, [[SUPER]]* {{.*}}, i8* {{.*}})
     return NSInsetRect(super.frame(), 2.0, 2.0)
   }
   // CHECK: }

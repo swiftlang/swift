@@ -31,7 +31,7 @@ import gizmo
 // CHECK:   @_PROTOCOL__TtP13generic_casts10ObjCProto1_
 // CHECK: }
 
-// CHECK: define hidden i64 @_TF13generic_casts8allToInt{{.*}}(%swift.opaque*, %swift.type* %T)
+// CHECK: define hidden i64 @_TF13generic_casts8allToInt{{.*}}(%swift.opaque* noalias nocapture, %swift.type* %T)
 func allToInt<T>(x: T) -> Int {
   return x as! Int
   // CHECK: [[BUF:%.*]] = alloca [[BUFFER:.24 x i8.]],
@@ -45,7 +45,7 @@ func allToInt<T>(x: T) -> Int {
   // CHECK: ret i64 [[INT_RESULT]]
 }
 
-// CHECK: define hidden void @_TF13generic_casts8intToAll{{.*}}(%swift.opaque* noalias sret, i64, %swift.type* %T) {{.*}} {
+// CHECK: define hidden void @_TF13generic_casts8intToAll{{.*}}(%swift.opaque* noalias nocapture sret, i64, %swift.type* %T) {{.*}} {
 func intToAll<T>(x: Int) -> T {
   // CHECK: [[INT_TEMP:%.*]] = alloca %Si,
   // CHECK: [[T0:%.*]] = getelementptr inbounds %Si, %Si* [[INT_TEMP]], i32 0, i32 0
@@ -55,7 +55,7 @@ func intToAll<T>(x: Int) -> T {
   return x as! T
 }
 
-// CHECK: define hidden i64 @_TF13generic_casts8anyToInt{{.*}}(%"protocol<>"*)
+// CHECK: define hidden i64 @_TF13generic_casts8anyToInt{{.*}}(%"protocol<>"* noalias nocapture dereferenceable({{.*}}))
 func anyToInt(x: protocol<>) -> Int {
   return x as! Int
 }
@@ -88,7 +88,7 @@ func protoCast(x: ObjCClass) -> protocol<ObjCProto1, NSRuncing> {
 
 // <rdar://problem/15313840>
 // Class existential to opaque archetype cast
-// CHECK: define hidden void @_TF13generic_casts33classExistentialToOpaqueArchetype{{.*}}(%swift.opaque* noalias sret, %objc_object*, %swift.type* %T)
+// CHECK: define hidden void @_TF13generic_casts33classExistentialToOpaqueArchetype{{.*}}(%swift.opaque* noalias nocapture sret, %objc_object*, %swift.type* %T)
 func classExistentialToOpaqueArchetype<T>(var x: ObjCProto1) -> T {
   // CHECK: [[X:%.*]] = alloca %P13generic_casts10ObjCProto1_
   // CHECK: [[LOCAL:%.*]] = alloca %P13generic_casts10ObjCProto1_

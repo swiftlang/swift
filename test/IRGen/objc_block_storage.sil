@@ -36,7 +36,7 @@ import gizmo
 // CHECK:   i8* {{.*}} [[NSRECT_BLOCK_SIGNATURE]]
 // CHECK: }
 
-// CHECK-LABEL: define i8* @project_block_storage({ %objc_block, i8* }*) {{.*}} {
+// CHECK-LABEL: define i8* @project_block_storage({ %objc_block, i8* }* nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    %1 = getelementptr inbounds { %objc_block, i8* }, { %objc_block, i8* }* %0, i32 0, i32 1
 // CHECK-NEXT:    %2 = load i8*, i8** %1, align 8
@@ -49,7 +49,7 @@ entry(%0 : $*@block_storage Builtin.RawPointer):
   return %p : $Builtin.RawPointer
 }
 
-// CHECK-LABEL: define fp128 @overaligned_project_block_storage({ %objc_block, fp128 }*) {{.*}} {
+// CHECK-LABEL: define fp128 @overaligned_project_block_storage({ %objc_block, fp128 }* nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK-NEXT:  entry:
 // CHECK-NEXT:    %1 = getelementptr inbounds { %objc_block, fp128 }, { %objc_block, fp128 }* %0, i32 0, i32 1
 // CHECK-NEXT:    %2 = load fp128, fp128* %1, align 16
@@ -62,7 +62,7 @@ entry(%0 : $*@block_storage Builtin.FPIEEE128):
   return %p : $Builtin.FPIEEE128
 }
 
-// CHECK-LABEL: define %objc_block* @init_block_header_trivial({ %objc_block, i8* }*) {{.*}} {
+// CHECK-LABEL: define %objc_block* @init_block_header_trivial({ %objc_block, i8* }* nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK:         %1 = getelementptr inbounds { %objc_block, i8* }, { %objc_block, i8* }* %0, i32 0, i32 0
 // CHECK:         store %objc_block {
 // CHECK:           %objc_class* [[BLOCK_ISA]]
@@ -106,7 +106,7 @@ entry(%0 : $*@block_storage Builtin.RawPointer, %1 : $Int):
   return %1 : $Int
 }
 
-// CHECK-LABEL: define %objc_block* @init_block_header_nontrivial({ %objc_block, %swift.refcounted* }*) {{.*}} {
+// CHECK-LABEL: define %objc_block* @init_block_header_nontrivial({ %objc_block, %swift.refcounted* }* nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK:         store %objc_block {
 // CHECK:           %objc_class* [[BLOCK_ISA]]
 // --                  0x4200_0000 -- HAS_SIGNATURE, HAS_COPY_DISPOSE
@@ -140,7 +140,7 @@ entry(%0 : $*@block_storage Builtin.NativeObject):
 
 sil public_external @invoke_nontrivial : $@convention(c) (@inout @block_storage Builtin.NativeObject) -> ()
 
-// CHECK-LABEL: define %objc_block* @init_block_header_stret({ %objc_block, i8* }*) {{.*}} {
+// CHECK-LABEL: define %objc_block* @init_block_header_stret({ %objc_block, i8* }* nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK:         store %objc_block {
 // CHECK:           %objc_class* [[BLOCK_ISA]]
 // --                  0x6000_0000 -- HAS_STRET, HAS_SIGNATURE

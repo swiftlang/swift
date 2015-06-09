@@ -10,7 +10,7 @@ sil_vtable C {}
 class D : C {}
 sil_vtable D {}
 
-// CHECK-LABEL: define void @downcast_test(%C26unconditional_checked_cast1D** noalias sret, %C26unconditional_checked_cast1C**) {{.*}} {
+// CHECK-LABEL: define void @downcast_test(%C26unconditional_checked_cast1D** noalias nocapture sret, %C26unconditional_checked_cast1C** nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK: entry:
 // CHECK-NEXT: [[INPUTPTR:%[0-9]+]] = load %C26unconditional_checked_cast1C*, %C26unconditional_checked_cast1C** [[INPUTPTRPTR:%[0-9]+]], align 8
 // CHECK-NEXT: [[I8INPUTPTR:%[0-9]+]] = bitcast %C26unconditional_checked_cast1C* [[INPUTPTR]] to i8*

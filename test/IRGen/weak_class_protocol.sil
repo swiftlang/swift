@@ -6,7 +6,7 @@ import Swift
 
 protocol Foo: class { }
 
-// CHECK-LABEL: define void @store_weak({ %swift.weak, i8** }* noalias sret, i64, i64) {{.*}} {
+// CHECK-LABEL: define void @store_weak({ %swift.weak, i8** }* noalias nocapture sret, i64, i64) {{.*}} {
 // CHECK:       entry:
 // CHECK:         [[INSTANCE:%.*]] = inttoptr i64 %1 to %objc_object*
 // CHECK:         [[WTABLE:%.*]] = inttoptr i64 %2 to i8**

@@ -428,7 +428,7 @@ func destroyNonPODArray(array: Builtin.RawPointer, count: Builtin.Word) {
   Builtin.destroyArray(C.self, array, count)
 }
 
-// CHECK-LABEL: define hidden void @_TF8builtins15destroyGenArrayurFTBp5countBwq__T_(i8*, i64, %swift.opaque*, %swift.type* %T)
+// CHECK-LABEL: define hidden void @_TF8builtins15destroyGenArrayurFTBp5countBwq__T_(i8*, i64, %swift.opaque* noalias nocapture, %swift.type* %T)
 // CHECK-NOT:   loop:
 // CHECK:         call void %destroyArray
 func destroyGenArray<T>(array: Builtin.RawPointer, count: Builtin.Word, _: T) {
@@ -483,7 +483,7 @@ func copyNonPODArray(dest: Builtin.RawPointer, src: Builtin.RawPointer, count: B
   Builtin.takeArrayBackToFront(W.self, dest, src, count)
 }
 
-// CHECK-LABEL: define hidden void @_TF8builtins12copyGenArray{{.*}}(i8*, i8*, i64, %swift.opaque*, %swift.type* %T)
+// CHECK-LABEL: define hidden void @_TF8builtins12copyGenArray{{.*}}(i8*, i8*, i64, %swift.opaque* noalias nocapture, %swift.type* %T)
 // CHECK-NOT:   loop:
 // CHECK:         call %swift.opaque* %initializeArrayWithCopy
 // CHECK-NOT:   loop:
@@ -549,11 +549,11 @@ func zeroInitializerEmpty() {
 // isUnique variants
 // ----------------------------------------------------------------------------
 
-// CHECK: define hidden void @_TF8builtins26acceptsBuiltinNativeObjectFRGSqBo_T_([[BUILTIN_NATIVE_OBJECT_TY:%.*]]*) {{.*}} {
+// CHECK: define hidden void @_TF8builtins26acceptsBuiltinNativeObjectFRGSqBo_T_([[BUILTIN_NATIVE_OBJECT_TY:%.*]]* nocapture dereferenceable({{.*}})) {{.*}} {
 func acceptsBuiltinNativeObject(inout ref: Builtin.NativeObject?) {}
 
 // native
-// CHECK-LABEL: define hidden i1 @_TF8builtins8isUniqueFRGSqBo_Bi1_({{%.*}}*) {{.*}} {
+// CHECK-LABEL: define hidden i1 @_TF8builtins8isUniqueFRGSqBo_Bi1_({{%.*}}* nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: bitcast [[BUILTIN_NATIVE_OBJECT_TY]]* %0 to %swift.refcounted**
 // CHECK-NEXT: load %swift.refcounted*, %swift.refcounted** %1
@@ -564,7 +564,7 @@ func isUnique(inout ref: Builtin.NativeObject?) -> Bool {
 }
 
 // native nonNull
-// CHECK-LABEL: define hidden i1 @_TF8builtins8isUniqueFRBoBi1_(%swift.refcounted**) {{.*}} {
+// CHECK-LABEL: define hidden i1 @_TF8builtins8isUniqueFRBoBi1_(%swift.refcounted** nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: load %swift.refcounted*, %swift.refcounted** %0
 // CHECK-NEXT: call i1 @swift_isUniquelyReferenced_nonNull_native(%swift.refcounted* %1)
@@ -574,7 +574,7 @@ func isUnique(inout ref: Builtin.NativeObject) -> Bool {
 }
 
 // native pinned
-// CHECK-LABEL: define hidden i1 @_TF8builtins16isUniqueOrPinnedFRGSqBo_Bi1_({{%.*}}*) {{.*}} {
+// CHECK-LABEL: define hidden i1 @_TF8builtins16isUniqueOrPinnedFRGSqBo_Bi1_({{%.*}}* nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: bitcast [[BUILTIN_NATIVE_OBJECT_TY]]* %0 to %swift.refcounted**
 // CHECK-NEXT: load %swift.refcounted*, %swift.refcounted** %1
@@ -585,7 +585,7 @@ func isUniqueOrPinned(inout ref: Builtin.NativeObject?) -> Bool {
 }
 
 // native pinned nonNull
-// CHECK-LABEL: define hidden i1 @_TF8builtins16isUniqueOrPinnedFRBoBi1_(%swift.refcounted**) {{.*}} {
+// CHECK-LABEL: define hidden i1 @_TF8builtins16isUniqueOrPinnedFRBoBi1_(%swift.refcounted** nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: load %swift.refcounted*, %swift.refcounted** %0
 // CHECK-NEXT: call i1 @swift_isUniquelyReferencedOrPinned_nonNull_native(%swift.refcounted* %1)
@@ -594,11 +594,11 @@ func isUniqueOrPinned(inout ref: Builtin.NativeObject) -> Bool {
   return Builtin.isUniqueOrPinned(&ref)
 }
 
-// CHECK: define hidden void @_TF8builtins27acceptsBuiltinUnknownObjectFRGSqBO_T_([[BUILTIN_UNKNOWN_OBJECT_TY:%.*]]*) {{.*}} {
+// CHECK: define hidden void @_TF8builtins27acceptsBuiltinUnknownObjectFRGSqBO_T_([[BUILTIN_UNKNOWN_OBJECT_TY:%.*]]* nocapture dereferenceable({{.*}})) {{.*}} {
 func acceptsBuiltinUnknownObject(inout ref: Builtin.UnknownObject?) {}
 
 // ObjC
-// CHECK-LABEL: define hidden i1 @_TF8builtins8isUniqueFRGSqBO_Bi1_({{%.*}}*) {{.*}} {
+// CHECK-LABEL: define hidden i1 @_TF8builtins8isUniqueFRGSqBO_Bi1_({{%.*}}* nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: bitcast [[BUILTIN_UNKNOWN_OBJECT_TY]]* %0 to %objc_object**
 // CHECK-NEXT: load %objc_object*, %objc_object** %1
@@ -609,7 +609,7 @@ func isUnique(inout ref: Builtin.UnknownObject?) -> Bool {
 }
 
 // ObjC nonNull
-// CHECK-LABEL: define hidden i1 @_TF8builtins8isUniqueFRBOBi1_(%objc_object**) {{.*}} {
+// CHECK-LABEL: define hidden i1 @_TF8builtins8isUniqueFRBOBi1_(%objc_object** nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: load %objc_object*, %objc_object** %0
 // CHECK-NEXT: call i1 @swift_isUniquelyReferencedNonObjC_nonNull(%objc_object* %1)
@@ -619,7 +619,7 @@ func isUnique(inout ref: Builtin.UnknownObject) -> Bool {
 }
 
 // ObjC pinned nonNull
-// CHECK-LABEL: define hidden i1 @_TF8builtins16isUniqueOrPinnedFRBOBi1_(%objc_object**) {{.*}} {
+// CHECK-LABEL: define hidden i1 @_TF8builtins16isUniqueOrPinnedFRBOBi1_(%objc_object** nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: load %objc_object*, %objc_object** %0
 // CHECK-NEXT: call i1 @swift_isUniquelyReferencedOrPinnedNonObjC_nonNull(%objc_object* %1)
@@ -629,7 +629,7 @@ func isUniqueOrPinned(inout ref: Builtin.UnknownObject) -> Bool {
 }
 
 // BridgeObject nonNull
-// CHECK-LABEL: define hidden i1 @_TF8builtins8isUniqueFRBbBi1_(%swift.bridge**) {{.*}} {
+// CHECK-LABEL: define hidden i1 @_TF8builtins8isUniqueFRBbBi1_(%swift.bridge** nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: load %swift.bridge*, %swift.bridge** %0
 // CHECK-NEXT: call i1 @swift_isUniquelyReferencedNonObjC_nonNull_bridgeObject(%swift.bridge* %1)
@@ -639,7 +639,7 @@ func isUnique(inout ref: Builtin.BridgeObject) -> Bool {
 }
 
 // Bridge pinned nonNull
-// CHECK-LABEL: define hidden i1 @_TF8builtins16isUniqueOrPinnedFRBbBi1_(%swift.bridge**) {{.*}} {
+// CHECK-LABEL: define hidden i1 @_TF8builtins16isUniqueOrPinnedFRBbBi1_(%swift.bridge** nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: load %swift.bridge*, %swift.bridge** %0
 // CHECK-NEXT: call i1 @swift_isUniquelyReferencedOrPinnedNonObjC_nonNull_bridgeObject(%swift.bridge* %1)
@@ -649,7 +649,7 @@ func isUniqueOrPinned(inout ref: Builtin.BridgeObject) -> Bool {
 }
 
 // BridgeObject nonNull
-// CHECK-LABEL: define hidden i1 @_TF8builtins15isUnique_nativeFRBbBi1_(%swift.bridge**) {{.*}} {
+// CHECK-LABEL: define hidden i1 @_TF8builtins15isUnique_nativeFRBbBi1_(%swift.bridge** nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: bitcast %swift.bridge** %0 to %swift.refcounted**
 // CHECK-NEXT: load %swift.refcounted*, %swift.refcounted** %1
@@ -660,7 +660,7 @@ func isUnique_native(inout ref: Builtin.BridgeObject) -> Bool {
 }
 
 // Bridge pinned nonNull
-// CHECK-LABEL: define hidden i1 @_TF8builtins23isUniqueOrPinned_nativeFRBbBi1_(%swift.bridge**) {{.*}} {
+// CHECK-LABEL: define hidden i1 @_TF8builtins23isUniqueOrPinned_nativeFRBbBi1_(%swift.bridge** nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK-NEXT: bitcast %swift.bridge** %0 to %swift.refcounted**
 // CHECK-NEXT: load %swift.refcounted*, %swift.refcounted** %1

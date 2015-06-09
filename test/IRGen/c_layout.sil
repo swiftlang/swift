@@ -34,7 +34,7 @@ bb0:
 // CHECK-x86_64:   [[RESULT:%.*]] = alloca %VSC11BitfieldOne, align 8
 // CHECK-x86_64:   [[ARG:%.*]] = alloca %VSC11BitfieldOne, align 8
 //   Make the first call and pull all the values out of the indirect result.
-// CHECK-x86_64:   call void @createBitfieldOne(%VSC11BitfieldOne* noalias sret [[RESULT]])
+// CHECK-x86_64:   call void @createBitfieldOne(%VSC11BitfieldOne* noalias nocapture sret [[RESULT]])
 // CHECK-x86_64:   [[ADDR_A:%.*]] = getelementptr inbounds %VSC11BitfieldOne, %VSC11BitfieldOne* [[RESULT]], i32 0, i32 0
 // CHECK-x86_64:   [[ADDR_A_V:%.*]] = getelementptr inbounds %VSs6UInt32, %VSs6UInt32* [[ADDR_A]], i32 0, i32 0
 // CHECK-x86_64:   [[A:%.*]] = load i32, i32* [[ADDR_A_V]], align 8
@@ -243,7 +243,7 @@ entry(%b : $@convention(block) (CChar) -> CChar, %c : $CChar):
 }
 
 // CHECK-x86_64-LABEL: define void @testBitfieldInBlock
-// CHECK-x86_64:         call void {{%.*}}(%VSC11BitfieldOne* noalias sret {{%.*}}, %objc_block* {{%.*}}, %VSC11BitfieldOne* byval align 8 {{%.*}})
+// CHECK-x86_64:         call void {{%.*}}(%VSC11BitfieldOne* noalias nocapture sret {{%.*}}, %objc_block* {{%.*}}, %VSC11BitfieldOne* byval align 8 {{%.*}})
 sil @testBitfieldInBlock : $@convention(thin) (@owned @convention(block) (BitfieldOne) -> BitfieldOne, BitfieldOne) -> BitfieldOne  {
 entry(%b : $@convention(block) (BitfieldOne) -> BitfieldOne, %x : $BitfieldOne):
   %r = apply %b(%x) : $@convention(block) (BitfieldOne) -> BitfieldOne

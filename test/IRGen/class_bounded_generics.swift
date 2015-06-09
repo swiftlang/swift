@@ -119,7 +119,7 @@ func call_class_bounded_archetype(x: ConcreteClass) -> ConcreteClass {
   // CHECK: ret %C22class_bounded_generics13ConcreteClass* [[OUT]]
 }
 
-// CHECK: define hidden void @_TF22class_bounded_generics27not_class_bounded_archetype{{.*}}(%swift.opaque* noalias sret, %swift.opaque*, %swift.type* %T, i8** %T.NotClassBound)
+// CHECK: define hidden void @_TF22class_bounded_generics27not_class_bounded_archetype{{.*}}(%swift.opaque* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.NotClassBound)
 func not_class_bounded_archetype<T : NotClassBound>(x: T) -> T {
   return x
 }
@@ -218,7 +218,7 @@ func class_generic_field_struct_fields<T : ClassBound>
   return (x.x, x.y, x.z)
 }
 
-// CHECK-LABEL: define hidden void @_TF22class_bounded_generics34class_protocol_field_struct_fields{{.*}}(<{ %Si, %P22class_bounded_generics10ClassBound_, %Si }>* noalias sret, %V22class_bounded_generics24ClassProtocolFieldStruct*)
+// CHECK-LABEL: define hidden void @_TF22class_bounded_generics34class_protocol_field_struct_fields{{.*}}(<{ %Si, %P22class_bounded_generics10ClassBound_, %Si }>* noalias nocapture sret, %V22class_bounded_generics24ClassProtocolFieldStruct* noalias nocapture dereferenceable({{.*}}))
 func class_protocol_field_struct_fields
 (x:ClassProtocolFieldStruct) -> (Int, ClassBound, Int) {
   return (x.x, x.y, x.z)
@@ -233,7 +233,7 @@ func class_generic_field_class_fields<T : ClassBound>
   // CHECK: getelementptr inbounds %C22class_bounded_generics22ClassGenericFieldClass, %C22class_bounded_generics22ClassGenericFieldClass* %0, i32 0, i32 3
 }
 
-// CHECK-LABEL: define hidden void @_TF22class_bounded_generics33class_protocol_field_class_fields{{.*}}(<{ %Si, %P22class_bounded_generics10ClassBound_, %Si }>* noalias sret, %C22class_bounded_generics23ClassProtocolFieldClass*)
+// CHECK-LABEL: define hidden void @_TF22class_bounded_generics33class_protocol_field_class_fields{{.*}}(<{ %Si, %P22class_bounded_generics10ClassBound_, %Si }>* noalias nocapture sret, %C22class_bounded_generics23ClassProtocolFieldClass*)
 func class_protocol_field_class_fields(x: ClassProtocolFieldClass)
 -> (Int, ClassBound, Int) {
   return (x.x, x.y, x.z)

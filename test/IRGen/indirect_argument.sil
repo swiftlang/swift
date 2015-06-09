@@ -12,9 +12,9 @@ struct HugeAlignment {
 }
 
 // TODO: could be the context param
-// CHECK-LABEL: define void @huge_method(%V17indirect_argument4Huge*)
+// CHECK-LABEL: define void @huge_method(%V17indirect_argument4Huge* noalias nocapture dereferenceable({{.*}}))
 // CHECK:         [[TMP:%.*]] = alloca
-// CHECK:         call void @huge_method(%V17indirect_argument4Huge* [[TMP]])
+// CHECK:         call void @huge_method(%V17indirect_argument4Huge* noalias nocapture dereferenceable({{.*}}) [[TMP]])
 sil @huge_method : $@convention(method) Huge -> () {
 entry(%x : $Huge):
   %f = function_ref @huge_method : $@convention(method) Huge -> ()
@@ -22,9 +22,9 @@ entry(%x : $Huge):
   return %z : $()
 }
 
-// CHECK-LABEL: define void @huge_param(%V17indirect_argument4Huge*)
+// CHECK-LABEL: define void @huge_param(%V17indirect_argument4Huge* noalias nocapture dereferenceable({{.*}}))
 // CHECK:         [[TMP:%.*]] = alloca
-// CHECK:         call void @huge_param(%V17indirect_argument4Huge* [[TMP]])
+// CHECK:         call void @huge_param(%V17indirect_argument4Huge* noalias nocapture dereferenceable({{.*}}) [[TMP]])
 sil @huge_param : $@convention(thin) Huge -> () {
 entry(%x : $Huge):
   %f = function_ref @huge_param : $@convention(thin) Huge -> ()
@@ -32,9 +32,9 @@ entry(%x : $Huge):
   return %z : $()
 }
 
-// CHECK-LABEL: define void @huge_alignment_param(%V17indirect_argument13HugeAlignment*)
+// CHECK-LABEL: define void @huge_alignment_param(%V17indirect_argument13HugeAlignment* noalias nocapture dereferenceable({{.*}}))
 // CHECK:         [[TMP:%.*]] = alloca
-// CHECK:         call void @huge_alignment_param(%V17indirect_argument13HugeAlignment* [[TMP]])
+// CHECK:         call void @huge_alignment_param(%V17indirect_argument13HugeAlignment* noalias nocapture dereferenceable({{.*}}) [[TMP]])
 sil @huge_alignment_param : $@convention(thin) HugeAlignment -> () {
 entry(%x : $HugeAlignment):
   %f = function_ref @huge_alignment_param : $@convention(thin) HugeAlignment -> ()
@@ -42,10 +42,10 @@ entry(%x : $HugeAlignment):
   return %z : $()
 }
 
-// CHECK-LABEL: define void @huge_param_and_return(%V17indirect_argument4Huge* noalias sret, %V17indirect_argument4Huge*)
+// CHECK-LABEL: define void @huge_param_and_return(%V17indirect_argument4Huge* noalias nocapture sret, %V17indirect_argument4Huge* noalias nocapture dereferenceable({{.*}}))
 // CHECK:         [[TMP_ARG:%.*]] = alloca
 // CHECK:         [[TMP_RET:%.*]] = alloca
-// CHECK:         call void @huge_param_and_return(%V17indirect_argument4Huge* noalias sret [[TMP_RET]], %V17indirect_argument4Huge* [[TMP_ARG]])
+// CHECK:         call void @huge_param_and_return(%V17indirect_argument4Huge* noalias nocapture sret [[TMP_RET]], %V17indirect_argument4Huge* noalias nocapture dereferenceable({{.*}}) [[TMP_ARG]])
 sil @huge_param_and_return : $@convention(thin) Huge -> Huge {
 entry(%x : $Huge):
   %f = function_ref @huge_param_and_return : $@convention(thin) Huge -> Huge
@@ -53,9 +53,9 @@ entry(%x : $Huge):
   return %z : $Huge
 }
 
-// CHECK-LABEL: define void @huge_param_and_indirect_return(%V17indirect_argument4Huge* noalias sret, %V17indirect_argument4Huge*)
+// CHECK-LABEL: define void @huge_param_and_indirect_return(%V17indirect_argument4Huge* noalias nocapture sret, %V17indirect_argument4Huge* noalias nocapture dereferenceable({{.*}}))
 // CHECK:         [[TMP_ARG:%.*]] = alloca
-// CHECK:         call void @huge_param_and_indirect_return(%V17indirect_argument4Huge* noalias sret %0, %V17indirect_argument4Huge* [[TMP_ARG]])
+// CHECK:         call void @huge_param_and_indirect_return(%V17indirect_argument4Huge* noalias nocapture sret %0, %V17indirect_argument4Huge* noalias nocapture dereferenceable({{.*}}) [[TMP_ARG]])
 sil @huge_param_and_indirect_return : $@convention(thin) (@out Huge, Huge) -> () {
 entry(%o : $*Huge, %x : $Huge):
   %f = function_ref @huge_param_and_indirect_return : $@convention(thin) (@out Huge, Huge) -> ()
@@ -63,15 +63,15 @@ entry(%o : $*Huge, %x : $Huge):
   return %z : $()
 }
 
-// CHECK-LABEL: define void @huge_partial_application(%V17indirect_argument4Huge*, %V17indirect_argument4Huge*)
+// CHECK-LABEL: define void @huge_partial_application(%V17indirect_argument4Huge* noalias nocapture dereferenceable({{.*}}), %V17indirect_argument4Huge* noalias nocapture dereferenceable({{.*}}))
 // CHECK:         [[TMP_ARG:%.*]] = alloca
 // CHECK:         [[CLOSURE:%.*]] = call noalias %swift.refcounted* @swift_allocObject
 // CHECK:         bitcast %swift.refcounted* [[CLOSURE]] to <{ %swift.refcounted, %V17indirect_argument4Huge }>*
-// CHECK:         call void @_TPA_huge_partial_application(%V17indirect_argument4Huge* [[TMP_ARG]], %swift.refcounted* [[CLOSURE]])
-// CHECK:       define internal void @_TPA_huge_partial_application(%V17indirect_argument4Huge*, %swift.refcounted*)
+// CHECK:         call void @_TPA_huge_partial_application(%V17indirect_argument4Huge* noalias nocapture dereferenceable({{.*}}) [[TMP_ARG]], %swift.refcounted* [[CLOSURE]])
+// CHECK:       define internal void @_TPA_huge_partial_application(%V17indirect_argument4Huge* noalias nocapture dereferenceable({{.*}}), %swift.refcounted*)
 // CHECK:         [[TMP_ARG:%.*]] = alloca
 // CHECK-NOT:     tail
-// CHECK:         call void @huge_partial_application(%V17indirect_argument4Huge* %0, %V17indirect_argument4Huge* [[TMP_ARG]])
+// CHECK:         call void @huge_partial_application(%V17indirect_argument4Huge* noalias nocapture dereferenceable({{.*}}) %0, %V17indirect_argument4Huge* noalias nocapture dereferenceable({{.*}}) [[TMP_ARG]])
 sil @huge_partial_application : $@convention(thin) (Huge, Huge) -> () {
 entry(%x : $Huge, %y : $Huge):
   %f = function_ref @huge_partial_application : $@convention(thin) (Huge, Huge) -> ()
@@ -80,16 +80,16 @@ entry(%x : $Huge, %y : $Huge):
   return %z : $()
 }
 
-// CHECK-LABEL: define void @huge_partial_application_stret(%V17indirect_argument4Huge* noalias sret, %V17indirect_argument4Huge*, %V17indirect_argument4Huge*)
+// CHECK-LABEL: define void @huge_partial_application_stret(%V17indirect_argument4Huge* noalias nocapture sret, %V17indirect_argument4Huge* noalias nocapture dereferenceable({{.*}}), %V17indirect_argument4Huge* noalias nocapture dereferenceable({{.*}}))
 // CHECK:         [[TMP_ARG:%.*]] = alloca
 // CHECK:         [[TMP_RET:%.*]] = alloca
 // CHECK:         [[CLOSURE:%.*]] = call noalias %swift.refcounted* @swift_allocObject
 // CHECK:         bitcast %swift.refcounted* [[CLOSURE]] to <{ %swift.refcounted, %V17indirect_argument4Huge }>*
-// CHECK:         call void @_TPA_huge_partial_application_stret(%V17indirect_argument4Huge* noalias sret [[TMP_RET]], %V17indirect_argument4Huge* [[TMP_ARG]], %swift.refcounted* [[CLOSURE]])
-// CHECK:       define internal void @_TPA_huge_partial_application_stret(%V17indirect_argument4Huge* noalias sret, %V17indirect_argument4Huge*, %swift.refcounted*)
+// CHECK:         call void @_TPA_huge_partial_application_stret(%V17indirect_argument4Huge* noalias nocapture sret [[TMP_RET]], %V17indirect_argument4Huge* noalias nocapture dereferenceable({{.*}}) [[TMP_ARG]], %swift.refcounted* [[CLOSURE]])
+// CHECK:       define internal void @_TPA_huge_partial_application_stret(%V17indirect_argument4Huge* noalias nocapture sret, %V17indirect_argument4Huge* noalias nocapture dereferenceable({{.*}}), %swift.refcounted*)
 // CHECK:         [[TMP_ARG:%.*]] = alloca
 // CHECK-NOT:     tail
-// CHECK:         call void @huge_partial_application_stret(%V17indirect_argument4Huge* noalias sret %0, %V17indirect_argument4Huge* %1, %V17indirect_argument4Huge* [[TMP_ARG]])
+// CHECK:         call void @huge_partial_application_stret(%V17indirect_argument4Huge* noalias nocapture sret %0, %V17indirect_argument4Huge* noalias nocapture dereferenceable({{.*}}) %1, %V17indirect_argument4Huge* noalias nocapture dereferenceable({{.*}}) [[TMP_ARG]])
 sil @huge_partial_application_stret : $@convention(thin) (Huge, Huge) -> Huge {
 entry(%x : $Huge, %y : $Huge):
   %f = function_ref @huge_partial_application_stret : $@convention(thin) (Huge, Huge) -> Huge

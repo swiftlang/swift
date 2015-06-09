@@ -18,7 +18,7 @@ entry(%b : $*Builtin.UnsafeValueBuffer, %v : $Int):
   %r = tuple ()
   return %r : $()
 }
-// CHECK-LABEL: define void @alloc_small([24 x i8]*, i64)
+// CHECK-LABEL: define void @alloc_small([24 x i8]* nocapture dereferenceable({{.*}}), i64)
 // CHECK-NEXT: entry:
 // CHECK-NEXT: [[T0:%.*]] = bitcast [24 x i8]* %0 to %Si*
 // CHECK-NEXT: [[T2:%.*]] = getelementptr inbounds %Si, %Si* [[T0]], i32 0, i32 0
@@ -32,7 +32,7 @@ entry(%b : $*Builtin.UnsafeValueBuffer, %v : $Int):
   %r = tuple ()
   return %r : $()
 }
-// CHECK-LABEL: define void @project_small([24 x i8]*, i64)
+// CHECK-LABEL: define void @project_small([24 x i8]* nocapture dereferenceable({{.*}}), i64)
 // CHECK-NEXT: entry:
 // CHECK-NEXT: [[T0:%.*]] = bitcast [24 x i8]* %0 to %Si*
 // CHECK-NEXT: [[T2:%.*]] = getelementptr inbounds %Si, %Si* [[T0]], i32 0, i32 0
@@ -45,7 +45,7 @@ entry(%b : $*Builtin.UnsafeValueBuffer):
   %r = tuple ()
   return %r : $()
 }
-// CHECK-LABEL: define void @dealloc_small([24 x i8]*)
+// CHECK-LABEL: define void @dealloc_small([24 x i8]* nocapture dereferenceable({{.*}}))
 // CHECK-NEXT: entry:
 // CHECK-NEXT: ret void
 
@@ -56,7 +56,7 @@ entry(%b : $*Builtin.UnsafeValueBuffer, %v : $BigStruct):
   %r = tuple ()
   return %r : $()
 }
-// CHECK-LABEL: define void @alloc_big([24 x i8]*, %V13value_buffers9BigStruct*)
+// CHECK-LABEL: define void @alloc_big([24 x i8]* nocapture dereferenceable({{.*}}), %V13value_buffers9BigStruct* noalias nocapture dereferenceable({{.*}}))
 // CHECK-NEXT: entry:
 // CHECK: [[SLOT0:%.*]] = load i64
 // CHECK: [[SLOT1:%.*]] = load i64
@@ -87,7 +87,7 @@ entry(%b : $*Builtin.UnsafeValueBuffer, %v : $BigStruct):
   %r = tuple ()
   return %r : $()
 }
-// CHECK-LABEL: define void @project_big([24 x i8]*, %V13value_buffers9BigStruct*)
+// CHECK-LABEL: define void @project_big([24 x i8]* nocapture dereferenceable({{.*}}), %V13value_buffers9BigStruct* noalias nocapture dereferenceable({{.*}}))
 // CHECK-NEXT: entry:
 // CHECK: [[SLOT0:%.*]] = load i64
 // CHECK: [[SLOT1:%.*]] = load i64
@@ -115,7 +115,7 @@ entry(%b : $*Builtin.UnsafeValueBuffer):
   %r = tuple ()
   return %r : $()
 }
-// CHECK-LABEL: define void @dealloc_big([24 x i8]*)
+// CHECK-LABEL: define void @dealloc_big([24 x i8]* nocapture dereferenceable({{.*}}))
 // CHECK-NEXT: entry:
 // CHECK-NEXT: [[T0:%.*]] = bitcast [24 x i8]* %0 to i8**
 // CHECK-NEXT: [[ADDR:%.*]] = load i8*, i8** [[T0]], align 8

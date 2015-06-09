@@ -221,7 +221,7 @@ dest(%u2 : $(Builtin.Int64, Builtin.Int64)):
   return %x : $()
 }
 
-// CHECK: define void @singleton_switch_indirect(%O4enum9Singleton*) {{.*}} {
+// CHECK: define void @singleton_switch_indirect(%O4enum9Singleton* nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK: entry:
 // CHECK:   br label %[[DEST:[0-9]+]]
 // CHECK: ; <label>:[[DEST]]
@@ -250,7 +250,7 @@ entry(%0 : $Builtin.Int64, %1 : $Builtin.Int64):
   return %u : $Singleton
 }
 
-// CHECK: define void @singleton_inject_indirect(i64, i64, %O4enum9Singleton*) {{.*}} {
+// CHECK: define void @singleton_inject_indirect(i64, i64, %O4enum9Singleton* nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK: entry:
 // CHECK:   [[DATA_ADDR:%.*]] = bitcast %O4enum9Singleton* %2 to <{ i64, i64 }>*
 // CHECK:   [[DATA_0_ADDR:%.*]] = getelementptr inbounds <{ i64, i64 }>, <{ i64, i64 }>* [[DATA_ADDR]], i32 0, i32 0
@@ -326,7 +326,7 @@ end:
   return %x : $()
 }
 
-// CHECK: define void @no_payload_switch_indirect(%O4enum10NoPayloads*) {{.*}} {
+// CHECK: define void @no_payload_switch_indirect(%O4enum10NoPayloads* nocapture dereferenceable({{.*}})) {{.*}} {
 sil @no_payload_switch_indirect : $@convention(thin) (@inout NoPayloads) -> () {
 entry(%u : $*NoPayloads):
 // CHECK:   [[TAG_ADDR:%.*]] = getelementptr inbounds %O4enum10NoPayloads, %O4enum10NoPayloads* %0, i32 0, i32 0
@@ -375,7 +375,7 @@ entry:
   return %u : $NoPayloads
 }
 
-// CHECK: define void @no_payload_inject_z_indirect(%O4enum10NoPayloads*) {{.*}} {
+// CHECK: define void @no_payload_inject_z_indirect(%O4enum10NoPayloads* nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK: entry:
 // CHECK:   [[TAG_ADDR:%.*]] = getelementptr inbounds %O4enum10NoPayloads, %O4enum10NoPayloads* %0, i32 0, i32 0
 // CHECK:   store i2 -2, i2* [[TAG_ADDR]]
@@ -584,7 +584,7 @@ entry(%0 : $Builtin.Word):
   return %u : $SinglePayloadNoXI2
 }
 
-// CHECK: define void @single_payload_no_xi_inject_x_indirect([[WORD]], %O4enum18SinglePayloadNoXI2*) {{.*}} {
+// CHECK: define void @single_payload_no_xi_inject_x_indirect([[WORD]], %O4enum18SinglePayloadNoXI2* nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK: entry:
 // CHECK:   [[DATA_ADDR:%.*]] = bitcast %O4enum18SinglePayloadNoXI2* %1 to [[WORD]]*
 // CHECK:   store [[WORD]] %0, [[WORD]]* [[DATA_ADDR]]
@@ -612,7 +612,7 @@ entry:
   return %u : $SinglePayloadNoXI2
 }
 
-// CHECK: define void @single_payload_no_xi_inject_y_indirect(%O4enum18SinglePayloadNoXI2*) {{.*}} {
+// CHECK: define void @single_payload_no_xi_inject_y_indirect(%O4enum18SinglePayloadNoXI2* nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK: entry:
 // CHECK:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum18SinglePayloadNoXI2* %0 to [[WORD]]*
 // CHECK:   store [[WORD]] 0, [[WORD]]* [[PAYLOAD_ADDR]]
@@ -707,7 +707,7 @@ enum AggregateSinglePayload2 {
   case z
 }
 
-// CHECK: define void @aggregate_single_payload_unpack_2(%O4enum23AggregateSinglePayload2*) {{.*}} {
+// CHECK: define void @aggregate_single_payload_unpack_2(%O4enum23AggregateSinglePayload2* noalias nocapture dereferenceable({{.*}})) {{.*}} {
 sil @aggregate_single_payload_unpack_2 : $@convention(thin) (AggregateSinglePayload2) -> () {
 entry(%u : $AggregateSinglePayload2):
 // CHECK: [[CHUNK0:%.*]] = load [[WORD]]
@@ -729,7 +729,7 @@ end:
   return %x : $()
 }
 
-// CHECK: define void @aggregate_single_payload_2_inject(%O4enum23AggregateSinglePayload2* noalias sret, i21, [[WORD]], [[WORD]], [[WORD]]) {{.*}} {
+// CHECK: define void @aggregate_single_payload_2_inject(%O4enum23AggregateSinglePayload2* noalias nocapture sret, i21, [[WORD]], [[WORD]], [[WORD]]) {{.*}} {
 // CHECK: entry:
 // CHECK:   [[ZEXT_0:%.*]] = zext i21 %1 to [[WORD]]
 // CHECK:   store [[WORD]] [[ZEXT_0]]
@@ -944,7 +944,7 @@ entry(%0 : $Builtin.Int63):
   return %u : $SinglePayloadSpareBit
 }
 
-// CHECK-64: define void @single_payload_spare_bit_inject_x_indirect(i63, %O4enum21SinglePayloadSpareBit*) {{.*}} {
+// CHECK-64: define void @single_payload_spare_bit_inject_x_indirect(i63, %O4enum21SinglePayloadSpareBit* nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK-64: entry:
 // CHECK-64:   [[DATA_ADDR:%.*]] = bitcast %O4enum21SinglePayloadSpareBit* %1 to i63*
 // CHECK-64:   store i63 %0, i63* [[DATA_ADDR]]
@@ -970,7 +970,7 @@ entry:
   return %u : $SinglePayloadSpareBit
 }
 
-// CHECK-64: define void @single_payload_spare_bit_inject_y_indirect(%O4enum21SinglePayloadSpareBit*) {{.*}} {
+// CHECK-64: define void @single_payload_spare_bit_inject_y_indirect(%O4enum21SinglePayloadSpareBit* nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK-64: entry:
 // CHECK-64:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum21SinglePayloadSpareBit* %0 to i64*
 // --                0x8000_0000_0000_0000
@@ -1206,7 +1206,7 @@ enum DynamicSinglePayload<T> {
   case w
 }
 
-// CHECK: define void @dynamic_single_payload_switch(%O4enum20DynamicSinglePayload*, %swift.type* %T) {{.*}} {
+// CHECK: define void @dynamic_single_payload_switch(%O4enum20DynamicSinglePayload* noalias nocapture, %swift.type* %T) {{.*}} {
 // CHECK:   [[OPAQUE_ENUM:%.*]] = bitcast %O4enum20DynamicSinglePayload* %0 to %swift.opaque*
 // CHECK:   [[CASE_INDEX:%.*]] = call i32 @swift_getEnumCaseSinglePayload(%swift.opaque* [[OPAQUE_ENUM]], %swift.type* %T, i32 3)
 // CHECK:   switch i32 [[CASE_INDEX]], label {{%.*}} [
@@ -1231,7 +1231,7 @@ end:
   return %v : $()
 }
 
-// CHECK: define void @dynamic_single_payload_inject_x(%O4enum20DynamicSinglePayload* noalias sret, %swift.opaque*, %swift.type* %T) {{.*}} {
+// CHECK: define void @dynamic_single_payload_inject_x(%O4enum20DynamicSinglePayload* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.type* %T) {{.*}} {
 // CHECK:   [[ADDR:%.*]] = bitcast %O4enum20DynamicSinglePayload* %0 to %swift.opaque*
 // CHECK:   call void @swift_storeEnumTagSinglePayload(%swift.opaque* [[ADDR]], %swift.type* %T, i32 -1, i32 3)
 sil @dynamic_single_payload_inject_x : $<T> (@out DynamicSinglePayload<T>, @in T) -> () {
@@ -1241,7 +1241,7 @@ entry(%r : $*DynamicSinglePayload<T>, %t : $*T):
   return %v : $()
 }
 
-// CHECK: define void @dynamic_single_payload_inject_y(%O4enum20DynamicSinglePayload* noalias sret, %swift.type* %T) {{.*}} {
+// CHECK: define void @dynamic_single_payload_inject_y(%O4enum20DynamicSinglePayload* noalias nocapture sret, %swift.type* %T) {{.*}} {
 // CHECK:   [[ADDR:%.*]] = bitcast %O4enum20DynamicSinglePayload* %0 to %swift.opaque*
 // CHECK:   call void @swift_storeEnumTagSinglePayload(%swift.opaque* [[ADDR]], %swift.type* %T, i32 0, i32 3)
 sil @dynamic_single_payload_inject_y : $<T> (@out DynamicSinglePayload<T>) -> () {
@@ -1284,7 +1284,7 @@ end(%z : $()):
   return %z : $()
 }
 
-// CHECK: define i2 @dynamic_single_payload_empty_payload_load([[DYNAMIC_SINGLE_EMPTY_PAYLOAD]]*) {{.*}} {
+// CHECK: define i2 @dynamic_single_payload_empty_payload_load([[DYNAMIC_SINGLE_EMPTY_PAYLOAD]]* nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK: entry:
 // CHECK:   %1 = bitcast [[DYNAMIC_SINGLE_EMPTY_PAYLOAD]]* %0 to i2*
 // CHECK:   %2 = load i2, i2* %1
@@ -1296,7 +1296,7 @@ entry(%p : $*DynamicSinglePayload<()>):
   return %x : $DynamicSinglePayload<()>
 }
 
-// CHECK: define void @dynamic_single_payload_empty_payload_store([[DYNAMIC_SINGLE_EMPTY_PAYLOAD]]*, i2) {{.*}} {
+// CHECK: define void @dynamic_single_payload_empty_payload_store([[DYNAMIC_SINGLE_EMPTY_PAYLOAD]]* nocapture dereferenceable({{.*}}), i2) {{.*}} {
 // CHECK: entry:
 // CHECK:   %2 = bitcast [[DYNAMIC_SINGLE_EMPTY_PAYLOAD]]* %0 to i2*
 // CHECK:   store i2 %1, i2* %2
@@ -1422,7 +1422,7 @@ end:
   return %v : $()
 }
 
-// CHECK-64: define void @multi_payload_no_spare_bits_switch_indirect(%O4enum23MultiPayloadNoSpareBits*) {{.*}} {
+// CHECK-64: define void @multi_payload_no_spare_bits_switch_indirect(%O4enum23MultiPayloadNoSpareBits* nocapture dereferenceable({{.*}})) {{.*}} {
 sil @multi_payload_no_spare_bits_switch_indirect : $(@inout MultiPayloadNoSpareBits) -> () {
 entry(%u : $*MultiPayloadNoSpareBits):
 // CHECK-64:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum23MultiPayloadNoSpareBits* %0 to i64*
@@ -1481,7 +1481,7 @@ entry(%0 : $Builtin.Int64):
   return %u : $MultiPayloadNoSpareBits
 }
 
-// CHECK-64: define void @multi_payload_no_spare_bit_inject_x_indirect(i64, %O4enum23MultiPayloadNoSpareBits*) {{.*}} {
+// CHECK-64: define void @multi_payload_no_spare_bit_inject_x_indirect(i64, %O4enum23MultiPayloadNoSpareBits* nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK-64: entry:
 // CHECK-64:   [[DATA_ADDR:%.*]] = bitcast %O4enum23MultiPayloadNoSpareBits* %1 to i64*
 // CHECK-64:   store i64 %0, i64* [[DATA_ADDR]]
@@ -1535,7 +1535,7 @@ entry:
   return %u : $MultiPayloadNoSpareBits
 }
 
-// CHECK-64: define void @multi_payload_no_spare_bit_inject_a_indirect(%O4enum23MultiPayloadNoSpareBits*) {{.*}} {
+// CHECK-64: define void @multi_payload_no_spare_bit_inject_a_indirect(%O4enum23MultiPayloadNoSpareBits* nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK-64: entry:
 // CHECK-64:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum23MultiPayloadNoSpareBits* %0 to i64*
 // CHECK-64:   store i64 0, i64* [[PAYLOAD_ADDR]]
@@ -1733,7 +1733,7 @@ entry(%0 : $Builtin.Int62):
   return %u : $MultiPayloadOneSpareBit
 }
 
-// CHECK-64: define void @multi_payload_one_spare_bit_inject_x_indirect(i62, %O4enum23MultiPayloadOneSpareBit*) {{.*}} {
+// CHECK-64: define void @multi_payload_one_spare_bit_inject_x_indirect(i62, %O4enum23MultiPayloadOneSpareBit* nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK-64: entry:
 // CHECK-64:   [[DATA_ADDR:%.*]] = bitcast %O4enum23MultiPayloadOneSpareBit* %1 to i62*
 // CHECK-64:   store i62 %0, i62* [[DATA_ADDR]]
@@ -1772,7 +1772,7 @@ entry(%0 : $Builtin.Int63):
   return %u : $MultiPayloadOneSpareBit
 }
 
-// CHECK-64: define void @multi_payload_one_spare_bit_inject_y_indirect(i63, %O4enum23MultiPayloadOneSpareBit*) {{.*}} {
+// CHECK-64: define void @multi_payload_one_spare_bit_inject_y_indirect(i63, %O4enum23MultiPayloadOneSpareBit* nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK-64: entry:
 // CHECK-64:   [[DATA_ADDR:%.*]] = bitcast %O4enum23MultiPayloadOneSpareBit* %1 to i63*
 // CHECK-64:   store i63 %0, i63* [[DATA_ADDR]]
@@ -1823,7 +1823,7 @@ entry:
   return %u : $MultiPayloadOneSpareBit
 }
 
-// CHECK-64: define void @multi_payload_one_spare_bit_inject_a_indirect(%O4enum23MultiPayloadOneSpareBit*) {{.*}} {
+// CHECK-64: define void @multi_payload_one_spare_bit_inject_a_indirect(%O4enum23MultiPayloadOneSpareBit* nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK-64: entry:
 // CHECK-64:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum23MultiPayloadOneSpareBit* %0 to i64*
 // --                0x8000_0000_0000_0000
@@ -1967,7 +1967,7 @@ entry(%0 : $Builtin.Int62):
   return %u : $MultiPayloadTwoSpareBits
 }
 
-// CHECK-64: define void @multi_payload_two_spare_bits_inject_x_indirect(i62, %O4enum24MultiPayloadTwoSpareBits*) {{.*}} {
+// CHECK-64: define void @multi_payload_two_spare_bits_inject_x_indirect(i62, %O4enum24MultiPayloadTwoSpareBits* nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK-64: entry:
 // CHECK-64:   [[DATA_ADDR:%.*]] = bitcast %O4enum24MultiPayloadTwoSpareBits* %1 to i62*
 // CHECK-64:   store i62 %0, i62* [[DATA_ADDR]]
@@ -2001,7 +2001,7 @@ entry(%0 : $Builtin.Int60):
   return %u : $MultiPayloadTwoSpareBits
 }
 
-// CHECK-64: define void @multi_payload_two_spare_bits_inject_y_indirect(i60, %O4enum24MultiPayloadTwoSpareBits*) {{.*}} {
+// CHECK-64: define void @multi_payload_two_spare_bits_inject_y_indirect(i60, %O4enum24MultiPayloadTwoSpareBits* nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK-64: entry:
 // CHECK-64:   [[DATA_ADDR:%.*]] = bitcast %O4enum24MultiPayloadTwoSpareBits* %1 to i60*
 // CHECK-64:   store i60 %0, i60* [[DATA_ADDR]]
@@ -2048,7 +2048,7 @@ entry:
   return %u : $MultiPayloadTwoSpareBits
 }
 
-// CHECK-64: define void @multi_payload_two_spare_bits_inject_a_indirect(%O4enum24MultiPayloadTwoSpareBits*) {{.*}} {
+// CHECK-64: define void @multi_payload_two_spare_bits_inject_a_indirect(%O4enum24MultiPayloadTwoSpareBits* nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK-64: entry:
 // CHECK-64:   [[PAYLOAD_ADDR:%.*]] = bitcast %O4enum24MultiPayloadTwoSpareBits* %0 to i64*
 // --                0xC000_0000_0000_0000
@@ -2254,7 +2254,7 @@ enum MultiPayloadNestedSpareBits {
   case B(MultiPayloadInnerSpareBits)
 }
 
-// CHECK-64-LABEL: define void @multi_payload_nested_spare_bits_switch(%O4enum27MultiPayloadNestedSpareBits*) {{.*}} {
+// CHECK-64-LABEL: define void @multi_payload_nested_spare_bits_switch(%O4enum27MultiPayloadNestedSpareBits* noalias nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK-64: entry:
 // CHECK-64:   %1 = bitcast %O4enum27MultiPayloadNestedSpareBits* %0 to [[WORD]]*
 // CHECK-64:   %2 = load [[WORD]], [[WORD]]* %1
@@ -2328,7 +2328,7 @@ enum MultiPayloadAddressOnlyFixed {
   case Y(Builtin.Int32)
 }
 
-// CHECK-LABEL: define void @multi_payload_address_only_destroy(%O4enum28MultiPayloadAddressOnlyFixed*)
+// CHECK-LABEL: define void @multi_payload_address_only_destroy(%O4enum28MultiPayloadAddressOnlyFixed* noalias nocapture dereferenceable({{.*}}))
 sil @multi_payload_address_only_destroy : $@convention(thin) (@in MultiPayloadAddressOnlyFixed) -> () {
 entry(%m : $*MultiPayloadAddressOnlyFixed):
   destroy_addr %m : $*MultiPayloadAddressOnlyFixed
@@ -2358,7 +2358,7 @@ typealias AllConcreteTestEnums = (
 
 sil_global @x : $AllConcreteTestEnums
 
-// CHECK: define void @dynamic_singleton_switch_indirect([[DYNAMIC_SINGLETON]]*, %swift.type* %T) {{.*}} {
+// CHECK: define void @dynamic_singleton_switch_indirect([[DYNAMIC_SINGLETON]]* noalias nocapture, %swift.type* %T) {{.*}} {
 // CHECK:   bitcast [[DYNAMIC_SINGLETON]]* %0 to %swift.opaque*
 // CHECK:   ret void
 // CHECK: }
@@ -2464,7 +2464,7 @@ struct StructWithWeakVar {
 weak var delegate: delegateProtocol?
 }
 
-// CHECK-64-LABEL: define void @weak_optional(%Sq{{.*}}*)
+// CHECK-64-LABEL: define void @weak_optional(%Sq{{.*}}* noalias nocapture dereferenceable({{.*}}))
 sil @weak_optional : $@convention(thin) (@in StructWithWeakVar?) -> () {
 entry(%x : $*StructWithWeakVar?):
   // CHECK-64:      icmp eq [[WORD]] {{%.*}}, 0

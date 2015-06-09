@@ -2,7 +2,7 @@
 
 // Make sure that we are able to lower upcast addresses.
 
-// CHECK-LABEL: define void @upcast_test(%C6upcast1D**) {{.*}} {
+// CHECK-LABEL: define void @upcast_test(%C6upcast1D** nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK: entry:
 // CHECK-NEXT: bitcast %C6upcast1D** {{%[0-0]+}} to %C6upcast1C**
 // CHECK-NEXT: ret void

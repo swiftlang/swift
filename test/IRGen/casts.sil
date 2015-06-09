@@ -16,7 +16,7 @@ class B: A {}
 sil_vtable A {}
 sil_vtable B {}
 
-// CHECK-LABEL: define %C5casts1B* @unchecked_addr_cast(%C5casts1A**) {{.*}} {
+// CHECK-LABEL: define %C5casts1B* @unchecked_addr_cast(%C5casts1A** noalias nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK:         bitcast %C5casts1A** %0 to %C5casts1B**
 sil @unchecked_addr_cast : $(@in A) -> B {
 entry(%a : $*A):

@@ -90,16 +90,16 @@ struct BigStructWithNativeObjects {
     return NSRect(origin: NSPoint(x: 0, y: 0), 
                   size: NSSize(width: 0, height: 0))
   }
-  // CHECK: define internal void @_TToFC17objc_class_export3Foo6boundsfS0_FT_VSC6NSRect([[NSRECT]]* noalias sret, [[OPAQUE4:%.*]]*, i8*) unnamed_addr {{.*}} {
+  // CHECK: define internal void @_TToFC17objc_class_export3Foo6boundsfS0_FT_VSC6NSRect([[NSRECT]]* noalias nocapture sret, [[OPAQUE4:%.*]]*, i8*) unnamed_addr {{.*}} {
   // CHECK:   [[CAST:%[a-zA-Z0-9]+]] = bitcast [[OPAQUE4]]* %1 to [[FOO]]*
-  // CHECK:   call void @_TFC17objc_class_export3Foo6boundsfS0_FT_VSC6NSRect([[NSRECT]]* noalias sret {{.*}}, [[FOO]]* [[CAST]])
+  // CHECK:   call void @_TFC17objc_class_export3Foo6boundsfS0_FT_VSC6NSRect([[NSRECT]]* noalias nocapture sret {{.*}}, [[FOO]]* [[CAST]])
 
   func convertRectToBacking(r r: NSRect) -> NSRect {
     return r;
   }
-  // CHECK: define internal void @_TToFC17objc_class_export3Foo20convertRectToBackingfS0_FT1rVSC6NSRect_S1_([[NSRECT]]* noalias sret, [[OPAQUE5:%.*]]*, i8*, [[NSRECT]]* byval align 8) unnamed_addr {{.*}} {
+  // CHECK: define internal void @_TToFC17objc_class_export3Foo20convertRectToBackingfS0_FT1rVSC6NSRect_S1_([[NSRECT]]* noalias nocapture sret, [[OPAQUE5:%.*]]*, i8*, [[NSRECT]]* byval align 8) unnamed_addr {{.*}} {
   // CHECK:   [[CAST:%[a-zA-Z0-9]+]] = bitcast [[OPAQUE5]]* %1 to [[FOO]]*
-  // CHECK:   call void @_TFC17objc_class_export3Foo20convertRectToBackingfS0_FT1rVSC6NSRect_S1_([[NSRECT]]* noalias sret {{.*}}, %VSC6NSRect* {{.*}}, [[FOO]]* [[CAST]])
+  // CHECK:   call void @_TFC17objc_class_export3Foo20convertRectToBackingfS0_FT1rVSC6NSRect_S1_([[NSRECT]]* noalias nocapture sret {{.*}}, %VSC6NSRect* {{.*}}, [[FOO]]* [[CAST]])
 
   func doStuffToSwiftSlice(f f: [Int]) {
   }

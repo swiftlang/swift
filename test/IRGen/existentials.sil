@@ -18,7 +18,7 @@ bb0(%0 : $*protocol<>, %1 : $T):
   %3 = tuple ()
   return %3 : $()
 }
-// CHECK-DAG:   define void @init_opaque_existential([[ANY:%"protocol<>"]]* noalias sret, [[GIZMO:%.*]]*, [[TYPE:%.*]]* %T)
+// CHECK-DAG:   define void @init_opaque_existential([[ANY:%"protocol<>"]]* noalias nocapture sret, [[GIZMO:%.*]]*, [[TYPE:%.*]]* %T)
 // CHECK:         [[T0:%.*]] = getelementptr inbounds [[ANY]], [[ANY]]* %0, i32 0, i32 1
 // CHECK-NEXT:    store [[TYPE]]* %T, [[TYPE]]** [[T0]], align 8
 // CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds [[ANY]], [[ANY]]* %0, i32 0, i32 0
@@ -33,7 +33,7 @@ bb0(%0 : $*protocol<>, %1 : $*protocol<>):
   return %3 : $()
 }
 
-// CHECK-DAG:   define void @take_opaque_existential([[ANY:%"protocol<>"]]* noalias sret, %"protocol<>"*) {{.*}} {
+// CHECK-DAG:   define void @take_opaque_existential([[ANY:%"protocol<>"]]* noalias nocapture sret, %"protocol<>"* noalias nocapture dereferenceable({{.*}})) {{.*}} {
 // CHECK:         [[T0:%.*]] = getelementptr inbounds [[ANY]], [[ANY]]* [[SRC:%1]], i32 0, i32 1
 // CHECK-NEXT:    [[TYPE:%.*]] = load %swift.type*, %swift.type** [[T0]], align 8
 // CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds [[ANY]], [[ANY]]* [[DEST:%0]], i32 0, i32 1
@@ -88,7 +88,7 @@ entry(%s : $CP):
   return %z : $CP
 }
 
-// CHECK-DAG: define void @class_existential_weak({ %swift.weak, i8** }* noalias sret, i64, i64)
+// CHECK-DAG: define void @class_existential_weak({ %swift.weak, i8** }* noalias nocapture sret, i64, i64)
 sil @class_existential_weak : $@convention(thin) (@out @sil_weak CP?, @owned CP?) -> () {
 entry(%w : $*@sil_weak CP?, %a : $CP?):
   // CHECK: [[V:%.*]] = alloca { %swift.weak, i8** }

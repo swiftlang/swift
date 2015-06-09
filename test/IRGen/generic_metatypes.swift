@@ -14,7 +14,7 @@
 // REQUIRES: X86
 // REQUIRES: enable_target_appletvos
 
-// CHECK: define hidden %swift.type* [[GENERIC_TYPEOF:@_TF17generic_metatypes13genericTypeof.*]](%swift.opaque*, %swift.type* [[TYPE:%.*]])
+// CHECK: define hidden %swift.type* [[GENERIC_TYPEOF:@_TF17generic_metatypes13genericTypeof.*]](%swift.opaque* noalias nocapture, %swift.type* [[TYPE:%.*]])
 func genericTypeof<T>(x: T) -> T.Type {
   // CHECK: [[METATYPE:%.*]] = call %swift.type* @swift_getDynamicType(%swift.opaque* {{.*}}, %swift.type* [[TYPE]])
   // CHECK: ret %swift.type* [[METATYPE]]
@@ -28,9 +28,9 @@ class Bar {}
 func remapToSubstitutedMetatypes(x: Foo, y: Bar)
   -> (Foo.Type, Bar.Type)
 {
-  // CHECK: call %swift.type* [[GENERIC_TYPEOF]](%swift.opaque* undef, %swift.type* {{.*}} @_TMdV17generic_metatypes3Foo {{.*}})
+  // CHECK: call %swift.type* [[GENERIC_TYPEOF]](%swift.opaque* noalias nocapture undef, %swift.type* {{.*}} @_TMdV17generic_metatypes3Foo {{.*}})
   // CHECK: [[T0:%.*]] = call %swift.type* @_TMaC17generic_metatypes3Bar()
-  // CHECK: [[BAR_META:%.*]] = call %swift.type* [[GENERIC_TYPEOF]](%swift.opaque* {{%.*}}, %swift.type* [[T0]])
+  // CHECK: [[BAR_META:%.*]] = call %swift.type* [[GENERIC_TYPEOF]](%swift.opaque* noalias nocapture {{%.*}}, %swift.type* [[T0]])
   // CHECK: ret %swift.type* [[BAR_META]]
   return (genericTypeof(x), genericTypeof(y))
 }
@@ -47,7 +47,7 @@ func genericMetatypes<T, U>(t: T.Type, _ u: U.Type) {}
 
 protocol Bas {}
 
-// CHECK: define hidden { %swift.type*, i8** } @_TF17generic_metatypes14protocolTypeof{{.*}}(%P17generic_metatypes3Bas_*)
+// CHECK: define hidden { %swift.type*, i8** } @_TF17generic_metatypes14protocolTypeof{{.*}}(%P17generic_metatypes3Bas_* noalias nocapture dereferenceable({{.*}}))
 func protocolTypeof(x: Bas) -> Bas.Type {
   // CHECK: [[METADATA_ADDR:%.*]] = getelementptr inbounds %P17generic_metatypes3Bas_, %P17generic_metatypes3Bas_* [[X:%.*]], i32 0, i32 1
   // CHECK: [[METADATA:%.*]] = load %swift.type*, %swift.type** [[METADATA_ADDR]]

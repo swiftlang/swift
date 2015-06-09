@@ -36,7 +36,7 @@ entry(%b : $*@convention(block) () -> ()):
   return %z : $()
 }
 
-// CHECK-LABEL: define void @generic_with_block(%objc_block**)
+// CHECK-LABEL: define void @generic_with_block(%objc_block** noalias nocapture dereferenceable({{.*}}))
 // --                                                                               0x100_0001 = block convention, 1 arg
 // CHECK:         call %swift.type* @swift_getFunctionTypeMetadata1([[WORD:i(64|32)]] 16777217
 

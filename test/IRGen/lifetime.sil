@@ -17,7 +17,7 @@ bb0(%x : $*T):
   %0 = tuple ()
   return %0 : $()
 }
-// CHECK:    define void @generic_tuple([[OPAQUE]]*, [[TYPE]]* %T) {{.*}} {
+// CHECK:    define void @generic_tuple([[OPAQUE]]* noalias nocapture, [[TYPE]]* %T) {{.*}} {
 //  Type metadata.
 // CHECK: alloca
 //   The fixed-size buffer.
