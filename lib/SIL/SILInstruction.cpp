@@ -582,32 +582,7 @@ namespace {
   };
 }
 
-bool SILInstruction::isIdenticalTo(const SILInstruction *RHS) const {
-  // Quick check if both instructions have the same kind, number of operands,
-  // and number of types. This should filter out most cases.
-  if (getKind() != RHS->getKind() ||
-      getNumOperands() != RHS->getNumOperands() ||
-      getNumTypes() != RHS->getNumTypes()) {
-    return false;
-  }
-
-  // Check types.
-  //
-  // Many instructions have only 1 type so it makes sense to check it first.
-  for (unsigned i = 0, e = getNumTypes(); i != e; ++i)
-    if (getType(i) != RHS->getType(i))
-      return false;
-
-  // Check operands.
-  for (unsigned i = 0, e = getNumOperands(); i != e; ++i)
-    if (getOperand(i) != RHS->getOperand(i))
-      return false;
-
-  // Check any special state of instructions that are not represented in the
-  // instructions operands/type. We whitelist instructions that we handle so
-  // that we can ensure that every instruction in this switch statement has been
-  // audited and more importantly that as this method is used on more
-  // instructions, it is updated appropriately.
+bool SILInstruction::hasIdenticalState(const SILInstruction *RHS) const {
   SILInstruction *UnconstRHS = const_cast<SILInstruction *>(RHS);
   return InstructionIdentityComparer(this).visit(UnconstRHS);
 }

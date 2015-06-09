@@ -65,6 +65,10 @@ class SILInstruction : public ValueBase,public llvm::ilist_node<SILInstruction>{
   void operator=(const SILInstruction &) = delete;
   void operator delete(void *Ptr, size_t) = delete;
 
+  /// Check any special state of instructions that are not represented in the
+  /// instructions operands/type.
+  bool hasIdenticalState(const SILInstruction *RHS) const;
+
 protected:
   /// This instruction's location (i.e., AST).
   SILLocation Loc;
@@ -156,7 +160,41 @@ public:
   bool mayTrap() const;
 
   /// Returns true if the given instruction is completely identical to RHS.
-  bool isIdenticalTo(const SILInstruction *RHS) const;
+  bool isIdenticalTo(const SILInstruction *RHS) const {
+    return isIdenticalTo(RHS,
+                         [](const SILValue &Op1, const SILValue &Op2) -> bool {
+                           return Op1 == Op2; });
+  }
+  
+  /// Returns true if the given instruction is completely identical to RHS,
+  /// using \p opEqual to compare operands.
+  ///
+  template <typename OpCmp>
+  bool isIdenticalTo(const SILInstruction *RHS, OpCmp opEqual) const {
+    // Quick check if both instructions have the same kind, number of operands,
+    // and number of types. This should filter out most cases.
+    if (getKind() != RHS->getKind() ||
+        getNumOperands() != RHS->getNumOperands() ||
+        getNumTypes() != RHS->getNumTypes()) {
+      return false;
+    }
+    
+    // Check types.
+    //
+    // Many instructions have only 1 type so it makes sense to check it first.
+    for (unsigned i = 0, e = getNumTypes(); i != e; ++i)
+      if (getType(i) != RHS->getType(i))
+        return false;
+    
+    // Check operands.
+    for (unsigned i = 0, e = getNumOperands(); i != e; ++i)
+      if (!opEqual(getOperand(i), RHS->getOperand(i)))
+        return false;
+
+    // Check any special state of instructions that are not represented in the
+    // instructions operands/type.
+    return hasIdenticalState(RHS);
+  }
 
   /// \brief Returns true if the instruction may have side effects.
   ///
