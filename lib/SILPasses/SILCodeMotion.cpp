@@ -120,17 +120,39 @@ static bool isSinkBarrier(SILInstruction *Inst) {
   return false;
 }
 
+using ValueToBBArgIdxMap = llvm::DenseMap<SILValue, int>;
+
 /// \brief Search for an instruction that is identical to \p Iden by scanning
 /// \p BB starting at the end of the block, stopping on sink barriers.
-SILInstruction *findIdenticalInBlock(SILBasicBlock *BB, SILInstruction *Iden) {
+SILInstruction *findIdenticalInBlock(SILBasicBlock *BB, SILInstruction *Iden,
+                                   const ValueToBBArgIdxMap &valueToArgIdxMap) {
   int SkipBudget = SinkSearchWindow;
 
   SILBasicBlock::iterator InstToSink = BB->getTerminator();
 
+  auto operandCompare = [&](const SILValue &Op1, const SILValue &Op2) -> bool {
+    
+    // The trivial case.
+    if (Op1 == Op2)
+      return true;
+
+    // Check if both operand values are passed to the same block argument in the
+    // successor block. This means that the operands are equal after we move the
+    // instruction into the successor block.
+    auto Iter1 = valueToArgIdxMap.find(Op1);
+    if (Iter1 != valueToArgIdxMap.end()) {
+      auto Iter2 = valueToArgIdxMap.find(Op2);
+      if (Iter2 != valueToArgIdxMap.end() && Iter1->second == Iter2->second)
+      return true;
+    }
+    return false;
+  };
+  
   while (SkipBudget) {
     // If we found a sinkable instruction that is identical to our goal
     // then return it.
-    if (canSinkInstruction(InstToSink) && Iden->isIdenticalTo(InstToSink)) {
+    if (canSinkInstruction(InstToSink) &&
+        Iden->isIdenticalTo(InstToSink, operandCompare)) {
       DEBUG(llvm::dbgs() << "Found an identical instruction.");
       return InstToSink;
     }
@@ -349,6 +371,25 @@ static bool sinkCodeFromPredecessors(SILBasicBlock *BB) {
 
   DEBUG(llvm::dbgs() << " Sinking values from predecessors.\n");
 
+  // Map values in predecessor blocks to argument indices of the successor
+  // block. For example:
+  //
+  // bb1:
+  //   br bb3(%a, %b)    // %a -> 0, %b -> 1
+  // bb2:
+  //   br bb3(%c, %d)    // %c -> 0, %d -> 1
+  // bb3(%x, %y):
+  //   ...
+  ValueToBBArgIdxMap valueToArgIdxMap;
+  for (auto P : BB->getPreds()) {
+    if (auto *BI = dyn_cast<BranchInst>(P->getTerminator())) {
+      auto Args = BI->getArgs();
+      for (size_t idx = 0, size = Args.size(); idx < size; idx++) {
+        valueToArgIdxMap[Args[idx]] = idx;
+      }
+    }
+  }
+
   unsigned SkipBudget = SinkSearchWindow;
 
   // Start scanning backwards from the terminator.
@@ -367,7 +408,8 @@ static bool sinkCodeFromPredecessors(SILBasicBlock *BB) {
           continue;
 
         // Search the duplicated instruction in the predecessor.
-        if (SILInstruction *DupInst = findIdenticalInBlock(P, InstToSink)) {
+        if (SILInstruction *DupInst = findIdenticalInBlock(P, InstToSink,
+                                                           valueToArgIdxMap)) {
           Dups.push_back(DupInst);
         } else {
           DEBUG(llvm::dbgs() << "Instruction mismatch.\n");
@@ -381,6 +423,17 @@ static bool sinkCodeFromPredecessors(SILBasicBlock *BB) {
       if (Dups.size()) {
         DEBUG(llvm::dbgs() << "Moving: " << *InstToSink);
         InstToSink->moveBefore(BB->begin());
+        
+        // Replace operand values (which are passed to the successor block) with
+        // corresponding block arguments.
+        for (size_t idx = 0, numOps = InstToSink->getNumOperands();
+             idx < numOps; idx++) {
+          SILValue Op = InstToSink->getOperand(idx);
+          auto Iter = valueToArgIdxMap.find(Op);
+          if (Iter != valueToArgIdxMap.end()) {
+            InstToSink->setOperand(idx, BB->getBBArg(Iter->second));
+          }
+        }
         Changed = true;
         for (auto I : Dups) {
           I->replaceAllUsesWith(InstToSink);
