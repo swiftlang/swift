@@ -1,8 +1,8 @@
-// RUN: %target-parse-verify-swift
-// RUN: not %target-swift-frontend -parse %s 2>&1 | FileCheck %s '--implicit-check-not=<unknown>:0'
+// RUN: %target-parse-verify-swift -disable-objc-attr-requires-foundation-module
+// RUN: not %target-swift-frontend -disable-objc-attr-requires-foundation-module -parse %s 2>&1 | FileCheck %s '--implicit-check-not=<unknown>:0'
 
 // Make sure we do not emit availability errors or warnings when -disable-availability-checking is passed
-// RUN: not %target-swift-frontend -parse -disable-availability-checking %s 2>&1 | FileCheck %s '--implicit-check-not=error:' '--implicit-check-not=warning:'
+// RUN: not %target-swift-frontend -parse -disable-objc-attr-requires-foundation-module -disable-availability-checking %s 2>&1 | FileCheck %s '--implicit-check-not=error:' '--implicit-check-not=warning:'
 
 // REQUIRES: OS=macosx
 

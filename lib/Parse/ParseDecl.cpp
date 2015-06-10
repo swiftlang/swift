@@ -289,12 +289,6 @@ getStringLiteralIfNotInterpolated(Parser &P, SourceLoc Loc, const Token &Tok,
                                                  Segments.front().Length));
 }
 
-static void recordObjCAttr(const DeclContext *DC, const ObjCAttr *attr) {
-  if (auto SF = DC->getParentSourceFile())
-    if (!SF->FirstObjCAttr)
-      SF->FirstObjCAttr = attr;
-}
-
 bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                    DeclAttrKind DK) {
   // Ok, it is a valid attribute, eat it, and then process it.
@@ -932,7 +926,6 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
     if (Tok.isNot(tok::l_paren)) {
       auto attr = ObjCAttr::createUnnamed(Context, AtLoc, Loc);
       Attributes.add(attr);
-      recordObjCAttr(CurDeclContext, attr);
       break;
     }
 
@@ -1019,7 +1012,6 @@ bool Parser::parseNewDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                       NameLocs, Names, RParenLoc);
     }
     Attributes.add(attr);
-    recordObjCAttr(CurDeclContext, attr);
     break;
   }
 
@@ -1985,6 +1977,13 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
   
     // If we 'break' out of the switch, break out of the loop too.
     break;
+  }
+
+  if (auto SF = CurDeclContext->getParentSourceFile()) {
+    for (auto Attr : Attributes) {
+      if (isa<ObjCAttr>(Attr) || isa<DynamicAttr>(Attr))
+        SF->AttrsRequiringFoundation.insert({Attr->getKind(), Attr});
+    }
   }
 
   if (FoundCCTokenInAttr) {

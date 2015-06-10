@@ -3,10 +3,7 @@
 
 // REQUIRES: objc_interop
 
-#if os(iOS)
 import Foundation
-#endif
-
 import CoreGraphics
 
 // CHECK-LABEL: extension CGColor

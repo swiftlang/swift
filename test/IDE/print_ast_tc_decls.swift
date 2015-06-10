@@ -58,7 +58,7 @@
 // XFAIL: linux
 
 import Bar
-import ObjectiveC
+import Foundation
 import class Foo.FooClassBase
 import func Foo.fooFunc1
 @exported import FooHelper

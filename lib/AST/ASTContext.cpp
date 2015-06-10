@@ -1650,6 +1650,36 @@ std::pair<unsigned, DeclName> swift::getObjCMethodDiagInfo(
   }
 }
 
+void ASTContext::diagnoseAttrsRequiringFoundation(SourceFile &SF) {
+  bool ImportsFoundationModule = false;
+
+  if (SF.Kind == SourceFileKind::SIL ||
+      !LangOpts.EnableObjCAttrRequiresFoundation)
+    return;
+
+  SF.forAllVisibleModules([&](Module::ImportedModule import) {
+    if (import.second->getName() == Id_Foundation)
+      ImportsFoundationModule = true;
+  });
+
+  if (ImportsFoundationModule)
+    return;
+
+  for (auto &Attr : SF.AttrsRequiringFoundation) {
+    // If we've already diagnosed this attribute, keep going.
+    if (!Attr.second)
+      continue;
+
+    Diags.diagnose(Attr.second->getLocation(),
+                   diag::attr_used_without_required_module,
+                   Attr.second, Id_Foundation)
+      .highlight(Attr.second->getRangeWithAt());
+
+    // Don't diagnose this again.
+    Attr.second = nullptr;
+  }
+}
+
 void ASTContext::recordObjCMethod(AbstractFunctionDecl *func) {
   // If this method comes from Objective-C, ignore it.
   if (func->hasClangNode())

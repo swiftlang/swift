@@ -110,21 +110,9 @@ protocol Runcible: class {
   func runce()
 }
 
-#if _runtime(_ObjC)
-@objc protocol Fungible: class {
-  func funge()
-}
-#endif
-
 extension C: Runcible {
   func runce() { print("C") }
 }
-
-#if _runtime(_ObjC)
-extension D: Fungible {
-  @objc func funge() { print("D") }
-}
-#endif
 
 let c1: AnyObject = C()
 let c2: Any = C()
@@ -165,41 +153,3 @@ print(StaticBar.mightHaveFoo())
 
 // CHECK: StaticWibble.foo
 print(StaticWibble.mightHaveFoo())
-
-#if _runtime(_ObjC)
-let d: D = D()
-let d1: AnyObject = D()
-let d2: Any = D()
-if let frungible = d1 as? protocol<Fooable, Runcible, Fungible> {
-  frungible.foo() // CHECK-objc-NEXT: D
-  frungible.runce() // CHECK-objc-NEXT: C
-  frungible.funge() // CHECK-objc-NEXT: D
-} else {
-  print("not fooable, runcible, and fungible")
-}
-
-let inttype: Any.Type = Int.self
-if let frungibleType = inttype as? protocol<Fooable, Runcible, Fungible>.Type {
-  print("is fooable, runcible, and fungible")
-} else {
-  print("not fooable, runcible, and fungible") // CHECK-objc-NEXT: not
-}
-
-let dtype: Any.Type = D.self
-if let frungibleType = dtype as? protocol<Fooable, Runcible, Fungible>.Type {
-  print("is fooable, runcible, and fungible") // CHECK-objc-NEXT: is
-} else {
-  print("not fooable, runcible, and fungible")
-}
-
-func genericCast<U: AnyObject>(x: AnyObject, _: U.Type) -> U? {
-  return x as? U
-}
-
-if let fungible = genericCast(d, Fungible.self) {
-  fungible.funge() // CHECK-objc-NEXT: D
-} else {
-  print("not fungible")
-}
-#endif
-

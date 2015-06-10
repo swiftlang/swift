@@ -11,9 +11,6 @@ extension Foo {
 
   // CHECK-LABEL: sil hidden @_TFC10extensions3Foog7zippitySi
   var zippity: Int { return 0 }
-
-  dynamic func kay() {}
-  dynamic var cox: Int { return 0 }
 }
 
 struct Bar {
@@ -34,22 +31,11 @@ func extensionReferences(x: Foo) {
   // CHECK: function_ref @_TFC10extensions3Foog7zippitySi
   _ = x.zippity
 
-  // dynamic extension methods are still dynamically dispatched.
-  // CHECK: class_method [volatile] %0 : $Foo, #Foo.kay!1.foreign
-  x.kay()
-  // CHECK: class_method [volatile] %0 : $Foo, #Foo.cox!getter.1.foreign
-  _ = x.cox
-
 }
 
 func extensionMethodCurrying(x: Foo) {
   _ = x.zang
-  _ = x.kay
 }
 
 // CHECK-LABEL: sil shared @_TFC10extensions3Foo4zangFS0_FT_T_
 // CHECK:         function_ref @_TFC10extensions3Foo4zangfS0_FT_T_
-// CHECK:       sil shared @_TFC10extensions3Foo3kayFS0_FT_T_
-// CHECK:         function_ref @_TTDFC10extensions3Foo3kayfS0_FT_T_
-// CHECK:       sil shared [transparent] @_TTDFC10extensions3Foo3kayfS0_FT_T_
-// CHECK:         class_method [volatile] %0 : $Foo, #Foo.kay!1.foreign

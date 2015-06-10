@@ -493,13 +493,6 @@ func testAddressOnlyGetOnlyGlobalProperty() -> SimpleProtocol {
 }
 
 
-// rdar://15933538 let decls with StoredObjC storage type should have a getter
-// synthesized, but not a setter.
-@objc
-class C  {
-  let x : Int = 100
-}
-
 // rdar://15962740
 struct LetDeclInStruct {
     let immutable: Int
