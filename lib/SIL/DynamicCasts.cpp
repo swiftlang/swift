@@ -323,6 +323,47 @@ swift::classifyDynamicCast(Module *M,
     // If we don't know any better, assume that the cast may succeed.
     return DynamicCastFeasibility::MaySucceed;
   }
+  
+  // Function casts.
+  if (auto sourceFunction = dyn_cast<FunctionType>(source)) {
+    if (auto targetFunction = dyn_cast<FunctionType>(target)) {
+      // A function cast can succeed if the function types can be identical,
+      // or if the target type is throwier than the original.
+
+      // A non-throwing source function can be cast to a throwing target type,
+      // but not vice versa.
+      if (sourceFunction->throws() && !targetFunction->throws())
+        return DynamicCastFeasibility::WillFail;
+      
+      // A noreturn source function can be cast to a returning target type,
+      // but not vice versa.
+      // (noreturn isn't really reified at runtime though.)
+      if (targetFunction->isNoReturn() && !sourceFunction->isNoReturn())
+        return DynamicCastFeasibility::WillFail;
+      
+      // The cast can't change the representation at runtime.
+      if (targetFunction->getRepresentation()
+            != sourceFunction->getRepresentation())
+        return DynamicCastFeasibility::WillFail;
+      
+      if (sourceFunction.getInput() == targetFunction.getInput()
+          && sourceFunction.getResult() == targetFunction.getResult())
+        return DynamicCastFeasibility::WillSucceed;
+
+      auto isSubstitutable = [](CanType a, CanType b) -> bool {
+        // FIXME: Unnecessarily conservative; should structurally check for
+        // substitutability.
+        return a == b || a->hasArchetype() || b->hasArchetype();
+      };
+    
+      if (isSubstitutable(sourceFunction.getInput(), targetFunction.getInput())
+          && isSubstitutable(targetFunction.getInput(),
+                             targetFunction.getResult()))
+        return DynamicCastFeasibility::MaySucceed;
+      
+      return DynamicCastFeasibility::WillFail;
+    }
+  }
 
   // If the source is not existential or an archetype, and the destination
   // is a metatype, there is no way the cast can succeed.

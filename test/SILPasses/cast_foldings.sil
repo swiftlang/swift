@@ -22,3 +22,52 @@ entry (%0 : $AnyObject):
   %1 = unconditional_checked_cast %0 : $AnyObject to $NSCloud
   return %1 : $NSCloud
 }
+
+// CHECK-LABEL: sil @function_cast_nothrow_to_nothrow
+// CHECK:         load
+// CHECK:         store
+sil @function_cast_nothrow_to_nothrow : $@convention(thin) <T> () -> () {
+entry:
+  %a = unconditional_checked_cast_addr take_on_success () -> ()        in undef : $*(@out (), @in ()) -> ()                 to () -> ()        in undef : $*(@out (), @in ()) -> ()
+  return undef : $()
+}
+
+// CHECK-LABEL: sil @function_cast_nothrow_to_nothrow_substitutable
+// CHECK:         unconditional_checked_cast_addr
+sil @function_cast_nothrow_to_nothrow_substitutable : $@convention(thin) <T> () -> () {
+entry:
+  %a = unconditional_checked_cast_addr take_on_success () -> ()        in undef : $*(@out (), @in ()) -> ()                 to T -> T        in undef : $*(@out T, @in T) -> ()
+  return undef : $()
+}
+
+// CHECK-LABEL: sil @function_cast_nothrow_substitutable_to_nothrow
+// CHECK:         unconditional_checked_cast_addr
+sil @function_cast_nothrow_substitutable_to_nothrow : $@convention(thin) <T> () -> () {
+entry:
+  %a = unconditional_checked_cast_addr take_on_success T -> T        in undef : $*(@out T, @in T) -> ()                 to () -> ()        in undef : $*(@out (), @in ()) -> ()
+  return undef : $()
+}
+
+// CHECK-LABEL: sil @function_cast_throw_to_nothrow
+// CHECK:         builtin "int_trap"
+sil @function_cast_throw_to_nothrow : $@convention(thin) <T> () -> () {
+  %b = unconditional_checked_cast_addr take_on_success () throws -> () in undef : $*(@out (), @in ()) -> (@error ErrorType) to () -> ()        in undef : $*(@out (), @in ()) -> ()
+  return undef : $()
+}
+
+// TODO: Do a function_conversion?
+// CHECK-LABEL: sil @function_cast_nothrow_to_throw
+// CHECK:         unconditional_checked_cast_addr
+sil @function_cast_nothrow_to_throw : $@convention(thin) <T> () -> () {
+  %c = unconditional_checked_cast_addr take_on_success () -> ()        in undef : $*(@out (), @in ()) -> ()                 to () throws -> () in undef : $*(@out (), @in ()) -> (@error ErrorType)
+  return undef : $()
+}
+
+// CHECK-LABEL: sil @function_cast_throw_to_throw
+// CHECK:         load
+// CHECK:         store
+sil @function_cast_throw_to_throw : $@convention(thin) <T> () -> () {
+  %d = unconditional_checked_cast_addr take_on_success () throws -> () in undef : $*(@out (), @in ()) -> (@error ErrorType) to () throws -> () in undef : $*(@out (), @in ()) -> (@error ErrorType)
+  return undef : $()
+}
+
