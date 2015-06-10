@@ -975,6 +975,7 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
     // <impl-convention> ::= 'l'                      // indirect, inout
     // <impl-convention> ::= 'g'                      // direct, guaranteed
     // <impl-convention> ::= 'G'                      // indirect, guaranteed
+    // <impl-convention> ::= 'z' <impl-convention>    // error result
     // <impl-function-attribute> ::= 'Cb'             // block invocation function
     // <impl-function-attribute> ::= 'Cc'             // C global function
     // <impl-function-attribute> ::= 'Cm'             // Swift method
@@ -1064,6 +1065,13 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
       Buffer << mangleResultConvention(result.getConvention());
       mangleType(result.getType(), ResilienceExpansion::Minimal, 0);
     }
+    
+    if (fn->hasErrorResult()) {
+      auto error = fn->getErrorResult();
+      Buffer << 'z' << mangleResultConvention(error.getConvention());
+      mangleType(error.getType(), ResilienceExpansion::Minimal, 0);
+    }
+    
     Buffer << '_';
     return;
   }

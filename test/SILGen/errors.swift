@@ -268,7 +268,7 @@ func create<T>(fn: () throws -> T) throws -> T {
 func testThunk(fn: () throws -> Int) throws -> Int {
   return try create(fn)
 }
-// CHECK-LABEL: sil shared [transparent] [thunk] @_TTRXFo__dSi_XFo__iSi_ : $@convention(thin) (@out Int, @owned @callee_owned () -> (Int, @error ErrorType)) -> @error ErrorType
+// CHECK-LABEL: sil shared [transparent] [thunk] @_TTRXFo__dSizoPSs9ErrorType__XFo__iSizoPS___ : $@convention(thin) (@out Int, @owned @callee_owned () -> (Int, @error ErrorType)) -> @error ErrorType
 // CHECK: bb0(%0 : $*Int, %1 : $@callee_owned () -> (Int, @error ErrorType)):
 // CHECK:   try_apply %1()
 // CHECK: bb1([[T0:%.*]] : $Int):

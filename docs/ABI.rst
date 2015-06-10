@@ -968,6 +968,7 @@ which are juxtaposed and terminated with a trailing underscore.
   impl-convention ::= 'l'                     // indirect, inout
   impl-convention ::= 'G'                     // indirect, guaranteed
   impl-convention ::= 'o'                     // direct, ownership transfer
+  impl-convention ::= 'z' impl-convention     // error result
   impl-function-attribute ::= 'Cb'            // compatible with C block invocation function
   impl-function-attribute ::= 'Cc'            // compatible with C global function
   impl-function-attribute ::= 'Cm'            // compatible with Swift method

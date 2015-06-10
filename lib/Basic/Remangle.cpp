@@ -1094,6 +1094,12 @@ void Remangler::mangleImplParameter(Node *node) {
   mangleChildNodes(node); // impl convention, type
 }
 
+void Remangler::mangleImplErrorResult(Node *node) {
+  assert(node->getNumChildren() == 2);
+  Out << 'z';
+  mangleChildNodes(node); // impl convention, type
+}
+
 void Remangler::mangleImplResult(Node *node) {
   assert(node->getNumChildren() == 2);
   mangleChildNodes(node); // impl convention, type

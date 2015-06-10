@@ -26,3 +26,11 @@ func test0() {
 // CHECK-NEXT: store [[T1]] to %0
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
+
+// CHECK-LABEL: sil hidden @_TF10reabstract10testThrowsFP_T_
+// CHECK:         function_ref @_TTRXFo_iT__iT__XFo__dT__
+// CHECK:         function_ref @_TTRXFo_iT__iT_zoPSs9ErrorType__XFo__dT_zoPS___
+func testThrows(x: Any) {
+  _ = x as? () -> ()
+  _ = x as? () throws -> ()
+}

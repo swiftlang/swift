@@ -15,6 +15,7 @@
 //===---------------------------------------------------------------------===//
 
 #include "swift/Basic/Demangle.h"
+#include "swift/Basic/Fallthrough.h"
 #include "swift/Strings.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Punycode.h"
@@ -2113,10 +2114,18 @@ private:
   }
 
   NodePointer demangleImplParameterOrResult(Node::Kind kind) {
+    if (Mangled.nextIf('z')) {
+      // Only valid for a result.
+      if (kind != Node::Kind::ImplResult)
+        return nullptr;
+      kind = Node::Kind::ImplErrorResult;
+    }
+  
     auto getContext = [](Node::Kind kind) -> ImplConventionContext {
       if (kind == Node::Kind::ImplParameter)
         return ImplConventionContext::Parameter;
-      else if (kind == Node::Kind::ImplResult)
+      else if (kind == Node::Kind::ImplResult
+               || kind == Node::Kind::ImplErrorResult)
         return ImplConventionContext::Result;
       else
         unreachable("unexpected node kind");
@@ -2131,6 +2140,7 @@ private:
     node->addChild(NodeFactory::create(Node::Kind::ImplConvention,
                                        convention));
     node->addChild(type);
+    
     return node;
   }
 };
@@ -2310,6 +2320,7 @@ private:
     case Node::Kind::ImplicitClosure:
     case Node::Kind::ImplParameter:
     case Node::Kind::ImplResult:
+    case Node::Kind::ImplErrorResult:
     case Node::Kind::InOut:
     case Node::Kind::InfixOperator:
     case Node::Kind::Initializer:
@@ -2511,7 +2522,8 @@ private:
         if (curState == Inputs) Printer << ", ";
         transitionTo(Inputs);
         print(child);
-      } else if (child->getKind() == Node::Kind::ImplResult) {
+      } else if (child->getKind() == Node::Kind::ImplResult
+                 || child->getKind() == Node::Kind::ImplErrorResult) {
         if (curState == Results) Printer << ", ";
         transitionTo(Results);
         print(child);
@@ -3369,6 +3381,9 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
   case Node::Kind::ImplFunctionAttribute:
     Printer << pointer->getText();
     return;
+  case Node::Kind::ImplErrorResult:
+    Printer << "@error ";
+    SWIFT_FALLTHROUGH;
   case Node::Kind::ImplParameter:
   case Node::Kind::ImplResult:
     printChildren(pointer, " ");
