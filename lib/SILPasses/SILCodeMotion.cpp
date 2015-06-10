@@ -36,6 +36,8 @@ STATISTIC(NumHoisted, "Number of instructions hoisted");
 
 using namespace swift;
 
+namespace {
+  
 //===----------------------------------------------------------------------===//
 //                                  Utility
 //===----------------------------------------------------------------------===//
@@ -120,17 +122,62 @@ static bool isSinkBarrier(SILInstruction *Inst) {
   return false;
 }
 
+using ValueInBlock = std::pair<SILValue, SILBasicBlock *>;
+using ValueToBBArgIdxMap = llvm::DenseMap<ValueInBlock, int>;
+
+enum OperandRelation {
+  /// Uninitialized state.
+  NotDeterminedYet,
+  
+  /// The original operand values are equal.
+  AlwaysEqual,
+  
+  /// The operand values are euqal after replacing with the successor block
+  /// arguments.
+  EqualAfterMove
+};
+
 /// \brief Search for an instruction that is identical to \p Iden by scanning
 /// \p BB starting at the end of the block, stopping on sink barriers.
-SILInstruction *findIdenticalInBlock(SILBasicBlock *BB, SILInstruction *Iden) {
+/// The \p opRelation must be consistent for all operand comparisons.
+SILInstruction *findIdenticalInBlock(SILBasicBlock *BB, SILInstruction *Iden,
+                                   const ValueToBBArgIdxMap &valueToArgIdxMap,
+                                   OperandRelation &opRelation) {
   int SkipBudget = SinkSearchWindow;
 
   SILBasicBlock::iterator InstToSink = BB->getTerminator();
+  SILBasicBlock *IdenBlock = Iden->getParent();
+  
+  // The compare function for instruction operands.
+  auto operandCompare = [&](const SILValue &Op1, const SILValue &Op2) -> bool {
+    
+    if (opRelation != EqualAfterMove && Op1 == Op2) {
+      // The trivial case.
+      opRelation = AlwaysEqual;
+      return true;
+    }
 
+    // Check if both operand values are passed to the same block argument in the
+    // successor block. This means that the operands are equal after we move the
+    // instruction into the successor block.
+    if (opRelation != AlwaysEqual) {
+      auto Iter1 = valueToArgIdxMap.find({Op1, IdenBlock});
+      if (Iter1 != valueToArgIdxMap.end()) {
+        auto Iter2 = valueToArgIdxMap.find({Op2, BB});
+        if (Iter2 != valueToArgIdxMap.end() && Iter1->second == Iter2->second) {
+          opRelation = EqualAfterMove;
+          return true;
+        }
+      }
+    }
+    return false;
+  };
+  
   while (SkipBudget) {
     // If we found a sinkable instruction that is identical to our goal
     // then return it.
-    if (canSinkInstruction(InstToSink) && Iden->isIdenticalTo(InstToSink)) {
+    if (canSinkInstruction(InstToSink) &&
+        Iden->isIdenticalTo(InstToSink, operandCompare)) {
       DEBUG(llvm::dbgs() << "Found an identical instruction.");
       return InstToSink;
     }
@@ -349,6 +396,25 @@ static bool sinkCodeFromPredecessors(SILBasicBlock *BB) {
 
   DEBUG(llvm::dbgs() << " Sinking values from predecessors.\n");
 
+  // Map values in predecessor blocks to argument indices of the successor
+  // block. For example:
+  //
+  // bb1:
+  //   br bb3(%a, %b)    // %a -> 0, %b -> 1
+  // bb2:
+  //   br bb3(%c, %d)    // %c -> 0, %d -> 1
+  // bb3(%x, %y):
+  //   ...
+  ValueToBBArgIdxMap valueToArgIdxMap;
+  for (auto P : BB->getPreds()) {
+    if (auto *BI = dyn_cast<BranchInst>(P->getTerminator())) {
+      auto Args = BI->getArgs();
+      for (size_t idx = 0, size = Args.size(); idx < size; idx++) {
+        valueToArgIdxMap[{Args[idx], P}] = idx;
+      }
+    }
+  }
+
   unsigned SkipBudget = SinkSearchWindow;
 
   // Start scanning backwards from the terminator.
@@ -361,13 +427,18 @@ static bool sinkCodeFromPredecessors(SILBasicBlock *BB) {
     SmallVector<SILInstruction *, 4> Dups;
 
     if (canSinkInstruction(InstToSink)) {
+      
+      OperandRelation opRelation = NotDeterminedYet;
+
       // For all preds:
       for (auto P : BB->getPreds()) {
         if (P == FirstPred)
           continue;
 
         // Search the duplicated instruction in the predecessor.
-        if (SILInstruction *DupInst = findIdenticalInBlock(P, InstToSink)) {
+        if (SILInstruction *DupInst = findIdenticalInBlock(P, InstToSink,
+                                                           valueToArgIdxMap,
+                                                           opRelation)) {
           Dups.push_back(DupInst);
         } else {
           DEBUG(llvm::dbgs() << "Instruction mismatch.\n");
@@ -381,6 +452,18 @@ static bool sinkCodeFromPredecessors(SILBasicBlock *BB) {
       if (Dups.size()) {
         DEBUG(llvm::dbgs() << "Moving: " << *InstToSink);
         InstToSink->moveBefore(BB->begin());
+
+        if (opRelation == EqualAfterMove) {
+          // Replace operand values (which are passed to the successor block)
+          // with corresponding block arguments.
+          for (size_t idx = 0, numOps = InstToSink->getNumOperands();
+               idx < numOps; idx++) {
+            ValueInBlock OpInFirstPred(InstToSink->getOperand(idx), FirstPred);
+            assert(valueToArgIdxMap.count(OpInFirstPred) != 0);
+            int argIdx = valueToArgIdxMap[OpInFirstPred];
+            InstToSink->setOperand(idx, BB->getBBArg(argIdx));
+          }
+        }
         Changed = true;
         for (auto I : Dups) {
           I->replaceAllUsesWith(InstToSink);
@@ -1377,7 +1460,6 @@ static bool processFunction(SILFunction *F, AliasAnalysis *AA,
   return Changed;
 }
 
-namespace {
 class SILCodeMotion : public SILFunctionTransform {
 
   bool HoistReleases;
@@ -1402,6 +1484,7 @@ public:
 
   StringRef getName() override { return "SIL Code Motion"; }
 };
+
 } // end anonymous namespace
 
 /// Code motion that does not releases into diamonds.

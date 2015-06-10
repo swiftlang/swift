@@ -65,6 +65,205 @@ bb3:
   return %4 : $()
 }
 
+// CHECK-LABEL: sil @sink_from_preds_through_args
+// CHECK: bb1:
+// CHECK-NEXT: br bb3
+// CHECK: bb2:
+// CHECK-NEXT: br bb3
+// CHECK: bb3([[A:%[0-9]+]] : $B):
+// CHECK: strong_retain [[A]]
+// CHECK: return
+sil @sink_from_preds_through_args : $@convention(thin) (Builtin.Int1, B, B) -> () {
+bb0(%0 : $Builtin.Int1, %1 : $B, %2 : $B):
+  cond_br %0, bb1, bb2
+
+bb1:
+  %r1 = strong_retain %1 : $B
+  br bb3(%1 : $B)
+
+bb2:
+  %r2 = strong_retain %2 : $B
+  br bb3(%2 : $B)
+
+bb3(%a1 : $B):
+  %t1 = tuple()
+  return %t1 : $()
+}
+
+// CHECK-LABEL: sil @sink_from_preds_not_through_args
+// CHECK: bb1:
+// CHECK-NEXT: br bb3
+// CHECK: bb2:
+// CHECK-NEXT: br bb3
+// CHECK: bb3({{%[0-9]+}} : $B):
+// CHECK: strong_retain %1
+// CHECK: return
+sil @sink_from_preds_not_through_args : $@convention(thin) (Builtin.Int1, B, B) -> () {
+bb0(%0 : $Builtin.Int1, %1 : $B, %2 : $B):
+  cond_br %0, bb1, bb2
+
+bb1:
+  %r1 = strong_retain %1 : $B
+  br bb3(%1 : $B)
+
+bb2:
+  %r2 = strong_retain %1 : $B
+  br bb3(%2 : $B)
+
+bb3(%a1 : $B):
+  %t1 = tuple()
+  return %t1 : $()
+}
+
+// CHECK-LABEL: sil @sink_from_preds_through_args2
+// CHECK: bb1:
+// CHECK-NEXT: br bb3
+// CHECK: bb2:
+// CHECK-NEXT: br bb3
+// CHECK: bb3({{%[0-9]+}} : $B, [[A:%[0-9]+]] : $B):
+// CHECK: strong_retain [[A]]
+// CHECK: return
+sil @sink_from_preds_through_args2 : $@convention(thin) (Builtin.Int1, B, B, B) -> () {
+bb0(%0 : $Builtin.Int1, %1 : $B, %2 : $B, %3 : $B):
+  cond_br %0, bb1, bb2
+
+bb1:
+  %r1 = strong_retain %1 : $B
+  br bb3(%3 : $B, %1 : $B)
+
+bb2:
+  %r2 = strong_retain %2 : $B
+  br bb3(%3 : $B, %2 : $B)
+
+bb3(%a1 : $B, %a2 : $B):
+  %t1 = tuple()
+  return %t1 : $()
+}
+
+// CHECK-LABEL: sil @do_not_sink_from_preds_through_args
+// CHECK: bb1:
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: br bb3
+// CHECK: bb2:
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: br bb3
+// CHECK-NOT: strong_retain
+// CHECK: return
+sil @do_not_sink_from_preds_through_args : $@convention(thin) (Builtin.Int1, B, B, B) -> () {
+bb0(%0 : $Builtin.Int1, %1 : $B, %2 : $B, %3 : $B):
+  cond_br %0, bb1, bb2
+
+bb1:
+  %r1 = strong_retain %1 : $B
+  br bb3(%1 : $B)
+
+bb2:
+  %r2 = strong_retain %2 : $B
+  br bb3(%3 : $B)
+
+bb3(%a1 : $B):
+  %t1 = tuple()
+  return %t1 : $()
+}
+
+// CHECK-LABEL: sil @do_not_sink_from_preds_through_args2
+// CHECK: bb1:
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: br bb3
+// CHECK: bb2:
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: br bb3
+// CHECK-NOT: strong_retain
+// CHECK: return
+sil @do_not_sink_from_preds_through_args2 : $@convention(thin) (Builtin.Int1, B, B, B) -> () {
+bb0(%0 : $Builtin.Int1, %1 : $B, %2 : $B, %3 : $B):
+  cond_br %0, bb1, bb2
+
+bb1:
+  %r1 = strong_retain %1 : $B
+  br bb3(%1 : $B, %3 : $B)
+
+bb2:
+  %r2 = strong_retain %2 : $B
+  br bb3(%3 : $B, %2 : $B)
+
+bb3(%a1 : $B, %a2 : $B):
+  %t1 = tuple()
+  return %t1 : $()
+}
+
+// CHECK-LABEL: sil @do_not_sink_from_preds_through_args3
+// CHECK: bb2:
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: br bb5
+// CHECK: bb3:
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: br bb5
+// CHECK: bb4:
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: br bb5
+// CHECK-NOT: strong_retain
+// CHECK: return
+sil @do_not_sink_from_preds_through_args3 : $@convention(thin) (Builtin.Int1, B, B) -> () {
+bb0(%0 : $Builtin.Int1, %1 : $B, %2 : $B):
+  cond_br %0, bb1, bb2
+
+bb1:
+  cond_br %0, bb3, bb4
+
+bb2:
+  %r1 = strong_retain %1 : $B
+  br bb5(%1 : $B)
+
+bb3:
+  %r2 = strong_retain %2 : $B
+  br bb5(%2 : $B)
+
+bb4:
+  %r3 = strong_retain %1 : $B
+  br bb5(%2 : $B)
+
+bb5(%a1 : $B):
+  %t1 = tuple()
+  return %t1 : $()
+}
+
+// CHECK-LABEL: sil @do_not_sink_from_preds_through_args4
+// CHECK: bb2:
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: br bb5
+// CHECK: bb3:
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: br bb5
+// CHECK: bb4:
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: br bb5
+// CHECK-NOT: strong_retain
+// CHECK: return
+sil @do_not_sink_from_preds_through_args4 : $@convention(thin) (Builtin.Int1, B, B) -> () {
+bb0(%0 : $Builtin.Int1, %1 : $B, %2 : $B):
+  cond_br %0, bb1, bb2
+
+bb1:
+  cond_br %0, bb3, bb4
+
+bb2:
+  %r1 = strong_retain %1 : $B
+  br bb5(%2 : $B)
+
+bb3:
+  %r2 = strong_retain %2 : $B
+  br bb5(%2 : $B)
+
+bb4:
+  %r3 = strong_retain %1 : $B
+  br bb5(%1 : $B)
+
+bb5(%a1 : $B):
+  %t1 = tuple()
+  return %t1 : $()
+}
+
 // CHECK-LABEL: sil @do_not_sink_local_uses
 // CHECK: integer_literal
 // CHECK: integer_literal
