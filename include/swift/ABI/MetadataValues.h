@@ -401,6 +401,13 @@ public:
   static FunctionTypeFlags fromIntValue(int_type Data) {
     return FunctionTypeFlags(Data);
   }
+  
+  bool operator==(FunctionTypeFlags other) const {
+    return Data == other.Data;
+  }
+  bool operator!=(FunctionTypeFlags other) const {
+    return Data != other.Data;
+  }
 };
 
 }

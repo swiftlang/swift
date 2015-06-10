@@ -1790,6 +1790,15 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
                               const Metadata *srcType,
                               const Metadata *targetType,
                               DynamicCastFlags flags) {
+  auto succeed = [&]() -> bool {
+    if (flags & DynamicCastFlags::TakeOnSuccess) {
+      srcType->vw_initializeWithTake(dest, src);
+    } else {
+      srcType->vw_initializeWithCopy(dest, src);
+    }
+    return true;
+  };
+  
   switch (targetType->getKind()) {
 
   // Casts to class type.
@@ -1867,6 +1876,65 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
                                  cast<ExistentialMetatypeMetadata>(targetType),
                                              flags);
 
+  // Function types.
+  case MetadataKind::Function: {
+    // Function casts succeed on exact matches, or if the target type is
+    // throwier than the source type.
+    //
+    // TODO: We could also allow ABI-compatible variance, such as casting
+    // a dynamic Base -> Derived to Derived -> Base. We wouldn't be able to
+    // perform a dynamic cast that required any ABI adjustment without a JIT
+    // though.
+
+    // Check for an exact type match first.
+    if (srcType == targetType) {
+      return succeed();
+    }
+
+    switch (srcType->getKind()) {
+    case MetadataKind::Function: {
+      auto srcFn = static_cast<const FunctionTypeMetadata *>(srcType);
+      auto targetFn = static_cast<const FunctionTypeMetadata *>(targetType);
+      
+      // Check that argument counts and convention match. "throws" can vary.
+      if (srcFn->Flags.withThrows(false) != targetFn->Flags.withThrows(false))
+        break;
+      
+      // If the target type can't throw, neither can the source.
+      if (srcFn->throws() && !targetFn->throws())
+        break;
+      
+      // The result and argument types must match.
+      if (srcFn->ResultType != targetFn->ResultType)
+        break;
+      for (unsigned i = 0, e = srcFn->getNumArguments(); i < e; ++i)
+        if (srcFn->getArguments()[i] != targetFn->getArguments()[i])
+          break;
+      
+      return succeed();
+    }
+    
+    case MetadataKind::Existential:
+      return _dynamicCastFromExistential(dest, src,
+                           static_cast<const ExistentialTypeMetadata*>(srcType),
+                           targetType, flags);
+      
+    case MetadataKind::Class:
+    case MetadataKind::Struct:
+    case MetadataKind::Enum:
+    case MetadataKind::ObjCClassWrapper:
+    case MetadataKind::ForeignClass:
+    case MetadataKind::ExistentialMetatype:
+    case MetadataKind::HeapLocalVariable:
+    case MetadataKind::ErrorObject:
+    case MetadataKind::Metatype:
+    case MetadataKind::Opaque:
+    case MetadataKind::Tuple:
+      break;
+    }
+    return _fail(src, srcType, targetType, flags);
+  }
+
   case MetadataKind::Struct:
   case MetadataKind::Enum:
     switch (srcType->getKind()) {
@@ -1907,20 +1975,13 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
     SWIFT_FALLTHROUGH;
 
   // The non-polymorphic types.
-  case MetadataKind::Function:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::ErrorObject:
   case MetadataKind::Opaque:
   case MetadataKind::Tuple:
     // If there's an exact type match, we're done.
-    if (srcType == targetType) {
-      if (flags & DynamicCastFlags::TakeOnSuccess) {
-        srcType->vw_initializeWithTake(dest, src);
-      } else {
-        srcType->vw_initializeWithCopy(dest, src);
-      }
-      return true;
-    }
+    if (srcType == targetType)
+      return succeed();
 
     // If we have an existential, look at its dynamic type.
     if (auto srcExistentialType = dyn_cast<ExistentialTypeMetadata>(srcType)) {
