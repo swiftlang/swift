@@ -5764,8 +5764,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
       // Validate the generic type parameters.
       if (validateGenericTypeSignature(nominal)) {
-        nominal->setInvalid();
-        nominal->overwriteType(ErrorType::get(Context));
+        nominal->markInvalidGenericSignature();
         return;
       }
 
