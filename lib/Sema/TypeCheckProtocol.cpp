@@ -1553,6 +1553,7 @@ static Substitution getArchetypeSubstitution(TypeChecker &tc,
                                           &conformance);
     assert((conforms || isError) &&
            "Conformance should already have been verified");
+    (void)isError;
     (void)conforms;
     conformances.push_back(conformance);
   }

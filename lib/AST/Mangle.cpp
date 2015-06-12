@@ -449,6 +449,7 @@ void Mangler::mangleDeclName(const ValueDecl *decl) {
       assert(!discriminator.empty());
       assert(!isNonAscii(discriminator.str()) &&
              "discriminator contains non-ASCII characters");
+      (void) isNonAscii;
       assert(!clang::isDigit(discriminator.str().front()) &&
              "not a valid identifier");
 

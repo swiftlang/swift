@@ -1014,6 +1014,7 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
     InOutOptionalParam = Dest;
   }
 
+  (void) ParamTypes;
   assert(ParamTypes[0].getConvention() == ParameterConvention::Direct_Owned &&
          "Parameter should be @owned");
 
@@ -1126,6 +1127,7 @@ optimizeBridgedSwiftToObjCCast(SILInstruction *Inst,
 
   assert(Conf.getInt() == ConformanceKind::Conforms &&
          "_ObjectiveCBridgeable conformance should exist");
+  (void) Conf;
 
   bool isCurrentModuleBridgeToObjectiveC = false;
 

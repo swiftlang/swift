@@ -62,6 +62,7 @@ public:
         assert(IGM.DataLayout.getTypeSizeInBits(type)
                  == IGM.DataLayout.getTypeAllocSizeInBits(type)
                && "enum payload schema elements should use full alloc size");
+        (void) type;
         fn(element.getScalarType());
       }
       return;

@@ -3299,7 +3299,8 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
     Decl ? Decl->getNameStr() :
 # endif
     "";
-  
+
+  (void) Decl;
   // If a dynamic alloc_stack is immediately initialized by a copy_addr
   // operation, we can combine the allocation and initialization using an
   // optimized value witness.

@@ -1890,6 +1890,7 @@ static void emitTupleShuffleExprInto(RValueEmitter &emitter,
                                      Initialization *outerTupleInit) {
   CanTupleType outerTuple = cast<TupleType>(E->getType()->getCanonicalType());
   auto outerFields = outerTuple->getElements();
+  (void) outerFields;
 
   // Decompose the initialization.
   SmallVector<InitializationPtr, 4> outerInitsBuffer;

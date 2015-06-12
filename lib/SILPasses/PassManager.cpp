@@ -330,6 +330,8 @@ void SILPassManager::runOneIteration() {
 
 void SILPassManager::run() {
   const SILOptions &Options = getOptions();
+  (void) Options;
+
   if (SILPrintAll) {
     if (SILPrintOnlyFun.empty() && SILPrintOnlyFuns.empty()) {
       llvm::dbgs() << "*** SIL module before transformation ("

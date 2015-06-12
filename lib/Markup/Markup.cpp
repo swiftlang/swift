@@ -152,6 +152,7 @@ ParseResult<Header> parseHeader(MarkupContext &MC, LineList &LL,
   auto ResultState = parseChildren(MC, LL, State, Children);
   assert(State.Node == ResultState.Node
       && ResultState.Event == CMARK_EVENT_EXIT);
+  (void) ResultState;
   return { Header::create(MC, Level, Children), State.next() };
 }
 

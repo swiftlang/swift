@@ -2854,6 +2854,7 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
     bool signExt = clangResultTy->hasSignedIntegerRepresentation();
     assert((signExt || clangResultTy->hasUnsignedIntegerRepresentation()) &&
            "Invalid attempt to add extension attribute to argument!");
+    (void) signExt;
   }
 
   for (auto i : indices(paramTys).slice(firstParam)) {
@@ -2869,6 +2870,7 @@ static void externalizeArguments(IRGenFunction &IGF, const Callee &callee,
       bool signExt = paramTys[i]->hasSignedIntegerRepresentation();
       assert((signExt || paramTys[i]->hasUnsignedIntegerRepresentation()) &&
              "Invalid attempt to add extension attribute to argument!");
+      (void) signExt;
       SWIFT_FALLTHROUGH;
     }
     case clang::CodeGen::ABIArgInfo::Direct:
