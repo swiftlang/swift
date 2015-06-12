@@ -939,9 +939,23 @@ public:
     llvm_unreachable("bad reason kind");
   }
 
-  void diagnoseUncoveredThrowSite(TypeChecker &TC, SourceLoc loc,
+  void diagnoseUncoveredThrowSite(TypeChecker &TC, ASTNode E,
                                   const PotentialReason &reason) {
-    TC.diagnose(loc, diag::throwing_call_without_try);
+    auto message = diag::throwing_call_without_try;
+    auto loc = E.getStartLoc();
+    SourceRange highlight;
+    
+    // Generate more specific messages in some cases.
+    if (auto e = dyn_cast_or_null<ApplyExpr>(E.dyn_cast<Expr*>())) {
+      if (isa<PrefixUnaryExpr>(e) || isa<PostfixUnaryExpr>(e) ||
+          isa<BinaryExpr>(e)) {
+        loc = e->getFn()->getStartLoc();
+        message = diag::throwing_operator_without_try;
+      }
+      highlight = e->getSourceRange();
+    }
+    
+    TC.diagnose(loc, message).highlight(highlight);
     maybeAddRethrowsNote(TC, loc, reason);
   }
 
@@ -1287,7 +1301,7 @@ private:
         CurContext.diagnoseUnhandledThrowSite(TC, E, isTryCovered,
                                               classification.getThrowsReason());
       } else if (!isTryCovered && !TC.Context.LangOpts.EnableThrowWithoutTry) {
-        CurContext.diagnoseUncoveredThrowSite(TC, E.getStartLoc(),
+        CurContext.diagnoseUncoveredThrowSite(TC, E,
                                               classification.getThrowsReason());
       }
       return;

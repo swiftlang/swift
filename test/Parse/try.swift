@@ -52,3 +52,10 @@ func test() throws -> Int {
   // expected-error@-1 {{does not conform to protocol 'ErrorType'}}
   try return foo() // expected-error {{'try' must be placed on the returned expression}} {{3-7=}} {{14-14=try }}
 }
+
+// Test operators.
+func *(a : String, b : String) throws -> Int { return 42 }
+let _ = "foo"
+        *  // expected-error {{operator can throw but expression is not marked with 'try'}}
+        "bar"
+let _ = try! "foo"*"bar"

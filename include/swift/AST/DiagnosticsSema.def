@@ -1865,6 +1865,8 @@ ERROR(throwing_call_in_illegal_context,sema,none,
 ERROR(throw_in_illegal_context,sema,none,
       "errors cannot be thrown out of %0", (StringRef))
 
+ERROR(throwing_operator_without_try,sema,none,
+      "operator can throw but expression is not marked with 'try'", ())
 ERROR(throwing_call_without_try,sema,none,
       "call can throw but is not marked with 'try'", ())
 WARNING(no_throw_in_try,sema,none,
