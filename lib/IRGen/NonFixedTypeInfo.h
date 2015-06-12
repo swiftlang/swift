@@ -78,9 +78,7 @@ public:
                                  SILType T,
                                  const llvm::Twine &name) const override {
     // Make a fixed-size buffer.
-    Address buffer = IGF.createAlloca(IGF.IGM.getFixedBufferTy(),
-                                      getFixedBufferAlignment(IGF.IGM),
-                                      name);
+    Address buffer = IGF.createFixedSizeBufferAlloca(name);
 
     // Allocate an object of the appropriate type within it.
     llvm::Value *address = emitAllocateBufferCall(IGF, T, buffer);

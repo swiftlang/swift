@@ -20,14 +20,11 @@ func dup<T>(var x: T) -> (T, T) { return (x,x) }
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[TYPE]]* %T to i8***
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 -1
 // CHECK-NEXT: [[T_VALUE:%.*]] = load i8**, i8*** [[T1]], align 8
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T_VALUE]], i32 11
+// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T_VALUE]], i32 8
 // CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]], align 8
-// CHECK-NEXT: [[ALLOCATE_FN:%.*]] = bitcast i8* [[T1]] to [[OPAQUE]]* ([[BUFFER]]*, [[TYPE]]*)*
-// CHECK-NEXT: [[X:%.*]] = call [[OPAQUE]]* [[ALLOCATE_FN]]([[BUFFER]]* [[XBUF]], [[TYPE]]* %T)
+// CHECK-NEXT: [[INITIALIZE_BUFFER_FN:%.*]] = bitcast i8* [[T1]] to [[OPAQUE]]* ([[BUFFER]]*, [[OPAQUE]]*, [[TYPE]]*)*
+// CHECK-NEXT: [[X:%.*]] = call [[OPAQUE]]* [[INITIALIZE_BUFFER_FN]]([[BUFFER]]* [[XBUF]], [[OPAQUE]]* {{.*}}, [[TYPE]]* %T)
 //   Get value witnesses for T.
-// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T_VALUE]], i32 9
-// CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]], align 8
-// CHECK-NEXT: [[TAKE_FN:%.*]] = bitcast i8* [[T1]] to [[OPAQUE]]* ([[OPAQUE]]*, [[OPAQUE]]*, [[TYPE]]*)*
 //   Project to first element of tuple.
 // CHECK: [[FST:%.*]] = bitcast <{}>* [[RET:%.*]] to [[OPAQUE]]*
 //   Get the tuple metadata.
@@ -46,6 +43,9 @@ func dup<T>(var x: T) -> (T, T) { return (x,x) }
 // CHECK-NEXT: [[COPY_FN:%.*]] = bitcast i8* [[T1]] to [[OPAQUE]]* ([[OPAQUE]]*, [[OPAQUE]]*, [[TYPE]]*)*
 // CHECK-NEXT: call [[OPAQUE]]* [[COPY_FN]]([[OPAQUE]]* [[FST]], [[OPAQUE]]* [[X]], [[TYPE]]* %T)
 //   Copy 'x' into the second element.
+// CHECK-NEXT: [[T0:%.*]] = getelementptr inbounds i8*, i8** [[T_VALUE]], i32 9
+// CHECK-NEXT: [[T1:%.*]] = load i8*, i8** [[T0]], align 8
+// CHECK-NEXT: [[TAKE_FN:%.*]] = bitcast i8* [[T1]] to [[OPAQUE]]* ([[OPAQUE]]*, [[OPAQUE]]*, [[TYPE]]*)*
 // CHECK-NEXT: call [[OPAQUE]]* [[TAKE_FN]]([[OPAQUE]]* [[SND]], [[OPAQUE]]* [[X]], [[TYPE]]* %T)
 
 // CHECK: ret void

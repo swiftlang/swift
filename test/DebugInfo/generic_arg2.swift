@@ -3,7 +3,7 @@
 func markUsed<T>(t: T) {}
 
 // CHECK: @_TFC12generic_arg25Class3foo{{.*}}, %swift.type* %U
-// CHECK: %[[Y:.*]] = call %swift.opaque* %allocateBuffer4([{{(24|12)}} x i8]* %{{.*}}, %swift.type* %U)
+// CHECK: %[[Y:.*]] = call %swift.opaque* %initializeBufferWithTake{{.*}}([{{(24|12)}} x i8]* %{{.*}}, %swift.opaque* %{{.*}}, %swift.type* %U)
 // store %swift.opaque* %[[Y]], %swift.opaque** %[[Y_SHADOW:.*]], align
 // CHECK: call void @llvm.dbg.value(metadata %swift.opaque* %[[Y]], {{.*}}metadata ![[U:.*]], metadata !{{[0-9]+}}), !dbg
 // Make sure there is no conflicting dbg.value for this variable.x

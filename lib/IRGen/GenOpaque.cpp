@@ -428,6 +428,34 @@ void irgen::emitInitializeWithCopyCall(IRGenFunction &IGF,
   call->setDoesNotThrow();
 }
 
+llvm::Value *irgen::emitInitializeBufferWithTakeCall(IRGenFunction &IGF,
+                                                     SILType T,
+                                                     llvm::Value *destObject,
+                                                     llvm::Value *srcObject) {
+  auto metadata = IGF.emitTypeMetadataRefForLayout(T);
+  llvm::Value *copyFn = IGF.emitValueWitnessForLayout(T,
+                                       ValueWitness::InitializeBufferWithTake);
+  llvm::CallInst *call =
+    IGF.Builder.CreateCall3(copyFn, destObject, srcObject, metadata);
+  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setDoesNotThrow();
+  return call;
+}
+
+llvm::Value *irgen::emitInitializeBufferWithCopyCall(IRGenFunction &IGF,
+                                                     SILType T,
+                                                     llvm::Value *destObject,
+                                                     llvm::Value *srcObject) {
+  auto metadata = IGF.emitTypeMetadataRefForLayout(T);
+  llvm::Value *copyFn = IGF.emitValueWitnessForLayout(T,
+                                       ValueWitness::InitializeBufferWithCopy);
+  llvm::CallInst *call =
+    IGF.Builder.CreateCall3(copyFn, destObject, srcObject, metadata);
+  call->setCallingConv(IGF.IGM.RuntimeCC);
+  call->setDoesNotThrow();
+  return call;
+}
+
 /// Emit a call to do an 'initializeArrayWithCopy' operation.
 void irgen::emitInitializeArrayWithCopyCall(IRGenFunction &IGF,
                                             SILType T,

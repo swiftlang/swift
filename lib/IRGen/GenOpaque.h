@@ -71,6 +71,18 @@ namespace irgen {
                                   llvm::Value *destObject,
                                   llvm::Value *srcObject);
 
+  /// Emit a call to do an 'initializeBufferWithCopy' operation.
+  llvm::Value *emitInitializeBufferWithCopyCall(IRGenFunction &IGF,
+                                                SILType T,
+                                                llvm::Value *destObject,
+                                                llvm::Value *srcObject);
+
+  /// Emit a call to do an 'initializeBufferWithTake' operation.
+  llvm::Value *emitInitializeBufferWithTakeCall(IRGenFunction &IGF,
+                                                SILType T,
+                                                llvm::Value *destObject,
+                                                llvm::Value *srcObject);
+
   /// Emit a call to do an 'initializeArrayWithCopy' operation.
   void emitInitializeArrayWithCopyCall(IRGenFunction &IGF,
                                        SILType T,

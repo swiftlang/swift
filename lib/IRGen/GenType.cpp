@@ -27,6 +27,7 @@
 #include "EnumPayload.h"
 #include "LoadableTypeInfo.h"
 #include "GenMeta.h"
+#include "GenProto.h"
 #include "GenType.h"
 #include "IRGenFunction.h"
 #include "IRGenModule.h"
@@ -49,6 +50,25 @@ llvm::DenseMap<TypeBase*, TypeCacheEntry> &
 TypeConverter::Types_t::getCacheFor(TypeBase *t) {
   return t->isDependentType() ? DependentCache : IndependentCache;
 }
+
+Address TypeInfo::initializeBufferWithTake(IRGenFunction &IGF,
+                                           Address destBuffer,
+                                           Address srcAddr,
+                                           SILType T) const {
+  Address destAddr = emitAllocateBuffer(IGF, T, destBuffer);
+  initializeWithTake(IGF, destAddr, srcAddr, T);
+  return destAddr;
+}
+
+Address TypeInfo::initializeBufferWithCopy(IRGenFunction &IGF,
+                                           Address destBuffer,
+                                           Address srcAddr,
+                                           SILType T) const {
+  Address destAddr = emitAllocateBuffer(IGF, T, destBuffer);
+  initializeWithCopy(IGF, destAddr, srcAddr, T);
+  return destAddr;
+}
+
 
 bool TypeInfo::isSingleSwiftRetainablePointer(ResilienceScope scope) const {
   return false;

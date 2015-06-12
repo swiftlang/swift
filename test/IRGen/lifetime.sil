@@ -27,15 +27,11 @@ bb0(%x : $*T):
 // CHECK-NEXT: [[T0:%.*]] = bitcast [[TYPE]]* %T to i8***
 // CHECK-NEXT: [[T1:%.*]] = getelementptr inbounds i8**, i8*** [[T0]], i64 -1
 // CHECK-NEXT: [[VWTABLE:%.*]] = load i8**, i8*** [[T1]], align 8
-// CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds i8*, i8** [[VWTABLE]], i32 11
+// CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds i8*, i8** [[VWTABLE]], i32 5
 // CHECK-NEXT: [[T4:%.*]] = load i8*, i8** [[T3]], align 8
-// CHECK-NEXT: [[ALLOCATE_FN:%.*]] = bitcast i8* [[T4]] to [[OPAQUE]]* ([[BUFFER]]*, [[TYPE]]*)*
-// CHECK-NEXT: [[Y:%.*]] = call [[OPAQUE]]* [[ALLOCATE_FN]]([[BUFFER]]* [[YBUF]], [[TYPE]]* %T)
+// CHECK-NEXT: [[BUFFER_COPY_FN:%.*]] = bitcast i8* [[T4]] to [[OPAQUE]]* ([[BUFFER]]*, [[OPAQUE]]*, [[TYPE]]*)*
 //   Copy 'x' into 'y'.
-// CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds i8*, i8** [[VWTABLE]], i32 6
-// CHECK-NEXT: [[T4:%.*]] = load i8*, i8** [[T3]], align 8
-// CHECK-NEXT: [[COPY_FN:%.*]] = bitcast i8* [[T4]] to [[OPAQUE]]* ([[OPAQUE]]*, [[OPAQUE]]*, [[TYPE]]*)*
-// CHECK-NEXT: call [[OPAQUE]]* [[COPY_FN]]([[OPAQUE]]* [[Y]], [[OPAQUE]]* [[X:%.*]], [[TYPE]]* %T)
+// CHECK-NEXT: [[Y:%.*]] = call [[OPAQUE]]* [[BUFFER_COPY_FN]]([[BUFFER]]* [[YBUF]], [[OPAQUE]]* [[X:%.*]], [[TYPE]]* %T)
 //   Destroy 'y'.
 // CHECK-NEXT: [[T3:%.*]] = getelementptr inbounds i8*, i8** [[VWTABLE]], i32 4
 // CHECK-NEXT: [[T4:%.*]] = load i8*, i8** [[T3]], align 8

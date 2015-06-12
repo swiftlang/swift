@@ -44,6 +44,7 @@
 #include "FormalType.h"
 #include "GenClass.h"
 #include "GenObjC.h"
+#include "GenOpaque.h"
 #include "GenMeta.h"
 #include "GenType.h"
 #include "IRGenDebugInfo.h"
@@ -2051,6 +2052,13 @@ Address IRGenFunction::createAlloca(llvm::Type *type,
   llvm::AllocaInst *alloca = new llvm::AllocaInst(type, name, AllocaIP);
   alloca->setAlignment(alignment.getValue());
   return Address(alloca, alignment);
+}
+
+/// Allocate a fixed-size buffer on the stack.
+Address IRGenFunction::createFixedSizeBufferAlloca(const llvm::Twine &name) {
+  return createAlloca(IGM.getFixedBufferTy(),
+                      getFixedBufferAlignment(IGM),
+                      name);
 }
 
 /// Get or create a global string constant.

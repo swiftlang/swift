@@ -36,8 +36,7 @@ func allToInt<T>(x: T) -> Int {
   return x as! Int
   // CHECK: [[BUF:%.*]] = alloca [[BUFFER:.24 x i8.]],
   // CHECK: [[INT_TEMP:%.*]] = alloca %Si,
-  // CHECK: [[TEMP:%.*]] = call %swift.opaque* {{.*}}([[BUFFER]]* [[BUF]], %swift.type* %T)
-  // CHECK: call %swift.opaque* {{%.*}}(%swift.opaque* [[TEMP]], %swift.opaque* %0, %swift.type* %T)
+  // CHECK: [[TEMP:%.*]] = call %swift.opaque* {{.*}}([[BUFFER]]* [[BUF]], %swift.opaque* %0, %swift.type* %T)
   // CHECK: [[T0:%.*]] = bitcast %Si* [[INT_TEMP]] to %swift.opaque*
   // CHECK: call i1 @swift_dynamicCast(%swift.opaque* [[T0]], %swift.opaque* [[TEMP]], %swift.type* %T, %swift.type* getelementptr inbounds ({{.*}} @_TMdSi, {{.*}}), i64 7)
   // CHECK: [[T0:%.*]] = getelementptr inbounds %Si, %Si* [[INT_TEMP]], i32 0, i32 0

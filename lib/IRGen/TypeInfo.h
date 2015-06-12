@@ -276,6 +276,36 @@ public:
   virtual void initializeWithCopy(IRGenFunction &IGF, Address destAddr,
                                   Address srcAddr, SILType T) const = 0;
 
+  /// Perform a "take-initialization" from the given object into an
+  /// uninitialized fixed-size buffer, allocating the buffer if necessary.
+  /// Returns the address of the value inside the buffer.
+  ///
+  /// This is equivalent to:
+  ///   auto destAddress = allocateBuffer(IGF, destBuffer, T);
+  ///   initializeWithTake(IGF, destAddr, srcAddr, T);
+  ///   return destAddress;
+  /// but will be more efficient for dynamic types, since it uses a single
+  /// value witness call.
+  virtual Address initializeBufferWithTake(IRGenFunction &IGF,
+                                           Address destBuffer,
+                                           Address srcAddr,
+                                           SILType T) const;
+
+  /// Perform a copy-initialization from the given object into an
+  /// uninitialized fixed-size buffer, allocating the buffer if necessary.
+  /// Returns the address of the value inside the buffer.
+  ///
+  /// This is equivalent to:
+  ///   auto destAddress = allocateBuffer(IGF, destBuffer, T);
+  ///   initializeWithCopy(IGF, destAddr, srcAddr, T);
+  ///   return destAddress;
+  /// but will be more efficient for dynamic types, since it uses a single
+  /// value witness call.
+  virtual Address initializeBufferWithCopy(IRGenFunction &IGF,
+                                           Address destBuffer,
+                                           Address srcAddr,
+                                           SILType T) const;
+
   /// Take-initialize an address from a parameter explosion.
   virtual void initializeFromParams(IRGenFunction &IGF, Explosion &params,
                                     Address src, SILType T) const = 0;

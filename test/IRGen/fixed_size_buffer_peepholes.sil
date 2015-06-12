@@ -1,0 +1,69 @@
+// RUN: %target-swift-frontend -emit-ir %s | FileCheck %s
+
+import Builtin
+
+sil @consume : $@convention(thin) <T> (@in T) -> ()
+sil @produce : $@convention(thin) <T> (@out T) -> ()
+
+// CHECK-LABEL: define void @join_alloc_stack_copy_addr
+sil @join_alloc_stack_copy_addr : $@convention(thin) <T> (@in T) -> () {
+entry(%x : $*T):
+  // CHECK: [[BUFFER:%.*]] = alloca [[BUFFER_TYPE:\[.* x i8\]]]
+  %a = alloc_stack $T
+  // CHECK: [[ADDR:%.*]] = call %swift.opaque* %initializeBufferWithCopy([[BUFFER_TYPE]]* [[BUFFER]], %swift.opaque* %0, %swift.type* %T)
+  copy_addr %x to [initialization] %a#1 : $*T
+  // CHECK: call void @consume(%swift.opaque* noalias nocapture [[ADDR]], %swift.type* %T)
+  %u = function_ref @consume : $@convention(thin) <T> (@in T) -> ()
+  %z = apply %u<T>(%a#1) : $@convention(thin) <T> (@in T) -> ()
+  dealloc_stack %a#0 : $*@local_storage T
+  return undef : $()
+}
+
+// CHECK-LABEL: define void @dont_join_alloc_stack_copy_addr_if_intervening_use
+sil @dont_join_alloc_stack_copy_addr_if_intervening_use : $@convention(thin) <T> (@in T) -> () {
+entry(%x : $*T):
+  // CHECK: [[BUFFER:%.*]] = alloca [[BUFFER_TYPE:\[.* x i8\]]]
+  // CHECK: [[ADDR:%.*]] = call %swift.opaque* %allocateBuffer([[BUFFER_TYPE]]* [[BUFFER]], %swift.type* %T)
+  %a = alloc_stack $T
+  %p = function_ref @produce : $@convention(thin) <T> (@out T) -> ()
+  %y = apply %p<T>(%a#1) : $@convention(thin) <T> (@out T) -> ()
+  destroy_addr %a#1 : $*T
+
+  // CHECK: call %swift.opaque* %initializeWithCopy(%swift.opaque* [[ADDR]],
+  copy_addr %x to [initialization] %a#1 : $*T
+  %u = function_ref @consume : $@convention(thin) <T> (@in T) -> ()
+  %z = apply %u<T>(%a#1) : $@convention(thin) <T> (@in T) -> ()
+  dealloc_stack %a#0 : $*@local_storage T
+  return undef : $()
+}
+
+// CHECK-LABEL: define void @dont_join_alloc_stack_copy_addr_if_no_copy_addr
+sil @dont_join_alloc_stack_copy_addr_if_no_copy_addr : $@convention(thin) <T> (@in T) -> () {
+entry(%x : $*T):
+  // CHECK: [[BUFFER:%.*]] = alloca [[BUFFER_TYPE:\[.* x i8\]]]
+  // CHECK: [[ADDR:%.*]] = call %swift.opaque* %allocateBuffer([[BUFFER_TYPE]]* [[BUFFER]], %swift.type* %T)
+  %a = alloc_stack $T
+  %p = function_ref @produce : $@convention(thin) <T> (@out T) -> ()
+  %y = apply %p<T>(%a#1) : $@convention(thin) <T> (@out T) -> ()
+  destroy_addr %a#1 : $*T
+  dealloc_stack %a#0 : $*@local_storage T
+  return undef : $()
+}
+
+// CHECK-LABEL: define void @dont_join_alloc_stack_if_copy_addr_in_different_bb
+sil @dont_join_alloc_stack_if_copy_addr_in_different_bb : $@convention(thin) <T> (@in T) -> () {
+entry(%x : $*T):
+  // CHECK: [[BUFFER:%.*]] = alloca [[BUFFER_TYPE:\[.* x i8\]]]
+  // CHECK: [[ADDR:%.*]] = call %swift.opaque* %allocateBuffer([[BUFFER_TYPE]]* [[BUFFER]], %swift.type* %T)
+  %a = alloc_stack $T
+  br next
+
+next:
+  // CHECK: call %swift.opaque* %initializeWithCopy(%swift.opaque* [[ADDR]],
+  copy_addr %x to [initialization] %a#1 : $*T
+  // CHECK: call void @consume(%swift.opaque* noalias nocapture [[ADDR]], %swift.type* %T)
+  %u = function_ref @consume : $@convention(thin) <T> (@in T) -> ()
+  %z = apply %u<T>(%a#1) : $@convention(thin) <T> (@in T) -> ()
+  dealloc_stack %a#0 : $*@local_storage T
+  return undef : $()
+}

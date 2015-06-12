@@ -120,6 +120,10 @@ public:
   enum class Kind {
     /// This LoweredValue corresponds to a SIL address value.
     Address,
+
+    /// This LoweredValue corresponds to a SIL address value owned by an
+    /// uninitialized fixed-size buffer. The initializatio
+    UnallocatedAddressInBuffer,
     
     /// The following kinds correspond to SIL non-address values.
     Value_First,
@@ -155,6 +159,12 @@ public:
     : kind(Kind::Address), address(address)
   {}
   
+  enum UnallocatedAddressInBuffer_t { UnallocatedAddressInBuffer };
+  
+  LoweredValue(const Address &address, UnallocatedAddressInBuffer_t)
+    : kind(Kind::UnallocatedAddressInBuffer), address(address)
+  {}
+  
   LoweredValue(StaticFunction &&staticFunction)
     : kind(Kind::StaticFunction), staticFunction(std::move(staticFunction))
   {}
@@ -174,6 +184,7 @@ public:
   {    
     switch (kind) {
     case Kind::Address:
+    case Kind::UnallocatedAddressInBuffer:
       ::new (&address) Address(std::move(lv.address));
       break;
     case Kind::Explosion:
@@ -195,13 +206,23 @@ public:
     return *this;
   }
   
-  bool isAddress() const { return kind == Kind::Address; }
+  bool isAddress() const {
+    return kind == Kind::Address;
+  }
+  bool isUnallocatedAddressInBuffer() const {
+    return kind == Kind::UnallocatedAddressInBuffer;
+  }
   bool isValue() const {
     return kind >= Kind::Value_First && kind <= Kind::Value_Last;
   }
   
   Address getAddress() const {
-    assert(kind == Kind::Address && "not an address");
+    assert(kind == Kind::Address && "not an allocated address");
+    return address;
+  }
+  
+  Address getAddressOfUnallocatedBuffer() const {
+    assert(kind == Kind::UnallocatedAddressInBuffer);
     return address;
   }
   
@@ -228,6 +249,7 @@ public:
   ~LoweredValue() {
     switch (kind) {
     case Kind::Address:
+    case Kind::UnallocatedAddressInBuffer:
       address.~Address();
       break;
     case Kind::Explosion:
@@ -290,12 +312,34 @@ public:
     (void)inserted;
   }
   
+  void overwriteLoweredValue(SILValue v, LoweredValue &&lv) {
+    auto it = LoweredValues.find(v);
+    assert(it != LoweredValues.end() && "no existing entry for overwrite?");
+    it->second = std::move(lv);
+  }
+  
   /// Create a new Address corresponding to the given SIL address value.
   void setLoweredAddress(SILValue v, const Address &address) {
     assert((v.getType().isAddress() || v.getType().isLocalStorage()) &&
            "address for non-address value?!");
     setLoweredValue(v, address);
   }
+
+  void setLoweredUnallocatedAddressInBuffer(SILValue v,
+                                            const Address &buffer) {
+    assert((v.getType().isAddress() || v.getType().isLocalStorage()) &&
+           "address for non-address value?!");
+    setLoweredValue(v,
+                LoweredValue(buffer, LoweredValue::UnallocatedAddressInBuffer));
+  }
+  
+  void overwriteLoweredAddress(SILValue v, const Address &address) {
+    assert((v.getType().isAddress() || v.getType().isLocalStorage()) &&
+           "address for non-address value?!");
+    overwriteLoweredValue(v, address);
+  }
+
+  void setAllocatedAddressForBuffer(SILValue v, const Address &allocedAddress);
 
   /// Create a new Explosion corresponding to the given SIL value.
   void setLoweredExplosion(SILValue v, Explosion &e) {
@@ -305,9 +349,7 @@ public:
 
   void overwriteLoweredExplosion(SILValue v, Explosion &e) {
     assert(v.getType().isObject() && "explosion for address value?!");
-    auto it = LoweredValues.find(v);
-    assert(it != LoweredValues.end() && "no existing entry for overwrite?");
-    it->second = LoweredValue(e);
+    overwriteLoweredValue(v, LoweredValue(e));
   }
 
   void setLoweredSingleValue(SILValue v, llvm::Value *scalar) {
@@ -752,6 +794,7 @@ llvm::Value *StaticFunction::getExplosionValue(IRGenFunction &IGF) const {
 void LoweredValue::getExplosion(IRGenFunction &IGF, Explosion &ex) const {
   switch (kind) {
   case Kind::Address:
+  case Kind::UnallocatedAddressInBuffer:
     llvm_unreachable("not a value");
       
   case Kind::Explosion:
@@ -772,6 +815,7 @@ void LoweredValue::getExplosion(IRGenFunction &IGF, Explosion &ex) const {
 llvm::Value *LoweredValue::getSingletonExplosion(IRGenFunction &IGF) const {
   switch (kind) {
   case Kind::Address:
+  case Kind::UnallocatedAddressInBuffer:
     llvm_unreachable("not a value");
 
   case Kind::Explosion:
@@ -1852,6 +1896,7 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
   }
       
   case LoweredValue::Kind::Address:
+  case LoweredValue::Kind::UnallocatedAddressInBuffer:
     llvm_unreachable("sil address isn't a valid callee");
   }
   
@@ -2004,6 +2049,7 @@ getPartialApplicationFunction(IRGenSILFunction &IGF,
 
   switch (lv.kind) {
   case LoweredValue::Kind::Address:
+  case LoweredValue::Kind::UnallocatedAddressInBuffer:
     llvm_unreachable("can't partially apply an address");
   case LoweredValue::Kind::ObjCMethod:
     llvm_unreachable("objc method partial application shouldn't get here");
@@ -3168,22 +3214,62 @@ visitIsUniqueOrPinnedInst(swift::IsUniqueOrPinnedInst *i) {
   setLoweredExplosion(SILValue(i, 0), out);
 }
 
-void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
-  const TypeInfo &type = getTypeInfo(i->getElementType());
+static bool tryDeferFixedSizeBufferInitialization(IRGenSILFunction &IGF,
+                                                  const SILInstruction *allocInst,
+                                                  const TypeInfo &ti,
+                                                  SILValue containerValue,
+                                                  SILValue addressValue,
+                                                  const llvm::Twine &name) {
+  // There's no point in doing this for fixed-sized types, since we'll allocate
+  // an appropriately-sized buffer for them statically.
+  if (ti.isFixedSize())
+    return false;
 
-  // Derive name from SIL location.
+  // TODO: More interesting dominance analysis could be done here to see
+  // if the alloc_stack is dominated by copy_addrs into it on all paths.
+  // For now, check only that the copy_addr is the first use within the same
+  // block.
+  const SILInstruction *inst = allocInst;
+  while ((inst = inst->getNextNode()) && !isa<TermInst>(inst)) {
+    // Does this instruction use the allocation?
+    for (auto &operand : inst->getAllOperands())
+      if (operand.get() == addressValue)
+        goto is_use;
+    
+    continue;
+  
+  is_use:
+    // Is this a copy?
+    auto copy = dyn_cast<swift::CopyAddrInst>(inst);
+    if (!copy)
+      return false;
+
+    // Destination must be the allocation.
+    if (copy->getDest().getDef() != allocInst)
+      return false;
+
+    // Copy must be an initialization.
+    if (!copy->isInitializationOfDest())
+      return false;
+    
+    // We can defer to this initialization. Allocate the fixed-size buffer
+    // now, but don't allocate the value inside it.
+    auto fixedSizeBuffer = IGF.createFixedSizeBufferAlloca(name);
+    if (containerValue)
+      IGF.setLoweredAddress(containerValue, fixedSizeBuffer);
+    IGF.setLoweredUnallocatedAddressInBuffer(addressValue, fixedSizeBuffer);
+    return true;
+  }
+  
+  return false;
+}
+
+static void emitDebugDeclarationForAllocStack(IRGenSILFunction &IGF,
+                                              AllocStackInst *i,
+                                              const TypeInfo &type,
+                                              llvm::Value *addr) {
   VarDecl *Decl = i->getDecl();
-  StringRef dbgname =
-# ifndef NDEBUG
-    // If this is a DEBUG build, use pretty names for the LLVM IR.
-    Decl ? Decl->getNameStr() :
-# endif
-    "";
-
-  auto addr = type.allocateStack(*this,
-                                 i->getElementType(),
-                                 dbgname);
-  if (IGM.DebugInfo && Decl) {
+  if (IGF.IGM.DebugInfo && Decl) {
     auto *Pattern = Decl->getParentPattern();
     if (!Pattern || !Pattern->isImplicit()) {
       // Discard any inout or lvalue qualifiers. Since the object itself
@@ -3195,12 +3281,40 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
       auto Name = Decl->getName().empty() ? "_" : Decl->getName().str();
       auto DS = i->getDebugScope();
       if (DS) {
-        assert(DS->SILFn == CurSILFn || DS->InlinedCallSite);
-        emitDebugVariableDeclaration(Builder, addr.getAddress().getAddress(),
-                                     DbgTy, DS, Name);
+        assert(DS->SILFn == IGF.CurSILFn || DS->InlinedCallSite);
+        IGF.emitDebugVariableDeclaration(IGF.Builder, addr, DbgTy, DS, Name);
       }
     }
   }
+}
+
+void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
+  const TypeInfo &type = getTypeInfo(i->getElementType());
+
+  // Derive name from SIL location.
+  VarDecl *Decl = i->getDecl();
+  StringRef dbgname =
+# ifndef NDEBUG
+    // If this is a DEBUG build, use pretty names for the LLVM IR.
+    Decl ? Decl->getNameStr() :
+# endif
+    "";
+  
+  // If a dynamic alloc_stack is immediately initialized by a copy_addr
+  // operation, we can combine the allocation and initialization using an
+  // optimized value witness.
+  if (tryDeferFixedSizeBufferInitialization(*this, i, type,
+                                            i->getContainerResult(),
+                                            i->getAddressResult(),
+                                            dbgname))
+    return;
+
+  auto addr = type.allocateStack(*this,
+                                 i->getElementType(),
+                                 dbgname);
+  
+  emitDebugDeclarationForAllocStack(*this, i, type,
+                                    addr.getAddress().getAddress());
   
   setLoweredAddress(i->getContainerResult(), addr.getContainer());
   setLoweredAddress(i->getAddressResult(), addr.getAddress());
@@ -4124,10 +4238,35 @@ void IRGenSILFunction::visitWitnessMethodInst(swift::WitnessMethodInst *i) {
   setLoweredExplosion(SILValue(i, 0), lowered);
 }
 
+void IRGenSILFunction::setAllocatedAddressForBuffer(SILValue v,
+                                                const Address &allocedAddress) {
+  assert(getLoweredValue(v).kind == LoweredValue::Kind::UnallocatedAddressInBuffer
+         && "not an unallocated address");
+  
+  overwriteLoweredAddress(v, allocedAddress);
+  // Emit the debug info for the variable if any.
+  if (auto allocStack = dyn_cast<AllocStackInst>(v)) {
+    emitDebugDeclarationForAllocStack(*this, allocStack,
+                                      getTypeInfo(v.getType()),
+                                      allocedAddress.getAddress());
+  }
+}
+
 void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {
   SILType addrTy = i->getSrc().getType();
   Address src = getLoweredAddress(i->getSrc());
-  Address dest = getLoweredAddress(i->getDest());
+  Address dest;
+  bool isFixedBufferInitialization;
+  // See whether we have a deferred fixed-size buffer initialization.
+  auto &loweredDest = getLoweredValue(i->getDest());
+  if (loweredDest.isUnallocatedAddressInBuffer()) {
+    isFixedBufferInitialization = true;
+    dest = loweredDest.getAddressOfUnallocatedBuffer();
+  } else {
+    isFixedBufferInitialization = false;
+    dest = loweredDest.getAddress();
+  }
+  
   const TypeInfo &addrTI = getTypeInfo(addrTy);
 
   unsigned takeAndOrInitialize =
@@ -4136,16 +4275,28 @@ void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {
   
   switch (takeAndOrInitialize) {
   case ASSIGN | COPY:
+    assert(!isFixedBufferInitialization
+           && "can't assign into an unallocated buffer");
     addrTI.assignWithCopy(*this, dest, src, addrTy);
     break;
   case INITIALIZE | COPY:
-    addrTI.initializeWithCopy(*this, dest, src, addrTy);
+    if (isFixedBufferInitialization) {
+      Address addr = addrTI.initializeBufferWithCopy(*this, dest, src, addrTy);
+      setAllocatedAddressForBuffer(i->getDest(), addr);
+    } else
+      addrTI.initializeWithCopy(*this, dest, src, addrTy);
     break;
   case ASSIGN | TAKE:
+    assert(!isFixedBufferInitialization
+           && "can't assign into an unallocated buffer");
     addrTI.assignWithTake(*this, dest, src, addrTy);
     break;
   case INITIALIZE | TAKE:
-    addrTI.initializeWithTake(*this, dest, src, addrTy);
+    if (isFixedBufferInitialization) {
+      Address addr = addrTI.initializeBufferWithTake(*this, dest, src, addrTy);
+      setAllocatedAddressForBuffer(i->getDest(), addr);
+    } else
+      addrTI.initializeWithTake(*this, dest, src, addrTy);      
     break;
   default:
     llvm_unreachable("unexpected take/initialize attribute combination?!");

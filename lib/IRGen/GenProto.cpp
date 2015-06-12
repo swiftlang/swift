@@ -1281,8 +1281,24 @@ namespace {
                              dest.getAddress(), src.getAddress());
     }
 
+    Address initializeBufferWithCopy(IRGenFunction &IGF,
+                                     Address dest, Address src,
+                                     SILType T) const override {
+      auto addr = emitInitializeBufferWithCopyCall(IGF, T,
+                                           dest.getAddress(), src.getAddress());
+      return getAddressForPointer(addr);
+    }
+
+    Address initializeBufferWithTake(IRGenFunction &IGF,
+                                     Address dest, Address src,
+                                     SILType T) const override {
+      auto addr = emitInitializeBufferWithTakeCall(IGF, T,
+                                           dest.getAddress(), src.getAddress());
+      return getAddressForPointer(addr);
+    }
+
     void initializeWithCopy(IRGenFunction &IGF,
-                            Address dest, Address src, SILType T) const override {
+                          Address dest, Address src, SILType T) const override {
       emitInitializeWithCopyCall(IGF, T,
                                  dest.getAddress(), src.getAddress());
     }
@@ -1295,7 +1311,7 @@ namespace {
     }
 
     void initializeWithTake(IRGenFunction &IGF,
-                            Address dest, Address src, SILType T) const override {
+                          Address dest, Address src, SILType T) const override {
       emitInitializeWithTakeCall(IGF, T,
                                  dest.getAddress(), src.getAddress());
     }
