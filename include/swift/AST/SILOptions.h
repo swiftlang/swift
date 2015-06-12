@@ -54,18 +54,6 @@ public:
   /// Controls whether or not paranoid verification checks are run.
   bool VerifyAll = false;
 
-  /// Dump SIL after each transform.
-  bool PrintAll = false;
-  
-  /// Dump pass number and name before each transform.
-  bool PrintPassName = false;
-
-  /// Time each transform invocation in the pass manager.
-  bool TimeTransforms = false;
-  
-  /// Stop optimizing after the Nth pass. For debugging purposes.
-  unsigned NumOptPassesToRun = UINT_MAX;
-
   /// Are we debugging sil serialization.
   bool DebugSerialization = false;
 

@@ -244,19 +244,6 @@ def sil_serialize_all : Flag<["-"], "sil-serialize-all">,
 def sil_verify_all : Flag<["-"], "sil-verify-all">,
   HelpText<"Verify SIL after each transform">;
   
-def sil_opt_pass_count : Separate<["-"], "sil-opt-pass-count">,
-  MetaVarName<"<N>">,
-  HelpText<"Stop optimizing after <N> optimization passes">;
-  
-def sil_print_all : Flag<["-"], "sil-print-all">,
-  HelpText<"Print SIL after each transform">;
-
-def sil_print_pass_name : Flag<["-"], "sil-print-pass-name">,
-  HelpText<"Print SIL pass name before each transform">;
-  
-def sil_time_transforms : Flag<["-"], "sil-time-transforms">,
-  HelpText<"Time each SIL transform invocation">;
-
 def sil_debug_serialization : Flag<["-"], "sil-debug-serialization">,
   HelpText<"Do not eliminate functions in Mandatory Inlining/SILCombine dead "
            "functions. (for debugging only)">;

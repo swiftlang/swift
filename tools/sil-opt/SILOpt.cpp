@@ -287,12 +287,6 @@ RemoveRuntimeAsserts("remove-runtime-asserts",
                      llvm::cl::desc("Remove runtime assertions (cond_fail)."));
 
 static llvm::cl::opt<bool>
-EnableSILPrintAll("sil-print-all",
-                  llvm::cl::Hidden,
-                  llvm::cl::init(false),
-                  llvm::cl::desc("Print sil after every pass."));
-
-static llvm::cl::opt<bool>
 EmitVerboseSIL("emit-verbose-sil",
                llvm::cl::desc("Emit locations during sil emission."));
 
@@ -397,7 +391,6 @@ int main(int argc, char **argv) {
   SILOptions &SILOpts = Invocation.getSILOptions();
   SILOpts.InlineThreshold = SILInlineThreshold;
   SILOpts.VerifyAll = EnableSILVerifyAll;
-  SILOpts.PrintAll = EnableSILPrintAll;
   SILOpts.RemoveRuntimeAsserts = RemoveRuntimeAsserts;
   SILOpts.AssertConfig = AssertConfId;
 

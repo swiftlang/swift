@@ -866,13 +866,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       return true;
     }
   }
-  if (const Arg *A = Args.getLastArg(OPT_sil_opt_pass_count)) {
-    if (StringRef(A->getValue()).getAsInteger(10, Opts.NumOptPassesToRun)) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     A->getAsString(Args), A->getValue());
-      return true;
-    }
-  }
   
   if (const Arg *A = Args.getLastArg(OPT_disable_sil_linking,
                                      OPT_sil_link_all)) {
@@ -937,9 +930,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
 
   Opts.EnableARCOptimizations |= !Args.hasArg(OPT_disable_arc_opts);
   Opts.VerifyAll |= Args.hasArg(OPT_sil_verify_all);
-  Opts.PrintAll |= Args.hasArg(OPT_sil_print_all);
-  Opts.PrintPassName |= Args.hasArg(OPT_sil_print_pass_name);
-  Opts.TimeTransforms |= Args.hasArg(OPT_sil_time_transforms);
   Opts.DebugSerialization |= Args.hasArg(OPT_sil_debug_serialization);
   Opts.PrintInstCounts |= Args.hasArg(OPT_print_inst_counts);
   Opts.EnableFuncSigOpts &= !Args.hasArg(OPT_disable_func_sig_opts);

@@ -27,6 +27,22 @@ using namespace swift;
 
 STATISTIC(NumOptzIterations, "Number of optimization iterations");
 
+llvm::cl::opt<bool> SILPrintAll(
+    "sil-print-all", llvm::cl::init(false),
+    llvm::cl::desc("Print SIL after each pass"));
+
+llvm::cl::opt<bool> SILPrintPassName(
+    "sil-print-pass-name", llvm::cl::init(false),
+    llvm::cl::desc("Print the name of each SIL pass before it runs"));
+
+llvm::cl::opt<bool> SILPrintPassTime(
+    "sil-print-pass-time", llvm::cl::init(false),
+    llvm::cl::desc("Print the execution time of each SIL pass"));
+
+llvm::cl::opt<unsigned> SILNumOptPassesToRun(
+    "sil-opt-pass-count", llvm::cl::init(UINT_MAX),
+    llvm::cl::desc("Stop optimizing after <N> optimization passes"));
+
 llvm::cl::opt<std::string>
     SILPrintOnlyFun("sil-print-only-function", llvm::cl::init(""),
                     llvm::cl::desc("Only print out the sil for this function"));
@@ -157,7 +173,7 @@ runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
 
       currentPassHasInvalidated = false;
 
-      if (Options.PrintPassName)
+      if (SILPrintPassName)
         llvm::dbgs() << "#" << NumPassesRun << " Stage: " << StageName
                      << " Pass: " << SFT->getName()
                      << ", Function: " << F.getName() << "\n";
@@ -172,7 +188,7 @@ runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
       llvm::sys::TimeValue StartTime = llvm::sys::TimeValue::now();
       SFT->run();
 
-      if (Options.TimeTransforms) {
+      if (SILPrintPassTime) {
         auto Delta = llvm::sys::TimeValue::now().nanoseconds() -
           StartTime.nanoseconds();
         llvm::dbgs() << Delta << " (" << SFT->getName() << "," << F.getName()
@@ -181,7 +197,7 @@ runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
 
       // If this pass invalidated anything, print and verify.
       if (doPrintAfter(SFT, &F,
-                       currentPassHasInvalidated && Options.PrintAll)) {
+                       currentPassHasInvalidated && SILPrintAll)) {
         llvm::dbgs() << "*** SIL function after " << StageName << " "
                      << SFT->getName() << " (" << NumOptimizationIterations
                      << ") ***\n";
@@ -200,7 +216,7 @@ runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
 
       ++NumPassesRun;
       if (Mod->getStage() == SILStage::Canonical
-          && NumPassesRun >= Options.NumOptPassesToRun)
+          && NumPassesRun >= SILNumOptPassesToRun)
         return false;
     }
   }
@@ -220,7 +236,7 @@ void SILPassManager::runOneIteration() {
 
   DEBUG(llvm::dbgs() << "*** Optimizing the module (" << StageName
         << ") *** \n");
-  if (Options.PrintAll && NumOptimizationIterations == 0) {
+  if (SILPrintAll && NumOptimizationIterations == 0) {
     llvm::dbgs() << "*** SIL module before "  << StageName
                  << " transformation (" << NumOptimizationIterations
                  << ") ***\n";
@@ -234,7 +250,7 @@ void SILPassManager::runOneIteration() {
   for (SILTransform *ST : Transformations) {
     // Bail out if we've hit the optimization pass limit.
     if (Mod->getStage() == SILStage::Canonical
-        && NumPassesRun >= Options.NumOptPassesToRun)
+        && NumPassesRun >= SILNumOptPassesToRun)
       return;
 
     // Run module transformations on the module.
@@ -256,7 +272,7 @@ void SILPassManager::runOneIteration() {
 
       currentPassHasInvalidated = false;
 
-      if (Options.PrintPassName)
+      if (SILPrintPassName)
         llvm::dbgs() << "#" << NumPassesRun << " Stage: " << StageName
                      << " Pass: " << SMT->getName() << " (module pass)\n";
 
@@ -270,7 +286,7 @@ void SILPassManager::runOneIteration() {
       llvm::sys::TimeValue StartTime = llvm::sys::TimeValue::now();
       SMT->run();
 
-      if (Options.TimeTransforms) {
+      if (SILPrintPassTime) {
         auto Delta = llvm::sys::TimeValue::now().nanoseconds() -
           StartTime.nanoseconds();
         llvm::dbgs() << Delta << " (" << SMT->getName() << ",Module)\n";
@@ -278,7 +294,7 @@ void SILPassManager::runOneIteration() {
 
       // If this pass invalidated anything, print and verify.
       if (doPrintAfter(SMT, nullptr,
-                       currentPassHasInvalidated && Options.PrintAll)) {
+                       currentPassHasInvalidated && SILPrintAll)) {
         llvm::dbgs() << "*** SIL module after " << StageName << " "
                      << SMT->getName() << " (" << NumOptimizationIterations
                      << ") ***\n";
@@ -293,7 +309,7 @@ void SILPassManager::runOneIteration() {
 
       ++NumPassesRun;
       if (Mod->getStage() == SILStage::Canonical
-          && NumPassesRun >= Options.NumOptPassesToRun) {
+          && NumPassesRun >= SILNumOptPassesToRun) {
         return;
       }
       
@@ -314,7 +330,7 @@ void SILPassManager::runOneIteration() {
 
 void SILPassManager::run() {
   const SILOptions &Options = getOptions();
-  if (Options.PrintAll) {
+  if (SILPrintAll) {
     if (SILPrintOnlyFun.empty() && SILPrintOnlyFuns.empty()) {
       llvm::dbgs() << "*** SIL module before transformation ("
                    << NumOptimizationIterations << ") ***\n";
