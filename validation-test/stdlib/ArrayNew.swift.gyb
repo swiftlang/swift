@@ -7,8 +7,6 @@
 // RUN: %S/../../utils/line-directive %t/main.swift -- %target-run %t/Array
 // REQUIRES: executable_test
 
-// REQUIRES: swift_test_mode_optimize_none
-
 // XFAIL: linux
 
 import Darwin
@@ -1494,17 +1492,24 @@ for (step, evilBoundsCheck) in [ (1, true), (-1, false), (-1, true) ] {
     ? evilBoundsError
     : "invalid CollectionType: count differed in successive traversals"
 
+  // The invalid CollectionType error is a _debugPreconditon that will only fire
+  // in a Debug assert configuration.
+  let expectedToFail = (step < 0 && evilBoundsCheck) ||
+                       _isDebugAssertConfiguration()
+
   let natureOfEvil = step > 0 ? "Growth" : "Shrinkage"
   let boundsChecked = evilBoundsCheck ? "BoundsChecked" : "NoBoundsCheck"
   let testPrefix = "MemorySafety/\(boundsChecked)/Evil\(natureOfEvil)"
 
   let t = ArrayTestSuite.test("\(testPrefix)/Infrastructure")
-  (evilBoundsCheck ? t.crashOutputMatches(evilBoundsError) : t).code {
+  (evilBoundsCheck && _isDebugAssertConfiguration()
+    ? t.crashOutputMatches(evilBoundsError) : t)
+  .code {
     let evil = EvilCollection(step, boundsChecked: evilBoundsCheck)
     let count0 = evil.count
     let count1 = evil.count
     expectNotEqual(count0, count1)
-    if step > 0 {
+   if step > 0 {
       expectLE(count0, count1)
     }
     else {
@@ -1514,34 +1519,44 @@ for (step, evilBoundsCheck) in [ (1, true), (-1, false), (-1, true) ] {
       expectCrashLater()
     }
     let x = evil[-1]
+    _blackHole(x)
   }
 
 
-  ArrayTestSuite.test("\(testPrefix)/Construction")
-  .crashOutputMatches(message)
+  let t2 = ArrayTestSuite.test("\(testPrefix)/Construction")
+  (_isDebugAssertConfiguration() ? t2.crashOutputMatches(message) : t2)
   .code {
     let evil = EvilCollection(step, boundsChecked: evilBoundsCheck)
-    expectCrashLater()
+
+    if expectedToFail {
+      expectCrashLater()
+    }
+
     let a = Array(evil)
+    _blackHole(a)
   }
 
   for (op, rangeMax) in ["Grow":0, "Shrink":200] {
-    ArrayTestSuite.test("\(testPrefix)/replaceRange/\(op)Unique")
-    .crashOutputMatches(message)
+    let t3 =  ArrayTestSuite.test("\(testPrefix)/replaceRange/\(op)Unique")
+    (_isDebugAssertConfiguration() ? t3.crashOutputMatches(message) : t3)
     .code {
       let evil = EvilCollection(step, boundsChecked: evilBoundsCheck)
       var a = Array(lazy(0..<200).map { TestValueTy($0) })
-      expectCrashLater()
+      if expectedToFail {
+        expectCrashLater()
+      }
       a.replaceRange(0..<rangeMax, with: evil)
     }
 
-    ArrayTestSuite.test("\(testPrefix)/replaceRange/\(op)NonUnique")
-    .crashOutputMatches(message)
+    let t4 = ArrayTestSuite.test("\(testPrefix)/replaceRange/\(op)NonUnique")
+    (_isDebugAssertConfiguration() ? t4.crashOutputMatches(message) : t4)
     .code {
       let evil = EvilCollection(step, boundsChecked: evilBoundsCheck)
       var a = Array(lazy(0..<200).map { TestValueTy($0) })
       var b = a
-      expectCrashLater()
+      if expectedToFail {
+        expectCrashLater()
+      }
       a.replaceRange(0..<rangeMax, with: evil)
       _fixLifetime(b)
     }
@@ -1580,7 +1595,10 @@ ArrayTestSuite.setUp {
 }
 
 ArrayTestSuite.tearDown {
-  expectNoLeaksOfDictionaryKeysValues()
+  if _isDebugAssertConfiguration() {
+    // The return autorelease optimization does not happen reliable.
+    expectNoLeaksOfDictionaryKeysValues()
+  }
 }
 
 runAllTests()
