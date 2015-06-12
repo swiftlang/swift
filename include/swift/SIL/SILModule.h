@@ -464,6 +464,12 @@ public:
 
   /// Pretty-print the module.
   void dump() const;
+  
+  /// Pretty-print the module to a file.
+  /// Useful for dumping the module when running in a debugger.
+  /// Warning: no error handling is done. Fails with an assert if the file
+  /// cannot be opened.
+  void dump(const char *FileName) const;
 
   /// Pretty-print the module to the designated stream.
   ///

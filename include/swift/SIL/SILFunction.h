@@ -528,6 +528,12 @@ public:
   /// Pretty-print the SILFunction.
   void dump(bool Verbose) const;
   void dump() const;
+  
+  /// Pretty-print the SILFunction.
+  /// Useful for dumping the function when running in a debugger.
+  /// Warning: no error handling is done. Fails with an assert if the file
+  /// cannot be opened.
+  void dump(const char *FileName) const;
 
   /// Pretty-print the SILFunction with the designated stream as a 'sil'
   /// definition.

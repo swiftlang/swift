@@ -40,6 +40,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FormattedStream.h"
+#include "llvm/Support/FileSystem.h"
 
 
 using namespace swift;
@@ -1481,6 +1482,12 @@ void SILFunction::dump() const {
   dump(false);
 }
 
+void SILFunction::dump(const char *FileName) const {
+  std::error_code EC;
+  llvm::raw_fd_ostream os(FileName, EC, llvm::sys::fs::OpenFlags::F_None);
+  print(os, false);
+}
+
 static StringRef getLinkageString(SILLinkage linkage) {
   switch (linkage) {
   case SILLinkage::Public: return "public ";
@@ -1631,6 +1638,12 @@ void SILGlobalVariable::printName(raw_ostream &OS) const {
 /// Pretty-print the SILModule to errs.
 void SILModule::dump() const {
   print(llvm::errs());
+}
+
+void SILModule::dump(const char *FileName) const {
+  std::error_code EC;
+  llvm::raw_fd_ostream os(FileName, EC, llvm::sys::fs::OpenFlags::F_None);
+  print(os);
 }
 
 static void printSILGlobals(llvm::raw_ostream &OS, bool Verbose,
