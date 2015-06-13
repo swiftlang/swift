@@ -45,6 +45,7 @@ namespace llvm {
   class GlobalVariable;
   class IntegerType;
   class LLVMContext;
+  class MDNode;
   class Metadata;
   class Module;
   class PointerType;
@@ -347,6 +348,10 @@ public:
   llvm::PointerType *ErrorPtrTy;       /// %swift.error*
   llvm::StructType *OpenedErrorTripleTy; /// { %swift.opaque*, %swift.type*, i8** }
   llvm::PointerType *OpenedErrorTriplePtrTy; /// { %swift.opaque*, %swift.type*, i8** }*
+  
+  unsigned InvariantMetadataID; /// !invariant.load
+  unsigned DereferenceableID;   /// !dereferenceable
+  llvm::MDNode *InvariantNode;
   
   llvm::CallingConv::ID RuntimeCC;     /// lightweight calling convention
 

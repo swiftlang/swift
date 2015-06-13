@@ -227,6 +227,11 @@ public:
   llvm::Value *coerceValue(llvm::Value *value, llvm::Type *toTy,
                            const llvm::DataLayout &);
 
+  /// Mark a load as invariant.
+  void setInvariantLoad(llvm::LoadInst *load);
+  /// Mark a load as dereferenceable to `size` bytes.
+  void setDereferenceableLoad(llvm::LoadInst *load, unsigned size);
+
 private:
   llvm::Instruction *AllocaIP;
   SILDebugScope* DbgScope;

@@ -256,7 +256,8 @@ namespace {
     /// Apply the path to the given witness table.
     llvm::Value *apply(IRGenFunction &IGF, llvm::Value *wtable) const {
       for (unsigned i = ReversePath.size(); i != 0; --i) {
-        wtable = emitLoadOfOpaqueWitness(IGF, wtable, ReversePath[i-1]);
+        wtable = emitInvariantLoadOfOpaqueWitness(IGF, wtable,
+                                                  ReversePath[i-1]);
         wtable = IGF.Builder.CreateBitCast(wtable, IGF.IGM.WitnessTablePtrTy);
       }
       return wtable;
@@ -5076,7 +5077,7 @@ irgen::emitWitnessMethodValue(IRGenFunction &IGF,
 
   // Find the witness we're interested in.
   auto index = fnProtoInfo.getWitnessEntry(fn).getFunctionIndex();
-  llvm::Value *witness = emitLoadOfOpaqueWitness(IGF, wtable, index);
+  llvm::Value *witness = emitInvariantLoadOfOpaqueWitness(IGF, wtable, index);
   
   // Cast the witness pointer to i8*.
   witness = IGF.Builder.CreateBitCast(witness, IGF.IGM.Int8PtrTy);

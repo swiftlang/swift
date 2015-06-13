@@ -289,6 +289,10 @@ IRGenModule::IRGenModule(IRGenModuleDispatcher &dispatcher, SourceFile *SF,
                                               /*packed*/ false);
   OpenedErrorTriplePtrTy = OpenedErrorTripleTy->getPointerTo(DefaultAS);
   
+  InvariantMetadataID = LLVMContext.getMDKindID("invariant.load");
+  InvariantNode = llvm::MDNode::get(LLVMContext, {});
+  DereferenceableID = LLVMContext.getMDKindID("dereferenceable");
+  
   // TODO: use "tinycc" on platforms that support it
   RuntimeCC = llvm::CallingConv::C;
 

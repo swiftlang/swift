@@ -262,9 +262,9 @@ static StringRef getValueWitnessLabel(ValueWitness index) {
 
 /// Load a specific witness from a known table.  The result is
 /// always an i8*.
-llvm::Value *irgen::emitLoadOfOpaqueWitness(IRGenFunction &IGF,
-                                            llvm::Value *table,
-                                            WitnessIndex index) {
+llvm::Value *irgen::emitInvariantLoadOfOpaqueWitness(IRGenFunction &IGF,
+                                                     llvm::Value *table,
+                                                     WitnessIndex index) {
   assert(table->getType() == IGF.IGM.WitnessTablePtrTy);
 
   // GEP to the appropriate index, avoiding spurious IR in the trivial case.
@@ -272,8 +272,9 @@ llvm::Value *irgen::emitLoadOfOpaqueWitness(IRGenFunction &IGF,
   if (index.getValue() != 0)
     slot = IGF.Builder.CreateConstInBoundsGEP1_32(table, index.getValue());
 
-  llvm::Value *witness =
+  auto witness =
     IGF.Builder.CreateLoad(Address(slot, IGF.IGM.getPointerAlignment()));
+  IGF.setInvariantLoad(witness);
   return witness;
 }
 
@@ -282,7 +283,7 @@ llvm::Value *irgen::emitLoadOfOpaqueWitness(IRGenFunction &IGF,
 static llvm::Value *emitLoadOfValueWitness(IRGenFunction &IGF,
                                            llvm::Value *table,
                                            ValueWitness index) {
-  llvm::Value *witness = emitLoadOfOpaqueWitness(IGF, table, index);
+  llvm::Value *witness = emitInvariantLoadOfOpaqueWitness(IGF, table, index);
   auto label = getValueWitnessLabel(index);
   auto type = IGF.IGM.getValueWitnessTy(index);
   if (isValueWitnessFunction(index)) {
