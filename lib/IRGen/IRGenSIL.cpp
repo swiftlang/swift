@@ -49,6 +49,7 @@
 #include "GenHeap.h"
 #include "GenMeta.h"
 #include "GenObjC.h"
+#include "GenOpaque.h"
 #include "GenPoly.h"
 #include "GenProto.h"
 #include "GenStruct.h"
@@ -3219,6 +3220,7 @@ static bool tryDeferFixedSizeBufferInitialization(IRGenSILFunction &IGF,
                                                   const TypeInfo &ti,
                                                   SILValue containerValue,
                                                   SILValue addressValue,
+                                                  Address fixedSizeBuffer,
                                                   const llvm::Twine &name) {
   // There's no point in doing this for fixed-sized types, since we'll allocate
   // an appropriately-sized buffer for them statically.
@@ -3254,7 +3256,8 @@ static bool tryDeferFixedSizeBufferInitialization(IRGenSILFunction &IGF,
     
     // We can defer to this initialization. Allocate the fixed-size buffer
     // now, but don't allocate the value inside it.
-    auto fixedSizeBuffer = IGF.createFixedSizeBufferAlloca(name);
+    if (!fixedSizeBuffer.getAddress())
+      fixedSizeBuffer = IGF.createFixedSizeBufferAlloca(name);
     if (containerValue)
       IGF.setLoweredAddress(containerValue, fixedSizeBuffer);
     IGF.setLoweredUnallocatedAddressInBuffer(addressValue, fixedSizeBuffer);
@@ -3307,6 +3310,7 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
   if (tryDeferFixedSizeBufferInitialization(*this, i, type,
                                             i->getContainerResult(),
                                             i->getAddressResult(),
+                                            Address(),
                                             dbgname))
     return;
 
@@ -4076,7 +4080,52 @@ void IRGenSILFunction::visitInitExistentialAddrInst(swift::InitExistentialAddrIn
                                                 i->getFormalConcreteType(),
                                                 i->getLoweredConcreteType(),
                                                 i->getConformances());
-  setLoweredAddress(SILValue(i, 0), buffer);
+
+  auto &srcTI = getTypeInfo(i->getLoweredConcreteType());
+
+  // See if we can defer initialization of the buffer to a copy_addr into it.
+  if (tryDeferFixedSizeBufferInitialization(*this, i, srcTI, SILValue(), i,
+                                            buffer, ""))
+    return;
+  
+  // Compute basic layout information about the type.  If we have a
+  // concrete type, we need to know how it packs into a fixed-size
+  // buffer.  If we don't, we need a value witness table.
+  
+  
+  FixedPacking packing;
+  bool needValueWitnessToAllocate;
+  if (!isa<FixedTypeInfo>(srcTI)) {
+    packing = (FixedPacking) -1;
+    needValueWitnessToAllocate = true;
+  } else {
+    packing = srcTI.getFixedPacking(IGM);
+    needValueWitnessToAllocate = false;
+  }
+
+  // Project down to the destination fixed-size buffer.
+  Address address = [&]{
+    // If the type is provably empty, we're done.
+    if (srcTI.isKnownEmpty()) {
+      assert(packing == FixedPacking::OffsetZero);
+      return buffer;
+    }
+    
+      // Otherwise, allocate if necessary.
+
+    if (needValueWitnessToAllocate) {
+      // If we're using a witness-table to do this, we need to emit a
+      // value-witness call to allocate the fixed-size buffer.
+      return Address(emitAllocateBufferCall(*this, i->getLoweredConcreteType(),
+                                            buffer),
+                     Alignment(1));
+    } else {
+      // Otherwise, allocate using what we know statically about the type.
+      return emitAllocateBuffer(*this, i->getLoweredConcreteType(), buffer);
+    }
+  }();
+  
+  setLoweredAddress(SILValue(i, 0), address);
 }
 
 void IRGenSILFunction::visitInitExistentialMetatypeInst(
@@ -4297,7 +4346,7 @@ void IRGenSILFunction::visitCopyAddrInst(swift::CopyAddrInst *i) {
       Address addr = addrTI.initializeBufferWithTake(*this, dest, src, addrTy);
       setAllocatedAddressForBuffer(i->getDest(), addr);
     } else
-      addrTI.initializeWithTake(*this, dest, src, addrTy);      
+      addrTI.initializeWithTake(*this, dest, src, addrTy);
     break;
   default:
     llvm_unreachable("unexpected take/initialize attribute combination?!");

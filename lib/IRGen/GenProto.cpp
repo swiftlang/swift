@@ -4995,7 +4995,8 @@ void irgen::emitClassExistentialContainer(IRGenFunction &IGF,
 }
 
 /// Emit an existential container initialization operation for a concrete type.
-/// Returns the address of the uninitialized buffer for the concrete value.
+/// Returns the address of the uninitialized fixed-size buffer for the concrete
+/// value.
 Address irgen::emitOpaqueExistentialContainerInit(IRGenFunction &IGF,
                                   Address dest,
                                   SILType destType,
@@ -5005,7 +5006,6 @@ Address irgen::emitOpaqueExistentialContainerInit(IRGenFunction &IGF,
   assert(!destType.isClassExistentialType() &&
          "initializing a class existential container as opaque");
   auto &destTI = IGF.getTypeInfo(destType).as<OpaqueExistentialTypeInfo>();
-  auto &srcTI = IGF.getTypeInfo(loweredSrcType);
   OpaqueExistentialLayout destLayout = destTI.getLayout();
   assert(destTI.getStoredProtocols().size() == conformances.size());
 
@@ -5013,18 +5013,6 @@ Address irgen::emitOpaqueExistentialContainerInit(IRGenFunction &IGF,
   llvm::Value *metadata = IGF.emitTypeMetadataRef(formalSrcType);
   IGF.Builder.CreateStore(metadata, destLayout.projectMetadataRef(IGF, dest));
 
-  // Compute basic layout information about the type.  If we have a
-  // concrete type, we need to know how it packs into a fixed-size
-  // buffer.  If we don't, we need a value witness table.
-  FixedPacking packing;
-  bool needValueWitnessToAllocate;
-  if (!isa<FixedTypeInfo>(srcTI)) {
-    packing = (FixedPacking) -1;
-    needValueWitnessToAllocate = true;
-  } else {
-    packing = srcTI.getFixedPacking(IGF.IGM);
-    needValueWitnessToAllocate = false;
-  }
 
   // Next, write the protocol witness tables.
   forEachProtocolWitnessTable(IGF, formalSrcType, destType.getSwiftRValueType(),
@@ -5037,26 +5025,7 @@ Address irgen::emitOpaqueExistentialContainerInit(IRGenFunction &IGF,
   // Finally, evaluate into the buffer.
 
   // Project down to the destination fixed-size buffer.
-  Address buffer = destLayout.projectExistentialBuffer(IGF, dest);
-
-  // If the type is provably empty, we're done.
-  if (srcTI.isKnownEmpty()) {
-    assert(packing == FixedPacking::OffsetZero);
-    return buffer;
-  }
-
-  // Otherwise, allocate if necessary.
-
-  if (needValueWitnessToAllocate) {
-    // If we're using a witness-table to do this, we need to emit a
-    // value-witness call to allocate the fixed-size buffer.
-    return Address(emitAllocateBufferCall(IGF, loweredSrcType, buffer),
-                   Alignment(1));
-  } else {
-    // Otherwise, allocate using what we know statically about the type.
-    return emitAllocateBuffer(IGF, loweredSrcType,
-                              srcTI, packing, buffer);
-  }
+  return destLayout.projectExistentialBuffer(IGF, dest);
 }
 
 /// Emit an existential metatype container from a metatype value

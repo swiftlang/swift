@@ -19,6 +19,18 @@ entry(%x : $*T):
   return undef : $()
 }
 
+protocol P {}
+
+// CHECK-LABEL: define void @join_init_existential_copy_addr(%P27fixed_size_buffer_peepholes1P_* noalias nocapture sret, %swift.opaque* noalias nocapture, %swift.type* %T, i8** %T.P)
+// CHECK:         [[BUFFER:%.*]] = getelementptr inbounds %P27fixed_size_buffer_peepholes1P_, %P27fixed_size_buffer_peepholes1P_* %0, i32 0, i32 0
+// CHECK:         call %swift.opaque* %initializeBufferWithTake([[BUFFER_TYPE]]* [[BUFFER]], %swift.opaque* %1
+sil @join_init_existential_copy_addr : $@convention(thin) <T: P> (@out P, @in T) -> () {
+entry(%p : $*P, %x: $*T):
+  %y = init_existential_addr %p : $*P, $T
+  copy_addr [take] %x to [initialization] %y : $*T
+  return undef : $()
+}
+
 // CHECK-LABEL: define void @dont_join_alloc_stack_copy_addr_if_intervening_use
 sil @dont_join_alloc_stack_copy_addr_if_intervening_use : $@convention(thin) <T> (@in T) -> () {
 entry(%x : $*T):
@@ -67,3 +79,5 @@ next:
   dealloc_stack %a#0 : $*@local_storage T
   return undef : $()
 }
+
+
