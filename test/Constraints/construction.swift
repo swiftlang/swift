@@ -119,10 +119,10 @@ struct S2 {
 func getMetatype(i: Int) -> S1.Type { return S1.self }
 func getMetatype(d: Double) -> S2.Type { return S2.self }
 
-var s1 = getMetatype(1)(i: 5)
+var s1 = getMetatype(1).init(i: 5)
 s1 = S1(i: 5)
 
-var s2 = getMetatype(3.14)(i: 5)
+var s2 = getMetatype(3.14).init(i: 5)
 s2 = S2(i: 5)
 
 // rdar://problem/19254404

@@ -281,7 +281,7 @@ class HasStringQLO : CanaryBase {
 
 func testQLO<T : CanaryBase>(type: T.Type) {
   autoreleasepool {
-    _ = reflect(type()).quickLookObject
+    _ = reflect(type.init()).quickLookObject
   }
 }
 

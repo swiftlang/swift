@@ -277,7 +277,7 @@ internal class _ForwardIndexBox<
   }
 
   func successor() -> _ForwardIndexBoxType {
-    return self.dynamicType(self.base.successor())
+    return self.dynamicType.init(self.base.successor())
   }
 
   func _successorInPlace() {
@@ -297,14 +297,14 @@ internal class _ForwardIndexBox<
   }
 
   func _advancedBy(n: AnyForwardIndex.Distance) -> _ForwardIndexBoxType {
-    return self.dynamicType(advance(base, numericCast(n)))
+    return self.dynamicType.init(advance(base, numericCast(n)))
   }
 
   func _advancedBy(
     n: AnyForwardIndex.Distance,
     _ limit: _ForwardIndexBoxType
   ) -> _ForwardIndexBoxType {
-    return self.dynamicType(advance(base, numericCast(n), unsafeUnbox(limit)))
+    return self.dynamicType.init(advance(base, numericCast(n), unsafeUnbox(limit)))
   }
 
   func _unbox<T : ForwardIndexType>() -> T? {
@@ -339,11 +339,11 @@ internal class _BidirectionalIndexBox<
   }
 
   override func successor() -> _ForwardIndexBoxType {
-    return self.dynamicType(self.base.successor())
+    return self.dynamicType.init(self.base.successor())
   }
 
   func predecessor() -> _BidirectionalIndexBoxType {
-    return self.dynamicType(self.base.predecessor())
+    return self.dynamicType.init(self.base.predecessor())
   }
 
   func _predecessorInPlace() {

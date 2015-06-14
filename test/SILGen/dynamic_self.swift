@@ -18,7 +18,7 @@ class X : P, CP {
   // CHECK: bb0([[I:%[0-9]+]] : $Int, [[SELF:%[0-9]+]] : $@thick X.Type):
   // CHECK: [[CTOR:%[0-9]+]] = class_method [[SELF]] : $@thick X.Type, #X.init!allocator.1 : X.Type -> (int: Int) -> X , $@convention(thin) (Int, @thick X.Type) -> @owned X
   // CHECK: apply [[CTOR]]([[I]], [[SELF]]) : $@convention(thin) (Int, @thick X.Type) -> @owned X
-  class func factory(i: Int) -> Self { return self(int: i) }
+  class func factory(i: Int) -> Self { return self.init(int: i) }
 }
 
 class Y : X { 
@@ -123,7 +123,7 @@ func testObjCInit(meta: ObjCInit.Type) {
 // CHECK:   strong_release [[O]]#0 : $Builtin.NativeObject
 // CHECK:   [[RESULT:%[0-9]+]] = tuple ()
 // CHECK:   return [[RESULT]] : $()
-  var o = meta()
+  var o = meta.init()
 }
 
 class OptionalResult {

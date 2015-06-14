@@ -694,7 +694,7 @@ public func transcode<
   // InputEncoding == OutputEncoding.  The reason is that memcpy will not
   // substitute U+FFFD replacement characters for ill-formed sequences.
 
-  var inputDecoder = inputEncoding()
+  var inputDecoder = inputEncoding.init()
   var hadError = false
   for var scalar = inputDecoder.decode(&input);
           !scalar.isEmptyInput();

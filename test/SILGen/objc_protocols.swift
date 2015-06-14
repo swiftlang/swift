@@ -190,7 +190,7 @@ func testInitializableExistential(im: Initializable.Type, i: Int) -> Initializab
 // CHECK:   strong_retain [[I2]] : $Initializable
 // CHECK:   strong_release [[I2_BOX]]#0 : $Builtin.NativeObject
 // CHECK:   return [[I2]] : $Initializable
-  var i2 = im(int: i)
+  var i2 = im.init(int: i)
   return i2
 }
 

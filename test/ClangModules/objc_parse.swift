@@ -206,7 +206,7 @@ func testProtocolMethods(b: B, p2m: P2.Type) {
   // Imported constructor.
   var b2 = B(viaP2: 3.14159, second:3.14159)
 
-  p2m(viaP2:3.14159, second: 3.14159)
+  p2m.init(viaP2:3.14159, second: 3.14159)
 }
 
 func testId(x: AnyObject) {

@@ -190,19 +190,11 @@ Initializer *Expr::findExistingInitializerContext() {
   return finder.TheInitializer;
 }
 
-bool Expr::isStaticallyDerivedMetatype() const {
-  // IF the result isn't a metatype, there's nothing else to do.
+bool Expr::isTypeReference() const {
+  // If the result isn't a metatype, there's nothing else to do.
   if (!getType()->is<AnyMetatypeType>())
     return false;
-
-  // If we've established that this expression is a direct reference to a type,
-  // determine whether that type statically resolves to a known type.
-  // This is true of concrete type names, but not of archetypes.
-  auto isStaticType = [&]() -> bool {
-    return !getType()->getAs<AnyMetatypeType>()->getInstanceType()
-      ->is<ArchetypeType>();
-  };
-
+  
   const Expr *expr = this;
   do {
     // Skip syntax.
@@ -211,9 +203,9 @@ bool Expr::isStaticallyDerivedMetatype() const {
     // Direct reference to a type.
     if (auto declRef = dyn_cast<DeclRefExpr>(expr))
       if (isa<TypeDecl>(declRef->getDecl()))
-        return isStaticType();
+        return true;
     if (isa<TypeExpr>(expr))
-      return isStaticType();
+      return true;
 
     // A "." expression that refers to a member.
     if (auto memberRef = dyn_cast<MemberRefExpr>(expr))
@@ -228,6 +220,17 @@ bool Expr::isStaticallyDerivedMetatype() const {
     // Anything else is not statically derived.
     return false;
   } while (true);
+
+}
+
+bool Expr::isStaticallyDerivedMetatype() const {
+  // The type must first be a type reference.
+  if (!isTypeReference())
+    return false;
+
+  // Archetypes are never statically derived.
+  return !getType()->getAs<AnyMetatypeType>()->getInstanceType()
+    ->is<ArchetypeType>();
 }
 
 bool Expr::isSuperExpr() const {

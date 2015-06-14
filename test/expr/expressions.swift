@@ -486,8 +486,8 @@ func conversionTest(inout a: Double, inout b: Int) {
   var pi_s2: SpecialPi = getPi() // no-warning
   
   var float = Float.self
-  var pi_f3 = float(getPi()) // expected-error {{ambiguous use of 'getPi'}}
-  var pi_f4 = float(pi_f)
+  var pi_f3 = float.init(getPi()) // expected-error {{ambiguous use of 'getPi'}}
+  var pi_f4 = float.init(pi_f)
 
   var e = Empty(f)
   var e2 = Empty(d) // expected-error{{cannot invoke initializer for type 'Empty' with an argument list of type '(Double)'}} expected-note{{expected an argument list of type '(Float)'}}

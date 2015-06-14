@@ -383,6 +383,9 @@ ERROR(missing_explicit_conversion,sema_tcc,none,
 ERROR(missing_address_of,sema_tcc,none,
       "passing value of type %0 to an inout parameter requires explicit '&'",
       (Type))
+ERROR(missing_init_on_metatype_initialization,sema_tcc,none,
+      "initializing from a metatype must reference 'init' explicitly",
+      ())
 ERROR(extra_call_nonfunction,sema_tcc,none,
       "invalid use of '()' to call a value of non-function type %0",
       (Type))

@@ -297,7 +297,7 @@ extension ClassInitRequirement {
 }
 
 func foo(t: ObjCInitRequirement.Type, c: OC) -> ObjCInitRequirement {
-  return t(c: OC(), d: OC())
+  return t.init(c: OC(), d: OC())
 }
 
 extension ObjCInitRequirement {

@@ -229,7 +229,7 @@ func use_initializable_existential(im: Initializable.Type, i: Int) {
 // CHECK:   [[INIT_RESULT:%[0-9]+]] = apply [[INIT_WITNESS]]<@opened([[N]]) Initializable>([[TEMP_ADDR]], [[I]], [[ARCHETYPE_META]]) : $@convention(witness_method) <τ_0_0 where τ_0_0 : Initializable> (@out τ_0_0, Int, @thick τ_0_0.Type) -> ()
 // CHECK:   destroy_addr [[TEMP_VALUE]]#1 : $*Initializable
 // CHECK:   dealloc_stack [[TEMP_VALUE]]#0 : $*@local_storage Initializable
-  im(int: i)
+  im.init(int: i)
 // CHECK:   [[RESULT:%[0-9]+]] = tuple ()
 // CHECK:   return [[RESULT]] : $()
 }

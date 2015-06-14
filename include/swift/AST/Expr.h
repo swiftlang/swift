@@ -405,10 +405,16 @@ public:
   /// context, look through it for any existing context object.
   Initializer *findExistingInitializerContext();
 
+  /// Determine whether this expression refers to a type by name.
+  ///
+  /// This distinguishes static references to types, like Int, from metatype
+  /// values, "someTy: Any.Type".
+  bool isTypeReference() const;
+
   /// Determine whether this expression refers to a statically-derived metatype.
   ///
-  /// A statically-derived metatype is a metatype value that comes from
-  /// referring to a named type directly.
+  /// This implies `isTypeReference`, but also requires that the referenced type
+  /// is not an archetype or dependent type.
   bool isStaticallyDerivedMetatype() const;
 
   /// isImplicit - Determines whether this expression was implicitly-generated,

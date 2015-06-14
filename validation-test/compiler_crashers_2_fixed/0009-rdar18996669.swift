@@ -20,7 +20,7 @@ class B: P {
 
 let cls:P.Type = A.self
 
-let p:P = cls(i:1)
+let p:P = cls.init(i:1)
 
 func markUsed<T>(t: T) {}
 markUsed(p)

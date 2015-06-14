@@ -12,7 +12,7 @@ func testDynamicInit(cm: C.Type) {
   // CHECK:   strong_release [[C_OBJ]] : $C
   // CHECK:   [[RESULT:%[0-9]+]] = tuple ()
   // CHECK:   return [[RESULT]] : $()
-  cm()
+  cm.init()
 }
 
 // CHECK-LABEL: sil hidden @_TF12dynamic_init14testStaticInit

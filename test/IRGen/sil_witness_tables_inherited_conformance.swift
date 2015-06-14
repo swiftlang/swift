@@ -30,7 +30,7 @@ func feed<T : Cat>(t: T) {
 }
 
 func obtain<T : Panda>(t: T.Type) {
-  t()
+  t.init()
 }
 
 // CHECK-LABEL: define hidden void @_TF40sil_witness_tables_inherited_conformance6wangleuRdq_CS_3Cat_FMq_T_(%swift.type*, %swift.type* %T)

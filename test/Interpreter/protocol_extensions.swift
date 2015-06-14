@@ -277,11 +277,11 @@ Sub()
 
 // CHECK: 17 main.Super
 var sup: Super.Type = Super.self
-sup()
+sup.init()
 
 // CHECK: 17 main.Sub
 sup = Sub.self
-sup()
+sup.init()
 
 // CHECK: DONE
 print("DONE")

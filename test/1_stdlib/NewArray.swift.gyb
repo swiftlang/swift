@@ -47,7 +47,7 @@ final class X : ForwardIndexType, Comparable, CustomStringConvertible,
   }
 
   func successor() -> Self {
-    return self.dynamicType(self.value.successor())
+    return self.dynamicType.init(self.value.successor())
   }
   
   convenience init(integerLiteral value: Int) {

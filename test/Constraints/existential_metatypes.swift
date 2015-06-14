@@ -49,5 +49,5 @@ extension P2 {
 }
 
 func testP2(pt: P2.Type) {
-  pt().elements
+  pt.init().elements
 }

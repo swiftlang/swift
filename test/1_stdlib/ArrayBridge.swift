@@ -64,7 +64,7 @@ class Tracked : NSObject, Fooable {
   }
 
   func successor() -> Self {
-    return self.dynamicType(self.value.successor())
+    return self.dynamicType.init(self.value.successor())
   }
 
   var value: Int

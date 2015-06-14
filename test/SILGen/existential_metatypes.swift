@@ -20,7 +20,7 @@ func existentialMetatype(x: P) {
   // CHECK: [[INSTANCE1_VALUE:%.*]] = init_existential_addr [[INSTANCE1]]#1 : $*P
   // CHECK: [[INIT:%.*]] = witness_method {{.*}} #P.init!allocator
   // CHECK: apply [[INIT]]<{{.*}}>([[INSTANCE1_VALUE]], [[OPEN_TYPE1]])
-  let instance1 = type1()
+  let instance1 = type1.init()
 
   // CHECK: [[S:%.*]] = metatype $@thick S.Type
   // CHECK: [[TYPE2:%.*]] = init_existential_metatype [[S]] : $@thick S.Type, $@thick P.Type

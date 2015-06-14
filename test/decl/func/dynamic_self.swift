@@ -46,7 +46,7 @@ class C1 {
     if b { return C1(int: 5) } // expected-error{{'C1' is not convertible to 'Self'}}
 
     // One can use .dynamicType to attempt to construct an object of type Self.
-    if !b { return self.dynamicType(int: 5) }
+    if !b { return self.dynamicType.init(int: 5) }
 
     // Can't utter Self within the body of a method.
     var _: Self = self // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'C1'?}}
@@ -63,7 +63,7 @@ class C1 {
     // Can't utter Self within the body of a method.
     var c1 = C1(int: 5) as Self // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'C1'?}}
 
-    if b { return self(int: 5) }
+    if b { return self.init(int: 5) }
 
     return Self() // expected-error{{use of unresolved identifier 'Self'}}
   }

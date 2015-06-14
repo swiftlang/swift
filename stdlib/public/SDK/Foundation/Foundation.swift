@@ -1086,7 +1086,7 @@ extension NSString {
     format: NSString, _ args: CVarArgType...
   ) -> Self {
     return withVaList(args) {
-      self(format: format as String, locale: NSLocale.currentLocale(), arguments: $0)
+      self.init(format: format as String, locale: NSLocale.currentLocale(), arguments: $0)
     }
   }
 

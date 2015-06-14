@@ -226,9 +226,9 @@ func init_tests() {
   var c2 = c.init(x: 0) // expected-error{{'required' initializer}}
   var c3 = c.init() // expected-error{{'required' initializer}}
 
-  var c1a = c(required: 0)
-  var c2a = c(x: 0) // expected-error{{'required' initializer}}
-  var c3a = c() // expected-error{{'required' initializer}}
+  var c1a = c.init(required: 0)
+  var c2a = c.init(x: 0) // expected-error{{'required' initializer}}
+  var c3a = c.init() // expected-error{{'required' initializer}}
 
   var cf1: (Double) -> C = c.init
   var cf2: (Int) -> C    = c.init // expected-error{{'required' initializer}}
@@ -264,10 +264,10 @@ func foo<T: C where T: P>(x: T, y: T.Type) {
   var cf3: () -> T       = x.dynamicType.init // expected-error{{'required' initializer}}
   var cf4: (String) -> T = x.dynamicType.init
 
-  var c1a = x.dynamicType(required: 0)
-  var c2a = x.dynamicType(x: 0) // expected-error{{'required' initializer}}
-  var c3a = x.dynamicType() // expected-error{{'required' initializer}}
-  var c4a = x.dynamicType(proto: "")
+  var c1a = x.dynamicType.init(required: 0)
+  var c2a = x.dynamicType.init(x: 0) // expected-error{{'required' initializer}}
+  var c3a = x.dynamicType.init() // expected-error{{'required' initializer}}
+  var c4a = x.dynamicType.init(proto: "")
 
   var ci1 = x.init(required: 0) // expected-error{{}}
   var ci2 = x.init(x: 0) // expected-error{{}}
@@ -284,10 +284,10 @@ func foo<T: C where T: P>(x: T, y: T.Type) {
   var cm3 = y.init() // expected-error{{'required' initializer}}
   var cm4 = y.init(proto: "")
 
-  var cm1a = y(required: 0)
-  var cm2a = y(x: 0) // expected-error{{'required' initializer}}
-  var cm3a = y() // expected-error{{'required' initializer}}
-  var cm4a = y(proto: "")
+  var cm1a = y.init(required: 0)
+  var cm2a = y.init(x: 0) // expected-error{{'required' initializer}}
+  var cm3a = y.init() // expected-error{{'required' initializer}}
+  var cm4a = y.init(proto: "")
 
   var cs1 = T.init(required: 0)
   var cs2 = T.init(x: 0) // expected-error{{'required' initializer}}

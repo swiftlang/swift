@@ -142,8 +142,8 @@ func existential(var p: P) {
 }
 
 func staticExistential(p: P.Type, pp: P.Protocol) {
-  _ = p()
-  _ = pp() // expected-error{{constructing an object of protocol type 'P' requires a conforming metatype}}
+  _ = p.init()
+  _ = pp.init() // expected-error{{constructing an object of protocol type 'P' requires a conforming metatype}}
   _ = P() // expected-error{{constructing an object of protocol type 'P' requires a conforming metatype}}
   _ = p.tum
   _ = pp.tum // expected-error{{'P.Protocol' does not have a member named 'tum'}}

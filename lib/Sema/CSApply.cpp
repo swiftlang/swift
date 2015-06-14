@@ -5521,6 +5521,14 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   // We have a type constructor.
   auto metaTy = fn->getType()->castTo<AnyMetatypeType>();
   auto ty = metaTy->getInstanceType();
+  
+  // If the metatype value isn't a type expression, the user should reference
+  // '.init' explicitly, for clarity.
+  if (!fn->isTypeReference()) {
+    cs.TC.diagnose(apply->getArg()->getStartLoc(),
+                   diag::missing_init_on_metatype_initialization)
+      .fixItInsert(apply->getArg()->getStartLoc(), ".init");
+  }
 
   // If we're "constructing" a tuple type, it's simply a conversion.
   if (auto tupleTy = ty->getAs<TupleType>()) {
