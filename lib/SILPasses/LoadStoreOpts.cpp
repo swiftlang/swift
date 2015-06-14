@@ -86,7 +86,7 @@ enum class ForwardingKind {
   UncheckedAddress
 };
 
-/// This is a move-only structure. Thus is has a private default constructor and
+/// This is a move-only structure. Thus it has a private default constructor and
 /// a deleted copy constructor.
 class ForwardingAnalysis {
   ForwardingKind Kind;
@@ -1326,12 +1326,22 @@ mergePredecessorStates(llvm::DenseMap<SILBasicBlock *,
 
   // Update StoreMap. Do this before updating Stores since we need the states
   // at the end of the basic blocks.
+  //
+  // The reason why we need the states at the end of the basic blocks is that
+  // the optimization that this is used for is a simple self cycle. If we move
+  // this later we will have already cleared this basic blocks's state when we
+  // merged in our predecessors.
+  //
+  // Once we have a fully optimistic iterative dataflow that uses LSValues
+  // this should be removed.
   updateStoreMap(BBToBBIDMap, BBIDToForwarderMap, StoreMap, PredOrder);
 
   bool HasAtLeastOnePred = false;
   // If we have a self cycle, we keep the old state and merge in states
   // of other predecessors. Otherwise, we initialize the state with the first
   // predecessor's state and merge in states of other predecessors.
+  //
+  // Again, this is why we call updateStoreMap earlier.
   SILBasicBlock *TheBB = getBB();
   bool HasSelfCycle = std::any_of(BB->pred_begin(), BB->pred_end(),
                                   [&TheBB](SILBasicBlock *Pred) -> bool {
@@ -1380,6 +1390,9 @@ mergePredecessorStates(llvm::DenseMap<SILBasicBlock *,
     HasAtLeastOnePred = true;
   }
 
+  // If we updated the StoreMap earlier and later on we discovered that along
+  // all predecessors we have a store, remove the store from the store map.
+  // Otherwise we will be representing the same store in two places.
   for (auto &P : Stores) {
     DEBUG(llvm::dbgs() << "        Removing from StoreMap: " << P);
     StoreMap.erase(P.first);
