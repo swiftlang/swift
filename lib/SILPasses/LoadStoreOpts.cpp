@@ -435,7 +435,7 @@ public:
 
   /// Returns the set of insts represented by this LSValue.
   ArrayRef<SILInstruction *> getInsts() const { return Insts; }
- 
+
   /// Returns true if the value contains the instruction \p Inst.
   bool containsInst(SILInstruction *Inst) const {
     for (SILInstruction *I : Insts) {
@@ -673,7 +673,7 @@ public:
     Stores.erase(Addr);
     Loads.erase(Addr);
   }
-  
+
   /// Merge in the states of all predecessors.
   void mergePredecessorStates(llvm::DenseMap<SILBasicBlock *,
                                              unsigned> &BBToBBIDMap,
@@ -783,7 +783,7 @@ void LSBBForwarder::deleteStoreMappedToAddress(SILValue Addr,
     return;
   assert((Loads.find(Addr) == Loads.end()) &&
          "An address can never be in both the stores and load lists.");
-  
+
   llvm::SmallVector<SILInstruction *, 8> InstsToDelete;
 
   for (auto *SI : SIIter->second.getInsts())
@@ -1457,7 +1457,7 @@ void LSContext::stopTrackingInst(SILInstruction *I, CoveredStoreMap &StoreMap) {
   // have to look into successors as well.
   SmallVector<SILBasicBlock *, 8> WorkList;
   SmallPtrSet<SILBasicBlock *, 8> BlocksHandled;
-  
+
   // Start with the block of the instruction.
   WorkList.push_back(I->getParentBB());
 
@@ -1475,7 +1475,7 @@ void LSContext::stopTrackingInst(SILInstruction *I, CoveredStoreMap &StoreMap) {
     // with the successors.
     if (!F.removeIfContainsInst(I))
       continue;
-    
+
     // Continue with the successors.
     for (SILBasicBlock *Succ : WorkBB->getSuccessors()) {
       if (BlocksHandled.count(Succ) == 0)
