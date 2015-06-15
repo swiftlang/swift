@@ -155,7 +155,7 @@ public:
     // If we've collected redundant cond_fails then remove them now.
     bool Changed = removeCollectedRedundantInstructions();
 
-    // Prform another check, this time in reverse and use future overflow
+    // Perform another check, this time in reverse and use future overflow
     // checks that must be executed to eliminate earlier overflow checks.
     // Notice that this scan is only block local because at this point we
     // don't use post-dominators.
@@ -249,7 +249,7 @@ public:
   }
 
   /// Return true if the constraint \p F can prove that the overflow check
-  /// for \p BI is not needd.
+  /// for \p BI is not needed.
   static bool isOverflowCheckRemovedByConstraint(Constraint &F,
                                                  BuiltinInst *BI) {
     // L and R are the righthand and lefthand sides of the constraint.
