@@ -108,6 +108,9 @@ public:
   /// the given type names.
   SmallVector<StringRef, 1> VerifyTypeLayoutNames;
 
+  /// Frameworks that we should not autolink against.
+  SmallVector<std::string, 4> DisableAutolinkFrameworks;
+
   /// Instrument code to generate profiling information.
   unsigned GenerateProfile : 1;
 

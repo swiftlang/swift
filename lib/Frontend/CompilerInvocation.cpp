@@ -1041,7 +1041,13 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
                                  Args.filtered_end())) {
     Opts.VerifyTypeLayoutNames.push_back(A->getValue());
   }
-  
+
+  for (const Arg *A : make_range(Args.filtered_begin(
+                                   OPT_disable_autolink_framework),
+                                 Args.filtered_end())) {
+    Opts.DisableAutolinkFrameworks.push_back(A->getValue());
+  }
+
   Opts.GenerateProfile |= Args.hasArg(OPT_profile_generate);
 
   if (Args.hasArg(OPT_embed_bitcode))

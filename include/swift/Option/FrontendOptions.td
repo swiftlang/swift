@@ -150,6 +150,9 @@ def enable_access_control : Flag<["-"], "enable-access-control">,
 def code_complete_inits_in_postfix_expr : Flag<["-"], "code-complete-inits-in-postfix-expr">,
   HelpText<"Include initializers when completing a postfix expression">;
 
+def disable_autolink_framework : Separate<["-"],"disable-autolink-framework">,
+  HelpText<"Disable autolinking against the provided framework">;
+
 def disable_diagnostic_passes : Flag<["-"], "disable-diagnostic-passes">,
   HelpText<"Don't run diagnostic passes">;
 
