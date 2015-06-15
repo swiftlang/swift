@@ -26,5 +26,5 @@ Contents
    StoredAndComputedVariables
    SIL
    TypeChecker
-
+   DebuggingTheCompiler
 
