@@ -97,6 +97,15 @@ class NoThrowVariance: ThrowVariance {
   override func mightThrow() {}
 }
 
+// rdar://problem/20657811
+
+class X<T: B> {
+  func foo(x: T) { }
+}
+class Y: X<D> {
+  override func foo(x: D) { }
+}
+
 // CHECK-LABEL: sil private @_TTVFC13vtable_thunks1D3iuofS0_FTGSqCS_1B_1yS1_1zS1__S1_
 // CHECK:         [[WRAP_X:%.*]] = enum $Optional<B>
 // CHECK:         [[FORCE_UNWRAP_FN:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueurFGSQq__q_

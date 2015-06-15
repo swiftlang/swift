@@ -268,6 +268,13 @@ public:
         if (aa == bb)
           continue;
         
+        // FIXME: If one or both types are dependent, we can't accurately assess
+        // whether they're ABI-compatible without a generic context. We can
+        // do a better job here when dependent types are related to their
+        // generic signatures.
+        if (aa.isDependentType() || bb.isDependentType())
+          continue;
+        
         // Bridgeable object types are interchangeable.
         if (aa.isBridgeableObjectType() && bb.isBridgeableObjectType())
           continue;
