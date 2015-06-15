@@ -362,6 +362,17 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
         return;
       }
     }
+
+    // Constrained extensions cannot have inheritance clauses.
+    if (!inheritedClause.empty() &&
+        ext->getGenericParams() &&
+        ext->getGenericParams()->hasTrailingWhereClause()) {
+      diagnose(ext->getLoc(), diag::extension_constrained_inheritance,
+               ext->getExtendedType())
+      .highlight(SourceRange(inheritedClause.front().getSourceRange().Start,
+                             inheritedClause.back().getSourceRange().End));
+      ext->setInherited({ });
+    }
   }
 
   // Check all of the types listed in the inheritance clause.

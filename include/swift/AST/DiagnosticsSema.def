@@ -714,11 +714,15 @@ ERROR(extension_access_with_conformances,sema_tcd,none,
 ERROR(extension_metatype,sema_tcd,none,
       "cannot extend a metatype %0", (Type))
 ERROR(extension_specialization,decl_parsing,none,
-      "cannot extend a specialization of %0", (Identifier))
+      "constrained extension must be declared on the unspecialized generic "
+      "type %0 with constraints specified by a 'where' clause", (Identifier))
 ERROR(extension_stored_property,sema_tcd,none,
       "extensions may not contain stored properties", ())
 ERROR(extension_nongeneric_trailing_where,sema_tcd,none,
       "trailing 'where' clause for extension of non-generic type %0", (Type))
+ERROR(extension_constrained_inheritance,sema_tcd,none,
+      "extension of type %0 with constraints cannot have an "
+      "inheritance clause", (Type))
 ERROR(extension_protocol_inheritance,sema_tcd,none,
       "extension of protocol %0 cannot have an inheritance clause", (Type))
 ERROR(extension_protocol_type_definition,sema_tcd,none,

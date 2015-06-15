@@ -481,8 +481,8 @@ static NominalTypeDecl *getEnclosingNominalContext(DeclContext *dc) {
   while (dc->isLocalContext())
     dc = dc->getParent();
 
-  if (dc->isTypeContext())
-    return dc->getDeclaredTypeOfContext()->getAnyNominal();
+  if (auto nominal = dc->isNominalTypeOrNominalTypeExtensionContext())
+    return nominal;
 
   return nullptr;
 }

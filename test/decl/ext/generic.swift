@@ -26,7 +26,7 @@ extension Double : P2 {
   typealias AssocType = Double
 }
 
-extension X<Int, Double, String> { } // expected-error{{cannot extend a specialization of 'X'}}
+extension X<Int, Double, String> { } // expected-error{{constrained extension must be declared on the unspecialized generic type 'X' with constraints specified by a 'where' clause}}
 
 // Lvalue check when the archetypes are not the same.
 struct LValueCheck<T> {
@@ -140,3 +140,9 @@ func genericClassNotEquatable<T>(gc: GenericClass<T>, x: T, y: T) {
 
 // FIXME: Future direction
 extension Array where T == String { } // expected-error{{same-type requirement makes generic parameter 'T' non-generic}}
+
+extension GenericClass : P3 where T : P3 { } // expected-error{{extension of type 'GenericClass' with constraints cannot have an inheritance clause}}
+
+extension GenericClass where Self : P3 { }
+// expected-error@-1{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'GenericClass'?}}
+// expected-error@-2{{type 'GenericClass' in conformance requirement does not refer to a generic parameter or associated type}}
