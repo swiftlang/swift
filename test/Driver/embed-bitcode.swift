@@ -22,11 +22,16 @@
 // CHECK-MARKER: -embed-bitcode-marker
 // CHECK-MARKER-NOT: -frontend
 
-// RUN: %target-swiftc_driver -embed-bitcode -c -emit-module %s 2>&1 -### | FileCheck %s -check-prefix=CHECK-MODULE
+// RUN: %target-swiftc_driver -embed-bitcode -Xcc -DDEBUG -Xllvm -fake-llvm-option -c -emit-module %s 2>&1 -### | FileCheck %s -check-prefix=CHECK-MODULE
 // CHECK-MODULE: -frontend
 // CHECK-MODULE: -emit-bc
-// CHECK-MODULE: -emit-module-path
+// CHECK-MODULE-DAG: -Xcc -DDEBUG
+// CHECK-MODULE-DAG: -Xllvm -fake-llvm-option
+// CHECK-MODULE-DAG: -emit-module-path
 // CHECK-MODULE: -frontend
+// CHECK-MODULE-NOT: -Xcc
+// CHECK-MODULE-NOT: -DDEBUG
+// CHECK-MODULE-NOT: -fake-llvm-option
 // CHECK-MODULE-NOT: -emit-module-path
 // CHECK-MODULE: -frontend
 // CHECK-MODULE: -emit-module

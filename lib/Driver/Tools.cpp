@@ -346,10 +346,6 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
 
     Args.AddLastArg(Arguments, options::OPT_parse_stdlib);
 
-    // Pass through any subsystem flags.
-    Args.AddAllArgs(Arguments, options::OPT_Xllvm);
-    Args.AddAllArgs(Arguments, options::OPT_Xcc);
-
     // Pass the optimization level down to the frontend.
     Args.AddLastArg(Arguments, options::OPT_O_Group);
 
