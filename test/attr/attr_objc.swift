@@ -27,6 +27,8 @@ protocol Protocol_Class2 : class {}
 
 //===--- Subjects of @objc attribute.
 
+@objc extension PlainClass { } // expected-error{{@objc cannot be applied to this declaration}}{{1-6=}}
+
 @objc  
 var subject_globalVar: Int // expected-error {{only classes, protocols, methods, initializers, properties, and subscript declarations can be declared @objc}}
 

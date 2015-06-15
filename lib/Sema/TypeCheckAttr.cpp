@@ -38,7 +38,7 @@ public:
   template<typename ...ArgTypes>
   void diagnoseAndRemoveAttr(DeclAttribute *attr, ArgTypes &&...Args) {
     TC.diagnose(attr->getLocation(), std::forward<ArgTypes>(Args)...)
-      .fixItRemove(attr->getRange());
+      .fixItRemove(attr->getRangeWithAt());
     attr->setInvalid();
   }
 
