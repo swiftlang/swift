@@ -8,23 +8,23 @@
 // CHECK-elf: "swift-autolink-extract", inputs: ["[[OBJECT]]"], output: {autolink: "[[AUTOLINK:.*\.autolink]]"}
 // CHECK-elf: "linux::Linker", inputs: ["[[OBJECT]]", "[[AUTOLINK]]"], output: {image: "main"}
 
-// RUN: %target-swiftc_driver -embed-bitcode %s 2>&1 -### | FileCheck %s -check-prefix=CHECK-FRONT
+// RUN: %target-swiftc_driver -embed-bitcode %s 2>&1 -### | FileCheck %s -check-prefix=CHECK-FRONT -check-prefix=CHECK-FRONT-%target-object-format
 // CHECK-FRONT: -frontend
 // CHECK-FRONT: -emit-bc
 // CHECK-FRONT: -frontend
 // CHECK-FRONT: -c
 // CHECK-FRONT: -embed-bitcode{{ }}
 // CHECK-FRONT: -disable-llvm-optzns
-// CHECK-FRONT: ld{{"? }}
-// CHECK-FRONT: -bitcode_bundle
+// CHECK-FRONT-macho: ld{{"? }}
+// CHECK-FRONT-macho: -bitcode_bundle
 
-// RUN: %target-swiftc_driver -embed-bitcode-marker %s 2>&1 -### | FileCheck %s -check-prefix=CHECK-MARKER
+// RUN: %target-swiftc_driver -embed-bitcode-marker %s 2>&1 -### | FileCheck %s -check-prefix=CHECK-MARKER -check-prefix=CHECK-MARKER-%target-object-format
 // CHECK-MARKER: -frontend
 // CHECK-MARKER: -c
 // CHECK-MARKER: -embed-bitcode-marker
 // CHECK-MARKER-NOT: -frontend
-// CHECK-MARKER: ld{{"? }}
-// CHECK-MARKER: -bitcode_bundle
+// CHECK-MARKER-macho: ld{{"? }}
+// CHECK-MARKER-macho: -bitcode_bundle
 
 // RUN: %target-swiftc_driver -embed-bitcode -Xcc -DDEBUG -Xllvm -fake-llvm-option -c -emit-module %s 2>&1 -### | FileCheck %s -check-prefix=CHECK-MODULE
 // CHECK-MODULE: -frontend
