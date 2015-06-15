@@ -1723,7 +1723,7 @@ Type GeneralFailureDiagnosis::getTypeOfIndependentSubExpression(Expr *subExpr) {
   return subExpr->getType();
 }
 
-bool GeneralFailureDiagnosis::diagnoseContextualConversionError(Expr *expr) {
+bool GeneralFailureDiagnosis::diagnoseContextualConversionError() {
   
   TypeBase *contextualType = CS->getConversionType(expr);
   
@@ -2025,7 +2025,7 @@ void FailureDiagnosis::diagnoseAssignmentFailure(Expr *dest, Type destTy,
 bool FailureDiagnosis::diagnoseFailureForBinaryExpr() {
   assert(expr->getKind() == ExprKind::Binary);
   
-  if (diagnoseContextualConversionError(expr))
+  if (diagnoseContextualConversionError())
     return true;
   
   CleanupIllFormedExpressionRAII cleanup(*CS, expr);
@@ -2127,7 +2127,7 @@ bool FailureDiagnosis::diagnoseFailureForUnaryExpr() {
   assert(expr->getKind() == ExprKind::PostfixUnary ||
          expr->getKind() == ExprKind::PrefixUnary);
   
-  if (diagnoseContextualConversionError(expr))
+  if (diagnoseContextualConversionError())
     return true;
   
   CleanupIllFormedExpressionRAII cleanup(*CS, expr);
@@ -2207,7 +2207,7 @@ bool FailureDiagnosis::diagnoseFailureForSubscriptExpr() {
   assert(expr->getKind() == ExprKind::Subscript ||
          expr->getKind() == ExprKind::PrefixUnary);
   
-  if (diagnoseContextualConversionError(expr))
+  if (diagnoseContextualConversionError())
     return true;
   
   CleanupIllFormedExpressionRAII cleanup(*CS, expr);
@@ -2265,7 +2265,7 @@ bool FailureDiagnosis::diagnoseFailureForCallExpr() {
     }
   }
 
-  if (diagnoseContextualConversionError(expr))
+  if (diagnoseContextualConversionError())
     return true;
   
   CleanupIllFormedExpressionRAII cleanup(*CS, expr);

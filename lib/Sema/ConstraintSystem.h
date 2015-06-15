@@ -1182,7 +1182,7 @@ protected:
   
   /// Attempt to produce a diagnostic for a mismatch between an expression's
   /// type and its assumed contextual type.
-  bool diagnoseContextualConversionError(Expr *subExpr);
+  bool diagnoseContextualConversionError();
   
   /// Produce a diagnostic for a general member-lookup failure (irrespective of
   /// the exact expression kind).
