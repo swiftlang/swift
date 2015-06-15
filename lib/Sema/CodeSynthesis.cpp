@@ -2183,7 +2183,7 @@ swift::createDesignatedInitOverride(TypeChecker &tc,
 
   // Create the initializer declaration.
   auto ctor = new (ctx) ConstructorDecl(superclassCtor->getFullName(), 
-                                        SourceLoc(),
+                                        classDecl->getBraces().Start,
                                         superclassCtor->getFailability(),
                                         SourceLoc(),
                                         selfBodyPattern, bodyParamPatterns,

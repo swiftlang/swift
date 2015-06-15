@@ -932,6 +932,10 @@ private:
   TypeRefinementContext *buildDeclarationRefinementContext(Decl *D) {
     // We require a valid range in order to be able to query for the TRC
     // corresponding to a given SourceLoc.
+    // If this assert fires, it means we have probably synthesized an implicit
+    // declaration without location information. The appropriate fix is
+    // probably to gin up a source range for the declaration when synthesizing
+    // it.
     assert(D->getSourceRange().isValid());
     
     // The potential versions in the declaration are constrained by both

@@ -85,7 +85,7 @@ class SubCls : MyCls, Prot {
 func genFn<T : Prot where T.Blarg : Prot2>(p : T) -> Int {}
 
 func test(x: Int) {
-  // CHECK: <Func@[[@LINE-3]]:6>genFn</Func>(<Ctor@-Class@[[@LINE-11]]:7>SubCls</Ctor>())
+  // CHECK: <Func@[[@LINE-3]]:6>genFn</Func>(<Ctor@[[@LINE-11]]:28-Class@[[@LINE-11]]:7>SubCls</Ctor>())
   genFn(SubCls())
   // CHECK: "This is string \(<Func@[[@LINE-5]]:6>genFn</Func>({(<Param>a</Param>:<iStruct@>Int</iStruct>) in <Class@[[@LINE-13]]:7>SubCls</Class>()}(<Param@[[@LINE-3]]:11>x</Param>))) interpolation"
   "This is string \(genFn({(a:Int) in SubCls()}(x))) interpolation"

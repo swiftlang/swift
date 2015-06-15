@@ -1,5 +1,5 @@
-// RUN: %swift -parse -verify -target x86_64-apple-macosx10.10 %clang-importer-sdk -I %S/Inputs/custom-modules %s
-// RUN: not %swift -parse -target x86_64-apple-macosx10.10 %clang-importer-sdk -I %S/Inputs/custom-modules %s 2>&1 | FileCheck %s '--implicit-check-not=<unknown>:0'
+// RUN: %swift -parse -verify -target x86_64-apple-macosx10.10 %clang-importer-sdk -I %S/Inputs/custom-modules %s %S/Inputs/availability_implicit_macosx_other.swift
+// RUN: not %swift -parse -target x86_64-apple-macosx10.10 %clang-importer-sdk -I %S/Inputs/custom-modules %s %S/Inputs/availability_implicit_macosx_other.swift 2>&1 | FileCheck %s '--implicit-check-not=<unknown>:0'
 
 // REQUIRES: OS=macosx
 
@@ -100,4 +100,10 @@ func unavailableUseInUnavailableFunction() {
   // Diagnose references to unavailable functions in non-implicit code
   // as errors
   unavailableFunction() // expected-error {{'unavailableFunction()' is unavailable}}
+}
+
+
+@available(OSX 10.11, *)
+func foo() {
+  let _ =  SubOfOtherWithInit()
 }
