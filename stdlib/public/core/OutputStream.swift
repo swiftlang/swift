@@ -47,8 +47,8 @@ public protocol Streamable {
 /// - Note: `String(instance)` will work for an `instance` of *any*
 ///   type, returning its `description` if the `instance` happens to be
 ///   `CustomStringConvertible`.  Using `CustomStringConvertible` as a
-/// generic constraint, or accessing a conforming type's `description`
-/// directly, is therefore discouraged.
+///   generic constraint, or accessing a conforming type's `description`
+///   directly, is therefore discouraged.
 ///
 /// - SeeAlso: `String.init<T>(T)`, `CustomDebugStringConvertible`
 public protocol CustomStringConvertible {
