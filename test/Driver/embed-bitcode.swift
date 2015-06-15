@@ -13,14 +13,18 @@
 // CHECK-FRONT: -emit-bc
 // CHECK-FRONT: -frontend
 // CHECK-FRONT: -c
-// CHECK-FRONT: -embed-bitcode
+// CHECK-FRONT: -embed-bitcode{{ }}
 // CHECK-FRONT: -disable-llvm-optzns
+// CHECK-FRONT: ld{{"? }}
+// CHECK-FRONT: -bitcode_bundle
 
 // RUN: %target-swiftc_driver -embed-bitcode-marker %s 2>&1 -### | FileCheck %s -check-prefix=CHECK-MARKER
 // CHECK-MARKER: -frontend
 // CHECK-MARKER: -c
 // CHECK-MARKER: -embed-bitcode-marker
 // CHECK-MARKER-NOT: -frontend
+// CHECK-MARKER: ld{{"? }}
+// CHECK-MARKER: -bitcode_bundle
 
 // RUN: %target-swiftc_driver -embed-bitcode -Xcc -DDEBUG -Xllvm -fake-llvm-option -c -emit-module %s 2>&1 -### | FileCheck %s -check-prefix=CHECK-MODULE
 // CHECK-MODULE: -frontend

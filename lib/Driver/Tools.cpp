@@ -715,6 +715,11 @@ Job *darwin::Linker::constructJob(const JobAction &JA,
     Arguments.push_back("-application_extension");
   }
 
+  if (Args.hasArg(options::OPT_embed_bitcode,
+                  options::OPT_embed_bitcode_marker)) {
+    Arguments.push_back("-bitcode_bundle");
+  }
+
   if (!OI.SDKPath.empty()) {
     Arguments.push_back("-syslibroot");
     Arguments.push_back(Args.MakeArgString(OI.SDKPath));
