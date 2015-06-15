@@ -59,7 +59,7 @@ public:
     return Result;
   }
 
-  static LookupState makeUnqalified() {
+  static LookupState makeUnqualified() {
     LookupState Result;
     Result.IsQualified = 0;
     return Result;
@@ -823,7 +823,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
     const ValueDecl *BaseDecl = nullptr;
     GenericParamList *GenericParams = nullptr;
     Type ExtendedType;
-    auto LS = LookupState::makeUnqalified();
+    auto LS = LookupState::makeUnqualified();
 
     // Skip initializer contexts, we will not find any declarations there.
     if (isa<Initializer>(DC)) {
