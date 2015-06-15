@@ -5891,6 +5891,132 @@ static bool exprNeedsParensAfterAddingAs(DeclContext *DC, Expr *expr,
           getMinPrecedenceForExpr(DC, expr, rootExpr));
 }
 
+namespace {
+  class ExprWalker : public ASTWalker {
+    ExprRewriter &Rewriter;
+    SmallVector<ClosureExpr *, 4> closuresToTypeCheck;
+    unsigned LeftSideOfAssignment = 0;
+
+  public:
+    ExprWalker(ExprRewriter &Rewriter) : Rewriter(Rewriter) { }
+
+    ~ExprWalker() {
+      auto &cs = Rewriter.getConstraintSystem();
+      auto &tc = cs.getTypeChecker();
+      for (auto *closure : closuresToTypeCheck)
+        tc.typeCheckClosureBody(closure);
+    }
+
+    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      // For a default-value expression, do nothing.
+      if (isa<DefaultValueExpr>(expr))
+        return { false, expr };
+
+      // For closures, update the parameter types and check the body.
+      if (auto closure = dyn_cast<ClosureExpr>(expr)) {
+        Rewriter.simplifyExprType(expr);
+        auto &cs = Rewriter.getConstraintSystem();
+        auto &tc = cs.getTypeChecker();
+
+        // Coerce the pattern, in case we resolved something.
+        auto fnType = closure->getType()->castTo<FunctionType>();
+        Pattern *params = closure->getParams();
+        TypeResolutionOptions TROptions;
+        TROptions |= TR_OverrideType;
+        TROptions |= TR_FromNonInferredPattern;
+        TROptions |= TR_InExpression;
+        TROptions |= TR_ImmediateFunctionInput;
+        if (tc.coercePatternToType(params, closure, fnType->getInput(),
+                                   TROptions))
+          return { false, nullptr };
+        closure->setParams(params);
+
+        // If this is a single-expression closure, convert the expression
+        // in the body to the result type of the closure.
+        if (closure->hasSingleExpressionBody()) {
+          // Enter the context of the closure when type-checking the body.
+          llvm::SaveAndRestore<DeclContext *> savedDC(Rewriter.dc, closure);
+          Expr *body = closure->getSingleExpressionBody()->walk(*this);
+          
+          if (body != closure->getSingleExpressionBody())
+            closure->setSingleExpressionBody(body);
+          
+          if (body) {
+            
+            if (fnType->getResult()->isVoid() && !body->getType()->isVoid()) {
+              closure = Rewriter.coerceClosureExprToVoid(closure);
+            } else {
+            
+              body = Rewriter.coerceToType(body,
+                                           fnType->getResult(),
+                                           cs.getConstraintLocator(
+                                             closure,
+                                             ConstraintLocator::ClosureResult));
+              if (!body)
+                return { false, nullptr } ;
+
+              closure->setSingleExpressionBody(body);
+            }
+          }
+        } else {
+          // For other closures, type-check the body once we've finished with
+          // the expression.
+          closuresToTypeCheck.push_back(closure);
+        }
+
+        tc.ClosuresWithUncomputedCaptures.push_back(closure);
+
+        return { false, closure };
+      }
+
+      // Track whether we're in the left-hand side of an assignment...
+      if (auto assign = dyn_cast<AssignExpr>(expr)) {
+        ++LeftSideOfAssignment;
+        
+        if (auto dest = assign->getDest()->walk(*this))
+          assign->setDest(dest);
+        else
+          return { false, nullptr };
+        
+        --LeftSideOfAssignment;
+
+        auto &cs = Rewriter.getConstraintSystem();
+        auto srcLocator = cs.getConstraintLocator(
+                            assign,
+                            ConstraintLocator::AssignSource);
+
+        if (auto src = assign->getSrc()->walk(*this))
+          assign->setSrc(src);
+        else
+          return { false, nullptr };
+        
+        expr = Rewriter.visitAssignExpr(assign, srcLocator);
+        return { false, expr };
+      }
+      
+      // ...so we can verify that '_' only appears there.
+      if (isa<DiscardAssignmentExpr>(expr) && LeftSideOfAssignment == 0)
+        Rewriter.getConstraintSystem().getTypeChecker()
+          .diagnose(expr->getLoc(), diag::discard_expr_outside_of_assignment);
+      
+      return { true, expr };
+    }
+
+    Expr *walkToExprPost(Expr *expr) override {
+      return Rewriter.visit(expr);
+    }
+
+    /// \brief Ignore statements.
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
+      return { false, stmt };
+    }
+
+    /// \brief Ignore declarations.
+    bool walkToDeclPre(Decl *decl) override { return false; }
+  };
+
+}
+
 /// \brief Apply a given solution to the expression, producing a fully
 /// type-checked expression.
 Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
@@ -6224,129 +6350,6 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
 
     return nullptr;
   }
-
-  class ExprWalker : public ASTWalker {
-    ExprRewriter &Rewriter;
-    SmallVector<ClosureExpr *, 4> closuresToTypeCheck;
-    unsigned LeftSideOfAssignment = 0;
-
-  public:
-    ExprWalker(ExprRewriter &Rewriter) : Rewriter(Rewriter) { }
-
-    ~ExprWalker() {
-      auto &cs = Rewriter.getConstraintSystem();
-      auto &tc = cs.getTypeChecker();
-      for (auto *closure : closuresToTypeCheck)
-        tc.typeCheckClosureBody(closure);
-    }
-
-    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      // For a default-value expression, do nothing.
-      if (isa<DefaultValueExpr>(expr))
-        return { false, expr };
-
-      // For closures, update the parameter types and check the body.
-      if (auto closure = dyn_cast<ClosureExpr>(expr)) {
-        Rewriter.simplifyExprType(expr);
-        auto &cs = Rewriter.getConstraintSystem();
-        auto &tc = cs.getTypeChecker();
-
-        // Coerce the pattern, in case we resolved something.
-        auto fnType = closure->getType()->castTo<FunctionType>();
-        Pattern *params = closure->getParams();
-        TypeResolutionOptions TROptions;
-        TROptions |= TR_OverrideType;
-        TROptions |= TR_FromNonInferredPattern;
-        TROptions |= TR_InExpression;
-        TROptions |= TR_ImmediateFunctionInput;
-        if (tc.coercePatternToType(params, closure, fnType->getInput(),
-                                   TROptions))
-          return { false, nullptr };
-        closure->setParams(params);
-
-        // If this is a single-expression closure, convert the expression
-        // in the body to the result type of the closure.
-        if (closure->hasSingleExpressionBody()) {
-          // Enter the context of the closure when type-checking the body.
-          llvm::SaveAndRestore<DeclContext *> savedDC(Rewriter.dc, closure);
-          Expr *body = closure->getSingleExpressionBody()->walk(*this);
-          
-          if (body != closure->getSingleExpressionBody())
-            closure->setSingleExpressionBody(body);
-          
-          if (body) {
-            
-            if (fnType->getResult()->isVoid() && !body->getType()->isVoid()) {
-              closure = Rewriter.coerceClosureExprToVoid(closure);
-            } else {
-            
-              body = Rewriter.coerceToType(body,
-                                           fnType->getResult(),
-                                           cs.getConstraintLocator(
-                                             closure,
-                                             ConstraintLocator::ClosureResult));
-              if (!body)
-                return { false, nullptr } ;
-
-              closure->setSingleExpressionBody(body);
-            }
-          }
-        } else {
-          // For other closures, type-check the body once we've finished with
-          // the expression.
-          closuresToTypeCheck.push_back(closure);
-        }
-
-        tc.ClosuresWithUncomputedCaptures.push_back(closure);
-
-        return { false, closure };
-      }
-
-      // Track whether we're in the left-hand side of an assignment...
-      if (auto assign = dyn_cast<AssignExpr>(expr)) {
-        ++LeftSideOfAssignment;
-        
-        if (auto dest = assign->getDest()->walk(*this))
-          assign->setDest(dest);
-        else
-          return { false, nullptr };
-        
-        --LeftSideOfAssignment;
-
-        auto &cs = Rewriter.getConstraintSystem();
-        auto srcLocator = cs.getConstraintLocator(
-                            assign,
-                            ConstraintLocator::AssignSource);
-
-        if (auto src = assign->getSrc()->walk(*this))
-          assign->setSrc(src);
-        else
-          return { false, nullptr };
-        
-        expr = Rewriter.visitAssignExpr(assign, srcLocator);
-        return { false, expr };
-      }
-      
-      // ...so we can verify that '_' only appears there.
-      if (isa<DiscardAssignmentExpr>(expr) && LeftSideOfAssignment == 0)
-        Rewriter.getConstraintSystem().getTypeChecker()
-          .diagnose(expr->getLoc(), diag::discard_expr_outside_of_assignment);
-      
-      return { true, expr };
-    }
-
-    Expr *walkToExprPost(Expr *expr) override {
-      return Rewriter.visit(expr);
-    }
-
-    /// \brief Ignore statements.
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
-      return { false, stmt };
-    }
-
-    /// \brief Ignore declarations.
-    bool walkToDeclPre(Decl *decl) override { return false; }
-  };
 
   ExprRewriter rewriter(*this, solution, suppressDiagnostics);
   ExprWalker walker(rewriter);
