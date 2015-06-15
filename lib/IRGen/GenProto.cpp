@@ -5043,7 +5043,7 @@ void irgen::emitExistentialMetatypeContainer(IRGenFunction &IGF,
   auto destType = outType.castTo<ExistentialMetatypeType>().getInstanceType();
   while (auto destMetatypeType = dyn_cast<ExistentialMetatypeType>(destType)) {
     destType = destMetatypeType.getInstanceType();
-    srcType = cast<MetatypeType>(srcType).getInstanceType();
+    srcType = cast<AnyMetatypeType>(srcType).getInstanceType();
   }
 
   // Emit the witness table pointers.

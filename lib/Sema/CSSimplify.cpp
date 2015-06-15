@@ -1972,10 +1972,11 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
     }
   }
 
-  // A subtyping relation between a metatype and an existential
-  // metatype is actually equivalent to a conformance relationship
-  // on the instance types.
-  if (concrete && kind >= TypeMatchKind::Subtype) {
+  // Conformance of a metatype to an existential metatype is actually
+  // equivalent to a conformance relationship on the instance types.
+  // This applies to nested metatype levels, so if A : P then
+  // A.Type : P.Type.
+  if (concrete && kind >= TypeMatchKind::ConformsTo) {
     if (auto meta1 = type1->getAs<MetatypeType>()) {
       if (auto meta2 = type2->getAs<ExistentialMetatypeType>()) {
         return matchTypes(meta1->getInstanceType(),

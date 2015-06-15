@@ -4080,9 +4080,14 @@ Expr *ExprRewriter::coerceExistentialMetatype(Expr *expr, Type toType,
                                               ConstraintLocatorBuilder locator) {
   auto &tc = solution.getConstraintSystem().getTypeChecker();
   Type fromType = expr->getType();
-  Type fromInstanceType = fromType->castTo<AnyMetatypeType>()->getInstanceType();
-  Type toInstanceType =
-    toType->castTo<ExistentialMetatypeType>()->getInstanceType();
+  Type fromInstanceType = fromType;
+  Type toInstanceType = toType;
+
+  do {
+    fromInstanceType = fromInstanceType->castTo<AnyMetatypeType>()->getInstanceType();
+    toInstanceType = toInstanceType->castTo<ExistentialMetatypeType>()->getInstanceType();
+  } while(fromInstanceType->is<AnyMetatypeType>() &&
+          toInstanceType->is<ExistentialMetatypeType>());
 
   auto conformances =
     collectExistentialConformances(tc, fromInstanceType, toInstanceType, cs.DC);

@@ -38,6 +38,26 @@ var ap: Any.Protocol
 ap = pp // expected-error{{cannot assign}}
 ap = pt // expected-error{{cannot assign}}
 
+// Meta-metatypes
+
+protocol Toaster {}
+class WashingMachine : Toaster {}
+class Dryer : WashingMachine {}
+class HairDryer {}
+
+let a: Toaster.Type.Protocol = Toaster.Type.self
+let b: Any.Type.Type = Toaster.Type.self
+let c: Any.Type.Protocol = Toaster.Type.self // expected-error {{'Toaster' is not identical to 'Any'}}
+let d: Toaster.Type.Type = WashingMachine.Type.self
+let e: Any.Type.Type = WashingMachine.Type.self
+let f: Toaster.Type.Type = Dryer.Type.self
+let g: Toaster.Type.Type = HairDryer.Type.self // expected-error {{type 'HairDryer' does not conform to protocol 'Toaster'}}
+let h: WashingMachine.Type.Type = Dryer.Type.self // expected-error {{'Dryer' is not identical to 'WashingMachine'}}
+
+func generic<T : WashingMachine>(t: T.Type) {
+  let _: Toaster.Type.Type = t.dynamicType
+}
+
 // rdar://problem/20780797
 protocol P2 {
   init(x: Int)
