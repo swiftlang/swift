@@ -60,6 +60,13 @@ func forgotOptionalBang(a: A, obj: AnyObject) {
   let b2: B = bo?.createB() // expected-error{{value of optional type 'B?' not unwrapped; did you mean to use '!' or '?'?}}{{15-15=(}}{{28-28=)!}}
 }
 
+// Crash with one-element tuple with labeled element
+class Dinner {}
+
+func microwave() -> Dinner {
+  return (n: Dinner?()) // expected-error{{value of optional type 'Dinner?' not unwrapped; did you mean to use '!' or '?'?}}
+}
+
 func forgotAnyObjectBang(obj: AnyObject) {
   var a = A()
   a = obj // expected-error{{'AnyObject' is not convertible to 'A'; did you mean to use 'as!' to force downcast?}}{{10-10= as! A}}

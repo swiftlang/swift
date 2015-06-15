@@ -4389,8 +4389,8 @@ ConstraintSystem::simplifyFixConstraint(Fix fix,
 
   case FixKind::ForceOptional:
     // Assume that '!' was applied to the first type.
-    return matchTypes(type1->getRValueType()->getOptionalObjectType(), type2,
-                      matchKind, subFlags, locator);
+    return matchTypes(type1->getRValueObjectType()->getOptionalObjectType(),
+                      type2, matchKind, subFlags, locator);
 
   case FixKind::ForceDowncast:
     // These work whenever they are suggested.
