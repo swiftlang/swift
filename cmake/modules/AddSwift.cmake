@@ -1159,7 +1159,7 @@ function(add_swift_library name)
       SHARED IS_STDLIB IS_STDLIB_CORE IS_SDK_OVERLAY TARGET_LIBRARY
       API_NOTES_NON_OVERLAY DONT_EMBED_BITCODE)
   parse_arguments(SWIFTLIB
-    "DEPENDS;LINK_LIBRARIES;SWIFT_MODULE_DEPENDS;SWIFT_MODULE_DEPENDS_OSX;SWIFT_MODULE_DEPENDS_IOS_TVOS;SWIFT_MODULE_DEPENDS_WATCHOS;FRAMEWORK_DEPENDS;FRAMEWORK_DEPENDS_WEAK;FRAMEWORK_DEPENDS_OSX;FRAMEWORK_DEPENDS_IOS_TVOS;COMPONENT_DEPENDS;FILE_DEPENDS;TARGET_SDKS;C_COMPILE_FLAGS;SWIFT_COMPILE_FLAGS;LINK_FLAGS;PRIVATE_LINK_LIBRARIES;INTERFACE_LINK_LIBRARIES;INSTALL_IN_COMPONENT"
+    "DEPENDS;LINK_LIBRARIES;SWIFT_MODULE_DEPENDS;SWIFT_MODULE_DEPENDS_OSX;SWIFT_MODULE_DEPENDS_IOS_TVOS;SWIFT_MODULE_DEPENDS_WATCHOS;FRAMEWORK_DEPENDS;FRAMEWORK_DEPENDS_WEAK;FRAMEWORK_DEPENDS_OSX;FRAMEWORK_DEPENDS_IOS_TVOS;COMPONENT_DEPENDS;FILE_DEPENDS;TARGET_SDKS;C_COMPILE_FLAGS;SWIFT_COMPILE_FLAGS;SWIFT_COMPILE_FLAGS_OSX;SWIFT_COMPILE_FLAGS_IOS;SWIFT_COMPILE_FLAGS_TVOS;SWIFT_COMPILE_FLAGS_WATCHOS;LINK_FLAGS;PRIVATE_LINK_LIBRARIES;INTERFACE_LINK_LIBRARIES;INSTALL_IN_COMPONENT"
       "${SWIFTLIB_options}"
       ${ARGN})
   set(SWIFTLIB_SOURCES ${SWIFTLIB_DEFAULT_ARGS})
@@ -1191,7 +1191,7 @@ function(add_swift_library name)
 
   # All Swift code depends on the standard library, except for the standard
   # library itself.
-  if(SWIFTLIB_TARGET_LIBRARY AND NOT SWIFTLIB_IS_STDLIB_CORE)
+   if(SWIFTLIB_TARGET_LIBRARY AND NOT SWIFTLIB_IS_STDLIB_CORE)
     list(APPEND SWIFTLIB_SWIFT_MODULE_DEPENDS Core)
   endif()
 
@@ -1269,6 +1269,22 @@ function(add_swift_library name)
           endif()
         endforeach()
 
+        # Collect compiler flags
+        set(swiftlib_swift_compile_flags_all ${SWIFTLIB_SWIFT_COMPILE_FLAGS})
+        if("${sdk}" STREQUAL "OSX")
+          list(APPEND swiftlib_swift_compile_flags_all
+              ${SWIFTLIB_SWIFT_COMPILE_FLAGS_OSX})
+        elseif("${sdk}" STREQUAL "IOS" OR "${sdk}" STREQUAL "IOS_SIMULATOR")
+          list(APPEND swiftlib_swift_compile_flags_all
+              ${SWIFTLIB_SWIFT_COMPILE_FLAGS_IOS})
+        elseif("${sdk}" STREQUAL "TVOS" OR "${sdk}" STREQUAL "TVOS_SIMULATOR")
+          list(APPEND swiftlib_swift_compile_flags_all
+              ${SWIFTLIB_SWIFT_COMPILE_FLAGS_TVOS})
+        elseif("${sdk}" STREQUAL "WATCHOS" OR "${sdk}" STREQUAL "WATCHOS_SIMULATOR")
+          list(APPEND swiftlib_swift_compile_flags_all
+              ${SWIFTLIB_SWIFT_COMPILE_FLAGS_WATCHOS})
+        endif()
+
         # Add this library variant.
         _add_swift_library_single(
           ${VARIANT_NAME}
@@ -1284,7 +1300,7 @@ function(add_swift_library name)
           COMPONENT_DEPENDS ${SWIFTLIB_COMPONENT_DEPENDS}
           FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS} ${swiftlib_module_dependency_targets}
           C_COMPILE_FLAGS ${SWIFTLIB_C_COMPILE_FLAGS}
-          SWIFT_COMPILE_FLAGS ${SWIFTLIB_SWIFT_COMPILE_FLAGS}
+          SWIFT_COMPILE_FLAGS ${swiftlib_swift_compile_flags_all}
           LINK_FLAGS ${SWIFTLIB_LINK_FLAGS}
           PRIVATE_LINK_LIBRARIES ${swiftlib_private_link_libraries_targets}
           ${SWIFTLIB_DONT_EMBED_BITCODE_keyword}
@@ -1416,6 +1432,22 @@ function(add_swift_library name)
     set(sdk "${SWIFT_HOST_VARIANT_SDK}")
     set(arch "${SWIFT_HOST_VARIANT_ARCH}")
 
+    # Collect compiler flags
+    set(swiftlib_swift_compile_flags_all ${SWIFTLIB_SWIFT_COMPILE_FLAGS})
+    if("${sdk}" STREQUAL "OSX")
+      list(APPEND swiftlib_swift_compile_flags_all
+        ${SWIFTLIB_SWIFT_COMPILE_FLAGS_OSX})
+    elseif("${sdk}" STREQUAL "IOS" OR "${sdk}" STREQUAL "IOS_SIMULATOR")
+      list(APPEND swiftlib_swift_compile_flags_all
+        ${SWIFTLIB_SWIFT_COMPILE_FLAGS_IOS})
+    elseif("${sdk}" STREQUAL "TVOS" OR "${sdk}" STREQUAL "TVOS_SIMULATOR")
+      list(APPEND swiftlib_swift_compile_flags_all
+        ${SWIFTLIB_SWIFT_COMPILE_FLAGS_TVOS})
+    elseif("${sdk}" STREQUAL "WATCHOS" OR "${sdk}" STREQUAL "WATCHOS_SIMULATOR")
+      list(APPEND swiftlib_swift_compile_flags_all
+        ${SWIFTLIB_SWIFT_COMPILE_FLAGS_WATCHOS})
+    endif()
+
     _add_swift_library_single(
       ${name}
       ${name}
@@ -1430,7 +1462,7 @@ function(add_swift_library name)
       COMPONENT_DEPENDS ${SWIFTLIB_COMPONENT_DEPENDS}
       FILE_DEPENDS ${SWIFTLIB_FILE_DEPENDS}
       C_COMPILE_FLAGS ${SWIFTLIB_C_COMPILE_FLAGS}
-      SWIFT_COMPILE_FLAGS ${SWIFTLIB_SWIFT_COMPILE_FLAGS}
+      SWIFT_COMPILE_FLAGS ${swiftlib_swift_compile_flags_all}
       LINK_FLAGS ${SWIFTLIB_LINK_FLAGS}
       PRIVATE_LINK_LIBRARIES ${SWIFTLIB_PRIVATE_LINK_LIBRARIES}
       INTERFACE_LINK_LIBRARIES ${SWIFTLIB_INTERFACE_LINK_LIBRARIES}
