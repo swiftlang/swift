@@ -6,8 +6,8 @@ struct X {
   func f0(i: Int) -> X { }
 
   func f1(i: Int) { }
-  mutating
-  func f1(f: Float) { }
+
+  mutating func f1(f: Float) { }
 
   func f2<T>(x: T) -> T { }
 }
@@ -138,6 +138,7 @@ func existential(var p: P) {
   p.mut(1)
   _ = p.bar
   _ = p.mut // expected-error{{partial application of 'mutating' method is not allowed}}
+  _ = p.dynamicType.tum
   var _ : () = p.bar(0)
 }
 
@@ -146,6 +147,8 @@ func staticExistential(p: P.Type, pp: P.Protocol) {
   _ = pp.init() // expected-error{{constructing an object of protocol type 'P' requires a conforming metatype}}
   _ = P() // expected-error{{constructing an object of protocol type 'P' requires a conforming metatype}}
   _ = p.tum
+  _ = p.bar // expected-error{{'P.Type' does not have a member named 'bar'}}
+  _ = p.mut // expected-error{{'P.Type' does not have a member named 'mut'}}
   _ = pp.tum // expected-error{{'P.Protocol' does not have a member named 'tum'}}
   _ = P.tum // expected-error{{'P.Protocol' does not have a member named 'tum'}}
 }

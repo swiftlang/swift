@@ -2770,19 +2770,46 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       baseTy = objTy;
   }
 
-  // Dig out the instance type.
+  // Dig out the instance type and figure out what members of the instance type
+  // we are going to see.
   bool isMetatype = false;
+  bool hasInstanceMembers = false;
+  bool hasInstanceMethods = false;
   bool hasStaticMembers = false;
   Type instanceTy = baseObjTy;
-  if (auto baseObjMeta = baseObjTy->getAs<AnyMetatypeType>()) {
+  if (baseObjTy->is<ModuleType>()) {
+    hasStaticMembers = true;
+  } else if (auto baseObjMeta = baseObjTy->getAs<AnyMetatypeType>()) {
     instanceTy = baseObjMeta->getInstanceType();
     isMetatype = true;
-    // Protocol metatypes do not have static members because there is no
-    // metatype to witness it.
-    if (baseObjTy->getAs<ExistentialMetatypeType>() ||
-        !instanceTy->isExistentialType())
+    if (baseObjMeta->is<ExistentialMetatypeType>()) {
+      // An instance of an existential metatype is a concrete type conforming
+      // to the existential, say Self. Instance members of the concrete type
+      // have type Self -> T -> U, but we don't know what Self is at compile
+      // time so we cannot refer to them. Static methods are fine, on the other
+      // hand -- we already know that they do not have Self or associated type
+      // requirements, since otherwise we would not be able to refer to the
+      // existential metatype in the first place.
       hasStaticMembers = true;
+    } else if (instanceTy->isExistentialType()) {
+      // A protocol metatype has instance methods with type P -> T -> U, but
+      // not instance properties or static members -- the metatype value itself
+      // doesn't give us a witness so there's no static method to bind.
+      hasInstanceMethods = true;
+    } else {
+      // Metatypes of nominal types and archetypes have instance methods and
+      // static members, but not instance properties.
+      // FIXME: partial application of properties
+      hasInstanceMethods = true;
+      hasStaticMembers = true;
+    }
+  } else {
+    // Otherwise, we can access all instance members.
+    hasInstanceMembers = true;
+    hasInstanceMethods = true;
   }
+
+  bool isExistential = instanceTy->isExistentialType();
 
   bool isUnresolvedMember;
   switch (constraint.getKind()) {
@@ -2881,7 +2908,6 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     return true;
   };
 
-  bool isExistential = instanceTy->isExistentialType();
   if (name.isSimpleName(TC.Context.Id_init)) {
     // Constructors have their own approach to name lookup.
     NameLookupOptions lookupOptions = defaultConstructorLookupOptions;
@@ -3174,23 +3200,18 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     if (isExistential && isUnavailableInExistential(getTypeChecker(), result))
       return;
 
-    // If we are looking for a metatype member, include instance methods,
-    // static methods, and static members.
+    // See if we have an instance method, instance member or static method,
+    // and check if it can be accessed on our base type.
     // FIXME: Mark this as 'unavailable'.
-    if (isMetatype && !(isa<FuncDecl>(result) || !result->isInstanceMember()))
-      return;
+    if (result->isInstanceMember()) {
+      if (isa<FuncDecl>(result) && !hasInstanceMethods)
+        return;
 
-    // If we are looking for an instance member or protocol metatype member,
-    // ignore static functions, static variables, and enum elements.
-    if (!hasStaticMembers && !baseObjTy->is<ModuleType>() &&
-        !result->isInstanceMember())
-      return;
-
-    // If we're doing dynamic lookup into a metatype of AnyObject and we've
-    // found an instance member, ignore it.
-    if (isDynamicLookup && isMetatype && result->isInstanceMember()) {
-      // FIXME: Mark as 'unavailable' somehow.
-      return;
+      if (!isa<FuncDecl>(result) && !hasInstanceMembers)
+        return;
+    } else {
+      if (!hasStaticMembers)
+        return;
     }
 
     // If we have an rvalue base of struct or enum type, make sure that the
