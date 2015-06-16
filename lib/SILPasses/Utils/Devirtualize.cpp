@@ -257,6 +257,14 @@ bool swift::canDevirtualizeClassMethod(ApplyInst *AI,
     return false;
   }
 
+  if (AI->getFunction()->isFragile()) {
+    // function_ref inside fragile function cannot reference a private or
+    // hidden symbol.
+    if (!(F->isFragile() || isValidLinkageForFragileRef(F->getLinkage()) ||
+          F->isExternalDeclaration()))
+      return false;
+  }
+
   CanSILFunctionType GenCalleeType = F->getLoweredFunctionType();
 
   auto Subs = getSubstitutionsForCallee(Mod, GenCalleeType,

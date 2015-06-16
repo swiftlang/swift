@@ -131,6 +131,10 @@ SILInstruction *tryToConcatenateStrings(ApplyInst *AI, SILBuilder &B);
 bool tryCheckedCastBrJumpThreading(TermInst *Term, DominanceInfo *DT,
                                    SmallVectorImpl<SILBasicBlock *> &BBs);
 
+/// Checks if a symbol with a given linkage can be referenced from fragile
+/// functions.
+bool isValidLinkageForFragileRef(SILLinkage linkage);
+
 /// A structure containing callbacks that are called when an instruction is
 /// removed or added.
 struct InstModCallbacks {

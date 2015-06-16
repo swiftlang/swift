@@ -1078,7 +1078,7 @@ optimizeBridgedObjCToSwiftCast(SILInstruction *Inst,
   return (NewI) ? NewI : AI;
 }
 
-static bool isValidLinkageForFragileRef(SILLinkage linkage) {
+bool swift::isValidLinkageForFragileRef(SILLinkage linkage) {
   switch (linkage) {
   case SILLinkage::Private:
   case SILLinkage::PrivateExternal:
