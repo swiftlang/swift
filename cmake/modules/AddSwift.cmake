@@ -1191,7 +1191,7 @@ function(add_swift_library name)
 
   # All Swift code depends on the standard library, except for the standard
   # library itself.
-   if(SWIFTLIB_TARGET_LIBRARY AND NOT SWIFTLIB_IS_STDLIB_CORE)
+  if(SWIFTLIB_TARGET_LIBRARY AND NOT SWIFTLIB_IS_STDLIB_CORE)
     list(APPEND SWIFTLIB_SWIFT_MODULE_DEPENDS Core)
   endif()
 
