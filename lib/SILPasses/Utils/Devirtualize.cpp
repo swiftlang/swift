@@ -157,6 +157,9 @@ getSubstitutionsForCallee(SILModule &M, CanSILFunctionType GenCalleeType,
         }
       }
     }
+  } else {
+    // If the callee is not polymorphic, no substitutions are required.
+    return {};
   }
 
   if (ClassSubs.empty())
