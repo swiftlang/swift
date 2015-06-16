@@ -3202,6 +3202,16 @@ void ConformanceChecker::resolveTypeWitnesses() {
       TypeWitnessesScope typeWitnessesScope(typeWitnesses);
       llvm::SaveAndRestore<unsigned> savedNumTypeWitnesses(numTypeWitnesses);
 
+      // Record this value witness, popping it when we exit the current scope.
+      valueWitnesses.push_back({inferredReq.first, witnessReq.Witness});
+      if (witnessReq.Witness->getDeclContext()->isProtocolExtensionContext())
+        ++numValueWitnessesInProtocolExtensions;
+      defer([&]{
+        if (witnessReq.Witness->getDeclContext()->isProtocolExtensionContext())
+          --numValueWitnessesInProtocolExtensions;
+        valueWitnesses.pop_back();
+      });
+
       // Introduce each of the type witnesses into the hash table.
       bool failed = false;
       for (const auto &typeWitness : witnessReq.Inferred) {
@@ -3238,14 +3248,8 @@ void ConformanceChecker::resolveTypeWitnesses() {
       if (failed)
         continue;
 
-      // Record this value witness and recurse.
-      valueWitnesses.push_back({inferredReq.first, witnessReq.Witness});
-      if (witnessReq.Witness->getDeclContext()->isProtocolExtensionContext())
-        ++numValueWitnessesInProtocolExtensions;
+      // Recurse
       findSolutions(reqDepth + 1);
-      if (witnessReq.Witness->getDeclContext()->isProtocolExtensionContext())
-        --numValueWitnessesInProtocolExtensions;
-      valueWitnesses.pop_back();
     }
   };
   findSolutions(0);

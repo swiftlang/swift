@@ -163,3 +163,17 @@ struct XCollectionLikeP0a<T> : CollectionLikeP0 {
 
   subscript (r: Range<Int>) -> SomeSlice<T> { get { return SomeSlice() } }
 }
+
+// rdar://problem/21304164
+public protocol Thenable {
+    typealias T // expected-note{{ambiguous inference of associated type 'T': 'T' vs. '(t: T, CorePromise<T>)'}}
+    func then(success: (_: T) -> T) -> Self
+}
+
+public class CorePromise<T> : Thenable { // expected-error{{type 'CorePromise<T>' does not conform to protocol 'Thenable'}}
+    public func then(success: (t: T, _: CorePromise<T>) -> T) -> Self { // expected-note 2{{matching requirement 'then' to this declaration}}
+        return self.then() { (t: T) -> T in
+            return success(t: t, self)
+        }
+    }
+}
