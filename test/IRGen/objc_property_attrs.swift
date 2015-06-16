@@ -58,8 +58,8 @@ class Foo: NSManagedObject {
   let l: String? = nil
 
   // -- Protocol types:
-  // CHECK: private unnamed_addr constant [15 x i8] c"T@\22<P>\22,N,&,Vp\00"
+  // CHECK: private unnamed_addr constant {{.*}} c"T@\22<_TtP19objc_property_attrs1P_>\22,N,&,Vp\00"
   var p: P?
-  // CHECK: private unnamed_addr constant [19 x i8] c"T@\22<P><Q>\22,N,&,Vpq\00"
+  // CHECK: private unnamed_addr constant {{.*}} c"T@\22<_TtP19objc_property_attrs1P_><_TtP19objc_property_attrs1Q_>\22,N,&,Vpq\00"
   var pq: protocol<P, Q>?
 }

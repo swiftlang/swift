@@ -67,20 +67,20 @@ class Class17127126 {
 
 
 // CHECK: [[READONLY_NAME:@.*]] = private unnamed_addr constant [9 x i8] c"readonly\00"
-// CHECK: [[READONLY_ATTRS:@.*]] = private unnamed_addr constant [19 x i8] c"T@\22SomeObject\22,N,R\00"
+// CHECK: [[READONLY_ATTRS:@.*]] = private unnamed_addr constant [42 x i8] c"T@\22_TtC15objc_properties10SomeObject\22,N,R\00"
 
 // CHECK: [[GETTER_SIGNATURE:@.*]] = private unnamed_addr constant [8 x i8] c"@16@0:8\00"
 
 // CHECK: [[READWRITE_NAME:@.*]] = private unnamed_addr constant [10 x i8] c"readwrite\00"
-// CHECK: [[READWRITE_ATTRS:@.*]] = private unnamed_addr constant [19 x i8] c"T@\22SomeObject\22,N,&\00"
+// CHECK: [[READWRITE_ATTRS:@.*]] = private unnamed_addr constant [42 x i8] c"T@\22_TtC15objc_properties10SomeObject\22,N,&\00"
 
 // CHECK: [[SETTER_SIGNATURE:@.*]] = private unnamed_addr constant [11 x i8] c"v24@0:8@16\00"
 
 // CHECK: [[BAREIVAR_NAME:@.*]] = private unnamed_addr constant [9 x i8] c"bareIvar\00"
-// CHECK: [[BAREIVAR_ATTRS:@.*]] = private unnamed_addr constant [29 x i8] c"T@\22SomeObject\22,N,&,VbareIvar\00"
+// CHECK: [[BAREIVAR_ATTRS:@.*]] = private unnamed_addr constant [52 x i8] c"T@\22_TtC15objc_properties10SomeObject\22,N,&,VbareIvar\00"
 
 // CHECK: [[WIBBLE_NAME:@.*]] = private unnamed_addr constant [7 x i8] c"wobble\00"
-// CHECK: [[WIBBLE_ATTRS:@.*]] = private unnamed_addr constant [27 x i8] c"T@\22SomeObject\22,N,&,Vwibble\00"
+// CHECK: [[WIBBLE_ATTRS:@.*]] = private unnamed_addr constant [50 x i8] c"T@\22_TtC15objc_properties10SomeObject\22,N,&,Vwibble\00"
 
 // CHECK: @_INSTANCE_METHODS__TtC15objc_properties10SomeObject = private constant { {{.*}}] } {
 // CHECK:   i32 24,
@@ -125,16 +125,16 @@ class Class17127126 {
 // CHECK:   i32 4,
 // CHECK:   [4 x { i8*, i8* }] [{
 // CHECK:     i8* getelementptr inbounds ([9 x i8], [9 x i8]* [[READONLY_NAME]], i64 0, i64 0),
-// CHECK:     i8* getelementptr inbounds ([19 x i8], [19 x i8]* [[READONLY_ATTRS]], i64 0, i64 0)
+// CHECK:     i8* getelementptr inbounds ([42 x i8], [42 x i8]* [[READONLY_ATTRS]], i64 0, i64 0)
 // CHECK:   }, {
 // CHECK:     i8* getelementptr inbounds ([10 x i8], [10 x i8]* [[READWRITE_NAME]], i64 0, i64 0),
-// CHECK:     i8* getelementptr inbounds ([19 x i8], [19 x i8]* [[READWRITE_ATTRS]], i64 0, i64 0)
+// CHECK:     i8* getelementptr inbounds ([42 x i8], [42 x i8]* [[READWRITE_ATTRS]], i64 0, i64 0)
 // CHECK:   }, {
 // CHECK:     i8* getelementptr inbounds ([9 x i8], [9 x i8]* [[BAREIVAR_NAME]], i64 0, i64 0),
-// CHECK:     i8* getelementptr inbounds ([29 x i8], [29 x i8]* [[BAREIVAR_ATTRS]], i64 0, i64 0)
+// CHECK:     i8* getelementptr inbounds ([52 x i8], [52 x i8]* [[BAREIVAR_ATTRS]], i64 0, i64 0)
 // CHECK:   }, {
 // CHECK:     i8* getelementptr inbounds ([7 x i8], [7 x i8]* [[WIBBLE_NAME]], i64 0, i64 0),
-// CHECK:     i8* getelementptr inbounds ([27 x i8], [27 x i8]* [[WIBBLE_ATTRS]], i64 0, i64 0)
+// CHECK:     i8* getelementptr inbounds ([50 x i8], [50 x i8]* [[WIBBLE_ATTRS]], i64 0, i64 0)
 // CHECK:   }]
 // CHECK: }, section "__DATA, __objc_const", align 8
 
@@ -159,7 +159,7 @@ class Class17127126 {
 // CHECK:   i32 1,
 // CHECK:   [1 x { i8*, i8* }] [{
 // CHECK:     i8* getelementptr inbounds ([18 x i8], [18 x i8]* [[EXTENSIONPROPERTY_NAME]], i64 0, i64 0),
-// CHECK:     i8* getelementptr inbounds ([19 x i8], [19 x i8]* [[READWRITE_ATTRS]], i64 0, i64 0)
+// CHECK:     i8* getelementptr inbounds ([42 x i8], [42 x i8]* [[READWRITE_ATTRS]], i64 0, i64 0)
 // CHECK:   }]
 // CHECK: }, section "__DATA, __objc_const", align 8
 

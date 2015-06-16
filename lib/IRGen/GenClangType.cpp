@@ -296,6 +296,13 @@ clang::CanQualType GenClangType::visitProtocolType(CanProtocolType type) {
                     clangCtx.getTranslationUnitDecl(), name,
                     clang::SourceLocation(), clang::SourceLocation(), nullptr);
 
+    // Attach an objc_runtime_name attribute with the Objective-C name to use
+    // for this protocol.
+    SmallString<64> runtimeNameBuffer;
+    PDecl->addAttr(clang::ObjCRuntimeNameAttr::CreateImplicit(
+                     PDecl->getASTContext(),
+                     proto->getObjCRuntimeName(runtimeNameBuffer)));
+
     auto clangType  = clangCtx.getObjCObjectType(clangCtx.ObjCBuiltinIdTy,
                                                  &PDecl, 1);
     auto ptrTy = clangCtx.getObjCObjectPointerType(clangType);
@@ -326,6 +333,14 @@ clang::CanQualType GenClangType::visitClassType(CanClassType type) {
                           clang::SourceLocation(), ForwardClassId,
                           /*typeParamList*/nullptr, /*PrevDecl=*/nullptr,
                           clang::SourceLocation());
+
+    // Attach an objc_runtime_name attribute with the Objective-C name to use
+    // for this class.
+    SmallString<64> runtimeNameBuffer;
+    CDecl->addAttr(clang::ObjCRuntimeNameAttr::CreateImplicit(
+                     CDecl->getASTContext(),
+                     swiftDecl->getObjCRuntimeName(runtimeNameBuffer)));
+
     auto clangType  = clangCtx.getObjCInterfaceType(CDecl);
     auto ptrTy = clangCtx.getObjCObjectPointerType(clangType);
     return clangCtx.getCanonicalType(ptrTy);
