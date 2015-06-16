@@ -1087,9 +1087,53 @@ public:
 };
 
 void TypeChecker::eraseTypeData(Expr *&expr) {
-  assert(expr);
-  
   expr->walk(TypeNullifier());
+}
+
+/// Private class to "cleanse" an expression tree of open existentials. This is
+/// done in the case of a typecheck failure, after we re-typecheck partially-
+/// typechecked subexpressions in a context-free manner.
+class ExistentialEraser : public ASTWalker {
+  llvm::SmallDenseMap<OpaqueValueExpr *, Expr *, 4> OpenExistentials;
+
+public:
+  std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+    if (auto openExistentialExpr = dyn_cast<OpenExistentialExpr>(expr)) {
+      auto archetypeVal = openExistentialExpr->getOpaqueValue();
+      auto base = openExistentialExpr->getExistentialValue();
+      bool inserted = OpenExistentials.insert({archetypeVal, base}).second;
+      assert(inserted);
+      (void) inserted;
+      return { true, openExistentialExpr->getSubExpr() };
+    } else if (auto opaqueValueExpr = dyn_cast<OpaqueValueExpr>(expr)) {
+      auto value = OpenExistentials.find(opaqueValueExpr);
+      assert(value != OpenExistentials.end());
+      return { true, value->second };
+    }
+    
+    return { true, expr };
+  }
+
+  Expr *walkToExprPost(Expr *expr) override {
+    Type type = expr->getType();
+    if (!type || !type->hasOpenedExistential())
+      return expr;
+
+    type = type.transform([&](Type type) -> Type {
+      if (auto archetype = type->getAs<ArchetypeType>())
+        if (auto existentialType = archetype->getOpenedExistentialType())
+          return existentialType;
+
+      return type;
+    });
+    expr->setType(type);
+
+    return expr;
+  }
+};
+
+void TypeChecker::eraseOpenedExistentials(Expr *&expr) {
+  expr->walk(ExistentialEraser());
 }
 
 bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc,

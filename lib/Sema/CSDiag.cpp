@@ -1692,10 +1692,11 @@ bool GeneralFailureDiagnosis::diagnoseGeneralFailure() {
 }
 
 Type GeneralFailureDiagnosis::getTypeOfIndependentSubExpression(Expr *subExpr) {
-  
+  Type resultType = subExpr->getType();
+
   // Track if this sub-expression is currently being diagnosed.
   if (CS->TC.exprIsBeingDiagnosed(subExpr))
-    return subExpr->getType();
+    return resultType;
   
   CS->TC.addExprForDiagnosis(subExpr);
   
@@ -1707,20 +1708,27 @@ Type GeneralFailureDiagnosis::getTypeOfIndependentSubExpression(Expr *subExpr) {
     // Store off the sub-expression, in case a new one is provided via the
     // type check operation.
     Expr *preCheckedExpr = subExpr;
-    
-    CS->TC.eraseTypeData(subExpr);
 
+    CS->TC.eraseTypeData(subExpr);
     CS->TC.typeCheckExpression(subExpr, CS->DC, Type(), Type(), false);
+    resultType = subExpr->getType();
+
+    // This is a terrible hack to get around the fact that typeCheckExpression()
+    // might change subExpr to point to a new OpenExistentialExpr. In that case,
+    // since the caller passed subExpr by value here, they would be left
+    // holding on to an expression containing open existential types but
+    // no OpenExistentialExpr, which breaks invariants enforced by the
+    // ASTChecker.
+    CS->TC.eraseOpenedExistentials(subExpr);
  
     // Reset the type of the previous expression. This prevents stale type
     // variable data from being leaked out of the temporary constraint system.
     if (preCheckedExpr != subExpr)
-      preCheckedExpr->setType(subExpr->getType());
+      preCheckedExpr->setType(resultType);
   }
   
-  assert(subExpr->getType());
-  
-  return subExpr->getType();
+  assert(resultType);
+  return resultType;
 }
 
 bool GeneralFailureDiagnosis::diagnoseContextualConversionError() {

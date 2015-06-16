@@ -1124,7 +1124,7 @@ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
   if (auto *BOE = dyn_cast<BindOptionalExpr>(E))
     return markStoredOrInOutExpr(BOE->getSubExpr(), Flags);
   
-  // If this is an OapqueValueExpr that we've seen a mapping for, jump to the
+  // If this is an OpaqueValueExpr that we've seen a mapping for, jump to the
   // mapped value.
   if (auto *OVE = dyn_cast<OpaqueValueExpr>(E))
     if (auto *expr = OpaqueValueMap[OVE])

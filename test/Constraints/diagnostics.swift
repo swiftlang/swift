@@ -70,10 +70,28 @@ f3( // expected-error {{cannot invoke 'f3' with an argument list of type '((((In
 // FIXME: Can't test constructible requirement yet.
 
 // Missing member.
-i.wobble() // expected-error{{Int' does not have a member named 'wobble'}}
+i.wobble() // expected-error{{'Int' does not have a member named 'wobble'}}
 
 // Does not conform to protocol.
 // FIXME: f5(i)
+
+// Make sure we don't leave open existentials when diagnosing.
+// <rdar://problem/20598568>
+func pancakes(p: P2) {
+  f4(p.wonka) // expected-error{{cannot invoke 'f4' with an argument list of type '(() -> ())'}}
+  // expected-note@-1{{expected an argument list of type '(Int)'}}
+  f4(p.wonka()) // expected-error{{cannot invoke 'f4' with an argument list of type '(())'}}
+  // expected-note@-1{{expected an argument list of type '(Int)'}}
+}
+
+protocol Shoes {
+  static func select(subject: Shoes) -> Self
+}
+
+// Here the opaque value has type (metatype_type (archetype_type ... ))
+func f(x: Shoes, asType t: Shoes.Type) {
+  return t.select(x) // expected-error{{'Shoes' is not convertible to '()'}}
+}
 
 infix operator **** {
   associativity left

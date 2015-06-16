@@ -2859,7 +2859,7 @@ namespace {
     }
 
     Expr *visitOpaqueValueExpr(OpaqueValueExpr *expr) {
-      return expr;
+      llvm_unreachable("Already type-checked");
     }
 
     Expr *visitDefaultValueExpr(DefaultValueExpr *expr) {
