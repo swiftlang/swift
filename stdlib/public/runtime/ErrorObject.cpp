@@ -104,15 +104,4 @@ void swift::swift_errorRelease(SwiftError *object) {
 
 void swift::swift_willThrow(SwiftError *object) { }
 
-void swift::swift_errorInMain(SwiftError *object) {
-  // FIXME: terrible stub implementation
-  fprintf(stderr, "error caught in main()\n");
-}
-
-void swift::swift_unexpectedError(SwiftError *object) {
-  // FIXME: terrible stub implementation
-  fprintf(stderr, "unexpected error thrown\n");
-  abort();
-}
-
 #endif

@@ -36,3 +36,16 @@ public func _stdlib_getErrorCode<T : ErrorType>(x: UnsafePointer<T>) -> Int {
 @asmname("swift_bridgeErrorTypeToNSError")
 public func _bridgeErrorTypeToNSError(e: ErrorType) -> AnyObject
 #endif
+
+/// Invoked by the compiler when the subexpression of a `try!` expression
+/// throws an error.
+@asmname("swift_unexpectedError")
+public func _unexpectedError(error: ErrorType) {
+  preconditionFailure("'try!' expression unexpectedly raised an error: \(error)")
+}
+
+/// Invoked by the compiler when code at top level throws an uncaught error.
+@asmname("swift_errorInMain")
+public func _errorInMain(error: ErrorType) {
+  fatalError("Error raised at top level: \(error)")
+}
