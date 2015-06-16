@@ -70,11 +70,11 @@ allowed to replace the reference, thereby releasing the
 referent. Consider the following sequence of rules:
 
 (1) An operation taking the address of a variable is allowed to
-    replace the reference help by that variable. The fact that
+    replace the reference held by that variable. The fact that
     is_unique will not actually replace it is opaque to the optimizer.
 
 (2) If the refcount is 1 when the reference is replaced, the referent
-    is be deallocated.
+    is deallocated.
 
 (3) A different source-level variable pointing at the same referent
     must not be changed/invalidated by such a call
@@ -97,7 +97,7 @@ conservative. It must not remove retain/release pairs of this form:
    release X
    release X
 
-To prevent removal of the apparently redundant innder retain/release
+To prevent removal of the apparently redundant inner retain/release
 pair, the LLVM ARC optimizer should model _swift_isUniquelyReferenced
 as a function that may release X, use X, and exit the program (the
 subsequent release instruction does not prove safety).
