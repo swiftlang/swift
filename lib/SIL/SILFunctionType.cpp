@@ -382,6 +382,26 @@ enum class ConventionsKind : uint8_t {
 
       unsigned origParamIndex = NextOrigParamIndex++;
 
+      // A parameter may add optionality to an overridden interface,
+      // or force off IUO.
+      if (substOverrideType) {
+        OptionalTypeKind overrideOTK, substOTK;
+        substOverrideType.getAnyOptionalObjectType(overrideOTK);
+        auto substObjTy = substType.getAnyOptionalObjectType(substOTK);
+
+        if (overrideOTK != substOTK) {
+          if (overrideOTK == OTK_None) {
+            substType = substObjTy;
+          } else {
+            auto optionalDecl = M.getASTContext()
+              .getOptionalDecl(overrideOTK);
+            substType = BoundGenericType::get(optionalDecl, Type(), substType)
+              ->getCanonicalType();
+          }
+        }
+      }
+
+
       auto &substTL = M.Types.getTypeLowering(origType, substType);
       ParameterConvention convention;
       if (origType.getAs<InOutType>()) {
@@ -396,26 +416,6 @@ enum class ConventionsKind : uint8_t {
         assert(!isIndirectParameter(convention));
       }
       auto loweredType = substTL.getLoweredType().getSwiftRValueType();
-      
-      // A parameter may add optionality to an overridden interface,
-      // or force off IUO.
-      if (substOverrideType) {
-        OptionalTypeKind overrideOTK, substOTK;
-        substOverrideType->getAnyOptionalObjectType(overrideOTK);
-        auto substObjTy = substTL.getLoweredType()
-          .getAnyOptionalObjectType(M, substOTK);
-
-        if (overrideOTK != substOTK) {
-          if (overrideOTK == OTK_None) {
-            loweredType = substObjTy.getSwiftRValueType();
-          } else {
-            auto optionalDecl = M.getASTContext()
-              .getOptionalDecl(overrideOTK);
-            loweredType = BoundGenericType::get(optionalDecl, Type(), substType)
-              ->getCanonicalType();
-          }
-        }
-      }
       
       Inputs.push_back(SILParameterInfo(loweredType, convention));
     }

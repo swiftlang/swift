@@ -77,7 +77,6 @@ SILGenModule::emitVTableMethod(SILDeclRef derived, SILDeclRef base) {
   auto baseInfo = Types.getConstantInfo(base);
   auto derivedInfo = Types.getConstantInfo(derived);
   auto basePattern = AbstractionPattern(baseInfo.LoweredType);
-  CanAnyFunctionType overrideInterfaceType = baseInfo.LoweredInterfaceType;
   
   auto derivedOrigTy = M.Types.getConstantOverrideType(derived, base);
 
@@ -150,8 +149,7 @@ needs_thunk:
   thunk->setDebugScope(new (M) SILDebugScope(loc, *thunk));
 
   SILGenFunction(*this, *thunk)
-    .emitVTableThunk(derived, basePattern, derivedInfo.LoweredType,
-                     overrideInterfaceType);
+    .emitVTableThunk(derived, basePattern, derivedInfo.LoweredType);
 
   return thunk;
 }

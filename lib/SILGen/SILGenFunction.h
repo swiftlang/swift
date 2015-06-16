@@ -625,8 +625,7 @@ public:
   /// Thunk between a derived and base class.
   void emitVTableThunk(SILDeclRef derived,
                        AbstractionPattern origPattern,
-                       CanAnyFunctionType substTy,
-                       CanAnyFunctionType substOverrideTy);
+                       CanAnyFunctionType substTy);
   
   //===--------------------------------------------------------------------===//
   // Control flow

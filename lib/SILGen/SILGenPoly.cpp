@@ -1646,8 +1646,7 @@ SILGenFunction::emitRValueAsOrig(Expr *expr, AbstractionPattern origFormalType,
 void
 SILGenFunction::emitVTableThunk(SILDeclRef derived,
                                 AbstractionPattern origPattern,
-                                CanAnyFunctionType substTy,
-                                CanAnyFunctionType _) {
+                                CanAnyFunctionType substTy) {
   auto fd = cast<AbstractFunctionDecl>(derived.getDecl());
 
   SILLocation loc(fd);

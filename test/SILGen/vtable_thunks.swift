@@ -89,23 +89,6 @@ class F: D {
   override func i4(x: Int, y: Int) -> Int {}
 }
 
-class ThrowVariance {
-  func mightThrow() throws {}
-}
-
-class NoThrowVariance: ThrowVariance {
-  override func mightThrow() {}
-}
-
-// rdar://problem/20657811
-
-class X<T: B> {
-  func foo(x: T) { }
-}
-class Y: X<D> {
-  override func foo(x: D) { }
-}
-
 // CHECK-LABEL: sil private @_TTVFC13vtable_thunks1D3iuofS0_FTGSqCS_1B_1yS1_1zS1__S1_
 // CHECK:         [[WRAP_X:%.*]] = enum $Optional<B>
 // CHECK:         [[FORCE_UNWRAP_FN:%.*]] = function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueurFGSQq__q_
@@ -126,6 +109,41 @@ class Y: X<D> {
 // CHECK:         [[DEST_ADDR:%.*]] = init_enum_data_addr %0
 // CHECK:         copy_addr [take] [[RES_ADDR]]#1 to [initialization] [[DEST_ADDR]]
 // CHECK:         inject_enum_addr %0
+
+class ThrowVariance {
+  func mightThrow() throws {}
+}
+
+class NoThrowVariance: ThrowVariance {
+  override func mightThrow() {}
+}
+
+// rdar://problem/20657811
+
+class X<T: B> {
+  func foo(x: T) { }
+}
+class Y: X<D> {
+  override func foo(x: D) { }
+}
+
+// rdar://problem/21154055
+// Ensure reabstraction happens when necessary to get a value in or out of an
+// optional.
+
+class Foo {
+  func foo(x: Int -> Int) -> (Int -> Int)? {}
+}
+
+class Bar: Foo {
+  override func foo(x: (Int -> Int)?) -> Int -> Int {}
+}
+
+// CHECK-LABEL: sil private @_TTVFC13vtable_thunks3Bar3foofS0_FGSqFSiSi_FSiSi : $@convention(method) (@owned @callee_owned (Int) -> Int, @guaranteed Bar) -> @owned Optional<Int -> Int>
+// CHECK:         function_ref @_TTRXFo_dSi_dSi_XFo_iSi_iSi_
+// CHECK:         [[IMPL:%.*]] = function_ref @_TFC13vtable_thunks3Bar3foofS0_FGSqFSiSi_FSiSi
+// CHECK:         apply [[IMPL]]
+// CHECK:         function_ref @_TTRXFo_dSi_dSi_XFo_iSi_iSi_
 
 // CHECK-LABEL: sil_vtable D {
 // CHECK:         #B.iuo!1: _TTVF{{[A-Z0-9a-z_]*}}1D
