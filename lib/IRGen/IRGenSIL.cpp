@@ -947,7 +947,7 @@ static ArrayRef<SILArgument*> emitEntryPointIndirectReturn(
   }  
 }
 
-/// Emit a direct parameter that was passed under a native CC.
+/// Emit a direct parameter that was passed under a C-based CC.
 static void emitDirectExternalParameter(IRGenSILFunction &IGF,
                                         Explosion &in,
                                         llvm::Type *coercionTy,
@@ -988,13 +988,11 @@ static void emitDirectExternalParameter(IRGenSILFunction &IGF,
   }
 
   // Otherwise, we need to traffic through memory.
-  assert((IGF.IGM.DataLayout.getTypeSizeInBits(coercionTy) ==
-          IGF.IGM.DataLayout.getTypeSizeInBits(paramTI.StorageType))
-         && "Coerced types should not differ in size!");
-
   // Create a temporary.
-  Address temporary = paramTI.allocateStack(IGF, paramType,
-                                            "coerced-param").getAddress();
+  Address temporary = allocateForCoercion(IGF,
+                                          coercionTy,
+                                          paramTI.getStorageType(),
+                                          "");
 
   // Write the input parameters into the temporary:
   Address coercedAddr =
@@ -1015,6 +1013,8 @@ static void emitDirectExternalParameter(IRGenSILFunction &IGF,
   }
 
   // Pull out the elements.
+  temporary = IGF.Builder.CreateBitCast(temporary,
+                                      paramTI.getStorageType()->getPointerTo());
   paramTI.loadAsTake(IGF, temporary, out);
 
   // Deallocate the temporary.

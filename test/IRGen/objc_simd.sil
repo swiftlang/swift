@@ -5,8 +5,12 @@ import simd
 
 // Work around rdar://problem/20577079 with a Swift function that touches all
 // the fields of float4, forcing it to be validated.
-func forceStuff(x: float4) -> (Float,Float,Float,Float) {
-  return (x.x, x.y, x.z, x.w)
+func forceStuff(x: float4, y: float3) -> (Float,Float,Float,Float) {
+  if true {
+    return (y.x, y.y, y.z, y.x)
+  } else {
+    return (x.x, x.y, x.z, x.w)
+  }
 }
 
 // x86_64-LABEL: define <4 x float> @simd_c_args(<4 x float>)
@@ -18,6 +22,20 @@ func forceStuff(x: float4) -> (Float,Float,Float,Float) {
 sil @simd_c_args : $@convention(c) (float4) -> float4 {
 entry(%x : $float4):
   return %x : $float4
+}
+
+// x86_64-LABEL: define <3 x float> @simd_c_args_float3(<3 x float>)
+// i386-LABEL: define <2 x i64> @simd_c_args_float3(<3 x float>)
+// arm64-LABEL: define <3 x float> @simd_c_args_float3(<4 x i32>)
+// armv7-LABEL: define <3 x float> @simd_c_args_float3(<4 x i32>)
+// armv7s-LABEL: define <3 x float> @simd_c_args_float3(<4 x i32>)
+// armv7k-LABEL: define <3 x float> @simd_c_args_float3(<4 x i32>)
+sil @simd_c_args_float3 : $@convention(c) (float3) -> float3 {
+entry(%x : $float3):
+// x86_64: [[COERCE:%.*]] = alloca <3 x float>, align 16
+// x86_64: store <3 x float> %0, <3 x float>* [[COERCE]]
+// x86_64: [[COERCED:%.*]] = bitcast <3 x float>* [[COERCE]] to %V4simd6float3*
+  return %x : $float3
 }
 
 // x86_64-LABEL: define void @simd_native_args(%V4simd6float4* noalias nocapture sret, %V4simd6float4* noalias nocapture dereferenceable({{.*}}))
@@ -33,4 +51,15 @@ entry(%x : $float4):
   return %y : $float4
 }
 
-
+// x86_64-LABEL: define { float, float, float } @simd_native_args_float3(float, float, float)
+// i386-LABEL: define { float, float, float } @simd_native_args_float3(float, float, float)
+// arm64-LABEL: define { float, float, float } @simd_native_args_float3(float, float, float)
+// armv7-LABEL: define { float, float, float } @simd_native_args_float3(float, float, float)
+// armv7s-LABEL: define { float, float, float } @simd_native_args_float3(float, float, float)
+// armv7k-LABEL: define { float, float, float } @simd_native_args_float3(float, float, float)
+sil @simd_native_args_float3 : $@convention(thin) (float3) -> float3 {
+entry(%x : $float3):
+  %f = function_ref @simd_c_args_float3 : $@convention(c) (float3) -> float3
+  %y = apply %f(%x) : $@convention(c) (float3) -> float3
+  return %y : $float3
+}

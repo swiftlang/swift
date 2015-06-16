@@ -3098,6 +3098,23 @@ void IRGenFunction::emitEpilogue() {
   AllocaIP->eraseFromParent();
 }
 
+Address irgen::allocateForCoercion(IRGenFunction &IGF,
+                                   llvm::Type *fromTy,
+                                   llvm::Type *toTy,
+                                   const llvm::Twine &basename) {
+  auto &DL = IGF.IGM.DataLayout;
+  
+  auto bufferTy = DL.getTypeSizeInBits(fromTy) >= DL.getTypeSizeInBits(toTy)
+    ? fromTy
+    : toTy;
+
+  auto alignment = std::max(DL.getABITypeAlignment(fromTy),
+                            DL.getABITypeAlignment(toTy));
+
+  return IGF.createAlloca(bufferTy, Alignment(alignment),
+                          basename + ".coerced");
+}
+
 llvm::Value* IRGenFunction::coerceValue(llvm::Value *value, llvm::Type *toTy,
                                         const llvm::DataLayout &DL)
 {
@@ -3121,15 +3138,8 @@ llvm::Value* IRGenFunction::coerceValue(llvm::Value *value, llvm::Type *toTy,
   }
 
   // Otherwise we need to store, bitcast, and load.
-  auto bufferTy = DL.getTypeSizeInBits(fromTy) >= DL.getTypeSizeInBits(toTy)
-    ? fromTy
-    : toTy;
-
-  auto alignment = std::max(DL.getABITypeAlignment(fromTy),
-                            DL.getABITypeAlignment(toTy));
-
-  auto address = createAlloca(bufferTy, Alignment(alignment),
-                              value->getName() + ".coerced");
+  auto address = allocateForCoercion(*this, fromTy, toTy,
+                                     value->getName());
   auto *orig = Builder.CreateBitCast(address.getAddress(),
                                      fromTy->getPointerTo());
   Builder.CreateStore(value, orig);
