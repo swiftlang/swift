@@ -1689,6 +1689,15 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   case TypeKind::Function:
   case TypeKind::PolymorphicFunction:
   case TypeKind::GenericFunction: {
+    auto FwdDecl = llvm::TempDINode(
+      DBuilder.createReplaceableCompositeType(
+        llvm::dwarf::DW_TAG_subroutine_type, MangledName, Scope, File, 0,
+          llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits, Flags,
+          MangledName));
+     
+    auto TH = llvm::TrackingMDNodeRef(FwdDecl.get());
+    DITypeCache[DbgTy.getType()] = TH;
+
     CanSILFunctionType FunctionTy;
     if (auto *SILFnTy = dyn_cast<SILFunctionType>(BaseTy))
       FunctionTy = CanSILFunctionType(SILFnTy);
@@ -1711,9 +1720,10 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     // Functions are actually stored as a Pointer or a FunctionPairTy:
     // { i8*, %swift.refcounted* }
     auto FnTy = DBuilder.createSubroutineType(MainFile, Params, Flags);
-    return createPointerSizedStruct(Scope, MangledName, FnTy,
-                                    MainFile, 0, Flags, MangledName);
-
+    auto DITy = createPointerSizedStruct(Scope, MangledName, FnTy,
+                                         MainFile, 0, Flags, MangledName);
+    DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
+    return DITy;
   }
 
   case TypeKind::Enum: {

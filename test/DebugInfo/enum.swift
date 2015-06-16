@@ -43,3 +43,12 @@ let movie : Maybe<Color> = .None
 public enum Nothing { }
 public func foo(empty : Nothing) { }
 // CHECK: !DICompositeType({{.*}}name: "Nothing", {{.*}}elements: ![[EMPTY]]
+
+// CHECK: !DICompositeType({{.*}}name: "Rose", {{.*}}elements: ![[ELTS:[0-9]+]],
+// CHECK-SAME:             {{.*}}identifier: "_TtGO4enum4Roseq__")
+public enum Rose<A> {
+	case MkRose(() -> A, () -> [Rose<A>])
+  // CHECK: !DICompositeType({{.*}}name: "Rose", {{.*}}elements: ![[ELTS]],
+  // CHECK-SAME:             {{.*}}identifier: "_TtGO4enum4RoseQq_S0__")
+	case IORose(() -> Rose<A>)
+}
