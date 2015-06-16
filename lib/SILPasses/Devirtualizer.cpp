@@ -463,11 +463,12 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
     }
 
     // Pass the metatype of the subclass.
-    AI = insertMonomorphicInlineCaches(AI, ClassOrMetatypeType);
-    if (!AI) {
+    auto NewAI = insertMonomorphicInlineCaches(AI, ClassOrMetatypeType);
+    if (!NewAI) {
       NotHandledSubsNum++;
       continue;
     }
+    AI = NewAI;
     Changed = true;
   }
 
