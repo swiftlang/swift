@@ -1266,9 +1266,10 @@ llvm::DICompositeType *IRGenDebugInfo::createStructType(
   StringRef Name = Decl->getName().str();
 
   // Forward declare this first because types may be recursive.
-  auto FwdDecl = DBuilder.createReplaceableCompositeType(
+  auto FwdDecl = llvm::TempDIType(
+    DBuilder.createReplaceableCompositeType(
       llvm::dwarf::DW_TAG_structure_type, Name, Scope, File, Line,
-        llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits);
+        llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits, Flags, UniqueID));
 
 #ifndef NDEBUG
   if (UniqueID.empty())
@@ -1278,14 +1279,13 @@ llvm::DICompositeType *IRGenDebugInfo::createStructType(
            "UID is not a mangled name");
 #endif
 
-  auto TH = llvm::TrackingMDNodeRef(FwdDecl);
+  auto TH = llvm::TrackingMDNodeRef(FwdDecl.get());
   DITypeCache[DbgTy.getType()] = TH;
   auto Members = getStructMembers(Decl, BaseTy, Scope, File, Flags, SizeInBits);
   auto DITy = DBuilder.createStructType(
       Scope, Name, File, Line, SizeInBits, AlignInBits, Flags, DerivedFrom,
       Members, RuntimeLang, nullptr, UniqueID);
-  FwdDecl->replaceAllUsesWith(DITy);
-  llvm::MDNode::deleteTemporary(FwdDecl);
+  DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
   return DITy;
 }
 
@@ -1336,12 +1336,13 @@ llvm::DICompositeType *IRGenDebugInfo::createEnumType(
 
   // FIXME: Is DW_TAG_union_type the right thing here?
   // Consider using a DW_TAG_variant_type instead.
-  auto FwdDecl =
+  auto FwdDecl = llvm::TempDIType(
     DBuilder.createReplaceableCompositeType(
       llvm::dwarf::DW_TAG_union_type, MangledName, Scope, File, Line,
-        llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits);
+        llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits, Flags,
+        MangledName));
 
-  auto TH = llvm::TrackingMDNodeRef(FwdDecl);
+  auto TH = llvm::TrackingMDNodeRef(FwdDecl.get());
   DITypeCache[DbgTy.getType()] = TH;
 
   auto DITy = DBuilder.createUnionType(
@@ -1349,8 +1350,7 @@ llvm::DICompositeType *IRGenDebugInfo::createEnumType(
       getEnumElements(DbgTy, Decl, Scope, File, Flags),
       llvm::dwarf::DW_LANG_Swift, MangledName);
 
-  FwdDecl->replaceAllUsesWith(DITy);
-  llvm::MDNode::deleteTemporary(FwdDecl);
+  DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
   return DITy;
 }
 
@@ -1647,9 +1647,11 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     auto DerivedFrom = Superclass.isNull()
                            ? nullptr
                            : getOrCreateDesugaredType(Superclass, DbgTy);
-    auto FwdDecl = DBuilder.createReplaceableCompositeType(
-      llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, File, L.Line,
-        llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits);
+    auto FwdDecl = llvm::TempDIType(
+      DBuilder.createReplaceableCompositeType(
+        llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, File, L.Line,
+          llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits, Flags,
+          MangledName));
 
     // Emit the protocols the archetypes conform to.
     SmallVector<llvm::Metadata *, 4> Protocols;
@@ -1658,7 +1660,8 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
                      .getSwiftRValueType();
       auto PDbgTy = DebugTypeInfo(ProtocolDecl, IGM.getTypeInfoForLowered(PTy));
       auto PDITy = getOrCreateType(PDbgTy);
-      Protocols.push_back(DBuilder.createInheritance(FwdDecl, PDITy, 0, Flags));
+      Protocols.push_back(DBuilder.createInheritance(FwdDecl.get(),
+                                                     PDITy, 0, Flags));
     }
     auto DITy = DBuilder.createStructType(
         Scope, MangledName, File, L.Line, SizeInBits, AlignInBits, Flags,
@@ -1666,8 +1669,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
         llvm::dwarf::DW_LANG_Swift, nullptr,
         MangledName);
 
-    FwdDecl->replaceAllUsesWith(DITy);
-    llvm::MDNode::deleteTemporary(FwdDecl);
+    DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
     return DITy;
   }
 
