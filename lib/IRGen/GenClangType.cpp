@@ -23,6 +23,7 @@
 #include "swift/SIL/SILType.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/Attr.h"
 #include "clang/AST/CanonicalType.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
@@ -280,6 +281,27 @@ clang::CanQualType GenClangType::visitTupleType(CanTupleType type) {
 }
 
 clang::CanQualType GenClangType::visitProtocolType(CanProtocolType type) {
+  auto proto = type->getDecl();
+
+  // AnyObject -> id.
+  if (proto->isSpecificProtocol(KnownProtocolKind::AnyObject))
+    return getClangIdType(getClangASTContext());
+
+  // Single protocol -> id<Proto>
+  if (proto->isObjC()) {
+    auto &clangCtx = getClangASTContext();
+    clang::IdentifierInfo *name = &clangCtx.Idents.get(proto->getName().get());
+    auto *PDecl = clang::ObjCProtocolDecl::Create(
+                    const_cast<clang::ASTContext &>(clangCtx),
+                    clangCtx.getTranslationUnitDecl(), name,
+                    clang::SourceLocation(), clang::SourceLocation(), nullptr);
+
+    auto clangType  = clangCtx.getObjCObjectType(clangCtx.ObjCBuiltinIdTy,
+                                                 &PDecl, 1);
+    auto ptrTy = clangCtx.getObjCObjectPointerType(clangType);
+    return clangCtx.getCanonicalType(ptrTy);
+  }
+
   return getClangIdType(getClangASTContext());
 }
 
@@ -529,12 +551,12 @@ clang::CanQualType GenClangType::visitProtocolCompositionType(
   CanProtocolCompositionType type) {
   // FIXME. Eventually, this will have its own helper routine.
   SmallVector<const clang::ObjCProtocolDecl *, 4> Protocols;
-  for (Type t : type->getProtocols()) {
-    ProtocolDecl *protocol = t->castTo<ProtocolType>()->getDecl();
-    if (auto *clangDecl = protocol->getClangDecl())
-      if (auto *PDecl = dyn_cast<clang::ObjCProtocolDecl>(clangDecl))
-        Protocols.push_back(PDecl);
+  for (CanType t : type.getProtocols()) {
+    auto opt = cast<clang::ObjCObjectPointerType>(Converter.convert(IGM, t));
+    for (auto p : opt->quals())
+      Protocols.push_back(p);
   }
+
   auto &clangCtx = getClangASTContext();
   if (Protocols.empty())
     return getClangIdType(clangCtx);
@@ -620,6 +642,14 @@ clang::CanQualType ClangTypeConverter::convert(IRGenModule &IGM, CanType type) {
       } else if (auto ifaceDecl = dyn_cast<clang::ObjCInterfaceDecl>(clangDecl)) {
         auto &ctx = IGM.getClangASTContext();
         auto clangType  = ctx.getObjCInterfaceType(ifaceDecl);
+        auto ptrTy = ctx.getObjCObjectPointerType(clangType);
+        return ctx.getCanonicalType(ptrTy);
+      } else if (auto protoDecl = dyn_cast<clang::ObjCProtocolDecl>(clangDecl)){
+        auto &ctx = IGM.getClangASTContext();
+        auto clangType  = ctx.getObjCObjectType(
+                            ctx.ObjCBuiltinIdTy,
+                            const_cast<clang::ObjCProtocolDecl **>(&protoDecl),
+                            1);
         auto ptrTy = ctx.getObjCObjectPointerType(clangType);
         return ctx.getCanonicalType(ptrTy);
       }

@@ -7,6 +7,9 @@
 
 import Foundation
 
+@objc protocol P { }
+@objc protocol Q { }
+
 class Foo: NSManagedObject {
   // -- POD types:
 
@@ -53,4 +56,10 @@ class Foo: NSManagedObject {
   // nonatomic, readonly, ivar l
   // CHECK: private unnamed_addr constant {{.*}} c"T@\22NSString\22,N,R,Vl\00"
   let l: String? = nil
+
+  // -- Protocol types:
+  // CHECK: private unnamed_addr constant [15 x i8] c"T@\22<P>\22,N,&,Vp\00"
+  var p: P?
+  // CHECK: private unnamed_addr constant [19 x i8] c"T@\22<P><Q>\22,N,&,Vpq\00"
+  var pq: protocol<P, Q>?
 }
