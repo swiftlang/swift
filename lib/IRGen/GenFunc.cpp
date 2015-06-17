@@ -3139,12 +3139,10 @@ llvm::Value* IRGenFunction::coerceValue(llvm::Value *value, llvm::Type *toTy,
 
   // Otherwise we need to store, bitcast, and load.
   auto address = allocateForCoercion(*this, fromTy, toTy,
-                                     value->getName());
-  auto *orig = Builder.CreateBitCast(address.getAddress(),
-                                     fromTy->getPointerTo());
+                                     value->getName() + ".coercion");
+  auto orig = Builder.CreateBitCast(address, fromTy->getPointerTo());
   Builder.CreateStore(value, orig);
-  auto *coerced = Builder.CreateBitCast(address.getAddress(),
-                                        toTy->getPointerTo());
+  auto coerced = Builder.CreateBitCast(address, toTy->getPointerTo());
   return Builder.CreateLoad(coerced);
 }
 

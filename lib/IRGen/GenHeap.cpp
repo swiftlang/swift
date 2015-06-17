@@ -917,23 +917,20 @@ void IRGenFunction::emitUnpin(llvm::Value *value) {
 }
 
 llvm::Value *IRGenFunction::emitLoadNativeRefcountedPtr(Address addr) {
-  llvm::Value *src =
-    Builder.CreateBitCast(addr.getAddress(),
-                          IGM.RefCountedPtrTy->getPointerTo());
+  Address src =
+    Builder.CreateBitCast(addr, IGM.RefCountedPtrTy->getPointerTo());
   return Builder.CreateLoad(src);
 }
 
 llvm::Value *IRGenFunction::emitLoadUnknownRefcountedPtr(Address addr) {
-  llvm::Value *src =
-    Builder.CreateBitCast(addr.getAddress(),
-                          IGM.UnknownRefCountedPtrTy->getPointerTo());
+  Address src =
+    Builder.CreateBitCast(addr, IGM.UnknownRefCountedPtrTy->getPointerTo());
   return Builder.CreateLoad(src);
 }
 
 llvm::Value *IRGenFunction::emitLoadBridgeRefcountedPtr(Address addr) {
-  llvm::Value *src =
-    Builder.CreateBitCast(addr.getAddress(),
-                          IGM.BridgeObjectPtrTy->getPointerTo());
+  Address src =
+    Builder.CreateBitCast(addr, IGM.BridgeObjectPtrTy->getPointerTo());
   return Builder.CreateLoad(src);
 }
 

@@ -472,7 +472,7 @@ public:
   /// At -O0, emit a shadow copy of an Address in an alloca, so the
   /// register allocator doesn't elide the dbg.value intrinsic when
   /// register pressure is high.  There is a trade-off to this: With
-  /// shadow copies, we loose the precise lifetime.
+  /// shadow copies, we lose the precise lifetime.
   llvm::Value *emitShadowCopy(llvm::Value *Storage,
                               StringRef Name,
                               Alignment Align = Alignment(0)) {
@@ -487,43 +487,50 @@ public:
       Align = IGM.getPointerAlignment();
 
     auto Alloca = createAlloca(Ty, Align, Name+".addr");
-    Builder.CreateAlignedStore(Storage, Alloca.getAddress(), Align.getValue());
+    Builder.CreateStore(Storage, Alloca.getAddress(), Align);
     return Alloca.getAddress();
   }
 
-  llvm::Value *emitShadowCopy(const Address &Storage, StringRef Name) {
-    return emitShadowCopy(Storage.getAddress(), Name, Storage.getAlignment());
+  llvm::Value *emitShadowCopy(Address storage, StringRef name) {
+    return emitShadowCopy(storage.getAddress(), name, storage.getAlignment());
   }
 
-  void emitShadowCopy(ArrayRef<llvm::Value *> Vals, StringRef Name,
-                      llvm::SmallVectorImpl<llvm::Value *> &Copy) {
+  void emitShadowCopy(ArrayRef<llvm::Value *> vals, StringRef name,
+                      llvm::SmallVectorImpl<llvm::Value *> &copy) {
     // Only do this at -O0.
     if (IGM.Opts.Optimize) {
-      for (auto val : Vals)
-        Copy.push_back(val);
+      copy.append(vals.begin(), vals.end());
       return;
     }
 
     // Single or empty values.
-    if (Vals.size() <= 1) {
-      for (auto val : Vals)
-        Copy.push_back(emitShadowCopy(val, Name));
+    if (vals.size() <= 1) {
+      for (auto val : vals)
+        copy.push_back(emitShadowCopy(val, name));
       return;
     }
 
     // Create a single aggregate alloca for explosions.
-    SmallVector<llvm::Type *, 8> Eltypes;
-    for (auto val : Vals)
-      Eltypes.push_back(val->getType());
-    auto AggregateType = llvm::StructType::get(Builder.getContext(), Eltypes);
-    auto Align = IGM.getPointerAlignment();
-    auto Alloca = createAlloca(AggregateType, Align, Name+".coerce");
-    unsigned i = 0;
-    for (auto val : Vals) {
-      auto addr = Builder.CreateConstGEP2_32(Alloca.getAddress(), 0, i++);
+    // TODO: why are we doing this instead of using the TypeInfo?
+    llvm::StructType *aggregateType = [&] {
+      SmallVector<llvm::Type *, 8> eltTypes;
+      for (auto val : vals)
+        eltTypes.push_back(val->getType());
+      return llvm::StructType::get(IGM.LLVMContext, eltTypes);
+    }();
+
+    auto layout = IGM.DataLayout.getStructLayout(aggregateType);
+    Alignment align(layout->getAlignment());
+
+    auto alloca = createAlloca(aggregateType, align, name + ".debug");
+    size_t i = 0;
+    for (auto val : vals) {
+      auto addr = Builder.CreateStructGEP(alloca, i,
+                                          Size(layout->getElementOffset(i)));
       Builder.CreateStore(val, addr);
+      i++;
     }
-    Copy.push_back(Alloca.getAddress());
+    copy.push_back(alloca.getAddress());
   }
 
   /// Determine the Swift argument ordering for a given parameter and
@@ -558,12 +565,12 @@ public:
 
   /// Emit debug info for a function argument or a local variable.
   template <typename StorageType>
-  void emitDebugVariableDeclaration(IRBuilder &Builder,
-                                    StorageType Storage,
+  void emitDebugVariableDeclaration(StorageType Storage,
                                     DebugTypeInfo Ty,
                                     SILDebugScope *DS,
                                     StringRef Name) {
-    if (!IGM.DebugInfo) return;
+    assert(IGM.DebugInfo && "debug info not enabled");
+
     auto VD = cast<VarDecl>(Ty.getDecl());
     auto N = getArgNo(VD);
     if (N) {
@@ -645,10 +652,12 @@ public:
     StringRef Name = Decl->getNameStr();
     Explosion e = getLoweredExplosion(SILVal);
     DebugTypeInfo DbgTy(Decl, Decl->getType(), getTypeInfo(SILVal.getType()));
+
+    // Put the value in memory if necessary.
     // Emit an -O0 shadow copy for the explosion.
     llvm::SmallVector<llvm::Value *, 8> Copy;
     emitShadowCopy(e.claimAll(), Name, Copy);
-    emitDebugVariableDeclaration(Builder, Copy, DbgTy,
+    emitDebugVariableDeclaration(Copy, DbgTy,
                                  i->getDebugScope(), Name);
   }
   void visitDebugValueAddrInst(DebugValueAddrInst *i) {
@@ -665,7 +674,7 @@ public:
     StringRef Name = Decl->getName().str();
     auto Val = getLoweredAddress(SILVal).getAddress();
     DebugTypeInfo DbgTy(Decl, Decl->getType(), getTypeInfo(SILVal.getType()));
-    emitDebugVariableDeclaration(Builder, Val, DbgTy, i->getDebugScope(), Name);
+    emitDebugVariableDeclaration(Val, DbgTy, i->getDebugScope(), Name);
   }
   void visitLoadWeakInst(LoadWeakInst *i);
   void visitStoreWeakInst(StoreWeakInst *i);
@@ -3285,7 +3294,7 @@ static void emitDebugDeclarationForAllocStack(IRGenSILFunction &IGF,
       auto DS = i->getDebugScope();
       if (DS) {
         assert(DS->SILFn == IGF.CurSILFn || DS->InlinedCallSite);
-        IGF.emitDebugVariableDeclaration(IGF.Builder, addr, DbgTy, DS, Name);
+        IGF.emitDebugVariableDeclaration(addr, DbgTy, DS, Name);
       }
     }
   }
