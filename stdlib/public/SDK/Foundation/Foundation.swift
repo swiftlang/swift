@@ -1252,3 +1252,93 @@ extension NSUndoManager {
   }
 }
 
+//===----------------------------------------------------------------------===//
+// NSCoder
+//===----------------------------------------------------------------------===//
+
+@asmname("NS_Swift_NSCoder_decodeObject")
+internal func NS_Swift_NSCoder_decodeObject(
+  self_: AnyObject,
+  _ error: NSErrorPointer) -> AnyObject?
+
+@asmname("NS_Swift_NSCoder_decodeObjectForKey")
+internal func NS_Swift_NSCoder_decodeObjectForKey(
+  self_: AnyObject,
+  _ key: AnyObject,
+  _ error: NSErrorPointer) -> AnyObject?
+
+@asmname("NS_Swift_NSCoder_decodeObjectOfClassForKey")
+internal func NS_Swift_NSCoder_decodeObjectOfClassForKey(
+  self_: AnyObject,
+  _ cls: AnyObject,
+  _ key: AnyObject,
+  _ error: NSErrorPointer) -> AnyObject?
+
+@asmname("NS_Swift_NSCoder_decodeObjectOfClassesForKey")
+internal func NS_Swift_NSCoder_decodeObjectOfClassesForKey(
+  self_: AnyObject,
+  _ classes: NSSet?,
+  _ key: AnyObject,
+  _ error: NSErrorPointer) -> AnyObject?
+
+
+@available(OSX 10.11, iOS 9.0, *)
+internal func resolveError(error: NSError?) throws {
+  if let error = error where error.code != NSCoderValueNotFoundError {
+    throw error
+  }
+}
+
+extension NSCoder {
+  @available(OSX 10.11, iOS 9.0, *)
+  public func decodeTopLevelObject() throws -> AnyObject? {
+    var error: NSError?
+    let result = NS_Swift_NSCoder_decodeObject(self as AnyObject, &error)
+    try resolveError(error)
+    return result
+  }
+
+  @available(OSX 10.11, iOS 9.0, *)
+  public func decodeTopLevelObjectForKey(key: String) throws -> AnyObject? {
+    var error: NSError?
+    let result = NS_Swift_NSCoder_decodeObjectForKey(self as AnyObject, key as AnyObject, &error)
+    try resolveError(error)
+    return result
+  }
+
+  @available(OSX 10.11, iOS 9.0, *)
+  public func decodeTopLevelObjectOfClass<DecodedObjectType: NSCoding where DecodedObjectType: NSObject>(cls: DecodedObjectType.Type, forKey key: String) throws -> DecodedObjectType? {
+    var error: NSError?
+    let result = NS_Swift_NSCoder_decodeObjectOfClassForKey(self as AnyObject, cls as AnyObject, key as AnyObject, &error)
+    try resolveError(error)
+    return result as? DecodedObjectType
+  }
+
+  @available(OSX 10.11, iOS 9.0, *)
+  public func decodeTopLevelObjectOfClasses(classes: NSSet?, forKey key: String) throws -> AnyObject? {
+    var error: NSError?
+    let result = NS_Swift_NSCoder_decodeObjectOfClassesForKey(self as AnyObject, classes, key as AnyObject, &error)
+    try resolveError(error)
+    return result
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// NSKeyedUnarchiver
+//===----------------------------------------------------------------------===//
+
+@asmname("NS_Swift_NSKeyedUnarchiver_unarchiveObjectWithData")
+internal func NS_Swift_NSKeyedUnarchiver_unarchiveObjectWithData(
+  self_: AnyObject,
+  _ data: AnyObject,
+  _ error: NSErrorPointer) -> AnyObject?
+
+extension NSKeyedUnarchiver {
+  @available(OSX 10.11, iOS 9.0, *)
+  public class func unarchiveTopLevelObjectWithData(data: NSData) throws -> AnyObject? {
+    var error: NSError?
+    let result = NS_Swift_NSKeyedUnarchiver_unarchiveObjectWithData(self as AnyClass, data as AnyObject, &error)
+    try resolveError(error)
+    return result
+  }
+}

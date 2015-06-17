@@ -13,10 +13,9 @@ func test_NSCoder_decodeObject(coder: NSCoder) {
 
 @available(iOS, introduced=9.0)
 @available(OSX, introduced=10.11)
-func test_NSCoder_decodeObjectAndReturnError(coder: NSCoder) throws {
-  // expected-error@+1 {{'decodeObjectAndReturnError()' is unavailable in Swift}}
-  var r = try coder.decodeObjectAndReturnError()
-  expectType(AnyObject.self, &r)
+func test_NSCoder_decodeTopLevelObject(coder: NSCoder) throws {
+  var r = try coder.decodeTopLevelObject()
+  expectType(Optional<AnyObject>.self, &r)
 }
 
 func test_NSCoder_decodeObjectForKey(coder: NSCoder, key: String) {
