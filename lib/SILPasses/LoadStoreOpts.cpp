@@ -166,10 +166,8 @@ initializeWithUncheckedAddrCast(SILValue Address, LoadInst *LI,
   // casts pointers to differently sized integer types. This code prevents
   // that we bitcast the values.
   if (OutputTy.getStructOrBoundGenericStruct() &&
-      InputTy.getStructOrBoundGenericStruct()) {
-    Result = ForwardingAnalysisResult::Failure;
+      InputTy.getStructOrBoundGenericStruct())
     return false;
-  }
 
   SILValue LdAddr = LI->getOperand();
   Path = std::move(ProjectionPath::getAddrProjectionPath(InputUADCI, LdAddr));
