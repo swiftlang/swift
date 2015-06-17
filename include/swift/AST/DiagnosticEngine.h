@@ -380,8 +380,10 @@ namespace swift {
 
     /// \brief Add a token-based removal fix-it to the currently-active
     /// diagnostic.
-    InFlightDiagnostic &fixItRemove(SourceRange R);
-    
+    InFlightDiagnostic &fixItRemove(SourceRange R) {
+      return fixItReplace(R, {});
+    }
+
     /// \brief Add a character-based removal fix-it to the currently-active
     /// diagnostic.
     InFlightDiagnostic &fixItRemoveChars(SourceLoc Start, SourceLoc End) {

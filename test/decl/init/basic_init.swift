@@ -19,7 +19,7 @@ typealias t = t // expected-error {{type alias 't' circularly references itself}
 struct MyStruct {
   init(k: Int) {
   }
-  convenience init() {  // expected-error {{delegating initializers in structs are not marked with 'convenience'}} {{3-15=}}
+  convenience init() {  // expected-error {{delegating initializers in structs are not marked with 'convenience'}} {{3-14=}}
     self.init(k: 1)
   }
 }

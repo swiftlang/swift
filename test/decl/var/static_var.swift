@@ -1,79 +1,79 @@
 // RUN: %target-parse-verify-swift -parse-as-library
 
 // See also rdar://15626843.
-static var gvu1: Int // expected-error {{static properties may only be declared on a type}}{{1-8=}}
+static var gvu1: Int // expected-error {{static properties may only be declared on a type}}{{1-7=}}
     // expected-error@-1 {{global 'var' declaration requires an initializer expression or getter/setter specifier}}
-class var gvu2: Int // expected-error {{class properties may only be declared on a type}}{{1-7=}}
+class var gvu2: Int // expected-error {{class properties may only be declared on a type}}{{1-6=}}
     // expected-error@-1 {{global 'var' declaration requires an initializer expression or getter/setter specifier}}
-override static var gvu3: Int // expected-error {{static properties may only be declared on a type}}{{10-17=}}
-    // expected-error@-1 {{'override' can only be specified on class members}}{{1-10=}}
+override static var gvu3: Int // expected-error {{static properties may only be declared on a type}}{{10-16=}}
+    // expected-error@-1 {{'override' can only be specified on class members}}{{1-9=}}
     // expected-error@-2 {{global 'var' declaration requires an initializer expression or getter/setter specifier}}
-override class var gvu4: Int // expected-error {{class properties may only be declared on a type}}{{10-16=}}
-    // expected-error@-1 {{'override' can only be specified on class members}}{{1-10=}}
+override class var gvu4: Int // expected-error {{class properties may only be declared on a type}}{{10-15=}}
+    // expected-error@-1 {{'override' can only be specified on class members}}{{1-9=}}
     // expected-error@-2 {{global 'var' declaration requires an initializer expression or getter/setter specifier}}
-static override var gvu5: Int // expected-error {{static properties may only be declared on a type}}{{1-8=}}
-    // expected-error@-1 {{'override' can only be specified on class members}}{{8-17=}}
+static override var gvu5: Int // expected-error {{static properties may only be declared on a type}}{{1-7=}}
+    // expected-error@-1 {{'override' can only be specified on class members}}{{8-16=}}
     // expected-error@-2 {{global 'var' declaration requires an initializer expression or getter/setter specifier}}
-class override var gvu6: Int // expected-error {{class properties may only be declared on a type}}{{1-7=}}
-    // expected-error@-1 {{'override' can only be specified on class members}}{{7-16=}}
+class override var gvu6: Int // expected-error {{class properties may only be declared on a type}}{{1-6=}}
+    // expected-error@-1 {{'override' can only be specified on class members}}{{7-15=}}
     // expected-error@-2 {{global 'var' declaration requires an initializer expression or getter/setter specifier}}
 
-static var gvu7: Int { // expected-error {{static properties may only be declared on a type}}{{1-8=}}
+static var gvu7: Int { // expected-error {{static properties may only be declared on a type}}{{1-7=}}
   return 42
 }
-class var gvu8: Int { // expected-error {{class properties may only be declared on a type}}{{1-7=}}
+class var gvu8: Int { // expected-error {{class properties may only be declared on a type}}{{1-6=}}
   return 42
 }
 
 
-static let glu1: Int // expected-error {{static properties may only be declared on a type}}{{1-8=}}
+static let glu1: Int // expected-error {{static properties may only be declared on a type}}{{1-7=}}
     // expected-error@-1 {{global 'let' declaration requires an initializer expression}}
-class let glu2: Int // expected-error {{class properties may only be declared on a type}}{{1-7=}}
+class let glu2: Int // expected-error {{class properties may only be declared on a type}}{{1-6=}}
     // expected-error@-1 {{global 'let' declaration requires an initializer expression}}
-override static let glu3: Int // expected-error {{static properties may only be declared on a type}}{{10-17=}}
-    // expected-error@-1 {{'override' can only be specified on class members}}{{1-10=}}
+override static let glu3: Int // expected-error {{static properties may only be declared on a type}}{{10-16=}}
+    // expected-error@-1 {{'override' can only be specified on class members}}{{1-9=}}
     // expected-error@-2 {{global 'let' declaration requires an initializer expression}}
-override class let glu4: Int // expected-error {{class properties may only be declared on a type}}{{10-16=}}
-    // expected-error@-1 {{'override' can only be specified on class members}}{{1-10=}}
+override class let glu4: Int // expected-error {{class properties may only be declared on a type}}{{10-15=}}
+    // expected-error@-1 {{'override' can only be specified on class members}}{{1-9=}}
     // expected-error@-2 {{global 'let' declaration requires an initializer expression}}
-static override let glu5: Int // expected-error {{static properties may only be declared on a type}}{{1-8=}}
-    // expected-error@-1 {{'override' can only be specified on class members}}{{8-17=}}
+static override let glu5: Int // expected-error {{static properties may only be declared on a type}}{{1-7=}}
+    // expected-error@-1 {{'override' can only be specified on class members}}{{8-16=}}
     // expected-error@-2 {{global 'let' declaration requires an initializer expression}}
-class override let glu6: Int // expected-error {{class properties may only be declared on a type}}{{1-7=}}
-    // expected-error@-1 {{'override' can only be specified on class members}}{{7-16=}}
+class override let glu6: Int // expected-error {{class properties may only be declared on a type}}{{1-6=}}
+    // expected-error@-1 {{'override' can only be specified on class members}}{{7-15=}}
     // expected-error@-2 {{global 'let' declaration requires an initializer expression}}
 
 
-static var gvi1: Int = 0 // expected-error {{static properties may only be declared on a type}}{{1-8=}}
-class var gvi2: Int = 0 // expected-error {{class properties may only be declared on a type}}{{1-7=}}
-override static var gvi3: Int = 0 // expected-error {{static properties may only be declared on a type}}{{10-17=}}
-    // expected-error@-1 {{'override' can only be specified on class members}}{{1-10=}}
-override class var gvi4: Int = 0 // expected-error {{class properties may only be declared on a type}}{{10-16=}}
-    // expected-error@-1 {{'override' can only be specified on class members}}{{1-10=}}
-static override var gvi5: Int = 0 // expected-error {{static properties may only be declared on a type}}{{1-8=}}
-    // expected-error@-1 {{'override' can only be specified on class members}}{{8-17=}}
-class override var gvi6: Int = 0 // expected-error {{class properties may only be declared on a type}}{{1-7=}}
-    // expected-error@-1 {{'override' can only be specified on class members}}{{7-16=}}
+static var gvi1: Int = 0 // expected-error {{static properties may only be declared on a type}}{{1-7=}}
+class var gvi2: Int = 0 // expected-error {{class properties may only be declared on a type}}{{1-6=}}
+override static var gvi3: Int = 0 // expected-error {{static properties may only be declared on a type}}{{10-16=}}
+    // expected-error@-1 {{'override' can only be specified on class members}}{{1-9=}}
+override class var gvi4: Int = 0 // expected-error {{class properties may only be declared on a type}}{{10-15=}}
+    // expected-error@-1 {{'override' can only be specified on class members}}{{1-9=}}
+static override var gvi5: Int = 0 // expected-error {{static properties may only be declared on a type}}{{1-7=}}
+    // expected-error@-1 {{'override' can only be specified on class members}}{{8-16=}}
+class override var gvi6: Int = 0 // expected-error {{class properties may only be declared on a type}}{{1-6=}}
+    // expected-error@-1 {{'override' can only be specified on class members}}{{7-15=}}
 
 
-static let gli1: Int = 0 // expected-error {{static properties may only be declared on a type}}{{1-8=}}
-class let gli2: Int = 0 // expected-error {{class properties may only be declared on a type}}{{1-7=}}
-override static let gli3: Int = 0 // expected-error {{static properties may only be declared on a type}}{{10-17=}}
-    // expected-error@-1 {{'override' can only be specified on class members}}{{1-10=}}
-override class let gli4: Int = 0 // expected-error {{class properties may only be declared on a type}}{{10-16=}}
-    // expected-error@-1 {{'override' can only be specified on class members}}{{1-10=}}
-static override let gli5: Int = 0 // expected-error {{static properties may only be declared on a type}}{{1-8=}}
-    // expected-error@-1 {{'override' can only be specified on class members}}{{8-17=}}
-class override let gli6: Int = 0 // expected-error {{class properties may only be declared on a type}}{{1-7=}}
-    // expected-error@-1 {{'override' can only be specified on class members}}{{7-16=}}
+static let gli1: Int = 0 // expected-error {{static properties may only be declared on a type}}{{1-7=}}
+class let gli2: Int = 0 // expected-error {{class properties may only be declared on a type}}{{1-6=}}
+override static let gli3: Int = 0 // expected-error {{static properties may only be declared on a type}}{{10-16=}}
+    // expected-error@-1 {{'override' can only be specified on class members}}{{1-9=}}
+override class let gli4: Int = 0 // expected-error {{class properties may only be declared on a type}}{{10-15=}}
+    // expected-error@-1 {{'override' can only be specified on class members}}{{1-9=}}
+static override let gli5: Int = 0 // expected-error {{static properties may only be declared on a type}}{{1-7=}}
+    // expected-error@-1 {{'override' can only be specified on class members}}{{8-16=}}
+class override let gli6: Int = 0 // expected-error {{class properties may only be declared on a type}}{{1-6=}}
+    // expected-error@-1 {{'override' can only be specified on class members}}{{7-15=}}
 
 
 func inGlobalFunc() {
-  static var v1: Int // expected-error {{static properties may only be declared on a type}}{{3-10=}}
-  class var v2: Int // expected-error {{class properties may only be declared on a type}}{{3-9=}}
+  static var v1: Int // expected-error {{static properties may only be declared on a type}}{{3-9=}}
+  class var v2: Int // expected-error {{class properties may only be declared on a type}}{{3-8=}}
 
-  static let l1: Int = 0 // expected-error {{static properties may only be declared on a type}}{{3-10=}}
-  class let l2: Int = 0 // expected-error {{class properties may only be declared on a type}}{{3-9=}}
+  static let l1: Int = 0 // expected-error {{static properties may only be declared on a type}}{{3-9=}}
+  class let l2: Int = 0 // expected-error {{class properties may only be declared on a type}}{{3-8=}}
   
   v1 = 1; v2 = 1
   _ = v1+v2+l1+l2
@@ -81,11 +81,11 @@ func inGlobalFunc() {
 
 struct InMemberFunc {
   func member() {
-    static var v1: Int // expected-error {{static properties may only be declared on a type}}{{5-12=}}
-    class var v2: Int // expected-error {{class properties may only be declared on a type}}{{5-11=}}
+    static var v1: Int // expected-error {{static properties may only be declared on a type}}{{5-11=}}
+    class var v2: Int // expected-error {{class properties may only be declared on a type}}{{5-10=}}
 
-    static let l1: Int = 0 // expected-error {{static properties may only be declared on a type}}{{5-12=}}
-    class let l2: Int = 0 // expected-error {{class properties may only be declared on a type}}{{5-11=}}
+    static let l1: Int = 0 // expected-error {{static properties may only be declared on a type}}{{5-11=}}
+    class let l2: Int = 0 // expected-error {{class properties may only be declared on a type}}{{5-10=}}
 
     v1 = 1; v2 = 1
     _ = v1+v2+l1+l2

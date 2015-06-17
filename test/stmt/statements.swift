@@ -10,7 +10,7 @@ func f2() {}
 func f3() -> Int {}
 
 func invalid_semi() {
-  ; // expected-error {{';' statements are not allowed}} {{3-5=}}
+  ; // expected-error {{';' statements are not allowed}} {{3-4=}}
 }
 
 func nested1(x: Int) {

@@ -16,7 +16,7 @@ func foo() {
     skview! // expected-error 2{{expected ',' separator}} expected-error {{use of unresolved identifier 'skview'}}
 } // expected-error {{expected expression in list of expressions}} expected-error {{expected ')' in expression list}}
 
-func test3(a: inout Int) {} // expected-error {{'inout' must appear before the parameter name}}{{12-12=inout }}{{15-21=}}
+func test3(a: inout Int) {} // expected-error {{'inout' must appear before the parameter name}}{{12-12=inout }}{{15-20=}}
 
 super.init() // expected-error {{'super' cannot be used outside of class members}} expected-error {{initializers may only be declared within a type}}
 

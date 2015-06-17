@@ -87,7 +87,7 @@ if #available(OSX 10.10 || iOS 8.0) {// expected-error {{'||' cannot be used in 
 
 // Emit Fix-It removing un-needed >=, for the moment.
 
-if #available(OSX >= 10.10, *) { // expected-error {{version comparison not needed}} {{19-22=}}
+if #available(OSX >= 10.10, *) { // expected-error {{version comparison not needed}} {{19-21=}}
 }
 
 // <rdar://problem/20904820> Following a "let" condition with #available is incorrectly rejected

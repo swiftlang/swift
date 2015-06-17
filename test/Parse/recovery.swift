@@ -39,7 +39,7 @@ func test(a: BadAttributes) -> () {
 }
 
 // Here is an extra random close-brace!
-} // expected-error{{extraneous '}' at top level}} {{1-3=}}
+} // expected-error{{extraneous '}' at top level}} {{1-2=}}
 
 
 //===--- Recovery for braced blocks.
