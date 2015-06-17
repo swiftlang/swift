@@ -82,39 +82,38 @@ static SILType getForwardingTypeForLS(const SILInstruction *I) {
 namespace {
 
 enum class ForwardingAnalysisResult {
+  Failure,
   Normal,
-  UncheckedAddress
+  UncheckedAddress,
 };
 
 /// This is a move-only structure. Thus it has a private default constructor and
 /// a deleted copy constructor.
-class ForwardingAnalysis {
-  ForwardingAnalysisResult Kind;
-  UncheckedAddrCastInst *UADCI;
+class ForwardingAnalysis final {
+  ForwardingAnalysisResult Result = ForwardingAnalysisResult::Failure;
+  UncheckedAddrCastInst *UADCI = nullptr;
   Optional<ProjectionPath> Path;
 
-  ForwardingAnalysis(ForwardingAnalysisResult Kind,
-                     UncheckedAddrCastInst *UADCI,
-                     Optional<ProjectionPath> &&P)
-    : Kind(Kind), UADCI(UADCI), Path(std::move(*P)) {}
-
-  ForwardingAnalysis(ForwardingAnalysisResult Kind,
-                     Optional<ProjectionPath> &&P)
-    : Kind(Kind), UADCI(nullptr), Path(std::move(*P)) {}
-
 public:
-  ForwardingAnalysis() = delete;
+  ForwardingAnalysis(SILValue Address, LoadInst *LI,
+                     UncheckedAddrCastInst *UADCI);
+  ForwardingAnalysis(SILValue Address, LoadInst *LI);
+
   ForwardingAnalysis(const ForwardingAnalysis &) = delete;
   ForwardingAnalysis(ForwardingAnalysis &&FFA) = default;
 
-  static Optional<ForwardingAnalysis>
-  canForwardAddrToUncheckedAddrToLd(SILValue Address, LoadInst *LI,
-                                    UncheckedAddrCastInst *UADCI);
-  static Optional<ForwardingAnalysis>
-  canForwardAddrToLd(SILValue Address, LoadInst *LI);
+  SILValue forward(SILValue Addr, SILValue StoredValue, LoadInst *LI);
 
-  SILValue forwardAddr(SILValue Addr, SILValue StoredValue,
-                       LoadInst *LI);
+  /// Returns true if this analysis is able to forward the analyzed load.
+  bool canForward() const {
+    switch (Result) {
+    case ForwardingAnalysisResult::Failure:
+      return false;
+    case ForwardingAnalysisResult::Normal:
+    case ForwardingAnalysisResult::UncheckedAddress:
+      return true;
+    }
+  }
 
 private:
   SILValue forwardAddrToLdWithExtractPath(SILValue Address,
@@ -125,76 +124,85 @@ private:
   SILValue forwardAddrToUncheckedCastToLd(SILValue Address,
                                           SILValue StoredValue,
                                           LoadInst *LI);
+
+  bool initializeWithUncheckedAddrCast(SILValue Address, LoadInst *LI,
+                                       UncheckedAddrCastInst *InputUADCI);
 };
 
 } // end anonymous namespace
 
-/// Given an unchecked_addr_cast with various address projections using it,
-/// check if we can forward the stored value.
-Optional<ForwardingAnalysis>
+bool
 ForwardingAnalysis::
-canForwardAddrToUncheckedAddrToLd(SILValue Address,
-                                  LoadInst *LI,
-                                  UncheckedAddrCastInst *UADCI) {
-  assert(LI->getOperand().stripAddressProjections() == UADCI &&
+initializeWithUncheckedAddrCast(SILValue Address, LoadInst *LI,
+                                UncheckedAddrCastInst *InputUADCI) {
+  assert(LI->getOperand().stripAddressProjections() == InputUADCI &&
          "We assume that the UADCI is the load's address stripped of "
          "address projections.");
 
   // First grab the address operand of our UADCI.
-  SILValue UADCIOp = UADCI->getOperand();
+  SILValue UADCIOp = InputUADCI->getOperand();
 
   // Make sure that this is equal to our address. If not, bail.
   if (UADCIOp != Address)
-    return llvm::NoneType::None;
+    return false;
 
   // Construct the relevant bitcast.
-  SILModule &Mod = UADCI->getModule();
-  SILType InputTy = UADCI->getOperand().getType();
-  SILType OutputTy = UADCI->getType();
+  SILModule &Mod = InputUADCI->getModule();
+  SILType InputTy = InputUADCI->getOperand().getType();
+  SILType OutputTy = InputUADCI->getType();
 
   bool InputIsTrivial = InputTy.isTrivial(Mod);
   bool OutputIsTrivial = OutputTy.isTrivial(Mod);
 
   // If either are generic, bail.
   if (InputTy.hasArchetype() || OutputTy.hasArchetype())
-    return llvm::NoneType::None;
+    return false;
 
   // If we have a trivial input and a non-trivial output bail.
-  if (InputIsTrivial && !OutputIsTrivial) {
-    return llvm::NoneType::None;
-  }
+  if (InputIsTrivial && !OutputIsTrivial)
+    return false;
 
   // The structs could have different size. We have code in the stdlib that
   // casts pointers to differently sized integer types. This code prevents
   // that we bitcast the values.
   if (OutputTy.getStructOrBoundGenericStruct() &&
-      InputTy.getStructOrBoundGenericStruct())
-    return llvm::NoneType::None;
+      InputTy.getStructOrBoundGenericStruct()) {
+    Result = ForwardingAnalysisResult::Failure;
+    return false;
+  }
 
   SILValue LdAddr = LI->getOperand();
-  auto P = ProjectionPath::getAddrProjectionPath(UADCI, LdAddr);
-  if (!P)
-    return llvm::NoneType::None;
-  return ForwardingAnalysis(ForwardingAnalysisResult::UncheckedAddress,
-                            UADCI, std::move(P));
+  Path = std::move(ProjectionPath::getAddrProjectionPath(InputUADCI, LdAddr));
+  if (!Path)
+    return false;
+
+  Result = ForwardingAnalysisResult::UncheckedAddress;
+  UADCI = InputUADCI;
+  return true;
 }
 
-Optional<ForwardingAnalysis>
+/// Given an unchecked_addr_cast with various address projections using it,
+/// check if we can forward the stored value.
 ForwardingAnalysis::
-canForwardAddrToLd(SILValue Address, LoadInst *LI) {
+ForwardingAnalysis(SILValue Address, LoadInst *LI,
+                   UncheckedAddrCastInst *InputUADCI) {
+  initializeWithUncheckedAddrCast(Address, LI, InputUADCI);
+}
+
+ForwardingAnalysis::ForwardingAnalysis(SILValue Address, LoadInst *LI) {
   // First if we have a store + unchecked_addr_cast + load, try to forward the
   // value the store using a bitcast.
   SILValue LIOpWithoutProjs = LI->getOperand().stripAddressProjections();
-  if (auto *UADCI = dyn_cast<UncheckedAddrCastInst>(LIOpWithoutProjs))
-    return ForwardingAnalysis::canForwardAddrToUncheckedAddrToLd(Address, LI,
-                                                                 UADCI);
+  if (auto *InputUADCI = dyn_cast<UncheckedAddrCastInst>(LIOpWithoutProjs))
+    if (initializeWithUncheckedAddrCast(Address, LI, InputUADCI))
+      return;
 
   // Attempt to find the projection path from Address -> Load->getOperand().
   // If we failed to find the path, return an empty value early.
-  auto P = ProjectionPath::getAddrProjectionPath(Address, LI->getOperand());
-  if (!P)
-    return llvm::NoneType::None;
-  return ForwardingAnalysis(ForwardingAnalysisResult::Normal, std::move(P));
+  Path = std::move(ProjectionPath::getAddrProjectionPath(Address, LI->getOperand()));
+  if (!Path)
+    return;
+  Result = ForwardingAnalysisResult::Normal;
 }
 
 /// Given an unchecked_addr_cast with various address projections using it,
@@ -238,14 +246,16 @@ forwardAddrToUncheckedCastToLd(SILValue Address, SILValue StoredValue,
 }
 
 SILValue
-ForwardingAnalysis::forwardAddr(SILValue Addr, SILValue StoredValue,
+ForwardingAnalysis::forward(SILValue Addr, SILValue StoredValue,
                                 LoadInst *LI) {
+  assert(canForward() && "Can not forward if analysis failed");
+
   // First if we have a store + unchecked_addr_cast + load, try to forward the
   // value the store using a bitcast.
-  if (Kind == ForwardingAnalysisResult::UncheckedAddress)
+  if (Result == ForwardingAnalysisResult::UncheckedAddress)
     return forwardAddrToUncheckedCastToLd(Addr, StoredValue, LI);
 
-  assert(Kind == ForwardingAnalysisResult::Normal && "The default kind is Normal.");
+  assert(Result == ForwardingAnalysisResult::Normal && "The default kind is Normal.");
 
   // Next, try to promote partial loads from stores. If this fails, it will
   // return SILValue(), which is also our failure condition.
@@ -286,10 +296,10 @@ forwardAddrToLdWithExtractPath(SILValue Address, SILValue StoredValue,
 static SILValue tryToForwardAddressValueToLoad(SILValue Address,
                                                SILValue StoredValue,
                                                LoadInst *LI) {
-  auto CheckResult = ForwardingAnalysis::canForwardAddrToLd(Address, LI);
-  if (!CheckResult)
+  ForwardingAnalysis FA(Address, LI);
+  if (!FA.canForward())
     return SILValue();
-  return CheckResult->forwardAddr(Address, StoredValue, LI);
+  return FA.forward(Address, StoredValue, LI);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1038,8 +1048,8 @@ bool LSBBForwarder::tryToForwardStoresToLoad(LSContext &Ctx, LoadInst *LI,
   for (auto &P : Stores) {
     SILValue Addr = P.first;
 
-    auto CheckResult = ForwardingAnalysis::canForwardAddrToLd(Addr, LI);
-    if (!CheckResult) {
+    ForwardingAnalysis FA(Addr, LI);
+    if (!FA.canForward()) {
       if (Addr == LI->getOperand()) {
         // Although the addresses match, we cannot load the stored value.
         stopTrackingAddress(Addr, StoreMap);
@@ -1050,7 +1060,7 @@ bool LSBBForwarder::tryToForwardStoresToLoad(LSContext &Ctx, LoadInst *LI,
     }
 
     SILValue Value = P.second.getForwardingValue();
-    SILValue Result = CheckResult->forwardAddr(Addr, Value, LI);
+    SILValue Result = FA.forward(Addr, Value, LI);
     assert(Result);
 
     DEBUG(llvm::dbgs() << "        Forwarding store from: " << *Addr);
@@ -1062,8 +1072,8 @@ bool LSBBForwarder::tryToForwardStoresToLoad(LSContext &Ctx, LoadInst *LI,
 
   // Check if we can forward from multiple stores.
   for (auto I = StoreMap.begin(), E = StoreMap.end(); I != E; I++) {
-    auto CheckResult = ForwardingAnalysis::canForwardAddrToLd(I->first, LI);
-    if (!CheckResult)
+    ForwardingAnalysis FA(I->first, LI);
+    if (!FA.canForward())
       continue;
 
     DEBUG(llvm::dbgs() << "        Checking from: ");
@@ -1074,7 +1084,7 @@ bool LSBBForwarder::tryToForwardStoresToLoad(LSContext &Ctx, LoadInst *LI,
 
     // Create a BBargument to merge in multiple stores.
     SILValue PhiValue = fixPhiPredBlocks(I->second, PredOrder, BB);
-    SILValue Result = CheckResult->forwardAddr(I->first, PhiValue, LI);
+    SILValue Result = FA.forward(I->first, PhiValue, LI);
     assert(Result && "Forwarding from multiple stores failed!");
 
     DEBUG(llvm::dbgs() << "        Forwarding from multiple stores: ");

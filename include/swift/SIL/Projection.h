@@ -364,6 +364,12 @@ public:
   /// able to be constructed by calling our factory method.
   ProjectionPath(ProjectionPath &&Other) : Path(Other.Path) {}
 
+  ProjectionPath &operator=(ProjectionPath &&O) {
+    *this = std::move(O);
+    O.Path.clear();
+    return *this;
+  }
+
   /// Create a new address projection path from the pointer Start through
   /// various address projections to End. Returns Nothing::None if there is no
   /// such path.
