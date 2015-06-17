@@ -145,3 +145,16 @@ struct Bill : Totalled {
 // SILGEN:   method #Totalled.total!setter.1: @_TTWV17materializeForSet4BillS_8TotalledS_FS1_s5totalSi
 // SILGEN:   method #Totalled.total!materializeForSet.1: @_TTWV17materializeForSet4BillS_8TotalledS_FS1_m5totalSi
 // SILGEN: }
+
+protocol AddressOnlySubscript {
+  typealias Index
+  subscript(i: Index) -> Index { get set }
+}
+
+struct Foo<T>: AddressOnlySubscript {
+  subscript(i: T) -> T {
+    get { return i }
+    set { print("\(i) = \(newValue)") }
+  }
+}
+

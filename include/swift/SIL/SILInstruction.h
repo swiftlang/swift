@@ -390,7 +390,6 @@ public:
   AllocValueBufferInst(SILLocation loc, SILType valueType,
                        SILValue operand)
       : UnaryInstructionBase(loc, operand, valueType.getAddressType()) {
-    assert(valueType.isObject());
   }
 
   SILType getValueType() const { return getType().getObjectType(); }
@@ -2981,7 +2980,6 @@ public:
   DeallocValueBufferInst(SILLocation loc, SILType valueType,
                          SILValue operand)
       : UnaryInstructionBase(loc, operand), ValueType(valueType) {
-    assert(valueType.isObject());
   }
 
   SILType getValueType() const { return ValueType; }
@@ -3050,7 +3048,6 @@ public:
   ProjectValueBufferInst(SILLocation loc, SILType valueType,
                          SILValue operand)
       : UnaryInstructionBase(loc, operand, valueType.getAddressType()) {
-    assert(valueType.isObject());
   }
 
   SILType getValueType() const { return getType().getObjectType(); }
