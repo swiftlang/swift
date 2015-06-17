@@ -55,3 +55,15 @@ while true {
   }
 }
 
+// rdar://problem/21197042
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=GENERIC_PARAM_AND_ASSOC_TYPE | FileCheck %s -check-prefix=GENERIC_PARAM_AND_ASSOC_TYPE
+struct CustomGenericCollection<Key> : DictionaryLiteralConvertible {
+  // GENERIC_PARAM_AND_ASSOC_TYPE: Begin completions
+  // GENERIC_PARAM_AND_ASSOC_TYPE-DAG: Decl[InstanceVar]/CurrNominal:      count[#Int#]; name=count
+  // GENERIC_PARAM_AND_ASSOC_TYPE-DAG: Decl[TypeAlias]/CurrNominal:        Key[#Key#]; name=Key
+  // GENERIC_PARAM_AND_ASSOC_TYPE-DAG: Decl[TypeAlias]/CurrNominal:        Value[#Value#]; name=Value
+  // GENERIC_PARAM_AND_ASSOC_TYPE: End completions
+  
+  var count: Int { #^GENERIC_PARAM_AND_ASSOC_TYPE^# }
+}
+

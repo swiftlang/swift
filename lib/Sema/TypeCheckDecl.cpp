@@ -995,10 +995,19 @@ static void finalizeGenericParamList(ArchetypeBuilder &builder,
                                      GenericParamList *genericParams,
                                      DeclContext *dc,
                                      TypeChecker &TC) {
+  Accessibility access;
+  if (auto *fd = dyn_cast<FuncDecl>(dc))
+    access = fd->getFormalAccess();
+  else if (auto *nominal = dyn_cast<NominalTypeDecl>(dc))
+    access = nominal->getFormalAccess();
+  else
+    access = Accessibility::Internal;
+
   // Wire up the archetypes.
   for (auto GP : *genericParams) {
     GP->setArchetype(builder.getArchetype(GP));
     TC.checkInheritanceClause(GP);
+    GP->setAccessibility(access);
   }
   genericParams->setAllArchetypes(
     TC.Context.AllocateCopy(builder.getAllArchetypes()));
