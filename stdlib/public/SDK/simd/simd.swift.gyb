@@ -13,7 +13,6 @@
 //===----------------------------------------------------------------------===//
 
 import Darwin
-import simd
 
 % component = ['x','y','z','w']
 % scalar_types = ['Float','Double','Int32']

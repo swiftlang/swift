@@ -3,7 +3,7 @@
 // RUN: echo "public struct X {}; public var x = X()" | %target-swift-frontend -module-name import_builtin -parse-stdlib -emit-module -o %t -
 // RUN: echo "public func foo() -> Int { return false }" > %t/import_text.swift
 // RUN: echo "public func pho$(printf '\xC3\xBB')x() -> Int { return false }" > %t/fran$(printf '\xC3\xA7')ais.swift
-// RUN: %target-swift-frontend -parse %s -I %t -sdk "" -enable-source-import -verify -show-diagnostics-after-fatal
+// RUN: %target-swift-frontend -parse %s -I %t -sdk "" -enable-source-import -module-name main -verify -show-diagnostics-after-fatal
 
 import Builtin  // expected-error {{no such module 'Builtin'}}
 
@@ -55,3 +55,5 @@ var _ : Int = foo()
 
 import français
 import func français.phoûx
+
+import main // expected-error {{cannot import module being compiled}}

@@ -1,8 +1,7 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse -I %S/Inputs/custom-modules %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse -I %S/Inputs/custom-modules %s -import-underlying-module -verify
 
 // REQUIRES: objc_interop
 
-import nullability;
 import CoreCooling
 
 func testSomeClass(sc: SomeClass, osc: SomeClass?) {

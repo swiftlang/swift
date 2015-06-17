@@ -76,7 +76,11 @@ NameBinder::getModule(ArrayRef<std::pair<Identifier, SourceLoc>> modulePath) {
   // If the imported module name is the same as the current module,
   // skip the Swift module loader and use the Clang module loader instead.
   // This allows a Swift module to extend a Clang module of the same name.
-  if (moduleID.first == SF.getParentModule()->getName() && modulePath.size() == 1) {
+  //
+  // FIXME: We'd like to only use this in SIL mode, but unfortunately we use it
+  // for our fake overlays as well.
+  if (moduleID.first == SF.getParentModule()->getName() &&
+      modulePath.size() == 1) {
     if (auto importer = Context.getClangModuleLoader())
       return importer->loadModule(moduleID.second, modulePath);
     return nullptr;
@@ -130,9 +134,27 @@ static const char *getImportKindString(ImportKind kind) {
   }
 }
 
+static bool shouldImportSelfImportClang(const ImportDecl *ID,
+                                        const SourceFile &SF) {
+  // FIXME: We use '@exported' for fake overlays in testing.
+  if (ID->isExported())
+    return true;
+  if (SF.Kind == SourceFileKind::SIL)
+    return true;
+  return false;
+}
+
 void NameBinder::addImport(
     SmallVectorImpl<std::pair<ImportedModule, ImportOptions>> &imports,
     ImportDecl *ID) {
+  if (ID->getModulePath().front().first == SF.getParentModule()->getName() &&
+      ID->getModulePath().size() == 1 && !shouldImportSelfImportClang(ID, SF)) {
+    // If the imported module name is the same as the current module,
+    // produce an error.
+    Context.Diags.diagnose(ID, diag::sema_import_current_module);
+    return;
+  }
+
   Module *M = getModule(ID->getModulePath());
   if (!M) {
     SmallString<64> modulePathStr;

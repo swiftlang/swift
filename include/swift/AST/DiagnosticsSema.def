@@ -182,6 +182,8 @@ NOTE(sema_no_import_no_sdk,sema_nb,none,
 NOTE(sema_no_import_no_sdk_xcrun,sema_nb,none,
      "use \"xcrun -sdk macosx swift\" to select the default OS X SDK installed "
      "with Xcode", ())
+ERROR(sema_import_current_module,sema_nb,none,
+      "cannot import module being compiled", ())
 ERROR(sema_opening_import,sema_nb,Fatal,
       "opening import file for module %0: %1", (Identifier, StringRef))
 
