@@ -663,16 +663,6 @@ extension ${Self} : _ArrayType {
     }
   }
 
-  /// Interpose `self` between each consecutive pair of `elements`,
-  /// and concatenate the elements of the resulting sequence.  For
-  /// example, `[-1, -2].join([[1, 2, 3], [4, 5, 6], [7, 8, 9]])`
-  /// yields `[1, 2, 3, -1, -2, 4, 5, 6, -1, -2, 7, 8, 9]`.
-  public func join<
-      S : SequenceType where S.Generator.Element == ${Self}<T>
-  >(elements: S) -> ${Self}<T> {
-    return Swift.join(self, elements)
-  }
-
   /// Returns a copy of `self` that has been sorted according to
   /// `isOrderedBefore`.
   ///

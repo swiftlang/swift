@@ -5,7 +5,7 @@
 extension SequenceType {
   final var myCount: Int {
     var result = 0
-    for x in self {
+    for _ in self {
       ++result
     }
     return result
@@ -114,7 +114,7 @@ extension ExtensibleCollectionType {
   public final func myJoin<S : SequenceType where S.Generator.Element == Self>(
     elements: S
   ) -> Self {
-    return Swift.join(self, elements)
+    return self.join(elements)
   }
 }
 
