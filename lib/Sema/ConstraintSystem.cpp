@@ -1205,11 +1205,13 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
   }
 
   // If we are looking at a member of an existential, open the existential.
+  Type baseOpenedTy = baseObjTy;
+
   if (baseObjTy->isExistentialType()) {
     ArchetypeType *openedArchetype = ArchetypeType::getOpened(baseObjTy);
     OpenedExistentialTypes.push_back({ getConstraintLocator(locator),
                                        openedArchetype });
-    baseObjTy = openedArchetype;
+    baseOpenedTy = openedArchetype;
   }
 
   // Constrain the 'self' object type.
@@ -1219,10 +1221,10 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     // For a protocol, substitute the base object directly. We don't need a
     // conformance constraint because we wouldn't have found the declaration
     // if it didn't conform.
-    addConstraint(ConstraintKind::Equal, baseObjTy, selfObjTy,
+    addConstraint(ConstraintKind::Equal, baseOpenedTy, selfObjTy,
                   getConstraintLocator(locator));
   } else if (!isDynamicResult) {
-    addSelfConstraint(*this, baseObjTy, selfObjTy, locator);
+    addSelfConstraint(*this, baseOpenedTy, selfObjTy, locator);
   }
 
   // Compute the type of the reference.
@@ -1248,23 +1250,19 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     auto assocType = cast<AssociatedTypeDecl>(value);
 
     type = openedFnType->getResult();
-    if (baseObjTy->is<ArchetypeType>()) {
+    if (baseOpenedTy->is<ArchetypeType>()) {
       // For an archetype, we substitute the base object for the base.
       // FIXME: Feels like a total hack.
-    } else if (!baseObjTy->isExistentialType() &&
-               !baseObjTy->is<ArchetypeType>()) {
+    } else if (!baseOpenedTy->isExistentialType() &&
+               !baseOpenedTy->is<ArchetypeType>()) {
       ProtocolConformance *conformance = nullptr;
-      if (TC.conformsToProtocol(baseObjTy, proto, DC,
+      if (TC.conformsToProtocol(baseOpenedTy, proto, DC,
                                 ConformanceCheckFlags::InExpression,
                                 &conformance)) {
         type = conformance->getTypeWitness(assocType, &TC).getReplacement();
       }
     }
-  } else if (isa<ConstructorDecl>(value) || isa<EnumElementDecl>(value) ||
-             (isa<FuncDecl>(value) && cast<FuncDecl>(value)->isStatic()) ||
-             (isa<VarDecl>(value) && cast<VarDecl>(value)->isStatic()) ||
-             isa<TypeDecl>(value) ||
-             isInstance) {
+  } else if (!value->isInstanceMember() || isInstance) {
     // For a constructor, enum element, static method, static property,
     // or an instance method referenced through an instance, we've consumed the
     // curried 'self' already. For a type, strip off the 'self' we artificially
@@ -1280,18 +1278,12 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
                      ->getDeclaredTypeOfContext();
     type = FunctionType::get(inputTy, resultTy, funcTy->getExtInfo());
   } else {
-    type = openedType;
-
-    // If we're referencing a method with dynamic Self that has 'self'
-    // curried, replace the type of 'self' with the actual base object
-    // type.
-    if (hasDynamicSelf) {
-      auto fnType = type->castTo<FunctionType>();
-      auto selfTy = rebuildSelfTypeWithObjectType(fnType->getInput(), 
-                                                  baseObjTy);      
-      type = FunctionType::get(selfTy, fnType->getResult(),
-                               fnType->getExtInfo());
-    }
+    // For an unbound instance method reference, replace the 'Self'
+    // parameter with the base type.
+    auto selfTy = rebuildSelfTypeWithObjectType(openedFnType->getInput(),
+                                                baseObjTy);
+    type = FunctionType::get(selfTy, openedFnType->getResult(),
+                             openedFnType->getExtInfo());
   }
 
   // If we opened up any type variables, record the replacements.

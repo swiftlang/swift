@@ -223,9 +223,13 @@ class ThisDerived1 : ThisBase1 {
     self.baseInstanceVar = 42 // expected-error {{'ThisDerived1.Type' does not have a member named 'baseInstanceVar'}}
     self.baseProp = 42 // expected-error {{'ThisDerived1.Type' does not have a member named 'baseProp'}}
     self.baseFunc0() // expected-error {{missing argument}}
-    self.baseFunc0(ThisBase1())()
+    // FIXME: crappy diagnostic
+    self.baseFunc0(ThisBase1())() // expected-error {{unable to infer closure type in the current context}}
+    self.baseFunc0(ThisDerived1())()
     self.baseFunc1(42) // expected-error {{cannot invoke 'baseFunc1' with an argument list of type '(Int)'}}
-    self.baseFunc1(ThisBase1())(42)
+    // FIXME: crappy diagnostic
+    self.baseFunc1(ThisBase1())(42) // expected-error {{unexpected trailing closure}}
+    self.baseFunc1(ThisDerived1())(42)
     self[0] = 42.0 // expected-error {{'ThisDerived1.Type' does not have a member named 'subscript'}}
     self.baseStaticVar = 42
     self.baseStaticProp = 42
