@@ -1259,7 +1259,7 @@ Type ClangImporter::Implementation::importFunctionType(
     }
 
     // Figure out the name for this parameter.
-    Identifier bodyName = importName(param->getDeclName());
+    Identifier bodyName = importName(param);
 
     // Note: C functions never have argument names.
     Identifier name;
@@ -1768,7 +1768,7 @@ Type ClangImporter::Implementation::importMethodType(
     }
 
     // Figure out the name for this parameter.
-    Identifier bodyName = importName(param->getDeclName());
+    Identifier bodyName = importName(param);
 
     // Figure out the name for this argument, which comes from the method name.
     Identifier name;

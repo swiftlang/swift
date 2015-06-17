@@ -680,6 +680,11 @@ public:
 
   /// \brief Converts the given Swift identifier for Clang.
   clang::DeclarationName exportName(Identifier name);
+
+  /// Imports the name of the given Clang decl into Swift.
+  ///
+  /// \sa importName(clang::DeclarationName, StringRef)
+  Identifier importName(const clang::NamedDecl *D, StringRef removePrefix = "");
   
   /// \brief Import the given Clang name into Swift.
   ///

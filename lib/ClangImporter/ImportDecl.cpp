@@ -1059,7 +1059,7 @@ namespace {
     }
 
     Decl *VisitTypedefNameDecl(const clang::TypedefNameDecl *Decl) {
-      auto Name = Impl.importName(Decl->getDeclName());
+      auto Name = Impl.importName(Decl);
       if (Name.empty())
         return nullptr;
 
@@ -1370,7 +1370,7 @@ namespace {
       }
 
       StringRef enumPrefix = Impl.EnumConstantNamePrefixes.lookup(clangEnum);
-      return Impl.importName(decl->getDeclName(), enumPrefix);
+      return Impl.importName(decl, enumPrefix);
     }
 
     /// Determine the common prefix to remove from the element names of an
@@ -1649,9 +1649,9 @@ namespace {
       
       Identifier name;
       if (decl->getDeclName())
-        name = Impl.importName(decl->getDeclName());
-      else if (decl->getTypedefNameForAnonDecl())
-        name =Impl.importName(decl->getTypedefNameForAnonDecl()->getDeclName());
+        name = Impl.importName(decl);
+      else if (auto *typedefForAnon = decl->getTypedefNameForAnonDecl())
+        name = Impl.importName(typedefForAnon);
 
       if (name.empty())
         return nullptr;
@@ -1906,9 +1906,9 @@ namespace {
 
       Identifier name;
       if (decl->getDeclName())
-        name = Impl.importName(decl->getDeclName());
-      else if (decl->getTypedefNameForAnonDecl())
-        name =Impl.importName(decl->getTypedefNameForAnonDecl()->getDeclName());
+        name = Impl.importName(decl);
+      else if (auto *typedefForAnon = decl->getTypedefNameForAnonDecl())
+        name = Impl.importName(typedefForAnon);
 
       if (name.empty())
         return nullptr;
@@ -2135,7 +2135,7 @@ namespace {
         }
       }
 
-      auto name = Impl.importName(decl->getDeclName());
+      auto name = Impl.importName(decl);
       if (name.empty())
         return nullptr;
 
@@ -2182,8 +2182,7 @@ namespace {
       auto loc = Impl.importSourceLoc(decl->getLocation());
 
       // Form the name of the function.
-      // FIXME: Allow remapping of the name.
-      auto baseName = Impl.importName(decl->getDeclName());
+      auto baseName = Impl.importName(decl);
       if (baseName.empty())
         return nullptr;
 
@@ -2235,7 +2234,7 @@ namespace {
         return nullptr;
 
       // Fields are imported as variables.
-      auto name = Impl.importName(decl->getDeclName());
+      auto name = Impl.importName(decl);
       if (name.empty())
         return nullptr;
 
@@ -2280,7 +2279,7 @@ namespace {
         return nullptr;
 
       // Variables are imported as... variables.
-      auto name = Impl.importName(decl->getDeclName());
+      auto name = Impl.importName(decl);
       if (name.empty())
         return nullptr;
 
@@ -4461,8 +4460,7 @@ namespace {
     }
 
     Decl *VisitObjCProtocolDecl(const clang::ObjCProtocolDecl *decl) {
-      clang::DeclarationName clangName = decl->getDeclName();
-      Identifier name = Impl.importName(clangName);
+      Identifier name = Impl.importName(decl);
       if (name.empty())
         return nullptr;
 
@@ -4510,7 +4508,7 @@ namespace {
       // hidden declarations from different modules because we do a
       // module check before deciding that there's a conflict.
       bool hasConflict = false;
-      clang::LookupResult lookupResult(Impl.getClangSema(), clangName,
+      clang::LookupResult lookupResult(Impl.getClangSema(), decl->getDeclName(),
                                        clang::SourceLocation(),
                                        clang::Sema::LookupOrdinaryName);
       lookupResult.setAllowHidden(true);
@@ -4614,7 +4612,7 @@ namespace {
     }
 
     Decl *VisitObjCInterfaceDecl(const clang::ObjCInterfaceDecl *decl) {
-      auto name = Impl.importName(decl->getDeclName());
+      auto name = Impl.importName(decl);
       if (name.empty())
         return nullptr;
 
@@ -4824,7 +4822,7 @@ namespace {
 
     Decl *VisitObjCPropertyDecl(const clang::ObjCPropertyDecl *decl,
                                 DeclContext *dc) {
-      auto name = Impl.importName(decl->getDeclName());
+      auto name = Impl.importName(decl);
       if (name.empty())
         return nullptr;
 
@@ -4981,16 +4979,10 @@ namespace {
 /// \brief Classify the given Clang enumeration to describe how to import it.
 EnumKind ClangImporter::Implementation::
 classifyEnum(const clang::EnumDecl *decl) {
-  Identifier name;
-  if (decl->getDeclName())
-    name = importName(decl->getDeclName());
-  else if (decl->getTypedefNameForAnonDecl())
-    name = importName(decl->getTypedefNameForAnonDecl()->getDeclName());
-
   // Anonymous enumerations simply get mapped to constants of the
   // underlying type of the enum, because there is no way to conjure up a
   // name for the Swift type.
-  if (name.empty())
+  if (!decl->hasNameForLinkage())
     return EnumKind::Constants;
   
   // Was the enum declared using *_ENUM or *_OPTIONS?

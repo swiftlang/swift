@@ -1197,6 +1197,13 @@ ClangImporter::Implementation::importName(clang::DeclarationName name,
   return SwiftContext.getIdentifier(nameStr);
 }
 
+Identifier
+ClangImporter::Implementation::importName(const clang::NamedDecl *D,
+                                          StringRef removePrefix) {
+  Identifier result = importName(D->getDeclName(), removePrefix);
+  return result;
+}
+
 /// Split the given selector piece at the given index, updating
 /// capitalization as required.
 ///
@@ -1211,7 +1218,7 @@ splitSelectorPieceAt(StringRef selector, unsigned index,
                      SmallVectorImpl<char> &buffer) {
   // If the split point is at the end of the selector, the solution is
   // trivial.
-  if (selector.str().size() == index) {
+  if (selector.size() == index) {
     return { selector, "" };
   }
 
