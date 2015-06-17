@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+@exported import GameplayKit
 
 @asmname("GK_Swift_GKEntity_componentForClass")
 internal func GK_Swift_GKEntity_componentForClass(

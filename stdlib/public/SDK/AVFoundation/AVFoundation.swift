@@ -1,3 +1,4 @@
+@exported import AVFoundation // Clang module
 import Foundation
 
 extension AVError : _BridgedNSError {

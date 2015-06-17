@@ -1,3 +1,4 @@
+@exported import SpriteKit
 
 // SpriteKit defines SKColor using a macro.
 

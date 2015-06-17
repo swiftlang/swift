@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+@exported import CoreMedia // Clang module
 
 // CMTIME_IS_VALID
 // CMTIME_IS_INVALID

@@ -1,3 +1,4 @@
+@exported import CoreLocation
 import Foundation
 
 extension CLError : _BridgedNSError {

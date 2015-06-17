@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import Foundation
+@exported import AppKit
 
 class REPLApplication : NSApplication {
 }

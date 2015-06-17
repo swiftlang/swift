@@ -12,6 +12,7 @@
 // GLKit overlays for Swift
 //===----------------------------------------------------------------------===//
 
+@exported import GLKit // Clang module
 
 // The GLKit headers provide a fairly complete set of types and operations
 // that Swift's importer is now able to present in Swift. However, Swift

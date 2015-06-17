@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+@exported import CoreMedia // Clang module
 
 // Nothing here yet.
 

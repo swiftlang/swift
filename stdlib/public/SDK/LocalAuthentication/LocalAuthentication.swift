@@ -1,3 +1,4 @@
+@exported import LocalAuthentication
 import Foundation
 
 @available(OSX, introduced=10.10) @available(iOS, introduced=8.0)

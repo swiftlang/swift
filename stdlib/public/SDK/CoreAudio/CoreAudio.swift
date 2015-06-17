@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+@exported import CoreAudio // Clang module
+
 extension UnsafeBufferPointer {
   /// Initialize an `UnsafeBufferPointer<T>` from an `AudioBuffer`.
   public init(_ audioBuffer: AudioBuffer) {
