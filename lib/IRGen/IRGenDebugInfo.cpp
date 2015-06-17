@@ -1617,16 +1617,27 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   case TypeKind::Tuple: {
     auto *TupleTy = BaseTy->castTo<TupleType>();
     // Tuples are also represented as structs.
+    auto FwdDecl = llvm::TempDINode(
+      DBuilder.createReplaceableCompositeType(
+        llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, File, 0,
+          llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits, Flags,
+          MangledName));
+    
+    DITypeCache[DbgTy.getType()] = llvm::TrackingMDNodeRef(FwdDecl.get());
+
     unsigned RealSize;
     auto Elements = getTupleElements(TupleTy, Scope, MainFile, Flags,
                                      DbgTy.getDeclContext(), RealSize);
     // FIXME: Handle %swift.opaque members and make this into an assertion.
     if (!RealSize)
       RealSize = SizeInBits;
-    return DBuilder.createStructType(
+    auto DITy = DBuilder.createStructType(
         Scope, MangledName, File, 0, RealSize, AlignInBits, Flags,
         nullptr, // DerivedFrom
         Elements, llvm::dwarf::DW_LANG_Swift, nullptr, MangledName);
+
+    DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
+    return DITy;
   }
 
   case TypeKind::InOut: {

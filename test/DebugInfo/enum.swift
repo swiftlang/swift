@@ -52,3 +52,11 @@ public enum Rose<A> {
   // CHECK-SAME:             {{.*}}identifier: "_TtGO4enum4RoseQq_S0__")
 	case IORose(() -> Rose<A>)
 }
+
+// CHECK: !DICompositeType({{.*}}name: "Tuple", {{.*}}elements: ![[ELTS:[0-9]+]],
+// CHECK-SAME:             {{.*}}identifier: "_TtGO4enum5Tupleq__")
+public enum Tuple<P> {
+  // CHECK: !DICompositeType({{.*}}name: "Tuple", {{.*}}elements: ![[ELTS]],
+  // CHECK-SAME:             {{.*}}identifier: "_TtGO4enum5TupleQq_S0__")
+	case C(P, () -> Tuple)
+}
