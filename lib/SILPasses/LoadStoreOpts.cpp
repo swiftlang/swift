@@ -81,7 +81,7 @@ static SILType getForwardingTypeForLS(const SILInstruction *I) {
 
 namespace {
 
-enum class ForwardingKind {
+enum class ForwardingAnalysisResult {
   Normal,
   UncheckedAddress
 };
@@ -89,16 +89,16 @@ enum class ForwardingKind {
 /// This is a move-only structure. Thus it has a private default constructor and
 /// a deleted copy constructor.
 class ForwardingAnalysis {
-  ForwardingKind Kind;
+  ForwardingAnalysisResult Kind;
   UncheckedAddrCastInst *UADCI;
   Optional<ProjectionPath> Path;
 
-  ForwardingAnalysis(ForwardingKind Kind,
+  ForwardingAnalysis(ForwardingAnalysisResult Kind,
                      UncheckedAddrCastInst *UADCI,
                      Optional<ProjectionPath> &&P)
     : Kind(Kind), UADCI(UADCI), Path(std::move(*P)) {}
 
-  ForwardingAnalysis(ForwardingKind Kind,
+  ForwardingAnalysis(ForwardingAnalysisResult Kind,
                      Optional<ProjectionPath> &&P)
     : Kind(Kind), UADCI(nullptr), Path(std::move(*P)) {}
 
@@ -175,7 +175,7 @@ canForwardAddrToUncheckedAddrToLd(SILValue Address,
   auto P = ProjectionPath::getAddrProjectionPath(UADCI, LdAddr);
   if (!P)
     return llvm::NoneType::None;
-  return ForwardingAnalysis(ForwardingKind::UncheckedAddress,
+  return ForwardingAnalysis(ForwardingAnalysisResult::UncheckedAddress,
                             UADCI, std::move(P));
 }
 
@@ -194,7 +194,7 @@ canForwardAddrToLd(SILValue Address, LoadInst *LI) {
   auto P = ProjectionPath::getAddrProjectionPath(Address, LI->getOperand());
   if (!P)
     return llvm::NoneType::None;
-  return ForwardingAnalysis(ForwardingKind::Normal, std::move(P));
+  return ForwardingAnalysis(ForwardingAnalysisResult::Normal, std::move(P));
 }
 
 /// Given an unchecked_addr_cast with various address projections using it,
@@ -242,10 +242,10 @@ ForwardingAnalysis::forwardAddr(SILValue Addr, SILValue StoredValue,
                                 LoadInst *LI) {
   // First if we have a store + unchecked_addr_cast + load, try to forward the
   // value the store using a bitcast.
-  if (Kind == ForwardingKind::UncheckedAddress)
+  if (Kind == ForwardingAnalysisResult::UncheckedAddress)
     return forwardAddrToUncheckedCastToLd(Addr, StoredValue, LI);
 
-  assert(Kind == ForwardingKind::Normal && "The default kind is Normal.");
+  assert(Kind == ForwardingAnalysisResult::Normal && "The default kind is Normal.");
 
   // Next, try to promote partial loads from stores. If this fails, it will
   // return SILValue(), which is also our failure condition.
