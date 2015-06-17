@@ -878,6 +878,8 @@ Module *ClangImporter::Implementation::finishLoadingClangModule(
     // but that's not correct for submodules.
     Identifier name = SwiftContext.getIdentifier((*clangModule).Name);
     result = Module::create(name, SwiftContext);
+    // Silence error messages about testably importing a Clang module.
+    result->setTestingEnabled();
 
     wrapperUnit =
       new (SwiftContext) ClangModuleUnit(*result, owner, clangModule);
@@ -1019,6 +1021,8 @@ ClangModuleUnit *ClangImporter::Implementation::getWrapperForModule(
   // FIXME: Handle hierarchical names better.
   Identifier name = SwiftContext.getIdentifier(underlying->Name);
   auto wrapper = Module::create(name, SwiftContext);
+  // Silence error messages about testably importing a Clang module.
+  wrapper->setTestingEnabled();
 
   auto file = new (SwiftContext) ClangModuleUnit(*wrapper, importer,
                                                  underlying);
