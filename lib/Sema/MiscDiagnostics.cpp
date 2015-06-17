@@ -1262,18 +1262,8 @@ void swift::fixItAccessibility(InFlightDiagnostic &diag, ValueDecl *VD,
   if (isForSetter && VD->getFormalAccess() == desiredAccess) {
     assert(attr);
     attr->setInvalid();
-    if (!attr->Range.isValid())
-      return;
-
-    // Remove the setter attribute along with a possible single trailing space.
-    SourceManager &sourceMgr = VD->getASTContext().SourceMgr;
-    SourceLoc nextCharLoc = Lexer::getLocForEndOfToken(sourceMgr,
-                                                       attr->Range.End);
-    StringRef nextChar = sourceMgr.extractText({ nextCharLoc, 1 });
-    if (nextChar == " ")
-      diag.fixItRemoveChars(attr->Range.Start, nextCharLoc.getAdvancedLoc(1));
-    else
-      diag.fixItRemove(attr->Range);
+    // Remove the setter attribute.
+    diag.fixItRemove(attr->Range);
 
   } else if (attr) {
     // This uses getLocation() instead of getRange() because we don't want to

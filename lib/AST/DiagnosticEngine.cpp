@@ -103,8 +103,40 @@ InFlightDiagnostic &InFlightDiagnostic::fixItInsertAfter(SourceLoc L,
   return fixItInsert(L, Str);
 }
 
+/// \brief Add a token-based removal fix-it to the currently-active
+/// diagnostic.
+InFlightDiagnostic &InFlightDiagnostic::fixItRemove(SourceRange R) {
+  assert(IsActive && "Cannot modify an inactive diagnostic");
+  if (R.isInvalid() || !Engine) return *this;
+
+  // Convert from a token range to a CharSourceRange, which points to the end of
+  // the token we want to remove.
+  auto &SM = Engine->SourceMgr;
+  auto charRange = toCharSourceRange(SM, R);
+
+  // If we're removing something (e.g. a keyword), do a bit of extra work to
+  // make sure that we leave the code in a good place, without extraneous white
+  // space around its hole.  Specifically, check to see there is whitespace
+  // before and after the end of range.  If so, nuke the space afterward to keep
+  // things consistent.
+  if (SM.extractText({charRange.getEnd(), 1}) == " ") {
+    auto beforeChars =
+      SM.extractText({charRange.getStart().getAdvancedLoc(-1), 1});
+    if (!beforeChars.empty() && isspace(beforeChars[0])) {
+      charRange = CharSourceRange(charRange.getStart(),
+                                  charRange.getByteLength()+1);
+    }
+  }
+  Engine->getActiveDiagnostic().addFixIt(Diagnostic::FixIt(charRange, {}));
+  return *this;
+}
+
+
 InFlightDiagnostic &InFlightDiagnostic::fixItReplace(SourceRange R,
                                                      StringRef Str) {
+  if (Str.empty())
+    return fixItRemove(R);
+
   assert(IsActive && "Cannot modify an inactive diagnostic");
   if (Engine && R.isValid())
     Engine->getActiveDiagnostic().addFixIt(

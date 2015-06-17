@@ -7,7 +7,7 @@ struct S {
 }
 
 struct SpuriousSemi {
-  ; // expected-error{{unexpected ';' separator}} {{3-4=}}
+  ; // expected-error{{unexpected ';' separator}} {{3-5=}}
   var a : Int ; ; // FIXME -- we need to consistently track ','/';' separators
   func b () {};
   ; static func c () {} // FIXME -- we need to consistently track ','/';' separators

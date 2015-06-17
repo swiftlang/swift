@@ -1,41 +1,41 @@
 // RUN: %target-parse-verify-swift
 
-static func gf1() {} // expected-error {{static methods may only be declared on a type}}{{1-7=}}
-class func gf2() {} // expected-error {{class methods may only be declared on a type}}{{1-6=}}
+static func gf1() {} // expected-error {{static methods may only be declared on a type}}{{1-8=}}
+class func gf2() {} // expected-error {{class methods may only be declared on a type}}{{1-7=}}
 
-override static func gf3() {} // expected-error {{static methods may only be declared on a type}}{{10-16=}}
-    // expected-error@-1 {{'override' can only be specified on class members}}{{1-9=}}
-override class func gf4() {} // expected-error {{class methods may only be declared on a type}}{{10-15=}}
-    // expected-error@-1 {{'override' can only be specified on class members}}{{1-9=}}
+override static func gf3() {} // expected-error {{static methods may only be declared on a type}}{{10-17=}}
+    // expected-error@-1 {{'override' can only be specified on class members}}{{1-10=}}
+override class func gf4() {} // expected-error {{class methods may only be declared on a type}}{{10-16=}}
+    // expected-error@-1 {{'override' can only be specified on class members}}{{1-10=}}
 
-static override func gf5() {} // expected-error {{static methods may only be declared on a type}}{{1-7=}}
-    // expected-error@-1 {{'override' can only be specified on class members}}{{8-16=}}
-class override func gf6() {} // expected-error {{class methods may only be declared on a type}}{{1-6=}}
-    // expected-error@-1 {{'override' can only be specified on class members}}{{7-15=}}
+static override func gf5() {} // expected-error {{static methods may only be declared on a type}}{{1-8=}}
+    // expected-error@-1 {{'override' can only be specified on class members}}{{8-17=}}
+class override func gf6() {} // expected-error {{class methods may only be declared on a type}}{{1-7=}}
+    // expected-error@-1 {{'override' can only be specified on class members}}{{7-16=}}
 
 static gf7() {} // expected-error {{expected declaration}} expected-error {{braced block of statements is an unused closure}} expected-error{{begin with a closure}} expected-note{{discard the result}} expected-error{{type of expression is ambiguous without more context}}
 class gf8() {} // expected-error {{expected '{' in class}} expected-error {{braced block of statements is an unused closure}} expected-error{{begin with a closure}} expected-note{{discard the result}} expected-error{{type of expression is ambiguous without more context}}
 
 func inGlobalFunc() {
-  static func gf1() {} // expected-error {{static methods may only be declared on a type}}{{3-9=}}
-  class func gf2() {} // expected-error {{class methods may only be declared on a type}}{{3-8=}}
+  static func gf1() {} // expected-error {{static methods may only be declared on a type}}{{3-10=}}
+  class func gf2() {} // expected-error {{class methods may only be declared on a type}}{{3-9=}}
 }
 
 struct InMemberFunc {
   func member() {
-    static func gf1() {} // expected-error {{static methods may only be declared on a type}}{{5-11=}}
-    class func gf2() {} // expected-error {{class methods may only be declared on a type}}{{5-10=}}
+    static func gf1() {} // expected-error {{static methods may only be declared on a type}}{{5-12=}}
+    class func gf2() {} // expected-error {{class methods may only be declared on a type}}{{5-11=}}
   }
 }
 
 struct DuplicateStatic {
-  static static func f1() {} // expected-error{{'static' specified twice}}{{10-16=}}
-  static class func f2() {} // expected-error{{'class' specified twice}}{{10-15=}}
-  class static func f3() {} // expected-error{{'static' specified twice}}{{9-15=}} expected-error{{class methods are only allowed within classes; use 'static' to declare a static method}}{{3-8=static}}
-  class class func f4() {} // expected-error{{'class' specified twice}}{{9-14=}} expected-error{{class methods are only allowed within classes; use 'static' to declare a static method}}{{3-8=static}}
-  override static static func f5() {} // expected-error{{'static' specified twice}}{{19-25=}} expected-error{{'override' can only be specified on class members}}
-  static override static func f6() {} // expected-error{{'static' specified twice}}{{19-25=}} expected-error{{'override' can only be specified on class members}}
-  static static override func f7() {} // expected-error{{'static' specified twice}}{{10-16=}} expected-error{{'override' can only be specified on class members}}
+  static static func f1() {} // expected-error{{'static' specified twice}}{{10-17=}}
+  static class func f2() {} // expected-error{{'class' specified twice}}{{10-16=}}
+  class static func f3() {} // expected-error{{'static' specified twice}}{{9-16=}} expected-error{{class methods are only allowed within classes; use 'static' to declare a static method}}{{3-8=static}}
+  class class func f4() {} // expected-error{{'class' specified twice}}{{9-15=}} expected-error{{class methods are only allowed within classes; use 'static' to declare a static method}}{{3-8=static}}
+  override static static func f5() {} // expected-error{{'static' specified twice}}{{19-26=}} expected-error{{'override' can only be specified on class members}}
+  static override static func f6() {} // expected-error{{'static' specified twice}}{{19-26=}} expected-error{{'override' can only be specified on class members}}
+  static static override func f7() {} // expected-error{{'static' specified twice}}{{10-17=}} expected-error{{'override' can only be specified on class members}}
   static final func f8() {} // expected-error {{only classes and class members may be marked with 'final'}}
 }
 

@@ -64,7 +64,7 @@ private extension PublicStruct {
   public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}}
   private func extImplPrivate() {}
 }
-public extension InternalStruct { // expected-error {{extension of internal struct cannot be declared public}} {{1-7=}}
+public extension InternalStruct { // expected-error {{extension of internal struct cannot be declared public}} {{1-8=}}
   public func extMemberPublic() {} // expected-warning {{declaring a public instance method for an internal struct}} {{3-9=internal}}
   private func extImplPublic() {}
 }
@@ -76,11 +76,11 @@ private extension InternalStruct {
   public func extMemberPrivate() {} // expected-warning {{declaring a public instance method in a private extension}}
   private func extImplPrivate() {}
 }
-public extension PrivateStruct { // expected-error {{extension of private struct cannot be declared public}} {{1-7=}}
+public extension PrivateStruct { // expected-error {{extension of private struct cannot be declared public}} {{1-8=}}
   public func extMemberPublic() {} // expected-warning {{declaring a public instance method for a private struct}} {{3-9=private}}
   private func extImplPublic() {}
 }
-internal extension PrivateStruct { // expected-error {{extension of private struct cannot be declared internal}} {{1-9=}}
+internal extension PrivateStruct { // expected-error {{extension of private struct cannot be declared internal}} {{1-10=}}
   public func extMemberInternal() {} // expected-warning {{declaring a public instance method in an internal extension}}
   private func extImplInternal() {}
 }
