@@ -86,7 +86,7 @@ func testIfCase(a : Int?) {
   if case nil = a where a != nil {}
   if case let (b?) = a where b != 42 {}
   
-  if let case (b?) = a where b != 42 {}  // expected-error {{pattern matching binding is spelled with 'case let', not 'let case'}} {{6-9=}} {{14-14= let}}
+  if let case (b?) = a where b != 42 {}  // expected-error {{pattern matching binding is spelled with 'case let', not 'let case'}} {{6-10=}} {{14-14= let}}
   
   if a != nil, let c = a, case nil = a { _ = c}
   
