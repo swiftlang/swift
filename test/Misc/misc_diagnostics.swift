@@ -84,4 +84,14 @@ func test17875634() {
 
   match.append(coord)
   match.append((1, 2))
+
+  // Make sure the behavior matches the non-generic case.
+  struct FakeNonGenericArray {
+    func append(p: (Int, Int)) {}
+  }
+  let a2 = FakeNonGenericArray()
+  a2.append(row, col) // expected-error{{extra argument in call}}
+  a2.append(1, 2) // expected-error{{extra argument in call}}
+  a2.append(coord)
+  a2.append((1, 2))
 }
