@@ -54,13 +54,6 @@ public func testFactoryMethods() {
   _ = Foo(__: 1)
 }
 
-#if !IRGEN
-public func testSubscript(foo: Foo) {
-  _ = foo[foo] // expected-error {{'Foo' does not have a member named 'subscript'}}
-  _ = foo[1] // expected-error {{'Foo' does not have a member named 'subscript'}}
-}
-#endif
-
 // CHECK-LABEL: define void @{{.+}}12testTopLevel
 public func testTopLevel() {
   // Checked below; look for "PrivFooSub".

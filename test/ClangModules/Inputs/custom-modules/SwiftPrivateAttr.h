@@ -19,12 +19,6 @@ NS_REFINED_FOR_SWIFT
 + (instancetype)fooWithTwoArgs:(int)arg other:(int)arg2 NS_REFINED_FOR_SWIFT;
 + (instancetype)foo:(int)arg NS_REFINED_FOR_SWIFT;
 
-- (id)objectForKeyedSubscript:(id)index;
-- (void)setObject:(id)object forKeyedSubscript:(id)index NS_REFINED_FOR_SWIFT;
-
-- (id)objectAtIndexedSubscript:(int)index NS_REFINED_FOR_SWIFT;
-- (void)setObject:(id)object atIndexedSubscript:(int)index;
-
 @end
 
 @interface Bar : NSObject

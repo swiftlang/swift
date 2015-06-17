@@ -18,10 +18,6 @@ class Foo : NSObject, __PrivProto {
   convenience init!(__ arg: Int32)
   @available(*, unavailable, message="use object construction 'Foo(__:)'")
   class func __foo(arg: Int32) -> Self!
-  func objectForKeyedSubscript(index: AnyObject!) -> AnyObject!
-  func __setObject(object: AnyObject!, forKeyedSubscript index: AnyObject!)
-  func __objectAtIndexedSubscript(index: Int32) -> AnyObject!
-  func setObject(object: AnyObject!, atIndexedSubscript index: Int32)
   init()
 }
 class Bar : NSObject {

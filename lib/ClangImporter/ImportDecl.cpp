@@ -3496,67 +3496,105 @@ namespace {
                                    DeclContext *dc) {
       assert(objcMethod->isInstanceMethod() && "Caller must filter");
 
-      if (objcMethod->hasAttr<clang::SwiftPrivateAttr>())
-        return nullptr;
-
       const clang::ObjCInterfaceDecl *interface = nullptr;
       const clang::ObjCProtocolDecl *protocol =
           dyn_cast<clang::ObjCProtocolDecl>(objcMethod->getDeclContext());
       if (!protocol)
         interface = objcMethod->getClassInterface();
       auto lookupInstanceMethod = [&](clang::Selector Sel) ->
-          const clang::ObjCMethodDecl * {
+          clang::ObjCMethodDecl * {
         if (interface)
           return interface->lookupInstanceMethod(Sel);
         else
           return protocol->lookupInstanceMethod(Sel);
       };
 
+      bool optionalMethods = true;
       FuncDecl *getter = nullptr, *setter = nullptr;
-      clang::Selector counterpartSelector;
-
       if (objcMethod->getSelector() == Impl.objectAtIndexedSubscript) {
         getter = cast<FuncDecl>(decl);
-        counterpartSelector = Impl.setObjectAtIndexedSubscript;
+
+        // Find the setter
+        if (auto objcSetter = lookupInstanceMethod(
+                                Impl.setObjectAtIndexedSubscript)) {
+          setter = cast_or_null<FuncDecl>(Impl.importDecl(objcSetter));
+
+          // Don't allow static setters.
+          if (setter && setter->isStatic())
+            setter = nullptr;
+
+          if (setter) {
+            optionalMethods = optionalMethods &&
+              objcSetter->getImplementationControl()
+                == clang::ObjCMethodDecl::Optional;
+          }
+        }
       } else if (objcMethod->getSelector() == Impl.setObjectAtIndexedSubscript){
         setter = cast<FuncDecl>(decl);
-        counterpartSelector = Impl.objectAtIndexedSubscript;
+
+        // Find the getter.
+        if (auto objcGetter = lookupInstanceMethod(
+                                Impl.objectAtIndexedSubscript)) {
+          getter = cast_or_null<FuncDecl>(Impl.importDecl(objcGetter));
+
+          // Don't allow static getters.
+          if (getter && getter->isStatic())
+            return nullptr;
+
+          if (getter) {
+            optionalMethods = optionalMethods &&
+              objcGetter->getImplementationControl()
+                == clang::ObjCMethodDecl::Optional;
+          }
+        }
+
+        // FIXME: Swift doesn't have write-only subscripting.
+        if (!getter)
+          return nullptr;
       } else if (objcMethod->getSelector() == Impl.objectForKeyedSubscript) {
         getter = cast<FuncDecl>(decl);
-        counterpartSelector = Impl.setObjectForKeyedSubscript;
+
+        // Find the setter
+        if (auto objcSetter = lookupInstanceMethod(
+                                Impl.setObjectForKeyedSubscript)) {
+          setter = cast_or_null<FuncDecl>(Impl.importDecl(objcSetter));
+
+          // Don't allow static setters.
+          if (setter && setter->isStatic())
+            setter = nullptr;
+
+          if (setter) {
+            optionalMethods = optionalMethods &&
+              objcSetter->getImplementationControl()
+                == clang::ObjCMethodDecl::Optional;
+          }
+
+        }
       } else if (objcMethod->getSelector() == Impl.setObjectForKeyedSubscript) {
         setter = cast<FuncDecl>(decl);
-        counterpartSelector = Impl.objectForKeyedSubscript;
+
+        // Find the getter.
+        if (auto objcGetter = lookupInstanceMethod(
+                                Impl.objectForKeyedSubscript)) {
+          getter = cast_or_null<FuncDecl>(Impl.importDecl(objcGetter));
+
+          // Don't allow static getters.
+          if (getter && getter->isStatic())
+            return nullptr;
+
+          if (getter) {
+            optionalMethods = optionalMethods &&
+              objcGetter->getImplementationControl()
+                == clang::ObjCMethodDecl::Optional;
+          }
+        }
+
+        // FIXME: Swift doesn't have write-only subscripting.
+        if (!getter)
+          return nullptr;
       } else {
         llvm_unreachable("Unknown getter/setter selector");
       }
-
-      bool optionalMethods = (objcMethod->getImplementationControl() ==
-                              clang::ObjCMethodDecl::Optional);
-
-      auto *counterpart = lookupInstanceMethod(counterpartSelector);
-      if (counterpart) {
-        auto *importedCounterpart =
-            cast_or_null<FuncDecl>(Impl.importDecl(counterpart));
-
-        assert(!importedCounterpart || !importedCounterpart->isStatic());
-
-        if (getter)
-          setter = importedCounterpart;
-        else
-          getter = importedCounterpart;
-
-        if (optionalMethods)
-          optionalMethods = (counterpart->getImplementationControl() ==
-                             clang::ObjCMethodDecl::Optional);
-
-        if (counterpart->hasAttr<clang::SwiftPrivateAttr>())
-          return nullptr;
-      }
-
-      // Swift doesn't have write-only subscripting.
-      if (!getter)
-        return nullptr;
 
       // Check whether we've already created a subscript operation for
       // this getter/setter pair.
