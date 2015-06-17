@@ -685,13 +685,10 @@ public:
   ///
   /// \param name The Clang name to map into Swift.
   ///
-  /// \param suffix The suffix to append to the Clang name to produce the
-  /// Swift name.
-  ///
   /// \param removePrefix The prefix to remove from the Clang name to produce
   /// the Swift name. If the Clang name does not start with this prefix,
   /// nothing is removed.
-  Identifier importName(clang::DeclarationName name, StringRef suffix = "",
+  Identifier importName(clang::DeclarationName name,
                         StringRef removePrefix = "");
 
   /// Import an Objective-C selector.

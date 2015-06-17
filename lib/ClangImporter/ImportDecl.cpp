@@ -1370,7 +1370,7 @@ namespace {
       }
 
       StringRef enumPrefix = Impl.EnumConstantNamePrefixes.lookup(clangEnum);
-      return Impl.importName(decl->getDeclName(), /*suffix*/ "", enumPrefix);
+      return Impl.importName(decl->getDeclName(), enumPrefix);
     }
 
     /// Determine the common prefix to remove from the element names of an

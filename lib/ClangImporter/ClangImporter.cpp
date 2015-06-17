@@ -1180,7 +1180,6 @@ ClangImporter::Implementation::exportName(Identifier name) {
 
 Identifier
 ClangImporter::Implementation::importName(clang::DeclarationName name,
-                                          StringRef suffix,
                                           StringRef removePrefix) {
   // FIXME: At some point, we'll be able to import operators as well.
   if (!name || name.getNameKind() != clang::DeclarationName::Identifier)
@@ -1195,16 +1194,7 @@ ClangImporter::Implementation::importName(clang::DeclarationName name,
   }
 
   // Get the Swift identifier.
-  if (suffix.empty()) {
-    return SwiftContext.getIdentifier(nameStr);
-  }
-
-  // Append the suffix, and try again.
-  llvm::SmallString<64> nameBuf;
-  nameBuf += nameStr;
-  nameBuf += suffix;
-
-  return SwiftContext.getIdentifier(nameBuf);
+  return SwiftContext.getIdentifier(nameStr);
 }
 
 /// Split the given selector piece at the given index, updating
