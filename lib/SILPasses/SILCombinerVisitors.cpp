@@ -2091,7 +2091,7 @@ visitPointerToAddressInst(PointerToAddressInst *PTAI) {
   // always legal to do since address-to-pointer pointer-to-address implies
   // layout compatibility.
   //
-  // (pointer-to-address (address-to-pointer %x)) -> unchecked_
+  // (pointer-to-address (address-to-pointer %x)) -> (unchecked_addr_cast %x)
   if (auto *ATPI = dyn_cast<AddressToPointerInst>(PTAI->getOperand())) {
     return new (PTAI->getModule()) UncheckedAddrCastInst(PTAI->getLoc(),
                                                          ATPI->getOperand(),
