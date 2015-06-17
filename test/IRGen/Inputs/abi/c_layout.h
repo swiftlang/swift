@@ -79,8 +79,10 @@ unsigned unsigneds(unsigned a);
 
 // Test static globals
 
-static float glowingArable = 17.0;
+static float staticFloat = 17.0;
+static int staticInt = 42;
+static const char * const staticString = "abc";
 
 static inline void doubleTrouble(void) {
-  glowingArable *= 2.0;
+  staticFloat *= 2.0;
 }

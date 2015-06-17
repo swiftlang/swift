@@ -1370,17 +1370,24 @@ void IRGenModule::emitExternalDefinition(Decl *D) {
 Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
                                                 ForDefinition_t forDefinition) {
   LinkEntity entity = LinkEntity::forSILGlobalVariable(var);
+  auto &ti = getTypeInfo(var->getLoweredType());
 
   // Check whether we've created the global variable already.
   // FIXME: We should integrate this into the LinkEntity cache more cleanly.
   auto gvar = Module.getGlobalVariable(var->getName(), /*allowInternal*/ true);
   if (gvar) {
-    if (forDefinition) updateLinkageForDefinition(*this, gvar, entity);
-    return Address(gvar, Alignment(gvar->getAlignment()));
+    if (forDefinition)
+      updateLinkageForDefinition(*this, gvar, entity);
+
+    llvm::Constant *addr = gvar;
+    if (ti.getStorageType() != gvar->getType()->getElementType()) {
+      auto *expectedTy = ti.StorageType->getPointerTo();
+      addr = llvm::ConstantExpr::getBitCast(addr, expectedTy);
+    }
+    return Address(addr, Alignment(gvar->getAlignment()));
   }
 
   LinkInfo link = LinkInfo::get(*this, entity, forDefinition);
-  auto &ti = getTypeInfo(var->getLoweredType());
   if (var->getDecl()) {
     // If we have the VarDecl, use it for more accurate debugging information.
     DebugTypeInfo DbgTy(var->getDecl(),
