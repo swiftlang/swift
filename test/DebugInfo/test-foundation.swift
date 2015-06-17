@@ -61,7 +61,6 @@ class MyObject : NSObject {
   }
 }
 
-// FIXME (LLVM-branch): The [local] attribute means ObjectiveC-CC.
 // SANITY-DAG: !DISubprogram(name: "blah",{{.*}} line: [[@LINE+2]],{{.*}} isDefinition: true
 extension MyObject {
   func blah() {
