@@ -18,12 +18,6 @@ class Associated {
 
 var token: Int8 = 0
 
-// Hack to build with both older and newer SDKs.
-// rdar://problem/19494514
-extension UInt {
-  static let OBJC_ASSOCIATION_RETAIN_NONATOMIC: UInt = 1
-}
-
 autoreleasepool {
   let root = Root()
   objc_setAssociatedObject(root, &token, Associated(),

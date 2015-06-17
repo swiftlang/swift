@@ -13,12 +13,6 @@ class Canary: NSObject {
 
 var CanaryAssocObjectHandle: UInt8 = 0
 
-// Hack to build with both older and newer SDKs.
-// rdar://problem/19494514
-extension UInt {
-  static let OBJC_ASSOCIATION_RETAIN_NONATOMIC: UInt = 1
-}
-
 // Attach an associated object with a loud deinit so we can see that the
 // error died.
 func hangCanary(o: AnyObject) {
