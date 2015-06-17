@@ -1264,19 +1264,23 @@ splitSelectorPieceAt(StringRef selector, unsigned index,
 }
 
 /// Import an argument name.
-static Identifier importArgName(ASTContext &ctx, StringRef name, bool dropWith){
+static Identifier importArgName(ASTContext &ctx, StringRef name,
+                                bool dropWith, bool isSwiftPrivate) {
   // Simple case: empty name.
-  if (name.empty())
+  if (name.empty()) {
+    if (isSwiftPrivate)
+      return ctx.getIdentifier("__");
     return Identifier();
+  }
 
-  llvm::SmallString<16> scratch;
+  SmallString<32> scratch;
   auto words = camel_case::getWords(name);
   auto firstWord = *words.begin();
+  StringRef argName = name;
 
   // If we're dropping "with", handle that now.
   if (dropWith) {
     // If the first word is "with"...
-    StringRef argName;
     if (name.size() > 4 &&
         camel_case::sameWordIgnoreFirstCase(firstWord, "with")) {
       // Drop it.
@@ -1303,18 +1307,23 @@ static Identifier importArgName(ASTContext &ctx, StringRef name, bool dropWith){
 
       argName = name;
     }
-
-    return ctx.getIdentifier(camel_case::toLowercaseWord(argName, scratch));
   }
 
   /// Lowercase the first word to form the argument name.
-  return ctx.getIdentifier(camel_case::toLowercaseWord(name, scratch));
+  argName = camel_case::toLowercaseWord(argName, scratch);
+  if (!isSwiftPrivate)
+    return ctx.getIdentifier(argName);
+
+  SmallString<32> prefixed{"__"};
+  prefixed.append(argName);
+  return ctx.getIdentifier(prefixed.str());
 }
 
 /// Map an Objective-C selector name to a Swift method name.
 static DeclName mapSelectorName(ASTContext &ctx,
                                 ObjCSelector selector,
-                                bool isInitializer) {
+                                bool isInitializer,
+                                bool isSwiftPrivate) {
   // Zero-argument selectors.
   if (selector.getNumArgs() == 0) {
     ++NumNullaryMethodNames;
@@ -1322,8 +1331,17 @@ static DeclName mapSelectorName(ASTContext &ctx,
     auto name = selector.getSelectorPieces()[0];
     StringRef nameText = name.empty()? "" : name.str();
 
-    // Simple case.
-    if (!isInitializer || nameText.size() == 4)
+    if (!isInitializer) {
+      if (!isSwiftPrivate)
+        return DeclName(ctx, name, {});
+
+      SmallString<32> newName{"__"};
+      newName.append(nameText);
+      return DeclName(ctx, ctx.getIdentifier(newName.str()), {});
+    }
+
+    // Simple case for initializers.
+    if (nameText == "init" && !isSwiftPrivate)
       return DeclName(ctx, name, { });
 
     // This is an initializer with no parameters but a name that
@@ -1332,7 +1350,8 @@ static DeclName mapSelectorName(ASTContext &ctx,
     ++NumNullaryInitMethodsMadeUnary;
     assert(camel_case::getFirstWord(nameText).equals("init"));
     auto baseName = ctx.Id_init;
-    auto argName = importArgName(ctx, nameText.substr(4), /*dropWith=*/true);
+    auto argName = importArgName(ctx, nameText.substr(4), /*dropWith=*/true,
+                                 isSwiftPrivate);
     return DeclName(ctx, baseName, argName);
   }
 
@@ -1344,10 +1363,15 @@ static DeclName mapSelectorName(ASTContext &ctx,
   if (isInitializer) {
     assert(camel_case::getFirstWord(firstPieceText).equals("init"));
     baseName = ctx.Id_init;
-    argumentNames.push_back(
-      importArgName(ctx, firstPieceText.substr(4), /*dropWith=*/true));
+    argumentNames.push_back(importArgName(ctx, firstPieceText.substr(4),
+                                          /*dropWith=*/true, isSwiftPrivate));
   } else {
     baseName = firstPiece;
+    if (isSwiftPrivate) {
+      SmallString<32> newName{"__"};
+      newName.append(firstPieceText);
+      baseName = ctx.getIdentifier(newName);
+    }
     argumentNames.push_back(Identifier());
   }
 
@@ -1366,7 +1390,8 @@ static DeclName mapSelectorName(ASTContext &ctx,
       argumentNames.push_back(piece);
     else
       argumentNames.push_back(importArgName(ctx, piece.str(),
-                                            /*dropWith=*/false));
+                                            /*dropWith=*/false,
+                                            /*isSwiftPrivate=*/false));
   }
   return DeclName(ctx, baseName, argumentNames);
 }
@@ -1472,9 +1497,10 @@ ClangImporter::Implementation::exportSelector(ObjCSelector selector) {
 }
 
 
-DeclName ClangImporter::Implementation::mapSelectorToDeclName(
-           ObjCSelector selector,
-           bool isInitializer)
+DeclName
+ClangImporter::Implementation::mapSelectorToDeclName(ObjCSelector selector,
+                                                     bool isInitializer,
+                                                     bool isSwiftPrivate)
 {
   // Check whether we've already mapped this selector.
   auto known = SelectorMappings.find({selector, isInitializer});
@@ -1482,7 +1508,8 @@ DeclName ClangImporter::Implementation::mapSelectorToDeclName(
     return known->second;
 
   // Map the selector.
-  auto result = mapSelectorName(SwiftContext, selector, isInitializer);
+  auto result = mapSelectorName(SwiftContext, selector, isInitializer,
+                                isSwiftPrivate);
 
   // Cache the result and return.
   SelectorMappings[{selector, isInitializer}] = result;
@@ -1490,8 +1517,9 @@ DeclName ClangImporter::Implementation::mapSelectorToDeclName(
 }
 
 DeclName ClangImporter::Implementation::mapFactorySelectorToInitializerName(
-           ObjCSelector selector,
-           StringRef className) {
+    ObjCSelector selector,
+    StringRef className,
+    bool isSwiftPrivate) {
   auto firstPiece = selector.getSelectorPieces()[0];
   if (firstPiece.empty())
     return DeclName();
@@ -1559,7 +1587,8 @@ DeclName ClangImporter::Implementation::mapFactorySelectorToInitializerName(
                   splitSelectorPieceAt(firstPieceStr,
                                        methodWordIter.getPosition(),
                                        scratch).second,
-                  /*dropWith=*/true));
+                  /*dropWith=*/true,
+                  isSwiftPrivate));
 
   // Handle nullary factory methods.
   if (selector.getNumArgs() == 0) {
@@ -1578,7 +1607,8 @@ DeclName ClangImporter::Implementation::mapFactorySelectorToInitializerName(
       argumentNames.push_back(piece);
     else
       argumentNames.push_back(importArgName(SwiftContext, piece.str(),
-                                            /*dropWith=*/false));
+                                            /*dropWith=*/false,
+                                            /*isSwiftPrivate=*/false));
   }
 
   return DeclName(SwiftContext, SwiftContext.Id_init, argumentNames);

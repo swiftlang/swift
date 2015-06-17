@@ -715,7 +715,11 @@ public:
   ///
   /// \param isInitializer Whether this name should be mapped as an
   /// initializer.
-  DeclName mapSelectorToDeclName(ObjCSelector selector, bool isInitializer);
+  ///
+  /// \param isSwiftPrivate Whether this name is for a declaration marked with
+  /// the 'swift_private' attribute.
+  DeclName mapSelectorToDeclName(ObjCSelector selector, bool isInitializer,
+                                 bool isSwiftPrivate);
 
   /// Try to map the given selector, which may be the name of a factory method,
   /// to the name of an initializer.
@@ -724,10 +728,14 @@ public:
   ///
   /// \param className The name of the class in which the method occurs.
   ///
+  /// \param isSwiftPrivate Whether this name is for a declaration marked with
+  /// the 'swift_private' attribute.
+  ///
   /// \returns the initializer name for this factory method, or an empty
   /// name if this selector does not fit the pattern.
   DeclName mapFactorySelectorToInitializerName(ObjCSelector selector,
-                                               StringRef className);
+                                               StringRef className,
+                                               bool isSwiftPrivate);
 
   /// \brief Import the given Swift source location into Clang.
   clang::SourceLocation exportSourceLoc(SourceLoc loc);

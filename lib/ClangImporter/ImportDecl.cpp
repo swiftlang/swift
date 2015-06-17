@@ -2518,13 +2518,15 @@ namespace {
         // succeed.
         SWIFT_FALLTHROUGH;
 
-      case FactoryAsInitKind::Infer:
+      case FactoryAsInitKind::Infer: {
         // Check whether the name fits the pattern.
+        bool isSwiftPrivate = decl->hasAttr<clang::SwiftPrivateAttr>();
         initName =
             Impl.mapFactorySelectorToInitializerName(selector,
-                                                     objcClass->getName());
+                                                     objcClass->getName(),
+                                                     isSwiftPrivate);
         break;
-
+      }
       case FactoryAsInitKind::AsClassMethod:
         return None;
       }
@@ -2621,11 +2623,15 @@ namespace {
         return nullptr;
 
       DeclName name;
-      if (auto *customNameAttr = decl->getAttr<clang::SwiftNameAttr>())
+      if (auto *customNameAttr = decl->getAttr<clang::SwiftNameAttr>()) {
         if (!customNameAttr->getName().startswith("init("))
           name = parseDeclName(customNameAttr->getName());
-      if (!name)
-        name = Impl.mapSelectorToDeclName(selector, /*isInitializer=*/false);
+      }
+      if (!name) {
+        bool isSwiftPrivate = decl->hasAttr<clang::SwiftPrivateAttr>();
+        name = Impl.mapSelectorToDeclName(selector, /*isInitializer=*/false,
+                                          isSwiftPrivate);
+      }
       if (!name)
         return nullptr;
 
@@ -2894,7 +2900,8 @@ namespace {
     DeclName
     mapInitSelectorToDeclName(ObjCSelector &selector,
                               ArrayRef<const clang::ParmVarDecl *> &args,
-                              bool &variadic) {
+                              bool &variadic,
+                              bool isSwiftPrivate) {
       auto &C = Impl.SwiftContext;
       
       // Map a few initializers to non-variadic versions that drop the
@@ -2907,7 +2914,8 @@ namespace {
         variadic = false;
       }
       
-      return Impl.mapSelectorToDeclName(selector, /*initializer*/true);
+      return Impl.mapSelectorToDeclName(selector, /*initializer*/true,
+                                        isSwiftPrivate);
     }
 
     static bool shouldMakeSelectorNonVariadic(ObjCSelector selector) {
@@ -2965,8 +2973,10 @@ namespace {
         objcMethod->param_begin(),
         objcMethod->param_end()
       };
+      bool isSwiftPrivate = objcMethod->hasAttr<clang::SwiftPrivateAttr>();
       bool variadic = objcMethod->isVariadic();
-      DeclName name = mapInitSelectorToDeclName(selector, params, variadic);
+      DeclName name = mapInitSelectorToDeclName(selector, params, variadic,
+                                                isSwiftPrivate);
 
       bool redundant;
       return importConstructor(objcMethod, dc, implicit, kind, required,

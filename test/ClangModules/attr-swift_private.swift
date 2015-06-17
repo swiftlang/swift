@@ -25,6 +25,35 @@ public func testProperty(foo: Foo) {
 #endif
 }
 
+// CHECK-LABEL: define void @{{.+}}11testMethods
+public func testMethods(foo: Foo) {
+  // CHECK: @"\01L_selector(noArgs)"
+  foo.__noArgs()
+  // CHECK: @"\01L_selector(oneArg:)"
+  foo.__oneArg(1)
+  // CHECK: @"\01L_selector(twoArgs:other:)"
+  foo.__twoArgs(1, other: 2)
+}
+
+// CHECK-LABEL: define void @{{.+}}16testInitializers
+public func testInitializers() {
+  // Checked below; look for "CSo3Bar".
+  _ = Bar(__noArgs: ())
+  _ = Bar(__oneArg: 1)
+  _ = Bar(__twoArgs: 1, other: 2)
+  _ = Bar(__: 1)
+}
+
+// CHECK-LABEL: define void @{{.+}}18testFactoryMethods
+public func testFactoryMethods() {
+  // CHECK: @"\01L_selector(fooWithOneArg:)"
+  _ = Foo(__oneArg: 1)
+  // CHECK: @"\01L_selector(fooWithTwoArgs:other:)"
+  _ = Foo(__twoArgs: 1, other: 2)
+  // CHECK: @"\01L_selector(foo:)"
+  _ = Foo(__: 1)
+}
+
 // CHECK-LABEL: define void @{{.+}}12testTopLevel
 public func testTopLevel() {
   // Checked below; look for "PrivFooSub".
@@ -49,6 +78,15 @@ public func testTopLevel() {
 // CHECK-LABEL: define linkonce_odr hidden %swift.type* @_TMaCSo12__PrivFooSub{{.*}} {
 // CHECK: %objc_class* @"OBJC_CLASS_$_PrivFooSub"
 // CHECK: }
+
+// CHECK-LABEL: define linkonce_odr hidden {{.+}} @_TTOFCSo3BarcfMS_FT2__VSs5Int32_GSQS__
+// CHECK: @"\01L_selector(init:)"
+// CHECK-LABEL: define linkonce_odr hidden {{.+}} @_TTOFCSo3BarcfMS_FT9__twoArgsVSs5Int325otherS0__GSQS__
+// CHECK: @"\01L_selector(initWithTwoArgs:other:)"
+// CHECK-LABEL: define linkonce_odr hidden {{.+}} @_TTOFCSo3BarcfMS_FT8__oneArgVSs5Int32_GSQS__
+// CHECK: @"\01L_selector(initWithOneArg:)"
+// CHECK-LABEL: define linkonce_odr hidden {{.+}} @_TTOFCSo3BarcfMS_FT8__noArgsT__GSQS__
+// CHECK: @"\01L_selector(initWithNoArgs)"
 
 _ = __PrivAnonymousA
 _ = __E0PrivA

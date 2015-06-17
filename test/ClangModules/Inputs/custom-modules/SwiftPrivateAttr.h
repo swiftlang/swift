@@ -8,6 +8,25 @@ NS_REFINED_FOR_SWIFT
   
 @interface Foo : NSObject <PrivProto>
 @property id privValue NS_REFINED_FOR_SWIFT;
+
+- (void)noArgs NS_REFINED_FOR_SWIFT;
+- (void)oneArg:(int)arg NS_REFINED_FOR_SWIFT;
+- (void)twoArgs:(int)arg other:(int)arg2 NS_REFINED_FOR_SWIFT;
+
++ (instancetype)foo NS_REFINED_FOR_SWIFT;
++ (instancetype)fooWithNoArgs NS_REFINED_FOR_SWIFT;
++ (instancetype)fooWithOneArg:(int)arg NS_REFINED_FOR_SWIFT;
++ (instancetype)fooWithTwoArgs:(int)arg other:(int)arg2 NS_REFINED_FOR_SWIFT;
++ (instancetype)foo:(int)arg NS_REFINED_FOR_SWIFT;
+
+@end
+
+@interface Bar : NSObject
+- (instancetype)init NS_REFINED_FOR_SWIFT;
+- (instancetype)initWithNoArgs NS_REFINED_FOR_SWIFT;
+- (instancetype)initWithOneArg:(int)arg NS_REFINED_FOR_SWIFT;
+- (instancetype)initWithTwoArgs:(int)arg other:(int)arg2 NS_REFINED_FOR_SWIFT;
+- (instancetype)init:(int)arg NS_REFINED_FOR_SWIFT;
 @end
 
 NS_REFINED_FOR_SWIFT

@@ -4,9 +4,33 @@ protocol __PrivProto {
 }
 class Foo : NSObject, __PrivProto {
   var __privValue: AnyObject!
+  func __noArgs()
+  func __oneArg(arg: Int32)
+  func __twoArgs(arg: Int32, other arg2: Int32)
+  class func __foo() -> Self!
+  class func __fooWithNoArgs() -> Self!
+  convenience init!(__oneArg arg: Int32)
+  @available(*, unavailable, message="use object construction 'Foo(__oneArg:)'")
+  class func __fooWithOneArg(arg: Int32) -> Self!
+  convenience init!(__twoArgs arg: Int32, other arg2: Int32)
+  @available(*, unavailable, message="use object construction 'Foo(__twoArgs:other:)'")
+  class func __fooWithTwoArgs(arg: Int32, other arg2: Int32) -> Self!
+  convenience init!(__ arg: Int32)
+  @available(*, unavailable, message="use object construction 'Foo(__:)'")
+  class func __foo(arg: Int32) -> Self!
   init()
 }
+class Bar : NSObject {
+  init!()
+  init!(__noArgs: ())
+  init!(__oneArg arg: Int32)
+  init!(__twoArgs arg: Int32, other arg2: Int32)
+  init!(__ arg: Int32)
+}
 class __PrivFooSub : Foo {
+  convenience init!(__oneArg arg: Int32)
+  convenience init!(__twoArgs arg: Int32, other arg2: Int32)
+  convenience init!(__ arg: Int32)
   init()
 }
 func __privTest()
