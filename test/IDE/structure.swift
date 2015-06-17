@@ -165,3 +165,6 @@ enum Rawness : Int {
   case One = 1
   case Two = 2, Three = 3
 }
+
+// CHECK: <ffunc>func <name>rethrowFunc(<param>f</param>: () throws -> ())</name> rethrows {}</ffunc>
+func rethrowFunc(f: () throws -> ()) rethrows {}

@@ -400,9 +400,9 @@ func emptyDocBlockComment3() {}
 
 
 /**/
-func malformedBlockComment() {}
+func malformedBlockComment(f : ()throws->()) rethrows {}
 // CHECK: <doc-comment-block>/**/</doc-comment-block>
-// CHECK: <kw>func</kw> malformedBlockComment() {}
+// CHECK: <kw>func</kw> malformedBlockComment(f : ()<kw>throws</kw>->()) <attr-builtin>rethrows</attr-builtin> {}
 
 // Keep this as the last test
 // CHECK: <comment-line>// Keep this as the last test</comment-line>
