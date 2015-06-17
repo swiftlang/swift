@@ -97,9 +97,6 @@ public:
 
   /// Disable frame pointer elimination?
   unsigned DisableFPElim : 1;
-
-  /// Whether or not this is the Swift half of a mixed-source framework.
-  unsigned HasUnderlyingModule : 1;
   
   /// Special codegen for playgrounds.
   unsigned Playground : 1;
@@ -124,8 +121,8 @@ public:
                    Optimize(false), DebugInfoKind(IRGenDebugInfoKind::None),
                    UseJIT(false), DisableLLVMOptzns(false),
                    DisableLLVMARCOpts(false), DisableLLVMSLPVectorizer(false),
-                   DisableFPElim(true), HasUnderlyingModule(false),
-                   Playground(false), GenerateProfile(false),
+                   DisableFPElim(true), Playground(false),
+                   GenerateProfile(false),
                    EmbedMode(IRGenEmbedMode::None) {}
   
   /// Gets the name of the specified output filename.

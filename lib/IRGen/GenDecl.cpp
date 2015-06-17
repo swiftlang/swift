@@ -436,8 +436,7 @@ void IRGenModule::emitSourceFile(SourceFile &SF, unsigned StartElem) {
 
   SF.forAllVisibleModules([&](swift::Module::ImportedModule import) {
     swift::Module *next = import.second;
-    if (Opts.HasUnderlyingModule &&
-        next->getName() == SF.getParentModule()->getName())
+    if (next->getName() == SF.getParentModule()->getName())
       return;
 
     next->collectLinkLibraries([this](LinkLibrary linkLib) {

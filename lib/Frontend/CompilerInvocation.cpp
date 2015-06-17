@@ -1018,8 +1018,6 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   if (Args.hasArg(OPT_disable_llvm_verify))
     Opts.Verify = false;
 
-  Opts.HasUnderlyingModule |= Args.hasArg(OPT_import_underlying_module);
-
   if (Args.hasArg(OPT_autolink_force_load))
     Opts.ForceLoadSymbolName = Args.getLastArgValue(OPT_module_link_name);
 
