@@ -35,7 +35,6 @@ namespace swift {
     ArrayRef<std::string> ExtraClangOptions;
 
     bool AutolinkForceLoad = false;
-    bool HasUnderlyingModule = false;
     bool SerializeAllSIL = false;
     bool SerializeOptionsForDebugging = false;
     bool IsSIB = false;

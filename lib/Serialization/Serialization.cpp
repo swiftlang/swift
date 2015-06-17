@@ -724,8 +724,6 @@ void Serializer::writeInputBlock(const SerializationOptions &options) {
     LinkLibrary.emit(ScratchRecord, serialization::LibraryKind::Library,
                      options.AutolinkForceLoad, options.ModuleLinkName);
   }
-
-  ModuleFlags.emit(ScratchRecord, options.HasUnderlyingModule);
 }
 
 /// Translate AST default argument kind to the Serialization enum values, which

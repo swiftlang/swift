@@ -700,7 +700,6 @@ static bool performCompile(CompilerInstance &Instance,
           Invocation.getClangImporterOptions().ExtraArgs;
       if (!IRGenOpts.ForceLoadSymbolName.empty())
         serializationOpts.AutolinkForceLoad = true;
-      serializationOpts.HasUnderlyingModule = opts.ImportUnderlyingModule;
 
       // Options contain information about the developer's computer,
       // so only serialize them if the module isn't going to be shipped to

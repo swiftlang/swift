@@ -1067,6 +1067,11 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
       continue;
     }
 
+    // This is for backwards-compatibility with modules that still rely on the
+    // "HasUnderlyingModule" flag.
+    if (Bits.HasUnderlyingModule && module == ShadowedModule)
+      dependency.forceExported();
+
     if (scopePath.empty()) {
       dependency.Import = { {}, module };
     } else {
@@ -1081,9 +1086,6 @@ Status ModuleFile::associateWithFileContext(FileUnit *file,
   if (missingDependency) {
     return error(Status::MissingDependency);
   }
-
-  if (Bits.HasUnderlyingModule)
-    (void)getModule(FileContext->getParentModule()->getName());
 
   if (Bits.HasEntryPoint) {
     FileContext->getParentModule()->registerEntryPointFile(FileContext,
@@ -1171,8 +1173,6 @@ void ModuleFile::getImportedModules(
     SmallVectorImpl<Module::ImportedModule> &results,
     Module::ImportFilter filter) {
   PrettyModuleFileDeserialization stackEntry(*this);
-  bool includeShadowedModule = (filter != Module::ImportFilter::Private &&
-                                ShadowedModule && Bits.HasUnderlyingModule);
 
   for (auto &dep : Dependencies) {
     if (filter != Module::ImportFilter::All &&
@@ -1180,15 +1180,7 @@ void ModuleFile::getImportedModules(
       continue;
     assert(dep.isLoaded());
     results.push_back(dep.Import);
-
-    // FIXME: Do we want a way to limit re-exports?
-    if (includeShadowedModule && dep.Import.first.empty() &&
-        dep.Import.second == ShadowedModule)
-      includeShadowedModule = false;
   }
-
-  if (includeShadowedModule)
-    results.push_back({ {}, ShadowedModule });
 }
 
 void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {

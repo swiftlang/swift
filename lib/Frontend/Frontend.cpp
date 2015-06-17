@@ -298,7 +298,8 @@ void CompilerInstance::performSema() {
     SmallVector<ImportPair, 4> additionalImports;
 
     if (underlying)
-      additionalImports.push_back({ { /*accessPath=*/{}, underlying }, {} });
+      additionalImports.push_back({ { /*accessPath=*/{}, underlying },
+                                    SourceFile::ImportFlags::Exported });
     if (importedHeaderModule)
       additionalImports.push_back({ { /*accessPath=*/{}, importedHeaderModule },
                                     SourceFile::ImportFlags::Exported });

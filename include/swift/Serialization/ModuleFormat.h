@@ -499,7 +499,7 @@ namespace input_block {
 
   using ModuleFlagsLayout = BCRecordLayout<
     MODULE_FLAGS,
-    BCFixed<1> // has underlying module?
+    BCFixed<1> // has underlying module? [[UNUSED]]
   >;
 
   using SearchPathLayout = BCRecordLayout<
