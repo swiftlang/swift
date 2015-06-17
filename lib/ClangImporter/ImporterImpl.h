@@ -678,8 +678,8 @@ public:
 
   ClangModuleUnit *getClangModuleForMacro(const clang::MacroInfo *MI);
 
-  /// \brief Import the given Swift identifier into Clang.
-  clang::DeclarationName importName(Identifier name);
+  /// \brief Converts the given Swift identifier for Clang.
+  clang::DeclarationName exportName(Identifier name);
   
   /// \brief Import the given Clang name into Swift.
   ///
@@ -698,7 +698,7 @@ public:
   ObjCSelector importSelector(clang::Selector selector);
 
   /// Import a Swift name as a Clang selector.
-  clang::Selector importSelector(DeclName name, bool allowSimpleName = true);
+  clang::Selector exportSelector(DeclName name, bool allowSimpleName = true);
 
   /// Export a Swift Objective-C selector as a Clang Objective-C selector.
   clang::Selector exportSelector(ObjCSelector selector);
@@ -724,7 +724,7 @@ public:
                                                StringRef className);
 
   /// \brief Import the given Swift source location into Clang.
-  clang::SourceLocation importSourceLoc(SourceLoc loc);
+  clang::SourceLocation exportSourceLoc(SourceLoc loc);
 
   /// \brief Import the given Clang source location into Swift.
   SourceLoc importSourceLoc(clang::SourceLocation loc);

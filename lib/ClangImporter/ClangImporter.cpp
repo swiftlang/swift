@@ -803,7 +803,7 @@ Module *ClangImporter::loadModule(
     clangPath;
   for (auto component : path) {
     clangPath.push_back({ &clangContext.Idents.get(component.first.str()),
-                          Impl.importSourceLoc(component.second) } );
+                          Impl.exportSourceLoc(component.second) } );
   }
 
   auto &srcMgr = clangContext.getSourceManager();
@@ -1138,7 +1138,7 @@ ClangModuleUnit *ClangImporter::Implementation::getClangModuleForDecl(
 
 #pragma mark Source locations
 clang::SourceLocation
-ClangImporter::Implementation::importSourceLoc(SourceLoc loc) {
+ClangImporter::Implementation::exportSourceLoc(SourceLoc loc) {
   // FIXME: Implement!
   return clang::SourceLocation();
 }
@@ -1164,7 +1164,7 @@ bool ClangImporter::Implementation::isSwiftReservedName(StringRef name) {
 }
 
 clang::DeclarationName
-ClangImporter::Implementation::importName(Identifier name) {
+ClangImporter::Implementation::exportName(Identifier name) {
   // FIXME: When we start dealing with C++, we can map over some operator
   // names.
   if (name.empty() || name.isOperator())
@@ -1405,7 +1405,7 @@ ObjCSelector ClangImporter::Implementation::importSelector(
 }
 
 clang::Selector
-ClangImporter::Implementation::importSelector(DeclName name,
+ClangImporter::Implementation::exportSelector(DeclName name,
                                               bool allowSimpleName) {
   if (!allowSimpleName && name.isSimpleName())
     return {};
@@ -1413,7 +1413,7 @@ ClangImporter::Implementation::importSelector(DeclName name,
   clang::ASTContext &ctx = getClangASTContext();
 
   SmallVector<clang::IdentifierInfo *, 8> pieces;
-  pieces.push_back(importName(name.getBaseName()).getAsIdentifierInfo());
+  pieces.push_back(exportName(name.getBaseName()).getAsIdentifierInfo());
 
   auto argNames = name.getArgumentNames();
   if (argNames.empty())
@@ -1424,7 +1424,7 @@ ClangImporter::Implementation::importSelector(DeclName name,
   argNames = argNames.slice(1);
 
   for (Identifier argName : argNames)
-    pieces.push_back(importName(argName).getAsIdentifierInfo());
+    pieces.push_back(exportName(argName).getAsIdentifierInfo());
 
   return ctx.Selectors.getSelector(pieces.size(), pieces.data());
 }
@@ -1433,7 +1433,7 @@ clang::Selector
 ClangImporter::Implementation::exportSelector(ObjCSelector selector) {
   SmallVector<clang::IdentifierInfo *, 4> pieces;
   for (auto piece : selector.getSelectorPieces())
-    pieces.push_back(importName(piece).getAsIdentifierInfo());
+    pieces.push_back(exportName(piece).getAsIdentifierInfo());
   return getClangASTContext().Selectors.getSelector(selector.getNumArgs(),
                                                     pieces.data());
 }
@@ -1945,7 +1945,7 @@ void ClangImporter::lookupValue(Identifier name, VisibleDeclConsumer &consumer){
   auto &sema = Impl.Instance->getSema();
 
   // Map the name. If we can't represent the Swift name in Clang, bail out now.
-  auto clangName = Impl.importName(name);
+  auto clangName = Impl.exportName(name);
   if (!clangName)
     return;
   
@@ -2601,7 +2601,7 @@ void ClangImporter::loadExtensions(NominalTypeDecl *nominal,
     if (nominal->isObjC()) {
       // Map the name. If we can't represent the Swift name in Clang, bail out
       // now.
-      auto clangName = Impl.importName(nominal->getName());
+      auto clangName = Impl.exportName(nominal->getName());
       if (!clangName)
         return;
 
@@ -2778,7 +2778,7 @@ static void lookupClassMembersImpl(ClangImporter::Implementation &Impl,
     }
 
   } else if (name) {
-    auto sel = Impl.importSelector(name);
+    auto sel = Impl.exportSelector(name);
     if (!sel.isNull()) {
       S.ReadMethodPool(sel);
       importMethods(S.MethodPool[sel]);
@@ -2788,7 +2788,7 @@ static void lookupClassMembersImpl(ClangImporter::Implementation &Impl,
       // Note: If this is ever used to look up init methods, we'd need to do
       // the reverse as well.
       if (name.isSimpleName()) {
-        auto *II = Impl.importName(name.getBaseName()).getAsIdentifierInfo();
+        auto *II = Impl.exportName(name.getBaseName()).getAsIdentifierInfo();
         sel = Impl.getClangASTContext().Selectors.getUnarySelector(II);
         assert(!sel.isNull());
 
