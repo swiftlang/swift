@@ -997,9 +997,9 @@ namespace {
     }
 
     Type importCFClassType(const clang::TypedefNameDecl *decl,
-                           CFPointeeInfo info) {
+                           StringRef name, CFPointeeInfo info) {
       // If the name ends in 'Ref', drop that from the imported class name.
-      StringRef nameWithoutRef = getImportedCFTypeName(decl->getName());
+      StringRef nameWithoutRef = getImportedCFTypeName(name);
       Identifier className = Impl.SwiftContext.getIdentifier(nameWithoutRef);
 
       auto dc = Impl.importDeclContextOf(decl);
@@ -1020,7 +1020,7 @@ namespace {
       theClass->setCheckedInheritanceClause();
       theClass->setAddedImplicitInitializers(); // suppress all initializers
       theClass->setForeign(true);
-      addObjCAttribute(theClass, className);
+      addObjCAttribute(theClass, None);
       Impl.registerExternalDecl(theClass);
 
       SmallVector<ProtocolDecl *, 4> protocols;
@@ -1081,7 +1081,7 @@ namespace {
           if (auto pointee = CFPointeeInfo::classifyTypedef(Decl)) {
             // If the pointee is a record, consider creating a class type.
             if (pointee.isRecord()) {
-              SwiftType = importCFClassType(Decl, pointee);
+              SwiftType = importCFClassType(Decl, Name.str(), pointee);
               if (!SwiftType) return nullptr;
               NameMapping = MappedTypeNameKind::DefineOnly;
 
@@ -1457,8 +1457,15 @@ namespace {
           checkPrefix = checkPrefix.drop_front();
         }
 
+        // Account for the enum being imported using
+        // __attribute__((swift_private)). This is a little ad hoc, but it's a
+        // rare case anyway.
+        StringRef enumNameStr = enumName.str();
+        if (enumNameStr.startswith("__") && !checkPrefix.startswith("__"))
+          enumNameStr = enumNameStr.drop_front(2);
+
         StringRef commonWithEnum = getCommonPluralPrefix(checkPrefix,
-                                                         enumName.str());
+                                                         enumNameStr);
         size_t delta = commonPrefix.size() - checkPrefix.size();
         if (commonWithEnum.size() < checkPrefix.size())
           delta -= droppedFromBack;
@@ -4526,7 +4533,6 @@ namespace {
         }
       }
 
-      Identifier origName = name;
       if (hasConflict) {
         SmallString<64> nameBuf{name.str()};
         nameBuf += SWIFT_PROTOCOL_SUFFIX;
@@ -4550,7 +4556,7 @@ namespace {
                                    name,
                                    None);
       result->computeType();
-      addObjCAttribute(result, origName);
+      addObjCAttribute(result, Impl.importName(decl->getDeclName()));
 
       if (declaredNative)
         markMissingSwiftDecl(result);
@@ -4632,7 +4638,7 @@ namespace {
         result->setSuperclass(Type());
         result->setCheckedInheritanceClause();
         result->setAddedImplicitInitializers(); // suppress all initializers
-        addObjCAttribute(result, name);
+        addObjCAttribute(result, Impl.importName(decl->getDeclName()));
         Impl.registerExternalDecl(result);
         return result;
       };
@@ -4701,7 +4707,7 @@ namespace {
       Impl.ImportedDecls[decl->getCanonicalDecl()] = result;
       result->setCircularityCheck(CircularityCheck::Checked);
       result->setAddedImplicitInitializers();
-      addObjCAttribute(result, name);
+      addObjCAttribute(result, Impl.importName(decl->getDeclName()));
 
       if (declaredNative)
         markMissingSwiftDecl(result);

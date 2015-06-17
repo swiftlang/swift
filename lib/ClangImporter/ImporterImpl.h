@@ -683,6 +683,10 @@ public:
 
   /// Imports the name of the given Clang decl into Swift.
   ///
+  /// Note that this may result in a name different from the Clang name, so it
+  /// should not be used when referencing Clang symbols. (In particular, it
+  /// should not be put into \c \@objc attributes.)
+  ///
   /// \sa importName(clang::DeclarationName, StringRef)
   Identifier importName(const clang::NamedDecl *D, StringRef removePrefix = "");
   

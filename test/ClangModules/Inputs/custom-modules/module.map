@@ -104,6 +104,10 @@ module Redeclaration {
   export *
 }
 
+module SwiftPrivateAttr {
+  header "SwiftPrivateAttr.h"
+}
+
 module TestProtocols { header "Protocols.h" }
 
 module TypeAndValue {

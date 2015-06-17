@@ -1201,6 +1201,42 @@ Identifier
 ClangImporter::Implementation::importName(const clang::NamedDecl *D,
                                           StringRef removePrefix) {
   Identifier result = importName(D->getDeclName(), removePrefix);
+  if (result.empty())
+    return result;
+
+  auto hasSwiftPrivate = [this](const clang::NamedDecl *D) {
+    if (D->hasAttr<clang::SwiftPrivateAttr>())
+      return true;
+
+    // Enum constants that are not imported as members should be considered
+    // private if the parent enum is marked private.
+    if (auto *ECD = dyn_cast<clang::EnumConstantDecl>(D)) {
+      auto *ED = cast<clang::EnumDecl>(ECD->getDeclContext());
+      switch (classifyEnum(ED)) {
+      case EnumKind::Constants:
+      case EnumKind::Unknown:
+        if (ED->hasAttr<clang::SwiftPrivateAttr>())
+          return true;
+        if (auto *enumTypedef = ED->getTypedefNameForAnonDecl())
+          if (enumTypedef->hasAttr<clang::SwiftPrivateAttr>())
+            return true;
+        break;
+
+      case EnumKind::Enum:
+      case EnumKind::Options:
+        break;
+      }
+    }
+
+    return false;
+  };
+
+  if (hasSwiftPrivate(D) && D->getDeclName().isIdentifier()) {
+    SmallString<64> name{"__"};
+    name += result.str();
+    result = SwiftContext.getIdentifier(name.str());
+  }
+
   return result;
 }
 

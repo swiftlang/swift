@@ -1,0 +1,71 @@
+import Foundation
+
+protocol __PrivProto {
+}
+class Foo : NSObject, __PrivProto {
+  var __privValue: AnyObject!
+  init()
+}
+class __PrivFooSub : Foo {
+  init()
+}
+func __privTest()
+struct S0 {
+  var __privValue: Int32
+  init()
+  init(__privValue: Int32)
+}
+struct __PrivS1 {
+  var value: Int32
+  init()
+  init(value: Int32)
+}
+struct __PrivS2 {
+  var value: Int32
+  init()
+  init(value: Int32)
+}
+var __PrivAnonymousA: Int { get }
+struct E0 : RawRepresentable {
+  init(_ rawValue: UInt32)
+  init(rawValue: UInt32)
+  var rawValue: UInt32
+}
+var __E0PrivA: E0 { get }
+struct __PrivE1 : RawRepresentable {
+  init(_ rawValue: UInt32)
+  init(rawValue: UInt32)
+  var rawValue: UInt32
+}
+var __PrivE1A: __PrivE1 { get }
+struct __PrivE2 : RawRepresentable {
+  init(_ rawValue: UInt32)
+  init(rawValue: UInt32)
+  var rawValue: UInt32
+}
+var __PrivE2A: __PrivE2 { get }
+enum __PrivNSEnum : Int {
+  init?(rawValue: Int)
+  var rawValue: Int { get }
+  case A
+}
+enum NSEnum : Int {
+  init?(rawValue: Int)
+  var rawValue: Int { get }
+  case __PrivA
+  case B
+}
+struct __PrivNSOptions : OptionSetType {
+  init(rawValue: Int)
+  let rawValue: Int
+  static var A: __PrivNSOptions { get }
+}
+struct NSOptions : OptionSetType {
+  init(rawValue: Int)
+  let rawValue: Int
+  static var __PrivA: NSOptions { get }
+  static var B: NSOptions { get }
+}
+typealias __PrivCFTypeRef = __PrivCFType
+typealias __PrivCFSubRef = __PrivCFSub
+typealias __PrivInt = Int32
