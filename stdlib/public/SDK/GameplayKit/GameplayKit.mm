@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if 0
 #import <GameplayKit/GameplayKit.h>
 
 extern "C" NS_RETURNS_RETAINED __nullable GKComponent *
@@ -32,4 +31,3 @@ GK_Swift_GKStateMachine_stateForClass(
   [self_ release];
   return state;
 }
-#endif
