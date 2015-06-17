@@ -90,5 +90,19 @@ ErrorTypeTests.test("dynamic casts") {
   expectEqual(NoisyErrorDeathCount, NoisyErrorLifeCount)
 }
 
+enum SillyError: ErrorType { case JazzHands }
+
+ErrorTypeTests.test("try!")
+  .skip(.Custom({ _isFastAssertConfiguration() },
+                reason: "trap is not guaranteed to happen in -Ounchecked"))
+  .crashOutputMatches(_isDebugAssertConfiguration()
+                        ? "'try!' expression unexpectedly raised an error: "
+                          + "main.SillyError.JazzHands"
+                        : "")
+  .code {
+    expectCrashLater()
+    let _: () = try! { throw SillyError.JazzHands }()
+  }
+
 runAllTests()
 
