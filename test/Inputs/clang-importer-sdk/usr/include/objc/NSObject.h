@@ -9,6 +9,7 @@
 @property (readonly, copy) NSString *description;
 - (instancetype)retain OBJC_ARC_UNAVAILABLE;
 - (Class)class;
+- (BOOL)conformsToProtocol:(Protocol *)aProtocol;
 @end
 
 @interface NSObject <NSObject>

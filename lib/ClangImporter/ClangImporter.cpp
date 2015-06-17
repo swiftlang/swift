@@ -2032,66 +2032,75 @@ void ClangImporter::lookupValue(Identifier name, VisibleDeclConsumer &consumer){
     }
   };
 
+
   // Perform name lookup into the global scope.
   // FIXME: Map source locations over.
-  clang::LookupResult lookupResult(sema, clangName, clang::SourceLocation(),
+  clang::LookupResult lookupResult(sema, /*name=*/{}, clang::SourceLocation(),
                                    clang::Sema::LookupOrdinaryName);
-  if (sema.LookupName(lookupResult, /*Scope=*/nullptr))
-    processResults(lookupResult);
 
-  if (!FoundType) {
-    // Look up a tag name if we did not find a type with this name already.
-    // We don't want to introduce multiple types with same name.
-    lookupResult.clear(clang::Sema::LookupTagName);
-    if (sema.LookupName(lookupResult, /*Scope=*/nullptr))
-      processResults(lookupResult);
-  }
+  auto lookupNameForSwift = [&](clang::DeclarationName clangNameToLookup) {
+    lookupResult.setLookupName(clangNameToLookup);
 
-  // Look up protocol names as well.
-  lookupResult.clear(clang::Sema::LookupObjCProtocolName);
-  if (sema.LookupName(lookupResult, /*Scope=*/nullptr)) {
-    processResults(lookupResult);
-
-  } else if (!FoundAny && name.str().endswith(SWIFT_PROTOCOL_SUFFIX)) {
-    auto noProtoNameStr = name.str().drop_back(strlen(SWIFT_PROTOCOL_SUFFIX));
-    auto protoIdent = &Impl.getClangASTContext().Idents.get(noProtoNameStr);
-    lookupResult.clear(clang::Sema::LookupObjCProtocolName);
-    lookupResult.setLookupName(protoIdent);
-
-    if (sema.LookupName(lookupResult, /*Scope=*/nullptr))
-      processResults(lookupResult);
-
-    lookupResult.setLookupName(clangName);
-  }
-
-  // If we *still* haven't found anything, try looking for '<name>Ref'.
-  // Eventually, this should be optimized by recognizing this case when
-  // generating the clang module.
-  if (!FoundAny && clangID) {
     lookupResult.clear(clang::Sema::LookupOrdinaryName);
+    if (sema.LookupName(lookupResult, /*Scope=*/nullptr))
+      processResults(lookupResult);
 
-    llvm::SmallString<128> buffer;
-    buffer += clangID->getName();
-    buffer += SWIFT_CFTYPE_SUFFIX;
-    auto refIdent = &Impl.Instance->getASTContext().Idents.get(buffer.str());
-    lookupResult.setLookupName(refIdent);
+    if (!FoundType) {
+      // Look up a tag name if we did not find a type with this name already.
+      // We don't want to introduce multiple types with same name.
+      lookupResult.clear(clang::Sema::LookupTagName);
+      if (sema.LookupName(lookupResult, /*Scope=*/nullptr))
+        processResults(lookupResult);
+    }
 
-    if (sema.LookupName(lookupResult, /*Scope=*/0)) {
-      // FIXME: Filter based on access path? C++ access control?
-      for (auto decl : lookupResult) {
-        if (auto swiftDecl = Impl.importDeclReal(decl->getUnderlyingDecl())) {
-          auto alias = dyn_cast<TypeAliasDecl>(swiftDecl);
-          if (!alias) continue;
+    const auto *clangIDToLookup = clangNameToLookup.getAsIdentifierInfo();
+
+    // Look up protocol names as well.
+    lookupResult.clear(clang::Sema::LookupObjCProtocolName);
+    if (sema.LookupName(lookupResult, /*Scope=*/nullptr)) {
+      processResults(lookupResult);
+
+    } else if (!FoundAny &&
+               clangIDToLookup->getName().endswith(SWIFT_PROTOCOL_SUFFIX)) {
+      StringRef noProtoNameStr = clangIDToLookup->getName();
+      noProtoNameStr = noProtoNameStr.drop_back(strlen(SWIFT_PROTOCOL_SUFFIX));
+      auto protoIdent = &Impl.getClangASTContext().Idents.get(noProtoNameStr);
+      lookupResult.clear(clang::Sema::LookupObjCProtocolName);
+      lookupResult.setLookupName(protoIdent);
+
+      if (sema.LookupName(lookupResult, /*Scope=*/nullptr))
+        processResults(lookupResult);
+    }
+
+    // If we *still* haven't found anything, try looking for '<name>Ref'.
+    // Eventually, this should be optimized by recognizing this case when
+    // generating the clang module.
+    if (!FoundAny && clangIDToLookup) {
+      llvm::SmallString<128> buffer;
+      buffer += clangIDToLookup->getName();
+      buffer += SWIFT_CFTYPE_SUFFIX;
+      auto refIdent = &Impl.Instance->getASTContext().Idents.get(buffer.str());
+
+      lookupResult.clear(clang::Sema::LookupOrdinaryName);
+      lookupResult.setLookupName(refIdent);
+      if (sema.LookupName(lookupResult, /*Scope=*/0)) {
+        // FIXME: Filter based on access path? C++ access control?
+        // FIXME: Sort this list, even though there's probably only one result.
+        for (auto decl : lookupResult) {
+          auto swiftDecl = Impl.importDeclReal(decl->getUnderlyingDecl());
+          auto alias = dyn_cast_or_null<TypeAliasDecl>(swiftDecl);
+          if (!alias)
+            continue;
 
           Type underlyingTy = alias->getUnderlyingType();
           TypeDecl *underlying = nullptr;
           if (auto anotherAlias =
-                dyn_cast<NameAliasType>(underlyingTy.getPointer())) {
+              dyn_cast<NameAliasType>(underlyingTy.getPointer())) {
             underlying = anotherAlias->getDecl();
           } else if (auto aliasedClass = underlyingTy->getAs<ClassType>()) {
             underlying = aliasedClass->getDecl();
           }
-          
+
           if (!underlying)
             continue;
           if (underlying->getName() == name) {
@@ -2101,6 +2110,19 @@ void ClangImporter::lookupValue(Identifier name, VisibleDeclConsumer &consumer){
         }
       }
     }
+  };
+
+  // Actually do the lookup.
+  lookupNameForSwift(clangName);
+
+  // If we haven't found anything and the name starts with "__", maybe it's a
+  // decl marked with the swift_private attribute. Try chopping off the prefix.
+  if (!FoundAny && clangID && clangID->getName().startswith("__") &&
+      clangID->getName().size() > 2) {
+    StringRef unprefixedName = clangID->getName().drop_front(2);
+    auto unprefixedID =
+        &Impl.Instance->getASTContext().Idents.get(unprefixedName);
+    lookupNameForSwift(unprefixedID);
   }
 }
 
