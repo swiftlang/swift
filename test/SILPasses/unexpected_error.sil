@@ -1,0 +1,18 @@
+// RUN: %target-sil-opt -dce %s | FileCheck %s
+import Swift
+
+// CHECK-LABEL: sil @unexpected_error : $@convention(thin) (ErrorType) -> () {
+sil @unexpected_error : $@convention(thin) ErrorType -> () {
+entry(%10 : $ErrorType):
+  // CHECK: builtin "unexpectedError"
+  %11 = builtin "unexpectedError"(%10 : $ErrorType) : $()
+  unreachable
+}
+
+// CHECK-LABEL: sil @error_in_main : $@convention(thin) (ErrorType) -> () {
+sil @error_in_main : $@convention(thin) ErrorType -> () {
+entry(%10 : $ErrorType):
+  // CHECK: builtin "errorInMain"
+  %11 = builtin "errorInMain"(%10 : $ErrorType) : $()
+  unreachable
+}

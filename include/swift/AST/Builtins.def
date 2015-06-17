@@ -344,10 +344,10 @@ BUILTIN_SIL_OPERATION(IsUniqueOrPinned_native, "isUniqueOrPinned_native",
 BUILTIN_RUNTIME_CALL(WillThrow, "willThrow", "n")
 
 /// unexpectedError: ErrorType -> ()
-BUILTIN_RUNTIME_CALL(UnexpectedError, "unexpectedError", "n")
+BUILTIN_RUNTIME_CALL(UnexpectedError, "unexpectedError", "")
 
 /// errorInMain: ErrorType -> ()
-BUILTIN_RUNTIME_CALL(ErrorInMain, "errorInMain", "n")
+BUILTIN_RUNTIME_CALL(ErrorInMain, "errorInMain", "")
 
 #undef BUILTIN_RUNTIME_CALL
 

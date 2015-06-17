@@ -418,7 +418,9 @@ static SILInstruction *getAsCallToNoReturn(SILInstruction *I) {
     if (BI->getIntrinsicInfo().hasAttribute(llvm::Attribute::NoReturn))
       return BI;
     if (BI->getBuiltinInfo().ID == BuiltinValueKind::Unreachable
-        || BI->getBuiltinInfo().ID == BuiltinValueKind::CondUnreachable)
+        || BI->getBuiltinInfo().ID == BuiltinValueKind::CondUnreachable
+        || BI->getBuiltinInfo().ID == BuiltinValueKind::UnexpectedError
+        || BI->getBuiltinInfo().ID == BuiltinValueKind::ErrorInMain)
       return BI;
   }
   return nullptr;
