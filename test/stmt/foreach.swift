@@ -149,3 +149,20 @@ func testForEachInference() {
   for i: Int8 in 0..<10 { }
   for i: UInt in 0...10 { }
 }
+
+func testMatchingPatterns() {
+  // <rdar://problem/21428712> for case parse failure
+  let myArray : [Int?] = []
+  for case .Some(let x) in myArray {
+    _ = x
+  }
+
+  // <rdar://problem/21392677> for/case/in patterns aren't parsed properly
+  class A {}
+  class B : A {}
+  class C : A {}
+  let array : [A] = [A(), B(), C()]
+  for case (let x as B) in array {
+    _ = x
+  }
+}
