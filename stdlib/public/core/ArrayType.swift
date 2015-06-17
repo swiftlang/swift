@@ -111,6 +111,12 @@ protocol _ArrayType
   /// will not change.
   mutating func removeAll(keepCapacity keepCapacity: Bool)
 
+  //===--- algorithms -----------------------------------------------------===//
+
+  func join<
+      S : SequenceType where S.Generator.Element == Self
+  >(elements: S) -> Self
+
   //===--- implementation detail  -----------------------------------------===//
 
   typealias _Buffer : _ArrayBufferType

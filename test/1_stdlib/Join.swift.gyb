@@ -32,42 +32,42 @@ JoinTestSuite.test("${ArrayType}") {
   if true {
     let separator: ArrayType = []
     if true {
-      let r = separator.join([[Int]]())
+      let r = join(separator, [])
       expectEqual([], r)
     }
     if true {
       let seq: [ArrayType] = [[]]
-      let r = separator.join(seq)
+      let r = join(separator, seq)
       expectEqual([], r)
     }
     if true {
       let seq: [ArrayType] = [[], []]
-      let r = separator.join(seq)
+      let r = join(separator, seq)
       expectEqual([], r)
     }
     if true {
       let seq: [ArrayType] = [[], [], []]
-      let r = separator.join(seq)
+      let r = join(separator, seq)
       expectEqual([], r)
     }
     if true {
       let seq: [ArrayType] = [[ 1 ]]
-      let r = separator.join(seq)
+      let r = join(separator, seq)
       expectEqual([ 1 ], r)
     }
     if true {
       let seq: [ArrayType] = [[ 1 ], [ 2 ]]
-      let r = separator.join(seq)
+      let r = join(separator, seq)
       expectEqual([ 1, 2 ], r)
     }
     if true {
       let seq: [ArrayType] = [[ 1 ], [ 2 ], [ 3 ]]
-      let r = separator.join(seq)
+      let r = join(separator, seq)
       expectEqual([ 1, 2, 3 ], r)
     }
     if true {
       let seq: [ArrayType] = [[ 1, 2 ], [ 3, 4 ], [ 5, 6 ]]
-      let r = separator.join(seq)
+      let r = join(separator, seq)
       expectEqual([ 1, 2, 3, 4, 5, 6 ], r)
     }
   }
@@ -77,42 +77,42 @@ JoinTestSuite.test("${ArrayType}") {
     let separator: ArrayType = [ 42 ]
     if true {
       let seq: [ArrayType] = []
-      let r = separator.join(seq)
+      let r = join(separator, seq)
       expectEqual([], r)
     }
     if true {
       let seq: [ArrayType] = [[]]
-      let r = separator.join(seq)
+      let r = join(separator, seq)
       expectEqual([], r)
     }
     if true {
       let seq: [ArrayType] = [[], []]
-      let r = separator.join(seq)
+      let r = join(separator, seq)
       expectEqual([ 42 ], r)
     }
     if true {
       let seq: [ArrayType] = [[], [], []]
-      let r = separator.join(seq)
+      let r = join(separator, seq)
       expectEqual([ 42, 42 ], r)
     }
     if true {
       let seq: [ArrayType] = [[ 1 ]]
-      let r = separator.join(seq)
+      let r = join(separator, seq)
       expectEqual([ 1 ], r)
     }
     if true {
       let seq: [ArrayType] = [[ 1 ], [ 2 ]]
-      let r = separator.join(seq)
+      let r = join(separator, seq)
       expectEqual([ 1, 42, 2 ], r)
     }
     if true {
       let seq: [ArrayType] = [[ 1 ], [ 2 ], [ 3 ]]
-      let r = separator.join(seq)
+      let r = join(separator, seq)
       expectEqual([ 1, 42, 2, 42, 3 ], r)
     }
     if true {
       let seq: [ArrayType] = [[ 1, 2 ], [ 3, 4 ], [ 5, 6 ]]
-      let r = separator.join(seq)
+      let r = join(separator, seq)
       expectEqual([ 1, 2, 42, 3, 4, 42, 5, 6 ], r)
     }
   }
@@ -122,53 +122,69 @@ JoinTestSuite.test("${ArrayType}") {
     let separator: ArrayType = [ 42, 4242 ]
     if true {
       let seq: [ArrayType] = []
-      let r = separator.join(seq)
+      let r = join(separator, seq)
       expectEqual([], r)
     }
     if true {
       let seq: [ArrayType] = [[]]
-      let r = separator.join(seq)
+      let r = join(separator, seq)
       expectEqual([], r)
     }
     if true {
       let seq: [ArrayType] = [[], []]
-      let r = separator.join(seq)
+      let r = join(separator, seq)
       expectEqual([ 42, 4242 ], r)
     }
     if true {
       let seq: [ArrayType] = [[], [], []]
-      let r = separator.join(seq)
+      let r = join(separator, seq)
       expectEqual([ 42, 4242, 42, 4242 ], r)
     }
     if true {
       let seq: [ArrayType] = [[ 1 ]]
-      let r = separator.join(seq)
+      let r = join(separator, seq)
       expectEqual([ 1 ], r)
     }
     if true {
       let seq: [ArrayType] = [[ 1 ], [ 2 ]]
-      let r = separator.join(seq)
+      let r = join(separator, seq)
       expectEqual([ 1, 42, 4242, 2 ], r)
     }
     if true {
       let seq: [ArrayType] = [[ 1 ], [ 2 ], [ 3 ]]
-      let r = separator.join(seq)
+      let r = join(separator, seq)
       expectEqual([ 1, 42, 4242, 2, 42, 4242, 3 ], r)
     }
     if true {
       let seq: [ArrayType] = [[ 1, 2 ], [ 3, 4 ], [ 5, 6 ]]
-      let r = separator.join(seq)
+      let r = join(separator, seq)
       expectEqual([ 1, 2, 42, 4242, 3, 4, 42, 4242, 5, 6 ], r)
     }
-    if true {
-      let seq = [[ 1, 2 ], [ 3, 4 ], [ 5, 6 ]].map { AnySequence($0) }
-      let r = separator.join(seq)
-      expectEqual([ 1, 2, 42, 4242, 3, 4, 42, 4242, 5, 6 ], r)
-    }
+  }
+
+  //
+  // Test forwarding instance function.
+  //
+
+  if true {
+    let separator: ArrayType = [ 42, 4242 ]
+    let seq: [ArrayType] = [[ 1, 2 ], [ 3, 4 ], [ 5, 6 ]]
+    let r = separator.join(seq)
+    expectEqual([ 1, 2, 42, 4242, 3, 4, 42, 4242, 5, 6 ], r)
   }
 }
 
 %end
+
+func join<S: SequenceType where S.Generator.Element == String>(
+  separator: String, _ elements: S
+) -> String {
+  return String(
+    join(
+      separator.characters,
+      lazy(elements).map { $0.characters }
+    ))
+}
 
 JoinTestSuite.test("String.CharacterView") {
   //
@@ -176,41 +192,38 @@ JoinTestSuite.test("String.CharacterView") {
   //
 
   // Empty separator.
-  expectEqual("",    "".join([]))
-  expectEqual("",    "".join([""]))
-  expectEqual("",    "".join(["", ""]))
-  expectEqual("",    "".join(["", "", ""]))
-  expectEqual("a",   "".join(["a"]))
-  expectEqual("ab",  "".join(["a", "b"]))
-  expectEqual("abc", "".join(["a", "b", "c"]))
-  expectEqual("abcdef", "".join(["ab", "cd", "ef"]))
+  expectEqual("",    join("", []))
+  expectEqual("",    join("", [""]))
+  expectEqual("",    join("", ["", ""]))
+  expectEqual("",    join("", ["", "", ""]))
+  expectEqual("a",   join("", ["a"]))
+  expectEqual("ab",  join("", ["a", "b"]))
+  expectEqual("abc", join("", ["a", "b", "c"]))
+  expectEqual("abcdef", join("", ["ab", "cd", "ef"]))
 
   // 1-element separator.
-  expectEqual("",      "x".join([""]))
-  expectEqual("x",     "x".join(["", ""]))
-  expectEqual("xx",    "x".join(["", "", ""]))
-  expectEqual("a",     "x".join(["a"]))
-  expectEqual("axb",   "x".join(["a", "b"]))
-  expectEqual("axbxc", "x".join(["a", "b", "c"]))
-  expectEqual("abxcdxef", "x".join(["ab", "cd", "ef"]))
+  expectEqual("",      join("x", [""]))
+  expectEqual("x",     join("x", ["", ""]))
+  expectEqual("xx",    join("x", ["", "", ""]))
+  expectEqual("a",     join("x", ["a"]))
+  expectEqual("axb",   join("x", ["a", "b"]))
+  expectEqual("axbxc", join("x", ["a", "b", "c"]))
+  expectEqual("abxcdxef", join("x", ["ab", "cd", "ef"]))
 
   // 2-element separator.
-  expectEqual("",        "xy".join([""]))
-  expectEqual("xy",      "xy".join(["", ""]))
-  expectEqual("xyxy",    "xy".join(["", "", ""]))
-  expectEqual("a",       "xy".join(["a"]))
-  expectEqual("axyb",    "xy".join(["a", "b"]))
-  expectEqual("axybxyc", "xy".join(["a", "b", "c"]))
-  expectEqual("abxycdxyef", "xy".join(["ab", "cd", "ef"]))
+  expectEqual("",        join("xy", [""]))
+  expectEqual("xy",      join("xy", ["", ""]))
+  expectEqual("xyxy",    join("xy", ["", "", ""]))
+  expectEqual("a",       join("xy", ["a"]))
+  expectEqual("axyb",    join("xy", ["a", "b"]))
+  expectEqual("axybxyc", join("xy", ["a", "b", "c"]))
+  expectEqual("abxycdxyef", join("xy", ["ab", "cd", "ef"]))
 
-  // Different sequence type on RHS
-  expectEqual("",        "xy".join([""].map {$0.characters}))
-  expectEqual("xy",      "xy".join(["", ""].map {$0.characters}))
-  expectEqual("xyxy",    "xy".join(["", "", ""].map {$0.characters}))
-  expectEqual("a",       "xy".join(["a"].map {$0.characters}))
-  expectEqual("axyb",    "xy".join(["a", "b"].map {$0.characters}))
-  expectEqual("axybxyc", "xy".join(["a", "b", "c"].map {$0.characters}))
-  expectEqual("abxycdxyef", "xy".join(["ab", "cd", "ef"].map {$0.characters}))
+  //
+  // Test forwarding instance function.
+  //
+
+  expectEqual("abxycdxyef", "xy".join(["ab", "cd", "ef"]))
 }
 
 struct MockExtensibleCollection : ExtensibleCollectionType {
@@ -260,24 +273,28 @@ struct MockExtensibleCollection : ExtensibleCollectionType {
 
 JoinTestSuite.test("ReservesCapacity") {
   if true {
-    let r = 
-    MockExtensibleCollection([]).join([[Int]]())
+    let r = join(MockExtensibleCollection([]), [])
     expectEqual(0, r._reservedCapacity!)
   }
   if true {
-    let r = MockExtensibleCollection([ 42 ]).join([[Int]()])
+    let r = join(MockExtensibleCollection([ 42 ]),
+        [ MockExtensibleCollection([]) ])
     expectEqual(0, r._reservedCapacity!)
   }
 
   if true {
-    let r = MockExtensibleCollection([ 42 ]).join(
-      [ [1], [ 2, 3, 4 ], [ 5, 6, 7 ] ])
+    let r = join(MockExtensibleCollection([ 42 ]),
+        [ MockExtensibleCollection([ 1 ]),
+          MockExtensibleCollection([ 2, 3, 4 ]),
+          MockExtensibleCollection([ 5, 6, 7 ]) ])
     expectEqual(9, r._reservedCapacity!)
     expectEqual([ 1, 42, 2, 3, 4, 42, 5, 6, 7 ], r._storage)
   }
   if true {
-    let r = MockExtensibleCollection([ 42, 4242 ]).join(
-      [ [ 1 ], [ 2, 3, 4 ], [ 5, 6, 7 ] ])
+    let r = join(MockExtensibleCollection([ 42, 4242 ]),
+        [ MockExtensibleCollection([ 1 ]),
+          MockExtensibleCollection([ 2, 3, 4 ]),
+          MockExtensibleCollection([ 5, 6, 7 ]) ])
     expectEqual(11, r._reservedCapacity!)
     expectEqual([ 1, 42, 4242, 2, 3, 4, 42, 4242, 5, 6, 7 ], r._storage)
   }

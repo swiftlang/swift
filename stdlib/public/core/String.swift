@@ -616,20 +616,11 @@ extension String {
   ///
   ///     "-|-".join(["foo", "bar", "baz"]) // "foo-|-bar-|-baz"
   public func join<
-  S : SequenceType where S.Generator.Element == String
+      S : SequenceType where S.Generator.Element == String
   >(elements: S) -> String {
-    return join(lazy(elements).map { $0.characters })
-  }
-
-  /// Interpose `self` between every pair of consecutive `elements`,
-  /// then concatenate the result.  For example:
-  ///
-  ///     "-|-".join(["foo".characters, "bar".characters]) // "foo-|-bar"
-  public func join<
-  S : SequenceType where S.Generator.Element : SequenceType,
-    S.Generator.Element.Generator.Element == Character
-  >(elements: S) -> String {
-    return String(characters.join(elements))
+    return String(
+      characters.join(lazy(elements).map { $0.characters })
+    )
   }
 }
 

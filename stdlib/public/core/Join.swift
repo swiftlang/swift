@@ -131,62 +131,49 @@ public func +<
   return lhs
 }
 
-@available(*, unavailable, message="call the 'join' method on the first argument")
+/// Creates and returns a collection of type `C` that is the result of
+/// interposing a given separator between the elements of the sequence
+/// `elements`.
+///
+/// For example, this code excerpt writes "``here be dragons``" to the standard
+/// output:
+///
+///     print(join(" ", [ "here", "be", "dragons" ]))
 public func join<
- C : ExtensibleCollectionType, S : SequenceType 
- where S.Generator.Element : SequenceType,
-       S.Generator.Element.Generator.Element == C.Generator.Element
-> (
- separator: C, _ elements: S
+  C : ExtensibleCollectionType, S : SequenceType
+  where S.Generator.Element == C
+>(
+  separator: C, _ elements: S
 ) -> C {
-  fatalError("unavailable")
-}
+  var result = C()
+  let separatorSize = separator.count
 
-extension ExtensibleCollectionType {
-  /// Creates and returns a collection of type `Self` that is the
-  /// result of concatenating `elements` with interposed copies of
-  /// `self`.
-  ///
-  /// For example:
-  ///
-  ///     [1, 0].join([[5, 6], [7], [8, 9]]) // [5,6,  1,0,  7,  1,0,  8,9]
-  ///
-  /// - seealso: `String.join`
-  public func join<
-  S : SequenceType where S.Generator.Element : SequenceType,
-    S.Generator.Element.Generator.Element == Generator.Element
-  > (elements: S) -> Self {
-    var result = Self()
-    
-    typealias Distance = Index.Distance
-    let separatorCount = self.count
-
-    let reservation = elements._preprocessingPass { s in
-      s.reduce(0) {
-        $0 + separatorCount + numericCast($1.underestimateCount())
-      } - separatorCount
-    }
-
-    if let n = reservation {
-      result.reserveCapacity(n)
-    }
-
-    if separatorCount != 0 {
-      var gen = elements.generate()
-      if let first = gen.next() {
-        result.extend(first)
-        while let next = gen.next() {
-          result.extend(self)
-          result.extend(next)
-        }
-      }
-    } else {
-      for x in elements {
-        result.extend(x)
-      }
-    }
-
-    return result
+  // FIXME: include separator
+  let reservation = elements._preprocessingPass {
+    (s: S) -> C.Index.Distance in
+    let r: C.Index.Distance = s.reduce(0) { $0 + separatorSize + $1.count }
+    return r - separatorSize
   }
+
+  if let n = reservation {
+    result.reserveCapacity(n)
+  }
+
+  if separatorSize != 0 {
+    var gen = elements.generate()
+    if let first = gen.next() {
+      result.extend(first)
+      while let next = gen.next() {
+        result.extend(separator)
+        result.extend(next)
+      }
+    }
+  } else {
+    for x in elements {
+      result.extend(x)
+    }
+  }
+
+  return result
 }
 
