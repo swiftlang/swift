@@ -250,6 +250,14 @@ class Foo {
   // arm64-tvos-fixme:     define internal zeroext i1 @_TToFC8abitypes3Foo6negate
   // arm64-tvos-fixme:     [[R2:%[0-9]+]] = call i1 @_TFC8abitypes3Foo6negate
   // arm64-tvos-fixme:     ret i1 [[R2]]
+
+  // i386-watchos:  define hidden i1 @_TFC8abitypes3Foo6negatefS0_FSbSb(i1, %C8abitypes3Foo*)
+  // i386-watchos:  define hidden zeroext i1 @_TToFC8abitypes3Foo6negatefS0_FSbSb
+  // i386-watchos:  [[R1:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertObjCBoolToBoolFVS_8ObjCBoolSb(i1 %2)
+  // i386-watchos:  [[R2:%[0-9]+]] = call i1 @_TFC8abitypes3Foo6negatefS0_FSbSb(i1 [[R1]]
+  // i386-watchos:  [[R3:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertBoolToObjCBoolFSbVS_8ObjCBool(i1 [[R2]])
+  // i386-watchos:  ret i1 [[R3]]
+
   dynamic func negate(b: Bool) -> Bool {
     return !b
   }
@@ -332,6 +340,16 @@ class Foo {
   // arm64-tvos: [[NEG:%[0-9]+]] = call i1 @_TFC8abitypes3Foo7negate2{{.*}}(i1
   // arm64-tvos: [[TOOBJCBOOL:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertBoolToObjCBool{{.*}}(i1 [[NEG]])
   // arm64-tvos: ret i1 [[TOOBJCBOOL]]
+
+  // i386-watchos: define hidden i1 @_TFC8abitypes3Foo7negate2{{.*}}(i1, %C8abitypes3Foo*) {{.*}} {
+  // i386-watchos: [[SEL:%[0-9]+]] = load i8** @"\01L_selector(negate:)", align 4
+  // i386-watchos: [[NEG:%[0-9]+]] = call zeroext i1 bitcast (void ()* @objc_msgSend to i1 ([[RECEIVER:.*]]*, i8*, i1)*)([[RECEIVER]]* {{%[0-9]+}}, i8* [[SEL]], i1 zeroext %0)
+  // i386-watchos: ret i1 [[NEG]]
+  //
+  // i386-watchos: define hidden zeroext i1 @_TToFC8abitypes3Foo7negate2{{.*}}(i8*, i8*, i1 zeroext)
+  // i386-watchos: [[NEG:%[0-9]+]] = call i1 @_TFC8abitypes3Foo7negate2{{.*}}(i1
+  // i386-watchos: [[TOOBJCBOOL:%[0-9]+]] = call i1 @_TF10ObjectiveC22_convertBoolToObjCBool{{.*}}(i1 [[NEG]])
+  // i386-watchos: ret i1 [[TOOBJCBOOL]]
   //
   // armv7k-watchos: define hidden i1 @_TFC8abitypes3Foo7negate2{{.*}}(i1, %C8abitypes3Foo*) {{.*}} {
   // armv7k-watchos: [[SEL:%[0-9]+]] = load i8** @"\01L_selector(negate:)", align 4
