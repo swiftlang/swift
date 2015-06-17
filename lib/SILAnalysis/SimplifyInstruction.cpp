@@ -243,8 +243,37 @@ SILValue InstSimplifier::visitSelectEnumAddrInst(SelectEnumAddrInst *SEI) {
 }
 
 SILValue InstSimplifier::visitEnumInst(EnumInst *EI) {
-  if (EI->hasOperand())
-    return simplifyEnumFromUncheckedEnumData(EI);
+  if (EI->hasOperand()) {
+    if (!simplifyEnumFromUncheckedEnumData(EI)) {
+      // switch_enum %e : $EnumTy, case %casex: bbX,...
+      // bbX(%arg):
+      // enum $EnumTy, EnumTy::casex, %arg
+      // ->
+      // replace enum $EnumTy, EnumTy::casex, %arg by %e
+
+      auto Op = EI->getOperand();
+
+      if (!isa<SILArgument>(Op))
+        return SILValue();
+
+      auto *Pred = EI->getParent()->getSinglePredecessor();
+      if (!Pred)
+        return SILValue();
+
+      auto *SEI = dyn_cast<SwitchEnumInst>(Pred->getTerminator());
+      if (!SEI)
+        return SILValue();
+
+      auto Case = SEI->getUniqueCaseForDestination(EI->getParent());
+
+      if (Case && Case.getPtrOrNull() == EI->getElement() &&
+          SEI->getOperand().getType() == EI->getType()) {
+        return SEI->getOperand();
+      }
+
+      return SILValue();
+    }
+  }
 
   // Simplify enum insts to the value from a switch_enum when possible, e.g.
   // for
