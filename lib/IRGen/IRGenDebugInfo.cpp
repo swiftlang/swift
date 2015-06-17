@@ -1534,9 +1534,6 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
     auto *ClassTy = BaseTy->castTo<ClassType>();
     auto *Decl = ClassTy->getDecl();
     Location L = getLoc(SM, Decl);
-    // TODO: We may want to peek at Decl->isObjC() and set this
-    // attribute accordingly.
-    auto RuntimeLang = llvm::dwarf::DW_LANG_Swift;
     if (auto *ClangDecl = Decl->getClangDecl()) {
       auto ClangSrcLoc = ClangDecl->getLocStart();
       clang::SourceManager &ClangSM =
@@ -1544,7 +1541,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
       L.Line = ClangSM.getPresumedLineNumber(ClangSrcLoc);
       L.Filename = ClangSM.getBufferName(ClangSrcLoc);
 
-     // Use "ObjectiveC" as default for implicit decls.
+      // Use "ObjectiveC" as default for implicit decls.
       // FIXME 1: Do something more clever based on the decl's mangled name.
       // FIXME 2: Clang submodules are not handled here.
       StringRef ModuleName = "ObjectiveC";
@@ -1555,11 +1552,9 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
       // This placeholder gets RAUW'd by finalize().
       Scope = getOrCreateModule(ModuleFile, ModuleName, ModuleFile);
     }
-    return createStructType(DbgTy, Decl, ClassTy, Scope,
-                            getOrCreateFile(L.Filename), L.Line, SizeInBits,
-                            AlignInBits, Flags,
-                            nullptr, // DerivedFrom
-                            RuntimeLang, MangledName);
+    return createPointerSizedStruct(Scope, Decl->getNameStr(),
+                                    getOrCreateFile(L.Filename), L.Line, Flags,
+                                    MangledName);
   }
 
   case TypeKind::Protocol: {

@@ -36,22 +36,14 @@ class MyObject : NSObject {
   // LOC-CHECK: ret {{.*}}, !dbg ![[DBG:.*]]
   // LOC-CHECK: ret
   var MyArr = NSArray()
-// Capture the pointer size from type Int
-// IMPORT-CHECK: %Si = type <{ i[[PTRSIZE:[0-9]+]] }>
 // IMPORT-CHECK: filename: "test-foundation.swift"
 // IMPORT-CHECK: !MDModule(name: "ObjectiveC"
-// IMPORT-CHECK: !DIDerivedType(tag: DW_TAG_member, name: "MyArr",
-// IMPORT-CHECK-NOT:            line:
-// IMPORT-CHECK-SAME:           baseType: ![[NSARRAY:"[^"]+"]]
-// IMPORT-CHECK-SAME:           size: [[PTRSIZE]], align: [[PTRSIZE]]
-// IMPORT-CHECK-NOT:            offset: 0
-// IMPORT-CHECK-SAME:           ){{$}}
-// IMPORT-CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "NSArray", scope: ![[FOUNDATION:[0-9]+]]
-// IMPORT-CHECK-SAME:             identifier: [[NSARRAY]]
-// IMPORT-CHECK: [[FOUNDATION]] = !MDModule(name: "Foundation",{{.*}} file: ![[FOUNDATION_FILE:[0-9]+]]
+// IMPORT-CHECK: [[FOUNDATION:[0-9]+]] = !MDModule(name: "Foundation",
+// IMPORT-CHECK-SAME:                        {{.*}}file: ![[FOUNDATION_FILE:[0-9]+]]
 // IMPORT-CHECK: ![[FOUNDATION_FILE]] = !DIFile(filename: "Foundation-{{.*}}.pcm"
-// IMPORT-CHECK: !DIImportedEntity(tag: DW_TAG_imported_module,{{.*}} entity: ![[FOUNDATION]]
-
+// IMPORT-CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "NSArray",
+// IMPORT-CHECK-SAME:             scope: ![[FOUNDATION]]
+// IMPORT-CHECK: !DIImportedEntity(tag: DW_TAG_imported_module, {{.*}}entity: ![[FOUNDATION]]
 
   // Force the use of Int.
   var count : Int = 0
