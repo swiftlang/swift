@@ -28,8 +28,8 @@ public enum _GenericObjCError : ErrorType {
 
 /// An intrinsic used by the runtime to create an error when an
 /// Objective-C API indicates failure but produces a nil error.
-@asmname("_swift_allocNilObjCError")
-func _allocNilObjCError() -> ErrorType {
+@asmname("swift_allocNilObjCError")
+public func _allocNilObjCError() -> ErrorType {
   return _GenericObjCError.NilError
 }
 

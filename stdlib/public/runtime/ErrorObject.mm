@@ -305,7 +305,7 @@ swift::swift_convertNSErrorToErrorType(id errorObject) {
 
   // Unlike Objective-C, we can't just propagate nil errors around.
   auto allocNilError =
-    (SwiftError*(*)()) dlsym(RTLD_DEFAULT, "_swift_allocNilObjCError");
+    (SwiftError*(*)()) dlsym(RTLD_DEFAULT, "swift_allocNilObjCError");
   assert(allocNilError && "didn't link Foundation overlay?");
   return allocNilError();
 }

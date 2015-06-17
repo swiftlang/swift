@@ -9,4 +9,10 @@
 @property NSInteger count;
 @end
 
+/* This class has a method that doesn't fill in the error properly. */
+@interface NilError : NSObject
++ (BOOL) throwIt: (NSError**) error;
+@end
+
+
 #endif
