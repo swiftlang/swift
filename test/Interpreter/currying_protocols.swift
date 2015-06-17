@@ -1,67 +1,117 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 // REQUIRES: executable_test
 
-protocol P {
-  func scale(x : Int)(y : Int) -> Int
+enum Medal {
+  case Bronze, Silver, Gold
 }
 
-struct S : P  {
-  var offset : Int
-  func scale(x : Int)(y : Int) -> Int {
-    return offset + x * y
+struct Steroids {}
+
+protocol Gymnast {
+  func backflip(angle: Double) -> Self
+  func compete() -> Medal -> Self
+  func scandal()(s: Steroids) -> ()
+  static func currentYear() -> Int
+}
+
+final class Archimedes : Gymnast {
+  func backflip(angle: Double) -> Self {
+    print(angle >= 360 ? "Not in a thousand years" : "Ok")
+    return self
+  }
+
+  func compete() -> Medal -> Archimedes {
+    return { (m: Medal) in
+      print(m == .Gold ? "We won gold!" : "Try again next time")
+      return Archimedes()
+    }
+  }
+
+  func scandal()(s: Steroids) -> () {
+    print("Archimedes don't do that")
+  }
+
+  static func currentYear() -> Int {
+    return -287
   }
 }
 
-func foo<T : P>(t : T) {
-  print("\(t.scale(7)(y: 13))\n", appendNewline: false)
+////
+// Protocol-constrained archetype
+////
+
+func genericOlympicGames<T: Gymnast>(g1: T) -> T {
+  let f1: T -> Double -> T = T.backflip
+  let f2: Double -> T = f1(g1)
+  let g2: T = f2(180)
+
+  let f3: Double -> T = g2.backflip
+  let g3: T = f3(360)
+
+  let f4: T -> () -> Medal -> T = T.compete
+  let f5: () -> Medal -> T = f4(g3)
+  let f6: Medal -> T = f5()
+  let g4: T = f6(Medal.Silver)
+
+  let f7: () -> Medal -> T = g4.compete
+  let f8: Medal -> T = f7()
+  let g5: T = f8(Medal.Gold)
+
+  let f9: T -> () -> Steroids -> () = T.scandal
+  let f10: () -> Steroids -> () = f9(g5)
+  let f11: Steroids -> () = f10()
+  f11(Steroids())
+
+  let f12: () -> Steroids -> () = g5.scandal
+  let f13: Steroids -> () = f12()
+  f13(Steroids())
+
+  let f14: () -> Int = T.currentYear
+  print(f14())
+
+  let metatype: T.Type = T.self
+  let f15: () -> Int = metatype.currentYear
+  print(f15())
+
+  return g5
 }
 
-foo(S(offset: 4))
-// CHECK: 95
+genericOlympicGames(Archimedes())
 
-let p : P = S(offset: 4)
-print("\(p.scale(5)(y: 7))\n", appendNewline: false)
-// CHECK: 39
+// CHECK: Ok
+// CHECK: Not in a thousand years
+// CHECK: Try again next time
+// CHECK: We won gold!
+// CHECK: Archimedes don't do that
+// CHECK: Archimedes don't do that
+// CHECK: -287
+// CHECK: -287
 
-func culDeSac<T>(t: T) {}
-func roundabout<T>(t: T, _ u: T -> ()) { u(t) }
+////
+// Existential
+////
 
-protocol Proto {
-  typealias Category
-  func f(t: Self)(i: Category, j: Category)
-  static func ff()(i: Category, j: Category)
+func olympicGames(g1: Gymnast) -> Gymnast {
+  // FIXME -- <rdar://problem/21391055>
+#if false
+  let f1: Double -> Gymnast = g1.backflip
+  let g2: Gymnast = f1(180)
+
+  let f2: Medal -> Gymnast = g2.compete
+  let g4: Gymnast = f2()(Medal.Gold)
+#endif
+
+  let f3: () -> Steroids -> () = g1.scandal
+  let f4: Steroids -> () = f3()
+  f4(Steroids())
+
+  let f5: () -> Int = g1.dynamicType.currentYear
+  print(f5())
+
+  return g1
 }
 
-class Q : Proto {
-  typealias Category = Int
-  var q: Int
-  init(q: Int) { self.q = q }
-  func f(t: Q)(i: Int, j: Int) { print(q * t.q + i * j) }
-  static func ff()(i: Int, j: Int) { print(i * j) }
-}
+olympicGames(Archimedes())
 
-func suburbanJungle<T : Proto where T.Category == Int>(t: T) {
-  roundabout(T.ff) { $0()(i: 2, j: 10) }
-  roundabout(T.ff()) { $0(i: 4, j: 10) }
-  culDeSac(T.ff()(i: 6, j: 10))
-  roundabout(T.f) { $0(t)(t)(i: 1, j: 2) }
-  roundabout(T.f(t)) { $0(t)(i: 3, j: 4) }
-  roundabout(T.f(t)(t)) { $0(i: 5, j: 6) }
-  culDeSac(T.f(t)(t)(i: 7, j: 8))
-  roundabout(t.f) { $0(t)(i: 9, j: 10) }
-  roundabout(t.f(t)) { $0(i: 11, j: 12) }
-  culDeSac(t.f(t)(i: 13, j: 14))
-}
-
-suburbanJungle(Q(q: 3))
-
-// CHECK: 20
-// CHECK: 40
-// CHECK: 60
-// CHECK: 11
-// CHECK: 21
-// CHECK: 39
-// CHECK: 65
-// CHECK: 99
-// CHECK: 141
-// CHECK: 191
+// CHECK: Archimedes don't do that
+// CHECK: -287

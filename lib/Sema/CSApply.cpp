@@ -488,10 +488,6 @@ namespace {
 
     /// Describes an opened existential that has not yet been closed.
     struct OpenedExistential {
-      /// The sequence number, which is used for ordering the opened
-      /// existentials.
-      unsigned SequenceNumber;
-
       /// The archetype describing this opened existential.
       ArchetypeType *Archetype;
 
@@ -503,27 +499,94 @@ namespace {
       OpaqueValueExpr *OpaqueValue;
 
       /// The depth of this currently-opened existential. Once the
-      /// depth has been reduced to zero, the existential can be
-      /// closed.
+      /// depth of the expression stack is equal to this value, the
+      /// existential can be closed.
       unsigned Depth;
-
-      friend bool operator<(const OpenedExistential &lhs,
-                            const OpenedExistential &rhs) {
-        return lhs.SequenceNumber < rhs.SequenceNumber;
-      }
     };
 
-    /// The number of existentials that have been opened, used to
-    /// determine sequence numbers.
-    ///
-    /// For the number of currently-open existentials, use \c
-    /// OpenedExistentials.size().
-    unsigned NumOpenedExistentials = 0;
+    /// A stack of opened existentials that have not yet been closed.
+    /// Ordered by decreasing depth.
+    llvm::SmallVector<OpenedExistential, 2> OpenedExistentials;
 
-    /// A mapping from "key" expressions to the opened existential
-    /// whose depth will be reduced once that key expression has been
-    /// consumed by a parent expression.
-    llvm::SmallDenseMap<Expr *, OpenedExistential> OpenedExistentials;
+    /// A stack of expressions being walked, used to compute existential depth.
+    llvm::SmallVector<Expr *, 8> ExprStack;
+
+    /// Members which are AbstractFunctionDecls but not FuncDecls cannot
+    /// mutate self.
+    bool isNonMutatingMember(ValueDecl *member) {
+      if (!isa<AbstractFunctionDecl>(member))
+        return false;
+      return !isa<FuncDecl>(member) || !cast<FuncDecl>(member)->isMutating();
+    }
+
+    unsigned getNaturalArgumentCount(ValueDecl *member) {
+      if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
+        // For functions, close the existential once the function
+        // has been fully applied.
+        return func->getNaturalArgumentCount();
+      } else {
+        // For storage, close the existential either when it's
+        // accessed (if it's an rvalue only) or when it is loaded or
+        // stored (if it's an lvalue).
+        assert(isa<AbstractStorageDecl>(member) &&
+              "unknown member when opening existential");
+        return 1;
+      }
+    }
+
+    /// If the expression might be a dynamic method call, return the base
+    /// value for the call.
+    Expr *getBaseExpr(Expr *expr) {
+      // Keep going up as long as this expression is the parent's base.
+      if (auto unresolvedDot = dyn_cast<UnresolvedDotExpr>(expr)) {
+        return unresolvedDot->getBase();
+      // Remaining cases should only come up when we're re-typechecking.
+      // FIXME: really it would be much better if Sema had stricter phase
+      // separation.
+      } else if (auto dotSyntax = dyn_cast<DotSyntaxCallExpr>(expr)) {
+        return dotSyntax->getArg();
+      } else if (auto ctorRef = dyn_cast<ConstructorRefCallExpr>(expr)) {
+        return ctorRef->getArg();
+      } else if (auto apply = dyn_cast<ApplyExpr>(expr)) {
+        return apply->getFn();
+      } else if (auto memberRef = dyn_cast<MemberRefExpr>(expr)) {
+        return memberRef->getBase();
+      } else if (auto dynMemberRef = dyn_cast<DynamicMemberRefExpr>(expr)) {
+        return dynMemberRef->getBase();
+      } else if (auto subscriptRef = dyn_cast<SubscriptExpr>(expr)) {
+        return subscriptRef->getBase();
+      } else if (auto dynSubscriptRef = dyn_cast<DynamicSubscriptExpr>(expr)) {
+        return dynSubscriptRef->getBase();
+      } else if (auto load = dyn_cast<LoadExpr>(expr)) {
+        return load->getSubExpr();
+      } else if (auto inout = dyn_cast<InOutExpr>(expr)) {
+        return inout->getSubExpr();
+      } else if (auto force = dyn_cast<ForceValueExpr>(expr)) {
+        return force->getSubExpr();
+      } else {
+        return nullptr;
+      }
+    }
+
+    /// Calculates the nesting depth of the current application.
+    unsigned getArgCount(unsigned maxArgCount) {
+      unsigned e = ExprStack.size();
+      unsigned argCount;
+
+      // Starting from the current expression, count up if the expression is
+      // equal to its parent expression's base.
+      Expr *prev = ExprStack.back();
+
+      for (argCount = 1; argCount < maxArgCount && argCount < e; argCount++) {
+        Expr *result = ExprStack[e - argCount - 1];
+        Expr *base = getBaseExpr(result);
+        if (base != prev)
+          break;
+        prev = result;
+      }
+
+      return argCount;
+    }
 
     /// Open an existential value into a new, opaque value of
     /// archetype type.
@@ -537,13 +600,11 @@ namespace {
     /// \param member The member that is being referenced on the existential
     /// type.
     ///
-    /// \returns A pair (expr, type) that provides a reference to the value
+    /// \returns An OpaqueValueExpr that provides a reference to the value
     /// stored within the expression or its metatype (if the base was a
-    /// metatype) and the archetype that describes the dynamic type stored
-    /// within the existential.
-    std::tuple<Expr *, ArchetypeType *>
-    openExistentialReference(Expr *base, ArchetypeType *archetype,
-                             ValueDecl *member) {
+    /// metatype).
+    Expr *openExistentialReference(Expr *base, ArchetypeType *archetype,
+                                   ValueDecl *member) {
       assert(archetype && "archetype not already opened?");
 
       auto &tc = cs.getTypeChecker();
@@ -564,43 +625,23 @@ namespace {
         isMetatype = true;
         baseTy = metaTy->getInstanceType();
       }
+
       assert(baseTy->isAnyExistentialType() && "Type must be existential");
+
+      // If the base was an lvalue but it will only be treated as an
+      // rvalue, turn the base into an rvalue now. This results in
+      // better SILGen.
+      if (isLValue &&
+          (isNonMutatingMember(member) ||
+           isMetatype || baseTy->isClassExistentialType())) {
+        base = tc.coerceToRValue(base);
+        isLValue = false;
+      }
 
       // Determine the number of applications that need to occur before
       // we can close this existential, and record it.
-      unsigned depth;
-      if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
-        // For functions, close the existential once the function
-        // has been fully applied.
-        depth = func->getNaturalArgumentCount();
-
-        // If the base was an lvalue but it will only be treated as an
-        // rvalue, turn the base into an rvalue now. This results in
-        // better SILGen.
-        if (isLValue &&
-            (!isa<FuncDecl>(func) || !cast<FuncDecl>(func)->isMutating() ||
-             baseTy->isClassExistentialType() ||
-             baseTy->is<ExistentialMetatypeType>())) {
-          base = tc.coerceToRValue(base);
-          isLValue = false;
-        }
-      } else {
-        // For storage, close the existential either when it's
-        // accessed (if it's an rvalue only) or when it is loaded or
-        // stored (if it's an lvalue).
-        assert(isa<AbstractStorageDecl>(member) &&
-               "unknown member when opening existential");
-        depth = 1;
-
-        // If the base was an lvalue but it will only be treated as an
-        // rvalue, turn the base into an rvalue now. This results in
-        // better SILGen.
-        if (isLValue &&
-            (baseTy->isClassExistentialType() || baseTy->is<ExistentialMetatypeType>())) {
-          base = tc.coerceToRValue(base);
-          isLValue = false;
-        }
-      }
+      unsigned maxArgCount = getNaturalArgumentCount(member);
+      unsigned depth = ExprStack.size() - getArgCount(maxArgCount);
 
       // Create the opaque opened value. If we started with a
       // metatype, it's a metatype.
@@ -615,72 +656,21 @@ namespace {
       archetypeVal->setUniquelyReferenced(true);
 
       // Record the opened existential.
-      OpenedExistential record{NumOpenedExistentials++, archetype, base,
-                               archetypeVal, depth};
-      bool inserted = OpenedExistentials.insert({archetypeVal, record}).second;
-      (void)inserted;
-      assert(inserted && "already opened an existential here?");
+      OpenedExistentials.push_back({archetype, base, archetypeVal, depth});
 
-      return std::make_tuple(archetypeVal, archetype);
+      return archetypeVal;
     }
 
     /// Trying to close the active existential, if there is one.
-    bool closeExistential(Expr *&result) {
-      // If there are no opened existentials, we're done.
+    bool closeExistential(Expr *&result, bool force=false) {
       if (OpenedExistentials.empty())
         return false;
 
-      // Find the key expression that could be associated with an opened
-      // existential.
-      Expr *keyExpr;
-      bool isDynamic = false;
-      if (auto dotSyntax = dyn_cast<DotSyntaxCallExpr>(result)) {
-        keyExpr = dotSyntax->getArg();
-      } else if (auto ctorRef = dyn_cast<ConstructorRefCallExpr>(result)) {
-        keyExpr = ctorRef->getArg();
-      } else if (auto apply = dyn_cast<ApplyExpr>(result)) {
-        keyExpr = apply->getFn();
-      } else if (auto memberRef = dyn_cast<MemberRefExpr>(result)) {
-        keyExpr = memberRef->getBase();
-      } else if (auto dynMemberRef = dyn_cast<DynamicMemberRefExpr>(result)) {
-        keyExpr = dynMemberRef->getBase();
-        isDynamic = true;
-      } else if (auto subscriptRef = dyn_cast<SubscriptExpr>(result)) {
-        keyExpr = subscriptRef->getBase();
-      } else if (auto dynSubscriptRef = dyn_cast<DynamicSubscriptExpr>(result)) {
-        keyExpr = dynSubscriptRef->getBase();
-        isDynamic = true;
-      } else if (auto load = dyn_cast<LoadExpr>(result)) {
-        keyExpr = load->getSubExpr();
-      } else {
-        // Cannot close an existential.
-        return false;
-      }
+      auto &record = OpenedExistentials.back();
+      assert(record.Depth <= ExprStack.size() - 1);
 
-      // FIXME: Look through certain implicit conversions as well?
-      keyExpr = keyExpr->getValueProvidingExpr();
-      if (auto inout = dyn_cast<InOutExpr>(keyExpr))
-        keyExpr = inout->getSubExpr()->getValueProvidingExpr();
-      if (auto load = dyn_cast<LoadExpr>(keyExpr))
-        keyExpr = load->getSubExpr()->getValueProvidingExpr();
-      if (auto force = dyn_cast<ForceValueExpr>(keyExpr))
-        keyExpr = force->getSubExpr();
-      auto known = OpenedExistentials.find(keyExpr);
-      if (known == OpenedExistentials.end())
+      if (!force && record.Depth < ExprStack.size() - 1)
         return false;
-
-      // Decrease the depth.
-      auto record = known->second;
-      --record.Depth;
-      OpenedExistentials.erase(known);
-      if (record.Depth > 0 && !isDynamic) {
-        // We're not ready to close this existential yet. Replace the previous
-        // result with our current result at the new depth.
-        bool inserted = OpenedExistentials.insert({result, record}).second;
-        (void)inserted;
-        assert(inserted && "opened existential depth conflict");
-        return false;
-      }
 
       // If we had a return type of 'Self', erase it.
       ConstraintSystem &cs = solution.getConstraintSystem();
@@ -708,9 +698,11 @@ namespace {
         if (resultTy->isEqual(record.Archetype)) {
           //   - Coerce to an existential value.
           erasedTy = record.Archetype->getOpenedExistentialType();
+
           result = coerceToType(result, erasedTy, nullptr);
-          if (!result)
-            return result;
+          // FIXME: can this really ever fail? We'll leave behind rogue
+          // OpaqueValueExprs if that is the case.
+          assert(result);
         } else {
           //   - Perform a covariant function coercion.
           erasedTy = resultTy->eraseOpenedExistential(
@@ -737,6 +729,7 @@ namespace {
                                   record.OpaqueValue,
                                   result);
 
+      OpenedExistentials.pop_back();
       return true;
     }
 
@@ -841,9 +834,8 @@ namespace {
                              memberLocator));
       bool openedExistential = false;
       if (knownOpened != solution.OpenedExistentialTypes.end()) {
-        std::tie(base, baseTy) = openExistentialReference(base,
-                                                          knownOpened->second,
-                                                          member);
+        base = openExistentialReference(base, knownOpened->second, member);
+        baseTy = knownOpened->second;
         containerTy = baseTy;
         openedExistential = true;
       }
@@ -958,8 +950,7 @@ namespace {
 
         ref->setType(refType);
 
-        if (openedExistential)
-          closeExistential(ref);
+        closeExistential(ref, /*force=*/true);
 
         return ref;
       }
@@ -1000,7 +991,7 @@ namespace {
         // Reference to an unbound instance method.
         Expr *result = new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc,
                                                               ref);
-        closeExistential(result);
+        closeExistential(result, /*force=*/true);
         return result;
       } else {
         assert((!baseIsInstance || member->isInstanceMember()) &&
@@ -1237,9 +1228,8 @@ namespace {
                              locator.withPathElement(
                                ConstraintLocator::SubscriptMember)));
       if (knownOpened != solution.OpenedExistentialTypes.end()) {
-        std::tie(base, baseTy) = openExistentialReference(base,
-                                                          knownOpened->second,
-                                                          subscript);
+        base = openExistentialReference(base, knownOpened->second, subscript);
+        baseTy = knownOpened->second;
         containerTy = baseTy;
       }
 
@@ -2598,9 +2588,6 @@ namespace {
                                                 isDynamic,
                                                 reason);
 
-        if (auto applyExpr = dyn_cast<ApplyExpr>(member))
-          advancePartialApplyExpr(applyExpr, applyExpr);
-
         return member;
       }
 
@@ -3466,7 +3453,24 @@ namespace {
       return E;
     }
 
+    /// Interface for ExprWalker
+    void walkToExprPre(Expr *expr) {
+      ExprStack.push_back(expr);
+    }
+
+    Expr *walkToExprPost(Expr *expr) {
+      Expr *result = visit(expr);
+
+      assert(expr == ExprStack.back());
+      ExprStack.pop_back();
+
+      return result;
+    }
+
     void finalize(Expr *&result) {
+      assert(ExprStack.empty());
+      assert(OpenedExistentials.empty());
+
       // Check that all value type methods were fully applied.
       auto &tc = cs.getTypeChecker();
       for (auto &unapplied : InvalidPartialApplications) {
@@ -3475,25 +3479,6 @@ namespace {
                     diag::partial_application_of_function_invalid,
                     kind);
       }
-
-      // Close out any existentials that are still open.
-      // This happens when we don't compute a tighter bound for the
-      // open-existential expression.
-      // FIXME: This would go away with a smarter post-pass for placing
-      // open-existential expressions.
-      SmallVector<OpenedExistential, 4> remainingOpenedExistentials;
-      for (const auto &opened : OpenedExistentials) {
-        remainingOpenedExistentials.push_back(opened.second);
-      }
-      llvm::array_pod_sort(remainingOpenedExistentials.begin(),
-                           remainingOpenedExistentials.end());
-      for (auto &opened : remainingOpenedExistentials) {
-        result = new (tc.Context) OpenExistentialExpr(
-                                    opened.ExistentialValue,
-                                    opened.OpaqueValue,
-                                    result);
-      }
-      OpenedExistentials.clear();
 
       // Look at all of the suspicious optional injections
       for (auto injection : SuspiciousOptionalInjections) {
@@ -5501,6 +5486,8 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     apply->setType(fnType->getResult());
     apply->setIsSuper(isSuper);
 
+    advancePartialApplyExpr(apply, apply);
+
     assert(!apply->getType()->is<PolymorphicFunctionType>() &&
            "Polymorphic function type slipped through");
     Expr *result = tc.substituteInputSugarTypeForResult(apply);
@@ -5998,12 +5985,13 @@ namespace {
       if (isa<DiscardAssignmentExpr>(expr) && LeftSideOfAssignment == 0)
         Rewriter.getConstraintSystem().getTypeChecker()
           .diagnose(expr->getLoc(), diag::discard_expr_outside_of_assignment);
-      
+
+      Rewriter.walkToExprPre(expr);
       return { true, expr };
     }
 
     Expr *walkToExprPost(Expr *expr) override {
-      return Rewriter.visit(expr);
+      return Rewriter.walkToExprPost(expr);
     }
 
     /// \brief Ignore statements.
@@ -6393,7 +6381,8 @@ Expr *ConstraintSystem::applySolutionShallow(const Solution &solution,
                                              Expr *expr,
                                              bool suppressDiagnostics) {
   ExprRewriter rewriter(*this, solution, suppressDiagnostics);
-  Expr *result = rewriter.visit(expr);
+  rewriter.walkToExprPre(expr);
+  Expr *result = rewriter.walkToExprPost(expr);
   if (result)
     rewriter.finalize(result);
   return result;
@@ -6577,7 +6566,6 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
                                        Diag<> brokenProtocolDiag,
                                        Diag<> brokenBuiltinDiag) {
   auto &cs = solution.getConstraintSystem();
-  ExprRewriter rewriter(cs, solution, /*suppressDiagnostics=*/false);
 
   // FIXME: Cache name.
   auto &tc = cs.getTypeChecker();
@@ -6668,7 +6656,6 @@ static Expr *convertViaBuiltinProtocol(const Solution &solution,
   assert(!failed && "Could not call witness?");
   (void)failed;
 
-  rewriter.finalize(expr);
   return expr;
 }
 

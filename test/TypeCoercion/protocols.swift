@@ -172,3 +172,6 @@ func testREPLPrintable() {
   doREPLPrint(1)
   doREPLPrint("foo")
 }
+
+// Boolean coercion
+if true as BooleanType {}
