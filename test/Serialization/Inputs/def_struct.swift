@@ -17,6 +17,14 @@ public struct ComputedProperty {
   }
 }
 
+public struct StaticProperties {
+  public static var foo: Int = 0
+  public static let bar: Int = 0
+  public static var baz: Int {
+    return 0
+  }
+}
+
 // Generics
 public struct Pair<A, B> {
   public var first : A

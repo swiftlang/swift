@@ -4696,7 +4696,8 @@ public:
             const DeclContext *accessDC = nullptr;
             if (requiredAccess == Accessibility::Internal)
               accessDC = classDecl->getParentModule();
-            shouldDiagnoseSetter = !ASD->isSetterAccessibleFrom(accessDC);
+            shouldDiagnoseSetter = ASD->isSettable(accessDC) &&
+                                   !ASD->isSetterAccessibleFrom(accessDC);
           }
         }
       }

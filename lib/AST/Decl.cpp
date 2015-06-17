@@ -2959,7 +2959,7 @@ static bool isSettable(const AbstractStorageDecl *decl) {
 /// \brief Returns whether the var is settable in the specified context: this
 /// is either because it is a stored var, because it has a custom setter, or
 /// is a let member in an initializer.
-bool VarDecl::isSettable(DeclContext *UseDC,
+bool VarDecl::isSettable(const DeclContext *UseDC,
                          const DeclRefExpr *base) const {
   // 'let' properties are immutable, but enforcement of this is enforced by
   // SIL level passes.  If the 'let' property has an initializer, it can never
@@ -2976,7 +2976,7 @@ bool VarDecl::isSettable(DeclContext *UseDC,
     
     // Properties in structs/classes are only ever mutable in their designated
     // initializer(s).
-    if (getDeclContext()->isTypeContext()) {
+    if (isInstanceMember()) {
       auto *CD = dyn_cast_or_null<ConstructorDecl>(UseDC);
       if (!CD) return false;
       
@@ -4085,7 +4085,7 @@ void ConstructorDecl::setInitializerInterfaceType(Type t) {
 
 ConstructorDecl::BodyInitKind
 ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
-                                                ApplyExpr **init) {
+                                                ApplyExpr **init) const {
   assert(hasBody() && "Constructor does not have a definition");
 
   if (init)
@@ -4181,7 +4181,9 @@ ConstructorDecl::getDelegatingOrChainedInitKind(DiagnosticEngine *diags,
 
   // Cache the result if it is trustworthy.
   if (diags) {
-    ConstructorDeclBits.ComputedBodyInitKind = static_cast<unsigned>(Kind) + 1;
+    auto *mutableThis = const_cast<ConstructorDecl *>(this);
+    mutableThis->ConstructorDeclBits.ComputedBodyInitKind =
+        static_cast<unsigned>(Kind) + 1;
     if (init)
       *init = finder.InitExpr;
   }

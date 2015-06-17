@@ -67,3 +67,12 @@ var revP = p.swap()
 func testMasterConformanceMap(x: Int32) -> Bool {
   return x != -1
 }
+
+struct TestStaticProperties {
+  init() {
+    // This used to crash when in an initializer, though not anywhere else.
+    _ = StaticProperties.foo
+    _ = StaticProperties.bar
+    _ = StaticProperties.baz
+  }
+}
