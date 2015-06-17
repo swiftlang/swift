@@ -19,7 +19,6 @@ word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
 
 }%
 
-@exported import CoreGraphics
 import Darwin
 
 public struct CGFloat {

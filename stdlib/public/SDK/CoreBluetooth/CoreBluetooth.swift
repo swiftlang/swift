@@ -1,4 +1,3 @@
-@exported import CoreBluetooth
 import Foundation
 
 extension CBError : _BridgedNSError {

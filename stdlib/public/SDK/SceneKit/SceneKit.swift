@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-@exported import SceneKit // Clang module
 
 @available(iOS, introduced=8.0)
 @available(OSX, introduced=10.8)

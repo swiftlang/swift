@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-@exported import OpenCL // Clang module
 
 @available(OSX, introduced=10.7)
 public func clSetKernelArgsListAPPLE(

@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 import Foundation
-@exported import UIKit
 
 // These are un-imported macros in UIKit.
 

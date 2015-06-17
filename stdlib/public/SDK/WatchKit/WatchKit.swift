@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-@exported import WatchKit
 import Foundation
 
 @available(iOS 8.2, *)

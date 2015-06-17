@@ -298,7 +298,9 @@ function(_compile_swift_files dependency_target_out_var_name)
   endif()
 
   if(SWIFTFILE_IS_SDK_OVERLAY)
-    list(APPEND swift_flags "-autolink-force-load")
+    list(APPEND swift_flags
+         "-autolink-force-load"
+         "-import-underlying-module")
   endif()
 
   list(APPEND swift_flags ${SWIFT_EXPERIMENTAL_EXTRA_FLAGS})

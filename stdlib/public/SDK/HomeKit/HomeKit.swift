@@ -1,4 +1,3 @@
-@exported import HomeKit
 import Foundation
 
 @available(iOS 8.0, *)
