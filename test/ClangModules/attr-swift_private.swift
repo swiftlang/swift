@@ -8,6 +8,8 @@
 // Look for identifiers with "Priv" in them that haven't been prefixed.
 // GENERATED-NEGATIVE-NOT: {{[^A-Za-z0-9_][A-Za-z0-9]*[Pp]riv}}
 
+// REQUIRES: objc_interop
+
 import SwiftPrivateAttr
 
 // Note: The long-term plan is for these to only be available from the Swift 
