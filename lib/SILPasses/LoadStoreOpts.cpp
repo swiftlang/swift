@@ -757,6 +757,14 @@ private:
 
   bool tryToSubstitutePartialAliasLoad(SILValue PrevAddr, SILValue PrevValue,
                                        LoadInst *LI);
+
+  bool tryToForwardStoresToLoad(LSContext &Ctx, LoadInst *LI,
+                                CoveredStoreMap &StoreMap,
+                                PredOrderInStoreList &PredOrder);
+
+  bool tryToForwardLoadsToLoad(LSContext &Ctx, LoadInst *LI,
+                               CoveredStoreMap &StoreMap,
+                               PredOrderInStoreList &PredOrder);
 };
 
 #ifndef NDEBUG
@@ -1023,9 +1031,9 @@ static SILValue fixPhiPredBlocks(SmallVectorImpl<StoreInst *> &Stores,
   return PhiValue;
 }
 
-bool LSBBForwarder::tryToForwardLoad(LSContext &Ctx, LoadInst *LI,
-                                     CoveredStoreMap &StoreMap,
-                                     PredOrderInStoreList &PredOrder) {
+bool LSBBForwarder::tryToForwardStoresToLoad(LSContext &Ctx, LoadInst *LI,
+                                             CoveredStoreMap &StoreMap,
+                                             PredOrderInStoreList &PredOrder) {
   // If we are loading a value that we just stored, forward the stored value.
   for (auto &P : Stores) {
     SILValue Addr = P.first;
@@ -1052,6 +1060,36 @@ bool LSBBForwarder::tryToForwardLoad(LSContext &Ctx, LoadInst *LI,
     return true;
   }
 
+  // Check if we can forward from multiple stores.
+  for (auto I = StoreMap.begin(), E = StoreMap.end(); I != E; I++) {
+    auto CheckResult = ForwardingAnalysis::canForwardAddrToLd(I->first, LI);
+    if (!CheckResult)
+      continue;
+
+    DEBUG(llvm::dbgs() << "        Checking from: ");
+    for (auto *SI : I->second) {
+      DEBUG(llvm::dbgs() << "          " << *SI);
+      (void)SI;
+    }
+
+    // Create a BBargument to merge in multiple stores.
+    SILValue PhiValue = fixPhiPredBlocks(I->second, PredOrder, BB);
+    SILValue Result = CheckResult->forwardAddr(I->first, PhiValue, LI);
+    assert(Result && "Forwarding from multiple stores failed!");
+
+    DEBUG(llvm::dbgs() << "        Forwarding from multiple stores: ");
+    SILValue(LI).replaceAllUsesWith(Result);
+    deleteUntrackedInstruction(LI, StoreMap, Ctx);
+    NumForwardedLoads++;
+    return true;
+  }
+
+  return false;
+}
+
+bool LSBBForwarder::tryToForwardLoadsToLoad(LSContext &Ctx, LoadInst *LI,
+                                            CoveredStoreMap &StoreMap,
+                                            PredOrderInStoreList &PredOrder) {
   // Search the previous loads and replace the current load or one of the
   // current loads uses with one of the previous loads.
   for (auto &P : Loads) {
@@ -1084,31 +1122,18 @@ bool LSBBForwarder::tryToForwardLoad(LSContext &Ctx, LoadInst *LI,
     }
   }
 
-  // Check if we can forward from multiple stores.
-  for (auto I = StoreMap.begin(), E = StoreMap.end(); I != E; I++) {
-    auto CheckResult = ForwardingAnalysis::canForwardAddrToLd(I->first, LI);
-    if (!CheckResult)
-      continue;
+  return false;
+}
 
-    DEBUG(llvm::dbgs() << "        Checking from: ");
-    for (auto *SI : I->second) {
-      DEBUG(llvm::dbgs() << "          " << *SI);
-      (void) SI;
-    }
+bool LSBBForwarder::tryToForwardLoad(LSContext &Ctx, LoadInst *LI,
+                                     CoveredStoreMap &StoreMap,
+                                     PredOrderInStoreList &PredOrder) {
 
-    // Create a BBargument to merge in multiple stores.
-    SILValue PhiValue = fixPhiPredBlocks(I->second, PredOrder, BB);
-    SILValue Result = CheckResult->forwardAddr(I->first,
-                                               PhiValue,
-                                               LI);
-    assert(Result && "Forwarding from multiple stores failed!");
-
-    DEBUG(llvm::dbgs() << "        Forwarding from multiple stores: ");
-    SILValue(LI).replaceAllUsesWith(Result);
-    deleteUntrackedInstruction(LI, StoreMap, Ctx);
-    NumForwardedLoads++;
+  if (tryToForwardLoadsToLoad(Ctx, LI, StoreMap, PredOrder))
     return true;
-  }
+
+  if (tryToForwardStoresToLoad(Ctx, LI, StoreMap, PredOrder))
+    return true;
 
   startTrackingLoad(LI);
 
