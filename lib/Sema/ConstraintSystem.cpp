@@ -570,6 +570,11 @@ namespace {
     Type operator()(Type type) {
       assert(!type->is<PolymorphicFunctionType>() && "Shouldn't get here");
 
+      // Preserve parens when opening types.
+      if (isa<ParenType>(type.getPointer())) {
+        return type;
+      }
+
       // Replace archetypes with fresh type variables.
       if (auto archetype = type->getAs<ArchetypeType>()) {
         auto known = replacements.find(archetype->getCanonicalType());
@@ -637,13 +642,6 @@ namespace {
         Type inputTy = genericFn->getInput().transform(*this);
         if (!inputTy)
           return Type();
-
-        // If we didn't get something that structurally has the parentheses,
-        // add them back.
-        if (!isa<TupleType>(inputTy.getPointer()) &&
-            !isa<ParenType>(inputTy.getPointer())) {
-          inputTy = ParenType::get(cs.getASTContext(), inputTy);
-        }
 
         Type resultTy = genericFn->getResult().transform(*this);
         if (!resultTy)
