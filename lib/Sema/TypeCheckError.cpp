@@ -236,7 +236,7 @@ public:
     /// The function throws unconditionally.
     Throw,
 
-    /// The function throws unconditionally.
+    /// The function calls an unconditionally throwing function.
     CallThrows,
 
     /// The function is 'rethrows', and it was passed an explicit
@@ -300,7 +300,8 @@ enum class ThrowingKind {
   Throws,
 };
 
-/// A type expressing the result of classifying whether an call or function throws.
+/// A type expressing the result of classifying whether an call or function
+/// throws.
 class Classification {
   ThrowingKind Result;
   Optional<PotentialReason> Reason;
