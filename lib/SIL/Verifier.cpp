@@ -905,16 +905,16 @@ public:
 
   void checkGlobalAddrInst(GlobalAddrInst *GAI) {
     require(GAI->getType().isAddress(),
-            "GlobalAddr must have an address result type");
+            "global_addr must have an address result type");
     require(GAI->getType().getObjectType() ==
               GAI->getReferencedGlobal()->getLoweredType(),
-            "GlobalAddr must be the address type of the variable it "
+            "global_addr must be the address type of the variable it "
             "references");
     if (F.isFragile()) {
       SILGlobalVariable *RefG = GAI->getReferencedGlobal();
       require(RefG->isFragile()
                 || isValidLinkageForFragileRef(RefG->getLinkage()),
-              "function_ref inside fragile function cannot "
+              "global_addr inside fragile function cannot "
               "reference a private or hidden symbol");
     }
   }
