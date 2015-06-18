@@ -13,7 +13,7 @@ if let realRoomName = roomName as! NSString { // expected-error {{initializer fo
 
 var pi = 3.14159265358979
 var d: CGFloat = 2.0
-var dpi:CGFloat = d*pi // expected-error{{binary operator '*' cannot be applied to operands of type 'CGFloat' and 'Double'}} expected-note{{overloads for '*' exist with these partially matching parameter lists: (Double, Double), (CGFloat, CGFloat)}}
+var dpi:CGFloat = d*pi // expected-error{{binary operator '*' cannot be applied to operands of type 'CGFloat' and 'Double'}}
 
 let ff: CGFloat = floorf(20.0) // expected-error{{'Float' is not convertible to 'CGFloat'}}
 
@@ -65,23 +65,5 @@ func testIS1() -> Int { return 0 }
 let _: String = testIS1() // expected-error {{'Int' is not convertible to 'String'}}
 
 func insertA<T>(inout array : [T], elt : T) {
-  array.append(T); // expected-error {{cannot invoke 'append' with an argument list of type '((T).Type)'}}
-}
-
-// <rdar://problem/17875634> can't append to array of tuples
-func test17875634() {
-  var match: [(Int, Int)] = []
-  var row = 1
-  var col = 2
-  var coord = (row, col)
-
-  match += (1, 2) // expected-error{{binary operator '+=' cannot be applied to operands of type '[(Int, Int)]' and '(Int, Int)'}}
-  match += (row, col) // expected-error{{binary operator '+=' cannot be applied to operands of type '[(Int, Int)]' and '(Int, Int)'}}
-  match += coord // expected-error{{binary operator '+=' cannot be applied to operands of type '[(Int, Int)]' and '(Int, Int)'}}
-
-  match.append(row, col) // expected-error{{extra argument in call}}
-  match.append(1, 2) // expected-error{{extra argument in call}}
-
-  match.append(coord)
-  match.append((1, 2))
+  array.append(T); // expected-error {{cannot invoke 'append' with an argument list of type '(T.Type)'}}
 }

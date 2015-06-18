@@ -1357,8 +1357,8 @@ std::string getUserFriendlyTypeName(Type t, bool unwrap = true) {
   
   // Unwrap any l-value types.
   if (unwrap) {
-    if (t->isLValueType()) {
-      t = t->getRValueType();
+    if (auto lv = t->getAs<LValueType>()) {
+      t = lv->getObjectType();
     }
   }
   
@@ -1710,10 +1710,7 @@ Type GeneralFailureDiagnosis::getTypeOfIndependentSubExpression(Expr *subExpr) {
     Expr *preCheckedExpr = subExpr;
 
     CS->TC.eraseTypeData(subExpr);
-    // Passing 'true' to the 'discardedExpr' arg preserves the lvalue type of
-    // the expression.
-    CS->TC.typeCheckExpression(subExpr, CS->DC, Type(), Type(),
-                               /*discardedExpr=*/true);
+    CS->TC.typeCheckExpression(subExpr, CS->DC, Type(), Type(), false);
     resultType = subExpr->getType();
 
     // This is a terrible hack to get around the fact that typeCheckExpression()
@@ -1781,8 +1778,6 @@ void FailureDiagnosis::suggestPotentialOverloads(
   
   std::string suggestionText = "";
   std::map<std::string, bool> dupes;
-  bool isOperator =
-      CS->getASTContext().getIdentifier(functionName).isOperator();
 
   for (auto paramList : paramLists) {
     SmallVector<Identifier, 16> paramNames;
@@ -1805,17 +1800,8 @@ void FailureDiagnosis::suggestPotentialOverloads(
     for (size_t i = 0; i < paramTypes.size(); i++) {
       auto pt = paramTypes[i];
       auto at = argTypes[i];
-      bool typesMatch = pt->isEqual(at->getRValueType());
-      if (!typesMatch && isOperator) {
-        if (auto inoutPt = pt->getAs<InOutType>()) {
-          if (auto lvalueAt = at->getAs<LValueType>()) {
-            typesMatch = inoutPt->getObjectType()->isEqual(
-                lvalueAt->getObjectType());
-          }
-        }
-      }
     
-      if (typesMatch) {
+      if (pt->isEqual(at)) {
         auto typeListString = getTypeListString(paramNames, paramTypes);
         if (!dupes[typeListString]) {
           dupes[typeListString] = true;
