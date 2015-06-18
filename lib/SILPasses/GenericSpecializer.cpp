@@ -64,11 +64,8 @@ static void addApplyInst(ApplySite AI,
     return;
 
   SILFunction *Callee = FRI->getReferencedFunction();
-  auto &M = AI.getInstruction()->getModule();
   if (Callee->isExternalDeclaration())
-    if (!M.linkFunction(Callee, SILModule::LinkingMode::LinkAll,
-                        CallGraphLinkerEditor(CG).getCallback()))
-      return;
+    return;
 
   NewApplies.push_back(AI);
 }

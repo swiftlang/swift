@@ -846,12 +846,9 @@ public:
       if (!F->shouldOptimize())
         return;
 
-      // If F is an external declaration, attempt to link in its definition. If
-      // we fail to do so, there is nothing further that we can do.
+      // If F is an external declaration, there is nothing to specialize.
       if (F->isExternalDeclaration())
-        if (!getModule()->linkFunction(F, SILModule::LinkingMode::LinkAll,
-                                       CallGraphLinkerEditor(CG).getCallback()))
-          continue;
+        continue;
 
       Changed |= C.specialize(F, CG);
     }

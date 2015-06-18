@@ -874,15 +874,10 @@ FullApplySite SILPerformanceInliner::devirtualizeUpdatingCallGraph(
   auto *F = getReferencedFunction(NewAI);
   assert(F && "Expected direct function referenced!");
 
-  // If we devirtualized to a function declaration, attempt to link it
-  // in and update the call graph, or else just return the newly
-  // devirtualized instruction.
-  if (F->isExternalDeclaration()) {
-    auto &M = F->getModule();
-    if (!M.linkFunction(F, SILModule::LinkingMode::LinkAll,
-                        CallGraphLinkerEditor(CG).getCallback()))
-      return NewAI;
-  }
+  // If we devirtualized to a function declaration, we cannot add
+  // edges.
+  if (F->isExternalDeclaration())
+    return NewAI;
 
   CG.addEdgesForApply(NewAI);
 
@@ -900,15 +895,8 @@ FullApplySite SILPerformanceInliner::specializeGenericUpdatingCallGraph(
 
   auto *Callee = getReferencedFunction(Apply);
 
-  if (!Callee)
+  if (!Callee || Callee->isExternalDeclaration())
     return FullApplySite();
-
-  if (Callee->isExternalDeclaration()) {
-    auto &M = Callee->getModule();
-    if (!M.linkFunction(Callee, SILModule::LinkingMode::LinkAll,
-                        CallGraphLinkerEditor(CG).getCallback()))
-      return FullApplySite();
-  }
 
   auto *AI = Apply.getInstruction();
   SILFunction *SpecializedFunction;
