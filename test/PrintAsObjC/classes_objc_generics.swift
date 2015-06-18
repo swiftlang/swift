@@ -120,6 +120,7 @@ class NotObjC {}
 // CHECK-NEXT: - (void)testDictionaryBridging3:(NSDictionary<NSString *, NSString *> * __nonnull)a;
 // CHECK-NEXT: - (void)testSetBridging:(NSSet * __nonnull)a;
 // CHECK-NEXT: - (IBAction)actionMethod:(id __nonnull)_;
+// CHECK-NEXT: - (void)methodWithReservedParameterNames:(id __nonnull)long_ protected:(id __nonnull)protected_;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Methods {
@@ -165,6 +166,8 @@ class NotObjC {}
   func testSetBridging(a: Set<NSObject>) {}
 
   @IBAction func actionMethod(_: AnyObject) {}
+
+  func methodWithReservedParameterNames(long: AnyObject, protected: AnyObject) {}
 }
 
 typealias AliasForNSRect = NSRect
@@ -311,7 +314,7 @@ public class NonObjCClass { }
 
 // CHECK-LABEL: @interface Properties
 // CHECK-NEXT: @property (nonatomic) NSInteger i;
-// CHECK-NEXT: @property (nonatomic, readonly) Properties * __nonnull this;
+// CHECK-NEXT: @property (nonatomic, readonly) Properties * __nonnull mySelf;
 // CHECK-NEXT: @property (nonatomic, readonly) double pi;
 // CHECK-NEXT: @property (nonatomic) NSInteger computed;
 // CHECK-NEXT: + (Properties * __nonnull)shared;
@@ -341,11 +344,13 @@ public class NonObjCClass { }
 // CHECK-NEXT: + (double)staticDouble;
 // CHECK-NEXT: @property (nonatomic) Properties * __nullable wobble;
 // CHECK-NEXT: @property (nonatomic, getter=isEnabled, setter=setIsEnabled:) BOOL enabled;
+// CHECK-NEXT: @property (nonatomic, getter=register, setter=setRegister:) BOOL register_;
+// CHECK-NEXT: @property (nonatomic, readonly, getter=this) Properties * __nonnull this_;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Properties {
   var i: Int = 1
-  var this: Properties {
+  var mySelf: Properties {
     return self
   }
   let pi = 3.14
@@ -399,6 +404,9 @@ public class NonObjCClass { }
     @objc(isEnabled) get { return true }
     @objc(setIsEnabled:) set { }
   }
+
+  var register: Bool = false
+  var this: Properties { return self }
 }
 
 // CHECK-LABEL: @interface PropertiesOverridden

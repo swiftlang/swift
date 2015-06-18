@@ -45,6 +45,26 @@ static bool isNSObject(Type type) {
   return false;
 }
 
+/// Returns true if \p name matches a keyword in any Clang language mode.
+static bool isClangKeyword(Identifier name) {
+  static const llvm::StringSet<> keywords = []{
+    llvm::StringSet<> set;
+    // FIXME: clang::IdentifierInfo /nearly/ has the API we need to do this
+    // in a more principled way, but not quite.
+#define KEYWORD(SPELLING, FLAGS) \
+    set.insert(#SPELLING);
+#define CXX_KEYWORD_OPERATOR(SPELLING, TOK) \
+    set.insert(#SPELLING);
+#include "clang/Basic/TokenKinds.def"
+    return set;
+  }();
+
+  if (name.empty())
+    return false;
+  return keywords.find(name.str()) != keywords.end();
+}
+
+
 namespace {
 class ObjCPrinter : private DeclVisitor<ObjCPrinter>,
                     private TypeVisitor<ObjCPrinter, void, 
@@ -220,10 +240,14 @@ private:
     }
     os << ")";
 
-    if (isa<AnyPattern>(param))
+    if (isa<AnyPattern>(param)) {
       os << "_";
-    else
-      os << cast<NamedPattern>(param)->getBodyName();
+    } else {
+      Identifier name = cast<NamedPattern>(param)->getBodyName();
+      os << name;
+      if (isClangKeyword(name))
+        os << "_";
+    }
   }
 
   template <typename T>
@@ -505,17 +529,23 @@ private:
       }
     }
 
+    Identifier objCName = VD->getObjCPropertyName();
+    bool hasReservedName = isClangKeyword(objCName);
+
     // Handle custom accessor names.
     llvm::SmallString<64> buffer;
-    if (VD->getObjCGetterSelector() !=
-          VarDecl::getDefaultObjCGetterSelector(ctx,VD->getObjCPropertyName())){
+    if (hasReservedName ||
+        VD->getObjCGetterSelector() !=
+          VarDecl::getDefaultObjCGetterSelector(ctx, objCName)) {
       os << ", getter=" << VD->getObjCGetterSelector().getString(buffer);
     }
-    if (VD->isSettable(nullptr) && 
-        VD->getObjCSetterSelector() !=
-          VarDecl::getDefaultObjCSetterSelector(ctx,VD->getObjCPropertyName())){
-      buffer.clear();
-      os << ", setter=" << VD->getObjCSetterSelector().getString(buffer);
+    if (VD->isSettable(nullptr)) {
+      if (hasReservedName ||
+          VD->getObjCSetterSelector() !=
+            VarDecl::getDefaultObjCSetterSelector(ctx, objCName)) {
+        buffer.clear();
+        os << ", setter=" << VD->getObjCSetterSelector().getString(buffer);
+      }
     }
 
     os << ") ";
@@ -530,10 +560,13 @@ private:
         clangTy = prop->getType();
 
     if (!clangTy.isNull() && isNSUInteger(clangTy)) {
-      os << "NSUInteger " << VD->getObjCPropertyName().str();
+      os << "NSUInteger " << objCName;
     } else {
-      print(ty, OTK_None, VD->getObjCPropertyName().str());
+      print(ty, OTK_None, objCName.str());
     }
+
+    if (hasReservedName)
+      os << "_";
 
     os << ";\n";
   }
