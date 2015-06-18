@@ -817,9 +817,9 @@ SequenceTypeAlgorithms.test("lexicographicalCompare/Predicate") {
 // These tests are shared between find() and contains().
 struct FindTest {
   let expected: Int?
-  let element: Int
-  let sequence: [Int]
-  let expectedLeftoverSequence: [Int]
+  let element: MinimalEquatableValue
+  let sequence: [MinimalEquatableValue]
+  let expectedLeftoverSequence: [MinimalEquatableValue]
   let loc: SourceLoc
 
   init(
@@ -828,9 +828,10 @@ struct FindTest {
     file: String = __FILE__, line: UWord = __LINE__
   ) {
     self.expected = expected
-    self.element = element
-    self.sequence = sequence
-    self.expectedLeftoverSequence = expectedLeftoverSequence
+    self.element = MinimalEquatableValue(element)
+    self.sequence = sequence.map { MinimalEquatableValue($0) }
+    self.expectedLeftoverSequence = expectedLeftoverSequence.map {
+      MinimalEquatableValue($0)}
     self.loc = SourceLoc(file, line, comment: "test data")
   }
 }
@@ -848,8 +849,47 @@ let findTests = [
   FindTest(3, 4, [ 1, 2, 3, 4 ], []),
 ]
 
+class Box<T> {
+  init(_ value: T) { self.value = value }
+  var value: T
+}
+
+//===--- Sequence with default implementations ----------------------------===//
+protocol StrictSequenceType : SequenceType {
+  typealias Element
+  init(base: MinimalSequence<Element>)
+  var base: MinimalSequence<Element> { get }
+}
+
+extension StrictSequenceType {
+  init<S: SequenceType where S.Generator.Element == Element>(
+    _ s: S
+  ) {
+    self.init(base: MinimalSequence(s))
+  }
+
+  init(_ data: [Element], underestimatedCount: UnderestimateCountBehavior) {
+    self.init(
+      base: MinimalSequence(data, underestimatedCount: underestimatedCount))
+  }
+  
+  func generate() -> MinimalGenerator<Element> {
+    return base.generate()
+  }
+}
+
+/// A Sequence that uses as many default implementations as
+/// SequenceType can provide.
+struct DefaultedSequence<Element> : StrictSequenceType {
+  let base: MinimalSequence<Element>
+}
+
+//===----------------------------------------------------------------------===//
+
+typealias StrictSequenceOfEquatable = MinimalSequence<MinimalEquatableValue>
+
 func callStaticContains(
-  sequence: MinimalSequence<MinimalEquatableValue>,
+  sequence: StrictSequenceOfEquatable,
   _ element: MinimalEquatableValue
 ) -> Bool {
   return sequence.contains(element)
@@ -861,55 +901,41 @@ func callGenericContains<
   return sequence.contains(element)
 }
 
+// FIXME:
+// typealias StrictSequence = MinimalSequence
+
 % for dispatch in [ 'Static', 'Generic' ]:
 
 SequenceTypeAlgorithms.test("contains/WhereElementIsEquatable/${dispatch}") {
   for test in findTests {
-    let s = MinimalSequence<MinimalEquatableValue>(
-      test.sequence.map { MinimalEquatableValue($0) })
+    let s = StrictSequenceOfEquatable(MinimalSequence(test.sequence))
+    
     expectEqual(
       test.expected != nil,
-      call${dispatch}Contains(s, MinimalEquatableValue(test.element)),
+      call${dispatch}Contains(s, test.element),
       stackTrace: test.loc.withCurrentLoc())
-    expectEqual(
-      test.expectedLeftoverSequence, s.map { $0.value },
-      stackTrace: test.loc.withCurrentLoc())
+    expectEqualSequence(
+      test.expectedLeftoverSequence, s, stackTrace: test.loc.withCurrentLoc())
   }
 }
 
 % end
 
-struct SequenceWithCustomContainsMethod : SequenceType {
-  static var timesContainsWasCalled: Int = 0
 
-  internal let _elements: [Int]
-
-  init(_ elements: [Int]) {
-    self._elements = elements
-  }
-
-  func generate() -> MinimalGenerator<MinimalEquatableValue> {
-    // Lie from our generate() method about sequence contents.
-    // Tests using this type should not call generate() anyway.
-    expectUnreachable()
-    return MinimalSequence<MinimalEquatableValue>([]).generate()
-  }
-
+struct SequenceWithCustomContainsMethod<Element> : StrictSequenceType {
+  internal let base: MinimalSequence<Element>
+  internal let timesContainsWasCalled = Box(0)
+  
   func _customContainsEquatableElement(
-    element: MinimalEquatableValue
+    element: Element
   ) -> Bool? {
-    ++SequenceWithCustomContainsMethod.timesContainsWasCalled
-    for e in _elements {
-      if e == element.value {
-        return true
-      }
-    }
-    return false
+    ++timesContainsWasCalled.value
+    return base._customContainsEquatableElement(element)
   }
 }
 
 func callStaticContains(
-  sequence: SequenceWithCustomContainsMethod,
+  sequence: SequenceWithCustomContainsMethod<MinimalEquatableValue>,
   _ element: MinimalEquatableValue) -> Bool {
   return sequence.contains(element)
 }
@@ -919,12 +945,11 @@ func callStaticContains(
 SequenceTypeAlgorithms.test("contains/WhereElementIsEquatable/CustomImplementation/${dispatch}") {
   for test in findTests {
     let s = SequenceWithCustomContainsMethod(test.sequence)
-    SequenceWithCustomContainsMethod.timesContainsWasCalled = 0
     expectEqual(
       test.expected != nil,
-      call${dispatch}Contains(s, MinimalEquatableValue(test.element)),
+      call${dispatch}Contains(s, test.element),
       stackTrace: test.loc.withCurrentLoc())
-    expectEqual(1, SequenceWithCustomContainsMethod.timesContainsWasCalled)
+    expectEqual(1, s.timesContainsWasCalled.value)
   }
 }
 
@@ -941,15 +966,15 @@ func callStaticContains(
 
 // FIXME: implement the same optimization for Dictionary.
 // FIXME: move to the file where other Set tests live.
-SequenceTypeAlgorithms.test("Set<T>.contains/WhereElementIsEquatable/CustomImplementation/${dispatch}") {
+SequenceTypeAlgorithms.test("Set<T>.contains/CustomImplementation/${dispatch}") {
   for test in findTests {
     let s = Set<MinimalHashableValue>(
-      test.sequence.map { MinimalHashableValue($0) })
+      test.sequence.map { MinimalHashableValue($0.value) })
     MinimalHashableValue.timesEqualEqualWasCalled = 0
     MinimalHashableValue.timesHashValueWasCalled = 0
     expectEqual(
       test.expected != nil,
-      call${dispatch}Contains(s, MinimalHashableValue(test.element)),
+      call${dispatch}Contains(s, MinimalHashableValue(test.element.value)),
       stackTrace: test.loc.withCurrentLoc())
     if test.sequence.isEmpty {
       expectEqual(
@@ -976,13 +1001,13 @@ SequenceTypeAlgorithms.test("Set<T>.contains/WhereElementIsEquatable/CustomImple
 SequenceTypeAlgorithms.test("contains/Predicate") {
   for test in findTests {
     let s = MinimalSequence<OpaqueValue<Int>>(
-      test.sequence.map { OpaqueValue($0) })
+      test.sequence.map { OpaqueValue($0.value) })
     expectEqual(
       test.expected != nil,
-      s.contains { $0.value == test.element },
+      s.contains { $0.value == test.element.value },
       stackTrace: test.loc.withCurrentLoc())
     expectEqual(
-      test.expectedLeftoverSequence, s.map { $0.value },
+      test.expectedLeftoverSequence.map { $0.value }, s.map { $0.value },
       stackTrace: test.loc.withCurrentLoc())
   }
 }
@@ -1153,48 +1178,21 @@ let filterTests = [
   ),
 ]
 
-var MinimalSequenceWithCustomFilter_timesFilterWasCalled: Int = 0
 
-% for Implementation in [ 'Default', 'Custom' ]:
-
-struct MinimalSequenceWith${Implementation}Filter<Element> : SequenceType {
-  init(_ data: [Element], underestimatedCount: UnderestimateCountBehavior) {
-    self._data = MinimalSequence(
-      data, underestimatedCount: underestimatedCount)
-  }
-
-  func generate() -> MinimalGenerator<Element> {
-    return _data.generate()
-  }
-
-  var _data: MinimalSequence<Element>
-
-
-%   if Implementation == 'Custom':
-
-  static var timesFilterWasCalled: Int {
-    get {
-      return MinimalSequenceWithCustomFilter_timesFilterWasCalled
-    }
-    set {
-      MinimalSequenceWithCustomFilter_timesFilterWasCalled = newValue
-    }
-  }
+struct StrictSequenceWithCustomFilter<Element> : StrictSequenceType {
+  let base: MinimalSequence<Element>
+  let timesFilterWasCalled = Box(0)
 
   func filter(
     @noescape transform: (Element) -> Bool
   ) -> [Element] {
-    ++MinimalSequenceWithCustomFilter.timesFilterWasCalled
-    return _data.filter(transform)
+    ++timesFilterWasCalled.value
+    return base.filter(transform)
   }
-
-%   end
 }
 
-% end
-
 func callStaticSequenceFilter(
-  sequence: MinimalSequenceWithDefaultFilter<OpaqueValue<Int>>,
+  sequence: DefaultedSequence<OpaqueValue<Int>>,
   @noescape includeElement: (OpaqueValue<Int>) -> Bool
 ) -> [OpaqueValue<Int>] {
   var result = sequence.filter(includeElement)
@@ -1203,7 +1201,7 @@ func callStaticSequenceFilter(
 }
 
 func callStaticSequenceFilter(
-  sequence: MinimalSequenceWithCustomFilter<OpaqueValue<Int>>,
+  sequence: StrictSequenceWithCustomFilter<OpaqueValue<Int>>,
   @noescape includeElement: (OpaqueValue<Int>) -> Bool
 ) -> [OpaqueValue<Int>] {
   var result = sequence.filter(includeElement)
@@ -1232,15 +1230,17 @@ SequenceTypeAlgorithms.test("filter/SequenceType/${Implementation}Implementation
       UnderestimateCountBehavior.Half,
       UnderestimateCountBehavior.Value(0)
     ] {
-      let s = MinimalSequenceWith${Implementation}Filter<OpaqueValue<Int>>(
+      
+      typealias Default = DefaultedSequence<OpaqueValue<Int>>
+      typealias Custom = StrictSequenceWithCustomFilter<OpaqueValue<Int>>
+      
+      let s = ${Implementation}(
         test.sequence.map { OpaqueValue($0) },
         underestimatedCount: underestimateCountBehavior)
+      
       let closureLifetimeTracker = LifetimeTracked(0)
       expectEqual(1, LifetimeTracked.instances)
       var timesClosureWasCalled = 0
-%     if Implementation == 'Custom':
-      MinimalSequenceWithCustomFilter<OpaqueValue<Int>>.timesFilterWasCalled = 0
-%     end
       var result = call${dispatch}SequenceFilter(s) {
         (element) in
         _blackHole(closureLifetimeTracker)
@@ -1250,7 +1250,7 @@ SequenceTypeAlgorithms.test("filter/SequenceType/${Implementation}Implementation
       expectType([OpaqueValue<Int>].self, &result)
       expectEqual(test.expected, result.map { $0.value })
 %     if Implementation == 'Custom':
-      expectEqual(1, MinimalSequenceWithCustomFilter<OpaqueValue<Int>>.timesFilterWasCalled)
+      expectEqual(1, s.timesFilterWasCalled.value)
 %     end
       expectEqual([], s.map { $0.value }) { "sequence should be consumed" }
       expectEqual(test.sequence.count, timesClosureWasCalled) {
@@ -2748,32 +2748,33 @@ func callGenericFind<
 
 SequenceTypeAlgorithms.test("find/WhereElementIsEquatable/${dispatch}") {
   for test in findTests {
-    let s = MinimalForwardCollection<MinimalEquatableValue>(
-      test.sequence.map { MinimalEquatableValue($0) })
+    let s = MinimalForwardCollection<MinimalEquatableValue>(test.sequence)
     expectEqual(
       test.expected,
-      call${dispatch}Find(s, MinimalEquatableValue(test.element))
-        .map { $0.position },
+      call${dispatch}Find(s, test.element).map { $0.position },
       stackTrace: test.loc.withCurrentLoc())
   }
 }
 
 % end
 
-struct CollectionWithCustomFindMethod : CollectionType {
-  static var timesFindWasCalled: Int = 0
+struct CollectionWithCustomFindMethod<
+  Base: CollectionType where Base.Generator.Element : Equatable
+> : CollectionType {
+  var timesFindWasCalled = Box(0)
 
-  internal let _elements: [Int]
+  typealias Element = Base.Generator.Element
+  internal let _elements: [Element]
 
-  init(_ elements: [Int]) {
-    self._elements = elements
+  init(_ elements: Base) {
+    self._elements = elements.map { $0 }
   }
 
-  func generate() -> MinimalGenerator<MinimalEquatableValue> {
+  func generate() -> MinimalGenerator<Element> {
     // Lie from our generate() method about sequence contents.
     // Tests using this type should not call generate() anyway.
     expectUnreachable()
-    return MinimalSequence<MinimalEquatableValue>([]).generate()
+    return MinimalSequence<Element>([]).generate()
   }
 
   var startIndex: MinimalForwardIndex {
@@ -2788,16 +2789,16 @@ struct CollectionWithCustomFindMethod : CollectionType {
       endIndex: _elements.endIndex)
   }
 
-  subscript(i: MinimalForwardIndex) -> MinimalEquatableValue {
-    return MinimalEquatableValue(_elements[i.position])
+  subscript(i: MinimalForwardIndex) -> Element {
+    return _elements[i.position]
   }
 
   func _customIndexOfEquatableElement(
-    element: MinimalEquatableValue
+    element: Element
   ) -> MinimalForwardIndex?? {
-    ++CollectionWithCustomFindMethod.timesFindWasCalled
+    ++timesFindWasCalled.value
     for i in _elements.indices {
-      if _elements[i] == element.value {
+      if _elements[i] == element {
         return MinimalForwardIndex(
           position: i,
           startIndex: 0,
@@ -2809,9 +2810,9 @@ struct CollectionWithCustomFindMethod : CollectionType {
 }
 
 func callStaticFind(
-  sequence: CollectionWithCustomFindMethod,
+  sequence: CollectionWithCustomFindMethod<[MinimalEquatableValue]>,
   _ element: MinimalEquatableValue
-) -> CollectionWithCustomFindMethod.Index? {
+) -> CollectionWithCustomFindMethod<[MinimalEquatableValue]>.Index? {
   return sequence.indexOf(element)
 }
 
@@ -2820,13 +2821,11 @@ func callStaticFind(
 SequenceTypeAlgorithms.test("find/WhereElementIsEquatable/CustomImplementation/${dispatch}") {
   for test in findTests {
     let s = CollectionWithCustomFindMethod(test.sequence)
-    CollectionWithCustomFindMethod.timesFindWasCalled = 0
     expectEqual(
       test.expected,
-      call${dispatch}Find(s, MinimalEquatableValue(test.element))
-        .map { $0.position },
+      call${dispatch}Find(s, test.element).map { $0.position },
       stackTrace: test.loc.withCurrentLoc())
-    expectEqual(1, CollectionWithCustomFindMethod.timesFindWasCalled)
+    expectEqual(1, s.timesFindWasCalled.value)
   }
 }
 
@@ -2852,16 +2851,16 @@ func callStaticFind_(
 
 // FIXME: implement the same optimization for Dictionary.
 // FIXME: move to the file where other Set tests live.
-SequenceTypeAlgorithms.test("Set<T>.find/WhereElementIsEquatable/CustomImplementation/${dispatch}") {
+SequenceTypeAlgorithms.test("Set<T>.find/CustomImplementation/${dispatch}") {
   for test in findTests {
     let s = Set<MinimalHashableValue>(
-      test.sequence.map { MinimalHashableValue($0) })
+      test.sequence.map { MinimalHashableValue($0.value) })
     MinimalHashableValue.timesEqualEqualWasCalled = 0
     MinimalHashableValue.timesHashValueWasCalled = 0
     expectEqual(
       test.expected
-        .map { _ in MinimalHashableValue(test.element) },
-      call${dispatch}Find_(s, MinimalHashableValue(test.element))
+        .map { _ in MinimalHashableValue(test.element.value) },
+      call${dispatch}Find_(s, MinimalHashableValue(test.element.value))
         .map { s[$0] },
       stackTrace: test.loc.withCurrentLoc())
     if test.sequence.isEmpty {
@@ -2889,14 +2888,14 @@ SequenceTypeAlgorithms.test("Set<T>.find/WhereElementIsEquatable/CustomImplement
 SequenceTypeAlgorithms.test("find/Predicate") {
   expectEqual(0, LifetimeTracked.instances)
   for test in findTests {
-    let s = MinimalForwardCollection<MinimalEquatableValue>(
-      test.sequence.map { MinimalEquatableValue($0) })
+    let s = MinimalForwardCollection<OpaqueValue<Int>>(
+      test.sequence.map { OpaqueValue($0.value) })
     let closureLifetimeTracker = LifetimeTracked(0)
     expectEqual(1, LifetimeTracked.instances)
     let result = s.indexOf {
       (candidate) in
       _blackHole(closureLifetimeTracker)
-      return candidate.value == test.element
+      return candidate.value == test.element.value
     }
     expectEqual(
       test.expected,
