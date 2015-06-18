@@ -2408,7 +2408,7 @@ public enum UnderestimateCountBehavior {
 /// narrow way possible.
 ///
 /// This sequence is consumed when its generator is advanced.
-public struct MinimalSequence<T> : SequenceType {
+public struct MinimalSequence<T> : SequenceType, CustomDebugStringConvertible {
   public init<S : SequenceType where S.Generator.Element == T>(
     _ s: S,
     underestimatedCount: UnderestimateCountBehavior = .Value(0)
@@ -2439,6 +2439,9 @@ public struct MinimalSequence<T> : SequenceType {
     return max(0, self._sharedState.underestimatedCount - self._sharedState.i)
   }
 
+  public var debugDescription: String {
+    return "MinimalSequence(\(_sharedState.data[_sharedState.i..<_sharedState.data.count]))"
+  }
   internal let _sharedState: _MinimalGeneratorSharedState<T>
 }
 
