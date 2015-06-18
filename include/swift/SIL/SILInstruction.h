@@ -3053,18 +3053,6 @@ public:
   SILType getValueType() const { return getType().getObjectType(); }
 };
 
-/// Project out the address of the value in a box.
-class ProjectBoxInst :
-  public UnaryInstructionBase<ValueKind::ProjectBoxInst,
-                              SILInstruction, /*HasResult*/ true> {
-public:
-  ProjectBoxInst(SILLocation loc, SILType valueType,
-                 SILValue operand)
-      : UnaryInstructionBase(loc, operand, valueType.getAddressType()) {
-  }
-
-  SILType getValueType() const { return getType().getObjectType(); }
-};
 
 //===----------------------------------------------------------------------===//
 // Runtime failure

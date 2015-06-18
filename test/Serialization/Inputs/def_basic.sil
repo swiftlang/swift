@@ -993,16 +993,12 @@ bb2(%3 : $ErrorType):
   throw %3 : $ErrorType
 }
 
-// CHECK-LABEL: sil public_external [fragile] @box_type : $@convention(thin) (@box Int, Int) -> () {
-sil [fragile] @box_type : $@convention(thin) (@box Int, Int) -> () {
-// CHECK-NEXT: bb0(%0 : $@box Int, %1 : $Int):
-bb0(%0 : $@box Int, %1 : $Int):
+// CHECK-LABEL: sil public_external [fragile] @box_type : $@convention(thin) (@box Int) -> () {
+sil [fragile] @box_type : $@convention(thin) (@box Int) -> () {
+// CHECK-NEXT: bb0(%0 : $@box Int):
+bb0(%0 : $@box Int):
   // CHECK-NEXT: strong_retain %0 : $@box Int
   strong_retain %0 : $@box Int
-  // CHECK-NEXT: %3 = project_box %0 : $@box Int
-  %3 = project_box %0 : $@box Int
-  // CHECK-NEXT: store %1 to %3 : $*Int
-  store %1 to %3 : $*Int
   // CHECK-NEXT: strong_release %0 : $@box Int
   strong_release %0 : $@box Int
   return undef : $()
@@ -1310,7 +1306,7 @@ bb0:
   %127 = function_ref @bitcasts : $@convention(thin) (@owned Class1) -> @owned (Class2, Int)
   %126 = function_ref @protocol_conversion : $@convention(thin) () -> @owned Protocol
   %133 = function_ref @test_try_apply : $@convention(thin) (@convention(thin) () -> @error ErrorType) -> @error ErrorType
-  %134 = function_ref @box_type : $@convention(thin) (@box Int, Int) -> ()
+  %134 = function_ref @box_type : $@convention(thin) (@box Int) -> ()
   %120 = function_ref @test_forward_ref : $@convention(thin) (UInt8, UInt8) -> UInt8
   %121 = function_ref @partial_apply : $@convention(thin) (@convention(thin) (@out Int, Int) -> (), Int) -> Int
   %122 = function_ref @partial_apply_with_closure : $@convention(thin) (@owned @callee_owned () -> Bool, @owned String, UnsafePointer<Int8>, Int64) -> ()

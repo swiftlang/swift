@@ -1477,14 +1477,6 @@ void SILCloner<ImplClass>::visitProjectValueBufferInst(
 }
 
 template<typename ImplClass>
-void SILCloner<ImplClass>::visitProjectBoxInst(ProjectBoxInst *inst) {
-  doPostProcess(inst,
-    getBuilder().createProjectBox(getOpLocation(inst->getLoc()),
-                                  getOpType(inst->getValueType()),
-                                  getOpValue(inst->getOperand())));
-}
-
-template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitCondFailInst(CondFailInst *Inst) {
   doPostProcess(Inst,

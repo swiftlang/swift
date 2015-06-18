@@ -570,11 +570,7 @@ inline SILType SILFunctionType::getSemanticResultSILType() const {
 inline SILType SILBlockStorageType::getCaptureAddressType() const {
   return SILType::getPrimitiveAddressType(getCaptureType());
 }
-
-inline SILType SILBoxType::getBoxedAddressType() const {
-  return SILType::getPrimitiveAddressType(getBoxedType());
-}
-
+  
 /// The hash of a SILType is the hash of its opaque value.
 static inline llvm::hash_code hash_value(SILType V) {
   return llvm::hash_value(V.getOpaqueValue());

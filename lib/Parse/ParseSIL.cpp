@@ -1231,7 +1231,6 @@ bool SILParser::parseSILOpcode(ValueKind &Opcode, SourceLoc &OpcodeLoc,
     .Case("pointer_to_address", ValueKind::PointerToAddressInst)
     .Case("pointer_to_thin_function", ValueKind::PointerToThinFunctionInst)
     .Case("project_block_storage", ValueKind::ProjectBlockStorageInst)
-    .Case("project_box", ValueKind::ProjectBoxInst)
     .Case("project_value_buffer", ValueKind::ProjectValueBufferInst)
     .Case("existential_metatype", ValueKind::ExistentialMetatypeInst)
     .Case("raw_pointer_to_ref", ValueKind::RawPointerToRefInst)
@@ -1767,13 +1766,6 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
         parseTypedValueRef(Val))
       return true;
     ResultVal = B.createDeallocValueBuffer(InstLoc, Ty, Val);
-    break;
-  }
-
-  case ValueKind::ProjectBoxInst: {
-    if (parseTypedValueRef(Val))
-      return true;
-    ResultVal = B.createProjectBox(InstLoc, Val);
     break;
   }
       

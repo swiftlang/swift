@@ -1254,10 +1254,7 @@ public:
     *this << "project_value_buffer " << PVBI->getValueType()
        << " in " << getIDAndType(PVBI->getOperand());
   }
-  void visitProjectBoxInst(ProjectBoxInst *PBI) {
-    *this << "project_box " << getIDAndType(PBI->getOperand());
-  }
-
+  
   void visitCondFailInst(CondFailInst *FI) {
     *this << "cond_fail " << getIDAndType(FI->getOperand());
   }

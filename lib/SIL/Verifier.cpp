@@ -1042,16 +1042,6 @@ public:
             "Operand value should be a Builtin.UnsafeValueBuffer");
   }
 
-  void checkProjectBoxInst(ProjectBoxInst *I) {
-    require(I->getOperand().getType().isObject(),
-            "project_box operand should be a value");
-    require(I->getOperand().getType().is<SILBoxType>(),
-            "project_box operand should be a @box type");
-    require(I->getType() == I->getOperand().getType().castTo<SILBoxType>()
-                             ->getBoxedAddressType(),
-            "project_box result should be address of boxed type");
-  }
-
   void checkDeallocValueBufferInst(DeallocValueBufferInst *I) {
     require(I->getOperand().getType().isAddress(),
             "Operand value should be an address");
