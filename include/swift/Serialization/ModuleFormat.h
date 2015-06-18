@@ -701,6 +701,11 @@ namespace decls_block {
     TypeIDField            // capture type
   >;
 
+  using SILBoxTypeLayout = BCRecordLayout<
+    SIL_BOX_TYPE,
+    TypeIDField            // capture type
+  >;
+
   template <unsigned Code>
   using SyntaxSugarTypeLayout = BCRecordLayout<
     Code,

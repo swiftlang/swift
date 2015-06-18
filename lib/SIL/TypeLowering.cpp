@@ -343,6 +343,11 @@ namespace {
       // Should not be loaded.
       return asImpl().handleAddressOnly(type);
     }
+
+    RetTy visitSILBoxType(CanSILBoxType type) {
+      // Should not be loaded.
+      return asImpl().handleReference(type);
+    }
   };
 
   class TypeClassifier :

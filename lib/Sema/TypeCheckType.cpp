@@ -1505,6 +1505,12 @@ Type TypeResolver::resolveAttributedType(TypeAttributes &attrs,
     attrs.clearAttribute(TAK_block_storage);
   }
   
+  // In SIL *only*, allow @box to specify a box type.
+  if ((options & TR_SILType) && attrs.has(TAK_box)) {
+    ty = SILBoxType::get(ty->getCanonicalType());
+    attrs.clearAttribute(TAK_box);
+  }
+  
   // Diagnose @local_storage in nested positions.
   if (attrs.has(TAK_local_storage)) {
     assert(DC->getParentSourceFile()->Kind == SourceFileKind::SIL);

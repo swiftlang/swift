@@ -3788,6 +3788,14 @@ Type ModuleFile::getType(TypeID TID) {
                                               ->getCanonicalType());
     break;
   }
+
+  case decls_block::SIL_BOX_TYPE: {
+    TypeID boxID;
+
+    decls_block::SILBoxTypeLayout::readRecord(scratch, boxID);
+    typeOrOffset = SILBoxType::get(getType(boxID)->getCanonicalType());
+    break;
+  }
       
   case decls_block::SIL_FUNCTION_TYPE: {
     TypeID interfaceResultID;

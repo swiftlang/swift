@@ -1867,7 +1867,11 @@ namespace {
     // rules.
     CanType visitSILBlockStorageType(CanSILBlockStorageType origType) {
       auto substCaptureType = visit(origType->getCaptureType());
-      return SILBlockStorageType::get(substCaptureType);
+      return SILBoxType::get(substCaptureType);
+    }
+    CanType visitSILBoxType(CanSILBoxType origType) {
+      auto substBoxedType = visit(origType->getBoxedType());
+      return SILBoxType::get(substBoxedType);
     }
 
     /// Any other type is would be a valid type in the AST.  Just

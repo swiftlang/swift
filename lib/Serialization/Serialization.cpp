@@ -2872,6 +2872,15 @@ void Serializer::writeType(Type ty) {
     break;
   }
       
+  case TypeKind::SILBox: {
+    auto boxTy = cast<SILBoxType>(ty.getPointer());
+
+    unsigned abbrCode = DeclTypeAbbrCodes[SILBoxTypeLayout::Code];
+    SILBoxTypeLayout::emitRecord(Out, ScratchRecord, abbrCode,
+                                 addTypeRef(boxTy->getBoxedType()));
+    break;
+  }
+      
   case TypeKind::SILFunction: {
     auto fnTy = cast<SILFunctionType>(ty.getPointer());
 
@@ -3119,6 +3128,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<PolymorphicFunctionTypeLayout>();
   registerDeclTypeAbbr<GenericFunctionTypeLayout>();
   registerDeclTypeAbbr<SILBlockStorageTypeLayout>();
+  registerDeclTypeAbbr<SILBoxTypeLayout>();
   registerDeclTypeAbbr<SILFunctionTypeLayout>();
   registerDeclTypeAbbr<ArraySliceTypeLayout>();
   registerDeclTypeAbbr<DictionaryTypeLayout>();

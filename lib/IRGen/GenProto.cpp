@@ -4311,6 +4311,7 @@ namespace {
     void visitDynamicSelfType(CanDynamicSelfType type) {}
     void visitProtocolCompositionType(CanProtocolCompositionType type) {}
     void visitReferenceStorageType(CanReferenceStorageType type) {}
+    void visitSILBoxType(CanSILBoxType t) {}
 
     // L-values are impossible.
     void visitLValueType(CanLValueType type) {

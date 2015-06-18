@@ -36,6 +36,7 @@ TYPE_ATTR(noreturn)
 
 // SIL-specific attributes
 TYPE_ATTR(block_storage)
+TYPE_ATTR(box)
 TYPE_ATTR(local_storage)
 TYPE_ATTR(sil_unowned)
 TYPE_ATTR(sil_unmanaged)
