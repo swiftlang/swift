@@ -1869,6 +1869,10 @@ namespace {
       auto substCaptureType = visit(origType->getCaptureType());
       return SILBlockStorageType::get(substCaptureType);
     }
+    CanType visitSILBoxType(CanSILBoxType origType) {
+      auto substBoxedType = visit(origType->getBoxedType());
+      return SILBoxType::get(substBoxedType);
+    }
 
     /// Any other type is would be a valid type in the AST.  Just
     /// apply the substitution on the AST level and then lower that.

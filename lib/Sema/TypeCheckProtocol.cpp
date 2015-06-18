@@ -2844,6 +2844,7 @@ ConformanceChecker::inferTypeWitnessesViaValueWitness(ValueDecl *req,
 
     TRIVIAL_CASE(SILFunctionType)
     TRIVIAL_CASE(SILBlockStorageType)
+    TRIVIAL_CASE(SILBoxType)
     TRIVIAL_CASE(ProtocolCompositionType)
 
     bool visitLValueType(CanLValueType reqLValue, Type witnessType) {

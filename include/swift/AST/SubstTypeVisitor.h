@@ -96,6 +96,7 @@ public:
     DISPATCH(Metatype)
     DISPATCH(PolymorphicFunction)
     DISPATCH(SILBlockStorage)
+    DISPATCH(SILBox)
     DISPATCH(SILFunction)
     DISPATCH(UnmanagedStorage)
     DISPATCH(UnownedStorage)
@@ -126,6 +127,7 @@ public:
   DEFER_TO_SUPERTYPE(InOut, Type)
   DEFER_TO_SUPERTYPE(Metatype, Type)
   DEFER_TO_SUPERTYPE(SILBlockStorage, Type)
+  DEFER_TO_SUPERTYPE(SILBox, Type)
   DEFER_TO_SUPERTYPE(SILFunction, Type)
   DEFER_TO_SUPERTYPE(Tuple, Type)
 #undef DEFER_TO_SUPERTYPE

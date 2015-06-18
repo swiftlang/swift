@@ -51,7 +51,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 202; // Last change: xref protocol vs. ext
+const uint16_t VERSION_MINOR = 203; // Last change: add @box type
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -698,6 +698,11 @@ namespace decls_block {
   
   using SILBlockStorageTypeLayout = BCRecordLayout<
     SIL_BLOCK_STORAGE_TYPE,
+    TypeIDField            // capture type
+  >;
+
+  using SILBoxTypeLayout = BCRecordLayout<
+    SIL_BOX_TYPE,
     TypeIDField            // capture type
   >;
 

@@ -2979,7 +2979,34 @@ public:
   }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(SILFunctionType, Type)
-  
+
+class SILBoxType;
+typedef CanTypeWrapper<SILBoxType> CanSILBoxType;
+
+/// The SIL-only type @box T, which represents a reference to a (non-class)
+/// refcounted heap allocation containing a value of type T.
+class SILBoxType : public TypeBase {
+  CanType BoxedType;
+
+  SILBoxType(CanType BoxedType)
+    : TypeBase(TypeKind::SILBox,
+               &BoxedType->getASTContext(),
+               BoxedType->getRecursiveProperties()),
+      BoxedType(BoxedType) {}
+
+public:
+  static CanSILBoxType get(CanType BoxedType);
+
+  CanType getBoxedType() const { return BoxedType; }
+  // In SILType.h
+  SILType getBoxedAddressType() const;
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::SILBox;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(SILBoxType, Type)
+
 class SILBlockStorageType;
 typedef CanTypeWrapper<SILBlockStorageType> CanSILBlockStorageType;
   

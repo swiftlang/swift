@@ -917,6 +917,11 @@ namespace {
       llvm_unreachable("cannot ask for metadata of block storage");
     }
 
+    llvm::Value *visitSILBoxType(CanSILBoxType type) {
+      // The Builtin.NativeObject metadata can stand in for boxes.
+      return emitDirectMetadataRef(type->getASTContext().TheNativeObjectType);
+    }
+
     /// Try to find the metatype in local data.
     llvm::Value *tryGetLocal(CanType type) {
       return IGF.tryGetLocalTypeData(type, LocalTypeData::forMetatype());
