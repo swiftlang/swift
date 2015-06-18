@@ -1123,22 +1123,6 @@ extension NSArray {
   }
 }
 
-extension NSDictionary {
-  // - (instancetype)initWithObjectsAndKeys:(id)firstObject, ...
-  public
-  convenience init(objectsAndKeys objects: AnyObject...) {
-    // - (instancetype)initWithObjects:(NSArray *)objects forKeys:(NSArray *)keys;
-    var values: [AnyObject] = []
-    var keys:   [AnyObject] = []
-    for var i = 0; i < objects.count; i += 2 {
-      values.append(objects[i])
-      keys.append(objects[i+1])
-    }
-    // - (instancetype)initWithObjects:(NSArray *)values forKeys:(NSArray *)keys;
-    self.init(objects: values, forKeys: keys)
-  }
-}
-
 extension NSOrderedSet {
   // - (instancetype)initWithObjects:(id)firstObj, ...
   public
