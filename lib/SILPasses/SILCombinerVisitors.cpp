@@ -2272,13 +2272,8 @@ SILCombiner::visitUncheckedAddrCastInst(UncheckedAddrCastInst *UADCI) {
     // Insert a new load from our source and bitcast that as appropriate.
     LoadInst *NewLoad = Builder->createLoad(Loc, Op);
     NewLoad->setDebugScope(Scope);
-    SILInstruction *BitCast = nullptr;
-    if (OutputIsTrivial)
-      BitCast = Builder->createUncheckedTrivialBitCast(Loc, NewLoad,
-                                                       OutputTy.getObjectType());
-    else
-      BitCast = Builder->createUncheckedRefBitCast(Loc, NewLoad,
-                                                   OutputTy.getObjectType());
+    auto *BitCast = Builder->createUncheckedBitCast(Loc, NewLoad,
+                                                    OutputTy.getObjectType());
     BitCast->setDebugScope(Scope);
 
     // Replace all uses of the old load with the new bitcasted result and erase

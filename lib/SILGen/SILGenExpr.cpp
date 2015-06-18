@@ -3000,12 +3000,8 @@ static bool emitOptimizedOptionalEvaluation(OptionalEvaluationExpr *E,
   if (optInit == nullptr) {
     auto subMV = SGF.emitRValueAsSingleValue(BO->getSubExpr());
     SILValue result;
-    if (optTL.isTrivial())
-      result = SGF.B.createUncheckedTrivialBitCast(E, subMV.forward(SGF),
-                                                   optTL.getLoweredType());
-    else
-      result = SGF.B.createUncheckedRefBitCast(E, subMV.forward(SGF),
-                                               optTL.getLoweredType());
+    result = SGF.B.createUncheckedBitCast(E, subMV.forward(SGF),
+                                          optTL.getLoweredType());
     
     LoadableResult = result;
     return true;

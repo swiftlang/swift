@@ -213,23 +213,13 @@ forwardAddrToUncheckedCastToLd(SILValue Address, SILValue StoredValue,
   assert(UADCI && "UADCI is assumed to be non-null here");
 
   // Construct the relevant bitcast.
-  SILModule &Mod = UADCI->getModule();
   SILType OutputTy = UADCI->getType();
-  bool OutputIsTrivial = OutputTy.isTrivial(Mod);
 
   SILBuilderWithScope<1> B(LI);
   SILValue CastValue;
 
-  // If the output is trivial, we have a trivial bit cast.
-  if (OutputIsTrivial) {
-    CastValue = B.createUncheckedTrivialBitCast(UADCI->getLoc(), StoredValue,
-                                                OutputTy.getObjectType());
-  } else {
-    // Otherwise, both must have some sort of reference counts on them. Insert
-    // the ref count cast.
-    CastValue = B.createUncheckedRefBitCast(UADCI->getLoc(), StoredValue,
-                                            OutputTy.getObjectType());
-  }
+  CastValue = B.createUncheckedBitCast(UADCI->getLoc(), StoredValue,
+                                       OutputTy.getObjectType());
 
   // Then try to construct an extract path from the UADCI to the Address.
   SILValue ExtractPath =
