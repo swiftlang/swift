@@ -28,7 +28,8 @@ using namespace swift;
 /// to prevent these predicates from changing values by mistake.
 static_assert(std::is_standard_layout<Projection>::value,
               "Expected projection to be a standard layout type");
-static_assert(sizeof(Projection) == (sizeof(uintptr_t) * 3),
+static_assert(sizeof(Projection) == ((sizeof(uintptr_t) * 2)
+                                     + (sizeof (unsigned int) * 2)),
               "Projection size changed");
 
 //===----------------------------------------------------------------------===//
