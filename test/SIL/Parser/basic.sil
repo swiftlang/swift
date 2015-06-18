@@ -1356,17 +1356,6 @@ bb0(%0 : $*Builtin.NativeObject):
   return %1 : $Builtin.Int1
 }
 
-// CHECK-LABEL: sil @box_type : $@convention(thin) (@box Int) -> () {
-sil @box_type : $@convention(thin) (@box Int) -> () {
-// CHECK-NEXT: bb0(%0 : $@box Int):
-bb0(%0 : $@box Int):
-  // CHECK-NEXT: strong_retain %0 : $@box Int
-  strong_retain %0 : $@box Int
-  // CHECK-NEXT: strong_release %0 : $@box Int
-  strong_release %0 : $@box Int
-  return undef : $()
-}
-
 // CHECK-LABEL: sil_vtable Foo {
 // CHECK: #Foo.subscript!getter.1: _TFC3tmp3Foog9subscriptFTVSs5Int32S1__S1_
 // CHECK: #Foo.subscript!setter.1: _TFC3tmp3Foos9subscriptFTVSs5Int32S1__S1_

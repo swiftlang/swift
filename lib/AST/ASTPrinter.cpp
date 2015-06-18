@@ -2749,11 +2749,6 @@ public:
     printWithParensIfNotSimple(T->getCaptureType());
   }
 
-  void visitSILBoxType(SILBoxType *T) {
-    Printer << "@box ";
-    printWithParensIfNotSimple(T->getBoxedType());
-  }
-
   void visitArraySliceType(ArraySliceType *T) {
     Printer << "[";
     visit(T->getBaseType());

@@ -88,10 +88,9 @@ bool CanType::isReferenceTypeImpl(CanType type, bool functionsCount) {
   case TypeKind::BuiltinBridgeObject:
   case TypeKind::Class:
   case TypeKind::BoundGenericClass:
-  case TypeKind::SILBox:
     return true;
 
-  // For Self types, recur on the underlying type.
+  // For Self types, recurse on the underlying type.
   case TypeKind::DynamicSelf:
     return isReferenceTypeImpl(cast<DynamicSelfType>(type).getSelfType(),
                                functionsCount);
@@ -388,9 +387,6 @@ bool TypeBase::isUnspecializedGeneric() {
       
   case TypeKind::SILBlockStorage:
     return cast<SILBlockStorageType>(this)->getCaptureType()
-        ->isUnspecializedGeneric();
-  case TypeKind::SILBox:
-    return cast<SILBoxType>(this)->getBoxedType()
         ->isUnspecializedGeneric();
   }
   llvm_unreachable("bad TypeKind");
@@ -1300,7 +1296,6 @@ CanType TypeBase::getCanonicalType() {
   }
       
   case TypeKind::SILBlockStorage:
-  case TypeKind::SILBox:
   case TypeKind::SILFunction:
     llvm_unreachable("SIL-only types are always canonical!");
 
@@ -1387,7 +1382,6 @@ TypeBase *TypeBase::getDesugaredType() {
   case TypeKind::PolymorphicFunction:
   case TypeKind::GenericFunction:
   case TypeKind::SILBlockStorage:
-  case TypeKind::SILBox:
   case TypeKind::SILFunction:
   case TypeKind::LValue:
   case TypeKind::InOut:
@@ -1602,7 +1596,6 @@ bool TypeBase::isSpelledLike(Type other) {
 
   case TypeKind::SILFunction:
   case TypeKind::SILBlockStorage:
-  case TypeKind::SILBox:
   case TypeKind::PolymorphicFunction:
   case TypeKind::GenericFunction: {
     // Polymorphic function types should never be explicitly spelled.
@@ -2684,17 +2677,6 @@ case TypeKind::Id:
     CanType canTransCap = transCap->getCanonicalType();
     if (canTransCap != storageTy->getCaptureType())
       return SILBlockStorageType::get(canTransCap);
-    return storageTy;
-  }
-
-  case TypeKind::SILBox: {
-    auto storageTy = cast<SILBoxType>(base);
-    Type transBoxed = storageTy->getBoxedType().transform(fn);
-    if (!transBoxed)
-      return Type();
-    CanType canTransBoxed = transBoxed->getCanonicalType();
-    if (canTransBoxed != storageTy->getBoxedType())
-      return SILBoxType::get(canTransBoxed);
     return storageTy;
   }
 

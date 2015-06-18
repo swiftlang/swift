@@ -1221,8 +1221,7 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
     Buffer << '_';
     return;
   }
-
-  case TypeKind::SILBox:
+      
   case TypeKind::SILBlockStorage:
     llvm_unreachable("should never be mangled");
   }

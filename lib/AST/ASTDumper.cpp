@@ -2642,12 +2642,6 @@ namespace {
       OS << ")";
     }
 
-    void visitSILBoxType(SILBoxType *T, StringRef label) {
-      printCommon(T, label, "sil_box_type");
-      printRec(T->getBoxedType());
-      OS << ")";
-    }
-
     void visitArraySliceType(ArraySliceType *T, StringRef label) {
       printCommon(T, label, "array_slice_type");
       printRec(T->getBaseType());

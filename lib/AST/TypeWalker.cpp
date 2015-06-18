@@ -161,12 +161,6 @@ class Traversal : public TypeVisitor<Traversal, bool>
     return false;
   }
 
-  bool visitSILBoxType(SILBoxType *ty) {
-    if (doIt(ty->getBoxedType()))
-      return true;
-    return false;
-  }
-
 public:
   explicit Traversal(TypeWalker &walker) : Walker(walker) {}
 

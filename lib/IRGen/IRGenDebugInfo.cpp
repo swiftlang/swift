@@ -1833,7 +1833,6 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
   case TypeKind::TypeVariable:
   case TypeKind::Module:
   case TypeKind::SILBlockStorage:
-  case TypeKind::SILBox:
   case TypeKind::BuiltinUnsafeValueBuffer:
 
     DEBUG(llvm::errs() << "Unhandled type: "; DbgTy.getType()->dump();
@@ -1850,7 +1849,6 @@ static bool canMangle(TypeBase *Ty) {
   case TypeKind::PolymorphicFunction: // Mangler crashes.
   case TypeKind::GenericFunction:     // Not yet supported.
   case TypeKind::SILBlockStorage:     // Not suported at all.
-  case TypeKind::SILBox:
     return false;
   case TypeKind::InOut: {
     auto *ObjectTy = Ty->castTo<InOutType>()->getObjectType().getPointer();

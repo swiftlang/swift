@@ -1415,8 +1415,6 @@ TypeCacheEntry TypeConverter::convertType(CanType ty) {
     return convertWeakStorageType(cast<WeakStorageType>(ty));
   case TypeKind::SILBlockStorage: {
     return convertBlockStorageType(cast<SILBlockStorageType>(ty));
-  case TypeKind::SILBox:
-    llvm_unreachable("to be implemented");
   }
   }
   llvm_unreachable("bad type kind");

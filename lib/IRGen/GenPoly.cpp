@@ -325,12 +325,6 @@ namespace {
              && "block storage should not differ by abstraction");
       return false;
     }
-
-    bool visitSILBoxType(CanSILBoxType origTy,
-                         CanSILBoxType substTy) {
-      // Will be a refcounted pointer regardless of box payload.
-      return false;
-    }
   };
 }
 
@@ -404,9 +398,6 @@ struct EmbedsArchetype : DeclVisitor<EmbedsArchetype, bool>,
   }
   bool visitSILBlockStorageType(CanSILBlockStorageType type) {
     return visit(type->getCaptureType());
-  }
-  bool visitSILBoxType(CanSILBoxType type) {
-    return false;
   }
   bool visitProtocolDecl(ProtocolDecl *decl) { return false; }
   bool visitClassDecl(ClassDecl *decl) { return false; }
