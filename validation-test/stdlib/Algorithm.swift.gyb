@@ -183,7 +183,7 @@ func randomArray() -> A<Int> {
 Algorithm.test("invalidOrderings") {
   withInvalidOrderings {
     var a = randomArray()
-    a.sort($0)
+    _blackHole(a.sort($0))
   }
   withInvalidOrderings {
     var a: A<Int>
