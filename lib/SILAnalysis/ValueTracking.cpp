@@ -65,7 +65,6 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::DebugValueAddrInst:
   case ValueKind::DebugValueInst:
   case ValueKind::DestroyAddrInst:
-  case ValueKind::ProjectValueBufferInst:
   case ValueKind::ReleaseValueInst:
   case ValueKind::AutoreleaseValueInst:
   case ValueKind::FloatLiteralInst:
@@ -133,6 +132,8 @@ static bool isTransitiveEscapeInst(SILInstruction *Inst) {
   case ValueKind::OpenExistentialRefInst:
   case ValueKind::OpenExistentialBoxInst:
   case ValueKind::PartialApplyInst:
+  case ValueKind::ProjectBoxInst:
+  case ValueKind::ProjectValueBufferInst:
   case ValueKind::PointerToAddressInst:
   case ValueKind::PointerToThinFunctionInst:
   case ValueKind::ProjectBlockStorageInst:
