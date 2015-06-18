@@ -405,12 +405,15 @@ static bool removeRedundantChecksInBlock(SILBasicBlock &BB, ArraySet &Arrays,
   return Changed;
 }
 
-/// Walk down the dominator tree removing redundant checks.
+/// Walk down the dominator tree inside the loop, removing redundant checks.
 static bool removeRedundantChecks(DominanceInfoNode *CurBB,
                                   ArraySet &SafeArrays,
                                   IndexedArraySet &DominatingSafeChecks,
+                                  SILLoop *Loop,
                                   CallGraph *CG) {
   auto *BB = CurBB->getBlock();
+  if (!Loop->contains(BB))
+    return false;
   bool Changed = false;
 
   // When we come back from the dominator tree recursion we need to remove
@@ -462,10 +465,10 @@ static bool removeRedundantChecks(DominanceInfoNode *CurBB,
     Changed = true;
   }
 
-  // Traverse the children in the dominator tree.
+  // Traverse the children in the dominator tree inside the loop.
   for (auto Child: *CurBB)
     Changed |=
-        removeRedundantChecks(Child, SafeArrays, DominatingSafeChecks, CG);
+        removeRedundantChecks(Child, SafeArrays, DominatingSafeChecks, Loop, CG);
 
   // Remove checks we have seen for the first time.
   std::for_each(SafeChecksToPop.begin(), SafeChecksToPop.end(),
@@ -978,10 +981,13 @@ static bool hoistBoundsChecks(SILLoop *Loop, DominanceInfo *DT, SILLoopInfo *LI,
         for (auto Arr
              : SafeArrays) { llvm::dbgs() << " " << *Arr.getDef(); });
 
-  // Remove redundant checks down the dominator tree starting at the header.
+  // Remove redundant checks down the dominator tree inside the loop,
+  // starting at the header.
+  // We may not go to dominated blocks outside the loop, because we didn't
+  // check for safety outside the loop (with ABCAnalysis).
   IndexedArraySet DominatingSafeChecks;
   bool Changed = removeRedundantChecks(DT->getNode(Header), SafeArrays,
-                                       DominatingSafeChecks, CG);
+                                       DominatingSafeChecks, Loop, CG);
 
   if (!EnableABCHoisting)
     return Changed;
