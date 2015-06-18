@@ -335,7 +335,7 @@ func testMyEnumWithCaseLabels(a : MyEnumWithCaseLabels) {
   case let .Case(one: _, two: x): break // ok
   case let .Case(xxx: _, two: x): break // expected-error {{tuple pattern element label 'xxx' must be 'one'}}
   // TODO: In principle, reordering like this could be supported.
-  case let .Case(two: _, one: x): break // expected-error 2 {{tuple pattern element label}}
+  case let .Case(two: _, one: x): break // expected-error {{tuple pattern element label}}
   }
 }
 
