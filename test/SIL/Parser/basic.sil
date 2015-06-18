@@ -1356,12 +1356,16 @@ bb0(%0 : $*Builtin.NativeObject):
   return %1 : $Builtin.Int1
 }
 
-// CHECK-LABEL: sil @box_type : $@convention(thin) (@box Int) -> () {
-sil @box_type : $@convention(thin) (@box Int) -> () {
-// CHECK-NEXT: bb0(%0 : $@box Int):
-bb0(%0 : $@box Int):
+// CHECK-LABEL: sil @box_type : $@convention(thin) (@box Int, Int) -> () {
+sil @box_type : $@convention(thin) (@box Int, Int) -> () {
+// CHECK-NEXT: bb0(%0 : $@box Int, %1 : $Int):
+bb0(%0 : $@box Int, %1 : $Int):
   // CHECK-NEXT: strong_retain %0 : $@box Int
   strong_retain %0 : $@box Int
+  // CHECK-NEXT: %3 = project_box %0 : $@box Int
+  %3 = project_box %0 : $@box Int
+  // CHECK-NEXT: store %1 to %3 : $*Int
+  store %1 to %3 : $*Int
   // CHECK-NEXT: strong_release %0 : $@box Int
   strong_release %0 : $@box Int
   return undef : $()

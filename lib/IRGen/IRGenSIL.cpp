@@ -710,6 +710,10 @@ public:
   void visitProjectValueBufferInst(ProjectValueBufferInst *i);
   void visitDeallocValueBufferInst(DeallocValueBufferInst *i);
 
+  void visitProjectBoxInst(ProjectBoxInst *i) {
+    llvm_unreachable("todo");
+  }
+
   void visitOpenExistentialAddrInst(OpenExistentialAddrInst *i);
   void visitOpenExistentialMetatypeInst(OpenExistentialMetatypeInst *i);
   void visitOpenExistentialRefInst(OpenExistentialRefInst *i);

@@ -234,6 +234,10 @@ namespace {
       return X->getValueType() == RHS->getValueType();
     }
 
+    bool visitProjectBoxInst(const ProjectBoxInst *RHS) {
+      return true;
+    }
+
     bool visitStrongReleaseInst(const StrongReleaseInst *RHS) {
       return true;
     }

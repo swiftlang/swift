@@ -570,6 +570,13 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
                                  PVBI->getOperand());
     break;
   }
+  case ValueKind::ProjectBoxInst: {
+    auto PBI = cast<ProjectBoxInst>(&SI);
+    writeOneTypeOneOperandLayout(PBI->getKind(), 0,
+                                 PBI->getValueType(),
+                                 PBI->getOperand());
+    break;
+  }
   case ValueKind::BuiltinInst: {
     // Format: number of substitutions, the builtin name, result type, and
     // a list of values for the arguments. Each value in the list

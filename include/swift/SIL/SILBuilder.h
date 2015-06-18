@@ -994,7 +994,21 @@ public:
     return insert(new (F.getModule())
                     ProjectValueBufferInst(loc, valueType, operand));
   }
-  
+  ProjectBoxInst *createProjectBox(SILLocation loc,
+                                   SILValue boxOperand) {
+    auto valueTy =
+      boxOperand.getType().castTo<SILBoxType>()->getBoxedAddressType();
+
+    return insert(new (F.getModule())
+                    ProjectBoxInst(loc, valueTy, boxOperand));
+  }
+  ProjectBoxInst *createProjectBox(SILLocation loc,
+                                   SILType valueTy,
+                                   SILValue boxOperand) {
+    return insert(new (F.getModule())
+                    ProjectBoxInst(loc, valueTy, boxOperand));
+  }
+
   //===--------------------------------------------------------------------===//
   // Runtime failure
   //===--------------------------------------------------------------------===//
