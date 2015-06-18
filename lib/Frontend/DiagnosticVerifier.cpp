@@ -181,8 +181,6 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
       continue;
     }
 
-    bool AtLeastOne = false;
-    unsigned MatchCount = 1;
     int LineOffset = 0;
     if (TextStartIdx > 0 && MatchStart[0] == '@') {
       if (MatchStart[1] != '+' && MatchStart[1] != '-') {
@@ -214,22 +212,28 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
       }
     }
 
+    unsigned MinCount = 1;
+    unsigned MaxCount = 1;
     if (TextStartIdx > 0) {
       StringRef CountStr = MatchStart.substr(0, TextStartIdx).trim();
       if (CountStr == "+") {
-        // Rely on wraparound to bring this to UINT_MAX after the first match,
-        // thus continuing to search for diagnostics until we've matched all
-        // of them.
-        MatchCount = 0;
-        AtLeastOne = true;
-      } else if (CountStr.getAsInteger(10, MatchCount)) {
-        Errors.push_back(std::make_pair(MatchStart.data(),
-                                        "expected match count before '{{'"));
-        continue;
-      } else if (MatchCount == 0) {
-        Errors.push_back({ MatchStart.data(),
-          "expected positive match count before '{{'" });
-        continue;
+        MinCount = 1;
+        MaxCount = std::numeric_limits<unsigned>::max();
+      } else if (CountStr == "?") {
+        MinCount = 0;
+        MaxCount = 1;
+      } else {
+        if (CountStr.getAsInteger(10, MinCount)) {
+          Errors.push_back(std::make_pair(MatchStart.data(),
+                                          "expected match count before '{{'"));
+          continue;
+        }
+        if (MinCount == 0) {
+          Errors.push_back({ MatchStart.data(),
+            "expected positive match count before '{{'" });
+          continue;
+        }
+        MaxCount = MinCount;
       }
 
       // Resync up to the '{{'.
@@ -265,10 +269,10 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
       PrevExpectedContinuationLine = 0;
 
     // Check to see if we had this expected diagnostic.
-    do {
+    for (unsigned MatchCount = 0; MatchCount < MaxCount; MatchCount++) {
       auto FoundDiagnosticIter = findDiagnostic(Expected, BufferName);
       if (FoundDiagnosticIter == CapturedDiagnostics.end()) {
-        if (!AtLeastOne || MatchCount == 0) {
+        if (MatchCount < MinCount) {
           std::string message =
             "expected "+getDiagKindString(Expected.Classification) +
             " not produced";
@@ -383,7 +387,7 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
       // again. We do have to do this after checking fix-its, though, because
       // the diagnostic owns its fix-its.
       CapturedDiagnostics.erase(FoundDiagnosticIter);
-    } while (--MatchCount);
+    }
   }
 
   // Verify that there are no diagnostics (in MemoryBuffer) left in the list.
