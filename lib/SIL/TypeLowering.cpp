@@ -1849,7 +1849,12 @@ TypeConverter::getFunctionTypeWithCaptures(CanAnyFunctionType funcType,
       break;
     case CaptureKind::Box: {
       // Capture the owning NativeObject and the address of the value.
-      inputFields.push_back(Context.TheNativeObjectType);
+      CanType boxTy;
+      if (M.getOptions().EnableTypedBoxes)
+        boxTy = SILBoxType::get(captureType);
+      else
+        boxTy = Context.TheNativeObjectType;
+      inputFields.push_back(boxTy);
       auto lvType = CanInOutType::get(captureType);
       inputFields.push_back(TupleTypeElt(lvType));
       break;
@@ -1926,7 +1931,13 @@ TypeConverter::getFunctionInterfaceTypeWithCaptures(CanAnyFunctionType funcType,
       break;
     case CaptureKind::Box: {
       // Capture the owning NativeObject and the address of the value.
-      inputFields.push_back(Context.TheNativeObjectType);
+      CanType boxTy;
+      if (M.getOptions().EnableTypedBoxes)
+        boxTy = SILBoxType::get(captureType);
+      else
+        boxTy = Context.TheNativeObjectType;
+
+      inputFields.push_back(boxTy);
       auto lvType = CanInOutType::get(captureType);
       inputFields.push_back(TupleTypeElt(lvType));
       break;

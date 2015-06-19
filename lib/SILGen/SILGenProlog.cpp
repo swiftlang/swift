@@ -462,9 +462,13 @@ static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture) {
     // LValues are captured as two arguments: a retained NativeObject that owns
     // the captured value, and the address of the value itself.
     SILType ty = gen.getLoweredType(type).getAddressType();
-    SILValue box = new (gen.SGM.M) SILArgument(gen.F.begin(),
-                                               SILType::getNativeObjectType(c),
-                                               VD);
+    SILType boxTy;
+    if (gen.SGM.M.getOptions().EnableTypedBoxes)
+      boxTy = SILType::getPrimitiveObjectType(
+        SILBoxType::get(ty.getSwiftRValueType()));
+    else
+      boxTy = SILType::getNativeObjectType(c);
+    SILValue box = new (gen.SGM.M) SILArgument(gen.F.begin(), boxTy, VD);
     SILValue addr = new (gen.SGM.M) SILArgument(gen.F.begin(), ty, VD);
     gen.VarLocs[VD] = SILGenFunction::VarLoc::get(addr, box);
     gen.Cleanups.pushCleanup<StrongReleaseCleanup>(box);

@@ -573,8 +573,14 @@ static void forwardCaptureArgs(SILGenFunction &gen,
   case CaptureKind::Box: {
     SILType ty = gen.getLoweredType(vd->getType()->getRValueType())
       .getAddressType();
-    // Forward the captured owning NativeObject.
-    addSILArgument(SILType::getNativeObjectType(c), vd);
+    // Forward the captured owning box.
+    SILType boxTy;
+    if (gen.SGM.M.getOptions().EnableTypedBoxes)
+      boxTy = SILType::getPrimitiveObjectType(
+        SILBoxType::get(ty.getSwiftRValueType()));
+    else
+      boxTy = SILType::getNativeObjectType(c);
+    addSILArgument(boxTy, vd);
     // Forward the captured value address.
     addSILArgument(ty, vd);
     break;
