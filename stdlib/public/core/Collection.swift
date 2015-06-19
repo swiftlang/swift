@@ -93,9 +93,6 @@ extension _CollectionDefaultsType {
 
 /// This protocol is an implementation detail of `CollectionType`; do
 /// not use it directly.
-///
-/// Its requirements are inherited by `CollectionType` and thus must
-/// be satisfied by types conforming to that protocol.
 public protocol _CollectionGeneratorDefaultsType {
   typealias Index : ForwardIndexType
   typealias _Element
@@ -403,9 +400,6 @@ public struct PermutationGenerator<
 
 /// This protocol is an implementation detail of `Sliceable`; do
 /// not use it directly.
-///
-/// Its requirements are inherited by `Sliceable` and thus must
-/// be satisfied by types conforming to that protocol.
 public protocol _Sliceable : CollectionType {}
 
 /// A *collection* from which a sub-range of elements (a "slice")

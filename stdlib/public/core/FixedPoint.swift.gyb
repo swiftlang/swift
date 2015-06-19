@@ -48,9 +48,6 @@ public typealias UIntMax = ${UIntMax}
 
 /// This protocol is an implementation detail of `IntegerType`; do
 /// not use it directly.
-///
-/// Its requirements are inherited by `IntegerType` and thus must
-/// be satisfied by types conforming to that protocol.
 public protocol _IntegerType
   : _BuiltinIntegerLiteralConvertible,
     IntegerLiteralConvertible,
@@ -68,9 +65,6 @@ public protocol IntegerType : _IntegerType, RandomAccessIndexType {
 
 /// This protocol is an implementation detail of `SignedIntegerType`;
 /// do not use it directly.
-///
-/// Its requirements are inherited by `SignedIntegerType` and thus
-/// must be satisfied by types conforming to that protocol.
 public protocol _SignedIntegerType : _IntegerType, SignedNumberType {
   /// Represent this number using Swift's widest native signed integer
   /// type.
@@ -83,6 +77,13 @@ public protocol _SignedIntegerType : _IntegerType, SignedNumberType {
 
 /// A set of common requirements for Swift's signed integer types.
 public protocol SignedIntegerType : _SignedIntegerType, IntegerType {
+  /// Represent this number using Swift's widest native signed integer
+  /// type.
+  func toIntMax() -> IntMax
+
+  /// Convert from Swift's widest signed integer type, trapping on
+  /// overflow.
+  init(IntMax)
 }
 
 /// This protocol is an implementation detail of `UnsignedIntegerType`;

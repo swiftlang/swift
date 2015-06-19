@@ -12,9 +12,6 @@
 
 /// This protocol is an implementation detail of `Strideable`; do
 /// not use it directly.
-///
-/// Its requirements are inherited by `Strideable` and thus must
-/// be satisfied by types conforming to that protocol.
 public protocol _Strideable {
   // FIXME: We'd like to name this type "Distance" but for
   // <rdar://problem/17619038>
@@ -53,7 +50,30 @@ public func == <T : _Strideable>(x: T, y: T) -> Bool {
 /// values that can be offset and measured.
 ///
 /// - SeeAlso: `stride(from: to: by:)` and `stride(from: through: by:)`
-public protocol Strideable : Comparable, _Strideable {}
+public protocol Strideable : Comparable, _Strideable {
+  // FIXME: We'd like to name this type "Distance" but for
+  // <rdar://problem/17619038>
+  /// A type that can represent the distance between two values of `Self`.
+  typealias Stride : SignedNumberType
+
+  /// Returns a stride `x` such that `self.advancedBy(x)` approximates
+  /// `other`.
+  ///
+  /// - Complexity: O(1).
+  ///
+  /// - SeeAlso: `RandomAccessIndexType`'s `distanceTo`, which provides a
+  ///   stronger semantic guarantee.
+  func distanceTo(other: Self) -> Stride
+
+  /// Returns a `Self` `x` such that `self.distanceTo(x)` approximates
+  /// `n`.
+  ///
+  /// - Complexity: O(1).
+  ///
+  /// - SeeAlso: `RandomAccessIndexType`'s `advancedBy`, which
+  ///   provides a stronger semantic guarantee.
+  func advancedBy(n: Stride) -> Self
+}
 
 public func + <T : Strideable> (lhs: T, rhs: T.Stride) -> T {
   return lhs.advancedBy(rhs)
