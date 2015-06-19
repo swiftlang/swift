@@ -1468,6 +1468,16 @@ public:
     : UnaryInstructionBase(Loc, Operand, Ty) {}
 };
 
+/// Bitwise copy a value into another value of the same size or smaller.
+class UncheckedBitwiseCastInst
+  : public UnaryInstructionBase<ValueKind::UncheckedBitwiseCastInst,
+                                ConversionInst>
+{
+public:
+  UncheckedBitwiseCastInst(SILLocation Loc, SILValue Operand, SILType Ty)
+    : UnaryInstructionBase(Loc, Operand, Ty) {}
+};
+
 /// Build a Builtin.BridgeObject from a heap object reference by bitwise-or-ing
 /// in bits from a word.
 class RefToBridgeObjectInst : public ConversionInst {

@@ -250,6 +250,7 @@ bool swift::canNeverUseValues(SILInstruction *Inst) {
   case ValueKind::RawPointerToRefInst:
   case ValueKind::UnconditionalCheckedCastInst:
   case ValueKind::UncheckedRefBitCastInst:
+  case ValueKind::UncheckedBitwiseCastInst:
     return true;
 
   // If we have a trivial bit cast between trivial types, it is not something

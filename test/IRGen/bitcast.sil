@@ -83,5 +83,20 @@ bb0(%0 : $ImplicitlyUnwrappedOptional<C>):
   return %o : $Optional<C>
 }
 
-
-
+// CHECK-x86_64-LABEL: define hidden i64 @unchecked_bitwise_cast(i64, i64) {{.*}} {
+// CHECK-x86_64-NEXT: entry:
+// CHECK-x86_64-NEXT: alloca <{ %Si, %Si }>, align 8
+//   A bunch of GEPs happen here to get from Int to int.
+// CHECK-x86_64:      store i64 %{{.*}}, i64* %bitcast.elt.value, align 8
+// CHECK-x86_64:      store i64 %{{.*}}, i64* %bitcast.elt1.value, align 8
+// CHECK-x86_64-NEXT: %{{.*}} = bitcast <{ %Si, %Si }>* %bitcast to %Si*
+// CHECK-x86_64-NEXT: [[VAL:%.*]] = getelementptr inbounds %Si, %Si* %2, i32 0, i32 0
+// CHECK-x86_64-NEXT: [[RESULT:%.*]] = load i64, i64* [[VAL]], align 8
+// CHECK-x86_64-NEXT: ret i64 [[RESULT]]
+// CHECK-x86_64-NEXT: }
+sil hidden @unchecked_bitwise_cast : $@convention(thin) (Int, Int) -> Int {
+bb0(%0 : $Int, %1 : $Int):
+  %2 = tuple (%0 : $Int, %1 : $Int) 
+  %3 = unchecked_bitwise_cast %2 : $(Int, Int) to $Int
+  return %3 : $Int
+}

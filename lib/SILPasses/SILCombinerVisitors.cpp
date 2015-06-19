@@ -2572,6 +2572,21 @@ visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI) {
   return nullptr;
 }
 
+SILInstruction *
+SILCombiner::
+visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI) {
+  // (unchecked_bitwise_cast Y->Z (unchecked_bitwise_cast X->Y x))
+  //   ->
+  // (unchecked_bitwise_cast X->Z x)
+  if (auto *Op = dyn_cast<UncheckedBitwiseCastInst>(UBCI->getOperand())) {
+    return new (UBCI->getModule()) UncheckedBitwiseCastInst(UBCI->getLoc(),
+                                                      Op->getOperand(),
+                                                      UBCI->getType());
+  }
+
+  return nullptr;
+}
+
 SILInstruction *SILCombiner::visitSelectEnumInst(SelectEnumInst *EIT) {
   // TODO: We should be able to flat-out replace the select_enum instruction
   // with the selected value in another pass. For parity with the enum_is_tag

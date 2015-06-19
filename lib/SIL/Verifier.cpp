@@ -2136,6 +2136,13 @@ public:
             " of the value");
   }
 
+  void checkUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *BI) {
+    require(BI->getOperand().getType().isObject(),
+            "unchecked_bitwise_cast must operate on a value");
+    require(BI->getType().isObject(),
+            "unchecked_bitwise_cast must produce a value");
+  }
+
   void checkRefToRawPointerInst(RefToRawPointerInst *AI) {
     require(AI->getOperand().getType().getSwiftType()
               ->isAnyClassReferenceType(),

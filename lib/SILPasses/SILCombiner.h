@@ -231,6 +231,8 @@ public:
   visitUncheckedRefBitCastInst(UncheckedRefBitCastInst *URBCI);
   SILInstruction *
   visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI);
+  SILInstruction *
+  visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI);
   SILInstruction *visitSelectEnumInst(SelectEnumInst *EIT);
   SILInstruction *visitSelectEnumAddrInst(SelectEnumAddrInst *EIT);
   SILInstruction *visitStructExtractInst(StructExtractInst *SEI);

@@ -255,6 +255,7 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     case ValueKind::UncheckedAddrCastInst:
     case ValueKind::UncheckedRefBitCastInst:
     case ValueKind::UncheckedTrivialBitCastInst:
+    case ValueKind::UncheckedBitwiseCastInst:
 
     case ValueKind::RawPointerToRefInst:
     case ValueKind::RefToRawPointerInst:

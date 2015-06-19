@@ -479,6 +479,10 @@ namespace {
       return true;
     }
 
+    bool visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *RHS) {
+      return true;
+    }
+
     bool visitUpcastInst(UpcastInst *RHS) {
       return true;
     }

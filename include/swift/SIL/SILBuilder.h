@@ -442,6 +442,12 @@ public:
                                                      SILType Ty) {
     return insert(new (F.getModule()) UncheckedRefBitCastInst(Loc, Op, Ty));
   }
+
+  UncheckedBitwiseCastInst *createUncheckedBitwiseCast(SILLocation Loc,
+                                           SILValue Op,
+                                           SILType Ty) {
+    return insert(new (F.getModule()) UncheckedBitwiseCastInst(Loc, Op, Ty));
+  }
   
   // Create the appropriate cast instruction based on result type.
   SILInstruction *createUncheckedBitCast(SILLocation Loc,

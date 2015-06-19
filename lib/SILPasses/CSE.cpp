@@ -96,6 +96,7 @@ struct SimpleValue {
     case ValueKind::IsNonnullInst:
     case ValueKind::UncheckedRefBitCastInst:
     case ValueKind::UncheckedTrivialBitCastInst:
+    case ValueKind::UncheckedBitwiseCastInst:
     case ValueKind::RefToRawPointerInst:
     case ValueKind::RawPointerToRefInst:
     case ValueKind::RefToUnownedInst:
@@ -166,6 +167,10 @@ public:
   }
 
   hash_code visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *X) {
+    return llvm::hash_combine(X->getKind(), X->getType(), X->getOperand());
+  }
+
+  hash_code visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *X) {
     return llvm::hash_combine(X->getKind(), X->getType(), X->getOperand());
   }
 

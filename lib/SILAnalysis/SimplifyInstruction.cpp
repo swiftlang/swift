@@ -52,6 +52,7 @@ namespace {
     SILValue visitRefToUnmanagedInst(RefToUnmanagedInst *RUI);
     SILValue visitUnmanagedToRefInst(UnmanagedToRefInst *URI);
     SILValue visitUncheckedRefBitCastInst(UncheckedRefBitCastInst *URBCI);
+    SILValue visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI);
     SILValue
     visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI);
     SILValue visitThinFunctionToPointerInst(ThinFunctionToPointerInst *TFTPI);
@@ -457,6 +458,22 @@ visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI) {
   // (unchecked_trivial_bit_cast Y->X (unchecked_trivial_bit_cast X->Y x)) -> x
   if (auto *Op = dyn_cast<UncheckedTrivialBitCastInst>(UTBCI->getOperand()))
     if (Op->getOperand().getType() == UTBCI->getType())
+      return Op->getOperand();
+
+  return SILValue();
+}
+
+SILValue
+InstSimplifier::
+visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI) {
+  // (unchecked_bitwise_cast X->X x) -> x
+  if (UBCI->getOperand().getType() == UBCI->getType())
+    return UBCI->getOperand();
+
+  // A round-trip cast implies X and Y have the same size:
+  // (unchecked_bitwise_cast Y->X (unchecked_bitwise_cast X->Y x)) -> x
+  if (auto *Op = dyn_cast<UncheckedBitwiseCastInst>(UBCI->getOperand()))
+    if (Op->getOperand().getType() == UBCI->getType())
       return Op->getOperand();
 
   return SILValue();

@@ -798,6 +798,16 @@ visitUncheckedRefBitCastInst(UncheckedRefBitCastInst *Inst) {
 template<typename ImplClass>
 void
 SILCloner<ImplClass>::
+visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *Inst) {
+  doPostProcess(Inst,
+    getBuilder().createUncheckedBitwiseCast(getOpLocation(Inst->getLoc()),
+                                      getOpValue(Inst->getOperand()),
+                                      getOpType(Inst->getType())));
+}
+
+template<typename ImplClass>
+void
+SILCloner<ImplClass>::
 visitRefToBridgeObjectInst(RefToBridgeObjectInst *Inst) {
   doPostProcess(Inst,
     getBuilder().createRefToBridgeObject(getOpLocation(Inst->getLoc()),

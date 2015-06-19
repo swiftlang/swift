@@ -622,6 +622,7 @@ static bool isTransitiveSafeUser(SILInstruction *I) {
   case ValueKind::EnumInst:
   case ValueKind::UncheckedRefBitCastInst:
   case ValueKind::UncheckedRefCastInst:
+  case ValueKind::UncheckedBitwiseCastInst:
     assert(I->getNumTypes() == 1 && "We assume these are unary");
     return true;
   default:

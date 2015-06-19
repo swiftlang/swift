@@ -242,3 +242,16 @@ bb0(%0 : $Builtin.Int32, %1 : $Builtin.Int32):
   return %3 : $Builtin.Int32
 }
 
+// CHECK-LABEL: sil @simplify_unchecked_bitwise_cast
+// CHECK-NEXT: bb0
+// CHECK-NEXT: unchecked_bitwise_cast
+// CHECK-NEXT: tuple
+// CHECK-NEXT: return
+sil @simplify_unchecked_bitwise_cast : $@convention(thin) (Builtin.Int64) -> (Builtin.Int32, Builtin.Int64) {
+bb0(%0 : $Builtin.Int64):
+  %1 = unchecked_bitwise_cast %0 : $Builtin.Int64 to $Builtin.Word
+  %2 = unchecked_bitwise_cast %1 : $Builtin.Word to $Builtin.Int32
+  %3 = unchecked_bitwise_cast %0 : $Builtin.Int64 to $Builtin.Int64
+  %4 = tuple (%2 : $Builtin.Int32, %3 : $Builtin.Int64)
+  return %4 : $(Builtin.Int32, Builtin.Int64)
+}

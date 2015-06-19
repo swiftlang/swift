@@ -3505,6 +3505,17 @@ not perform an unsafe operation that would require the optimizer to
 consider the operand and the output of the bitcast as objects with
 different ARC identities.
 
+unchecked_bitwise_cast
+``````````````````````
+::
+
+   sil-instruction ::= 'unchecked_bitwise_cast' sil-operand 'to' sil-type
+
+   %1 = unchecked_bitwise_cast %0 : $A to $B
+
+Bitwise copies an object of type ``A`` into a new object of type ``B``
+of the same size or smaller.
+
 ref_to_raw_pointer
 ``````````````````
 ::

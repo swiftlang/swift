@@ -761,6 +761,7 @@ public:
   void visitUncheckedAddrCastInst(UncheckedAddrCastInst *i);
   void visitUncheckedRefBitCastInst(UncheckedRefBitCastInst *i);
   void visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *i);
+  void visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *i);
   void visitRefToRawPointerInst(RefToRawPointerInst *i);
   void visitRawPointerToRefInst(RawPointerToRefInst *i);
   void visitRefToUnownedInst(RefToUnownedInst *i);
@@ -3511,41 +3512,42 @@ static bool isStructurallySame(const llvm::Type *T1, const llvm::Type *T2) {
   return false;
 }
 
-static void emitValueBitCast(IRGenSILFunction &IGF,
-                             SourceLoc loc,
-                             Explosion &in,
-                             const LoadableTypeInfo &inTI,
-                             Explosion &out,
-                             const LoadableTypeInfo &outTI) {
-  // Unfortunately, we can't check this invariant until we get to IRGen, since
-  // the AST and SIL don't know anything about type layout.
-  if (inTI.getFixedSize() != outTI.getFixedSize()) {
-    
-    // We can hit this case in specialized functions even for correct user code.
-    // If the user dynamically checks for correct type sizes in the generic
-    // function, a specialized function can contain the (not executed) bitcast
-    // with mismatching fixed sizes.
-    // Usually llvm can eliminate this code again because the user's safety
-    // check should be constant foldable on llvm level.
-    llvm::BasicBlock *failBB =
-        llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
-    IGF.Builder.CreateBr(failBB);
-    IGF.FailBBs.push_back(failBB);
+// Emit a trap in the event a type does not match expected layout constraints.
+// 
+// We can hit this case in specialized functions even for correct user code.
+// If the user dynamically checks for correct type sizes in the generic
+// function, a specialized function can contain the (not executed) bitcast
+// with mismatching fixed sizes.
+// Usually llvm can eliminate this code again because the user's safety
+// check should be constant foldable on llvm level.
+static void emitTrapAndUndefValue(IRGenSILFunction &IGF,
+                                  Explosion &in,
+                                  Explosion &out,
+                                  const LoadableTypeInfo &outTI) {
+  llvm::BasicBlock *failBB =
+    llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
+  IGF.Builder.CreateBr(failBB);
+  IGF.FailBBs.push_back(failBB);
+  
+  IGF.Builder.emitBlock(failBB);
+  llvm::Function *trapIntrinsic = llvm::Intrinsic::getDeclaration(
+    &IGF.IGM.Module, llvm::Intrinsic::ID::trap);
+  IGF.Builder.CreateCall(trapIntrinsic);
+  IGF.Builder.CreateUnreachable();
 
-    IGF.Builder.emitBlock(failBB);
-    llvm::Function *trapIntrinsic = llvm::Intrinsic::getDeclaration(
-        &IGF.IGM.Module, llvm::Intrinsic::ID::trap);
-    IGF.Builder.CreateCall(trapIntrinsic);
-    IGF.Builder.CreateUnreachable();
+  llvm::BasicBlock *contBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
+  IGF.Builder.emitBlock(contBB);
+  in.claimAll();
+  for (auto schema : outTI.getSchema())
+    out.add(llvm::UndefValue::get(schema.getScalarType()));
+}
 
-    llvm::BasicBlock *contBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
-    IGF.Builder.emitBlock(contBB);
-    in.claimAll();
-    for (auto schema : outTI.getSchema())
-      out.add(llvm::UndefValue::get(schema.getScalarType()));
-    return;
-  }
-
+static void emitUncheckedValueBitCast(IRGenSILFunction &IGF,
+                                      SourceLoc loc,
+                                      Explosion &in,
+                                      const LoadableTypeInfo &inTI,
+                                      Explosion &out,
+                                      const LoadableTypeInfo &outTI) {
   // If the transfer is doable bitwise, and if the elements of the explosion are
   // the same type, then just transfer the elements.
   if (inTI.isBitwiseTakable(ResilienceScope::Component) &&
@@ -3573,6 +3575,36 @@ static void emitValueBitCast(IRGenSILFunction &IGF,
   return;
 }
 
+static void emitValueBitCast(IRGenSILFunction &IGF,
+                             SourceLoc loc,
+                             Explosion &in,
+                             const LoadableTypeInfo &inTI,
+                             Explosion &out,
+                             const LoadableTypeInfo &outTI) {
+  // Unfortunately, we can't check this invariant until we get to IRGen, since
+  // the AST and SIL don't know anything about type layout.
+  if (inTI.getFixedSize() != outTI.getFixedSize()) {
+    emitTrapAndUndefValue(IGF, in, out, outTI);
+    return;
+  }
+  emitUncheckedValueBitCast(IGF, loc, in, inTI, out, outTI);
+}
+
+static void emitValueBitwiseCast(IRGenSILFunction &IGF,
+                                 SourceLoc loc,
+                                 Explosion &in,
+                                 const LoadableTypeInfo &inTI,
+                                 Explosion &out,
+                                 const LoadableTypeInfo &outTI) {
+  // Unfortunately, we can't check this invariant until we get to IRGen, since
+  // the AST and SIL don't know anything about type layout.
+  if (inTI.getFixedSize() < outTI.getFixedSize()) {
+    emitTrapAndUndefValue(IGF, in, out, outTI);
+    return;
+  }
+  emitUncheckedValueBitCast(IGF, loc, in, inTI, out, outTI);
+}
+
 void IRGenSILFunction::visitUncheckedTrivialBitCastInst(
                                       swift::UncheckedTrivialBitCastInst *i) {
   Explosion in = getLoweredExplosion(i->getOperand());
@@ -3591,6 +3623,18 @@ void IRGenSILFunction::visitUncheckedRefBitCastInst(
   Explosion out;
   
   emitValueBitCast(*this, i->getLoc().getSourceLoc(),
+            in,  cast<LoadableTypeInfo>(getTypeInfo(i->getOperand().getType())),
+            out, cast<LoadableTypeInfo>(getTypeInfo(i->getType())));
+  
+  setLoweredExplosion(SILValue(i, 0), out);
+}
+
+void IRGenSILFunction::
+visitUncheckedBitwiseCastInst(swift::UncheckedBitwiseCastInst *i) {
+  Explosion in = getLoweredExplosion(i->getOperand());
+  Explosion out;
+
+  emitValueBitwiseCast(*this, i->getLoc().getSourceLoc(),
             in,  cast<LoadableTypeInfo>(getTypeInfo(i->getOperand().getType())),
             out, cast<LoadableTypeInfo>(getTypeInfo(i->getType())));
   

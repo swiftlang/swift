@@ -929,6 +929,10 @@ public:
   void visitUncheckedRefBitCastInst(UncheckedRefBitCastInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand(), "unchecked_ref_bit_cast");
   }
+  void visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *CI) {
+    printUncheckedConversionInst(CI, CI->getOperand(),
+                                 "unchecked_bitwise_cast");
+  }
   void visitRefToRawPointerInst(RefToRawPointerInst *CI) {
     printUncheckedConversionInst(CI, CI->getOperand(), "ref_to_raw_pointer");
   }
