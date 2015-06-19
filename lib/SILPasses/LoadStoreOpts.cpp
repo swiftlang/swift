@@ -133,7 +133,8 @@ namespace {
     /// have a covering set.
     SILValue getForwardingValue();
 
-    /// Returns true if this LSValue aliases the given instruction.
+    /// Returns true if Inst may write to the instructions that make up this
+    /// LSValue.
     bool aliasingWrite(AliasAnalysis *AA, SILInstruction *Inst) const {
       // If we have a single inst, just get the forwarding value and compare if
       // they alias.
@@ -346,6 +347,14 @@ namespace {
     
     void setHasReadDependence() { HasReadDependence = true; }
     bool hasReadDependence() const { return HasReadDependence; }
+
+    bool mayWriteToMemory(AliasAnalysis *AA, SILInstruction *Inst) {
+      for (auto &I : getInsts()) {
+        if (AA->mayWriteToMemory(I, getAddressForLS(Inst)))
+          return true;
+      }
+      return false;
+    }
   };
   
 } // end anonymous namespace
@@ -357,25 +366,32 @@ namespace {
 namespace {
 
 enum class ForwardingAnalysisResult {
+  /// A failure to forward occurred.
   Failure,
+
+  /// Forwarding can occur using a projection path.
   Normal,
+
+  /// Forwarding can occur from a projection path rooted in an unchecked address
+  /// cast.
   UncheckedAddress,
 };
 
 /// This is a move-only structure. Thus it has a private default constructor and
 /// a deleted copy constructor.
 class ForwardingAnalysis final {
-  ForwardingAnalysisResult Result = ForwardingAnalysisResult::Failure;
+  ForwardingAnalysisResult Result;
   UncheckedAddrCastInst *UADCI = nullptr;
   Optional<ProjectionPath> Path;
 
 public:
-  ForwardingAnalysis(SILValue Address, LoadInst *LI,
-                     UncheckedAddrCastInst *UADCI);
-  ForwardingAnalysis(SILValue Address, LoadInst *LI);
+  ForwardingAnalysis(AliasAnalysis *AA, SILValue Address, LoadInst *LI);
 
   ForwardingAnalysis(const ForwardingAnalysis &) = delete;
   ForwardingAnalysis(ForwardingAnalysis &&FFA) = default;
+
+  ForwardingAnalysis &operator=(const ForwardingAnalysis &) = delete;
+  ForwardingAnalysis &operator=(ForwardingAnalysis &&) = delete;
 
   SILValue forward(SILValue Addr, SILValue StoredValue, LoadInst *LI);
 
@@ -389,6 +405,8 @@ public:
       return true;
     }
   }
+
+  ForwardingAnalysisResult getResult() const { return Result; }
 
 private:
   SILValue forwardAddrToLdWithExtractPath(SILValue Address,
@@ -454,15 +472,11 @@ initializeWithUncheckedAddrCast(SILValue Address, LoadInst *LI,
   return true;
 }
 
-/// Given an unchecked_addr_cast with various address projections using it,
-/// check if we can forward the stored value.
-ForwardingAnalysis::
-ForwardingAnalysis(SILValue Address, LoadInst *LI,
-                   UncheckedAddrCastInst *InputUADCI) {
-  initializeWithUncheckedAddrCast(Address, LI, InputUADCI);
-}
+ForwardingAnalysis::ForwardingAnalysis(AliasAnalysis *AA, SILValue Address,
+                                       LoadInst *LI)
+    : Result(ForwardingAnalysisResult::Failure),
+      UADCI(nullptr), Path() {
 
-ForwardingAnalysis::ForwardingAnalysis(SILValue Address, LoadInst *LI) {
   // First if we have a store + unchecked_addr_cast + load, try to forward the
   // value the store using a bitcast.
   SILValue LIOpWithoutProjs = LI->getOperand().stripAddressProjections();
@@ -553,18 +567,6 @@ forwardAddrToLdWithExtractPath(SILValue Address, SILValue StoredValue,
   return LastExtract;
 }
 
-/// Given an address \p Address and a value \p Value stored there that is then
-/// loaded or partially loaded by \p LI, forward the value with the appropriate
-/// extracts. This is the main entry point to the forwarding feasability code.
-static SILValue tryToForwardAddressValueToLoad(SILValue Address,
-                                               SILValue StoredValue,
-                                               LoadInst *LI) {
-  ForwardingAnalysis FA(Address, LI);
-  if (!FA.canForward())
-    return SILValue();
-  return FA.forward(Address, StoredValue, LI);
-}
-
 //===----------------------------------------------------------------------===//
 //                            LSContext Interface
 //===----------------------------------------------------------------------===//
@@ -626,11 +628,42 @@ public:
 
 namespace {
 
-/// State of the load store forwarder in one basic block.
+/// State of the load store forwarder in one basic block which allows for
+/// forwarding from loads, stores -> loads and eliminating dead stores by
+/// tracking various types of dependencies.
 ///
-/// An invariant of this pass is that a SILValue can only be in one of Stores
-/// and Loads. This is enforced by assertions in startTrackingLoad() and
-/// startTrackingStore().
+/// Discussion: The algorithm tracks data flow as follows:
+///
+/// 1. A write that aliases a load causes the load to no longer be tracked.
+/// 2. Read that aliases a load:
+///    a. If the read is a new load and we can forward from the first load to
+///       the second, we forward and delete the new load.
+///    b. If the read is a new load which we can not forward, we just track it.
+///       This may cause us to track multiple "views" of the same available
+///       value, but it should be harmless and may allow for further forwarding
+///       opportunities.
+///    c. If the read is not a load, we ignore it for the purposes of load
+///       forwarding.
+/// 3. An aliasing read that occurs after a store, causes the store to no longer
+///    be dead, but still allows for forwarding to occur from the store. This is
+///    modeled by setting the read dependence flag on the store. In the future
+///    this should be tracked at a finer level of granularity.
+/// 4. An aliasing new store that occurs after a store causes the old store
+///    to be eliminated if:
+///    a. The new store completely overlaps the old store. In the future, this
+///       may be able to be extended to perform partial dead store elimination.
+///    b. The new store post dominates the old store.
+///    c. The old store does not have a read dependency.
+/// 5. An aliasing write that is a store that does not cause the old store to
+///    be dead results in the old store no longer being tracked and the new
+///    store being tracked. Again in the future this can be extended to
+///    partial dead store elimination.
+/// 6. An aliasing write that is not a store (for simplicity) invalidates the
+///    store. This can be extended in the future to understand invalidation
+///    of specific parts of types (i.e. partial dead store elimination).
+///
+/// With these in mind, we have the following invariants:
+/// 1. All pointers that have available stored values should be no-alias.
 class LSBBForwarder {
 
   /// The basic block that we are optimizing.
@@ -640,11 +673,11 @@ class LSBBForwarder {
   /// that were not read/written to since the store was executed.
   llvm::SmallMapVector<SILValue, LSStore, 8> Stores;
 
-  // This is a list of LoadInst instructions that reference memory locations
-  // were not clobbered by instructions that write to memory. In other words
-  // the SSA value of the load is known to be the same value as the referenced
-  // pointer. The values in the list are potentially updated on each iteration
-  // of the loop below.
+  /// This is a list of LoadInst instructions that reference memory locations
+  /// were not clobbered by instructions that write to memory. In other words
+  /// the SSA value of the load is known to be the same value as the referenced
+  /// pointer. The values in the list are potentially updated on each iteration
+  /// of the loop below.
   llvm::SmallMapVector<SILValue, LSLoad, 8> Loads;
 
 public:
@@ -695,18 +728,50 @@ public:
   }
 
   /// Add this load to our tracking list.
-  void startTrackingLoad(LoadInst *LI) {
+  void startTrackingLoad(LSContext &Ctx, LoadInst *LI,
+                         CoveredStoreMap &StoreMap) {
     DEBUG(llvm::dbgs() << "        Tracking Load: " << *LI);
-    assert(Stores.find(LI->getOperand()) == Stores.end() &&
-           "Found new address asked to track in store list already!");
+
+#ifndef NDEBUG
+    // Make sure that any stores we are tracking that may alias this load have
+    // the read dependence bit set.
+    auto *AA = Ctx.getAA();
+    for (auto &P : Stores) {
+      assert((!P.second.aliasingWrite(AA, LI) ||
+              P.second.hasReadDependence()) &&
+             "Found aliasing store without read dependence");
+    }
+    for (auto &P : StoreMap) {
+      assert((!P.second.aliasingWrite(AA, LI) ||
+              P.second.hasReadDependence()) &&
+             "Found aliasing store without read dependence");
+    }
+#endif
+
     Loads.insert({LI->getOperand(), LSLoad(LI)});
   }
 
   /// Add this store to our tracking list.
-  void startTrackingStore(StoreInst *SI) {
+  void startTrackingStore(LSContext &Ctx, StoreInst *SI,
+                          CoveredStoreMap &StoreMap) {
     DEBUG(llvm::dbgs() << "        Tracking Store: " << *SI);
-    assert(Loads.find(SI->getDest()) == Loads.end() &&
-           "Found new address asked to track in load list already!\n");
+
+#ifndef NDEBUG
+    auto *AA = Ctx.getAA();
+    // Make sure that we do not have any loads that alias this store's
+    // destination. They should all be invalidated.
+    for (auto &P : Loads) {
+      assert(!AA->mayWriteToMemory(SI, P.first) &&
+             "Found aliasing load that can be written to by store that was not "
+             "invalidated");
+    }
+#endif
+
+    // If we have this store in StoreMap, remove it. We never track pointers in
+    // both the StoreMap and Stores.
+    //
+    // In the case of Stores this will overwrite whatever we have there.
+    StoreMap.erase(SI->getDest());
     Stores.insert({SI->getDest(), LSStore(SI)});
   }
 
@@ -716,6 +781,24 @@ public:
     Loads.erase(Addr);
     Stores.erase(Addr);
     StoreMap.erase(Addr);
+  }
+
+  /// Stop tracking any state related to the address \p Addr.
+  void setReadDependencyOnStores(SILValue Addr, CoveredStoreMap &StoreMap) {
+    DEBUG(llvm::dbgs() << "        Adding read dependency: " << Addr);
+    {
+      auto Iter = Stores.find(Addr);
+      if (Iter != Stores.end()) {
+        Iter->second.setHasReadDependence();
+      }
+    }
+
+    {
+      auto Iter = StoreMap.find(Addr);
+      if (Iter != StoreMap.end()) {
+        Iter->second.setHasReadDependence();
+      }
+    }
   }
 
   /// Delete the store that we have mapped to Addr, plus other instructions
@@ -768,6 +851,8 @@ private:
 
   bool tryToForwardLoadsToLoad(LSContext &Ctx, LoadInst *LI,
                                CoveredStoreMap &StoreMap);
+
+  void verify(LSContext &Ctx, CoveredStoreMap &StoreMap);
 };
 
 #ifndef NDEBUG
@@ -867,15 +952,14 @@ void LSBBForwarder::invalidateReadFromStores(LSContext &Ctx,
                                              SILInstruction *Inst,
                                              CoveredStoreMap &StoreMap) {
   AliasAnalysis *AA = Ctx.getAA();
-  llvm::SmallVector<SILValue, 4> InvalidatedStoreList;
-  for (auto &P : Stores)
-    if (P.second.aliasingRead(AA, Inst) && !isLetPointer(P.first))
-      InvalidatedStoreList.push_back(P.first);
+  for (auto &P : Stores) {
+    if (!P.second.aliasingRead(AA, Inst))
+      continue;
 
-  for (SILValue SIOp : InvalidatedStoreList) {
     DEBUG(llvm::dbgs() << "        Found an instruction that reads from "
-          "memory such that a store is invalidated:" << SIOp);
-    stopTrackingAddress(SIOp, StoreMap);
+                          "memory such that a store has a read dependence:"
+                       << P.first);
+    setReadDependencyOnStores(P.first, StoreMap);
   }
 }
 
@@ -892,6 +976,11 @@ bool LSBBForwarder::tryToEliminateDeadStores(LSContext &Ctx, StoreInst *SI,
     // is the same as the loaded address.
     SILValue LdSrcOp = LdSrc->getOperand();
     auto Iter = Loads.find(LdSrcOp);
+
+    // It is important that we do an exact comparison here so that the types
+    // match. Otherwise we would need to make sure that that the store is
+    // completely contained within the loaded value which we do not currently
+    // do.
     if (Iter != Loads.end() && LdSrcOp == SI->getDest()) {
       deleteUntrackedInstruction(Ctx, SI, StoreMap);
       NumDeadStores++;
@@ -912,8 +1001,30 @@ bool LSBBForwarder::tryToEliminateDeadStores(LSContext &Ctx, StoreInst *SI,
     if (!P.second.aliasingWrite(AA, SI))
       continue;
 
-    // We know that the locations might alias. Check whether it is a must alias.
-    bool IsStoreToSameLocation = AA->isMustAlias(SI->getDest(),  P.first);
+    // If this store has a read dependency then it can not be dead. We need to
+    // remove it from the store list and start tracking the new store, though.
+    if (P.second.hasReadDependence()) {
+      StoresToStopTracking.push_back(P.first);
+      DEBUG(llvm::dbgs()
+            << "        Found an aliasing store... But we don't "
+               "know that it must alias... Can't remove it but will track it.");
+      continue;
+    }
+
+    // We know that the locations might alias. Check whether if they are the
+    // exact same location.
+    //
+    // Some things to note:
+    //
+    // 1. Our alias analysis is relatively conservative with must alias. We only
+    // return must alias for two values V1, V2 if:
+    //   a. V1 == V2.
+    //   b. getUnderlyingObject(V1) == getUnderlingObject(V2) and the projection
+    //      paths from V1.stripCasts() to V2.stripCasts() to the underlying
+    //      objects are exactly the same and do not contain any casts.
+    // 2. There are FileCheck sil tests that verifies that the correct
+    // load store behavior is preserved in case this behavior changes.
+    bool IsStoreToSameLocation = AA->isMustAlias(SI->getDest(), P.first);
 
     // If this store may alias but is not known to be to the same location, we
     // cannot eliminate it. We need to remove it from the store list and start
@@ -952,7 +1063,7 @@ bool LSBBForwarder::tryToEliminateDeadStores(LSContext &Ctx, StoreInst *SI,
     stopTrackingAddress(SIOp, StoreMap);
 
   // Insert SI into our store list to start tracking.
-  startTrackingStore(SI);
+  startTrackingStore(Ctx, SI, StoreMap);
   return Changed;
 }
 
@@ -1021,24 +1132,41 @@ static SILValue fixPhiPredBlocks(ArrayRef<SILInstruction *> Stores,
   return Updater.GetValueInMiddleOfBlock(Dest);
 }
 
+/// Attempt to forward available values from stores to this load. If we do not
+/// perform store -> load forwarding, all stores which we failed to forward from
+/// which may alias the load will have the read dependency bit set on them.
 bool LSBBForwarder::tryToForwardStoresToLoad(LSContext &Ctx, LoadInst *LI,
                                              CoveredStoreMap &StoreMap) {
-  // If we are loading a value that we just stored, forward the stored value.
-  for (auto &P : Stores) {
-    SILValue Addr = P.first;
+  // The list of stores that this load conservatively depends on. If we do not
+  // eliminate the load from some store, we need to set the read dependency bit
+  // on all stores that may alias the load.
+  //
+  // We use a list so that if we see a later store that can be propagated to the
+  // load, we do not set the read dependency bit on any stores. I do not think
+  // given the current AA this is possible, but I am being conservatively
+  // correct. Additionally if we do not remove the dead store now, if we forward
+  // the load we will rerun the algorithm allowing us to hit the store the
+  // second time through. But modeling memory effects precisely is an
+  // imperitive.
+  llvm::SmallVector<SILValue, 8> ReadDependencyStores;
 
-    ForwardingAnalysis FA(Addr, LI);
+  auto *AA = Ctx.getAA();
+  // If we are loading a value that we just stored, forward the stored value.
+  for (auto &I : Stores) {
+    SILValue Addr = I.first;
+
+    ForwardingAnalysis FA(Ctx.getAA(), Addr, LI);
     if (!FA.canForward()) {
-      if (Addr == LI->getOperand()) {
-        // Although the addresses match, we cannot load the stored value.
-        stopTrackingAddress(Addr, StoreMap);
-        startTrackingLoad(LI);
-        return false;
+      // Although the addresses match, we cannot load the stored value. If we do
+      // not forward the load to be conservative, we need to set a read
+      // dependency on this store.
+      if (I.second.mayWriteToMemory(AA, LI)) {
+        ReadDependencyStores.push_back(Addr);
       }
       continue;
     }
 
-    SILValue Value = P.second.getForwardingValue();
+    SILValue Value = I.second.getForwardingValue();
     SILValue Result = FA.forward(Addr, Value, LI);
     assert(Result);
 
@@ -1050,20 +1178,27 @@ bool LSBBForwarder::tryToForwardStoresToLoad(LSContext &Ctx, LoadInst *LI,
   }
 
   // Check if we can forward from multiple stores.
-  for (auto I = StoreMap.begin(), E = StoreMap.end(); I != E; I++) {
-    ForwardingAnalysis FA(I->first, LI);
-    if (!FA.canForward())
+  for (auto &I : StoreMap) {
+    ForwardingAnalysis FA(AA, I.first, LI);
+    if (!FA.canForward()) {
+      // Although the addresses match, we cannot load the stored value. If we do
+      // not forward the load to be conservative, we need to set a read
+      // dependency on this store.
+      if (I.second.mayWriteToMemory(AA, LI)) {
+        ReadDependencyStores.push_back(I.first);
+      }
       continue;
+    }
 
     DEBUG(llvm::dbgs() << "        Checking from: ");
-    for (auto *SI : I->second.getInsts()) {
+    for (auto *SI : I.second.getInsts()) {
       DEBUG(llvm::dbgs() << "          " << *SI);
       (void)SI;
     }
 
     // Create a BBargument to merge in multiple stores.
-    SILValue PhiValue = fixPhiPredBlocks(I->second.getInsts(), BB);
-    SILValue Result = FA.forward(I->first, PhiValue, LI);
+    SILValue PhiValue = fixPhiPredBlocks(I.second.getInsts(), BB);
+    SILValue Result = FA.forward(I.first, PhiValue, LI);
     assert(Result && "Forwarding from multiple stores failed!");
 
     DEBUG(llvm::dbgs() << "        Forwarding from multiple stores: ");
@@ -1073,9 +1208,17 @@ bool LSBBForwarder::tryToForwardStoresToLoad(LSContext &Ctx, LoadInst *LI,
     return true;
   }
 
+  // If we were unable to eliminate the load, then set the read dependency bit
+  // on all of the addresses that we could have a dependency upon.
+  for (auto V : ReadDependencyStores) {
+    setReadDependencyOnStores(V, StoreMap);
+  }
+
   return false;
 }
 
+/// Try to forward a previously seen load to this load. We allow for multiple
+/// loads to be tracked from the same value.
 bool LSBBForwarder::tryToForwardLoadsToLoad(LSContext &Ctx, LoadInst *LI,
                                             CoveredStoreMap &StoreMap) {
   // Search the previous loads and replace the current load or one of the
@@ -1087,7 +1230,9 @@ bool LSBBForwarder::tryToForwardLoadsToLoad(LSContext &Ctx, LoadInst *LI,
     // First Check if LI can be completely replaced by PrevLI or if we can
     // construct an extract path from PrevLI's loaded value. The latter occurs
     // if PrevLI is a partially aliasing load that completely subsumes LI.
-    if (SILValue Result = tryToForwardAddressValueToLoad(Addr, Value, LI)) {
+    ForwardingAnalysis FA(Ctx.getAA(), Addr, LI);
+    if (FA.canForward()) {
+      SILValue Result = FA.forward(Addr, Value, LI);
       DEBUG(llvm::dbgs() << "        Replacing with previous load: "
             << *Result);
       SILValue(LI).replaceAllUsesWith(Result);
@@ -1122,7 +1267,7 @@ bool LSBBForwarder::tryToForwardLoad(LSContext &Ctx, LoadInst *LI,
   if (tryToForwardStoresToLoad(Ctx, LI, StoreMap))
     return true;
 
-  startTrackingLoad(LI);
+  startTrackingLoad(Ctx, LI, StoreMap);
 
   // No partial aliased loads were successfully forwarded. Return false to
   // indicate no change.
@@ -1136,6 +1281,10 @@ bool LSBBForwarder::optimize(LSContext &Ctx,
   auto II = BB->begin(), E = BB->end();
   bool Changed = false;
   while (II != E) {
+    // Make sure that all of our invariants have been maintained. This is a noop
+    // when asserts are disabled.
+    verify(Ctx, StoreMap);
+
     SILInstruction *Inst = II++;
     DEBUG(llvm::dbgs() << "    Visiting: " << *Inst);
 
@@ -1166,7 +1315,8 @@ bool LSBBForwarder::optimize(LSContext &Ctx,
     }
 
     // All other instructions that read from the memory location of the store
-    // invalidates the store.
+    // act as a read dependency on the store meaning that the store can no
+    // longer be dead.
     if (Inst->mayReadFromMemory()) {
       invalidateReadFromStores(Ctx, Inst, StoreMap);
     }
@@ -1407,6 +1557,31 @@ mergePredecessorStates(llvm::DenseMap<SILBasicBlock *,
     DEBUG(llvm::dbgs() << "        Removing from StoreMap: " << P);
     StoreMap.erase(P.first);
   }
+}
+
+void LSBBForwarder::verify(LSContext &Ctx, CoveredStoreMap &StoreMap) {
+#ifndef NDEBUG
+  llvm::SmallVector<SILValue, 8> Values;
+  auto *AA = Ctx.getAA();
+
+  for (auto &P : Stores) {
+    for (auto V : Values) {
+      for (SILInstruction *SI : P.second.getInsts()) {
+        assert(!AA->mayWriteToMemory(SI, V) && "Found overlapping stores");
+      }
+    }
+    Values.push_back(P.first);
+  }
+
+  for (auto &P : StoreMap) {
+    for (auto V : Values) {
+      for (SILInstruction *SI : P.second.getInsts()) {
+        assert(!AA->mayWriteToMemory(SI, V) && "Found overlapping stores");
+      }
+    }
+    Values.push_back(P.first);
+  }
+#endif
 }
 
 //===----------------------------------------------------------------------===//

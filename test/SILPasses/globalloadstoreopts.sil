@@ -28,6 +28,9 @@ struct C {
 }
 
 sil @use : $@convention(thin) (Builtin.Int32) -> ()
+sil @use_a : $@convention(thin) (@in A) -> ()
+sil @escaped_a_ptr : $@convention(thin) (@out A) -> ()
+sil @escaped_a : $@convention(thin) () -> Builtin.RawPointer
 
 // CHECK-LABEL: sil @store_promotion
 // CHECK: store
@@ -844,3 +847,162 @@ bb0(%0 : $*A, %1 : $A):
   return %l1 : $A
 }
 
+// Multi-BB version of the previous test.
+// CHECK-LABEL: sil @test_forwarding_ignoring_unchecked_addr_cast2 : $@convention(thin) (@inout A, A, A) -> A {
+sil @test_forwarding_ignoring_unchecked_addr_cast2 : $@convention(thin) (@inout A, A, A) -> A {
+bb0(%0 : $*A, %1 : $A, %2: $A):
+  %3 = unchecked_addr_cast %0 : $*A to $*A
+  store %1 to %3 : $*A
+  br bb1
+
+bb1:
+  %5 = load %3 : $*A
+  %6 = load %3 : $*A
+  store %2 to %3 : $*A
+  cond_br undef, bb1, bb2
+
+bb2:
+  return %5 : $A
+}
+
+// We internally use a map vector to represent stores. This means that when we iterate over
+// the stores it should be in insertion order. Use this to test whether or not we only set
+// the no-dependency bit if we do not forward a load.
+// CHECK-LABEL: sil @test_unchecked_addr_cast_3
+// CHECK: bb0([[ARG1:%.*]] : $A, [[ARG2:%.*]] : $A):
+// CHECK-NEXT: [[BOX1:%.*]] = alloc_stack $A
+// CHECK-NEXT: [[BOX2:%.*]] = alloc_stack $A
+// CHECK-NEXT: store [[ARG2]] to [[BOX2]]#1 : $*A
+// CHECK-NEXT: [[RESULT:%.*]] = unchecked_trivial_bit_cast [[ARG2]]
+// CHECK-NEXT: store [[ARG2]] to [[BOX1]]#1 : $*A
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: return [[RESULT]]
+sil @test_unchecked_addr_cast_3 : $@convention(thin) (A, A) -> Builtin.RawPointer {
+bb0(%x : $A, %y : $A):
+  %1 = alloc_stack $A
+  %2 = alloc_stack $A
+  store %x to %1#1 : $*A
+  store %y to %2#1 : $*A
+  %3 = unchecked_addr_cast %2#1 : $*A to $*Builtin.RawPointer
+  %l1 = load %3 : $*Builtin.RawPointer
+  store %y to %1#1 : $*A
+  dealloc_stack %2#0 : $*@local_storage A
+  dealloc_stack %1#0 : $*@local_storage A
+  return %l1 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: sil @test_read_dependence_allows_forwarding : $@convention(thin) (@inout A, A) -> A {
+// CHECK: bb0
+// CHECK-NEXT: store
+// CHECK-NEXT: unchecked_addr_cast
+// CHECK-NEXT: unchecked_addr_cast
+// CHECK-NEXT: load
+// CHECK-NEXT: store
+// CHECK-NEXT: return
+sil @test_read_dependence_allows_forwarding : $@convention(thin) (@inout A, A) -> A {
+bb0(%0 : $*A, %1 : $A):
+  store %1 to %0 : $*A
+  %2 = unchecked_addr_cast %0 : $*A to $*A
+  %3 = unchecked_addr_cast %2 : $*A to $*A
+  // This means that the first store is not dead.
+  %4 = load %3 : $*A
+  // But we still should be able to forward this load.
+  %5 = load %0 : $*A
+  store %1 to %0 : $*A
+  return %5 : $A
+}
+
+// CHECK-LABEL: sil @test_read_dependence_allows_forwarding_multi_bb_1 : $@convention(thin) (@inout A, A) -> A {
+// CHECK: bb0([[ARG_0:%.*]] : $*A, [[ARG_1:%.*]] : $A):
+// CHECK: store
+// CHECK: bb1:
+// CHECK-NEXT: load
+// CHECK-NEXT: store
+// CHECK-NEXT: cond_br
+// CHECK: bb2:
+// CHECK: return [[ARG_1]] : $A
+sil @test_read_dependence_allows_forwarding_multi_bb_1 : $@convention(thin) (@inout A, A) -> A {
+bb0(%0 : $*A, %1 : $A):
+  store %1 to %0 : $*A
+  %2 = unchecked_addr_cast %0 : $*A to $*A
+  %3 = unchecked_addr_cast %2 : $*A to $*A
+  br bb1
+
+bb1:
+  // This means that the first store is not dead.
+  %4 = load %3 : $*A
+  // But we still should be able to forward this load.
+  %5 = load %0 : $*A
+  // We need to dedup this store to trigger the self loop
+  // forwarding. Once we do the full optimistic data flow this will no
+  // longer be needed.
+  %6 = load %0 : $*A
+  store %1 to %0 : $*A
+  cond_br undef, bb1, bb2
+
+bb2:
+  return %5 : $A
+}
+
+// CHECK-LABEL: sil @test_read_dependence_allows_forwarding_multi_bb_2 : $@convention(thin) (@inout A, A, A) -> A {
+// CHECK: bb0([[ARG_0:%.*]] : $*A, [[ARG_1:%.*]] : $A, {{%.*}} : $A):
+// CHECK: store
+// CHECK: br bb1([[ARG_1]] : $A)
+// CHECK: bb1([[PHI:%.*]] : $A):
+// CHECK-NEXT: load
+// CHECK-NEXT: store
+// CHECK-NEXT: cond_br
+// CHECK: bb2:
+// CHECK: return [[PHI]] : $A
+sil @test_read_dependence_allows_forwarding_multi_bb_2 : $@convention(thin) (@inout A, A, A) -> A {
+bb0(%0 : $*A, %1 : $A, %2 : $A):
+  store %1 to %0 : $*A
+  %3 = unchecked_addr_cast %0 : $*A to $*A
+  %4 = unchecked_addr_cast %3 : $*A to $*A
+  br bb1
+
+bb1:
+  // This means that the first store is not dead.
+  %5 = load %3 : $*A
+  // But we still should be able to forward this load.
+  %6 = load %0 : $*A
+  // This load must be forwarded is needed to trigger the self loop forwarding. Once we do the full
+  // optimistic dataflow this will no longer be needed.
+  %7 = load %0 : $*A
+  store %2 to %0 : $*A
+  cond_br undef, bb1, bb2
+
+bb2:
+  return %6 : $A
+}
+
+// Make sure that we do not eliminate a partially dead store as if it
+// was a full dead store.
+//
+// CHECK-LABEL: sil @partially_dead_store1 : $@convention(thin) (@inout AA, AA, A) -> () {
+// CHECK: store
+// CHECK: store
+sil @partially_dead_store1 : $@convention(thin) (@inout AA, AA, A) -> () {
+bb0(%0 : $*AA, %1 : $AA, %2 : $A):
+  store %1 to %0 : $*AA
+  %3 = unchecked_addr_cast %0 : $*AA to $*A
+  store %2 to %3 : $*A
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// Make sure that we do not eliminate a partially dead store as if it
+// was a full dead store.
+//
+// CHECK-LABEL: sil @partially_dead_store2 : $@convention(thin) (@inout AA, AA, A) -> () {
+// CHECK: store
+// CHECK: store
+sil @partially_dead_store2 : $@convention(thin) (@inout AA, AA, A) -> () {
+bb0(%0 : $*AA, %1 : $AA, %2 : $A):
+  store %1 to %0 : $*AA
+  %3 = struct_element_addr %0 : $*AA, #AA.a
+  store %2 to %3 : $*A
+  %9999 = tuple()
+  return %9999 : $()
+}
