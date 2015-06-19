@@ -95,3 +95,9 @@ func test17875634() {
   a2.append(coord)
   a2.append((1, 2))
 }
+
+// <rdar://problem/20770032> Pattern matching ranges against tuples crashes the compiler
+func test20770032() {
+  if case let 1...10 = (1, 1) { // expected-warning{{'let' pattern has no effect; sub-pattern didn't bind any variables}} expected-error{{binary operator '~=' cannot be applied to operands of type 'Range<Int>' and '(Int, Int)'}}
+  }
+}

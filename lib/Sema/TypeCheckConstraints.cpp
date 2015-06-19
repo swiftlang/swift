@@ -1727,14 +1727,12 @@ bool TypeChecker::typeCheckExprPattern(ExprPattern *EP, DeclContext *DC,
                                              /*Implicit=*/true);
   
   // Check the expression as a condition.
-  if (typeCheckCondition(matchCall, DC))
-    return true;
-
+  bool hadError = typeCheckCondition(matchCall, DC);
   // Save the type-checked expression in the pattern.
   EP->setMatchExpr(matchCall);
   // Set the type on the pattern.
   EP->setType(rhsType);
-  return false;
+  return hadError;
 }
 
 bool TypeChecker::typesSatisfyConstraint(Type type1, Type type2,
