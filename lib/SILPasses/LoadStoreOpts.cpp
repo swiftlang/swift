@@ -24,6 +24,7 @@
 #include "swift/SILAnalysis/PostOrderAnalysis.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
 #include "swift/SILAnalysis/ValueTracking.h"
+#include "swift/SILPasses/Utils/SILSSAUpdater.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SILPasses/Utils/CFG.h"
 #include "swift/SILPasses/Transforms.h"
@@ -297,15 +298,10 @@ static SILValue tryToForwardAddressValueToLoad(SILValue Address,
 namespace {
 
 class LSBBForwarder;
-
-using StoreList = SmallVector<StoreInst *, 8>;
-
-/// The predecessor order in StoreList. We have one StoreInst for each
-/// predecessor in StoreList.
-using PredOrderInStoreList = SmallVector<SILBasicBlock *, 8>;
+class LSStore;
 
 /// Map an address to a list of StoreInst, one for each predecessor.
-using CoveredStoreMap = llvm::DenseMap<SILValue, StoreList>;
+using CoveredStoreMap = llvm::DenseMap<SILValue, LSStore>;
 
 /// This class stores global state that we use when processing and also drives
 /// the computation. We put its interface at the top for use in other parts of
@@ -395,6 +391,10 @@ public:
   LSValue(SILBasicBlock *NewParentBB, ArrayRef<StoreInst *> NewInsts);
 
   bool operator==(const LSValue &Other) const;
+
+  void addValue(SILInstruction *I) {
+    Insts.push_back(I);
+  }
 
   /// Return the SILValue necessary for forwarding the given LSValue.
   ///
@@ -643,8 +643,7 @@ public:
     BB = NewBB;
   }
 
-  bool optimize(LSContext &Ctx, CoveredStoreMap &StoreMap,
-                PredOrderInStoreList &PredOrder);
+  bool optimize(LSContext &Ctx, CoveredStoreMap &StoreMap);
 
   SILBasicBlock *getBB() const { return BB; }
 
@@ -676,8 +675,7 @@ public:
   void mergePredecessorStates(llvm::DenseMap<SILBasicBlock *,
                                              unsigned> &BBToBBIDMap,
                               std::vector<LSBBForwarder> &BBIDToForwarderMap,
-                              CoveredStoreMap &StoreMap,
-                              PredOrderInStoreList &PredOrder);
+                              CoveredStoreMap &StoreMap);
 
   /// Clear all state in the BB optimizer.
   void clear() {
@@ -737,8 +735,7 @@ public:
   /// Try to find a previously known value that we can forward to LI. This
   /// includes from stores and loads.
   bool tryToForwardLoad(LSContext &Ctx, LoadInst *LI,
-                        CoveredStoreMap &StoreMap,
-                        PredOrderInStoreList &PredOrder);
+                        CoveredStoreMap &StoreMap);
 
 private:
 
@@ -750,19 +747,16 @@ private:
   void updateStoreMap(llvm::DenseMap<SILBasicBlock *,
                                      unsigned> &BBToBBIDMap,
                       std::vector<LSBBForwarder> &BBIDToForwarderMap,
-                      CoveredStoreMap &StoreMap,
-                      PredOrderInStoreList &PredOrder);
+                      CoveredStoreMap &StoreMap);
 
   bool tryToSubstitutePartialAliasLoad(SILValue PrevAddr, SILValue PrevValue,
                                        LoadInst *LI);
 
   bool tryToForwardStoresToLoad(LSContext &Ctx, LoadInst *LI,
-                                CoveredStoreMap &StoreMap,
-                                PredOrderInStoreList &PredOrder);
+                                CoveredStoreMap &StoreMap);
 
   bool tryToForwardLoadsToLoad(LSContext &Ctx, LoadInst *LI,
-                               CoveredStoreMap &StoreMap,
-                               PredOrderInStoreList &PredOrder);
+                               CoveredStoreMap &StoreMap);
 };
 
 #ifndef NDEBUG
@@ -838,16 +832,6 @@ invalidateAliasingLoads(LSContext &Ctx, SILInstruction *Inst,
   }
 }
 
-static bool writeAliasesStoreInList(AliasAnalysis *AA,
-                                    SILInstruction *Writer,
-                                    ArrayRef<StoreInst *> Stores) {
-  for (auto *S : Stores)
-    if (LSValue(S).aliasingWrite(AA, Writer))
-      return true;
-
-  return false;
-}
-
 void
 LSBBForwarder::
 invalidateWriteToStores(LSContext &Ctx, SILInstruction *Inst,
@@ -859,7 +843,7 @@ invalidateWriteToStores(LSContext &Ctx, SILInstruction *Inst,
       InvalidatedStoreList.push_back(P.first);
 
   for (auto &P : StoreMap)
-    if (writeAliasesStoreInList(AA, Inst, P.second))
+    if (P.second.aliasingWrite(AA, Inst))
       InvalidatedStoreList.push_back(P.first);
 
   for (SILValue SIOp : InvalidatedStoreList) {
@@ -1011,27 +995,24 @@ bool LSBBForwarder::tryToSubstitutePartialAliasLoad(SILValue PrevLIAddr,
 }
 
 /// Add a BBArgument in Dest to combine sources of Stores.
-static SILValue fixPhiPredBlocks(SmallVectorImpl<StoreInst *> &Stores,
-                                 SmallVectorImpl<SILBasicBlock *> &PredOrder,
+static SILValue fixPhiPredBlocks(ArrayRef<SILInstruction *> Stores,
                                  SILBasicBlock *Dest) {
-  SILModule &M = Dest->getModule();
+  assert(!Stores.empty() && "Can not fix phi pred for multiple blocks");
   assert(Stores.size() ==
          (unsigned)std::distance(Dest->pred_begin(), Dest->pred_end()) &&
          "Multiple store forwarding size mismatch");
-  auto PhiValue = new (M) SILArgument(Dest, Stores[0]->getSrc().getType());
-  unsigned Id = 0;
-  for (auto Pred : PredOrder) {
-    TermInst *TI = Pred->getTerminator();
-    // This can change the order of predecessors in getPreds.
-    addArgumentToBranch(Stores[Id++]->getSrc(), Dest, TI);
-    TI->eraseFromParent();
-  }
-  return PhiValue;
+  SILSSAUpdater Updater;
+
+  // We know that we only have one store per block already so we can use the
+  // SSA updater.
+  Updater.Initialize(cast<StoreInst>(Stores[0])->getSrc().getType());
+  for (auto *I : Stores)
+    Updater.AddAvailableValue(I->getParent(), cast<StoreInst>(I)->getSrc());
+  return Updater.GetValueInMiddleOfBlock(Dest);
 }
 
 bool LSBBForwarder::tryToForwardStoresToLoad(LSContext &Ctx, LoadInst *LI,
-                                             CoveredStoreMap &StoreMap,
-                                             PredOrderInStoreList &PredOrder) {
+                                             CoveredStoreMap &StoreMap) {
   // If we are loading a value that we just stored, forward the stored value.
   for (auto &P : Stores) {
     SILValue Addr = P.first;
@@ -1065,13 +1046,13 @@ bool LSBBForwarder::tryToForwardStoresToLoad(LSContext &Ctx, LoadInst *LI,
       continue;
 
     DEBUG(llvm::dbgs() << "        Checking from: ");
-    for (auto *SI : I->second) {
+    for (auto *SI : I->second.getInsts()) {
       DEBUG(llvm::dbgs() << "          " << *SI);
       (void)SI;
     }
 
     // Create a BBargument to merge in multiple stores.
-    SILValue PhiValue = fixPhiPredBlocks(I->second, PredOrder, BB);
+    SILValue PhiValue = fixPhiPredBlocks(I->second.getInsts(), BB);
     SILValue Result = FA.forward(I->first, PhiValue, LI);
     assert(Result && "Forwarding from multiple stores failed!");
 
@@ -1086,8 +1067,7 @@ bool LSBBForwarder::tryToForwardStoresToLoad(LSContext &Ctx, LoadInst *LI,
 }
 
 bool LSBBForwarder::tryToForwardLoadsToLoad(LSContext &Ctx, LoadInst *LI,
-                                            CoveredStoreMap &StoreMap,
-                                            PredOrderInStoreList &PredOrder) {
+                                            CoveredStoreMap &StoreMap) {
   // Search the previous loads and replace the current load or one of the
   // current loads uses with one of the previous loads.
   for (auto &P : Loads) {
@@ -1124,13 +1104,12 @@ bool LSBBForwarder::tryToForwardLoadsToLoad(LSContext &Ctx, LoadInst *LI,
 }
 
 bool LSBBForwarder::tryToForwardLoad(LSContext &Ctx, LoadInst *LI,
-                                     CoveredStoreMap &StoreMap,
-                                     PredOrderInStoreList &PredOrder) {
+                                     CoveredStoreMap &StoreMap) {
 
-  if (tryToForwardLoadsToLoad(Ctx, LI, StoreMap, PredOrder))
+  if (tryToForwardLoadsToLoad(Ctx, LI, StoreMap))
     return true;
 
-  if (tryToForwardStoresToLoad(Ctx, LI, StoreMap, PredOrder))
+  if (tryToForwardStoresToLoad(Ctx, LI, StoreMap))
     return true;
 
   startTrackingLoad(LI);
@@ -1143,8 +1122,7 @@ bool LSBBForwarder::tryToForwardLoad(LSContext &Ctx, LoadInst *LI,
 /// \brief Promote stored values to loads, remove dead stores and merge
 /// duplicated loads.
 bool LSBBForwarder::optimize(LSContext &Ctx,
-                             CoveredStoreMap &StoreMap,
-                             PredOrderInStoreList &PredOrder) {
+                             CoveredStoreMap &StoreMap) {
   auto II = BB->begin(), E = BB->end();
   bool Changed = false;
   while (II != E) {
@@ -1160,7 +1138,7 @@ bool LSBBForwarder::optimize(LSContext &Ctx,
     // This is a LoadInst. Let's see if we can find a previous loaded, stored
     // value to use instead of this load.
     if (LoadInst *LI = dyn_cast<LoadInst>(Inst)) {
-      Changed |= tryToForwardLoad(Ctx, LI, StoreMap, PredOrder);
+      Changed |= tryToForwardLoad(Ctx, LI, StoreMap);
       continue;
     }
 
@@ -1263,11 +1241,12 @@ void LSBBForwarder::
 updateStoreMap(llvm::DenseMap<SILBasicBlock *,
                               unsigned> &BBToBBIDMap,
                std::vector<LSBBForwarder> &BBIDToForwarderMap,
-               CoveredStoreMap &StoreMap, PredOrderInStoreList &PredOrder) {
+               CoveredStoreMap &StoreMap) {
   if (std::distance(BB->pred_begin(), BB->pred_end()) <= 1)
     return;
 
   bool FirstPred = true;
+
   for (auto Pred : BB->getPreds()) {
     // Bail out if one of the predecessors has a terminator that we currently
     // do not handle.
@@ -1277,7 +1256,6 @@ updateStoreMap(llvm::DenseMap<SILBasicBlock *,
       return;
     }
 
-    PredOrder.push_back(Pred);
     auto I = BBToBBIDMap.find(Pred);
     if (I == BBToBBIDMap.end()) {
       StoreMap.clear();
@@ -1305,7 +1283,7 @@ updateStoreMap(llvm::DenseMap<SILBasicBlock *,
       // Update StoreMap with stores from the first predecessor.
       for (auto I = StoredMapOfThisPred.begin(), E = StoredMapOfThisPred.end();
            I != E; I++) {
-        StoreMap[I->first].push_back(I->second);
+        StoreMap.insert({I->first, LSStore(I->second)});
         DEBUG(llvm::dbgs() << "        Updating StoreMap bb" <<
               Pred->getDebugID() << ": " << I->first << "          " <<
               *I->second);
@@ -1315,14 +1293,14 @@ updateStoreMap(llvm::DenseMap<SILBasicBlock *,
       for (auto I = StoreMap.begin(), E = StoreMap.end(); I != E;) {
         SILValue Current = I->first;
         if (!StoredMapOfThisPred.count(Current) ||
-            I->second[0]->getSrc().getType() !=
+            cast<StoreInst>(I->second.getInsts()[0])->getSrc().getType() !=
             StoredMapOfThisPred[Current]->getSrc().getType()) {
           DEBUG(llvm::dbgs() << "        Removing from StoreMap: " << Current);
           I++; // Move to the next before erasing the current.
           StoreMap.erase(Current);
         }
         else {
-          I->second.push_back(StoredMapOfThisPred[Current]);
+          I->second.addValue(StoredMapOfThisPred[Current]);
           DEBUG(llvm::dbgs() << "        Updating StoreMap bb" <<
                 Pred->getDebugID() << ": " << Current <<
                 "          " << *StoredMapOfThisPred[Current]);
@@ -1339,8 +1317,7 @@ LSBBForwarder::
 mergePredecessorStates(llvm::DenseMap<SILBasicBlock *,
                                       unsigned> &BBToBBIDMap,
                        std::vector<LSBBForwarder> &BBIDToForwarderMap,
-                       CoveredStoreMap &StoreMap,
-                       PredOrderInStoreList &PredOrder) {
+                       CoveredStoreMap &StoreMap) {
   // Clear the state if the basic block has no predecessor.
   if (BB->getPreds().empty()) {
     clear();
@@ -1357,7 +1334,7 @@ mergePredecessorStates(llvm::DenseMap<SILBasicBlock *,
   //
   // Once we have a fully optimistic iterative dataflow that uses LSValues
   // this should be removed.
-  updateStoreMap(BBToBBIDMap, BBIDToForwarderMap, StoreMap, PredOrder);
+  updateStoreMap(BBToBBIDMap, BBIDToForwarderMap, StoreMap);
 
   bool HasAtLeastOnePred = false;
   // If we have a self cycle, we keep the old state and merge in states
@@ -1465,18 +1442,17 @@ LSContext::runIteration() {
     DEBUG(llvm::dbgs() << "Visiting bb" << BB->getDebugID() << "\n");
 
     CoveredStoreMap StoreMap;
-    PredOrderInStoreList PredOrder;
 
     // Merge the predecessors. After merging, LSBBForwarder now contains
     // lists of stores|loads that reach the beginning of the basic block
     // along all paths.
     Forwarder.mergePredecessorStates(BBToBBIDMap, BBIDToForwarderMap,
-                                     StoreMap, PredOrder);
+                                     StoreMap);
 
     // Remove dead stores, merge duplicate loads, and forward stores to
     // loads. We also update lists of stores|loads to reflect the end
     // of the basic block.
-    Changed |= Forwarder.optimize(*this, StoreMap, PredOrder);
+    Changed |= Forwarder.optimize(*this, StoreMap);
   }
 
   return Changed;
