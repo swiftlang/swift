@@ -196,7 +196,7 @@ protocol AssociatedType1 {
 //===---
 
 var topLevelVar1 = 42
-// CHECK: {{^}}var topLevelVar1{{$}}
+// CHECK: {{^}}var topLevelVar1: Int{{$}}
 // CHECK-NOT: topLevelVar1
 
 // CHECK: class C1

@@ -7,6 +7,6 @@ public class C {
 
 // RUN: %target-swift-ide-test -print-ast-typechecked -accessibility-filter-internal -source-filename %s | FileCheck %s -check-prefix=CHECK1
 // CHECK1-NOT: private
-// CHECK1: public var PublicVar
-// CHECK1: var InternalVar
-// CHECK1: var InternalVar1, InternalVar2
+// CHECK1: public var PublicVar: Int
+// CHECK1: var InternalVar: Int
+// CHECK1: var InternalVar1: Int, InternalVar2: Int

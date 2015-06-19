@@ -573,8 +573,7 @@ struct d0190_LetVarDecls {
 // PASS_PRINT_MODULE_INTERFACE-NEXT: {{^}}  let instanceVar1: Int{{$}}
 
   let instanceVar2 = 0
-  // FIXME: PRINTED_WITHOUT_TYPE
-// PASS_PRINT_AST-NEXT: {{^}}  let instanceVar2{{$}}
+// PASS_PRINT_AST-NEXT: {{^}}  let instanceVar2: Int{{$}}
 // PASS_PRINT_MODULE_INTERFACE-NEXT: {{^}}  let instanceVar2: Int{{$}}
 
   static let staticVar1: Int = 42
@@ -583,7 +582,7 @@ struct d0190_LetVarDecls {
 
   static let staticVar2 = 42
   // FIXME: PRINTED_WITHOUT_TYPE
-// PASS_PRINT_AST-NEXT: {{^}}  static let staticVar2{{$}}
+// PASS_PRINT_AST-NEXT: {{^}}  static let staticVar2: Int{{$}}
 // PASS_PRINT_MODULE_INTERFACE-NEXT: {{^}}  static let staticVar2: Int{{$}}
 }
 

@@ -1133,6 +1133,14 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
       Printer << ", ";
     
     printPattern(entry.getPattern());
+
+    // We also try to print type for named patterns; e.g. var Field = 10
+    if (auto NP = dyn_cast<NamedPattern>(entry.getPattern())) {
+      if (NP->hasType()) {
+        Printer << ": ";
+        NP->getType().print(Printer, Options);
+      }
+    }
     if (Options.VarInitializers) {
       // FIXME: Implement once we can pretty-print expressions.
     }
