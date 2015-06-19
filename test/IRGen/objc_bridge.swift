@@ -100,6 +100,9 @@ import Foundation
 
 // CHECK: @_PROPERTIES__TtC11objc_bridge3Bas = private constant { i32, i32, [5 x { i8*, i8* }] } {
 
+// CHECK: [[OBJC_BLOCK_PROPERTY:@.*]] = private unnamed_addr constant [11 x i8] c"T@?,N,C,Vx\00"
+// CHECK: @_PROPERTIES__TtC11objc_bridge21OptionalBlockProperty = private constant {{.*}} [[OBJC_BLOCK_PROPERTY]]
+
 func getDescription(o: NSObject) -> String {
   return o.description
 }
@@ -194,3 +197,7 @@ class Bas : NSObject {
 }
 
 func ==(lhs: Bas, rhs: Bas) -> Bool { return true }
+
+class OptionalBlockProperty: NSObject {
+  var x: ([AnyObject] -> [AnyObject])?
+}

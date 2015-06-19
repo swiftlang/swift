@@ -1132,6 +1132,7 @@ static llvm::Constant *getObjCEncodingForMethodType(IRGenModule &IGM,
   specialParams += "@0:";
   auto ptrSize = IGM.getPointerSize().getValue();
   specialParams += llvm::itostr(ptrSize);
+  GenericContextScope scope(IGM, fnType->getGenericSignature());
   return getObjCEncodingForTypes(IGM, resultType, inputs, specialParams,
                                  ptrSize * 2, useExtendedEncoding);
 }
