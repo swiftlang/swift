@@ -47,7 +47,7 @@ private:
 public:
   /// Collect and specialize calls in a specific order specified by
   /// \p BotUpFuncList.
-  bool specialize(const llvm::SmallVectorImpl<SILFunction *> &BotUpFuncList);
+  bool specialize(ArrayRef<SILFunction *> BotUpFuncList);
 };
 
 
@@ -126,8 +126,7 @@ GenericSpecializer::specializeApplyInstGroup(
 
 /// Collect and specialize calls in a specific order specified by
 /// \p BotUpFuncList.
-bool GenericSpecializer::specialize(const llvm::SmallVectorImpl<SILFunction *>
-                                    &BotUpFuncList) {
+bool GenericSpecializer::specialize(ArrayRef<SILFunction *> BotUpFuncList) {
   // Initialize the worklist with a call-graph bottom-up list of functions.
   // We specialize the functions in a top-down order, starting from the end
   // of the list.

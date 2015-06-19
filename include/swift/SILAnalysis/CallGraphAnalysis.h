@@ -318,15 +318,14 @@ public:
 
   // Functions for getting bottom-up lists of SCCs or functions in the
   // call graph.
-
-  const llvm::SmallVectorImpl<CallGraphSCC *> &getBottomUpSCCOrder() {
+  ArrayRef<CallGraphSCC *> getBottomUpSCCOrder() {
     if (BottomUpSCCOrder.empty())
       computeBottomUpSCCOrder();
 
     return BottomUpSCCOrder;
   }
 
-  const llvm::SmallVectorImpl<SILFunction *> &getBottomUpFunctionOrder() {
+  ArrayRef<SILFunction *> getBottomUpFunctionOrder() {
     if (BottomUpFunctionOrder.empty())
       computeBottomUpFunctionOrder();
 

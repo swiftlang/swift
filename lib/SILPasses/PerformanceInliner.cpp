@@ -1323,7 +1323,7 @@ public:
                                   WhatToInline);
 
     auto &CG = CGA->getOrBuildCallGraph();
-    auto &BottomUpFunctions = CG.getBottomUpFunctionOrder();
+    auto BottomUpFunctions = CG.getBottomUpFunctionOrder();
 
     // Copy the bottom-up function list into a worklist.
     llvm::SmallVector<SILFunction *, 32> WorkList;
