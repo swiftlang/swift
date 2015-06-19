@@ -137,14 +137,12 @@ public let	S_IEXEC  = S_IXUSR
 
 @available(*, unavailable, message="Please use threads or posix_spawn*()")
 public func fork() -> Int32 {
-  errno = ENOSYS
-  return -1
+  fatalError("unavailable function can't be called")
 }
 
 @available(*, unavailable, message="Please use threads or posix_spawn*()")
 public func vfork() -> Int32 {
-  errno = ENOSYS
-  return -1
+  fatalError("unavailable function can't be called")
 }
 
 //===----------------------------------------------------------------------===//
