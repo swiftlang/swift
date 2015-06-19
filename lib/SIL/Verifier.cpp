@@ -1292,12 +1292,46 @@ public:
     require(DI->getOperand().getType().getClassOrBoundGenericClass(),
             "Operand of dealloc_ref must be of class type");
   }
-  void checkDeallocBoxInst(DeallocBoxInst *DI) {
-    require(DI->getElementType().isObject(),
-            "Element type of dealloc_box must be an object type");
-    requireObjectType(BuiltinNativeObjectType, DI->getOperand(),
-                      "Operand of dealloc_box");
+
+  void checkAllocBoxInst(AllocBoxInst *AI) {
+    // TODO: Allow the box to be typed, but for staging purposes, only require
+    // it when -sil-enable-typed-boxes is enabled.
+    if (auto boxTy = AI->getType(0).getAs<SILBoxType>()) {
+      require(AI->getType(0).isObject(),
+              "first result must be an object");
+      require(AI->getType(1).isAddress(),
+              "second result of alloc_box must be address");
+      requireSameType(boxTy->getBoxedAddressType(), AI->getType(1),
+                      "address type must match box type");
+    } else if (F.getModule().getOptions().EnableTypedBoxes) {
+      require(false, "first result must be a @box type");
+    } else {
+      requireObjectType(BuiltinNativeObjectType, AI->getType(0),
+                        "first result of alloc_box");
+      require(AI->getType(1).isAddress(),
+              "second result of alloc_box must be address");
+    }
   }
+
+  void checkDeallocBoxInst(DeallocBoxInst *DI) {
+    // TODO: Allow the box to be typed, but for staging purposes, only require
+    // it when -sil-enable-typed-boxes is enabled.
+    if (auto boxTy = DI->getOperand().getType().getAs<SILBoxType>()) {
+      require(DI->getOperand().getType().isObject(),
+              "operand must be an object");
+      requireSameType(boxTy->getBoxedAddressType().getObjectType(),
+                      DI->getElementType().getObjectType(),
+                      "element type of dealloc_box must match box element type");
+    } else if (F.getModule().getOptions().EnableTypedBoxes) {
+      require(false, "operand must be a @box type");
+    } else {
+      require(DI->getElementType().isObject(),
+              "Element type of dealloc_box must be an object type");
+      requireObjectType(BuiltinNativeObjectType, DI->getOperand(),
+                        "Operand of dealloc_box");
+    }
+  }
+
   void checkDestroyAddrInst(DestroyAddrInst *DI) {
     require(DI->getOperand().getType().isAddress(),
             "Operand of destroy_addr must be address");

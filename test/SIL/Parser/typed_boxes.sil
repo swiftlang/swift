@@ -1,0 +1,15 @@
+// RUN: %target-swift-frontend -sil-enable-typed-boxes %s -emit-silgen | FileCheck %s
+
+import Swift
+
+// CHECK-LABEL: sil @alloc_dealloc : $@convention(thin) (Int) -> () {
+sil @alloc_dealloc : $@convention(thin) (Int) -> () {
+entry(%x : $Int):
+  // CHECK: [[B:%.*]] = alloc_box $Int
+  %b = alloc_box $Int
+  // CHECK: store [[X:%.*]] to [[B]]#1 : $*Int
+  store %x to %b#1 : $*Int
+  // CHECK: dealloc_box [[B]]#0 : $@box Int
+  dealloc_box %b#0 : $@box Int
+  return undef : $()
+}

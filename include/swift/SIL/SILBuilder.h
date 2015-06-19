@@ -988,6 +988,11 @@ public:
                                    SILValue operand) {
     return insert(new (F.getModule()) DeallocBoxInst(loc, eltType, operand));
   }
+  DeallocBoxInst *createDeallocBox(SILLocation loc, SILValue operand) {
+    auto eltType
+      = operand.getType().castTo<SILBoxType>()->getBoxedAddressType();
+    return insert(new (F.getModule()) DeallocBoxInst(loc, eltType, operand));
+  }
   DeallocExistentialBoxInst *createDeallocExistentialBox(SILLocation loc,
                                                          CanType concreteType,
                                                          SILValue operand) {

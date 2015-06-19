@@ -938,6 +938,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
 
   Opts.GenerateProfile |= Args.hasArg(OPT_profile_generate);
   Opts.EmitProfileCoverageMapping |= Args.hasArg(OPT_profile_coverage_mapping);
+  Opts.EnableTypedBoxes |= Args.hasArg(OPT_sil_enable_typed_boxes);
 
   return false;
 }

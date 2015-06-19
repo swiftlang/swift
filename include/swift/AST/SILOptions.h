@@ -83,6 +83,9 @@ public:
   /// Emit a mapping of profile counters for use in coverage.
   bool EmitProfileCoverageMapping = false;
 
+  /// Stage in typed boxes.
+  bool EnableTypedBoxes = false;
+
   /// Should we use a pass pipeline passed in via a json file? Null by default.
   StringRef ExternalPassPipelineFilename;
 };

@@ -3006,6 +3006,7 @@ class DeallocBoxInst :
   public UnaryInstructionBase<ValueKind::DeallocBoxInst, DeallocationInst,
                               /*HAS_RESULT*/ false>
 {
+  // TODO: The element type can be derived from a typed box.
   SILType ElementType;
 public:
   DeallocBoxInst(SILLocation loc, SILType elementType, SILValue operand)

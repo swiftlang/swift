@@ -2325,6 +2325,15 @@ bool SILParser::parseSILInstruction(SILBasicBlock *BB) {
     }
     break;
   case ValueKind::DeallocBoxInst:
+    if (B.getModule().getOptions().EnableTypedBoxes) {
+      if (parseTypedValueRef(Val))
+        return true;
+
+      ResultVal = B.createDeallocBox(InstLoc, Val);
+      break;
+    }
+
+    SWIFT_FALLTHROUGH;
   case ValueKind::ValueMetatypeInst:
   case ValueKind::ExistentialMetatypeInst: {
     SILType Ty;

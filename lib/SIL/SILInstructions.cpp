@@ -66,8 +66,15 @@ AllocRefInst::AllocRefInst(SILLocation loc, SILType elementType, SILFunction &F,
 static SILTypeList *getAllocBoxType(SILType EltTy, SILFunction &F) {
   const ASTContext &Ctx = F.getModule().getASTContext();
 
+  SILType boxTy;
+  if (F.getModule().getOptions().EnableTypedBoxes)
+    boxTy = SILType::getPrimitiveObjectType(
+                                   SILBoxType::get(EltTy.getSwiftRValueType()));
+  else
+    boxTy = SILType::getNativeObjectType(Ctx);
+
   SILType ResTys[] = {
-    SILType::getNativeObjectType(Ctx),
+    boxTy,
     EltTy.getAddressType()
   };
 
