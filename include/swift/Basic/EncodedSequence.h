@@ -66,23 +66,33 @@ private:
 
   /// A structure representing out-of-line chunk storage.
   struct OutOfLineStorage {
-    uint16_t Length;
+    uint16_t Size;
     uint16_t Capacity;
 
-    OutOfLineStorage(size_t capacity) : Length(0), Capacity(capacity) {}
+    OutOfLineStorage(size_t capacity) : Size(0), Capacity(capacity) {}
 
+  public:
     OutOfLineStorage *clone(size_t newCapacity) const {
-      size_t newSize = sizeof(OutOfLineStorage) + newCapacity * sizeof(Chunk);
-      auto newData = new (operator new(newSize)) OutOfLineStorage(newCapacity);
-      newData->Length = Length;
+      size_t newAllocSize =
+        sizeof(OutOfLineStorage) + newCapacity * sizeof(Chunk);
+      auto newData =
+        new (operator new(newAllocSize)) OutOfLineStorage(newCapacity);
+      newData->setSize(Size);
       memcpy(newData->chunkStorage().data(), chunks().data(),
-             newCapacity * sizeof(Chunk));
+             Size * sizeof(Chunk));
       return newData;
     }
     static OutOfLineStorage *alloc(size_t newSizeInBytes) {
       auto capacity =
         (newSizeInBytes - sizeof(OutOfLineStorage)) / sizeof(Chunk);
       return new (operator new(newSizeInBytes)) OutOfLineStorage(capacity);
+    }
+
+    size_t getCapacity() const { return Capacity; }
+
+    void setSize(size_t newSize) {
+      assert(newSize <= Capacity);
+      Size = newSize;
     }
 
     MutableArrayRef<Chunk> chunkStorage() {
@@ -92,7 +102,7 @@ private:
       return ArrayRef<Chunk>(reinterpret_cast<const Chunk*>(this+1), Capacity);
     }
     ArrayRef<Chunk> chunks() const {
-      return ArrayRef<Chunk>(reinterpret_cast<const Chunk*>(this+1), Length);
+      return ArrayRef<Chunk>(reinterpret_cast<const Chunk*>(this+1), Size);
     }
   };
   OutOfLineStorage *getOutOfLineStorage() {
@@ -120,7 +130,8 @@ private:
 
   void cloneOutOfLineStorage() {
     auto oldStorage = getOutOfLineStorage();
-    Data = reinterpret_cast<uintptr_t>(oldStorage->clone(oldStorage->Capacity));
+    Data = reinterpret_cast<uintptr_t>(
+                                oldStorage->clone(oldStorage->getCapacity()));
   }
   void destroyOutOfLineStorage() {
     auto oldStorage = getOutOfLineStorage();
@@ -141,10 +152,10 @@ public:
       // Try to copy into the existing storage.
       auto otherChunks = other.chunks();
       auto selfStorage = getOutOfLineStorage();
-      if (otherChunks.size() <= selfStorage->Capacity) {
+      if (otherChunks.size() <= selfStorage->getCapacity()) {
         memcpy(selfStorage->chunkStorage().data(), otherChunks.data(),
                sizeof(Chunk) * otherChunks.size());
-        selfStorage->Length = otherChunks.size();
+        selfStorage->setSize(otherChunks.size());
         return *this;
       }
 
@@ -182,37 +193,36 @@ protected:
   /// Claim N more storage chunks, reallocating the storage if necessary.
   MutableArrayRef<Chunk> claimStorage(size_t extra) {
     MutableArrayRef<Chunk> oldStorage = chunkStorage();
-    auto oldLength = chunks().size();
-    auto newLength = oldLength + extra;
+    auto oldSize = chunks().size();
+    auto newSize = oldSize + extra;
 
     // If the existing storage has enough space, we're fine.
-    if (newLength <= oldStorage.size()) {
+    if (newSize <= oldStorage.size()) {
       if (hasOutOfLineStorage()) {
-        getOutOfLineStorage()->Length = newLength;
+        getOutOfLineStorage()->setSize(newSize);
       } else {
-        setInlineSize(newLength);
+        setInlineSize(newSize);
       }
-      return oldStorage.slice(oldLength);
+      return oldStorage.slice(oldSize);
     }
 
     // Otherwise, allocate out-of-line storage.
     size_t newAllocSize = 32;
-    while ((oldLength + extra) * sizeof(Chunk)
-             + sizeof(OutOfLineStorage) > newAllocSize)
+    while (newSize * sizeof(Chunk) + sizeof(OutOfLineStorage) > newAllocSize)
       newAllocSize *= 2;
     auto newStorage = OutOfLineStorage::alloc(newAllocSize);
 
     // Copy from the old storage.
-    newStorage->Length = oldLength + extra;
+    newStorage->setSize(newSize);
     memcpy(newStorage->chunkStorage().data(), oldStorage.data(),
-           newStorage->Length * sizeof(Chunk));
+           oldSize * sizeof(Chunk));
 
     // Destroy the old storage.
     if (hasOutOfLineStorage()) destroyOutOfLineStorage();
 
     // Install the new storage and return.
     Data = reinterpret_cast<uintptr_t>(newStorage);
-    return newStorage->chunkStorage().slice(oldLength);
+    return newStorage->chunkStorage().slice(oldSize);
   }
 
 public:
