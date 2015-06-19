@@ -99,11 +99,11 @@ func getZim(f: Foo) -> Bool {
 func setZim(f: Foo, b: Bool) {
   f.setZim(b)
 }
-// CHECK-i386-LABEL: sil hidden @_TF13objc_bridging6setZim
-// CHECK-i386:   [[CONVERT:%.*]] = function_ref @swift_BoolToObjCBool : $@convention(thin) (Bool) -> ObjCBool
-// CHECK-i386:   [[OBJC_BOOL:%.*]] = apply [[CONVERT]]({{%.*}}) : $@convention(thin) (Bool) -> ObjCBool
-// CHECK-i386:   apply {{%.*}}([[OBJC_BOOL]], {{%.*}}) : $@convention(objc_method) (ObjCBool, Foo) -> ()
-// CHECK-i386: }
+// CHECK-ios-i386-LABEL: sil hidden @_TF13objc_bridging6setZim
+// CHECK-ios-i386:   [[CONVERT:%.*]] = function_ref @swift_BoolToObjCBool : $@convention(thin) (Bool) -> ObjCBool
+// CHECK-ios-i386:   [[OBJC_BOOL:%.*]] = apply [[CONVERT]]({{%.*}}) : $@convention(thin) (Bool) -> ObjCBool
+// CHECK-ios-i386:   apply {{%.*}}([[OBJC_BOOL]], {{%.*}}) : $@convention(objc_method) (ObjCBool, Foo) -> ()
+// CHECK-ios-i386: }
 
 // CHECK-macosx-x86_64-LABEL: sil hidden @_TF13objc_bridging6setZim
 // CHECK-macosx-x86_64:   [[CONVERT:%.*]] = function_ref @swift_BoolToObjCBool : $@convention(thin) (Bool) -> ObjCBool
@@ -120,6 +120,11 @@ func setZim(f: Foo, b: Bool) {
 // CHECK-arm64: bb0([[FOO_OBJ:%[0-9]+]] : $Foo, [[SWIFT_BOOL:%[0-9]+]] : $Bool):
 // CHECK-arm64:   apply {{%.*}}([[SWIFT_BOOL]], [[FOO_OBJ]]) : $@convention(objc_method) (Bool, Foo) -> ()
 // CHECK-arm64: }
+
+// CHECK-watchos-i386-LABEL: sil hidden @_TF13objc_bridging6setZim
+// CHECK-watchos-i386: bb0([[FOO_OBJ:%[0-9]+]] : $Foo, [[SWIFT_BOOL:%[0-9]+]] : $Bool):
+// CHECK-watchos-i386:   apply {{%.*}}([[SWIFT_BOOL]], [[FOO_OBJ]]) : $@convention(objc_method) (Bool, Foo) -> ()
+// CHECK-watchos-i386: }
 
 // @interface Foo -(_Bool) zang; @end
 func getZang(f: Foo) -> Bool {
