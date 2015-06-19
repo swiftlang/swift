@@ -2564,3 +2564,15 @@ bb0(%0 : $NClass):
   strong_release %0 : $NClass                    // id: %6
   return %5 : $Int                                // id: %7
 }
+
+// CHECK-LABEL: sil @lower_retainrelease_value_of_unowned_to_unowned_retainrelease : $@convention(thin) (@owned @sil_unowned NClass, @owned @sil_unowned NClass) -> @owned @sil_unowned NClass {
+// CHECK: unowned_retain
+// CHECK: unowned_release
+// CHECK: unowned_release
+sil @lower_retainrelease_value_of_unowned_to_unowned_retainrelease : $@convention(thin) (@owned @sil_unowned NClass, @owned @sil_unowned NClass) -> @owned @sil_unowned NClass {
+bb0(%0 : $@sil_unowned NClass, %1 : $@sil_unowned NClass):
+  retain_value %0 : $@sil_unowned NClass
+  release_value %1 : $@sil_unowned NClass
+  release_value %0 : $@sil_unowned NClass  
+  return %0 : $@sil_unowned NClass
+}

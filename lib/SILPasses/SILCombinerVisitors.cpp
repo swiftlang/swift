@@ -332,6 +332,10 @@ SILInstruction *SILCombiner::visitReleaseValueInst(ReleaseValueInst *RVI) {
     }
   }
 
+  // ReleaseValueInst of an unowned type is an unowned_release.
+  if (OperandTy.is<UnownedStorageType>())
+    return new (RVI->getModule()) UnownedReleaseInst(RVI->getLoc(), Operand);
+
   // ReleaseValueInst of a reference type is a strong_release.
   if (OperandTy.isReferenceCounted(RVI->getModule()))
     return new (RVI->getModule()) StrongReleaseInst(RVI->getLoc(), Operand);
@@ -363,6 +367,10 @@ SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *RVI) {
                                                     EI->getOperand());
     }
   }
+
+  // RetainValueInst of an unowned type is an unowned_retain.
+  if (OperandTy.is<UnownedStorageType>())
+    return new (RVI->getModule()) UnownedRetainInst(RVI->getLoc(), Operand);
 
   // RetainValueInst of a reference type is a strong_release.
   if (OperandTy.isReferenceCounted(RVI->getModule())) {
