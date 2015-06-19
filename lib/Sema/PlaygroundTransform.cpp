@@ -106,7 +106,7 @@ private:
     }
   };
 
-  typedef llvm::SmallVector<swift::ASTNode, 3> ElementVector;
+  typedef SmallVector<swift::ASTNode, 3> ElementVector;
 
   // Before a "return," "continue" or similar statement, emit pops of
   // all the braces up to its target.
@@ -132,7 +132,7 @@ private:
   public:
     ClosureFinder (Instrumenter &Inst) : I(Inst) { }
     virtual std::pair<bool, Stmt*> walkToStmtPre(Stmt *S) {
-      if (llvm::dyn_cast<BraceStmt>(S)) {
+      if (isa<BraceStmt>(S)) {
         return { false, S }; // don't walk into brace statements; we
                              // need to respect nesting!
       } else {
@@ -140,7 +140,7 @@ private:
       }
     }
     virtual std::pair<bool, Expr*> walkToExprPre(Expr *E) {
-      if (ClosureExpr *CE = llvm::dyn_cast<ClosureExpr>(E)) {
+      if (ClosureExpr *CE = dyn_cast<ClosureExpr>(E)) {
         BraceStmt *B = CE->getBody();
         if (B) {
           BraceStmt *NB = I.transformBraceStmt(B);
@@ -165,33 +165,33 @@ public:
     default:
       return S;
     case StmtKind::Brace:
-      return transformBraceStmt(llvm::cast<BraceStmt>(S));
+      return transformBraceStmt(cast<BraceStmt>(S));
     case StmtKind::If:
-      return transformIfStmt(llvm::cast<IfStmt>(S));
+      return transformIfStmt(cast<IfStmt>(S));
     case StmtKind::Guard:
-      return transformGuardStmt(llvm::cast<GuardStmt>(S));
+      return transformGuardStmt(cast<GuardStmt>(S));
     case StmtKind::While: {
         TargetKindSetter TKS(BracePairs, BracePair::TargetKinds::Break);
-        return transformWhileStmt(llvm::cast<WhileStmt>(S));
+        return transformWhileStmt(cast<WhileStmt>(S));
       }
     case StmtKind::RepeatWhile: {
         TargetKindSetter TKS(BracePairs, BracePair::TargetKinds::Break);
-        return transformRepeatWhileStmt(llvm::cast<RepeatWhileStmt>(S));
+        return transformRepeatWhileStmt(cast<RepeatWhileStmt>(S));
       }
     case StmtKind::For: {
         TargetKindSetter TKS(BracePairs, BracePair::TargetKinds::Break);
-        return transformForStmt(llvm::cast<ForStmt>(S));
+        return transformForStmt(cast<ForStmt>(S));
       }
     case StmtKind::ForEach: {
         TargetKindSetter TKS(BracePairs, BracePair::TargetKinds::Break);
-        return transformForEachStmt(llvm::cast<ForEachStmt>(S));
+        return transformForEachStmt(cast<ForEachStmt>(S));
       }
     case StmtKind::Switch: {
         TargetKindSetter TKS(BracePairs, BracePair::TargetKinds::Fallthrough);
-        return transformSwitchStmt(llvm::cast<SwitchStmt>(S));
+        return transformSwitchStmt(cast<SwitchStmt>(S));
       }
     case StmtKind::DoCatch:
-      return transformDoCatchStmt(llvm::cast<DoCatchStmt>(S));
+      return transformDoCatchStmt(cast<DoCatchStmt>(S));
     }
   }
     
@@ -268,7 +268,7 @@ public:
   SwitchStmt *transformSwitchStmt(SwitchStmt *SS) {
     for (CaseStmt *CS : SS->getCases()) {
       if (Stmt *S = CS->getBody()) {
-        if (BraceStmt *B = llvm::dyn_cast<BraceStmt>(S)) {
+        if (auto *B = dyn_cast<BraceStmt>(S)) {
           BraceStmt *NB = transformBraceStmt(B);
           if (NB != B) {
             CS->setBody(NB);
@@ -301,7 +301,7 @@ public:
   Decl *transformDecl(Decl *D) {
     if (D->isImplicit())
       return D;
-    if (FuncDecl *FD = llvm::dyn_cast<FuncDecl>(D)) {
+    if (FuncDecl *FD = dyn_cast<FuncDecl>(D)) {
       if (BraceStmt *B = FD->getBody()) {
         TargetKindSetter TKS(BracePairs, BracePair::TargetKinds::Return);
         BraceStmt *NB = transformBraceStmt(B);
@@ -309,7 +309,7 @@ public:
           FD->setBody(NB);
         }
       }
-    } else if (NominalTypeDecl *NTD = llvm::dyn_cast<NominalTypeDecl>(D)) {
+    } else if (auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
       for (Decl *Member : NTD->getMembers()) {
         transformDecl(Member);
       }
@@ -321,22 +321,20 @@ public:
   std::pair<Expr *, ValueDecl *> digForVariable(Expr *E) {
     switch (E->getKind()) {
     default:
-      if (ImplicitConversionExpr *ICE =
-          llvm::dyn_cast<ImplicitConversionExpr>(E)) {
+      if (auto *ICE = dyn_cast<ImplicitConversionExpr>(E))
         return digForVariable(ICE->getSubExpr());
-      }
       return std::make_pair(nullptr, nullptr);
     case ExprKind::DeclRef:
-      return std::make_pair(E, llvm::cast<DeclRefExpr>(E)->getDecl());
+      return std::make_pair(E, cast<DeclRefExpr>(E)->getDecl());
     case ExprKind::MemberRef:
       return std::make_pair(
-        E, llvm::cast<MemberRefExpr>(E)->getMember().getDecl());
+        E, cast<MemberRefExpr>(E)->getMember().getDecl());
     case ExprKind::Load:
-      return digForVariable(llvm::cast<LoadExpr>(E)->getSubExpr());
+      return digForVariable(cast<LoadExpr>(E)->getSubExpr());
     case ExprKind::ForceValue:
-      return digForVariable(llvm::cast<ForceValueExpr>(E)->getSubExpr());
+      return digForVariable(cast<ForceValueExpr>(E)->getSubExpr());
     case ExprKind::InOut:
-      return digForVariable( llvm::cast<InOutExpr>(E)->getSubExpr());
+      return digForVariable(cast<InOutExpr>(E)->getSubExpr());
     }
   }
   
@@ -380,8 +378,8 @@ public:
   }
 
   BraceStmt *transformBraceStmt(BraceStmt *BS, bool TopLevel = false) {
-    llvm::ArrayRef<ASTNode> OriginalElements = BS->getElements();
-    typedef llvm::SmallVector<swift::ASTNode, 3> ElementVector;
+    ArrayRef<ASTNode> OriginalElements = BS->getElements();
+    typedef SmallVector<swift::ASTNode, 3> ElementVector;
     ElementVector Elements(OriginalElements.begin(),
                            OriginalElements.end());
 
@@ -394,9 +392,8 @@ public:
       swift::ASTNode &Element = Elements[EI];
       if (Expr *E = Element.dyn_cast<Expr*>()) {
         E->walk(CF);
-        if (AssignExpr *AE = llvm::dyn_cast<AssignExpr>(E)) {
-          if (MemberRefExpr *MRE =
-              llvm::dyn_cast<MemberRefExpr>(AE->getDest())) {
+        if (AssignExpr *AE = dyn_cast<AssignExpr>(E)) {
+          if (auto *MRE = dyn_cast<MemberRefExpr>(AE->getDest())) {
             // an assignment to a property of an object counts as a mutation of
             // that object
             Expr *Base_RE = nullptr;
@@ -441,24 +438,22 @@ public:
             EI += 3;
           }
         }
-        else if (ApplyExpr *AE = llvm::dyn_cast<ApplyExpr>(E)) {
+        else if (ApplyExpr *AE = dyn_cast<ApplyExpr>(E)) {
           bool Handled = false;
-          if (DeclRefExpr *DRE = llvm::dyn_cast<DeclRefExpr>(AE->getFn())) {
-            AbstractFunctionDecl *FnD =
-              llvm::dyn_cast<AbstractFunctionDecl>(DRE->getDecl());
+          if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(AE->getFn())) {
+            auto *FnD = dyn_cast<AbstractFunctionDecl>(DRE->getDecl());
             if (FnD && FnD->getModuleContext() == Context.TheStdlibModule) {
               StringRef FnName = FnD->getNameStr();
               if (FnName.equals("print") || FnName.equals("debugPrint")) {
                 const bool isDebugPrint = FnName.equals("debugPrint");
                 Expr *object = nullptr;
                 Expr *appendNewline = nullptr;
-                if (ParenExpr *PE = llvm::dyn_cast<ParenExpr>(AE->getArg())) {
+                if (ParenExpr *PE = dyn_cast<ParenExpr>(AE->getArg())) {
                   object = PE->getSubExpr();
                   appendNewline =
                     new (Context) BooleanLiteralExpr(true, SourceLoc(), true);
                   typeCheckContextExpr(Context, TypeCheckDC, appendNewline);
-                } else if (TupleExpr *TE =
-                          llvm::dyn_cast<TupleExpr>(AE->getArg())) {
+                } else if (TupleExpr *TE = dyn_cast<TupleExpr>(AE->getArg())) {
                   if (TE->getNumElements() == 2) {
                     object = TE->getElement(0);
                     appendNewline = TE->getElement(1);
@@ -490,8 +485,7 @@ public:
           if (!Handled &&
               AE->getType()->getCanonicalType() ==
               Context.TheEmptyTupleType) {
-            if (DotSyntaxCallExpr *DSCE =
-                llvm::dyn_cast<DotSyntaxCallExpr>(AE->getFn())) {
+            if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(AE->getFn())) {
               Expr *TargetExpr = DSCE->getArg();
               Expr *Target_RE = nullptr;
               ValueDecl *TargetVD = nullptr;
@@ -551,7 +545,7 @@ public:
         }
       } else if (Stmt *S = Element.dyn_cast<Stmt*>()) {
         S->walk(CF);
-        if (ReturnStmt *RS = llvm::dyn_cast<ReturnStmt>(S)) {
+        if (ReturnStmt *RS = dyn_cast<ReturnStmt>(S)) {
           if (RS->hasResult()) {
             std::pair<PatternBindingDecl *, VarDecl *> PV =
               buildPatternAndVariable(RS->getResult());
@@ -579,10 +573,9 @@ public:
           }
           EI = escapeToTarget(BracePair::TargetKinds::Return, Elements, EI);
         } else {
-          if (llvm::isa<BreakStmt>(S) ||
-              llvm::isa<ContinueStmt>(S)) {
+          if (isa<BreakStmt>(S) || isa<ContinueStmt>(S)) {
             EI = escapeToTarget(BracePair::TargetKinds::Break, Elements, EI);
-          } else if (llvm::isa<FallthroughStmt>(S)) {
+          } else if (isa<FallthroughStmt>(S)) {
             EI = escapeToTarget(BracePair::TargetKinds::Fallthrough, Elements,
                                 EI);
           }
@@ -593,7 +586,7 @@ public:
         }
       } else if (Decl *D = Element.dyn_cast<Decl*>()) {
         D->walk(CF);
-        if (auto *PBD = llvm::dyn_cast<PatternBindingDecl>(D)) {
+        if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
           if (VarDecl *VD = PBD->getSingleVar()) {
             if (VD->getParentInitializer()) {
               if (Expr *Log = logVarDecl(VD)) {
@@ -632,8 +625,7 @@ public:
   // after or instead of the expression they're looking at.  Only call this
   // if the variable has an initializer.
   Expr *logVarDecl(VarDecl *VD) {
-    if (llvm::dyn_cast<ConstructorDecl>(TypeCheckDC) &&
-        VD->getNameStr().equals("self")) {
+    if (isa<ConstructorDecl>(TypeCheckDC) && VD->getNameStr().equals("self")) {
       // Don't log "self" in a constructor
       return nullptr;
     }
@@ -648,11 +640,10 @@ public:
   }
 
   Expr *logDeclOrMemberRef(Expr *RE) {
-    if (DeclRefExpr *DRE = llvm::dyn_cast<DeclRefExpr>(RE)) {
-      VarDecl *VD = llvm::cast<VarDecl>(DRE->getDecl());
+    if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(RE)) {
+      VarDecl *VD = cast<VarDecl>(DRE->getDecl());
   
-      if (llvm::dyn_cast<ConstructorDecl>(TypeCheckDC) &&
-          VD->getNameStr().equals("self")) {
+      if (isa<ConstructorDecl>(TypeCheckDC) && VD->getNameStr().equals("self")){
         // Don't log "self" in a constructor
         return nullptr;
       }
@@ -664,11 +655,11 @@ public:
                                   AccessSemantics::Ordinary,
                                   Type()),
         DRE->getSourceRange(), VD->getName().str().str().c_str());
-    } else if (MemberRefExpr *MRE = llvm::dyn_cast<MemberRefExpr>(RE)) {
+    } else if (MemberRefExpr *MRE = dyn_cast<MemberRefExpr>(RE)) {
       Expr *B = MRE->getBase();
       ConcreteDeclRef M = MRE->getMember();
 
-      if (llvm::dyn_cast<ConstructorDecl>(TypeCheckDC) &&
+      if (isa<ConstructorDecl>(TypeCheckDC) &&
           !digForName(B).compare("self")) {
         // Don't log attributes of "self" in a constructor
         return nullptr;
@@ -716,7 +707,7 @@ public:
     Expr *MaybeLoadInitExpr = nullptr;
     
     if (LValueType *LVT =
-        llvm::dyn_cast<LValueType>(InitExpr->getType().getPointer())) {
+          dyn_cast<LValueType>(InitExpr->getType().getPointer())) {
       MaybeLoadInitExpr = new (Context) LoadExpr (InitExpr,
                                                   LVT->getObjectType());
     }
@@ -881,7 +872,7 @@ void swift::performPlaygroundTransform(SourceFile &SF,
     ExpressionFinder(bool HP) : HighPerformance(HP) { }
 
     virtual bool walkToDeclPre(Decl *D) {
-      if (AbstractFunctionDecl *FD = llvm::dyn_cast<AbstractFunctionDecl>(D)) {
+      if (AbstractFunctionDecl *FD = dyn_cast<AbstractFunctionDecl>(D)) {
         if (!FD->isImplicit()) {
           if (BraceStmt *Body = FD->getBody()) {
             ASTContext &ctx = FD->getASTContext();
@@ -894,7 +885,7 @@ void swift::performPlaygroundTransform(SourceFile &SF,
             return false;
           }
         }
-      } else if (TopLevelCodeDecl *TLCD = llvm::dyn_cast<TopLevelCodeDecl>(D)) {
+      } else if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
         if (!TLCD->isImplicit()) {
           if (BraceStmt *Body = TLCD->getBody()) {
             ASTContext &ctx = static_cast<Decl*>(TLCD)->getASTContext();
