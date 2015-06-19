@@ -144,11 +144,32 @@ public:
 #define requireObjectType(type, value, valueDescription) \
   _requireObjectType<type>(value, valueDescription, #type)
 
-  // Require that the operand is a non-optional reference-counted type.
+  template <class T>
+  typename CanTypeWrapperTraits<T>::type
+  _forbidObjectType(SILType type, const Twine &valueDescription,
+                    const char *typeName) {
+    _require(type.isObject(), valueDescription + " must be an object");
+    auto result = type.getAs<T>();
+    _require(!bool(result),
+             valueDescription + " must not have type " + typeName);
+    return result;
+  }
+  template <class T>
+  typename CanTypeWrapperTraits<T>::type
+  _forbidObjectType(SILValue value, const Twine &valueDescription,
+                    const char *typeName) {
+    return _forbidObjectType<T>(value.getType(), valueDescription, typeName);
+  }
+#define forbidObjectType(type, value, valueDescription)                        \
+  _forbidObjectType<type>(value, valueDescription, #type)
+
+  // Require that the operand is a non-optional, non-unowned reference-counted
+  // type.
   void requireReferenceValue(SILValue value, const Twine &valueDescription) {
     require(value.getType().isObject(), valueDescription +" must be an object");
     require(value.getType().isReferenceCounted(F.getModule()),
             valueDescription + " must have reference semantics");
+    forbidObjectType(UnownedStorageType, value, valueDescription);
   }
 
   // Require that the operand is a reference-counted type, or an Optional
