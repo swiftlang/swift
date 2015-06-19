@@ -913,6 +913,27 @@ void TypeChecker::computeCaptures(AnyFunctionRef AFR) {
   FindCapturedVars finder(*this, Captures, AFR);
   AFR.getBody()->walk(finder);
 
+  // If this is an init(), explicitly walk the initializer values for members of
+  // the type.  They will be implicitly emitted by SILGen into the generated
+  // initializer.
+  if (auto CD =
+        dyn_cast_or_null<ConstructorDecl>(AFR.getAbstractFunctionDecl())) {
+    auto *typeDecl = dyn_cast<NominalTypeDecl>(CD->getDeclContext());
+    if (typeDecl && CD->isDesignatedInit()) {
+      for (auto member : typeDecl->getMembers()) {
+        // Ignore everything other than PBDs.
+        auto *PBD = dyn_cast<PatternBindingDecl>(member);
+        if (!PBD) continue;
+        // Walk the initializers for all properties declared in the type with
+        // an initializer.
+        for (auto &elt : PBD->getPatternList())
+          if (auto *init = elt.getInit())
+            init->walk(finder);
+      }
+    }
+  }
+  
+  
   if (Captures.empty()) {
     AFR.getCaptureInfo().setCaptures(None);
     return;
