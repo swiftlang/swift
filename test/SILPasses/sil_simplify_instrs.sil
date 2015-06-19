@@ -145,6 +145,37 @@ bb2:
   unreachable
 }
 
+public enum GenericEnum<T> {
+	case A(T)
+	case B(Int)
+}
+
+// CHECK-LABEL: sil @combine_enum_data_and_enum
+// CHECK: [[RESULT:%[0-9]+]] = load %0
+// CHECK-NOT: unchecked_enum_data
+// CHECK-NOT: enum $GenericEnum
+// CHECK: return [[RESULT]]
+sil @combine_enum_data_and_enum : $@convention(thin) (@in_guaranteed GenericEnum<Int>) -> GenericEnum<Int> {
+bb0(%0 : $*GenericEnum<Int>):
+  %5 = load %0 : $*GenericEnum<Int>       // users: %6, %7, %8, %23
+  %23 = unchecked_enum_data %5 : $GenericEnum<Int>, #GenericEnum.B!enumelt.1 // user: %24
+  %24 = enum $GenericEnum<Int>, #GenericEnum.B!enumelt.1, %23 : $Int
+  return %24 : $GenericEnum<Int>
+}
+
+// CHECK-LABEL: sil @dont_combine_enum_data_and_enum
+// CHECK: load
+// CHECK-NEXT: unchecked_enum_data
+// CHECK-NEXT: enum $GenericEnum
+// CHECK-NEXT: return
+sil @dont_combine_enum_data_and_enum : $@convention(thin) (@in_guaranteed GenericEnum<Int>) -> GenericEnum<Double> {
+bb0(%0 : $*GenericEnum<Int>):
+  %5 = load %0 : $*GenericEnum<Int>       // users: %6, %7, %8, %23
+  %23 = unchecked_enum_data %5 : $GenericEnum<Int>, #GenericEnum.B!enumelt.1 // user: %24
+  %24 = enum $GenericEnum<Double>, #GenericEnum.B!enumelt.1, %23 : $Int
+  return %24 : $GenericEnum<Double>
+}
+
 public enum Ternary {
 case First
 case Second
