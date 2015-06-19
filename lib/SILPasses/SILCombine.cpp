@@ -208,9 +208,12 @@ bool SILCombiner::doOneIteration(SILFunction &F, unsigned Iteration) {
     // SILBuilder during this iteration. Go through the tracking list and add
     // its contents to the worklist and then clear said list in preparation for
     // the next iteration.
-    for (SILInstruction *I : TrackingList)
-      Worklist.add(I);
+    for (SILInstruction *I : TrackingList) {
+      if (!DeletedInstSet.count(I))
+        Worklist.add(I);
+    }
     TrackingList.clear();
+    DeletedInstSet.clear();
   }
 
   Worklist.zap();
@@ -334,6 +337,7 @@ SILInstruction *SILCombiner::eraseInstFromFunction(SILInstruction &I,
 
   Worklist.remove(&I);
   eraseFromParentWithDebugInsts(&I, InstIter);
+  DeletedInstSet.insert(&I);
   MadeChange = true;
   return nullptr;  // Don't do anything with I
 }

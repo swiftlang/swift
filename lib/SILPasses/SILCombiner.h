@@ -38,7 +38,6 @@ class AliasAnalysis;
 class SILCombineWorklist {
   llvm::SmallVector<SILInstruction *, 256> Worklist;
   llvm::DenseMap<SILInstruction *, unsigned> WorklistMap;
-  llvm::SmallVector<SILInstruction *, 8> TrackingList;
 
   void operator=(const SILCombineWorklist &RHS) = delete;
   SILCombineWorklist(const SILCombineWorklist &Worklist) = delete;
@@ -133,9 +132,14 @@ class SILCombiner :
   SILBuilder *Builder;
 
   /// A list that the builder inserts newly created instructions into. Its
-  /// contents are added to the worklist after every iteration and then the list
+  /// contents are added to the worklist after every iteration unless the
+  /// instruction is in the DeletedInstructionList. Then the list
   /// is cleared.
   llvm::SmallVector<SILInstruction *, 64> TrackingList;
+
+  /// A set of instructions which have been deleted during this iteration. It is
+  /// used to make sure that we do not
+  llvm::DenseSet<SILInstruction *> DeletedInstSet;
 
   /// Cast optimizer
   CastOptimizer CastOpt;
@@ -146,7 +150,7 @@ class SILCombiner :
 public:
   SILCombiner(AliasAnalysis *AA, CallGraph *CG, bool removeCondFails)
       : AA(AA), Worklist(), MadeChange(false), RemoveCondFails(removeCondFails),
-        Iteration(0), Builder(0),
+        Iteration(0), Builder(0), TrackingList(), DeletedInstSet(128),
         CastOpt(/* ReplaceInstUsesAction */
                 [&](SILInstruction *I, ValueBase * V) {
                   replaceInstUsesWith(*I, V);
