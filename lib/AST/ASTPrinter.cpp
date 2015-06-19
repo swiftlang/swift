@@ -593,6 +593,16 @@ bool PrintAST::shouldPrint(const Decl *D) {
       return false;
   }
 
+  if (Options.AccessibilityFilter > Accessibility::Private) {
+    // If getting no formal access, we ask the attribute instead.
+    for(auto Att : D->getAttrs()) {
+      if (auto Acc = dyn_cast<AccessibilityAttr>(Att)) {
+        if (Acc->getAccess() < Options.AccessibilityFilter)
+          return false;
+      }
+    }
+  }
+
   if (Options.SkipPrivateStdlibDecls && D->isPrivateStdlibDecl())
       return false;
 
@@ -612,6 +622,22 @@ bool PrintAST::shouldPrint(const Decl *D) {
         return false;
     }
   }
+
+  // We need to handle PatternBindingDecl as a special case here because its
+  // attributes can only be retrieved from the inside VarDecls.
+  if (auto *PD = dyn_cast<PatternBindingDecl>(D)) {
+    const VarDecl *anyVar = nullptr;
+    for (auto entry : PD->getPatternList()) {
+      entry.getPattern()->forEachVariable([&](VarDecl *V) {
+        anyVar = V;
+      });
+      if (anyVar)
+        break;
+    }
+    if (anyVar && !shouldPrint(anyVar))
+      return false;
+  }
+
   return true;
 }
 
