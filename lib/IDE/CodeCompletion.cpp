@@ -755,6 +755,13 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
 
   Optional<Type> getTypeOfParsedExpr() {
     assert(ParsedExpr && "should have an expression");
+    // If we've already successfully type-checked the expression for some
+    // reason, just return the type.
+    // FIXME: if it's ErrorType but we've already typechecked we shouldn't
+    // typecheck again. rdar://21466394
+    if (ParsedExpr->getType() && !ParsedExpr->getType()->is<ErrorType>())
+      return ParsedExpr->getType();
+
     Expr *ModifiedExpr = ParsedExpr;
     if (auto T = getTypeOfCompletionContextExpr(P.Context, CurDeclContext,
                                                 ModifiedExpr)) {

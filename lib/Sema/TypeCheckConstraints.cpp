@@ -521,7 +521,14 @@ namespace {
         assert(DC == ce && "DeclContext imbalance");
         DC = ce->getParent();
       }
-      
+
+      // Strip off any AutoClosures that were produced by a previous type check
+      // so that we don't choke in CSGen.
+      // FIXME: we shouldn't double typecheck, but it looks like code completion
+      // may do so in some circumstances. rdar://21466394
+      if (auto autoClosure = dyn_cast<AutoClosureExpr>(expr))
+        return autoClosure->getSingleExpressionBody();
+
       // A 'self.init' or 'super.init' application inside a constructor will
       // evaluate to void, with the initializer's result implicitly rebound
       // to 'self'. Wrap (apply (unresolved_constructor)) in a RebindSelf expr

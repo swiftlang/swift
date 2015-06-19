@@ -148,6 +148,17 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=MEMBER_THROWS3 | FileCheck %s -check-prefix=MEMBER_THROWS3
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=INIT_THROWS1 | FileCheck %s -check-prefix=INIT_THROWS1
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AUTOCLOSURE1 > %t.autoclosure1
+// RUN: FileCheck %s -check-prefix=AUTOCLOSURE_STRING < %t.autoclosure1
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AUTOCLOSURE2 > %t.autoclosure2
+// RUN: FileCheck %s -check-prefix=AUTOCLOSURE_STRING < %t.autoclosure2
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AUTOCLOSURE3 > %t.autoclosure3
+// RUN: FileCheck %s -check-prefix=AUTOCLOSURE_STRING < %t.autoclosure3
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AUTOCLOSURE4 > %t.autoclosure4
+// RUN: FileCheck %s -check-prefix=AUTOCLOSURE_STRING < %t.autoclosure4
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AUTOCLOSURE5 > %t.autoclosure5
+// RUN: FileCheck %s -check-prefix=AUTOCLOSURE_STRING < %t.autoclosure5
+
 // Test code completion of expressions that produce a value.
 
 struct FooStruct {
@@ -1728,4 +1739,27 @@ func testThrows006() {
 // INIT_THROWS1: Decl[Constructor]/CurrNominal:      ['('])[' throws'][#HasThrowingMembers#]
 // INIT_THROWS1: Decl[Constructor]/CurrNominal:      ['(']{#x: () throws -> ()##() throws -> ()#})[' rethrows'][#HasThrowingMembers#]
 // INIT_THROWS1: End completions
+}
+
+
+// rdar://21346928
+// Just sample some String API to sanity check.
+// AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal:      characters[#String.CharacterView#]
+// AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal:      utf16[#String.UTF16View#]
+// AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal:      utf8[#String.UTF8View#]
+func testWithAutoClosure1(x: String?) {
+  (x ?? "autoclosure").#^AUTOCLOSURE1^#
+}
+func testWithAutoClosure2(x: String?) {
+  let y = (x ?? "autoclosure").#^AUTOCLOSURE2^#
+}
+func testWithAutoClosure3(x: String?) {
+  let y = (x ?? "autoclosure".#^AUTOCLOSURE3^#)
+}
+func testWithAutoClosure4(x: String?) {
+  let y = { let z = (x ?? "autoclosure").#^AUTOCLOSURE4^# }
+}
+func testWithAutoClosure5(x: String?) {
+  if let y = (x ?? "autoclosure").#^AUTOCLOSURE5^# {
+  }
 }

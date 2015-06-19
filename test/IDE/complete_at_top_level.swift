@@ -50,6 +50,9 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_STMT_9 | FileCheck %s -check-prefix=PLAIN_TOP_LEVEL
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_STMT_10 | FileCheck %s -check-prefix=PLAIN_TOP_LEVEL
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_AUTOCLOSURE_1 | FileCheck %s -check-prefix=AUTOCLOSURE_STRING
+
+
 // Test code completion in top-level code.
 //
 // This test is not meant to test that we can correctly form all kinds of
@@ -286,3 +289,10 @@ if true {
 } else {
     assertionFailure("Shouldn't be here")
 }
+
+// rdar://21346928
+func optStr() -> String? { return nil }
+let x = (optStr() ?? "autoclosure").#^TOP_LEVEL_AUTOCLOSURE_1^#
+// AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal:      characters[#String.CharacterView#]
+// AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal:      utf16[#String.UTF16View#]
+// AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal:      utf8[#String.UTF8View#]

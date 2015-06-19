@@ -1869,6 +1869,7 @@ namespace {
     }
 
     Type visitAutoClosureExpr(AutoClosureExpr *expr) {
+      // AutoClosureExpr is introduced by CSApply.
       llvm_unreachable("Already type-checked");
     }
 
@@ -2410,10 +2411,6 @@ namespace {
           return expr;
         }
       }
-
-      // FIXME: has this been completely handled?
-      if (isa<AutoClosureExpr>(expr))
-        return expr;
 
       if (auto type = CG.visit(expr)) {
         expr->setType(CG.getConstraintSystem().simplifyType(type));
