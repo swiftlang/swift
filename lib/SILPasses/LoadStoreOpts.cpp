@@ -76,6 +76,280 @@ static SILType getForwardingTypeForLS(const SILInstruction *I) {
   return getForwardingValueForLS(I).getType();
 }
 
+
+//===----------------------------------------------------------------------===//
+//                                  LSValue
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+  /// This class represents either a single value or a covering of values that we
+  /// can load forward from via the introdution of a SILArgument. This enables us
+  /// to treat the case of having one value or multiple values and load and store
+  /// cases all at once abstractly and cleanly.
+  class LSValue {
+    /// The "parent" basic block which this LSValue originated in.
+    ///
+    /// In the case where we are tracking one value this is the BB in which the
+    /// actual value originated. In the case in which we are tracking a covering
+    /// set of loads, this is the BB where if we forward this load value, we will
+    /// need to insert a SILArgument.
+    SILBasicBlock *ParentBB;
+
+    /// The individual inst or covering inst set that this LSValue represents.
+    llvm::TinyPtrVector<SILInstruction *> Insts;
+
+    /// The lazily computed value that can be used to forward this LSValue.
+    ///
+    /// In the case where we have a single value this is always initialized. In
+    /// the case where we are handling a covering set, this is initially null and
+    /// when we insert the PHI node, this is set to the SILArgument which
+    /// represents the PHI node.
+    ///
+    /// In the case where we are dealing with loads this is the loaded value or a
+    /// phi derived from a covering set of loaded values. In the case where we are
+    /// dealing with stores, this is the value that is stored or a phi of such
+    /// values.
+    SILValue ForwardingValue;
+
+  public:
+    LSValue(SILInstruction *NewInst)
+    : ParentBB(NewInst->getParent()), Insts(NewInst),
+    ForwardingValue(getForwardingValueForLS(NewInst)) {}
+
+    LSValue(SILBasicBlock *NewParentBB, ArrayRef<SILInstruction *> NewInsts);
+    LSValue(SILBasicBlock *NewParentBB, ArrayRef<LoadInst *> NewInsts);
+    LSValue(SILBasicBlock *NewParentBB, ArrayRef<StoreInst *> NewInsts);
+
+    bool operator==(const LSValue &Other) const;
+
+    void addValue(SILInstruction *I) {
+      Insts.push_back(I);
+    }
+
+    /// Return the SILValue necessary for forwarding the given LSValue.
+    ///
+    /// *NOTE* This will create a PHI node if we have not created one yet if we
+    /// have a covering set.
+    SILValue getForwardingValue();
+
+    /// Returns true if this LSValue aliases the given instruction.
+    bool aliasingWrite(AliasAnalysis *AA, SILInstruction *Inst) const {
+      // If we have a single inst, just get the forwarding value and compare if
+      // they alias.
+      if (isSingleInst())
+        return AA->mayWriteToMemory(Inst, getAddressForLS(getInst()));
+
+      // Otherwise, loop over all of our forwaring insts and return true if any of
+      // them alias Inst.
+      for (auto &I : getInsts())
+        if (AA->mayWriteToMemory(Inst, getAddressForLS(I)))
+          return true;
+      return false;
+    }
+
+    bool aliasingRead(AliasAnalysis *AA, SILInstruction *Inst) const {
+      // If we have a single inst, just get the forwarding value and compare if
+      // they alias.
+      if (isSingleInst())
+        return AA->mayReadFromMemory(Inst, getAddressForLS(getInst()));
+
+      // Otherwise, loop over all of our forwaring insts and return true if any of
+      // them alias Inst.
+      for (auto &I : getInsts())
+        if (AA->mayReadFromMemory(Inst, getAddressForLS(I)))
+          return true;
+      return false;
+    }
+
+    /// Returns the set of insts represented by this LSValue.
+    ArrayRef<SILInstruction *> getInsts() const { return Insts; }
+
+    /// Returns true if the value contains the instruction \p Inst.
+    bool containsInst(SILInstruction *Inst) const {
+      for (SILInstruction *I : Insts) {
+        if (I == Inst)
+          return true;
+      }
+      return false;
+    }
+
+#ifndef NDEBUG
+    friend raw_ostream &operator<<(raw_ostream &os, const LSValue &Val) {
+      os << "value in bb" << Val.ParentBB->getDebugID() << ": " <<
+      Val.ForwardingValue;
+      for (SILInstruction *I : Val.Insts) {
+        os << "             " << *I;
+      }
+      return os;
+    }
+#endif
+
+  protected:
+    /// Returns true if this LSValue represents a singular inst instruction.
+    bool isSingleInst() const { return Insts.size() == 1; }
+
+    /// Returns true if this LSValue represents a covering set of insts.
+    bool isCoveringInst() const { return Insts.size() > 1; }
+
+    /// Returns a singular inst if we are tracking a singular inst. Asserts
+    /// otherwise.
+    SILInstruction *getInst() const {
+      assert(isSingleInst() && "Can only getLoad() if this is a singular load");
+      return Insts[0];
+    }
+  };
+
+} // end anonymous namespace
+
+LSValue::LSValue(SILBasicBlock *NewParentBB,
+                 ArrayRef<SILInstruction *> NewInsts)
+: ParentBB(NewParentBB), Insts(), ForwardingValue() {
+  std::copy(NewInsts.begin(), NewInsts.end(), Insts.begin());
+  // Sort Insts so we can trivially compare two LSValues.
+  std::sort(Insts.begin(), Insts.end());
+}
+
+LSValue::LSValue(SILBasicBlock *NewParentBB,
+                 ArrayRef<LoadInst *> NewInsts)
+: ParentBB(NewParentBB), Insts(), ForwardingValue() {
+  std::copy(NewInsts.begin(), NewInsts.end(), Insts.begin());
+  // Sort Insts so we can trivially compare two LSValues.
+  std::sort(Insts.begin(), Insts.end());
+}
+
+LSValue::LSValue(SILBasicBlock *NewParentBB,
+                 ArrayRef<StoreInst *> NewInsts)
+: ParentBB(NewParentBB), Insts(), ForwardingValue() {
+  std::copy(NewInsts.begin(), NewInsts.end(), Insts.begin());
+  // Sort Insts so we can trivially compare two LSValues.
+  std::sort(Insts.begin(), Insts.end());
+}
+
+/// Return the SILValue necessary for forwarding the given LSValue. *NOTE*
+/// This will create a PHI node if we have not created one yet if we have a
+/// covering set.
+SILValue LSValue::getForwardingValue() {
+  // If we already have a forwarding value, just return it.
+  if (ForwardingValue)
+    return ForwardingValue;
+
+  // Otherwise, we must have a covering set of loads. Create the PHI and set
+  // forwarding value to it.
+  assert(isCoveringInst() &&
+         "Must have a covering inst at this point since "
+         "if we have a singular inst ForwardingValue is set in the "
+         "constructor.");
+
+  // We only support adding arguments to cond_br and br. If any predecessor
+  // does not have such a terminator, return an empty SILValue().
+  //
+  // *NOTE* There is an assertion in addNewEdgeValueToBranch that will throw
+  // if we do not do this early.
+  // *NOTE* This is a strong argument in favor of representing PHI nodes
+  // separately from SILArguments.
+  if (std::any_of(ParentBB->pred_begin(), ParentBB->pred_end(),
+                  [](SILBasicBlock *Pred) -> bool {
+                    TermInst *TI = Pred->getTerminator();
+                    return !isa<CondBranchInst>(TI) || !isa<BranchInst>(TI);
+                  }))
+    return SILValue();
+
+  // Create the new SILArgument and set ForwardingValue to it.
+  ForwardingValue = ParentBB->createBBArg(getForwardingTypeForLS(Insts[0]));
+
+  // Update all edges. We do not create new edges in between BBs so this
+  // information should always be correct.
+  for (SILInstruction *I : getInsts())
+    addNewEdgeValueToBranch(I->getParent()->getTerminator(), ParentBB,
+                            getForwardingValueForLS(I));
+
+  /// Return our new forwarding value.
+  return ForwardingValue;
+}
+
+/// We use the fact that LSValues always have items sorted by pointer address to
+/// compare the two instruction lists.
+bool LSValue::operator==(const LSValue &Other) const {
+  if (Insts.size() != Other.Insts.size())
+    return false;
+
+  for (unsigned i : indices(Insts))
+    if (Insts[i] != Other.Insts[i])
+      return false;
+
+  return true;
+}
+
+//===----------------------------------------------------------------------===//
+//                                   LSLoad
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+  /// This class represents either a single value that we can load forward or a
+  /// covering of values that we could load forward from via the introdution of a
+  /// SILArgument. This enables us to treat both cases the same during our
+  /// transformations in an abstract way.
+  class LSLoad : public LSValue {
+  public:
+    /// TODO: Add constructor to TinyPtrVector that takes in an individual
+    LSLoad(LoadInst *NewLoad) : LSValue(NewLoad) {}
+
+    /// TODO: Add constructor to TinyPtrVector that takes in an ArrayRef.
+    LSLoad(SILBasicBlock *NewParentBB, ArrayRef<LoadInst *> NewLoads)
+    : LSValue(NewParentBB, NewLoads) {}
+  };
+
+} // end anonymous namespace
+
+//===----------------------------------------------------------------------===//
+//                                  LSStore
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+  /// This structure represents either a single value or a covering of values that
+  /// we could use in we can dead store elimination or store forward via the
+  /// introdution of a SILArgument. This enables us to treat both cases the same
+  /// during our transformations in an abstract way.
+  class LSStore : public LSValue {
+    /// Set to true if this LSStore has been read from by some instruction so it
+    /// must be live.
+    ///
+    /// This allows us to know that the LSStore can not be deleted, but can still
+    /// be forwarded from.
+    bool HasReadDependence = false;
+
+  public:
+    LSStore(StoreInst *NewStore) : LSValue(NewStore) {}
+
+    LSStore(SILBasicBlock *NewParentBB, ArrayRef<StoreInst *> NewStores)
+    : LSValue(NewParentBB, NewStores) {}
+
+    /// Delete the store or set of stores that this LSStore represents.
+    void deleteDeadValue() {
+      for (SILInstruction *I : getInsts()) {
+        I->eraseFromParent();
+      }
+    }
+
+    /// Returns true if I post dominates all of the stores that we are tracking.
+    bool postdominates(PostDominanceInfo *PDI, SILInstruction *I) {
+      for (SILInstruction *Stores : getInsts()) {
+        if (!PDI->properlyDominates(I, Stores)) {
+          return false;
+        }
+      }
+      return true;
+    }
+    
+    void setHasReadDependence() { HasReadDependence = true; }
+    bool hasReadDependence() const { return HasReadDependence; }
+  };
+  
+} // end anonymous namespace
+
 //===----------------------------------------------------------------------===//
 //                      Forwarding Feasability Analysis
 //===----------------------------------------------------------------------===//
@@ -342,269 +616,6 @@ public:
 
   AliasAnalysis *getAA() const { return AA; }
   PostDominanceInfo *getPDI() const { return PDI; }
-};
-
-} // end anonymous namespace
-
-//===----------------------------------------------------------------------===//
-//                                  LSValue
-//===----------------------------------------------------------------------===//
-
-namespace {
-
-/// This class represents either a single value or a covering of values that we
-/// can load forward from via the introdution of a SILArgument. This enables us
-/// to treat the case of having one value or multiple values and load and store
-/// cases all at once abstractly and cleanly.
-class LSValue {
-  /// The "parent" basic block which this LSValue originated in.
-  ///
-  /// In the case where we are tracking one value this is the BB in which the
-  /// actual value originated. In the case in which we are tracking a covering
-  /// set of loads, this is the BB where if we forward this load value, we will
-  /// need to insert a SILArgument.
-  SILBasicBlock *ParentBB;
-
-  /// The individual inst or covering inst set that this LSValue represents.
-  llvm::TinyPtrVector<SILInstruction *> Insts;
-
-  /// The lazily computed value that can be used to forward this LSValue.
-  ///
-  /// In the case where we have a single value this is always initialized. In
-  /// the case where we are handling a covering set, this is initially null and
-  /// when we insert the PHI node, this is set to the SILArgument which
-  /// represents the PHI node.
-  ///
-  /// In the case where we are dealing with loads this is the loaded value or a
-  /// phi derived from a covering set of loaded values. In the case where we are
-  /// dealing with stores, this is the value that is stored or a phi of such
-  /// values.
-  SILValue ForwardingValue;
-
-public:
-  LSValue(SILInstruction *NewInst)
-      : ParentBB(NewInst->getParent()), Insts(NewInst),
-        ForwardingValue(getForwardingValueForLS(NewInst)) {}
-
-  LSValue(SILBasicBlock *NewParentBB, ArrayRef<SILInstruction *> NewInsts);
-  LSValue(SILBasicBlock *NewParentBB, ArrayRef<LoadInst *> NewInsts);
-  LSValue(SILBasicBlock *NewParentBB, ArrayRef<StoreInst *> NewInsts);
-
-  bool operator==(const LSValue &Other) const;
-
-  void addValue(SILInstruction *I) {
-    Insts.push_back(I);
-  }
-
-  /// Return the SILValue necessary for forwarding the given LSValue.
-  ///
-  /// *NOTE* This will create a PHI node if we have not created one yet if we
-  /// have a covering set.
-  SILValue getForwardingValue();
-
-  /// Returns true if this LSValue aliases the given instruction.
-  bool aliasingWrite(AliasAnalysis *AA, SILInstruction *Inst) const {
-    // If we have a single inst, just get the forwarding value and compare if
-    // they alias.
-    if (isSingleInst())
-      return AA->mayWriteToMemory(Inst, getAddressForLS(getInst()));
-
-    // Otherwise, loop over all of our forwaring insts and return true if any of
-    // them alias Inst.
-    for (auto &I : getInsts())
-      if (AA->mayWriteToMemory(Inst, getAddressForLS(I)))
-        return true;
-    return false;
-  }
-
-  bool aliasingRead(AliasAnalysis *AA, SILInstruction *Inst) const {
-    // If we have a single inst, just get the forwarding value and compare if
-    // they alias.
-    if (isSingleInst())
-      return AA->mayReadFromMemory(Inst, getAddressForLS(getInst()));
-
-    // Otherwise, loop over all of our forwaring insts and return true if any of
-    // them alias Inst.
-    for (auto &I : getInsts())
-      if (AA->mayReadFromMemory(Inst, getAddressForLS(I)))
-        return true;
-    return false;
-  }
-
-  /// Returns the set of insts represented by this LSValue.
-  ArrayRef<SILInstruction *> getInsts() const { return Insts; }
-
-  /// Returns true if the value contains the instruction \p Inst.
-  bool containsInst(SILInstruction *Inst) const {
-    for (SILInstruction *I : Insts) {
-      if (I == Inst)
-        return true;
-    }
-    return false;
-  }
-
-#ifndef NDEBUG
-  friend raw_ostream &operator<<(raw_ostream &os, const LSValue &Val) {
-    os << "value in bb" << Val.ParentBB->getDebugID() << ": " <<
-      Val.ForwardingValue;
-    for (SILInstruction *I : Val.Insts) {
-      os << "             " << *I;
-    }
-    return os;
-  }
-#endif
-
-protected:
-  /// Returns true if this LSValue represents a singular inst instruction.
-  bool isSingleInst() const { return Insts.size() == 1; }
-
-  /// Returns true if this LSValue represents a covering set of insts.
-  bool isCoveringInst() const { return Insts.size() > 1; }
-
-  /// Returns a singular inst if we are tracking a singular inst. Asserts
-  /// otherwise.
-  SILInstruction *getInst() const {
-    assert(isSingleInst() && "Can only getLoad() if this is a singular load");
-    return Insts[0];
-  }
-};
-
-} // end anonymous namespace
-
-LSValue::LSValue(SILBasicBlock *NewParentBB,
-                 ArrayRef<SILInstruction *> NewInsts)
-    : ParentBB(NewParentBB), Insts(), ForwardingValue() {
-  std::copy(NewInsts.begin(), NewInsts.end(), Insts.begin());
-  // Sort Insts so we can trivially compare two LSValues.
-  std::sort(Insts.begin(), Insts.end());
-}
-
-LSValue::LSValue(SILBasicBlock *NewParentBB,
-                 ArrayRef<LoadInst *> NewInsts)
-    : ParentBB(NewParentBB), Insts(), ForwardingValue() {
-  std::copy(NewInsts.begin(), NewInsts.end(), Insts.begin());
-  // Sort Insts so we can trivially compare two LSValues.
-  std::sort(Insts.begin(), Insts.end());
-}
-
-LSValue::LSValue(SILBasicBlock *NewParentBB,
-                 ArrayRef<StoreInst *> NewInsts)
-    : ParentBB(NewParentBB), Insts(), ForwardingValue() {
-  std::copy(NewInsts.begin(), NewInsts.end(), Insts.begin());
-  // Sort Insts so we can trivially compare two LSValues.
-  std::sort(Insts.begin(), Insts.end());
-}
-
-/// Return the SILValue necessary for forwarding the given LSValue. *NOTE*
-/// This will create a PHI node if we have not created one yet if we have a
-/// covering set.
-SILValue LSValue::getForwardingValue() {
-  // If we already have a forwarding value, just return it.
-  if (ForwardingValue)
-    return ForwardingValue;
-
-  // Otherwise, we must have a covering set of loads. Create the PHI and set
-  // forwarding value to it.
-  assert(isCoveringInst() &&
-         "Must have a covering inst at this point since "
-         "if we have a singular inst ForwardingValue is set in the "
-         "constructor.");
-
-  // We only support adding arguments to cond_br and br. If any predecessor
-  // does not have such a terminator, return an empty SILValue().
-  //
-  // *NOTE* There is an assertion in addNewEdgeValueToBranch that will throw
-  // if we do not do this early.
-  // *NOTE* This is a strong argument in favor of representing PHI nodes
-  // separately from SILArguments.
-  if (std::any_of(ParentBB->pred_begin(), ParentBB->pred_end(),
-                  [](SILBasicBlock *Pred) -> bool {
-        TermInst *TI = Pred->getTerminator();
-        return !isa<CondBranchInst>(TI) || !isa<BranchInst>(TI);
-      }))
-    return SILValue();
-
-  // Create the new SILArgument and set ForwardingValue to it.
-  ForwardingValue = ParentBB->createBBArg(getForwardingTypeForLS(Insts[0]));
-
-  // Update all edges. We do not create new edges in between BBs so this
-  // information should always be correct.
-  for (SILInstruction *I : getInsts())
-    addNewEdgeValueToBranch(I->getParent()->getTerminator(), ParentBB,
-                            getForwardingValueForLS(I));
-
-  /// Return our new forwarding value.
-  return ForwardingValue;
-}
-
-/// We use the fact that LSValues always have items sorted by pointer address to
-/// compare the two instruction lists.
-bool LSValue::operator==(const LSValue &Other) const {
-  if (Insts.size() != Other.Insts.size())
-    return false;
-
-  for (unsigned i : indices(Insts))
-    if (Insts[i] != Other.Insts[i])
-      return false;
-
-  return true;
-}
-
-//===----------------------------------------------------------------------===//
-//                                   LSLoad
-//===----------------------------------------------------------------------===//
-
-namespace {
-
-/// This class represents either a single value that we can load forward or a
-/// covering of values that we could load forward from via the introdution of a
-/// SILArgument. This enables us to treat both cases the same during our
-/// transformations in an abstract way.
-class LSLoad : public LSValue {
-public:
-  /// TODO: Add constructor to TinyPtrVector that takes in an individual
-  LSLoad(LoadInst *NewLoad) : LSValue(NewLoad) {}
-
-  /// TODO: Add constructor to TinyPtrVector that takes in an ArrayRef.
-  LSLoad(SILBasicBlock *NewParentBB, ArrayRef<LoadInst *> NewLoads)
-      : LSValue(NewParentBB, NewLoads) {}
-};
-
-} // end anonymous namespace
-
-//===----------------------------------------------------------------------===//
-//                                  LSStore
-//===----------------------------------------------------------------------===//
-
-namespace {
-
-/// This structure represents either a single value or a covering of values that
-/// we could use in we can dead store elimination or store forward via the
-/// introdution of a SILArgument. This enables us to treat both cases the same
-/// during our transformations in an abstract way.
-class LSStore : public LSValue {
-public:
-  LSStore(StoreInst *NewStore) : LSValue(NewStore) {}
-
-  LSStore(SILBasicBlock *NewParentBB, ArrayRef<StoreInst *> NewStores)
-      : LSValue(NewParentBB, NewStores) {}
-
-  /// Delete the store or set of stores that this LSStore represents.
-  void deleteDeadValue() {
-    for (SILInstruction *I : getInsts()) {
-      I->eraseFromParent();
-    }
-  }
-
-  /// Returns true if I post dominates all of the stores that we are tracking.
-  bool postdominates(PostDominanceInfo *PDI, SILInstruction *I) {
-    for (SILInstruction *Stores : getInsts()) {
-      if (!PDI->properlyDominates(I, Stores)) {
-        return false;
-      }
-    }
-    return true;
-  }
 };
 
 } // end anonymous namespace
