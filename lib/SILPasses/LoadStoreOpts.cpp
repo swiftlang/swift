@@ -709,11 +709,11 @@ public:
 
   /// Delete the store that we have mapped to Addr, plus other instructions
   /// which get dead due to the removed store.
-  void deleteStoreMappedToAddress(SILValue Addr, CoveredStoreMap &StoreMap,
-                                  LSContext &Ctx);
+  void deleteStoreMappedToAddress(LSContext &Ctx, SILValue Addr,
+                                  CoveredStoreMap &StoreMap);
 
-  void deleteUntrackedInstruction(SILInstruction *I, CoveredStoreMap &StoreMap,
-                                  LSContext &Ctx);
+  void deleteUntrackedInstruction(LSContext &Ctx, SILInstruction *I,
+                                  CoveredStoreMap &StoreMap);
 
   /// Invalidate any loads that we can not prove that Inst does not write to.
   void invalidateAliasingLoads(LSContext &Ctx, SILInstruction *Inst,
@@ -775,9 +775,9 @@ inline raw_ostream &operator<<(raw_ostream &os,
 
 } // end anonymous namespace
 
-void LSBBForwarder::deleteStoreMappedToAddress(SILValue Addr,
-                                               CoveredStoreMap &StoreMap,
-                                               LSContext &Ctx) {
+void LSBBForwarder::deleteStoreMappedToAddress(LSContext &Ctx,
+                                               SILValue Addr,
+                                               CoveredStoreMap &StoreMap) {
   auto SIIter = Stores.find(Addr);
   if (SIIter == Stores.end())
     return;
@@ -803,9 +803,8 @@ void LSBBForwarder::deleteStoreMappedToAddress(SILValue Addr,
 
 void
 LSBBForwarder::
-deleteUntrackedInstruction(SILInstruction *I,
-                           CoveredStoreMap &StoreMap,
-                           LSContext &Ctx) {
+deleteUntrackedInstruction(LSContext &Ctx, SILInstruction *I,
+                           CoveredStoreMap &StoreMap) {
   DEBUG(llvm::dbgs() << "        Deleting all instructions recursively from: "
                      << *I);
   auto UpdateFun = [&](SILInstruction *DeadI) {
@@ -883,7 +882,7 @@ bool LSBBForwarder::tryToEliminateDeadStores(LSContext &Ctx, StoreInst *SI,
     SILValue LdSrcOp = LdSrc->getOperand();
     auto Iter = Loads.find(LdSrcOp);
     if (Iter != Loads.end() && LdSrcOp == SI->getDest()) {
-      deleteUntrackedInstruction(SI, StoreMap, Ctx);
+      deleteUntrackedInstruction(Ctx, SI, StoreMap);
       NumDeadStores++;
       return true;
     }
@@ -937,7 +936,7 @@ bool LSBBForwarder::tryToEliminateDeadStores(LSContext &Ctx, StoreInst *SI,
   }
 
   for (SILValue SIOp : StoresToDelete)
-    deleteStoreMappedToAddress(SIOp, StoreMap, Ctx);
+    deleteStoreMappedToAddress(Ctx, SIOp, StoreMap);
   for (SILValue SIOp : StoresToStopTracking)
     stopTrackingAddress(SIOp, StoreMap);
 
@@ -1034,7 +1033,7 @@ bool LSBBForwarder::tryToForwardStoresToLoad(LSContext &Ctx, LoadInst *LI,
 
     DEBUG(llvm::dbgs() << "        Forwarding store from: " << *Addr);
     SILValue(LI).replaceAllUsesWith(Result);
-    deleteUntrackedInstruction(LI, StoreMap, Ctx);
+    deleteUntrackedInstruction(Ctx, LI, StoreMap);
     NumForwardedLoads++;
     return true;
   }
@@ -1058,7 +1057,7 @@ bool LSBBForwarder::tryToForwardStoresToLoad(LSContext &Ctx, LoadInst *LI,
 
     DEBUG(llvm::dbgs() << "        Forwarding from multiple stores: ");
     SILValue(LI).replaceAllUsesWith(Result);
-    deleteUntrackedInstruction(LI, StoreMap, Ctx);
+    deleteUntrackedInstruction(Ctx, LI, StoreMap);
     NumForwardedLoads++;
     return true;
   }
@@ -1081,7 +1080,7 @@ bool LSBBForwarder::tryToForwardLoadsToLoad(LSContext &Ctx, LoadInst *LI,
       DEBUG(llvm::dbgs() << "        Replacing with previous load: "
             << *Result);
       SILValue(LI).replaceAllUsesWith(Result);
-      deleteUntrackedInstruction(LI, StoreMap, Ctx);
+      deleteUntrackedInstruction(Ctx, LI, StoreMap);
       NumDupLoads++;
       return true;
     }
@@ -1137,7 +1136,7 @@ bool LSBBForwarder::optimize(LSContext &Ctx,
 
     // This is a LoadInst. Let's see if we can find a previous loaded, stored
     // value to use instead of this load.
-    if (LoadInst *LI = dyn_cast<LoadInst>(Inst)) {
+    if (auto *LI = dyn_cast<LoadInst>(Inst)) {
       Changed |= tryToForwardLoad(Ctx, LI, StoreMap);
       continue;
     }
