@@ -46,3 +46,23 @@ var TopLevelVar: TopLevelVar? { return nil } // expected-error 2 {{use of undecl
 protocol AProtocol {
   typealias e : e  // expected-error {{inheritance from non-protocol, non-class type '`Self`.e'}}
 }
+
+
+
+// <rdar://problem/15604574> Protocol conformance checking needs to be delayed
+protocol P15604574 {
+  typealias FooResult
+  func foo() -> FooResult
+}
+
+class AcceptsP<T : P15604574> { }
+
+class X {
+  func foo() -> AcceptsP<X> { } // expected-error {{type 'X' does not conform to protocol 'P15604574'}}
+}
+
+// <rdar://problem/17144076> recursive typealias causes a segfault in the type checker
+struct SomeStruct<A> {
+  typealias A = A // expected-error {{type alias 'A' circularly references itself}}
+}
+
