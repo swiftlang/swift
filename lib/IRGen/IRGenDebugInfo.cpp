@@ -1075,9 +1075,6 @@ void IRGenDebugInfo::emitVariableDeclaration(
   ElementSizes EltSizes(DITy, DIRefMap);
   auto Dim = EltSizes.getNext();
   for (llvm::Value *Piece : Storage) {
-    assert((Piece->getType()->isPointerTy() || VarSizeInBits > 0)
-           && "zero-sized variable");
-
     // There are variables without storage, such as "struct { func foo() {} }".
     // Emit them as constant 0.
     if (isa<llvm::UndefValue>(Piece))
@@ -1086,9 +1083,9 @@ void IRGenDebugInfo::emitVariableDeclaration(
     if (IsPiece) {
       // Try to get the size from the type if possible.
       auto StorageSize = getSizeFromExplosionValue(CI.getTargetInfo(), Piece);
-      // FIXME: Occasionally, there is a discrepancy between the AST
-      // type and the Storage type. Usually this is due to reference
-      // counting.
+      // FIXME: The TypeInfo for bound generic enum types reports a
+      // type <{}> (with size 0) but a concrete instance may still
+      // have storage allocated for it. rdar://problem/21470869
       if (!Dim.SizeInBits || (StorageSize && Dim.SizeInBits > StorageSize))
         Dim.SizeInBits = StorageSize;
 
