@@ -642,7 +642,7 @@ public:
       return;
 
     VarDecl *Decl = i->getDecl();
-    if (!Decl)
+    if (!Decl || ArgEmitted.lookup(Decl))
       return;
 
     auto SILVal = i->getOperand();
@@ -664,7 +664,7 @@ public:
     if (!IGM.DebugInfo)
       return;
     VarDecl *Decl = i->getDecl();
-    if (!Decl)
+    if (!Decl || ArgEmitted.lookup(Decl))
       return;
 
     auto SILVal = i->getOperand();
