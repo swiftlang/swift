@@ -20,6 +20,13 @@
 + (instancetype)testZ SWIFT_NAME(zz());
 + (instancetype)testY:(nullable id)x SWIFT_NAME(yy(aa:));
 + (instancetype)testX:(nullable id)x xx:(nullable id)xx SWIFT_NAME(xx(_:bb:));
+
+// Things that Clang won't catch as problematic, but we should.
++ (instancetype)f:(id)x SWIFT_NAME(init(f:ff:));
++ (instancetype)g:(id)x outParam:(int *)foo SWIFT_NAME(init(g:));
++ (instancetype)testW:(id)x out:(id *)outObject SWIFT_NAME(ww(_:));
++ (instancetype)test SWIFT_NAME(test(a:b:));
++ (instancetype)test:(id)x more:(id)y SWIFT_NAME(test());
 @end
 
 @interface SwiftNameTestError : NSObject

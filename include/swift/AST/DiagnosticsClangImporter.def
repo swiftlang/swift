@@ -54,6 +54,10 @@ WARNING(could_not_rewrite_bridging_header,none,none,
   "failed to serialize bridging header; "
   "target may not be debuggable outside of its original project", ())
 
+WARNING(invalid_swift_name_method,none,none,
+  "too %select{few|many}0 parameters in swift_name attribute (expected %1; "
+  "got %2)", (bool, unsigned, unsigned))
+
 #ifndef DIAG_NO_UNDEF
 # if defined(DIAG)
 #  undef DIAG

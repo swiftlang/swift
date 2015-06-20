@@ -15,21 +15,23 @@
 //===----------------------------------------------------------------------===//
 
 #include "ImporterImpl.h"
-#include "swift/ClangImporter/ClangModule.h"
+#include "ClangDiagnosticConsumer.h"
 #include "swift/Strings.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticEngine.h"
+#include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Types.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/AST/TypeVisitor.h"
-#include "swift/ClangImporter/ClangModule.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
@@ -1813,6 +1815,21 @@ Type ClangImporter::Implementation::importMethodType(
   if (kind == SpecialMethodKind::Constructor && params.empty() && 
       argNames.size() == 1) {
     addEmptyTupleParameter(argNames[0]);
+  }
+
+  if (isCustomName && argNames.size() != swiftBodyParams.size()) {
+    // Note carefully: we're emitting a warning in the /Clang/ buffer.
+    auto &srcMgr = getClangASTContext().getSourceManager();
+    auto &rawDiagClient = Instance->getDiagnosticClient();
+    auto &diagClient = static_cast<ClangDiagnosticConsumer &>(rawDiagClient);
+    SourceLoc methodLoc =
+        diagClient.resolveSourceLocation(srcMgr, clangDecl->getLocation());
+    if (methodLoc.isValid()) {
+      SwiftContext.Diags.diagnose(methodLoc, diag::invalid_swift_name_method,
+                                  swiftBodyParams.size() < argNames.size(),
+                                  swiftBodyParams.size(), argNames.size());
+    }
+    return Type();
   }
 
   // Form the parameter tuple.

@@ -85,7 +85,7 @@ static SourceLoc findEndOfLine(SourceManager &SM, SourceLoc loc,
   CharSourceRange entireBuffer = SM.getRangeForBuffer(bufferID);
   CharSourceRange rangeFromLoc{SM, loc, entireBuffer.getEnd()};
   StringRef textFromLoc = SM.extractText(rangeFromLoc);
-  size_t newlineOffset = textFromLoc.find_first_of("\r\n");
+  size_t newlineOffset = textFromLoc.find_first_of({"\r\n\0", 3});
   if (newlineOffset == StringRef::npos)
     return entireBuffer.getEnd();
   return loc.getAdvancedLoc(newlineOffset);

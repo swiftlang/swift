@@ -70,9 +70,6 @@ private:
   SourceLoc DiagLoc;
   const bool DumpToStderr;
 
-  SourceLoc resolveSourceLocation(const clang::SourceManager &clangSrcMgr,
-                                  clang::SourceLocation clangLoc);
-
 public:
   ClangDiagnosticConsumer(ClangImporter::Implementation &impl,
                           clang::DiagnosticOptions &clangDiagOptions,
@@ -83,6 +80,12 @@ public:
     DiagLoc = diagLoc;
     return LoadModuleRAII(*this, name);
   }
+
+  /// Returns a Swift source location that points into a Clang buffer.
+  ///
+  /// This will keep the Clang buffer alive as long as this diagnostic consumer.
+  SourceLoc resolveSourceLocation(const clang::SourceManager &clangSrcMgr,
+                                  clang::SourceLocation clangLoc);
 
   void HandleDiagnostic(clang::DiagnosticsEngine::Level diagLevel,
                         const clang::Diagnostic &info) override;
