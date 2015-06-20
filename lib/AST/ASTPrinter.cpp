@@ -2453,7 +2453,13 @@ public:
     printWithParensIfNotSimple(T->getInstanceType());
 
     // We spell normal metatypes of existential types as .Protocol.
-    if (isa<MetatypeType>(T) && T->getInstanceType()->isAnyExistentialType()) {
+    if (isa<MetatypeType>(T) &&
+        // Special case AssociatedTypeType's here, since they may not be fully
+        // set up within the type checker (preventing getCanonicalType from
+        // working), and we want type printing to always work even in malformed
+        // programs half way through the type checker.
+        !isa<AssociatedTypeType>(T->getInstanceType().getPointer()) &&
+        T->getInstanceType()->isAnyExistentialType()) {
       Printer << ".Protocol";
     } else {
       Printer << ".Type";
