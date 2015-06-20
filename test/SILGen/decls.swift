@@ -171,3 +171,8 @@ struct StructWithLazyField {
 func test21057425() {
   var x = 0, y: Int = 0
 }
+
+func useImplicitDecls() {
+  _ = StructWithLazyField(once: 55)
+}
+

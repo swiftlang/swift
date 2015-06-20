@@ -190,6 +190,29 @@ static SILLinkage getLinkageForLocalContext(DeclContext *dc) {
   return SILLinkage::Shared;
 }
 
+bool SILDeclRef::isThunk() const {
+  return isCurried || isForeignToNativeThunk() || isNativeToForeignThunk();
+}
+
+bool SILDeclRef::isClangImported() const {
+  if (!hasDecl())
+    return false;
+
+  ValueDecl *d = getDecl();
+  DeclContext *moduleContext = d->getDeclContext()->getModuleScopeContext();
+
+  if (isa<ClangModuleUnit>(moduleContext)) {
+    if (isa<ConstructorDecl>(d) || isa<EnumElementDecl>(d))
+      return true;
+
+    if (auto *FD = dyn_cast<FuncDecl>(d))
+      if (FD->isAccessor() ||
+          isa<NominalTypeDecl>(d->getDeclContext()))
+        return true;
+  }
+  return false;
+}
+
 SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   // Anonymous functions have local linkage.
   if (auto closure = getAbstractClosureExpr())
@@ -207,22 +230,16 @@ SILLinkage SILDeclRef::getLinkage(ForDefinition_t forDefinition) const {
   }
   
   // Currying and calling convention thunks have shared linkage.
-  if (isCurried || isForeignToNativeThunk() || isNativeToForeignThunk())
+  if (isThunk())
     return SILLinkage::Shared;
   
   // Declarations imported from Clang modules have shared linkage.
   // FIXME: They shouldn't.
   const SILLinkage ClangLinkage = SILLinkage::Shared;
-  
-  if (isa<ClangModuleUnit>(moduleContext)) {
-    if (isa<ConstructorDecl>(d) || isa<EnumElementDecl>(d))
-      return ClangLinkage;
 
-    if (auto *FD = dyn_cast<FuncDecl>(d))
-      if (FD->isAccessor() ||
-          isa<NominalTypeDecl>(d->getDeclContext()))
-        return ClangLinkage;
-  }
+  if (isClangImported())
+    return ClangLinkage;
+
   // Declarations that were derived on behalf of types in Clang modules get
   // shared linkage.
   if (auto *FD = dyn_cast<FuncDecl>(d)) {

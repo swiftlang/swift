@@ -335,6 +335,19 @@ struct SILDeclRef {
   /// declarations do not always have vtable entries.
   SILDeclRef getOverriddenVTableEntry() const;
 
+  /// True if the referenced entity is some kind of thunk.
+  bool isThunk() const;
+
+  /// True if the referenced entity is generated on behalf of the Clang
+  /// importer.
+  bool isClangImported() const;
+
+  bool isImplicit() const {
+    if (hasDecl())
+      return getDecl()->isImplicit();
+    return getAbstractClosureExpr()->isImplicit();
+  }
+
 private:
   friend struct llvm::DenseMapInfo<swift::SILDeclRef>;
   /// Produces a SILDeclRef from an opaque value.

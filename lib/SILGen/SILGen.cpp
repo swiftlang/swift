@@ -218,8 +218,8 @@ SILType SILGenModule::getConstantType(SILDeclRef constant) {
   return Types.getConstantType(constant);
 }
 
-SILFunction *SILGenModule::getFunction(SILDeclRef constant,
-                                       ForDefinition_t forDefinition) {
+SILFunction *SILGenModule::getEmittedFunction(SILDeclRef constant,
+                                              ForDefinition_t forDefinition) {
   auto found = emittedFunctions.find(constant);
   if (found != emittedFunctions.end()) {
     SILFunction *F = found->second;
@@ -237,6 +237,39 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
     return F;
   }
 
+  return nullptr;
+}
+
+static SILFunction *getFunctionToInsertAfter(SILGenModule &SGM,
+                                             SILDeclRef insertAfter) {
+  // If the decl ref was emitted, emit after its function.
+  while (insertAfter) {
+    auto found = SGM.emittedFunctions.find(insertAfter);
+    if (found != SGM.emittedFunctions.end()) {
+      return found->second;
+    }
+
+    // Otherwise, try to insert after the function we would be transitively
+    // be inserted after.
+    auto foundDelayed = SGM.delayedFunctions.find(insertAfter);
+    if (foundDelayed != SGM.delayedFunctions.end()) {
+      insertAfter = foundDelayed->second.insertAfter;
+    } else {
+      break;
+    }
+  }
+
+  // If the decl ref is nil, just insert at the beginning.
+  return nullptr;
+}
+
+SILFunction *SILGenModule::getFunction(SILDeclRef constant,
+                                       ForDefinition_t forDefinition) {
+  // If we already emitted the function, return it (potentially preparing it
+  // for definition).
+  if (auto emitted = getEmittedFunction(constant, forDefinition))
+    return emitted;
+
   // Note: Do not provide any SILLocation. You can set it afterwards.
   auto *F = M.getOrCreateFunction((Decl*)nullptr, constant, forDefinition);
 
@@ -251,6 +284,27 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
 
   emittedFunctions[constant] = F;
 
+  // If we delayed emitting this function previously, we need it now.
+  auto foundDelayed = delayedFunctions.find(constant);
+  if (foundDelayed != delayedFunctions.end()) {
+    // Move the function to its proper place within the module.
+    M.functions.remove(F);
+    SILFunction *insertAfter = getFunctionToInsertAfter(*this,
+                                              foundDelayed->second.insertAfter);
+    if (!insertAfter) {
+      M.functions.push_front(F);
+    } else {
+      M.functions.insertAfter(insertAfter, F);
+    }
+
+    forcedFunctions.push_back(*foundDelayed);
+    delayedFunctions.erase(foundDelayed);
+  } else {
+    // We would have registered a delayed function as "last emitted" when we
+    // enqueued. If the function wasn't delayed, then we're emitting it now.
+    lastEmittedFunction = constant;
+  }
+
   return F;
 }
 
@@ -263,37 +317,79 @@ void SILGenModule::visitFuncDecl(FuncDecl *fd) {
   emitFunction(fd);
 }
 
+/// Emit a function now, if it's externally usable or has been referenced in
+/// the current TU, or remember how to emit it later if not.
+template<typename /*void (SILFunction*)*/ Fn>
+void emitOrDelayFunction(SILGenModule &SGM,
+                         SILDeclRef constant,
+                         Fn &&emitter) {
+  auto emitAfter = SGM.lastEmittedFunction;
+
+  SILFunction *f = nullptr;
+
+  // If the function is explicit or may be externally referenced, we must emit
+  // it.
+  bool mayDelay;
+  // Shared thunks and Clang-imported definitions can always be delayed.
+  if (constant.isThunk() || constant.isClangImported()) {
+    mayDelay = true;
+  // Implicit decls may be delayed if they can't be used externally.
+  } else {
+    auto linkage = constant.getLinkage(ForDefinition);
+    mayDelay = constant.isImplicit()
+      && !isPossiblyUsedExternally(linkage, SGM.M.isWholeModule());
+  }
+
+  // Avoid emitting a delayable definition if it hasn't already been referenced.
+  if (mayDelay)
+    f = SGM.getEmittedFunction(constant, ForDefinition);
+  else
+    f = SGM.getFunction(constant, ForDefinition);
+
+  // If we don't want to emit now, remember how for later.
+  if (!f) {
+    SGM.delayedFunctions.insert({constant, {emitAfter,
+                                            std::forward<Fn>(emitter)}});
+    // Even though we didn't emit the function now, update the
+    // lastEmittedFunction so that we preserve the original ordering that
+    // the symbols would have been emitted in.
+    SGM.lastEmittedFunction = constant;
+    return;
+  }
+
+  emitter(f);
+}
+
 template<typename T>
-SILFunction *SILGenModule::preEmitFunction(SILDeclRef constant, T *astNode,
-                                           SILLocation Loc) {
+void SILGenModule::preEmitFunction(SILDeclRef constant,
+                                   T *astNode,
+                                   SILFunction *F,
+                                   SILLocation Loc) {
   // By default, use the astNode to create the location.
   if (Loc.isNull())
     Loc = RegularLocation(astNode);
 
-  SILFunction *f = getFunction(constant, ForDefinition);
-  assert(f->empty() && "already emitted function?!");
+  assert(F->empty() && "already emitted function?!");
 
-  f->setContextGenericParams(
+  F->setContextGenericParams(
                          Types.getConstantInfo(constant).ContextGenericParams);
 
   // Create a debug scope for the function using astNode as source location.
-  f->setDebugScope(new (M) SILDebugScope(RegularLocation(astNode), *f));
+  F->setDebugScope(new (M) SILDebugScope(RegularLocation(astNode), *F));
 
-  f->setLocation(Loc);
+  F->setLocation(Loc);
 
-  f->setDeclContext(astNode);
+  F->setDeclContext(astNode);
 
   DEBUG(llvm::dbgs() << "lowering ";
-        f->printName(llvm::dbgs());
+        F->printName(llvm::dbgs());
         llvm::dbgs() << " : $";
-        f->getLoweredType().print(llvm::dbgs());
+        F->getLoweredType().print(llvm::dbgs());
         llvm::dbgs() << '\n';
         if (astNode) {
           astNode->print(llvm::dbgs());
           llvm::dbgs() << '\n';
         });
-
-  return f;
 }
 
 void SILGenModule::postEmitFunction(SILDeclRef constant,
@@ -350,16 +446,21 @@ void SILGenModule::emitFunction(FuncDecl *fd) {
     PrettyStackTraceDecl stackTrace("emitting SIL for", fd);
 
     SILDeclRef constant(decl);
-    SILFunction *f = preEmitFunction(constant, fd, fd);
-    SILGenFunction(*this, *f).emitFunction(fd);
-    postEmitFunction(constant, f);
+
+    emitOrDelayFunction(*this, constant, [this,constant,fd](SILFunction *f){
+      preEmitFunction(constant, fd, f, fd);
+      SILGenFunction(*this, *f).emitFunction(fd);
+      postEmitFunction(constant, f);
+    });
   }
 }
 
 void SILGenModule::emitCurryThunk(SILDeclRef entryPoint,
                                   SILDeclRef nextEntryPoint,
                                   ValueDecl *fd) {
-  SILFunction *f = preEmitFunction(entryPoint, fd, fd);
+  // Thunks are always emitted by need, so don't need delayed emission.
+  SILFunction *f = getFunction(entryPoint, ForDefinition);
+  preEmitFunction(entryPoint, fd, f, fd);
   PrettyStackTraceSILFunction X("silgen emitCurryThunk", f);
 
   SILGenFunction(*this, *f)
@@ -368,22 +469,25 @@ void SILGenModule::emitCurryThunk(SILDeclRef entryPoint,
 }
 
 void SILGenModule::emitForeignToNativeThunk(SILDeclRef thunk) {
+  // Thunks are always emitted by need, so don't need delayed emission.
   assert(!thunk.isForeign && "foreign-to-native thunks only");
-  SILFunction *f = preEmitFunction(thunk, thunk.getDecl(), thunk.getDecl());
+  SILFunction *f = getFunction(thunk, ForDefinition);
+  preEmitFunction(thunk, thunk.getDecl(), f, thunk.getDecl());
   PrettyStackTraceSILFunction X("silgen emitForeignToNativeThunk", f);
   SILGenFunction(*this, *f).emitForeignToNativeThunk(thunk);
   postEmitFunction(thunk, f);
 }
 
 void SILGenModule::emitNativeToForeignThunk(SILDeclRef thunk) {
+  // Thunks are always emitted by need, so don't need delayed emission.
   assert(thunk.isForeign && "native-to-foreign thunks only");
   
-  SILFunction *f;
+  SILFunction *f = getFunction(thunk, ForDefinition);
   if (thunk.hasDecl())
-    f = preEmitFunction(thunk, thunk.getDecl(), thunk.getDecl());
+    preEmitFunction(thunk, thunk.getDecl(), f, thunk.getDecl());
   else
-    f = preEmitFunction(thunk, thunk.getAbstractClosureExpr(),
-                        thunk.getAbstractClosureExpr());
+    preEmitFunction(thunk, thunk.getAbstractClosureExpr(), f,
+                    thunk.getAbstractClosureExpr());
   PrettyStackTraceSILFunction X("silgen emitNativeToForeignThunk", f);
   f->setBare(IsBare);
   SILGenFunction(*this, *f).emitNativeToForeignThunk(thunk);
@@ -412,44 +516,57 @@ void SILGenModule::emitConstructor(ConstructorDecl *decl) {
     return;
 
   SILDeclRef constant(decl);
-  SILFunction *f = preEmitFunction(constant, decl, decl);
-  PrettyStackTraceSILFunction X("silgen emitConstructor", f);
 
   if (decl->getImplicitSelfDecl()->getType()->getInOutObjectType()
         ->getClassOrBoundGenericClass()) {
     // Class constructors have separate entry points for allocation and
     // initialization.
-    SILGenFunction(*this, *f)
-      .emitClassConstructorAllocator(decl);
-    postEmitFunction(constant, f);
+    emitOrDelayFunction(*this, constant, [this,constant,decl](SILFunction *f){
+      preEmitFunction(constant, decl, f, decl);
+      PrettyStackTraceSILFunction X("silgen emitConstructor", f);
+      SILGenFunction(*this, *f)
+        .emitClassConstructorAllocator(decl);
+      postEmitFunction(constant, f);
+    });
 
     // If this constructor was imported, we don't need the initializing
     // constructor to be emitted.
     if (!decl->hasClangNode()) {
       SILDeclRef initConstant(decl, SILDeclRef::Kind::Initializer);
-      SILFunction *initF = preEmitFunction(initConstant, decl, decl);
-      PrettyStackTraceSILFunction X("silgen constructor initializer", initF);
-      SILGenFunction(*this, *initF).emitClassConstructorInitializer(decl);
-      postEmitFunction(initConstant, initF);
+      emitOrDelayFunction(*this, initConstant,
+                          [this,initConstant,decl](SILFunction *initF){
+        preEmitFunction(initConstant, decl, initF, decl);
+        PrettyStackTraceSILFunction X("silgen constructor initializer", initF);
+        SILGenFunction(*this, *initF).emitClassConstructorInitializer(decl);
+        postEmitFunction(initConstant, initF);
+      });
     }
   } else {
     // Struct and enum constructors do everything in a single function.
-    SILGenFunction(*this, *f).emitValueConstructor(decl);
-    postEmitFunction(constant, f);
+    emitOrDelayFunction(*this, constant, [this,constant,decl](SILFunction *f) {
+      preEmitFunction(constant, decl, f, decl);
+      PrettyStackTraceSILFunction X("silgen emitConstructor", f);
+      SILGenFunction(*this, *f).emitValueConstructor(decl);
+      postEmitFunction(constant, f);
+    });
   }
 }
 
 void SILGenModule::emitEnumConstructor(EnumElementDecl *decl) {
   SILDeclRef constant(decl);
-  SILFunction *f = preEmitFunction(constant, decl, decl);
-  PrettyStackTraceSILFunction X("silgen enum constructor", f);
-  SILGenFunction(*this, *f).emitEnumConstructor(decl);
-  postEmitFunction(constant, f);
+  emitOrDelayFunction(*this, constant, [this,constant,decl](SILFunction *f) {
+    preEmitFunction(constant, decl, f, decl);
+    PrettyStackTraceSILFunction X("silgen enum constructor", f);
+    SILGenFunction(*this, *f).emitEnumConstructor(decl);
+    postEmitFunction(constant, f);
+  });
 }
 
 SILFunction *SILGenModule::emitClosure(AbstractClosureExpr *ce) {
+  // Closures are emitted by need, so don't required delayed emission.
   SILDeclRef constant(ce);
-  SILFunction *f = preEmitFunction(constant, ce, ce);
+  SILFunction *f = getFunction(constant, ForDefinition);
+  preEmitFunction(constant, ce, f, ce);
   PrettyStackTraceSILFunction X("silgen closureexpr", f);
   SILGenFunction(*this, *f).emitClosure(ce);
   postEmitFunction(constant, f);
@@ -493,9 +610,11 @@ static bool requiresIVarDestruction(SILGenModule &SGM, ClassDecl *cd) {
 void SILGenModule::emitObjCAllocatorDestructor(ClassDecl *cd,
                                                DestructorDecl *dd) {
   // Emit the native deallocating destructor for -dealloc.
+  // Destructors are a necessary part of class metadata, so can't be delayed.
   {
     SILDeclRef dealloc(dd, SILDeclRef::Kind::Deallocator);
-    SILFunction *f = preEmitFunction(dealloc, dd, dd);
+    SILFunction *f = getFunction(dealloc, ForDefinition);
+    preEmitFunction(dealloc, dd, f, dd);
     PrettyStackTraceSILFunction X("silgen emitDestructor -dealloc", f);
     SILGenFunction(*this, *f).emitObjCDestructor(dealloc);
     postEmitFunction(dealloc, f);
@@ -512,7 +631,8 @@ void SILGenModule::emitObjCAllocatorDestructor(ClassDecl *cd,
                                SILDeclRef::ConstructAtBestResilienceExpansion,
                                SILDeclRef::ConstructAtNaturalUncurryLevel,
                                /*isForeign=*/true);
-    SILFunction *f = preEmitFunction(ivarInitializer, dd, dd);
+    SILFunction *f = getFunction(ivarInitializer, ForDefinition);
+    preEmitFunction(ivarInitializer, dd, f, dd);
     PrettyStackTraceSILFunction X("silgen emitDestructor ivar initializer", f);
     SILGenFunction(*this, *f).emitIVarInitializer(ivarInitializer);
     postEmitFunction(ivarInitializer, f);
@@ -524,7 +644,8 @@ void SILGenModule::emitObjCAllocatorDestructor(ClassDecl *cd,
                              SILDeclRef::ConstructAtBestResilienceExpansion,
                              SILDeclRef::ConstructAtNaturalUncurryLevel,
                              /*isForeign=*/true);
-    SILFunction *f = preEmitFunction(ivarDestroyer, dd, dd);
+    SILFunction *f = getFunction(ivarDestroyer, ForDefinition);
+    preEmitFunction(ivarDestroyer, dd, f, dd);
     PrettyStackTraceSILFunction X("silgen emitDestructor ivar destroyer", f);
     SILGenFunction(*this, *f).emitIVarDestroyer(ivarDestroyer);
     postEmitFunction(ivarDestroyer, f);
@@ -541,9 +662,11 @@ void SILGenModule::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
   }
 
   // Emit the destroying destructor.
+  // Destructors are a necessary part of class metadata, so can't be delayed.
   {
     SILDeclRef destroyer(dd, SILDeclRef::Kind::Destroyer);
-    SILFunction *f = preEmitFunction(destroyer, dd, dd);
+    SILFunction *f = getFunction(destroyer, ForDefinition);
+    preEmitFunction(destroyer, dd, f, dd);
     PrettyStackTraceSILFunction X("silgen emitDestroyingDestructor", f);
     SILGenFunction(*this, *f).emitDestroyingDestructor(dd);
     postEmitFunction(destroyer, f);
@@ -552,7 +675,8 @@ void SILGenModule::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
   // Emit the deallocating destructor.
   {
     SILDeclRef deallocator(dd, SILDeclRef::Kind::Deallocator);
-    SILFunction *f = preEmitFunction(deallocator, dd, dd);
+    SILFunction *f = getFunction(deallocator, ForDefinition);
+    preEmitFunction(deallocator, dd, f, dd);
     PrettyStackTraceSILFunction X("silgen emitDeallocatingDestructor", f);
     SILGenFunction(*this, *f).emitDeallocatingDestructor(dd);
     postEmitFunction(deallocator, f);
@@ -560,10 +684,12 @@ void SILGenModule::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
 }
 
 void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant, Expr *arg) {
-  SILFunction *f = preEmitFunction(constant, arg, arg);
-  PrettyStackTraceSILFunction X("silgen emitDefaultArgGenerator ", f);
-  SILGenFunction(*this, *f).emitGeneratorFunction(constant, arg);
-  postEmitFunction(constant, f);
+  emitOrDelayFunction(*this, constant, [this,constant,arg](SILFunction *f) {
+    preEmitFunction(constant, arg, f, arg);
+    PrettyStackTraceSILFunction X("silgen emitDefaultArgGenerator ", f);
+    SILGenFunction(*this, *f).emitGeneratorFunction(constant, arg);
+    postEmitFunction(constant, f);
+  });
 }
 
 SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
@@ -597,22 +723,28 @@ void SILGenModule::emitGlobalAccessor(VarDecl *global,
                                       SILGlobalVariable *onceToken,
                                       SILFunction *onceFunc) {
   SILDeclRef accessor(global, SILDeclRef::Kind::GlobalAccessor);
-  SILFunction *f = preEmitFunction(accessor, global, global);
-  PrettyStackTraceSILFunction X("silgen emitGlobalAccessor", f);
-  SILGenFunction(*this, *f)
-    .emitGlobalAccessor(global, onceToken, onceFunc);
-  postEmitFunction(accessor, f);
+  emitOrDelayFunction(*this, accessor,
+                      [this,accessor,global,onceToken,onceFunc](SILFunction *f){
+    preEmitFunction(accessor, global, f, global);
+    PrettyStackTraceSILFunction X("silgen emitGlobalAccessor", f);
+    SILGenFunction(*this, *f)
+      .emitGlobalAccessor(global, onceToken, onceFunc);
+    postEmitFunction(accessor, f);
+  });
 }
 
 void SILGenModule::emitGlobalGetter(VarDecl *global,
                                     SILGlobalVariable *onceToken,
                                     SILFunction *onceFunc) {
   SILDeclRef accessor(global, SILDeclRef::Kind::GlobalGetter);
-  SILFunction *f = preEmitFunction(accessor, global, global);
-  PrettyStackTraceSILFunction X("silgen emitGlobalGetter", f);
-  SILGenFunction(*this, *f)
-    .emitGlobalGetter(global, onceToken, onceFunc);
-  postEmitFunction(accessor, f);
+  emitOrDelayFunction(*this, accessor,
+                      [this,accessor,global,onceToken,onceFunc](SILFunction *f){
+    preEmitFunction(accessor, global, f, global);
+    PrettyStackTraceSILFunction X("silgen emitGlobalGetter", f);
+    SILGenFunction(*this, *f)
+      .emitGlobalGetter(global, onceToken, onceFunc);
+    postEmitFunction(accessor, f);
+  });
 }
 
 void SILGenModule::emitDefaultArgGenerators(SILDeclRef::Loc decl,
@@ -645,7 +777,11 @@ void SILGenModule::emitObjCMethodThunk(FuncDecl *method) {
   // Don't emit the thunk if it already exists.
   if (hasFunction(thunk))
     return;
-  SILFunction *f = preEmitFunction(thunk, method, method);
+
+  // ObjC entry points are always externally usable, so can't be delay-emitted.
+
+  SILFunction *f = getFunction(thunk, ForDefinition);
+  preEmitFunction(thunk, method, f, method);
   PrettyStackTraceSILFunction X("silgen emitObjCMethodThunk", f);
   f->setBare(IsBare);
   SILGenFunction(*this, *f).emitNativeToForeignThunk(thunk);
@@ -668,12 +804,15 @@ void SILGenModule::emitObjCPropertyMethodThunks(AbstractStorageDecl *prop) {
 
   RegularLocation ThunkBodyLoc(prop);
   ThunkBodyLoc.markAutoGenerated();
+  // ObjC entry points are always externally usable, so emitting can't be
+  // delayed.
   {
-  SILFunction *f = preEmitFunction(getter, prop, ThunkBodyLoc);
-  PrettyStackTraceSILFunction X("silgen objc property getter thunk", f);
-  f->setBare(IsBare);
-  SILGenFunction(*this, *f).emitNativeToForeignThunk(getter);
-  postEmitFunction(getter, f);
+    SILFunction *f = getFunction(getter, ForDefinition);
+    preEmitFunction(getter, prop, f, ThunkBodyLoc);
+    PrettyStackTraceSILFunction X("silgen objc property getter thunk", f);
+    f->setBare(IsBare);
+    SILGenFunction(*this, *f).emitNativeToForeignThunk(getter);
+    postEmitFunction(getter, f);
   }
 
   if (!prop->isSettable(prop->getDeclContext()))
@@ -685,7 +824,8 @@ void SILGenModule::emitObjCPropertyMethodThunks(AbstractStorageDecl *prop) {
                     SILDeclRef::ConstructAtNaturalUncurryLevel,
                     /*isObjC*/ true);
 
-  SILFunction *f = preEmitFunction(setter, prop, ThunkBodyLoc);
+  SILFunction *f = getFunction(setter, ForDefinition);
+  preEmitFunction(setter, prop, f, ThunkBodyLoc);
   PrettyStackTraceSILFunction X("silgen objc property setter thunk", f);
   f->setBare(IsBare);
   SILGenFunction(*this, *f).emitNativeToForeignThunk(setter);
@@ -702,7 +842,11 @@ void SILGenModule::emitObjCConstructorThunk(ConstructorDecl *constructor) {
   // Don't emit the thunk if it already exists.
   if (hasFunction(thunk))
     return;
-  SILFunction *f = preEmitFunction(thunk, constructor, constructor);
+  // ObjC entry points are always externally usable, so emitting can't be
+  // delayed.
+
+  SILFunction *f = getFunction(thunk, ForDefinition);
+  preEmitFunction(thunk, constructor, f, constructor);
   PrettyStackTraceSILFunction X("silgen objc constructor thunk", f);
   f->setBare(IsBare);
   SILGenFunction(*this, *f).emitNativeToForeignThunk(thunk);
@@ -719,7 +863,8 @@ void SILGenModule::emitObjCDestructorThunk(DestructorDecl *destructor) {
   // Don't emit the thunk if it already exists.
   if (hasFunction(thunk))
     return;
-  SILFunction *f = preEmitFunction(thunk, destructor, destructor);
+  SILFunction *f = getFunction(thunk, ForDefinition);
+  preEmitFunction(thunk, destructor, f, destructor);
   PrettyStackTraceSILFunction X("silgen objc destructor thunk", f);
   f->setBare(IsBare);
   SILGenFunction(*this, *f).emitNativeToForeignThunk(thunk);
@@ -967,6 +1112,15 @@ SILModule::constructSIL(Module *mod, SILOptions &options, FileUnit *sf,
        i != e; ++i) {
     auto def = mod->getASTContext().ExternalDefinitions[i];
     sgm.emitExternalDefinition(def);
+  }
+
+  // Emit any delayed definitions that were forced.
+  // Emitting these may in turn force more definitions, so we have to take care
+  // to keep pumping the queue.
+  while (!sgm.forcedFunctions.empty()) {
+    auto &front = sgm.forcedFunctions.front();
+    front.second.emitter(sgm.getFunction(front.first, ForDefinition));
+    sgm.forcedFunctions.pop_front();
   }
 
   return m;

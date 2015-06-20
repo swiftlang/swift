@@ -23,6 +23,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/DenseMap.h"
+#include <deque>
 
 namespace swift {
   class SILBasicBlock;
@@ -62,7 +63,23 @@ public:
   llvm::DenseMap<SILDeclRef, SILFunction*> emittedFunctions;
   /// Mapping from ProtocolConformances to emitted SILWitnessTables.
   llvm::DenseMap<ProtocolConformance*, SILWitnessTable*> emittedWitnessTables;
-  
+
+  struct DelayedFunction {
+    /// Insert the entity after the given function when it's emitted.
+    SILDeclRef insertAfter;
+    /// Code that generates the function.
+    std::function<void (SILFunction *)> emitter;
+  };
+
+  /// Mapping from SILDeclRefs to delayed SILFunction generators for
+  /// non-externally-visible symbols.
+  llvm::DenseMap<SILDeclRef, DelayedFunction> delayedFunctions;
+
+  /// Queue of delayed SILFunctions that need to be forced.
+  std::deque<std::pair<SILDeclRef, DelayedFunction>> forcedFunctions;
+
+  SILDeclRef lastEmittedFunction;
+
   SILFunction *emitTopLevelFunction(SILLocation Loc);
   
   size_t anonymousSymbolCounter = 0;
@@ -106,8 +123,13 @@ public:
     return getConstantType(constant).getAs<SILFunctionType>()
       ->getRepresentation();
   }
-  
-  /// Get the function for a SILDeclRef.
+
+  /// Get the function for a SILDeclRef, or return nullptr if it hasn't been
+  /// emitted yet.
+  SILFunction *getEmittedFunction(SILDeclRef constant,
+                                  ForDefinition_t forDefinition);
+
+  /// Get the function for a SILDeclRef, creating it if necessary.
   SILFunction *getFunction(SILDeclRef constant,
                            ForDefinition_t forDefinition);
   
@@ -209,8 +231,9 @@ public:
   void emitNativeToForeignThunk(SILDeclRef thunk);
 
   template<typename T>
-  SILFunction *preEmitFunction(SILDeclRef constant, T *astNode,
-                               SILLocation L);
+  void preEmitFunction(SILDeclRef constant, T *astNode,
+                       SILFunction *F,
+                       SILLocation L);
   void postEmitFunction(SILDeclRef constant, SILFunction *F);
   
   /// Add a global variable to the SILModule.

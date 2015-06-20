@@ -11,8 +11,9 @@ import gizmo
 
 // CHECK-DAG: sil shared [transparent] @_TFOSC16NSRuncingOptions5MinceFMS_S_
 // CHECK-DAG: sil shared [transparent] @_TFOSC16NSRuncingOptions12QuinceSlicedFMS_S_
-// CHECK-DAG: sil shared [transparent] @_TFOSC16NSRuncingOptions15QuinceJuliennedFMS_S_
-// CHECK-DAG: sil shared [transparent] @_TFOSC16NSRuncingOptions11QuinceDicedFMS_S_
+// Unused enum ctors don't need to be instantiated.
+// CHECK-NOT: sil shared [transparent] @_TFOSC16NSRuncingOptions15QuinceJuliennedFMS_S_
+// CHECK-NOT: sil shared [transparent] @_TFOSC16NSRuncingOptions11QuinceDicedFMS_S_
 
 var runcing: NSRuncingOptions = .Mince
 

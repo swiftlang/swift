@@ -439,8 +439,12 @@ func static_set(x: Int) {
 
 func takeInt(a : Int) {}
 
-struct DidSetWillSetTests {
-  var a : Int {
+protocol ForceAccessors {
+  var a: Int { get set }
+}
+
+struct DidSetWillSetTests: ForceAccessors {
+  var a: Int {
     willSet(newA) {
       // CHECK-LABEL: // {{.*}}.DidSetWillSetTests.a.willset
       // CHECK-NEXT: sil hidden @_TFV10properties18DidSetWillSetTestsw1a
@@ -516,7 +520,6 @@ struct DidSetWillSetTests {
   // CHECK-NEXT: [[SELFBOX:%.*]] = alloc_box $DidSetWillSetTests
   // CHECK-NEXT: copy_addr %1 to [initialization] [[SELFBOX]]#1 : $*DidSetWillSetTests
 
-
   // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr [[SELFBOX:%.*]]#1 : $*DidSetWillSetTests, #DidSetWillSetTests.a
   // CHECK-NEXT: [[OLDVAL:%.*]] = load [[AADDR]] : $*Int
   // CHECK-NEXT: debug_value [[OLDVAL]] : $Int  // let tmp
@@ -549,6 +552,11 @@ var global_observing_property : Int = zero {
   didSet {
     takeInt(global_observing_property)
   }
+}
+
+func force_global_observing_property_setter() {
+  let x = global_observing_property
+  global_observing_property = x
 }
 
 // The property is initialized with "zero".

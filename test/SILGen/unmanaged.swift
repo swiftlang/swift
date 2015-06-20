@@ -5,6 +5,7 @@ class C {}
 struct Holder {
   unowned(unsafe) var value: C
 }
+_ = Holder(value: C())
 // CHECK-LABEL:sil hidden @_TFV9unmanaged6HolderCfMS0_FT5valueCS_1C_S0_ : $@convention(thin) (@owned C, @thin Holder.Type) -> Holder
 // CHECK-NEXT: bb0([[T0:%.*]] : $C,
 // CHECK-NEXT:   [[T1:%.*]] = ref_to_unmanaged [[T0]] : $C to $@sil_unmanaged C

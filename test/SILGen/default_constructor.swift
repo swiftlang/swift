@@ -78,3 +78,11 @@ struct G {
 // CHECK-NEXT: sil hidden @_TFV19default_constructor1GCfMS0_FT3barGSqVSs5Int32__S0_
 // CHECK-NOT: default_constructor.G.init (default_constructor.G.Type)()
 
+func useImplicitDecls() {
+  _ = B(i: 0, j: 0, c: C())
+  _ = D()
+  _ = D(i: 0, j: 0)
+  _ = E()
+  _ = F()
+  _ = G(bar: 0)
+}

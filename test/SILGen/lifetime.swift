@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-as-library -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -emit-silgen -primary-file %s | FileCheck %s
 
 struct Buh<T> {
   var x: Int {

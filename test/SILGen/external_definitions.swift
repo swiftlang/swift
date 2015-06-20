@@ -42,6 +42,6 @@ hasNoPrototype()
 // CHECK:   return %2 : $ImplicitlyUnwrappedOptional<Ansible>
 // CHECK: }
 
-// -- Constructors for imported Ansible
-// CHECK-LABEL: sil  shared @_TFCSo7AnsibleCfMS_FT_S_ : $@convention(thin) (@thick Ansible.Type) -> @owned Ansible
+// -- Constructor for imported Ansible was unused, should not be emitted.
+// CHECK-NOT: sil  shared @_TFCSo7AnsibleCfMS_FT_S_ : $@convention(thin) (@thick Ansible.Type) -> @owned Ansible
 

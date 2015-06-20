@@ -9,6 +9,7 @@ class C {
 struct A {
   unowned var x: C
 }
+_ = A(x: C())
 // CHECK-LABEL: sil hidden @_TFV7unowned1ACfMS0_FT1xCS_1C_S0_
 // CHECK: bb0([[X:%.*]] : $C, %1 : $@thin A.Type):
 // CHECK:   [[X_UNOWNED:%.*]] = ref_to_unowned [[X]] : $C to $@sil_unowned C
@@ -19,11 +20,13 @@ struct A {
 // CHECK: }
 
 protocol P {}
+struct X: P {}
 
 struct AddressOnly {
   unowned var x: C
   var p: P
 }
+_ = AddressOnly(x: C(), p: X())
 // CHECK-LABEL: sil hidden @_TFV7unowned11AddressOnlyCfMS0_FT1xCS_1C1pPS_1P__S0_
 // CHECK: bb0([[RET:%.*]] : $*AddressOnly, [[X:%.*]] : $C, {{.*}}):
 // CHECK:   [[X_ADDR:%.*]] = struct_element_addr [[RET]] : $*AddressOnly, #AddressOnly.x
