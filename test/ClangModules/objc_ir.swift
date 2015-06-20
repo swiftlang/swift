@@ -127,18 +127,29 @@ func customFactoryMethods() {
 
   do {
     // CHECK: call %CSo18SwiftNameTestError* @_TTOFCSo18SwiftNameTestErrorCfMS_FzT5errorT__S_
+    // CHECK: call %CSo18SwiftNameTestError* @_TTOFCSo18SwiftNameTestErrorCfMS_FzT2aaGSqPSs9AnyObject__5errorT__S_
+    // CHECK: call %CSo18SwiftNameTestError* @_TTOFCSo18SwiftNameTestErrorCfMS_FzT2aaGSqPSs9AnyObject__5errorT_5blockFT_T__S_
+    // CHECK: call %CSo18SwiftNameTestError* @_TTOFCSo18SwiftNameTestErrorCfMS_FzT5errorT_5blockFT_T__S_
     // CHECK: call %CSo18SwiftNameTestError* @_TTOFCSo18SwiftNameTestErrorCfMS_FzT2aaGSqPSs9AnyObject___S_
     // CHECK: call %CSo18SwiftNameTestError* @_TTOFCSo18SwiftNameTestErrorCfMS_FzT2aaGSqPSs9AnyObject__5blockFT_T__S_
-    // CHECK: call %CSo18SwiftNameTestError* @_TTOFCSo18SwiftNameTestErrorCfMS_FzT5errorT_5blockFT_T__S_
+    // CHECK: call %CSo18SwiftNameTestError* @_TTOFCSo18SwiftNameTestErrorCfMS_FzT5blockFT_T__S_
     _ = try SwiftNameTestError(error: ())
-    _ = try SwiftNameTestError(aa: nil)
-    _ = try SwiftNameTestError(aa: nil, block: {})
+    _ = try SwiftNameTestError(aa: nil, error: ())
+    _ = try SwiftNameTestError(aa: nil, error: (), block: {})
     _ = try SwiftNameTestError(error: (), block: {})
 
-      // CHECK: load i8*, i8** @"\01L_selector(testW:error:)"
-      // CHECK: load i8*, i8** @"\01L_selector(testV:)"
+    _ = try SwiftNameTestError(aa: nil)
+    _ = try SwiftNameTestError(aa: nil, block: {})
+    _ = try SwiftNameTestError(block: {})
+
+    // CHECK: load i8*, i8** @"\01L_selector(testW:error:)"
+    // CHECK: load i8*, i8** @"\01L_selector(testW2:error:)"
+    // CHECK: load i8*, i8** @"\01L_selector(testV:)"
+    // CHECK: load i8*, i8** @"\01L_selector(testV2:)"
     _ = try SwiftNameTestError.ww(nil)
+    _ = try SwiftNameTestError.w2(nil, error: ())
     _ = try SwiftNameTestError.vv()
+    _ = try SwiftNameTestError.v2(error: ())
   } catch _ {
   }
 }
@@ -155,16 +166,28 @@ func customFactoryMethods() {
 // CHECK: load i8*, i8** @"\01L_selector(err1:)"
 // CHECK: }
 
-// CHECK-LABEL: define linkonce_odr hidden %CSo18SwiftNameTestError* @_TTOFCSo18SwiftNameTestErrorCfMS_FzT2aaGSqPSs9AnyObject___S_
+// CHECK-LABEL: define linkonce_odr hidden %CSo18SwiftNameTestError* @_TTOFCSo18SwiftNameTestErrorCfMS_FzT2aaGSqPSs9AnyObject__5errorT__S_
 // CHECK: load i8*, i8** @"\01L_selector(err2:error:)"
 // CHECK: }
 
-// CHECK-LABEL: define linkonce_odr hidden %CSo18SwiftNameTestError* @_TTOFCSo18SwiftNameTestErrorCfMS_FzT2aaGSqPSs9AnyObject__5blockFT_T__S_
+// CHECK-LABEL: define linkonce_odr hidden %CSo18SwiftNameTestError* @_TTOFCSo18SwiftNameTestErrorCfMS_FzT2aaGSqPSs9AnyObject__5errorT_5blockFT_T__S_
 // CHECK: load i8*, i8** @"\01L_selector(err3:error:callback:)"
 // CHECK: }
 
 // CHECK-LABEL: define linkonce_odr hidden %CSo18SwiftNameTestError* @_TTOFCSo18SwiftNameTestErrorCfMS_FzT5errorT_5blockFT_T__S_
 // CHECK: load i8*, i8** @"\01L_selector(err4:callback:)"
+// CHECK: }
+
+// CHECK-LABEL: define linkonce_odr hidden %CSo18SwiftNameTestError* @_TTOFCSo18SwiftNameTestErrorCfMS_FzT2aaGSqPSs9AnyObject___S_
+// CHECK: load i8*, i8** @"\01L_selector(err5:error:)"
+// CHECK: }
+
+// CHECK-LABEL: define linkonce_odr hidden %CSo18SwiftNameTestError* @_TTOFCSo18SwiftNameTestErrorCfMS_FzT2aaGSqPSs9AnyObject__5blockFT_T__S_
+// CHECK: load i8*, i8** @"\01L_selector(err6:error:callback:)"
+// CHECK: }
+
+// CHECK-LABEL: define linkonce_odr hidden %CSo18SwiftNameTestError* @_TTOFCSo18SwiftNameTestErrorCfMS_FzT5blockFT_T__S_
+// CHECK: load i8*, i8** @"\01L_selector(err7:callback:)"
 // CHECK: }
 
 // CHECK-LABEL: define hidden void @_TF7objc_ir29customFactoryMethodsInheritedFT_T_() {{.*}} {
@@ -183,18 +206,29 @@ func customFactoryMethodsInherited() {
 
   do {
     // CHECK: call %CSo21SwiftNameTestErrorSub* @_TTOFCSo21SwiftNameTestErrorSubCfMS_FzT5errorT__S_
+    // CHECK: call %CSo21SwiftNameTestErrorSub* @_TTOFCSo21SwiftNameTestErrorSubCfMS_FzT2aaGSqPSs9AnyObject__5errorT__S_
+    // CHECK: call %CSo21SwiftNameTestErrorSub* @_TTOFCSo21SwiftNameTestErrorSubCfMS_FzT2aaGSqPSs9AnyObject__5errorT_5blockFT_T__S_
+    // CHECK: call %CSo21SwiftNameTestErrorSub* @_TTOFCSo21SwiftNameTestErrorSubCfMS_FzT5errorT_5blockFT_T__S_
     // CHECK: call %CSo21SwiftNameTestErrorSub* @_TTOFCSo21SwiftNameTestErrorSubCfMS_FzT2aaGSqPSs9AnyObject___S_
     // CHECK: call %CSo21SwiftNameTestErrorSub* @_TTOFCSo21SwiftNameTestErrorSubCfMS_FzT2aaGSqPSs9AnyObject__5blockFT_T__S_
-    // CHECK: call %CSo21SwiftNameTestErrorSub* @_TTOFCSo21SwiftNameTestErrorSubCfMS_FzT5errorT_5blockFT_T__S_
+    // CHECK: call %CSo21SwiftNameTestErrorSub* @_TTOFCSo21SwiftNameTestErrorSubCfMS_FzT5blockFT_T__S_
     _ = try SwiftNameTestErrorSub(error: ())
-    _ = try SwiftNameTestErrorSub(aa: nil)
-    _ = try SwiftNameTestErrorSub(aa: nil, block: {})
+    _ = try SwiftNameTestErrorSub(aa: nil, error: ())
+    _ = try SwiftNameTestErrorSub(aa: nil, error: (), block: {})
     _ = try SwiftNameTestErrorSub(error: (), block: {})
 
+    _ = try SwiftNameTestErrorSub(aa: nil)
+    _ = try SwiftNameTestErrorSub(aa: nil, block: {})
+    _ = try SwiftNameTestErrorSub(block: {})
+
     // CHECK: load i8*, i8** @"\01L_selector(testW:error:)"
+    // CHECK: load i8*, i8** @"\01L_selector(testW2:error:)"
     // CHECK: load i8*, i8** @"\01L_selector(testV:)"
+    // CHECK: load i8*, i8** @"\01L_selector(testV2:)"
     _ = try SwiftNameTestErrorSub.ww(nil)
+    _ = try SwiftNameTestErrorSub.w2(nil, error: ())
     _ = try SwiftNameTestErrorSub.vv()
+    _ = try SwiftNameTestErrorSub.v2(error: ())
   } catch _ {
   }
 }
@@ -211,16 +245,28 @@ func customFactoryMethodsInherited() {
 // CHECK: load i8*, i8** @"\01L_selector(err1:)"
 // CHECK: }
 
-// CHECK-LABEL: define linkonce_odr hidden %CSo21SwiftNameTestErrorSub* @_TTOFCSo21SwiftNameTestErrorSubCfMS_FzT2aaGSqPSs9AnyObject___S_
+// CHECK-LABEL: define linkonce_odr hidden %CSo21SwiftNameTestErrorSub* @_TTOFCSo21SwiftNameTestErrorSubCfMS_FzT2aaGSqPSs9AnyObject__5errorT__S_
 // CHECK: load i8*, i8** @"\01L_selector(err2:error:)"
 // CHECK: }
 
-// CHECK-LABEL: define linkonce_odr hidden %CSo21SwiftNameTestErrorSub* @_TTOFCSo21SwiftNameTestErrorSubCfMS_FzT2aaGSqPSs9AnyObject__5blockFT_T__S_
+// CHECK-LABEL: define linkonce_odr hidden %CSo21SwiftNameTestErrorSub* @_TTOFCSo21SwiftNameTestErrorSubCfMS_FzT2aaGSqPSs9AnyObject__5errorT_5blockFT_T__S_
 // CHECK: load i8*, i8** @"\01L_selector(err3:error:callback:)"
 // CHECK: }
 
 // CHECK-LABEL: define linkonce_odr hidden %CSo21SwiftNameTestErrorSub* @_TTOFCSo21SwiftNameTestErrorSubCfMS_FzT5errorT_5blockFT_T__S_
 // CHECK: load i8*, i8** @"\01L_selector(err4:callback:)"
+// CHECK: }
+
+// CHECK-LABEL: define linkonce_odr hidden %CSo21SwiftNameTestErrorSub* @_TTOFCSo21SwiftNameTestErrorSubCfMS_FzT2aaGSqPSs9AnyObject___S_
+// CHECK: load i8*, i8** @"\01L_selector(err5:error:)"
+// CHECK: }
+
+// CHECK-LABEL: define linkonce_odr hidden %CSo21SwiftNameTestErrorSub* @_TTOFCSo21SwiftNameTestErrorSubCfMS_FzT2aaGSqPSs9AnyObject__5blockFT_T__S_
+// CHECK: load i8*, i8** @"\01L_selector(err6:error:callback:)"
+// CHECK: }
+
+// CHECK-LABEL: define linkonce_odr hidden %CSo21SwiftNameTestErrorSub* @_TTOFCSo21SwiftNameTestErrorSubCfMS_FzT5blockFT_T__S_
+// CHECK: load i8*, i8** @"\01L_selector(err7:callback:)"
 // CHECK: }
 
 // CHECK: linkonce_odr hidden {{.*}} @_TTOFCSo1BcfMS_FT3intVSs5Int32_GSQS__

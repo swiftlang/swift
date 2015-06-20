@@ -48,22 +48,31 @@ class TestError : NSObject {
   convenience init(error: ()) throws
   @available(*, unavailable, message="use object construction 'TestError(error:)'")
   class func err1() throws -> Self
-  convenience init(_ x: AnyObject) throws
-  @available(*, unavailable, message="use object construction 'TestError(_:error:)'")
-  class func err2(x: AnyObject) throws -> Self
-  convenience init(aa x: AnyObject) throws
+  convenience init(aa x: AnyObject?, error: ()) throws
   @available(*, unavailable, message="use object construction 'TestError(aa:error:)'")
-  class func err3(x: AnyObject) throws -> Self
-  convenience init(aa x: AnyObject, block: () -> Void) throws
+  class func err2(x: AnyObject?) throws -> Self
+  convenience init(aa x: AnyObject?, error: (), block: () -> Void) throws
   @available(*, unavailable, message="use object construction 'TestError(aa:error:block:)'")
-  class func err4(x: AnyObject, callback block: () -> Void) throws -> Self
+  class func err3(x: AnyObject?, callback block: () -> Void) throws -> Self
   convenience init(error: (), block: () -> Void) throws
   @available(*, unavailable, message="use object construction 'TestError(error:block:)'")
-  class func err5(callback block: () -> Void) throws -> Self
+  class func err4(callback block: () -> Void) throws -> Self
+  
+  convenience init(aa x: AnyObject?) throws
+  @available(*, unavailable, message="use object construction 'TestError(aa:)'")
+  class func err5(x: AnyObject?) throws -> Self
+  convenience init(aa x: AnyObject?, block: () -> Void) throws
+  @available(*, unavailable, message="use object construction 'TestError(aa:block:)'")
+  class func err6(x: AnyObject?, callback block: () -> Void) throws -> Self
+  convenience init(block: () -> Void) throws
+  @available(*, unavailable, message="use object construction 'TestError(block:)'")
+  class func err7(callback block: () -> Void) throws -> Self
   
   // Would-be initializers.
-  class func ww(x: AnyObject) throws -> Self
+  class func ww(x: AnyObject?) throws -> Self
+  class func w2(x: AnyObject?, error: ()) throws -> Self
   class func vv() throws -> Self
+  class func v2(error error: ()) throws -> Self
   init()
 }
 
@@ -79,9 +88,11 @@ class TestSub : Test {
 
 class TestErrorSub : TestError {
   convenience init(error: ()) throws
-  convenience init(_ x: AnyObject) throws
-  convenience init(aa x: AnyObject) throws
-  convenience init(aa x: AnyObject, block: () -> Void) throws
+  convenience init(aa x: AnyObject?, error: ()) throws
+  convenience init(aa x: AnyObject?, error: (), block: () -> Void) throws
   convenience init(error: (), block: () -> Void) throws
+  convenience init(aa x: AnyObject?) throws
+  convenience init(aa x: AnyObject?, block: () -> Void) throws
+  convenience init(block: () -> Void) throws
   init()
 }

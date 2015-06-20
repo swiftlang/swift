@@ -1011,6 +1011,9 @@ public:
   /// \param params The parameter types to the function.
   /// \param isVariadic Whether the function is variadic.
   /// \param isNoReturn Whether the function is noreturn.
+  /// \param isFromSystemModule Whether to apply special rules that only apply
+  ///   to system APIs.
+  /// \param isCustomName If true, the user has provided this name.
   /// \param bodyPatterns The patterns visible inside the function body.
   ///   whether the created arg/body patterns are different (selector-style).
   /// \param methodName The name of the imported method.
@@ -1024,7 +1027,7 @@ public:
                         clang::QualType resultType,
                         ArrayRef<const clang::ParmVarDecl *> params,
                         bool isVariadic, bool isNoReturn,
-                        bool isFromSystemModule,
+                        bool isFromSystemModule, bool isCustomName,
                         SmallVectorImpl<Pattern*> &bodyPatterns,
                         DeclName &methodName,
                         Optional<ForeignErrorConvention> &errorConvention,

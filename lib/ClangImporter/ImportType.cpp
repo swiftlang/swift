@@ -1463,7 +1463,8 @@ considerErrorImport(ClangImporter::Implementation &importer,
                     DeclName &methodName,
                     ArrayRef<const clang::ParmVarDecl *> params,
                     Type &importedResultType,
-                    SpecialMethodKind methodKind) {
+                    SpecialMethodKind methodKind,
+                    bool hasCustomName) {
   // Respect the compiler option.
   if (!importer.ErrorHandling) return None;
 
@@ -1471,7 +1472,8 @@ considerErrorImport(ClangImporter::Implementation &importer,
   // list (e.g. if the method has C-style parameter declarations),
   // don't try to apply error conventions.
   auto paramNames = methodName.getArgumentNames();
-  bool expectsToRemoveError = paramNames.size() + 1 == params.size();
+  bool expectsToRemoveError =
+      hasCustomName && paramNames.size() + 1 == params.size();
   if (!expectsToRemoveError && paramNames.size() != params.size())
     return None;
 
@@ -1491,7 +1493,7 @@ considerErrorImport(ClangImporter::Implementation &importer,
 
     // Consider adjusting the imported declaration name to remove the
     // parameter.
-    bool adjustName = !expectsToRemoveError;
+    bool adjustName = !hasCustomName;
 
     // Never do this if it's the first parameter of a constructor.
     if (methodKind == SpecialMethodKind::Constructor && index == 0) {
@@ -1588,7 +1590,7 @@ Type ClangImporter::Implementation::importMethodType(
        clang::QualType resultType,
        ArrayRef<const clang::ParmVarDecl *> params,
        bool isVariadic, bool isNoReturn,
-       bool isFromSystemModule,
+       bool isFromSystemModule, bool isCustomName,
        SmallVectorImpl<Pattern*> &bodyPatterns,
        DeclName &methodName,
        Optional<ForeignErrorConvention> &foreignErrorInfo,
@@ -1658,7 +1660,7 @@ Type ClangImporter::Implementation::importMethodType(
     return Type();
 
   auto errorInfo = considerErrorImport(*this, clangDecl, methodName, params,
-                                       swiftResultTy, kind);
+                                       swiftResultTy, kind, isCustomName);
 
   // Import the parameters.
   SmallVector<TupleTypeElt, 4> swiftArgParams;

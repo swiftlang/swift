@@ -2506,12 +2506,14 @@ namespace {
         return None;
 
       DeclName initName;
+      bool hasCustomName;
 
       // Check whether we're allowed to try.
       switch (Impl.getFactoryAsInit(objcClass, decl)) {
       case FactoryAsInitKind::AsInitializer:
         if (auto *customNameAttr = decl->getAttr<clang::SwiftNameAttr>()) {
           initName = parseDeclName(customNameAttr->getName());
+          hasCustomName = true;
           break;
         }
         // FIXME: We probably should stop using this codepath. It won't ever
@@ -2525,6 +2527,7 @@ namespace {
             Impl.mapFactorySelectorToInitializerName(selector,
                                                      objcClass->getName(),
                                                      isSwiftPrivate);
+        hasCustomName = false;
         break;
       }
       case FactoryAsInitKind::AsClassMethod:
@@ -2560,6 +2563,7 @@ namespace {
       bool redundant = false;
       auto result = importConstructor(decl, dc, false, initKind,
                                       /*required=*/false, selector, initName,
+                                      hasCustomName,
                                       {decl->param_begin(), decl->param_size()},
                                       decl->isVariadic(), redundant);
       if (result)
@@ -2623,11 +2627,15 @@ namespace {
         return nullptr;
 
       DeclName name;
+      bool hasCustomName;
       if (auto *customNameAttr = decl->getAttr<clang::SwiftNameAttr>()) {
-        if (!customNameAttr->getName().startswith("init("))
+        if (!customNameAttr->getName().startswith("init(")) {
           name = parseDeclName(customNameAttr->getName());
+          hasCustomName = true;
+        }
       }
       if (!name) {
+        hasCustomName = false;
         bool isSwiftPrivate = decl->hasAttr<clang::SwiftPrivateAttr>();
         name = Impl.mapSelectorToDeclName(selector, /*isInitializer=*/false,
                                           isSwiftPrivate);
@@ -2668,6 +2676,7 @@ namespace {
                                         decl->isVariadic(),
                                         decl->hasAttr<clang::NoReturnAttr>(),
                                         isInSystemModule(dc),
+                                        hasCustomName,
                                         bodyPatterns,
                                         name,
                                         errorConvention,
@@ -2980,7 +2989,8 @@ namespace {
 
       bool redundant;
       return importConstructor(objcMethod, dc, implicit, kind, required,
-                               selector, name, params, variadic, redundant);
+                               selector, name, /*customName=*/false, params,
+                               variadic, redundant);
     }
 
     /// \brief Given an imported method, try to import it as a constructor.
@@ -3002,6 +3012,7 @@ namespace {
                                        bool required,
                                        ObjCSelector selector,
                                        DeclName name,
+                                       bool hasCustomName,
                                        ArrayRef<const clang::ParmVarDecl*> args,
                                        bool variadic,
                                        bool &redundant) {
@@ -3056,6 +3067,7 @@ namespace {
                                         variadic,
                                         objcMethod->hasAttr<clang::NoReturnAttr>(),
                                         isInSystemModule(dc),
+                                        hasCustomName,
                                         bodyPatterns,
                                         name,
                                         errorConvention,
@@ -4274,6 +4286,7 @@ namespace {
                                                  /*required=*/false, 
                                                  ctor->getObjCSelector(),
                                                  ctor->getFullName(),
+                                                 /*customName=*/true,
                                                  objcMethod->parameters(),
                                                  objcMethod->isVariadic(),
                                                  redundant)) {
