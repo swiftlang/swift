@@ -384,10 +384,16 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
   for (unsigned i = 0, n = inheritedClause.size(); i != n; ++i) {
     auto &inherited = inheritedClause[i];
 
-    // Validate the type.
-    if (validateType(inherited, DC, options, resolver)) {
-      inherited.setInvalidType(Context);
-      continue;
+    {
+      bool iBTC = decl->isBeingTypeChecked();
+      decl->setIsBeingTypeChecked();
+      defer([&]{decl->setIsBeingTypeChecked(iBTC); });
+
+      // Validate the type.
+      if (validateType(inherited, DC, options, resolver)) {
+        inherited.setInvalidType(Context);
+        continue;
+      }
     }
 
     auto inheritedTy = inherited.getType();

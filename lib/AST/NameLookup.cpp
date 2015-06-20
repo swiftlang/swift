@@ -1339,6 +1339,13 @@ bool DeclContext::lookupQualified(Type type,
   // criteria.
   bool onlyCompleteObjectInits = false;
   auto isAcceptableDecl = [&](NominalTypeDecl *current, Decl *decl) -> bool {
+    // If the decl is currently being type checked, then we have something
+    // cyclic going on.  Instead of poking at parts that are potentially not
+    // set up, just assume it is acceptable.  This will make sure we produce an
+    // error later.
+    if (decl->isBeingTypeChecked())
+      return true;
+    
     // Filter out designated initializers, if requested.
     if (onlyCompleteObjectInits) {
       if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
