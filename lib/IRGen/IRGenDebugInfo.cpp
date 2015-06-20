@@ -1075,7 +1075,6 @@ void IRGenDebugInfo::emitVariableDeclaration(
   ElementSizes EltSizes(DITy, DIRefMap);
   auto Dim = EltSizes.getNext();
   for (llvm::Value *Piece : Storage) {
-    assert(Piece && "already-claimed explosion value?");
     assert((Piece->getType()->isPointerTy() || VarSizeInBits > 0)
            && "zero-sized variable");
 
