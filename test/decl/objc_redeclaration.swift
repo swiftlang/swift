@@ -57,5 +57,5 @@ extension Redecl1 {
 }
 
 extension NSArray {
-  func nsstringProperty2() -> Int { return 0 } // expected-error{{method 'nsstringProperty2()' with Objective-C selector 'nsstringProperty2' conflicts with getter for 'nsstringProperty2' with the same Objective-C selector}}
+  func nsstringProperty2() -> Int { return 0 } // expected-error{{method 'nsstringProperty2()' with Objective-C selector 'nsstringProperty2' conflicts with previous declaration with the same Objective-C selector}}
 }
