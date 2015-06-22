@@ -220,6 +220,12 @@ func testBridgedVerbatim() {
   // CHECK-NEXT: [[base42]]
   print(nsArrayOfBaseConvertedToAnyObjectArray[0] as! Base)
 
+  // Verify that NSArray class methods are inherited by a Swift bridging class.
+  // CHECK-NEXT: Swift.{{.*}}Array
+  print(basesConvertedToNSArray.dynamicType)
+  // CHECK-NEXT: true
+  print(basesConvertedToNSArray.dynamicType.supportsSecureCoding())
+
   //===--- Up- and Down-casts -----------------------------------------------===//
   var derived: [Derived] = [Derived(11), Derived(22)]
   // CHECK-NEXT: [[derived0:\[Derived#[0-9]+\(11\), Derived#[0-9]+\(22\)\]{1}]]
