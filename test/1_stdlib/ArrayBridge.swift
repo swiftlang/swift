@@ -18,7 +18,9 @@
 
 // RUN: %target-run %t/ArrayBridge > %t.txt
 // RUN: FileCheck %s < %t.txt
-// REQUIRES: executable_test, objc_interop
+// REQUIRES: executable_test
+
+// XFAIL: linux
 
 import Foundation
 import ArrayBridgeObjC
