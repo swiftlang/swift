@@ -18,6 +18,8 @@
 // RUN: FileCheck %s -check-prefix=GLOBAL_NEGATIVE < %t.types.txt
 // RUN: FileCheck %s -check-prefix=PATTERN_IS_GENERIC_2 < %t.types.txt
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=AFTER_PATTERN_IS | FileCheck %s -check-prefix=AFTER_PATTERN_IS
+
 //===--- Helper types that are used in this test
 
 struct FooStruct {
@@ -130,3 +132,13 @@ struct PatternIsGeneric2<
 // PATTERN_IS_GENERIC_2-DAG: Decl[GenericTypeParam]/Local: GenericBar[#GenericBar#]{{; name=.+$}}
 // PATTERN_IS_GENERIC_2-DAG: Decl[GenericTypeParam]/Local: GenericBaz[#GenericBaz#]{{; name=.+$}}
 // PATTERN_IS_GENERIC_2: End completions
+
+
+// rdar://21174713
+// AFTER_PATTERN_IS: Begin completions
+func test<T>(x: T) {
+  switch T.self {
+  case is Int.Type:
+    #^AFTER_PATTERN_IS^#
+  }
+}

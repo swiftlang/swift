@@ -513,7 +513,8 @@ public:
 
   CheckedCastKind getCastKind() const { return CastKind; }
   void setCastKind(CheckedCastKind kind) { CastKind = kind; }
-  
+
+  bool hasSubPattern() const { return SubPattern; }
   Pattern *getSubPattern() { return SubPattern; }
   const Pattern *getSubPattern() const { return SubPattern; }
   void setSubPattern(Pattern *p) { SubPattern = p; }
