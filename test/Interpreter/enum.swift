@@ -480,14 +480,16 @@ let oofs = [Oof()]
 let goofs = [Goof()]
 
 enum Planet: String {
-    case Mercury = "Mercury", Venus = "Venus"
+    case Mercury = "Mercury", Venus = "Venus", Mars
     init() {
         self = Planet.Venus
     }
 }
 var pl1 = Planet()
 print(pl1.rawValue)
-// CHECK: Venus
+// CHECK: {{^Venus$}}
+print(Planet.Mars.rawValue)
+// CHECK: {{^Mars$}}
 
 enum EitherOr<T, U> {
   case Left(T)

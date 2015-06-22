@@ -474,8 +474,9 @@ llvm::APFloat FloatLiteralExpr::getValue() const {
                   getType()->castTo<BuiltinFloatType>()->getAPFloatSemantics());
 }
 
-StringLiteralExpr::StringLiteralExpr(StringRef Val, SourceRange Range)
-    : LiteralExpr(ExprKind::StringLiteral, /*Implicit=*/false), Val(Val),
+StringLiteralExpr::StringLiteralExpr(StringRef Val, SourceRange Range,
+                                     bool Implicit)
+    : LiteralExpr(ExprKind::StringLiteral, Implicit), Val(Val),
       Range(Range) {
   StringLiteralExprBits.Encoding = static_cast<unsigned>(UTF8);
   StringLiteralExprBits.IsSingleUnicodeScalar =

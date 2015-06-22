@@ -653,7 +653,7 @@ public:
     OneUnicodeScalar
   };
 
-  StringLiteralExpr(StringRef Val, SourceRange Range);
+  StringLiteralExpr(StringRef Val, SourceRange Range, bool Implicit = false);
 
   StringRef getValue() const { return Val; }
   SourceRange getSourceRange() const { return Range; }

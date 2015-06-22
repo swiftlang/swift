@@ -2535,50 +2535,60 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
   }
 }
 
+namespace {
+  /// How to generate raw values for
+  enum class AutomaticEnumValueKind {
+    None,
+    String,
+    Integer,
+  };
+} // end anonymous namespace
+
 /// Given the raw value literal expression for an enum case, produces the
 /// auto-incremented raw value for the subsequent case, or returns null if
 /// the value is not auto-incrementable.
-static LiteralExpr *getAutoIncrementedLiteralExpr(TypeChecker &TC,
-                                                  Type rawTy,
-                                                  EnumElementDecl *forElt,
-                                                  LiteralExpr *prevValue) {
-  // If there was no previous value, start from zero.
-  if (!prevValue) {
-    // The raw type must be integer literal convertible for this to work.
-    ProtocolDecl *ilcProto =
-      TC.getProtocol(forElt->getLoc(),
-                     KnownProtocolKind::IntegerLiteralConvertible);
-    if (!TC.conformsToProtocol(rawTy, ilcProto, forElt->getDeclContext(),
-                               None)) {
-      TC.diagnose(forElt->getLoc(),
-                  diag::enum_non_integer_convertible_raw_type_no_value);
-      return nullptr;
+static LiteralExpr *getAutomaticRawValueExpr(TypeChecker &TC,
+                                             AutomaticEnumValueKind valueKind,
+                                             EnumElementDecl *forElt,
+                                             LiteralExpr *prevValue) {
+  switch (valueKind) {
+  case AutomaticEnumValueKind::None:
+    TC.diagnose(forElt->getLoc(),
+                diag::enum_non_integer_convertible_raw_type_no_value);
+    return nullptr;
+
+  case AutomaticEnumValueKind::String:
+    return new (TC.Context) StringLiteralExpr(forElt->getNameStr(), SourceLoc(),
+                                              /*implicit=*/true);
+
+  case AutomaticEnumValueKind::Integer:
+    // If there was no previous value, start from zero.
+    if (!prevValue) {
+      return new (TC.Context) IntegerLiteralExpr("0", SourceLoc(),
+                                                 /*Implicit=*/true);
     }
     
-    return new (TC.Context) IntegerLiteralExpr("0", SourceLoc(),
-                                               /*Implicit=*/true);
+    if (auto intLit = dyn_cast<IntegerLiteralExpr>(prevValue)) {
+      APInt nextVal = intLit->getValue() + 1;
+      bool negative = nextVal.slt(0);
+      if (negative)
+        nextVal = -nextVal;
+
+      llvm::SmallString<10> nextValStr;
+      nextVal.toStringSigned(nextValStr);
+      auto expr = new (TC.Context)
+        IntegerLiteralExpr(TC.Context.AllocateCopy(StringRef(nextValStr)),
+                           forElt->getLoc(), /*Implicit=*/true);
+      if (negative)
+        expr->setNegative(forElt->getLoc());
+
+      return expr;
+    }
+
+    TC.diagnose(forElt->getLoc(),
+                diag::enum_non_integer_raw_value_auto_increment);
+    return nullptr;
   }
-  
-  if (auto intLit = dyn_cast<IntegerLiteralExpr>(prevValue)) {
-    APInt nextVal = intLit->getValue() + 1;
-    bool negative = nextVal.slt(0);
-    if (negative)
-      nextVal = -nextVal;
-    
-    llvm::SmallString<10> nextValStr;
-    nextVal.toStringSigned(nextValStr);
-    auto expr = new (TC.Context)
-      IntegerLiteralExpr(TC.Context.AllocateCopy(StringRef(nextValStr)),
-                         forElt->getLoc(), /*Implicit=*/true);
-    if (negative)
-      expr->setNegative(forElt->getLoc());
-    
-    return expr;
-  }
-  
-  TC.diagnose(forElt->getLoc(),
-              diag::enum_non_integer_raw_value_auto_increment);
-  return nullptr;
 }
 
 static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
@@ -2592,6 +2602,10 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
   }
 
   rawTy = ArchetypeBuilder::mapTypeIntoContext(ED, rawTy);
+  if (rawTy->is<ErrorType>())
+    return;
+
+  AutomaticEnumValueKind valueKind;
 
   if (ED->isObjC()) {
     // @objc enums must have a raw type that's an ObjC-representable
@@ -2603,31 +2617,34 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
       ED->getInherited().front().setInvalidType(TC.Context);
       return;
     }
+    valueKind = AutomaticEnumValueKind::Integer;
   } else {
     // Swift enums require that the raw type is convertible from one of the
     // primitive literal protocols.
-    static auto literalProtocolKinds = {
-      KnownProtocolKind::IntegerLiteralConvertible,
+    auto conformsToProtocol = [&](KnownProtocolKind protoKind) {
+        ProtocolDecl *proto = TC.getProtocol(ED->getLoc(), protoKind);
+        return TC.conformsToProtocol(rawTy, proto, ED->getDeclContext(), None);
+    };
+
+    static auto otherLiteralProtocolKinds = {
       KnownProtocolKind::FloatLiteralConvertible,
       KnownProtocolKind::UnicodeScalarLiteralConvertible,
       KnownProtocolKind::ExtendedGraphemeClusterLiteralConvertible,
-      KnownProtocolKind::StringLiteralConvertible
     };
-    bool literalConvertible = std::any_of(literalProtocolKinds.begin(),
-                                          literalProtocolKinds.end(),
-                                          [&](KnownProtocolKind protoKind) {
-      ProtocolDecl *proto = TC.getProtocol(ED->getLoc(), protoKind);
-      return TC.conformsToProtocol(rawTy, proto, ED->getDeclContext(), None);
-    });
 
-    if (!literalConvertible) {
-      if (!rawTy->is<ErrorType>()) {
-        TC.diagnose(ED->getInherited().front().getSourceRange().Start,
-                    diag::raw_type_not_literal_convertible,
-                    rawTy);
-        ED->getInherited().front().setInvalidType(TC.Context);
-      }
-
+    if (conformsToProtocol(KnownProtocolKind::IntegerLiteralConvertible)) {
+      valueKind = AutomaticEnumValueKind::Integer;
+    } else if (conformsToProtocol(KnownProtocolKind::StringLiteralConvertible)){
+      valueKind = AutomaticEnumValueKind::String;
+    } else if (std::any_of(otherLiteralProtocolKinds.begin(),
+                           otherLiteralProtocolKinds.end(),
+                           conformsToProtocol)) {
+      valueKind = AutomaticEnumValueKind::None;
+    } else {
+      TC.diagnose(ED->getInherited().front().getSourceRange().Start,
+                  diag::raw_type_not_literal_convertible,
+                  rawTy);
+      ED->getInherited().front().setInvalidType(TC.Context);
       return;
     }
   }
@@ -2672,7 +2689,7 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
       // If the enum element has no explicit raw value, try to
       // autoincrement from the previous value, or start from zero if this
       // is the first element.
-      auto nextValue = getAutoIncrementedLiteralExpr(TC, rawTy, elt, prevValue);
+      auto nextValue = getAutomaticRawValueExpr(TC, valueKind, elt, prevValue);
       if (!nextValue) {
         break;
       }
@@ -2701,16 +2718,19 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
     assert(lastExplicitValueElt &&
            "should not be able to have non-unique raw values when "
            "relying on autoincrement");
-    if (lastExplicitValueElt != elt)
+    if (lastExplicitValueElt != elt &&
+        valueKind == AutomaticEnumValueKind::Integer) {
       TC.diagnose(lastExplicitValueElt->getRawValueExpr()->getLoc(),
                   diag::enum_raw_value_incrementing_from_here);
+    }
 
     RawValueSource prevSource = insertIterPair.first->second;
     auto foundElt = prevSource.sourceElt;
     diagLoc = foundElt->getRawValueExpr()->isImplicit()
         ? foundElt->getLoc() : foundElt->getRawValueExpr()->getLoc();
     TC.diagnose(diagLoc, diag::enum_raw_value_used_here);
-    if (foundElt != prevSource.lastExplicitValueElt) {
+    if (foundElt != prevSource.lastExplicitValueElt &&
+        valueKind == AutomaticEnumValueKind::Integer) {
       if (prevSource.lastExplicitValueElt)
         TC.diagnose(prevSource.lastExplicitValueElt
                       ->getRawValueExpr()->getLoc(),

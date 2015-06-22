@@ -159,8 +159,11 @@ enum RawTypeCircularityB : RawTypeCircularityA, IntegerLiteralConvertible { // e
   }
 }
 
-enum RawTypeNotIntegerLiteralConvertible : String {
-  case Everett // expected-error {{enum cases require explicit raw values when the raw type is not integer literal convertible}}
+struct FloatLiteralConvertibleOnly : FloatLiteralConvertible {
+    init(floatLiteral: Double) {}
+}
+enum RawTypeNotIntegerLiteralConvertible : FloatLiteralConvertibleOnly { // expected-error {{RawRepresentable 'init' cannot be synthesized because raw type 'FloatLiteralConvertibleOnly' is not Equatable}}
+  case Everett // expected-error {{enum cases require explicit raw values when the raw type is not integer or string literal convertible}}
   case Flanders
 }
 
@@ -175,13 +178,13 @@ enum RawTypeWithNegativeValues : Int {
 
 enum RawTypeWithUnicodeScalarValues : UnicodeScalar {
   case Kearney = "K"
-  case Lovejoy // expected-error {{enum case must declare a raw value when the preceding raw value is not an integer}}
+  case Lovejoy // expected-error {{enum cases require explicit raw values when the raw type is not integer or string literal convertible}}
   case Marshall = "M"
 }
 
 enum RawTypeWithCharacterValues : Character {
   case First = "い"
-  case Second // expected-error {{enum case must declare a raw value when the preceding raw value is not an integer}}
+  case Second // expected-error {{enum cases require explicit raw values when the raw type is not integer or string literal convertible}}
   case Third = "は"
 }
 
@@ -196,8 +199,9 @@ enum RawTypeWithFloatValues : Float {
 }
 
 enum RawTypeWithStringValues : String {
+  case Primrose // okay
   case Quimby = "Lucky Lab"
-  case Raleigh // expected-error {{enum case must declare a raw value when the preceding raw value is not an integer}}
+  case Raleigh // okay
   case Savier = "McMenamin's", Thurman = "Kenny and Zuke's"
 }
 
@@ -248,6 +252,11 @@ enum RawTypeWithRepeatValues7 : Double {
   case Wilson = 340282366920938463463374607431768211455.0
 }
 
+enum RawTypeWithRepeatValues8 : String {
+  case Vaughn = "XYZ" // expected-note {{raw value previously used here}}
+  case Wilson = "XYZ" // expected-error {{raw value for enum case is not unique}}
+}
+
 enum RawTypeWithNonRepeatValues : Double {
   case SantaClara = 3.7
   case SanFernando = 7.4
@@ -272,6 +281,22 @@ enum RawTypeWithRepeatValuesAutoInc3 : Double {
   case Vaughn // expected-note {{raw value implicitly auto-incremented from zero}}
   case Wilson // expected-note {{raw value previously used here}}
   case Yeon = 1 // expected-error {{raw value for enum case is not unique}}
+}
+
+enum RawTypeWithRepeatValuesAutoInc4 : String {
+  case A = "B" // expected-note {{raw value previously used here}}
+  case B // expected-error {{raw value for enum case is not unique}}
+}
+
+enum RawTypeWithRepeatValuesAutoInc5 : String {
+  case A // expected-note {{raw value previously used here}}
+  case B = "A" // expected-error {{raw value for enum case is not unique}}
+}
+
+enum RawTypeWithRepeatValuesAutoInc6 : String {
+  case A
+  case B // expected-note {{raw value previously used here}}
+  case C = "B" // expected-error {{raw value for enum case is not unique}}
 }
 
 enum NonliteralRawValue : Int {
@@ -319,6 +344,11 @@ enum DuplicateMembers6 {
   case Foo // expected-error {{duplicate definition of enum element}}
 }
 
+enum DuplicateMembers7 : String {
+  case Foo // expected-note {{previous definition of 'Foo' is here}}
+  case Foo = "Bar" // expected-error {{duplicate definition of enum element}}
+}
+
 // Refs to duplicated enum cases shouldn't crash the compiler.
 // rdar://problem/20922401
 func check20922401() -> String {
@@ -350,4 +380,28 @@ enum PlaygroundRepresentation : UInt8 {
     let repr = PlaygroundRepresentation(rawValue: byte)
     if repr == .None { return .Unknown } else { return repr! }
   }
+}
+
+struct ManyLiteralable : IntegerLiteralConvertible, StringLiteralConvertible, Equatable {
+  init(stringLiteral: String) {}
+  init(integerLiteral: Int) {}
+
+  init(unicodeScalarLiteral: String) {}
+  init(extendedGraphemeClusterLiteral: String) {}
+}
+func ==(lhs: ManyLiteralable, rhs: ManyLiteralable) -> Bool { return true }
+
+enum ManyLiteralA : ManyLiteralable {
+  case A // expected-note {{raw value previously used here}} expected-note {{raw value implicitly auto-incremented from zero}}
+  case B = 0 // expected-error {{raw value for enum case is not unique}}
+}
+
+enum ManyLiteralB : ManyLiteralable {
+  case A = "abc"
+  case B // expected-error {{enum case must declare a raw value when the preceding raw value is not an integer}}
+}
+
+enum ManyLiteralC : ManyLiteralable {
+  case A
+  case B = "0"
 }

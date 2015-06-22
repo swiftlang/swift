@@ -1148,7 +1148,8 @@ ERROR(objc_enum_raw_type_not_integer,sema_tcd,none,
 ERROR(enum_non_integer_raw_value_auto_increment,sema_tcd,none,
       "enum case must declare a raw value when the preceding raw value is not an integer", ())
 ERROR(enum_non_integer_convertible_raw_type_no_value,sema_tcd,none,
-      "enum cases require explicit raw values when the raw type is not integer literal convertible", ())
+      "enum cases require explicit raw values when the raw type is not integer "
+      "or string literal convertible", ())
 ERROR(enum_raw_value_not_unique,sema_tcd,none,
       "raw value for enum case is not unique", ())
 NOTE(enum_raw_value_used_here,sema_tcd,none,
