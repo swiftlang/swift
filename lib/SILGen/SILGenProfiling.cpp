@@ -12,6 +12,7 @@
 
 #include "SILGenProfiling.h"
 #include "SILGen.h"
+#include "SILGenFunction.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/Basic/Fallthrough.h"
@@ -641,7 +642,7 @@ static SILLocation getLocation(ASTNode Node) {
     llvm_unreachable("unsupported ASTNode");
 }
 
-void SILGenProfiling::emitCounterIncrement(SILBuilder &Builder, ASTNode Node) {
+void SILGenProfiling::emitCounterIncrement(SILGenBuilder &Builder,ASTNode Node){
   auto &C = Builder.getASTContext();
 
   auto CounterIt = RegionCounterMap.find(Node);

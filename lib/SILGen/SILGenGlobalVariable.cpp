@@ -106,7 +106,7 @@ SILGenFunction::emitGlobalVariableRef(SILLocation loc, VarDecl *var) {
   // instruction into the prolog of the function so we can memoize/CSE it in
   // VarLocs.
   auto &entryBB = getFunction().getBlocks().front();
-  SILBuilder prologueB(&entryBB, entryBB.begin());
+  SILGenBuilder prologueB(*this, &entryBB, entryBB.begin());
   prologueB.setTrackingList(B.getTrackingList());
 
   auto *silG = SGM.getSILGlobalVariable(var, NotForDefinition);

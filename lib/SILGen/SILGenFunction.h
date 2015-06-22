@@ -113,7 +113,7 @@ public:
   /*implicit*/
   SGFContext(AllowGuaranteedPlusZero_t) : state(nullptr, GuaranteedPlusZero) {
   }
-  
+
   /// Returns a pointer to the Initialization that the current expression should
   /// store its result to, or null if the expression should allocate temporary
   /// storage for its result.
@@ -210,6 +210,78 @@ enum class FunctionSection : bool {
   Postmatter,
 };
 
+/// A subclass of SILBuilder that tracks used protocol conformances.
+class SILGenBuilder : public SILBuilder {
+  SILGenModule &SGM;
+public:
+  SILGenBuilder(SILGenFunction &gen);
+  SILGenBuilder(SILGenFunction &gen, SILBasicBlock *insertBB);
+  SILGenBuilder(SILGenFunction &gen, SILBasicBlock *insertBB,
+                SmallVectorImpl<SILInstruction *> *insertedInsts);
+  SILGenBuilder(SILGenFunction &gen, SILBasicBlock *insertBB,
+                SILInstruction *insertInst);
+
+  // Metatype instructions use the conformances necessary to instantiate the
+  // type.
+  
+  MetatypeInst *createMetatype(SILLocation Loc, SILType Metatype);
+
+  // Generic pply instructions use the conformances necessary to form the call.
+
+  using SILBuilder::createApply;
+
+  ApplyInst *createApply(SILLocation Loc, SILValue Fn,
+                         SILType SubstFnTy,
+                         SILType Result,
+                         ArrayRef<Substitution> Subs,
+                         ArrayRef<SILValue> Args);
+
+
+  TryApplyInst *createTryApply(SILLocation loc, SILValue fn,
+                               SILType substFnTy,
+                               ArrayRef<Substitution> subs,
+                               ArrayRef<SILValue> args,
+                               SILBasicBlock *normalBB,
+                               SILBasicBlock *errorBB);
+
+  PartialApplyInst *createPartialApply(SILLocation Loc, SILValue Fn,
+                                       SILType SubstFnTy,
+                                       ArrayRef<Substitution> Subs,
+                                       ArrayRef<SILValue> Args,
+                                       SILType ClosureTy);
+
+  BuiltinInst *createBuiltin(SILLocation Loc, Identifier Name,
+                             SILType ResultTy, ArrayRef<Substitution> Subs,
+                             ArrayRef<SILValue> Args);
+
+  // Existential containers use the conformances needed by the existential
+  // box.
+
+  InitExistentialAddrInst *
+  createInitExistentialAddr(SILLocation Loc,
+                            SILValue Existential,
+                            CanType FormalConcreteType,
+                            SILType LoweredConcreteType,
+                            ArrayRef<ProtocolConformance*> Conformances);
+
+  InitExistentialMetatypeInst *
+  createInitExistentialMetatype(SILLocation loc, SILValue metatype,
+                                SILType existentialType,
+                                ArrayRef<ProtocolConformance*> conformances);
+  
+  InitExistentialRefInst *
+  createInitExistentialRef(SILLocation Loc, SILType ExistentialType,
+                           CanType FormalConcreteType,
+                           SILValue Concrete,
+                           ArrayRef<ProtocolConformance*> Conformances);
+
+  AllocExistentialBoxInst *createAllocExistentialBox(SILLocation Loc,
+                                 SILType ExistentialType,
+                                 CanType ConcreteType,
+                                 SILType ConcreteLoweredType,
+                                 ArrayRef<ProtocolConformance *> Conformances);
+};
+
 /// SILGenFunction - an ASTVisitor for producing SIL from function bodies.
 class LLVM_LIBRARY_VISIBILITY SILGenFunction
   : public ASTVisitor<SILGenFunction>
@@ -266,10 +338,10 @@ public:
   /// \brief Is emission currently within an inout conversion?
   bool InInOutConversionScope = false;
   
-  /// B - The SILBuilder used to construct the SILFunction.  It is
+  /// B - The SILGenBuilder used to construct the SILFunction.  It is
   /// what maintains the notion of the current block being emitted
   /// into.
-  SILBuilder B;
+  SILGenBuilder B;
 
   /// IndirectReturnAddress - For a function with an indirect return, holds a
   /// value representing the address to initialize with the return value. Null
@@ -461,7 +533,7 @@ public:
   }
   
   SILFunction &getFunction() { return F; }
-  SILBuilder &getBuilder() { return B; }
+  SILGenBuilder &getBuilder() { return B; }
   
   const TypeLowering &getTypeLowering(AbstractionPattern orig, Type subst,
                                       unsigned uncurryLevel = 0) {
@@ -1320,7 +1392,7 @@ public:
                                      ManagedValue errorSlot,
                                      bool suppressErrorCheck,
                                const ForeignErrorConvention &foreignError);
-  
+
   //===--------------------------------------------------------------------===//
   // Declarations
   //===--------------------------------------------------------------------===//

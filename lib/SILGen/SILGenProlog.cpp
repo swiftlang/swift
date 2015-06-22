@@ -205,7 +205,7 @@ struct ArgumentInitVisitor :
 {
   SILGenFunction &gen;
   SILFunction &f;
-  SILBuilder &initB;
+  SILGenBuilder &initB;
 
   /// An ArrayRef that we use in our SILParameterList queue. Parameters are
   /// sliced off of the front as they're emitted.

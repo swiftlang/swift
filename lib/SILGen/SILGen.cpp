@@ -894,7 +894,7 @@ void SILGenModule::visitVarDecl(VarDecl *vd) {
     addGlobalVariable(vd);
 }
 
-void emitTopLevelProlog(SILGenFunction &gen, SILLocation loc) {
+static void emitTopLevelProlog(SILGenFunction &gen, SILLocation loc) {
   assert(gen.B.getInsertionBB() == gen.F.begin()
          && "not at entry point?!");
 
@@ -916,6 +916,37 @@ void emitTopLevelProlog(SILGenFunction &gen, SILLocation loc) {
     };
     gen.emitApplyOfLibraryIntrinsic(loc, didEnterMain, {}, params,
                                     SGFContext());
+  }
+}
+
+void SILGenModule::useConformance(ProtocolConformance *conformance) {
+  // We don't need to emit dependent conformances.
+  if (!conformance)
+    return;
+
+  auto root = conformance->getRootNormalConformance();
+  // If we already emitted this witness table, we don't need to track the fact
+  // we need it.
+  if (emittedWitnessTables.count(root))
+    return;
+
+  // If we delayed emitting this witness table, force it.
+  auto foundDelayed = delayedConformances.find(root);
+  if (foundDelayed != delayedConformances.end()) {
+    forcedConformances.push_back(*foundDelayed);
+    delayedConformances.erase(foundDelayed);
+    return;
+  }
+
+  // Otherwise, just remember the fact we used this conformance.
+  usedConformances.insert(root);
+}
+
+void
+SILGenModule::useConformancesFromSubstitutions(ArrayRef<Substitution> subs) {
+  for (auto &sub : subs) {
+    for (auto *conformance : sub.getConformances())
+      useConformance(conformance);
   }
 }
 
@@ -1116,11 +1147,19 @@ SILModule::constructSIL(Module *mod, SILOptions &options, FileUnit *sf,
 
   // Emit any delayed definitions that were forced.
   // Emitting these may in turn force more definitions, so we have to take care
-  // to keep pumping the queue.
-  while (!sgm.forcedFunctions.empty()) {
-    auto &front = sgm.forcedFunctions.front();
-    front.second.emitter(sgm.getFunction(front.first, ForDefinition));
-    sgm.forcedFunctions.pop_front();
+  // to keep pumping the queues.
+  while (!sgm.forcedFunctions.empty()
+         || !sgm.forcedConformances.empty()) {
+    while (!sgm.forcedFunctions.empty()) {
+      auto &front = sgm.forcedFunctions.front();
+      front.second.emitter(sgm.getFunction(front.first, ForDefinition));
+      sgm.forcedFunctions.pop_front();
+    }
+    while (!sgm.forcedConformances.empty()) {
+      auto &front = sgm.forcedConformances.front();
+      sgm.getWitnessTable(front.first);
+      sgm.forcedConformances.pop_front();
+    }
   }
 
   return m;

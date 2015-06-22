@@ -1957,7 +1957,7 @@ ManagedValue SILGenFunction::emitLoad(SILLocation loc, SILValue addr,
   return emitManagedRValueWithCleanup(loadedV, rvalueTL);
 }
 
-static void emitUnloweredStoreOfCopy(SILBuilder &B, SILLocation loc,
+static void emitUnloweredStoreOfCopy(SILGenBuilder &B, SILLocation loc,
                                      SILValue value, SILValue addr,
                                      IsInitialization_t isInit) {
   if (isInit)

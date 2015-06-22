@@ -26,7 +26,6 @@
 
 namespace swift {
   class PatternBindingDecl;
-  class SILBuilder;
   class SILBasicBlock;
   
 namespace Lowering {

@@ -16,7 +16,6 @@
 #include "llvm/ADT/DenseMap.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/Stmt.h"
-#include "swift/SIL/SILBuilder.h"
 
 namespace llvm {
 using swift::ASTNode;
@@ -37,9 +36,13 @@ template <> struct DenseMapInfo<ASTNode> {
 }
 
 namespace swift {
+
+class AbstractFunctionDecl;
+
 namespace Lowering {
 
 class SILGenModule;
+class SILGenBuilder;
 
 /// RAII object to set up profiling for a function.
 struct ProfilerRAII {
@@ -73,7 +76,7 @@ public:
   void assignRegionCounters(AbstractFunctionDecl *Root);
 
   /// Emit SIL to increment the counter for \c Node.
-  void emitCounterIncrement(SILBuilder &Builder, ASTNode Node);
+  void emitCounterIncrement(SILGenBuilder &Builder, ASTNode Node);
 };
 
 } // end namespace Lowering

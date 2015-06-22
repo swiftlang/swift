@@ -78,7 +78,26 @@ public:
   /// Queue of delayed SILFunctions that need to be forced.
   std::deque<std::pair<SILDeclRef, DelayedFunction>> forcedFunctions;
 
+  /// The most recent declaration we considered for emission.
   SILDeclRef lastEmittedFunction;
+
+  /// Set of used conformances for which witness tables need to be emitted.
+  llvm::DenseSet<NormalProtocolConformance *> usedConformances;
+
+  struct DelayedWitnessTable {
+    NormalProtocolConformance *insertAfter;
+  };
+
+  /// Set of conformances we delayed emitting witness tables for.
+  llvm::DenseMap<NormalProtocolConformance *, DelayedWitnessTable>
+    delayedConformances;
+
+  /// Queue of delayed conformances that need to be forced.
+  std::deque<std::pair<NormalProtocolConformance *, DelayedWitnessTable>>
+    forcedConformances;
+
+  /// The most recent conformance...
+  NormalProtocolConformance *lastEmittedConformance = nullptr;
 
   SILFunction *emitTopLevelFunction(SILLocation Loc);
   
@@ -241,7 +260,10 @@ public:
   
   /// Emit SIL related to a Clang-imported declaration.
   void emitExternalDefinition(Decl *d);
-  
+
+  /// Emit SIL related to a Clang-imported declaration.
+  void emitExternalWitnessTable(ProtocolConformance *d);
+
   /// Emit the ObjC-compatible entry point for a method.
   void emitObjCMethodThunk(FuncDecl *method);
   
@@ -332,6 +354,13 @@ public:
   /// Get or create SILGlobalVariable for a given global VarDecl.
   SILGlobalVariable *getSILGlobalVariable(VarDecl *gDecl,
                                           ForDefinition_t forDef);
+
+  /// Mark a protocol conformance as used, so we know we need to emit it if
+  /// it's in our TU.
+  void useConformance(ProtocolConformance *conformance);
+
+  /// Mark protocol conformances from the given set of substitutions as used.
+  void useConformancesFromSubstitutions(ArrayRef<Substitution> subs);
 
 private:
   /// Emit the deallocator for a class that uses the objc allocator.

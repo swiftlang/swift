@@ -16,7 +16,6 @@
 #include "RValue.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILFunction.h"
-#include "swift/SIL/SILBuilder.h"
 using namespace swift;
 using namespace Lowering;
 

@@ -102,7 +102,7 @@ bool CleanupManager::hasAnyActiveCleanups(CleanupsDepth from) {
 void CleanupManager::emitBranchAndCleanups(JumpDest Dest,
                                            SILLocation BranchLoc,
                                            ArrayRef<SILValue> Args) {
-  SILBuilder &B = Gen.getBuilder();
+  SILGenBuilder &B = Gen.getBuilder();
   assert(B.hasValidInsertionPoint() && "Inserting branch in invalid spot");
   auto depth = Dest.getDepth();
   auto end = Stack.find(depth);

@@ -1428,6 +1428,10 @@ static RValue emitBoxedErasure(SILGenFunction &gen, ErasureExpr *E) {
 }
 
 RValue RValueEmitter::visitErasureExpr(ErasureExpr *E, SGFContext C) {
+  // Mark the needed conformances as used.
+  for (auto *conformance : E->getConformances())
+    SGF.SGM.useConformance(conformance);
+
   switch (SILType::getPrimitiveObjectType(E->getType()->getCanonicalType())
             .getPreferredExistentialRepresentation(SGF.SGM.M,
                                                    E->getSubExpr()->getType())){
@@ -1485,6 +1489,10 @@ static SILValue emitOpenExistentialMetatype(SILGenFunction &SGF,
 
 RValue RValueEmitter::visitMetatypeErasureExpr(MetatypeErasureExpr *E,
                                                SGFContext C) {
+  // Mark the needed conformances as used.
+  for (auto *conformance : E->getConformances())
+    SGF.SGM.useConformance(conformance);
+
   SILValue metatype =
     SGF.emitRValueAsSingleValue(E->getSubExpr()).getUnmanagedValue();
 
@@ -3186,7 +3194,7 @@ RValue RValueEmitter::emitForceValue(SILLocation loc, Expr *E,
       if (failureBB->pred_empty()) {
         SGF.eraseBasicBlock(failureBB);
       } else {
-        SILBuilder failureBuilder(failureBB);
+        SILGenBuilder failureBuilder(SGF, failureBB);
         failureBuilder.setTrackingList(SGF.getBuilder().getTrackingList());
         auto boolTy = SILType::getBuiltinIntegerType(1, SGF.getASTContext());
         auto trueV = failureBuilder.createIntegerLiteral(loc, boolTy, 1);
