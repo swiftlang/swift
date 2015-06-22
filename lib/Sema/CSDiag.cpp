@@ -1259,17 +1259,15 @@ bool typeIsNotSpecialized(Type type) {
     return true;
   
   if (auto tv = type->getAs<TypeVariableType>()) {
-    
-      // If it's a nil-literal conformance, there's no reason to re-specialize.
-      if (tv->getImpl().literalConformanceProto) {
-      
-        auto knownProtoKind =
-            tv->getImpl().literalConformanceProto->getKnownProtocolKind();
+    // If it's a nil-literal conformance, there's no reason to re-specialize.
+    if (tv->getImpl().literalConformanceProto) {
+      auto knownProtoKind =
+        tv->getImpl().literalConformanceProto->getKnownProtocolKind();
         
-        if (knownProtoKind.hasValue() &&
-            (knownProtoKind.getValue() ==
-                KnownProtocolKind::NilLiteralConvertible)) {
-          return false;
+      if (knownProtoKind.hasValue() &&
+          (knownProtoKind.getValue() ==
+           KnownProtocolKind::NilLiteralConvertible)) {
+        return false;
       }
     }
     
@@ -1701,8 +1699,7 @@ Type GeneralFailureDiagnosis::getTypeOfIndependentSubExpression(Expr *subExpr) {
   CS->TC.addExprForDiagnosis(subExpr);
   
   if (!isa<ClosureExpr>(subExpr) &&
-      (dyn_cast<CallExpr>(subExpr) ||
-       dyn_cast<ArrayExpr>(subExpr) ||
+      (isa<CallExpr>(subExpr) || isa<ArrayExpr>(subExpr) ||
        typeIsNotSpecialized(subExpr->getType()))) {
     
     // Store off the sub-expression, in case a new one is provided via the
