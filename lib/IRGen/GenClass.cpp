@@ -906,7 +906,9 @@ namespace {
         else
           superPtr = IGM.getAddrOfMetaclassObject(base, NotForDefinition);
       } else {
-        superPtr = rootPtr;
+        superPtr = IGM.getAddrOfMetaclassObject(
+          IGM.getObjCRuntimeBaseForSwiftRootClass(getClass()),
+          NotForDefinition);
       }
 
       auto dataPtr = emitROData(ForMetaClass);
