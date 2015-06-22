@@ -174,7 +174,8 @@ ERROR(return_from_noreturn,sil_analysis,none,
 ERROR(non_exhaustive_switch,sil_analysis,none, 
       "switch must be exhaustive, consider adding a default clause", ())
 ERROR(guard_body_must_not_fallthrough,sil_analysis,none,
-      "'guard' body may not fall through", ())
+      "'guard' body may not fall through, consider using 'return' or 'break'"
+      " to exit the scope", ())
 WARNING(unreachable_code,sil_analysis,none, "will never be executed", ())
 NOTE(unreachable_code_branch,sil_analysis,none,
      "condition always evaluates to %select{false|true}0", (bool))
