@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-ir %s | FileCheck %s
+// REQUIRES: objc_interop
 
 // CHECK-LABEL: @_TMmC30swift_native_objc_runtime_base1C = global %objc_class {
 // -- metaclass "isa" is root metaclass
