@@ -148,7 +148,7 @@ func for_loop() {
   for (let i = 0; i < 10; ) {}
 }
 
-break // expected-error {{'break' is only allowed inside a loop}}
+break // expected-error {{'break' is only allowed inside a loop, if, do, or switch}}
 continue // expected-error {{'continue' is only allowed inside a loop}}
 while true {
   func f() {
