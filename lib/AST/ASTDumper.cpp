@@ -1382,14 +1382,15 @@ public:
       OS << " negative";
     OS << " value=";
     Type T = E->getType();
-    if (T.isNull() || T->is<ErrorType>() || T->hasTypeVariable())
+    if (T.isNull() || !T->is<BuiltinIntegerType>())
       OS << E->getDigitsText();
     else
       OS << E->getValue();
     OS << ')';
   }
   void visitFloatLiteralExpr(FloatLiteralExpr *E) {
-    printCommon(E, "float_literal_expr") << " value=" << E->getDigitsText() << ')';
+    printCommon(E, "float_literal_expr") << " value="
+          << E->getDigitsText() << ')';
   }
 
   void visitBooleanLiteralExpr(BooleanLiteralExpr *E) {
