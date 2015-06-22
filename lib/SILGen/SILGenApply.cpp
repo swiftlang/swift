@@ -1393,10 +1393,14 @@ public:
     // Load the 'self' argument.
     Expr *arg = expr->getArg();
     ManagedValue self;
+    CanType selfFormalType = arg->getType()->getCanonicalType();
 
     // If we're using the allocating constructor, we need to pass along the
     // metatype.
     if (useAllocatingCtor) {
+      selfFormalType = CanMetatypeType::get(
+          selfFormalType->getInOutObjectType()->getCanonicalType());
+
       if (SGF.AllocatorMetatype)
         self = ManagedValue::forUnmanaged(SGF.AllocatorMetatype);
       else
@@ -1417,7 +1421,6 @@ public:
       }
     }
 
-    CanType selfFormalType = arg->getType()->getCanonicalType();
     setSelfParam(ArgumentSource(arg, RValue(SGF, expr, selfFormalType, self)),
                  expr);
 
@@ -1427,8 +1430,7 @@ public:
     // that's the only thing that's witnessed. For classes,
     // this is the initializing constructor, to which we will dynamically
     // dispatch.
-    if (isa<ArchetypeType>(
-                 SelfParam.getSubstRValueType().getLValueOrInOutObjectType())
+    if (SelfParam.getSubstRValueType()->getRValueInstanceType()->is<ArchetypeType>()
         && isa<ProtocolDecl>(ctorRef->getDecl()->getDeclContext())) {
       // Look up the witness for the constructor.
       auto constant = SILDeclRef(ctorRef->getDecl(),

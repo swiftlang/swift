@@ -148,6 +148,8 @@ class C3 {
   init(x: X) { }
 }
 
+// Initializer delegation from a constructor defined in an extension.
+
 class C4 { }
 
 extension C4 {
@@ -159,5 +161,33 @@ extension C4 {
   // CHECK: apply [[PEER]]([[X:%[0-9]+]], [[OBJ:%[0-9]+]])
   convenience init(x2: X) {
     self.init(x1: x2)
+  }
+}
+
+// Initializer delegation to a constructor defined in a protocol extension.
+
+protocol Pb {
+  init()
+}
+
+extension Pb {
+  init(d: Int) { }
+}
+
+class Sn : Pb {
+  required init() { }
+
+  convenience init(d3: Int) {
+    self.init(d: d3)
+  }
+}
+
+// Same as above but for a value type.
+
+struct Cs : Pb {
+  init() { }
+
+  init(d3: Int) {
+    self.init(d: d3)
   }
 }

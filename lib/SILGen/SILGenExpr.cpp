@@ -2173,6 +2173,17 @@ static SILInstruction *findDelegatingInitCall(SILValue value) {
 
   // Okay, this should be the actual call.
 
+  if (auto load = dyn_cast<LoadInst>(value)) {
+    SILInstruction *found = nullptr;
+    for (auto use : load->getOperand()->getUses()) {
+      if (auto apply = dyn_cast<ApplyInst>(use->getUser())) {
+        assert(!found);
+        found = apply;
+      }
+    }
+    return found;
+  }
+
   if (auto apply = dyn_cast<ApplyInst>(value)) {
     return apply;
   }
