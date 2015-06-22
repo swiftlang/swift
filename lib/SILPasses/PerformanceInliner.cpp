@@ -1248,7 +1248,6 @@ void SILPerformanceInliner::inlineDevirtualizeAndSpecialize(
       }
 
       Lap++;
-      if (Lap > MaxLaps)
       // It's possible to construct real code where this will hit, but
       // it's more likely that there is an issue tracking recursive
       // inlining, in which case we want to know about it in internal
