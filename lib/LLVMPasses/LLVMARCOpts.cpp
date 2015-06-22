@@ -222,6 +222,7 @@ static bool canonicalizeInputFunction(Function &F) {
       I = CallInst::Create(getRetainNoResult(F, ArgVal->getType(),
                                              RetainNoResultCache),
                            ArgVal, "", &CI);
+      I->setDebugLoc(CI.getDebugLoc());
       CI.eraseFromParent();
       Changed = true;
       break;
@@ -249,6 +250,7 @@ static bool canonicalizeInputFunction(Function &F) {
       CallInst &CI = cast<CallInst>(Inst);
 
       IRBuilder<> B(&CI);
+      B.SetCurrentDebugLocation(CI.getDebugLoc());
       Type *HeapObjectTy = CI.getArgOperand(0)->getType();
 
       // Reprocess starting at the new swift_retain_noresult.
@@ -1020,6 +1022,7 @@ static bool optimizeReturn3(ReturnInst *TheReturn) {
 
   // Insert any new instructions before the return.
   IRBuilder<> B(TheReturn);
+  B.SetCurrentDebugLocation(TheReturn->getDebugLoc());
   Type *Int64Ty = B.getInt64Ty();
 
   // The swift_retainAndReturnThree function takes the three arguments as i64.
@@ -1129,6 +1132,7 @@ bool SwiftARCExpandPass::runOnFunction(Function &F) {
         CallInst &CI =
            *CallInst::Create(getRetain(F, ArgVal->getType(), RetainCache),
                              ArgVal, "", &Inst);
+        CI.setDebugLoc(Inst.getDebugLoc());
         CI.setTailCall(true);
         Inst.eraseFromParent();
 

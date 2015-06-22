@@ -51,7 +51,7 @@ entry:
 ; CHECK: insertvalue
 ; CHECK-NEXT: insertvalue
 ; CHECK-NEXT: insertvalue
-; CHECK-NEXT: call void @swift_retain_noresult(%swift.refcounted* %2)
+; CHECK-NEXT: call void @swift_retain_noresult(%swift.refcounted* %2), !dbg
 ; CHECK-NEXT: ret
 
 define { i8*, i64, %swift.refcounted* } @retain3_test2(i8*, i64, %swift.refcounted*) nounwind {
@@ -59,7 +59,7 @@ entry:
   %x = ptrtoint i8* %0 to i64
   %z = ptrtoint %swift.refcounted* %2 to i64
   
-  %3 = call { i64, i64, i64 } @swift_retainAndReturnThree(%swift.refcounted* %2, i64 %x, i64 %1, i64 %z)
+  %3 = call { i64, i64, i64 } @swift_retainAndReturnThree(%swift.refcounted* %2, i64 %x, i64 %1, i64 %z), !dbg !0
   %a = extractvalue { i64, i64, i64 } %3, 0
   %b = extractvalue { i64, i64, i64 } %3, 1
   %c = extractvalue { i64, i64, i64 } %3, 2
@@ -187,3 +187,12 @@ define void @move_retain_but_not_release_across_objc_fix_lifetime(%swift.refcoun
   tail call void @swift_release(%swift.refcounted* %A) nounwind
   ret void
 }
+
+!llvm.dbg.cu = !{!1}
+!llvm.module.flags = !{!4}
+
+!0 = !DILocation(line: 0, scope: !3)
+!1 = distinct !DICompileUnit(language: DW_LANG_Swift, file: !2)
+!2 = !DIFile(filename: "basic.swift", directory: "")
+!3 = !DISubprogram(name: "_", scope: !1, file: !2, type: !DISubroutineType(types: !{}))
+!4 = !{i32 1, !"Debug Info Version", i32 3}

@@ -69,3 +69,22 @@ entry:
   call void @swift_fixLifetime(%swift.refcounted* %1)
   ret void
 }
+
+
+; CHECK-LABEL: define void @swift_expandNoresultTest
+; CHECK: call %swift.refcounted* @swift_retain(%swift.refcounted* %A), !dbg
+define void @swift_expandNoresultTest(%swift.refcounted* %A) {
+  tail call void @swift_retain_noresult(%swift.refcounted* %A), !dbg !0
+  tail call void @swift_release(%swift.refcounted* %A) nounwind
+  ret void
+}
+
+
+!llvm.dbg.cu = !{!1}
+!llvm.module.flags = !{!4}
+
+!0 = !DILocation(line: 0, scope: !3)
+!1 = distinct !DICompileUnit(language: DW_LANG_Swift, file: !2)
+!2 = !DIFile(filename: "expand.swift", directory: "")
+!3 = !DISubprogram(name: "_", scope: !1, file: !2, type: !DISubroutineType(types: !{}))
+!4 = !{i32 1, !"Debug Info Version", i32 3}
