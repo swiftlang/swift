@@ -298,6 +298,8 @@ public:
 
 private:
   bool shouldPrint(const Decl *D);
+  bool shouldPrintPattern(const Pattern *P);
+  void printPatternType(const Pattern *P);
   void printAccessors(AbstractStorageDecl *ASD);
   void printMembers(DeclRange members, bool needComma = false);
   void printNominalDeclName(NominalTypeDecl *decl);
@@ -573,6 +575,21 @@ void PrintAST::printWhereClause(ArrayRef<RequirementRepr> requirements) {
   }
 }
 
+bool PrintAST::shouldPrintPattern(const Pattern *P) {
+  bool ShouldPrint = false;
+  P->forEachVariable([&](VarDecl *VD) {
+    ShouldPrint |= shouldPrint(VD);
+  });
+  return ShouldPrint;
+}
+
+void PrintAST::printPatternType(const Pattern *P) {
+  if (P->hasType()) {
+    Printer << ": ";
+    P->getType().print(Printer, Options);
+  }
+}
+
 bool PrintAST::shouldPrint(const Decl *D) {
   if (Options.SkipDeinit && isa<DestructorDecl>(D)) {
     return false;
@@ -626,16 +643,13 @@ bool PrintAST::shouldPrint(const Decl *D) {
   // We need to handle PatternBindingDecl as a special case here because its
   // attributes can only be retrieved from the inside VarDecls.
   if (auto *PD = dyn_cast<PatternBindingDecl>(D)) {
-    const VarDecl *anyVar = nullptr;
+    auto ShouldPrint = false;
     for (auto entry : PD->getPatternList()) {
-      entry.getPattern()->forEachVariable([&](VarDecl *V) {
-        anyVar = V;
-      });
-      if (anyVar)
-        break;
+      ShouldPrint |= shouldPrintPattern(entry.getPattern());
+      if (ShouldPrint)
+        return true;
     }
-    if (anyVar && !shouldPrint(anyVar))
-      return false;
+    return false;
   }
 
   return true;
@@ -1127,6 +1141,8 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
   
   bool isFirst = true;
   for (auto entry : decl->getPatternList()) {
+    if (!shouldPrintPattern(entry.getPattern()))
+      continue;
     if (isFirst)
       isFirst = false;
     else
@@ -1134,13 +1150,13 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
     
     printPattern(entry.getPattern());
 
-    // We also try to print type for named patterns; e.g. var Field = 10
-    if (auto NP = dyn_cast<NamedPattern>(entry.getPattern())) {
-      if (NP->hasType()) {
-        Printer << ": ";
-        NP->getType().print(Printer, Options);
-      }
+    // We also try to print type for named patterns, e.g. var Field = 10;
+    // and tuple patterns, e.g. var (T1, T2) = (10, 10)
+    if (isa<NamedPattern>(entry.getPattern()) ||
+        isa<TuplePattern>(entry.getPattern())) {
+      printPatternType(entry.getPattern());
     }
+
     if (Options.VarInitializers) {
       // FIXME: Implement once we can pretty-print expressions.
     }
