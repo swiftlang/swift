@@ -980,7 +980,7 @@ static bool isSelfInitUse(SILInstruction *I) {
     return false;
   }
 
-  // This is a super.init call if structured like this:
+  // This is a self.init call if structured like this:
   // (call_expr type='SomeClass'
   //   (dot_syntax_call_expr type='() -> SomeClass' self
   //     (other_constructor_ref_expr implicit decl=SomeClass.init)
@@ -1029,6 +1029,18 @@ static bool isSelfInitUse(ValueMetatypeInst *Inst) {
       // ... of factory initializers.
       auto ctor = dyn_cast_or_null<ConstructorDecl>(Member.getDecl());
       return ctor && ctor->isFactoryInit();
+    }
+
+    if (auto *AI = dyn_cast<ApplyInst>(User)) {
+      auto *LocExpr = AI->getLoc().getAsASTNode<ApplyExpr>();
+      if (!LocExpr)
+        return false;
+
+      LocExpr = dyn_cast<ApplyExpr>(LocExpr->getFn());
+      if (!LocExpr || !isa<OtherConstructorDeclRefExpr>(LocExpr->getFn()))
+        return false;
+
+      return true;
     }
 
     // Ignore the thick_to_objc_metatype instruction.
@@ -1131,6 +1143,29 @@ void ElementUseCollector::collectDelegatingClassInitSelfUses() {
     // part of the super.init call.  Ignore both of these.
     if (isa<StoreInst>(User) && UI->getOperandNumber() == 1)
       continue;
+
+    // Stores *to* the allocation are writes.  If the value being stored is a
+    // call to self.init()... then we have a self.init call.
+    if (auto *AI = dyn_cast<AssignInst>(User)) {
+      if (auto *AssignSource = dyn_cast<SILInstruction>(AI->getOperand(0)))
+        if (isSelfInitUse(AssignSource)) {
+          Uses.push_back(DIMemoryUse(User, DIUseKind::SelfInit, 0, 1));
+          continue;
+        }
+      if (auto *AssignSource = dyn_cast<SILArgument>(AI->getOperand(0)))
+        if (AssignSource->getParent() == AI->getParent())
+          if (isSelfInitUse(AssignSource)) {
+            Uses.push_back(DIMemoryUse(User, DIUseKind::SelfInit, 0, 1));
+            continue;
+          }
+    }
+    
+    if (auto *CAI = dyn_cast<CopyAddrInst>(User)) {
+      if (isSelfInitUse(CAI)) {
+        Uses.push_back(DIMemoryUse(User, DIUseKind::SelfInit, 0, 1));
+        continue;
+      }
+    }
 
     // Loads of the box produce self, so collect uses from them.
     if (auto *LI = dyn_cast<LoadInst>(User)) {

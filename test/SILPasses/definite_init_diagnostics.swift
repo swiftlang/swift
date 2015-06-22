@@ -555,6 +555,61 @@ enum DelegatingCtorEnum {
   }                // expected-error {{self.init isn't called on all paths in delegating initializer}}
 }
 
+//===----------------------------------------------------------------------===//
+//  Delegating initializers vs extensions
+//===----------------------------------------------------------------------===//
+
+protocol TriviallyConstructible {
+  init()
+  func go(x: Int)
+}
+
+extension TriviallyConstructible {
+  init(up: Int) {
+    self.init()
+    go(up)
+  }
+
+  init(down: Int) {
+    go(down) // expected-error {{use of 'self' in delegating initializer before self.init is called}}
+    self.init()
+  }
+}
+
+class TrivialClass : TriviallyConstructible {
+  required init() {}
+
+  func go(x: Int) {}
+
+  convenience init(y: Int) {
+    self.init(up: y * y)
+  }
+}
+
+struct TrivialStruct : TriviallyConstructible {
+  init() {}
+
+  func go(x: Int) {}
+
+  init(y: Int) {
+    self.init(up: y * y)
+  }
+}
+
+enum TrivialEnum : TriviallyConstructible {
+  case NotSoTrivial
+
+  init() {
+    self = NotSoTrivial
+  }
+
+  func go(x: Int) {}
+
+  init(y: Int) {
+    self.init(up: y * y)
+  }
+}
+
 @requires_stored_property_inits
 class RequiresInitsDerived : Gizmo {
   var a = 1
