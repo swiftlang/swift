@@ -173,6 +173,9 @@ MyOtherIf: if 1 != 2 {
   continue       // expected-error {{'continue' is only allowed inside a loop}}
 }
 
+do {
+  break  // expected-error {{unlabeled 'break' is only allowed inside a loop or switch, a labeled break is required to exit an if or do}}
+}
 
 func tuple_assign() {
   var a,b,c,d : Int

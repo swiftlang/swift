@@ -736,10 +736,11 @@ public:
       
       auto diagid = diag::break_outside_loop;
 
-      // If someone is using an unlabeled break inside of an 'if' statement,
-      // produce a more specific error.
+      // If someone is using an unlabeled break inside of an 'if' or 'do'
+      // statement, produce a more specific error.
       if (S->getTargetName().empty() && !ActiveLabeledStmts.empty() &&
-          isa<IfStmt>(ActiveLabeledStmts.back()))
+          (isa<IfStmt>(ActiveLabeledStmts.back()) ||
+           isa<DoStmt>(ActiveLabeledStmts.back())))
         diagid = diag::unlabeled_break_outside_loop;
 
       TC.diagnose(S->getLoc(), diagid);
