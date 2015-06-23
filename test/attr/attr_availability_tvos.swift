@@ -72,11 +72,9 @@ if #available(iOS 9.1, tvOS 9.2, *) {
 if #available(iOS 8.0, tvOS 9.2, *) {
 }
 
-@available(iOS 9.0, tvOS 9.0, *)
-func availableOn9_0() { // expected-note {{enclosing scope here}}
-  if #available(iOS 9.2, tvOS 8.0, *) { // expected-warning {{unnecessary check for 'tvOS'; enclosing scope ensures guard will always be true}}
-  }
+if #available(iOS 9.2, tvOS 8.0, *) { // expected-warning {{unnecessary check for 'tvOS'; minimum deployment target ensures guard will always be true}}
 }
+
 
 // Swift-originated iOS availability attributes should not be transcribed to tvOS
 

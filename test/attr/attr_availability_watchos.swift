@@ -70,11 +70,9 @@ if #available(iOS 9.1, watchOS 2.2, *) {
 if #available(iOS 8.0, watchOS 2.2, *) {
 }
 
-@available(iOS 9.0, watchOS 2.0, *)
-func availableOn2_0() { // expected-note {{enclosing scope here}}
-  if #available(iOS 9.2, watchOS 1.0, *) { // expected-warning {{unnecessary check for 'watchOS'; enclosing scope ensures guard will always be true}}
-  }
+if #available(iOS 9.2, watchOS 1.0, *) { // expected-warning {{unnecessary check for 'watchOS'; minimum deployment target ensures guard will always be true}}
 }
+
 
 // Swift-originated iOS availability attributes should not be transcribed to watchOS
 

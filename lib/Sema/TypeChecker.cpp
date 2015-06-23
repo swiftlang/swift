@@ -1185,18 +1185,9 @@ private:
           CurTRC->getPotentialVersions().isContainedIn(Range)) {
         DiagnosticEngine &Diags = AC.Diags;
         if (CurTRC->getReason() == TypeRefinementContext::Reason::Root) {
-          // Diagnose for checks that are useless because the minimum deployment
-          // target ensures they will never be false. We suppress this warning
-          // when compiling for playgrounds because the developer cannot
-          // cannot explicitly set the minimum deployment target to silence
-          // the alarm. We also suppress in script mode (where setting the
-          // minimum deployment target requires a target triple).
-          auto *SF = CurTRC->getIntroductionNode().get<SourceFile *>();
-          if (!AC.LangOpts.Playground && !SF->isScriptMode()) {
-            Diags.diagnose(Query->getLoc(),
-                           diag::availability_query_useless_min_deployment,
-                           platformString(targetPlatform(AC.LangOpts)));
-          }
+          Diags.diagnose(Query->getLoc(),
+                         diag::availability_query_useless_min_deployment,
+                         platformString(targetPlatform(AC.LangOpts)));
         } else {
           Diags.diagnose(Query->getLoc(),
                          diag::availability_query_useless_enclosing_scope,
