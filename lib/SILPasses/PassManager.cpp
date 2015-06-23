@@ -71,10 +71,6 @@ llvm::cl::list<std::string>
                      llvm::cl::desc("Disable passes "
                                     "which contain a string from this list"));
 
-llvm::cl::opt<bool> SILValidateAnalyses(
-    "sil-validate-analyses", llvm::cl::init(false),
-    llvm::cl::desc("Validate analyses when running with -sil-verify-all"));
-
 static bool doPrintBefore(SILTransform *T, SILFunction *F) {
   if (!SILPrintOnlyFun.empty() && F && F->getName() != SILPrintOnlyFun)
     return false;
@@ -210,8 +206,7 @@ runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
 
       if (currentPassHasInvalidated && Options.VerifyAll) {
         F.verify();
-        if (SILValidateAnalyses)
-          verifyAnalyses();
+        verifyAnalyses();
       }
 
       ++NumPassesRun;
@@ -303,8 +298,7 @@ void SILPassManager::runOneIteration() {
 
       if (currentPassHasInvalidated && Options.VerifyAll) {
         Mod->verify();
-        if (SILValidateAnalyses)
-          verifyAnalyses();
+        verifyAnalyses();
       }
 
       ++NumPassesRun;
