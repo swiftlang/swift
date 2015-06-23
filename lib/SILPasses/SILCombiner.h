@@ -250,9 +250,9 @@ public:
   visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI);
   SILInstruction *
   visitCheckedCastBranchInst(CheckedCastBranchInst *CBI);
-  SILInstruction * visitUnreachableInst(UnreachableInst *UI);
-  SILInstruction * visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI);
-  SILInstruction * visitEnumInst(EnumInst *EI);
+  SILInstruction *visitUnreachableInst(UnreachableInst *UI);
+  SILInstruction *visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI);
+  SILInstruction *visitEnumInst(EnumInst *EI);
 
 
   /// Instruction visitor helpers.
