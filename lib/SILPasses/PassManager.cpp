@@ -206,7 +206,7 @@ runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
 
       if (currentPassHasInvalidated && Options.VerifyAll) {
         F.verify();
-        verifyAnalyses();
+        verifyAnalyses(&F);
       }
 
       ++NumPassesRun;

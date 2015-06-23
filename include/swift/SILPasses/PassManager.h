@@ -140,6 +140,18 @@ class SILPassManager {
     }
   }
 
+  /// Verify all analyses, limiting the verification to just this one function
+  /// if possible.
+  ///
+  /// Discussion: We leave it up to the analyses to decide how to implement
+  /// this. If no override is provided the SILAnalysis should just call the
+  /// normal verify method.
+  void verifyAnalyses(SILFunction *F) const {
+    for (auto *A : Analysis) {
+      A->verify(F);
+    }
+  }
+
   /// Add a pass of a specific kind.
   void addPass(PassKind Kind);
 

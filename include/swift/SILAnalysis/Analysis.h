@@ -96,6 +96,14 @@ namespace swift {
 
     /// Verify the state of this analysis.
     virtual void verify() const {}
+
+    /// Verify the state of this analysis limited to this one function if
+    /// possible.
+    ///
+    /// By default this just calls the module verify function as a sensible
+    /// default so that only functions which are able to provide the function
+    /// specific verification will do so.
+    virtual void verify(SILFunction *F) const { verify(); }
   };
 
   /// An abstract base class that implements the boiler plate of cacheing and
@@ -115,6 +123,10 @@ namespace swift {
     /// preserved.
     virtual bool shouldInvalidate(SILAnalysis::PreserveKind K) = 0;
 
+    /// A stub function that verifies the specific AnalysisTy \p A. This is
+    /// meant to be overridden by subclasses.
+    virtual void verify(AnalysisTy *A) const {}
+
   public:
     /// Returns an analysis provider for a specific function \p F.
     AnalysisTy *get(SILFunction *F) {
@@ -124,7 +136,7 @@ namespace swift {
       return it.second;
     }
 
-    virtual void invalidate(SILAnalysis::PreserveKind K) {
+    virtual void invalidate(SILAnalysis::PreserveKind K) override {
       if (!shouldInvalidate(K)) return;
 
       for (auto D : Storage)
@@ -133,7 +145,8 @@ namespace swift {
       Storage.clear();
     }
 
-    virtual void invalidate(SILFunction *F, SILAnalysis::PreserveKind K) {
+    virtual void invalidate(SILFunction *F,
+                            SILAnalysis::PreserveKind K) override {
       if (!shouldInvalidate(K)) return;
 
       auto &it = Storage.FindAndConstruct(F);
@@ -147,6 +160,27 @@ namespace swift {
     FunctionAnalysisBase(const FunctionAnalysisBase &) = delete;
     FunctionAnalysisBase &operator=(const FunctionAnalysisBase &) = delete;
     FunctionAnalysisBase() {}
+
+    /// Verify all of the AnalysisTy for all functions.
+    ///
+    /// This is not meant to be overridden by subclasses. See "void
+    /// verify(AnalysisTy *A)".
+    virtual void verify() const override final {
+      for (auto Iter : Storage)
+        verify(Iter.second);
+    }
+
+    /// Verify the AnalysisTy that we have stored for the specific function \p
+    /// F.
+    ///
+    /// This is not meant to be overridden by subclasses. See "void
+    /// verify(AnalysisTy *A)".
+    virtual void verify(SILFunction *F) const override final {
+      auto Iter = Storage.find(F);
+      if (Iter == Storage.end())
+        return;
+      verify(Iter->second);
+    }
   };
 
   SILAnalysis *createCallGraphAnalysis(SILModule *M);
