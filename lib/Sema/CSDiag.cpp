@@ -1771,6 +1771,23 @@ bool GeneralFailureDiagnosis::diagnoseContextualConversionError() {
   if (subExprTy->getAs<TypeVariableType>())
     return false;
   
+  
+  // If this is conversion failure due to a return statement with an argument
+  // that cannot be coerced to the result type of the function, emit a
+  // specific error.
+  if (expr->isReturnExpr()) {
+    if (contextualType->isVoid()) {
+      CS->TC.diagnose(expr->getLoc(), diag::cannot_return_value_from_void_func)
+        .highlight(expr->getSourceRange());
+    } else {
+      CS->TC.diagnose(expr->getLoc(), diag::cannot_convert_to_return_type,
+                      subExprTy, contextualType)
+        .highlight(expr->getSourceRange());
+    }
+    return true;
+  }
+
+  
   CS->TC.diagnose(expr->getLoc(),
                   diag::invalid_relation,
                   Failure::FailureKind::TypesNotConvertible -

@@ -31,7 +31,7 @@ var f2: Float = 3.0
 var dd: Double = f1 - f2 // expected-error{{'Float' is not convertible to 'Double'}}
 
 func f() -> Bool {
-  return 1 + 1 // expected-error{{'Int' is not convertible to 'Bool'}}
+  return 1 + 1 // expected-error{{cannot convert return expression of type 'Int' to expected return type 'Bool'}}
 }
 
 // Test that nested diagnostics are properly surfaced.
@@ -73,6 +73,15 @@ func bad_return2() -> (Int, Int) {
 func bad_return3(lhs:Int, rhs:Int) {
   return lhs != 0  // expected-error {{unexpected non-void return value in void function}}
 }
+
+class MyBadReturnClass {
+  static var intProperty = 42
+}
+
+func ==(lhs:MyBadReturnClass, rhs:MyBadReturnClass) {
+  return MyBadReturnClass.intProperty == MyBadReturnClass.intProperty  // expected-error {{unexpected non-void return value in void function}}
+}
+
 
 func testIS1() -> Int { return 0 }
 let _: String = testIS1() // expected-error {{'Int' is not convertible to 'String'}}
