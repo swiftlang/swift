@@ -982,3 +982,22 @@ func addressOnlyReadOnlySubscriptFromMutableBase(x: Int) {
   var base = AddressOnlyReadOnlySubscript()
   _ = base[x]
 }
+
+
+
+/// <rdar://problem/20912019> passing unmaterialized r-value as inout argument
+struct MutatingGetterStruct {
+  var write: Int {
+    mutating get {  }
+  }
+
+  // CHECK-LABEL: sil hidden @_TZFV10properties20MutatingGetterStruct4testfMS0_FT_T_
+  // CHECK: [[X:%.*]] = alloc_box $MutatingGetterStruct  // var x
+  // CHECK: store {{.*}} to [[X]]#1 : $*MutatingGetterStruct
+  // CHECK: apply {{%.*}}([[X]]#1) : $@convention(method) (@inout MutatingGetterStruct) -> Int
+  static func test() {
+    var x = MutatingGetterStruct()
+    _ = x.write
+  }
+}
+
