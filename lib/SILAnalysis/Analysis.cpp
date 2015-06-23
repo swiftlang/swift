@@ -44,9 +44,8 @@ SILAnalysis *swift::createInductionVariableAnalysis(SILModule *M) {
 }
 
 SILAnalysis *swift::createPostOrderAnalysis(SILModule *M) {
-  return new PostOrderAnalysis(M);
+  return new PostOrderAnalysis();
 }
-
 
 SILAnalysis *swift::createClassHierarchyAnalysis(SILModule *M) {
   return new ClassHierarchyAnalysis(M);

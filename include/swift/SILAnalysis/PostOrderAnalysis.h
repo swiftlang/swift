@@ -27,41 +27,30 @@ namespace swift {
 class SILBasicBlock;
 class SILFunction;
 
+struct PostOrderInfo {
+  std::vector<SILBasicBlock *> PostOrder;
+
+  PostOrderInfo(SILFunction *F) {
+    std::copy(po_begin(F), po_end(F), std::back_inserter(PostOrder));
+  }
+};
+
 /// This class is a simple wrapper around the POT iterator provided by LLVM. It
 /// lazily re-evaluates the post order when it is invalidated so that we do not
 /// reform the post order over and over again (it can be expensive).
-class PostOrderAnalysis : public SILAnalysis {
-  struct FunctionPOTInfo {
-    bool IsInvalidated;
-    std::vector<SILBasicBlock *> PostOrder;
+class PostOrderAnalysis : public FunctionAnalysisBase<PostOrderInfo> {
+protected:
+  virtual PostOrderInfo *newFunctionAnalysis(SILFunction *F) override {
+    return new PostOrderInfo(F);
+  }
 
-    FunctionPOTInfo() : IsInvalidated(true), PostOrder() {}
-    FunctionPOTInfo(const FunctionPOTInfo &) = delete;
-    FunctionPOTInfo &operator=(const FunctionPOTInfo &) = delete;
+  virtual bool shouldInvalidate(SILAnalysis::PreserveKind K) override {
+    return !(K & PreserveKind::Branches);
+  }
 
-    FunctionPOTInfo(const FunctionPOTInfo &&F) {
-      IsInvalidated = F.IsInvalidated;
-      PostOrder = std::move(F.PostOrder);
-    }
-
-    FunctionPOTInfo &operator=(const FunctionPOTInfo &&F) {
-      IsInvalidated = F.IsInvalidated;
-      PostOrder = std::move(F.PostOrder);
-      return *this;
-    }
-
-    void recompute(SILFunction *F) {
-      assert(IsInvalidated && "Should only call this if the POT info is "
-             "invalidated for this function.");
-      PostOrder.clear();
-      std::copy(po_begin(F), po_end(F), std::back_inserter(PostOrder));
-      IsInvalidated = false;
-    }
-  };
-
-  llvm::DenseMap<SILFunction *, FunctionPOTInfo> FunctionToPOTMap;
 public:
-  PostOrderAnalysis(SILModule *) : SILAnalysis(AnalysisKind::PostOrder) {}
+  PostOrderAnalysis()
+      : FunctionAnalysisBase<PostOrderInfo>(AnalysisKind::PostOrder) {}
 
   // This is a cache and shouldn't be copied around.
   PostOrderAnalysis(const PostOrderAnalysis &) = delete;
@@ -74,17 +63,13 @@ public:
   using reverse_range = Range<reverse_iterator>;
 
   Range<iterator> getPostOrder(SILFunction *F) {
-    FunctionPOTInfo &POTInfo = FunctionToPOTMap[F];
-    if (POTInfo.IsInvalidated)
-      POTInfo.recompute(F);
-    return Range<iterator>(POTInfo.PostOrder.begin(), POTInfo.PostOrder.end());
+    auto *Info = get(F);
+    return Range<iterator>(Info->PostOrder.begin(), Info->PostOrder.end());
   }
 
   Range<reverse_iterator> getReversePostOrder(SILFunction *F) {
-    FunctionPOTInfo &POTInfo = FunctionToPOTMap[F];
-    if (POTInfo.IsInvalidated)
-      POTInfo.recompute(F);
-    return reversed(POTInfo.PostOrder);
+    auto *Info = get(F);
+    return reversed(Info->PostOrder);
   }
 
   // Return the size of the post order for \p F.
@@ -96,19 +81,6 @@ public:
 
   static bool classof(const SILAnalysis *S) {
     return S->getKind() == AnalysisKind::PostOrder;
-  }
-
-  virtual void invalidate(SILAnalysis::PreserveKind K) {
-    if (K & PreserveKind::Branches) return;
-
-    FunctionToPOTMap.clear();
-  }
-
-  virtual void invalidate(SILFunction* F, SILAnalysis::PreserveKind K) {
-    if (K & PreserveKind::Branches) return;
-
-    // Invalidate just this one function. We will lazily recompute it.
-    FunctionToPOTMap[F].IsInvalidated = true;
   }
 };
 
