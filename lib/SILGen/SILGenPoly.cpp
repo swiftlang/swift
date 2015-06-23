@@ -264,10 +264,17 @@ static void explodeTuple(SILGenFunction &gen,
   // None of the operations we do here can fail, so we can atomically
   // disable the tuple's cleanup and then create cleanups for all the
   // elements.
-  SILValue tuple = managedTuple.forward(gen);
 
-  auto tupleSILType = tuple.getType();
-  auto tupleType = tupleSILType.castTo<TupleType>();
+  auto tupleSILType = managedTuple.getType();
+  auto tupleType = tupleSILType.getAs<TupleType>();
+
+  // If the value lowered to a non-tuple, then we don't need to explode it.
+  if (!tupleType) {
+    out.push_back({managedTuple, &gen.getTypeLowering(tupleSILType)});
+    return;
+  }
+
+  SILValue tuple = managedTuple.forward(gen);
 
   out.reserve(tupleType->getNumElements());
 
@@ -553,6 +560,16 @@ namespace {
         return translateParallelExploded(origType, cast<TupleType>(substType));
       }
       if (auto substTuple = dyn_cast<TupleType>(substType)) {
+        // We can translate a single-element tuple directly as if it were the
+        // underlying scalar.
+        if (substTuple->getNumElements() == 1) {
+          auto input = claimNextInput();
+          auto outputType = claimNextOutputType();
+          return translateSingleElementTuple(origType.getTupleElementType(0),
+                                             substTuple.getElementType(0),
+                                             input, outputType);
+        }
+
         if (!substTuple->isMaterializable())
           return translateParallelExploded(origType, substTuple);
         return translateExplodedIndirect(origType, substTuple);
@@ -566,6 +583,39 @@ namespace {
     }
 
   private:
+    void translateSingleElementTuple(AbstractionPattern origType,
+                                     CanType substType,
+                                     ManagedValue input,
+                                     SILParameterInfo outputType) {
+      // Strip away any single-tuple-ness in our parameters.
+      while (auto inputTuple = input.getType().getAs<TupleType>()) {
+        if (inputTuple->getNumElements() != 1)
+          break;
+        SILValue inputElt;
+        if (input.getType().isAddress())
+          inputElt = SGF.B.createTupleElementAddr(Loc, input.getValue(), 0,
+                SILType::getPrimitiveAddressType(inputTuple.getElementType(0)));
+        else
+          inputElt = SGF.B.createTupleExtract(Loc, input.getValue(), 0,
+                 SILType::getPrimitiveObjectType(inputTuple.getElementType(0)));
+
+        input = ManagedValue(inputElt, input.getCleanup());
+      }
+
+      while (auto outputTuple = dyn_cast<TupleType>(outputType.getType())) {
+        if (outputTuple->getNumElements() != 1)
+          break;
+
+        outputType = SILParameterInfo(outputTuple.getElementType(0),
+                                      outputType.getConvention());
+      }
+
+      // If we ended up with a scalar, translate it as a single value.
+      if (input.getType().is<TupleType>())
+        return 
+      return translateSingle(origType, substType, input, outputType);
+    }
+
     /// Handle a tuple that has been exploded in the input but wrapped in
     /// an optional in the output.
     void translateAndImplodeIntoOptional(AbstractionPattern origType,
