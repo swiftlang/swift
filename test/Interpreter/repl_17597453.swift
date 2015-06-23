@@ -6,11 +6,7 @@
 // REQUIRES: swift_repl
 // REQUIRES: objc_interop 
 
-import simd
 import VerySmallObjCFramework
 
 // CHECK: 1171
 print(staticGlobalValue)
-
-// CHECK: float4(1.0, 2.0, 3.0, 4.0)
-print(staticGlobalValueSIMD)
