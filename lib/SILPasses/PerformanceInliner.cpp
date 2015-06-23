@@ -1203,7 +1203,7 @@ void SILPerformanceInliner::inlineDevirtualizeAndSpecialize(
     auto *Initial = WorkList.back();
 
     // In practice we rarely exceed 5, but in a perf test we iterate 51 times.
-    const unsigned MaxLaps = 150;
+    const unsigned MaxLaps = 1500;
     unsigned Lap = 0;
     while (1) {
       auto *WorkItem = WorkList.back();
