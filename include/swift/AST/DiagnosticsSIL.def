@@ -128,6 +128,8 @@ ERROR(self_before_superselfinit,sil_analysis,none,
      (unsigned))
 ERROR(return_from_init_without_initing_self,sil_analysis,none,
       "return from enum initializer method without storing to 'self'", ())
+ERROR(return_from_protocol_init_without_initing_self,sil_analysis,none,
+      "protocol extension initializer never chained to 'self.init'", ())
 ERROR(return_from_init_without_initing_stored_properties,sil_analysis,none,
       "return from initializer without initializing all"
       " stored properties", ())

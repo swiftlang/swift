@@ -1172,13 +1172,11 @@ extension SomeProtocol {
   }
 
   init(a : Int) {
-  } // expected-error {{return from initializer without initializing all stored properties}}
-  // expected-note@-1 {{'self' not initialized}}
+  } // expected-error {{protocol extension initializer never chained to 'self.init'}}
 
   init(c : Float) {
     protoMe()   // expected-error {{variable 'self' used before being initialized}}
-  } // expected-error {{return from initializer without initializing all stored properties}}
-  // expected-note@-1 {{'self' not initialized}}
+  } // expected-error {{protocol extension initializer never chained to 'self.init'}}
 }
 
 
@@ -1272,3 +1270,20 @@ class DerivedThrowingInitializer : ThrowingInitializer {
     try super.init()
   }
 }
+
+// <rdar://problem/21295093> Swift protocol cannot implement default initializer
+protocol ProtocolInitTest {
+  init()
+  init(a : Int)
+}
+
+extension ProtocolInitTest {
+  init() {
+  }  // expected-error {{protocol extension initializer never chained to 'self.init'}}
+
+  init(b : Float) {
+    self.init(a: 42)  // ok
+  }
+}
+
+

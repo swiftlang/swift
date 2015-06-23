@@ -1009,8 +1009,17 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
         diagnose(Module, Inst->getLoc(),
                  diag::return_from_init_without_initing_self);
         return;
-      } else if (TheMemory.isAnyInitSelf() && !TheMemory.isClassInitSelf() &&
-                 !TheMemory.isDelegatingInit()) {
+      }
+
+      if (TheMemory.isProtocolInitSelf()) {
+        if (!shouldEmitError(Inst)) return;
+        diagnose(Module, Inst->getLoc(),
+                 diag::return_from_protocol_init_without_initing_self);
+        return;
+      }
+
+      if (TheMemory.isAnyInitSelf() && !TheMemory.isClassInitSelf() &&
+          !TheMemory.isDelegatingInit()) {
         if (!shouldEmitError(Inst)) return;
         diagnose(Module, Inst->getLoc(),
                  diag::return_from_init_without_initing_stored_properties);
