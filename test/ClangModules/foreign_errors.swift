@@ -15,6 +15,8 @@ func testAndReturnError() throws {
   try ErrorProne.fail()
   try ErrorProne.go()
   try ErrorProne.tryAndReturnError() // collides with 'try' keyword
+
+  ErrorProne.messUpSignatureAndReturnError(nil) // wrong signature
 }
 
 func testInheritedInit() throws {
@@ -64,12 +66,14 @@ func testConflict4_error() throws {
 }
 
 func testBlockFinal() throws {
-  try ErrorProne.runWithError(callback: {})
+  try ErrorProne.run(callback: {})
+  try ErrorProne.runWithAnError(callback: {})
   try ErrorProne.runSwiftly(5000, callback: {})
 }
 
 func testNonBlockFinal() throws {
   ErrorProne.runWithError(count: 0) // expected-error {{missing argument for parameter #1 in call}}
+  ErrorProne.runWithAnError(count: 0) // expected-error {{missing argument for parameter #1 in call}}
 }
 
 class VeryErrorProne : ErrorProne {

@@ -10,4 +10,8 @@
 - (id)objectAtIndexedSubscript:(NSUInteger)idx;
 
 - (void)callback:(NSUInteger(^)(void))block;
+
+- (BOOL)doThingAndReturnError:(NSError **)error;
+- (BOOL)doAnotherThingWithError:(NSError **)error;
+
 @end

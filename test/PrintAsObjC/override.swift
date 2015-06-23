@@ -32,6 +32,13 @@ class A_Child : Base {
   override func foo(_: Int) -> Int { return 0 }
   // CHECK-NEXT: - (NSUInteger)foo:(NSUInteger)x y:(NSUInteger)y;
   override func foo(x: Int, y: Int) -> Int { return x + y }
+  
+  
+  // CHECK-NEXT: - (BOOL)doThingAndReturnError:(NSError * __nullable * __null_unspecified)error;
+  override func doThing() throws {}
+
+  // CHECK-NEXT: - (BOOL)doAnotherThingWithError:(NSError * __nullable * __null_unspecified)error;
+  override func doAnotherThing() throws {}
 
   // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 } // CHECK-NEXT: @end

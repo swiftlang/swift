@@ -1414,6 +1414,7 @@ classifyMethodErrorHandling(ClangImporter::Implementation &importer,
 }
 
 static const char ErrorSuffix[] = "AndReturnError";
+static const char AltErrorSuffix[] = "WithError";
 
 /// Look for a method that will import to have the same name as the
 /// given method after importing the Nth parameter as an elided error
@@ -1421,7 +1422,7 @@ static const char ErrorSuffix[] = "AndReturnError";
 static bool hasErrorMethodNameCollision(ClangImporter::Implementation &importer,
                                         const clang::ObjCMethodDecl *method,
                                         unsigned paramIndex,
-                                        bool stripErrorSuffix) {
+                                        StringRef suffixToStrip) {
   // Copy the existing selector pieces into an array.
   auto selector = method->getSelector();
   unsigned numArgs = selector.getNumArgs();
@@ -1433,11 +1434,10 @@ static bool hasErrorMethodNameCollision(ClangImporter::Implementation &importer,
   }
 
   auto &ctx = method->getASTContext();
-  if (paramIndex == 0 && stripErrorSuffix) {
-    assert(stripErrorSuffix);
+  if (paramIndex == 0 && !suffixToStrip.empty()) {
     StringRef name = chunks[0]->getName();
-    assert(name.endswith(ErrorSuffix));
-    name = name.drop_back(sizeof(ErrorSuffix) - 1);
+    assert(name.endswith(suffixToStrip));
+    name = name.drop_back(suffixToStrip.size());
     chunks[0] = &ctx.Idents.get(name);
   } else if (paramIndex != 0) {
     chunks.erase(chunks.begin() + paramIndex);
@@ -1504,17 +1504,22 @@ considerErrorImport(ClangImporter::Implementation &importer,
 
     // If the error parameter is the first parameter, try removing the
     // standard error suffix from the base name.
-    bool stripErrorSuffix = false;
+    StringRef suffixToStrip;
     Identifier newBaseName = methodName.getBaseName();
     if (adjustName && index == 0 && paramNames[0].empty()) {
       StringRef baseNameStr = newBaseName.str();
-      if (baseNameStr.endswith(ErrorSuffix)) {
-        baseNameStr = baseNameStr.drop_back(sizeof(ErrorSuffix) - 1);
+      if (baseNameStr.endswith(ErrorSuffix))
+        suffixToStrip = ErrorSuffix;
+      else if (baseNameStr.endswith(AltErrorSuffix))
+        suffixToStrip = AltErrorSuffix;
+
+      if (!suffixToStrip.empty()) {
+        baseNameStr = baseNameStr.drop_back(suffixToStrip.size());
         if (baseNameStr.empty() || importer.isSwiftReservedName(baseNameStr)) {
           adjustName = false;
+          suffixToStrip = {};
         } else {
           newBaseName = importer.SwiftContext.getIdentifier(baseNameStr);
-          stripErrorSuffix = true;
         }
       }
     }
@@ -1524,18 +1529,18 @@ considerErrorImport(ClangImporter::Implementation &importer,
     // TODO: this privileges the old API over the new one
     if (adjustName &&
         hasErrorMethodNameCollision(importer, clangDecl, index,
-                                    stripErrorSuffix)) {
+                                    suffixToStrip)) {
       // If there was a conflict on the first argument, and this was
       // the first argument and we're not stripping error suffixes, just
       // give up completely on error import.
-      if (index == 0 && !stripErrorSuffix) {
+      if (index == 0 && suffixToStrip.empty()) {
         return None;
 
       // If there was a conflict stripping an error suffix, adjust the
       // name but don't change the base name.  This avoids creating a
       // spurious _: () argument.
-      } else if (index == 0 && stripErrorSuffix) {
-        stripErrorSuffix = false;
+      } else if (index == 0 && !suffixToStrip.empty()) {
+        suffixToStrip = {};
         newBaseName = methodName.getBaseName();
 
       // Otherwise, give up on adjusting the name.

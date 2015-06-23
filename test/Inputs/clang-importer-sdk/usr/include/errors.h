@@ -7,6 +7,8 @@
 + (BOOL) goAndReturnError: (NSError**) error;
 + (BOOL) tryAndReturnError: (NSError**) error;
 
++ (BOOL) messUpSignatureAndReturnError: (NSError*) error;
+
 + (BOOL) consume: (id) object error: (NSError**) error;
 
 - (instancetype) initWithNewtonMessagePad: (NSString *) assistant;
@@ -28,6 +30,9 @@
 
 + (BOOL) runWithError: (NSError**) err callback: (void(^)(void)) block;
 + (BOOL) runWithError: (NSError**) err count: (NSInteger) n;
+
++ (BOOL) runWithAnError: (NSError**) err callback: (void(^)(void)) block;
++ (BOOL) runWithAnError: (NSError**) err count: (NSInteger) n;
 
 + (BOOL) runSwiftly: (NSInteger) speed error: (NSError**) err callback: (void(^)(void)) block;
 
