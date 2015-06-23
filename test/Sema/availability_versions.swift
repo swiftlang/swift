@@ -952,35 +952,6 @@ func useUnavailableExtension() {
       // expected-note@-2 {{guard with version check}}
 }
 
-// Useless #available(...) checks
-
-func functionWithDefaultAvailabilityAndUselessCheck() {
-// Default availability reflects minimum deployment: 10.9 and up
-
-  if #available(OSX 10.9, *) { // expected-warning {{unnecessary check for 'OSX'; minimum deployment target ensures guard will always be true}}
-    let _ = globalFuncAvailableOn10_9()
-  }
-  
-  if #available(OSX 10.10, *) { // expected-note {{enclosing scope here}}
-    let _ = globalFuncAvailableOn10_10()
-    
-    if #available(OSX 10.10, *) { // expected-warning {{unnecessary check for 'OSX'; enclosing scope ensures guard will always be true}}
-      let _ = globalFuncAvailableOn10_10()
-    }
-  }
-
-  // We don't want * generate a warn about useless checks; the check may be required on
-  // another platform
-  if #available(iOS 8.0, *) {
-  }
-
-  if #available(OSX 10.10, *) {
-    // Similarly do not want '*' to generate a warning in a refined TRC.
-    if #available(iOS 8.0, *) {
-    }
-  }
-}
-
 @available(OSX, introduced=10.10)
 func functionWithSpecifiedAvailabilityAndUselessCheck() { // expected-note 2{{enclosing scope here}}
   if #available(OSX 10.9, *) { // expected-warning {{unnecessary check for 'OSX'; enclosing scope ensures guard will always be true}}
