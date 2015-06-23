@@ -90,7 +90,7 @@ protocol Shoes {
 
 // Here the opaque value has type (metatype_type (archetype_type ... ))
 func f(x: Shoes, asType t: Shoes.Type) {
-  return t.select(x) // expected-error{{'Shoes' is not convertible to '()'}}
+  return t.select(x) // expected-error{{unexpected non-void return value in void function}}
 }
 
 infix operator **** {

@@ -61,6 +61,19 @@ func retAI() -> Int {
     return (a + b) // expected-error {{cannot convert return expression of type '[String]' to expected return type 'Int'}}
 }
 
+func bad_return1() {
+  return 42  // expected-error {{unexpected non-void return value in void function}}
+}
+
+func bad_return2() -> (Int, Int) {
+  return 42  // expected-error {{cannot convert return expression of type 'Int' to expected return type '(Int, Int)'}}
+}
+
+// <rdar://problem/14096697> QoI: Diagnostics for trying to return values from void functions
+func bad_return3(lhs:Int, rhs:Int) {
+  return lhs != 0  // expected-error {{unexpected non-void return value in void function}}
+}
+
 func testIS1() -> Int { return 0 }
 let _: String = testIS1() // expected-error {{'Int' is not convertible to 'String'}}
 

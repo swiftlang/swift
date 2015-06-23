@@ -641,6 +641,11 @@ Expr *TypeChecker::foldSequence(SequenceExpr *expr, DeclContext *dc) {
 
   Expr *Result = ::foldSequence(*this, dc, LHS, Elts, /*min precedence*/ 0);
   assert(Elts.empty());
+  
+  // Propagate the 'isReturnExpr' bit to improve diagnostics for invalid returns
+  // of binary expressions.
+  if (expr->isReturnExpr())
+    Result->setIsReturnExpr();
   return Result;
 }
 

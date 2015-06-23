@@ -17,7 +17,7 @@ func doCompare<T : EqualComparable, U : EqualComparable>(t1: T, t2: T, u: U) -> 
     return true;
   }
 
-  return t1.isEqual(u) // expected-error{{cannot invoke 'isEqual' with an argument list of type '(U)'}}
+  return t1.isEqual(u) // expected-error{{cannot convert return expression of type 'U' to expected return type 'T'}}
 }
 
 protocol MethodLessComparable {

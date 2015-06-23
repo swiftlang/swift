@@ -130,7 +130,7 @@ func testAssocTypeEquivalence<
 }
 
 func fail6<T where T == Int>(t: T) -> Int { // expected-error{{same-type requirement makes generic parameter 'T' non-generic}}
-  return t // expected-error{{'T' is not convertible to 'Int'}}
+  return t // expected-error{{cannot convert return expression of type 'T' to expected return type 'Int'}}
 }
 
 func test8<

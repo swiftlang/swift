@@ -711,7 +711,7 @@ static bool diagnoseFailure(ConstraintSystem &cs,
     tc.diagnose(loc, diag::invalid_tuple_size, tuple1, tuple2,
                 tuple1->getNumElements(), tuple2->getNumElements())
       .highlight(range1).highlight(range2);
-    break;
+    return true;
   }
 
   case Failure::TupleUnused:
@@ -719,13 +719,30 @@ static bool diagnoseFailure(ConstraintSystem &cs,
                 failure.getFirstType(),
                 failure.getSecondType())
       .highlight(range1).highlight(range2);
-    break;
+    return true;
 
   case Failure::TypesNotConvertible:
   case Failure::TypesNotEqual:
   case Failure::TypesNotSubtypes:
   case Failure::TypesNotConstructible:
   case Failure::FunctionTypesMismatch: {
+    // If this is conversion failure due to a return statement with an argument
+    // that cannot be coerced to the result type of the function, emit a
+    // specific error.
+    if (expr->isReturnExpr()) {
+      if (failure.getSecondType()->isVoid()) {
+        tc.diagnose(loc, diag::cannot_return_value_from_void_func)
+          .highlight(range1).highlight(range2);
+      } else {
+        tc.diagnose(loc, diag::cannot_convert_to_return_type,
+                    failure.getFirstType(), failure.getSecondType())
+          .highlight(range1).highlight(range2);
+      }
+      
+      if (targetLocator && !useExprLoc)
+        noteTargetOfDiagnostic(cs, failure, targetLocator);
+      return true;
+    }
     
     // We can do a better job of diagnosing application argument conversion
     // failures elsewhere.
@@ -741,8 +758,8 @@ static bool diagnoseFailure(ConstraintSystem &cs,
       .highlight(range1).highlight(range2);
     if (targetLocator && !useExprLoc)
       noteTargetOfDiagnostic(cs, failure, targetLocator);
-    }
-    break;
+    return true;
+  }
 
   case Failure::DoesNotHaveMember:
   case Failure::DoesNotHaveNonMutatingMember:
