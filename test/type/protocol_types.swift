@@ -57,3 +57,12 @@ func testHasAssoc(x: Any) {
     p.foo() // don't crash here.
   }
 }
+
+// rdar://problem/16803384
+protocol InheritsAssoc : HasAssoc {
+  func silverSpoon()
+}
+
+func testInheritsAssoc(x: InheritsAssoc) { // expected-error {{protocol 'InheritsAssoc' can only be used as a generic constraint}}
+  x.silverSpoon()
+}

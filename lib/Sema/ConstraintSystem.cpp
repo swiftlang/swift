@@ -1082,6 +1082,13 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
   // Handle associated type lookup as a special case, horribly.
   // FIXME: This is an awful hack.
   if (auto assocType = dyn_cast<AssociatedTypeDecl>(value)) {
+    // Error recovery path.
+    if (baseObjTy->isOpenedExistential()) {
+      Type memberTy = ErrorType::get(TC.Context);
+      auto openedType = FunctionType::get(baseObjTy, memberTy);
+      return { openedType, memberTy };
+    }
+
     // Refer to a member of the archetype directly.
     if (auto archetype = baseObjTy->getAs<ArchetypeType>()) {
       Type memberTy = archetype->getNestedTypeValue(value->getName());

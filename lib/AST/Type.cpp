@@ -2354,10 +2354,13 @@ static Type getMemberForBaseType(Module *module,
                                  AssociatedTypeDecl *assocType,
                                  Identifier name,
                                  SubstOptions options) {
+  // Error recovery path.
+  if (substBase->isOpenedExistential())
+    return ErrorType::get(module->getASTContext());
+
   // If the parent is an archetype, extract the child archetype with the
   // given name.
   if (auto archetypeParent = substBase->getAs<ArchetypeType>()) {
-    
     if (!archetypeParent->hasNestedType(name) &&
         archetypeParent->getParent()->isSelfDerived()) {
       return archetypeParent->getParent()->getNestedTypeValue(name);

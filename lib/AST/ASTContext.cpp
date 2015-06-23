@@ -3148,24 +3148,6 @@ CanArchetypeType ArchetypeType::getOpened(Type existential,
   result->setOpenedExistentialID(*knownID);
   openedExistentialArchetypes[*knownID] = result;
 
-  // If there are any associated types in the list of protocols to
-  // which the existential conforms, map them to ErrorType. This is an
-  // error-recovery path.
-  SmallVector<std::pair<Identifier, NestedType>, 4> nestedTypes;
-  llvm::SmallPtrSet<Identifier, 4> knownNestedTypes;
-  for (auto proto : conformsTo) {
-    for (auto member : proto->getMembers()) {
-      if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
-        if (knownNestedTypes.insert(assocType->getName()).second) {
-          nestedTypes.push_back(
-            {assocType->getName(), 
-             NestedType::forConcreteType(ErrorType::get(ctx))});
-        }
-      }
-    }
-  }
-  result->setNestedTypes(ctx, nestedTypes);
-
   return CanArchetypeType(result);
 }
 
