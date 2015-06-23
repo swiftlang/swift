@@ -42,7 +42,7 @@ func getMetatype<T>(m : T.Type) -> T.Type { return m }
 // Construction from a struct Type value
 func constructStructMetatypeValue() {
   _ = getMetatype(S.self).init(i: 5)
-  _ = getMetatype(S.self)(i: 5) // expected-error{{initializing from a metatype must reference 'init' explicitly}}
+  _ = getMetatype(S.self)(i: 5) // expected-error{{initializing from a metatype value must reference 'init' explicitly}}
   _ = getMetatype(S.self)
 }
 
@@ -85,11 +85,11 @@ protocol P2 {
 
 func constructExistentialValue(pm: P.Type) {
   _ = pm.init()
-  _ = P() // expected-error{{constructing an object of protocol type 'P' requires a conforming metatype}}
+  _ = P() // expected-error{{protocol type 'P' cannot be instantiated}}
 }
 
 typealias P1_and_P2 = protocol<P, P2>
 func constructExistentialCompositionValue(pm: protocol<P, P2>.Type) {
   _ = pm.init(int: 5)
-  _ = P1_and_P2(int: 5) // expected-error{{constructing an object of protocol type 'P1_and_P2' requires a conforming metatype}}
+  _ = P1_and_P2(int: 5) // expected-error{{protocol type 'P1_and_P2' cannot be instantiated}}
 }

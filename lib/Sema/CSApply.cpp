@@ -5416,8 +5416,13 @@ TypeChecker::diagnoseInvalidDynamicConstructorReferences(Expr *base,
     if (SuppressDiagnostics)
       return false;
 
-    diagnose(memberRefLoc, diag::static_construct_existential, ty)
-      .highlight(base->getSourceRange());
+    if (base->isStaticallyDerivedMetatype()) {
+      diagnose(memberRefLoc, diag::construct_protocol_by_name, ty)
+        .highlight(base->getSourceRange());
+    } else {
+      diagnose(memberRefLoc, diag::construct_protocol_value, metaTy)
+        .highlight(base->getSourceRange());
+    }
   }
   return true;
 }

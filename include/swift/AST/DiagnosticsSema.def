@@ -386,7 +386,7 @@ ERROR(missing_address_of,sema_tcc,none,
       "passing value of type %0 to an inout parameter requires explicit '&'",
       (Type))
 ERROR(missing_init_on_metatype_initialization,sema_tcc,none,
-      "initializing from a metatype must reference 'init' explicitly",
+      "initializing from a metatype value must reference 'init' explicitly",
       ())
 ERROR(extra_call_nonfunction,sema_tcc,none,
       "invalid use of '()' to call a value of non-function type %0",
@@ -1402,8 +1402,11 @@ ERROR(dynamic_construct_class,sema_tce,none,
 NOTE(note_nonrequired_initializer,sema_tce,none,
       "selected %select{non-required|implicit}0 initializer %1", 
      (bool, DeclName))
-ERROR(static_construct_existential,sema_tce,none,
-      "constructing an object of protocol type %0 requires a conforming metatype",
+ERROR(construct_protocol_value,sema_tce,none,
+      "value of type %0 is a protocol; it cannot be instantiated",
+      (Type))
+ERROR(construct_protocol_by_name,sema_tce,none,
+      "protocol type %0 cannot be instantiated",
       (Type))
 
 // Operators

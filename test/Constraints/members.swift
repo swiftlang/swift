@@ -204,8 +204,8 @@ func existential(var p: P) {
 
 func staticExistential(p: P.Type, pp: P.Protocol) {
   let ppp: P = p.init()
-  _ = pp.init() // expected-error{{constructing an object of protocol type 'P' requires a conforming metatype}}
-  _ = P() // expected-error{{constructing an object of protocol type 'P' requires a conforming metatype}}
+  _ = pp.init() // expected-error{{value of type 'P.Protocol' is a protocol; it cannot be instantiated}}
+  _ = P() // expected-error{{protocol type 'P' cannot be instantiated}}
 
   // Instance member of metatype
   let _: P -> Int -> () = P.bar
