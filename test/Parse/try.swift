@@ -59,3 +59,26 @@ let _ = "foo"
         *  // expected-error {{operator can throw but expression is not marked with 'try'}}
         "bar"
 let _ = try! "foo"*"bar"
+
+
+// <rdar://problem/21414023> Assertion failure when compiling function that takes throwing functions and rethrows
+func rethrowsDispatchError(handleError: ((ErrorType) throws -> ()), body: () throws -> ()) rethrows {
+  do {
+    body()   // expected-error {{call can throw but is not marked with 'try'}}
+  } catch {
+  }
+}
+
+// <rdar://problem/21432429> Calling rethrows from rethrows crashes Swift compiler
+struct r21432429 {
+  func x(f: () throws ->()) rethrows {}
+  func y(f: () throws ->()) rethrows {
+    x(f)  // expected-error {{call can throw but is not marked with 'try'}} expected-note {{call is to 'rethrows' function, but argument function can throw}}
+  }
+}
+
+// <rdar://problem/21427855> Swift 2: Omitting try from call to throwing closure in rethrowing function crashes compiler
+func callThrowingClosureWithoutTry(closure: Int throws -> Int) rethrows {
+  closure(0)  // expected-error {{call can throw but is not marked with 'try'}}
+}
+

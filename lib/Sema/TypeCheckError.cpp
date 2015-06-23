@@ -310,7 +310,8 @@ public:
   Classification() : Result(ThrowingKind::None) {}
   explicit Classification(ThrowingKind result, PotentialReason reason)
       : Result(result) {
-    if (result == ThrowingKind::Throws) {
+    if (result == ThrowingKind::Throws ||
+        result == ThrowingKind::RethrowingOnly) {
       Reason = reason;
     }
   }
@@ -330,9 +331,10 @@ public:
     return result;
   }
 
-  static Classification forRethrowingOnly() {
+  static Classification forRethrowingOnly(PotentialReason reason) {
     Classification result;
     result.Result = ThrowingKind::RethrowingOnly;
+    result.Reason = reason;
     return result;
   }
 
@@ -344,7 +346,8 @@ public:
 
   ThrowingKind getResult() const { return Result; }
   PotentialReason getThrowsReason() const {
-    assert(getResult() == ThrowingKind::Throws);
+    assert(getResult() == ThrowingKind::Throws ||
+           getResult() == ThrowingKind::RethrowingOnly);
     return *Reason;
   }
 };
@@ -482,13 +485,11 @@ private:
 
     // If we're currently doing rethrows-checking on the body of the
     // function which declares the parameter, it's rethrowing-only.
-    if (param->getDeclContext() == RethrowsDC) {
-      return Classification::forRethrowingOnly();
+    if (param->getDeclContext() == RethrowsDC)
+      return Classification::forRethrowingOnly(reason);
 
     // Otherwise, it throws unconditionally.
-    } else {
-      return Classification::forThrow(reason);
-    }
+    return Classification::forThrow(reason);
   }
 
   bool isLocallyDefinedInRethrowsContext(DeclContext *DC) {
