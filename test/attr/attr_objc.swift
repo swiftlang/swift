@@ -1728,6 +1728,7 @@ struct NotObjCStruct {}
   @objc func zim(f: () -> NotObjCStruct) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
   // CHECK: @objc func zang
   @objc func zang(f: (NotObjCEnum, NotObjCStruct) -> ()) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
+  @objc func zangZang(f: (Int...) -> ()) {} // expected-error{{method cannot be marked @objc because the type of the parameter cannot be represented in Objective-C}} expected-note{{function types cannot be represented in Objective-C unless their parameters and returns can be}}
   // CHECK: @objc func fooImplicit
   func fooImplicit(f: Int -> ()) {}
   // CHECK: {{^}}  func barImplicit
@@ -1738,6 +1739,8 @@ struct NotObjCStruct {}
   func zimImplicit(f: () -> NotObjCStruct) {}
   // CHECK: {{^}}  func zangImplicit
   func zangImplicit(f: (NotObjCEnum, NotObjCStruct) -> ()) {}
+  // CHECK: {{^}}  func zangZangImplicit
+  func zangZangImplicit(f: (Int...) -> ()) {}
 }
 
 typealias GoodBlock = @convention(block) Int -> ()

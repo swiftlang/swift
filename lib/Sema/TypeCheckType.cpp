@@ -2914,6 +2914,8 @@ bool TypeChecker::isRepresentableInObjC(const DeclContext *DC, Type T) {
     Type Input = FT->getInput();
     if (auto InputTuple = Input->getAs<TupleType>()) {
       for (auto &Elt : InputTuple->getElements()) {
+        if (Elt.isVararg())
+          return false;
         if (!isRepresentableInObjC(DC, Elt.getType()))
           return false;
       }
