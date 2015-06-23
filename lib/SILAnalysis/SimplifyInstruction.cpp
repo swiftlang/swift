@@ -268,10 +268,15 @@ SILValue InstSimplifier::visitEnumInst(EnumInst *EI) {
 
     auto Op = EI->getOperand();
 
-    if (!isa<SILArgument>(Op))
+    auto *EnumArg = dyn_cast<SILArgument>(Op);
+    if (!EnumArg)
       return SILValue();
 
-    auto *Pred = EI->getParent()->getSinglePredecessor();
+    SILBasicBlock *EnumBlock = EI->getParent();
+    if (EnumArg->getParent() != EnumBlock)
+      return SILValue();
+    
+    auto *Pred = EnumBlock->getSinglePredecessor();
     if (!Pred)
       return SILValue();
 

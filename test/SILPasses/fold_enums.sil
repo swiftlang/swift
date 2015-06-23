@@ -38,6 +38,33 @@ bb3(%8 : $Optional<Int32>):                       // Preds: bb1 bb2
   return %8 : $Optional<Int32>                    // id: %9
 }
 
+// CHECK-LABEL: sil @dont_fold_wrong_arg
+// CHECK: bb0(%0 : $Optional<Int32>, %1 : $Int32):
+// CHECK: switch_enum
+// CHECK: {{^bb1.*:}}
+// CHECK: enum {{.*}} %1
+// CHECK: {{^bb2:}}
+// CHECK: {{^bb3.*:}}
+// CHECK: return
+sil @dont_fold_wrong_arg : $@convention(thin) (Optional<Int32>, Int32) -> Optional<Int32> {
+bb0(%0 : $Optional<Int32>, %1 : $Int32):
+  debug_value %0 : $Optional<Int32>
+  switch_enum %0 : $Optional<Int32>, case #Optional.Some!enumelt.1: bb1, default bb2
+
+bb1(%3 : $Int32):
+  debug_value %3 : $Int32
+
+  // The operand is not %3 (= the argument of this block).	
+  %5 = enum $Optional<Int32>, #Optional.Some!enumelt.1, %1 : $Int32
+  br bb3(%5 : $Optional<Int32>)
+
+bb2:
+  br bb3(%0 : $Optional<Int32>)
+
+bb3(%8 : $Optional<Int32>):
+  return %8 : $Optional<Int32>
+}
+
 // CHECK-LABEL: sil @_TF10fold_enums18recreate_optional2FGSqVSs5Int32_GSqS0__
 // CHECK: bb0(%0 : $Optional<Int32>)
 // CHECK-NOT: bb1
