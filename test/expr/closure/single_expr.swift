@@ -19,3 +19,17 @@ func testMap(array: [Int]) {
   farray = farray2
   _ = farray
 }
+
+// Nested single-expression closures -- <rdar://problem/20931915>
+class NestedSingleExpr {
+  private var b: Bool = false
+  private func callClosure(callback: Void -> Void) {}
+
+  func call() {
+    callClosure { [weak self] in
+      self?.callClosure {
+        self?.b = true
+      }
+    }
+  }
+}

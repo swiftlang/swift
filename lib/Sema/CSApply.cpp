@@ -4498,8 +4498,8 @@ static bool applyTypeToClosureExpr(Expr *expr, Type toType) {
 }
 
 ClosureExpr *ExprRewriter::coerceClosureExprToVoid(ClosureExpr *closureExpr) {
-  
   auto &tc = cs.getTypeChecker();
+
   // Re-write the single-expression closure to return '()'
   assert(closureExpr->hasSingleExpressionBody());
   
@@ -4540,21 +4540,10 @@ ClosureExpr *ExprRewriter::coerceClosureExprToVoid(ClosureExpr *closureExpr) {
                                      elements,
                                      closureExpr->getEndLoc(),
                                      /*implicit*/true);
-
-  auto newClosure = new (tc.Context)
-                      ClosureExpr(closureExpr->getParams(),
-                                  SourceLoc(),
-                                  SourceLoc(),
-                                  closureExpr->getInLoc(),
-                                  TypeLoc(),
-                                  closureExpr->getDiscriminator(),
-                                  cs.DC);
   
-  newClosure->setImplicit();
-  newClosure->setIsVoidConversionClosure();
-  newClosure->setBody(braceStmt, false);
-  if (closureExpr->hasAnonymousClosureVars())
-    newClosure->setHasAnonymousClosureVars();
+  closureExpr->setImplicit();
+  closureExpr->setIsVoidConversionClosure();
+  closureExpr->setBody(braceStmt, false);
 
   auto fnType = closureExpr->getType()->getAs<FunctionType>();
   Type inputType = fnType->getInput();
@@ -4562,10 +4551,9 @@ ClosureExpr *ExprRewriter::coerceClosureExprToVoid(ClosureExpr *closureExpr) {
   auto newClosureType = FunctionType::get(inputType,
                                           resultType,
                                           fnType->getExtInfo());
+  closureExpr->setType(newClosureType);
   
-  newClosure->setType(newClosureType);
-  
-  return newClosure;
+  return closureExpr;
 }
 
 // FIXME: This is duplicating work that should really only exist at the SIL

@@ -95,12 +95,12 @@ namespace {
           if ((CE->getParent()->getContextKind() !=
                     ParentDC->getContextKind()) ||
               ParentDC->getContextKind() != DeclContextKind::TopLevelCodeDecl) {
-          // If a closure is nested within an auto closure, we'll need to update
-          // its parent to the auto closure parent.
-          assert(ParentDC->getContextKind() ==
-                 DeclContextKind::AbstractClosureExpr &&
-                 "Incorrect parent decl context for closure");
-          CE->setParent(ParentDC);
+            // If a closure is nested within an auto closure, we'll need to update
+            // its parent to the auto closure parent.
+            assert(ParentDC->getContextKind() ==
+                   DeclContextKind::AbstractClosureExpr &&
+                   "Incorrect parent decl context for closure");
+            CE->setParent(ParentDC);
           }
         }
 
