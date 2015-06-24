@@ -165,8 +165,7 @@ bool AbstractionPattern::matchesTuple(CanTupleType substType) {
   case Kind::ClangType:
   case Kind::Type:
     auto tuple = dyn_cast<TupleType>(getType());
-    return tuple ? tuple->getNumElements() == substType->getNumElements()
-                 : substType->getNumElements() == 1;
+    return (tuple && tuple->getNumElements() == substType->getNumElements());
   }
   llvm_unreachable("bad kind");
 }
@@ -207,16 +206,6 @@ static bool isVoidLike(CanType type) {
 
 AbstractionPattern
 AbstractionPattern::getTupleElementType(unsigned index) const {
-  auto getElementType = [&]() -> CanType {
-    auto tuple = dyn_cast<TupleType>(getType());
-    if (tuple) {
-      return tuple.getElementType(index);
-    } else {
-      assert(index == 0);
-      return getType();
-    }
-  };
-
   switch (getKind()) {
   case Kind::Invalid:
     llvm_unreachable("querying invalid abstraction pattern!");
@@ -231,14 +220,14 @@ AbstractionPattern::getTupleElementType(unsigned index) const {
     return OrigTupleElements[index];
   case Kind::ClangType:
     return AbstractionPattern(getGenericSignature(),
-                              getElementType(),
+                              cast<TupleType>(getType()).getElementType(index),
                               getClangArrayElementType(getClangType(), index));
   case Kind::Type:
     return AbstractionPattern(getGenericSignature(),
-                              getElementType());
+                              cast<TupleType>(getType()).getElementType(index));
   case Kind::ClangFunctionParamTupleType:
     return AbstractionPattern(getGenericSignature(),
-                              getElementType(),
+                              cast<TupleType>(getType()).getElementType(index),
                           getClangFunctionParameterType(getClangType(), index));
 
   case Kind::ObjCMethodFormalParamTupleType: {
