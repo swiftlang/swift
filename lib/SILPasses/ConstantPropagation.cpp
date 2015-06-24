@@ -776,7 +776,30 @@ constantFoldStringConcatenation(ApplyInst *AI,
                                              RemoveCallback);
 }
 
-static bool CCPFunctionBody(SILFunction &F, bool EnableDiagnostics,
+/// Initialize the worklist to all of the constant instructions.
+static void initializeWorklist(SILFunction &F,
+                               bool InstantiateAssertConfiguration,
+                               llvm::SetVector<SILInstruction *> &WorkList) {
+  for (auto &BB : F) {
+    for (auto &I : BB) {
+      if (isFoldable(&I) && !I.use_empty())
+        WorkList.insert(&I);
+      else if (InstantiateAssertConfiguration &&
+               (isApplyOfBuiltin(I, BuiltinValueKind::AssertConf) ||
+                isApplyOfBuiltin(I, BuiltinValueKind::CondUnreachable)))
+        WorkList.insert(&I);
+      else if (isApplyOfStringConcat(I))
+        WorkList.insert(&I);
+      else if (isa<CheckedCastBranchInst>(&I) ||
+               isa<CheckedCastAddrBranchInst>(&I) ||
+               isa<UnconditionalCheckedCastInst>(&I) ||
+               isa<UnconditionalCheckedCastAddrInst>(&I))
+        WorkList.insert(&I);
+    }
+  }
+}
+
+static bool processFunction(SILFunction &F, bool EnableDiagnostics,
                             unsigned AssertConfiguration) {
   DEBUG(llvm::dbgs() << "*** ConstPropagation processing: " << F.getName()
         << "\n");
@@ -794,23 +817,7 @@ static bool CCPFunctionBody(SILFunction &F, bool EnableDiagnostics,
 
   // The worklist of the constants that could be folded into their users.
   llvm::SetVector<SILInstruction *> WorkList;
-  // Initialize the worklist to all of the constant instructions.
-  for (auto &BB : F) {
-    for (auto &I : BB) {
-      if (isFoldable(&I) && !I.use_empty())
-        WorkList.insert(&I);
-      else if (InstantiateAssertConfiguration
-               && (isApplyOfBuiltin(I, BuiltinValueKind::AssertConf)
-                   || isApplyOfBuiltin(I, BuiltinValueKind::CondUnreachable)))
-        WorkList.insert(&I);
-      else if (isApplyOfStringConcat(I))
-        WorkList.insert(&I);
-      else if (isa<CheckedCastBranchInst>(&I) || isa<CheckedCastAddrBranchInst>(&I) ||
-               isa<UnconditionalCheckedCastInst>(&I) ||
-               isa<UnconditionalCheckedCastAddrInst>(&I))
-        WorkList.insert(&I);
-    }
-  }
+  initializeWorklist(F, InstantiateAssertConfiguration, WorkList);
 
   llvm::SetVector<SILInstruction *> FoldedUsers;
   CastOptimizer CastOpt(/* ReplaceInstUsesAction */
@@ -993,7 +1000,12 @@ static bool CCPFunctionBody(SILFunction &F, bool EnableDiagnostics,
   return Changed;
 }
 
+//===----------------------------------------------------------------------===//
+//                              Top Level Driver
+//===----------------------------------------------------------------------===//
+
 namespace {
+
 class ConstantPropagation : public SILFunctionTransform {
   bool EnableDiagnostics;
 
@@ -1004,13 +1016,14 @@ public:
 private:
   /// The entry point to the transformation.
   void run() override {
-    if (CCPFunctionBody(*getFunction(), EnableDiagnostics,
+    if (processFunction(*getFunction(), EnableDiagnostics,
                         getOptions().AssertConfig))
       invalidateAnalysis(SILAnalysis::PreserveKind::ProgramFlow);
   }
 
   StringRef getName() override { return "Constant Propagation"; }
 };
+
 } // end anonymous namespace
 
 SILTransform *swift::createDiagnosticConstantPropagation() {
