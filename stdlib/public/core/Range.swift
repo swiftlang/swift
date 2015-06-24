@@ -31,13 +31,9 @@ public struct RangeGenerator<
     return startIndex++
   }
 
-  /// A type whose instances can produce the elements of this
-  /// sequence, in order.
-  public typealias Generator = RangeGenerator<Element>
-
   /// `RangeGenerator` is also a `SequenceType`, so it
   /// `generate`'s a copy of itself.
-  public func generate() -> Generator {
+  public func generate() -> RangeGenerator<Element> {
     return self
   }
 
@@ -98,12 +94,6 @@ public struct Range<
     _endIndex = end
   }
 
-  /// A type that represents a valid position in the collection.
-  ///
-  /// Valid indices consist of the position of every element and a
-  /// "past the end" position that's not valid for use as a subscript.
-  public typealias Index = Element
-
   /// Access the element at `position`.
   ///
   /// - Requires: `position` is a valid position in `self` and
@@ -126,10 +116,6 @@ public struct Range<
   }
 
   //===--------------------------------------------------------------------===//
-
-  /// A type whose instances can produce the elements of this
-  /// sequence, in order.
-  public typealias Generator = RangeGenerator<Element>
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
