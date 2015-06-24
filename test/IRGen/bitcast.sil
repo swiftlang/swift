@@ -101,11 +101,11 @@ bb0(%0 : $Int, %1 : $Int):
   return %3 : $Int
 }
 
-// CHECK-LABEL: define hidden i64 @trivial_bitwise_cast(i64, i64) {{.*}} {
-// CHECK-NOT: trap
-// CHECK-NOT: unreachable
-// CHECK: bitcast <{ %Si, %Si }>* %bitcast to %Si*
-// CHECK: ret
+// CHECK-x86_64-LABEL: define hidden i64 @trivial_bitwise_cast(i64, i64) {{.*}} {
+// CHECK-x86_64-NOT: trap
+// CHECK-x86_64-NOT: unreachable
+// CHECK-x86_64: bitcast <{ %Si, %Si }>* %bitcast to %Si*
+// CHECK-x86_64: ret
 sil hidden [noinline] @trivial_bitwise_cast : $@convention(thin) (Int, Int) -> Int {
 bb0(%0 : $Int, %1 : $Int):
   %t1 = tuple (%0 : $Int, %1 : $Int)
