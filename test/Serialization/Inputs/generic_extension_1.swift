@@ -1,3 +1,3 @@
 public extension Array {
-  func wobble() -> T? { return nil }
+  func wobble() -> Element? { return nil }
 }

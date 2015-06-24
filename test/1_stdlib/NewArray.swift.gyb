@@ -278,7 +278,7 @@ func testCocoa() {
 testCocoa()
 
 extension ArraySlice {
-  mutating func qsort(compare: (T,T)->Bool) {
+  mutating func qsort(compare: (Element, Element) -> Bool) {
     _introSort(&self, self.indices, compare)
   }
 }

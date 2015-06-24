@@ -43,10 +43,11 @@ takesInt(noParams(1)) // expected-error{{cannot invoke 'noParams' with an argume
 takesInt(takesAndReturnsInt("")) // expected-error{{cannot invoke 'takesAndReturnsInt' with an argument list of type '(String)'}} expected-note{{expected an argument list of type '(Int)'}}
 
 // Test error recovery for type expressions.
+struct MyArray<Element> {}
 class A {
-    var a: Array<Int>
+    var a: MyArray<Int>
     init() {
-        a = Array<Int // expected-error{{argument for generic parameter 'T' could not be inferred}} 
+        a = MyArray<Int // expected-error{{argument for generic parameter 'Element' could not be inferred}}
         // expected-error@-1 5{{expected member name or constructor call after type name}}
         // expected-note@-2 5{{add arguments after the type to construct a value of the type}}
         // expected-note@-3 5{{use '.self' to reference the type object}}

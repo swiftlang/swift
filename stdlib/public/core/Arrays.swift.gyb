@@ -12,14 +12,15 @@
 //
 //  Three generic, mutable array-like types with value semantics.
 //
-//  - ContiguousArray<T> is a fast, contiguous array of T with a known
-//    backing store.
+//  - `ContiguousArray<Element>` is a fast, contiguous array of `Element` with
+//    a known backing store.
 //
-//  - ArraySlice<T> presents an arbitrary subsequence of some
-//    contiguous sequence of Ts.
+//  - `ArraySlice<Element>` presents an arbitrary subsequence of some
+//    contiguous sequence of `Element`s.
 //
-//  - Array<T> is like ContiguousArray<T> when T is not an ObjC type.
-//    Otherwise, it may use an NSArray bridged from Cocoa for storage
+//  - `Array<Element>` is like `ContiguousArray<Element>` when `Element` is not
+//    an reference type or an Objective-C existential.  Otherwise, it may use
+//    an `NSArray` bridged from Cocoa for storage.
 //
 //===----------------------------------------------------------------------===//
 
@@ -49,9 +50,9 @@ if True:
 
     if Self == 'ContiguousArray':
       SelfDocComment = """\
-/// A fast, contiguously-stored array of `T`.
+/// A fast, contiguously-stored array of `Element`.
 ///
-/// Efficiency is equivalent to that of `Array`, unless `T` is a
+/// Efficiency is equivalent to that of `Array`, unless `Element` is a
 /// `class` or `@objc` `protocol` type, in which case using
 /// `ContiguousArray` may be more efficient.  Note, however, that
 /// `ContiguousArray` does not bridge to Objective-C.  See `Array`,
@@ -82,9 +83,9 @@ if True:
 /// ================================
 ///
 /// The information in this section applies to all three of Swift's
-/// array types, `Array<T>`, `ContiguousArray<T>`, and `ArraySlice<T>`.
-/// When you read the word "array" here in a normal typeface, it
-/// applies to all three of them.
+/// array types, `Array<Element>`, `ContiguousArray<Element>`, and
+/// `ArraySlice<Element>`.  When you read the word "array" here in
+/// a normal typeface, it applies to all three of them.
 ///
 /// Value Semantics
 /// ---------------
@@ -128,12 +129,12 @@ if True:
 /// The main distinction between `Array` and the other array types is
 /// that it interoperates seamlessly and efficiently with Objective-C.
 ///
-/// `Array<T>` is considered bridged to Objective-C iff `T` is bridged
-/// to Objective-C.
+/// `Array<Element>` is considered bridged to Objective-C iff `Element`
+/// is bridged to Objective-C.
 ///
-/// When `T` is a `class` or `@objc` protocol type, `Array` may store
-/// its elements in an `NSArray`.  Since any arbitrary subclass of
-/// `NSArray` can become an `Array`, there are no guarantees about
+/// When `Element` is a `class` or `@objc` protocol type, `Array` may
+/// store its elements in an `NSArray`.  Since any arbitrary subclass
+/// of `NSArray` can become an `Array`, there are no guarantees about
 /// representation or efficiency in this case (see also
 /// `ContiguousArray`).  Since `NSArray` is immutable, it is just as
 /// though the storage was shared by some copy: the first in any
@@ -146,7 +147,7 @@ if True:
 /// -----------------------
 ///
 /// Any bridged `Array` can be implicitly converted to an `NSArray`.
-/// When `T` is a `class` or `@objc` protocol, bridging takes O(1)
+/// When `Element` is a `class` or `@objc` protocol, bridging takes O(1)
 /// time and O(1) space.  Other `Array`s must be bridged
 /// element-by-element, allocating a new object for each element, at a
 /// cost of at least O(`count`) time and space.
@@ -155,10 +156,10 @@ if True:
 /// -------------------------
 ///
 /// An `NSArray` can be implicitly or explicitly converted to any
-/// bridged `Array<T>`.  This conversion calls `copyWithZone` on the
-/// `NSArray`, to ensure it won't be modified, and stores the result
-/// in the `Array`.  Type-checking, to ensure the `NSArray`'s
-/// elements match or can be bridged to `T`, is deferred until the
+/// bridged `Array<Element>`.  This conversion calls `copyWithZone`
+/// on the `NSArray`, to ensure it won't be modified, and stores the
+/// result in the `Array`.  Type-checking, to ensure the `NSArray`'s
+/// elements match or can be bridged to `Element`, is deferred until the
 /// first element access.'''
 # FIXME: Write about Array up/down-casting.
     elif Self == '_UnitTestArray':
@@ -168,12 +169,9 @@ if True:
 }%
 
 ${SelfDocComment}
-public struct ${Self}<T>
+public struct ${Self}<Element>
   : CollectionType, MutableCollectionType, Sliceable,
   _DestructorSafeContainer {
-
-  /// The type of element stored by this `${Self}`.
-  public typealias Element = T
 
   /// Always zero, which is the index of the first element when non-empty.
   public var startIndex: Int {
@@ -257,7 +255,7 @@ public struct ${Self}<T>
 #endif
 
   /// A type that can represent a sub-range of ${a_Self}.
-  public typealias SubSlice = ArraySlice<T>
+  public typealias SubSlice = ArraySlice<Element>
 
   /// Access the elements indicated by the given half-open
   /// `subRange`.  O(1).
@@ -311,7 +309,7 @@ public struct ${Self}<T>
   // path preventing retains/releases to be matched accross that region.
   @inline(never)
   internal func _copyBuffer(inout buffer: _Buffer) {
-    let newBuffer = _ContiguousArrayBuffer<T>(
+    let newBuffer = _ContiguousArrayBuffer<Element>(
       count: buffer.count, minimumCapacity: buffer.count)
     buffer._uninitializedCopy(
       0..<count, target: newBuffer.baseAddress)
@@ -380,14 +378,14 @@ public struct ${Self}<T>
 
 %if Self == 'Array':
 #if _runtime(_ObjC)
-  public typealias _Buffer = _ArrayBuffer<T>
+  public typealias _Buffer = _ArrayBuffer<Element>
 #else
-  public typealias _Buffer = _ContiguousArrayBuffer<T>
+  public typealias _Buffer = _ContiguousArrayBuffer<Element>
 #endif
 %elif Self == 'ArraySlice':
-  public typealias _Buffer = _SliceBuffer<T>
+  public typealias _Buffer = _SliceBuffer<Element>
 %else:
-  public typealias _Buffer = _${Self.strip('_')}Buffer<T>
+  public typealias _Buffer = _${Self.strip('_')}Buffer<Element>
 %end
 
   /// Initialization from an existing buffer does not have "array.init"
@@ -400,7 +398,7 @@ public struct ${Self}<T>
 }
 
 extension ${Self} : __ArrayType {
-  public func _doCopyToNativeArrayBuffer() -> _ContiguousArrayBuffer<T> {
+  public func _doCopyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element> {
     return _extractOrCopyToNativeArrayBuffer(self._buffer)
   }
 }
@@ -422,9 +420,9 @@ extension ${Self} : ArrayLiteralConvertible {
 
 // Referenced by the compiler to allocate array literals.
 @_semantics("array.uninitialized")
-public func _allocateUninitialized${Self}<T>(count: Builtin.Word)
-    -> (${Self}<T>, Builtin.RawPointer) {
-  let (array, ptr) = ${Self}<T>._allocateUninitialized(Int(count))
+public func _allocateUninitialized${Self}<Element>(count: Builtin.Word)
+    -> (${Self}<Element>, Builtin.RawPointer) {
+  let (array, ptr) = ${Self}<Element>._allocateUninitialized(Int(count))
   return (array, ptr._rawValue)
 }
 
@@ -432,8 +430,10 @@ public func _allocateUninitialized${Self}<T>(count: Builtin.Word)
 // Referenced by the compiler to deallocate array literals on the
 // error path.
 @_semantics("array.dealloc_uninitialized")
-public func _deallocateUninitialized${Self}<T>(var array: ${Self}<T>) {
-   array._deallocateUninitialized()
+public func _deallocateUninitialized${Self}<Element>(
+  var array: ${Self}<Element>
+) {
+  array._deallocateUninitialized()
 }
 %end
 
@@ -444,7 +444,7 @@ extension ${Self} : _ArrayType {
     _buffer = _Buffer()
   }
 
-  /// Construct from an arbitrary sequence with elements of type `T`.
+  /// Construct from an arbitrary sequence with elements of type `Element`.
   public init<
     S: SequenceType where S.Generator.Element == _Buffer.Element
   >(_ s: S) {
@@ -454,8 +454,8 @@ extension ${Self} : _ArrayType {
   /// Construct a ${Self} of `count` elements, each initialized to
   /// `repeatedValue`.
   @_semantics("array.init")
-  public init(count: Int, repeatedValue: T) {
-    var p: UnsafeMutablePointer<T>
+  public init(count: Int, repeatedValue: Element) {
+    var p: UnsafeMutablePointer<Element>
     (self, p) = ${Self}._allocateUninitialized(count)
     for _ in 0..<count {
       p++.initialize(repeatedValue)
@@ -478,7 +478,7 @@ extension ${Self} : _ArrayType {
   /// a ${Self} of `count` uninitialized elements.
   internal static func _allocateUninitialized(
     count: Int
-  ) -> (${Self}, UnsafeMutablePointer<T>) {
+  ) -> (${Self}, UnsafeMutablePointer<Element>) {
     let result = ${Self}(_uninitializedCount: count)
     return (result, result._buffer.baseAddress)
   }
@@ -533,7 +533,7 @@ extension ${Self} : _ArrayType {
   public mutating func reserveCapacity(minimumCapacity: Int) {
     if _buffer.requestUniqueMutableBackingBuffer(minimumCapacity) == nil {
 
-      let newBuffer = _ContiguousArrayBuffer<T>(
+      let newBuffer = _ContiguousArrayBuffer<Element>(
         count: count, minimumCapacity: minimumCapacity)
 
       _buffer._uninitializedCopy(0..<count, target: newBuffer.baseAddress)
@@ -546,7 +546,7 @@ extension ${Self} : _ArrayType {
   ///
   /// - Complexity: Amortized ${O1}.
   @_semantics("array.mutate_unknown")
-  public mutating func append(newElement: T) {
+  public mutating func append(newElement: Element) {
     // Checking for the isNative fast-path in the outermost if-statement helps
     // the optimizer to eliminate subsequent isNative checks, e.g. when
     // accessing _buffer.count.
@@ -580,7 +580,7 @@ extension ${Self} : _ArrayType {
   /// - Complexity: O(*length of result*).
   public mutating func extend<
       S : SequenceType
-      where S.Generator.Element == T
+      where S.Generator.Element == Element
   >(newElements: S) {
     // Calling a helper free function instead of writing the code inline
     // because of:
@@ -594,7 +594,7 @@ extension ${Self} : _ArrayType {
   /// Remove an element from the end of the ${Self} in O(1).
   ///
   /// - Requires: `count > 0`.
-  public mutating func removeLast() -> T {
+  public mutating func removeLast() -> Element {
     _precondition(count > 0, "can't removeLast from an empty ${Self}")
     let c = count
     // We don't check for "c - 1"  underflow because C is known to be positive.
@@ -608,7 +608,7 @@ extension ${Self} : _ArrayType {
   /// - Requires: `i <= count`.
   ///
   /// - Complexity: O(`count`).
-  public mutating func insert(newElement: T, atIndex i: Int) {
+  public mutating func insert(newElement: Element, atIndex i: Int) {
     _checkIndex(i)
     self.replaceRange(i..<i, with: CollectionOfOne(newElement))
   }
@@ -618,7 +618,7 @@ extension ${Self} : _ArrayType {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`count`).
-  public mutating func removeAtIndex(index: Int) -> T {
+  public mutating func removeAtIndex(index: Int) -> Element {
     let result = self[index]
     self.replaceRange(index..<(index + 1), with: EmptyCollection())
     return result
@@ -641,7 +641,7 @@ extension ${Self} : _ArrayType {
   //===--- algorithms -----------------------------------------------------===//
 
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    @noescape body: (inout UnsafeMutableBufferPointer<T>) -> R
+    @noescape body: (inout UnsafeMutableBufferPointer<Element>) -> R
   ) -> R? {
     // FIXME: Can't write simple code because of:
     // <rdar://problem/20735802> Assertion failure while emitting SIL for
@@ -661,8 +661,8 @@ extension ${Self} : _ArrayType {
   /// example, `[-1, -2].join([[1, 2, 3], [4, 5, 6], [7, 8, 9]])`
   /// yields `[1, 2, 3, -1, -2, 4, 5, 6, -1, -2, 7, 8, 9]`.
   public func join<
-      S : SequenceType where S.Generator.Element == ${Self}<T>
-  >(elements: S) -> ${Self}<T> {
+      S : SequenceType where S.Generator.Element == ${Self}<Element>
+  >(elements: S) -> ${Self}<Element> {
     return Swift.join(self, elements)
   }
 
@@ -673,15 +673,15 @@ extension ${Self} : _ArrayType {
   /// [strict weak ordering](http://en.wikipedia.org/wiki/Strict_weak_order#Strict_weak_orderings)
   /// over the elements.
   @available(*, unavailable, message="call the 'sort()' method on the array")
-  public func sorted(isOrderedBefore: (T, T) -> Bool) -> ${Self} {
+  public func sorted(isOrderedBefore: (Element, Element) -> Bool) -> ${Self} {
     fatalError("unavailable function can't be called")
   }
 }
 
 internal func _${Self}Extend<
-    T, S : SequenceType
-    where S.Generator.Element == T
->(inout a: ${Self}<T>, sequence: S) {
+    Element, S : SequenceType
+    where S.Generator.Element == Element
+>(inout a: ${Self}<Element>, sequence: S) {
   a += sequence
 }
 
@@ -745,7 +745,7 @@ extension ${Self} {
   /// same algorithm on `body`'s argument lets you trade safety for
   /// speed.
   public func withUnsafeBufferPointer<R>(
-    @noescape body: (UnsafeBufferPointer<T>) -> R
+    @noescape body: (UnsafeBufferPointer<Element>) -> R
   ) -> R {
     return _buffer.withUnsafeBufferPointer(body)
   }
@@ -763,7 +763,7 @@ extension ${Self} {
   ///   `body`: it may not appear to have its correct value.  Instead,
   ///   use only the `UnsafeMutableBufferPointer` argument to `body`.
   public mutating func withUnsafeMutableBufferPointer<R>(
-    @noescape body: (inout UnsafeMutableBufferPointer<T>) -> R
+    @noescape body: (inout UnsafeMutableBufferPointer<Element>) -> R
   ) -> R {
     // Ensure unique storage
     _arrayReserve(&_buffer, 0)
@@ -955,7 +955,7 @@ extension ${Self} {
   ///
   /// - Complexity: O(`count + newElements.count`).
   public mutating func splice<
-    S : CollectionType where S.Generator.Element == T
+    S : CollectionType where S.Generator.Element == Element
   >(newElements: S, atIndex i: Int) {
     Swift.splice(&self, newElements, atIndex: i)
   }
@@ -970,9 +970,9 @@ extension ${Self} {
 
 /// Extend `lhs` with the elements of `rhs`.
 public func += <
-  T, S : SequenceType
-  where S.Generator.Element == T
->(inout lhs: ${Self}<T>, rhs: S) {
+  Element, S : SequenceType
+  where S.Generator.Element == Element
+>(inout lhs: ${Self}<Element>, rhs: S) {
   let oldCount = lhs.count
   let capacity = lhs.capacity
   let newCount = oldCount + rhs.underestimateCount()
@@ -986,9 +986,9 @@ public func += <
 
 /// Extend `lhs` with the elements of `rhs`.
 public func += <
-  T, C : CollectionType
-  where C.Generator.Element == T
->(inout lhs: ${Self}<T>, rhs: C) {
+  Element, C : CollectionType
+  where C.Generator.Element == Element
+>(inout lhs: ${Self}<Element>, rhs: C) {
   let rhsCount = numericCast(rhs.count) as Int
 
   let oldCount = lhs.count
@@ -1188,7 +1188,9 @@ internal func _arrayAppendSequence<
 // ArraySlice<Int> and Array<Int>.
 
 /// Returns true if these arrays contain the same elements.
-public func ==<T : Equatable>(lhs: ${Self}<T>, rhs: ${Self}<T>) -> Bool {
+public func == <Element : Equatable>(
+  lhs: ${Self}<Element>, rhs: ${Self}<Element>
+) -> Bool {
   let lhsCount = lhs.count
   if lhsCount != rhs.count {
     return false
@@ -1215,7 +1217,9 @@ public func ==<T : Equatable>(lhs: ${Self}<T>, rhs: ${Self}<T>) -> Bool {
 }
 
 /// Returns true if the arrays do not contain the same elements.
-public func !=<T : Equatable>(lhs: ${Self}<T>, rhs: ${Self}<T>) -> Bool {
+public func != <Element : Equatable>(
+  lhs: ${Self}<Element>, rhs: ${Self}<Element>
+) -> Bool {
   return !(lhs == rhs)
 }
 %end
@@ -1245,7 +1249,7 @@ extension Array {
   ) -> Array? {
     if let deferred = source as? _SwiftDeferredNSArray {
       if let nativeStorage =
-        deferred._nativeStorage as? _ContiguousArrayStorage<T> {
+        deferred._nativeStorage as? _ContiguousArrayStorage<Element> {
         return Array(_ContiguousArrayBuffer(nativeStorage))
       }
     }
@@ -1257,7 +1261,7 @@ extension Array {
   /// Only use this initializer when both conditions are true:
   ///
   /// * it is statically known that the given `NSArray` is immutable;
-  /// * `T` is bridged verbatim to Objective-C (i.e.,
+  /// * `Element` is bridged verbatim to Objective-C (i.e.,
   ///   is a reference type).
   public init(_immutableCocoaArray: _NSArrayCoreType) {
     self = Array(_ArrayBuffer(nsArray: _immutableCocoaArray))

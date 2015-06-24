@@ -3,8 +3,7 @@
 // Make sure we are not looping forever.
 
 extension Array {
-  mutating
-  func new_method(predicate: (T, T) -> Bool, left : Int, right : Int) {
+  mutating func new_method(predicate: (Element, Element) -> Bool, left : Int, right : Int) {
       new_method(predicate, left: left, right: right);
   }
 }

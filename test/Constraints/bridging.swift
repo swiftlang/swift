@@ -191,7 +191,7 @@ func takesArray<T>(t: Array<T>) {}
 func rdar19695671() {
   takesSet(NSSet() as! Set) // expected-error{{'NSSet' is not convertible to 'Set<T>'}}
   takesDictionary(NSDictionary() as! Dictionary) // expected-error{{'NSDictionary' is not convertible to 'Dictionary<Key, Value>'}}
-  takesArray(NSArray() as! Array) // expected-error{{'NSArray' is not convertible to 'Array<T>'}}
+  takesArray(NSArray() as! Array) // expected-error{{'NSArray' is not convertible to 'Array<Element>'}}
 }
 
 
@@ -265,7 +265,7 @@ func rdar20029786(ns: NSString?) {
 
 // <rdar://problem/19813772> QoI: Using as! instead of as in this case produces really bad diagnostic
 func rdar19813772(nsma: NSMutableArray) {
-  var a1 = nsma as! Array // expected-error{{argument for generic parameter 'T' could not be inferred}}
+  var a1 = nsma as! Array // expected-error{{argument for generic parameter 'Element' could not be inferred}}
   var a2 = nsma as! Array<AnyObject> // expected-warning{{forced cast from 'NSMutableArray' to 'Array<AnyObject>' always succeeds; did you mean to use 'as'?}}
   var a3 = nsma as Array<AnyObject>
 }

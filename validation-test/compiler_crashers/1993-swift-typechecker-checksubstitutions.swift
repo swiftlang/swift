@@ -5,6 +5,6 @@
 // Test case found by fuzzing
 
 extension Array {
-struct X<T : A: (s: T, Bool]
+struct X<Element : A: (s: Element, Bool]
 return ")
-protocol A : X<T>
+protocol A : X<Element>

@@ -447,7 +447,7 @@ extension Array : _ObjectiveCBridgeable {
   /// The provided `NSArray` will be copied to ensure that the copy can
   /// not be mutated by other code.
   internal init(_cocoaArray: NSArray) {
-    _sanityCheck(_isBridgedVerbatimToObjectiveC(T.self),
+    _sanityCheck(_isBridgedVerbatimToObjectiveC(Element.self),
       "Array can be backed by NSArray only when the element type can be bridged verbatim to Objective-C")
     // FIXME: We would like to call CFArrayCreateCopy() to avoid doing an
     // objc_msgSend() for instances of CoreFoundation types.  We can't do that
@@ -465,7 +465,7 @@ extension Array : _ObjectiveCBridgeable {
   }
 
   public static func _isBridgedToObjectiveC() -> Bool {
-    return Swift._isBridgedToObjectiveC(T.self)
+    return Swift._isBridgedToObjectiveC(Element.self)
   }
 
   public static func _getObjectiveCType() -> Any.Type {
@@ -482,7 +482,7 @@ extension Array : _ObjectiveCBridgeable {
     inout result: Array?
   ) {
     _precondition(
-      Swift._isBridgedToObjectiveC(T.self),
+      Swift._isBridgedToObjectiveC(Element.self),
       "array element type is not bridged to Objective-C")
 
     // If we have the appropriate native storage already, just adopt it.
@@ -491,7 +491,7 @@ extension Array : _ObjectiveCBridgeable {
       return
     }
 
-    if _fastPath(_isBridgedVerbatimToObjectiveC(T.self)) {
+    if _fastPath(_isBridgedVerbatimToObjectiveC(Element.self)) {
       // Forced down-cast (possible deferred type-checking)
       result = Array(_cocoaArray: source)
       return

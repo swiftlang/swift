@@ -70,7 +70,7 @@ extension MemberTypeCheckB {
 
 // rdar://problem/19795284
 extension Array {
-  var pairs: [(T,T)] {
+  var pairs: [(Element, Element)] {
     get {
       return []
     }
@@ -101,7 +101,7 @@ extension GenericOverloads where T : P1, U : P2 {
   subscript (i: Int) -> Int { return i }
 }
 
-extension Array where T : Hashable {
+extension Array where Element : Hashable {
   var worseHashEver: Int {
     var result = 0
     for elt in self {
@@ -139,7 +139,7 @@ func genericClassNotEquatable<T>(gc: GenericClass<T>, x: T, y: T) {
 
 
 // FIXME: Future direction
-extension Array where T == String { } // expected-error{{same-type requirement makes generic parameter 'T' non-generic}}
+extension Array where Element == String { } // expected-error{{same-type requirement makes generic parameter 'Element' non-generic}}
 
 extension GenericClass : P3 where T : P3 { } // expected-error{{extension of type 'GenericClass' with constraints cannot have an inheritance clause}}
 

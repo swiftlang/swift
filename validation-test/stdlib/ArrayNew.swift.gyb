@@ -41,6 +41,7 @@ extension _UnitTestArray {
     return self._buffer.identity
   }
 }
+
 var ArrayTestSuite = TestSuite("Array")
 
 ArrayTestSuite.test("sizeof") {
@@ -84,7 +85,16 @@ ArrayTestSuite.test("Native/isEmpty") {
   expectFalse(a.isEmpty)
 }
 
+protocol TestProtocol1 {}
+
 % for array_type in all_array_types:
+
+// Check that the generic parameter is called 'Element'.
+extension ${array_type} where Element : TestProtocol1 {
+  var _elementIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
 
 /// Returns an ${array_type} that does not share its buffer with other arrays.
 func getFresh${array_type}<S : SequenceType>(sequence: S)
