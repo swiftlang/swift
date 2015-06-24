@@ -3469,8 +3469,10 @@ unchecked_addr_cast
   // %0 must be an address
   // %1 will be of type $*B
 
-Converts an address to a different address type. Using the resulting address 
-is undefined unless ``B`` is layout compatible with ``A``.
+Converts an address to a different address type. Using the resulting
+address is undefined unless ``B`` is layout compatible with ``A``. The
+layout of ``A`` may be smaller than that of ``B`` as long as the lower
+order bytes have identical layout.
 
 unchecked_trivial_bit_cast
 ``````````````````````````
@@ -3483,9 +3485,9 @@ unchecked_trivial_bit_cast
   // %0 must be an object.
   // %1 must be an object with trivial type.
 
-Bitcasts an object of type ``A`` to be of same sized type ``B`` with
-the constraint that ``B`` must be trivial. This can be used for
-bitcasting among trivial types, but more importantly is a one way
+Bitcasts an object of type ``A`` to be of same sized or smaller type
+``B`` with the constraint that ``B`` must be trivial. This can be used
+for bitcasting among trivial types, but more importantly is a one way
 bitcast from non-trivial types to trivial types.
 
 unchecked_ref_bit_cast

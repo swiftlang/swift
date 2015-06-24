@@ -3627,7 +3627,7 @@ void IRGenSILFunction::visitUncheckedTrivialBitCastInst(
   Explosion in = getLoweredExplosion(i->getOperand());
   Explosion out;
   
-  emitValueBitCast(*this, i->getLoc().getSourceLoc(),
+  emitValueBitwiseCast(*this, i->getLoc().getSourceLoc(),
             in,  cast<LoadableTypeInfo>(getTypeInfo(i->getOperand().getType())),
             out, cast<LoadableTypeInfo>(getTypeInfo(i->getType())));
   
