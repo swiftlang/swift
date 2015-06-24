@@ -43,7 +43,7 @@ represented by the `SequenceType` protocol::
 .. sidebar:: Hiding Generator Type Details
 
   A sequence's generator is an associated type—rather than something
-  like |GeneratorOf|__ that depends only on the element type—for
+  like |AnyGenerator|__ that depends only on the element type—for
   performance reasons.  Although the alternative design has
   significant usability benefits, it requires one dynamic
   allocation/deallocation pair and *N* dynamic dispatches to traverse
@@ -52,9 +52,9 @@ represented by the `SequenceType` protocol::
   and we are `considering <rdar://19755076>`_ changing the design
   accordingly.
 
-  .. |GeneratorOf| replace:: `GeneratorOf<T>`
+  .. |AnyGenerator| replace:: `AnyGenerator<T>`
 
-  __ http://swiftdoc.org/type/GeneratorOf/
+  __ http://swiftdoc.org/type/AnyGenerator/
 
 As you can see, sequence does nothing more than deliver a generator.
 To understand the need for generators, it's important to distinguish
