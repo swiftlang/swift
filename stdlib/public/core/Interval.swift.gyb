@@ -126,12 +126,11 @@ public struct ${Self}<Bound : Comparable>
     return _IntervalMirror(self)
   }
 
-  var _start: Bound
-  var _end: Bound
+  internal var _start: Bound
+  internal var _end: Bound
 }
 
-/// Two `${Self}`s are equal if their `start` and `end` are
-/// equal.
+/// Two `${Self}`s are equal if their `start` and `end` are equal.
 public func == <Bound : Comparable> (
   lhs: ${Self}<Bound>, rhs: ${Self}<Bound>
 ) -> Bool {
@@ -190,12 +189,14 @@ public func ~= <I: IntervalType>(pattern: I, value: I.Bound) -> Bool {
 %                                  introspecteeType='T',\
 %                                  disposition='Struct')
 
-struct _IntervalMirror<T : protocol<IntervalType,CustomStringConvertible>> : MirrorType {
+internal struct _IntervalMirror<
+  T : protocol<IntervalType, CustomStringConvertible>
+> : MirrorType {
   ${Boilerplate}
 
-  var count: Int { return 2 }
+  internal var count: Int { return 2 }
 
-  subscript(i: Int) -> (String, MirrorType) {
+  internal subscript(i: Int) -> (String, MirrorType) {
     switch i {
     case 0: return ("start", reflect(_value.start))
     case 1: return ("end", reflect(_value.end))
@@ -203,7 +204,7 @@ struct _IntervalMirror<T : protocol<IntervalType,CustomStringConvertible>> : Mir
     }
   }
 
-  var summary: String { return _value.description }
+  internal var summary: String { return _value.description }
 
-  var quickLookObject: QuickLookObject? { return .Some(.Text(summary)) }
+  internal var quickLookObject: QuickLookObject? { return .Some(.Text(summary)) }
 }
