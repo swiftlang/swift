@@ -24,7 +24,7 @@ struct D : DrawingElementType {
 // CHECK: integer_literal $Builtin.Int32, 42
 // CHECK-NOT: class_method
 // CHECK-NOT: witness_method
-// CHECK-NOT: bb1
+// CHECK-NOT: bb1:
 // return
 public func test1111() -> Int32 {
   return (D() as DrawingElementType).boundingBox
