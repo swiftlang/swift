@@ -1624,16 +1624,8 @@ SILGenModule::emitProtocolWitness(ProtocolConformance *conformance,
       assert(isa<FuncDecl>(requirement.getDecl())
              && "need to handle mangling of non-Func SILDeclRefs here");
       auto requiredDecl = cast<FuncDecl>(requirement.getDecl());
-      auto accessorKind = requiredDecl->getAccessorKind();
-      if (accessorKind != AccessorKind::NotAccessor) {
-        mangler.mangleAccessorEntity(accessorKind,
-                                     requiredDecl->getAddressorKind(),
-                                     requiredDecl->getAccessorStorageDecl(),
-                                     ResilienceExpansion::Minimal);
-      } else {
-        mangler.mangleEntity(requiredDecl, ResilienceExpansion::Minimal,
-                             requirement.uncurryLevel);
-      }
+      mangler.mangleEntity(requiredDecl, ResilienceExpansion::Minimal,
+                           requirement.uncurryLevel);
     }
   }
 

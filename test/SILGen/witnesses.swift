@@ -329,12 +329,15 @@ struct LabeledSelfWitness : UnlabeledSelfRequirement {
 }
 
 protocol ReadOnlyRequirement {
+  var prop: String { get }
   static var prop: String { get }
 }
 
 struct ImmutableModel: ReadOnlyRequirement {
-  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses14ImmutableModelS_19ReadOnlyRequirementS_FS1_g4propSS : $@convention(witness_method) (@thick ImmutableModel.Type) -> @owned String
-  static let prop: String = ""
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses14ImmutableModelS_19ReadOnlyRequirementS_FS1_g4propSS : $@convention(witness_method) (@in_guaranteed ImmutableModel) -> @owned String
+  let prop: String = "a"
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses14ImmutableModelS_19ReadOnlyRequirementS_ZFS1_g4propSS : $@convention(witness_method) (@thick ImmutableModel.Type) -> @owned String
+  static let prop: String = "b"
 }
 
 protocol FailableRequirement {
