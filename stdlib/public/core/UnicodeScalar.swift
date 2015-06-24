@@ -312,14 +312,6 @@ extension UnicodeScalar.UTF16View : CollectionType {
       endIndex == 1 ? UTF16.CodeUnit(value.value) : UTF16.leadSurrogate(value)
     ) : UTF16.trailSurrogate(value)
   }
-
-  /// Return a *generator* over the code points that comprise this
-  /// *sequence*.
-  ///
-  /// - Complexity: O(1).
-  func generate() -> IndexingGenerator<UnicodeScalar.UTF16View> {
-    return IndexingGenerator(self)
-  }
 }
 
 /// Return c as a UTF8.CodeUnit.  Meant to be used as _ascii8("x").

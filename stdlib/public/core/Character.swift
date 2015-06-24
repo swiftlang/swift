@@ -183,13 +183,6 @@ public struct Character :
         truncatingBitPattern: data >> (UInt64(position) &* 8))
     }
 
-    /// Return a *generator* over the elements of this *sequence*.
-    ///
-    /// - Complexity: O(1).
-    func generate() -> IndexingGenerator<_SmallUTF8> {
-      return IndexingGenerator(self)
-    }
-
     var count: UInt16
     var data: UInt64
   }
@@ -243,13 +236,6 @@ public struct Character :
       // above sanity checks hold.
       return UTF16.CodeUnit(truncatingBitPattern:
         data >> ((UInt64(count) &- UInt64(position) &- 1) &* 16))
-    }
-
-    /// Return a *generator* over the elements of this *sequence*.
-    ///
-    /// - Complexity: O(1).
-    func generate() -> IndexingGenerator<_SmallUTF16> {
-      return IndexingGenerator(self)
     }
 
     var count: UInt16

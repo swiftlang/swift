@@ -564,11 +564,6 @@ extension _StringCore : CollectionType {
   var endIndex: Int {
     return count
   }
-
-  public // @testable
-  func generate() -> IndexingGenerator<_StringCore> {
-    return IndexingGenerator(self)
-  }
 }
 
 extension _StringCore : Sliceable {}

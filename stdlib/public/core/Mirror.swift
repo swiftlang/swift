@@ -501,10 +501,6 @@ internal extension Mirror {
       return (label: label, value: childMirror.value)
     }
 
-    func generate() -> IndexingGenerator<LegacyChildren> {
-      return IndexingGenerator(self)
-    }
-
     internal let _oldMirror: MirrorType
   }
 
@@ -679,15 +675,6 @@ extension DictionaryLiteral : CollectionType {
   /// - complexity: O(1).
   public subscript(position: Int) -> Element {
     return elements[position]
-  }
-
-  /// Return a *generator* over the elements of this *sequence*.  The
-  /// *generator*'s next element is the first element of the
-  /// sequence.
-  ///
-  /// - Complexity: O(1).
-  public func generate() -> IndexingGenerator<DictionaryLiteral> {
-    return IndexingGenerator(self)
   }
 }
 

@@ -96,13 +96,6 @@ public struct ${View}<
     self._base = _base
   }
 
-  /// Return a *generator* over the elements of this *sequence*.
-  ///
-  /// - Complexity: O(1).
-  public func generate() -> IndexingGenerator<${View}> {
-    return IndexingGenerator(self)
-  }
-
   /// The position of the first element in a non-empty collection.
   ///
   /// In an empty collection, `startIndex == endIndex`.

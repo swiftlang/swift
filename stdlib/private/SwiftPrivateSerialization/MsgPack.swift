@@ -591,10 +591,6 @@ public struct MsgPackVariantArray : CollectionType {
     self._data = data
   }
 
-  public func generate() -> IndexingGenerator<MsgPackVariantArray> {
-    return IndexingGenerator(self)
-  }
-
   public var startIndex: Int {
     return _data.startIndex
   }
@@ -626,10 +622,6 @@ public struct MsgPackVariantMap : CollectionType {
   public init(_ data: [String: MsgPackVariant]) {
     self._data = data.map { (key, value) in
       (MsgPackVariant.String(key), value) }
-  }
-
-  public func generate() -> IndexingGenerator<MsgPackVariantMap> {
-    return IndexingGenerator(self)
   }
 
   public var startIndex: Int {

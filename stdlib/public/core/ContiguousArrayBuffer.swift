@@ -534,13 +534,6 @@ extension _ContiguousArrayBuffer : CollectionType {
   public var endIndex: Int {
     return count
   }
-  
-  /// Return a *generator* over the elements of this *sequence*.
-  ///
-  /// - Complexity: O(1).
-  public func generate() -> IndexingGenerator<_ContiguousArrayBuffer> {
-    return IndexingGenerator(self)
-  }
 }
 
 extension SequenceType {

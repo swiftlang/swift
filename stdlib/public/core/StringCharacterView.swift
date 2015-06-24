@@ -228,13 +228,6 @@ extension String.CharacterView : CollectionType {
     return Character(String(unicodeScalars[i._base..<i._endBase]))
   }
 
-  /// Return a *generator* over the `Character`s.
-  ///
-  /// - Complexity: O(1).
-  public func generate() -> IndexingGenerator<String.CharacterView> {
-    return IndexingGenerator(self)
-  }
-
   internal struct _IndexMirror : MirrorType {
     var _value: Index
 

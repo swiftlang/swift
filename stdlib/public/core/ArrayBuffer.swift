@@ -485,13 +485,6 @@ extension _ArrayBuffer {
     return count
   }
 
-  /// Return a *generator* over the elements of this *sequence*.
-  ///
-  /// - Complexity: O(1).
-  public func generate() -> IndexingGenerator<_ArrayBuffer> {
-    return IndexingGenerator(self)
-  }
-  
   //===--- private --------------------------------------------------------===//
   typealias Storage = _ContiguousArrayStorage<T>
   typealias NativeBuffer = _ContiguousArrayBuffer<T>

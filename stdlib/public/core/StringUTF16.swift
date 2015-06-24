@@ -41,10 +41,6 @@ extension String {
       return _core.startIndex + _offset + i
     }
 
-    public func generate() -> IndexingGenerator<UTF16View> {
-      return IndexingGenerator(self)
-    }
-
     /// Access the element at `position`.
     ///
     /// - Requires: `position` is a valid position in `self` and

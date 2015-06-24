@@ -38,10 +38,6 @@ internal struct _CocoaArrayWrapper : CollectionType {
     return buffer.objectAtIndex(i)
   }
 
-  func generate() -> IndexingGenerator<_CocoaArrayWrapper> {
-    return IndexingGenerator(self)
-  }
-  
   /// Returns a pointer to the first element in the given subRange if
   /// the subRange is stored contiguously. Otherwise, return nil.
   ///

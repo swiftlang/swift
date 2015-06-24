@@ -301,13 +301,6 @@ struct _SliceBuffer<T> : _ArrayBufferType {
     return count
   }
 
-  /// Return a *generator* over the elements of this *sequence*.
-  ///
-  /// - Complexity: O(1).
-  public func generate() -> IndexingGenerator<_SliceBuffer> {
-    return IndexingGenerator(self)
-  }
-
   //===--- misc -----------------------------------------------------------===//
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
   /// underlying contiguous storage.

@@ -543,13 +543,6 @@ extension String {
   /// - Requires: `position` is a valid position in `self.characters`
   ///   and `position != endIndex`.
   public subscript(i: Index) -> Character { return characters[i] }
-
-  /// Return a *generator* over the `Character`s.
-  ///
-  /// - Complexity: O(1).
-  public func generate() -> IndexingGenerator<String.CharacterView> {
-    return characters.generate()
-  }
 }
 
 public func == (lhs: String.Index, rhs: String.Index) -> Bool {

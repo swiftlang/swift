@@ -38,13 +38,6 @@ public struct Repeat<T> : CollectionType {
     return count
   }
 
-  /// Returns a *generator* over the elements of this *sequence*.
-  ///
-  /// - Complexity: O(1).
-  public func generate() -> IndexingGenerator<Repeat> {
-    return IndexingGenerator(self)
-  }
-
   /// Access the element at `position`.
   ///
   /// - Requires: `position` is a valid position in `self` and

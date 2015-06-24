@@ -226,14 +226,6 @@ extension String {
       return UTF8View(_core, subRange.startIndex, subRange.endIndex)
     }
 
-    /// Returns a *generator* over the code points that comprise this
-    /// *sequence*.
-    ///
-    /// - Complexity: O(1).
-    public func generate() -> IndexingGenerator<UTF8View> {
-      return IndexingGenerator(self)
-    }
-
     /// Returns a mirror that reflects `self`.
     public func getMirror() -> MirrorType {
       return _UTF8ViewMirror(self)

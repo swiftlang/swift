@@ -256,13 +256,6 @@ public struct ${Self}<T>
   }
 #endif
 
-  /// Return a *generator* over the elements.
-  ///
-  /// - Complexity: O(1).
-  public func generate() -> IndexingGenerator<${Self}> {
-    return IndexingGenerator(self)
-  }
-
   /// A type that can represent a sub-range of ${a_Self}.
   public typealias SubSlice = ArraySlice<T>
 
