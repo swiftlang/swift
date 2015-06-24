@@ -90,8 +90,8 @@ public struct Range<
   /// end`.
   @transparent
   public init(start: Element, end: Element) {
-    _startIndex = start
-    _endIndex = end
+    self.startIndex = start
+    self.endIndex = end
   }
 
   /// Access the element at `position`.
@@ -127,28 +127,14 @@ public struct Range<
   /// The range's lower bound.
   ///
   /// Identical to `endIndex` in an empty range.
-  public var startIndex: Element {
-    get {
-      return _startIndex
-    }
-    set(newValue) {
-      _startIndex = newValue
-    }
-  }
+  public var startIndex: Element
 
   /// The range's upper bound.
   ///
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
   /// `successor()`.
-  public var endIndex: Element {
-    get {
-      return _endIndex
-    }
-    set(newValue) {
-      _endIndex = newValue
-    }
-  }
+  public var endIndex: Element
 
   /// A textual representation of `self`.
   public var description: String {
@@ -159,14 +145,11 @@ public struct Range<
   public var debugDescription: String {
     return "Range(\(String(reflecting: startIndex))..<\(String(reflecting: endIndex)))"
   }
-
-  var _startIndex: Element
-  var _endIndex: Element
 }
 
 public func ==<Element>(lhs: Range<Element>, rhs: Range<Element>) -> Bool {
-  return lhs._startIndex == rhs._startIndex &&
-      lhs._endIndex == rhs._endIndex
+  return lhs.startIndex == rhs.startIndex &&
+      lhs.endIndex == rhs.endIndex
 }
 
 /// Forms a half-open range that contains `minimum`, but not
