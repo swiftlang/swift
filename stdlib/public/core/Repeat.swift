@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A collection whose elements are all identical `T`s.
-public struct Repeat<T> : CollectionType {
+/// A collection whose elements are all identical `Element`s.
+public struct Repeat<Element> : CollectionType {
   
   /// A type that represents a valid position in the collection.
   /// 
@@ -21,7 +21,7 @@ public struct Repeat<T> : CollectionType {
 
   /// Construct an instance that contains `count` elements having the
   /// value `repeatedValue`.
-  public init(count: Int, repeatedValue: T) {
+  public init(count: Int, repeatedValue: Element) {
     self.count = count
     self.repeatedValue = repeatedValue
   }
@@ -42,7 +42,7 @@ public struct Repeat<T> : CollectionType {
   ///
   /// - Requires: `position` is a valid position in `self` and
   ///   `position != endIndex`.
-  public subscript(position: Int) -> T {
+  public subscript(position: Int) -> Element {
     _precondition(position >= 0 && position < count, "Index out of range")
     return repeatedValue
   }
@@ -51,6 +51,6 @@ public struct Repeat<T> : CollectionType {
   public var count: Int
 
   /// The value of every element in this collection.
-  public let repeatedValue: T
+  public let repeatedValue: Element
 }
 
