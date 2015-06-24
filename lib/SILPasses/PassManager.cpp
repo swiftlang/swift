@@ -71,6 +71,10 @@ llvm::cl::list<std::string>
                      llvm::cl::desc("Disable passes "
                                     "which contain a string from this list"));
 
+llvm::cl::opt<bool> SILVerifyWithoutInvalidation(
+    "sil-verify-without-invalidation", llvm::cl::init(false),
+    llvm::cl::desc("Verify after passes even if the pass has not invalidated"));
+
 static bool doPrintBefore(SILTransform *T, SILFunction *F) {
   if (!SILPrintOnlyFun.empty() && F && F->getName() != SILPrintOnlyFun)
     return false;
@@ -204,7 +208,8 @@ runFunctionPasses(llvm::ArrayRef<SILFunctionTransform*> FuncTransforms) {
       if (!currentPassHasInvalidated)
         completedPasses.set((size_t)SFT->getPassKind());
 
-      if (currentPassHasInvalidated && Options.VerifyAll) {
+      if (Options.VerifyAll &&
+          (currentPassHasInvalidated || SILVerifyWithoutInvalidation)) {
         F.verify();
         verifyAnalyses(&F);
       }
@@ -296,7 +301,8 @@ void SILPassManager::runOneIteration() {
         printModule(Mod);
       }
 
-      if (currentPassHasInvalidated && Options.VerifyAll) {
+      if (Options.VerifyAll &&
+          (currentPassHasInvalidated || !SILVerifyWithoutInvalidation)) {
         Mod->verify();
         verifyAnalyses();
       }
