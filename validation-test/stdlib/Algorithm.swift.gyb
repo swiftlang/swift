@@ -274,12 +274,115 @@ var SequenceTypeAlgorithms = TestSuite("SequenceTypeAlgorithms")
 // [1.0, Double.NaN].startsWith([1.0, 2.0]) should be false.
 
 //===----------------------------------------------------------------------===//
-// enumerate()
+// GeneratorSequence
 //===----------------------------------------------------------------------===//
 
 // Check that the generic parameter is called 'Base'.
 protocol TestProtocol1 {}
 
+extension GeneratorSequence where Base : TestProtocol1 {
+  var _baseIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+SequenceTypeAlgorithms.test("GeneratorSequence/GeneratorType/empty") {
+  if true {
+    let data: [OpaqueValue<Int>] = []
+    let base = MinimalGenerator(data)
+    var g = GeneratorSequence(base)
+    expectType(
+      GeneratorSequence<MinimalGenerator<OpaqueValue<Int>>>.self,
+      &g)
+    checkGenerator(
+      data, g, { $0.value == $1.value },
+      resiliencyChecks: .none)
+  }
+  if true {
+    let data: [OpaqueValue<Int>] = []
+    let base = data.generate()
+    var g = GeneratorSequence(base)
+    expectType(
+      GeneratorSequence<IndexingGenerator<Array<OpaqueValue<Int>>>>.self,
+      &g)
+    checkGenerator(data, g, { $0.value == $1.value })
+  }
+}
+
+SequenceTypeAlgorithms.test("GeneratorSequence/GeneratorType") {
+  if true {
+    let data: [OpaqueValue<Int>] = []
+    let base = MinimalGenerator(data)
+    var g = GeneratorSequence(base)
+    expectType(
+      GeneratorSequence<MinimalGenerator<OpaqueValue<Int>>>.self,
+      &g)
+    checkGenerator(
+      data, g, { $0.value == $1.value },
+      resiliencyChecks: .none)
+  }
+  if true {
+    let data: [OpaqueValue<Int>] = []
+    let base = data.generate()
+    var g = GeneratorSequence(base)
+    expectType(
+      GeneratorSequence<IndexingGenerator<Array<OpaqueValue<Int>>>>.self,
+      &g)
+    checkGenerator(data, g, { $0.value == $1.value })
+  }
+}
+
+SequenceTypeAlgorithms.test("GeneratorSequence/SequenceType/empty") {
+  if true {
+    let data = [ 10, 20, 30 ].map { OpaqueValue($0) }
+    let base = MinimalGenerator(data)
+    var g = GeneratorSequence(base)
+    expectType(
+      GeneratorSequence<MinimalGenerator<OpaqueValue<Int>>>.self,
+      &g)
+    checkSequence(
+      data, g, { $0.value == $1.value },
+      resiliencyChecks: .none)
+  }
+  if true {
+    let data = [ 10, 20, 30 ].map { OpaqueValue($0) }
+    let base = data.generate()
+    var g = GeneratorSequence(base)
+    expectType(
+      GeneratorSequence<IndexingGenerator<Array<OpaqueValue<Int>>>>.self,
+      &g)
+    checkSequence(data, g, { $0.value == $1.value })
+  }
+}
+
+SequenceTypeAlgorithms.test("GeneratorSequence/SequenceType") {
+  if true {
+    let data = [ 10, 20, 30 ].map { OpaqueValue($0) }
+    let base = MinimalGenerator(data)
+    var g = GeneratorSequence(base)
+    expectType(
+      GeneratorSequence<MinimalGenerator<OpaqueValue<Int>>>.self,
+      &g)
+    checkSequence(
+      data, g, { $0.value == $1.value },
+      resiliencyChecks: .none)
+  }
+  if true {
+    let data = [ 10, 20, 30 ].map { OpaqueValue($0) }
+    let base = data.generate()
+    var g = GeneratorSequence(base)
+    expectType(
+      GeneratorSequence<IndexingGenerator<Array<OpaqueValue<Int>>>>.self,
+      &g)
+    checkSequence(data, g, { $0.value == $1.value })
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// enumerate()
+//===----------------------------------------------------------------------===//
+
+// Check that the generic parameter is called 'Base'.
 extension EnumerateGenerator where Base : TestProtocol1 {
   var _elementIsTestProtocol1: Bool {
     fatalError("not implemented")

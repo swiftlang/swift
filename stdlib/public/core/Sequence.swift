@@ -167,11 +167,11 @@ extension SequenceType {
 ///
 ///     for x in GeneratorSequence(g) { ... }
 public struct GeneratorSequence<
-  G: GeneratorType
+  Base : GeneratorType
 > : GeneratorType, SequenceType {
 
   /// Construct an instance whose generator is a copy of `base`.
-  public init(_ base: G) {
+  public init(_ base: Base) {
     _base = base
   }
 
@@ -181,7 +181,7 @@ public struct GeneratorSequence<
   /// - Requires: `next()` has not been applied to a copy of `self`
   ///   since the copy was made, and no preceding call to `self.next()`
   ///   has returned `nil`.
-  public mutating func next() -> G.Element? {
+  public mutating func next() -> Base.Element? {
     return _base.next()
   }
 
@@ -192,6 +192,6 @@ public struct GeneratorSequence<
     return self
   }
 
-  var _base: G
+  internal var _base: Base
 }
 
