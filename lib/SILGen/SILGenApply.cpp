@@ -2497,7 +2497,11 @@ namespace {
 
       if (hasAbstractionDifference(Rep, loweredSubstParamType,
                                    loweredSubstArgType)) {
-        lv.addSubstToOrigComponent(origType, loweredSubstParamType);
+        AbstractionPattern origObjectType = origType.transformType(
+          [](CanType type)->CanType {
+            return CanType(type->getInOutObjectType());
+          });
+        lv.addSubstToOrigComponent(origObjectType, loweredSubstParamType);
       }
 
       // Leave an empty space in the ManagedValue sequence and

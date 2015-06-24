@@ -1,4 +1,4 @@
-// RUN: not --crash %target-swift-frontend %s -emit-ir
+// RUN: %target-swift-frontend %s -emit-ir
 
 // rdar://20985062
 
