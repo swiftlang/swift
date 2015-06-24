@@ -15,10 +15,10 @@
 /// When you use this type, you become partially responsible for
 /// keeping the object alive.
 public struct Unmanaged<Instance : AnyObject> {
-  unowned(unsafe) var _value: Instance
+  internal unowned(unsafe) var _value: Instance
 
   @transparent
-  init(_private: Instance) { _value = _private }
+  internal init(_private: Instance) { _value = _private }
 
   /// Unsafely turn an opaque C pointer into an unmanaged
   /// class reference.
@@ -26,8 +26,8 @@ public struct Unmanaged<Instance : AnyObject> {
   /// This operation does not change reference counts.
   ///
   ///     let str: CFString = Unmanaged.fromOpaque(ptr).takeUnretainedValue()
-  @transparent public
-  static func fromOpaque(value: COpaquePointer) -> Unmanaged {
+  @transparent
+  public static func fromOpaque(value: COpaquePointer) -> Unmanaged {
     // Null pointer check is a debug check, because it guards only against one
     // specific bad pointer value.
     _debugPrecondition(
@@ -43,8 +43,8 @@ public struct Unmanaged<Instance : AnyObject> {
   /// This operation does not change reference counts.
   ///
   ///     let str: CFString = Unmanaged.fromOpaque(ptr).takeUnretainedValue()
-  @transparent public
-  func toOpaque() -> COpaquePointer {
+  @transparent
+  public func toOpaque() -> COpaquePointer {
     return unsafeBitCast(_value, COpaquePointer.self)
   }
 
@@ -54,8 +54,8 @@ public struct Unmanaged<Instance : AnyObject> {
   /// This is useful when passing an object to an API which Swift
   /// does not know the ownership rules for, but you know that the
   /// API expects you to pass the object at +1.
-  @transparent public
-  static func passRetained(value: Instance) -> Unmanaged {
+  @transparent
+  public static func passRetained(value: Instance) -> Unmanaged {
     return Unmanaged(_private: value).retain()
   }
 
@@ -68,8 +68,8 @@ public struct Unmanaged<Instance : AnyObject> {
   ///
   ///     CFArraySetValueAtIndex(.passUnretained(array), i,
   ///                            .passUnretained(object))
-  @transparent public
-  static func passUnretained(value: Instance) -> Unmanaged {
+  @transparent
+  public static func passUnretained(value: Instance) -> Unmanaged {
     return Unmanaged(_private: value)
   }
 
@@ -94,22 +94,22 @@ public struct Unmanaged<Instance : AnyObject> {
   }
 
   /// Perform an unbalanced retain of the object.
-  @transparent public
-  func retain() -> Unmanaged {
+  @transparent
+  public func retain() -> Unmanaged {
     Builtin.retain(_value)
     return self
   }
 
   /// Perform an unbalanced release of the object.
-  @transparent public
-  func release() {
+  @transparent
+  public func release() {
     Builtin.release(_value)
   }
 
 #if _runtime(_ObjC)
   /// Perform an unbalanced autorelease of the object.
-  @transparent public
-  func autorelease() -> Unmanaged {
+  @transparent
+  public func autorelease() -> Unmanaged {
     Builtin.autorelease(_value)
     return self
   }
