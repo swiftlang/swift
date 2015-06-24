@@ -17,6 +17,7 @@
 #include "swift/Driver/Types.h"
 #include "swift/Driver/Util.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/Support/TimeValue.h"
 
 namespace llvm {
 namespace opt {
@@ -121,29 +122,41 @@ public:
 
 class CompileJobAction : public JobAction {
 public:
-  enum class BuildState {
-    UpToDate,
-    NeedsCascadingBuild,
-    NeedsNonCascadingBuild,
-    NewlyAdded
+  struct InputInfo {
+    enum Status {
+      UpToDate,
+      NeedsCascadingBuild,
+      NeedsNonCascadingBuild,
+      NewlyAdded
+    };
+    Status status = UpToDate;
+    llvm::sys::TimeValue previousModTime;
+
+    InputInfo() = default;
+    InputInfo(Status stat, llvm::sys::TimeValue time)
+        : status(stat), previousModTime(time) {}
+
+    static InputInfo makeNewlyAdded() {
+      return InputInfo(Status::NewlyAdded, llvm::sys::TimeValue::MaxTime());
+    }
   };
 
 private:
   virtual void anchor();
-  BuildState PreviousBuildState;
+  InputInfo inputInfo;
 
 public:
   CompileJobAction(types::ID OutputType)
       : JobAction(Action::CompileJob, llvm::None, OutputType),
-        PreviousBuildState(BuildState::UpToDate) {}
+        inputInfo(InputInfo()) {}
 
   CompileJobAction(Action *Input, types::ID OutputType,
-                   BuildState previousState)
+                   InputInfo info)
       : JobAction(Action::CompileJob, Input, OutputType),
-        PreviousBuildState(previousState) {}
+        inputInfo(info) {}
 
-  BuildState getPreviousBuildState() const {
-    return PreviousBuildState;
+  InputInfo getInputInfo() const {
+    return inputInfo;
   }
 
   static bool classof(const Action *A) {

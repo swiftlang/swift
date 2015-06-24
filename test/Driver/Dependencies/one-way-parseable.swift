@@ -42,7 +42,7 @@
 // CHECK-SECOND: ".\/other.swift"
 // CHECK-SECOND: {{^}$}}
 
-// RUN: rm %t/other.o
+// RUN: touch -t 201401240006 %t/other.swift
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path %S/Inputs/update-dependencies.py -output-file-map %t/output.json -incremental ./main.swift ./other.swift -module-name main -j1 -parseable-output 2>&1 | FileCheck -check-prefix=CHECK-THIRD %s
 
 // CHECK-THIRD: {{^{$}}
@@ -69,7 +69,7 @@
 // CHECK-THIRD: "output": "Handled main.swift\n"
 // CHECK-THIRD: {{^}$}}
 
-// RUN: rm %t/main.o
+// RUN: touch -t 201401240006 %t/main.swift
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path %S/Inputs/update-dependencies.py -output-file-map %t/output.json -incremental ./main.swift ./other.swift -module-name main -j1 -parseable-output 2>&1 | FileCheck -check-prefix=CHECK-FOURTH %s
 
 // CHECK-FOURTH: {{^{$}}

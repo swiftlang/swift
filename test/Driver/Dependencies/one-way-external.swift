@@ -21,7 +21,7 @@
 // RUN: touch -t 201401240005 %t/*
 // RUN: touch -t 201401240006 %t/*.o
 // RUN: touch -t 201401240004 %t/*-external
-// RUN: touch %t/other1-external
+// RUN: touch -t 300004010005 %t/other1-external
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path %S/Inputs/update-dependencies.py -output-file-map %t/output.json -incremental ./main.swift ./other.swift -module-name main -j1 -v 2>&1 | FileCheck -check-prefix=CHECK-THIRD %s
 
 // CHECK-THIRD-DAG: Handled other.swift
@@ -30,14 +30,14 @@
 // RUN: touch -t 201401240005 %t/*
 // RUN: touch -t 201401240006 %t/*.o
 // RUN: touch -t 201401240004 %t/*-external
-// RUN: touch %t/other2-external
+// RUN: touch -t 300004010005 %t/other2-external
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path %S/Inputs/update-dependencies.py -output-file-map %t/output.json -incremental ./main.swift ./other.swift -module-name main -j1 -v 2>&1 | FileCheck -check-prefix=CHECK-THIRD %s
 
 
 // RUN: touch -t 201401240005 %t/*
 // RUN: touch -t 201401240006 %t/*.o
 // RUN: touch -t 201401240004 %t/*-external
-// RUN: touch %t/main1-external
+// RUN: touch -t 300004010005 %t/main1-external
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path %S/Inputs/update-dependencies.py -output-file-map %t/output.json -incremental ./main.swift ./other.swift -module-name main -j1 -v 2>&1 | FileCheck -check-prefix=CHECK-FOURTH %s
 
 // CHECK-FOURTH-NOT: Handled other.swift
@@ -47,5 +47,5 @@
 // RUN: touch -t 201401240005 %t/*
 // RUN: touch -t 201401240006 %t/*.o
 // RUN: touch -t 201401240004 %t/*-external
-// RUN: touch %t/main2-external
+// RUN: touch -t 300004010005 %t/main2-external
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path %S/Inputs/update-dependencies.py -output-file-map %t/output.json -incremental ./main.swift ./other.swift -module-name main -j1 -v 2>&1 | FileCheck -check-prefix=CHECK-FOURTH %s

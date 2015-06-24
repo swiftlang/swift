@@ -20,6 +20,7 @@
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Support/TimeValue.h"
 
 #include <memory>
 #include <vector>
@@ -54,6 +55,10 @@ enum class OutputLevel {
 };
 
 class Compilation {
+public:
+  struct PerformJobsState;
+
+private:
   /// The driver we were created by.
   const Driver &TheDriver;
 
@@ -88,6 +93,17 @@ class Compilation {
   /// A hash representing all the arguments that could trigger a full rebuild.
   std::string ArgsHash;
 
+  /// When the build was started.
+  ///
+  /// This should be as close as possible to when the driver was invoked, since
+  /// it's used as a lower bound.
+  llvm::sys::TimeValue BuildStartTime;
+
+  /// The time of the last build.
+  ///
+  /// If unknown, this will be some time in the past.
+  llvm::sys::TimeValue LastBuildTime = llvm::sys::TimeValue::MinTime();
+
   /// The number of commands which this compilation should attempt to run in
   /// parallel.
   unsigned NumberOfParallelCommands;
@@ -115,7 +131,7 @@ public:
               DiagnosticEngine &Diags, OutputLevel Level,
               std::unique_ptr<llvm::opt::InputArgList> InputArgs,
               std::unique_ptr<llvm::opt::DerivedArgList> TranslatedArgs,
-              StringRef ArgsHash,
+              StringRef ArgsHash, llvm::sys::TimeValue StartTime,
               unsigned NumberOfParallelCommands = 1,
               bool EnableIncrementalBuild = false,
               bool SkipTaskExecution = false,
@@ -165,14 +181,16 @@ public:
     CompilationRecordPath = path;
   }
 
+  void setLastBuildTime(llvm::sys::TimeValue time) {
+    LastBuildTime = time;
+  }
+
   /// Asks the Compilation to perform the Jobs which it knows about.
   /// \returns result code for the Compilation's Jobs; 0 indicates success and
   /// -2 indicates that one of the Compilation's Jobs crashed during execution
   int performJobs();
 
 private:
-  struct PerformJobsState;
-
   /// \brief Perform the Jobs in \p JL if necessary.
   ///
   /// \param JL the list of Jobs to perform

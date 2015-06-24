@@ -12,7 +12,7 @@
 // CHECK-INITIAL: Handled d.swift
 // CHECK-INITIAL: Handled e.swift
 
-// RUN: rm %t/a.o
+// RUN: touch -t 201401240006 %t/a.swift
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path %S/Inputs/update-dependencies.py -output-file-map %t/output.json -incremental ./a.swift ./b.swift ./c.swift ./d.swift ./e.swift -module-name main -j1 -v > %t/a.txt 2>&1
 // RUN: FileCheck -check-prefix=CHECK-A %s < %t/a.txt
 // RUN: FileCheck -check-prefix=CHECK-A-NEG %s < %t/a.txt
@@ -23,7 +23,7 @@
 // CHECK-A-NEG-NOT: Handled d.swift
 // CHECK-A-NEG-NOT: Handled e.swift
 
-// RUN: rm %t/b.o
+// RUN: touch -t 201401240006 %t/b.swift
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path %S/Inputs/update-dependencies.py -output-file-map %t/output.json -incremental ./a.swift ./b.swift ./c.swift ./d.swift ./e.swift -module-name main -j1 -v > %t/b.txt 2>&1
 // RUN: FileCheck -check-prefix=CHECK-B %s < %t/b.txt
 // RUN: FileCheck -check-prefix=CHECK-B-NEG %s < %t/b.txt
@@ -34,7 +34,7 @@
 // CHECK-B-NEG-NOT: Handled d.swift
 // CHECK-B-NEG-NOT: Handled e.swift
 
-// RUN: rm %t/c.o
+// RUN: touch -t 201401240006 %t/c.swift
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path %S/Inputs/update-dependencies.py -output-file-map %t/output.json -incremental ./a.swift ./b.swift ./c.swift ./d.swift ./e.swift -module-name main -j1 -v > %t/c.txt 2>&1
 // RUN: FileCheck -check-prefix=CHECK-C %s < %t/c.txt
 // RUN: FileCheck -check-prefix=CHECK-C-NEG %s < %t/c.txt
@@ -45,7 +45,7 @@
 // CHECK-C: Handled d.swift
 // CHECK-C-NEG-NOT: Handled e.swift
 
-// RUN: rm %t/d.o
+// RUN: touch -t 201401240006 %t/d.swift
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path %S/Inputs/update-dependencies.py -output-file-map %t/output.json -incremental ./a.swift ./b.swift ./c.swift ./d.swift ./e.swift -module-name main -j1 -v > %t/d.txt 2>&1
 // RUN: FileCheck -check-prefix=CHECK-D %s < %t/d.txt
 // RUN: FileCheck -check-prefix=CHECK-D-NEG %s < %t/d.txt
@@ -56,7 +56,7 @@
 // CHECK-D: Handled d.swift
 // CHECK-D-NEG-NOT: Handled e.swift
 
-// RUN: rm %t/e.o
+// RUN: touch -t 201401240006 %t/e.swift
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path %S/Inputs/update-dependencies.py -output-file-map %t/output.json -incremental ./a.swift ./b.swift ./c.swift ./d.swift ./e.swift -module-name main -j1 -v > %t/e.txt 2>&1
 // RUN: FileCheck -check-prefix=CHECK-E %s < %t/e.txt
 // RUN: FileCheck -check-prefix=CHECK-E-NEG %s < %t/e.txt
@@ -67,7 +67,7 @@
 // CHECK-E-DAG: Handled c.swift
 // CHECK-E-DAG: Handled d.swift
 
-// RUN: rm %t/a.o %t/e.o
+// RUN: touch -t 201401240007 %t/a.swift %t/e.swift
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path %S/Inputs/update-dependencies.py -output-file-map %t/output.json -incremental ./a.swift ./b.swift ./c.swift ./d.swift ./e.swift -module-name main -j1 -v > %t/ae.txt 2>&1
 // RUN: FileCheck -check-prefix=CHECK-AE %s < %t/ae.txt
 // RUN: FileCheck -check-prefix=CHECK-AE-NEG %s < %t/ae.txt

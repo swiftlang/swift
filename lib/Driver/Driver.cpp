@@ -180,9 +180,165 @@ static void computeArgsHash(SmallString<32> &out, const DerivedArgList &args) {
   llvm::MD5::stringifyResult(hashBuf, out);
 }
 
+class Driver::InputInfoMap
+    : public llvm::SmallDenseMap<const Arg *, CompileJobAction::InputInfo, 16> {
+};
+using InputInfoMap = Driver::InputInfoMap;
+
+static bool populateOutOfDateMap(InputInfoMap &map, StringRef argsHashStr,
+                                 const Driver::InputList &inputs,
+                                 StringRef buildRecordPath) {
+  // Treat a missing file as "no previous build".
+  auto buffer = llvm::MemoryBuffer::getFile(buildRecordPath);
+  if (!buffer)
+    return false;
+
+  namespace yaml = llvm::yaml;
+  using InputInfo = CompileJobAction::InputInfo;
+
+  llvm::SourceMgr SM;
+  yaml::Stream stream(buffer.get()->getMemBufferRef(), SM);
+
+  auto I = stream.begin();
+  if (I == stream.end() || !I->getRoot())
+    return true;
+
+  auto *topLevelMap = dyn_cast<yaml::MappingNode>(I->getRoot());
+  if (!topLevelMap)
+    return true;
+  SmallString<64> scratch;
+
+  llvm::StringMap<InputInfo> previousInputs;
+  bool versionValid = false;
+  bool optionsMatch = true;
+
+  auto readTimeValue = [&scratch](yaml::Node *node,
+                                  llvm::sys::TimeValue &timeValue) -> bool {
+    auto *seq = dyn_cast<yaml::SequenceNode>(node);
+    if (!seq)
+      return true;
+
+    auto seqI = seq->begin(), seqE = seq->end();
+    // FIXME: operator== is not implemented.
+    if (!(seqI != seqE))
+      return true;
+
+    auto *secondsRaw = dyn_cast<yaml::ScalarNode>(&*seqI);
+    if (!secondsRaw)
+      return true;
+    llvm::sys::TimeValue::SecondsType parsedSeconds;
+    if (secondsRaw->getValue(scratch).getAsInteger(10, parsedSeconds))
+      return true;
+
+    ++seqI;
+    // FIXME: operator== is not implemented.
+    if (!(seqI != seqE))
+      return true;
+
+    auto *nanosecondsRaw = dyn_cast<yaml::ScalarNode>(&*seqI);
+    if (!nanosecondsRaw)
+      return true;
+    llvm::sys::TimeValue::NanoSecondsType parsedNanoseconds;
+    if (nanosecondsRaw->getValue(scratch).getAsInteger(10, parsedNanoseconds))
+      return true;
+
+    ++seqI;
+    if (seqI != seqE)
+      return true;
+
+    timeValue.seconds(parsedSeconds);
+    timeValue.nanoseconds(parsedNanoseconds);
+    return false;
+  };
+
+  // FIXME: LLVM's YAML support does incremental parsing in such a way that
+  // for-range loops break.
+  for (auto i = topLevelMap->begin(), e = topLevelMap->end(); i != e; ++i) {
+    auto *key = cast<yaml::ScalarNode>(i->getKey());
+    StringRef keyStr = key->getValue(scratch);
+
+    if (keyStr == "version") {
+      auto *value = dyn_cast<yaml::ScalarNode>(i->getValue());
+      if (!value)
+        return true;
+      versionValid =
+          (value->getValue(scratch) == version::getSwiftFullVersion());
+
+    } else if (keyStr == "options") {
+      auto *value = dyn_cast<yaml::ScalarNode>(i->getValue());
+      if (!value)
+        return true;
+      optionsMatch = (argsHashStr == value->getValue(scratch));
+
+    } else if (keyStr == "build_time") {
+      auto *value = dyn_cast<yaml::SequenceNode>(i->getValue());
+      if (!value)
+        return true;
+      llvm::sys::TimeValue timeVal;
+      if (readTimeValue(i->getValue(), timeVal))
+        return true;
+      map[nullptr] = { InputInfo::NeedsCascadingBuild, timeVal };
+
+    } else if (keyStr == "inputs") {
+      auto *inputMap = dyn_cast<yaml::MappingNode>(i->getValue());
+      if (!inputMap)
+        return true;
+
+      // FIXME: LLVM's YAML support does incremental parsing in such a way that
+      // for-range loops break.
+      for (auto i = inputMap->begin(), e = inputMap->end(); i != e; ++i) {
+        auto *key = dyn_cast<yaml::ScalarNode>(i->getKey());
+        if (!key)
+          return true;
+
+        auto *value = dyn_cast<yaml::SequenceNode>(i->getValue());
+        if (!value)
+          return true;
+
+        auto previousBuildState =
+            llvm::StringSwitch<Optional<InputInfo::Status>>(value->getRawTag())
+              .Case("", InputInfo::UpToDate)
+              .Case("!dirty", InputInfo::NeedsCascadingBuild)
+              .Case("!private", InputInfo::NeedsNonCascadingBuild)
+              .Default(None);
+
+        if (!previousBuildState)
+          return true;
+
+        llvm::sys::TimeValue timeValue;
+        if (readTimeValue(value, timeValue))
+          return true;
+
+        auto inputName = key->getValue(scratch);
+        previousInputs[inputName] = { *previousBuildState, timeValue };
+      }
+    }
+  }
+
+  if (!versionValid || !optionsMatch)
+    return true;
+
+  size_t numInputsFromPrevious = 0;
+  for (auto &inputPair : inputs) {
+    auto iter = previousInputs.find(inputPair.second->getValue());
+    if (iter == previousInputs.end()) {
+      map[inputPair.second] = InputInfo::makeNewlyAdded();
+      continue;
+    }
+    ++numInputsFromPrevious;
+    map[inputPair.second] = iter->getValue();
+  }
+
+  // If a file was removed, we've lost its dependency info. Rebuild everything.
+  // FIXME: Can we do better?
+  return numInputsFromPrevious != previousInputs.size();
+}
+
 std::unique_ptr<Compilation> Driver::buildCompilation(
     ArrayRef<const char *> Args) {
   llvm::PrettyStackTraceString CrashInfo("Compilation construction");
+
+  llvm::sys::TimeValue StartTime = llvm::sys::TimeValue::now();
 
   std::unique_ptr<InputArgList> ArgList(parseArgStrings(Args.slice(1)));
   if (Diags.hadAnyError())
@@ -264,10 +420,43 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
   SmallString<32> ArgsHash;
   computeArgsHash(ArgsHash, *TranslatedArgList);
 
+  InputInfoMap outOfDateMap;
+  bool rebuildEverything = true;
+  if (Incremental) {
+    if (!OFM) {
+      // FIXME: This should work without an output file map. We should have
+      // another way to specify a build record and where to put intermediates.
+      Diags.diagnose(SourceLoc(), diag::incremental_requires_output_file_map);
+
+    } else {
+      StringRef buildRecordPath;
+      if (auto *masterOutputMap = OFM->getOutputMapForSingleOutput()) {
+        auto iter = masterOutputMap->find(types::TY_SwiftDeps);
+        if (iter != masterOutputMap->end())
+          buildRecordPath = iter->second;
+      }
+
+      if (buildRecordPath.empty()) {
+        Diags.diagnose(SourceLoc(),
+                       diag::incremental_requires_build_record_entry,
+                       types::getTypeName(types::TY_SwiftDeps));
+        rebuildEverything = true;
+
+      } else {
+        if (populateOutOfDateMap(outOfDateMap, ArgsHash, Inputs,
+                                 buildRecordPath)) {
+          // FIXME: Distinguish errors from "file removed", which is benign.
+        } else {
+          rebuildEverything = false;
+        }
+      }
+    }
+  }
+
   // Construct the graph of Actions.
   ActionList Actions;
-  buildActions(*TC, *TranslatedArgList, Inputs, OI, OFM.get(), ArgsHash,
-               Incremental, Actions);
+  buildActions(*TC, *TranslatedArgList, Inputs, OI, OFM.get(),
+               rebuildEverything ? nullptr : &outOfDateMap, Actions);
 
   if (Diags.hadAnyError())
     return nullptr;
@@ -300,7 +489,7 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
   std::unique_ptr<Compilation> C(new Compilation(*this, *TC, Diags, Level,
                                                  std::move(ArgList),
                                                  std::move(TranslatedArgList),
-                                                 ArgsHash,
+                                                 ArgsHash, StartTime,
                                                  NumberOfParallelCommands,
                                                  Incremental,
                                                  DriverSkipExecution,
@@ -315,9 +504,15 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
       OI.ShouldGenerateFixitEdits)
     C->setContinueBuildingAfterErrors();
 
-  if (OFM)
-    if (auto *masterOutputMap = OFM->getOutputMapForSingleOutput())
+  if (OFM) {
+    if (auto *masterOutputMap = OFM->getOutputMapForSingleOutput()) {
       C->setCompilationRecordPath(masterOutputMap->lookup(types::TY_SwiftDeps));
+
+      auto buildEntry = outOfDateMap.find(nullptr);
+      if (buildEntry != outOfDateMap.end())
+        C->setLastBuildTime(buildEntry->second.previousModTime);
+    }
+  }
 
   if (Diags.hadAnyError())
     return nullptr;
@@ -888,155 +1083,16 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
   }
 }
 
-using OutOfDateMap =
-    llvm::SmallDenseMap<const Arg *, CompileJobAction::BuildState, 16>;
-
-static bool populateOutOfDateMap(OutOfDateMap &map, StringRef argsHashStr,
-                                 const Driver::InputList &inputs,
-                                 StringRef buildRecordPath) {
-  // Treat a missing file as "no previous build".
-  auto buffer = llvm::MemoryBuffer::getFile(buildRecordPath);
-  if (!buffer)
-    return false;
-
-  namespace yaml = llvm::yaml;
-  using BuildState = CompileJobAction::BuildState;
-
-  llvm::SourceMgr SM;
-  yaml::Stream stream(buffer.get()->getMemBufferRef(), SM);
-
-  auto I = stream.begin();
-  if (I == stream.end() || !I->getRoot())
-    return true;
-
-  auto *topLevelMap = dyn_cast<yaml::MappingNode>(I->getRoot());
-  if (!topLevelMap)
-    return true;
-  SmallString<64> scratch;
-
-  llvm::StringMap<BuildState> previousInputs;
-  bool versionValid = false;
-  bool optionsMatch = true;
-
-  // FIXME: LLVM's YAML support does incremental parsing in such a way that
-  // for-range loops break.
-  for (auto i = topLevelMap->begin(), e = topLevelMap->end(); i != e; ++i) {
-    auto *key = cast<yaml::ScalarNode>(i->getKey());
-    StringRef keyStr = key->getValue(scratch);
-
-    if (keyStr == "version") {
-      auto *value = dyn_cast<yaml::ScalarNode>(i->getValue());
-      if (!value)
-        return true;
-      versionValid =
-          (value->getValue(scratch) == version::getSwiftFullVersion());
-
-    } else if (keyStr == "options") {
-      auto *value = dyn_cast<yaml::ScalarNode>(i->getValue());
-      if (!value)
-        return true;
-      optionsMatch = (argsHashStr == value->getValue(scratch));
-
-    } else if (keyStr == "inputs") {
-      auto *inputList = dyn_cast<yaml::SequenceNode>(i->getValue());
-      if (!inputList)
-        return true;
-
-      for (const yaml::Node &rawEntry : *inputList) {
-        auto *entry = dyn_cast<yaml::ScalarNode>(&rawEntry);
-        if (!entry)
-          return true;
-
-        auto previousBuildState =
-            llvm::StringSwitch<Optional<BuildState>>(entry->getRawTag())
-              .Case("", BuildState::UpToDate)
-              .Case("!dirty", BuildState::NeedsCascadingBuild)
-              .Case("!private", BuildState::NeedsNonCascadingBuild)
-              .Default(None);
-
-        if (!previousBuildState)
-          return true;
-        previousInputs[entry->getValue(scratch)] = *previousBuildState;
-      }
-    }
-  }
-
-  if (!versionValid || !optionsMatch)
-    return true;
-
-  size_t numInputsFromPrevious = 0;
-  for (auto &inputPair : inputs) {
-    auto iter = previousInputs.find(inputPair.second->getValue());
-    if (iter == previousInputs.end()) {
-      map[inputPair.second] = BuildState::NewlyAdded;
-      continue;
-    }
-    ++numInputsFromPrevious;
-
-    switch (iter->getValue()) {
-    case BuildState::UpToDate:
-      break;
-    case BuildState::NeedsCascadingBuild:
-    case BuildState::NeedsNonCascadingBuild:
-      map[inputPair.second] = iter->getValue();
-      break;
-    case BuildState::NewlyAdded:
-      llvm_unreachable("previously built files don't use NewlyAdded");
-    }
-  }
-
-  // If a file was removed, we've lost its dependency info. Rebuild everything.
-  // FIXME: Can we do better?
-  return numInputsFromPrevious != previousInputs.size();
-}
-
 void Driver::buildActions(const ToolChain &TC,
                           const DerivedArgList &Args,
                           const InputList &Inputs,
                           const OutputInfo &OI,
                           const OutputFileMap *OFM,
-                          StringRef ArgsHash,
-                          bool IsIncremental,
+                          InputInfoMap *OutOfDateMap,
                           ActionList &Actions) const {
   if (!SuppressNoInputFilesError && Inputs.empty()) {
     Diags.diagnose(SourceLoc(), diag::error_no_input_files);
     return;
-  }
-
-  OutOfDateMap outOfDateMap;
-  bool rebuildEverything = true;
-  static_assert(CompileJobAction::BuildState() ==
-                  CompileJobAction::BuildState::UpToDate,
-                "relying on default-initialization");
-  if (IsIncremental) {
-    if (!OFM) {
-      // FIXME: This should work without an output file map. We should have
-      // another way to specify a build record and where to put intermediates.
-      Diags.diagnose(SourceLoc(), diag::incremental_requires_output_file_map);
-
-    } else {
-      StringRef buildRecordPath;
-      if (auto *masterOutputMap = OFM->getOutputMapForSingleOutput()) {
-        auto iter = masterOutputMap->find(types::TY_SwiftDeps);
-        if (iter != masterOutputMap->end())
-          buildRecordPath = iter->second;
-      }
-
-      if (buildRecordPath.empty()) {
-        Diags.diagnose(SourceLoc(),
-                       diag::incremental_requires_build_record_entry,
-                       types::getTypeName(types::TY_SwiftDeps));
-        rebuildEverything = true;
-
-      } else {
-        if (populateOutOfDateMap(outOfDateMap, ArgsHash, Inputs,
-                                 buildRecordPath)) {
-          // FIXME: Distinguish errors from "file removed", which is benign.
-        } else {
-          rebuildEverything = false;
-        }
-      }
-    }
   }
 
   ActionList CompileActions;
@@ -1053,10 +1109,12 @@ void Driver::buildActions(const ToolChain &TC,
       case types::TY_SIL:
       case types::TY_SIB: {
         // Source inputs always need to be compiled.
-        auto previousBuildState =
-          CompileJobAction::BuildState::NeedsCascadingBuild;
-        if (!rebuildEverything)
-          previousBuildState = outOfDateMap.lookup(InputArg);
+        CompileJobAction::InputInfo previousBuildState = {
+          CompileJobAction::InputInfo::NeedsCascadingBuild,
+          llvm::sys::TimeValue::MinTime()
+        };
+        if (OutOfDateMap)
+          previousBuildState = OutOfDateMap->lookup(InputArg);
         if (Args.hasArg(options::OPT_embed_bitcode)) {
           Current.reset(new CompileJobAction(Current.release(),
                                              types::TY_LLVM_BC,
@@ -1479,16 +1537,12 @@ static void addAuxiliaryOutput(Compilation &C, CommandOutput &output,
   }
 }
 
-/// Returns whether the file at \p input has not been modified more recently
-/// than the file at \p output.
-///
-/// If there is any error (such as either file not existing), returns false.
+/// If the file at \p input has not been modified since the last build (i.e. its
+/// mtime has not changed), adjust the Job's condition accordingly.
 static void
-handleCompileJobCondition(Job *J,
-                          CompileJobAction::BuildState previousBuildState,
-                          StringRef input,
-                          StringRef output) {
-  if (previousBuildState == CompileJobAction::BuildState::NewlyAdded) {
+handleCompileJobCondition(Job *J, CompileJobAction::InputInfo inputInfo,
+                          StringRef input) {
+  if (inputInfo.status == CompileJobAction::InputInfo::NewlyAdded) {
     J->setCondition(Job::Condition::NewlyAdded);
     return;
   }
@@ -1497,27 +1551,22 @@ handleCompileJobCondition(Job *J,
   if (llvm::sys::fs::status(input, inputStatus))
     return;
 
-  J->updatePreviousBuildTime(inputStatus.getLastModificationTime());
-
-  llvm::sys::fs::file_status outputStatus;
-  if (llvm::sys::fs::status(output, outputStatus))
-    return;
-
-  if (!J->updatePreviousBuildTime(outputStatus.getLastModificationTime()))
+  J->setInputModTime(inputStatus.getLastModificationTime());
+  if (J->getInputModTime() != inputInfo.previousModTime)
     return;
 
   Job::Condition condition;
-  switch (previousBuildState) {
-  case CompileJobAction::BuildState::UpToDate:
+  switch (inputInfo.status) {
+  case CompileJobAction::InputInfo::UpToDate:
     condition = Job::Condition::CheckDependencies;
     break;
-  case CompileJobAction::BuildState::NeedsCascadingBuild:
+  case CompileJobAction::InputInfo::NeedsCascadingBuild:
     condition = Job::Condition::Always;
     break;
-  case CompileJobAction::BuildState::NeedsNonCascadingBuild:
+  case CompileJobAction::InputInfo::NeedsNonCascadingBuild:
     condition = Job::Condition::RunWithoutCascading;
     break;
-  case CompileJobAction::BuildState::NewlyAdded:
+  case CompileJobAction::InputInfo::NewlyAdded:
     llvm_unreachable("handled above");
   }
   J->setCondition(condition);
@@ -1786,8 +1835,7 @@ Job *Driver::buildJobsForAction(Compilation &C, const Action *A,
   if (!J->getOutput().getAdditionalOutputForType(types::TY_SwiftDeps).empty()) {
     if (InputActions.size() == 1) {
       auto compileJob = cast<CompileJobAction>(A);
-      handleCompileJobCondition(J, compileJob->getPreviousBuildState(),
-                                BaseInput, OutputFile);
+      handleCompileJobCondition(J, compileJob->getInputInfo(), BaseInput);
     }
   }
 

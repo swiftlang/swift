@@ -143,8 +143,8 @@ private:
   /// which will be the Executable).
   llvm::opt::ArgStringList Arguments;
 
-  /// An estimate of the latest possible time this job was previously run.
-  llvm::sys::TimeValue MaxPreviousBuildTime = llvm::sys::TimeValue::MinTime();
+  /// The modification time of the main input file, if any.
+  llvm::sys::TimeValue InputModTime = llvm::sys::TimeValue::MaxTime();
 
 public:
   Job(const Action &Source, const Tool &Creator,
@@ -170,18 +170,12 @@ public:
     CreatorAndCondition.setInt(Cond);
   }
 
-  /// Updates the estimated timestamp of the previous execution of this job.
-  ///
-  /// \returns true if the new time value is later than the old time value.
-  bool updatePreviousBuildTime(llvm::sys::TimeValue NewTime) {
-    if (MaxPreviousBuildTime >= NewTime)
-      return false;
-    MaxPreviousBuildTime = NewTime;
-    return true;
+  void setInputModTime(llvm::sys::TimeValue time) {
+    InputModTime = time;
   }
 
-  llvm::sys::TimeValue getPreviousBuildTime() const {
-    return MaxPreviousBuildTime;
+  llvm::sys::TimeValue getInputModTime() const {
+    return InputModTime;
   }
 
   /// Print the command line for this Job to the given \p stream,

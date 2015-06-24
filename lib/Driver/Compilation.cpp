@@ -42,7 +42,7 @@ Compilation::Compilation(const Driver &D, const ToolChain &DefaultToolChain,
                          DiagnosticEngine &Diags, OutputLevel Level,
                          std::unique_ptr<InputArgList> InputArgs,
                          std::unique_ptr<DerivedArgList> TranslatedArgs,
-                         StringRef ArgsHash,
+                         StringRef ArgsHash, llvm::sys::TimeValue StartTime,
                          unsigned NumberOfParallelCommands,
                          bool EnableIncrementalBuild,
                          bool SkipTaskExecution,
@@ -50,13 +50,14 @@ Compilation::Compilation(const Driver &D, const ToolChain &DefaultToolChain,
   : TheDriver(D), DefaultToolChain(DefaultToolChain), Diags(Diags),
     Level(Level), Jobs(new JobList), InputArgs(std::move(InputArgs)),
     TranslatedArgs(std::move(TranslatedArgs)), ArgsHash(ArgsHash),
+    BuildStartTime(StartTime),
     NumberOfParallelCommands(NumberOfParallelCommands),
     SkipTaskExecution(SkipTaskExecution),
     EnableIncrementalBuild(EnableIncrementalBuild),
     SaveTemps(SaveTemps) {
 };
 
-using CommandSet = llvm::DenseSet<const Job *>;
+using CommandSet = llvm::SmallPtrSet<const Job *, 16>;
 
 struct Compilation::PerformJobsState {
   /// All jobs which have been scheduled for execution (whether or not
@@ -71,13 +72,14 @@ struct Compilation::PerformJobsState {
   /// A map from a Job to the commands it is known to be blocking.
   ///
   /// The blocked jobs should be scheduled as soon as possible.
-  llvm::DenseMap<const Job *, TinyPtrVector<const Job *>> BlockingCommands;
+  llvm::SmallDenseMap<const Job *, TinyPtrVector<const Job *>, 16>
+      BlockingCommands;
 
   /// A map from commands that didn't get to run to whether or not they affect
   /// downstream commands.
   ///
   /// Only intended for source files.
-  llvm::DenseMap<const Job *, bool> UnfinishedCommands;
+  llvm::SmallDenseMap<const Job *, bool, 16> UnfinishedCommands;
 };
 
 Compilation::~Compilation() = default;
@@ -106,9 +108,7 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
   DependencyGraph<const Job *> DepGraph;
   SmallPtrSet<const Job *, 16> DeferredCommands;
   SmallVector<const Job *, 16> InitialOutOfDateCommands;
-  auto MinPreviousBuildTime = llvm::sys::TimeValue::MaxTime();
   unsigned InitialBlockingCount = State.BlockingCommands.size();
-  (void)InitialBlockingCount;
 
   // Set up scheduleCommandIfNecessaryAndPossible.
   // This will only schedule the given command if it has not been scheduled
@@ -139,9 +139,6 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
       scheduleCommandIfNecessaryAndPossible(Cmd);
       continue;
     }
-
-    MinPreviousBuildTime = std::min(MinPreviousBuildTime,
-                                    Cmd->getPreviousBuildTime());
 
     // Try to load the dependencies file for this job. If there isn't one, we
     // always have to run the job, but it doesn't affect any other jobs. If
@@ -200,7 +197,7 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
     for (StringRef dependency : DepGraph.getExternalDependencies()) {
       llvm::sys::fs::file_status depStatus;
       if (!llvm::sys::fs::status(dependency, depStatus))
-        if (depStatus.getLastModificationTime() < MinPreviousBuildTime)
+        if (depStatus.getLastModificationTime() < LastBuildTime)
           continue;
 
       // If the dependency has been modified since the oldest built file,
@@ -369,6 +366,7 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
   if (Result == 0) {
     assert(State.BlockingCommands.size() == InitialBlockingCount &&
            "some blocking commands never finished properly");
+    (void)InitialBlockingCount;
   } else {
     // Make sure we record any files that still need to be rebuilt.
     for (const Job *Cmd : JL) {
@@ -432,15 +430,40 @@ int Compilation::performSingleCommand(const Job *Cmd) {
 }
 
 static void writeCompilationRecord(
-    StringRef path, StringRef argsHash,
-    const llvm::DenseMap<const Job *, bool> &unfinishedCommands,
-    const llvm::opt::ArgList &args) {
-  llvm::DenseMap<const llvm::opt::Arg *, bool> unfinishedInputs;
-  for (auto &entry : unfinishedCommands) {
+    StringRef path,
+    StringRef argsHash,
+    llvm::sys::TimeValue buildTime,
+    const Compilation::PerformJobsState &endState) {
+
+  llvm::SmallDenseMap<const llvm::opt::Arg *, CompileJobAction::InputInfo, 16>
+      inputs;
+
+  for (auto &entry : endState.UnfinishedCommands) {
     ArrayRef<Action *> actionInputs = entry.first->getSource().getInputs();
     assert(actionInputs.size() == 1);
     auto inputFile = cast<InputAction>(actionInputs.front());
-    unfinishedInputs[&inputFile->getInputArg()] = entry.second;
+
+    CompileJobAction::InputInfo info;
+    info.previousModTime = entry.first->getInputModTime();
+    info.status = entry.second ?
+        CompileJobAction::InputInfo::NeedsCascadingBuild :
+        CompileJobAction::InputInfo::NeedsNonCascadingBuild;
+    inputs[&inputFile->getInputArg()] = info;
+  }
+
+  for (const Job *entry : endState.FinishedCommands) {
+    const auto *compileAction = dyn_cast<CompileJobAction>(&entry->getSource());
+    if (!compileAction)
+      continue;
+
+    ArrayRef<Action *> actionInputs = compileAction->getInputs();
+    assert(actionInputs.size() == 1);
+    auto inputFile = cast<InputAction>(actionInputs.front());
+
+    CompileJobAction::InputInfo info;
+    info.previousModTime = entry->getInputModTime();
+    info.status = CompileJobAction::InputInfo::UpToDate;
+    inputs[&inputFile->getInputArg()] = info;
   }
 
   std::error_code error;
@@ -451,26 +474,35 @@ static void writeCompilationRecord(
     return;
   }
 
+  auto writeTimeValue = [](llvm::raw_ostream &out, llvm::sys::TimeValue time) {
+    out << "[" << time.seconds() << ", " << time.nanoseconds() << "]";
+  };
+
   out << "version: \"" << llvm::yaml::escape(version::getSwiftFullVersion())
       << "\"\n";
   out << "options: \"" << llvm::yaml::escape(argsHash) << "\"\n";
+  out << "build_time: ";
+  writeTimeValue(out, buildTime);
+  out << "\n";
   out << "inputs: \n";
 
-  for (auto &inputArg : args) {
-    if (inputArg->getOption().getKind() != llvm::opt::Option::InputClass)
-      continue;
-    out << "- ";
+  for (auto &entry : inputs) {
+    out << "\t" << llvm::yaml::escape(entry.first->getValue()) << ": ";
 
-    auto unfinishedIter = unfinishedInputs.find(inputArg);
-    if (unfinishedIter == unfinishedInputs.end()) {
-      /* do nothing */
-    } else if (unfinishedIter->second) {
+    switch (entry.second.status) {
+    case CompileJobAction::InputInfo::UpToDate:
+      break;
+    case CompileJobAction::InputInfo::NewlyAdded:
+    case CompileJobAction::InputInfo::NeedsCascadingBuild:
       out << "!dirty ";
-    } else {
+      break;
+    case CompileJobAction::InputInfo::NeedsNonCascadingBuild:
       out << "!private ";
+      break;
     }
 
-    out << "\"" << llvm::yaml::escape(inputArg->getValue()) << "\"\n";
+    writeTimeValue(out, entry.second.previousModTime);
+    out << "\n";
   }
 }
 
@@ -491,8 +523,8 @@ int Compilation::performJobs() {
   int result = performJobsInList(*Jobs, State);
 
   if (!CompilationRecordPath.empty()) {
-    writeCompilationRecord(CompilationRecordPath, ArgsHash,
-                           State.UnfinishedCommands, getArgs());
+    writeCompilationRecord(CompilationRecordPath, ArgsHash, BuildStartTime,
+                           State);
   }
 
   if (!SaveTemps) {

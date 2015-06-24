@@ -3,14 +3,19 @@
 
 // RUN: rm -rf %t && cp -r %S/Inputs/private-after/ %t
 // RUN: touch -t 201401240005 %t/*.swift
-// RUN: touch -t 201401240006 %t/*.o
+
+// Generate the build record...
+// RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path %S/Inputs/update-dependencies.py -output-file-map %t/output.json -incremental ./a.swift ./b.swift ./c.swift ./d.swift ./e.swift ./f.swift ./g.swift -module-name main -j1 -v
+
+// ...then reset the .swiftdeps files.
+// RUN: cp -r %S/Inputs/private-after/*.swiftdeps %t
 
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path %S/Inputs/update-dependencies.py -output-file-map %t/output.json -incremental ./a.swift ./b.swift ./c.swift ./d.swift ./e.swift ./f.swift ./g.swift -module-name main -j1 -v 2>&1 | FileCheck -check-prefix=CHECK-INITIAL %s
 
 // CHECK-INITIAL-NOT: warning
 // CHECK-INITIAL-NOT: Handled
 
-// RUN: rm %t/a.o
+// RUN: touch -t 201401240006 %t/a.swift
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path %S/Inputs/update-dependencies.py -output-file-map %t/output.json -incremental ./a.swift ./b.swift ./c.swift ./d.swift ./e.swift ./f.swift ./g.swift -module-name main -j1 -v > %t/a.txt 2>&1
 // RUN: FileCheck -check-prefix=CHECK-A %s < %t/a.txt
 // RUN: FileCheck -check-prefix=CHECK-A-NEG %s < %t/a.txt
@@ -26,9 +31,14 @@
 
 // RUN: rm -rf %t && cp -r %S/Inputs/private-after/ %t
 // RUN: touch -t 201401240005 %t/*.swift
-// RUN: touch -t 201401240006 %t/*.o
 
-// RUN: rm %t/f.o
+// Generate the build record...
+// RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path %S/Inputs/update-dependencies.py -output-file-map %t/output.json -incremental ./a.swift ./b.swift ./c.swift ./d.swift ./e.swift ./f.swift ./g.swift -module-name main -j1 -v
+
+// ...then reset the .swiftdeps files.
+// RUN: cp -r %S/Inputs/private-after/*.swiftdeps %t
+
+// RUN: touch -t 201401240006 %t/f.swift
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path %S/Inputs/update-dependencies.py -output-file-map %t/output.json -incremental ./a.swift ./b.swift ./c.swift ./d.swift ./e.swift ./f.swift ./g.swift -module-name main -j1 -v > %t/f.txt 2>&1
 // RUN: FileCheck -check-prefix=CHECK-F %s < %t/f.txt
 // RUN: FileCheck -check-prefix=CHECK-F-NEG %s < %t/f.txt

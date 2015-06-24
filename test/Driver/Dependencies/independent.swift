@@ -13,10 +13,10 @@
 
 // CHECK-SECOND-NOT: Handled
 
-// RUN: touch -t 201401240005 %t/*
+// RUN: touch -t 201401240006 %t/*
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path %S/Inputs/update-dependencies.py -output-file-map %t/output.json -incremental ./main.swift -j1 -v 2>&1 | FileCheck -check-prefix=CHECK-FIRST %s
 
-// RUN: rm %t/main.o
+// RUN: touch -t 201401240007 %t/main.swift
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path %S/Inputs/update-dependencies.py -output-file-map %t/output.json -incremental ./main.swift -j1 -v 2>&1 | FileCheck -check-prefix=CHECK-FIRST %s
 
 
@@ -30,10 +30,7 @@
 
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path %S/Inputs/update-dependencies.py -output-file-map %t/output.json -incremental ./main.swift ./other.swift -module-name main -j1 -v 2>&1 | FileCheck -check-prefix=CHECK-SECOND %s
 
-// RUN: touch -t 201401240005 %t/*
-// RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path %S/Inputs/update-dependencies.py -output-file-map %t/output.json -incremental ./main.swift ./other.swift -module-name main -j1 -v 2>&1 | FileCheck -check-prefix=CHECK-FIRST-MULTI %s
-
-// RUN: rm %t/*.o
+// RUN: touch -t 201401240006 %t/*
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path %S/Inputs/update-dependencies.py -output-file-map %t/output.json -incremental ./main.swift ./other.swift -module-name main -j1 -v 2>&1 | FileCheck -check-prefix=CHECK-FIRST-MULTI %s
 
 

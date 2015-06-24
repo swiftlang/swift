@@ -124,6 +124,8 @@ public:
     AutolinkExtract, // swift-autolink-extract
   };
 
+  class InputInfoMap;
+
 private:
   std::unique_ptr<llvm::opt::OptTable> Opts;
 
@@ -225,15 +227,13 @@ public:
   /// \param OI The OutputInfo for which Actions should be generated.
   /// \param OFM The OutputFileMap for the compilation; used to find any
   /// cross-build information.
-  /// \param ArgsHash A hash of the input arguments, to decide if we need a full
-  /// rebuild.
-  /// \param IsIncremental True if we're planning on the built actions being
-  /// run incrementally.
+  /// \param OutOfDateMap If present, information used to decide which files
+  /// need to be rebuilt.
   /// \param[out] Actions The list in which to store the resulting Actions.
   void buildActions(const ToolChain &TC, const llvm::opt::DerivedArgList &Args,
                     const InputList &Inputs, const OutputInfo &OI,
-                    const OutputFileMap *OFM, StringRef ArgsHash,
-                    bool IsIncremental, ActionList &Actions) const;
+                    const OutputFileMap *OFM, InputInfoMap *OutOfDateMap,
+                    ActionList &Actions) const;
 
   /// Construct the OutputFileMap for the driver from the given arguments.
   std::unique_ptr<OutputFileMap>

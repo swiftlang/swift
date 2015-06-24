@@ -14,18 +14,14 @@
 
 // CHECK-SECOND-NOT: Handled
 
-// RUN: rm %t/other.o
+// RUN: touch -t 201401240006 %t/other.swift
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path %S/Inputs/update-dependencies.py -output-file-map %t/output.json -incremental ./main.swift ./other.swift ./yet-another.swift -module-name main -j1 -v 2>&1 | FileCheck -check-prefix=CHECK-THIRD %s
 
 // CHECK-THIRD: Handled other.swift
 // CHECK-THIRD-DAG: Handled main.swift
 // CHECK-THIRD-DAG: Handled yet-another.swift
 
-// RUN: rm %t/other.o
+// RUN: touch -t 201401240007 %t/other.swift
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path %S/Inputs/update-dependencies.py -output-file-map %t/output.json -incremental ./other.swift ./main.swift ./yet-another.swift -module-name main -j1 -v 2>&1 | FileCheck -check-prefix=CHECK-THIRD %s
 
-// RUN: rm %t/other.o
-// RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path %S/Inputs/update-dependencies.py -output-file-map %t/output.json -incremental ./yet-another.swift ./other.swift ./main.swift -module-name main -j1 -v 2>&1 | FileCheck -check-prefix=CHECK-THIRD %s
-
-// RUN: rm %t/other.o
-// RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path %S/Inputs/update-dependencies.py -output-file-map %t/output.json -incremental ./other.swift ./yet-another.swift ./main.swift -module-name main -j1 -v 2>&1 | FileCheck -check-prefix=CHECK-THIRD %s
+// RUN: touch -t 201401240008 %t/other.swift
