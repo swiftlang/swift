@@ -1118,6 +1118,7 @@ private:
       NodePointer def_module = demangleModule();
       if (!def_module) return nullptr;
       NodePointer type = demangleContext();
+      if (!type) return nullptr;
       ext->addChild(def_module);
       ext->addChild(type);
       return ext;
@@ -1133,6 +1134,7 @@ private:
       NodePointer def_module = demangleModule();
       if (!def_module) return nullptr;
       NodePointer type = demangleContext();
+      if (!type) return nullptr;
       
       ext->addChild(def_module);
       ext->addChild(type);
