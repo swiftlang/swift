@@ -287,9 +287,16 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         }
       }
     } else {
+      SourceLoc typeStartLoc = Tok.getLoc();
       auto type = parseType(diag::expected_parameter_type);
       status |= type;
       param.Type = type.getPtrOrNull();
+
+      // Unnamed parameters must be written as "_: Type".
+      if (param.Type) {
+        diagnose(typeStartLoc, diag::parameter_unnamed)
+          .fixItInsert(typeStartLoc, "_: ");
+      }
     }
 
     // '...'?

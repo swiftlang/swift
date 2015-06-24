@@ -87,6 +87,7 @@ func parseError7(a: Int, goo b: unknown_type) {} // expected-error {{use of unde
 
 public func foo(a: Bool = true) -> (b: Bar, c: Bar) {} // expected-error {{use of undeclared type 'Bar'}}
 
+// expected-error@+1{{unnamed parameters must be be written}}
 func parenPatternInArg((a): Int) -> Int { // expected-error {{use of undeclared type 'a'}} expected-error 2{{expected ',' separator}} expected-error {{expected parameter type following ':'}}
   return a
 }
@@ -99,6 +100,7 @@ nullaryClosure(0)
 // rdar://16737322 - This argument is an unnamed argument that has a labeled
 // tuple type as the type.  Because the labels are in the type, they are not
 // parameter labels, and they are thus not in scope in the body of the function.
+// expected-error@+1{{unnamed parameters must be be written}}
 func destructureArgument( (result: Int, error: Bool) ) -> Int {
   return result  // expected-error {{use of unresolved identifier 'result'}}
 }
@@ -136,5 +138,6 @@ func !!!<T>(lhs: UnsafePointer<T>, rhs: UnsafePointer<T>) -> Bool { return false
 func var_inout_error(inout var x : Int) {} // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}}
 func var_inout_error(var inout x : Int) {} // expected-error {{parameter may not have multiple 'inout', 'var', or 'let' specifiers}} expected-warning {{parameter 'x' was never mutated}}
 
-
+// Unnamed parameters require the name "_":
+func unnamed(Int) { } // expected-error{{unnamed parameters must be be written with the empty name '_'}}{{14-14=_: }}
 

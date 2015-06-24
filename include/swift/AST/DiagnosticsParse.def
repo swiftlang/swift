@@ -687,6 +687,9 @@ WARNING(parameter_extraneous_empty_name,decl_parsing,none,
 ERROR(parameter_operator_keyword_argument,decl_parsing,none,
       "operator cannot have keyword arguments", ())
 
+ERROR(parameter_unnamed,decl_parsing,none,
+      "unnamed parameters must be be written with the empty name '_'", ())
+
 //------------------------------------------------------------------------------
 // Statement parsing diagnostics
 //------------------------------------------------------------------------------
