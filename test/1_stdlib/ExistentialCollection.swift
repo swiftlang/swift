@@ -14,6 +14,39 @@
 
 import StdlibUnittest
 
+// Check that the generic parameter is called 'Element'.
+protocol TestProtocol1 {}
+
+extension AnyGenerator where Element : TestProtocol1 {
+  var _elementIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+extension AnySequence where Element : TestProtocol1 {
+  var _elementIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+extension AnyForwardCollection where Element : TestProtocol1 {
+  var _elementIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+extension AnyBidirectionalCollection where Element : TestProtocol1 {
+  var _elementIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+extension AnyRandomAccessCollection where Element : TestProtocol1 {
+  var _elementIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
 var tests = TestSuite("ExistentialCollection")
 
 tests.test("AnyGenerator") {

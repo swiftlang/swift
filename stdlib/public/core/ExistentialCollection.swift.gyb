@@ -24,7 +24,7 @@ internal func _abstract(file: StaticString = __FILE__, line: UWord = __LINE__) {
 
 public class _AnyGeneratorBase {}
 
-/// An abstract `GeneratorType` base class over `T` elements.
+/// An abstract `GeneratorType` base class over `Element` elements.
 ///
 /// Use this as a `Sequence`'s associated `Generator` type when you
 /// don't want to expose details of the concrete generator, a subclass.
@@ -35,22 +35,22 @@ public class _AnyGeneratorBase {}
 /// - seealso:
 ///   - `struct AnySequence<S : SequenceType>`
 ///   - `func anyGenerator<G : GeneratorType>(base: G) -> AnyGenerator<G.Element>`
-///   - `func anyGenerator<T>(body: ()->T?) -> AnyGenerator<T>`
-public class AnyGenerator<T> : _AnyGeneratorBase, GeneratorType {
+///   - `func anyGenerator<Element>(body: ()->Element?) -> AnyGenerator<Element>`
+public class AnyGenerator<Element> : _AnyGeneratorBase, GeneratorType {
   /// Initialize the instance.  May only be called from a subclass
   /// initializer.
   override public init() {
     super.init()
     _debugPrecondition(
       _typeID(self) != unsafeBitCast(AnyGenerator.self, ObjectIdentifier.self),
-      "AnyGenerator<T> instances can not be created; create a subclass instance instead.")
+      "AnyGenerator<Element> instances can not be created; create a subclass instance instead.")
   }
 
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   ///
   /// - Note: Subclasses must override this method.
-  public func next() -> T? {_abstract()}
+  public func next() -> Element? {_abstract()}
 }
 
 /// Every `GeneratorType` can also be a `SequenceType`.  Note that
@@ -82,12 +82,12 @@ public func anyGenerator<G: GeneratorType>(base: G) -> AnyGenerator<G.Element> {
   return _GeneratorBox(base)
 }
 
-internal class _FunctionGenerator<T> : AnyGenerator<T> {
-  init(_ body: ()->T?) {
+internal class _FunctionGenerator<Element> : AnyGenerator<Element> {
+  init(_ body: ()->Element?) {
     self.body = body
   }
-  override func next() -> T? { return body() }
-  let body: ()->T?
+  override func next() -> Element? { return body() }
+  let body: ()->Element?
 }
 
 /// Return a `GeneratorType` instance whose `next` method invokes
@@ -98,7 +98,7 @@ internal class _FunctionGenerator<T> : AnyGenerator<T> {
 ///     var x = 7
 ///     let g = anyGenerator { x < 15 ? x++ : nil }
 ///     let a = Array(g) // [ 7, 8, 9, 10, 11, 12, 13, 14 ]
-public func anyGenerator<T>(body: ()->T?) -> AnyGenerator<T> {
+public func anyGenerator<Element>(body: ()->Element?) -> AnyGenerator<Element> {
   return _FunctionGenerator(body)
 }
 
@@ -119,12 +119,12 @@ internal func _typeID(instance: AnyObject) -> ObjectIdentifier {
 
 internal class _AnySequenceBox {
   // FIXME: can't make _AnySequenceBox generic and return
-  // _AnyGenerator<T> here due to <rdar://20211022>
+  // _AnyGenerator<Element> here due to <rdar://20211022>
   func generate() -> _AnyGeneratorBase {_abstract()}
 
   func _underestimateCount() -> Int  {_abstract()}
-  // FIXME: can't traffic in UnsafeMutablePointer<T> and
-  // _ContiguousArrayBuffer<T> here due to <rdar://20164041>
+  // FIXME: can't traffic in UnsafeMutablePointer<Element> and
+  // _ContiguousArrayBuffer<Element> here due to <rdar://20164041>
   func _initializeTo(ptr: UnsafeMutablePointer<Void>) {_abstract()}
   func _copyToNativeArrayBuffer() -> _ContiguousArrayStorageBase {_abstract()}
 }
@@ -207,18 +207,16 @@ internal struct _ClosureBasedSequence<Generator : GeneratorType>
 /// same `Element` type, hiding the specifics of the underlying
 /// `SequenceType`.
 ///
-/// - SeeAlso: `AnyGenerator<T>`.
-public struct AnySequence<T> : SequenceType {
-  public typealias Element = T
-
+/// - SeeAlso: `AnyGenerator<Element>`.
+public struct AnySequence<Element> : SequenceType {
   /// Wrap and forward operations to to `base`.
-  public init<S: SequenceType where S.Generator.Element == T>(_ base: S) {
+  public init<S: SequenceType where S.Generator.Element == Element>(_ base: S) {
     _box = _SequenceBox(base)
   }
 
   /// Create a sequence whose `generate()` method forwards to
   /// `makeUnderlyingGenerator`.
-  public init<G : GeneratorType where G.Element == T>(
+  public init<G : GeneratorType where G.Element == Element>(
     _ makeUnderlyingGenerator: () -> G
   ) {
     self.init(_ClosureBasedSequence(makeUnderlyingGenerator))
@@ -503,9 +501,9 @@ internal class _AnyCollectionBox<Element> : _AnyCollectionBoxBase {
   }
 }
 
-/// A protocol for `AnyForwardCollection<T>`,
-/// `AnyBidirectionalCollection<T>`, and
-/// `AnyRandomAccessCollection<T>`.
+/// A protocol for `AnyForwardCollection<Element>`,
+/// `AnyBidirectionalCollection<Element>`, and
+/// `AnyRandomAccessCollection<Element>`.
 ///
 /// This protocol can be considered an implementation detail of the
 /// `===` and `!==` implementations for these types.
