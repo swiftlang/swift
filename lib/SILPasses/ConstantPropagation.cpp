@@ -61,8 +61,8 @@ constantFoldBinaryWithOverflow(BuiltinInst *BI, llvm::Intrinsic::ID ID,
   OperandValueArrayRef Args = BI->getArguments();
   assert(Args.size() >= 2);
 
-  IntegerLiteralInst *Op1 = dyn_cast<IntegerLiteralInst>(Args[0]);
-  IntegerLiteralInst *Op2 = dyn_cast<IntegerLiteralInst>(Args[1]);
+  auto *Op1 = dyn_cast<IntegerLiteralInst>(Args[0]);
+  auto *Op2 = dyn_cast<IntegerLiteralInst>(Args[1]);
 
   // If either Op1 or Op2 is not a literal, we cannot do anything.
   if (!Op1 || !Op2)
@@ -86,7 +86,7 @@ constantFoldBinaryWithOverflow(BuiltinInst *BI, llvm::Intrinsic::ID ID,
     const ApplyExpr *CE = Loc.getAsASTNode<ApplyExpr>();
     SourceRange LHSRange, RHSRange;
     if (CE) {
-      const TupleExpr *Args = dyn_cast_or_null<TupleExpr>(CE->getArg());
+      const auto *Args = dyn_cast_or_null<TupleExpr>(CE->getArg());
       if (Args && Args->getNumElements() == 2) {
         // Look through inout types in order to handle += well.
         CanType LHSTy = Args->getElement(0)->getType()->getInOutObjectType()->
@@ -155,7 +155,7 @@ static SILInstruction *
 constantFoldBinaryWithOverflow(BuiltinInst *BI, BuiltinValueKind ID,
                                Optional<bool> &ResultsInError) {
   OperandValueArrayRef Args = BI->getArguments();
-  IntegerLiteralInst *ShouldReportFlag = dyn_cast<IntegerLiteralInst>(Args[2]);
+  auto *ShouldReportFlag = dyn_cast<IntegerLiteralInst>(Args[2]);
   return constantFoldBinaryWithOverflow(BI,
            getLLVMIntrinsicIDForBuiltinWithOverflow(ID),
            ShouldReportFlag && (ShouldReportFlag->getValue() == 1),
@@ -194,8 +194,8 @@ static SILInstruction *constantFoldCompare(BuiltinInst *BI,
   OperandValueArrayRef Args = BI->getArguments();
 
   // Fold for integer constant arguments.
-  IntegerLiteralInst *LHS = dyn_cast<IntegerLiteralInst>(Args[0]);
-  IntegerLiteralInst *RHS = dyn_cast<IntegerLiteralInst>(Args[1]);
+  auto *LHS = dyn_cast<IntegerLiteralInst>(Args[0]);
+  auto *RHS = dyn_cast<IntegerLiteralInst>(Args[1]);
   if (LHS && RHS) {
     APInt Res = constantFoldComparison(LHS->getValue(), RHS->getValue(), ID);
     SILBuilderWithScope<1> B(BI);
@@ -217,7 +217,7 @@ constantFoldAndCheckDivision(BuiltinInst *BI, BuiltinValueKind ID,
   SILModule &M = BI->getModule();
 
   // Get the denominator.
-  IntegerLiteralInst *Denom = dyn_cast<IntegerLiteralInst>(Args[1]);
+  auto *Denom = dyn_cast<IntegerLiteralInst>(Args[1]);
   if (!Denom)
     return nullptr;
   APInt DenomVal = Denom->getValue();
@@ -236,7 +236,7 @@ constantFoldAndCheckDivision(BuiltinInst *BI, BuiltinValueKind ID,
   }
 
   // Get the numerator.
-  IntegerLiteralInst *Num = dyn_cast<IntegerLiteralInst>(Args[0]);
+  auto *Num = dyn_cast<IntegerLiteralInst>(Args[0]);
   if (!Num)
     return nullptr;
   APInt NumVal = Num->getValue();
@@ -306,8 +306,8 @@ static SILInstruction *constantFoldBinary(BuiltinInst *BI,
   case BuiltinValueKind::Shl:
   case BuiltinValueKind::Xor: {
     OperandValueArrayRef Args = BI->getArguments();
-    IntegerLiteralInst *LHS = dyn_cast<IntegerLiteralInst>(Args[0]);
-    IntegerLiteralInst *RHS = dyn_cast<IntegerLiteralInst>(Args[1]);
+    auto *LHS = dyn_cast<IntegerLiteralInst>(Args[0]);
+    auto *RHS = dyn_cast<IntegerLiteralInst>(Args[1]);
     if (!RHS || !LHS)
       return nullptr;
     APInt LHSI = LHS->getValue();
@@ -337,8 +337,8 @@ static SILInstruction *constantFoldBinary(BuiltinInst *BI,
   case BuiltinValueKind::FMul:
   case BuiltinValueKind::FSub: {
     OperandValueArrayRef Args = BI->getArguments();
-    FloatLiteralInst *LHS = dyn_cast<FloatLiteralInst>(Args[0]);
-    FloatLiteralInst *RHS = dyn_cast<FloatLiteralInst>(Args[1]);
+    auto *LHS = dyn_cast<FloatLiteralInst>(Args[0]);
+    auto *RHS = dyn_cast<FloatLiteralInst>(Args[1]);
     if (!RHS || !LHS)
       return nullptr;
     APFloat LHSF = LHS->getValue();
@@ -393,7 +393,7 @@ constantFoldAndCheckIntegerConversions(BuiltinInst *BI,
 
   // Check if we are converting a constant integer.
   OperandValueArrayRef Args = BI->getArguments();
-  IntegerLiteralInst *V = dyn_cast<IntegerLiteralInst>(Args[0]);
+  auto *V = dyn_cast<IntegerLiteralInst>(Args[0]);
   if (!V)
     return nullptr;
   APInt SrcVal = V->getValue();
@@ -604,7 +604,7 @@ case BuiltinValueKind::id:
   case BuiltinValueKind::SExtOrBitCast: {
 
     // We can fold if the value being cast is a constant.
-    IntegerLiteralInst *V = dyn_cast<IntegerLiteralInst>(Args[0]);
+    auto *V = dyn_cast<IntegerLiteralInst>(Args[0]);
     if (!V)
       return nullptr;
 
@@ -630,7 +630,7 @@ case BuiltinValueKind::id:
     // Get the value. It should be a constant in most cases.
     // Note, this will not always be a constant, for example, when analyzing
     // _convertFromBuiltinIntegerLiteral function itself.
-    IntegerLiteralInst *V = dyn_cast<IntegerLiteralInst>(Args[0]);
+    auto *V = dyn_cast<IntegerLiteralInst>(Args[0]);
     if (!V)
       return nullptr;
     APInt SrcVal = V->getValue();
@@ -667,7 +667,7 @@ case BuiltinValueKind::id:
   }
       
   case BuiltinValueKind::AssumeNonNegative: {
-    IntegerLiteralInst *V = dyn_cast<IntegerLiteralInst>(Args[0]);
+    auto *V = dyn_cast<IntegerLiteralInst>(Args[0]);
     if (!V)
       return nullptr;
 
@@ -687,19 +687,19 @@ case BuiltinValueKind::id:
 static SILValue constantFoldInstruction(SILInstruction &I,
                                         Optional<bool> &ResultsInError) {
   // Constant fold function calls.
-  if (BuiltinInst *BI = dyn_cast<BuiltinInst>(&I)) {
+  if (auto *BI = dyn_cast<BuiltinInst>(&I)) {
     return constantFoldBuiltin(BI, ResultsInError);
   }
 
   // Constant fold extraction of a constant element.
-  if (TupleExtractInst *TEI = dyn_cast<TupleExtractInst>(&I)) {
-    if (TupleInst *TheTuple = dyn_cast<TupleInst>(TEI->getOperand()))
+  if (auto *TEI = dyn_cast<TupleExtractInst>(&I)) {
+    if (auto *TheTuple = dyn_cast<TupleInst>(TEI->getOperand()))
       return TheTuple->getElement(TEI->getFieldNo());
   }
 
   // Constant fold extraction of a constant struct element.
-  if (StructExtractInst *SEI = dyn_cast<StructExtractInst>(&I)) {
-    if (StructInst *Struct = dyn_cast<StructInst>(SEI->getOperand()))
+  if (auto *SEI = dyn_cast<StructExtractInst>(&I)) {
+    if (auto *Struct = dyn_cast<StructInst>(SEI->getOperand()))
       return Struct->getOperandForField(SEI->getField())->get();
   }
 
@@ -758,7 +758,7 @@ constantFoldStringConcatenation(ApplyInst *AI,
     SILValue Val = Op.get();
     Op.drop();
     if (Val.use_empty()) {
-      SILInstruction *DeadI = dyn_cast<SILInstruction>(Val);
+      auto *DeadI = dyn_cast<SILInstruction>(Val);
       recursivelyDeleteTriviallyDeadInstructions(DeadI, /*force*/ true,
                                                  RemoveCallback);
       WorkList.remove(DeadI);
