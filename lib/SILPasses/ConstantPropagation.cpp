@@ -782,19 +782,30 @@ static void initializeWorklist(SILFunction &F,
                                llvm::SetVector<SILInstruction *> &WorkList) {
   for (auto &BB : F) {
     for (auto &I : BB) {
-      if (isFoldable(&I) && !I.use_empty())
+      if (isFoldable(&I) && !I.use_empty()) {
         WorkList.insert(&I);
-      else if (InstantiateAssertConfiguration &&
-               (isApplyOfBuiltin(I, BuiltinValueKind::AssertConf) ||
-                isApplyOfBuiltin(I, BuiltinValueKind::CondUnreachable)))
+        continue;
+      }
+
+      if (InstantiateAssertConfiguration &&
+          (isApplyOfBuiltin(I, BuiltinValueKind::AssertConf) ||
+           isApplyOfBuiltin(I, BuiltinValueKind::CondUnreachable))) {
         WorkList.insert(&I);
-      else if (isApplyOfStringConcat(I))
+        continue;
+      }
+
+      if (isa<CheckedCastBranchInst>(&I) ||
+          isa<CheckedCastAddrBranchInst>(&I) ||
+          isa<UnconditionalCheckedCastInst>(&I) ||
+          isa<UnconditionalCheckedCastAddrInst>(&I)) {
         WorkList.insert(&I);
-      else if (isa<CheckedCastBranchInst>(&I) ||
-               isa<CheckedCastAddrBranchInst>(&I) ||
-               isa<UnconditionalCheckedCastInst>(&I) ||
-               isa<UnconditionalCheckedCastAddrInst>(&I))
-        WorkList.insert(&I);
+        continue;
+      }
+
+      if (!isApplyOfStringConcat(I)) {
+        continue;
+      }
+      WorkList.insert(&I);
     }
   }
 }
