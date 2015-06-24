@@ -56,7 +56,7 @@ public protocol UnicodeCodecType {
   /// can have an internal buffer that is pre-filled with data from the input
   /// generator.
   ///
-  /// Because of buffering, it is impossible to find the corresponing position
+  /// Because of buffering, it is impossible to find the corresponding position
   /// in the generator for a given returned `UnicodeScalar` or an error.
   ///
   /// - parameter next: A *generator* of code units to be decoded.
@@ -325,7 +325,7 @@ public struct UTF8 : UnicodeCodecType {
   /// can have an internal buffer that is pre-filled with data from the input
   /// generator.
   ///
-  /// Because of buffering, it is impossible to find the corresponing position
+  /// Because of buffering, it is impossible to find the corresponding position
   /// in the generator for a given returned `UnicodeScalar` or an error.
   ///
   /// - parameter next: A *generator* of code units to be decoded.
@@ -509,7 +509,7 @@ public struct UTF16 : UnicodeCodecType {
   /// can have an internal buffer that is pre-filled with data from the input
   /// generator.
   ///
-  /// Because of buffering, it is impossible to find the corresponing position
+  /// Because of buffering, it is impossible to find the corresponding position
   /// in the generator for a given returned `UnicodeScalar` or an error.
   ///
   /// - parameter next: A *generator* of code units to be decoded.
@@ -643,7 +643,7 @@ public struct UTF32 : UnicodeCodecType {
   /// can have an internal buffer that is pre-filled with data from the input
   /// generator.
   ///
-  /// Because of buffering, it is impossible to find the corresponing position
+  /// Because of buffering, it is impossible to find the corresponding position
   /// in the generator for a given returned `UnicodeScalar` or an error.
   ///
   /// - parameter next: A *generator* of code units to be decoded.
