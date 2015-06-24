@@ -10,10 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// The `GeneratorType` used by `FilterSequenceView` and
-/// `FilterCollectionView`.
+/// The `GeneratorType` used by `FilterSequence` and `FilterCollection`.
 public struct FilterGenerator<
-  Base: GeneratorType
+  Base : GeneratorType
 > : GeneratorType, SequenceType {
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
@@ -43,7 +42,7 @@ public struct FilterGenerator<
 
 /// The lazy `SequenceType` returned by `filter(c)` where `c` is a
 /// `SequenceType`.
-public struct FilterSequenceView<Base : SequenceType> : SequenceType {
+public struct FilterSequence<Base : SequenceType> : SequenceType {
   /// Return a *generator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
@@ -55,22 +54,22 @@ public struct FilterSequenceView<Base : SequenceType> : SequenceType {
   var _include: (Base.Generator.Element)->Bool
 }
 
-/// The `Index` used for subscripting a `FilterCollectionView`.
-public struct FilterCollectionViewIndex<
-  Base: CollectionType
+/// The `Index` used for subscripting a `FilterCollection`.
+public struct FilterCollectionIndex<
+  Base : CollectionType
 > : ForwardIndexType {
   /// Returns the next consecutive value after `self`.
   ///
   /// - Requires: The next value is representable.
-  public func successor() -> FilterCollectionViewIndex {
+  public func successor() -> FilterCollectionIndex {
     for nextPos in _pos.successor()..<_end {
       if _include(_base[nextPos]) {
-        return FilterCollectionViewIndex(
+        return FilterCollectionIndex(
           _pos: nextPos, _end: _end,
           _base: _base, _include: _include)
       }
     }
-    return FilterCollectionViewIndex(
+    return FilterCollectionIndex(
       _pos: _end, _end: _end, _base: _base, _include: _include)
   }
   var _pos: Base.Index
@@ -79,9 +78,9 @@ public struct FilterCollectionViewIndex<
   var _include: (Base.Generator.Element)->Bool
 }
 
-public func == <Base: CollectionType>(
-  lhs: FilterCollectionViewIndex<Base>,
-  rhs: FilterCollectionViewIndex<Base>
+public func == <Base : CollectionType>(
+  lhs: FilterCollectionIndex<Base>,
+  rhs: FilterCollectionIndex<Base>
 ) -> Bool {
   return lhs._pos == rhs._pos
 }
@@ -92,20 +91,20 @@ public func == <Base: CollectionType>(
 ///
 /// * The O(1) guarantee of our `Index` would be iffy at best, since
 ///   it advances an underlying `Index` until the predicate is
-///   satisfied.  Be aware that a `FilterCollectionView` may not offer
+///   satisfied.  Be aware that a `FilterCollection` may not offer
 ///   the expected efficiency for this reason.
 ///
 /// * Constructing an `Array` from a `CollectionType` measures the length
 ///   of the collection before traversing it to read the elements.
 ///   This causes the filter predicate to be called twice for each
 ///   element of the underlying collection, which is surprising.
-public struct FilterCollectionView<Base : CollectionType> : CollectionType {
+public struct FilterCollection<Base : CollectionType> : CollectionType {
 
   /// A type that represents a valid position in the collection.
   ///
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
-  public typealias Index = FilterCollectionViewIndex<Base>
+  public typealias Index = FilterCollectionIndex<Base>
 
   /// Construct an instance containing the elements of `base` that
   /// satisfy `predicate`.
@@ -131,7 +130,7 @@ public struct FilterCollectionView<Base : CollectionType> : CollectionType {
       }
       ++first
     }
-    return FilterCollectionViewIndex(
+    return FilterCollectionIndex(
       _pos: first, _end: _base.endIndex, _base: _base, _include: _include)
   }
 
@@ -143,7 +142,7 @@ public struct FilterCollectionView<Base : CollectionType> : CollectionType {
   ///
   /// - Complexity: O(1).
   public var endIndex: Index {
-    return FilterCollectionViewIndex(
+    return FilterCollectionIndex(
       _pos: _base.endIndex, _end: _base.endIndex,
       _base: _base, _include: _include)
   }
@@ -184,13 +183,22 @@ extension ${Self} {
   public
   func filter(
     includeElement: (S.Generator.Element)->Bool
-  ) -> LazySequence<FilterSequenceView<S>> {
-    return LazySequence<FilterSequenceView<S>>(
-      FilterSequenceView(_base: self._base, _include: includeElement))
+  ) -> LazySequence<FilterSequence<S>> {
+    return LazySequence<FilterSequence<S>>(
+      FilterSequence(_base: self._base, _include: includeElement))
   }
 }
 
 % end
+
+@available(*, unavailable, renamed="FilterSequence")
+public struct FilterSequenceView<Base : SequenceType> {}
+
+@available(*, unavailable, renamed="FilterCollectionIndex")
+public struct FilterCollectionViewIndex<Base: CollectionType> {}
+
+@available(*, unavailable, renamed="FilterCollection")
+public struct FilterCollectionView<Base : CollectionType> {}
 
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)
