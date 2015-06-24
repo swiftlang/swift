@@ -16,6 +16,33 @@
 
 import StdlibUnittest
 
+// Check that the generic parameter is called 'Element'.
+protocol TestProtocol1 {}
+
+extension StrideToGenerator where Element : TestProtocol1 {
+  var _elementIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+extension StrideTo where Element : TestProtocol1 {
+  var _elementIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+extension StrideThroughGenerator where Element : TestProtocol1 {
+  var _elementIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+extension StrideThrough where Element : TestProtocol1 {
+  var _elementIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
 var StrideTestSuite = TestSuite("Strideable")
 
 struct R : RandomAccessIndexType {

@@ -142,15 +142,15 @@ public func -= <T : UnsignedIntegerType> (
 
 //===----------------------------------------------------------------------===//
 
-/// A GeneratorType for `StrideTo<T>`.
-public struct StrideToGenerator<T : Strideable> : GeneratorType {
-  var current: T
-  let end: T
-  let stride: T.Stride
+/// A GeneratorType for `StrideTo<Element>`.
+public struct StrideToGenerator<Element : Strideable> : GeneratorType {
+  var current: Element
+  let end: Element
+  let stride: Element.Stride
 
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
-  public mutating func next() -> T? {
+  public mutating func next() -> Element? {
     if stride > 0 ? current >= end : current <= end {
       return nil
     }
@@ -161,17 +161,17 @@ public struct StrideToGenerator<T : Strideable> : GeneratorType {
 }
 
 /// A `SequenceType` of values formed by striding over a half-open interval.
-public struct StrideTo<T : Strideable> : SequenceType {
+public struct StrideTo<Element : Strideable> : SequenceType {
   // FIXME: should really be a CollectionType, as it is multipass
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> StrideToGenerator<T> {
+  public func generate() -> StrideToGenerator<Element> {
     return StrideToGenerator(current: start, end: end, stride: stride)
   }
 
-  init(start: T, end: T, stride: T.Stride) {
+  init(start: Element, end: Element, stride: Element.Stride) {
     _precondition(stride != 0, "stride size must not be zero")
     // Unreachable endpoints are allowed; they just make for an
     // already-empty SequenceType.
@@ -180,9 +180,9 @@ public struct StrideTo<T : Strideable> : SequenceType {
     self.stride = stride
   }
 
-  let start: T
-  let end: T
-  let stride: T.Stride
+  let start: Element
+  let end: Element
+  let stride: Element.Stride
 }
 
 /// Return the sequence of values (`start`, `start + stride`, `start +
@@ -194,16 +194,16 @@ public func stride<
   return StrideTo(start: start, end: end, stride: stride)
 }
 
-/// A GeneratorType for `StrideThrough<T>`.
-public struct StrideThroughGenerator<T : Strideable> : GeneratorType {
-  var current: T
-  let end: T
-  let stride: T.Stride
+/// A GeneratorType for `StrideThrough<Element>`.
+public struct StrideThroughGenerator<Element : Strideable> : GeneratorType {
+  var current: Element
+  let end: Element
+  let stride: Element.Stride
   var done: Bool = false
 
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
-  public mutating func next() -> T? {
+  public mutating func next() -> Element? {
     if done {
       return nil
     }
@@ -221,27 +221,27 @@ public struct StrideThroughGenerator<T : Strideable> : GeneratorType {
 }
 
 /// A `SequenceType` of values formed by striding over a closed interval.
-public struct StrideThrough<T : Strideable> : SequenceType {
+public struct StrideThrough<Element : Strideable> : SequenceType {
   // FIXME: should really be a CollectionType, as it is multipass
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> StrideThroughGenerator<T> {
+  public func generate() -> StrideThroughGenerator<Element> {
     return StrideThroughGenerator(
       current: start, end: end, stride: stride, done: false)
   }
 
-  init(start: T, end: T, stride: T.Stride) {
+  init(start: Element, end: Element, stride: Element.Stride) {
     _precondition(stride != 0, "stride size must not be zero")
     self.start = start
     self.end = end
     self.stride = stride
   }
 
-  let start: T
-  let end: T
-  let stride: T.Stride
+  let start: Element
+  let end: Element
+  let stride: Element.Stride
 }
 
 /// Return the sequence of values (`start`, `start + stride`, `start +
