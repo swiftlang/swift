@@ -1,8 +1,8 @@
 // RUN: %target-parse-verify-swift
 
 func f1() -> Int { }
-func f2(Int = 5) -> Int { }
-func f3(Int...) -> Int { }
+func f2(_: Int = 5) -> Int { }
+func f3(_: Int...) -> Int { }
 
 class A { }
 class B : A { 
@@ -12,13 +12,13 @@ class B : A {
 
 func f4() -> B { }
 func f5(a: A) { }
-func f6(a: A, Int) { }
+func f6(a: A, _: Int) { }
 
 func createB() -> B { }
 func createB(i: Int) -> B { }
 
-func f7(a: A, () -> Int) -> B { }
-func f7(a: A, Int) -> Int { }
+func f7(a: A, _: () -> Int) -> B { }
+func f7(a: A, _: Int) -> Int { }
 
 // Forgot the '()' to call a function.
 func forgotCall() {

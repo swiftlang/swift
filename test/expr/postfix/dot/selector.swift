@@ -1,18 +1,18 @@
 // RUN: %target-parse-verify-swift
 
 class C {
-  class func classMethod(Int) {}
-  class func classMethod(Int, withArgument: Int) {}
-  class func classMethod(Int, withArgument: Int, argument: Int) {}
-  class func classMethod(Int, withArgument: Int, argument: Int, argument _:Int) {}
+  class func classMethod(_: Int) {}
+  class func classMethod(_: Int, withArgument: Int) {}
+  class func classMethod(_: Int, withArgument: Int, argument: Int) {}
+  class func classMethod(_: Int, withArgument: Int, argument: Int, argument _:Int) {}
 
-  func instMethod(Int) {}
-  func instMethod(Int, withArgument: Int) {}
-  func instMethod(Int, withArgument: Int, argument: Int) {}
-  func instMethod(Int, withArgument: Int, argument: Int, argument _:Int) {}
+  func instMethod(_: Int) {}
+  func instMethod(_: Int, withArgument: Int) {}
+  func instMethod(_: Int, withArgument: Int, argument: Int) {}
+  func instMethod(_: Int, withArgument: Int, argument: Int, argument _:Int) {}
 
-  func instMethod(Int, overloaded: String) {}
-  func instMethod(Int, overloaded: Int) {}
+  func instMethod(_: Int, overloaded: String) {}
+  func instMethod(_: Int, overloaded: Int) {}
 }
 
 let x = C()

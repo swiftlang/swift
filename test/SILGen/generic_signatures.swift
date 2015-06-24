@@ -56,7 +56,7 @@ protocol Fooable {
 protocol Barrable {
   typealias Bar: Fooable
 
-  func bar(Bar) -> Bar.Foo
+  func bar(_: Bar) -> Bar.Foo
 }
 
 struct FooBar<T: Fooable>: Barrable {

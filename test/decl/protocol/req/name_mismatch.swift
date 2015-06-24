@@ -17,7 +17,7 @@ struct S3 : P {
 }
 
 struct S4 : P {
-  func foo(i: Int, Float) { } // expected-error{{method 'foo' has different argument names from those required by protocol 'P' ('foo(_:x:)')}}{{20-20=x: }}
+  func foo(i: Int, _: Float) { } // expected-error{{method 'foo' has different argument names from those required by protocol 'P' ('foo(_:x:)')}}{{20-20=x }}
 }
 
 struct S5 : P {

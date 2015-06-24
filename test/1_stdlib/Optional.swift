@@ -110,7 +110,7 @@ struct X {}
 class C {}
 
 class E : Equatable {}
-func == (E, E) -> Bool { return true }
+func == (_: E, _: E) -> Bool { return true }
 
 func nilComparison() {
   let x0: X? = nil

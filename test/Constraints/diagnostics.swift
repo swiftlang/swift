@@ -106,7 +106,7 @@ infix operator ***~ {
   precedence 200
 }
 
-func ***~(Int, String) { }
+func ***~(_: Int, _: String) { }
 i ***~ i // expected-error{{binary operator '***~' cannot be applied to two Int operands}}
 
 // <rdar://problem/20142523>

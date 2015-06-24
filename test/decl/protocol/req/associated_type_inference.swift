@@ -5,8 +5,8 @@ protocol P0 {
   // expected-note@-1{{ambiguous inference of associated type 'Assoc1': 'Double' vs. 'Int'}}
   // expected-note@-2{{unable to infer associated type 'Assoc1' for protocol 'P0'}}
   // expected-note@-3{{unable to infer associated type 'Assoc1' for protocol 'P0'}}
-  func f0(Assoc1)
-  func g0(Assoc1)
+  func f0(_: Assoc1)
+  func g0(_: Assoc1)
 }
 
 protocol PSimple { }
@@ -14,65 +14,65 @@ extension Int : PSimple { }
 extension Double : PSimple { }
 
 struct X0a : P0 { // okay: Assoc1 == Int
-  func f0(Int) { }
-  func g0(Int) { }
+  func f0(_: Int) { }
+  func g0(_: Int) { }
 }
 
 struct X0b : P0 { // expected-error{{type 'X0b' does not conform to protocol 'P0'}}
-  func f0(Int) { } // expected-note{{matching requirement 'f0' to this declaration inferred associated type to 'Int'}}
-  func g0(Double) { } // expected-note{{matching requirement 'g0' to this declaration inferred associated type to 'Double'}}
+  func f0(_: Int) { } // expected-note{{matching requirement 'f0' to this declaration inferred associated type to 'Int'}}
+  func g0(_: Double) { } // expected-note{{matching requirement 'g0' to this declaration inferred associated type to 'Double'}}
 }
 
 struct X0c : P0 { // okay: Assoc1 == Int
-  func f0(Int) { }
-  func g0(Float) { }
-  func g0(Int) { }
+  func f0(_: Int) { }
+  func g0(_: Float) { }
+  func g0(_: Int) { }
 }
 
 struct X0d : P0 { // okay: Assoc1 == Int
-  func f0(Int) { }
-  func g0(Double) { } // viable, but no correspinding f0
-  func g0(Int) { }
+  func f0(_: Int) { }
+  func g0(_: Double) { } // viable, but no correspinding f0
+  func g0(_: Int) { }
 }
 
 struct X0e : P0 { // expected-error{{type 'X0e' does not conform to protocol 'P0'}}
-  func f0(Double) { } // expected-note{{matching requirement 'f0' to this declaration inferred associated type to 'Double}}
-  func f0(Int) { } // expected-note{{matching requirement 'f0' to this declaration inferred associated type to 'Int'}}
-  func g0(Double) { }
-  func g0(Int) { } 
+  func f0(_: Double) { } // expected-note{{matching requirement 'f0' to this declaration inferred associated type to 'Double}}
+  func f0(_: Int) { } // expected-note{{matching requirement 'f0' to this declaration inferred associated type to 'Int'}}
+  func g0(_: Double) { }
+  func g0(_: Int) { } 
 }
 
 struct X0f : P0 { // okay: Assoc1 = Int because Float doesn't conform to PSimple
-  func f0(Float) { }
-  func f0(Int) { }
-  func g0(Float) { }
-  func g0(Int) { }
+  func f0(_: Float) { }
+  func f0(_: Int) { }
+  func g0(_: Float) { }
+  func g0(_: Int) { }
 }
 
 struct X0g : P0 { // expected-error{{type 'X0g' does not conform to protocol 'P0'}}
-  func f0(Float) { } // expected-note{{inferred type 'Float' (by matching requirement 'f0') is invalid: does not conform to 'PSimple'}}
-  func g0(Float) { } // expected-note{{inferred type 'Float' (by matching requirement 'g0') is invalid: does not conform to 'PSimple'}}
+  func f0(_: Float) { } // expected-note{{inferred type 'Float' (by matching requirement 'f0') is invalid: does not conform to 'PSimple'}}
+  func g0(_: Float) { } // expected-note{{inferred type 'Float' (by matching requirement 'g0') is invalid: does not conform to 'PSimple'}}
 }
 
 struct X0h<T : PSimple> : P0 {
-  func f0(T) { }
+  func f0(_: T) { }
 }
 
 extension X0h {
-  func g0(T) { }
+  func g0(_: T) { }
 }
 
 struct X0i<T : PSimple> {
 }
 
 extension X0i {
-  func g0(T) { }
+  func g0(_: T) { }
 }
 
 extension X0i : P0 { }
 
 extension X0i {
-  func f0(T) { }
+  func f0(_: T) { }
 }
 
 // Protocol extension used to infer requirements

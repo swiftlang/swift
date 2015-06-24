@@ -237,7 +237,7 @@ protocol subject_containerObjCProtocol1 {
   // expected-note@-2 {{Swift structs cannot be represented in Objective-C}}
   // expected-note@-3 {{inferring '@objc' because the declaration is a member of an '@objc' protocol}}
 
-  func func_Variadic(AnyObject...)
+  func func_Variadic(_: AnyObject...)
   // expected-error @-1{{method cannot be a member of an @objc protocol because it has a variadic parameter}}
   // expected-note @-2{{inferring '@objc' because the declaration is a member of an '@objc' protocol}}
 
@@ -1604,17 +1604,17 @@ extension PlainClass {
 
   // CHECK-LABEL: @objc(setWithRed:green:blue:alpha:) dynamic func set
   @objc(setWithRed:green:blue:alpha:)
-  func set(Float, green: Float, blue: Float, alpha: Float)  { }
+  func set(_: Float, green: Float, blue: Float, alpha: Float)  { }
 
   // CHECK-LABEL: @objc(createWithRed:green:blue:alpha:) dynamic class func createWith
   @objc(createWithRed:green blue:alpha)
-  class func createWithRed(Float, green: Float, blue: Float, alpha: Float) { }
+  class func createWithRed(_: Float, green: Float, blue: Float, alpha: Float) { }
   // expected-error@-2{{missing ':' after selector piece in @objc attribute}}{{28-28=:}}
   // expected-error@-3{{missing ':' after selector piece in @objc attribute}}{{39-39=:}}
 
   // CHECK-LABEL: @objc(::) dynamic func badlyNamed
   @objc(::)
-  func badlyNamed(Int, y: Int) {}
+  func badlyNamed(_: Int, y: Int) {}
 }
 
 @objc(Class:) // expected-error{{'@objc' class must have a simple name}}{{12-13=}}
@@ -1638,13 +1638,13 @@ class BadClass2 {
   func noArgNamesOneParam(x: Int) { }
   
   @objc(foo) // expected-error{{'@objc' method name provides names for 0 arguments, but method has one parameter}}
-  func noArgNamesOneParam2(Int) { }
+  func noArgNamesOneParam2(_: Int) { }
 
   @objc(foo) // expected-error{{'@objc' method name provides names for 0 arguments, but method has 2 parameters}}
-  func noArgNamesTwoParams(Int, y: Int) { }
+  func noArgNamesTwoParams(_: Int, y: Int) { }
 
   @objc(foo:) // expected-error{{'@objc' method name provides one argument name, but method has 2 parameters}}
-  func oneArgNameTwoParams(Int, y: Int) { }
+  func oneArgNameTwoParams(_: Int, y: Int) { }
 
   @objc(foo:) // expected-error{{'@objc' method name provides one argument name, but method has 0 parameters}}
   func oneArgNameNoParams() { }

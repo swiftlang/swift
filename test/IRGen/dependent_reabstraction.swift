@@ -4,7 +4,7 @@ func markUsed<T>(t: T) {}
 
 protocol A {
   typealias B
-  func b(B)
+  func b(_: B)
 }
 
 struct X<Y> : A {

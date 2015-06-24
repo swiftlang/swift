@@ -443,11 +443,11 @@ public protocol SequenceDefaultsType {
 }
 
 extension SequenceDefaultsType {
-  public final func _constrainElement(FakeGenerator.Element) {}
+  public final func _constrainElement(_: FakeGenerator.Element) {}
 }
 
 public protocol SequenceType : SequenceDefaultsType {
-  func _constrainElement(Element)
+  func _constrainElement(_: Element)
 }
 
 
@@ -455,7 +455,7 @@ extension FakeArray : SequenceType {
   typealias Element = FakeElement
   typealias Generator = FakeGenerator
 
-  func _containsElement(Element) {}
+  func _containsElement(_: Element) {}
 }
 
 // -----------------------------------------------------------------------------

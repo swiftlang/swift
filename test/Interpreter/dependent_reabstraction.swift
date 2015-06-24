@@ -3,7 +3,7 @@
 
 protocol A {
   typealias B
-  func b(B)
+  func b(_: B)
 }
 
 struct X<Y> : A {

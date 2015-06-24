@@ -114,29 +114,29 @@ class F : E {
 
 
 class G {
-  func f1(Int, int: Int) { }
-  func f2(Int, int: Int) { }
-  func f3(Int, int: Int) { }
-  func f4(Int, int: Int) { }
-  func f5(Int, int: Int) { }
-  func f6(Int, int: Int) { }
-  func f7(Int, int: Int) { }
+  func f1(_: Int, int: Int) { }
+  func f2(_: Int, int: Int) { }
+  func f3(_: Int, int: Int) { }
+  func f4(_: Int, int: Int) { }
+  func f5(_: Int, int: Int) { }
+  func f6(_: Int, int: Int) { }
+  func f7(_: Int, int: Int) { }
 
-  func g1(Int, string: String) { } // expected-note{{potential overridden method 'g1(_:string:)' here}}
-  func g1(Int, path: String) { } // expected-note{{potential overridden method 'g1(_:path:)' here}}
+  func g1(_: Int, string: String) { } // expected-note{{potential overridden method 'g1(_:string:)' here}}
+  func g1(_: Int, path: String) { } // expected-note{{potential overridden method 'g1(_:path:)' here}}
 }
 
 class H : G {
-  override func f1(Int, Int) { } // expected-error{{argument names for method 'f1' do not match those of overridden method 'f1(_:int:)'}}{{25-25=int: }}
-  override func f2(Int, value: Int) { } // expected-error{{argument names for method 'f2(_:value:)' do not match those of overridden method 'f2(_:int:)'}}{{25-25=int }}
-  override func f3(Int, value int: Int) { } // expected-error{{argument names for method 'f3(_:value:)' do not match those of overridden method 'f3(_:int:)'}}{{25-31=}}
-  override func f4(Int, _ int: Int) { } // expected-error{{argument names for method 'f4' do not match those of overridden method 'f4(_:int:)'}}{{25-27=}}
-  override func f5(Int, value inValue: Int) { } // expected-error{{argument names for method 'f5(_:value:)' do not match those of overridden method 'f5(_:int:)'}}{{25-30=int}}
-  override func f6(Int, _ inValue: Int) { } // expected-error{{argument names for method 'f6' do not match those of overridden method 'f6(_:int:)'}}{{25-26=int}}
+  override func f1(_: Int, _: Int) { } // expected-error{{argument names for method 'f1' do not match those of overridden method 'f1(_:int:)'}}{{28-28=int }}
+  override func f2(_: Int, value: Int) { } // expected-error{{argument names for method 'f2(_:value:)' do not match those of overridden method 'f2(_:int:)'}}{{28-28=int }}
+  override func f3(_: Int, value int: Int) { } // expected-error{{argument names for method 'f3(_:value:)' do not match those of overridden method 'f3(_:int:)'}}{{28-34=}}
+  override func f4(_: Int, _ int: Int) { } // expected-error{{argument names for method 'f4' do not match those of overridden method 'f4(_:int:)'}}{{28-30=}}
+  override func f5(_: Int, value inValue: Int) { } // expected-error{{argument names for method 'f5(_:value:)' do not match those of overridden method 'f5(_:int:)'}}{{28-33=int}}
+  override func f6(_: Int, _ inValue: Int) { } // expected-error{{argument names for method 'f6' do not match those of overridden method 'f6(_:int:)'}}{{28-29=int}}
 
-  override func f7(Int, int value: Int) { } // okay
+  override func f7(_: Int, int value: Int) { } // okay
 
-  override func g1(Int, s: String) { } // expected-error{{declaration 'g1(_:s:)' has different argument names from any potential overrides}}
+  override func g1(_: Int, s: String) { } // expected-error{{declaration 'g1(_:s:)' has different argument names from any potential overrides}}
 }
 
 @objc class IUOTestBaseClass {

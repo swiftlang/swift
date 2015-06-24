@@ -61,7 +61,7 @@ struct Z {
   var settable_x : X
 
   subscript(i: Int) -> Double { get {} }
-  subscript((i: Int, j: Int)) -> X { get {} }
+  subscript(_: (i: Int, j: Int)) -> X { get {} }
 }
 
 var z : Z

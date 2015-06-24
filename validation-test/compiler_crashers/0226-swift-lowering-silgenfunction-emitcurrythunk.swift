@@ -9,5 +9,5 @@ enum S<T> : P {
     }
 }
 protocol P {
-    func f<T>()(T) -> T
+    func f<T>()(_: T) -> T
 }

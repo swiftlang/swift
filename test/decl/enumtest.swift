@@ -147,7 +147,7 @@ func area(r: CGRect) -> Int {
 
 extension CGRect {
   func search(x: Int) -> CGSize {}
-  func bad_search(Int) -> CGSize {}
+  func bad_search(_: Int) -> CGSize {}
 }
 
 func test5(myorigin: CGPoint) {

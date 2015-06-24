@@ -6,11 +6,11 @@ public func getInput(x x: Int) -> Int {
   return x
 }
 
-public func getSecond(Int, y: Int) -> Int {
+public func getSecond(_: Int, y: Int) -> Int {
   return y
 }
 
-public func useNested((x: Int, y: Int), n: Int) {}
+public func useNested(_: (x: Int, y: Int), n: Int) {}
 
 public func variadic(x x: Double, _ y: Int...) {}
 

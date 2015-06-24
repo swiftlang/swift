@@ -88,7 +88,7 @@ var fd = posixCantFail(open)(args: ("foo", 0))
 // Tuples and lvalues
 class C {
   init() {}
-  func f(C) {}
+  func f(_: C) {}
 }
 
 func testLValue(var c: C) {

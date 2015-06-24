@@ -13,10 +13,10 @@ func func2(@autoclosure fp : () -> Int) { func2(4)}
 func func3(@autoclosure fp fpx : () -> Int) {func3(fp: 0)}
 func func4(@autoclosure fp fp : () -> Int) {func4(fp: 0)}
 func func5(@autoclosure var fp fp : () -> Int) {func5(fp: 0)} // expected-warning {{parameter 'fp' was never mutated}}
-func func6(@autoclosure () -> Int) {func6(0)}
+func func6(@autoclosure _: () -> Int) {func6(0)}
 
 // declattr and typeattr on the argument.
-func func7(@autoclosure @noreturn () -> Int) {func7(0)}
+func func7(@autoclosure _: @noreturn () -> Int) {func7(0)}
 
 // autoclosure + inout don't make sense.
 func func8(@autoclosure inout x: () -> Bool) -> Bool {  // expected-error {{@autoclosure may only be applied to values of function type}}
@@ -82,10 +82,10 @@ struct AutoclosureEscapeTest {
 }
 
 // @autoclosure(escaping)
-func func10(@autoclosure(escaping () -> ()) { } // expected-error{{expected ')' in @autoclosure}}
+func func10(@autoclosure(escaping _: () -> ()) { } // expected-error{{expected ')' in @autoclosure}}
 // expected-note@-1{{to match this opening '('}}
 
-func func11(@autoclosure(escaping) @noescape () -> ()) { } // expected-error{{@noescape conflicts with @autoclosure(escaping)}}
+func func11(@autoclosure(escaping) @noescape _: () -> ()) { } // expected-error{{@noescape conflicts with @autoclosure(escaping)}}
 
 
 class Super {

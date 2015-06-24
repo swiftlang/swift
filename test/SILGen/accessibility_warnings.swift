@@ -73,12 +73,12 @@ private extension PrivateStruct {
 
 public protocol PublicReadOnlyOperations {
   var size: Int { get }
-  subscript (Int) -> Int { get }
+  subscript (_: Int) -> Int { get }
 }
 
 internal struct PrivateSettersForReadOnlyInternal : PublicReadOnlyOperations {
   public private(set) var size = 0 // expected-warning {{declaring a public var for an internal struct}}
-  internal private(set) subscript (Int) -> Int { // no-warning
+  internal private(set) subscript (_: Int) -> Int { // no-warning
     get { return 42 }
     set {}
   }

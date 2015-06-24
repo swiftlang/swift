@@ -92,7 +92,7 @@ var e : E
 // Argument/parameter name separation
 //----------------------------------------------------------------------------
 class ArgParamSep {
-  init(_ b: Int, Int, forInt int: Int, c _: Int, d: Int) { }
+  init(_ b: Int, _: Int, forInt int: Int, c _: Int, d: Int) { }
 }
 
 //===---
@@ -102,7 +102,7 @@ class ArgParamSep {
 //===--- rdar://14082378
 
 struct NoCrash1a {
-  init(NoCrash1b) {} // expected-error {{use of undeclared type 'NoCrash1b'}}
+  init(_: NoCrash1b) {} // expected-error {{use of undeclared type 'NoCrash1b'}}
 }
 var noCrash1c : NoCrash1a
 

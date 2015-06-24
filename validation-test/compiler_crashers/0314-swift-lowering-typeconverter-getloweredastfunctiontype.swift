@@ -9,5 +9,5 @@ enum e<b> : d {
      }
 }
 protocol d {
-    func c<b>()(b) -> b
+    func c<b>()(_: b) -> b
 }

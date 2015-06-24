@@ -1,16 +1,15 @@
-// RUN: %target-swift-frontend %s -parse -verify
+// RUN: not %target-swift-frontend %s -parse
 
 // Distributed under the terms of the MIT license
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-func f<c>(f.c { // expected-error{{}} expected-error{{}} expected-error{{}} expected-error{{}}
-typealias f == h>(T][], e: C(f("a: AnyObject, g : B // expected-error{{}}
-print(c) -> : c: c) { // expected-note{{}}
-func ^(A> Any, end: a { // expected-error{{}}
+func f<c>(f.c {
+typealias f == h>(T][], e: C(f("a: AnyObject, g : B
+print(c) -> : c: c) {
+func ^(A> Any, end: a {
 }
-b) { // expected-error{{}} expected-error{{}}
+b) {
 }
-let c: c = c(): // expected-error{{}} expected-error{{}} expected-error{{}}
+let c: c = c():
 t
-// expected-error{{}}
