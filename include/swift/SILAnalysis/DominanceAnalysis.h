@@ -24,13 +24,6 @@ class SILValue;
 class SILInstruction;
 
 class DominanceAnalysis : public FunctionAnalysisBase<DominanceInfo> {
-protected:
-  virtual void verify(DominanceInfo *DI) const override {
-    if (DI->getRoots().empty())
-      return;
-    DI->verify();
-  }
-
 public:
   DominanceAnalysis()
   : FunctionAnalysisBase<DominanceInfo>(AnalysisKind::Dominance) {}
@@ -42,24 +35,17 @@ public:
     return S->getKind() == AnalysisKind::Dominance;
   }
 
-  DominanceInfo *newFunctionAnalysis(SILFunction *F) override {
+  DominanceInfo *newFunctionAnalysis(SILFunction *F) {
     return new DominanceInfo(F);
   }
 
-  virtual bool shouldInvalidate(SILAnalysis::PreserveKind K) override {
+  virtual bool shouldInvalidate(SILAnalysis::PreserveKind K) {
     bool branchesPreserved = K & PreserveKind::Branches;
     return !branchesPreserved;
   }
 };
 
 class PostDominanceAnalysis : public FunctionAnalysisBase<PostDominanceInfo> {
-protected:
-  virtual void verify(PostDominanceInfo *PDI) const override {
-    if (PDI->getRoots().empty())
-      return;
-    PDI->verify();
-  }
-
 public:
   PostDominanceAnalysis()
   : FunctionAnalysisBase<PostDominanceInfo>(AnalysisKind::PostDominance) {}
@@ -71,11 +57,11 @@ public:
     return S->getKind() == AnalysisKind::PostDominance;
   }
 
-  PostDominanceInfo *newFunctionAnalysis(SILFunction *F) override {
+  PostDominanceInfo *newFunctionAnalysis(SILFunction *F) {
     return new PostDominanceInfo(F);
   }
 
-  virtual bool shouldInvalidate(SILAnalysis::PreserveKind K) override {
+  virtual bool shouldInvalidate(SILAnalysis::PreserveKind K) {
     bool branchesPreserved = K & PreserveKind::Branches;
     return !branchesPreserved;
   }
