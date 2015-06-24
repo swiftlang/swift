@@ -28,6 +28,8 @@ using namespace swift;
 STATISTIC(NumDeadFunc, "Number of dead functions eliminated");
 STATISTIC(NumEliminatedExternalDefs, "Number of external function definitions eliminated");
 
+namespace {
+
 /// This is a base class for passes that are based on function liveness
 /// computations like e.g. dead function elimination.
 /// It provides a common logic for computing live (i.e. reachable) functions.
@@ -216,9 +218,13 @@ public:
   virtual ~FunctionLivenessComputation() {}
 };
 
+} // end anonymous namespace
+
 //===----------------------------------------------------------------------===//
 //                             DeadFunctionElimination
 //===----------------------------------------------------------------------===//
+
+namespace {
 
 class DeadFunctionElimination : FunctionLivenessComputation {
 
@@ -335,9 +341,13 @@ public:
   }
 };
 
+} // end anonymous namespace
+
 //===----------------------------------------------------------------------===//
 //                        ExternalFunctionDefinitionsElimination
 //===----------------------------------------------------------------------===//
+
+namespace {
 
 /// This pass performs removal of external function definitions for a sake of
 /// reducing the amount of code to run through IRGen. It is supposed to run very
@@ -381,7 +391,7 @@ class ExternalFunctionDefinitionsElimination : FunctionLivenessComputation {
 
   /// Try to convert definition into declaration.
   /// Returns true if function was erased from the module.
-  bool tryToConvertExtenralDefinitionIntoDeclaration(SILFunction *F) {
+  bool tryToConvertExternalDefinitionIntoDeclaration(SILFunction *F) {
     bool FunctionWasErased = false;
     // Bail if it is a declaration already
     if (!F->isDefinition())
@@ -427,13 +437,15 @@ public:
       SILFunction *F = FI++;
       // Do not remove bodies of any functions that are alive.
       if (!isAlive(F)) {
-        if (tryToConvertExtenralDefinitionIntoDeclaration(F)) {
+        if (tryToConvertExternalDefinitionIntoDeclaration(F)) {
           DFEPass->invalidateAnalysis(F, SILAnalysis::PreserveKind::Nothing);
         }
       }
     }
   }
 };
+
+} // end anonymous namespace
 
 //===----------------------------------------------------------------------===//
 //                      Pass Definition and Entry Points
