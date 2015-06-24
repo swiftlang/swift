@@ -14,11 +14,11 @@
 ///
 /// When you use this type, you become partially responsible for
 /// keeping the object alive.
-public struct Unmanaged<T : AnyObject> {
-  unowned(unsafe) var _value: T
+public struct Unmanaged<Instance : AnyObject> {
+  unowned(unsafe) var _value: Instance
 
   @transparent
-  init(_private: T) { _value = _private }
+  init(_private: Instance) { _value = _private }
 
   /// Unsafely turn an opaque C pointer into an unmanaged
   /// class reference.
@@ -34,7 +34,7 @@ public struct Unmanaged<T : AnyObject> {
       value != nil,
       "attempt to create an Unmanaged instance from a null pointer")
 
-    return Unmanaged(_private: unsafeBitCast(value, T.self))
+    return Unmanaged(_private: unsafeBitCast(value, Instance.self))
   }
 
   /// Unsafely turn an unmanaged class reference into an opaque
@@ -55,7 +55,7 @@ public struct Unmanaged<T : AnyObject> {
   /// does not know the ownership rules for, but you know that the
   /// API expects you to pass the object at +1.
   @transparent public
-  static func passRetained(value: T) -> Unmanaged {
+  static func passRetained(value: Instance) -> Unmanaged {
     return Unmanaged(_private: value).retain()
   }
 
@@ -69,7 +69,7 @@ public struct Unmanaged<T : AnyObject> {
   ///     CFArraySetValueAtIndex(.passUnretained(array), i,
   ///                            .passUnretained(object))
   @transparent public
-  static func passUnretained(value: T) -> Unmanaged {
+  static func passUnretained(value: Instance) -> Unmanaged {
     return Unmanaged(_private: value)
   }
 
@@ -78,7 +78,7 @@ public struct Unmanaged<T : AnyObject> {
   ///
   /// This is useful when a function returns an unmanaged reference
   /// and you know that you're not responsible for releasing the result.
-  public func takeUnretainedValue() -> T {
+  public func takeUnretainedValue() -> Instance {
     return _value
   }
 
@@ -87,7 +87,7 @@ public struct Unmanaged<T : AnyObject> {
   ///
   /// This is useful when a function returns an unmanaged reference
   /// and you know that you're responsible for releasing the result.
-  public func takeRetainedValue() -> T {
+  public func takeRetainedValue() -> Instance {
     let result = _value
     release()
     return result

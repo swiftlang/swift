@@ -5,6 +5,15 @@
 
 import StdlibUnittest
 
+// Check that the generic parameter is called 'Instance'.
+protocol TestProtocol1 {}
+
+extension Unmanaged where Instance : TestProtocol1 {
+  var _instanceIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
 var UnmanagedTests = TestSuite("Unmanaged")
 
 UnmanagedTests.test("fromOpaque()/trap")
