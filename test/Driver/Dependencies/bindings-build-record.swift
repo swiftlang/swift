@@ -1,3 +1,6 @@
+// XFAIL: linux
+// rdar://problem/21515673
+
 // RUN: rm -rf %t && cp -r %S/Inputs/bindings-build-record/ %t
 // RUN: touch -t 201401240005 %t/*
 
