@@ -166,8 +166,11 @@ namespace swift {
     /// This is not meant to be overridden by subclasses. See "void
     /// verify(AnalysisTy *A)".
     virtual void verify() const override final {
-      for (auto Iter : Storage)
+      for (auto Iter : Storage) {
+        if (!Iter.second)
+          continue;
         verify(Iter.second);
+      }
     }
 
     /// Verify the AnalysisTy that we have stored for the specific function \p
@@ -178,6 +181,8 @@ namespace swift {
     virtual void verify(SILFunction *F) const override final {
       auto Iter = Storage.find(F);
       if (Iter == Storage.end())
+        return;
+      if (!Iter->second)
         return;
       verify(Iter->second);
     }
