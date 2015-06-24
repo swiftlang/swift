@@ -16,6 +16,21 @@
 
 import StdlibUnittest
 
+// Check that the generic parameter is called 'Bound'.
+protocol TestProtocol1 {}
+
+extension HalfOpenInterval where Bound : TestProtocol1 {
+  var _elementIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+extension ClosedInterval where Bound : TestProtocol1 {
+  var _elementIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
 var IntervalTestSuite = TestSuite("Interval")
 
 IntervalTestSuite.test("Ambiguity") {

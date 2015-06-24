@@ -48,14 +48,15 @@ selfDocComment = """
 /// `end`.  Can represent an empty interval.""" if Kind == 'HalfOpen' else """
 /// A closed `IntervalType`, which contains both its `start` and its
 /// `end`.  Cannot represent an empty interval."""
+
+selfDocComment += """
+///
+/// - parameter Bound: The type of the endpoints."""
 }%
 
 ${selfDocComment}
-public struct ${Self}<T : Comparable>
+public struct ${Self}<Bound : Comparable>
   : IntervalType, Equatable, CustomStringConvertible, CustomDebugStringConvertible, _Reflectable {
-
-  /// The type of the `Interval`'s endpoints.
-  public typealias Bound = T
 
   /// Construct a copy of `x`.
   public init(_ x: ${Self}) {
@@ -67,7 +68,7 @@ public struct ${Self}<T : Comparable>
   /// Construct an interval with the given bounds.
   ///
   /// - Requires: `start <= end`.
-  public init(_ start: T, _ end: T) {
+  public init(_ start: Bound, _ end: Bound) {
     _precondition(end >= start, "Invalid ${Self} bounds (end < start)")
     _start = start
     _end = end
@@ -76,14 +77,14 @@ public struct ${Self}<T : Comparable>
   /// The `Interval`'s lower bound.
   ///
   /// Invariant: `start` <= `end`.
-  public var start: T {
+  public var start: Bound {
     return _start
   }
 
   /// The `Interval`'s upper bound.
   ///
   /// Invariant: `start` <= `end`.
-  public var end: T {
+  public var end: Bound {
     return _end
   }
 
@@ -125,14 +126,14 @@ public struct ${Self}<T : Comparable>
     return _IntervalMirror(self)
   }
 
-  var _start: T
-  var _end: T
+  var _start: Bound
+  var _end: Bound
 }
 
 /// Two `${Self}`s are equal if their `start` and `end` are
 /// equal.
-public func == <T : Comparable> (
-  lhs: ${Self}<T>, rhs: ${Self}<T>
+public func == <Bound : Comparable> (
+  lhs: ${Self}<Bound>, rhs: ${Self}<Bound>
 ) -> Bool {
   return lhs.start == rhs.start && lhs.end == rhs.end
 }
@@ -163,12 +164,16 @@ public func overlaps<
 }
 
 /// Returns a half-open interval from `start` to `end`.
-public func ..< <T : Comparable>(start: T, end: T) -> HalfOpenInterval<T> {
+public func ..< <Bound : Comparable>(
+  start: Bound, end: Bound
+) -> HalfOpenInterval<Bound> {
   return HalfOpenInterval(start, end)
 }
 
 /// Returns a closed interval from `start` through `end`.
-public func ... <T : Comparable>(start: T, end: T) -> ClosedInterval<T> {
+public func ... <Bound : Comparable>(
+  start: Bound, end: Bound
+) -> ClosedInterval<Bound> {
   return ClosedInterval(start, end)
 }
 
