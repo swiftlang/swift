@@ -1,0 +1,240 @@
+// RUN: %target-sil-opt -inline -performance-constant-propagation -sil-verify-without-invalidation
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+private class Foo {
+  func speak()
+  deinit
+  init()
+}
+
+private class Foo2 : Foo {
+  override func speak()
+  deinit
+  override init()
+}
+
+// static Swift.Process._argc : Swift.Int32
+sil_global [fragile] @_TZvOSs7Process5_argcVSs5Int32 : $Int32
+
+// globalinit_33_1BDF70FFC18749BAB495A73B459ED2F0_token5
+sil_global private_external [fragile] @globalinit_33_1BDF70FFC18749BAB495A73B459ED2F0_token5 : $Builtin.Word
+
+// static Swift.Process._unsafeArgv : Swift.UnsafeMutablePointer<Swift.UnsafeMutablePointer<Swift.Int8>>
+sil_global [fragile] @_TZvOSs7Process11_unsafeArgvGVSs20UnsafeMutablePointerGS0_VSs4Int8__ : $UnsafeMutablePointer<UnsafeMutablePointer<Int8>>
+
+// main
+sil @main : $@convention(c) (Int32, UnsafeMutablePointer<UnsafeMutablePointer<Int8>>) -> Int32 {
+bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<UnsafeMutablePointer<Int8>>):
+  %2 = global_addr @_TZvOSs7Process5_argcVSs5Int32 : $*Int32 // user: %3
+  store %0 to %2 : $*Int32                        // id: %3
+  %4 = global_addr @globalinit_33_1BDF70FFC18749BAB495A73B459ED2F0_token5 : $*Builtin.Word // user: %5
+  %5 = address_to_pointer %4 : $*Builtin.Word to $Builtin.RawPointer // user: %7
+  // function_ref globalinit_33_1BDF70FFC18749BAB495A73B459ED2F0_func5
+  %6 = function_ref @globalinit_33_1BDF70FFC18749BAB495A73B459ED2F0_func5 : $@convention(thin) () -> () // user: %7
+  %7 = builtin "once"(%5 : $Builtin.RawPointer, %6 : $@convention(thin) () -> ()) : $()
+  %8 = global_addr @_TZvOSs7Process11_unsafeArgvGVSs20UnsafeMutablePointerGS0_VSs4Int8__ : $*UnsafeMutablePointer<UnsafeMutablePointer<Int8>> // user: %9
+  store %1 to %8 : $*UnsafeMutablePointer<UnsafeMutablePointer<Int8>> // id: %9
+  %10 = integer_literal $Builtin.Int32, 0         // user: %11
+  %11 = struct $Int32 (%10 : $Builtin.Int32)      // user: %12
+  return %11 : $Int32                             // id: %12
+}
+
+// Swift._didEnterMain (Swift.Int32, argv : Swift.UnsafeMutablePointer<Swift.UnsafeMutablePointer<Swift.Int8>>) -> ()
+sil [transparent] [fragile] @_TFSs13_didEnterMainFTVSs5Int324argvGVSs20UnsafeMutablePointerGS0_VSs4Int8___T_ : $@convention(thin) (Int32, UnsafeMutablePointer<UnsafeMutablePointer<Int8>>) -> ()
+
+// main.(Foo in _9ACC0692747077F216D14C36CD927671).speak (main.(Foo in _9ACC0692747077F216D14C36CD927671))() -> ()
+sil private @_TFC4mainP33_9ACC0692747077F216D14C36CD9276713Foo5speakfS0_FT_T_ : $@convention(method) (@guaranteed Foo) -> () {
+bb0(%0 : $Foo):
+  debug_value %0 : $Foo                           // id: %1
+  // function_ref speakFoo
+  %2 = function_ref @speakFoo : $@convention(thin) () -> () // user: %3
+  %3 = apply %2() : $@convention(thin) () -> ()
+  %4 = tuple ()                                   // user: %5
+  return %4 : $()                                 // id: %5
+}
+
+// speakFoo
+sil hidden_external @speakFoo : $@convention(thin) () -> ()
+
+// main.(Foo in _9ACC0692747077F216D14C36CD927671).__deallocating_deinit
+sil private @_TFC4mainP33_9ACC0692747077F216D14C36CD9276713FooD : $@convention(method) (@owned Foo) -> () {
+bb0(%0 : $Foo):
+  debug_value %0 : $Foo                           // id: %1
+  dealloc_ref %0 : $Foo                           // id: %2
+  %3 = tuple ()                                   // user: %4
+  return %3 : $()                                 // id: %4
+}
+
+// main.(Foo in _9ACC0692747077F216D14C36CD927671).deinit
+sil private @_TFC4mainP33_9ACC0692747077F216D14C36CD9276713Food : $@convention(method) (@guaranteed Foo) -> @owned Builtin.NativeObject {
+bb0(%0 : $Foo):
+  debug_value %0 : $Foo                           // id: %1
+  %2 = unchecked_ref_cast %0 : $Foo to $Builtin.NativeObject // user: %3
+  return %2 : $Builtin.NativeObject               // id: %3
+}
+
+// main.(Foo in _9ACC0692747077F216D14C36CD927671).init (main.(Foo in _9ACC0692747077F216D14C36CD927671).Type)() -> main.(Foo in _9ACC0692747077F216D14C36CD927671)
+sil private @_TFC4mainP33_9ACC0692747077F216D14C36CD9276713FoocfMS0_FT_S0_ : $@convention(method) (@owned Foo) -> @owned Foo {
+bb0(%0 : $Foo):
+  debug_value %0 : $Foo                           // id: %1
+  return %0 : $Foo                                // id: %2
+}
+
+// main.(Foo2 in _9ACC0692747077F216D14C36CD927671).speak (main.(Foo2 in _9ACC0692747077F216D14C36CD927671))() -> ()
+sil private @_TFC4mainP33_9ACC0692747077F216D14C36CD9276714Foo25speakfS0_FT_T_ : $@convention(method) (@guaranteed Foo2) -> () {
+bb0(%0 : $Foo2):
+  debug_value %0 : $Foo2                          // id: %1
+  // function_ref speakFoo2
+  %2 = function_ref @speakFoo2 : $@convention(thin) () -> () // user: %3
+  %3 = apply %2() : $@convention(thin) () -> ()
+  %4 = tuple ()                                   // user: %5
+  return %4 : $()                                 // id: %5
+}
+
+// speakFoo2
+sil hidden_external @speakFoo2 : $@convention(thin) () -> ()
+
+// main.(Foo2 in _9ACC0692747077F216D14C36CD927671).__deallocating_deinit
+sil private @_TFC4mainP33_9ACC0692747077F216D14C36CD9276714Foo2D : $@convention(method) (@owned Foo2) -> () {
+bb0(%0 : $Foo2):
+  debug_value %0 : $Foo2                          // id: %1
+  dealloc_ref %0 : $Foo2                          // id: %2
+  %3 = tuple ()                                   // user: %4
+  return %3 : $()                                 // id: %4
+}
+
+// main.(Foo2 in _9ACC0692747077F216D14C36CD927671).deinit
+sil private @_TFC4mainP33_9ACC0692747077F216D14C36CD9276714Foo2d : $@convention(method) (@guaranteed Foo2) -> @owned Builtin.NativeObject {
+bb0(%0 : $Foo2):
+  debug_value %0 : $Foo2                          // id: %1
+  %2 = unchecked_ref_cast %0 : $Foo2 to $Builtin.NativeObject // user: %3
+  return %2 : $Builtin.NativeObject               // id: %3
+}
+
+// main.(Foo2 in _9ACC0692747077F216D14C36CD927671).init (main.(Foo2 in _9ACC0692747077F216D14C36CD927671).Type)() -> main.(Foo2 in _9ACC0692747077F216D14C36CD927671)
+sil private @_TFC4mainP33_9ACC0692747077F216D14C36CD9276714Foo2cfMS0_FT_S0_ : $@convention(method) (@owned Foo2) -> @owned Foo2 {
+bb0(%0 : $Foo2):
+  %1 = null_class $Foo2
+  return %0 : $Foo2                               // id: %2
+}
+
+// main.(Foo2 in _9ACC0692747077F216D14C36CD927671).__allocating_init (main.(Foo2 in _9ACC0692747077F216D14C36CD927671).Type)() -> main.(Foo2 in _9ACC0692747077F216D14C36CD927671)
+sil private @_TFC4mainP33_9ACC0692747077F216D14C36CD9276714Foo2CfMS0_FT_S0_ : $@convention(thin) (@thick Foo2.Type) -> @owned Foo2 {
+bb0(%0 : $@thick Foo2.Type):
+  %1 = alloc_ref $Foo2                            // user: %3
+  %2 = null_class $Foo2
+  return %1 : $Foo2                               // id: %3
+}
+
+// main.callSpeak () -> ()
+sil hidden @_TF4main9callSpeakFT_T_ : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_ref $Foo2                            // users: %2, %3, %4, %27
+  %1 = null_class $Foo2
+  debug_value %0 : $Foo2                          // id: %2
+  strong_retain %0 : $Foo2                        // id: %3
+  %4 = upcast %0 : $Foo2 to $Foo                  // users: %5, %6, %17, %23
+  checked_cast_br %0 : $Foo2 to $Foo2, bb1, bb6    // id: %6
+
+bb1(%7 : $Foo2):                                  // Preds: bb0
+  %8 = enum $Optional<Foo2>, #Optional.Some!enumelt.1, %7 : $Foo2 // user: %9
+  br bb2(%8 : $Optional<Foo2>)                    // id: %9
+
+bb2(%10 : $Optional<Foo2>):                       // Preds: bb1 bb6
+  switch_enum %10 : $Optional<Foo2>, case #Optional.Some!enumelt.1: bb3, default bb5 // id: %11
+
+bb3(%12 : $Foo2):                                 // Preds: bb2
+  // function_ref speakFoo2
+  %13 = function_ref @speakFoo2 : $@convention(thin) () -> () // user: %14
+  %14 = apply %13() : $@convention(thin) () -> ()
+  strong_release %12 : $Foo2                      // id: %15
+  br bb4                                          // id: %16
+
+bb4:                                              // Preds: bb3 bb5
+  strong_release %4 : $Foo                        // id: %17
+  %18 = tuple ()                                  // user: %19
+  br bb7(%18 : $())                               // id: %19
+
+bb5:                                              // Preds: bb2
+  // function_ref speakFoo2
+  %20 = function_ref @speakFoo2 : $@convention(thin) () -> () // user: %21
+  %21 = apply %20() : $@convention(thin) () -> ()
+  br bb4                                          // id: %22
+
+bb6:                                              // Preds: bb0
+  strong_release %4 : $Foo                        // id: %23
+  %24 = enum $Optional<Foo2>, #Optional.None!enumelt // user: %25
+  br bb2(%24 : $Optional<Foo2>)                   // id: %25
+
+bb7(%26 : $()):                                   // Preds: bb4
+  strong_release %0 : $Foo2                       // id: %27
+  %28 = tuple ()                                  // user: %29
+  return %28 : $()                                // id: %29
+}
+
+// main.(speak in _9ACC0692747077F216D14C36CD927671) (main.(Foo in _9ACC0692747077F216D14C36CD927671)) -> ()
+sil private [always_inline] @_TF4mainP33_9ACC0692747077F216D14C36CD9276715speakFCS_P33_9ACC0692747077F216D14C36CD9276713FooT_ : $@convention(thin) (@owned Foo) -> () {
+bb0(%0 : $Foo):
+  debug_value %0 : $Foo                           // id: %1
+  strong_retain %0 : $Foo                         // id: %2
+  checked_cast_br %0 : $Foo to $Foo2, bb1, bb2    // id: %3
+
+bb1(%4 : $Foo2):                                  // Preds: bb0
+  %5 = enum $Optional<Foo2>, #Optional.Some!enumelt.1, %4 : $Foo2 // user: %6
+  br bb3(%5 : $Optional<Foo2>)                    // id: %6
+
+bb2:                                              // Preds: bb0
+  strong_release %0 : $Foo                        // id: %7
+  %8 = enum $Optional<Foo2>, #Optional.None!enumelt // user: %9
+  br bb3(%8 : $Optional<Foo2>)                    // id: %9
+
+bb3(%10 : $Optional<Foo2>):                       // Preds: bb1 bb2
+  switch_enum %10 : $Optional<Foo2>, case #Optional.Some!enumelt.1: bb4, default bb5 // id: %11
+
+bb4(%12 : $Foo2):                                 // Preds: bb3
+  debug_value %12 : $Foo2                         // id: %13
+  // function_ref speakFoo2
+  %14 = function_ref @speakFoo2 : $@convention(thin) () -> () // user: %15
+  %15 = apply %14() : $@convention(thin) () -> ()
+  strong_release %12 : $Foo2                      // id: %16
+  br bb6                                          // id: %17
+
+bb5:                                              // Preds: bb3
+  %18 = class_method %0 : $Foo, #Foo.speak!1 : Foo -> () -> () , $@convention(method) (@guaranteed Foo) -> () // user: %19
+  %19 = apply %18(%0) : $@convention(method) (@guaranteed Foo) -> ()
+  br bb6                                          // id: %20
+
+bb6:                                              // Preds: bb4 bb5
+  strong_release %0 : $Foo                        // id: %21
+  %22 = tuple ()                                  // user: %23
+  return %22 : $()                                // id: %23
+}
+
+// globalinit_33_1BDF70FFC18749BAB495A73B459ED2F0_func5
+sil private_external [fragile] @globalinit_33_1BDF70FFC18749BAB495A73B459ED2F0_func5 : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @_TZvOSs7Process11_unsafeArgvGVSs20UnsafeMutablePointerGS0_VSs4Int8__ : $*UnsafeMutablePointer<UnsafeMutablePointer<Int8>> // user: %4
+  %1 = integer_literal $Builtin.Int8, 0           // user: %2
+  %2 = builtin "inttoptr_Int8"(%1 : $Builtin.Int8) : $Builtin.RawPointer // user: %3
+  %3 = struct $UnsafeMutablePointer<UnsafeMutablePointer<Int8>> (%2 : $Builtin.RawPointer) // user: %4
+  store %3 to %0 : $*UnsafeMutablePointer<UnsafeMutablePointer<Int8>> // id: %4
+  %5 = tuple ()                                   // user: %6
+  return %5 : $()                                 // id: %6
+}
+
+sil_vtable Foo {
+  #Foo.speak!1: _TFC4mainP33_9ACC0692747077F216D14C36CD9276713Foo5speakfS0_FT_T_	// main.(Foo in _9ACC0692747077F216D14C36CD927671).speak (main.(Foo in _9ACC0692747077F216D14C36CD927671))() -> ()
+  #Foo.deinit!deallocator: _TFC4mainP33_9ACC0692747077F216D14C36CD9276713FooD	// main.(Foo in _9ACC0692747077F216D14C36CD927671).__deallocating_deinit
+  #Foo.init!initializer.1: _TFC4mainP33_9ACC0692747077F216D14C36CD9276713FoocfMS0_FT_S0_	// main.(Foo in _9ACC0692747077F216D14C36CD927671).init (main.(Foo in _9ACC0692747077F216D14C36CD927671).Type)() -> main.(Foo in _9ACC0692747077F216D14C36CD927671)
+}
+
+sil_vtable Foo2 {
+  #Foo.speak!1: _TFC4mainP33_9ACC0692747077F216D14C36CD9276714Foo25speakfS0_FT_T_	// main.(Foo2 in _9ACC0692747077F216D14C36CD927671).speak (main.(Foo2 in _9ACC0692747077F216D14C36CD927671))() -> ()
+  #Foo.init!initializer.1: _TFC4mainP33_9ACC0692747077F216D14C36CD9276714Foo2cfMS0_FT_S0_	// main.(Foo2 in _9ACC0692747077F216D14C36CD927671).init (main.(Foo2 in _9ACC0692747077F216D14C36CD927671).Type)() -> main.(Foo2 in _9ACC0692747077F216D14C36CD927671)
+  #Foo2.deinit!deallocator: _TFC4mainP33_9ACC0692747077F216D14C36CD9276714Foo2D	// main.(Foo2 in _9ACC0692747077F216D14C36CD927671).__deallocating_deinit
+}
