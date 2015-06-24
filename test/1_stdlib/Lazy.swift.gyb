@@ -48,12 +48,57 @@ LazyTestSuite.test("Repeat") {
     { $0.value == $1.value })
 
   checkRandomAccessCollection(
-    [ OpaqueValue(42), OpaqueValue(42), OpaqueValue(42) ],
+    [ OpaqueValue(42), OpaqueValue(42), OpaqueValue(42) ] as Array<OpaqueValue<Int>>,
     Repeat(count: 3, repeatedValue: OpaqueValue(42)),
     { $0.value == $1.value })
 }
 
 // FIXME: trap tests.
+
+//===----------------------------------------------------------------------===//
+// CollectionOfOne
+//===----------------------------------------------------------------------===//
+
+// Check that the generic parameter is called 'Element'.
+extension CollectionOfOne where Element : TestProtocol1 {
+  var _elementIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+LazyTestSuite.test("CollectionOfOne") {
+  checkRandomAccessCollection(
+    [ OpaqueValue(42) ],
+    CollectionOfOne(OpaqueValue(42)),
+    { $0.value == $1.value })
+}
+
+// FIXME: trap tests.
+
+//===----------------------------------------------------------------------===//
+// GeneratorOfOne
+//===----------------------------------------------------------------------===//
+
+// Check that the generic parameter is called 'Element'.
+extension GeneratorOfOne where Element : TestProtocol1 {
+  var _elementIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+LazyTestSuite.test("GeneratorOfOne") {
+  checkGenerator(
+    [] as Array<OpaqueValue<Int>>,
+    GeneratorOfOne(nil as Optional<OpaqueValue<Int>>),
+    { $0.value == $1.value },
+    SourceLocStack().withCurrentLoc())
+
+  checkGenerator(
+    [ OpaqueValue(42) ] as Array<OpaqueValue<Int>>,
+    GeneratorOfOne(OpaqueValue(42)),
+    { $0.value == $1.value },
+    SourceLocStack().withCurrentLoc())
+}
 
 //===----------------------------------------------------------------------===//
 // lazy()
