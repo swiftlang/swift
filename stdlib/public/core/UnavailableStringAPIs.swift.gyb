@@ -1,0 +1,111 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+%{
+stringSubscriptComment = """
+  /// Subscripting strings with integers is not available.
+  ///
+  /// The concept of "the `i`th character in a string" has
+  /// different interpretations in different libraries and system
+  /// components.  The correct interpretation should be selected
+  /// according to the use case and the APIs involved, so `String`
+  /// can not be subscripted with an integer.
+  ///
+  /// Swift provides several different ways to access the character
+  /// data stored inside strings.
+  ///
+  /// - `String.utf8` is a collection of UTF-8 code units in the
+  ///   string. Use this API when converting the string to UTF-8.
+  ///   Most POSIX APIs process strings in terms of UTF-8 code units.
+  ///
+  /// - `String.utf16` is a collection of UTF-16 code units in
+  ///   string.  Most Cocoa and Cocoa touch APIs process strings in
+  ///   terms of UTF-16 code units.  For example, instances of
+  ///   `NSRange` used with `NSAttributedString` and
+  ///   `NSRegularExpression` store substring offsets and lengths in
+  ///   terms of UTF-16 code units.
+  ///
+  /// - `String.unicodeScalars` is a collection of Unicode scalars.
+  ///   Use this API when you are performing low-level manipulation
+  ///   of character data.
+  ///
+  /// - `String.chracters` is a collection of extended grapheme
+  ///   clusters, which are an approximation of user-precieved
+  ///   characters.
+  ///
+  /// Note that when processing strings that contain human-readable
+  /// text, character-by-character processing should be avoided to
+  /// the largest extent possible.  Use high-level locale-sensitive
+  /// Unicode algorithms instead, for example,
+  /// `String.localizedStandardCompare()`,
+  /// `String.localizedLowercaseString`,
+  /// `String.localizedStandardRangeOfString()` etc."""
+}%
+
+extension String {
+${stringSubscriptComment}
+  @available(
+    *, unavailable,
+    message="cannot subscript String with an Int, see the documentation comment for discussion")
+  public subscript(i: Int) -> Character {
+    fatalError("unavailable function can't be called")
+  }
+
+${stringSubscriptComment}
+  @available(
+    *, unavailable,
+    message="cannot subscript String with a Range<Int>, see the documentation comment for discussion")
+  public subscript(subRange: Range<Int>) -> String {
+    fatalError("unavailable function can't be called")
+  }
+
+  /// The unavailable `String.count` API.
+  ///
+  /// The concept of "the number of characters in a string" has
+  /// different interpretations in different libraries and system
+  /// components.  The correct interpretation should be selected
+  /// according to the use case and the APIs involved, so `String`
+  /// does not have a `count` property, since there is no universal
+  /// answer to the question about the number of characters in a
+  /// given string.
+  ///
+  /// Swift provides several different ways to access the character
+  /// data stored inside strings.  To access the number of data units
+  /// in each representation you can use the following APIs.
+  ///
+  /// - `String.utf8.count` property returns the number of UTF-8 code
+  ///   units in the string.  Use this API when converting the string
+  ///   to UTF-8.  Most POSIX APIs process strings in terms of UTF-8
+  ///   code units.
+  ///
+  /// - `String.utf16.count` property returns the number of UTF-16
+  ///   code units in the string.  Most Cocoa and Cocoa touch APIs
+  ///   process strings in terms of UTF-16 code units.  For example,
+  ///   instances of `NSRange` used with `NSAttributedString` and
+  ///   `NSRegularExpression` store substring offsets and lengths in
+  ///   terms of UTF-16 code units.
+  ///
+  /// - `String.unicodeScalars.count` property returns the number of
+  ///   Unicode scalars in the string.  Use this API when you are
+  ///   performing low-level manipulation of character data.
+  ///
+  /// - `String.chracters.count` property returns the number of
+  ///   extended grapheme clusters.  Use this API to count the
+  ///   number of user-precieved characters in the string.
+  @available(
+    *, unavailable,
+    message="there is no universally good answer, see the documentation comment for discussion")
+  public var count: Int {
+    fatalError("unavailable function can't be called")
+  }
+}
+

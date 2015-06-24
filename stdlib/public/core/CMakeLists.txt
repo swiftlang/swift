@@ -106,6 +106,7 @@ set(SWIFTLIB_ESSENTIAL
   UnicodeScalar.swift
   UnicodeTrie.swift.gyb
   UnitTestArrayBuffer.swift
+  UnavailableStringAPIs.swift.gyb
   Unmanaged.swift
   UnsafeBufferPointer.swift.gyb
   UnsafePointer.swift.gyb

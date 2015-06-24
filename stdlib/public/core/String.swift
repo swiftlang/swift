@@ -543,11 +543,6 @@ extension String {
   /// - Requires: `position` is a valid position in `self.characters`
   ///   and `position != endIndex`.
   public subscript(i: Index) -> Character { return characters[i] }
-  
-  @available(*, unavailable, message="cannot subscript String with an Int")
-  public subscript(i: Int) -> Character {
-    fatalError("unavailable function can't be called")
-  }
 
   /// Return a *generator* over the `Character`s.
   ///
@@ -572,13 +567,6 @@ extension String {
   ///   O(N) conversion.
   public subscript(subRange: Range<Index>) -> String {
     return String(characters[subRange])
-  }
-
-  @available(
-    *, unavailable,
-    message="cannot subscript String with a range of Int")
-  public subscript(subRange: Range<Int>) -> String {
-    fatalError("unavailable function can't be called")
   }
 }
 
@@ -939,3 +927,4 @@ extension String.Index {
     return String.UnicodeScalarView.Index(self, within: unicodeScalars)
   }
 }
+

@@ -6,11 +6,16 @@ import Foundation
 
 // Common pitfall: trying to subscript a string with integers.
 func testIntSubscripting(s: String, i: Int) {
-  _ = s[i] // expected-error{{'subscript' is unavailable: cannot subscript String with an Int}}
-  _ = s[17] // expected-error{{'subscript' is unavailable: cannot subscript String with an Int}}
-  _ = s[i...i] // expected-error{{subscript' is unavailable: cannot subscript String with a range of Int}}
-  _ = s[17..<20] // expected-error{{subscript' is unavailable: cannot subscript String with a range of Int}}
-  _ = s[17...20] // expected-error{{subscript' is unavailable: cannot subscript String with a range of Int}}
+  _ = s[i] // expected-error{{'subscript' is unavailable: cannot subscript String with an Int, see the documentation comment for discussion}}
+  _ = s[17] // expected-error{{'subscript' is unavailable: cannot subscript String with an Int, see the documentation comment for discussion}}
+  _ = s[i...i] // expected-error{{subscript' is unavailable: cannot subscript String with a Range<Int>, see the documentation comment for discussion}}
+  _ = s[17..<20] // expected-error{{subscript' is unavailable: cannot subscript String with a Range<Int>, see the documentation comment for discussion}}
+  _ = s[17...20] // expected-error{{subscript' is unavailable: cannot subscript String with a Range<Int>, see the documentation comment for discussion}}
+}
+
+// Common pitfall: trying to access `String.count`.
+func testStringCount(s: String) {
+  _ = s.count // expected-error{{'count' is unavailable: there is no universally good answer, see the documentation comment for discussion}}
 }
 
 func testNonAmbiguousStringComparisons() {
