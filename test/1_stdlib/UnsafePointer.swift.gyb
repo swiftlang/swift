@@ -5,6 +5,27 @@
 
 import StdlibUnittest
 
+// Check that the generic parameter is called 'Element'.
+protocol TestProtocol1 {}
+
+extension UnsafeBufferPointerGenerator where Element : TestProtocol1 {
+  var _elementIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+extension UnsafeBufferPointer where Element : TestProtocol1 {
+  var _elementIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+extension UnsafeMutableBufferPointer where Element : TestProtocol1 {
+  var _elementIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
 var UnsafePointerTestSuite = TestSuite("UnsafePointer")
 var UnsafeMutablePointerTestSuite = TestSuite("UnsafeMutablePointer")
 var COpaquePointerTestSuite = TestSuite("COpaquePointer")

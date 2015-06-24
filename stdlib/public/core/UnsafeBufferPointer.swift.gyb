@@ -12,10 +12,12 @@
 
 /// A generator for the elements in the buffer referenced by
 /// `UnsafeBufferPointer` or `UnsafeMutableBufferPointer`.
-public struct UnsafeBufferPointerGenerator<T>: GeneratorType, SequenceType {
+public struct UnsafeBufferPointerGenerator<Element>
+  : GeneratorType, SequenceType {
+
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
-  public mutating func next() -> T? {
+  public mutating func next() -> Element? {
     return position == end ? nil : (position++).memory
   }
 
@@ -25,14 +27,15 @@ public struct UnsafeBufferPointerGenerator<T>: GeneratorType, SequenceType {
     return self
   }
 
-  var position, end: UnsafePointer<T>
+  var position, end: UnsafePointer<Element>
 }
 
 %for Mutable in ('Mutable', ''):
-/// A non-owning pointer to buffer of ${Mutable.lower()} `T`s stored
+/// A non-owning pointer to buffer of ${Mutable.lower()} `Element`s stored
 /// contiguously in memory, presenting a `Collection` interface to the
 /// underlying elements.
-public struct Unsafe${Mutable}BufferPointer<T> : ${Mutable}CollectionType {
+public struct Unsafe${Mutable}BufferPointer<Element>
+  : ${Mutable}CollectionType {
 
   /// Always zero, which is the index of the first element in a
   /// non-empty buffer.
@@ -50,7 +53,7 @@ public struct Unsafe${Mutable}BufferPointer<T> : ${Mutable}CollectionType {
   }
 
   /// Access the `i`th element in the buffer.
-  public subscript(i: Int) -> T {
+  public subscript(i: Int) -> Element {
     get {
       _debugPrecondition(i >= 0)
       _debugPrecondition(i < endIndex)
@@ -66,8 +69,8 @@ public struct Unsafe${Mutable}BufferPointer<T> : ${Mutable}CollectionType {
   }
 
   /// Construct an Unsafe${Mutable}Pointer over the `count` contiguous
-  /// `T` instances beginning at `start`.
-  public init(start: Unsafe${Mutable}Pointer<T>, count: Int) {
+  /// `Element` instances beginning at `start`.
+  public init(start: Unsafe${Mutable}Pointer<Element>, count: Int) {
     _precondition(
       count >= 0, "Unsafe${Mutable}BufferPointer with negative count")
     _position = start
@@ -77,12 +80,12 @@ public struct Unsafe${Mutable}BufferPointer<T> : ${Mutable}CollectionType {
   /// Return a *generator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> UnsafeBufferPointerGenerator<T> {
+  public func generate() -> UnsafeBufferPointerGenerator<Element> {
     return UnsafeBufferPointerGenerator(position: _position, end: _end)
   }
 
   /// A pointer to the first element of the buffer.
-  public var baseAddress: Unsafe${Mutable}Pointer<T> {
+  public var baseAddress: Unsafe${Mutable}Pointer<Element> {
     return _position
   }
 
@@ -91,7 +94,7 @@ public struct Unsafe${Mutable}BufferPointer<T> : ${Mutable}CollectionType {
     return _end - _position
   }
 
-  var _position, _end: Unsafe${Mutable}Pointer<T>
+  var _position, _end: Unsafe${Mutable}Pointer<Element>
 }
 
 extension Unsafe${Mutable}BufferPointer : CustomDebugStringConvertible {

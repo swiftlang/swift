@@ -13,30 +13,34 @@
 @exported import CoreAudio // Clang module
 
 extension UnsafeBufferPointer {
-  /// Initialize an `UnsafeBufferPointer<T>` from an `AudioBuffer`.
+  /// Initialize an `UnsafeBufferPointer<Element>` from an `AudioBuffer`.
   public init(_ audioBuffer: AudioBuffer) {
     self.init(
-      start: UnsafePointer<T>(audioBuffer.mData),
-      count: Int(audioBuffer.mDataByteSize) / strideof(T))
+      start: UnsafePointer<Element>(audioBuffer.mData),
+      count: Int(audioBuffer.mDataByteSize) / strideof(Element))
   }
 }
 
 extension UnsafeMutableBufferPointer {
-  /// Initialize an `UnsafeMutableBufferPointer<T>` from an `AudioBuffer`.
+  /// Initialize an `UnsafeMutableBufferPointer<Element>` from an
+  /// `AudioBuffer`.
   public init(_ audioBuffer: AudioBuffer) {
     self.init(
-      start: UnsafeMutablePointer<T>(audioBuffer.mData),
-      count: Int(audioBuffer.mDataByteSize) / strideof(T))
+      start: UnsafeMutablePointer<Element>(audioBuffer.mData),
+      count: Int(audioBuffer.mDataByteSize) / strideof(Element))
   }
 }
 
 extension AudioBuffer {
-  /// Initialize an `AudioBuffer` from an `UnsafeMutableBufferPointer<T>`.
-  public init<T>(
-    _ typedBuffer: UnsafeMutableBufferPointer<T>, numberOfChannels: Int) {
+  /// Initialize an `AudioBuffer` from an
+  /// `UnsafeMutableBufferPointer<Element>`.
+  public init<Element>(
+    _ typedBuffer: UnsafeMutableBufferPointer<Element>,
+    numberOfChannels: Int
+  ) {
     self.mNumberChannels = UInt32(numberOfChannels)
     self.mData = UnsafeMutablePointer<Void>(typedBuffer.baseAddress)
-    self.mDataByteSize = UInt32(typedBuffer.count * strideof(T))
+    self.mDataByteSize = UInt32(typedBuffer.count * strideof(Element))
   }
 }
 
@@ -103,7 +107,7 @@ public struct UnsafeMutableAudioBufferListPointer {
 
   // FIXME: the properties 'unsafePointer' and 'unsafeMutablePointer' should be
   // initializers on UnsafePointer and UnsafeMutablePointer, but we don't want
-  // to allow any UnsafePointer<T> to be initializable from an
+  // to allow any UnsafePointer<Element> to be initializable from an
   // UnsafeMutableAudioBufferListPointer, only UnsafePointer<AudioBufferList>.
   // We need constrained extensions for that.  rdar://17821143
 
