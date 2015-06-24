@@ -482,7 +482,7 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
     //
     // But we can still try to devirtualize the static class of instance
     // if it is possible.
-    return insertMonomorphicInlineCaches(AI, SubType);
+    return bool(insertMonomorphicInlineCaches(AI, SubType)) | Changed;
   }
 
   // At this point it is known that there is only one remaining method

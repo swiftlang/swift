@@ -1,0 +1,112 @@
+// RUN: %target-sil-opt %s -inline -inlinecaches -sil-verify-without-invalidation
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+public class Foo {
+  deinit
+  func doSomething() -> Foo
+  init()
+}
+
+public class Foo2 : Foo {
+  deinit
+  override func doSomething() -> Foo
+  override init()
+}
+
+// test.Foo.doSomething (test.Foo)() -> test.Foo
+sil hidden_external @_TFC4test3Foo11doSomethingfS0_FT_S0_ : $@convention(method) (@guaranteed Foo) -> @owned Foo
+
+// test.Foo.init (test.Foo.Type)() -> test.Foo
+sil hidden_external @_TFC4test3FoocfMS0_FT_S0_ : $@convention(method) (@owned Foo) -> @owned Foo
+
+// test.Foo2.doSomething (test.Foo2)() -> test.Foo
+sil hidden @_TFC4test4Foo211doSomethingfS0_FT_CS_3Foo : $@convention(method) (@guaranteed Foo2) -> @owned Foo {
+bb0(%0 : $Foo2):
+  debug_value %0 : $Foo2                          // id: %1
+  strong_retain %0 : $Foo2                        // id: %2
+  %3 = upcast %0 : $Foo2 to $Foo                  // user: %4
+  return %3 : $Foo                                // id: %4
+}
+
+// test.Foo2.__deallocating_deinit
+sil @_TFC4test4Foo2D : $@convention(method) (@owned Foo2) -> () {
+bb0(%0 : $Foo2):
+  debug_value %0 : $Foo2                          // id: %1
+  %2 = upcast %0 : $Foo2 to $Foo                  // user: %4
+  // function_ref test.Foo.deinit
+  %3 = function_ref @_TFC4test3Food : $@convention(method) (@guaranteed Foo) -> @owned Builtin.NativeObject // user: %4
+  %4 = apply %3(%2) : $@convention(method) (@guaranteed Foo) -> @owned Builtin.NativeObject // user: %5
+  %5 = unchecked_ref_cast %4 : $Builtin.NativeObject to $Foo2 // user: %6
+  dealloc_ref %5 : $Foo2                          // id: %6
+  %7 = tuple ()                                   // user: %8
+  return %7 : $()                                 // id: %8
+}
+
+// test.Foo2.deinit
+sil @_TFC4test4Foo2d : $@convention(method) (@guaranteed Foo2) -> @owned Builtin.NativeObject {
+bb0(%0 : $Foo2):
+  debug_value %0 : $Foo2                          // id: %1
+  %2 = upcast %0 : $Foo2 to $Foo                  // user: %4
+  // function_ref test.Foo.deinit
+  %3 = function_ref @_TFC4test3Food : $@convention(method) (@guaranteed Foo) -> @owned Builtin.NativeObject // user: %4
+  %4 = apply %3(%2) : $@convention(method) (@guaranteed Foo) -> @owned Builtin.NativeObject // user: %5
+  return %4 : $Builtin.NativeObject               // id: %5
+}
+
+// test.Foo.deinit
+sil @_TFC4test3Food : $@convention(method) (@guaranteed Foo) -> @owned Builtin.NativeObject
+
+// test.Foo2.init (test.Foo2.Type)() -> test.Foo2
+sil hidden @_TFC4test4Foo2cfMS0_FT_S0_ : $@convention(method) (@owned Foo2) -> @owned Foo2 {
+bb0(%0 : $Foo2):
+  %1 = alloc_stack $Foo2                          // users: %2, %6, %9, %10
+  store %0 to %1#1 : $*Foo2                       // id: %2
+  %3 = upcast %0 : $Foo2 to $Foo                  // user: %7
+  // function_ref test.Foo.init (test.Foo.Type)() -> test.Foo
+  %4 = function_ref @_TFC4test3FoocfMS0_FT_S0_ : $@convention(method) (@owned Foo) -> @owned Foo // user: %7
+  %5 = null_class $Foo2                           // user: %6
+  store %5 to %1#1 : $*Foo2                       // id: %6
+  %7 = apply %4(%3) : $@convention(method) (@owned Foo) -> @owned Foo // user: %8
+  %8 = unchecked_ref_cast %7 : $Foo to $Foo2      // users: %9, %11
+  store %8 to %1#1 : $*Foo2                       // id: %9
+  dealloc_stack %1#0 : $*@local_storage Foo2      // id: %10
+  return %8 : $Foo2                               // id: %11
+}
+
+// test.Foo2.__allocating_init (test.Foo2.Type)() -> test.Foo2
+sil hidden @_TFC4test4Foo2CfMS0_FT_S0_ : $@convention(thin) (@thick Foo2.Type) -> @owned Foo2 {
+bb0(%0 : $@thick Foo2.Type):
+  %1 = alloc_ref $Foo2                            // users: %3, %4
+  %2 = alloc_stack $Foo2                          // users: %3, %7, %10, %11
+  store %1 to %2#1 : $*Foo2                       // id: %3
+  %4 = upcast %1 : $Foo2 to $Foo                  // user: %8
+  // function_ref test.Foo.init (test.Foo.Type)() -> test.Foo
+  %5 = function_ref @_TFC4test3FoocfMS0_FT_S0_ : $@convention(method) (@owned Foo) -> @owned Foo // user: %8
+  %6 = null_class $Foo2                           // user: %7
+  store %6 to %2#1 : $*Foo2                       // id: %7
+  %8 = apply %5(%4) : $@convention(method) (@owned Foo) -> @owned Foo // user: %9
+  %9 = unchecked_ref_cast %8 : $Foo to $Foo2      // users: %10, %12
+  store %9 to %2#1 : $*Foo2                       // id: %10
+  dealloc_stack %2#0 : $*@local_storage Foo2      // id: %11
+  return %9 : $Foo2                               // id: %12
+}
+
+// test.main (test.Foo) -> test.Foo
+sil hidden @_TF4test4mainFCS_3FooS0_ : $@convention(thin) (@owned Foo) -> @owned Foo {
+bb0(%0 : $Foo):
+  debug_value %0 : $Foo                           // id: %1
+  %2 = class_method %0 : $Foo, #Foo.doSomething!1 : Foo -> () -> Foo , $@convention(method) (@guaranteed Foo) -> @owned Foo // user: %3
+  %3 = apply %2(%0) : $@convention(method) (@guaranteed Foo) -> @owned Foo // user: %5
+  strong_release %0 : $Foo                        // id: %4
+  return %3 : $Foo                                // id: %5
+}
+
+sil_vtable Foo2 {
+  #Foo.doSomething!1: _TFC4test4Foo211doSomethingfS0_FT_CS_3Foo	// test.Foo2.doSomething (test.Foo2)() -> test.Foo
+  #Foo.init!initializer.1: _TFC4test4Foo2cfMS0_FT_S0_	// test.Foo2.init (test.Foo2.Type)() -> test.Foo2
+  #Foo2.deinit!deallocator: _TFC4test4Foo2D	// test.Foo2.__deallocating_deinit
+}
