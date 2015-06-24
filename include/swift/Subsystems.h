@@ -146,7 +146,11 @@ namespace swift {
 
     /// If set, dumps wall time taken to check each function body to
     /// llvm::errs().
-    DebugTimeFunctionBodies = 1 << 1
+    DebugTimeFunctionBodies = 1 << 1,
+
+    /// Indicates that the type checker is checking code that will be
+    /// immediately executed.
+    ForImmediateMode = 1 << 2
   };
 
   /// Once parsing and name-binding are complete, this walks the AST to resolve

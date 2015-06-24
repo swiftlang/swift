@@ -517,6 +517,9 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     auto &DefinedFunctions = TC.definedFunctions;
     if (Options.contains(TypeCheckingFlags::DebugTimeFunctionBodies))
       TC.enableDebugTimeFunctionBodies();
+
+    if (Options.contains(TypeCheckingFlags::ForImmediateMode))
+      TC.setInImmediateMode(true);
     
     // Lookup the swift module.  This ensures that we record all known
     // protocols in the AST.
@@ -525,7 +528,7 @@ void swift::performTypeChecking(SourceFile &SF, TopLevelContext &TLC,
     if (!Ctx.LangOpts.DisableAvailabilityChecking) {
       // Build the type refinement hierarchy for the primary
       // file before type checking.
-      TypeChecker::buildTypeRefinementContextHierarchy(SF, StartElem);
+      TC.buildTypeRefinementContextHierarchy(SF, StartElem);
     }
 
     // Resolve extensions. This has to occur first during type checking,
@@ -841,7 +844,7 @@ class TypeRefinementContextBuilder : private ASTWalker {
   };
 
   std::vector<ContextInfo> ContextStack;
-  ASTContext &AC;
+  TypeChecker &TC;
 
   /// A mapping from abstract storage declarations with accessors to
   /// to the type refinement contexts for those declarations. We refer to
@@ -862,8 +865,8 @@ class TypeRefinementContextBuilder : private ASTWalker {
   }
 
 public:
-  TypeRefinementContextBuilder(TypeRefinementContext *TRC, ASTContext &AC)
-      : AC(AC) {
+  TypeRefinementContextBuilder(TypeRefinementContext *TRC, TypeChecker &TC)
+      : TC(TC) {
     assert(TRC);
     pushContext(TRC, ParentTy());
   }
@@ -941,11 +944,11 @@ private:
     // The potential versions in the declaration are constrained by both
     // the declared availability of the declaration and the potential versions
     // of its lexical context.
-    VersionRange DeclVersionRange = TypeChecker::availableRange(D, AC);
+    VersionRange DeclVersionRange = TypeChecker::availableRange(D, TC.Context);
     DeclVersionRange.meetWith(getCurrentTRC()->getPotentialVersions());
     
     TypeRefinementContext *NewTRC =
-        TypeRefinementContext::createForDecl(AC, D, getCurrentTRC(),
+        TypeRefinementContext::createForDecl(TC.Context, D, getCurrentTRC(),
                                              DeclVersionRange,
                                              refinementSourceRangeForDecl(D));
     
@@ -969,7 +972,7 @@ private:
     
     // No need to introduce a context if the declaration does not have an
     // availability attribute.
-    if (!hasActiveAvailableAttribute(D, AC)) {
+    if (!hasActiveAvailableAttribute(D, TC.Context)) {
       return false;
     }
     
@@ -1059,9 +1062,10 @@ private:
       // Create a new context for the Then branch and traverse it in that new
       // context.
       auto *ThenTRC =
-          TypeRefinementContext::createForIfStmtThen(AC, IS, getCurrentTRC(),
-                                                   RefinedRange.getValue());
-      TypeRefinementContextBuilder(ThenTRC, AC).build(IS->getThenStmt());
+          TypeRefinementContext::createForIfStmtThen(TC.Context, IS,
+                                                     getCurrentTRC(),
+                                                     RefinedRange.getValue());
+      TypeRefinementContextBuilder(ThenTRC, TC).build(IS->getThenStmt());
     } else {
       build(IS->getThenStmt());
     }
@@ -1087,8 +1091,8 @@ private:
       // Create a new context for the branch and traverse it in the new
       // context.
       auto *ThenTRC = TypeRefinementContext::createForWhileStmtBody(
-          AC, WS, getCurrentTRC(), RefinedRange.getValue());
-      TypeRefinementContextBuilder(ThenTRC, AC).build(WS->getBody());
+          TC.Context, WS, getCurrentTRC(), RefinedRange.getValue());
+      TypeRefinementContextBuilder(ThenTRC, TC).build(WS->getBody());
     } else {
       build(WS->getBody());
     }
@@ -1124,7 +1128,7 @@ private:
     // Create a new context for the fallthrough.
 
     auto *FallthroughTRC =
-          TypeRefinementContext::createForGuardStmtFallthrough(AC, GS,
+          TypeRefinementContext::createForGuardStmtFallthrough(TC.Context, GS,
               ParentBrace, getCurrentTRC(), RefinedRange.getValue());
 
     pushContext(FallthroughTRC, ParentBrace);
@@ -1167,9 +1171,9 @@ private:
         // We couldn't find an appropriate spec for the current platform,
         // so rather than refining, emit a diagnostic and just use the current
         // TRC.
-        AC.Diags.diagnose(Query->getLoc(),
+        TC.Diags.diagnose(Query->getLoc(),
                           diag::availability_query_required_for_platform,
-                          platformString(targetPlatform(AC.LangOpts)));
+                          platformString(targetPlatform(TC.getLangOpts())));
         
         continue;
       }
@@ -1183,22 +1187,30 @@ private:
       // spec is useless. If so, report this.
       if (Spec->getKind() == AvailabilitySpecKind::VersionConstraint &&
           CurTRC->getPotentialVersions().isContainedIn(Range)) {
-        DiagnosticEngine &Diags = AC.Diags;
+        DiagnosticEngine &Diags = TC.Diags;
         if (CurTRC->getReason() == TypeRefinementContext::Reason::Root) {
-          Diags.diagnose(Query->getLoc(),
-                         diag::availability_query_useless_min_deployment,
-                         platformString(targetPlatform(AC.LangOpts)));
+          // Diagnose for checks that are useless because the minimum deployment
+          // target ensures they will never be false. We suppress this warning
+          // when compiling for playgrounds because the developer cannot
+          // cannot explicitly set the minimum deployment target to silence
+          // the alarm. We also suppress in script mode (where setting the
+          // minimum deployment target requires a target triple).
+          if (!TC.getLangOpts().Playground && !TC.getInImmediateMode()) {
+            Diags.diagnose(Query->getLoc(),
+                           diag::availability_query_useless_min_deployment,
+                           platformString(targetPlatform(TC.getLangOpts())));
+          }
         } else {
           Diags.diagnose(Query->getLoc(),
                          diag::availability_query_useless_enclosing_scope,
-                         platformString(targetPlatform(AC.LangOpts)));
+                         platformString(targetPlatform(TC.getLangOpts())));
           Diags.diagnose(CurTRC->getIntroductionLoc(),
                          diag::availability_query_useless_enclosing_scope_here);
         }
       }
 
       auto *TRC = TypeRefinementContext::createForConditionFollowingQuery(
-          AC, Query, LastElement, getCurrentTRC(), Range);
+          TC.Context, Query, LastElement, getCurrentTRC(), Range);
 
       pushContext(TRC, ParentTy());
       NestedCount++;
@@ -1232,7 +1244,7 @@ private:
       // properly. For example, on the OSXApplicationExtension platform
       // we want to chose the OSX spec unless there is an explicit
       // OSXApplicationExtension spec.
-      if (isPlatformActive(VersionSpec->getPlatform(), AC.LangOpts)) {
+      if (isPlatformActive(VersionSpec->getPlatform(), TC.getLangOpts())) {
         return VersionSpec;
       }
     }
@@ -1245,7 +1257,7 @@ private:
   /// Return the version range for the given availability spec.
   VersionRange rangeForSpec(AvailabilitySpec *Spec) {
     if (isa<OtherPlatformAvailabilitySpec>(Spec)) {
-      return VersionRange::allGTE(AC.LangOpts.getMinPlatformVersion());
+      return VersionRange::allGTE(TC.getLangOpts().getMinPlatformVersion());
     }
 
     auto *VersionSpec = cast<VersionConstraintAvailabilitySpec>(Spec);
@@ -1285,7 +1297,7 @@ void TypeChecker::buildTypeRefinementContextHierarchy(SourceFile &SF,
 
   // Build refinement contexts, if necessary, for all declarations starting
   // with StartElem.
-  TypeRefinementContextBuilder Builder(RootTRC, AC);
+  TypeRefinementContextBuilder Builder(RootTRC, *this);
   for (auto D : llvm::makeArrayRef(SF.Decls).slice(StartElem)) {
     Builder.build(D);
   }

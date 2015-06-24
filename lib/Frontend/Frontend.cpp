@@ -406,6 +406,9 @@ void CompilerInstance::performSema() {
   if (Invocation.getFrontendOptions().DebugTimeFunctionBodies) {
     TypeCheckOptions |= TypeCheckingFlags::DebugTimeFunctionBodies;
   }
+  if (Invocation.getFrontendOptions().actionIsImmediate()) {
+    TypeCheckOptions |= TypeCheckingFlags::ForImmediateMode;
+  }
 
   // Parse the main file last.
   if (MainBufferID != NO_SUCH_BUFFER) {

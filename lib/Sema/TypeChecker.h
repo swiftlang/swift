@@ -467,6 +467,11 @@ private:
   /// to llvm::errs().
   bool DebugTimeFunctionBodies = false;
 
+  /// Indicate that the type checker is checking code that will be
+  /// immediately executed. This will suppress certain warnings
+  /// when executing scripts.
+  bool InImmediateMode = false;
+
   /// A helper to construct and typecheck call to super.init().
   ///
   /// \returns NULL if the constructed expression does not typecheck.
@@ -482,6 +487,14 @@ public:
   /// Dump the time it takes to type-check each function to llvm::errs().
   void enableDebugTimeFunctionBodies() {
     DebugTimeFunctionBodies = true;
+  }
+
+  bool getInImmediateMode() {
+    return InImmediateMode;
+  }
+
+  void setInImmediateMode(bool InImmediateMode) {
+    this->InImmediateMode = InImmediateMode;
   }
   
   template<typename ...ArgTypes>
@@ -1511,13 +1524,13 @@ public:
   ///
   /// \param StartElem Where to start for incremental building of refinement
   /// contexts
-  static void buildTypeRefinementContextHierarchy(SourceFile &SF,
-                                                  unsigned StartElem);
+  void buildTypeRefinementContextHierarchy(SourceFile &SF,
+                                           unsigned StartElem);
 
   /// Build the hierarchy of TypeRefinementContexts for the entire
   /// source file, if it has not already been built. Returns the root
   /// TypeRefinementContext for the source file.
-  static TypeRefinementContext *getOrBuildTypeRefinementContext(SourceFile *SF);
+  TypeRefinementContext *getOrBuildTypeRefinementContext(SourceFile *SF);
 
   /// Returns a diagnostic indicating why the declaration cannot be annotated
   /// with an @available() attribute indicating it is potentially unavailable
