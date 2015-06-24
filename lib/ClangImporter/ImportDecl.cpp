@@ -2294,40 +2294,24 @@ namespace {
       if (!dc)
         return nullptr;
 
-      Type type;
-
-      // HACK: Special-case badly-typed constants in <Security/SecItem.h>.
-      if (name.str().startswith("kSec") &&
-          dc->getParentModule()->getName().str().equals("Security")) {
-        auto typedefTy = decl->getType()->getAs<clang::TypedefType>();
-        if (typedefTy && typedefTy->getDecl()->getName() == "CFTypeRef") {
-          auto &clangSrcMgr = Impl.getClangASTContext().getSourceManager();
-          StringRef headerName = clangSrcMgr.getBufferName(decl->getLocation());
-          if (llvm::sys::path::filename(headerName) == "SecItem.h")
-            type = Impl.getCFStringRefType();
-        }
-      }
-
       auto knownVarInfo = Impl.getKnownGlobalVariable(decl);
 
-      if (!type) {
-        // Lookup nullability info.
-        OptionalTypeKind optionality = OTK_ImplicitlyUnwrappedOptional;
-        if (knownVarInfo) {
-          if (auto nullability = knownVarInfo->getNullability())
-            optionality = Impl.translateNullability(*nullability);
-        }
-
-        // If the declaration is const, consider it audited.
-        // We can assume that loading a const global variable doesn't
-        // involve an ownership transfer.
-        bool isAudited = decl->getType().isConstQualified();
-
-        type = Impl.importType(decl->getType(),
-                               (isAudited ? ImportTypeKind::AuditedVariable
-                                          : ImportTypeKind::Variable),
-                               isInSystemModule(dc));
+      // Lookup nullability info.
+      OptionalTypeKind optionality = OTK_ImplicitlyUnwrappedOptional;
+      if (knownVarInfo) {
+        if (auto nullability = knownVarInfo->getNullability())
+          optionality = Impl.translateNullability(*nullability);
       }
+
+      // If the declaration is const, consider it audited.
+      // We can assume that loading a const global variable doesn't
+      // involve an ownership transfer.
+      bool isAudited = decl->getType().isConstQualified();
+
+      Type type = Impl.importType(decl->getType(),
+                                  (isAudited ? ImportTypeKind::AuditedVariable
+                                   : ImportTypeKind::Variable),
+                                  isInSystemModule(dc));
 
       if (!type)
         return nullptr;
