@@ -67,6 +67,8 @@ void DominanceInfo::verify() const {
 /// Compute the immmediate-post-dominators map.
 PostDominanceInfo::PostDominanceInfo(SILFunction *F)
   : DominatorTreeBase(/*isPostDom*/ true) {
+  assert(!F->isExternalDeclaration() &&
+         "Can not construct a post dominator tree for a declaration");
   recalculate(*F);
 }
 
@@ -89,4 +91,22 @@ properlyDominates(SILInstruction *I1, SILInstruction *I2) {
   }
 
   return true;
+}
+
+void PostDominanceInfo::verify() const {
+  // Recompute.
+  //
+  // Even though at the SIL level we have "one" return function, we can have
+  // multiple exits provided by no-return functions.
+  auto *F = getRoots()[0]->getParent();
+  PostDominanceInfo OtherDT(F);
+
+  // And compare.
+  if (errorOccuredOnComparison(OtherDT)) {
+    llvm::errs() << "PostDominatorTree is not up to date!\nComputed:\n";
+    print(llvm::errs());
+    llvm::errs() << "\nActual:\n";
+    OtherDT.print(llvm::errs());
+    abort();
+  }
 }

@@ -127,6 +127,26 @@ public:
 
   bool properlyDominates(SILInstruction *A, SILInstruction *B);
 
+  void verify() const;
+
+  /// Return true if the other dominator tree does not match this dominator
+  /// tree.
+  inline bool errorOccuredOnComparison(const PostDominanceInfo &Other) const {
+    const auto *R = getRootNode();
+    const auto *OtherR = Other.getRootNode();
+
+    if (!R || !OtherR || R->getBlock() != OtherR->getBlock())
+      return true;
+
+    // Returns *false* if they match.
+    if (compare(Other))
+      return true;
+
+    return false;
+  }
+
+  bool isValid(SILFunction *F) const { return getNode(&F->front()) != nullptr; }
+
   using DominatorTreeBase::properlyDominates;
 };
 
