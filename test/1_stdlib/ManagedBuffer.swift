@@ -18,6 +18,33 @@
 import StdlibUnittest
 import Foundation
 
+// Check that the generic parameters are called 'Value' and 'Element'.
+protocol TestProtocol1 {}
+
+extension ManagedProtoBuffer
+  where Value : TestProtocol1, Element : TestProtocol1 {
+
+  var _valueAndElementAreTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+extension ManagedBuffer
+  where Value : TestProtocol1, Element : TestProtocol1 {
+
+  var _valueAndElementAreTestProtocol1_: Bool {
+    fatalError("not implemented")
+  }
+}
+
+extension ManagedBufferPointer
+  where Value : TestProtocol1, Element : TestProtocol1 {
+
+  var _valueAndElementAreTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
 struct CountAndCapacity {
   var count: LifetimeTracked
   let capacity: Int
