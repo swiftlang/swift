@@ -79,8 +79,8 @@ print([1, 2, 3, 4, 5].myReduce(0, combine: +))
 
 
 extension SequenceType {
-  final public func myZip<S : SequenceType>(s: S) -> Zip2<Self, S> {
-    return Zip2(self, s)
+  final public func myZip<S : SequenceType>(s: S) -> Zip2Sequence<Self, S> {
+    return Zip2Sequence(self, s)
   }
 }
 

@@ -32,7 +32,7 @@ for x in w {
 // Test round-trip GeneratorType/GeneratorType adaptation
 var x = (1..<7).generate()
 var y = x
-var z = ZipGenerator2(y, (1..<7).generate())
+var z = Zip2Generator(y, (1..<7).generate())
 
 for a in GeneratorSequence(z) {
   print("\(a.0), \(a.1)")

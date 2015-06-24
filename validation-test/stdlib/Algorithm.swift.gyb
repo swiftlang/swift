@@ -1970,6 +1970,23 @@ SequenceTypeAlgorithms.test("flatMap/SequenceType/TransformProducesOptional") {
 // zip()
 //===----------------------------------------------------------------------===//
 
+// Check that the generic parameters are called 'Generator1' and 'Generator2'.
+extension Zip2Generator
+  where Generator1 : TestProtocol1, Generator2 : TestProtocol1 {
+
+  var _generator1IsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+extension Zip2Sequence
+  where Sequence1 : TestProtocol1, Sequence2 : TestProtocol1 {
+
+  var _sequence1IsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
 struct ZipTest {
   let expected: [(Int, Int32)]
   let sequence: [Int]
@@ -2054,10 +2071,11 @@ SequenceTypeAlgorithms.test("zip") {
       test.other.map { OpaqueValue($0) })
     var result = zip(s, other)
     expectType(
-      Zip2<MinimalSequence<OpaqueValue<Int>>, MinimalSequence<OpaqueValue<Int32>>>.self,
+      Zip2Sequence<MinimalSequence<OpaqueValue<Int>>, MinimalSequence<OpaqueValue<Int32>>>.self,
       &result)
 
-    // Check for expected result and check the Zip2 SequenceType conformance.
+    // Check for expected result and check the Zip2Sequence's SequenceType
+    // conformance.
     checkSequence(
       test.expected.map { (OpaqueValue($0), OpaqueValue($1)) },
       result,
