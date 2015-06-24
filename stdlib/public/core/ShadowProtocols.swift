@@ -61,7 +61,7 @@ public protocol _NSArrayCoreType :
 
   func objectAtIndex(index: Int) -> AnyObject
 
-  func getObjects(UnsafeMutablePointer<AnyObject>, range: _SwiftNSRange)
+  func getObjects(_: UnsafeMutablePointer<AnyObject>, range: _SwiftNSRange)
 
   func countByEnumeratingWithState(
          state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,

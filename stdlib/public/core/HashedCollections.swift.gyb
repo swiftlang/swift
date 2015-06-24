@@ -761,7 +761,7 @@ extension Set: CustomStringConvertible, CustomDebugStringConvertible {
 
 #if _runtime(_ObjC)
 @asmname("swift_stdlib_CFSetGetValues")
-func _stdlib_CFSetGetValues(nss: _NSSetType, UnsafeMutablePointer<AnyObject>)
+func _stdlib_CFSetGetValues(nss: _NSSetType, _: UnsafeMutablePointer<AnyObject>)
 
 /// Equivalent to `NSSet.allObjects`, but does not leave objects on the
 /// autorelease pool.

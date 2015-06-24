@@ -130,7 +130,7 @@ public protocol ForwardIndexType : _Incrementable {
 
   // Do not use these operators directly; call distance(start, end)
   // and advance(start, n) instead
-  func _distanceTo(Self) -> Distance
+  func _distanceTo(_: Self) -> Distance
   func ~> (start:Self, _ : (_Advance, Distance)) -> Self
   func ~> (start:Self, _ : (_Advance, (Distance, Self))) -> Self
 }

@@ -1034,7 +1034,7 @@ internal func _forceCreateUniqueMutableBuffer<_Buffer : _ArrayBufferType>(
 
 internal protocol _PointerFunctionType {
   typealias Element
-  func call(UnsafeMutablePointer<Element>, count: Int)
+  func call(_: UnsafeMutablePointer<Element>, count: Int)
 }
 
 /// Initialize the elements of dest by copying the first headCount

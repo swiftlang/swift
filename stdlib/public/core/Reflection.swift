@@ -457,9 +457,9 @@ struct _EnumMirror : MirrorType {
 }
 
 @asmname("swift_ClassMirror_count")
-func _getClassCount(_MagicMirrorData) -> Int
+func _getClassCount(_: _MagicMirrorData) -> Int
 @asmname("swift_ClassMirror_subscript")
-func _getClassChild(Int, _MagicMirrorData) -> (String, MirrorType)
+func _getClassChild(_: Int, _: _MagicMirrorData) -> (String, MirrorType)
 
 #if _runtime(_ObjC)
 @asmname("swift_ClassMirror_quickLookObject")public

@@ -12,9 +12,9 @@
 
 #if _runtime(_ObjC)
 @asmname("swift_ObjCMirror_count") 
-func _getObjCCount(_MagicMirrorData) -> Int
+func _getObjCCount(_: _MagicMirrorData) -> Int
 @asmname("swift_ObjCMirror_subscript") 
-func _getObjCChild(Int, _MagicMirrorData) -> (String, MirrorType)
+func _getObjCChild(_: Int, _: _MagicMirrorData) -> (String, MirrorType)
 
 @objc protocol _DebugDescriptionProxy {
   var debugDescription: _CocoaStringType {get}

@@ -490,7 +490,7 @@ public func == (lhs: ${Self}, rhs: ${Self}) -> Bool {
 //===----------------------------------------------------------------------===//
 
 internal class _AnyCollectionBox<Element> : _AnyCollectionBoxBase {
-  subscript(_ForwardIndexBoxType) -> Element {_abstract()}
+  subscript(_: _ForwardIndexBoxType) -> Element {_abstract()}
   func _count() -> IntMax {_abstract()}
 
   // FIXME: should be inherited, but a known bug prevents it since
