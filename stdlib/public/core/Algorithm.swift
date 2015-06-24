@@ -190,7 +190,7 @@ public func startsWith<
 /// - Note: Idiomatic usage is to call `enumerate` instead of
 ///   constructing an `EnumerateGenerator` directly.
 public struct EnumerateGenerator<
-  Base: GeneratorType
+  Base : GeneratorType
 > : GeneratorType, SequenceType {
   /// The type of element returned by `next()`.
   public typealias Element = (index: Int, element: Base.Element)
