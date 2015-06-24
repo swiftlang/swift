@@ -18,6 +18,15 @@ import SwiftExperimental
 import Foundation
 import StdlibUnittest
 
+// Check that the generic parameters are called 'Key' and 'Value'.
+protocol TestProtocol1 {}
+
+extension DictionaryLiteral where Key : TestProtocol1, Value : TestProtocol1 {
+  var _keyAndValueAreTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
 var strings: DictionaryLiteral = ["a": "1", "b": "Foo"]
 expectType(DictionaryLiteral<String, String>.self, &strings)
 
