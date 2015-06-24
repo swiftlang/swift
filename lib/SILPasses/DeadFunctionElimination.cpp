@@ -392,7 +392,6 @@ class ExternalFunctionDefinitionsElimination : FunctionLivenessComputation {
   /// Try to convert definition into declaration.
   /// Returns true if function was erased from the module.
   bool tryToConvertExternalDefinitionIntoDeclaration(SILFunction *F) {
-    bool FunctionWasErased = false;
     // Bail if it is a declaration already
     if (!F->isDefinition())
       return false;
@@ -412,12 +411,10 @@ class ExternalFunctionDefinitionsElimination : FunctionLivenessComputation {
     Blocks.clear();
     assert(F->isExternalDeclaration() &&
            "Function should be an external declaration");
-    if (F->getRefCount() == 0) {
+    if (F->getRefCount() == 0)
       Module->eraseFunction(F);
-      FunctionWasErased = true;
-    }
     NumEliminatedExternalDefs++;
-    return FunctionWasErased;
+    return true;
   }
 
 public:
