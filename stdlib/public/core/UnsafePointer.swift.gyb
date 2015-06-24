@@ -18,11 +18,11 @@
 % for mutable in (True, False):
 %  Self = 'UnsafeMutablePointer' if mutable else 'UnsafePointer'
 %  a_Self = 'an `UnsafeMutablePointer`' if mutable else 'an `UnsafePointer`'
-%  MirrorConformance = gyb.executeTemplate(TMirrorConformance,introspecteeType=Self,genericArgs=['T'],disposition='Struct')
-%  MirrorDecl = gyb.executeTemplate(TMirrorDecl,introspecteeType=Self,genericArgs=['T'],disposition='Struct')
-%  MirrorBoilerplate = gyb.executeTemplate(TMirrorBoilerplate,introspecteeType=Self,genericArgs=['T'],disposition='Struct')
+%  MirrorConformance = gyb.executeTemplate(TMirrorConformance,introspecteeType=Self,genericArgs=['Memory'],disposition='Struct')
+%  MirrorDecl = gyb.executeTemplate(TMirrorDecl,introspecteeType=Self,genericArgs=['Memory'],disposition='Struct')
+%  MirrorBoilerplate = gyb.executeTemplate(TMirrorBoilerplate,introspecteeType=Self,genericArgs=['Memory'],disposition='Struct')
 
-/// A pointer to an object of type `T`.  This type provides no automated
+/// A pointer to an object of type `Memory`.  This type provides no automated
 /// memory management, and therefore the user must take care to allocate
 /// and free memory appropriately.
 ///
@@ -34,7 +34,7 @@
 /// - memory is allocated, but value has not been initialized;
 ///
 /// - memory is allocated and value is initialized.
-public struct ${Self}<T>
+public struct ${Self}<Memory>
   : RandomAccessIndexType, Hashable,
     NilLiteralConvertible, _PointerType {
 
@@ -100,13 +100,13 @@ public struct ${Self}<T>
   }
 
 %  if mutable:
-  /// Allocate memory for `num` objects of type `T`.
+  /// Allocate memory for `num` objects of type `Memory`.
   ///
   /// - Postcondition: The memory is allocated, but not initialized.
   public static func alloc(num: Int) -> ${Self} {
-    let size = strideof(T.self) * num
+    let size = strideof(Memory.self) * num
     return ${Self}(
-      Builtin.allocRaw(size._builtinWordValue, Builtin.alignof(T.self)))
+      Builtin.allocRaw(size._builtinWordValue, Builtin.alignof(Memory.self)))
   }
 
   /// Deallocate `num` objects.
@@ -119,9 +119,9 @@ public struct ${Self}<T>
   ///
   /// - Postcondition: The memory has been deallocated.
   public func dealloc(num: Int) {
-    let size = strideof(T.self) * num
+    let size = strideof(Memory.self) * num
     Builtin.deallocRaw(
-      _rawValue, size._builtinWordValue, Builtin.alignof(T.self))
+      _rawValue, size._builtinWordValue, Builtin.alignof(Memory.self))
   }
 %  end
 
@@ -135,7 +135,7 @@ else:
 }%
 
 ${comment}
-  public var memory: T {
+  public var memory: Memory {
 %  if mutable:
     @transparent unsafeAddress {
       return UnsafePointer(self)
@@ -158,7 +158,7 @@ ${comment}
   ///
   /// - Postcondition: The memory is initalized; the value should eventually
   ///   be destroyed or moved from to avoid leaks.
-  public func initialize(newvalue: T) {
+  public func initialize(newvalue: Memory) {
     Builtin.initialize(newvalue, _rawValue)
   }
 
@@ -172,7 +172,7 @@ ${comment}
   ///
   /// - Postcondition: The value has been destroyed and the memory must
   ///   be initialized before being used again.
-  public func move() -> T {
+  public func move() -> Memory {
     return Builtin.take(_rawValue)
   }
 
@@ -215,7 +215,7 @@ ${comment}
       self < source || self >= source + count,
       "${Self}.moveInitializeFrom non-following overlapping range; use moveInitializeBackwardFrom")
     Builtin.takeArrayFrontToBack(
-      T.self, self._rawValue, source._rawValue, count._builtinWordValue)
+      Memory.self, self._rawValue, source._rawValue, count._builtinWordValue)
     // This builtin is equivalent to:
     // for i in 0..<count {
     //   (self + i).initialize((source + i).move())
@@ -235,7 +235,7 @@ ${comment}
       source < self || source >= self + count,
       "${Self}.moveInitializeBackwardFrom non-preceding overlapping range; use moveInitializeFrom instead")
     Builtin.takeArrayBackToFront(
-      T.self, self._rawValue, source._rawValue, count._builtinWordValue)
+      Memory.self, self._rawValue, source._rawValue, count._builtinWordValue)
     // This builtin is equivalent to:
     // var src = source + count
     // var dst = self + count
@@ -256,7 +256,7 @@ ${comment}
       self + count <= source || source + count <= self,
       "${Self}.initializeFrom non-following overlapping range")
     Builtin.copyArray(
-      T.self, self._rawValue, source._rawValue, count._builtinWordValue)
+      Memory.self, self._rawValue, source._rawValue, count._builtinWordValue)
     // This builtin is equivalent to:
     // for i in 0..<count {
     //   (self + i).initialize(source[i])
@@ -266,8 +266,9 @@ ${comment}
   /// Copy the elements of `C` into raw memory.
   ///
   /// - Precondition: The memory is not initialized.
-  public func initializeFrom<C: CollectionType where C.Generator.Element == T>(
-    source: C) {
+  public func initializeFrom<
+    C : CollectionType where C.Generator.Element == Memory
+  >(source: C) {
     source._initializeTo(self)
   }
 
@@ -281,9 +282,9 @@ ${comment}
     _debugPrecondition(
       self + count <= source || source + count <= self,
       "moveAssignFrom overlapping range")
-    Builtin.destroyArray(T.self, self._rawValue, count._builtinWordValue)
+    Builtin.destroyArray(Memory.self, self._rawValue, count._builtinWordValue)
     Builtin.takeArrayFrontToBack(
-      T.self, self._rawValue, source._rawValue, count._builtinWordValue)
+      Memory.self, self._rawValue, source._rawValue, count._builtinWordValue)
     // These builtins are equivalent to:
     // for i in 0..<count {
     //   self[i] = (source + i).move()
@@ -297,7 +298,7 @@ ${comment}
   /// - Postcondition: The value has been destroyed and the memory must
   ///   be initialized before being used again.
   public func destroy() {
-    Builtin.destroy(T.self, _rawValue)
+    Builtin.destroy(Memory.self, _rawValue)
   }
 
   /// Destroy the `count` objects the pointer points to.
@@ -307,7 +308,7 @@ ${comment}
   ///   be initialized before being used again.
   public func destroy(count: Int) {
     _debugPrecondition(count >= 0, "${Self}.destroy with negative count")
-    Builtin.destroyArray(T.self, _rawValue, count._builtinWordValue)
+    Builtin.destroyArray(Memory.self, _rawValue, count._builtinWordValue)
   }
 %  end
 
@@ -317,7 +318,7 @@ ${comment}
   }
 
   /// Access the `i`th element of the raw array starting at `self`.
-  public subscript (i : Int) -> T {
+  public subscript(i: Int) -> Memory {
 %  if mutable:
     @transparent
     unsafeAddress {
@@ -339,7 +340,7 @@ ${comment}
   /// If self was converted from `nil`, writes the result of invoking body into
   /// the pointee.
   public // SPI(Foundation)
-  func _setIfNonNil(@noescape body: () -> T) {
+  func _setIfNonNil(@noescape body: () -> Memory) {
     if self != nil {
       memory = body()
     }
@@ -348,7 +349,7 @@ ${comment}
 #if _runtime(_ObjC)
   /// Return the result of invoking body.  If self was converted from
   /// nil, passes nil as the argument.  Otherwise, passes the address
-  /// of a `T` which is written into buffer before this method returns.
+  /// of a `Memory` which is written into buffer before this method returns.
   @transparent public
   func _withBridgeObject<U : AnyObject, R>(
     inout buffer: U?, @noescape body: AutoreleasingUnsafeMutablePointer<U?> -> R
@@ -449,61 +450,64 @@ ${MirrorDecl} {
 ${MirrorConformance}
 
 @transparent
-public func == <T> (lhs: ${Self}<T>, rhs: ${Self}<T>) -> Bool {
+public func == <Memory>(
+  lhs: ${Self}<Memory>, rhs: ${Self}<Memory>
+) -> Bool {
   return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
 }
 
 @transparent
-public func < <T>(lhs: ${Self}<T>, rhs: ${Self}<T>) -> Bool {
+public func < <Memory>(lhs: ${Self}<Memory>, rhs: ${Self}<Memory>) -> Bool {
   return Bool(Builtin.cmp_ult_RawPointer(lhs._rawValue, rhs._rawValue))
 }
 
 @transparent
-public func + <T>(lhs: ${Self}<T>, rhs: Int) -> ${Self}<T> {
+public func + <Memory>(lhs: ${Self}<Memory>, rhs: Int) -> ${Self}<Memory> {
   return ${Self}(Builtin.gep_Word(
-    lhs._rawValue, (rhs &* strideof(T.self))._builtinWordValue))
+    lhs._rawValue, (rhs &* strideof(Memory.self))._builtinWordValue))
 }
 
 @transparent
-public func + <T>(lhs: Int,
-           rhs: ${Self}<T>) -> ${Self}<T> {
+public func + <Memory>(lhs: Int,
+           rhs: ${Self}<Memory>) -> ${Self}<Memory> {
   return rhs + lhs
 }
 
 @transparent
-public func - <T>(lhs: ${Self}<T>, rhs: Int) -> ${Self}<T> {
+public func - <Memory>(lhs: ${Self}<Memory>, rhs: Int) -> ${Self}<Memory> {
   return lhs + -rhs
 }
 
 @transparent
-public func - <T>(lhs: ${Self}<T>, rhs: ${Self}<T>) -> Int {
+public func - <Memory>(lhs: ${Self}<Memory>, rhs: ${Self}<Memory>) -> Int {
   return
     Int(Builtin.sub_Word(Builtin.ptrtoint_Word(lhs._rawValue),
                          Builtin.ptrtoint_Word(rhs._rawValue)))
-    / strideof(T.self)
+    / strideof(Memory.self)
 }
 
 @transparent
-public func += <T>(inout lhs: ${Self}<T>, rhs: Int) {
+public func += <Memory>(inout lhs: ${Self}<Memory>, rhs: Int) {
   lhs = lhs + rhs
 }
 
 @transparent
-public func -= <T>(inout lhs: ${Self}<T>, rhs: Int) {
+public func -= <Memory>(inout lhs: ${Self}<Memory>, rhs: Int) {
   lhs = lhs - rhs
 }
 % end # for mutable
 
 extension UnsafeMutablePointer : SinkType {
-  public mutating func put(x: T) {
+  public mutating func put(x: Memory) {
     self.memory = x
     ++self
   }
 }
 
 /// A byte-sized thing that isn't designed to interoperate with
-/// any other types; it makes a decent parameter to `UnsafeMutablePointer` when
-/// you just want to do bytewise pointer arithmetic.
+/// any other types; it makes a decent parameter to
+/// `UnsafeMutablePointer<Memory>` when you just want to do bytewise
+/// pointer arithmetic.
 public struct RawByte {
   let _inaccessible: UInt8
 }

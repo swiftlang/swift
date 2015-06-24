@@ -42,7 +42,7 @@ public protocol _ObjectiveCBridgeable {
   ///
   /// This bridging operation is used for forced downcasting (e.g.,
   /// via as), and may defer complete checking until later. For
-  /// example, when bridging from `NSArray` to `Array<T>`, we can defer
+  /// example, when bridging from `NSArray` to `Array<Element>`, we can defer
   /// the checking for the individual elements of the array.
   ///
   /// - parameter result The location where the result is written. The optional
@@ -263,19 +263,19 @@ internal var _nilNativeObject: AnyObject? {
 /// - `nil`, which gets passed as a null pointer,
 /// - an inout argument of the referenced type, which gets passed as a pointer
 ///   to a writeback temporary with autoreleasing ownership semantics,
-/// - an `UnsafeMutablePointer<T>`, which is passed as-is.
+/// - an `UnsafeMutablePointer<Memory>`, which is passed as-is.
 ///
 /// Passing pointers to mutable arrays of ObjC class pointers is not
-/// directly supported. Unlike `UnsafeMutablePointer<T>`,
-/// AutoreleasingUnsafeMutablePointer must reference storage that does
-/// not own a reference count to the referenced
+/// directly supported. Unlike `UnsafeMutablePointer<Memory>`,
+/// `AutoreleasingUnsafeMutablePointer<Memory>` must reference storage that
+/// does not own a reference count to the referenced
 /// value. UnsafeMutablePointer's operations, by contrast, assume that
 /// the referenced storage owns values loaded from or stored to it.
 ///
 /// This type does not carry an owner pointer unlike the other C*Pointer types
 /// because it only needs to reference the results of inout conversions, which
 /// already have writeback-scoped lifetime.
-public struct AutoreleasingUnsafeMutablePointer<T /* TODO : class */>
+public struct AutoreleasingUnsafeMutablePointer<Memory /* TODO : class */>
   : Equatable, NilLiteralConvertible, _PointerType {
   public let _rawValue: Builtin.RawPointer
 
@@ -287,17 +287,17 @@ public struct AutoreleasingUnsafeMutablePointer<T /* TODO : class */>
 
   @transparent
   var _isNull : Bool {
-    return UnsafeMutablePointer<T>(self)._isNull
+    return UnsafeMutablePointer<Memory>(self)._isNull
   }
 
   /// Access the underlying raw memory, getting and
   /// setting values.
-  public var memory : T {
+  public var memory: Memory {
     /// Retrieve the value the pointer points to.
     @transparent get {
       _debugPrecondition(!_isNull)
       // We can do a strong load normally.
-      return UnsafeMutablePointer<T>(self).memory
+      return UnsafeMutablePointer<Memory>(self).memory
     }
     /// Set the value the pointer points to, copying over the previous value.
     ///
@@ -315,7 +315,7 @@ public struct AutoreleasingUnsafeMutablePointer<T /* TODO : class */>
       // autoreleasing slot, so retains/releases of the original value are
       // unneeded.
       let p = UnsafeMutablePointer<COpaquePointer>(
-        UnsafeMutablePointer<T>(self))
+        UnsafeMutablePointer<Memory>(self))
         p.memory = unsafeBitCast(newValue, COpaquePointer.self)
     }
   }
@@ -324,12 +324,12 @@ public struct AutoreleasingUnsafeMutablePointer<T /* TODO : class */>
   /// `self`.
   ///
   /// - Requires: `self != nil`.
-  public subscript(i: Int) -> T {
+  public subscript(i: Int) -> Memory {
     @transparent
     get {
       _debugPrecondition(!_isNull)
       // We can do a strong load normally.
-      return (UnsafePointer<T>(self) + i).memory
+      return (UnsafePointer<Memory>(self) + i).memory
     }
   }
 
@@ -373,9 +373,9 @@ extension AutoreleasingUnsafeMutablePointer : CustomDebugStringConvertible {
 }
 
 @transparent
-public func == <T> (
-  lhs: AutoreleasingUnsafeMutablePointer<T>,
-  rhs: AutoreleasingUnsafeMutablePointer<T>
+public func == <Memory> (
+  lhs: AutoreleasingUnsafeMutablePointer<Memory>,
+  rhs: AutoreleasingUnsafeMutablePointer<Memory>
 ) -> Bool {
   return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
 }

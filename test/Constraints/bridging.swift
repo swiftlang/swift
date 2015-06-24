@@ -225,7 +225,7 @@ func rdar19770981(s: String, ns: NSString) {
 
 // <rdar://problem/19831919> Fixit offers as! conversions that are known to always fail
 func rdar19831919() {
-  var s1 = 1 + "str"; // expected-error{{binary operator '+' cannot be applied to operands of type 'Int' and 'String'}} expected-note{{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (String, String), (Int, UnsafeMutablePointer<T>), (Int, UnsafePointer<T>)}}
+  var s1 = 1 + "str"; // expected-error{{binary operator '+' cannot be applied to operands of type 'Int' and 'String'}} expected-note{{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (String, String), (Int, UnsafeMutablePointer<Memory>), (Int, UnsafePointer<Memory>)}}
 }
 
 // <rdar://problem/19831698> Incorrect 'as' fixits offered for invalid literal expressions

@@ -5,9 +5,30 @@
 
 import StdlibUnittest
 
-// Check that the generic parameter is called 'Element'.
 protocol TestProtocol1 {}
 
+// Check that the generic parameter is called 'Memory'.
+#if _runtime(_ObjC)
+extension AutoreleasingUnsafeMutablePointer where Memory : TestProtocol1 {
+  var _memoryIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+#endif
+
+extension UnsafePointer where Memory : TestProtocol1 {
+  var _memoryIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+extension UnsafeMutablePointer where Memory : TestProtocol1 {
+  var _memoryIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+// Check that the generic parameter is called 'Element'.
 extension UnsafeBufferPointerGenerator where Element : TestProtocol1 {
   var _elementIsTestProtocol1: Bool {
     fatalError("not implemented")
