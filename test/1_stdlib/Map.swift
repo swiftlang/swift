@@ -12,6 +12,27 @@
 // RUN: %target-run-simple-swift | FileCheck %s
 // REQUIRES: executable_test
 
+// Check that the generic parameters are called 'Base' and 'Element'.
+protocol TestProtocol1 {}
+
+extension MapGenerator where Base : TestProtocol1, Element : TestProtocol1 {
+  var _baseIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+extension MapSequence where Base : TestProtocol1, Element : TestProtocol1 {
+  var _baseIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+extension MapCollection where Base : TestProtocol1, Element : TestProtocol1 {
+  var _baseIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
 // CHECK: testing...
 print("testing...")
 

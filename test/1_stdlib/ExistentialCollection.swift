@@ -55,8 +55,7 @@ tests.test("AnyGenerator") {
     
     // This is a really complicated type of no interest to our
     // clients.
-    let g: MapSequenceGenerator<RangeGenerator<Int>, String>
-      = lazyStrings.generate()
+    let g: MapGenerator<RangeGenerator<Int>, String> = lazyStrings.generate()
     return anyGenerator(g)
   }
   expectEqual(["0", "1", "2", "3", "4"], Array(countStrings()))

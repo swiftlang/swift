@@ -187,17 +187,17 @@ LazyTestSuite.test("LazySequence<${traversal}Collection>/underestimateCount") {
 %end
 
 //===----------------------------------------------------------------------===//
-// MapSequenceView
+// MapSequence
 //===----------------------------------------------------------------------===//
 
-LazyTestSuite.test("MapSequenceView<Sequence>/underestimateCount") {
+LazyTestSuite.test("MapSequence<Sequence>/underestimateCount") {
   let s = MinimalSequence(
     [ 0, 30, 10, 90 ].map { OpaqueValue($0) },
     underestimatedCount: .Value(42))
   var lazyMap = lazy(s).map { OpaqueValue(Int32($0.value)) }
   expectType(
     LazySequence<
-      MapSequenceView<
+      MapSequence<
         MinimalSequence<OpaqueValue<Int>>,
         OpaqueValue<Int32>
       >
@@ -245,14 +245,14 @@ LazyTestSuite.test("LazySequence.array") {
 
 %for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
 
-LazyTestSuite.test("MapCollectionView<${traversal}Collection>/underestimateCount") {
+LazyTestSuite.test("MapCollection<${traversal}Collection>/underestimateCount") {
   let s = Minimal${traversal}Collection(
     [ 0, 30, 10, 90 ].map { OpaqueValue($0) },
     underestimatedCount: .Value(42))
   var lazyMap = lazy(s).map { OpaqueValue(Int32($0.value)) }
   expectType(
     Lazy${traversal}Collection<
-      MapCollectionView<
+      MapCollection<
         Minimal${traversal}Collection<OpaqueValue<Int>>,
         OpaqueValue<Int32>
       >

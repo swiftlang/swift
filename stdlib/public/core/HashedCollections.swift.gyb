@@ -1159,8 +1159,7 @@ public struct Dictionary<Key : Hashable, Value> :
   /// Keys appear in the same order as they occur as the `.0` member
   /// of key-value pairs in `self`.  Each key in the result has a
   /// unique value.
-  public var keys:
-    LazyForwardCollection<MapCollectionView<Dictionary, Key>> {
+  public var keys: LazyForwardCollection<MapCollection<Dictionary, Key>> {
     return lazy(self).map { $0.0 }
   }
 
@@ -1168,8 +1167,7 @@ public struct Dictionary<Key : Hashable, Value> :
   ///
   /// Values appear in the same order as they occur as the `.1` member
   /// of key-value pairs in `self`.
-  public var values:
-    LazyForwardCollection<MapCollectionView<Dictionary, Value>> {
+  public var values: LazyForwardCollection<MapCollection<Dictionary, Value>> {
     return lazy(self).map { $0.1 }
   }
 
