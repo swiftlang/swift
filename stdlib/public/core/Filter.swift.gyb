@@ -180,11 +180,10 @@ public func filter<S : SequenceType>(
 extension ${Self} {
   /// Return a lazy SequenceType containing the elements `x` of `source` for
   /// which `includeElement(x)` is `true`.
-  public
-  func filter(
-    includeElement: (S.Generator.Element)->Bool
-  ) -> LazySequence<FilterSequence<S>> {
-    return LazySequence<FilterSequence<S>>(
+  public func filter(
+    includeElement: (Base.Generator.Element)->Bool
+  ) -> LazySequence<FilterSequence<Base>> {
+    return LazySequence<FilterSequence<Base>>(
       FilterSequence(_base: self._base, _include: includeElement))
   }
 }

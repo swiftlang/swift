@@ -127,10 +127,9 @@ extension ${Self} {
   /// Return a `${View}` over this `${Self}`.  The elements of
   /// the result are computed lazily, each time they are read, by
   /// calling `transform` function on a base element.
-  public
-  func reverse() -> LazyBidirectionalCollection<${View}<S>> {
-    return LazyBidirectionalCollection<${View}<S>>(
-      ${View}<S>(self._base)
+  public func reverse() -> LazyBidirectionalCollection<${View}<Base>> {
+    return LazyBidirectionalCollection<${View}<Base>>(
+      ${View}<Base>(self._base)
     )
   }
 }

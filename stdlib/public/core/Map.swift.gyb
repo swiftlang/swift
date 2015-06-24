@@ -157,9 +157,9 @@ extension ${Self} {
   /// the result are computed lazily, each time they are read, by
   /// calling `transform` function on a base element.
   public func map<U>(
-    transform: (S.Generator.Element) -> U
-  ) -> ${Self}<${View}<S, U>> {
-    return ${Self}<${View}<S, U>>(
+    transform: (Base.Generator.Element) -> U
+  ) -> ${Self}<${View}<Base, U>> {
+    return ${Self}<${View}<Base, U>>(
       ${View}(_base: self._base, _transform: transform)
     )
   }

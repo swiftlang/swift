@@ -160,6 +160,13 @@ LazyTestSuite.test("firstLast") {
 // LazySequence
 //===----------------------------------------------------------------------===//
 
+// Check that the generic parameter is called 'Base'.
+extension LazySequence where Base : TestProtocol1 {
+  var _baseIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
 LazyTestSuite.test("LazySequence<Sequence>/underestimateCount") {
   let s = MinimalSequence(
     [ 0, 30, 10, 90 ].map { OpaqueValue($0) },
@@ -259,6 +266,21 @@ LazyTestSuite.test("MapCollection<${traversal}Collection>/underestimateCount") {
     >.self,
     &lazyMap)
   expectEqual(42, lazyMap.underestimateCount())
+}
+
+%end
+
+//===----------------------------------------------------------------------===//
+// LazyCollection
+//===----------------------------------------------------------------------===//
+
+%for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
+
+// Check that the generic parameter is called 'Base'.
+extension Lazy${traversal}Collection where Base : TestProtocol1 {
+  var _baseIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
 }
 
 LazyTestSuite.test("Lazy${traversal}Collection.array") {

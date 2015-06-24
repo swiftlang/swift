@@ -11,30 +11,30 @@
 //===----------------------------------------------------------------------===//
 
 %for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
-%  whereClause = 'where S.Index : %sIndexType' % traversal
+%  whereClause = 'where Base.Index : %sIndexType' % traversal
 %  Self = 'Lazy%sCollection' % traversal
 
 /// A collection that forwards its implementation to an underlying
 /// collection instance while exposing lazy computations as methods.
-public struct ${Self}<S : CollectionType ${whereClause}> : CollectionType {
+public struct ${Self}<Base : CollectionType ${whereClause}> : CollectionType {
   
   /// Construct an instance with `base` as its underlying collection
   /// instance.
-  public init(_ base: S) {
+  public init(_ base: Base) {
     self._base = base
   }
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> S.Generator {
+  public func generate() -> Base.Generator {
     return self._base.generate()
   }
 
   /// The position of the first element in a non-empty collection.
   ///
   /// In an empty collection, `startIndex == endIndex`.
-  public var startIndex: S.Index {
+  public var startIndex: Base.Index {
     return _base.startIndex
   }
   
@@ -43,7 +43,7 @@ public struct ${Self}<S : CollectionType ${whereClause}> : CollectionType {
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
   /// `successor()`.
-  public var endIndex: S.Index {
+  public var endIndex: Base.Index {
     return _base.endIndex
   }
 
@@ -52,13 +52,13 @@ public struct ${Self}<S : CollectionType ${whereClause}> : CollectionType {
   /// - Requires: `position` is a valid position in `self` and
   ///   `position != endIndex`.
   public
-  subscript(position: S.Index) -> S.Generator.Element {
+  subscript(position: Base.Index) -> Base.Generator.Element {
     return _base[position]
   }
   
   /// an Array, created on-demand, containing the elements of this
   /// lazy CollectionType.
-  public var array: [S.Generator.Element] {
+  public var array: [Base.Generator.Element] {
     return Array(_base)
   }
 
@@ -66,12 +66,13 @@ public struct ${Self}<S : CollectionType ${whereClause}> : CollectionType {
     return _base.underestimateCount()
   }
 
-  var _base: S
+  var _base: Base
 }
 
 /// Augment `s` with lazy methods such as `map`, `filter`, etc.
-public
-func lazy<S: CollectionType ${whereClause}>(s: S) -> ${Self}<S> {
+public func lazy<Base : CollectionType ${whereClause}>(s: Base)
+  -> ${Self}<Base> {
+
   return ${Self}(s)
 }
 
