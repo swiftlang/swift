@@ -16,6 +16,27 @@ import Foundation
 // For experimental Set operators
 import SwiftExperimental
 
+// Check that the generic parameter is called 'Element'.
+protocol TestProtocol1 {}
+
+extension Set where Element : TestProtocol1 {
+  var _elementIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+extension SetIndex where Element : TestProtocol1 {
+  var _elementIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+extension SetGenerator where Element : TestProtocol1 {
+  var _elementIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
 let hugeNumberArray = (0..<500).map {
   (i: Int) -> Int in
   return random()

@@ -15,6 +15,30 @@ import StdlibUnittest
 import Foundation
 import StdlibUnittestFoundationExtras
 
+// Check that the generic parameters are called 'Key' and 'Value'.
+protocol TestProtocol1 {}
+
+extension Dictionary where Key : TestProtocol1, Value : TestProtocol1 {
+  var _keyValueAreTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+extension DictionaryIndex where Key : TestProtocol1, Value : TestProtocol1 {
+  var _keyValueAreTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+extension DictionaryGenerator
+  where Key : TestProtocol1, Value : TestProtocol1 {
+
+  var _keyValueAreTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+
 var DictionaryTestSuite = TestSuite("Dictionary")
 
 DictionaryTestSuite.test("sizeof") {

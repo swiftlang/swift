@@ -193,7 +193,8 @@ import SwiftShims
 // Bridging `NSSet` to `Set` and vice versa
 // ----------------------------------------
 //
-// Bridging guarantees for `Set<T>` are the same as for `Dictionary<T, ()>`.
+// Bridging guarantees for `Set<Element>` are the same as for
+// `Dictionary<Element, ()>`.
 //
 
 /// This protocol is only used for compile-time checks that
@@ -261,7 +262,7 @@ internal struct _UnmanagedAnyObjectArray {
   }
 }
 
-//===--- APIs unique to Set<T> --------------------------------------------===//
+//===--- APIs unique to Set<Element> --------------------------------------===//
 
 /// Header part of the native storage for `Set`.
 internal struct _SetBody {
@@ -277,23 +278,22 @@ internal struct _SetBody {
 
 /// An element of the variable-length array part of the native storage for
 /// `Set`.
-internal struct _SetElement<T> {
-  internal let key : T
-  internal var value: T {
+internal struct _SetElement<Element> {
+  internal let key : Element
+  internal var value: Element {
     return key
   }
 }
 
-/// A collection of unique `T` instances with no defined ordering.
-public struct Set<T : Hashable> :
+/// A collection of unique `Element` instances with no defined ordering.
+public struct Set<Element : Hashable> :
   Hashable, CollectionType, ArrayLiteralConvertible {
 
-  internal typealias _Self = Set<T>
-  internal typealias _VariantStorage = _VariantSetStorage<T>
-  internal typealias _NativeStorage = _NativeSetStorage<T>
-  public typealias Element = T
-  public typealias Index = SetIndex<T>
-  public typealias GeneratorType = SetGenerator<T>
+  internal typealias _Self = Set<Element>
+  internal typealias _VariantStorage = _VariantSetStorage<Element>
+  internal typealias _NativeStorage = _NativeSetStorage<Element>
+  public typealias Index = SetIndex<Element>
+  public typealias GeneratorType = SetGenerator<Element>
 
   internal var _variantStorage: _VariantStorage
 
@@ -307,13 +307,13 @@ public struct Set<T : Hashable> :
   }
 
   /// Private initializer.
-  internal init(_nativeStorage: _NativeSetStorage<T>) {
+  internal init(_nativeStorage: _NativeSetStorage<Element>) {
     _variantStorage = _VariantStorage.Native(
       _NativeStorage.Owner(nativeStorage: _nativeStorage))
   }
 
   /// Private initializer.
-  internal init(_nativeStorageOwner: _NativeSetStorageOwner<T>) {
+  internal init(_nativeStorageOwner: _NativeSetStorageOwner<Element>) {
     _variantStorage = .Native(_nativeStorageOwner)
   }
 
@@ -328,10 +328,10 @@ public struct Set<T : Hashable> :
   /// Only use this initializer when both conditions are true:
   ///
   /// * it is statically known that the given `NSSet` is immutable;
-  /// * `T` is bridged verbatim to Objective-C (i.e.,
+  /// * `Element` is bridged verbatim to Objective-C (i.e.,
   ///   is a reference type).
   public init(_immutableCocoaSet: _NSSetType) {
-    _sanityCheck(_isBridgedVerbatimToObjectiveC(T.self),
+    _sanityCheck(_isBridgedVerbatimToObjectiveC(Element.self),
       "Set can be backed by NSSet _variantStorage only when the member type can be bridged verbatim to Objective-C")
     _variantStorage = _VariantSetStorage.Cocoa(
       _CocoaSetStorage(cocoaSet: _immutableCocoaSet))
@@ -361,23 +361,23 @@ public struct Set<T : Hashable> :
   }
 
   /// Returns `true` if the set contains a member.
-  public func contains(member: T) -> Bool {
+  public func contains(member: Element) -> Bool {
     return _variantStorage.maybeGet(member) != nil
   }
 
   /// Returns the `Index` of a given member, or `nil` if the member is not
   /// present in the set.
-  public func indexOf(member: T) -> Index? {
+  public func indexOf(member: Element) -> Index? {
     return _variantStorage.indexForKey(member)
   }
 
   /// Insert a member into the set.
-  public mutating func insert(member: T) {
+  public mutating func insert(member: Element) {
     _variantStorage.updateValue(member, forKey: member)
   }
 
   /// Remove the member from the set and return it if it was present.
-  public mutating func remove(member: T) -> T? {
+  public mutating func remove(member: Element) -> Element? {
     return _variantStorage.removeValueForKey(member)
   }
 
@@ -395,7 +395,7 @@ public struct Set<T : Hashable> :
   /// Remove a member from the set and return it.
   ///
   /// - Requires: `count > 0`.
-  public mutating func removeFirst() -> T {
+  public mutating func removeFirst() -> Element {
     _precondition(count > 0, "can't removeFirst from an empty Set")
     let member = first!
     remove(member)
@@ -446,13 +446,13 @@ public struct Set<T : Hashable> :
 
   /// Create an empty `Set`.
   public init() {
-    self = Set<T>(minimumCapacity: 0)
+    self = Set<Element>(minimumCapacity: 0)
   }
 
   /// Create a `Set` from a finite sequence of items.
-  public init<S: SequenceType where S.Generator.Element == T>(_ sequence: S) {
+  public init<S : SequenceType where S.Generator.Element == Element>(_ sequence: S) {
     self.init()
-    if let s = sequence as? Set<T> {
+    if let s = sequence as? Set<Element> {
       // If this sequence is actually a native `Set`, then we can quickly
       // adopt its native storage and let COW handle uniquing only
       // if necessary.
@@ -471,9 +471,9 @@ public struct Set<T : Hashable> :
 
   /// Returns true if the set is a subset of a finite sequence as a `Set`.
   public func isSubsetOf<
-    S: SequenceType where S.Generator.Element == T
+    S : SequenceType where S.Generator.Element == Element
   >(sequence: S) -> Bool {
-    let other = sequence as? Set<T> ?? Set(sequence)
+    let other = sequence as? Set<Element> ?? Set(sequence)
     let (isSubset, isEqual) = _compareSets(self, other)
     return isSubset || isEqual
   }
@@ -481,35 +481,35 @@ public struct Set<T : Hashable> :
   /// Returns true if the set is a subset of a finite sequence as a `Set`
   /// but not equal.
   public func isStrictSubsetOf<
-    S: SequenceType where S.Generator.Element == T
+    S : SequenceType where S.Generator.Element == Element
   >(sequence: S) -> Bool {
-    let other = sequence as? Set<T> ?? Set(sequence)
+    let other = sequence as? Set<Element> ?? Set(sequence)
     let (isSubset, isEqual) = _compareSets(self, other)
     return isSubset && !isEqual
   }
 
   /// Returns true if the set is a superset of a finite sequence as a `Set`.
   public func isSupersetOf<
-    S: SequenceType where S.Generator.Element == T
+    S : SequenceType where S.Generator.Element == Element
   >(sequence: S) -> Bool {
-    let other = sequence as? Set<T> ?? Set(sequence)
+    let other = sequence as? Set<Element> ?? Set(sequence)
     return other.isSubsetOf(self)
   }
 
   /// Returns true if the set is a superset of a finite sequence as a `Set`
   /// but not equal.
   public func isStrictSupersetOf<
-    S: SequenceType where S.Generator.Element == T
+    S : SequenceType where S.Generator.Element == Element
   >(sequence: S) -> Bool {
-    let other = sequence as? Set<T> ?? Set(sequence)
+    let other = sequence as? Set<Element> ?? Set(sequence)
     return other.isStrictSubsetOf(self)
   }
 
   /// Returns true if no members in the set are in a finite sequence as a `Set`.
   public func isDisjointWith<
-    S: SequenceType where S.Generator.Element == T
+    S : SequenceType where S.Generator.Element == Element
   >(sequence: S) -> Bool {
-    let other = sequence as? Set<T> ?? Set(sequence)
+    let other = sequence as? Set<Element> ?? Set(sequence)
     for member in self {
       if other.contains(member) {
         return false
@@ -520,8 +520,8 @@ public struct Set<T : Hashable> :
 
   /// Return a new `Set` with items in both this set and a finite sequence.
   public func union<
-    S: SequenceType where S.Generator.Element == T
-  >(sequence: S) -> Set<T> {
+    S : SequenceType where S.Generator.Element == Element
+  >(sequence: S) -> Set<Element> {
     var newSet = self
     newSet.unionInPlace(sequence)
     return newSet
@@ -529,7 +529,7 @@ public struct Set<T : Hashable> :
 
   /// Insert elements of a finite sequence into this `Set`.
   public mutating func unionInPlace<
-    S: SequenceType where S.Generator.Element == T
+    S : SequenceType where S.Generator.Element == Element
   >(sequence: S) {
     for item in sequence {
       insert(item)
@@ -539,8 +539,8 @@ public struct Set<T : Hashable> :
   /// Return a new set with elements in this set that do not occur
   /// in a finite sequence.
   public func subtract<
-    S: SequenceType where S.Generator.Element == T
-  >(sequence: S) -> Set<T> {
+    S : SequenceType where S.Generator.Element == Element
+  >(sequence: S) -> Set<Element> {
     var newSet = self
     newSet.subtractInPlace(sequence)
     return newSet
@@ -548,7 +548,7 @@ public struct Set<T : Hashable> :
 
   /// Remove all members in the set that occur in a finite sequence.
   public mutating func subtractInPlace<
-    S: SequenceType where S.Generator.Element == T
+    S : SequenceType where S.Generator.Element == Element
   >(sequence: S) {
     for item in sequence {
       remove(item)
@@ -557,10 +557,10 @@ public struct Set<T : Hashable> :
 
   /// Return a new set with elements common to this set and a finite sequence.
   public func intersect<
-    S: SequenceType where S.Generator.Element == T
-  >(sequence: S) -> Set<T> {
-    let other = sequence as? Set<T> ?? Set(sequence)
-    var newSet = Set<T>()
+    S : SequenceType where S.Generator.Element == Element
+  >(sequence: S) -> Set<Element> {
+    let other = sequence as? Set<Element> ?? Set(sequence)
+    var newSet = Set<Element>()
     for member in self {
       if other.contains(member) {
         newSet.insert(member)
@@ -571,7 +571,7 @@ public struct Set<T : Hashable> :
 
   /// Remove any members of this set that aren't also in a finite sequence.
   public mutating func intersectInPlace<
-    S: SequenceType where S.Generator.Element == T
+    S : SequenceType where S.Generator.Element == Element
   >(sequence: S) {
     // Because `intersect` needs to both modify and iterate over
     // the left-hand side, the index may become invalidated during
@@ -592,8 +592,8 @@ public struct Set<T : Hashable> :
   /// Return a new set with elements that are either in the set or a finite
   /// sequence but do not occur in both.
   public func exclusiveOr<
-    S: SequenceType where S.Generator.Element == T
-  >(sequence: S) -> Set<T> {
+    S : SequenceType where S.Generator.Element == Element
+  >(sequence: S) -> Set<Element> {
     var newSet = self
     newSet.exclusiveOrInPlace(sequence)
     return newSet
@@ -603,9 +603,9 @@ public struct Set<T : Hashable> :
   /// common element, otherwise add it to the set. Repeated elements of the
   /// sequence will be ignored.
   public mutating func exclusiveOrInPlace<
-    S: SequenceType where S.Generator.Element == T
+    S : SequenceType where S.Generator.Element == Element
   >(sequence: S) {
-    let other = sequence as? Set<T> ?? Set(sequence)
+    let other = sequence as? Set<Element> ?? Set(sequence)
     for member in other {
       if contains(member) {
         remove(member)
@@ -628,11 +628,11 @@ public struct Set<T : Hashable> :
   // `SequenceType` conformance
   //
 
-  public func _customContainsEquatableElement(member: T) -> Bool? {
+  public func _customContainsEquatableElement(member: Element) -> Bool? {
     return contains(member)
   }
 
-  public func _customIndexOfEquatableElement(member: T) -> Index?? {
+  public func _customIndexOfEquatableElement(member: Element) -> Index?? {
     return Optional(indexOf(member))
   }
 
@@ -647,7 +647,7 @@ public struct Set<T : Hashable> :
 
   /// The first element obtained when iterating, or `nil` if `self` is
   /// empty.  Equivalent to `self.generate().next()`.
-  public var first: T? {
+  public var first: Element? {
     return count > 0 ? self[startIndex] : .None
   }
 }
@@ -656,7 +656,7 @@ public struct Set<T : Hashable> :
 /// a set and some sequence (which may itself be a `Set`).
 ///
 /// (isSubset: lhs ⊂ rhs, isEqual: lhs ⊂ rhs and |lhs| = |rhs|)
-internal func _compareSets<T>(lhs: Set<T>, _ rhs: Set<T>)
+internal func _compareSets<Element>(lhs: Set<Element>, _ rhs: Set<Element>)
   -> (isSubset: Bool, isEqual: Bool) {
   for member in lhs {
     if !rhs.contains(member) {
@@ -666,7 +666,7 @@ internal func _compareSets<T>(lhs: Set<T>, _ rhs: Set<T>)
   return (true, lhs.count == rhs.count)
 }
 
-public func == <T : Hashable>(lhs: Set<T>, rhs: Set<T>) -> Bool {
+public func == <Element : Hashable>(lhs: Set<Element>, rhs: Set<Element>) -> Bool {
   switch (lhs._variantStorage, rhs._variantStorage) {
   case (.Native(let lhsNativeOwner), .Native(let rhsNativeOwner)):
     let lhsNative = lhsNativeOwner.nativeStorage
@@ -712,7 +712,7 @@ public func == <T : Hashable>(lhs: Set<T>, rhs: Set<T>) -> Bool {
       let bridgedKey: AnyObject = _bridgeToObjectiveCUnconditional(key)
       let optRhsValue: AnyObject? = rhsCocoa.maybeGet(bridgedKey)
       if let rhsValue = optRhsValue {
-        if key == _forceBridgeFromObjectiveC(rhsValue, T.self) {
+        if key == _forceBridgeFromObjectiveC(rhsValue, Element.self) {
           continue
         }
       }
@@ -775,7 +775,7 @@ internal func _stdlib_NSSet_allObjects(nss: _NSSetType) ->
 }
 #endif
 
-//===--- Compiler conversion/casting entry points for Set<T> --------------===//
+//===--- Compiler conversion/casting entry points for Set<Element> --------===//
 
 #if _runtime(_ObjC)
 /// Perform a non-bridged upcast that always succeeds.
@@ -1575,10 +1575,10 @@ public func _dictionaryBridgeFromObjectiveCConditional<
 collections = [
   ('Set',
    'a Set',
-   'T : Hashable',
-   'T',
+   'Element : Hashable',
+   'Element',
    'AnyObject',
-   'T',
+   'Element',
    'AnyObject'),
 
   ('Dictionary',
@@ -1600,9 +1600,9 @@ final internal class _Native${Self}StorageImpl<${TypeParameters}> {
   // (without : Hashable) is used here - this storage must work
   // with non-Hashable types.
 
-  typealias Element = _${Self}Element<${TypeParameters}>
-  typealias ${Self}HeapBuffer = _HeapBuffer<_${Self}Body, Element?>
-  typealias HeapBufferStorage = _HeapBufferStorage<_${Self}Body, Element?>
+  typealias StorageElement = _${Self}Element<${TypeParameters}>
+  typealias ${Self}HeapBuffer = _HeapBuffer<_${Self}Body, StorageElement?>
+  typealias HeapBufferStorage = _HeapBufferStorage<_${Self}Body, StorageElement?>
 
   deinit {
     // FIXME: this cast is invalid.
@@ -1625,7 +1625,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   _HashStorageType, CustomStringConvertible {
   internal typealias Owner = _Native${Self}StorageOwner<${TypeParameters}>
   internal typealias StorageImpl = _Native${Self}StorageImpl<${TypeParameters}>
-  internal typealias Element = _${Self}Element<${TypeParameters}>
+  internal typealias StorageElement = _${Self}Element<${TypeParameters}>
   internal typealias SequenceElement = ${SequenceType}
 
 %if Self == 'Set': # Set needs these to keep signatures simple.
@@ -1646,7 +1646,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   }
 
   @transparent
-  internal var elements: UnsafeMutablePointer<Element?> {
+  internal var elements: UnsafeMutablePointer<StorageElement?> {
     return buffer.baseAddress
   }
 
@@ -1715,7 +1715,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
     }
   }
 
-  internal subscript(i: Int) -> Element? {
+  internal subscript(i: Int) -> StorageElement? {
     @transparent
     get {
       _precondition(i >= 0 && i < capacity)
@@ -1780,11 +1780,11 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
 
 %if Self == 'Set':
 
-  internal mutating func unsafeAddNew(key newKey: T) {
+  internal mutating func unsafeAddNew(key newKey: Element) {
     let (i, found) = _find(newKey, _bucket(newKey))
     _sanityCheck(
       !found, "unsafeAddNew was called, but the key is already present")
-    self[i.offset] = Element(key: newKey)
+    self[i.offset] = StorageElement(key: newKey)
   }
 
 %elif Self == 'Dictionary':
@@ -1793,7 +1793,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
     let (i, found) = _find(newKey, _bucket(newKey))
     _sanityCheck(
       !found, "unsafeAddNew was called, but the key is already present")
-    self[i.offset] = Element(key: newKey, value: value)
+    self[i.offset] = StorageElement(key: newKey, value: value)
   }
 
 %end
@@ -1910,7 +1910,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
       if found {
         continue
       }
-      nativeStorage[i.offset] = Element(key: key)
+      nativeStorage[i.offset] = StorageElement(key: key)
       ++count
     }
     nativeStorage.count = count
@@ -1920,7 +1920,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
     for (key, value) in elements {
       let (i, found) = nativeStorage._find(key, nativeStorage._bucket(key))
       _precondition(!found, "${Self} literal contains duplicate keys")
-      nativeStorage[i.offset] = Element(key: key, value: value)
+      nativeStorage[i.offset] = StorageElement(key: key, value: value)
     }
     nativeStorage.count = elements.count
 
@@ -1935,7 +1935,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
 /// `${Self}<${AnyTypeParameters}>`, but `AnyObject` can not be a Key because
 /// it is not `Hashable`.
 internal struct _BridgedNative${Self}Storage {
-  internal typealias Element = _${Self}Element<${AnyTypeParameters}>
+  internal typealias StorageElement = _${Self}Element<${AnyTypeParameters}>
   internal typealias StorageImpl =
     _Native${Self}StorageImpl<${AnyTypeParameters}>
   internal typealias SequenceElement = ${AnySequenceType}
@@ -1957,7 +1957,7 @@ internal struct _BridgedNative${Self}Storage {
   }
 
   @transparent
-  internal var elements: UnsafeMutablePointer<Element?> {
+  internal var elements: UnsafeMutablePointer<StorageElement?> {
     return buffer.baseAddress
   }
 
@@ -1971,7 +1971,7 @@ internal struct _BridgedNative${Self}Storage {
     }
   }
 
-  subscript(i: Int) -> Element? {
+  subscript(i: Int) -> StorageElement? {
     @transparent
     get {
       _precondition(i >= 0 && i < capacity)
@@ -2298,8 +2298,8 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
 #endif
 
 %if Self == 'Set':
-  internal typealias Key = T
-  internal typealias Value = T
+  internal typealias Key = Element
+  internal typealias Value = Element
 %end
 
 %if Self == 'Set':
@@ -3348,7 +3348,7 @@ internal enum ${Self}IndexRepresentation<${TypeParametersDecl}> {
 %{
 if Self == 'Set':
   SubscriptingWithIndexDoc = """\
-/// Used to access the members in an instance of `Set<T>`."""
+/// Used to access the members in an instance of `Set<Element>`."""
 elif Self == 'Dictionary':
   SubscriptingWithIndexDoc = """\
 /// Used to access the key-value pairs in an instance of
@@ -3620,7 +3620,7 @@ public struct ${Self}Generator<${TypeParametersDecl}> : GeneratorType {
   @transparent
   internal var _guaranteedNative: Bool {
 %if Self == 'Set':
-    return _canBeClass(T.self) == 0
+    return _canBeClass(Element.self) == 0
 %elif Self == 'Dictionary':
     return _canBeClass(Key.self) == 0 && _canBeClass(Value.self) == 0
 %end
@@ -3657,7 +3657,7 @@ public struct ${Self}Generator<${TypeParametersDecl}> : GeneratorType {
 #if _runtime(_ObjC)
 %if Self == 'Set':
       if let anyObjectElement = cocoaGenerator.next() {
-        return _forceBridgeFromObjectiveC(anyObjectElement, T.self)
+        return _forceBridgeFromObjectiveC(anyObjectElement, Element.self)
       }
 %elif Self == 'Dictionary':
       if let (anyObjectKey, anyObjectValue) = cocoaGenerator.next() {
@@ -3833,7 +3833,7 @@ extension ${Self} {
     switch _variantStorage {
     case _Variant${Self}Storage.Native(let nativeOwner):
 %if Self == 'Set':
-      _precondition(_isBridgedToObjectiveC(T.self),
+      _precondition(_isBridgedToObjectiveC(Element.self),
         "Key is not bridged to Objective-C")
 %elif Self == 'Dictionary':
       _precondition(_isBridgedToObjectiveC(Value.self),

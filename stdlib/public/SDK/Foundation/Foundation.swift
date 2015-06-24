@@ -746,7 +746,7 @@ extension Set {
   /// The provided `NSSet` will be copied to ensure that the copy can
   /// not be mutated by other code.
   public init(_cocoaSet: _NSSetType) {
-    _sanityCheck(_isBridgedVerbatimToObjectiveC(T.self),
+    _sanityCheck(_isBridgedVerbatimToObjectiveC(Element.self),
       "Set can be backed by NSSet _variantStorage only when the member type can be bridged verbatim to Objective-C")
     // FIXME: We would like to call CFSetCreateCopy() to avoid doing an
     // objc_msgSend() for instances of CoreFoundation types.  We can't do that
@@ -868,28 +868,34 @@ extension Set : _ObjectiveCBridgeable {
   }
 
   public static func _forceBridgeFromObjectiveC(s: NSSet, inout result: Set?) {
-    if let native = Set<T>._bridgeFromObjectiveCAdoptingNativeStorage(s as AnyObject) {
+    if let native =
+      Set<Element>._bridgeFromObjectiveCAdoptingNativeStorage(s as AnyObject) {
+
       result = native
       return
     }
 
-    if _isBridgedVerbatimToObjectiveC(T.self) {
-      result = Set<T>(_cocoaSet: unsafeBitCast(s, _NSSetType.self))
+    if _isBridgedVerbatimToObjectiveC(Element.self) {
+      result = Set<Element>(_cocoaSet: unsafeBitCast(s, _NSSetType.self))
       return
     }
 
-    // `Set<T>` where `T` is a value type may not be backed by an NSSet.
-    var builder = _SetBuilder<T>(count: s.count)
+    // `Set<Element>` where `Element` is a value type may not be backed by
+    // an NSSet.
+    var builder = _SetBuilder<Element>(count: s.count)
     s.enumerateObjectsUsingBlock {
       (anyObjectMember: AnyObject, stop: UnsafeMutablePointer<ObjCBool>) in
-      builder.add(member: Swift._forceBridgeFromObjectiveC(anyObjectMember, T.self))
+      builder.add(member: Swift._forceBridgeFromObjectiveC(
+        anyObjectMember, Element.self))
     }
     result = builder.take()
   }
 
-  public static func _conditionallyBridgeFromObjectiveC(x: NSSet, inout result: Set?) -> Bool {
+  public static func _conditionallyBridgeFromObjectiveC(
+    x: NSSet, inout result: Set?
+  ) -> Bool {
     let anySet = x as Set<NSObject>
-    if _isBridgedVerbatimToObjectiveC(T.self) {
+    if _isBridgedVerbatimToObjectiveC(Element.self) {
       result = Swift._setDownCastConditional(anySet)
       return result != nil
     }
@@ -899,7 +905,7 @@ extension Set : _ObjectiveCBridgeable {
   }
 
   public static func _isBridgedToObjectiveC() -> Bool {
-    return Swift._isBridgedToObjectiveC(T.self)
+    return Swift._isBridgedToObjectiveC(Element.self)
   }
 }
 
