@@ -731,7 +731,7 @@ static bool isFoldable(SILInstruction *I) {
   return isa<IntegerLiteralInst>(I) || isa<FloatLiteralInst>(I);
 }
 
-static void
+static bool
 constantFoldStringConcatenation(ApplyInst *AI,
                                 llvm::SetVector<SILInstruction *> &WorkList) {
   SILBuilder B(AI);
@@ -739,7 +739,7 @@ constantFoldStringConcatenation(ApplyInst *AI,
   auto *Concatenated = tryToConcatenateStrings(AI, B);
   // Bail if string literal concatenation could not be performed.
   if (!Concatenated)
-    return;
+    return false;
 
   // Add the newly created instruction to the BB.
   AI->getParent()->getInstList().insert(AI,
@@ -774,6 +774,7 @@ constantFoldStringConcatenation(ApplyInst *AI,
   // Delete the old apply instruction.
   recursivelyDeleteTriviallyDeadInstructions(AI, /*force*/ true,
                                              RemoveCallback);
+  return true;
 }
 
 /// Initialize the worklist to all of the constant instructions.
@@ -810,11 +811,21 @@ static void initializeWorklist(SILFunction &F,
   }
 }
 
-static bool processFunction(SILFunction &F, bool EnableDiagnostics,
-                            unsigned AssertConfiguration) {
+static llvm::Optional<SILAnalysis::PreserveKind>
+mergePreserveKind(llvm::Optional<SILAnalysis::PreserveKind> Original,
+                  SILAnalysis::PreserveKind NewValue) {
+  if (!Original.hasValue())
+    return NewValue;
+
+  return SILAnalysis::PreserveKind(Original.getValue() & NewValue);
+}
+
+static llvm::Optional<SILAnalysis::PreserveKind>
+processFunction(SILFunction &F, bool EnableDiagnostics,
+                unsigned AssertConfiguration) {
   DEBUG(llvm::dbgs() << "*** ConstPropagation processing: " << F.getName()
         << "\n");
-  bool Changed = false;
+  llvm::Optional<SILAnalysis::PreserveKind> Preserves;
 
   // Should we replace calls to assert_configuration by the assert
   // configuration.
@@ -858,21 +869,30 @@ static bool processFunction(SILFunction &F, bool EnableDiagnostics,
           WorkList.insert(AssertConfInt);
           // Delete the call.
           recursivelyDeleteTriviallyDeadInstructions(BI);
+          Preserves = mergePreserveKind(Preserves,
+                                        SILAnalysis::PreserveKind::ProgramFlow);
           continue;
         }
-        
+
         // Kill calls to conditionallyUnreachable if we've folded assert
         // configuration calls.
         if (isApplyOfBuiltin(*BI, BuiltinValueKind::CondUnreachable)) {
           assert(BI->use_empty() && "use of conditionallyUnreachable?!");
           recursivelyDeleteTriviallyDeadInstructions(BI, /*force*/ true);
+          Preserves = mergePreserveKind(Preserves,
+                                        SILAnalysis::PreserveKind::ProgramFlow);
           continue;
         }
       }
 
     if (auto *AI = dyn_cast<ApplyInst>(I)) {
       // Apply may only come from a string.concat invocation.
-      constantFoldStringConcatenation(AI, WorkList);
+      if (constantFoldStringConcatenation(AI, WorkList)) {
+        // This only preserves branches, not calls.
+        Preserves =
+            mergePreserveKind(Preserves, SILAnalysis::PreserveKind::Branches);
+      }
+
       continue;
     }
 
@@ -881,14 +901,17 @@ static bool processFunction(SILFunction &F, bool EnableDiagnostics,
         isa<UnconditionalCheckedCastAddrInst>(I)) {
       // Try to perform cast optimizations.
       ValueBase *Result = nullptr;
+      bool InvalidateBranches = false;
       switch(I->getKind()) {
       default:
         llvm_unreachable("Unexpected instruction for cast optimizations");
       case ValueKind::CheckedCastBranchInst:
         Result = CastOpt.simplifyCheckedCastBranchInst(cast<CheckedCastBranchInst>(I));
+        InvalidateBranches |= bool(Result);
         break;
       case ValueKind::CheckedCastAddrBranchInst:
         Result = CastOpt.simplifyCheckedCastAddrBranchInst(cast<CheckedCastAddrBranchInst>(I));
+        InvalidateBranches |= bool(Result);
         break;
       case ValueKind::UnconditionalCheckedCastInst:
         Result = CastOpt.optimizeUnconditionalCheckedCastInst(cast<UnconditionalCheckedCastInst>(I));
@@ -899,9 +922,18 @@ static bool processFunction(SILFunction &F, bool EnableDiagnostics,
       }
 
       if (Result) {
-        if (isa<CheckedCastBranchInst>(Result) || isa<CheckedCastAddrBranchInst>(Result) ||
-                isa<UnconditionalCheckedCastInst>(Result) ||
-                isa<UnconditionalCheckedCastAddrInst>(Result))
+        if (InvalidateBranches) {
+          Preserves =
+              mergePreserveKind(Preserves, SILAnalysis::PreserveKind::Calls);
+        } else {
+          Preserves = mergePreserveKind(Preserves,
+                                        SILAnalysis::PreserveKind::ProgramFlow);
+        }
+
+        if (isa<CheckedCastBranchInst>(Result) ||
+            isa<CheckedCastAddrBranchInst>(Result) ||
+            isa<UnconditionalCheckedCastInst>(Result) ||
+            isa<UnconditionalCheckedCastAddrInst>(Result))
           WorkList.insert(cast<SILInstruction>(Result));
       }
       continue;
@@ -961,7 +993,9 @@ static bool processFunction(SILFunction &F, bool EnableDiagnostics,
       // necessary cleanups, RAUWs, etc.
       FoldedUsers.insert(User);
       ++NumInstFolded;
-      Changed = true;
+
+      Preserves =
+          mergePreserveKind(Preserves, SILAnalysis::PreserveKind::ProgramFlow);
 
       // If the constant produced a tuple, be smarter than RAUW: explicitly nuke
       // any tuple_extract instructions using the apply.  This is a common case
@@ -1002,13 +1036,18 @@ static bool processFunction(SILFunction &F, bool EnableDiagnostics,
     // invalidate the uses iterator.
     auto UserArray = ArrayRef<SILInstruction *>(&*FoldedUsers.begin(),
                                                 FoldedUsers.size());
+    if (!UserArray.empty()) {
+      Preserves =
+          mergePreserveKind(Preserves, SILAnalysis::PreserveKind::ProgramFlow);
+    }
+
     recursivelyDeleteTriviallyDeadInstructions(UserArray, false,
                                                [&](SILInstruction *DeadI) {
                                                  WorkList.remove(DeadI);
                                                });
   }
 
-  return Changed;
+  return Preserves;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1027,9 +1066,9 @@ public:
 private:
   /// The entry point to the transformation.
   void run() override {
-    if (processFunction(*getFunction(), EnableDiagnostics,
-                        getOptions().AssertConfig))
-      invalidateAnalysis(SILAnalysis::PreserveKind::ProgramFlow);
+    if (auto Preserves = processFunction(*getFunction(), EnableDiagnostics,
+                                         getOptions().AssertConfig))
+      invalidateAnalysis(Preserves.getValue());
   }
 
   StringRef getName() override { return "Constant Propagation"; }

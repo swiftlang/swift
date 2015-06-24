@@ -430,17 +430,16 @@ public:
   SILInstruction *
   optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst);
 
-  /// Optimize checked_cast_addr__br. This cannot change the control flow.
+  /// Optimize checked_cast_addr_br. This cannot change the control flow.
   SILInstruction *
   optimizeCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst);
 
-  /// Optimize unconditional_checked_cast.
-  /// This cannot change the control flow.
+  /// Optimize unconditional_checked_cast. This cannot change the control flow.
   ValueBase *
   optimizeUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *Inst);
 
-  /// Optimize unconditional_checked_cast_addr.
-  /// This cannot change the control flow.
+  /// Optimize unconditional_checked_cast_addr. This cannot change the control
+  /// flow.
   SILInstruction *
   optimizeUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *Inst);
 

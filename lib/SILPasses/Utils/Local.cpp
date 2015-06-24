@@ -1556,18 +1556,16 @@ optimizeCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
 
       if (MI) {
         if (SuccessBB->getSinglePredecessor()) {
-        SILBuilderWithScope<1> B(Inst);
-        auto NewI = B.createCheckedCastBranch(Loc,false /*isExact*/,
-                                  SILValue(MI, 0),
-                                  Dest.getType().getObjectType(),
-                                  SuccessBB,
-                                  FailureBB);
-        SuccessBB->createBBArg(Dest.getType().getObjectType(), nullptr);
-        B.setInsertionPoint(SuccessBB->begin());
-        // Store the result
-        B.createStore(Loc, SuccessBB->getBBArg(0), Dest);
-        EraseInstAction(Inst);
-        return NewI;
+          SILBuilderWithScope<1> B(Inst);
+          auto NewI = B.createCheckedCastBranch(
+              Loc, false /*isExact*/, SILValue(MI, 0),
+              Dest.getType().getObjectType(), SuccessBB, FailureBB);
+          SuccessBB->createBBArg(Dest.getType().getObjectType(), nullptr);
+          B.setInsertionPoint(SuccessBB->begin());
+          // Store the result
+          B.createStore(Loc, SuccessBB->getBBArg(0), Dest);
+          EraseInstAction(Inst);
+          return NewI;
         }
       }
     }
