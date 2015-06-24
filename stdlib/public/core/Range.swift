@@ -10,16 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A generator over the elements of `Range<T>`.
+/// A generator over the elements of `Range<Element>`.
 public struct RangeGenerator<
-  T : ForwardIndexType
+  Element : ForwardIndexType
 > : GeneratorType, SequenceType {
-  /// The type of element returned by `next()`.
-  public typealias Element = T
 
   /// Construct an instance that traverses the elements of `bounds`.
   @transparent
-  public init(_ bounds: Range<T>) {
+  public init(_ bounds: Range<Element>) {
     self.startIndex = bounds.startIndex
     self.endIndex = bounds.endIndex
   }
@@ -35,7 +33,7 @@ public struct RangeGenerator<
 
   /// A type whose instances can produce the elements of this
   /// sequence, in order.
-  public typealias Generator = RangeGenerator<T>
+  public typealias Generator = RangeGenerator<Element>
 
   /// `RangeGenerator` is also a `SequenceType`, so it
   /// `generate`'s a copy of itself.
@@ -44,16 +42,16 @@ public struct RangeGenerator<
   }
 
   /// The lower bound of the remaining range.
-  public var startIndex: T
+  public var startIndex: Element
 
   /// The upper bound of the remaining range; not included in the
   /// generated sequence.
-  public var endIndex: T
+  public var endIndex: Element
 }
 
 /// A collection of consecutive discrete index values.
 ///
-/// - parameter T: Is both the element type and the index type of the
+/// - parameter Element: Is both the element type and the index type of the
 ///   collection.
 ///
 /// Like other collections, a range containing one element has an
@@ -62,25 +60,25 @@ public struct RangeGenerator<
 ///
 /// Axiom: for any `Range` `r`, `r[i] == i`.
 ///
-/// Therefore, if `T` has a maximal value, it can serve as an
-/// `endIndex`, but can never be contained in a `Range<T>`.
+/// Therefore, if `Element` has a maximal value, it can serve as an
+/// `endIndex`, but can never be contained in a `Range<Element>`.
 ///
 /// It also follows from the axiom above that `(-99..<100)[0] == 0`.
 /// To prevent confusion (because some expect the result to be `-99`),
-/// in a context where `T` is known to be an integer type,
-/// subscripting with `T` is a compile-time error:
+/// in a context where `Element` is known to be an integer type,
+/// subscripting with `Element` is a compile-time error:
 ///
 ///     // error: could not find an overload for 'subscript'...
 ///     print(Range<Int>(start: -99, end: 100)[0])
 ///
 /// However, subscripting that range still works in a generic context:
 ///
-///     func brackets<T : ForwardIndexType>(x: Range<T>, i: T) -> T {
+///     func brackets<Element : ForwardIndexType>(x: Range<Element>, i: Element) -> Element {
 ///       return x[i] // Just forward to subscript
 ///     }
 ///     print(brackets(Range<Int>(start:-99, end:100), 0)) // prints 0
 public struct Range<
-  T : ForwardIndexType
+  Element : ForwardIndexType
 > : Equatable, CollectionType,
     CustomStringConvertible, CustomDebugStringConvertible {
 
@@ -95,7 +93,7 @@ public struct Range<
   /// Construct a range with `startIndex == start` and `endIndex ==
   /// end`.
   @transparent
-  public init(start: T, end: T) {
+  public init(start: Element, end: Element) {
     _startIndex = start
     _endIndex = end
   }
@@ -104,26 +102,26 @@ public struct Range<
   ///
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
-  public typealias Index = T
+  public typealias Index = Element
 
   /// Access the element at `position`.
   ///
   /// - Requires: `position` is a valid position in `self` and
   ///   `position != endIndex`.
-  public subscript(position: T) -> T {
+  public subscript(position: Element) -> Element {
     _debugPrecondition(position != endIndex, "Index out of range")
     return position
   }
 
   //===--------------------------------------------------------------------===//
   // Overloads for subscript that allow us to make subscripting fail
-  // at compile time, outside a generic context, when T is an IntegerType
+  // at compile time, outside a generic context, when Element is an IntegerType
   // type. The current language design gives us no way to force r[0]
   // to work "as expected" (return the first element of the range) for
   // an arbitrary Range<Int>, so instead we make it ambiguous.  Same
   // goes for slicing.  The error message will be poor but at least it
   // is a compile-time error.
-  public subscript(_: T._DisabledRangeIndex) -> T {
+  public subscript(_: Element._DisabledRangeIndex) -> Element {
     _sanityCheckFailure("It shouldn't be possible to call this function'")
   }
 
@@ -131,19 +129,19 @@ public struct Range<
 
   /// A type whose instances can produce the elements of this
   /// sequence, in order.
-  public typealias Generator = RangeGenerator<T>
+  public typealias Generator = RangeGenerator<Element>
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> RangeGenerator<T> {
+  public func generate() -> RangeGenerator<Element> {
     return Generator(self)
   }
 
   /// The range's lower bound.
   ///
   /// Identical to `endIndex` in an empty range.
-  public var startIndex: T {
+  public var startIndex: Element {
     get {
       return _startIndex
     }
@@ -157,7 +155,7 @@ public struct Range<
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
   /// `successor()`.
-  public var endIndex: T {
+  public var endIndex: Element {
     get {
       return _endIndex
     }
@@ -176,11 +174,11 @@ public struct Range<
     return "Range(\(String(reflecting: startIndex))..<\(String(reflecting: endIndex)))"
   }
 
-  var _startIndex: T
-  var _endIndex: T
+  var _startIndex: Element
+  var _endIndex: Element
 }
 
-public func ==<T>(lhs: Range<T>, rhs: Range<T>) -> Bool {
+public func ==<Element>(lhs: Range<Element>, rhs: Range<Element>) -> Bool {
   return lhs._startIndex == rhs._startIndex &&
       lhs._endIndex == rhs._endIndex
 }

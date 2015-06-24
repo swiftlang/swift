@@ -5,6 +5,21 @@
 
 import StdlibUnittest
 
+// Check that the generic parameter is called 'Element'.
+protocol TestProtocol1 {}
+
+extension Range where Element : TestProtocol1 {
+  var _elementIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+extension RangeGenerator where Element : TestProtocol1 {
+  var _elementIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
 var RangeTestSuite = TestSuite("Range")
 
 RangeTestSuite.test("ReverseRange") {
