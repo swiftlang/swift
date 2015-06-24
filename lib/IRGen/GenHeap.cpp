@@ -299,7 +299,7 @@ namespace {
   };
 }
 
-const TypeInfo *TypeConverter::convertBuiltinNativeObject() {
+const LoadableTypeInfo *TypeConverter::convertBuiltinNativeObject() {
   return new BuiltinNativeObjectTypeInfo(IGM.RefCountedPtrTy,
                                       IGM.getPointerSize(),
                                       IGM.getHeapObjectSpareBits(),
@@ -821,6 +821,66 @@ void IRGenFunction::emitInitializeRetained(llvm::Value *newValue,
   Builder.CreateStore(newValue, address);
 }
 
+/// Emit a release of a live value with the given refcounting implementation.
+void IRGenFunction::emitScalarRelease(llvm::Value *value,
+                                      ReferenceCounting refcounting) {
+  switch (refcounting) {
+  case ReferenceCounting::Native:
+    return emitRelease(value);
+  case ReferenceCounting::ObjC:
+    return emitObjCRelease(value);
+  case ReferenceCounting::Block:
+    return emitBlockRelease(value);
+  case ReferenceCounting::Unknown:
+    return emitUnknownRelease(value);
+  case ReferenceCounting::Bridge:
+    return emitBridgeRelease(value);
+  case ReferenceCounting::Error:
+    return emitErrorRelease(value);
+  }
+}
+
+void IRGenFunction::emitScalarRetainCall(llvm::Value *value,
+                                         ReferenceCounting refcounting) {
+  switch (refcounting) {
+  case ReferenceCounting::Native:
+    emitRetainCall(value);
+    return;
+  case ReferenceCounting::Bridge:
+    emitBridgeRetainCall(value);
+    return;
+  case ReferenceCounting::ObjC:
+    emitObjCRetainCall(value);
+    return;
+  case ReferenceCounting::Block:
+    emitBlockCopyCall(value);
+    return;
+  case ReferenceCounting::Unknown:
+    emitUnknownRetainCall(value);
+    return;
+  case ReferenceCounting::Error:
+    emitErrorRetainCall(value);
+    return;
+  }
+}
+
+llvm::Type *IRGenModule::getReferenceType(ReferenceCounting refcounting) {
+  switch (refcounting) {
+  case ReferenceCounting::Native:
+    return RefCountedPtrTy;
+  case ReferenceCounting::Bridge:
+    return BridgeObjectPtrTy;
+  case ReferenceCounting::ObjC:
+    return ObjCPtrTy;
+  case ReferenceCounting::Block:
+    return ObjCBlockPtrTy;
+  case ReferenceCounting::Unknown:
+    return UnknownRefCountedPtrTy;
+  case ReferenceCounting::Error:
+    return ErrorPtrTy;
+  }
+}
+
 /// Emit a release of a live value.
 void IRGenFunction::emitRelease(llvm::Value *value) {
   if (doesNotRequireRefCounting(value)) return;
@@ -979,6 +1039,236 @@ emitIsUniqueCall(llvm::Value *value, SourceLoc loc, bool isNonNull,
   call->setCallingConv(IGM.RuntimeCC);
   call->setDoesNotThrow();
   return call;
+}
+
+namespace {
+/// Basic layout and common operations for box types.
+class BoxTypeInfo : public HeapTypeInfo<BoxTypeInfo> {
+public:
+  BoxTypeInfo(IRGenModule &IGM)
+    : HeapTypeInfo(IGM.RefCountedPtrTy, IGM.getPointerSize(),
+                   IGM.getHeapObjectSpareBits(), IGM.getPointerAlignment())
+  {}
+
+  ReferenceCounting getReferenceCounting() const {
+    // Boxes are always native-refcounted.
+    return ReferenceCounting::Native;
+  }
+
+  /// Allocate a box of the given type.
+  virtual OwnedAddress
+  allocate(IRGenFunction &IGF, SILType boxedType,
+           const llvm::Twine &name) const = 0;
+
+  /// Deallocate an uninitialized box.
+  virtual void
+  deallocate(IRGenFunction &IGF, llvm::Value *box, SILType boxedType) const = 0;
+
+  /// Project the address of the contained value from a box.
+  virtual Address
+  project(IRGenFunction &IGF, llvm::Value *box, SILType boxedType) const = 0;
+};
+
+/// Common implementation for empty box type info.
+class EmptyBoxTypeInfo final : public BoxTypeInfo {
+public:
+  EmptyBoxTypeInfo(IRGenModule &IGM) : BoxTypeInfo(IGM) {}
+
+  OwnedAddress
+  allocate(IRGenFunction &IGF, SILType boxedType,
+           const llvm::Twine &name) const override {
+    return OwnedAddress(getUndefAddress(), IGF.IGM.RefCountedNull);
+  }
+
+  void
+  deallocate(IRGenFunction &IGF, llvm::Value *box, SILType boxedType)
+  const override {
+    /* Nothing to do; the box should be nil. */
+  }
+
+  Address
+  project(IRGenFunction &IGF, llvm::Value *box, SILType boxedType)
+  const override {
+    return getUndefAddress();
+  }
+};
+
+/// Common implementation for non-fixed box type info.
+class NonFixedBoxTypeInfo final : public BoxTypeInfo {
+public:
+  NonFixedBoxTypeInfo(IRGenModule &IGM) : BoxTypeInfo(IGM) {}
+
+  OwnedAddress
+  allocate(IRGenFunction &IGF, SILType boxedType,
+           const llvm::Twine &name) const override {
+    auto &ti = IGF.getTypeInfo(boxedType);
+    // Use the runtime to allocate a box of the appropriate size.
+    auto metadata = IGF.emitTypeMetadataRefForLayout(boxedType);
+    llvm::Value *box, *address;
+    IGF.emitAllocBox2Call(metadata, box, address);
+    address = IGF.Builder.CreateBitCast(address,
+                                        ti.getStorageType()->getPointerTo());
+    return {ti.getAddressForPointer(address), box};
+  }
+
+  void
+  deallocate(IRGenFunction &IGF, llvm::Value *box, SILType boxedType)
+  const override {
+    auto metadata = IGF.emitTypeMetadataRefForLayout(boxedType);
+    IGF.emitDeallocBox2Call(box, metadata);
+  }
+
+  Address
+  project(IRGenFunction &IGF, llvm::Value *box, SILType boxedType)
+  const override {
+    auto &ti = IGF.getTypeInfo(boxedType);
+    auto metadata = IGF.emitTypeMetadataRefForLayout(boxedType);
+    llvm::Value *address = IGF.emitProjectBox2Call(box, metadata);
+    address = IGF.Builder.CreateBitCast(address,
+                                        ti.getStorageType()->getPointerTo());
+    return ti.getAddressForPointer(address);
+  }
+};
+
+/// Base implementation for fixed-sized boxes.
+class FixedBoxTypeInfoBase : public BoxTypeInfo {
+  HeapLayout layout;
+
+public:
+  FixedBoxTypeInfoBase(IRGenModule &IGM, HeapLayout &&layout)
+    : BoxTypeInfo(IGM), layout(std::move(layout))
+  {}
+
+  OwnedAddress
+  allocate(IRGenFunction &IGF, SILType boxedType, const llvm::Twine &name)
+  const override {
+    // Allocate a new object using the layout.
+    llvm::Value *allocation = IGF.emitUnmanagedAlloc(layout, name);
+    Address rawAddr = project(IGF, allocation, boxedType);
+    return {rawAddr, allocation};
+  }
+
+  void
+  deallocate(IRGenFunction &IGF, llvm::Value *box, SILType _)
+  const override {
+    auto size = layout.emitSize(IGF.IGM);
+    auto alignMask = layout.emitAlignMask(IGF.IGM);
+
+    emitDeallocateHeapObject(IGF, box, size, alignMask);
+  }
+
+  Address
+  project(IRGenFunction &IGF, llvm::Value *box, SILType boxedType)
+  const override {
+    Address rawAddr = layout.emitCastTo(IGF, box);
+    rawAddr = layout.getElement(0).project(IGF, rawAddr, None);
+    auto &ti = IGF.getTypeInfo(boxedType);
+    return IGF.Builder.CreateBitCast(rawAddr,
+                                     ti.getStorageType()->getPointerTo());
+  }
+};
+
+static HeapLayout getHeapLayoutForSingleTypeInfo(IRGenModule &IGM,
+                                                 const TypeInfo &ti) {
+  return HeapLayout(IGM, LayoutStrategy::Optimal, SILType(), &ti);
+}
+
+/// Common implementation for POD boxes of a known stride and alignment.
+class PODBoxTypeInfo final : public FixedBoxTypeInfoBase {
+public:
+  PODBoxTypeInfo(IRGenModule &IGM, Size stride, Alignment alignment)
+    : FixedBoxTypeInfoBase(IGM, getHeapLayoutForSingleTypeInfo(IGM,
+                             IGM.getOpaqueStorageTypeInfo(stride, alignment))) {
+  }
+};
+
+/// Common implementation for single-refcounted boxes.
+class SingleRefcountedBoxTypeInfo final : public FixedBoxTypeInfoBase {
+public:
+  SingleRefcountedBoxTypeInfo(IRGenModule &IGM, ReferenceCounting refcounting)
+    : FixedBoxTypeInfoBase(IGM, getHeapLayoutForSingleTypeInfo(IGM,
+                                   IGM.getReferenceObjectTypeInfo(refcounting)))
+  {
+  }
+};
+
+/// Implementation of a box for a specific type.
+class FixedBoxTypeInfo final : public FixedBoxTypeInfoBase {
+public:
+  FixedBoxTypeInfo(IRGenModule &IGM, SILType T)
+    : FixedBoxTypeInfoBase(IGM,
+       HeapLayout(IGM, LayoutStrategy::Optimal, T, &IGM.getTypeInfo(T)))
+  {}
+};
+
+}
+
+const TypeInfo *TypeConverter::convertBoxType(SILBoxType *T) {
+  // We can share a type info for all dynamic-sized heap metadata.
+  auto &eltTI = IGM.getTypeInfoForLowered(T->getBoxedType());
+  if (!eltTI.isFixedSize()) {
+    if (!NonFixedBoxTI)
+      NonFixedBoxTI = new NonFixedBoxTypeInfo(IGM);
+    return NonFixedBoxTI;
+  }
+
+  // For fixed-sized types, we can emit concrete box metadata.
+  auto &fixedTI = cast<FixedTypeInfo>(eltTI);
+
+  // For empty types, we don't really need to allocate anything.
+  if (fixedTI.isKnownEmpty()) {
+    if (!EmptyBoxTI)
+      EmptyBoxTI = new EmptyBoxTypeInfo(IGM);
+    return EmptyBoxTI;
+  }
+
+  // We can share box info for all similarly-shaped POD types.
+  if (fixedTI.isPOD(ResilienceScope::Component)) {
+    auto stride = fixedTI.getFixedStride();
+    auto align = fixedTI.getFixedAlignment();
+    auto foundPOD = PODBoxTI.find({stride.getValue(),align.getValue()});
+    if (foundPOD == PODBoxTI.end()) {
+      auto newPOD = new PODBoxTypeInfo(IGM, stride, align);
+      PODBoxTI.insert({{stride.getValue(), align.getValue()}, newPOD});
+      return newPOD;
+    }
+
+    return foundPOD->second;
+  }
+
+  // We can share box info for all single-refcounted types.
+  if (fixedTI.isSingleSwiftRetainablePointer(ResilienceScope::Component)) {
+    if (!SwiftRetainablePointerBoxTI)
+      SwiftRetainablePointerBoxTI
+        = new SingleRefcountedBoxTypeInfo(IGM, ReferenceCounting::Native);
+    return SwiftRetainablePointerBoxTI;
+  }
+
+  // TODO: Other common shapes? Optional-of-Refcounted would be nice.
+
+  // Produce a tailored box metadata for the type.
+  return new FixedBoxTypeInfo(IGM, T->getBoxedAddressType());
+}
+
+OwnedAddress
+irgen::emitAllocateBox(IRGenFunction &IGF, CanSILBoxType boxType,
+                       const llvm::Twine &name) {
+  auto &boxTI = IGF.getTypeInfoForLowered(boxType).as<BoxTypeInfo>();
+  return boxTI.allocate(IGF, boxType->getBoxedAddressType(), name);
+}
+
+void irgen::emitDeallocateBox(IRGenFunction &IGF,
+                              llvm::Value *box,
+                              CanSILBoxType boxType) {
+  auto &boxTI = IGF.getTypeInfoForLowered(boxType).as<BoxTypeInfo>();
+  return boxTI.deallocate(IGF, box, boxType->getBoxedAddressType());
+}
+
+Address irgen::emitProjectBox(IRGenFunction &IGF,
+                              llvm::Value *box,
+                              CanSILBoxType boxType) {
+  auto &boxTI = IGF.getTypeInfoForLowered(boxType).as<BoxTypeInfo>();
+  return boxTI.project(IGF, box, boxType->getBoxedAddressType());
 }
 
 #define DEFINE_VALUE_OP(ID)                                           \

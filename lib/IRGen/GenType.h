@@ -83,6 +83,7 @@ private:
   const TypeInfo *FirstType;
   
   const ProtocolInfo *FirstProtocol;
+  const LoadableTypeInfo *NativeObjectTI = nullptr;
   const LoadableTypeInfo *UnknownObjectTI = nullptr;
   const LoadableTypeInfo *BridgeObjectTI = nullptr;
   const LoadableTypeInfo *WitnessTablePtrTI = nullptr;
@@ -92,7 +93,14 @@ private:
   
   llvm::DenseMap<std::pair<unsigned, unsigned>, const LoadableTypeInfo *>
     OpaqueStorageTypes;
-  
+
+  const LoadableTypeInfo *NonFixedBoxTI = nullptr;
+  const LoadableTypeInfo *EmptyBoxTI = nullptr;
+  llvm::DenseMap<std::pair<unsigned, unsigned>, const LoadableTypeInfo *>
+    PODBoxTI;
+  const LoadableTypeInfo *SwiftRetainablePointerBoxTI = nullptr,
+                         *UnknownRetainablePointerBoxTI = nullptr;
+
   const LoadableTypeInfo *createPrimitive(llvm::Type *T,
                                           Size size, Alignment align);
   const LoadableTypeInfo *createPrimitiveForAlignedPointer(llvm::PointerType *T,
@@ -111,6 +119,7 @@ private:
   const TypeInfo *convertStructType(TypeBase *key, CanType type, StructDecl *D);
   const TypeInfo *convertFunctionType(SILFunctionType *T);
   const TypeInfo *convertBlockStorageType(SILBlockStorageType *T);
+  const TypeInfo *convertBoxType(SILBoxType *T);
   const TypeInfo *convertArchetypeType(ArchetypeType *T);
   const TypeInfo *convertInOutType(InOutType *T);
   const TypeInfo *convertExistentialMetatypeType(ExistentialMetatypeType *T);
@@ -118,7 +127,7 @@ private:
   const TypeInfo *convertModuleType(ModuleType *T);
   const TypeInfo *convertProtocolType(ProtocolType *T);
   const TypeInfo *convertProtocolCompositionType(ProtocolCompositionType *T);
-  const TypeInfo *convertBuiltinNativeObject();
+  const LoadableTypeInfo *convertBuiltinNativeObject();
   const LoadableTypeInfo *convertBuiltinUnknownObject();
   const LoadableTypeInfo *convertBuiltinBridgeObject();
   const TypeInfo *convertUnmanagedStorageType(UnmanagedStorageType *T);
@@ -133,6 +142,7 @@ public:
   const TypeInfo &getCompleteTypeInfo(CanType type);
   const TypeInfo *tryGetCompleteTypeInfo(CanType type);
   const TypeInfo &getTypeInfo(ClassDecl *D);
+  const LoadableTypeInfo &getNativeObjectTypeInfo();
   const LoadableTypeInfo &getUnknownObjectTypeInfo();
   const LoadableTypeInfo &getBridgeObjectTypeInfo();
   const LoadableTypeInfo &getTypeMetadataPtrTypeInfo();

@@ -910,6 +910,34 @@ const LoadableTypeInfo &TypeConverter::getTypeMetadataPtrTypeInfo() {
   return *TypeMetadataPtrTI;
 }
 
+const LoadableTypeInfo &
+IRGenModule::getReferenceObjectTypeInfo(ReferenceCounting refcounting) {
+  switch (refcounting) {
+  case ReferenceCounting::Native:
+    return getNativeObjectTypeInfo();
+  case ReferenceCounting::Unknown:
+    return getUnknownObjectTypeInfo();
+  case ReferenceCounting::Bridge:
+    return getBridgeObjectTypeInfo();
+  case ReferenceCounting::Block:
+  case ReferenceCounting::Error:
+  case ReferenceCounting::ObjC:
+    llvm_unreachable("not implemented");
+  }
+}
+
+const LoadableTypeInfo &IRGenModule::getNativeObjectTypeInfo() {
+  return Types.getNativeObjectTypeInfo();
+}
+
+const LoadableTypeInfo &TypeConverter::getNativeObjectTypeInfo() {
+  if (NativeObjectTI) return *NativeObjectTI;
+  NativeObjectTI = convertBuiltinNativeObject();
+  NativeObjectTI->NextConverted = FirstType;
+  FirstType = NativeObjectTI;
+  return *NativeObjectTI;
+}
+
 const LoadableTypeInfo &IRGenModule::getUnknownObjectTypeInfo() {
   return Types.getUnknownObjectTypeInfo();
 }
@@ -1360,7 +1388,7 @@ TypeCacheEntry TypeConverter::convertType(CanType ty) {
     return convertAnyNominalType(ty, nominal);
   }
   case TypeKind::BuiltinNativeObject:
-    return convertBuiltinNativeObject();
+    return &getNativeObjectTypeInfo();
   case TypeKind::BuiltinUnknownObject:
     return &getUnknownObjectTypeInfo();
   case TypeKind::BuiltinBridgeObject:
@@ -1416,7 +1444,7 @@ TypeCacheEntry TypeConverter::convertType(CanType ty) {
   case TypeKind::SILBlockStorage: {
     return convertBlockStorageType(cast<SILBlockStorageType>(ty));
   case TypeKind::SILBox:
-    llvm_unreachable("to be implemented");
+    return convertBoxType(cast<SILBoxType>(ty));
   }
   }
   llvm_unreachable("bad type kind");

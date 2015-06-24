@@ -63,9 +63,9 @@ namespace irgen {
   class Scope;
   class TypeInfo;
   enum class ValueWitness : unsigned;
-  
-/// A nonce value for storing some sort of
-/// locally-known information about a type.
+  enum class ReferenceCounting : unsigned char;
+
+/// A nonce value for storing some sort of locally-known information about a type.
 class LocalTypeData {
   unsigned Value;
   
@@ -191,8 +191,14 @@ public:
   void emitAllocBoxCall(llvm::Value *typeMetadata,
                         llvm::Value *&box,
                         llvm::Value *&valueAddress);
-  
+  void emitAllocBox2Call(llvm::Value *typeMetadata,
+                         llvm::Value *&box,
+                         llvm::Value *&valueAddress);
+
   void emitDeallocBoxCall(llvm::Value *box, llvm::Value *typeMetadata);
+  void emitDeallocBox2Call(llvm::Value *box, llvm::Value *typeMetadata);
+
+  llvm::Value *emitProjectBox2Call(llvm::Value *box, llvm::Value *typeMetadata);
 
   // Emit a reference to the canonical type metadata record for the given AST
   // type. This can be used to identify the type at runtime. For types with
@@ -244,6 +250,8 @@ public:
   void emitLoadAndRetain(Address addr, Explosion &explosion);
   void emitAssignRetained(llvm::Value *value, Address addr);
   void emitInitializeRetained(llvm::Value *value, Address addr);
+  void emitScalarRetainCall(llvm::Value *value, ReferenceCounting refcounting);
+  void emitScalarRelease(llvm::Value *value, ReferenceCounting refcounting);
   void emitRetain(llvm::Value *value, Explosion &explosion);
   void emitRetainCall(llvm::Value *value);
   void emitRelease(llvm::Value *value);

@@ -127,6 +127,22 @@ void IRGenFunction::emitAllocBoxCall(llvm::Value *typeMetadata,
   valueAddress = Builder.CreateExtractValue(call, 1);
 }
 
+void IRGenFunction::emitAllocBox2Call(llvm::Value *typeMetadata,
+                                      llvm::Value *&box,
+                                      llvm::Value *&valueAddress) {
+  auto attrs = llvm::AttributeSet::get(IGM.LLVMContext,
+                                       llvm::AttributeSet::FunctionIndex,
+                                       llvm::Attribute::NoUnwind);
+  
+  llvm::CallInst *call =
+    Builder.CreateCall(IGM.getAllocBox2Fn(), typeMetadata);
+  call->setCallingConv(IGM.RuntimeCC);
+  call->setAttributes(attrs);
+
+  box = Builder.CreateExtractValue(call, 0);
+  valueAddress = Builder.CreateExtractValue(call, 1);
+}
+
 void IRGenFunction::emitDeallocBoxCall(llvm::Value *box,
                                        llvm::Value *typeMetadata) {
   auto attrs = llvm::AttributeSet::get(IGM.LLVMContext,
@@ -137,6 +153,34 @@ void IRGenFunction::emitDeallocBoxCall(llvm::Value *box,
     Builder.CreateCall2(IGM.getDeallocBoxFn(), box, typeMetadata);
   call->setCallingConv(IGM.RuntimeCC);
   call->setAttributes(attrs);
+}
+
+void IRGenFunction::emitDeallocBox2Call(llvm::Value *box,
+                                        llvm::Value *typeMetadata) {
+  auto attrs = llvm::AttributeSet::get(IGM.LLVMContext,
+                                       llvm::AttributeSet::FunctionIndex,
+                                       llvm::Attribute::NoUnwind);
+
+  llvm::CallInst *call =
+    Builder.CreateCall2(IGM.getDeallocBox2Fn(), box, typeMetadata);
+  call->setCallingConv(IGM.RuntimeCC);
+  call->setAttributes(attrs);
+}
+
+llvm::Value *IRGenFunction::emitProjectBox2Call(llvm::Value *box,
+                                                llvm::Value *typeMetadata) {
+  llvm::Attribute::AttrKind attrKinds[] = {
+    llvm::Attribute::NoUnwind,
+    llvm::Attribute::ReadNone,
+  };
+  auto attrs = llvm::AttributeSet::get(IGM.LLVMContext,
+                                       llvm::AttributeSet::FunctionIndex,
+                                       attrKinds);
+  llvm::CallInst *call =
+    Builder.CreateCall2(IGM.getProjectBox2Fn(), box, typeMetadata);
+  call->setCallingConv(IGM.RuntimeCC);
+  call->setAttributes(attrs);
+  return call;
 }
 
 static void emitDeallocatingCall(IRGenFunction &IGF, llvm::Constant *fn,

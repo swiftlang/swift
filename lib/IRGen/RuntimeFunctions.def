@@ -49,6 +49,21 @@ FUNCTION(DeallocBox,     swift_deallocBox,    RuntimeCC,
          ARGS(RefCountedPtrTy, TypeMetadataPtrTy),
          ATTRS(NoUnwind))
 
+FUNCTION(AllocBox2,       swift_allocBox2,      RuntimeCC,
+         RETURNS(RefCountedPtrTy, OpaquePtrTy),
+         ARGS(TypeMetadataPtrTy),
+         ATTRS(NoUnwind))
+
+FUNCTION(DeallocBox2,     swift_deallocBox2,    RuntimeCC,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind))
+
+FUNCTION(ProjectBox2,     swift_projectBox2,    RuntimeCC,
+         RETURNS(OpaquePtrTy),
+         ARGS(RefCountedPtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind, ReadNone))
+
 // RefCounted *swift_allocObject(Metadata *type, size_t size, size_t alignMask);
 FUNCTION(AllocObject,    swift_allocObject,   RuntimeCC,
          RETURNS(RefCountedPtrTy),

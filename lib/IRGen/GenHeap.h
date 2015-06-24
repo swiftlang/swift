@@ -29,6 +29,7 @@ namespace llvm {
 namespace swift {
 namespace irgen {
   class Address;
+  class OwnedAddress;
   
 /// A heap layout is the result of laying out a complete structure for
 /// heap-allocation.
@@ -104,6 +105,19 @@ void emitDeallocateClassInstance(IRGenFunction &IGF,
                                  llvm::Value *object,
                                  llvm::Value *size,
                                  llvm::Value *alignMask);
+
+/// Allocate a boxed value.
+OwnedAddress
+emitAllocateBox(IRGenFunction &IGF, CanSILBoxType boxType,
+                const llvm::Twine &name);
+
+/// Deallocate a box whose value is uninitialized.
+void emitDeallocateBox(IRGenFunction &IGF, llvm::Value *box,
+                       CanSILBoxType boxType);
+
+/// Project the address of the value inside a box.
+Address emitProjectBox(IRGenFunction &IGF, llvm::Value *box,
+                       CanSILBoxType boxType);
 
 } // end namespace irgen
 } // end namespace swift

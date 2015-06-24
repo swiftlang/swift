@@ -113,6 +113,7 @@ namespace irgen {
   class TypeConverter;
   class TypeInfo;
   enum class ValueWitness : unsigned;
+  enum class ReferenceCounting : unsigned char;
 
 class IRGenModule;
   
@@ -370,6 +371,8 @@ public:
   Alignment getTypeMetadataAlignment() const {
     return getPointerAlignment();
   }
+
+  llvm::Type *getReferenceType(ReferenceCounting refcounting);
   
   /// Return the spare bit mask to use for types that comprise heap object
   /// pointers.
@@ -413,6 +416,9 @@ public:
   const TypeInfo &getTypeMetadataPtrTypeInfo();
   const TypeInfo &getObjCClassPtrTypeInfo();
   const LoadableTypeInfo &getOpaqueStorageTypeInfo(Size size, Alignment align);
+  const LoadableTypeInfo &
+  getReferenceObjectTypeInfo(ReferenceCounting refcounting);
+  const LoadableTypeInfo &getNativeObjectTypeInfo();
   const LoadableTypeInfo &getUnknownObjectTypeInfo();
   const LoadableTypeInfo &getBridgeObjectTypeInfo();
   llvm::Type *getStorageTypeForUnlowered(Type T);

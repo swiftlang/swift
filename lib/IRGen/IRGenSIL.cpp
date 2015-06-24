@@ -613,6 +613,8 @@ public:
   void visitAllocRefDynamicInst(AllocRefDynamicInst *i);
   void visitAllocBoxInst(AllocBoxInst *i);
 
+  void visitProjectBoxInst(ProjectBoxInst *i);
+
   void visitApplyInst(ApplyInst *i);
   void visitTryApplyInst(TryApplyInst *i);
   void visitFullApplySite(FullApplySite i);
@@ -709,10 +711,6 @@ public:
   void visitAllocValueBufferInst(AllocValueBufferInst *i);
   void visitProjectValueBufferInst(ProjectValueBufferInst *i);
   void visitDeallocValueBufferInst(DeallocValueBufferInst *i);
-
-  void visitProjectBoxInst(ProjectBoxInst *i) {
-    llvm_unreachable("todo");
-  }
 
   void visitOpenExistentialAddrInst(OpenExistentialAddrInst *i);
   void visitOpenExistentialMetatypeInst(OpenExistentialMetatypeInst *i);
@@ -3375,7 +3373,11 @@ void IRGenSILFunction::visitDeallocBoxInst(swift::DeallocBoxInst *i) {
   const TypeInfo &type = getTypeInfo(i->getElementType());
   Explosion owner = getLoweredExplosion(i->getOperand());
   llvm::Value *ownerPtr = owner.claimNext();
-  type.deallocateBox(*this, ownerPtr, i->getElementType());
+
+  if (auto boxTy = i->getOperand().getType().getAs<SILBoxType>())
+    emitDeallocateBox(*this, ownerPtr, boxTy);
+  else
+    type.deallocateBox(*this, ownerPtr, i->getElementType());
 }
 
 void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
@@ -3391,9 +3393,16 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
 # else
     "";
 # endif
-  OwnedAddress addr = type.allocateBox(*this,
-                                       i->getElementType(),
-                                       DbgName);
+  OwnedAddress addr;
+
+  // TODO: Use the "new" emitAllocateBox call until untyped boxes can be
+  // phased out.
+  if (auto boxTy = i->getContainerResult().getType().getAs<SILBoxType>())
+    addr = emitAllocateBox(*this, boxTy, DbgName);
+  else
+   addr = type.allocateBox(*this,
+                           i->getElementType(),
+                           DbgName);
   
   Explosion box;
   box.add(addr.getOwner());
@@ -3414,6 +3423,14 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
        DebugTypeInfo(Decl, i->getElementType().getSwiftType(), type),
        i->getDebugScope(), Name, Indirection);
   }
+}
+
+void IRGenSILFunction::visitProjectBoxInst(swift::ProjectBoxInst *i) {
+  auto boxTy = i->getOperand().getType().castTo<SILBoxType>();
+
+  Explosion box = getLoweredExplosion(i->getOperand());
+  auto addr = emitProjectBox(*this, box.claimNext(), boxTy);
+  setLoweredAddress(SILValue(i,0), addr);
 }
 
 void IRGenSILFunction::visitConvertFunctionInst(swift::ConvertFunctionInst *i) {

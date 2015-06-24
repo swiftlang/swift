@@ -143,20 +143,7 @@ public:
   static const bool IsScalarPOD = false;
 
   void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value) const {
-    switch (asDerived().getReferenceCounting()) {
-    case ReferenceCounting::Native:
-      return IGF.emitRelease(value);
-    case ReferenceCounting::ObjC:
-      return IGF.emitObjCRelease(value);
-    case ReferenceCounting::Block:
-      return IGF.emitBlockRelease(value);
-    case ReferenceCounting::Unknown:
-      return IGF.emitUnknownRelease(value);
-    case ReferenceCounting::Bridge:
-      return IGF.emitBridgeRelease(value);
-    case ReferenceCounting::Error:
-      return IGF.emitErrorRelease(value);
-    }
+    IGF.emitScalarRelease(value, asDerived().getReferenceCounting());
   }
 
   void emitScalarFixLifetime(IRGenFunction &IGF, llvm::Value *value) const {
@@ -164,26 +151,7 @@ public:
   }
 
   void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value) const {
-    switch (asDerived().getReferenceCounting()) {
-    case ReferenceCounting::Native:
-      IGF.emitRetainCall(value);
-      return;
-    case ReferenceCounting::Bridge:
-      IGF.emitBridgeRetainCall(value);
-      return;
-    case ReferenceCounting::ObjC:
-      IGF.emitObjCRetainCall(value);
-      return;
-    case ReferenceCounting::Block:
-      IGF.emitBlockCopyCall(value);
-      return;
-    case ReferenceCounting::Unknown:
-      IGF.emitUnknownRetainCall(value);
-      return;
-    case ReferenceCounting::Error:
-      IGF.emitErrorRetainCall(value);
-      return;
-    }
+    IGF.emitScalarRetainCall(value, asDerived().getReferenceCounting());
   }
 
   void emitScalarRetainUnowned(IRGenFunction &IGF, llvm::Value *value) const {
