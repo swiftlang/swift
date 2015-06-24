@@ -21,17 +21,23 @@ public func reverse<C:CollectionType where C.Index: BidirectionalIndexType>(
 }
 
 % for traversal in ('Bidirectional', 'RandomAccess'):
-%   View = '%sReverseView' % traversal
 %   Self = 'Lazy%sCollection' % traversal
-%   Index = 'Reverse%sIndex' % traversal
-%   IndexProtocol = '%sIndexType' % traversal
+%   if traversal == 'Bidirectional':
+%     View = 'ReverseCollection'
+%     Index = 'ReverseIndex'
+%     IndexProtocol = '%sIndexType' % traversal
+%   else:
+%     View = 'Reverse%sCollection' % traversal
+%     Index = 'Reverse%sIndex' % traversal
+%     IndexProtocol = '%sIndexType' % traversal
+%   end
 
 /// A wrapper for a `${IndexProtocol}` that reverses its
 /// direction of traversal.
-public struct ${Index}<I : ${IndexProtocol}> : ${IndexProtocol} {
-  var _base: I
+public struct ${Index}<Base : ${IndexProtocol}> : ${IndexProtocol} {
+  var _base: Base
 
-  init(_ _base: I) { self._base = _base }
+  init(_ _base: Base) { self._base = _base }
 
   /// Returns the next consecutive value after `self`.
   ///
@@ -48,8 +54,8 @@ public struct ${Index}<I : ${IndexProtocol}> : ${IndexProtocol} {
   }
 
   /// A type that can represent the number of steps between pairs of
-  /// `${Self}` values where one value is reachable from the other.
-  typealias Distance = I.Distance
+  /// `${Index}` values where one value is reachable from the other.
+  typealias Distance = Base.Distance
 
 %   if traversal == 'RandomAccess':
   /// Return the minimum number of applications of `successor` or
@@ -80,19 +86,19 @@ public func == <I> (lhs: ${Index}<I>, rhs: ${Index}<I>) -> Bool {
 /// The lazy `CollectionType` returned by `reverse(c)` where `c` is a
 /// `CollectionType` with an `Index` conforming to `${IndexProtocol}`.
 public struct ${View}<
-  T : CollectionType where T.Index : ${IndexProtocol}
+  Base : CollectionType where Base.Index : ${IndexProtocol}
 > : CollectionType {
   /// A type that represents a valid position in the collection.
   ///
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
-  public typealias Index = ${Index}<T.Index>
+  public typealias Index = ${Index}<Base.Index>
 
   /// A type whose instances can produce the elements of this
   /// sequence, in order.
   public typealias Generator = IndexingGenerator<${View}>
 
-  init(_ _base: T) {
+  init(_ _base: Base) {
     self._base = _base
   }
 
@@ -116,21 +122,19 @@ public struct ${View}<
   ///
   /// - Requires: `position` is a valid position in `self` and
   ///   `position != endIndex`.
-  public subscript(position: Index) -> T.Generator.Element {
+  public subscript(position: Index) -> Base.Generator.Element {
     return _base[position._base.predecessor()]
   }
 
-  var _base: T
+  var _base: Base
 }
 
 extension ${Self} {
   /// Return a `${View}` over this `${Self}`.  The elements of
   /// the result are computed lazily, each time they are read, by
   /// calling `transform` function on a base element.
-  public func reverse() -> LazyBidirectionalCollection<${View}<Base>> {
-    return LazyBidirectionalCollection<${View}<Base>>(
-      ${View}<Base>(self._base)
-    )
+  public func reverse() -> ${Self}<${View}<Base>> {
+    return ${Self}<${View}<Base>>(${View}<Base>(self._base))
   }
 }
 

@@ -274,7 +274,11 @@ LazyTestSuite.test("MapCollection<${traversal}Collection>/underestimateCount") {
 // LazyCollection
 //===----------------------------------------------------------------------===//
 
-%for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
+%for (traversal, ReversedType) in [
+%    ('Forward', None),
+%    ('Bidirectional', 'ReverseCollection'),
+%    ('RandomAccess', 'ReverseRandomAccessCollection')
+%]:
 
 // Check that the generic parameter is called 'Base'.
 extension Lazy${traversal}Collection where Base : TestProtocol1 {
@@ -297,7 +301,79 @@ LazyTestSuite.test("Lazy${traversal}Collection.array") {
   expectGE(40, arrayFromLazy.capacity)
 }
 
+%  if ReversedType is not None:
+LazyTestSuite.test("Lazy${traversal}Collection.reverse()") {
+  let base = Minimal${traversal}Collection(
+    [ 0, 30, 10, 90 ].map { OpaqueValue($0) },
+    underestimatedCount: .Value(42))
+  let lazyCollection = Lazy${traversal}Collection(base)
+  var reversed = lazyCollection.reverse()
+  expectType(
+    Lazy${traversal}Collection<${ReversedType}<Minimal${traversal}Collection<OpaqueValue<Int>>>>.self,
+    &reversed)
+
+  check${traversal}Collection(
+    [ 90, 10, 30, 0 ].map { OpaqueValue($0) },
+    reversed,
+    { $0.value == $1.value })
+
+  var reversedTwice = reversed.reverse()
+  expectType(
+    Lazy${traversal}Collection<${ReversedType}<${ReversedType}<Minimal${traversal}Collection<OpaqueValue<Int>>>>>.self,
+    &reversedTwice)
+
+  check${traversal}Collection(
+    [ 0, 30, 10, 90 ].map { OpaqueValue($0) },
+    reversedTwice,
+    { $0.value == $1.value })
+}
+%  end
+
 %end
+
+//===----------------------------------------------------------------------===//
+// ReverseCollection
+//===----------------------------------------------------------------------===//
+
+// Check that the generic parameter is called 'Base'.
+extension ReverseCollection where Base : TestProtocol1 {
+  var _baseIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// ReverseIndex
+//===----------------------------------------------------------------------===//
+
+// Check that the generic parameter is called 'Base'.
+extension ReverseIndex where Base : TestProtocol1 {
+  var _baseIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// RandomAccessReverseCollection
+//===----------------------------------------------------------------------===//
+
+// Check that the generic parameter is called 'Base'.
+extension ReverseRandomAccessCollection where Base : TestProtocol1 {
+  var _baseIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// ReverseRandomAccessIndex
+//===----------------------------------------------------------------------===//
+
+// Check that the generic parameter is called 'Base'.
+extension ReverseRandomAccessIndex where Base : TestProtocol1 {
+  var _baseIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
 
 runAllTests()
 

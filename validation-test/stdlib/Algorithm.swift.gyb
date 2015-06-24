@@ -1120,13 +1120,13 @@ SequenceTypeAlgorithms.test("reverse/WhereIndexIsBidirectional,BidirectionalReve
       test.sequence.map { OpaqueValue($0) })
     var result = s.reverse()
     expectType(
-      BidirectionalReverseView<MinimalBidirectionalCollection<OpaqueValue<Int>>>.self,
+      ReverseCollection<MinimalBidirectionalCollection<OpaqueValue<Int>>>.self,
       &result)
     expectEqual(
       test.expected, result.map { $0.value },
       stackTrace: test.loc.withCurrentLoc())
 
-    // Check BidirectionalReverseView CollectionType conformance.
+    // Check ReverseCollection's CollectionType conformance.
     checkBidirectionalCollection(
       test.expected.map { OpaqueValue($0) } as [OpaqueValue<Int>],
       result,
@@ -1141,13 +1141,13 @@ SequenceTypeAlgorithms.test("reverse/WhereIndexIsRandomAccess,RandomAccessRevers
       test.sequence.map { OpaqueValue($0) })
     var result = s.reverse()
     expectType(
-      RandomAccessReverseView<MinimalRandomAccessCollection<OpaqueValue<Int>>>.self,
+      ReverseRandomAccessCollection<MinimalRandomAccessCollection<OpaqueValue<Int>>>.self,
       &result)
     expectEqual(
       test.expected, result.map { $0.value },
       stackTrace: test.loc.withCurrentLoc())
 
-    // Check RandomAccessReverseView CollectionType conformance.
+    // Check ReverseRandomAccessCollection CollectionType conformance.
     checkRandomAccessCollection(
       test.expected.map { OpaqueValue($0) } as [OpaqueValue<Int>],
       result,

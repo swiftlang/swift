@@ -358,16 +358,16 @@ extension SequenceType {
 extension CollectionType where Index : BidirectionalIndexType {
   /// Return a lazy `CollectionType` containing the elements of `self`
   /// in reverse order.
-  public func reverse() -> BidirectionalReverseView<Self> {
-    return BidirectionalReverseView(self)
+  public func reverse() -> ReverseCollection<Self> {
+    return ReverseCollection(self)
   }
 }
 
 extension CollectionType where Index : RandomAccessIndexType {
   /// Return a lazy `CollectionType` containing the elements of `self`
   /// in reverse order.
-  public func reverse() -> RandomAccessReverseView<Self> {
-    return RandomAccessReverseView(self)
+  public func reverse() -> ReverseRandomAccessCollection<Self> {
+    return ReverseRandomAccessCollection(self)
   }
 }
 
