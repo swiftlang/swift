@@ -17,7 +17,7 @@ class 你好 {
 你好.שלום.வணக்கம்.Γειά.привет()
 
 // Identifiers cannot start with combining chars.
-.́duh() // expected-error 2{{an identifier cannot begin with this character}} // expected-error{{expected identifier after '.' expression}}
+_ = .́duh() // expected-error {{an identifier cannot begin with this character}} // expected-error{{expected identifier after '.' expression}}
 
 // Combining characters can be used within identifiers.
 func s̈pin̈al_tap̈() {}

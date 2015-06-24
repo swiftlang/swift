@@ -36,7 +36,8 @@ func test1a() -> unionSearchFlags {
 
 func test1b(b : Bool) {
   _ = 123
-  .description == 1 // expected-error{{could not find member 'description'}}
+  // FIXME: bogus "_ can only appear in an assignment" error.
+  _ = .description == 1 // expected-error{{could not find member 'description'}} expected-error{{'_' can only appear in a pattern}}
 }
 
 enum MaybeInt {

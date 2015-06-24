@@ -56,7 +56,7 @@ acceptString("\(hello), \(world) #\(i)!")
 
 Optional<Int>(1) // expected-warning{{unused}}
 Optional(1) // expected-warning{{unused}}
-.none as Optional<Int>
+_ = .none as Optional<Int>
 Optional(.none) // expected-error{{could not find member 'none'}}
 
 // Interpolation

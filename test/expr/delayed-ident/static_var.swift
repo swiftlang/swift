@@ -13,7 +13,7 @@ x1 = .AnX1
 x1 = .NotAnX1 // expected-error{{could not find member 'NotAnX1'}}
 
 // Delayed identifier expressions as lvalues
-.AnX1 = x1
+(.AnX1 = x1)
 acceptInOutX1(&(.AnX1))
 
 // Generic struct types

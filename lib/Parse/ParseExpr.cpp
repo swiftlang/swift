@@ -637,23 +637,6 @@ MagicIdentifierLiteralExpr::Kind getMagicIdentifierLiteralKind(tok Kind) {
   }
 }
 
-/// Look ahead to see if we have '.foo(', '.foo[', '.foo{', or '.foo.',
-/// or if '.foo' appears on a line by itself, which is an indication of a
-/// builder-pattern-like method chain.
-bool Parser::periodPrefixIsFollowedByBuilderPatternLikeExpr() {
-  assert(Tok.is(tok::period_prefix) && "Tok should be the period_prefix token");
-  if (peekToken().is(tok::identifier) || peekToken().is(tok::integer_literal)) {
-    BacktrackingScope BS(*this);
-    consumeToken(tok::period_prefix);
-    return peekToken().isFollowingLParen() ||
-      peekToken().isFollowingLSquare() ||
-      peekToken().isAtStartOfLine() ||
-      peekToken().is(tok::period) ||
-      peekToken().is(tok::l_brace);
-  }
-  return false;
-}
-
 /// parseExprPostfix
 ///
 ///   expr-literal:
@@ -949,14 +932,7 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
 
     // Check for a .foo suffix.
     SourceLoc TokLoc = Tok.getLoc();
-    bool IsPeriod = false;
-    // Look ahead to see if we have '.foo(', '.foo[', '.foo{',
-    //   '.foo.1(', '.foo.1[', or '.foo.1{', or if the '.foo' appears on a line
-    //   by itself.
-    if (Tok.is(tok::period_prefix)) {
-      IsPeriod = periodPrefixIsFollowedByBuilderPatternLikeExpr();
-    }
-    if (consumeIf(tok::period) || (IsPeriod && consumeIf(tok::period_prefix))) {
+    if (consumeIf(tok::period) || consumeIf(tok::period_prefix)) {
       // Non-identifier cases.
       if (Tok.isNot(tok::identifier) && Tok.isNot(tok::integer_literal)) {
         // A metatype expr.

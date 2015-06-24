@@ -752,6 +752,7 @@ static bool isGenericTypeDisambiguatingToken(Parser &P) {
   case tok::l_brace:
   case tok::r_brace:
   case tok::period:
+  case tok::period_prefix:
   case tok::comma:
   case tok::semi:
   case tok::eof:
@@ -765,17 +766,7 @@ static bool isGenericTypeDisambiguatingToken(Parser &P) {
   case tok::oper_postfix:
     // These might be '?' or '!' type modifiers.
     return P.isOptionalToken(tok) || P.isImplicitlyUnwrappedOptionalToken(tok);
-      
-  case tok::period_prefix:
-    // These will be turned into following tokens if they appear unspaced after
-    // a generic angle bracket, or are followed by an identifier in a builder
-    // pattern situation, e.g.:
-    //
-    //   Foo<T>
-    //     .bar
-    return tok.getText().data()[-1] == '>'
-      || P.periodPrefixIsFollowedByBuilderPatternLikeExpr();
-      
+
   case tok::l_paren:
   case tok::l_square:
     // These only apply to the generic type if they don't start a new line.
