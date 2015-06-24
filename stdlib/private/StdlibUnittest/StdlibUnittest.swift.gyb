@@ -1591,8 +1591,8 @@ public struct CollectionMisuseResiliencyChecks {
 %   ('Expected', '_UnitTestArray<Element>')):
 
 public func checkGenerator<
-  G : GeneratorType, ${genericParam}
-  where ${Element} == G.Element
+  ${genericParam}, G : GeneratorType
+  where G.Element == ${Element}
 >(
   expected: ${Expected},
   _ generator: G,
@@ -1625,8 +1625,26 @@ public func checkGenerator<
 }
 
 public func checkGenerator<
-  G : GeneratorType, ${genericParam}
-  where ${Element} == G.Element, ${Element} : Equatable
+  ${genericParam}, G : GeneratorType
+  where G.Element == ${Element}
+>(
+  expected: ${Expected},
+  _ generator: G,
+  _ sameValue: (${Element}, ${Element}) -> Bool,
+  resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
+  file: String = __FILE__, line: UWord = __LINE__,
+  collectMoreInfo: (()->String)? = nil
+) {
+  checkGenerator(
+    expected, generator, sameValue,
+    resiliencyChecks: resiliencyChecks,
+    SourceLocStack().with(SourceLoc(file, line)),
+    collectMoreInfo: collectMoreInfo)
+}
+
+public func checkGenerator<
+  ${genericParam}, G : GeneratorType
+  where G.Element == ${Element}, ${Element} : Equatable
 >(
   expected: ${Expected},
   _ generator: G,
@@ -1638,6 +1656,23 @@ public func checkGenerator<
     expected, generator, { $0 == $1 },
     resiliencyChecks: resiliencyChecks,
     stackTrace.withCurrentLoc(),
+    collectMoreInfo: collectMoreInfo)
+}
+
+public func checkGenerator<
+  ${genericParam}, G : GeneratorType
+  where G.Element == ${Element}, ${Element} : Equatable
+>(
+  expected: ${Expected},
+  _ generator: G,
+  resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
+  file: String = __FILE__, line: UWord = __LINE__,
+  collectMoreInfo: (()->String)? = nil
+) {
+  checkGenerator(
+    expected, generator, { $0 == $1 },
+    resiliencyChecks: resiliencyChecks,
+    SourceLocStack().with(SourceLoc(file, line)),
     collectMoreInfo: collectMoreInfo)
 }
 

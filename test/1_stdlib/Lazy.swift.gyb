@@ -101,6 +101,46 @@ LazyTestSuite.test("GeneratorOfOne") {
 }
 
 //===----------------------------------------------------------------------===//
+// EmptyCollection
+//===----------------------------------------------------------------------===//
+
+// Check that the generic parameter is called 'Element'.
+extension EmptyCollection where Element : TestProtocol1 {
+  var _elementIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+LazyTestSuite.test("EmptyCollection") {
+  checkRandomAccessCollection(
+    [],
+    EmptyCollection<OpaqueValue<Int>>(),
+    { $0.value == $1.value })
+}
+
+// FIXME: trap tests.
+
+//===----------------------------------------------------------------------===//
+// EmptyGenerator
+//===----------------------------------------------------------------------===//
+
+// Check that the generic parameter is called 'Element'.
+extension EmptyGenerator where Element : TestProtocol1 {
+  var _elementIsTestProtocol1: Bool {
+    fatalError("not implemented")
+  }
+}
+
+LazyTestSuite.test("EmptyGenerator") {
+  checkGenerator(
+    [] as Array<OpaqueValue<Int>>,
+    EmptyGenerator<OpaqueValue<Int>>(),
+    { $0.value == $1.value })
+}
+
+// FIXME: trap tests.
+
+//===----------------------------------------------------------------------===//
 // lazy()
 //===----------------------------------------------------------------------===//
 

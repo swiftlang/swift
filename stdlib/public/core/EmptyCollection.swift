@@ -19,8 +19,8 @@
 
 /// A generator that never produces an element.
 ///
-/// - SeeAlso: `EmptyCollection<T>`.
-public struct EmptyGenerator<T> : GeneratorType, SequenceType {
+/// - SeeAlso: `EmptyCollection<Element>`.
+public struct EmptyGenerator<Element> : GeneratorType, SequenceType {
   /// Construct an instance.
   public init() {}
 
@@ -31,13 +31,13 @@ public struct EmptyGenerator<T> : GeneratorType, SequenceType {
   }
 
   /// Return `nil`, indicating that there are no more elements.
-  public mutating func next() -> T? {
+  public mutating func next() -> Element? {
     return nil
   }
 }
 
-/// A collection whose element type is `T` but that is always empty.
-public struct EmptyCollection<T> : CollectionType {
+/// A collection whose element type is `Element` but that is always empty.
+public struct EmptyCollection<Element> : CollectionType {
   /// A type that represents a valid position in the collection.
   ///
   /// Valid indices consist of the position of every element and a
@@ -60,14 +60,14 @@ public struct EmptyCollection<T> : CollectionType {
   /// Returns an empty *generator*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> EmptyGenerator<T> {
+  public func generate() -> EmptyGenerator<Element> {
     return EmptyGenerator()
   }
 
   /// Access the element at `position`.
   ///
   /// Should never be called, since this collection is always empty.
-  public subscript(position: Index) -> T {
+  public subscript(position: Index) -> Element {
     _preconditionFailure("Index out of range")
   }
 
