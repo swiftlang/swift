@@ -11,6 +11,8 @@
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-stdlib-swift
 // REQUIRES: executable_test
+// XFAIL'd temporarily due to <rdar://problem/21547909> "Constraint system missed a conformance?" x2
+// XFAIL: *
 
 import StdlibUnittest
 

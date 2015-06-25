@@ -6,9 +6,9 @@ import StdlibUnittest
 // Check that CollectionType._prext_SubSlice is constrained to CollectionType.
 //
 
-// expected-error@+2 {{type 'CollectionWithBadSubSlice' does not conform to protocol '_CollectionDefaultsType'}}
-// expected-error@+1 {{type 'CollectionWithBadSubSlice' does not conform to protocol 'CollectionType'}}
-struct CollectionWithBadSubSlice : CollectionType {
+// expected-error@+2 {{type 'CollectionWithBadSubSequence' does not conform to protocol 'SequenceType'}}
+// expected-error@+1 {{type 'CollectionWithBadSubSequence' does not conform to protocol 'CollectionType'}}
+struct CollectionWithBadSubSequence : CollectionType {
   var startIndex: MinimalForwardIndex {
     fatalError("unreachable")
   }
@@ -21,20 +21,20 @@ struct CollectionWithBadSubSlice : CollectionType {
     fatalError("unreachable")
   }
 
-  // expected-note@+1 {{possibly intended match '_prext_SubSlice' does not conform to '_CollectionDefaultsType'}}
-  typealias _prext_SubSlice = OpaqueValue<Int8>
+  // expected-note@+1 {{possibly intended match '_prext_SubSequence' does not conform to 'Indexable'}}
+  typealias _prext_SubSequence = OpaqueValue<Int8>
 }
 
-func useCollectionTypeSubSliceIndex<
+func useCollectionTypeSubSequenceIndex<
   C : CollectionType
   where
-  C._prext_SubSlice.Index : BidirectionalIndexType
+  C._prext_SubSequence.Index : BidirectionalIndexType
 >(c: C) {}
 
-func useCollectionTypeSubSliceGeneratorElement<
+func useCollectionTypeSubSequenceGeneratorElement<
   C : CollectionType
   where
-  C._prext_SubSlice.Generator.Element == C.Generator.Element
+  C._prext_SubSequence.Generator.Element == C.Generator.Element
 >(c: C) {}
 
 func sortResultIgnored<

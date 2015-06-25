@@ -2366,7 +2366,7 @@ SequenceTypeAlgorithms.test("CollectionType.generate()/CustomImplementation") {
 }
 
 //===----------------------------------------------------------------------===//
-// CollectionType.subscript(range:), CollectionType.SubSlice
+// CollectionType.subscript(range:), CollectionType.SubSequence
 //===----------------------------------------------------------------------===//
 
 struct MinimalForwardCollectionWithDefaultSlicing : CollectionType {
@@ -2398,7 +2398,7 @@ struct MinimalForwardCollectionWithDefaultSlicing : CollectionType {
 func callGenericSlicing<C : CollectionType>(
   collection: C,
   _ bounds: Range<C.Index>
-) -> C._prext_SubSlice {
+) -> C._prext_SubSequence {
   return collection[bounds]
 }
 
@@ -2425,7 +2425,7 @@ SequenceTypeAlgorithms.test("subscript(range:)/DefaultImplementation") {
         &slice)
     }
 
-    // FIXME: improve checkForwardCollection to check the SubSlice type.
+    // FIXME: improve checkForwardCollection to check the SubSequence type.
     checkForwardCollection(
       Array(1..<count+1).map { OpaqueValue($0) } as [OpaqueValue<Int>],
       collection,
@@ -2509,7 +2509,7 @@ SequenceTypeAlgorithms.test("subscript(range:)/CustomImplementation") {
       expectType(CustomSlice.self, &slice)
     }
 
-    // FIXME: improve checkForwardCollection to check the SubSlice type.
+    // FIXME: improve checkForwardCollection to check the SubSequence type.
     checkForwardCollection(
       Array(1..<count+1).map { OpaqueValue($0) } as [OpaqueValue<Int>],
       collection,

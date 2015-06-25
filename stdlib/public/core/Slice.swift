@@ -10,26 +10,30 @@
 //
 //===----------------------------------------------------------------------===//
 
-public struct _prext_Slice<
-  UnderlyingCollection : _CollectionDefaultsType
-> : CollectionType {
+public struct _prext_Slice<Base : _prext_Indexable> : CollectionType {
 
-  public typealias Index = UnderlyingCollection.Index
-  public typealias Element = UnderlyingCollection._Element
+  public func generate() -> IndexingGenerator<_prext_Slice> {
+    return IndexingGenerator(self)
+  }
+  public typealias Index = Base.Index
+  public typealias Element = Base._Element
 
   public let startIndex: Index
   public let endIndex: Index
 
   public subscript(index: Index) -> Element {
-    return _underlyingCollection[index]
+    return _base[index]
   }
 
-  internal init(_collection: UnderlyingCollection, bounds: Range<Index>) {
-    self._underlyingCollection = _collection
+  public subscript(_prext_bounds bounds: Range<Index>) -> _prext_Slice {
+    return _prext_Slice(_collection: _base, bounds: bounds)
+  }
+  
+  internal init(_collection: Base, bounds: Range<Index>) {
+    self._base = _collection
     self.startIndex = bounds.startIndex
     self.endIndex = bounds.endIndex
   }
 
-  internal let _underlyingCollection: UnderlyingCollection
+  internal let _base: Base
 }
-

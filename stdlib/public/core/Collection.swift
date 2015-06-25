@@ -10,15 +10,22 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// Return the number of elements in `x`.
-///
-/// O(1) if `T.Index` is `RandomAccessIndexType`; O(N) otherwise.
 @available(*, unavailable, message="access the 'count' property on the collection")
 public func count <T : CollectionType>(x: T) -> T.Index.Distance {
   fatalError("unavailable function can't be called")
 }
 
-public protocol _CollectionDefaultsType : SequenceType {
+/// A protocol representing the minimal requirements of
+/// `CollectionType`.
+///
+/// - Note: In most cases, it's best to ignore this protocol and use
+///   `CollectionType` instead, as it has a more complete interface.
+//
+// This protocol is almost an implementation detail of the standard
+// library; it is used to deduce things like the `SubSequence` and
+// `Generator` type from a minimal collection, but it is also used in
+// exposed places like as a constraint on IndexingGenerator.
+public protocol _prext_Indexable {
   /// A type that represents a valid position in the collection.
   ///
   /// Valid indices consist of the position of every element and a
@@ -37,7 +44,7 @@ public protocol _CollectionDefaultsType : SequenceType {
   /// `successor()`.
   var endIndex: Index {get}
 
-  // The declaration of Element and _subscript here is a trick used to
+  // The declaration of _Element and subscript here is a trick used to
   // break a cyclic conformance/deduction that Swift can't handle.  We
   // need something other than a CollectionType.Generator.Element that can
   // be used as IndexingGenerator<T>'s Element.  Here we arrange for the
@@ -46,69 +53,24 @@ public protocol _CollectionDefaultsType : SequenceType {
   // Element to be the same as CollectionType.Generator.Element (see
   // below), but we have no way of expressing it today.
   typealias _Element
-  subscript(_i: Index) -> _Element {get}
+
+  /// Returns the element at the given `position`.
+  subscript(position: Index) -> _Element {get}
 }
 
-extension _CollectionDefaultsType {
-  /// Returns `true` iff `self` is empty.
-  public var isEmpty: Bool {
-    return startIndex == endIndex
-  }
 
-  /// Returns a value less than or equal to the number of elements in
-  /// `self`, *nondestructively*.
-  ///
-  /// - Complexity: O(N).
-  public func underestimateCount() -> Int {
-    return numericCast(count)
-  }
-
-  /// Returns the number of elements.
-  ///
-  /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndexType`;
-  ///   O(N) otherwise.
-  public var count: Index.Distance {
-    return distance(startIndex, endIndex)
-  }
-
-  /// Customization point for `SequenceType.indexOf()`.
-  ///
-  /// Define this method if the collection can find an element in less than
-  /// O(N) by exploiting collection-specific knowledge.
-  ///
-  /// - Returns: `nil` if a linear search should be attempted instead,
-  ///   `Optional(nil)` if the element was not found, or
-  ///   `Optional(Optional(index))` if an element was found.
-  ///
-  /// - Complexity: O(N).
-  public func _customIndexOfEquatableElement(
-    element: Generator.Element
-  ) -> Index?? {
-    return nil
+// FIXME: should be
+//
+//   extension SequenceType where Self : GeneratorType {
+//
+// but for <rdar://problem/21546738>
+extension GeneratorType where Self : SequenceType {
+  public func generate() -> Self {
+    return self
   }
 }
 
-/// This protocol is an implementation detail of `CollectionType`; do
-/// not use it directly.
-public protocol _CollectionGeneratorDefaultsType {
-  typealias Index : ForwardIndexType
-  typealias _Element
-  subscript(position: Index) -> _Element { get }
-  var startIndex: Index { get }
-  var endIndex: Index { get }
-}
-
-extension _CollectionGeneratorDefaultsType {
-  public func generate() -> IndexingGenerator<Self> {
-    return IndexingGenerator(self)
-  }
-}
-
-extension _CollectionDefaultsType {
-  public subscript(_prext_bounds: Range<Index>) -> _prext_Slice<Self> {
-    return _prext_Slice(_collection: self, bounds: _prext_bounds)
-  }
-}
+// FIXME: IndexingGenerator should go here for better readability
 
 /// A multi-pass *sequence* with addressable positions.
 ///
@@ -124,27 +86,33 @@ extension _CollectionDefaultsType {
 ///     for i in startIndex..<endIndex {
 ///       let x = self[i]
 ///     }
-public protocol CollectionType
-  : SequenceType, _CollectionDefaultsType,
-  _CollectionGeneratorDefaultsType {
-
-  /// Access the element indicated by `position`.
+public protocol CollectionType : _prext_Indexable, SequenceType {
+  /// A type that provides the *sequence*'s iteration interface and
+  /// encapsulates its iteration state.
   ///
-  /// - Requires: `position` indicates a valid position in `self` and
-  ///   `position != endIndex`.
-  subscript(position: Index) -> Generator.Element {get}
+  /// By default, a `CollectionType` satisfies `SequenceType` by
+  /// supplying an `IndexingGenerator` as its associated `Generator`
+  /// type.
+  typealias Generator: GeneratorType = IndexingGenerator<Self>
 
-  /// The *collection* type that represents a sub-range of elements.
+  // FIXME: Needed here so that the Generator is properly deduced from
+  // a custom generate() function.  Otherwise we get an
+  // IndexingGenerator. <rdar://problem/21539115>
+  func generate() -> Generator
+  
+  // FIXME: should be constrained to CollectionType
+  // (<rdar://problem/20715009> Implement recursive protocol
+  // constraints)
+  typealias _prext_SubSequence: _prext_Indexable, SequenceType = _prext_Slice<Self>
+
+  /// Returns the element at the given `position`.
+  subscript(_: Index) -> Generator.Element {get}
+  
+  /// Returns a collection representing a contiguous sub-range of
+  /// `self`'s elements.
   ///
-  /// Though it can't currently be enforced by the type system, the
-  /// `_prext_SubSlice` type in a concrete implementation of `CollectionType`
-  /// should also be `CollectionType`.
-  typealias _prext_SubSlice
-    : _CollectionDefaultsType, _CollectionGeneratorDefaultsType
-  // <rdar://problem/20715031> CollectionType.SubSlice should be constrained to CollectionType
-  // <rdar://problem/20715697> CollectionType.SubSlice should constrain its Element type
-
-  subscript(_prext_bounds: Range<Index>) -> _prext_SubSlice { get }
+  /// - Complexity: O(1)
+  subscript(_prext_bounds: Range<Index>) -> _prext_SubSequence {get}
 
   /// Returns `true` iff `self` is empty.
   var isEmpty: Bool { get }
@@ -154,7 +122,80 @@ public protocol CollectionType
   /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndexType`;
   ///   O(N) otherwise.
   var count: Index.Distance { get }
+  
+  ///   `Optional(Optional(index))` if an element was found.
+  ///
+  /// - Complexity: O(N).
+  //
+  // The following requirement enables dispatching for indexOf when
+  // the element type is Equatable.
+  func _customIndexOfEquatableElement(element: Generator.Element) -> Index??
 
+  /// Returns the first element of `self`, or `nil` if `self` is empty.
+  var first: Generator.Element? { get }
+}
+
+// FIXME: Can't constrain with Generator == _IndexingGenerator<Self>, due
+// to <rdar://problem/21538521> Nonsense diagnostic, then crash.
+/// A protocol used only to identify `IndexingGenerator`.
+internal protocol _IndexingGeneratorType {}
+extension IndexingGenerator : _IndexingGeneratorType {}
+
+/// Supply the default `generate()` method for `CollectionType` models
+/// that accept the default associated `Generator`,
+/// `IndexingGenerator<Self>`.
+extension CollectionType where Generator : _IndexingGeneratorType  {
+  public func generate() -> IndexingGenerator<Self> {
+    return IndexingGenerator(self)
+  }
+}
+
+
+// FIXME: Can't constrain with _prext_SubSequence ==
+// _prext_Slice<Self>, due to <rdar://problem/21538521> Nonsense
+// diagnostic, then crash.  Therefore, use a stand-in internal
+// protocol.
+/// A protocol used only to identify `_prext_Slice`.
+internal protocol _SliceType {}
+extension _prext_Slice : _SliceType {}
+
+/// Supply the default "slicing" `subscript`  for `CollectionType` models
+/// that accept the default associated `_prext_SubSequence`,
+/// `_prext_Slice<Self>`.
+extension CollectionType where _prext_SubSequence : _SliceType {
+  public subscript(_prext_bounds: Range<Index>) -> _prext_Slice<Self> {
+    return _prext_Slice(_collection: self, bounds: _prext_bounds)
+  }
+}
+
+/// Default implementations of core requirements
+extension CollectionType {
+  /// Returns `true` iff `self` is empty.
+  public var isEmpty: Bool {
+    return startIndex == endIndex
+  }
+
+  /// Returns the first element of `self`, or `nil` if `self` is empty.
+  public var first: Generator.Element? {
+    return isEmpty ? nil : self[startIndex]
+  }
+  
+  /// Returns a value less than or equal to the number of elements in
+  /// `self`, *nondestructively*.
+  ///
+  /// - Complexity: O(N).
+  public func underestimateCount() -> Int {
+    return numericCast(count)
+  }
+
+  /// Returns the number of elements.
+  ///
+  /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndexType`;
+  ///   O(N) otherwise.
+  public var count: Index.Distance {
+    return distance(startIndex, endIndex)
+  }
+  
   /// Customization point for `SequenceType.indexOf()`.
   ///
   /// Define this method if the collection can find an element in less than
@@ -165,12 +206,13 @@ public protocol CollectionType
   ///   `Optional(Optional(index))` if an element was found.
   ///
   /// - Complexity: O(N).
-  func _customIndexOfEquatableElement(element: Generator.Element) -> Index??
-
-  /// Returns the first element of `self`, or `nil` if `self` is empty.
-  var first: Generator.Element? { get }
+  public // dispatching
+  func _customIndexOfEquatableElement(_: Generator.Element) -> Index?? {
+    return nil
+  }
 }
 
+/// Algorithms
 extension CollectionType {
   /// Return an `Array` containing the results of mapping `transform`
   /// over `self`.
@@ -189,9 +231,7 @@ extension CollectionType {
     // returns an instance of a different type.
     return Array<T>(lazy(self).map(escapableTransform))
   }
-}
 
-extension CollectionType {
   /// Returns an `Array` containing the elements of `self`,
   /// in order, that satisfy the predicate `includeElement`.
   public func filter(
@@ -202,13 +242,6 @@ extension CollectionType {
     let escapableIncludeElement =
       unsafeBitCast(includeElement, IncludeElement.self)
     return Array(lazy(self).filter(escapableIncludeElement))
-  }
-}
-
-extension CollectionType {
-  /// Returns the first element of `self`, or `nil` if `self` is empty.
-  public var first: Generator.Element? {
-    return isEmpty ? nil : self[startIndex]
   }
 }
 
@@ -301,7 +334,7 @@ extension MutableCollectionType {
 }
 
 /// A *generator* for an arbitrary *collection*.  Provided `C`
-/// conforms to the other requirements of *CollectionType*,
+/// conforms to the other requirements of `_prext_Indexable`,
 /// `IndexingGenerator<C>` can be used as the result of `C`'s
 /// `generate()` method.  For example:
 ///
@@ -312,36 +345,26 @@ extension MutableCollectionType {
 ///          return IndexingGenerator(self)
 ///        }
 ///      }
-public struct IndexingGenerator<
-  C: _CollectionGeneratorDefaultsType
-> : GeneratorType, SequenceType {
-  // Because of <rdar://problem/14396120> we've had to factor
-  // _CollectionType out of CollectionType to make it useful.
-
+public struct IndexingGenerator<Elements : _prext_Indexable>
+ : GeneratorType, SequenceType {
+  
   /// Create a *generator* over the given collection.
-  public init(_ seq: C) {
-    self._elements = seq
-    self._position = seq.startIndex
-  }
-
-  /// Returns a *generator* over the elements of this *sequence*.
-  ///
-  /// - Complexity: O(1).
-  public func generate() -> IndexingGenerator {
-    return self
+  public init(_ elements: Elements) {
+    self._elements = elements
+    self._position = elements.startIndex
   }
 
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   ///
   /// - Requires: No preceding call to `self.next()` has returned `nil`.
-  public mutating func next() -> C._Element? {
+  public mutating func next() -> Elements._Element? {
     return _position == _elements.endIndex
     ? .None : .Some(_elements[_position++])
   }
 
-  let _elements: C
-  var _position: C.Index
+  let _elements: Elements
+  var _position: Elements.Index
 }
 
 /// Returns the range of `x`'s valid index values.
