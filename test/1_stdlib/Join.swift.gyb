@@ -274,12 +274,12 @@ struct MockExtensibleCollection : ExtensibleCollectionType {
 JoinTestSuite.test("ReservesCapacity") {
   if true {
     let r = join(MockExtensibleCollection([]), [])
-    expectEqual(0, r._reservedCapacity!)
+    expectEqual(0, r._reservedCapacity)
   }
   if true {
     let r = join(MockExtensibleCollection([ 42 ]),
         [ MockExtensibleCollection([]) ])
-    expectEqual(0, r._reservedCapacity!)
+    expectEqual(0, r._reservedCapacity)
   }
 
   if true {
@@ -287,7 +287,7 @@ JoinTestSuite.test("ReservesCapacity") {
         [ MockExtensibleCollection([ 1 ]),
           MockExtensibleCollection([ 2, 3, 4 ]),
           MockExtensibleCollection([ 5, 6, 7 ]) ])
-    expectEqual(9, r._reservedCapacity!)
+    expectEqual(9, r._reservedCapacity)
     expectEqual([ 1, 42, 2, 3, 4, 42, 5, 6, 7 ], r._storage)
   }
   if true {
@@ -295,7 +295,7 @@ JoinTestSuite.test("ReservesCapacity") {
         [ MockExtensibleCollection([ 1 ]),
           MockExtensibleCollection([ 2, 3, 4 ]),
           MockExtensibleCollection([ 5, 6, 7 ]) ])
-    expectEqual(11, r._reservedCapacity!)
+    expectEqual(11, r._reservedCapacity)
     expectEqual([ 1, 42, 4242, 2, 3, 4, 42, 4242, 5, 6, 7 ], r._storage)
   }
 }
