@@ -416,7 +416,7 @@ void CodeCompletionResultBuilder::setAssociatedDecl(const Decl *D) {
   AssociatedDecl = D;
 
   if (auto *ClangD = D->getClangDecl())
-    CurrentModule = ClangD->getOwningModule();
+    CurrentModule = ClangD->getImportedOwningModule();
   // FIXME: macros
   // FIXME: imported header module
 

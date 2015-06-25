@@ -1126,7 +1126,7 @@ ClangImporter::Implementation::getClangSubmoduleForDecl(
   if (!actual)
     actual = D->getCanonicalDecl();
 
-  return actual->getOwningModule();
+  return actual->getImportedOwningModule();
 }
 
 ClangModuleUnit *ClangImporter::Implementation::getClangModuleForDecl(
@@ -2480,7 +2480,7 @@ bool ClangImporter::lookupDeclsFromHeader(StringRef Filename,
         clang::PreprocessedEntity *PPE = *I;
         if (!PPE)
           continue;
-        if (auto *MD = dyn_cast<clang::MacroDefinition>(PPE)) {
+        if (auto *MD = dyn_cast<clang::MacroDefinitionRecord>(PPE)) {
           auto *II = const_cast<clang::IdentifierInfo*>(MD->getName());
           if (auto *MI = ClangPP.getMacroInfo(II)) {
             if (filter(MI)) {
@@ -2543,8 +2543,8 @@ void ClangImporter::lookupVisibleDecls(VisibleDeclConsumer &Consumer) const {
       auto Name = Impl.importName(I->first);
       if (Name.empty())
         continue;
-      if (auto *Imported =
-              Impl.importMacro(Name, I->second->getMacroInfo())) {
+      if (auto *Imported = Impl.importMacro(
+              Name, ClangPP.getMacroDefinition(I->first).getMacroInfo())) {
         Impl.CachedVisibleDecls.push_back(Imported);
       }
     }
