@@ -389,6 +389,76 @@ public:
     }
   }
 
+  class ErrorGatherer : public DiagnosticConsumer {
+  private:
+    bool error = false;
+    DiagnosticEngine &diags;
+  public:
+    ErrorGatherer(DiagnosticEngine &diags) : diags(diags) {
+      diags.addConsumer(*this);
+    }
+    ~ErrorGatherer() {
+      diags.takeConsumers();
+    }
+    virtual void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
+                                  DiagnosticKind Kind, StringRef Text,
+                                  const DiagnosticInfo &Info) {
+      if (Kind == swift::DiagnosticKind::Error) {
+        error = true;
+      }
+      llvm::errs() << Text << "\n";
+    }
+    bool hadError() { 
+      return error;
+    }
+  };
+
+  class ErrorFinder : public ASTWalker {
+  private:
+    bool error = false;
+  public:
+    ErrorFinder () { }
+    virtual std::pair<bool, Expr*> walkToExprPre(Expr *E) {
+      if (isa<ErrorExpr>(E) || !E->getType() || E->getType()->is<ErrorType>()) {
+        error = true;
+        return { false, E };
+      }
+      return { true, E };
+    }
+    virtual bool walkToDeclPre(Decl *D) {
+      if (ValueDecl *VD = dyn_cast<ValueDecl>(D)) {
+        if (!VD->getType() || VD->getType()->is<ErrorType>()) {
+          error = true;
+          return false;
+        }
+      }
+      return true;
+    }
+    bool hadError() { 
+      return error;
+    }
+  };
+
+  bool doTypeCheck(ASTContext &Ctx, DeclContext *DC, Expr *&parsedExpr) {
+    DiagnosticEngine diags(Ctx.SourceMgr);
+    ErrorGatherer errorGatherer(diags);
+    const bool discardedExpr = false;
+  
+    TypeChecker TC(Ctx, diags);
+    TC.typeCheckExpression(parsedExpr, DC, Type(), Type(), discardedExpr,
+                           FreeTypeVariableBinding::GenericParameters);
+    
+    if (parsedExpr) {
+      ErrorFinder errorFinder;
+      parsedExpr->walk(errorFinder);
+      if (!errorFinder.hadError() && !errorGatherer.hadError()) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
   BraceStmt *transformBraceStmt(BraceStmt *BS, bool TopLevel = false) {
     ArrayRef<ASTNode> OriginalElements = BS->getElements();
     typedef SmallVector<swift::ASTNode, 3> ElementVector;
@@ -464,7 +534,7 @@ public:
                   object = PE->getSubExpr();
                   appendNewline =
                     new (Context) BooleanLiteralExpr(true, SourceLoc(), true);
-                  typeCheckContextExpr(Context, TypeCheckDC, appendNewline);
+                  doTypeCheck(Context, TypeCheckDC, appendNewline);
                 } else if (TupleExpr *TE = dyn_cast<TupleExpr>(AE->getArg())) {
                   if (TE->getNumElements() == 2) {
                     object = TE->getElement(0);
@@ -864,7 +934,7 @@ public:
     Expr *SendDataCall = new (Context) CallExpr(SendDataRef, SendDataArgs, true,
                                                 Type());
 
-    if (!typeCheckContextExpr(Context, TypeCheckDC, SendDataCall)) {
+    if (!doTypeCheck(Context, TypeCheckDC, SendDataCall)) {
       return nullptr;
     }
 
