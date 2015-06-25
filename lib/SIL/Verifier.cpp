@@ -2371,7 +2371,7 @@ public:
                     "select_enum case operand must match type of instruction");
     }
 
-    // If the switch is non-exhaustive, we require a default.
+    // If the select is non-exhaustive, we require a default.
     require(unswitchedElts.empty() || I->hasDefault(),
             "nonexhaustive select_enum must have a default destination");
     if (I->hasDefault()) {
