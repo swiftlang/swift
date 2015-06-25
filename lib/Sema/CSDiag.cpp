@@ -1418,22 +1418,129 @@ static std::string getTypeListString(SmallVectorImpl<Identifier> &names,
   return typeList;
 }
 
+namespace {
+/// If a constraint system fails to converge on a solution for a given
+/// expression, this class can produce a reasonable diagnostic for the failure
+/// by analyzing the remnants of the failed constraint system. (Specifically,
+/// left-over inactive, active and failed constraints.)
+/// This class does not tune its diagnostics for a specific expression kind,
+/// for that, you'll want to use an instance of the FailureDiagnosis class.
+class FailureDiagnosis :public ASTVisitor<FailureDiagnosis, /*exprresult*/bool>{
+  friend class ASTVisitor<FailureDiagnosis, /*exprresult*/bool>;
+  
+  Expr *expr = nullptr;
+  ConstraintSystem *CS = nullptr;
+  
+  // Specific constraint kinds used, in conjunction with the expression node,
+  // to determine the appropriate diagnostic.
+  Constraint *conversionConstraint = nullptr;
+  Constraint *overloadConstraint = nullptr;
+  Constraint *fallbackConstraint = nullptr;
+  Constraint *activeConformanceConstraint = nullptr;
+  Constraint *valueMemberConstraint = nullptr;
+  Constraint *argumentConstraint = nullptr;
+  Constraint *disjunctionConversionConstraint = nullptr;
+  Constraint *conformanceConstraint = nullptr;
+  Constraint *bridgeToObjCConstraint = nullptr;
+  
+public:
+  
+  FailureDiagnosis(Expr *expr, ConstraintSystem *CS);
+     
+  /// Attempt to diagnose a failure without taking into account the specific
+  /// kind of expression that could not be type checked.
+  bool diagnoseGeneralFailure();
+  
+  /// If the type check failure on the expression is a top-level one, obtain a
+  /// type or any sub expressions by potentially re-typechecking in a
+  /// context-free manner.
+  Type getTypeOfIndependentSubExpression(Expr *subExpr);
+  
+  /// Attempt to diagnose a specific failure from the info we've collected from
+  /// the failed constraint system.
+  bool diagnoseFailure();
+
+private:
+  /// Attempt to produce a diagnostic for a mismatch between an expression's
+  /// type and its assumed contextual type.
+  bool diagnoseContextualConversionError();
+  
+  /// Produce a diagnostic for a general member-lookup failure (irrespective of
+  /// the exact expression kind).
+  bool diagnoseGeneralValueMemberFailure();
+  
+  /// Produce a diagnostic for a general overload resolution failure
+  /// (irrespective of the exact expression kind).
+  bool diagnoseGeneralOverloadFailure();
+  
+  /// Produce a diagnostic for a general conversion failure (irrespective of the
+  /// exact expression kind).
+  bool diagnoseGeneralConversionFailure();
+     
+  /// Given a set of parameter lists from an overload group, and a list of
+  /// arguments, emit a diagnostic indicating any partially matching overloads.
+  void suggestPotentialOverloads(const StringRef functionName,
+                                 const SourceLoc &loc,
+                                 const SmallVectorImpl<Type> &paramLists,
+                                 const SmallVectorImpl<Type> &argTypes);
+  
+  bool visitExpr(Expr *E) {
+    return diagnoseGeneralFailure();
+  }
+      
+  /// Diagnose a specific kind of application expression.
+  bool visitBinaryExpr(BinaryExpr *BE);
+  bool visitUnaryExpr(ApplyExpr *AE);
+  bool visitPrefixUnaryExpr(PrefixUnaryExpr *PUE) {
+    return visitUnaryExpr(PUE);
+  }
+  bool visitPostfixUnaryExpr(PostfixUnaryExpr *PUE) {
+    return visitUnaryExpr(PUE);
+  }
+      
+  bool visitParenExpr(ParenExpr *PE);
+  bool visitSubscriptExpr(SubscriptExpr *SE);
+  
+  /// Diagnose a failed function, method or initializer application expression.
+  bool visitCallExpr(CallExpr *CE);
+  
+  /// Diagnose a failed assignment expression, with special attention paid to
+  /// assignments to immutable values.
+  bool visitAssignExpr(AssignExpr *AE);
+  
+  /// Diagnose the specific case of addressing an immutable value, or one
+  /// without a setter.
+  bool visitInOutExpr(InOutExpr *IOE);
+
+  /// Diagnose a failed coerce expression, considering the possibility that it
+  /// should be a forced downcast instead.
+  bool visitCoerceExpr(CoerceExpr *CE);
+
+  /// Diagnose a failed forced downcast expr.
+  bool visitForcedCheckedCastExpr(ForcedCheckedCastExpr *FCCE);
+  
+  /// Diagnose a failed tuple expression, by examining its element expressions.
+  bool visitTupleExpr(TupleExpr *TE);
+};
+} // end anonymous namespace.
+
+
 FailureDiagnosis::FailureDiagnosis(Expr *expr, ConstraintSystem *cs)
   : expr(expr), CS(cs) {
   assert(expr && CS);
   
   // Collect and categorize constraint information from the failed system.
   
-  if(!CS->ActiveConstraints.empty()) {
+  if (!CS->getActiveConstraints().empty()) {
     // If any active conformance constraints are in the system, we know that
     // any inactive constraints are in its service. Capture the constraint and
     // present this information to the user.
-    auto *constraint = &CS->ActiveConstraints.front();
+    auto *constraint = &CS->getActiveConstraints().front();
     
     activeConformanceConstraint = getComponentConstraint(constraint);
   }
   
-  for (auto & constraintRef : CS->InactiveConstraints) {
+  for (auto & constraintRef : CS->getConstraints()) {
     auto constraint = &constraintRef;
     
     // Capture the first non-disjunction constraint we find. We'll use this

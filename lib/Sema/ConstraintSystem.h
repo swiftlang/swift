@@ -1141,109 +1141,6 @@ public:
   }
 };
 
-/// If a constraint system fails to converge on a solution for a given
-/// expression, this class can produce a reasonable diagnostic for the failure
-/// by analyzing the remnants of the failed constraint system. (Specifically,
-/// left-over inactive, active and failed constraints.)
-/// This class does not tune its diagnostics for a specific expression kind,
-/// for that, you'll want to use an instance of the FailureDiagnosis class.
-class FailureDiagnosis :public ASTVisitor<FailureDiagnosis, /*exprresult*/bool>{
-  friend class ASTVisitor<FailureDiagnosis, /*exprresult*/bool>;
-  
-  Expr *expr = nullptr;
-  ConstraintSystem *CS = nullptr;
-  
-  // Specific constraint kinds used, in conjunction with the expression node,
-  // to determine the appropriate diagnostic.
-  Constraint *conversionConstraint = nullptr;
-  Constraint *overloadConstraint = nullptr;
-  Constraint *fallbackConstraint = nullptr;
-  Constraint *activeConformanceConstraint = nullptr;
-  Constraint *valueMemberConstraint = nullptr;
-  Constraint *argumentConstraint = nullptr;
-  Constraint *disjunctionConversionConstraint = nullptr;
-  Constraint *conformanceConstraint = nullptr;
-  Constraint *bridgeToObjCConstraint = nullptr;
-  
-public:
-  
-  FailureDiagnosis(Expr *expr, ConstraintSystem *CS);
-     
-  /// Attempt to diagnose a failure without taking into account the specific
-  /// kind of expression that could not be type checked.
-  bool diagnoseGeneralFailure();
-  
-  /// If the type check failure on the expression is a top-level one, obtain a
-  /// type or any sub expressions by potentially re-typechecking in a
-  /// context-free manner.
-  Type getTypeOfIndependentSubExpression(Expr *subExpr);
-  
-  /// Attempt to diagnose a specific failure from the info we've collected from
-  /// the failed constraint system.
-  bool diagnoseFailure();
-
-private:
-  /// Attempt to produce a diagnostic for a mismatch between an expression's
-  /// type and its assumed contextual type.
-  bool diagnoseContextualConversionError();
-  
-  /// Produce a diagnostic for a general member-lookup failure (irrespective of
-  /// the exact expression kind).
-  bool diagnoseGeneralValueMemberFailure();
-  
-  /// Produce a diagnostic for a general overload resolution failure
-  /// (irrespective of the exact expression kind).
-  bool diagnoseGeneralOverloadFailure();
-  
-  /// Produce a diagnostic for a general conversion failure (irrespective of the
-  /// exact expression kind).
-  bool diagnoseGeneralConversionFailure();
-     
-  /// Given a set of parameter lists from an overload group, and a list of
-  /// arguments, emit a diagnostic indicating any partially matching overloads.
-  void suggestPotentialOverloads(const StringRef functionName,
-                                 const SourceLoc &loc,
-                                 const SmallVectorImpl<Type> &paramLists,
-                                 const SmallVectorImpl<Type> &argTypes);
-  
-  bool visitExpr(Expr *E) {
-    return diagnoseGeneralFailure();
-  }
-      
-  /// Diagnose a specific kind of application expression.
-  bool visitBinaryExpr(BinaryExpr *BE);
-  bool visitUnaryExpr(ApplyExpr *AE);
-  bool visitPrefixUnaryExpr(PrefixUnaryExpr *PUE) {
-    return visitUnaryExpr(PUE);
-  }
-  bool visitPostfixUnaryExpr(PostfixUnaryExpr *PUE) {
-    return visitUnaryExpr(PUE);
-  }
-      
-  bool visitParenExpr(ParenExpr *PE);
-  bool visitSubscriptExpr(SubscriptExpr *SE);
-  
-  /// Diagnose a failed function, method or initializer application expression.
-  bool visitCallExpr(CallExpr *CE);
-  
-  /// Diagnose a failed assignment expression, with special attention paid to
-  /// assignments to immutable values.
-  bool visitAssignExpr(AssignExpr *AE);
-  
-  /// Diagnose the specific case of addressing an immutable value, or one
-  /// without a setter.
-  bool visitInOutExpr(InOutExpr *IOE);
-
-  /// Diagnose a failed coerce expression, considering the possibility that it
-  /// should be a forced downcast instead.
-  bool visitCoerceExpr(CoerceExpr *CE);
-
-  /// Diagnose a failed forced downcast expr.
-  bool visitForcedCheckedCastExpr(ForcedCheckedCastExpr *FCCE);
-  
-  /// Diagnose a failed tuple expression, by examining its element expressions.
-  bool visitTupleExpr(TupleExpr *TE);
-};
 
 /// An intrusive, doubly-linked list of constraints.
 typedef llvm::ilist<Constraint> ConstraintList;
@@ -1261,7 +1158,6 @@ typedef OptionSet<ConstraintSystemFlags> ConstraintSystemOptions;
 /// solution of which assigns concrete types to each of the type variables.
 /// Constraint systems are typically generated given an (untyped) expression.
 class ConstraintSystem {
-  
 public:
   TypeChecker &TC;
   DeclContext *DC;
@@ -1269,15 +1165,21 @@ public:
   
   friend class Fix;
   friend class OverloadChoice;
-  friend class GeneralFailureDiagnosis;
-  friend class FailureDiagnosis;
-  
+
   class SolverScope;
 
-private:
-  
   Constraint *failedConstraint = nullptr;
-  
+
+  /// \brief Failures that occured while solving.
+  ///
+  /// FIXME: We really need to track overload sets and type variable bindings
+  /// to make any sense of this data. Also, it probably belongs within
+  /// SolverState.
+  llvm::FoldingSetVector<Failure> failures;
+
+
+private:
+
   /// \brief Allocator used for all of the related constraint systems.
   llvm::BumpPtrAllocator Allocator;
 
@@ -1309,13 +1211,6 @@ private:
   /// These failures are unavoidable, in the sense that they occur before
   /// we have made any (potentially incorrect) assumptions at all.
   TinyPtrVector<Failure *> unavoidableFailures;
-
-  /// \brief Failures that occured while solving.
-  ///
-  /// FIXME: We really need to track overload sets and type variable bindings
-  /// to make any sense of this data. Also, it probably belongs within
-  /// SolverState.
-  llvm::FoldingSetVector<Failure> failures;
 
   /// \brief The overload sets that have been resolved along the current path.
   ResolvedOverloadSetListItem *resolvedOverloadSets = nullptr;
@@ -1879,6 +1774,10 @@ public:
 
   /// Retrieve the list of inactive constraints.
   ConstraintList &getConstraints() { return InactiveConstraints; }
+
+  /// The worklist of "active" constraints that should be revisited
+  /// due to a change.
+  ConstraintList &getActiveConstraints() { return ActiveConstraints; }
 
   /// \brief Retrieve the representative of the equivalence class containing
   /// this type variable.
