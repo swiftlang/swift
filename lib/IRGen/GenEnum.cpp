@@ -1336,10 +1336,16 @@ namespace {
       // by setting the tag bits.
       APInt payloadTag, extraTag;
       std::tie(payloadTag, extraTag) = getNoPayloadCaseValue(IGF.IGM, Case);
-      llvm::Value *payloadResult = payload.emitCompare(IGF,
-                getFixedPayloadTypeInfo().getFixedExtraInhabitantMask(IGF.IGM),
-                payloadTag);
-      
+
+      auto &ti = getFixedPayloadTypeInfo();
+      bool hasExtraInhabitants = ti.getFixedExtraInhabitantCount(IGF.IGM) > 0;
+
+      llvm::Value *payloadResult = nullptr;
+      if (hasExtraInhabitants)
+        payloadResult = payload.emitCompare(IGF,
+                                        ti.getFixedExtraInhabitantMask(IGF.IGM),
+                                            payloadTag);
+
       // If any tag bits are present, they must match.
       llvm::Value *tagResult = nullptr;
       if (tagBits) {
