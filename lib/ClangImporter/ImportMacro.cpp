@@ -388,6 +388,9 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
 
 ValueDecl *ClangImporter::Implementation::importMacro(Identifier name,
                                                       clang::MacroInfo *macro) {
+  if (!macro)
+    return nullptr;
+
   // Look for the value for an already-imported macro.
   auto known = ImportedMacros.find(macro);
   if (known != ImportedMacros.end()) {
