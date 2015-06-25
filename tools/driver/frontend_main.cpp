@@ -40,7 +40,6 @@
 // FIXME: We're just using CompilerInstance::createOutputFile.
 // This API should be sunk down to LLVM.
 #include "clang/Frontend/CompilerInstance.h"
-#include "clang/CodeGen/LLVMModuleProvider.h"
 
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/LLVMContext.h"
@@ -331,8 +330,7 @@ static bool printAsObjC(const std::string &outputPath, Module *M,
                         StringRef bridgingHeader, bool moduleIsPublic) {
   using namespace llvm::sys;
 
-  clang::CompilerInstance Clang{
-    clang::SharedModuleProvider::Create<clang::LLVMModuleProvider>()};
+  clang::CompilerInstance Clang;
 
   std::string tmpFilePath;
   std::error_code EC;
