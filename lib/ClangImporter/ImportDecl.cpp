@@ -4959,7 +4959,7 @@ classifyEnum(const clang::EnumDecl *decl) {
   // name for the Swift type.
   if (!decl->hasNameForLinkage())
     return EnumKind::Constants;
-  
+
   // Was the enum declared using *_ENUM or *_OPTIONS?
   // FIXME: Use Clang attributes instead of grovelling the macro expansion loc.
   auto loc = decl->getLocStart();
@@ -4972,7 +4972,11 @@ classifyEnum(const clang::EnumDecl *decl) {
         || MacroName == "SWIFT_OPTIONS")
       return EnumKind::Options;
   }
-  
+
+  // Hardcode a particular annoying case in the OS X headers.
+  if (decl->getName() == "DYLD_BOOL")
+    return EnumKind::Enum;
+
   // Fall back to the 'Unknown' path.
   return EnumKind::Unknown;
 }
