@@ -1539,7 +1539,7 @@ Type ConstraintSystem::computeAssignDestType(Expr *dest, SourceLoc equalLoc) {
     return objectTv;
   }
 
-  FailureDiagnosis::diagnoseAssignmentFailure(dest, destTy, equalLoc, *this);
+  diagnoseAssignmentFailure(dest, destTy, equalLoc);
   return Type();
 }
 

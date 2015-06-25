@@ -2021,10 +2021,11 @@ static void diagnoseSubElementFailure(Expr *destExpr,
 }
 
 
-void FailureDiagnosis::diagnoseAssignmentFailure(Expr *dest, Type destTy,
-                                                 SourceLoc equalLoc,
-                                                 ConstraintSystem &CS) {
-  auto &TC = CS.getTypeChecker();
+/// When an assignment to an expression is detected and the destination is
+/// invalid, emit a detailed error about the condition.
+void ConstraintSystem::diagnoseAssignmentFailure(Expr *dest, Type destTy,
+                                                 SourceLoc equalLoc) {
+  auto &TC = getTypeChecker();
 
   // Diagnose obvious assignments to literals.
   if (isa<LiteralExpr>(dest->getSemanticsProvidingExpr())) {
@@ -2045,7 +2046,7 @@ void FailureDiagnosis::diagnoseAssignmentFailure(Expr *dest, Type destTy,
     diagID = diag::assignment_lhs_is_immutable_variable;
   }
   
-  diagnoseSubElementFailure(dest, equalLoc, CS, diagID,
+  diagnoseSubElementFailure(dest, equalLoc, *this, diagID,
                             diag::assignment_lhs_not_lvalue);
 }
 
@@ -2494,7 +2495,7 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
   // If the result type is a non-lvalue, then we are failing because it is
   // immutable and that's not a great thing to assign to.
   if (!destType->isLValueType()) {
-    diagnoseAssignmentFailure(destExpr, destType, assignExpr->getLoc(), *CS);
+    CS->diagnoseAssignmentFailure(destExpr, destType, assignExpr->getLoc());
     return true;
   }
 

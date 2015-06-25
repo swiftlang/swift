@@ -1182,12 +1182,6 @@ public:
   /// the failed constraint system.
   bool diagnoseFailure();
 
-  /// When an assignment to an expression is detected and the destination is
-  /// invalid, emit a detailed error about the condition.
-  static void diagnoseAssignmentFailure(Expr *dest, Type destTy,
-                                        SourceLoc equalLoc,
-                                        ConstraintSystem &CS);
-
 private:
   /// Attempt to produce a diagnostic for a mismatch between an expression's
   /// type and its assumed contextual type.
@@ -1782,7 +1776,11 @@ public:
   bool salvage(SmallVectorImpl<Solution> &viable,
               Expr *expr,
               bool onlyFailures = false);
-  
+
+  /// When an assignment to an expression is detected and the destination is
+  /// invalid, emit a detailed error about the condition.
+  void diagnoseAssignmentFailure(Expr *dest, Type destTy, SourceLoc equalLoc);
+
   /// \brief Mine the active and inactive constraints in the constraint
   /// system to generate a plausible diagnosis of why the system could not be
   /// solved.
