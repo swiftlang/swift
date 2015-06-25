@@ -969,13 +969,18 @@ void ConstraintSystem::openGeneric(
     case RequirementKind::Conformance: {
       auto subjectTy = req.getFirstType().transform(replaceDependentTypes);
       if (auto proto = req.getSecondType()->getAs<ProtocolType>()) {
-        if (!skipProtocolSelfConstraint ||
-            !(dc->isProtocolOrProtocolExtensionContext() ||
-              dc->getParent()->isProtocolOrProtocolExtensionContext()) ||
-            !isProtocolSelfType(req.getFirstType())) {
-          addConstraint(ConstraintKind::ConformsTo, subjectTy, proto,
-                        locatorPtr);
+        // Determine whether this is the protocol 'Self' constraint we should
+        // skip.
+        if (skipProtocolSelfConstraint &&
+            (proto->getDecl() == dc->isProtocolOrProtocolExtensionContext() ||
+             proto->getDecl()
+               == dc->getParent()->isProtocolOrProtocolExtensionContext())&&
+            isProtocolSelfType(req.getFirstType())) {
+          break;
         }
+
+        addConstraint(ConstraintKind::ConformsTo, subjectTy, proto,
+                      locatorPtr);
       } else {
         auto boundTy = req.getSecondType().transform(replaceDependentTypes);
         addConstraint(ConstraintKind::Subtype, subjectTy, boundTy, locatorPtr);
