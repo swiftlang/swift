@@ -1442,13 +1442,6 @@ namespace {
 
       if (!commonPrefix.empty()) {
         StringRef checkPrefix = commonPrefix;
-        size_t droppedFromBack = 0;
-
-        // Account for the 'EnumName_Constant' convention on enumerators.
-        if (checkPrefix.back() == '_' && !followedByNonIdentifier) {
-          checkPrefix = checkPrefix.drop_back();
-          ++droppedFromBack;
-        }
 
         // Account for the 'kConstant' naming convention on enumerators.
         if (checkPrefix[0] == 'k' &&
@@ -1467,8 +1460,14 @@ namespace {
         StringRef commonWithEnum = getCommonPluralPrefix(checkPrefix,
                                                          enumNameStr);
         size_t delta = commonPrefix.size() - checkPrefix.size();
-        if (commonWithEnum.size() < checkPrefix.size())
-          delta -= droppedFromBack;
+
+        // Account for the 'EnumName_Constant' convention on enumerators.
+        if (commonWithEnum.size() < checkPrefix.size() &&
+            checkPrefix[commonWithEnum.size()] == '_' &&
+            !followedByNonIdentifier) {
+          delta += 1;
+        }
+
         commonPrefix = commonPrefix.slice(0, commonWithEnum.size() + delta);
       }
       Impl.EnumConstantNamePrefixes.insert({decl, commonPrefix});

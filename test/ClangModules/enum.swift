@@ -170,6 +170,7 @@ let bitmapFormat5: NSABitmapFormat5 = [.NSAA16d , .NSAB32d]
 // Drop trailing underscores when possible.
 let timeFlags: CMTimeFlags = [.Valid , .HasBeenRounded]
 let timeFlags2: CMTimeFlagsWithNumber = [._Valid, ._888]
+let audioComponentOpts: AudioComponentInstantiationOptions = [.LoadOutOfProcess]
 
 let objcFlags: objc_flags = [.taggedPointer, .swiftRefcount]
 

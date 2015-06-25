@@ -22,3 +22,11 @@ typedef NS_ENUM(NSInteger, SomeRandomEnum) {
   SomeRandomA,
   SomeRandomB
 };
+
+// From <AudioUnit/AudioComponent.h>
+// The interesting feature of this enum is that the common prefix before
+// taking the enum name itself into account extends past the underscore.
+typedef CF_OPTIONS(UInt32, AudioComponentInstantiationOptions) {
+  kAudioComponentInstantiation_LoadOutOfProcess = 1,
+  kAudioComponentInstantiation_LoadInProcess = 2
+};
