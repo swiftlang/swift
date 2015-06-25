@@ -998,11 +998,11 @@ public:
   Type getFixedType(TypeVariableType *typeVar) const;
 
   LLVM_ATTRIBUTE_DEPRECATED(
-      void dump(SourceManager *SM) const LLVM_ATTRIBUTE_USED,
+      void dump() const LLVM_ATTRIBUTE_USED,
       "only for use within the debugger");
 
   /// \brief Dump this solution.
-  void dump(SourceManager *SM, raw_ostream &OS) const LLVM_ATTRIBUTE_USED;
+  void dump(raw_ostream &OS) const LLVM_ATTRIBUTE_USED;
 };
 
 /// \brief Describes the differences between several solutions to the same

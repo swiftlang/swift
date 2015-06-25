@@ -2832,7 +2832,7 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable,
         int i = 0;
         for (auto &solution : viable) {
           log << "---Ambiguous solution #" << i++ << "---\n";
-          solution.dump(&TC.Context.SourceMgr, log);
+          solution.dump(log);
           log << "\n";
         }
       }        

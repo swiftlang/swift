@@ -967,7 +967,7 @@ bool TypeChecker::solveForExpression(
   if (getLangOpts().DebugConstraintSolver) {
     auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Solution---\n";
-    solution.dump(&Context.SourceMgr, log);
+    solution.dump(log);
   }
 
   // Notify the listener that we have a solution.
@@ -1180,7 +1180,7 @@ bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc,
   if (getLangOpts().DebugConstraintSolver) {
     auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Solution---\n";
-    solution.dump(&Context.SourceMgr, log);
+    solution.dump(log);
   }
 
   // Apply the solution to the expression.
@@ -1899,7 +1899,7 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc) {
   if (getLangOpts().DebugConstraintSolver) {
     auto &log = Context.TypeCheckerDebug->getStream();
     log << "---Solution---\n";
-    solution.dump(&Context.SourceMgr, log);
+    solution.dump(log);
   }
 
   // Perform the conversion.
@@ -1925,11 +1925,17 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc) {
 //===--------------------------------------------------------------------===//
 #pragma mark Debugging
 
-void Solution::dump(SourceManager *sm) const {
-  dump(sm, llvm::errs());
+void Solution::dump() const {
+  dump(llvm::errs());
 }
 
-void Solution::dump(SourceManager *sm, raw_ostream &out) const {
+void Solution::dump(raw_ostream &out) const {
+  ASTContext &ctx = getConstraintSystem().getASTContext();
+  llvm::SaveAndRestore<bool> debugSolver(ctx.LangOpts.DebugConstraintSolver,
+                                         true);
+
+  SourceManager *sm = &ctx.SourceMgr;
+
   out << "Fixed score: " << FixedScore << "\n";
 
   out << "Type variables:\n";
