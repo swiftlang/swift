@@ -827,8 +827,12 @@ Module *ClangImporter::loadModule(
     clang::SourceLocation clangImportLoc
       = srcMgr.getLocForStartOfFile(srcMgr.getMainFileID())
               .getLocWithOffset(Impl.ImportCounter++);
-    return Impl.Instance->loadModule(clangImportLoc, path, visibility,
-                                     /*IsInclusionDirective=*/false);
+    clang::ModuleLoadResult result =
+        Impl.Instance->loadModule(clangImportLoc, path, visibility,
+                                  /*IsInclusionDirective=*/false);
+    if (result && makeVisible)
+      Impl.getClangPreprocessor().makeModuleVisible(result, clangImportLoc);
+    return result;
   };
 
   // Now load the top-level module, so that we can check if the submodule

@@ -298,7 +298,7 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
           return importNil(impl, DC, name, ClangN);
 
         auto macroID = impl.getClangPreprocessor().getMacroInfo(clangID);
-        if (macroID != macro)
+        if (macroID && macroID != macro)
           return importMacro(impl, DC, name, macroID, ClangN);
       }
 
