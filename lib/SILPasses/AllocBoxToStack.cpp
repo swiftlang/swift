@@ -634,7 +634,7 @@ class LifetimeTracker {
     LifetimeTracker(SILValue Value): TheValue(Value) {}
 
   using EndpointRange =
-    Range<llvm::SmallVectorImpl<SILInstruction *>::const_iterator>;
+    iterator_range<llvm::SmallVectorImpl<SILInstruction *>::const_iterator>;
 
   SILValue getStart() { return TheValue; }
 
@@ -707,7 +707,7 @@ specializePartialApply(PartialApplyInst *PartialApply,
            "Expected dead param to be an alloc_box container!");
 
     // If the partial_apply is dead, insert a release after it.
-    if (Endpoints.empty()) {
+    if (Endpoints.begin() == Endpoints.end()) {
       emitStrongReleaseAfter(O.get(), PartialApply);
       continue;
     }

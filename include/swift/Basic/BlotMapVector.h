@@ -38,7 +38,9 @@ template<typename KeyT, typename ValueT,
     const_iterator begin() const { return Vector.begin(); }
     const_iterator end() const { return Vector.end(); }
 
-    Range<iterator> getItems() { return swift::make_range(begin(), end()); }
+    iterator_range<iterator> getItems() {
+      return swift::make_range(begin(), end());
+    }
 
 #ifdef XDEBUG
     ~BlotMapVector() {

@@ -1479,7 +1479,7 @@ mergePredecessorStates(llvm::DenseMap<SILBasicBlock *,
                        std::vector<LSBBForwarder> &BBIDToForwarderMap,
                        CoveredStoreMap &StoreMap) {
   // Clear the state if the basic block has no predecessor.
-  if (BB->getPreds().empty()) {
+  if (BB->getPreds().begin() == BB->getPreds().end()) {
     clear();
     return;
   }

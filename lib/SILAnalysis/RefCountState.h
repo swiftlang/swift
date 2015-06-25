@@ -147,7 +147,7 @@ struct RefCountState {
 
   /// The latest point we can move the increment without bypassing instructions
   /// that may have reference semantics.
-  Range<InstructionSet::iterator> getInsertPts() const {
+  iterator_range<InstructionSet::iterator> getInsertPts() const {
     return {InsertPts.begin(), InsertPts.end()};
   }
 

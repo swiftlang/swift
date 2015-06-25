@@ -197,7 +197,7 @@ public:
 
   unsigned size() const { return ArgInstMap.size(); }
 
-  Range<iterator> getRange() { return swift::make_range(begin(), end()); }
+  iterator_range<iterator> getRange() { return swift::make_range(begin(), end()); }
 };
 
 class ReleaseTracker {
@@ -218,7 +218,7 @@ public:
 
   void trackUser(SILInstruction *User) { TrackedUsers.insert(User); }
 
-  using range = Range<llvm::SmallSetVector<SILInstruction *, 4>::iterator>;
+  using range = iterator_range<llvm::SmallSetVector<SILInstruction *, 4>::iterator>;
 
   range getTrackedUsers() { return {TrackedUsers.begin(), TrackedUsers.end()}; }
 

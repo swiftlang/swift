@@ -1274,12 +1274,12 @@ public:
   /// \brief Retrieves a list containing all archetypes from this generic
   /// parameter clause and all outer generic parameter clauses in outer-to-
   /// inner order.
-  Range<NestedArchetypeIterator> getAllNestedArchetypes() const;
+  iterator_range<NestedArchetypeIterator> getAllNestedArchetypes() const;
   
   /// \brief Retrieves a list containing all generic parameter records from
   /// this generic parameter clause and all outer generic parameter clauses in
   /// outer-to-inner order.
-  Range<NestedGenericParamIterator> getNestedGenericParams() const;
+  iterator_range<NestedGenericParamIterator> getNestedGenericParams() const;
   
   /// \brief Retrieve the outer generic parameter list, which provides the
   /// generic parameters of the context in which this generic parameter list
@@ -1439,7 +1439,7 @@ public:
   }
   
   // An empty range of nested archetypes.
-  static Range<NestedGenericParamListIterator> emptyRange() {
+  static iterator_range<NestedGenericParamListIterator> emptyRange() {
     return {{}, {}};
   }
 };
@@ -1447,12 +1447,12 @@ public:
 using NestedArchetypeIterator = GenericParamList::NestedArchetypeIterator;
 using NestedGenericParamIterator = GenericParamList::NestedGenericParamIterator;
 
-inline Range<NestedArchetypeIterator>
+inline iterator_range<NestedArchetypeIterator>
 GenericParamList::getAllNestedArchetypes() const {
   return {NestedArchetypeIterator(this), NestedArchetypeIterator()};
 }
   
-inline Range<NestedGenericParamIterator>
+inline iterator_range<NestedGenericParamIterator>
 GenericParamList::getNestedGenericParams() const {
   return {NestedGenericParamIterator(this), NestedGenericParamIterator()};
 }

@@ -268,10 +268,10 @@ public:
   iterator end() { return functions.end(); }
   const_iterator begin() const { return functions.begin(); }
   const_iterator end() const { return functions.end(); }
-  Range<iterator> getFunctions() {
+  iterator_range<iterator> getFunctions() {
     return {functions.begin(), functions.end()};
   }
-  Range<const_iterator> getFunctions() const {
+  iterator_range<const_iterator> getFunctions() const {
     return {functions.begin(), functions.end()};
   }
 
@@ -286,10 +286,10 @@ public:
   vtable_iterator vtable_end() { return vtables.end(); }
   vtable_const_iterator vtable_begin() const { return vtables.begin(); }
   vtable_const_iterator vtable_end() const { return vtables.end(); }
-  Range<vtable_iterator> getVTables() {
+  iterator_range<vtable_iterator> getVTables() {
     return {vtables.begin(), vtables.end()};
   }
-  Range<vtable_const_iterator> getVTables() const {
+  iterator_range<vtable_const_iterator> getVTables() const {
     return {vtables.begin(), vtables.end()};
   }
 
@@ -301,10 +301,10 @@ public:
   witness_table_iterator witness_table_end() { return witnessTables.end(); }
   witness_table_const_iterator witness_table_begin() const { return witnessTables.begin(); }
   witness_table_const_iterator witness_table_end() const { return witnessTables.end(); }
-  Range<witness_table_iterator> getWitnessTables() {
+  iterator_range<witness_table_iterator> getWitnessTables() {
     return {witnessTables.begin(), witnessTables.end()};
   }
-  Range<witness_table_const_iterator> getWitnessTables() const {
+  iterator_range<witness_table_const_iterator> getWitnessTables() const {
     return {witnessTables.begin(), witnessTables.end()};
   }
 
@@ -320,10 +320,10 @@ public:
   sil_global_const_iterator sil_global_end() const {
     return silGlobals.end();
   }
-  Range<sil_global_iterator> getSILGlobals() {
+  iterator_range<sil_global_iterator> getSILGlobals() {
     return {silGlobals.begin(), silGlobals.end()};
   }
-  Range<sil_global_const_iterator> getSILGlobals() const {
+  iterator_range<sil_global_const_iterator> getSILGlobals() const {
     return {silGlobals.begin(), silGlobals.end()};
   }
 
@@ -339,10 +339,10 @@ public:
   coverage_map_const_iterator coverage_map_end() const {
     return coverageMaps.end();
   }
-  Range<coverage_map_iterator> getCoverageMaps() {
+  iterator_range<coverage_map_iterator> getCoverageMaps() {
     return {coverageMaps.begin(), coverageMaps.end()};
   }
-  Range<coverage_map_const_iterator> getCoverageMaps() const {
+  iterator_range<coverage_map_const_iterator> getCoverageMaps() const {
     return {coverageMaps.begin(), coverageMaps.end()};
  }
 

@@ -116,24 +116,25 @@ template <typename V> using NonDUIterator =
 /// Returns a range of all debug instructions in the uses of a value (e.g.
 /// SILValue or SILInstruction).
 template <typename V>
-inline Range<DUIterator<V>> getDebugUses(const V &value) {
-  return Range<DUIterator<V>>(DUIterator<V>(value.use_begin()),
-                              DUIterator<V>(value.use_end()));
+inline iterator_range<DUIterator<V>> getDebugUses(const V &value) {
+  return make_range(DUIterator<V>(value.use_begin()),
+                    DUIterator<V>(value.use_end()));
 }
 
 /// Returns a range of all non-debug instructions in the uses of a value (e.g.
 /// SILValue or SILInstruction).
 template <typename V>
-inline Range<NonDUIterator<V>> getNonDebugUses(const V &value) {
-  return Range<NonDUIterator<V>>(NonDUIterator<V>(value.use_begin()),
-                                NonDUIterator<V>(value.use_end()));
+inline iterator_range<NonDUIterator<V>> getNonDebugUses(const V &value) {
+  return make_range(NonDUIterator<V>(value.use_begin()),
+                    NonDUIterator<V>(value.use_end()));
 }
 
 /// Returns true if a value (e.g. SILInstruction) has no uses except debug
 /// instructions.
 template <typename V>
 inline bool hasNoUsesExceptDebug(V *I) {
-  return getNonDebugUses(*I).empty();
+  auto NonDebugUses = getNonDebugUses(*I);
+  return NonDebugUses.begin() == NonDebugUses.end();
 }
 
 /// Returns true if a value (e.g. SILInstruction) has exactly one use which is

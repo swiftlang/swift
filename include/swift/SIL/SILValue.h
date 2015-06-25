@@ -116,7 +116,7 @@ public:
   /// Returns a range of all uses, which is useful for iterating over all uses.
   /// To ignore debug-info instructions use swift::getNonDebugUses instead
   // (see comment in DebugUtils.h).
-  inline Range<use_iterator> getUses() const;
+  inline iterator_range<use_iterator> getUses() const;
 
   /// Returns true if this value has exactly one use.
   /// To ignore debug-info instructions use swift::hasOneNonDebugUse instead
@@ -223,7 +223,7 @@ public:
   /// Returns a range of all uses, which is useful for iterating over all uses.
   /// To ignore debug-info instructions use swift::getNonDebugUses instead
   /// (see comment in DebugUtils.h).
-  inline Range<use_iterator> getUses() const;
+  inline iterator_range<use_iterator> getUses() const;
 
   /// Returns true if this value has exactly one use.
   /// To ignore debug-info instructions use swift::hasOneNonDebugUse instead
@@ -496,7 +496,7 @@ inline ValueBase::use_iterator ValueBase::use_begin() const {
 inline ValueBase::use_iterator ValueBase::use_end() const {
   return ValueBase::use_iterator(nullptr);
 }
-inline Range<ValueBase::use_iterator> ValueBase::getUses() const {
+inline iterator_range<ValueBase::use_iterator> ValueBase::getUses() const {
   return { use_begin(), use_end() };
 }
 inline bool ValueBase::hasOneUse() const {
@@ -561,7 +561,7 @@ inline SILValue::use_iterator SILValue::use_begin() const {
 inline SILValue::use_iterator SILValue::use_end() const {
   return SILValue::use_iterator(nullptr, 0);
 }
-inline Range<SILValue::use_iterator> SILValue::getUses() const {
+inline iterator_range<SILValue::use_iterator> SILValue::getUses() const {
   return { use_begin(), use_end() };
 }
 inline bool SILValue::use_empty() const { return use_begin() == use_end(); }

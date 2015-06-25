@@ -69,7 +69,7 @@ public:
     return PtrToTopDownState.begin();
   }
   topdown_const_iterator topdown_end() const { return PtrToTopDownState.end(); }
-  Range<topdown_iterator> getTopDownStates() {
+  iterator_range<topdown_iterator> getTopDownStates() {
     return make_range(topdown_begin(), topdown_end());
   }
 
@@ -84,7 +84,7 @@ public:
   bottomup_const_iterator bottomup_end() const {
     return PtrToBottomUpState.end();
   }
-  Range<bottomup_iterator> getBottomupStates() {
+  iterator_range<bottomup_iterator> getBottomupStates() {
     return make_range(bottomup_begin(), bottomup_end());
   }
 

@@ -13,15 +13,10 @@
 //  This file provides classes and functions for conveniently working
 //  with ranges, 
 //
-//  Range is a template class which makes it easy to turn a pair of
-//  iterators into a "collection" suitable for C++11's for loop.
+//  reversed returns an iterator_range out of the reverse iterators of a type.
 //
-//  make_range creates a Range out of two iterators of the same type.
-//
-//  reversed returns a Range out of the reverse iterators of a type.
-//
-//  map creates a Range which applies a function to all the elements
-//  in another Range.
+//  map creates an iterator_range which applies a function to all the elements
+//  in another iterator_range.
 //
 //  IntRange is a template class for iterating over a range of
 //  integers.
@@ -41,32 +36,17 @@
 #include <algorithm>
 #include <type_traits>
 #include <utility>
+#include "llvm/ADT/iterator_range.h"
 #include "llvm/ADT/ArrayRef.h"
 
 namespace swift {
-  /// A pair of iterators which can be used as the collection of a
-  /// C++11 for-loop.
-  template <typename T> class Range {
-    T Begin;
-    T End;
-  public:
-    Range(const T &begin, const T &end) : Begin(begin), End(end) {}
-    T begin() { return Begin; }
-    T end() { return End; }
-    const T begin() const { return Begin; }
-    const T end() const { return End; }
-    bool empty() const { return Begin == End; }
-  };
-  
-  template<typename T>
-  inline Range<T> make_range(const T &begin, const T &end) {
-    return {begin, end};
-  }
-  
+  using llvm::make_range;
+  using llvm::iterator_range;
+
   template<typename T>
   inline auto reversed(T &&container)
-  -> decltype(swift::make_range(container.rbegin(), container.rend())) {
-    return swift::make_range(container.rbegin(), container.rend());
+  -> decltype(llvm::make_range(container.rbegin(), container.rend())) {
+    return llvm::make_range(container.rbegin(), container.rend());
   }
   
   // Wrapper for std::transform that creates a new back-insertable container

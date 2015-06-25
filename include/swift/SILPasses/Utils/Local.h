@@ -32,12 +32,13 @@ using ValueBaseUserRange =
 using ValueUserRange =
   TransformRange<IteratorRange<SILValue::use_iterator>, UserTransform>;
 
-inline ValueBaseUserRange makeUserRange(Range<ValueBase::use_iterator> R) {
+inline ValueBaseUserRange makeUserRange(
+    iterator_range<ValueBase::use_iterator> R) {
   auto toUser = [](Operand *O) { return O->getUser(); };
   return makeTransformRange(makeIteratorRange(R.begin(), R.end()),
                             UserTransform(toUser));
 }
-inline ValueUserRange makeUserRange(Range<SILValue::use_iterator> R) {
+inline ValueUserRange makeUserRange(iterator_range<SILValue::use_iterator> R) {
   auto toUser = [](Operand *O) { return O->getUser(); };
   return makeTransformRange(makeIteratorRange(R.begin(), R.end()),
                             UserTransform(toUser));
@@ -562,10 +563,10 @@ public:
   }
 };
 
-inline Range<IgnoreExpectUseIterator>
+inline iterator_range<IgnoreExpectUseIterator>
 ignore_expect_uses(ValueBase *V) {
-  return Range<IgnoreExpectUseIterator>(IgnoreExpectUseIterator(V),
-                                        IgnoreExpectUseIterator());
+  return make_range(IgnoreExpectUseIterator(V),
+                    IgnoreExpectUseIterator());
 }
 } // end namespace swift
 

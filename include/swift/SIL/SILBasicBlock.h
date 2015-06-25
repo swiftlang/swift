@@ -223,7 +223,9 @@ public:
   pred_iterator pred_begin() const { return pred_iterator(PredList); }
   pred_iterator pred_end() const { return pred_iterator(); }
 
-  Range<pred_iterator> getPreds() const { return {pred_begin(), pred_end() }; }
+  iterator_range<pred_iterator> getPreds() const {
+    return {pred_begin(), pred_end() };
+  }
 
   SILBasicBlock *getSinglePredecessor() {
     if (pred_empty() || std::next(pred_begin()) != pred_end())

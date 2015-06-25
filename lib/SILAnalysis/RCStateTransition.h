@@ -111,8 +111,8 @@ public:
     return Mutators.count(I);
   }
 
-  using mutator_range = Range<decltype(Mutators)::iterator>;
-  using const_mutator_range = Range<decltype(Mutators)::const_iterator>;
+  using mutator_range = iterator_range<decltype(Mutators)::iterator>;
+  using const_mutator_range = iterator_range<decltype(Mutators)::const_iterator>;
 
   /// Returns a Range of Mutators. Asserts if this transition is not a mutator
   /// transition.

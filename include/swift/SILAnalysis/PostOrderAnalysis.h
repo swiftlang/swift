@@ -59,15 +59,15 @@ public:
   using iterator = std::vector<SILBasicBlock *>::iterator;
   using reverse_iterator = std::vector<SILBasicBlock *>::reverse_iterator;
 
-  using range = Range<iterator>;
-  using reverse_range = Range<reverse_iterator>;
+  using range = iterator_range<iterator>;
+  using reverse_range = iterator_range<reverse_iterator>;
 
-  Range<iterator> getPostOrder(SILFunction *F) {
+  iterator_range<iterator> getPostOrder(SILFunction *F) {
     auto *Info = get(F);
-    return Range<iterator>(Info->PostOrder.begin(), Info->PostOrder.end());
+    return make_range(Info->PostOrder.begin(), Info->PostOrder.end());
   }
 
-  Range<reverse_iterator> getReversePostOrder(SILFunction *F) {
+  iterator_range<reverse_iterator> getReversePostOrder(SILFunction *F) {
     auto *Info = get(F);
     return reversed(Info->PostOrder);
   }

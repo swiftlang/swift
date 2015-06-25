@@ -429,7 +429,7 @@ void CheckedCastBrJumpThreading::modifyCFGForSuccessPreds() {
 
 /// Handle a special case, where ArgBB is the entry block.
 bool CheckedCastBrJumpThreading::handleArgBBIsEntryBlock(SILBasicBlock *ArgBB) {
-  if (ArgBB->getPreds().empty()) {
+  if (ArgBB->getPreds().begin() == ArgBB->getPreds().end()) {
     // It must be the entry block
     // See if it is reached over Success or Failure path.
     bool SuccessDominates = DomSuccessBB == BB;
