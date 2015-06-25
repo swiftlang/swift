@@ -1461,6 +1461,11 @@ public:
   bool diagnoseFailure();
 
 private:
+  /// Given a callee of the current node, attempt to determine a list of
+  /// candidate functions that are being invoked.  If this returns an empty
+  /// list, then nothing worked.
+  SmallVector<ValueDecl*, 4> collectCalleeCandidateInfo(Expr *Fn);
+
   /// Attempt to produce a diagnostic for a mismatch between an expression's
   /// type and its assumed contextual type.
   bool diagnoseContextualConversionError();
@@ -1479,8 +1484,7 @@ private:
      
   /// Given a set of parameter lists from an overload group, and a list of
   /// arguments, emit a diagnostic indicating any partially matching overloads.
-  void suggestPotentialOverloads(const StringRef functionName,
-                                 const SourceLoc &loc,
+  void suggestPotentialOverloads(StringRef functionName, SourceLoc loc,
                                  const SmallVectorImpl<Type> &paramLists,
                                  const SmallVectorImpl<Type> &argTypes);
   
@@ -1896,9 +1900,8 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
 /// FIXME: Right now, a "matching" overload is one with a parameter whose type
 /// is identical to one of the argument types. We can obviously do something
 /// more sophisticated with this.
-void FailureDiagnosis::suggestPotentialOverloads(
-                               const StringRef functionName,
-                               const SourceLoc &loc,
+void FailureDiagnosis::suggestPotentialOverloads(StringRef functionName,
+                                                 SourceLoc loc,
                                const SmallVectorImpl<Type> &paramLists,
                                const SmallVectorImpl<Type> &argTypes) {
   if (argTypes.empty())
@@ -1944,10 +1947,8 @@ void FailureDiagnosis::suggestPotentialOverloads(
   if (!suggestionText.length())
     return;
   
-  CS->TC.diagnose(loc,
-                  diag::suggest_partial_overloads,
-                  functionName,
-                  suggestionText);
+  CS->TC.diagnose(loc, diag::suggest_partial_overloads,
+                  functionName, suggestionText);
 }
 
 
@@ -2157,6 +2158,22 @@ void ConstraintSystem::diagnoseAssignmentFailure(Expr *dest, Type destTy,
                             diag::assignment_lhs_not_lvalue);
 }
 
+SmallVector<ValueDecl*, 4>
+FailureDiagnosis::collectCalleeCandidateInfo(Expr *fn) {
+  SmallVector<ValueDecl*, 4> result;
+
+  if (auto declRefExpr = dyn_cast<DeclRefExpr>(fn)) {
+    result.push_back(declRefExpr->getDecl());
+  } else if (auto overloadedDRE = dyn_cast<OverloadedDeclRefExpr>(fn)) {
+    result.append(overloadedDRE->getDecls().begin(),
+                  overloadedDRE->getDecls().end());
+  } else if (overloadConstraint) {
+    result.push_back(overloadConstraint->getOverloadChoice().getDecl());
+  }
+
+  return result;
+}
+
 
 bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
   // FIXME: seems weird to do this before looking at arguments.
@@ -2174,20 +2191,9 @@ bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
   if (!argTuple)
     return true;
   
-  ValueDecl *CandidatePtr = nullptr; // temporary for the ArrayRef to reference.
-  ArrayRef<ValueDecl *> Candidates;
-  if (auto declRefExpr = dyn_cast<DeclRefExpr>(binop->getFn())) {
-    CandidatePtr = declRefExpr->getDecl();
-    Candidates = CandidatePtr;
-  } else if (auto overloadedDRE =
-                 dyn_cast<OverloadedDeclRefExpr>(binop->getFn())) {
-    Candidates = overloadedDRE->getDecls();
-  } else if (overloadConstraint) {
-    CandidatePtr = overloadConstraint->getOverloadChoice().getDecl();
-    Candidates = CandidatePtr;
-  } else {
-    llvm_unreachable("unrecognized unop function kind");
-  }
+  auto Candidates = collectCalleeCandidateInfo(binop->getFn());
+  assert(!Candidates.empty() && "unrecognized unop function kind");
+
   std::string overloadName = Candidates[0]->getNameStr();
   assert(!overloadName.empty());
   
@@ -2270,25 +2276,12 @@ bool FailureDiagnosis::visitUnaryExpr(ApplyExpr *applyExpr) {
   // recursively.
   if (isErrorTypeKind(argType))
     return true;
-  
-  ValueDecl *CandidatePtr = nullptr; // temporary for the ArrayRef to reference.
-  ArrayRef<ValueDecl *> Candidates;
 
-  if (auto declRefExpr = dyn_cast<DeclRefExpr>(applyExpr->getFn())) {
-    CandidatePtr = declRefExpr->getDecl();
-    Candidates = CandidatePtr;
-  } else if (auto overloadedDRE =
-             dyn_cast<OverloadedDeclRefExpr>(applyExpr->getFn())) {
-    Candidates = overloadedDRE->getDecls();
-  } else if (overloadConstraint) {
-    CandidatePtr = overloadConstraint->getOverloadChoice().getDecl();
-    Candidates = CandidatePtr;
-  } else {
-    llvm_unreachable("unrecognized unop function kind");
-  }
+  auto Candidates = collectCalleeCandidateInfo(applyExpr->getFn());
+  assert(!Candidates.empty() && "unrecognized unop function kind");
 
   std::string overloadName = Candidates[0]->getNameStr();
-  assert(!overloadName.empty() && !Candidates.empty());
+  assert(!overloadName.empty());
   auto argTyName = getUserFriendlyTypeName(argType);
 
   
@@ -2406,10 +2399,10 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
   auto argExpr = callExpr->getArg();
   
   // An error was posted elsewhere.
-  if (isErrorTypeKind(fnExpr->getType())) {
+  if (isErrorTypeKind(fnExpr->getType()))
     return true;
-  }
-  
+
+
   std::string overloadName = "";
 
   bool isClosureInvocation = false;
@@ -2420,7 +2413,7 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
   llvm::SmallVector<Type, 16> paramLists;
   llvm::SmallVector<Identifier, 16> argNames;
   llvm::SmallVector<Type, 16> argTypes;
-  
+
   // Obtain the function's name, and collect any parameter lists for diffing
   // purposes.
   if (auto DRE = dyn_cast<DeclRefExpr>(fnExpr)) {
@@ -2460,9 +2453,9 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
         }
       }
     }
-    if (paramLists.size() > 1) {
+    if (paramLists.size() > 1)
       isOverloadedFn = true;
-    }
+
   } else if (auto UDE = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
     overloadName = UDE->getName().str().str();
   } else if (isa<UnresolvedConstructorExpr>(fnExpr)) {
@@ -2485,7 +2478,7 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
     argNames.push_back(Identifier());
     argTypes.push_back(subType);
   } else if (auto tupleExpr = dyn_cast<TupleExpr>(argExpr)) {
-    for (unsigned i = 0; i < tupleExpr->getNumElements(); i++) {
+    for (unsigned i = 0, e = tupleExpr->getNumElements(); i != e; i++) {
       Identifier elName = tupleExpr->getElementName(i);
       Expr *elExpr = tupleExpr->getElement(i);
       auto elType = getTypeOfIndependentSubExpression(elExpr);
