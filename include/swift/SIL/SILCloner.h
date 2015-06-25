@@ -93,14 +93,9 @@ protected:
     CanType newReplacement =
       asImpl().getOpASTType(sub.getReplacement()->getCanonicalType());
     
-    ArrayRef<ProtocolConformance*> conformances =
-      asImpl().getOpConformances(sub.getArchetype(),
-                                 sub.getReplacement()->getCanonicalType(),
-                                 sub.getConformances());
-
     return Substitution(sub.getArchetype(),
                         newReplacement,
-                        conformances);
+                        sub.getConformances());
   }
   ArrayRef<Substitution> getOpSubstitutions(ArrayRef<Substitution> Subs) {
     MutableArrayRef<Substitution> newSubsBuf;
@@ -164,18 +159,14 @@ protected:
   ArrayRef<ProtocolConformance*> getOpConformances(ArchetypeType *archetype,
                                                    CanType type,
                              ArrayRef<ProtocolConformance*> oldConformances) {
-    SmallVector<ProtocolConformance*, 4> newConformances;
-    newConformances.reserve(oldConformances.size());
-    bool hasDifferences = false;
-
-    for (auto oldConf : oldConformances) {
-      auto newConf = asImpl().getOpConformance(archetype, type, oldConf);
-      hasDifferences |= (oldConf != newConf);
-      newConformances.push_back(newConf);
-    }
+    Substitution sub(archetype, type, oldConformances);
+    Substitution mappedSub = asImpl().remapSubstitution(sub);
+    ArrayRef<ProtocolConformance*> newConformances = mappedSub.getConformances();
 
     // Use the existing conformances array if possible.
-    if (!hasDifferences) return oldConformances;
+    if (oldConformances == newConformances)
+      return oldConformances;
+
     return type->getASTContext().AllocateCopy(newConformances);
   }
 
