@@ -44,7 +44,7 @@ void SILLoopInfo::verify() const {
 
   // We need access to the map for this.
   // Verify that blocks are mapped to valid loops.
-  for (llvm::DenseMap<SILBasicBlock *, SILLoop *>::const_iterator
+  for (llvm::DenseMap<const SILBasicBlock *, SILLoop *>::const_iterator
            I = LI.getBlockMap().begin(),
            E = LI.getBlockMap().end();
        I != E; ++I) {
