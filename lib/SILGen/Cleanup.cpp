@@ -41,30 +41,40 @@ namespace {
   };
 }
 
-void CleanupManager::popAndEmitTopCleanup(CleanupLocation *l) {
-  Cleanup &stackCleanup = *Stack.begin();
-  
-  // Copy it off the cleanups stack.
-  CleanupBuffer buffer(stackCleanup);
-  Cleanup &cleanup = buffer.getCopy();
-  
-  // Pop now.
-  Stack.pop();
-
-  if (cleanup.isActive() && Gen.B.hasValidInsertionPoint()) {
-    assert(l && "Location should be provided for active cleanups.");
-    cleanup.emit(Gen, *l);
-  }
-}
-
 void CleanupManager::popTopDeadCleanups(CleanupsDepth end) {
   Stack.checkIterator(end);
 
   while (Stack.stable_begin() != end && Stack.begin()->isDead()) {
     assert(!Stack.empty());
-    
-    popAndEmitTopCleanup(0);
+    Stack.pop();
     Stack.checkIterator(end);
+  }
+}
+
+void CleanupManager::emitCleanups(CleanupsDepth depth, CleanupLocation l,
+                                  bool popCleanups) {
+  auto begin = Stack.stable_begin();
+  while (begin != depth) {
+    auto iter = Stack.find(begin);
+
+    Cleanup &stackCleanup = *iter;
+
+    // Copy it off the cleanup stack in case the cleanup pushes a new cleanup
+    // and the backing storage is re-allocated.
+    CleanupBuffer buffer(stackCleanup);
+    Cleanup &cleanup = buffer.getCopy();
+
+    // Advance stable iterator.
+    begin = Stack.stabilize(++iter);
+
+    // Pop now.
+    if (popCleanups)
+      Stack.pop();
+
+    if (cleanup.isActive() && Gen.B.hasValidInsertionPoint())
+      cleanup.emit(Gen, l);
+
+    Stack.checkIterator(begin);
   }
 }
 
@@ -81,9 +91,7 @@ void CleanupManager::endScope(CleanupsDepth depth, CleanupLocation l) {
   
   // Iteratively mark cleanups dead and pop them.
   // Maybe we'd get better results if we marked them all dead in one shot?
-  while (Stack.stable_begin() != depth) {
-    popAndEmitTopCleanup(&l);
-  }
+  emitCleanups(depth, l);
 }
 
 bool CleanupManager::hasAnyActiveCleanups(CleanupsDepth from,
@@ -95,7 +103,6 @@ bool CleanupManager::hasAnyActiveCleanups(CleanupsDepth from) {
   return ::hasAnyActiveCleanups(Stack.begin(), Stack.find(from));
 }
 
-
 /// emitBranchAndCleanups - Emit a branch to the given jump destination,
 /// threading out through any cleanups we might need to run.  This does not
 /// pop the cleanup stack.
@@ -103,22 +110,15 @@ void CleanupManager::emitBranchAndCleanups(JumpDest Dest,
                                            SILLocation BranchLoc,
                                            ArrayRef<SILValue> Args) {
   SILGenBuilder &B = Gen.getBuilder();
-  assert(B.hasValidInsertionPoint() && "Inserting branch in invalid spot");
-  auto depth = Dest.getDepth();
-  auto end = Stack.find(depth);
-  for (auto cleanup = Stack.begin(); cleanup != end; ++cleanup) {
-    if (cleanup->isActive()) {
-      cleanup->emit(Gen, Dest.getCleanupLocation());
-    }
-  }
-
+  assert(B.hasValidInsertionPoint() && "Emitting branch in invalid spot");
+  emitCleanups(Dest.getDepth(), Dest.getCleanupLocation(), /*popCleanups=*/false);
   B.createBranch(BranchLoc, Dest.getBlock(), Args);
 }
 
 void CleanupManager::emitCleanupsForReturn(CleanupLocation Loc) {
-  for (auto &cleanup : Stack)
-    if (cleanup.isActive())
-      cleanup.emit(Gen, Loc);
+  SILGenBuilder &B = Gen.getBuilder();
+  assert(B.hasValidInsertionPoint() && "Emitting return in invalid spot");
+  emitCleanups(Stack.stable_end(), Loc, /*popCleanups=*/false);
 }
 
 /// Emit a new block that jumps to the specified location and runs necessary

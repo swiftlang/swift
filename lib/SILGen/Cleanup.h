@@ -103,13 +103,13 @@ class LLVM_LIBRARY_VISIBILITY CleanupManager {
   /// that we've handed out as a Scope.
   CleanupsDepth InnermostScope;
   
-  void popAndEmitTopCleanup(CleanupLocation *l);
   void popTopDeadCleanups(CleanupsDepth end);
-  
+  void emitCleanups(CleanupsDepth depth, CleanupLocation l,
+                    bool popCleanups=true);
+  void endScope(CleanupsDepth depth, CleanupLocation l);
+
   Cleanup &initCleanup(Cleanup &cleanup, size_t allocSize, CleanupState state);
   void setCleanupState(Cleanup &cleanup, CleanupState state);
-  
-  void endScope(CleanupsDepth depth, CleanupLocation l);
 
   friend class CleanupStateRestorationScope;
   
