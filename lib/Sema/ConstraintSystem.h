@@ -1240,6 +1240,7 @@ private:
   bool diagnoseFailureForPrefixUnaryExpr();
   bool diagnoseFailureForPostfixUnaryExpr();
   bool diagnoseFailureForUnaryExpr();
+  bool diagnoseFailureForParenExpr();
   bool diagnoseFailureForSubscriptExpr();
   
   /// Diagnose a failed function, method or initializer application expression.

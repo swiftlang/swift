@@ -669,7 +669,7 @@ func testNilCoalescePrecedence(cond: Bool, a: Int?, r: Range<Int>?) {
 
   // ?? should have lower precedence than range and arithmetic operators.
   let r1 = r ?? (0...42) // ok
-  let r2 = (r ?? 0)...42 // not ok: expected-error {{could not find an overload for '??' that accepts the supplied arguments}}
+  let r2 = (r ?? 0)...42 // not ok: expected-error {{binary operator '??' cannot be applied to operands of type 'Range<Int>?' and 'Int'}}
   let r3 = r ?? 0...42 // parses as the first one, not the second.
 }
 
@@ -678,4 +678,15 @@ func testOptionalTypeParsing(a : AnyObject) -> String {
   return a as? String ?? "default name string here"
 }
 
-
+func testParenExprInTheWay() {
+  let x = 42
+  // expected-error @+2 {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}}
+  // expected-note @+1 {{overloads for '&' exist with these partially matching parameter lists: (Int, Int)}}
+  if x & 4.0 {}
+  // expected-error @+2 {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}}
+  // expected-note @+1 {{overloads for '&' exist with these partially matching parameter lists: (Int, Int)}}
+  if (x & 4.0) {}
+  // expected-error @+2 {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}}
+  // expected-note @+1 {{overloads for '&' exist with these partially matching parameter lists: (Int, Int)}}
+  if !(x & 4.0) {}
+}

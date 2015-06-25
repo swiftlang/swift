@@ -1257,7 +1257,7 @@ getBoundTypesFromConstraint(ConstraintSystem *CS, Expr *expr,
   
   if (auto tv2 = type2->getAs<TypeVariableType>())
     type2 = substituteLiteralForTypeVariable(CS, tv2);
-    
+  
   return std::pair<Type, Type>(type1->getLValueOrInOutObjectType(),
                                type2->getLValueOrInOutObjectType());
 }
@@ -1800,8 +1800,6 @@ void FailureDiagnosis::suggestPotentialOverloads(
   
   std::string suggestionText = "";
   std::map<std::string, bool> dupes;
-  bool isOperator =
-      CS->getASTContext().getIdentifier(functionName).isOperator();
 
   for (auto paramList : paramLists) {
     SmallVector<Identifier, 16> paramNames;
@@ -1821,20 +1819,10 @@ void FailureDiagnosis::suggestPotentialOverloads(
     if (paramTypes.size() != argTypes.size())
       continue;
     
-    for (size_t i = 0; i < paramTypes.size(); i++) {
+    for (size_t i = 0, e = paramTypes.size(); i != e; i++) {
       auto pt = paramTypes[i];
       auto at = argTypes[i];
-      bool typesMatch = pt->isEqual(at->getRValueType());
-      if (!typesMatch && isOperator) {
-        if (auto inoutPt = pt->getAs<InOutType>()) {
-          if (auto lvalueAt = at->getAs<LValueType>()) {
-            typesMatch = inoutPt->getObjectType()->isEqual(
-                lvalueAt->getObjectType());
-          }
-        }
-      }
-    
-      if (typesMatch) {
+      if (pt->isEqual(at->getRValueType())) {
         auto typeListString = getTypeListString(paramNames, paramTypes);
         if (!dupes[typeListString]) {
           dupes[typeListString] = true;
@@ -2241,6 +2229,22 @@ bool FailureDiagnosis::diagnoseFailureForPrefixUnaryExpr() {
 bool FailureDiagnosis::diagnoseFailureForPostfixUnaryExpr() {
   return diagnoseFailureForUnaryExpr();
 }
+
+bool FailureDiagnosis::diagnoseFailureForParenExpr() {
+  auto parenExpr = cast<ParenExpr>(expr);
+
+  // Usually, the problem is that the subexpr of the parenexpr is invalid or
+  // bogus.  Type check it independently to try to figure out how and diagnose
+  // it if so.
+  auto indexType = getTypeOfIndependentSubExpression(parenExpr->getSubExpr());
+  if (isErrorTypeKind(indexType))
+    return true;
+
+  // If not, then we have some general failure, perhaps do to a conversion
+  // constraint issue.
+  return diagnoseGeneralFailure();
+}
+
 
 bool FailureDiagnosis::diagnoseFailureForSubscriptExpr() {
   assert(expr->getKind() == ExprKind::Subscript ||
@@ -2651,7 +2655,6 @@ bool FailureDiagnosis::diagnoseFailure() {
 /// Given a specific expression and the remnants of the failed constraint
 /// system, produce a specific diagnostic.
 bool ConstraintSystem::diagnoseFailureForExpr(Expr *expr) {
-  
   FailureDiagnosis diagnosis(expr, this);
   
   // Now, attempt to diagnose the failure from the info we've collected.
@@ -2716,7 +2719,7 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable,
     // If we can't make sense of the existing constraints (or none exist), go
     // ahead and try the unavoidable failures again, but with locator
     // substitutions in place.
-    if (!this->diagnoseFailureForExpr(expr) &&
+    if (!diagnoseFailureForExpr(expr) &&
         !unavoidableFailures.empty()) {
       for (auto failure : unavoidableFailures) {
         if (diagnoseFailure(*this, *failure, expr, true))
@@ -2795,7 +2798,7 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable,
   
   // If all else fails, attempt to diagnose the failure by looking through the
   // system's constraints.
-  this->diagnoseFailureForExpr(expr);
+  diagnoseFailureForExpr(expr);
   
   return true;
 }
