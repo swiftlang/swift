@@ -15,6 +15,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Driver/Util.h"
+#include "llvm/Option/Option.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 
@@ -70,12 +71,24 @@ public:
   /// \param Args The argument list for this tool chain.
   /// \param OI information about the output which the driver will create,
   /// which may influence the creation of this Job.
-  virtual Job *constructJob(const JobAction &JA,
-                            std::unique_ptr<JobList> Inputs,
-                            std::unique_ptr<CommandOutput> Output,
-                            const ActionList &InputActions,
-                            const llvm::opt::ArgList &Args,
-                            const OutputInfo &OI) const = 0;
+  std::unique_ptr<Job> constructJob(const JobAction &JA,
+                                    std::unique_ptr<JobList> Inputs,
+                                    std::unique_ptr<CommandOutput> Output,
+                                    const ActionList &InputActions,
+                                    const llvm::opt::ArgList &Args,
+                                    const OutputInfo &OI) const;
+
+protected:
+  virtual llvm::opt::ArgStringList
+  constructArgumentList(const JobAction &JA,
+                        const JobList *Inputs,
+                        const CommandOutput *Output,
+                        const ActionList &InputActions,
+                        const llvm::opt::ArgList &Args,
+                        const OutputInfo &OI) const = 0;
+
+  virtual const char *getPath(const llvm::opt::ArgList &Args,
+                              const OutputInfo &OI) const = 0;
 };
 } // end namespace driver
 } // end namespace swift

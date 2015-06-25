@@ -33,14 +33,19 @@ class LLVM_LIBRARY_VISIBILITY Swift : public Tool {
 public:
   explicit Swift(const ToolChain &TC) : Tool("swift", "swift frontend", TC) {}
 
-  virtual bool hasGoodDiagnostics() const { return true; }
+  bool hasGoodDiagnostics() const override { return true; }
 
-  virtual Job *constructJob(const JobAction &JA,
-                            std::unique_ptr<JobList> Inputs,
-                            std::unique_ptr<CommandOutput> Output,
-                            const ActionList &InputActions,
-                            const llvm::opt::ArgList &Args,
-                            const OutputInfo &OI) const;
+protected:
+  const char *getPath(const llvm::opt::ArgList &Args,
+                      const OutputInfo &OI) const override;
+
+  llvm::opt::ArgStringList
+  constructArgumentList(const JobAction &JA,
+                        const JobList *Inputs,
+                        const CommandOutput *Output,
+                        const ActionList &InputActions,
+                        const llvm::opt::ArgList &Args,
+                        const OutputInfo &OI) const override;
 };
 
 class LLVM_LIBRARY_VISIBILITY MergeModule : public Tool {
@@ -48,14 +53,19 @@ public:
   explicit MergeModule(const ToolChain &TC)
     : Tool("merge-module", TC) {}
 
-  virtual bool hasGoodDiagnostics() const { return true; }
+  bool hasGoodDiagnostics() const override { return true; }
 
-  virtual Job *constructJob(const JobAction &JA,
-                            std::unique_ptr<JobList> Inputs,
-                            std::unique_ptr<CommandOutput> Output,
-                            const ActionList &InputActions,
-                            const llvm::opt::ArgList &Args,
-                            const OutputInfo &OI) const;
+protected:
+  const char *getPath(const llvm::opt::ArgList &Args,
+                      const OutputInfo &OI) const override;
+
+  llvm::opt::ArgStringList
+  constructArgumentList(const JobAction &JA,
+                        const JobList *Inputs,
+                        const CommandOutput *Output,
+                        const ActionList &InputActions,
+                        const llvm::opt::ArgList &Args,
+                        const OutputInfo &OI) const override;
 };
 
 /// A ToolchainTool may be installed in a location relative to the driver
@@ -75,8 +85,10 @@ protected:
   ToolchainTool(StringRef Name, const ToolChain &TC)
       : ToolchainTool(Name, Name, Name, TC) {}
 
+  const char *getPath(const llvm::opt::ArgList &Args,
+                      const OutputInfo &OI) const override;
+
 public:
-  const char *getPath() const;
   bool isPresentRelativeToDriver() const;
 };
 
@@ -85,24 +97,28 @@ public:
   explicit LLDB(const ToolChain &TC)
       : ToolchainTool("lldb", "LLDB", "LLDB REPL", TC) {}
 
-  virtual Job *constructJob(const JobAction &JA,
-                            std::unique_ptr<JobList> Inputs,
-                            std::unique_ptr<CommandOutput> Output,
-                            const ActionList &InputActions,
-                            const llvm::opt::ArgList &Args,
-                            const OutputInfo &OI) const;
+protected:
+  llvm::opt::ArgStringList
+  constructArgumentList(const JobAction &JA,
+                        const JobList *Inputs,
+                        const CommandOutput *Output,
+                        const ActionList &InputActions,
+                        const llvm::opt::ArgList &Args,
+                        const OutputInfo &OI) const override;
 };
 
 class LLVM_LIBRARY_VISIBILITY Dsymutil : public ToolchainTool {
 public:
   explicit Dsymutil(const ToolChain &TC) : ToolchainTool("dsymutil", TC) {}
 
-  virtual Job *constructJob(const JobAction &JA,
-                            std::unique_ptr<JobList> Inputs,
-                            std::unique_ptr<CommandOutput> Output,
-                            const ActionList &InputActions,
-                            const llvm::opt::ArgList &Args,
-                            const OutputInfo &OI) const;
+protected:
+  llvm::opt::ArgStringList
+  constructArgumentList(const JobAction &JA,
+                        const JobList *Inputs,
+                        const CommandOutput *Output,
+                        const ActionList &InputActions,
+                        const llvm::opt::ArgList &Args,
+                        const OutputInfo &OI) const override;
 };
 
 class LLVM_LIBRARY_VISIBILITY AutolinkExtract : public ToolchainTool {
@@ -110,12 +126,14 @@ public:
   explicit AutolinkExtract(const ToolChain &TC)
     : ToolchainTool("swift-autolink-extract", TC) {}
 
-  virtual Job *constructJob(const JobAction &JA,
-                            std::unique_ptr<JobList> Inputs,
-                            std::unique_ptr<CommandOutput> Output,
-                            const ActionList &InputActions,
-                            const llvm::opt::ArgList &Args,
-                            const OutputInfo &OI) const;
+protected:
+  llvm::opt::ArgStringList
+  constructArgumentList(const JobAction &JA,
+                        const JobList *Inputs,
+                        const CommandOutput *Output,
+                        const ActionList &InputActions,
+                        const llvm::opt::ArgList &Args,
+                        const OutputInfo &OI) const override;
 };
 
 namespace darwin {
@@ -127,12 +145,14 @@ public:
   explicit Linker(const ToolChain &TC)
     : ToolchainTool("ld", "darwin::Linker", "linker", TC) {}
 
-  virtual Job *constructJob(const JobAction &JA,
-                            std::unique_ptr<JobList> Inputs,
-                            std::unique_ptr<CommandOutput> Output,
-                            const ActionList &InputActions,
-                            const llvm::opt::ArgList &Args,
-                            const OutputInfo &OI) const;
+protected:
+  llvm::opt::ArgStringList
+  constructArgumentList(const JobAction &JA,
+                        const JobList *Inputs,
+                        const CommandOutput *Output,
+                        const ActionList &InputActions,
+                        const llvm::opt::ArgList &Args,
+                        const OutputInfo &OI) const override;
 };
 
 } // end namespace darwin
@@ -144,12 +164,17 @@ public:
   explicit Linker(const ToolChain &TC)
     : Tool("linux::Linker", "linker", TC) {}
 
-  virtual Job *constructJob(const JobAction &JA,
-                            std::unique_ptr<JobList> Inputs,
-                            std::unique_ptr<CommandOutput> Output,
-                            const ActionList &InputActions,
-                            const llvm::opt::ArgList &Args,
-                            const OutputInfo &OI) const;
+protected:
+  const char *getPath(const llvm::opt::ArgList &Args,
+                      const OutputInfo &OI) const override;
+
+  llvm::opt::ArgStringList
+  constructArgumentList(const JobAction &JA,
+                        const JobList *Inputs,
+                        const CommandOutput *Output,
+                        const ActionList &InputActions,
+                        const llvm::opt::ArgList &Args,
+                        const OutputInfo &OI) const override;
 };
 
 } // end namespace linux

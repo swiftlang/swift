@@ -11,3 +11,22 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Driver/Tool.h"
+#include "swift/Driver/Action.h"
+#include "swift/Driver/Job.h"
+#include "llvm/ADT/STLExtras.h"
+
+using namespace swift;
+using namespace swift::driver;
+
+std::unique_ptr<Job>
+Tool::constructJob(const JobAction &JA,
+                   std::unique_ptr<JobList> inputs,
+                   std::unique_ptr<CommandOutput> output,
+                   const ActionList &inputActions,
+                   const llvm::opt::ArgList &args,
+                   const OutputInfo &OI) const {
+  auto arguments = constructArgumentList(JA, inputs.get(), output.get(),
+                                         inputActions, args, OI);
+  return llvm::make_unique<Job>(JA, *this, std::move(inputs), std::move(output),
+                                getPath(args, OI), std::move(arguments));
+}

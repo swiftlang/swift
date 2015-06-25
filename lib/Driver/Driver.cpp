@@ -1828,20 +1828,21 @@ Job *Driver::buildJobsForAction(Compilation &C, const Action *A,
   }
 
   // 5. Construct a Job which produces the right CommandOutput.
-  Job *J = T->constructJob(*JA, std::move(InputJobs), std::move(Output),
-                           InputActions, C.getArgs(), OI);
+  std::unique_ptr<Job> J = T->constructJob(*JA, std::move(InputJobs),
+                                           std::move(Output),
+                                           InputActions, C.getArgs(), OI);
 
   // If we track dependencies for this job, we may be able to avoid running it.
   if (!J->getOutput().getAdditionalOutputForType(types::TY_SwiftDeps).empty()) {
     if (InputActions.size() == 1) {
       auto compileJob = cast<CompileJobAction>(A);
-      handleCompileJobCondition(J, compileJob->getInputInfo(), BaseInput);
+      handleCompileJobCondition(J.get(), compileJob->getInputInfo(), BaseInput);
     }
   }
 
   // 6. Add it to the JobCache, so we don't construct the same Job multiple
   // times.
-  JobCache[Key] = J;
+  JobCache[Key] = J.get();
 
   if (DriverPrintBindings) {
     llvm::outs() << "# \"" << T->getToolChain().getTripleString()
@@ -1876,7 +1877,7 @@ Job *Driver::buildJobsForAction(Compilation &C, const Action *A,
                },
                [] { llvm::outs() << ", "; });
 
-    types::forAllTypes([J](types::ID Ty) {
+    types::forAllTypes([&J](types::ID Ty) {
       StringRef AdditionalOutput =
         J->getOutput().getAdditionalOutputForType(Ty);
       if (!AdditionalOutput.empty()) {
@@ -1903,7 +1904,7 @@ Job *Driver::buildJobsForAction(Compilation &C, const Action *A,
     llvm::outs() << '\n';
   }
 
-  return J;
+  return J.release();
 }
 
 static unsigned printActions(const Action *A,

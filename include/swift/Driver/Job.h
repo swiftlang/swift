@@ -149,10 +149,10 @@ private:
 public:
   Job(const Action &Source, const Tool &Creator,
       std::unique_ptr<JobList> Inputs, std::unique_ptr<CommandOutput> Output,
-      const char *Executable, llvm::opt::ArgStringList &Arguments)
+      const char *Executable, llvm::opt::ArgStringList Arguments)
       : Source(Source), CreatorAndCondition(&Creator, Condition::Always),
         Inputs(std::move(Inputs)), Output(std::move(Output)),
-        Executable(Executable), Arguments(Arguments) {}
+        Executable(Executable), Arguments(std::move(Arguments)) {}
 
   const Action &getSource() const { return Source; }
   const Tool &getCreator() const { return *CreatorAndCondition.getPointer(); }

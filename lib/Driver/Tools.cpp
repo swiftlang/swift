@@ -84,7 +84,7 @@ static void addPrimaryInputsOfType(ArgStringList &Arguments,
 /// module-merging, LLDB's REPL, etc).
 static void addCommonFrontendArgs(const ToolChain &TC,
                                   const OutputInfo &OI,
-                                  CommandOutput *output,
+                                  const CommandOutput *output,
                                   const ArgList &inputArgs,
                                   ArgStringList &arguments) {
   arguments.push_back("-target");
@@ -160,31 +160,35 @@ static void addCommonFrontendArgs(const ToolChain &TC,
 /// \returns the executable name.
 static const char *setupSwiftFrontendOrSwiftUpdate(const Tool &Tool,
                                                    const ArgList &Args,
-                                                   const OutputInfo &OI,
-                                                   ArgStringList &Arguments) {
-  const char *Exec =
-    Tool.getToolChain().getDriver().getSwiftProgramPath().c_str();
+                                                   const OutputInfo &OI) {
+  const std::string &Exec =
+      Tool.getToolChain().getDriver().getSwiftProgramPath();
 
   if (OI.CompilerMode == OutputInfo::Mode::UpdateCode) {
     SmallString<128> SwiftUpdatePath = llvm::sys::path::parent_path(Exec);
     llvm::sys::path::append(SwiftUpdatePath, "swift-update");
-    Exec = Args.MakeArgString(SwiftUpdatePath.str());
-  } else {
-    // Invoke ourselves in -frontend mode.
-    Arguments.push_back("-frontend");
+    return Args.MakeArgString(SwiftUpdatePath.str());
   }
 
-  return Exec;
+  return Exec.c_str();
 }
 
-Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
-                         std::unique_ptr<CommandOutput> Output,
-                         const ActionList &InputActions, const ArgList &Args,
-                         const OutputInfo &OI) const {
+const char *Swift::getPath(const llvm::opt::ArgList &Args,
+                           const OutputInfo &OI) const {
+  return setupSwiftFrontendOrSwiftUpdate(*this, Args, OI);
+}
+
+llvm::opt::ArgStringList
+Swift::constructArgumentList(const JobAction &JA,
+                             const JobList *Inputs,
+                             const CommandOutput *Output,
+                             const ActionList &InputActions,
+                             const llvm::opt::ArgList &Args,
+                             const OutputInfo &OI) const {
   ArgStringList Arguments;
 
-  const char *Exec = setupSwiftFrontendOrSwiftUpdate(*this, Args, OI,
-                                                     Arguments);
+  if (OI.CompilerMode != OutputInfo::Mode::UpdateCode)
+    Arguments.push_back("-frontend");
 
   // Determine the frontend mode option.
   const char *FrontendModeOption = nullptr;
@@ -365,14 +369,13 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
     // Disable all llvm IR level optimizations.
     Arguments.push_back("-disable-llvm-optzns");
 
-    return new Job(JA, *this, std::move(Inputs), std::move(Output), Exec,
-                   Arguments);
+    return Arguments;
   }
 
   if (Args.hasArg(options::OPT_parse_stdlib))
     Arguments.push_back("-disable-objc-attr-requires-foundation-module");
 
-  addCommonFrontendArgs(getToolChain(), OI, Output.get(), Args, Arguments);
+  addCommonFrontendArgs(getToolChain(), OI, Output, Args, Arguments);
 
   // Pass the optimization level down to the frontend.
   Args.AddLastArg(Arguments, options::OPT_O_Group);
@@ -464,21 +467,25 @@ Job *Swift::constructJob(const JobAction &JA, std::unique_ptr<JobList> Inputs,
   if (Args.hasArg(options::OPT_embed_bitcode_marker))
     Arguments.push_back("-embed-bitcode-marker");
 
-  return new Job(JA, *this, std::move(Inputs), std::move(Output), Exec,
-                 Arguments);
+  return Arguments;
 }
 
+const char *MergeModule::getPath(const llvm::opt::ArgList &Args,
+                                 const OutputInfo &OI) const {
+  return setupSwiftFrontendOrSwiftUpdate(*this, Args, OI);
+}
 
-Job *MergeModule::constructJob(const JobAction &JA,
-                               std::unique_ptr<JobList> Inputs,
-                               std::unique_ptr<CommandOutput> Output,
-                               const ActionList &InputActions,
-                               const ArgList &Args,
-                               const OutputInfo &OI) const {
+llvm::opt::ArgStringList
+MergeModule::constructArgumentList(const JobAction &JA,
+                                   const JobList *Inputs,
+                                   const CommandOutput *Output,
+                                   const ActionList &InputActions,
+                                   const llvm::opt::ArgList &Args,
+                                   const OutputInfo &OI) const {
   ArgStringList Arguments;
 
-  const char *Exec = setupSwiftFrontendOrSwiftUpdate(*this, Args, OI,
-                                                     Arguments);
+  if (OI.CompilerMode != OutputInfo::Mode::UpdateCode)
+    Arguments.push_back("-frontend");
 
   // We just want to emit a module, so pass -emit-module without any other
   // mode options.
@@ -497,7 +504,7 @@ Job *MergeModule::constructJob(const JobAction &JA,
   // serialized ASTs.
   Arguments.push_back("-parse-as-library");
 
-  addCommonFrontendArgs(getToolChain(), OI, Output.get(), Args, Arguments);
+  addCommonFrontendArgs(getToolChain(), OI, Output, Args, Arguments);
 
   Arguments.push_back("-module-name");
   Arguments.push_back(Args.MakeArgString(OI.ModuleName));
@@ -515,15 +522,22 @@ Job *MergeModule::constructJob(const JobAction &JA,
   Arguments.push_back("-o");
   Arguments.push_back(Args.MakeArgString(Output->getPrimaryOutputFilename()));
 
-  return new Job(JA, *this, std::move(Inputs), std::move(Output), Exec,
-                 Arguments);
+  return Arguments;
 }
 
-const char *ToolchainTool::getPath() const {
+const char *ToolchainTool::getPath(const ArgList &Args,
+                                   const OutputInfo &OI) const {
+  if (!Bits.DidCheckRelativeToDriver) {
+    (void)isPresentRelativeToDriver();
+  }
+  return NameOrPath.c_str();
+}
+
+bool ToolchainTool::isPresentRelativeToDriver() const {
   if (!Bits.DidCheckRelativeToDriver) {
     const Driver &D = getToolChain().getDriver();
     std::string RelativePath =
-        findRelativeExecutable(D.getSwiftProgramPath(), NameOrPath);
+    findRelativeExecutable(D.getSwiftProgramPath(), NameOrPath);
     if (RelativePath.empty()) {
       NameOrPath = getToolChain().getProgramPath(NameOrPath);
     } else {
@@ -532,28 +546,22 @@ const char *ToolchainTool::getPath() const {
     }
     Bits.DidCheckRelativeToDriver = true;
   }
-  return NameOrPath.c_str();
-}
-
-bool ToolchainTool::isPresentRelativeToDriver() const {
-  if (!Bits.DidCheckRelativeToDriver) {
-    (void)getPath();
-  }
   return Bits.IsPresentRelativeToDriver;
 }
 
-Job *LLDB::constructJob(const JobAction &JA,
-                        std::unique_ptr<JobList> Inputs,
-                        std::unique_ptr<CommandOutput> Output,
-                        const ActionList &InputActions,
-                        const ArgList &Args,
-                        const OutputInfo &OI) const {
+llvm::opt::ArgStringList
+LLDB::constructArgumentList(const JobAction &JA,
+                            const JobList *Inputs,
+                            const CommandOutput *Output,
+                            const ActionList &InputActions,
+                            const llvm::opt::ArgList &Args,
+                            const OutputInfo &OI) const {
   assert(Inputs->empty());
   assert(InputActions.empty());
 
   // Squash important frontend options into a single argument for LLDB.
   ArgStringList FrontendArgs;
-  addCommonFrontendArgs(getToolChain(), OI, Output.get(), Args, FrontendArgs);
+  addCommonFrontendArgs(getToolChain(), OI, Output, Args, FrontendArgs);
   Args.AddAllArgs(FrontendArgs, options::OPT_l, options::OPT_framework,
                   options::OPT_L);
 
@@ -566,16 +574,16 @@ Job *LLDB::constructJob(const JobAction &JA,
   ArgStringList Arguments;
   Arguments.push_back(Args.MakeArgString(std::move(SingleArg)));
 
-  return new Job(JA, *this, std::move(Inputs), std::move(Output), getPath(),
-                 Arguments);
+  return Arguments;
 }
 
-Job *Dsymutil::constructJob(const JobAction &JA,
-                            std::unique_ptr<JobList> Inputs,
-                            std::unique_ptr<CommandOutput> Output,
-                            const ActionList &InputActions,
-                            const ArgList &Args,
-                            const OutputInfo &OI) const {
+llvm::opt::ArgStringList
+Dsymutil::constructArgumentList(const JobAction &JA,
+                                const JobList *Inputs,
+                                const CommandOutput *Output,
+                                const ActionList &InputActions,
+                                const llvm::opt::ArgList &Args,
+                                const OutputInfo &OI) const {
   assert(Inputs->size() == 1);
   assert(InputActions.empty());
   assert(Output->getPrimaryOutputType() == types::TY_dSYM);
@@ -588,16 +596,16 @@ Job *Dsymutil::constructJob(const JobAction &JA,
   Arguments.push_back("-o");
   Arguments.push_back(Args.MakeArgString(Output->getPrimaryOutputFilename()));
 
-  return new Job(JA, *this, std::move(Inputs), std::move(Output), getPath(),
-                 Arguments);
+  return Arguments;
 }
 
-Job *AutolinkExtract::constructJob(const JobAction &JA,
-                                   std::unique_ptr<JobList> Inputs,
-                                   std::unique_ptr<CommandOutput> Output,
-                                   const ActionList &InputActions,
-                                   const ArgList &Args,
-                                   const OutputInfo &OI) const {
+llvm::opt::ArgStringList
+AutolinkExtract::constructArgumentList(const JobAction &JA,
+                                       const JobList *Inputs,
+                                       const CommandOutput *Output,
+                                       const ActionList &InputActions,
+                                       const llvm::opt::ArgList &Args,
+                                       const OutputInfo &OI) const {
   assert(Output->getPrimaryOutputType() == types::TY_AutolinkFile);
 
   ArgStringList Arguments;
@@ -607,8 +615,7 @@ Job *AutolinkExtract::constructJob(const JobAction &JA,
   Arguments.push_back("-o");
   Arguments.push_back(Args.MakeArgString(Output->getPrimaryOutputFilename()));
 
-  return new Job(JA, *this, std::move(Inputs), std::move(Output), getPath(),
-                 Arguments);
+  return Arguments;
 }
 
 /// Darwin Tools
@@ -638,12 +645,13 @@ static void addVersionString(const ArgList &inputArgs, ArgStringList &arguments,
   arguments.push_back(inputArgs.MakeArgString(os.str()));
 }
 
-Job *darwin::Linker::constructJob(const JobAction &JA,
-                                  std::unique_ptr<JobList> Inputs,
-                                  std::unique_ptr<CommandOutput> Output,
-                                  const ActionList &InputActions,
-                                  const ArgList &Args,
-                                  const OutputInfo &OI) const {
+llvm::opt::ArgStringList
+darwin::Linker::constructArgumentList(const JobAction &JA,
+                                      const JobList *Inputs,
+                                      const CommandOutput *Output,
+                                      const ActionList &InputActions,
+                                      const llvm::opt::ArgList &Args,
+                                      const OutputInfo &OI) const {
   assert(Output->getPrimaryOutputType() == types::TY_Image &&
          "Invalid linker output type.");
 
@@ -822,20 +830,28 @@ Job *darwin::Linker::constructJob(const JobAction &JA,
   Arguments.push_back("-o");
   Arguments.push_back(Output->getPrimaryOutputFilename().c_str());
 
-  return new Job(JA, *this, std::move(Inputs), std::move(Output), getPath(),
-                 Arguments);
+  return Arguments;
 }
 
 #if defined(SWIFT_ENABLE_TARGET_LINUX)
 
 /// Linux Tools
 
-Job *linux::Linker::constructJob(const JobAction &JA,
-                                 std::unique_ptr<JobList> Inputs,
-                                 std::unique_ptr<CommandOutput> Output,
-                                 const ActionList &InputActions,
-                                 const ArgList &Args,
-                                 const OutputInfo &OI) const {
+const char *linux::Linker::getPath(const llvm::opt::ArgList &Args,
+                                   const OutputInfo &OI) const {
+  // This avoids a bunch of issues trying to correctly guess parameters
+  // for ld for linux platforms. We know we have clang, we know it should
+  // be able to link, so use clang for now.
+  return Args.MakeArgString(getToolChain().getProgramPath("clang++"));
+}
+
+llvm::opt::ArgStringList
+linux::Linker::constructArgumentList(const JobAction &JA,
+                                   const JobList *Inputs,
+                                   const CommandOutput *Output,
+                                   const ActionList &InputActions,
+                                   const llvm::opt::ArgList &Args,
+                                   const OutputInfo &OI) const {
   const ToolChain &TC = getToolChain();
   const Driver &D = TC.getDriver();
 
@@ -920,13 +936,7 @@ Job *linux::Linker::constructJob(const JobAction &JA,
   Arguments.push_back("-o");
   Arguments.push_back(Output->getPrimaryOutputFilename().c_str());
 
-  // This avoids a bunch of issues trying to correctly guess parameters
-  // for ld for linux platforms. We know we have clang, we know it should
-  // be able to link, so use clang for now.
-  std::string Exec = TC.getProgramPath("clang++");
-
-  return new Job(JA, *this, std::move(Inputs), std::move(Output),
-                 Args.MakeArgString(Exec), Arguments);
+  return Arguments;
 }
 
 #endif // SWIFT_ENABLE_TARGET_LINUX
