@@ -55,12 +55,12 @@ func functionIntroducedOnwatchOS2_2() { }
 
 if #available(iOS 9.3, *) {
   functionIntroducedOnwatchOS2_2() // expected-error {{'functionIntroducedOnwatchOS2_2()' is only available on watchOS 2.2 or newer}}
-      // expected-note@-1 {{guard with version check}}
+      // expected-note@-1 {{add if #available version check}}
 }
 
 if #available(iOS 9.3, watchOS 2.1, *) {
   functionIntroducedOnwatchOS2_2() // expected-error {{'functionIntroducedOnwatchOS2_2()' is only available on watchOS 2.2 or newer}}
-      // expected-note@-1 {{guard with version check}}
+      // expected-note@-1 {{add if #available version check}}
 }
 
 if #available(iOS 9.1, watchOS 2.2, *) {

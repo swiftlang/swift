@@ -2263,7 +2263,7 @@ ERROR(availability_decl_only_version_newer, sema_avail, none,
       (DeclName, StringRef, clang::VersionTuple))
 
 NOTE(availability_guard_with_version_check, sema_avail, none,
-     "guard with version check", ())
+     "add if #available version check", ())
 
 NOTE(availability_add_attribute, sema_avail, none,
      "add @available attribute to enclosing %0", (DescriptiveDeclKind))

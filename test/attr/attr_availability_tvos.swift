@@ -57,12 +57,12 @@ func functionIntroducedOntvOS9_2() { }
 
 if #available(iOS 9.3, *) {
   functionIntroducedOntvOS9_2() // expected-error {{'functionIntroducedOntvOS9_2()' is only available on tvOS 9.2 or newer}}
-      // expected-note@-1 {{guard with version check}}
+      // expected-note@-1 {{add if #available version check}}
 }
 
 if #available(iOS 9.3, tvOS 9.1, *) {
   functionIntroducedOntvOS9_2() // expected-error {{'functionIntroducedOntvOS9_2()' is only available on tvOS 9.2 or newer}}
-      // expected-note@-1 {{guard with version check}}
+      // expected-note@-1 {{add if #available version check}}
 }
 
 if #available(iOS 9.1, tvOS 9.2, *) {
