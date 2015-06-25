@@ -6,18 +6,13 @@
 
 // CHECK: xor <2 x i64>
 
-func f() -> Int {
-  var a : Int = 10
-  var b : Int = 15
-  var c : Int = 0
+public func f(a: UnsafePointer<Int>, b: UnsafePointer<Int>, count: Int) -> Int {
+  var c = 0
 
-  for _ in 0..<100000 {
-    for _ in 0..<1000000 {
-      c = a ^ b ^ c
-    }
+  for i in 0..<count {
+    c = a[i] ^ b[i] ^ c
   }
 
   return c
 }
 
-var c = f()
