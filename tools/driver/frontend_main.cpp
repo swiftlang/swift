@@ -40,6 +40,7 @@
 // FIXME: We're just using CompilerInstance::createOutputFile.
 // This API should be sunk down to LLVM.
 #include "clang/Frontend/CompilerInstance.h"
+#include "clang/CodeGen/LLVMModuleProvider.h"
 
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/LLVMContext.h"
@@ -330,19 +331,22 @@ static bool printAsObjC(const std::string &outputPath, Module *M,
                         StringRef bridgingHeader, bool moduleIsPublic) {
   using namespace llvm::sys;
 
+  clang::CompilerInstance Clang{
+    clang::SharedModuleProvider::Create<clang::LLVMModuleProvider>()};
+
   std::string tmpFilePath;
   std::error_code EC;
-  std::unique_ptr<llvm::raw_fd_ostream> out{
-    clang::CompilerInstance::createOutputFile(outputPath, EC,
-                                              /*binary=*/false,
-                                              /*removeOnSignal=*/true,
-                                              /*inputPath=*/"",
-                                              path::extension(outputPath),
-                                              /*temporary=*/true,
-                                              /*createDirs=*/false,
-                                              /*finalPath=*/nullptr,
-                                              &tmpFilePath)
-  };
+  std::unique_ptr<llvm::raw_pwrite_stream> out =
+    Clang.createOutputFile(outputPath, EC,
+                           /*binary=*/false,
+                           /*removeOnSignal=*/true,
+                           /*inputPath=*/"",
+                           path::extension(outputPath),
+                           /*temporary=*/true,
+                           /*createDirs=*/false,
+                           /*finalPath=*/nullptr,
+                           &tmpFilePath);
+
   if (!out) {
     M->getASTContext().Diags.diagnose(SourceLoc(), diag::error_opening_output,
                                       tmpFilePath, EC.message());
