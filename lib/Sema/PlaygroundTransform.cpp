@@ -541,7 +541,8 @@ public:
                     appendNewline = TE->getElement(1);
                   }
                 }
-                if (object && appendNewline) {
+                if (object && !object->getType()->is<InOutType>() &&
+                  appendNewline && !appendNewline->getType()->is<InOutType>()) {
                   std::pair<PatternBindingDecl *, VarDecl *> objectPV =
                     buildPatternAndVariable(object);
                   std::pair<PatternBindingDecl *, VarDecl *> appendNewlinePV =
