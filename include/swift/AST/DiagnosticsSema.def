@@ -169,6 +169,10 @@ ERROR(cannot_convert_to_return_type,sema,none,
 ERROR(cannot_return_value_from_void_func,sema,none,
       "unexpected non-void return value in void function", ())
 
+ERROR(unexpected_expr_result_type,sema,none,
+      "subexpression produces result of type %0, "
+      "which is unexpected by context", (Type))
+
 //------------------------------------------------------------------------------
 // Name Binding
 //------------------------------------------------------------------------------

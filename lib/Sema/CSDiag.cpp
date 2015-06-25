@@ -2147,8 +2147,6 @@ bool FailureDiagnosis::diagnoseFailureForBinaryExpr() {
       return true;
     }
   }
-
-  
   
   
   if (argTyName1.compare(argTyName2)) {
@@ -2336,7 +2334,6 @@ bool FailureDiagnosis::diagnoseFailureForCallExpr() {
 
   bool isClosureInvocation = false;
   bool isInvalidTrailingClosureTarget = false;
-  bool foundIntermediateError = false;
   bool isInitializer = false;
   bool isOverloadedFn = false;
   
@@ -2403,7 +2400,7 @@ bool FailureDiagnosis::diagnoseFailureForCallExpr() {
         getTypeOfIndependentSubExpression((parenExpr->getSubExpr()));
     
     if (isErrorTypeKind(subType))
-      foundIntermediateError = true;
+      return true; // already diagnosed.
     
     argNames.push_back(Identifier());
     argTypes.push_back(subType);
@@ -2414,7 +2411,7 @@ bool FailureDiagnosis::diagnoseFailureForCallExpr() {
       auto elType = getTypeOfIndependentSubExpression(elExpr);
       
       if (isErrorTypeKind(elType))
-        foundIntermediateError = true;
+        return true; // already diagnosed.
       
       argNames.push_back(elName);
       argTypes.push_back(elType);
@@ -2424,55 +2421,44 @@ bool FailureDiagnosis::diagnoseFailureForCallExpr() {
     argTypes.push_back(typeExpr->getType());
   }
   
-  if (foundIntermediateError)
-    return true;
-  
-  if (argTypes.size()) {
-    
+  if (!argTypes.empty()) {
     std::string argString = "(" + getTypeListString(argNames, argTypes) + ")";
     
-    if (!isOverloadedFn) {
-      if (isClosureInvocation) {
-        
-        if (isInvalidTrailingClosureTarget) {
-          CS->TC.diagnose(fnExpr->getLoc(),
-                          diag::invalid_trailing_closure_target);
-        } else {
-          CS->TC.diagnose(fnExpr->getLoc(),
-                          diag::cannot_invoke_closure,
-                          argString);
-        }
-      } else {
-        CS->TC.diagnose(fnExpr->getLoc(),
-                        isInitializer ?
-                          diag::cannot_apply_initializer_to_args :
-                          diag::cannot_apply_function_to_args,
-                        overloadName,
-                        argString);
-      }
-    } else {
+    if (isOverloadedFn) {
       CS->TC.diagnose(fnExpr->getLoc(),
                       isInitializer ?
-                        diag::cannot_find_appropriate_initializer_with_list :
-                        diag::cannot_find_appropriate_overload_with_list,
+                      diag::cannot_find_appropriate_initializer_with_list :
+                      diag::cannot_find_appropriate_overload_with_list,
                       overloadName,
+                      argString);
+    } else if (!isClosureInvocation) {
+      CS->TC.diagnose(fnExpr->getLoc(),
+                      isInitializer ?
+                      diag::cannot_apply_initializer_to_args :
+                      diag::cannot_apply_function_to_args,
+                      overloadName,
+                      argString);
+    } else if (isInvalidTrailingClosureTarget) {
+      CS->TC.diagnose(fnExpr->getLoc(),
+                      diag::invalid_trailing_closure_target);
+    } else {
+      CS->TC.diagnose(fnExpr->getLoc(),
+                      diag::cannot_invoke_closure,
                       argString);
     }
   } else {
-    
     if (isClosureInvocation) {
       CS->TC.diagnose(fnExpr->getLoc(), diag::cannot_infer_closure_type);
       
       if (!isInvalidTrailingClosureTarget) {
-        auto closureExpr = dyn_cast<ClosureExpr>(unwrapParenExpr(fnExpr));
+        auto closureExpr = cast<ClosureExpr>(unwrapParenExpr(fnExpr));
         
         if (!closureExpr->hasSingleExpressionBody() &&
             !closureExpr->hasExplicitResultType() &&
-            closureExpr->getBody()->getElements().size()) {
+            !closureExpr->getBody()->getElements().empty()) {
           CS->TC.diagnose(fnExpr->getLoc(),
                           diag::mult_stmt_closures_require_explicit_result);
         }
-        
       }
       
     } else {
@@ -2485,7 +2471,7 @@ bool FailureDiagnosis::diagnoseFailureForCallExpr() {
   }
   
   // Did the user intend on invoking a different overload?
-  if (paramLists.size()) {
+  if (!paramLists.empty()) {
     if(!isOverloadedFn) {
       std::string paramString = "";
       SmallVector<Identifier, 16> paramNames;
@@ -2517,7 +2503,6 @@ bool FailureDiagnosis::diagnoseFailureForCallExpr() {
   }
   
   expr->setType(ErrorType::get(CS->getASTContext()));
-  
   return true;
 }
 
