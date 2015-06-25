@@ -42,7 +42,7 @@ namespace swift {
     }
     
     virtual ModRefResult getModRefInfo(llvm::ImmutableCallSite CS,
-                                       const Location &Loc) override;
+                                       const llvm::MemoryLocation &Loc) override;
   };
 
   class SwiftARCOpt : public llvm::FunctionPass {

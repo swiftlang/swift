@@ -28,7 +28,8 @@ bool SwiftAliasAnalysis::doInitialization(Module &M) {
 }
 
 AliasAnalysis::ModRefResult
-SwiftAliasAnalysis::getModRefInfo(ImmutableCallSite CS, const Location &Loc) {
+SwiftAliasAnalysis::getModRefInfo(ImmutableCallSite CS,
+                                  const llvm::MemoryLocation &Loc) {
   // We know the mod-ref behavior of various runtime functions.
   switch (classifyInstruction(*CS.getInstruction())) {
   case RT_AllocObject:
