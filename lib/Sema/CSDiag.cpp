@@ -1024,7 +1024,8 @@ static Identifier getOverloadChoiceName(ArrayRef<OverloadChoice> choices) {
   return Identifier();
 }
 
-bool diagnoseAmbiguity(ConstraintSystem &cs, ArrayRef<Solution> solutions) {
+static bool diagnoseAmbiguity(ConstraintSystem &cs,
+                              ArrayRef<Solution> solutions) {
   // Produce a diff of the solutions.
   SolutionDiff diff(solutions);
 
@@ -1115,41 +1116,36 @@ bool diagnoseAmbiguity(ConstraintSystem &cs, ArrayRef<Solution> solutions) {
   return false;
 }
 
-Constraint *getConstraintChoice(Constraint *constraint,
+static Constraint *getConstraintChoice(Constraint *constraint,
                                  ConstraintKind kind,
                                  bool takeAny = false) {
-  if ((constraint->getKind() != ConstraintKind::Disjunction) &&
-      (constraint->getKind() != ConstraintKind::Conjunction)) {
+  if (constraint->getKind() != ConstraintKind::Disjunction &&
+      constraint->getKind() != ConstraintKind::Conjunction)
     return nullptr;
-  }
   
   auto nestedConstraints = constraint->getNestedConstraints();
   
   for (auto nestedConstraint : nestedConstraints) {
-    if (takeAny ||
-        (nestedConstraint->getKind() == kind)) {
+    if (!takeAny && nestedConstraint->getKind() != kind)
+      continue;
       
-      // If this is a last-chance search, and we have a conjunction or
-      // disjunction, look within.
-      if (takeAny &&
-          ((nestedConstraint->getKind() == ConstraintKind::Disjunction) ||
-           (nestedConstraint->getKind() == ConstraintKind::Conjunction))) {
-            return getConstraintChoice(nestedConstraint,
-                                       kind,
-                                       takeAny);
-          }
-      
-      return nestedConstraint;
-    }
+    // If this is a last-chance search, and we have a conjunction or
+    // disjunction, look within.
+    if (takeAny &&
+        ((nestedConstraint->getKind() == ConstraintKind::Disjunction) ||
+         (nestedConstraint->getKind() == ConstraintKind::Conjunction))) {
+          return getConstraintChoice(nestedConstraint, kind, takeAny);
+        }
+    
+    return nestedConstraint;
   }
-  
+
   return nullptr;
 }
 
-Constraint *getComponentConstraint(Constraint *constraint) {
-  if (constraint->getKind() != ConstraintKind::Disjunction) {
+static Constraint *getComponentConstraint(Constraint *constraint) {
+  if (constraint->getKind() != ConstraintKind::Disjunction)
     return constraint;
-  }
   
   return constraint->getNestedConstraints().front();
 }
@@ -1203,9 +1199,9 @@ static Type substituteLiteralForTypeVariable(ConstraintSystem *CS,
   return tv;
 }
 
-static std::pair<Type, Type> getBoundTypesFromConstraint(ConstraintSystem *CS,
-                                                         Expr *expr,
-                                                         Constraint *constraint) {
+static std::pair<Type, Type>
+getBoundTypesFromConstraint(ConstraintSystem *CS, Expr *expr,
+                            Constraint *constraint) {
   auto type1 = getDiagnosticTypeFromExpr(expr);
   auto type2 = constraint->getSecondType();
   
@@ -1256,13 +1252,12 @@ static std::pair<Type, Type> getBoundTypesFromConstraint(ConstraintSystem *CS,
   }
   
   // If we still have a literal type variable, substitute in the default type.
-  if (auto tv1 = type1->getAs<TypeVariableType>()) {
+  if (auto tv1 = type1->getAs<TypeVariableType>())
     type1 = substituteLiteralForTypeVariable(CS, tv1);
-  }
-  if (auto tv2 = type2->getAs<TypeVariableType>()) {
-    type2 = substituteLiteralForTypeVariable(CS, tv2);
-  }
   
+  if (auto tv2 = type2->getAs<TypeVariableType>())
+    type2 = substituteLiteralForTypeVariable(CS, tv2);
+    
   return std::pair<Type, Type>(type1->getLValueOrInOutObjectType(),
                                type2->getLValueOrInOutObjectType());
 }
@@ -1271,7 +1266,7 @@ static std::pair<Type, Type> getBoundTypesFromConstraint(ConstraintSystem *CS,
 /// specialized, or if it still has type variable type arguments.
 /// (This diverges slightly from hasTypeVariable, in that certain tyvars,
 /// such as for nil literals, will be treated as specialized.)
-bool typeIsNotSpecialized(Type type) {
+static bool typeIsNotSpecialized(Type type) {
   if (type.isNull())
     return true;
   
@@ -1334,7 +1329,7 @@ bool typeIsNotSpecialized(Type type) {
 }
 
 /// Obtain the colloquial description for a known protocol kind.
-std::string getDescriptionForKnownProtocolKind(KnownProtocolKind kind) {
+static std::string getDescriptionForKnownProtocolKind(KnownProtocolKind kind) {
   switch (kind) {
 #define PROTOCOL(Id) \
 case KnownProtocolKind::Id: \
@@ -1355,8 +1350,7 @@ return #Id;
 }
 
 /// Determine if the type is an error type, or its metatype.
-bool isErrorTypeKind(Type t) {
-  
+static bool isErrorTypeKind(Type t) {
   if (auto mt = t->getAs<MetatypeType>())
     t = mt->getInstanceType();
   
@@ -1382,9 +1376,8 @@ std::string getUserFriendlyTypeName(Type t, bool unwrap = true) {
       Optional<KnownProtocolKind> kind =
           tv->getImpl().literalConformanceProto->getKnownProtocolKind();
       
-      if (kind.hasValue()) {
+      if (kind.hasValue())
         return getDescriptionForKnownProtocolKind(kind.getValue());
-      }
     }
   }
   
@@ -1392,7 +1385,7 @@ std::string getUserFriendlyTypeName(Type t, bool unwrap = true) {
 }
 
 /// Conveniently unwrap a paren expression, if necessary.
-Expr* unwrapParenExpr(Expr *e) {
+static Expr *unwrapParenExpr(Expr *e) {
   if (auto parenExpr = dyn_cast<ParenExpr>(e))
     return unwrapParenExpr(parenExpr->getSubExpr());
   
@@ -1402,36 +1395,32 @@ Expr* unwrapParenExpr(Expr *e) {
 /// Given a vector of names and types, obtain a stringified comma-separated
 /// list of the names (if present) and their associated "user friendly" type
 /// names.
-std::string getTypeListString(SmallVectorImpl<Identifier> &names,
-                              SmallVectorImpl<Type> &types) {
-  
+static std::string getTypeListString(SmallVectorImpl<Identifier> &names,
+                                     SmallVectorImpl<Type> &types) {
+  if (types.empty())
+    return "";
+
   std::string typeList = "";
+  if (!names[0].empty()) {
+    typeList += names[0].get();
+    typeList += ": ";
+  }
+  typeList += getUserFriendlyTypeName(types[0]);
   
-  if (types.size()) {
-    if (!names[0].empty()) {
-      typeList += names[0].get();
+  for (size_t i = 1, e = types.size(); i != e; i++) {
+    typeList += ", ";
+    if (!names[i].empty()) {
+      typeList += names[i].get();
       typeList += ": ";
     }
-    typeList += getUserFriendlyTypeName(types[0]);
-    
-    for (size_t i = 1; i < types.size(); i++) {
-      typeList += ", ";
-      if (!names[i].empty()) {
-        typeList += names[i].get();
-        typeList += ": ";
-      }
-      typeList += getUserFriendlyTypeName(types[i]);
-    }
+    typeList += getUserFriendlyTypeName(types[i]);
   }
-  
   return typeList;
-  
 }
 
-GeneralFailureDiagnosis::GeneralFailureDiagnosis(Expr *expr,
-                                                 ConstraintSystem *cs) :
-expr(expr), CS(cs) {
-  
+GeneralFailureDiagnosis::
+GeneralFailureDiagnosis(Expr *expr, ConstraintSystem *cs)
+  : expr(expr), CS(cs) {
   assert(expr && CS);
   
   // Collect and categorize constraint information from the failed system.
@@ -1806,9 +1795,8 @@ void FailureDiagnosis::suggestPotentialOverloads(
                                const SourceLoc &loc,
                                const SmallVectorImpl<Type> &paramLists,
                                const SmallVectorImpl<Type> &argTypes) {
-  if (!argTypes.size()) {
+  if (argTypes.empty())
     return;
-  }
   
   std::string suggestionText = "";
   std::map<std::string, bool> dupes;
@@ -2472,7 +2460,7 @@ bool FailureDiagnosis::diagnoseFailureForCallExpr() {
   
   // Did the user intend on invoking a different overload?
   if (!paramLists.empty()) {
-    if(!isOverloadedFn) {
+    if (!isOverloadedFn) {
       std::string paramString = "";
       SmallVector<Identifier, 16> paramNames;
       SmallVector<Type, 16> paramTypes;
@@ -2487,7 +2475,7 @@ bool FailureDiagnosis::diagnoseFailureForCallExpr() {
         }
       }
       
-      if (paramTypes.size()) {
+      if (!paramTypes.empty()) {
         paramString = "(" + getTypeListString(paramNames, paramTypes) + ")";
         
         CS->TC.diagnose(argExpr->getLoc(),
