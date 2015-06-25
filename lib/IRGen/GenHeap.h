@@ -36,6 +36,7 @@ namespace irgen {
 class HeapLayout : public StructLayout {
   SmallVector<SILType, 8> ElementTypes;
   NecessaryBindings Bindings;
+  mutable llvm::Constant *privateMetadata = nullptr;
   
 public:
   HeapLayout(IRGenModule &IGM, LayoutStrategy strategy,

@@ -263,8 +263,10 @@ static llvm::Constant *buildPrivateMetadata(IRGenModule &IGM,
 }
 
 llvm::Constant *HeapLayout::getPrivateMetadata(IRGenModule &IGM) const {
-  return buildPrivateMetadata(IGM, createDtorFn(IGM, *this),
-                              MetadataKind::HeapLocalVariable);
+  if (!privateMetadata)
+    privateMetadata = buildPrivateMetadata(IGM, createDtorFn(IGM, *this),
+                                           MetadataKind::HeapLocalVariable);
+  return privateMetadata;
 }
 
 llvm::Value *IRGenFunction::emitUnmanagedAlloc(const HeapLayout &layout,
