@@ -224,7 +224,6 @@ macro(swift_common_standalone_build_config product is_cross_compiling)
   include(AddLLVM)
   include(TableGen)
   include(HandleLLVMOptions)
-  include(LLVMParseArguments)
 
   set(PACKAGE_VERSION "${LLVM_PACKAGE_VERSION}")
 
