@@ -34,6 +34,12 @@ using namespace swift;
 /// This routine only examines the state of the instruction at hand.
 bool
 swift::isInstructionTriviallyDead(SILInstruction *I) {
+  // At Onone, consider all uses, including the debug_info.
+  // This way, debug_info is preserved at Onone.
+  if (!I->use_empty() &&
+      I->getModule().getOptions().Optimization <= SILOptions::SILOptMode::None)
+    return false;
+
   if (!hasNoUsesExceptDebug(I) || isa<TermInst>(I))
     return false;
 

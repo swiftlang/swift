@@ -27,7 +27,6 @@ class XImpl : X {
 sil @_TF31peephole_thick_to_objc_metatype36test_thick_to_objc_metatype_metatypeFT_PSs9AnyObject_ : $@convention(thin) () -> @owned AnyObject {
 bb0:
   %0 = metatype $@thick XImpl.Type                // users: %1, %2
-  debug_value %0 : $@thick XImpl.Type  // let Ty  // id: %1
   %2 = thick_to_objc_metatype %0 : $@thick XImpl.Type to $@objc_metatype XImpl.Type // user: %3
   %3 = objc_metatype_to_object %2 : $@objc_metatype XImpl.Type to $AnyObject // user: %4
   return %3 : $AnyObject                          // id: %4
@@ -81,7 +80,6 @@ bb0(%0 : $T):
 sil @_TF31peephole_thick_to_objc_metatype36test_objc_to_thick_metatype_metatypeFT_PSs9AnyObject_ : $@convention(thin) () -> @thick XImpl.Type {
 bb0:
   %0 = metatype $@objc_metatype XImpl.Type                // users: %1, %2
-  debug_value %0 : $@objc_metatype XImpl.Type  // let Ty  // id: %1
   %2 = objc_to_thick_metatype %0 : $@objc_metatype XImpl.Type to $@thick XImpl.Type
   return %2 : $@thick XImpl.Type
 }
