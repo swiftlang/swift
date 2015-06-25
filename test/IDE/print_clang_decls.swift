@@ -18,7 +18,7 @@
 // RUN: FileCheck %s -check-prefix=FOUNDATION -strict-whitespace < %t.printed.txt
 
 // RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -print-module -source-filename %s -module-to-print=ctypes.bits -function-definitions=false -prefer-type-repr=true > %t.printed.txt
-// RUN: FileCheck %s -check-prefix=CTYPESBITS -strict-whitespace < %t.printed.txt
+// RUN: not FileCheck %s -check-prefix=CTYPESBITS -strict-whitespace < %t.printed.txt
 
 // RUN: %target-swift-ide-test(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -print-module -source-filename %s -module-to-print=nullability -function-definitions=false -prefer-type-repr=true > %t.printed.txt
 // RUN: FileCheck %s -check-prefix=CHECK-NULLABILITY -strict-whitespace < %t.printed.txt

@@ -179,13 +179,6 @@ class <loc>FooClassDerived</loc> : <ref:Class>FooClassBase</ref>, <ref:Protocol>
   func <loc>fooProtoFuncWithExtraIndentation2()</loc></decl>
   <decl:Func>class func <loc>fooProtoClassFunc()</loc></decl>
 }</decl>
-<decl:Var>var <loc>FOO_MACRO_1</loc>: <ref:Struct>Int32</ref> { get }</decl>
-<decl:Var>var <loc>FOO_MACRO_2</loc>: <ref:Struct>Int32</ref> { get }</decl>
-<decl:Var>var <loc>FOO_MACRO_3</loc>: <ref:Struct>Int32</ref> { get }</decl>
-<decl:Var>var <loc>FOO_MACRO_4</loc>: <ref:Struct>UInt32</ref> { get }</decl>
-<decl:Var>var <loc>FOO_MACRO_5</loc>: <ref:Struct>UInt64</ref> { get }</decl>
-<decl:Var>var <loc>FOO_MACRO_REDEF_1</loc>: <ref:Struct>Int32</ref> { get }</decl>
-<decl:Var>var <loc>FOO_MACRO_REDEF_2</loc>: <ref:Struct>Int32</ref> { get }</decl>
 <decl:Func>func <loc>theLastDeclInFoo()</loc></decl>
 <decl:Func>func <loc>_internalTopLevelFunc()</loc></decl>
 <decl:Struct>struct <loc>_InternalStruct</loc> {

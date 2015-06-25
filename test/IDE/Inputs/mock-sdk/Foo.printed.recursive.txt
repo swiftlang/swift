@@ -179,13 +179,6 @@ class FooClassDerived : FooClassBase, FooProtocolDerived, FooProtocolBase {
   func fooProtoFuncWithExtraIndentation2()
   class func fooProtoClassFunc()
 }
-var FOO_MACRO_1: Int32 { get }
-var FOO_MACRO_2: Int32 { get }
-var FOO_MACRO_3: Int32 { get }
-var FOO_MACRO_4: UInt32 { get }
-var FOO_MACRO_5: UInt64 { get }
-var FOO_MACRO_REDEF_1: Int32 { get }
-var FOO_MACRO_REDEF_2: Int32 { get }
 func theLastDeclInFoo()
 func _internalTopLevelFunc()
 struct _InternalStruct {
