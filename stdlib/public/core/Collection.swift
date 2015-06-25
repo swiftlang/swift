@@ -47,9 +47,6 @@ public protocol _CollectionDefaultsType : SequenceType {
   // below), but we have no way of expressing it today.
   typealias _Element
   subscript(_i: Index) -> _Element {get}
-
-  /// Returns the first element of `self`, or `nil` if `self` is empty.
-  var first: Generator.Element? { get }
 }
 
 extension _CollectionDefaultsType {
@@ -169,6 +166,9 @@ public protocol CollectionType
   ///
   /// - Complexity: O(N).
   func _customIndexOfEquatableElement(element: Generator.Element) -> Index??
+
+  /// Returns the first element of `self`, or `nil` if `self` is empty.
+  var first: Generator.Element? { get }
 }
 
 extension CollectionType {
