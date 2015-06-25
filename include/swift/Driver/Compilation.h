@@ -17,6 +17,8 @@
 #ifndef SWIFT_DRIVER_COMPILATION_H
 #define SWIFT_DRIVER_COMPILATION_H
 
+#include "swift/Driver/Job.h"
+#include "swift/Basic/ArrayRefView.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/StringRef.h"
@@ -37,7 +39,6 @@ namespace swift {
 
 namespace driver {
   class Driver;
-  class Job;
   class JobList;
   class ToolChain;
 
@@ -69,7 +70,7 @@ private:
   OutputLevel Level;
 
   /// The Jobs which will be performed by this compilation.
-  std::unique_ptr<JobList> Jobs;
+  SmallVector<std::unique_ptr<const Job>, 32> Jobs;
 
   /// The original (untranslated) input argument list.
   std::unique_ptr<llvm::opt::InputArgList> InputArgs;
@@ -122,6 +123,10 @@ private:
 
   /// True if temporary files should not be deleted.
   bool SaveTemps;
+
+  static const Job *unwrap(const std::unique_ptr<const Job> &p) {
+    return p.get();
+  }
   
 public:
   Compilation(const Driver &D, const ToolChain &DefaultToolChain,
@@ -139,8 +144,12 @@ public:
 
   const ToolChain &getDefaultToolChain() const { return DefaultToolChain; }
 
-  JobList &getJobs() const { return *Jobs; }
-  void addJob(Job *J);
+  ArrayRefView<std::unique_ptr<const Job>, const Job *, Compilation::unwrap>
+  getJobs() const {
+    return llvm::makeArrayRef(Jobs);
+  }
+  Job *addJob(std::unique_ptr<Job> J);
+
   void addTemporaryFile(StringRef file) {
     TempFilePaths.push_back(file.str());
   }
@@ -190,11 +199,9 @@ public:
 private:
   /// \brief Perform all jobs.
   ///
-  /// \param Jobs the list of Jobs to perform
-  ///
   /// \returns exit code of the first failed Job, or 0 on success. A return
   /// value of -2 indicates that a Job crashed during execution.
-  int performJobsInList(ArrayRef<const Job *> Jobs);
+  int performJobsImpl();
 
   /// \brief Performs a single Job by executing in place, if possible.
   ///

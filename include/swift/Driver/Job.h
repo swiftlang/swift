@@ -47,7 +47,7 @@ private:
   bool OwnsJobs;
 
 public:
-  JobList() : OwnsJobs(true) {}
+  JobList() : OwnsJobs(false) {}
   ~JobList();
 
   bool getOwnsJobs() const { return OwnsJobs; }

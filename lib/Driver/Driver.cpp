@@ -521,7 +521,7 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
     return nullptr;
 
   if (DriverPrintJobs) {
-    printJobs(C->getJobs());
+    printJobs(*C);
     return nullptr;
   }
 
@@ -1381,9 +1381,8 @@ void Driver::buildJobs(const ActionList &Actions, const OutputInfo &OI,
   }
 
   for (const Action *A : Actions) {
-    Job *J = buildJobsForAction(C, A, OI, OFM, C.getDefaultToolChain(), true,
-                                JobCache);
-    C.addJob(J);
+    (void)buildJobsForAction(C, A, OI, OFM, C.getDefaultToolChain(), true,
+                             JobCache);
   }
 }
 
@@ -1591,7 +1590,6 @@ Job *Driver::buildJobsForAction(Compilation &C, const Action *A,
   // 2. Build up the list of input jobs.
   ActionList InputActions;
   std::unique_ptr<JobList> InputJobs(new JobList);
-  InputJobs->setOwnsJobs(A->getOwnsInputs());
   for (Action *Input : *A) {
     if (isa<InputAction>(Input)) {
       InputActions.push_back(Input);
@@ -1828,21 +1826,22 @@ Job *Driver::buildJobsForAction(Compilation &C, const Action *A,
   }
 
   // 5. Construct a Job which produces the right CommandOutput.
-  std::unique_ptr<Job> J = T->constructJob(*JA, std::move(InputJobs),
+  std::unique_ptr<Job> ownedJob = T->constructJob(*JA, std::move(InputJobs),
                                            std::move(Output),
                                            InputActions, C.getArgs(), OI);
+  Job *J = C.addJob(std::move(ownedJob));
 
   // If we track dependencies for this job, we may be able to avoid running it.
   if (!J->getOutput().getAdditionalOutputForType(types::TY_SwiftDeps).empty()) {
     if (InputActions.size() == 1) {
       auto compileJob = cast<CompileJobAction>(A);
-      handleCompileJobCondition(J.get(), compileJob->getInputInfo(), BaseInput);
+      handleCompileJobCondition(J, compileJob->getInputInfo(), BaseInput);
     }
   }
 
   // 6. Add it to the JobCache, so we don't construct the same Job multiple
   // times.
-  JobCache[Key] = J.get();
+  JobCache[Key] = J;
 
   if (DriverPrintBindings) {
     llvm::outs() << "# \"" << T->getToolChain().getTripleString()
@@ -1904,7 +1903,7 @@ Job *Driver::buildJobsForAction(Compilation &C, const Action *A,
     llvm::outs() << '\n';
   }
 
-  return J.release();
+  return J;
 }
 
 static unsigned printActions(const Action *A,
@@ -1944,20 +1943,9 @@ void Driver::printActions(const ActionList &Actions) const {
   }
 }
 
-static void printJob(const Job *Cmd, llvm::DenseSet<const Job *> &VisitedJobs) {
-  if (!VisitedJobs.insert(Cmd).second)
-    return;
-  
-  const JobList &Inputs = Cmd->getInputs();
-  for (const Job *J : Inputs)
-    printJob(J, VisitedJobs);
-  Cmd->printCommandLine(llvm::outs());
-}
-
-void Driver::printJobs(const JobList &Jobs) const {
-  llvm::DenseSet<const Job *> VisitedJobs;
-  for (const Job *J : Jobs)
-    printJob(J, VisitedJobs);
+void Driver::printJobs(const Compilation &C) const {
+  for (const Job *J : C.getJobs())
+    J->printCommandLine(llvm::outs());
 }
 
 void Driver::printVersion(const ToolChain &TC, raw_ostream &OS) const {

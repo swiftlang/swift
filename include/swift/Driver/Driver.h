@@ -279,8 +279,8 @@ public:
   /// Print the list of Actions.
   void printActions(const ActionList &Actions) const;
 
-  /// Print the list of Jobs.
-  void printJobs(const JobList &Jobs) const;
+  /// Print the list of Jobs in a Compilation.
+  void printJobs(const Compilation &C) const;
 
   /// Print the driver version.
   void printVersion(const ToolChain &TC, raw_ostream &OS) const;

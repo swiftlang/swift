@@ -48,7 +48,7 @@ Compilation::Compilation(const Driver &D, const ToolChain &DefaultToolChain,
                          bool SkipTaskExecution,
                          bool SaveTemps)
   : TheDriver(D), DefaultToolChain(DefaultToolChain), Diags(Diags),
-    Level(Level), Jobs(new JobList), InputArgs(std::move(InputArgs)),
+    Level(Level), InputArgs(std::move(InputArgs)),
     TranslatedArgs(std::move(TranslatedArgs)), ArgsHash(ArgsHash),
     BuildStartTime(StartTime),
     NumberOfParallelCommands(NumberOfParallelCommands),
@@ -86,8 +86,10 @@ namespace {
 
 Compilation::~Compilation() = default;
 
-void Compilation::addJob(Job *J) {
-  Jobs->addJob(J);
+Job *Compilation::addJob(std::unique_ptr<Job> J) {
+  Job *result = J.get();
+  Jobs.emplace_back(std::move(J));
+  return result;
 }
 
 static const Job *findUnfinishedJob(const JobList &JL,
@@ -174,7 +176,7 @@ static void writeCompilationRecord(StringRef path, StringRef argsHash,
   }
 }
 
-int Compilation::performJobsInList(ArrayRef<const Job *> Jobs) {
+int Compilation::performJobsImpl() {
   // Create a TaskQueue for execution.
   std::unique_ptr<TaskQueue> TQ;
   if (SkipTaskExecution)
@@ -209,7 +211,7 @@ int Compilation::performJobsInList(ArrayRef<const Job *> Jobs) {
 
   // Perform all inputs to the Jobs in our JobList, and schedule any commands
   // which we know need to execute.
-  for (const Job *Cmd : Jobs) {
+  for (const Job *Cmd : getJobs()) {
     if (!getIncrementalBuildEnabled()) {
       scheduleCommandIfNecessaryAndPossible(Cmd);
       continue;
@@ -444,7 +446,7 @@ int Compilation::performJobsInList(ArrayRef<const Job *> Jobs) {
     (void)InitialBlockingCount;
   } else {
     // Make sure we record any files that still need to be rebuilt.
-    for (const Job *Cmd : Jobs) {
+    for (const Job *Cmd : getJobs()) {
       // Skip files that don't use dependency analysis.
       StringRef DependenciesFile =
           Cmd->getOutput().getAdditionalOutputForType(types::TY_SwiftDeps);
@@ -470,16 +472,6 @@ int Compilation::performJobsInList(ArrayRef<const Job *> Jobs) {
   }
 
   return Result;
-}
-
-static const Job *getOnlyCommandInList(const JobList *List) {
-  if (List->size() != 1)
-    return nullptr;
-
-  const Job *Cmd = List->front();
-  if (Cmd->getInputs().empty())
-    return Cmd;
-  return nullptr;
 }
 
 int Compilation::performSingleCommand(const Job *Cmd) {
@@ -521,18 +513,16 @@ int Compilation::performJobs() {
   // If we don't have to do any cleanup work, just exec the subprocess.
   if (Level < OutputLevel::Parseable &&
       (SaveTemps || TempFilePaths.empty()) &&
-      CompilationRecordPath.empty()) {
-    if (const Job *OnlyCmd = getOnlyCommandInList(Jobs.get()))
-      return performSingleCommand(OnlyCmd);
+      CompilationRecordPath.empty() &&
+      Jobs.size() == 1) {
+    return performSingleCommand(Jobs.front().get());
   }
 
   if (!TaskQueue::supportsParallelExecution() && NumberOfParallelCommands > 1) {
     Diags.diagnose(SourceLoc(), diag::warning_parallel_execution_not_supported);
   }
 
-  SmallVector<const Job *, 32> flattenedJobs;
-  flattenJobList(flattenedJobs, *Jobs);
-  int result = performJobsInList(flattenedJobs);
+  int result = performJobsImpl();
 
   if (!SaveTemps) {
     // FIXME: Do we want to be deleting temporaries even when a child process

@@ -23,17 +23,6 @@
 using namespace swift;
 using namespace swift::driver;
 
-typedef SmallPtrSet<const Job *, 4> SmallCommandSet;
-
-static void collectCompileCommands(const JobList &source, SmallCommandSet &outCmds) {
-  for (const Job *Cmd : source) {
-    if (isa<CompileJobAction>(Cmd->getSource()))
-      outCmds.insert(Cmd);
-
-    collectCompileCommands(Cmd->getInputs(), outCmds);
-  }
-}
-
 std::unique_ptr<CompilerInvocation>
 swift::driver::createCompilerInvocation(ArrayRef<const char *> ArgList,
                                         DiagnosticEngine &Diags) {
@@ -56,8 +45,10 @@ swift::driver::createCompilerInvocation(ArrayRef<const char *> ArgList,
   if (!C || C->getJobs().empty())
     return nullptr; // Don't emit an error; one should already have been emitted
 
-  SmallCommandSet CompileCommands;
-  collectCompileCommands(C->getJobs(), CompileCommands);
+  SmallPtrSet<const Job *, 4> CompileCommands;
+  for (const Job *Cmd : C->getJobs())
+    if (isa<CompileJobAction>(Cmd->getSource()))
+      CompileCommands.insert(Cmd);
 
   if (CompileCommands.size() != 1) {
     // TODO: include Jobs in the diagnostic.
