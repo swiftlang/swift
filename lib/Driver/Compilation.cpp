@@ -59,28 +59,30 @@ Compilation::Compilation(const Driver &D, const ToolChain &DefaultToolChain,
 
 using CommandSet = llvm::SmallPtrSet<const Job *, 16>;
 
-struct Compilation::PerformJobsState {
-  /// All jobs which have been scheduled for execution (whether or not
-  /// they've finished execution), or which have been determined that they
-  /// don't need to run.
-  CommandSet ScheduledCommands;
+namespace {
+  struct PerformJobsState {
+    /// All jobs which have been scheduled for execution (whether or not
+    /// they've finished execution), or which have been determined that they
+    /// don't need to run.
+    CommandSet ScheduledCommands;
 
-  /// All jobs which have finished execution or which have been determined
-  /// that they don't need to run.
-  CommandSet FinishedCommands;
+    /// All jobs which have finished execution or which have been determined
+    /// that they don't need to run.
+    CommandSet FinishedCommands;
 
-  /// A map from a Job to the commands it is known to be blocking.
-  ///
-  /// The blocked jobs should be scheduled as soon as possible.
-  llvm::SmallDenseMap<const Job *, TinyPtrVector<const Job *>, 16>
-      BlockingCommands;
+    /// A map from a Job to the commands it is known to be blocking.
+    ///
+    /// The blocked jobs should be scheduled as soon as possible.
+    llvm::SmallDenseMap<const Job *, TinyPtrVector<const Job *>, 16>
+        BlockingCommands;
 
-  /// A map from commands that didn't get to run to whether or not they affect
-  /// downstream commands.
-  ///
-  /// Only intended for source files.
-  llvm::SmallDenseMap<const Job *, bool, 16> UnfinishedCommands;
-};
+    /// A map from commands that didn't get to run to whether or not they affect
+    /// downstream commands.
+    ///
+    /// Only intended for source files.
+    llvm::SmallDenseMap<const Job *, bool, 16> UnfinishedCommands;
+  };
+}
 
 Compilation::~Compilation() = default;
 
@@ -97,13 +99,90 @@ static const Job *findUnfinishedJob(const JobList &JL,
   return nullptr;
 }
 
-int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
+static void writeCompilationRecord(StringRef path, StringRef argsHash,
+                                   llvm::sys::TimeValue buildTime,
+                                   const PerformJobsState &endState) {
+
+  llvm::SmallDenseMap<const llvm::opt::Arg *, CompileJobAction::InputInfo, 16>
+      inputs;
+
+  for (auto &entry : endState.UnfinishedCommands) {
+    ArrayRef<Action *> actionInputs = entry.first->getSource().getInputs();
+    assert(actionInputs.size() == 1);
+    auto inputFile = cast<InputAction>(actionInputs.front());
+
+    CompileJobAction::InputInfo info;
+    info.previousModTime = entry.first->getInputModTime();
+    info.status = entry.second ?
+        CompileJobAction::InputInfo::NeedsCascadingBuild :
+        CompileJobAction::InputInfo::NeedsNonCascadingBuild;
+    inputs[&inputFile->getInputArg()] = info;
+  }
+
+  for (const Job *entry : endState.FinishedCommands) {
+    const auto *compileAction = dyn_cast<CompileJobAction>(&entry->getSource());
+    if (!compileAction)
+      continue;
+
+    ArrayRef<Action *> actionInputs = compileAction->getInputs();
+    assert(actionInputs.size() == 1);
+    auto inputFile = cast<InputAction>(actionInputs.front());
+
+    CompileJobAction::InputInfo info;
+    info.previousModTime = entry->getInputModTime();
+    info.status = CompileJobAction::InputInfo::UpToDate;
+    inputs[&inputFile->getInputArg()] = info;
+  }
+
+  std::error_code error;
+  llvm::raw_fd_ostream out(path, error, llvm::sys::fs::F_None);
+  if (out.has_error()) {
+    // FIXME: How should we report this error?
+    out.clear_error();
+    return;
+  }
+
+  auto writeTimeValue = [](llvm::raw_ostream &out, llvm::sys::TimeValue time) {
+    out << "[" << time.seconds() << ", " << time.nanoseconds() << "]";
+  };
+
+  out << "version: \"" << llvm::yaml::escape(version::getSwiftFullVersion())
+      << "\"\n";
+  out << "options: \"" << llvm::yaml::escape(argsHash) << "\"\n";
+  out << "build_time: ";
+  writeTimeValue(out, buildTime);
+  out << "\n";
+  out << "inputs: \n";
+
+  for (auto &entry : inputs) {
+    out << "\t" << llvm::yaml::escape(entry.first->getValue()) << ": ";
+
+    switch (entry.second.status) {
+    case CompileJobAction::InputInfo::UpToDate:
+      break;
+    case CompileJobAction::InputInfo::NewlyAdded:
+    case CompileJobAction::InputInfo::NeedsCascadingBuild:
+      out << "!dirty ";
+      break;
+    case CompileJobAction::InputInfo::NeedsNonCascadingBuild:
+      out << "!private ";
+      break;
+    }
+
+    writeTimeValue(out, entry.second.previousModTime);
+    out << "\n";
+  }
+}
+
+int Compilation::performJobsInList(ArrayRef<const Job *> Jobs) {
   // Create a TaskQueue for execution.
   std::unique_ptr<TaskQueue> TQ;
   if (SkipTaskExecution)
     TQ.reset(new DummyTaskQueue(NumberOfParallelCommands));
   else
     TQ.reset(new TaskQueue(NumberOfParallelCommands));
+
+  PerformJobsState State;
 
   DependencyGraph<const Job *> DepGraph;
   SmallPtrSet<const Job *, 16> DeferredCommands;
@@ -130,11 +209,7 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
 
   // Perform all inputs to the Jobs in our JobList, and schedule any commands
   // which we know need to execute.
-  for (const Job *Cmd : JL) {
-    int res = performJobsInList(Cmd->getInputs(), State);
-    if (res != 0)
-      return res;
-
+  for (const Job *Cmd : Jobs) {
     if (!getIncrementalBuildEnabled()) {
       scheduleCommandIfNecessaryAndPossible(Cmd);
       continue;
@@ -369,7 +444,7 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
     (void)InitialBlockingCount;
   } else {
     // Make sure we record any files that still need to be rebuilt.
-    for (const Job *Cmd : JL) {
+    for (const Job *Cmd : Jobs) {
       // Skip files that don't use dependency analysis.
       StringRef DependenciesFile =
           Cmd->getOutput().getAdditionalOutputForType(types::TY_SwiftDeps);
@@ -387,6 +462,11 @@ int Compilation::performJobsInList(const JobList &JL, PerformJobsState &State) {
         isCascading = DepGraph.isMarked(Cmd);
       State.UnfinishedCommands.insert({Cmd, isCascading});
     }
+  }
+
+  if (!CompilationRecordPath.empty()) {
+    writeCompilationRecord(CompilationRecordPath, ArgsHash, BuildStartTime,
+                           State);
   }
 
   return Result;
@@ -429,80 +509,11 @@ int Compilation::performSingleCommand(const Job *Cmd) {
   return ExecuteInPlace(ExecPath, argv);
 }
 
-static void writeCompilationRecord(
-    StringRef path,
-    StringRef argsHash,
-    llvm::sys::TimeValue buildTime,
-    const Compilation::PerformJobsState &endState) {
-
-  llvm::SmallDenseMap<const llvm::opt::Arg *, CompileJobAction::InputInfo, 16>
-      inputs;
-
-  for (auto &entry : endState.UnfinishedCommands) {
-    ArrayRef<Action *> actionInputs = entry.first->getSource().getInputs();
-    assert(actionInputs.size() == 1);
-    auto inputFile = cast<InputAction>(actionInputs.front());
-
-    CompileJobAction::InputInfo info;
-    info.previousModTime = entry.first->getInputModTime();
-    info.status = entry.second ?
-        CompileJobAction::InputInfo::NeedsCascadingBuild :
-        CompileJobAction::InputInfo::NeedsNonCascadingBuild;
-    inputs[&inputFile->getInputArg()] = info;
-  }
-
-  for (const Job *entry : endState.FinishedCommands) {
-    const auto *compileAction = dyn_cast<CompileJobAction>(&entry->getSource());
-    if (!compileAction)
-      continue;
-
-    ArrayRef<Action *> actionInputs = compileAction->getInputs();
-    assert(actionInputs.size() == 1);
-    auto inputFile = cast<InputAction>(actionInputs.front());
-
-    CompileJobAction::InputInfo info;
-    info.previousModTime = entry->getInputModTime();
-    info.status = CompileJobAction::InputInfo::UpToDate;
-    inputs[&inputFile->getInputArg()] = info;
-  }
-
-  std::error_code error;
-  llvm::raw_fd_ostream out(path, error, llvm::sys::fs::F_None);
-  if (out.has_error()) {
-    // FIXME: How should we report this error?
-    out.clear_error();
-    return;
-  }
-
-  auto writeTimeValue = [](llvm::raw_ostream &out, llvm::sys::TimeValue time) {
-    out << "[" << time.seconds() << ", " << time.nanoseconds() << "]";
-  };
-
-  out << "version: \"" << llvm::yaml::escape(version::getSwiftFullVersion())
-      << "\"\n";
-  out << "options: \"" << llvm::yaml::escape(argsHash) << "\"\n";
-  out << "build_time: ";
-  writeTimeValue(out, buildTime);
-  out << "\n";
-  out << "inputs: \n";
-
-  for (auto &entry : inputs) {
-    out << "\t" << llvm::yaml::escape(entry.first->getValue()) << ": ";
-
-    switch (entry.second.status) {
-    case CompileJobAction::InputInfo::UpToDate:
-      break;
-    case CompileJobAction::InputInfo::NewlyAdded:
-    case CompileJobAction::InputInfo::NeedsCascadingBuild:
-      out << "!dirty ";
-      break;
-    case CompileJobAction::InputInfo::NeedsNonCascadingBuild:
-      out << "!private ";
-      break;
-    }
-
-    writeTimeValue(out, entry.second.previousModTime);
-    out << "\n";
+static void flattenJobList(SmallVectorImpl<const Job *> &output,
+                           const JobList &input) {
+  for (const Job *cmd : input) {
+    flattenJobList(output, cmd->getInputs());
+    output.push_back(cmd);
   }
 }
 
@@ -519,13 +530,9 @@ int Compilation::performJobs() {
     Diags.diagnose(SourceLoc(), diag::warning_parallel_execution_not_supported);
   }
 
-  PerformJobsState State;
-  int result = performJobsInList(*Jobs, State);
-
-  if (!CompilationRecordPath.empty()) {
-    writeCompilationRecord(CompilationRecordPath, ArgsHash, BuildStartTime,
-                           State);
-  }
+  SmallVector<const Job *, 32> flattenedJobs;
+  flattenJobList(flattenedJobs, *Jobs);
+  int result = performJobsInList(flattenedJobs);
 
   if (!SaveTemps) {
     // FIXME: Do we want to be deleting temporaries even when a child process

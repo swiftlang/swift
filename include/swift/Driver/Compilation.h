@@ -55,9 +55,6 @@ enum class OutputLevel {
 };
 
 class Compilation {
-public:
-  struct PerformJobsState;
-
 private:
   /// The driver we were created by.
   const Driver &TheDriver;
@@ -191,15 +188,13 @@ public:
   int performJobs();
 
 private:
-  /// \brief Perform the Jobs in \p JL if necessary.
+  /// \brief Perform all jobs.
   ///
-  /// \param JL the list of Jobs to perform
-  /// \param State persistent state that crosses the entire compilation
-  /// or which are known not to need to execute.
+  /// \param Jobs the list of Jobs to perform
   ///
   /// \returns exit code of the first failed Job, or 0 on success. A return
   /// value of -2 indicates that a Job crashed during execution.
-  int performJobsInList(const JobList &JL, PerformJobsState &State);
+  int performJobsInList(ArrayRef<const Job *> Jobs);
 
   /// \brief Performs a single Job by executing in place, if possible.
   ///
