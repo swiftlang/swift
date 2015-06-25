@@ -1147,9 +1147,8 @@ public:
 /// left-over inactive, active and failed constraints.)
 /// This class does not tune its diagnostics for a specific expression kind,
 /// for that, you'll want to use an instance of the FailureDiagnosis class.
-class GeneralFailureDiagnosis {
-
-protected:
+class FailureDiagnosis :public ASTVisitor<FailureDiagnosis, /*exprresult*/bool>{
+  friend class ASTVisitor<FailureDiagnosis, /*exprresult*/bool>;
   
   Expr *expr = nullptr;
   ConstraintSystem *CS = nullptr;
@@ -1168,7 +1167,8 @@ protected:
   
 public:
   
-  GeneralFailureDiagnosis(Expr *expr, ConstraintSystem *CS);
+  FailureDiagnosis(Expr *expr, ConstraintSystem *CS);
+     
   /// Attempt to diagnose a failure without taking into account the specific
   /// kind of expression that could not be type checked.
   bool diagnoseGeneralFailure();
@@ -1178,8 +1178,17 @@ public:
   /// context-free manner.
   Type getTypeOfIndependentSubExpression(Expr *subExpr);
   
-protected:
-  
+  /// Attempt to diagnose a specific failure from the info we've collected from
+  /// the failed constraint system.
+  bool diagnoseFailure();
+
+  /// When an assignment to an expression is detected and the destination is
+  /// invalid, emit a detailed error about the condition.
+  static void diagnoseAssignmentFailure(Expr *dest, Type destTy,
+                                        SourceLoc equalLoc,
+                                        ConstraintSystem &CS);
+
+private:
   /// Attempt to produce a diagnostic for a mismatch between an expression's
   /// type and its assumed contextual type.
   bool diagnoseContextualConversionError();
@@ -1195,33 +1204,7 @@ protected:
   /// Produce a diagnostic for a general conversion failure (irrespective of the
   /// exact expression kind).
   bool diagnoseGeneralConversionFailure();
-};
-  
-/// When a specific constraint system failure cannot be ascertained, this class
-/// can be used to deduce the cause of the failure and produce a suitable
-/// diagnostic by examining the expression in question along with the remnants
-/// of the failed constraint system.
-class FailureDiagnosis :
-    public GeneralFailureDiagnosis,
-    public ASTVisitor<FailureDiagnosis, /*exprresult*/bool> {
-
-      friend class ASTVisitor<FailureDiagnosis, /*exprresult*/bool>;
-public:
-  FailureDiagnosis(Expr *expr, ConstraintSystem *cs) :
-      GeneralFailureDiagnosis(expr, cs) {}
-  
-  /// Attempt to diagnose a specific failure from the info we've collected from
-  /// the failed constraint system.
-  bool diagnoseFailure();
-
-  /// When an assignment to an expression is detected and the destination is
-  /// invalid, emit a detailed error about the condition.
-  static void diagnoseAssignmentFailure(Expr *dest, Type destTy,
-                                        SourceLoc equalLoc,
-                                        ConstraintSystem &CS);
-
-private:
-  
+     
   /// Given a set of parameter lists from an overload group, and a list of
   /// arguments, emit a diagnostic indicating any partially matching overloads.
   void suggestPotentialOverloads(const StringRef functionName,

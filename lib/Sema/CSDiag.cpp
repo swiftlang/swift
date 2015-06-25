@@ -1418,8 +1418,7 @@ static std::string getTypeListString(SmallVectorImpl<Identifier> &names,
   return typeList;
 }
 
-GeneralFailureDiagnosis::
-GeneralFailureDiagnosis(Expr *expr, ConstraintSystem *cs)
+FailureDiagnosis::FailureDiagnosis(Expr *expr, ConstraintSystem *cs)
   : expr(expr), CS(cs) {
   assert(expr && CS);
   
@@ -1523,7 +1522,7 @@ GeneralFailureDiagnosis(Expr *expr, ConstraintSystem *cs)
   }
 }
 
-bool GeneralFailureDiagnosis::diagnoseGeneralValueMemberFailure() {
+bool FailureDiagnosis::diagnoseGeneralValueMemberFailure() {
   
   if (valueMemberConstraint) {
     auto memberName = valueMemberConstraint->getMember().getBaseName();
@@ -1538,7 +1537,7 @@ bool GeneralFailureDiagnosis::diagnoseGeneralValueMemberFailure() {
   return false;
 }
 
-bool GeneralFailureDiagnosis::diagnoseGeneralOverloadFailure() {
+bool FailureDiagnosis::diagnoseGeneralOverloadFailure() {
   
   // If this is a return expression with available conversion constraints,
   // we can produce a better diagnostic by pointing out the return expression
@@ -1581,7 +1580,7 @@ bool GeneralFailureDiagnosis::diagnoseGeneralOverloadFailure() {
   return false;
 }
 
-bool GeneralFailureDiagnosis::diagnoseGeneralConversionFailure() {
+bool FailureDiagnosis::diagnoseGeneralConversionFailure() {
   
   // Otherwise, if we have a conversion constraint, use that as the basis for
   // the diagnostic.
@@ -1688,14 +1687,14 @@ bool GeneralFailureDiagnosis::diagnoseGeneralConversionFailure() {
   return false;
 }
 
-bool GeneralFailureDiagnosis::diagnoseGeneralFailure() {
+bool FailureDiagnosis::diagnoseGeneralFailure() {
   
   return diagnoseGeneralValueMemberFailure() ||
          diagnoseGeneralOverloadFailure() ||
          diagnoseGeneralConversionFailure();
 }
 
-Type GeneralFailureDiagnosis::getTypeOfIndependentSubExpression(Expr *subExpr) {
+Type FailureDiagnosis::getTypeOfIndependentSubExpression(Expr *subExpr) {
   Type resultType = subExpr->getType();
 
   // Track if this sub-expression is currently being diagnosed.
@@ -1737,7 +1736,7 @@ Type GeneralFailureDiagnosis::getTypeOfIndependentSubExpression(Expr *subExpr) {
   return resultType;
 }
 
-bool GeneralFailureDiagnosis::diagnoseContextualConversionError() {
+bool FailureDiagnosis::diagnoseContextualConversionError() {
   
   TypeBase *contextualType = CS->getConversionType(expr);
   
