@@ -255,7 +255,13 @@ static_assert(offsetof(MagicMirror, MirrorWitness) ==
               "MagicMirror layout does not match existential container");
   
 // -- Build an Any from an arbitrary value unowned-referenced by a mirror.
+
+// We intentionally use a non-POD return type with these entry points to give
+// them an indirect return ABI for compatibility with Swift.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wreturn-type-c-linkage"
   
+
 extern "C"
 AnyReturn swift_MagicMirrorData_value(HeapObject *owner,
                                       const OpaqueValue *value,
@@ -289,6 +295,8 @@ AnyReturn swift_MagicMirrorData_objcValue(HeapObject *owner,
   return AnyReturn(result);
 }
 #endif
+
+#pragma clang diagnostic pop
 
 extern "C"
 void swift_MagicMirrorData_summary(const Metadata *T, String *result) {

@@ -37,7 +37,11 @@ struct MirrorReturn {
   ~MirrorReturn() { }
 };
 
-  
+// We intentionally use a non-POD return type with these entry points to give
+// them an indirect return ABI for compatibility with Swift.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wreturn-type-c-linkage"
+
 /// func reflect<T>(x: T) -> Mirror
 ///
 /// Produce a mirror for any value. If the value's type conforms to _Reflectable,
@@ -55,5 +59,7 @@ swift_reflectAny(OpaqueValue *value, const Metadata *T);
 extern "C" MirrorReturn
 swift_unsafeReflectAny(HeapObject *owner,
                        const OpaqueValue *value, const Metadata *T);
-  
+
+#pragma clang diagnostic pop
+
 }
