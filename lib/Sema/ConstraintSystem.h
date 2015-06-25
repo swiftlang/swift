@@ -26,7 +26,7 @@
 #include "OverloadChoice.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/OptionSet.h"
-#include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTVisitor.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeCheckerDebugConsumer.h"
@@ -1195,23 +1195,17 @@ protected:
   /// Produce a diagnostic for a general conversion failure (irrespective of the
   /// exact expression kind).
   bool diagnoseGeneralConversionFailure();
-  
-  // By default, diagnose all failures as "general" failures. To tailor a
-  // diagnostic for a specific expression kind, override the appropriate
-  // diagnosis method in the FailureDiagnosis class.
-#define EXPR(ID, PARENT) \
-  bool diagnoseFailureFor##ID##Expr() { \
-    return diagnoseGeneralFailure(); \
-  }
-#include "swift/AST/ExprNodes.def"
 };
   
 /// When a specific constraint system failure cannot be ascertained, this class
 /// can be used to deduce the cause of the failure and produce a suitable
 /// diagnostic by examining the expression in question along with the remnants
 /// of the failed constraint system.
-class FailureDiagnosis : public GeneralFailureDiagnosis {
+class FailureDiagnosis :
+    public GeneralFailureDiagnosis,
+    public ASTVisitor<FailureDiagnosis, /*exprresult*/bool> {
 
+      friend class ASTVisitor<FailureDiagnosis, /*exprresult*/bool>;
 public:
   FailureDiagnosis(Expr *expr, ConstraintSystem *cs) :
       GeneralFailureDiagnosis(expr, cs) {}
@@ -1235,34 +1229,43 @@ private:
                                  const SmallVectorImpl<Type> &paramLists,
                                  const SmallVectorImpl<Type> &argTypes);
   
+  bool visitExpr(Expr *E) {
+    return diagnoseGeneralFailure();
+  }
+      
   /// Diagnose a specific kind of application expression.
-  bool diagnoseFailureForBinaryExpr();
-  bool diagnoseFailureForPrefixUnaryExpr();
-  bool diagnoseFailureForPostfixUnaryExpr();
-  bool diagnoseFailureForUnaryExpr();
-  bool diagnoseFailureForParenExpr();
-  bool diagnoseFailureForSubscriptExpr();
+  bool visitBinaryExpr(BinaryExpr *BE);
+  bool visitUnaryExpr(ApplyExpr *AE);
+  bool visitPrefixUnaryExpr(PrefixUnaryExpr *PUE) {
+    return visitUnaryExpr(PUE);
+  }
+  bool visitPostfixUnaryExpr(PostfixUnaryExpr *PUE) {
+    return visitUnaryExpr(PUE);
+  }
+      
+  bool visitParenExpr(ParenExpr *PE);
+  bool visitSubscriptExpr(SubscriptExpr *SE);
   
   /// Diagnose a failed function, method or initializer application expression.
-  bool diagnoseFailureForCallExpr();
+  bool visitCallExpr(CallExpr *CE);
   
   /// Diagnose a failed assignment expression, with special attention paid to
   /// assignments to immutable values.
-  bool diagnoseFailureForAssignExpr();
+  bool visitAssignExpr(AssignExpr *AE);
   
   /// Diagnose the specific case of addressing an immutable value, or one
   /// without a setter.
-  bool diagnoseFailureForInOutExpr();
+  bool visitInOutExpr(InOutExpr *IOE);
 
   /// Diagnose a failed coerce expression, considering the possibility that it
   /// should be a forced downcast instead.
-  bool diagnoseFailureForCoerceExpr();
+  bool visitCoerceExpr(CoerceExpr *CE);
 
   /// Diagnose a failed forced downcast expr.
-  bool diagnoseFailureForForcedCheckedCastExpr();
+  bool visitForcedCheckedCastExpr(ForcedCheckedCastExpr *FCCE);
   
   /// Diagnose a failed tuple expression, by examining its element expressions.
-  bool diagnoseFailureForTupleExpr();
+  bool visitTupleExpr(TupleExpr *TE);
 };
 
 /// An intrusive, doubly-linked list of constraints.

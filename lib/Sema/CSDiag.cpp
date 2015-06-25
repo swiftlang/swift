@@ -2051,15 +2051,12 @@ void FailureDiagnosis::diagnoseAssignmentFailure(Expr *dest, Type destTy,
 }
 
 
-bool FailureDiagnosis::diagnoseFailureForBinaryExpr() {
-  assert(expr->getKind() == ExprKind::Binary);
-  
+bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
+  // FIXME: seems weird to do this before looking at arguments.
   if (diagnoseContextualConversionError())
     return true;
   
   CleanupIllFormedExpressionRAII cleanup(*CS, expr);
-  
-  auto binop = cast<BinaryExpr>(expr);
   
   auto argExpr = cast<TupleExpr>(binop->getArg());
   auto argTuple = getTypeOfIndependentSubExpression(argExpr)->
@@ -2150,7 +2147,7 @@ bool FailureDiagnosis::diagnoseFailureForBinaryExpr() {
   return true;
 }
 
-bool FailureDiagnosis::diagnoseFailureForUnaryExpr() {
+bool FailureDiagnosis::visitUnaryExpr(ApplyExpr *applyExpr) {
   assert(expr->getKind() == ExprKind::PostfixUnary ||
          expr->getKind() == ExprKind::PrefixUnary);
   
@@ -2159,7 +2156,6 @@ bool FailureDiagnosis::diagnoseFailureForUnaryExpr() {
   
   CleanupIllFormedExpressionRAII cleanup(*CS, expr);
   
-  auto applyExpr = cast<ApplyExpr>(expr);
   auto argExpr = applyExpr->getArg();
   auto argType = getTypeOfIndependentSubExpression(argExpr);
   
@@ -2222,21 +2218,11 @@ bool FailureDiagnosis::diagnoseFailureForUnaryExpr() {
   return true;
 }
 
-bool FailureDiagnosis::diagnoseFailureForPrefixUnaryExpr() {
-  return diagnoseFailureForUnaryExpr();
-}
-
-bool FailureDiagnosis::diagnoseFailureForPostfixUnaryExpr() {
-  return diagnoseFailureForUnaryExpr();
-}
-
-bool FailureDiagnosis::diagnoseFailureForParenExpr() {
-  auto parenExpr = cast<ParenExpr>(expr);
-
+bool FailureDiagnosis::visitParenExpr(ParenExpr *PE) {
   // Usually, the problem is that the subexpr of the parenexpr is invalid or
   // bogus.  Type check it independently to try to figure out how and diagnose
   // it if so.
-  auto indexType = getTypeOfIndependentSubExpression(parenExpr->getSubExpr());
+  auto indexType = getTypeOfIndependentSubExpression(PE->getSubExpr());
   if (isErrorTypeKind(indexType))
     return true;
 
@@ -2246,16 +2232,13 @@ bool FailureDiagnosis::diagnoseFailureForParenExpr() {
 }
 
 
-bool FailureDiagnosis::diagnoseFailureForSubscriptExpr() {
-  assert(expr->getKind() == ExprKind::Subscript ||
-         expr->getKind() == ExprKind::PrefixUnary);
-  
+bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *subscriptExpr) {
+  // FIXME: Doesn't seem right, check arguments first.
   if (diagnoseContextualConversionError())
     return true;
   
   CleanupIllFormedExpressionRAII cleanup(*CS, expr);
   
-  auto subscriptExpr = cast<SubscriptExpr>(expr);
   auto indexExpr = subscriptExpr->getIndex();
   auto baseExpr = subscriptExpr->getBase();
   
@@ -2289,8 +2272,7 @@ bool FailureDiagnosis::diagnoseFailureForSubscriptExpr() {
   return true;
 }
 
-bool FailureDiagnosis::diagnoseFailureForCallExpr() {
-  assert(expr->getKind() == ExprKind::Call);
+bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
 
   // If there are multiple available overloads to a call expression that
   // didn't have one of the expected attributes below, we may have recorded
@@ -2313,7 +2295,6 @@ bool FailureDiagnosis::diagnoseFailureForCallExpr() {
   
   CleanupIllFormedExpressionRAII cleanup(*CS, expr);
   
-  auto callExpr = cast<CallExpr>(expr);
   auto fnExpr = callExpr->getFn();
   auto argExpr = callExpr->getArg();
   
@@ -2498,12 +2479,8 @@ bool FailureDiagnosis::diagnoseFailureForCallExpr() {
   return true;
 }
 
-bool FailureDiagnosis::diagnoseFailureForAssignExpr() {
-  assert(expr->getKind() == ExprKind::Assign);
-  
+bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
   CleanupIllFormedExpressionRAII cleanup(*CS, expr);
-  
-  auto assignExpr = cast<AssignExpr>(expr);
   auto destExpr = assignExpr->getDest();
   auto srcExpr = assignExpr->getSrc();
   
@@ -2529,12 +2506,8 @@ bool FailureDiagnosis::diagnoseFailureForAssignExpr() {
   return true;
 }
 
-bool FailureDiagnosis::diagnoseFailureForInOutExpr() {
-  assert(expr->getKind() == ExprKind::InOut);
-  
+bool FailureDiagnosis::visitInOutExpr(InOutExpr *inoutExpr) {
   CleanupIllFormedExpressionRAII cleanup(*CS, expr);
-  
-  auto inoutExpr = cast<InOutExpr>(expr);
   auto addressedExpr = inoutExpr->getSubExpr();
 
   auto subExprType = getTypeOfIndependentSubExpression(addressedExpr);
@@ -2551,9 +2524,8 @@ bool FailureDiagnosis::diagnoseFailureForInOutExpr() {
   return diagnoseGeneralFailure();
 }
 
-bool FailureDiagnosis::diagnoseFailureForCoerceExpr() {
+bool FailureDiagnosis::visitCoerceExpr(CoerceExpr *coerceExpr) {
   CleanupIllFormedExpressionRAII cleanup(*CS, expr);
-  CoerceExpr *coerceExpr = cast<CoerceExpr>(expr);
 
   Expr *subExpr = coerceExpr->getSubExpr();
   Type subType = getTypeOfIndependentSubExpression(subExpr);
@@ -2583,10 +2555,10 @@ bool FailureDiagnosis::diagnoseFailureForCoerceExpr() {
   return diagnoseGeneralFailure();
 }
 
-bool FailureDiagnosis::diagnoseFailureForForcedCheckedCastExpr() {
+bool FailureDiagnosis::
+visitForcedCheckedCastExpr(ForcedCheckedCastExpr *castExpr) {
   assert(expr->getKind() == ExprKind::ForcedCheckedCast);
   CleanupIllFormedExpressionRAII cleanup(*CS, expr);
-  ForcedCheckedCastExpr *castExpr = dyn_cast<ForcedCheckedCastExpr>(expr);
 
   Expr *subExpr = castExpr->getSubExpr();
   Type subType = getTypeOfIndependentSubExpression(subExpr);
@@ -2616,11 +2588,9 @@ bool FailureDiagnosis::diagnoseFailureForForcedCheckedCastExpr() {
   return diagnoseGeneralFailure();
 }
 
-bool FailureDiagnosis::diagnoseFailureForTupleExpr() {
+bool FailureDiagnosis::visitTupleExpr(TupleExpr *tupleExpr) {
   assert(expr->getKind() == ExprKind::Tuple);
   
-  auto tupleExpr = cast<TupleExpr>(expr);
-
   // Stop at the first failed sub-expression.
   for (auto elt : tupleExpr->getElements()) {
     if (getTypeOfIndependentSubExpression(elt)->getAs<ErrorType>())
@@ -2636,20 +2606,10 @@ bool FailureDiagnosis::diagnoseFailure() {
   // If a bridging conversion slips through, treat it as ambiguous.
   if (bridgeToObjCConstraint) {
     CS->TC.diagnose(expr->getLoc(), diag::type_of_expression_is_ambiguous);
-    
     return true;
   }
   
-  // Move on to expr-specific diagnostics.
-  switch(expr->getKind()) {
-      
-#define EXPR(ID, PARENT) \
-  case ExprKind::ID: return diagnoseFailureFor##ID##Expr();
-#include "swift/AST/ExprNodes.def"
-
-  }
-  
-  llvm_unreachable("unrecognized expr kind");
+  return visit(expr);
 }
 
 /// Given a specific expression and the remnants of the failed constraint
