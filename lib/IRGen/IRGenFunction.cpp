@@ -150,7 +150,7 @@ void IRGenFunction::emitDeallocBoxCall(llvm::Value *box,
                                        llvm::Attribute::NoUnwind);
 
   llvm::CallInst *call =
-    Builder.CreateCall2(IGM.getDeallocBoxFn(), box, typeMetadata);
+    Builder.CreateCall(IGM.getDeallocBoxFn(), {box, typeMetadata});
   call->setCallingConv(IGM.RuntimeCC);
   call->setAttributes(attrs);
 }
@@ -162,7 +162,7 @@ void IRGenFunction::emitDeallocBox2Call(llvm::Value *box,
                                        llvm::Attribute::NoUnwind);
 
   llvm::CallInst *call =
-    Builder.CreateCall2(IGM.getDeallocBox2Fn(), box, typeMetadata);
+    Builder.CreateCall(IGM.getDeallocBox2Fn(), {box, typeMetadata});
   call->setCallingConv(IGM.RuntimeCC);
   call->setAttributes(attrs);
 }
@@ -177,7 +177,7 @@ llvm::Value *IRGenFunction::emitProjectBox2Call(llvm::Value *box,
                                        llvm::AttributeSet::FunctionIndex,
                                        attrKinds);
   llvm::CallInst *call =
-    Builder.CreateCall2(IGM.getProjectBox2Fn(), box, typeMetadata);
+    Builder.CreateCall(IGM.getProjectBox2Fn(), {box, typeMetadata});
   call->setCallingConv(IGM.RuntimeCC);
   call->setAttributes(attrs);
   return call;

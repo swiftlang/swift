@@ -155,8 +155,8 @@ void irgen::emitDeallocateHeapObject(IRGenFunction &IGF,
                                      llvm::Value *alignMask) {
   // FIXME: We should call a fast deallocator for heap objects with
   // known size.
-  IGF.Builder.CreateCall3(IGF.IGM.getDeallocObjectFn(),
-                          object, size, alignMask);
+  IGF.Builder.CreateCall(IGF.IGM.getDeallocObjectFn(),
+                         {object, size, alignMask});
 }
 
 void irgen::emitDeallocateClassInstance(IRGenFunction &IGF,
@@ -165,8 +165,8 @@ void irgen::emitDeallocateClassInstance(IRGenFunction &IGF,
                                         llvm::Value *alignMask) {
   // FIXME: We should call a fast deallocator for heap objects with
   // known size.
-  IGF.Builder.CreateCall3(IGF.IGM.getDeallocClassInstanceFn(),
-                          object, size, alignMask);
+  IGF.Builder.CreateCall(IGF.IGM.getDeallocClassInstanceFn(),
+                         {object, size, alignMask});
 }
 
 /// Create the destructor function for a layout.
@@ -259,7 +259,8 @@ static llvm::Constant *buildPrivateMetadata(IRGenModule &IGM,
     llvm::ConstantInt::get(IGM.Int32Ty, 0),
     llvm::ConstantInt::get(IGM.Int32Ty, 2)
   };
-  return llvm::ConstantExpr::getInBoundsGetElementPtr(var, indices);
+  return llvm::ConstantExpr::getInBoundsGetElementPtr(
+      /*Ty=*/nullptr, var, indices);
 }
 
 llvm::Constant *HeapLayout::getPrivateMetadata(IRGenModule &IGM) const {
@@ -713,7 +714,7 @@ static void emitCopyLikeCall(IRGenFunction &IGF,
   }
   
   // Emit the call.
-  llvm::CallInst *call = IGF.Builder.CreateCall2(fn, dest, src);
+  llvm::CallInst *call = IGF.Builder.CreateCall(fn, {dest, src});
   call->setCallingConv(IGF.IGM.RuntimeCC);
   call->setDoesNotThrow();  
 }
@@ -765,7 +766,7 @@ static void emitStoreWeakLikeCall(IRGenFunction &IGF,
   }
 
   // Emit the call.
-  llvm::CallInst *call = IGF.Builder.CreateCall2(fn, addr, value);
+  llvm::CallInst *call = IGF.Builder.CreateCall(fn, {addr, value});
   call->setCallingConv(IGF.IGM.RuntimeCC);
   call->setDoesNotThrow();
 }

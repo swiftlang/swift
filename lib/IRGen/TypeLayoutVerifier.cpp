@@ -111,8 +111,8 @@ irgen::emitTypeLayoutVerifier(IRGenFunction &IGF,
       auto msg
         = IGF.IGM.getAddrOfGlobalString(description.str());
       
-      IGF.Builder.CreateCall5(verifierFn, metadata,
-                              runtimePtr, staticPtr, count, msg);
+      IGF.Builder.CreateCall(
+          verifierFn, {metadata, runtimePtr, staticPtr, count, msg});
     };
 
     // Check that the fixed layout matches the runtime layout.

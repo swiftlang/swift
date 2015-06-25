@@ -131,7 +131,7 @@ public:
       
       llvm::Value *protoRef = IGM.getAddrOfObjCProtocolRef(p, NotForDefinition);
       auto proto = Builder.CreateLoad(protoRef, IGM.getPointerAlignment());
-      Builder.CreateCall2(class_addProtocol, classMetadata, proto);
+      Builder.CreateCall(class_addProtocol, {classMetadata, proto});
     }
   }
   
@@ -317,7 +317,7 @@ public:
                                    IGM.ProtocolDescriptorPtrTy->getPointerTo());
         auto parent = Builder.CreateLoad(parentRef,
                                              IGM.getPointerAlignment());
-        Builder.CreateCall2(protocol_addProtocol, NewProto, parent);
+        Builder.CreateCall(protocol_addProtocol, {NewProto, parent});
       }
     }
     
@@ -559,7 +559,7 @@ void IRGenModule::emitRuntimeRegistration() {
     llvm::BasicBlock::iterator IP = EntryBB->getFirstInsertionPt();
     IRBuilder Builder(getLLVMContext());
     Builder.llvm::IRBuilderBase::SetInsertPoint(EntryBB, IP);
-    Builder.CreateCall(RegistrationFunction);
+    Builder.CreateCall(RegistrationFunction, {});
   }
   
   IRGenFunction RegIGF(*this, RegistrationFunction);
@@ -606,7 +606,7 @@ void IRGenModule::emitRuntimeRegistration() {
     }
     
     for (llvm::WeakVH &ObjCClass : ObjCClasses) {
-      RegIGF.Builder.CreateCall(getInstantiateObjCClassFn(), ObjCClass);
+      RegIGF.Builder.CreateCall(getInstantiateObjCClassFn(), {ObjCClass});
     }
       
     for (ExtensionDecl *ext : ObjCCategoryDecls) {
@@ -622,15 +622,16 @@ void IRGenModule::emitRuntimeRegistration() {
       llvm::ConstantInt::get(Int32Ty, 0),
       llvm::ConstantInt::get(Int32Ty, 0),
     };
-    auto begin = llvm::ConstantExpr::getGetElementPtr(conformances,
-                                                      beginIndices);
+    auto begin = llvm::ConstantExpr::getGetElementPtr(
+        /*Ty=*/nullptr, conformances, beginIndices);
     llvm::Constant *endIndices[] = {
       llvm::ConstantInt::get(Int32Ty, 0),
       llvm::ConstantInt::get(Int32Ty, ProtocolConformanceRecords.size()),
     };
-    auto end = llvm::ConstantExpr::getGetElementPtr(conformances, endIndices);
+    auto end = llvm::ConstantExpr::getGetElementPtr(
+        /*Ty=*/nullptr, conformances, endIndices);
     
-    RegIGF.Builder.CreateCall2(getRegisterProtocolConformancesFn(), begin, end);
+    RegIGF.Builder.CreateCall(getRegisterProtocolConformancesFn(), {begin, end});
   }
   RegIGF.Builder.CreateRetVoid();
 }
@@ -933,7 +934,7 @@ void IRGenModule::emitTypeVerifier() {
     llvm::BasicBlock::iterator IP = EntryBB->getFirstInsertionPt();
     IRBuilder Builder(getLLVMContext());
     Builder.llvm::IRBuilderBase::SetInsertPoint(EntryBB, IP);
-    Builder.CreateCall(VerifierFunction);
+    Builder.CreateCall(VerifierFunction, {});
   }
 
   IRGenFunction VerifierIGF(*this, VerifierFunction);
@@ -1737,7 +1738,8 @@ llvm::Constant *IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
       llvm::ConstantInt::get(Int32Ty, 0),
       llvm::ConstantInt::get(Int32Ty, adjustmentIndex)
     };
-    addr = llvm::ConstantExpr::getInBoundsGetElementPtr(addr, indices);
+    addr = llvm::ConstantExpr::getInBoundsGetElementPtr(
+        /*Ty=*/nullptr, addr, indices);
   }
 
   return addr;
@@ -1768,8 +1770,8 @@ IRGenModule::getAddrOfForeignTypeMetadataCandidate(CanType type) {
   // Apply the offset.
   llvm::Constant *result = var;
   result = llvm::ConstantExpr::getBitCast(result, Int8PtrTy);
-  result = llvm::ConstantExpr::getInBoundsGetElementPtr(result,
-                                                        getSize(addressPoint));
+  result = llvm::ConstantExpr::getInBoundsGetElementPtr(
+      Int8Ty, result, getSize(addressPoint));
   result = llvm::ConstantExpr::getBitCast(result, TypeMetadataPtrTy);
 
   // Only remember the offset.
@@ -2086,7 +2088,8 @@ llvm::Constant *IRGenModule::getAddrOfGlobalString(StringRef data) {
   // Drill down to make an i8*.
   auto zero = llvm::ConstantInt::get(SizeTy, 0);
   llvm::Constant *indices[] = { zero, zero };
-  auto address = llvm::ConstantExpr::getInBoundsGetElementPtr(global, indices);
+  auto address = llvm::ConstantExpr::getInBoundsGetElementPtr(
+      global->getValueType(), global, indices);
 
   // Cache and return.
   entry = address;
@@ -2126,7 +2129,8 @@ llvm::Constant *IRGenModule::getAddrOfGlobalUTF16String(StringRef utf8) {
   // Drill down to make an i16*.
   auto zero = llvm::ConstantInt::get(SizeTy, 0);
   llvm::Constant *indices[] = { zero, zero };
-  auto address = llvm::ConstantExpr::getInBoundsGetElementPtr(global, indices);
+  auto address = llvm::ConstantExpr::getInBoundsGetElementPtr(
+      global->getValueType(), global, indices);
 
   // Cache and return.
   entry = address;

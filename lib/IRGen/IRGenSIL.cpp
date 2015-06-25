@@ -1874,7 +1874,8 @@ static CallEmission getCallEmissionForLoweredValue(IRGenSILFunction &IGF,
       args.add(blockPtr);
 
       // Extract the invocation pointer for blocks.
-      llvm::Value *invokeAddr = IGF.Builder.CreateStructGEP(blockPtr, 3);
+      llvm::Value *invokeAddr = IGF.Builder.CreateStructGEP(
+          /*Ty=*/nullptr, blockPtr, 3);
       calleeFn = IGF.Builder.CreateLoad(invokeAddr, IGF.IGM.getPointerAlignment());
       calleeData = nullptr;
       break;
@@ -2832,8 +2833,8 @@ void IRGenSILFunction::visitDynamicMethodBranchInst(DynamicMethodBranchInst *i){
   if (object->getType() != IGM.ObjCPtrTy)
     object = Builder.CreateBitCast(object, IGM.ObjCPtrTy);
   llvm::Value *loadSel = emitObjCSelectorRefLoad(selector);
-  llvm::CallInst *call = Builder.CreateCall2(IGM.getObjCRespondsToSelectorFn(),
-                                             object, loadSel);
+  llvm::CallInst *call = Builder.CreateCall(IGM.getObjCRespondsToSelectorFn(),
+                                            {object, loadSel});
   call->setDoesNotThrow();
 
   // FIXME: Assume (probably safely) that the hasMethodBB has only us as a
@@ -3549,7 +3550,7 @@ static void emitTrapAndUndefValue(IRGenSILFunction &IGF,
   IGF.Builder.emitBlock(failBB);
   llvm::Function *trapIntrinsic = llvm::Intrinsic::getDeclaration(
     &IGF.IGM.Module, llvm::Intrinsic::ID::trap);
-  IGF.Builder.CreateCall(trapIntrinsic);
+  IGF.Builder.CreateCall(trapIntrinsic, {});
   IGF.Builder.CreateUnreachable();
 
   llvm::BasicBlock *contBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
@@ -4446,7 +4447,7 @@ void IRGenSILFunction::visitCondFailInst(swift::CondFailInst *i) {
   Builder.emitBlock(failBB);
   llvm::Function *trapIntrinsic =
       llvm::Intrinsic::getDeclaration(&IGM.Module, llvm::Intrinsic::ID::trap);
-  Builder.CreateCall(trapIntrinsic);
+  Builder.CreateCall(trapIntrinsic, {});
   Builder.CreateUnreachable();
   Builder.emitBlock(contBB);
   FailBBs.push_back(failBB);

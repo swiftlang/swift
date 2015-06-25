@@ -2138,7 +2138,7 @@ if (Builtin.ID == BuiltinValueKind::id) { \
     
     // Emit the runtime "once" call.
     auto call
-      = IGF.Builder.CreateCall2(IGF.IGM.getOnceFn(), PredPtr, FnCode);
+      = IGF.Builder.CreateCall(IGF.IGM.getOnceFn(), {PredPtr, FnCode});
     call->setCallingConv(IGF.IGM.RuntimeCC);
     
     // If we emitted the "done" check inline, join the branches.

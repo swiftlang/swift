@@ -532,8 +532,8 @@ namespace {
                         SILType T) const {
       auto objPtrTy = dest.getAddress()->getType();
       auto fn = getAssignExistentialsFunction(IGF.IGM, objPtrTy, getLayout());
-      auto call = IGF.Builder.CreateCall2(fn, dest.getAddress(),
-                                          src.getAddress());
+      auto call = IGF.Builder.CreateCall(
+          fn, {dest.getAddress(), src.getAddress()});
       call->setCallingConv(IGF.IGM.RuntimeCC);
       call->setDoesNotThrow();
     }
@@ -4862,9 +4862,9 @@ Address irgen::emitBoxedExistentialProjection(IRGenFunction &IGF,
                                  IGF.IGM.getPointerAlignment(),
                                  "project_error_out");
   
-  IGF.Builder.CreateCall3(IGF.IGM.getGetErrorValueFn(), box,
-                          scratch.getAddress(),
-                          out.getAddress());
+  IGF.Builder.CreateCall(IGF.IGM.getGetErrorValueFn(), {box,
+                         scratch.getAddress(),
+                         out.getAddress()});
   // Load the 'out' values.
   auto &openedTI = IGF.getTypeInfoForLowered(openedArchetype);
   auto projectedPtrAddr = IGF.Builder.CreateStructGEP(out, 0, Size(0));
@@ -4905,8 +4905,8 @@ Address irgen::emitBoxedExistentialContainerAllocation(IRGenFunction &IGF,
                                          entry, conformances[0]);
   
   // Call the runtime to allocate the box.
-  auto result = IGF.Builder.CreateCall2(IGF.IGM.getAllocErrorFn(),
-                                        srcMetadata, witness);
+  auto result = IGF.Builder.CreateCall(IGF.IGM.getAllocErrorFn(),
+                                       {srcMetadata, witness});
   
   // Extract the box and value address from the result.
   auto box = IGF.Builder.CreateExtractValue(result, 0);
@@ -4930,7 +4930,7 @@ void irgen::emitBoxedExistentialContainerDeallocation(IRGenFunction &IGF,
   auto box = container.claimNext();
   auto srcMetadata = IGF.emitTypeMetadataRef(valueType);
   
-  IGF.Builder.CreateCall2(IGF.IGM.getDeallocErrorFn(), box, srcMetadata);
+  IGF.Builder.CreateCall(IGF.IGM.getDeallocErrorFn(), {box, srcMetadata});
 }
 
 /// "Deinitialize" an existential container whose contained value is allocated
@@ -5095,8 +5095,8 @@ llvm::Value *irgen::emitDynamicTypeOfOpaqueArchetype(IRGenFunction &IGF,
   // Acquire the archetype's static metadata.
   llvm::Value *metadata = IGF.getLocalTypeData(archetype,
                                                LocalTypeData::forMetatype());
-  return IGF.Builder.CreateCall2(IGF.IGM.getGetDynamicTypeFn(),
-                                 addr.getAddress(), metadata);
+  return IGF.Builder.CreateCall(IGF.IGM.getGetDynamicTypeFn(),
+                                {addr.getAddress(), metadata});
 }
 
 void irgen::emitMetatypeOfOpaqueExistential(IRGenFunction &IGF, Address addr,
@@ -5113,8 +5113,8 @@ void irgen::emitMetatypeOfOpaqueExistential(IRGenFunction &IGF, Address addr,
   Address buffer = existLayout.projectExistentialBuffer(IGF, addr);
   llvm::Value *object = emitProjectBufferCall(IGF, metadata, buffer);
   llvm::Value *dynamicType =
-    IGF.Builder.CreateCall2(IGF.IGM.getGetDynamicTypeFn(),
-                            object, metadata);
+    IGF.Builder.CreateCall(IGF.IGM.getGetDynamicTypeFn(),
+                           {object, metadata});
   out.add(dynamicType);
 
   // Get the witness tables.

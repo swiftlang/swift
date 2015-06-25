@@ -363,8 +363,8 @@ static llvm::Value *emitNominalMetadataRef(IRGenFunction &IGF,
     IGF.Builder.CreateBitCast(argsBuffer.getAddress(), IGF.IGM.Int8PtrTy);
 
   // Make the call.
-  auto result = IGF.Builder.CreateCall2(IGF.IGM.getGetGenericMetadataFn(),
-                                        metadata, arguments);
+  auto result = IGF.Builder.CreateCall(IGF.IGM.getGetGenericMetadataFn(),
+                                       {metadata, arguments});
   result->setDoesNotThrow();
   result->addAttribute(llvm::AttributeSet::FunctionIndex,
                        llvm::Attribute::ReadOnly);
@@ -578,8 +578,8 @@ namespace {
           llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0),
           llvm::ConstantInt::get(IGF.IGM.Int32Ty, 1)
         };
-        return llvm::ConstantExpr::getInBoundsGetElementPtr(fullMetadata,
-                                                            indices);
+        return llvm::ConstantExpr::getInBoundsGetElementPtr(
+            /*Ty=*/nullptr, fullMetadata, indices);
       }
 
       case 1:
@@ -744,10 +744,9 @@ namespace {
             extractAndMarkInOut(inputTuple.getElementType(0))
           : extractAndMarkInOut(type.getInput());
 
-          auto call = IGF.Builder.CreateCall3(
+          auto call = IGF.Builder.CreateCall(
                                             IGF.IGM.getGetFunctionMetadata1Fn(),
-                                            flags, arg0,
-                                            resultMetadata);
+                                            {flags, arg0, resultMetadata});
           call->setDoesNotThrow();
           call->setCallingConv(IGF.IGM.RuntimeCC);
           return setLocal(CanType(type), call);
@@ -756,10 +755,9 @@ namespace {
         case 2: {
           auto arg0 = extractAndMarkInOut(inputTuple.getElementType(0));
           auto arg1 = extractAndMarkInOut(inputTuple.getElementType(1));
-          auto call = IGF.Builder.CreateCall4(
+          auto call = IGF.Builder.CreateCall(
                                             IGF.IGM.getGetFunctionMetadata2Fn(),
-                                            flags, arg0, arg1,
-                                            resultMetadata);
+                                            {flags, arg0, arg1, resultMetadata});
           call->setDoesNotThrow();
           call->setCallingConv(IGF.IGM.RuntimeCC);
           return setLocal(CanType(type), call);
@@ -769,10 +767,10 @@ namespace {
           auto arg0 = extractAndMarkInOut(inputTuple.getElementType(0));
           auto arg1 = extractAndMarkInOut(inputTuple.getElementType(1));
           auto arg2 = extractAndMarkInOut(inputTuple.getElementType(2));
-          auto call = IGF.Builder.CreateCall5(
+          auto call = IGF.Builder.CreateCall(
                                             IGF.IGM.getGetFunctionMetadata3Fn(),
-                                            flags, arg0, arg1, arg2,
-                                            resultMetadata);
+                                            {flags, arg0, arg1, arg2,
+                                             resultMetadata});
           call->setDoesNotThrow();
           call->setCallingConv(IGF.IGM.RuntimeCC);
           return setLocal(CanType(type), call);
@@ -869,9 +867,9 @@ namespace {
         ++index;
       }
       
-      auto call = IGF.Builder.CreateCall2(IGF.IGM.getGetExistentialMetadataFn(),
-                                        IGF.IGM.getSize(Size(protocols.size())),
-                                        descriptorArray.getAddress());
+      auto call = IGF.Builder.CreateCall(IGF.IGM.getGetExistentialMetadataFn(),
+                                         {IGF.IGM.getSize(Size(protocols.size())),
+                                          descriptorArray.getAddress()});
       call->setDoesNotThrow();
       call->setCallingConv(IGF.IGM.RuntimeCC);
       return setLocal(type, call);
@@ -1015,7 +1013,7 @@ initialize_super:
   // This function will ensure the initialization is dependency-ordered-before
   // any loads from the base class metadata.
   auto initFn = IGF.IGM.getInitializeSuperclassFn();
-  IGF.Builder.CreateCall2(initFn, classMetadata, superMetadata);
+  IGF.Builder.CreateCall(initFn, {classMetadata, superMetadata});
 }
 
 /// Get or create an accessor function to the given non-dependent type.
@@ -1114,7 +1112,7 @@ static llvm::Value *emitCallToTypeMetadataAccessFunction(IRGenFunction &IGF,
   
   llvm::Constant *accessor =
     getTypeMetadataAccessFunction(IGF.IGM, type, shouldDefine);
-  llvm::CallInst *call = IGF.Builder.CreateCall(accessor);
+  llvm::CallInst *call = IGF.Builder.CreateCall(accessor, {});
   call->setCallingConv(IGF.IGM.RuntimeCC);
   call->setDoesNotAccessMemory();
   call->setDoesNotThrow();
@@ -1177,8 +1175,8 @@ namespace {
           llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0),
           llvm::ConstantInt::get(IGF.IGM.Int32Ty, 1)
         };
-        return llvm::ConstantExpr::getInBoundsGetElementPtr(fullMetadata,
-                                                            indices);
+        return llvm::ConstantExpr::getInBoundsGetElementPtr(
+            /*Ty=*/nullptr, fullMetadata, indices);
       }
 
       case 1:
@@ -1307,8 +1305,8 @@ namespace {
           llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0),
           llvm::ConstantInt::get(IGF.IGM.Int32Ty, 1)
         };
-        return llvm::ConstantExpr::getInBoundsGetElementPtr(fullMetadata,
-                                                            indices);
+        return llvm::ConstantExpr::getInBoundsGetElementPtr(
+            /*Ty=*/nullptr, fullMetadata, indices);
       }
       case MetatypeRepresentation::Thick:
       case MetatypeRepresentation::ObjC:
@@ -2204,8 +2202,8 @@ irgen::emitFieldTypeAccessor(IRGenModule &IGM,
     Size offset = getSizeOfMetadata(IGM, type).getOffsetToEnd();
     vectorPtr = IGF.Builder.CreateBitCast(metadata,
                                           metadataArrayPtrTy->getPointerTo());
-    vectorPtr = IGF.Builder.CreateConstInBoundsGEP1_32(vectorPtr,
-                                            getOffsetInWords(IGM, offset));
+    vectorPtr = IGF.Builder.CreateConstInBoundsGEP1_32(
+        /*Ty=*/nullptr, vectorPtr, getOffsetInWords(IGM, offset));
   }
   
   // First, see if the field type vector has already been populated. This
@@ -2912,8 +2910,8 @@ namespace {
           = llvm::ConstantPointerNull::get(IGF.IGM.ObjCClassPtrTy);
       }
 
-      return IGF.Builder.CreateCall3(IGM.getAllocateGenericClassMetadataFn(),
-                                     metadataPattern, arguments, superMetadata);
+      return IGF.Builder.CreateCall(IGM.getAllocateGenericClassMetadataFn(),
+                                    {metadataPattern, arguments, superMetadata});
     }
     
     void addMetadataFlags() {
@@ -3242,9 +3240,9 @@ namespace {
 
         // Ask the runtime to lay out the class.
         auto numFields = IGF.IGM.getSize(Size(storedProperties.size()));
-        IGF.Builder.CreateCall5(IGF.IGM.getInitClassMetadataUniversalFn(),
-                                metadata, superMetadata, numFields,
-                                firstField.getAddress(), fieldVector);
+        IGF.Builder.CreateCall(IGF.IGM.getInitClassMetadataUniversalFn(),
+                               {metadata, superMetadata, numFields,
+                                firstField.getAddress(), fieldVector});
 
       } else if (IGF.IGM.ObjCInterop) {
         // Register the class with the ObjC runtime.
@@ -3276,12 +3274,12 @@ static void emitObjCClassSymbol(IRGenModule &IGM,
     addrPointOffset,
   };
   auto addressPoint
-    = llvm::ConstantExpr::getGetElementPtr(fullMetadata, gepIndexes);
+    = llvm::ConstantExpr::getGetElementPtr(
+        /*Ty=*/nullptr, fullMetadata, gepIndexes);
   auto addressPointTy = cast<llvm::PointerType>(addressPoint->getType());
   
   // Create the alias.
-  llvm::GlobalAlias::create(addressPointTy->getElementType(),
-                            addressPointTy->getAddressSpace(),
+  llvm::GlobalAlias::create(addressPointTy,
                             fullMetadata->getLinkage(), classSymbol.str(),
                             addressPoint, IGM.getModule());
 }
@@ -3896,7 +3894,7 @@ llvm::Value *irgen::emitClassHeapMetadataRefForMetatype(IRGenFunction &IGF,
 
   // Load the metatype kind.
   auto metatypeKindAddr =
-    Address(IGF.Builder.CreateStructGEP(metatype, 0),
+    Address(IGF.Builder.CreateStructGEP(/*Ty=*/nullptr, metatype, 0),
             IGF.IGM.getPointerAlignment());
   auto metatypeKind =
     IGF.Builder.CreateLoad(metatypeKindAddr, metatype->getName() + ".kind");
@@ -4117,8 +4115,8 @@ namespace {
     llvm::Value *emitAllocateMetadata(IRGenFunction &IGF,
                                       llvm::Value *metadataPattern,
                                       llvm::Value *arguments) {
-      return IGF.Builder.CreateCall2(IGM.getAllocateGenericValueMetadataFn(),
-                                     metadataPattern, arguments);
+      return IGF.Builder.CreateCall(IGM.getAllocateGenericValueMetadataFn(),
+                                    {metadataPattern, arguments});
     }
 
     void addValueWitnessTable() {
@@ -4246,8 +4244,8 @@ public:
   llvm::Value *emitAllocateMetadata(IRGenFunction &IGF,
                                     llvm::Value *metadataPattern,
                                     llvm::Value *arguments) {
-    return IGF.Builder.CreateCall2(IGM.getAllocateGenericValueMetadataFn(),
-                                   metadataPattern, arguments);
+    return IGF.Builder.CreateCall(IGM.getAllocateGenericValueMetadataFn(),
+                                  {metadataPattern, arguments});
   }
   
   void addValueWitnessTable() {

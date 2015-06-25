@@ -168,7 +168,9 @@ public:
   using IRBuilderBase::CreateStructGEP;
   Address CreateStructGEP(Address address, unsigned index, Size size,
                           const llvm::Twine &name = "") {
-    llvm::Value *addr = CreateStructGEP(address.getAddress(), index, name);
+    llvm::Value *addr = CreateStructGEP(
+        address.getType()->getElementType(), address.getAddress(),
+        index, name);
     return Address(addr, address.getAlignment().alignmentAtOffset(size));
   }
 
@@ -176,7 +178,8 @@ public:
   /// N elements past it.  The type is not changed.
   Address CreateConstArrayGEP(Address base, unsigned index, Size eltSize,
                               const llvm::Twine &name = "") {
-    auto addr = CreateConstInBoundsGEP1_32(base.getAddress(), index, name);
+    auto addr = CreateConstInBoundsGEP1_32(
+        base.getType()->getElementType(), base.getAddress(), index, name);
     return Address(addr,
                    base.getAlignment().alignmentAtOffset(eltSize * index));
   }
@@ -184,9 +187,9 @@ public:
   /// Given an i8*, GEP to N bytes past it.
   Address CreateConstByteArrayGEP(Address base, Size offset,
                                   const llvm::Twine &name = "") {
-    auto addr = CreateConstInBoundsGEP1_32(base.getAddress(),
-                                           offset.getValue(),
-                                           name);
+    auto addr = CreateConstInBoundsGEP1_32(
+        base.getType()->getElementType(), base.getAddress(), offset.getValue(),
+        name);
     return Address(addr, base.getAlignment().alignmentAtOffset(offset));
   }
 

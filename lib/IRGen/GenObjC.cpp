@@ -156,7 +156,7 @@ llvm::Value *irgen::emitObjCRetainAutoreleasedReturnValue(IRGenFunction &IGF,
                                                           llvm::Value *value) {
   // Call the inline-assembly marker if we need one.
   if (auto marker = IGF.IGM.getObjCRetainAutoreleasedReturnValueMarker()) {
-    IGF.Builder.CreateCall(marker);
+    IGF.Builder.CreateCall(marker, {});
   }
 
   auto fn = IGF.IGM.getObjCRetainAutoreleasedReturnValueFn();
@@ -303,7 +303,8 @@ llvm::Constant *IRGenModule::getAddrOfObjCMethodName(StringRef selector) {
   // Drill down to make an i8*.
   auto zero = llvm::ConstantInt::get(SizeTy, 0);
   llvm::Constant *indices[] = { zero, zero };
-  auto address = llvm::ConstantExpr::getInBoundsGetElementPtr(global, indices);
+  auto address = llvm::ConstantExpr::getInBoundsGetElementPtr(
+      init->getType(), global, indices);
 
   // Cache and return.
   entry = address;

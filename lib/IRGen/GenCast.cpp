@@ -195,7 +195,7 @@ llvm::Value *irgen::emitClassDowncast(IRGenFunction &IGF, llvm::Value *from,
 
   // Call the (unconditional) dynamic cast.
   auto call
-    = IGF.Builder.CreateCall2(castFn, from, metadataRef);
+    = IGF.Builder.CreateCall(castFn, {from, metadataRef});
   // FIXME: Eventually, we may want to throw.
   call->setDoesNotThrow();
 
@@ -250,7 +250,7 @@ void irgen::emitMetatypeDowncast(IRGenFunction &IGF,
     llvm_unreachable("not implemented");
   }
 
-  auto call = IGF.Builder.CreateCall2(castFn, metatype, toMetadata);
+  auto call = IGF.Builder.CreateCall(castFn, {metatype, toMetadata});
   call->setDoesNotThrow();
   ex.add(call);
 }
@@ -335,7 +335,7 @@ static llvm::Function *emitExistentialScalarCastFn(IRGenModule &IGM,
   // Look up each protocol conformance we want.
   for (unsigned i = 0; i < numProtocols; ++i) {
     auto proto = args.claimNext();
-    auto witness = IGF.Builder.CreateCall2(conformsToProtocol, ref, proto);
+    auto witness = IGF.Builder.CreateCall(conformsToProtocol, {ref, proto});
     auto isNull = IGF.Builder.CreateICmpEQ(witness,
                      llvm::ConstantPointerNull::get(IGM.WitnessTablePtrTy));
     auto contBB = IGF.createBasicBlock("cont");
@@ -360,7 +360,7 @@ static llvm::Function *emitExistentialScalarCastFn(IRGenModule &IGM,
   case CheckedCastMode::Unconditional: {
     llvm::Function *trapIntrinsic = llvm::Intrinsic::getDeclaration(&IGM.Module,
                                                     llvm::Intrinsic::ID::trap);
-    IGF.Builder.CreateCall(trapIntrinsic);
+    IGF.Builder.CreateCall(trapIntrinsic, {});
     IGF.Builder.CreateUnreachable();
     break;
   }
@@ -555,9 +555,10 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
     }
 
     
-    objcCast = IGF.Builder.CreateCall3(castFn, objcCastObject,
-                                       IGF.IGM.getSize(Size(objcProtos.size())),
-                                       protoRefsBuf.getAddress());
+    objcCast = IGF.Builder.CreateCall(
+        castFn,
+        {objcCastObject, IGF.IGM.getSize(Size(objcProtos.size())),
+         protoRefsBuf.getAddress()});
     resultValue = IGF.Builder.CreateBitCast(objcCast, resultType);
   }
 

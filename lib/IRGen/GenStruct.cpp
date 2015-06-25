@@ -426,9 +426,9 @@ namespace {
       // Ask the runtime to lay out the struct.
       auto numFields = llvm::ConstantInt::get(IGF.IGM.SizeTy,
                                               storedProperties.size());
-      IGF.Builder.CreateCall4(IGF.IGM.getInitStructMetadataUniversalFn(),
-                              numFields, fields.getAddress(),
-                              fieldVector, vwtable);
+      IGF.Builder.CreateCall(IGF.IGM.getInitStructMetadataUniversalFn(),
+                             {numFields, fields.getAddress(),
+                              fieldVector, vwtable});
     }
   };
 

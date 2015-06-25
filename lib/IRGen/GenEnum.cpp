@@ -1563,9 +1563,9 @@ namespace {
       }
 
       // Ask the runtime to find the case index.
-      auto caseIndex = IGF.Builder.CreateCall3(
+      auto caseIndex = IGF.Builder.CreateCall(
                             IGF.IGM.getGetEnumCaseSinglePayloadFn(),
-                            opaqueAddr, payloadMetadata, numEmptyCases);
+                            {opaqueAddr, payloadMetadata, numEmptyCases});
 
       // Switch on the index.
       auto *swi = IGF.Builder.CreateSwitch(caseIndex, defaultDest);
@@ -1810,9 +1810,9 @@ namespace {
                                                           IGF.IGM.OpaquePtrTy);
       llvm::Value *numCases = llvm::ConstantInt::get(IGF.IGM.Int32Ty,
                                                  ElementsWithNoPayload.size());
-      llvm::Value *which = IGF.Builder.CreateCall3(
+      llvm::Value *which = IGF.Builder.CreateCall(
                                        IGF.IGM.getGetEnumCaseSinglePayloadFn(),
-                                       opaqueAddr, metadata, numCases);
+                                       {opaqueAddr, metadata, numCases});
 
       // If it's -1 then we have the payload.
       llvm::Value *hasPayload = IGF.Builder.CreateICmpEQ(which,
@@ -2082,11 +2082,11 @@ namespace {
       llvm::Value *opaqueAddr = IGF.Builder.CreateBitCast(dest.getAddress(),
                                                           IGF.IGM.OpaquePtrTy);
       llvm::Value *metadata = emitPayloadMetadataForLayout(IGF, T);
-      IGF.Builder.CreateCall4(IGF.IGM.getStoreEnumTagSinglePayloadFn(),
-                              opaqueAddr, metadata,
+      IGF.Builder.CreateCall(IGF.IGM.getStoreEnumTagSinglePayloadFn(),
+                             {opaqueAddr, metadata,
                               llvm::ConstantInt::getSigned(IGF.IGM.Int32Ty, -1),
                               llvm::ConstantInt::get(IGF.IGM.Int32Ty,
-                                                 ElementsWithNoPayload.size()));
+                                                 ElementsWithNoPayload.size())});
     }
 
     /// Emit an reassignment sequence from an enum at one address to another.
@@ -2293,8 +2293,8 @@ namespace {
           = IGF.Builder.CreateBitCast(enumAddr.getAddress(),
                                       IGF.IGM.OpaquePtrTy);
 
-        IGF.Builder.CreateCall4(IGF.IGM.getStoreEnumTagSinglePayloadFn(),
-                                opaqueAddr, payload, caseIndex, numEmptyCases);
+        IGF.Builder.CreateCall(IGF.IGM.getStoreEnumTagSinglePayloadFn(),
+                               {opaqueAddr, payload, caseIndex, numEmptyCases});
 
         return;
       }
@@ -2333,9 +2333,9 @@ namespace {
       auto emptyCasesVal = llvm::ConstantInt::get(IGF.IGM.Int32Ty,
                                                   ElementsWithNoPayload.size());
 
-      IGF.Builder.CreateCall3(
+      IGF.Builder.CreateCall(
                     IGF.IGM.getInitEnumValueWitnessTableSinglePayloadFn(),
-                    vwtable, payloadMetadata, emptyCasesVal);
+                    {vwtable, payloadMetadata, emptyCasesVal});
     }
 
     /// \group Extra inhabitants
@@ -2758,8 +2758,8 @@ namespace {
     loadDynamicTag(IRGenFunction &IGF, Address addr, SILType T) const {
       addr = IGF.Builder.CreateBitCast(addr, IGF.IGM.OpaquePtrTy);
       auto metadata = IGF.emitTypeMetadataRef(T.getSwiftRValueType());
-      auto call = IGF.Builder.CreateCall2(IGF.IGM.getGetEnumCaseMultiPayloadFn(),
-                                          addr.getAddress(), metadata);
+      auto call = IGF.Builder.CreateCall(IGF.IGM.getGetEnumCaseMultiPayloadFn(),
+                                         {addr.getAddress(), metadata});
       call->setDoesNotThrow();
       call->addAttribute(llvm::AttributeSet::FunctionIndex,
                          llvm::Attribute::ReadOnly);
@@ -3715,9 +3715,9 @@ namespace {
       auto indexVal = llvm::ConstantInt::get(IGF.IGM.Int32Ty, index);
       auto metadata = IGF.emitTypeMetadataRef(T.getSwiftRValueType());
       
-      auto call = IGF.Builder.CreateCall3(
+      auto call = IGF.Builder.CreateCall(
                                      IGF.IGM.getStoreEnumTagMultiPayloadFn(),
-                                     enumAddr.getAddress(), metadata, indexVal);
+                                     {enumAddr.getAddress(), metadata, indexVal});
       call->setDoesNotThrow();
     }
 
@@ -3804,9 +3804,9 @@ namespace {
       auto numPayloadsVal = llvm::ConstantInt::get(IGF.IGM.SizeTy,
                                                    ElementsWithPayload.size());
 
-      IGF.Builder.CreateCall4(IGF.IGM.getInitEnumMetadataMultiPayloadFn(),
-                              vwtable, metadata, numPayloadsVal,
-                              payloadMetadataArray);
+      IGF.Builder.CreateCall(IGF.IGM.getInitEnumMetadataMultiPayloadFn(),
+                             {vwtable, metadata, numPayloadsVal,
+                              payloadMetadataArray});
     }
 
     /// \group Extra inhabitants

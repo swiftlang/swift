@@ -1039,8 +1039,8 @@ static bool optimizeReturn3(ReturnInst *TheReturn) {
   Function &F = *TheReturn->getParent()->getParent();
   Constant *Cache = 0;  // Not utilized.
   Value *LibCall = getRetainAndReturnThree(F,RetainedObject->getType(),Cache);
-  CallInst *NR = B.CreateCall4(LibCall, RetainedObject, RetVals[0],RetVals[1],
-                               RetVals[2]);
+  CallInst *NR = B.CreateCall(
+      LibCall, {RetainedObject, RetVals[0],RetVals[1], RetVals[2]});
   NR->setTailCall(true);
 
   // The return type of the libcall is (i64,i64,i64).  Since at least one of

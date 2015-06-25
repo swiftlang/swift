@@ -1541,7 +1541,7 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
       // FIXME 1: Do something more clever based on the decl's mangled name.
       // FIXME 2: Clang submodules are not handled here.
       StringRef ModuleName = "ObjectiveC";
-      if (auto *OwningModule = ClangDecl->getOwningModule())
+      if (auto *OwningModule = ClangDecl->getImportedOwningModule())
         ModuleName = OwningModule->getTopLevelModuleName();
 
       auto ModuleFile = getOrCreateFile(L.Filename);

@@ -112,29 +112,32 @@ static bool performLLVM(IRGenOptions &Opts, DiagnosticEngine &Diags,
                         llvm::Module *Module,
                         llvm::TargetMachine *TargetMachine,
                         StringRef OutputFilename) {
-  std::unique_ptr<raw_fd_ostream> RawOS;
-  formatted_raw_ostream FormattedOS;
+  llvm::SmallString<0> Buffer;
+  std::unique_ptr<raw_pwrite_stream> RawOS;
   if (!OutputFilename.empty()) {
     // Try to open the output file.  Clobbering an existing file is fine.
     // Open in binary mode if we're doing binary output.
     llvm::sys::fs::OpenFlags OSFlags = llvm::sys::fs::F_None;
     std::error_code EC;
-    RawOS.reset(new raw_fd_ostream(OutputFilename, EC, OSFlags));
-    if (RawOS->has_error() || EC) {
+    auto *FDOS = new raw_fd_ostream(OutputFilename, EC, OSFlags);
+    RawOS.reset(FDOS);
+    if (FDOS->has_error() || EC) {
       if (DiagMutex)
         DiagMutex->lock();
       Diags.diagnose(SourceLoc(), diag::error_opening_output,
                      OutputFilename, EC.message());
       if (DiagMutex)
         DiagMutex->unlock();
-      RawOS->clear_error();
+      FDOS->clear_error();
       return true;
     }
 
     // Most output kinds want a formatted output stream.  It's not clear
     // why writing an object file does.
-    if (Opts.OutputKind != IRGenOutputKind::LLVMBitcode)
-      FormattedOS.setStream(*RawOS, formatted_raw_ostream::PRESERVE_STREAM);
+    //if (Opts.OutputKind != IRGenOutputKind::LLVMBitcode)
+    //  FormattedOS.setStream(*RawOS, formatted_raw_ostream::PRESERVE_STREAM);
+  } else {
+    RawOS.reset(new raw_svector_ostream(Buffer));
   }
 
   // Set up a pipeline.
@@ -209,7 +212,7 @@ static bool performLLVM(IRGenOptions &Opts, DiagnosticEngine &Diags,
   case IRGenOutputKind::Module:
     break;
   case IRGenOutputKind::LLVMAssembly:
-    EmitPasses.add(createPrintModulePass(FormattedOS));
+    EmitPasses.add(createPrintModulePass(*RawOS));
     break;
   case IRGenOutputKind::LLVMBitcode:
     EmitPasses.add(createBitcodeWriterPass(*RawOS));
@@ -231,7 +234,7 @@ static bool performLLVM(IRGenOptions &Opts, DiagnosticEngine &Diags,
     if (Opts.Optimize)
       EmitPasses.add(createObjCARCContractPass());
 
-    bool fail = TargetMachine->addPassesToEmitFile(EmitPasses, FormattedOS,
+    bool fail = TargetMachine->addPassesToEmitFile(EmitPasses, *RawOS,
                                                    FileType, !Opts.Verify);
     if (fail) {
       if (DiagMutex)

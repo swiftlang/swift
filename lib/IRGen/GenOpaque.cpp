@@ -270,7 +270,8 @@ llvm::Value *irgen::emitInvariantLoadOfOpaqueWitness(IRGenFunction &IGF,
   // GEP to the appropriate index, avoiding spurious IR in the trivial case.
   llvm::Value *slot = table;
   if (index.getValue() != 0)
-    slot = IGF.Builder.CreateConstInBoundsGEP1_32(table, index.getValue());
+    slot = IGF.Builder.CreateConstInBoundsGEP1_32(
+        /*Ty=*/nullptr, table, index.getValue());
 
   auto witness =
     IGF.Builder.CreateLoad(Address(slot, IGF.IGM.getPointerAlignment()));
@@ -364,8 +365,9 @@ llvm::Value *irgen::emitInitializeBufferWithCopyOfBufferCall(IRGenFunction &IGF,
   llvm::Value *copyFn = emitLoadOfValueWitnessFromMetadata(IGF, metadata,
                              ValueWitness::InitializeBufferWithCopyOfBuffer);
   llvm::CallInst *call =
-    IGF.Builder.CreateCall3(copyFn, destBuffer.getAddress(),
-                            srcBuffer.getAddress(), metadata);
+    IGF.Builder.CreateCall(
+        copyFn,
+        {destBuffer.getAddress(), srcBuffer.getAddress(), metadata});
   call->setCallingConv(IGF.IGM.RuntimeCC);
   setHelperAttributesForAggResult(call, false);
 
@@ -380,8 +382,9 @@ llvm::Value *irgen::emitInitializeBufferWithTakeOfBufferCall(IRGenFunction &IGF,
   llvm::Value *copyFn = emitLoadOfValueWitnessFromMetadata(IGF, metadata,
                              ValueWitness::InitializeBufferWithTakeOfBuffer);
   llvm::CallInst *call =
-    IGF.Builder.CreateCall3(copyFn, destBuffer.getAddress(),
-                            srcBuffer.getAddress(), metadata);
+    IGF.Builder.CreateCall(
+        copyFn,
+        {destBuffer.getAddress(), srcBuffer.getAddress(), metadata});
   call->setCallingConv(IGF.IGM.RuntimeCC);
   setHelperAttributesForAggResult(call, false);
 
@@ -396,7 +399,7 @@ llvm::Value *irgen::emitAllocateBufferCall(IRGenFunction &IGF,
   llvm::Value *allocateFn
     = IGF.emitValueWitnessForLayout(T, ValueWitness::AllocateBuffer);
   llvm::CallInst *result =
-    IGF.Builder.CreateCall2(allocateFn, buffer.getAddress(), metadata);
+    IGF.Builder.CreateCall(allocateFn, {buffer.getAddress(), metadata});
   result->setCallingConv(IGF.IGM.RuntimeCC);
   result->setDoesNotThrow();
   return result;
@@ -409,7 +412,7 @@ llvm::Value *irgen::emitProjectBufferCall(IRGenFunction &IGF,
   llvm::Value *projectFn = emitLoadOfValueWitnessFromMetadata(IGF, metadata,
                                             ValueWitness::ProjectBuffer);
   llvm::CallInst *result =
-    IGF.Builder.CreateCall2(projectFn, buffer.getAddress(), metadata);
+    IGF.Builder.CreateCall(projectFn, {buffer.getAddress(), metadata});
   result->setCallingConv(IGF.IGM.RuntimeCC);
   result->setDoesNotThrow();
   return result;
@@ -424,7 +427,7 @@ void irgen::emitInitializeWithCopyCall(IRGenFunction &IGF,
   llvm::Value *copyFn = IGF.emitValueWitnessForLayout(T,
                                          ValueWitness::InitializeWithCopy);
   llvm::CallInst *call =
-    IGF.Builder.CreateCall3(copyFn, destObject, srcObject, metadata);
+    IGF.Builder.CreateCall(copyFn, {destObject, srcObject, metadata});
   call->setCallingConv(IGF.IGM.RuntimeCC);
   call->setDoesNotThrow();
 }
@@ -437,7 +440,7 @@ llvm::Value *irgen::emitInitializeBufferWithTakeCall(IRGenFunction &IGF,
   llvm::Value *copyFn = IGF.emitValueWitnessForLayout(T,
                                        ValueWitness::InitializeBufferWithTake);
   llvm::CallInst *call =
-    IGF.Builder.CreateCall3(copyFn, destObject, srcObject, metadata);
+    IGF.Builder.CreateCall(copyFn, {destObject, srcObject, metadata});
   call->setCallingConv(IGF.IGM.RuntimeCC);
   call->setDoesNotThrow();
   return call;
@@ -451,7 +454,7 @@ llvm::Value *irgen::emitInitializeBufferWithCopyCall(IRGenFunction &IGF,
   llvm::Value *copyFn = IGF.emitValueWitnessForLayout(T,
                                        ValueWitness::InitializeBufferWithCopy);
   llvm::CallInst *call =
-    IGF.Builder.CreateCall3(copyFn, destObject, srcObject, metadata);
+    IGF.Builder.CreateCall(copyFn, {destObject, srcObject, metadata});
   call->setCallingConv(IGF.IGM.RuntimeCC);
   call->setDoesNotThrow();
   return call;
@@ -468,7 +471,7 @@ void irgen::emitInitializeArrayWithCopyCall(IRGenFunction &IGF,
                                          ValueWitness::InitializeArrayWithCopy);
 
   llvm::CallInst *call =
-    IGF.Builder.CreateCall4(copyFn, destObject, srcObject, count, metadata);
+    IGF.Builder.CreateCall(copyFn, {destObject, srcObject, count, metadata});
   call->setCallingConv(IGF.IGM.RuntimeCC);
   call->setDoesNotThrow();
 }
@@ -482,7 +485,7 @@ void irgen::emitInitializeWithTakeCall(IRGenFunction &IGF,
   llvm::Value *copyFn = IGF.emitValueWitnessForLayout(T,
                                             ValueWitness::InitializeWithTake);
   llvm::CallInst *call =
-    IGF.Builder.CreateCall3(copyFn, destObject, srcObject, metadata);
+    IGF.Builder.CreateCall(copyFn, {destObject, srcObject, metadata});
   call->setCallingConv(IGF.IGM.RuntimeCC);
   call->setDoesNotThrow();
 }
@@ -497,7 +500,7 @@ void irgen::emitInitializeArrayWithTakeFrontToBackCall(IRGenFunction &IGF,
   llvm::Value *copyFn = IGF.emitValueWitnessForLayout(T,
                              ValueWitness::InitializeArrayWithTakeFrontToBack);
   llvm::CallInst *call =
-    IGF.Builder.CreateCall4(copyFn, destObject, srcObject, count, metadata);
+    IGF.Builder.CreateCall(copyFn, {destObject, srcObject, count, metadata});
   call->setCallingConv(IGF.IGM.RuntimeCC);
   call->setDoesNotThrow();
 }
@@ -512,7 +515,7 @@ void irgen::emitInitializeArrayWithTakeBackToFrontCall(IRGenFunction &IGF,
   llvm::Value *copyFn = IGF.emitValueWitnessForLayout(T,
                              ValueWitness::InitializeArrayWithTakeBackToFront);
   llvm::CallInst *call =
-    IGF.Builder.CreateCall4(copyFn, destObject, srcObject, count, metadata);
+    IGF.Builder.CreateCall(copyFn, {destObject, srcObject, count, metadata});
   call->setCallingConv(IGF.IGM.RuntimeCC);
   call->setDoesNotThrow();
 }
@@ -525,7 +528,7 @@ void irgen::emitAssignWithCopyCall(IRGenFunction &IGF,
   llvm::Value *copyFn = emitLoadOfValueWitnessFromMetadata(IGF, metadata,
                                          ValueWitness::AssignWithCopy);
   llvm::CallInst *call =
-    IGF.Builder.CreateCall3(copyFn, destObject, srcObject, metadata);
+    IGF.Builder.CreateCall(copyFn, {destObject, srcObject, metadata});
   call->setCallingConv(IGF.IGM.RuntimeCC);
   call->setDoesNotThrow();
 }
@@ -537,7 +540,7 @@ void irgen::emitAssignWithCopyCall(IRGenFunction &IGF,
   llvm::Value *copyFn = IGF.emitValueWitnessForLayout(T,
                                          ValueWitness::AssignWithCopy);
   llvm::CallInst *call =
-    IGF.Builder.CreateCall3(copyFn, destObject, srcObject, metadata);
+    IGF.Builder.CreateCall(copyFn, {destObject, srcObject, metadata});
   call->setCallingConv(IGF.IGM.RuntimeCC);
   call->setDoesNotThrow();
 }
@@ -551,7 +554,7 @@ void irgen::emitAssignWithTakeCall(IRGenFunction &IGF,
   llvm::Value *copyFn = IGF.emitValueWitnessForLayout(T,
                                          ValueWitness::AssignWithTake);
   llvm::CallInst *call =
-    IGF.Builder.CreateCall3(copyFn, destObject, srcObject, metadata);
+    IGF.Builder.CreateCall(copyFn, {destObject, srcObject, metadata});
   call->setCallingConv(IGF.IGM.RuntimeCC);
   call->setDoesNotThrow();
 }
@@ -563,7 +566,7 @@ void irgen::emitDestroyCall(IRGenFunction &IGF,
   auto metadata = IGF.emitTypeMetadataRefForLayout(T);
   llvm::Value *fn = IGF.emitValueWitnessForLayout(T,
                                    ValueWitness::Destroy);
-  llvm::CallInst *call = IGF.Builder.CreateCall2(fn, object, metadata);
+  llvm::CallInst *call = IGF.Builder.CreateCall(fn, {object, metadata});
   call->setCallingConv(IGF.IGM.RuntimeCC);
   setHelperAttributes(call);
 }
@@ -576,7 +579,7 @@ void irgen::emitDestroyArrayCall(IRGenFunction &IGF,
   auto metadata = IGF.emitTypeMetadataRefForLayout(T);
   llvm::Value *fn = IGF.emitValueWitnessForLayout(T,
                                    ValueWitness::DestroyArray);
-  llvm::CallInst *call = IGF.Builder.CreateCall3(fn, object, count, metadata);
+  llvm::CallInst *call = IGF.Builder.CreateCall(fn, {object, count, metadata});
   call->setCallingConv(IGF.IGM.RuntimeCC);
   setHelperAttributes(call);
 }
@@ -588,7 +591,7 @@ void irgen::emitDestroyBufferCall(IRGenFunction &IGF,
   auto fn = emitLoadOfValueWitnessFromMetadata(IGF, metadata,
                                    ValueWitness::DestroyBuffer);
   llvm::CallInst *call =
-    IGF.Builder.CreateCall2(fn, buffer.getAddress(), metadata);
+    IGF.Builder.CreateCall(fn, {buffer.getAddress(), metadata});
   call->setCallingConv(IGF.IGM.RuntimeCC);
   setHelperAttributes(call);
 }
@@ -600,7 +603,7 @@ void irgen::emitDeallocateBufferCall(IRGenFunction &IGF,
   auto fn = emitLoadOfValueWitnessFromMetadata(IGF, metadata,
                                    ValueWitness::DeallocateBuffer);
   llvm::CallInst *call =
-    IGF.Builder.CreateCall2(fn, buffer.getAddress(), metadata);
+    IGF.Builder.CreateCall(fn, {buffer.getAddress(), metadata});
   call->setCallingConv(IGF.IGM.RuntimeCC);
   setHelperAttributes(call);
 }
@@ -611,7 +614,7 @@ void irgen::emitDeallocateBufferCall(IRGenFunction &IGF,
   llvm::Value *fn = IGF.emitValueWitnessForLayout(T,
                                    ValueWitness::DeallocateBuffer);
   llvm::CallInst *call =
-    IGF.Builder.CreateCall2(fn, buffer.getAddress(), metadata);
+    IGF.Builder.CreateCall(fn, {buffer.getAddress(), metadata});
   call->setCallingConv(IGF.IGM.RuntimeCC);
   setHelperAttributes(call);
 }
@@ -626,7 +629,7 @@ llvm::Value *irgen::emitGetExtraInhabitantIndexCall(IRGenFunction &IGF,
                                          ValueWitness::GetExtraInhabitantIndex);
   
   llvm::CallInst *call =
-    IGF.Builder.CreateCall2(fn, srcObject, metadata);
+    IGF.Builder.CreateCall(fn, {srcObject, metadata});
   call->setCallingConv(IGF.IGM.RuntimeCC);
   setHelperAttributes(call);
   return call;
@@ -642,7 +645,7 @@ llvm::Value *irgen::emitStoreExtraInhabitantCall(IRGenFunction &IGF,
   llvm::Value *fn = IGF.emitValueWitnessForLayout(T,
                                        ValueWitness::StoreExtraInhabitant);
   llvm::CallInst *call =
-    IGF.Builder.CreateCall3(fn, destObject, index, metadata);
+    IGF.Builder.CreateCall(fn, {destObject, index, metadata});
   call->setCallingConv(IGF.IGM.RuntimeCC);
   setHelperAttributes(call);
   return call;
