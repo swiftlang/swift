@@ -625,7 +625,7 @@ InputArgList *Driver::parseArgStrings(ArrayRef<const char *> Args) {
         ExcludedFlagsBitmask);
 
   } else {
-    ArgList = getOpts().ParseArgs(Args.begin(), Args.end(),
+    ArgList = getOpts().ParseArgs(Args,
                                   MissingArgIndex, MissingArgCount,
                                   IncludedFlagsBitmask,
                                   ExcludedFlagsBitmask);

@@ -64,7 +64,7 @@ public:
     unsigned MissingIndex;
     unsigned MissingCount;
     ParsedArgs.reset(
-        Table->ParseArgs(Args.begin(), Args.end(), MissingIndex, MissingCount,
+        Table->ParseArgs(Args, MissingIndex, MissingCount,
                          AutolinkExtractOption));
     if (MissingCount) {
       Diags.diagnose(SourceLoc(), diag::error_missing_arg_value,

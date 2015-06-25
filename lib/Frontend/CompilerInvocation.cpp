@@ -1098,8 +1098,7 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
   unsigned MissingIndex;
   unsigned MissingCount;
   ParsedArgs.reset(
-      Table->ParseArgs(Args.begin(), Args.end(), MissingIndex, MissingCount,
-                       FrontendOption));
+      Table->ParseArgs(Args, MissingIndex, MissingCount, FrontendOption));
   if (MissingCount) {
     Diags.diagnose(SourceLoc(), diag::error_missing_arg_value,
                    ParsedArgs->getArgString(MissingIndex), MissingCount);
