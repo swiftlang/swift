@@ -78,13 +78,8 @@ entry:
 sil @rc_box_b : $@convention(thin) () -> () {
 entry:
   // TODO: Should reuse metadata
-<<<<<<< HEAD
   // CHECK-32: [[BOX:%.*]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* {{.*}} [[NATIVE_RC_METADATA]], {{.*}} [[WORD]] 16, [[WORD]] 3)
   // CHECK-64: [[BOX:%.*]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* {{.*}} [[NATIVE_RC_METADATA]], {{.*}} [[WORD]] 24, [[WORD]] 7)
-=======
-  // CHECK-32: [[BOX:%.*]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* {{.*}} [[NATIVE_RC_METADATA:@metadata[0-9.]*]], {{.*}} [[WORD]] 16, [[WORD]] 3)
-  // CHECK-64: [[BOX:%.*]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* {{.*}} [[NATIVE_RC_METADATA:@metadata[0-9.]*]], {{.*}} [[WORD]] 24, [[WORD]] 7)
->>>>>>> 40ec298... Adjust tests for the new scheme of name conflict resolution in LLVM
   %a = alloc_box $D
   // CHECK: bitcast %swift.refcounted** {{%.*}} to %C11typed_boxes1D**
   %b = project_box %a#0 : $@box D
@@ -95,13 +90,8 @@ entry:
 // CHECK-LABEL: define void @unknown_rc_box
 sil @unknown_rc_box : $@convention(thin) () -> () {
 entry:
-<<<<<<< HEAD
-  // CHECK-32: [[BOX:%.*]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* {{.*}} [[UNKNOWN_RC_METADATA:@metadata[0-9]*]], {{.*}} [[WORD]] 16, [[WORD]] 3)
-  // CHECK-64: [[BOX:%.*]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* {{.*}} [[UNKNOWN_RC_METADATA:@metadata[0-9]*]], {{.*}} [[WORD]] 24, [[WORD]] 7)
-=======
-  // CHECK-32: [[BOX:%.*]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* {{.*}} [[NATIVE_RC_METADATA:@metadata[0-9.]*]], {{.*}} [[WORD]] 16, [[WORD]] 3)
-  // CHECK-64: [[BOX:%.*]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* {{.*}} [[NATIVE_RC_METADATA:@metadata[0-9.]*]], {{.*}} [[WORD]] 24, [[WORD]] 7)
->>>>>>> 40ec298... Adjust tests for the new scheme of name conflict resolution in LLVM
+  // CHECK-32: [[BOX:%.*]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* {{.*}} [[UNKNOWN_RC_METADATA:@metadata[0-9.]*]], {{.*}} [[WORD]] 16, [[WORD]] 3)
+  // CHECK-64: [[BOX:%.*]] = call noalias %swift.refcounted* @swift_allocObject(%swift.type* {{.*}} [[UNKNOWN_RC_METADATA:@metadata[0-9.]*]], {{.*}} [[WORD]] 24, [[WORD]] 7)
   %a = alloc_box $Builtin.UnknownObject
   %b = project_box %a#0 : $@box Builtin.UnknownObject
   dealloc_box %a#0 : $@box Builtin.UnknownObject
