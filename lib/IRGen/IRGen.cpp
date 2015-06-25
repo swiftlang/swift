@@ -89,7 +89,6 @@ swift::getIRTargetOptions(IRGenOptions &Opts, ASTContext &Ctx) {
   //   - code model
   // FIXME: We should do this entirely through Clang, for consistency.
   TargetOptions TargetOpts;
-  TargetOpts.NoFramePointerElim = Opts.DisableFPElim;
 
   auto *Clang = static_cast<ClangImporter *>(Ctx.getClangModuleLoader());
   clang::TargetOptions &ClangOpts = Clang->getTargetInfo().getTargetOpts();

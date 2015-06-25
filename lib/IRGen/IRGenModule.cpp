@@ -487,6 +487,13 @@ llvm::AttributeSet IRGenModule::constructInitialAttributes() {
     attrsUpdated = attrsUpdated.addAttribute(LLVMContext,
                      llvm::AttributeSet::FunctionIndex,
                      "no-frame-pointer-elim", "false");
+  } else {
+    attrsUpdated = attrsUpdated.addAttribute(
+        LLVMContext, llvm::AttributeSet::FunctionIndex,
+        "no-frame-pointer-elim", "true");
+    attrsUpdated = attrsUpdated.addAttribute(
+        LLVMContext, llvm::AttributeSet::FunctionIndex,
+        "no-frame-pointer-elim-non-leaf");
   }
 
   // Add target-cpu and target-features if they are non-null.

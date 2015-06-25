@@ -145,5 +145,5 @@ func makeGenericMetatypes() {
 // CHECK:   [[T0:%.*]] = getelementptr inbounds [[BUFFER_T]], [[BUFFER_T]]* [[BUFFER]], i32 0, i32 4
 // CHECK:   store %swift.type* getelementptr {{.*}} @_TMdV17generic_metatypes3Foo {{.*}}, %swift.type** [[T0]]
 
-// CHECK: attributes [[NOUNWIND_READNONE_OPT]] = { nounwind readnone "target-cpu"
+// CHECK: attributes [[NOUNWIND_READNONE_OPT]] = { nounwind readnone "no-frame-pointer-elim"="true" "no-frame-pointer-elim-non-leaf" "target-cpu"
 // CHECK: attributes [[NOUNWIND_READNONE]] = { nounwind readnone }
