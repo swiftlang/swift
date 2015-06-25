@@ -42,6 +42,15 @@ public:
     LinkAll
   };
 
+  /// Representation of optimization modes.
+  enum class SILOptMode: unsigned {
+    NotSet,
+    None,
+    Debug,
+    Optimize,
+    OptimizeUnchecked
+  };
+
   /// Controls how  perform SIL linking.
   LinkingMode LinkMode = LinkNormal;
 
@@ -56,6 +65,9 @@ public:
 
   /// Are we debugging sil serialization.
   bool DebugSerialization = false;
+
+  /// Optimization mode being used.
+  SILOptMode Optimization = SILOptMode::NotSet;
 
   enum AssertConfiguration: unsigned {
     // Used by standard library code to distinguish between a debug and release

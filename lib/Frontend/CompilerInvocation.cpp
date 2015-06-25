@@ -881,18 +881,22 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArg(OPT_O_Group)) {
     if (A->getOption().matches(OPT_Onone)) {
       IRGenOpts.Optimize = false;
+      Opts.Optimization = SILOptions::SILOptMode::None;
     } else if (A->getOption().matches(OPT_Ounchecked)) {
       // Turn on optimizations and remove all runtime checks.
       IRGenOpts.Optimize = true;
+      Opts.Optimization = SILOptions::SILOptMode::OptimizeUnchecked;
       // Removal of cond_fail (overflow on binary operations).
       Opts.RemoveRuntimeAsserts = true;
       Opts.AssertConfig = SILOptions::Fast;
     } else if (A->getOption().matches(OPT_Oplayground)) {
       // For now -Oplayground is equivalent to -Onone.
       IRGenOpts.Optimize = false;
+      Opts.Optimization = SILOptions::SILOptMode::None;
     } else {
       assert(A->getOption().matches(OPT_O));
       IRGenOpts.Optimize = true;
+      Opts.Optimization = SILOptions::SILOptMode::Optimize;
     }
   }
 
