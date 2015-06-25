@@ -1,0 +1,64 @@
+// RUN: %target-sil-opt -inline -verify %s | FileCheck %s
+
+// Check if cloning of init_existential_* works correctly with multiple
+// conformances.
+
+sil_stage canonical
+
+import Builtin
+
+protocol ClassProto1 : class {
+}
+
+protocol ClassProto2 : class {
+}
+
+class MyClass : ClassProto1, ClassProto2 {
+}
+
+protocol Proto1 {
+}
+
+protocol Proto2 {
+}
+
+class MyClass2 : Proto1, Proto2 {
+}
+
+// CHECK-LABEL: sil @test_ref
+sil @test_ref : $@convention(thin) (@guaranteed MyClass) -> () {
+bb0(%0 : $MyClass):
+  %6 = init_existential_ref %0 : $MyClass : $MyClass, $protocol<ClassProto1, ClassProto2>
+  %11 = tuple ()
+  return %11 : $()
+}
+
+// CHECK-LABEL: sil @call_test_ref
+// CHECK: init_existential_ref
+sil @call_test_ref : $@convention(thin) (@guaranteed MyClass) -> () {
+bb0(%0 : $MyClass):
+  %1 = function_ref @test_ref : $@convention(thin) (@guaranteed MyClass) -> ()
+  %3 = apply %1(%0) : $@convention(thin) (@guaranteed MyClass) -> ()
+  return %3 : $()
+}
+
+
+// CHECK-LABEL: sil @test_addr
+sil @test_addr : $@convention(thin) (@out protocol<Proto1, Proto2>, @guaranteed MyClass2) -> () {
+bb0(%0 : $*protocol<Proto1, Proto2>, %1 : $MyClass2):
+  %3 = init_existential_addr %0 : $*protocol<Proto1, Proto2>, $MyClass2
+  store %1 to %3 : $*MyClass2
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK-LABEL: sil @call_test_addr
+// CHECK: init_existential_addr
+sil @call_test_addr : $@convention(thin) (@out protocol<Proto1, Proto2>, @guaranteed MyClass2) -> () {
+bb0(%0 : $*protocol<Proto1, Proto2>, %1 : $MyClass2):
+  %3 = function_ref @test_addr : $@convention(thin) (@out protocol<Proto1, Proto2>, @guaranteed MyClass2) -> ()
+  %5 = apply %3(%0, %1) : $@convention(thin) (@out protocol<Proto1, Proto2>, @guaranteed MyClass2) -> ()
+  %7 = tuple ()
+  return %7 : $()
+}
+
