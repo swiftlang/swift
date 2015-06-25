@@ -41,7 +41,7 @@ protected:
 
   llvm::opt::ArgStringList
   constructArgumentList(const JobAction &JA,
-                        const JobList *Inputs,
+                        ArrayRef<const Job *> Inputs,
                         const CommandOutput *Output,
                         const ActionList &InputActions,
                         const llvm::opt::ArgList &Args,
@@ -61,7 +61,7 @@ protected:
 
   llvm::opt::ArgStringList
   constructArgumentList(const JobAction &JA,
-                        const JobList *Inputs,
+                        ArrayRef<const Job *> Inputs,
                         const CommandOutput *Output,
                         const ActionList &InputActions,
                         const llvm::opt::ArgList &Args,
@@ -100,7 +100,7 @@ public:
 protected:
   llvm::opt::ArgStringList
   constructArgumentList(const JobAction &JA,
-                        const JobList *Inputs,
+                        ArrayRef<const Job *> Inputs,
                         const CommandOutput *Output,
                         const ActionList &InputActions,
                         const llvm::opt::ArgList &Args,
@@ -114,7 +114,7 @@ public:
 protected:
   llvm::opt::ArgStringList
   constructArgumentList(const JobAction &JA,
-                        const JobList *Inputs,
+                        ArrayRef<const Job *> Inputs,
                         const CommandOutput *Output,
                         const ActionList &InputActions,
                         const llvm::opt::ArgList &Args,
@@ -129,7 +129,7 @@ public:
 protected:
   llvm::opt::ArgStringList
   constructArgumentList(const JobAction &JA,
-                        const JobList *Inputs,
+                        ArrayRef<const Job *> Inputs,
                         const CommandOutput *Output,
                         const ActionList &InputActions,
                         const llvm::opt::ArgList &Args,
@@ -148,7 +148,7 @@ public:
 protected:
   llvm::opt::ArgStringList
   constructArgumentList(const JobAction &JA,
-                        const JobList *Inputs,
+                        ArrayRef<const Job *> Inputs,
                         const CommandOutput *Output,
                         const ActionList &InputActions,
                         const llvm::opt::ArgList &Args,
@@ -170,7 +170,7 @@ protected:
 
   llvm::opt::ArgStringList
   constructArgumentList(const JobAction &JA,
-                        const JobList *Inputs,
+                        ArrayRef<const Job *> Inputs,
                         const CommandOutput *Output,
                         const ActionList &InputActions,
                         const llvm::opt::ArgList &Args,

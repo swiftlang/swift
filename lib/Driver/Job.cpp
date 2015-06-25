@@ -20,21 +20,6 @@
 using namespace swift;
 using namespace swift::driver;
 
-JobList::~JobList() {
-  if (OwnsJobs) {
-    llvm::DeleteContainerPointers(Jobs);
-  }
-}
-
-void JobList::clear() {
-  if (OwnsJobs) {
-    llvm::DeleteContainerPointers(Jobs);
-  } else {
-    // We don't own the pointers, so just clear the list.
-    Jobs.clear();
-  }
-}
-
 void CommandOutput::setAdditionalOutputForType(types::ID type,
                                                StringRef OutputFilename) {
   AdditionalOutputsMap[type] = OutputFilename;

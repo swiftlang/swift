@@ -34,7 +34,6 @@ namespace driver {
   class CommandOutput;
   class JobAction;
   class Job;
-  class JobList;
   class OutputInfo;
   class ToolChain;
 
@@ -72,7 +71,7 @@ public:
   /// \param OI information about the output which the driver will create,
   /// which may influence the creation of this Job.
   std::unique_ptr<Job> constructJob(const JobAction &JA,
-                                    std::unique_ptr<JobList> Inputs,
+                                    SmallVectorImpl<const Job *> &&Inputs,
                                     std::unique_ptr<CommandOutput> Output,
                                     const ActionList &InputActions,
                                     const llvm::opt::ArgList &Args,
@@ -81,7 +80,7 @@ public:
 protected:
   virtual llvm::opt::ArgStringList
   constructArgumentList(const JobAction &JA,
-                        const JobList *Inputs,
+                        ArrayRef<const Job *> Inputs,
                         const CommandOutput *Output,
                         const ActionList &InputActions,
                         const llvm::opt::ArgList &Args,

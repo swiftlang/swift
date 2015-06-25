@@ -47,7 +47,8 @@ static void addInputsOfType(ArgStringList &Arguments, const ActionList &Inputs,
   }
 }
 
-static void addInputsOfType(ArgStringList &Arguments, const JobList &Jobs,
+static void addInputsOfType(ArgStringList &Arguments,
+                            ArrayRef<const Job *> Jobs,
                             types::ID InputType) {
   for (const Job *Cmd : Jobs) {
     auto &output = Cmd->getOutput().getAnyOutputForType(InputType);
@@ -68,7 +69,7 @@ static void addInputsOfType(ArgStringList &Arguments, const JobList &Jobs,
 }
 
 static void addPrimaryInputsOfType(ArgStringList &Arguments,
-                                   const JobList &Jobs,
+                                   ArrayRef<const Job *> Jobs,
                                    types::ID InputType) {
   for (const Job *Cmd : Jobs) {
     auto &outputInfo = Cmd->getOutput();
@@ -180,7 +181,7 @@ const char *Swift::getPath(const llvm::opt::ArgList &Args,
 
 llvm::opt::ArgStringList
 Swift::constructArgumentList(const JobAction &JA,
-                             const JobList *Inputs,
+                             ArrayRef<const Job *> Inputs,
                              const CommandOutput *Output,
                              const ActionList &InputActions,
                              const llvm::opt::ArgList &Args,
@@ -266,7 +267,7 @@ Swift::constructArgumentList(const JobAction &JA,
   
   Arguments.push_back(FrontendModeOption);
   
-  assert((Inputs->empty() || isa<BackendJobAction>(JA)) &&
+  assert((Inputs.empty() || isa<BackendJobAction>(JA)) &&
          "The Swift frontend does not expect to be fed any input Jobs!");
 
   // Add input arguments.
@@ -274,9 +275,9 @@ Swift::constructArgumentList(const JobAction &JA,
   case OutputInfo::Mode::StandardCompile:
   case OutputInfo::Mode::UpdateCode: {
     if (isa<BackendJobAction>(JA)) {
-      assert(Inputs->size() == 1 && "The Swift backend expects one input!");
+      assert(Inputs.size() == 1 && "The Swift backend expects one input!");
       Arguments.push_back("-primary-file");
-      const Job *Cmd = Inputs->front();
+      const Job *Cmd = Inputs.front();
       Arguments.push_back(
         Cmd->getOutput().getPrimaryOutputFilename().c_str());
       break;
@@ -304,9 +305,9 @@ Swift::constructArgumentList(const JobAction &JA,
   }
   case OutputInfo::Mode::SingleCompile:
     if (isa<BackendJobAction>(JA)) {
-      assert(Inputs->size() == 1 && "The Swift backend expects one input!");
+      assert(Inputs.size() == 1 && "The Swift backend expects one input!");
       Arguments.push_back("-primary-file");
-      const Job *Cmd = Inputs->front();
+      const Job *Cmd = Inputs.front();
       
       // In multi-threaded compilation, the backend job must select the correct
       // output file of the compilation job.
@@ -477,7 +478,7 @@ const char *MergeModule::getPath(const llvm::opt::ArgList &Args,
 
 llvm::opt::ArgStringList
 MergeModule::constructArgumentList(const JobAction &JA,
-                                   const JobList *Inputs,
+                                   ArrayRef<const Job *> Inputs,
                                    const CommandOutput *Output,
                                    const ActionList &InputActions,
                                    const llvm::opt::ArgList &Args,
@@ -493,10 +494,10 @@ MergeModule::constructArgumentList(const JobAction &JA,
 
   size_t origLen = Arguments.size();
   (void)origLen;
-  addInputsOfType(Arguments, *Inputs, types::TY_SwiftModuleFile);
+  addInputsOfType(Arguments, Inputs, types::TY_SwiftModuleFile);
   addInputsOfType(Arguments, InputActions, types::TY_SwiftModuleFile);
-  assert(Arguments.size() - origLen >= Inputs->size() + InputActions.size());
-  assert((Arguments.size() - origLen == Inputs->size() ||
+  assert(Arguments.size() - origLen >= Inputs.size() + InputActions.size());
+  assert((Arguments.size() - origLen == Inputs.size() ||
           !InputActions.empty()) &&
          "every input to MergeModule must generate a swiftmodule");
 
@@ -551,12 +552,12 @@ bool ToolchainTool::isPresentRelativeToDriver() const {
 
 llvm::opt::ArgStringList
 LLDB::constructArgumentList(const JobAction &JA,
-                            const JobList *Inputs,
+                            ArrayRef<const Job *> Inputs,
                             const CommandOutput *Output,
                             const ActionList &InputActions,
                             const llvm::opt::ArgList &Args,
                             const OutputInfo &OI) const {
-  assert(Inputs->empty());
+  assert(Inputs.empty());
   assert(InputActions.empty());
 
   // Squash important frontend options into a single argument for LLDB.
@@ -579,18 +580,18 @@ LLDB::constructArgumentList(const JobAction &JA,
 
 llvm::opt::ArgStringList
 Dsymutil::constructArgumentList(const JobAction &JA,
-                                const JobList *Inputs,
+                                ArrayRef<const Job *> Inputs,
                                 const CommandOutput *Output,
                                 const ActionList &InputActions,
                                 const llvm::opt::ArgList &Args,
                                 const OutputInfo &OI) const {
-  assert(Inputs->size() == 1);
+  assert(Inputs.size() == 1);
   assert(InputActions.empty());
   assert(Output->getPrimaryOutputType() == types::TY_dSYM);
 
   ArgStringList Arguments;
 
-  StringRef inputPath = Inputs->front()->getOutput().getPrimaryOutputFilename();
+  StringRef inputPath = Inputs.front()->getOutput().getPrimaryOutputFilename();
   Arguments.push_back(Args.MakeArgString(inputPath));
 
   Arguments.push_back("-o");
@@ -601,7 +602,7 @@ Dsymutil::constructArgumentList(const JobAction &JA,
 
 llvm::opt::ArgStringList
 AutolinkExtract::constructArgumentList(const JobAction &JA,
-                                       const JobList *Inputs,
+                                       ArrayRef<const Job *> Inputs,
                                        const CommandOutput *Output,
                                        const ActionList &InputActions,
                                        const llvm::opt::ArgList &Args,
@@ -609,7 +610,7 @@ AutolinkExtract::constructArgumentList(const JobAction &JA,
   assert(Output->getPrimaryOutputType() == types::TY_AutolinkFile);
 
   ArgStringList Arguments;
-  addPrimaryInputsOfType(Arguments, *Inputs, types::TY_Object);
+  addPrimaryInputsOfType(Arguments, Inputs, types::TY_Object);
   addInputsOfType(Arguments, InputActions, types::TY_Object);
 
   Arguments.push_back("-o");
@@ -647,7 +648,7 @@ static void addVersionString(const ArgList &inputArgs, ArgStringList &arguments,
 
 llvm::opt::ArgStringList
 darwin::Linker::constructArgumentList(const JobAction &JA,
-                                      const JobList *Inputs,
+                                      ArrayRef<const Job *> Inputs,
                                       const CommandOutput *Output,
                                       const ActionList &InputActions,
                                       const llvm::opt::ArgList &Args,
@@ -660,7 +661,7 @@ darwin::Linker::constructArgumentList(const JobAction &JA,
   const llvm::Triple &Triple = TC.getTriple();
 
   ArgStringList Arguments;
-  addPrimaryInputsOfType(Arguments, *Inputs, types::TY_Object);
+  addPrimaryInputsOfType(Arguments, Inputs, types::TY_Object);
   addInputsOfType(Arguments, InputActions, types::TY_Object);
 
   if (OI.DebugInfoKind == IRGenDebugInfoKind::Normal) {
@@ -668,9 +669,9 @@ darwin::Linker::constructArgumentList(const JobAction &JA,
 
     size_t argCount = Arguments.size();
     if (OI.CompilerMode == OutputInfo::Mode::SingleCompile)
-      addInputsOfType(Arguments, *Inputs, types::TY_SwiftModuleFile);
+      addInputsOfType(Arguments, Inputs, types::TY_SwiftModuleFile);
     else
-      addPrimaryInputsOfType(Arguments, *Inputs, types::TY_SwiftModuleFile);
+      addPrimaryInputsOfType(Arguments, Inputs, types::TY_SwiftModuleFile);
     assert(argCount + 1 == Arguments.size() && "no swiftmodule found for -g");
     (void)argCount;
   }
@@ -847,7 +848,7 @@ const char *linux::Linker::getPath(const llvm::opt::ArgList &Args,
 
 llvm::opt::ArgStringList
 linux::Linker::constructArgumentList(const JobAction &JA,
-                                   const JobList *Inputs,
+                                   ArrayRef<const Job *> Inputs,
                                    const CommandOutput *Output,
                                    const ActionList &InputActions,
                                    const llvm::opt::ArgList &Args,
@@ -871,7 +872,7 @@ linux::Linker::constructArgumentList(const JobAction &JA,
     break;
   }
 
-  addPrimaryInputsOfType(Arguments, *Inputs, types::TY_Object);
+  addPrimaryInputsOfType(Arguments, Inputs, types::TY_Object);
   addInputsOfType(Arguments, InputActions, types::TY_Object);
 
   Args.AddAllArgs(Arguments, options::OPT_Xlinker);
@@ -919,7 +920,7 @@ linux::Linker::constructArgumentList(const JobAction &JA,
   Arguments.push_back("-lswiftCore");
 
   // Add any autolinking scripts to the arguments
-  for (const Job *Cmd : *Inputs) {
+  for (const Job *Cmd : Inputs) {
     auto &OutputInfo = Cmd->getOutput();
     if (OutputInfo.getPrimaryOutputType() == types::TY_AutolinkFile)
       Arguments.push_back(Args.MakeArgString(

@@ -34,41 +34,6 @@ class InputAction;
 class Job;
 class Tool;
 
-class JobList {
-  typedef SmallVector<Job *, 4> list_type;
-    
-public:
-  typedef list_type::size_type size_type;
-  typedef list_type::iterator iterator;
-  typedef list_type::const_iterator const_iterator;
-
-private:
-  list_type Jobs;
-  bool OwnsJobs;
-
-public:
-  JobList() : OwnsJobs(false) {}
-  ~JobList();
-
-  bool getOwnsJobs() const { return OwnsJobs; }
-  void setOwnsJobs(bool Value) { OwnsJobs = Value; }
-
-  void addJob(Job *J) { Jobs.push_back(J); }
-
-  void clear();
-
-  ArrayRef<Job *> getJobs() const { return Jobs; }
-
-  size_type size() const { return Jobs.size(); }
-  bool empty() const { return Jobs.empty(); }
-  iterator begin() { return Jobs.begin(); }
-  const_iterator begin() const { return Jobs.begin(); }
-  iterator end() { return Jobs.end(); }
-  const_iterator end() const { return Jobs.end(); }
-  Job *front() const { return Jobs.front(); }
-  Job *back() const { return Jobs.back(); }
-};
-
 class CommandOutput {
   types::ID PrimaryOutputType;
   
@@ -131,7 +96,7 @@ private:
   llvm::PointerIntPair<const Tool *, 2, Condition> CreatorAndCondition;
 
   /// The list of other Jobs which are inputs to this Job.
-  std::unique_ptr<JobList> Inputs;
+  SmallVector<const Job *, 4> Inputs;
 
   /// The output of this command.
   std::unique_ptr<CommandOutput> Output;
@@ -148,8 +113,10 @@ private:
 
 public:
   Job(const Action &Source, const Tool &Creator,
-      std::unique_ptr<JobList> Inputs, std::unique_ptr<CommandOutput> Output,
-      const char *Executable, llvm::opt::ArgStringList Arguments)
+      SmallVectorImpl<const Job *> &&Inputs,
+      std::unique_ptr<CommandOutput> Output,
+      const char *Executable,
+      llvm::opt::ArgStringList Arguments)
       : Source(Source), CreatorAndCondition(&Creator, Condition::Always),
         Inputs(std::move(Inputs)), Output(std::move(Output)),
         Executable(Executable), Arguments(std::move(Arguments)) {}
@@ -160,7 +127,7 @@ public:
   const char *getExecutable() const { return Executable; }
   const llvm::opt::ArgStringList &getArguments() const { return Arguments; }
 
-  const JobList &getInputs() const { return *Inputs; }
+  ArrayRef<const Job *> getInputs() const { return Inputs; }
   const CommandOutput &getOutput() const { return *Output; }
 
   Condition getCondition() const {

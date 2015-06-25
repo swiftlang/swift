@@ -44,7 +44,6 @@ namespace swift {
 namespace driver {
   class Compilation;
   class Job;
-  class JobList;
   class OutputFileMap;
   class ToolChain;
 

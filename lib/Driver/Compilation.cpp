@@ -92,7 +92,7 @@ Job *Compilation::addJob(std::unique_ptr<Job> J) {
   return result;
 }
 
-static const Job *findUnfinishedJob(const JobList &JL,
+static const Job *findUnfinishedJob(ArrayRef<const Job *> JL,
                                     const CommandSet &FinishedCommands) {
   for (const Job *Cmd : JL) {
     if (!FinishedCommands.count(Cmd))
@@ -209,8 +209,7 @@ int Compilation::performJobsImpl() {
                 (void *)Cmd);
   };
 
-  // Perform all inputs to the Jobs in our JobList, and schedule any commands
-  // which we know need to execute.
+  // Schedule all jobs we can.
   for (const Job *Cmd : getJobs()) {
     if (!getIncrementalBuildEnabled()) {
       scheduleCommandIfNecessaryAndPossible(Cmd);
@@ -346,8 +345,8 @@ int Compilation::performJobsImpl() {
           TaskFinishedResponse::StopExecution;
     }
 
-    // When a task finishes, we need to reevaluate the other commands in our
-    // JobList.
+    // When a task finishes, we need to reevaluate the other commands that
+    // might have been blocked.
 
     State.FinishedCommands.insert(FinishedCmd);
 
@@ -499,14 +498,6 @@ int Compilation::performSingleCommand(const Job *Cmd) {
   const char **argv = Argv.data();
 
   return ExecuteInPlace(ExecPath, argv);
-}
-
-static void flattenJobList(SmallVectorImpl<const Job *> &output,
-                           const JobList &input) {
-  for (const Job *cmd : input) {
-    flattenJobList(output, cmd->getInputs());
-    output.push_back(cmd);
-  }
 }
 
 int Compilation::performJobs() {

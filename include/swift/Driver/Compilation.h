@@ -39,7 +39,6 @@ namespace swift {
 
 namespace driver {
   class Driver;
-  class JobList;
   class ToolChain;
 
 /// An enum providing different levels of output which should be produced

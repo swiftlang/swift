@@ -1393,7 +1393,7 @@ static StringRef getOutputFilename(Compilation &C,
                                    const llvm::opt::DerivedArgList &Args,
                                    bool AtTopLevel,
                                    StringRef BaseInput,
-                                   const JobList &InputJobs,
+                                   ArrayRef<const Job *> InputJobs,
                                    DiagnosticEngine &Diags,
                                    llvm::SmallString<128> &Buffer) {
   if (JA->getType() == types::TY_Nothing)
@@ -1589,14 +1589,14 @@ Job *Driver::buildJobsForAction(Compilation &C, const Action *A,
 
   // 2. Build up the list of input jobs.
   ActionList InputActions;
-  std::unique_ptr<JobList> InputJobs(new JobList);
+  SmallVector<const Job *, 4> InputJobs;
   for (Action *Input : *A) {
     if (isa<InputAction>(Input)) {
       InputActions.push_back(Input);
     } else {
-      InputJobs->addJob(buildJobsForAction(C, Input, OI, OFM,
-                                           C.getDefaultToolChain(), false,
-                                           JobCache));
+      InputJobs.push_back(buildJobsForAction(C, Input, OI, OFM,
+                                             C.getDefaultToolChain(), false,
+                                             JobCache));
     }
   }
 
@@ -1612,9 +1612,9 @@ Job *Driver::buildJobsForAction(Compilation &C, const Action *A,
     // Use the first InputAction as our BaseInput.
     InputAction *IA = cast<InputAction>(InputActions[0]);
     BaseInput = IA->getInputArg().getValue();
-  } else if (!InputJobs->empty()) {
+  } else if (!InputJobs.empty()) {
     // Use the first Job's BaseInput as our BaseInput.
-    BaseInput = InputJobs->front()->getOutput().getBaseInput(JA->getInputIndex());
+    BaseInput = InputJobs.front()->getOutput().getBaseInput(JA->getInputIndex());
   }
 
   const TypeToPathMap *OutputMap = nullptr;
@@ -1644,7 +1644,7 @@ Job *Driver::buildJobsForAction(Compilation &C, const Action *A,
         OMForInput = OFM->getOutputMapForInput(Input);
       
       OutputFile = getOutputFilename(C, JA, OI, OMForInput, C.getArgs(),
-                                     AtTopLevel, Input, *InputJobs,
+                                     AtTopLevel, Input, InputJobs,
                                      Diags, Buf);
       Output->addPrimaryOutput(OutputFile, Input);
     };
@@ -1655,13 +1655,13 @@ Job *Driver::buildJobsForAction(Compilation &C, const Action *A,
 
     }
     // Add an output file for each input job.
-    for (Job *job : *InputJobs) {
+    for (const Job *job : InputJobs) {
       OutputFunc(job->getOutput().getBaseInput(0));
     }
   } else {
     // The common case: there is a single output file.
     OutputFile = getOutputFilename(C, JA, OI, OutputMap, C.getArgs(),
-                                   AtTopLevel, BaseInput, *InputJobs,
+                                   AtTopLevel, BaseInput, InputJobs,
                                    Diags, Buf);
     Output->addPrimaryOutput(OutputFile, BaseInput);
   }
