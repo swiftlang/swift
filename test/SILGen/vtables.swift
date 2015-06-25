@@ -149,8 +149,23 @@ class Observed {
   }
 }
 
+// rdar://problem/21298214
+class BaseWithDefaults {
+   func a(object: AnyObject? = nil) {}
+}
+
+class DerivedWithoutDefaults : BaseWithDefaults {
+   override func a(object: AnyObject?) { 
+     super.a(object)   
+   }
+}
+
+
 // CHECK-LABEL: sil_vtable Observed {
 // CHECK-NOT:     #Observed.x!didSet
 // CHECK-NOT:     #Observed.x!willSet
 // CHECK:         #Observed.x!getter
 // CHECK:         #Observed.x!setter
+
+// CHECK-LABEL: sil_vtable DerivedWithoutDefaults {
+// CHECK:         #BaseWithDefaults.a!1: _TFC7vtables22DerivedWithoutDefaults1afS0_FGSqPSs9AnyObject__T_

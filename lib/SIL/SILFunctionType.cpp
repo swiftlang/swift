@@ -365,16 +365,26 @@ enum class ConventionsKind : uint8_t {
       if (substOverrideType
           && isa<TupleType>(substOverrideType)
           && (!origType.isOpaque() || !substOverrideType->isMaterializable())) {
-        auto substTuple = cast<TupleType>(substType.getAnyOptionalObjectType());
-        assert(origType.isOpaque() ||
-               origType.getNumTupleElements() == substTuple->getNumElements());
-        for (auto i : indices(substTuple.getElementTypes())) {
-          CanType substOverrideElt;
-          visit(origType.getTupleElementType(i),
-                substTuple.getElementType(i),
-                // Can't override optionality at depth.
-                CanType());
+        if (auto substTuple = dyn_cast<TupleType>(
+                                substType.getAnyOptionalObjectType())) {
+          assert(origType.isOpaque() ||
+                 origType.getNumTupleElements() == substTuple->getNumElements());
+          for (auto i : indices(substTuple.getElementTypes())) {
+            CanType substOverrideElt;
+            visit(origType.getTupleElementType(i),
+                  substTuple.getElementType(i),
+                  // Can't override optionality at depth.
+                  CanType());
+          }
+          return;
         }
+        
+        assert(origType.isOpaque() || origType.getNumTupleElements() == 1);
+        CanType substOverrideElt;
+        visit(origType.getTupleElementType(0),
+              substType.getAnyOptionalObjectType(),
+              // Can't override optionality at depth.
+              CanType());
         return;
       }
 
