@@ -1156,44 +1156,44 @@ func getAsNSMutableDictionary(d: Dictionary<Int, Int>) -> NSMutableDictionary {
 }
 
 func getBridgedVerbatimDictionary() -> Dictionary<NSObject, AnyObject> {
-  var nsd = getAsNSDictionary([ 10: 1010, 20: 1020, 30: 1030 ])
+  let nsd = getAsNSDictionary([ 10: 1010, 20: 1020, 30: 1030 ])
   return _convertNSDictionaryToDictionary(nsd)
 }
 
 func getBridgedVerbatimDictionary(d: Dictionary<Int, Int>) -> Dictionary<NSObject, AnyObject> {
-  var nsd = getAsNSDictionary(d)
+  let nsd = getAsNSDictionary(d)
   return _convertNSDictionaryToDictionary(nsd)
 }
 
 func getBridgedVerbatimDictionaryAndNSMutableDictionary()
     -> (Dictionary<NSObject, AnyObject>, NSMutableDictionary) {
-  var nsd = getAsNSMutableDictionary([ 10: 1010, 20: 1020, 30: 1030 ])
+  let nsd = getAsNSMutableDictionary([ 10: 1010, 20: 1020, 30: 1030 ])
   return (_convertNSDictionaryToDictionary(nsd), nsd)
 }
 
 func getBridgedNonverbatimDictionary() -> Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
-  var nsd = getAsNSDictionary([ 10: 1010, 20: 1020, 30: 1030 ])
+  let nsd = getAsNSDictionary([ 10: 1010, 20: 1020, 30: 1030 ])
   return Swift._forceBridgeFromObjectiveC(nsd, Dictionary.self)
 }
 
 func getBridgedNonverbatimDictionary(d: Dictionary<Int, Int>) -> Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
-  var nsd = getAsNSDictionary(d)
+  let nsd = getAsNSDictionary(d)
   return Swift._forceBridgeFromObjectiveC(nsd, Dictionary.self)
 }
 
 func getBridgedNonverbatimDictionaryAndNSMutableDictionary()
     -> (Dictionary<TestBridgedKeyTy, TestBridgedValueTy>, NSMutableDictionary) {
-  var nsd = getAsNSMutableDictionary([ 10: 1010, 20: 1020, 30: 1030 ])
+  let nsd = getAsNSMutableDictionary([ 10: 1010, 20: 1020, 30: 1030 ])
   return (Swift._forceBridgeFromObjectiveC(nsd, Dictionary.self), nsd)
 }
 
 func getBridgedVerbatimEquatableDictionary(d: Dictionary<Int, Int>) -> Dictionary<NSObject, TestObjCEquatableValueTy> {
-  var nsd = getAsEquatableNSDictionary(d)
+  let nsd = getAsEquatableNSDictionary(d)
   return _convertNSDictionaryToDictionary(nsd)
 }
 
 func getBridgedNonverbatimEquatableDictionary(d: Dictionary<Int, Int>) -> Dictionary<TestBridgedKeyTy, TestBridgedEquatableValueTy> {
-  var nsd = getAsEquatableNSDictionary(d)
+  let nsd = getAsEquatableNSDictionary(d)
   return Swift._forceBridgeFromObjectiveC(nsd, Dictionary.self)
 }
 
@@ -1209,12 +1209,12 @@ func getHugeBridgedVerbatimDictionaryHelper() -> NSDictionary {
 }
 
 func getHugeBridgedVerbatimDictionary() -> Dictionary<NSObject, AnyObject> {
-  var nsd = getHugeBridgedVerbatimDictionaryHelper()
+  let nsd = getHugeBridgedVerbatimDictionaryHelper()
   return _convertNSDictionaryToDictionary(nsd)
 }
 
 func getHugeBridgedNonverbatimDictionary() -> Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
-  var nsd = getHugeBridgedVerbatimDictionaryHelper()
+  let nsd = getHugeBridgedVerbatimDictionaryHelper()
   return Swift._forceBridgeFromObjectiveC(nsd, Dictionary.self)
 }
 
@@ -1276,12 +1276,12 @@ class ParallelArrayDictionary : NSDictionary {
 }
 
 func getParallelArrayBridgedVerbatimDictionary() -> Dictionary<NSObject, AnyObject> {
-  var nsd: NSDictionary = ParallelArrayDictionary()
+  let nsd: NSDictionary = ParallelArrayDictionary()
   return _convertNSDictionaryToDictionary(nsd)
 }
 
 func getParallelArrayBridgedNonverbatimDictionary() -> Dictionary<TestBridgedKeyTy, TestBridgedValueTy> {
-  var nsd: NSDictionary = ParallelArrayDictionary()
+  let nsd: NSDictionary = ParallelArrayDictionary()
   return Swift._forceBridgeFromObjectiveC(nsd, Dictionary.self)
 }
 
@@ -2381,8 +2381,8 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.EqualityTest_Empty") {
 
 DictionaryTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Small") {
   func helper(nd1: Dictionary<Int, Int>, _ nd2: Dictionary<Int, Int>, _ expectedEq: Bool) {
-    var d1 = getBridgedVerbatimEquatableDictionary(nd1)
-    var identity1 = unsafeBitCast(d1, Word.self)
+    let d1 = getBridgedVerbatimEquatableDictionary(nd1)
+    let identity1 = unsafeBitCast(d1, Word.self)
     assert(isCocoaDictionary(d1))
 
     var d2 = getBridgedVerbatimEquatableDictionary(nd2)
@@ -2390,16 +2390,16 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Small") {
     assert(isCocoaDictionary(d2))
 
     if true {
-      var eq1 = (d1 == d2)
+      let eq1 = (d1 == d2)
       assert(eq1 == expectedEq)
 
-      var eq2 = (d2 == d1)
+      let eq2 = (d2 == d1)
       assert(eq2 == expectedEq)
 
-      var neq1 = (d1 != d2)
+      let neq1 = (d1 != d2)
       assert(neq1 != expectedEq)
 
-      var neq2 = (d2 != d1)
+      let neq2 = (d2 != d1)
       assert(neq2 != expectedEq)
     }
     assert(identity1 == unsafeBitCast(d1, Word.self))
@@ -2412,16 +2412,16 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.EqualityTest_Small") {
     identity2 = unsafeBitCast(d2, Word.self)
 
     if true {
-      var eq1 = (d1 == d2)
+      let eq1 = (d1 == d2)
       assert(eq1 == expectedEq)
 
-      var eq2 = (d2 == d1)
+      let eq2 = (d2 == d1)
       assert(eq2 == expectedEq)
 
-      var neq1 = (d1 != d2)
+      let neq1 = (d1 != d2)
       assert(neq1 != expectedEq)
 
-      var neq2 = (d2 != d1)
+      let neq2 = (d2 != d1)
       assert(neq2 != expectedEq)
     }
     assert(identity1 == unsafeBitCast(d1, Word.self))
@@ -2851,9 +2851,9 @@ func getRoundtripBridgedNSDictionary() -> NSDictionary {
   values.addObject(TestObjCValueTy(1020))
   values.addObject(TestObjCValueTy(1030))
 
-  var nsd = NSDictionary(objects: values as [AnyObject], forKeys: keys as [AnyObject])
+  let nsd = NSDictionary(objects: values as [AnyObject], forKeys: keys as [AnyObject])
 
-  var d: Dictionary<NSObject, AnyObject> = _convertNSDictionaryToDictionary(nsd)
+  let d: Dictionary<NSObject, AnyObject> = _convertNSDictionaryToDictionary(nsd)
 
   let bridgedBack = _convertDictionaryToNSDictionary(d)
   assert(isCocoaNSDictionary(bridgedBack))
