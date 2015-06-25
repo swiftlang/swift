@@ -88,8 +88,8 @@ entry(%a : $@thick Any.Type):
 // CHECK:       cont:
 // CHECK:         [[WITNESS:%.*]] = call i8** @swift_conformsToProtocol(%swift.type* %1, %swift.protocol* %3)
 // CHECK:         [[IS_NULL:%.*]] = icmp eq i8** [[WITNESS]], null
-// CHECK:         br i1 [[IS_NULL]], label %fail, label %cont1
-// CHECK:       cont1:
+// CHECK:         br i1 [[IS_NULL]], label %fail, label %cont.1
+// CHECK:       cont.1:
 // CHECK:         ret { i8*, i8**, i8** }
 // CHECK:       fail:
 // CHECK:         call void @llvm.trap()
@@ -160,8 +160,8 @@ nay:
 // CHECK:       cont:
 // CHECK:         [[WITNESS:%.*]] = call i8** @swift_conformsToProtocol(%swift.type* %1, %swift.protocol* %3)
 // CHECK:         [[IS_NULL:%.*]] = icmp eq i8** [[WITNESS]], null
-// CHECK:         br i1 [[IS_NULL]], label %fail, label %cont1
-// CHECK:       cont1:
+// CHECK:         br i1 [[IS_NULL]], label %fail, label %cont.1
+// CHECK:       cont.1:
 // CHECK:         ret { i8*, i8**, i8** }
 // CHECK:       fail:
 // CHECK:         ret { i8*, i8**, i8** } zeroinitializer

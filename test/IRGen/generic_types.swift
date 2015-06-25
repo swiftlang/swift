@@ -36,7 +36,7 @@ import Swift
 // CHECK:   %C13generic_types1A* (i64, %C13generic_types1A*)* @_TFC13generic_types1AcurfMGS0_q__FT1ySi_GS0_q__
 // CHECK: }
 // CHECK: @_TMPdC13generic_types1B = global [[B_METADATA_T:{.* } }]] {
-// CHECK:   %swift.type* (%swift.type_pattern*, i8**)* [[B_METADATA_CREATE:@[a-z0-9_]+]],
+// CHECK:   %swift.type* (%swift.type_pattern*, i8**)* [[B_METADATA_CREATE:@[a-z0-9_.]+]],
 // CHECK:   i32 328,
 // CHECK:   i16 1,
 // CHECK:   i16 16,

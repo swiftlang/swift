@@ -161,7 +161,7 @@ import Swift
 
 
 // CHECK: @_TMPdO4enum20DynamicSinglePayload = global { {{.*}}* } {
-// CHECK:   %swift.type* (%swift.type_pattern*, i8**)* [[DYNAMIC_SINGLE_PAYLOAD_CREATE:@create_generic_metadata[0-9]*]]
+// CHECK:   %swift.type* (%swift.type_pattern*, i8**)* [[DYNAMIC_SINGLE_PAYLOAD_CREATE:@create_generic_metadata[.0-9]*]]
 // CHECK:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_TwxsO4enum20DynamicSinglePayload to i8*),
 // CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_TwxgO4enum20DynamicSinglePayload to i8*),
 // CHECK:   i8* null

@@ -88,7 +88,7 @@ import gizmo
 
 // CHECK: @_TMPdC15generic_classes22GenericInheritsGeneric = global { {{.*}}* } } {
 // --       template fill function
-// CHECK:   %swift.type* (%swift.type_pattern*, i8**)* [[CREATE_GENERICINHERITSGENERIC:@create_generic_metadata[0-9]*]],
+// CHECK:   %swift.type* (%swift.type_pattern*, i8**)* [[CREATE_GENERICINHERITSGENERIC:@create_generic_metadata[.0-9]*]],
 // --       RootGeneric vtable
 // CHECK:   @_TFC15generic_classes11RootGeneric3fooU__fGS0_Q__FT_T_,
 // CHECK:   @_TFC15generic_classes11RootGeneric3barU__fGS0_Q__FT_T_,
