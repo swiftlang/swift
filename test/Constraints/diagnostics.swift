@@ -80,7 +80,7 @@ i.wobble() // expected-error{{'Int' does not have a member named 'wobble'}}
 func pancakes(p: P2) {
   f4(p.wonka) // expected-error{{cannot invoke 'f4' with an argument list of type '(() -> ())'}}
   // expected-note@-1{{expected an argument list of type '(Int)'}}
-  f4(p.wonka()) // expected-error{{cannot invoke 'f4' with an argument list of type '(())'}}
+  f4(p.wonka()) // expected-error{{cannot invoke 'f4' with an argument list of type '()'}}
   // expected-note@-1{{expected an argument list of type '(Int)'}}
 }
 
@@ -113,7 +113,7 @@ i ***~ i // expected-error{{binary operator '***~' cannot be applied to two Int 
 // FIXME: poor diagnostic, to be fixed in 20142462. For now, we just want to
 // make sure that it doesn't crash.
 func rdar20142523() {
-  map(0..<10, { x in // expected-error{{cannot find an overload for 'map' that accepts an argument list of type '(Range<Int>, (_) -> _)'}}
+  map(0..<10, { x in // expected-error{{could not find an overload for '..<' that accepts the supplied arguments}}
     ()
     return x
   })

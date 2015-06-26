@@ -186,6 +186,7 @@ struct S : P2 {
     overloadedEach(self, transform, 1) // expected-error {{invalid use of non-escaping function in escaping context 'O.Element -> ()'}}
       // expected-error@-1 {{invalid use of non-escaping function in escaping context 'P.Element -> ()'}}
       // expected-error@-2 {{cannot find an overload for 'overloadedEach' that accepts an argument list of type '(S, @noescape Int -> (), Int)'}}
+      // expected-error@-3 {{@noescape parameter 'transform' may only be called}}
   }
 }
 

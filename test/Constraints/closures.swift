@@ -27,7 +27,7 @@ struct X2 {
   func g() -> Float { return 0 }  
 }
 
-f0(X2(), {$0.g()})  // expected-error {{cannot invoke 'f0' with an argument list of type '(X2, (_) -> _)'}} expected-note{{expected an argument list of type '(T, (inout T) -> U)'}}
+f0(X2(), {$0.g()})  // expected-error {{could not find member 'g'}}
 
 // Autoclosure
 func f1(@autoclosure f f: () -> Int) { }

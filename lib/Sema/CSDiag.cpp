@@ -1360,17 +1360,12 @@ static bool isErrorTypeKind(Type t) {
 /// Obtain a "user friendly" type name. E.g., one that uses colloquial names
 /// for literal convertible protocols if necessary, and is devoid of type
 /// variables.
-std::string getUserFriendlyTypeName(Type t, bool unwrap = true) {
-  
+std::string getUserFriendlyTypeName(Type t) {
   assert(!t.isNull());
   
   // Unwrap any l-value types.
-  if (unwrap) {
-    if (t->isLValueType()) {
-      t = t->getRValueType();
-    }
-  }
-  
+  t = t->getRValueType();
+
   if (auto tv = t->getAs<TypeVariableType>()) {
     if (tv->getImpl().literalConformanceProto) {
       Optional<KnownProtocolKind> kind =
@@ -1392,31 +1387,54 @@ static Expr *unwrapParenExpr(Expr *e) {
   return e;
 }
 
-/// Given a vector of names and types, obtain a stringified comma-separated
-/// list of the names (if present) and their associated "user friendly" type
-/// names.
-static std::string getTypeListString(SmallVectorImpl<Identifier> &names,
-                                     SmallVectorImpl<Type> &types) {
-  if (types.empty())
-    return "";
+static SmallVector<Type, 4> decomposeArgumentType(Type ty) {
+  SmallVector<Type, 4> result;
 
-  std::string typeList = "";
-  if (!names[0].empty()) {
-    typeList += names[0].get();
-    typeList += ": ";
+  // Assemble the parameter type list.
+  if (auto parenType = dyn_cast<ParenType>(ty.getPointer())) {
+    result.push_back(parenType->getUnderlyingType());
+  } else if (auto tupleType = ty->getAs<TupleType>()) {
+    for (auto field : tupleType->getElements())
+      result.push_back(field.getType());
+  } else {
+    result.push_back(ty);
   }
-  typeList += getUserFriendlyTypeName(types[0]);
-  
-  for (size_t i = 1, e = types.size(); i != e; i++) {
-    typeList += ", ";
-    if (!names[i].empty()) {
-      typeList += names[i].get();
-      typeList += ": ";
-    }
-    typeList += getUserFriendlyTypeName(types[i]);
-  }
-  return typeList;
+  return result;
 }
+
+static std::string getTypeListString(Type type) {
+  // Assemble the parameter type list.
+  auto tupleType = type->getAs<TupleType>();
+  if (!tupleType) {
+    if (auto PT = dyn_cast<ParenType>(type.getPointer()))
+      type = PT->getUnderlyingType();
+
+    std::string result = "(";
+    result += getUserFriendlyTypeName(type);
+    result += ')';
+    return result;
+  }
+
+  std::string result = "(";
+  for (auto field : tupleType->getElements()) {
+    if (result.size() != 1)
+      result += ", ";
+    if (!field.getName().empty()) {
+      result += field.getName().str();
+      result += ": ";
+    }
+
+    if (!field.isVararg())
+      result += getUserFriendlyTypeName(field.getType());
+    else {
+      result += getUserFriendlyTypeName(field.getVarargBaseTy());
+      result += "...";
+    }
+  }
+  result += ")";
+  return result;
+}
+
 
 namespace {
 /// If a constraint system fails to converge on a solution for a given
@@ -1486,7 +1504,7 @@ private:
   /// arguments, emit a diagnostic indicating any partially matching overloads.
   void suggestPotentialOverloads(StringRef functionName, SourceLoc loc,
                                  const SmallVectorImpl<Type> &paramLists,
-                                 const SmallVectorImpl<Type> &argTypes);
+                                 Type argType);
   
   bool visitExpr(Expr *E) {
     return diagnoseGeneralFailure();
@@ -1903,41 +1921,32 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
 void FailureDiagnosis::suggestPotentialOverloads(StringRef functionName,
                                                  SourceLoc loc,
                                const SmallVectorImpl<Type> &paramLists,
-                               const SmallVectorImpl<Type> &argTypes) {
-  if (argTypes.empty())
+                                                 Type argType) {
+  // FIXME: This is arbitrary.
+  if (argType->isVoid())
     return;
-  
+
+  auto argTypeElts = decomposeArgumentType(argType);
+
   std::string suggestionText = "";
   std::map<std::string, bool> dupes;
 
   for (auto paramList : paramLists) {
-    SmallVector<Identifier, 16> paramNames;
-    SmallVector<Type, 16> paramTypes;
-    
-    // Assemble the parameter type list.
-    if (auto parenType = dyn_cast<ParenType>(paramList.getPointer())) {
-      paramNames.push_back(Identifier());
-      paramTypes.push_back(parenType->getUnderlyingType());
-    } else if (auto tupleType = paramList->getAs<TupleType>()) {
-      for (auto field : tupleType->getElements()) {
-        paramNames.push_back(field.getName());
-        paramTypes.push_back(field.getType());
-      }
-    }
-    
-    if (paramTypes.size() != argTypes.size())
+    auto paramTypeElts = decomposeArgumentType(paramList);
+
+    if (paramTypeElts.size() != argTypeElts.size())
       continue;
     
-    for (size_t i = 0, e = paramTypes.size(); i != e; i++) {
-      auto pt = paramTypes[i];
-      auto at = argTypes[i];
+    for (size_t i = 0, e = paramTypeElts.size(); i != e; i++) {
+      auto pt = paramTypeElts[i];
+      auto at = argTypeElts[i];
       if (pt->isEqual(at->getRValueType())) {
-        auto typeListString = getTypeListString(paramNames, paramTypes);
+        auto typeListString = getTypeListString(paramList);
         if (!dupes[typeListString]) {
           dupes[typeListString] = true;
-          if (suggestionText.length())
+          if (!suggestionText.empty())
             suggestionText += ", ";
-          suggestionText += "(" + typeListString + ")";
+          suggestionText += typeListString;
         }
         break;
       }
@@ -2196,20 +2205,13 @@ bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
 
   std::string overloadName = Candidates[0]->getNameStr();
   assert(!overloadName.empty());
-  
-  SmallVector<Type, 2> argTypes;
-  argTypes.push_back(argTuple->getElementType(0));
-  argTypes.push_back(argTuple->getElementType(1));
-  
-  auto argTyName1 = getUserFriendlyTypeName(argTypes[0]);
-  auto argTyName2 = getUserFriendlyTypeName(argTypes[1]);
   expr->setType(ErrorType::get(CS->getASTContext()));
 
   
   // A common error is to apply an operator that only has an inout LHS (e.g. +=)
   // to non-lvalues (e.g. a local let).  Produce a nice diagnostic for this
   // case.
-  if (!argTypes[0]->isLValueType()) {
+  if (!argTuple->getElementType(0)->isLValueType()) {
     bool allAreLValues = true;
     for (auto decl : Candidates) {
       auto fnType = decl->getType()->getAs<AnyFunctionType>();
@@ -2234,7 +2236,8 @@ bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
     }
   }
   
-  
+  auto argTyName1 = getUserFriendlyTypeName(argTuple->getElementType(0));
+  auto argTyName2 = getUserFriendlyTypeName(argTuple->getElementType(1));
   if (argTyName1.compare(argTyName2)) {
     CS->TC.diagnose(argExpr->getElement(0)->getLoc(),
                     diag::cannot_apply_binop_to_args,
@@ -2255,7 +2258,7 @@ bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
         paramLists.push_back(fnType->getInput());
     
     suggestPotentialOverloads(overloadName, argExpr->getElement(0)->getLoc(),
-                              paramLists, argTypes);
+                              paramLists, argTuple);
   }
   return true;
 }
@@ -2282,7 +2285,6 @@ bool FailureDiagnosis::visitUnaryExpr(ApplyExpr *applyExpr) {
 
   std::string overloadName = Candidates[0]->getNameStr();
   assert(!overloadName.empty());
-  auto argTyName = getUserFriendlyTypeName(argType);
 
   
   expr->setType(ErrorType::get(CS->getASTContext()));
@@ -2308,7 +2310,9 @@ bool FailureDiagnosis::visitUnaryExpr(ApplyExpr *applyExpr) {
       return true;
     }
   }
-  
+
+  auto argTyName = getUserFriendlyTypeName(argType);
+
   // FIXME: Note that we don't currently suggest a partially matching overload.
   CS->TC.diagnose(argExpr->getLoc(),
                   diag::cannot_apply_unop_to_arg,
@@ -2411,8 +2415,6 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
   bool isOverloadedFn = false;
   
   llvm::SmallVector<Type, 16> paramLists;
-  llvm::SmallVector<Identifier, 16> argNames;
-  llvm::SmallVector<Type, 16> argTypes;
 
   // Obtain the function's name, and collect any parameter lists for diffing
   // purposes.
@@ -2466,36 +2468,52 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
     auto unwrappedExpr = unwrapParenExpr(fnExpr);
     isInvalidTrailingClosureTarget = !isa<ClosureExpr>(unwrappedExpr);
   }
-  
-  // Build the argument type list.
-  if (auto parenExpr = dyn_cast<ParenExpr>(argExpr)) {
-    auto subType =
-        getTypeOfIndependentSubExpression((parenExpr->getSubExpr()));
+
+
+  Type argType;
+
+  if (auto *PE = dyn_cast<ParenExpr>(argExpr)) {
+    argType = getTypeOfIndependentSubExpression(PE->getSubExpr());
+  } else if (auto *TE = dyn_cast<TupleExpr>(argExpr)) {
+    // FIXME: This should all just be a matter of getting type type of the
+    // sub-expression, but this doesn't work well when the argument list contains
+    // InOutExprs.  Special case them to avoid producing poor diagnostics.
+    bool containsInOutExprs = false;
+    for (auto elt : TE->getElements())
+      containsInOutExprs |= isa<InOutExpr>(elt);
     
-    if (isErrorTypeKind(subType))
-      return true; // already diagnosed.
-    
-    argNames.push_back(Identifier());
-    argTypes.push_back(subType);
-  } else if (auto tupleExpr = dyn_cast<TupleExpr>(argExpr)) {
-    for (unsigned i = 0, e = tupleExpr->getNumElements(); i != e; i++) {
-      Identifier elName = tupleExpr->getElementName(i);
-      Expr *elExpr = tupleExpr->getElement(i);
-      auto elType = getTypeOfIndependentSubExpression(elExpr);
+    if (!containsInOutExprs) {
+      argType = getTypeOfIndependentSubExpression(TE);
+    } else {
+      // If InOutExprs are in play, get the simplified type of each element and
+      // rebuild the aggregate :-(
+      SmallVector<TupleTypeElt, 4> resultElts;
+
+      for (unsigned i = 0, e = TE->getNumElements(); i != e; i++) {
+        auto elType = getTypeOfIndependentSubExpression(TE->getElement(i));
+        if (isErrorTypeKind(elType))
+          return true; // already diagnosed.
+
+        Identifier elName = TE->getElementName(i);
+
+        resultElts.push_back({elType, elName});
+      }
       
-      if (isErrorTypeKind(elType))
-        return true; // already diagnosed.
-      
-      argNames.push_back(elName);
-      argTypes.push_back(elType);
+      argType = TupleType::get(resultElts, CS->getASTContext());
     }
-  } else if (auto typeExpr = dyn_cast<TypeExpr>(argExpr)) {
-    argNames.push_back(Identifier());
-    argTypes.push_back(typeExpr->getType());
+    
+  } else {
+    argType = getTypeOfIndependentSubExpression(unwrapParenExpr(argExpr));
   }
   
-  if (!argTypes.empty()) {
-    std::string argString = "(" + getTypeListString(argNames, argTypes) + ")";
+  if (isErrorTypeKind(argType))
+    return true; // already diagnosed.
+
+  // If we have an argument list (i.e., a scalar, or a non-zero-element tuple)
+  // then diagnose with some specificity about the arguments.
+  if (!isa<TupleExpr>(argExpr) ||
+      cast<TupleExpr>(argExpr)->getNumElements() != 0) {
+    std::string argString = getTypeListString(argType);
     
     if (isOverloadedFn) {
       CS->TC.diagnose(fnExpr->getLoc(),
@@ -2520,6 +2538,7 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
                       argString);
     }
   } else {
+    // Otherwise, emit diagnostics that say "no arguments".
     if (isClosureInvocation) {
       CS->TC.diagnose(fnExpr->getLoc(), diag::cannot_infer_closure_type);
       
@@ -2547,31 +2566,17 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
   if (!paramLists.empty()) {
     if (!isOverloadedFn) {
       std::string paramString = "";
-      SmallVector<Identifier, 16> paramNames;
-      SmallVector<Type, 16> paramTypes;
-      
-      if (auto parenType = dyn_cast<ParenType>(paramLists[0].getPointer())) {
-        paramNames.push_back(Identifier());
-        paramTypes.push_back(parenType->getUnderlyingType());
-      } else if (auto tupleType = paramLists[0]->getAs<TupleType>()) {
-        for (auto field : tupleType->getElements()) {
-          paramNames.push_back(field.getName());
-          paramTypes.push_back(field.getType());
-        }
-      }
-      
-      if (!paramTypes.empty()) {
-        paramString = "(" + getTypeListString(paramNames, paramTypes) + ")";
+
+      if (!paramLists[0]->isVoid()) {
+        paramString = getTypeListString(paramLists[0]);
         
         CS->TC.diagnose(argExpr->getLoc(),
                         diag::expected_certain_args,
                         paramString);
       }
     } else {
-      suggestPotentialOverloads(overloadName,
-                                fnExpr->getLoc(),
-                                paramLists,
-                                argTypes);
+      suggestPotentialOverloads(overloadName, fnExpr->getLoc(),
+                                paramLists, argType);
     }
   }
   
@@ -2760,7 +2765,6 @@ bool ConstraintSystem::diagnoseFailureForExpr(Expr *expr) {
 bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable,
                                Expr *expr,
                                bool onlyFailures) {
-  
   // If there were any unavoidable failures, emit the first one we can.
   if (!unavoidableFailures.empty()) {
     for (auto failure : unavoidableFailures) {
