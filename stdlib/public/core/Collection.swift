@@ -73,7 +73,39 @@ extension GeneratorType where Self : SequenceType {
   }
 }
 
-// FIXME: IndexingGenerator should go here for better readability
+/// A *generator* for an arbitrary *collection*.  Provided `C`
+/// conforms to the other requirements of `_prext_Indexable`,
+/// `IndexingGenerator<C>` can be used as the result of `C`'s
+/// `generate()` method.  For example:
+///
+///      struct MyCollection : CollectionType {
+///        struct Index : ForwardIndexType { /* implementation hidden */ }
+///        subscript(i: Index) -> MyElement { /* implementation hidden */ }
+///        func generate() -> IndexingGenerator<MyCollection> { // <===
+///          return IndexingGenerator(self)
+///        }
+///      }
+public struct IndexingGenerator<Elements : _prext_Indexable>
+ : GeneratorType, SequenceType {
+  
+  /// Create a *generator* over the given collection.
+  public init(_ elements: Elements) {
+    self._elements = elements
+    self._position = elements.startIndex
+  }
+
+  /// Advance to the next element and return it, or `nil` if no next
+  /// element exists.
+  ///
+  /// - Requires: No preceding call to `self.next()` has returned `nil`.
+  public mutating func next() -> Elements._Element? {
+    return _position == _elements.endIndex
+    ? .None : .Some(_elements[_position++])
+  }
+
+  internal let _elements: Elements
+  internal var _position: Elements.Index
+}
 
 /// A multi-pass *sequence* with addressable positions.
 ///
@@ -334,40 +366,6 @@ extension MutableCollectionType {
   ) -> R? {
     return nil
   }
-}
-
-/// A *generator* for an arbitrary *collection*.  Provided `C`
-/// conforms to the other requirements of `_prext_Indexable`,
-/// `IndexingGenerator<C>` can be used as the result of `C`'s
-/// `generate()` method.  For example:
-///
-///      struct MyCollection : CollectionType {
-///        struct Index : ForwardIndexType { /* implementation hidden */ }
-///        subscript(i: Index) -> MyElement { /* implementation hidden */ }
-///        func generate() -> IndexingGenerator<MyCollection> { // <===
-///          return IndexingGenerator(self)
-///        }
-///      }
-public struct IndexingGenerator<Elements : _prext_Indexable>
- : GeneratorType, SequenceType {
-  
-  /// Create a *generator* over the given collection.
-  public init(_ elements: Elements) {
-    self._elements = elements
-    self._position = elements.startIndex
-  }
-
-  /// Advance to the next element and return it, or `nil` if no next
-  /// element exists.
-  ///
-  /// - Requires: No preceding call to `self.next()` has returned `nil`.
-  public mutating func next() -> Elements._Element? {
-    return _position == _elements.endIndex
-    ? .None : .Some(_elements[_position++])
-  }
-
-  let _elements: Elements
-  var _position: Elements.Index
 }
 
 /// Returns the range of `x`'s valid index values.
