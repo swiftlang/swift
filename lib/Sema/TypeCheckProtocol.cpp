@@ -21,10 +21,10 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/AST/ArchetypeBuilder.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ReferencedNameTracker.h"
+#include "swift/AST/TypeMatcher.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Defer.h"
 #include "llvm/ADT/ScopedHashTable.h"
@@ -2730,7 +2730,7 @@ ConformanceChecker::inferTypeWitnessesViaValueWitness(ValueDecl *req,
   /// obvious conflicts between the structure of the two types,
   /// returns true. The conflict checking is fairly conservative, only
   /// considering rough structure.
-  class MatchVisitor : public CanTypeVisitor<MatchVisitor, bool, Type> {
+  class MatchVisitor : public TypeMatcher<MatchVisitor> {
     NormalProtocolConformance *Conformance;
     InferredAssociatedTypesByWitness &Inferred;
 
@@ -2739,168 +2739,41 @@ ConformanceChecker::inferTypeWitnessesViaValueWitness(ValueDecl *req,
                  InferredAssociatedTypesByWitness &inferred)
       : Conformance(conformance), Inferred(inferred) { }
 
-#define TRIVIAL_CASE(TheType)                                     \
-    bool visit##TheType(Can##TheType reqType, Type witnessType) { \
-      return false;                                               \
-    }
-
-    TRIVIAL_CASE(ErrorType)
-    TRIVIAL_CASE(BuiltinType)
-
-    bool visitTupleType(CanTupleType reqTuple, Type witnessType) {
-      if (auto witnessTuple = witnessType->getAs<TupleType>()) {
-        if (reqTuple->getNumElements() != witnessTuple->getNumElements())
-          return false;
-
-        for (unsigned i = 0, n = reqTuple->getNumElements(); i != n; ++i) {
-          const auto &reqElt = reqTuple->getElements()[i];
-          const auto &witnessElt = witnessTuple->getElements()[i];
-
-          if (reqElt.getName() != witnessElt.getName() ||
-              reqElt.isVararg() != witnessElt.isVararg())
-            return false;
-
-          // Recurse on the tuple elements.
-          if (visit(reqTuple.getElementType(i), witnessElt.getType()))
-            return true;
-        }
-
-        return false;
-      }
-
-      return true;
-    }
-
-    bool visitReferenceStorageType(CanReferenceStorageType reqStorage,
-                                   Type witnessType) {
-      if (auto witnessStorage = witnessType->getAs<ReferenceStorageType>()) {
-        if (reqStorage->getKind() != witnessStorage->getKind())
-          return true;
-
-        return visit(reqStorage.getReferentType(), 
-                     witnessStorage->getReferentType());
-      }
-
-      return true;
-    }
-
-    bool visitNominalType(CanNominalType reqNominal, Type witnessType) {
-      // If the witness type is nominal and refers to a different
-      // nominal type, the match fails.
-      auto witnessNominalDecl = witnessType->getAnyNominal();
-      if (witnessNominalDecl && witnessNominalDecl != reqNominal->getDecl()) {
-        return true;
-      }
-
-      if (auto witnessNominal = witnessType->getAs<NominalType>()) {
-        if (reqNominal.getParent())
-          return visit(reqNominal.getParent(), witnessNominal->getParent());
-
-        return false;
-      }
-
+    /// Structural mismatches imply that the witness cannot match.
+    bool mismatch(TypeBase *firstType, TypeBase *secondType) {
+      // FIXME: Check whether one of the types is dependent?
       return false;
     }
 
-    bool visitAnyMetatypeType(CanAnyMetatypeType reqMeta, Type witnessType) {
-      if (auto witnessMeta = witnessType->getAs<AnyMetatypeType>()) {
-        if (reqMeta->getKind() != witnessMeta->getKind())
-          return false;
-
-        return visit(reqMeta.getInstanceType(), 
-                     witnessMeta->getInstanceType());
-      }
-
-      return true;
-    }
-
-    TRIVIAL_CASE(ModuleType)
-    TRIVIAL_CASE(DynamicSelfType)
-    TRIVIAL_CASE(ArchetypeType)
-    TRIVIAL_CASE(AbstractTypeParamType)
-
-    bool visitDependentMemberType(CanDependentMemberType reqType,
-                                  Type witnessType) {
+    /// Deduce associated types from dependent member types in the witness.
+    bool mismatch(DependentMemberType *firstDepMember,
+                  TypeBase *secondType) {
       auto proto = Conformance->getProtocol();
-      if (auto assocType = getReferencedAssocTypeOfProtocol(reqType, proto)) {
+      if (auto assocType = getReferencedAssocTypeOfProtocol(firstDepMember,
+                                                            proto)) {
         // If the witness type is non-dependent, add it as a
         // deduction.
-        if (!witnessType->isDependentType()) {
-          Inferred.Inferred.push_back({assocType, witnessType});
+        if (!secondType->isDependentType()) {
+          Inferred.Inferred.push_back({assocType, secondType});
         }
       }
 
-      return false;
-    }
-
-    bool visitAnyFunctionType(CanAnyFunctionType reqFunc, Type witnessType) {
-      if (auto witnessFunc = witnessType->getAs<AnyFunctionType>()) {
-        return visit(reqFunc.getInput(), witnessFunc->getInput()) ||
-               visit(reqFunc.getResult(), witnessFunc->getResult());
-      }
-
+      // Always allow mismatches here.
       return true;
     }
 
-    TRIVIAL_CASE(SILFunctionType)
-    TRIVIAL_CASE(SILBlockStorageType)
-    TRIVIAL_CASE(SILBoxType)
-    TRIVIAL_CASE(ProtocolCompositionType)
-
-    bool visitLValueType(CanLValueType reqLValue, Type witnessType) {
-      if (auto witnessLValue = witnessType->getAs<LValueType>()) {
-        return visit(reqLValue.getObjectType(), 
-                     witnessLValue->getObjectType());
-      }
-
+    /// FIXME: Recheck the type of Self against the second type?
+    bool mismatch(GenericTypeParamType *selfParamType,
+                  TypeBase *secondType) {
       return true;
     }
-
-    bool visitInOutType(CanInOutType reqInOut, Type witnessType) {
-      if (auto witnessInOut = witnessType->getAs<InOutType>()) {
-        return visit(reqInOut.getObjectType(), witnessInOut->getObjectType());
-      }
-
-      return true;
-    }
-
-    TRIVIAL_CASE(UnboundGenericType)
-
-    bool visitBoundGenericType(CanBoundGenericType reqBGT, Type witnessType) {
-      // If the witness type is nominal and refers to a different
-      // nominal type, the match fails.
-      auto witnessNominalDecl = witnessType->getAnyNominal();
-      if (witnessNominalDecl && witnessNominalDecl != reqBGT->getDecl()) {
-        return true;
-      }
-
-      if (auto witnessBGT = witnessType->getAs<BoundGenericType>()) {
-        if (reqBGT->getParent() && 
-            visit(reqBGT.getParent(), witnessBGT->getParent()))
-          return true;
-
-        for (unsigned i = 0, n = reqBGT->getGenericArgs().size(); i != n; ++i) {
-          if (visit(reqBGT.getGenericArgs()[i], 
-                    witnessBGT->getGenericArgs()[i]))
-            return true;
-        }
-
-        return false;
-      }
-
-      return !witnessType->isDependentType();
-    }
-
-    TRIVIAL_CASE(TypeVariableType)
-
-#undef TRIVIAL_CASE
   };
 
   // Match a requirement and witness type.
   MatchVisitor matchVisitor(Conformance, inferred);
   auto matchTypes = [&](Type reqType, Type witnessType)
                       -> Optional<RequirementMatch> {
-    if (matchVisitor.visit(reqType->getCanonicalType(), witnessType)) {
+    if (!matchVisitor.match(reqType, witnessType)) {
       return RequirementMatch(witness, MatchKind::TypeConflict,
                               fullWitnessType);
     }

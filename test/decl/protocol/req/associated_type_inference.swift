@@ -166,12 +166,12 @@ struct XCollectionLikeP0a<T> : CollectionLikeP0 {
 
 // rdar://problem/21304164
 public protocol Thenable {
-    typealias T // expected-note{{ambiguous inference of associated type 'T': 'T' vs. '(t: T, CorePromise<T>)'}}
+    typealias T // expected-note{{protocol requires nested type 'T'}}
     func then(success: (_: T) -> T) -> Self
 }
 
 public class CorePromise<T> : Thenable { // expected-error{{type 'CorePromise<T>' does not conform to protocol 'Thenable'}}
-    public func then(success: (t: T, _: CorePromise<T>) -> T) -> Self { // expected-note 2{{matching requirement 'then' to this declaration}}
+    public func then(success: (t: T, _: CorePromise<T>) -> T) -> Self {
         return self.then() { (t: T) -> T in
             return success(t: t, self)
         }
