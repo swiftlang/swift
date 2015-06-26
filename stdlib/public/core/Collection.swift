@@ -149,7 +149,7 @@ public protocol CollectionType : _prext_Indexable, SequenceType {
   typealias _prext_SubSequence: _prext_Indexable, SequenceType = _prext_Slice<Self>
 
   /// Returns the element at the given `position`.
-  subscript(_: Index) -> Generator.Element {get}
+  subscript(position: Index) -> Generator.Element {get}
   
   /// Returns a collection representing a contiguous sub-range of
   /// `self`'s elements.
