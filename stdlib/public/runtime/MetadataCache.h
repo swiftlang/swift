@@ -121,7 +121,6 @@ protected:
   CacheEntry() = default;
 
 public:
-  template<typename...ImplArgs>
   static Impl *allocate(MetadataAllocator &allocator,
                         const void * const *arguments,
                         size_t numArguments, size_t payloadSize) {

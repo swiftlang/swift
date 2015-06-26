@@ -56,12 +56,12 @@ FUNCTION(AllocBox2,       swift_allocBox2,      RuntimeCC,
 
 FUNCTION(DeallocBox2,     swift_deallocBox2,    RuntimeCC,
          RETURNS(VoidTy),
-         ARGS(RefCountedPtrTy, TypeMetadataPtrTy),
+         ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
 
 FUNCTION(ProjectBox2,     swift_projectBox2,    RuntimeCC,
          RETURNS(OpaquePtrTy),
-         ARGS(RefCountedPtrTy, TypeMetadataPtrTy),
+         ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind, ReadNone))
 
 // RefCounted *swift_allocObject(Metadata *type, size_t size, size_t alignMask);

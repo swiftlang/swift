@@ -896,6 +896,7 @@ extern "C" const Metadata *swift_dynamicCastTypeToObjCProtocolUnconditional(
                              protocols[0], protocol_getName(protocols[0]));
       
   case MetadataKind::HeapLocalVariable:
+  case MetadataKind::HeapGenericLocalVariable:
   case MetadataKind::ErrorObject:
     assert(false && "not type metadata");
     break;
@@ -941,6 +942,7 @@ extern "C" const Metadata *swift_dynamicCastTypeToObjCProtocolConditional(
     return nullptr;
       
   case MetadataKind::HeapLocalVariable:
+  case MetadataKind::HeapGenericLocalVariable:
   case MetadataKind::ErrorObject:
     assert(false && "not type metadata");
     break;
@@ -1230,6 +1232,7 @@ static Demangle::NodePointer _buildDemanglingForMetadata(const Metadata *type) {
     // FIXME: Some opaque types do have manglings, but we don't have enough info
     // to figure them out.
   case MetadataKind::HeapLocalVariable:
+  case MetadataKind::HeapGenericLocalVariable:
   case MetadataKind::ErrorObject:
     break;
   }

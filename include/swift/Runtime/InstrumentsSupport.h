@@ -25,6 +25,7 @@ extern "C" HeapObject *(*_swift_allocObject)(HeapMetadata const *metadata,
                                              size_t requiredAlignmentMask);
 
 extern "C" BoxPair::Return (*_swift_allocBox)(Metadata const *type);
+extern "C" BoxPair::Return (*_swift_allocBox2)(Metadata const *type);
 
 extern "C" HeapObject *(*_swift_retain)(HeapObject *object);
 extern "C" HeapObject *(*_swift_tryRetain)(HeapObject *object);

@@ -2292,6 +2292,7 @@ Metadata::getNominalTypeDescriptor() const {
   case MetadataKind::Metatype:
   case MetadataKind::ObjCClassWrapper:
   case MetadataKind::HeapLocalVariable:
+  case MetadataKind::HeapGenericLocalVariable:
   case MetadataKind::ErrorObject:
     return nullptr;
   }
@@ -2328,6 +2329,7 @@ Metadata::getClassObject() const {
   case MetadataKind::ExistentialMetatype:
   case MetadataKind::Metatype:
   case MetadataKind::HeapLocalVariable:
+  case MetadataKind::HeapGenericLocalVariable:
   case MetadataKind::ErrorObject:
     return nullptr;
   }

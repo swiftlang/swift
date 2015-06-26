@@ -127,10 +127,10 @@ entry:
   // CHECK: [[PTR:%.*]] = extractvalue { %swift.refcounted*, %swift.opaque* } [[ALLOC]], 1
   // CHECK: bitcast %swift.opaque* [[PTR]] to %V11typed_boxes3Dyn*
   %a = alloc_box $Dyn<T>
-  // CHECK: [[PTR:%.*]] = call %swift.opaque* @swift_projectBox2(%swift.refcounted* [[BOX]], %swift.type* [[METADATA]])
+  // CHECK: [[PTR:%.*]] = call %swift.opaque* @swift_projectBox2(%swift.refcounted* [[BOX]])
   // CHECK: bitcast %swift.opaque* [[PTR]] to %V11typed_boxes3Dyn*
   %b = project_box %a#0 : $@box Dyn<T>
-  // CHECK: call void @swift_deallocBox2(%swift.refcounted* [[BOX]], %swift.type* [[METADATA]])
+  // CHECK: call void @swift_deallocBox2(%swift.refcounted* [[BOX]])
   dealloc_box %a#0 : $@box Dyn<T>
   return undef : $()
 }
@@ -142,9 +142,9 @@ entry:
   // CHECK: [[BOX:%.*]] = extractvalue { %swift.refcounted*, %swift.opaque* } [[ALLOC]], 0
   // CHECK: [[PTR:%.*]] = extractvalue { %swift.refcounted*, %swift.opaque* } [[ALLOC]], 1
   %a = alloc_box $T
-  // CHECK: [[PTR:%.*]] = call %swift.opaque* @swift_projectBox2(%swift.refcounted* [[BOX]], %swift.type* %T)
+  // CHECK: [[PTR:%.*]] = call %swift.opaque* @swift_projectBox2(%swift.refcounted* [[BOX]])
   %b = project_box %a#0 : $@box T
-  // CHECK: call void @swift_deallocBox2(%swift.refcounted* [[BOX]], %swift.type* %T)
+  // CHECK: call void @swift_deallocBox2(%swift.refcounted* [[BOX]])
   dealloc_box %a#0 : $@box T
   return undef : $()
 }

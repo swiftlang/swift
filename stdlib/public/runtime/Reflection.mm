@@ -337,6 +337,9 @@ void swift_MagicMirrorData_summary(const Metadata *T, String *result) {
     case MetadataKind::HeapLocalVariable:
       new (result) String("(Heap Local Variable)");
       break;
+    case MetadataKind::HeapGenericLocalVariable:
+      new (result) String("(Heap Generic Local Variable)");
+      break;
     case MetadataKind::ErrorObject:
       new (result) String("(ErrorType Object)");
       break;
@@ -1092,6 +1095,7 @@ getImplementationForType(const Metadata *T, const OpaqueValue *Value) {
       
   // Types can't have these kinds.
   case MetadataKind::HeapLocalVariable:
+  case MetadataKind::HeapGenericLocalVariable:
   case MetadataKind::ErrorObject:
     swift::crash("Swift mirror lookup failure");
   }
@@ -1175,6 +1179,7 @@ getReflectableConformance(const Metadata *T, const OpaqueValue *Value) {
       
   // Types can't have these kinds.
   case MetadataKind::HeapLocalVariable:
+  case MetadataKind::HeapGenericLocalVariable:
   case MetadataKind::ErrorObject:
     swift::crash("Swift mirror lookup failure");
   }
@@ -1303,6 +1308,7 @@ static void swift_stdlib_getDemangledTypeNameImpl(OpaqueValue *value,
 
   // Values should never use these metadata kinds.
   case MetadataKind::HeapLocalVariable:
+  case MetadataKind::HeapGenericLocalVariable:
   case MetadataKind::ErrorObject:
     assert(false);
     new (result) String("");

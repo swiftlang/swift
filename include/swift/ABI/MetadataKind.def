@@ -71,11 +71,14 @@ METADATAKIND(ExistentialMetatype, 15)
 /// A foreign class, such as a Core Foundation class.
 METADATAKIND(ForeignClass, 16)
   
-/// A heap-allocated local variable.
+/// A heap-allocated local variable using statically-generated metadata.
 METADATAKIND(HeapLocalVariable, 64)
 
+/// A heap-allocated local variable using runtime-instantiated metadata.
+METADATAKIND(HeapGenericLocalVariable, 65)
+
 /// A native error object.
-METADATAKIND(ErrorObject, 65)
+METADATAKIND(ErrorObject, 128)
 
 /// All metadata kinds in this range are non-isa metadata. Any "metadata" values
 /// outside of this range are objective-c class isa pointers. These isa pointers

@@ -843,6 +843,7 @@ public:
     case MetadataKind::Metatype:
     case MetadataKind::ExistentialMetatype:
     case MetadataKind::HeapLocalVariable:
+    case MetadataKind::HeapGenericLocalVariable:
     case MetadataKind::ErrorObject:
       return false;
     }
@@ -866,6 +867,7 @@ public:
     case MetadataKind::Tuple:
     case MetadataKind::Function:
     case MetadataKind::HeapLocalVariable:
+    case MetadataKind::HeapGenericLocalVariable:
     case MetadataKind::ErrorObject:
       return false;
     }
