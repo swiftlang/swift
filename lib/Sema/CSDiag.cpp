@@ -1478,11 +1478,26 @@ public:
   /// the failed constraint system.
   bool diagnoseFailure();
 
+  
+  /// Each match in an ApplyExpr is evaluated for how close of a match it is.
+  /// The result is captured in this enum value, where the earlier entries are
+  /// most specific.
+  enum CandidateCloseness {
+    CC_ExactMatch,             // This is a perfect match for the arguments.
+    CC_NonLValueInOut,         // First argument is inout but no lvalue present.
+    CC_OneArgumentMismatch,    // All arguments except one match.
+    CC_ArgumentCountMismatch,  // This candidate has wrong # arguments.
+    CC_GeneralMismatch         // Something else is wrong.
+  };
+  
 private:
+
   /// Given a callee of the current node, attempt to determine a list of
   /// candidate functions that are being invoked.  If this returns an empty
   /// list, then nothing worked.
-  SmallVector<ValueDecl*, 4> collectCalleeCandidateInfo(Expr *Fn);
+  SmallVector<ValueDecl*, 4>
+  collectCalleeCandidateInfo(Expr *Fn, Type actualArgsType,
+                             CandidateCloseness &Closeness);
 
   /// Attempt to produce a diagnostic for a mismatch between an expression's
   /// type and its assumed contextual type.
@@ -1688,13 +1703,13 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure() {
       if (argType->getAs<TupleType>()) {
         CS->TC.diagnose(expr->getLoc(),
                         diag::cannot_find_appropriate_overload_with_type_list,
-                        overloadName.str(), argType)
+                        overloadName.str(), getTypeListString(argType))
         .highlight(expr->getSourceRange());
       } else {
         CS->TC.diagnose(expr->getLoc(),
                         diag::cannot_find_appropriate_overload_with_type,
                         overloadName.str(),
-                        argType)
+                        getTypeListString(argType))
         .highlight(expr->getSourceRange());
       }
     } else {
@@ -1953,7 +1968,7 @@ void FailureDiagnosis::suggestPotentialOverloads(StringRef functionName,
     }
   }
   
-  if (!suggestionText.length())
+  if (suggestionText.empty())
     return;
   
   CS->TC.diagnose(loc, diag::suggest_partial_overloads,
@@ -2167,9 +2182,50 @@ void ConstraintSystem::diagnoseAssignmentFailure(Expr *dest, Type destTy,
                             diag::assignment_lhs_not_lvalue);
 }
 
+static FailureDiagnosis::CandidateCloseness
+evaluateCloseness(ValueDecl *VD, ArrayRef<Type> actualArgs) {
+  // If the decl has a non-function type, it obviously doesn't match.
+  auto fnType = VD->getType()->getAs<AnyFunctionType>();
+  if (!fnType) return FailureDiagnosis::CC_GeneralMismatch;
+  
+  auto candArgs = decomposeArgumentType(fnType->getInput());
+
+  // FIXME: This isn't handling varargs.
+  if (actualArgs.size() != candArgs.size())
+    return FailureDiagnosis::CC_ArgumentCountMismatch;
+  
+  // Count the number of mismatched arguments.
+  unsigned mismatchingArgs = 0;
+  for (unsigned i = 0, e = actualArgs.size(); i != e; ++i) {
+    // FIXME: Right now, a "matching" overload is one with a parameter whose
+    // type is identical to one of the argument types. We can obviously do
+    // something more sophisticated with this.
+    if (!actualArgs[i]->getRValueType()->isEqual(candArgs[i]))
+      ++mismatchingArgs;
+  }
+  
+  // If the arguments match up exactly, then we have an exact match.  This
+  // handles the no-argument cases as well.
+  if (mismatchingArgs == 0)
+    return FailureDiagnosis::CC_ExactMatch;
+  
+  // Check to see if the first argument expects an inout argument, but is not
+  // an lvalue.
+  if (candArgs[0]->is<InOutType>() && !actualArgs[0]->isLValueType())
+    return FailureDiagnosis::CC_NonLValueInOut;
+  
+  if (mismatchingArgs == 1)
+    return FailureDiagnosis::CC_OneArgumentMismatch;
+
+  return FailureDiagnosis::CC_GeneralMismatch;
+}
+
+
 SmallVector<ValueDecl*, 4>
-FailureDiagnosis::collectCalleeCandidateInfo(Expr *fn) {
+FailureDiagnosis::collectCalleeCandidateInfo(Expr *fn, Type actualArgsType,
+                                             CandidateCloseness &Closeness) {
   SmallVector<ValueDecl*, 4> result;
+  Closeness = CC_GeneralMismatch;
 
   if (auto declRefExpr = dyn_cast<DeclRefExpr>(fn)) {
     result.push_back(declRefExpr->getDecl());
@@ -2178,11 +2234,35 @@ FailureDiagnosis::collectCalleeCandidateInfo(Expr *fn) {
                   overloadedDRE->getDecls().end());
   } else if (overloadConstraint) {
     result.push_back(overloadConstraint->getOverloadChoice().getDecl());
+  } else {
+    return result;
   }
 
+  // Now that we have the candidate list, figure out what the best matches from
+  // the candidate list are, and remove all the ones that aren't at that level.
+  auto actualArgs = decomposeArgumentType(actualArgsType);
+  SmallVector<CandidateCloseness, 4> closenessList;
+  closenessList.reserve(result.size());
+  for (auto decl : result) {
+    closenessList.push_back(evaluateCloseness(decl, actualArgs));
+    Closeness = std::min(Closeness, closenessList.back());
+  }
+
+  // Now that we know the minimum closeness, remove all the elements that aren't
+  // as close.
+  unsigned NextElt = 0;
+  for (unsigned i = 0, e = result.size(); i != e; ++i) {
+    // If this decl in the result list isn't a close match, ignore it.
+    if (Closeness != closenessList[i])
+      continue;
+    
+    // Otherwise, preserve it.
+    result[NextElt++] = result[i];
+  }
+  
+  result.erase(result.begin()+NextElt, result.end());
   return result;
 }
-
 
 bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
   // FIXME: seems weird to do this before looking at arguments.
@@ -2200,44 +2280,27 @@ bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
   if (!argTuple)
     return true;
   
-  auto Candidates = collectCalleeCandidateInfo(binop->getFn());
+  CandidateCloseness candidateCloseness;
+  auto Candidates = collectCalleeCandidateInfo(binop->getFn(), argTuple,
+                                               candidateCloseness);
   assert(!Candidates.empty() && "unrecognized unop function kind");
 
-  std::string overloadName = Candidates[0]->getNameStr();
-  assert(!overloadName.empty());
   expr->setType(ErrorType::get(CS->getASTContext()));
-
   
   // A common error is to apply an operator that only has an inout LHS (e.g. +=)
   // to non-lvalues (e.g. a local let).  Produce a nice diagnostic for this
   // case.
-  if (!argTuple->getElementType(0)->isLValueType()) {
-    bool allAreLValues = true;
-    for (auto decl : Candidates) {
-      auto fnType = decl->getType()->getAs<AnyFunctionType>();
-      if (!fnType) continue;
-      
-      auto tupleType = fnType->getInput()->getAs<TupleType>();
-      if (!tupleType || tupleType->getNumElements() < 1) continue;
-      
-      if (!tupleType->getElement(0).getType()->is<InOutType>()) {
-        allAreLValues = false;
-        break;
-      }
-    }
-    
-    if (allAreLValues) {
-      // Ok, that's the problem.  Special case it further based on what the
-      // actual expression is.
-      diagnoseSubElementFailure(argExpr->getElement(0), binop->getLoc(), *CS,
-                                diag::cannot_apply_lvalue_binop_to_subelement,
-                                diag::cannot_apply_lvalue_binop_to_rvalue);
-      return true;
-    }
+  if (candidateCloseness == CC_NonLValueInOut) {
+    diagnoseSubElementFailure(argExpr->getElement(0), binop->getLoc(), *CS,
+                              diag::cannot_apply_lvalue_binop_to_subelement,
+                              diag::cannot_apply_lvalue_binop_to_rvalue);
+    return true;
   }
   
   auto argTyName1 = getUserFriendlyTypeName(argTuple->getElementType(0));
   auto argTyName2 = getUserFriendlyTypeName(argTuple->getElementType(1));
+  std::string overloadName = Candidates[0]->getNameStr();
+  assert(!overloadName.empty());
   if (argTyName1.compare(argTyName2)) {
     CS->TC.diagnose(argExpr->getElement(0)->getLoc(),
                     diag::cannot_apply_binop_to_args,
@@ -2280,38 +2343,26 @@ bool FailureDiagnosis::visitUnaryExpr(ApplyExpr *applyExpr) {
   if (isErrorTypeKind(argType))
     return true;
 
-  auto Candidates = collectCalleeCandidateInfo(applyExpr->getFn());
+  CandidateCloseness candidateCloseness;
+  auto Candidates = collectCalleeCandidateInfo(applyExpr->getFn(), argType,
+                                               candidateCloseness);
   assert(!Candidates.empty() && "unrecognized unop function kind");
-
-  std::string overloadName = Candidates[0]->getNameStr();
-  assert(!overloadName.empty());
-
-  
   expr->setType(ErrorType::get(CS->getASTContext()));
   
   // A common error is to apply an operator that only has inout forms (e.g. ++)
   // to non-lvalues (e.g. a local let).  Produce a nice diagnostic for this
   // case.
-  if (!argType->isLValueType()) {
-    bool allAreLValues = true;
-    for (auto decl : Candidates) {
-      auto fnType = decl->getType()->getAs<AnyFunctionType>();
-      if (fnType && !fnType->getInput()->is<InOutType>()) {
-        allAreLValues = false;
-        break;
-      }
-    }
-    
-    if (allAreLValues) {
-      // Diagnose the case when the failure.
-      diagnoseSubElementFailure(argExpr, applyExpr->getFn()->getLoc(), *CS,
-                                diag::cannot_apply_lvalue_unop_to_subelement,
-                                diag::cannot_apply_lvalue_unop_to_rvalue);
-      return true;
-    }
+  if (candidateCloseness == CC_NonLValueInOut) {
+    // Diagnose the case when the failure.
+    diagnoseSubElementFailure(argExpr, applyExpr->getFn()->getLoc(), *CS,
+                              diag::cannot_apply_lvalue_unop_to_subelement,
+                              diag::cannot_apply_lvalue_unop_to_rvalue);
+    return true;
   }
 
   auto argTyName = getUserFriendlyTypeName(argType);
+  std::string overloadName = Candidates[0]->getNameStr();
+  assert(!overloadName.empty());
 
   // FIXME: Note that we don't currently suggest a partially matching overload.
   CS->TC.diagnose(argExpr->getLoc(),
@@ -2377,7 +2428,6 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *subscriptExpr) {
 }
 
 bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
-
   // If there are multiple available overloads to a call expression that
   // didn't have one of the expected attributes below, we may have recorded
   // multiple failures. These shouldn't fall through to the contextual
@@ -2389,8 +2439,10 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
       continue;
 
     if (failure.getKind() == Failure::FunctionNoEscapeMismatch) {
-        if (noEscapeSecondTypes.insert(failure.getSecondType()).second)
-          ::diagnoseFailure(*CS, failure, expr, false);
+      if (noEscapeSecondTypes.insert(failure.getSecondType()).second) {
+        ::diagnoseFailure(*CS, failure, expr, true);
+        return true;
+      }
     }
   }
 
