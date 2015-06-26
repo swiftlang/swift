@@ -983,6 +983,14 @@ static bool diagnoseAvailability(Type ty, IdentTypeRepr *IdType, SourceLoc Loc,
       return true;
   }
 
+  // Look through substituted types to diagnose when the original
+  // type is marked unavailable.
+  if (auto *ST = dyn_cast<SubstitutedType>(ty.getPointer())) {
+    if (diagnoseAvailability(ST->getOriginal(), IdType, Loc, DC, TC)) {
+      return true;
+    }
+  }
+
   CanType canTy = ty.getCanonicalTypeOrNull();
   if (canTy.isNull())
     return false;

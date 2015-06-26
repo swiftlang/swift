@@ -33,6 +33,16 @@ typealias int = Int // expected-note {{'int' has been explicitly marked unavaila
 @available(*, unavailable, renamed="Float")
 typealias float = Float // expected-note {{'float' has been explicitly marked unavailable here}}
 
+struct MyCollection<Element> {
+  @available(*, unavailable, renamed="Element")
+  typealias T = Element // expected-note 2{{'T' has been explicitly marked unavailable here}}
+
+  func foo(x: T) { } // expected-error {{'T' has been renamed to Element}}
+}
+
+extension MyCollection {
+  func append(element: T) { } // expected-error {{'T' has been renamed to Element}}
+}
 
 var x : int // expected-error {{'int' is unavailable: oh no you dont}}
 var y : float // expected-error {{'float' has been renamed to Float}}{{9-14=Float}}
