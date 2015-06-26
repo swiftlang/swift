@@ -135,6 +135,14 @@ public protocol CollectionType : _prext_Indexable, SequenceType {
   // IndexingGenerator. <rdar://problem/21539115>
   func generate() -> Generator
   
+  /// A `SequenceType` that can represent a contiguous subrange of `self`'s
+  /// elements.
+  ///
+  /// - Note: this associated type appears as a requirement in
+  ///   `SequenceType`, but is restated here with stricter
+  ///   constraints: in a `CollectionType`, the `SubSequence` should
+  ///   also be a `CollectionType`.
+  //
   // FIXME: should be constrained to CollectionType
   // (<rdar://problem/20715009> Implement recursive protocol
   // constraints)
