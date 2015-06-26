@@ -109,16 +109,16 @@ static void writeCompilationRecord(StringRef path, StringRef argsHash,
       inputs;
 
   for (auto &entry : endState.UnfinishedCommands) {
-    ArrayRef<Action *> actionInputs = entry.first->getSource().getInputs();
-    assert(actionInputs.size() == 1);
-    auto inputFile = cast<InputAction>(actionInputs.front());
+    for (auto *action : entry.first->getSource().getInputs()) {
+      auto inputFile = cast<InputAction>(action);
 
-    CompileJobAction::InputInfo info;
-    info.previousModTime = entry.first->getInputModTime();
-    info.status = entry.second ?
-        CompileJobAction::InputInfo::NeedsCascadingBuild :
-        CompileJobAction::InputInfo::NeedsNonCascadingBuild;
-    inputs[&inputFile->getInputArg()] = info;
+      CompileJobAction::InputInfo info;
+      info.previousModTime = entry.first->getInputModTime();
+      info.status = entry.second ?
+          CompileJobAction::InputInfo::NeedsCascadingBuild :
+          CompileJobAction::InputInfo::NeedsNonCascadingBuild;
+      inputs[&inputFile->getInputArg()] = info;
+    }
   }
 
   for (const Job *entry : endState.FinishedCommands) {
@@ -126,14 +126,14 @@ static void writeCompilationRecord(StringRef path, StringRef argsHash,
     if (!compileAction)
       continue;
 
-    ArrayRef<Action *> actionInputs = compileAction->getInputs();
-    assert(actionInputs.size() == 1);
-    auto inputFile = cast<InputAction>(actionInputs.front());
+    for (auto *action : compileAction->getInputs()) {
+      auto inputFile = cast<InputAction>(action);
 
-    CompileJobAction::InputInfo info;
-    info.previousModTime = entry->getInputModTime();
-    info.status = CompileJobAction::InputInfo::UpToDate;
-    inputs[&inputFile->getInputArg()] = info;
+      CompileJobAction::InputInfo info;
+      info.previousModTime = entry->getInputModTime();
+      info.status = CompileJobAction::InputInfo::UpToDate;
+      inputs[&inputFile->getInputArg()] = info;
+    }
   }
 
   std::error_code error;
