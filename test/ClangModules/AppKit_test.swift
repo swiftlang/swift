@@ -14,7 +14,9 @@ class MyDocument : NSDocument {
   }
 }
 
-func test(URL: NSURL) {
+func test(URL: NSURL, controller: NSDocumentController) {
   try! NSDocument(contentsOfURL: URL, ofType: "") // expected-warning{{unused}}
   try! MyDocument(contentsOfURL: URL, ofType: "")
+
+  try! controller.makeDocumentWithContentsOfURL(URL, ofType: "")
 }

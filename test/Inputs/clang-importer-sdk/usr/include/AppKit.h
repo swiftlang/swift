@@ -55,6 +55,14 @@
 -(void)noReturnMethod:(int)arg  __attribute__((noreturn));
 @end
 
+@interface NSDocumentController : NSObject
+- (nullable id)makeDocumentWithContentsOfURL:(NSURL *)url ofType:(NSString *)typeName error:(NSError **)outError;
+@end
+
+@interface NSDocumentController (NSDeprecated)
+- (nullable id)makeDocumentWithContentsOfURL:(NSURL *)url ofType:(null_unspecified NSString *)type __attribute__((availability(macosx, introduced=10.0, deprecated=10.4)));
+@end
+
 @interface URLDocument : NSObject
 - (instancetype)init NS_DESIGNATED_INITIALIZER;
 - (instancetype)initWithURL:(NSString *)urlString;

@@ -79,3 +79,7 @@ func testNonBlockFinal() throws {
 class VeryErrorProne : ErrorProne {
   override class func fail() throws {}
 }
+
+func testConflictWithUnavailable() throws {
+  try ErrorProne.doTheThing(42)
+}

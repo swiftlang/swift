@@ -37,6 +37,9 @@
 + (BOOL) runSwiftly: (NSInteger) speed error: (NSError**) err callback: (void(^)(void)) block;
 
 - (BOOL) integrate: (NSInteger) spec code: (NSInteger) code error: (NSError**) err;
+
++ (void)doTheThing:(NSInteger)whichThing __attribute__((swift, unavailable));
++ (BOOL)doTheThing:(NSInteger)whichThing error:(NSError **)error;
 @end
 
 @interface ReallyErrorProne : ErrorProne
