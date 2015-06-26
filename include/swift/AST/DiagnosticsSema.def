@@ -838,6 +838,8 @@ NOTE(associated_type_deduction_witness,sema_tcd,none,
      "matching requirement %0 to this declaration inferred associated type to "
      "%1",
      (DeclName, Type))
+NOTE(associated_type_deduction_default,sema_tcd,none,
+     "using associated type default %0", (Type))
 NOTE(ambiguous_witnesses_type,sema_tcd,none,
      "multiple matching types named %0", (Identifier))
 NOTE(protocol_witness_exact_match,sema_tcd,none,

@@ -3430,18 +3430,30 @@ void ConformanceChecker::resolveTypeWitnesses() {
   // Multiple solutions. Diagnose the ambiguity.
   for (auto assocType : unresolvedAssocTypes) {
     // Find two types that conflict.
-    Type firstType = solutions.front().TypeWitnesses[assocType].first;
-    std::pair<ValueDecl *, ValueDecl *> firstMatch
-      = solutions.front().ValueWitnesses[
-          solutions.front().TypeWitnesses[assocType].second];
+    auto &firstSolution = solutions.front();
+
+    // Local function to retrieve the value witness for the current associated
+    // type within the given solution.
+    auto getValueWitness = [&](InferredTypeWitnessesSolution &solution) {
+      unsigned witnessIdx = solution.TypeWitnesses[assocType].second;
+      if (witnessIdx < solution.ValueWitnesses.size())
+        return solution.ValueWitnesses[witnessIdx];
+
+      return std::pair<ValueDecl *, ValueDecl *>(nullptr, nullptr);
+    };
+
+    Type firstType = firstSolution.TypeWitnesses[assocType].first;
+
+    // Extract the value witness used to deduce this associated type, if any.
+    auto firstMatch = getValueWitness(firstSolution);
+
     Type secondType;
     std::pair<ValueDecl *, ValueDecl *> secondMatch;
     for (auto &solution : solutions) {
       Type typeWitness = solution.TypeWitnesses[assocType].first;
       if (!typeWitness->isEqual(firstType)) {
         secondType = typeWitness;
-        secondMatch = solution.ValueWitnesses[
-                        solution.TypeWitnesses[assocType].second];
+        secondMatch = getValueWitness(solution);
         break;
       }
     }
@@ -3455,11 +3467,25 @@ void ConformanceChecker::resolveTypeWitnesses() {
         TypeChecker &tc, NormalProtocolConformance *conformance) {
         tc.diagnose(assocType, diag::ambiguous_associated_type_deduction,
                     assocType->getFullName(), firstType, secondType);
-      
-        tc.diagnose(firstMatch.second, diag::associated_type_deduction_witness,
-                    firstMatch.first->getFullName(), firstType);
-        tc.diagnose(secondMatch.second, diag::associated_type_deduction_witness,
-                    secondMatch.second->getFullName(), secondType);
+
+        auto diagnoseWitness = [&](std::pair<ValueDecl *, ValueDecl *> match,
+                                   Type type){
+          // If we have a requirement/witness pair, diagnose it.
+          if (match.first && match.second) {
+            tc.diagnose(match.second, diag::associated_type_deduction_witness,
+                        match.first->getFullName(), type);
+
+            return;
+          }
+
+          // Otherwise, we have a default.
+          tc.diagnose(assocType, diag::associated_type_deduction_default,
+                      type)
+            .highlight(assocType->getDefaultDefinitionLoc().getSourceRange());
+        };
+
+        diagnoseWitness(firstMatch, firstType);
+        diagnoseWitness(secondMatch, secondType);
       });
 
     return;
