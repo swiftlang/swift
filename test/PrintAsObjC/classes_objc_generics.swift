@@ -57,6 +57,25 @@ import CoreFoundation
   }
 }
 
+// CHECK: @class CustomName2;
+// CHECK-LABEL: SWIFT_CLASS_NAMED("ClassWithCustomName")
+// CHECK-NEXT: @interface CustomName{{$}}
+// CHECK-NEXT: - (void)forwardCustomName:(CustomName2 * __nonnull)_;
+// CHECK-NEXT: init
+// CHECK-NEXT: @end
+@objc(CustomName)
+class ClassWithCustomName {
+  func forwardCustomName(_: ClassWithCustomName2) {}
+}
+  
+// CHECK-LABEL: SWIFT_CLASS_NAMED("ClassWithCustomName2")
+// CHECK-NEXT: @interface CustomName2{{$}}
+// CHECK-NEXT: init
+// CHECK-NEXT: @end
+@objc(CustomName2)
+class ClassWithCustomName2 {}
+
+
 // CHECK-LABEL: @interface ClassWithNSObjectProtocol <NSObject>
 // CHECK-NEXT: @property (nonatomic, readonly, copy) NSString * __nonnull description;
 // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
@@ -121,6 +140,7 @@ class NotObjC {}
 // CHECK-NEXT: - (void)testSetBridging:(NSSet * __nonnull)a;
 // CHECK-NEXT: - (IBAction)actionMethod:(id __nonnull)_;
 // CHECK-NEXT: - (void)methodWithReservedParameterNames:(id __nonnull)long_ protected:(id __nonnull)protected_;
+// CHECK-NEXT: - (void)honorRenames:(CustomName * __nonnull)_;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Methods {
@@ -168,6 +188,8 @@ class NotObjC {}
   @IBAction func actionMethod(_: AnyObject) {}
 
   func methodWithReservedParameterNames(long: AnyObject, protected: AnyObject) {}
+
+  func honorRenames(_: ClassWithCustomName) {}
 }
 
 typealias AliasForNSRect = NSRect

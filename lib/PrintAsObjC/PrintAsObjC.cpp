@@ -66,6 +66,28 @@ static bool isClangKeyword(Identifier name) {
 
 
 namespace {
+  enum CustomNamesOnly_t : bool {
+    Normal = false,
+    CustomNamesOnly = true,
+  };
+}
+
+static Identifier getNameForObjC(const NominalTypeDecl *NTD,
+                                 CustomNamesOnly_t customNamesOnly = Normal) {
+  // FIXME: Should we support renaming for enums too?
+  assert(isa<ClassDecl>(NTD) || isa<ProtocolDecl>(NTD));
+  if (auto objc = NTD->getAttrs().getAttribute<ObjCAttr>()) {
+    if (auto name = objc->getName()) {
+      assert(name->getNumSelectorPieces() == 1);
+      return name->getSelectorPieces().front();
+    }
+  }
+
+  return customNamesOnly ? Identifier() : NTD->getName();
+}
+
+
+namespace {
 class ObjCPrinter : private DeclVisitor<ObjCPrinter>,
                     private TypeVisitor<ObjCPrinter, void, 
                                         Optional<OptionalTypeKind>> {
@@ -127,14 +149,7 @@ private:
 
     os << " <";
     interleave(protosToPrint,
-               [this](const ProtocolDecl *PD) {
-                 if (PD->hasClangNode()) {
-                   SmallString<64> buf;
-                   os << PD->getObjCRuntimeName(buf);
-                 } else {
-                   os << PD->getName().str();
-                  }
-               },
+               [this](const ProtocolDecl *PD) { os << getNameForObjC(PD); },
                [this] { os << ", "; });
     os << ">";
   }
@@ -168,9 +183,17 @@ private:
 
   void visitClassDecl(ClassDecl *CD) {
     printDocumentationComment(CD);
-    llvm::SmallString<32> scratch;
-    os << "SWIFT_CLASS(\"" << CD->getObjCRuntimeName(scratch) << "\")\n"
-       << "@interface " << CD->getName();
+
+    Identifier customName = getNameForObjC(CD, CustomNamesOnly);
+    if (customName.empty()) {
+      llvm::SmallString<32> scratch;
+      os << "SWIFT_CLASS(\"" << CD->getObjCRuntimeName(scratch) << "\")\n"
+         << "@interface " << CD->getName();
+    } else {
+      os << "SWIFT_CLASS_NAMED(\"" << CD->getName() << "\")\n"
+         << "@interface " << customName;
+    }
+
     if (Type superTy = CD->getSuperclass())
       os << " : " << superTy->getClassOrBoundGenericClass()->getName();
     printProtocols(CD->getLocalProtocols(ConformanceLookupKind::OnlyExplicit));
@@ -191,9 +214,17 @@ private:
 
   void visitProtocolDecl(ProtocolDecl *PD) {
     printDocumentationComment(PD);
-    llvm::SmallString<32> scratch;
-    os << "SWIFT_PROTOCOL(\"" << PD->getObjCRuntimeName(scratch) << "\")\n"
-       << "@protocol " << PD->getName();
+
+    Identifier customName = getNameForObjC(PD, CustomNamesOnly);
+    if (customName.empty()) {
+      llvm::SmallString<32> scratch;
+      os << "SWIFT_PROTOCOL(\"" << PD->getObjCRuntimeName(scratch) << "\")\n"
+         << "@protocol " << PD->getName();
+    } else {
+      os << "SWIFT_PROTOCOL_NAMED(\"" << PD->getName() << "\")\n"
+         << "@protocol " << customName;
+    }
+
     printProtocols(PD->getInheritedProtocols(nullptr));
     os << "\n";
     assert(!protocolMembersOptional && "protocols start required");
@@ -959,7 +990,7 @@ private:
         printNullability(optionalKind);
       }
     } else {
-      os << CD->getName() << " *";
+      os << getNameForObjC(CD) << " *";
       printNullability(optionalKind);
     }
   }
@@ -1319,14 +1350,16 @@ public:
   bool forwardDeclare(const ClassDecl *CD) {
     if (!CD->isObjC() || CD->isForeign())
       return false;
-    forwardDeclare(CD, [&]{ os << "@class " << CD->getName() << ";\n"; });
+    forwardDeclare(CD, [&]{ os << "@class " << getNameForObjC(CD) << ";\n"; });
     return true;
   }
 
   void forwardDeclare(const ProtocolDecl *PD) {
     assert(PD->isObjC() ||
            *PD->getKnownProtocolKind() == KnownProtocolKind::AnyObject);
-    forwardDeclare(PD, [&]{ os << "@protocol " << PD->getName() << ";\n"; });
+    forwardDeclare(PD, [&]{
+      os << "@protocol " << getNameForObjC(PD) << ";\n";
+    });
   }
   
   void forwardDeclare(const EnumDecl *ED) {
@@ -1531,6 +1564,13 @@ public:
            "#else\n"
            "# define SWIFT_RUNTIME_NAME(X)\n"
            "#endif\n"
+           "#if defined(__has_attribute) && "
+             "__has_attribute(swift_name)\n"
+           "# define SWIFT_COMPILE_NAME(X) "
+             "__attribute__((swift_name(X)))\n"
+           "#else\n"
+           "# define SWIFT_COMPILE_NAME(X)\n"
+           "#endif\n"
            "#if !defined(SWIFT_CLASS_EXTRA)\n"
            "# define SWIFT_CLASS_EXTRA\n"
            "#endif\n"
@@ -1546,14 +1586,23 @@ public:
            "#  define SWIFT_CLASS(SWIFT_NAME) SWIFT_RUNTIME_NAME(SWIFT_NAME) "
              "__attribute__((objc_subclassing_restricted)) "
              "SWIFT_CLASS_EXTRA\n"
+           "#  define SWIFT_CLASS_NAMED(SWIFT_NAME) "
+             "__attribute__((objc_subclassing_restricted)) "
+             "SWIFT_CLASS_EXTRA\n"
            "# else\n"
            "#  define SWIFT_CLASS(SWIFT_NAME) SWIFT_RUNTIME_NAME(SWIFT_NAME) "
+             "SWIFT_CLASS_EXTRA\n"
+           "#  define SWIFT_CLASS_NAMED(SWIFT_NAME) "
+             "SWIFT_COMPILE_NAME(SWIFT_NAME) "
              "SWIFT_CLASS_EXTRA\n"
            "# endif\n"
            "#endif\n"
            "\n"
            "#if !defined(SWIFT_PROTOCOL)\n"
            "# define SWIFT_PROTOCOL(SWIFT_NAME) SWIFT_RUNTIME_NAME(SWIFT_NAME) "
+             "SWIFT_PROTOCOL_EXTRA\n"
+           "# define SWIFT_PROTOCOL_NAMED(SWIFT_NAME) "
+             "SWIFT_COMPILE_NAME(SWIFT_NAME) "
              "SWIFT_PROTOCOL_EXTRA\n"
            "#endif\n"
            "\n"
