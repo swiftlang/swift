@@ -646,11 +646,11 @@ namespace {
           return false;
         
         // Figure out the parameter type.
-        if (value->getDeclContext()->isTypeContext() &&
-            isa<FuncDecl>(value) && !value->isStatic()) {
-          fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
+        if (auto *FD = dyn_cast<AbstractFunctionDecl>(value)) {
+          if (FD->getImplicitSelfDecl()) {
+            fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
+          }
         }
-        
         Type paramTy = fnTy->getInput();
         
         return favoredTy->isEqual(paramTy);
