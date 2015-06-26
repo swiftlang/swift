@@ -998,14 +998,14 @@ static bool diagnoseFailure(ConstraintSystem &cs,
     break;
   }
 
-    case Failure::ExistentialIsNotObjC: {
-      tc.diagnose(loc, diag::existential_non_objc,
-                  failure.getFirstType(), failure.getSecondType())
-      .highlight(range1);
-      if (!useExprLoc)
-        noteTargetOfDiagnostic(cs, failure, locator);
-      break;
-    }
+  case Failure::ExistentialIsNotObjC: {
+    tc.diagnose(loc, diag::existential_non_objc,
+                failure.getFirstType(), failure.getSecondType())
+    .highlight(range1);
+    if (!useExprLoc)
+      noteTargetOfDiagnostic(cs, failure, locator);
+    break;
+  }
 
   case Failure::IsNotMaterializable: {
     tc.diagnose(loc, diag::cannot_bind_generic_parameter_to_type,
