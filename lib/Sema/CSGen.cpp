@@ -646,7 +646,8 @@ namespace {
           return false;
         
         // Figure out the parameter type.
-        if (value->getDeclContext()->isTypeContext()) {
+        if (value->getDeclContext()->isTypeContext() &&
+            isa<FuncDecl>(value) && !value->isStatic()) {
           fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
         }
         

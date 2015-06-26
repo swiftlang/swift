@@ -116,3 +116,8 @@ func availTest(x: Any) { markUsed("this one") }
 func doAvailTest(x: Int) {
   availTest(x)
 }
+
+// rdar://problem/20886179
+func test20886179(handlers: [(Int) -> Void], buttonIndex: Int) {
+    handlers[buttonIndex](buttonIndex)
+}
