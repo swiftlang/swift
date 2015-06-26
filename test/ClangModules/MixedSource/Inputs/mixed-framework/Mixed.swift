@@ -10,3 +10,12 @@
 public class PureSwiftClass {
   public class func verify() -> Bool { return true }
 }
+
+@objc(SwiftProtoWithCustomName)
+public protocol CustomNameType {}
+
+@objc(SwiftClassWithCustomName)
+public class CustomNameClass : CustomNameType {
+  public init() {}
+  @nonobjc func pureSwiftMethod() {}
+}
