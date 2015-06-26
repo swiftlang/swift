@@ -719,8 +719,7 @@ ArrayRef<Substitution> BoundGenericType::getSubstitutions(
           conformances.push_back(nullptr);
           break;
         case ConformanceKind::DoesNotConform:
-          if (type->is<ErrorType>())
-            conformances.push_back(nullptr);
+          conformances.push_back(nullptr);
           break;
         }
       }
