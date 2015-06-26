@@ -73,18 +73,22 @@ func protocolTypeof(x: Bas) -> Bas.Type {
   return x.dynamicType
 }
 
-// FIXME: The typechecker doesn't support this conversion.
-/*
 struct Zim : Bas {}
 class Zang : Bas {}
 
+// CHECK-LABEL: define hidden { %swift.type*, i8** } @_TF17generic_metatypes15metatypeErasureFMVS_3ZimPMPS_3Bas_() #0
 func metatypeErasure(z: Zim.Type) -> Bas.Type {
+  // CHECK: ret { %swift.type*, i8** } {{.*}} @_TMdV17generic_metatypes3Zim {{.*}} @_TWPV17generic_metatypes3ZimS_3BasS_
   return z
 }
+
+// CHECK-LABEL: define hidden { %swift.type*, i8** } @_TF17generic_metatypes15metatypeErasureFMCS_4ZangPMPS_3Bas_(%swift.type*) #0
 func metatypeErasure(z: Zang.Type) -> Bas.Type {
+  // CHECK: [[RET:%.*]] = insertvalue { %swift.type*, i8** } undef, %swift.type* %0, 0
+  // CHECK: [[RET2:%.*]] = insertvalue { %swift.type*, i8** } [[RET]], i8** getelementptr inbounds ([0 x i8*], [0 x i8*]* @_TWPC17generic_metatypes4ZangS_3BasS_, i32 0, i32 0), 1
+  // CHECK: ret { %swift.type*, i8** } [[RET2]]
   return z
 }
-*/
 
 struct OneArg<T> {}
 struct TwoArgs<T, U> {}
