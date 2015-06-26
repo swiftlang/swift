@@ -139,6 +139,30 @@ extension Dictionary : _ObjectiveCBridgeable {
   }
 }
 
+extension Set : _ObjectiveCBridgeable {
+  public static func _isBridgedToObjectiveC() -> Bool {
+    return true
+  }
+
+  public static func _getObjectiveCType() -> Any.Type {
+    return NSSet.self
+  }
+  public func _bridgeToObjectiveC() -> NSSet {
+    return NSSet()
+  }
+  public static func _forceBridgeFromObjectiveC(
+    x: NSSet,
+    inout result: Set?
+  ) {
+  }
+  public static func _conditionallyBridgeFromObjectiveC(
+    x: NSSet,
+    inout result: Set?
+  ) -> Bool {
+    return true
+  }
+}
+
 extension CGFloat : _ObjectiveCBridgeable {
   public static func _isBridgedToObjectiveC() -> Bool {
     return true

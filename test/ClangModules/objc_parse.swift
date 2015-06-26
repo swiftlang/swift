@@ -178,9 +178,9 @@ func keyedSubscripting(b: B, idx: A, a: A) {
 }
 
 // Typed indexed subscripting
-func checkHive(hive: Hive, b: B) {
-  let b2 = hive.bees[5] as! B
-  b2.method(1, withFloat:1.5)
+func checkHive(hive: Hive, b: Bee) {
+  let b2 = hive.bees[5] as Bee
+  b2.buzz()
 }
 
 // Protocols
@@ -303,7 +303,7 @@ class NSObjectable : NSObjectProtocol {
 
 
 // Properties with custom accessors
-func customAccessors(hive: Hive, bee: B) {
+func customAccessors(hive: Hive, bee: Bee) {
   markUsed(hive.makingHoney)
   markUsed(hive.isMakingHoney()) // expected-error{{'Hive' does not have a member named 'isMakingHoney'}}
   hive.setMakingHoney(true) // expected-error{{'Hive' does not have a member named 'setMakingHoney'}}
@@ -314,7 +314,7 @@ func customAccessors(hive: Hive, bee: B) {
 }
 
 // instancetype/Dynamic Self invocation.
-func testDynamicSelf(queen: B, wobbler: NSWobbling) {
+func testDynamicSelf(queen: Bee, wobbler: NSWobbling) {
   var hive = Hive()
 
   // Factory method with instancetype result.

@@ -8,6 +8,9 @@
 #import <CoreGraphics.h>
 #endif
 
+#define NS_DESIGNATED_INITIALIZER __attribute__((objc_designated_initializer))
+
+
 typedef struct objc_object { void *isa; } *id;
 
 typedef struct _NSZone NSZone;
@@ -81,7 +84,15 @@ __attribute__((availability(ios,introduced=8.0)))
 @class NSString, NSArray, NSDictionary, NSSet, NSEnumerator;
 
 /// Aaa.  NSArray.  Bbb.
-@interface NSArray : NSObject
+@interface NSArray<ObjectType> : NSObject
+- (nonnull ObjectType)objectAtIndexedSubscript:(NSUInteger)idx;
+- description;
++ (instancetype)arrayWithObjects:(const ObjectType __nonnull [__nullable])objects count:(NSUInteger)count;
+- (void)makeObjectsPerformSelector:(nonnull SEL)aSelector;
+- (void)makeObjectsPerformSelector:(nonnull SEL)aSelector withObject:(nullable ObjectType)anObject;
+@end
+
+@interface DummyClass : NSObject
 - (nonnull id)objectAtIndexedSubscript:(NSUInteger)idx;
 - description;
 
@@ -91,12 +102,9 @@ __attribute__((availability(ios,introduced=8.0)))
 @property NSDictionary *dictProperty;
 @property NSSet *setProperty;
 
-+ (nonnull instancetype)arrayWithObjects:(const id __nonnull[__nullable])objects count:(NSUInteger)count;
-- (void)makeObjectsPerformSelector:(SEL)aSelector;
-- (void)makeObjectsPerformSelector:(SEL)aSelector withObject:(id)anObject;
 @end
 
-@interface NSArray (Extras)
+@interface DummyClass (Extras)
 @property NSString *nsstringProperty2;
 @end
 
@@ -114,41 +122,41 @@ __attribute__((availability(ios,introduced=8.0)))
 - (id)copyWithZone:(NSZone *)zone;
 @end
 
-@interface NSDictionary : NSObject /*<NSCopying, NSMutableCopying, NSSecureCoding, NSFastEnumeration>*/
+@interface NSDictionary<KeyType : id<NSCopying>, ObjectType> : NSObject /*<NSCopying, NSMutableCopying, NSSecureCoding, NSFastEnumeration>*/
 @property (readonly) NSUInteger count;
-- (nullable id)objectForKey:(nonnull id)aKey;
+- (nullable ObjectType)objectForKey:(nonnull KeyType)aKey;
 - (nonnull NSEnumerator *)keyEnumerator;
 @end
-@interface NSDictionary (NSExtendedDictionary)
-- (nullable id)objectForKeyedSubscript:(nonnull id)key /*NS_AVAILABLE(10_8, 6_0)*/;
+@interface NSDictionary<KeyType, ObjectType> (NSExtendedDictionary)
+- (nullable ObjectType)objectForKeyedSubscript:(nonnull KeyType)key;
 @end
 
 @interface NSDictionary (Inits)
 - (nonnull instancetype)init;
 @end
 
-@interface NSMutableDictionary : NSDictionary
-- (void)removeObjectForKey:(nonnull id)aKey;
-- (void)setObject:(nonnull id)anObject forKey:(nonnull id <NSCopying>)aKey;
+@interface NSMutableDictionary<KeyType : id<NSCopying>, ObjectType> : NSDictionary<KeyType, ObjectType>
+- (void)removeObjectForKey:(nonnull KeyType)aKey;
+- (void)setObject:(nonnull ObjectType)anObject forKey:(nonnull KeyType)aKey;
 @end
 
-@interface NSMutableDictionary (NSExtendedMutableDictionary)
-- (void)setObject:(nullable id)obj forKeyedSubscript:(nonnull id <NSCopying>)key /*NS_AVAILABLE(10_8, 6_0)*/;
+@interface NSMutableDictionary<KeyType, ObjectType> (NSExtendedMutableDictionary)
+- (void)setObject:(nullable ObjectType)obj forKeyedSubscript:(nonnull KeyType)key;
 @end
 
-@interface NSSet : NSObject
+@interface NSSet<KeyType> : NSObject
 - (nonnull instancetype)init;
 - (NSUInteger)count;
-- (nonnull id)anyObject;
-- (nonnull instancetype)initWithArray:(nonnull NSArray *)array;
+- (nonnull KeyType)anyObject;
+- (nonnull instancetype)initWithArray:(nonnull NSArray<KeyType> *)array;
 @end
 
-@interface NSMutableSet : NSSet
-- (void)addObject:(nonnull id)obj;
-- (void)removeObject:(nonnull id)obj;
+@interface NSMutableSet<KeyType> : NSSet<KeyType>
+- (void)addObject:(KeyType)obj;
+- (void)removeObject:(KeyType)obj;
 @end
 
-@interface NSNumber : NSObject
+@interface NSNumber : NSObject <NSCopying>
 @end
 
 @interface NSDecimalNumber : NSObject
@@ -173,23 +181,38 @@ __attribute__((availability(ios,introduced=8.0)))
 
 NSString *NSStringToNSString(NSString *str);
 
+@interface Bee : NSObject
+-(void)buzz;
+@end
+
 @interface Hive : NSObject {
-  B *queen;
+  Bee *queen;
 }
 - init;
 - (instancetype)initWithCoder:(NSCoder *)aDecoder;
 
-@property __attribute__((iboutletcollection(B))) NSArray *bees;
+@property (nonnull) NSArray<Bee *> *bees;
+@property (nullable) NSDictionary<NSString *, Bee *> *beesByName;
+@property (nonnull) NSSet<Bee *> *allBees;
+@property (nonnull) NSDictionary<id <NSCopying>, Bee *> *anythingToBees;
 
 @property(getter=isMakingHoney) BOOL makingHoney;
 @property(setter=assignGuard:) id guard;
 
-+ (instancetype)hiveWithQueen:(B *)queen;
++ (instancetype)hiveWithQueen:(Bee *)queen;
 
 - (instancetype)visit;
 @end
 
 @interface NSMutableString : NSString
+@end
+
+@interface NSURL : NSObject
++ (instancetype)URLWithString:(NSString *)URLString;
+@end
+
+@interface NSAttributedString : NSString
+- (NSAttributedString *)sliceAttributedString:(NSInteger)startIndex;
 @end
 
 BOOL BOOLtoBOOL(BOOL b);
@@ -622,12 +645,6 @@ typedef NS_OPTIONS(NSUInteger, NSExplicitlyUnavailableOnOSXOptions) {
 - (id)initWithWobble:(int)wobble;
 @end
 
-#define NS_DESIGNATED_INITIALIZER __attribute__((objc_designated_initializer))
-
-@interface NSURL : NSObject
-+ (instancetype)URLWithString:(NSString *)URLString;
-@end
-
 @interface NSURLRequest : NSObject
 + (instancetype)requestWithString:(NSString *)URLString;
 + (instancetype)URLRequestWithURL:(NSURL *)URL;
@@ -637,10 +654,6 @@ typedef struct _NSRange {
     NSUInteger location;
     NSUInteger length;
 } NSRange;
-
-@interface NSAttributedString : NSString
-- (NSAttributedString *)sliceAttributedString:(NSInteger)startIndex;
-@end
 
 NS_SWIFT_UNAVAILABLE("NSInvocation and related APIs not available")
 @interface NSInvocation : NSObject

@@ -6,20 +6,20 @@
 // RUN: mkdir %t
 
 // FIXME: BEGIN -enable-source-import hackaround
-// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/objc-generics-sdk -I %t) -emit-module -o %t  %S/../Inputs/objc-generics-sdk/swift-modules/ObjectiveC.swift
-// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/objc-generics-sdk -I %t) -emit-module -o %t  %S/../Inputs/objc-generics-sdk/swift-modules/CoreGraphics.swift
-// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/objc-generics-sdk -I %t) -emit-module -o %t  %S/../Inputs/objc-generics-sdk/swift-modules/Foundation.swift
-// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/objc-generics-sdk -I %t) -emit-module -o %t  %S/../Inputs/objc-generics-sdk/swift-modules/AppKit.swift
+// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/ObjectiveC.swift
+// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/CoreGraphics.swift
+// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/Foundation.swift
+// RUN:  %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %S/../Inputs/clang-importer-sdk/swift-modules/AppKit.swift
 // FIXME: END -enable-source-import hackaround
 
 
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/objc-generics-sdk -I %t) -emit-module -o %t  %s
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/objc-generics-sdk -I %t) -parse-as-library %t/classes_objc_generics.swiftmodule -parse -emit-objc-header-path %t/classes.h -import-objc-header %S/../Inputs/empty.h
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -parse-as-library %t/classes_objc_generics.swiftmodule -parse -emit-objc-header-path %t/classes.h -import-objc-header %S/../Inputs/empty.h
 // RUN: FileCheck %s < %t/classes.h
 // RUN: FileCheck --check-prefix=NEGATIVE %s < %t/classes.h
-// RUN: %check-in-clang-objc-generics %t/classes.h
-// RUN: not %check-in-clang-objc-generics -fno-modules %t/classes.h
-// RUN: %check-in-clang-objc-generics -fno-modules %t/classes.h -include Foundation.h -include CoreFoundation.h
+// RUN: %check-in-clang %t/classes.h
+// RUN: not %check-in-clang -fno-modules %t/classes.h
+// RUN: %check-in-clang -fno-modules %t/classes.h -include Foundation.h -include CoreFoundation.h
 
 // CHECK-NOT: AppKit;
 // CHECK-NOT: Properties;
@@ -78,10 +78,12 @@ class ClassWithCustomName2 {}
 
 // CHECK-LABEL: @interface ClassWithNSObjectProtocol <NSObject>
 // CHECK-NEXT: @property (nonatomic, readonly, copy) NSString * __nonnull description;
+// CHECK-NEXT: - (BOOL)conformsToProtocol:(Protocol * __nonnull)_;
 // CHECK-NEXT: - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: @end
 @objc class ClassWithNSObjectProtocol : NSObjectProtocol {
   var description: String { return "me" }
+  func conformsToProtocol(_: Protocol) -> Bool { return false }
 }
 
 // CHECK-LABEL: @interface Initializers
@@ -434,6 +436,7 @@ public class NonObjCClass { }
 // CHECK-LABEL: @interface PropertiesOverridden
 // CHECK-NEXT: @property (nonatomic, copy) NSArray<Bee *> * __nonnull bees;
 // CHECK-NEXT: - (null_unspecified instancetype)init
+// CHECK-NEXT: - (null_unspecified instancetype)initWithCoder:(NSCoder * __null_unspecified)aDecoder OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: @end
 @objc class PropertiesOverridden : Hive {
   override var bees : [Bee] {

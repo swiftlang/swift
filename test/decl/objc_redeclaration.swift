@@ -56,6 +56,6 @@ extension Redecl1 {
   @objc func wibble() -> Int { return 0 } // expected-error{{method 'wibble()' with Objective-C selector 'wibble' conflicts with getter for 'other' with the same Objective-C selector}}
 }
 
-extension NSArray {
+extension DummyClass {
   func nsstringProperty2() -> Int { return 0 } // expected-error{{method 'nsstringProperty2()' with Objective-C selector 'nsstringProperty2' conflicts with previous declaration with the same Objective-C selector}}
 }

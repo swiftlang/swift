@@ -5,11 +5,11 @@
 import Foundation
 import ObjCParseExtras
 
-class MyArray : NSArray {
-  func setBoolProperty(x: Bool) { } // expected-error{{method 'setBoolProperty' with Objective-C selector 'setBoolProperty:' conflicts with setter for 'boolProperty' from superclass 'NSArray' with the same Objective-C selector}}
+class MyArray : DummyClass {
+  func setBoolProperty(x: Bool) { } // expected-error{{method 'setBoolProperty' with Objective-C selector 'setBoolProperty:' conflicts with setter for 'boolProperty' from superclass 'DummyClass' with the same Objective-C selector}}
 
   @objc(objectAtIndexedSubscript:)
-  func getObjectAt(i: Int) { } // expected-error{{method 'getObjectAt' with Objective-C selector 'objectAtIndexedSubscript:' conflicts with method 'objectAtIndexedSubscript' from superclass 'NSArray' with the same Objective-C selector}}
+  func getObjectAt(i: Int) { } // expected-error{{method 'getObjectAt' with Objective-C selector 'objectAtIndexedSubscript:' conflicts with method 'objectAtIndexedSubscript' from superclass 'DummyClass' with the same Objective-C selector}}
 }
 
 class SomeCellSub1 : SomeCell {

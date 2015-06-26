@@ -5,7 +5,7 @@
 import AppKit
 import NotificationCenter
 
-func testInstanceTypeFactoryMethod(queen: B) {
+func testInstanceTypeFactoryMethod(queen: Bee) {
   _ = Hive(queen: queen)
   
   _ = NSObjectFactory() // okay, prefers init method
@@ -31,7 +31,7 @@ func testNonInstanceTypeFactoryMethod(s: String) {
   _ = NSObjectFactory(string: s) // expected-error{{extra argument 'string' in call}}
 }
 
-func testUseOfFactoryMethod(queen: B) {
+func testUseOfFactoryMethod(queen: Bee) {
   _ = Hive.hiveWithQueen(queen) // expected-error{{'hiveWithQueen' is unavailable: use object construction 'Hive(queen:)'}}
 }
 

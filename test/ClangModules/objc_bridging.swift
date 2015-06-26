@@ -27,20 +27,20 @@ extension Set {
 
 func foo() {
   _  = NSStringToNSString as (String!) -> String?
-  _ = NSArray().nsstringProperty.onlyOnString() as String
+  _ = DummyClass().nsstringProperty.onlyOnString() as String
 
   _  = BOOLtoBOOL as (Bool) -> Bool
-  _  = NSArray().boolProperty.onlyOnBool() as Bool
+  _  = DummyClass().boolProperty.onlyOnBool() as Bool
 
   _  = arrayToArray as (Array<AnyObject>!) -> (Array<AnyObject>!)
-  NSArray().arrayProperty.onlyOnArray()
+  DummyClass().arrayProperty.onlyOnArray()
 
   _ = dictToDict as (Dictionary<NSObject, AnyObject>!) -> Dictionary<NSObject, AnyObject>!
 
-  NSArray().dictProperty.onlyOnDictionary()
+  DummyClass().dictProperty.onlyOnDictionary()
 
   _ = setToSet as (Set<NSObject>!) -> Set<NSObject>!
-  NSArray().setProperty.onlyOnSet()
+  DummyClass().setProperty.onlyOnSet()
 }
 
 func allocateMagic(zone: NSZone) -> UnsafeMutablePointer<Void> {
