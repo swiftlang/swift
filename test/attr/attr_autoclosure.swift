@@ -71,7 +71,7 @@ func overloadedEach<P: P2>(source: P, _ closure: () -> ()) {
 struct S : P2 {
   typealias Element = Int
   func each(@autoclosure closure: () -> ()) {
-    overloadedEach(self, closure) // expected-error 2 {{invalid use of non-escaping function in escaping context '() -> ()'}}
+    overloadedEach(self, closure) // expected-error {{cannot find an overload for 'overloadedEach' that accepts an argument list of type '(S, @autoclosure () -> ())'}}
   }
 }
 

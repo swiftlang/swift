@@ -2412,25 +2412,6 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *subscriptExpr) {
 }
 
 bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
-  // If there are multiple available overloads to a call expression that
-  // didn't have one of the expected attributes below, we may have recorded
-  // multiple failures. These shouldn't fall through to the contextual
-  // conversion diagnostics because the actual types may be correct
-  // (minus the attribute).
-  SmallPtrSet<Type, 3> noEscapeSecondTypes;
-  for (auto failure : CS->failures) {
-    if (failure.getLocator() && failure.getLocator()->getAnchor() != expr)
-      continue;
-
-    if (failure.getKind() == Failure::FunctionNoEscapeMismatch) {
-      if (noEscapeSecondTypes.insert(failure.getSecondType()).second) {
-        ::diagnoseFailure(*CS, failure, expr, true);
-        return true;
-      }
-    }
-  }
-
-  
   CleanupIllFormedExpressionRAII cleanup(*CS, expr);
   
   auto fnExpr = callExpr->getFn();
