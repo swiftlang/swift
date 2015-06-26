@@ -612,13 +612,13 @@ func unusedExpressionResults() {
 func arrayLiterals() { 
   var a = [1,2,3]
   var b : [Int] = []
-  var c = []  // expected-error {{type of expression is ambiguous without more context}} expected-error{{'_' is not convertible to 'ArrayLiteralConvertible'}}
+  var c = []  // expected-error {{type of expression is ambiguous without more context}}
 }
 
 func dictionaryLiterals() {
   var a = [1 : "foo",2 : "bar",3 : "baz"]
   var b : Dictionary<Int, String> = [:]
-  var c = [:]  // expected-error {{type of expression is ambiguous without more context}} expected-error{{'_' is not convertible to 'DictionaryLiteralConvertible'}}
+  var c = [:]  // expected-error {{type of expression is ambiguous without more context}} 
 }
 
 func invalidDictionaryLiteral() {
@@ -689,4 +689,6 @@ func testParenExprInTheWay() {
   // expected-error @+2 {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}}
   // expected-note @+1 {{overloads for '&' exist with these partially matching parameter lists: (Int, Int)}}
   if !(x & 4.0) {}
+  
+  if x & x {} // expected-error {{result type 'Int' does not match expected type}}
 }

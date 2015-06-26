@@ -36,6 +36,6 @@ r0[0..<4]   // FIXME-error {{cannot subscript a value of type 'Range<Int>' with 
 r1[0..<4]   // FIXME-error {{cannot subscript a value of type 'Range<UInt>' with an index of type 'Range<Int>'}}
 r2[0..<4]   // FIXME-error {{cannot subscript a value of type 'Range<Int>' with an index of type 'Range<Int>'}}
 r3[0..<4]   // FIXME-error {{cannot subscript a value of type 'Range<UInt>' with an index of type 'Range<Int>'}}
-(10..<100)[0]           // expected-error {{cannot subscript a value of type '(Range<Int>)' with an index of type 'Int'}}
-(UInt(10)...100)[0..<4] // FIXME-error {{cannot subscript a value of type '(Range<UInt>)' with an index of type 'Range<Int>'}}
+(10..<100)[0]           // expected-error {{cannot subscript a value of type 'Range<Int>' with an index of type 'Int'}}
+(UInt(10)...100)[0..<4] // FIXME-error {{cannot subscript a value of type 'Range<UInt>' with an index of type 'Range<Int>'}}
 

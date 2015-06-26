@@ -33,7 +33,7 @@ useDouble(b)
 useDouble(c)
 useDouble(d)
 
-var z = true ? a : b // expected-error{{}} expected-error{{}}
+var z = true ? a : b // expected-error{{type of expression is ambiguous without more context}} 
 
 var e = true ? B() : B() // should infer B
 var f = true ? B() : D1() // should infer B

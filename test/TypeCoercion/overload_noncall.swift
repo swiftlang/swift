@@ -14,22 +14,22 @@ func f1(x: X) -> X {}
 func f2(g: (x: X) -> X) -> ((y: Y) -> Y) { }
 
 func test_conv() {
-  var a1 : (x1 : X, x2 : X) -> X = f0;
-  var a2 : (X, X) -> X = f0;
-  var a5 : (Y, X) -> X = f0; // expected-error{{could not find an overload for 'f0' that accepts the supplied arguments}}
-  var a6 : (X) -> X = f1;
-  var a7 : (X) -> (X) = f1;
-  var a8 : (x2 : X) -> (X) = f1;
-  var a9 : (x2 : X) -> ((X)) = f1;
-  a7 = a8;
-  a8 = a9;
-  a9 = a7;
+  var _ : (x1 : X, x2 : X) -> X = f0
+  var _ : (X, X) -> X = f0
+  var _ : (Y, X) -> X = f0 // expected-error{{'X' is not convertible to '(Y, X) -> X'}}
+  var _ : (X) -> X = f1
+  var a7 : (X) -> (X) = f1
+  var a8 : (x2 : X) -> (X) = f1
+  var a9 : (x2 : X) -> ((X)) = f1
+  a7 = a8
+  a8 = a9
+  a9 = a7
 
-  var a10 : ((X)->X) -> ((Y) -> Y) = f2;
-  var a11 : ((x2 : X)-> (X)) -> (((y2 : Y) -> (Y))) = f2;
+  var _ : ((X)->X) -> ((Y) -> Y) = f2;
+  var _ : ((x2 : X)-> (X)) -> (((y2 : Y) -> (Y))) = f2;
 
   typealias fp = ((X)->X) -> ((Y) -> Y)
-  var a12 = f2
+  var _ = f2
 }
 
 

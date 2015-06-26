@@ -17,6 +17,56 @@
 using namespace swift;
 using namespace constraints;
 
+/// Obtain the colloquial description for a known protocol kind.
+static std::string getDescriptionForKnownProtocolKind(KnownProtocolKind kind) {
+  switch (kind) {
+#define PROTOCOL(Id) \
+case KnownProtocolKind::Id: \
+return #Id;
+      
+#define LITERAL_CONVERTIBLE_PROTOCOL(Id, Description) \
+case KnownProtocolKind::Id: \
+return #Description;
+      
+#define BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL(Id) \
+case KnownProtocolKind::Id: \
+return #Id;
+      
+#include "swift/AST/KnownProtocols.def"
+  }
+  
+  llvm_unreachable("unrecognized known protocol kind");
+}
+
+
+/// Obtain a "user friendly" type name. E.g., one that uses colloquial names
+/// for literal convertible protocols if necessary, and is devoid of type
+/// variables.
+static std::string getUserFriendlyTypeName(Type t) {
+  assert(!t.isNull());
+  
+  // Unwrap any l-value types.
+  t = t->getRValueType();
+  
+  if (auto tv = t->getAs<TypeVariableType>()) {
+    if (tv->getImpl().literalConformanceProto) {
+      Optional<KnownProtocolKind> kind =
+        tv->getImpl().literalConformanceProto->getKnownProtocolKind();
+      
+      if (kind.hasValue())
+        return getDescriptionForKnownProtocolKind(kind.getValue());
+    }
+  }
+
+  // Remove parens from the other level of the type.
+  if (auto *PT = dyn_cast<ParenType>(t.getPointer()))
+    t = PT->getUnderlyingType();
+  
+  return t.getString();
+}
+
+
+
 void Failure::dump(SourceManager *sm) const {
   dump(sm, llvm::errs());
 }
@@ -753,8 +803,8 @@ static bool diagnoseFailure(ConstraintSystem &cs,
 
     tc.diagnose(loc, diag::invalid_relation,
                 failure.getKind() - Failure::TypesNotEqual,
-                failure.getFirstType(),
-                failure.getSecondType())
+                getUserFriendlyTypeName(failure.getFirstType()),
+                getUserFriendlyTypeName(failure.getSecondType()))
       .highlight(range1).highlight(range2);
     if (targetLocator && !useExprLoc)
       noteTargetOfDiagnostic(cs, failure, targetLocator);
@@ -1328,55 +1378,12 @@ static bool typeIsNotSpecialized(Type type) {
   return type->hasTypeVariable();
 }
 
-/// Obtain the colloquial description for a known protocol kind.
-static std::string getDescriptionForKnownProtocolKind(KnownProtocolKind kind) {
-  switch (kind) {
-#define PROTOCOL(Id) \
-case KnownProtocolKind::Id: \
-return #Id;
-      
-#define LITERAL_CONVERTIBLE_PROTOCOL(Id, Description) \
-case KnownProtocolKind::Id: \
-return #Description;
-      
-#define BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL(Id) \
-case KnownProtocolKind::Id: \
-return #Id;
-      
-#include "swift/AST/KnownProtocols.def"
-  }
-  
-  llvm_unreachable("unrecognized known protocol kind");
-}
-
 /// Determine if the type is an error type, or its metatype.
 static bool isErrorTypeKind(Type t) {
   if (auto mt = t->getAs<MetatypeType>())
     t = mt->getInstanceType();
   
   return t->is<ErrorType>();
-}
-
-/// Obtain a "user friendly" type name. E.g., one that uses colloquial names
-/// for literal convertible protocols if necessary, and is devoid of type
-/// variables.
-std::string getUserFriendlyTypeName(Type t) {
-  assert(!t.isNull());
-  
-  // Unwrap any l-value types.
-  t = t->getRValueType();
-
-  if (auto tv = t->getAs<TypeVariableType>()) {
-    if (tv->getImpl().literalConformanceProto) {
-      Optional<KnownProtocolKind> kind =
-          tv->getImpl().literalConformanceProto->getKnownProtocolKind();
-      
-      if (kind.hasValue())
-        return getDescriptionForKnownProtocolKind(kind.getValue());
-    }
-  }
-  
-  return t.getString();
 }
 
 /// Conveniently unwrap a paren expression, if necessary.
@@ -1501,7 +1508,7 @@ private:
 
   /// Attempt to produce a diagnostic for a mismatch between an expression's
   /// type and its assumed contextual type.
-  bool diagnoseContextualConversionError();
+  bool diagnoseContextualConversionError(Type exprResultType);
   
   /// Produce a diagnostic for a general member-lookup failure (irrespective of
   /// the exact expression kind).
@@ -1728,107 +1735,96 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure() {
   
   // Otherwise, if we have a conversion constraint, use that as the basis for
   // the diagnostic.
-  if (conversionConstraint || argumentConstraint) {
-    auto constraint = argumentConstraint ?
-    argumentConstraint :
-    conversionConstraint;
-    
-    if (conformanceConstraint) {
-      if (conformanceConstraint->getTypeVariables().size() <
-          constraint->getTypeVariables().size()) {
-        constraint = conformanceConstraint;
-      }
+  if (!conversionConstraint && !argumentConstraint)
+    return false;
+  
+  auto constraint = argumentConstraint ?
+  argumentConstraint :
+  conversionConstraint;
+  
+  if (conformanceConstraint) {
+    if (conformanceConstraint->getTypeVariables().size() <
+        constraint->getTypeVariables().size()) {
+      constraint = conformanceConstraint;
     }
+  }
+  
+  auto locator = constraint->getLocator();
+  auto anchor = locator ? locator->getAnchor() : expr;
+  std::pair<Type, Type> types = getBoundTypesFromConstraint(CS, expr,
+                                                            constraint);
+  
+  if (argumentConstraint) {
+    CS->TC.diagnose(expr->getLoc(), diag::could_not_convert_argument,
+                    types.first).
+    highlight(anchor->getSourceRange());
+    return true;
+  }
     
-    auto locator = constraint->getLocator();
-    auto anchor = locator ? locator->getAnchor() : expr;
-    std::pair<Type, Type> types = getBoundTypesFromConstraint(CS,
-                                                              expr,
-                                                              constraint);
-    
-    if (argumentConstraint) {
-      CS->TC.diagnose(expr->getLoc(),
-                      diag::could_not_convert_argument,
-                      types.first).
-      highlight(anchor->getSourceRange());
-      
-      return true;
-    }
-      
-    // If it's a type variable failing a conformance, avoid printing the type
-    // variable and just print the conformance.
-    if ((constraint->getKind() == ConstraintKind::ConformsTo) &&
-        types.first->getAs<TypeVariableType>()) {
-      CS->TC.diagnose(anchor->getLoc(),
-                      diag::single_expression_conformance_failure,
-                      types.first)
-      .highlight(anchor->getSourceRange());
-      
-      return true;
-    }
-    
-    auto fromType = getTypeOfIndependentSubExpression(expr);
-    
-    if (fromType->getAs<ErrorType>())
-      fromType = types.first.getPointer();
-
-    fromType = fromType->getRValueType();
-    
-    auto toType = CS->getConversionType(expr);
-    
-    if (!toType)
-      toType = CS->getContextualType(expr);
-    
-    if (!toType)
-      toType = types.second.getPointer();
-    
-    // If the second type is a type variable, the expression itself is
-    // ambiguous.
-    if (fromType->getAs<UnboundGenericType>() ||
-        toType->getAs<TypeVariableType>()) {
-      if (isa<ClosureExpr>(expr)) {
-        CS->TC.diagnose(expr->getLoc(),
-                        diag::cannot_infer_closure_type);
-        
-        return true;
-      } else {
-        CS->TC.diagnose(expr->getLoc(),
-                        diag::type_of_expression_is_ambiguous);
-      }
-      
-      return true;
-    }
-    
-    // Special case the diagnostic for a function result-type mismatch.
-    if (expr->isReturnExpr()) {
-      if (toType->isVoid()) {
-        CS->TC.diagnose(expr->getLoc(),
-                        diag::cannot_return_value_from_void_func);
-        
-        return true;
-      }
-      
-      CS->TC.diagnose(expr->getLoc(),
-                      diag::cannot_convert_to_return_type,
-                      fromType,
-                      toType).highlight(anchor->getSourceRange());
-      
-      return true;
-    }
-    
-    auto failureKind =
-    Failure::TypesNotConvertible - Failure::TypesNotEqual;
-    
+  // If it's a type variable failing a conformance, avoid printing the type
+  // variable and just print the conformance.
+  if ((constraint->getKind() == ConstraintKind::ConformsTo) &&
+      types.first->getAs<TypeVariableType>()) {
     CS->TC.diagnose(anchor->getLoc(),
-                    diag::invalid_relation,
-                    failureKind,
-                    fromType, toType)
+                    diag::single_expression_conformance_failure,
+                    types.first)
     .highlight(anchor->getSourceRange());
     
     return true;
   }
   
-  return false;
+  auto fromType = getTypeOfIndependentSubExpression(expr);
+  
+  if (fromType->getAs<ErrorType>())
+    fromType = types.first.getPointer();
+
+  fromType = fromType->getRValueType();
+  
+  auto toType = CS->getConversionType(expr);
+  
+  if (!toType)
+    toType = CS->getContextualType(expr);
+  
+  if (!toType)
+    toType = types.second.getPointer();
+  
+  // If the second type is a type variable, the expression itself is
+  // ambiguous.
+  if (fromType->is<UnboundGenericType>() || toType->is<TypeVariableType>() ||
+      (fromType->is<TypeVariableType>() && toType->is<ProtocolType>())) {
+    auto diagID = diag::type_of_expression_is_ambiguous;
+    if (isa<ClosureExpr>(expr))
+      diagID = diag::cannot_infer_closure_type;
+      
+    CS->TC.diagnose(expr->getLoc(), diagID)
+      .highlight(expr->getSourceRange());
+    
+    return true;
+  }
+  
+  // Special case the diagnostic for a function result-type mismatch.
+  if (expr->isReturnExpr()) {
+    if (toType->isVoid()) {
+      CS->TC.diagnose(expr->getLoc(),
+                      diag::cannot_return_value_from_void_func);
+      
+      return true;
+    }
+    
+    CS->TC.diagnose(expr->getLoc(), diag::cannot_convert_to_return_type,
+                    fromType, toType)
+      .highlight(anchor->getSourceRange());
+    
+    return true;
+  }
+  
+  CS->TC.diagnose(anchor->getLoc(), diag::invalid_relation,
+                  Failure::TypesNotConvertible - Failure::TypesNotEqual,
+                  getUserFriendlyTypeName(fromType),
+                  getUserFriendlyTypeName(toType))
+  .highlight(anchor->getSourceRange());
+  
+  return true;
 }
 
 bool FailureDiagnosis::diagnoseGeneralFailure() {
@@ -1880,8 +1876,7 @@ Type FailureDiagnosis::getTypeOfIndependentSubExpression(Expr *subExpr) {
   return resultType;
 }
 
-bool FailureDiagnosis::diagnoseContextualConversionError() {
-  
+bool FailureDiagnosis::diagnoseContextualConversionError(Type exprResultType) {
   TypeBase *contextualType = CS->getConversionType(expr);
   
   if (!contextualType) {
@@ -1890,17 +1885,10 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
       return false;
     }
   }
-  
-  auto subExprTy = getTypeOfIndependentSubExpression(expr);
-  
-  if (subExprTy->isEqual(contextualType))
+  if (exprResultType->isEqual(contextualType))
     return false;
   
-  // We've already caught the error.
-  if (subExprTy->getAs<ErrorType>())
-    return true;
-  
-  if (subExprTy->getAs<TypeVariableType>())
+  if (exprResultType->getAs<TypeVariableType>())
     return false;
   
   
@@ -1913,7 +1901,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
         .highlight(expr->getSourceRange());
     } else {
       CS->TC.diagnose(expr->getLoc(), diag::cannot_convert_to_return_type,
-                      subExprTy, contextualType)
+                      exprResultType, contextualType)
         .highlight(expr->getSourceRange());
     }
     return true;
@@ -1924,7 +1912,8 @@ bool FailureDiagnosis::diagnoseContextualConversionError() {
                   diag::invalid_relation,
                   Failure::FailureKind::TypesNotConvertible -
                       Failure::FailureKind::TypesNotEqual,
-                  subExprTy, contextualType)
+                  getUserFriendlyTypeName(exprResultType),
+                  getUserFriendlyTypeName(contextualType))
   .highlight(expr->getSourceRange());
   
   return true;
@@ -2265,12 +2254,6 @@ FailureDiagnosis::collectCalleeCandidateInfo(Expr *fn, Type actualArgsType,
 }
 
 bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
-  // FIXME: seems weird to do this before looking at arguments.
-  if (diagnoseContextualConversionError())
-    return true;
-  
-  CleanupIllFormedExpressionRAII cleanup(*CS, expr);
-  
   auto argExpr = cast<TupleExpr>(binop->getArg());
   auto argTuple = getTypeOfIndependentSubExpression(argExpr)->
         getAs<TupleType>();
@@ -2283,7 +2266,26 @@ bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
   CandidateCloseness candidateCloseness;
   auto Candidates = collectCalleeCandidateInfo(binop->getFn(), argTuple,
                                                candidateCloseness);
-  assert(!Candidates.empty() && "unrecognized unop function kind");
+  assert(!Candidates.empty() && "unrecognized binop function kind");
+
+  if (candidateCloseness == CC_ExactMatch) {
+    
+    // Otherwise, whatever the result type of the call happened to be must not
+    // have been what we were looking for.
+    auto resultTy = getTypeOfIndependentSubExpression(binop);
+    if (isErrorTypeKind(resultTy))
+      return true;
+    
+    if (typeIsNotSpecialized(resultTy))
+      resultTy = Candidates[0]->getType()->castTo<FunctionType>()->getResult();
+    
+    CS->TC.diagnose(binop->getLoc(), diag::result_type_no_match,
+                    getUserFriendlyTypeName(resultTy))
+      .highlight(binop->getSourceRange());
+    return true;
+  }
+  
+  CleanupIllFormedExpressionRAII cleanup(*CS, expr);
 
   expr->setType(ErrorType::get(CS->getASTContext()));
   
@@ -2330,9 +2332,6 @@ bool FailureDiagnosis::visitUnaryExpr(ApplyExpr *applyExpr) {
   assert(expr->getKind() == ExprKind::PostfixUnary ||
          expr->getKind() == ExprKind::PrefixUnary);
   
-  if (diagnoseContextualConversionError())
-    return true;
-  
   CleanupIllFormedExpressionRAII cleanup(*CS, expr);
   
   auto argExpr = applyExpr->getArg();
@@ -2347,7 +2346,27 @@ bool FailureDiagnosis::visitUnaryExpr(ApplyExpr *applyExpr) {
   auto Candidates = collectCalleeCandidateInfo(applyExpr->getFn(), argType,
                                                candidateCloseness);
   assert(!Candidates.empty() && "unrecognized unop function kind");
+  
+  
+  if (candidateCloseness == CC_ExactMatch) {
+    // Otherwise, whatever the result type of the call happened to be must not
+    // have been what we were looking for.
+    auto resultTy = getTypeOfIndependentSubExpression(applyExpr);
+    if (isErrorTypeKind(resultTy))
+      return true;
+    
+    if (typeIsNotSpecialized(resultTy))
+      resultTy = Candidates[0]->getType()->castTo<FunctionType>()->getResult();
+    
+    CS->TC.diagnose(applyExpr->getLoc(), diag::result_type_no_match,
+                    getUserFriendlyTypeName(resultTy))
+      .highlight(applyExpr->getSourceRange());
+    return true;
+  }
+  
   expr->setType(ErrorType::get(CS->getASTContext()));
+
+  
   
   // A common error is to apply an operator that only has inout forms (e.g. ++)
   // to non-lvalues (e.g. a local let).  Produce a nice diagnostic for this
@@ -2388,10 +2407,6 @@ bool FailureDiagnosis::visitParenExpr(ParenExpr *PE) {
 
 
 bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *subscriptExpr) {
-  // FIXME: Doesn't seem right, check arguments first.
-  if (diagnoseContextualConversionError())
-    return true;
-  
   CleanupIllFormedExpressionRAII cleanup(*CS, expr);
   
   auto indexExpr = subscriptExpr->getIndex();
@@ -2446,8 +2461,6 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
     }
   }
 
-  if (diagnoseContextualConversionError())
-    return true;
   
   CleanupIllFormedExpressionRAII cleanup(*CS, expr);
   
@@ -2704,7 +2717,8 @@ bool FailureDiagnosis::visitCoerceExpr(CoerceExpr *coerceExpr) {
   if (conversionTypes.first && conversionTypes.second) {
     CS->TC.diagnose(coerceExpr->getLoc(), diag::invalid_relation,
                     Failure::TypesNotConvertible - Failure::TypesNotEqual,
-                    conversionTypes.first, conversionTypes.second)
+                    getUserFriendlyTypeName(conversionTypes.first),
+                    getUserFriendlyTypeName(conversionTypes.second))
       .highlight(coerceExpr->getSourceRange());
     return true;
   }
@@ -2714,7 +2728,6 @@ bool FailureDiagnosis::visitCoerceExpr(CoerceExpr *coerceExpr) {
 
 bool FailureDiagnosis::
 visitForcedCheckedCastExpr(ForcedCheckedCastExpr *castExpr) {
-  assert(expr->getKind() == ExprKind::ForcedCheckedCast);
   CleanupIllFormedExpressionRAII cleanup(*CS, expr);
 
   Expr *subExpr = castExpr->getSubExpr();
@@ -2737,7 +2750,8 @@ visitForcedCheckedCastExpr(ForcedCheckedCastExpr *castExpr) {
   if (conversionTypes.first && conversionTypes.second) {
     CS->TC.diagnose(castExpr->getLoc(), diag::invalid_relation,
                     Failure::TypesNotConvertible - Failure::TypesNotEqual,
-                    conversionTypes.first, conversionTypes.second)
+                    getUserFriendlyTypeName(conversionTypes.first),
+                    getUserFriendlyTypeName(conversionTypes.second))
       .highlight(castExpr->getSourceRange());
     return true;
   }
@@ -2746,8 +2760,6 @@ visitForcedCheckedCastExpr(ForcedCheckedCastExpr *castExpr) {
 }
 
 bool FailureDiagnosis::visitTupleExpr(TupleExpr *tupleExpr) {
-  assert(expr->getKind() == ExprKind::Tuple);
-  
   // Stop at the first failed sub-expression.
   for (auto elt : tupleExpr->getElements()) {
     if (getTypeOfIndependentSubExpression(elt)->getAs<ErrorType>())
@@ -2766,6 +2778,21 @@ bool FailureDiagnosis::diagnoseFailure() {
     return true;
   }
   
+  // Our general approach is to do a depth first traversal of the broken
+  // expression tree, type checking as we go.  If we find a subtree that cannot
+  // be type checked on its own (even to an incomplete type) then that is where
+  // we focus our attention.  If we do find a type, we use it to check for
+  // contextual type mismatches.
+  auto subExprTy = getTypeOfIndependentSubExpression(expr);
+  
+  // We've already caught the error.
+  if (subExprTy->getAs<ErrorType>())
+    return true;
+  
+  // If there is a contextual type that mismatches, diagnose it as the problem.
+  if (diagnoseContextualConversionError(subExprTy))
+    return true;
+
   return visit(expr);
 }
 

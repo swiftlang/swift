@@ -54,6 +54,11 @@ NOTE(while_converting_subscript_index,sema,none,
 // Constraint solver diagnostics
 //------------------------------------------------------------------------------
 
+ERROR(result_type_no_match,sema,none,
+      "result type '%0' does not match expected type",
+      (StringRef))
+
+
 ERROR(cannot_find_appropriate_overload,sema,none,
       "could not find an overload for '%0' that accepts the supplied "
       "arguments", (StringRef))
@@ -315,9 +320,9 @@ ERROR(load_of_explicit_lvalue,sema_tcc,none,
 // Expression Type Checking Errors
 //------------------------------------------------------------------------------
 ERROR(invalid_relation,sema_tcc,none,
-      "%1 is not %select{identical to|a subtype of|"
-      "convertible to|constructible with|identical to}0 %2",
-      (unsigned, Type, Type))
+      "'%1' is not %select{identical to|a subtype of|"
+      "convertible to|constructible with|identical to}0 '%2'",
+      (unsigned, StringRef, StringRef))
 ERROR(invalid_tuple_size,sema_tcc,none,
       "tuple types %0 and %1 have a different number of elements (%2 vs. %3)",
       (Type, Type, unsigned, unsigned))

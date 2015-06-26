@@ -4,7 +4,7 @@ func foo(x: Int) -> Int {}
 func foo(x: Float) -> Float {}
 
 var v = foo(<#T##x: Float##Float#>) // expected-error {{editor placeholder}}
-v = "" // expected-error {{cannot assign a value of type 'String' to a value of type '(Float)'}}
+v = "" // expected-error {{cannot assign a value of type 'String' to a value of type 'Float'}}
 
 if (true) {
   <#code#> // expected-error {{editor placeholder}}

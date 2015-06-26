@@ -34,10 +34,9 @@ using namespace swift;
 // Expression Semantic Analysis Routines
 //===----------------------------------------------------------------------===//
 
-void substituteInputSugarArgumentType(Type argTy,
-                                      CanType resultTy,
-                                      Type &resultSugarTy,
-                                      bool &uniqueSugarTy) {
+static void substituteInputSugarArgumentType(Type argTy, CanType resultTy,
+                                             Type &resultSugarTy,
+                                             bool &uniqueSugarTy) {
   // If we already failed finding a unique sugar, bail out.
   if (!uniqueSugarTy)
     return;
@@ -50,20 +49,28 @@ void substituteInputSugarArgumentType(Type argTy,
       if (!uniqueSugarTy)
         return;
     }
-  } else {
-    if (argTy->getCanonicalType() == resultTy) {
-      if (resultSugarTy) {
-        // Make sure this argument's sugar is consistent with the sugar we
-        // already found.
-        if (argTy->isSpelledLike(resultSugarTy))
-          return;
-        uniqueSugarTy = false;
-        return;
-      } else {
-        resultSugarTy = argTy;
-      }
-    }
+    return;
   }
+  
+  if (argTy->getCanonicalType() != resultTy)
+    return;
+
+  // If this type is parenthesized, remove the parens.  We don't want to
+  // propagate parens from arguments to the result type.
+  if (auto *PT = dyn_cast<ParenType>(argTy.getPointer()))
+    argTy = PT->getUnderlyingType();
+  
+  // If this is the first match against the sugar type we found, use it.
+  if (!resultSugarTy) {
+    resultSugarTy = argTy;
+    return;
+  }
+  
+  // Make sure this argument's sugar is consistent with the sugar we
+  // already found.
+  if (argTy->isSpelledLike(resultSugarTy))
+    return;
+  uniqueSugarTy = false;
 }
 
 /// If the inputs to an apply expression use a consistent "sugar" type

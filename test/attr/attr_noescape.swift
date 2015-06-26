@@ -183,7 +183,7 @@ func overloadedEach<P: P2, T>(source: P, _ transform: P.Element -> (), _: T) {}
 struct S : P2 {
   typealias Element = Int
   func each(@noescape transform: Int -> ()) {
-    overloadedEach(self, transform, 1) // expected-error {{invalid use of non-escaping function in escaping context 'O.Element -> ()'}}
+    overloadedEach(self, transform, 1) // expected-error 2 {{invalid use of non-escaping function in escaping context 'O.Element -> ()'}}
   }
 }
 

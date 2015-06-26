@@ -14,7 +14,7 @@ var closure3a : ()->()->(Int,Int) = {{ (4, 2) }} // multi-level closing.
 var closure3b : (Int,Int)->(Int)->(Int,Int) = {{ (4, 2) }} // expected-error{{tuple types '(Int, Int)' and '()' have a different number of elements (2 vs. 0)}}
 var closure4 : (Int,Int) -> Int = { $0 + $1 }
 var closure5 : (Double) -> Int =
-   { // expected-error{{could not find an overload for '+' that accepts the supplied arguments}}
+   { // expected-error {{'(_) -> Int' is not convertible to '(Double) -> Int'}}
        $0 + 1.0 }
 
 var closure6 = $0  // expected-error {{anonymous closure argument not contained in a closure}}
@@ -28,7 +28,7 @@ func funcdecl4(a: ((Int)->Int), _ b: Int) {}
 
 func funcdecl5(a: Int, _ y: Int) {
   // Pass in a closure containing the call to funcdecl3.
-  funcdecl4({ funcdecl3() }, 12) // expected-error{{cannot invoke 'funcdecl4' with an argument list of type '(() -> Int, Int)'}} expected-note{{expected an argument list of type '(((Int) -> Int), Int)'}}
+  funcdecl4({ funcdecl3() }, 12) // expected-error{{cannot invoke 'funcdecl4' with an argument list of type '(() -> Int, Int)'}} expected-note{{expected an argument list of type '((Int) -> Int, Int)'}}
   func6(fn: {$0 + $1})       // Closure with two named anonymous arguments
   func6(fn: {($0) + $1})    // Closure with sequence expr inferred type
   func6(fn: {($0) + $0})    // expected-error{{could not find an overload for '+' that accepts the supplied arguments}}

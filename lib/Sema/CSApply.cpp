@@ -6292,7 +6292,7 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
           case CheckedCastKind::Unresolved:
             TC.diagnose(coerceExpr->getLoc(), diag::invalid_relation,
                         Failure::TypesNotConvertible - Failure::TypesNotEqual,
-                        fromType, toType)
+                        fromType->getString(), toType->getString())
               .highlight(coerceExpr->getSourceRange());
             break;
           case CheckedCastKind::Coercion:
