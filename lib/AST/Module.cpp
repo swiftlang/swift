@@ -775,7 +775,8 @@ LookupConformanceResult Module::lookupConformance(Type type,
     // existential to an archetype parameter, so for now we restrict this to
     // @objc protocols.
     for (auto proto : protocols) {
-      if (!proto->isObjC())
+      if (!proto->isObjC() &&
+          !proto->isSpecificProtocol(KnownProtocolKind::AnyObject))
         return { nullptr, ConformanceKind::DoesNotConform };
     }
 
