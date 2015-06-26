@@ -1752,17 +1752,33 @@ void IRGenSILFunction::visitExistentialMetatypeInst(
   Explosion result;
   SILValue op = i->getOperand();
   SILType opType = op.getType();
-  if (opType.isClassExistentialType()) {
+
+  switch (opType.getPreferredExistentialRepresentation(*IGM.SILMod)) {
+  case ExistentialRepresentation::Metatype: {
+    Explosion existential = getLoweredExplosion(op);
+    emitMetatypeOfMetatype(*this, existential, opType, result);
+    break;
+  }
+  case ExistentialRepresentation::Class: {
     Explosion existential = getLoweredExplosion(op);
     emitMetatypeOfClassExistential(*this, existential, i->getType(),
                                    opType, result);
-  } else if (opType.is<ExistentialMetatypeType>()) {
-    Explosion existential = getLoweredExplosion(op);
-    emitMetatypeOfMetatype(*this, existential, opType, result);
-  } else {
-    Address existential = getLoweredAddress(i->getOperand());
-    emitMetatypeOfOpaqueExistential(*this, existential, opType, result);
+    break;
   }
+  case ExistentialRepresentation::Boxed: {
+    Explosion existential = getLoweredExplosion(op);
+    emitMetatypeOfBoxedExistential(*this, existential, opType, result);
+    break;
+  }
+  case ExistentialRepresentation::Opaque: {
+    Address existential = getLoweredAddress(op);
+    emitMetatypeOfOpaqueExistential(*this, existential, opType, result);
+    break;
+  }
+  case ExistentialRepresentation::None:
+    llvm_unreachable("Bad existential representation");
+  }
+
   setLoweredExplosion(SILValue(i, 0), result);
 }
 

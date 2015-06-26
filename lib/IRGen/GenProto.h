@@ -240,9 +240,13 @@ namespace irgen {
                                       Explosion &value, SILType metatypeType,
                                       SILType existentialType, Explosion &out);
 
-  // Emit the existential metatype of a metatype.
+  /// Emit the existential metatype of a boxed existential value.
+  void emitMetatypeOfBoxedExistential(IRGenFunction &IGF, Explosion &value,
+                                      SILType type, Explosion &out);
+
+  /// Emit the existential metatype of a metatype.
   void emitMetatypeOfMetatype(IRGenFunction &IGF, Explosion &value,
-                                      SILType existentialType, Explosion &out);
+                              SILType existentialType, Explosion &out);
 
   std::pair<Address, llvm::Value*>
   emitIndirectExistentialProjectionWithMetadata(IRGenFunction &IGF,

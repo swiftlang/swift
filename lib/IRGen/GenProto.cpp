@@ -5121,6 +5121,45 @@ void irgen::emitMetatypeOfOpaqueExistential(IRGenFunction &IGF, Address addr,
   baseTI.emitLoadOfTables(IGF, addr, out);
 }
 
+void irgen::emitMetatypeOfBoxedExistential(IRGenFunction &IGF, Explosion &value,
+                                           SILType type, Explosion &out) {
+  // TODO: Non-ErrorType boxed existentials.
+  assert(_isErrorType(type));
+
+  // Get the reference to the existential box.
+  llvm::Value *box = value.claimNext();
+
+  // Allocate scratch space to invoke the runtime.
+  Address scratchAddr = IGF.createAlloca(IGF.IGM.Int8PtrTy,
+                                         IGF.IGM.getPointerAlignment(),
+                                         "project_error_scratch");
+  Address outAddr = IGF.createAlloca(IGF.IGM.OpenedErrorTripleTy,
+                                     IGF.IGM.getPointerAlignment(),
+                                     "project_error_out");
+
+  IGF.Builder.CreateCall(IGF.IGM.getGetErrorValueFn(), {box,
+                         scratchAddr.getAddress(),
+                         outAddr.getAddress()});
+
+  auto projectedPtrAddr = IGF.Builder.CreateStructGEP(outAddr, 0, Size(0));
+  auto projectedPtr = IGF.Builder.CreateLoad(projectedPtrAddr);
+
+  auto metadataAddr = IGF.Builder.CreateStructGEP(outAddr, 1,
+                                                  IGF.IGM.getPointerSize());
+  auto metadata = IGF.Builder.CreateLoad(metadataAddr);
+
+  auto dynamicType =
+    IGF.Builder.CreateCall(IGF.IGM.getGetDynamicTypeFn(),
+                           {projectedPtr, metadata});
+
+  auto witnessAddr = IGF.Builder.CreateStructGEP(outAddr, 2,
+                                                 2 * IGF.IGM.getPointerSize());
+  auto witness = IGF.Builder.CreateLoad(witnessAddr);
+
+  out.add(dynamicType);
+  out.add(witness);
+}
+
 void irgen::emitMetatypeOfClassExistential(IRGenFunction &IGF, Explosion &value,
                                            SILType metatypeTy,
                                            SILType existentialTy,

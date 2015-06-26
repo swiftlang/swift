@@ -71,3 +71,24 @@ entry(%b : $ErrorType):
   // CHECK: ret [[INT]] [[RESULT]]
   return %c : $Int
 }
+
+sil @dynamic_type_boxed_existential : $@convention(thin) (@owned ErrorType) -> @thick ErrorType.Type {
+entry(%b : $ErrorType):
+  // CHECK: call void @swift_getErrorValue(%swift.error* %0, i8** {{%.*}}, [[TRIPLE:{ %swift.opaque\*, %swift.type\*, i8\*\* }]]* [[OUT:%.*]])
+  // CHECK: [[OUT_ADDR:%.*]] = getelementptr inbounds {{.*}} [[OUT]], i32 0, i32 0
+  // CHECK: [[ADDR:%.*]] = load {{.*}} [[OUT_ADDR]]
+  // CHECK: [[OUT_TYPE:%.*]] = getelementptr inbounds {{.*}} [[OUT]], i32 0, i32 1
+  // CHECK: [[TYPE:%.*]] = load {{.*}} [[OUT_TYPE]]
+  // CHECK: [[DYNAMIC_TYPE:%.*]] = call %swift.type* @swift_getDynamicType(%swift.opaque* [[ADDR]], %swift.type* [[TYPE]])
+  // CHECK: [[OUT_WITNESS:%.*]] = getelementptr inbounds {{.*}} [[OUT]], i32 0, i32 2
+  // CHECK: [[WITNESS:%.*]] = load {{.*}} [[OUT_WITNESS]]
+  %m = existential_metatype $@thick ErrorType.Type, %b : $ErrorType
+
+  // CHECK: call void @swift_errorRelease(%swift.error* %0) #1
+  strong_release %b : $ErrorType
+
+  // CHECK: [[RET:%.*]] = insertvalue { %swift.type*, i8** } undef, %swift.type* [[DYNAMIC_TYPE]], 0
+  // CHECK: [[RET2:%.*]] = insertvalue { %swift.type*, i8** } [[RET]], i8** [[WITNESS]], 1
+  // CHECK: ret { %swift.type*, i8** } [[RET2]]
+  return %m : $@thick ErrorType.Type
+}
