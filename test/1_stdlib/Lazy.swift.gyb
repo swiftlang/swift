@@ -12,11 +12,8 @@
 // RUN: rm -rf %t
 // RUN: mkdir -p %t
 // RUN: %S/../../utils/gyb %s -o %t/Lazy.swift
-// RUN: %S/../../utils/line-directive %t/Lazy.swift -- %target-build-swift %t/Lazy.swift -o %t/a.out_Debug
-// RUN: %S/../../utils/line-directive %t/Lazy.swift -- %target-build-swift %t/Lazy.swift -o %t/a.out_Release -O
-//
-// RUN: %S/../../utils/line-directive %t/Lazy.swift -- %target-run %t/a.out_Debug
-// RUN: %S/../../utils/line-directive %t/Lazy.swift -- %target-run %t/a.out_Release
+// RUN: %S/../../utils/line-directive %t/Lazy.swift -- %target-build-swift %t/Lazy.swift -o %t/a.out
+// RUN: %S/../../utils/line-directive %t/Lazy.swift -- %target-run %t/a.out
 // REQUIRES: executable_test
 
 import StdlibUnittest
@@ -38,12 +35,12 @@ extension Repeat where Element : TestProtocol1 {
 
 LazyTestSuite.test("Repeat") {
   checkRandomAccessCollection(
-    [],
+    [] as Array<OpaqueValue<Int>>,
     Repeat(count: 0, repeatedValue: OpaqueValue(42)),
     { $0.value == $1.value })
 
   checkRandomAccessCollection(
-    [ OpaqueValue(42) ],
+    [ OpaqueValue(42) ] as Array<OpaqueValue<Int>>,
     Repeat(count: 1, repeatedValue: OpaqueValue(42)),
     { $0.value == $1.value })
 
@@ -150,8 +147,8 @@ LazyTestSuite.test("isEmpty") {
 }
 
 LazyTestSuite.test("firstLast") {
-  expectOptionalEqual(7, lazy(7..<42).first)
-  expectOptionalEqual(41, lazy(7..<42).last)
+  expectOptionalEqual(7 as Int, lazy(7..<42).first)
+  expectOptionalEqual(41 as Int, lazy(7..<42).last)
   expectEmpty(lazy(7..<7).first)
   expectEmpty(lazy(7..<7).last)
 }
@@ -256,7 +253,10 @@ LazyTestSuite.test("MapCollection<${traversal}Collection>/underestimateCount") {
   let s = Minimal${traversal}Collection(
     [ 0, 30, 10, 90 ].map { OpaqueValue($0) },
     underestimatedCount: .Value(42))
-  var lazyMap = lazy(s).map { OpaqueValue(Int32($0.value)) }
+  var lazyMap = lazy(s).map {
+    (input: OpaqueValue<Int>) -> OpaqueValue<Int32> in
+    OpaqueValue(Int32(input.value))
+  }
   expectType(
     Lazy${traversal}Collection<
       MapCollection<
@@ -313,7 +313,7 @@ LazyTestSuite.test("Lazy${traversal}Collection.reverse()") {
     &reversed)
 
   check${traversal}Collection(
-    [ 90, 10, 30, 0 ].map { OpaqueValue($0) },
+    [ 90, 10, 30, 0 ].map { OpaqueValue($0) } as [OpaqueValue<Int>],
     reversed,
     { $0.value == $1.value })
 
@@ -323,7 +323,7 @@ LazyTestSuite.test("Lazy${traversal}Collection.reverse()") {
     &reversedTwice)
 
   check${traversal}Collection(
-    [ 0, 30, 10, 90 ].map { OpaqueValue($0) },
+    [ 0, 30, 10, 90 ].map { OpaqueValue($0) } as [OpaqueValue<Int>],
     reversedTwice,
     { $0.value == $1.value })
 }
