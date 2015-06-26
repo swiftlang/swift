@@ -58,15 +58,9 @@ public protocol _prext_Indexable {
   subscript(position: Index) -> _Element {get}
 }
 
-
-// FIXME: should be
-//
-//   extension SequenceType where Self : GeneratorType {
-//
-// but for <rdar://problem/21546738>
 /// A default generate() function for `GeneratorType` instances that
 /// are declared to conform to `SequenceType`
-extension GeneratorType where Self : SequenceType {
+extension SequenceType where Self : GeneratorType {
   /// Returns `self`.
   public func generate() -> Self {
     return self
