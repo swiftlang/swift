@@ -29,8 +29,8 @@ public struct _prext_Slice<Base : _prext_Indexable> : CollectionType {
     return _prext_Slice(_collection: _base, bounds: bounds)
   }
   
-  internal init(_collection: Base, bounds: Range<Index>) {
-    self._base = _collection
+  internal init(_base: Base, bounds: Range<Index>) {
+    self._base = _base
     self.startIndex = bounds.startIndex
     self.endIndex = bounds.endIndex
   }

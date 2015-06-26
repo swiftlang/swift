@@ -129,6 +129,10 @@ public protocol CollectionType : _prext_Indexable, SequenceType {
   // IndexingGenerator. <rdar://problem/21539115>
   func generate() -> Generator
   
+  // FIXME: should be constrained to CollectionType
+  // (<rdar://problem/20715009> Implement recursive protocol
+  // constraints)
+  
   /// A `SequenceType` that can represent a contiguous subrange of `self`'s
   /// elements.
   ///
@@ -136,10 +140,6 @@ public protocol CollectionType : _prext_Indexable, SequenceType {
   ///   `SequenceType`, but is restated here with stricter
   ///   constraints: in a `CollectionType`, the `SubSequence` should
   ///   also be a `CollectionType`.
-  //
-  // FIXME: should be constrained to CollectionType
-  // (<rdar://problem/20715009> Implement recursive protocol
-  // constraints)
   typealias _prext_SubSequence: _prext_Indexable, SequenceType = _prext_Slice<Self>
 
   /// Returns the element at the given `position`.
@@ -160,12 +160,13 @@ public protocol CollectionType : _prext_Indexable, SequenceType {
   ///   O(N) otherwise.
   var count: Index.Distance { get }
   
-  ///   `Optional(Optional(index))` if an element was found.
-  ///
-  /// - Complexity: O(N).
-  //
   // The following requirement enables dispatching for indexOf when
   // the element type is Equatable.
+  
+  /// Returns `Optional(Optional(index))` if an element was found;
+  /// `nil` otherwise.
+  ///
+  /// - Complexity: O(N).
   func _customIndexOfEquatableElement(element: Generator.Element) -> Index??
 
   /// Returns the first element of `self`, or `nil` if `self` is empty.
@@ -201,7 +202,7 @@ extension _prext_Slice : _SliceType {}
 /// `_prext_Slice<Self>`.
 extension CollectionType where _prext_SubSequence : _SliceType {
   public subscript(_prext_bounds: Range<Index>) -> _prext_Slice<Self> {
-    return _prext_Slice(_collection: self, bounds: _prext_bounds)
+    return _prext_Slice(_base: self, bounds: _prext_bounds)
   }
 }
 

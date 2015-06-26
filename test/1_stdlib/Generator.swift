@@ -31,4 +31,19 @@ tests.test("GeneratorSequence") {
   expectEqual(r.startIndex, r.endIndex)
 }
 
+struct G : GeneratorType {
+  var i = 0
+  mutating func next() -> Int? {
+    return i < 10 ? i++ : nil
+  }
+}
+
+extension G : SequenceType {}
+tests.test("GeneratorsModelSequenceTypeByDeclaration") {
+  var n = 0
+  for i in G() {
+    expectEqual(n++, i)
+  }
+}
+
 runAllTests()
