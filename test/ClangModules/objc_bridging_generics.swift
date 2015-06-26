@@ -25,7 +25,7 @@ public func expectType<T>(_: T.Type, inout _ x: T) {}
 func testNSMutableDictionarySubscript(
   dict: NSMutableDictionary, key: NSCopying, value: AnyObject) {
   var oldValue = dict[key]
-  expectType(ImplicitlyUnwrappedOptional<AnyObject>.self, &oldValue)
+  expectType(Optional<AnyObject>.self, &oldValue)
 
   dict[key] = value
 }
