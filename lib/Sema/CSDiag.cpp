@@ -206,18 +206,6 @@ void Failure::dump(SourceManager *sm, raw_ostream &out) const {
         << " is an unbound generic parameter";
     break;
 
-  case IsNotSelfConforming:
-    out << getFirstType().getString()
-        << " cannot be bound to protocol " << getSecondType().getString()
-        << " because the protocol is not @objc or has static methods";
-      break;
-
-    case ExistentialIsNotObjC:
-      out << getFirstType().getString()
-      << " cannot be bound to existential containing non-@objc protocol "
-      << getSecondType().getString();
-      break;
-
   case IsNotMaterializable:
     out << getFirstType().getString() << " is not materializable";
     break;
@@ -983,25 +971,6 @@ static bool diagnoseFailure(ConstraintSystem &cs,
   case Failure::UnboundGenericParameter: {
     tc.diagnose(loc, diag::unbound_generic_parameter, failure.getFirstType())
       .highlight(range1);
-    if (!useExprLoc)
-      noteTargetOfDiagnostic(cs, failure, locator);
-    break;
-  }
-
-  case Failure::IsNotSelfConforming: {
-    tc.diagnose(loc, diag::protocol_not_self_conforming,
-                failure.getFirstType(), failure.getSecondType(),
-                failure.getValue())
-      .highlight(range1);
-    if (!useExprLoc)
-      noteTargetOfDiagnostic(cs, failure, locator);
-    break;
-  }
-
-  case Failure::ExistentialIsNotObjC: {
-    tc.diagnose(loc, diag::existential_non_objc,
-                failure.getFirstType(), failure.getSecondType())
-    .highlight(range1);
     if (!useExprLoc)
       noteTargetOfDiagnostic(cs, failure, locator);
     break;

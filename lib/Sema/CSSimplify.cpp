@@ -1231,61 +1231,6 @@ static bool allowsBridgingFromObjC(TypeChecker &tc, DeclContext *dc,
   return true;
 }
 
-/// Determine whether this type variable represents a generic parameter
-/// that may be bound to an existential conforming to the given protocols.
-///
-/// This is only possible if the metatype is "trivial" in the sense that
-/// there is nothing interesting the code can do with it, like calling
-/// static methods. It also dovetails with an IRGen limitation, where
-/// witness tables cannot be passed from an existential to an archetype
-/// parameter, so for now we also restrict this to @objc protocols.
-static bool canBindGenericParamToExistential(ConstraintSystem &cs,
-                              TypeVariableType *typeVar,
-                              const SmallVector<ProtocolDecl *, 2> &protocols) {
-  auto locator = typeVar->getImpl().getLocator();
-  if (!locator || locator->getPath().empty() ||
-      locator->getPath().back().getKind() != ConstraintLocator::Archetype)
-    return true;
-
-  auto archetype = locator->getPath().back().getArchetype();
-
-  // If the archetype has no protocol requirements, there is nothing to
-  // check. In particular, we don't care if the existential has any
-  // problematic conformances.
-  if (archetype->getConformsTo().empty())
-    return true;
-
-  // Check archetype conformances.
-  for (auto proto : archetype->getConformsTo()) {
-    if (!proto->existentialConformsToSelf()) {
-      if (cs.shouldRecordFailures()) {
-        cs.recordFailure(cs.getConstraintLocator(locator),
-                         Failure::IsNotSelfConforming,
-                         archetype, proto->getDeclaredType(),
-                         // value is for diag::protocol_not_self_conforming
-                         proto->isObjC() ? 1 : 0);
-      }
-      return false;
-    }
-  }
-
-  // We are going to shoehorn this existential into an archetype. It better
-  // not have any witness tables.
-  for (auto proto : protocols) {
-    if (!proto->isObjC() &&
-        !proto->isSpecificProtocol(KnownProtocolKind::AnyObject)) {
-      if (cs.shouldRecordFailures()) {
-        cs.recordFailure(cs.getConstraintLocator(locator),
-                         Failure::ExistentialIsNotObjC,
-                         archetype, proto->getDeclaredType());
-      }
-      return false;
-    }
-  }
-
-  return true;
-}
-
 /// Check whether the given value type is one of a few specific
 /// bridged types.
 static bool isArrayDictionarySetOrString(const ASTContext &ctx, Type type) {
@@ -1385,17 +1330,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
           }
 
           // Okay. Bind below.
-        }
-
-        // A generic parameter can only be bound to an existential
-        // type if the existential type is compatible with
-        // Objective-C.
-        Type archetype;
-        SmallVector<ProtocolDecl *, 2> protocols;
-
-        if (type2->isExistentialType(protocols) &&
-            !canBindGenericParamToExistential(*this, typeVar1, protocols)) {
-          return SolutionKind::Error;
         }
 
         // Check whether the type variable must be bound to a materializable

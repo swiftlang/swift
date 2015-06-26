@@ -769,6 +769,17 @@ LookupConformanceResult Module::lookupConformance(Type type,
   // existential's list of conformances and the existential conforms to
   // itself.
   if (type->isExistentialType()) {
+    SmallVector<ProtocolDecl *, 4> protocols;
+    type->getAnyExistentialTypeProtocols(protocols);
+
+    // Due to an IRGen limitation, witness tables cannot be passed from an
+    // existential to an archetype parameter, so for now we restrict this to
+    // @objc protocols.
+    for (auto proto : protocols) {
+      if (!proto->isObjC())
+        return { nullptr, ConformanceKind::DoesNotConform };
+    }
+
     // If the existential type cannot be represented or the protocol does not
     // conform to itself, there's no point in looking further.
     if (!protocol->existentialConformsToSelf() ||
@@ -783,10 +794,8 @@ LookupConformanceResult Module::lookupConformance(Type type,
     }
 
     // Look for this protocol within the existential's list of conformances.
-    SmallVector<ProtocolDecl *, 4> protocols;
-    type->getAnyExistentialTypeProtocols(protocols);
-    for (auto ap : protocols) {
-      if (ap == protocol || ap->inheritsFrom(protocol)) {
+    for (auto proto : protocols) {
+      if (proto == protocol || proto->inheritsFrom(protocol)) {
         return { nullptr, ConformanceKind::Conforms };
       }
     }

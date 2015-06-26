@@ -3672,6 +3672,33 @@ void ConformanceChecker::checkConformance() {
   }
 }
 
+static void diagnoseConformanceFailure(TypeChecker &TC, Type T,
+                                       ProtocolDecl *Proto,
+                                       SourceLoc ComplainLoc) {
+  if (T->is<ErrorType>())
+    return;
+
+  // If we're checking conformance of an existential type to a protocol,
+  // do a little bit of extra work to produce a better diagnostic.
+  SmallVector<ProtocolDecl *, 2> protocols;
+  if (T->isExistentialType(protocols)) {
+    for (auto proto : protocols) {
+      if (!proto->isObjC()) {
+        TC.diagnose(ComplainLoc, diag::protocol_does_not_conform,
+                    T, Proto->getDeclaredType(), proto->getDeclaredType(), 0);
+        return;
+      }
+    }
+
+    TC.diagnose(ComplainLoc, diag::protocol_does_not_conform,
+                T, Proto->getDeclaredType(), Proto->getDeclaredType(), 1);
+    return;
+  }
+
+  TC.diagnose(ComplainLoc, diag::type_does_not_conform,
+              T, Proto->getDeclaredType());
+}
+
 void ConformanceChecker::diagnoseOrDefer(
        ValueDecl *requirement, bool isError,
        std::function<void(TypeChecker &, NormalProtocolConformance *)> fn) {
@@ -3693,8 +3720,7 @@ void ConformanceChecker::diagnoseOrDefer(
 
   // Complain that the type does not conform, once.
   if (isError && !AlreadyComplained) {
-    TC.diagnose(Loc, diag::type_does_not_conform, Adoptee,
-                Proto->getDeclaredType());
+    diagnoseConformanceFailure(TC, Adoptee, Proto, Loc);
     AlreadyComplained = true;
   }
 
@@ -3895,13 +3921,10 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
     return true;
 
   case ConformanceKind::DoesNotConform:
-    if (ComplainLoc.isValid()) {
-      if (!T->is<ErrorType>())
-        diagnose(ComplainLoc, diag::type_does_not_conform,
-                 T, Proto->getDeclaredType());
-    } else {
+    if (ComplainLoc.isValid())
+      diagnoseConformanceFailure(*this, T, Proto, ComplainLoc);
+    else
       recordDependency();
-    }
     return false;
 
   case ConformanceKind::UncheckedConforms:

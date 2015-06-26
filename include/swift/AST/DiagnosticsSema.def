@@ -426,15 +426,6 @@ ERROR(no_accessible_initializers,sema_tcc,none,
       (Type))
 ERROR(unbound_generic_parameter,sema_tcc,none,
       "argument for generic parameter %0 could not be inferred", (Type))
-ERROR(protocol_not_self_conforming,sema_tcc,none,
-      "generic parameter %0 is constrained to a %select{non-@objc protocol type|"
-      "protocol type with static methods}2 %1 and cannot be bound to an "
-      "existential type",
-      (Type, Type, unsigned))
-ERROR(existential_non_objc,sema_tcc,none,
-      "generic parameter %0 cannot be bound to an existential type containing "
-      "a non-@objc protocol type %1",
-      (Type, Type))
 ERROR(cannot_bind_generic_parameter_to_type,sema_tcc,none,
       "cannot bind generic parameter to type %0",
       (Type))
@@ -744,6 +735,10 @@ ERROR(extension_anyobject,sema_tcd,none,
 // Protocols
 ERROR(type_does_not_conform,sema_tcd,none,
       "type %0 does not conform to protocol %1", (Type, Type))
+ERROR(protocol_does_not_conform,sema_tcc,none,
+      "protocol type %0 does not conform to protocol %1 because "
+      "%select{%2 is not declared @objc|%2 defines static methods}3",
+      (Type, Type, Type, unsigned))
 ERROR(protocol_derivation_is_broken,sema_tcd,none,
       "protocol %0 is broken; cannot derive conformance for type %1", (Type, Type))
 ERROR(type_does_not_inherit,sema_tcd,none,
