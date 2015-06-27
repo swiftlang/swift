@@ -638,9 +638,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalUnavailableAsOptional |=
       Args.hasArg(OPT_enable_experimental_unavailable_as_optional);
   
-  Opts.EnableSIMDImport |=
-      Args.hasArg(OPT_enable_simd_import);
-
   Opts.EnableCharacterLiterals |= Args.hasArg(OPT_enable_character_literals);
 
   if (auto A = Args.getLastArg(OPT_enable_access_control,

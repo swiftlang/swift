@@ -77,9 +77,6 @@ namespace swift {
     /// symbols as optionals.
     bool EnableExperimentalUnavailableAsOptional = false;
     
-    /// \brief Enable support for SIMD type imports.
-    bool EnableSIMDImport = true;
-
     /// \brief Enable features useful for running in the debugger.
     bool DebuggerSupport = false;
 

@@ -417,10 +417,6 @@ namespace {
     }
 
     ImportResult VisitVectorType(const clang::VectorType *type) {
-      // We can map this into a type from the SIMD module, if it exists.
-      if (!Impl.SwiftContext.LangOpts.EnableSIMDImport)
-        return Type();
-      
       auto *SIMD = Impl.tryLoadSIMDModule();
       if (!SIMD)
         return Type();
