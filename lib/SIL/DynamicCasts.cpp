@@ -59,8 +59,8 @@ static bool canClassOrSuperclassesHaveExtensions(ClassDecl *CD,
     if (CD->getEffectiveAccess() == Accessibility::Public)
       return true;
 
-    // Internal classes can be extended, if we are not in a
-    // whole-module-optimizations mode.
+    // Internal classes can be extended, if we are not in
+    // whole-module-optimization mode.
     if (CD->getEffectiveAccess() == Accessibility::Internal &&
         !isWholeModuleOpts)
       return true;
