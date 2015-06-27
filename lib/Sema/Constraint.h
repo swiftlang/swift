@@ -592,6 +592,10 @@ public:
       void dump(SourceManager *SM) const LLVM_ATTRIBUTE_USED,
       "only for use within the debugger");
 
+  LLVM_ATTRIBUTE_DEPRECATED(
+      void dump(ConstraintSystem *CS) const LLVM_ATTRIBUTE_USED,
+    "only for use within the debugger");
+
   void *operator new(size_t bytes, ConstraintSystem& cs,
                      size_t alignment = alignof(Constraint));
 

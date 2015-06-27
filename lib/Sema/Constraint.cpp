@@ -329,7 +329,13 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
 
 void Constraint::dump(SourceManager *sm) const {
   print(llvm::errs(), sm);
+  llvm::errs() << "\n";
 }
+
+void Constraint::dump(ConstraintSystem *CS) const {
+  dump(&CS->getASTContext().SourceMgr);
+}
+
 
 StringRef swift::constraints::getName(ConversionRestrictionKind kind) {
   switch (kind) {
