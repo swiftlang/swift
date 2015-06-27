@@ -111,22 +111,6 @@ llvm::Value *IRGenFunction::emitAllocObjectCall(llvm::Value *metadata,
                             { metadata, size, alignMask }, name);
 }
 
-void IRGenFunction::emitAllocBoxCall(llvm::Value *typeMetadata,
-                                     llvm::Value *&box,
-                                     llvm::Value *&valueAddress) {
-  auto attrs = llvm::AttributeSet::get(IGM.LLVMContext,
-                                       llvm::AttributeSet::FunctionIndex,
-                                       llvm::Attribute::NoUnwind);
-  
-  llvm::CallInst *call =
-    Builder.CreateCall(IGM.getAllocBoxFn(), typeMetadata);
-  call->setCallingConv(IGM.RuntimeCC);
-  call->setAttributes(attrs);
-
-  box = Builder.CreateExtractValue(call, 0);
-  valueAddress = Builder.CreateExtractValue(call, 1);
-}
-
 void IRGenFunction::emitAllocBox2Call(llvm::Value *typeMetadata,
                                       llvm::Value *&box,
                                       llvm::Value *&valueAddress) {
@@ -141,18 +125,6 @@ void IRGenFunction::emitAllocBox2Call(llvm::Value *typeMetadata,
 
   box = Builder.CreateExtractValue(call, 0);
   valueAddress = Builder.CreateExtractValue(call, 1);
-}
-
-void IRGenFunction::emitDeallocBoxCall(llvm::Value *box,
-                                       llvm::Value *typeMetadata) {
-  auto attrs = llvm::AttributeSet::get(IGM.LLVMContext,
-                                       llvm::AttributeSet::FunctionIndex,
-                                       llvm::Attribute::NoUnwind);
-
-  llvm::CallInst *call =
-    Builder.CreateCall(IGM.getDeallocBoxFn(), {box, typeMetadata});
-  call->setCallingConv(IGM.RuntimeCC);
-  call->setAttributes(attrs);
 }
 
 void IRGenFunction::emitDeallocBox2Call(llvm::Value *box,

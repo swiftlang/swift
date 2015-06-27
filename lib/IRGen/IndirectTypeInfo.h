@@ -31,7 +31,6 @@ namespace irgen {
 ///
 /// Subclasses must implement the following operations:
 ///   allocateStack
-///   allocateBox
 ///   assignWithCopy
 ///   initializeWithCopy
 ///   destroy

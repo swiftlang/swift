@@ -102,17 +102,6 @@ void UnimplementedTypeInfo::deallocateStack(IRGenFunction &IGF, Address addr,
   
 }
 
-OwnedAddress UnimplementedTypeInfo::allocateBox(IRGenFunction &IGF, SILType T,
-                                                const llvm::Twine &name) const {
-  return OwnedAddress(getUndefOpaqueAddress(getStorageType()),
-                      llvm::UndefValue::get(IGF.IGM.RefCountedPtrTy));
-}
-
-void UnimplementedTypeInfo::deallocateBox(IRGenFunction &IGF,
-                                          llvm::Value *boxOwner, SILType T)
-const {
-}
-
 void UnimplementedTypeInfo::assignWithCopy(IRGenFunction &IGF, Address dest,
                                            Address src, SILType T) const {
   

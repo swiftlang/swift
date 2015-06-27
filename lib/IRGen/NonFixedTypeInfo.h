@@ -57,23 +57,6 @@ public:
   // This is useful for metaprogramming.
   static bool isFixed() { return false; }
 
-  OwnedAddress allocateBox(IRGenFunction &IGF,
-                           SILType T,
-                           const llvm::Twine &name) const override {
-    // Allocate a new object using the allocBox runtime call.
-    llvm::Value *metadata = IGF.emitTypeMetadataRefForLayout(T);
-    llvm::Value *box, *address;
-    IGF.emitAllocBoxCall(metadata, box, address);
-    return OwnedAddress(getAsBitCastAddress(IGF, address), box);
-  }
-  
-  void deallocateBox(IRGenFunction &IGF, llvm::Value *boxOwner,
-                     SILType T) const override {
-    // Deallocate the box using the deallocBox runtime call.
-    llvm::Value *metadata = IGF.emitTypeMetadataRefForLayout(T);
-    IGF.emitDeallocBoxCall(boxOwner, metadata);
-  }
-
   ContainedAddress allocateStack(IRGenFunction &IGF,
                                  SILType T,
                                  const llvm::Twine &name) const override {

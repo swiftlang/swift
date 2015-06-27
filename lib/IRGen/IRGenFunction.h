@@ -188,14 +188,10 @@ public:
   void emitDeallocRawCall(llvm::Value *pointer, llvm::Value *size,
                           llvm::Value *alignMask);
   
-  void emitAllocBoxCall(llvm::Value *typeMetadata,
-                        llvm::Value *&box,
-                        llvm::Value *&valueAddress);
   void emitAllocBox2Call(llvm::Value *typeMetadata,
                          llvm::Value *&box,
                          llvm::Value *&valueAddress);
 
-  void emitDeallocBoxCall(llvm::Value *box, llvm::Value *typeMetadata);
   void emitDeallocBox2Call(llvm::Value *box, llvm::Value *typeMetadata);
 
   llvm::Value *emitProjectBox2Call(llvm::Value *box, llvm::Value *typeMetadata);

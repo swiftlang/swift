@@ -3391,10 +3391,8 @@ void IRGenSILFunction::visitDeallocBoxInst(swift::DeallocBoxInst *i) {
   Explosion owner = getLoweredExplosion(i->getOperand());
   llvm::Value *ownerPtr = owner.claimNext();
 
-  if (auto boxTy = i->getOperand().getType().getAs<SILBoxType>())
-    emitDeallocateBox(*this, ownerPtr, boxTy);
-  else
-    type.deallocateBox(*this, ownerPtr, i->getElementType());
+  auto boxTy = i->getOperand().getType().castTo<SILBoxType>();
+  emitDeallocateBox(*this, ownerPtr, boxTy);
 }
 
 void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
@@ -3412,15 +3410,9 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
 # endif
   OwnedAddress addr;
 
-  // TODO: Use the "new" emitAllocateBox call until untyped boxes can be
-  // phased out.
-  if (auto boxTy = i->getContainerResult().getType().getAs<SILBoxType>())
-    addr = emitAllocateBox(*this, boxTy, DbgName);
-  else
-   addr = type.allocateBox(*this,
-                           i->getElementType(),
-                           DbgName);
-  
+  auto boxTy = i->getContainerResult().getType().castTo<SILBoxType>();
+  addr = emitAllocateBox(*this, boxTy, DbgName);
+
   Explosion box;
   box.add(addr.getOwner());
   setLoweredExplosion(SILValue(i, 0), box);

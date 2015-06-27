@@ -247,15 +247,6 @@ public:
   virtual void deallocateStack(IRGenFunction &IGF, Address addr,
                                SILType T) const = 0;
 
-  /// Allocate a box of this type on the heap.
-  virtual OwnedAddress allocateBox(IRGenFunction &IGF, SILType T,
-                                   const llvm::Twine &name) const = 0;
-
-  /// Deallocate an uninitialized box of this type on the heap.
-  virtual void deallocateBox(IRGenFunction &IGF,
-                             llvm::Value *boxOwner,
-                             SILType T) const = 0;
-  
   /// Copy a value out of an object and into another, destroying the
   /// old value in the destination.
   virtual void assignWithCopy(IRGenFunction &IGF, Address dest,

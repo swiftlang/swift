@@ -38,17 +38,6 @@
 #define FUNCTION(Id, Name, CC, ReturnTys, ArgTys, Attrs) FUNCTION_ID(Id)
 #endif
 
-// struct { RefCounted *box; void *value; } swift_allocBox(Metadata *type);
-FUNCTION(AllocBox,       swift_allocBox,      RuntimeCC,
-         RETURNS(RefCountedPtrTy, OpaquePtrTy),
-         ARGS(TypeMetadataPtrTy),
-         ATTRS(NoUnwind))
-
-FUNCTION(DeallocBox,     swift_deallocBox,    RuntimeCC,
-         RETURNS(VoidTy),
-         ARGS(RefCountedPtrTy, TypeMetadataPtrTy),
-         ATTRS(NoUnwind))
-
 FUNCTION(AllocBox2,       swift_allocBox2,      RuntimeCC,
          RETURNS(RefCountedPtrTy, OpaquePtrTy),
          ARGS(TypeMetadataPtrTy),
