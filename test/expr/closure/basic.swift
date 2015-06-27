@@ -26,7 +26,7 @@ func variadic() {
   f(1, 2)
   f(1, 3)
 
-  let D = { (Ss ...) in 1 } // expected-error{{'...' cannot be applied to a subpattern which is not explicitly typed}}, expected-error{{'(_) -> _' is not convertible to 'IntegerLiteralConvertible'}}
+  let D = { (Ss ...) in 1 } // expected-error{{'...' cannot be applied to a subpattern which is not explicitly typed}}, expected-error{{cannot convert return expression of type 'Int' to expected return type 'IntegerLiteralConvertible'}}
 }
 
 // Closures with attributes in the parameter list.

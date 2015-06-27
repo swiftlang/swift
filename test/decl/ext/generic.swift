@@ -112,7 +112,7 @@ extension Array where Element : Hashable {
 }
 
 func notHashableArray<T>(x: [T]) {
-  x.worseHashEver // expected-error{{'Int' is not convertible to 'Hashable'}}
+  x.worseHashEver // expected-error{{'[T]' is not convertible to 'Hashable'}}
 }
 
 func hashableArray<T : Hashable>(x: [T]) {

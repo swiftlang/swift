@@ -58,8 +58,7 @@ func funcdecl5(a: Int, _ y: Int) {
   func6(fn: { a,b in a+b })
   
   // Infer incompatible type.
-  // FIXME: Need to relate diagnostic to return type
-  func6(fn: {a,b->Float in 4.0 })    // expected-error {{'(fn: (_, _) -> Float)' is not convertible to 'Float'}}
+  func6(fn: {a,b->Float in 4.0 })    // expected-error {{cannot convert return expression of type 'Double' to expected return type 'Float'}}
 
   // Pattern doesn't need to name arguments.
   func6(fn: { _,_ in 4 })

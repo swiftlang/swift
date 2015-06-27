@@ -433,6 +433,18 @@ void constraints::simplifyLocator(Expr *&anchor,
       }
       break;
 
+    case ConstraintLocator::ClosureResult:
+      if (auto CE = dyn_cast<ClosureExpr>(anchor)) {
+        if (auto body = CE->getSingleExpressionBody()) {
+          targetAnchor = nullptr;
+          targetPath.clear();
+          anchor = body;
+          path = path.slice(1);
+          continue;
+        }
+      }
+      break;
+        
     default:
       // FIXME: Lots of other cases to handle.
       break;
@@ -1136,8 +1148,8 @@ static bool diagnoseAmbiguity(ConstraintSystem &cs,
 }
 
 static Constraint *getConstraintChoice(Constraint *constraint,
-                                 ConstraintKind kind,
-                                 bool takeAny = false) {
+                                       ConstraintKind kind,
+                                       bool takeAny = false) {
   if (constraint->getKind() != ConstraintKind::Disjunction &&
       constraint->getKind() != ConstraintKind::Conjunction)
     return nullptr;
@@ -1619,9 +1631,7 @@ FailureDiagnosis::FailureDiagnosis(Expr *expr, ConstraintSystem *cs)
   
   // If no more descriptive constraint was found, use the fallback constraint.
   if (fallbackConstraint &&
-      !(conversionConstraint ||
-        overloadConstraint ||
-        argumentConstraint)) {
+      !(conversionConstraint || overloadConstraint || argumentConstraint)) {
         
         if (fallbackConstraint->getKind() == ConstraintKind::ArgumentConversion)
           argumentConstraint = fallbackConstraint;
@@ -1630,9 +1640,8 @@ FailureDiagnosis::FailureDiagnosis(Expr *expr, ConstraintSystem *cs)
       }
   
   // If there's still no conversion to diagnose, use the disjunction conversion.
-  if (!conversionConstraint) {
+  if (!conversionConstraint)
     conversionConstraint = disjunctionConversionConstraint;
-  }
   
   // If there was already a conversion failure, use it.
   if (!conversionConstraint &&
@@ -1662,9 +1671,9 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure() {
   // If this is a return expression with available conversion constraints,
   // we can produce a better diagnostic by pointing out the return expression
   // conversion failure.
-  if (expr->isReturnExpr() &&
-      (conversionConstraint || argumentConstraint))
-    return diagnoseGeneralConversionFailure();
+  if (expr->isReturnExpr() && (conversionConstraint || argumentConstraint))
+    if (diagnoseGeneralConversionFailure())
+      return true;
   
   // In the absense of a better conversion constraint failure, point out the
   // inability to find an appropriate overload.
@@ -1707,9 +1716,8 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure() {
   if (!conversionConstraint && !argumentConstraint)
     return false;
   
-  auto constraint = argumentConstraint ?
-  argumentConstraint :
-  conversionConstraint;
+  auto constraint =
+    argumentConstraint ? argumentConstraint : conversionConstraint;
   
   if (conformanceConstraint) {
     if (conformanceConstraint->getTypeVariables().size() <
@@ -1718,13 +1726,18 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure() {
     }
   }
   
-  auto locator = constraint->getLocator();
-  auto anchor = locator ? locator->getAnchor() : expr;
-  std::pair<Type, Type> types = getBoundTypesFromConstraint(CS, expr,
+  auto anchor = expr;
+  if (auto locator = constraint->getLocator()) {
+    anchor = simplifyLocatorToAnchor(*CS, locator);
+    if (!anchor)
+      anchor = locator->getAnchor();
+  }
+  
+  std::pair<Type, Type> types = getBoundTypesFromConstraint(CS, anchor,
                                                             constraint);
   
   if (argumentConstraint) {
-    CS->TC.diagnose(expr->getLoc(), diag::could_not_convert_argument,
+    CS->TC.diagnose(anchor->getLoc(), diag::could_not_convert_argument,
                     types.first).
     highlight(anchor->getSourceRange());
     return true;
@@ -1742,18 +1755,16 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure() {
     return true;
   }
   
-  auto fromType = getTypeOfIndependentSubExpression(expr);
+  auto fromType = getTypeOfIndependentSubExpression(anchor);
   
   if (fromType->getAs<ErrorType>())
     fromType = types.first.getPointer();
 
   fromType = fromType->getRValueType();
   
-  auto toType = CS->getConversionType(expr);
-  
+  auto toType = CS->getConversionType(anchor);
   if (!toType)
-    toType = CS->getContextualType(expr);
-  
+    toType = CS->getContextualType(anchor);
   if (!toType)
     toType = types.second.getPointer();
   
@@ -1762,25 +1773,25 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure() {
   if (fromType->is<UnboundGenericType>() || toType->is<TypeVariableType>() ||
       (fromType->is<TypeVariableType>() && toType->is<ProtocolType>())) {
     auto diagID = diag::type_of_expression_is_ambiguous;
-    if (isa<ClosureExpr>(expr))
+    if (isa<ClosureExpr>(anchor))
       diagID = diag::cannot_infer_closure_type;
       
-    CS->TC.diagnose(expr->getLoc(), diagID)
-      .highlight(expr->getSourceRange());
+    CS->TC.diagnose(anchor->getLoc(), diagID)
+      .highlight(anchor->getSourceRange());
     
     return true;
   }
   
   // Special case the diagnostic for a function result-type mismatch.
-  if (expr->isReturnExpr()) {
+  if (anchor->isReturnExpr()) {
     if (toType->isVoid()) {
-      CS->TC.diagnose(expr->getLoc(),
+      CS->TC.diagnose(anchor->getLoc(),
                       diag::cannot_return_value_from_void_func);
       
       return true;
     }
     
-    CS->TC.diagnose(expr->getLoc(), diag::cannot_convert_to_return_type,
+    CS->TC.diagnose(anchor->getLoc(), diag::cannot_convert_to_return_type,
                     fromType, toType)
       .highlight(anchor->getSourceRange());
     
@@ -2885,13 +2896,13 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable,
   if (getExpressionTooComplex()) {
     TC.diagnose(expr->getLoc(), diag::expression_too_complex).
     highlight(expr->getSourceRange());
-    
     return true;
   }
   
   // If all else fails, attempt to diagnose the failure by looking through the
   // system's constraints.
-  diagnoseFailureForExpr(expr);
-  
+  bool result = diagnoseFailureForExpr(expr);
+  assert(result && "didn't diagnose any failure?"); (void)result;
+    
   return true;
 }

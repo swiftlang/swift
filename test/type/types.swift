@@ -15,7 +15,7 @@ var d2 : () -> Int = { 4}
 
 var d3 : () -> Float = {4 }
 
-var d4 : () -> Int = { d2 }  // rdar://19821875 expected-error{{'() -> Int' is not convertible to '() -> Int'}}
+var d4 : () -> Int = { d2 }  // expected-error{{function produces expected type 'Int'; did you mean to call it with '()'?}}
 
 var e0 : [Int]
 e0[] // expected-error {{cannot subscript a value of type '[Int]' with an index of type '()'}}
