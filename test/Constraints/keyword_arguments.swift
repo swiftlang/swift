@@ -49,6 +49,10 @@ allkeywords1(1, 2) // expected-error{{missing argument labels}}
 allkeywords1(x: 1, 2) // expected-error{{missing argument label 'y:' in call}}
 allkeywords1(1, y: 2) // expected-error{{missing argument label 'x:' in call}}
 
+// If keyword is reserved, make sure to quote it. rdar://problem/21392294
+func reservedLabel(x: Int, `repeat`: Bool) {}
+reservedLabel(1, true) // expected-error{{missing argument label 'repeat:' in call}}{{18-18=`repeat`: }}
+
 class GenericCtor<U> {
   init<T>(t : T) {}
 }

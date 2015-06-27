@@ -5706,17 +5706,25 @@ static bool diagnoseRelabel(TypeChecker &tc, Expr *expr,
       continue;
     }
 
+    tok newNameKind =
+      Lexer::kindOfIdentifier(newName.str(), /*inSILMode=*/false);
+    bool newNameIsReserved = newNameKind != tok::identifier;
+    llvm::SmallString<16> newStr;
+    if (newNameIsReserved)
+      newStr += "`";
+    newStr += newName.str();
+    if (newNameIsReserved)
+      newStr += "`";
+
     if (oldName.empty()) {
       // Insert the name.
-      llvm::SmallString<16> str;
-      str += newName.str();
-      str += ": ";
-      diag.fixItInsert(tuple->getElement(i)->getStartLoc(), str);
+      newStr += ": ";
+      diag.fixItInsert(tuple->getElement(i)->getStartLoc(), newStr);
       continue;
     }
     
     // Change the name.
-    diag.fixItReplace(tuple->getElementNameLocs()[i], newName.str());
+    diag.fixItReplace(tuple->getElementNameLocs()[i], newStr);
   }
 
   // FIXME: Fix AST.
