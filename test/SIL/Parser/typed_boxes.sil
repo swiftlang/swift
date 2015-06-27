@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -sil-enable-typed-boxes %s -emit-silgen | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-silgen | FileCheck %s
 
 import Swift
 

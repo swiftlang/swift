@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -sil-enable-typed-boxes -emit-silgen %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
 func foo(var x: Int) -> () -> Int {
   return { x }

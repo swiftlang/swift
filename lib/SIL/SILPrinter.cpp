@@ -1248,11 +1248,7 @@ public:
        << " in " << getIDAndType(DVBI->getOperand());
   }
   void visitDeallocBoxInst(DeallocBoxInst *DI) {
-    *this << "dealloc_box ";
-    // TODO: The element type is redundant with typed boxes.
-    if (!DI->getModule().getOptions().EnableTypedBoxes)
-      *this << DI->getElementType() << ", ";
-    *this << getIDAndType(DI->getOperand());
+    *this << "dealloc_box " << getIDAndType(DI->getOperand());
   }
   void visitDestroyAddrInst(DestroyAddrInst *DI) {
     *this << "destroy_addr " << getIDAndType(DI->getOperand());

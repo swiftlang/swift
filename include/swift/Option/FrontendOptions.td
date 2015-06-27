@@ -247,9 +247,6 @@ def sil_serialize_all : Flag<["-"], "sil-serialize-all">,
 def sil_verify_all : Flag<["-"], "sil-verify-all">,
   HelpText<"Verify SIL after each transform">;
 
-def sil_enable_typed_boxes : Flag<["-"], "sil-enable-typed-boxes">,
-  HelpText<"Generate typed box insns in SIL">;
-
 def sil_debug_serialization : Flag<["-"], "sil-debug-serialization">,
   HelpText<"Do not eliminate functions in Mandatory Inlining/SILCombine dead "
            "functions. (for debugging only)">;

@@ -3387,7 +3387,6 @@ void IRGenSILFunction::visitDeallocRefInst(swift::DeallocRefInst *i) {
 }
 
 void IRGenSILFunction::visitDeallocBoxInst(swift::DeallocBoxInst *i) {
-  const TypeInfo &type = getTypeInfo(i->getElementType());
   Explosion owner = getLoweredExplosion(i->getOperand());
   llvm::Value *ownerPtr = owner.claimNext();
 

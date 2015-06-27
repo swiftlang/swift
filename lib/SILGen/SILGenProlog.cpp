@@ -427,8 +427,6 @@ emitReconstitutedConstantCaptureArguments(SILType ty,
 }
 
 static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture) {
-  ASTContext &c = gen.getASTContext();
-
   auto *VD = capture.getDecl();
   auto type = VD->getType();
   switch (gen.SGM.Types.getDeclCaptureKind(capture)) {
@@ -462,12 +460,8 @@ static void emitCaptureArguments(SILGenFunction &gen, CapturedValue capture) {
     // LValues are captured as two arguments: a retained NativeObject that owns
     // the captured value, and the address of the value itself.
     SILType ty = gen.getLoweredType(type).getAddressType();
-    SILType boxTy;
-    if (gen.SGM.M.getOptions().EnableTypedBoxes)
-      boxTy = SILType::getPrimitiveObjectType(
-        SILBoxType::get(ty.getSwiftRValueType()));
-    else
-      boxTy = SILType::getNativeObjectType(c);
+    SILType boxTy = SILType::getPrimitiveObjectType(
+      SILBoxType::get(ty.getSwiftRValueType()));
     SILValue box = new (gen.SGM.M) SILArgument(gen.F.begin(), boxTy, VD);
     SILValue addr = new (gen.SGM.M) SILArgument(gen.F.begin(), ty, VD);
     gen.VarLocs[VD] = SILGenFunction::VarLoc::get(addr, box);

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -sil-enable-typed-boxes -emit-ir %s | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend -emit-ir %s | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 sil_stage canonical
 
 import Builtin

@@ -554,8 +554,6 @@ void SILGenFunction::emitArtificialTopLevel(ClassDecl *mainClass) {
 static void forwardCaptureArgs(SILGenFunction &gen,
                                SmallVectorImpl<SILValue> &args,
                                CapturedValue capture) {
-  ASTContext &c = gen.getASTContext();
-
   auto addSILArgument = [&](SILType t, ValueDecl *d) {
     args.push_back(new (gen.SGM.M) SILArgument(gen.F.begin(), t, d));
   };
@@ -574,12 +572,8 @@ static void forwardCaptureArgs(SILGenFunction &gen,
     SILType ty = gen.getLoweredType(vd->getType()->getRValueType())
       .getAddressType();
     // Forward the captured owning box.
-    SILType boxTy;
-    if (gen.SGM.M.getOptions().EnableTypedBoxes)
-      boxTy = SILType::getPrimitiveObjectType(
+    SILType boxTy = SILType::getPrimitiveObjectType(
         SILBoxType::get(ty.getSwiftRValueType()));
-    else
-      boxTy = SILType::getNativeObjectType(c);
     addSILArgument(boxTy, vd);
     // Forward the captured value address.
     addSILArgument(ty, vd);
