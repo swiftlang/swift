@@ -18,7 +18,7 @@ bb0(%0 : $Int64):
   %7 = integer_literal $Builtin.Int128, 20
   %8 = apply %5(%7, %6) : $@convention(thin) (Builtin.Int128, @thin Int64.Type) -> Int64
   %9 = apply %3(%4, %8) : $@convention(thin) (Int64, Int64) -> Int64
-  strong_release %1#0 : $Builtin.NativeObject
+  strong_release %1#0 : $@box Int64
   return %9 : $Int64
 }
 
@@ -41,7 +41,7 @@ bb0(%0 : $Int64):
   %15 = integer_literal $Builtin.Int128, 30
   %16 = apply %13(%15, %14) : $@convention(thin) (Builtin.Int128, @thin Int64.Type) -> Int64
   %17 = apply %3(%12, %16) : $@convention(thin) (Int64, Int64) -> Int64
-  strong_release %1#0 : $Builtin.NativeObject
+  strong_release %1#0 : $@box Int64
   return %17 : $Int64
 
   // CHECK-LABEL: sil @inline_test_add : $@convention(thin) (Int64) -> Int64 {

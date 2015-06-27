@@ -36,7 +36,7 @@ bb3:
 bb4:
   %30 = load %3#1 : $*Optional<()>
   dealloc_stack %3#0 : $*@local_storage Optional<()>
-  strong_release %1#0 : $Builtin.NativeObject
+  strong_release %1#0 : $@box Optional<() -> ()>
   %33 = tuple ()
   return %33 : $()
 }

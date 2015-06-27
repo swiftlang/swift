@@ -292,7 +292,7 @@ class RootClass {
   // CHECK:         br [[EXIT:bb[0-9]+]]([[SOME]] : $Optional<RootClass>)
 
   // CHECK:       [[FAILURE]]:
-  // CHECK:          strong_release [[SELF_BOX]]#0 : $Builtin.NativeObject
+  // CHECK:          strong_release [[SELF_BOX]]#0 : $@box RootClass
   // CHECK:         [[NIL:%.*]] = enum $Optional<RootClass>, #Optional.None!enumelt
   // CHECK:         br [[EXIT]]([[NIL]] : $Optional<RootClass>)
   // CHECK:       [[EXIT]]([[RESULT:%.*]] : $Optional<RootClass>):

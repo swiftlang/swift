@@ -22,7 +22,7 @@ bb0(%0 : $Int64):
   %7 = integer_literal $Builtin.Int128, 20
   %8 = apply %5(%7, %6) : $@convention(thin) (Builtin.Int128, @thin Int64.Type) -> Int64
   %9 = apply %3(%4, %8) : $@convention(thin) (Int64, Int64) -> Int64
-  strong_release %1#0 : $Builtin.NativeObject
+  strong_release %1#0 : $@box Int64
   return %9 : $Int64
 }
 
@@ -75,7 +75,7 @@ bb0(%0 : $Int64):
   %15 = integer_literal $Builtin.Int128, 30
   %16 = apply %13(%15, %14) : $@convention(thin) (Builtin.Int128, @thin Int64.Type) -> Int64
   %17 = apply %3(%12, %16) : $@convention(thin) (Int64, Int64) -> Int64
-  strong_release %1#0 : $Builtin.NativeObject
+  strong_release %1#0 : $@box Int64
   return %17 : $Int64
 }
 
@@ -140,7 +140,7 @@ bb0(%0 : $Int64):
   %17 = integer_literal $Builtin.Int128, 30
   %18 = apply %15(%17, %16) : $@convention(thin) (Builtin.Int128, @thin Int64.Type) -> Int64
   %19 = apply %3(%14, %18) : $@convention(thin) (Int64, Int64) -> Int64
-  strong_release %1#0 : $Builtin.NativeObject
+  strong_release %1#0 : $@box Int64
   return %19 : $Int64
 }
 
@@ -157,7 +157,7 @@ bb0(%0 : $*SomeProtocol):
   %6 = existential_metatype $@thick SomeProtocol.Type, %4#1 : $*SomeProtocol
   destroy_addr %4#1 : $*SomeProtocol
   dealloc_stack %4#0 : $*@local_storage SomeProtocol
-  strong_release %1#0 : $Builtin.NativeObject
+  strong_release %1#0 : $@box SomeProtocol
   return %6 : $@thick SomeProtocol.Type
 }
 
@@ -246,8 +246,8 @@ bb5:
   br bb6(%37 : $Float)
 
 bb6(%39 : $Float):
-  strong_release %3#0 : $Builtin.NativeObject
-  strong_release %2#0 : $Builtin.NativeObject
+  strong_release %3#0 : $@box Float
+  strong_release %2#0 : $@box Float
   return %39 : $Float
 }
 
@@ -353,7 +353,7 @@ bb0(%0 : $Float):
   %19 = float_literal $Builtin.FPIEEE64, 0x4008000000000000
   %20 = apply %17(%19, %18) : $@convention(thin) (Builtin.FPIEEE64, @thin Float.Type) -> Float
   %21 = apply %3(%16, %20) : $@convention(thin) (Float, Float) -> Float
-  strong_release %1#0 : $Builtin.NativeObject
+  strong_release %1#0 : $@box Float
   return %21 : $Float
 }
 
@@ -444,16 +444,16 @@ bb2:
   br bb3(%14 : $Bool)
 
 bb3(%16 : $Bool):
-  strong_release %3#0 : $Builtin.NativeObject
-  strong_release %2#0 : $Builtin.NativeObject
+  strong_release %3#0 : $@box @callee_owned () -> Bool
+  strong_release %2#0 : $@box Bool
   return %16 : $Bool
 }
 
-sil private [transparent] @closure0 : $@convention(thin) (@owned Builtin.NativeObject, @inout Bool) -> Bool {
-bb0(%0 : $Builtin.NativeObject, %1 : $*Bool):
+sil private [transparent] @closure0 : $@convention(thin) (@owned @box Bool, @inout Bool) -> Bool {
+bb0(%0 : $@box Bool, %1 : $*Bool):
   %2 = tuple ()
   %3 = load %1 : $*Bool
-  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $@box Bool
   return %3 : $Bool
 }
 
@@ -487,12 +487,12 @@ bb0(%0 : $Bool, %1 : $Bool):
   store %1 to %3#1 : $*Bool
   %6 = function_ref @short_circuit_or : $@convention(thin) (Bool, @callee_owned () -> Bool) -> Bool
   %7 = load %2#1 : $*Bool
-  %8 = function_ref @closure0 : $@convention(thin) (@owned Builtin.NativeObject, @inout Bool) -> Bool
-  strong_retain %3#0 : $Builtin.NativeObject
-  %10 = partial_apply %8(%3#0, %3#1) : $@convention(thin) (@owned Builtin.NativeObject, @inout Bool) -> Bool
+  %8 = function_ref @closure0 : $@convention(thin) (@owned @box Bool, @inout Bool) -> Bool
+  strong_retain %3#0 : $@box Bool
+  %10 = partial_apply %8(%3#0, %3#1) : $@convention(thin) (@owned @box Bool, @inout Bool) -> Bool
   %11 = apply %6(%7, %10) : $@convention(thin) (Bool, @callee_owned () -> Bool) -> Bool
-  strong_release %3#0 : $Builtin.NativeObject
-  strong_release %2#0 : $Builtin.NativeObject
+  strong_release %3#0 : $@box Bool
+  strong_release %2#0 : $@box Bool
   return %11 : $Bool
 }
 
@@ -526,15 +526,15 @@ bb0(%0 : $Bool, %1 : $Bool):
   store %1 to %3#1 : $*Bool
   %6 = function_ref @short_circuit_or : $@convention(thin) (Bool, @callee_owned () -> Bool) -> Bool
   %7 = load %2#1 : $*Bool
-  %8 = function_ref @closure0 : $@convention(thin) (@owned Builtin.NativeObject, @inout Bool) -> Bool
-  strong_retain %3#0 : $Builtin.NativeObject
-  %10 = partial_apply %8(%3#0, %3#1) : $@convention(thin) (@owned Builtin.NativeObject, @inout Bool) -> Bool
+  %8 = function_ref @closure0 : $@convention(thin) (@owned @box Bool, @inout Bool) -> Bool
+  strong_retain %3#0 : $@box Bool
+  %10 = partial_apply %8(%3#0, %3#1) : $@convention(thin) (@owned @box Bool, @inout Bool) -> Bool
   strong_retain %10 : $@callee_owned () -> Bool
   %12 = tuple ()
 
   %11 = apply %6(%7, %10) : $@convention(thin) (Bool, @callee_owned () -> Bool) -> Bool
-  strong_release %3#0 : $Builtin.NativeObject
-  strong_release %2#0 : $Builtin.NativeObject
+  strong_release %3#0 : $@box Bool
+  strong_release %2#0 : $@box Bool
   return %11 : $Bool
 }
 
@@ -557,7 +557,7 @@ bb0:
   %4 = integer_literal $Builtin.Int2048, 1
   %5 = apply %2(%4, %3) : $@convention(thin) (Builtin.Int2048, @thin Int64.Type) -> Int64
   store %5 to %1#1 : $*Int64
-  strong_release %1#0 : $Builtin.NativeObject
+  strong_release %1#0 : $@box Int64
   %8 = tuple ()
   return %8 : $()
 }

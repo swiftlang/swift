@@ -163,7 +163,7 @@ public struct TestAddressOnlyStruct<T>  {
 // CHECK-NEXT: %2 = alloc_box $ImplicitlyUnwrappedOptional<Int>  // var x
 // CHECK-NEXT: %3 = unchecked_addr_cast %2#1 : $*ImplicitlyUnwrappedOptional<Int> to $*Optional<Int>
 // CHECK-NEXT: store %0 to %3 : $*Optional<Int>
-// CHECK-NEXT: strong_release %2#0 : $Builtin.NativeObject
+// CHECK-NEXT: strong_release %2#0 : $@box ImplicitlyUnwrappedOptional<Int>
 func testContextualInitOfNonAddrOnlyType(a : Int?) {
   var x = a as Int!
 }

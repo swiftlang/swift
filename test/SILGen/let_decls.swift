@@ -471,7 +471,7 @@ struct LetPropertyStruct {
 // CHECK:   store %0 to %1#1 : $*LetPropertyStruct
 // CHECK:   %3 = load %1#1 : $*LetPropertyStruct
 // CHECK:   %4 = struct_extract %3 : $LetPropertyStruct, #LetPropertyStruct.lp
-// CHECK:   strong_release %1#0 : $Builtin.NativeObject
+// CHECK:   strong_release %1#0 : $@box LetPropertyStruct
 // CHECK:   return %4 : $Int
 func testLetPropertyAccessOnLValueBase(var a : LetPropertyStruct) -> Int {
   return a.lp

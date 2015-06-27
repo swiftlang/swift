@@ -15,7 +15,7 @@ bb0:
   %0 = alloc_box $Int
   %1 = mark_uninitialized [var] %0#1 : $*Int // expected-note {{variable defined here}}
   %4 = load %1 : $*Int                // expected-error {{variable '<unknown>' used before being initialized}}
-  strong_release %0#0 : $Builtin.NativeObject
+  strong_release %0#0 : $@box Int
   %9 = return %4 : $Int
 }
 
@@ -30,7 +30,7 @@ bb0:
   %6 = apply %5(%1) : $@convention(thin) (@inout Int) -> () // expected-error {{variable '<unknown>' passed by reference before being initialized}}
   
   %t = tuple ()
-  strong_release %0#0 : $Builtin.NativeObject
+  strong_release %0#0 : $@box Int
   return %t : $()
 }
 
@@ -56,7 +56,7 @@ bb0(%0 : $Int):
   %6 = apply %5(%1) : $@convention(thin) (@inout Int) -> ()
   %7 = load %1 : $*Int
   %8 = tuple (%3 : $Int, %7 : $Int)
-  strong_release %91#0 : $Builtin.NativeObject
+  strong_release %91#0 : $@box Int
   %11 = return %8 : $(Int, Int)
 }
 
@@ -80,7 +80,7 @@ bb0:
   %3 = apply %2(%1) : $@convention(thin) (@out AddressOnlyStruct) -> ()
   %4 = struct_element_addr %1 : $*AddressOnlyStruct, #AddressOnlyStruct.b
   %5 = load %4 : $*Int
-  strong_release %0#0 : $Builtin.NativeObject
+  strong_release %0#0 : $@box AddressOnlyStruct
   return %5 : $Int
 }
 
@@ -96,7 +96,7 @@ bb0(%0 : $Int):
   %15 = tuple_element_addr %3 : $*(Int, Int), 1
   %16 = apply %14(%15) : $@convention(thin) (@inout Int) -> ()  // expected-error {{variable '<unknown>.1' passed by reference before being initialized}}
 
-  strong_release %2#0 : $Builtin.NativeObject
+  strong_release %2#0 : $@box (Int, Int)
   %99 = tuple ()
   return %99 : $()
 }
@@ -112,7 +112,7 @@ bb0(%0 : $Int):
   %21 = tuple_extract %20 : $(Int, Int), 0
   %22 = tuple_extract %20 : $(Int, Int), 1
   %23 = tuple (%21 : $Int, %22 : $Int)
-  strong_release %2#0 : $Builtin.NativeObject
+  strong_release %2#0 : $@box (Int, Int)
   return %23 : $(Int, Int)
 }
 
@@ -125,7 +125,7 @@ bb0(%0 : $*T, %1 : $*T):
   %4 = mark_uninitialized [var] %3#1 : $*T
   copy_addr [take] %1 to [initialization] %4 : $*T
   copy_addr %4 to [initialization] %0 : $*T
-  strong_release %3#0 : $Builtin.NativeObject
+  strong_release %3#0 : $@box T
   %9 = tuple ()
   return %9 : $()
 }
@@ -136,14 +136,14 @@ bb0(%0 : $*T, %1 : $*T):
   %3 = alloc_box $T
   %4 = mark_uninitialized [var] %3#1 : $*T // expected-note {{variable defined here}}
   copy_addr %4 to [initialization] %0 : $*T   // expected-error {{variable '<unknown>' used before being initialized}}
-  strong_release %3#0 : $Builtin.NativeObject
+  strong_release %3#0 : $@box T
   %9 = tuple ()
   return %9 : $()
 }
 
 
 sil @takes_closure : $@convention(thin) (@callee_owned () -> ()) -> ()
-sil @closure0 : $@convention(thin) (@owned Builtin.NativeObject, @inout Int) -> ()
+sil @closure0 : $@convention(thin) (@owned @box Int, @inout Int) -> ()
 
 // CHECK-LABEL: sil @closure_test
 sil @closure_test : $@convention(thin) () -> () {
@@ -152,11 +152,11 @@ bb0:
   %0 = mark_uninitialized [var] %1#1 : $*Int // expected-note {{variable defined here}}
 
   %5 = function_ref @takes_closure : $@convention(thin) (@callee_owned () -> ()) -> ()
-  %6 = function_ref @closure0 : $@convention(thin) (@owned Builtin.NativeObject, @inout Int) -> ()
-  strong_retain %1#0 : $Builtin.NativeObject
-  %8 = partial_apply %6(%1#0, %0) : $@convention(thin) (@owned Builtin.NativeObject, @inout Int) -> ()  // expected-error {{variable '<unknown>' captured by a closure before being initialized}}
+  %6 = function_ref @closure0 : $@convention(thin) (@owned @box Int, @inout Int) -> ()
+  strong_retain %1#0 : $@box Int
+  %8 = partial_apply %6(%1#0, %0) : $@convention(thin) (@owned @box Int, @inout Int) -> ()  // expected-error {{variable '<unknown>' captured by a closure before being initialized}}
   %9 = apply %5(%8) : $@convention(thin) (@callee_owned () -> ()) -> ()
-  strong_release %1#0 : $Builtin.NativeObject
+  strong_release %1#0 : $@box Int
 
   %11 = tuple ()
   return %11 : $()
@@ -182,7 +182,7 @@ bb0(%0 : $Int):
   assign %0 to %1 : $*Int
 
   %2 = load %1 : $*Int
-  strong_release %7#0 : $Builtin.NativeObject
+  strong_release %7#0 : $@box Int
 
   return %2 : $Int
 }
@@ -214,7 +214,7 @@ bb0:
 
   destroy_addr %c : $*SomeClass
   // CHECK-NEXT: destroy_addr
-  dealloc_box $SomeClass, %b#0 : $Builtin.NativeObject
+  dealloc_box %b#0 : $@box SomeClass
 
   %11 = tuple ()
   return %11 : $()
@@ -241,7 +241,7 @@ bb0(%0 : $*T, %1 : $*T):
   copy_addr %2 to [initialization] %0 : $*T
   // CHECK-NEXT: copy_addr %2#1 to [initialization] %0 : $*T
 
-  strong_release %b#0 : $Builtin.NativeObject
+  strong_release %b#0 : $@box T
   // CHECK-NEXT: strong_release %2#0
   %9 = tuple ()
   return %9 : $()
@@ -280,7 +280,7 @@ bb0:
   release_value %8 : $Optional<SomeClass>
   // CHECK-NEXT: release_value [[C2]]
 
-  strong_release %b#0 : $Builtin.NativeObject
+  strong_release %b#0 : $@box @sil_weak Optional<SomeClass>
 
   %11 = tuple ()
   return %11 : $()
@@ -328,7 +328,7 @@ bb0:
   // CHECK-NEXT: strong_release [[C2]]
 
   destroy_addr %c : $*@sil_unowned SomeClass
-  dealloc_box $SomeClass, %b#0 : $Builtin.NativeObject
+  dealloc_box %b#0 : $@box @sil_unowned SomeClass
 
   %11 = tuple ()
   return %11 : $()
@@ -348,7 +348,7 @@ bb0(%0 : $*ContainsNativeObject):
   %1 = load %0 : $*ContainsNativeObject
   assign %1 to %c : $*ContainsNativeObject
   
-  strong_release %b#0 : $Builtin.NativeObject
+  strong_release %b#0 : $@box ContainsNativeObject
   %x = tuple ()
   return %x : $()
 }
@@ -638,7 +638,7 @@ bb0(%0 : $DerivedClassWithIVars):
   assign %16 to %3 : $*DerivedClassWithIVars
   %18 = load %3 : $*DerivedClassWithIVars
   strong_retain %18 : $DerivedClassWithIVars
-  strong_release %1#0 : $Builtin.NativeObject
+  strong_release %1#0 : $@box DerivedClassWithIVars
   return %18 : $DerivedClassWithIVars
 }
 
@@ -657,7 +657,7 @@ bb0(%0 : $DerivedClassWithIVars):
   assign %16 to %3 : $*DerivedClassWithIVars
   %18 = load %3 : $*DerivedClassWithIVars
   strong_retain %18 : $DerivedClassWithIVars
-  strong_release %1#0 : $Builtin.NativeObject
+  strong_release %1#0 : $@box DerivedClassWithIVars
   return %18 : $DerivedClassWithIVars
 }
 
@@ -826,13 +826,13 @@ bb0(%0 : $DerivedClassWithNontrivialStoredProperties):
 // CHECK-NEXT: store %0 to [[SELFBOX]]#1
 // CHECK-NEXT: [[SELF:%[0-9]+]] = load [[SELFBOX]]#1
 // CHECK-NEXT: dealloc_ref [[SELF]]
-// CHECK-NEXT: dealloc_box $RootClassWithNontrivialStoredProperties, [[SELFBOX]]#0
+// CHECK-NEXT: dealloc_box [[SELFBOX]]#0
 sil @test_delegating_release : $@convention(method) (@owned RootClassWithNontrivialStoredProperties) -> () {
 bb0(%0 : $RootClassWithNontrivialStoredProperties):
   %2 = alloc_box $RootClassWithNontrivialStoredProperties
   %4 = mark_uninitialized [delegatingself] %2#1 : $*RootClassWithNontrivialStoredProperties
   store %0 to %4 : $*RootClassWithNontrivialStoredProperties
-  strong_release %2#0 : $Builtin.NativeObject
+  strong_release %2#0 : $@box RootClassWithNontrivialStoredProperties
 
   %13 = tuple ()
   return %13 : $()
@@ -890,7 +890,7 @@ bb0(%0 : $DerivedClassWithIVars, %i : $Int):
   assign %16 to %3 : $*DerivedClassWithIVars
   %18 = load %3 : $*DerivedClassWithIVars
   strong_retain %18 : $DerivedClassWithIVars
-  strong_release %1#0 : $Builtin.NativeObject
+  strong_release %1#0 : $@box DerivedClassWithIVars
   return %18 : $DerivedClassWithIVars
 }
 

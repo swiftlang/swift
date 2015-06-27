@@ -188,9 +188,9 @@ func testFor() {
   // CHECK-LABEL: sil hidden @_TF13sil_locations7testForFT_T_
   // CHECK: [[VAR_Y_IN_FOR:%[0-9]+]]  = alloc_box $Int                 // {{.*}} line:[[@LINE-10]]:9
   // CHECK: integer_literal $Builtin.Int2048, 300                        // {{.*}} line:[[@LINE-11]]:18
-  // CHECK: strong_release [[VAR_Y_IN_FOR]]#0 : $Builtin.NativeObject   // {{.*}} line:[[@LINE-5]]:3:cleanup
+  // CHECK: strong_release [[VAR_Y_IN_FOR]]#0 : $@box Int
   // CHECK: br bb{{.*}}                                                  // {{.*}} line:[[@LINE-10]]:7
-  // CHECK: strong_release [[VAR_Y_IN_FOR]]#0 : $Builtin.NativeObject   // {{.*}} line:[[@LINE-7]]:3:cleanup
+  // CHECK: strong_release [[VAR_Y_IN_FOR]]#0 : $@box Int
   // CHECK: br bb{{.*}}                                                  // {{.*}} line:[[@LINE-9]]:5
   
   

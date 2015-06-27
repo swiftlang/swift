@@ -44,8 +44,8 @@ func test0(var c c: C) {
 
 // <rdar://problem/16871284> silgen crashes on weak capture
 // CHECK: weak.(testClosureOverWeak () -> ()).(closure #1)
-// CHECK-LABEL: sil shared @_TFF4weak19testClosureOverWeakFT_T_U_FT_Si : $@convention(thin) (@owned Builtin.NativeObject, @inout @sil_weak Optional<C>) -> Int {
-// CHECK-NEXT: bb0(%0 : $Builtin.NativeObject, %1 : $*@sil_weak Optional<C>):
+// CHECK-LABEL: sil shared @_TFF4weak19testClosureOverWeakFT_T_U_FT_Si : $@convention(thin) (@owned @box @sil_weak Optional<C>, @inout @sil_weak Optional<C>) -> Int {
+// CHECK-NEXT: bb0(%0 : $@box @sil_weak Optional<C>, %1 : $*@sil_weak Optional<C>):
 // CHECK-NEXT:  %2 = alloc_stack $Optional<C>
 // CHECK-NEXT:  %3 = load_weak %1 : $*@sil_weak Optional<C>
 // CHECK-NEXT:  store %3 to %2#1 : $*Optional<C>

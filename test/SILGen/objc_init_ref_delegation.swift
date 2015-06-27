@@ -16,7 +16,7 @@ extension Gizmo {
     // CHECK:   [[SELF_RET:%[0-9]+]] = apply [[INIT_DELEG]]([[I]], [[SELF]]) : $@convention(objc_method) (Int, @owned Gizmo) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
     // CHECK:   store [[SELF_RET]] to [[SELFMUI:%[0-9]+]]#1 : $*ImplicitlyUnwrappedOptional<Gizmo>
     // CHECK:   strong_retain [[SELF4:%[0-9]+]] : $Gizmo
-    // CHECK:   strong_release [[SELF_BOX:%[0-9]+]]#0 : $Builtin.NativeObject
+    // CHECK:   strong_release [[SELF_BOX:%[0-9]+]]#0 : $@box Gizmo
     // CHECK:   return [[SELF4]] : $Gizmo
     self.init(bellsOn:i)
   }

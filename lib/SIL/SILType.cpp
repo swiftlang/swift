@@ -154,6 +154,8 @@ bool SILType::isHeapObjectReferenceType() const {
     return true;
   if (getSwiftRValueType()->isEqual(C.TheUnknownObjectType))
     return true;
+  if (is<SILBoxType>())
+    return true;
   return false;
 }
 

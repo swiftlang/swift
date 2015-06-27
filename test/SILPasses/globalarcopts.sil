@@ -7,7 +7,7 @@ import Builtin
 
 // Utilities
 
-sil @user : $@convention(thin) (Builtin.NativeObject) -> ()
+sil @user : $@convention(thin) (@box Builtin.Int32) -> ()
 
 struct S {
   var x : Builtin.NativeObject
@@ -53,7 +53,7 @@ enum Either<LTy, RTy> {
 
 sil @guaranteed_use : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
 
-sil @owned_return : $@convention(thin) () -> (@owned Builtin.NativeObject)
+sil @owned_return : $@convention(thin) () -> (@owned @box Builtin.Int32)
 
 /////////////////
 // Basic Tests //
@@ -137,7 +137,7 @@ bb0(%0 : $S, %1 : $Builtin.NativeObject):
   return %2 : $()
 }
 
-// CHECK-LABEL: sil @dont_delete_retain_over_decrement_use : $@convention(thin) (Builtin.NativeObject) -> ()
+// CHECK-LABEL: sil @dont_delete_retain_over_decrement_use : $@convention(thin) (@box Builtin.Int32) -> ()
 // CHECK: bb0
 // CHECK: strong_retain
 // CHECK-NEXT: apply
@@ -145,13 +145,13 @@ bb0(%0 : $S, %1 : $Builtin.NativeObject):
 // CHECK-NEXT: strong_release
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
-sil @dont_delete_retain_over_decrement_use : $@convention(thin) (Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject):
-  %1 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
-  strong_retain %0 : $Builtin.NativeObject
-  apply %1 (%0) : $@convention(thin) (Builtin.NativeObject) -> ()
-  apply %1 (%0) : $@convention(thin) (Builtin.NativeObject) -> ()
-  strong_release %0 : $Builtin.NativeObject
+sil @dont_delete_retain_over_decrement_use : $@convention(thin) (@box Builtin.Int32) -> () {
+bb0(%0 : $@box Builtin.Int32):
+  %1 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_retain %0 : $@box Builtin.Int32
+  apply %1 (%0) : $@convention(thin) (@box Builtin.Int32) -> ()
+  apply %1 (%0) : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_release %0 : $@box Builtin.Int32
   %2 = tuple()
   return %2 : $()
 }
@@ -175,7 +175,7 @@ bb0(%0 : $S):
   return %2 : $()
 }
 
-// CHECK-LABEL: sil @move_delete_retain_over_decrement_use_when_knownsafe : $@convention(thin) (Builtin.NativeObject) -> ()
+// CHECK-LABEL: sil @move_delete_retain_over_decrement_use_when_knownsafe : $@convention(thin) (@box Builtin.Int32) -> ()
 // CHECK: bb0
 // CHECK: integer_literal
 // CHECK-NEXT: integer_literal
@@ -185,17 +185,17 @@ bb0(%0 : $S):
 // CHECK-NEXT: strong_release
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
-sil @move_delete_retain_over_decrement_use_when_knownsafe : $@convention(thin) (Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject):
-  %1 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
-  strong_retain %0 : $Builtin.NativeObject
+sil @move_delete_retain_over_decrement_use_when_knownsafe : $@convention(thin) (@box Builtin.Int32) -> () {
+bb0(%0 : $@box Builtin.Int32):
+  %1 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_retain %0 : $@box Builtin.Int32
   %2 = integer_literal $Builtin.Int32, 1
   %3 = integer_literal $Builtin.Int32, 2
-  strong_retain %0 : $Builtin.NativeObject
-  apply %1 (%0) : $@convention(thin) (Builtin.NativeObject) -> ()
-  apply %1 (%0) : $@convention(thin) (Builtin.NativeObject) -> ()
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
+  strong_retain %0 : $@box Builtin.Int32
+  apply %1 (%0) : $@convention(thin) (@box Builtin.Int32) -> ()
+  apply %1 (%0) : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_release %0 : $@box Builtin.Int32
+  strong_release %0 : $@box Builtin.Int32
   %4 = tuple()
   return %4 : $()
 }
@@ -225,7 +225,7 @@ bb0(%0 : $S):
   return %4 : $()
 }
 
-// CHECK-LABEL: sil @literals_do_not_use_values_with_reference_semantics : $@convention(thin) (Builtin.NativeObject) -> ()
+// CHECK-LABEL: sil @literals_do_not_use_values_with_reference_semantics : $@convention(thin) (@box Builtin.Int32) -> ()
 // CHECK: bb0
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: function_ref
@@ -236,15 +236,15 @@ bb0(%0 : $S):
 // CHECK-NEXT: string_literal
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
-sil @literals_do_not_use_values_with_reference_semantics : $@convention(thin) (Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject):
-  strong_retain %0 : $Builtin.NativeObject
-  %1 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
-  apply %1 (%0) : $@convention(thin) (Builtin.NativeObject) -> ()
-  %2 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+sil @literals_do_not_use_values_with_reference_semantics : $@convention(thin) (@box Builtin.Int32) -> () {
+bb0(%0 : $@box Builtin.Int32):
+  strong_retain %0 : $@box Builtin.Int32
+  %1 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
+  apply %1 (%0) : $@convention(thin) (@box Builtin.Int32) -> ()
+  %2 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
   %4 = integer_literal $Builtin.Int64, 0
   %5 = string_literal utf8 "123"
-  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $@box Builtin.Int32
   %6 = tuple()
   return %6 : $()
 }
@@ -264,36 +264,36 @@ bb0(%0 : $Builtin.NativeObject):
 // CHECK-NEXT: strong_release
 // CHECK-NEXT: tuple ()
 // CHECK-NEXT: return
-sil @owned_arguments_are_known_safe_in_the_first_bb : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject):
-  %1 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
-  strong_retain %0 : $Builtin.NativeObject
-  apply %1 (%0) : $@convention(thin) (Builtin.NativeObject) -> ()
-  apply %1 (%0) : $@convention(thin) (Builtin.NativeObject) -> ()
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
+sil @owned_arguments_are_known_safe_in_the_first_bb : $@convention(thin) (@owned @box Builtin.Int32) -> () {
+bb0(%0 : $@box Builtin.Int32):
+  %1 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_retain %0 : $@box Builtin.Int32
+  apply %1 (%0) : $@convention(thin) (@box Builtin.Int32) -> ()
+  apply %1 (%0) : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_release %0 : $@box Builtin.Int32
+  strong_release %0 : $@box Builtin.Int32
   br bb1
 
 bb1:
-  strong_retain %0 : $Builtin.NativeObject
-  apply %1 (%0) : $@convention(thin) (Builtin.NativeObject) -> ()
-  apply %1 (%0) : $@convention(thin) (Builtin.NativeObject) -> ()
-  strong_release %0 : $Builtin.NativeObject
+  strong_retain %0 : $@box Builtin.Int32
+  apply %1 (%0) : $@convention(thin) (@box Builtin.Int32) -> ()
+  apply %1 (%0) : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_release %0 : $@box Builtin.Int32
   %2 = tuple()
   return %2 : $()
 }
 
-// CHECK-LABEL: @simple_alias_store_use_test : $@convention(thin) (Builtin.NativeObject, @inout Builtin.Int32) -> () {
+// CHECK-LABEL: @simple_alias_store_use_test : $@convention(thin) (@box Builtin.Int32, @inout Builtin.Int32) -> () {
 // CHECK-NOT: strong_retain
 // CHECK-NOT: strong_release
-sil @simple_alias_store_use_test : $@convention(thin) (Builtin.NativeObject, @inout Builtin.Int32) -> () {
-bb0(%0 : $Builtin.NativeObject, %1 : $*Builtin.Int32):
-  %2 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+sil @simple_alias_store_use_test : $@convention(thin) (@box Builtin.Int32, @inout Builtin.Int32) -> () {
+bb0(%0 : $@box Builtin.Int32, %1 : $*Builtin.Int32):
+  %2 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
   %3 = integer_literal $Builtin.Int32, 2
-  strong_retain %0 : $Builtin.NativeObject
-  apply %2 (%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  strong_retain %0 : $@box Builtin.Int32
+  apply %2 (%0) : $@convention(thin) (@box Builtin.Int32) -> ()
   store %3 to %1 : $*Builtin.Int32
-  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $@box Builtin.Int32
   %4 = tuple()
   return %4: $()
 }
@@ -314,11 +314,11 @@ bb0(%0 : $Builtin.NativeObject, %1 : $*Builtin.Int32):
 sil @simple_alias_load_use_test : $@convention(thin) (@inout Builtin.Int32) -> () {
 bb0(%0 : $*Builtin.Int32):
   %1 = alloc_box $Builtin.Int32
-  %2 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
-  strong_retain %1#0 : $Builtin.NativeObject
-  apply %2 (%1#0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  %2 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_retain %1#0 : $@box Builtin.Int32
+  apply %2 (%1#0) : $@convention(thin) (@box Builtin.Int32) -> ()
   %3 = load %1#1 : $*Builtin.Int32
-  strong_release %1#0 : $Builtin.NativeObject
+  strong_release %1#0 : $@box Builtin.Int32
   %4 = tuple()
   return %4: $()
 }
@@ -339,18 +339,18 @@ bb0(%0 : $*Builtin.Int32):
 sil @simple_alias_load_use_test_two_release : $@convention(thin) (@inout Builtin.Int32) -> () {
 bb0(%0 : $*Builtin.Int32):
   %1 = alloc_box $Builtin.Int32
-  %2 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
-  strong_retain %1#0 : $Builtin.NativeObject
-  strong_retain %1#0 : $Builtin.NativeObject
-  apply %2 (%1#0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  %2 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_retain %1#0 : $@box Builtin.Int32
+  strong_retain %1#0 : $@box Builtin.Int32
+  apply %2 (%1#0) : $@convention(thin) (@box Builtin.Int32) -> ()
   %3 = load %1#1 : $*Builtin.Int32
-  strong_release %1#0 : $Builtin.NativeObject
-  strong_release %1#0 : $Builtin.NativeObject
+  strong_release %1#0 : $@box Builtin.Int32
+  strong_release %1#0 : $@box Builtin.Int32
   %4 = tuple()
   return %4: $()
 }
 
-// CHECK-LABEL: sil @silargument_retain_iterated : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+// CHECK-LABEL: sil @silargument_retain_iterated : $@convention(thin) (@owned @box Builtin.Int32) -> ()
 // CHECK: bb0
 // CHECK-NEXT: function_ref user
 // CHECK-NEXT: function_ref @user
@@ -361,18 +361,18 @@ bb0(%0 : $*Builtin.Int32):
 // CHECK-NEXT: apply
 // CHECK-NEXT: apply
 // CHECK-NEXT: strong_release
-sil @silargument_retain_iterated : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject):
-  %1 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
-  strong_retain %0 : $Builtin.NativeObject
-  apply %1 (%0) : $@convention(thin) (Builtin.NativeObject) -> ()
-  apply %1 (%0) : $@convention(thin) (Builtin.NativeObject) -> ()
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
-  strong_retain %0 : $Builtin.NativeObject
-  apply %1 (%0) : $@convention(thin) (Builtin.NativeObject) -> ()
-  apply %1 (%0) : $@convention(thin) (Builtin.NativeObject) -> ()
-  strong_release %0 : $Builtin.NativeObject
+sil @silargument_retain_iterated : $@convention(thin) (@owned @box Builtin.Int32) -> () {
+bb0(%0 : $@box Builtin.Int32):
+  %1 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_retain %0 : $@box Builtin.Int32
+  apply %1 (%0) : $@convention(thin) (@box Builtin.Int32) -> ()
+  apply %1 (%0) : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_release %0 : $@box Builtin.Int32
+  strong_release %0 : $@box Builtin.Int32
+  strong_retain %0 : $@box Builtin.Int32
+  apply %1 (%0) : $@convention(thin) (@box Builtin.Int32) -> ()
+  apply %1 (%0) : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_release %0 : $@box Builtin.Int32
   %2 = tuple()
   return %2 : $()
 }
@@ -383,28 +383,28 @@ bb0(%0 : $Builtin.NativeObject):
 sil @value_that_does_not_alias_pointer_args_cannot_be_decremented : $@convention(thin) (Cls) -> () {
 bb0(%0 : $Cls):
   %1 = alloc_ref $Cls
-  %2 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
-  %3 = unchecked_ref_cast %0 : $Cls to $Builtin.NativeObject
+  %2 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
+  %3 = unchecked_ref_cast %0 : $Cls to $@box Builtin.Int32
   strong_retain %1 : $Cls
-  apply %2(%3) : $@convention(thin) (Builtin.NativeObject) -> ()
-  apply %2(%3) : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %2(%3) : $@convention(thin) (@box Builtin.Int32) -> ()
+  apply %2(%3) : $@convention(thin) (@box Builtin.Int32) -> ()
   strong_release %1 : $Cls
   %4 = tuple()
   return %4 : $()
 }
 
-// CHECK-LABEL: sil @escaping_pointer_can_have_refcount_decremented_indirectly : $@convention(thin) (Builtin.NativeObject) -> ()
+// CHECK-LABEL: sil @escaping_pointer_can_have_refcount_decremented_indirectly : $@convention(thin) (@box Builtin.Int32) -> ()
 // CHECK: strong_retain
 // CHECK: strong_release
 
 sil @the_kraken : $@convention(thin) () -> ()
-sil @escaping_pointer_can_have_refcount_decremented_indirectly : $@convention(thin) (Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject):
+sil @escaping_pointer_can_have_refcount_decremented_indirectly : $@convention(thin) (@box Builtin.Int32) -> () {
+bb0(%0 : $@box Builtin.Int32):
   %1 = function_ref @the_kraken : $@convention(thin) () -> ()
-  strong_retain %0 : $Builtin.NativeObject
+  strong_retain %0 : $@box Builtin.Int32
   apply %1() : $@convention(thin) () -> ()
   apply %1() : $@convention(thin) () -> ()
-  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $@box Builtin.Int32
   %2 = tuple()
   return %2 : $()
 }
@@ -435,13 +435,13 @@ bb0(%0 : $Builtin.RawPointer):
   %1 = function_ref @objc_autoreleasePoolPush : $@convention(thin) () -> Builtin.RawPointer
   %2 = function_ref @objc_autoreleasePoolPop : $@convention(thin) (Builtin.RawPointer) -> ()
   %3 = alloc_box $Builtin.Int32
-  strong_retain %3#0 : $Builtin.NativeObject
+  strong_retain %3#0 : $@box Builtin.Int32
   apply %1() : $@convention(thin) () -> Builtin.RawPointer
-  strong_release %3#0 : $Builtin.NativeObject
-  strong_retain %3#0 : $Builtin.NativeObject
+  strong_release %3#0 : $@box Builtin.Int32
+  strong_retain %3#0 : $@box Builtin.Int32
   apply %2(%0) : $@convention(thin) (Builtin.RawPointer) -> ()
-  strong_release %3#0 : $Builtin.NativeObject
-  strong_release %3#0 : $Builtin.NativeObject
+  strong_release %3#0 : $@box Builtin.Int32
+  strong_release %3#0 : $@box Builtin.Int32
   %4 = tuple()
   return %4 : $()
 }
@@ -454,31 +454,31 @@ bb0(%0 : $Builtin.RawPointer):
 sil @release_can_decrement_other_releases  : $@convention(thin) () -> () {
 bb0:
   %1 = alloc_box $Builtin.Int32
-  %2 = alloc_stack $Builtin.NativeObject
-  store %1#0 to %2#1 : $*Builtin.NativeObject
-  %4 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
-  strong_retain %1#0 : $Builtin.NativeObject
-  %6 = load %2#1 : $*Builtin.NativeObject
-  %7 = apply %4(%6) : $@convention(thin) (Builtin.NativeObject) -> ()
-  strong_release %6 : $Builtin.NativeObject
-  strong_release %1#0 : $Builtin.NativeObject
-  dealloc_stack %2#0 : $*@local_storage Builtin.NativeObject
+  %2 = alloc_stack $@box Builtin.Int32
+  store %1#0 to %2#1 : $*@box Builtin.Int32
+  %4 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_retain %1#0 : $@box Builtin.Int32
+  %6 = load %2#1 : $*@box Builtin.Int32
+  %7 = apply %4(%6) : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_release %6 : $@box Builtin.Int32
+  strong_release %1#0 : $@box Builtin.Int32
+  dealloc_stack %2#0 : $*@local_storage @box Builtin.Int32
   %11 = tuple ()
   return %11 : $()
 }
 
-// CHECK-LABEL: sil @retain_can_be_used_by_other_pointer : $@convention(thin) (RetainUser, Builtin.NativeObject) -> Builtin.NativeObject {
+// CHECK-LABEL: sil @retain_can_be_used_by_other_pointer : $@convention(thin) (RetainUser, @box Builtin.Int32) -> @box Builtin.Int32 {
 // CHECK: strong_retain
 // CHECK: strong_retain
 // CHECK: strong_release
-sil @retain_can_be_used_by_other_pointer : $@convention(thin) (RetainUser, Builtin.NativeObject) -> Builtin.NativeObject {
-bb0(%0 : $RetainUser, %1 : $Builtin.NativeObject):
-  %2 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+sil @retain_can_be_used_by_other_pointer : $@convention(thin) (RetainUser, @box Builtin.Int32) -> @box Builtin.Int32 {
+bb0(%0 : $RetainUser, %1 : $@box Builtin.Int32):
+  %2 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
   strong_retain %0 : $RetainUser
-  apply %2(%1) : $@convention(thin) (Builtin.NativeObject) -> ()
-  strong_retain %1 : $Builtin.NativeObject
+  apply %2(%1) : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_retain %1 : $@box Builtin.Int32
   strong_release %0 : $RetainUser
-  return %1 : $Builtin.NativeObject
+  return %1 : $@box Builtin.Int32
 }
 
 
@@ -673,7 +673,7 @@ bb2:
 // Make sure we do not do anything in the presense of double partial
 // applies. This is due to issues related to the two branches of the two
 // diamonds not being control dependent.
-// CHECK-LABEL: sil @double_hammock1 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil @double_hammock1 : $@convention(thin) (@box Builtin.Int32) -> () {
 // CHECK: bb0
 // CHECK-NEXT: function_ref user
 // CHECK-NEXT: function_ref @user
@@ -691,25 +691,25 @@ bb2:
 // CHECK-NEXT: strong_release
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
-sil @double_hammock1 : $@convention(thin) (Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject):
-  %1 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
-  strong_retain %0 : $Builtin.NativeObject
+sil @double_hammock1 : $@convention(thin) (@box Builtin.Int32) -> () {
+bb0(%0 : $@box Builtin.Int32):
+  %1 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_retain %0 : $@box Builtin.Int32
   cond_br undef, bb1, bb2
 
 bb1:
-  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %1(%0) : $@convention(thin) (@box Builtin.Int32) -> ()
   br bb2
 
 bb2:
   cond_br undef, bb3, bb4
 
 bb3:
-  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %1(%0) : $@convention(thin) (@box Builtin.Int32) -> ()
   br bb4
 
 bb4:
-  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $@box Builtin.Int32
   %9999 = tuple()
   return %9999 : $()
 }
@@ -1068,77 +1068,77 @@ bb2:
   unreachable
 }
 
-// CHECK: sil @dont_move_values_in_face_of_partial_merges : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK: sil @dont_move_values_in_face_of_partial_merges : $@convention(thin) (@box Builtin.Int32) -> () {
 // CHECK: strong_retain
 // CHECK: strong_release
-sil @dont_move_values_in_face_of_partial_merges : $@convention(thin) (Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject):
-  %1 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
-  strong_retain %0 : $Builtin.NativeObject
+sil @dont_move_values_in_face_of_partial_merges : $@convention(thin) (@box Builtin.Int32) -> () {
+bb0(%0 : $@box Builtin.Int32):
+  %1 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_retain %0 : $@box Builtin.Int32
   cond_br undef, bb1, bb2
 
 bb1:
-  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
-  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %1(%0) : $@convention(thin) (@box Builtin.Int32) -> ()
+  apply %1(%0) : $@convention(thin) (@box Builtin.Int32) -> ()
   br bb3
 
 bb2:
   br bb3
 
 bb3:
-  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $@box Builtin.Int32
   %2 = tuple()
   return %2 : $()
 }
 
-// CHECK-LABEL: sil @do_remove_values_in_face_of_partial_merges : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil @do_remove_values_in_face_of_partial_merges : $@convention(thin) (@box Builtin.Int32) -> () {
 // CHECK: strong_retain
 // CHECK-NOT: strong_retain
 // CHECK-NEXT: cond_br
 // CHECK: bb3:
 // CHECK-NEXT: strong_release
 // CHECK-NOT: strong_release
-sil @do_remove_values_in_face_of_partial_merges : $@convention(thin) (Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject):
-  %1 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
-  strong_retain %0 : $Builtin.NativeObject
-  strong_retain %0 : $Builtin.NativeObject
+sil @do_remove_values_in_face_of_partial_merges : $@convention(thin) (@box Builtin.Int32) -> () {
+bb0(%0 : $@box Builtin.Int32):
+  %1 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_retain %0 : $@box Builtin.Int32
+  strong_retain %0 : $@box Builtin.Int32
   cond_br undef, bb1, bb2
 
 bb1:
-  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
-  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %1(%0) : $@convention(thin) (@box Builtin.Int32) -> ()
+  apply %1(%0) : $@convention(thin) (@box Builtin.Int32) -> ()
   br bb3
 
 bb2:
   br bb3
 
 bb3:
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $@box Builtin.Int32
+  strong_release %0 : $@box Builtin.Int32
   %2 = tuple()
   return %2 : $()
 }
 
-// CHECK-LABEL: sil @release_use_optimization : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil @release_use_optimization : $@convention(thin) (@owned @box Builtin.Int32) -> () {
 // CHECK-NOT: strong_retain
 // CHECK: strong_release
 // CHECK-NOT: strong_release
-sil @release_use_optimization : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject):
-  %1 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
-  strong_retain %0 : $Builtin.NativeObject
-  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
-  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
-  strong_release %0 : $Builtin.NativeObject
-  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
-  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
-  strong_release %0 : $Builtin.NativeObject
+sil @release_use_optimization : $@convention(thin) (@owned @box Builtin.Int32) -> () {
+bb0(%0 : $@box Builtin.Int32):
+  %1 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_retain %0 : $@box Builtin.Int32
+  apply %1(%0) : $@convention(thin) (@box Builtin.Int32) -> ()
+  apply %1(%0) : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_release %0 : $@box Builtin.Int32
+  apply %1(%0) : $@convention(thin) (@box Builtin.Int32) -> ()
+  apply %1(%0) : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_release %0 : $@box Builtin.Int32
   %2 = tuple()
   return %2 : $()
 }
 
-// CHECK-LABEL: sil @increment_known_safe_merge_with_last_knownsafe : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil @increment_known_safe_merge_with_last_knownsafe : $@convention(thin) (@box Builtin.Int32) -> () {
 // CHECK: bb1:
 // CHECK-NEXT: strong_retain
 // CHECK-NEXT: br bb3
@@ -1153,31 +1153,31 @@ bb0(%0 : $Builtin.NativeObject):
 // CHECK-NEXT: strong_release
 // CHECK-NEXT: tuple
 // CHECK-NEXT: return
-sil @increment_known_safe_merge_with_last_knownsafe : $@convention(thin) (Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject):
-  %1 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+sil @increment_known_safe_merge_with_last_knownsafe : $@convention(thin) (@box Builtin.Int32) -> () {
+bb0(%0 : $@box Builtin.Int32):
+  %1 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
   cond_br undef, bb1, bb2
 
 bb1:
-  strong_retain %0 : $Builtin.NativeObject
-  strong_retain %0 : $Builtin.NativeObject
+  strong_retain %0 : $@box Builtin.Int32
+  strong_retain %0 : $@box Builtin.Int32
   br bb3
 
 bb2:
-  strong_retain %0 : $Builtin.NativeObject
-  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
-  strong_retain %0 : $Builtin.NativeObject
+  strong_retain %0 : $@box Builtin.Int32
+  apply %1(%0) : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_retain %0 : $@box Builtin.Int32
   br bb3
 
 bb3:
-  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
-  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
-  strong_release %0 : $Builtin.NativeObject
+  apply %1(%0) : $@convention(thin) (@box Builtin.Int32) -> ()
+  apply %1(%0) : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_release %0 : $@box Builtin.Int32
   %2 = tuple()
   return %2 : $()
 }
 
-// CHECK-LABEL: sil @decrement_known_safe_merge_with_last_knownsafe : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil @decrement_known_safe_merge_with_last_knownsafe : $@convention(thin) (@box Builtin.Int32) -> () {
 // CHECK: bb0(
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: function_ref
@@ -1190,22 +1190,22 @@ bb3:
 // CHECK-NEXT: strong_release
 // CHECK-NEXT: br bb3
 // CHECK-NOT: strong_release
-sil @decrement_known_safe_merge_with_last_knownsafe : $@convention(thin) (Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject):
-  %1 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
-  strong_retain %0 : $Builtin.NativeObject
-  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
-  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+sil @decrement_known_safe_merge_with_last_knownsafe : $@convention(thin) (@box Builtin.Int32) -> () {
+bb0(%0 : $@box Builtin.Int32):
+  %1 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_retain %0 : $@box Builtin.Int32
+  apply %1(%0) : $@convention(thin) (@box Builtin.Int32) -> ()
+  apply %1(%0) : $@convention(thin) (@box Builtin.Int32) -> ()
   cond_br undef, bb1, bb2
 
 bb1:
-  strong_release %0 : $Builtin.NativeObject
-  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $@box Builtin.Int32
+  strong_release %0 : $@box Builtin.Int32
   br bb3
 
 bb2:
-  strong_release %0 : $Builtin.NativeObject
-  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  strong_release %0 : $@box Builtin.Int32
+  apply %1(%0) : $@convention(thin) (@box Builtin.Int32) -> ()
   br bb3
 
 bb3:
@@ -1265,21 +1265,21 @@ bb0(%0 : $S):
   cond_br undef, bb1, bb2
 
 bb1:
-  %1 = unchecked_ref_bit_cast %0 : $S to $Builtin.NativeObject
-  strong_retain %1 : $Builtin.NativeObject
+  %1 = unchecked_ref_bit_cast %0 : $S to $@box Builtin.Int32
+  strong_retain %1 : $@box Builtin.Int32
   br bb3
 
 bb2:
-  %2 = unchecked_ref_bit_cast %0 : $S to $Builtin.NativeObject
-  strong_retain %2 : $Builtin.NativeObject
+  %2 = unchecked_ref_bit_cast %0 : $S to $@box Builtin.Int32
+  strong_retain %2 : $@box Builtin.Int32
   br bb3
 
 bb3:
-  %3 = unchecked_ref_bit_cast %0 : $S to $Builtin.NativeObject
-  %4 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
-  apply %4(%3) : $@convention(thin) (Builtin.NativeObject) -> ()
-  apply %4(%3) : $@convention(thin) (Builtin.NativeObject) -> ()
-  strong_release %3 : $Builtin.NativeObject
+  %3 = unchecked_ref_bit_cast %0 : $S to $@box Builtin.Int32
+  %4 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
+  apply %4(%3) : $@convention(thin) (@box Builtin.Int32) -> ()
+  apply %4(%3) : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_release %3 : $@box Builtin.Int32
   %5 = tuple()
   return %5 : $()
 }
@@ -1409,16 +1409,16 @@ bb0(%0 : $Builtin.NativeObject):
   return %2 : $()
 }
 
-// CHECK-LABEL: sil @guaranteed_is_always_known_safe : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil @guaranteed_is_always_known_safe : $@convention(thin) (@guaranteed @box Builtin.Int32) -> () {
 // CHECK-NOT: retain
 // CHECK-NOT: release
-sil @guaranteed_is_always_known_safe : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject):
-  %1 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
-  strong_retain %0 : $Builtin.NativeObject
-  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
-  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
-  strong_release %0 : $Builtin.NativeObject
+sil @guaranteed_is_always_known_safe : $@convention(thin) (@guaranteed @box Builtin.Int32) -> () {
+bb0(%0 : $@box Builtin.Int32):
+  %1 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_retain %0 : $@box Builtin.Int32
+  apply %1(%0) : $@convention(thin) (@box Builtin.Int32) -> ()
+  apply %1(%0) : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_release %0 : $@box Builtin.Int32
   %2 = tuple()
   return %2 : $()
 }
@@ -1469,7 +1469,7 @@ bb6:
   unreachable
 }
 
-// CHECK-LABEL: sil @propagate_postdominating_owned_release_info : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil @propagate_postdominating_owned_release_info : $@convention(thin) (@owned @box Builtin.Int32) -> () {
 // CHECK: bb0(
 // CHECK-NOT: retain
 // CHECK-NOT: release
@@ -1478,20 +1478,20 @@ bb6:
 // CHECK-NOT: release
 // CHECK: bb2:
 // CHECK: strong_release
-sil @propagate_postdominating_owned_release_info : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject):
-  %1 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
-  strong_retain %0 : $Builtin.NativeObject
-  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
-  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
-  strong_release %0 : $Builtin.NativeObject
+sil @propagate_postdominating_owned_release_info : $@convention(thin) (@owned @box Builtin.Int32) -> () {
+bb0(%0 : $@box Builtin.Int32):
+  %1 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_retain %0 : $@box Builtin.Int32
+  apply %1(%0) : $@convention(thin) (@box Builtin.Int32) -> ()
+  apply %1(%0) : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_release %0 : $@box Builtin.Int32
   br bb1
 
 bb1:
   cond_br undef, bb1, bb2
 
 bb2:
-  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $@box Builtin.Int32
   %2 = tuple()
   return %2 : $()
 }
@@ -1556,78 +1556,78 @@ bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
 // In the face of partial merges, we *can* remove retains, releases, but we can
 // not move them. So remove these retains, releases.
 //
-// CHECK-LABEL: sil @branch_use1 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil @branch_use1 : $@convention(thin) (@box Builtin.Int32) -> () {
 // CHECK-NOT: strong_retain
 // CHECK-NOT: strong_release
-sil @branch_use1 : $@convention(thin) (Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject):
+sil @branch_use1 : $@convention(thin) (@box Builtin.Int32) -> () {
+bb0(%0 : $@box Builtin.Int32):
   cond_br undef, bb1, bb2
 
 bb1:
-  strong_retain %0 : $Builtin.NativeObject
-  %1 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
-  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  strong_retain %0 : $@box Builtin.Int32
+  %1 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
+  apply %1(%0) : $@convention(thin) (@box Builtin.Int32) -> ()
   br bb3
 
 bb2:
-  strong_retain %0 : $Builtin.NativeObject
+  strong_retain %0 : $@box Builtin.Int32
   br bb3
 
 bb3:
-  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $@box Builtin.Int32
   %9999 = tuple()
   return %9999 : $()
 }
 
 // We currently do not move this retain, release since we are very conservative with partial merges and code motion.
 //
-// CHECK-LABEL: sil @branch_use2 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil @branch_use2 : $@convention(thin) (@box Builtin.Int32) -> () {
 // CHECK: strong_retain
 // CHECK: strong_retain
 // CHECK: strong_release
-sil @branch_use2 : $@convention(thin) (Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject):
+sil @branch_use2 : $@convention(thin) (@box Builtin.Int32) -> () {
+bb0(%0 : $@box Builtin.Int32):
   cond_br undef, bb1, bb2
 
 bb1:
-  strong_retain %0 : $Builtin.NativeObject
-  %1 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
-  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
-  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  strong_retain %0 : $@box Builtin.Int32
+  %1 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
+  apply %1(%0) : $@convention(thin) (@box Builtin.Int32) -> ()
+  apply %1(%0) : $@convention(thin) (@box Builtin.Int32) -> ()
   br bb3
 
 bb2:
-  strong_retain %0 : $Builtin.NativeObject
+  strong_retain %0 : $@box Builtin.Int32
   br bb3
 
 bb3:
-  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $@box Builtin.Int32
   %9999 = tuple()
   return %9999 : $()
 }
 
 // We can not ignore this branch since bb3 uses %0.
 //
-// CHECK-LABEL: sil @branch_use3 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil @branch_use3 : $@convention(thin) (@box Builtin.Int32) -> () {
 // CHECK: strong_retain
 // CHECK: strong_retain
 // CHECK: strong_release
-sil @branch_use3 : $@convention(thin) (Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject):
+sil @branch_use3 : $@convention(thin) (@box Builtin.Int32) -> () {
+bb0(%0 : $@box Builtin.Int32):
   cond_br undef, bb1, bb2
 
 bb1:
-  strong_retain %0 : $Builtin.NativeObject
-  %1 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
-  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
-  br bb3(undef : $Builtin.NativeObject)
+  strong_retain %0 : $@box Builtin.Int32
+  %1 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
+  apply %1(%0) : $@convention(thin) (@box Builtin.Int32) -> ()
+  br bb3(undef : $@box Builtin.Int32)
 
 bb2:
-  strong_retain %0 : $Builtin.NativeObject
-  br bb3(%0 : $Builtin.NativeObject)
+  strong_retain %0 : $@box Builtin.Int32
+  br bb3(%0 : $@box Builtin.Int32)
 
-bb3(%2 : $Builtin.NativeObject):
-  strong_release %0 : $Builtin.NativeObject
+bb3(%2 : $@box Builtin.Int32):
+  strong_release %0 : $@box Builtin.Int32
   %9999 = tuple()
   return %9999 : $()
 }
@@ -1635,14 +1635,14 @@ bb3(%2 : $Builtin.NativeObject):
 // Make sure that we properly ignore the cond_br and do not try to compare the
 // pointer with the Builtin.Int1 arg.
 //
-// CHECK-LABEL: sil @cond_branch_use1 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil @cond_branch_use1 : $@convention(thin) (@box Builtin.Int32) -> () {
 // CHECK-NOT: strong_retain
 // CHECK-NOT: strong_release
-sil @cond_branch_use1 : $@convention(thin) (Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject):
-  strong_retain %0 : $Builtin.NativeObject
-  %1 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
-  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+sil @cond_branch_use1 : $@convention(thin) (@box Builtin.Int32) -> () {
+bb0(%0 : $@box Builtin.Int32):
+  strong_retain %0 : $@box Builtin.Int32
+  %1 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
+  apply %1(%0) : $@convention(thin) (@box Builtin.Int32) -> ()
   %2 = integer_literal $Builtin.Int1, 0
   cond_br %2, bb1, bb2
 
@@ -1653,7 +1653,7 @@ bb2:
   br bb3
 
 bb3:
-  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $@box Builtin.Int32
   %9999 = tuple()
   return %9999 : $()
 }
@@ -1661,48 +1661,48 @@ bb3:
 // Make sure that we do not ignore the cond_br and do not try to compare the
 // pointer with the Builtin.Int1 arg.
 //
-// CHECK-LABEL: sil @cond_branch_use2 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil @cond_branch_use2 : $@convention(thin) (@box Builtin.Int32) -> () {
 // CHECK: strong_retain
 // CHECK: strong_release
-sil @cond_branch_use2 : $@convention(thin) (Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject):
-  strong_retain %0 : $Builtin.NativeObject
-  %1 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
-  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+sil @cond_branch_use2 : $@convention(thin) (@box Builtin.Int32) -> () {
+bb0(%0 : $@box Builtin.Int32):
+  strong_retain %0 : $@box Builtin.Int32
+  %1 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
+  apply %1(%0) : $@convention(thin) (@box Builtin.Int32) -> ()
   %2 = integer_literal $Builtin.Int1, 0
-  cond_br %2, bb1(%0 : $Builtin.NativeObject), bb2
+  cond_br %2, bb1(%0 : $@box Builtin.Int32), bb2
 
-bb1(%3 : $Builtin.NativeObject):
+bb1(%3 : $@box Builtin.Int32):
   br bb3
 
 bb2:
   br bb3
 
 bb3:
-  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $@box Builtin.Int32
   %9999 = tuple()
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil @cond_branch_use3 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil @cond_branch_use3 : $@convention(thin) (@box Builtin.Int32) -> () {
 // CHECK: strong_retain
 // CHECK: strong_release
-sil @cond_branch_use3 : $@convention(thin) (Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject):
-  strong_retain %0 : $Builtin.NativeObject
-  %1 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
-  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+sil @cond_branch_use3 : $@convention(thin) (@box Builtin.Int32) -> () {
+bb0(%0 : $@box Builtin.Int32):
+  strong_retain %0 : $@box Builtin.Int32
+  %1 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
+  apply %1(%0) : $@convention(thin) (@box Builtin.Int32) -> ()
   %2 = integer_literal $Builtin.Int1, 0
-  cond_br %2, bb2(%0 : $Builtin.NativeObject), bb1
+  cond_br %2, bb2(%0 : $@box Builtin.Int32), bb1
 
-bb2(%3 : $Builtin.NativeObject):
+bb2(%3 : $@box Builtin.Int32):
   br bb3
 
 bb1:
   br bb3
 
 bb3:
-  strong_release %0 : $Builtin.NativeObject
+  strong_release %0 : $@box Builtin.Int32
   %9999 = tuple()
   return %9999 : $()
 }
@@ -1713,19 +1713,19 @@ bb3:
 // CHECK-NOT: strong_release
 sil @owned_return_value_test : $@convention(thin) () -> () {
 bb0:
-  %0 = function_ref @owned_return : $@convention(thin) () -> (@owned Builtin.NativeObject)
-  %1 = apply %0() : $@convention(thin) () -> (@owned Builtin.NativeObject)
-  %2 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
-  strong_retain %1 : $Builtin.NativeObject
-  apply %2(%1) : $@convention(thin) (Builtin.NativeObject) -> ()
-  apply %2(%1) : $@convention(thin) (Builtin.NativeObject) -> ()
-  strong_release %1 : $Builtin.NativeObject
-  strong_release %1 : $Builtin.NativeObject
+  %0 = function_ref @owned_return : $@convention(thin) () -> (@owned @box Builtin.Int32)
+  %1 = apply %0() : $@convention(thin) () -> (@owned @box Builtin.Int32)
+  %2 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_retain %1 : $@box Builtin.Int32
+  apply %2(%1) : $@convention(thin) (@box Builtin.Int32) -> ()
+  apply %2(%1) : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_release %1 : $@box Builtin.Int32
+  strong_release %1 : $@box Builtin.Int32
   %9999 = tuple()
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil @retains_that_are_not_removed_preserves_known_safety : $@convention(thin) (@owned Builtin.NativeObject, Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil @retains_that_are_not_removed_preserves_known_safety : $@convention(thin) (@owned @box Builtin.Int32, @box Builtin.Int32) -> () {
 // CHECK-NOT: strong_retain
 // CHECK: apply
 // CHECK: apply
@@ -1734,22 +1734,22 @@ bb0:
 // CHECK: apply
 // CHECK: apply
 // CHECK: strong_release
-sil @retains_that_are_not_removed_preserves_known_safety : $@convention(thin) (@owned Builtin.NativeObject, Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
-  %2 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
-  strong_retain %0 : $Builtin.NativeObject
-  apply %2(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
-  apply %2(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
-  strong_release %0 : $Builtin.NativeObject
-  strong_retain %0 : $Builtin.NativeObject
-  apply %2(%1) : $@convention(thin) (Builtin.NativeObject) -> ()
-  apply %2(%1) : $@convention(thin) (Builtin.NativeObject) -> ()
-  strong_release %0 : $Builtin.NativeObject
+sil @retains_that_are_not_removed_preserves_known_safety : $@convention(thin) (@owned @box Builtin.Int32, @box Builtin.Int32) -> () {
+bb0(%0 : $@box Builtin.Int32, %1 : $@box Builtin.Int32):
+  %2 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_retain %0 : $@box Builtin.Int32
+  apply %2(%0) : $@convention(thin) (@box Builtin.Int32) -> ()
+  apply %2(%0) : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_release %0 : $@box Builtin.Int32
+  strong_retain %0 : $@box Builtin.Int32
+  apply %2(%1) : $@convention(thin) (@box Builtin.Int32) -> ()
+  apply %2(%1) : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_release %0 : $@box Builtin.Int32
   %9999 = tuple()
   return %9999 : $() 
 }
 
-// CHECK-LABEL: sil @retains_that_are_removed_do_not_preserve_known_safety : $@convention(thin) (@owned Builtin.NativeObject, Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil @retains_that_are_removed_do_not_preserve_known_safety : $@convention(thin) (@owned @box Builtin.Int32, @box Builtin.Int32) -> () {
 // CHECK: strong_retain
 // CHECK: apply
 // CHECK: apply
@@ -1757,16 +1757,16 @@ bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
 // CHECK-NOT: strong_retain
 // CHECK: apply
 // CHECK-NOT: strong_release
-sil @retains_that_are_removed_do_not_preserve_known_safety : $@convention(thin) (@owned Builtin.NativeObject, Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
-  %2 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
-  strong_retain %0 : $Builtin.NativeObject
-  apply %2(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
-  apply %2(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
-  strong_release %0 : $Builtin.NativeObject
-  strong_retain %0 : $Builtin.NativeObject
-  apply %2(%1) : $@convention(thin) (Builtin.NativeObject) -> ()
-  strong_release %0 : $Builtin.NativeObject
+sil @retains_that_are_removed_do_not_preserve_known_safety : $@convention(thin) (@owned @box Builtin.Int32, @box Builtin.Int32) -> () {
+bb0(%0 : $@box Builtin.Int32, %1 : $@box Builtin.Int32):
+  %2 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_retain %0 : $@box Builtin.Int32
+  apply %2(%0) : $@convention(thin) (@box Builtin.Int32) -> ()
+  apply %2(%0) : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_release %0 : $@box Builtin.Int32
+  strong_retain %0 : $@box Builtin.Int32
+  apply %2(%1) : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_release %0 : $@box Builtin.Int32
   %9999 = tuple()
   return %9999 : $() 
 }
@@ -1781,13 +1781,13 @@ bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
 sil @alloc_ref_returns_at_p1 : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_ref $Cls
-  %1 = unchecked_ref_cast %0 : $Cls to $Builtin.NativeObject
+  %1 = unchecked_ref_cast %0 : $Cls to $@box Builtin.Int32
   strong_retain %0 : $Cls
-  %2 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
-  apply %2(%1) : $@convention(thin) (Builtin.NativeObject) -> ()
-  apply %2(%1) : $@convention(thin) (Builtin.NativeObject) -> ()
-  strong_release %1 : $Builtin.NativeObject
-  strong_release %1 : $Builtin.NativeObject
+  %2 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
+  apply %2(%1) : $@convention(thin) (@box Builtin.Int32) -> ()
+  apply %2(%1) : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_release %1 : $@box Builtin.Int32
+  strong_release %1 : $@box Builtin.Int32
   %9999 = tuple()
   return %9999 : $()
 }
@@ -1803,30 +1803,30 @@ sil @alloc_ref_dynamic_returns_at_p1 : $@convention(thin) () -> () {
 bb0:
   %0 = metatype $@thick Cls.Type
   %1 = alloc_ref_dynamic %0 : $@thick Cls.Type, $Cls
-  %2 = unchecked_ref_cast %1 : $Cls to $Builtin.NativeObject
+  %2 = unchecked_ref_cast %1 : $Cls to $@box Builtin.Int32
   strong_retain %1 : $Cls
-  %3 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
-  apply %3(%2) : $@convention(thin) (Builtin.NativeObject) -> ()
-  apply %3(%2) : $@convention(thin) (Builtin.NativeObject) -> ()
-  strong_release %2 : $Builtin.NativeObject
-  strong_release %2 : $Builtin.NativeObject
+  %3 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
+  apply %3(%2) : $@convention(thin) (@box Builtin.Int32) -> ()
+  apply %3(%2) : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_release %2 : $@box Builtin.Int32
+  strong_release %2 : $@box Builtin.Int32
   %9999 = tuple()
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil @must_use_test : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil @must_use_test : $@convention(thin) (@owned @box Builtin.Int32) -> () {
 // CHECK-NOT: strong_retain
 // CHECK-NOT: strong_release
-sil @must_use_test : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-bb0(%0 : $Builtin.NativeObject):
-  %1 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
-  strong_retain %0 : $Builtin.NativeObject
-  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
-  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
-  strong_release %0 : $Builtin.NativeObject
-  strong_retain %0 : $Builtin.NativeObject
-  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
-  strong_release %0 : $Builtin.NativeObject
+sil @must_use_test : $@convention(thin) (@owned @box Builtin.Int32) -> () {
+bb0(%0 : $@box Builtin.Int32):
+  %1 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_retain %0 : $@box Builtin.Int32
+  apply %1(%0) : $@convention(thin) (@box Builtin.Int32) -> ()
+  apply %1(%0) : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_release %0 : $@box Builtin.Int32
+  strong_retain %0 : $@box Builtin.Int32
+  apply %1(%0) : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_release %0 : $@box Builtin.Int32
   %9999 = tuple()
   return %9999 : $()
 }
@@ -1840,13 +1840,13 @@ bb0(%0 : $Builtin.NativeObject):
 // CHECK-NOT: strong_release
 sil @alloc_box_returns_at_p1 : $@convention(thin) () -> () {
 bb0:
-  %0 = alloc_box $Builtin.Int1
-  strong_retain %0#0 : $Builtin.NativeObject
-  %3 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
-  apply %3(%0#0) : $@convention(thin) (Builtin.NativeObject) -> ()
-  apply %3(%0#0) : $@convention(thin) (Builtin.NativeObject) -> ()
-  strong_release %0#0 : $Builtin.NativeObject
-  strong_release %0#0 : $Builtin.NativeObject
+  %0 = alloc_box $Builtin.Int32
+  strong_retain %0#0 : $@box Builtin.Int32
+  %3 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
+  apply %3(%0#0) : $@convention(thin) (@box Builtin.Int32) -> ()
+  apply %3(%0#0) : $@convention(thin) (@box Builtin.Int32) -> ()
+  strong_release %0#0 : $@box Builtin.Int32
+  strong_release %0#0 : $@box Builtin.Int32
   %9999 = tuple()
   return %9999 : $()
 }

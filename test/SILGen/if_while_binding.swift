@@ -48,7 +48,7 @@ func if_else_chain() {
   // CHECK:   alloc_box $String   // var y
   // CHECK:   switch_enum {{.*}} : $Optional<String>, case #Optional.Some!enumelt.1: [[YESY:bb[0-9]+]], default [[ELSE1:bb[0-9]+]]
     // CHECK: [[ELSE1]]:
-    // CHECK:   dealloc_box $String
+    // CHECK:   dealloc_box {{.*}} $@box String
     // CHECK:   br [[ELSE:bb[0-9]+]]
   } else if var y = bar() {
   // CHECK: [[YESY]]([[VAL:%[0-9]+]] : $String):
@@ -157,7 +157,7 @@ func if_multi() {
   // CHECK:   switch_enum {{.*}}, case #Optional.Some!enumelt.1: [[IF_BODY:bb.*]], default [[IF_EXIT1a:bb[0-9]+]]
 
   // CHECK: [[IF_EXIT1a]]:
-  // CHECK:   dealloc_box $String, [[B]]
+  // CHECK:   dealloc_box {{.*}} $@box String
   // CHECK:   release_value [[A]]
   // CHECK:   br [[IF_DONE]]
 
@@ -184,7 +184,7 @@ func if_multi_else() {
   // CHECK:   switch_enum {{.*}}, case #Optional.Some!enumelt.1: [[IF_BODY:bb.*]], default [[IF_EXIT1a:bb[0-9]+]]
   
     // CHECK: [[IF_EXIT1a]]:
-    // CHECK:   dealloc_box $String, [[B]]#0
+    // CHECK:   dealloc_box {{.*}} $@box String
     // CHECK:   release_value [[A]]
     // CHECK:   br [[ELSE]]
 
@@ -215,7 +215,7 @@ func if_multi_where() {
   // CHECK:   [[BBOX:%[0-9]+]] = alloc_box $String // var b
   // CHECK:   switch_enum {{.*}}, case #Optional.Some!enumelt.1: [[CHECK_WHERE:bb.*]], default [[IF_EXIT1a:bb[0-9]+]]
   // CHECK: [[IF_EXIT1a]]:
-  // CHECK:   dealloc_box $String, [[BBOX]]
+  // CHECK:   dealloc_box {{.*}} $@box String
   // CHECK:   release_value [[A]]
   // CHECK:   br [[ELSE]]
 

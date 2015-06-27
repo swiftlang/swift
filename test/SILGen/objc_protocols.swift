@@ -188,7 +188,7 @@ func testInitializableExistential(im: Initializable.Type, i: Int) -> Initializab
 // CHECK:   store [[I2_EXIST_CONTAINER]] to [[I2_BOX]]#1 : $*Initializable
 // CHECK:   [[I2:%[0-9]+]] = load [[I2_BOX]]#1 : $*Initializable
 // CHECK:   strong_retain [[I2]] : $Initializable
-// CHECK:   strong_release [[I2_BOX]]#0 : $Builtin.NativeObject
+// CHECK:   strong_release [[I2_BOX]]#0 : $@box Initializable
 // CHECK:   return [[I2]] : $Initializable
   var i2 = im.init(int: i)
   return i2

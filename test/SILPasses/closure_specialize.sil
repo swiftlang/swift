@@ -87,8 +87,8 @@ bb0(%0 : $Int, %1 : $Int, %2 : $Int):
   %10 = load %5#1 : $*Int                         // user: %12
   %11 = load %7#1 : $*Int                         // user: %12
   %12 = apply %9(%10, %11, %2) : $@convention(thin) (Int, Int, Int) -> ()
-  strong_release %7#0 : $Builtin.NativeObject     // id: %13
-  strong_release %5#0 : $Builtin.NativeObject     // id: %14
+  strong_release %7#0 : $@box Int
+  strong_release %5#0 : $@box Int
   %15 = tuple ()                                  // user: %16
   return %15 : $()                                // id: %16
 }

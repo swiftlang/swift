@@ -39,9 +39,9 @@ bb0(%0 : $Int32, %25: $Bar):
   %1 = struct_extract %0 : $Int32, #Int32.value
   %2 = integer_literal $Builtin.Int32, 0
   %30 = alloc_box $Bool
-  br bb1(%1 : $Builtin.Int32, %2 : $Builtin.Int32, %25: $Bar, %30#0 : $Builtin.NativeObject, %30#1 : $*Bool)
+  br bb1(%1 : $Builtin.Int32, %2 : $Builtin.Int32, %25: $Bar, %30#0 : $@box Bool, %30#1 : $*Bool)
 
-bb1(%4 : $Builtin.Int32, %5 : $Builtin.Int32, %26: $Bar, %31 : $Builtin.NativeObject, %32 : $*Bool):
+bb1(%4 : $Builtin.Int32, %5 : $Builtin.Int32, %26: $Bar, %31 : $@box Bool, %32 : $*Bool):
   %24 = class_method %26 : $Bar, #Bar.foo!1 : Bar -> () -> () , $@convention(method) (@guaranteed Bar) -> () // user: %6
   %27 = apply %24(%25) : $@convention(method) (@guaranteed Bar) -> ()
   %6 = struct $Int32 (%5 : $Builtin.Int32)
@@ -59,7 +59,7 @@ bb2:
   %19 = integer_literal $Builtin.Int1, -1
   %20 = builtin "sadd_with_overflow_Word"(%4 : $Builtin.Int32, %17 : $Builtin.Int32, %19 : $Builtin.Int1) : $(Builtin.Int32, Builtin.Int1)
   %21 = tuple_extract %20 : $(Builtin.Int32, Builtin.Int1), 0
-  br bb1(%21 : $Builtin.Int32, %14 : $Builtin.Int32, %26: $Bar, %31 : $Builtin.NativeObject, %32 : $*Bool)
+  br bb1(%21 : $Builtin.Int32, %14 : $Builtin.Int32, %26: $Bar, %31 : $@box Bool, %32 : $*Bool)
 
 bb3:
   %23 = struct $Int32 (%4 : $Builtin.Int32)

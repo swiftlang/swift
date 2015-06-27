@@ -17,7 +17,7 @@ class A {
 // CHECK:   store [[INIT_RESULT]] to [[SELF]] : $*A
 // CHECK:   [[RESULT:%[0-9]+]] = load [[SELF]] : $*A
 // CHECK:   strong_retain [[RESULT]] : $A
-// CHECK:   strong_release [[SELF_BOX]]#0 : $Builtin.NativeObject
+// CHECK:   strong_release [[SELF_BOX]]#0 : $@box A
 // CHECK:   return [[RESULT]] : $A
 
   // CHECK-LABEL: sil hidden @_TFC20complete_object_init1ACfMS0_FT_S0_ : $@convention(thin) (@thick A.Type) -> @owned A

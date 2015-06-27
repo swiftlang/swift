@@ -19,7 +19,7 @@ struct S {
     self.init(x: X())
     // CHECK-NEXT:   assign [[REPLACEMENT_SELF]] to [[SELF]] : $*S
     // CHECK-NEXT:   [[SELF_BOX1:%[0-9]+]] = load [[SELF]] : $*S
-    // CHECK-NEXT:   strong_release [[SELF_BOX]]#0 : $Builtin.NativeObject
+    // CHECK-NEXT:   strong_release [[SELF_BOX]]#0 : $@box S
     // CHECK-NEXT:   return [[SELF_BOX1]] : $S
   }
 
@@ -43,7 +43,7 @@ enum E {
     // CHECK:   assign [[S:%[0-9]+]] to [[E_SELF]] : $*E
     // CHECK:   [[E_BOX1:%[0-9]+]] = load [[E_SELF]] : $*E
     self.init(x: X())
-    // CHECK:   strong_release [[E_BOX:%[0-9]+]]#0 : $Builtin.NativeObject
+    // CHECK:   strong_release [[E_BOX:%[0-9]+]]#0 : $@box E
     // CHECK:   return [[E_BOX1:%[0-9]+]] : $E
   }
 
@@ -70,7 +70,7 @@ struct S2 {
     // CHECK:   dealloc_stack [[X_BOX]]#0 : $*@local_storage X
     // CHECK:   [[SELF_BOX4:%[0-9]+]] = load [[SELF]] : $*S2
     self.init(t: X())
-    // CHECK:   strong_release [[SELF_BOX]]#0 : $Builtin.NativeObject
+    // CHECK:   strong_release [[SELF_BOX]]#0 : $@box S2
     // CHECK:   return [[SELF_BOX4]] : $S2
   }
 
@@ -95,7 +95,7 @@ class C1 {
     // CHECK:   store [[SELFP]] to [[SELF]] : $*C1
     // CHECK:   [[SELFP:%[0-9]+]] = load [[SELF]] : $*C1
     // CHECK:   strong_retain [[SELFP]] : $C1
-    // CHECK:   strong_release [[SELF_BOX]]#0 : $Builtin.NativeObject
+    // CHECK:   strong_release [[SELF_BOX]]#0 : $@box C1
     // CHECK:   return [[SELFP]] : $C1
     self.init(x1: x, x2: x)
   }
@@ -119,7 +119,7 @@ class C1 {
     // CHECK:   store [[REPLACE_SELF]] to [[UNINIT_SELF]] : $*C2
     // CHECK:   [[VAR_15:%[0-9]+]] = load [[UNINIT_SELF]] : $*C2
     // CHECK:   strong_retain [[VAR_15]] : $C2
-    // CHECK:   strong_release [[SELF_BOX]]#0 : $Builtin.NativeObject
+    // CHECK:   strong_release [[SELF_BOX]]#0 : $@box C2
     // CHECK:   return [[VAR_15]] : $C2
     self.init(x1: x, x2: x)
     // CHECK-NOT: sil hidden @_TToFC19init_ref_delegation2C2cfMS_FT1xV19init_ref_delegation1X_S_ : $@convention(objc_method) (X, @owned C2) -> @owned C2 {

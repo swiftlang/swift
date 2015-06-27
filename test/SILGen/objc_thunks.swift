@@ -309,13 +309,13 @@ extension Hoozit {
     // CHECK: [[NONNULL:%[0-9]+]] = is_nonnull [[NEW_SELF]] : $Hoozit
     // CHECK-NEXT: cond_br [[NONNULL]], [[NONNULL_BB:bb[0-9]+]], [[NULL_BB:bb[0-9]+]]
     // CHECK: [[NULL_BB]]:
-    // CHECK-NEXT: strong_release [[X_BOX]]#0 : $Builtin.NativeObject
+    // CHECK-NEXT: strong_release [[X_BOX]]#0 : $@box X
     // CHECK-NEXT: br [[EPILOG_BB:bb[0-9]+]]
 
     // CHECK: [[NONNULL_BB]]:
     // CHECK:   [[OTHER_REF:%[0-9]+]] = function_ref @_TF11objc_thunks5otherFT_T_ : $@convention(thin) () -> ()
     // CHECK-NEXT: apply [[OTHER_REF]]() : $@convention(thin) () -> ()
-    // CHECK-NEXT: strong_release [[X_BOX]]#0 : $Builtin.NativeObject
+    // CHECK-NEXT: strong_release [[X_BOX]]#0 : $@box X
     // CHECK-NEXT: br [[EPILOG_BB]]
     
     // CHECK: [[EPILOG_BB]]:

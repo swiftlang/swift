@@ -21,7 +21,7 @@ bb0:
   %2 = load %1#1 : $*Int64
   %3 = function_ref @inout_uninit : $@convention(thin)() -> ()
   apply %3() : $@convention(thin) () -> ()
-  strong_release %1#0 : $Builtin.NativeObject
+  strong_release %1#0 : $@box Int64
   %4 = return %2 : $Int64
 }
 
@@ -33,6 +33,6 @@ bb0:
   %6 = apply %5(%1#1) : $@convention(thin) (@inout Int64) -> ()
 
   %0 = tuple ()
-  strong_release %1#0 : $Builtin.NativeObject
+  strong_release %1#0 : $@box Int64
   return %0 : $()
 }

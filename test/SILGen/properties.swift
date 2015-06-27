@@ -663,16 +663,16 @@ func propertyWithDidSetTakingOldValue() {
 
 // CHECK: // properties.(propertyWithDidSetTakingOldValue () -> ()).(p #1).setter : Swift.Int
 // CHECK-NEXT: sil {{.*}} @_TFF10properties32propertyWithDidSetTakingOldValue
-// CHECK-NEXT: bb0(%0 : $Int, %1 : $Builtin.NativeObject, %2 : $*Int):
+// CHECK-NEXT: bb0(%0 : $Int, %1 : $@box Int, %2 : $*Int):
 // CHECK-NEXT:  debug_value %0 : $Int
 // CHECK-NEXT:  %4 = load %2 : $*Int
 // CHECK-NEXT:  debug_value %4 : $Int
 // CHECK-NEXT:  assign %0 to %2 : $*Int
-// CHECK-NEXT:  strong_retain %1 : $Builtin.NativeObject
+// CHECK-NEXT:  strong_retain %1 : $@box Int
 // CHECK-NEXT:  // function_ref
-// CHECK-NEXT:  %8 = function_ref @_TFF10properties32propertyWithDidSetTakingOldValueFT_T_WL_1pSi : $@convention(thin) (Int, @owned Builtin.NativeObject, @inout Int) -> ()
-// CHECK-NEXT:  %9 = apply %8(%4, %1, %2) : $@convention(thin) (Int, @owned Builtin.NativeObject, @inout Int) -> ()
-// CHECK-NEXT:  strong_release %1 : $Builtin.NativeObject
+// CHECK-NEXT:  %8 = function_ref @_TFF10properties32propertyWithDidSetTakingOldValueFT_T_WL_1pSi : $@convention(thin) (Int, @owned @box Int, @inout Int) -> ()
+// CHECK-NEXT:  %9 = apply %8(%4, %1, %2) : $@convention(thin) (Int, @owned @box Int, @inout Int) -> ()
+// CHECK-NEXT:  strong_release %1 : $@box Int
 // CHECK-NEXT:  %11 = tuple ()
 // CHECK-NEXT:  return %11 : $()
 // CHECK-NEXT:}

@@ -62,14 +62,14 @@ bb0(%0 : $Int64):
   cond_br %9, bb1, bb2                            // id: %10
 
 bb1:                                              // Preds: bb0
-  strong_release %3#0 : $Builtin.NativeObject    // id: %11
+  strong_release %3#0 : $@box Int64    // id: %11
   br bb3(%5 : $Int64)                             // id: %12
 
 bb2:                                              // Preds: bb0
   %13 = integer_literal $Builtin.Int64, 5         // user: %14
   %14 = struct $Int64 (%13 : $Builtin.Int64)      // user: %17
   cond_fail %9 : $Builtin.Int1                    // id: %15
-  strong_release %3#0 : $Builtin.NativeObject    // id: %16
+  strong_release %3#0 : $@box Int64    // id: %16
   br bb3(%14 : $Int64)                            // id: %17
 
 bb3(%18 : $Int64):                                // Preds: bb2 bb1
@@ -92,14 +92,14 @@ bb0(%0 : $Int64):
   cond_br %9, bb1, bb2                            // id: %10
 
 bb1:                                              // Preds: bb0
-  strong_release %3#0 : $Builtin.NativeObject    // id: %11
+  strong_release %3#0 : $@box Int64    // id: %11
   br bb3(%5 : $Int64)                             // id: %12
 
 bb2:                                              // Preds: bb0
   %13 = integer_literal $Builtin.Int64, 5         // user: %14
   %14 = struct $Int64 (%13 : $Builtin.Int64)      // user: %17
   cond_fail %9 : $Builtin.Int1                    // id: %15
-  strong_release %3#0 : $Builtin.NativeObject    // id: %16
+  strong_release %3#0 : $@box Int64    // id: %16
   br bb3(%14 : $Int64)                            // id: %17
 
 //CHECK: bb3([[RET:%[0-9]+]] : $Int64):

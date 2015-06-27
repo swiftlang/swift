@@ -87,8 +87,8 @@ func opt_to_class(var obj: AnyObject) {
 
   // Exit
   // CHECK-NEXT: strong_release [[OBJ_SELF]] : $@opened({{".*"}}) AnyObject
-  // CHECK-NEXT: strong_release [[OPTBOX]]#0 : $Builtin.NativeObject
-  // CHECK-NEXT: strong_release [[EXISTBOX]]#0 : $Builtin.NativeObject
+  // CHECK-NEXT: strong_release [[OPTBOX]]#0 : $@box ImplicitlyUnwrappedOptional<() -> ()>
+  // CHECK-NEXT: strong_release [[EXISTBOX]]#0 : $@box AnyObject
   // CHECK-NEXT: [[RESULT:%[0-9]+]] = tuple ()
   // CHECK-NEXT: return [[RESULT]] : $()
 }
@@ -197,7 +197,7 @@ func downcast(var obj: AnyObject) -> X {
   // CHECK-NEXT: [[OBJ:%[0-9]+]] = load [[OBJ_BOX]]#1 : $*AnyObject
   // CHECK-NEXT: strong_retain [[OBJ]] : $AnyObject
   // CHECK-NEXT: [[X:%[0-9]+]] = unconditional_checked_cast [[OBJ]] : $AnyObject to $X
-  // CHECK-NEXT: strong_release [[OBJ_BOX]]#0 : $Builtin.NativeObject
+  // CHECK-NEXT: strong_release [[OBJ_BOX]]#0 : $@box AnyObject
   // CHECK-NEXT: return [[X]] : $X
   return obj as! X
 }

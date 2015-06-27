@@ -120,7 +120,7 @@ func testObjCInit(meta: ObjCInit.Type) {
 // CHECK:   [[INIT:%[0-9]+]] = class_method [volatile] [[OBJ]] : $ObjCInit, #ObjCInit.init!initializer.1.foreign : ObjCInit.Type -> () -> ObjCInit , $@convention(objc_method) (@owned ObjCInit) -> @owned ObjCInit
 // CHECK:   [[RESULT_OBJ:%[0-9]+]] = apply [[INIT]]([[OBJ]]) : $@convention(objc_method) (@owned ObjCInit) -> @owned ObjCInit
 // CHECK:   store [[RESULT_OBJ]] to [[O]]#1 : $*ObjCInit
-// CHECK:   strong_release [[O]]#0 : $Builtin.NativeObject
+// CHECK:   strong_release [[O]]#0 : $@box ObjCInit
 // CHECK:   [[RESULT:%[0-9]+]] = tuple ()
 // CHECK:   return [[RESULT]] : $()
   var o = meta.init()

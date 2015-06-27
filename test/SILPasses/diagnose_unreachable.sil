@@ -144,7 +144,7 @@ bb0(%0 : $B):
   %4 = strong_retain %3 : $B                         // CHECK: strong_retain
   %5 = unchecked_ref_cast %3 : $B to $Builtin.NativeObject     // CHECK-NOT: unchecked_ref_cast
   %7 = strong_release %3 : $B                        // CHECK: strong_release
-  %8 = strong_release %1#0 : $Builtin.NativeObject  // CHECK-NEXT: strong_release
+  %8 = strong_release %1#0 : $@box B  // CHECK-NEXT: strong_release
   %9 = function_ref @exit : $@convention(thin) @noreturn () -> () // ret.exit : () -> ()
   %10 = apply %9() : $@convention(thin) @noreturn () -> ()
   %6 = unchecked_ref_cast %5 : $Builtin.NativeObject to $B // CHECK-NOT: unchecked_ref_cast

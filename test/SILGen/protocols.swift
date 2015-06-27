@@ -90,7 +90,7 @@ func use_subscript_archetype_lvalue_get<T : SubscriptableGetSet>(inout generic :
 // CHECK-NEXT: destroy_addr [[GUARANTEEDSTACK]]#1 : $*T
 // CHECK-NEXT: dealloc_stack [[GUARANTEEDSTACK]]#0 : $*@local_storage T
 // CHECK-NEXT: copy_addr [[INOUTBOX]]#1 to %0 : $*T
-// CHECK-NEXT: strong_release [[INOUTBOX]]#0 : $Builtin.NativeObject
+// CHECK-NEXT: strong_release [[INOUTBOX]]#0 : $@box T
 // CHECK: return [[APPLYRESULT]]
 
 

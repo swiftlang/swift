@@ -85,7 +85,7 @@ bb0(%0 : $Int):
 bb1:
   // Forward reference MRVs.
   store %0 to %6#1 : $*Int
-  strong_release %6#0 : $Builtin.NativeObject
+  strong_release %6#0 : $@box Int
 
   return %5 : $()
 bb2:
@@ -261,7 +261,7 @@ bb0(%0 : $*Runcible, %1 : $*protocol<Bendable, Runcible>):
   %8 = destroy_addr %4#1 : $*protocol<Bendable, Runcible>
   // CHECK: dealloc_stack
   %9 = dealloc_stack %4#0 : $*@local_storage protocol<Bendable, Runcible>
-  %10 = strong_release %2#0 : $Builtin.NativeObject
+  %10 = strong_release %2#0 : $@box protocol<Bendable, Runcible>
   // CHECK: return
   %11 = return %7 : $()
 }
@@ -283,7 +283,7 @@ bb0(%0 : $ClassBound):
   %6 = witness_method $@opened("01234567-89ab-cdef-0123-111111111111") ClassBound, #ClassBound.classBoundMethod!1, %5 : $@opened("01234567-89ab-cdef-0123-111111111111") ClassBound : $@convention(witness_method) <T: ClassBound> (T) -> ()
   %7 = apply %6<@opened("01234567-89ab-cdef-0123-111111111111") ClassBound>(%5) : $@convention(witness_method) <T: ClassBound> (T) -> ()
   %8 = tuple ()
-  %9 = strong_release %1#0 : $Builtin.NativeObject
+  %9 = strong_release %1#0 : $@box ClassBound
   %10 = return %8 : $()
 }
 
@@ -325,7 +325,7 @@ bb0(%0 : $@thin Aleph.Type):
   // CHECK: struct_extract {{%.*}} : $Aleph, #Aleph.a
   %15 = struct_extract %14 : $Aleph, #Aleph.a
   %16 = strong_retain %15 : $Ref
-  %17 = strong_release %2#0 : $Builtin.NativeObject
+  %17 = strong_release %2#0 : $@box Aleph
   %18 = return %14 : $Aleph
 }
 
@@ -403,7 +403,7 @@ bb0(%0 : $Int, %1 : $Float32):
   // CHECK: apply
   %24 = apply %19(%17) : $@convention(thin) (Float32) -> ()
   %25 = tuple ()
-  %26 = strong_release %2#0 : $Builtin.NativeObject
+  %26 = strong_release %2#0 : $@box (Int, Float32)
   %27 = return %25 : $()
 }
 
@@ -427,8 +427,8 @@ bb0(%0 : $Int, %1 : $M):
   %10 = store %6 to %9 : $*Int
   %11 = strong_release %7 : $M
   %12 = tuple ()
-  %13 = strong_release %4#0 : $Builtin.NativeObject
-  %14 = strong_release %2#0 : $Builtin.NativeObject
+  %13 = strong_release %4#0 : $@box M
+  %14 = strong_release %2#0 : $@box Int
   %15 = return %12 : $()
 }
 
@@ -451,7 +451,7 @@ no:
   br isa(%n : $Builtin.Int1)
 isa(%6 : $Builtin.Int1):
   %7 = strong_release %3 : $B
-  %8 = strong_release %1#0 : $Builtin.NativeObject
+  %8 = strong_release %1#0 : $@box B
   %9 = return %6 : $Builtin.Int1
 }
 
@@ -471,8 +471,8 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
   %8 = load %3#1 : $*Builtin.Word
   // CHECK: index_raw_pointer {{%.*}} : $Builtin.RawPointer, {{%.*}} : $Builtin.Word
   %9 = index_raw_pointer %7 : $Builtin.RawPointer, %8 : $Builtin.Word
-  %10 = strong_release %3#0 : $Builtin.NativeObject
-  %11 = strong_release %2#0 : $Builtin.NativeObject
+  %10 = strong_release %3#0 : $@box Builtin.Word
+  %11 = strong_release %2#0 : $@box Builtin.RawPointer
   %12 = return %9 : $Builtin.RawPointer
 }
 
@@ -521,8 +521,8 @@ bb0(%0 : $SomeClass, %1 : $SomeSubclass):
   %15 = tuple (%9 : $@thick SomeClass.Type, %14 : $@thick SomeClass.Type)
   %16 = strong_release %11 : $SomeSubclass
   %17 = strong_release %7 : $SomeClass
-  %18 = strong_release %3#0 : $Builtin.NativeObject
-  %19 = strong_release %2#0 : $Builtin.NativeObject
+  %18 = strong_release %3#0 : $@box SomeSubclass
+  %19 = strong_release %2#0 : $@box SomeClass
   %20 = return %15 : $(@thick SomeClass.Type, @thick SomeClass.Type)
 }
 
@@ -540,7 +540,7 @@ bb0(%0 : $*SomeProtocol):
   %6 = existential_metatype $@thick SomeProtocol.Type, %4#1 : $*SomeProtocol
   %7 = destroy_addr %4#1 : $*SomeProtocol
   %8 = dealloc_stack %4#0 : $*@local_storage SomeProtocol
-  %9 = strong_release %1#0 : $Builtin.NativeObject
+  %9 = strong_release %1#0 : $@box SomeProtocol
   %10 = return %6 : $@thick SomeProtocol.Type
 }
 
@@ -618,8 +618,8 @@ bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
   %9 = load %3#1 : $*Builtin.Int1
   // CHECK: builtin "cmp_eq_Int1"({{%.*}} : $Builtin.Int1, {{%.*}} : $Builtin.Int1) : $Builtin.Int1
   %10 = builtin "cmp_eq_Int1"(%8 : $Builtin.Int1, %9 : $Builtin.Int1) : $Builtin.Int1
-  strong_release %3#0 : $Builtin.NativeObject
-  strong_release %2#0 : $Builtin.NativeObject
+  strong_release %3#0 : $@box Builtin.Int1
+  strong_release %2#0 : $@box Builtin.Int1
   return %10 : $Builtin.Int1
 }
 
@@ -637,25 +637,25 @@ bb0:
 sil [fragile] @test_dealloc_box : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_box $Class1
-  dealloc_box $Class1, %0#0 : $Builtin.NativeObject
+  dealloc_box %0#0 : $@box Class1
   %2 = tuple ()
   return %2 : $()
 }
 
 // CHECK-LABEL: @closure_test
 sil [fragile] @takes_closure : $@convention(thin) (@callee_owned () -> ()) -> ()
-sil [fragile] @closure0 : $@convention(thin) (Builtin.NativeObject, @inout Int) -> ()
+sil [fragile] @closure0 : $@convention(thin) (@box Int, @inout Int) -> ()
 
 sil [fragile] @closure_test : $@convention(thin) () -> () {
 bb0:
   %0 = alloc_box $Int                           // users: %10, %8, %8, %7, %4
 
   %5 = function_ref @takes_closure : $@convention(thin) (@callee_owned () -> ()) -> ()
-  %6 = function_ref @closure0 : $@convention(thin) (Builtin.NativeObject, @inout Int) -> ()
-  strong_retain %0#0 : $Builtin.NativeObject
-  //%8 = partial_apply %6(%0#0, %0#1) : $@convention(thin) (Builtin.NativeObject, @inout Int) -> ()
+  %6 = function_ref @closure0 : $@convention(thin) (@box Int, @inout Int) -> ()
+  strong_retain %0#0 : $@box Int
+  //%8 = partial_apply %6(%0#0, %0#1) : $@convention(thin) (@box Int, @inout Int) -> ()
   //%9 = apply %5(%8) : $@convention(thin) (@callee_owned () -> ()) -> ()
-  //strong_release %0#0 : $Builtin.NativeObject
+  //strong_release %0#0 : $@box Int
 
   %11 = tuple ()
   return %11 : $()
@@ -703,7 +703,7 @@ bb4(%y : $Int):
 bb5:
   %15 = function_ref @_TF6switch1cFT_T_ : $@convention(thin) () -> ()
   %16 = apply %15() : $@convention(thin) () -> ()
-  strong_release %1#0 : $Builtin.NativeObject
+  strong_release %1#0 : $@box MaybePair
   %18 = tuple ()
   return %18 : $()                                        // CHECK: return
 }
@@ -771,7 +771,7 @@ bb0(%0 : $*Bendable, %1 : $Spoon):
   deinit_existential_addr %0 : $*Bendable
   %5 = load %2#1 : $*Spoon
   store %5 to %4 : $*Spoon
-  strong_release %2#0 : $Builtin.NativeObject
+  strong_release %2#0 : $@box Spoon
   %8 = tuple ()
   return %8 : $()
 }
@@ -785,7 +785,7 @@ bb0(%0 : $ConcreteClass):
   strong_retain %3 : $ConcreteClass
   // CHECK: init_existential_ref %{{.*}} : $ConcreteClass : $ConcreteClass, $ClassP
   %5 = init_existential_ref %3 : $ConcreteClass : $ConcreteClass, $ClassP
-  strong_release %1#0 : $Builtin.NativeObject
+  strong_release %1#0 : $@box ConcreteClass
   return %5 : $ClassP
 }
 

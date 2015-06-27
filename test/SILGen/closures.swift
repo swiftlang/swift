@@ -26,14 +26,14 @@ func read_only_capture(var x: Int) -> Int {
   }
 
   return cap()
-  // CHECK: [[CAP:%[0-9]+]] = function_ref @[[CAP_NAME:_TFF8closures17read_only_capture.*]] : $@convention(thin) (@owned Builtin.NativeObject, @inout Int) -> Int
+  // CHECK: [[CAP:%[0-9]+]] = function_ref @[[CAP_NAME:_TFF8closures17read_only_capture.*]] : $@convention(thin) (@owned @box Int, @inout Int) -> Int
   // CHECK: [[RET:%[0-9]+]] = apply [[CAP]]([[XBOX]]#0, [[XBOX]]#1)
   // CHECK: release [[XBOX]]#0
   // CHECK: return [[RET]]
 }
 
 // CHECK: sil shared @[[CAP_NAME]]
-// CHECK: bb0([[XBOX:%[0-9]+]] : $Builtin.NativeObject, [[XADDR:%[0-9]+]] : $*Int):
+// CHECK: bb0([[XBOX:%[0-9]+]] : $@box Int, [[XADDR:%[0-9]+]] : $*Int):
 // CHECK: [[X:%[0-9]+]] = load [[XADDR]]
 // CHECK: release [[XBOX]]
 // CHECK: return [[X]]
@@ -50,7 +50,7 @@ func write_to_capture(var x: Int) -> Int {
   }
 
   scribble()
-  // CHECK: [[SCRIB:%[0-9]+]] = function_ref @[[SCRIB_NAME:_TFF8closures16write_to_capture.*]] : $@convention(thin) (@owned Builtin.NativeObject, @inout Int) -> ()
+  // CHECK: [[SCRIB:%[0-9]+]] = function_ref @[[SCRIB_NAME:_TFF8closures16write_to_capture.*]] : $@convention(thin) (@owned @box Int, @inout Int) -> ()
   // CHECK: apply [[SCRIB]]([[X2BOX]]#0, [[X2BOX]]#1)
   // CHECK: [[RET:%[0-9]+]] = load [[X2BOX]]#1
   // CHECK: release [[X2BOX]]#0
@@ -60,7 +60,7 @@ func write_to_capture(var x: Int) -> Int {
 }
 
 // CHECK: sil shared @[[SCRIB_NAME]]
-// CHECK: bb0([[XBOX:%[0-9]+]] : $Builtin.NativeObject, [[XADDR:%[0-9]+]] : $*Int):
+// CHECK: bb0([[XBOX:%[0-9]+]] : $@box Int, [[XADDR:%[0-9]+]] : $*Int):
 // CHECK: copy_addr {{%[0-9]+}} to [[XADDR]]
 // CHECK: release [[XBOX]]
 // CHECK: return
@@ -72,9 +72,9 @@ func multiple_closure_refs(var x: Int) -> (() -> Int, () -> Int) {
   }
 
   return (cap, cap)
-  // CHECK: [[CAP:%[0-9]+]] = function_ref @[[CAP_NAME:_TFF8closures21multiple_closure_refs.*]] : $@convention(thin) (@owned Builtin.NativeObject, @inout Int) -> Int
+  // CHECK: [[CAP:%[0-9]+]] = function_ref @[[CAP_NAME:_TFF8closures21multiple_closure_refs.*]] : $@convention(thin) (@owned @box Int, @inout Int) -> Int
   // CHECK: [[CAP_CLOSURE_1:%[0-9]+]] = partial_apply [[CAP]]
-  // CHECK: [[CAP:%[0-9]+]] = function_ref @[[CAP_NAME:_TFF8closures21multiple_closure_refs.*]] : $@convention(thin) (@owned Builtin.NativeObject, @inout Int) -> Int
+  // CHECK: [[CAP:%[0-9]+]] = function_ref @[[CAP_NAME:_TFF8closures21multiple_closure_refs.*]] : $@convention(thin) (@owned @box Int, @inout Int) -> Int
   // CHECK: [[CAP_CLOSURE_2:%[0-9]+]] = partial_apply [[CAP]]
   // CHECK: [[RET:%[0-9]+]] = tuple ([[CAP_CLOSURE_1]] : {{.*}}, [[CAP_CLOSURE_2]] : {{.*}})
   // CHECK: return [[RET]]
@@ -86,7 +86,7 @@ func capture_local_func(var x: Int) -> () -> () -> Int {
   // C/HECK: [[XBOX:%[0-9]+]] = alloc_box $Int
 
   func aleph() -> Int { return x }
-  // C/HECK: [[ALEPH_REF:%[0-9]+]] = function_ref @[[ALEPH_NAME:_TFF8closures18capture_local_func.*]] : $@convention(thin) (@owned Builtin.NativeObject, @inout Int) -> Int
+  // C/HECK: [[ALEPH_REF:%[0-9]+]] = function_ref @[[ALEPH_NAME:_TFF8closures18capture_local_func.*]] : $@convention(thin) (@owned @box Int, @inout Int) -> Int
   // C/HECK: [[ALEPH_CLOSURE:%[0-9]+]] = partial_apply [[ALEPH_REF]]([[XBOX]]#0, [[XBOX]]#1)
 
   func beth() -> () -> Int { return aleph }
@@ -99,7 +99,7 @@ func capture_local_func(var x: Int) -> () -> () -> Int {
   // C/HECK: return [[BETH_CLOSURE]]
 }
 // C/HECK: sil shared @[[ALEPH_NAME]]
-// C/HECK: bb0([[XBOX:%[0-9]+]] : $Builtin.NativeObject, [[XADDR:%[0-9]+]] : $*Int):
+// C/HECK: bb0([[XBOX:%[0-9]+]] : $@box Int, [[XADDR:%[0-9]+]] : $*Int):
 
 // C/HECK: sil shared @[[BETH_NAME]]
 // C/HECK: bb0([[ALEPH:%[0-9]+]] : $@callee_owned () -> Int):
@@ -151,15 +151,15 @@ func small_closure_capture_with_argument(var x: Int) -> (y: Int) -> Int {
 
   return { x + $0 }
   // -- func expression
-  // CHECK: [[ANON:%[0-9]+]] = function_ref @[[CLOSURE_NAME:_TFF8closures35small_closure_capture_with_argument.*]] : $@convention(thin) (Int, @owned Builtin.NativeObject, @inout Int) -> Int
+  // CHECK: [[ANON:%[0-9]+]] = function_ref @[[CLOSURE_NAME:_TFF8closures35small_closure_capture_with_argument.*]] : $@convention(thin) (Int, @owned @box Int, @inout Int) -> Int
   // CHECK: retain [[XBOX]]#0
   // CHECK: [[ANON_CLOSURE_APP:%[0-9]+]] = partial_apply [[ANON]]([[XBOX]]#0, [[XBOX]]#1)
   // -- return
   // CHECK: release [[XBOX]]#0
   // CHECK: return [[ANON_CLOSURE_APP]]
 }
-// CHECK: sil shared @[[CLOSURE_NAME]] : $@convention(thin) (Int, @owned Builtin.NativeObject, @inout Int) -> Int
-// CHECK: bb0([[DOLLAR0:%[0-9]+]] : $Int, [[XBOX:%[0-9]+]] : $Builtin.NativeObject, [[XADDR:%[0-9]+]] : $*Int):
+// CHECK: sil shared @[[CLOSURE_NAME]] : $@convention(thin) (Int, @owned @box Int, @inout Int) -> Int
+// CHECK: bb0([[DOLLAR0:%[0-9]+]] : $Int, [[XBOX:%[0-9]+]] : $@box Int, [[XADDR:%[0-9]+]] : $*Int):
 // CHECK: [[PLUS:%[0-9]+]] = function_ref @_TZFSsoi1pFTSiSi_Si{{.*}}
 // CHECK: [[LHS:%[0-9]+]] = load [[XADDR]]
 // CHECK: [[RET:%[0-9]+]] = apply [[PLUS]]([[LHS]], [[DOLLAR0]])

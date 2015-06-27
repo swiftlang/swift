@@ -13,8 +13,8 @@ bb0(%0 : $Int):                         // CHECK: bb0(%0 : $Int):
   %4 = load %1#1 : $*Int
   store %4 to %3#1 : $*Int
   %6 = load %3#1 : $*Int
-  strong_release %3#0 : $Builtin.NativeObject
-  strong_release %1#0 : $Builtin.NativeObject
+  strong_release %3#0 : $@box Int
+  strong_release %1#0 : $@box Int
   return %6 : $Int
 
   // CHECK-NEXT: return %0 : $Int
@@ -34,7 +34,7 @@ bb0(%0 : $Int):                         // CHECK: bb0(%0 : $Int):
   %c = load %1#1 : $*(Int, Int)
   %d = tuple_extract %c : $(Int, Int), 0
 
-  strong_release %1#0 : $Builtin.NativeObject
+  strong_release %1#0 : $@box (Int, Int)
 
   return %d : $Int
 
@@ -78,7 +78,7 @@ bb0(%0 : $Int):
   // This should use the incoming argument to the function.
   // CHECK: tuple ({{.*}} : $Int, {{.*}} : $Int)
   %8 = tuple (%3 : $Int, %7 : $Int)
-  strong_release %1#0 : $Builtin.NativeObject
+  strong_release %1#0 : $@box Int
   %11 = return %8 : $(Int, Int)
 }
 
@@ -94,7 +94,7 @@ sil @returns_generic_struct : $@convention(thin) (@out AddressOnlyStruct) -> ()
 
 
 sil @takes_closure : $@convention(thin) (@callee_owned () -> ()) -> ()
-sil @closure0 : $@convention(thin) (@owned Builtin.NativeObject, @inout Int) -> ()
+sil @closure0 : $@convention(thin) (@owned @box Int, @inout Int) -> ()
 
 
 // CHECK-LABEL: sil @closure_test2
@@ -104,11 +104,11 @@ bb0(%1 : $Int):
   store %1 to %0#1 : $*Int  // CHECK: store
 
   %5 = function_ref @takes_closure : $@convention(thin) (@callee_owned () -> ()) -> ()
-  %6 = function_ref @closure0 : $@convention(thin) (@owned Builtin.NativeObject, @inout Int) -> ()
-  strong_retain %0#0 : $Builtin.NativeObject
-  %8 = partial_apply %6(%0#0, %0#1) : $@convention(thin) (@owned Builtin.NativeObject, @inout Int) -> ()
+  %6 = function_ref @closure0 : $@convention(thin) (@owned @box Int, @inout Int) -> ()
+  strong_retain %0#0 : $@box Int
+  %8 = partial_apply %6(%0#0, %0#1) : $@convention(thin) (@owned @box Int, @inout Int) -> ()
   %9 = apply %5(%8) : $@convention(thin) (@callee_owned () -> ()) -> ()
-  strong_release %0#0 : $Builtin.NativeObject
+  strong_release %0#0 : $@box Int
 
   store %1 to %0#1 : $*Int // CHECK: store
 
@@ -134,7 +134,7 @@ bb0(%0 : $Int):
   store %0 to %1#1 : $*Int
 
   %2 = load %1#1 : $*Int
-  strong_release %1#0 : $Builtin.NativeObject
+  strong_release %1#0 : $@box Int
 
   // Verify that the load got forwarded from an assign.
   return %2 : $Int                        // CHECK: return %0 : $Int

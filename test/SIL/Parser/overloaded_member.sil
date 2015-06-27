@@ -31,9 +31,9 @@ bb0(%0 : $A, %1 : $X):
   %11 = load %3#1 : $*A
   %12 = apply %9(%10, %11, %7) : $@convention(objc_method) (A, A, @owned X) -> @owned X
   assign %12 to %2#1 : $*X
-  strong_release %3#0 : $Builtin.NativeObject
+  strong_release %3#0 : $@box A
   %15 = load %2#1 : $*X
   strong_retain %15 : $X
-  strong_release %2#0 : $Builtin.NativeObject
+  strong_release %2#0 : $@box X
   return %15 : $X
 }

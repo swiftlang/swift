@@ -61,7 +61,7 @@ class F : E { }
 // CHECK-NEXT: store [[ESELFW]] to [[SELF]] : $*F
 // CHECK-NEXT: [[SELFP:%[0-9]+]] = load [[SELF]] : $*F
 // CHECK-NEXT: strong_retain [[SELFP]] : $F
-// CHECK-NEXT: strong_release [[SELF_BOX]]#0 : $Builtin.NativeObject
+// CHECK-NEXT: strong_release [[SELF_BOX]]#0 : $@box F
 // CHECK-NEXT: return [[SELFP]] : $F
 
 
