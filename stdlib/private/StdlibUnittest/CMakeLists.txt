@@ -26,6 +26,7 @@ add_swift_library(swiftStdlibUnittest SHARED IS_STDLIB
   # filename.
   StdlibUnittest.swift.gyb
 
+  InstrumentedWrappers.swift
   InterceptTraps.cpp
   OpaqueIdentityFunctions.cpp
   OpaqueIdentityFunctions.swift
@@ -33,6 +34,7 @@ add_swift_library(swiftStdlibUnittest SHARED IS_STDLIB
   Statistics.swift
   StdlibCoreExtras.swift
   TestHelpers.swift
+  TypeIndexed.swift
   LifetimeTracked.swift
   ${swift_stdlib_unittest_platform_sources}
 

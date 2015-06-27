@@ -263,6 +263,73 @@ Algorithm.test("sorted/return type") {
 
 var SequenceTypeAlgorithms = TestSuite("SequenceTypeAlgorithms")
 
+//===--- Demonstrate technique for testing generic dispatching ------------===//
+// A counter we can use to record calls to our non-customizable operation
+var countNotCustomizable = TypeIndexed(0)
+
+// Add a non-customizable operation to sequence
+extension SequenceType {
+  func notCustomizable() {
+    // This is not typical, but for the purposes of this demonstration
+    // we'll bump a counter Void (used as a dummy). It allows us to
+    // demonstrate where the implementation of the operation that
+    // comes from the protocol extension is called.
+    ++countNotCustomizable[Void.self]
+  }
+}
+
+// Extend InstrumentedSequence to shadow the new operation.  When
+// requirements are added to a protocol 'P', there should be an
+// implementation in 'InstrumentedP' that does some bookeeping for
+// testing (like counting calls to the operation) and then dispatches
+// to the same operation on its 'base' member.  InstrumentedSequence
+// already contains implementations of all the SequenceType
+// requirements.
+extension InstrumentedSequence {
+  func notCustomizable() {
+    ++countNotCustomizable[self.dynamicType]
+    return base.notCustomizable()
+  }
+}
+
+SequenceTypeAlgorithms.test("Demonstration/NotCustomizable") {
+  // Direct context
+  //
+  // directly call the operation on an InstrumentedSequence.
+  let direct = InstrumentedSequence(0..<5)
+  countNotCustomizable = TypeIndexed(0)     // reset the operation count
+  direct.notCustomizable()                  // invoke the operation
+
+  // Because InstrumentedSequence forwards to its base property, after
+  // counting one operation on the type of direct, we forward to
+  // the "default" implementation in SequenceType, which explains the
+  // presence of Void.
+  expectEqual(                              
+    [direct.dynamicType: 1, Void.self: 1],
+    countNotCustomizable)                 
+
+  // Generic context.
+  //
+  // Wrap direct in another layer of InstrumentedSequence.  When
+  // InstrumentedSequence forwards to its base, it happens in a
+  // generic context.  If the operation is a customization point (a
+  // requirement), we'll observe that the operation was called on the
+  // inner InstrumentedSequence /and/ the outer one.  In this case, we
+  // only see a call to the outer InstrumentedSequence, and within its
+  // generic context, forwarding to its base goes directly to the
+  // implementation in the protocol extension, bypassing the inner
+  // InstrumentedSequence.
+  let generic = InstrumentedSequence(direct)
+  countNotCustomizable = TypeIndexed(0)
+  generic.notCustomizable()
+  expectEqual([generic.dynamicType: 1, Void.self: 1], countNotCustomizable)
+
+  // FIXME: the entire test can be done with two layers of wrapping
+  // and one call to the operation.
+}
+
+//===----------------------------------------------------------------------===//
+
 // FIXME: add tests for:
 //
 // - Array, ContiguousArray and ArraySlice as inputs.  These types special-case
@@ -1006,78 +1073,51 @@ struct DefaultedSequence<Element> : StrictSequenceType {
 
 typealias StrictSequenceOfEquatable = MinimalSequence<MinimalEquatableValue>
 
-func callStaticContains(
-  sequence: StrictSequenceOfEquatable,
-  _ element: MinimalEquatableValue
-) -> Bool {
-  return sequence.contains(element)
-}
-
-func callGenericContains<
-  S : SequenceType where S.Generator.Element : Equatable
->(sequence: S, _ element: S.Generator.Element) -> Bool {
-  return sequence.contains(element)
-}
-
-// FIXME:
+// FIXME: rename in StdlibUnittest
 // typealias StrictSequence = MinimalSequence
 
-% for dispatch in [ 'Static', 'Generic' ]:
+SequenceTypeAlgorithms.test("contains/WhereElementIsEquatable/dispatch") {
+  // Static context.
+  count_customContainsEquatableElement = TypeIndexed(0)
+  let direct = InstrumentedSequence([MinimalEquatableValue(1)])
+  _ = direct.contains(MinimalEquatableValue(1))
+  expectEqual([direct.dynamicType: 1], count_customContainsEquatableElement)
 
-SequenceTypeAlgorithms.test("contains/WhereElementIsEquatable/${dispatch}") {
+  // Generic context.
+  count_customContainsEquatableElement = TypeIndexed(0)
+  let generic = InstrumentedSequence(direct)
+  _ = generic.contains(MinimalEquatableValue(1))
+  expectEqual(
+    [direct.dynamicType: 1, generic.dynamicType: 1],
+    count_customContainsEquatableElement)
+}
+
+SequenceTypeAlgorithms.test("contains/WhereElementIsEquatable/semantics") {
   for test in findTests {
     let s = StrictSequenceOfEquatable(MinimalSequence(test.sequence))
     
     expectEqual(
       test.expected != nil,
-      call${dispatch}Contains(s, test.element),
+      s.contains(test.element),
       stackTrace: test.loc.withCurrentLoc())
+    
     expectEqualSequence(
       test.expectedLeftoverSequence, s, stackTrace: test.loc.withCurrentLoc())
   }
 }
-
-% end
-
-
-struct SequenceWithCustomContainsMethod<Element> : StrictSequenceType {
-  internal let base: MinimalSequence<Element>
-  internal let timesContainsWasCalled = Box(0)
-  
-  func _customContainsEquatableElement(
-    element: Element
-  ) -> Bool? {
-    ++timesContainsWasCalled.value
-    return base._customContainsEquatableElement(element)
-  }
-}
-
-func callStaticContains(
-  sequence: SequenceWithCustomContainsMethod<MinimalEquatableValue>,
-  _ element: MinimalEquatableValue) -> Bool {
-  return sequence.contains(element)
-}
-
-% for dispatch in [ 'Static', 'Generic' ]:
-
-SequenceTypeAlgorithms.test("contains/WhereElementIsEquatable/CustomImplementation/${dispatch}") {
-  for test in findTests {
-    let s = SequenceWithCustomContainsMethod(test.sequence)
-    expectEqual(
-      test.expected != nil,
-      call${dispatch}Contains(s, test.element),
-      stackTrace: test.loc.withCurrentLoc())
-    expectEqual(1, s.timesContainsWasCalled.value)
-  }
-}
-
-% end
 
 func callStaticContains(
   set: Set<MinimalHashableValue>,
   _ element: MinimalHashableValue
 ) -> Bool {
   return set.contains(element)
+}
+
+
+func callGenericContains<
+  S : SequenceType where S.Generator.Element : Equatable
+>(sequence: S, _ element: S.Generator.Element) -> Bool {
+  return sequence.contains(element)
 }
 
 % for dispatch in [ 'Static', 'Generic' ]:

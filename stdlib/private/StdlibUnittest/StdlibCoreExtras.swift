@@ -91,3 +91,16 @@ public func createTemporaryFile(
   return fileName
 }
 
+public final class Box<T> {
+  public init(_ value: T) { self.value = value }
+  public var value: T
+}
+
+infix operator <=> {}
+
+public func <=> <T: Comparable>(lhs: T, rhs: T) -> ExpectedComparisonResult {
+  return lhs < rhs
+    ? .LT
+    : lhs > rhs ? .GT : .EQ
+}
+
