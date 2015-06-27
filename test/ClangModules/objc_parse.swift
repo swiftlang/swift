@@ -273,7 +273,7 @@ class Wobbler : NSWobbling { // expected-note{{candidate is not '@objc', but pro
 extension Wobbler : NSMaybeInitWobble { // expected-error{{type 'Wobbler' does not conform to protocol 'NSMaybeInitWobble'}}
 }
 
-@objc class Wobbler2 : NSWobbling { // expected-note{{Objective-C method 'init' provided by implicit initializer 'init()' does not match the requirement's selector ('initWithWobble:')}}
+@objc class Wobbler2 : NSObject, NSWobbling { // expected-note{{Objective-C method 'init' provided by implicit initializer 'init()' does not match the requirement's selector ('initWithWobble:')}}
   func wobble() { }
   func returnMyself() -> Self { return self }
 }

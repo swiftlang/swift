@@ -86,7 +86,7 @@ class Foo: Fooable {
 
 // rdar://16006333 - observing properties don't work in @objc classes
 @objc
-class ObservingAccessorTest {
+class ObservingAccessorTest : NSObject {
   var bounds: Int = 0 {
     willSet {}
     didSet {}

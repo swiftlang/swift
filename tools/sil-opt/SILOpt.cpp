@@ -381,6 +381,7 @@ int main(int argc, char **argv) {
   Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
   Invocation.setParseStdlib();
   Invocation.getLangOptions().EnableAccessControl = false;
+  Invocation.getLangOptions().EnableObjCAttrRequiresFoundation = false;
 
   Invocation.getLangOptions().ASTVerifierProcessCount =
       ASTVerifierProcessCount;

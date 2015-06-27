@@ -254,9 +254,10 @@ ImplicitProperties("enable-objc-implicit-properties",
                    llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
-FactoryMethodsAsConstructors("enable-objc-factory-method-constructors",
-                   llvm::cl::desc("Implicitly import Objective-C factory methods as initializers"),
-                   llvm::cl::init(false));
+DisableObjCAttrRequiresFoundationModule(
+    "disable-objc-attr-requires-foundation-module",
+    llvm::cl::desc("Allow @objc to be used freely"),
+    llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
 PrintStats("print-stats",
@@ -2417,6 +2418,8 @@ int main(int argc, char *argv[]) {
   }
   InitInvok.getLangOptions().DebugForbidTypecheckPrefix =
     options::DebugForbidTypecheckPrefix;
+  InitInvok.getLangOptions().EnableObjCAttrRequiresFoundation =
+    !options::DisableObjCAttrRequiresFoundationModule;
 
   for (auto ConfigName : options::BuildConfigs)
     InitInvok.getLangOptions().addBuildConfigOption(ConfigName);

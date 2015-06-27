@@ -10,7 +10,7 @@ import Foundation
 
 // CHECK-LABEL: class-members:
 
-@objc class Base {
+@objc class Base : NSObject {
   // CHECK-DAG: - "foo"
   func foo() {}
 

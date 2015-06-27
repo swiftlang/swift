@@ -5838,8 +5838,8 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     if (!nominal->hasType())
       nominal->computeType();
 
-    validateAttributes(*this, D);
     checkInheritanceClause(D);
+    validateAttributes(*this, D);
 
     // Mark a class as @objc. This must happen before checking its members.
     if (auto CD = dyn_cast<ClassDecl>(nominal)) {
@@ -6940,7 +6940,7 @@ void TypeChecker::defineDefaultConstructor(NominalTypeDecl *decl) {
 }
 
 static void validateAttributes(TypeChecker &TC, Decl *D) {
-  const DeclAttributes &Attrs = D->getAttrs();
+  DeclAttributes &Attrs = D->getAttrs();
 
   auto isInClassOrProtocolContext = [](Decl *vd) {
    Type ContextTy = vd->getDeclContext()->getDeclaredTypeInContext();
@@ -6951,17 +6951,25 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
   };
 
   if (auto objcAttr = Attrs.getAttribute<ObjCAttr>()) {
-    // Only classes, class protocols, instance properties, methods,
-    // constructors, and subscripts can be ObjC.
+    // Only certain decls can be ObjC.
     Optional<Diag<>> error;
-    if (isa<ClassDecl>(D)) {
-      /* ok */
+    if (auto *CD = dyn_cast<ClassDecl>(D)) {
+      // Only allow ObjC-rooted classes to be @objc.
+      // (Leave a hole for test cases.)
+      const ClassDecl *superclassDecl = nullptr;
+      if (CD->hasSuperclass())
+        superclassDecl = CD->getSuperclass()->getClassOrBoundGenericClass();
+      if ((!superclassDecl || !superclassDecl->isObjC()) &&
+          TC.getLangOpts().EnableObjCAttrRequiresFoundation) {
+        error = diag::invalid_objc_swift_rooted_class;
+      }
+
     } else if (isa<FuncDecl>(D) && isInClassOrProtocolContext(D)) {
       auto func = cast<FuncDecl>(D);
       if (func->isOperator())
         error = diag::invalid_objc_decl;
       else if (func->isAccessor() && !func->isGetterOrSetter()) {
-        error= diag::objc_observing_accessor;
+        error = diag::objc_observing_accessor;
       }
     } else if (isa<ConstructorDecl>(D) && isInClassOrProtocolContext(D)) {
       /* ok */
@@ -6982,8 +6990,9 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     }
 
     if (error) {
-      TC.diagnose(D->getStartLoc(), *error);
-      const_cast<ObjCAttr *>(objcAttr)->setInvalid();
+      TC.diagnose(D->getStartLoc(), *error)
+        .fixItRemove(objcAttr->getRangeWithAt());
+      objcAttr->setInvalid();
       return;
     }
 
@@ -7069,8 +7078,9 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
     }
 
     if (error) {
-      TC.diagnose(D->getStartLoc(), *error);
-      const_cast<NonObjCAttr *>(nonObjcAttr)->setInvalid();
+      TC.diagnose(D->getStartLoc(), *error)
+        .fixItRemove(nonObjcAttr->getRangeWithAt());
+      nonObjcAttr->setInvalid();
       return;
     }
   }

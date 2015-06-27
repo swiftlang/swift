@@ -1,5 +1,5 @@
 // RUN: %target-parse-verify-swift
-// RUN: %target-swift-ide-test -skip-deinit=false -print-ast-typechecked -source-filename %s -function-definitions=true -prefer-type-repr=false -print-implicit-attrs=true -explode-pattern-binding-decls=true | FileCheck %s
+// RUN: %target-swift-ide-test -skip-deinit=false -print-ast-typechecked -source-filename %s -function-definitions=true -prefer-type-repr=false -print-implicit-attrs=true -explode-pattern-binding-decls=true -disable-objc-attr-requires-foundation-module | FileCheck %s
 // RUN: not %target-swift-frontend -parse -dump-ast -disable-objc-attr-requires-foundation-module %s 2> %t.dump
 // RUN: FileCheck -check-prefix CHECK-DUMP %s < %t.dump
 // REQUIRES: objc_interop

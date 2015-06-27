@@ -3,7 +3,7 @@
 // REQUIRES: objc_interop
 import Foundation
 
-@objc class Foo {
+class Foo : NSObject {
   dynamic func foo(f: Int -> Int, x: Int) -> Int {
     return f(x)
   }

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-silgen | FileCheck %s
+// RUN: %target-swift-frontend %s -emit-silgen -disable-objc-attr-requires-foundation-module | FileCheck %s
 
 // rdar://15763213
 // Make sure that we can parse SILDeclRef to an overloaded member.

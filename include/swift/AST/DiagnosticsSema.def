@@ -2025,6 +2025,8 @@ ERROR(attr_used_without_required_module, sema_tcd, none,
 ERROR(invalid_objc_decl,sema_tcd,none,
       "only classes, protocols, methods, initializers, properties, and "
       "subscript declarations can be declared @objc", ())
+ERROR(invalid_objc_swift_rooted_class,sema_tcd,none,
+      "only classes that inherit from NSObject can be declared @objc", ())
 ERROR(invalid_nonobjc_decl,sema_tcd,none,
       "only methods, initializers, properties and subscript declarations can "
       "be declared @nonobjc", ())

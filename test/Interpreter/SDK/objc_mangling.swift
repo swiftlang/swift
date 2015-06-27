@@ -65,7 +65,7 @@ print(anyWibble.description)
 @objc protocol RadicalHeart⺖ { }
 checkProtocolName(RadicalHeart⺖.self, "MangleTest.RadicalHeart⺖", "_TtP10MangleTest15RadicalHeart⺖_")
 
-@objc class RadicalSheep⽺ : RadicalHeart⺖ { 
+@objc class RadicalSheep⽺ : NSObject, RadicalHeart⺖ {
   var ⽺x: Int = 0
 }
 checkClassName(RadicalSheep⽺.self, 

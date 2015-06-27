@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -F %S/Inputs/mixed-target/ -module-name Mixed -import-underlying-module -parse %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -F %S/Inputs/mixed-target/ -module-name Mixed -import-underlying-module -parse %s -verify -disable-objc-attr-requires-foundation-module
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -F %S/Inputs/mixed-target/ -module-name Mixed -import-underlying-module -emit-ir %S/../../Inputs/empty.swift - | FileCheck -check-prefix=CHECK-AUTOLINK %s
-// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -F %S/Inputs/mixed-target/ -module-name WrongName -import-underlying-module -parse %s 2>&1 | FileCheck -check-prefix=CHECK-WRONG-NAME %s
+// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk) -F %S/Inputs/mixed-target/ -module-name WrongName -import-underlying-module -parse %s  -disable-objc-attr-requires-foundation-module 2>&1 | FileCheck -check-prefix=CHECK-WRONG-NAME %s
 
 // REQUIRES: objc_interop
 

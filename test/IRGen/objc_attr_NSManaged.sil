@@ -12,8 +12,9 @@
 import Builtin
 import Swift
 import gizmo
+import Foundation
 
-@objc class X {
+@objc class X : NSObject {
 }
 sil_vtable X {}
 

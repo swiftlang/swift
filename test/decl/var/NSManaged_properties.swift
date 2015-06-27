@@ -4,7 +4,7 @@
 
 import Foundation
 
-@objc class X {
+class X : NSObject {
   func foo() -> X { return self }
 }
 

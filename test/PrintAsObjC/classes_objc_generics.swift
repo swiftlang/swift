@@ -13,8 +13,8 @@
 // FIXME: END -enable-source-import hackaround
 
 
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t  %s
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -parse-as-library %t/classes_objc_generics.swiftmodule -parse -emit-objc-header-path %t/classes.h -import-objc-header %S/../Inputs/empty.h
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -o %t %s -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -parse-as-library %t/classes_objc_generics.swiftmodule -parse -emit-objc-header-path %t/classes.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
 // RUN: FileCheck %s < %t/classes.h
 // RUN: FileCheck --check-prefix=NEGATIVE %s < %t/classes.h
 // RUN: %check-in-clang %t/classes.h

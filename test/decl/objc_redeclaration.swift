@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse -module-name ZZZ %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse -module-name ZZZ %s -disable-objc-attr-requires-foundation-module -verify
 
 import Foundation
 

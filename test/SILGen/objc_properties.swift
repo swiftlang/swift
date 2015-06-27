@@ -118,7 +118,7 @@ class TestNSCopying {
 
 // <rdar://problem/16663515> IBOutlet not adjusting getter/setter when making a property implicit unchecked optional
 @objc
-class TestComputedOutlet {
+class TestComputedOutlet : NSObject {
   var _disclosedView : TestComputedOutlet! = .None
 
   @IBOutlet var disclosedView : TestComputedOutlet! {

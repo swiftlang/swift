@@ -1,6 +1,6 @@
 // RUN: rm -rf %t && mkdir %t
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) %s -emit-ir | FileCheck %s -check-prefix=CHECK-%target-os
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) %s -emit-ir -disable-objc-attr-requires-foundation-module | FileCheck %s -check-prefix=CHECK-%target-os
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop

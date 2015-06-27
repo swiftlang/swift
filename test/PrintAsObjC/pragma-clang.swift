@@ -9,7 +9,7 @@
 // CHECK: #pragma clang diagnostic push
 // CHECK: #pragma clang diagnostic ignored "-Wproperty-attribute-mismatch"
 // CHECK: @interface Test
-@objc class Test : TestProto {
+@objc class Test : NSObject, TestProto {
   var str: String = ""
   var strongProp: AnyObject?
 }

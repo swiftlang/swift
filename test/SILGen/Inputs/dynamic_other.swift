@@ -1,3 +1,5 @@
+import Foundation
+
 class FromOtherFile: Proto {
   // Not objc or dynamic, so only a vtable entry
   init(native: Int) {}
@@ -32,7 +34,7 @@ class FromOtherFile: Proto {
   @NSManaged var managedProp: Int
 }
 
-@objc class ObjCOtherFile {}
+@objc class ObjCOtherFile : NSObject {}
 
 extension ObjCOtherFile {
   func extensionMethod() {}

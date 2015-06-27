@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -gnone -emit-ir | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+// RUN: %target-swift-frontend %s -gnone -emit-ir -disable-objc-attr-requires-foundation-module | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 // REQUIRES: CPU=i386_or_x86_64
 

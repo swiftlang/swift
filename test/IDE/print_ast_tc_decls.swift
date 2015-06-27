@@ -5,9 +5,9 @@
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/foo_swift_module.swift
 //
 // This file should not have any syntax or type checker errors.
-// RUN: %target-swift-frontend -parse -verify -I %t %clang-importer-sdk -F %S/Inputs/mock-sdk %s
+// RUN: %target-swift-frontend -parse -verify -I %t %clang-importer-sdk -F %S/Inputs/mock-sdk %s -disable-objc-attr-requires-foundation-module
 //
-// RUN: %target-swift-ide-test -skip-deinit=false -print-ast-typechecked -source-filename %s -I %t %clang-importer-sdk -F %S/Inputs/mock-sdk -function-definitions=false -prefer-type-repr=false -print-implicit-attrs=true > %t.printed.txt
+// RUN: %target-swift-ide-test -skip-deinit=false -print-ast-typechecked -source-filename %s -I %t %clang-importer-sdk -F %S/Inputs/mock-sdk -function-definitions=false -prefer-type-repr=false -print-implicit-attrs=true -disable-objc-attr-requires-foundation-module > %t.printed.txt
 // RUN: FileCheck %s -check-prefix=PASS_COMMON -strict-whitespace < %t.printed.txt
 // RUN: FileCheck %s -check-prefix=PASS_PRINT_AST -strict-whitespace < %t.printed.txt
 // RUN: FileCheck %s -check-prefix=PASS_RW_PROP_GET_SET -strict-whitespace < %t.printed.txt
@@ -18,7 +18,7 @@
 // RUN: FileCheck %s -check-prefix=PREFER_TYPE_PRINTING -strict-whitespace < %t.printed.txt
 // RUN: FileCheck %s -check-prefix=PASS_QUAL_UNQUAL -strict-whitespace < %t.printed.txt
 //
-// RUN: %target-swift-ide-test -skip-deinit=false -print-ast-typechecked -source-filename %s -I %t %clang-importer-sdk -F %S/Inputs/mock-sdk -function-definitions=false -prefer-type-repr=true -print-implicit-attrs=true > %t.printed.txt
+// RUN: %target-swift-ide-test -skip-deinit=false -print-ast-typechecked -source-filename %s -I %t %clang-importer-sdk -F %S/Inputs/mock-sdk -function-definitions=false -prefer-type-repr=true -print-implicit-attrs=true -disable-objc-attr-requires-foundation-module > %t.printed.txt
 // RUN: FileCheck %s -check-prefix=PASS_COMMON -strict-whitespace < %t.printed.txt
 // RUN: FileCheck %s -check-prefix=PASS_PRINT_AST -strict-whitespace < %t.printed.txt
 // RUN: FileCheck %s -check-prefix=PASS_RW_PROP_GET_SET -strict-whitespace < %t.printed.txt
@@ -29,8 +29,8 @@
 // RUN: FileCheck %s -check-prefix=PREFER_TYPE_REPR_PRINTING -strict-whitespace < %t.printed.txt
 // RUN: FileCheck %s -check-prefix=PASS_QUAL_UNQUAL -strict-whitespace < %t.printed.txt
 //
-// RUN: %target-swift-frontend -emit-module -o %t -I %t %clang-importer-sdk -F %S/Inputs/mock-sdk %s
-// RUN: %target-swift-ide-test -skip-deinit=false -print-module -source-filename %s %clang-importer-sdk -F %S/Inputs/mock-sdk -I %t -module-to-print=print_ast_tc_decls -print-implicit-attrs=true > %t.printed.txt
+// RUN: %target-swift-frontend -emit-module -o %t -I %t %clang-importer-sdk -F %S/Inputs/mock-sdk -disable-objc-attr-requires-foundation-module %s
+// RUN: %target-swift-ide-test -skip-deinit=false -print-module -source-filename %s %clang-importer-sdk -F %S/Inputs/mock-sdk -I %t -module-to-print=print_ast_tc_decls -print-implicit-attrs=true -disable-objc-attr-requires-foundation-module > %t.printed.txt
 // RUN: FileCheck %s -check-prefix=PASS_COMMON -strict-whitespace < %t.printed.txt
 // RUN: FileCheck %s -check-prefix=PASS_PRINT_MODULE_INTERFACE -strict-whitespace < %t.printed.txt
 // RUN: FileCheck %s -check-prefix=PASS_RW_PROP_NO_GET_SET -strict-whitespace < %t.printed.txt
@@ -42,13 +42,13 @@
 // RUN: FileCheck %s -check-prefix=PASS_QUAL_UNQUAL -strict-whitespace < %t.printed.txt
 // RUN: FileCheck %s -check-prefix=PASS_EXPLODE_PATTERN -strict-whitespace < %t.printed.txt
 //
-// RUN: %target-swift-ide-test -skip-deinit=false -print-module -source-filename %s %clang-importer-sdk -F %S/Inputs/mock-sdk -I %t -module-to-print=print_ast_tc_decls -synthesize-sugar-on-types=true -print-implicit-attrs=true > %t.printed.txt
+// RUN: %target-swift-ide-test -skip-deinit=false -print-module -source-filename %s %clang-importer-sdk -F %S/Inputs/mock-sdk -I %t -module-to-print=print_ast_tc_decls -synthesize-sugar-on-types=true -print-implicit-attrs=true -disable-objc-attr-requires-foundation-module > %t.printed.txt
 // RUN: FileCheck %s -check-prefix=PASS_PRINT_MODULE_INTERFACE -strict-whitespace < %t.printed.txt
 // RUN: FileCheck %s -check-prefix=PASS_QUAL_UNQUAL -strict-whitespace < %t.printed.txt
 // RUN: FileCheck %s -check-prefix=SYNTHESIZE_SUGAR_ON_TYPES -strict-whitespace < %t.printed.txt
 // RUN: FileCheck %s -check-prefix=PASS_EXPLODE_PATTERN -strict-whitespace < %t.printed.txt
 
-// RUN: %target-swift-ide-test -skip-deinit=false -print-module -source-filename %s %clang-importer-sdk -F %S/Inputs/mock-sdk -I %t -module-to-print=print_ast_tc_decls -synthesize-sugar-on-types=true -fully-qualified-types-if-ambiguous=true -print-implicit-attrs=true > %t.printed.txt
+// RUN: %target-swift-ide-test -skip-deinit=false -print-module -source-filename %s %clang-importer-sdk -F %S/Inputs/mock-sdk -I %t -module-to-print=print_ast_tc_decls -synthesize-sugar-on-types=true -fully-qualified-types-if-ambiguous=true -print-implicit-attrs=true -disable-objc-attr-requires-foundation-module > %t.printed.txt
 // RUN: FileCheck %s -check-prefix=PASS_PRINT_MODULE_INTERFACE -strict-whitespace < %t.printed.txt
 // RUN: FileCheck %s -check-prefix=PASS_QUAL_IF_AMBIGUOUS -strict-whitespace < %t.printed.txt
 // RUN: FileCheck %s -check-prefix=SYNTHESIZE_SUGAR_ON_TYPES -strict-whitespace < %t.printed.txt

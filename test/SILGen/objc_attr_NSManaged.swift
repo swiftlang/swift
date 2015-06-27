@@ -7,7 +7,7 @@
 import Foundation
 import gizmo
 
-@objc class X { 
+@objc class X : NSObject {
   func foo() -> X { return self }
 }
 

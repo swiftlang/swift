@@ -1,4 +1,5 @@
-// RUN: %target-run-simple-swift | FileCheck %s
+// RUN: %target-build-swift %s -Xfrontend -disable-objc-attr-requires-foundation-module -o %t-main
+// RUN: %target-run %t-main | FileCheck %s
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
