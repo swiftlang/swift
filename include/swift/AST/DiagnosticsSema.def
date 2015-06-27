@@ -2220,7 +2220,7 @@ ERROR(availability_decl_unavailable, sema_avail, none,
   "%0 is unavailable", (DeclName))
 
 ERROR(availability_decl_unavailable_rename, sema_avail, none,
-      "%0 has been renamed to %1", (DeclName, StringRef))
+      "%0 has been renamed to '%1'", (DeclName, StringRef))
 
 ERROR(availability_decl_unavailable_msg, sema_avail, none,
   "%0 is unavailable: %1", (DeclName, StringRef))

@@ -37,15 +37,15 @@ struct MyCollection<Element> {
   @available(*, unavailable, renamed="Element")
   typealias T = Element // expected-note 2{{'T' has been explicitly marked unavailable here}}
 
-  func foo(x: T) { } // expected-error {{'T' has been renamed to Element}}
+  func foo(x: T) { } // expected-error {{'T' has been renamed to 'Element'}}
 }
 
 extension MyCollection {
-  func append(element: T) { } // expected-error {{'T' has been renamed to Element}}
+  func append(element: T) { } // expected-error {{'T' has been renamed to 'Element'}}
 }
 
 var x : int // expected-error {{'int' is unavailable: oh no you dont}}
-var y : float // expected-error {{'float' has been renamed to Float}}{{9-14=Float}}
+var y : float // expected-error {{'float' has been renamed to 'Float'}}{{9-14=Float}}
 
 // Encoded message
 @available(*, unavailable, message="This message has a double quote \"")
