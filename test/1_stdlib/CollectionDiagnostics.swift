@@ -196,9 +196,6 @@ extension GeneratorSequence {
 extension ZipGenerator2 {} // expected-error {{'ZipGenerator2' has been renamed to 'Zip2Generator'}}
 extension Zip2 {} // expected-error {{'Zip2' has been renamed to 'Zip2Sequence'}}
 
-extension AutoreleasingUnsafeMutablePointer {
-  func foo(memory: T) {} // expected-error {{'T' has been renamed to 'Memory'}}
-}
 extension UnsafePointer {
   func foo(memory: T) {} // expected-error {{'T' has been renamed to 'Memory'}}
 }
