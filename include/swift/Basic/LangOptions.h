@@ -77,9 +77,6 @@ namespace swift {
     /// symbols as optionals.
     bool EnableExperimentalUnavailableAsOptional = false;
     
-    /// \brief Enable support for native C function pointer types.
-    bool EnableCFunctionPointers = true;
-    
     /// \brief Enable support for SIMD type imports.
     bool EnableSIMDImport = true;
 

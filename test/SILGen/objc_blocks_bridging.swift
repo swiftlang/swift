@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -verify -enable-c-function-pointers -emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import -disable-objc-attr-requires-foundation-module %s | FileCheck %s
+// RUN: %target-swift-frontend -verify -emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import -disable-objc-attr-requires-foundation-module %s | FileCheck %s
 
 // REQUIRES: objc_interop
 

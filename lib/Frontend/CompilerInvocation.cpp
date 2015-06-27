@@ -638,9 +638,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalUnavailableAsOptional |=
       Args.hasArg(OPT_enable_experimental_unavailable_as_optional);
   
-  Opts.EnableCFunctionPointers |=
-      Args.hasArg(OPT_enable_c_function_pointers);
-  
   Opts.EnableSIMDImport |=
       Args.hasArg(OPT_enable_simd_import);
 

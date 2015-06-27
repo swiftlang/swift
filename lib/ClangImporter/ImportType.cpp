@@ -326,19 +326,13 @@ namespace {
         return getOpaquePointerType();
       
       if (pointeeQualType->isFunctionType()) {
-        if (Impl.SwiftContext.LangOpts.EnableCFunctionPointers) {
-          auto funcTy = pointeeType->castTo<FunctionType>();
-          return {
-            FunctionType::get(funcTy->getInput(), funcTy->getResult(),
-              funcTy->getExtInfo().withRepresentation(
-                            AnyFunctionType::Representation::CFunctionPointer)),
-            ImportHint::CFunctionPointer
-          };
-        }
-      
-        return Impl.getNamedSwiftTypeSpecialization(Impl.getStdlibModule(),
-                                                    "CFunctionPointer",
-                                                    pointeeType);
+        auto funcTy = pointeeType->castTo<FunctionType>();
+        return {
+          FunctionType::get(funcTy->getInput(), funcTy->getResult(),
+            funcTy->getExtInfo().withRepresentation(
+                          AnyFunctionType::Representation::CFunctionPointer)),
+          ImportHint::CFunctionPointer
+        };
       }
 
       auto quals = pointeeQualType.getQualifiers();

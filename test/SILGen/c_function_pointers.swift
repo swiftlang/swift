@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -enable-c-function-pointers %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
 func values(arg: @convention(c) Int -> Int) -> @convention(c) Int -> Int {
   return arg

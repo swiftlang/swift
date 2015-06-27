@@ -195,10 +195,6 @@ def enable_availability_checking_in_implicit_functions : Flag<["-"],
   "enable-availability-checking-in-implicit-functions">,
   HelpText<"Enable checking availability in implicit functions">;
 
-def enable_c_function_pointers : Flag<["-"],
-  "enable-c-function-pointers">,
-  HelpText<"Enable native C function pointer types">;
-
 def enable_simd_import : Flag<["-"],
   "enable-simd-import">,
   HelpText<"Enable importing C vector types as SIMD types">;
