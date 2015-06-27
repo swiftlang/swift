@@ -17,7 +17,9 @@
 /// A collection that forwards its implementation to an underlying
 /// collection instance while exposing lazy computations as methods.
 public struct ${Self}<Base : CollectionType ${whereClause}> : CollectionType {
-  
+  @available(*, unavailable, renamed="Base")
+  public typealias S = Base
+
   /// Construct an instance with `base` as its underlying collection
   /// instance.
   public init(_ base: Base) {

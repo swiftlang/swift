@@ -12,7 +12,10 @@
 
 /// A collection whose elements are all identical `Element`s.
 public struct Repeat<Element> : CollectionType {
-  
+
+  @available(*, unavailable, renamed="Element")
+  public typealias T = Element
+
   /// A type that represents a valid position in the collection.
   /// 
   /// Valid indices consist of the position of every element and a

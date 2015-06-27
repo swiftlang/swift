@@ -170,6 +170,9 @@ public struct GeneratorSequence<
   Base : GeneratorType
 > : GeneratorType, SequenceType {
 
+  @available(*, unavailable, renamed="Base")
+  public typealias G = Base
+
   /// Construct an instance whose generator is a copy of `base`.
   public init(_ base: Base) {
     _base = base

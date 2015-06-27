@@ -16,6 +16,9 @@
 public struct MapGenerator<
   Base : GeneratorType, Element
 > : GeneratorType, SequenceType {
+  @available(*, unavailable, renamed="Element")
+  public typealias T = Element
+
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   ///
@@ -47,6 +50,9 @@ public struct MapGenerator<
 /// These elements are computed lazily, each time they're read, by
 /// calling the transform function on a base element.
 public struct MapSequence<Base : SequenceType, Element> : SequenceType {
+  @available(*, unavailable, renamed="Element")
+  public typealias T = Element
+
   /// Return a *generator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
@@ -88,6 +94,9 @@ public func flatMap<S : SequenceType, T>(
 /// These elements are computed lazily, each time they're read, by
 /// calling the transform function on a base element.
 public struct MapCollection<Base : CollectionType, Element> : CollectionType {
+  @available(*, unavailable, renamed="Element")
+  public typealias T = Element
+
   /// The position of the first element in a non-empty collection.
   ///
   /// In an empty collection, `startIndex == endIndex`.

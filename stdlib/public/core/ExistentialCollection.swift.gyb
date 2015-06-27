@@ -37,6 +37,9 @@ public class _AnyGeneratorBase {}
 ///   - `func anyGenerator<G : GeneratorType>(base: G) -> AnyGenerator<G.Element>`
 ///   - `func anyGenerator<Element>(body: ()->Element?) -> AnyGenerator<Element>`
 public class AnyGenerator<Element> : _AnyGeneratorBase, GeneratorType {
+  @available(*, unavailable, renamed="Element")
+  public typealias T = Element
+
   /// Initialize the instance.  May only be called from a subclass
   /// initializer.
   override public init() {
@@ -209,6 +212,9 @@ internal struct _ClosureBasedSequence<Generator : GeneratorType>
 ///
 /// - SeeAlso: `AnyGenerator<Element>`.
 public struct AnySequence<Element> : SequenceType {
+  @available(*, unavailable, renamed="Element")
+  public typealias T = Element
+
   /// Wrap and forward operations to to `base`.
   public init<S: SequenceType where S.Generator.Element == Element>(_ base: S) {
     _box = _SequenceBox(base)
@@ -537,6 +543,9 @@ public func !== <
 ///
 /// - SeeAlso: ${', '.join('`Any%sType`' % t for t in (2 * traversals)[ti + 1 : ti + 3]) }
 public struct Any${Traversal}Collection<Element> : AnyCollectionType {
+  @available(*, unavailable, renamed="Element")
+  public typealias T = Element
+
   typealias Box = _AnyCollectionBox<Element>
 
 %   for SubTraversal in traversals[ti:]:

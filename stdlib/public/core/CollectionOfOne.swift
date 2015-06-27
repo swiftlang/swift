@@ -12,6 +12,9 @@
 
 /// A generator that produces one or fewer instances of `Element`.
 public struct GeneratorOfOne<Element> : GeneratorType, SequenceType {
+  @available(*, unavailable, renamed="Element")
+  public typealias T = Element
+
   /// Construct an instance that generates `element!`, or an empty
   /// sequence if `element == nil`.
   public init(_ element: Element?) {
@@ -40,6 +43,9 @@ public struct GeneratorOfOne<Element> : GeneratorType, SequenceType {
 
 /// A collection containing a single element of type `Element`.
 public struct CollectionOfOne<Element> : CollectionType {
+  @available(*, unavailable, renamed="Element")
+  public typealias T = Element
+
   /// A type that represents a valid position in the collection.
   ///
   /// Valid indices consist of the position of every element and a

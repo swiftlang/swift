@@ -13,6 +13,9 @@
 /// A sequence that forwards its implementation to an underlying
 /// sequence instance while exposing lazy computations as methods.
 public struct LazySequence<Base : SequenceType> : SequenceType {
+  @available(*, unavailable, renamed="Base")
+  public typealias S = Base
+
   /// Construct an instance with `base` as its underlying sequence
   /// instance.
   public init(_ base: Base) {

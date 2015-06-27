@@ -21,6 +21,9 @@
 ///
 /// - SeeAlso: `EmptyCollection<Element>`.
 public struct EmptyGenerator<Element> : GeneratorType, SequenceType {
+  @available(*, unavailable, renamed="Element")
+  public typealias T = Element
+
   /// Construct an instance.
   public init() {}
 
@@ -38,6 +41,9 @@ public struct EmptyGenerator<Element> : GeneratorType, SequenceType {
 
 /// A collection whose element type is `Element` but that is always empty.
 public struct EmptyCollection<Element> : CollectionType {
+  @available(*, unavailable, renamed="Element")
+  public typealias T = Element
+
   /// A type that represents a valid position in the collection.
   ///
   /// Valid indices consist of the position of every element and a

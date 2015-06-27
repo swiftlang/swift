@@ -289,6 +289,9 @@ internal struct _SetElement<Element> {
 public struct Set<Element : Hashable> :
   Hashable, CollectionType, ArrayLiteralConvertible {
 
+  @available(*, unavailable, renamed="Element")
+  public typealias T = Element
+
   internal typealias _Self = Set<Element>
   internal typealias _VariantStorage = _VariantSetStorage<Element>
   internal typealias _NativeStorage = _NativeSetStorage<Element>
@@ -3379,6 +3382,9 @@ public struct ${Self}Index<${TypeParametersDecl}> :
 %if Self == 'Set':
   internal typealias Key = ${TypeParameters}
   internal typealias Value = ${TypeParameters}
+
+  @available(*, unavailable, renamed="Element")
+  public typealias T = Element
 %end
 
   internal var _value: ${Self}IndexRepresentation<${TypeParameters}>
@@ -3598,6 +3604,11 @@ public struct ${Self}Generator<${TypeParametersDecl}> : GeneratorType {
   internal typealias _NativeStorageOwner =
     _Native${Self}StorageOwner<${TypeParameters}>
   internal typealias _NativeIndex = _Native${Self}Index<${TypeParameters}>
+
+%if Self == 'Set':
+  @available(*, unavailable, renamed="Element")
+  public typealias T = Element
+%end
 
   internal var _state: ${Self}GeneratorRepresentation<${TypeParameters}>
 

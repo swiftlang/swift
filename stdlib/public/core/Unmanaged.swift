@@ -15,6 +15,9 @@
 /// When you use this type, you become partially responsible for
 /// keeping the object alive.
 public struct Unmanaged<Instance : AnyObject> {
+  @available(*, unavailable, renamed="Instance")
+  public typealias T = Instance
+
   internal unowned(unsafe) var _value: Instance
 
   @transparent

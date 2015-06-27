@@ -35,6 +35,9 @@ public func reverse<C:CollectionType where C.Index: BidirectionalIndexType>(
 /// A wrapper for a `${IndexProtocol}` that reverses its
 /// direction of traversal.
 public struct ${Index}<Base : ${IndexProtocol}> : ${IndexProtocol} {
+  @available(*, unavailable, renamed="Base")
+  public typealias I = Base
+
   var _base: Base
 
   init(_ _base: Base) { self._base = _base }
@@ -88,6 +91,9 @@ public func == <I> (lhs: ${Index}<I>, rhs: ${Index}<I>) -> Bool {
 public struct ${View}<
   Base : CollectionType where Base.Index : ${IndexProtocol}
 > : CollectionType {
+  @available(*, unavailable, renamed="Base")
+  public typealias T = Base
+
   /// A type that represents a valid position in the collection.
   ///
   /// Valid indices consist of the position of every element and a
@@ -139,6 +145,16 @@ extension ${Self} {
 }
 
 % end
+
+@available(*, unavailable, renamed="ReverseCollection")
+public struct BidirectionalReverseView<
+  Base : CollectionType where Base.Index : BidirectionalIndexType
+> {}
+
+@available(*, unavailable, renamed="ReverseRandomAccessCollection")
+public struct RandomAccessReverseView<
+  Base : CollectionType where Base.Index : RandomAccessIndexType
+> {}
 
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)

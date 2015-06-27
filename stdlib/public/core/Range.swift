@@ -15,6 +15,9 @@ public struct RangeGenerator<
   Element : ForwardIndexType
 > : GeneratorType, SequenceType {
 
+  @available(*, unavailable, renamed="Element")
+  public typealias T = Element
+
   /// Construct an instance that traverses the elements of `bounds`.
   @transparent
   public init(_ bounds: Range<Element>) {
@@ -77,6 +80,9 @@ public struct Range<
   Element : ForwardIndexType
 > : Equatable, CollectionType,
     CustomStringConvertible, CustomDebugStringConvertible {
+
+  @available(*, unavailable, renamed="Element")
+  public typealias T = Element
 
   /// Construct a copy of `x`.
   public init(_ x: Range) {

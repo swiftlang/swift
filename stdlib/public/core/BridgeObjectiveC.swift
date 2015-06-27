@@ -277,6 +277,10 @@ internal var _nilNativeObject: AnyObject? {
 /// already have writeback-scoped lifetime.
 public struct AutoreleasingUnsafeMutablePointer<Memory /* TODO : class */>
   : Equatable, NilLiteralConvertible, _PointerType {
+
+  @available(*, unavailable, renamed="Memory")
+  public typealias T = Memory
+
   public let _rawValue: Builtin.RawPointer
 
   @transparent

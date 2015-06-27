@@ -58,6 +58,9 @@ ${selfDocComment}
 public struct ${Self}<Bound : Comparable>
   : IntervalType, Equatable, CustomStringConvertible, CustomDebugStringConvertible, _Reflectable {
 
+  @available(*, unavailable, renamed="Bound")
+  public typealias T = Bound
+
   /// Construct a copy of `x`.
   public init(_ x: ${Self}) {
     // This initializer exists only so that we can have a descriptive

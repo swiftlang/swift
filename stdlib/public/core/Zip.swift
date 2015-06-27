@@ -95,3 +95,14 @@ public struct Zip2Sequence<Sequence1 : SequenceType, Sequence2 : SequenceType>
 
   internal let _sequences: (Sequence1, Sequence2)
 }
+
+@available(*, unavailable, renamed="Zip2Generator")
+public struct ZipGenerator2<
+  Generator1 : GeneratorType, Generator2 : GeneratorType
+> {}
+
+@available(*, unavailable, renamed="Zip2Sequence")
+public struct Zip2<
+  Sequence1 : SequenceType, Sequence2 : SequenceType
+> {}
+

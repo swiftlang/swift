@@ -173,6 +173,9 @@ public struct ${Self}<Element>
   : CollectionType, MutableCollectionType, Sliceable,
   _DestructorSafeContainer {
 
+  @available(*, unavailable, renamed="Element")
+  public typealias T = Element
+
   /// Always zero, which is the index of the first element when non-empty.
   public var startIndex: Int {
     return 0
