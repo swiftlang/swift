@@ -132,146 +132,12 @@ swift::swift_allocPOD(size_t dataSize, size_t dataAlignmentMask) {
 }
 
 namespace {
-  /// Header for a generic box created by swift_allocBox in the worst case.
-  struct GenericBox : HeapObject {
-    /// The type of the value inside the box.
-    Metadata const *type;
-    
-    /// Returns the offset in bytes from the address of the box header to the
-    /// address of the value inside the box.
-    size_t getValueOffset() const {
-      return getValueOffset(type);
-    }
-
-    /// Returns the offset in bytes from the address of the box header for
-    /// a box containing a value of the given type to the address of the value
-    /// inside the box.
-    static size_t getValueOffset(Metadata const *type) {
-      return llvm::RoundUpToAlignment(sizeof(GenericBox),
-                                  type->getValueWitnesses()->getAlignment());
-    }
-
-    /// Returns the size of the allocation for the box, including the header
-    /// and the value.
-    size_t getAllocatedSize() const {
-      return getAllocatedSize(type);
-    }
-
-    /// Returns the size of the allocation that would be made for a box
-    /// containing a value of the given type, including the header and the value.
-    static size_t getAllocatedSize(Metadata const *type) {
-      return getValueOffset(type) + type->getValueWitnesses()->stride;
-    }
-
-    size_t getAllocatedAlignMask() const {
-      return getAllocatedAlignMask(type);
-    }
-
-    /// Returns the alignment mask of the allocation that would be
-    /// made for a box containing a value of the given type, including
-    /// the header and the value.
-    static size_t getAllocatedAlignMask(Metadata const *type) {
-      return std::max(type->getValueWitnesses()->getAlignmentMask(),
-                      alignof(GenericBox) - 1);
-    }
-
-    /// Returns an opaque pointer to the value inside the box.
-    OpaqueValue *getValuePointer() {
-      char *p = reinterpret_cast<char*>(this) + getValueOffset();
-      return reinterpret_cast<OpaqueValue*>(p);
-    }
-
-    /// Returns an opaque pointer to the value inside the box.
-    OpaqueValue const *getValuePointer() const {
-      auto *p = reinterpret_cast<char const *>(this) + getValueOffset();
-      return reinterpret_cast<OpaqueValue const *>(p);
-    }
-  };
-}
-
-/// Heap object destructor for a generic box allocated with swift_allocBox.
-static void destroyGenericBox(HeapObject *o) {
-  auto *box = static_cast<GenericBox*>(o);
-  
-  // Destroy the value inside the box.
-  OpaqueValue *value = box->getValuePointer();
-  box->type->getValueWitnesses()->destroy(value, box->type);
-  
-  // Deallocate the buffer.
-  return swift_deallocObject(o, box->getAllocatedSize(),
-                             box->getAllocatedAlignMask());
-}
-
-/// Generic heap metadata for generic allocBox allocations.
-/// FIXME: It may be worth the tradeoff to instantiate type-specific
-/// heap metadata at runtime.
-static const FullMetadata<HeapMetadata> GenericBoxHeapMetadata{
-  HeapMetadataHeader{{destroyGenericBox}, {nullptr}},
-  HeapMetadata{Metadata{MetadataKind::HeapLocalVariable}}
-};
-
-BoxPair::Return
-swift::swift_allocBox(Metadata const *type) {
-  return _swift_allocBox(type);
-}
-static BoxPair::Return _swift_allocBox_(Metadata const *type) {
-  // NB: Special cases here need to also be checked for and handled in
-  // swift_deallocBox.
-  
-  // If the contained type is POD, perform a POD allocation.
-  auto *vw = type->getValueWitnesses();
-  if (vw->isPOD()) {
-    return swift_allocPOD(vw->getSize(), vw->getAlignmentMask());
-  }
-
-  // Allocate the box.
-  HeapObject *obj = swift_allocObject(&GenericBoxHeapMetadata,
-                                      GenericBox::getAllocatedSize(type),
-                                      GenericBox::getAllocatedAlignMask(type));
-  // allocObject will initialize the heap metadata pointer and refcount for us.
-  // We also need to store the type metadata between the header and the
-  // value.
-  auto *box = static_cast<GenericBox *>(obj);
-  box->type = type;
-  
-  // Return the box and the value pointer.
-  return BoxPair{box, box->getValuePointer()};
-}
-auto swift::_swift_allocBox = _swift_allocBox_;
-
-void swift::swift_deallocBox(HeapObject *box, Metadata const *type) {
-  // NB: Special cases here need to also be checked for and handled in
-  // swift_allocBox.
-
-  // First, we need to recover what the allocation size was.
-  size_t allocatedSize, allocatedAlignMask;
-  auto *vw = type->getValueWitnesses();
-  if (vw->isPOD()) {
-    // If the contained type is POD, use the POD allocation size.
-    allocatedSize = static_cast<PODBox*>(box)->allocatedSize;
-    allocatedAlignMask = static_cast<PODBox*>(box)->allocatedAlignMask;
-  } else {
-    // Use the generic box size to deallocate the object.
-    allocatedSize = GenericBox::getAllocatedSize(type);
-    allocatedAlignMask = GenericBox::getAllocatedAlignMask(type);
-  }
-
-  // Deallocate the box.
-  swift_deallocObject(box, allocatedSize, allocatedAlignMask);
-}
-
-void swift::swift_deallocPOD(HeapObject *obj) {
-  swift_deallocObject(obj, static_cast<PODBox*>(obj)->allocatedSize,
-                      static_cast<PODBox*>(obj)->allocatedAlignMask);
-}
-
-namespace {
 /// Heap metadata for runtime-instantiated generic boxes.
-struct GenericBox2HeapMetadata : public HeapMetadata {
+struct GenericBoxHeapMetadata : public HeapMetadata {
   /// The type inside the box.
   const Metadata *BoxedType;
 
-  constexpr GenericBox2HeapMetadata(MetadataKind kind,
+  constexpr GenericBoxHeapMetadata(MetadataKind kind,
                                     const Metadata *boxedType)
     : HeapMetadata{kind}, BoxedType(boxedType)
   {}
@@ -301,9 +167,9 @@ struct GenericBox2HeapMetadata : public HeapMetadata {
   }
 };
 
-/// Heap object destructor for a generic box allocated with swift_allocBox2.
-static void destroyGenericBox2(HeapObject *o) {
-  auto metadata = static_cast<const GenericBox2HeapMetadata *>(o->metadata);
+/// Heap object destructor for a generic box allocated with swift_allocBox.
+static void destroyGenericBox(HeapObject *o) {
+  auto metadata = static_cast<const GenericBoxHeapMetadata *>(o->metadata);
   // Destroy the object inside.
   auto *value = metadata->project(o);
   metadata->BoxedType->vw_destroy(value);
@@ -315,11 +181,11 @@ static void destroyGenericBox2(HeapObject *o) {
 
 class BoxCacheEntry : public CacheEntry<BoxCacheEntry> {
 public:
-  FullMetadata<GenericBox2HeapMetadata> Metadata;
+  FullMetadata<GenericBoxHeapMetadata> Metadata;
 
   BoxCacheEntry(size_t numArguments)
-    : Metadata{HeapMetadataHeader{{destroyGenericBox2}, {nullptr}},
-               GenericBox2HeapMetadata{MetadataKind::HeapGenericLocalVariable,
+    : Metadata{HeapMetadataHeader{{destroyGenericBox}, {nullptr}},
+               GenericBoxHeapMetadata{MetadataKind::HeapGenericLocalVariable,
                                        nullptr}} {
     assert(numArguments == 1);
   }
@@ -328,10 +194,10 @@ public:
     return 1;
   }
 
-  FullMetadata<GenericBox2HeapMetadata> *getData() {
+  FullMetadata<GenericBoxHeapMetadata> *getData() {
     return &Metadata;
   }
-  const FullMetadata<GenericBox2HeapMetadata> *getData() const {
+  const FullMetadata<GenericBoxHeapMetadata> *getData() const {
     return &Metadata;
   }
 };
@@ -341,10 +207,10 @@ public:
 static Lazy<MetadataCache<BoxCacheEntry>> Boxes;
 
 BoxPair::Return
-swift::swift_allocBox2(const Metadata *type) {
-  return _swift_allocBox2(type);
+swift::swift_allocBox(const Metadata *type) {
+  return _swift_allocBox(type);
 }
-static BoxPair::Return _swift_allocBox2_(const Metadata *type) {
+static BoxPair::Return _swift_allocBox_(const Metadata *type) {
   // Get the heap metadata for the box.
   auto &B = Boxes.get();
   const void *typeArg = type;
@@ -367,16 +233,16 @@ static BoxPair::Return _swift_allocBox2_(const Metadata *type) {
 
   return BoxPair{allocation, projection};
 }
-auto swift::_swift_allocBox2 = _swift_allocBox2_;
+auto swift::_swift_allocBox = _swift_allocBox_;
 
-void swift::swift_deallocBox2(HeapObject *o) {
-  auto metadata = static_cast<const GenericBox2HeapMetadata *>(o->metadata);
+void swift::swift_deallocBox(HeapObject *o) {
+  auto metadata = static_cast<const GenericBoxHeapMetadata *>(o->metadata);
   swift_deallocObject(o, metadata->getAllocSize(),
                       metadata->getAllocAlignMask());
 }
 
-OpaqueValue *swift::swift_projectBox2(HeapObject *o) {
-  auto metadata = static_cast<const GenericBox2HeapMetadata *>(o->metadata);
+OpaqueValue *swift::swift_projectBox(HeapObject *o) {
+  auto metadata = static_cast<const GenericBoxHeapMetadata *>(o->metadata);
   return metadata->project(o);
 }
 

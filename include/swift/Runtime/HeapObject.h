@@ -123,7 +123,6 @@ extern "C" void swift_deallocPOD(HeapObject *obj);
 /// The heap object has an initial retain count of 1, and its metadata is set
 /// such that destroying the heap object destroys the contained value.
 extern "C" BoxPair::Return swift_allocBox(Metadata const *type);
-extern "C" BoxPair::Return swift_allocBox2(Metadata const *type);
 
 // Allocate plain old memory. This is the generalized entry point
 // Never returns nil. The returned memory is uninitialized. 
@@ -277,13 +276,12 @@ extern "C" void swift_deallocClassInstance(HeapObject *object,
 /// by swift_allocBox but is otherwise in an unknown state. The given Metadata
 /// pointer must be the same metadata pointer that was passed to swift_allocBox
 /// when the memory was allocated.
-extern "C" void swift_deallocBox(HeapObject *object, Metadata const *type);
-extern "C" void swift_deallocBox2(HeapObject *object);
+extern "C" void swift_deallocBox(HeapObject *object);
 
 /// Project the value out of a box. `object` must have been allocated
-/// using `swift_allocBox2`, or by the compiler using a statically-emitted
+/// using `swift_allocBox`, or by the compiler using a statically-emitted
 /// box metadata object.
-extern "C" OpaqueValue *swift_projectBox2(HeapObject *object);
+extern "C" OpaqueValue *swift_projectBox(HeapObject *object);
 
 /// RAII object that wraps a Swift heap object and releases it upon
 /// destruction.

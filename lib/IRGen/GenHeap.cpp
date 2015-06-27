@@ -1108,7 +1108,7 @@ public:
     // Use the runtime to allocate a box of the appropriate size.
     auto metadata = IGF.emitTypeMetadataRefForLayout(boxedType);
     llvm::Value *box, *address;
-    IGF.emitAllocBox2Call(metadata, box, address);
+    IGF.emitAllocBoxCall(metadata, box, address);
     address = IGF.Builder.CreateBitCast(address,
                                         ti.getStorageType()->getPointerTo());
     return {ti.getAddressForPointer(address), box};
@@ -1118,7 +1118,7 @@ public:
   deallocate(IRGenFunction &IGF, llvm::Value *box, SILType boxedType)
   const override {
     auto metadata = IGF.emitTypeMetadataRefForLayout(boxedType);
-    IGF.emitDeallocBox2Call(box, metadata);
+    IGF.emitDeallocBoxCall(box, metadata);
   }
 
   Address
@@ -1126,7 +1126,7 @@ public:
   const override {
     auto &ti = IGF.getTypeInfo(boxedType);
     auto metadata = IGF.emitTypeMetadataRefForLayout(boxedType);
-    llvm::Value *address = IGF.emitProjectBox2Call(box, metadata);
+    llvm::Value *address = IGF.emitProjectBoxCall(box, metadata);
     address = IGF.Builder.CreateBitCast(address,
                                         ti.getStorageType()->getPointerTo());
     return ti.getAddressForPointer(address);

@@ -122,15 +122,15 @@ struct Dyn<T> {
 sil @dyn_box_a : $@convention(thin) <T> () -> () {
 entry:
   // CHECK: [[METADATA:%.*]] = call %swift.type* @swift_getGenericMetadata
-  // CHECK: [[ALLOC:%.*]] = call { %swift.refcounted*, %swift.opaque* } @swift_allocBox2(%swift.type* [[METADATA]])
+  // CHECK: [[ALLOC:%.*]] = call { %swift.refcounted*, %swift.opaque* } @swift_allocBox(%swift.type* [[METADATA]])
   // CHECK: [[BOX:%.*]] = extractvalue { %swift.refcounted*, %swift.opaque* } [[ALLOC]], 0
   // CHECK: [[PTR:%.*]] = extractvalue { %swift.refcounted*, %swift.opaque* } [[ALLOC]], 1
   // CHECK: bitcast %swift.opaque* [[PTR]] to %V11typed_boxes3Dyn*
   %a = alloc_box $Dyn<T>
-  // CHECK: [[PTR:%.*]] = call %swift.opaque* @swift_projectBox2(%swift.refcounted* [[BOX]])
+  // CHECK: [[PTR:%.*]] = call %swift.opaque* @swift_projectBox(%swift.refcounted* [[BOX]])
   // CHECK: bitcast %swift.opaque* [[PTR]] to %V11typed_boxes3Dyn*
   %b = project_box %a#0 : $@box Dyn<T>
-  // CHECK: call void @swift_deallocBox2(%swift.refcounted* [[BOX]])
+  // CHECK: call void @swift_deallocBox(%swift.refcounted* [[BOX]])
   dealloc_box %a#0 : $@box Dyn<T>
   return undef : $()
 }
@@ -138,13 +138,13 @@ entry:
 // CHECK-LABEL: define void @dyn_box_b
 sil @dyn_box_b : $@convention(thin) <T> () -> () {
 entry:
-  // CHECK: [[ALLOC:%.*]] = call { %swift.refcounted*, %swift.opaque* } @swift_allocBox2(%swift.type* %T)
+  // CHECK: [[ALLOC:%.*]] = call { %swift.refcounted*, %swift.opaque* } @swift_allocBox(%swift.type* %T)
   // CHECK: [[BOX:%.*]] = extractvalue { %swift.refcounted*, %swift.opaque* } [[ALLOC]], 0
   // CHECK: [[PTR:%.*]] = extractvalue { %swift.refcounted*, %swift.opaque* } [[ALLOC]], 1
   %a = alloc_box $T
-  // CHECK: [[PTR:%.*]] = call %swift.opaque* @swift_projectBox2(%swift.refcounted* [[BOX]])
+  // CHECK: [[PTR:%.*]] = call %swift.opaque* @swift_projectBox(%swift.refcounted* [[BOX]])
   %b = project_box %a#0 : $@box T
-  // CHECK: call void @swift_deallocBox2(%swift.refcounted* [[BOX]])
+  // CHECK: call void @swift_deallocBox(%swift.refcounted* [[BOX]])
   dealloc_box %a#0 : $@box T
   return undef : $()
 }

@@ -38,17 +38,17 @@
 #define FUNCTION(Id, Name, CC, ReturnTys, ArgTys, Attrs) FUNCTION_ID(Id)
 #endif
 
-FUNCTION(AllocBox2,       swift_allocBox2,      RuntimeCC,
+FUNCTION(AllocBox,       swift_allocBox,      RuntimeCC,
          RETURNS(RefCountedPtrTy, OpaquePtrTy),
          ARGS(TypeMetadataPtrTy),
          ATTRS(NoUnwind))
 
-FUNCTION(DeallocBox2,     swift_deallocBox2,    RuntimeCC,
+FUNCTION(DeallocBox,     swift_deallocBox,    RuntimeCC,
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind))
 
-FUNCTION(ProjectBox2,     swift_projectBox2,    RuntimeCC,
+FUNCTION(ProjectBox,     swift_projectBox,    RuntimeCC,
          RETURNS(OpaquePtrTy),
          ARGS(RefCountedPtrTy),
          ATTRS(NoUnwind, ReadNone))

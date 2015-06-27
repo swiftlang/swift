@@ -188,13 +188,13 @@ public:
   void emitDeallocRawCall(llvm::Value *pointer, llvm::Value *size,
                           llvm::Value *alignMask);
   
-  void emitAllocBox2Call(llvm::Value *typeMetadata,
+  void emitAllocBoxCall(llvm::Value *typeMetadata,
                          llvm::Value *&box,
                          llvm::Value *&valueAddress);
 
-  void emitDeallocBox2Call(llvm::Value *box, llvm::Value *typeMetadata);
+  void emitDeallocBoxCall(llvm::Value *box, llvm::Value *typeMetadata);
 
-  llvm::Value *emitProjectBox2Call(llvm::Value *box, llvm::Value *typeMetadata);
+  llvm::Value *emitProjectBoxCall(llvm::Value *box, llvm::Value *typeMetadata);
 
   // Emit a reference to the canonical type metadata record for the given AST
   // type. This can be used to identify the type at runtime. For types with

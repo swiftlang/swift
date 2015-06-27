@@ -53,7 +53,7 @@ func b<T : Ordinable>(var seq seq: T) -> (Int) -> Int {
 func captures_tuple<T, U>(var x x: (T, U)) -> () -> (T, U) {
   // CHECK: [[METADATA:%.*]] = call %swift.type* @swift_getTupleTypeMetadata2(%swift.type* %T, %swift.type* %U, i8* null, i8** null)
   // CHECK-NOT: @swift_getTupleTypeMetadata2
-  // CHECK: [[BOX:%.*]] = call { %swift.refcounted*, %swift.opaque* } @swift_allocBox2(%swift.type* [[METADATA]])
+  // CHECK: [[BOX:%.*]] = call { %swift.refcounted*, %swift.opaque* } @swift_allocBox(%swift.type* [[METADATA]])
   // CHECK: [[ADDR:%.*]] = extractvalue { %swift.refcounted*, %swift.opaque* } [[BOX]], 1
   // CHECK: bitcast %swift.opaque* [[ADDR]] to <{}>*
   return {x}
