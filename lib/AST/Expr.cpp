@@ -174,6 +174,45 @@ Expr *Expr::getValueProvidingExpr() {
   return getSemanticsProvidingExpr();
 }
 
+
+/// Enumerate each immediate child expression of this node, invoking the
+/// specific functor on it.  This ignores statements and other non-expression
+/// children.
+void Expr::forEachChildExpr(const std::function<void(Expr*)> &callback) {
+  struct ChildWalker : ASTWalker {
+    const std::function<void(Expr*)> &callback;
+    Expr *ThisNode;
+    
+    ChildWalker(const std::function<void(Expr*)> &callback, Expr *ThisNode)
+      : callback(callback), ThisNode(ThisNode) {}
+    
+    std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
+      // When looking at the current node, of course we want to enter it.  We
+      // also don't want to enumerate it.
+      if (E == ThisNode)
+        return { true, E };
+
+      // Otherwise we must be a child of our expression, enumerate it!
+      callback(E);
+      return { false, E };
+    }
+    
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+      return { false, S };
+    }
+
+    std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
+      return { false, P };
+    }
+    bool walkToDeclPre(Decl *D) override { return false; }
+    bool walkToTypeReprPre(TypeRepr *T) override { return false; }
+
+  };
+  
+  this->walk(ChildWalker(callback, this));
+}
+
+
 Initializer *Expr::findExistingInitializerContext() {
   struct FindExistingInitializer : ASTWalker {
     Initializer *TheInitializer = nullptr;

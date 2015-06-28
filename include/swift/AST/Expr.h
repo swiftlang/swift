@@ -396,10 +396,15 @@ public:
     return const_cast<Expr *>(this)->getValueProvidingExpr();
   }
 
-  /// walk - This recursively walks the AST rooted at this expression.
+  /// This recursively walks the AST rooted at this expression.
   Expr *walk(ASTWalker &walker);
   Expr *walk(ASTWalker &&walker) { return walk(walker); }
 
+  /// Enumerate each immediate child expression of this node, invoking the
+  /// specific functor on it.  This ignores statements and other non-expression
+  /// children.
+  void forEachChildExpr(const std::function<void(Expr*)> &callback);
+  
   /// findExistingInitializerContext - Given that this expression is
   /// an initializer that belongs in some sort of Initializer
   /// context, look through it for any existing context object.
