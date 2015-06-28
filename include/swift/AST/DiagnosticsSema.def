@@ -630,8 +630,15 @@ WARNING(unsupported_synthesize_init_variadic,sema_tcd,none,
 NOTE(variadic_superclass_init_here,sema_tcd,none,
      "variadic superclass initializer defined here", ())
 
+// Alignment attribute
 ERROR(alignment_not_power_of_two,sema_tcd,none,
       "alignment value must be a power of two", ())
+
+// Indirect enums
+ERROR(indirect_case_without_payload,sema_tcd,none,
+      "enum case %0 without associated value cannot be 'indirect'", (Identifier))
+ERROR(indirect_case_in_indirect_enum,sema_tcd,none,
+      "enum case in 'indirect' enum cannot also be 'indirect'", ())
 
 // Variables (var and let).
 ERROR(unimplemented_type_var,decl_parsing,none,

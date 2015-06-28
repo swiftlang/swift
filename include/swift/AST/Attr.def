@@ -229,6 +229,10 @@ DECL_ATTR(warn_unused_result, WarnUnusedResult,
 DECL_ATTR(_swift_native_objc_runtime_base, SwiftNativeObjCRuntimeBase,
           OnClass | UserInaccessible, 59)
 
+SIMPLE_DECL_ATTR(indirect, Indirect,
+                 OnEnum | OnEnumElement | DeclModifier,
+                 60)
+
 #undef TYPE_ATTR
 #undef DECL_ATTR_ALIAS
 #undef SIMPLE_DECL_ATTR

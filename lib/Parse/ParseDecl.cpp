@@ -1837,6 +1837,10 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
         parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Postfix);
         continue;
       }
+      if (Tok.isContextualKeyword("indirect")) {
+        parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Indirect);
+        continue;
+      }
       if (Tok.isContextualKeyword("infix")) {
         parseNewDeclAttribute(Attributes, /*AtLoc*/ {}, DAK_Infix);
         continue;

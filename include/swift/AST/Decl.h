@@ -3221,7 +3221,7 @@ public:
 ///
 ///    enum Optional<T> {
 ///      case None
-///      case Just(T)
+///      case Some(T)
 ///    }
 /// \endcode
 ///
@@ -3303,6 +3303,11 @@ public:
   ///
   /// Note that this is false for enums with absolutely no cases.
   bool hasOnlyCasesWithoutAssociatedValues() const;
+
+  /// True if the enum is marked 'indirect'.
+  bool isIndirect() const {
+    return getAttrs().hasAttribute<IndirectAttr>();
+  }
 };
 
 /// StructDecl - This is the declaration of a struct, for example:
@@ -5196,6 +5201,11 @@ public:
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::EnumElement;
+  }
+
+  /// True if the case is marked 'indirect'.
+  bool isIndirect() const {
+    return getAttrs().hasAttribute<IndirectAttr>();
   }
 };
   

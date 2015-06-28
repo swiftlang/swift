@@ -109,6 +109,20 @@ public:
     }
   }
 
+  void visitIndirectAttr(IndirectAttr *attr) {
+    if (auto caseDecl = dyn_cast<EnumElementDecl>(D)) {
+      // An indirect case should have a payload.
+      if (caseDecl->getArgumentTypeLoc().isNull())
+        TC.diagnose(attr->getLocation(),
+                    diag::indirect_case_without_payload, caseDecl->getName());
+      // If the enum is already indirect, its cases don't need to be.
+      else if (caseDecl->getParentEnum()->getAttrs()
+                 .hasAttribute<IndirectAttr>())
+        TC.diagnose(attr->getLocation(),
+                    diag::indirect_case_in_indirect_enum);
+    }
+  }
+
   void visitIBActionAttr(IBActionAttr *attr);
   void visitLazyAttr(LazyAttr *attr);
   void visitIBDesignableAttr(IBDesignableAttr *attr);
@@ -587,6 +601,7 @@ public:
     IGNORED_ATTR(IBDesignable)
     IGNORED_ATTR(IBInspectable)
     IGNORED_ATTR(IBOutlet) // checked early.
+    IGNORED_ATTR(Indirect)
     IGNORED_ATTR(Inline)
     IGNORED_ATTR(Effects)
     IGNORED_ATTR(Lazy)      // checked early.

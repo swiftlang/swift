@@ -158,7 +158,7 @@ public:
     case 'f':
       return Text == "final";
     case 'i':
-      return Text == "infix";
+      return Text == "indirect" || Text == "infix";
     case 'l':
       return Text == "lazy";
     case 'm':
