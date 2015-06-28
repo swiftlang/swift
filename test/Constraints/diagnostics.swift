@@ -123,3 +123,19 @@ func rdar21080030() {
   var s = "Hello"
   if s.characters.count() == 0 {} // expected-error{{cannot invoke 'count' with no arguments}}
 }
+
+
+// <rdar://problem/21248136> QoI: problem with return type inference mis-diagnosed as invalid arguments
+func r21248136<T>() -> T { preconditionFailure() } // expected-note 2 {{in call to function 'r21248136'}}
+
+r21248136()            // expected-error {{argument for generic parameter 'T' could not be inferred}}
+let _ = r21248136()    // expected-error {{argument for generic parameter 'T' could not be inferred}}
+
+
+// <rdar://problem/16375647> QoI: Uncallable funcs should be compile time errors
+func perform<T>() {}  // expected-error {{generic parameter 'T' is not used in function signature}}
+
+// <rdar://problem/17080659> Error Message QOI - wrong return type in an overload
+func recArea(h: Int, w : Int) {
+  return h * w  // expected-error {{unexpected non-void return value in void function}}
+}
