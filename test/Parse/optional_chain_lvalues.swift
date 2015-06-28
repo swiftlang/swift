@@ -2,7 +2,7 @@
 
 struct S {
   var x: Int = 0
-  let y: Int = 0
+  let y: Int = 0  // expected-note {{change 'let' to 'var' to make it mutable}}
 
   mutating func mutateS() {}
 
@@ -26,7 +26,7 @@ immT?.mutateT() // expected-error{{only has mutating members}}
 mutT?.mutS?.mutateS()
 mutT?.immS?.mutateS() // expected-error{{only has mutating members}}
 mutT?.mutS?.x++
-mutT?.mutS?.y++ // expected-error{{could not find an overload for '++' that accepts the supplied arguments}}
+mutT?.mutS?.y++ // expected-error{{cannot pass immutable value to mutating operator: 'y' is a 'let' constant}}
 
 // Prefix operators don't chain
 ++mutT?.mutS?.x // expected-error{{cannot pass immutable value of type 'Int?' to mutating operator}}
@@ -41,5 +41,5 @@ _ = mutT?.mutS?.x + 0 // expected-error{{value of optional type 'Int?' not unwra
 mutT?.mutS?.y -= 0 // expected-error{{could not find an overload for '-=' that accepts the supplied arguments}}
 mutT?.immS = S() // expected-error{{cannot assign to property: 'immS' is a 'let' constant}}
 mutT?.immS? = S() // expected-error{{cannot assign to immutable expression of type 'S'}}
-mutT?.immS?.x += 0 // expected-error{{could not find an overload for '+=' that accepts the supplied arguments}}
+mutT?.immS?.x += 0 // expected-error{{left side of mutating operator has immutable type 'Int'}}
 mutT?.immS?.y -= 0 // expected-error{{could not find an overload for '-=' that accepts the supplied arguments}}

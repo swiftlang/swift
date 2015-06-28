@@ -1509,11 +1509,8 @@ private:
                                  const SmallVectorImpl<Type> &paramLists,
                                  Type argType);
   
-  bool visitExpr(Expr *E) {
-    return diagnoseGeneralFailure();
-  }
-      
-  /// Diagnose a specific kind of application expression.
+  bool visitExpr(Expr *E);
+  
   bool visitBinaryExpr(BinaryExpr *BE);
   bool visitUnaryExpr(ApplyExpr *AE);
   bool visitPrefixUnaryExpr(PrefixUnaryExpr *PUE) {
@@ -1523,29 +1520,13 @@ private:
     return visitUnaryExpr(PUE);
   }
       
-  bool visitParenExpr(ParenExpr *PE);
   bool visitSubscriptExpr(SubscriptExpr *SE);
-  
-  /// Diagnose a failed function, method or initializer application expression.
   bool visitCallExpr(CallExpr *CE);
-  
-  /// Diagnose a failed assignment expression, with special attention paid to
-  /// assignments to immutable values.
   bool visitAssignExpr(AssignExpr *AE);
-  
-  /// Diagnose the specific case of addressing an immutable value, or one
-  /// without a setter.
   bool visitInOutExpr(InOutExpr *IOE);
-
-  /// Diagnose a failed coerce expression, considering the possibility that it
-  /// should be a forced downcast instead.
   bool visitCoerceExpr(CoerceExpr *CE);
-
-  /// Diagnose a failed forced downcast expr.
   bool visitForcedCheckedCastExpr(ForcedCheckedCastExpr *FCCE);
-  
-  /// Diagnose a failed tuple expression, by examining its element expressions.
-  bool visitTupleExpr(TupleExpr *TE);
+  bool visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E);
 };
 } // end anonymous namespace.
 
@@ -1681,6 +1662,9 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure() {
     auto overloadChoice = overloadConstraint->getOverloadChoice();
     auto overloadName = overloadChoice.getDecl()->getName();
     Type argType = getDiagnosticTypeFromExpr(expr);
+    
+    // FIXME: These diagnostics should be emitted with location info specified
+    // by the simplified anchor of the constraint locator!
     
     if (!argType.isNull() &&
         !argType->getAs<TypeVariableType>() &&
@@ -1821,6 +1805,7 @@ Type FailureDiagnosis::getTypeOfIndependentSubExpression(Expr *subExpr) {
   if (CS->TC.exprIsBeingDiagnosed(subExpr))
     return resultType;
   
+  // FIXME: expressions are never removed from this set.
   CS->TC.addExprForDiagnosis(subExpr);
   
   if (!isa<ClosureExpr>(subExpr) &&
@@ -2284,16 +2269,15 @@ bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
   std::string overloadName = Candidates[0]->getNameStr();
   assert(!overloadName.empty());
   if (argTyName1.compare(argTyName2)) {
-    CS->TC.diagnose(argExpr->getElement(0)->getLoc(),
-                    diag::cannot_apply_binop_to_args,
-                    overloadName,
-                    argTyName1,
-                    argTyName2);
+    CS->TC.diagnose(binop->getLoc(), diag::cannot_apply_binop_to_args,
+                    overloadName, argTyName1, argTyName2)
+      .highlight(argExpr->getElement(0)->getSourceRange())
+      .highlight(argExpr->getElement(1)->getSourceRange());
   } else {
-    CS->TC.diagnose(argExpr->getElement(0)->getLoc(),
-                    diag::cannot_apply_binop_to_same_args,
-                    overloadName,
-                    argTyName1);
+    CS->TC.diagnose(binop->getLoc(), diag::cannot_apply_binop_to_same_args,
+                    overloadName, argTyName1)
+      .highlight(argExpr->getElement(0)->getSourceRange())
+      .highlight(argExpr->getElement(1)->getSourceRange());
   }
   
   if (auto ODRE = dyn_cast<OverloadedDeclRefExpr>(binop->getFn())) {
@@ -2370,19 +2354,6 @@ bool FailureDiagnosis::visitUnaryExpr(ApplyExpr *applyExpr) {
                   argTyName);
   
   return true;
-}
-
-bool FailureDiagnosis::visitParenExpr(ParenExpr *PE) {
-  // Usually, the problem is that the subexpr of the parenexpr is invalid or
-  // bogus.  Type check it independently to try to figure out how and diagnose
-  // it if so.
-  auto indexType = getTypeOfIndependentSubExpression(PE->getSubExpr());
-  if (isErrorTypeKind(indexType))
-    return true;
-
-  // If not, then we have some general failure, perhaps do to a conversion
-  // constraint issue.
-  return diagnoseGeneralFailure();
 }
 
 
@@ -2720,15 +2691,35 @@ visitForcedCheckedCastExpr(ForcedCheckedCastExpr *castExpr) {
   return diagnoseGeneralFailure();
 }
 
-bool FailureDiagnosis::visitTupleExpr(TupleExpr *tupleExpr) {
-  // Stop at the first failed sub-expression.
-  for (auto elt : tupleExpr->getElements()) {
-    if (getTypeOfIndependentSubExpression(elt)->getAs<ErrorType>())
-      return true;
-  }
-  
+bool FailureDiagnosis::
+visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E) {
+  // Don't walk the children for this node, it leads to multiple diagnostics
+  // because of how sema injects this node into the type checker.
   return diagnoseGeneralFailure();
 }
+
+
+bool FailureDiagnosis::visitExpr(Expr *E) {
+  // Check each of our immediate children to see if any of them are
+  // independently invalid.
+  bool errorInSubExpr = false;
+  
+  E->forEachChildExpr([&](Expr *Child) {
+    // If we already found an error, stop checking.
+    if (errorInSubExpr) return;
+    
+    // Otherwise this subexpr is an error if type checking it produces an error.
+    errorInSubExpr |= isErrorTypeKind(getTypeOfIndependentSubExpression(Child));
+  });
+  
+  // If any of the children were errors, we're done.
+  if (errorInSubExpr)
+    return true;
+  
+  // Otherwise, produce a more generic error.
+  return diagnoseGeneralFailure();
+}
+
 
 bool FailureDiagnosis::diagnoseFailure() {
   assert(CS && expr);

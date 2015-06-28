@@ -139,3 +139,9 @@ func perform<T>() {}  // expected-error {{generic parameter 'T' is not used in f
 func recArea(h: Int, w : Int) {
   return h * w  // expected-error {{unexpected non-void return value in void function}}
 }
+
+func r17224804(monthNumber : Int) {
+  // expected-error @+2 {{binary operator '+' cannot be applied to operands of type 'String' and 'Int'}}
+  // expected-note @+1 {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (String, String), (UnsafeMutablePointer<Memory>, Int), (UnsafePointer<Memory>, Int)}}
+  let monthString = (monthNumber <= 9) ? ("0" + monthNumber) : String(monthNumber)
+}
