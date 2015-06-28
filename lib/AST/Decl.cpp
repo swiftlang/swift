@@ -3220,7 +3220,7 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
            .fixItReplace(VP->getLoc(), "var");
         } else {
           d.diagnose(P->getStartLoc(), diag::mark_param_var)
-           .fixItInsert(P->getStartLoc(), "var");
+           .fixItInsert(P->getStartLoc(), "var ");
         }
         return;
       }

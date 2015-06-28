@@ -215,7 +215,7 @@ func test_mutability() {
 }
 
 
-func test_arguments(a : Int,       // expected-note {{mark parameter with 'var' to make it mutable}} {{21-21=var}}
+func test_arguments(a : Int,       // expected-note {{mark parameter with 'var' to make it mutable}} {{21-21=var }}
                     var b : Int,
                     let c : Int) {   // expected-note {{change 'let' parameter to 'var' to make it mutable}}  {{21-24=var}}
   a = 1  // expected-error {{cannot assign to value: 'a' is a 'let' constant}}
