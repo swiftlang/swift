@@ -3175,6 +3175,8 @@ public:
     return V->getKind() >= ValueKind::First_TermInst &&
            V->getKind() <= ValueKind::Last_TermInst;
   }
+
+  bool isBranch() const { return !getSuccessors().empty(); }
 };
 
 /// UnreachableInst - Position in the code which would be undefined to reach.

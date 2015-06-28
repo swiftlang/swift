@@ -13,6 +13,7 @@
 #include "llvm/Support/Casting.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SmallVector.h"
 #include <vector>
 
@@ -33,15 +34,48 @@ namespace swift {
     /// may refer to a specific function or to a list of functions depending
     /// on the context in which it is used.
     enum PreserveKind : unsigned {
-      Nothing     = 0x0,   // The pass does not preserve any analysis trait.
-      Calls       = 0x1,   // The pass did not modify any calls.
-      Branches    = 0x2,   // The pass did not modify any branches.
+      /// The pass does not preserve any analysis trait.
+      Nothing = 0x0,
 
-      // This is a list of combined traits that is defined to make the use of
+      /// The pass did not modify any call instructions.
+      ///
+      /// The intention of this preserve kind is twofold:
+      ///
+      /// 1. Allow analyses like the CallGraphAnalysis that store pointers to
+      /// apply instructions and SILFunctions to invalidate their stored
+      /// information, preventing dangling pointers.
+      /// 2. Allow analyses like the CallGraphAnalysis to know to search for new
+      /// edges in the callgraph.
+      Calls = 0x1,
+
+      /// The pass did not modify any branch edges in the CFG beyond reordering
+      /// them in the successor or predecessor list of a BB.
+      ///
+      /// The intention of this preserve kind is to tell analyses like the
+      /// Dominance Analysis and the Post Order Analysis that the underlying CFG
+      /// has been changed up to reordering of branch edges in the successor or
+      /// predecessor lists of a BB. Unlike the "Calls" preservation kind this
+      /// is not meant to prevent dangling pointers. This is because all CFG
+      /// related analyses are able to store basic blocks instead of
+      /// terminators. This allows for certain useful transformations to occur
+      /// without requiring recomputation of the dominator tree or CFG post
+      /// order. Some of these transformations are:
+      ///
+      /// 1. Converting a branch from one type of branch to another type that
+      /// preserves the CFG. Ex: Convering a checked_cast_addr_br =>
+      /// checked_cast_br.
+      /// 2. Canonicalizing a conditional branch by inverting its branch
+      /// condition.
+      Branches = 0x2,
+
+      /// This is a list of combined traits that is defined to make the use of
       /// the invalidation API more convenient.
       ProgramFlow = Calls | Branches, // The pass changed some instructions but
-                                   // did not change the overall flow
-                                   // of the code.
+                                      // did not change the overall flow
+                                      // of the code.
+
+      /// This Top in case we add a different top besides ProgramFlow.
+      All = ProgramFlow,
     };
 
     /// A list of the known analysis.
@@ -198,6 +232,31 @@ namespace swift {
   SILAnalysis *createClassHierarchyAnalysis(SILModule *M);
   SILAnalysis *createRCIdentityAnalysis(SILModule *M, SILPassManager *PM);
   SILAnalysis *createDestructorAnalysis(SILModule *M);
+
+  /// A builder struct that can be used by passes to manage the building of a
+  /// SILAnalysis::PreserveKind when multiple SILAnalysis::PreserveKind can be
+  /// produced by the pass.
+  class PreserveKindBuilder {
+    using PreserveKind = SILAnalysis::PreserveKind;
+    llvm::Optional<PreserveKind> Kind;
+
+    /// Initialize Kind if it is None with PreserveKind::All and unset the bits
+    /// corresponding to K.
+    void invalidate(PreserveKind K) {
+      unsigned NewValue = !Kind ? PreserveKind::All : Kind.getValue();
+      Kind = PreserveKind(NewValue & ~K);
+    }
+
+  public:
+    /// Returns None if no changes were made. Returns the kind that is preserved
+    /// otherwise.
+    llvm::Optional<PreserveKind> getKind() const { return Kind; }
+
+    void invalidateProgramFlow() { invalidate(PreserveKind::ProgramFlow); }
+    void invalidateCalls() { invalidate(PreserveKind::Calls); }
+    void invalidateBranches() { invalidate(PreserveKind::Branches); }
+    void invalidateInstructions() { invalidate(PreserveKind::Nothing); }
+  };
 } // end namespace swift
 
 #endif

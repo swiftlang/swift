@@ -1632,21 +1632,27 @@ bool SimplifyCFG::simplifyCheckedCastBranchBlock(CheckedCastBranchInst *CCBI) {
   auto FailureBB = CCBI->getFailureBB();
   auto ThisBB = CCBI->getParent();
 
+  bool MadeChange = false;
   CastOptimizer CastOpt(
-      [](SILInstruction *I, ValueBase *V){} /* ReplaceInstUsesAction */,
-      [](SILInstruction *I) { /* EraseInstAction */
+      [&MadeChange](SILInstruction *I,
+                    ValueBase *V) {  /* ReplaceInstUsesAction */
+        MadeChange = true;
+      },
+      [&MadeChange](SILInstruction *I) { /* EraseInstAction */
+        MadeChange = true;
         I->eraseFromParent();
       },
       [&]() { /* WillSucceedAction */
-        removeIfDead(FailureBB);
+        MadeChange |= removeIfDead(FailureBB);
         addToWorklist(ThisBB);
       },
       [&]() { /* WillFailAction */
-        removeIfDead(SuccessBB);
+        MadeChange |= removeIfDead(SuccessBB);
         addToWorklist(ThisBB);
       });
 
-  return CastOpt.simplifyCheckedCastBranchInst(CCBI) != nullptr;
+  MadeChange |= bool(CastOpt.simplifyCheckedCastBranchInst(CCBI));
+  return MadeChange;
 }
 
 bool
@@ -1656,21 +1662,26 @@ simplifyCheckedCastAddrBranchBlock(CheckedCastAddrBranchInst *CCABI) {
   auto FailureBB = CCABI->getFailureBB();
   auto ThisBB = CCABI->getParent();
 
+  bool MadeChange = false;
   CastOptimizer CastOpt(
-      [](SILInstruction *I, ValueBase *V){} /* ReplaceInstUsesAction */,
-      [](SILInstruction *I) { /* EraseInstAction */
+      [&MadeChange](SILInstruction *I, ValueBase *V) {
+        MadeChange = true;
+      }, /* ReplaceInstUsesAction */
+      [&MadeChange](SILInstruction *I) { /* EraseInstAction */
+        MadeChange = true;
         I->eraseFromParent();
       },
       [&]() { /* WillSucceedAction */
-        removeIfDead(FailureBB);
+        MadeChange |= removeIfDead(FailureBB);
         addToWorklist(ThisBB);
       },
       [&]() { /* WillFailAction */
-        removeIfDead(SuccessBB);
+        MadeChange |= removeIfDead(SuccessBB);
         addToWorklist(ThisBB);
       });
 
-  return CastOpt.simplifyCheckedCastAddrBranchInst(CCABI) != nullptr;
+  MadeChange |= bool(CastOpt.simplifyCheckedCastAddrBranchInst(CCABI));
+  return MadeChange;
 }
 
 // Replace the terminator of BB with a simple branch if all successors go

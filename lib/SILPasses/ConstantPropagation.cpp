@@ -812,20 +812,12 @@ static void initializeWorklist(SILFunction &F,
 }
 
 static llvm::Optional<SILAnalysis::PreserveKind>
-mergePreserveKind(llvm::Optional<SILAnalysis::PreserveKind> Original,
-                  SILAnalysis::PreserveKind NewValue) {
-  if (!Original.hasValue())
-    return NewValue;
-
-  return SILAnalysis::PreserveKind(Original.getValue() & NewValue);
-}
-
-static llvm::Optional<SILAnalysis::PreserveKind>
 processFunction(SILFunction &F, bool EnableDiagnostics,
                 unsigned AssertConfiguration) {
   DEBUG(llvm::dbgs() << "*** ConstPropagation processing: " << F.getName()
         << "\n");
-  llvm::Optional<SILAnalysis::PreserveKind> Preserves;
+
+  PreserveKindBuilder PKBuilder;
 
   // Should we replace calls to assert_configuration by the assert
   // configuration.
@@ -842,12 +834,21 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
   initializeWorklist(F, InstantiateAssertConfiguration, WorkList);
 
   llvm::SetVector<SILInstruction *> FoldedUsers;
-  CastOptimizer CastOpt(/* ReplaceInstUsesAction */
-                  [&](SILInstruction *I, ValueBase * V) {
-                    SILValue(I).replaceAllUsesWith(V);
-                  },
-                  /* EraseAction */
-                  [&](SILInstruction *I) { WorkList.remove(I); I->eraseFromParent(); });
+  CastOptimizer CastOpt(
+      [&](SILInstruction *I, ValueBase *V) { /* ReplaceInstUsesAction */
+        PKBuilder.invalidateInstructions();
+        SILValue(I).replaceAllUsesWith(V);
+      },
+      [&](SILInstruction *I) { /* EraseAction */
+        auto *TI = dyn_cast<TermInst>(I);
+        if (TI && TI->isBranch()) {
+          PKBuilder.invalidateBranches();
+        } else {
+          PKBuilder.invalidateInstructions();
+        }
+        WorkList.remove(I);
+        I->eraseFromParent();
+      });
 
   while (!WorkList.empty()) {
     SILInstruction *I = WorkList.pop_back_val();
@@ -869,8 +870,7 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
           WorkList.insert(AssertConfInt);
           // Delete the call.
           recursivelyDeleteTriviallyDeadInstructions(BI);
-          Preserves = mergePreserveKind(Preserves,
-                                        SILAnalysis::PreserveKind::ProgramFlow);
+          PKBuilder.invalidateInstructions();
           continue;
         }
 
@@ -879,8 +879,7 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
         if (isApplyOfBuiltin(*BI, BuiltinValueKind::CondUnreachable)) {
           assert(BI->use_empty() && "use of conditionallyUnreachable?!");
           recursivelyDeleteTriviallyDeadInstructions(BI, /*force*/ true);
-          Preserves = mergePreserveKind(Preserves,
-                                        SILAnalysis::PreserveKind::ProgramFlow);
+          PKBuilder.invalidateInstructions();
           continue;
         }
       }
@@ -888,9 +887,8 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
     if (auto *AI = dyn_cast<ApplyInst>(I)) {
       // Apply may only come from a string.concat invocation.
       if (constantFoldStringConcatenation(AI, WorkList)) {
-        // This only preserves branches, not calls.
-        Preserves =
-            mergePreserveKind(Preserves, SILAnalysis::PreserveKind::Branches);
+        // This invalidates calls.
+        PKBuilder.invalidateCalls();
       }
 
       continue;
@@ -899,19 +897,17 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
     if (isa<CheckedCastBranchInst>(I) || isa<CheckedCastAddrBranchInst>(I) ||
         isa<UnconditionalCheckedCastInst>(I) ||
         isa<UnconditionalCheckedCastAddrInst>(I)) {
-      // Try to perform cast optimizations.
+      // Try to perform cast optimizations. Invalidation is handled by a
+      // callback inside the cast optimizer.
       ValueBase *Result = nullptr;
-      bool InvalidateBranches = false;
       switch(I->getKind()) {
       default:
         llvm_unreachable("Unexpected instruction for cast optimizations");
       case ValueKind::CheckedCastBranchInst:
         Result = CastOpt.simplifyCheckedCastBranchInst(cast<CheckedCastBranchInst>(I));
-        InvalidateBranches |= bool(Result);
         break;
       case ValueKind::CheckedCastAddrBranchInst:
         Result = CastOpt.simplifyCheckedCastAddrBranchInst(cast<CheckedCastAddrBranchInst>(I));
-        InvalidateBranches |= bool(Result);
         break;
       case ValueKind::UnconditionalCheckedCastInst:
         Result = CastOpt.optimizeUnconditionalCheckedCastInst(cast<UnconditionalCheckedCastInst>(I));
@@ -922,14 +918,6 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
       }
 
       if (Result) {
-        if (InvalidateBranches) {
-          Preserves =
-              mergePreserveKind(Preserves, SILAnalysis::PreserveKind::Calls);
-        } else {
-          Preserves = mergePreserveKind(Preserves,
-                                        SILAnalysis::PreserveKind::ProgramFlow);
-        }
-
         if (isa<CheckedCastBranchInst>(Result) ||
             isa<CheckedCastAddrBranchInst>(Result) ||
             isa<UnconditionalCheckedCastInst>(Result) ||
@@ -994,8 +982,7 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
       FoldedUsers.insert(User);
       ++NumInstFolded;
 
-      Preserves =
-          mergePreserveKind(Preserves, SILAnalysis::PreserveKind::ProgramFlow);
+      PKBuilder.invalidateInstructions();
 
       // If the constant produced a tuple, be smarter than RAUW: explicitly nuke
       // any tuple_extract instructions using the apply.  This is a common case
@@ -1037,8 +1024,7 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
     auto UserArray = ArrayRef<SILInstruction *>(&*FoldedUsers.begin(),
                                                 FoldedUsers.size());
     if (!UserArray.empty()) {
-      Preserves =
-          mergePreserveKind(Preserves, SILAnalysis::PreserveKind::ProgramFlow);
+      PKBuilder.invalidateInstructions();
     }
 
     recursivelyDeleteTriviallyDeadInstructions(UserArray, false,
@@ -1047,7 +1033,7 @@ processFunction(SILFunction &F, bool EnableDiagnostics,
                                                });
   }
 
-  return Preserves;
+  return PKBuilder.getKind();
 }
 
 //===----------------------------------------------------------------------===//
