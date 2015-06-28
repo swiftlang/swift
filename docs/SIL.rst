@@ -348,9 +348,11 @@ A type ``T`` is a *legal SIL type* if:
 - it is a function type which satisfies the constraints (below) on
   function types in SIL,
 
-- it is a tuple type whose element types are legal SIL types, or
+- it is a tuple type whose element types are legal SIL types,
 
-- it is a legal Swift type that is not a function, tuple, or l-value type.
+- it is a legal Swift type that is not a function, tuple, or l-value type, or
+
+- it is a ``@box`` containing a legal SIL type.
 
 Note that types in other recursive positions in the type grammar are
 still formal types.  For example, the instance type of a metatype or
@@ -399,6 +401,15 @@ type as the first result of ``alloc_stack`` and the operand of
 
 Local-storage address types are not *first-class* in the same sense
 that address types are not first-class.
+
+Box Types
+`````````
+
+Captured local variables and the payloads of ``indirect`` value types are stored
+on the heap. The type ``@box T`` is a reference-counted type that references
+a box containing a mutable value of type ``T``. Boxes always use Swift-native
+reference counting, so they can be queried for uniqueness and cast to the
+``Builtin.NativeObject`` type.
 
 Function Types
 ``````````````
@@ -697,7 +708,7 @@ to multiple-value instructions choose the value by following the ``%name`` with
   // value address %box#1
   %box = alloc_box $Int64
   // Refer to the refcounted pointer
-  strong_retain %box#0 : $Builtin.ObjectPointer
+  strong_retain %box#0 : $@box Int64
   // Refer to the address
   store %value to %box#1 : $*Int64
 
@@ -1434,11 +1445,11 @@ implementation level, but unlike SIL addresses, they are first class values and
 can be ``capture``-d and alias. Swift, however, is memory-safe and statically
 typed, so aliasing of classes is constrained by the type system as follows:
 
-* A ``Builtin.ObjectPointer`` may alias any native Swift heap object,
+* A ``Builtin.NativeObject`` may alias any native Swift heap object,
   including a Swift class instance, a box allocated by ``alloc_box``,
   or a thick function's closure context.
   It may not alias natively Objective-C class instances.
-* A ``Builtin.ObjCPointer`` may alias any class instance, whether Swift or
+* A ``Builtin.UnknownObject`` may alias any class instance, whether Swift or
   Objective-C, but may not alias non-class-instance heap objects.
 * Two values of the same class type ``$C`` may alias. Two values of related
   class type ``$B`` and ``$D``, where there is a subclass relationship between
@@ -1653,14 +1664,14 @@ alloc_box
 
   %1 = alloc_box $T
   // %1 has two values:
-  //   %1#0 has type $Builtin.ObjectPointer
+  //   %1#0 has type $@box T
   //   %1#1 has type $*T
 
-Allocates a reference-counted "box" on the heap large enough to hold a value of
-type ``T``, along with a retain count and any other metadata required by the
-runtime.  The result of the instruction is a two-value operand;
-the first value is the reference-counted ``ObjectPointer`` that owns the box,
-and the second value is the address of the value inside the box.
+Allocates a reference-counted ``@box`` on the heap large enough to hold a value
+of type ``T``, along with a retain count and any other metadata required by the
+runtime.  The result of the instruction is a two-value operand; the first value
+is the reference-counted ``@box`` reference that owns the box, and the second
+value is the address of the value inside the box.
 
 The box will be initialized with a retain count of 1; the storage will be
 uninitialized. The box owns the contained value, and releasing it to a retain
@@ -1707,9 +1718,9 @@ dealloc_box
 ```````````
 ::
 
-  sil-instruction ::= 'dealloc_box' sil-type ',' sil-operand
+  sil-instruction ::= 'dealloc_box' sil-operand
 
-  dealloc_box $Int, %0 : $Builtin.ObjectPointer
+  dealloc_box %0 : $@box T
 
 Deallocates a box, bypassing the reference counting mechanism. The box
 variable must have a retain count of one. The boxed type must match the
@@ -1719,6 +1730,18 @@ undefined behavior results.
 This does not destroy the boxed value. The contents of the
 value must have been fully uninitialized or destroyed before
 ``dealloc_box`` is applied.
+
+project_box
+```````````
+::
+
+  sil-instruction ::= 'project_box' sil-operand
+
+  %1 = project_box %0 : $@box T
+
+  // %1 has type $*T
+
+Given a ``@box T`` reference, produces the address of the value inside the box.
 
 dealloc_ref
 ```````````
@@ -2630,8 +2653,8 @@ following example::
 
 lowers to an uncurried entry point and is curried in the enclosing function::
   
-  func @bar : $@thin (Int, Builtin.ObjectPointer, *Int) -> Int {
-  entry(%y : $Int, %x_box : $Builtin.ObjectPointer, %x_address : $*Int):
+  func @bar : $@thin (Int, @box Int, *Int) -> Int {
+  entry(%y : $Int, %x_box : $@box Int, %x_address : $*Int):
     // ... body of bar ...
   }
 
