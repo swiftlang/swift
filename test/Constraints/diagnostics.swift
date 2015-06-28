@@ -140,8 +140,32 @@ func recArea(h: Int, w : Int) {
   return h * w  // expected-error {{unexpected non-void return value in void function}}
 }
 
+// <rdar://problem/17224804> QoI: Error In Ternary Condition is Wrong
 func r17224804(monthNumber : Int) {
   // expected-error @+2 {{binary operator '+' cannot be applied to operands of type 'String' and 'Int'}}
   // expected-note @+1 {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (String, String), (UnsafeMutablePointer<Memory>, Int), (UnsafePointer<Memory>, Int)}}
   let monthString = (monthNumber <= 9) ? ("0" + monthNumber) : String(monthNumber)
 }
+
+// <rdar://problem/17020197> QoI: Operand of postfix '!' should have optional type; type is 'Int?'
+func r17020197(x : Int?, y : Int) {
+  if x! {  }  // expected-error {{type 'Int' does not conform to protocol 'BooleanType'}}
+
+  // <rdar://problem/12939553> QoI: diagnostic for using an integer in a condition is utterly terrible
+  if y {}    // expected-error {{type 'Int' does not conform to protocol 'BooleanType'}}
+}
+
+// <rdar://problem/20714480> QoI: Boolean expr not treated as Bool type when function return type is different
+func validateSaveButton(text: String) {
+  return (text.characters.count > 0) ? true : false  // expected-error {{unexpected non-void return value in void function}}
+}
+
+// <rdar://problem/20201968> QoI: poor diagnostic when calling a class method via a metatype
+class r20201968C {
+  func blah() {
+    r20201968C.blah()  // expected-error {{missing argument for parameter #1 in call}}
+  }
+}
+
+
+
