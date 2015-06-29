@@ -265,67 +265,41 @@ var SequenceTypeAlgorithms = TestSuite("SequenceTypeAlgorithms")
 
 //===--- Demonstrate technique for testing generic dispatching ------------===//
 // A counter we can use to record calls to our non-customizable operation
-var countNotCustomizable = TypeIndexed(0)
 
-// Add a non-customizable operation to sequence
-extension SequenceType {
-  func notCustomizable() {
-    // This is not typical, but for the purposes of this demonstration
-    // we'll bump a counter Void (used as a dummy). It allows us to
-    // demonstrate where the implementation of the operation that
-    // comes from the protocol extension is called.
-    ++countNotCustomizable[Void.self]
+var _nonCustomizableOperation = TypeIndexed(0)
+extension SequenceLog {
+  static var nonCustomizableOperation : TypeIndexed<Int> {
+    get {return _nonCustomizableOperation}
+    set {_nonCustomizableOperation = newValue}
   }
 }
 
-// Extend InstrumentedSequence to shadow the new operation.  When
+// Add a non-customizable operation to sequence
+extension SequenceType {
+  func nonCustomizableOperation() {}
+}
+
+// Extend LoggingSequence to shadow the new operation.  When
 // requirements are added to a protocol 'P', there should be an
 // implementation in 'InstrumentedP' that does some bookeeping for
 // testing (like counting calls to the operation) and then dispatches
 // to the same operation on its 'base' member.  InstrumentedSequence
 // already contains implementations of all the SequenceType
 // requirements.
-extension InstrumentedSequence {
-  func notCustomizable() {
-    ++countNotCustomizable[self.dynamicType]
-    return base.notCustomizable()
+extension LoggingSequence {
+  func nonCustomizableOperation() {
+    ++Log.nonCustomizableOperation[self.dynamicType]
+    return base.nonCustomizableOperation()
   }
 }
 
 SequenceTypeAlgorithms.test("Demonstration/NotCustomizable") {
-  // Direct context
-  //
-  // directly call the operation on an InstrumentedSequence.
-  let direct = InstrumentedSequence(0..<5)
-  countNotCustomizable = TypeIndexed(0)     // reset the operation count
-  direct.notCustomizable()                  // invoke the operation
-
-  // Because InstrumentedSequence forwards to its base property, after
-  // counting one operation on the type of direct, we forward to
-  // the "default" implementation in SequenceType, which explains the
-  // presence of Void.
-  expectEqual(                              
-    [direct.dynamicType: 1, Void.self: 1],
-    countNotCustomizable)                 
-
-  // Generic context.
-  //
-  // Wrap direct in another layer of InstrumentedSequence.  When
-  // InstrumentedSequence forwards to its base, it happens in a
-  // generic context.  If the operation is a customization point (a
-  // requirement), we'll observe that the operation was called on the
-  // inner InstrumentedSequence /and/ the outer one.  In this case, we
-  // only see a call to the outer InstrumentedSequence, and within its
-  // generic context, forwarding to its base goes directly to the
-  // implementation in the protocol extension, bypassing the inner
-  // InstrumentedSequence.
-  let generic = InstrumentedSequence(direct)
-  countNotCustomizable = TypeIndexed(0)
-  generic.notCustomizable()
-  expectEqual([generic.dynamicType: 1, Void.self: 1], countNotCustomizable)
-
-  // FIXME: the entire test can be done with two layers of wrapping
-  // and one call to the operation.
+  let tester = SequenceLog.dispatchTester([OpaqueValue(1)])
+  tester.log.nonCustomizableOperation.reset()
+  
+  tester.nonCustomizableOperation()
+  
+  expectNotCustomizable(tester, tester.log.nonCustomizableOperation)
 }
 
 //===----------------------------------------------------------------------===//
@@ -1077,19 +1051,10 @@ typealias StrictSequenceOfEquatable = MinimalSequence<MinimalEquatableValue>
 // typealias StrictSequence = MinimalSequence
 
 SequenceTypeAlgorithms.test("contains/WhereElementIsEquatable/dispatch") {
-  // Static context.
-  count_customContainsEquatableElement = TypeIndexed(0)
-  let direct = InstrumentedSequence([MinimalEquatableValue(1)])
-  _ = direct.contains(MinimalEquatableValue(1))
-  expectEqual([direct.dynamicType: 1], count_customContainsEquatableElement)
-
-  // Generic context.
-  count_customContainsEquatableElement = TypeIndexed(0)
-  let generic = InstrumentedSequence(direct)
-  _ = generic.contains(MinimalEquatableValue(1))
-  expectEqual(
-    [direct.dynamicType: 1, generic.dynamicType: 1],
-    count_customContainsEquatableElement)
+  let tester = SequenceLog.dispatchTester([MinimalEquatableValue(1)])
+  tester.log._customContainsEquatableElement.reset()
+  _ = tester.contains(MinimalEquatableValue(1))
+  expectCustomizable(tester, tester.log._customContainsEquatableElement)
 }
 
 SequenceTypeAlgorithms.test("contains/WhereElementIsEquatable/semantics") {

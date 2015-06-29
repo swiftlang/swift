@@ -24,6 +24,8 @@ public struct TypeIndexed<Value> {
     }
   }
 
+  public mutating func reset() { byType = [:] }
+
   internal var byType: [ObjectIdentifier:Value] = [:]
   internal var defaultValue: Value
 }
