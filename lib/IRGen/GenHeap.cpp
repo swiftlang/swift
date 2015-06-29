@@ -1080,7 +1080,8 @@ public:
   OwnedAddress
   allocate(IRGenFunction &IGF, SILType boxedType,
            const llvm::Twine &name) const override {
-    return OwnedAddress(getUndefAddress(), IGF.IGM.RefCountedNull);
+    return OwnedAddress(IGF.getTypeInfo(boxedType).getUndefAddress(),
+                        IGF.IGM.RefCountedNull);
   }
 
   void
@@ -1092,7 +1093,7 @@ public:
   Address
   project(IRGenFunction &IGF, llvm::Value *box, SILType boxedType)
   const override {
-    return getUndefAddress();
+    return IGF.getTypeInfo(boxedType).getUndefAddress();
   }
 };
 

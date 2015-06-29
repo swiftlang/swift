@@ -503,3 +503,16 @@ bb0:
  %2 = tuple ()
  return %2 : $()
 }
+
+sil public_external @partial_empty_box : $@convention(thin) (@owned @box (), @inout ()) -> ()
+
+// CHECK-LABEL: define void @empty_box()
+sil @empty_box : $@convention(thin) () -> () {
+entry:
+  // CHECK: store %swift.refcounted* null
+  // CHECK: store %swift.opaque* undef
+  %b = alloc_box $()
+  %f = function_ref @partial_empty_box : $@convention(thin) (@owned @box (), @inout ()) -> ()
+  %g = partial_apply %f(%b#0, %b#1) : $@convention(thin) (@owned @box (), @inout ()) -> ()
+  return undef : $()
+}
