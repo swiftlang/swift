@@ -655,16 +655,30 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // protocol members, let the checks below determine if the two choices are
     // 'identical' or not. This allows us to structurally unify disparate
     // protocol members during overload resolution.
+    // FIXME: Along with the FIXME below, this is a hack to work around
+    // problems with restating requirements in protocols.
+    bool decl1InSubprotocol = false;
+    bool decl2InSubprotocol = false;
     if ((dc1->getContextKind() == DeclContextKind::NominalTypeDecl) &&
         (dc1->getContextKind() == dc2->getContextKind())) {
       
-        auto ntd1 = dyn_cast<NominalTypeDecl>(dc1);
-        auto ntd2 = dyn_cast<NominalTypeDecl>(dc2);
-        
-        identical = (ntd1 != ntd2) &&
-                    (ntd1->getKind() == DeclKind::Protocol) &&
-                    (ntd2->getKind() == DeclKind::Protocol);
+      auto ntd1 = dyn_cast<NominalTypeDecl>(dc1);
+      auto ntd2 = dyn_cast<NominalTypeDecl>(dc2);
       
+      identical = (ntd1 != ntd2) &&
+                  (ntd1->getKind() == DeclKind::Protocol) &&
+                  (ntd2->getKind() == DeclKind::Protocol);
+
+      // FIXME: This hack tells us to prefer members of subprotocols over
+      // those of the protocols they inherit, if all else fails.
+      // If we were properly handling overrides of protocol members when
+      // requirements get restated, it would not be necessary.
+      if (identical) {
+        decl1InSubprotocol = cast<ProtocolDecl>(ntd1)->inheritsFrom(
+                               cast<ProtocolDecl>(ntd2));
+        decl2InSubprotocol = cast<ProtocolDecl>(ntd2)->inheritsFrom(
+                               cast<ProtocolDecl>(ntd1));
+      }
     } else {
       identical = false;
     }
@@ -773,6 +787,14 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
         
         if (isDeclMoreConstrainedThan(decl2, decl1)) {
           foundRefinement2 = true;
+        }
+      }
+
+      // FIXME: The rest of the hack for restating requirements.
+      if (!(foundRefinement1 && foundRefinement2)) {
+        if (identical && decl1InSubprotocol != decl2InSubprotocol) {
+          foundRefinement1 = decl1InSubprotocol;
+          foundRefinement2 = decl2InSubprotocol;
         }
       }
 

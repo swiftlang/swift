@@ -35,3 +35,25 @@ C: MutableCollectionType
 ) {
   var _: C.Generator.Element = elements[i] // should not error
 }
+
+// rdar://problem/21322215
+protocol FactoryType {
+  typealias Item
+}
+
+protocol MyCollectionType : Swift.CollectionType {}
+
+struct TestClass<
+  Factory: FactoryType,
+  NodeCollection: MyCollectionType
+  where
+  NodeCollection.Generator.Element == Factory.Item
+> {
+  var flattenedNodes: NodeCollection
+
+  func test() {
+    let node1 = self.flattenedNodes[self.flattenedNodes.startIndex]
+    let typecheck1: NodeCollection.Generator.Element = node1
+    _ = typecheck1
+  }
+}

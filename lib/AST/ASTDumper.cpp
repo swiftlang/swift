@@ -1621,6 +1621,10 @@ public:
     OS << E->getAccessSemantics();
     if (E->isSuper())
       OS << " super";
+    if (E->hasDecl()) {
+      OS << "  decl=";
+      E->getDecl().dump(OS);
+    }
     OS << '\n';
     printRec(E->getBase());
     OS << '\n';
