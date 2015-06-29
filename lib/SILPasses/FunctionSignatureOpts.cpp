@@ -792,31 +792,31 @@ static bool isSpecializableRepresentation(SILFunctionTypeRepresentation Rep) {
 
 /// Returns true if F is a function which the pass know show to specialize
 /// function signatures for.
-static bool canSpecializeFunction(SILFunction &F) {
+static bool canSpecializeFunction(SILFunction *F) {
   // Do not specialize the signature of SILFunctions that are external
   // declarations since there is no body to optimize.
-  if (F.isExternalDeclaration())
+  if (F->isExternalDeclaration())
     return false;
 
   // Do not specialize functions that are available externally. If an external
   // function was able to be specialized, it would have been specialized in its
   // own module. We will inline the original function as a thunk. The thunk will
   // call the specialized function.
-  if (F.isAvailableExternally())
+  if (F->isAvailableExternally())
     return false;
 
   // Do not specialize the signature of always inline functions. We
   // will just inline them and specialize each one of the individual
   // functions that these sorts of functions are inlined into.
-  if (F.getInlineStrategy() == Inline_t::AlwaysInline)
+  if (F->getInlineStrategy() == Inline_t::AlwaysInline)
     return false;
 
   // For now ignore generic functions to keep things simple...
-  if (F.getLoweredFunctionType()->isPolymorphic())
+  if (F->getLoweredFunctionType()->isPolymorphic())
     return false;
 
   // Make sure F has a linkage that we can optimize.
-  if (!isSpecializableRepresentation(F.getRepresentation()))
+  if (!isSpecializableRepresentation(F->getRepresentation()))
     return false;
 
   return true;
@@ -851,46 +851,45 @@ public:
     std::vector<SILFunction *> DeadFunctions;
     DeadFunctions.reserve(128);
 
-    for (auto &F : *M) {
+    // We process functions in Bottom Up SCC Order. Even though we do not
+    // technically need the SCCs, it is more efficient to iterate over the SCCs
+    // and get the CallGraphNodes rather than get a list of functions from the
+    // Nodes and then lookup the Nodes again.
+    for (auto *SCC : CG.getBottomUpSCCOrder()) {
+      for (auto *FNode : SCC->SCCNodes) {
+        SILFunction *F = FNode->getFunction();
 
-      // Don't optimize functions that are marked with the opt.never attribute.
-      if (!F.shouldOptimize())
-        continue;
+        // Don't optimize functions that are marked with the opt.never
+        // attribute.
+        if (!F->shouldOptimize())
+          continue;
 
-      // Check the signature of F to make sure that it is a function that we can
-      // specialize. These are conditions independent of the call graph.
-      if (!canSpecializeFunction(F))
-        continue;
+        // Check the signature of F to make sure that it is a function that we
+        // can
+        // specialize. These are conditions independent of the call graph.
+        if (!canSpecializeFunction(F))
+          continue;
 
-      // Then try and grab F's call graph node.
-      CallGraphNode *FNode = CG.getCallGraphNode(&F);
+        // Now that we have our call graph, grab the CallSites of F.
+        auto &CallSites = FNode->getPartialCallerEdges();
 
-      // If we don't have any call graph information for F, skip F.
-      // FIXME: Update call graph during function signature
-      //        optimization, and change this to an assert.
-      if (!FNode)
-        continue;
+        // If this function is not called anywhere, for now don't do anything.
+        //
+        // TODO: If it is public, it may still make sense to specialize since if
+        // we link in the public function in another module, we may be able to
+        // inline it and access the specialized version.
+        if (CallSites.empty())
+          continue;
 
-      // Now that we have our call graph, grab the CallSites of F.
-      auto &CallSites = FNode->getPartialCallerEdges();
+        // Check if we know the callgraph is complete with respect to this
+        // function. In such a case, we don't need to generate the thunk.
+        bool CallerSetIsComplete = FNode->isCallerEdgesComplete();
 
-      // If this function is not called anywhere, for now don't do anything.
-      //
-      // TODO: If it is public, it may still make sense to specialize since if
-      // we link in the public function in another module, we may be able to
-      // inline it and access the specialized version.
-      if (CallSites.empty())
-        continue;
-
-      // Check if we know the callgraph is complete with respect to this
-      // function. In such a case, we don't need to generate the thunk.
-      bool CallerSetIsComplete = FNode->isCallerEdgesComplete();
-
-      // Otherwise, try to optimize the function signature of F.
-      Changed |= optimizeFunctionSignature(Allocator, RCIA->get(&F),
-                                           &F, FNode, CallSites,
-                                           CallerSetIsComplete,
-                                           DeadFunctions);
+        // Otherwise, try to optimize the function signature of F.
+        Changed |= optimizeFunctionSignature(Allocator, RCIA->get(F), F, FNode,
+                                             CallSites, CallerSetIsComplete,
+                                             DeadFunctions);
+      }
     }
 
     while (!DeadFunctions.empty()) {

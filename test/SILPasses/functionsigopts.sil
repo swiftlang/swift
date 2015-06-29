@@ -334,6 +334,38 @@ bb0(%0 : $Builtin.NativeObject):
   return %2 : $()
 }
 
+// Make sure that we are processing in bottom up order. This test
+// works since the default order in which the SIL Parser places
+// SILFunctions into the SILModule is the order in which the function
+// is parsed. Thus if we are just processing in that order, s3 will
+// call s2 instead of s2 with the dead argument.
+//
+// CHECK-LABEL: sil [fragile] @s3 : $@convention(thin) (Builtin.Int32) -> () {
+// CHECK: [[FUN:%.*]] = function_ref @_TTSf4d__s2
+// CHECK: apply [[FUN]](
+sil [fragile] @s3 : $@convention(thin) (Builtin.Int32) -> () {
+bb0(%0 : $Builtin.Int32):
+  %1 = function_ref @s2 : $@convention(thin) (Builtin.Int32) -> ()
+  apply %1(%0) : $@convention(thin) (Builtin.Int32) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [fragile] [thunk] @s2 : $@convention(thin) (Builtin.Int32) -> () {
+sil [fragile] @s2 : $@convention(thin) (Builtin.Int32) -> () {
+bb0(%0 : $Builtin.Int32):
+  %1 = function_ref @s1 : $@convention(thin) (Builtin.Int32) -> ()
+  apply %1(%0) : $@convention(thin) (Builtin.Int32) -> ()
+  %9999 = tuple()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [fragile] [thunk] @s1 : $@convention(thin) (Builtin.Int32) -> () {
+sil [fragile] @s1 : $@convention(thin) (Builtin.Int32) -> () {
+bb0(%0 : $Builtin.Int32):
+  %9999 = tuple()
+  return %9999 : $()
+}
 
 // Check that we specialized this function by removing the dead argument and
 // copied everything appropriately.
