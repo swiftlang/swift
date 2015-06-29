@@ -128,6 +128,7 @@ bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
 // CHECK-LABEL: sil [fragile] [thunk] @owned_to_guaranteed_simple_singlebb_callee : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 // CHECK: [[FUNC_REF:%[0-9]+]] = function_ref @_TTSf4g__owned_to_guaranteed_simple_singlebb_callee : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
 // CHECK: apply [[FUNC_REF]]
+// CHECK-NOT: fix_lifetime
 // CHECK: release_value
 sil [fragile] @owned_to_guaranteed_simple_singlebb_callee : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
@@ -138,6 +139,7 @@ bb0(%0 : $Builtin.NativeObject):
 
 // Callee to make sure we handle multiple callees properly.
 // CHECK-LABEL: sil [fragile] @owned_to_guaranteed_simple_singlebb_caller1 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK-NOT: fix_lifetime
 // CHECK: release_value
 sil [fragile] @owned_to_guaranteed_simple_singlebb_caller1 : $@convention(thin) (Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
@@ -148,6 +150,7 @@ bb0(%0 : $Builtin.NativeObject):
 }
 
 // CHECK-LABEL: sil [fragile] @owned_to_guaranteed_simple_singlebb_caller2 : $@convention(thin) (Builtin.NativeObject) -> () {
+// CHECK-NOT: fix_lifetime
 // CHECK: release_value
 sil [fragile] @owned_to_guaranteed_simple_singlebb_caller2 : $@convention(thin) (Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
@@ -173,6 +176,7 @@ bb0(%0 : $Builtin.NativeObject):
 // BB. Additionally this test makes sure that we delete dead parameters before
 // invalidating the owned argument -> release map.
 // CHECK-LABEL: sil [fragile] [thunk] @owned_to_guaranteed_multibb_callee_with_release_in_exit : $@convention(thin) (Builtin.Int1, @owned Builtin.NativeObject) -> () {
+// CHECK-NOT: fix_lifetime
 // CHECK: release_value %1 : $Builtin.NativeObject
 sil [fragile] @owned_to_guaranteed_multibb_callee_with_release_in_exit : $@convention(thin) (Builtin.Int1, @owned Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.Int1, %1 : $Builtin.NativeObject):

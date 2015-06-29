@@ -600,7 +600,7 @@ rewriteApplyInstToCallNewFunction(FunctionAnalyzer &Analyzer, SILFunction *NewF,
     AI->replaceAllUsesWith(NewAI);
 
     // If we have any arguments that were consumed but are now guaranteed,
-    // insert a fix lifetime instruction and a release_value.
+    // insert a release_value.
     for (auto &ArgDesc : ArgDescs) {
       if (!ArgDesc.CalleeRelease)
         continue;
@@ -640,12 +640,10 @@ static void createThunkBody(SILBasicBlock *BB, SILFunction *NewF,
                                              ThunkArgs);
 
   // If we have any arguments that were consumed but are now guaranteed,
-  // insert a fix lifetime instruction and a release_value.
+  // insert a release_value.
   for (auto &ArgDesc : ArgDescs) {
     if (!ArgDesc.CalleeRelease)
       continue;
-
-    Builder.createFixLifetime(Loc, BB->getBBArg(ArgDesc.Index));
     Builder.createReleaseValue(Loc, BB->getBBArg(ArgDesc.Index));
   }
 
