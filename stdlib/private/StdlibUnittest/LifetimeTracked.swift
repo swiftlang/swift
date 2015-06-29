@@ -10,19 +10,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-internal var _trackedCount = 0
-internal var _nextTrackedSerialNumber = 0
-
 public final class LifetimeTracked : ForwardIndexType, CustomStringConvertible {
   public init(_ value: Int) {
-    ++_trackedCount
-    serialNumber = ++_nextTrackedSerialNumber
+    ++LifetimeTracked.instances
+    serialNumber = ++LifetimeTracked._nextSerialNumber
     self.value = value
   }
 
   deinit {
     assert(serialNumber > 0, "double destruction!")
-    --_trackedCount
+    --LifetimeTracked.instances
     serialNumber = -serialNumber
   }
 
@@ -38,10 +35,9 @@ public final class LifetimeTracked : ForwardIndexType, CustomStringConvertible {
     return LifetimeTracked(self.value.successor())
   }
 
-  public class var instances: Int {
-    return _trackedCount
-  }
-
+  public static var instances: Int = 0
+  internal static var _nextSerialNumber = 0
+  
   public let value: Int
   public var serialNumber: Int = 0
 }
