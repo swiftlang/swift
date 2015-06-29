@@ -105,6 +105,12 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M) const {
                                           elt->getArgumentInterfaceType());
   auto loweredTy =
     M.Types.getLoweredType(M.Types.getAbstractionPattern(elt), substEltTy);
+
+  // If the case is indirect, then the payload is boxed.
+  if (elt->isIndirect() || elt->getParentEnum()->isIndirect())
+    loweredTy = SILType::getPrimitiveObjectType(
+      SILBoxType::get(loweredTy.getSwiftRValueType()));
+
   return SILType(loweredTy.getSwiftRValueType(), getCategory());
 }
 

@@ -1093,6 +1093,11 @@ namespace {
         }
       }
 
+      // If the whole enum is indirect, then it's always loadable and
+      // nontrivial.
+      if (D->isIndirect())
+        return new (TC, Dependent) LoadableEnumTypeLowering(OrigType);
+
       // If any of the enum elements have address-only data, the enum is
       // address-only.
       bool trivial = true;
@@ -1100,6 +1105,13 @@ namespace {
         // No-payload elements do not affect address-only-ness.
         if (!elt->hasArgumentType())
           continue;
+
+        // Indirect elements make the type nontrivial, but don't affect
+        // address-only-ness.
+        if (elt->isIndirect()) {
+          trivial = false;
+          continue;
+        }
         
         auto substEltType = enumType->getTypeOfMember(
                               D->getModuleContext(),

@@ -1,0 +1,55 @@
+// RUN: %target-swift-frontend -emit-sil -verify %s
+sil_stage canonical
+
+import Swift
+
+indirect enum TreeA<T> {
+  case Nil
+  case Leaf(T)
+  case Branch(left: TreeA<T>, right: TreeA<T>)
+}
+
+enum TreeB<T> {
+  case Nil
+  case Leaf(T)
+  indirect case Branch(left: TreeB<T>, right: TreeB<T>)
+}
+
+enum TreeInt {
+  case Nil
+  case Leaf(Int)
+  indirect case Branch(left: TreeInt, right: TreeInt)
+}
+
+sil @indirect_enum : $@convention(thin) <T> (@owned TreeA<T>) -> () {
+entry(%e : $TreeA<T>):
+  %a = unchecked_enum_data %e : $TreeA<T>, #TreeA.Leaf!enumelt.1
+  %b = project_box %a : $@box T
+
+  %c = unchecked_enum_data %e : $TreeA<T>, #TreeA.Branch!enumelt.1
+  %d = project_box %c : $@box (left: TreeA<T>, right: TreeA<T>)
+
+  return undef : $()
+}
+
+sil @indirect_enum_case_addr_only : $@convention(thin) <T> (@in TreeB<T>) -> () {
+entry(%e : $*TreeB<T>):
+  %a = unchecked_take_enum_data_addr %e : $*TreeB<T>, #TreeB.Leaf!enumelt.1
+  %b = destroy_addr %a : $*T
+
+  %c = unchecked_take_enum_data_addr %e : $*TreeB<T>, #TreeB.Branch!enumelt.1
+  %d = load %c : $*@box (left: TreeB<T>, right: TreeB<T>)
+
+  return undef : $()
+}
+
+sil @indirect_enum_case_loadable : $@convention(thin) (@owned TreeInt) -> () {
+entry(%e : $TreeInt):
+  %a = unchecked_enum_data %e : $TreeInt, #TreeInt.Leaf!enumelt.1
+  store %a to undef : $*Int
+
+  %c = unchecked_enum_data %e : $TreeInt, #TreeInt.Branch!enumelt.1
+  %d = project_box %c : $@box (left: TreeInt, right: TreeInt)
+
+  return undef : $()
+}
