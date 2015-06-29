@@ -117,6 +117,16 @@ struct ThirtySixFieldStruct {
   var b5 : EightFieldStruct
 }
 
+struct SingleFieldLvl1 {
+  var s2: SingleFieldLvl2
+}
+struct SingleFieldLvl2 {
+  var s3: SingleFieldLvl3
+}
+struct SingleFieldLvl3 {
+  var s4: Builtin.Int16
+}
+
 
 ///////////
 // Tests //
@@ -366,32 +376,32 @@ bb0(%0 : $Builtin.Int256, %1 : $S5, %2 : $Builtin.Int128):
 }
 
 /// This test makes sure that we ignore pointer arguments for now.
-// CHECK-LABEL: sil [fragile] [thunk] @ignore_ptrs_callee : $@convention(thin) (@in S1, S0, S0) -> (Builtin.Int16, Builtin.Int16) {
-// CHECK: bb0([[IN1:%.*]] : $*S1, [[IN2:%.*]] : $S0, [[IN3:%.*]] : $S0):
+// CHECK-LABEL: sil [fragile] [thunk] @ignore_ptrs_callee : $@convention(thin) (@in S1, S1, S1) -> (Builtin.Int16, Builtin.Int16) {
+// CHECK: bb0([[IN1:%.*]] : $*S1, [[IN2:%.*]] : $S1, [[IN3:%.*]] : $S1):
 // CHECK: [[FN:%.*]] = function_ref @_TTSf4n_s_s__ignore_ptrs_callee : $@convention(thin) (@in S1, Builtin.Int16, Builtin.Int16) -> (Builtin.Int16, Builtin.Int16)
-// CHECK: [[EXT1:%.*]] = struct_extract [[IN2]] : $S0, #S0.f
-// CHECK: [[EXT2:%.*]] = struct_extract [[IN3]] : $S0, #S0.f
+// CHECK: [[EXT1:%.*]] = struct_extract [[IN2]] : $S1, #S1.f1
+// CHECK: [[EXT2:%.*]] = struct_extract [[IN3]] : $S1, #S1.f1
 // CHECK: apply [[FN]]([[IN1]], [[EXT1]], [[EXT2]]) : $@convention(thin) (@in S1, Builtin.Int16, Builtin.Int16) -> (Builtin.Int16, Builtin.Int16)
-sil [fragile] @ignore_ptrs_callee : $@convention(thin) (@in S1, S0, S0) -> (Builtin.Int16, Builtin.Int16) {
-bb0(%0 : $*S1, %1 : $S0, %2 : $S0):
+sil [fragile] @ignore_ptrs_callee : $@convention(thin) (@in S1, S1, S1) -> (Builtin.Int16, Builtin.Int16) {
+bb0(%0 : $*S1, %1 : $S1, %2 : $S1):
   %3 = function_ref @s1_ptr_user : $@convention(thin) (@in S1) -> ()
   %4 = apply %3(%0) : $@convention(thin) (@in S1) -> ()
-  %5 = struct_extract %1 : $S0, #S0.f
-  %6 = struct_extract %2 : $S0, #S0.f
+  %5 = struct_extract %1 : $S1, #S1.f1
+  %6 = struct_extract %2 : $S1, #S1.f1
   %7 = tuple(%5 : $Builtin.Int16, %6 : $Builtin.Int16)
   return %7 : $(Builtin.Int16, Builtin.Int16)
 }
 
-// CHECK-LABEL: sil [fragile] @ignore_ptrs_caller : $@convention(thin) (@in S1, S0, S0) -> () {
-// CHECK: bb0([[IN1:%.*]] : $*S1, [[IN2:%.*]] : $S0, [[IN3:%.*]] : $S0):
+// CHECK-LABEL: sil [fragile] @ignore_ptrs_caller : $@convention(thin) (@in S1, S1, S1) -> () {
+// CHECK: bb0([[IN1:%.*]] : $*S1, [[IN2:%.*]] : $S1, [[IN3:%.*]] : $S1):
 // CHECK: [[FN:%.*]] = function_ref @_TTSf4n_s_s__ignore_ptrs_callee : $@convention(thin) (@in S1, Builtin.Int16, Builtin.Int16) -> (Builtin.Int16, Builtin.Int16)
-// CHECK: [[EXT1:%.*]] = struct_extract [[IN2]] : $S0, #S0.f
-// CHECK: [[EXT2:%.*]] = struct_extract [[IN3]] : $S0, #S0.f
+// CHECK: [[EXT1:%.*]] = struct_extract [[IN2]] : $S1, #S1.f1
+// CHECK: [[EXT2:%.*]] = struct_extract [[IN3]] : $S1, #S1.f1
 // CHECK: apply [[FN]]([[IN1]], [[EXT1]], [[EXT2]]) : $@convention(thin) (@in S1, Builtin.Int16, Builtin.Int16) -> (Builtin.Int16, Builtin.Int16)
-sil [fragile] @ignore_ptrs_caller : $@convention(thin) (@in S1, S0, S0) -> () {
-bb0(%0 : $*S1, %1 : $S0, %2 : $S0):
-  %3 = function_ref @ignore_ptrs_callee : $@convention(thin) (@in S1, S0, S0) -> (Builtin.Int16, Builtin.Int16)
-  %4 = apply %3(%0, %1, %2) : $@convention(thin) (@in S1, S0, S0) -> (Builtin.Int16, Builtin.Int16)
+sil [fragile] @ignore_ptrs_caller : $@convention(thin) (@in S1, S1, S1) -> () {
+bb0(%0 : $*S1, %1 : $S1, %2 : $S1):
+  %3 = function_ref @ignore_ptrs_callee : $@convention(thin) (@in S1, S1, S1) -> (Builtin.Int16, Builtin.Int16)
+  %4 = apply %3(%0, %1, %2) : $@convention(thin) (@in S1, S1, S1) -> (Builtin.Int16, Builtin.Int16)
   %9999 = tuple()
   return %9999 : $()
 }
@@ -561,6 +571,24 @@ bb0(%0 : $ThirtySixFieldStruct):
   return %2 : $Builtin.Int32
 }
 
+// We should not specialize this since SingleFieldLvl1 is a struct that is layout compatible with its only leaf node, %0.s2.s3.s4
+// CHECK-LABEL: sil [fragile] @multiple_level_all_single_field_struct_callee : $@convention(thin) (SingleFieldLvl1) -> Builtin.Int16 {
+sil [fragile] @multiple_level_all_single_field_struct_callee : $@convention(thin) (SingleFieldLvl1) -> Builtin.Int16 {
+bb0(%0 : $SingleFieldLvl1):
+  %1 = struct_extract %0 : $SingleFieldLvl1, #SingleFieldLvl1.s2
+  %2 = struct_extract %1 : $SingleFieldLvl2, #SingleFieldLvl2.s3
+  %3 = struct_extract %2 : $SingleFieldLvl3, #SingleFieldLvl3.s4
+  return %3 : $Builtin.Int16
+}
+
+// CHECK-LABEL: sil [fragile] @multiple_level_all_single_field_struct_caller : $@convention(thin) (SingleFieldLvl1) -> Builtin.Int16 {
+sil [fragile] @multiple_level_all_single_field_struct_caller : $@convention(thin) (SingleFieldLvl1) -> Builtin.Int16 {
+bb0(%0 : $SingleFieldLvl1):
+  %1 = function_ref @multiple_level_all_single_field_struct_callee : $@convention(thin) (SingleFieldLvl1) -> Builtin.Int16
+  %2 = apply %1(%0) : $@convention(thin) (SingleFieldLvl1) -> Builtin.Int16
+  return %2 : $Builtin.Int16
+}
+
 // Check Statements for generated code.
 
 // CHECK-LABEL: sil [fragile] @_TTSf4s__single_level_dead_root_callee : $@convention(thin) (Builtin.Int32) -> Builtin.Int32 {
@@ -630,8 +658,8 @@ bb0(%0 : $ThirtySixFieldStruct):
 // CHECK: bb0([[IN1:%.*]] : $*S1, [[IN2:%.*]] : $Builtin.Int16, [[IN3:%.*]] : $Builtin.Int16):
 // CHECK: [[FN:%.*]] = function_ref @s1_ptr_user : $@convention(thin) (@in S1) -> ()
 // CHECK: apply [[FN]]([[IN1]]) : $@convention(thin) (@in S1) -> ()
-// CHECK: struct_extract undef : $S0, #S0.f
-// CHECK: struct_extract undef : $S0, #S0.f
+// CHECK: struct_extract undef : $S1, #S1.f1
+// CHECK: struct_extract undef : $S1, #S1.f1
 // CHECK: [[OUT:%.*]] = tuple ([[IN2]] : $Builtin.Int16, [[IN3]] : $Builtin.Int16)
 // CHECK: return [[OUT]] : $(Builtin.Int16, Builtin.Int16)
 

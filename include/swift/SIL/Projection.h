@@ -622,7 +622,28 @@ public:
   }
 
   bool isSingleton() const {
-    return ProjectionTreeNodes.size() == 1;
+    // If we only have one root node, there is no interesting explosion
+    // here. Exit early.
+    if (ProjectionTreeNodes.size() == 1)
+      return true;
+
+    // Now we know that we have multiple level node hierarchy. See if we have a
+    // linear list of nodes down to a singular leaf node.
+    auto *Node = getRoot();
+    while (Node->ChildProjections.size() <= 1) {
+      // If this node does not have any child projections, then it is a leaf
+      // node. If we have not existed at this point then all of our parents must
+      // have only had one child as well. So return true.
+      if (Node->ChildProjections.empty())
+        return true;
+
+      // Otherwise, Node only has one Child. Set Node to that child and continue
+      // searching.
+      Node = getNode(Node->ChildProjections[0]);
+    }
+
+    // Otherwise this Node has multiple children, return false.
+    return false;
   }
 
   void getLeafTypes(llvm::SmallVectorImpl<SILType> &OutArray) const {

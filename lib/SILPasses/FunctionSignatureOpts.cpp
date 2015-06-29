@@ -134,7 +134,9 @@ struct ArgumentDescriptor {
     if (!canOptimizeLiveArg())
       return false;
 
-    // We should not bother with single element aggregates.
+    // See if the projection tree consists of potentially multiple levels of
+    // structs containing one field. In such a case, there is no point in
+    // exploding the argument.
     if (ProjTree.isSingleton())
       return false;
 
