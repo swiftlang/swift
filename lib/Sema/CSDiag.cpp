@@ -1424,6 +1424,184 @@ static std::string getTypeListString(Type type) {
 }
 
 
+/// If an UnresolvedDotExpr has been resolved by the constraint system, return
+/// the decl that it references.
+static ValueDecl *findResolvedMemberRef(ConstraintLocator *locator,
+                                        ConstraintSystem &CS) {
+  auto *resolvedOverloadSets = CS.getResolvedOverloadSets();
+  if (!resolvedOverloadSets) return nullptr;
+
+  // Search through the resolvedOverloadSets to see if we have a resolution for
+  // this member.  This is an O(n) search, but only happens when producing an
+  // error diagnostic.
+  for (auto resolved = resolvedOverloadSets;
+       resolved; resolved = resolved->Previous) {
+    if (resolved->Locator != locator) continue;
+
+    // We only handle the simplest decl binding.
+    if (resolved->Choice.getKind() != OverloadChoiceKind::Decl)
+      return nullptr;
+    return resolved->Choice.getDecl();
+  }
+
+  return nullptr;
+}
+
+
+/// Given an expression that has a non-lvalue type, dig into it until we find
+/// the part of the expression that prevents the entire subexpression from being
+/// mutable.  For example, in a sequence like "x.v.v = 42" we want to complain
+/// about "x" being a let property if "v.v" are both mutable.
+///
+/// This returns the base subexpression that looks immutable (or that can't be
+/// analyzed any further) along with a decl extracted from it if we could.
+///
+static std::pair<Expr*, ValueDecl*>
+resolveImmutableBase(Expr *expr, ConstraintSystem &CS) {
+  expr = expr->getSemanticsProvidingExpr();
+
+  // Provide specific diagnostics for assignment to subscripts whose base expr
+  // is known to be an rvalue.
+  if (auto *SE = dyn_cast<SubscriptExpr>(expr)) {
+    // If we found a decl for the subscript, check to see if it is a set-only
+    // subscript decl.
+    auto loc = CS.getConstraintLocator(SE, ConstraintLocator::SubscriptMember);
+    auto *member =
+      dyn_cast_or_null<SubscriptDecl>(findResolvedMemberRef(loc, CS));
+
+    // If it isn't settable, return it.
+    if (member) {
+      if (!member->isSettable() ||
+          !member->isSetterAccessibleFrom(CS.DC))
+        return { expr, member };
+    }
+
+    // If it is settable, then the base must be the problem, recurse.
+    return resolveImmutableBase(SE->getBase(), CS);
+  }
+
+  // Look through property references.
+  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
+    // If we found a decl for the UDE, check it.
+    auto loc = CS.getConstraintLocator(UDE, ConstraintLocator::Member);
+    auto *member = dyn_cast_or_null<VarDecl>(findResolvedMemberRef(loc, CS));
+
+    // If the member isn't settable, then it is the problem: return it.
+    if (member) {
+      if (!member->isSettable(nullptr) ||
+          !member->isSetterAccessibleFrom(CS.DC))
+        return { expr, member };
+    }
+
+    // If we weren't able to resolve a member or if it is mutable, then the
+    // problem must be with the base, recurse.
+    return resolveImmutableBase(UDE->getBase(), CS);
+  }
+
+  if (auto *MRE = dyn_cast<MemberRefExpr>(expr)) {
+    // If the member isn't settable, then it is the problem: return it.
+    if (auto member = dyn_cast<AbstractStorageDecl>(MRE->getMember().getDecl()))
+      if (!member->isSettable(nullptr) ||
+          !member->isSetterAccessibleFrom(CS.DC))
+        return { expr, member };
+
+    // If we weren't able to resolve a member or if it is mutable, then the
+    // problem must be with the base, recurse.
+    return resolveImmutableBase(MRE->getBase(), CS);
+  }
+
+  if (auto *DRE = dyn_cast<DeclRefExpr>(expr))
+    return { expr, DRE->getDecl() };
+
+  // Look through x!
+  if (auto *FVE = dyn_cast<ForceValueExpr>(expr))
+    return resolveImmutableBase(FVE->getSubExpr(), CS);
+  
+  return { expr, nullptr };
+}
+
+static void diagnoseSubElementFailure(Expr *destExpr,
+                                      SourceLoc loc,
+                                      ConstraintSystem &CS,
+                                      Diag<StringRef> diagID,
+                                      Diag<Type> unknownDiagID) {
+  auto &TC = CS.getTypeChecker();
+  
+  // Walk through the destination expression, resolving what the problem is.  If
+  // we find a node in the lvalue path that is problematic, this returns it.
+  auto immInfo = resolveImmutableBase(destExpr, CS);
+
+  // Otherwise, we cannot resolve this because the available setter candidates
+  // are all mutating and the base must be mutating.  If we dug out a
+  // problematic decl, we can produce a nice tailored diagnostic.
+  if (auto *VD = dyn_cast_or_null<VarDecl>(immInfo.second)) {
+    std::string message = "'";
+    message += VD->getName().str().str();
+    message += "'";
+ 
+    if (VD->isImplicit())
+      message += " is immutable";
+    else if (VD->isLet())
+      message += " is a 'let' constant";
+    else if (VD->hasAccessorFunctions() && !VD->getSetter())
+      message += " is a get-only property";
+    else if (!VD->isSetterAccessibleFrom(CS.DC))
+      message += " setter is inaccessible";
+    else {
+      message += " is immutable";
+    }
+    TC.diagnose(loc, diagID, message)
+      .highlight(immInfo.first->getSourceRange());
+    
+    // If this is a simple variable marked with a 'let', emit a note to fixit
+    // hint it to 'var'.
+    VD->emitLetToVarNoteIfSimple(CS.DC);
+    return;
+  }
+
+  // If the underlying expression was a read-only subscript, diagnose that.
+  if (auto *SD = dyn_cast_or_null<SubscriptDecl>(immInfo.second)) {
+    StringRef message;
+    if (!SD->getSetter())
+      message = "subscript is get-only";
+    else if (!SD->isSetterAccessibleFrom(CS.DC))
+      message = "subscript setter is inaccessible";
+    else
+      message = "subscript is immutable";
+
+    TC.diagnose(loc, diagID, message)
+      .highlight(immInfo.first->getSourceRange());
+    return;
+  }
+
+  // If the expression is the result of a call, it is an rvalue, not a mutable
+  // lvalue.
+  if (auto *AE = dyn_cast<ApplyExpr>(immInfo.first)) {
+    std::string name = "call";
+    if (isa<PrefixUnaryExpr>(AE) || isa<PostfixUnaryExpr>(AE))
+      name = "unary operator";
+    else if (isa<BinaryExpr>(AE))
+      name = "binary operator";
+    else if (isa<CallExpr>(AE))
+      name = "function call";
+    else if (isa<DotSyntaxCallExpr>(AE) || isa<DotSyntaxBaseIgnoredExpr>(AE))
+      name = "method call";
+
+    if (auto *DRE =
+          dyn_cast<DeclRefExpr>(AE->getFn()->getSemanticsProvidingExpr()))
+      name = std::string("'") + DRE->getDecl()->getName().str().str() + "'";
+
+    TC.diagnose(loc, diagID, name + " returns immutable value")
+      .highlight(AE->getSourceRange());
+    return;
+  }
+
+  TC.diagnose(loc, unknownDiagID, destExpr->getType())
+    .highlight(immInfo.first->getSourceRange());
+}
+
+
+
 namespace {
 /// If a constraint system fails to converge on a solution for a given
 /// expression, this class can produce a reasonable diagnostic for the failure
@@ -1681,9 +1859,11 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure() {
   while (call && isa<IdentityExpr>(call))
     call = expr->getParentMap()[call];
   
+  // Do some sanity checking based on the call: e.g. make sure we're invoking
+  // the overloaded decl, not using it as an argument.
   Type argType;
-  
-  if (call && isa<ApplyExpr>(call))
+  if (call && isa<ApplyExpr>(call) &&
+      cast<ApplyExpr>(call)->getFn()->getSemanticsProvidingExpr() == anchor)
     argType = getDiagnosticTypeFromExpr(call);
   
   if (argType.isNull() || argType->is<TypeVariableType>()) {
@@ -1693,7 +1873,31 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure() {
     return true;
   }
   
+  // Otherwise, we have a good grasp on what is going on: we have a call of an
+  // unresolve overload set.  Try to dig out the candidates.
   auto apply = cast<ApplyExpr>(call);
+
+  CandidateCloseness candidateCloseness;
+  auto Candidates = collectCalleeCandidateInfo(apply->getFn(), argType,
+                                               candidateCloseness);
+
+  
+  // A common error is to apply an operator that only has an inout LHS (e.g. +=)
+  // to non-lvalues (e.g. a local let).  Produce a nice diagnostic for this
+  // case.
+  if (candidateCloseness == CC_NonLValueInOut) {
+    Expr *firstArg = apply->getArg();
+    if (auto *tuple = dyn_cast<TupleExpr>(firstArg))
+      if (tuple->getNumElements())
+        firstArg = tuple->getElement(0);
+    
+    diagnoseSubElementFailure(firstArg, apply->getLoc(), *CS,
+                              diag::cannot_apply_lvalue_binop_to_subelement,
+                              diag::cannot_apply_lvalue_binop_to_rvalue);
+    return true;
+  }
+
+  
   if (argType->getAs<TupleType>()) {
     CS->TC.diagnose(apply->getFn()->getLoc(),
                     diag::cannot_find_appropriate_overload_with_type_list,
@@ -1705,6 +1909,16 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure() {
                     overloadName.str(), getTypeListString(argType))
     .highlight(apply->getSourceRange());
   }
+  if (auto ODRE = dyn_cast<OverloadedDeclRefExpr>(anchor)) {
+    SmallVector<Type, 16> paramLists;
+    for (auto DRE : ODRE->getDecls())
+      if (auto fnType = DRE->getType()->getAs<AnyFunctionType>())
+        paramLists.push_back(fnType->getInput());
+    
+    suggestPotentialOverloads(overloadName.str(), apply->getLoc(),
+                              paramLists, argType);
+  }
+
   return true;
 }
 
@@ -1945,183 +2159,6 @@ void FailureDiagnosis::suggestPotentialOverloads(StringRef functionName,
 }
 
 
-/// If an UnresolvedDotExpr has been resolved by the constraint system, return
-/// the decl that it references.
-static ValueDecl *findResolvedMemberRef(ConstraintLocator *locator,
-                                        ConstraintSystem &CS) {
-  auto *resolvedOverloadSets = CS.getResolvedOverloadSets();
-  if (!resolvedOverloadSets) return nullptr;
-
-  // Search through the resolvedOverloadSets to see if we have a resolution for
-  // this member.  This is an O(n) search, but only happens when producing an
-  // error diagnostic.
-  for (auto resolved = resolvedOverloadSets;
-       resolved; resolved = resolved->Previous) {
-    if (resolved->Locator != locator) continue;
-
-    // We only handle the simplest decl binding.
-    if (resolved->Choice.getKind() != OverloadChoiceKind::Decl)
-      return nullptr;
-    return resolved->Choice.getDecl();
-  }
-
-  return nullptr;
-}
-
-
-/// Given an expression that has a non-lvalue type, dig into it until we find
-/// the part of the expression that prevents the entire subexpression from being
-/// mutable.  For example, in a sequence like "x.v.v = 42" we want to complain
-/// about "x" being a let property if "v.v" are both mutable.
-///
-/// This returns the base subexpression that looks immutable (or that can't be
-/// analyzed any further) along with a decl extracted from it if we could.
-///
-static std::pair<Expr*, ValueDecl*>
-resolveImmutableBase(Expr *expr, ConstraintSystem &CS) {
-  expr = expr->getSemanticsProvidingExpr();
-
-  // Provide specific diagnostics for assignment to subscripts whose base expr
-  // is known to be an rvalue.
-  if (auto *SE = dyn_cast<SubscriptExpr>(expr)) {
-    // If we found a decl for the subscript, check to see if it is a set-only
-    // subscript decl.
-    auto loc = CS.getConstraintLocator(SE, ConstraintLocator::SubscriptMember);
-    auto *member =
-      dyn_cast_or_null<SubscriptDecl>(findResolvedMemberRef(loc, CS));
-
-    // If it isn't settable, return it.
-    if (member) {
-      if (!member->isSettable() ||
-          !member->isSetterAccessibleFrom(CS.DC))
-        return { expr, member };
-    }
-
-    // If it is settable, then the base must be the problem, recurse.
-    return resolveImmutableBase(SE->getBase(), CS);
-  }
-
-  // Look through property references.
-  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(expr)) {
-    // If we found a decl for the UDE, check it.
-    auto loc = CS.getConstraintLocator(UDE, ConstraintLocator::Member);
-    auto *member = dyn_cast_or_null<VarDecl>(findResolvedMemberRef(loc, CS));
-
-    // If the member isn't settable, then it is the problem: return it.
-    if (member) {
-      if (!member->isSettable(nullptr) ||
-          !member->isSetterAccessibleFrom(CS.DC))
-        return { expr, member };
-    }
-
-    // If we weren't able to resolve a member or if it is mutable, then the
-    // problem must be with the base, recurse.
-    return resolveImmutableBase(UDE->getBase(), CS);
-  }
-
-  if (auto *MRE = dyn_cast<MemberRefExpr>(expr)) {
-    // If the member isn't settable, then it is the problem: return it.
-    if (auto member = dyn_cast<AbstractStorageDecl>(MRE->getMember().getDecl()))
-      if (!member->isSettable(nullptr) ||
-          !member->isSetterAccessibleFrom(CS.DC))
-        return { expr, member };
-
-    // If we weren't able to resolve a member or if it is mutable, then the
-    // problem must be with the base, recurse.
-    return resolveImmutableBase(MRE->getBase(), CS);
-  }
-
-  if (auto *DRE = dyn_cast<DeclRefExpr>(expr))
-    return { expr, DRE->getDecl() };
-
-  // Look through x!
-  if (auto *FVE = dyn_cast<ForceValueExpr>(expr))
-    return resolveImmutableBase(FVE->getSubExpr(), CS);
-  
-  return { expr, nullptr };
-}
-
-static void diagnoseSubElementFailure(Expr *destExpr,
-                                      SourceLoc loc,
-                                      ConstraintSystem &CS,
-                                      Diag<StringRef> diagID,
-                                      Diag<Type> unknownDiagID) {
-  auto &TC = CS.getTypeChecker();
-  
-  // Walk through the destination expression, resolving what the problem is.  If
-  // we find a node in the lvalue path that is problematic, this returns it.
-  auto immInfo = resolveImmutableBase(destExpr, CS);
-
-  // Otherwise, we cannot resolve this because the available setter candidates
-  // are all mutating and the base must be mutating.  If we dug out a
-  // problematic decl, we can produce a nice tailored diagnostic.
-  if (auto *VD = dyn_cast_or_null<VarDecl>(immInfo.second)) {
-    std::string message = "'";
-    message += VD->getName().str().str();
-    message += "'";
- 
-    if (VD->isImplicit())
-      message += " is immutable";
-    else if (VD->isLet())
-      message += " is a 'let' constant";
-    else if (VD->hasAccessorFunctions() && !VD->getSetter())
-      message += " is a get-only property";
-    else if (!VD->isSetterAccessibleFrom(CS.DC))
-      message += " setter is inaccessible";
-    else {
-      message += " is immutable";
-    }
-    TC.diagnose(loc, diagID, message)
-      .highlight(immInfo.first->getSourceRange());
-    
-    // If this is a simple variable marked with a 'let', emit a note to fixit
-    // hint it to 'var'.
-    VD->emitLetToVarNoteIfSimple(CS.DC);
-    return;
-  }
-
-  // If the underlying expression was a read-only subscript, diagnose that.
-  if (auto *SD = dyn_cast_or_null<SubscriptDecl>(immInfo.second)) {
-    StringRef message;
-    if (!SD->getSetter())
-      message = "subscript is get-only";
-    else if (!SD->isSetterAccessibleFrom(CS.DC))
-      message = "subscript setter is inaccessible";
-    else
-      message = "subscript is immutable";
-
-    TC.diagnose(loc, diagID, message)
-      .highlight(immInfo.first->getSourceRange());
-    return;
-  }
-
-  // If the expression is the result of a call, it is an rvalue, not a mutable
-  // lvalue.
-  if (auto *AE = dyn_cast<ApplyExpr>(immInfo.first)) {
-    std::string name = "call";
-    if (isa<PrefixUnaryExpr>(AE) || isa<PostfixUnaryExpr>(AE))
-      name = "unary operator";
-    else if (isa<BinaryExpr>(AE))
-      name = "binary operator";
-    else if (isa<CallExpr>(AE))
-      name = "function call";
-    else if (isa<DotSyntaxCallExpr>(AE) || isa<DotSyntaxBaseIgnoredExpr>(AE))
-      name = "method call";
-
-    if (auto *DRE =
-          dyn_cast<DeclRefExpr>(AE->getFn()->getSemanticsProvidingExpr()))
-      name = std::string("'") + DRE->getDecl()->getName().str().str() + "'";
-
-    TC.diagnose(loc, diagID, name + " returns immutable value")
-      .highlight(AE->getSourceRange());
-    return;
-  }
-
-  TC.diagnose(loc, unknownDiagID, destExpr->getType())
-    .highlight(immInfo.first->getSourceRange());
-}
-
-
 /// When an assignment to an expression is detected and the destination is
 /// invalid, emit a detailed error about the condition.
 void ConstraintSystem::diagnoseAssignmentFailure(Expr *dest, Type destTy,
@@ -2301,7 +2338,7 @@ bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
       if (auto fnType = DRE->getType()->getAs<AnyFunctionType>())
         paramLists.push_back(fnType->getInput());
     
-    suggestPotentialOverloads(overloadName, argExpr->getElement(0)->getLoc(),
+    suggestPotentialOverloads(overloadName, binop->getLoc(),
                               paramLists, argTuple);
   }
   return true;

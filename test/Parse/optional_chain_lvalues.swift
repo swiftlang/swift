@@ -2,7 +2,7 @@
 
 struct S {
   var x: Int = 0
-  let y: Int = 0  // expected-note {{change 'let' to 'var' to make it mutable}}
+  let y: Int = 0  // expected-note 3 {{change 'let' to 'var' to make it mutable}}
 
   mutating func mutateS() {}
 
@@ -38,8 +38,8 @@ mutT?.mutS = S()
 mutT?.mutS? = S()
 mutT?.mutS?.x += 0
 _ = mutT?.mutS?.x + 0 // expected-error{{value of optional type 'Int?' not unwrapped}}
-mutT?.mutS?.y -= 0 // expected-error{{cannot invoke '-=' with an argument list of type '(Int, integer)'}}
+mutT?.mutS?.y -= 0 // expected-error{{left side of mutating operator isn't mutable: 'y' is a 'let' constant}}
 mutT?.immS = S() // expected-error{{cannot assign to property: 'immS' is a 'let' constant}}
 mutT?.immS? = S() // expected-error{{cannot assign to immutable expression of type 'S'}}
 mutT?.immS?.x += 0 // expected-error{{left side of mutating operator has immutable type 'Int'}}
-mutT?.immS?.y -= 0 // expected-error{{cannot invoke '-=' with an argument list of type '(Int, integer)'}}
+mutT?.immS?.y -= 0 // expected-error{{left side of mutating operator isn't mutable: 'y' is a 'let' constant}}
