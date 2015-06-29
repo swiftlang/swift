@@ -1299,52 +1299,13 @@ let filterTests = [
   ),
 ]
 
-
-struct StrictSequenceWithCustomFilter<Element> : StrictSequenceType {
-  let base: MinimalSequence<Element>
-  let timesFilterWasCalled = Box(0)
-
-  func filter(
-    @noescape transform: (Element) -> Bool
-  ) -> [Element] {
-    ++timesFilterWasCalled.value
-    return base.filter(transform)
-  }
+SequenceTypeAlgorithms.test("filter/SequenceType/Dispatch") {
+  let tester = SequenceLog.dispatchTester([OpaqueValue(1)])
+  tester.filter { _ in false }
+  expectCustomizable(tester, tester.log.filter)
 }
 
-func callStaticSequenceFilter(
-  sequence: DefaultedSequence<OpaqueValue<Int>>,
-  @noescape includeElement: (OpaqueValue<Int>) -> Bool
-) -> [OpaqueValue<Int>] {
-  var result = sequence.filter(includeElement)
-  expectType([OpaqueValue<Int>].self, &result)
-  return result
-}
-
-func callStaticSequenceFilter(
-  sequence: StrictSequenceWithCustomFilter<OpaqueValue<Int>>,
-  @noescape includeElement: (OpaqueValue<Int>) -> Bool
-) -> [OpaqueValue<Int>] {
-  var result = sequence.filter(includeElement)
-  expectType([OpaqueValue<Int>].self, &result)
-  return result
-}
-
-func callGenericSequenceFilter<S : SequenceType>(
-  sequence: S,
-  @noescape includeElement: (S.Generator.Element) -> Bool
-) -> [S.Generator.Element] {
-  var result = sequence.filter(includeElement)
-  expectType(Array<S.Generator.Element>.self, &result)
-  return result
-}
-
-% for Implementation in [ 'Default', 'Custom' ]:
-
-%   for dispatch in [ 'Static', 'Generic' ]:
-
-SequenceTypeAlgorithms.test("filter/SequenceType/${Implementation}Implementation/${dispatch}") {
-  expectEqual(0, LifetimeTracked.instances)
+SequenceTypeAlgorithms.test("filter/SequenceType/Semantics") {
   for test in filterTests {
     for underestimateCountBehavior in [
       UnderestimateCountBehavior.Precise,
@@ -1352,17 +1313,14 @@ SequenceTypeAlgorithms.test("filter/SequenceType/${Implementation}Implementation
       UnderestimateCountBehavior.Value(0)
     ] {
       
-      typealias Default = DefaultedSequence<OpaqueValue<Int>>
-      typealias Custom = StrictSequenceWithCustomFilter<OpaqueValue<Int>>
-      
-      let s = ${Implementation}(
+      let s = DefaultedSequence<OpaqueValue<Int>> (
         test.sequence.map { OpaqueValue($0) },
         underestimatedCount: underestimateCountBehavior)
       
       let closureLifetimeTracker = LifetimeTracked(0)
       expectEqual(1, LifetimeTracked.instances)
       var timesClosureWasCalled = 0
-      var result = call${dispatch}SequenceFilter(s) {
+      var result = s.filter {
         (element) in
         _blackHole(closureLifetimeTracker)
         ++timesClosureWasCalled
@@ -1370,9 +1328,6 @@ SequenceTypeAlgorithms.test("filter/SequenceType/${Implementation}Implementation
       }
       expectType([OpaqueValue<Int>].self, &result)
       expectEqual(test.expected, result.map { $0.value })
-%     if Implementation == 'Custom':
-      expectEqual(1, s.timesFilterWasCalled.value)
-%     end
       expectEqual([], s.map { $0.value }) { "sequence should be consumed" }
       expectEqual(test.sequence.count, timesClosureWasCalled) {
         "filter() should be eager and should only call its predicate once per element"
@@ -1382,12 +1337,7 @@ SequenceTypeAlgorithms.test("filter/SequenceType/${Implementation}Implementation
       }
     }
   }
-  expectEqual(0, LifetimeTracked.instances)
 }
-
-%   end
-
-% end
 
 var MinimalForwardCollectionWithCustomFilter_timesFilterWasCalled: Int = 0
 
