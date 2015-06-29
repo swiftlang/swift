@@ -373,5 +373,20 @@ AssertionsTestSuite.test("UnexpectedCrash/NullPointerDereference") {
 // CHECK: the test crashed unexpectedly
 // CHECK: [     FAIL ] Assertions.UnexpectedCrash/NullPointerDereference
 
+var TestSuiteLifetimeTracked = TestSuite("TestSuiteLifetimeTracked")
+var leakMe: LifetimeTracked? = nil
+TestSuiteLifetimeTracked.test("failsIfLifetimeTrackedAreLeaked") {
+  leakMe = LifetimeTracked(0)
+}
+// CHECK: [ RUN      ] TestSuiteLifetimeTracked.failsIfLifetimeTrackedAreLeaked
+// CHECK: out>>> check failed at {{.*}}.swift, line [[@LINE-4]]
+// CHECK: out>>> expected: "0" (of type Swift.Int)
+// CHECK: out>>> actual: "1" (of type Swift.Int)
+// CHECK: [     FAIL ] TestSuiteLifetimeTracked.failsIfLifetimeTrackedAreLeaked
+
+TestSuiteLifetimeTracked.test("passesIfLifetimeTrackedAreResetAfterFailure") {}
+// CHECK: [ RUN      ] TestSuiteLifetimeTracked.passesIfLifetimeTrackedAreResetAfterFailure
+// CHECK: [       OK ] TestSuiteLifetimeTracked.passesIfLifetimeTrackedAreResetAfterFailure
+
 runAllTests()
 

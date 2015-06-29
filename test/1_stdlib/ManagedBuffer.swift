@@ -126,7 +126,6 @@ class MyBuffer<T> {
 var tests = TestSuite("ManagedBuffer")
 
 tests.test("basic") {
-  expectEqual(0, LifetimeTracked.instances)
   if true {
     let s = TestManagedBuffer<LifetimeTracked>.create(0)
     expectEqual(1, LifetimeTracked.instances)
@@ -158,7 +157,6 @@ tests.test("basic") {
       )
     }
   }
-  expectEqual(0, LifetimeTracked.instances)
 }
 
 tests.test("ManagedBufferPointer/SizeValidation/TestmanagedBuffer") {
@@ -235,7 +233,6 @@ tests.test("ManagedBufferPointer") {
     expectEqual(val.count.value, 0)
     expectEqual(val.capacity, 99)
   }
-  expectEqual(0, LifetimeTracked.instances)
 }
 
 tests.test("isUniquelyReferenced") {

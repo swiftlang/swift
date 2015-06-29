@@ -73,7 +73,6 @@ FoundationExtrasTests.test("withOverriddenNSLocaleCurrentLocale(String)") {
 func objc_autorelease(ref: AnyObject)
 
 FoundationExtrasTests.test("objc_autorelease()") {
-  expectEqual(0, LifetimeTracked.instances)
   autoreleasepool {
     // Check that objc_autorelease indeed autoreleases.
     objc_autorelease(LifetimeTracked(101))
@@ -82,18 +81,15 @@ FoundationExtrasTests.test("objc_autorelease()") {
 }
 
 FoundationExtrasTests.test("autoreleasepoolIfUnoptimizedReturnAutoreleased()/autorelease") {
-  expectEqual(0, LifetimeTracked.instances)
   autoreleasepool {
     autoreleasepoolIfUnoptimizedReturnAutoreleased {
       objc_autorelease(LifetimeTracked(103))
       expectEqual(1, LifetimeTracked.instances)
     }
   }
-  expectEqual(0, LifetimeTracked.instances)
 }
 
 FoundationExtrasTests.test("autoreleasepoolIfUnoptimizedReturnAutoreleased()/return-autoreleased") {
-  expectEqual(0, LifetimeTracked.instances)
   autoreleasepool {
     autoreleasepoolIfUnoptimizedReturnAutoreleased {
       let nsa = [ LifetimeTracked(104) ] as NSArray
@@ -102,7 +98,6 @@ FoundationExtrasTests.test("autoreleasepoolIfUnoptimizedReturnAutoreleased()/ret
     }
     expectEqual(0, LifetimeTracked.instances)
   }
-  expectEqual(0, LifetimeTracked.instances)
 }
 
 runAllTests()

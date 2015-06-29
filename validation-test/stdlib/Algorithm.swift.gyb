@@ -1476,7 +1476,6 @@ func callGenericCollectionFilter<S : CollectionType>(
 %   for dispatch in [ 'Static', 'Generic' ]:
 
 SequenceTypeAlgorithms.test("filter/CollectionType/${Implementation}Implementation/${dispatch}") {
-  expectEqual(0, LifetimeTracked.instances)
   for test in filterTests {
     for underestimateCountBehavior in [
       UnderestimateCountBehavior.Precise,
@@ -1514,7 +1513,6 @@ SequenceTypeAlgorithms.test("filter/CollectionType/${Implementation}Implementati
       }
     }
   }
-  expectEqual(0, LifetimeTracked.instances)
 }
 
 %   end
@@ -1627,7 +1625,6 @@ func callGenericSequenceMap<S : SequenceType, T>(
 %   for dispatch in [ 'Static', 'Generic' ]:
 
 SequenceTypeAlgorithms.test("map/SequenceType/${Implementation}Implementation/${dispatch}") {
-  expectEqual(0, LifetimeTracked.instances)
   for test in mapTests {
     for underestimateCountBehavior in [
       UnderestimateCountBehavior.Precise,
@@ -1660,7 +1657,6 @@ SequenceTypeAlgorithms.test("map/SequenceType/${Implementation}Implementation/${
       }
     }
   }
-  expectEqual(0, LifetimeTracked.instances)
 }
 
 %   end
@@ -1754,7 +1750,6 @@ func callGenericCollectionMap<C : CollectionType, T>(
 %   for dispatch in [ 'Static', 'Generic' ]:
 
 SequenceTypeAlgorithms.test("map/CollectionType/${Implementation}Implementation/${dispatch}") {
-  expectEqual(0, LifetimeTracked.instances)
   for test in mapTests {
     for underestimateCountBehavior in [
       UnderestimateCountBehavior.Precise,
@@ -1789,7 +1784,6 @@ SequenceTypeAlgorithms.test("map/CollectionType/${Implementation}Implementation/
       }
     }
   }
-  expectEqual(0, LifetimeTracked.instances)
 }
 
 %   end
@@ -1857,7 +1851,6 @@ let flatMapTests = [
 ]
 
 SequenceTypeAlgorithms.test("flatMap/SequenceType") {
-  expectEqual(0, LifetimeTracked.instances)
   for test in flatMapTests {
     for underestimateCountBehavior in [
       UnderestimateCountBehavior.Precise,
@@ -1889,7 +1882,6 @@ SequenceTypeAlgorithms.test("flatMap/SequenceType") {
       }
     }
   }
-  expectEqual(0, LifetimeTracked.instances)
 }
 
 struct FlatMapToOptionalTest {
@@ -1935,7 +1927,6 @@ let flatMapToOptionalTests = [
 ]
 
 SequenceTypeAlgorithms.test("flatMap/SequenceType/TransformProducesOptional") {
-  expectEqual(0, LifetimeTracked.instances)
   for test in flatMapToOptionalTests {
     for underestimateCountBehavior in [
       UnderestimateCountBehavior.Precise,
@@ -1966,7 +1957,6 @@ SequenceTypeAlgorithms.test("flatMap/SequenceType/TransformProducesOptional") {
       }
     }
   }
-  expectEqual(0, LifetimeTracked.instances)
 }
 
 //===----------------------------------------------------------------------===//
@@ -3025,7 +3015,6 @@ SequenceTypeAlgorithms.test("Set<T>.find/CustomImplementation/${dispatch}") {
 % end
 
 SequenceTypeAlgorithms.test("find/Predicate") {
-  expectEqual(0, LifetimeTracked.instances)
   for test in findTests {
     let s = MinimalForwardCollection<OpaqueValue<Int>>(
       test.sequence.map { OpaqueValue($0.value) })
@@ -3041,7 +3030,6 @@ SequenceTypeAlgorithms.test("find/Predicate") {
       result.map { $0.position },
       stackTrace: test.loc.withCurrentLoc())
   }
-  expectEqual(0, LifetimeTracked.instances)
 }
 
 //===----------------------------------------------------------------------===//
@@ -3395,7 +3383,6 @@ SequenceTypeAlgorithms.test("partition/${'Predicate' if predicate else 'WhereEle
   CustomComparableValue.equalImpl = { $0 == $1 }
   CustomComparableValue.lessImpl = { $0 < $1 }
 %   end
-  expectEqual(0, LifetimeTracked.instances)
 
   for test in partitionExhaustiveTests {
     forAllPermutations(test.sequence) { (sequence) in
@@ -3479,7 +3466,6 @@ SequenceTypeAlgorithms.test("partition/${'Predicate' if predicate else 'WhereEle
 %   end
     }
   }
-  expectEqual(0, LifetimeTracked.instances)
 }
 
 % end
@@ -3487,7 +3473,6 @@ SequenceTypeAlgorithms.test("partition/${'Predicate' if predicate else 'WhereEle
 % for predicate in [ False, True ]:
 
 SequenceTypeAlgorithms.test("partition/${'Predicate' if predicate else 'WhereElementIsEquatable'}/InvalidOrderings") {
-  expectEqual(0, LifetimeTracked.instances)
   withInvalidOrderings { (comparisonPredicate) in
     for i in 0..<7 {
       forAllPermutations(i) { (sequence) in
@@ -3521,7 +3506,6 @@ SequenceTypeAlgorithms.test("partition/${'Predicate' if predicate else 'WhereEle
       }
     }
   }
-  expectEqual(0, LifetimeTracked.instances)
 }
 
 % end

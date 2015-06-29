@@ -872,12 +872,19 @@ public class TestSuite {
     _testSuiteNameToIndex[name] = _allTestSuites.count - 1
   }
 
-  public func test(name: String, _ testFunction: () -> ()) {
-    _TestBuilder(testSuite: self, name: name).code(testFunction)
+  public func test(
+    name: String,
+    file: String = __FILE__, line: UWord = __LINE__,
+    _ testFunction: () -> ()) {
+    
+    _TestBuilder(testSuite: self, name: name, loc: SourceLoc(file, line))
+    .code(testFunction)
   }
 
-  public func test(name: String) -> _TestBuilder {
-    return _TestBuilder(testSuite: self, name: name)
+  public func test(
+    name: String, file: String = __FILE__, line: UWord = __LINE__
+  ) -> _TestBuilder {
+    return _TestBuilder(testSuite: self, name: name, loc: SourceLoc(file, line))
   }
 
   public func setUp(code: () -> ()) {
@@ -894,13 +901,18 @@ public class TestSuite {
     for r in _allResettables {
       r.reset()
     }
+    LifetimeTracked.instances = 0
     if let f = _testSetUpCode {
       f()
     }
-    _testByName(testName).code()
+    let test = _testByName(testName)
+    test.code()
     if let f = _testTearDownCode {
       f()
     }
+    expectEqual(
+      0, LifetimeTracked.instances,
+      file: test.testLoc.file, line: test.testLoc.line)
   }
 
   func _testByName(testName: String) -> _Test {
@@ -909,6 +921,7 @@ public class TestSuite {
 
   struct _Test {
     let name: String
+    let testLoc: SourceLoc
     let xfail: _UnitTestArray<TestRunPredicate>
     let skip: _UnitTestArray<TestRunPredicate>
     let stdinText: String?
@@ -942,11 +955,13 @@ public class TestSuite {
       var _stdinText: String? = nil
       var _stdinEndsWithEOF: Bool = false
       var _crashOutputMatches: [String] = []
+      var _testLoc: SourceLoc? = nil
     }
 
-    init(testSuite: TestSuite, name: String) {
+    init(testSuite: TestSuite, name: String, loc: SourceLoc) {
       _testSuite = testSuite
       _name = name
+      _data._testLoc = loc
     }
 
     public func xfail(predicate: TestRunPredicate) -> _TestBuilder {
@@ -971,11 +986,13 @@ public class TestSuite {
     }
 
     public func code(testFunction: () -> ()) {
-      _testSuite._tests.append(_Test(
-        name: _name, xfail: _data._xfail, skip: _data._skip,
-        stdinText: _data._stdinText,
-        stdinEndsWithEOF: _data._stdinEndsWithEOF,
-        crashOutputMatches: _data._crashOutputMatches, code: testFunction))
+      _testSuite._tests.append(
+        _Test(
+          name: _name, testLoc: _data._testLoc!, xfail: _data._xfail,
+          skip: _data._skip,
+          stdinText: _data._stdinText,
+          stdinEndsWithEOF: _data._stdinEndsWithEOF,
+          crashOutputMatches: _data._crashOutputMatches, code: testFunction))
       _testSuite._testNameToIndex[_name] = _testSuite._tests.count - 1
     }
   }
