@@ -21,18 +21,29 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/DiagnosticConsumer.h"
 
+#include "llvm/Support/raw_ostream.h"
+
 namespace swift {
 
 /// \brief Diagnostic consumer that displays diagnostics to standard error.
 class PrintingDiagnosticConsumer : public DiagnosticConsumer {
+  llvm::raw_ostream &Stream;
   bool ForceColors = false;
+  bool DidErrorOccur = false;
 public:
+  PrintingDiagnosticConsumer(llvm::raw_ostream &stream = llvm::errs()) :
+    Stream(stream) { }
+
   virtual void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
                                 DiagnosticKind Kind, StringRef Text,
                                 const DiagnosticInfo &Info) override;
 
   void forceColors() {
     ForceColors = true;
+  }
+
+  bool didErrorOccur() {
+    return DidErrorOccur;
   }
 };
   

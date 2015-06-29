@@ -84,6 +84,10 @@ PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM, SourceLoc Loc,
       SMKind = llvm::SourceMgr::DK_Note; 
       break;
   }
+
+  if (Kind == DiagnosticKind::Error) {
+    DidErrorOccur = true;
+  }
   
   // Translate ranges.
   SmallVector<llvm::SMRange, 2> Ranges;
@@ -96,8 +100,8 @@ PrintingDiagnosticConsumer::handleDiagnostic(SourceManager &SM, SourceLoc Loc,
     FixIts.push_back(getRawFixIt(SM, F));
 
   // Display the diagnostic.
-  ColoredStream coloredErrs{llvm::errs()};
-  raw_ostream &out = ForceColors ? coloredErrs : llvm::errs();
+  ColoredStream coloredErrs{Stream};
+  raw_ostream &out = ForceColors ? coloredErrs : Stream;
   const llvm::SourceMgr &rawSM = SM.getLLVMSourceMgr();
   auto Msg = SM.GetMessage(Loc, SMKind, Text, Ranges, FixIts);
   rawSM.PrintMessage(out, Msg);
