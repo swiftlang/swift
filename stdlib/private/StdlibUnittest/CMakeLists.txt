@@ -26,8 +26,8 @@ add_swift_library(swiftStdlibUnittest SHARED IS_STDLIB
   # filename.
   StdlibUnittest.swift.gyb
 
-  InstrumentedWrappers.swift
   InterceptTraps.cpp
+  LoggingWrappers.swift
   OpaqueIdentityFunctions.cpp
   OpaqueIdentityFunctions.swift
   RaceTest.swift
