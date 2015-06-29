@@ -246,7 +246,59 @@ bool TypeBase::isSpecialized() {
   });
 }
 
-ArrayRef<Substitution> 
+ArrayRef<Type> TypeBase::getAllGenericArgs(SmallVectorImpl<Type> &scratch) {
+  Type type(this);
+  SmallVector<ArrayRef<Type>, 2> allGenericArgs;
+
+  while (type) {
+    // Gather generic arguments from a bound generic type.
+    if (auto bound = type->getAs<BoundGenericType>()) {
+      allGenericArgs.push_back(bound->getGenericArgs());
+
+      // Continue up to the parent.
+      type = bound->getParent();
+      continue;
+    }
+
+    // Use the generic type parameter types for an unbound generic type.
+    if (auto unbound = type->getAs<UnboundGenericType>()) {
+      auto genericSig = unbound->getDecl()->getGenericSignature();
+      auto genericParams = genericSig->getInnermostGenericParams();
+      allGenericArgs.push_back(
+        llvm::makeArrayRef((const Type *)genericParams.data(),
+                           genericParams.size()));
+
+      // Continue up to the parent.
+      type = unbound->getParent();
+      continue;
+    }
+
+    // Look through non-generic nominal types.
+    if (auto nominal = type->getAs<NominalType>()) {
+      type = nominal->getParent();
+      continue;
+    }
+
+    break;
+  }
+
+  // Trivial case: no generic arguments.
+  if (allGenericArgs.empty())
+    return { };
+
+  // Common case: a single set of generic arguments, for which we need no
+  // allocation.
+  if (allGenericArgs.size() == 1)
+    return allGenericArgs.front();
+
+  // General case: concatenate all of the generic argument lists together.
+  scratch.clear();
+  for (auto args : reversed(allGenericArgs))
+    scratch.append(args.begin(), args.end());
+  return scratch;
+}
+
+ArrayRef<Substitution>
 TypeBase::gatherAllSubstitutions(Module *module,
                                  SmallVectorImpl<Substitution> &scratchSpace,
                                  LazyResolver *resolver,

@@ -1327,14 +1327,6 @@ public:
                          NominalTypeDecl *nominal,
                          AssociatedTypeDecl *assocType);
 
-  /// \brief Given a set of archetype substitutions, verify and record all of
-  /// the required protocol-conformance relationships.
-  bool checkSubstitutions(TypeSubstitutionMap &Substitutions,
-                          ConformanceMap &Conformance,
-                          DeclContext *DC,
-                          SourceLoc ComplainLoc,
-                          TypeSubstitutionMap *RecordSubstitutions = nullptr);
-
   /// Perform unqualified name lookup at the given source location
   /// within a particular declaration context.
   ///

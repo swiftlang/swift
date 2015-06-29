@@ -284,7 +284,24 @@ var xp : XParam<Int>.T = Int() // expected-error{{'T' is not a member type of 'X
 
 // Diagnose failure to meet a superclass requirement.
 class X1 { }
-class X2<T : X1> { }
+class X2<T : X1> { } // expected-note{{requirement specified as 'T' : 'X1' [with T = X3]}}
 class X3 { }
 
-var x2 : X2<X3> // expected-error{{type 'X3' does not inherit from 'X1'}}
+var x2 : X2<X3> // expected-error{{'X2' requires that 'X3' inherit from 'X1'}}
+
+protocol P {
+  typealias AssocP
+}
+
+protocol Q {
+  typealias AssocQ
+}
+
+struct X4 : P, Q {
+  typealias AssocP = Int
+  typealias AssocQ = String
+}
+
+struct X5<T, U where T: P, T: Q, T.AssocP == T.AssocQ> { } // expected-note{{requirement specified as 'T.AssocP' == 'T.AssocQ' [with T = X4]}}
+
+var y: X5<X4, Int> // expected-error{{'X5' requires the types 'AssocP' and 'AssocQ' be equivalent}}

@@ -749,7 +749,14 @@ ERROR(protocol_does_not_conform,sema_tcc,none,
 ERROR(protocol_derivation_is_broken,sema_tcd,none,
       "protocol %0 is broken; cannot derive conformance for type %1", (Type, Type))
 ERROR(type_does_not_inherit,sema_tcd,none,
-      "type %0 does not inherit from %1", (Type, Type))
+      "%0 requires that %1 inherit from %2", (Type, Type, Type))
+NOTE(type_does_not_inherit_requirement,sema_tcd,none,
+     "requirement specified as %0 : %1%2", (Type, Type, StringRef))
+ERROR(types_not_equal,sema_tcd,none,
+      "%0 requires the types %1 and %2 be equivalent",
+      (Type, Type, Type))
+NOTE(types_not_equal_requirement,sema_tcd,none,
+     "requirement specified as %0 == %1%2", (Type, Type, StringRef))
 ERROR(non_class_cannot_conform_to_class_protocol,sema_tcd,none,
       "non-class type %0 cannot conform to class protocol %1",
       (Type, Type))

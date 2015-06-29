@@ -1,12 +1,13 @@
-// RUN: not --crash %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -parse
 
 // Distributed under the terms of the MIT license
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-enum S<T : NSManagedObject {
-class B<b: B<c>: Array) { self[B<T -> Any {
+func g<T>() {
+S(AnyObject) {
 }
-self] = [1]
-}
-protocol c
+convenience init(array: U -> : Int
+b: A? = {
+func a(")
+class C<H : C<T>(b<T>](f
