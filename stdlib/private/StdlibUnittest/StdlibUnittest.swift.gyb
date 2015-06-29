@@ -891,6 +891,9 @@ public class TestSuite {
   }
 
   func _runTest(testName: String) {
+    for r in _allResettables {
+      r.reset()
+    }
     if let f = _testSetUpCode {
       f()
     }

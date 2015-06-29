@@ -295,8 +295,7 @@ extension LoggingSequence {
 
 SequenceTypeAlgorithms.test("Demonstration/NotCustomizable") {
   let tester = SequenceLog.dispatchTester([OpaqueValue(1)])
-  tester.log.nonCustomizableOperation.reset()
-  
+
   tester.nonCustomizableOperation()
   
   expectNotCustomizable(tester, tester.log.nonCustomizableOperation)
@@ -1052,7 +1051,6 @@ typealias StrictSequenceOfEquatable = MinimalSequence<MinimalEquatableValue>
 
 SequenceTypeAlgorithms.test("contains/WhereElementIsEquatable/dispatch") {
   let tester = SequenceLog.dispatchTester([MinimalEquatableValue(1)])
-  tester.log._customContainsEquatableElement.reset()
   _ = tester.contains(MinimalEquatableValue(1))
   expectCustomizable(tester, tester.log._customContainsEquatableElement)
 }

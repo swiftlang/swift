@@ -10,9 +10,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-public struct TypeIndexed<Value> {
+protocol Resettable : AnyObject {
+  func reset()
+}
+
+internal var _allResettables: [Resettable] = []
+
+public class TypeIndexed<Value> : Resettable {
   public init(_ value: Value) {
     self.defaultValue = value
+    _allResettables.append(self)
   }
   
   public subscript(t: Any.Type) -> Value {
@@ -24,7 +31,7 @@ public struct TypeIndexed<Value> {
     }
   }
 
-  public mutating func reset() { byType = [:] }
+  public func reset() { byType = [:] }
 
   internal var byType: [ObjectIdentifier:Value] = [:]
   internal var defaultValue: Value
