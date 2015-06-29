@@ -296,7 +296,6 @@ public struct Set<Element : Hashable> :
   internal typealias _VariantStorage = _VariantSetStorage<Element>
   internal typealias _NativeStorage = _NativeSetStorage<Element>
   public typealias Index = SetIndex<Element>
-  public typealias GeneratorType = SetGenerator<Element>
 
   internal var _variantStorage: _VariantStorage
 
@@ -426,7 +425,7 @@ public struct Set<Element : Hashable> :
   /// Return a *generator* over the members.
   ///
   /// - Complexity: O(1).
-  public func generate() -> GeneratorType {
+  public func generate() -> SetGenerator<Element> {
     return _variantStorage.generate()
   }
 
