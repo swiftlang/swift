@@ -65,7 +65,7 @@ enum E1 {
 // Ill-formed initializer delegation: no matching constructor
 class Z0 {
   init() { // expected-error {{designated initializer for 'Z0' cannot delegate (with 'self.init'); did you mean this to be a convenience initializer?}}
-    self.init(5, 5) // expected-error{{could not find an overload for 'init' that accepts the supplied arguments}} expected-note{{delegation occurs here}}
+    self.init(5, 5) // expected-error{{cannot invoke 'init' with an argument list of type '(integer, integer)'}} expected-note{{delegation occurs here}}
   }
 
   init(value: Int) { /* ... */ }
@@ -74,7 +74,7 @@ class Z0 {
 
 struct Z1 {
   init() {
-    self.init(5, 5) // expected-error{{could not find an overload for 'init' that accepts the supplied arguments}}
+    self.init(5, 5) // expected-error{{cannot invoke 'init' with an argument list of type '(integer, integer)'}}
   }
 
   init(value: Int) { /* ... */ }
@@ -86,7 +86,7 @@ enum Z2 {
   case B
 
   init() {
-    self.init(5, 5) // expected-error{{could not find an overload for 'init' that accepts the supplied arguments}}
+    self.init(5, 5) // expected-error{{cannot invoke 'init' with an argument list of type '(integer, integer)'}}
   }
 
   init(value: Int) { /* ... */ }

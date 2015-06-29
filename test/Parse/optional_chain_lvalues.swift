@@ -38,8 +38,8 @@ mutT?.mutS = S()
 mutT?.mutS? = S()
 mutT?.mutS?.x += 0
 _ = mutT?.mutS?.x + 0 // expected-error{{value of optional type 'Int?' not unwrapped}}
-mutT?.mutS?.y -= 0 // expected-error{{could not find an overload for '-=' that accepts the supplied arguments}}
+mutT?.mutS?.y -= 0 // expected-error{{cannot invoke '-=' with an argument list of type '(Int, integer)'}}
 mutT?.immS = S() // expected-error{{cannot assign to property: 'immS' is a 'let' constant}}
 mutT?.immS? = S() // expected-error{{cannot assign to immutable expression of type 'S'}}
 mutT?.immS?.x += 0 // expected-error{{left side of mutating operator has immutable type 'Int'}}
-mutT?.immS?.y -= 0 // expected-error{{could not find an overload for '-=' that accepts the supplied arguments}}
+mutT?.immS?.y -= 0 // expected-error{{cannot invoke '-=' with an argument list of type '(Int, integer)'}}

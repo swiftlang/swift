@@ -1658,39 +1658,54 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure() {
   
   // In the absense of a better conversion constraint failure, point out the
   // inability to find an appropriate overload.
-  if (overloadConstraint) {
-    auto overloadChoice = overloadConstraint->getOverloadChoice();
-    auto overloadName = overloadChoice.getDecl()->getName();
-    Type argType = getDiagnosticTypeFromExpr(expr);
-    
-    // FIXME: These diagnostics should be emitted with location info specified
-    // by the simplified anchor of the constraint locator!
-    
-    if (!argType.isNull() &&
-        !argType->getAs<TypeVariableType>() &&
-        isa<ApplyExpr>(expr)) {
-      if (argType->getAs<TupleType>()) {
-        CS->TC.diagnose(expr->getLoc(),
-                        diag::cannot_find_appropriate_overload_with_type_list,
-                        overloadName.str(), getTypeListString(argType))
-        .highlight(expr->getSourceRange());
-      } else {
-        CS->TC.diagnose(expr->getLoc(),
-                        diag::cannot_find_appropriate_overload_with_type,
-                        overloadName.str(),
-                        getTypeListString(argType))
-        .highlight(expr->getSourceRange());
-      }
-    } else {
-      CS->TC.diagnose(expr->getLoc(),
-                      diag::cannot_find_appropriate_overload,
-                      overloadName.str())
-      .highlight(expr->getSourceRange());
-    }
+  if (!overloadConstraint)
+    return false;
+  
+  
+  auto overloadChoice = overloadConstraint->getOverloadChoice();
+  auto overloadName = overloadChoice.getDecl()->getName();
+  
+  // Get the referenced expression from the failed constraint.
+  auto anchor = expr;
+  if (auto locator = overloadConstraint->getLocator()) {
+    anchor = simplifyLocatorToAnchor(*CS, locator);
+    if (!anchor)
+      anchor = locator->getAnchor();
+  }
+
+  // The anchor for the constraint is almost always an OverloadedDeclRefExpr.
+  // Look at the parent node in the AST to find the Apply to give a better
+  // diagnostic.
+  Expr *call = expr->getParentMap()[anchor];
+  // Ignore parens around the callee.
+  while (call && isa<IdentityExpr>(call))
+    call = expr->getParentMap()[call];
+  
+  Type argType;
+  
+  if (call && isa<ApplyExpr>(call))
+    argType = getDiagnosticTypeFromExpr(call);
+  
+  if (argType.isNull() || argType->is<TypeVariableType>()) {
+    CS->TC.diagnose(anchor->getLoc(), diag::cannot_find_appropriate_overload,
+                    overloadName.str())
+       .highlight(anchor->getSourceRange());
     return true;
   }
   
-  return false;
+  auto apply = cast<ApplyExpr>(call);
+  if (argType->getAs<TupleType>()) {
+    CS->TC.diagnose(apply->getFn()->getLoc(),
+                    diag::cannot_find_appropriate_overload_with_type_list,
+                    overloadName.str(), getTypeListString(argType))
+    .highlight(apply->getSourceRange());
+  } else {
+    CS->TC.diagnose(apply->getFn()->getLoc(),
+                    diag::cannot_find_appropriate_overload_with_type,
+                    overloadName.str(), getTypeListString(argType))
+    .highlight(apply->getSourceRange());
+  }
+  return true;
 }
 
 bool FailureDiagnosis::diagnoseGeneralConversionFailure() {

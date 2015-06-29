@@ -124,7 +124,6 @@ func rdar21080030() {
   if s.characters.count() == 0 {} // expected-error{{cannot invoke 'count' with no arguments}}
 }
 
-
 // <rdar://problem/21248136> QoI: problem with return type inference mis-diagnosed as invalid arguments
 func r21248136<T>() -> T { preconditionFailure() } // expected-note 2 {{in call to function 'r21248136'}}
 
@@ -168,4 +167,7 @@ class r20201968C {
 }
 
 
-
+// <rdar://problem/21459429> QoI: Poor compilation error calling assert
+func r21459429(a : Int) {
+  assert(a != nil, "ASSERT COMPILATION ERROR") // expected-error {{cannot invoke '!=' with an argument list of type '(Int, nil)'}}
+}

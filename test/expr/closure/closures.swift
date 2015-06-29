@@ -31,7 +31,7 @@ func funcdecl5(a: Int, _ y: Int) {
   funcdecl4({ funcdecl3() }, 12) // expected-error{{cannot invoke 'funcdecl4' with an argument list of type '(() -> Int, Int)'}} expected-note{{expected an argument list of type '((Int) -> Int, Int)'}}
   func6(fn: {$0 + $1})       // Closure with two named anonymous arguments
   func6(fn: {($0) + $1})    // Closure with sequence expr inferred type
-  func6(fn: {($0) + $0})    // expected-error{{could not find an overload for '+' that accepts the supplied arguments}}
+  func6(fn: {($0) + $0})    // expected-error{{cannot invoke '+' with an argument list of type '(_, _)'}}
 
 
   var testfunc : ((), Int) -> Int
