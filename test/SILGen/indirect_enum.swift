@@ -58,3 +58,164 @@ enum TreeInt {
   indirect case Branch(left: TreeInt, right: TreeInt)
 }
 
+func a() {}
+func b<T>(x: T) {}
+func c<T>(x: T, _ y: T) {}
+func d() {}
+
+// CHECK-LABEL: sil hidden @_TF13indirect_enum11switchTreeAurFGOS_5TreeAq__T_
+func switchTreeA<T>(x: TreeA<T>) {
+  // --           x +2
+  // CHECK:       retain_value %0
+  // CHECK:       switch_enum %0 : $TreeA<T>
+  switch x {
+  // CHECK:     bb{{.*}}:
+  // CHECK:       function_ref @_TF13indirect_enum1aFT_T_
+  case .Nil:
+    a()
+  // CHECK:     bb{{.*}}([[LEAF_BOX:%.*]] : $@box T):
+  // CHECK:       [[VALUE:%.*]] = project_box [[LEAF_BOX]]
+  // CHECK:       copy_addr [[VALUE]] to [initialization] [[X:%.*]]#1 : $*T
+  // CHECK:       function_ref @_TF13indirect_enum1burFq_T_
+  // CHECK:       destroy_addr [[X]]#1
+  // CHECK:       dealloc_stack [[X]]#0
+  // --           x +1
+  // CHECK:       strong_release [[LEAF_BOX]]
+  // CHECK:       br [[OUTER_CONT:bb[0-9]+]]
+  case .Leaf(let x):
+    b(x)
+
+  // CHECK:     bb{{.*}}([[NODE_BOX:%.*]] : $@box (left: TreeA<T>, right: TreeA<T>)):
+  // CHECK:       [[TUPLE_ADDR:%.*]] = project_box [[NODE_BOX]]
+  // CHECK:       [[TUPLE:%.*]] = load [[TUPLE_ADDR]]
+  // CHECK:       [[LEFT:%.*]] = tuple_extract [[TUPLE]] {{.*}}, 0
+  // CHECK:       [[RIGHT:%.*]] = tuple_extract [[TUPLE]] {{.*}}, 1
+  // CHECK:       switch_enum [[RIGHT]] {{.*}}, default [[FAIL_RIGHT:bb[0-9]+]]
+
+  // CHECK:     bb{{.*}}([[RIGHT_LEAF_BOX:%.*]] : $@box T):
+  // CHECK:       [[RIGHT_LEAF_VALUE:%.*]] = project_box [[RIGHT_LEAF_BOX]]
+  // CHECK:       switch_enum [[LEFT]] {{.*}}, default [[FAIL_LEFT:bb[0-9]+]]
+  
+  // CHECK:     bb{{.*}}([[LEFT_LEAF_BOX:%.*]] : $@box T):
+  // CHECK:       [[LEFT_LEAF_VALUE:%.*]] = project_box [[LEFT_LEAF_BOX]]
+  // CHECK:       copy_addr [[LEFT_LEAF_VALUE]]
+  // CHECK:       copy_addr [[RIGHT_LEAF_VALUE]]
+  // --           x +1
+  // CHECK:       strong_release [[NODE_BOX]]
+  // CHECK:       br [[OUTER_CONT]]
+
+  // CHECK:     [[FAIL_LEFT]]:
+  // CHECK:       br [[DEFAULT:bb[0-9]+]]
+
+  // CHECK:     [[FAIL_RIGHT]]:
+  // CHECK:       br [[DEFAULT]]
+
+  case .Branch(.Leaf(let x), .Leaf(let y)):
+    c(x, y)
+
+  // CHECK:     [[DEFAULT]]:
+  // --           x +1
+  // CHECK:       release_value %0
+  default:
+    d()
+  }
+
+  // CHECK:     [[OUTER_CONT:%.*]]:
+  // --           x +0
+  // CHECK:       release_value %0 : $TreeA<T>
+}
+
+// CHECK-LABEL: sil hidden @_TF13indirect_enum11switchTreeBurFGOS_5TreeBq__T_
+func switchTreeB<T>(x: TreeB<T>) {
+  // CHECK:       copy_addr %0 to [initialization] [[SCRATCH:%.*]]#1
+  // CHECK:       switch_enum_addr [[SCRATCH]]#1
+  switch x {
+
+  // CHECK:     bb{{.*}}:
+  // CHECK:       destroy_addr [[SCRATCH]]
+  // CHECK:       dealloc_stack [[SCRATCH]]
+  // CHECK:       function_ref @_TF13indirect_enum1aFT_T_
+  // CHECK:       br [[OUTER_CONT:bb[0-9]+]]
+  case .Nil:
+    a()
+
+  // CHECK:     bb{{.*}}:
+  // CHECK:       copy_addr [[SCRATCH]]#1 to [initialization] [[LEAF_COPY:%.*]]#1
+  // CHECK:       [[LEAF_ADDR:%.*]] = unchecked_take_enum_data_addr [[LEAF_COPY]]
+  // CHECK:       copy_addr [take] [[LEAF_ADDR]] to [initialization] [[LEAF:%.*]]#1
+  // CHECK:       function_ref @_TF13indirect_enum1burFq_T_
+  // CHECK:       destroy_addr [[LEAF]]
+  // CHECK:       dealloc_stack [[LEAF]]
+  // CHECK-NOT:   destroy_addr [[LEAF_COPY]]
+  // CHECK:       dealloc_stack [[LEAF_COPY]]
+  // CHECK:       destroy_addr [[SCRATCH]]
+  // CHECK:       dealloc_stack [[SCRATCH]]
+  // CHECK:       br [[OUTER_CONT]]
+  case .Leaf(let x):
+    b(x)
+
+  // CHECK:     bb{{.*}}:
+  // CHECK:       copy_addr [[SCRATCH]]#1 to [initialization] [[TREE_COPY:%.*]]#1
+  // CHECK:       [[TREE_ADDR:%.*]] = unchecked_take_enum_data_addr [[TREE_COPY]]
+  // --           box +1 immutable
+  // CHECK:       [[BOX:%.*]] = load [[TREE_ADDR]]
+  // CHECK:       [[TUPLE:%.*]] = project_box [[BOX]]
+  // CHECK:       [[LEFT:%.*]] = tuple_element_addr [[TUPLE]]
+  // CHECK:       [[RIGHT:%.*]] = tuple_element_addr [[TUPLE]]
+  // CHECK:       switch_enum_addr [[RIGHT]] {{.*}}, default [[RIGHT_FAIL:bb[0-9]+]]
+
+  // CHECK:     bb{{.*}}:
+  // CHECK:       copy_addr [[RIGHT]] to [initialization] [[RIGHT_COPY:%.*]]#1
+  // CHECK:       [[RIGHT_LEAF:%.*]] = unchecked_take_enum_data_addr [[RIGHT_COPY]]#1 : $*TreeB<T>, #TreeB.Leaf
+  // CHECK:       switch_enum_addr [[LEFT]] {{.*}}, default [[LEFT_FAIL:bb[0-9]+]]
+
+  // CHECK:     bb{{.*}}:
+  // CHECK:       copy_addr [[LEFT]] to [initialization] [[LEFT_COPY:%.*]]#1
+  // CHECK:       [[LEFT_LEAF:%.*]] = unchecked_take_enum_data_addr [[LEFT_COPY]]#1 : $*TreeB<T>, #TreeB.Leaf
+  // CHECK:       copy_addr [take] [[LEFT_LEAF]] to [initialization] [[X:%.*]]#1
+  // CHECK:       copy_addr [take] [[RIGHT_LEAF]] to [initialization] [[Y:%.*]]#1
+  // CHECK:       function_ref @_TF13indirect_enum1curFTq_q__T_
+  // CHECK:       destroy_addr [[Y]]
+  // CHECK:       dealloc_stack [[Y]]
+  // CHECK:       destroy_addr [[X]]
+  // CHECK:       dealloc_stack [[X]]
+  // CHECK-NOT:   destroy_addr [[LEFT_COPY]]
+  // CHECK:       dealloc_stack [[LEFT_COPY]]
+  // CHECK-NOT:   destroy_addr [[RIGHT_COPY]]
+  // CHECK:       dealloc_stack [[RIGHT_COPY]]
+  // --           box +0
+  // CHECK:       strong_release [[BOX]]
+  // CHECK-NOT:   destroy_addr [[TREE_COPY]]
+  // CHECK:       dealloc_stack [[TREE_COPY]]
+  // CHECK:       destroy_addr [[SCRATCH]]
+  // CHECK:       dealloc_stack [[SCRATCH]]
+  case .Branch(.Leaf(let x), .Leaf(let y)):
+    c(x, y)
+
+  // CHECK:     [[LEFT_FAIL]]:
+  // CHECK:       destroy_addr [[RIGHT_LEAF]]
+  // CHECK-NOT:   destroy_addr [[RIGHT_COPY]]
+  // CHECK:       dealloc_stack [[RIGHT_COPY]]
+  // CHECK:       strong_release [[BOX]]
+  // CHECK-NOT:   destroy_addr [[TREE_COPY]]
+  // CHECK:       dealloc_stack [[TREE_COPY]]
+  // CHECK:       br [[INNER_CONT:bb[0-9]+]]
+
+  // CHECK:     [[RIGHT_FAIL]]:
+  // CHECK:       strong_release [[BOX]]
+  // CHECK-NOT:   destroy_addr [[TREE_COPY]]
+  // CHECK:       dealloc_stack [[TREE_COPY]]
+  // CHECK:       br [[INNER_CONT:bb[0-9]+]]
+
+  // CHECK:     [[INNER_CONT]]:
+  // CHECK:       destroy_addr [[SCRATCH]]
+  // CHECK:       dealloc_stack [[SCRATCH]]
+  // CHECK:       function_ref @_TF13indirect_enum1dFT_T_
+  // CHECK:       br [[OUTER_CONT]]
+  default:
+    d()
+  }
+  // CHECK:     [[OUTER_CONT]]:
+  // CHECK:       destroy_addr %0
+}
+

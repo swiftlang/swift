@@ -1342,10 +1342,10 @@ getManagedSubobject(SILGenFunction &gen, SILValue value,
                     const TypeLowering &valueTL,
                     CastConsumptionKind consumption) {
   if (consumption != CastConsumptionKind::CopyOnSuccess) {
-    return { gen.emitManagedRValueWithCleanup(value, valueTL),
-             consumption };
+    return {gen.emitManagedRValueWithCleanup(value, valueTL),
+             consumption};
   } else {
-    return ConsumableManagedValue::forUnmanaged(value);
+    return {ManagedValue::forUnmanaged(value), consumption};
   }
 }
 
@@ -1705,6 +1705,31 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
 
   // Emit the switch_enum{_addr} instruction.
   bool addressOnlyEnum = src.getType().isAddress();
+
+  // We lack a SIL instruction to nondestructively project data from an
+  // address-only enum, so we can only do so in place if we're allowed to take
+  // the source always. Copy the source if we can't.
+  if (addressOnlyEnum) {
+    switch (src.getFinalConsumption()) {
+    case CastConsumptionKind::TakeAlways:
+    case CastConsumptionKind::CopyOnSuccess:
+      // No change to src necessary.
+      break;
+
+    case CastConsumptionKind::TakeOnSuccess:
+      // If any of the specialization cases is refutable, we must copy.
+      for (auto caseInfo : caseInfos)
+        if (!caseInfo.Irrefutable)
+          goto refutable;
+      break;
+
+    refutable:
+      src = ConsumableManagedValue(ManagedValue::forUnmanaged(src.getValue()),
+                                   CastConsumptionKind::CopyOnSuccess);
+      break;
+    }
+  }
+
   SILValue srcValue = src.getFinalManagedValue().forward(SGF);
   SILLocation loc = PatternMatchStmt;
   loc.setDebugLoc(rows[0].Pattern);
@@ -1737,8 +1762,7 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
       hasElt = !eltTy.getSwiftRValueType()->isVoid();
     }
 
-    ConsumableManagedValue eltCMV;
-    ConsumableManagedValue origCMV;
+    ConsumableManagedValue eltCMV, origCMV;
 
     // Empty cases.  Try to avoid making an empty tuple value if it's
     // obviously going to be ignored.  This assumes that we won't even
@@ -1766,19 +1790,7 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
 
     // Okay, specialize on the argument.
     } else {
-      auto &eltTL = SGF.getTypeLowering(eltTy);
-
-      SILValue eltValue;
-      if (addressOnlyEnum) {
-        // FIXME: this is not okay to do if we're not consuming.
-        eltValue = SGF.B.createUncheckedTakeEnumDataAddr(loc, srcValue,
-                                                         elt, eltTy);
-        // Load a loadable data value.
-        if (eltTL.isLoadable())
-          eltValue = SGF.B.createLoad(loc, eltValue);
-      } else {
-        eltValue = new (SGF.F.getModule()) SILArgument(caseBB, eltTy);
-      }
+      auto *eltTL = &SGF.getTypeLowering(eltTy);
 
       // Normally we'd just use the consumption of the source
       // because the difference between TakeOnSuccess and TakeAlways
@@ -1790,16 +1802,67 @@ emitEnumElementDispatch(ArrayRef<RowToSpecialize> rows,
           eltConsumption == CastConsumptionKind::TakeOnSuccess)
         eltConsumption = CastConsumptionKind::TakeAlways;
 
-      origCMV = getManagedSubobject(SGF, eltValue, eltTL, eltConsumption);
+      SILValue eltValue;
+      if (addressOnlyEnum) {
+        // We can only project destructively from an address-only enum, so
+        // copy the value if we can't consume it.
+        // TODO: Should have a more efficient way to copy payload
+        // nondestructively from an enum.
+        switch (eltConsumption) {
+        case CastConsumptionKind::TakeAlways:
+          eltValue = SGF.B.createUncheckedTakeEnumDataAddr(loc, srcValue,
+                                                           elt, eltTy);
+          break;
+
+        case CastConsumptionKind::CopyOnSuccess: {
+          auto copy = SGF.emitTemporaryAllocation(loc, srcValue.getType());
+          SGF.B.createCopyAddr(loc, srcValue, copy,
+                               IsNotTake, IsInitialization);
+          // We can always take from the copy.
+          eltConsumption = CastConsumptionKind::TakeAlways;
+          eltValue = SGF.B.createUncheckedTakeEnumDataAddr(loc, copy,
+                                                           elt, eltTy);
+          break;
+        }
+
+        // We can't conditionally take, since UncheckedTakeEnumDataAddr
+        // invalidates the enum.
+        case CastConsumptionKind::TakeOnSuccess:
+          llvm_unreachable("not allowed");
+        }
+        
+        // Load a loadable data value.
+        if (eltTL->isLoadable())
+          eltValue = SGF.B.createLoad(loc, eltValue);
+      } else {
+        eltValue = new (SGF.F.getModule()) SILArgument(caseBB, eltTy);
+      }
+
+      origCMV = getManagedSubobject(SGF, eltValue, *eltTL, eltConsumption);
+      eltCMV = origCMV;
+
+      // If the payload is boxed, project it.
+
+      if (elt->isIndirect() || elt->getParentEnum()->isIndirect()) {
+        SILValue boxedValue = SGF.B.createProjectBox(loc, origCMV.getValue());
+        eltTL = &SGF.getTypeLowering(boxedValue.getType());
+        if (eltTL->isLoadable())
+          boxedValue = SGF.B.createLoad(loc, boxedValue);
+
+        // The boxed value may be shared, so we always have to copy it.
+        eltCMV = getManagedSubobject(SGF, boxedValue, *eltTL,
+                                     CastConsumptionKind::CopyOnSuccess);
+      }
 
       // Reabstract to the substituted type, if needed.
+
       CanType substEltTy =
         sourceType->getTypeOfMember(SGF.SGM.M.getSwiftModule(),
                                     elt, nullptr,
                                     elt->getArgumentInterfaceType())
                   ->getCanonicalType();
 
-      eltCMV = emitReabstractedSubobject(SGF, loc, origCMV, eltTL,
+      eltCMV = emitReabstractedSubobject(SGF, loc, eltCMV, *eltTL,
                                   AbstractionPattern(elt->getArgumentType()),
                                          substEltTy);
     }
