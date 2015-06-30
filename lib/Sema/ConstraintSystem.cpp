@@ -856,15 +856,13 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
     // If this is a method whose result type is dynamic Self, replace
     // DynamicSelf with the actual object type.
     if (func->hasDynamicSelf()) {
-      openedType = openedType.transform([&](Type type) {
-        if (type->is<DynamicSelfType>())
-          return openedFnType->getInput()->getRValueInstanceType();
-        return type;
-      });
-      
+      Type selfTy = openedFnType->getInput()->getRValueInstanceType();
+      openedType = openedType->replaceCovariantResultType(
+                     selfTy,
+                     func->getNumParamPatterns());
       openedFnType = openedType->castTo<FunctionType>();
     }
-  
+
     // The 'Self' type must be bound to an archetype.
     // FIXME: We eventually want to loosen this constraint, to allow us
     // to find operator functions both in classes and in protocols to which
@@ -1188,15 +1186,13 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
 
   // If this is a method whose result type has a dynamic Self return, replace
   // DynamicSelf with the actual object type.
-  bool hasDynamicSelf = false;
   if (auto func = dyn_cast<FuncDecl>(value)) {
-    if (func->hasDynamicSelf()) {
-      hasDynamicSelf = true;
-      openedType = openedType.transform([&](Type type) {
-          if (type->is<DynamicSelfType>())
-            return baseObjTy;
-          return type;
-        });
+    if (func->hasDynamicSelf() ||
+        (baseObjTy->isExistentialType() &&
+         func->hasArchetypeSelf())) {
+      openedType = openedType->replaceCovariantResultType(
+                     baseObjTy,
+                     func->getNumParamPatterns());
     }
   }
   // If this is an initializer, replace the result type with the base

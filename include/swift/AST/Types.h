@@ -647,7 +647,7 @@ public:
   /// replacing the type. With uncurry level == 0, this simply
   /// replaces the current type with the new result type.
   Type replaceCovariantResultType(Type newResultType,
-                                  unsigned uncurryLevel = 1);
+                                  unsigned uncurryLevel);
 
   /// Returns a function type that is not 'noreturn', but is otherwis the same
   /// as this type.

@@ -3977,6 +3977,19 @@ DynamicSelfType *FuncDecl::getDynamicSelfInterface() const {
   return DynamicSelfType::get(extType, getASTContext());
 }
 
+bool FuncDecl::hasArchetypeSelf() const {
+  if (!getDeclContext()->isProtocolExtensionContext())
+    return false;
+
+  auto selfTy = getDeclContext()->getProtocolSelf()->getArchetype();
+
+  auto resultTy = getResultType();
+  auto optionalResultTy = resultTy->getAnyOptionalObjectType();
+  if (optionalResultTy)
+    return optionalResultTy->isEqual(selfTy);
+  return resultTy->isEqual(selfTy);
+}
+
 SourceRange FuncDecl::getSourceRange() const {
   SourceLoc StartLoc = getStartLoc();
   if (StartLoc.isInvalid()) return SourceRange();

@@ -4263,11 +4263,8 @@ public:
                                            /*isTypeReference=*/false);
     if (auto func = dyn_cast<FuncDecl>(decl)) {
       if (func->hasDynamicSelf()) {
-        type = type.transform([subclass](Type type) -> Type {
-            if (type->is<DynamicSelfType>())
-              return subclass;
-            return type;
-        });
+        type = type->replaceCovariantResultType(subclass,
+                                                func->getNaturalArgumentCount());
       }
     } else if (isa<ConstructorDecl>(decl)) {
       type = type->replaceCovariantResultType(subclass, /*uncurryLevel=*/2);

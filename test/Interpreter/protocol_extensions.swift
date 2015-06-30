@@ -20,7 +20,14 @@ extension CollectionType {
   final var myIndices: Range<Index> {
     return Range(start: startIndex, end: endIndex)
   }
+
+  func clone() -> Self {
+    return self
+  }
 }
+
+// CHECK: 4
+print(["a", "b", "c", "d"].clone().myCount)
 
 extension CollectionType {
   final func indexMatching(fn: Generator.Element -> Bool) -> Index? {

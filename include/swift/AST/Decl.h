@@ -5010,6 +5010,13 @@ public:
   /// return type.
   DynamicSelfType *getDynamicSelfInterface() const;
 
+  /// Determine whether this method has an archetype \c Self return
+  /// type. This is when a method defined in a protocol extension
+  /// returns Self. In this case, the type is not quite as constrained
+  /// as a dynamic Self, because it is bound to the conforming type,
+  /// not the dynamic type of the value.
+  bool hasArchetypeSelf() const;
+
   void getLocalCaptures(SmallVectorImpl<CapturedValue> &Result) const {
     return getCaptureInfo().getLocalCaptures(Result);
   }
@@ -5059,7 +5066,7 @@ public:
   }
 
   /// Returns true if a function declaration overrides a given
-  /// method  from its direct or indirect superclass.
+  /// method from its direct or indirect superclass.
   bool isOverridingDecl(const FuncDecl *method) const;
   
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Func; }

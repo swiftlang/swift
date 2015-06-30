@@ -845,7 +845,9 @@ namespace {
       // If this is a method whose result type is dynamic Self, or a
       // construction, replace the result type with the actual object type.
       if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
-        if ((isa<FuncDecl>(func) && cast<FuncDecl>(func)->hasDynamicSelf()) ||
+        if ((isa<FuncDecl>(func) &&
+             (cast<FuncDecl>(func)->hasDynamicSelf() ||
+              (openedExistential && cast<FuncDecl>(func)->hasArchetypeSelf()))) ||
             isPolymorphicConstructor(func)) {
           refTy = refTy->replaceCovariantResultType(
                     containerTy,
@@ -855,7 +857,9 @@ namespace {
                                 func->getNumParamPatterns());
 
           if (openedExistential) {
-            // Replace the covariant result type in the opened type.
+            // Replace the covariant result type in the opened type. We need to
+            // handle dynamic member references, which wrap the function type
+            // in an optional.
             OptionalTypeKind optKind;
             if (auto optObject = openedType->getAnyOptionalObjectType(optKind))
               openedType = optObject;
