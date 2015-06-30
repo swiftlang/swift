@@ -217,6 +217,7 @@ DependencyGraphImpl::markTransitive(SmallVectorImpl<const void *> &visited,
   };
 
   SmallVector<WorklistEntry, 16> worklist;
+  SmallPtrSet<const void *, 16> visitedSet;
 
   auto addDependentsToWorklist = [&](const void *next,
                                      ArrayRef<MarkTracerImpl::Entry> reason) {
@@ -259,6 +260,8 @@ DependencyGraphImpl::markTransitive(SmallVectorImpl<const void *> &visited,
   };
 
   auto record = [&](WorklistEntry next) {
+    if (!visitedSet.insert(next.Node).second)
+      return;
     visited.push_back(next.Node);
     if (tracer) {
       auto &savedReason = tracer->Table[next.Node];

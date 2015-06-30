@@ -200,6 +200,8 @@ int Compilation::performJobsImpl() {
   auto noteBuilding = [&] (const Job *cmd, StringRef reason) {
     if (!ShowIncrementalBuildDecisions)
       return;
+    if (State.ScheduledCommands.count(cmd))
+      return;
     llvm::outs() << "Queuing "
                  << llvm::sys::path::filename(cmd->getOutput().getBaseInput(0))
                  << " " << reason << "\n";
