@@ -24,6 +24,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
+#include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/CodeCompletionTypeChecking.h"
 #include "swift/Subsystems.h"
@@ -389,15 +390,15 @@ public:
     }
   }
 
-  class ErrorGatherer : public DiagnosticConsumer {
+  class ErrorConsumer : public DiagnosticConsumer {
   private:
     bool error = false;
     DiagnosticEngine &diags;
   public:
-    ErrorGatherer(DiagnosticEngine &diags) : diags(diags) {
+    ErrorConsumer(DiagnosticEngine &diags) : diags(diags) {
       diags.addConsumer(*this);
     }
-    ~ErrorGatherer() {
+    ~ErrorConsumer() {
       diags.takeConsumers();
     }
     virtual void handleDiagnostic(SourceManager &SM, SourceLoc Loc,
@@ -410,6 +411,24 @@ public:
     }
     bool hadError() { 
       return error;
+    }
+  };
+
+  class TypeRestorer : public ASTWalker {
+  private:
+    llvm::DenseMap<Expr *, Type> backups;
+  public:
+    TypeRestorer () { }
+    virtual std::pair<bool, Expr*> walkToExprPre(Expr *E) {
+      if (E->getType()) {
+        backups[E] = E->getType();
+      }
+      return { true, E };
+    }
+    void restore() {
+      for (std::pair<Expr *, Type> &backup : backups) {
+        backup.first->setType(backup.second);
+      }
     }
   };
 
@@ -441,9 +460,14 @@ public:
 
   bool doTypeCheck(ASTContext &Ctx, DeclContext *DC, Expr *&parsedExpr) {
     DiagnosticEngine diags(Ctx.SourceMgr);
-    ErrorGatherer errorGatherer(diags);
-    const bool discardedExpr = false;
+
+    ErrorConsumer errorConsumer(diags);
+    const bool discardedExpr = true;
   
+    TypeRestorer restorer;
+    parsedExpr->walk(restorer);
+    Expr *backupExpr = parsedExpr; // TODO clone this properly
+
     TypeChecker TC(Ctx, diags);
     TC.typeCheckExpression(parsedExpr, DC, Type(), Type(), discardedExpr,
                            FreeTypeVariableBinding::GenericParameters);
@@ -451,11 +475,13 @@ public:
     if (parsedExpr) {
       ErrorFinder errorFinder;
       parsedExpr->walk(errorFinder);
-      if (!errorFinder.hadError() && !errorGatherer.hadError()) {
+      if (!errorFinder.hadError() && !errorConsumer.hadError()) {
         return true;
       }
     }
 
+    restorer.restore();
+    parsedExpr = backupExpr;
     return false;
   }
 
