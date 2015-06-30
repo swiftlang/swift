@@ -302,7 +302,7 @@ void DependencyGraphImpl::MarkTracerImpl::printPath(
       if (name.front() == 'P')
         name.push_back('_');
       out << " provides type '"
-          << swift::demangle_wrappers::demangleTypeAsString(entry.Name)
+          << swift::demangle_wrappers::demangleTypeAsString(name.str())
           << "'\n";
     } else if (entry.KindMask.contains(DependencyKind::DynamicLookupName)) {
       out << " provides AnyObject member '" << entry.Name << "'\n";
