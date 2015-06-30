@@ -98,3 +98,11 @@ std::string swift::demangle_wrappers::demangleSymbolAsString(
                                                  MangledName.size(), Options);
 }
 
+std::string swift::demangle_wrappers::demangleTypeAsString(
+    llvm::StringRef MangledName, const DemangleOptions &Options) {
+  PrettyStackTraceStringAction prettyStackTrace("demangling type string",
+                                                MangledName);
+  return swift::Demangle::demangleTypeAsString(MangledName.data(),
+                                               MangledName.size(), Options);
+}
+

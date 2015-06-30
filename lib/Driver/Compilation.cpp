@@ -30,6 +30,7 @@
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/YAMLParser.h"
 
@@ -186,10 +187,28 @@ int Compilation::performJobsImpl() {
 
   PerformJobsState State;
 
-  DependencyGraph<const Job *> DepGraph;
+  using DependencyGraph = DependencyGraph<const Job *>;
+  DependencyGraph DepGraph;
   SmallPtrSet<const Job *, 16> DeferredCommands;
   SmallVector<const Job *, 16> InitialOutOfDateCommands;
   unsigned InitialBlockingCount = State.BlockingCommands.size();
+
+  DependencyGraph::MarkTracer ActualIncrementalTracer;
+  DependencyGraph::MarkTracer *IncrementalTracer = nullptr;
+  if (ShowIncrementalBuildDecisions)
+    IncrementalTracer = &ActualIncrementalTracer;
+
+  auto noteBuilding = [&] (const Job *cmd, StringRef reason) {
+    if (!ShowIncrementalBuildDecisions)
+      return;
+    llvm::outs() << "Queuing "
+                 << llvm::sys::path::filename(cmd->getOutput().getBaseInput(0))
+                 << " " << reason << "\n";
+    IncrementalTracer->printPath(llvm::outs(), cmd,
+                                 [](raw_ostream &out, const Job *base) {
+      out << llvm::sys::path::filename(base->getOutput().getBaseInput(0));
+    });
+  };
 
   // Set up scheduleCommandIfNecessaryAndPossible.
   // This will only schedule the given command if it has not been scheduled
@@ -246,10 +265,13 @@ int Compilation::performJobsImpl() {
 
     switch (Condition) {
     case Job::Condition::Always:
-      if (getIncrementalBuildEnabled() && !DependenciesFile.empty())
+      if (getIncrementalBuildEnabled() && !DependenciesFile.empty()) {
         InitialOutOfDateCommands.push_back(Cmd);
+        DepGraph.markIntransitive(Cmd);
+      }
       SWIFT_FALLTHROUGH;
     case Job::Condition::RunWithoutCascading:
+      noteBuilding(Cmd, "(initial)");
       scheduleCommandIfNecessaryAndPossible(Cmd);
       break;
     case Job::Condition::CheckDependencies:
@@ -266,8 +288,14 @@ int Compilation::performJobsImpl() {
     // We scheduled all of the files that have actually changed. Now add the
     // files that haven't changed, so that they'll get built in parallel if
     // possible and after the first set of files if it's not.
-    for (auto *Cmd : InitialOutOfDateCommands)
-      DepGraph.markTransitive(AdditionalOutOfDateCommands, Cmd);
+    for (auto *Cmd : InitialOutOfDateCommands) {
+      DepGraph.markTransitive(AdditionalOutOfDateCommands, Cmd,
+                              IncrementalTracer);
+    }
+
+    for (auto *transitiveCmd : AdditionalOutOfDateCommands)
+      noteBuilding(transitiveCmd, "because of the initial set:");
+    size_t firstSize = AdditionalOutOfDateCommands.size();
 
     // Check all cross-module dependencies as well.
     for (StringRef dependency : DepGraph.getExternalDependencies()) {
@@ -280,6 +308,11 @@ int Compilation::performJobsImpl() {
       // or if we can't stat it for some reason (perhaps it's been deleted?),
       // trigger rebuilds through the dependency graph.
       DepGraph.markExternal(AdditionalOutOfDateCommands, dependency);
+    }
+
+    for (auto *externalCmd :
+            llvm::makeArrayRef(AdditionalOutOfDateCommands).slice(firstSize)) {
+      noteBuilding(externalCmd, "because of external dependencies");
     }
 
     for (auto *AdditionalCmd : AdditionalOutOfDateCommands) {
@@ -388,6 +421,7 @@ int Compilation::performJobsImpl() {
 
         for (const Job *Cmd : Dependents) {
           DeferredCommands.erase(Cmd);
+          noteBuilding(Cmd, "because of dependencies discovered later");
           scheduleCommandIfNecessaryAndPossible(Cmd);
         }
       }
@@ -465,7 +499,7 @@ int Compilation::performJobsImpl() {
     }
   }
 
-  if (!CompilationRecordPath.empty()) {
+  if (!CompilationRecordPath.empty() && !SkipTaskExecution) {
     writeCompilationRecord(CompilationRecordPath, ArgsHash, BuildStartTime,
                            State);
   }

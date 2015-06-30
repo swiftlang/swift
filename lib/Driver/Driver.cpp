@@ -354,6 +354,8 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
   bool DriverPrintJobs = ArgList->hasArg(options::OPT_driver_print_jobs);
   bool DriverSkipExecution =
     ArgList->hasArg(options::OPT_driver_skip_execution);
+  bool ShowIncrementalBuildDecisions =
+    ArgList->hasArg(options::OPT_driver_show_incremental);
 
   bool Incremental = ArgList->hasArg(options::OPT_incremental) &&
     !ArgList->hasArg(options::OPT_whole_module_optimization) &&
@@ -503,6 +505,9 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
   if (OI.CompilerMode == OutputInfo::Mode::UpdateCode ||
       OI.ShouldGenerateFixitEdits)
     C->setContinueBuildingAfterErrors();
+
+  if (ShowIncrementalBuildDecisions)
+    C->setShowsIncrementalBuildDecisions();
 
   if (OFM) {
     if (auto *masterOutputMap = OFM->getOutputMapForSingleOutput()) {

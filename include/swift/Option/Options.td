@@ -82,6 +82,9 @@ def driver_skip_execution : Flag<["-"], "driver-skip-execution">,
 def driver_use_frontend_path : Separate<["-"], "driver-use-frontend-path">,
   InternalDebugOpt,
   HelpText<"Use the given executable to perform compilations">;
+def driver_show_incremental : Flag<["-"], "driver-show-incremental">,
+  InternalDebugOpt,
+  HelpText<"With -v, dump information about why files are being rebuilt">;
 
 def driver_mode : Joined<["--"], "driver-mode=">, Flags<[HelpHidden]>,
   HelpText<"Set the driver mode to either 'swift' or 'swiftc'">;

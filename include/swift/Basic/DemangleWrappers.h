@@ -50,6 +50,10 @@ std::string
 demangleSymbolAsString(StringRef MangledName,
                        const DemangleOptions &Options = DemangleOptions());
 
+std::string
+demangleTypeAsString(StringRef MangledTypeName,
+                     const DemangleOptions &Options = DemangleOptions());
+
 } // end namespace demangle_wrappers
 } // end namespace swift
 

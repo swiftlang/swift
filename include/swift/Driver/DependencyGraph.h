@@ -22,6 +22,7 @@
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/PointerLikeTypeTraits.h"
 #include <string>
 #include <vector>
@@ -56,6 +57,22 @@ public:
     /// The file was loaded successfully; anything that depends on the node
     /// should be considered out of date.
     AffectsDownstream
+  };
+
+  /// The non-templated implementation of DependencyGraph::MarkTracer.
+  ///
+  /// \see DependencyGraph::MarkTracer
+  class MarkTracerImpl {
+    class Entry;
+    llvm::DenseMap<const void *, SmallVector<Entry, 4>> Table;
+
+    friend class DependencyGraphImpl;
+  protected:
+    MarkTracerImpl();
+    ~MarkTracerImpl();
+
+    void printPath(raw_ostream &out, const void *item,
+                   llvm::function_ref<void(const void *)> printItem) const;
   };
 
 private:
@@ -146,7 +163,7 @@ protected:
   }
 
   void markTransitive(SmallVectorImpl<const void *> &visited,
-                      const void *node);
+                      const void *node, MarkTracerImpl *tracer = nullptr);
   bool markIntransitive(const void *node) {
     assert(Provides.count(node) && "node is not in the graph");
     return Marked.insert(node).second;
@@ -195,6 +212,23 @@ class DependencyGraph : public DependencyGraphImpl {
   }
 
 public:
+  /// Traces the graph traversal performed in DependencyGraph::markTransitive.
+  ///
+  /// This is intended to be a debugging aid.
+  class MarkTracer : public MarkTracerImpl {
+  public:
+    MarkTracer() = default;
+
+    /// Dump the path that led to \p node.
+    void printPath(raw_ostream &out, T node,
+                   llvm::function_ref<void(raw_ostream &, T)> printItem) const {
+      MarkTracerImpl::printPath(out, Traits::getAsVoidPointer(node),
+                                [printItem, &out](const void *n) {
+        printItem(out, Traits::getFromVoidPointer(n));
+      });
+    }
+  };
+
   /// Load "depends" and "provides" data for \p node from the file at the given
   /// path.
   ///
@@ -236,11 +270,16 @@ public:
   ///
   /// Nodes that are only reachable through "non-cascading" edges are added to
   /// the \p visited set, but are \em not added to the graph's marked set.
+  ///
+  /// If you want to see how each node gets added to \p visited, pass a local
+  /// MarkTracer instance to \p tracer.
   template <unsigned N>
-  void markTransitive(SmallVector<T, N> &visited, T node) {
+  void markTransitive(SmallVector<T, N> &visited, T node,
+                      MarkTracer *tracer = nullptr) {
     SmallVector<const void *, N> rawMarked;
     DependencyGraphImpl::markTransitive(rawMarked,
-                                        Traits::getAsVoidPointer(node));
+                                        Traits::getAsVoidPointer(node),
+                                        tracer);
     // FIXME: How can we avoid this copy?
     copyBack(visited, rawMarked);
   }

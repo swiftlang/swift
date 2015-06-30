@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Driver/DependencyGraph.h"
+#include "swift/Basic/DemangleWrappers.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -31,6 +32,16 @@ enum class DependencyGraphImpl::DependencyKind : uint8_t {
 enum class DependencyGraphImpl::DependencyFlags : uint8_t {
   IsCascading = 1 << 0
 };
+
+class DependencyGraphImpl::MarkTracerImpl::Entry {
+public:
+  const void *Node;
+  StringRef Name;
+  DependencyMaskTy KindMask;
+};
+
+DependencyGraphImpl::MarkTracerImpl::MarkTracerImpl() = default;
+DependencyGraphImpl::MarkTracerImpl::~MarkTracerImpl() = default;
 
 using LoadResult = DependencyGraphImpl::LoadResult;
 using DependencyKind = DependencyGraphImpl::DependencyKind;
@@ -195,11 +206,20 @@ void DependencyGraphImpl::markExternal(SmallVectorImpl<const void *> &visited,
 
 void
 DependencyGraphImpl::markTransitive(SmallVectorImpl<const void *> &visited,
-                                    const void *node) {
+                                    const void *node, MarkTracerImpl *tracer) {
   assert(Provides.count(node) && "node is not in the graph");
-  SmallVector<std::pair<const void *, bool>, 16> worklist;
+  llvm::SpecificBumpPtrAllocator<MarkTracerImpl::Entry> scratchAlloc;
 
-  auto addDependentsToWorklist = [&](const void *next) {
+  struct WorklistEntry {
+    ArrayRef<MarkTracerImpl::Entry> Reason;
+    const void *Node;
+    bool IsCascading;
+  };
+
+  SmallVector<WorklistEntry, 16> worklist;
+
+  auto addDependentsToWorklist = [&](const void *next,
+                                     ArrayRef<MarkTracerImpl::Entry> reason) {
     auto allProvided = Provides.find(next);
     if (allProvided == Provides.end())
       return;
@@ -209,37 +229,85 @@ DependencyGraphImpl::markTransitive(SmallVectorImpl<const void *> &visited,
       if (allDependents == Dependencies.end())
         continue;
 
+      if (allDependents->second.second.contains(provided.kindMask))
+        continue;
+
       // Record that we've traversed this dependency.
       allDependents->second.second |= provided.kindMask;
 
       for (const auto &dependent : allDependents->second.first) {
-        if (!(provided.kindMask & dependent.kindMask))
+        if (dependent.node == next)
+          continue;
+        auto intersectingKinds = provided.kindMask & dependent.kindMask;
+        if (!intersectingKinds)
           continue;
         if (isMarked(dependent.node))
           continue;
         bool isCascading{dependent.flags & DependencyFlags::IsCascading};
-        worklist.push_back({ dependent.node, isCascading });
+
+        MutableArrayRef<MarkTracerImpl::Entry> newReason;
+        if (tracer) {
+          newReason = {scratchAlloc.Allocate(reason.size()+1), reason.size()+1};
+          std::uninitialized_copy(reason.begin(), reason.end(),
+                                  newReason.begin());
+          new (&newReason.back()) MarkTracerImpl::Entry({next, provided.name,
+                                                         intersectingKinds});
+        }
+        worklist.push_back({ newReason, dependent.node, isCascading });
       }
+    }
+  };
+
+  auto record = [&](WorklistEntry next) {
+    visited.push_back(next.Node);
+    if (tracer) {
+      auto &savedReason = tracer->Table[next.Node];
+      savedReason.clear();
+      savedReason.append(next.Reason.begin(), next.Reason.end());
     }
   };
 
   // Always mark through the starting node, even if it's already marked.
   markIntransitive(node);
-  addDependentsToWorklist(node);
+  addDependentsToWorklist(node, {});
 
   while (!worklist.empty()) {
     auto next = worklist.pop_back_val();
 
     // Is this a non-cascading dependency?
-    if (!next.second) {
-      if (!isMarked(next.first))
-        visited.push_back(next.first);
+    if (!next.IsCascading) {
+      if (!isMarked(next.Node))
+        record(next);
       continue;
     }
 
-    addDependentsToWorklist(next.first);
-    if (!markIntransitive(next.first))
+    addDependentsToWorklist(next.Node, next.Reason);
+    if (!markIntransitive(next.Node))
       continue;
-    visited.push_back(next.first);
+    record(next);
+  }
+}
+
+void DependencyGraphImpl::MarkTracerImpl::printPath(
+    raw_ostream &out,
+    const void *item,
+    llvm::function_ref<void (const void *)> printItem) const {
+  for (const Entry &entry : Table.lookup(item)) {
+    out << "\t";
+    printItem(entry.Node);
+    if (entry.KindMask.contains(DependencyKind::TopLevelName)) {
+      out << " provides top-level name '" << entry.Name << "'\n";
+    } else if (entry.KindMask.contains(DependencyKind::NominalType)) {
+      SmallString<64> name{entry.Name};
+      if (name.front() == 'P')
+        name.push_back('_');
+      out << " provides type '"
+          << swift::demangle_wrappers::demangleTypeAsString(entry.Name)
+          << "'\n";
+    } else if (entry.KindMask.contains(DependencyKind::DynamicLookupName)) {
+      out << " provides AnyObject member '" << entry.Name << "'\n";
+    } else {
+      llvm_unreachable("not a dependency kind between nodes");
+    }
   }
 }

@@ -123,6 +123,10 @@ private:
   /// True if temporary files should not be deleted.
   bool SaveTemps;
 
+  /// When true, dumps information about why files are being scheduled to be
+  /// rebuilt.
+  bool ShowIncrementalBuildDecisions = false;
+
   static const Job *unwrap(const std::unique_ptr<const Job> &p) {
     return p.get();
   }
@@ -179,6 +183,10 @@ public:
   }
   void setContinueBuildingAfterErrors(bool Value = true) {
     ContinueBuildingAfterErrors = Value;
+  }
+
+  void setShowsIncrementalBuildDecisions(bool value = true) {
+    ShowIncrementalBuildDecisions = value;
   }
 
   void setCompilationRecordPath(StringRef path) {
