@@ -1517,6 +1517,10 @@ resolveImmutableBase(Expr *expr, ConstraintSystem &CS) {
   if (auto *FVE = dyn_cast<ForceValueExpr>(expr))
     return resolveImmutableBase(FVE->getSubExpr(), CS);
   
+  // Look through x?
+  if (auto *BOE = dyn_cast<BindOptionalExpr>(expr))
+    return resolveImmutableBase(BOE->getSubExpr(), CS);
+  
   return { expr, nullptr };
 }
 

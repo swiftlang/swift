@@ -11,7 +11,7 @@ struct S {
 
 struct T {
   var mutS: S? = nil
-  let immS: S? = nil  // expected-note {{change 'let' to 'var' to make it mutable}}
+  let immS: S? = nil  // expected-note 3 {{change 'let' to 'var' to make it mutable}}
 
   mutating func mutateT() {}
 
@@ -32,7 +32,6 @@ mutT?.mutS?.y++ // expected-error{{cannot pass immutable value to mutating opera
 ++mutT?.mutS?.x // expected-error{{cannot pass immutable value of type 'Int?' to mutating operator}}
 ++mutT?.mutS?.y // expected-error{{cannot pass immutable value of type 'Int?' to mutating operator}}
 
-// TODO: assignment operators
 mutT? = T()
 mutT?.mutS = S()
 mutT?.mutS? = S()
@@ -40,6 +39,6 @@ mutT?.mutS?.x += 0
 _ = mutT?.mutS?.x + 0 // expected-error{{value of optional type 'Int?' not unwrapped}}
 mutT?.mutS?.y -= 0 // expected-error{{left side of mutating operator isn't mutable: 'y' is a 'let' constant}}
 mutT?.immS = S() // expected-error{{cannot assign to property: 'immS' is a 'let' constant}}
-mutT?.immS? = S() // expected-error{{cannot assign to immutable expression of type 'S'}}
-mutT?.immS?.x += 0 // expected-error{{left side of mutating operator has immutable type 'Int'}}
+mutT?.immS? = S() // expected-error{{cannot assign to value: 'immS' is a 'let' constant}}
+mutT?.immS?.x += 0 // expected-error{{left side of mutating operator isn't mutable: 'immS' is a 'let' constant}}
 mutT?.immS?.y -= 0 // expected-error{{left side of mutating operator isn't mutable: 'y' is a 'let' constant}}
