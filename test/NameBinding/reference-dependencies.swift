@@ -30,6 +30,8 @@
 // CHECK-NEXT: "PSs23ArrayLiteralConvertible"
 // CHECK-NEXT: "Si"
 // CHECK-NEXT: "VE4mainSi10InnerToInt"
+// CHECK: "V4main9Sentinel1"
+// CHECK-NEXT: "V4main9Sentinel2"
 
 // CHECK-LABEL: {{^top-level:$}}
 
@@ -283,6 +285,18 @@ private func privateTy5(x: PrivateTopLevelStruct4.ValueType) -> PrivateTopLevelS
 private struct PrivateTy6 {}
 // CHECK-DAG: !private "PrivateProto3"
 extension PrivateTy6 : PrivateProto3 {}
+
+struct Sentinel1 {}
+
+private protocol ExtensionProto {}
+extension OtherFileTypeToBeExtended : ExtensionProto {
+  private func foo() {}
+}
+private extension OtherFileTypeToBeExtended {
+  func bar() {}
+}
+
+struct Sentinel2 {}
 
 
 // CHECK-LABEL: {{^member-access:$}}

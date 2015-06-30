@@ -127,6 +127,26 @@ static void findNominals(llvm::SetVector<const NominalTypeDecl *, V, S> &list,
   }
 }
 
+static bool declIsPrivate(const Decl *member) {
+  auto *VD = dyn_cast<ValueDecl>(member);
+  if (!VD)
+    return false;
+  return VD->getFormalAccess() == Accessibility::Private;
+}
+
+static bool extendedTypeIsPrivate(TypeLoc inheritedType) {
+  if (!inheritedType.getType())
+    return true;
+
+  SmallVector<ProtocolDecl *, 2> protocols;
+  if (!inheritedType.getType()->isAnyExistentialType(protocols)) {
+    // Be conservative. We don't know how to deal with other extended types.
+    return false;
+  }
+
+  return std::all_of(protocols.begin(), protocols.end(), declIsPrivate);
+}
+
 /// Emits a Swift-style dependencies file.
 static bool emitReferenceDependencies(DiagnosticEngine &diags,
                                       SourceFile *SF,
@@ -174,6 +194,12 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
         break;
       if (NTD->hasAccessibility() &&
           NTD->getFormalAccess() == Accessibility::Private) {
+        break;
+      }
+      if (std::all_of(ED->getInherited().begin(), ED->getInherited().end(),
+                      extendedTypeIsPrivate) &&
+          std::all_of(ED->getMembers().begin(), ED->getMembers().end(),
+                      declIsPrivate)) {
         break;
       }
       extendedNominals.insert(NTD);

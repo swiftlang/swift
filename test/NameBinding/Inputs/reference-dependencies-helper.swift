@@ -125,3 +125,5 @@ protocol PrivateProto2 {}
 protocol PrivateProto3 {}
 
 struct OtherFileElementType {}
+
+struct OtherFileTypeToBeExtended {}
