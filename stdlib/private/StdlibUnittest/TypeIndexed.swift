@@ -24,22 +24,22 @@ public class TypeIndexed<Value> : Resettable {
   
   public subscript(t: Any.Type) -> Value {
     get {
-      return byType[ObjectIdentifier(t)] ?? defaultValue
+      return byType[TypeIdentifier(t)] ?? defaultValue
     }
     set {
-      byType[ObjectIdentifier(t)] = newValue
+      byType[TypeIdentifier(t)] = newValue
     }
   }
 
   public func reset() { byType = [:] }
 
-  internal var byType: [ObjectIdentifier:Value] = [:]
+  internal var byType: [TypeIdentifier:Value] = [:]
   internal var defaultValue: Value
 }
 
 public func <=> <T: Comparable>(
-  lhs: (ObjectIdentifier, T),
-  rhs: (ObjectIdentifier, T)
+  lhs: (TypeIdentifier, T),
+  rhs: (TypeIdentifier, T)
 ) -> ExpectedComparisonResult {
   let a = lhs.0 <=> rhs.0
   if !a.isEQ() { return a }
@@ -53,7 +53,7 @@ public func expectEqual<V: Comparable>(
   collectMoreInfo: (()->String)? = nil
 ) {
   expectEqualsUnordered(
-    expected.map { (ObjectIdentifier($0.0), $0.1) },
+    expected.map { (TypeIdentifier($0.0), $0.1) },
     actual.byType,
     { $0 <=> $1 },
     stackTrace: stackTrace, file: file,

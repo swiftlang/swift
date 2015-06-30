@@ -104,3 +104,31 @@ public func <=> <T: Comparable>(lhs: T, rhs: T) -> ExpectedComparisonResult {
     : lhs > rhs ? .GT : .EQ
 }
 
+public struct TypeIdentifier : Hashable, Comparable {
+  public init(_ value: Any.Type) {
+    self.value = value
+  }
+
+  public var hashValue: Int { return objectID.hashValue }
+  public var value: Any.Type
+  
+  internal var objectID : ObjectIdentifier { return ObjectIdentifier(value) }
+}
+
+public func < (lhs: TypeIdentifier, rhs: TypeIdentifier) -> Bool {
+  return lhs.objectID < rhs.objectID
+}
+
+public func == (lhs: TypeIdentifier, rhs: TypeIdentifier) -> Bool {
+  return lhs.objectID == rhs.objectID
+}
+
+extension TypeIdentifier
+  : CustomStringConvertible, CustomDebugStringConvertible {
+  public var description: String {
+    return String(value)
+  }
+  public var debugDescription: String {
+    return "TypeIdentifier(\(description))"
+  }
+}
