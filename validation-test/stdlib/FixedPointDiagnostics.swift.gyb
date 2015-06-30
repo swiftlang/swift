@@ -4,16 +4,16 @@
 // Pending a fix for <rdar://problem/19434979>, remove exact diagnostic strings.
 
 func testUnaryMinusInUnsigned() {
-  var a: UInt8 = -(1) // expected-error {{}}
+  var a: UInt8 = -(1) // expected-error {{unary operator '-' cannot be applied to an operand of type 'Int'}}
   // expected-note @-1 {{overloads for '-' exist with these partially matching parameter lists: (Float), (Double), (Float80), (T), (Self)}}
 
-  var b: UInt16 = -(1) // expected-error {{}}
+  var b: UInt16 = -(1) // expected-error {{unary operator '-' cannot be applied to an operand of type 'Int'}}
   // expected-note @-1 {{overloads for '-' exist with these partially matching parameter lists: (Float), (Double), (Float80), (T), (Self)}}
 
-  var c: UInt32 = -(1) // expected-error {{}}
+  var c: UInt32 = -(1) // expected-error {{unary operator '-' cannot be applied to an operand of type 'Int'}}
   // expected-note @-1 {{overloads for '-' exist with these partially matching parameter lists: (Float), (Double), (Float80), (T), (Self)}}
 
-  var d: UInt64 = -(1) // expected-error {{}}
+  var d: UInt64 = -(1) // expected-error {{unary operator '-' cannot be applied to an operand of type 'Int'}}
   // expected-note @-1 {{overloads for '-' exist with these partially matching parameter lists: (Float), (Double), (Float80), (T), (Self)}}
 }
 

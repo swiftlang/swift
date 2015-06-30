@@ -2038,7 +2038,7 @@ Type FailureDiagnosis::getTypeOfIndependentSubExpression(Expr *subExpr) {
   CS->TC.addExprForDiagnosis(subExpr);
   
   if (!isa<ClosureExpr>(subExpr) &&
-      (isa<CallExpr>(subExpr) || isa<ArrayExpr>(subExpr) ||
+      (isa<ApplyExpr>(subExpr) || isa<ArrayExpr>(subExpr) ||
        typeIsNotSpecialized(subExpr->getType()))) {
     
     // Store off the sub-expression, in case a new one is provided via the

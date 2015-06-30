@@ -5,8 +5,8 @@ var f = false
 
 func markUsed<T>(t: T) {}
 
-markUsed(t != nil) // expected-error {{cannot invoke 'markUsed' with an argument list of type '(Bool)'}} expected-note {{expected an argument list of type '(T)'}}
-markUsed(f != nil) // expected-error {{cannot invoke 'markUsed' with an argument list of type '(Bool)'}} expected-note {{expected an argument list of type '(T)'}}
+markUsed(t != nil) // expected-error {{binary operator '!=' cannot be applied to operands of type 'Bool' and 'nil'}}
+markUsed(f != nil) // expected-error {{binary operator '!=' cannot be applied to operands of type 'Bool' and 'nil'}}
 
 class C : Equatable {}
 
