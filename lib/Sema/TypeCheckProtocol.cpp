@@ -3483,6 +3483,20 @@ void ConformanceChecker::checkConformance() {
     return;
   }
 
+  // Ensure that all of the requirements of the protocol have been satisfied.
+  // Note: the odd check for one generic parameter parameter copes with
+  // protocols nested within other generic contexts, which is ill-formed.
+  SourceLoc noteLoc = Proto->getLoc();
+  if (noteLoc.isInvalid())
+    noteLoc = Loc;
+  if (Proto->getGenericSignature()->getGenericParams().size() != 1 ||
+      TC.checkGenericArguments(DC, Loc, noteLoc, Proto->getDeclaredType(),
+                               Proto->getGenericSignature(),
+                               {Adoptee})) {
+    Conformance->setState(ProtocolConformanceState::Invalid);
+    return;
+  }
+
   // Check non-type requirements.
   bool invalid = false;
   for (auto member : Proto->getMembers()) {

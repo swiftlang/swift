@@ -9,17 +9,17 @@ class D : C {
 
 class E { }
 
-protocol P {
+protocol P { // expected-note{{requirement specified as '`Self`.Assoc' : 'C' [with Self = X2]}}
   typealias Assoc : C
-  func getAssoc() -> Assoc // expected-note{{protocol requires function 'getAssoc()' with type '() -> E'}}
+  func getAssoc() -> Assoc
 }
 
 struct X1 : P {
   func getAssoc() -> D { return D() }
 }
 
-struct X2 : P { // expected-error{{type 'X2' does not conform to protocol 'P'}}
-  func getAssoc() -> E { return E() } // expected-note{{candidate has non-matching type '() -> E'}}
+struct X2 : P { // expected-error{{'P' requires that 'E' inherit from 'C'}}
+  func getAssoc() -> E { return E() }
 }
 
 func testP<T:P>(t: T) {

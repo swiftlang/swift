@@ -48,20 +48,6 @@ extension SequenceType
     return _base._customContainsEquatableElement(element)
   }
   
-  /// If `self` is multi-pass (i.e., a `CollectionType`), invoke
-  /// `preprocess` on `self` and return its result.  Otherwise, return
-  /// `nil`.
-  public func _preprocessingPass<R>(preprocess: (Self)->R) -> R? {
-    return _base._preprocessingPass { _ in preprocess(self) }
-  }
-
-  /// Create a native array buffer containing the elements of `self`,
-  /// in the same order.
-  public func _copyToNativeArrayBuffer()
-    -> _ContiguousArrayBuffer<Base.Generator.Element> {
-    return _base._copyToNativeArrayBuffer()
-  }
-
   /// Copy a Sequence into an array.
   public func _initializeTo(ptr: UnsafeMutablePointer<Base.Generator.Element>) {
     return _base._initializeTo(ptr)
