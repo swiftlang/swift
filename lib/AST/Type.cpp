@@ -2121,8 +2121,12 @@ ArchetypeType::NestedType ArchetypeType::getNestedType(Identifier Name) const {
       }
     }
   }
-  
-  assert(Pos != NestedTypes.end() && Pos->first == Name);
+
+  if (Pos == NestedTypes.end() || Pos->first != Name)
+    return NestedType::forConcreteType(
+             ErrorType::get(
+               const_cast<ArchetypeType *>(this)->getASTContext()));
+
   return Pos->second;
 }
 
