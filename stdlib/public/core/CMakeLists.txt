@@ -81,6 +81,7 @@ set(SWIFTLIB_ESSENTIAL
   Reverse.swift.gyb
   Runtime.swift.gyb
   Sequence.swift
+  SequenceWrapper.swift
   SequenceAlgorithms.swift.gyb
   SetAlgebra.swift
   ShadowProtocols.swift
