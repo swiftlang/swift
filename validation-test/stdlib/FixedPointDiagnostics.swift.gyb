@@ -5,9 +5,16 @@
 
 func testUnaryMinusInUnsigned() {
   var a: UInt8 = -(1) // expected-error {{}}
+  // expected-note @-1 {{overloads for '-' exist with these partially matching parameter lists: (Float), (Double), (Float80), (T), (Self)}}
+
   var b: UInt16 = -(1) // expected-error {{}}
+  // expected-note @-1 {{overloads for '-' exist with these partially matching parameter lists: (Float), (Double), (Float80), (T), (Self)}}
+
   var c: UInt32 = -(1) // expected-error {{}}
+  // expected-note @-1 {{overloads for '-' exist with these partially matching parameter lists: (Float), (Double), (Float80), (T), (Self)}}
+
   var d: UInt64 = -(1) // expected-error {{}}
+  // expected-note @-1 {{overloads for '-' exist with these partially matching parameter lists: (Float), (Double), (Float80), (T), (Self)}}
 }
 
 // Int and UInt are not identical to any fixed-size integer type
