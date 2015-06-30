@@ -136,6 +136,12 @@ public:
   execute(TaskBeganCallback Began = TaskBeganCallback(),
           TaskFinishedCallback Finished = TaskFinishedCallback(),
           TaskSignalledCallback Signalled = TaskSignalledCallback());
+
+  /// Returns true if there are any tasks that have been queued but have not
+  /// yet been executed.
+  bool hasRemainingTasks() {
+    return !QueuedTasks.empty();
+  }
 };
 
 /// \brief A class which simulates execution of tasks with behavior similar to

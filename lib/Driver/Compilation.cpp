@@ -191,7 +191,6 @@ int Compilation::performJobsImpl() {
   DependencyGraph DepGraph;
   SmallPtrSet<const Job *, 16> DeferredCommands;
   SmallVector<const Job *, 16> InitialOutOfDateCommands;
-  unsigned InitialBlockingCount = State.BlockingCommands.size();
 
   DependencyGraph::MarkTracer ActualIncrementalTracer;
   DependencyGraph::MarkTracer *IncrementalTracer = nullptr;
@@ -226,6 +225,20 @@ int Compilation::performJobsImpl() {
     State.ScheduledCommands.insert(Cmd);
     TQ->addTask(Cmd->getExecutable(), Cmd->getArguments(), llvm::None,
                 (void *)Cmd);
+  };
+
+  // When a task finishes, we need to reevaluate the other commands that
+  // might have been blocked.
+  auto markFinished = [&] (const Job *Cmd) {
+    State.FinishedCommands.insert(Cmd);
+
+    auto BlockedIter = State.BlockingCommands.find(Cmd);
+    if (BlockedIter != State.BlockingCommands.end()) {
+      auto AllBlocked = std::move(BlockedIter->second);
+      State.BlockingCommands.erase(BlockedIter);
+      for (auto *Blocked : AllBlocked)
+        scheduleCommandIfNecessaryAndPossible(Blocked);
+    }
   };
 
   // Schedule all jobs we can.
@@ -380,17 +393,7 @@ int Compilation::performJobsImpl() {
 
     // When a task finishes, we need to reevaluate the other commands that
     // might have been blocked.
-
-    State.FinishedCommands.insert(FinishedCmd);
-
-    auto BlockedIter = State.BlockingCommands.find(FinishedCmd);
-    if (BlockedIter != State.BlockingCommands.end()) {
-      for (auto *Blocked : BlockedIter->second)
-        scheduleCommandIfNecessaryAndPossible(Blocked);
-      // Don't erase using the iterator; BlockingCommands may have been
-      // updated by this point.
-      State.BlockingCommands.erase(FinishedCmd);
-    }
+    markFinished(FinishedCmd);
 
     // In order to handle both old dependencies that have disappeared and new
     // dependencies that have arisen, we need to reload the dependency file.
@@ -458,25 +461,28 @@ int Compilation::performJobsImpl() {
     return TaskFinishedResponse::StopExecution;
   };
 
-  // Ask the TaskQueue to execute.
-  TQ->execute(taskBegan, taskFinished, taskSignalled);
+  do {
+    // Ask the TaskQueue to execute.
+    TQ->execute(taskBegan, taskFinished, taskSignalled);
 
-  // Mark all remaining deferred commands as skipped.
-  for (const Job *Cmd : DeferredCommands) {
-    if (Level == OutputLevel::Parseable) {
-      // Provide output indicating this command was skipped if parseable output
-      // was requested.
-      parseable_output::emitSkippedMessage(llvm::errs(), *Cmd);
+    // Mark all remaining deferred commands as skipped.
+    for (const Job *Cmd : DeferredCommands) {
+      if (Level == OutputLevel::Parseable) {
+        // Provide output indicating this command was skipped if parseable output
+        // was requested.
+        parseable_output::emitSkippedMessage(llvm::errs(), *Cmd);
+      }
+
+      State.ScheduledCommands.insert(Cmd);
+      markFinished(Cmd);
     }
 
-    State.ScheduledCommands.insert(Cmd);
-    State.FinishedCommands.insert(Cmd);
-  };
+    // ...which may allow us to go on and do later tasks.
+  } while (Result == 0 && TQ->hasRemainingTasks());
 
   if (Result == 0) {
-    assert(State.BlockingCommands.size() == InitialBlockingCount &&
+    assert(State.BlockingCommands.empty() &&
            "some blocking commands never finished properly");
-    (void)InitialBlockingCount;
   } else {
     // Make sure we record any files that still need to be rebuilt.
     for (const Job *Cmd : getJobs()) {
