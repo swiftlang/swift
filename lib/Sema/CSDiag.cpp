@@ -1187,24 +1187,19 @@ static Type getDiagnosticTypeFromExpr(Expr *expr) {
   
   // For a forced checked cast expression or coerce expression, use the type of
   // the sub-expression.
-  if (auto fcc = dyn_cast<ForcedCheckedCastExpr>(expr)) {
-    auto subExpr = fcc->getSubExpr();
-    return subExpr->getType();
-  }
-  if (auto coerceExpr = dyn_cast<CoerceExpr>(expr)) {
-    auto subExpr = coerceExpr->getSubExpr();
-    return subExpr->getType();
-  }
+  if (auto fcc = dyn_cast<ForcedCheckedCastExpr>(expr))
+    return fcc->getSubExpr()->getType();
+
+  if (auto coerceExpr = dyn_cast<CoerceExpr>(expr))
+    return coerceExpr->getSubExpr()->getType();
   
   // For an application expression, use the argument type.
-  if (auto applyExpr = dyn_cast<ApplyExpr>(expr)) {
+  if (auto applyExpr = dyn_cast<ApplyExpr>(expr))
     return applyExpr->getArg()->getType();
-  }
   
   // For a subscript expression, use the index type.
-  if (auto subscriptExpr = dyn_cast<SubscriptExpr>(expr)) {
+  if (auto subscriptExpr = dyn_cast<SubscriptExpr>(expr))
     return subscriptExpr->getIndex()->getType();
-  }
   
   return expr->getType();
 }
@@ -1668,7 +1663,12 @@ private:
   SmallVector<ValueDecl*, 4>
   collectCalleeCandidateInfo(Expr *Fn, Type actualArgsType,
                              CandidateCloseness &Closeness);
+  SmallVector<ValueDecl*, 4>
+  collectCalleeCandidateInfo(ConstraintLocator *locator,
+                             CandidateCloseness &Closeness,
+    const std::function<CandidateCloseness(ValueDecl*)> &closenessPredicate);
 
+    
   /// Attempt to produce a diagnostic for a mismatch between an expression's
   /// type and its assumed contextual type.
   bool diagnoseContextualConversionError(Type exprResultType);
@@ -1690,6 +1690,9 @@ private:
   void suggestPotentialOverloads(StringRef functionName, SourceLoc loc,
                                  const SmallVectorImpl<Type> &paramLists,
                                  Type argType);
+  void suggestPotentialOverloads(StringRef functionName, SourceLoc loc,
+                                 ArrayRef<ValueDecl*> candidates,
+                                 CandidateCloseness closeness);
   
   bool visitExpr(Expr *E);
   
@@ -1913,16 +1916,9 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure() {
                     overloadName.str(), getTypeListString(argType))
     .highlight(apply->getSourceRange());
   }
-  if (auto ODRE = dyn_cast<OverloadedDeclRefExpr>(anchor)) {
-    SmallVector<Type, 16> paramLists;
-    for (auto DRE : ODRE->getDecls())
-      if (auto fnType = DRE->getType()->getAs<AnyFunctionType>())
-        paramLists.push_back(fnType->getInput());
-    
-    suggestPotentialOverloads(overloadName.str(), apply->getLoc(),
-                              paramLists, argType);
-  }
-
+  
+  suggestPotentialOverloads(overloadName.str(), apply->getLoc(),
+                            Candidates, candidateCloseness);
   return true;
 }
 
@@ -2117,9 +2113,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError(Type exprResultType) {
   return true;
 }
 
-/// FIXME: Right now, a "matching" overload is one with a parameter whose type
-/// is identical to one of the argument types. We can obviously do something
-/// more sophisticated with this.
+// FIXME: Remove this!
 void FailureDiagnosis::suggestPotentialOverloads(StringRef functionName,
                                                  SourceLoc loc,
                                const SmallVectorImpl<Type> &paramLists,
@@ -2138,7 +2132,9 @@ void FailureDiagnosis::suggestPotentialOverloads(StringRef functionName,
 
     if (paramTypeElts.size() != argTypeElts.size())
       continue;
-    
+  /// FIXME: Right now, a "matching" overload is one with a parameter whose type
+  /// is identical to one of the argument types. We can obviously do something
+  /// more sophisticated with this.
     for (size_t i = 0, e = paramTypeElts.size(); i != e; i++) {
       auto pt = paramTypeElts[i];
       auto at = argTypeElts[i];
@@ -2153,6 +2149,55 @@ void FailureDiagnosis::suggestPotentialOverloads(StringRef functionName,
         break;
       }
     }
+  }
+  
+  if (suggestionText.empty())
+    return;
+  
+  CS->TC.diagnose(loc, diag::suggest_partial_overloads,
+                  functionName, suggestionText);
+}
+
+void FailureDiagnosis::
+suggestPotentialOverloads(StringRef functionName, SourceLoc loc,
+                          ArrayRef<ValueDecl*> candidates,
+                          CandidateCloseness closeness) {
+  
+  // If the candidate list is has no near matches to the actual types, don't
+  // print out a candidate list, it will just be noise.
+  if (closeness == CC_ArgumentCountMismatch ||
+      closeness == CC_GeneralMismatch)
+    return;
+  
+  std::string suggestionText = "";
+  std::set<std::string> dupes;
+  
+  // FIXME2: For (T,T) & (Self, Self), emit this as two candidates, one using
+  // the LHS and one using the RHS type for T's.
+  
+  for (auto decl : candidates) {
+    Type paramListType;
+    
+    if (auto *FD = dyn_cast<AbstractFunctionDecl>(decl)) {
+      paramListType = FD->getType();
+      if (FD->getImplicitSelfDecl()) // Strip the self member.
+        paramListType = paramListType->castTo<AnyFunctionType>()->getResult();
+      paramListType = paramListType->castTo<AnyFunctionType>()->getInput();
+    } else if (auto *SD = dyn_cast<SubscriptDecl>(decl)) {
+      paramListType = SD->getIndicesType();
+    }
+    if (paramListType.isNull())
+      continue;
+    
+    // If we've already seen this (e.g. decls overridden on the result type),
+    // ignore this one.
+    auto name = getTypeListString(paramListType);
+    if (!dupes.insert(name).second)
+      continue;
+    
+    if (!suggestionText.empty())
+      suggestionText += ", ";
+    suggestionText += name;
   }
   
   if (suggestionText.empty())
@@ -2192,13 +2237,11 @@ void ConstraintSystem::diagnoseAssignmentFailure(Expr *dest, Type destTy,
                             diag::assignment_lhs_not_lvalue);
 }
 
+/// Determine how close an argument list is to an already decomposed argument
+/// list.
 static FailureDiagnosis::CandidateCloseness
-evaluateCloseness(ValueDecl *VD, ArrayRef<Type> actualArgs) {
-  // If the decl has a non-function type, it obviously doesn't match.
-  auto fnType = VD->getType()->getAs<AnyFunctionType>();
-  if (!fnType) return FailureDiagnosis::CC_GeneralMismatch;
-  
-  auto candArgs = decomposeArgumentType(fnType->getInput());
+evaluateCloseness(Type candArgListType, ArrayRef<Type> actualArgs) {
+  auto candArgs = decomposeArgumentType(candArgListType);
 
   // FIXME: This isn't handling varargs.
   if (actualArgs.size() != candArgs.size())
@@ -2254,7 +2297,14 @@ FailureDiagnosis::collectCalleeCandidateInfo(Expr *fn, Type actualArgsType,
   SmallVector<CandidateCloseness, 4> closenessList;
   closenessList.reserve(result.size());
   for (auto decl : result) {
-    closenessList.push_back(evaluateCloseness(decl, actualArgs));
+    // If the decl has a non-function type, it obviously doesn't match.
+    auto fnType = decl->getType()->getAs<AnyFunctionType>();
+    if (!fnType) {
+      closenessList.push_back(FailureDiagnosis::CC_GeneralMismatch);
+      continue;
+    }
+
+    closenessList.push_back(evaluateCloseness(fnType->getInput(), actualArgs));
     Closeness = std::min(Closeness, closenessList.back());
   }
 
@@ -2336,15 +2386,10 @@ bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
       .highlight(argExpr->getElement(1)->getSourceRange());
   }
   
-  if (auto ODRE = dyn_cast<OverloadedDeclRefExpr>(binop->getFn())) {
-    SmallVector<Type, 16> paramLists;
-    for (auto DRE : ODRE->getDecls())
-      if (auto fnType = DRE->getType()->getAs<AnyFunctionType>())
-        paramLists.push_back(fnType->getInput());
-    
+  // FIXME: This is a hack to avoid printing candidate sets
+  if (isa<OverloadedDeclRefExpr>(binop->getFn()))
     suggestPotentialOverloads(overloadName, binop->getLoc(),
-                              paramLists, argTuple);
-  }
+                              Candidates, candidateCloseness);
   return true;
 }
 
@@ -2403,49 +2448,140 @@ bool FailureDiagnosis::visitUnaryExpr(ApplyExpr *applyExpr) {
   std::string overloadName = Candidates[0]->getNameStr();
   assert(!overloadName.empty());
 
-  // FIXME: Note that we don't currently suggest a partially matching overload.
-  CS->TC.diagnose(argExpr->getLoc(),
-                  diag::cannot_apply_unop_to_arg,
-                  overloadName,
-                  argTyName);
+  CS->TC.diagnose(argExpr->getLoc(), diag::cannot_apply_unop_to_arg,
+                  overloadName, argTyName);
   
+  // FIXME: This is a hack to avoid printing candidate sets
+  if (isa<OverloadedDeclRefExpr>(applyExpr->getFn()))
+    suggestPotentialOverloads(overloadName, argExpr->getLoc(),
+                              Candidates, candidateCloseness);
   return true;
 }
 
-
-bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *subscriptExpr) {
-  CleanupIllFormedExpressionRAII cleanup(*CS, expr);
+SmallVector<ValueDecl*, 4>
+FailureDiagnosis::collectCalleeCandidateInfo(ConstraintLocator *locator,
+                                             CandidateCloseness &Closeness,
+     const std::function<CandidateCloseness(ValueDecl*)> &closenessPredicate) {
+  SmallVector<ValueDecl*, 4> result;
+  Closeness = CC_GeneralMismatch;
   
-  auto indexExpr = subscriptExpr->getIndex();
-  auto baseExpr = subscriptExpr->getBase();
-  
-  auto indexType = getTypeOfIndependentSubExpression(indexExpr);
-  
-  // Extract the exact argument type from the argument tuple.
-  if (auto parenTy = dyn_cast<ParenType>(indexType.getPointer())) {
-    indexType = parenTy->getUnderlyingType();
+  if (auto decl = findResolvedMemberRef(locator, *CS)) {
+    // If the decl is fully resolved, add it.
+    result.push_back(decl);
+  } else {
+    // Otherwise, look for a disjunction between different candidates.
+    for (auto &constraint : CS->getConstraints()) {
+      if (constraint.getLocator() != locator) continue;
+      
+      // Okay, we found our constraint.  Check to see if it is a disjunction.
+      if (constraint.getKind() != ConstraintKind::Disjunction) continue;
+      
+      for (auto *bindOverload : constraint.getNestedConstraints()) {
+        auto c = bindOverload->getOverloadChoice();
+        if (c.isDecl())
+          result.push_back(c.getDecl());
+      }
+    }
   }
   
-  // An error has been posted elsewhere.
+  // Now that we have the candidate list, figure out what the best matches from
+  // the candidate list are, and remove all the ones that aren't at that level.
+  SmallVector<CandidateCloseness, 4> closenessList;
+  closenessList.reserve(result.size());
+  for (auto decl : result) {
+    closenessList.push_back(closenessPredicate(decl));
+    Closeness = std::min(Closeness, closenessList.back());
+  }
+  
+  // Now that we know the minimum closeness, remove all the elements that aren't
+  // as close.
+  unsigned NextElt = 0;
+  for (unsigned i = 0, e = result.size(); i != e; ++i) {
+    // If this decl in the result list isn't a close match, ignore it.
+    if (Closeness != closenessList[i])
+      continue;
+    
+    // Otherwise, preserve it.
+    result[NextElt++] = result[i];
+  }
+  
+  result.erase(result.begin()+NextElt, result.end());
+  return result;
+}
+
+bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
+  CleanupIllFormedExpressionRAII cleanup(*CS, expr);
+  
+  auto indexExpr = SE->getIndex();
+  auto baseExpr = SE->getBase();
+  
+  auto indexType = getTypeOfIndependentSubExpression(indexExpr);
   if (isErrorTypeKind(indexType))
     return true;
   
   auto baseType = getTypeOfIndependentSubExpression(baseExpr);
+  if (isErrorTypeKind(baseType))
+    return true;
+
+  // See if the subscript got resolved.
+  auto loc = CS->getConstraintLocator(SE, ConstraintLocator::SubscriptMember);
+
+  auto decomposedIndexType = decomposeArgumentType(indexType);
   
+  CandidateCloseness candidateCloseness;
+  auto Candidates = collectCalleeCandidateInfo(loc, candidateCloseness,
+     [&](ValueDecl *decl) -> CandidateCloseness {
+    // Classify how close this match is.  Non-subscript decls don't match.
+    auto *SD = dyn_cast<SubscriptDecl>(decl);
+    if (!SD) return CC_GeneralMismatch;
+    
+    // TODO: Do we need to consider the baseType matching or not?
+
+    // Explode out multi-index subscripts to find the best match.
+    return evaluateCloseness(SD->getIndicesType(), decomposedIndexType);
+  });
+ 
+  // TODO: Is there any reason to check for CC_NonLValueInOut here?
+  
+  if (candidateCloseness == CC_ExactMatch) {
+    // Otherwise, the return type of the subscript happened to not have been
+    // what we were looking for.
+    auto resultTy = getTypeOfIndependentSubExpression(SE);
+    if (isErrorTypeKind(resultTy))
+      return true;
+    
+    if (!typeIsNotSpecialized(resultTy)) {
+      // If we got a strong type back, then we know what the subscript produced.
+    } else if (Candidates.size() == 1) {
+      // If we have one candidate, the result must be what that candidate
+      // produced.
+      resultTy = Candidates[0]->getType()->castTo<FunctionType>()->getResult();
+    } else {
+      CS->TC.diagnose(SE->getLoc(), diag::result_type_no_match_ambiguous)
+        .highlight(SE->getSourceRange());
+      suggestPotentialOverloads("subscript", SE->getLoc(),
+                                Candidates, candidateCloseness);
+      return true;
+    }
+    
+    // Only one choice.
+    CS->TC.diagnose(SE->getLoc(), diag::result_type_no_match,
+                    getUserFriendlyTypeName(resultTy))
+      .highlight(SE->getSourceRange());
+    return true;
+  }
+
+  expr->setType(ErrorType::get(CS->getASTContext()));
+
   auto indexTypeName = getUserFriendlyTypeName(indexType);
   auto baseTypeName = getUserFriendlyTypeName(baseType);
   
-  assert(!(indexTypeName.empty() || baseTypeName.empty()));
+  assert(!indexTypeName.empty() && !baseTypeName.empty());
   
-  // FIXME: As with unary applications, we don't currently suggest a partially
-  // matching overload.
-  CS->TC.diagnose(indexExpr->getLoc(),
-                  diag::cannot_subscript_with_index,
-                  baseTypeName,
-                  indexTypeName);
-  
-  expr->setType(ErrorType::get(CS->getASTContext()));
-  
+  CS->TC.diagnose(indexExpr->getLoc(), diag::cannot_subscript_with_index,
+                  baseTypeName, indexTypeName);
+  suggestPotentialOverloads("subscript", SE->getLoc(),
+                            Candidates, candidateCloseness);
   return true;
 }
 

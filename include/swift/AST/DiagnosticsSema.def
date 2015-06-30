@@ -57,6 +57,9 @@ NOTE(while_converting_subscript_index,sema,none,
 ERROR(result_type_no_match,sema,none,
       "result type '%0' does not match expected type",
       (StringRef))
+ERROR(result_type_no_match_ambiguous,sema,none,
+      "multiple candidates fail to match based on result type",
+      ())
 
 
 ERROR(cannot_find_appropriate_overload,sema,none,

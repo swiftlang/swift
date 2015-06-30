@@ -180,9 +180,10 @@ func test_subscript(inout x2: X2, i: Int, j: Int, inout value: Int, no: NoSubscr
   ovl[(i, j)] = value
 
   value = ovl[(i, j, i)] // expected-error{{cannot subscript a value of type 'OverloadedSubscript' with an index of type '(Int, Int, Int)'}}
+  // expected-note @-1 {{overloads for 'subscript' exist with these partially matching parameter lists: (Int)}}
 
-  // FIXME: <rdar://problem/11510876> Implement overload resolution
-  ret[i] // expected-error{{cannot subscript a value of type 'RetOverloadedSubscript' with an index of type 'Int'}}
+  ret[i] // expected-error{{multiple candidates fail to match based on result type}}
+  // expected-note @-1 {{overloads for 'subscript' exist with these partially matching parameter lists: (Int)}}
 
   value = ret[i]
   ret[i] = value
@@ -209,4 +210,42 @@ struct tuple_index {
   func test() -> (Int, Int) {
     return self[123, 456]
   }
+}
+
+
+
+struct SubscriptTest1 {
+  subscript(keyword:String) -> Bool { return true }
+  subscript(keyword:String) -> String? {return nil }
+}
+
+func testSubscript1(s1 : SubscriptTest1) {
+  // FIXME: This is an overload ambiguity, Bool is just one choice.
+  let _ : Int = s1["hello"]  // expected-error {{'Bool' is not convertible to 'Int'}}
+  
+  // FIXME: This is a bug, it should not be ambiguous. rdar://18741539
+  if s1["hello"] {}  // expected-error {{multiple candidates fail to match based on result type}}
+  // expected-note @-1 {{overloads for 'subscript' exist with these partially matching parameter lists: (String)}}
+  
+  
+  let _ = s1["hello"]  // expected-error {{multiple candidates fail to match based on result type}}
+  // expected-note @-1 {{overloads for 'subscript' exist with these partially matching parameter lists: (String)}}
+}
+
+struct SubscriptTest2 {
+  subscript(a : String, b : Int) -> Int { return 0 }
+  subscript(a : String, b : String) -> Int { return 0 }
+}
+
+func testSubscript1(s2 : SubscriptTest2) {
+  // FIXME: Error about _ is bogus.
+  // expected-error @+1 {{'_' can only appear in a pattern or on the left side of an assignment}}
+  _ = s2["foo"] // expected-error {{cannot subscript a value of type 'SubscriptTest2' with an index of type 'String'}}
+  
+  let a = s2["foo", 1.0] // expected-error {{cannot subscript a value of type 'SubscriptTest2' with an index of type '(String, Double)'}}
+  // expected-note @-1 {{overloads for 'subscript' exist with these partially matching parameter lists: (String, Int), (String, String)}}
+  
+  
+  let b = s2[1, "foo"] // expected-error {{cannot subscript a value of type 'SubscriptTest2' with an index of type '(Int, String)'}}
+  // expected-note @-1 {{overloads for 'subscript' exist with these partially matching parameter lists: (String, String)}}
 }

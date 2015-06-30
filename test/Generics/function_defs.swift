@@ -154,6 +154,7 @@ func subscripting<T : protocol<Subscriptable, IntSubscriptable>>(t: T) {
   t[42] = element // expected-error{{cannot assign through subscript: 't' is a 'let' constant}}
 
   t[value] = 17 // expected-error{{cannot subscript a value of type 'T' with an index of type 'T.Value'}}
+  // expected-note @-1 {{overloads for 'subscript' exist with these partially matching parameter lists: (Self.Index), (Int)}}
 }
 
 //===----------------------------------------------------------------------===//
