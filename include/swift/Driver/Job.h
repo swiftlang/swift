@@ -23,6 +23,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/TimeValue.h"
+#include "llvm/Support/raw_ostream.h"
 
 #include <memory>
 
@@ -148,6 +149,8 @@ public:
   /// Print the command line for this Job to the given \p stream,
   /// terminating output with the given \p terminator.
   void printCommandLine(raw_ostream &Stream, StringRef Terminator = "\n") const;
+
+  void dump() const LLVM_ATTRIBUTE_USED;
 
   static void printArguments(raw_ostream &Stream,
                              const llvm::opt::ArgStringList &Args);

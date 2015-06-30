@@ -84,6 +84,10 @@ void Job::printArguments(raw_ostream &os,
              [&] { os << ' '; });
 }
 
+void Job::dump() const {
+  printCommandLine(llvm::errs());
+}
+
 void Job::printCommandLine(raw_ostream &os, StringRef Terminator) const {
   escapeAndPrintString(os, Executable);
   os << ' ';
