@@ -11,6 +11,8 @@
 # We don't actually care about the content of the input file, either, so we
 # actually stick *the new dependencies* in the input file, and copy that over
 # the old dependencies (if present).
+#
+# If invoked in non-primary-file mode, it only creates the output file.
 
 import os
 import shutil
@@ -18,16 +20,23 @@ import sys
 
 assert sys.argv[1] == '-frontend'
 
-primaryFile = sys.argv[sys.argv.index('-primary-file') + 1]
-depsFile = sys.argv[sys.argv.index('-emit-reference-dependencies-path') + 1]
-outputFile = sys.argv[sys.argv.index('-o') + 1]
+if '-primary-file' in sys.argv:
+  primaryFile = sys.argv[sys.argv.index('-primary-file') + 1]
+  depsFile = sys.argv[sys.argv.index('-emit-reference-dependencies-path') + 1]
 
-# Replace the dependencies file with the input file.
-shutil.copyfile(primaryFile, depsFile)
+  # Replace the dependencies file with the input file.
+  shutil.copyfile(primaryFile, depsFile)
+else:
+  primaryFile = None
+
+outputFile = sys.argv[sys.argv.index('-o') + 1]
 
 # Update the output file mtime, or create it if necessary.
 # From http://stackoverflow.com/a/1160227.
 with open(outputFile, 'a'):
     os.utime(outputFile, None)
 
-print "Handled", os.path.basename(primaryFile)
+if primaryFile:
+  print "Handled", os.path.basename(primaryFile)
+else:
+  print "Produced", os.path.basename(outputFile)
