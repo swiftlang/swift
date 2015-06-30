@@ -919,6 +919,144 @@ bool TypeChecker::validateGenericTypeSignature(NominalTypeDecl *nominal) {
   return invalid;
 }
 
+/// Create a text string that describes the bindings of generic parameters that
+/// are relevant to the given set of types, e.g., "[with T = Bar, U = Wibble]".
+///
+/// \param types The types that will be scanned for generic type parameters,
+/// which will be used in the resulting type.
+///
+/// \param genericParams The actual generic parameters, whose names will be used
+/// in the resulting text.
+///
+/// \param substitutions The generic parameter -> generic argument substitutions
+/// that will have been applied to these types. These are used to produce the
+/// "parameter = argument" bindings in the test.
+static std::string gatherGenericParamBindingsText(
+                     ArrayRef<Type> types,
+                     ArrayRef<GenericTypeParamType *> genericParams,
+                     TypeSubstitutionMap &substitutions) {
+  llvm::SmallPtrSet<GenericTypeParamType *, 2> knownGenericParams;
+  for (auto type : types) {
+    type.findIf([&](Type type) -> bool {
+      if (auto gp = type->getAs<GenericTypeParamType>()) {
+        knownGenericParams.insert(gp->getCanonicalType()
+                                    ->castTo<GenericTypeParamType>());
+      }
+      return false;
+    });
+  }
+
+  if (knownGenericParams.empty())
+    return "";
+
+  SmallString<128> result;
+  for (auto gp : genericParams) {
+    auto canonGP = gp->getCanonicalType()->castTo<GenericTypeParamType>();
+    if (!knownGenericParams.count(canonGP))
+      continue;
+
+    if (result.empty())
+      result += " [with ";
+    else
+      result += ", ";
+    result += gp->getName().str();
+    result += " = ";
+    result += substitutions[canonGP].getString();
+  }
+
+  result += "]";
+  return result.str().str();
+}
+
+bool TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
+                                        SourceLoc noteLoc,
+                                        Type owner,
+                                        GenericSignature *genericSig,
+                                        ArrayRef<Type> genericArgs) {
+  // Form the set of generic substitutions required
+  TypeSubstitutionMap substitutions;
+  auto genericParams = genericSig->getGenericParams();
+  assert(genericParams.size() == genericArgs.size());
+  for (unsigned i = 0, n = genericParams.size(); i != n; ++i) {
+    auto gp
+      = genericParams[i]->getCanonicalType()->castTo<GenericTypeParamType>();
+    substitutions[gp] = genericArgs[i];
+  }
+
+  // Check each of the requirements.
+  Module *module = dc->getParentModule();
+  for (const auto &req : genericSig->getRequirements()) {
+    Type firstType = req.getFirstType().subst(module, substitutions,
+                                              SubstOptions::IgnoreMissing);
+    if (firstType.isNull()) {
+      // Another requirement will fail later; just continue.
+      continue;
+    }
+
+    Type secondType = req.getSecondType();
+    if (secondType) {
+      secondType = secondType.subst(module, substitutions,
+                                    SubstOptions::IgnoreMissing);
+      if (secondType.isNull()) {
+        // Another requirement will fail later; just continue.
+        continue;
+      }
+    }
+
+    switch (req.getKind()) {
+    case RequirementKind::Conformance: {
+      // Protocol conformance requirements.
+      if (auto proto = secondType->getAs<ProtocolType>()) {
+        // FIXME: This should track whether this should result in a private
+        // or non-private dependency.
+        // FIXME: Do we really need "used" at this point?
+        // FIXME: Poor location information. How much better can we do here?
+        if (!conformsToProtocol(firstType, proto->getDecl(), dc,
+                                ConformanceCheckFlags::Used, nullptr, loc))
+          return true;
+
+        continue;
+      }
+
+      // Superclass requirements.
+      if (!isSubtypeOf(firstType, secondType, dc)) {
+        // FIXME: Poor source-location information.
+        diagnose(loc, diag::type_does_not_inherit, owner, firstType,
+                 secondType);
+
+        diagnose(noteLoc, diag::type_does_not_inherit_requirement,
+                 req.getFirstType(), req.getSecondType(),
+                 gatherGenericParamBindingsText(
+                   {req.getFirstType(), req.getSecondType()},
+                   genericParams, substitutions));
+        return true;
+      }
+
+      continue;
+    }
+
+    case RequirementKind::SameType:
+      if (!firstType->isEqual(secondType)) {
+        // FIXME: Better location info for both diagnostics.
+        diagnose(loc, diag::types_not_equal, owner, firstType, secondType);
+
+        diagnose(noteLoc, diag::types_not_equal_requirement,
+                 req.getFirstType(), req.getSecondType(),
+                 gatherGenericParamBindingsText(
+                   {req.getFirstType(), req.getSecondType()},
+                   genericParams, substitutions));
+        return true;
+      }
+      continue;
+      
+    case RequirementKind::WitnessMarker:
+      continue;
+    }
+  }
+
+  return false;
+}
+
 Type TypeChecker::getInterfaceTypeFromInternalType(DeclContext *dc, Type type) {
   assert(dc->isGenericContext() && "Not a generic context?");
 

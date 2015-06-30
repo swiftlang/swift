@@ -324,55 +324,6 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
                                  fromType, /*isTypeReference=*/true);
 }
 
-/// Create a text string that describes the bindings of generic parameters that
-/// are relevant to the given set of types, e.g., "[with T = Bar, U = Wibble]".
-///
-/// \param types The types that will be scanned for generic type parameters,
-/// which will be used in the resulting type.
-///
-/// \param genericParams The actual generic parameters, whose names will be used
-/// in the resulting text.
-///
-/// \param substitutions The generic parameter -> generic argument substitutions
-/// that will have been applied to these types. These are used to produce the
-/// "parameter = argument" bindings in the test.
-static std::string gatherGenericParamBindingsText(
-                     ArrayRef<Type> types,
-                     ArrayRef<GenericTypeParamType *> genericParams,
-                     TypeSubstitutionMap &substitutions) {
-  llvm::SmallPtrSet<GenericTypeParamType *, 2> knownGenericParams;
-  for (auto type : types) {
-    type.findIf([&](Type type) -> bool {
-      if (auto gp = type->getAs<GenericTypeParamType>()) {
-        knownGenericParams.insert(gp->getCanonicalType()
-                                    ->castTo<GenericTypeParamType>());
-      }
-      return false;
-    });
-  }
-
-  if (knownGenericParams.empty())
-    return "";
-
-  SmallString<128> result;
-  for (auto gp : genericParams) {
-    auto canonGP = gp->getCanonicalType()->castTo<GenericTypeParamType>();
-    if (!knownGenericParams.count(canonGP))
-      continue;
-
-    if (result.empty())
-      result += " [with ";
-    else
-      result += ", ";
-    result += gp->getName().str();
-    result += " = ";
-    result += substitutions[canonGP].getString();
-  }
-
-  result += "]";
-  return result.str().str();
-}
-
 /// Apply generic arguments to the given type.
 Type TypeChecker::applyGenericArguments(Type type,
                                         SourceLoc loc,
@@ -433,94 +384,18 @@ Type TypeChecker::applyGenericArguments(Type type,
     // FIXME: Record that we're checking substitutions, so we can't end up
     // with infinite recursion.
 
-    // Form the set of substitutions we'll perform for the
-    TypeSubstitutionMap substitutions;
+    // Collect the complete set of generic arguments.
     SmallVector<Type, 4> scratch;
     ArrayRef<Type> allGenericArgs = BGT->getAllGenericArgs(scratch);
+
+    // Check the generic arguments against the generic signature.
     auto genericSig = unbound->getDecl()->getGenericSignature();
-    auto genericParams = genericSig->getGenericParams();
-    for (unsigned i = 0, n = genericParams.size(); i != n; ++i) {
-      auto gp
-        = genericParams[i]->getCanonicalType()->castTo<GenericTypeParamType>();
-      substitutions[gp] = allGenericArgs[i];
-    }
-
-    // Check each of the requirements.
-    Module *module = dc->getParentModule();
-    for (const auto &req : genericSig->getRequirements()) {
-      Type firstType = req.getFirstType().subst(module, substitutions,
-                                                SubstOptions::IgnoreMissing);
-      if (firstType.isNull()) {
-        // Another requirement will fail later; just continue.
-        continue;
-      }
-
-      Type secondType = req.getSecondType();
-      if (secondType) {
-        secondType = secondType.subst(module, substitutions,
-                                      SubstOptions::IgnoreMissing);
-        if (secondType.isNull()) {
-          // Another requirement will fail later; just continue.
-          continue;
-        }
-      }
-
-      switch (req.getKind()) {
-      case RequirementKind::Conformance: {
-        // Protocol conformance requirements.
-        if (auto proto = secondType->getAs<ProtocolType>()) {
-          // FIXME: This should track whether this should result in a private
-          // or non-private dependency.
-          // FIXME: Do we really need "used" at this point?
-          // FIXME: Poor location information. How much better can we do here?
-          if (!conformsToProtocol(firstType, proto->getDecl(), dc,
-                                  ConformanceCheckFlags::Used, nullptr, loc))
-            return nullptr;
-
-          continue;
-        }
-
-        // Superclass requirements.
-        if (!isSubtypeOf(firstType, secondType, dc)) {
-          // FIXME: Poor source-location information.
-          diagnose(loc, diag::type_does_not_inherit, unbound, firstType,
-                   secondType);
-
-          SourceLoc noteLoc = unbound->getDecl()->getLoc();
-          if (noteLoc.isInvalid())
-            noteLoc = loc;
-          diagnose(noteLoc, diag::type_does_not_inherit_requirement,
-                   req.getFirstType(), req.getSecondType(),
-                   gatherGenericParamBindingsText(
-                     {req.getFirstType(), req.getSecondType()},
-                     genericParams, substitutions));
-          return nullptr;
-        }
-
-        continue;
-      }
-
-      case RequirementKind::SameType:
-        if (!firstType->isEqual(secondType)) {
-          // FIXME: Better location info for both diagnostics.
-          diagnose(loc, diag::types_not_equal, unbound, firstType, secondType);
-
-          SourceLoc noteLoc = unbound->getDecl()->getLoc();
-          if (noteLoc.isInvalid())
-            noteLoc = loc;
-          diagnose(noteLoc, diag::types_not_equal_requirement,
-                   req.getFirstType(), req.getSecondType(),
-                   gatherGenericParamBindingsText(
-                     {req.getFirstType(), req.getSecondType()},
-                     genericParams, substitutions));
-          return nullptr;
-        }
-        continue;
-
-      case RequirementKind::WitnessMarker:
-        continue;
-      }
-    }
+    SourceLoc noteLoc = unbound->getDecl()->getLoc();
+    if (noteLoc.isInvalid())
+      noteLoc = loc;
+    if (checkGenericArguments(dc, loc, noteLoc, unbound, genericSig,
+                              allGenericArgs))
+      return nullptr;
   }
 
   return BGT;

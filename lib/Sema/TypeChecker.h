@@ -832,6 +832,23 @@ public:
   /// \returns true if an error occurred, or false otherwise.
   bool validateGenericTypeSignature(NominalTypeDecl *nominal);
 
+  /// Check the given set of generic arguments against the requirements in a
+  /// generic signature.
+  ///
+  /// \param dc The context in which the generic arguments should be checked.
+  /// \param loc The location at which any diagnostics should be emitted.
+  /// \param noteLoc The location at which any notes will be printed.
+  /// \param owner The type that owns the generic signature.
+  /// \param genericSig The actual generic signature.
+  /// \param genericArgs The generic arguments.
+  ///
+  /// \returns true if an error occurred, false otherwise.
+  bool checkGenericArguments(DeclContext *dc, SourceLoc loc,
+                             SourceLoc noteLoc,
+                             Type owner,
+                             GenericSignature *genericSig,
+                             ArrayRef<Type> genericArgs);
+
   /// Given a type that was produced within the given generic declaration
   /// context, produce the corresponding interface type.
   ///
