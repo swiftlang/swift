@@ -226,7 +226,7 @@ extension String : _BuiltinStringLiteralConvertible {
     _builtinStringLiteral start: Builtin.RawPointer,
     byteSize: Builtin.Word,
     isASCII: Builtin.Int1) {
-    if isASCII {
+    if Bool(isASCII) {
       self = String(
         _StringCore(
           baseAddress: COpaquePointer(start),

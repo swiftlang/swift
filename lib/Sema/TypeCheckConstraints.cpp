@@ -1553,18 +1553,7 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
     virtual bool builtConstraints(ConstraintSystem &cs, Expr *expr) {
       // Save the original expression.
       OrigExpr = expr;
-
-      // If the expression has type Builtin.Int1 (or an l-value with that
-      // object type), go ahead and special-case that.  This doesn't need
-      // to be deeply principled because builtin types are not user-facing.
-      auto rvalueType = expr->getType()->getRValueType();
-      if (rvalueType->isBuiltinIntegerType(1)) {
-        cs.addConstraint(ConstraintKind::Conversion, expr->getType(),
-                         rvalueType,
-                         cs.getConstraintLocator(expr));
-        return false;
-      }
-
+      
       // Otherwise, the result must be a BooleanType.
       auto &tc = cs.getTypeChecker();
       auto logicValueProto = tc.getProtocol(expr->getLoc(),
