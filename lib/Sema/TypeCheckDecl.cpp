@@ -1689,6 +1689,8 @@ class TypeAccessibilityChecker : private TypeWalker {
     AccessStack.push_back(Accessibility::Private);
   }
 
+  bool shouldVisitOriginalSubstitutedType() override { return true; }
+
   Action walkToTypePre(Type ty) override {
     // Assume failure until we post-visit this node.
     // This will be correct as long as we don't ever have self-referential

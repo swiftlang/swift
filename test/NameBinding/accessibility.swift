@@ -91,7 +91,6 @@ class ReplacingOverrider : Base {
   }
 }
 
-
 protocol MethodProto {
   func method() // expected-note + {{protocol requires function 'method()' with type '() -> ()'}}
 }
@@ -120,5 +119,17 @@ extension Foo : TypeProto {} // expected-error {{type 'Foo' does not conform to 
 private func privateInBothFiles() {} // no-warning
 private func privateInPrimaryFile() {} // expected-error {{invalid redeclaration}}
 func privateInOtherFile() {} // expected-note {{previously declared here}}
+#endif
+
+
+#if !ACCESS_DISABLED
+// rdar://problem/21408035
+private class PrivateBox<T> { // expected-note 2 {{type declared here}}
+  typealias ValueType = T
+  typealias AlwaysFloat = Float
+}
+
+let boxUnboxInt: PrivateBox<Int>.ValueType = 0 // expected-error {{constant must be declared private because its type uses a private type}}
+let boxFloat: PrivateBox<Int>.AlwaysFloat = 0 // expected-error {{constant must be declared private because its type uses a private type}}
 #endif
 
