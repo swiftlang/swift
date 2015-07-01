@@ -690,5 +690,5 @@ func testParenExprInTheWay() {
   if !(x & 4.0) {}  // expected-error {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}}
 
   
-  if x & x {} // expected-error {{result type 'Int' does not match expected type}}
+  if x & x {} // expected-error {{'Int' is not convertible to 'BooleanType'}}
 }

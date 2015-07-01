@@ -2046,11 +2046,20 @@ Type FailureDiagnosis::getTypeOfIndependentSubExpression(Expr *subExpr) {
     Expr *preCheckedExpr = subExpr;
 
     CS->TC.eraseTypeData(subExpr);
+        
     // Passing 'true' to the 'discardedExpr' arg preserves the lvalue type of
     // the expression.
-    CS->TC.typeCheckExpression(subExpr, CS->DC, Type(), Type(),
-                               /*discardedExpr=*/true);
-    resultType = subExpr->getType();
+    if (CS->TC.typeCheckExpression(subExpr, CS->DC, Type(), Type(),
+                                   /*discardedExpr=*/true)) {
+      // If recursive type checking failed, then an error was emitted, tell the
+      // caller that we are done diagnosing things to avoid multiple
+      // diagnostics.
+      resultType = ErrorType::get(CS->getASTContext());
+    } else {
+      // Otherwise, if type checking succeeded, the resultant type is the type
+      // on the expr node.
+      resultType = subExpr->getType();
+    }
 
     // This is a terrible hack to get around the fact that typeCheckExpression()
     // might change subExpr to point to a new OpenExistentialExpr. In that case,

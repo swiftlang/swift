@@ -6685,11 +6685,6 @@ Expr *
 Solution::convertBooleanTypeToBuiltinI1(Expr *expr, ConstraintLocator *locator) const {
   auto &tc = getConstraintSystem().getTypeChecker();
 
-  // Special case: already a builtin logic value.
-  if (expr->getType()->getRValueType()->isBuiltinIntegerType(1)) {
-    return tc.coerceToRValue(expr);
-  }
-
   // FIXME: Cache names.
   auto result = convertViaBuiltinProtocol(
                   *this, expr, locator,

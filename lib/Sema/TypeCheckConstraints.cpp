@@ -1563,21 +1563,12 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
       }
 
       auto logicValueType = logicValueProto->getDeclaredType();
-      
-      // Relate this expr to the the BooleanType in the cache, but don't
-      // create a new conformance. This will help us produce a better
-      // diagnostic, if need be.
-      auto innerExpr = expr;
-      while (auto parenExpr = dyn_cast<ParenExpr>(innerExpr))
-        innerExpr = parenExpr->getSubExpr();
-      
-      if (dyn_cast<LiteralExpr>(innerExpr))
-        cs.setConversionType(expr, logicValueType);
 
       // We use SelfObjectOfProtocol because an existential BooleanType is
       // allowed as a condition, but BooleanType is not self-conforming.
       cs.addConstraint(ConstraintKind::SelfObjectOfProtocol, expr->getType(),
                        logicValueType, cs.getConstraintLocator(OrigExpr));
+      cs.setConversionType(expr, logicValueType);
       return false;
     }
 
