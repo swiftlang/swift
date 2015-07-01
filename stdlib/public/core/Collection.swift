@@ -140,7 +140,7 @@ public protocol CollectionType : _prext_Indexable, SequenceType {
   ///   `SequenceType`, but is restated here with stricter
   ///   constraints: in a `CollectionType`, the `SubSequence` should
   ///   also be a `CollectionType`.
-  typealias SubSequence: _prext_Indexable, SequenceType = _prext_Slice<Self>
+  typealias SubSequence: _prext_Indexable, SequenceType = Slice<Self>
 
   /// Returns the element at the given `position`.
   subscript(position: Index) -> Generator.Element {get}
@@ -189,20 +189,18 @@ extension CollectionType where Generator : _IndexingGeneratorType  {
 }
 
 
-// FIXME: Can't constrain with SubSequence ==
-// _prext_Slice<Self>, due to <rdar://problem/21538521> Nonsense
-// diagnostic, then crash.  Therefore, use a stand-in internal
-// protocol.
-/// A protocol used only to identify `_prext_Slice`.
+// FIXME: Can't constrain with SubSequence == Slice<Self>, due to
+// <rdar://problem/21538521> Nonsense diagnostic, then crash.  Therefore, use a
+// stand-in internal protocol.
+/// A protocol used only to identify `Slice`.
 internal protocol _SliceType {}
-extension _prext_Slice : _SliceType {}
+extension Slice : _SliceType {}
 
 /// Supply the default "slicing" `subscript`  for `CollectionType` models
-/// that accept the default associated `SubSequence`,
-/// `_prext_Slice<Self>`.
+/// that accept the default associated `SubSequence`, `Slice<Self>`.
 extension CollectionType where SubSequence : _SliceType {
-  public subscript(bounds: Range<Index>) -> _prext_Slice<Self> {
-    return _prext_Slice(_base: self, bounds: bounds)
+  public subscript(bounds: Range<Index>) -> Slice<Self> {
+    return Slice(_base: self, bounds: bounds)
   }
 }
 

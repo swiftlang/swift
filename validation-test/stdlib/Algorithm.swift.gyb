@@ -2275,13 +2275,14 @@ SequenceTypeAlgorithms.test("CollectionType.generate()/CustomImplementation") {
 // CollectionType.subscript(_: Range<Index>), CollectionType.SubSequence
 //===----------------------------------------------------------------------===//
 
-struct SlicingSubscriptTest {
+struct SubscriptRangeTest {
   let expected: [OpaqueValue<Int>]
   let collection: [OpaqueValue<Int>]
   let bounds: Range<Int>
   let loc: SourceLoc
 
-  func boundsForStartIndex<I : ForwardIndexType>(i: I) -> Range<I> {
+  func boundsIn<C : CollectionType>(c: C) -> Range<C.Index> {
+    let i = c.startIndex
     return Range(
       start: advance(i, numericCast(bounds.startIndex)),
       end: advance(i, numericCast(bounds.endIndex)))
@@ -2298,26 +2299,42 @@ struct SlicingSubscriptTest {
   }
 }
 
-let sliceSubscriptTests = [
-  SlicingSubscriptTest(
+let subscriptRangeTests = [
+  // Slice an empty collection.
+  SubscriptRangeTest(
     expected: [],
     collection: [],
     bounds: 0..<0),
 
-  SlicingSubscriptTest(
-    expected: [ 20 ],
+  // Slice to the full extent.
+  SubscriptRangeTest(
+    expected: [ 10, 20, 30 ],
     collection: [ 10, 20, 30 ],
-    bounds: 1..<2),
+    bounds: 0..<3),
 
-  SlicingSubscriptTest(
+  // Slice a prefix.
+  SubscriptRangeTest(
+    expected: [ 10, 20, ],
+    collection: [ 10, 20, 30 ],
+    bounds: 0..<2),
+
+  // Slice a suffix.
+  SubscriptRangeTest(
     expected: [ 20, 30 ],
     collection: [ 10, 20, 30 ],
     bounds: 1..<3),
 
-  SlicingSubscriptTest(
-    expected: [ 10, 20, 30 ],
+  // Slice the middle part.
+  SubscriptRangeTest(
+    expected: [ 20 ],
     collection: [ 10, 20, 30 ],
-    bounds: 0..<3),
+    bounds: 1..<2),
+
+  // Slice the middle part.
+  SubscriptRangeTest(
+    expected: [ 20, 30, 40 ],
+    collection: [ 10, 20, 30, 40, 50, 60 ],
+    bounds: 1..<4),
 ]
 
 SequenceTypeAlgorithms.test("subscript(_: Range<Index>)/Dispatch") {
@@ -2328,12 +2345,10 @@ SequenceTypeAlgorithms.test("subscript(_: Range<Index>)/Dispatch") {
   expectCustomizable(tester, tester.log.subscriptRange)
 }
 
-// FIXME: need separate tests for the Slice type itself.
-
 SequenceTypeAlgorithms.test("subscript(_: Range<Index>)/Semantics") {
-  for test in sliceSubscriptTests {
-    let s = DefaultedForwardCollection<OpaqueValue<Int>>(test.collection)
-    var result = s[test.boundsForStartIndex(s.startIndex)]
+  for test in subscriptRangeTests {
+    let c = DefaultedForwardCollection<OpaqueValue<Int>>(test.collection)
+    var result = c[test.boundsIn(c)]
 
     // FIXME: improve checkForwardCollection to check the SubSequence type.
     checkForwardCollection(
@@ -2341,6 +2356,126 @@ SequenceTypeAlgorithms.test("subscript(_: Range<Index>)/Semantics") {
       result,
       { $0.value == $1.value },
       resiliencyChecks: .none,
+      test.loc.withCurrentLoc())
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Slice<Base>
+//===----------------------------------------------------------------------===//
+
+/*
+Can't write a simple test function because of:
+<rdar://problem/21620908> Funny generic constraint crashes the compiler
+
+func expectCollectionGeneratorIsIndexingGenerator<
+  C : CollectionType
+  where
+  C.Generator == IndexingGenerator<C>
+>(c: C) {}
+*/
+// Workaround:
+func getCollectionGeneratorThroughGeneric<
+  C : CollectionType
+>(c: C) -> C.Generator { return c.generate() }
+
+func expectCollectionSubSequenceIsSelf<
+  C : CollectionType
+  where
+  C.SubSequence == C
+>(c: C) {}
+
+/*
+Can't write a simple test function because of:
+<rdar://problem/21621421> Trivial generic constraint can't be satisfied
+
+func expectCollectionIndexIsMinimalForwardIndex<
+  C : CollectionType
+  where
+  C.Index == MinimalForwardIndex
+>(c: C) {}
+*/
+// Workaround:
+func getCollectionIndexThroughGeneric<
+  C : CollectionType
+>(c: C) -> C.Index { return c.startIndex }
+
+SequenceTypeAlgorithms.test("Slice/AssociatedTypes") {
+  let c = MinimalForwardCollection([ OpaqueValue(1) ])
+  var slice = c[c.indices]
+  expectType(
+    Slice<MinimalForwardCollection<OpaqueValue<Int>>>.self,
+    &slice)
+
+  expectCollectionType(slice)
+
+  var g = getCollectionGeneratorThroughGeneric(slice)
+  expectType(
+    IndexingGenerator<Slice<MinimalForwardCollection<OpaqueValue<Int>>>>.self,
+    &g)
+
+  expectCollectionSubSequenceIsSelf(slice)
+
+  var i = getCollectionIndexThroughGeneric(slice)
+  expectType(MinimalForwardIndex.self, &i)
+}
+
+SequenceTypeAlgorithms.test("Slice.{startIndex,endIndex}") {
+  for test in subscriptRangeTests {
+    let c = MinimalForwardCollection(test.collection)
+    var slice = c[c.indices]
+    expectType(
+      Slice<MinimalForwardCollection<OpaqueValue<Int>>>.self,
+      &slice)
+    let bounds = test.boundsIn(c)
+    var result = slice[bounds]
+    expectType(
+      Slice<MinimalForwardCollection<OpaqueValue<Int>>>.self,
+      &result)
+
+    expectEqual(bounds.startIndex, result.startIndex)
+    expectEqual(bounds.endIndex, result.endIndex)
+  }
+}
+
+SequenceTypeAlgorithms.test("Slice.subscript(_: Index)") {
+  for test in subscriptRangeTests {
+    let c = MinimalForwardCollection(test.collection)
+    var slice = c[c.indices]
+    expectType(
+      Slice<MinimalForwardCollection<OpaqueValue<Int>>>.self,
+      &slice)
+    let bounds = test.boundsIn(c)
+    var result = slice[bounds]
+    expectType(
+      Slice<MinimalForwardCollection<OpaqueValue<Int>>>.self,
+      &result)
+
+    for i in bounds {
+      var element = result[i]
+      expectType(OpaqueValue<Int>.self, &element)
+      expectEqual(c[i].value, element.value)
+    }
+  }
+}
+
+SequenceTypeAlgorithms.test("Slice.subscript(_: Range<Index>)") {
+  for test in subscriptRangeTests {
+    let c = MinimalForwardCollection(test.collection)
+    var slice = c[c.indices]
+    expectType(
+      Slice<MinimalForwardCollection<OpaqueValue<Int>>>.self,
+      &slice)
+
+    var result = slice[test.boundsIn(slice)]
+    expectType(
+      Slice<MinimalForwardCollection<OpaqueValue<Int>>>.self,
+      &result)
+
+    checkForwardCollection(
+      test.expected,
+      result,
+      { $0.value == $1.value },
       test.loc.withCurrentLoc())
   }
 }

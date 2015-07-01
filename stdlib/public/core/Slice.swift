@@ -10,9 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-public struct _prext_Slice<Base : _prext_Indexable> : CollectionType {
+public struct Slice<Base : _prext_Indexable> : CollectionType {
 
-  public func generate() -> IndexingGenerator<_prext_Slice> {
+  public func generate() -> IndexingGenerator<Slice> {
     return IndexingGenerator(self)
   }
   public typealias Index = Base.Index
@@ -25,8 +25,8 @@ public struct _prext_Slice<Base : _prext_Indexable> : CollectionType {
     return _base[index]
   }
 
-  public subscript(bounds: Range<Index>) -> _prext_Slice {
-    return _prext_Slice(_base: _base, bounds: bounds)
+  public subscript(bounds: Range<Index>) -> Slice {
+    return Slice(_base: _base, bounds: bounds)
   }
 
   internal init(_base: Base, bounds: Range<Index>) {
