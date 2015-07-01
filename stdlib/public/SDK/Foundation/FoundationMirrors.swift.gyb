@@ -37,8 +37,8 @@ ${getMirrorDecl("NSURL")} {
   
   var count: Int { get { return 0 } }
   
-  subscript(_: Int) -> (String, MirrorType) {
-    _preconditionFailure("MirrorType access out of bounds")
+  subscript(_: Int) -> (String, _MirrorType) {
+    _preconditionFailure("_MirrorType access out of bounds")
   }
   
   var summary: String { get { return _value.absoluteString } }
@@ -51,11 +51,11 @@ ${getMirrorDecl("NSRange")} {
   
   var count: Int { get { return 2 } }
   
-  subscript(i: Int) -> (String, MirrorType) {
+  subscript(i: Int) -> (String, _MirrorType) {
     switch i {
     case 0: return ("location", _reflect(_value.location))
     case 1: return ("length", _reflect(_value.length))
-    default: _preconditionFailure("MirrorType access out of bounds")
+    default: _preconditionFailure("_MirrorType access out of bounds")
     }
   }
   
@@ -71,8 +71,8 @@ ${getMirrorDecl("NSDate")} {
   
   var count: Int { get { return 0 } }
   
-  subscript(i: Int) -> (String, MirrorType) {
-    _preconditionFailure("MirrorType access out of bounds")
+  subscript(i: Int) -> (String, _MirrorType) {
+    _preconditionFailure("_MirrorType access out of bounds")
   }
   
   var summary: String {
@@ -110,8 +110,8 @@ ${getMirrorDecl("NSSet","MembershipContainer")} {
     return 0
   }
   
-  subscript(i: Int) -> (String, MirrorType) {
-    _precondition(i >= 0 && i < count, "MirrorType access out of bounds")
+  subscript(i: Int) -> (String, _MirrorType) {
+    _precondition(i >= 0 && i < count, "_MirrorType access out of bounds")
     return ("[\(i)]", _reflect(_a[i]))
   }
   
@@ -128,20 +128,20 @@ ${getMirrorConformance("NSSet","MembershipContainer")}
 
 extension NSArray : _Reflectable {
   /// Returns a mirror that reflects `self`.
-  public func _getMirror() -> MirrorType {
+  public func _getMirror() -> _MirrorType {
     return _reflect(self as [AnyObject])
   }
 }
 extension NSDictionary : _Reflectable {
   /// Returns a mirror that reflects `self`.
-  public func _getMirror() -> MirrorType {
+  public func _getMirror() -> _MirrorType {
     let dict: [NSObject : AnyObject] = _convertNSDictionaryToDictionary(self)
     return _reflect(dict)
   }
 }
 extension NSString : _Reflectable {
   /// Returns a mirror that reflects `self`.
-  public func _getMirror() -> MirrorType {
+  public func _getMirror() -> _MirrorType {
     return _reflect(self as String)
   }
 }

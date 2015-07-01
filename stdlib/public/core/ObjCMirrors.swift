@@ -14,7 +14,7 @@
 @asmname("swift_ObjCMirror_count") 
 func _getObjCCount(_: _MagicMirrorData) -> Int
 @asmname("swift_ObjCMirror_subscript") 
-func _getObjCChild(_: Int, _: _MagicMirrorData) -> (String, MirrorType)
+func _getObjCChild(_: Int, _: _MagicMirrorData) -> (String, _MirrorType)
 
 @objc protocol _DebugDescriptionProxy {
   var debugDescription: _CocoaStringType {get}
@@ -26,7 +26,7 @@ func _getObjCSummary(data: _MagicMirrorData) -> String {
 }
 
 public // SPI(runtime)
-struct _ObjCMirror : MirrorType {
+struct _ObjCMirror : _MirrorType {
   let data: _MagicMirrorData
 
   public var value: Any { return data.objcValue }
@@ -37,7 +37,7 @@ struct _ObjCMirror : MirrorType {
   public var count: Int {
     return _getObjCCount(data)
   }
-  public subscript(i: Int) -> (String, MirrorType) {
+  public subscript(i: Int) -> (String, _MirrorType) {
     return _getObjCChild(i, data)
   }
   public var summary: String {
@@ -50,7 +50,7 @@ struct _ObjCMirror : MirrorType {
 }
 
 public // SPI(runtime)
-struct _ObjCSuperMirror : MirrorType {
+struct _ObjCSuperMirror : _MirrorType {
   let data: _MagicMirrorData
 
   public var value: Any { return data.objcValue }
@@ -63,7 +63,7 @@ struct _ObjCSuperMirror : MirrorType {
   public var count: Int {
     return _getObjCCount(data)
   }
-  public subscript(i: Int) -> (String, MirrorType) {
+  public subscript(i: Int) -> (String, _MirrorType) {
     return _getObjCChild(i, data)
   }
   public var summary: String {

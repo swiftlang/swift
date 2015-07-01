@@ -221,7 +221,7 @@ static_assert(sizeof(MagicMirrorData) == sizeof(ValueBuffer),
 /// arbitrary object.
 ///
 /// This type is layout-compatible with a Swift existential container for the
-/// MirrorType protocol.
+/// _MirrorType protocol.
 class MagicMirror {
 public:
   // The data for the mirror.
@@ -925,46 +925,46 @@ swift_ClassMirror_quickLookObject(HeapObject *owner, const OpaqueValue *value,
 extern "C" const FullMetadata<Metadata> OpaqueMirrorMetadata
   __asm__(UNDERSCORE "_TMdVSs13_OpaqueMirror");
 extern "C" const MirrorWitnessTable OpaqueMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVSs13_OpaqueMirrorSs10MirrorTypeSs");
+  __asm__(UNDERSCORE "_TWPVSs13_OpaqueMirrorSs11_MirrorTypeSs");
 extern "C" const FullMetadata<Metadata> TupleMirrorMetadata
   __asm__(UNDERSCORE "_TMdVSs12_TupleMirror");
 extern "C" const MirrorWitnessTable TupleMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVSs12_TupleMirrorSs10MirrorTypeSs");
+  __asm__(UNDERSCORE "_TWPVSs12_TupleMirrorSs11_MirrorTypeSs");
 
 extern "C" const FullMetadata<Metadata> StructMirrorMetadata
   __asm__(UNDERSCORE "_TMdVSs13_StructMirror");
 extern "C" const MirrorWitnessTable StructMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVSs13_StructMirrorSs10MirrorTypeSs");
+  __asm__(UNDERSCORE "_TWPVSs13_StructMirrorSs11_MirrorTypeSs");
 
 extern "C" const FullMetadata<Metadata> EnumMirrorMetadata
   __asm__(UNDERSCORE "_TMdVSs11_EnumMirror");
 extern "C" const MirrorWitnessTable EnumMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVSs11_EnumMirrorSs10MirrorTypeSs");
+  __asm__(UNDERSCORE "_TWPVSs11_EnumMirrorSs11_MirrorTypeSs");
 
 extern "C" const FullMetadata<Metadata> ClassMirrorMetadata
   __asm__(UNDERSCORE "_TMdVSs12_ClassMirror");
 extern "C" const MirrorWitnessTable ClassMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVSs12_ClassMirrorSs10MirrorTypeSs");
+  __asm__(UNDERSCORE "_TWPVSs12_ClassMirrorSs11_MirrorTypeSs");
 
 extern "C" const FullMetadata<Metadata> ClassSuperMirrorMetadata
   __asm__(UNDERSCORE "_TMdVSs17_ClassSuperMirror");
 extern "C" const MirrorWitnessTable ClassSuperMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVSs17_ClassSuperMirrorSs10MirrorTypeSs");
+  __asm__(UNDERSCORE "_TWPVSs17_ClassSuperMirrorSs11_MirrorTypeSs");
 
 extern "C" const FullMetadata<Metadata> MetatypeMirrorMetadata
   __asm__(UNDERSCORE "_TMdVSs15_MetatypeMirror");
 extern "C" const MirrorWitnessTable MetatypeMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVSs15_MetatypeMirrorSs10MirrorTypeSs");
+  __asm__(UNDERSCORE "_TWPVSs15_MetatypeMirrorSs11_MirrorTypeSs");
   
 #if SWIFT_OBJC_INTEROP
 extern "C" const FullMetadata<Metadata> ObjCMirrorMetadata
   __asm__(UNDERSCORE "_TMdVSs11_ObjCMirror");
 extern "C" const MirrorWitnessTable ObjCMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVSs11_ObjCMirrorSs10MirrorTypeSs");
+  __asm__(UNDERSCORE "_TWPVSs11_ObjCMirrorSs11_MirrorTypeSs");
 extern "C" const FullMetadata<Metadata> ObjCSuperMirrorMetadata
   __asm__(UNDERSCORE "_TMdVSs16_ObjCSuperMirror");
 extern "C" const MirrorWitnessTable ObjCSuperMirrorWitnessTable
-  __asm__(UNDERSCORE "_TWPVSs16_ObjCSuperMirrorSs10MirrorTypeSs");
+  __asm__(UNDERSCORE "_TWPVSs16_ObjCSuperMirrorSs11_MirrorTypeSs");
 #endif
 
 #undef UNDERSCORE

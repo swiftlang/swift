@@ -26,8 +26,8 @@ extension String {
 
       var count: Int { return distance(_value.startIndex,_value.endIndex) }
 
-      subscript(i: Int) -> (String, MirrorType) {
-        _precondition(i >= 0 && i < count, "MirrorType access out of bounds")
+      subscript(i: Int) -> (String, _MirrorType) {
+        _precondition(i >= 0 && i < count, "_MirrorType access out of bounds")
         // FIXME(performance): optimize for sequential access.
         return ("[\(i)]", _reflect(_value[advance(_value.startIndex, i)]))
       }

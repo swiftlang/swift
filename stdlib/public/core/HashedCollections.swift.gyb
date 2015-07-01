@@ -3718,7 +3718,7 @@ internal func < <${TypeParametersDecl}> (
   return lhs._intPos < rhs
 }
 
-internal class ${Self}Mirror<${TypeParametersDecl}> : MirrorType {
+internal class ${Self}Mirror<${TypeParametersDecl}> : _MirrorType {
   typealias MirroredType = ${Self}<${TypeParameters}>
   internal let _mirror : MirroredType
   internal var _pos : ${Self}MirrorPosition<${TypeParameters}>
@@ -3736,8 +3736,8 @@ internal class ${Self}Mirror<${TypeParametersDecl}> : MirrorType {
 
   internal var count: Int { return _mirror.count }
 
-  internal subscript(i: Int) -> (String, MirrorType) {
-    _precondition(i >= 0 && i < count, "MirrorType access out of bounds")
+  internal subscript(i: Int) -> (String, _MirrorType) {
+    _precondition(i >= 0 && i < count, "_MirrorType access out of bounds")
 
     if _pos > i {
       _pos._intPos = 0
@@ -3778,7 +3778,7 @@ internal class ${Self}Mirror<${TypeParametersDecl}> : MirrorType {
 
 extension ${Self} : _Reflectable {
   /// Returns a mirror that reflects `self`.
-  public func _getMirror() -> MirrorType {
+  public func _getMirror() -> _MirrorType {
     return ${Self}Mirror(self)
   }
 }

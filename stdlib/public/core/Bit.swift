@@ -55,12 +55,12 @@ public enum Bit : Int, Comparable, RandomAccessIndexType, _Reflectable {
   }
 
   /// Returns a mirror that reflects `self`.
-  public func _getMirror() -> MirrorType {
+  public func _getMirror() -> _MirrorType {
     return _BitMirror(self)
   }
 }
 
-internal struct _BitMirror : MirrorType {
+internal struct _BitMirror : _MirrorType {
   let _value: Bit
 
   init(_ v: Bit) {
@@ -75,8 +75,8 @@ internal struct _BitMirror : MirrorType {
 
   var count: Int { return 0 }
 
-  subscript(i: Int) -> (String, MirrorType) {
-    _preconditionFailure("MirrorType access out of bounds")
+  subscript(i: Int) -> (String, _MirrorType) {
+    _preconditionFailure("_MirrorType access out of bounds")
   }
 
   var summary: String {

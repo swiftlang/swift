@@ -62,7 +62,7 @@ public struct ObjCBool : BooleanType, BooleanLiteralConvertible {
 
 extension ObjCBool : _Reflectable {
   /// Returns a mirror that reflects `self`.
-  public func _getMirror() -> MirrorType {
+  public func _getMirror() -> _MirrorType {
     return _reflect(boolValue)
   }
 }
@@ -165,7 +165,7 @@ extension String {
 
 extension Selector : _Reflectable {
   /// Returns a mirror that reflects `self`.
-  public func _getMirror() -> MirrorType {
+  public func _getMirror() -> _MirrorType {
     return _reflect(String(_sel: self))
   }
 }

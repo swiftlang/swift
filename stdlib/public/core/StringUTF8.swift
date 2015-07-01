@@ -227,7 +227,7 @@ extension String {
     }
 
     /// Returns a mirror that reflects `self`.
-    public func _getMirror() -> MirrorType {
+    public func _getMirror() -> _MirrorType {
       return _UTF8ViewMirror(self)
     }
 

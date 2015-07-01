@@ -123,7 +123,7 @@ protocol _ArrayType
   init(_ buffer: _Buffer)
 }
 
-internal struct _ArrayTypeMirror<T : _ArrayType> : MirrorType {
+internal struct _ArrayTypeMirror<T : _ArrayType> : _MirrorType {
   let _value : T
 
   init(_ v : T) { _value = v }
@@ -136,8 +136,8 @@ internal struct _ArrayTypeMirror<T : _ArrayType> : MirrorType {
 
   var count: Int { return _value.count }
 
-  subscript(i: Int) -> (String, MirrorType) {
-    _precondition(i >= 0 && i < count, "MirrorType access out of bounds")
+  subscript(i: Int) -> (String, _MirrorType) {
+    _precondition(i >= 0 && i < count, "_MirrorType access out of bounds")
     return ("[\(i)]", _reflect(_value[i]))
   }
 

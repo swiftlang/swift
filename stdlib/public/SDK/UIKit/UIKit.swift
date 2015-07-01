@@ -138,7 +138,7 @@ public extension UIAlertView {
 #endif
 
 #if !os(watchOS)
-struct _UIViewMirror : MirrorType {
+struct _UIViewMirror : _MirrorType {
   static var _views = NSMutableSet()
 
   var _v : UIView
@@ -153,8 +153,8 @@ struct _UIViewMirror : MirrorType {
   
   var count: Int { get { return 0 } }
   
-  subscript(_: Int) -> (String, MirrorType) {
-    _preconditionFailure("MirrorType access out of bounds")
+  subscript(_: Int) -> (String, _MirrorType) {
+    _preconditionFailure("_MirrorType access out of bounds")
   }
   
   var summary: String { get { return ""} }
@@ -201,7 +201,7 @@ struct _UIViewMirror : MirrorType {
 
 extension UIView : _Reflectable {
   /// Returns a mirror that reflects `self`.
-  public func _getMirror() -> MirrorType {
+  public func _getMirror() -> _MirrorType {
     return _UIViewMirror(self)
   }
 }

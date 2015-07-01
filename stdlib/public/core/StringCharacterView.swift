@@ -200,7 +200,7 @@ extension String.CharacterView : CollectionType {
     }
 
     /// Returns a mirror that reflects `self`.
-    public func _getMirror() -> MirrorType {
+    public func _getMirror() -> _MirrorType {
       return _IndexMirror(self)
     }
   }
@@ -228,7 +228,7 @@ extension String.CharacterView : CollectionType {
     return Character(String(unicodeScalars[i._base..<i._endBase]))
   }
 
-  internal struct _IndexMirror : MirrorType {
+  internal struct _IndexMirror : _MirrorType {
     var _value: Index
 
     init(_ x: Index) {
@@ -245,8 +245,8 @@ extension String.CharacterView : CollectionType {
 
     var count: Int { return 0 }
 
-    subscript(i: Int) -> (String, MirrorType) {
-      _preconditionFailure("MirrorType access out of bounds")
+    subscript(i: Int) -> (String, _MirrorType) {
+      _preconditionFailure("_MirrorType access out of bounds")
     }
 
     var summary: String { return "\(_value._utf16Index)" }

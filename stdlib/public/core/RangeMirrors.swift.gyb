@@ -26,7 +26,7 @@ ${MirrorDecl} {
   ${MirrorBoilerplate}
   var count: Int { return 2 }
 
-  subscript(i: Int) -> (String, MirrorType) {
+  subscript(i: Int) -> (String, _MirrorType) {
     switch i {
     case 0: return ("startIndex",_reflect(_value.startIndex))
     case 1: return ("endIndex",_reflect(_value.endIndex))
