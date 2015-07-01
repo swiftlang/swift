@@ -2252,10 +2252,6 @@ PolymorphicFunctionType::getGenericParameters() const {
   return Params->getParams();
 }
 
-ArrayRef<ArchetypeType *> PolymorphicFunctionType::getAllArchetypes() const {
-  return Params->getAllArchetypes();
-}
-
 FunctionType *PolymorphicFunctionType::substGenericArgs(Module *module,
                                                         ArrayRef<Type> args) {
   TypeSubstitutionMap map;

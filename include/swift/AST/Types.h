@@ -2265,7 +2265,6 @@ public:
                                       const ExtInfo &Info);
 
   ArrayRef<GenericTypeParamDecl *> getGenericParameters() const;
-  ArrayRef<ArchetypeType *> getAllArchetypes() const;
 
   GenericParamList &getGenericParams() const { return *Params; }
 
