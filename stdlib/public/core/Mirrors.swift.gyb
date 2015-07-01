@@ -42,7 +42,7 @@ internal func _toString<T>(x: T) -> String {
 % for Type in Types:
 extension ${Type[0]} : _Reflectable {
   /// Returns a mirror that reflects `self`.
-  public func getMirror() -> MirrorType {
+  public func _getMirror() -> MirrorType {
     return _LeafMirror(self, _toString, { .Some(${Type[1]}(${Type[2]})) })
   }
 }

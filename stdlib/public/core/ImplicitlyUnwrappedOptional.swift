@@ -66,7 +66,7 @@ public enum ImplicitlyUnwrappedOptional<T>
   }
 
   /// Returns a mirror that reflects `self`.
-  public func getMirror() -> MirrorType {
+  public func _getMirror() -> MirrorType {
     // FIXME: This should probably use _OptionalMirror in both cases.
     if let value = self {
       return reflect(value)

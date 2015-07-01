@@ -206,7 +206,7 @@ extension String {
     }
 
     /// Returns a mirror that reflects `self`.
-    public func getMirror() -> MirrorType {
+    public func _getMirror() -> MirrorType {
       return _UnicodeScalarViewMirror(self)
     }
 

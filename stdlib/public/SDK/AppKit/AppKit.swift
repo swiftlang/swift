@@ -60,7 +60,7 @@ struct _NSCursorMirror : MirrorType {
 }
 
 extension NSCursor : _Reflectable {
-  public func getMirror() -> MirrorType {
+  public func _getMirror() -> MirrorType {
     return _NSCursorMirror(self)
   }
 }
@@ -121,7 +121,7 @@ struct _NSViewMirror : MirrorType {
 
 extension NSView : _Reflectable {
   /// Returns a mirror that reflects `self`.
-  public func getMirror() -> MirrorType {
+  public func _getMirror() -> MirrorType {
     return _NSViewMirror(self)
   }
 }

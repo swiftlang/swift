@@ -31,7 +31,6 @@
 // LITERAL3-DAG:     Decl[InstanceVar]/CurrNominal:      boolValue[#Bool#]; name=boolValue{{$}}
 // LITERAL3-DAG:     Decl[InstanceVar]/CurrNominal:      description[#String#]; name=description{{$}}
 // LITERAL3-DAG:     Decl[InstanceVar]/CurrNominal:      hashValue[#Int#]; name=hashValue{{$}}
-// LITERAL3-DAG:     Decl[InstanceMethod]/CurrNominal:   getMirror()[#MirrorType#]; name=getMirror(){{$}}
 
 {
   "swift".#^LITERAL4^#

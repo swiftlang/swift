@@ -61,7 +61,7 @@ struct AnyReturn {
 
 /// A _Reflectable witness table.
 struct _ReflectableWitnessTable {
-  /// func getMirror() -> Mirror
+  /// func _getMirror() -> Mirror
   Mirror (*getMirror)(OpaqueValue *self, const Metadata *Self);
 };
   
@@ -1196,7 +1196,7 @@ getReflectableConformance(const Metadata *T, const OpaqueValue *Value) {
 /// func reflect<T>(x: T) -> Mirror
 ///
 /// Produce a mirror for any value. If the value's type conforms to _Reflectable,
-/// invoke its getMirror() method; otherwise, fall back to an implementation
+/// invoke its _getMirror() method; otherwise, fall back to an implementation
 /// in the runtime that structurally reflects values of any type.
 ///
 /// This function consumes 'value', following Swift's +1 convention for "in"

@@ -90,7 +90,7 @@ enum Statistic: _Reflectable {
   case ForState(State)
   case ForCountry(Country)
 
-  func getMirror() -> MirrorType {
+  func _getMirror() -> MirrorType {
     return StatMirror(_value: self)
   }
 }

@@ -45,7 +45,7 @@ public enum Optional<T> : _Reflectable, NilLiteralConvertible {
   }
 
   /// Returns a mirror that reflects `self`.
-  public func getMirror() -> MirrorType {
+  public func _getMirror() -> MirrorType {
     return _OptionalMirror(self)
   }
 

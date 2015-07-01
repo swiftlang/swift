@@ -128,20 +128,20 @@ ${getMirrorConformance("NSSet","MembershipContainer")}
 
 extension NSArray : _Reflectable {
   /// Returns a mirror that reflects `self`.
-  public func getMirror() -> MirrorType {
+  public func _getMirror() -> MirrorType {
     return reflect(self as [AnyObject])
   }
 }
 extension NSDictionary : _Reflectable {
   /// Returns a mirror that reflects `self`.
-  public func getMirror() -> MirrorType {
+  public func _getMirror() -> MirrorType {
     let dict: [NSObject : AnyObject] = _convertNSDictionaryToDictionary(self)
     return reflect(dict)
   }
 }
 extension NSString : _Reflectable {
   /// Returns a mirror that reflects `self`.
-  public func getMirror() -> MirrorType {
+  public func _getMirror() -> MirrorType {
     return reflect(self as String)
   }
 }

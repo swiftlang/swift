@@ -1057,7 +1057,7 @@ class Brilliant : _Reflectable {
     self.second = snd
   }
 
-  func getMirror() -> MirrorType {
+  func _getMirror() -> MirrorType {
     return BrilliantMirror(self)
   }
 }

@@ -18,7 +18,7 @@ public protocol _Reflectable {
   // corresponding change to Reflection.cpp.
 
   /// Returns a mirror that reflects `self`.
-  func getMirror() -> MirrorType
+  func _getMirror() -> MirrorType
 }
 
 /// A unique identifier for a class instance or metatype. This can be used by
@@ -217,9 +217,10 @@ func _getSummary<T>(out: UnsafeMutablePointer<String>, x: T) {
   out.initialize(reflect(x).summary)
 }
 
-/// Produce a mirror for any value. If the value's type conforms to _Reflectable,
-/// invoke its getMirror() method; otherwise, fall back to an implementation
-/// in the runtime that structurally reflects values of any type.
+/// Produce a mirror for any value. If the value's type conforms to
+/// `_Reflectable`, invoke its `_getMirror()` method; otherwise, fall back
+/// to an implementation in the runtime that structurally reflects values
+/// of any type.
 @asmname("swift_reflectAny")public func reflect<T>(x: T) -> MirrorType
 
 /// Unsafely produce a mirror for a value in memory whose lifetime is
