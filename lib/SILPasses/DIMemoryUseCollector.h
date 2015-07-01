@@ -86,6 +86,12 @@ public:
     return SILValue(MemoryInst, 1);
   }
 
+  SILValue getContainer() const {
+    if (isa<MarkUninitializedInst>(MemoryInst))
+      return SILValue();
+    return SILValue(MemoryInst, 0);
+  }
+
   /// getNumMemoryElements - Return the number of elements, without the extra
   /// "super.init" tracker in initializers of derived classes.
   unsigned getNumMemoryElements() const {

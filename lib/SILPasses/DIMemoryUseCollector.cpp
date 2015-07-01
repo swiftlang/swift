@@ -428,8 +428,11 @@ namespace {
         // If this is a class pointer, we need to look through
         // ref_element_addrs.
         collectClassSelfUses();
-      } else
+      } else {
+        if (auto container = TheMemory.getContainer())
+          collectContainerUses(container, TheMemory.getAddress());
         collectUses(TheMemory.getAddress(), 0);
+      }
 
       if (!isa<MarkUninitializedInst>(TheMemory.MemoryInst)) {
         // Collect information about the retain count result as well.
@@ -447,6 +450,7 @@ namespace {
 
   private:
     void collectUses(SILValue Pointer, unsigned BaseEltNo);
+    void collectContainerUses(SILValue Container, SILValue Pointer);
     void collectClassSelfUses();
     void collectDelegatingClassInitSelfUses();
     void collectDelegatingValueTypeInitSelfUses();
@@ -528,6 +532,35 @@ void ElementUseCollector::collectStructElementUses(StructElementAddrInst *SEAI,
   }
 
   collectUses(SILValue(SEAI, 0), BaseEltNo);
+}
+
+void ElementUseCollector::collectContainerUses(SILValue container,
+                                               SILValue pointer) {
+  auto pointeeType = pointer.getType().getObjectType();
+  for (auto UI : container.getUses()) {
+    auto *User = UI->getUser();
+
+    // Deallocations and retain/release don't affect the value directly.
+    if (isa<DeallocBoxInst>(User))
+      continue;
+    if (isa<DeallocStackInst>(User))
+      continue;
+    if (isa<StrongRetainInst>(User))
+      continue;
+    if (isa<StrongReleaseInst>(User))
+      continue;
+
+    // TODO: We should consider uses of project_box as equivalent to uses of
+    // the box element. For now, just consider them escapes. We would need
+    // to fix this if we phased out alloc_box's #1 result.
+    //if (isa<ProjectBoxInst>(User)) {
+      // do something smart
+      // continue;
+    //}
+
+    // Other uses of the container are considered escapes of the value.
+    addElementUses(0, pointeeType, User, DIUseKind::Escape);
+  }
 }
 
 void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {

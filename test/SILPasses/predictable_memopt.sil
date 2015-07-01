@@ -374,3 +374,22 @@ sil @dead_allocation_2 : $@convention(thin) (Optional<AnyObject>) -> () {
   %3 = tuple ()
   return %3 : $()
 }
+
+enum IndirectCase {
+  indirect case X(Int)
+}
+
+// CHECK-LABEL: sil @indirect_enum_box
+sil @indirect_enum_box : $@convention(thin) (Int) -> IndirectCase {
+// CHECK: bb0([[X:%.*]] : $Int):
+entry(%x : $Int):
+  // CHECK: [[BOX:%.*]] = alloc_box $Int
+  %b = alloc_box $Int
+  // CHECK: store [[X]] to [[BOX]]
+  store %x to %b#1 : $*Int
+  // CHECK: [[E:%.*]] = enum $IndirectCase, #IndirectCase.X!enumelt.1, [[BOX]]#0 : $@box Int
+  %e = enum $IndirectCase, #IndirectCase.X!enumelt.1, %b#0 : $@box Int
+  // CHECK: return [[E]]
+  return %e : $IndirectCase
+}
+
