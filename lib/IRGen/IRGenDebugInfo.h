@@ -24,6 +24,7 @@
 #include "llvm/IR/DIBuilder.h"
 #include "llvm/Support/Allocator.h"
 
+#include "swift/AST/Module.h"
 #include "swift/SIL/SILLocation.h"
 #include "swift/SIL/SILBasicBlock.h"
 
@@ -84,7 +85,7 @@ class IRGenDebugInfo {
   llvm::DenseMap<SILDebugScope *, llvm::TrackingMDNodeRef> ScopeCache;
   llvm::DenseMap<const char *, llvm::TrackingMDNodeRef> DIFileCache;
   llvm::DenseMap<TypeBase *, llvm::TrackingMDNodeRef> DITypeCache;
-  std::map<std::string, llvm::TrackingMDNodeRef> DIModuleCache;
+  llvm::StringMap<llvm::TrackingMDNodeRef> DIModuleCache;
   TrackingDIRefMap DIRefMap;
 
   llvm::SmallString<256> MainFilename;
@@ -92,7 +93,7 @@ class IRGenDebugInfo {
   StringRef CWDName;               /// The current working directory.
   llvm::DICompileUnit *TheCU = nullptr; /// The current compilation unit.
   llvm::DIFile *MainFile = nullptr;     /// The main file.
-  llvm::MDModule *MainModule = nullptr; /// The current module.
+  llvm::DIModule *MainModule = nullptr; /// The current module.
   llvm::MDNode *EntryPointFn;      /// Scope of SWIFT_ENTRY_POINT_FUNCTION.
   TypeAliasDecl *MetadataTypeDecl; /// The type decl for swift.type.
   llvm::DIType *InternalType; /// Catch-all type for opaque internal types.
@@ -247,9 +248,6 @@ private:
   StringRef BumpAllocatedString(std::string S);
   StringRef BumpAllocatedString(StringRef S);
 
-  void createImportedModule(StringRef Name, StringRef MangledPrefix,
-                            llvm::MDModule *Module, unsigned Line);
-
   llvm::DIType *createType(DebugTypeInfo DbgTy, StringRef MangledName,
                            llvm::DIScope *Scope, llvm::DIFile *File);
   llvm::DIType *getOrCreateType(DebugTypeInfo DbgTy);
@@ -275,8 +273,9 @@ private:
                                      DeclContext *DeclContext,
                                      unsigned &SizeInBits);
   llvm::DIFile *getFile(llvm::DIScope *Scope);
-  llvm::MDModule *getOrCreateModule(llvm::DIScope *Parent, std::string Name,
-                                    llvm::DIFile *File);
+  llvm::DIModule *getOrCreateModule(ModuleDecl::ImportedModule M);
+  llvm::DIModule *getOrCreateModule(StringRef Key, llvm::DIScope *Parent,
+                                    StringRef Name, StringRef Filename);
   llvm::DIScope *getModule(StringRef MangledName);
   llvm::DINodeArray getStructMembers(NominalTypeDecl *D, Type BaseTy,
                                      llvm::DIScope *Scope, llvm::DIFile *File,

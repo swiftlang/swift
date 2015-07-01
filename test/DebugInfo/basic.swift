@@ -65,14 +65,9 @@ func foo(var a: Int64, var _ b: Int64) -> Int64 {
 // Function type for foo.
 // CHECK-DAG: ![[FOOTYPE]] = !DISubroutineType(types: ![[PARAMTYPES:[0-9]+]])
 // CHECK-DAG: ![[PARAMTYPES]] = !{!"_TtVSs5Int64", !"_TtVSs5Int64", !"_TtVSs5Int64"}
-// Import of the main module.
+// Import of the main module with the implicit name.
 // CHECK-DAG: !DIImportedEntity(tag: DW_TAG_imported_module, scope: ![[MAINFILE]], entity: ![[MAINMODULE:[0-9]+]], line: 1)
-// CHECK-DAG: ![[MAINMODULE]] = !MDModule(name: "basic"
-
-// Import of the swift standard library.
-// CHECK-DAG: ![[SWIFTFILE:[0-9]+]] = !DIFile(filename: "{{.*}}Swift.swiftmodule",
-// CHECK-DAG: !DIImportedEntity(tag: DW_TAG_imported_module, scope: ![[SWIFTFILE]], entity: ![[SWIFTMODULE:[0-9]+]])
-// CHECK-DAG: ![[SWIFTMODULE]] = !MDModule(name: "Swift"
+// CHECK-DAG: ![[MAINMODULE]] = !DIModule({{.*}}, name: "basic"
 
 // DWARF Version
 // CHECK-DAG:  i32 2, !"Dwarf Version", i32 3}

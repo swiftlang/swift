@@ -37,10 +37,8 @@ class MyObject : NSObject {
   // LOC-CHECK: ret
   var MyArr = NSArray()
 // IMPORT-CHECK: filename: "test-foundation.swift"
-// IMPORT-CHECK: !MDModule(name: "ObjectiveC"
-// IMPORT-CHECK: [[FOUNDATION:[0-9]+]] = !MDModule(name: "Foundation",
-// IMPORT-CHECK-SAME:                        {{.*}}file: ![[FOUNDATION_FILE:[0-9]+]]
-// IMPORT-CHECK: ![[FOUNDATION_FILE]] = !DIFile(filename: "Foundation-{{.*}}.pcm"
+// IMPORT-CHECK: [[FOUNDATION:[0-9]+]] = !DIModule({{.*}} name: "Foundation",
+// IMPORT-CHECK-SAME:                              {{.*}} includePath:
 // IMPORT-CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "NSArray",
 // IMPORT-CHECK-SAME:             scope: ![[FOUNDATION]]
 // IMPORT-CHECK: !DIImportedEntity(tag: DW_TAG_imported_module, {{.*}}entity: ![[FOUNDATION]]

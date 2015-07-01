@@ -8,7 +8,7 @@
 // Test variables-interpreter.swift runs this code with `swift -g -i`.
 // Test variables-repl.swift runs this code with `swift -g < variables.swift`.
 
-// CHECK-DAG: ![[TLC:.*]] = !MDModule(name: "variables"
+// CHECK-DAG: ![[TLC:.*]] = !DIModule({{.*}}, name: "variables"
 
 // Global variables.
 var glob_i8:   Int8 = 8;

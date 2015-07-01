@@ -72,30 +72,6 @@ StringRef IRGenDebugInfo::BumpAllocatedString(StringRef S) {
   return BumpAllocatedString(S.data(), S.size());
 }
 
-static bool isNonAscii(StringRef str) {
-  for (unsigned char c : str) {
-    if (c >= 0x80)
-      return true;
-  }
-  return false;
-}
-
-// Mangle a single non-operator identifier.
-static void mangleIdent(llvm::raw_string_ostream &OS, StringRef Id) {
-  // If the identifier contains non-ASCII character, we mangle with an initial
-  // X and Punycode the identifier string.
-  std::string PunycodeBuf;
-  (void) isNonAscii;
-  if (isNonAscii(Id)) {
-    OS << 'X';
-    Punycode::encodePunycodeUTF8(Id, PunycodeBuf);
-    Id = PunycodeBuf;
-  }
-  OS << Id.size() << Id;
-  OS.flush();
-  return;
-}
-
 /// Return the size reported by a type.
 static unsigned getSizeInBits(llvm::DIType *Ty, const TrackingDIRefMap &Map) {
   // Follow derived types until we reach a type that
@@ -191,14 +167,9 @@ IRGenDebugInfo::IRGenDebugInfo(const IRGenOptions &Opts,
   }
 
   // Create a module for the current compile unit.
-  MainModule = getOrCreateModule(TheCU, Opts.ModuleName, MainFile);
-  std::string Mangled("_TF");
-  llvm::raw_string_ostream MS(Mangled);
-  if (Opts.ModuleName == IGM.Context.StdlibModuleName.str())
-    MS << "S";
-  else
-    mangleIdent(MS, Opts.ModuleName);
-  createImportedModule(Opts.ModuleName, MS.str(), MainModule, 1);
+  MainModule =
+      getOrCreateModule(Opts.ModuleName, TheCU, Opts.ModuleName, MainFilename);
+  DBuilder.createImportedModule(MainFile, MainModule, 1);
 }
 
 static const char *getFilenameFromDC(const DeclContext *DC) {
@@ -587,17 +558,15 @@ llvm::DIScope *IRGenDebugInfo::getOrCreateContext(DeclContext *DC) {
   case DeclContextKind::AbstractFunctionDecl:
 
   // We don't model these in DWARF.
-
   case DeclContextKind::SerializedLocal:
   case DeclContextKind::Initializer:
   case DeclContextKind::ExtensionDecl:
     return getOrCreateContext(DC->getParent());
+
   case DeclContextKind::TopLevelCodeDecl:
     return cast<llvm::DIScope>(EntryPointFn);
-  case DeclContextKind::Module: {
-    auto File = getOrCreateFile(getFilenameFromDC(DC));
-    return getOrCreateModule(TheCU, cast<Module>(DC)->getName().str(), File);
-  }
+  case DeclContextKind::Module:
+    return getOrCreateModule({Module::AccessPathTy(), cast<ModuleDecl>(DC)});
   case DeclContextKind::FileUnit:
     // A module may contain multiple files.
     return getOrCreateContext(DC->getParent());
@@ -788,69 +757,60 @@ void IRGenDebugInfo::emitImport(ImportDecl *D) {
   if (Opts.DebugInfoKind == IRGenDebugInfoKind::LineTables)
     return;
 
-  // Imports are visited after SILFunctions.
-  llvm::MDModule *Module = MainModule;
   swift::Module *M = IGM.Context.getModule(D->getModulePath());
-  if (!M && D->getModulePath()[0].first.str() == "Builtin")
+  if (!M &&
+      D->getModulePath()[0].first == IGM.Context.TheBuiltinModule->getName())
     M = IGM.Context.TheBuiltinModule;
   if (!M) {
     assert(M && "Could not find module for import decl.");
     return;
   }
-  auto File = getOrCreateFile(getFilenameFromDC(M->getFiles().front()));
-
-  std::string Printed, Mangled("_T");
-  {
-    llvm::raw_string_ostream MS(Mangled), PS(Printed);
-    bool first = true;
-    for (auto elt : D->getModulePath()) {
-      auto Component = elt.first.str();
-
-      // We model each component of the access path as a module.
-      if (first && Component == D->getASTContext().StdlibModuleName.str())
-        MS << "S";
-      else
-        mangleIdent(MS, Component);
-      Module = getOrCreateModule(Module, Component, File);
-
-      if (first)
-        first = false;
-      else
-        PS << '.';
-      PS << Component;
-    }
-  }
-
-  StringRef Name = BumpAllocatedString(Printed);
-  unsigned Line = getLoc(SM, D).Line;
-  createImportedModule(Name, Mangled, Module, Line);
+  auto DIMod = getOrCreateModule({D->getModulePath(), M});
+  Location L = getLoc(SM, D);
+  DBuilder.createImportedModule(getOrCreateFile(L.Filename), DIMod, L.Line);
 }
 
-// Create an imported module and import declarations for all functions
-// from that module.
-void IRGenDebugInfo::createImportedModule(StringRef Name, StringRef Mangled,
-                                          llvm::MDModule *Module,
-                                          unsigned Line) {
-  llvm::SmallString<512> Path(Module->getDirectory());
-  llvm::sys::path::append(Path, Module->getFilename());
-  auto File = getOrCreateFile(BumpAllocatedString(Path).data());
-  DBuilder.createImportedModule(File, Module, Line);
+llvm::DIModule *
+IRGenDebugInfo::getOrCreateModule(ModuleDecl::ImportedModule M) {
+  const char *fn = getFilenameFromDC(M.second);
+  StringRef Path(fn ? fn : "");
+  if (M.first.empty()) {
+    StringRef Name = M.second->getName().str();
+    return getOrCreateModule(Name, TheCU, Name, Path);
+  }
+
+  unsigned I = 0;
+  SmallString<128> AccessPath;
+  llvm::DIScope *Scope = TheCU;
+  llvm::raw_svector_ostream OS(AccessPath);
+  for (auto elt : M.first) {
+    auto Component = elt.first.str();
+    if (++I > 1)
+      OS << '.';
+    OS << Component;
+    OS.flush();
+    Scope = getOrCreateModule(AccessPath, Scope, Component, Path);
+  }
+  return cast<llvm::DIModule>(Scope);
 }
 
 /// Return a cached module for an access path or create a new one.
-llvm::MDModule *IRGenDebugInfo::getOrCreateModule(llvm::DIScope *Parent,
-                                                  std::string Name,
-                                                  llvm::DIFile *File) {
+llvm::DIModule *IRGenDebugInfo::getOrCreateModule(StringRef Key,
+                                                  llvm::DIScope *Parent,
+                                                  StringRef Name,
+                                                  StringRef Filename) {
   // Look in the cache first.
-  auto CachedM = DIModuleCache.find(Name);
+  auto Val = DIModuleCache.find(Key);
+  if (Val != DIModuleCache.end())
+    return cast<llvm::DIModule>(Val->second);
 
-  if (CachedM != DIModuleCache.end())
-    // Verify that the information still exists.
-    if (llvm::Metadata *Val = CachedM->second)
-      return cast<llvm::MDModule>(Val);
-
-  auto M = DBuilder.createModule(Parent, Name, File, 1);
-  DIModuleCache[Name] = llvm::TrackingMDNodeRef(M);
+  StringRef ConfigMacros;
+  StringRef Sysroot = IGM.Context.SearchPathOpts.SDKPath;
+  SmallString<256> IncludePath(Filename);
+  llvm::sys::path::remove_filename(IncludePath);
+  auto M =
+      DBuilder.createModule(Parent, Name, ConfigMacros, IncludePath, Sysroot);
+  DIModuleCache.insert({Key, llvm::TrackingMDNodeRef(M)});
   return M;
 }
 
@@ -1538,15 +1498,24 @@ llvm::DIType *IRGenDebugInfo::createType(DebugTypeInfo DbgTy,
       L.Filename = ClangSM.getBufferName(ClangSrcLoc);
 
       // Use "ObjectiveC" as default for implicit decls.
-      // FIXME 1: Do something more clever based on the decl's mangled name.
-      // FIXME 2: Clang submodules are not handled here.
+      // FIXME: Do something more clever based on the decl's mangled name.
+      StringRef ModulePath;
       StringRef ModuleName = "ObjectiveC";
       if (auto *OwningModule = ClangDecl->getImportedOwningModule())
         ModuleName = OwningModule->getTopLevelModuleName();
 
-      auto ModuleFile = getOrCreateFile(L.Filename);
-      // This placeholder gets RAUW'd by finalize().
-      Scope = getOrCreateModule(ModuleFile, ModuleName, ModuleFile);
+      if (auto *SwiftModule = Decl->getParentModule())
+        if (auto *ClangModule = SwiftModule->findUnderlyingClangModule()) {
+          // FIXME: Clang submodules are not handled here.
+          // FIXME: Clang module config macros are not handled here.
+          ModuleName = ClangModule->getFullModuleName();
+          // FIXME: A clang module's Directory is supposed to be the
+          // directory containing the module map, but ClangImporter
+          // sets it to the module cache directory.
+          if (ClangModule->Directory)
+            ModulePath = ClangModule->Directory->getName();
+        }
+      Scope = getOrCreateModule(ModuleName, TheCU, ModuleName, ModulePath);
     }
     return createPointerSizedStruct(Scope, Decl->getNameStr(),
                                     getOrCreateFile(L.Filename), L.Line, Flags,
