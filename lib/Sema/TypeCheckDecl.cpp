@@ -2490,14 +2490,25 @@ void swift::markAsObjC(TypeChecker &TC, ValueDecl *D,
 
       classDecl->recordObjCMethod(method);
 
-      // Swift does not permit class methods named "load".
+      // Swift does not permit class methods with Objective-C selectors 'load',
+      // 'alloc', or 'allocWithZone:'.
       if (!method->isInstanceMember()) {
-        auto selector = method->getObjCSelector(&TC);
-        if (selector.getNumArgs() == 0 &&
-            selector.getSelectorPieces()[0] == TC.Context.Id_load) {
+        auto isForbiddenSelector = [&TC](ObjCSelector sel) {
+          switch (sel.getNumArgs()) {
+          case 0:
+            return sel.getSelectorPieces().front() == TC.Context.Id_load ||
+                   sel.getSelectorPieces().front() == TC.Context.Id_alloc;
+          case 1:
+            return sel.getSelectorPieces().front()==TC.Context.Id_allocWithZone;
+          default:
+            return false;
+          }
+        };
+        auto sel = method->getObjCSelector(&TC);
+        if (isForbiddenSelector(sel)) {
           auto diagInfo = getObjCMethodDiagInfo(method);
-          TC.diagnose(method, diag::objc_class_method_load,
-                      diagInfo.first, diagInfo.second);
+          TC.diagnose(method, diag::objc_class_method_not_permitted,
+                      diagInfo.first, diagInfo.second, sel);
         }
       }
     } else if (auto var = dyn_cast<VarDecl>(D)) {

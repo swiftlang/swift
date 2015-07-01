@@ -22,6 +22,8 @@
 #define IDENTIFIER(name) IDENTIFIER_WITH_NAME(name, #name)
 #define IDENTIFIER_(name) IDENTIFIER_WITH_NAME(name, "_" #name)
 
+IDENTIFIER(alloc)
+IDENTIFIER(allocWithZone)
 IDENTIFIER(atIndexedSubscript)
 IDENTIFIER_(bridgeToObjectiveC)
 IDENTIFIER_WITH_NAME(code_, "_code")

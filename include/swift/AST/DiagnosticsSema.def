@@ -2198,9 +2198,9 @@ ERROR(objc_override_other,sema_objc,none,
       "selector",
       (unsigned, DeclName, unsigned, DeclName, ObjCSelector, Type))
 
-ERROR(objc_class_method_load,sema_objc,none,
-      OBJC_DIAG_SELECT " defines Objective-C class method 'load', which is "
-      "not permitted by Swift", (unsigned, DeclName))
+ERROR(objc_class_method_not_permitted,sema_objc,none,
+      OBJC_DIAG_SELECT " defines Objective-C class method %2, which is "
+      "not permitted by Swift", (unsigned, DeclName, ObjCSelector))
 
 NOTE(objc_witness_selector_mismatch,sema_objc,none,
       "Objective-C method %2 provided by " OBJC_DIAG_SELECT
