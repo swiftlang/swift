@@ -128,6 +128,20 @@ SWIFT_CLASS("_TtC8comments13EmptyComments")
 @end
 
 
+SWIFT_CLASS("_TtC8comments19HasThrowingFunction")
+@interface HasThrowingFunction
+
+/// Might throw something.
+///
+/// \param x A number
+///
+/// \param error An error if <code>x == 0
+/// </code>
+- (void)f1:(NSInteger)x;
+- (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
+@end
+
+
 SWIFT_CLASS("_TtC8comments15HorizontalRules")
 @interface HorizontalRules
 

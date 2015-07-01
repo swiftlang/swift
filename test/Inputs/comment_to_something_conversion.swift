@@ -153,6 +153,17 @@ enum A012_AttachToEntities {
 // CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>s:FC14swift_ide_test8Emphasis2f0FS0_FT_T_</USR><Declaration>func f0()</Declaration><Abstract><Para>Aaa <emphasis>bbb</emphasis> ccc. Aaa <emphasis>bbb</emphasis> ccc.</Para></Abstract></Function>]
 }
 
+@objc class HasThrowingFunction {
+// CHECK: {{.*}}DocCommentAsXML=none
+
+  /// Might throw something.
+  ///
+  /// - parameter x: A number
+  /// - throws: An error if `x == 0`
+  @objc func f1(x: Int) /*throws*/ {}
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f1(_:)</Name><USR>s:FC14swift_ide_test19HasThrowingFunction2f1FS0_FSiT_</USR><Declaration>@objc func f1(x: Int)</Declaration><Abstract><Para>Might throw something.</Para></Abstract><Parameters><Parameter><Name>x</Name><Direction isExplicit="0">in</Direction><Discussion><Para>A number</Para></Discussion></Parameter></Parameters><ThrowsDiscussion><Para>An error if <codeVoice>x == 0</codeVoice></Para></ThrowsDiscussion></Function>]
+}
+
 @objc class HorizontalRules {
 // CHECK: {{.*}}DocCommentAsXML=none
   /// Briefly.
@@ -394,4 +405,3 @@ func f0(x: Int, y: Int, z: Int) {}
   func f0() {}
 // CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>f0()</Name><USR>s:FC14swift_ide_test14MultiLineBrief2f0FS0_FT_T_</USR><Declaration>func f0()</Declaration><Abstract><Para>Brief first line. Brief after softbreak.</Para></Abstract><Discussion><Para>Some paragraph text.</Para></Discussion></Function>]
 }
-

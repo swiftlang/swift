@@ -56,6 +56,16 @@ shown in Xcode's QuickHelp.
 
   - returns: ...
 
+Throwing Functions
+------------------
+
+Functions that are marked as `throws` should contain the following describing
+what kind of errors are thrown and in what situations:
+
+::
+
+  - throws: ...
+
 
 Field Extensions
 ----------------

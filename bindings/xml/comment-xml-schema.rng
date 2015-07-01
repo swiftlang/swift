@@ -40,6 +40,9 @@
         <ref name="Parameters" />
       </optional>
       <optional>
+        <ref name="ThrowsDiscussion" />
+      </optional>
+      <optional>
         <ref name="ResultDiscussion" />
       </optional>
       <optional>
@@ -103,6 +106,9 @@
         <ref name="Unavailable" />
       </zeroOrMore>
       <optional>
+        <ref name="ThrowsDiscussion" />
+      </optional>
+      <optional>
         <ref name="ResultDiscussion" />
       </optional>
       <optional>
@@ -147,6 +153,9 @@
         <ref name="Parameters" />
       </optional>
       <optional>
+        <ref name="ThrowsDiscussion" />
+      </optional>
+      <optional>
         <ref name="ResultDiscussion" />
       </optional>
 
@@ -181,6 +190,9 @@
       </optional>
       <optional>
         <ref name="Parameters" />
+      </optional>
+      <optional>
+        <ref name="ThrowsDiscussion" />
       </optional>
       <optional>
         <ref name="ResultDiscussion" />
@@ -219,6 +231,9 @@
         <ref name="Parameters" />
       </optional>
       <optional>
+        <ref name="ThrowsDiscussion" />
+      </optional>
+      <optional>
         <ref name="ResultDiscussion" />
       </optional>
 
@@ -255,6 +270,9 @@
         <ref name="Parameters" />
       </optional>
       <optional>
+        <ref name="ThrowsDiscussion" />
+      </optional>
+      <optional>
         <ref name="ResultDiscussion" />
       </optional>
 
@@ -289,6 +307,9 @@
       </optional>
       <optional>
         <ref name="Parameters" />
+      </optional>
+      <optional>
+        <ref name="ThrowsDiscussion" />
       </optional>
       <optional>
         <ref name="ResultDiscussion" />
@@ -695,6 +716,14 @@
       <optional>
         <data type="string" />
       </optional>
+    </element>
+  </define>
+
+  <define name="ThrowsDiscussion">
+    <element name="ThrowsDiscussion">
+      <zeroOrMore>
+        <ref name="BlockContent" />
+      </zeroOrMore>
     </element>
   </define>
 

@@ -27,10 +27,11 @@ public:
     Optional<const llvm::markup::Paragraph *>Brief;
     SmallVector<const llvm::markup::MarkupASTNode *, 4> BodyNodes;
     SmallVector<const llvm::markup::ParamField *, 8> ParamFields;
-    Optional<const llvm::markup::ReturnsField *>ReturnsField;
+    Optional<const llvm::markup::ReturnsField *> ReturnsField;
+    Optional<const llvm::markup::ThrowsField *> ThrowsField;
 
     bool isEmpty() const {
-      return !Brief.hasValue() && !ReturnsField.hasValue() && BodyNodes.empty() && ParamFields.empty();
+      return !Brief.hasValue() && !ReturnsField.hasValue() && !ThrowsField.hasValue() && BodyNodes.empty() && ParamFields.empty();
     }
   };
 
@@ -52,12 +53,16 @@ public:
     return Parts;
   }
 
-  Optional<const llvm::markup::Paragraph *>getBrief() const {
+  Optional<const llvm::markup::Paragraph *> getBrief() const {
     return Parts.Brief;
   }
 
-  Optional<const llvm::markup::ReturnsField *>getReturnsField() const {
+  Optional<const llvm::markup::ReturnsField * >getReturnsField() const {
     return Parts.ReturnsField;
+  }
+
+  Optional<const llvm::markup::ThrowsField*> getThrowsField() const {
+    return Parts.ThrowsField;
   }
 
   ArrayRef<const llvm::markup::ParamField *> getParamFields() const {

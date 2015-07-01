@@ -261,6 +261,8 @@ bool extractSimpleField(llvm::markup::MarkupContext &MC,
 
     if (auto RF = dyn_cast<llvm::markup::ReturnsField>(Field))
       Parts.ReturnsField = RF;
+    else if (auto TF = dyn_cast<llvm::markup::ThrowsField>(Field))
+      Parts.ThrowsField = TF;
     else
       Parts.BodyNodes.push_back(Field);
   }

@@ -210,6 +210,13 @@ struct CommentToXMLConverter {
     OS << "</ResultDiscussion>";
   }
 
+  void printThrowsDiscussion(const ThrowsField *RF) {
+    OS << "<ThrowsDiscussion>";
+    for (auto Child : RF->getChildren())
+      printASTNode(Child);
+    OS << "</ThrowsDiscussion>";
+  }
+
   void visitDocComment(const DocComment *DC);
 };
 } // unnamed namespace
@@ -306,6 +313,10 @@ void CommentToXMLConverter::visitDocComment(const DocComment *DC) {
   auto RF = DC->getReturnsField();
   if (RF.hasValue())
     printResultDiscussion(RF.getValue());
+
+  auto TF = DC->getThrowsField();
+  if (TF.hasValue())
+    printThrowsDiscussion(TF.getValue());
 
   if (!DC->getBodyNodes().empty()) {
     OS << "<Discussion>";
@@ -554,6 +565,14 @@ break;
 
     printNewline();
   }
+
+  void printThrowField(const ThrowsField *TF) {
+    print("\\param error ");
+    for (auto Child : TF->getChildren())
+      printASTNode(Child);
+
+    printNewline();
+  }
 };
 } // unnamed namespace
 
@@ -584,6 +603,12 @@ void ide::getDocumentationCommentAsDoxygen(const DocComment *DC,
 
   for (const auto PF : DC->getParamFields()) {
     Converter.printParamField(PF);
+    Converter.printNewline();
+  }
+
+  auto TF = DC->getThrowsField();
+  if (TF.hasValue()) {
+    Converter.printThrowField(TF.getValue());
     Converter.printNewline();
   }
 

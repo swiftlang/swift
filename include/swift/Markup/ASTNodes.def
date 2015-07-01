@@ -71,6 +71,7 @@ MARKUP_AST_NODE(PrivateExtension, MarkupASTNode)
   MARKUP_AST_NODE(SeeField, PrivateExtension)
   MARKUP_AST_NODE(SinceField, PrivateExtension)
   MARKUP_AST_NODE(TODOField, PrivateExtension)
+  MARKUP_AST_NODE(ThrowsField, PrivateExtension)
   MARKUP_AST_NODE(VersionField, PrivateExtension)
   MARKUP_AST_NODE(WarningField, PrivateExtension)
 
