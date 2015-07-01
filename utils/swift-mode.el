@@ -163,7 +163,7 @@
                               "case \\|default *:\\|[a-zA-Z_][a-zA-Z0-9_]*\\(\\s-\\|\n\\)*:\\(\\s-\\|\n\\)*\\(for\\|do\\|\\while\\|switch\\)\\>"))
                            1)
                           (t 0))))))
-      (indent-line-to target-column))
+      (indent-line-to (max target-column 0)))
     (when (< (current-column) target-column)
       (move-to-column target-column)))
   )
