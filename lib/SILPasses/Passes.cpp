@@ -285,8 +285,8 @@ void swift::runSILOptimizationPasses(SILModule &Module) {
   // Specialize closure.
   PM.addClosureSpecializer();
 
-  // Insert inline caches for virtual calls.
-  PM.addInlineCaches();
+  // Speculate virtual call targets.
+  PM.addSpeculativeDevirtualization();
 
   // Optimize function signatures if we are asked to.
   //

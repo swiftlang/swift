@@ -499,9 +499,9 @@ static bool insertInlineCaches(ApplyInst *AI, ClassHierarchyAnalysis *CHA) {
 namespace {
   /// Generate inline caches of virtual calls by speculating that the requested
   /// class is at the bottom of the class hierarchy.
-  class SILInlineCaches : public SILFunctionTransform {
+  class SpeculativeDevirtualization : public SILFunctionTransform {
   public:
-    virtual ~SILInlineCaches() {}
+    virtual ~SpeculativeDevirtualization() {}
 
     void run() override {
       ClassHierarchyAnalysis *CHA = PM->getAnalysis<ClassHierarchyAnalysis>();
@@ -532,7 +532,7 @@ namespace {
 
 } // end anonymous namespace
 
-SILTransform *swift::createInlineCaches() {
-  return new SILInlineCaches();
+SILTransform *swift::createSpeculativeDevirtualization() {
+  return new SpeculativeDevirtualization();
 }
 
