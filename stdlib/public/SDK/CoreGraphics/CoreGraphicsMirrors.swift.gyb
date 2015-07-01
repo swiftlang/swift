@@ -44,8 +44,8 @@ ${MirrorDecl} {
 
   subscript(i: Int) -> (String, MirrorType) {
     switch i {
-    case 0: return ("${Children[0]}", reflect(_value.${Children[0]}))
-    case 1: return ("${Children[1]}", reflect(_value.${Children[1]}))
+    case 0: return ("${Children[0]}", _reflect(_value.${Children[0]}))
+    case 1: return ("${Children[1]}", _reflect(_value.${Children[1]}))
     default: _preconditionFailure("cannot extract this child index")
     }
   }

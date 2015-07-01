@@ -69,7 +69,7 @@ public enum ImplicitlyUnwrappedOptional<T>
   public func _getMirror() -> MirrorType {
     // FIXME: This should probably use _OptionalMirror in both cases.
     if let value = self {
-      return reflect(value)
+      return _reflect(value)
     } else {
       return _OptionalMirror<T>(.None)
     }

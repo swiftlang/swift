@@ -77,7 +77,7 @@ dump(NSURL(fileURLWithPath: "/Volumes", isDirectory: true))
 //    associated enum tag.
 
 // CHECK-NEXT: got the expected quick look text
-switch reflect("woozle wuzzle" as NSString).quickLookObject {
+switch _reflect("woozle wuzzle" as NSString).quickLookObject {
 case .Some(.Text("woozle wuzzle")):
   print("got the expected quick look text")
 case _:
@@ -86,14 +86,14 @@ case _:
 
 // CHECK-NEXT: foobar
 let somesubclassofnsstring = ("foo" + "bar") as NSString
-switch reflect(somesubclassofnsstring).quickLookObject {
+switch _reflect(somesubclassofnsstring).quickLookObject {
   case .Some(.Text(let text)): print(text)
   default: print("not the expected quicklook")
 }
 
 // CHECK-NEXT: got the expected quick look attributed string
 let astr = NSAttributedString(string: "yizzle pizzle")
-switch reflect(astr as NSAttributedString).quickLookObject {
+switch _reflect(astr as NSAttributedString).quickLookObject {
 case .Some(.AttributedString(let astr2 as NSAttributedString))
 where astr === astr2:
   print("got the expected quick look attributed string")
@@ -102,7 +102,7 @@ case _:
 }
 
 // CHECK-NEXT: got the expected quick look int
-switch reflect(Int.max as NSNumber).quickLookObject {
+switch _reflect(Int.max as NSNumber).quickLookObject {
 case .Some(.Int(+Int64(Int.max))):
   print("got the expected quick look int")
 case _:
@@ -110,7 +110,7 @@ case _:
 }
 
 // CHECK-NEXT: got the expected quick look uint
-switch reflect(NSNumber(unsignedLongLong: UInt64.max)).quickLookObject {
+switch _reflect(NSNumber(unsignedLongLong: UInt64.max)).quickLookObject {
 case .Some(.UInt(UInt64.max)):
   print("got the expected quick look uint")
 case _:
@@ -118,7 +118,7 @@ case _:
 }
 
 // CHECK-NEXT: got the expected quick look double
-switch reflect(22.5 as NSNumber).quickLookObject {
+switch _reflect(22.5 as NSNumber).quickLookObject {
 case .Some(.Double(22.5)):
   print("got the expected quick look double")
 case _:
@@ -126,7 +126,7 @@ case _:
 }
 
 // CHECK-NEXT: got the expected quick look float
-switch reflect(Float32(1.25)).quickLookObject {
+switch _reflect(Float32(1.25)).quickLookObject {
 case .Some(.Float(1.25)):
   print("got the expected quick look float")
 case _:
@@ -138,7 +138,7 @@ case _:
 // CHECK-NEXT: got the expected quick look bezier path
 
 let image = OSImage(contentsOfFile:Process.arguments[1])!
-switch reflect(image).quickLookObject {
+switch _reflect(image).quickLookObject {
 case .Some(.Image(let image2 as OSImage)) where image === image2:
   print("got the expected quick look image")
 case _:
@@ -146,7 +146,7 @@ case _:
 }
 
 let color = OSColor.blackColor()
-switch reflect(color).quickLookObject {
+switch _reflect(color).quickLookObject {
 case .Some(.Color(let color2 as OSColor)) where color === color2:
   print("got the expected quick look color")
 case _:
@@ -154,7 +154,7 @@ case _:
 }
 
 let path = OSBezierPath()
-switch reflect(path).quickLookObject {
+switch _reflect(path).quickLookObject {
 case .Some(.BezierPath(let path2 as OSBezierPath)) where path === path2:
   print("got the expected quick look bezier path")
 case _:
@@ -162,7 +162,7 @@ case _:
 }
 
 let intNSArray : NSArray = [1 as NSNumber,2 as NSNumber,3 as NSNumber,4 as NSNumber,5 as NSNumber]
-let intNSArrayMirror = reflect(intNSArray)
+let intNSArrayMirror = _reflect(intNSArray)
 // CHECK-NEXT: 5 elements
 print(intNSArrayMirror.summary)
 // CHECK-NEXT: [0]: 1
@@ -172,7 +172,7 @@ print("\(intNSArrayMirror[4].0): \(intNSArrayMirror[4].1.summary)")
 
 
 let numset = NSSet(objects: 1,2,3,4)
-let numsetMirror = reflect(numset)
+let numsetMirror = _reflect(numset)
 // CHECK-NEXT: 4 elements
 print(numsetMirror.summary)
 // CHECK-NEXT: I see all four elements
@@ -197,7 +197,7 @@ class MyQLTestClass {
   }
 }
 
-switch reflect(MyQLTestClass()).quickLookObject {
+switch _reflect(MyQLTestClass()).quickLookObject {
   case .Some(.Int(let value)): print(value)
   case .Some(_): print("non-Int object")
   default: print("None")
@@ -210,18 +210,18 @@ class MyNonQLTestClass {
   }
 }
 
-switch reflect(MyNonQLTestClass()).quickLookObject {
+switch _reflect(MyNonQLTestClass()).quickLookObject {
   case .Some(.Int(let value)): print(value)
   case .Some(_): print("non-Int object")
   default: print("nil is good here")
 }
 
 // CHECK-NEXT: (3.0, 6.0)
-print(reflect(CGPoint(x: 3,y: 6)).summary)
+print(_reflect(CGPoint(x: 3,y: 6)).summary)
 // CHECK-NEXT: (30.0, 60.0)
-print(reflect(CGSize(width: 30, height: 60)).summary)
+print(_reflect(CGSize(width: 30, height: 60)).summary)
 // CHECK-NEXT: (50.0, 60.0, 100.0, 150.0)
-print(reflect(CGRect(x: 50, y: 60, width: 100, height: 150)).summary)
+print(_reflect(CGRect(x: 50, y: 60, width: 100, height: 150)).summary)
 
 // rdar://problem/18513769 -- Make sure that QuickLookObject lookup correctly
 // manages memory.
@@ -275,7 +275,7 @@ class HasStringQLO : CanaryBase {
 
 func testQLO<T : CanaryBase>(type: T.Type) {
   autoreleasepool {
-    _ = reflect(type.init()).quickLookObject
+    _ = _reflect(type.init()).quickLookObject
   }
 }
 

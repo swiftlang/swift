@@ -107,9 +107,9 @@ struct StatMirror: MirrorType {
     assert(i == 0)
     switch _value {
     case .ForState(let state):
-      return ("State", reflect(state))
+      return ("State", _reflect(state))
     case .ForCountry(let country):
-      return ("Country", reflect(country))
+      return ("Country", _reflect(country))
     }
   }
 

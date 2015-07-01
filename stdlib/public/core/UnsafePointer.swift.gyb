@@ -435,7 +435,7 @@ ${MirrorDecl} {
 
   subscript(i: Int) -> (String, MirrorType) {
     switch i {
-    case 0: return ("pointerValue",reflect(_getPointerValue()))
+    case 0: return ("pointerValue",_reflect(_getPointerValue()))
     default: _preconditionFailure("cannot extract this child index")
     }
   }

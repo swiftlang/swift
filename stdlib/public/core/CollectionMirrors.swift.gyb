@@ -16,7 +16,7 @@
 %TMirrorBoilerplate = gyb.parseTemplate("../common/MirrorBoilerplate.gyb")
 
 % for Type in [['CollectionOfOne',1,"element",\
-%               'CollectionOfOne(\( reflect(_value.element).summary ))'],\
+%               'CollectionOfOne(\( _reflect(_value.element).summary ))'],\
 %             ['EmptyCollection',0,"DONTSHOWME",'EmptyCollection']]:
 %   Self = Type[0]
 %   Count = Type[1]
@@ -42,7 +42,7 @@ ${MirrorDecl} {
 
   subscript(i: Int) -> (String, MirrorType) {
     _precondition(i >= 0 && i < count, "MirrorType access out of bounds")
-    return ("${ElementName}", reflect(_value[advance(_value.startIndex, i)]))
+    return ("${ElementName}", _reflect(_value[advance(_value.startIndex, i)]))
   }
 
   var summary: String { return "${SummaryString}" }

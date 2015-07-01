@@ -201,8 +201,8 @@ internal struct _IntervalMirror<
 
   internal subscript(i: Int) -> (String, MirrorType) {
     switch i {
-    case 0: return ("start", reflect(_value.start))
-    case 1: return ("end", reflect(_value.end))
+    case 0: return ("start", _reflect(_value.start))
+    case 1: return ("end", _reflect(_value.end))
     default: _preconditionFailure("MirrorType access out of bounds")
     }
   }

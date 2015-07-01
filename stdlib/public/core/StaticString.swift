@@ -228,6 +228,6 @@ public struct StaticString
   }
 
   public func _getMirror() -> MirrorType {
-    return reflect(self.stringValue)
+    return _reflect(self.stringValue)
   }
 }

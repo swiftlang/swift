@@ -138,7 +138,7 @@ internal struct _ArrayTypeMirror<T : _ArrayType> : MirrorType {
 
   subscript(i: Int) -> (String, MirrorType) {
     _precondition(i >= 0 && i < count, "MirrorType access out of bounds")
-    return ("[\(i)]", reflect(_value[i]))
+    return ("[\(i)]", _reflect(_value[i]))
   }
 
   var summary: String {

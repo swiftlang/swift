@@ -53,8 +53,8 @@ ${getMirrorDecl("NSRange")} {
   
   subscript(i: Int) -> (String, MirrorType) {
     switch i {
-    case 0: return ("location", reflect(_value.location))
-    case 1: return ("length", reflect(_value.length))
+    case 0: return ("location", _reflect(_value.location))
+    case 1: return ("length", _reflect(_value.length))
     default: _preconditionFailure("MirrorType access out of bounds")
     }
   }
@@ -112,7 +112,7 @@ ${getMirrorDecl("NSSet","MembershipContainer")} {
   
   subscript(i: Int) -> (String, MirrorType) {
     _precondition(i >= 0 && i < count, "MirrorType access out of bounds")
-    return ("[\(i)]", reflect(_a[i]))
+    return ("[\(i)]", _reflect(_a[i]))
   }
   
   var summary: String { return "\(count) elements" }
@@ -129,19 +129,19 @@ ${getMirrorConformance("NSSet","MembershipContainer")}
 extension NSArray : _Reflectable {
   /// Returns a mirror that reflects `self`.
   public func _getMirror() -> MirrorType {
-    return reflect(self as [AnyObject])
+    return _reflect(self as [AnyObject])
   }
 }
 extension NSDictionary : _Reflectable {
   /// Returns a mirror that reflects `self`.
   public func _getMirror() -> MirrorType {
     let dict: [NSObject : AnyObject] = _convertNSDictionaryToDictionary(self)
-    return reflect(dict)
+    return _reflect(dict)
   }
 }
 extension NSString : _Reflectable {
   /// Returns a mirror that reflects `self`.
   public func _getMirror() -> MirrorType {
-    return reflect(self as String)
+    return _reflect(self as String)
   }
 }

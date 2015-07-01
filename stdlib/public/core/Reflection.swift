@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// Customizes the result of `reflect(x)`, where `x` is a conforming
+/// Customizes the result of `_reflect(x)`, where `x` is a conforming
 /// type.
 public protocol _Reflectable {
   // The runtime has inappropriate knowledge of this protocol and how its
@@ -94,7 +94,7 @@ public enum _MirrorDisposition {
   case ObjCObject
 }
 
-/// The type returned by `reflect(x)`; supplies an API for runtime
+/// The type returned by `_reflect(x)`; supplies an API for runtime
 /// reflection on `x`.
 public protocol MirrorType {
   /// The instance being reflected.
@@ -129,20 +129,22 @@ public protocol MirrorType {
 @asmname("swift_getSummary")
 public // COMPILER_INTRINSIC
 func _getSummary<T>(out: UnsafeMutablePointer<String>, x: T) {
-  out.initialize(reflect(x).summary)
+  out.initialize(_reflect(x).summary)
 }
 
 /// Produce a mirror for any value. If the value's type conforms to
 /// `_Reflectable`, invoke its `_getMirror()` method; otherwise, fall back
 /// to an implementation in the runtime that structurally reflects values
 /// of any type.
-@asmname("swift_reflectAny")public func reflect<T>(x: T) -> MirrorType
+@asmname("swift_reflectAny")
+public func _reflect<T>(x: T) -> MirrorType
 
 /// Unsafely produce a mirror for a value in memory whose lifetime is
 /// guaranteed by holding a strong reference to a heap object.
 /// This lets containers with heap storage vend mirrors for their elements
 /// without unnecessary copying of the underlying value.
-@asmname("swift_unsafeReflectAny")func unsafeReflect<T>(
+@asmname("swift_unsafeReflectAny")
+internal func _unsafeReflect<T>(
   owner: Builtin.NativeObject,
   ptr: UnsafeMutablePointer<T>
 ) -> MirrorType
@@ -157,7 +159,7 @@ public func dump<T, TargetStream : OutputStreamType>(
   var maxItemCounter = maxItems
   var visitedItems = [ObjectIdentifier : Int]()
   _dumpWithMirror(
-    reflect(x), name, indent, maxDepth, &maxItemCounter, &visitedItems,
+    _reflect(x), name, indent, maxDepth, &maxItemCounter, &visitedItems,
     &targetStream)
   return x
 }
@@ -456,3 +458,9 @@ struct _MetatypeMirror : MirrorType {
   // Special disposition for types?
   var disposition: _MirrorDisposition { return .Aggregate }
 }
+
+@available(*, unavailable, message="call the 'Mirror(reflecting:)' initializer")
+public func reflect<T>(x: T) -> MirrorType {
+  fatalError("unavailable function can't be called")
+}
+

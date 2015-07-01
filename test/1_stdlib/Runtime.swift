@@ -961,12 +961,12 @@ Reflection.test("Struct/NonGeneric/DefaultMirror") {
   }
 
   // Structs have no identity and thus no object identifier
-  expectEmpty(reflect(StructWithDefaultMirror("")).objectIdentifier)
+  expectEmpty(_reflect(StructWithDefaultMirror("")).objectIdentifier)
 
   // The default mirror provides no quick look object
-  expectEmpty(reflect(StructWithDefaultMirror("")).quickLookObject)
+  expectEmpty(_reflect(StructWithDefaultMirror("")).quickLookObject)
 
-  expectEqual(.Struct, reflect(StructWithDefaultMirror("")).disposition)
+  expectEqual(.Struct, _reflect(StructWithDefaultMirror("")).disposition)
 }
 
 struct GenericStructWithDefaultMirror<T, U> {
@@ -1025,9 +1025,9 @@ struct BrilliantMirror : MirrorType {
   subscript(i: Int) -> (String, MirrorType) {
     switch i {
     case 0:
-      return ("first", reflect(_value.first))
+      return ("first", _reflect(_value.first))
     case 1:
-      return ("second", reflect(_value.second))
+      return ("second", _reflect(_value.second))
     case 2:
       return ("self", self)
     case _:
@@ -1125,7 +1125,7 @@ Reflection.test("CustomMirror") {
     expectEqual(expected, output)
   }
 
-  expectEqual(.Container, reflect(Brilliant(123, "four five six")).disposition)
+  expectEqual(.Container, _reflect(Brilliant(123, "four five six")).disposition)
 
   do {
     // Check that object identifiers are unique to class instances.
@@ -1219,10 +1219,10 @@ Reflection.test("MetatypeMirror") {
     dump(nativeProtocolMetatype, &output)
     expectEqual(expectedInt, output)
 
-    expectEqual(reflect(concreteMetatype).objectIdentifier!,
-                reflect(anyMetatype).objectIdentifier!)
-    expectEqual(reflect(concreteMetatype).objectIdentifier!,
-                reflect(nativeProtocolMetatype).objectIdentifier!)
+    expectEqual(_reflect(concreteMetatype).objectIdentifier!,
+                _reflect(anyMetatype).objectIdentifier!)
+    expectEqual(_reflect(concreteMetatype).objectIdentifier!,
+                _reflect(nativeProtocolMetatype).objectIdentifier!)
 
 
     let concreteClassMetatype = SomeClass.self
@@ -1236,8 +1236,8 @@ Reflection.test("MetatypeMirror") {
     dump(objcProtocolMetatype, &output)
     expectEqual(expectedSomeClass, output)
 
-    expectEqual(reflect(concreteClassMetatype).objectIdentifier!,
-                reflect(objcProtocolMetatype).objectIdentifier!)
+    expectEqual(_reflect(concreteClassMetatype).objectIdentifier!,
+                _reflect(objcProtocolMetatype).objectIdentifier!)
 
     let nativeProtocolConcreteMetatype = SomeNativeProto.self
     let expectedNativeProtocolConcrete = "- a.SomeNativeProto #0\n"
@@ -1278,8 +1278,8 @@ Reflection.test("TupleMirror") {
 
     expectEqual(expected, output)
 
-    expectEmpty(reflect(tuple).quickLookObject)
-    expectEqual(.Tuple, reflect(tuple).disposition)
+    expectEmpty(_reflect(tuple).quickLookObject)
+    expectEqual(.Tuple, _reflect(tuple).disposition)
   }
 
   do {
@@ -1326,19 +1326,19 @@ Reflection.test("ObjectIdentity") {
   let p = NSObject()
 
   checkEquatable(
-    true, reflect(x).objectIdentifier!, reflect(x).objectIdentifier!)
+    true, _reflect(x).objectIdentifier!, _reflect(x).objectIdentifier!)
   checkEquatable(
-    false, reflect(x).objectIdentifier!, reflect(y).objectIdentifier!)
+    false, _reflect(x).objectIdentifier!, _reflect(y).objectIdentifier!)
   checkEquatable(
-    true, reflect(o).objectIdentifier!, reflect(o).objectIdentifier!)
+    true, _reflect(o).objectIdentifier!, _reflect(o).objectIdentifier!)
   checkEquatable(
-    false, reflect(o).objectIdentifier!, reflect(p).objectIdentifier!)
+    false, _reflect(o).objectIdentifier!, _reflect(p).objectIdentifier!)
   checkEquatable(
-    false, reflect(o).objectIdentifier!, reflect(y).objectIdentifier!)
+    false, _reflect(o).objectIdentifier!, _reflect(y).objectIdentifier!)
 
-  expectEmpty(reflect(x).quickLookObject)
+  expectEmpty(_reflect(x).quickLookObject)
 
-  expectEqual(.Class, reflect(x).disposition)
+  expectEqual(.Class, _reflect(x).disposition)
 }
 
 Reflection.test("String/Mirror") {
@@ -1759,7 +1759,7 @@ Reflection.test("MirrorMirror") {
 Reflection.test("COpaquePointer/null") {
   // Don't crash on null pointers. rdar://problem/19708338
   var sequence = COpaquePointer()
-  var mirror = reflect(sequence)
+  var mirror = _reflect(sequence)
   var child = mirror[0]
   expectEqual("(Opaque Value)", child.1.summary)
 }

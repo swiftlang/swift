@@ -91,7 +91,7 @@ public typealias Printable = CustomStringConvertible
 internal func _adHocPrint<T, TargetStream : OutputStreamType>(
     value: T, inout _ target: TargetStream
 ) {
-  let mirror = reflect(value)
+  let mirror = _reflect(value)
   // Checking the mirror kind is not a good way to implement this, but we don't
   // have a more expressive reflection API now.
   if mirror is _TupleMirror {

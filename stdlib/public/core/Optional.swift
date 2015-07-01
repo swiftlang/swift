@@ -218,14 +218,14 @@ internal struct _OptionalMirror<T> : MirrorType {
 
   subscript(i: Int) -> (String, MirrorType) {
     switch (_value,i) {
-    case (.Some(let contents),0) : return ("Some",reflect(contents))
+    case (.Some(let contents),0) : return ("Some",_reflect(contents))
     default: _preconditionFailure("cannot extract this child index")
     }
   }
 
   var summary: String {
     switch _value {
-      case let contents?: return reflect(contents).summary
+      case let contents?: return _reflect(contents).summary
       default: return "nil"
     }
   }

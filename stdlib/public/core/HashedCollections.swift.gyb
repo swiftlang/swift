@@ -3747,9 +3747,9 @@ internal class ${Self}Mirror<${TypeParametersDecl}> : MirrorType {
       _pos.successor()
     }
 %if Self == 'Set':
-    return ("[\(_pos._intPos)]", reflect(_mirror[_pos.${Self}Pos]))
+    return ("[\(_pos._intPos)]", _reflect(_mirror[_pos.${Self}Pos]))
 %elif Self == 'Dictionary':
-    return ("[\(_pos._intPos)]", reflect(_mirror[_pos.${Self}Pos]))
+    return ("[\(_pos._intPos)]", _reflect(_mirror[_pos.${Self}Pos]))
 %end
   }
 

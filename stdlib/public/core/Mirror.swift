@@ -105,7 +105,7 @@ public struct Mirror {
       self = customized.customMirror()
     } else {
       self = Mirror(
-        legacy: Swift.reflect(subject),
+        legacy: _reflect(subject),
         subjectType: subject.dynamicType)
     }
   }
@@ -150,7 +150,7 @@ public struct Mirror {
     
     // get a legacy mirror and the most-derived type
     var cls: AnyClass = subject.dynamicType
-    var clsMirror = Swift.reflect(subject)
+    var clsMirror = _reflect(subject)
 
     // Walk up the chain of mirrors/classes until we find staticSubclass
     while let superclass: AnyClass = _getSuperclass(cls) {
@@ -340,7 +340,7 @@ public struct Mirror {
 
 /// A type that explicitly supplies its own Mirror.
 ///
-/// Instances of any type can be `reflect`'ed upon, but if you are
+/// Instances of any type can be `Mirror(reflect:)`'ed upon, but if you are
 /// not satisfied with the `Mirror` supplied for your type by default,
 /// you can make it conform to `CustomReflectable` and return a custom
 /// `Mirror`.
@@ -389,10 +389,10 @@ extension Mirror {
   ///     let children = Mirror(reflecting: x).children
   ///     let p0 = advance(children.startIndex, 1, children.endIndex)
   ///     if p0 != children.endIndex {
-  ///       let grandChildren = reflect(children[p0].value).children
+  ///       let grandChildren = Mirror(reflecting: children[p0].value).children
   ///       SeekTwo: for g in grandChildren {
   ///         if g.label == "two" {
-  ///           let greatGrandChildren = reflect(g.value).children
+  ///           let greatGrandChildren = Mirror(reflecting: g.value).children
   ///           let p1 = advance(
   ///             greatGrandChildren.startIndex, 3, 
   ///             greatGrandChildren.endIndex)
@@ -671,7 +671,7 @@ extension PlaygroundQuickLook {
       self = customized.customPlaygroundQuickLook()
     }
     else {
-      if let q = Swift.reflect(subject).quickLookObject {
+      if let q = _reflect(subject).quickLookObject {
         self = q
       }
       else {
@@ -683,7 +683,7 @@ extension PlaygroundQuickLook {
 
 /// A type that explicitly supplies its own PlaygroundQuickLook.
 ///
-/// Instances of any type can be `reflect`'ed upon, but if you are
+/// Instances of any type can be `Mirror(reflect:)`'ed upon, but if you are
 /// not satisfied with the `Mirror` supplied for your type by default,
 /// you can make it conform to `CustomReflectable` and return a custom
 /// `Mirror`.

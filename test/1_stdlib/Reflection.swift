@@ -99,13 +99,13 @@ dump(any)
 // CHECK-LABEL: Character:
 // CHECK-NEXT: a
 print("Character:")
-print(reflect(Character("a")).summary)
+print(_reflect(Character("a")).summary)
 
 let range = 3...9
 // CHECK-NEXT: 3..<10
-print(reflect(range).summary)
+print(_reflect(range).summary)
 // CHECK-NEXT: startIndex=3
-print("startIndex=\(reflect(range)[0].1.summary)")
+print("startIndex=\(_reflect(range)[0].1.summary)")
 
 protocol Fooable {}
 extension Int : Fooable {}
@@ -150,7 +150,7 @@ var reflectable: _Reflectable = 1
 dump(reflectable)
 
 // CHECK-NEXT: Logical: true
-switch reflect(true).quickLookObject {
+switch _reflect(true).quickLookObject {
   case .None: print("no quicklook")
   case .Some(let ql):
     switch ql {
@@ -160,12 +160,12 @@ switch reflect(true).quickLookObject {
 }
 
 // CHECK-NEXT: Hello world
-print( reflect(Optional<String>("Hello world")).summary )
+print( _reflect(Optional<String>("Hello world")).summary )
 // CHECK-NEXT: nil
-print( reflect(Optional<String>()).summary  )
+print( _reflect(Optional<String>()).summary  )
 
 let intArray = [1,2,3,4,5]
-let intArrayMirror = reflect(intArray)
+let intArrayMirror = _reflect(intArray)
 // CHECK-NEXT: 5 elements
 print(intArrayMirror.summary)
 // CHECK-NEXT: [0]: 1
@@ -187,7 +187,7 @@ print(JustSomeEnum.A)
 print(JustSomeEnum.ß)
 
 // CHECK-NEXT: 0
-print(reflect(JustSomeEnum.A).count)
+print(_reflect(JustSomeEnum.A).count)
 
 enum Highlander {case ThereCanOnlyBeOne}
 
@@ -209,7 +209,7 @@ print(Pet.Cat)
 print(Pet.Volleyball("Wilson", 2000))
 
 // CHECK-NEXT: 1
-print(reflect(Pet.Volleyball("Wilson", 2000)).count)
+print(_reflect(Pet.Volleyball("Wilson", 2000)).count)
 
 // Single payload enum with single case
 enum Exaggeration<T> {
@@ -220,7 +220,7 @@ enum Exaggeration<T> {
 print(Exaggeration<Array<Int>>.Claim([]))
 
 // CHECK-NEXT: 1
-print(reflect(Exaggeration<Array<Int>>.Claim([])).count)
+print(_reflect(Exaggeration<Array<Int>>.Claim([])).count)
 
 // Multi-payload enum
 enum Hylomorphism {
@@ -232,7 +232,7 @@ enum Hylomorphism {
 print(Hylomorphism.Yin(5))
 
 // CHECK-NEXT: 0
-print(reflect(Hylomorphism.Yin(5)).count)
+print(_reflect(Hylomorphism.Yin(5)).count)
 
 // Multi-payload enum with generic type arguments
 // This one has enough metadata to get the tag and payload out
@@ -246,17 +246,17 @@ enum Transportation<T, S> {
 print(Transportation<Int, String>.Horse(31337))
 
 // CHECK-NEXT: 1
-print(reflect(Transportation<Int, String>.Horse(31337)).count)
+print(_reflect(Transportation<Int, String>.Horse(31337)).count)
 
 // CHECK-NEXT: Transportation<Swift.Int, Swift.String>.Roadster("Porsche")
 print(Transportation<Int, String>.Roadster("Porsche"))
 
 var justSomeFunction = { (x:Int)->Int in return x + 1 }
 // CHECK-NEXT: (Function)
-print(reflect(justSomeFunction).summary)
+print(_reflect(justSomeFunction).summary)
 
 // CHECK-NEXT: Swift.String
-print(reflect(String.self).summary)
+print(_reflect(String.self).summary)
 
 // CHECK-NEXT: CollectionOfOne(Howdy Swift!)
 // CHECK-NEXT:  - element: Howdy Swift!
@@ -264,10 +264,10 @@ dump(CollectionOfOne("Howdy Swift!"))
 
 // CHECK-NEXT: EmptyCollection
 var emptyCollectionOfInt: EmptyCollection<Int> = EmptyCollection()
-print(reflect(emptyCollectionOfInt).summary)
+print(_reflect(emptyCollectionOfInt).summary)
 
 // CHECK-NEXT: .One
-print(reflect(Bit.One).summary)
+print(_reflect(Bit.One).summary)
 
 // CHECK-NEXT: ▿
 // CHECK-NEXT: from: 1.0
@@ -277,17 +277,17 @@ dump(stride(from: 1.0, through: 12.15, by: 3.14))
 
 // CHECK-NEXT: UnsafeMutablePointer(nil)
 var nilUnsafeMutablePointerString: UnsafeMutablePointer<String> = nil
-print(reflect(nilUnsafeMutablePointerString).summary)
+print(_reflect(nilUnsafeMutablePointerString).summary)
 
 // CHECK-NEXT: UnsafeMutablePointer(0x123456)
 var randomUnsafeMutablePointerString = UnsafeMutablePointer<String>(
   bitPattern: 0x123456)
-print(reflect(randomUnsafeMutablePointerString).summary)
+print(_reflect(randomUnsafeMutablePointerString).summary)
 
 // CHECK-NEXT: Hello panda
 var sanePointerString = UnsafeMutablePointer<String>.alloc(1)
 sanePointerString.initialize("Hello panda")
-print(reflect(sanePointerString.memory).summary)
+print(_reflect(sanePointerString.memory).summary)
 sanePointerString.destroy()
 sanePointerString.dealloc(1)
 

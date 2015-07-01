@@ -28,10 +28,10 @@ ${MirrorDecl} {
     subscript(i: Int) -> (String, MirrorType) {
       _precondition(i >= 0 && i < count, "MirrorType access out of bounds")
       switch i {
-      case 0: return ("${Self[1]}",reflect(_value.start))
-      case 1: return ("${Self[2]}",reflect(_value.end))
+      case 0: return ("${Self[1]}",_reflect(_value.start))
+      case 1: return ("${Self[2]}",_reflect(_value.end))
       case 2: fallthrough
-      default: return ("${Self[3]}",reflect(_value.stride))
+      default: return ("${Self[3]}",_reflect(_value.stride))
       }
     }
 

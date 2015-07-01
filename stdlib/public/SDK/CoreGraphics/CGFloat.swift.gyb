@@ -144,7 +144,7 @@ public let CGFLOAT_MAX = CGFloat.max
 extension CGFloat : _Reflectable {
   /// Returns a mirror that reflects `self`.
   public func _getMirror() -> MirrorType {
-    return reflect(native)
+    return _reflect(native)
   }
 }
 

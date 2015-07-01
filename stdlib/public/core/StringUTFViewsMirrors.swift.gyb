@@ -29,7 +29,7 @@ extension String {
       subscript(i: Int) -> (String, MirrorType) {
         _precondition(i >= 0 && i < count, "MirrorType access out of bounds")
         // FIXME(performance): optimize for sequential access.
-        return ("[\(i)]", reflect(_value[advance(_value.startIndex, i)]))
+        return ("[\(i)]", _reflect(_value[advance(_value.startIndex, i)]))
       }
 
       var summary: String { return _value.description }
