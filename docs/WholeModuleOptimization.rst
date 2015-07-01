@@ -11,11 +11,11 @@ Since Swift 1.2 / Xcode 6.3, the Swift optimizer has included support
 for whole module optimization (WMO).
 
 To date (Swift 2.0 / Xcode 7), the differences in the optimization
-pipeline and specific optimization passes when WMO is enabled has been
-relatively minimal, and have provided high value at low implementation
-cost. Examples of this include inferring final on internal methods,
-and removing functions that are not referenced within the module and
-cannot be referenced from outside the module.
+pipeline and specific optimization passes when WMO is enabled have
+been relatively minimal, and have provided high value at low
+implementation cost. Examples of this include inferring final on
+internal methods, and removing functions that are not referenced
+within the module and cannot be referenced from outside the module.
 
 Additionally, compiling with WMO has some natural consequences that
 require no enhancements to passes. For example the increased scope of
@@ -66,8 +66,8 @@ primarily for the benefit of improved analyses. For example consider
 escape analysis. If there is an SCC in the call graph and we process
 one function at a time, there are cases where we would have to be
 pessimistic and assume a value escapes, when in fact the value may be
-used within the SCC but never in a way that it escapes. The same
-pessimism can happen in other analyses, e.g. dead argument analysis.
+used within the SCC such that it never escapes. The same pessimism can
+happen in other analyses, e.g. dead argument analysis.
 
 In our current set of passes, several are implemented as
 SILModuleTransforms but simply iterate over the functions in the
