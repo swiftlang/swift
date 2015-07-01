@@ -3424,13 +3424,10 @@ public struct ${Self}Index<${TypeParametersDecl}> :
   }
 #endif
 
-  /// Identical to `self.dynamicType`
-  internal typealias Index = ${Self}Index<${TypeParameters}>
-
   /// Returns the next consecutive value after `self`.
   ///
   /// - Requires: The next value is representable.
-  public func successor() -> Index {
+  public func successor() -> ${Self}Index<${TypeParameters}> {
     if _fastPath(_guaranteedNative) {
       return ._Native(_nativeIndex.successor())
     }
@@ -3789,8 +3786,8 @@ extension ${Self} : _Reflectable {
 /// `${Self}`.
 public struct _${Self}Builder<${TypeParametersDecl}> {
 %if Self == 'Set':
-  typealias Key = ${TypeParameters}
-  typealias Value = ${TypeParameters}
+  public typealias Key = ${TypeParameters}
+  public typealias Value = ${TypeParameters}
 %end
 
   internal var _result: ${Self}<${TypeParameters}>

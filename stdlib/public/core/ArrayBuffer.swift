@@ -485,7 +485,7 @@ extension _ArrayBuffer {
 
   //===--- private --------------------------------------------------------===//
   typealias Storage = _ContiguousArrayStorage<Element>
-  typealias NativeBuffer = _ContiguousArrayBuffer<Element>
+  public typealias NativeBuffer = _ContiguousArrayBuffer<Element>
 
   var _isNative: Bool {
     if !_isClassOrObjCExistential(Element.self) {

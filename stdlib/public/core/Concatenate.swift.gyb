@@ -199,7 +199,7 @@ struct ${View}<
   ///
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
-  typealias Index = ${Index}<C>
+  public typealias Index = ${Index}<C>
 
   init(_ _base: C) {
     self._base = _base

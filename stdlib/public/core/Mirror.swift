@@ -746,8 +746,7 @@ extension DictionaryLiteral : CollectionType {
   public var endIndex: Int { return elements.endIndex }
 
   // FIXME: a typealias is needed to prevent <rdar://20248032>
-  // why doesn't this need to be public?
-  typealias Element = (Key, Value)
+  public typealias Element = (Key, Value)
 
   /// Access the element indicated by `position`.
   ///

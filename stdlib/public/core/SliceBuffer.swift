@@ -13,9 +13,9 @@
 /// Buffer type for ArraySlice<T>
 public
 struct _SliceBuffer<T> : _ArrayBufferType {
-  typealias Element = T
+  public typealias Element = T
   typealias NativeStorage = _ContiguousArrayStorage<T>
-  typealias NativeBuffer = _ContiguousArrayBuffer<T>
+  public typealias NativeBuffer = _ContiguousArrayBuffer<T>
 
   init(owner: AnyObject, start: UnsafeMutablePointer<T>, count: Int, 
        hasNativeBuffer: Bool) {
