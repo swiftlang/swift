@@ -257,12 +257,29 @@ extension String.CharacterView : CollectionType {
   }
 }
 
-extension String.CharacterView : ExtensibleCollectionType {
+extension String.CharacterView : RangeReplaceableCollectionType {
   /// Create an empty instance.
   public init() {
     self.init("")
   }
-  
+
+  /// Replace the given `subRange` of elements with `newElements`.
+  ///
+  /// Invalidates all indices with respect to `self`.
+  ///
+  /// - Complexity: O(`subRange.count`) if `subRange.endIndex
+  ///   == self.endIndex` and `isEmpty(newElements)`, O(N) otherwise.
+  public mutating func replaceRange<
+    C: CollectionType where C.Generator.Element == Character
+  >(
+    subRange: Range<Index>, with newElements: C
+  ) {
+    let rawSubRange = subRange.startIndex._base._position
+      ..< subRange.endIndex._base._position
+    let lazyUTF16 = _lazyConcatenate(lazy(newElements).map { $0.utf16 })
+    _core.replaceRange(rawSubRange, with: lazyUTF16)
+  }
+
   /// Reserve enough space to store `n` ASCII characters.
   ///
   /// - Complexity: O(`n`).
@@ -314,74 +331,6 @@ extension String.CharacterView {
       S : SequenceType where S.Generator.Element == String.CharacterView
   >(elements: S) -> String.CharacterView {
     return Swift.join(self, elements)
-  }
-}
-
-extension String.CharacterView : RangeReplaceableCollectionType {
-  /// Replace the given `subRange` of elements with `newElements`.
-  ///
-  /// Invalidates all indices with respect to `self`.
-  ///
-  /// - Complexity: O(`subRange.count`) if `subRange.endIndex
-  ///   == self.endIndex` and `isEmpty(newElements)`, O(N) otherwise.
-  public mutating func replaceRange<
-    C: CollectionType where C.Generator.Element == Character
-  >(
-    subRange: Range<Index>, with newElements: C
-  ) {
-    let rawSubRange = subRange.startIndex._base._position
-      ..< subRange.endIndex._base._position
-    let lazyUTF16 = _lazyConcatenate(lazy(newElements).map { $0.utf16 })
-    _core.replaceRange(rawSubRange, with: lazyUTF16)
-  }
-
-  /// Insert `newElement` at index `i`.
-  ///
-  /// Invalidates all indices with respect to `self`.
-  ///
-  /// - Complexity: O(`self.count`).
-  public mutating func insert(newElement: Character, atIndex i: Index) {
-    Swift.insert(&self, newElement, atIndex: i)
-  }
-
-  /// Insert `newElements` at index `i`.
-  ///
-  /// Invalidates all indices with respect to `self`.
-  ///
-  /// - Complexity: O(`self.count + newElements.count`).
-  public mutating func splice<
-    S : CollectionType where S.Generator.Element == Character
-  >(newElements: S, atIndex i: Index) {
-    Swift.splice(&self, newElements, atIndex: i)
-  }
-
-  /// Remove and return the element at index `i`.
-  ///
-  /// Invalidates all indices with respect to `self`.
-  ///
-  /// - Complexity: O(`self.count`).
-  public mutating func removeAtIndex(i: Index) -> Character {
-    return Swift.removeAtIndex(&self, i)
-  }
-
-  /// Remove the indicated `subRange` of characters.
-  ///
-  /// Invalidates all indices with respect to `self`.
-  ///
-  /// - Complexity: O(`self.count`).
-  public mutating func removeRange(subRange: Range<Index>) {
-    Swift.removeRange(&self, subRange)
-  }
-
-  /// Remove all characters.
-  ///
-  /// Invalidates all indices with respect to `self`.
-  ///
-  /// - parameter keepCapacity: If `true`, prevents the release of
-  ///   allocated storage, which can be a useful optimization
-  ///   when `self` is going to be grown again.
-  public mutating func removeAll(keepCapacity keepCapacity: Bool = false) {
-    Swift.removeAll(&self, keepCapacity: keepCapacity)
   }
 
   /// Access the characters in the given `subRange`.

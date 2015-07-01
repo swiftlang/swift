@@ -950,24 +950,6 @@ extension ${Self} {
       _arrayOutOfPlaceReplace(&self._buffer, subRange, newElements, insertCount)
     }
   }
-
-  /// Insert `newElements` at index `i`.
-  ///
-  /// Invalidates all indices with respect to `self`.
-  ///
-  /// - Complexity: O(`count + newElements.count`).
-  public mutating func splice<
-    S : CollectionType where S.Generator.Element == Element
-  >(newElements: S, atIndex i: Int) {
-    Swift.splice(&self, newElements, atIndex: i)
-  }
-
-  /// Remove the indicated `subRange` of elements.
-  ///
-  /// - Complexity: O(`count`).
-  public mutating func removeRange(subRange: Range<Int>) {
-    Swift.removeRange(&self, subRange)
-  }
 }
 
 /// Extend `lhs` with the elements of `rhs`.

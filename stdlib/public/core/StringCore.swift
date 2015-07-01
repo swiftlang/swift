@@ -566,72 +566,8 @@ extension _StringCore : CollectionType {
   }
 }
 
-extension _StringCore : ExtensibleCollectionType {
-
-  public mutating func reserveCapacity(n: Int) {
-    if _fastPath(!hasCocoaBuffer) {
-      if _fastPath(isUniquelyReferencedNonObjC(&_owner)) {
-
-        let subRange: Range<UnsafePointer<RawByte>>
-          = UnsafePointer(_pointerToNth(0))..<UnsafePointer(_pointerToNth(count))
-
-        if _fastPath(nativeBuffer!.hasCapacity(n, forSubRange: subRange)) {
-          return
-        }
-      }
-    }
-    _copyInPlace(newSize: count, newCapacity: max(count, n), minElementWidth: 1)
-  }
-
-  public mutating func extend<
-    S : SequenceType
-      where S.Generator.Element == UTF16.CodeUnit
-  >(s: S) {
-    var width = elementWidth
-    if width == 1 {
-      if let hasNonAscii = s._preprocessingPass({
-          s in s.contains { $0 > 0x7f }
-        }) {
-        width = hasNonAscii ? 2 : 1
-      }
-    }
-
-    let growth = s.underestimateCount()
-    var g = s.generate()
-
-    if _fastPath(growth > 0) {
-      let newSize = count + growth
-      let destination = _growBuffer(newSize, minElementWidth: width)
-      if elementWidth == 1 {
-        let destination8 = UnsafeMutablePointer<UTF8.CodeUnit>(destination)
-        for i in 0..<growth {
-          destination8[i] = UTF8.CodeUnit(g.next()!)
-        }
-      }
-      else {
-        let destination16 = UnsafeMutablePointer<UTF16.CodeUnit>(destination)
-        for i in 0..<growth {
-          destination16[i] = g.next()!
-        }
-      }
-    }
-    // Append any remaining elements
-    for u in GeneratorSequence(g) {
-      self.append(u)
-    }
-  }
-}
-
-// Used to support a tighter invariant: all strings with contiguous
-// storage have a non-NULL base address.
-var _emptyStringStorage: UInt32 = 0
-
-var _emptyStringBase: COpaquePointer {
-  return COpaquePointer(
-    UnsafeMutablePointer<UInt16>(Builtin.addressof(&_emptyStringStorage)))
-}
-
 extension _StringCore : RangeReplaceableCollectionType {
+
   /// Replace the given `subRange` of elements with `newElements`.
   ///
   /// - Complexity: O(`subRange.count`) if `subRange.endIndex
@@ -712,25 +648,65 @@ extension _StringCore : RangeReplaceableCollectionType {
     }
   }
 
-  public mutating func insert(newElement: UTF16.CodeUnit, atIndex i: Int) {
-    Swift.insert(&self, newElement, atIndex: i)
+  public mutating func reserveCapacity(n: Int) {
+    if _fastPath(!hasCocoaBuffer) {
+      if _fastPath(isUniquelyReferencedNonObjC(&_owner)) {
+
+        let subRange: Range<UnsafePointer<RawByte>>
+          = UnsafePointer(_pointerToNth(0))..<UnsafePointer(_pointerToNth(count))
+
+        if _fastPath(nativeBuffer!.hasCapacity(n, forSubRange: subRange)) {
+          return
+        }
+      }
+    }
+    _copyInPlace(newSize: count, newCapacity: max(count, n), minElementWidth: 1)
   }
 
-  public mutating func splice<
-    S : CollectionType where S.Generator.Element == UTF16.CodeUnit
-  >(newElements: S, atIndex i: Int) {
-    Swift.splice(&self, newElements, atIndex: i)
-  }
+  public mutating func extend<
+    S : SequenceType
+      where S.Generator.Element == UTF16.CodeUnit
+  >(s: S) {
+    var width = elementWidth
+    if width == 1 {
+      if let hasNonAscii = s._preprocessingPass({
+          s in s.contains { $0 > 0x7f }
+        }) {
+        width = hasNonAscii ? 2 : 1
+      }
+    }
 
-  public mutating func removeAtIndex(i: Int) -> UTF16.CodeUnit {
-    return Swift.removeAtIndex(&self, i)
-  }
+    let growth = s.underestimateCount()
+    var g = s.generate()
 
-  public mutating func removeRange(subRange: Range<Int>) {
-    Swift.removeRange(&self, subRange)
+    if _fastPath(growth > 0) {
+      let newSize = count + growth
+      let destination = _growBuffer(newSize, minElementWidth: width)
+      if elementWidth == 1 {
+        let destination8 = UnsafeMutablePointer<UTF8.CodeUnit>(destination)
+        for i in 0..<growth {
+          destination8[i] = UTF8.CodeUnit(g.next()!)
+        }
+      }
+      else {
+        let destination16 = UnsafeMutablePointer<UTF16.CodeUnit>(destination)
+        for i in 0..<growth {
+          destination16[i] = g.next()!
+        }
+      }
+    }
+    // Append any remaining elements
+    for u in GeneratorSequence(g) {
+      self.append(u)
+    }
   }
+}
 
-  public mutating func removeAll(keepCapacity keepCapacity: Bool = false) {
-    Swift.removeAll(&self, keepCapacity: keepCapacity)
-  }
+// Used to support a tighter invariant: all strings with contiguous
+// storage have a non-NULL base address.
+var _emptyStringStorage: UInt32 = 0
+
+var _emptyStringBase: COpaquePointer {
+  return COpaquePointer(
+    UnsafeMutablePointer<UInt16>(Builtin.addressof(&_emptyStringStorage)))
 }

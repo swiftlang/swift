@@ -244,7 +244,7 @@ extension String {
   }
 }
 
-extension String.UnicodeScalarView : ExtensibleCollectionType {
+extension String.UnicodeScalarView : RangeReplaceableCollectionType {
   /// Construct an empty instance.
   public init() {
     self = String.UnicodeScalarView(_StringCore())
@@ -271,10 +271,6 @@ extension String.UnicodeScalarView : ExtensibleCollectionType {
       _lazyConcatenate(lazy(newElements).map { $0.utf16 })
     )
   }
-}
-
-extension String.UnicodeScalarView : RangeReplaceableCollectionType {
-
   /// Replace the given `subRange` of elements with `newElements`.
   ///
   /// Invalidates all indices with respect to `self`.
@@ -290,55 +286,6 @@ extension String.UnicodeScalarView : RangeReplaceableCollectionType {
       ..< subRange.endIndex._position
     let lazyUTF16 = _lazyConcatenate(lazy(newElements).map { $0.utf16 })
     _core.replaceRange(rawSubRange, with: lazyUTF16)
-  }
-
-  /// Insert `newElement` at index `i`.
-  ///
-  /// Invalidates all indices with respect to `self`.
-  ///
-  /// - Complexity: O(`self.count`).
-  public mutating func insert(newElement: UnicodeScalar, atIndex i: Index) {
-    Swift.insert(&self, newElement, atIndex: i)
-  }
-
-  /// Insert `newElements` at index `i`.
-  ///
-  /// Invalidates all indices with respect to `self`.
-  ///
-  /// - Complexity: O(`self.count + newElements.count`).
-  public mutating func splice<
-    S : CollectionType where S.Generator.Element == UnicodeScalar
-  >(newElements: S, atIndex i: Index) {
-    Swift.splice(&self, newElements, atIndex: i)
-  }
-
-  /// Remove the and return element at index `i`.
-  ///
-  /// Invalidates all indices with respect to `self`.
-  ///
-  /// - Complexity: O(`self.count`).
-  public mutating func removeAtIndex(i: Index) -> UnicodeScalar {
-    return Swift.removeAtIndex(&self, i)
-  }
-
-  /// Remove the indicated `subRange` of elements.
-  ///
-  /// Invalidates all indices with respect to `self`.
-  ///
-  /// - Complexity: O(`self.count`).
-  public mutating func removeRange(subRange: Range<Index>) {
-    Swift.removeRange(&self, subRange)
-  }
-
-  /// Remove all elements.
-  ///
-  /// Invalidates all indices with respect to `self`.
-  ///
-  /// - parameter keepCapacity: If `true`, prevents the release of
-  ///   allocated storage, which can be a useful optimization
-  ///   when `self` is going to be grown again.
-  public mutating func removeAll(keepCapacity keepCapacity: Bool = false) {
-    Swift.removeAll(&self, keepCapacity: keepCapacity)
   }
 }
 

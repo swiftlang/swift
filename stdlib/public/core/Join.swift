@@ -10,127 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// A collection type that can be efficiently appended-to.
-public protocol ExtensibleCollectionType : CollectionType {
-  /// Create an empty instance.
-  init()
-
-  /// A non-binding request to ensure `n` elements of available storage.
-  ///
-  /// This works as an optimization to avoid multiple reallocations of
-  /// linear data structures like `Array`.  Conforming types may
-  /// reserve more than `n`, exactly `n`, less than `n` elements of
-  /// storage, or even ignore the request completely.
-  mutating func reserveCapacity(n: Index.Distance)
-
-  /*
-  The 'extend' requirement should be an operator, but the compiler crashes:
-
-  <rdar://problem/16566712> Dependent type should have been substituted by Sema
-  or SILGen
-
-  func +=<
-    S : SequenceType
-    where S.Generator.Element == Generator.Element
-  >(inout _: Self, _: S)
-  */
-
-  /// Append `x` to `self`.
-  ///
-  /// Applying `successor()` to the index of the new element yields
-  /// `self.endIndex`.
-  ///
-  /// - Complexity: Amortized O(1).
-  mutating func append(x: Generator.Element)
-
-  /// Append the elements of `newElements` to `self`.
-  ///
-  /// - Complexity: O(*length of result*).
-  ///
-  /// A possible implementation:
-  ///
-  ///     reserveCapacity(self.count + newElements.underestimateCount())
-  ///     for x in newElements {
-  ///       self.append(x)
-  ///     }
-  mutating func extend<
-      S : SequenceType
-      where S.Generator.Element == Generator.Element
-  >(newElements: S)
-
-  /*
-  We could have these operators with default implementations, but the compiler
-  crashes:
-
-  <rdar://problem/16566712> Dependent type should have been substituted by Sema
-  or SILGen
-
-  func +<
-    S : SequenceType
-    where S.Generator.Element == Generator.Element
-  >(_: Self, _: S) -> Self
-
-  func +<
-    S : SequenceType
-    where S.Generator.Element == Generator.Element
-  >(_: S, _: Self) -> Self
-
-  func +<
-    S : CollectionType
-    where S.Generator.Element == Generator.Element
-  >(_: Self, _: S) -> Self
-
-  func +<
-    EC : ExtensibleCollectionType
-    where EC.Generator.Element == Generator.Element
-  >(_: Self, _: S) -> Self
-*/
-}
-
-public func +<
-    C : ExtensibleCollectionType,
-    S : SequenceType
-    where S.Generator.Element == C.Generator.Element
->(var lhs: C, rhs: S) -> C {
-  // FIXME: what if lhs is a reference type?  This will mutate it.
-  lhs.extend(rhs)
-  return lhs
-}
-
-public func +<
-    C : ExtensibleCollectionType,
-    S : SequenceType
-    where S.Generator.Element == C.Generator.Element
->(lhs: S, rhs: C) -> C {
-  var result = C()
-  result.reserveCapacity(rhs.count + numericCast(rhs.underestimateCount()))
-  result.extend(lhs)
-  result.extend(rhs)
-  return result
-}
-
-public func +<
-    C : ExtensibleCollectionType,
-    S : CollectionType
-    where S.Generator.Element == C.Generator.Element
->(var lhs: C, rhs: S) -> C {
-  // FIXME: what if lhs is a reference type?  This will mutate it.
-  lhs.reserveCapacity(lhs.count + numericCast(rhs.count))
-  lhs.extend(rhs)
-  return lhs
-}
-
-public func +<
-    EC1 : ExtensibleCollectionType,
-    EC2 : ExtensibleCollectionType
-    where EC1.Generator.Element == EC2.Generator.Element
->(var lhs: EC1, rhs: EC2) -> EC1 {
-  // FIXME: what if lhs is a reference type?  This will mutate it.
-  lhs.reserveCapacity(lhs.count + numericCast(rhs.count))
-  lhs.extend(rhs)
-  return lhs
-}
-
 /// Creates and returns a collection of type `C` that is the result of
 /// interposing a given separator between the elements of the sequence
 /// `elements`.
@@ -140,7 +19,7 @@ public func +<
 ///
 ///     print(join(" ", [ "here", "be", "dragons" ]))
 public func join<
-  C : ExtensibleCollectionType, S : SequenceType
+  C : RangeReplaceableCollectionType, S : SequenceType
   where S.Generator.Element == C
 >(
   separator: C, _ elements: S

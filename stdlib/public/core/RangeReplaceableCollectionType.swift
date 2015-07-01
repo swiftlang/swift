@@ -16,15 +16,9 @@
 
 /// A *collection* that supports replacement of an arbitrary subRange
 /// of elements with the elements of another collection.
-public protocol RangeReplaceableCollectionType : ExtensibleCollectionType {
-
-  /// Append `x` to `self`.
-  ///
-  /// Applying `successor()` to the index of the new element yields
-  /// `self.endIndex`.
-  ///
-  /// - Complexity: Amortized O(1).
-  mutating func append(x: Generator.Element)
+public protocol RangeReplaceableCollectionType : CollectionType {
+  /// Create an empty instance.
+  init()
 
   //===--- Fundamental Requirements ---------------------------------------===//
 
@@ -41,16 +35,77 @@ public protocol RangeReplaceableCollectionType : ExtensibleCollectionType {
     subRange: Range<Index>, with newElements: C
   )
 
+  /*
+  We could have these operators with default implementations, but the compiler
+  crashes:
+
+  <rdar://problem/16566712> Dependent type should have been substituted by Sema
+  or SILGen
+
+  func +<
+    S : SequenceType
+    where S.Generator.Element == Generator.Element
+  >(_: Self, _: S) -> Self
+
+  func +<
+    S : SequenceType
+    where S.Generator.Element == Generator.Element
+  >(_: S, _: Self) -> Self
+
+  func +<
+    S : CollectionType
+    where S.Generator.Element == Generator.Element
+  >(_: Self, _: S) -> Self
+
+  func +<
+    RC : RangeReplaceableCollectionType
+    where RC.Generator.Element == Generator.Element
+  >(_: Self, _: S) -> Self
+*/
+
+  /// A non-binding request to ensure `n` elements of available storage.
+  ///
+  /// This works as an optimization to avoid multiple reallocations of
+  /// linear data structures like `Array`.  Conforming types may
+  /// reserve more than `n`, exactly `n`, less than `n` elements of
+  /// storage, or even ignore the request completely.
+  mutating func reserveCapacity(n: Index.Distance)
+
   //===--- Derivable Requirements (see free functions below) --------------===//
+
+  /// Append `x` to `self`.
+  ///
+  /// Applying `successor()` to the index of the new element yields
+  /// `self.endIndex`.
+  ///
+  /// - Complexity: Amortized O(1).
+  mutating func append(x: Generator.Element)
+
+  /*
+  The 'extend' requirement should be an operator, but the compiler crashes:
+
+  <rdar://problem/16566712> Dependent type should have been substituted by Sema
+  or SILGen
+
+  func +=<
+    S : SequenceType
+    where S.Generator.Element == Generator.Element
+  >(inout _: Self, _: S)
+  */
+
+  /// Append the elements of `newElements` to `self`.
+  ///
+  /// - Complexity: O(*length of result*).
+  mutating func extend<
+    S : SequenceType
+    where S.Generator.Element == Generator.Element
+  >(newElements: S)
+
   /// Insert `newElement` at index `i`.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
-  ///
-  /// Can be implemented as:
-  ///
-  ///     Swift.insert(&self, newElement, atIndex: i)
   mutating func insert(newElement: Generator.Element, atIndex i: Index)
 
   /// Insert `newElements` at index `i`.
@@ -58,10 +113,6 @@ public protocol RangeReplaceableCollectionType : ExtensibleCollectionType {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count + newElements.count`).
-  ///
-  /// Can be implemented as:
-  ///
-  ///     Swift.splice(&self, newElements, atIndex: i)
   mutating func splice<
     S : CollectionType where S.Generator.Element == Generator.Element
   >(newElements: S, atIndex i: Index)
@@ -71,21 +122,19 @@ public protocol RangeReplaceableCollectionType : ExtensibleCollectionType {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
-  ///
-  /// Can be implemented as:
-  ///
-  ///     Swift.removeAtIndex(&self, i)
   mutating func removeAtIndex(i: Index) -> Generator.Element
+
+  /// Remove an element from the end and return it.
+  ///
+  /// - Complexity: O(1)
+  /// - Requires: `count > 0`.
+  mutating func removeLast() -> Generator.Element
 
   /// Remove the indicated `subRange` of elements.
   ///
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count`).
-  ///
-  /// Can be implemented as:
-  ///
-  ///     Swift.removeRange(&self, subRange)
   mutating func removeRange(subRange: Range<Index>)
 
   /// Remove all elements.
@@ -97,11 +146,64 @@ public protocol RangeReplaceableCollectionType : ExtensibleCollectionType {
   ///    when `self` is going to be grown again.
   ///
   /// - Complexity: O(`self.count`).
-  ///
-  /// Can be implemented as:
-  ///
-  ///     Swift.removeAll(&self, keepCapacity: keepCapacity)
   mutating func removeAll(keepCapacity keepCapacity: Bool /*= false*/)
+}
+
+//===----------------------------------------------------------------------===//
+// Default implementations for RangeReplaceableCollectionType
+//===----------------------------------------------------------------------===//
+
+extension RangeReplaceableCollectionType {
+  public mutating func append(newElement: Generator.Element) {
+    insert(newElement, atIndex: endIndex)
+  }
+
+  public mutating func extend<
+    S : SequenceType where S.Generator.Element == Generator.Element
+  >(newElements: S) {
+    for element in newElements {
+      append(element)
+    }
+  }
+
+  public mutating func insert(
+    newElement: Generator.Element, atIndex i: Index
+  ) {
+    replaceRange(i..<i, with: CollectionOfOne(newElement))
+  }
+
+  public mutating func splice<
+    C : CollectionType where C.Generator.Element == Generator.Element
+  >(newElements: C, atIndex i: Index) {
+    replaceRange(i..<i, with: newElements)
+  }
+
+  public mutating func removeAtIndex(index: Index) -> Generator.Element {
+    _precondition(!isEmpty, "can't remove from an empty collection")
+    let result: Generator.Element = self[index]
+    replaceRange(index...index, with: EmptyCollection())
+    return result
+  }
+
+  public mutating func removeRange(subRange: Range<Index>) {
+    replaceRange(subRange, with: EmptyCollection())
+  }
+
+  public mutating func removeAll(keepCapacity keepCapacity: Bool = false) {
+    if !keepCapacity {
+      self = Self()
+    }
+    else {
+      replaceRange(indices, with: EmptyCollection())
+    }
+  }
+}
+
+extension RangeReplaceableCollectionType where Index: BidirectionalIndexType {
+  public mutating func removeLast() -> Generator.Element {
+    _precondition(!isEmpty, "can't removeLast from an empty collection")
+    return removeAtIndex(endIndex.predecessor())
+  }
 }
 
 /// Insert `newElement` into `x` at index `i`.
@@ -109,10 +211,11 @@ public protocol RangeReplaceableCollectionType : ExtensibleCollectionType {
 /// Invalidates all indices with respect to `x`.
 ///
 /// - Complexity: O(`x.count`).
+@available(*, unavailable, message="call the 'insert()' method on the collection")
 public func insert<
-  C: RangeReplaceableCollectionType
+    C: RangeReplaceableCollectionType
 >(inout x: C, _ newElement: C.Generator.Element, atIndex i: C.Index) {
-    x.replaceRange(i..<i, with: CollectionOfOne(newElement))
+  fatalError("unavailable function can't be called")
 }
 
 /// Insert `newElements` into `x` at index `i`.
@@ -120,23 +223,12 @@ public func insert<
 /// Invalidates all indices with respect to `x`.
 ///
 /// - Complexity: O(`x.count + newElements.count`).
+@available(*, unavailable, message="call the 'splice()' method on the collection")
 public func splice<
-  C: RangeReplaceableCollectionType,
-  S : CollectionType where S.Generator.Element == C.Generator.Element
+    C: RangeReplaceableCollectionType,
+    S : CollectionType where S.Generator.Element == C.Generator.Element
 >(inout x: C, _ newElements: S, atIndex i: C.Index) {
-  x.replaceRange(i..<i, with: newElements)
-}
-
-// FIXME: Trampoline helper to make the typechecker happy.  For some
-// reason we can't call x.replaceRange directly in the places where
-// this is used.  <rdar://problem/17863882>
-internal func _replaceRange<
-  C0: RangeReplaceableCollectionType, C1: CollectionType
-    where C0.Generator.Element == C1.Generator.Element
->(
-  inout x: C0, _ subRange: Range<C0.Index>, with newElements: C1
-) {
-  x.replaceRange(subRange, with: newElements)
+  fatalError("unavailable function can't be called")
 }
 
 /// Remove from `x` and return the element at index `i`.
@@ -144,13 +236,11 @@ internal func _replaceRange<
 /// Invalidates all indices with respect to `x`.
 ///
 /// - Complexity: O(`x.count`).
+@available(*, unavailable, message="call the 'removeAtIndex()' method on the collection")
 public func removeAtIndex<
-  C: RangeReplaceableCollectionType
+    C: RangeReplaceableCollectionType
 >(inout x: C, _ index: C.Index) -> C.Generator.Element {
-  _precondition(!x.isEmpty, "can't remove from an empty collection")
-  let result: C.Generator.Element = x[index]
-  _replaceRange(&x, index...index, with: EmptyCollection())
-  return result
+  fatalError("unavailable function can't be called")
 }
 
 /// Remove from `x` the indicated `subRange` of elements.
@@ -158,10 +248,11 @@ public func removeAtIndex<
 /// Invalidates all indices with respect to `x`.
 ///
 /// - Complexity: O(`x.count`).
+@available(*, unavailable, message="call the 'removeRange()' method on the collection")
 public func removeRange<
-  C: RangeReplaceableCollectionType
+    C: RangeReplaceableCollectionType
 >(inout x: C, _ subRange: Range<C.Index>) {
-  _replaceRange(&x, subRange, with: EmptyCollection())
+  fatalError("unavailable function can't be called")
 }
 
 /// Remove all elements from `x`.
@@ -173,36 +264,77 @@ public func removeRange<
 ///    when `x` is going to be grown again.
 ///
 /// - Complexity: O(`x.count`).
+@available(*, unavailable, message="call the 'removeAll()' method on the collection")
 public func removeAll<
-  C: RangeReplaceableCollectionType
+    C: RangeReplaceableCollectionType
 >(inout x: C, keepCapacity: Bool = false) {
-  if !keepCapacity {
-    x = C()
-  }
-  else {
-    _replaceRange(&x, x.indices, with: EmptyCollection())
-  }
+  fatalError("unavailable function can't be called")
 }
 
 /// Append elements from `newElements` to `x`.
 ///
 /// - Complexity: O(N).
+@available(*, unavailable, message="call the 'extend()' method on the collection")
 public func extend<
-  C: RangeReplaceableCollectionType,
-  S : CollectionType where S.Generator.Element == C.Generator.Element
+    C: RangeReplaceableCollectionType,
+    S : SequenceType where S.Generator.Element == C.Generator.Element
 >(inout x: C, _ newElements: S) {
-  x.replaceRange(x.endIndex..<x.endIndex, with: newElements)
+  fatalError("unavailable function can't be called")
 }
 
 /// Remove an element from the end of `x`  in O(1).
 ///
 /// - Requires: `x` is nonempty.
+@available(*, unavailable, message="call the 'removeLast()' method on the collection")
 public func removeLast<
-  C: RangeReplaceableCollectionType where C.Index : BidirectionalIndexType
->(
-  inout x: C
-) -> C.Generator.Element {
-  _precondition(!x.isEmpty, "can't removeLast from an empty collection")
-  return removeAtIndex(&x, x.endIndex.predecessor())
+    C: RangeReplaceableCollectionType where C.Index : BidirectionalIndexType
+>(inout x: C) -> C.Generator.Element {
+  fatalError("unavailable function can't be called")
 }
 
+public func +<
+    C : RangeReplaceableCollectionType,
+    S : SequenceType
+    where S.Generator.Element == C.Generator.Element
+>(var lhs: C, rhs: S) -> C {
+  // FIXME: what if lhs is a reference type?  This will mutate it.
+  lhs.extend(rhs)
+  return lhs
+}
+
+public func +<
+    C : RangeReplaceableCollectionType,
+    S : SequenceType
+    where S.Generator.Element == C.Generator.Element
+>(lhs: S, rhs: C) -> C {
+  var result = C()
+  result.reserveCapacity(rhs.count + numericCast(rhs.underestimateCount()))
+  result.extend(lhs)
+  result.extend(rhs)
+  return result
+}
+
+public func +<
+    C : RangeReplaceableCollectionType,
+    S : CollectionType
+    where S.Generator.Element == C.Generator.Element
+>(var lhs: C, rhs: S) -> C {
+  // FIXME: what if lhs is a reference type?  This will mutate it.
+  lhs.reserveCapacity(lhs.count + numericCast(rhs.count))
+  lhs.extend(rhs)
+  return lhs
+}
+
+public func +<
+    RRC1 : RangeReplaceableCollectionType,
+    RRC2 : RangeReplaceableCollectionType 
+    where RRC1.Generator.Element == RRC2.Generator.Element
+>(var lhs: RRC1, rhs: RRC2) -> RRC1 {
+  // FIXME: what if lhs is a reference type?  This will mutate it.
+  lhs.reserveCapacity(lhs.count + numericCast(rhs.count))
+  lhs.extend(rhs)
+  return lhs
+}
+
+@available(*, unavailable, message="'ExtensibleCollectionType' has been folded into 'RangeReplaceableCollectionType'")
+public typealias ExtensibleCollectionType = RangeReplaceableCollectionType

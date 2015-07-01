@@ -117,7 +117,7 @@ for i in evenOdd.myIndices {
 }
 print("")
 
-extension ExtensibleCollectionType {
+extension RangeReplaceableCollectionType {
   public final func myJoin<S : SequenceType where S.Generator.Element == Self>(
     elements: S
   ) -> Self {

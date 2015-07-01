@@ -104,8 +104,8 @@ func test17875634() {
   match += (row, col) // expected-error{{binary operator '+=' cannot be applied to operands of type '[(Int, Int)]' and '(Int, Int)'}}
   match += coord // expected-error{{binary operator '+=' cannot be applied to operands of type '[(Int, Int)]' and '(Int, Int)'}}
 
-  match.append(row, col) // expected-error{{extra argument in call}}
-  match.append(1, 2) // expected-error{{extra argument in call}}
+  match.append(row, col) // expected-error{{cannot invoke 'append' with an argument list of type '(Int, Int)'}}
+  match.append(1, 2) // expected-error{{cannot invoke 'append' with an argument list of type '(Int, Int)'}}
 
   match.append(coord)
   match.append((1, 2))

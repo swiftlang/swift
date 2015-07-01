@@ -1,0 +1,903 @@
+// -*- swift -*-
+// RUN: rm -rf %t ; mkdir -p %t
+// RUN: %S/../../utils/gyb %s -o %t/RangeReplaceable.swift
+// RUN: %S/../../utils/line-directive %t/RangeReplaceable.swift -- %target-build-swift %t/RangeReplaceable.swift -o %t/a.out
+// RUN: %S/../../utils/line-directive %t/RangeReplaceable.swift -- %target-run %t/a.out
+// REQUIRES: executable_test
+
+import StdlibUnittest
+
+var RangeReplaceableTestSuite = TestSuite("RangeReplaceable")
+
+extension MinimalCollection : RangeReplaceableCollectionType {
+  public init() {
+    _storage = []
+  }
+
+  mutating public func replaceRange<
+    C : CollectionType where C.Generator.Element == Generator.Element
+  >(
+    subRange: Range<Index>, with newElements: C
+  ) {
+    _storage.replaceRange(subRange, with: newElements)
+  }
+
+  mutating public func reserveCapacity(n: Index.Distance) {
+    _storage.reserveCapacity(n)
+  }
+
+  mutating public func append(x: Generator.Element) {
+    _storage.append(x)
+  }
+
+  mutating public func extend<
+      S : SequenceType
+      where S.Generator.Element == Generator.Element
+  >(newElements: S) {
+    _storage.extend(newElements)
+  }
+
+  mutating public func insert(newElement: Generator.Element, atIndex i: Index) {
+    _storage.insert(newElement, atIndex: i)
+  }
+
+  mutating public func splice<
+    S : CollectionType where S.Generator.Element == Generator.Element
+  >(newElements: S, atIndex i: Index) {
+    _storage.splice(newElements, atIndex: i)
+  }
+
+  mutating public func removeAtIndex(i: Index) -> Generator.Element {
+    return _storage.removeAtIndex(i)
+  }
+
+  mutating public func removeRange(subRange: Range<Index>) {
+    _storage.removeRange(subRange)
+  }
+
+  mutating public func removeAll(keepCapacity keepCapacity: Bool /*= false*/) {
+    _storage.removeAll(keepCapacity: keepCapacity)
+  }
+
+  mutating public func removeLast() {
+    _storage.removeLast()
+  }
+}
+
+enum RangeSelection {
+  case EmptyRange
+  case LeftEdge
+  case RightEdge
+  case MiddleWithSize(Int)
+  case LeftWithSize(Int)
+  case RightWithSize(Int)
+}
+
+/// The fundamental test input/output data for RangeReplaceableCollectionType.
+///
+/// replaceRange is the one fundamental operation on
+/// RangeReplaceableCollectionType. All tests are eventually of the form:
+///
+/// Input, New Elements, Range -> Output
+///
+/// We can then compare the output to `ReplaceRangeTest`'s `expected` property
+/// to see if they match.
+struct ReplaceRangeTest<T: Equatable> : CustomStringConvertible {
+  typealias Collection = Array<T>
+  var collection: Collection
+  let elements: Collection
+  let expected: Collection
+  let description: String
+  let loc: SourceLoc
+  let range: Range<Collection.Index>
+
+  init(_ description: String, collection: Collection, elements: Collection,
+       range: RangeSelection,  expected: Collection,
+       file: String = __FILE__, line: UWord = __LINE__
+  ) {
+    self.description = description
+    self.elements = elements
+    self.collection = collection
+    self.expected = expected
+    switch range {
+      case .EmptyRange: self.range = collection.endIndex..<collection.endIndex
+      case .LeftEdge: self.range = collection.startIndex..<collection.startIndex
+      case .RightEdge: self.range = collection.endIndex..<collection.endIndex
+      case .MiddleWithSize(let size):
+        if size > collection.count {
+          fatalError("Range size cannot exceed collection's count")
+        }
+        let start = advance(collection.startIndex, (collection.count / 2) - size / 2)
+        let end = advance(collection.startIndex, (collection.count / 2) + size / 2)
+        print("MiddleWithSize: \(start) ..< \(end)")
+        self.range = start...end
+      case .LeftWithSize(let size):
+        if size > collection.count {
+          fatalError("Range size cannot exceed collection's count")
+        }
+        let start = collection.startIndex
+        let end = advance(start, size)
+        self.range = start..<end
+      case .RightWithSize(let size):
+        if size > collection.count {
+          fatalError("Range size cannot exceed collection's count")
+        }
+        let start = advance(collection.startIndex, collection.count - size)
+        let end = collection.endIndex
+        self.range = start..<end
+    }
+    self.loc = SourceLoc(file, line, comment: "RangeReplaceableCollectionType test data")
+  }
+
+  static func emptyRange<T>(collection: [T])
+      -> Range<MinimalCollection<T>.Index> {
+    return collection.endIndex..<collection.endIndex
+  }
+
+  static func leftEdge<T>(collection: [T])
+      -> Range<MinimalCollection<T>.Index> {
+    return collection.startIndex..<collection.startIndex
+  }
+
+  static func rightEdge<T>(collection: [T])
+      -> Range<MinimalCollection<T>.Index> {
+    return collection.endIndex..<collection.endIndex
+  }
+
+  static func middleRange<T>(collection: [T],
+      _ size: Int) -> Range<MinimalCollection<T>.Index> {
+    if size > collection.count {
+      fatalError("Range size cannot exceed collection's count")
+    }
+
+    let start = advance(collection.startIndex, size / 4)
+    let end = advance(start, size / 2)
+    return Range(start: start, end: end)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// replaceRange()
+//===----------------------------------------------------------------------===//
+
+RangeReplaceableTestSuite.test("replaceRange") {
+  var replaceRangeTests = [ReplaceRangeTest<Int>]()
+
+  replaceRangeTests.append(
+    ReplaceRangeTest(
+        "empty -> empty",
+        collection: [],
+        elements: [],
+        range: .EmptyRange,
+        expected: []))
+
+  replaceRangeTests.append(
+    ReplaceRangeTest(
+        "small -> empty",
+        collection: [],
+        elements: [1010, 2020, 3030],
+        range: .EmptyRange,
+        expected: [1010, 2020, 3030]))
+
+  replaceRangeTests.append(
+    ReplaceRangeTest(
+        "small -> one, left side",
+        collection: [4040],
+        elements: [1010, 2020, 3030],
+        range: .LeftEdge,
+        expected: [1010, 2020, 3030, 4040]))
+
+  replaceRangeTests.append(
+    ReplaceRangeTest(
+        "small -> one, right side",
+        collection: [1010],
+        elements: [2020, 3030, 4040],
+        range: .RightEdge,
+        expected: [1010, 2020, 3030, 4040]))
+
+  replaceRangeTests.append(
+    ReplaceRangeTest(
+        "one -> small, right side",
+        collection: [1010, 2020, 3030],
+        elements: [4040],
+        range: .RightEdge,
+        expected: [1010, 2020, 3030, 4040]))
+
+  replaceRangeTests.append(
+    ReplaceRangeTest(
+        "one -> small, middle",
+        collection: [1010, 2020, 3030, 4040, 5050],
+        elements: [9090],
+        range: .MiddleWithSize(1),
+        expected: [1010, 2020, 9090, 4040, 5050]))
+
+  for var test in replaceRangeTests {
+    test.collection.replaceRange(test.range, with: test.elements)
+    print(test)
+    expectEqual(test.expected, test.collection)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// append()
+//===----------------------------------------------------------------------===//
+
+RangeReplaceableTestSuite.test("append/dispatch") {
+  var tester = RangeReplaceableCollectionLog.dispatchTester([1])
+  tester.append(2)
+  expectCustomizable(tester, tester.log.append)
+}
+
+RangeReplaceableTestSuite.test("append/semantics") {
+  var appendTests = [ReplaceRangeTest<Int>]()
+
+  appendTests.append(
+    ReplaceRangeTest(
+      "one -> empty",
+      collection: [],
+      elements: [1010],
+      range: .RightEdge,
+      expected: [1010]))
+
+  appendTests.append(
+    ReplaceRangeTest(
+      "one -> one",
+      collection: [1010],
+      elements: [2020],
+      range: .RightEdge,
+      expected: [1010, 2020]))
+
+  appendTests.append(
+    ReplaceRangeTest(
+      "one -> some",
+      collection: [1010, 2020, 3030, 4040, 5050, 6060, 7070],
+      elements: [8080],
+      range: .RightEdge,
+      expected: [1010, 2020, 3030, 4040, 5050, 6060, 7070, 8080]))
+
+  for var test in appendTests {
+    var c = MinimalCollection<Int>(test.collection)
+    c.append(test.elements[0])
+    print(test)
+    expectEqual(test.expected, c.map { Int($0.value) })
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// extend()
+//===----------------------------------------------------------------------===//
+
+RangeReplaceableTestSuite.test("extend/dispatch") {
+  var tester = RangeReplaceableCollectionLog.dispatchTester([1])
+  tester.extend([2, 3])
+  expectCustomizable(tester, tester.log.extend)
+}
+
+RangeReplaceableTestSuite.test("extend/semantics") {
+  var appendTests = [ReplaceRangeTest<Int>]()
+
+  appendTests.append(
+    ReplaceRangeTest(
+      "empty -> empty",
+      collection: [],
+      elements: [],
+      range: .RightEdge,
+      expected: []))
+
+  appendTests.append(
+    ReplaceRangeTest(
+      "empty -> one",
+      collection: [1010],
+      elements: [],
+      range: .RightEdge,
+      expected: [1010]))
+
+  appendTests.append(
+    ReplaceRangeTest(
+      "empty -> some",
+      collection: [1010, 2020, 3030, 4040],
+      elements: [],
+      range: .RightEdge,
+      expected: [1010, 2020, 3030, 4040]))
+
+  appendTests.append(
+    ReplaceRangeTest(
+      "one -> empty",
+      collection: [],
+      elements: [1010],
+      range: .RightEdge,
+      expected: [1010]))
+
+  appendTests.append(
+    ReplaceRangeTest(
+      "one -> one",
+      collection: [1010],
+      elements: [2020],
+      range: .RightEdge,
+      expected: [1010, 2020]))
+
+  appendTests.append(
+    ReplaceRangeTest(
+      "some -> one",
+      collection: [1010],
+      elements: [2020, 3030, 4040],
+      range: .RightEdge,
+      expected: [1010, 2020, 3030, 4040]))
+
+  appendTests.append(
+    ReplaceRangeTest(
+      "some -> some",
+      collection: [1010, 2020, 3030, 4040],
+      elements: [5050, 6060, 7070, 8080],
+      range: .RightEdge,
+      expected: [1010, 2020, 3030, 4040, 5050, 6060, 7070, 8080]))
+
+  for var test in appendTests {
+    test.collection.extend(test.elements)
+    print(test)
+    expectEqual(test.expected, test.collection)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// insert()
+//===----------------------------------------------------------------------===//
+
+RangeReplaceableTestSuite.test("insert/dispatch") {
+  var tester = RangeReplaceableCollectionLog.dispatchTester([1])
+  tester.insert(2, atIndex: tester.base.startIndex)
+  expectCustomizable(tester, tester.log.insert)
+}
+
+RangeReplaceableTestSuite.test("insert/semantics") {
+  var insertTests = [ReplaceRangeTest<Int>]()
+
+  insertTests.append(
+    ReplaceRangeTest(
+      "one into empty at left",
+      collection: [],
+      elements: [1010],
+      range: .LeftEdge,
+      expected: [1010]))
+
+  insertTests.append(
+    ReplaceRangeTest(
+      "one into one at left",
+      collection: [2020],
+      elements: [1010],
+      range: .LeftEdge,
+      expected: [1010, 2020]))
+
+  insertTests.append(
+    ReplaceRangeTest(
+      "one into one at right",
+      collection: [1010],
+      elements: [2020],
+      range: .RightEdge,
+      expected: [1010, 2020]))
+
+  insertTests.append(
+    ReplaceRangeTest(
+      "one into some at left",
+      collection: [2020, 3030, 4040, 5050],
+      elements: [1010],
+      range: .LeftEdge,
+      expected: [1010, 2020, 3030, 4040, 5050]))
+
+  insertTests.append(
+    ReplaceRangeTest(
+      "one into some at right",
+      collection: [1010, 2020, 3030, 4040],
+      elements: [5050],
+      range: .RightEdge,
+      expected: [1010, 2020, 3030, 4040, 5050]))
+
+  insertTests.append(
+    ReplaceRangeTest(
+        "one -> some, middle",
+        collection: [1010, 2020, 4040, 5050],
+        elements: [3030],
+        range: .MiddleWithSize(0),
+        expected: [1010, 2020, 3030, 4040, 5050]))
+
+  for var test in insertTests {
+    test.collection.insert(test.elements[0], atIndex: test.range.startIndex)
+    print(test)
+    expectEqual(test.expected, test.collection)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// splice()
+//===----------------------------------------------------------------------===//
+
+RangeReplaceableTestSuite.test("splice/dispatch") {
+  var tester = RangeReplaceableCollectionLog.dispatchTester([1])
+  tester.splice([2, 3], atIndex: tester.base.endIndex)
+  expectCustomizable(tester, tester.log.splice)
+}
+
+RangeReplaceableTestSuite.test("splice/semantics") {
+  var spliceTests = [ReplaceRangeTest<Int>]()
+
+  spliceTests.append(
+    ReplaceRangeTest(
+        "empty -> empty, left side",
+        collection: [],
+        elements: [],
+        range: .LeftEdge,
+        expected: []))
+
+  spliceTests.append(
+    ReplaceRangeTest(
+        "one -> empty, left side",
+        collection: [],
+        elements: [1010],
+        range: .LeftEdge,
+        expected: [1010]))
+
+  spliceTests.append(
+    ReplaceRangeTest(
+        "some -> empty, left side",
+        collection: [],
+        elements: [1010, 2020, 3030, 4040],
+        range: .LeftEdge,
+        expected: [1010, 2020, 3030, 4040]))
+
+  spliceTests.append(
+    ReplaceRangeTest(
+        "one -> one, left side",
+        collection: [2020],
+        elements: [1010],
+        range: .LeftEdge,
+        expected: [1010, 2020]))
+
+  spliceTests.append(
+    ReplaceRangeTest(
+        "one -> one, right side",
+        collection: [1010],
+        elements: [2020],
+        range: .RightEdge,
+        expected: [1010, 2020]))
+
+  spliceTests.append(
+    ReplaceRangeTest(
+        "some -> one, left side",
+        collection: [4040],
+        elements: [1010, 2020, 3030],
+        range: .LeftEdge,
+        expected: [1010, 2020, 3030, 4040]))
+
+  spliceTests.append(
+    ReplaceRangeTest(
+        "some -> one, right side",
+        collection: [1010],
+        elements: [2020, 3030, 4040],
+        range: .RightEdge,
+        expected: [1010, 2020, 3030, 4040]))
+
+  spliceTests.append(
+    ReplaceRangeTest(
+        "one -> some, middle",
+        collection: [1010, 2020, 4040, 5050],
+        elements: [3030],
+        range: .MiddleWithSize(1),
+        expected: [1010, 2020, 3030, 4040, 5050]))
+
+  spliceTests.append(
+    ReplaceRangeTest(
+        "some -> some, left side",
+        collection: [4040, 5050, 6060],
+        elements: [1010, 2020, 3030],
+        range: .LeftEdge,
+        expected: [1010, 2020, 3030, 4040, 5050, 6060]))
+
+  spliceTests.append(
+    ReplaceRangeTest(
+        "some -> some, right side",
+        collection: [1010, 2020, 3030],
+        elements: [4040, 5050, 6060],
+        range: .RightEdge,
+        expected: [1010, 2020, 3030, 4040, 5050, 6060]))
+
+  spliceTests.append(
+    ReplaceRangeTest(
+        "some -> some, insert into middle",
+        collection: [1010, 2020, 3030, 7070, 8080, 9090],
+        elements: [4040, 5050, 6060],
+        range: .MiddleWithSize(0),
+        expected: [1010, 2020, 3030, 4040, 5050, 6060, 7070, 8080, 9090]))
+
+  for var test in spliceTests {
+    test.collection.splice(test.elements, atIndex: test.range.startIndex)
+    print(test)
+    expectEqual(test.expected, test.collection)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// removeAtIndex()
+//===----------------------------------------------------------------------===//
+
+RangeReplaceableTestSuite.test("removeAtIndex/dispatch") {
+  var tester = RangeReplaceableCollectionLog.dispatchTester([1])
+  tester.removeAtIndex(tester.base.startIndex)
+  expectCustomizable(tester, tester.log.removeAtIndex)
+}
+
+RangeReplaceableTestSuite.test("removeAtIndex/semantics") {
+  var removeAtIndexTests = [ReplaceRangeTest<Int>]()
+
+  removeAtIndexTests.append(
+    ReplaceRangeTest(
+        "remove only element",
+        collection: [1010],
+        elements: [],
+        range: .LeftEdge,
+        expected: []))
+
+  removeAtIndexTests.append(
+    ReplaceRangeTest(
+        "remove first from some",
+        collection: [1010, 2020, 3030],
+        elements: [],
+        range: .LeftEdge,
+        expected: [2020, 3030]))
+
+  removeAtIndexTests.append(
+    ReplaceRangeTest(
+        "remove middle from some",
+        collection: [1010, 2020, 3030],
+        elements: [],
+        range: .MiddleWithSize(1),
+        expected: [1010, 3030]))
+
+  removeAtIndexTests.append(
+    ReplaceRangeTest(
+        "remove last from some",
+        collection: [1010, 2020, 3030],
+        elements: [],
+        range: .RightWithSize(1),
+        expected: [1010, 2020]))
+
+  for var test in removeAtIndexTests {
+    test.collection.removeAtIndex(test.range.startIndex)
+    print(test)
+    expectEqual(test.expected, test.collection)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// removeLast()
+//===----------------------------------------------------------------------===//
+
+RangeReplaceableTestSuite.test("removeLast/dispatch") {
+  var tester = RangeReplaceableCollectionLog.dispatchTester([1])
+  tester.removeLast()
+  expectCustomizable(tester, tester.log.removeLast)
+}
+
+RangeReplaceableTestSuite.test("removeLast") {
+  var removeLastTests = [ReplaceRangeTest<Int>]()
+
+  removeLastTests.append(
+    ReplaceRangeTest(
+        "remove last from one",
+        collection: [1010],
+        elements: [],
+        range: .EmptyRange,
+        expected: []))
+
+  removeLastTests.append(
+    ReplaceRangeTest(
+        "remove last from some",
+        collection: [1010, 2020, 3030, 4040, 5050],
+        elements: [],
+        range: .EmptyRange,
+        expected: [1010, 2020, 3030, 4040]))
+
+  for var test in removeLastTests {
+    test.collection.removeLast()
+    print(test)
+    expectEqual(test.expected, test.collection)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// removeRange()
+//===----------------------------------------------------------------------===//
+
+RangeReplaceableTestSuite.test("removeRange/dispatch") {
+  var tester = RangeReplaceableCollectionLog.dispatchTester([1, 2, 3])
+  tester.removeRange(tester.base.startIndex..<tester.base.endIndex)
+  expectCustomizable(tester, tester.log.removeRange)
+}
+
+RangeReplaceableTestSuite.test("removeRange") {
+  var removeRangeTests = [ReplaceRangeTest<Int>]()
+
+  removeRangeTests.append(
+    ReplaceRangeTest(
+        "remove empty range from empty",
+        collection: [],
+        elements: [],
+        range: .EmptyRange,
+        expected: []))
+
+  removeRangeTests.append(
+    ReplaceRangeTest(
+        "remove range of size one from one",
+        collection: [1010],
+        elements: [],
+        range: .MiddleWithSize(1),
+        expected: []))
+
+  removeRangeTests.append(
+    ReplaceRangeTest(
+        "remove range: first element",
+        collection: [1010, 2020, 3030],
+        elements: [],
+        range: .LeftWithSize(1),
+        expected: [2020, 3030]))
+
+  removeRangeTests.append(
+    ReplaceRangeTest(
+        "remove range: last element",
+        collection: [1010, 2020, 3030],
+        elements: [],
+        range: .RightWithSize(1),
+        expected: [1010, 2020]))
+
+  removeRangeTests.append(
+    ReplaceRangeTest(
+        "remove range of size one from some at middle",
+        collection: [1010, 2020, 3030],
+        elements: [],
+        range: .MiddleWithSize(1),
+        expected: [1010, 3030]))
+
+  removeRangeTests.append(
+    ReplaceRangeTest(
+        "remove range of size 3 from some from the left",
+        collection: [1010, 2020, 3030, 4040, 5050],
+        elements: [],
+        range: .LeftWithSize(3),
+        expected: [4040, 5050]))
+
+  removeRangeTests.append(
+    ReplaceRangeTest(
+        "remove range of size 3 from some from the right",
+        collection: [1010, 2020, 3030, 4040, 5050],
+        elements: [],
+        range: .RightWithSize(3),
+        expected: [1010, 2020]))
+
+  removeRangeTests.append(
+    ReplaceRangeTest(
+        "remove range of size 3 from some from the middle",
+        collection: [1010, 2020, 3030, 4040, 5050],
+        elements: [],
+        range: .MiddleWithSize(3),
+        expected: [1010, 5050]))
+
+  for var test in removeRangeTests {
+    test.collection.removeRange(test.range)
+    print(test)
+    expectEqual(test.expected, test.collection)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// removeAll()
+//===----------------------------------------------------------------------===//
+
+RangeReplaceableTestSuite.test("removeAll/dispatch") {
+  var tester = RangeReplaceableCollectionLog.dispatchTester([1])
+  tester.removeAll(keepCapacity: false)
+  expectCustomizable(tester, tester.log.removeAll)
+}
+
+RangeReplaceableTestSuite.test("removeAll/dispatch") {
+  var removeAllTests = [ReplaceRangeTest<Int>]()
+
+  removeAllTests.append(
+    ReplaceRangeTest(
+        "remove all from empty",
+        collection: [],
+        elements: [],
+        range: .EmptyRange,
+        expected: []))
+
+  removeAllTests.append(
+    ReplaceRangeTest(
+        "remove all from one",
+        collection: [1010],
+        elements: [],
+        range: .EmptyRange,
+        expected: []))
+
+  removeAllTests.append(
+    ReplaceRangeTest(
+        "remove all from some",
+        collection: [1010, 2020, 3030, 4040, 5050],
+        elements: [],
+        range: .EmptyRange,
+        expected: []))
+
+  for var test in removeAllTests {
+    test.collection.removeAll(keepCapacity: false)
+    print(test)
+    expectEqual(test.expected, test.collection)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// reserveCapacity()
+//===----------------------------------------------------------------------===//
+
+RangeReplaceableTestSuite.test("reserveCapacity") {
+  if true {
+    let r = join(MinimalCollection<Int>([]), [])
+    expectEqual(0, r.reservedCapacity)
+  }
+  if true {
+    let r = join(MinimalCollection([ 42 ]),
+        [ MinimalCollection([]) ])
+    expectEqual(0, r.reservedCapacity)
+  }
+
+  if true {
+    let r = join(MinimalCollection([ 42 ]),
+        [ MinimalCollection([ 1 ]),
+          MinimalCollection([ 2, 3, 4 ]),
+          MinimalCollection([ 5, 6, 7 ]) ])
+    expectEqual(9, r.reservedCapacity)
+    expectEqual([ 1, 42, 2, 3, 4, 42, 5, 6, 7 ], r._storage)
+  }
+  if true {
+    let r = join(MinimalCollection([ 42, 4242 ]),
+        [ MinimalCollection([ 1 ]),
+          MinimalCollection([ 2, 3, 4 ]),
+          MinimalCollection([ 5, 6, 7 ]) ])
+    expectEqual(11, r.reservedCapacity)
+    expectEqual([ 1, 42, 4242, 2, 3, 4, 42, 4242, 5, 6, 7 ], r._storage)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// + operator
+//===----------------------------------------------------------------------===//
+
+RangeReplaceableTestSuite.test("OperatorPlus") {
+  // RangeReplaceableCollectionType + SequenceType
+  if true {
+    var ec: [Int] = []
+    var s = AnySequence([Int]())
+    var r: [Int] = ec + s
+    expectEqual([], r)
+  }
+  if true {
+    var ec: [Int] = []
+    var s = AnySequence([ 4, 5, 6, 7 ])
+    var r: [Int] = ec + s
+    expectEqual([ 4, 5, 6, 7 ], r)
+  }
+  if true {
+    var ec: [Int] = [ 1, 2, 3 ]
+    var s = AnySequence([Int]())
+    var r: [Int] = ec + s
+    expectEqual([ 1, 2, 3 ], r)
+  }
+  if true {
+    var ec: [Int] = [ 1, 2, 3 ]
+    var s = AnySequence([ 4, 5, 6, 7 ])
+    var r: [Int] = ec + s
+    expectEqual([ 1, 2, 3, 4, 5, 6, 7 ], r)
+  }
+
+  // SequenceType + RangeReplaceableCollectionType
+  if true {
+    var s = AnySequence([Int]())
+    var ec: [Int] = []
+    var r: [Int] = s + ec
+    expectEqual([], r)
+  }
+  if true {
+    var s = AnySequence([Int]())
+    var ec: [Int] = [ 4, 5, 6, 7 ]
+    var r: [Int] = s + ec
+    expectEqual([ 4, 5, 6, 7 ], r)
+  }
+  if true {
+    var s = AnySequence([ 1, 2, 3 ])
+    var ec: [Int] = []
+    var r: [Int] = s + ec
+    expectEqual([ 1, 2, 3 ], r)
+  }
+  if true {
+    var s = AnySequence([ 1, 2, 3 ])
+    var ec: [Int] = [ 4, 5, 6, 7]
+    var r: [Int] = s + ec
+    expectEqual([ 1, 2, 3, 4, 5, 6, 7 ], r)
+  }
+
+  // RangeReplaceableCollectionType + CollectionType
+  if true {
+    var ec: [Int] = []
+    var c = MinimalCollection([Int]())
+    var r: [Int] = ec + c
+    expectEqual([], r)
+  }
+  if true {
+    var ec: [Int] = []
+    var c = MinimalCollection([ 4, 5, 6, 7 ])
+    var r: [Int] = ec + c
+    expectEqual([ 4, 5, 6, 7 ], r)
+  }
+  if true {
+    var ec: [Int] = [ 1, 2, 3 ]
+    var c = MinimalCollection([Int]())
+    var r: [Int] = ec + c
+    expectEqual([ 1, 2, 3 ], r)
+  }
+  if true {
+    var ec: [Int] = [ 1, 2, 3 ]
+    var c = MinimalCollection([ 4, 5, 6, 7 ])
+    var r: [Int] = ec + c
+    expectEqual([ 1, 2, 3, 4, 5, 6, 7 ], r)
+  }
+
+  // RangeReplaceableCollectionType + same RangeReplaceableCollectionType
+  if true {
+    var ec1: [Int] = []
+    var ec2: [Int] = []
+    var r: [Int] = ec1 + ec2
+    expectEqual([], r)
+  }
+  if true {
+    var ec1: [Int] = []
+    var ec2: [Int] = [ 4, 5, 6, 7 ]
+    var r: [Int] = ec1 + ec2
+    expectEqual([ 4, 5, 6, 7 ], r)
+  }
+  if true {
+    var ec1: [Int] = [ 1, 2, 3 ]
+    var ec2: [Int] = []
+    var r: [Int] = ec1 + ec2
+    expectEqual([ 1, 2, 3 ], r)
+  }
+  if true {
+    var ec1: [Int] = [ 1, 2, 3 ]
+    var ec2: [Int] = [ 4, 5, 6, 7 ]
+    var r: [Int] = ec1 + ec2
+    expectEqual([ 1, 2, 3, 4, 5, 6, 7 ], r)
+  }
+
+  // MinimalCollection + other MinimalCollection
+  if true {
+    var ec1: [Int] = []
+    var ec2 = MinimalCollection([Int]())
+    var r: [Int] = ec1 + ec2
+    expectEqual([], r)
+  }
+  if true {
+    var ec1: [Int] = []
+    var ec2 = MinimalCollection([ 4, 5, 6, 7 ])
+    var r: [Int] = ec1 + ec2
+    expectEqual([ 4, 5, 6, 7 ], r)
+  }
+  if true {
+    var ec1: [Int] = [ 1, 2, 3 ]
+    var ec2 = MinimalCollection([Int]())
+    var r: [Int] = ec1 + ec2
+    expectEqual([ 1, 2, 3 ], r)
+  }
+  if true {
+    var ec1: [Int] = [ 1, 2, 3 ]
+    var ec2 = MinimalCollection([ 4, 5, 6, 7 ])
+    var r: [Int] = ec1 + ec2
+    expectEqual([ 1, 2, 3, 4, 5, 6, 7 ], r)
+  }
+}
+
+runAllTests()

@@ -2,9 +2,9 @@
 
 // Test case submitted to project by https://github.com/tmu (Teemu Kurppa)
 
-extension String : ExtensibleCollectionType {}
+extension String : RangeReplaceableCollectionType {}
 
-func f<S : ExtensibleCollectionType>(seq: S) -> S {
+func f<S : RangeReplaceableCollectionType>(seq: S) -> S {
     return S() + seq
 }
 

@@ -56,6 +56,149 @@ public struct LoggingGenerator<Base: GeneratorType>
   public var base: Base
 }
 
+/// Data container to keep track of how many times each `Base` type calls methods
+/// of RangeReplaceableCollectionType.
+///
+/// Each static variable is a mapping of Type -> Number of calls.
+public class RangeReplaceableCollectionLog {
+  public static var append = TypeIndexed(0)
+  public static var extend = TypeIndexed(0)
+  public static var insert = TypeIndexed(0)
+  public static var removeAll = TypeIndexed(0)
+  public static var removeAtIndex = TypeIndexed(0)
+  public static var removeLast = TypeIndexed(0)
+  public static var removeRange = TypeIndexed(0)
+  public static var replaceRange = TypeIndexed(0)
+  public static var splice = TypeIndexed(0)
+
+  public static func dispatchTester<C: RangeReplaceableCollectionType>(
+    rrc: C
+  ) -> LoggingRangeReplaceableCollection<LoggingRangeReplaceableCollection<C>> {
+    return LoggingRangeReplaceableCollection(
+      LoggingRangeReplaceableCollection(rrc)
+    )
+  }
+}
+
+/// Interposes between RangeReplaceableCollectionType method calls to
+/// increment each method's counter.
+public struct LoggingRangeReplaceableCollection<
+  Base: RangeReplaceableCollectionType
+> : RangeReplaceableCollectionType, LoggingType {
+
+  typealias Index = Base.Index
+  typealias Log = RangeReplaceableCollectionLog
+
+  public var base: Base
+
+  public init() {
+    self.base = Base()
+  }
+
+  public init(_ base: Base) {
+    self.base = base
+  }
+
+  public var count: Base.Index.Distance {
+    return base.count
+  }
+
+  public var first: Base.Generator.Element? {
+    return base.first
+  }
+
+  public var isEmpty: Bool {
+    return base.isEmpty
+  }
+
+  public var startIndex: Base.Index {
+    return base.startIndex
+  }
+
+  public var endIndex: Base.Index {
+    return base.endIndex
+  }
+
+  public subscript(position: Base.Index) -> Base.Generator.Element {
+    return base[position]
+  }
+
+  public mutating func replaceRange<
+    C : CollectionType where C.Generator.Element == Base.Generator.Element
+  >(
+    subRange: Range<Base.Index>, with newElements: C
+  ) {
+    ++Log.replaceRange[selfType]
+    base.replaceRange(subRange, with: newElements)
+  }
+
+  public mutating func append(newElement: Base.Generator.Element) {
+    ++Log.append[selfType]
+    base.append(newElement)
+  }
+
+  public mutating func extend<
+    S : SequenceType where S.Generator.Element == Base.Generator.Element
+  >(newElements: S) {
+    ++Log.extend[selfType]
+    base.extend(newElements)
+  }
+
+  public mutating func insert(
+    newElement: Base.Generator.Element, atIndex i: Base.Index
+  ) {
+    ++Log.insert[selfType]
+    base.insert(newElement, atIndex: i)
+  }
+
+  public mutating func removeAtIndex(index: Base.Index) -> Base.Generator.Element {
+    ++Log.removeAtIndex[selfType]
+    return base.removeAtIndex(index)
+  }
+
+  public mutating func removeLast() -> Base.Generator.Element {
+    ++Log.removeLast[selfType]
+    return base.removeLast()
+  }
+
+  public mutating func removeRange(subRange: Range<Base.Index>) {
+    ++Log.removeRange[selfType]
+    base.removeRange(subRange)
+  }
+
+  public mutating func removeAll(keepCapacity keepCapacity: Bool) {
+    ++Log.removeAll[selfType]
+    base.removeAll(keepCapacity: keepCapacity)
+  }
+
+  public mutating func reserveCapacity(n: Base.Index.Distance) {
+    base.reserveCapacity(n)
+  }
+
+  public mutating func splice<
+    C : CollectionType where C.Generator.Element == Base.Generator.Element
+  >(newElements: C, atIndex i: Base.Index) {
+    ++Log.splice[selfType]
+    base.splice(newElements, atIndex: i)
+  }
+
+  public func map<T>(
+    @noescape transform: (Base.Generator.Element) -> T
+  ) -> [T] {
+    return base.map(transform)
+  }
+
+  public func filter(
+    @noescape includeElement: (Base.Generator.Element) -> Bool
+  ) -> [Base.Generator.Element] {
+    return base.filter(includeElement)
+  }
+
+  public func generate() -> Base.Generator {
+    return base.generate()
+  }
+}
+
 public class SequenceLog {
   public static func dispatchTester<S: SequenceType>(
     s: S

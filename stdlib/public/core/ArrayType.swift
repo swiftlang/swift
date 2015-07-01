@@ -34,9 +34,6 @@ protocol _ArrayType
     ArrayLiteralConvertible
 {
   //===--- public interface -----------------------------------------------===//
-  /// Construct an empty Array.
-  init()
-
   /// Construct an array of `count` elements, each initialized to `repeatedValue`.
   init(count: Int, repeatedValue: Generator.Element)
 
@@ -68,26 +65,10 @@ protocol _ArrayType
   /// - Complexity: O(`count`).
   mutating func reserveCapacity(minimumCapacity: Int)
 
-  /// Append newElement to the Array in O(1) (amortized).
-  mutating func append(newElement: Generator.Element)
-
-  /// Append elements from `sequence` to the Array.
-  mutating func extend<
-      S : SequenceType
-      where S.Generator.Element == Generator.Element
-  >(sequence: S)
-
   /// Operator form of `extend`.
   func += <
     S: SequenceType where S.Generator.Element == Generator.Element
   >(inout lhs: Self, rhs: S)
-
-  /// Remove an element from the end of the Array in O(1).
-  ///
-  /// - returns: The removed element.
-  ///
-  /// - Requires: `count > 0`.
-  mutating func removeLast() -> Generator.Element
 
   /// Insert `newElement` at index `i`.
   ///
@@ -106,10 +87,6 @@ protocol _ArrayType
   ///
   /// - Requires: `count > index`.
   mutating func removeAtIndex(index: Int) -> Generator.Element
-
-  /// Erase all the elements.  If `keepCapacity` is `true`, `capacity`
-  /// will not change.
-  mutating func removeAll(keepCapacity keepCapacity: Bool)
 
   //===--- algorithms -----------------------------------------------------===//
 
