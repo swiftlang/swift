@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -inline -inlinecaches -sil-verify-without-invalidation
+// RUN: %target-sil-opt %s -inline -specdevirt -sil-verify-without-invalidation
 
 sil_stage canonical
 

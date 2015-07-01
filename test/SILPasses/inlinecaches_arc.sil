@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -inlinecaches -sil-sort-output | FileCheck %s
+// RUN: %target-sil-opt %s -specdevirt -sil-sort-output | FileCheck %s
 
 sil_stage canonical
 
