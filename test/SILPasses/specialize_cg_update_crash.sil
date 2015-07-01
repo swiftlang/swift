@@ -1,0 +1,52 @@
+// RUN: %target-sil-opt -specialize %s | FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// Test if the CG is updated correctly during specialization and
+// there is no crash because of a missing CG node for a deserialized function.
+
+// FIXME: Unfortunately this test depends on internals of the stdlib.
+
+// CHECK-LABEL: sil @testit
+sil @testit : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @test_callee : $@convention(thin) () -> ()
+  %1 = apply %0() : $@convention(thin) () -> ()
+  %2 = function_ref @_TFSS4joinuRq_Ss12SequenceTypezqqq_S_9GeneratorSs13GeneratorType7ElementSS_fSSFq_SS : $@convention(method) <τ_0_0 where τ_0_0 : SequenceType, τ_0_0.Generator : GeneratorType, τ_0_0.Generator.Element == String> (@in τ_0_0, @guaranteed String) -> @owned String
+  %3 = function_ref @_TFSSCfMSSFT21_builtinStringLiteralBp8byteSizeBw7isASCIIBi1__SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %4 = metatype $@thin String.Type
+  %5 = string_literal utf8 "y"
+  %6 = integer_literal $Builtin.Word, 1
+  %7 = integer_literal $Builtin.Int1, -1
+  %8 = apply %3(%5, %6, %7, %4) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+  %18 = alloc_stack $Array<String>
+  %20 = apply %2<[String], IndexingGenerator<Array<String>>>(%18#1, %8) : $@convention(method) <τ_0_0 where τ_0_0 : SequenceType, τ_0_0.Generator : GeneratorType, τ_0_0.Generator.Element == String> (@in τ_0_0, @guaranteed String) -> @owned String
+  release_value %8 : $String
+  release_value %20 : $String
+  dealloc_stack %18#0 : $*@local_storage Array<String>
+  %24 = tuple ()
+  return %24 : $()
+}
+
+// CHECK-LABEL: sil @test_callee
+sil @test_callee : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $IndexingGenerator<String.UTF8View>
+  %22 = function_ref @_TFVSs17IndexingGenerator4nextuRq_Ss16_prext_Indexable_fRGS_q__FT_GSqqq_S0_8_Element_ : $@convention(method) <τ_0_0 where τ_0_0 : _prext_Indexable, τ_0_0.Index : ForwardIndexType, τ_0_0.Index.Distance : _SignedIntegerType, τ_0_0.Index.Distance.IntegerLiteralType : _BuiltinIntegerLiteralConvertible> (@out Optional<τ_0_0._Element>, @inout IndexingGenerator<τ_0_0>) -> ()
+  %23 = alloc_stack $Optional<UInt8>
+  %24 = apply %22<String.UTF8View, String.UTF8View.Index, Int, Int, _DisabledRangeIndex_, UInt8>(%23#1, %0#1) : $@convention(method) <τ_0_0 where τ_0_0 : _prext_Indexable, τ_0_0.Index : ForwardIndexType, τ_0_0.Index.Distance : _SignedIntegerType, τ_0_0.Index.Distance.IntegerLiteralType : _BuiltinIntegerLiteralConvertible> (@out Optional<τ_0_0._Element>, @inout IndexingGenerator<τ_0_0>) -> ()
+  dealloc_stack %23#0 : $*@local_storage Optional<UInt8>
+  destroy_addr %0#1 : $*IndexingGenerator<String.UTF8View>
+  %34 = tuple ()
+  dealloc_stack %0#0 : $*@local_storage IndexingGenerator<String.UTF8View>
+  return %34 : $()
+}
+
+
+sil @_TFSSCfMSSFT21_builtinStringLiteralBp8byteSizeBw7isASCIIBi1__SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+sil @_TFSS4joinuRq_Ss12SequenceTypezqqq_S_9GeneratorSs13GeneratorType7ElementSS_fSSFq_SS : $@convention(method) <τ_0_0 where τ_0_0 : SequenceType, τ_0_0.Generator : GeneratorType, τ_0_0.Generator.Element == String> (@in τ_0_0, @guaranteed String) -> @owned String
+sil @_TFVSs17IndexingGenerator4nextuRq_Ss16_prext_Indexable_fRGS_q__FT_GSqqq_S0_8_Element_ : $@convention(method) <τ_0_0 where τ_0_0 : _prext_Indexable, τ_0_0.Index : ForwardIndexType, τ_0_0.Index.Distance : _SignedIntegerType, τ_0_0.Index.Distance.IntegerLiteralType : _BuiltinIntegerLiteralConvertible> (@out Optional<τ_0_0._Element>, @inout IndexingGenerator<τ_0_0>) -> ()
+

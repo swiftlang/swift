@@ -432,7 +432,8 @@ public:
   lookUpFunctionInWitnessTable(const ProtocolConformance *C, SILDeclRef Member);
 
   /// Look up the VTable mapped to the given ClassDecl. Returns null on failure.
-  SILVTable *lookUpVTable(const ClassDecl *C);
+  SILVTable *lookUpVTable(const ClassDecl *C,
+                          std::function<void(SILFunction *)> Callback = nullptr);
 
   /// Attempt to lookup the function corresponding to \p Member in the class
   /// hierarchy of \p Class.

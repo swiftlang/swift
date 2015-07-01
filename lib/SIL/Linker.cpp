@@ -137,7 +137,7 @@ SILVTable *SILLinkerVisitor::processClassDecl(const ClassDecl *C) {
 
 bool SILLinkerVisitor::linkInVTable(ClassDecl *D) {
   // Attempt to lookup the Vtbl from the SILModule.
-  SILVTable *Vtbl = Mod.lookUpVTable(D);
+  SILVTable *Vtbl = Mod.lookUpVTable(D, Callback);
 
   // If the SILModule does not have the VTable, attempt to deserialize the
   // VTable. If we fail to do that as well, bail.

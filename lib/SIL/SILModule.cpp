@@ -542,7 +542,8 @@ void SILModule::eraseFunction(SILFunction *F) {
   }
 }
 
-SILVTable *SILModule::lookUpVTable(const ClassDecl *C) {
+SILVTable *SILModule::lookUpVTable(const ClassDecl *C,
+                                   std::function<void(SILFunction *)> Callback) {
   if (!C)
     return nullptr;
 
@@ -554,7 +555,8 @@ SILVTable *SILModule::lookUpVTable(const ClassDecl *C) {
   // If that fails, try to deserialize it. If that fails, return nullptr.
   SILVTable *Vtbl = SILLinkerVisitor(*this, getSILLoader(),
                                      SILModule::LinkingMode::LinkAll,
-                                     ExternalSource).processClassDecl(C);
+                                     ExternalSource,
+                                     Callback).processClassDecl(C);
   if (!Vtbl)
     return nullptr;
 
