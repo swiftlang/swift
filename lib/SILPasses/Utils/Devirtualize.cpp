@@ -311,6 +311,50 @@ static SILValue conditionallyCastAddr(SILBuilderWithScope<16> &B,
   return B.createUncheckedRefCast(Loc, Arg, ParamTy);
 }
 
+/// Insert instructions to cast the tuple return type into appropiate
+/// tuple type expected by the original apply_inst.
+static SILInstruction *castTupleReturnType(ApplyInst *AI, ApplyInst *NewAI,
+    CanTypeWrapper<TupleType> ResultTupleTy, SILFunction *F, SILBuilder& B) {
+  auto AITupleTy = cast<TupleType>(AI->getType().getSwiftRValueType());
+  SmallVector<SILValue, 4> TupleElements;
+  auto TupleElementTypes = ResultTupleTy.getElementTypes();
+  unsigned NumElements = ResultTupleTy->getElements().size();
+  for (unsigned i = 0; i < NumElements; ++i) {
+    auto EltTy = TupleElementTypes[i];
+    auto ExtractedElt = B.createTupleExtract(AI->getLoc(), NewAI, i);
+    OptionalTypeKind OTK;
+    auto OptionalEltTy =
+        EltTy.getCanonicalTypeOrNull()->getAnyOptionalObjectType(OTK);
+    if (!OptionalEltTy
+        || !isa<FunctionType>(OptionalEltTy.getCanonicalTypeOrNull())) {
+      // No need to convert this parameter
+      TupleElements.push_back(ExtractedElt);
+      continue;
+    }
+
+    // Dereference the optional value
+    auto *SomeDecl = B.getASTContext().getOptionalSomeDecl(OTK);
+    auto FuncPtr = B.createUncheckedEnumData(AI->getLoc(), ExtractedElt,
+        SomeDecl);
+
+    auto AIOptionalEltTy =
+        AITupleTy.getElementType(i).getCanonicalTypeOrNull()->getAnyOptionalObjectType();
+    auto SILAIOptionalEltTy = AI->getModule().Types.getLoweredType(
+        AIOptionalEltTy);
+    auto ConvertedFuncPtr = B.createConvertFunction(AI->getLoc(), FuncPtr,
+        SILAIOptionalEltTy);
+
+    TupleElements.push_back(
+        B.createOptionalSome(AI->getLoc(), ConvertedFuncPtr, OTK,
+            SILType::getPrimitiveObjectType(AITupleTy.getElementType(i))));
+  }
+
+  // Now create a new tuple
+  DEBUG(llvm::dbgs() << "        SUCCESS: " << F->getName() << "\n");
+  NumClassDevirt++;
+  return B.createTuple(AI->getLoc(), AI->getType(), TupleElements);
+}
+
 /// \brief Devirtualize an apply of a class method.
 ///
 /// \p AI is the apply to devirtualize.
@@ -379,6 +423,20 @@ SILInstruction *swift::devirtualizeClassMethod(ApplyInst *AI,
 
   // If our return type differs from AI's return type, then we know that we have
   // a covariant return type. Cast it before we RAUW. This can not happen
+
+  // Accessors could return a tuple where one of the elements is of a function
+  // type, which may refer to a subclass instead of a superclass in its
+  // signature.
+  // These function types are ABI-compatible between the subclass and a
+  // superclass. To make the SIL type system happy, insert a conversion between
+  // the function types and reconstruct the tuple.
+  if (auto *FD = dyn_cast<FuncDecl>(CMI->getMember().getDecl())) {
+    if (FD->isAccessor()) {
+      if (auto ResultTupleTy = dyn_cast<TupleType>(ReturnType.getSwiftRValueType()))
+        return castTupleReturnType(AI, NewAI, ResultTupleTy, F, B);
+    }
+  }
+
 
   // Check if the return type is an optional of the apply_inst type
   // or the other way around
