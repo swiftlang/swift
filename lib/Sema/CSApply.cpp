@@ -1481,37 +1481,52 @@ namespace {
       // Form a reference to the function. The bridging operations are generic,
       // so we need to form substitutions and compute the resulting type.
       auto Conformances =
-        tc.Context.Allocate<ProtocolConformance *>(conformance?1:0);
+        tc.Context.Allocate<ProtocolConformance *>(conformance ? 1 : 0);
 
       if (conformsToBridgedToObjectiveC)
         Conformances[0] = conformance;
 
+
+      auto fnGenericParams
+        = fn->getGenericSignatureOfContext()->getGenericParams();
+      auto firstArchetype
+        = ArchetypeBuilder::mapTypeIntoContext(fn, fnGenericParams[0])
+            ->castTo<ArchetypeType>();
+
       SmallVector<Substitution, 2> Subs;
-      Substitution sub(fn->getGenericParams()->getAllArchetypes()[0],
-                       valueType,
-                       Conformances);
+      Substitution sub(firstArchetype, valueType, Conformances);
       Subs.push_back(sub);
 
       // Add substitution for the dependent type T._ObjectiveCType.
       if (conformsToBridgedToObjectiveC) {
-        const Substitution *DepTypeSubst = getTypeWitnessByName(
-            conformance, tc.Context.getIdentifier("_ObjectiveCType"), nullptr);
+        auto objcTypeId = tc.Context.getIdentifier("_ObjectiveCType");
+        auto objcAssocType = cast<AssociatedTypeDecl>(
+                               conformance->getProtocol()->lookupDirect(
+                                 objcTypeId).front());
+        auto objcDepType = DependentMemberType::get(fnGenericParams[0],
+                                                    objcAssocType,
+                                                    tc.Context);
+        auto objcArchetype
+          = ArchetypeBuilder::mapTypeIntoContext(fn, objcDepType)
+            ->castTo<ArchetypeType>();
+
+        const Substitution &objcSubst = conformance->getTypeWitness(
+                                          objcAssocType, &tc);
 
         // Create a substitution for the dependent type.
-        Substitution NewDepTypeSubst(
-                       fn->getGenericParams()->getAllArchetypes()[1],
-                       DepTypeSubst->getReplacement(),
-                       DepTypeSubst->getConformances());
+        Substitution newDepTypeSubst(
+                       objcArchetype,
+                       objcSubst.getReplacement(),
+                       objcSubst.getConformances());
 
-        Subs.push_back(NewDepTypeSubst);
+        Subs.push_back(newDepTypeSubst);
       }
 
       ConcreteDeclRef fnSpecRef(tc.Context, fn, Subs);
       Expr *fnRef = new (tc.Context) DeclRefExpr(fnSpecRef, object->getLoc(),
                                                  /*Implicit=*/true);
       TypeSubstitutionMap subMap;
-      auto genericParam
-        = fn->getGenericSignatureOfContext()->getGenericParams()[0];
+      auto genericParam = fnGenericParams[0];
       subMap[genericParam->getCanonicalType()->castTo<SubstitutableType>()]
         = valueType;
       fnRef->setType(fn->getInterfaceType().subst(dc->getParentModule(), subMap,
@@ -6706,8 +6721,13 @@ Expr *Solution::convertOptionalToBool(Expr *expr,
   // Form a reference to the function. This library intrinsic is generic, so we
   // need to form substitutions and compute the resulting type.
   auto unwrappedOptionalType = expr->getType()->getOptionalObjectType();
-  Substitution sub(fn->getGenericParams()->getAllArchetypes()[0],
-                   unwrappedOptionalType, {});
+  auto fnGenericParams
+    = fn->getGenericSignatureOfContext()->getGenericParams();
+  auto firstArchetype
+    = ArchetypeBuilder::mapTypeIntoContext(fn, fnGenericParams[0])
+        ->castTo<ArchetypeType>();
+
+  Substitution sub(firstArchetype, unwrappedOptionalType, {});
   ConcreteDeclRef fnSpecRef(ctx, fn, sub);
   auto *fnRef =
       new (ctx) DeclRefExpr(fnSpecRef, SourceLoc(), /*Implicit=*/true);

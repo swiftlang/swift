@@ -3526,8 +3526,12 @@ ManagedValue SILGenFunction::emitLValueToPointer(SILLocation loc,
   // Invoke the conversion intrinsic.
   FuncDecl *converter =
     getASTContext().getConvertInOutToPointerArgument(nullptr);
-  Substitution sub = getPointerSubstitution(pointerType,
-                          converter->getGenericParams()->getAllArchetypes()[0]);
+  auto firstParam
+         = converter->getGenericSignatureOfContext()->getGenericParams()[0];
+  auto firstArchetype = ArchetypeBuilder::mapTypeIntoContext(converter,
+                                                             firstParam)
+                          ->castTo<ArchetypeType>();
+  Substitution sub = getPointerSubstitution(pointerType, firstArchetype);
   return emitApplyOfLibraryIntrinsic(loc, converter, sub,
                                      ManagedValue::forUnmanaged(address),
                                      SGFContext());
@@ -3551,19 +3555,26 @@ RValue RValueEmitter::visitArrayToPointerExpr(ArrayToPointerExpr *E,
     converter = Ctx.getConvertConstArrayToPointerArgument(nullptr);
     orig = SGF.emitRValueAsSingleValue(subExpr);
   }
-  auto converterArchetypes = converter->getGenericParams()->getAllArchetypes();
+
+  auto converterGenericParams
+    = converter->getGenericSignatureOfContext()->getGenericParams();
+  auto firstArchetype
+    = ArchetypeBuilder::mapTypeIntoContext(converter, converterGenericParams[0])
+        ->castTo<ArchetypeType>();
+  auto secondArchetype
+    = ArchetypeBuilder::mapTypeIntoContext(converter, converterGenericParams[1])
+        ->castTo<ArchetypeType>();
 
   // Invoke the conversion intrinsic, which will produce an owner-pointer pair.
   Substitution subs[2] = {
     Substitution{
-      converterArchetypes[0],
+      firstArchetype,
       subExpr->getType()->getInOutObjectType()
         ->castTo<BoundGenericType>()
         ->getGenericArgs()[0],
       {}
     },
-    SGF.getPointerSubstitution(E->getType(),
-                               converterArchetypes[1]),
+    SGF.getPointerSubstitution(E->getType(), secondArchetype),
   };
   auto result = SGF.emitApplyOfLibraryIntrinsic(E, converter, subs, orig, C);
   
@@ -3577,15 +3588,18 @@ RValue RValueEmitter::visitStringToPointerExpr(StringToPointerExpr *E,
                                                SGFContext C) {
   auto &Ctx = SGF.getASTContext();
   FuncDecl *converter = Ctx.getConvertConstStringToUTF8PointerArgument(nullptr);
-  auto converterArchetypes = converter->getGenericParams()->getAllArchetypes();
+
+  auto converterGenericParams
+    = converter->getGenericSignatureOfContext()->getGenericParams();
+  auto firstArchetype
+    = ArchetypeBuilder::mapTypeIntoContext(converter, converterGenericParams[0])
+        ->castTo<ArchetypeType>();
 
   // Get the original value.
   ManagedValue orig = SGF.emitRValueAsSingleValue(E->getSubExpr());
   
   // Invoke the conversion intrinsic, which will produce an owner-pointer pair.
-  Substitution sub =
-    SGF.getPointerSubstitution(E->getType(),
-                               converterArchetypes[0]);
+  Substitution sub = SGF.getPointerSubstitution(E->getType(), firstArchetype);
   auto result = SGF.emitApplyOfLibraryIntrinsic(E, converter, sub, orig, C);
   
   // Lifetime-extend the owner, and pass on the pointer.
@@ -3598,7 +3612,15 @@ RValue RValueEmitter::visitPointerToPointerExpr(PointerToPointerExpr *E,
                                                 SGFContext C) {
   auto &Ctx = SGF.getASTContext();
   auto converter = Ctx.getConvertPointerToPointerArgument(nullptr);
-  auto converterArchetypes = converter->getGenericParams()->getAllArchetypes();
+
+  auto converterGenericParams
+    = converter->getGenericSignatureOfContext()->getGenericParams();
+  auto firstArchetype
+    = ArchetypeBuilder::mapTypeIntoContext(converter, converterGenericParams[0])
+        ->castTo<ArchetypeType>();
+  auto secondArchetype
+    = ArchetypeBuilder::mapTypeIntoContext(converter, converterGenericParams[1])
+        ->castTo<ArchetypeType>();
 
   // Get the original pointer value, abstracted to the converter function's
   // expected level.
@@ -3614,8 +3636,8 @@ RValue RValueEmitter::visitPointerToPointerExpr(PointerToPointerExpr *E,
   
   // Invoke the conversion intrinsic to convert to the destination type.
   Substitution subs[2] = {
-    SGF.getPointerSubstitution(E->getSubExpr()->getType(), converterArchetypes[0]),
-    SGF.getPointerSubstitution(E->getType(), converterArchetypes[1]),
+    SGF.getPointerSubstitution(E->getSubExpr()->getType(), firstArchetype),
+    SGF.getPointerSubstitution(E->getType(), secondArchetype),
   };
   
   auto result = SGF.emitApplyOfLibraryIntrinsic(E, converter, subs, orig, C);
