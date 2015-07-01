@@ -2610,7 +2610,7 @@ ConformanceChecker::inferTypeWitnessesViaValueWitnesses(
     // FIXME: If we had some basic sanity checking of Self, we might be able to
     // use these.
     if (auto func = dyn_cast<FuncDecl>(req)) {
-      if (func->isOperator())
+      if (func->isOperator() || func->isAccessor())
         continue;
     }
 
@@ -2792,7 +2792,8 @@ ConformanceChecker::inferTypeWitnessesViaValueWitness(ValueDecl *req,
 
   };
 
-  // Match the witness. If we don't 
+  // Match the witness. If we don't succeed, throw away the inference
+  // information.
   // FIXME: A renamed match might be useful to retain for the failure case.
   if (matchWitness(TC, Conformance, DC, req, witness, setup, matchTypes,
                    finalize).Kind != MatchKind::ExactMatch) {
