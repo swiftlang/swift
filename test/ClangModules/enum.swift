@@ -171,6 +171,8 @@ let bitmapFormat5: NSABitmapFormat5 = [.NSAA16d , .NSAB32d]
 let timeFlags: CMTimeFlags = [.Valid , .HasBeenRounded]
 let timeFlags2: CMTimeFlagsWithNumber = [._Valid, ._888]
 let audioComponentOpts: AudioComponentInstantiationOptions = [.LoadOutOfProcess]
+let audioComponentFlags: AudioComponentFlags = [.SandboxSafe]
+let audioComponentFlags2: FakeAudioComponentFlags = [.LoadOutOfProcess]
 
 let objcFlags: objc_flags = [.taggedPointer, .swiftRefcount]
 

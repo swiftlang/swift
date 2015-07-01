@@ -387,28 +387,31 @@ static StringRef getCommonPluralPrefix(StringRef singular, StringRef plural) {
     return commonPrefix;
 
   StringRef leftover = singular.substr(commonPrefix.size());
+  StringRef firstLeftoverWord = camel_case::getFirstWord(leftover);
+  StringRef commonPrefixPlusWord =
+      singular.substr(0, commonPrefix.size() + firstLeftoverWord.size());
 
   // Is the plural string just "[singular]s"?
   plural = plural.drop_back();
-  if (plural.endswith(leftover))
-    return singular;
+  if (plural.endswith(firstLeftoverWord))
+    return commonPrefixPlusWord;
 
   if (plural.empty() || plural.back() != 'e')
     return commonPrefix;
 
   // Is the plural string "[singular]es"?
   plural = plural.drop_back();
-  if (plural.endswith(leftover))
-    return singular;
+  if (plural.endswith(firstLeftoverWord))
+    return commonPrefixPlusWord;
 
   if (plural.empty() || !(plural.back() == 'i' && singular.back() == 'y'))
     return commonPrefix;
 
   // Is the plural string "[prefix]ies" and the singular "[prefix]y"?
   plural = plural.drop_back();
-  leftover = leftover.drop_back();
-  if (plural.endswith(leftover))
-    return singular;
+  firstLeftoverWord = firstLeftoverWord.drop_back();
+  if (plural.endswith(firstLeftoverWord))
+    return commonPrefixPlusWord;
 
   return commonPrefix;
 }

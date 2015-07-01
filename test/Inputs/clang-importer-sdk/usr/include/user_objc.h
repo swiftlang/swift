@@ -30,3 +30,16 @@ typedef CF_OPTIONS(UInt32, AudioComponentInstantiationOptions) {
   kAudioComponentInstantiation_LoadOutOfProcess = 1,
   kAudioComponentInstantiation_LoadInProcess = 2
 };
+
+// ...whereas this one has a pluralized name before the underscore prefix.
+typedef CF_OPTIONS(UInt32, AudioComponentFlags) {
+  kAudioComponentFlag_Unsearchable    = 1,
+  kAudioComponentFlag_SandboxSafe     = 2,
+  kAudioComponentFlag_IsV3AudioUnit	= 4
+};
+
+// ...and this one has both complications.
+typedef CF_OPTIONS(UInt32, FakeAudioComponentFlags) {
+  kFakeAudioComponentFlag_LoadOutOfProcess  = 1,
+  kFakeAudioComponentFlag_LoadInProcess     = 2,
+};
