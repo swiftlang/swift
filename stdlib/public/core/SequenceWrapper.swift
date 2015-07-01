@@ -76,7 +76,8 @@ extension SequenceType
   }
 }
 
-internal protocol _CollectionWrapperType : _SequenceWrapperType {
+public // @testable
+protocol _CollectionWrapperType : _SequenceWrapperType {
   typealias Base : CollectionType
   typealias Index : ForwardIndexType = Base.Index
   var _base: Base {get}
@@ -106,5 +107,43 @@ extension CollectionType
   ///   `position != endIndex`.
   public subscript(position: Base.Index) -> Base.Generator.Element {
     return _base[position]
+  }
+
+  //===--- Restatements From SequenceWrapperType break ambiguity ----------===//
+  public func map<T>(
+    @noescape transform: (Base.Generator.Element) -> T
+  ) -> [T] {
+    return _base.map(transform)
+  }
+
+  public func filter(
+    @noescape includeElement: (Base.Generator.Element) -> Bool
+  ) -> [Base.Generator.Element] {
+    return _base.filter(includeElement)
+  }
+  
+  public func _customContainsEquatableElement(
+    element: Base.Generator.Element
+  ) -> Bool? { 
+    return _base._customContainsEquatableElement(element)
+  }
+  
+  /// If `self` is multi-pass (i.e., a `CollectionType`), invoke
+  /// `preprocess` on `self` and return its result.  Otherwise, return
+  /// `nil`.
+  public func _preprocessingPass<R>(preprocess: (Self)->R) -> R? {
+    return _base._preprocessingPass { _ in preprocess(self) }
+  }
+
+  /// Create a native array buffer containing the elements of `self`,
+  /// in the same order.
+  public func _copyToNativeArrayBuffer()
+    -> _ContiguousArrayBuffer<Base.Generator.Element> {
+    return _base._copyToNativeArrayBuffer()
+  }
+
+  /// Copy a Sequence into an array.
+  public func _initializeTo(ptr: UnsafeMutablePointer<Base.Generator.Element>) {
+    return _base._initializeTo(ptr)
   }
 }
