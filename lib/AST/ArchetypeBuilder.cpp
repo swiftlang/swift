@@ -491,15 +491,20 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
   
   // Collect the set of nested types of this archetype, and put them into
   // the archetype itself.
-  SmallVector<std::pair<Identifier, NestedType>, 4>
-    FlatNestedTypes;
-  for (auto Nested : NestedTypes) {
-    FlatNestedTypes.push_back({ Nested.first,
-                                Nested.second.front()->getType(builder) });
-    assert(FlatNestedTypes.back().second && "Couldn't create nested type'");
+  if (!NestedTypes.empty()) {
+    mod.getASTContext().registerLazyArchetype(arch, builder, this);
+    SmallVector<std::pair<Identifier, NestedType>, 4> FlatNestedTypes;
+    for (auto Nested : NestedTypes) {
+      FlatNestedTypes.push_back({ Nested.first, NestedType() });
+    }
+    arch->setNestedTypes(mod.getASTContext(), FlatNestedTypes);
+
+    // Force the resolution of the nested types.
+    (void)arch->getNestedTypes();
+
+    mod.getASTContext().unregisterLazyArchetype(arch);
   }
-  arch->setNestedTypes(mod.getASTContext(), FlatNestedTypes);
-  
+
   return NestedType::forArchetype(arch);
 }
 

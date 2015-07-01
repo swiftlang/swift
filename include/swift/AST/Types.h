@@ -3437,7 +3437,7 @@ private:
   AssocTypeOrProtocolType AssocTypeOrProto;
   Identifier Name;
   unsigned isRecursive: 1;
-  ArrayRef<std::pair<Identifier, NestedType>> NestedTypes;
+  MutableArrayRef<std::pair<Identifier, NestedType>> NestedTypes;
 
   /// Set the ID number of this opened existential.
   void setOpenedExistentialID(UUID value) {
@@ -3445,6 +3445,8 @@ private:
     // The UUID is tail-allocated at the end of opened existential archetypes.
     *reinterpret_cast<UUID *>(this + 1) = value;
   }
+
+  void resolveNestedType(std::pair<Identifier, NestedType> &nested) const;
 
 public:
   /// getNew - Create a new archetype with the given name.
@@ -3561,9 +3563,12 @@ public:
   bool hasNestedType(Identifier Name) const;
 
   /// \brief Retrieve the nested types of this archetype.
-  ArrayRef<std::pair<Identifier, NestedType>> getNestedTypes() const {
-    return NestedTypes;
-  }
+  ///
+  /// \param resolveTypes Whether to eagerly resolve the nested types
+  /// (defaults to \c true). Otherwise, the nested types might be
+  /// null.
+  ArrayRef<std::pair<Identifier, NestedType>>
+  getNestedTypes(bool resolveTypes = true) const;
 
   /// \brief Set the nested types to a copy of the given array of
   /// archetypes, which will first be sorted in place.

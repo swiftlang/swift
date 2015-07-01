@@ -2517,13 +2517,15 @@ namespace {
         printRec("opened_existential", openedExistential);
 
       Indent += 2;
-      for (auto nestedType : T->getNestedTypes()) {
+      for (auto nestedType : T->getNestedTypes(/*resolveTypes=*/false)) {
         OS << "\n";
         OS.indent(Indent) << "(";
         PrintWithColorRAII(OS, TypeFieldColor) << "nested_type";
         OS << "=";
         OS << nestedType.first.str() << " ";
-        if (auto concrete = nestedType.second.getAsConcreteType()) {
+        if (!nestedType.second) {
+          PrintWithColorRAII(OS, TypeColor) << "unresolved";          
+        } else if (auto concrete = nestedType.second.getAsConcreteType()) {
           PrintWithColorRAII(OS, TypeColor) << "concrete";
           OS << "=" << concrete.getString();
         } else {

@@ -2067,6 +2067,16 @@ bool ArchetypeType::requiresClass() const {
   return false;
 }
 
+void ArchetypeType::resolveNestedType(
+       std::pair<Identifier, NestedType> &nested) const {
+  auto &ctx = const_cast<ArchetypeType *>(this)->getASTContext();
+  auto lazyArchetype = ctx.getLazyArchetype(this);
+  nested.second = lazyArchetype.second->getNestedType(nested.first,
+                                                      *lazyArchetype.first,
+                                                      nullptr)
+                    ->getType(*lazyArchetype.first);
+}
+
 namespace {
   /// \brief Function object that orders archetypes by name.
   struct OrderArchetypeByName {
@@ -2127,6 +2137,11 @@ ArchetypeType::NestedType ArchetypeType::getNestedType(Identifier Name) const {
              ErrorType::get(
                const_cast<ArchetypeType *>(this)->getASTContext()));
 
+  // If the type is null, lazily resolve it. 
+  if (!Pos->second) {
+    resolveNestedType(*Pos);
+  }
+
   return Pos->second;
 }
 
@@ -2136,10 +2151,21 @@ bool ArchetypeType::hasNestedType(Identifier Name) const {
   return Pos != NestedTypes.end() && Pos->first == Name;
 }
 
-void
-ArchetypeType::
-setNestedTypes(ASTContext &Ctx,
-               MutableArrayRef<std::pair<Identifier, NestedType>> Nested) {
+ArrayRef<std::pair<Identifier, ArchetypeType::NestedType>>
+ArchetypeType::getNestedTypes(bool resolveTypes) const {
+  if (resolveTypes) {
+    for (auto &nested : NestedTypes) {
+      if (!nested.second)
+        resolveNestedType(nested);
+    }
+  }
+
+  return NestedTypes;
+}
+
+void ArchetypeType::setNestedTypes(
+       ASTContext &Ctx,
+       MutableArrayRef<std::pair<Identifier, NestedType>> Nested) {
   std::sort(Nested.begin(), Nested.end(), OrderArchetypeByName());
   NestedTypes = Ctx.AllocateCopy(Nested);
 }

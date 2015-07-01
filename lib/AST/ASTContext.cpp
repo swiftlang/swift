@@ -197,6 +197,14 @@ struct ASTContext::Implementation {
   /// \brief A cached unused default-argument initializer context.
   DefaultArgumentInitializer *UnusedDefaultArgumentContext = nullptr;
 
+  /// Mapping from archetypes with lazily-resolved nested types to the
+  /// archetype builder and potential archetype corresponding to that
+  /// archetype.
+  llvm::DenseMap<const ArchetypeType *, 
+                 std::pair<ArchetypeBuilder *,
+                           ArchetypeBuilder::PotentialArchetype *>>
+    LazyArchetypes;
+
   /// \brief Structure that captures data that is segregated into different
   /// arenas.
   struct Arena {
@@ -3346,4 +3354,25 @@ ASTContext::getBridgedToObjC(const DeclContext *dc, bool inExpression,
                                                conformance.getPointer(),
                                                getIdentifier("_ObjectiveCType"),
                                                resolver);
+}
+
+std::pair<ArchetypeBuilder *, ArchetypeBuilder::PotentialArchetype *>
+ASTContext::getLazyArchetype(const ArchetypeType *archetype) {
+  auto known = Impl.LazyArchetypes.find(archetype);
+  assert(known != Impl.LazyArchetypes.end());
+  return known->second;
+}
+
+void ASTContext::registerLazyArchetype(
+       const ArchetypeType *archetype,
+       ArchetypeBuilder &builder,
+       ArchetypeBuilder::PotentialArchetype *potentialArchetype) {
+  assert(Impl.LazyArchetypes.count(archetype) == 0);
+  Impl.LazyArchetypes[archetype] = { &builder, potentialArchetype };
+}
+
+void ASTContext::unregisterLazyArchetype(const ArchetypeType *archetype) {
+  auto known = Impl.LazyArchetypes.find(archetype);
+  assert(known != Impl.LazyArchetypes.end());
+  Impl.LazyArchetypes.erase(known);
 }
