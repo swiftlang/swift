@@ -680,15 +680,15 @@ func testOptionalTypeParsing(a : AnyObject) -> String {
 
 func testParenExprInTheWay() {
   let x = 42
-  // expected-error @+2 {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}}
+  
   // expected-note @+1 {{overloads for '&' exist with these partially matching parameter lists: (Int, Int)}}
-  if x & 4.0 {}
-  // expected-error @+2 {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}}
+  if x & 4.0 {}  // expected-error {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}}
   // expected-note @+1 {{overloads for '&' exist with these partially matching parameter lists: (Int, Int)}}
-  if (x & 4.0) {}
-  // expected-error @+2 {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}}
+  if (x & 4.0) {}   // expected-error {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}}
+
   // expected-note @+1 {{overloads for '&' exist with these partially matching parameter lists: (Int, Int)}}
-  if !(x & 4.0) {}
+  if !(x & 4.0) {}  // expected-error {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}}
+
   
   if x & x {} // expected-error {{result type 'Int' does not match expected type}}
 }
