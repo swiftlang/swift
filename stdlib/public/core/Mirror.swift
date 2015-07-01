@@ -566,10 +566,91 @@ internal extension Mirror {
 
 //===--- QuickLooks -------------------------------------------------------===//
 
-// this typealias implies renaming the existing QuickLookObject to
-// PlaygroundQuickLook (since it is an enum, the use of the word
-// "Object" is misleading).
-public typealias PlaygroundQuickLook = QuickLookObject
+/// The sum of types that can be used as a quick look representation.
+public enum PlaygroundQuickLook {
+  //
+  // This type must be binary-compatible with the 'PlaygroundQuickLook' struct
+  // in stdlib/public/runtime/Reflection.mm, and 'PlaygroundQuickLook?' must be
+  // binary compatible with 'OptionalPlaygroundQuickLook' from the same.
+  //
+  // NB: This type is somewhat carefully laid out to *suppress* enum layout
+  // optimization so that it is easier to manufacture in the C++ runtime
+  // implementation.
+
+  /// Plain text.
+  case Text(String)
+
+  /// An integer numeric value.
+  case Int(Int64)
+
+  /// An unsigned integer numeric value.
+  case UInt(UInt64)
+
+  /// A single precision floating-point numeric value.
+  case Float(Float32)
+
+  /// A double precision floating-point numeric value.
+  case Double(Float64)
+
+  // FIXME: Uses an Any to avoid coupling a particular Cocoa type.
+  /// An image.
+  case Image(Any)
+
+  // FIXME: Uses an Any to avoid coupling a particular Cocoa type.
+  /// A sound.
+  case Sound(Any)
+
+  // FIXME: Uses an Any to avoid coupling a particular Cocoa type.
+  /// A color.
+  case Color(Any)
+
+  // FIXME: Uses an Any to avoid coupling a particular Cocoa type.
+  /// A bezier path.
+  case BezierPath(Any)
+
+  // FIXME: Uses an Any to avoid coupling a particular Cocoa type.
+  /// An attributed string.
+  case AttributedString(Any)
+
+  /// A rectangle.
+  ///
+  /// Uses explicit coordinates to avoid coupling a particular Cocoa type.
+  case Rectangle(Float64,Float64,Float64,Float64)
+
+  /// A point.
+  ///
+  /// Uses explicit coordinates to avoid coupling a particular Cocoa type.
+  case Point(Float64,Float64)
+
+  /// A size.
+  ///
+  /// Uses explicit coordinates to avoid coupling a particular Cocoa type.
+  case Size(Float64,Float64)
+
+  /// A logical value.
+  case Logical(Bool)
+
+  /// A range.
+  ///
+  /// Uses explicit values to avoid coupling a particular Cocoa type.
+  case Range(UInt64, UInt64)
+
+  /// A GUI view.
+  ///
+  /// Uses an Any to avoid coupling a particular Cocoa type.
+  case View(Any)
+
+  /// A graphical sprite.
+  ///
+  /// Uses an Any to avoid coupling a particular Cocoa type.
+  case Sprite(Any)
+
+  /// A Uniform Resource Locator.
+  case URL(String)
+
+  /// Raw data that has already been encoded in a format the IDE understands.
+  case _Raw([UInt8], String)
+}
 
 extension PlaygroundQuickLook {
   /// Initialize for the given `subject`.
@@ -730,3 +811,7 @@ extension Mirror : CustomReflectable {
     return Mirror(self, children: [:])
   }
 }
+
+@available(*, unavailable, renamed="PlaygroundQuickLook")
+public typealias QuickLookObject = PlaygroundQuickLook
+

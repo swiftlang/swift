@@ -52,7 +52,7 @@ ${MirrorDecl} {
 
   var summary: String { return "(${SummaryString})" }
 
-  var quickLookObject: QuickLookObject? { return .Some(.${QLTag}(${QLArgString})) }
+  var quickLookObject: PlaygroundQuickLook? { return .Some(.${QLTag}(${QLArgString})) }
 }
 
 ${MirrorConformance}

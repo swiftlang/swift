@@ -1039,7 +1039,7 @@ struct BrilliantMirror : MirrorType {
     return "Brilliant(\(_value.first), \(_value.second))"
   }
 
-  var quickLookObject: QuickLookObject? {
+  var quickLookObject: PlaygroundQuickLook? {
     return nil
   }
 

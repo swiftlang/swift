@@ -52,7 +52,7 @@ struct _NSCursorMirror : MirrorType {
 
   var summary: String { return ""}
 
-  var quickLookObject: QuickLookObject? {
+  var quickLookObject: PlaygroundQuickLook? {
     return .Some(.Image(_value.image))
   }
   
@@ -86,10 +86,10 @@ struct _NSViewMirror : MirrorType {
   
   var summary: String { get { return ""} }
   
-  var quickLookObject: QuickLookObject? { get {
+  var quickLookObject: PlaygroundQuickLook? { get {
       // adapted from the Xcode QuickLooks implementation
       
-      var result: QuickLookObject? = nil
+      var result: PlaygroundQuickLook? = nil
       
       // if you set NSView.needsDisplay, you can get yourself in a recursive scenario where the same view
       // could need to draw itself in order to get a QLObject for itself, which in turn if your code was

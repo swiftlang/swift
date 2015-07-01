@@ -230,7 +230,7 @@ internal struct _OptionalMirror<T> : MirrorType {
     }
   }
 
-  var quickLookObject: QuickLookObject? { return .None }
+  var quickLookObject: PlaygroundQuickLook? { return .None }
 
   var disposition: MirrorDisposition { return .Optional }
 }

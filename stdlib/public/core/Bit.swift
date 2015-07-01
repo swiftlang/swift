@@ -86,7 +86,7 @@ internal struct _BitMirror : MirrorType {
     }
   }
 
-  var quickLookObject: QuickLookObject? { return .None }
+  var quickLookObject: PlaygroundQuickLook? { return .None }
 
   var disposition: MirrorDisposition { return .Enum }
 }

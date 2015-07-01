@@ -43,7 +43,7 @@ ${getMirrorDecl("NSURL")} {
   
   var summary: String { get { return _value.absoluteString } }
   
-  var quickLookObject: QuickLookObject? { return .Some(.URL(summary)) }
+  var quickLookObject: PlaygroundQuickLook? { return .Some(.URL(summary)) }
 }
 
 ${getMirrorDecl("NSRange")} {
@@ -61,7 +61,7 @@ ${getMirrorDecl("NSRange")} {
   
   var summary: String { return "(\(_value.location),\(_value.length))" }
   
-  var quickLookObject: QuickLookObject? {
+  var quickLookObject: PlaygroundQuickLook? {
     return .Some(.Range(UInt64(_value.location),UInt64(_value.length)))
   }
 }
@@ -82,7 +82,7 @@ ${getMirrorDecl("NSDate")} {
     return df.stringFromDate(_value)
   }
   
-  var quickLookObject: QuickLookObject? { return .Some(.Text(summary)) }
+  var quickLookObject: PlaygroundQuickLook? { return .Some(.Text(summary)) }
 }
 
 ${getMirrorDecl("NSSet","MembershipContainer")} {
@@ -117,7 +117,7 @@ ${getMirrorDecl("NSSet","MembershipContainer")} {
   
   var summary: String { return "\(count) elements" }
   
-  var quickLookObject: QuickLookObject? { return nil }
+  var quickLookObject: PlaygroundQuickLook? { return nil }
 }
 
 // conformances

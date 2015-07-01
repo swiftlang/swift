@@ -31,7 +31,7 @@ ${MirrorDecl} {
 
   var summary: String { return _value.description }
   
-  var quickLookObject: QuickLookObject? {
+  var quickLookObject: PlaygroundQuickLook? {
       // this code comes straight from the quicklooks
       
       guard let data = (_value as AnyObject)._copyImageData?() else { return nil }

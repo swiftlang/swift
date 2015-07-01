@@ -118,7 +118,7 @@ struct Array {
   const void *x;
 };
   
-struct QuickLookObject {
+struct PlaygroundQuickLook {
   struct RawData {
     Array Data;
     String Type;
@@ -173,7 +173,7 @@ struct StringMirrorTuple {
   String first;
   Mirror second;
 };
-struct OptionalQuickLookObject {
+struct OptionalPlaygroundQuickLook {
   union {
     struct {
       union {
@@ -183,16 +183,16 @@ struct OptionalQuickLookObject {
         float Float;
         double Double;
         Any Any;
-        QuickLookObject::RawData Raw;
-        QuickLookObject::Rectangle Rect;
-        QuickLookObject::Point PointOrSize;
+        PlaygroundQuickLook::RawData Raw;
+        PlaygroundQuickLook::Rectangle Rect;
+        PlaygroundQuickLook::Point PointOrSize;
         bool Logical;
-        QuickLookObject::Interval Range;
+        PlaygroundQuickLook::Interval Range;
       };
-      QuickLookObject::Tag Kind;
+      PlaygroundQuickLook::Tag Kind;
       bool isNone;
     } optional;
-    QuickLookObject payload;
+    PlaygroundQuickLook payload;
   };
 };
   
@@ -815,11 +815,10 @@ StringMirrorTuple swift_ObjCMirror_subscript(intptr_t i,
 #endif
 }
 
-extern "C"
-OptionalQuickLookObject swift_ClassMirror_quickLookObject(HeapObject *owner,
-                                                       const OpaqueValue *value,
-                                                       const Metadata *type) {
-  OptionalQuickLookObject result;
+extern "C" OptionalPlaygroundQuickLook
+swift_ClassMirror_quickLookObject(HeapObject *owner, const OpaqueValue *value,
+                                  const Metadata *type) {
+  OptionalPlaygroundQuickLook result;
   memset(&result, 0, sizeof(result));
   
   id object = [*reinterpret_cast<const id *>(value) retain];
@@ -838,22 +837,22 @@ OptionalQuickLookObject swift_ClassMirror_quickLookObject(HeapObject *owner,
     switch ([n objCType][0]) {
     case 'd': // double
       result.payload.Double = [n doubleValue];
-      result.payload.Kind = QuickLookObject::Tag::Double;
+      result.payload.Kind = PlaygroundQuickLook::Tag::Double;
       break;
     case 'f': // float
       result.payload.Float = [n floatValue];
-      result.payload.Kind = QuickLookObject::Tag::Float;
+      result.payload.Kind = PlaygroundQuickLook::Tag::Float;
       break;
         
     case 'Q': // unsigned long long
       result.payload.UInt = [n unsignedLongLongValue];
-      result.payload.Kind = QuickLookObject::Tag::UInt;
+      result.payload.Kind = PlaygroundQuickLook::Tag::UInt;
       break;
 
     // FIXME: decimals?
     default:
       result.payload.Int = [n longLongValue];
-      result.payload.Kind = QuickLookObject::Tag::Int;
+      result.payload.Kind = PlaygroundQuickLook::Tag::Int;
       break;
     }
     
@@ -872,7 +871,7 @@ OptionalQuickLookObject swift_ClassMirror_quickLookObject(HeapObject *owner,
   
   if ([object isKindOfClass:NSClassFromString(@"NSAttributedString")]) {
     initializeAnyWithTakeOfObject(result.payload.Any, object);
-    result.payload.Kind = QuickLookObject::Tag::AttributedString;
+    result.payload.Kind = PlaygroundQuickLook::Tag::AttributedString;
     result.optional.isNone = false;
     return result;
   } else if ([object isKindOfClass:NSClassFromString(@"NSImage")]
@@ -882,25 +881,25 @@ OptionalQuickLookObject swift_ClassMirror_quickLookObject(HeapObject *owner,
       || [object isKindOfClass:NSClassFromString(@"CIImage")]
       || [object isKindOfClass:NSClassFromString(@"NSBitmapImageRep")]) {
     initializeAnyWithTakeOfObject(result.payload.Any, object);
-    result.payload.Kind = QuickLookObject::Tag::Image;
+    result.payload.Kind = PlaygroundQuickLook::Tag::Image;
     result.optional.isNone = false;
     return result;
   } else if ([object isKindOfClass:NSClassFromString(@"NSColor")]
              || [object isKindOfClass:NSClassFromString(@"UIColor")]) {
     initializeAnyWithTakeOfObject(result.payload.Any, object);
-    result.payload.Kind = QuickLookObject::Tag::Color;
+    result.payload.Kind = PlaygroundQuickLook::Tag::Color;
     result.optional.isNone = false;
     return result;
   } else if ([object isKindOfClass:NSClassFromString(@"NSBezierPath")]
              || [object isKindOfClass:NSClassFromString(@"UIBezierPath")]) {
     initializeAnyWithTakeOfObject(result.payload.Any, object);
-    result.payload.Kind = QuickLookObject::Tag::BezierPath;
+    result.payload.Kind = PlaygroundQuickLook::Tag::BezierPath;
     result.optional.isNone = false;
     return result;
   } else if ([object isKindOfClass:[NSString class]]) {
     result.payload.TextOrURL = String((NSString*)object);
     [object release];
-    result.payload.Kind = QuickLookObject::Tag::Text;
+    result.payload.Kind = PlaygroundQuickLook::Tag::Text;
     result.optional.isNone = false;
     return result;
   }

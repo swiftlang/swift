@@ -122,7 +122,7 @@ struct StatMirror: MirrorType {
     }
   }
 
-  var quickLookObject: QuickLookObject? { return nil }
+  var quickLookObject: PlaygroundQuickLook? { return nil }
   var disposition: MirrorDisposition { return .Enum }
 }
 

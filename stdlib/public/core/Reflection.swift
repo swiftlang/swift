@@ -67,91 +67,6 @@ public func ==(x: ObjectIdentifier, y: ObjectIdentifier) -> Bool {
   return Bool(Builtin.cmp_eq_RawPointer(x.value, y.value))
 }
 
-/// The sum of types that can be used as a quick look representation.
-public enum QuickLookObject {
-  //
-  // This type must be binary-compatible with the 'QuickLookObject' struct in
-  // stdlib/Runtime/Reflection.mm, and 'QuickLookObject?' must be binary
-  // compatible with 'OptionalQuickLookObject' from the same.
-  //
-  // NB: This type is somewhat carefully laid out to *suppress* enum layout
-  // optimization so that it is easier to manufacture in the C++ runtime
-  // implementation.
-
-  /// Plain text.
-  case Text(String)
-
-  /// An integer numeric value.
-  case Int(Int64)
-
-  /// An unsigned integer numeric value.
-  case UInt(UInt64)
-
-  /// A single precision floating-point numeric value.
-  case Float(Float32)
-
-  /// A double precision floating-point numeric value.
-  case Double(Float64)
-
-  // FIXME: Uses an Any to avoid coupling a particular Cocoa type.
-  /// An image.
-  case Image(Any)
-
-  // FIXME: Uses an Any to avoid coupling a particular Cocoa type.
-  /// A sound.
-  case Sound(Any)
-
-  // FIXME: Uses an Any to avoid coupling a particular Cocoa type.
-  /// A color.
-  case Color(Any)
-
-  // FIXME: Uses an Any to avoid coupling a particular Cocoa type.
-  /// A bezier path.
-  case BezierPath(Any)
-
-  // FIXME: Uses an Any to avoid coupling a particular Cocoa type.
-  /// An attributed string.
-  case AttributedString(Any)
-
-  /// A rectangle.
-  ///
-  /// Uses explicit coordinates to avoid coupling a particular Cocoa type.
-  case Rectangle(Float64,Float64,Float64,Float64)
-
-  /// A point.
-  ///
-  /// Uses explicit coordinates to avoid coupling a particular Cocoa type.
-  case Point(Float64,Float64)
-
-  /// A size.
-  ///
-  /// Uses explicit coordinates to avoid coupling a particular Cocoa type.
-  case Size(Float64,Float64)
-
-  /// A logical value.
-  case Logical(Bool)
-
-  /// A range.
-  ///
-  /// Uses explicit values to avoid coupling a particular Cocoa type.
-  case Range(UInt64, UInt64)
-
-  /// A GUI view.
-  ///
-  /// Uses an Any to avoid coupling a particular Cocoa type.
-  case View(Any)
-
-  /// A graphical sprite.
-  ///
-  /// Uses an Any to avoid coupling a particular Cocoa type.
-  case Sprite(Any)
-
-  /// A Uniform Resource Locator.
-  case URL(String)
-
-  /// Raw data that has already been encoded in a format the IDE understands.
-  case _Raw([UInt8], String)
-}
 
 /// How children of this value should be presented in the IDE.
 public enum MirrorDisposition {
@@ -202,7 +117,7 @@ public protocol MirrorType {
   var summary: String { get }
 
   /// A rich representation of `value` for an IDE, or `nil` if none is supplied.
-  var quickLookObject: QuickLookObject? { get }
+  var quickLookObject: PlaygroundQuickLook? { get }
 
   /// How `value` should be presented in an IDE.
   var disposition: MirrorDisposition { get }
@@ -319,10 +234,10 @@ func _dumpWithMirror<TargetStream : OutputStreamType>(
 internal struct _LeafMirror<T>: MirrorType {
   let _value: T
   let summaryFunction: T -> String
-  let quickLookFunction: T -> QuickLookObject?
+  let quickLookFunction: T -> PlaygroundQuickLook?
 
   init(_ value: T, _ summaryFunction: T -> String,
-       _ quickLookFunction: T -> QuickLookObject?) {
+       _ quickLookFunction: T -> PlaygroundQuickLook?) {
     self._value = value
     self.summaryFunction = summaryFunction
     self.quickLookFunction = quickLookFunction
@@ -336,7 +251,7 @@ internal struct _LeafMirror<T>: MirrorType {
     _preconditionFailure("no children")
   }
   var summary: String { return summaryFunction(_value) }
-  var quickLookObject: QuickLookObject? { return quickLookFunction(_value) }
+  var quickLookObject: PlaygroundQuickLook? { return quickLookFunction(_value) }
   var disposition: MirrorDisposition { return .Aggregate }
 }
 
@@ -389,7 +304,7 @@ struct _OpaqueMirror : MirrorType {
     _preconditionFailure("no children")
   }
   var summary: String { return data.summary }
-  var quickLookObject: QuickLookObject? { return nil }
+  var quickLookObject: PlaygroundQuickLook? { return nil }
   var disposition: MirrorDisposition { return .Aggregate }
 }
 
@@ -406,7 +321,7 @@ internal struct _TupleMirror : MirrorType {
     @asmname("swift_TupleMirror_subscript")get
   }
   var summary: String { return "(\(count) elements)" }
-  var quickLookObject: QuickLookObject? { return nil }
+  var quickLookObject: PlaygroundQuickLook? { return nil }
   var disposition: MirrorDisposition { return .Tuple }
 }
 
@@ -426,7 +341,7 @@ struct _StructMirror : MirrorType {
   var summary: String {
     return _stdlib_getDemangledTypeName(value)
   }
-  var quickLookObject: QuickLookObject? { return nil }
+  var quickLookObject: PlaygroundQuickLook? { return nil }
   var disposition: MirrorDisposition { return .Struct }
 }
 
@@ -453,7 +368,7 @@ struct _EnumMirror : MirrorType {
     }
     return typeName
   }
-  var quickLookObject: QuickLookObject? { return nil }
+  var quickLookObject: PlaygroundQuickLook? { return nil }
   var disposition: MirrorDisposition { return .Enum }
 }
 
@@ -464,7 +379,7 @@ func _getClassChild(_: Int, _: _MagicMirrorData) -> (String, MirrorType)
 
 #if _runtime(_ObjC)
 @asmname("swift_ClassMirror_quickLookObject")public
-func _getClassQuickLookObject(data: _MagicMirrorData) -> QuickLookObject?
+func _getClassPlaygroundQuickLook(data: _MagicMirrorData) -> PlaygroundQuickLook?
 #endif
 
 struct _ClassMirror : MirrorType {
@@ -484,9 +399,9 @@ struct _ClassMirror : MirrorType {
   var summary: String {
     return _stdlib_getDemangledTypeName(value)
   }
-  var quickLookObject: QuickLookObject? {
+  var quickLookObject: PlaygroundQuickLook? {
 #if _runtime(_ObjC)
-    return _getClassQuickLookObject(data)
+    return _getClassPlaygroundQuickLook(data)
 #else
     return .None
 #endif
@@ -513,7 +428,7 @@ struct _ClassSuperMirror : MirrorType {
   var summary: String {
     return _stdlib_getDemangledTypeName(value)
   }
-  var quickLookObject: QuickLookObject? { return nil }
+  var quickLookObject: PlaygroundQuickLook? { return nil }
   var disposition: MirrorDisposition { return .Class }
 }
 
@@ -536,7 +451,7 @@ struct _MetatypeMirror : MirrorType {
   var summary: String {
     return _typeName(data._loadValue() as Any.Type)
   }
-  var quickLookObject: QuickLookObject? { return nil }
+  var quickLookObject: PlaygroundQuickLook? { return nil }
 
   // Special disposition for types?
   var disposition: MirrorDisposition { return .Aggregate }

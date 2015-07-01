@@ -447,7 +447,7 @@ ${MirrorDecl} {
     return "\(selfType)(0x\(_uint64ToString(ptrValue, radix:16, uppercase:true)))"
   }
 
-  var quickLookObject: QuickLookObject? { return .Some(.Text(summary)) }
+  var quickLookObject: PlaygroundQuickLook? { return .Some(.Text(summary)) }
 }
 
 ${MirrorConformance}

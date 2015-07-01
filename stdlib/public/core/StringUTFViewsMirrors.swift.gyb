@@ -34,6 +34,6 @@ extension String {
 
       var summary: String { return _value.description }
 
-      var quickLookObject: QuickLookObject? { return .Some(.Text(summary)) }
+      var quickLookObject: PlaygroundQuickLook? { return .Some(.Text(summary)) }
   }
 }

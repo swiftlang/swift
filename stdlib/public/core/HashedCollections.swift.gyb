@@ -3767,7 +3767,7 @@ internal class ${Self}Mirror<${TypeParametersDecl}> : MirrorType {
 %end
   }
 
-  internal var quickLookObject: QuickLookObject? { return nil }
+  internal var quickLookObject: PlaygroundQuickLook? { return nil }
 
 %if Self == 'Set':
   internal var disposition: MirrorDisposition { return .MembershipContainer }

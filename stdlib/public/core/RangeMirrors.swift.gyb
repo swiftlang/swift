@@ -38,7 +38,7 @@ ${MirrorDecl} {
     return "\(self[0].1.summary)..<\(self[1].1.summary)"
   }
 
-  var quickLookObject: QuickLookObject? { return .Text(summary) }
+  var quickLookObject: PlaygroundQuickLook? { return .Text(summary) }
 }
 
 ${MirrorConformance}

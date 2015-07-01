@@ -43,8 +43,8 @@ struct _ObjCMirror : MirrorType {
   public var summary: String {
     return _getObjCSummary(data)
   }
-  public var quickLookObject: QuickLookObject? {
-    return _getClassQuickLookObject(data)
+  public var quickLookObject: PlaygroundQuickLook? {
+    return _getClassPlaygroundQuickLook(data)
   }
   public var disposition: MirrorDisposition { return .ObjCObject }
 }
@@ -69,8 +69,8 @@ struct _ObjCSuperMirror : MirrorType {
   public var summary: String {
     return _getObjCSummary(data)
   }
-  public var quickLookObject: QuickLookObject? {
-    return _getClassQuickLookObject(data)
+  public var quickLookObject: PlaygroundQuickLook? {
+    return _getClassPlaygroundQuickLook(data)
   }
   public var disposition: MirrorDisposition { return .ObjCObject }
 }

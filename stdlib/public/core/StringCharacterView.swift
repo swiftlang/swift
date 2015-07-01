@@ -251,7 +251,9 @@ extension String.CharacterView : CollectionType {
 
     var summary: String { return "\(_value._utf16Index)" }
 
-    var quickLookObject: QuickLookObject? { return .Some(.Int(Int64(_value._utf16Index))) }
+    var quickLookObject: PlaygroundQuickLook? {
+      return .Some(.Int(Int64(_value._utf16Index)))
+    }
   }
 }
 

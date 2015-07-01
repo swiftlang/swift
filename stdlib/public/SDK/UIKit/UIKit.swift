@@ -159,10 +159,10 @@ struct _UIViewMirror : MirrorType {
   
   var summary: String { get { return ""} }
   
-  var quickLookObject: QuickLookObject? {
+  var quickLookObject: PlaygroundQuickLook? {
       // iOS 7 or greater only
       
-      var result: QuickLookObject? = nil
+      var result: PlaygroundQuickLook? = nil
       
       switch _UIViewMirror._views.member(_v) {
         case nil:

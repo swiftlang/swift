@@ -146,7 +146,7 @@ internal struct _ArrayTypeMirror<T : _ArrayType> : MirrorType {
     return "\(count) elements"
   }
 
-  var quickLookObject: QuickLookObject? { return nil }
+  var quickLookObject: PlaygroundQuickLook? { return nil }
 
   var disposition: MirrorDisposition { return .IndexContainer }
 }
