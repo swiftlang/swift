@@ -396,10 +396,10 @@ const SILOptions &SILPassManager::getOptions() const {
 
 // Define the add-functions for all passes.
 
-#define PASS(Id)                           \
-void SILPassManager::add##Id() {           \
-  SILTransform *T = swift::create##Id();   \
-  T->setPassKind(PassKind::Id);            \
+#define PASS(ID, NAME, DESCRIPTION)	   \
+void SILPassManager::add##ID() {           \
+  SILTransform *T = swift::create##ID();   \
+  T->setPassKind(PassKind::ID);            \
   Transformations.push_back(T);            \
 }
 #include "swift/SILPasses/Passes.def"
@@ -408,7 +408,7 @@ void SILPassManager::addPass(PassKind Kind) {
   assert(unsigned(PassKind::AllPasses_Last) >= unsigned(Kind) &&
          "Invalid pass kind");
   switch (Kind) {
-#define PASS(ID)                           \
+#define PASS(ID, NAME, DESCRIPTION)	   \
   case PassKind::ID:                       \
     add##ID();                             \
     break;
@@ -420,7 +420,7 @@ void SILPassManager::addPass(PassKind Kind) {
 
 void SILPassManager::addPassForName(StringRef Name) {
   auto P = llvm::StringSwitch<PassKind>(Name)
-#define PASS(Id) .Case(#Id, PassKind::Id)
+#define PASS(ID, NAME, DESCRIPTION) .Case(#ID, PassKind::ID)
 #include "swift/SILPasses/Passes.def"
   ;
   addPass(P);

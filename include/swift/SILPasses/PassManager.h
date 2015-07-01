@@ -159,7 +159,7 @@ class SILPassManager {
   void addPassForName(StringRef Name);
 
   // Each pass gets its own add-function.
-#define PASS(ID) void add##ID();
+#define PASS(ID, NAME, DESCRIPTION) void add##ID();
 #include "Passes.def"
 
   protected:
