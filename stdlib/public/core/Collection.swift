@@ -25,7 +25,7 @@ public func count <T : CollectionType>(x: T) -> T.Index.Distance {
 // library; it is used to deduce things like the `SubSequence` and
 // `Generator` type from a minimal collection, but it is also used in
 // exposed places like as a constraint on IndexingGenerator.
-public protocol _prext_Indexable {
+public protocol Indexable {
   /// A type that represents a valid position in the collection.
   ///
   /// Valid indices consist of the position of every element and a
@@ -68,7 +68,7 @@ extension SequenceType where Self : GeneratorType {
 }
 
 /// A *generator* for an arbitrary *collection*.  Provided `C`
-/// conforms to the other requirements of `_prext_Indexable`,
+/// conforms to the other requirements of `Indexable`,
 /// `IndexingGenerator<C>` can be used as the result of `C`'s
 /// `generate()` method.  For example:
 ///
@@ -79,7 +79,7 @@ extension SequenceType where Self : GeneratorType {
 ///          return IndexingGenerator(self)
 ///        }
 ///      }
-public struct IndexingGenerator<Elements : _prext_Indexable>
+public struct IndexingGenerator<Elements : Indexable>
  : GeneratorType, SequenceType {
   
   /// Create a *generator* over the given collection.
@@ -115,7 +115,7 @@ public struct IndexingGenerator<Elements : _prext_Indexable>
 ///     for i in startIndex..<endIndex {
 ///       let x = self[i]
 ///     }
-public protocol CollectionType : _prext_Indexable, SequenceType {
+public protocol CollectionType : Indexable, SequenceType {
   /// A type that provides the *sequence*'s iteration interface and
   /// encapsulates its iteration state.
   ///
@@ -140,7 +140,7 @@ public protocol CollectionType : _prext_Indexable, SequenceType {
   ///   `SequenceType`, but is restated here with stricter
   ///   constraints: in a `CollectionType`, the `SubSequence` should
   ///   also be a `CollectionType`.
-  typealias SubSequence: _prext_Indexable, SequenceType = Slice<Self>
+  typealias SubSequence: Indexable, SequenceType = Slice<Self>
 
   /// Returns the element at the given `position`.
   subscript(position: Index) -> Generator.Element {get}

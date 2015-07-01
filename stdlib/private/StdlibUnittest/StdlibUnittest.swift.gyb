@@ -308,7 +308,9 @@ public func expectGE(
 public func expectType<T>(_: T.Type, inout _ x: T) {}
 
 public func isSequenceType<X : SequenceType>(x: X) -> X { return x }
+public func expectIndexable<X : Indexable>(x: X) -> X { return x }
 public func expectCollectionType<X : CollectionType>(x: X) -> X { return x }
+public func expectForwardIndexType<X : ForwardIndexType>(x: X) -> X { return x }
 public func expectIsBooleanType<X : BooleanType>(inout x: X) -> X { return x }
 
 public struct AssertionResult : CustomStringConvertible, BooleanType {

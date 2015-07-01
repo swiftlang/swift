@@ -1,5 +1,11 @@
 // RUN: %target-sil-opt -specialize %s | FileCheck %s
 
+// FIXME: <rdar://problem/21634461>
+// test/SILPasses/specialize_cg_update_crash.sil depends on fragile standard
+// library details and was disabled
+//
+// REQUIRES: disabled
+
 sil_stage canonical
 
 import Builtin

@@ -314,6 +314,39 @@ SequenceTypeAlgorithms.test("Demonstration/NotCustomizable") {
 // [1.0, Double.NaN].startsWith([1.0, 2.0]) should be false.
 
 //===----------------------------------------------------------------------===//
+// Indexable
+//===----------------------------------------------------------------------===//
+
+/// A minimal model of `Indexable`.
+///
+/// All the interesting semantic features of `Indexable` are covered
+/// by tests for `CollectionType`.
+struct MinimalIndexable {
+  var startIndex: MinimalForwardIndex {
+    fatalError("implement")
+  }
+  var endIndex: MinimalForwardIndex {
+    fatalError("implement")
+  }
+  subscript(position: MinimalForwardIndex) -> OpaqueValue<Int> {
+    fatalError("implement")
+  }
+}
+
+/// Test that `Indexable` has an associated `Index` type.
+/// Test that `Index` is used in the appropriate places in the API.
+func getIndexableIndexThroughGeneric<I : Indexable>(i: I) {
+  var index = expectForwardIndexType(i.startIndex)
+  index = i.endIndex // `endIndex` has the same type.
+  i[index] // `subscript()` has the same argument type.
+  expectType(I.Index.self, &index)
+}
+
+func testCollectionRefinesIndexable<C : CollectionType>(c: C) {
+  expectIndexable(c)
+}
+
+//===----------------------------------------------------------------------===//
 // GeneratorSequence
 //===----------------------------------------------------------------------===//
 

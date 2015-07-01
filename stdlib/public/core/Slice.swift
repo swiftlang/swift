@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-public struct Slice<Base : _prext_Indexable> : CollectionType {
+public struct Slice<Base : Indexable> : CollectionType {
 
   public func generate() -> IndexingGenerator<Slice> {
     return IndexingGenerator(self)
