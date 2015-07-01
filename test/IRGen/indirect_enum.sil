@@ -1,0 +1,16 @@
+// RUN: %target-swift-frontend -emit-ir %s | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
+
+// CHECK-64: @_TWVO13indirect_enum5TreeA = constant {{.*}} i8* inttoptr (i64 8 to i8*), i8* inttoptr (i64 65543 to i8*), i8* inttoptr (i64 8 to i8*)
+// CHECK-32: @_TWVO13indirect_enum5TreeA = constant {{.*}} i8* inttoptr (i32 4 to i8*), i8* inttoptr (i32 65539 to i8*), i8* inttoptr (i32 4 to i8*)
+indirect enum TreeA<T> {
+  case Nil
+  case Leaf(T)
+  case Branch(left: TreeA<T>, right: TreeA<T>)
+}
+
+enum TreeB<T> {
+  case Nil
+  case Leaf(T)
+  indirect case Branch(left: TreeB<T>, right: TreeB<T>)
+}
+

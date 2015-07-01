@@ -127,11 +127,9 @@ namespace {
     SingletonEnumImplStrategy(IRGenModule &IGM,
                               TypeInfoKind tik, unsigned NumElements,
                               std::vector<Element> &&WithPayload,
-                              std::vector<Element> &&WithRecursivePayload,
                               std::vector<Element> &&WithNoPayload)
       : EnumImplStrategy(IGM, tik, NumElements,
                          std::move(WithPayload),
-                         std::move(WithRecursivePayload),
                          std::move(WithNoPayload))
     {
       assert(NumElements <= 1);
@@ -506,11 +504,9 @@ namespace {
     NoPayloadEnumImplStrategyBase(IRGenModule &IGM,
                                   TypeInfoKind tik, unsigned NumElements,
                            std::vector<Element> &&WithPayload,
-                           std::vector<Element> &&WithRecursivePayload,
                            std::vector<Element> &&WithNoPayload)
       : SingleScalarTypeInfo(IGM, tik, NumElements,
                              std::move(WithPayload),
-                             std::move(WithRecursivePayload),
                              std::move(WithNoPayload))
     {
       assert(ElementsWithPayload.empty());
@@ -681,11 +677,9 @@ namespace {
     NoPayloadEnumImplStrategy(IRGenModule &IGM,
                               TypeInfoKind tik, unsigned NumElements,
                               std::vector<Element> &&WithPayload,
-                              std::vector<Element> &&WithRecursivePayload,
                               std::vector<Element> &&WithNoPayload)
       : NoPayloadEnumImplStrategyBase(IGM, tik, NumElements,
                                       std::move(WithPayload),
-                                      std::move(WithRecursivePayload),
                                       std::move(WithNoPayload))
     {
       assert(ElementsWithPayload.empty());
@@ -808,11 +802,9 @@ namespace {
     CCompatibleEnumImplStrategy(IRGenModule &IGM,
                                 TypeInfoKind tik, unsigned NumElements,
                                 std::vector<Element> &&WithPayload,
-                                std::vector<Element> &&WithRecursivePayload,
                                 std::vector<Element> &&WithNoPayload)
       : NoPayloadEnumImplStrategyBase(IGM, tik, NumElements,
                                       std::move(WithPayload),
-                                      std::move(WithRecursivePayload),
                                       std::move(WithNoPayload))
     {
       assert(ElementsWithPayload.empty());
@@ -914,12 +906,10 @@ namespace {
                                 TypeInfoKind tik,
                                 unsigned NumElements,
                                 std::vector<Element> &&WithPayload,
-                                std::vector<Element> &&WithRecursivePayload,
                                 std::vector<Element> &&WithNoPayload,
                                 EnumPayloadSchema schema)
       : EnumImplStrategy(IGM, tik, NumElements,
                          std::move(WithPayload),
-                         std::move(WithRecursivePayload),
                          std::move(WithNoPayload)),
         PayloadSchema(schema),
         PayloadElementCount(0)
@@ -1174,11 +1164,9 @@ namespace {
     SinglePayloadEnumImplStrategy(IRGenModule &IGM,
                                   TypeInfoKind tik, unsigned NumElements,
                                    std::vector<Element> &&WithPayload,
-                                   std::vector<Element> &&WithRecursivePayload,
                                    std::vector<Element> &&WithNoPayload)
       : PayloadEnumImplStrategyBase(IGM, tik, NumElements,
                                 std::move(WithPayload),
-                                std::move(WithRecursivePayload),
                                 std::move(WithNoPayload),
                                 getPreferredPayloadSchema(WithPayload.front())),
         CopyDestroyKind(Normal)
@@ -1291,8 +1279,7 @@ namespace {
         // If the Enum only contains two cases, test for the non-payload case
         // and invert the result.
         assert(ElementsWithPayload.size() == 1 && "Should have one payload");
-        if (ElementsWithNoPayload.size() == 1 &&
-            ElementsWithRecursivePayload.empty()) {
+        if (ElementsWithNoPayload.size() == 1) {
           auto *InvertedResult = emitValueCaseTest(IGF, value,
                                                  ElementsWithNoPayload[0].decl);
           return IGF.Builder.CreateNot(InvertedResult);
@@ -2535,12 +2522,10 @@ namespace {
     MultiPayloadEnumImplStrategy(IRGenModule &IGM,
                                  TypeInfoKind tik, unsigned NumElements,
                                  std::vector<Element> &&WithPayload,
-                                 std::vector<Element> &&WithRecursivePayload,
                                  std::vector<Element> &&WithNoPayload,
                                  bool constrainedByRuntimeLayout)
       : PayloadEnumImplStrategyBase(IGM, tik, NumElements,
                                     std::move(WithPayload),
-                                    std::move(WithRecursivePayload),
                                     std::move(WithNoPayload),
                                     getPayloadSchema(WithPayload)),
         CopyDestroyKind(Normal),
@@ -3917,7 +3902,6 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
   unsigned numElements = 0;
   TypeInfoKind tik = Loadable;
   std::vector<Element> elementsWithPayload;
-  std::vector<Element> elementsWithRecursivePayload;
   std::vector<Element> elementsWithNoPayload;
 
   bool constrainedByRuntimeLayout = false;
@@ -3936,14 +3920,19 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
       elementsWithNoPayload.push_back({elt, nullptr});
       continue;
     }
-    auto origArgLoweredTy = TC.IGM.SILMod->Types.getLoweredType(origArgType);
-    auto *origArgTI
-      = TC.tryGetCompleteTypeInfo(origArgLoweredTy.getSwiftRValueType());
-    if (!origArgTI) {
-      elementsWithRecursivePayload.push_back({elt, nullptr});
+
+    // If the payload is indirect, we can use the NativeObject type metadata
+    // without recurring. The box won't affect loadability or fixed-ness.
+    if (elt->isIndirect() || theEnum->isIndirect()) {
+      elementsWithPayload.push_back({elt, &TC.getNativeObjectTypeInfo()});
       continue;
     }
-    
+
+    auto origArgLoweredTy = TC.IGM.SILMod->Types.getLoweredType(origArgType);
+    const TypeInfo *origArgTI
+      = TC.tryGetCompleteTypeInfo(origArgLoweredTy.getSwiftRValueType());
+    assert(origArgTI && "didn't complete type info?!");
+
     // If the unsubstituted argument is dependent, then we need to constrain
     // our layout optimizations to what the runtime can reproduce.
     if (!isa<FixedTypeInfo>(origArgTI))
@@ -3967,13 +3956,8 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
     }
   }
 
-  // FIXME recursive enums
-  if (!elementsWithRecursivePayload.empty()) {
-    TC.IGM.fatal_unimplemented(theEnum->getLoc(), "recursive enum layout");
-  }
 
   assert(numElements == elementsWithPayload.size()
-           + elementsWithRecursivePayload.size()
            + elementsWithNoPayload.size()
          && "not all elements accounted for");
 
@@ -3982,30 +3966,25 @@ EnumImplStrategy *EnumImplStrategy::get(TypeConverter &TC,
     assert(elementsWithPayload.size() == 0 && "C enum with payload?!");
     return new CCompatibleEnumImplStrategy(TC.IGM, tik, numElements,
                                        std::move(elementsWithPayload),
-                                       std::move(elementsWithRecursivePayload),
                                        std::move(elementsWithNoPayload));
   }
 
   if (numElements <= 1)
     return new SingletonEnumImplStrategy(TC.IGM, tik, numElements,
                                     std::move(elementsWithPayload),
-                                    std::move(elementsWithRecursivePayload),
                                     std::move(elementsWithNoPayload));
   if (elementsWithPayload.size() > 1)
     return new MultiPayloadEnumImplStrategy(TC.IGM, tik, numElements,
                                     std::move(elementsWithPayload),
-                                    std::move(elementsWithRecursivePayload),
                                     std::move(elementsWithNoPayload),
                                     constrainedByRuntimeLayout);
   if (elementsWithPayload.size() == 1)
     return new SinglePayloadEnumImplStrategy(TC.IGM, tik, numElements,
                                     std::move(elementsWithPayload),
-                                    std::move(elementsWithRecursivePayload),
                                     std::move(elementsWithNoPayload));
 
   return new NoPayloadEnumImplStrategy(TC.IGM, tik, numElements,
                                       std::move(elementsWithPayload),
-                                      std::move(elementsWithRecursivePayload),
                                       std::move(elementsWithNoPayload));
 }
 

@@ -128,7 +128,6 @@ public:
   
 protected:
   std::vector<Element> ElementsWithPayload;
-  std::vector<Element> ElementsWithRecursivePayload;
   std::vector<Element> ElementsWithNoPayload;
   IRGenModule &IGM;
   const TypeInfo *TI = nullptr;
@@ -139,10 +138,8 @@ protected:
                    TypeInfoKind tik,
                    unsigned NumElements,
                    std::vector<Element> &&ElementsWithPayload,
-                   std::vector<Element> &&ElementsWithRecursivePayload,
                    std::vector<Element> &&ElementsWithNoPayload)
   : ElementsWithPayload(std::move(ElementsWithPayload)),
-    ElementsWithRecursivePayload(std::move(ElementsWithRecursivePayload)),
     ElementsWithNoPayload(std::move(ElementsWithNoPayload)),
     IGM(IGM), TIK(tik),
     NumElements(NumElements)
