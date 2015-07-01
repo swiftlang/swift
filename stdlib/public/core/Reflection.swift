@@ -69,7 +69,7 @@ public func ==(x: ObjectIdentifier, y: ObjectIdentifier) -> Bool {
 
 
 /// How children of this value should be presented in the IDE.
-public enum MirrorDisposition {
+public enum _MirrorDisposition {
   /// As a struct.
   case Struct
   /// As a class.
@@ -120,7 +120,7 @@ public protocol MirrorType {
   var quickLookObject: PlaygroundQuickLook? { get }
 
   /// How `value` should be presented in an IDE.
-  var disposition: MirrorDisposition { get }
+  var disposition: _MirrorDisposition { get }
 }
 
 /// An entry point that can be called from C++ code to get the summary string
@@ -252,7 +252,7 @@ internal struct _LeafMirror<T>: MirrorType {
   }
   var summary: String { return summaryFunction(_value) }
   var quickLookObject: PlaygroundQuickLook? { return quickLookFunction(_value) }
-  var disposition: MirrorDisposition { return .Aggregate }
+  var disposition: _MirrorDisposition { return .Aggregate }
 }
 
 // -- Implementation details for the runtime's MirrorType implementation
@@ -305,7 +305,7 @@ struct _OpaqueMirror : MirrorType {
   }
   var summary: String { return data.summary }
   var quickLookObject: PlaygroundQuickLook? { return nil }
-  var disposition: MirrorDisposition { return .Aggregate }
+  var disposition: _MirrorDisposition { return .Aggregate }
 }
 
 internal struct _TupleMirror : MirrorType {
@@ -322,7 +322,7 @@ internal struct _TupleMirror : MirrorType {
   }
   var summary: String { return "(\(count) elements)" }
   var quickLookObject: PlaygroundQuickLook? { return nil }
-  var disposition: MirrorDisposition { return .Tuple }
+  var disposition: _MirrorDisposition { return .Tuple }
 }
 
 struct _StructMirror : MirrorType {
@@ -342,7 +342,7 @@ struct _StructMirror : MirrorType {
     return _stdlib_getDemangledTypeName(value)
   }
   var quickLookObject: PlaygroundQuickLook? { return nil }
-  var disposition: MirrorDisposition { return .Struct }
+  var disposition: _MirrorDisposition { return .Struct }
 }
 
 struct _EnumMirror : MirrorType {
@@ -369,7 +369,7 @@ struct _EnumMirror : MirrorType {
     return typeName
   }
   var quickLookObject: PlaygroundQuickLook? { return nil }
-  var disposition: MirrorDisposition { return .Enum }
+  var disposition: _MirrorDisposition { return .Enum }
 }
 
 @asmname("swift_ClassMirror_count")
@@ -406,7 +406,7 @@ struct _ClassMirror : MirrorType {
     return .None
 #endif
   }
-  var disposition: MirrorDisposition { return .Class }
+  var disposition: _MirrorDisposition { return .Class }
 }
 
 struct _ClassSuperMirror : MirrorType {
@@ -429,7 +429,7 @@ struct _ClassSuperMirror : MirrorType {
     return _stdlib_getDemangledTypeName(value)
   }
   var quickLookObject: PlaygroundQuickLook? { return nil }
-  var disposition: MirrorDisposition { return .Class }
+  var disposition: _MirrorDisposition { return .Class }
 }
 
 struct _MetatypeMirror : MirrorType {
@@ -454,5 +454,5 @@ struct _MetatypeMirror : MirrorType {
   var quickLookObject: PlaygroundQuickLook? { return nil }
 
   // Special disposition for types?
-  var disposition: MirrorDisposition { return .Aggregate }
+  var disposition: _MirrorDisposition { return .Aggregate }
 }

@@ -148,5 +148,5 @@ internal struct _ArrayTypeMirror<T : _ArrayType> : MirrorType {
 
   var quickLookObject: PlaygroundQuickLook? { return nil }
 
-  var disposition: MirrorDisposition { return .IndexContainer }
+  var disposition: _MirrorDisposition { return .IndexContainer }
 }

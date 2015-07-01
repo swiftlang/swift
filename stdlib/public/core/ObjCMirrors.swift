@@ -46,7 +46,7 @@ struct _ObjCMirror : MirrorType {
   public var quickLookObject: PlaygroundQuickLook? {
     return _getClassPlaygroundQuickLook(data)
   }
-  public var disposition: MirrorDisposition { return .ObjCObject }
+  public var disposition: _MirrorDisposition { return .ObjCObject }
 }
 
 public // SPI(runtime)
@@ -72,6 +72,6 @@ struct _ObjCSuperMirror : MirrorType {
   public var quickLookObject: PlaygroundQuickLook? {
     return _getClassPlaygroundQuickLook(data)
   }
-  public var disposition: MirrorDisposition { return .ObjCObject }
+  public var disposition: _MirrorDisposition { return .ObjCObject }
 }
 #endif

@@ -88,7 +88,7 @@ internal struct _BitMirror : MirrorType {
 
   var quickLookObject: PlaygroundQuickLook? { return .None }
 
-  var disposition: MirrorDisposition { return .Enum }
+  var disposition: _MirrorDisposition { return .Enum }
 }
 
 public func == (lhs: Bit, rhs: Bit) -> Bool {

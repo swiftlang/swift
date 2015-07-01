@@ -196,7 +196,7 @@ struct _UIViewMirror : MirrorType {
       return result
   }
   
-  var disposition : MirrorDisposition { get { return .Aggregate } }
+  var disposition : _MirrorDisposition { get { return .Aggregate } }
 }
 
 extension UIView : _Reflectable {

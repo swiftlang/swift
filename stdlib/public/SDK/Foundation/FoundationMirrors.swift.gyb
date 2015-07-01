@@ -94,7 +94,7 @@ ${getMirrorDecl("NSSet","MembershipContainer")} {
     _a = _value.allObjects as NSArray
   }
   
-  var disposition: MirrorDisposition { return .MembershipContainer }
+  var disposition: _MirrorDisposition { return .MembershipContainer }
 
   var value: Any { return _value }
 

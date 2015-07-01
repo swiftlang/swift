@@ -241,7 +241,7 @@ extension String.CharacterView : CollectionType {
 
     var objectIdentifier: ObjectIdentifier? { return .None }
 
-    var disposition: MirrorDisposition { return .Aggregate }
+    var disposition: _MirrorDisposition { return .Aggregate }
 
     var count: Int { return 0 }
 

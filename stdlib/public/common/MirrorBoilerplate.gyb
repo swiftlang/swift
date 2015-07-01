@@ -45,5 +45,5 @@ var valueType: Any.Type { return (_value as Any).dynamicType }
 
 var objectIdentifier: ObjectIdentifier? { return .None }
 
-var disposition: MirrorDisposition { return ${disposition} }
+var disposition: _MirrorDisposition { return ${disposition} }
 

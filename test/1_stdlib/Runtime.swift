@@ -1043,7 +1043,7 @@ struct BrilliantMirror : MirrorType {
     return nil
   }
 
-  var disposition: MirrorDisposition {
+  var disposition: _MirrorDisposition {
     return .Container
   }
 }

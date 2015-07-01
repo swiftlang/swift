@@ -123,7 +123,7 @@ struct StatMirror: MirrorType {
   }
 
   var quickLookObject: PlaygroundQuickLook? { return nil }
-  var disposition: MirrorDisposition { return .Enum }
+  var disposition: _MirrorDisposition { return .Enum }
 }
 
 func statisticFromPlist(plist: Dictionary<String, AnyObject>) -> Statistic? {

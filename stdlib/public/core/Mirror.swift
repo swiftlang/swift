@@ -434,8 +434,8 @@ extension Mirror {
 
 //===--- Legacy MirrorType Support ----------------------------------------===//
 extension Mirror.DisplayStyle {
-  /// Construct from a legacy `MirrorDisposition`
-  internal init?(legacy: MirrorDisposition) {
+  /// Construct from a legacy `_MirrorDisposition`
+  internal init?(legacy: _MirrorDisposition) {
     switch legacy {
     case .Struct: self = .Struct
     case .Class: self = .Class

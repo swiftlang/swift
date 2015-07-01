@@ -232,7 +232,7 @@ internal struct _OptionalMirror<T> : MirrorType {
 
   var quickLookObject: PlaygroundQuickLook? { return .None }
 
-  var disposition: MirrorDisposition { return .Optional }
+  var disposition: _MirrorDisposition { return .Optional }
 }
 
 

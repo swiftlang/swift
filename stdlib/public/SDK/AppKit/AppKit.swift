@@ -56,7 +56,7 @@ struct _NSCursorMirror : MirrorType {
     return .Some(.Image(_value.image))
   }
   
-  var disposition : MirrorDisposition { return .Aggregate }
+  var disposition : _MirrorDisposition { return .Aggregate }
 }
 
 extension NSCursor : _Reflectable {
@@ -116,7 +116,7 @@ struct _NSViewMirror : MirrorType {
       
   } }
   
-  var disposition : MirrorDisposition { get { return .Aggregate } }
+  var disposition : _MirrorDisposition { get { return .Aggregate } }
 }
 
 extension NSView : _Reflectable {
