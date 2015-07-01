@@ -12,9 +12,6 @@
 
 public struct Slice<Base : Indexable> : CollectionType {
 
-  public func generate() -> IndexingGenerator<Slice> {
-    return IndexingGenerator(self)
-  }
   public typealias Index = Base.Index
   public typealias Element = Base._Element
 
