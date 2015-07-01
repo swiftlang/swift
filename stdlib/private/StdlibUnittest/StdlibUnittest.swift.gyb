@@ -2537,51 +2537,6 @@ public struct MinimalSequence<T> : SequenceType, CustomDebugStringConvertible {
 }
 
 //===----------------------------------------------------------------------===//
-// MinimalCollection
-//===----------------------------------------------------------------------===//
-
-public struct MinimalCollection<T: Equatable> : CollectionType, Equatable, ArrayLiteralConvertible {
-  public typealias Element = T
-  public typealias Storage = Array<T>
-  public typealias Index = Storage.Index
-  public typealias Generator = Storage.Generator
-
-  public var _storage: Storage
-
-  public init(_ collection: Storage) {
-    _storage = collection
-  }
-
-  public init(arrayLiteral: Element...) {
-    _storage = arrayLiteral
-  }
-
-  public func generate() -> Storage.Generator {
-    return _storage.generate()
-  }
-
-  public var startIndex: Index {
-    return _storage.startIndex
-  }
-
-  public var endIndex: Index {
-    return _storage.endIndex
-  }
-
-  public subscript(i: Index) -> Generator.Element {
-    return _storage[i]
-  }
-
-  public var reservedCapacity: Int {
-    return _storage.count
-  }
-}
-
-public func ==<T>(lhs: MinimalCollection<T>, rhs: MinimalCollection<T>) -> Bool {
-  return lhs._storage == rhs._storage
-}
-
-//===----------------------------------------------------------------------===//
 // MinimalForwardIndex
 //===----------------------------------------------------------------------===//
 

@@ -9,61 +9,6 @@ import StdlibUnittest
 
 var RangeReplaceableTestSuite = TestSuite("RangeReplaceable")
 
-extension MinimalCollection : RangeReplaceableCollectionType {
-  public init() {
-    _storage = []
-  }
-
-  mutating public func replaceRange<
-    C : CollectionType where C.Generator.Element == Generator.Element
-  >(
-    subRange: Range<Index>, with newElements: C
-  ) {
-    _storage.replaceRange(subRange, with: newElements)
-  }
-
-  mutating public func reserveCapacity(n: Index.Distance) {
-    _storage.reserveCapacity(n)
-  }
-
-  mutating public func append(x: Generator.Element) {
-    _storage.append(x)
-  }
-
-  mutating public func extend<
-      S : SequenceType
-      where S.Generator.Element == Generator.Element
-  >(newElements: S) {
-    _storage.extend(newElements)
-  }
-
-  mutating public func insert(newElement: Generator.Element, atIndex i: Index) {
-    _storage.insert(newElement, atIndex: i)
-  }
-
-  mutating public func splice<
-    S : CollectionType where S.Generator.Element == Generator.Element
-  >(newElements: S, atIndex i: Index) {
-    _storage.splice(newElements, atIndex: i)
-  }
-
-  mutating public func removeAtIndex(i: Index) -> Generator.Element {
-    return _storage.removeAtIndex(i)
-  }
-
-  mutating public func removeRange(subRange: Range<Index>) {
-    _storage.removeRange(subRange)
-  }
-
-  mutating public func removeAll(keepCapacity keepCapacity: Bool /*= false*/) {
-    _storage.removeAll(keepCapacity: keepCapacity)
-  }
-
-  mutating public func removeLast() {
-    _storage.removeLast()
-  }
-}
-
 enum RangeSelection {
   case EmptyRange
   case LeftEdge
@@ -129,23 +74,23 @@ struct ReplaceRangeTest<T: Equatable> : CustomStringConvertible {
     self.loc = SourceLoc(file, line, comment: "RangeReplaceableCollectionType test data")
   }
 
-  static func emptyRange<T>(collection: [T])
-      -> Range<MinimalCollection<T>.Index> {
+  static func emptyRange<T: RangeReplaceableCollectionType>(collection: T)
+      -> Range<T.Index> {
     return collection.endIndex..<collection.endIndex
   }
 
-  static func leftEdge<T>(collection: [T])
-      -> Range<MinimalCollection<T>.Index> {
+  static func leftEdge<T: RangeReplaceableCollectionType>(collection: T)
+      -> Range<T.Index> {
     return collection.startIndex..<collection.startIndex
   }
 
-  static func rightEdge<T>(collection: [T])
-      -> Range<MinimalCollection<T>.Index> {
+  static func rightEdge<T: RangeReplaceableCollectionType>(collection: T)
+      -> Range<T.Index> {
     return collection.endIndex..<collection.endIndex
   }
 
-  static func middleRange<T>(collection: [T],
-      _ size: Int) -> Range<MinimalCollection<T>.Index> {
+  static func middleRange<T: RangeReplaceableCollectionType>(collection: T,
+      _ size: T.Index.Distance) -> Range<T.Index> {
     if size > collection.count {
       fatalError("Range size cannot exceed collection's count")
     }
@@ -256,7 +201,7 @@ RangeReplaceableTestSuite.test("append/semantics") {
       expected: [1010, 2020, 3030, 4040, 5050, 6060, 7070, 8080]))
 
   for var test in appendTests {
-    var c = MinimalCollection<Int>(test.collection)
+    var c = MinimalForwardRangeReplaceableCollectionType<Int>(test.collection)
     c.append(test.elements[0])
     print(test)
     expectEqual(test.expected, c.map { Int($0.value) })
@@ -737,30 +682,30 @@ RangeReplaceableTestSuite.test("removeAll/dispatch") {
 
 RangeReplaceableTestSuite.test("reserveCapacity") {
   if true {
-    let r = join(MinimalCollection<Int>([]), [])
+    let r = join(MinimalForwardRangeReplaceableCollectionType<Int>([]), [])
     expectEqual(0, r.reservedCapacity)
   }
   if true {
-    let r = join(MinimalCollection([ 42 ]),
-        [ MinimalCollection([]) ])
+    let r = join(MinimalForwardRangeReplaceableCollectionType([ 42 ]),
+        [ MinimalForwardRangeReplaceableCollectionType([]) ])
     expectEqual(0, r.reservedCapacity)
   }
 
   if true {
-    let r = join(MinimalCollection([ 42 ]),
-        [ MinimalCollection([ 1 ]),
-          MinimalCollection([ 2, 3, 4 ]),
-          MinimalCollection([ 5, 6, 7 ]) ])
+    let r = join(MinimalForwardRangeReplaceableCollectionType([ 42 ]),
+        [ MinimalForwardRangeReplaceableCollectionType([ 1 ]),
+          MinimalForwardRangeReplaceableCollectionType([ 2, 3, 4 ]),
+          MinimalForwardRangeReplaceableCollectionType([ 5, 6, 7 ]) ])
     expectEqual(9, r.reservedCapacity)
-    expectEqual([ 1, 42, 2, 3, 4, 42, 5, 6, 7 ], r._storage)
+    expectEqual([ 1, 42, 2, 3, 4, 42, 5, 6, 7 ], r.elements)
   }
   if true {
-    let r = join(MinimalCollection([ 42, 4242 ]),
-        [ MinimalCollection([ 1 ]),
-          MinimalCollection([ 2, 3, 4 ]),
-          MinimalCollection([ 5, 6, 7 ]) ])
+    let r = join(MinimalForwardRangeReplaceableCollectionType([ 42, 4242 ]),
+        [ MinimalForwardRangeReplaceableCollectionType([ 1 ]),
+          MinimalForwardRangeReplaceableCollectionType([ 2, 3, 4 ]),
+          MinimalForwardRangeReplaceableCollectionType([ 5, 6, 7 ]) ])
     expectEqual(11, r.reservedCapacity)
-    expectEqual([ 1, 42, 4242, 2, 3, 4, 42, 4242, 5, 6, 7 ], r._storage)
+    expectEqual([ 1, 42, 4242, 2, 3, 4, 42, 4242, 5, 6, 7 ], r.elements)
   }
 }
 
@@ -824,25 +769,25 @@ RangeReplaceableTestSuite.test("OperatorPlus") {
   // RangeReplaceableCollectionType + CollectionType
   if true {
     var ec: [Int] = []
-    var c = MinimalCollection([Int]())
+    var c = MinimalForwardRangeReplaceableCollectionType([Int]())
     var r: [Int] = ec + c
     expectEqual([], r)
   }
   if true {
     var ec: [Int] = []
-    var c = MinimalCollection([ 4, 5, 6, 7 ])
+    var c = MinimalForwardRangeReplaceableCollectionType([ 4, 5, 6, 7 ])
     var r: [Int] = ec + c
     expectEqual([ 4, 5, 6, 7 ], r)
   }
   if true {
     var ec: [Int] = [ 1, 2, 3 ]
-    var c = MinimalCollection([Int]())
+    var c = MinimalForwardRangeReplaceableCollectionType([Int]())
     var r: [Int] = ec + c
     expectEqual([ 1, 2, 3 ], r)
   }
   if true {
     var ec: [Int] = [ 1, 2, 3 ]
-    var c = MinimalCollection([ 4, 5, 6, 7 ])
+    var c = MinimalForwardRangeReplaceableCollectionType([ 4, 5, 6, 7 ])
     var r: [Int] = ec + c
     expectEqual([ 1, 2, 3, 4, 5, 6, 7 ], r)
   }
@@ -873,28 +818,28 @@ RangeReplaceableTestSuite.test("OperatorPlus") {
     expectEqual([ 1, 2, 3, 4, 5, 6, 7 ], r)
   }
 
-  // MinimalCollection + other MinimalCollection
+  // MinimalForwardRangeReplaceableCollectionType + other MinimalForwardRangeReplaceableCollectionType
   if true {
     var ec1: [Int] = []
-    var ec2 = MinimalCollection([Int]())
+    var ec2 = MinimalForwardRangeReplaceableCollectionType([Int]())
     var r: [Int] = ec1 + ec2
     expectEqual([], r)
   }
   if true {
     var ec1: [Int] = []
-    var ec2 = MinimalCollection([ 4, 5, 6, 7 ])
+    var ec2 = MinimalForwardRangeReplaceableCollectionType([ 4, 5, 6, 7 ])
     var r: [Int] = ec1 + ec2
     expectEqual([ 4, 5, 6, 7 ], r)
   }
   if true {
     var ec1: [Int] = [ 1, 2, 3 ]
-    var ec2 = MinimalCollection([Int]())
+    var ec2 = MinimalForwardRangeReplaceableCollectionType([Int]())
     var r: [Int] = ec1 + ec2
     expectEqual([ 1, 2, 3 ], r)
   }
   if true {
     var ec1: [Int] = [ 1, 2, 3 ]
-    var ec2 = MinimalCollection([ 4, 5, 6, 7 ])
+    var ec2 = MinimalForwardRangeReplaceableCollectionType([ 4, 5, 6, 7 ])
     var r: [Int] = ec1 + ec2
     expectEqual([ 1, 2, 3, 4, 5, 6, 7 ], r)
   }
