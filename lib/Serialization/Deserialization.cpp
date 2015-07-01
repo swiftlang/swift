@@ -3955,7 +3955,8 @@ Type ModuleFile::getType(TypeID TID) {
 void ModuleFile::loadAllMembers(Decl *D,
                                 uint64_t contextData,
                                 bool *) {
-  // FIXME: Add PrettyStackTrace.
+  PrettyStackTraceDecl trace("loading members for", D);
+
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   DeclTypeCursor.JumpToBit(contextData);
   SmallVector<Decl *, 16> members;
@@ -3976,12 +3977,13 @@ void ModuleFile::loadAllMembers(Decl *D,
 void
 ModuleFile::loadAllConformances(const Decl *D, uint64_t contextData,
                          SmallVectorImpl<ProtocolConformance *> &conformances) {
+  PrettyStackTraceDecl trace("loading conformances for", D);
+
   uint64_t numConformances;
   uint64_t bitPosition;
   std::tie(numConformances, bitPosition)
     = decodeLazyConformanceContextData(contextData);
 
-  // FIXME: Add PrettyStackTrace.
   BCOffsetRAII restoreOffset(DeclTypeCursor);
   DeclTypeCursor.JumpToBit(bitPosition);
 
