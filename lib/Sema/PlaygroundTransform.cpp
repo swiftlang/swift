@@ -40,6 +40,20 @@ using namespace swift;
 
 namespace {
 
+template <class E> class Added {
+private:
+  E Contents;
+public:
+  Added() { }
+  Added(E &&NewContents) { Contents = NewContents; }
+  const Added<E> &operator=(const Added<E> &rhs) {
+    Contents = rhs.Contents;
+    return *this;
+  }
+  E &operator*() { return Contents; }
+  E &operator->() { return Contents; }
+};
+
 class Instrumenter {
 private:
   std::mt19937_64 &RNG;
@@ -120,7 +134,7 @@ private:
         break;
       }
       Elements.insert(Elements.begin() + EI,
-                      buildScopeExit(BP.BraceRange));
+                      *buildScopeExit(BP.BraceRange));
       ++EI;
     }
     return EI;
@@ -330,17 +344,37 @@ public:
     return D;
   }
 
-  std::pair<Expr *, ValueDecl *> digForVariable(Expr *E) {
+  std::pair<Added<Expr *>, ValueDecl *> digForVariable(Expr *E) {
     switch (E->getKind()) {
     default:
       if (auto *ICE = dyn_cast<ImplicitConversionExpr>(E))
         return digForVariable(ICE->getSubExpr());
-      return std::make_pair(nullptr, nullptr);
-    case ExprKind::DeclRef:
-      return std::make_pair(E, cast<DeclRefExpr>(E)->getDecl());
-    case ExprKind::MemberRef:
-      return std::make_pair(
-        E, cast<MemberRefExpr>(E)->getMember().getDecl());
+      return std::make_pair(Added<Expr*>(nullptr), nullptr);
+    case ExprKind::DeclRef: {
+      ValueDecl *D = cast<DeclRefExpr>(E)->getDecl();
+      Added<Expr *> DRE = 
+        new (Context) DeclRefExpr(ConcreteDeclRef(D),
+                                  cast<DeclRefExpr>(E)->getLoc(),
+                                  true, // implicit
+                                  AccessSemantics::Ordinary,
+                                  cast<DeclRefExpr>(E)->getType());
+      return std::make_pair(DRE, D);
+    }
+    case ExprKind::MemberRef: {
+      std::pair<Added<Expr *>, ValueDecl *> BaseVariable =
+        digForVariable(cast<MemberRefExpr>(E)->getBase());
+      if (!*BaseVariable.first || !BaseVariable.second)
+        return std::make_pair(nullptr, nullptr);
+      ValueDecl *M = cast<MemberRefExpr>(E)->getMember().getDecl();
+      Added<Expr *> MRE(
+        new (Context) MemberRefExpr(*BaseVariable.first,
+                                    cast<MemberRefExpr>(E)->getDotLoc(),
+                                    ConcreteDeclRef(M),
+                                    cast<MemberRefExpr>(E)->getSourceRange(),
+                                    true, // implicit
+                                    AccessSemantics::Ordinary));
+      return std::make_pair(MRE, M);
+    }
     case ExprKind::Load:
       return digForVariable(cast<LoadExpr>(E)->getSubExpr());
     case ExprKind::ForceValue:
@@ -351,7 +385,7 @@ public:
   }
   
   std::string digForName(Expr *E) {
-    Expr *RE = nullptr;
+    Added <Expr *> RE = nullptr;
     ValueDecl *VD = nullptr;
     std::tie(RE, VD) = digForVariable(E);
     if (VD) {
@@ -439,16 +473,17 @@ public:
     }
   };
 
-  bool doTypeCheck(ASTContext &Ctx, DeclContext *DC, Expr *&parsedExpr) {
+  bool doTypeCheck(ASTContext &Ctx, DeclContext *DC,
+                   Added<Expr *> &parsedExpr) {
     DiagnosticEngine diags(Ctx.SourceMgr);
     ErrorGatherer errorGatherer(diags);
     const bool discardedExpr = false;
   
     TypeChecker TC(Ctx, diags);
-    TC.typeCheckExpression(parsedExpr, DC, Type(), Type(), discardedExpr,
+    TC.typeCheckExpression(*parsedExpr, DC, Type(), Type(), discardedExpr,
                            FreeTypeVariableBinding::GenericParameters);
     
-    if (parsedExpr) {
+    if (*parsedExpr) {
       ErrorFinder errorFinder;
       parsedExpr->walk(errorFinder);
       if (!errorFinder.hadError() && !errorGatherer.hadError()) {
@@ -478,14 +513,14 @@ public:
           if (auto *MRE = dyn_cast<MemberRefExpr>(AE->getDest())) {
             // an assignment to a property of an object counts as a mutation of
             // that object
-            Expr *Base_RE = nullptr;
+            Added<Expr *> Base_RE = nullptr;
             ValueDecl *BaseVD = nullptr;
             std::tie(Base_RE, BaseVD) = digForVariable(MRE->getBase());
             
-            if (Base_RE) {
-              Expr *Log = logDeclOrMemberRef(Base_RE);
-              if (Log) {
-                Elements.insert(Elements.begin() + (EI + 1), Log);
+            if (*Base_RE) {
+              Added <Expr *> Log = logDeclOrMemberRef(Base_RE);
+              if (*Log) {
+                Elements.insert(Elements.begin() + (EI + 1), *Log);
                 ++EI;
               }
             }
@@ -506,18 +541,21 @@ public:
             AE->setImplicit(true);
             std::string Name = digForName(AE->getDest());
             
-            Expr *Log = buildLoggerCall(
+            Added<Expr *> Log(buildLoggerCall(
               new (Context) DeclRefExpr(ConcreteDeclRef(PV.second),
                                         SourceLoc(),
                                         true, // implicit
                                         AccessSemantics::Ordinary,
                                         AE->getSrc()->getType()),
-              AE->getSrc()->getSourceRange(), Name.c_str());
-            Elements[EI] = PV.first;
-            Elements.insert(Elements.begin() + (EI + 1), PV.second);
-            Elements.insert(Elements.begin() + (EI + 2), Log);
-            Elements.insert(Elements.begin() + (EI + 3), NAE);
-            EI += 3;
+              AE->getSrc()->getSourceRange(), Name.c_str()));
+
+            if (*Log) {
+              Elements[EI] = PV.first;
+              Elements.insert(Elements.begin() + (EI + 1), PV.second);
+              Elements.insert(Elements.begin() + (EI + 2), *Log);
+              Elements.insert(Elements.begin() + (EI + 3), NAE);
+              EI += 3;
+            }
           }
         }
         else if (ApplyExpr *AE = dyn_cast<ApplyExpr>(E)) {
@@ -532,9 +570,10 @@ public:
                 Expr *appendNewline = nullptr;
                 if (ParenExpr *PE = dyn_cast<ParenExpr>(AE->getArg())) {
                   object = PE->getSubExpr();
-                  appendNewline =
-                    new (Context) BooleanLiteralExpr(true, SourceLoc(), true);
-                  doTypeCheck(Context, TypeCheckDC, appendNewline);
+                  Added<Expr *> appendNewlineAdded(
+                    new (Context) BooleanLiteralExpr(true, SourceLoc(), true));
+                  doTypeCheck(Context, TypeCheckDC, appendNewlineAdded);
+                  appendNewline = *appendNewlineAdded;
                 } else if (TupleExpr *TE = dyn_cast<TupleExpr>(AE->getArg())) {
                   if (TE->getNumElements() == 2) {
                     object = TE->getElement(0);
@@ -547,19 +586,22 @@ public:
                     buildPatternAndVariable(object);
                   std::pair<PatternBindingDecl *, VarDecl *> appendNewlinePV =
                     buildPatternAndVariable(appendNewline);
-                  Expr *Log = logPrint(isDebugPrint,
-                                       objectPV.second, appendNewlinePV.second,
-                                       AE->getSourceRange());
-                  Elements[EI] = objectPV.first;
-                  Elements.insert(Elements.begin() + (EI + 1),
-                                  objectPV.second);
-                  Elements.insert(Elements.begin() + (EI + 2),
-                                  appendNewlinePV.first);
-                  Elements.insert(Elements.begin() + (EI + 3),
-                                  appendNewlinePV.second);
-                  Elements.insert(Elements.begin() + (EI + 4),
-                                  Log);
-                  EI += 4;
+                  Added<Expr *> Log = logPrint(isDebugPrint,
+                                               objectPV.second,
+                                               appendNewlinePV.second,
+                                               AE->getSourceRange());
+                  if (*Log) {
+                    Elements[EI] = objectPV.first;
+                    Elements.insert(Elements.begin() + (EI + 1),
+                                    objectPV.second);
+                    Elements.insert(Elements.begin() + (EI + 2),
+                                    appendNewlinePV.first);
+                    Elements.insert(Elements.begin() + (EI + 3),
+                                    appendNewlinePV.second);
+                    Elements.insert(Elements.begin() + (EI + 4),
+                                    *Log);
+                    EI += 4;
+                  }
                 }
                 Handled = true;
               }
@@ -570,22 +612,22 @@ public:
               Context.TheEmptyTupleType) {
             if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(AE->getFn())) {
               Expr *TargetExpr = DSCE->getArg();
-              Expr *Target_RE = nullptr;
+              Added <Expr *> Target_RE;
               ValueDecl *TargetVD = nullptr;
 
               std::tie(Target_RE, TargetVD) = digForVariable(TargetExpr);
 
               if (TargetVD) {
-                Expr *Log = logDeclOrMemberRef(Target_RE);
-                if (Log) {
-                  Elements.insert(Elements.begin() + (EI + 1), Log);
+                Added<Expr *> Log = logDeclOrMemberRef(Target_RE);
+                if (*Log) {
+                  Elements.insert(Elements.begin() + (EI + 1), *Log);
                   ++EI;
                 }
               }
             } else if (DeclRefExpr *DRE = digForInoutDeclRef(AE->getArg())) {
-              Expr *Log = logDeclOrMemberRef(DRE);
-              if (Log) {
-                Elements.insert(Elements.begin() + (EI + 1), Log);
+              Added<Expr *> Log = logDeclOrMemberRef(DRE);
+              if (*Log) {
+                Elements.insert(Elements.begin() + (EI + 1), *Log);
                 ++EI;
               }
             }
@@ -595,17 +637,19 @@ public:
             // do the same as for all other expressions
             std::pair<PatternBindingDecl *, VarDecl *> PV =
               buildPatternAndVariable(E);
-            Expr *Log = buildLoggerCall(
+            Added<Expr *> Log = buildLoggerCall(
               new (Context) DeclRefExpr(ConcreteDeclRef(PV.second),
                                         SourceLoc(),
                                         true, // implicit
                                         AccessSemantics::Ordinary,
                                         E->getType()),
               E->getSourceRange(), "");
-            Elements[EI] = PV.first;
-            Elements.insert(Elements.begin() + (EI + 1), PV.second);
-            Elements.insert(Elements.begin() + (EI + 2), Log);
-            EI += 2;
+            if (*Log) {
+              Elements[EI] = PV.first;
+              Elements.insert(Elements.begin() + (EI + 1), PV.second);
+              Elements.insert(Elements.begin() + (EI + 2), *Log);
+              EI += 2;
+            }
           }
         }
         else {
@@ -613,17 +657,19 @@ public:
               Context.TheEmptyTupleType) {
             std::pair<PatternBindingDecl *, VarDecl *> PV =
               buildPatternAndVariable(E);
-            Expr *Log = buildLoggerCall(
+            Added <Expr *> Log = buildLoggerCall(
               new (Context) DeclRefExpr(ConcreteDeclRef(PV.second),
                                         SourceLoc(),
                                         true, // implicit
                                         AccessSemantics::Ordinary,
                                         E->getType()),
               E->getSourceRange(), "");
-            Elements[EI] = PV.first;
-            Elements.insert(Elements.begin() + (EI + 1), PV.second);
-            Elements.insert(Elements.begin() + (EI + 2), Log);
-            EI += 2;
+            if (*Log) {
+              Elements[EI] = PV.first;
+              Elements.insert(Elements.begin() + (EI + 1), PV.second);
+              Elements.insert(Elements.begin() + (EI + 2), *Log);
+              EI += 2;
+            }
           }
         }
       } else if (Stmt *S = Element.dyn_cast<Stmt*>()) {
@@ -641,18 +687,20 @@ public:
             ReturnStmt *NRS = new (Context) ReturnStmt(SourceLoc(),
                                                        DRE,
                                                        true); // implicit
-            Expr *Log = buildLoggerCall(
+            Added <Expr *> Log = buildLoggerCall(
               new (Context) DeclRefExpr(ConcreteDeclRef(PV.second),
                                         SourceLoc(),
                                         true, // implicit
                                         AccessSemantics::Ordinary,
                                         RS->getResult()->getType()),
               RS->getResult()->getSourceRange(), "");
-            Elements[EI] = PV.first;
-            Elements.insert(Elements.begin() + (EI + 1), PV.second);
-            Elements.insert(Elements.begin() + (EI + 2), Log);
-            Elements.insert(Elements.begin() + (EI + 3), NRS);
-            EI += 3;
+            if (*Log) {
+              Elements[EI] = PV.first;
+              Elements.insert(Elements.begin() + (EI + 1), PV.second);
+              Elements.insert(Elements.begin() + (EI + 2), *Log);
+              Elements.insert(Elements.begin() + (EI + 3), NRS);
+              EI += 3;
+            }
           }
           EI = escapeToTarget(BracePair::TargetKinds::Return, Elements, EI);
         } else {
@@ -672,8 +720,9 @@ public:
         if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
           if (VarDecl *VD = PBD->getSingleVar()) {
             if (VD->getParentInitializer()) {
-              if (Expr *Log = logVarDecl(VD)) {
-                Elements.insert(Elements.begin() + (EI + 1), Log);
+              Added<Expr *> Log = logVarDecl(VD);
+              if (*Log) {
+                Elements.insert(Elements.begin() + (EI + 1), *Log);
                 ++EI;
               }
             }
@@ -685,8 +734,8 @@ public:
     }
 
     if (!TopLevel && !HighPerformance) {
-      Elements.insert(Elements.begin(), buildScopeEntry(BS->getSourceRange()));
-      Elements.insert(Elements.end(), buildScopeExit(BS->getSourceRange()));
+      Elements.insert(Elements.begin(), *buildScopeEntry(BS->getSourceRange()));
+      Elements.insert(Elements.end(), *buildScopeExit(BS->getSourceRange()));
     }
 
     // Remove null elements from the list.
@@ -707,7 +756,7 @@ public:
   // log*() functions return a newly-created log expression to be inserted
   // after or instead of the expression they're looking at.  Only call this
   // if the variable has an initializer.
-  Expr *logVarDecl(VarDecl *VD) {
+  Added<Expr *> logVarDecl(VarDecl *VD) {
     if (isa<ConstructorDecl>(TypeCheckDC) && VD->getNameStr().equals("self")) {
       // Don't log "self" in a constructor
       return nullptr;
@@ -722,8 +771,8 @@ public:
       VD->getSourceRange(), VD->getName().str().str().c_str());
   }
 
-  Expr *logDeclOrMemberRef(Expr *RE) {
-    if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(RE)) {
+  Added <Expr *> logDeclOrMemberRef(Added<Expr *> RE) {
+    if (DeclRefExpr *DRE = dyn_cast<DeclRefExpr>(*RE)) {
       VarDecl *VD = cast<VarDecl>(DRE->getDecl());
   
       if (isa<ConstructorDecl>(TypeCheckDC) && VD->getNameStr().equals("self")){
@@ -738,7 +787,7 @@ public:
                                   AccessSemantics::Ordinary,
                                   Type()),
         DRE->getSourceRange(), VD->getName().str().str().c_str());
-    } else if (MemberRefExpr *MRE = dyn_cast<MemberRefExpr>(RE)) {
+    } else if (MemberRefExpr *MRE = dyn_cast<MemberRefExpr>(*RE)) {
       Expr *B = MRE->getBase();
       ConcreteDeclRef M = MRE->getMember();
 
@@ -761,8 +810,8 @@ public:
     }
   }
 
-  Expr *logPrint(bool isDebugPrint, VarDecl *object, VarDecl *appendNewline,
-                 SourceRange SR) {
+  Added<Expr *> logPrint(bool isDebugPrint, VarDecl *object,
+                         VarDecl *appendNewline, SourceRange SR) {
     const char *LoggerName = isDebugPrint ? "$builtin_debugPrint" :
                                             "$builtin_print";
     DeclRefExpr *object_DRE = 
@@ -817,7 +866,8 @@ public:
     return std::make_pair(PBD, VD);
   }
 
-  Expr *buildLoggerCall(Expr *E, SourceRange SR, const char *Name) {
+  Added<Expr *> buildLoggerCall(Added<Expr *> E, SourceRange SR,
+    const char *Name) {
     assert(Name);
     std::string *NameInContext = Context.AllocateObjectCopy(std::string(Name));
     
@@ -831,10 +881,10 @@ public:
     const unsigned int id_num = Distribution(RNG);
     ::snprintf(id_buf, buf_size, "%u", id_num);
     Expr *IDExpr = new (Context) IntegerLiteralExpr(id_buf, 
-                                                    SR.End, true);
+                                                    SourceLoc(), true);
     
     Expr *LoggerArgExprs[] = {
-        E,
+        *E,
         NameExpr,
         IDExpr
       };
@@ -844,15 +894,15 @@ public:
                                    SR);
   }
 
-  Expr *buildScopeEntry(SourceRange SR) {
+  Added <Expr *> buildScopeEntry(SourceRange SR) {
     return buildScopeCall(SR, false);
   }
 
-  Expr *buildScopeExit(SourceRange SR) {
+  Added <Expr *> buildScopeExit(SourceRange SR) {
     return buildScopeCall(SR, true);
   }
 
-  Expr *buildScopeCall(SourceRange SR, bool IsExit) {
+  Added<Expr *> buildScopeCall(SourceRange SR, bool IsExit) {
     const char *LoggerName = IsExit ? "$builtin_log_scope_exit"
                                     : "$builtin_log_scope_entry";
 
@@ -861,9 +911,9 @@ public:
                                    SR);
   }
 
-  Expr *buildLoggerCallWithArgs(const char *LoggerName,
-                                MutableArrayRef<Expr *> Args,
-                                SourceRange SR) {
+  Added<Expr *> buildLoggerCallWithArgs(const char *LoggerName,
+                                        MutableArrayRef<Expr *> Args,
+                                        SourceRange SR) {
     Expr *LoggerArgs = nullptr;
 
     if (Args.size() == 1) {
@@ -932,8 +982,9 @@ public:
 
     SendDataRef->setImplicit(true);
 
-    Expr *SendDataCall = new (Context) CallExpr(SendDataRef, SendDataArgs, true,
-                                                Type());
+    Added<Expr *> SendDataCall = new (Context) CallExpr(SendDataRef,
+                                                        SendDataArgs, true,
+                                                        Type());
 
     if (!doTypeCheck(Context, TypeCheckDC, SendDataCall)) {
       return nullptr;
