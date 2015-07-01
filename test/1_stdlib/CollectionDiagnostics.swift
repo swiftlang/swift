@@ -3,7 +3,7 @@
 import StdlibUnittest
 
 //
-// Check that CollectionType._prext_SubSlice is constrained to CollectionType.
+// Check that CollectionType.SubSequence is constrained to CollectionType.
 //
 
 // expected-error@+2 {{type 'CollectionWithBadSubSequence' does not conform to protocol 'SequenceType'}}
@@ -21,20 +21,20 @@ struct CollectionWithBadSubSequence : CollectionType {
     fatalError("unreachable")
   }
 
-  // expected-note@+1 {{possibly intended match '_prext_SubSequence' does not conform to '_prext_Indexable'}}
-  typealias _prext_SubSequence = OpaqueValue<Int8>
+  // expected-note@+1 {{possibly intended match 'SubSequence' does not conform to '_prext_Indexable'}}
+  typealias SubSequence = OpaqueValue<Int8>
 }
 
 func useCollectionTypeSubSequenceIndex<
   C : CollectionType
   where
-  C._prext_SubSequence.Index : BidirectionalIndexType
+  C.SubSequence.Index : BidirectionalIndexType
 >(c: C) {}
 
 func useCollectionTypeSubSequenceGeneratorElement<
   C : CollectionType
   where
-  C._prext_SubSequence.Generator.Element == C.Generator.Element
+  C.SubSequence.Generator.Element == C.Generator.Element
 >(c: C) {}
 
 func sortResultIgnored<
@@ -213,4 +213,8 @@ extension ClosedInterval {
 extension Unmanaged {
   func foo(instance: T) {} // expected-error {{'T' has been renamed to 'Instance'}}
 }
+
+struct MyCollection : Sliceable {} // expected-error {{'Sliceable' has been renamed to 'CollectionType'}}
+protocol MyProtocol : Sliceable {} // expected-error {{'Sliceable' has been renamed to 'CollectionType'}}
+func processCollection<E : Sliceable>(e: E) {} // expected-error {{'Sliceable' has been renamed to 'CollectionType'}}
 

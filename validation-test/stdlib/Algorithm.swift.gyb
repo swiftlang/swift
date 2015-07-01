@@ -1007,43 +1007,6 @@ let findTests = [
   FindTest(3, 4, [ 1, 2, 3, 4 ], []),
 ]
 
-final class Box<T> {
-  init(_ value: T) { self.value = value }
-  var value: T
-}
-
-//===--- Sequence with default implementations ----------------------------===//
-protocol StrictSequenceType : SequenceType {
-  typealias Element
-  init(base: MinimalSequence<Element>)
-  var base: MinimalSequence<Element> { get }
-}
-
-extension StrictSequenceType {
-  init<S: SequenceType where S.Generator.Element == Element>(
-    _ s: S
-  ) {
-    self.init(base: MinimalSequence(s))
-  }
-
-  init(_ data: [Element], underestimatedCount: UnderestimateCountBehavior) {
-    self.init(
-      base: MinimalSequence(data, underestimatedCount: underestimatedCount))
-  }
-  
-  func generate() -> MinimalGenerator<Element> {
-    return base.generate()
-  }
-}
-
-/// A Sequence that uses as many default implementations as
-/// SequenceType can provide.
-struct DefaultedSequence<Element> : StrictSequenceType {
-  let base: MinimalSequence<Element>
-}
-
-//===----------------------------------------------------------------------===//
-
 typealias StrictSequenceOfEquatable = MinimalSequence<MinimalEquatableValue>
 
 // FIXME: rename in StdlibUnittest
@@ -2309,155 +2272,76 @@ SequenceTypeAlgorithms.test("CollectionType.generate()/CustomImplementation") {
 }
 
 //===----------------------------------------------------------------------===//
-// CollectionType.subscript(range:), CollectionType.SubSequence
+// CollectionType.subscript(_: Range<Index>), CollectionType.SubSequence
 //===----------------------------------------------------------------------===//
 
-struct MinimalForwardCollectionWithDefaultSlicing : CollectionType {
-  init(count: Int) {
-    self._count = count
+struct SlicingSubscriptTest {
+  let expected: [OpaqueValue<Int>]
+  let collection: [OpaqueValue<Int>]
+  let bounds: Range<Int>
+  let loc: SourceLoc
+
+  func boundsForStartIndex<I : ForwardIndexType>(i: I) -> Range<I> {
+    return Range(
+      start: advance(i, numericCast(bounds.startIndex)),
+      end: advance(i, numericCast(bounds.endIndex)))
   }
 
-  // FIXME: should return MinimalGenerator<OpaqueValue<Int>>
-  func generate() -> MinimalGenerator<OpaqueValue<Int>> {
-    return MinimalGenerator((1..<_count+1).map { OpaqueValue($0) })
+  init(
+    expected: [Int], collection: [Int], bounds: Range<Int>,
+    file: String = __FILE__, line: UWord = __LINE__
+  ) {
+    self.expected = expected.map { OpaqueValue($0) }
+    self.collection = collection.map { OpaqueValue($0) }
+    self.bounds = bounds
+    self.loc = SourceLoc(file, line, comment: "test data")
   }
-
-  var startIndex: MinimalForwardIndex {
-    return MinimalForwardIndex(position: 0, startIndex: 0, endIndex: _count)
-  }
-
-  var endIndex: MinimalForwardIndex {
-    return MinimalForwardIndex(
-      position: _count, startIndex: 0, endIndex: _count)
-  }
-
-  subscript(i: MinimalForwardIndex) -> OpaqueValue<Int> {
-    return OpaqueValue(i.position + 1)
-  }
-
-  var _count: Int
 }
 
-func callGenericSlicing<C : CollectionType>(
-  collection: C,
-  _ bounds: Range<C.Index>
-) -> C._prext_SubSequence {
-  return collection[bounds]
+let sliceSubscriptTests = [
+  SlicingSubscriptTest(
+    expected: [],
+    collection: [],
+    bounds: 0..<0),
+
+  SlicingSubscriptTest(
+    expected: [ 20 ],
+    collection: [ 10, 20, 30 ],
+    bounds: 1..<2),
+
+  SlicingSubscriptTest(
+    expected: [ 20, 30 ],
+    collection: [ 10, 20, 30 ],
+    bounds: 1..<3),
+
+  SlicingSubscriptTest(
+    expected: [ 10, 20, 30 ],
+    collection: [ 10, 20, 30 ],
+    bounds: 0..<3),
+]
+
+SequenceTypeAlgorithms.test("subscript(_: Range<Index>)/Dispatch") {
+  let tester = CollectionLog.dispatchTester([OpaqueValue(1)])
+  _ = tester[tester.startIndex..<tester.endIndex]
+  let log = tester.log
+  let log2 = tester.log.subscriptRange
+  expectCustomizable(tester, tester.log.subscriptRange)
 }
 
 // FIXME: need separate tests for the Slice type itself.
-SequenceTypeAlgorithms.test("subscript(range:)/DefaultImplementation") {
-  for count in [ 0, 5 ] {
-    let collection = MinimalForwardCollectionWithDefaultSlicing(count: count)
 
-    if true {
-      // Check the return type of the function when called statically.
-      var slice = collection[collection.startIndex..<collection.endIndex]
-      expectType(
-        _prext_Slice<MinimalForwardCollectionWithDefaultSlicing>.self,
-        &slice)
-    }
-
-    if true {
-      // Check the return type of the function when called generically.
-      var slice = callGenericSlicing(
-        collection,
-        collection.startIndex..<collection.endIndex)
-      expectType(
-        _prext_Slice<MinimalForwardCollectionWithDefaultSlicing>.self,
-        &slice)
-    }
+SequenceTypeAlgorithms.test("subscript(_: Range<Index>)/Semantics") {
+  for test in sliceSubscriptTests {
+    let s = DefaultedForwardCollection<OpaqueValue<Int>>(test.collection)
+    var result = s[test.boundsForStartIndex(s.startIndex)]
 
     // FIXME: improve checkForwardCollection to check the SubSequence type.
     checkForwardCollection(
-      Array(1..<count+1).map { OpaqueValue($0) } as [OpaqueValue<Int>],
-      collection,
+      test.expected,
+      result,
       { $0.value == $1.value },
       resiliencyChecks: .none,
-      SourceLocStack().withCurrentLoc())
-  }
-}
-
-struct MinimalForwardCollectionWithCustomSlicing : CollectionType {
-  init(count: Int) {
-    self._count = count
-  }
-
-  var startIndex: MinimalForwardIndex {
-    return MinimalForwardIndex(position: 0, startIndex: 0, endIndex: _count)
-  }
-
-  var endIndex: MinimalForwardIndex {
-    return MinimalForwardIndex(
-      position: _count, startIndex: 0, endIndex: _count)
-  }
-
-  subscript(i: MinimalForwardIndex) -> OpaqueValue<Int> {
-    return OpaqueValue(i.position + 1)
-  }
-
-  subscript(bounds: Range<MinimalForwardIndex>) -> CustomSlice {
-    return CustomSlice(
-      start: bounds.startIndex.position,
-      end: bounds.endIndex.position)
-  }
-
-  var _count: Int
-}
-
-struct CustomSlice : CollectionType {
-  init(start: Int, end: Int) {
-    self._start = start
-    self._end = end
-  }
-
-  var startIndex: MinimalForwardIndex {
-    return MinimalForwardIndex(
-      position: _start,
-      startIndex: _start,
-      endIndex: _end)
-  }
-
-  var endIndex: MinimalForwardIndex {
-    return MinimalForwardIndex(
-      position: _end,
-      startIndex: _start,
-      endIndex: _end)
-  }
-
-  subscript(i: MinimalForwardIndex) -> OpaqueValue<Int> {
-    return OpaqueValue(i.position + 1)
-  }
-
-  var _start: Int
-  var _end: Int
-}
-
-// FIXME: need separate tests for the Slice type itself.
-SequenceTypeAlgorithms.test("subscript(range:)/CustomImplementation") {
-  for count in [ 0, 5 ] {
-    let collection = MinimalForwardCollectionWithCustomSlicing(count: count)
-
-    if true {
-      // Check the return type of the function when called statically.
-      var slice = collection[collection.startIndex..<collection.endIndex]
-      expectType(CustomSlice.self, &slice)
-    }
-
-    if true {
-      // Check the return type of the function when called generically.
-      var slice = callGenericSlicing(
-        collection,
-        collection.startIndex..<collection.endIndex)
-      expectType(CustomSlice.self, &slice)
-    }
-
-    // FIXME: improve checkForwardCollection to check the SubSequence type.
-    checkForwardCollection(
-      Array(1..<count+1).map { OpaqueValue($0) } as [OpaqueValue<Int>],
-      collection,
-      { $0.value == $1.value },
-      SourceLocStack().withCurrentLoc())
+      test.loc.withCurrentLoc())
   }
 }
 

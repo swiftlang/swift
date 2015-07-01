@@ -383,9 +383,7 @@ extension String.CharacterView : RangeReplaceableCollectionType {
   public mutating func removeAll(keepCapacity keepCapacity: Bool = false) {
     Swift.removeAll(&self, keepCapacity: keepCapacity)
   }
-}
 
-extension String.CharacterView : Sliceable {
   /// Access the characters in the given `subRange`.
   ///
   /// - Complexity: O(1) unless bridging from Objective-C requires an

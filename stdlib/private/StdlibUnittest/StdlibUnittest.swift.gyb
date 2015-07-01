@@ -1964,13 +1964,15 @@ public func check${traversal}Collection<
 
 % end
 
+// FIXME: merge into checkCollection()
 public func checkSliceableWithBidirectionalIndex<
-  ${genericParam}, S : Sliceable
+  ${genericParam}, S : CollectionType
   where
   S.Generator.Element == ${Element},
-  S.SubSlice.Generator.Element == ${Element},
+  S.SubSequence.Generator.Element == ${Element},
   S.Index : BidirectionalIndexType,
-  S.SubSlice.Index : BidirectionalIndexType,
+  S.SubSequence : CollectionType,
+  S.SubSequence.Index : BidirectionalIndexType,
   ${Element} : Equatable
 >(
   expected: ${Expected}, 
@@ -2440,6 +2442,10 @@ public struct MinimalGenerator<T> : GeneratorType {
   internal let _sharedState: _MinimalGeneratorSharedState<T>
 }
 
+// A protocol to identify MinimalGenerator.
+public protocol _MinimalGeneratorType {}
+extension MinimalGenerator : _MinimalGeneratorType {}
+
 //===----------------------------------------------------------------------===//
 // MinimalSequence
 //===----------------------------------------------------------------------===//
@@ -2457,6 +2463,32 @@ public enum UnderestimateCountBehavior {
 
   /// Return the provided value.
   case Value(Int)
+}
+
+public protocol StrictSequenceType : SequenceType {
+  typealias Element
+  init(base: MinimalSequence<Element>)
+  var base: MinimalSequence<Element> { get }
+}
+
+extension StrictSequenceType {
+  public init<S : SequenceType where S.Generator.Element == Element>(
+    _ s: S,
+    underestimatedCount: UnderestimateCountBehavior = .Value(0)
+  ) {
+    self.init(
+      base: MinimalSequence(s, underestimatedCount: underestimatedCount))
+  }
+
+  public func underestimateCount() -> Int {
+    return base.underestimateCount()
+  }
+}
+
+extension StrictSequenceType where Generator : _MinimalGeneratorType {
+  public func generate() -> MinimalGenerator<Element> {
+    return base.generate()
+  }
 }
 
 /// A SequenceType that implements the protocol contract in the most
@@ -2497,6 +2529,7 @@ public struct MinimalSequence<T> : SequenceType, CustomDebugStringConvertible {
   public var debugDescription: String {
     return "MinimalSequence(\(_sharedState.data[_sharedState.i..<_sharedState.data.count]))"
   }
+
   internal let _sharedState: _MinimalGeneratorSharedState<T>
 }
 
@@ -2504,9 +2537,13 @@ public struct MinimalSequence<T> : SequenceType, CustomDebugStringConvertible {
 // MinimalForwardIndex
 //===----------------------------------------------------------------------===//
 
-% for Distance in [ '', 'Int32' ]:
+// A protocol to identify minimal index types.
+public protocol _MinimalIndexType {}
 
-public struct MinimalForward${Distance}Index : ForwardIndexType {
+% for Distance in [ '', 'Int32' ]:
+%   Index = 'MinimalForward%sIndex' % Distance
+
+public struct ${Index} : ForwardIndexType {
 % if Distance != '':
   typealias Distance = ${Distance}
 % end
@@ -2521,23 +2558,20 @@ public struct MinimalForward${Distance}Index : ForwardIndexType {
     self.endIndex = endIndex
   }
 
-  public func successor() -> MinimalForward${Distance}Index {
+  public func successor() -> ${Index} {
     expectNotEqual(endIndex, position)
-    return MinimalForward${Distance}Index(
-      position: position + 1,
-      endIndex: endIndex)
+    return ${Index}(position: position + 1, endIndex: endIndex)
   }
 
   public let position: Int
   public let endIndex: Int
 }
 
-public func == (
-  lhs: MinimalForward${Distance}Index,
-  rhs: MinimalForward${Distance}Index
-) -> Bool {
+public func == (lhs: ${Index}, rhs: ${Index}) -> Bool {
   return lhs.position == rhs.position
 }
+
+extension ${Index} : _MinimalIndexType {}
 
 % end
 
@@ -2575,6 +2609,8 @@ public func == (
 ) -> Bool {
   return lhs.position == rhs.position
 }
+
+extension MinimalBidirectionalIndex : _MinimalIndexType {}
 
 //===----------------------------------------------------------------------===//
 // MinimalRandomAccessIndex
@@ -2630,6 +2666,8 @@ public func == (
   return lhs.position == rhs.position
 }
 
+extension MinimalRandomAccessIndex : _MinimalIndexType {}
+
 //===----------------------------------------------------------------------===//
 // Minimal***Collection
 //===----------------------------------------------------------------------===//
@@ -2637,8 +2675,59 @@ public func == (
 % for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
 %   for mutable in [ False, True ]:
 // This comment is a workaround for <rdar://problem/18900352> gyb miscompiles nested loops
+%     Protocol = 'Strict%s%sCollectionType' % ('Mutable' if mutable else '', traversal)
 %     Self = 'Minimal%s%sCollection' % ('Mutable' if mutable else '', traversal)
 %     Index = 'Minimal%sIndex' % traversal
+
+public protocol ${Protocol} : CollectionType {
+  typealias Element
+  init(base: ${Self}<Element>)
+%     if mutable:
+  var base: ${Self}<Element> { get set }
+%     else:
+  var base: ${Self}<Element> { get }
+%     end
+}
+
+extension ${Protocol} {
+  public init<S : SequenceType where S.Generator.Element == Element>(
+    _ s: S,
+    underestimatedCount: UnderestimateCountBehavior = .Value(0)
+  ) {
+    self.init(base: ${Self}(s, underestimatedCount: underestimatedCount))
+  }
+
+  public func underestimateCount() -> Int {
+    return base.underestimateCount()
+  }
+}
+
+extension ${Protocol} where Generator : _MinimalGeneratorType {
+  public func generate() -> MinimalGenerator<Element> {
+    return base.generate()
+  }
+}
+
+extension ${Protocol} where Index : _MinimalIndexType {
+  public var startIndex: ${Index} {
+    return base.startIndex
+  }
+
+  public var endIndex: ${Index} {
+    return base.endIndex
+  }
+
+  public subscript(i: ${Index}) -> Element {
+    get {
+      return base[i]
+    }
+%     if mutable:
+    set {
+      base[i] = newValue
+    }
+%     end
+  }
+}
 
 /// A minimal implementation of `CollectionType` with extra checks.
 public struct ${Self}<T> : ${'MutableCollectionType' if mutable else 'CollectionType'} {
@@ -2949,6 +3038,31 @@ public func < (
 ) -> Bool {
   ++MinimalComparableValue.timesLessWasCalled
   return lhs.value < rhs.value
+}
+
+/// A Sequence that uses as many default implementations as
+/// `SequenceType` can provide.
+public struct DefaultedSequence<Element> : StrictSequenceType {
+  public let base: MinimalSequence<Element>
+
+  public init(base: MinimalSequence<Element>) {
+    self.base = base
+  }
+}
+
+/// A Collection that uses as many default implementations as
+/// `CollectionType` can provide.
+public struct DefaultedForwardCollection<Element>
+  : StrictForwardCollectionType {
+
+  typealias Generator = MinimalGenerator<Element>
+  typealias Index = MinimalForwardIndex
+
+  public let base: MinimalForwardCollection<Element>
+
+  public init(base: MinimalForwardCollection<Element>) {
+    self.base = base
+  }
 }
 
 // ${'Local Variables'}:

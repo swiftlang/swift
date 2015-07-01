@@ -566,8 +566,6 @@ extension _StringCore : CollectionType {
   }
 }
 
-extension _StringCore : Sliceable {}
-
 extension _StringCore : ExtensibleCollectionType {
 
   public mutating func reserveCapacity(n: Int) {

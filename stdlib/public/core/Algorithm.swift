@@ -104,14 +104,14 @@ public func max<T : Comparable>(x: T, _ y: T, _ z: T, _ rest: T...) -> T {
 ///
 /// - parameter allowEmptySlices: If `true`, an empty slice is produced in
 ///   the result for each pair of consecutive.
-public func split<S: Sliceable, R:BooleanType>(
+public func split<S : CollectionType, R : BooleanType>(
   elements: S,
   maxSplit: Int = Int.max,
   allowEmptySlices: Bool = false,
   @noescape isSeparator: (S.Generator.Element) -> R
-  ) -> [S.SubSlice] {
+  ) -> [S.SubSequence] {
 
-  var result = Array<S.SubSlice>()
+  var result = Array<S.SubSequence>()
 
   // FIXME: could be simplified pending <rdar://problem/15032945>
   // (ternary operator not resolving some/none)

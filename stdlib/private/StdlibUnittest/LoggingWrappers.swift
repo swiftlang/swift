@@ -138,6 +138,81 @@ public struct LoggingSequence<Base: SequenceType> : SequenceType, LoggingType {
   public var base: Base
 }
 
+public class CollectionLog : SequenceLog {
+  public class func dispatchTester<C : CollectionType>(
+    c: C
+  ) -> LoggingCollection<LoggingCollection<C>> {
+    return LoggingCollection(LoggingCollection(c))
+  }
+  public static var startIndex = TypeIndexed(0)
+  public static var endIndex = TypeIndexed(0)
+  public static var subscriptIndex = TypeIndexed(0)
+  public static var subscriptRange = TypeIndexed(0)
+  public static var isEmpty = TypeIndexed(0)
+  public static var count = TypeIndexed(0)
+  public static var _customIndexOfEquatableElement = TypeIndexed(0)
+  public static var first = TypeIndexed(0)
+}
+
+public struct LoggingCollection<Base : CollectionType>
+  : CollectionType, LoggingType {
+
+  typealias Log = CollectionLog
+
+  public init(_ base: Base) {
+    self.base = base
+  }
+
+  public func generate() -> LoggingGenerator<Base.Generator> {
+    ++Log.generate[selfType]
+    return LoggingGenerator(base.generate())
+  }
+
+  public var startIndex: Base.Index {
+    ++CollectionLog.startIndex[selfType]
+    return base.startIndex
+  }
+
+  public var endIndex: Base.Index {
+    ++CollectionLog.endIndex[selfType]
+    return base.endIndex
+  }
+
+  public subscript(position: Base.Index) -> Base.Generator.Element {
+    ++CollectionLog.subscriptIndex[selfType]
+    return base[position]
+  }
+
+  public subscript(bounds: Range<Base.Index>) -> Base.SubSequence {
+    ++CollectionLog.subscriptRange[selfType]
+    return base[bounds]
+  }
+
+  public var isEmpty: Bool {
+    ++CollectionLog.isEmpty[selfType]
+    return base.isEmpty
+  }
+
+  public var count: Base.Index.Distance {
+    ++CollectionLog.count[selfType]
+    return base.count
+  }
+
+  public func _customIndexOfEquatableElement(
+    element: Base.Generator.Element
+  ) -> Base.Index?? {
+    ++CollectionLog._customIndexOfEquatableElement[selfType]
+    return base._customIndexOfEquatableElement(element)
+  }
+
+  public var first: Base.Generator.Element? {
+    ++CollectionLog.first[selfType]
+    return base.first
+  }
+
+  public var base: Base
+}
+
 public func expectCustomizable<
   T : WrapperType where
   T : LoggingType,

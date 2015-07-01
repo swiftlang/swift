@@ -170,8 +170,7 @@ if True:
 
 ${SelfDocComment}
 public struct ${Self}<Element>
-  : CollectionType, MutableCollectionType, Sliceable,
-  _DestructorSafeContainer {
+  : CollectionType, MutableCollectionType, _DestructorSafeContainer {
 
   @available(*, unavailable, renamed="Element")
   public typealias T = Element

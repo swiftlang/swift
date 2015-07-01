@@ -140,7 +140,7 @@ public protocol CollectionType : _prext_Indexable, SequenceType {
   ///   `SequenceType`, but is restated here with stricter
   ///   constraints: in a `CollectionType`, the `SubSequence` should
   ///   also be a `CollectionType`.
-  typealias _prext_SubSequence: _prext_Indexable, SequenceType = _prext_Slice<Self>
+  typealias SubSequence: _prext_Indexable, SequenceType = _prext_Slice<Self>
 
   /// Returns the element at the given `position`.
   subscript(position: Index) -> Generator.Element {get}
@@ -149,7 +149,7 @@ public protocol CollectionType : _prext_Indexable, SequenceType {
   /// `self`'s elements.
   ///
   /// - Complexity: O(1)
-  subscript(_prext_bounds: Range<Index>) -> _prext_SubSequence {get}
+  subscript(bounds: Range<Index>) -> SubSequence {get}
 
   /// Returns `true` iff `self` is empty.
   var isEmpty: Bool { get }
@@ -189,7 +189,7 @@ extension CollectionType where Generator : _IndexingGeneratorType  {
 }
 
 
-// FIXME: Can't constrain with _prext_SubSequence ==
+// FIXME: Can't constrain with SubSequence ==
 // _prext_Slice<Self>, due to <rdar://problem/21538521> Nonsense
 // diagnostic, then crash.  Therefore, use a stand-in internal
 // protocol.
@@ -198,11 +198,11 @@ internal protocol _SliceType {}
 extension _prext_Slice : _SliceType {}
 
 /// Supply the default "slicing" `subscript`  for `CollectionType` models
-/// that accept the default associated `_prext_SubSequence`,
+/// that accept the default associated `SubSequence`,
 /// `_prext_Slice<Self>`.
-extension CollectionType where _prext_SubSequence : _SliceType {
-  public subscript(_prext_bounds: Range<Index>) -> _prext_Slice<Self> {
-    return _prext_Slice(_base: self, bounds: _prext_bounds)
+extension CollectionType where SubSequence : _SliceType {
+  public subscript(bounds: Range<Index>) -> _prext_Slice<Self> {
+    return _prext_Slice(_base: self, bounds: bounds)
   }
 }
 
@@ -425,47 +425,20 @@ public struct PermutationGenerator<
   }
 }
 
-/// This protocol is an implementation detail of `Sliceable`; do
-/// not use it directly.
-public protocol _Sliceable : CollectionType {}
-
-/// A *collection* from which a sub-range of elements (a "slice")
-/// can be efficiently extracted.
-public protocol Sliceable : _Sliceable {
-  // FIXME: ArraySlice should also be Sliceable but we can't express
-  // that constraint (<rdar://problem/14375973> Include associated
-  // type information in protocol witness tables) Instead we constrain
-  // to _Sliceable; at least error messages will be more informative.
-
-  /// The *collection* type that represents a sub-range of elements.
-  ///
-  /// Though it can't currently be enforced by the type system, the
-  /// `SubSlice` type in a concrete implementation of `Sliceable`
-  /// should also be `Sliceable`.
-  typealias SubSlice : _Sliceable
-
-  /// Access the elements delimited by the given half-open range of
-  /// indices.
-  ///
-  /// - Complexity: O(1) unless bridging from Objective-C requires an
-  ///   O(N) conversion.
-  subscript(bounds: Range<Index>) -> SubSlice {get}
-}
-
 /// A *collection* with mutable slices.
 ///
 /// For example,
 ///
 ///      x[i..<j] = someExpression
 ///      x[i..<j].mutatingMethod()
-public protocol MutableSliceable : Sliceable, MutableCollectionType {
-  subscript(_: Range<Index>) -> SubSlice {get set}
+public protocol MutableSliceable : CollectionType, MutableCollectionType {
+  subscript(_: Range<Index>) -> SubSequence { get set }
 }
 
 /// Returns a slice containing all but the first element of `s`.
 ///
 /// - Requires: `s` is non-empty.
-public func dropFirst<Seq : Sliceable>(s: Seq) -> Seq.SubSlice {
+public func dropFirst<Seq : CollectionType>(s: Seq) -> Seq.SubSequence {
   return s[s.startIndex.successor()..<s.endIndex]
 }
 
@@ -473,9 +446,9 @@ public func dropFirst<Seq : Sliceable>(s: Seq) -> Seq.SubSlice {
 ///
 /// - Requires: `s` is non-empty.
 public func dropLast<
-  S: Sliceable
+  S : CollectionType
   where S.Index: BidirectionalIndexType
->(s: S) -> S.SubSlice {
+>(s: S) -> S.SubSequence {
   return s[s.startIndex..<s.endIndex.predecessor()]
 }
 
@@ -488,7 +461,7 @@ public func dropLast<
 /// - Complexity: O(1)+K when `S.Index` conforms to
 ///   `RandomAccessIndexType` and O(N)+K otherwise, where K is the cost
 ///   of slicing `s`.
-public func prefix<S: Sliceable>(s: S, _ maxLength: Int) -> S.SubSlice {
+public func prefix<S : CollectionType>(s: S, _ maxLength: Int) -> S.SubSequence {
   let index = advance(s.startIndex, max(0, numericCast(maxLength)), s.endIndex)
   return s[s.startIndex..<index]
 }
@@ -503,8 +476,12 @@ public func prefix<S: Sliceable>(s: S, _ maxLength: Int) -> S.SubSlice {
 ///   `RandomAccessIndexType` and O(N)+K otherwise, where K is the cost
 ///   of slicing `s`.
 public func suffix<
-  S: Sliceable where S.Index: BidirectionalIndexType
->(s: S, _ maxLength: Int) -> S.SubSlice {
+  S : CollectionType where S.Index: BidirectionalIndexType
+>(s: S, _ maxLength: Int) -> S.SubSequence {
   let index = advance(s.endIndex, -max(0, numericCast(maxLength)), s.startIndex)
   return s[index..<s.endIndex]
 }
+
+@available(*, unavailable, renamed="CollectionType")
+public struct Sliceable {}
+

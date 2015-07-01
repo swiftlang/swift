@@ -25,10 +25,10 @@ public struct _prext_Slice<Base : _prext_Indexable> : CollectionType {
     return _base[index]
   }
 
-  public subscript(_prext_bounds bounds: Range<Index>) -> _prext_Slice {
+  public subscript(bounds: Range<Index>) -> _prext_Slice {
     return _prext_Slice(_base: _base, bounds: bounds)
   }
-  
+
   internal init(_base: Base, bounds: Range<Index>) {
     self._base = _base
     self.startIndex = bounds.startIndex
