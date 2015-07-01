@@ -132,31 +132,47 @@ swift::swift_allocPOD(size_t dataSize, size_t dataAlignmentMask) {
 }
 
 namespace {
+/// Heap metadata for a box, which may have been generated statically by the
+/// compiler or by the runtime.
+struct BoxHeapMetadata : public HeapMetadata {
+  /// The offset from the beginning of a box to its value.
+  unsigned Offset;
+
+  constexpr BoxHeapMetadata(MetadataKind kind,
+                            unsigned offset)
+    : HeapMetadata{kind}, Offset(offset)
+  {}
+
+
+};
+
 /// Heap metadata for runtime-instantiated generic boxes.
-struct GenericBoxHeapMetadata : public HeapMetadata {
+struct GenericBoxHeapMetadata : public BoxHeapMetadata {
   /// The type inside the box.
   const Metadata *BoxedType;
 
   constexpr GenericBoxHeapMetadata(MetadataKind kind,
-                                    const Metadata *boxedType)
-    : HeapMetadata{kind}, BoxedType(boxedType)
+                                   unsigned offset,
+                                   const Metadata *boxedType)
+    : BoxHeapMetadata{kind, offset},
+      BoxedType(boxedType)
   {}
 
-  unsigned getHeaderOffset() const {
+  static unsigned getHeaderOffset(const Metadata *boxedType) {
     // Round up the header size to alignment.
-    unsigned alignMask = BoxedType->getValueWitnesses()->getAlignmentMask();
+    unsigned alignMask = boxedType->getValueWitnesses()->getAlignmentMask();
     return (sizeof(HeapObject) + alignMask) & ~alignMask;
   }
 
   /// Project the value out of a box of this type.
   OpaqueValue *project(HeapObject *box) const {
     auto bytes = reinterpret_cast<char*>(box);
-    return reinterpret_cast<OpaqueValue *>(bytes + getHeaderOffset());
+    return reinterpret_cast<OpaqueValue *>(bytes + Offset);
   }
 
   /// Get the allocation size of this box.
   unsigned getAllocSize() const {
-    return getHeaderOffset() + BoxedType->getValueWitnesses()->getSize();
+    return Offset + BoxedType->getValueWitnesses()->getSize();
   }
 
   /// Get the allocation alignment of this box.
@@ -185,7 +201,7 @@ public:
 
   BoxCacheEntry(size_t numArguments)
     : Metadata{HeapMetadataHeader{{destroyGenericBox}, {nullptr}},
-               GenericBoxHeapMetadata{MetadataKind::HeapGenericLocalVariable,
+               GenericBoxHeapMetadata{MetadataKind::HeapGenericLocalVariable, 0,
                                        nullptr}} {
     assert(numArguments == 1);
   }
@@ -219,6 +235,7 @@ static BoxPair::Return _swift_allocBox_(const Metadata *type) {
     auto entry = BoxCacheEntry::allocate(B.getAllocator(), &typeArg, 1, 0);
 
     auto metadata = entry->getData();
+    metadata->Offset = GenericBoxHeapMetadata::getHeaderOffset(type);
     metadata->BoxedType = type;
 
     return entry;

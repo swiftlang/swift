@@ -237,6 +237,7 @@ llvm::Constant *HeapLayout::createSizeFn(IRGenModule &IGM) const {
 }
 
 static llvm::Constant *buildPrivateMetadata(IRGenModule &IGM,
+                                            const HeapLayout &layout,
                                             llvm::Constant *dtorFn,
                                             MetadataKind kind) {
   // Build the fields of the private metadata.
@@ -245,12 +246,22 @@ static llvm::Constant *buildPrivateMetadata(IRGenModule &IGM,
   fields.push_back(llvm::ConstantPointerNull::get(IGM.WitnessTablePtrTy));
   fields.push_back(llvm::ConstantStruct::get(IGM.TypeMetadataStructTy,
                                              getMetadataKind(IGM, kind)));
+  // Figure out the offset to the first element, which is necessary to be able
+  // to polymorphically project as a generic box.
+  auto elements = layout.getElements();
+  Size offset;
+  if (!elements.empty()
+      && elements[0].getKind() == ElementLayout::Kind::Fixed)
+    offset = elements[0].getByteOffset();
+  else
+    offset = Size(0);
+  fields.push_back(llvm::ConstantInt::get(IGM.Int32Ty, offset.getValue()));
 
   llvm::Constant *init =
-    llvm::ConstantStruct::get(IGM.FullHeapMetadataStructTy, fields);
+    llvm::ConstantStruct::get(IGM.FullBoxMetadataStructTy, fields);
 
   llvm::GlobalVariable *var =
-    new llvm::GlobalVariable(IGM.Module, IGM.FullHeapMetadataStructTy,
+    new llvm::GlobalVariable(IGM.Module, IGM.FullBoxMetadataStructTy,
                              /*constant*/ true,
                              llvm::GlobalVariable::PrivateLinkage, init,
                              "metadata");
@@ -265,7 +276,7 @@ static llvm::Constant *buildPrivateMetadata(IRGenModule &IGM,
 
 llvm::Constant *HeapLayout::getPrivateMetadata(IRGenModule &IGM) const {
   if (!privateMetadata)
-    privateMetadata = buildPrivateMetadata(IGM, createDtorFn(IGM, *this),
+    privateMetadata = buildPrivateMetadata(IGM, *this, createDtorFn(IGM, *this),
                                            MetadataKind::HeapLocalVariable);
   return privateMetadata;
 }

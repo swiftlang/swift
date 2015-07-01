@@ -211,6 +211,18 @@ IRGenModule::IRGenModule(IRGenModuleDispatcher &dispatcher, SourceFile *SF,
   });
   FullHeapMetadataPtrTy = FullHeapMetadataStructTy->getPointerTo(DefaultAS);
 
+  // A full box metadata is non-type heap metadata for a heap allocation of a
+  // single value. The box tracks the offset to the value inside the box.
+  FullBoxMetadataStructTy =
+                  createStructType(*this, "swift.full_boxmetadata", {
+    dtorPtrTy,
+    WitnessTablePtrTy,
+    TypeMetadataStructTy,
+    Int32Ty,
+  });
+  FullBoxMetadataPtrTy = FullBoxMetadataStructTy->getPointerTo(DefaultAS);
+
+
   llvm::Type *refCountedElts[] = { TypeMetadataPtrTy, Int32Ty, Int32Ty };
   RefCountedStructTy->setBody(refCountedElts);
 
