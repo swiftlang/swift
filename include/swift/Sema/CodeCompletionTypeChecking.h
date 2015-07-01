@@ -39,13 +39,6 @@ namespace swift {
                                                 DeclContext *DC,
                                                 Expr *&parsedExpr);
 
-  /// \brief Typecheck a single parsed expression.
-  ///
-  /// \returns true on success, false on error.
-  // FIXME: this is not used by code completion; we should probably move it.
-  bool typeCheckContextExpr(ASTContext &Ctx, DeclContext *DC,
-                            Expr *&parsedExpr);
-
   /// Partially typecheck the specified function body.
   bool typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
                                           SourceLoc EndTypeCheckLoc);

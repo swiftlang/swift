@@ -686,20 +686,6 @@ Optional<Type> swift::getTypeOfCompletionContextExpr(ASTContext &Ctx,
   return None;
 }
 
-bool swift::typeCheckContextExpr(ASTContext &Ctx, DeclContext *DC,
-                                 Expr *&parsedExpr) {
-  // Set up a diagnostics engine that swallows diagnostics.
-  DiagnosticEngine diags(Ctx.SourceMgr);
-
-  TypeChecker TC(Ctx, diags);
-  TC.typeCheckExpression(parsedExpr, DC, Type(), Type(), /*discardedExpr=*/true,
-                         FreeTypeVariableBinding::GenericParameters);
-  
-  return parsedExpr && !isa<ErrorExpr>(parsedExpr)
-                    && parsedExpr->getType()
-                    && !parsedExpr->getType()->is<ErrorType>();
-}
-
 bool swift::typeCheckAbstractFunctionBodyUntil(AbstractFunctionDecl *AFD,
                                                SourceLoc EndTypeCheckLoc) {
   auto &Ctx = AFD->getASTContext();
