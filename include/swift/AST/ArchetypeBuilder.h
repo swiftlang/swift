@@ -556,15 +556,6 @@ public:
     return ArchetypeOrConcreteType.getAsConcreteType();
   }
 
-  /// Determine whether this potential archetype will map to a primary
-  /// archetype.
-  bool isPrimary() const {
-    if (Representative != this)
-      return Representative->isPrimary();
-
-    return getGenericParam() && !isConcreteType();
-  }
-
   void setIsRecursive() { IsRecursive = true; }
   bool isRecursive() { return IsRecursive; }
 

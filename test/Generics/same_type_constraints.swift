@@ -218,3 +218,21 @@ func testSameTypeTuple(a: Array<(Int,Int)>, s: ArraySlice<(Int,Int)>) {
   TTGenWrap(a.generate())
   IntIntGenWrap(s.generate())
 }
+
+// rdar://problem/20256475
+protocol FooType {
+  typealias Element
+
+  func getElement() -> Element
+}
+protocol BarType {
+  typealias Foo : FooType
+
+  func getFoo() -> Foo
+
+  mutating func extend<
+    C : FooType
+    where
+    C.Element == Foo.Element
+  >(elements: C)
+}

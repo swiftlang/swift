@@ -469,10 +469,6 @@ static void collectRequirements(ArchetypeBuilder &builder,
     // We only care about the representative.
     pa = pa->getRepresentative();
 
-    // If the potential archetype has a parent, it isn't primary.
-    if (pa->getRepresentative()->getParent())
-      continue;
-
     if (knownPAs.insert(pa).second)
       primary.push_back(param);
   }

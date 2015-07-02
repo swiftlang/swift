@@ -793,31 +793,20 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
   // If the representives are already the same, we're done.
   if (T1 == T2)
     return false;
-  
-  // FIXME: Do we want to restrict which potential archetypes can be made
-  // equivalent? For example, can two generic parameters T and U be made
-  // equivalent? What about a generic parameter and a concrete type?
 
-  // Merge into the potential archetype with the smaller nesting
-  // depth. We prefer lower-depth potential archetypes both for better
-  // diagnostics (use T.A rather than U.B.C. when the two are required
-  // to be the same type) and because we want to select a generic
-  // parameter as a representative over an associated type. When the
-  // depths are equal, prefer outermost, first generic parameters at
-  // the root.
+  // Decide which potential archetype is to be considered the representative.
+  // We necessarily prefer potential archetypes rooted at parameters that come
+  // from outer generic parameter lists, since those generic parameters will
+  // have archetypes bound in the outer context.
+  // FIXME: This isn't a total ordering
+  auto T1Param = T1->getRootParam();
+  auto T2Param = T2->getRootParam();
   unsigned T1Depth = T1->getNestingDepth();
   unsigned T2Depth = T2->getNestingDepth();
-  if (T2Depth < T1Depth || (T1->isInvalid() && !T2->isInvalid())) {
+  if (std::make_tuple(T2Param->getDepth(), T2Param->getIndex(), T2Depth)
+        < std::make_tuple(T1Param->getDepth(), T1Param->getIndex(), T1Depth))
     std::swap(T1, T2);
-  } else if (T1Depth == T2Depth) {
-    auto T1Param = T1->getRootParam();
-    auto T2Param = T2->getRootParam();
-    if (T2Param->getDepth() < T1Param->getDepth() ||
-        (T1Param->getDepth() == T2Param->getDepth() &&
-         T2Param->getIndex() < T1Param->getIndex()))
-      std::swap(T1, T2);
-  }
-  
+
   // Don't allow two generic parameters to be equivalent, because then we
   // don't actually have two parameters.
   // FIXME: Should we simply allow this?
@@ -1309,12 +1298,9 @@ ArrayRef<ArchetypeType *> ArchetypeBuilder::getAllArchetypes() {
         continue;
 
       PotentialArchetype *PA = Entry.second;
-      if (PA->isPrimary()) {
-        auto Archetype = PA->getType(*this).castToArchetype();
-        assert(Archetype->isPrimary() && "isPrimary mismatch");
-        if (KnownArchetypes.insert(Archetype).second)
-          Impl->AllArchetypes.push_back(Archetype);
-      }
+      auto Archetype = PA->getType(*this).castToArchetype();
+      if (KnownArchetypes.insert(Archetype).second)
+        Impl->AllArchetypes.push_back(Archetype);
     }
 
     // Collect all of the remaining archetypes.

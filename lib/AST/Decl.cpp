@@ -702,7 +702,7 @@ GenericParamList::deriveAllArchetypes(ArrayRef<GenericTypeParamDecl *> params,
   // Collect all the primary archetypes.
   for (auto param : params) {
     auto archetype = param->getArchetype();
-    if (archetype->isPrimary() && known.insert(archetype).second)
+    if (known.insert(archetype).second)
       all.push_back(archetype);
   }
 
