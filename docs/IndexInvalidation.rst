@@ -95,8 +95,8 @@ slicing ``S``.
 
 FIXME: index should be in bounds of the slice.
 
-Additional guarantees for ``Swift.Array``, ``Swift.ContiguousArray``, ``Swift.Slice``
-=====================================================================================
+Additional guarantees for ``Swift.Array``, ``Swift.ContiguousArray``, ``Swift.ArraySlice``
+==========================================================================================
 
 **Valid array indexes can be created without using Array APIs.**  Array indexes
 are plain integers.  Integers that are dynamically in the range ``0..<A.count``
