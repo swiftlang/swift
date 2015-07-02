@@ -174,4 +174,12 @@ func r21459429(a : Int) {
 }
 
 
+// <rdar://problem/21362748> [WWDC Lab] QoI: cannot subscript a value of type '[Int]?' with an index of type 'Int'
+struct StructWithOptionalArray {
+  var array: [Int]?
+}
+
+func testStructWithOptionalArray(foo: StructWithOptionalArray) -> Int {
+  return foo.array[0]  // expected-error {{result type 'Element' does not match expected type}}
+}
 
