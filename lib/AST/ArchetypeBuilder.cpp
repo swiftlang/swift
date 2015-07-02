@@ -331,6 +331,44 @@ auto ArchetypeBuilder::PotentialArchetype::getRepresentative()
   return Result;
 }
 
+bool ArchetypeBuilder::PotentialArchetype::hasConcreteTypeInPath() const {
+  for (auto pa = this; pa; pa = pa->getParent()) {
+    if (pa->ArchetypeOrConcreteType.isConcreteType() &&
+        !pa->ArchetypeOrConcreteType.getAsConcreteType()->is<ArchetypeType>())
+      return true;
+  }
+
+  return false;
+}
+
+bool ArchetypeBuilder::PotentialArchetype::isBetterArchetypeAnchor(
+       PotentialArchetype *other) {
+  auto concrete = hasConcreteTypeInPath();
+  auto otherConcrete = other->hasConcreteTypeInPath();
+  if (concrete != otherConcrete)
+    return otherConcrete;
+
+  // FIXME: Not a total order.
+  return std::make_tuple(getRootParam()->getDepth(),
+                         getRootParam()->getIndex(),
+                         getNestingDepth())
+    < std::make_tuple(other->getRootParam()->getDepth(),
+                      other->getRootParam()->getIndex(),
+                      other->getNestingDepth());
+}
+
+auto ArchetypeBuilder::PotentialArchetype::getArchetypeAnchor()
+       -> PotentialArchetype * {
+   // Default to the representative, unless we find something better.
+   PotentialArchetype *best = getRepresentative();
+   for (auto pa : getEquivalenceClass()) {
+     if (pa->isBetterArchetypeAnchor(best))
+       best = pa;
+   }
+
+   return best;
+}
+
 auto ArchetypeBuilder::PotentialArchetype::getNestedType(
        Identifier nestedName,
        ArchetypeBuilder &builder,
@@ -425,22 +463,26 @@ static Type substConcreteTypesForDependentTypes(ArchetypeBuilder &builder,
 
 ArchetypeType::NestedType
 ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
-  // Retrieve the archetype from the representation of this set.
-  if (Representative != this)
-    return getRepresentative()->getType(builder);
-  
+  auto representative = getRepresentative();
+
+  // Retrieve the archetype from the archetype anchor in this equivalence class.
+  auto archetypeAnchor = getArchetypeAnchor();
+  if (archetypeAnchor != this)
+    return archetypeAnchor->getType(builder);
+
   // Return a concrete type or archetype we've already resolved.
-  if (ArchetypeOrConcreteType) {
+  if (representative->ArchetypeOrConcreteType) {
     // If the concrete type is dependent, substitute dependent types
     // for archetypes.
-    if (auto concreteType = ArchetypeOrConcreteType.getAsConcreteType()) {
+    if (auto concreteType
+          = representative->ArchetypeOrConcreteType.getAsConcreteType()) {
       if (concreteType->isDependentType()) {
         return NestedType::forConcreteType(
                  substConcreteTypesForDependentTypes(builder, concreteType));
       }
     }
 
-    return ArchetypeOrConcreteType;
+    return representative->ArchetypeOrConcreteType;
   }
   
   ArchetypeType::AssocTypeOrProtocolType assocTypeOrProto = RootProtocol;
@@ -460,9 +502,10 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
       // return that.
       ParentArchetype = parentTy.getValue()->getAs<ArchetypeType>();
       if (ParentArchetype) {
-        ArchetypeOrConcreteType = NestedType::forConcreteType(
-                             ParentArchetype->getNestedTypeValue(getName()));
-        return ArchetypeOrConcreteType;
+        representative->ArchetypeOrConcreteType
+          = NestedType::forConcreteType(
+              ParentArchetype->getNestedTypeValue(getName()));
+        return representative->ArchetypeOrConcreteType;
       }
 
       LazyResolver *resolver = mod.getASTContext().getLazyResolver();
@@ -478,17 +521,18 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
       if (auto memberPA = builder.resolveArchetype(memberType)) {
         // If the member type maps to an archetype, resolve that archetype.
         if (memberPA->getRepresentative() != getRepresentative()) {
-          ArchetypeOrConcreteType = memberPA->getType(builder);
-          return ArchetypeOrConcreteType;
+          representative->ArchetypeOrConcreteType = memberPA->getType(builder);
+          return representative->ArchetypeOrConcreteType;
         }
 
         llvm_unreachable("we have no parent archetype");
       } else {
         // Otherwise, it's a concrete type.
-        ArchetypeOrConcreteType = NestedType::forConcreteType(
-                                    builder.substDependentType(memberType));
+        representative->ArchetypeOrConcreteType
+          = NestedType::forConcreteType(
+              builder.substDependentType(memberType));
 
-        return ArchetypeOrConcreteType;
+        return representative->ArchetypeOrConcreteType;
       }
     }
 
@@ -497,7 +541,7 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
 
   // If we ended up building our parent archetype, then we'll have
   // already filled in our own archetype.
-  if (auto arch = ArchetypeOrConcreteType.getAsArchetype())
+  if (auto arch = representative->ArchetypeOrConcreteType.getAsArchetype())
     return NestedType::forArchetype(arch);
 
   SmallVector<ProtocolDecl *, 4> Protos;
@@ -510,7 +554,7 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
                             assocTypeOrProto, getName(), Protos,
                             Superclass, isRecursive());
 
-  ArchetypeOrConcreteType = NestedType::forArchetype(arch);
+  representative->ArchetypeOrConcreteType = NestedType::forArchetype(arch);
   
   // Collect the set of nested types of this archetype, and put them into
   // the archetype itself.

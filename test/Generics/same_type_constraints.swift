@@ -280,3 +280,19 @@ struct X4 : P4 {
 func testFoo(x3: X4) {
   foo(x3)
 }
+
+// rdar://problem/21625478
+struct X6<T> { }
+
+protocol P6 { }
+
+protocol P7 {
+  typealias AssocP7
+}
+
+protocol P8 {
+  typealias AssocP8 : P7
+  typealias AssocOther
+}
+
+func testP8<C : P8 where C.AssocOther == X6<C.AssocP8.AssocP7>>(c: C) { }

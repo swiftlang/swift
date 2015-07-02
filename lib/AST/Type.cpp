@@ -2474,7 +2474,7 @@ static Type getMemberForBaseType(Module *module,
   }
 
   // If we know the associated type, look in the witness table.
-  LazyResolver *resolver = assocType->getASTContext().getLazyResolver();
+  LazyResolver *resolver = substBase->getASTContext().getLazyResolver();
   if (assocType) {
     auto proto = assocType->getProtocol();
     // FIXME: Introduce substituted type node here?

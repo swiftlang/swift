@@ -531,6 +531,10 @@ public:
     return getRepresentative()->EquivalenceClass;
   }
 
+  /// \brief Retrieve the potential archetype to be used as the anchor for
+  /// potential archetype computations.
+  PotentialArchetype *getArchetypeAnchor();
+
   /// Retrieve the source of the same-type constraint that applies to this
   /// potential archetype.
   const RequirementSource &getSameTypeSource() const {
@@ -580,10 +584,17 @@ public:
     return UnresolvedReferences;
   }
 
+  /// Whether this potential archetype makes a better archetype anchor than
+  /// the given archetype anchor.
+  bool isBetterArchetypeAnchor(PotentialArchetype *other);
+
   void dump(llvm::raw_ostream &Out, SourceManager *SrcMgr,
             unsigned Indent);
 
   friend class ArchetypeBuilder;
+
+private:
+  bool hasConcreteTypeInPath() const;
 };
 
 } // end namespace swift
