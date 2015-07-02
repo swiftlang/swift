@@ -12,14 +12,12 @@
 // simd.h overlays for Swift
 //===----------------------------------------------------------------------===//
 
-import Swift
 import Darwin
 @exported import simd
 
 % component = ['x','y','z','w']
 % scalar_types = ['Float','Double','Int32']
 % ctype = { 'Float':'float', 'Double':'double', 'Int32':'int' }
-% llvm_type = { 'Float':'FPIEEE32', 'Double':'FPIEEE64', 'Int32':'Int32' }
 % floating_types = ['Float','Double']
 % cardinal = { 2:'two', 3:'three', 4:'four'}
 % hash_scales = ['1', '3', '5', '11']
@@ -29,66 +27,38 @@ import Darwin
 %   for size in [2, 3, 4]:
 //    Workaround <rdar://problem/18900352>
 %     vectype = ctype[type] + str(size)
-%     llvm_vectype = "Vec" + str(size) + "x" + llvm_type[type]
 %     vecsize = (8 if type == 'Double' else 4)*(2 if size == 2 else 4)
-%     extractelement = "extractelement_" + llvm_vectype + "_Int32"
-%     insertelement = "insertelement_" + llvm_vectype + "_" + llvm_type[type] + "_Int32"
 
 /// A vector of ${cardinal[size]} `${type}`.  This corresponds to the C and
 /// Obj-C type `vector_${vectype}` and the C++ type `simd::${vectype}`.
 @_alignment(${vecsize})
 public struct ${vectype} :
-    ArrayLiteralConvertible, CustomDebugStringConvertible {
-
-  public var _vector: Builtin.${llvm_vectype}
-
-% for i in xrange(size):
-  public var ${component[i]} : ${type} {
-    @transparent
-    get {
-      let elt = Builtin.${extractelement}(_vector,
-        (${i} as Int32).value)
-
-      return ${type}(_bits: elt)
-    }
-    @transparent
-    set {
-      _vector = Builtin.${insertelement}(_vector,
-        newValue.value,
-        (${i} as Int32).value)
-    }
-  }
+  ArrayLiteralConvertible, CustomDebugStringConvertible {
+  public var ${', '.join(component[:size])}: ${type}
+% if size == 3:
+  /// Three-element vectors require padding so that their size is the same as
+  /// the size of the corresponding C, Obj-C, and C++ types.
+  internal let _padding: ${type} = 0
 % end
 
   /// Initialize to the zero vector.
-  @transparent
   public init() { self.init(0) }
 
-  @transparent
-  public init(_bits: Builtin.${llvm_vectype}) {
-    _vector = _bits
-  }
-
   /// Initialize a vector with the specified elements.
-  @transparent
   public init(${', '.join(map(lambda c: '_ ' + c + ': ' + type, component[:size]))}) {
-    var v: Builtin.${llvm_vectype} = Builtin.zeroInitializer()
-% for i in xrange(size):
-    v = Builtin.${insertelement}(v,
-      ${component[i]}.value,
-      (${i} as Int32).value)
+% for c in component[:size]:
+    self.${c} = ${c}
 % end
-    _vector = v
   }
 
   /// Initialize a vector with the specified elements.
-  @transparent
   public init(${', '.join(map(lambda c: c + ': ' + type, component[:size]))}) {
-    self.init(${', '.join(c for c in component[:size])})
+% for c in component[:size]:
+    self.${c} = ${c}
+% end
   }
 
   /// Initialize to a vector with all elements equal to `scalar`.
-  @transparent
   public init(_ scalar: ${type}) {
     self.init(${', '.join(['scalar']*size)})
   }
@@ -111,21 +81,21 @@ public struct ${vectype} :
 
   /// Access individual elements of the vector via subscript.
   public subscript(index: Int) -> ${type} {
-    @transparent
     get {
-      _precondition(index >= 0, "vector index out of range")
-      _precondition(index < ${size}, "vector index out of range")
-      let elt = Builtin.${extractelement}(_vector,
-        Int32(index).value)
-      return ${type}(_bits: elt)
+      switch index {
+%     for i in range(size):
+      case ${i}: return ${component[i]}
+%     end
+      default: _preconditionFailure("Vector index out of range")
+      }
     }
-    @transparent
     set(value) {
-      _precondition(index >= 0, "vector index out of range")
-      _precondition(index < ${size}, "vector index out of range")
-      _vector = Builtin.${insertelement}(_vector,
-        value.value,
-        Int32(index).value)
+      switch index {
+%     for i in range(size):
+      case ${i}: ${component[i]} = value
+%     end
+      default: _preconditionFailure("Vector index out of range")
+      }
     }
   }
 
@@ -149,57 +119,43 @@ public struct ${vectype} :
 /// Vector sum of `lhs` and `rhs`.
 @inline(__always)
 public func +(lhs: ${vectype}, rhs: ${vectype}) -> ${vectype} {
-  return ${vectype}(_bits:
-%if type in floating_types:
-    Builtin.fadd_${llvm_vectype}(
-%else:
-    Builtin.add_${llvm_vectype}(
-%end
-      lhs._vector, rhs._vector))
+  return ${vectype}(${', '.join(map(lambda c: \
+                    'lhs.' + c + '+rhs.' + c,
+                    component[:size]))})
 }
 
 /// Vector difference of `lhs` and `rhs`.
 @inline(__always)
 public func -(lhs: ${vectype}, rhs: ${vectype}) -> ${vectype} {
-  return ${vectype}(_bits:
-%if type in floating_types:
-    Builtin.fsub_${llvm_vectype}(
-%else:
-    Builtin.sub_${llvm_vectype}(
-%end
-      lhs._vector, rhs._vector))
+  return ${vectype}(${', '.join(map(lambda c: \
+                    'lhs.' + c + '-rhs.' + c,
+                    component[:size]))})
 }
 
 /// Negation of `rhs`.
 @inline(__always)
 public prefix func -(rhs: ${vectype}) -> ${vectype} {
-  return ${vectype}(0) - rhs
+  return ${vectype}(${', '.join(map(lambda c: \
+                    '-rhs.' + c,
+                    component[:size]))})
 }
 
 /// Elementwise product of `lhs` and `rhs`.  A.k.a. the Hadamard or Schur
 /// product of the two vectors.
 @inline(__always)
 public func *(lhs: ${vectype}, rhs: ${vectype}) -> ${vectype} {
-  return ${vectype}(_bits:
-%if type in floating_types:
-    Builtin.fmul_${llvm_vectype}(
-%else:
-    Builtin.mul_${llvm_vectype}(
-%end
-      lhs._vector, rhs._vector))
+  return ${vectype}(${', '.join(map(lambda c: \
+                    'lhs.' + c + '*rhs.' + c,
+                    component[:size]))})
 }
 
 /// Elementwise quotient of `lhs` and `rhs`.  This is the inverse operation
 /// of the elementwise product.
 @inline(__always)
 public func /(lhs: ${vectype}, rhs: ${vectype}) -> ${vectype} {
-  return ${vectype}(_bits:
-%if type in floating_types:
-    Builtin.fdiv_${llvm_vectype}(
-%else:
-    Builtin.sdiv_${llvm_vectype}(
-%end
-      lhs._vector, rhs._vector))
+  return ${vectype}(${', '.join(map(lambda c: \
+                    'lhs.' + c + '/rhs.' + c,
+                    component[:size]))})
 }
 
 /// Add `rhs` to `lhs`.

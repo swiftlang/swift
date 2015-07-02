@@ -37,10 +37,6 @@ namespace {
   struct alignas(16) int128_like {
     char data[16];
   };
-
-  struct alignas(32) int256_like {
-    char data[32];
-  };
 }
 
 // We use explicit sizes and alignments here just in case the C ABI
@@ -55,8 +51,6 @@ const ValueWitnessTable swift::_TWVBi64_ =
   ValueWitnessTableForBox<NativeBox<uint64_t, 8>>::table;
 const ValueWitnessTable swift::_TWVBi128_ =
   ValueWitnessTableForBox<NativeBox<int128_like, 16>>::table;
-const ValueWitnessTable swift::_TWVBi256_ =
-  ValueWitnessTableForBox<NativeBox<int256_like, 16>>::table;
 
 /// The basic value-witness table for Swift object pointers.
 const ExtraInhabitantsValueWitnessTable swift::_TWVBo =
@@ -133,7 +127,6 @@ OPAQUE_METADATA(Bi16_)
 OPAQUE_METADATA(Bi32_)
 OPAQUE_METADATA(Bi64_)
 OPAQUE_METADATA(Bi128_)
-OPAQUE_METADATA(Bi256_)
 OPAQUE_METADATA(Bo)
 OPAQUE_METADATA(Bb)
 OPAQUE_METADATA(BB)
