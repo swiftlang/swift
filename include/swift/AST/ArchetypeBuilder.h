@@ -414,6 +414,9 @@ class ArchetypeBuilder::PotentialArchetype {
   /// that were unresolved (at least at some point).
   llvm::TinyPtrVector<ComponentIdentTypeRepr *> UnresolvedReferences;
 
+  /// The equivalence class of this potential archetype.
+  llvm::TinyPtrVector<PotentialArchetype *> EquivalenceClass;
+
   /// \brief Construct a new potential archetype for an unresolved
   /// associated type.
   PotentialArchetype(PotentialArchetype *Parent, Identifier Name)
@@ -421,6 +424,7 @@ class ArchetypeBuilder::PotentialArchetype {
       IsRecursive(false), Invalid(false)
   { 
     assert(Parent != nullptr && "Not an associated type?");
+    EquivalenceClass.push_back(this);
   }
 
   /// \brief Construct a new potential archetype for an associated type.
@@ -429,6 +433,7 @@ class ArchetypeBuilder::PotentialArchetype {
       Representative(this), IsRecursive(false), Invalid(false)
   { 
     assert(Parent != nullptr && "Not an associated type?");
+    EquivalenceClass.push_back(this);
   }
 
   /// \brief Construct a new potential archetype for a generic parameter.
@@ -437,7 +442,9 @@ class ArchetypeBuilder::PotentialArchetype {
                      Identifier Name)
     : ParentOrParam(GenericParam), RootProtocol(RootProtocol), 
       NameOrAssociatedType(Name), Representative(this), IsRecursive(false),
-      Invalid(false) { }
+      Invalid(false) {
+    EquivalenceClass.push_back(this);
+  }
 
   /// \brief Recursively build the full name.
   void buildFullName(bool forDebug, SmallVectorImpl<char> &result) const;
@@ -518,6 +525,11 @@ public:
   /// \brief Retrieve the representative for this archetype, performing
   /// path compression on the way.
   PotentialArchetype *getRepresentative();
+
+  /// Retrieve the equivalence class containing this potential archetype.
+  ArrayRef<PotentialArchetype *> getEquivalenceClass() {
+    return getRepresentative()->EquivalenceClass;
+  }
 
   /// Retrieve the source of the same-type constraint that applies to this
   /// potential archetype.

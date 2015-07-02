@@ -302,7 +302,9 @@ bool ArchetypeBuilder::PotentialArchetype::addConformance(
     // Otherwise, create a new potential archetype for this associated type
     // and make it equivalent to the first potential archetype we encountered.
     auto otherPA = new PotentialArchetype(this, assocType);
-    otherPA->Representative = known->second.front();
+    auto frontRep = known->second.front()->getRepresentative();
+    otherPA->Representative = frontRep;
+    frontRep->EquivalenceClass.push_back(otherPA);
     otherPA->SameTypeSource = RequirementSource(RequirementSource::Inferred,
                                                 source.getLoc());
     known->second.push_back(otherPA);
@@ -377,7 +379,8 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
         // If we have resolved this nested type to more than one associated
         // type, create same-type constraints between them.
         if (!nested.empty()) {
-          pa->Representative = nested.front();
+          pa->Representative = nested.front()->getRepresentative();
+          pa->Representative->EquivalenceClass.push_back(pa);
           pa->SameTypeSource = RequirementSource(RequirementSource::Inferred,
                                                  SourceLoc());
         }
@@ -867,6 +870,8 @@ bool ArchetypeBuilder::addSameTypeRequirementBetweenArchetypes(
   // Make T1 the representative of T2, merging the equivalence classes.
   T2->Representative = T1;
   T2->SameTypeSource = Source;
+  for (auto equiv : T2->EquivalenceClass)
+    T1->EquivalenceClass.push_back(equiv);
 
   // Add unresolved references.
   T1->UnresolvedReferences.insert(T1->UnresolvedReferences.end(),
