@@ -84,46 +84,6 @@ struct MrMcRange : CollectionType {
   var base: Base
 }
 
-//===--- struct MrMcArray<T> ----------------------------------------------===//
-// A faux ArrayType that allows us to detect that, rather than being
-// treated as an arbitrary CollectionType when converting to a
-// _ContiguousArrayBuffer, it is first asked for its underlying
-// _ContiguousArrayBuffer.
-struct MrMcArray<T> : _ArrayType {
-  typealias _Buffer = _ContiguousArrayBuffer<T>
-
-  init(_ buffer: _Buffer) {
-    self._buffer = buffer
-  }
-  
-  var count: Int {
-    return _buffer.count
-  }
-
-  typealias Generator = IndexingGenerator<MrMcArray>
-  func generate() -> Generator {
-    return IndexingGenerator(self)
-  }
-  
-  var startIndex: Int {
-    return 0
-  }
-  
-  var endIndex: Int {
-    return _buffer.count
-  }
-
-  subscript(i: Int) -> T {
-    return _buffer[i]
-  }
-
-  func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<T> {
-    return _buffer
-  }
-
-  var _buffer: _Buffer
-}
-
 func printSequence<T : SequenceType>(x: T) {
   print("<", appendNewline: false)
   var prefix = ""
@@ -153,15 +113,6 @@ func test() {
   let n1 = MrMcRange(3..<23)._copyToNativeArrayBuffer()
   // CHECK: <3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22>
   printSequence(n1)
-
-  //===--- _ArrayTypes get asked for a NativeBuffer -----------------------===//
-
-  let a0 = MrMcArray<Tracked>(n1)
-
-  let n2 = a0._copyToNativeArrayBuffer()
-
-  // CHECK-NEXT: true
-  print(n1.identity == n2.identity)
 }
 test()
 
