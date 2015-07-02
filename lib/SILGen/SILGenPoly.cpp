@@ -1966,6 +1966,19 @@ void SILGenFunction::emitProtocolWitness(ProtocolConformance *conformance,
                                             witnessSubstResultAddr,
                                             reqtResultAddr);
 
+  // The materializeForSet method for an accessor returns a function that takes
+  // the container object and metatype as arguments. If the accessor's property
+  // is defined in the base class of the conforming class, the return value type
+  // will be wrong. Do an unsafe bit cast since we cannot express contravariance
+  // here.
+  if (auto funcDecl = dyn_cast<FuncDecl>(requirement.getDecl())) {
+    if (funcDecl->getAccessorKind() == AccessorKind::IsMaterializeForSet &&
+        witness.getDecl()->getDeclContext() != conformance->getType()->getAnyNominal()) {
+      reqtResultValue = B.createUncheckedBitCast(loc, reqtResultValue,
+                                                 thunkResultTy);
+    }
+  }
+
   scope.pop();
   B.createReturn(loc, reqtResultValue);
 }

@@ -460,3 +460,44 @@ struct GenericParameterNameCollision<T: HasAssoc> :
   // CHECK:         apply {{%.*}}<T1, T1.Assoc, T>
   func bar<V>(x: V -> T.Assoc) {}
 }
+
+protocol PropertyRequirement {
+  var width: Int { get set }
+  static var height: Int { get set }
+  var depth: Int { get set }
+}
+
+class PropertyRequirementBase {
+  var width: Int = 12
+  static var height: Int = 13
+}
+
+class PropertyRequirementWitnessFromBase : PropertyRequirementBase, PropertyRequirement {
+  var depth: Int = 14
+
+  // Make sure the contravariant return type in materializeForSet works correctly
+
+  // If the witness is in a base class of the conforming class, make sure we have a bit_cast in there:
+
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses34PropertyRequirementWitnessFromBaseS_19PropertyRequirementS_FS1_m5widthSi : {{.*}} {
+  // CHECK: upcast
+  // CHECK-NEXT: [[METH:%.*]] = class_method {{%.*}} : $PropertyRequirementBase, #PropertyRequirementBase.width!materializeForSet.1
+  // CHECK-NEXT: [[RES:%.*]] = apply [[METH]]
+  // CHECK-NEXT: [[RES_CAST:%.*]] = unchecked_trivial_bit_cast [[RES]]
+  // CHECK-NEXT: strong_release
+  // CHECK-NEXT: return [[RES_CAST]]
+
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses34PropertyRequirementWitnessFromBaseS_19PropertyRequirementS_ZFS1_m6heightSi : {{.*}} {
+  // CHECK: [[METH:%.*]] = function_ref @_TZFC9witnesses23PropertyRequirementBasem6heightSi
+  // CHECK-NEXT: [[RES:%.*]] = apply [[METH]]
+  // CHECK-NEXT: [[RES_CAST:%.*]] = unchecked_trivial_bit_cast [[RES]]
+  // CHECK-NEXT: return [[RES_CAST]]
+
+  // Otherwise, we shouldn't need the bit_cast:
+
+  // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses34PropertyRequirementWitnessFromBaseS_19PropertyRequirementS_FS1_m5depthSi
+  // CHECK: [[METH:%.*]] = class_method {{%.*}} : $PropertyRequirementWitnessFromBase, #PropertyRequirementWitnessFromBase.depth!materializeForSet.1
+  // CHECK-NEXT: [[RES:%.*]] = apply [[METH]]
+  // CHECK-NEXT: strong_release
+  // CHECK-NEXT: return [[RES]]
+}

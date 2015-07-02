@@ -1973,8 +1973,8 @@ ManagedValue SILGenFunction::emitApply(
 
     if (!hasAbsDiffs) return managedActualResult;
     return emitOrigToSubstValue(loc, managedActualResult,
-                                    origResultType, substResultType,
-                                    evalContext);
+                                origResultType, substResultType,
+                                evalContext);
   }
 
   // Okay, we want a scalar result.
