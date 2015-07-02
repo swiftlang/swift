@@ -468,7 +468,17 @@ namespace {
                               [&]() -> TypeVariableType* {
         auto implArchetype = baseTypeVar->getImpl().getArchetype();
         if (!implArchetype) {
-          return baseTypeVar;
+          // If the base type variable doesn't have an associated archetype,
+          // just form the member constraint.
+          // FIXME: Additional requirements?
+          auto locator = CS.getConstraintLocator(
+                           Locator.withPathElement(member));
+          auto memberTypeVar = CS.createTypeVariable(locator,
+                                                     TVO_PrefersSubtypeBinding);
+          CS.addConstraint(Constraint::create(CS, ConstraintKind::TypeMember,
+                                              baseTypeVar, memberTypeVar,
+                                              member->getName(), locator));
+          return memberTypeVar;
         }
                                 
                                 

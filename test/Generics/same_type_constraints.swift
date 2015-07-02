@@ -256,3 +256,27 @@ func sameTypeParameterizedConcrete<C : P2 where C.Q == XP1<C>>(c: C) {
   c.getQ().wibble()
 }
 
+// rdar://problem/21621421
+protocol P3 {
+  typealias AssocP3 : P1
+}
+
+protocol P4 {
+  typealias AssocP4 : P3
+}
+
+struct X1 : P1 { }
+
+struct X3 : P3 {
+  typealias AssocP3 = X1
+}
+
+func foo<C : P4 where C.AssocP4 == X3>(c: C) { }
+
+struct X4 : P4 {
+  typealias AssocP4 = X3
+}
+
+func testFoo(x3: X4) {
+  foo(x3)
+}
