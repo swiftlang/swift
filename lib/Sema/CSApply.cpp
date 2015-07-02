@@ -6303,6 +6303,36 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
         diagnosed = true;
         break;
       }
+      case FixKind::AllZerosToInit: {
+        // Chase the parent map to find the reference to 'allZeros' and
+        // the call to it. We'll need these for the Fix-It.
+        UnresolvedDotExpr *allZerosRef = nullptr;
+        auto parentMap = expr->getParentMap();
+        Expr *current = affected;
+        do {
+          // We haven't found the reference to allZeros yet, look for it now.
+          if ((allZerosRef = dyn_cast<UnresolvedDotExpr>(current))) {
+            if (allZerosRef->getName().str() == "allZeros")
+              break;
+            allZerosRef = nullptr;
+          }
+
+          current = parentMap[current];
+        } while (current);
+
+        if (allZerosRef) {
+          TC.diagnose(allZerosRef->getNameLoc(),
+                      diag::migrate_from_allZeros)
+            .fixItReplace(SourceRange(allZerosRef->getDotLoc(),
+                                      allZerosRef->getNameLoc()),
+                          "()");
+        } else {
+          // Diagnostic without Fix-It; we couldn't find what we needed.
+          TC.diagnose(affected->getLoc(), diag::migrate_from_allZeros);
+        }
+        diagnosed = true;
+        break;
+      }
 
       case FixKind::CoerceToCheckedCast: {
         if (auto *coerceExpr = dyn_cast<CoerceExpr>(locator->getAnchor())) {

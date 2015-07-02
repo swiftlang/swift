@@ -12,3 +12,7 @@ let i = color.toRaw() // expected-error{{method 'fromRaw' has been replaced with
 let i2 = Color.fromRaw(2)!.toRaw()
 // expected-error @-1{{static method 'fromRaw' has been replaced with a failable initializer 'init(rawValue:)'}}{{15-24=(rawValue: }}
 // expected-error @-2{{method 'fromRaw' has been replaced with a property 'rawValue'}}{{28-35=rawValue}}
+
+
+// <rdar://problem/21087089> Fixit for <RawOptionSetType>.allZeros
+let i3 = Color.allZeros // expected-error {{static method 'allZeros' has been replaced with the default initializer}} {{15-24=()}}

@@ -261,6 +261,9 @@ enum class FixKind : uint8_t {
   /// Replace a call of 'toRaw' with a reference to 'rawValue'.
   ToRawToRawValue,
 
+  /// Replace a call of 'X.allZeros' with a reference to 'X()'.
+  AllZerosToInit,
+  
   /// Replace a coercion ('as') with a forced checked cast ('as!').
   CoerceToCheckedCast,
 };

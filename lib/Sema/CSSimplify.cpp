@@ -3095,6 +3095,25 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       addConstraint(ConstraintKind::Bind, memberTy, toRawType, locator);
 
       return SolutionKind::Solved;
+    } else if (shouldAttemptFixes() && name.isSimpleName("allZeros") &&
+               (rawValueType = getRawRepresentableValueType(TC, DC,
+                                                            instanceTy))) {
+      // Replace a reference to "X.allZeros" with a reference to X().
+      // FIXME: This is temporary.
+      
+      // Record this fix.
+      increaseScore(SK_Fix);
+      if (worseThanBestSolution())
+        return SolutionKind::Error;
+      
+      auto locator = constraint.getLocator();
+      Fixes.push_back({FixKind::AllZerosToInit,getConstraintLocator(locator)});
+      
+      // Form the type that "allZeros" would have had and bind the
+      // member type to it.
+      addConstraint(ConstraintKind::Bind, memberTy, rawValueType, locator);
+      return SolutionKind::Solved;
+
     } else if (shouldAttemptFixes() && 
                baseObjTy->getOptionalObjectType()) {
       // If the base type was an optional, look through it.
@@ -4402,6 +4421,7 @@ ConstraintSystem::simplifyFixConstraint(Fix fix,
   case FixKind::FromRawToInit:
   case FixKind::ToRawToRawValue:
   case FixKind::CoerceToCheckedCast:
+  case FixKind::AllZerosToInit:
     llvm_unreachable("handled elsewhere");
   }
 }

@@ -454,6 +454,8 @@ StringRef Fix::getName(FixKind kind) {
     return "fix: convert optional to boolean";
   case FixKind::FromRawToInit:
     return "fix: fromRaw(x) to init(rawValue:x)";
+  case FixKind::AllZerosToInit:
+    return "fix: x.allZeros to x()";
   case FixKind::ToRawToRawValue:
     return "fix: toRaw() to rawValue";
   case FixKind::CoerceToCheckedCast:

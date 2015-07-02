@@ -1496,6 +1496,10 @@ ERROR(optional_used_as_boolean,sema_tce,none,
 ERROR(migrate_from_raw_to_init,sema_tce,none,
       "static method 'fromRaw' has been replaced with a failable initializer "
       "'init(rawValue:)'", ())
+ERROR(migrate_from_allZeros,sema_tce,none,
+      "static method 'allZeros' has been replaced with the default initializer",
+      ())
+
 ERROR(migrate_to_raw_to_raw_value,sema_tce,none,
       "method 'fromRaw' has been replaced with a property 'rawValue'", ())
 
