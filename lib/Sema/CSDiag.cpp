@@ -1695,7 +1695,9 @@ private:
                                  CandidateCloseness closeness);
   
   bool visitExpr(Expr *E);
-  
+
+  bool visitForceValueExpr(ForceValueExpr *FVE);
+
   bool visitBinaryExpr(BinaryExpr *BE);
   bool visitUnaryExpr(ApplyExpr *AE);
   bool visitPrefixUnaryExpr(PrefixUnaryExpr *PUE) {
@@ -2039,6 +2041,7 @@ Type FailureDiagnosis::getTypeOfIndependentSubExpression(Expr *subExpr) {
   
   if (!isa<ClosureExpr>(subExpr) &&
       (isa<ApplyExpr>(subExpr) || isa<ArrayExpr>(subExpr) ||
+       isa<ForceValueExpr>(subExpr) ||
        typeIsNotSpecialized(subExpr->getType()))) {
     
     // Store off the sub-expression, in case a new one is provided via the
@@ -2401,6 +2404,7 @@ bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
                               Candidates, candidateCloseness);
   return true;
 }
+
 
 bool FailureDiagnosis::visitUnaryExpr(ApplyExpr *applyExpr) {
   assert(expr->getKind() == ExprKind::PostfixUnary ||
@@ -2889,6 +2893,31 @@ visitForcedCheckedCastExpr(ForcedCheckedCastExpr *castExpr) {
     return true;
   }
 
+  return diagnoseGeneralFailure();
+}
+
+bool FailureDiagnosis::visitForceValueExpr(ForceValueExpr *FVE) {
+  CleanupIllFormedExpressionRAII cleanup(*CS, expr);
+  
+  auto argExpr = FVE->getSubExpr();
+  auto argType = getTypeOfIndependentSubExpression(argExpr);
+  
+  // If the argument type is an error, we've posted the diagnostic
+  // recursively.
+  if (isErrorTypeKind(argType))
+    return true;
+  
+  // If the subexpression type checks as a non-optional type, then that is the
+  // error.  Produce a specific diagnostic about this.
+  if (argType->getOptionalObjectType().isNull()) {
+    CS->TC.diagnose(FVE->getLoc(), diag::invalid_force_unwrap,
+                    getUserFriendlyTypeName(argType))
+      .fixItRemove(FVE->getExclaimLoc())
+      .highlight(FVE->getSourceRange());
+    expr->setType(ErrorType::get(CS->getASTContext()));
+    return true;
+  }
+  
   return diagnoseGeneralFailure();
 }
 

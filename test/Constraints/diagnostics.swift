@@ -183,3 +183,8 @@ func testStructWithOptionalArray(foo: StructWithOptionalArray) -> Int {
   return foo.array[0]  // expected-error {{result type 'Element' does not match expected type}}
 }
 
+
+// <rdar://problem/19774755> Incorrect diagnostic for unwrapping non-optional bridged types
+var invalidForceUnwrap = Int()! // expected-error {{cannot force unwrap value of non-optional type 'Int'}}
+
+

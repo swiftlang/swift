@@ -326,6 +326,10 @@ ERROR(invalid_relation,sema_tcc,none,
       "'%1' is not %select{identical to|a subtype of|"
       "convertible to|constructible with|identical to}0 '%2'",
       (unsigned, StringRef, StringRef))
+ERROR(invalid_force_unwrap,sema_tcc,none,
+      "cannot force unwrap value of non-optional type '%0'", (StringRef))
+
+
 ERROR(invalid_tuple_size,sema_tcc,none,
       "tuple types %0 and %1 have a different number of elements (%2 vs. %3)",
       (Type, Type, unsigned, unsigned))
@@ -348,6 +352,7 @@ WARNING(isa_is_always_true,sema_tcc,none, "'%0' test is always true",
 WARNING(conditional_downcast_coercion,sema_tcc,none,
       "conditional cast from %0 to %1 always succeeds",
       (Type, Type))
+
 WARNING(forced_downcast_coercion,sema_tcc,none,
       "forced cast from %0 to %1 always succeeds; did you mean to use 'as'?",
       (Type, Type))
