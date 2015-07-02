@@ -1233,9 +1233,11 @@ void Mangler::mangleType(Type type, ResilienceExpansion explosion,
 /// candidate.
 ///   <protocol-list> ::= <protocol-name>+
 void Mangler::mangleProtocolList(ArrayRef<Type> protocols) {
-  for (auto protoTy : protocols) {
-    mangleProtocolName(protoTy->castTo<ProtocolType>()->getDecl());
-  }
+  for (auto protoTy : protocols)
+    if (auto composition = protoTy->getAs<ProtocolCompositionType>())
+      mangleProtocolList(composition->getProtocols());
+    else
+      mangleProtocolName(protoTy->castTo<ProtocolType>()->getDecl());
 }
 void Mangler::mangleProtocolList(ArrayRef<ProtocolDecl*> protocols) {
   for (auto protocol : protocols) {
