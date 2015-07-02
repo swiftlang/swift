@@ -306,6 +306,7 @@ public func expectGE(
 %end
 
 public func expectType<T>(_: T.Type, inout _ x: T) {}
+public func expectEqualType<T>(_: T.Type, _: T.Type) {}
 
 public func isSequenceType<X : SequenceType>(x: X) -> X { return x }
 public func expectIndexable<X : Indexable>(x: X) -> X { return x }

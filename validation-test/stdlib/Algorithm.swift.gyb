@@ -2426,6 +2426,10 @@ SequenceTypeAlgorithms.test("Slice/AssociatedTypes") {
   expectCollectionGeneratorIsIndexingGenerator(slice)
   expectCollectionSubSequenceIsSelf(slice)
   expectCollectionIndexIsMinimalForwardIndex(slice)
+
+  func checkStaticTypealiases<C : CollectionType>(c: C) {
+    expectEqualType(C.Index.self, Slice<C>.Index.self)
+  }
 }
 
 SequenceTypeAlgorithms.test("Slice.{startIndex,endIndex}") {

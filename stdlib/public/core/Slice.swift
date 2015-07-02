@@ -13,12 +13,11 @@
 public struct Slice<Base : Indexable> : CollectionType {
 
   public typealias Index = Base.Index
-  public typealias Element = Base._Element
 
   public let startIndex: Index
   public let endIndex: Index
 
-  public subscript(index: Index) -> Element {
+  public subscript(index: Index) -> Base._Element {
     return _base[index]
   }
 
