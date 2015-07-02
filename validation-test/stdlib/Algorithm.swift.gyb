@@ -2397,20 +2397,11 @@ SequenceTypeAlgorithms.test("subscript(_: Range<Index>)/Semantics") {
 // Slice<Base>
 //===----------------------------------------------------------------------===//
 
-/*
-Can't write a simple test function because of:
-<rdar://problem/21620908> Funny generic constraint crashes the compiler
-
 func expectCollectionGeneratorIsIndexingGenerator<
   C : CollectionType
   where
   C.Generator == IndexingGenerator<C>
 >(c: C) {}
-*/
-// Workaround:
-func getCollectionGeneratorThroughGeneric<
-  C : CollectionType
->(c: C) -> C.Generator { return c.generate() }
 
 func expectCollectionSubSequenceIsSelf<
   C : CollectionType
@@ -2418,20 +2409,11 @@ func expectCollectionSubSequenceIsSelf<
   C.SubSequence == C
 >(c: C) {}
 
-/*
-Can't write a simple test function because of:
-<rdar://problem/21621421> Trivial generic constraint can't be satisfied
-
 func expectCollectionIndexIsMinimalForwardIndex<
   C : CollectionType
   where
   C.Index == MinimalForwardIndex
 >(c: C) {}
-*/
-// Workaround:
-func getCollectionIndexThroughGeneric<
-  C : CollectionType
->(c: C) -> C.Index { return c.startIndex }
 
 SequenceTypeAlgorithms.test("Slice/AssociatedTypes") {
   let c = MinimalForwardCollection([ OpaqueValue(1) ])
@@ -2441,16 +2423,9 @@ SequenceTypeAlgorithms.test("Slice/AssociatedTypes") {
     &slice)
 
   expectCollectionType(slice)
-
-  var g = getCollectionGeneratorThroughGeneric(slice)
-  expectType(
-    IndexingGenerator<Slice<MinimalForwardCollection<OpaqueValue<Int>>>>.self,
-    &g)
-
+  expectCollectionGeneratorIsIndexingGenerator(slice)
   expectCollectionSubSequenceIsSelf(slice)
-
-  var i = getCollectionIndexThroughGeneric(slice)
-  expectType(MinimalForwardIndex.self, &i)
+  expectCollectionIndexIsMinimalForwardIndex(slice)
 }
 
 SequenceTypeAlgorithms.test("Slice.{startIndex,endIndex}") {
