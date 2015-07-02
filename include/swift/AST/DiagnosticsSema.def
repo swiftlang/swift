@@ -352,6 +352,8 @@ WARNING(isa_is_always_true,sema_tcc,none, "'%0' test is always true",
 WARNING(conditional_downcast_coercion,sema_tcc,none,
       "conditional cast from %0 to %1 always succeeds",
       (Type, Type))
+WARNING(forced_downcast_noop,sema_tcc,none,
+        "forced cast of %0 to same type has no effect", (Type))
 
 WARNING(forced_downcast_coercion,sema_tcc,none,
       "forced cast from %0 to %1 always succeeds; did you mean to use 'as'?",

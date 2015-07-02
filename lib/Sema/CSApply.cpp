@@ -3293,6 +3293,12 @@ namespace {
         if (SuppressDiagnostics)
           return nullptr;
 
+        if (sub->getType()->isEqual(toType)) {
+          tc.diagnose(expr->getLoc(), diag::forced_downcast_noop, toType)
+            .fixItRemove(SourceRange(expr->getLoc(),
+                                 expr->getCastTypeLoc().getSourceRange().End));
+          return sub;
+        }
         tc.diagnose(expr->getLoc(), diag::forced_downcast_coercion,
                     sub->getType(), toType)
           .fixItReplace(SourceRange(expr->getLoc(), expr->getExclaimLoc()),

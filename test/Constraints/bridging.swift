@@ -269,3 +269,9 @@ func rdar19813772(nsma: NSMutableArray) {
   var a2 = nsma as! Array<AnyObject> // expected-warning{{forced cast from 'NSMutableArray' to 'Array<AnyObject>' always succeeds; did you mean to use 'as'?}}
   var a3 = nsma as Array<AnyObject>
 }
+
+
+// <rdar://problem/20336036> QoI: Add cast-removing fixit for "Forced cast from 'T' to 'T' always succeeds"
+func force_cast_fixit(a : [NSString]) -> [NSString] {
+  return a as! [NSString] // expected-warning {{forced cast of '[NSString]' to same type has no effect}} {{12-27=}}
+}

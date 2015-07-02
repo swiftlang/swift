@@ -93,7 +93,7 @@ Double(1) as Double as String // expected-error{{'Double' is not convertible to 
 [(1, (1, 1))] as! [(Int, (String, Int))] // expected-error{{'[(Int, (Int, Int))]' is not convertible to '[(Int, (String, Int))]'}}
 
 // <rdar://problem/19495253> Incorrect diagnostic for explicitly casting to the same type
-"hello" as! String // expected-warning{{forced cast from 'String' to 'String' always succeeds; did you mean to use 'as'?}}
+"hello" as! String // expected-warning{{forced cast of 'String' to same type has no effect}} {{9-20=}}
 
 // <rdar://problem/19499340> QoI: Nimble as -> as! changes not covered by Fix-Its
 func f(x : String) {}
