@@ -447,7 +447,9 @@ StringMirrorTuple swift_StructMirror_subscript(intptr_t i,
   swift_retain(owner);
 
   // 'owner' is consumed by this call.
-  result.second = swift_unsafeReflectAny(owner, fieldData, fieldType);
+  assert(!fieldType.isIndirect() && "indirect struct fields not implemented");
+  result.second = swift_unsafeReflectAny(owner, fieldData,
+                                         fieldType.getType());
 
   return result;
 }
@@ -473,6 +475,7 @@ static void getEnumMirrorInfo(HeapObject *owner,
                               const OpaqueValue *value,
                               const Metadata *type,
                               const Metadata **payloadTypePtr,
+                              bool *indirectPtr,
                               int *tagPtr) {
   const auto Enum = static_cast<const EnumMetadata *>(type);
   const auto &Description = Enum->Description->Enum;
@@ -482,28 +485,46 @@ static void getEnumMirrorInfo(HeapObject *owner,
 
   const Metadata *payloadType;
   int tag;
+  bool indirect;
 
   switch (Description.getNumPayloadCases()) {
   case 0:
     payloadType = nullptr;
+    indirect = false;
     tag = swift_getEnumCaseSimple(value, emptyCases);
     break;
-  case 1:
-    payloadType = Description.GetCaseTypes(type)[0];
-    tag = swift_getEnumCaseSinglePayload(value, payloadType, emptyCases);
-    if (tag != -1) payloadType = nullptr;
+  case 1: {
+    auto payload = Description.GetCaseTypes(type)[0];
+    const Metadata *payloadLayout;
+    if (payload.isIndirect())
+      payloadLayout = &_TMdBo.base;
+    else
+      payloadLayout = payload.getType();
+    payloadType = payload.getType();
+    tag = swift_getEnumCaseSinglePayload(value, payloadLayout, emptyCases);
+    if (tag != -1) {
+      payloadType = nullptr;
+      indirect = false;
+    } else {
+      indirect = payload.isIndirect();
+    }
     tag++;
     break;
-  default:
+  }
+  default: {
     tag = swift_getEnumCaseMultiPayload(value, Enum);
-    payloadType = Description.GetCaseTypes(type)[tag];
+    auto payload = Description.GetCaseTypes(type)[tag];
+    payloadType = payload.getType();
+    indirect = payload.isIndirect();
     if (static_cast<unsigned>(tag) >= payloadCases)
       payloadType = nullptr;
     break;
   }
+  }
 
   *payloadTypePtr = payloadType;
   *tagPtr = tag;
+  *indirectPtr = indirect;
 }
 
 extern "C"
@@ -517,9 +538,10 @@ const char *swift_EnumMirror_caseName(HeapObject *owner,
   const auto &Description = Enum->Description->Enum;
 
   const Metadata *payloadType;
+  bool indirect;
   int tag;
 
-  getEnumMirrorInfo(owner, value, type, &payloadType, &tag);
+  getEnumMirrorInfo(owner, value, type, &payloadType, &indirect, &tag);
   return getFieldName(Description.CaseNames, tag);
 }
 
@@ -531,9 +553,10 @@ intptr_t swift_EnumMirror_count(HeapObject *owner,
     return 0;
 
   const Metadata *payloadType;
+  bool indirect;
   int tag;
 
-  getEnumMirrorInfo(owner, value, type, &payloadType, &tag);
+  getEnumMirrorInfo(owner, value, type, &payloadType, &indirect, &tag);
 
   return (payloadType != nullptr) ? 1 : 0;
 }
@@ -549,9 +572,17 @@ StringMirrorTuple swift_EnumMirror_subscript(intptr_t i,
   const auto &Description = Enum->Description->Enum;
 
   const Metadata *payloadType;
+  bool indirect;
   int tag;
 
-  getEnumMirrorInfo(owner, value, type, &payloadType, &tag);
+  getEnumMirrorInfo(owner, value, type, &payloadType, &indirect, &tag);
+
+  // If the payload is indirect, we need to jump through the box to get it.
+  if (indirect) {
+    owner = *reinterpret_cast<HeapObject * const *>(value);
+
+    value = swift_projectBox(const_cast<HeapObject *>(owner));
+  }
 
   // This matches the -1 in swift_unsafeReflectAny.
   swift_retain(owner);
@@ -625,6 +656,8 @@ StringMirrorTuple swift_ClassMirror_subscript(intptr_t i,
   
   // Load the type and offset from their respective vectors.
   auto fieldType = Clas->getFieldTypes()[i];
+  assert(!fieldType.isIndirect()
+         && "class indirect properties not implemented");
   
   // FIXME: If the class has ObjC heritage, get the field offset using the ObjC
   // metadata, because we don't update the field offsets in the face of
@@ -647,7 +680,7 @@ StringMirrorTuple swift_ClassMirror_subscript(intptr_t i,
   
   result.first = String(getFieldName(Clas->getDescription()->Class.FieldNames, i));
   // 'owner' is consumed by this call.
-  result.second = swift_unsafeReflectAny(owner, fieldData, fieldType);
+  result.second = swift_unsafeReflectAny(owner, fieldData, fieldType.getType());
   return result;
 }
   

@@ -39,6 +39,7 @@ namespace irgen {
   class AbstractCallee;
   class Callee;
   class Explosion;
+  class FieldTypeInfo;
   class IRGenFunction;
   class IRGenModule;
   class Size;
@@ -228,7 +229,7 @@ namespace irgen {
   void emitFieldTypeAccessor(IRGenModule &IGM,
                              NominalTypeDecl *type,
                              llvm::Function *fn,
-                             ArrayRef<CanType> fieldTypes);
+                             ArrayRef<FieldTypeInfo> fieldTypes);
   
   /// Adjustment indices for the address points of various metadata.
   /// Size is in words.

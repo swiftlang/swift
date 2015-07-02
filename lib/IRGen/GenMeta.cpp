@@ -457,6 +457,10 @@ TypeMetadataAccessStrategy irgen::getTypeMetadataAccessStrategy(CanType type) {
     if (tuple->getNumElements() == 0)
       return TypeMetadataAccessStrategy::Direct;
 
+  // SIL box types are opaque to the runtime; NativeObject stands in for them.
+  if (isa<SILBoxType>(type))
+    return TypeMetadataAccessStrategy::Direct;
+
   // Everything else requires a shared accessor function.
   return TypeMetadataAccessStrategy::NonUniqueAccessor;
 }
@@ -1863,7 +1867,7 @@ namespace {
   static llvm::Function *
   getFieldTypeAccessorFn(IRGenModule &IGM,
                          NominalTypeDecl *type,
-                         ArrayRef<CanType> fieldTypes) {
+                         ArrayRef<FieldTypeInfo> fieldTypes) {
     // The accessor function has the following signature:
     // const Metadata * const *getFieldTypes(const Metadata *T);
     auto metadataArrayPtrTy = IGM.TypeMetadataPtrTy->getPointerTo();
@@ -1890,9 +1894,10 @@ namespace {
   getFieldTypeAccessorFn(IRGenModule &IGM,
                          NominalTypeDecl *type,
                          NominalTypeDecl::StoredPropertyRange storedProperties){
-    SmallVector<CanType, 4> types;
+    SmallVector<FieldTypeInfo, 4> types;
     for (VarDecl *prop : storedProperties) {
-      types.push_back(prop->getType()->getCanonicalType());
+      types.push_back(FieldTypeInfo(prop->getType()->getCanonicalType(),
+                                    /*indirect*/ false));
     }
     return getFieldTypeAccessorFn(IGM, type, types);
   }
@@ -1902,10 +1907,13 @@ namespace {
   getFieldTypeAccessorFn(IRGenModule &IGM,
                          NominalTypeDecl *type,
                          ArrayRef<EnumImplStrategy::Element> enumElements){
-    SmallVector<CanType, 4> types;
+    SmallVector<FieldTypeInfo, 4> types;
     for (auto &elt : enumElements) {
       assert(elt.decl->hasArgumentType() && "enum case doesn't have arg?!");
-      types.push_back(elt.decl->getArgumentType()->getCanonicalType());
+      auto caseType = elt.decl->getArgumentType()->getCanonicalType();
+      bool isIndirect = elt.decl->isIndirect()
+        || elt.decl->getParentEnum()->isIndirect();
+      types.push_back(FieldTypeInfo(caseType, isIndirect));
     }
     return getFieldTypeAccessorFn(IGM, type, types);
   }
@@ -2164,16 +2172,16 @@ namespace {
 
 void
 IRGenModule::addLazyFieldTypeAccessor(NominalTypeDecl *type,
-                                      ArrayRef<CanType> fieldTypes,
+                                      ArrayRef<FieldTypeInfo> fieldTypes,
                                       llvm::Function *fn) {
   dispatcher.addLazyFieldTypeAccessor(type, fieldTypes, fn, this);
 }
 
 void
 irgen::emitFieldTypeAccessor(IRGenModule &IGM,
-                         NominalTypeDecl *type,
-                         llvm::Function *fn,
-                         ArrayRef<CanType> fieldTypes)
+                             NominalTypeDecl *type,
+                             llvm::Function *fn,
+                             ArrayRef<FieldTypeInfo> fieldTypes)
 {
   IRGenFunction IGF(IGM, fn);
   auto metadataArrayPtrTy = IGM.TypeMetadataPtrTy->getPointerTo();
@@ -2242,7 +2250,7 @@ irgen::emitFieldTypeAccessor(IRGenModule &IGM,
   
   // Emit type metadata for the fields into the vector.
   for (unsigned i : indices(fieldTypes)) {
-    auto fieldTy = fieldTypes[i];
+    auto fieldTy = fieldTypes[i].getType();
     auto slot = IGF.Builder.CreateInBoundsGEP(builtVector,
                       llvm::ConstantInt::get(IGM.Int32Ty, i));
     
@@ -2252,6 +2260,16 @@ irgen::emitFieldTypeAccessor(IRGenModule &IGM,
       fieldTy = refStorTy.getReferentType();
     
     auto metadata = IGF.emitTypeMetadataRef(fieldTy);
+
+    // Mix in flag bits.
+    if (fieldTypes[i].isIndirect()) {
+      auto flags = FieldType().withIndirect(true);
+      auto metadataBits = IGF.Builder.CreatePtrToInt(metadata, IGF.IGM.SizeTy);
+      metadataBits = IGF.Builder.CreateOr(metadataBits,
+                   llvm::ConstantInt::get(IGF.IGM.SizeTy, flags.getIntValue()));
+      metadata = IGF.Builder.CreateIntToPtr(metadataBits, metadata->getType());
+    }
+
     IGF.Builder.CreateStore(metadata, slot, IGM.getPointerAlignment());
   }
   

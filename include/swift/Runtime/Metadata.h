@@ -1047,7 +1047,7 @@ struct NominalTypeDescriptor {
       /// The field type vector accessor. Returns a pointer to an array of
       /// type metadata references whose order is consistent with that of the
       /// field offset vector.
-      const Metadata * const *(*GetFieldTypes)(const Metadata *Self);
+      const FieldType *(*GetFieldTypes)(const Metadata *Self);
 
       /// True if metadata records for this type have a field offset vector for
       /// its stored properties.
@@ -1071,7 +1071,7 @@ struct NominalTypeDescriptor {
       /// The field type vector accessor. Returns a pointer to an array of
       /// type metadata references whose order is consistent with that of the
       /// field offset vector.
-      const Metadata * const *(*GetFieldTypes)(const Metadata *Self);
+      const FieldType *(*GetFieldTypes)(const Metadata *Self);
 
       /// True if metadata records for this type have a field offset vector for
       /// its stored properties.
@@ -1093,7 +1093,7 @@ struct NominalTypeDescriptor {
       /// The field type vector accessor. Returns a pointer to an array of
       /// type metadata references whose order is consistent with that of the
       /// CaseNames. Only types for payload cases are provided.
-      const Metadata * const *(*GetCaseTypes)(const Metadata *Self);
+      const FieldType *(*GetCaseTypes)(const Metadata *Self);
 
       uint32_t getNumPayloadCases() const {
         return NumPayloadCasesAndPayloadSizeOffset & 0x00FFFFFFU;
@@ -1307,7 +1307,7 @@ public:
   }
   
   /// Get a pointer to the field type vector, if present, or null.
-  const Metadata * const *getFieldTypes() const {
+  const FieldType *getFieldTypes() const {
     assert(isTypeMetadata());
     auto *getter = Description->Class.GetFieldTypes;
     if (!getter)
@@ -1486,7 +1486,7 @@ struct StructMetadata : public Metadata {
   }
   
   /// Get a pointer to the field type vector, if present, or null.
-  const Metadata * const *getFieldTypes() const {
+  const FieldType *getFieldTypes() const {
     auto *getter = Description->Struct.GetFieldTypes;
     if (!getter)
       return nullptr;

@@ -1805,6 +1805,36 @@ Reflection.test("Name of metatype of artificial subclass") {
   expectEqual("\(obj.dynamicType)", "a.TestArtificialSubclass")
 }
 
+enum Foo<T> {
+  indirect case Foo(Int)
+  case Bar(T)
+}
+
+enum List<T> {
+  case Nil
+  indirect case Cons(first: T, rest: List<T>)
+}
+
+let x = List.Cons(first: 0, rest: .Cons(first: 1, rest: .Nil))
+switch x {
+case .Cons(_, .Cons(let second, .Nil)):
+  print(second)
+default:
+  print(x)
+}
+
+Reflection.test("Indirect enum payload") {
+  let x = Foo<String>.Foo(22)
+  let y = Foo<String>.Bar("twenty-two")
+
+  expectEqual("\(x)", "a.Foo<Swift.String>.Foo(22)")
+  expectEqual("\(y)", "a.Foo<Swift.String>.Bar(\"twenty-two\")")
+
+  let list = List.Cons(first: 0, rest: .Cons(first: 1, rest: .Nil))
+  expectEqual("\(list)",
+              "a.List<Swift.Int>.Cons(0, a.List<Swift.Int>.Cons(1, a.List<Swift.Int>.Nil))")
+}
+
 var BitTwiddlingTestSuite = TestSuite("BitTwiddling")
 
 func computeCountLeadingZeroes(var x: Int64) -> Int64 {

@@ -24,6 +24,8 @@
 
 namespace swift {
 
+struct Metadata;
+
 /// Kinds of Swift metadata records.  Some of these are types, some
 /// aren't.
 enum class MetadataKind : uintptr_t {
@@ -407,6 +409,45 @@ public:
   }
   bool operator!=(FunctionTypeFlags other) const {
     return Data != other.Data;
+  }
+};
+
+/// Field types and flags as represented in a nominal type's field/case type
+/// vector.
+class FieldType {
+  typedef uintptr_t int_type;
+  // Type metadata is always at least pointer-aligned, so we get at least two
+  // low bits to stash flags. We could use three low bits on 64-bit, and maybe
+  // some high bits as well.
+  enum : int_type {
+    Indirect = 1,
+
+    TypeMask = ((uintptr_t)-1) & ~(alignof(void*) - 1),
+  };
+  int_type Data;
+
+  constexpr FieldType(int_type Data) : Data(Data) {}
+public:
+  constexpr FieldType() : Data(0) {}
+  FieldType withType(const Metadata *T) const {
+    return FieldType((Data & ~TypeMask) | (uintptr_t)T);
+  }
+
+  constexpr FieldType withIndirect(bool indirect) const {
+    return FieldType((Data & ~Indirect)
+                     | (indirect ? Indirect : 0));
+  }
+
+  bool isIndirect() const {
+    return bool(Data & Indirect);
+  }
+
+  const Metadata *getType() const {
+    return (const Metadata *)(Data & TypeMask);
+  }
+
+  int_type getIntValue() const {
+    return Data;
   }
 };
 

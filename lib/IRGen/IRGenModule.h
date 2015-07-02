@@ -116,7 +116,30 @@ namespace irgen {
   enum class ReferenceCounting : unsigned char;
 
 class IRGenModule;
-  
+
+/// A type descriptor for a field type accessor.
+class FieldTypeInfo {
+  llvm::PointerIntPair<CanType, 1, unsigned> Info;
+  /// Bits in the "int" part of the Info pair.
+  enum : unsigned {
+    /// Flag indicates that the case is indirectly stored in a box.
+    Indirect = 1,
+  };
+
+  static unsigned getFlags(bool indirect) {
+    return (indirect ? Indirect : 0);
+    //   | (blah ? Blah : 0) ...
+  }
+
+public:
+  FieldTypeInfo(CanType type, bool indirect)
+    : Info(type, getFlags(indirect))
+  {}
+
+  CanType getType() const { return Info.getPointer(); }
+  bool isIndirect() const { return Info.getInt() & Indirect; }
+};
+
 /// Dispatches IR generation to a single or multiple IRGenModules.
 ///
 /// In single-threaded compilation IRGenModuleDispatcher contains a single
@@ -192,7 +215,7 @@ public:
   }
   
   void addLazyFieldTypeAccessor(NominalTypeDecl *type,
-                                ArrayRef<CanType> fieldTypes,
+                                ArrayRef<FieldTypeInfo> fieldTypes,
                                 llvm::Function *fn,
                                 IRGenModule *IGM) {
     LazyFieldTypeAccessors.push_back({type,
@@ -239,7 +262,7 @@ private:
 
   struct LazyFieldTypeAccessor {
     NominalTypeDecl *type;
-    std::vector<CanType> fieldTypes;
+    std::vector<FieldTypeInfo> fieldTypes;
     llvm::Function *fn;
     IRGenModule *IGM;
   };
@@ -478,7 +501,7 @@ public:
   void addProtocolConformanceRecord(llvm::Constant *record);
 
   void addLazyFieldTypeAccessor(NominalTypeDecl *type,
-                                ArrayRef<CanType> fieldTypes,
+                                ArrayRef<FieldTypeInfo> fieldTypes,
                                 llvm::Function *fn);
 
 private:

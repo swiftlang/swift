@@ -259,6 +259,11 @@ void swift::swift_deallocBox(HeapObject *o) {
 }
 
 OpaqueValue *swift::swift_projectBox(HeapObject *o) {
+  // The compiler will use a nil reference as a way to avoid allocating memory
+  // for boxes of empty type. The address of an empty value is always undefined,
+  // so we can just return nil back in this case.
+  if (!o)
+    return reinterpret_cast<OpaqueValue*>(o);
   auto metadata = static_cast<const GenericBoxHeapMetadata *>(o->metadata);
   return metadata->project(o);
 }
