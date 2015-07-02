@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-silgen
+// RUN: not %target-swift-frontend %s -emit-silgen
 import StdlibUnittest
 
 func testCollectionIndexIsMinimalForwardIndex<
