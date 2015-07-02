@@ -281,7 +281,8 @@ void TypeChecker::resolveInheritanceClause(DeclContext *dc) {
   PartialGenericTypeToArchetypeResolver resolver(*this);
 
   for (auto &inherited : inheritanceClause) {
-    if (validateType(inherited, dc, TR_GenericSignature, &resolver)) {
+    TypeResolutionOptions options = TR_GenericSignature | TR_InheritanceClause;
+    if (validateType(inherited, dc, options, &resolver)) {
       inherited.setInvalidType(Context);
       continue;
     }
@@ -299,10 +300,10 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
   DeclContext *DC;
   if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
     DC = nominal;
-    options |= TR_GenericSignature;
+    options |= TR_GenericSignature | TR_InheritanceClause;
   } else if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
     DC = ext;
-    options |= TR_GenericSignature;
+    options |= TR_GenericSignature | TR_InheritanceClause;
   } else if (isa<GenericTypeParamDecl>(decl)) {
     // For generic parameters, we want name lookup to look at just the
     // signature of the enclosing entity.

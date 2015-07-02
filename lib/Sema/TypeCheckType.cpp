@@ -181,6 +181,7 @@ void TypeChecker::forceExternalDeclMembers(NominalTypeDecl *nominalDecl) {
 
 Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
                                        DeclContext *fromDC,
+                                       TypeResolutionOptions options,
                                        bool isSpecialized,
                                        GenericTypeResolver *resolver) {
   PartialGenericTypeToArchetypeResolver defaultResolver(*this);
@@ -251,7 +252,8 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
 
   // If we found an associated type in an inherited protocol, the base
   // for our reference to this associated type is our own 'Self'.
-  if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl)) {
+  auto assocType = dyn_cast<AssociatedTypeDecl>(typeDecl);
+  if (assocType) {
     // If we found an associated type from within its protocol, resolve it
     // as a dependent member relative to Self if Self is still dependent.
     if (fromDC->isProtocolOrProtocolExtensionContext()) {
@@ -307,6 +309,17 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
         // Perform the substitution.
         return substMemberTypeWithBase(parentDC->getParentModule(), typeDecl,
                                        fromType, /*isTypeReference=*/true);
+      }
+
+      ProtocolConformance *conformance = nullptr;
+      if (assocType &&
+          !options.contains(TR_InheritanceClause) &&
+          conformsToProtocol(fromType,
+                             cast<ProtocolDecl>(assocType->getDeclContext()),
+                             parentDC, ConformanceCheckFlags::Used,
+                             &conformance) &&
+          conformance) {
+        return conformance->getTypeWitness(assocType, this).getReplacement();
       }
     }
   }
@@ -429,8 +442,7 @@ static void diagnoseUnboundGenericType(TypeChecker &tc, Type ty,SourceLoc loc) {
 static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
                             DeclContext *dc,
                             ArrayRef<TypeRepr *> genericArgs,
-                            bool allowUnboundGenerics,
-                            bool isGenericSignature,
+                            TypeResolutionOptions options,
                             GenericTypeResolver *resolver) {
   TC.validateDecl(typeDecl);
 
@@ -438,7 +450,7 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
   if (dc) {
     // Resolve the type declaration to a specific type. How this occurs
     // depends on the current context and where the type was found.
-    type = TC.resolveTypeInContext(typeDecl, dc, !genericArgs.empty(),
+    type = TC.resolveTypeInContext(typeDecl, dc, options, !genericArgs.empty(),
                                    resolver);
   } else {
     type = typeDecl->getDeclaredType();
@@ -450,7 +462,7 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
     return ErrorType::get(TC.Context);
 
   if (type->is<UnboundGenericType>() &&
-      genericArgs.empty() && !allowUnboundGenerics) {
+      genericArgs.empty() && !options.contains(TR_AllowUnboundGenerics)) {
     diagnoseUnboundGenericType(TC, type, loc);
     return ErrorType::get(TC.Context);
   }
@@ -471,7 +483,8 @@ static Type resolveTypeDecl(TypeChecker &TC, TypeDecl *typeDecl, SourceLoc loc,
   if (!genericArgs.empty()) {
     // Apply the generic arguments to the type.
     type = applyGenericTypeReprArgs(TC, type, loc, dc, genericArgs,
-                                    isGenericSignature, resolver);
+                                    options.contains(TR_GenericSignature),
+                                    resolver);
   }
 
   assert(type);
@@ -498,15 +511,13 @@ static NominalTypeDecl *getEnclosingNominalContext(DeclContext *dc) {
 /// \param dc The context in which name lookup occurred.
 /// \param components The components that refer to the type, where the last
 /// component refers to the type that could not be found.
-/// \param isGenericSignature True if we're only looking into the generic
-/// signature of the given context.
 ///
 /// \returns true if we could not fix the type reference, false if
 /// typo correction (or some other mechanism) was able to fix the
 /// reference.
 static bool diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
                                 ArrayRef<ComponentIdentTypeRepr *> components,
-                                bool isGenericSignature,
+                                TypeResolutionOptions options,
                                 GenericTypeResolver *resolver) {
   auto comp = components.back();
 
@@ -521,8 +532,7 @@ static bool diagnoseUnknownType(TypeChecker &tc, DeclContext *dc,
       // Retrieve the nominal type and resolve it within this context.
       assert(!isa<ProtocolDecl>(nominal) && "Cannot be a protocol");
       auto type = resolveTypeDecl(tc, nominal, comp->getIdLoc(), dc, { },
-                                  /*allowUnboundGenerics=*/false,
-                                  isGenericSignature, resolver);
+                                  options, resolver);
       if (type->is<ErrorType>())
         return true;
 
@@ -628,10 +638,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
     if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp))
       genericArgs = genComp->getGenericArgs();
     Type type = resolveTypeDecl(TC, typeDecl, comp->getIdLoc(),
-                                DC, genericArgs,
-                                options.contains(TR_AllowUnboundGenerics),
-                                options.contains(TR_GenericSignature),
-                                resolver);
+                                DC, genericArgs, options, resolver);
     if (type->is<ErrorType>()) {
       comp->setValue(type);
       return;
@@ -675,9 +682,7 @@ resolveTopLevelIdentTypeComponent(TypeChecker &TC, DeclContext *DC,
     // If we're not allowed to complain or we couldn't fix the
     // source, bail out.
     if (!diagnoseErrors ||
-        diagnoseUnknownType(TC, DC, comp,
-                            options.contains(TR_GenericSignature),
-                            resolver)) {
+        diagnoseUnknownType(TC, DC, comp, options, resolver)) {                 
       Type ty = ErrorType::get(TC.Context);
       comp->setValue(ty);
       return;
@@ -718,10 +723,8 @@ static Type resolveIdentTypeComponent(
             });
 
             if (matchingParam != genericParams->end()) {
-              bool unboundGenerics = options.contains(TR_AllowUnboundGenerics);
               Type type = resolveTypeDecl(TC, *matchingParam, comp->getIdLoc(),
-                                          DC, None, unboundGenerics, true,
-                                          resolver);
+                                          DC, None, options, resolver);
               comp->setValue(type);
               if (type->is<ErrorType>())
                 return type;
@@ -747,11 +750,8 @@ static Type resolveIdentTypeComponent(
             for (const auto decl : decls) {
               // FIXME: Better ambiguity handling.
               if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl)) {
-                bool unboundGenerics
-                  = options.contains(TR_AllowUnboundGenerics);
                 Type type = resolveTypeDecl(TC, assocType, comp->getIdLoc(),
-                                            DC, None, unboundGenerics, true,
-                                            resolver);
+                                            DC, None, options, resolver);
                 comp->setValue(type);
                 if (type->is<ErrorType>())
                   return type;
@@ -838,14 +838,12 @@ static Type resolveIdentTypeComponent(
       }
 
       // If we didn't find anything, complain.
-      bool isGenericSignature = options.contains(TR_GenericSignature);
       bool recovered = false;
       if (!memberTypes) {
         // If we're not allowed to complain or we couldn't fix the
         // source, bail out.
         if (!diagnoseErrors || 
-            diagnoseUnknownType(TC, DC, components, isGenericSignature,
-                                resolver)) {
+            diagnoseUnknownType(TC, DC, components, options, resolver)) {
           Type ty = ErrorType::get(TC.Context);
           comp->setValue(ty);
           return ty;
@@ -867,10 +865,10 @@ static Type resolveIdentTypeComponent(
 
       // If there are generic arguments, apply them now.
       if (auto genComp = dyn_cast<GenericIdentTypeRepr>(comp))
-        memberType = applyGenericTypeReprArgs(TC, memberType,
-                                              genComp->getIdLoc(),
-                                              DC, genComp->getGenericArgs(),
-                                              isGenericSignature, resolver);
+        memberType = applyGenericTypeReprArgs(
+                       TC, memberType, genComp->getIdLoc(), DC,
+                       genComp->getGenericArgs(),
+                       options.contains(TR_GenericSignature), resolver);
 
       comp->setValue(memberType);
       return memberType;
@@ -898,10 +896,7 @@ static Type resolveIdentTypeComponent(
     genericArgs = genComp->getGenericArgs();
 
   Type type = resolveTypeDecl(TC, typeDecl, comp->getIdLoc(), DC,
-                              genericArgs, 
-                              options.contains(TR_AllowUnboundGenerics),
-                              options.contains(TR_GenericSignature),
-                              resolver);
+                              genericArgs, options, resolver);
   comp->setValue(type);
   return type;
 }

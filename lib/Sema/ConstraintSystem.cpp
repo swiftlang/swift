@@ -891,6 +891,7 @@ ConstraintSystem::getTypeOfReference(ValueDecl *value,
   if (auto typeDecl = dyn_cast<TypeDecl>(value)) {
     // Resolve the reference to this type declaration in our current context.
     auto type = getTypeChecker().resolveTypeInContext(typeDecl, DC,
+                                                      TR_InExpression,
                                                       isSpecialized);
     if (!type)
       return { nullptr, nullptr };

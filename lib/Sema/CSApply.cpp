@@ -2202,6 +2202,7 @@ namespace {
         // Resolve the reference to this type declaration in our
         // current context.
         auto type = cs.getTypeChecker().resolveTypeInContext(typeDecl, dc,
+                                                             TR_InExpression,
                                                              isSpecialized);
         if (!type)
           return nullptr;

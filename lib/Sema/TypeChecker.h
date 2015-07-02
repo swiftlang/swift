@@ -295,10 +295,19 @@ enum TypeResolutionFlags {
   /// Whether we are binding an extension declaration, which limits
   /// the lookup.
   TR_ExtensionBinding = 0x40000,
+
+  /// Whether we are in the inheritance clause of a nominal type declaration
+  /// or extension.
+  TR_InheritanceClause = 0x80000,
 };
 
 /// Option set describing how type resolution should work.
 typedef OptionSet<TypeResolutionFlags> TypeResolutionOptions;
+
+inline TypeResolutionOptions operator|(TypeResolutionFlags lhs,
+                                       TypeResolutionFlags rhs) {
+  return TypeResolutionOptions(lhs) | rhs;
+}
 
 /// Strip the contextual options from the given type resolution options.
 static inline TypeResolutionOptions
@@ -608,6 +617,7 @@ public:
   /// \returns the resolved type, or emits a diagnostic and returns null if the
   /// type cannot be resolved.
   Type resolveTypeInContext(TypeDecl *typeDecl, DeclContext *fromDC,
+                            TypeResolutionOptions options,
                             bool isSpecialized,
                             GenericTypeResolver *resolver = nullptr);
 

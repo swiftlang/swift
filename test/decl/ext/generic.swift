@@ -146,3 +146,16 @@ extension GenericClass : P3 where T : P3 { } // expected-error{{extension of typ
 extension GenericClass where Self : P3 { }
 // expected-error@-1{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'GenericClass'?}}
 // expected-error@-2{{type 'GenericClass' in conformance requirement does not refer to a generic parameter or associated type}}
+
+protocol P4 {
+  typealias T
+  init(_: T)
+}
+
+protocol P5 { }
+
+struct S4<Q>: P4 {
+  init(_: Q) { }
+}
+
+extension S4 where T : P5 {} // expected-error{{type 'T' in conformance requirement does not refer to a generic parameter or associated type}}
