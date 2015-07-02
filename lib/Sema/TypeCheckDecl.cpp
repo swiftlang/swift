@@ -716,13 +716,6 @@ ArchetypeBuilder TypeChecker::createArchetypeBuilder(Module *mod) {
              checkInheritanceClause(assocType);
              return std::make_pair(assocType->getSuperclass(),
                                    assocType->getConformingProtocols(this));
-           },
-           [=](Module &M, Type T, ProtocolDecl *Protocol)
-           -> ProtocolConformance* {
-             ProtocolConformance *c;
-             if (conformsToProtocol(T, Protocol, &M, None, &c))
-               return c;
-             return nullptr;
            });
 }
 

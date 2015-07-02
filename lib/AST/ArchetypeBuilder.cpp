@@ -173,11 +173,6 @@ struct ArchetypeBuilder::Implementation {
   /// on the given generic type parameter.
   GetConformsToCallback getConformsTo;
 
-  /// Compute the protocol conformance when a given type conforms to the given
-  /// protocol.
-  std::function<ProtocolConformance *(Module &, Type, ProtocolDecl*)>
-    conformsToProtocol;
-
   /// A mapping from generic parameters to the corresponding potential
   /// archetypes.
   llvm::MapVector<GenericTypeParamKey, PotentialArchetype*> PotentialArchetypes;
@@ -594,28 +589,18 @@ ArchetypeBuilder::ArchetypeBuilder(Module &mod, DiagnosticEngine &diags)
     return std::make_pair(assocType->getSuperclass(), 
                           assocType->getConformingProtocols(nullptr));
   };
-  Impl->conformsToProtocol = [](Module &M, Type t, ProtocolDecl *protocol)
-  -> ProtocolConformance* {
-    auto res = M.lookupConformance(t, protocol, nullptr);
-    if (res.getInt() == ConformanceKind::DoesNotConform)
-      return nullptr;
-    return res.getPointer();
-  };
 }
 
 ArchetypeBuilder::ArchetypeBuilder(
   Module &mod, DiagnosticEngine &diags, 
   LazyResolver *lazyResolver,
   std::function<ArrayRef<ProtocolDecl *>(ProtocolDecl *)> getInheritedProtocols,
-  GetConformsToCallback getConformsTo,
-  std::function<ProtocolConformance * (Module &, Type, ProtocolDecl*)>
-    conformsToProtocol)
+  GetConformsToCallback getConformsTo)
   : Mod(mod), Context(mod.getASTContext()), Diags(diags),
     Resolver(lazyResolver), Impl(new Implementation)
 {
   Impl->getInheritedProtocols = std::move(getInheritedProtocols);
   Impl->getConformsTo = std::move(getConformsTo);
-  Impl->conformsToProtocol = std::move(conformsToProtocol);
 }
 
 ArchetypeBuilder::ArchetypeBuilder(ArchetypeBuilder &&) = default;
@@ -933,14 +918,17 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
   DenseMap<ProtocolDecl *, ProtocolConformance*> conformances;
   for (auto conforms : T->getConformsTo()) {
     auto protocol = conforms.first;
-    auto conformance = Impl->conformsToProtocol(Mod, Concrete, protocol);
-    if (!conformance) {
+    auto conformance = Mod.lookupConformance(
+                         Concrete, protocol,
+                         Mod.getASTContext().getLazyResolver());
+    if (conformance.getInt() == ConformanceKind::DoesNotConform) {
       Diags.diagnose(Source.getLoc(),
                      diag::requires_generic_param_same_type_does_not_conform,
                      Concrete, protocol->getName());
       return true;
     }
-    conformances[protocol] = conformance;
+
+    conformances[protocol] = conformance.getPointer();
   }
   
   // Record the requirement.

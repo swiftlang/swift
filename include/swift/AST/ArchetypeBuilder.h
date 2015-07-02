@@ -183,10 +183,7 @@ public:
     ModuleDecl &mod, DiagnosticEngine &diags, LazyResolver *resolver,
     std::function<ArrayRef<ProtocolDecl *>(ProtocolDecl *)>
       getInheritedProtocols,
-    GetConformsToCallback getConformsTo,
-    std::function<ProtocolConformance * (ModuleDecl &M, Type T,
-                                         ProtocolDecl* P)>
-      conformsToProtocol);
+    GetConformsToCallback getConformsTo);
   ArchetypeBuilder(ArchetypeBuilder &&);
   ~ArchetypeBuilder();
 
