@@ -30,6 +30,8 @@ namespace clang {
   class ASTContext;
   class CodeGenOptions;
   class Decl;
+  class EnumConstantDecl;
+  class EnumDecl;
   class MacroInfo;
   class Module;
   class NamedDecl;
@@ -232,6 +234,16 @@ public:
 
   /// Returns true if it is expected that the macro is ignored.
   bool shouldIgnoreMacro(StringRef Name, const clang::MacroInfo *Macro);
+
+  /// Returns the name of the given enum element as it would be imported into
+  /// Swift.
+  ///
+  /// The return value may be an empty identifier, in which case the enum would
+  /// not be imported.
+  ///
+  /// This is mostly an implementation detail of the importer, but is also
+  /// used by the debugger.
+  Identifier getEnumConstantName(const clang::EnumConstantDecl *enumConstant);
 
   using ClangModuleLoader::addDependency;
   

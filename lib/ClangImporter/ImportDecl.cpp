@@ -1364,16 +1364,17 @@ namespace {
     }
     
     /// Get the Swift name for an enum constant.
-    Identifier getEnumConstantName(const clang::EnumConstantDecl *decl,
-                                   const clang::EnumDecl *clangEnum) {
+    static Identifier getEnumConstantName(ClangImporter::Implementation &impl,
+                                          const clang::EnumConstantDecl *decl,
+                                          const clang::EnumDecl *clangEnum) {
       if (auto *nameAttr = decl->getAttr<clang::SwiftNameAttr>()) {
         StringRef customName = nameAttr->getName();
         if (Lexer::isIdentifier(customName))
-          return Impl.SwiftContext.getIdentifier(customName);
+          return impl.SwiftContext.getIdentifier(customName);
       }
 
-      StringRef enumPrefix = Impl.EnumConstantNamePrefixes.lookup(clangEnum);
-      return Impl.importName(decl, enumPrefix);
+      StringRef enumPrefix = impl.EnumConstantNamePrefixes.lookup(clangEnum);
+      return impl.importName(decl, enumPrefix);
     }
 
     /// Determine the common prefix to remove from the element names of an
@@ -1481,7 +1482,7 @@ namespace {
                          const clang::EnumDecl *clangEnum,
                          EnumDecl *theEnum) {
       auto &context = Impl.SwiftContext;
-      auto name = getEnumConstantName(decl, clangEnum);
+      auto name = getEnumConstantName(Impl, decl, clangEnum);
       if (name.empty())
         return nullptr;
       
@@ -1536,7 +1537,7 @@ namespace {
     Decl *importOptionConstant(const clang::EnumConstantDecl *decl,
                                const clang::EnumDecl *clangEnum,
                                NominalTypeDecl *theStruct) {
-      auto name = getEnumConstantName(decl, clangEnum);
+      auto name = getEnumConstantName(Impl, decl, clangEnum);
       if (name.empty())
         return nullptr;
       
@@ -1561,7 +1562,7 @@ namespace {
                               EnumElementDecl *original,
                               const clang::EnumDecl *clangEnum,
                               NominalTypeDecl *importedEnum) {
-      auto name = getEnumConstantName(alias, clangEnum);
+      auto name = getEnumConstantName(Impl, alias, clangEnum);
       if (name.empty())
         return nullptr;
       
@@ -2050,7 +2051,7 @@ namespace {
     Decl *VisitEnumConstantDecl(const clang::EnumConstantDecl *decl) {
       auto clangEnum = cast<clang::EnumDecl>(decl->getDeclContext());
       
-      auto name = getEnumConstantName(decl, clangEnum);
+      auto name = getEnumConstantName(Impl, decl, clangEnum);
       if (name.empty())
         return nullptr;
 
@@ -5868,3 +5869,10 @@ ClangImporter::Implementation::getSpecialTypedefKind(clang::TypedefNameDecl *dec
     return None;
   return iter->second;
 }
+
+Identifier
+ClangImporter::getEnumConstantName(const clang::EnumConstantDecl *enumConstant){
+  auto clangEnum = cast<clang::EnumDecl>(enumConstant->getDeclContext());
+  return SwiftDeclConverter::getEnumConstantName(Impl, enumConstant, clangEnum);
+}
+
