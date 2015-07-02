@@ -2670,6 +2670,7 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
     auto unwrappedExpr = unwrapParenExpr(fnExpr);
     isInvalidTrailingClosureTarget = !isa<ClosureExpr>(unwrappedExpr);
   }
+  // TODO: Handle dot_syntax_call_expr "fn" as a non-closure value.
 
 
   Type argType;

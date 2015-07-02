@@ -2981,6 +2981,25 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     auto lookup = TC.lookupMemberType(DC, baseObjTy, name.getBaseName(),
                                       lookupOptions);
     if (!lookup) {
+      // If the base type was an optional, try to look through it.
+      if (shouldAttemptFixes() && baseObjTy->getOptionalObjectType()) {
+        
+        // Note the fix.
+        increaseScore(SK_Fix);
+        if (worseThanBestSolution())
+          return SolutionKind::Error;
+        
+        Fixes.push_back({FixKind::ForceOptional, constraint.getLocator()});
+        
+        // Look through one level of optional.
+        addConstraint(Constraint::create(*this, ConstraintKind::TypeMember,
+                                         baseObjTy->getOptionalObjectType(),
+                                         constraint.getSecondType(),
+                                         constraint.getMember(),
+                                         constraint.getLocator()));
+        return SolutionKind::Solved;
+      }
+      
       // FIXME: Customize diagnostic to mention types.
       recordFailure(constraint.getLocator(), Failure::DoesNotHaveMember,
                     baseObjTy, name);

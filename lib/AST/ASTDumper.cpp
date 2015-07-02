@@ -1214,6 +1214,14 @@ public:
     OS << '\n';
     printRec(S->getSequence());
     OS << '\n';
+    if (S->getGenerator()) {
+      printRec(S->getGenerator());
+      OS << '\n';
+    }
+    if (S->getGeneratorNext()) {
+      printRec(S->getGeneratorNext());
+      OS << '\n';
+    }
     printRec(S->getBody());
     OS << ')';
   }
