@@ -2293,10 +2293,13 @@ public:
     StringRef UnderlyingStr;
     {
       // FIXME: Ugly hack: remove the .Builtin from the element type.
-      llvm::raw_svector_ostream UnderlyingOS(UnderlyingStrVec);
-      visit(T->getElementType());
+      {
+        llvm::raw_svector_ostream UnderlyingOS(UnderlyingStrVec);
+        T->getElementType().print(UnderlyingOS);
+        UnderlyingOS.flush();
+      }
       if (UnderlyingStrVec.startswith("Builtin."))
-        UnderlyingStr = UnderlyingStrVec.substr(9);
+        UnderlyingStr = UnderlyingStrVec.substr(8);
       else
         UnderlyingStr = UnderlyingStrVec;
     }
