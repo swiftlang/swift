@@ -1240,9 +1240,8 @@ void Mangler::mangleProtocolList(ArrayRef<Type> protocols) {
       mangleProtocolName(protoTy->castTo<ProtocolType>()->getDecl());
 }
 void Mangler::mangleProtocolList(ArrayRef<ProtocolDecl*> protocols) {
-  for (auto protocol : protocols) {
+  for (auto protocol : protocols)
     mangleProtocolName(protocol);
-  }
 }
 
 /// Mangle the name of a protocol as a substitution candidate.
