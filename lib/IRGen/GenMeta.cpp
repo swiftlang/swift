@@ -511,6 +511,7 @@ namespace {
     }
     TREAT_AS_OPAQUE(BuiltinInteger)
     TREAT_AS_OPAQUE(BuiltinFloat)
+    TREAT_AS_OPAQUE(BuiltinVector)
     TREAT_AS_OPAQUE(BuiltinRawPointer)
 #undef TREAT_AS_OPAQUE
 
@@ -522,13 +523,12 @@ namespace {
 
     /// The given type should use opaque type info.  We assume that
     /// the runtime always provides an entry for such a type;  right
-    /// now, that mapping is as one of the integer types.
+    /// now, that mapping is as one of the power-of-two integer types.
     llvm::Value *visitOpaqueType(CanType type) {
       auto &opaqueTI = cast<FixedTypeInfo>(IGF.IGM.getTypeInfoForLowered(type));
-      assert(opaqueTI.getFixedSize() ==
-             Size(opaqueTI.getFixedAlignment().getValue()));
-      assert(opaqueTI.getFixedSize().isPowerOf2());
-      auto numBits = 8 * opaqueTI.getFixedSize().getValue();
+      unsigned numBits = opaqueTI.getFixedSize().getValueInBits();
+      if (!llvm::isPowerOf2_32(numBits))
+        numBits = llvm::NextPowerOf2(numBits);
       auto intTy = BuiltinIntegerType::get(numBits, IGF.IGM.Context);
       return emitDirectMetadataRef(CanType(intTy));
     }
@@ -542,10 +542,6 @@ namespace {
     }
 
     llvm::Value *visitBuiltinUnknownObjectType(CanBuiltinUnknownObjectType type) {
-      return emitDirectMetadataRef(type);
-    }
-
-    llvm::Value *visitBuiltinVectorType(CanBuiltinVectorType type) {
       return emitDirectMetadataRef(type);
     }
 
