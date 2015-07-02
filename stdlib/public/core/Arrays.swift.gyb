@@ -399,12 +399,6 @@ public struct ${Self}<Element>
   public var _buffer: _Buffer
 }
 
-extension ${Self} : __ArrayType {
-  public func _doCopyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element> {
-    return _extractOrCopyToNativeArrayBuffer(self._buffer)
-  }
-}
-
 extension ${Self} : ArrayLiteralConvertible {
 %if Self == 'Array':
   // Optimized implementation for Array
@@ -677,6 +671,10 @@ extension ${Self} : _ArrayType {
   @available(*, unavailable, message="call the 'sort()' method on the array")
   public func sorted(isOrderedBefore: (Element, Element) -> Bool) -> ${Self} {
     fatalError("unavailable function can't be called")
+  }
+  
+  public func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element> {
+    return _extractOrCopyToNativeArrayBuffer(self._buffer)
   }
 }
 

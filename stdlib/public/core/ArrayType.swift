@@ -10,26 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-public protocol __ArrayType : CollectionType {
-  var count: Int {get}
-
-  typealias _Buffer : _ArrayBufferType
-  var _buffer: _Buffer {get}
-
-  func _doCopyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Generator.Element>
-}
-
-extension __ArrayType {
-  public func _copyToNativeArrayBuffer(
-  ) -> _ContiguousArrayBuffer<Generator.Element> {
-    return _doCopyToNativeArrayBuffer()
-  }
-}
-
 public // @testable
 protocol _ArrayType
-  : __ArrayType,
-    RangeReplaceableCollectionType,
+  : RangeReplaceableCollectionType,
     MutableSliceable,
     ArrayLiteralConvertible
 {
@@ -98,6 +81,9 @@ protocol _ArrayType
 
   typealias _Buffer : _ArrayBufferType
   init(_ buffer: _Buffer)
+
+  // For testing.
+  var _buffer: _Buffer {get}
 }
 
 internal struct _ArrayTypeMirror<T : _ArrayType> : _MirrorType {

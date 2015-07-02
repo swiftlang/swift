@@ -89,7 +89,7 @@ struct MrMcRange : CollectionType {
 // treated as an arbitrary CollectionType when converting to a
 // _ContiguousArrayBuffer, it is first asked for its underlying
 // _ContiguousArrayBuffer.
-struct MrMcArray<T> : CollectionType, __ArrayType {
+struct MrMcArray<T> : _ArrayType {
   typealias _Buffer = _ContiguousArrayBuffer<T>
 
   init(_ buffer: _Buffer) {
@@ -117,7 +117,7 @@ struct MrMcArray<T> : CollectionType, __ArrayType {
     return _buffer[i]
   }
 
-  func _doCopyToNativeArrayBuffer() -> _ContiguousArrayBuffer<T> {
+  func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<T> {
     return _buffer
   }
 
