@@ -81,6 +81,10 @@ NOTE(previous_inout_alias,sil_gen,none,
 ERROR(unsupported_recursive_type,sil_gen,none,
       "recursive value type %0 is not allowed", (Type))
 
+ERROR(recursive_enum_not_indirect,sil_gen,none,
+      "recursive enum %0 is not marked 'indirect'", (Type))
+
+
 // Definite initialization diagnostics.
 NOTE(variable_defined_here,sil_analysis,none,
      "variable defined here", ())

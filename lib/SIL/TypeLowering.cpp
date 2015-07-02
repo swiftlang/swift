@@ -1189,19 +1189,30 @@ const TypeLowering *TypeConverter::find(TypeKey k) {
   // When that Sema check is in place, we should reinstate the early-exit
   // behavior for address-only types (marked by other TODO: items throughout
   // this file).
-  if (!found->second) {
-    // Try to complain about a nominal type.
-    if (auto nomTy = k.SubstType.getAnyNominal()) {
-      if (RecursiveNominalTypes.insert(nomTy).second)
-        M.getASTContext().Diags.diagnose(nomTy->getLoc(),
-                                         diag::unsupported_recursive_type,
-                                         nomTy->getDeclaredTypeInContext());
-    } else
-      assert(false && "non-nominal types should not be recursive");
-    found->second = new (*this, k.isDependent()) RecursiveErrorTypeLowering(
-                                SILType::getPrimitiveAddressType(k.SubstType));
+  if (auto elt = found->second)
+    return elt;
+    
+  // Try to complain about a nominal type.
+  auto nomTy = k.SubstType.getAnyNominal();
+  assert(nomTy && "non-nominal types should not be recursive");
+  
+  if (RecursiveNominalTypes.insert(nomTy).second) {
+    auto &diags = M.getASTContext().Diags;
+    if (auto *ED = dyn_cast<EnumDecl>(nomTy)) {
+      diags.diagnose(ED->getStartLoc(),
+                     diag::recursive_enum_not_indirect,
+                     nomTy->getDeclaredTypeInContext())
+      .fixItInsert(ED->getStartLoc(), "indirect ");
+    } else {
+      diags.diagnose(nomTy->getLoc(),
+                     diag::unsupported_recursive_type,
+                     nomTy->getDeclaredTypeInContext());
+    }
   }
-  return found->second;
+  auto result = new (*this, k.isDependent()) RecursiveErrorTypeLowering(
+                            SILType::getPrimitiveAddressType(k.SubstType));
+  found->second = result;
+  return result;
 }
 
 void TypeConverter::insert(TypeKey k, const TypeLowering *tl) {

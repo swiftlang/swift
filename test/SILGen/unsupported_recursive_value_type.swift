@@ -17,16 +17,16 @@ struct IndirectlyRecursiveStruct2 {
   let a: IndirectlyRecursiveStruct1
 }
 
-enum NonterminatingSelfRecursiveEnum { // expected-error{{recursive value type}}
+enum NonterminatingSelfRecursiveEnum { // expected-error{{recursive enum 'NonterminatingSelfRecursiveEnum' is not marked 'indirect'}} {{1-1=indirect }}
   case A(NonterminatingSelfRecursiveEnum)
 }
 
-enum TerminatingSelfRecursiveEnum { // expected-error{{recursive value type}}
+enum TerminatingSelfRecursiveEnum { // expected-error{{recursive enum 'TerminatingSelfRecursiveEnum' is not marked 'indirect'}} {{1-1=indirect }}
   case A(TerminatingSelfRecursiveEnum)
   case B
 }
 
-enum IndirectlyRecursiveEnum1 { // expected-error{{recursive value type}}
+enum IndirectlyRecursiveEnum1 { // expected-error{{recursive enum 'IndirectlyRecursiveEnum1' is not marked 'indirect'}} {{1-1=indirect }}
   case A(IndirectlyRecursiveEnum2)
 }
 enum IndirectlyRecursiveEnum2 {
