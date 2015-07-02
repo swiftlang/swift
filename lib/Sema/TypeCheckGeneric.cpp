@@ -442,6 +442,10 @@ addNestedRequirements(
       if (!assocType)
         continue; // FIXME: If we do this late enough, there will be no failure.
 
+      // Skip nested types bound to concrete types.
+      if (rep->isConcreteType())
+        continue;
+
       auto nestedType = DependentMemberType::get(type, assocType,
                                                  mod.getASTContext());
 

@@ -449,7 +449,8 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
            "root protocol type given for non-root archetype");
     auto parentTy = parent->getType(builder);
     if (!parentTy)
-      return {};
+      return NestedType::forConcreteType(ErrorType::get(mod.getASTContext()));
+
     ParentArchetype = parentTy.getAsArchetype();
     if (!ParentArchetype) {
       // We might have an outer archetype as a concrete type here; if so, just
@@ -461,7 +462,31 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
         return ArchetypeOrConcreteType;
       }
 
-      return {};
+      LazyResolver *resolver = mod.getASTContext().getLazyResolver();
+      assert(resolver && "need a lazy resolver");
+
+      // Resolve the member type.
+      auto depMemberType = getDependentType(builder, false)
+        ->castTo<DependentMemberType>();
+      Type memberType = depMemberType->substBaseType(
+                          &mod,
+                          parent->ArchetypeOrConcreteType.getAsConcreteType(),
+                          mod.getASTContext().getLazyResolver());
+      if (auto memberPA = builder.resolveArchetype(memberType)) {
+        // If the member type maps to an archetype, resolve that archetype.
+        if (memberPA->getRepresentative() != getRepresentative()) {
+          ArchetypeOrConcreteType = memberPA->getType(builder);
+          return ArchetypeOrConcreteType;
+        }
+
+        llvm_unreachable("we have no parent archetype");
+      } else {
+        // Otherwise, it's a concrete type.
+        ArchetypeOrConcreteType = NestedType::forConcreteType(
+                                    builder.substDependentType(memberType));
+
+        return ArchetypeOrConcreteType;
+      }
     }
 
     assocTypeOrProto = getResolvedAssociatedType();
@@ -932,10 +957,16 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
       = nested.second.front()->getResolvedAssociatedType();
     auto witness = conformances[assocType->getProtocol()]
           ->getTypeWitness(assocType, getLazyResolver());
-    addSameTypeRequirementToConcrete(
-      nested.second.front(),
-      witness.getReplacement()->getDesugaredType(),
-      Source);
+    auto witnessType = witness.getReplacement();
+    if (auto witnessPA = resolveArchetype(witnessType)) {
+      addSameTypeRequirementBetweenArchetypes(nested.second.front(),
+                                              witnessPA,
+                                              Source);
+    } else {
+      addSameTypeRequirementToConcrete(nested.second.front(),
+                                       witnessType,
+                                       Source);
+    }
   }
   
   return false;

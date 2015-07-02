@@ -236,3 +236,23 @@ protocol BarType {
     C.Element == Foo.Element
   >(elements: C)
 }
+
+// rdar://problem/21620908
+protocol P1 { }
+
+protocol P2Base { }
+
+protocol P2 : P2Base {
+  typealias Q : P1
+
+  func getQ() -> Q
+}
+
+struct XP1<T : P2Base> : P1 {
+  func wibble() { }
+}
+
+func sameTypeParameterizedConcrete<C : P2 where C.Q == XP1<C>>(c: C) {
+  c.getQ().wibble()
+}
+
