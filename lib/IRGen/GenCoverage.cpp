@@ -64,7 +64,7 @@ void IRGenModule::emitCoverageMapping() {
   auto *Int64Ty = llvm::Type::getInt64Ty(LLVMContext);
   auto *Int8PtrTy = llvm::Type::getInt8PtrTy(LLVMContext);
   auto *FunctionRecordTy = llvm::StructType::get(
-      LLVMContext, {Int8PtrTy, Int32Ty, Int32Ty, Int64Ty});
+      LLVMContext, {Int8PtrTy, Int32Ty, Int32Ty, Int64Ty}, /*isPacked=*/true);
 
   std::vector<llvm::Constant *> FunctionRecords;
   std::vector<CounterMappingRegion> Regions;
