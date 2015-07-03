@@ -145,3 +145,14 @@ func classInoutToPointer() {
                          y: UnsafePointer<Int>,
                          z: AutoreleasingUnsafeMutablePointer<ObjCMethodBridging>) {}
 }
+
+// rdar://problem/21505805
+// CHECK-LABEL: sil hidden @_TF18pointer_conversion22functionInoutToPointerFT_T_
+func functionInoutToPointer() {
+  // CHECK: [[BOX:%.*]] = alloc_box $@callee_owned () -> ()
+  var f: () -> () = {}
+
+  // CHECK: [[REABSTRACT_BUF:%.*]] = alloc_stack $@callee_owned (@out (), @in ()) -> ()
+  // CHECK: address_to_pointer [[REABSTRACT_BUF]]#1
+  takesMutableVoidPointer(&f)
+}

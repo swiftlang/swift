@@ -3491,6 +3491,15 @@ ManagedValue SILGenFunction::emitLValueToPointer(SILLocation loc,
                                                  CanType pointerType,
                                                  PointerTypeKind pointerKind,
                                                  AccessKind accessKind) {
+  // The incoming lvalue should be at the abstraction level of T in
+  // Unsafe*Pointer<T>. Reabstract it if necessary.
+  auto opaqueTy = AbstractionPattern::getOpaque();
+  auto loweredTy = getLoweredType(opaqueTy, lv.getSubstFormalType());
+  if (lv.getTypeOfRValue().getSwiftRValueType()
+        != loweredTy.getSwiftRValueType()) {
+    lv.addSubstToOrigComponent(opaqueTy, loweredTy);
+  }
+
   switch (pointerKind) {
   case PTK_UnsafeMutablePointer:
   case PTK_UnsafePointer:
