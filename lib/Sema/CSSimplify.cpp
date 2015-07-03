@@ -2040,9 +2040,14 @@ commit_to_conversions:
       conversionsOrFixes.push_back(Fix::getForcedDowncast(*this, type2));
     }
 
+    // Look through IUO's.
+    auto type1WithoutIUO = objectType1;
+    if (auto elt = type1WithoutIUO->getImplicitlyUnwrappedOptionalObjectType())
+      type1WithoutIUO = elt;
+
     // If we could perform a bridging cast, try it.
     if (isArrayDictionarySetOrString(TC.Context, type2) &&
-        TC.getDynamicBridgedThroughObjCClass(DC, true, objectType1, type2)) {
+        TC.getDynamicBridgedThroughObjCClass(DC, true, type1WithoutIUO, type2)){
       conversionsOrFixes.push_back(Fix::getForcedDowncast(*this, type2));
     }
 

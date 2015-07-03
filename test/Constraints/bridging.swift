@@ -275,3 +275,9 @@ func rdar19813772(nsma: NSMutableArray) {
 func force_cast_fixit(a : [NSString]) -> [NSString] {
   return a as! [NSString] // expected-warning {{forced cast of '[NSString]' to same type has no effect}} {{12-27=}}
 }
+
+// <rdar://problem/21244068> QoI: IUO prevents specific diagnostic + fixit about non-implicitly converted bridge types
+func rdar21244068(n: NSString!) -> String {
+  return n  // expected-error {{'NSString!' is not implicitly convertible to 'String'; did you mean to use 'as' to explicitly convert?}} {{11-11= as String}}
+}
+
