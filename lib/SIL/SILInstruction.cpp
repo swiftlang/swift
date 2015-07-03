@@ -246,6 +246,10 @@ namespace {
       return true;
     }
 
+    bool visitStrongRetainUnownedInst(const StrongRetainUnownedInst *RHS) {
+      return true;
+    }
+      
     bool visitLoadInst(const LoadInst *RHS) {
       return true;
     }
