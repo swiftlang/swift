@@ -66,9 +66,10 @@ public class RangeReplaceableCollectionLog {
   public static var insert = TypeIndexed(0)
   public static var removeAll = TypeIndexed(0)
   public static var removeAtIndex = TypeIndexed(0)
-  public static var removeLast = TypeIndexed(0)
+  public static var _customRemoveLast = TypeIndexed(0)
   public static var removeRange = TypeIndexed(0)
   public static var replaceRange = TypeIndexed(0)
+  public static var reserveCapacity = TypeIndexed(0)
   public static var splice = TypeIndexed(0)
 
   public static func dispatchTester<C: RangeReplaceableCollectionType>(
@@ -156,9 +157,9 @@ public struct LoggingRangeReplaceableCollection<
     return base.removeAtIndex(index)
   }
 
-  public mutating func removeLast() -> Base.Generator.Element {
-    ++Log.removeLast[selfType]
-    return base.removeLast()
+  public mutating func _customRemoveLast() -> Base.Generator.Element? {
+    ++Log._customRemoveLast[selfType]
+    return base._customRemoveLast()
   }
 
   public mutating func removeRange(subRange: Range<Base.Index>) {
@@ -172,6 +173,7 @@ public struct LoggingRangeReplaceableCollection<
   }
 
   public mutating func reserveCapacity(n: Base.Index.Distance) {
+    ++Log.reserveCapacity[selfType]
     base.reserveCapacity(n)
   }
 

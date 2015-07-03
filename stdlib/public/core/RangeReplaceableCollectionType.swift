@@ -124,11 +124,7 @@ public protocol RangeReplaceableCollectionType : CollectionType {
   /// - Complexity: O(`self.count`).
   mutating func removeAtIndex(i: Index) -> Generator.Element
 
-  /// Remove an element from the end and return it.
-  ///
-  /// - Complexity: O(1)
-  /// - Requires: `count > 0`.
-  mutating func removeLast() -> Generator.Element
+  mutating func _customRemoveLast() -> Generator.Element?
 
   /// Remove the indicated `subRange` of elements.
   ///
@@ -197,11 +193,26 @@ extension RangeReplaceableCollectionType {
       replaceRange(indices, with: EmptyCollection())
     }
   }
+
+  public mutating func reserveCapacity(n: Index.Distance) {}
 }
 
-extension RangeReplaceableCollectionType where Index: BidirectionalIndexType {
+extension RangeReplaceableCollectionType {
+  public mutating func _customRemoveLast() -> Generator.Element? {
+    return nil
+  }
+}
+
+extension RangeReplaceableCollectionType where Index : BidirectionalIndexType {
+  /// Remove an element from the end.
+  ///
+  /// - Complexity: O(1)
+  /// - Requires: `!self.isEmpty`
   public mutating func removeLast() -> Generator.Element {
     _precondition(!isEmpty, "can't removeLast from an empty collection")
+    if let result = _customRemoveLast() {
+      return result
+    }
     return removeAtIndex(endIndex.predecessor())
   }
 }

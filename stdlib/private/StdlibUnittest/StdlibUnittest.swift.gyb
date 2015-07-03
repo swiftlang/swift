@@ -2801,9 +2801,54 @@ public struct ${Self}<T> : ${'MutableCollectionType' if mutable else 'Collection
 // Minimal***RangeReplaceableCollectionType
 //===----------------------------------------------------------------------===//
 
-%for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
-%  Self = 'Minimal%sRangeReplaceableCollectionType' % traversal
-%  Index = 'Minimal%sIndex' % traversal
+% for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
+%   Protocol = 'Strict%sRangeReplaceableCollectionType' % traversal
+%   Self = 'Minimal%sRangeReplaceableCollection' % traversal
+%   Index = 'Minimal%sIndex' % traversal
+
+public protocol ${Protocol} : RangeReplaceableCollectionType {
+  typealias Element
+  init(base: ${Self}<Element>)
+  var base: ${Self}<Element> { get set }
+}
+
+extension ${Protocol} {
+  public mutating func replaceRange<
+    C: CollectionType where C.Generator.Element == Element
+  >(subRange: Range<${Self}<Element>.Index>,
+    with newElements: C) {
+    base.replaceRange(subRange, with: newElements)
+  }
+
+  public mutating func removeLast() -> Element {
+    return base.removeLast()
+  }
+}
+
+extension ${Protocol} where Generator : _MinimalGeneratorType {
+  public func generate() -> MinimalGenerator<Element> {
+    return base.generate()
+  }
+}
+
+extension ${Protocol} where Index : _MinimalIndexType {
+  public var startIndex: ${Index} {
+    return base.startIndex
+  }
+
+  public var endIndex: ${Index} {
+    return base.endIndex
+  }
+
+  public subscript(i: ${Index}) -> Element {
+    get {
+      return base[i]
+    }
+    set {
+      base[i] = newValue
+    }
+  }
+}
 
 /// A minimal implementation of `RangeReplaceableCollectionType` with extra
 /// checks.
@@ -2858,7 +2903,12 @@ public struct ${Self}<T> : RangeReplaceableCollectionType {
   }
 
   public subscript(i: ${Index}) -> T {
-    return elements[i.position]
+    get {
+      return elements[i.position]
+    }
+    set {
+      elements[i.position] = newValue
+    }
   }
 
   public mutating func reserveCapacity(n: Int) {
@@ -2921,7 +2971,7 @@ public struct ${Self}<T> : RangeReplaceableCollectionType {
   public var elements: [T]
 }
 
-%end
+% end
 
 /// A type that does not conform to any protocols.
 ///
@@ -3070,6 +3120,27 @@ public struct DefaultedForwardCollection<Element>
 
   public init(base: MinimalForwardCollection<Element>) {
     self.base = base
+  }
+}
+
+public struct DefaultedForwardRangeReplaceableCollection<Element>
+  : StrictForwardRangeReplaceableCollectionType {
+
+  public typealias Base = MinimalForwardRangeReplaceableCollection<Element>
+  public typealias Generator = MinimalGenerator<Element>
+  public typealias Index = MinimalForwardIndex
+  public var base: Base
+
+  public init() {
+    base = Base()
+  }
+
+  public init(base: Base) {
+    self.base = base
+  }
+
+  public init(_ array: [Element]) {
+    self.base = Base(array)
   }
 }
 

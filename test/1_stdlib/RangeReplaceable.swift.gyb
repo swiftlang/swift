@@ -13,9 +13,46 @@ enum RangeSelection {
   case EmptyRange
   case LeftEdge
   case RightEdge
-  case MiddleWithSize(Int)
-  case LeftWithSize(Int)
-  case RightWithSize(Int)
+  case Middle
+  case LeftHalf
+  case RightHalf
+
+  func rangeOf<
+    C : CollectionType>(collection: C) -> Range<C.Index> {
+    switch self {
+      case .EmptyRange: return collection.endIndex..<collection.endIndex
+      case .LeftEdge: return collection.startIndex..<collection.startIndex
+      case .RightEdge: return collection.endIndex..<collection.endIndex
+      case .Middle:
+        let start = advance(collection.startIndex, (collection.count / 4))
+        let end = advance(collection.startIndex, (3 * collection.count / 4))
+        return start...end
+      case .LeftHalf:
+        let start = collection.startIndex
+        let end = advance(start, collection.count / 2)
+        return start..<end
+      case .RightHalf:
+        let start = advance(collection.startIndex, collection.count / 2)
+        let end = collection.endIndex
+        return start..<end
+    }
+  }
+}
+
+enum IndexSelection {
+  case Start
+  case Middle
+  case End
+  case Last
+
+  func indexOf<C : CollectionType>(collection: C) -> C.Index {
+    switch self {
+      case .Start: return collection.startIndex
+      case .Middle: return advance(collection.startIndex, collection.count / 2)
+      case .End: return collection.endIndex
+      case .Last: return advance(collection.startIndex, collection.count - 1)
+    }
+  }
 }
 
 /// The fundamental test input/output data for RangeReplaceableCollectionType.
@@ -27,77 +64,22 @@ enum RangeSelection {
 ///
 /// We can then compare the output to `ReplaceRangeTest`'s `expected` property
 /// to see if they match.
-struct ReplaceRangeTest<T: Equatable> : CustomStringConvertible {
-  typealias Collection = Array<T>
-  var collection: Collection
-  let elements: Collection
-  let expected: Collection
-  let description: String
+struct ReplaceRangeTest {
+  var collection: [OpaqueValue<Int>]
+  let newElements: [OpaqueValue<Int>]
+  let rangeSelection: RangeSelection
+  let expected: [Int]
   let loc: SourceLoc
-  let range: Range<Collection.Index>
 
-  init(_ description: String, collection: Collection, elements: Collection,
-       range: RangeSelection,  expected: Collection,
+  init(collection: [Int], newElements: [Int],
+       rangeSelection: RangeSelection, expected: [Int],
        file: String = __FILE__, line: UWord = __LINE__
   ) {
-    self.description = description
-    self.elements = elements
-    self.collection = collection
+    self.collection = collection.map { OpaqueValue($0) }
+    self.newElements = newElements.map { OpaqueValue($0) }
+    self.rangeSelection = rangeSelection
     self.expected = expected
-    switch range {
-      case .EmptyRange: self.range = collection.endIndex..<collection.endIndex
-      case .LeftEdge: self.range = collection.startIndex..<collection.startIndex
-      case .RightEdge: self.range = collection.endIndex..<collection.endIndex
-      case .MiddleWithSize(let size):
-        if size > collection.count {
-          fatalError("Range size cannot exceed collection's count")
-        }
-        let start = advance(collection.startIndex, (collection.count / 2) - size / 2)
-        let end = advance(collection.startIndex, (collection.count / 2) + size / 2)
-        print("MiddleWithSize: \(start) ..< \(end)")
-        self.range = start...end
-      case .LeftWithSize(let size):
-        if size > collection.count {
-          fatalError("Range size cannot exceed collection's count")
-        }
-        let start = collection.startIndex
-        let end = advance(start, size)
-        self.range = start..<end
-      case .RightWithSize(let size):
-        if size > collection.count {
-          fatalError("Range size cannot exceed collection's count")
-        }
-        let start = advance(collection.startIndex, collection.count - size)
-        let end = collection.endIndex
-        self.range = start..<end
-    }
-    self.loc = SourceLoc(file, line, comment: "RangeReplaceableCollectionType test data")
-  }
-
-  static func emptyRange<T: RangeReplaceableCollectionType>(collection: T)
-      -> Range<T.Index> {
-    return collection.endIndex..<collection.endIndex
-  }
-
-  static func leftEdge<T: RangeReplaceableCollectionType>(collection: T)
-      -> Range<T.Index> {
-    return collection.startIndex..<collection.startIndex
-  }
-
-  static func rightEdge<T: RangeReplaceableCollectionType>(collection: T)
-      -> Range<T.Index> {
-    return collection.endIndex..<collection.endIndex
-  }
-
-  static func middleRange<T: RangeReplaceableCollectionType>(collection: T,
-      _ size: T.Index.Distance) -> Range<T.Index> {
-    if size > collection.count {
-      fatalError("Range size cannot exceed collection's count")
-    }
-
-    let start = advance(collection.startIndex, size / 4)
-    let end = advance(start, size / 2)
-    return Range(start: start, end: end)
+    self.loc = SourceLoc(file, line, comment: "replaceRange() test data")
   }
 }
 
@@ -106,66 +88,72 @@ struct ReplaceRangeTest<T: Equatable> : CustomStringConvertible {
 //===----------------------------------------------------------------------===//
 
 RangeReplaceableTestSuite.test("replaceRange") {
-  var replaceRangeTests = [ReplaceRangeTest<Int>]()
-
-  replaceRangeTests.append(
+  var tests: [ReplaceRangeTest] = [
     ReplaceRangeTest(
-        "empty -> empty",
         collection: [],
-        elements: [],
-        range: .EmptyRange,
-        expected: []))
+        newElements: [],
+        rangeSelection: .EmptyRange,
+        expected: []),
 
-  replaceRangeTests.append(
     ReplaceRangeTest(
-        "small -> empty",
         collection: [],
-        elements: [1010, 2020, 3030],
-        range: .EmptyRange,
-        expected: [1010, 2020, 3030]))
+        newElements: [1010, 2020, 3030],
+        rangeSelection: .EmptyRange,
+        expected: [1010, 2020, 3030]),
 
-  replaceRangeTests.append(
     ReplaceRangeTest(
-        "small -> one, left side",
         collection: [4040],
-        elements: [1010, 2020, 3030],
-        range: .LeftEdge,
-        expected: [1010, 2020, 3030, 4040]))
+        newElements: [1010, 2020, 3030],
+        rangeSelection: .LeftEdge,
+        expected: [1010, 2020, 3030, 4040]),
 
-  replaceRangeTests.append(
     ReplaceRangeTest(
-        "small -> one, right side",
         collection: [1010],
-        elements: [2020, 3030, 4040],
-        range: .RightEdge,
-        expected: [1010, 2020, 3030, 4040]))
+        newElements: [2020, 3030, 4040],
+        rangeSelection: .RightEdge,
+        expected: [1010, 2020, 3030, 4040]),
 
-  replaceRangeTests.append(
     ReplaceRangeTest(
-        "one -> small, right side",
         collection: [1010, 2020, 3030],
-        elements: [4040],
-        range: .RightEdge,
-        expected: [1010, 2020, 3030, 4040]))
+        newElements: [4040],
+        rangeSelection: .RightEdge,
+        expected: [1010, 2020, 3030, 4040]),
 
-  replaceRangeTests.append(
     ReplaceRangeTest(
-        "one -> small, middle",
         collection: [1010, 2020, 3030, 4040, 5050],
-        elements: [9090],
-        range: .MiddleWithSize(1),
-        expected: [1010, 2020, 9090, 4040, 5050]))
+        newElements: [9090],
+        rangeSelection: .Middle,
+        expected: [1010, 9090, 5050]),
+  ]
 
-  for var test in replaceRangeTests {
-    test.collection.replaceRange(test.range, with: test.elements)
-    print(test)
-    expectEqual(test.expected, test.collection)
+  for var test in tests {
+    var c = DefaultedForwardRangeReplaceableCollection(test.collection)
+    let rangeToReplace = test.rangeSelection.rangeOf(c)
+    c.replaceRange(rangeToReplace, with: test.newElements)
+    expectEqualSequence(test.expected, c.map { $0.value },
+        stackTrace: test.loc.withCurrentLoc())
   }
 }
 
 //===----------------------------------------------------------------------===//
 // append()
 //===----------------------------------------------------------------------===//
+
+struct AppendTest {
+  typealias Collection = Array<OpaqueValue<Int>>
+  var collection: Collection
+  let newElement: OpaqueValue<Int>
+  let expected: [Int]
+  let loc: SourceLoc
+
+  init(collection: [Int], newElement: Int, expected: [Int],
+      file: String = __FILE__, line: UWord = __LINE__) {
+    self.collection = collection.map { OpaqueValue($0) }
+    self.newElement = OpaqueValue(newElement)
+    self.expected = expected
+    self.loc = SourceLoc(file, line, comment: "append() test data")
+  }
+}
 
 RangeReplaceableTestSuite.test("append/dispatch") {
   var tester = RangeReplaceableCollectionLog.dispatchTester([1])
@@ -174,43 +162,50 @@ RangeReplaceableTestSuite.test("append/dispatch") {
 }
 
 RangeReplaceableTestSuite.test("append/semantics") {
-  var appendTests = [ReplaceRangeTest<Int>]()
-
-  appendTests.append(
-    ReplaceRangeTest(
-      "one -> empty",
+  var tests: [AppendTest] = [
+    AppendTest(
       collection: [],
-      elements: [1010],
-      range: .RightEdge,
-      expected: [1010]))
+      newElement: 1010,
+      expected: [1010]),
 
-  appendTests.append(
-    ReplaceRangeTest(
-      "one -> one",
+    AppendTest(
       collection: [1010],
-      elements: [2020],
-      range: .RightEdge,
-      expected: [1010, 2020]))
+      newElement: 2020,
+      expected: [1010, 2020]),
 
-  appendTests.append(
-    ReplaceRangeTest(
-      "one -> some",
+    AppendTest(
       collection: [1010, 2020, 3030, 4040, 5050, 6060, 7070],
-      elements: [8080],
-      range: .RightEdge,
-      expected: [1010, 2020, 3030, 4040, 5050, 6060, 7070, 8080]))
+      newElement: 8080,
+      expected: [1010, 2020, 3030, 4040, 5050, 6060, 7070, 8080]),
+  ]
 
-  for var test in appendTests {
-    var c = MinimalForwardRangeReplaceableCollectionType<Int>(test.collection)
-    c.append(test.elements[0])
-    print(test)
-    expectEqual(test.expected, c.map { Int($0.value) })
+  for var test in tests {
+    var c = DefaultedForwardRangeReplaceableCollection(test.collection)
+    c.append(test.newElement)
+    expectEqualSequence(test.expected, c.map { $0.value },
+        stackTrace: test.loc.withCurrentLoc())
   }
 }
 
 //===----------------------------------------------------------------------===//
 // extend()
 //===----------------------------------------------------------------------===//
+
+struct ExtendTest {
+  typealias Collection = Array<OpaqueValue<Int>>
+  var collection: Collection
+  let newElements: Collection
+  let expected: [Int]
+  let loc: SourceLoc
+
+  init(collection: [Int], newElements: [Int], expected: [Int],
+    file: String = __FILE__, line: UWord = __LINE__) {
+    self.collection = collection.map { OpaqueValue($0) }
+    self.newElements = newElements.map { OpaqueValue($0) }
+    self.expected = expected
+    self.loc = SourceLoc(file, line, comment: "append() test data")
+  }
+}
 
 RangeReplaceableTestSuite.test("extend/dispatch") {
   var tester = RangeReplaceableCollectionLog.dispatchTester([1])
@@ -219,74 +214,73 @@ RangeReplaceableTestSuite.test("extend/dispatch") {
 }
 
 RangeReplaceableTestSuite.test("extend/semantics") {
-  var appendTests = [ReplaceRangeTest<Int>]()
+  var tests: [ExtendTest] = [
 
-  appendTests.append(
-    ReplaceRangeTest(
-      "empty -> empty",
+    ExtendTest(
       collection: [],
-      elements: [],
-      range: .RightEdge,
-      expected: []))
+      newElements: [],
+      expected: []),
 
-  appendTests.append(
-    ReplaceRangeTest(
-      "empty -> one",
+    ExtendTest(
       collection: [1010],
-      elements: [],
-      range: .RightEdge,
-      expected: [1010]))
+      newElements: [],
+      expected: [1010]),
 
-  appendTests.append(
-    ReplaceRangeTest(
-      "empty -> some",
+    ExtendTest(
       collection: [1010, 2020, 3030, 4040],
-      elements: [],
-      range: .RightEdge,
-      expected: [1010, 2020, 3030, 4040]))
+      newElements: [],
+      expected: [1010, 2020, 3030, 4040]),
 
-  appendTests.append(
-    ReplaceRangeTest(
-      "one -> empty",
+    ExtendTest(
       collection: [],
-      elements: [1010],
-      range: .RightEdge,
-      expected: [1010]))
+      newElements: [1010],
+      expected: [1010]),
 
-  appendTests.append(
-    ReplaceRangeTest(
-      "one -> one",
+    ExtendTest(
       collection: [1010],
-      elements: [2020],
-      range: .RightEdge,
-      expected: [1010, 2020]))
+      newElements: [2020],
+      expected: [1010, 2020]),
 
-  appendTests.append(
-    ReplaceRangeTest(
-      "some -> one",
+    ExtendTest(
       collection: [1010],
-      elements: [2020, 3030, 4040],
-      range: .RightEdge,
-      expected: [1010, 2020, 3030, 4040]))
+      newElements: [2020, 3030, 4040],
+      expected: [1010, 2020, 3030, 4040]),
 
-  appendTests.append(
-    ReplaceRangeTest(
-      "some -> some",
+    ExtendTest(
       collection: [1010, 2020, 3030, 4040],
-      elements: [5050, 6060, 7070, 8080],
-      range: .RightEdge,
-      expected: [1010, 2020, 3030, 4040, 5050, 6060, 7070, 8080]))
+      newElements: [5050, 6060, 7070, 8080],
+      expected: [1010, 2020, 3030, 4040, 5050, 6060, 7070, 8080]),
+  ]
 
-  for var test in appendTests {
-    test.collection.extend(test.elements)
-    print(test)
-    expectEqual(test.expected, test.collection)
+  for var test in tests {
+    var c = DefaultedForwardRangeReplaceableCollection(test.collection)
+    c.extend(test.newElements)
+    expectEqualSequence(test.expected, c.map { $0.value },
+        stackTrace: test.loc.withCurrentLoc())
   }
 }
 
 //===----------------------------------------------------------------------===//
 // insert()
 //===----------------------------------------------------------------------===//
+
+struct InsertTest {
+  typealias Collection = Array<OpaqueValue<Int>>
+  var collection: Collection
+  let newElement: OpaqueValue<Int>
+  let indexSelection: IndexSelection
+  let expected: [Int]
+  let loc: SourceLoc
+
+  init(collection: [Int], newElement: Int, indexSelection: IndexSelection,
+      expected: [Int], file: String = __FILE__, line: UWord = __LINE__) {
+    self.collection = collection.map { OpaqueValue($0) }
+    self.newElement = OpaqueValue(newElement)
+    self.indexSelection = indexSelection
+    self.expected = expected
+    self.loc = SourceLoc(file, line, comment: "insert() test data")
+  }
+}
 
 RangeReplaceableTestSuite.test("insert/dispatch") {
   var tester = RangeReplaceableCollectionLog.dispatchTester([1])
@@ -295,66 +289,73 @@ RangeReplaceableTestSuite.test("insert/dispatch") {
 }
 
 RangeReplaceableTestSuite.test("insert/semantics") {
-  var insertTests = [ReplaceRangeTest<Int>]()
-
-  insertTests.append(
-    ReplaceRangeTest(
-      "one into empty at left",
+  var tests: [InsertTest] = [
+    InsertTest(
       collection: [],
-      elements: [1010],
-      range: .LeftEdge,
-      expected: [1010]))
+      newElement: 1010,
+      indexSelection: IndexSelection.Start,
+      expected: [1010]),
 
-  insertTests.append(
-    ReplaceRangeTest(
-      "one into one at left",
+    InsertTest(
       collection: [2020],
-      elements: [1010],
-      range: .LeftEdge,
-      expected: [1010, 2020]))
+      newElement: 1010,
+      indexSelection: .Start,
+      expected: [1010, 2020]),
 
-  insertTests.append(
-    ReplaceRangeTest(
-      "one into one at right",
+    InsertTest(
       collection: [1010],
-      elements: [2020],
-      range: .RightEdge,
-      expected: [1010, 2020]))
+      newElement: 2020,
+      indexSelection: .End,
+      expected: [1010, 2020]),
 
-  insertTests.append(
-    ReplaceRangeTest(
-      "one into some at left",
+    InsertTest(
       collection: [2020, 3030, 4040, 5050],
-      elements: [1010],
-      range: .LeftEdge,
-      expected: [1010, 2020, 3030, 4040, 5050]))
+      newElement: 1010,
+      indexSelection: .Start,
+      expected: [1010, 2020, 3030, 4040, 5050]),
 
-  insertTests.append(
-    ReplaceRangeTest(
-      "one into some at right",
+    InsertTest(
       collection: [1010, 2020, 3030, 4040],
-      elements: [5050],
-      range: .RightEdge,
-      expected: [1010, 2020, 3030, 4040, 5050]))
+      newElement: 5050,
+      indexSelection: .End,
+      expected: [1010, 2020, 3030, 4040, 5050]),
 
-  insertTests.append(
-    ReplaceRangeTest(
-        "one -> some, middle",
-        collection: [1010, 2020, 4040, 5050],
-        elements: [3030],
-        range: .MiddleWithSize(0),
-        expected: [1010, 2020, 3030, 4040, 5050]))
+    InsertTest(
+      collection: [1010, 2020, 4040, 5050],
+      newElement: 3030,
+      indexSelection: .Middle,
+      expected: [1010, 2020, 3030, 4040, 5050]),
+  ]
 
-  for var test in insertTests {
-    test.collection.insert(test.elements[0], atIndex: test.range.startIndex)
-    print(test)
-    expectEqual(test.expected, test.collection)
+  for var test in tests {
+    var c = DefaultedForwardRangeReplaceableCollection(test.collection)
+    c.insert(test.newElement, atIndex: test.indexSelection.indexOf(c))
+    expectEqualSequence(test.expected, c.map { $0.value },
+        stackTrace: test.loc.withCurrentLoc())
   }
 }
 
 //===----------------------------------------------------------------------===//
 // splice()
 //===----------------------------------------------------------------------===//
+
+struct SpliceTest {
+  typealias Collection = Array<OpaqueValue<Int>>
+  var collection: Collection
+  let newElements: Collection
+  let indexSelection: IndexSelection
+  let expected: [Int]
+  let loc: SourceLoc
+
+  init(collection: [Int], newElements: [Int], indexSelection: IndexSelection,
+      expected: [Int], file: String = __FILE__, line: UWord = __LINE__) {
+    self.collection = collection.map { OpaqueValue($0) }
+    self.newElements = newElements.map { OpaqueValue($0) }
+    self.indexSelection = indexSelection
+    self.expected = expected
+    self.loc = SourceLoc(file, line, comment: "splice() test data")
+  }
+}
 
 RangeReplaceableTestSuite.test("splice/dispatch") {
   var tester = RangeReplaceableCollectionLog.dispatchTester([1])
@@ -363,106 +364,106 @@ RangeReplaceableTestSuite.test("splice/dispatch") {
 }
 
 RangeReplaceableTestSuite.test("splice/semantics") {
-  var spliceTests = [ReplaceRangeTest<Int>]()
+  var tests: [SpliceTest] = [
 
-  spliceTests.append(
-    ReplaceRangeTest(
-        "empty -> empty, left side",
+    SpliceTest(
         collection: [],
-        elements: [],
-        range: .LeftEdge,
-        expected: []))
+        newElements: [],
+        indexSelection: IndexSelection.Start,
+        expected: []),
 
-  spliceTests.append(
-    ReplaceRangeTest(
-        "one -> empty, left side",
+    SpliceTest(
         collection: [],
-        elements: [1010],
-        range: .LeftEdge,
-        expected: [1010]))
+        newElements: [1010],
+        indexSelection: .Start,
+        expected: [1010]),
 
-  spliceTests.append(
-    ReplaceRangeTest(
-        "some -> empty, left side",
+    SpliceTest(
         collection: [],
-        elements: [1010, 2020, 3030, 4040],
-        range: .LeftEdge,
-        expected: [1010, 2020, 3030, 4040]))
+        newElements: [1010, 2020, 3030, 4040],
+        indexSelection: .Start,
+        expected: [1010, 2020, 3030, 4040]),
 
-  spliceTests.append(
-    ReplaceRangeTest(
-        "one -> one, left side",
+    SpliceTest(
         collection: [2020],
-        elements: [1010],
-        range: .LeftEdge,
-        expected: [1010, 2020]))
+        newElements: [1010],
+        indexSelection: .Start,
+        expected: [1010, 2020]),
 
-  spliceTests.append(
-    ReplaceRangeTest(
-        "one -> one, right side",
+    SpliceTest(
         collection: [1010],
-        elements: [2020],
-        range: .RightEdge,
-        expected: [1010, 2020]))
+        newElements: [2020],
+        indexSelection: .End,
+        expected: [1010, 2020]),
 
-  spliceTests.append(
-    ReplaceRangeTest(
-        "some -> one, left side",
+    SpliceTest(
         collection: [4040],
-        elements: [1010, 2020, 3030],
-        range: .LeftEdge,
-        expected: [1010, 2020, 3030, 4040]))
+        newElements: [1010, 2020, 3030],
+        indexSelection: .Start,
+        expected: [1010, 2020, 3030, 4040]),
 
-  spliceTests.append(
-    ReplaceRangeTest(
-        "some -> one, right side",
+    SpliceTest(
         collection: [1010],
-        elements: [2020, 3030, 4040],
-        range: .RightEdge,
-        expected: [1010, 2020, 3030, 4040]))
+        newElements: [2020, 3030, 4040],
+        indexSelection: .End,
+        expected: [1010, 2020, 3030, 4040]),
 
-  spliceTests.append(
-    ReplaceRangeTest(
-        "one -> some, middle",
+    SpliceTest(
         collection: [1010, 2020, 4040, 5050],
-        elements: [3030],
-        range: .MiddleWithSize(1),
-        expected: [1010, 2020, 3030, 4040, 5050]))
+        newElements: [3030],
+        indexSelection: .Middle,
+        expected: [1010, 2020, 3030, 4040, 5050]),
 
-  spliceTests.append(
-    ReplaceRangeTest(
-        "some -> some, left side",
+    SpliceTest(
         collection: [4040, 5050, 6060],
-        elements: [1010, 2020, 3030],
-        range: .LeftEdge,
-        expected: [1010, 2020, 3030, 4040, 5050, 6060]))
+        newElements: [1010, 2020, 3030],
+        indexSelection: .Start,
+        expected: [1010, 2020, 3030, 4040, 5050, 6060]),
 
-  spliceTests.append(
-    ReplaceRangeTest(
-        "some -> some, right side",
+    SpliceTest(
         collection: [1010, 2020, 3030],
-        elements: [4040, 5050, 6060],
-        range: .RightEdge,
-        expected: [1010, 2020, 3030, 4040, 5050, 6060]))
+        newElements: [4040, 5050, 6060],
+        indexSelection: .End,
+        expected: [1010, 2020, 3030, 4040, 5050, 6060]),
 
-  spliceTests.append(
-    ReplaceRangeTest(
-        "some -> some, insert into middle",
+    SpliceTest(
         collection: [1010, 2020, 3030, 7070, 8080, 9090],
-        elements: [4040, 5050, 6060],
-        range: .MiddleWithSize(0),
-        expected: [1010, 2020, 3030, 4040, 5050, 6060, 7070, 8080, 9090]))
+        newElements: [4040, 5050, 6060],
+        indexSelection: .Middle,
+        expected: [1010, 2020, 3030, 4040, 5050, 6060, 7070, 8080, 9090]),
+  ]
 
-  for var test in spliceTests {
-    test.collection.splice(test.elements, atIndex: test.range.startIndex)
-    print(test)
-    expectEqual(test.expected, test.collection)
+  for var test in tests {
+    var c = DefaultedForwardRangeReplaceableCollection(test.collection)
+    c.splice(test.newElements, atIndex: test.indexSelection.indexOf(c))
+    expectEqualSequence(test.expected, c.map { $0.value },
+        stackTrace: test.loc.withCurrentLoc())
   }
 }
 
 //===----------------------------------------------------------------------===//
 // removeAtIndex()
 //===----------------------------------------------------------------------===//
+
+struct RemoveAtIndexTest {
+  typealias Collection = Array<OpaqueValue<Int>>
+
+  let collection: Collection
+  let indexSelection: IndexSelection
+  let expectedRemovedElement: Int
+  let expectedCollection: [Int]
+  let loc: SourceLoc
+
+  init(collection: [Int], indexSelection: IndexSelection,
+       expectedRemovedElement: Int, expectedCollection: [Int],
+       file: String = __FILE__, line: UWord = __LINE__) {
+    self.collection = collection.map { OpaqueValue($0) }
+    self.indexSelection = indexSelection
+    self.expectedRemovedElement = expectedRemovedElement
+    self.expectedCollection = expectedCollection
+    self.loc = SourceLoc(file, line, comment: "removeAtIndex() test data")
+  }
+}
 
 RangeReplaceableTestSuite.test("removeAtIndex/dispatch") {
   var tester = RangeReplaceableCollectionLog.dispatchTester([1])
@@ -471,44 +472,39 @@ RangeReplaceableTestSuite.test("removeAtIndex/dispatch") {
 }
 
 RangeReplaceableTestSuite.test("removeAtIndex/semantics") {
-  var removeAtIndexTests = [ReplaceRangeTest<Int>]()
-
-  removeAtIndexTests.append(
-    ReplaceRangeTest(
-        "remove only element",
+  var tests: [RemoveAtIndexTest] = [
+    RemoveAtIndexTest(
         collection: [1010],
-        elements: [],
-        range: .LeftEdge,
-        expected: []))
+        indexSelection: .Start,
+        expectedRemovedElement: 1010,
+        expectedCollection: []),
 
-  removeAtIndexTests.append(
-    ReplaceRangeTest(
-        "remove first from some",
+    RemoveAtIndexTest(
         collection: [1010, 2020, 3030],
-        elements: [],
-        range: .LeftEdge,
-        expected: [2020, 3030]))
+        indexSelection: .Start,
+        expectedRemovedElement: 1010,
+        expectedCollection: [2020, 3030]),
 
-  removeAtIndexTests.append(
-    ReplaceRangeTest(
-        "remove middle from some",
+    RemoveAtIndexTest(
         collection: [1010, 2020, 3030],
-        elements: [],
-        range: .MiddleWithSize(1),
-        expected: [1010, 3030]))
+        indexSelection: .Middle,
+        expectedRemovedElement: 2020,
+        expectedCollection: [1010, 3030]),
 
-  removeAtIndexTests.append(
-    ReplaceRangeTest(
-        "remove last from some",
+    RemoveAtIndexTest(
         collection: [1010, 2020, 3030],
-        elements: [],
-        range: .RightWithSize(1),
-        expected: [1010, 2020]))
+        indexSelection: .Last,
+        expectedRemovedElement: 3030,
+        expectedCollection: [1010, 2020]),
+  ]
 
-  for var test in removeAtIndexTests {
-    test.collection.removeAtIndex(test.range.startIndex)
-    print(test)
-    expectEqual(test.expected, test.collection)
+  for var test in tests {
+    var c = DefaultedForwardRangeReplaceableCollection(test.collection)
+    let removedElement = c.removeAtIndex(test.indexSelection.indexOf(c))
+    expectEqualSequence(test.expectedCollection, c.map { $0.value },
+        stackTrace: test.loc.withCurrentLoc())
+    expectEqual(test.expectedRemovedElement, removedElement.value,
+        stackTrace: test.loc.withCurrentLoc())
   }
 }
 
@@ -516,41 +512,85 @@ RangeReplaceableTestSuite.test("removeAtIndex/semantics") {
 // removeLast()
 //===----------------------------------------------------------------------===//
 
-RangeReplaceableTestSuite.test("removeLast/dispatch") {
-  var tester = RangeReplaceableCollectionLog.dispatchTester([1])
-  tester.removeLast()
-  expectCustomizable(tester, tester.log.removeLast)
+struct RemoveLastTest {
+  typealias Collection = Array<OpaqueValue<Int>>
+  let collection: Collection
+  let expectedRemovedElement: Int
+  let expectedCollection: [Int]
+  let loc: SourceLoc
+
+  init(collection: [Int], expectedRemovedElement: Int, expectedCollection: [Int],
+      file: String = __FILE__, line: UWord = __LINE__) {
+    self.collection = collection.map { OpaqueValue($0) }
+    self.expectedRemovedElement = expectedRemovedElement
+    self.expectedCollection = expectedCollection
+    self.loc = SourceLoc(file, line, comment: "removeLast() test data")
+  }
 }
 
-RangeReplaceableTestSuite.test("removeLast") {
-  var removeLastTests = [ReplaceRangeTest<Int>]()
+RangeReplaceableTestSuite.test("removeLast/whereIndexIsBidirectional/dispatch") {
+  var tester = RangeReplaceableCollectionLog.dispatchTester([1])
+  _ = tester.removeLast()
+  expectCustomizable(tester, tester.log._customRemoveLast)
+}
 
-  removeLastTests.append(
-    ReplaceRangeTest(
-        "remove last from one",
+RangeReplaceableTestSuite.test("removeLast/whereIndexIsBidirectional/semantics") {
+  var tests: [RemoveLastTest] = [
+    RemoveLastTest(
         collection: [1010],
-        elements: [],
-        range: .EmptyRange,
-        expected: []))
+        expectedRemovedElement: 1010,
+        expectedCollection: []),
 
-  removeLastTests.append(
-    ReplaceRangeTest(
-        "remove last from some",
+    RemoveLastTest(
         collection: [1010, 2020, 3030, 4040, 5050],
-        elements: [],
-        range: .EmptyRange,
-        expected: [1010, 2020, 3030, 4040]))
+        expectedRemovedElement: 5050,
+        expectedCollection: [1010, 2020, 3030, 4040]),
+  ]
 
-  for var test in removeLastTests {
-    test.collection.removeLast()
-    print(test)
-    expectEqual(test.expected, test.collection)
+  for var test in tests {
+    var c = DefaultedForwardRangeReplaceableCollection(test.collection)
+    let removedElement = c.removeLast()
+    expectEqualSequence(test.expectedCollection, c.map { $0.value },
+        stackTrace: test.loc.withCurrentLoc())
+    expectEqual(test.expectedRemovedElement, removedElement.value,
+        stackTrace: test.loc.withCurrentLoc())
   }
+}
+
+RangeReplaceableTestSuite.test("removeLast/whereIndexIsBidirectional/semantics/empty") {
+  let test = RemoveLastTest(
+    collection: [],
+    expectedRemovedElement: 0,
+    expectedCollection: [])
+  expectCrashLater()
+
+  var c = DefaultedForwardRangeReplaceableCollection(test.collection)
+  let removedElement = c.removeLast()
+  expectEqualSequence(test.expectedCollection, c.map { $0.value },
+      stackTrace: test.loc.withCurrentLoc())
+  expectEqual(test.expectedRemovedElement, removedElement.value,
+      stackTrace: test.loc.withCurrentLoc())
 }
 
 //===----------------------------------------------------------------------===//
 // removeRange()
 //===----------------------------------------------------------------------===//
+
+struct RemoveRangeTest {
+  typealias Collection = Array<OpaqueValue<Int>>
+  let collection: Collection
+  let rangeSelection: RangeSelection
+  let expected: [Int]
+  let loc: SourceLoc
+
+  init(collection: [Int], rangeSelection: RangeSelection, expected: [Int],
+      file: String = __FILE__, line: UWord = __LINE__) {
+    self.collection = collection.map { OpaqueValue($0) }
+    self.rangeSelection = rangeSelection
+    self.expected = expected
+    self.loc = SourceLoc(file, line, comment: "removeRange() test data")
+  }
+}
 
 RangeReplaceableTestSuite.test("removeRange/dispatch") {
   var tester = RangeReplaceableCollectionLog.dispatchTester([1, 2, 3])
@@ -558,83 +598,75 @@ RangeReplaceableTestSuite.test("removeRange/dispatch") {
   expectCustomizable(tester, tester.log.removeRange)
 }
 
-RangeReplaceableTestSuite.test("removeRange") {
-  var removeRangeTests = [ReplaceRangeTest<Int>]()
-
-  removeRangeTests.append(
-    ReplaceRangeTest(
-        "remove empty range from empty",
+RangeReplaceableTestSuite.test("removeRange/semantics") {
+  var tests: [RemoveRangeTest] = [
+    RemoveRangeTest(
         collection: [],
-        elements: [],
-        range: .EmptyRange,
-        expected: []))
+        rangeSelection: .EmptyRange,
+        expected: []),
 
-  removeRangeTests.append(
-    ReplaceRangeTest(
-        "remove range of size one from one",
+    RemoveRangeTest(
         collection: [1010],
-        elements: [],
-        range: .MiddleWithSize(1),
-        expected: []))
+        rangeSelection: .Middle,
+        expected: []),
 
-  removeRangeTests.append(
-    ReplaceRangeTest(
-        "remove range: first element",
-        collection: [1010, 2020, 3030],
-        elements: [],
-        range: .LeftWithSize(1),
-        expected: [2020, 3030]))
+    RemoveRangeTest(
+        collection: [1010, 2020, 3030, 4040],
+        rangeSelection: .LeftHalf,
+        expected: [3030, 4040]),
 
-  removeRangeTests.append(
-    ReplaceRangeTest(
-        "remove range: last element",
-        collection: [1010, 2020, 3030],
-        elements: [],
-        range: .RightWithSize(1),
-        expected: [1010, 2020]))
+    RemoveRangeTest(
+        collection: [1010, 2020, 3030, 4040],
+        rangeSelection: .RightHalf,
+        expected: [1010, 2020]),
 
-  removeRangeTests.append(
-    ReplaceRangeTest(
-        "remove range of size one from some at middle",
-        collection: [1010, 2020, 3030],
-        elements: [],
-        range: .MiddleWithSize(1),
-        expected: [1010, 3030]))
-
-  removeRangeTests.append(
-    ReplaceRangeTest(
-        "remove range of size 3 from some from the left",
+    RemoveRangeTest(
         collection: [1010, 2020, 3030, 4040, 5050],
-        elements: [],
-        range: .LeftWithSize(3),
-        expected: [4040, 5050]))
+        rangeSelection: .Middle,
+        expected: [1010, 5050]),
 
-  removeRangeTests.append(
-    ReplaceRangeTest(
-        "remove range of size 3 from some from the right",
-        collection: [1010, 2020, 3030, 4040, 5050],
-        elements: [],
-        range: .RightWithSize(3),
-        expected: [1010, 2020]))
+    RemoveRangeTest(
+        collection: [1010, 2020, 3030, 4040, 5050, 6060],
+        rangeSelection: .LeftHalf,
+        expected: [4040, 5050, 6060]),
 
-  removeRangeTests.append(
-    ReplaceRangeTest(
-        "remove range of size 3 from some from the middle",
-        collection: [1010, 2020, 3030, 4040, 5050],
-        elements: [],
-        range: .MiddleWithSize(3),
-        expected: [1010, 5050]))
+    RemoveRangeTest(
+        collection: [1010, 2020, 3030, 4040, 5050, 6060],
+        rangeSelection: .RightHalf,
+        expected: [1010, 2020, 3030]),
 
-  for var test in removeRangeTests {
-    test.collection.removeRange(test.range)
-    print(test)
-    expectEqual(test.expected, test.collection)
+    RemoveRangeTest(
+        collection: [1010, 2020, 3030, 4040, 5050, 6060],
+        rangeSelection: .Middle,
+        expected: [1010, 6060]),
+  ]
+
+  for var test in tests {
+    var c = DefaultedForwardRangeReplaceableCollection(test.collection)
+    let rangeToRemove = test.rangeSelection.rangeOf(c)
+    c.removeRange(rangeToRemove)
+    expectEqualSequence(test.expected, c.map { $0.value },
+        stackTrace: test.loc.withCurrentLoc())
   }
 }
 
 //===----------------------------------------------------------------------===//
 // removeAll()
 //===----------------------------------------------------------------------===//
+
+struct RemoveAllTest {
+  typealias Collection = Array<OpaqueValue<Int>>
+  var collection: Collection
+  var expected: [Int]
+  let loc: SourceLoc
+
+  init(collection: [Int], expected: [Int], file: String = __FILE__,
+      line: UWord = __LINE__) {
+    self.collection = collection.map { OpaqueValue($0) }
+    self.expected = expected
+    self.loc = SourceLoc(file, line, comment: "removeAll() test data")
+  }
+}
 
 RangeReplaceableTestSuite.test("removeAll/dispatch") {
   var tester = RangeReplaceableCollectionLog.dispatchTester([1])
@@ -643,36 +675,25 @@ RangeReplaceableTestSuite.test("removeAll/dispatch") {
 }
 
 RangeReplaceableTestSuite.test("removeAll/dispatch") {
-  var removeAllTests = [ReplaceRangeTest<Int>]()
-
-  removeAllTests.append(
-    ReplaceRangeTest(
-        "remove all from empty",
+  var tests: [RemoveAllTest] = [
+    RemoveAllTest(
         collection: [],
-        elements: [],
-        range: .EmptyRange,
-        expected: []))
+        expected: []),
 
-  removeAllTests.append(
-    ReplaceRangeTest(
-        "remove all from one",
+    RemoveAllTest(
         collection: [1010],
-        elements: [],
-        range: .EmptyRange,
-        expected: []))
+        expected: []),
 
-  removeAllTests.append(
-    ReplaceRangeTest(
-        "remove all from some",
+    RemoveAllTest(
         collection: [1010, 2020, 3030, 4040, 5050],
-        elements: [],
-        range: .EmptyRange,
-        expected: []))
+        expected: []),
+  ]
 
-  for var test in removeAllTests {
-    test.collection.removeAll(keepCapacity: false)
-    print(test)
-    expectEqual(test.expected, test.collection)
+  for var test in tests {
+    var c = DefaultedForwardRangeReplaceableCollection(test.collection)
+    c.removeAll()
+    expectEqualSequence(test.expected, c.map { $0.value },
+        stackTrace: test.loc.withCurrentLoc())
   }
 }
 
@@ -680,30 +701,36 @@ RangeReplaceableTestSuite.test("removeAll/dispatch") {
 // reserveCapacity()
 //===----------------------------------------------------------------------===//
 
-RangeReplaceableTestSuite.test("reserveCapacity") {
+RangeReplaceableTestSuite.test("reserveCapacity/dispatch") {
+  var tester = RangeReplaceableCollectionLog.dispatchTester(Array<Int>())
+  tester.reserveCapacity(10)
+  expectCustomizable(tester, tester.log.reserveCapacity)
+}
+
+RangeReplaceableTestSuite.test("reserveCapacity/semantics") {
   if true {
-    let r = join(MinimalForwardRangeReplaceableCollectionType<Int>([]), [])
+    let r = join(MinimalForwardRangeReplaceableCollection<Int>([]), [])
     expectEqual(0, r.reservedCapacity)
   }
   if true {
-    let r = join(MinimalForwardRangeReplaceableCollectionType([ 42 ]),
-        [ MinimalForwardRangeReplaceableCollectionType([]) ])
+    let r = join(MinimalForwardRangeReplaceableCollection([ 42 ]),
+        [ MinimalForwardRangeReplaceableCollection([]) ])
     expectEqual(0, r.reservedCapacity)
   }
 
   if true {
-    let r = join(MinimalForwardRangeReplaceableCollectionType([ 42 ]),
-        [ MinimalForwardRangeReplaceableCollectionType([ 1 ]),
-          MinimalForwardRangeReplaceableCollectionType([ 2, 3, 4 ]),
-          MinimalForwardRangeReplaceableCollectionType([ 5, 6, 7 ]) ])
+    let r = join(MinimalForwardRangeReplaceableCollection([ 42 ]),
+        [ MinimalForwardRangeReplaceableCollection([ 1 ]),
+          MinimalForwardRangeReplaceableCollection([ 2, 3, 4 ]),
+          MinimalForwardRangeReplaceableCollection([ 5, 6, 7 ]) ])
     expectEqual(9, r.reservedCapacity)
     expectEqual([ 1, 42, 2, 3, 4, 42, 5, 6, 7 ], r.elements)
   }
   if true {
-    let r = join(MinimalForwardRangeReplaceableCollectionType([ 42, 4242 ]),
-        [ MinimalForwardRangeReplaceableCollectionType([ 1 ]),
-          MinimalForwardRangeReplaceableCollectionType([ 2, 3, 4 ]),
-          MinimalForwardRangeReplaceableCollectionType([ 5, 6, 7 ]) ])
+    let r = join(MinimalForwardRangeReplaceableCollection([ 42, 4242 ]),
+        [ MinimalForwardRangeReplaceableCollection([ 1 ]),
+          MinimalForwardRangeReplaceableCollection([ 2, 3, 4 ]),
+          MinimalForwardRangeReplaceableCollection([ 5, 6, 7 ]) ])
     expectEqual(11, r.reservedCapacity)
     expectEqual([ 1, 42, 4242, 2, 3, 4, 42, 4242, 5, 6, 7 ], r.elements)
   }
@@ -769,25 +796,25 @@ RangeReplaceableTestSuite.test("OperatorPlus") {
   // RangeReplaceableCollectionType + CollectionType
   if true {
     var ec: [Int] = []
-    var c = MinimalForwardRangeReplaceableCollectionType([Int]())
+    var c = MinimalForwardRangeReplaceableCollection([Int]())
     var r: [Int] = ec + c
     expectEqual([], r)
   }
   if true {
     var ec: [Int] = []
-    var c = MinimalForwardRangeReplaceableCollectionType([ 4, 5, 6, 7 ])
+    var c = MinimalForwardRangeReplaceableCollection([ 4, 5, 6, 7 ])
     var r: [Int] = ec + c
     expectEqual([ 4, 5, 6, 7 ], r)
   }
   if true {
     var ec: [Int] = [ 1, 2, 3 ]
-    var c = MinimalForwardRangeReplaceableCollectionType([Int]())
+    var c = MinimalForwardRangeReplaceableCollection([Int]())
     var r: [Int] = ec + c
     expectEqual([ 1, 2, 3 ], r)
   }
   if true {
     var ec: [Int] = [ 1, 2, 3 ]
-    var c = MinimalForwardRangeReplaceableCollectionType([ 4, 5, 6, 7 ])
+    var c = MinimalForwardRangeReplaceableCollection([ 4, 5, 6, 7 ])
     var r: [Int] = ec + c
     expectEqual([ 1, 2, 3, 4, 5, 6, 7 ], r)
   }
@@ -818,28 +845,28 @@ RangeReplaceableTestSuite.test("OperatorPlus") {
     expectEqual([ 1, 2, 3, 4, 5, 6, 7 ], r)
   }
 
-  // MinimalForwardRangeReplaceableCollectionType + other MinimalForwardRangeReplaceableCollectionType
+  // MinimalForwardRangeReplaceableCollection + other MinimalForwardRangeReplaceableCollection
   if true {
     var ec1: [Int] = []
-    var ec2 = MinimalForwardRangeReplaceableCollectionType([Int]())
+    var ec2 = MinimalForwardRangeReplaceableCollection([Int]())
     var r: [Int] = ec1 + ec2
     expectEqual([], r)
   }
   if true {
     var ec1: [Int] = []
-    var ec2 = MinimalForwardRangeReplaceableCollectionType([ 4, 5, 6, 7 ])
+    var ec2 = MinimalForwardRangeReplaceableCollection([ 4, 5, 6, 7 ])
     var r: [Int] = ec1 + ec2
     expectEqual([ 4, 5, 6, 7 ], r)
   }
   if true {
     var ec1: [Int] = [ 1, 2, 3 ]
-    var ec2 = MinimalForwardRangeReplaceableCollectionType([Int]())
+    var ec2 = MinimalForwardRangeReplaceableCollection([Int]())
     var r: [Int] = ec1 + ec2
     expectEqual([ 1, 2, 3 ], r)
   }
   if true {
     var ec1: [Int] = [ 1, 2, 3 ]
-    var ec2 = MinimalForwardRangeReplaceableCollectionType([ 4, 5, 6, 7 ])
+    var ec2 = MinimalForwardRangeReplaceableCollection([ 4, 5, 6, 7 ])
     var r: [Int] = ec1 + ec2
     expectEqual([ 1, 2, 3, 4, 5, 6, 7 ], r)
   }
