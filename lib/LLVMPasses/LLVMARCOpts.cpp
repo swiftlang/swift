@@ -60,6 +60,13 @@ STATISTIC(NumReturnThreeTailCallsFormed,
 llvm::cl::opt<bool>
 DisableARCOpts("disable-llvm-arc-opts", llvm::cl::init(false));
 
+// FIXME: swift_retainAndReturnThree optimization disabled because of:
+// <rdar://problem/21665665> ARC optimizer inserts calls to
+// swift_retainAndReturnThree, which does not exist
+llvm::cl::opt<bool>
+DisableARCReturn3Opt(
+    "disable-llvm-arc-return3-opt", llvm::cl::init(true));
+
 //===----------------------------------------------------------------------===//
 //                            Utility Functions
 //===----------------------------------------------------------------------===//
@@ -941,6 +948,9 @@ bool SwiftARCOpt::runOnFunction(Function &F) {
 /// swift_retainAndReturnThree call.  This is particularly common when returning
 /// a string or array slice.
 static bool optimizeReturn3(ReturnInst *TheReturn) {
+  if (DisableARCReturn3Opt)
+    return false;
+
   // Ignore ret void.
   if (TheReturn->getNumOperands() == 0) return false;
 
