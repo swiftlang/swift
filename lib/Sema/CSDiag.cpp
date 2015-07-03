@@ -1821,17 +1821,35 @@ FailureDiagnosis::FailureDiagnosis(Expr *expr, ConstraintSystem *cs)
 
 bool FailureDiagnosis::diagnoseGeneralValueMemberFailure() {
   
-  if (valueMemberConstraint) {
-    auto memberName = valueMemberConstraint->getMember().getBaseName();
-    CS->TC.diagnose(expr->getLoc(),
-                    diag::could_not_find_member,
+  if (!valueMemberConstraint) return false;
+  
+  assert(valueMemberConstraint->getKind() == ConstraintKind::ValueMember ||
+         valueMemberConstraint->getKind() ==
+          ConstraintKind::UnresolvedValueMember);
+  
+  auto memberName = valueMemberConstraint->getMember().getBaseName();
+  
+  // Get the referenced expression from the failed constraint.
+  auto anchor = expr;
+  if (auto locator = valueMemberConstraint->getLocator()) {
+    anchor = simplifyLocatorToAnchor(*CS, locator);
+    if (!anchor)
+      anchor = locator->getAnchor();
+  }
+
+  auto type = anchor->getType();
+
+  if (typeIsNotSpecialized(type)) {
+    CS->TC.diagnose(anchor->getLoc(), diag::could_not_find_member,
                     memberName)
-    .highlight(expr->getSourceRange());
-    
-    return true;
+      .highlight(anchor->getSourceRange());
+  } else {
+    CS->TC.diagnose(anchor->getLoc(), diag::could_not_find_member_type,
+                    getUserFriendlyTypeName(type), memberName)
+      .highlight(anchor->getSourceRange());
   }
   
-  return false;
+  return true;
 }
 
 bool FailureDiagnosis::diagnoseGeneralOverloadFailure() {

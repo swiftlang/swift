@@ -188,3 +188,6 @@ func testStructWithOptionalArray(foo: StructWithOptionalArray) -> Int {
 var invalidForceUnwrap = Int()! // expected-error {{cannot force unwrap value of non-optional type 'Int'}}
 
 
+// <rdar://problem/20905802> Swift using incorrect diagnostic sometimes on String().asdf
+String().asdf  // expected-error {{value of type 'String' has no member 'asdf'}}
+

@@ -73,9 +73,11 @@ ERROR(cannot_find_appropriate_overload_with_type,sema,none,
 ERROR(cannot_find_appropriate_overload_with_type_list,sema,none,
       "cannot invoke '%0' with an argument list of type '%1'",
       (StringRef, StringRef))
-
 ERROR(could_not_find_member,sema,none,
       "could not find member %0", (Identifier))
+
+ERROR(could_not_find_member_type,sema,none,
+      "value of type '%0' has no member %1", (StringRef, Identifier))
 
 ERROR(could_not_convert_argument,sema,none,
       "cannot invoke function with an argument list of type %0", (Type))
