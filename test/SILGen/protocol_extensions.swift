@@ -2,6 +2,7 @@
 
 public protocol P1 {
   func reqP1a()
+  subscript(i: Int) -> Int { get set }
 }
 
 extension P1 {
@@ -21,6 +22,30 @@ extension P1 {
     // CHECK-NEXT: apply [[FN]]<Self>([[SELF]]) : $@convention(method) <τ_0_0 where τ_0_0 : P1> (@in_guaranteed τ_0_0) -> ()
     extP1a()
     // CHECK: return
+  }
+
+  subscript(i: Int) -> Int {
+    // materializeForSet can do static dispatch to peer accessors:
+
+    // CHECK-LABEL: sil hidden [transparent] @_TFeRq_19protocol_extensions2P1_S_S0_m9subscriptFSiSi
+    // CHECK-NEXT: bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $Int, %3 : $*Self):
+    // CHECK: function_ref @_TFeRq_19protocol_extensions2P1_S_S0_g9subscriptFSiSi
+    // CHECK: return
+
+    get {
+      return 0
+    }
+    set {}
+  }
+
+  final func callSubscript() -> Int {
+    // But here we have to do a witness method call:
+
+    // CHECK-LABEL: sil hidden @_TFeRq_19protocol_extensions2P1_S_S0_13callSubscriptuRq_S0__fq_FT_Si
+    // CHECK-NEXT: bb0(%0 : $*Self):
+    // CHECK: witness_method $Self, #P1.subscript!getter.1
+    // CHECK: return
+    return self[0]
   }
 }
 

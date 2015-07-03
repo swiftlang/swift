@@ -580,7 +580,7 @@ static Expr *buildStorageReference(
 
   if (auto subscript = dyn_cast<SubscriptDecl>(storage)) {
     Expr *indices = referenceContext.getIndexRefExpr(ctx, subscript);
-    return new (ctx) SubscriptExpr(selfDRE, indices, ConcreteDeclRef(),
+    return new (ctx) SubscriptExpr(selfDRE, indices, storage,
                                    IsImplicit, semantics);
   }
 

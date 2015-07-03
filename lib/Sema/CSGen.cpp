@@ -869,7 +869,8 @@ namespace {
     }
 
     /// \brief Add constraints for a subscript operation.
-    Type addSubscriptConstraints(Expr *expr, Expr *base, Expr *index) {
+    Type addSubscriptConstraints(Expr *expr, Expr *base, Expr *index,
+                                 ValueDecl *decl) {
       ASTContext &Context = CS.getASTContext();
 
       // Locators used in this expression.
@@ -941,8 +942,19 @@ namespace {
       // FIXME: lame name!
       auto baseTy = base->getType();
       auto fnTy = FunctionType::get(inputTv, outputTy);
-      CS.addValueMemberConstraint(baseTy, Context.Id_subscript,
-                                  fnTy, subscriptMemberLocator);
+
+      // FIXME: synthesizeMaterializeForSet() wants to statically dispatch to
+      // a known subscript here. This might be cleaner if we split off a new
+      // UnresolvedSubscriptExpr from SubscriptExpr.
+      if (decl) {
+        Optional<UnavailabilityReason> reason;
+        OverloadChoice choice(base->getType(), decl, /*isSpecialized=*/false,
+                              CS, reason);
+        CS.addBindOverloadConstraint(fnTy, choice, subscriptMemberLocator);
+      } else {
+        CS.addValueMemberConstraint(baseTy, Context.Id_subscript,
+                                    fnTy, subscriptMemberLocator);
+      }
 
       // Add the constraint that the index expression's type be convertible
       // to the input type of the subscript operator.
@@ -1464,7 +1476,11 @@ namespace {
     }
 
     Type visitSubscriptExpr(SubscriptExpr *expr) {
-      return addSubscriptConstraints(expr, expr->getBase(), expr->getIndex());
+      ValueDecl *decl = nullptr;
+      if (expr->hasDecl())
+        decl = expr->getDecl().getDecl();
+      return addSubscriptConstraints(expr, expr->getBase(), expr->getIndex(),
+                                     decl);
     }
     
     Type visitArrayExpr(ArrayExpr *expr) {
@@ -1611,7 +1627,8 @@ namespace {
     }
 
     Type visitDynamicSubscriptExpr(DynamicSubscriptExpr *expr) {
-      return addSubscriptConstraints(expr, expr->getBase(), expr->getIndex());
+      return addSubscriptConstraints(expr, expr->getBase(), expr->getIndex(),
+                                     nullptr);
     }
 
     Type visitTupleElementExpr(TupleElementExpr *expr) {
