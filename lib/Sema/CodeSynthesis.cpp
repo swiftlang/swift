@@ -306,6 +306,44 @@ bool needsToBeRegisteredAsExternalDecl(AbstractStorageDecl *storage) {
   return nominal->hasClangNode();
 }
 
+static Type createMaterializeForSetReturnType(AbstractStorageDecl *storage,
+                                              TypeChecker &TC) {
+  auto &ctx = storage->getASTContext();
+  SourceLoc loc = storage->getLoc();
+
+  auto DC = storage->getDeclContext();
+
+  if (DC->getDeclaredTypeInContext() &&
+      DC->getDeclaredTypeInContext()->is<ErrorType>()) {
+    return ErrorType::get(ctx);
+  }
+
+  Type callbackSelfType =
+    getSelfTypeForMaterializeForSetCallback(ctx, DC, storage->isStatic());
+  TupleTypeElt callbackArgs[] = {
+    ctx.TheRawPointerType,
+    InOutType::get(ctx.TheUnsafeValueBufferType),
+    InOutType::get(callbackSelfType),
+    MetatypeType::get(callbackSelfType, MetatypeRepresentation::Thick),
+  };
+  auto callbackExtInfo = FunctionType::ExtInfo()
+    .withRepresentation(FunctionType::Representation::Thin);
+  auto callbackType = FunctionType::get(TupleType::get(callbackArgs, ctx),
+                                        TupleType::getEmpty(ctx),
+                                        callbackExtInfo);
+
+  // Try to make the callback type optional.  Don't crash if it doesn't
+  // work, though.
+  auto optCallbackType = TC.getOptionalType(loc, callbackType);
+  if (!optCallbackType) optCallbackType = callbackType;
+
+  TupleTypeElt retElts[] = {
+    { ctx.TheRawPointerType },
+    { optCallbackType },
+  };
+  return TupleType::get(retElts, ctx);
+}
+
 static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
                                                   VarDecl *&bufferParamDecl,
                                                   TypeChecker &TC) {
@@ -332,34 +370,10 @@ static FuncDecl *createMaterializeForSetPrototype(AbstractStorageDecl *storage,
   };
   params.push_back(buildIndexForwardingPattern(storage, bufferElements, TC));
 
-  // Construct the callback type.
-  Type callbackSelfType =
-    getSelfTypeForMaterializeForSetCallback(ctx, DC, storage->isStatic());
-  TupleTypeElt callbackArgs[] = {
-    ctx.TheRawPointerType,
-    InOutType::get(ctx.TheUnsafeValueBufferType),
-    InOutType::get(callbackSelfType),
-    MetatypeType::get(callbackSelfType, MetatypeRepresentation::Thick),
-  };
-  auto callbackExtInfo = FunctionType::ExtInfo()
-    .withRepresentation(FunctionType::Representation::Thin);
-  auto callbackType = FunctionType::get(TupleType::get(callbackArgs, ctx),
-                                        TupleType::getEmpty(ctx),
-                                        callbackExtInfo);
-
-  // Try to make the callback type optional.  Don't crash if it doesn't
-  // work, though.
-  auto optCallbackType = TC.getOptionalType(loc, callbackType);
-  if (!optCallbackType) optCallbackType = callbackType;
-
   // The accessor returns (Builtin.RawPointer, (@convention(thin) (...) -> ())?),
   // where the first pointer is the materialized address and the
   // second is an optional callback.
-  TupleTypeElt retElts[] = {
-    { ctx.TheRawPointerType },
-    { optCallbackType },
-  };
-  Type retTy = TupleType::get(retElts, ctx);
+  Type retTy = createMaterializeForSetReturnType(storage, TC);
 
   auto *materializeForSet = FuncDecl::create(
       ctx, /*StaticLoc=*/SourceLoc(), StaticSpellingKind::None, loc,

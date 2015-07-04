@@ -1772,7 +1772,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
       aliasDecl->setInterfaceType(
         TC.getInterfaceTypeFromInternalType(DC, metaType));
     }
-    auto nominal = DC->getDeclaredTypeOfContext()->getAnyNominal();
+    auto nominal = DC->isNominalTypeOrNominalTypeExtensionContext();
     TC.computeAccessibility(nominal);
     aliasDecl->setAccessibility(nominal->getFormalAccess());
     if (nominal == DC) {
@@ -2972,6 +2972,9 @@ void ConformanceChecker::resolveTypeWitnesses() {
   // Local function to compute the derived type of an associated type,
   // for protocols known to the compiler.
   auto computeDerivedTypeWitness = [&](AssociatedTypeDecl *assocType) -> Type {
+    if (Adoptee->is<ErrorType>())
+      return Type();
+
     // Can we derive conformances for this protocol and adoptee?
     NominalTypeDecl *derivingTypeDecl = Adoptee->getAnyNominal();
     if (!derivingTypeDecl->derivesProtocolConformance(Proto))

@@ -1946,9 +1946,8 @@ Type NominalTypeDecl::computeInterfaceType() const {
 
   // Figure out the interface type of the parent.
   Type parentType;
-  if (auto typeOfParentContext = getDeclContext()->getDeclaredTypeOfContext())
-    parentType = typeOfParentContext->getAnyNominal()
-                   ->getDeclaredInterfaceType();
+  if (auto parent = getDeclContext()->isNominalTypeOrNominalTypeExtensionContext())
+    parentType = parent->getDeclaredInterfaceType();
 
   Type type;
   if (auto proto = dyn_cast<ProtocolDecl>(this)) {
