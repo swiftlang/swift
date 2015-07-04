@@ -27,6 +27,7 @@ using namespace swift;
 
 void VisibleDeclConsumer::anchor() {}
 void VectorDeclConsumer::anchor() {}
+void NamedDeclConsumer::anchor() {}
 
 namespace {
 struct LookupState {

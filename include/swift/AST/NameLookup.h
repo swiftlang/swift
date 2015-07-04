@@ -171,6 +171,23 @@ public:
   }
 };
 
+/// A consumer that inserts found decls with a matching name into an
+/// externally-owned SmallVector.
+class NamedDeclConsumer : public VisibleDeclConsumer {
+  virtual void anchor() override;
+public:
+  DeclName name;
+  SmallVectorImpl<UnqualifiedLookupResult> &results;
+  NamedDeclConsumer(DeclName name,
+                    SmallVectorImpl<UnqualifiedLookupResult> &results)
+    : name(name), results(results) {}
+
+  virtual void foundDecl(ValueDecl *VD, DeclVisibilityKind Reason) override {
+    if (VD->getFullName().matchesRef(name))
+      results.push_back(UnqualifiedLookupResult(VD));
+  }
+};
+
 /// A consumer that filters out decls that are not accessible from a given
 /// DeclContext.
 class AccessFilteringDeclConsumer final : public VisibleDeclConsumer {

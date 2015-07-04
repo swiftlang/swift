@@ -280,48 +280,48 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
   const SourceManager &SM;
   SourceLoc Loc;
   DeclName Name;
-  ValueDecl *MatchingValue;
+  VisibleDeclConsumer &Consumer;
 
-  FindLocalVal(const SourceManager &SM, SourceLoc Loc, DeclName Name)
-      : SM(SM), Loc(Loc), Name(Name), MatchingValue(nullptr) {}
+  FindLocalVal(const SourceManager &SM, SourceLoc Loc,
+               VisibleDeclConsumer &Consumer)
+      : SM(SM), Loc(Loc), Consumer(Consumer) {}
 
   bool IntersectsRange(SourceRange R) {
     return SM.rangeContainsTokenLoc(R, Loc);
   }
 
-  void checkValueDecl(ValueDecl *D) {
-    if (D->getFullName().matchesRef(Name)) {
-      assert(!MatchingValue);
-      MatchingValue = D;
-    }
+
+  void checkValueDecl(ValueDecl *D, DeclVisibilityKind Reason) {
+    Consumer.foundDecl(D, Reason);
   }
 
-  void checkPattern(const Pattern *Pat) {
+  void checkPattern(const Pattern *Pat, DeclVisibilityKind Reason) {
     switch (Pat->getKind()) {
     case PatternKind::Tuple:
       for (auto &field : cast<TuplePattern>(Pat)->getElements())
-        checkPattern(field.getPattern());
+        checkPattern(field.getPattern(), Reason);
       return;
     case PatternKind::Paren:
     case PatternKind::Typed:
     case PatternKind::Var:
-      return checkPattern(Pat->getSemanticsProvidingPattern());
+      return checkPattern(Pat->getSemanticsProvidingPattern(), Reason);
 
     case PatternKind::Named:
-      return checkValueDecl(cast<NamedPattern>(Pat)->getDecl());
+      return checkValueDecl(cast<NamedPattern>(Pat)->getDecl(), Reason);
     case PatternKind::NominalType: {
       for (const auto &elt : cast<NominalTypePattern>(Pat)->getElements())
-        checkPattern(elt.getSubPattern());
+        checkPattern(elt.getSubPattern(), Reason);
       return;
     }
     case PatternKind::EnumElement: {
       auto *OP = cast<EnumElementPattern>(Pat);
       if (OP->hasSubPattern())
-        checkPattern(OP->getSubPattern());
+        checkPattern(OP->getSubPattern(), Reason);
       return;
     }
     case PatternKind::OptionalSome:
-      return checkPattern(cast<OptionalSomePattern>(Pat)->getSubPattern());
+      return checkPattern(cast<OptionalSomePattern>(Pat)->getSubPattern(),
+                          Reason);
 
     // Handle non-vars.
     case PatternKind::Bool:
@@ -332,12 +332,12 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
     }
   }
 
-  void checkGenericParams(GenericParamList *Params) {
+  void checkGenericParams(GenericParamList *Params, DeclVisibilityKind Reason) {
     if (!Params)
       return;
 
     for (auto P : *Params) {
-      checkValueDecl(P);
+      checkValueDecl(P, Reason);
     }
   }
 
@@ -394,7 +394,7 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
       return;
     // Names in the pattern aren't visible until after the pattern.
     if (!IntersectsRange(S->getErrorPattern()->getSourceRange()))
-      checkPattern(S->getErrorPattern());
+      checkPattern(S->getErrorPattern(), DeclVisibilityKind::LocalVariable);
     visit(S->getBody());
   }
 
@@ -402,20 +402,16 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
     if (!IntersectsRange(S->getSourceRange()))
       return;
     visit(S->getBody());
-    if (MatchingValue)
-      return;
     for (Decl *D : S->getInitializerVarDecls()) {
       if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
-        checkValueDecl(VD);
+        checkValueDecl(VD, DeclVisibilityKind::LocalVariable);
     }
   }
   void visitForEachStmt(ForEachStmt *S) {
     if (!IntersectsRange(S->getSourceRange()))
       return;
     visit(S->getBody());
-    if (MatchingValue)
-      return;
-    checkPattern(S->getPattern());
+    checkPattern(S->getPattern(), DeclVisibilityKind::LocalVariable);
   }
   void visitBraceStmt(BraceStmt *S) {
     if (!IntersectsRange(S->getSourceRange()))
@@ -424,12 +420,10 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
       if (Stmt *S = elem.dyn_cast<Stmt*>())
         visit(S);
     }
-    if (MatchingValue)
-      return;
     for (auto elem : S->getElements()) {
       if (Decl *D = elem.dyn_cast<Decl*>()) {
         if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
-          checkValueDecl(VD);
+          checkValueDecl(VD, DeclVisibilityKind::LocalVariable);
       }
     }
   }
@@ -447,7 +441,7 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
     for (const auto &CLI : S->getCaseLabelItems()) {
       auto *P = CLI.getPattern();
       if (!IntersectsRange(P->getSourceRange()))
-        checkPattern(P);
+        checkPattern(P, DeclVisibilityKind::LocalVariable);
     }
     visit(S->getBody());
   }
@@ -518,6 +512,8 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
   const SourceManager &SM = Ctx.SourceMgr;
   DebuggerClient *DebugClient = M.getDebugClient();
 
+  NamedDeclConsumer Consumer(Name, Results);
+
   Optional<bool> isCascadingUse;
   if (IsKnownNonCascading)
     isCascadingUse = false;
@@ -551,16 +547,14 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
                 !SM.rangeContainsTokenLoc(AFD->getBodySourceRange(), Loc);
           }
 
-          FindLocalVal localVal(SM, Loc, Name);
+          FindLocalVal localVal(SM, Loc, Consumer);
           localVal.visit(AFD->getBody());
-          if (!localVal.MatchingValue) {
-            for (Pattern *P : AFD->getBodyParamPatterns())
-              localVal.checkPattern(P);
-          }
-          if (localVal.MatchingValue) {
-            Results.push_back(UnqualifiedLookupResult(localVal.MatchingValue));
+          if (!Results.empty())
             return;
-          }
+          for (Pattern *P : AFD->getBodyParamPatterns())
+            localVal.checkPattern(P, DeclVisibilityKind::FunctionParameter);
+          if (!Results.empty())
+            return;
         }
         if (!isCascadingUse.hasValue() || isCascadingUse.getValue())
           isCascadingUse = AFD->isCascadingContextForLookup(false);
@@ -600,16 +594,14 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
         // for us, but it can't do the right thing inside local types.
         if (Loc.isValid()) {
           if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
-            FindLocalVal localVal(SM, Loc, Name);
+            FindLocalVal localVal(SM, Loc, Consumer);
             localVal.visit(CE->getBody());
-            if (!localVal.MatchingValue) {
-              localVal.checkPattern(CE->getParams());
-            }
-            if (localVal.MatchingValue) {
-              Results.push_back(
-                UnqualifiedLookupResult(localVal.MatchingValue));
+            if (!Results.empty())
               return;
-            }
+            localVal.checkPattern(CE->getParams(),
+                                  DeclVisibilityKind::FunctionParameter);
+            if (!Results.empty())
+              return;
           }
         }
         if (!isCascadingUse.hasValue())
@@ -645,13 +637,12 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
 
       // Check the generic parameters for something with the given name.
       if (GenericParams) {
-        FindLocalVal localVal(SM, Loc, Name);
-        localVal.checkGenericParams(GenericParams);
+        FindLocalVal localVal(SM, Loc, Consumer);
+        localVal.checkGenericParams(GenericParams,
+                                    DeclVisibilityKind::GenericParameter);
 
-        if (localVal.MatchingValue) {
-          Results.push_back(UnqualifiedLookupResult(localVal.MatchingValue));
+        if (!Results.empty())
           return;
-        }
       }
 
       if (BaseDecl) {
@@ -717,13 +708,12 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
           dcGenericParams = ext->getGenericParams();
 
         if (dcGenericParams) {
-          FindLocalVal localVal(SM, Loc, Name);
-          localVal.checkGenericParams(dcGenericParams);
+          FindLocalVal localVal(SM, Loc, Consumer);
+          localVal.checkGenericParams(dcGenericParams,
+                                      DeclVisibilityKind::GenericParameter);
 
-          if (localVal.MatchingValue) {
-            Results.push_back(UnqualifiedLookupResult(localVal.MatchingValue));
+          if (!Results.empty())
             return;
-          }
         }
       }
 
@@ -739,12 +729,10 @@ UnqualifiedLookup::UnqualifiedLookup(DeclName Name, DeclContext *DC,
       // Look for local variables in top-level code; normally, the parser
       // resolves these for us, but it can't do the right thing for
       // local types.
-      FindLocalVal localVal(SM, Loc, Name);
+      FindLocalVal localVal(SM, Loc, Consumer);
       localVal.checkSourceFile(*SF);
-      if (localVal.MatchingValue) {
-        Results.push_back(UnqualifiedLookupResult(localVal.MatchingValue));
+      if (!Results.empty())
         return;
-      }
     }
   }
 
