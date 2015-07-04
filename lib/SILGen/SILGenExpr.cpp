@@ -1812,9 +1812,9 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *E, SGFContext C) {
     return RValue(SGF, E, ManagedValue::forUnmanaged(MT));
   }
 
-  // If we have a nominal type decl as our base, try to use special logic to
-  // emit the base rvalue's member using special logic that will let us avoid
-  // extra retains and releases.
+  // If we have a nominal type decl as our base, try to emit the base rvalue's
+  // member using special logic that will let us avoid extra retains
+  // and releases.
   if (auto *N = E->getBase()->getType()->getNominalOrBoundGenericNominal())
     if (auto RV = NominalTypeMemberRefRValueEmitter(E, C, N).emit(SGF))
       return RValue(std::move(RV).getValue());
