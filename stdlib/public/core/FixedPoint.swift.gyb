@@ -201,6 +201,11 @@ public struct ${Self}
     value = _v
   }
 
+  @transparent public
+  init(_bits: Builtin.${BuiltinName}) {
+    value = _bits
+  }
+
 % if self_ty.is_word:
   @transparent
   public // @testable
