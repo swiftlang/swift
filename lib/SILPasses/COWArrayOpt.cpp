@@ -1187,6 +1187,17 @@ private:
           if (!Loop->contains(UI->getUser()))
               return false;
         }
+
+    // We can't have a phi of two openexistential instructions of different UUID.
+    SILInstruction *OEI = dyn_cast<OpenExistentialAddrInst>(I);
+    if (OEI ||
+        (OEI = dyn_cast<OpenExistentialRefInst>(I)) ||
+        (OEI = dyn_cast<OpenExistentialMetatypeInst>(I))) {
+      for (auto *UI : OEI->getUses())
+        if (!Loop->contains(UI->getUser()))
+          return false;
+    }
+
     return true;
   }
 
