@@ -105,7 +105,7 @@ let myArray2 = [1]
 // CHECK: <gvar>let <name>myDict2</name> = <dictionary>[<elem-expr>1</elem-expr>:<elem-expr>1</elem-expr>]</dictionary></gvar>
 let myDict2 = [1:1]
 
-// CHECK: <for>for <brace>{}</brace></for>
+// CHECK: <for>for <brace><brace>{}</brace></brace></for>
 for {}
 
 // CHECK: <class>class <name><#MyCls#></name> : <inherited><elem-typeref><#OtherClass#></elem-typeref></inherited> {}

@@ -2957,6 +2957,11 @@ public:
     assert(hasExplicitResultType() && "No explicit result type");
     return ExplicitResultType;
   }
+  
+  void setExplicitResultType(SourceLoc arrowLoc, TypeLoc resultType) {
+    ArrowLoc = arrowLoc;
+    ExplicitResultType = resultType;
+  }
 
   /// \brief Determine whether the closure has a single expression for its
   /// body.

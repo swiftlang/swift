@@ -1887,6 +1887,51 @@ ParserResult<Stmt> Parser::parseStmtFor(LabeledStmtInfo LabelInfo) {
   return parseStmtForEach(ForLoc, LabelInfo);
 }
 
+
+/// Given an expression, check to see if it is a set of braces "{...}" parsed as
+/// a ClosureExpr that is probably a body of a statement.  If so, convert it
+/// into a BraceStmt that can be used as the body of a control flow statement
+/// to improve error recovery.
+///
+/// If this expression isn't a ClosureExpr or isn't convertible, this returns
+/// null.
+///
+static BraceStmt *ConvertClosureToBraceStmt(Expr *E, ASTContext &Ctx) {
+  if (!E) return nullptr;
+  
+  auto *CE = dyn_cast<ClosureExpr>(E);
+  if (!CE) return nullptr;
+  
+  // If this had a signature or anon-closure parameters (like $0) used, then it
+  // doesn't "look" like the body of a control flow statement, it looks like a
+  // closure.
+  if (CE->getInLoc().isValid() || CE->hasExplicitResultType() ||
+      !CE->getParams()->isImplicit() ||
+      !isa<TuplePattern>(CE->getParams()) ||
+      cast<TuplePattern>(CE->getParams())->getNumElements() != 0)
+    return nullptr;
+
+  // Silence downstream errors by giving it type ()->(), to match up with the
+  // call we will produce.
+  CE->setImplicit();
+  auto empty = TupleTypeRepr::create(Ctx, {}, CE->getStartLoc(), SourceLoc());
+  CE->setExplicitResultType(CE->getStartLoc(), empty);
+  
+  // The trick here is that the ClosureExpr provides a DeclContext for stuff
+  // inside of it, so it isn't safe to just drop it and rip the the BraceStmt
+  // from inside of it.  While we could try to walk the body and update any
+  // Decls, ClosureExprs, etc within the body of the ClosureExpr, it is easier
+  // to just turn it into BraceStmt(CallExpr(TheClosure, VoidTuple)).  This also
+  // more correctly handles the implicit ReturnStmt injected into single-expr
+  // closures.
+  auto voidArg = TupleExpr::createEmpty(Ctx, CE->getEndLoc(), CE->getEndLoc(),
+                                        /*implicit*/true);
+  ASTNode theCall = new (Ctx) CallExpr(CE, voidArg, /*implicit*/true);
+  return BraceStmt::create(Ctx, CE->getStartLoc(), theCall, CE->getEndLoc(),
+                           /*implicit*/true);
+}
+
+
 ///   stmt-for-c-style:
 ///     (identifier ':')? 'for' stmt-for-c-style-init? ';' expr-basic? ';'
 ///           (expr-basic (',' expr-basic)*)? stmt-brace
@@ -1981,21 +2026,19 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc,
 
   // If we're missing a semicolon, try to recover.
   if (Tok.isNot(tok::semi)) {
-    if (auto *CE = dyn_cast_or_null<ClosureExpr>(First.getPtrOrNull())) {
+    if (auto *BS = ConvertClosureToBraceStmt(First.getPtrOrNull(), Context)) {
       // We have seen:
       //     for { ... }
       // and there's no semicolon after that.
       //
       // We parsed the brace statement as a closure.  Recover by using the
       // brace statement as a 'for' body.
-      auto ClosureBody = CE->getBody();
-      SourceLoc LBraceLoc = ClosureBody->getStartLoc();
-      First = makeParserErrorResult(new (Context) ErrorExpr(LBraceLoc));
+      First = makeParserErrorResult(new (Context) ErrorExpr(BS->getStartLoc()));
       Second = nullptr;
       Third = nullptr;
-      Body = makeParserErrorResult(ClosureBody);
+      Body = makeParserErrorResult(BS);
       diagnose(ForLoc, diag::missing_init_for_stmt)
-          .highlight(SourceRange(ForLoc, LBraceLoc));
+          .highlight(SourceRange(ForLoc, BS->getStartLoc()));
       Status.setIsParseError();
 
       return makeParserResult(
@@ -2021,20 +2064,11 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc,
 
   if (Tok.isNot(tok::semi) && Second.isNonNull()) {
     Expr *RecoveredCondition = nullptr;
-    BraceStmt *RecoveredBody = nullptr;
-    if (auto *CE = dyn_cast<ClosureExpr>(Second.get())) {
-      // We have seen:
-      //     for ... ; { ... }
-      // and there's no semicolon after that.
-      //
-      // We parsed the brace statement as a closure.  Recover by using the
-      // brace statement as a 'for' body.
-      RecoveredCondition = nullptr;
-      RecoveredBody = CE->getBody();
-    }
+    BraceStmt *RecoveredBody = ConvertClosureToBraceStmt(Second.get(), Context);
+
     if (auto *CE = dyn_cast<CallExpr>(Second.get())) {
       if (auto *PE = dyn_cast<ParenExpr>(CE->getArg())) {
-        if (PE->hasTrailingClosure()) {
+        if (PE->hasTrailingClosure() && !RecoveredBody) {
           // We have seen:
           //     for ... ; ... { ... }
           // and there's no semicolon after that.
@@ -2042,7 +2076,7 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc,
           // We parsed the condition as a CallExpr with a brace statement as a
           // trailing closure.  Recover by using the original expression as the
           // condition and brace statement as a 'for' body.
-          RecoveredBody = cast<ClosureExpr>(PE->getSubExpr())->getBody();
+          RecoveredBody = ConvertClosureToBraceStmt(PE->getSubExpr(), Context);
           RecoveredCondition = CE->getFn();
         }
       }

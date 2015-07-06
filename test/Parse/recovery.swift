@@ -179,6 +179,22 @@ func missingControllingExprInFor() {
 // expected-error@-1{{expected ';' in 'for' statement}}
 // expected-error@-2{{braced block}}
   }
+  
+// The #if block is used to provide a scope for the for stmt to force it to end
+// where necessary to provoke the crash.
+#if true  // <rdar://problem/21679557> compiler crashes on "for{{"
+  // expected-error @+2 {{missing initialization in a 'for' statement}}
+  // expected-note @+1 2 {{to match this opening '{'}}
+for{{
+#endif  // expected-error 2 {{expected '}' at end of closure}}
+  
+#if true
+  // expected-error @+1 {{missing initialization in a 'for' statement}}
+  for{
+    var x = 42
+  }
+#endif
+
 }
 
 func missingControllingExprInForEach() {
