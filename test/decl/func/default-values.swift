@@ -89,3 +89,12 @@ class SomeClass3 {
 }
 class SomeDerivedClass3 : SomeClass3 {}
 _ = SomeDerivedClass3()
+
+// Tuple types with default arguments are not materializable
+func identity<T>(t: T) -> T { return t }
+func defaultArgTuplesNotMaterializable(x: Int, y: Int = 0) {}
+
+defaultArgTuplesNotMaterializable(identity(5))
+defaultArgTuplesNotMaterializable(identity((5, y: 10)))
+// expected-error@-1 {{cannot invoke 'defaultArgTuplesNotMaterializable' with an argument list of type '(Int, y: Int)'}}
+// expected-note@-2 {{expected an argument list of type '(Int, y: Int)'}}

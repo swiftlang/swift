@@ -2225,6 +2225,8 @@ Type TupleType::get(ArrayRef<TupleTypeElt> Fields, const ASTContext &C) {
   for (const TupleTypeElt &Elt : Fields) {
     if (Elt.getType())
       properties += Elt.getType()->getRecursiveProperties();
+    if (Elt.getDefaultArgKind() != DefaultArgumentKind::None)
+      properties += RecursiveTypeProperties::IsNotMaterializable;
   }
 
   auto arena = getArena(properties);
