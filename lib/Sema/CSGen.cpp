@@ -2227,6 +2227,10 @@ namespace {
     }
     
     Type visitAssignExpr(AssignExpr *expr) {
+      // Handle invalid code.
+      if (!expr->getDest() || !expr->getSrc())
+        return Type();
+      
       // Compute the type to which the source must be converted to allow
       // assignment to the destination.
       auto destTy = CS.computeAssignDestType(expr->getDest(), expr->getLoc());
