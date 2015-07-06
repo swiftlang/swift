@@ -3728,13 +3728,20 @@ void swift::serialize(ModuleOrSourceFile DC,
   namespace path = llvm::sys::path;
   assert(options.OutputPath && options.OutputPath[0] != '\0');
 
+  if (strcmp("-", options.OutputPath) == 0) {
+    // Special-case writing to stdout.
+    Serializer::writeToStream(llvm::outs(), DC, M, options);
+    assert(!options.DocOutputPath || options.DocOutputPath[0] == '\0');
+    return;
+  }
+
   clang::CompilerInstance Clang;
 
   std::string tmpFilePath;
   std::error_code EC;
   std::unique_ptr<llvm::raw_pwrite_stream> out =
     Clang.createOutputFile(options.OutputPath, EC,
-                           /*binary=*/false,
+                           /*binary=*/true,
                            /*removeOnSignal=*/true,
                            /*inputPath=*/"",
                            path::extension(options.OutputPath),
@@ -3761,7 +3768,7 @@ void swift::serialize(ModuleOrSourceFile DC,
   if (options.DocOutputPath && options.DocOutputPath[0] != '\0') {
     std::unique_ptr<llvm::raw_pwrite_stream> docOut =
       Clang.createOutputFile(options.OutputPath, EC,
-                             /*binary=*/false,
+                             /*binary=*/true,
                              /*removeOnSignal=*/true,
                              /*inputPath=*/"",
                              path::extension(options.OutputPath),
