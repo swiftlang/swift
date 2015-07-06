@@ -22,6 +22,7 @@
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Dwarf.h"
 #include "swift/Basic/Fallthrough.h"
+#include "swift/Basic/FileSystem.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -29,6 +30,9 @@
 #include "swift/Serialization/SerializationOptions.h"
 
 #include "clang/Basic/Module.h"
+// FIXME: We're just using CompilerInstance::createOutputFile.
+// This API should be sunk down to LLVM.
+#include "clang/Frontend/CompilerInstance.h"
 
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
@@ -40,6 +44,7 @@
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/OnDiskHashTable.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include <vector>
@@ -3720,32 +3725,64 @@ void Serializer::writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC) {
 void swift::serialize(ModuleOrSourceFile DC,
                       const SerializationOptions &options,
                       const SILModule *M) {
+  namespace path = llvm::sys::path;
   assert(options.OutputPath && options.OutputPath[0] != '\0');
 
-  std::error_code EC;
-  llvm::raw_fd_ostream out(options.OutputPath, EC, llvm::sys::fs::F_None);
+  clang::CompilerInstance Clang;
 
-  if (out.has_error() || EC) {
+  std::string tmpFilePath;
+  std::error_code EC;
+  std::unique_ptr<llvm::raw_pwrite_stream> out =
+    Clang.createOutputFile(options.OutputPath, EC,
+                           /*binary=*/false,
+                           /*removeOnSignal=*/true,
+                           /*inputPath=*/"",
+                           path::extension(options.OutputPath),
+                           /*temporary=*/true,
+                           /*createDirs=*/false,
+                           /*finalPath=*/nullptr,
+                           &tmpFilePath);
+
+  if (!out) {
     getContext(DC).Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                                  options.OutputPath, EC.message());
-    out.clear_error();
+                                  tmpFilePath, EC.message());
     return;
   }
 
-  Serializer::writeToStream(out, DC, M, options);
+  Serializer::writeToStream(*out, DC, M, options);
+
+  EC = swift::moveFileIfDifferent(tmpFilePath, options.OutputPath);
+  if (EC) {
+    getContext(DC).Diags.diagnose(SourceLoc(), diag::error_opening_output,
+                                  options.OutputPath, EC.message());
+    return;
+  }
 
   if (options.DocOutputPath && options.DocOutputPath[0] != '\0') {
-    std::error_code EC;
-    llvm::raw_fd_ostream docOut(options.DocOutputPath, EC,
-                                llvm::sys::fs::F_None);
+    std::unique_ptr<llvm::raw_pwrite_stream> docOut =
+      Clang.createOutputFile(options.OutputPath, EC,
+                             /*binary=*/false,
+                             /*removeOnSignal=*/true,
+                             /*inputPath=*/"",
+                             path::extension(options.OutputPath),
+                             /*temporary=*/true,
+                             /*createDirs=*/false,
+                             /*finalPath=*/nullptr,
+                             &tmpFilePath);
 
-    if (docOut.has_error() || EC) {
+    if (!out) {
       getContext(DC).Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                                    options.DocOutputPath, EC.message());
-      docOut.clear_error();
+                                    tmpFilePath, EC.message());
       return;
     }
 
-    Serializer::writeDocToStream(docOut, DC);
+    Serializer::writeDocToStream(*docOut, DC);
+
+    EC = swift::moveFileIfDifferent(tmpFilePath, options.DocOutputPath);
+    if (EC) {
+      getContext(DC).Diags.diagnose(SourceLoc(), diag::error_opening_output,
+                                    options.DocOutputPath, EC.message());
+      return;
+    }
   }
 }
