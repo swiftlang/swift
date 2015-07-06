@@ -687,7 +687,23 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
       new (TC.Context) OptionalTypeRepr(InnerTypeRepr, QuestionLoc);
     return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
   }
-  
+
+  // Fold T! into an IUO type when T is a TypeExpr.
+  if (auto *FVE = dyn_cast<ForceValueExpr>(E)) {
+    auto *TyExpr = dyn_cast<TypeExpr>(FVE->getSubExpr());
+    if (!TyExpr) return nullptr;
+
+    auto *InnerTypeRepr = TyExpr->getTypeRepr();
+    assert(!TyExpr->isImplicit() && InnerTypeRepr &&
+           "This doesn't work on implicit TypeExpr's, "
+           "the TypeExpr should have been built correctly in the first place");
+
+    auto *NewTypeRepr =
+      new (TC.Context) ImplicitlyUnwrappedOptionalTypeRepr(InnerTypeRepr,
+                                                          FVE->getExclaimLoc());
+    return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
+  }
+
   // Fold (T) into a type T with parens around it.
   if (auto *PE = dyn_cast<ParenExpr>(E)) {
     auto *TyExpr = dyn_cast<TypeExpr>(PE->getSubExpr());

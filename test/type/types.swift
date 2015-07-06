@@ -138,4 +138,5 @@ y17 = z17
 let tupleTypeWithNames = (age:Int, count:Int)(4, 5)
 let dictWithTuple = [String: (age:Int, count:Int)]()
 
-
+// <rdar://problem/21684837> typeexpr not being formed for postfix !
+let bb2 = [Int!](count: 2, repeatedValue: nil)
