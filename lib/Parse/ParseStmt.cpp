@@ -1979,6 +1979,7 @@ ParserResult<Stmt> Parser::parseStmtForCStyle(SourceLoc ForLoc,
     }
   }
 
+  // If we're missing a semicolon, try to recover.
   if (Tok.isNot(tok::semi)) {
     if (auto *CE = dyn_cast_or_null<ClosureExpr>(First.getPtrOrNull())) {
       // We have seen:

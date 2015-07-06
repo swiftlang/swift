@@ -358,6 +358,19 @@ void Parser::skipSingle() {
     skipUntil(tok::r_square);
     consumeIf(tok::r_square);
     break;
+  case tok::pound_if:
+  case tok::pound_else:
+  case tok::pound_elseif:
+    consumeToken();
+    // skipUntil also implicitly stops at tok::pound_endif.
+    skipUntil(tok::pound_else, tok::pound_elseif);
+      
+    if (Tok.isAny(tok::pound_else, tok::pound_elseif))
+      skipSingle();
+    else
+      consumeIf(tok::pound_endif);
+    break;
+      
   default:
     consumeToken();
     break;
@@ -368,7 +381,7 @@ void Parser::skipUntil(tok T1, tok T2) {
   // tok::unknown is a sentinel that means "don't skip".
   if (T1 == tok::unknown && T2 == tok::unknown) return;
   
-  while (Tok.isNot(tok::eof, T1, T2))
+  while (Tok.isNot(tok::eof, tok::pound_endif, T1, T2))
     skipSingle();
 }
 
@@ -412,6 +425,7 @@ void Parser::skipUntilDeclRBrace() {
 
 void Parser::skipUntilDeclStmtRBrace(tok T1) {
   while (Tok.isNot(T1) && Tok.isNot(tok::eof) && Tok.isNot(tok::r_brace) &&
+         Tok.isNot(tok::pound_endif) &&
          !isStartOfStmt() && !isStartOfDecl()) {
     skipSingle();
   }
