@@ -1004,7 +1004,6 @@ bool TypeChecker::typeCheckExpression(
   auto result = cs.applySolution(solution, expr, convertType, discardedExpr,
                                  listener && listener->suppressDiagnostics());
   if (!result) {
-    diagnoseExpr(*this, expr, dc, listener);
     // Failure already diagnosed, above, as part of applying the solution.
     return true;
   }
@@ -1019,7 +1018,6 @@ bool TypeChecker::typeCheckExpression(
   if (listener) {
     result = listener->appliedSolution(solution, result);
     if (!result) {
-      diagnoseExpr(*this, expr, dc, listener);
       return true;
     }
   }
