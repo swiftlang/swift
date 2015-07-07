@@ -107,9 +107,7 @@ ${SelfName}TestSuite.test("Hashable") {
     for j in ptrs.indices {
       var pi = ptrs[i]
       var pj = ptrs[j]
-      checkHashable(i == j, pi, pj, SourceLocStack().withCurrentLoc()) {
-        "i=\(i), j=\(j)"
-      }
+      checkHashable(i == j, pi, pj, "i=\(i), j=\(j)")
     }
   }
 }

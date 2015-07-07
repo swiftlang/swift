@@ -168,7 +168,7 @@ FloatingPoint.test("Float80/HashValueZero") {
 
 func getPositiveSubnormal_Float32() -> Float32 {
   var result: Float32 = 1.0
-  for i in 0..<127 {
+  for _ in 0..<127 {
     result /= 2.0 as Float32
   }
   expectTrue(result.isSubnormal)
@@ -177,7 +177,7 @@ func getPositiveSubnormal_Float32() -> Float32 {
 
 func getPositiveSubnormal_Float64() -> Float64 {
   var result: Float64 = 1.0
-  for i in 0..<1023 {
+  for _ in 0..<1023 {
     result /= 2.0 as Float64
   }
   expectTrue(result.isSubnormal)
@@ -197,22 +197,22 @@ func checkFloatingPointComparison_${FloatSelf}(
     "expected: lhs=\(lhs) \(expected) rhs=\(rhs)"
   }
   expectEqual(expected.isEQ(), lhs == rhs,
-    stackTrace: stackTrace, collectMoreInfo: collectMoreInfo)
+    collectMoreInfo(), stackTrace: stackTrace.withCurrentLoc())
   expectEqual(expected.isNE(), lhs != rhs,
-    stackTrace: stackTrace, collectMoreInfo: collectMoreInfo)
+    collectMoreInfo(), stackTrace: stackTrace.withCurrentLoc())
   checkHashable(expected.isEQ(), lhs, rhs,
-    stackTrace.withCurrentLoc(), collectMoreInfo: collectMoreInfo)
+    collectMoreInfo(), stackTrace: stackTrace.withCurrentLoc())
 
   expectEqual(expected.isLT(), lhs < rhs,
-    stackTrace: stackTrace, collectMoreInfo: collectMoreInfo)
+    collectMoreInfo(), stackTrace: stackTrace.withCurrentLoc())
   expectEqual(expected.isLE(), lhs <= rhs,
-    stackTrace: stackTrace, collectMoreInfo: collectMoreInfo)
+    collectMoreInfo(), stackTrace: stackTrace.withCurrentLoc())
   expectEqual(expected.isGE(), lhs >= rhs,
-    stackTrace: stackTrace, collectMoreInfo: collectMoreInfo)
+    collectMoreInfo(), stackTrace: stackTrace.withCurrentLoc())
   expectEqual(expected.isGT(), lhs > rhs,
-    stackTrace: stackTrace, collectMoreInfo: collectMoreInfo)
+    collectMoreInfo(), stackTrace: stackTrace.withCurrentLoc())
   checkComparable(expected, lhs, rhs,
-    stackTrace.withCurrentLoc(), collectMoreInfo: collectMoreInfo)
+    collectMoreInfo(), stackTrace: stackTrace.withCurrentLoc())
 }
 
 FloatingPoint.test("${FloatSelf}/{Comparable,Hashable,Equatable}") {

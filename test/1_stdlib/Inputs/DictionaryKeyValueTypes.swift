@@ -560,17 +560,14 @@ func resetLeaksOfDictionaryKeysValues() {
 }
 
 func expectNoLeaksOfDictionaryKeysValues() {
-  expectEqual(0, TestKeyTy.objectCount) { "TestKeyTy leak" }
-  expectEqual(0, TestValueTy.objectCount) { "TestValueTy leak" }
-  expectEqual(0, TestEquatableValueTy.objectCount) {
-    "TestEquatableValueTy leak"
-  }
+  expectEqual(0, TestKeyTy.objectCount, "TestKeyTy leak")
+  expectEqual(0, TestValueTy.objectCount, "TestValueTy leak")
+  expectEqual(0, TestEquatableValueTy.objectCount, "TestEquatableValueTy leak")
 
-  expectEqual(0, TestObjCKeyTy.objectCount) { "TestObjCKeyTy leak" }
-  expectEqual(0, TestObjCValueTy.objectCount) { "TestObjCValueTy leak" }
-  expectEqual(0, TestObjCEquatableValueTy.objectCount) {
-    "TestObjCEquatableValueTy leak"
-  }
+  expectEqual(0, TestObjCKeyTy.objectCount, "TestObjCKeyTy leak")
+  expectEqual(0, TestObjCValueTy.objectCount, "TestObjCValueTy leak")
+  expectEqual(
+    0, TestObjCEquatableValueTy.objectCount, "TestObjCEquatableValueTy leak")
 }
 
 func getBridgedNSDictionaryOfRefTypesBridgedVerbatim() -> NSDictionary {

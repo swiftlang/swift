@@ -118,10 +118,11 @@ class CodecTest<Codec : TestableUnicodeCodec> {
     default:
       fatalError("decoding failed")
     }
-    expectEqual(scalar, decoded) {
+    expectEqual(
+      scalar, decoded,
       "Decoding failed: \(asHex(scalar.value)) => " +
-        "\(asHex(nsEncoded)) => \(asHex(decoded.value))"
-    }
+      "\(asHex(nsEncoded)) => \(asHex(decoded.value))"
+    )
 
     encodeIndex = encodeBuffer.startIndex
     Codec.encode(scalar, output: encodeOutput)

@@ -1972,13 +1972,14 @@ func checkStringComparison(
   // String / String
   expectEqual(expected.isEQ(), lhs == rhs, stackTrace: stackTrace)
   expectEqual(expected.isNE(), lhs != rhs, stackTrace: stackTrace)
-  checkHashable(expected.isEQ(), lhs, rhs, stackTrace.withCurrentLoc())
+  checkHashable(
+    expected.isEQ(), lhs, rhs, stackTrace: stackTrace.withCurrentLoc())
 
   expectEqual(expected.isLT(), lhs < rhs, stackTrace: stackTrace)
   expectEqual(expected.isLE(), lhs <= rhs, stackTrace: stackTrace)
   expectEqual(expected.isGE(), lhs >= rhs, stackTrace: stackTrace)
   expectEqual(expected.isGT(), lhs > rhs, stackTrace: stackTrace)
-  checkComparable(expected, lhs, rhs, stackTrace.withCurrentLoc())
+  checkComparable(expected, lhs, rhs, stackTrace: stackTrace.withCurrentLoc())
 
   // NSString / NSString
   let lhsNSString = lhs as NSString
@@ -1994,7 +1995,7 @@ func checkStringComparison(
     stackTrace: stackTrace)
   checkHashable(
     expectedEqualUnicodeScalars, lhsNSString, rhsNSString,
-    stackTrace.withCurrentLoc())
+    stackTrace: stackTrace.withCurrentLoc())
 }
 
 NSStringAPIs.test("String.{Equatable,Hashable,Comparable}") {
@@ -2015,13 +2016,14 @@ func checkCharacterComparison(
   // Character / Character
   expectEqual(expected.isEQ(), lhs == rhs, stackTrace: stackTrace)
   expectEqual(expected.isNE(), lhs != rhs, stackTrace: stackTrace)
-  checkHashable(expected.isEQ(), lhs, rhs, stackTrace.withCurrentLoc())
+  checkHashable(
+    expected.isEQ(), lhs, rhs, stackTrace: stackTrace.withCurrentLoc())
 
   expectEqual(expected.isLT(), lhs < rhs, stackTrace: stackTrace)
   expectEqual(expected.isLE(), lhs <= rhs, stackTrace: stackTrace)
   expectEqual(expected.isGE(), lhs >= rhs, stackTrace: stackTrace)
   expectEqual(expected.isGT(), lhs > rhs, stackTrace: stackTrace)
-  checkComparable(expected, lhs, rhs, stackTrace.withCurrentLoc())
+  checkComparable(expected, lhs, rhs, stackTrace: stackTrace.withCurrentLoc())
 }
 
 NSStringAPIs.test("Character.{Equatable,Hashable,Comparable}") {
@@ -2175,7 +2177,8 @@ func getNonASCIICString() -> (UnsafeMutablePointer<CChar>, dealloc: ()->()) {
   return (UnsafeMutablePointer(up), { up.dealloc(100) })
 }
 
-func getIllFormedUTF8String1() -> (UnsafeMutablePointer<CChar>, dealloc: ()->()) {
+func getIllFormedUTF8String1(
+) -> (UnsafeMutablePointer<CChar>, dealloc: ()->()) {
   let up = UnsafeMutablePointer<UInt8>.alloc(100)
   up[0] = 0x41
   up[1] = 0xed
@@ -2186,7 +2189,8 @@ func getIllFormedUTF8String1() -> (UnsafeMutablePointer<CChar>, dealloc: ()->())
   return (UnsafeMutablePointer(up), { up.dealloc(100) })
 }
 
-func getIllFormedUTF8String2() -> (UnsafeMutablePointer<CChar>, dealloc: ()->()) {
+func getIllFormedUTF8String2(
+) -> (UnsafeMutablePointer<CChar>, dealloc: ()->()) {
   let up = UnsafeMutablePointer<UInt8>.alloc(100)
   up[0] = 0x41
   up[1] = 0xed

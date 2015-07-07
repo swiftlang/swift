@@ -159,9 +159,7 @@ CharacterTests.test("Hashable") {
       for j in characters.indices {
         var ci = Character(characters[i])
         var cj = Character(characters[j])
-        checkHashable(i == j, ci, cj, SourceLocStack().withCurrentLoc()) {
-          "i=\(i), j=\(j)"
-        }
+        checkHashable(i == j, ci, cj, "i=\(i), j=\(j)")
       }
     }
   }
@@ -191,10 +189,10 @@ func checkRepresentation(s: String) {
   let expectSmall = s.utf8.count <= 8
   let isSmall = isSmallRepresentation(s)
 
-  expectEqual(expectSmall, isSmall) {
-    let expectedSize = expectSmall ? "small" : "large"
-    return "expected \"\(s)\" to use the \(expectedSize) representation"
-  }
+  let expectedSize = expectSmall ? "small" : "large"
+  expectEqual(
+    expectSmall, isSmall,
+    "expected \"\(s)\" to use the \(expectedSize) representation")
 }
 
 CharacterTests.test("RoundTripping") {

@@ -137,66 +137,57 @@ public func expectEqual<T : Equatable, U : Equatable>(
   expectEqual(expected.1, actual.1, ${trace}, showFrame: false) {$0 == $1}
 }
 
+public func expectationFailure(
+  reason: String,
+  trace message: String,
+  stackTrace: SourceLocStack) {
+  _anyExpectFailed = true
+  stackTrace.print()
+  print(reason, appendNewline: reason != "")
+  print(message, appendNewline: message != "")
+}
+
 public func expectEqual<T>(
   expected: T, _ actual: T, ${TRACE}, sameValue equal: (T,T)->Bool
 ) {
   if !equal(expected, actual) {
-    _anyExpectFailed = true
-    stackTrace.pushIf(showFrame, file: file, line: line).print()
-    print("expected: \"\(expected)\" (of type \(_stdlib_getDemangledTypeName(expected)))")
-    print("actual: \"\(actual)\" (of type \(_stdlib_getDemangledTypeName(expected)))")
-    print(message() + "\n")
+    expectationFailure(
+      "expected: \"\(expected)\" (of type \(expected.dynamicType))\n"
+      + "actual: \"\(actual)\" (of type \(expected.dynamicType))",
+      trace: ${trace}
+    )
   }
 }
 
-public func expectNotEqual<T : Equatable>(
-    expected: T, _ actual: T,
-    stackTrace: SourceLocStack? = nil,
-    file: String = __FILE__, line: UWord = __LINE__,
-    collectMoreInfo: (()->String)? = nil
-) {
+public func expectNotEqual<T : Equatable>(expected: T, _ actual: T, ${TRACE}) {
   if expected == actual {
-    _anyExpectFailed = true
-    print("check failed at \(file), line \(line)")
-    _printStackTrace(stackTrace)
-    print("unexpected value: \"\(actual)\" (of type \(_stdlib_getDemangledTypeName(actual)))")
-    if collectMoreInfo != nil { print(collectMoreInfo!()) }
-    print("")
+    expectationFailure(
+      "unexpected value: \"\(actual)\" (of type \(actual.dynamicType))",
+      trace: ${trace}
+    )
   }
 }
 
 // Can not write a sane set of overloads using generics because of:
 // <rdar://problem/17015923> Array->NSArray implicit conversion insanity
 public func expectOptionalEqual<T : Equatable>(
-    expected: T, _ actual: T?,
-    stackTrace: SourceLocStack? = nil,
-    file: String = __FILE__, line: UWord = __LINE__
+  expected: T, _ actual: T?, ${TRACE}
 ) {
   if (actual == nil) || expected != actual! {
-    _anyExpectFailed = true
-    print("check failed at \(file), line \(line)")
-    _printStackTrace(stackTrace)
-    print("expected: \"\(expected)\" (of type \(_stdlib_getDemangledTypeName(expected)))")
-    print("actual: \"\(actual)\" (of type \(_stdlib_getDemangledTypeName(actual)))")
-    print("")
+    expectationFailure(
+      "expected: \"\(expected)\" (of type \(expected.dynamicType))\n"
+      + "actual: \"\(actual)\" (of type \(actual.dynamicType))",
+      trace: ${trace})
   }
 }
 
-public func expectEqual<T : Equatable>(
-    expected: T?, _ actual: T?,
-    stackTrace: SourceLocStack? = nil,
-    file: String = __FILE__, line: UWord = __LINE__,
-    collectMoreInfo: (()->String)? = nil
-) {
+public func expectEqual<T : Equatable>(expected: T?, _ actual: T?, ${TRACE}) {
   if (actual == nil) != (expected == nil)
     || actual != nil && expected! != actual! {
-    _anyExpectFailed = true
-    print("check failed at \(file), line \(line)")
-    _printStackTrace(stackTrace)
-    print("expected: \"\(expected)\" (of type \(_stdlib_getDemangledTypeName(expected)))")
-    print("actual: \"\(actual)\" (of type \(_stdlib_getDemangledTypeName(actual)))")
-    if collectMoreInfo != nil { print(collectMoreInfo!()) }
-    print("")
+    expectationFailure(
+      "expected: \"\(expected)\" (of type \(expected.dynamicType))\n"
+      + "actual: \"\(actual)\" (of type \(actual.dynamicType))",
+      trace: ${trace})
   }
 }
 
@@ -223,7 +214,7 @@ func _expectNotEqual${Generic}(
   if expected == actual {
     _anyExpectFailed = true
     print("check failed at \(file), line \(line)")
-    print("unexpected value: \"\(actual)\" (of type \(_stdlib_getDemangledTypeName(actual)))")
+    print("unexpected value: \"\(actual)\" (of type \(actual.dynamicType))")
     if collectMoreInfo != nil { print(collectMoreInfo!()) }
     print("")
   }
@@ -236,8 +227,8 @@ public func expectOptionalEqual${Generic}(
   if (actual == nil) || expected != actual! {
     _anyExpectFailed = true
     print("check failed at \(file), line \(line)")
-    print("expected: \"\(expected)\" (of type \(_stdlib_getDemangledTypeName(expected)))")
-    print("actual: \"\(actual)\" (of type \(_stdlib_getDemangledTypeName(actual)))")
+    print("expected: \"\(expected)\" (of type \(expected.dynamicType))")
+    print("actual: \"\(actual)\" (of type \(actual.dynamicType))")
     print("")
   }
 }
@@ -1489,57 +1480,25 @@ public enum TestRunPredicate : CustomStringConvertible {
 //
 
 public func checkEquatable<T : Equatable>(
-  expectedEqual: Bool, _ lhs: T, _ rhs: T, _ stackTrace: SourceLocStack,
-  collectMoreInfo: (()->String)? = nil
+  expectedEqual: Bool, _ lhs: T, _ rhs: T, ${TRACE}
 ) {
   // Test operator '==' that is found through witness tables.
-  expectEqual(
-    expectedEqual, lhs == rhs, stackTrace: stackTrace, 
-    collectMoreInfo: collectMoreInfo)
-  expectEqual(
-    !expectedEqual, lhs != rhs, stackTrace: stackTrace, 
-    collectMoreInfo: collectMoreInfo)
-}
-
-public func checkEquatable<T : Equatable>(
-  expectedEqual: Bool, _ lhs: T, _ rhs: T,
-  file: String = __FILE__, line: UWord = __LINE__,
-  collectMoreInfo: (()->String)? = nil
-) {
-  checkEquatable(
-    expectedEqual, lhs, rhs, SourceLocStack().with(SourceLoc(file, line)))
+  expectEqual(expectedEqual, lhs == rhs, ${trace})
+  expectEqual(!expectedEqual, lhs != rhs, ${trace})
 }
 
 public func checkHashable<T : Hashable>(
-  expectedEqual: Bool, _ lhs: T, _ rhs: T, _ stackTrace: SourceLocStack,
-  collectMoreInfo: (()->String)? = nil
+  expectedEqual: Bool, _ lhs: T, _ rhs: T, ${TRACE}
 ) {
-  // Test operator '==' that is found through witness tables.
-  expectEqual(
-    expectedEqual, lhs == rhs, stackTrace: stackTrace,
-    collectMoreInfo: collectMoreInfo)
-  expectEqual(
-    !expectedEqual, lhs != rhs, stackTrace: stackTrace,
-    collectMoreInfo: collectMoreInfo)
+  checkEquatable(expectedEqual, lhs, rhs, ${trace})
 
   // Test 'hashValue'.
   //
   // If objects are not equal, then the hash value can be different or it can
   // collide.
   if expectedEqual {
-    expectEqual(lhs.hashValue, rhs.hashValue,
-      stackTrace: stackTrace, collectMoreInfo: collectMoreInfo)
+    expectEqual(lhs.hashValue, rhs.hashValue, ${trace})
   }
-}
-
-public func checkHashable<T : Hashable>(
-  expectedEqual: Bool, _ lhs: T, _ rhs: T,
-  file: String = __FILE__, line: UWord = __LINE__,
-  collectMoreInfo: (()->String)? = nil
-) {
-  checkHashable(
-    expectedEqual, lhs, rhs, SourceLocStack(SourceLoc(file, line)),
-    collectMoreInfo: collectMoreInfo)
 }
 
 public enum ExpectedComparisonResult {
@@ -1595,28 +1554,12 @@ extension ExpectedComparisonResult : CustomStringConvertible {
 }
 
 public func checkComparable<T : Comparable>(
-  expected: ExpectedComparisonResult,
-  _ lhs: T, _ rhs: T, _ stackTrace: SourceLocStack,
-  collectMoreInfo: (()->String)? = nil
+  expected: ExpectedComparisonResult, _ lhs: T, _ rhs: T, ${TRACE}
 ) {
-  expectEqual(expected.isLT(), lhs < rhs,
-    stackTrace: stackTrace, collectMoreInfo: collectMoreInfo)
-  expectEqual(expected.isLE(), lhs <= rhs,
-    stackTrace: stackTrace, collectMoreInfo: collectMoreInfo)
-  expectEqual(expected.isGE(), lhs >= rhs,
-    stackTrace: stackTrace, collectMoreInfo: collectMoreInfo)
-  expectEqual(expected.isGT(), lhs > rhs,
-    stackTrace: stackTrace, collectMoreInfo: collectMoreInfo)
-}
-
-public func checkComparable<T : Comparable>(
-  expected: ExpectedComparisonResult,
-  _ lhs: T, _ rhs: T,
-  file: String = __FILE__, line: UWord = __LINE__,
-  collectMoreInfo: (()->String)? = nil
-) {
-  checkComparable(expected, lhs, rhs, SourceLocStack(SourceLoc(file, line)),
-    collectMoreInfo: collectMoreInfo)
+  expectEqual(expected.isLT(), lhs < rhs, ${trace})
+  expectEqual(expected.isLE(), lhs <= rhs, ${trace})
+  expectEqual(expected.isGE(), lhs >= rhs, ${trace})
+  expectEqual(expected.isGT(), lhs > rhs, ${trace})
 }
 
 public struct CollectionMisuseResiliencyChecks {
@@ -2106,7 +2049,7 @@ public func expectEqualSequence<
     print("check failed at \(file), line \(line)")
     _printStackTrace(stackTrace)
     print("expected elements: \"\(expected)\"")
-    print("actual: \"\(actual)\" (of type \(_stdlib_getDemangledTypeName(actual)))")
+    print("actual: \"\(actual)\" (of type \(actual.dynamicType))")
     if collectMoreInfo != nil { print(collectMoreInfo!()) }
     print("")
   }
@@ -2256,9 +2199,7 @@ public func expectEqualFunctionsForDomain<ArgumentType, Result : Equatable>(
   for a in arguments {
     let expected = function1(a)
     let actual = function2(a)
-    expectEqual(expected, actual) {
-      "where the argument is: \(a)"
-    }
+    expectEqual(expected, actual, "where the argument is: \(a)")
   }
 }
 
@@ -2273,9 +2214,10 @@ public func expectEqualMethodsForDomain<
     for a in arguments {
       let expected = function1(s)(a)
       let actual = function2(s)(a)
-      expectEqual(expected, actual) {
+      expectEqual(
+        expected, actual,
         "where the first argument is: \(s)\nand the second argument is: \(a)"
-      }
+      )
     }
   }
 }
@@ -2551,13 +2493,15 @@ public func expectSameBuffer(
   file: String = __FILE__, line: UWord = __LINE__,
   collectMoreInfo: (()->String)? = nil
 ) {
-  expectEqual(expected?.buffer._id, actual?.buffer._id) {
-    "lhs and rhs point to different buffers"
-  }
+  expectEqual(
+    expected?.buffer._id, actual?.buffer._id,
+    "lhs and rhs point to different buffers")
+  
   if expected?.buffer._id == actual?.buffer._id {
-    expectEqual(expected?.mutationEpoch, actual?.mutationEpoch) {
+    expectEqual(
+      expected?.mutationEpoch, actual?.mutationEpoch,
       "lhs and rhs are from different mutation epochs"
-    }
+    )
   }
 }
 

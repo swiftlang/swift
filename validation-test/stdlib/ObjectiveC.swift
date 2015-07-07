@@ -40,9 +40,7 @@ ObjectiveCTests.test("NSObject/Hashable") {
         object1._value == object2._value,
         object1,
         object2,
-        SourceLocStack().withCurrentLoc()) {
-        "i=\(i), j=\(j)"
-      }
+        "i=\(i), j=\(j)")
     }
   }
 }

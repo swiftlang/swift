@@ -270,12 +270,12 @@ public func expectCustomizable<
   collectMoreInfo: (()->String)? = nil
 ) {
   expectNotEqual(
-    0, counters[T.self], stackTrace: stackTrace,
-    file: file, line: line, collectMoreInfo: collectMoreInfo)
+    0, counters[T.self], collectMoreInfo?() ?? "",
+    stackTrace: stackTrace ?? SourceLocStack(), file: file, line: line)
   
   expectEqual(
-    counters[T.self], counters[T.Base.self], stackTrace: stackTrace,
-    file: file, line: line, collectMoreInfo: collectMoreInfo)
+    counters[T.self], counters[T.Base.self], collectMoreInfo?() ?? "",
+    stackTrace: stackTrace ?? SourceLocStack(), file: file, line: line)
 }
 
 public func expectNotCustomizable<
@@ -289,10 +289,10 @@ public func expectNotCustomizable<
   collectMoreInfo: (()->String)? = nil
 ) {
   expectNotEqual(
-    0, counters[T.self], stackTrace: stackTrace,
-    file: file, line: line, collectMoreInfo: collectMoreInfo)
+    0, counters[T.self], collectMoreInfo?() ?? "",
+    stackTrace: stackTrace ?? SourceLocStack(), file: file, line: line)
   
   expectEqual(
-    0, counters[T.Base.self], stackTrace: stackTrace,
-    file: file, line: line, collectMoreInfo: collectMoreInfo)
+    0, counters[T.Base.self], collectMoreInfo?() ?? "",
+    stackTrace: stackTrace ?? SourceLocStack(), file: file, line: line)
 }

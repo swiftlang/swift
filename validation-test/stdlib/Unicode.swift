@@ -778,28 +778,28 @@ var UTF8Decoder = TestSuite("UTF8Decoder")
 
 UTF8Decoder.test("Internal/_numTrailingBytes") {
   for i in UInt8(0x00)...UInt8(0x7f) {
-    expectEqual(0, UTF8._numTrailingBytes(i)) { "i=\(i)" }
+    expectEqual(0, UTF8._numTrailingBytes(i), "i=\(i)")
   }
   for i in UInt8(0x80)...UInt8(0xc1) {
-    expectEqual(4, UTF8._numTrailingBytes(i)) { "i=\(i)" }
+    expectEqual(4, UTF8._numTrailingBytes(i), "i=\(i)")
   }
   for i in UInt8(0xc2)...UInt8(0xdf) {
-    expectEqual(1, UTF8._numTrailingBytes(i)) { "i=\(i)" }
+    expectEqual(1, UTF8._numTrailingBytes(i), "i=\(i)")
   }
   for i in UInt8(0xe0)...UInt8(0xef) {
-    expectEqual(2, UTF8._numTrailingBytes(i)) { "i=\(i)" }
+    expectEqual(2, UTF8._numTrailingBytes(i), "i=\(i)")
   }
   for i in UInt8(0xf0)...UInt8(0xf4) {
-    expectEqual(3, UTF8._numTrailingBytes(i)) { "i=\(i)" }
+    expectEqual(3, UTF8._numTrailingBytes(i), "i=\(i)")
   }
   for i in UInt8(0xf5)...UInt8(0xfe) {
-    expectEqual(4, UTF8._numTrailingBytes(i)) { "i=\(i)" }
+    expectEqual(4, UTF8._numTrailingBytes(i), "i=\(i)")
   }
   // Separate test for 0xff because of:
   // <rdar://problem/17376512> Range UInt8(0x00)...UInt8(0xff) invokes a
   // runtime trap
   var i = UInt8(0xff)
-  expectEqual(4, UTF8._numTrailingBytes(i)) { "i=\(i)" }
+  expectEqual(4, UTF8._numTrailingBytes(i), "i=\(i)")
 }
 
 UTF8Decoder.test("Empty") {

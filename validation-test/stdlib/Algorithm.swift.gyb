@@ -623,9 +623,10 @@ SequenceTypeAlgorithms.test("${algorithmKind}Element/Predicate") {
         stackTrace: test.loc.withCurrentLoc())
     }
     expectEqual([], s.map { $0.value }, "sequence should be consumed")
-    expectEqual(max(0, test.sequence.count - 1), timesClosureWasCalled) {
-      "maxElement() should be eager and should only call its predicate once per element"
-    }
+    expectEqual(
+      max(0, test.sequence.count - 1), timesClosureWasCalled,
+      "maxElement() should be eager and should only call its predicate"
+      + " once per element")
   }
 }
 
@@ -1167,9 +1168,10 @@ SequenceTypeAlgorithms.test("reduce") {
     }
     expectEqual(test.sequence, result.value)
     expectEqual([], s.map { $0.value }, "sequence should be consumed")
-    expectEqual(test.sequence.count, timesClosureWasCalled) {
-      "reduce() should be eager and should only call its predicate once per element"
-    }
+    expectEqual(
+      test.sequence.count, timesClosureWasCalled,
+      "reduce() should be eager and should only call its predicate"
+      + "once per element")
   }
 }
 
@@ -1322,11 +1324,13 @@ SequenceTypeAlgorithms.test("filter/SequenceType/Semantics") {
       expectType([OpaqueValue<Int>].self, &result)
       expectEqual(test.expected, result.map { $0.value })
       expectEqual([], s.map { $0.value }, "sequence should be consumed")
-      expectEqual(test.sequence.count, timesClosureWasCalled) {
-        "filter() should be eager and should only call its predicate once per element"
-      }
+      expectEqual(
+        test.sequence.count, timesClosureWasCalled,
+        "filter() should be eager and should only call its predicate"
+        + "once per element")
       expectGE(2 * result.count, result.capacity) {
-        "filter() should not reserve capacity (it does not know how much the predicate will filter out)"
+        "filter() should not reserve capacity (it does not know how much the"
+        + "predicate will filter out)"
       }
     }
   }
@@ -1565,7 +1569,9 @@ func callGenericSequenceMap<S : SequenceType, T>(
 
 %   for dispatch in [ 'Static', 'Generic' ]:
 
-SequenceTypeAlgorithms.test("map/SequenceType/${Implementation}Implementation/${dispatch}") {
+SequenceTypeAlgorithms.test(
+  "map/SequenceType/${Implementation}Implementation/${dispatch}"
+) {
   for test in mapTests {
     for underestimateCountBehavior in [
       UnderestimateCountBehavior.Precise,
@@ -1590,12 +1596,14 @@ SequenceTypeAlgorithms.test("map/SequenceType/${Implementation}Implementation/${
       expectType([OpaqueValue<Int32>].self, &result)
       expectEqual(test.expected, result.map { $0.value })
 %     if Implementation == 'Custom':
-      expectEqual(1, MinimalSequenceWithCustomMap<OpaqueValue<Int>>.timesMapWasCalled)
+      expectEqual(
+        1, MinimalSequenceWithCustomMap<OpaqueValue<Int>>.timesMapWasCalled)
 %     end
       expectEqual([], s.map { $0.value }, "sequence should be consumed")
-      expectEqual(test.sequence.count, timesClosureWasCalled) {
-        "map() should be eager and should only call its predicate once per element"
-      }
+      expectEqual(
+        test.sequence.count, timesClosureWasCalled,
+        "map() should be eager and should only call its predicate"
+        + "once per element")
     }
   }
 }
@@ -1690,21 +1698,27 @@ func callGenericCollectionMap<C : CollectionType, T>(
 
 %   for dispatch in [ 'Static', 'Generic' ]:
 
-SequenceTypeAlgorithms.test("map/CollectionType/${Implementation}Implementation/${dispatch}") {
+SequenceTypeAlgorithms.test(
+  "map/CollectionType/${Implementation}Implementation/${dispatch}"
+) {
   for test in mapTests {
     for underestimateCountBehavior in [
       UnderestimateCountBehavior.Precise,
       UnderestimateCountBehavior.Half,
       UnderestimateCountBehavior.Value(0)
     ] {
-      let s = MinimalForwardCollectionWith${Implementation}Map<OpaqueValue<Int>>(
+      let s = MinimalForwardCollectionWith${Implementation}Map<
+        OpaqueValue<Int>
+      >(
         test.sequence.map { OpaqueValue($0) },
         underestimatedCount: underestimateCountBehavior)
       let closureLifetimeTracker = LifetimeTracked(0)
       expectEqual(1, LifetimeTracked.instances)
       var timesClosureWasCalled = 0
 %     if Implementation == 'Custom':
-      MinimalForwardCollectionWithCustomMap<OpaqueValue<Int>>.timesMapWasCalled = 0
+      MinimalForwardCollectionWithCustomMap<
+        OpaqueValue<Int>
+      >.timesMapWasCalled = 0
 %     end
       var result = call${dispatch}CollectionMap(s) {
         (element: OpaqueValue<Int>) -> OpaqueValue<Int32> in
@@ -1715,13 +1729,16 @@ SequenceTypeAlgorithms.test("map/CollectionType/${Implementation}Implementation/
       expectType([OpaqueValue<Int32>].self, &result)
       expectEqual(test.expected, result.map { $0.value })
 %     if Implementation == 'Custom':
-      expectEqual(1, MinimalForwardCollectionWithCustomMap<OpaqueValue<Int>>.timesMapWasCalled)
+      expectEqual(
+        1, MinimalForwardCollectionWithCustomMap<
+          OpaqueValue<Int>
+        >.timesMapWasCalled)
 %     end
       expectEqual(test.sequence, s.map { $0.value },
         "collection should not be consumed")
-      expectEqual(test.sequence.count, timesClosureWasCalled) {
-        "map() should be eager and should only call its predicate once per element"
-      }
+      expectEqual(test.sequence.count, timesClosureWasCalled,
+        "map() should be eager and should only call its predicate"
+        + "once per element")
     }
   }
 }
@@ -1814,9 +1831,7 @@ SequenceTypeAlgorithms.test("flatMap/SequenceType") {
         test.expected, result.map { $0.value },
         stackTrace: test.loc.withCurrentLoc())
       expectEqual([], s.map { $0.value }, "sequence should be consumed")
-      expectEqual(test.sequence.count, timesClosureWasCalled) {
-        "map() should be eager and should only call its predicate once per element"
-      }
+      expectEqual(test.sequence.count, timesClosureWasCalled, "map() should be eager and should only call its predicate once per element")
       expectGE(2 * result.count, result.capacity) {
         "flatMap() should not reserve capacity"
       }
@@ -1889,9 +1904,7 @@ SequenceTypeAlgorithms.test("flatMap/SequenceType/TransformProducesOptional") {
         test.expected, result.map { $0.value },
         stackTrace: test.loc.withCurrentLoc())
       expectEqual([], s.map { $0.value }, "sequence should be consumed")
-      expectEqual(test.sequence.count, timesClosureWasCalled) {
-        "flatMap() should be eager and should only call its predicate once per element"
-      }
+      expectEqual(test.sequence.count, timesClosureWasCalled, "flatMap() should be eager and should only call its predicate once per element")
       expectGE(2 * result.count, result.capacity) {
         "flatMap() should not reserve capacity"
       }

@@ -60,16 +60,16 @@ UnicodeTrie.test("_UnicodeGraphemeClusterBreakPropertyTrie") {
     if cp % 0x10000 == 0 {
       print("\(cp)...")
     }
-    expectEqual(expected[Int(cp)], trie.getPropertyValue(cp)) {
-      "code point \(cp)"
-    }
+    expectEqual(
+      expected[Int(cp)], trie.getPropertyValue(cp), "code point \(cp)")
   }
 }
 
 %{
 
 grapheme_cluster_break_tests = \
-    get_grapheme_cluster_break_tests_as_unicode_scalars(unicodeGraphemeBreakTestFile)
+  get_grapheme_cluster_break_tests_as_unicode_scalars(
+    unicodeGraphemeBreakTestFile)
 
 }%
 

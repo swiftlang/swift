@@ -36,18 +36,18 @@ extension Repeat where Element : TestProtocol1 {
 LazyTestSuite.test("Repeat") {
   checkRandomAccessCollection(
     [] as Array<OpaqueValue<Int>>,
-    Repeat(count: 0, repeatedValue: OpaqueValue(42)),
-    { $0.value == $1.value })
+    Repeat(count: 0, repeatedValue: OpaqueValue(42)))
+    { $0.value == $1.value }
 
   checkRandomAccessCollection(
     [ OpaqueValue(42) ] as Array<OpaqueValue<Int>>,
-    Repeat(count: 1, repeatedValue: OpaqueValue(42)),
-    { $0.value == $1.value })
+    Repeat(count: 1, repeatedValue: OpaqueValue(42)))
+    { $0.value == $1.value }
 
   checkRandomAccessCollection(
     [ OpaqueValue(42), OpaqueValue(42), OpaqueValue(42) ] as Array<OpaqueValue<Int>>,
-    Repeat(count: 3, repeatedValue: OpaqueValue(42)),
-    { $0.value == $1.value })
+    Repeat(count: 3, repeatedValue: OpaqueValue(42)))
+    { $0.value == $1.value }
 }
 
 // FIXME: trap tests.
@@ -66,8 +66,7 @@ extension CollectionOfOne where Element : TestProtocol1 {
 LazyTestSuite.test("CollectionOfOne") {
   checkRandomAccessCollection(
     [ OpaqueValue(42) ],
-    CollectionOfOne(OpaqueValue(42)),
-    { $0.value == $1.value })
+    CollectionOfOne(OpaqueValue(42))) { $0.value == $1.value }
 }
 
 // FIXME: trap tests.
@@ -111,8 +110,7 @@ extension EmptyCollection where Element : TestProtocol1 {
 LazyTestSuite.test("EmptyCollection") {
   checkRandomAccessCollection(
     [],
-    EmptyCollection<OpaqueValue<Int>>(),
-    { $0.value == $1.value })
+    EmptyCollection<OpaqueValue<Int>>()) { $0.value == $1.value }
 }
 
 // FIXME: trap tests.
@@ -314,8 +312,7 @@ LazyTestSuite.test("Lazy${traversal}Collection.reverse()") {
 
   check${traversal}Collection(
     [ 90, 10, 30, 0 ].map { OpaqueValue($0) } as [OpaqueValue<Int>],
-    reversed,
-    { $0.value == $1.value })
+    reversed) { $0.value == $1.value }
 
   var reversedTwice = reversed.reverse()
   expectType(
@@ -324,8 +321,7 @@ LazyTestSuite.test("Lazy${traversal}Collection.reverse()") {
 
   check${traversal}Collection(
     [ 0, 30, 10, 90 ].map { OpaqueValue($0) } as [OpaqueValue<Int>],
-    reversedTwice,
-    { $0.value == $1.value })
+    reversedTwice) { $0.value == $1.value }
 }
 %  end
 
