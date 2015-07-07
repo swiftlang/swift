@@ -2487,13 +2487,13 @@ ReferenceStorageType *ReferenceStorageType::get(Type T, Ownership ownership,
   assert(ownership != Ownership::Strong &&
          "ReferenceStorageType is unnecessary for strong ownership");
   assert(!T->hasTypeVariable()); // not meaningful in type-checker
-  auto arena = AllocationArena::Permanent;
+  auto properties = T->getRecursiveProperties();
+  auto arena = getArena(properties);
 
   auto key = uintptr_t(T.getPointer()) | unsigned(ownership);
   auto &entry = C.Impl.getArena(arena).ReferenceStorageTypes[key];
   if (entry) return entry;
 
-  auto properties = T->getRecursiveProperties();
 
   switch (ownership) {
   case Ownership::Strong: llvm_unreachable("not possible");
