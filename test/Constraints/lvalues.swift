@@ -88,11 +88,11 @@ z.non_settable_x += x // expected-error{{left side of mutating operator isn't mu
 ++z.non_settable_x // expected-error{{cannot pass immutable value to mutating operator: 'non_settable_x' is a get-only property}}
 
 // non-settable subscript is non-settable:
-z[0] = 0.0 // expected-error{{cannot assign through subscript: 'z' is immutable}}
-f2(&z[0]) // expected-error{{cannot pass immutable value as inout argument: 'z' is immutable}}
-f1(&z[0]) // expected-error{{cannot pass immutable value as inout argument: 'z' is immutable}}
+z[0] = 0.0 // expected-error{{cannot assign to immutable expression of type 'Double'}}
+f2(&z[0]) // expected-error{{cannot pass immutable value of type 'Double' as inout argument}}
+f1(&z[0]) // expected-error{{cannot pass immutable value of type 'Double' as inout argument}}
 z[0] += 0.0 // expected-error{{left side of mutating operator has immutable type 'Double'}}
-++z[0] // expected-error{{cannot pass immutable value to mutating operator: 'z' is immutable}}
+++z[0] // expected-error{{cannot pass immutable value of type 'Double' to mutating operator}}
 
 // settable property of an rvalue value type is non-settable:
 fz().settable_x = x // expected-error{{cannot assign to property: 'fz' returns immutable value}}

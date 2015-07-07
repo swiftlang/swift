@@ -573,7 +573,7 @@ func testCurriedFunc() {
 // CF4-NEXT: End completions
 }
 
-func testImplicitlyCurriedFunc(fs: FooStruct) {
+func testImplicitlyCurriedFunc(var fs: FooStruct) {
   FooStruct.instanceFunc0(&fs)#^IMPLICITLY_CURRIED_FUNC_0^#
 // IMPLICITLY_CURRIED_FUNC_0: Begin completions
 // IMPLICITLY_CURRIED_FUNC_0-NEXT: Pattern/ExprSpecific: ()[#Void#]{{; name=.+$}}

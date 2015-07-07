@@ -127,7 +127,7 @@ ERROR(cannot_pass_rvalue_inout_subelement,sema_tcs,none,
       "cannot pass immutable value as inout argument: %0",
       (StringRef))
 ERROR(cannot_pass_rvalue_inout,sema_tcs,none,
-      "cannot pass immutable value of type '%0' as inout argument",
+      "cannot pass immutable value of type %0 as inout argument",
       (Type))
 
 ERROR(cannot_assign_to_literal,sema,none,
