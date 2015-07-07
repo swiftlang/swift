@@ -183,6 +183,26 @@ namespace {
   };
 };
 
+/// Emit optional-to-optional conversions
+static ManagedValue emitMatchedOptionalToOptional(SILGenFunction &gen,
+                                                  SILLocation loc,
+                                                  ManagedValue input,
+                                                  SILType resultTy) {
+  return input;
+}
+
+// Produces a temporary copy of "translated" (if needed) and returns it,
+// for use with optional operations.
+static ManagedValue replaceWithTemp(SILGenFunction &gen,
+                                    SILLocation loc,
+                                    ManagedValue value) {
+  if (value.getType().isAddress())
+    return value;
+
+  Materialize materialized = gen.emitMaterialize(loc, value);
+  return ManagedValue(materialized.address, materialized.valueCleanup);
+};
+
 /// Apply this transformation to an arbitrary value.
 ManagedValue Transform::transform(ManagedValue v,
                                   AbstractionPattern origFormalType,
@@ -231,6 +251,13 @@ ManagedValue Transform::transform(ManagedValue v,
     valueOTK = OTK_None;
   }
 
+  if (valueOTK != OTK_None && substOTK != OTK_None && valueOTK != substOTK) {
+    SILType optTy = SGF.getLoweredType(substOptionalType);
+    v = replaceWithTemp(SGF, Loc, v);
+    v = SGF.emitOptionalToOptional(Loc, v, optTy,
+                                   emitMatchedOptionalToOptional);
+  }
+  
   // Transformable values are:
 
   //  - functions
@@ -898,14 +925,6 @@ static SILValue getThunkInnerResultAddr(SILGenFunction &gen,
   return {};
 }
 
-/// Emit optional-to-optional conversions
-static ManagedValue emitMatchedOptionalToOptional(SILGenFunction &gen,
-                                                  SILLocation loc,
-                                                  ManagedValue input,
-                                                  SILType resultTy) {
-  return input;
-}
-
 /// Return the result of a function application as the result from a thunk.
 static SILValue getThunkResult(SILGenFunction &gen,
                                SILLocation loc,
@@ -951,16 +970,6 @@ static SILValue getThunkResult(SILGenFunction &gen,
     innerResult = gen.emitManagedRValueWithCleanup(innerResultValue,
                                                    innerResultTL);
   }
-
-  // Local function that produces a temporary copy of "translated" (if needed)
-  // and returns it, for use with optional operations.
-  auto replaceWithTemp = [&](ManagedValue value) -> ManagedValue {
-    if (value.getType().isAddress())
-      return value;
-
-    Materialize materialized = gen.emitMaterialize(loc, value);
-    return ManagedValue(materialized.address, materialized.valueCleanup);
-  };
 
   auto opaque = AbstractionPattern::getOpaque();
   if (outerResultAddr) {
@@ -1011,14 +1020,16 @@ static SILValue getThunkResult(SILGenFunction &gen,
                  "Cannot force non-implicit optional");
           (void)fromOTK;
 
+          translated = replaceWithTemp(gen, loc, translated);
           translated = gen.emitCheckedGetOptionalValueFrom(loc,
-                                                    replaceWithTemp(translated),
+                                                    translated,
                                                     innerResultTL,
                                                     SGFContext());
         } else if (toOTK != OTK_None && fromOTK != toOTK) {
           // Translate between kinds of optionals.
+          translated = replaceWithTemp(gen, loc, translated);
           translated = gen.emitOptionalToOptional(loc,
-                                                  replaceWithTemp(translated),
+                                                  translated,
                                                   outerResultAddr.getType(),
                                                   emitMatchedOptionalToOptional);
         }
@@ -1074,14 +1085,16 @@ static SILValue getThunkResult(SILGenFunction &gen,
                "Cannot force non-implicit optional");
         (void)fromOTK;
 
+        translated = replaceWithTemp(gen, loc, translated);
         translated = gen.emitCheckedGetOptionalValueFrom(loc,
-                                                  replaceWithTemp(translated),
+                                                  translated,
                                                   innerResultTL,
                                                   SGFContext());
       } else if (toOTK != OTK_None && fromOTK != toOTK) {
         // Translate between kinds of optionals.
+        translated = replaceWithTemp(gen, loc, translated);
         translated = gen.emitOptionalToOptional(loc,
-                                                replaceWithTemp(translated),
+                                                translated,
                                                 substResultSILType,
                                                 emitMatchedOptionalToOptional);
       }

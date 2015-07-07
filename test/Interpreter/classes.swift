@@ -112,3 +112,61 @@ driver()
 // CHECK: Optional("CompilerCrasher")
 // CHECK-NEXT: Optional("CompilerCrasher")
 // CHECK-NEXT: Optional("ReturnOfCompilerCrasher")
+
+struct Account {
+  var owner: String
+}
+
+class Bank {
+  func transferMoney(from: Account?, to: Account!) -> Account! {
+    return nil
+  }
+
+  func deposit(to: Account) -> Account? {
+    return nil
+  }
+}
+
+class DodgyBank : Bank {
+  // Parameters: swap ? and !
+  // Result: less optional
+  override func transferMoney(from: Account!, to: Account?) -> Account {
+    if let fromAccount = from {
+      return fromAccount
+    } else {
+      return Account(owner: "Bank fees")
+    }
+  }
+
+  // Parameter: more optional
+  // Result: swap ? and !
+  override func deposit(to: Account?) -> Account! {
+    if let toAccount = to {
+      if (toAccount.owner == "Cyberdyne Systems") {
+        return nil
+      }
+    }
+    return to
+  }
+}
+
+// CHECK: main.Account(owner: "A")
+// CHECK: main.Account(owner: "Bank fees")
+// CHECK: nil
+// CHECK: Optional(main.Account(owner: "A"))
+
+let b = DodgyBank()
+
+#if false
+// FIXME: rdar://problem/21435542
+print(b.transferMoney(Account(owner: "A"), to: Account(owner: "B")))
+print(b.transferMoney(nil, to: nil))
+print(b.deposit(Account(owner: "Cyberdyne Systems")))
+print(b.deposit(Account(owner: "A")))
+print(b.deposit(nil))
+#endif
+
+print((b as Bank).transferMoney(Account(owner: "A"), to: Account(owner: "B")))
+print((b as Bank).transferMoney(nil, to: nil))
+print((b as Bank).deposit(Account(owner: "Cyberdyne Systems")))
+print((b as Bank).deposit(Account(owner: "A")))

@@ -139,6 +139,26 @@ class Bar: Foo {
   override func foo(x: (Int -> Int)?) -> Int -> Int {}
 }
 
+// rdar://problem/21364764
+// Ensure we can override an optional with an IUO or vice-versa.
+struct S {}
+
+class Aap {
+  func cat(b: B?) -> B? {}
+  func dog(b: B!) -> B! {}
+
+  func catFast(s: S?) -> S? {}
+  func dogFast(s: S!) -> S! {}
+}
+
+class Noot : Aap {
+  override func cat(b: B!) -> B! {}
+  override func dog(b: B?) -> B? {}
+
+  override func catFast(s: S!) -> S! {}
+  override func dogFast(s: S?) -> S? {}
+}
+
 // CHECK-LABEL: sil private @_TTVFC13vtable_thunks3Bar3foofS0_FGSqFSiSi_FSiSi : $@convention(method) (@owned @callee_owned (Int) -> Int, @guaranteed Bar) -> @owned Optional<Int -> Int>
 // CHECK:         function_ref @_TTRXFo_dSi_dSi_XFo_iSi_iSi_
 // CHECK:         [[IMPL:%.*]] = function_ref @_TFC13vtable_thunks3Bar3foofS0_FGSqFSiSi_FSiSi

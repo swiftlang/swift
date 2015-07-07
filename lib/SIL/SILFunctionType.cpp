@@ -392,8 +392,11 @@ enum class ConventionsKind : uint8_t {
 
       unsigned origParamIndex = NextOrigParamIndex++;
 
-      // A parameter may add optionality to an overridden interface,
-      // or force off IUO.
+      // Rules for changing optionality of parameters in overrides:
+      // - adding optionality in the override is OK.
+      // - going from IUO to optional or vice versa is OK.
+      // - forcing off IUO is also allowed in @objc method overrides (but might
+      //   trap at runtime).
       if (substOverrideType) {
         OptionalTypeKind overrideOTK, substOTK;
         substOverrideType.getAnyOptionalObjectType(overrideOTK);
@@ -403,9 +406,11 @@ enum class ConventionsKind : uint8_t {
           if (overrideOTK == OTK_None) {
             substType = substObjTy;
           } else {
+            if (substOTK == OTK_None)
+              substObjTy = substType;
             auto optionalDecl = M.getASTContext()
               .getOptionalDecl(overrideOTK);
-            substType = BoundGenericType::get(optionalDecl, Type(), substType)
+            substType = BoundGenericType::get(optionalDecl, Type(), substObjTy)
               ->getCanonicalType();
           }
         }
@@ -553,7 +558,9 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
     }
   }
   
-  // The overridden result may have shed optionality.
+  // Rules for changing optionality of results in overrides:
+  // - going from optional to not optional is OK.
+  // - going from IUO to optional or vice versa is OK.
   OptionalTypeKind overrideOTK;
   if (substFnOverrideType
       && substFnOverrideType.getResult()->getAnyOptionalObjectType(overrideOTK))
