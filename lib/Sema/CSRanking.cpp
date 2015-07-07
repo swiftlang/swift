@@ -883,7 +883,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
       continue;
     }
 
-    // If one type is a subtype of the other, but not vice-verse,
+    // If one type is a subtype of the other, but not vice-versa,
     // we prefer the system with the more-constrained type.
     // FIXME: Collapse this check into the second check.
     type1Better = tc.isSubtypeOf(type1, type2, cs.DC);

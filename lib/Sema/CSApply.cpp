@@ -3936,7 +3936,7 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
   else
     toScalarType = field.getType();
 
-  // Coerce the expression to the type to the scalar type.
+  // Coerce the expression to the scalar type.
   expr = coerceToType(expr, toScalarType,
                       locator.withPathElement(
                         ConstraintLocator::ScalarToTuple));
