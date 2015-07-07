@@ -238,8 +238,6 @@ struct SubscriptTest2 {
 }
 
 func testSubscript1(s2 : SubscriptTest2) {
-  // FIXME: Error about _ is bogus.
-  // expected-error @+1 {{'_' can only appear in a pattern or on the left side of an assignment}}
   _ = s2["foo"] // expected-error {{cannot subscript a value of type 'SubscriptTest2' with an index of type 'String'}}
   
   let a = s2["foo", 1.0] // expected-error {{cannot subscript a value of type 'SubscriptTest2' with an index of type '(String, Double)'}}

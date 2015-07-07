@@ -2810,12 +2810,14 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
   auto destExpr = assignExpr->getDest();
   auto srcExpr = assignExpr->getSrc();
   
-  auto destType = getTypeOfIndependentSubExpression(destExpr);
   auto srcType = getTypeOfIndependentSubExpression(srcExpr);
-  
   // If the source type is already an error type, we've likely already posted
   // an error due to a contextual type conversion error.
-  if (isErrorTypeKind(srcType) || isErrorTypeKind(destType))
+  if (isErrorTypeKind(srcType))
+    return true;
+
+  auto destType = getTypeOfIndependentSubExpression(destExpr);
+  if (isErrorTypeKind(destType))
     return true;
 
   // If the result type is a non-lvalue, then we are failing because it is
