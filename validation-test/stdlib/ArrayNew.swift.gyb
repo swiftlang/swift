@@ -167,8 +167,7 @@ ArrayTestSuite.test("${array_type}/Sliceable/Enums") {
   if true {
     let expected = [ E.A, E.B, E.C, E.D ]
     let sliceable = ${array_type}(expected)
-    checkSliceableWithBidirectionalIndex(
-      expected, sliceable, SourceLocStack().withCurrentLoc())
+    checkSliceableWithBidirectionalIndex(expected, sliceable)
   }
 
   /*

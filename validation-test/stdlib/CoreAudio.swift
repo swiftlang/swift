@@ -268,8 +268,7 @@ CoreAudioTestSuite.test("UnsafeMutableAudioBufferListPointer/Collection") {
   }
 
   // FIXME: use checkMutableRandomAccessCollection, when we have that function.
-  checkRandomAccessCollection(
-    expected, ablPtrWrapper, SourceLocStack().withCurrentLoc())
+  checkRandomAccessCollection(expected, ablPtrWrapper)
   free(ablPtrWrapper.unsafeMutablePointer)
 }
 

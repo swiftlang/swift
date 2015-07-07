@@ -129,14 +129,13 @@ func checkGraphemeClusterSegmentation(
     unicodeScalarCount += currentClusterSize
     actualBoundaries += [ unicodeScalarCount ]
   }
-  expectEqual(expectedBoundaries, actualBoundaries,
-      stackTrace: stackTrace.withCurrentLoc()) {
+  expectEqual(
+    expectedBoundaries, actualBoundaries,
     "scalars: \(asHex(lazy(subject.unicodeScalars).map { $0.value }.array))"
-  }
+  )
 
   let expectedCharacters: [Character] = Array(subject.characters)
-  checkSliceableWithBidirectionalIndex(expectedCharacters, subject.characters,
-      stackTrace.withCurrentLoc())
+  checkSliceableWithBidirectionalIndex(expectedCharacters, subject.characters)
 }
 
 func checkGraphemeClusterSegmentation(

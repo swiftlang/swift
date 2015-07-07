@@ -511,7 +511,7 @@ SequenceTypeAlgorithms.test("enumerate") {
       result, compareElements,
       resiliencyChecks: .none,
       test.loc.withCurrentLoc())
-    expectEqual([], s.map { $0.value }) { "sequence should be consumed" }
+    expectEqual([], s.map { $0.value }, "sequence should be consumed")
   }
 }
 
@@ -590,7 +590,7 @@ SequenceTypeAlgorithms.test("${algorithmKind}Element/WhereElementIsComparable") 
         test.expected${AlgorithmKind}Index,
         stackTrace: test.loc.withCurrentLoc())
     }
-    expectEqual([], s.map { $0.value }) { "sequence should be consumed" }
+    expectEqual([], s.map { $0.value }, "sequence should be consumed")
   }
 }
 
@@ -622,7 +622,7 @@ SequenceTypeAlgorithms.test("${algorithmKind}Element/Predicate") {
         test.expected${AlgorithmKind}Index,
         stackTrace: test.loc.withCurrentLoc())
     }
-    expectEqual([], s.map { $0.value }) { "sequence should be consumed" }
+    expectEqual([], s.map { $0.value }, "sequence should be consumed")
     expectEqual(max(0, test.sequence.count - 1), timesClosureWasCalled) {
       "maxElement() should be eager and should only call its predicate once per element"
     }
@@ -1166,7 +1166,7 @@ SequenceTypeAlgorithms.test("reduce") {
       return OpaqueValue<[Int]>(partialResult.value + [ element.value ])
     }
     expectEqual(test.sequence, result.value)
-    expectEqual([], s.map { $0.value }) { "sequence should be consumed" }
+    expectEqual([], s.map { $0.value }, "sequence should be consumed")
     expectEqual(test.sequence.count, timesClosureWasCalled) {
       "reduce() should be eager and should only call its predicate once per element"
     }
@@ -1212,7 +1212,7 @@ SequenceTypeAlgorithms.test("reverse/SequenceType") {
     expectEqual(
       test.expected, result.map { $0.value },
       stackTrace: test.loc.withCurrentLoc())
-    expectEqual([], s.map { $0.value }) { "sequence should be consumed" }
+    expectEqual([], s.map { $0.value }, "sequence should be consumed")
   }
 }
 
@@ -1231,9 +1231,7 @@ SequenceTypeAlgorithms.test("reverse/WhereIndexIsBidirectional,BidirectionalReve
     // Check ReverseCollection's CollectionType conformance.
     checkBidirectionalCollection(
       test.expected.map { OpaqueValue($0) } as [OpaqueValue<Int>],
-      result,
-      { $0.value == $1.value },
-      test.loc.withCurrentLoc())
+      result) { $0.value == $1.value }
   }
 }
 
@@ -1252,9 +1250,8 @@ SequenceTypeAlgorithms.test("reverse/WhereIndexIsRandomAccess,RandomAccessRevers
     // Check ReverseRandomAccessCollection CollectionType conformance.
     checkRandomAccessCollection(
       test.expected.map { OpaqueValue($0) } as [OpaqueValue<Int>],
-      result,
-      { $0.value == $1.value },
-      test.loc.withCurrentLoc())
+      result) { $0.value == $1.value }
+
   }
 }
 
@@ -1324,7 +1321,7 @@ SequenceTypeAlgorithms.test("filter/SequenceType/Semantics") {
       }
       expectType([OpaqueValue<Int>].self, &result)
       expectEqual(test.expected, result.map { $0.value })
-      expectEqual([], s.map { $0.value }) { "sequence should be consumed" }
+      expectEqual([], s.map { $0.value }, "sequence should be consumed")
       expectEqual(test.sequence.count, timesClosureWasCalled) {
         "filter() should be eager and should only call its predicate once per element"
       }
@@ -1448,12 +1445,10 @@ SequenceTypeAlgorithms.test("filter/CollectionType/${Implementation}Implementati
 %     if Implementation == 'Custom':
       expectEqual(1, MinimalForwardCollectionWithCustomFilter<OpaqueValue<Int>>.timesFilterWasCalled)
 %     end
-      expectEqual(test.sequence, s.map { $0.value }) {
-        "collection should not be consumed"
-      }
-      expectEqual(test.sequence.count, timesClosureWasCalled) {
-        "filter() should be eager and should only call its predicate once per element"
-      }
+      expectEqual(
+        test.sequence, s.map { $0.value }, "collection should not be consumed")
+      expectEqual(test.sequence.count, timesClosureWasCalled,
+        "filter() should be eager and should only call its predicate once per element")
       expectGE(2 * result.count, result.capacity) {
         "filter() should not reserve capacity (it does not know how much the predicate will filter out)"
       }
@@ -1597,7 +1592,7 @@ SequenceTypeAlgorithms.test("map/SequenceType/${Implementation}Implementation/${
 %     if Implementation == 'Custom':
       expectEqual(1, MinimalSequenceWithCustomMap<OpaqueValue<Int>>.timesMapWasCalled)
 %     end
-      expectEqual([], s.map { $0.value }) { "sequence should be consumed" }
+      expectEqual([], s.map { $0.value }, "sequence should be consumed")
       expectEqual(test.sequence.count, timesClosureWasCalled) {
         "map() should be eager and should only call its predicate once per element"
       }
@@ -1722,9 +1717,8 @@ SequenceTypeAlgorithms.test("map/CollectionType/${Implementation}Implementation/
 %     if Implementation == 'Custom':
       expectEqual(1, MinimalForwardCollectionWithCustomMap<OpaqueValue<Int>>.timesMapWasCalled)
 %     end
-      expectEqual(test.sequence, s.map { $0.value }) {
-        "collection should not be consumed"
-      }
+      expectEqual(test.sequence, s.map { $0.value },
+        "collection should not be consumed")
       expectEqual(test.sequence.count, timesClosureWasCalled) {
         "map() should be eager and should only call its predicate once per element"
       }
@@ -1819,7 +1813,7 @@ SequenceTypeAlgorithms.test("flatMap/SequenceType") {
       expectEqual(
         test.expected, result.map { $0.value },
         stackTrace: test.loc.withCurrentLoc())
-      expectEqual([], s.map { $0.value }) { "sequence should be consumed" }
+      expectEqual([], s.map { $0.value }, "sequence should be consumed")
       expectEqual(test.sequence.count, timesClosureWasCalled) {
         "map() should be eager and should only call its predicate once per element"
       }
@@ -1894,7 +1888,7 @@ SequenceTypeAlgorithms.test("flatMap/SequenceType/TransformProducesOptional") {
       expectEqual(
         test.expected, result.map { $0.value },
         stackTrace: test.loc.withCurrentLoc())
-      expectEqual([], s.map { $0.value }) { "sequence should be consumed" }
+      expectEqual([], s.map { $0.value }, "sequence should be consumed")
       expectEqual(test.sequence.count, timesClosureWasCalled) {
         "flatMap() should be eager and should only call its predicate once per element"
       }
@@ -2235,9 +2229,8 @@ SequenceTypeAlgorithms.test("CollectionType.generate()/DefaultImplementation") {
 
     checkForwardCollection(
       Array(1..<count+1).map { OpaqueValue($0) } as [OpaqueValue<Int>],
-      collection,
-      { $0.value == $1.value },
-      SourceLocStack().withCurrentLoc())
+      collection
+    ) { $0.value == $1.value }
   }
 }
 
@@ -2297,10 +2290,8 @@ SequenceTypeAlgorithms.test("CollectionType.generate()/CustomImplementation") {
 
     checkForwardCollection(
       Array(1..<count+1).map { OpaqueValue($0) } as [OpaqueValue<Int>],
-      collection,
-      { $0.value == $1.value },
-      resiliencyChecks: .none,
-      SourceLocStack().withCurrentLoc())
+      collection, resiliencyChecks: .none) { $0.value == $1.value }
+
   }
 }
 
@@ -2385,11 +2376,8 @@ SequenceTypeAlgorithms.test("subscript(_: Range<Index>)/Semantics") {
 
     // FIXME: improve checkForwardCollection to check the SubSequence type.
     checkForwardCollection(
-      test.expected,
-      result,
-      { $0.value == $1.value },
-      resiliencyChecks: .none,
-      test.loc.withCurrentLoc())
+      test.expected, result, resiliencyChecks: .none) { $0.value == $1.value }
+
   }
 }
 
@@ -2484,11 +2472,7 @@ SequenceTypeAlgorithms.test("Slice.subscript(_: Range<Index>)") {
       Slice<MinimalForwardCollection<OpaqueValue<Int>>>.self,
       &result)
 
-    checkForwardCollection(
-      test.expected,
-      result,
-      { $0.value == $1.value },
-      test.loc.withCurrentLoc())
+    checkForwardCollection(test.expected, result) { $0.value == $1.value }
   }
 }
 
@@ -2829,9 +2813,8 @@ SequenceTypeAlgorithms.test("CollectionType.count/${Implementation}Implementatio
 
     checkForwardCollection(
       Array(1..<count+1).map { OpaqueValue($0) } as [OpaqueValue<Int>],
-      collection,
-      { $0.value == $1.value },
-      SourceLocStack().withCurrentLoc())
+      collection
+    ) { $0.value == $1.value }
   }
 }
 

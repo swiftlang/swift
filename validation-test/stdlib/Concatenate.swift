@@ -33,10 +33,7 @@ let expected = ContiguousArray(0..<8)
 
 for (expected, source) in samples {
   ConcatenateTests.test("forward-\(source)") {
-    checkBidirectionalCollection(
-      expected,
-      _lazyConcatenate(source),
-      SourceLocStack().withCurrentLoc())
+    checkBidirectionalCollection(expected, _lazyConcatenate(source))
   }
 
   ConcatenateTests.test("reverse-\(source)") {
@@ -44,10 +41,7 @@ for (expected, source) in samples {
     // for: <rdar://problem/20789500>
     let expected = ContiguousArray(lazy(expected).reverse())
     let reversed = _lazyConcatenate(source).reverse()
-    checkBidirectionalCollection(
-      expected,
-      reversed,
-      SourceLocStack().withCurrentLoc())
+    checkBidirectionalCollection(expected, reversed)
   }
 
   ConcatenateTests.test("sequence-\(source)") {

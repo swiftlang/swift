@@ -172,9 +172,10 @@ CharacterTests.test("Hashable") {
 func checkRoundTripThroughCharacter(s: String) {
   let c = Character(s)
   var s2 = String(c)
-  expectEqual(Array(s.unicodeScalars), Array(s2.unicodeScalars)) {
+  expectEqual(
+    Array(s.unicodeScalars), Array(s2.unicodeScalars),
     "round-tripping error: \"\(s)\" != \"\(s2)\""
-  }
+  )
 }
 
 func isSmallRepresentation(s: String) -> Bool {

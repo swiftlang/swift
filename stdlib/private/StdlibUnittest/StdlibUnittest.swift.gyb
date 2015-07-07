@@ -67,12 +67,35 @@ public struct SourceLocStack {
     return SourceLocStack(_locs: locs)
   }
 
+  public func pushIf(
+    showFrame: Bool, file: String, line: UWord
+  ) -> SourceLocStack {
+    return showFrame ? self.with(SourceLoc(file, line)) : self
+  }
+
   public func withCurrentLoc(
       file: String = __FILE__, line: UWord = __LINE__
   ) -> SourceLocStack {
     return with(SourceLoc(file, line))
   }
+
+  public func print() {
+    let top = locs.last!
+    Swift.print("check failed at \(top.file), line \(top.line)")
+    _printStackTrace(SourceLocStack(_locs: _UnitTestArray(dropLast(locs))))
+  }
 }
+
+%{
+  TRACE = '''@autoclosure _ message: ()->String = "",
+    showFrame: Bool = true,
+    stackTrace: SourceLocStack = SourceLocStack(),  
+    file: String = __FILE__, line: UWord = __LINE__'''
+
+  stackTrace = 'stackTrace.pushIf(showFrame, file: file, line: line)'
+
+  trace = 'message(),\n  stackTrace: ' + stackTrace
+}%
 
 func _printStackTrace(stackTrace: SourceLocStack?) {
   guard let s = stackTrace else { return }
@@ -104,45 +127,25 @@ public func expectFailure(body: () -> ()) {
   _anyExpectFailed = _anyExpectFailed || startAnyExpectFailed
 }
 
-public func expectEqual<T : Equatable>(
-    expected: T, _ actual: T,
-    stackTrace: SourceLocStack? = nil,
-    file: String = __FILE__, line: UWord = __LINE__,
-    collectMoreInfo: (()->String)? = nil
-) {
-  expectEqual(expected, actual, {$0 == $1},
-    stackTrace: stackTrace, file: file, line: line,
-    collectMoreInfo: collectMoreInfo)
+public func expectEqual<T : Equatable>(expected: T, _ actual: T, ${TRACE}) {
+  expectEqual(expected, actual, ${trace}, showFrame: false) {$0 == $1}
 }
 
 public func expectEqual<T : Equatable, U : Equatable>(
-  expected: (T, U), _ actual: (T, U),
-  stackTrace: SourceLocStack? = nil,
-  file: String = __FILE__, line: UWord = __LINE__,
-  collectMoreInfo: (()->String)? = nil
-) {
-  expectEqual(expected.0, actual.0, {$0 == $1},
-    stackTrace: stackTrace, file: file, line: line,
-    collectMoreInfo: collectMoreInfo)
-  expectEqual(expected.1, actual.1, {$0 == $1},
-    stackTrace: stackTrace, file: file, line: line,
-    collectMoreInfo: collectMoreInfo)
+  expected: (T, U), _ actual: (T, U), ${TRACE}) {
+  expectEqual(expected.0, actual.0, ${trace}, showFrame: false) {$0 == $1}
+  expectEqual(expected.1, actual.1, ${trace}, showFrame: false) {$0 == $1}
 }
 
 public func expectEqual<T>(
-    expected: T, _ actual: T, _ equal: (T,T)->Bool,
-    stackTrace: SourceLocStack? = nil,
-    file: String = __FILE__, line: UWord = __LINE__,
-    collectMoreInfo: (()->String)? = nil
+  expected: T, _ actual: T, ${TRACE}, sameValue equal: (T,T)->Bool
 ) {
   if !equal(expected, actual) {
     _anyExpectFailed = true
-    print("check failed at \(file), line \(line)")
-    _printStackTrace(stackTrace)
+    stackTrace.pushIf(showFrame, file: file, line: line).print()
     print("expected: \"\(expected)\" (of type \(_stdlib_getDemangledTypeName(expected)))")
     print("actual: \"\(actual)\" (of type \(_stdlib_getDemangledTypeName(expected)))")
-    if collectMoreInfo != nil { print(collectMoreInfo!()) }
-    print("")
+    print(message() + "\n")
   }
 }
 
@@ -207,36 +210,10 @@ public func expectEqual<T : Equatable>(
 %    ('<T, U : Equatable>', 'Dictionary<T, U>')]:
 
 public func expectEqual${Generic}(
-    expected: ${EquatableType}, _ actual: ${EquatableType},
-    stackTrace: SourceLocStack? = nil,
-    file: String = __FILE__, line: UWord = __LINE__,
-    collectMoreInfo: (()->String)? = nil
+  expected: ${EquatableType}, _ actual: ${EquatableType}, ${TRACE}
 ) {
-  expectEqual(
-    expected, actual,
-    // FIXME: Simpler closures don't work here due to
-    // <rdar://problem/17716712> and <rdar://problem/17717618>
-    { (x: ${EquatableType}, y: ${EquatableType})->Bool in  x == y },
-    stackTrace: stackTrace, file: file, line: line,
-    collectMoreInfo: collectMoreInfo)
+  expectEqual(expected, actual, ${trace}, showFrame: false) { $0 == $1 }
 }
-
-
-public func expectEqualSequence${Generic}(
-    expected: ${EquatableType}, _ actual: ${EquatableType},
-    stackTrace: SourceLocStack? = nil,
-    file: String = __FILE__, line: UWord = __LINE__,
-    collectMoreInfo: (()->String)? = nil
-) {
-  expectEqual(
-    expected, actual,
-    // FIXME: Simpler closures don't work here due to
-    // <rdar://problem/17716712> and <rdar://problem/17717618>
-    { (x: ${EquatableType}, y: ${EquatableType})->Bool in  x == y },
-    stackTrace: stackTrace, file: file, line: line, 
-    collectMoreInfo: collectMoreInfo)
-}
-
 
 func _expectNotEqual${Generic}(
     expected: ${EquatableType}, actual: ${EquatableType},
@@ -965,7 +942,7 @@ public class TestSuite {
     }
     expectEqual(
       0, LifetimeTracked.instances,
-      file: test.testLoc.file, line: test.testLoc.line)
+      file: test.testLoc.file, line: test.testLoc.line)// { $0 == $1 }
   }
 
   func _testByName(testName: String) -> _Test {
@@ -1831,29 +1808,27 @@ public func check${traversal}Collection<
   C.Generator.Element == ${Element},
   C.Index : ${traversal}IndexType
 >(
-  expected: ${Expected},
-  _ collection: C,
-  _ sameValue: (${Element}, ${Element}) -> Bool,
+  expected: ${Expected}, _ collection: C,
+  ${TRACE},
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
-  _ stackTrace: SourceLocStack,
-  collectMoreInfo: (()->String)? = nil
+  sameValue: (${Element}, ${Element}) -> Bool
 ) {
+  // FIXME: temporary shim
+  let messageShim = message()
   // A `CollectionType` is a multi-pass `SequenceType`.
   for _ in 0..<3 {
     checkSequence(
       expected, collection, sameValue,
       resiliencyChecks: resiliencyChecks,
       stackTrace.withCurrentLoc(),
-      collectMoreInfo: collectMoreInfo)
+      collectMoreInfo: { messageShim })
   }
 
   let expectedArray = Array(expected)
 
   expectEqual(
     expectedArray.count.toIntMax(),
-    collection.count.toIntMax(),
-    stackTrace: stackTrace.withCurrentLoc(),
-    collectMoreInfo: collectMoreInfo)
+    collection.count.toIntMax(), ${trace})
 
   for _ in 0..<3 {
     if true {
@@ -1861,14 +1836,15 @@ public func check${traversal}Collection<
       let endIndex = collection.endIndex
 
       for _ in collection.indices {
-        expectEqual(startIndex, collection.startIndex,
-          stackTrace: stackTrace.withCurrentLoc()) {
-          "Iteration should not change startIndex"
-        }
-        expectEqual(endIndex, collection.endIndex,
-          stackTrace: stackTrace.withCurrentLoc()) {
-          "Iteration should not change endIndex"
-        }
+        expectEqual(
+          startIndex, collection.startIndex,
+          "Iteration should not change startIndex",
+          stackTrace: ${stackTrace})
+        
+        expectEqual(
+          endIndex, collection.endIndex,
+          "Iteration should not change endIndex",
+          stackTrace: ${stackTrace})
       }
     }
 
@@ -1885,14 +1861,9 @@ public func check${traversal}Collection<
         var successor3 = allIndices[i]
         ++successor3
         for s in [ successor1, successor2, successor3 ] {
+          expectEqual(allIndices[i + 1], s, ${trace})
           expectEqual(
-            allIndices[i + 1], s,
-            stackTrace: stackTrace.withCurrentLoc())
-          expectEqual(
-            expectedArray[i + 1],
-            collection[s],
-            sameValue,
-            stackTrace: stackTrace.withCurrentLoc())
+            expectedArray[i + 1], collection[s], ${trace}, sameValue: sameValue)
         }
       }
 %   if traversal == "Bidirectional":
@@ -1903,26 +1874,18 @@ public func check${traversal}Collection<
         var predecessor3 = allIndices[i]
         --predecessor3
         for p in [ predecessor1, predecessor2, predecessor3 ] {
+          expectEqual(allIndices[i - 1], p, ${trace})
           expectEqual(
-            allIndices[i - 1], p,
-            stackTrace: stackTrace.withCurrentLoc())
-          expectEqual(
-            expectedArray[i - 1], collection[p],
-            sameValue,
-            stackTrace: stackTrace.withCurrentLoc())
+            expectedArray[i - 1], collection[p], ${trace}, sameValue: sameValue)
         }
       }
       for i in 1..<allIndices.count {
         var index = allIndices[i]
         --index
         ++index
+        expectEqual(allIndices[i], index, ${trace})
         expectEqual(
-          allIndices[i], index,
-          stackTrace: stackTrace.withCurrentLoc())
-        expectEqual(
-          expectedArray[i], collection[index],
-          sameValue,
-          stackTrace: stackTrace.withCurrentLoc())
+          expectedArray[i], collection[index], ${trace}, sameValue: sameValue)
       }
 %   end
     }
@@ -1959,62 +1922,17 @@ public func check${traversal}Collection<
   ${genericParam}, C : CollectionType
   where
   C.Generator.Element == ${Element},
-  C.Index : ${traversal}IndexType
->(
-  expected: ${Expected},
-  _ collection: C,
-  _ sameValue: (${Element}, ${Element}) -> Bool,
-  resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
-  file: String = __FILE__, line: UWord = __LINE__,
-  collectMoreInfo: (()->String)? = nil
-) {
-  check${traversal}Collection(
-    expected, collection, sameValue,
-    resiliencyChecks: resiliencyChecks,
-    SourceLocStack().with(SourceLoc(file, line)),
-    collectMoreInfo: collectMoreInfo)
-}
-
-public func check${traversal}Collection<
-  ${genericParam}, C : CollectionType
-  where
-  C.Generator.Element == ${Element},
   C.Index : ${traversal}IndexType,
   ${Element} : Equatable
 >(
-  expected: ${Expected},
-  _ collection: C,
-  resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
-  _ stackTrace: SourceLocStack,
-  collectMoreInfo: (()->String)? = nil
+  expected: ${Expected}, _ collection: C,
+  ${TRACE},
+  resiliencyChecks: CollectionMisuseResiliencyChecks = .all
 ) {
   check${traversal}Collection(
-    expected, collection, { $0 == $1 },
-    resiliencyChecks: resiliencyChecks,
-    stackTrace.withCurrentLoc(),
-    collectMoreInfo: collectMoreInfo)
+    expected, collection, ${trace},
+    resiliencyChecks: resiliencyChecks) { $0 == $1 }
 }
-
-public func check${traversal}Collection<
-  ${genericParam}, C : CollectionType
-  where
-  C.Generator.Element == ${Element},
-  C.Index : ${traversal}IndexType,
-  ${Element} : Equatable
->(
-  expected: ${Expected},
-  _ collection: C,
-  resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
-  file: String = __FILE__, line: UWord = __LINE__,
-  collectMoreInfo: (()->String)? = nil
-) {
-  check${traversal}Collection(
-    expected, collection, { $0 == $1 },
-    resiliencyChecks: resiliencyChecks,
-    SourceLocStack().with(SourceLoc(file, line)),
-    collectMoreInfo: collectMoreInfo)
-}
-
 % end
 
 // FIXME: merge into checkCollection()
@@ -2028,11 +1946,10 @@ public func checkSliceableWithBidirectionalIndex<
   S.SubSequence.Index : BidirectionalIndexType,
   ${Element} : Equatable
 >(
-  expected: ${Expected}, 
-  _ sliceable: S, _ stackTrace: SourceLocStack
+  expected: ${Expected}, _ sliceable: S, ${TRACE}
 ) {
   // A `Sliceable` is a `CollectionType`.
-  checkBidirectionalCollection(expected, sliceable, stackTrace.withCurrentLoc())
+  checkBidirectionalCollection(expected, sliceable, ${trace})
 
   let expectedArray = _UnitTestArray(expected)
   
@@ -2054,8 +1971,7 @@ public func checkSliceableWithBidirectionalIndex<
       }
       let expectedSlice = expectedArray[startNumericIndex..<endNumericIndex]
       let slice = sliceable[start..<end]
-      checkBidirectionalCollection(
-        expectedSlice, slice, stackTrace.withCurrentLoc())
+      checkBidirectionalCollection(expectedSlice, slice, ${trace})
 
       if end != sliceable.endIndex {
         ++end

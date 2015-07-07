@@ -125,10 +125,11 @@ class CodecTest<Codec : TestableUnicodeCodec> {
 
     encodeIndex = encodeBuffer.startIndex
     Codec.encode(scalar, output: encodeOutput)
-    expectEqual(nsEncoded, encodeBuffer[0..<encodeIndex])  {
+    expectEqual(
+      nsEncoded, encodeBuffer[0..<encodeIndex],
       "Decoding failed: \(asHex(nsEncoded)) => " +
         "\(asHex(scalar.value)) => \(asHex(self.encodeBuffer[0]))"
-    }
+    )
   }
 
   func run(minScalarOrd: Int, _ maxScalarOrd: Int) {

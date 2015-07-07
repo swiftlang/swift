@@ -2152,15 +2152,12 @@ class NonContiguousNSString : NSString {
 
 func checkUTF8View(expected: [UInt8], _ subject: String,
     _ stackTrace: SourceLocStack) {
-  checkForwardCollection(
-    expected, subject.utf8,
-    stackTrace.withCurrentLoc())
+  checkForwardCollection(expected, subject.utf8)
 }
 
 func checkUTF16View(expected: [UInt16], _ subject: String,
     _ stackTrace: SourceLocStack) {
-  checkSliceableWithBidirectionalIndex(expected, subject.utf16,
-      stackTrace.withCurrentLoc())
+  checkSliceableWithBidirectionalIndex(expected, subject.utf16)
 }
 
 func forStringsWithUnpairedSurrogates(checkClosure: (UTF16Test, String) -> ()) {
@@ -2343,8 +2340,8 @@ StringCookedViews.test("UnicodeScalars") {
   for test in UTF8TestsSmokeTest {
     let expectedScalars = test.scalars.map { UnicodeScalar($0) }
     let subject = NonContiguousNSString(test.scalars) as String
-    checkSliceableWithBidirectionalIndex(expectedScalars,
-        subject.unicodeScalars, test.loc.withCurrentLoc())
+    checkSliceableWithBidirectionalIndex(
+      expectedScalars, subject.unicodeScalars)
   }
 
   forStringsWithUnpairedSurrogates {
@@ -2352,8 +2349,8 @@ StringCookedViews.test("UnicodeScalars") {
     let expectedScalars = (test.scalarsHead + test.scalarsRepairedTail).map {
       UnicodeScalar($0)
     }
-    checkSliceableWithBidirectionalIndex(expectedScalars,
-        subject.unicodeScalars, test.loc.withCurrentLoc())
+    checkSliceableWithBidirectionalIndex(
+      expectedScalars, subject.unicodeScalars)
   }
 }
 
