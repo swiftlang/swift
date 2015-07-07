@@ -261,7 +261,7 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
                       ->castTo<GenericTypeParamType>();
       auto baseTy = resolver->resolveGenericTypeParamType(selfTy);
 
-      if (baseTy->isDependentType()) {
+      if (baseTy->isTypeParameter()) {
         return resolver->resolveSelfAssociatedType(baseTy, fromDC, assocType);
       }
     }
@@ -393,7 +393,7 @@ Type TypeChecker::applyGenericArguments(Type type,
                                                 unbound->getParent(),
                                                 genericArgTypes);
   // Check protocol conformance.
-  if (!BGT->isDependentType()) {
+  if (!BGT->hasTypeParameter()) {
     // FIXME: Record that we're checking substitutions, so we can't end up
     // with infinite recursion.
 
@@ -782,9 +782,7 @@ static Type resolveIdentTypeComponent(
 
       
       // If the parent is a dependent type, the member is a dependent member.
-      if (parentTy->is<DependentMemberType>() ||
-          parentTy->is<GenericTypeParamType>()) {
-        
+      if (parentTy->isTypeParameter()) {
         // Try to resolve the dependent member type to a specific associated
         // type.
         Type memberType = resolver->resolveDependentMemberType(parentTy, DC,

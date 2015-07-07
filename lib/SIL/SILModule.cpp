@@ -294,7 +294,7 @@ static bool verifySILSelfParameterType(SILDeclRef DeclRef,
   // *NOTE* We do not run this check when we have a generic type since
   // *generic types do not have type lowering and are always treated as
   // *non-trivial since we do not know the type.
-  if (CTy->hasArchetype() || CTy->isDependentType() ||
+  if (CTy->hasArchetype() || CTy->hasTypeParameter() ||
       M.getTypeLowering(Ty).isTrivial())
     return true;
 

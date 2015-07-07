@@ -762,7 +762,7 @@ static void revertDependentTypeLoc(TypeLoc &tl) {
 
         // If the bound type isn't dependent, there's nothing to do.
         auto type = comp->getBoundType();
-        if (!type->isDependentType())
+        if (!type->hasTypeParameter())
           return true;
 
         // Turn a generic parameter type back into a reference to the
@@ -4123,7 +4123,7 @@ public:
       return;
 
     // This type check should have created a non-dependent type.
-    assert(!FD->getType()->isDependentType());
+    assert(!FD->getType()->hasTypeParameter());
 
     validateAttributes(TC, FD);
 

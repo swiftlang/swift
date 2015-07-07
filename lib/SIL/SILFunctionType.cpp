@@ -1537,10 +1537,10 @@ namespace {
       SILParameterInfo origIndirectResult;
       if (origHasIndirectResult) {
         origIndirectResult = claimNextOrigParam();
-        resultIsDependent = origIndirectResult.getType()->isDependentType();
+        resultIsDependent = origIndirectResult.getType()->hasTypeParameter();
         assert(origIndirectResult.isIndirectResult());
       } else {
-        resultIsDependent = origResult.getType()->isDependentType();
+        resultIsDependent = origResult.getType()->hasTypeParameter();
       }
 
       // If the result type didn't change and doesn't depend on context, we can
@@ -1617,7 +1617,7 @@ namespace {
       // If the type hasn't changed and doesn't rely on context, just use the
       // original parameter.
       if (origType.isExactType(substType) &&
-          !origParam.getType()->isDependentType()) {
+          !origParam.getType()->hasTypeParameter()) {
         SubstParams.push_back(origParam);
         return;
       }
@@ -1709,7 +1709,7 @@ TypeConverter::substFunctionType(CanSILFunctionType origFnType,
   Optional<SILResultInfo> substErrorResult
     = origFnType->getOptionalErrorResult();
   assert(!substErrorResult ||
-         (!substErrorResult->getType()->isDependentType() &&
+         (!substErrorResult->getType()->hasTypeParameter() &&
           !substErrorResult->getType()->hasArchetype()));
 
   // Map the inputs.
@@ -1833,7 +1833,7 @@ namespace {
 
       auto substErrorResult = origType->getOptionalErrorResult();
       assert(!substErrorResult ||
-             (!substErrorResult->getType()->isDependentType() &&
+             (!substErrorResult->getType()->hasTypeParameter() &&
               !substErrorResult->getType()->hasArchetype()));
 
       SmallVector<SILParameterInfo, 8> substParams;

@@ -305,8 +305,7 @@ SpecializedProtocolConformance::getTypeWitnessSubstAndDecl(
                                                         resolver);
     assert((conforms.getInt() == ConformanceKind::Conforms ||
             specializedType->is<TypeVariableType>() ||
-            specializedType->is<GenericTypeParamType>() ||
-            specializedType->is<DependentMemberType>() ||
+            specializedType->isTypeParameter() ||
             specializedType->is<ErrorType>()) &&
            "Improperly checked substitution");
     conformances.push_back(conforms.getPointer());

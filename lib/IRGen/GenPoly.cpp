@@ -53,7 +53,7 @@ void checkFunctionsAreCompatible(IRGenModule &IGM,
   GenericContextScope scope(IGM, origTy->getGenericSignature());
   
   auto getContextType = [&](CanType t) -> CanType {
-    if (t->isDependentType())
+    if (t->hasTypeParameter())
       return IGM.getContextArchetypes().substDependentType(t)
         ->getCanonicalType();
     return t;
@@ -208,10 +208,10 @@ namespace {
       if (origTy == substTy) return false;
       
       // Contextualize dependent types.
-      if (origTy->isDependentType())
+      if (origTy->hasTypeParameter())
         origTy = IGM.getContextArchetypes().substDependentType(origTy)
           ->getCanonicalType();
-      if (substTy->isDependentType())
+      if (substTy->hasTypeParameter())
         substTy = IGM.getContextArchetypes().substDependentType(substTy)
           ->getCanonicalType();
       
@@ -437,7 +437,7 @@ struct EmbedsArchetype : DeclVisitor<EmbedsArchetype, bool>,
 
 static SILType applyContextArchetypes(IRGenFunction &IGF,
                                       SILType type) {
-  if (!type.isDependentType()) {
+  if (!type.hasTypeParameter()) {
     return type;
   }
 

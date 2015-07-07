@@ -2436,7 +2436,7 @@ void CallEmission::emitToExplosion(Explosion &out) {
 
   CanType origResultType =
     getCallee().getOrigFunctionType()->getResult().getType();
-  if (origResultType->isDependentType())
+  if (origResultType->hasTypeParameter())
     origResultType = IGF.IGM.getContextArchetypes()
       .substDependentType(origResultType)
       ->getCanonicalType();
@@ -3640,7 +3640,7 @@ static llvm::Function *emitPartialApplicationForwarder(IRGenModule &IGM,
     llvm::Value *callResult = call;
     // If the result type is dependent on a type parameter we might have to cast
     // to the result type - it could be substituted.
-    if (origType->getSILResult().isDependentType()) {
+    if (origType->getSILResult().hasTypeParameter()) {
       auto ResType = fwd->getReturnType();
       callResult = subIGF.Builder.CreateBitCast(callResult, ResType);
     }

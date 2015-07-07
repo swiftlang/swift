@@ -142,7 +142,7 @@ class AbstractionPattern {
   CanGenericSignature GenericSig;
 
   static bool isOpaqueType(CanGenericSignature signature, CanType type) {
-    assert(signature || !type->isDependentType());
+    assert(signature || !type->hasTypeParameter());
     if (auto arch = dyn_cast<ArchetypeType>(type))
       return !arch->requiresClass();
     // FIXME: Check class constraint of dependent types in their originating
@@ -198,7 +198,7 @@ class AbstractionPattern {
   }
 
   void initSwiftType(CanGenericSignature signature, CanType origType) {
-    assert(signature || !origType->isDependentType());
+    assert(signature || !origType->hasTypeParameter());
     if (isOpaqueType(signature, origType)) {
       TheKind = unsigned(Kind::Opaque);
     } else {

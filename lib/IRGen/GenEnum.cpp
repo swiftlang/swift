@@ -4472,7 +4472,7 @@ MultiPayloadEnumImplStrategy::completeFixedLayout(TypeConverter &TC,
     // layout; that's a lot of overhead in generic code for little gain.
     // There's a corresponding hack in TypeConverter::convertArchetypeType to
     // give class archetypes no spare bits.
-    if (elt.decl->getInterfaceType()->isDependentType()) {
+    if (elt.decl->getInterfaceType()->hasTypeParameter()) {
       FixedTypeInfo::applyFixedSpareBitsMask(CommonSpareBits,
                                SpareBitVector::getConstant(payloadBits, false));
       continue;

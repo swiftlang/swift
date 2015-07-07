@@ -3668,7 +3668,7 @@ namespace {
     // a generic parameter or a member of a generic parameter, or return null
     // if it does not.
     ArchetypeType::NestedType getRepresentativeArchetype(Type depType) {
-      assert(depType->isDependentType()
+      assert(depType->hasTypeParameter()
              && "considering non-dependent type?!");
 
       auto *potential = ParamArchetypes.resolveArchetype(depType);
@@ -3906,7 +3906,7 @@ namespace {
         // prevents us from realizing that we can rederive T and U in the
         // following:
         //   \forall T U . Vector<T->U> -> ()
-        if (arg->isDependentType()) {
+        if (arg->isTypeParameter()) {
           // Find the archetype from the dependent type.
           considerDependentType(arg, params[i], depth, i);
         }
@@ -4006,7 +4006,7 @@ namespace {
 
       // Only add a fulfillment if we don't have any previous
       // fulfillment for that value.
-      assert(arg->isDependentType() && "fulfilling non-dependent type?!");
+      assert(arg->isTypeParameter() && "fulfilling non-dependent type?!");
       auto key = FulfillmentKey(arg, proto);
       Fulfillments.insert(std::make_pair(key,
                                    Fulfillment(sourceIndex, depth, index)));

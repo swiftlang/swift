@@ -90,7 +90,7 @@ public:
     HasArchetype        = 0x02,
 
     /// This type expression contains a GenericTypeParamType.
-    IsDependent         = 0x04,
+    HasTypeParameter    = 0x04,
 
     /// This type expression contains an LValueType or InOutType,
     /// other than as a function input.
@@ -129,10 +129,8 @@ public:
   /// archetype?
   bool hasArchetype() const { return Bits & HasArchetype; }
 
-  /// Is a type with these properties dependent, in the sense of being
-  /// expressed in terms of a generic type parameter or a dependent
-  /// member thereof?
-  bool isDependent() const { return Bits & IsDependent; }
+  /// Does a type with these properties have a type parameter somewhere in it?
+  bool hasTypeParameter() const { return Bits & HasTypeParameter; }
 
   /// Is a type with these properties materializable: that is, is it a
   /// first-class value type?
@@ -416,18 +414,20 @@ public:
   /// type variables referenced by this type.
   void getTypeVariables(SmallVectorImpl<TypeVariableType *> &typeVariables);
 
-  /// Determine whether the type is directly dependent on a generic type
-  /// parameter.
+  /// Determine whether this type is a type parameter, which is either a
+  /// GenericTypeParamType or a DependentMemberType.
   ///
-  /// Unlike the C++ notion of "dependent", for which nearly any occurrence of
-  /// a generic parameter within the type causes the type to be dependent,
-  /// the Swift definition of "dependent" is fairly shallow: we either have
-  /// a generic parameter or a member of that generic parameter. Types such
-  /// as X<T>, where T is a generic parameter, are not considered "dependent".
-  bool isDependentType() {
-    return getRecursiveProperties().isDependent();
+  /// Note that this routine will return \c false for types that include type
+  /// parameters in nested positions, e.g, \c T is a type parameter but
+  /// \c X<T> is not a type parameter. Use \c hasTypeParameter to determine
+  /// whether a type parameter exists at any position.
+  bool isTypeParameter();
+
+  /// Determine whether this type contains a type parameter somewhere in it.
+  bool hasTypeParameter() {
+    return getRecursiveProperties().hasTypeParameter();
   }
-  
+
   /// Determines whether this type is an lvalue. This includes both straight
   /// lvalue types as well as tuples or optionals of lvalues.
   bool isLValueType() {
@@ -3701,14 +3701,14 @@ private:
 
   explicit GenericTypeParamType(GenericTypeParamDecl *param)
     : AbstractTypeParamType(TypeKind::GenericTypeParam, nullptr,
-                            RecursiveTypeProperties::IsDependent),
+                            RecursiveTypeProperties::HasTypeParameter),
       ParamOrDepthIndex(param) { }
 
   explicit GenericTypeParamType(unsigned depth,
                                 unsigned index,
                                 const ASTContext &ctx)
     : AbstractTypeParamType(TypeKind::GenericTypeParam, &ctx,
-                            RecursiveTypeProperties::IsDependent),
+                            RecursiveTypeProperties::HasTypeParameter),
       ParamOrDepthIndex(depth << 16 | index) { }
 };
 BEGIN_CAN_TYPE_WRAPPER(GenericTypeParamType, AbstractTypeParamType)
@@ -4008,6 +4008,10 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(TypeVariableType, Type)
 
+
+inline bool TypeBase::isTypeParameter() {
+  return is<GenericTypeParamType>() || is<DependentMemberType>();
+}
 
 inline bool TypeBase::isExistentialType() {
   return getCanonicalType().isExistentialType();

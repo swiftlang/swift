@@ -476,7 +476,7 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
     // for archetypes.
     if (auto concreteType
           = representative->ArchetypeOrConcreteType.getAsConcreteType()) {
-      if (concreteType->isDependentType()) {
+      if (concreteType->hasTypeParameter()) {
         return NestedType::forConcreteType(
                  substConcreteTypesForDependentTypes(builder, concreteType));
       }
@@ -1613,7 +1613,7 @@ void ArchetypeBuilder::dump(llvm::raw_ostream &out) {
 Type ArchetypeBuilder::mapTypeIntoContext(DeclContext *dc, Type type,
                                          LazyResolver *resolver) {
   // If the type is not dependent, there's nothing to map.
-  if (!type->isDependentType())
+  if (!type->hasTypeParameter())
     return type;
 
   auto genericParams = dc->getGenericParamsOfContext();
@@ -1629,7 +1629,7 @@ Type ArchetypeBuilder::mapTypeIntoContext(Module *M,
                                           LazyResolver *resolver) {
   // If the type is not dependent, or we have no generic params, there's nothing
   // to map.
-  if (!genericParams || !type->isDependentType())
+  if (!genericParams || !type->hasTypeParameter())
     return type;
 
   unsigned genericParamsDepth = genericParams->getDepth();

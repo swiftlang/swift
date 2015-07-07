@@ -371,7 +371,7 @@ namespace {
 }
 
 static LoweredTypeKind classifyType(CanType type, SILModule &M) {
-  if (type->isDependentType())
+  if (type->hasTypeParameter())
     type = M.Types.getArchetypes().substDependentType(type)->getCanonicalType();
   return TypeClassifier(M).visit(type);
 }
@@ -519,7 +519,7 @@ namespace {
       if (Children.data() == nullptr) {
         SmallVector<Child, 4> children;
         lowerChildren(M, children);
-        auto isDependent = IsDependent_t(getLoweredType().isDependentType());
+        auto isDependent = IsDependent_t(getLoweredType().hasTypeParameter());
         auto buf = operator new(sizeof(Child) * children.size(), M.Types,
                                 isDependent);
         memcpy(buf, children.data(), sizeof(Child) * children.size());
@@ -754,7 +754,7 @@ namespace {
                                      M.Types.getTypeLowering(substTy)});
         }
         
-        auto isDependent = IsDependent_t(silTy.isDependentType());
+        auto isDependent = IsDependent_t(silTy.hasTypeParameter());
         
         auto buf = operator new(sizeof(NonTrivialElement) * elts.size(),
                                 M.Types, isDependent);
@@ -1530,7 +1530,7 @@ TypeConverter::getTypeLoweringForUncachedLoweredType(TypeKey key) {
   insert(key, nullptr);
 
   CanType contextType = key.SubstType;
-  if (contextType->isDependentType())
+  if (contextType->hasTypeParameter())
     contextType = getArchetypes().substDependentType(contextType)
       ->getCanonicalType();
   auto *theInfo = LowerType(*this, key.SubstType,
@@ -1561,7 +1561,7 @@ mapArchetypeToInterfaceType(const PrimaryArchetypeMap &primaryArchetypes,
   // Otherwise, map it to a dependent member type of the parent archetype.
   assert(arch->getAssocType());
   auto base = mapArchetypeToInterfaceType(primaryArchetypes, arch->getParent());
-  if (base->isDependentType())
+  if (base->isTypeParameter())
     return CanDependentMemberType::get(base, arch->getAssocType(), C);
   assert(base == CanType(arch->getParent())
          && "substituted to non-dependent type?!");

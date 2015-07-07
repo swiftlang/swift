@@ -1543,7 +1543,7 @@ static Substitution getArchetypeSubstitution(TypeChecker &tc,
                                              Type replacement) {
   ArchetypeType *resultArchetype = archetype;
   Type resultReplacement = replacement;
-  assert(!resultReplacement->isDependentType() && "Can't be dependent");
+  assert(!resultReplacement->isTypeParameter() && "Can't be dependent");
   SmallVector<ProtocolConformance *, 4> conformances;
 
   bool isError = replacement->is<ErrorType>();
@@ -2751,9 +2751,8 @@ ConformanceChecker::inferTypeWitnessesViaValueWitness(ValueDecl *req,
       auto proto = Conformance->getProtocol();
       if (auto assocType = getReferencedAssocTypeOfProtocol(firstDepMember,
                                                             proto)) {
-        // If the witness type is non-dependent, add it as a
-        // deduction.
-        if (!secondType->isDependentType()) {
+        // If the witness type does not contain type parameters, add it.
+        if (!secondType->hasTypeParameter()) {
           Inferred.Inferred.push_back({assocType, secondType});
         }
       }

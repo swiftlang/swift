@@ -1464,7 +1464,7 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
         return type;
       });
   }
-  assert(!refType->isDependentType() && "Cannot have a dependent type here");
+  assert(!refType->hasTypeParameter() && "Cannot have a dependent type here");
   
   // If we're binding to an init member, the 'throws' need to line up between
   // the bound and reference types.

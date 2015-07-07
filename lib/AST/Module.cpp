@@ -702,7 +702,7 @@ ArrayRef<Substitution> BoundGenericType::getSubstitutions(
       type = ErrorType::get(module->getASTContext());
 
     SmallVector<ProtocolConformance *, 4> conformances;
-    if (type->is<TypeVariableType>() || type->isDependentType()) {
+    if (type->is<TypeVariableType>() || type->isTypeParameter()) {
       // If the type is a type variable or is dependent, just fill in null
       // conformances. FIXME: It seems like we should record these as
       // requirements (?).

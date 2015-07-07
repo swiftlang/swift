@@ -293,7 +293,7 @@ public:
         // whether they're ABI-compatible without a generic context. We can
         // do a better job here when dependent types are related to their
         // generic signatures.
-        if (aa.isDependentType() || bb.isDependentType())
+        if (aa.hasTypeParameter() || bb.hasTypeParameter())
           continue;
         
         // Bridgeable object types are interchangeable.

@@ -2554,7 +2554,7 @@ static bool isProtocolSelf(Type type) {
 /// of a protocol.
 static bool containsProtocolSelf(Type type) {
   // If the type is not dependent, it doesn't refer to 'Self'.
-  if (!type->isDependentType())
+  if (!type->hasTypeParameter())
     return false;
 
   return type.findIf([](Type type) -> bool {

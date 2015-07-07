@@ -348,9 +348,9 @@ public:
                                   ExistentialRepresentation repr,
                                   Type containedType = Type()) const;
   
-  /// True if the type is dependent on a generic signature.
-  bool isDependentType() const {
-    return getSwiftRValueType()->isDependentType();
+  /// True if the type contains a type parameter.
+  bool hasTypeParameter() const {
+    return getSwiftRValueType()->hasTypeParameter();
   }
   
   /// True if the type is bridgeable to an ObjC object pointer type.

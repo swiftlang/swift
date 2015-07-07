@@ -698,11 +698,11 @@ isNonescapingUse(Operand *O, SmallVectorImpl<SILInstruction*> &Mutations) {
 }
 
 static bool signatureHasDependentTypes(SILFunctionType &CalleeTy) {
-  if (CalleeTy.getSemanticResultSILType().isDependentType())
+  if (CalleeTy.getSemanticResultSILType().hasTypeParameter())
     return true;
 
   for (auto ParamTy : CalleeTy.getParameterSILTypesWithoutIndirectResult())
-    if (ParamTy.isDependentType())
+    if (ParamTy.hasTypeParameter())
       return true;
 
   return false;

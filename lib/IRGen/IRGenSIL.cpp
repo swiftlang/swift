@@ -1470,7 +1470,7 @@ void IRGenSILFunction::emitFunctionArgDebugInfo(SILBasicBlock *BB) {
     // Generic and existential types were already handled in
     // visitAllocStackInst.
     if (Arg->getType().isExistentialType() ||
-        Arg->getType().getSwiftRValueType()->isDependentType() ||
+        Arg->getType().getSwiftRValueType()->isTypeParameter() ||
         Arg->getType().is<ArchetypeType>())
       continue;
 

@@ -317,7 +317,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
     type = metaT->getInstanceType();
   
   // Callers must cope with dependent types directly.  
-  assert(!type->is<DependentMemberType>() && !type->is<GenericTypeParamType>());
+  assert(!type->isTypeParameter());
          
   // Look for members with the given name.
   SmallVector<ValueDecl *, 4> decls;

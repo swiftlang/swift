@@ -48,7 +48,7 @@ using namespace irgen;
 
 llvm::DenseMap<TypeBase*, TypeCacheEntry> &
 TypeConverter::Types_t::getCacheFor(TypeBase *t) {
-  return t->isDependentType() ? DependentCache : IndependentCache;
+  return t->hasTypeParameter() ? DependentCache : IndependentCache;
 }
 
 Address TypeInfo::initializeBufferWithTake(IRGenFunction &IGF,
@@ -871,7 +871,7 @@ ArchetypeBuilder &IRGenModule::getContextArchetypes() {
 /// only until a proper mapping is added.
 void TypeConverter::addForwardDecl(TypeBase *key, llvm::Type *type) {
   assert(key->isCanonical());
-  assert(!key->isDependentType());
+  assert(!key->hasTypeParameter());
   assert(!Types.IndependentCache.count(key) && "entry already exists for type!");
   Types.IndependentCache.insert(std::make_pair(key, type));
 }
@@ -1187,7 +1187,7 @@ TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {
   
   // If the type is dependent, substitute it into our current context.
   auto contextTy = canonicalTy;
-  if (contextTy->isDependentType()) {
+  if (contextTy->hasTypeParameter()) {
     // The type we got should be lowered, so lower it like a SILType.
     contextTy = getArchetypes().substDependentType(*IGM.SILMod,
                                    SILType::getPrimitiveAddressType(contextTy))
@@ -1198,7 +1198,7 @@ TypeCacheEntry TypeConverter::getTypeEntry(CanType canonicalTy) {
   // Fold archetypes to unique exemplars. Any archetype with the same
   // constraints is equivalent for type lowering purposes.
   CanType exemplarTy = getExemplarType(contextTy);
-  assert(!exemplarTy->isDependentType());
+  assert(!exemplarTy->hasTypeParameter());
   
   // See whether we lowered a type equivalent to this one.
   if (exemplarTy != canonicalTy) {

@@ -2463,8 +2463,7 @@ static Type getMemberForBaseType(Module *module,
   }
 
   // If the parent is dependent, create a dependent member type.
-  if (substBase->is<GenericTypeParamType>() ||
-      substBase->is<DependentMemberType>()) {
+  if (substBase->isTypeParameter()) {
     if (assocType)
       return DependentMemberType::get(substBase, assocType,
                                       substBase->getASTContext());
@@ -3069,8 +3068,8 @@ case TypeKind::Id:
           return Type();
       }
 
-      if (firstType->isDependentType() || 
-          (secondType && secondType->isDependentType())) {
+      if (firstType->hasTypeParameter() ||
+          (secondType && secondType->hasTypeParameter())) {
         if (firstType.getPointer() != req.getFirstType().getPointer() ||
             secondType.getPointer() != req.getSecondType().getPointer())
           anyChanges = true;

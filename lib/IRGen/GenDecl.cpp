@@ -897,7 +897,7 @@ void IRGenModule::emitTypeVerifier() {
     
     {
       auto type = typeDecl->getDeclaredInterfaceType();
-      if (type->isDependentType()) {
+      if (type->hasTypeParameter()) {
         Context.Diags.diagnose(SourceLoc(), diag::type_to_verify_dependent,
                                name);
         continue;
@@ -1604,7 +1604,7 @@ llvm::Constant *IRGenModule::getAddrOfMetaclassObject(ClassDecl *decl,
 llvm::Function *
 IRGenModule::getAddrOfTypeMetadataAccessFunction(CanType type,
                                               ForDefinition_t forDefinition) {
-  assert(!type->hasArchetype() && !type->isDependentType());
+  assert(!type->hasArchetype() && !type->hasTypeParameter());
   LinkEntity entity = LinkEntity::forTypeMetadataAccessFunction(type);
   llvm::Function *&entry = GlobalFuncs[entity];
   if (entry) {
@@ -1623,7 +1623,7 @@ IRGenModule::getAddrOfTypeMetadataAccessFunction(CanType type,
 llvm::Constant *
 IRGenModule::getAddrOfTypeMetadataLazyCacheVariable(CanType type,
                                               ForDefinition_t forDefinition) {
-  assert(!type->hasArchetype() && !type->isDependentType());
+  assert(!type->hasArchetype() && !type->hasTypeParameter());
   LinkEntity entity = LinkEntity::forTypeMetadataLazyCacheVariable(type);
   llvm::Constant *&entry = GlobalVars[entity];
   if (entry) {
