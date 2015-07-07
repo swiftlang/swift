@@ -5911,7 +5911,6 @@ namespace {
   class ExprWalker : public ASTWalker {
     ExprRewriter &Rewriter;
     SmallVector<ClosureExpr *, 4> closuresToTypeCheck;
-    unsigned LeftSideOfAssignment = 0;
 
   public:
     ExprWalker(ExprRewriter &Rewriter) : Rewriter(Rewriter) { }
