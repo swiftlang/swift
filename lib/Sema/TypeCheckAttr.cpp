@@ -1219,15 +1219,16 @@ void AttributeChecker::visitRethrowsAttr(RethrowsAttr *attr) {
 
 bool AttributeChecker::visitAbstractAccessibilityAttr(
     AbstractAccessibilityAttr *attr) {
-  if (Type ty = D->getDeclContext()->getDeclaredTypeInContext()) {
-    Accessibility typeAccess = ty->getAnyNominal()->getFormalAccess();
+  DeclContext *dc = D->getDeclContext();
+  if (auto nominal = dc->isNominalTypeOrNominalTypeExtensionContext()) {
+    Accessibility typeAccess = nominal->getFormalAccess();
     if (attr->getAccess() > typeAccess) {
       auto diag = TC.diagnose(attr->getLocation(),
                               diag::access_control_member_more,
                               attr->getAccess(),
                               D->getDescriptiveKind(),
                               typeAccess,
-                              ty->getAnyNominal()->getDescriptiveKind());
+                              nominal->getDescriptiveKind());
       swift::fixItAccessibility(diag, cast<ValueDecl>(D), typeAccess);
       return true;
     }
