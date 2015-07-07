@@ -1,10 +1,13 @@
-// RUN: not --crash %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -parse
 
 // Distributed under the terms of the MIT license
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-protocol P {
-typealias b: b.init(f: T: A, g: Any) {
+protocol C {
+typealias e : SequenceType, x {
 }
-func b: b(T
+typealias d
+func f<T] == [c
+c, c(object1, self.f = ")
+typealias f : d {

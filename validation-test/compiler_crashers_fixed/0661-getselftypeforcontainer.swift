@@ -1,11 +1,10 @@
-// RUN: not --crash %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -parse
 
 // Distributed under the terms of the MIT license
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-func f: ExtensibleCollectionType>(a)) -> d.join()
-protocol a {
-typealias A {
-"
-typealias e : A.e = b,
+protocol P {
+typealias b: b.init(f: T: A, g: Any) {
+}
+func b: b(T

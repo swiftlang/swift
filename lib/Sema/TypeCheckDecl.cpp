@@ -3628,14 +3628,13 @@ public:
         }
       }
     }
+    PD->setIsBeingTypeChecked(false);
 
     // Check the members.
     for (auto Member : PD->getMembers())
       visit(Member);
 
     TC.checkDeclAttributes(PD);
-    
-    PD->setIsBeingTypeChecked(false);
   }
 
   void visitVarDecl(VarDecl *VD) {
@@ -6229,6 +6228,9 @@ static Type checkExtensionGenericParams(
     
     return builder.inferRequirements(extendedTypeInfer);
   };
+
+  ext->setIsBeingTypeChecked(true);
+  defer([ext] { ext->setIsBeingTypeChecked(false); });
 
   // Validate the generic type signature.
   bool invalid = false;

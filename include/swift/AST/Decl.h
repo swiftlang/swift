@@ -809,7 +809,7 @@ public:
   }
   
   /// Whether the declaration is currently being validated.
-  bool isBeingTypeChecked() { return DeclBits.BeingTypeChecked; }
+  bool isBeingTypeChecked();
   
   /// Toggle whether or not the declaration is being validated.
   void setIsBeingTypeChecked(bool ibt = true) {

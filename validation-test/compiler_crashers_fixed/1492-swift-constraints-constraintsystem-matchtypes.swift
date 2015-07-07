@@ -1,13 +1,12 @@
-// RUN: not --crash %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -parse
 
 // Distributed under the terms of the MIT license
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-lass func e: Int {
+[0x31] as String
+protocol C {
+typealias B : Range(false))
+for c {
 }
-struct c : a {
-protocol a {
-typealias d(()
-return ")).<e(A<T>(v: l.<T
-typealias e : d : (
+typealias e : B

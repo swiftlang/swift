@@ -1,13 +1,13 @@
-// RUN: not --crash %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -parse
 
 // Distributed under the terms of the MIT license
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-0
-protocol A {
-typealias e : B) {
+protocol P {
+typealias h: A<d>(_ c(b: (""ab")
+class func a: P {
 }
-func a(n: A {
-func g: e)"A? {
-typealias B
+class A<T : A<T, f(2, Any) -> e: l) -> {
+}
+typealias d
