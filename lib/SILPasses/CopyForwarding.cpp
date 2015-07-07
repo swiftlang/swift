@@ -231,10 +231,10 @@ public:
     case ParameterConvention::Indirect_Out:
       return true;
     case ParameterConvention::Indirect_Inout:
+    case ParameterConvention::Indirect_In_Guaranteed:
       return false;
     case ParameterConvention::Indirect_In:
-    case ParameterConvention::Indirect_In_Guaranteed:
-      llvm_unreachable("copy_addr not destroyed before reinitialization");
+      llvm_unreachable("copy_addr src destroyed without reinitialization");
     default:
       llvm_unreachable("unexpected calling convention for copy_addr user");
     }

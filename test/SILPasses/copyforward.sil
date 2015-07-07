@@ -7,6 +7,7 @@ import Swift
 
 class AClass {}
 sil @f_in : $@convention(thin) <T> (@in T) -> ()
+sil @f_in_guaranteed : $@convention(thin) <T> (@in_guaranteed T) -> ()
 sil @f_out : $@convention(thin) <T> (@out T) -> ()
 sil @f_owned : $@convention(thin) <T> (@owned T) -> ()
 
@@ -454,4 +455,22 @@ bb3:
   dealloc_stack %4#0 : $*@local_storage Optional<T>
   %13 = tuple()
   return %13 : $()
+}
+
+//CHECK-LABEL: test_in_guaranteed
+//CHECK: copy_addr %1 to [initialization]
+//CHECK-NOT: copy_addr
+//CHECK-NOT: destroy_addr
+//CHECK: return
+sil hidden @test_in_guaranteed : $@convention(thin) <T> (@out T, @in T) -> () {
+bb0(%0 : $*T, %1 : $*T):
+  %l1 = alloc_stack $T
+  copy_addr %1 to [initialization] %l1#1 : $*T
+  %f1 = function_ref @f_in_guaranteed : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %c2 = apply %f1<T>(%l1#1) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  copy_addr %l1#1 to [initialization] %0 : $*T
+  destroy_addr %l1#1 : $*T
+  dealloc_stack %l1#0 : $*@local_storage T
+  %t = tuple ()
+  return %t : $()
 }
