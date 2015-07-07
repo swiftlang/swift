@@ -94,7 +94,8 @@ public:
     for (auto &bb : *F) {
       auto term = bb.getTerminator();
       if (isa<ReturnInst>(term)
-          || isa<AutoreleaseReturnInst>(term)) {
+          || isa<AutoreleaseReturnInst>(term)
+          || isa<ThrowInst>(term)) {
         DEBUG(llvm::dbgs() << "     need load from stack slot on exit " << &bb
                            << '\n');
         ExitBBs.insert(&bb);
@@ -225,7 +226,8 @@ static void analyzeUseOfInOut(Operand *UI, StackSlotState &state) {
       return;
     
     if (!isa<ReturnInst>(term)
-        && !isa<AutoreleaseReturnInst>(term))
+        && !isa<AutoreleaseReturnInst>(term)
+        && !isa<ThrowInst>(term))
       // Any copy from the inout outside of an exit block fails the analysis.
       // We don't need full flow-sensitive analysis for SILGen-ed code.
       return state.setFailed("inout is stored outside of an exit block");
