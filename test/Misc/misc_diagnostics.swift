@@ -50,9 +50,6 @@ class A {
     var a: MyArray<Int>
     init() {
         a = MyArray<Int // expected-error{{argument for generic parameter 'Element' could not be inferred}}
-        // expected-error@-1 5{{expected member name or constructor call after type name}}
-        // expected-note@-2 5{{add arguments after the type to construct a value of the type}}
-        // expected-note@-3 5{{use '.self' to reference the type object}}
     }
 }
 

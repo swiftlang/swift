@@ -5987,14 +5987,10 @@ namespace {
 
       // Track whether we're in the left-hand side of an assignment...
       if (auto assign = dyn_cast<AssignExpr>(expr)) {
-        ++LeftSideOfAssignment;
-        
         if (auto dest = assign->getDest()->walk(*this))
           assign->setDest(dest);
         else
           return { false, nullptr };
-        
-        --LeftSideOfAssignment;
 
         auto &cs = Rewriter.getConstraintSystem();
         auto srcLocator = cs.getConstraintLocator(
@@ -6009,12 +6005,7 @@ namespace {
         expr = Rewriter.visitAssignExpr(assign, srcLocator);
         return { false, expr };
       }
-      
-      // ...so we can verify that '_' only appears there.
-      if (isa<DiscardAssignmentExpr>(expr) && LeftSideOfAssignment == 0)
-        Rewriter.getConstraintSystem().getTypeChecker()
-          .diagnose(expr->getLoc(), diag::discard_expr_outside_of_assignment);
-
+        
       Rewriter.walkToExprPre(expr);
       return { true, expr };
     }

@@ -952,7 +952,8 @@ bool TypeChecker::solveForExpression(
 
     // Try to provide a decent diagnostic.
     if (cs.salvage(viable, expr)) {
-      diagnoseExpr(*this, expr, dc, listener);
+      // If salvage produced an error message, then it failed to salvage the
+      // expression, just bail out having reported the error.
       return true;
     }
 

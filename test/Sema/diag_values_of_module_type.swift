@@ -91,7 +91,7 @@ func badTest1() {
 }
 func badTest2() {
   var x = 0
-  x = Swift // expected-error {{expected module member name after module name}} expected-error {{cannot assign a value of type 'module<Swift>' to a value of type 'Int'}}
+  x = Swift //  expected-error {{cannot assign a value of type 'module<Swift>' to a value of type 'Int'}}
   _ = x
 }
 func badTest3() {
@@ -104,9 +104,8 @@ func badTest5() {
   Swift. // expected-error {{postfix '.' is reserved}} expected-error {{expected member name following '.'}}
 }
 func badTest6() {
-  // FIXME: should be only a single diagnostic.
   _ = { () -> Int in
-            _ = Swift // expected-error 2{{expected module member name after module name}}
+            _ = Swift // expected-error {{expected module member name after module name}}
             return 42 }()
   _ = { Swift }() // expected-error {{expected module member name after module name}}
   _ = { { Swift }() }() // expected-error {{expected module member name after module name}}

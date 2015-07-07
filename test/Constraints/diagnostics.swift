@@ -191,3 +191,10 @@ var invalidForceUnwrap = Int()! // expected-error {{cannot force unwrap value of
 // <rdar://problem/20905802> Swift using incorrect diagnostic sometimes on String().asdf
 String().asdf  // expected-error {{value of type 'String' has no member 'asdf'}}
 
+
+// <rdar://problem/21553065> Spurious diagnostic: '_' can only appear in a pattern or on the left side of an assignment
+protocol r21553065Protocol {}
+class r21553065Class<T : AnyObject> {}
+_ = r21553065Class<r21553065Protocol>()  // expected-error {{protocol type 'r21553065Protocol' does not conform to protocol 'AnyObject' because 'r21553065Protocol' is not declared @objc}}
+
+

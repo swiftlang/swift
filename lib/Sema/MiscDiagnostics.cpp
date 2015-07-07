@@ -105,16 +105,31 @@ static void diagUnreachableCode(TypeChecker &TC, const Stmt *S) {
 ///   - Module values may only occur as part of qualification.
 ///   - Metatype names cannot generally be used as values: they need a "T.self"
 ///     qualification unless used in narrow case (e.g. T() for construction).
+///   - '_' may only exist on the LHS of an assignment expression.
 ///
 static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E) {
   class DiagnoseWalker : public ASTWalker {
     SmallPtrSet<Expr*, 4> AlreadyDiagnosedMetatypes;
     SmallPtrSet<DeclRefExpr*, 4> AlreadyDiagnosedNoEscapes;
+    
+    // Keep track of acceptable DiscardAssignmentExpr's.
+    SmallPtrSet<DiscardAssignmentExpr*, 2> CorrectDiscardAssignmentExprs;
   public:
     TypeChecker &TC;
 
     DiagnoseWalker(TypeChecker &TC) : TC(TC) {}
 
+    // Not interested in going outside a basic expression.
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+      return { false, S };
+    }
+    std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
+      return { false, P };
+    }
+    bool walkToDeclPre(Decl *D) override { return false; }
+    bool walkToTypeReprPre(TypeRepr *T) override { return true; }
+
+    
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       // See through implicit conversions of the expression.  We want to be able
       // to associate the parent of this expression with the ultimate callee.
@@ -179,9 +194,41 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E) {
             checkNoEscapeParameterUse(DRE, Call);
         }
       }
+      
+      // If we have an assignment expression, scout ahead for acceptable _'s.
+      if (auto *AE = dyn_cast<AssignExpr>(E))
+        markAcceptableDiscardExprs(AE->getDest());
+
+      /// Diagnose a '_' that isn't on the immediate LHS of an assignment.
+      if (auto *DAE = dyn_cast<DiscardAssignmentExpr>(E)) {
+        if (!CorrectDiscardAssignmentExprs.count(DAE) &&
+            !DAE->getType()->is<ErrorType>())
+          TC.diagnose(DAE->getLoc(), diag::discard_expr_outside_of_assignment);
+      }
+      
 
       return { true, E };
     }
+    
+    /// Scout out the specified destination of an AssignExpr to recursively
+    /// identify DiscardAssignmentExpr in legal places.  We can only allow them
+    /// in simple pattern-like expressions, so we reject anything complex here.
+    void markAcceptableDiscardExprs(Expr *E) {
+      if (!E) return;
+      
+      if (auto *PE = dyn_cast<ParenExpr>(E))
+        return markAcceptableDiscardExprs(PE->getSubExpr());
+      if (auto *TE = dyn_cast<TupleExpr>(E)) {
+        for (auto &elt : TE->getElements())
+          markAcceptableDiscardExprs(elt);
+        return;
+      }
+      if (auto *DAE = dyn_cast<DiscardAssignmentExpr>(E))
+        CorrectDiscardAssignmentExprs.insert(DAE);
+
+      // Otherwise, we can't support this.
+    }
+    
 
     void checkUseOfModule(DeclRefExpr *E) {
       // Allow module values as a part of:
