@@ -1,14 +1,14 @@
-// RUN: not --crash %target-swift-frontend %s -parse
-// REQUIRES: asserts
+// RUN: not %target-swift-frontend %s -parse
 
 // Distributed under the terms of the MIT license
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-let i: a {
-func f: d {
-let g = B<f = A? = 0)
-let c>(v: P {
+if true {
+class d<T> V {
 }
+let a {
 }
-struct B<T where A: d
+var b> T -> {
+}
+enum S<T where H.e : A

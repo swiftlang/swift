@@ -1,14 +1,14 @@
-// RUN: not --crash %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -parse
+// REQUIRES: asserts
 
 // Distributed under the terms of the MIT license
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-if true {
-class d<T> V {
+let c {
+struct A {
+func g> T {
+}))
+var b: A.startIndex, range.advance()
 }
-let a {
-}
-var b> T -> {
-}
-enum S<T where H.e : A
+struct A<T where f: b

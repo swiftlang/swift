@@ -2334,7 +2334,7 @@ Parser::parseDeclExtension(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   SmallVector<Decl*, 8> MemberDecls;
   SourceLoc LBLoc, RBLoc;
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_extension)) {
-    LBLoc = Tok.getLoc();
+    LBLoc = PreviousLoc;
     RBLoc = LBLoc;
     status.setIsParseError();
   } else {
@@ -4110,7 +4110,7 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
   SmallVector<Decl*, 8> MemberDecls;
   SourceLoc LBLoc, RBLoc;
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_enum)) {
-    LBLoc = Tok.getLoc();
+    LBLoc = PreviousLoc;
     RBLoc = LBLoc;
     Status.setIsParseError();
   } else {
@@ -4376,7 +4376,7 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
   SmallVector<Decl*, 8> MemberDecls;
   SourceLoc LBLoc, RBLoc;
   if (parseToken(tok::l_brace, LBLoc, diag::expected_lbrace_struct)) {
-    LBLoc = Tok.getLoc();
+    LBLoc = PreviousLoc;
     RBLoc = LBLoc;
     Status.setIsParseError();
   } else {

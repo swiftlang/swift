@@ -1,12 +1,12 @@
-// RUN: not --crash %target-swift-frontend %s -parse
-// REQUIRES: asserts
+// RUN: not %target-swift-frontend %s -parse
 
 // Distributed under the terms of the MIT license
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-func d() {
-func b<T : b(b)) {
-func b(c(T, A<h : ()
+var b {
+i> {
+protocol b = b> T, y: Array<l : AnyObject, A {
 }
-struct c<T where k.h : l
+}
+enum S<T where g: T> : b
