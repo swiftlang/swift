@@ -553,7 +553,10 @@ namespace {
         return translateParallelExploded(origType, cast<TupleType>(substType));
       }
       if (auto substTuple = dyn_cast<TupleType>(substType)) {
-        if (!substTuple->isMaterializable())
+        if (!origType.isTuple() && !origType.isOpaque()) {
+          assert(substTuple.getElementTypes().size() == 1);
+          return translate(origType, substTuple.getElementType(0));
+        } else if (!substTuple->isMaterializable())
           return translateParallelExploded(origType, substTuple);
         return translateExplodedIndirect(origType, substTuple);
       }
