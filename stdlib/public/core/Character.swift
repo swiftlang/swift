@@ -10,15 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-internal struct _SmallUTF8Sink : SinkType {
-  var asInt: UInt64 = 0
-  var shift: UInt64 = 0
-  mutating func put(x: UTF8.CodeUnit) {
-    asInt |= UInt64(x) << shift
-    shift += 8
-  }
-}
-
 /// `Character` represents some Unicode grapheme cluster as
 /// defined by a canonical, localized, or otherwise tailored
 /// segmentation algorithm.
@@ -43,10 +34,17 @@ public struct Character :
 
   /// Construct a `Character` containing just the given `scalar`.
   public init(_ scalar: UnicodeScalar) {
-    var output = _SmallUTF8Sink()
-    UTF8.encode(scalar, output: &output)
-    output.asInt |= (~0) << output.shift
-    _representation = .Small(Builtin.trunc_Int64_Int63(output.asInt.value))
+    var asInt: UInt64 = 0
+    var shift: UInt64 = 0
+
+    let output: (UTF8.CodeUnit) -> () = {
+      asInt |= UInt64($0) << shift
+      shift += 8
+    }
+
+    UTF8.encode(scalar, output: output)
+    asInt |= (~0) << shift
+    _representation = .Small(Builtin.trunc_Int64_Int63(asInt.value))
   }
 
   @effects(readonly)
@@ -187,14 +185,6 @@ public struct Character :
     var data: UInt64
   }
 
-  internal struct _SmallUTF16Sink : SinkType {
-    mutating func put(x: UTF16.CodeUnit) {
-      u16 = u16 << 16
-      u16 = u16 | UInt64(x)
-    }
-    var u16: UInt64 = 0
-  }
-
   struct _SmallUTF16 : CollectionType {
     init(_ u8: UInt64) {
       let count = UTF16.measure(
@@ -202,11 +192,15 @@ public struct Character :
         repairIllFormedSequences: true)!.0
       _sanityCheck(count <= 4, "Character with more than 4 UTF-16 code units")
       self.count = UInt16(count)
-      var output = _SmallUTF16Sink()
+      var u16: UInt64 = 0
+      let output: (UTF16.CodeUnit) -> () = {
+        u16 = u16 << 16
+        u16 = u16 | UInt64($0)
+      }
       transcode(
-        UTF8.self, UTF16.self, Character._makeSmallUTF8Generator(u8), &output,
+        UTF8.self, UTF16.self, Character._makeSmallUTF8Generator(u8), output,
         stopOnError: false)
-      self.data = output.u16
+      self.data = u16
     }
 
     /// The position of the first element in a non-empty collection.

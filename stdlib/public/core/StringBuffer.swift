@@ -104,22 +104,22 @@ public struct _StringBuffer {
 
     if isAscii {
       var p = UnsafeMutablePointer<UTF8.CodeUnit>(result.start)
-      var sink = SinkOf<UTF32.CodeUnit> {
-          (p++).memory = UTF8.CodeUnit($0)
-        }
+      let sink: (UTF32.CodeUnit) -> () = {
+        (p++).memory = UTF8.CodeUnit($0)
+      }
       let hadError = transcode(
-        encoding, UTF32.self, input.generate(), &sink,
+        encoding, UTF32.self, input.generate(), sink,
         stopOnError: true)
       _sanityCheck(!hadError, "string can not be ASCII if there were decoding errors")
       return (result, hadError)
     }
     else {
       var p = result._storage.baseAddress
-      var sink = SinkOf<UTF16.CodeUnit> {
-          (p++).memory = $0
-        }
+      let sink: (UTF16.CodeUnit) -> () = {
+        (p++).memory = $0
+      }
       let hadError = transcode(
-        encoding, UTF16.self, input.generate(), &sink,
+        encoding, UTF16.self, input.generate(), sink,
         stopOnError: !repairIllFormedSequences)
       return (result, hadError)
     }

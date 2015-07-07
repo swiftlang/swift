@@ -61,26 +61,6 @@ internal struct _CollectionOf<
   let _subscriptImpl: (IndexType_)->T
 }
 
-/// A type-erased sink.
-///
-/// Forwards operations to an arbitrary underlying sink with the same
-/// `Element` type, hiding the specifics of the underlying sink type.
-public struct SinkOf<T> : SinkType {
-  /// Construct an instance whose `put(x)` calls `putElement(x)`.
-  public init(_ putElement: (T)->()) {
-    _put = putElement
-  }
-
-  /// Construct an instance whose `put(x)` calls `base.put(x)`.
-  public init<S: SinkType where S.Element == T>(var _ base: S) {
-    _put = { base.put($0) }
-  }
-
-  /// Write `x` to this sink.
-  public func put(x: T) {
-    _put(x)
-  }
-
-  let _put: (T)->()
-}
+@available(*, unavailable, message="SinkOf has been removed. Use (T)->() closures directly instead.")
+public struct SinkOf<T> {}
 

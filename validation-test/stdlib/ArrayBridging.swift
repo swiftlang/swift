@@ -42,10 +42,9 @@ struct ArrayBridge_objectAtIndex_RaceTest : RaceTestWithPerTrialDataType {
     return Observation(unsafeBitCast(v, UWord.self))
   }
 
-  func evaluateObservations<
-    S : SinkType where S.Element == RaceTestObservationEvaluation
-  >(observations: _UnitTestArray<Observation>, inout _ sink: S) {
-    sink.put(evaluateObservationsAllEqual(observations))
+  func evaluateObservations(observations: _UnitTestArray<Observation>,
+      _ sink: (RaceTestObservationEvaluation) -> ()) {
+    sink(evaluateObservationsAllEqual(observations))
   }
 }
 
@@ -83,10 +82,9 @@ struct ArrayBridge_FastEnumeration_ObjC_RaceTest :
       unsafeBitCast(objcValues[3], UWord.self))
   }
 
-  func evaluateObservations<
-    S : SinkType where S.Element == RaceTestObservationEvaluation
-  >(observations: _UnitTestArray<Observation>, inout _ sink: S) {
-    sink.put(evaluateObservationsAllEqual(observations))
+  func evaluateObservations(observations: _UnitTestArray<Observation>,
+      _ sink: (RaceTestObservationEvaluation) -> ()) {
+    sink(evaluateObservationsAllEqual(observations))
   }
 }
 

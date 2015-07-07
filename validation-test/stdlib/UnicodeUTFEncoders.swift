@@ -90,30 +90,11 @@ func nsEncode<CodeUnit>(
     remainingRange: nil)
 }
 
-// A SinkType that stores the elements written into an Array that can be
-// inspected later.
-class ArraySink<T : IntegerLiteralConvertible> : SinkType {
-  init(capacity: Int) {
-    storage = Array(count: capacity, repeatedValue: 0)
-  }
-  func put(x: T) {
-    storage[count++] = x
-  }
-  func clear() {
-    count = 0
-  }
-  var elements: ArraySlice<T> {
-    return storage[0..<count]
-  }
-  var count = 0
-  var storage: [T] = Array()
-}
-
 class CodecTest<Codec : TestableUnicodeCodec> {
   var used = 0
   typealias CodeUnit = Codec.CodeUnit
   var nsEncodeBuffer: [CodeUnit] = Array(count: 4, repeatedValue: 0)
-  var encodeBuffer = ArraySink<CodeUnit>(capacity: 4)
+  var encodeBuffer: [CodeUnit] = Array(count: 4, repeatedValue: 0)
 
   func testOne(scalar: UnicodeScalar) {
     /* Progress reporter
@@ -125,6 +106,8 @@ class CodecTest<Codec : TestableUnicodeCodec> {
     // Use Cocoa to encode the scalar
     nsEncode(scalar.value, Codec.encodingId(), &nsEncodeBuffer, &used)
     let nsEncoded = nsEncodeBuffer[0..<(used/sizeof(CodeUnit.self))]
+    var encodeIndex = encodeBuffer.startIndex
+    let encodeOutput: (CodeUnit) -> () = { self.encodeBuffer[encodeIndex++] = $0 }
 
     var g = nsEncoded.generate()
     var decoded: UnicodeScalar
@@ -140,11 +123,11 @@ class CodecTest<Codec : TestableUnicodeCodec> {
         "\(asHex(nsEncoded)) => \(asHex(decoded.value))"
     }
 
-    encodeBuffer.clear()
-    Codec.encode(scalar, output: &self.encodeBuffer)
-    expectEqual(nsEncoded, encodeBuffer.elements)  {
+    encodeIndex = encodeBuffer.startIndex
+    Codec.encode(scalar, output: encodeOutput)
+    expectEqual(nsEncoded, encodeBuffer[0..<encodeIndex])  {
       "Decoding failed: \(asHex(nsEncoded)) => " +
-        "\(asHex(scalar.value)) => \(asHex(self.encodeBuffer.storage[0]))"
+        "\(asHex(scalar.value)) => \(asHex(self.encodeBuffer[0]))"
     }
   }
 

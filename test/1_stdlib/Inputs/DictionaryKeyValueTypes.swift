@@ -617,10 +617,9 @@ func getBridgedNSDictionaryOfKeyValue_ValueTypesCustomBridged(
   return bridged
 }
 
-func slurpFastEnumerationFromSwift<
-  S : SinkType where S.Element == AnyObject
->(
-  a: NSArray, _ fe: NSFastEnumeration, inout _ sink: S, maxItems: Int? = nil
+func slurpFastEnumerationFromSwift(
+  a: NSArray, _ fe: NSFastEnumeration, _ sink: (AnyObject) -> (),
+  maxItems: Int? = nil
 ) {
   var state = NSFastEnumerationState()
 
@@ -640,7 +639,7 @@ func slurpFastEnumerationFromSwift<
     }
     for i in 0..<returnedCount {
       let value: AnyObject = state.itemsPtr[i]!
-      sink.put(value)
+      sink(value)
       ++itemsReturned
     }
     if maxItems != nil && itemsReturned >= maxItems! {
@@ -660,10 +659,8 @@ func slurpFastEnumerationFromSwift<
 
 typealias AnyObjectTuple2 = (AnyObject, AnyObject)
 
-func slurpFastEnumerationFromSwift<
-  S : SinkType where S.Element == AnyObjectTuple2
->(
-  d: NSDictionary, _ fe: NSFastEnumeration, inout _ sink: S,
+func slurpFastEnumerationFromSwift(
+  d: NSDictionary, _ fe: NSFastEnumeration, _ sink: (AnyObjectTuple2) -> (),
   maxItems: Int? = nil
 ) {
   var state = NSFastEnumerationState()
@@ -686,7 +683,7 @@ func slurpFastEnumerationFromSwift<
       let key: AnyObject = state.itemsPtr[i]!
       let value: AnyObject = d.objectForKey(key)!
       let kv = (key, value)
-      sink.put(kv)
+      sink(kv)
       ++itemsReturned
     }
     if maxItems != nil && itemsReturned >= maxItems! {
@@ -702,45 +699,39 @@ func slurpFastEnumerationFromSwift<
   }
 }
 
-func slurpFastEnumerationOfNSEnumeratorFromSwift<
-  S : SinkType where S.Element == AnyObject
->(
-  a: NSArray, _ enumerator: NSEnumerator, inout _ sink: S,
+func slurpFastEnumerationOfNSEnumeratorFromSwift(
+  a: NSArray, _ enumerator: NSEnumerator, _ sink: (AnyObject) -> (),
   maxFastEnumerationItems: Int
 ) {
   slurpFastEnumerationFromSwift(
-    a, enumerator, &sink, maxItems: maxFastEnumerationItems)
+    a, enumerator, sink, maxItems: maxFastEnumerationItems)
   while let value = enumerator.nextObject() {
-    sink.put(value)
+    sink(value)
   }
 }
 
-func slurpFastEnumerationOfNSEnumeratorFromSwift<
-  S : SinkType where S.Element == AnyObjectTuple2
->(
-  d: NSDictionary, _ enumerator: NSEnumerator, inout _ sink: S,
+func slurpFastEnumerationOfNSEnumeratorFromSwift(
+  d: NSDictionary, _ enumerator: NSEnumerator, _ sink: (AnyObjectTuple2) -> (),
   maxFastEnumerationItems: Int
 ) {
   slurpFastEnumerationFromSwift(
-    d, enumerator, &sink, maxItems: maxFastEnumerationItems)
+    d, enumerator, sink, maxItems: maxFastEnumerationItems)
   while let key = enumerator.nextObject() {
     let value: AnyObject = d.objectForKey(key)!
     let kv = (key, value)
-    sink.put(kv)
+    sink(kv)
   }
 }
 
 import SlurpFastEnumeration
 
-func slurpFastEnumerationFromObjC<
-  S : SinkType where S.Element == AnyObject
->(
-  a: NSArray, _ fe: NSFastEnumeration, inout _ sink: S
+func slurpFastEnumerationFromObjC(
+  a: NSArray, _ fe: NSFastEnumeration, _ sink: (AnyObject) -> ()
 ) {
   let objcValues = NSMutableArray()
   slurpFastEnumerationOfArrayFromObjCImpl(a, fe, objcValues)
   for value in objcValues {
-    sink.put(value)
+    sink(value)
   }
 }
 
@@ -811,14 +802,14 @@ func _checkArrayFastEnumerationImpl(
 
   for i in 0..<3 {
     var actualContents = [ExpectedArrayElement]()
-    let sink = SinkOf<AnyObject> {
-      (value) in
+    let sink = {
+      (value: AnyObject) in
       actualContents.append(ExpectedArrayElement(
         value: convertValue(value),
         valueIdentity: unsafeBitCast(value, UWord.self)))
     }
 
-    useEnumerator(a, makeEnumerator(), { sink.put($0) })
+    useEnumerator(a, makeEnumerator(), sink)
 
     expectTrue(_equalsWithoutElementIdentity(
       expectedContentsWithoutIdentity, actualContents)) {
@@ -841,9 +832,8 @@ func checkArrayFastEnumerationFromSwift(
 ) {
   _checkArrayFastEnumerationImpl(
     expected, a, makeEnumerator,
-    { (a, fe, sinkFunction) in
-      var sink = SinkOf<AnyObject> { sinkFunction($0) }
-      slurpFastEnumerationFromSwift(a, fe, &sink)
+    { (a, fe, sink) in
+      slurpFastEnumerationFromSwift(a, fe, sink)
     },
     convertValue)
 }
@@ -855,9 +845,8 @@ func checkArrayFastEnumerationFromObjC(
 ) {
   _checkArrayFastEnumerationImpl(
     expected, a, makeEnumerator,
-    { (a, fe, sinkFunction) in
-      var sink = SinkOf<AnyObject> { sinkFunction($0) }
-      slurpFastEnumerationFromObjC(a, fe, &sink)
+    { (a, fe, sink) in
+      slurpFastEnumerationFromObjC(a, fe, sink)
     },
     convertValue)
 }
@@ -870,10 +859,9 @@ func checkArrayEnumeratorPartialFastEnumerationFromSwift(
 ) {
   _checkArrayFastEnumerationImpl(
     expected, a, { a.objectEnumerator() },
-    { (a, fe, sinkFunction) in
-      var sink = SinkOf<AnyObject> { sinkFunction($0) }
+    { (a, fe, sink) in
       slurpFastEnumerationOfNSEnumeratorFromSwift(
-        a, fe as! NSEnumerator, &sink,
+        a, fe as! NSEnumerator, sink,
         maxFastEnumerationItems: maxFastEnumerationItems)
     },
     convertValue)
@@ -946,14 +934,14 @@ func _checkSetFastEnumerationImpl(
 
   for i in 0..<3 {
     var actualContents = [ExpectedSetElement]()
-    let sink = SinkOf<AnyObject> {
-      (value) in
+    let sink = {
+      (value: AnyObject) in
       actualContents.append(ExpectedSetElement(
         value: convertMember(value),
         valueIdentity: unsafeBitCast(value, UWord.self)))
     }
 
-    useEnumerator(s, makeEnumerator(), { sink.put($0) })
+    useEnumerator(s, makeEnumerator(), sink)
 
     expectTrue(_equalsUnorderedWithoutElementIdentity(
       expectedContentsWithoutIdentity, actualContents)) {
@@ -968,35 +956,30 @@ func _checkSetFastEnumerationImpl(
   }
 }
 
-func slurpFastEnumerationFromObjC<
-  S : SinkType where S.Element == AnyObject
->(
-  s: NSSet, _ fe: NSFastEnumeration, inout _ sink: S
+func slurpFastEnumerationFromObjC(
+  s: NSSet, _ fe: NSFastEnumeration, _ sink: (AnyObject) -> ()
 ) {
   let objcValues = NSMutableArray()
   slurpFastEnumerationOfArrayFromObjCImpl(s, fe, objcValues)
   for value in objcValues {
-    sink.put(value)
+    sink(value)
   }
 }
 
-func slurpFastEnumerationOfNSEnumeratorFromSwift<
-  S : SinkType where S.Element == AnyObject
->(
-  s: NSSet, _ enumerator: NSEnumerator, inout _ sink: S,
+func slurpFastEnumerationOfNSEnumeratorFromSwift(
+  s: NSSet, _ enumerator: NSEnumerator, _ sink: (AnyObject) -> (),
   maxFastEnumerationItems: Int
 ) {
   slurpFastEnumerationFromSwift(
-    s, enumerator, &sink, maxItems: maxFastEnumerationItems)
+    s, enumerator, sink, maxItems: maxFastEnumerationItems)
   while let value = enumerator.nextObject() {
-    sink.put(value)
+    sink(value)
   }
 }
 
-func slurpFastEnumerationFromSwift<
-  S : SinkType where S.Element == AnyObject
->(
-  s: NSSet, _ fe: NSFastEnumeration, inout _ sink: S, maxItems: Int? = nil
+func slurpFastEnumerationFromSwift(
+  s: NSSet, _ fe: NSFastEnumeration, _ sink: (AnyObject) -> (),
+  maxItems: Int? = nil
 ) {
   var state = NSFastEnumerationState()
 
@@ -1016,7 +999,7 @@ func slurpFastEnumerationFromSwift<
     }
     for i in 0..<returnedCount {
       let value: AnyObject = state.itemsPtr[i]!
-      sink.put(value)
+      sink(value)
       ++itemsReturned
     }
     if maxItems != nil && itemsReturned >= maxItems! {
@@ -1041,9 +1024,8 @@ func checkSetFastEnumerationFromSwift(
 ) {
   _checkSetFastEnumerationImpl(
     expected, s, makeEnumerator,
-    { (s, fe, sinkFunction) in
-      var sink = SinkOf<AnyObject> { sinkFunction($0) }
-      slurpFastEnumerationFromSwift(s, fe, &sink)
+    { (s, fe, sink) in
+      slurpFastEnumerationFromSwift(s, fe, sink)
     },
     convertMember)
 }
@@ -1055,9 +1037,8 @@ func checkSetFastEnumerationFromObjC(
 ) {
   _checkSetFastEnumerationImpl(
     expected, s, makeEnumerator,
-    { (s, fe, sinkFunction) in
-      var sink = SinkOf<AnyObject> { sinkFunction($0) }
-      slurpFastEnumerationFromObjC(s, fe, &sink)
+    { (s, fe, sink) in
+      slurpFastEnumerationFromObjC(s, fe, sink)
     },
     convertMember)
 }
@@ -1070,20 +1051,17 @@ func checkSetEnumeratorPartialFastEnumerationFromSwift(
 ) {
   _checkSetFastEnumerationImpl(
     expected, s, { s.objectEnumerator() },
-    { (s, fe, sinkFunction) in
-      var sink = SinkOf<AnyObject> { sinkFunction($0) }
+    { (s, fe, sink) in
       slurpFastEnumerationOfNSEnumeratorFromSwift(
-        s, fe as! NSEnumerator, &sink,
+        s, fe as! NSEnumerator, sink,
         maxFastEnumerationItems: maxFastEnumerationItems)
     },
     convertMember)
 }
 
 
-func slurpFastEnumerationFromObjC<
-  S : SinkType where S.Element == AnyObjectTuple2
->(
-  d: NSDictionary, _ fe: NSFastEnumeration, inout _ sink: S
+func slurpFastEnumerationFromObjC(
+  d: NSDictionary, _ fe: NSFastEnumeration, _ sink: (AnyObjectTuple2) -> ()
 ) {
   let objcPairs = NSMutableArray()
   slurpFastEnumerationOfDictionaryFromObjCImpl(d, fe, objcPairs)
@@ -1091,7 +1069,7 @@ func slurpFastEnumerationFromObjC<
     let key: AnyObject = objcPairs[i * 2]
     let value: AnyObject = objcPairs[i * 2 + 1]
     let kv = (key, value)
-    sink.put(kv)
+    sink(kv)
   }
 }
 
@@ -1175,7 +1153,7 @@ func _checkDictionaryFastEnumerationImpl(
 
   for i in 0..<3 {
     var actualContents = [ExpectedDictionaryElement]()
-    let sink = SinkOf<AnyObjectTuple2> {
+    let sink: (AnyObjectTuple2) -> () = {
       (key, value) in
       actualContents.append(ExpectedDictionaryElement(
         key: convertKey(key),
@@ -1184,7 +1162,7 @@ func _checkDictionaryFastEnumerationImpl(
         valueIdentity: unsafeBitCast(value, UWord.self)))
     }
 
-    useEnumerator(d, makeEnumerator(), { sink.put($0) })
+    useEnumerator(d, makeEnumerator(), sink)
 
     expectTrue(_equalsUnorderedWithoutElementIdentity(
       expectedContentsWithoutIdentity, actualContents)) {
@@ -1207,9 +1185,8 @@ func checkDictionaryFastEnumerationFromSwift(
 ) {
   _checkDictionaryFastEnumerationImpl(
     expected, d, makeEnumerator,
-    { (d, fe, sinkFunction) in
-      var sink = SinkOf<AnyObjectTuple2> { sinkFunction($0) }
-      slurpFastEnumerationFromSwift(d, fe, &sink)
+    { (d, fe, sink) in
+      slurpFastEnumerationFromSwift(d, fe, sink)
     },
     convertKey, convertValue)
 }
@@ -1222,9 +1199,8 @@ func checkDictionaryFastEnumerationFromObjC(
 ) {
   _checkDictionaryFastEnumerationImpl(
     expected, d, makeEnumerator,
-    { (d, fe, sinkFunction) in
-      var sink = SinkOf<AnyObjectTuple2> { sinkFunction($0) }
-      slurpFastEnumerationFromObjC(d, fe, &sink)
+    { (d, fe, sink) in
+      slurpFastEnumerationFromObjC(d, fe, sink)
     },
     convertKey, convertValue)
 }
@@ -1238,10 +1214,9 @@ func checkDictionaryEnumeratorPartialFastEnumerationFromSwift(
 ) {
   _checkDictionaryFastEnumerationImpl(
     expected, d, { d.keyEnumerator() },
-    { (d, fe, sinkFunction) in
-      var sink = SinkOf<AnyObjectTuple2> { sinkFunction($0) }
+    { (d, fe, sink) in
       slurpFastEnumerationOfNSEnumeratorFromSwift(
-        d, fe as! NSEnumerator, &sink,
+        d, fe as! NSEnumerator, sink,
         maxFastEnumerationItems: maxFastEnumerationItems)
     },
     convertKey, convertValue)

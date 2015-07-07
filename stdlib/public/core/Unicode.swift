@@ -65,10 +65,8 @@ public protocol UnicodeCodecType {
   >(inout next: G) -> UnicodeDecodingResult
 
   /// Encode a `UnicodeScalar` as a series of `CodeUnit`s by
-  /// `put`'ing each `CodeUnit` to `output`.
-  static func encode<
-    S : SinkType where S.Element == CodeUnit
-  >(input: UnicodeScalar, inout output: S)
+  /// calling `output` on each `CodeUnit`.
+  static func encode(input: UnicodeScalar, output: (CodeUnit) -> ())
 }
 
 /// A codec for [UTF-8](http://www.unicode.org/glossary/#UTF_8).
@@ -441,10 +439,8 @@ public struct UTF8 : UnicodeCodecType {
   }
 
   /// Encode a `UnicodeScalar` as a series of `CodeUnit`s by
-  /// `put`'ing each `CodeUnit` to `output`.
-  public static func encode<
-    S : SinkType where S.Element == CodeUnit
-  >(input: UnicodeScalar, inout output: S) {
+  /// calling `output` on each `CodeUnit`.
+  public static func encode(input: UnicodeScalar, output put: (CodeUnit) -> ()) {
     var c = UInt32(input)
     var buf3 = UInt8(c & 0xFF)
 
@@ -465,13 +461,13 @@ public struct UTF8 : UnicodeCodecType {
         else {
           c >>= 6
           buf1 = (buf1 & 0x3F) | 0x80 // 10xxxxxx
-          output.put(UInt8(c | 0xF0)) // 11110xxx
+          put(UInt8(c | 0xF0)) // 11110xxx
         }
-        output.put(buf1)
+        put(buf1)
       }
-      output.put(buf2)
+      put(buf2)
     }
-    output.put(buf3)
+    put(buf3)
   }
 
   /// Return `true` if `byte` is a continuation byte of the form
@@ -608,19 +604,17 @@ public struct UTF16 : UnicodeCodecType {
   }
 
   /// Encode a `UnicodeScalar` as a series of `CodeUnit`s by
-  /// `put`'ing each `CodeUnit` to `output`.
-  public static func encode<
-      S : SinkType where S.Element == CodeUnit
-  >(input: UnicodeScalar, inout output: S) {
+  /// calling `output` on each `CodeUnit`.
+  public static func encode(input: UnicodeScalar, output put: (CodeUnit) -> ()) {
     let scalarValue: UInt32 = UInt32(input)
 
     if scalarValue <= UInt32(UInt16.max) {
-      output.put(UInt16(scalarValue))
+      put(UInt16(scalarValue))
     }
     else {
       let lead_offset = UInt32(0xd800) - UInt32(0x10000 >> 10)
-      output.put(UInt16(lead_offset + (scalarValue >> 10)))
-      output.put(UInt16(0xdc00 + (scalarValue & 0x3ff)))
+      put(UInt16(lead_offset + (scalarValue >> 10)))
+      put(UInt16(0xdc00 + (scalarValue & 0x3ff)))
     }
   }
 
@@ -665,11 +659,10 @@ public struct UTF32 : UnicodeCodecType {
   }
 
   /// Encode a `UnicodeScalar` as a series of `CodeUnit`s by
-  /// `put`'ing each `CodeUnit` to `output`.
-  public static func encode<
-    S : SinkType where S.Element == CodeUnit
-  >(input: UnicodeScalar, inout output: S) {
-    output.put(UInt32(input))
+  /// calling `output` on each `CodeUnit`.
+  public static func encode(input: UnicodeScalar,
+      output put: (CodeUnit) -> ()) {
+    put(UInt32(input))
   }
 }
 
@@ -681,13 +674,12 @@ public struct UTF32 : UnicodeCodecType {
 ///   replacement characters are inserted for each detected error.
 public func transcode<
   Input : GeneratorType,
-  Output : SinkType,
   InputEncoding : UnicodeCodecType,
   OutputEncoding : UnicodeCodecType
-  where InputEncoding.CodeUnit == Input.Element,
-      OutputEncoding.CodeUnit == Output.Element>(
+  where InputEncoding.CodeUnit == Input.Element>(
   inputEncoding: InputEncoding.Type, _ outputEncoding: OutputEncoding.Type,
-  var _ input: Input, inout _ output: Output, stopOnError: Bool
+  var _ input: Input, _ output: (OutputEncoding.CodeUnit) -> (),
+  stopOnError: Bool
 ) -> Bool {
 
   // NB.  It is not possible to optimize this routine to a memcpy if
@@ -701,14 +693,14 @@ public func transcode<
           scalar = inputDecoder.decode(&input) {
     switch scalar {
     case .Result(let us):
-      OutputEncoding.encode(us, output: &output)
+      OutputEncoding.encode(us, output: output)
     case .EmptyInput:
       _sanityCheckFailure("should not enter the loop when input becomes empty")
     case .Error:
       if stopOnError {
         return (hadError: true)
       } else {
-        OutputEncoding.encode("\u{fffd}", output: &output)
+        OutputEncoding.encode("\u{fffd}", output: output)
         hadError = true
       }
     }

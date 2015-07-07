@@ -73,20 +73,6 @@ grapheme_cluster_break_tests = \
 
 }%
 
-struct ArraySinkOf<T> : SinkType {
-  init() {}
-
-  init(_ array: [T]) {
-    self.array = array
-  }
-
-  mutating func put(x: T) {
-    array.append(x)
-  }
-
-  var array: [T] = []
-}
-
 // The most simple subclass of NSString that CoreFoundation does not know
 // about.
 class NonContiguousNSString : NSString {
@@ -105,12 +91,13 @@ class NonContiguousNSString : NSString {
   }
 
   convenience init(_ scalars: [UInt32]) {
-    var encoded = ArraySinkOf<UInt16>()
+    var encoded = Array<UInt16>()
     var g = scalars.generate()
+    let output: (UInt16) -> () = { encoded.append($0) }
     let hadError =
-      transcode(UTF32.self, UTF16.self, g, &encoded, stopOnError: true)
+      transcode(UTF32.self, UTF16.self, g, output, stopOnError: true)
     expectFalse(hadError)
-    self.init(encoded.array)
+    self.init(encoded)
   }
 
   @objc override func copyWithZone(zone: NSZone) -> AnyObject {
@@ -147,7 +134,7 @@ func checkGraphemeClusterSegmentation(
     "scalars: \(asHex(lazy(subject.unicodeScalars).map { $0.value }.array))"
   }
 
-  var expectedCharacters: [Character] = Array(subject.characters)
+  let expectedCharacters: [Character] = Array(subject.characters)
   checkSliceableWithBidirectionalIndex(expectedCharacters, subject.characters,
       stackTrace.withCurrentLoc())
 }

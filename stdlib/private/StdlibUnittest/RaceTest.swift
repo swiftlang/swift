@@ -92,9 +92,8 @@ public protocol RaceTestWithPerTrialDataType {
 
   /// Evaluates the observations made by all threads for a particular instance
   /// of `RaceData`.
-  func evaluateObservations<
-    S : SinkType where S.Element == RaceTestObservationEvaluation
-  >(observations: _UnitTestArray<Observation>, inout _ sink: S)
+  func evaluateObservations(observations: _UnitTestArray<Observation>,
+    _ sink: (RaceTestObservationEvaluation) -> ())
 }
 
 /// The result of evaluating observations.
@@ -461,10 +460,9 @@ func _masterThreadOneTrial<RT : RaceTestWithPerTrialDataType>(
       for j in 0..<racingThreadCount {
         observations.append(sharedState.workerStates[j].observations[i])
       }
-      var sink = SinkOf<RaceTestObservationEvaluation>({
-        sharedState.aggregatedEvaluations.addEvaluation($0)
-      })
-      rt.evaluateObservations(observations, &sink)
+
+      let sink = { sharedState.aggregatedEvaluations.addEvaluation($0) }
+      rt.evaluateObservations(observations, sink)
       observations.removeAll(keepCapacity: true)
     }
   }

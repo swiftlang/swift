@@ -45,19 +45,18 @@ struct RaceTest1 : RaceTestWithPerTrialDataType {
     }
   }
 
-  func evaluateObservations<
-    S : SinkType where S.Element == RaceTestObservationEvaluation
-  >(observations: _UnitTestArray<Observation>, inout _ sink: S) {
+  func evaluateObservations(observations: _UnitTestArray<Observation>,
+      _ sink: (RaceTestObservationEvaluation) -> ()) {
     for observation in observations {
       switch observation {
       case Observation(0x1):
-        sink.put(.Pass)
+        sink(.Pass)
       case Observation(0x2):
-        sink.put(.PassInteresting(String(observation)))
+        sink(.PassInteresting(String(observation)))
       case Observation(0xffff):
-        sink.put(.Failure)
+        sink(.Failure)
       case Observation(0xfffe):
-        sink.put(.FailureInteresting(String(observation)))
+        sink(.FailureInteresting(String(observation)))
       default:
         fatalError("should not happen")
       }

@@ -319,19 +319,16 @@ public struct _StringCore {
 
   /// Write the string, in the given encoding, to output.
   func encode<
-    Encoding: UnicodeCodecType,
-    Output: SinkType
-    where Encoding.CodeUnit == Output.Element
-  >(encoding: Encoding.Type, inout output: Output)
+    Encoding: UnicodeCodecType
+  >(encoding: Encoding.Type, output: (Encoding.CodeUnit) -> ())
   {
     if _fastPath(_baseAddress != nil) {
       if _fastPath(elementWidth == 1) {
-        var out = output
         for x in UnsafeBufferPointer(
           start: UnsafeMutablePointer<UTF8.CodeUnit>(_baseAddress),
           count: count
         ) {
-          Encoding.encode(UnicodeScalar(UInt32(x)), output: &out)
+          Encoding.encode(UnicodeScalar(UInt32(x)), output: output)
         }
       }
       else {
@@ -340,7 +337,7 @@ public struct _StringCore {
             start: UnsafeMutablePointer<UTF16.CodeUnit>(_baseAddress),
             count: count
           ).generate(),
-          &output,
+          output,
           stopOnError: true
         )
         _sanityCheck(!hadError, "Swift.String with native storage should not have unpaired surrogates")
@@ -350,7 +347,7 @@ public struct _StringCore {
 #if _runtime(_ObjC)
       _StringCore(
         _cocoaStringToContiguous(cocoaBuffer!, 0..<count, minimumCapacity: 0)
-      ).encode(encoding, output: &output)
+      ).encode(encoding, output: output)
 #else
       _sanityCheckFailure("encode: non-native string without objc runtime")
 #endif

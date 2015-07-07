@@ -271,8 +271,8 @@ extension String {
     Encoding: UnicodeCodecType
   >(encoding: Encoding.Type) -> Int {
     var codeUnitCount = 0
-    var output = SinkOf<Encoding.CodeUnit> { _ in ++codeUnitCount;() }
-    self._encode(encoding, output: &output)
+    let output: (Encoding.CodeUnit) -> () = { _ in ++codeUnitCount }
+    self._encode(encoding, output: output)
     return codeUnitCount
   }
 
@@ -284,12 +284,10 @@ extension String {
   // Related: <rdar://problem/17340917> Please document how NSString interacts
   // with unpaired surrogates
   func _encode<
-    Encoding: UnicodeCodecType,
-    Output: SinkType
-    where Encoding.CodeUnit == Output.Element
-  >(encoding: Encoding.Type, inout output: Output)
+    Encoding: UnicodeCodecType
+  >(encoding: Encoding.Type, output: (Encoding.CodeUnit) -> ())
   {
-    return _core.encode(encoding, output: &output)
+    return _core.encode(encoding, output: output)
   }
 }
 

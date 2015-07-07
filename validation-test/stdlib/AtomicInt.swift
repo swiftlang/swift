@@ -111,9 +111,8 @@ struct AtomicInt_fetchAndAdd_1_RaceTest : RaceTestWithPerTrialDataType {
     }
   }
 
-  func evaluateObservations<
-    S : SinkType where S.Element == RaceTestObservationEvaluation
-  >(observations: _UnitTestArray<Observation>, inout _ sink: S) {
+  func evaluateObservations(observations: _UnitTestArray<Observation>,
+      _ sink: (RaceTestObservationEvaluation) -> ()) {
     for observation in observations {
       switch observation {
       case Observation(1,  0,  0, 30, 40),
@@ -133,10 +132,10 @@ struct AtomicInt_fetchAndAdd_1_RaceTest : RaceTestWithPerTrialDataType {
            Observation(2, 10, 20,  0, 40),
            Observation(2, 10, 20, 30,  0),
            Observation(2, 10, 20, 30, 40):
-        sink.put(.PassInteresting(String(observation)))
+        sink(.PassInteresting(String(observation)))
 
       default:
-        sink.put(.FailureInteresting(String(observation)))
+        sink(.FailureInteresting(String(observation)))
       }
     }
   }
@@ -192,9 +191,8 @@ struct AtomicInt_fetchAndAdd_ReleaseAtomicStores_1_RaceTest
     }
   }
 
-  func evaluateObservations<
-    S : SinkType where S.Element == RaceTestObservationEvaluation
-  >(observations: _UnitTestArray<Observation>, inout _ sink: S) {
+  func evaluateObservations(observations: _UnitTestArray<Observation>,
+      _ sink: (RaceTestObservationEvaluation) -> ()) {
     for observation in observations {
       switch observation {
       case Observation(1,  0,  0, 30, 40),
@@ -203,10 +201,10 @@ struct AtomicInt_fetchAndAdd_ReleaseAtomicStores_1_RaceTest
            Observation(2, 10, 20,  0,  0),
            Observation(2, 10, 20, 30,  0),
            Observation(2, 10, 20, 30, 40):
-        sink.put(.PassInteresting(String(observation)))
+        sink(.PassInteresting(String(observation)))
 
       default:
-        sink.put(.FailureInteresting(String(observation)))
+        sink(.FailureInteresting(String(observation)))
       }
     }
   }
@@ -278,9 +276,8 @@ struct AtomicInt_fetchAndAdd_ReleaseAtomicStores_2_RaceTest
     }
   }
 
-  func evaluateObservations<
-    S : SinkType where S.Element == RaceTestObservationEvaluation
-  >(observations: _UnitTestArray<Observation>, inout _ sink: S) {
+  func evaluateObservations(observations: _UnitTestArray<Observation>,
+      _ sink: (RaceTestObservationEvaluation) -> ()) {
     for observation in observations {
       switch observation {
       case Observation(1,  0,  0, 30, 40),
@@ -289,10 +286,10 @@ struct AtomicInt_fetchAndAdd_ReleaseAtomicStores_2_RaceTest
            Observation(2, 10, 20,  0,  0),
            Observation(2, 10, 20, 30,  0),
            Observation(2, 10, 20, 30, 40):
-        sink.put(.PassInteresting(String(observation)))
+        sink(.PassInteresting(String(observation)))
 
       default:
-        sink.put(.FailureInteresting(String(observation)))
+        sink(.FailureInteresting(String(observation)))
       }
     }
   }
@@ -404,9 +401,8 @@ struct AtomicInt_fetchAndAdd_ReleaseNonAtomicStores_RaceTest
     }
   }
 
-  func evaluateObservations<
-    S : SinkType where S.Element == RaceTestObservationEvaluation
-  >(observations: _UnitTestArray<Observation>, inout _ sink: S) {
+  func evaluateObservations(observations: _UnitTestArray<Observation>,
+      _ sink: (RaceTestObservationEvaluation) -> ()) {
     for observation in observations {
       switch observation {
       case Observation(1,  0,  0, 30, 40, 100, 200, 300, 400),
@@ -415,10 +411,10 @@ struct AtomicInt_fetchAndAdd_ReleaseNonAtomicStores_RaceTest
            Observation(2, 10, 20,  0,  0, 100, 200, 999, 999),
            Observation(2, 10, 20, 30,  0, 100, 200, 300, 999),
            Observation(2, 10, 20, 30, 40, 100, 200, 300, 400):
-        sink.put(.PassInteresting(String(observation)))
+        sink(.PassInteresting(String(observation)))
 
       default:
-        sink.put(.FailureInteresting(String(observation)))
+        sink(.FailureInteresting(String(observation)))
       }
     }
   }
@@ -487,19 +483,18 @@ struct AtomicInitializeARCRefRaceTest : RaceTestWithPerTrialDataType {
     return observation
   }
 
-  func evaluateObservations<
-    S : SinkType where S.Element == RaceTestObservationEvaluation
-  >(observations: _UnitTestArray<Observation>, inout _ sink: S) {
+  func evaluateObservations(observations: _UnitTestArray<Observation>,
+      _ sink: (RaceTestObservationEvaluation) -> ()) {
     let ref = observations[0].uw2
     if observations.contains({ $0.uw2 != ref }) {
       for observation in observations {
-        sink.put(.FailureInteresting("mismatched reference, expected \(ref): \(observation)"))
+        sink(.FailureInteresting("mismatched reference, expected \(ref): \(observation)"))
       }
       return
     }
     if observations.contains({ $0.uw3 != 0x12345678 }) {
       for observation in observations {
-        sink.put(.FailureInteresting("wrong data: \(observation)"))
+        sink(.FailureInteresting("wrong data: \(observation)"))
       }
       return
     }
@@ -515,23 +510,23 @@ struct AtomicInitializeARCRefRaceTest : RaceTestWithPerTrialDataType {
         // Lost race, value destroyed.
         ++lostRace
       default:
-        sink.put(.FailureInteresting(String(observation)))
+        sink(.FailureInteresting(String(observation)))
       }
     }
     if wonRace != 1 {
       for observation in observations {
-        sink.put(.FailureInteresting("zero or more than one thread won race: \(observation)"))
+        sink(.FailureInteresting("zero or more than one thread won race: \(observation)"))
       }
       return
     }
     if lostRace < 1 {
       for observation in observations {
-        sink.put(.FailureInteresting("no thread lost race: \(observation)"))
+        sink(.FailureInteresting("no thread lost race: \(observation)"))
       }
       return
     }
 
-    sink.put(.Pass)
+    sink(.Pass)
   }
 }
 
