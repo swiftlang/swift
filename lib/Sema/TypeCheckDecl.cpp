@@ -5832,12 +5832,12 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         return;
       }
 
-      revertGenericParamList(gp);
-
       // If we're already validating the type declaration's generic signature,
       // avoid a potential infinite loop by not re-validating the generic
       // parameter list.
       if (!nominal->IsValidatingGenericSignature()) {
+        revertGenericParamList(gp);
+
         ArchetypeBuilder builder =
           createArchetypeBuilder(nominal->getModuleContext());
         checkGenericParamList(builder, gp, *this);
