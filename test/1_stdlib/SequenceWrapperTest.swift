@@ -36,16 +36,15 @@ func expectWrapperDispatch<R1, R2>(
   stackTrace: SourceLocStack = SourceLocStack(),  
   file: String = __FILE__, line: UWord = __LINE__
 ) {
+  let newTrace = stackTrace.pushIf(showFrame, file: file, line: line)
   counters.reset()
   _ = directOperation()
-  expectEqual(
-    [base.selfType: 1], counters,
-    message(), stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+  expectEqual([base.selfType: 1], counters, message(), stackTrace: newTrace)
   counters.reset()
   _ = indirectOperation()
   expectEqual(
     [base.selfType: 1, indirect.selfType: 1], counters,
-    message(), stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
+    message(), stackTrace: newTrace)
 }
 
 sequenceWrapperTests.test("Dispatch/generate") {

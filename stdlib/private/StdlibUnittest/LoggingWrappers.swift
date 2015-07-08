@@ -364,23 +364,16 @@ public func expectCustomizable<
   T.Base : WrapperType, T.Base : LoggingType,
   T.Log == T.Base.Log
 >(_: T, _ counters: TypeIndexed<Int>,
-  stackTrace: SourceLocStack? = nil,
-  file: String = __FILE__, line: UWord = __LINE__,
-  collectMoreInfo: (()->String)? = nil
+  //===--- TRACE boilerplate ----------------------------------------------===//
+  @autoclosure _ message: ()->String = "",
+  showFrame: Bool = true,
+  stackTrace: SourceLocStack = SourceLocStack(),  
+  file: String = __FILE__, line: UWord = __LINE__
 ) {
-  expectNotEqual(
-    0, counters[T.self],
-    collectMoreInfo?() ?? "",
-    file: file,
-    line: line,
-    stackTrace: stackTrace ?? SourceLocStack())
-  
+  let newTrace = stackTrace.pushIf(showFrame, file: file, line: line)
+  expectNotEqual(0, counters[T.self], message(), stackTrace: newTrace)
   expectEqual(
-    counters[T.self], counters[T.Base.self],
-    collectMoreInfo?() ?? "",
-    file: file,
-    line: line,
-    stackTrace: stackTrace ?? SourceLocStack())
+    counters[T.self], counters[T.Base.self], message(), stackTrace: newTrace)
 }
 
 public func expectNotCustomizable<
@@ -389,21 +382,13 @@ public func expectNotCustomizable<
   T.Base : WrapperType, T.Base : LoggingType,
   T.Log == T.Base.Log
 >(_: T, _ counters: TypeIndexed<Int>,
-  stackTrace: SourceLocStack? = nil,
-  file: String = __FILE__, line: UWord = __LINE__,
-  collectMoreInfo: (()->String)? = nil
+  //===--- TRACE boilerplate ----------------------------------------------===//
+  @autoclosure _ message: ()->String = "",
+  showFrame: Bool = true,
+  stackTrace: SourceLocStack = SourceLocStack(),  
+  file: String = __FILE__, line: UWord = __LINE__
 ) {
-  expectNotEqual(
-    0, counters[T.self], 
-    collectMoreInfo?() ?? "",
-    file: file,
-    line: line,
-    stackTrace: stackTrace ?? SourceLocStack())
-  
-  expectEqual(
-    0, counters[T.Base.self],
-    collectMoreInfo?() ?? "",
-    file: file,
-    line: line,
-    stackTrace: stackTrace ?? SourceLocStack())
+  let newTrace = stackTrace.pushIf(showFrame, file: file, line: line)
+  expectNotEqual(0, counters[T.self], message(), stackTrace: newTrace)
+  expectEqual(0, counters[T.Base.self], message(), stackTrace: newTrace)
 }

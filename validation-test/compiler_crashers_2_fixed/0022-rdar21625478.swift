@@ -73,7 +73,7 @@ public class GeneratorLog {
 public struct LoggingGenerator<Base: GeneratorType>
   : GeneratorType, LoggingType {
 
-  typealias Log = GeneratorLog
+  public typealias Log = GeneratorLog
   
   public init(_ base: Base) {
     self.base = base
@@ -170,8 +170,8 @@ extension LoggingSequenceType
 public struct LoggingSequence<
   Base_: SequenceType
 > : LoggingSequenceType, SequenceType {
-  typealias Log = SequenceLog
-  typealias Base = Base_
+  public typealias Log = SequenceLog
+  public typealias Base = Base_
 
   public init(_ base: Base_) {
     self.base = base

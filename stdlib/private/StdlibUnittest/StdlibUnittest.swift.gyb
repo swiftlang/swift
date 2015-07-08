@@ -80,9 +80,9 @@ public struct SourceLocStack {
   }
 
   public func print() {
-    let top = locs.last!
+    let top = locs.first!
     Swift.print("check failed at \(top.file), line \(top.line)")
-    _printStackTrace(SourceLocStack(_locs: _UnitTestArray(dropLast(locs))))
+    _printStackTrace(SourceLocStack(_locs: _UnitTestArray(dropFirst(locs))))
   }
 }
 
@@ -120,14 +120,16 @@ var _seenExpectCrash = false
 /// Run `body` and expect a failure to happen.
 ///
 /// The check passes iff `body` triggers one or more failures.
-public func expectFailure(body: () -> ()) {
+public func expectFailure(${TRACE1}, body: () -> ()) {
   let startAnyExpectFailed = _anyExpectFailed
   _anyExpectFailed = false
   body()
   let endAnyExpectFailed = _anyExpectFailed
   _anyExpectFailed = false
   expectTrue(
-    endAnyExpectFailed, "running `body` should produce an expected failure")
+    endAnyExpectFailed, "running `body` should produce an expected failure",
+    stackTrace: ${stackTrace}
+  )
   _anyExpectFailed = _anyExpectFailed || startAnyExpectFailed
 }
 
@@ -826,8 +828,8 @@ public class TestSuite {
       f()
     }
     expectEqual(
-      0, LifetimeTracked.instances,
-      file: test.testLoc.file, line: test.testLoc.line)// { $0 == $1 }
+      0, LifetimeTracked.instances, "leaked LifetimeTracked instances:",
+      file: test.testLoc.file, line: test.testLoc.line)
   }
 
   func _testByName(testName: String) -> _Test {
@@ -1951,64 +1953,46 @@ public func expectEqualMethodsForDomain<
 }
 
 public func expectEqualUnicodeScalars(
-  expected: _UnitTestArray<UInt32>, _ actual: String,
-  stackTrace: SourceLocStack? = nil,
-  file: String = __FILE__, line: UWord = __LINE__,
-  collectMoreInfo: (()->String)? = nil
-) {
-  let actualUnicodeScalars = _UnitTestArray(lazy(actual.unicodeScalars).map { $0.value })
+  expected: _UnitTestArray<UInt32>, _ actual: String, ${TRACE}) {
+  let actualUnicodeScalars = _UnitTestArray(
+    lazy(actual.unicodeScalars).map { $0.value })
+  
   if !expected.elementsEqual(actualUnicodeScalars) {
-    _anyExpectFailed = true
-    print("check failed at \(file), line \(line)")
-    _printStackTrace(stackTrace)
-    print("expected elements: \"\(asHex(expected))\"")
-    print("actual: \"\(asHex(actualUnicodeScalars))\"")
-    if collectMoreInfo != nil { print(collectMoreInfo!()) }
-    print("")
+    expectationFailure(
+      "expected elements: \"\(asHex(expected))\"\n"
+      + "actual: \"\(asHex(actualUnicodeScalars))\"",
+      trace: ${trace})
   }
-
 }
 
 public func expectPrinted<T>(
-  expectedOneOf patterns: _UnitTestArray<String>, _ object: T,
-  file: StaticString = __FILE__, line: UWord = __LINE__
+  expectedOneOf patterns: _UnitTestArray<String>, _ object: T, ${TRACE}
 ) {
   let actual = String(object)
   if !patterns.contains(actual) {
-    _anyExpectFailed = true
-    print("check failed at \(file), line \(line)")
-    print("expected: any of \(patterns.debugDescription)")
-    print("actual: \"\(actual)\"")
-    print("")
+    expectationFailure(
+      "expected: any of \(String(reflecting: patterns))\n"
+      + "actual: \(String(reflecting: actual))",
+      trace: ${trace})
   }
 }
 
 public func expectPrinted<T>(
-  expected: String, _ object: T,
-  file: StaticString = __FILE__, line: UWord = __LINE__
+  expected: String, _ object: T, ${TRACE}
 ) {
-  expectPrinted(expectedOneOf: [expected], object, file: file, line: line)
+  expectPrinted(expectedOneOf: [expected], object, ${trace})
 }
 
 public func expectDebugPrinted<T>(
-  expectedOneOf patterns: _UnitTestArray<String>, _ object: T,
-  file: StaticString = __FILE__, line: UWord = __LINE__
+  expectedOneOf patterns: _UnitTestArray<String>, _ object: T, ${TRACE}
 ) {
-  let actual = String(reflecting: object)
-  if !patterns.contains(actual) {
-    _anyExpectFailed = true
-    print("check failed at \(file), line \(line)")
-    print("expected: any of \(patterns.debugDescription)")
-    print("actual: \"\(actual)\"")
-    print("")
-  }
+  expectPrinted(expectedOneOf: patterns, String(reflecting: object), ${trace})
 }
 
 public func expectDebugPrinted<T>(
-  expected: String, _ object: T,
-  file: StaticString = __FILE__, line: UWord = __LINE__
+  expected: String, _ object: T, ${TRACE}
 ) {
-  expectDebugPrinted(expectedOneOf: [expected], object, file: file, line: line)
+  expectDebugPrinted(expectedOneOf: [expected], object, ${trace})
 }
 
 func compose<A, B, C>(f: A -> B, _ g: B -> C) -> A -> C {
@@ -2217,18 +2201,19 @@ public struct MinimalCollectionBufferSnapshot {
 public func expectSameBuffer(
   expected: MinimalCollectionBufferSnapshot?,
   _ actual: MinimalCollectionBufferSnapshot?,
-  stackTrace: SourceLocStack? = nil,
-  file: String = __FILE__, line: UWord = __LINE__,
-  collectMoreInfo: (()->String)? = nil
+  ${TRACE}
 ) {
   expectEqual(
     expected?.buffer._id, actual?.buffer._id,
-    "lhs and rhs point to different buffers")
+    "lhs and rhs point to different buffers",
+    stackTrace: ${stackTrace}
+  )
   
   if expected?.buffer._id == actual?.buffer._id {
     expectEqual(
       expected?.mutationEpoch, actual?.mutationEpoch,
-      "lhs and rhs are from different mutation epochs"
+      "lhs and rhs are from different mutation epochs",
+      stackTrace: ${stackTrace}
     )
   }
 }

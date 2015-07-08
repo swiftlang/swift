@@ -268,7 +268,7 @@ TestSuiteWithSetUpFails.setUp {
 }
 // CHECK: [ RUN      ] TestSuiteWithSetUpFails.fails
 // CHECK: out>>> setUp
-// CHECK: out>>> check failed at
+// CHECK-NEXT: out>>> check failed at {{.*}}/stdlib/StdlibUnittest.swift, line
 // CHECK: out>>> test body
 // CHECK: [     FAIL ] TestSuiteWithSetUpFails.fails
 // CHECK: TestSuiteWithSetUpFails: Some tests failed, aborting
@@ -301,7 +301,7 @@ TestSuiteWithTearDownFails.tearDown {
 // CHECK: [ RUN      ] TestSuiteWithTearDownFails.fails
 // CHECK: out>>> test body
 // CHECK: out>>> tearDown
-// CHECK: out>>> check failed at
+// CHECK-NEXT: out>>> check failed at {{.*}}/stdlib/StdlibUnittest.swift, line
 // CHECK: [     FAIL ] TestSuiteWithTearDownFails.fails
 // CHECK: TestSuiteWithTearDownFails: Some tests failed, aborting
 
@@ -318,7 +318,7 @@ AssertionsTestSuite.test("expectFailure/Pass") {
   }
 }
 // CHECK: [ RUN      ] Assertions.expectFailure/Pass
-// CHECK: out>>> check failed at
+// CHECK-NEXT: out>>> check failed at {{.*}}/stdlib/StdlibUnittest.swift, line
 // CHECK: out>>> expected: 1 (of type Swift.Int)
 // CHECK: out>>> actual: 2 (of type Swift.Int)
 // CHECK: [       OK ] Assertions.expectFailure/Pass
@@ -343,7 +343,7 @@ AssertionsTestSuite.test("expectFailure/Fail") {
   }
 }
 // CHECK: [ RUN      ] Assertions.expectFailure/Fail
-// CHECK: out>>> check failed at
+// CHECK-NEXT: out>>> check failed at {{.*}}/stdlib/StdlibUnittest.swift, line
 // CHECK: out>>> expected: true
 // CHECK: out>>> running `body` should produce an expected failure
 // CHECK: [     FAIL ] Assertions.expectFailure/Fail
@@ -356,7 +356,7 @@ AssertionsTestSuite.test("expectFailure/XFail")
   }
 }
 // CHECK: [ RUN      ] Assertions.expectFailure/XFail (XFAIL: [Custom(reason: test)])
-// CHECK: out>>> check failed at
+// CHECK-NEXT: out>>> check failed at {{.*}}/stdlib/StdlibUnittest.swift, line
 // CHECK: out>>> expected: true
 // CHECK: out>>> running `body` should produce an expected failure
 // CHECK: [    XFAIL ] Assertions.expectFailure/XFail
@@ -399,7 +399,7 @@ AssertionsTestSuite.test("expectUnreachable") {
   expectUnreachable()
 }
 // CHECK: [ RUN      ] Assertions.expectUnreachable
-// CHECK: out>>> check failed at
+// CHECK-NEXT: out>>> check failed at {{.*}}/stdlib/StdlibUnittest.swift, line
 // CHECK: out>>> this code should not be executed
 // CHECK: [     FAIL ] Assertions.expectUnreachable
 

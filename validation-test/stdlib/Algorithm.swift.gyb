@@ -570,17 +570,17 @@ SequenceTypeAlgorithms.test("${algorithmKind}Element/WhereElementIsComparable") 
     if let result = maybeResult {
       expectEqual(
         test.expected${AlgorithmKind}Value!, result.value,
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.expected${AlgorithmKind}Index!, result.identity,
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
     } else {
       expectEmpty(
         test.expected${AlgorithmKind}Value,
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
       expectEmpty(
         test.expected${AlgorithmKind}Index,
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
     }
     expectEqual([], s.map { $0.value }, "sequence should be consumed")
   }
@@ -602,17 +602,17 @@ SequenceTypeAlgorithms.test("${algorithmKind}Element/Predicate") {
     if let result = maybeResult {
       expectEqual(
         test.expected${AlgorithmKind}Value!, result.value,
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.expected${AlgorithmKind}Index!, result.identity,
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
     } else {
       expectEmpty(
         test.expected${AlgorithmKind}Value,
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
       expectEmpty(
         test.expected${AlgorithmKind}Index,
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
     }
     expectEqual([], s.map { $0.value }, "sequence should be consumed")
     expectEqual(
@@ -638,13 +638,13 @@ SequenceTypeAlgorithms.test("startsWith/WhereElementIsEquatable") {
       expectEqual(
         test.expected,
         s.startsWith(prefix),
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.expectedLeftoverSequence, s.map { $0.value },
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.expectedLeftoverPrefix, prefix.map { $0.value },
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
     }
 
     // Use different types for the sequence and prefix.
@@ -656,13 +656,13 @@ SequenceTypeAlgorithms.test("startsWith/WhereElementIsEquatable") {
       expectEqual(
         test.expected,
         s.startsWith(prefix),
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.sequence, s.map { $0.value },
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.expectedLeftoverPrefix, prefix.map { $0.value },
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
     }
   }
 }
@@ -677,13 +677,13 @@ SequenceTypeAlgorithms.test("startsWith/Predicate") {
       expectEqual(
         test.expected,
         s.startsWith(prefix) { $0.value == $1.value },
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.expectedLeftoverSequence, s.map { $0.value },
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.expectedLeftoverPrefix, prefix.map { $0.value },
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
     }
     if true {
       let s = MinimalSequence<OpaqueValue<Int>>(
@@ -693,13 +693,13 @@ SequenceTypeAlgorithms.test("startsWith/Predicate") {
       expectEqual(
         test.expected,
         s.startsWith(prefix) { $0.value / 2 == $1.value },
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.expectedLeftoverSequence, s.map { $0.value / 2 },
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.expectedLeftoverPrefix, prefix.map { $0.value },
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
     }
 
     // Use different types for the sequence and prefix.
@@ -711,13 +711,13 @@ SequenceTypeAlgorithms.test("startsWith/Predicate") {
       expectEqual(
         test.expected,
         s.startsWith(prefix) { $0.value == $1.value },
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.sequence, s.map { $0.value },
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.expectedLeftoverPrefix, prefix.map { $0.value },
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
     }
   }
 }
@@ -780,13 +780,13 @@ SequenceTypeAlgorithms.test("elementsEqual/WhereElementIsEquatable") {
       expectEqual(
         test.expected,
         s.elementsEqual(other),
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.expectedLeftoverSequence, s.map { $0.value },
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.expectedLeftoverOther, other.map { $0.value },
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
     }
 
     // Use different types for the sequence and other.
@@ -798,13 +798,13 @@ SequenceTypeAlgorithms.test("elementsEqual/WhereElementIsEquatable") {
       expectEqual(
         test.expected,
         s.elementsEqual(other),
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.sequence, s.map { $0.value },
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.expectedLeftoverOther, other.map { $0.value },
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
     }
   }
 }
@@ -819,13 +819,13 @@ SequenceTypeAlgorithms.test("elementsEqual/Predicate") {
       expectEqual(
         test.expected,
         s.elementsEqual(other) { $0.value == $1.value },
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.expectedLeftoverSequence, s.map { $0.value },
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.expectedLeftoverOther, other.map { $0.value },
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
     }
 
     // Use different types for the sequence and other.
@@ -837,13 +837,13 @@ SequenceTypeAlgorithms.test("elementsEqual/Predicate") {
       expectEqual(
         test.expected,
         s.elementsEqual(other) { $0.value == $1.value },
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.sequence, s.map { $0.value },
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.expectedLeftoverOther, other.map { $0.value },
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
     }
   }
 }
@@ -926,13 +926,13 @@ SequenceTypeAlgorithms.test("lexicographicalCompare/WhereElementIsComparable") {
       expectEqual(
         test.expected.isLT(),
         s.lexicographicalCompare(other),
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.expectedLeftoverSequence, s.map { $0.value },
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.expectedLeftoverOther, other.map { $0.value },
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
     }
 
     // Use different types for the sequence and other.
@@ -944,13 +944,13 @@ SequenceTypeAlgorithms.test("lexicographicalCompare/WhereElementIsComparable") {
       expectEqual(
         test.expected.isLT(),
         s.lexicographicalCompare(other),
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.sequence, s.map { $0.value },
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.expectedLeftoverOther, other.map { $0.value },
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
     }
   }
 }
@@ -965,13 +965,13 @@ SequenceTypeAlgorithms.test("lexicographicalCompare/Predicate") {
       expectEqual(
         test.expected.isLT(),
         s.lexicographicalCompare(other) { $0.value < $1.value },
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.expectedLeftoverSequence, s.map { $0.value },
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.expectedLeftoverOther, other.map { $0.value },
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
     }
 
     // Use different types for the sequence and other.
@@ -983,13 +983,13 @@ SequenceTypeAlgorithms.test("lexicographicalCompare/Predicate") {
       expectEqual(
         test.expected.isLT(),
         s.lexicographicalCompare(other) { $0.value < $1.value },
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.sequence, s.map { $0.value },
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         test.expectedLeftoverOther, other.map { $0.value },
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
     }
   }
 }
@@ -1051,10 +1051,10 @@ SequenceTypeAlgorithms.test("contains/WhereElementIsEquatable/semantics") {
     expectEqual(
       test.expected != nil,
       s.contains(test.element),
-      stackTrace: test.loc.withCurrentLoc())
+      stackTrace: SourceLocStack().with(test.loc))
     
     expectEqualSequence(
-      test.expectedLeftoverSequence, s, stackTrace: test.loc.withCurrentLoc())
+      test.expectedLeftoverSequence, s, stackTrace: SourceLocStack().with(test.loc))
   }
 }
 
@@ -1085,23 +1085,23 @@ SequenceTypeAlgorithms.test("Set<T>.contains/CustomImplementation/${dispatch}") 
     expectEqual(
       test.expected != nil,
       call${dispatch}Contains(s, MinimalHashableValue(test.element.value)),
-      stackTrace: test.loc.withCurrentLoc())
+      stackTrace: SourceLocStack().with(test.loc))
     if test.sequence.isEmpty {
       expectEqual(
         0, MinimalHashableValue.timesEqualEqualWasCalled,
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         0, MinimalHashableValue.timesHashValueWasCalled,
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
     } else {
       expectNotEqual(
         0, MinimalHashableValue.timesHashValueWasCalled,
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
     }
     if test.expected != nil {
       expectNotEqual(
         0, MinimalHashableValue.timesEqualEqualWasCalled,
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
     }
   }
 }
@@ -1115,10 +1115,10 @@ SequenceTypeAlgorithms.test("contains/Predicate") {
     expectEqual(
       test.expected != nil,
       s.contains { $0.value == test.element.value },
-      stackTrace: test.loc.withCurrentLoc())
+      stackTrace: SourceLocStack().with(test.loc))
     expectEqual(
       test.expectedLeftoverSequence.map { $0.value }, s.map { $0.value },
-      stackTrace: test.loc.withCurrentLoc())
+      stackTrace: SourceLocStack().with(test.loc))
   }
 }
 
@@ -1205,7 +1205,7 @@ SequenceTypeAlgorithms.test("reverse/SequenceType") {
     expectType([OpaqueValue<Int>].self, &result)
     expectEqual(
       test.expected, result.map { $0.value },
-      stackTrace: test.loc.withCurrentLoc())
+      stackTrace: SourceLocStack().with(test.loc))
     expectEqual([], s.map { $0.value }, "sequence should be consumed")
   }
 }
@@ -1220,7 +1220,7 @@ SequenceTypeAlgorithms.test("reverse/WhereIndexIsBidirectional,BidirectionalReve
       &result)
     expectEqual(
       test.expected, result.map { $0.value },
-      stackTrace: test.loc.withCurrentLoc())
+      stackTrace: SourceLocStack().with(test.loc))
 
     // Check ReverseCollection's CollectionType conformance.
     checkBidirectionalCollection(
@@ -1239,7 +1239,7 @@ SequenceTypeAlgorithms.test("reverse/WhereIndexIsRandomAccess,RandomAccessRevers
       &result)
     expectEqual(
       test.expected, result.map { $0.value },
-      stackTrace: test.loc.withCurrentLoc())
+      stackTrace: SourceLocStack().with(test.loc))
 
     // Check ReverseRandomAccessCollection CollectionType conformance.
     checkRandomAccessCollection(
@@ -1822,7 +1822,7 @@ SequenceTypeAlgorithms.test("flatMap/SequenceType") {
       expectType([OpaqueValue<Int32>].self, &result)
       expectEqual(
         test.expected, result.map { $0.value },
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
       expectEqual([], s.map { $0.value }, "sequence should be consumed")
       expectEqual(
         test.sequence.count, timesClosureWasCalled,
@@ -1898,7 +1898,7 @@ SequenceTypeAlgorithms.test("flatMap/SequenceType/TransformProducesOptional") {
       expectType([OpaqueValue<Int32>].self, &result)
       expectEqual(
         test.expected, result.map { $0.value },
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
       expectEqual([], s.map { $0.value }, "sequence should be consumed")
       expectEqual(
         test.sequence.count, timesClosureWasCalled,
@@ -2856,7 +2856,7 @@ SequenceTypeAlgorithms.test("find/WhereElementIsEquatable/${dispatch}") {
     expectEqual(
       test.expected,
       call${dispatch}Find(s, test.element).map { $0.position },
-      stackTrace: test.loc.withCurrentLoc())
+      stackTrace: SourceLocStack().with(test.loc))
   }
 }
 
@@ -2928,7 +2928,7 @@ SequenceTypeAlgorithms.test("find/WhereElementIsEquatable/CustomImplementation/$
     expectEqual(
       test.expected,
       call${dispatch}Find(s, test.element).map { $0.position },
-      stackTrace: test.loc.withCurrentLoc())
+      stackTrace: SourceLocStack().with(test.loc))
     expectEqual(1, s.timesFindWasCalled.value)
   }
 }
@@ -2966,23 +2966,23 @@ SequenceTypeAlgorithms.test("Set<T>.find/CustomImplementation/${dispatch}") {
         .map { _ in MinimalHashableValue(test.element.value) },
       call${dispatch}Find_(s, MinimalHashableValue(test.element.value))
         .map { s[$0] },
-      stackTrace: test.loc.withCurrentLoc())
+      stackTrace: SourceLocStack().with(test.loc))
     if test.sequence.isEmpty {
       expectEqual(
         0, MinimalHashableValue.timesEqualEqualWasCalled,
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
       expectEqual(
         0, MinimalHashableValue.timesHashValueWasCalled,
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
     } else {
       expectNotEqual(
         0, MinimalHashableValue.timesHashValueWasCalled,
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
     }
     if test.expected != nil {
       expectNotEqual(
         0, MinimalHashableValue.timesEqualEqualWasCalled,
-        stackTrace: test.loc.withCurrentLoc())
+        stackTrace: SourceLocStack().with(test.loc))
     }
   }
 }
@@ -3003,7 +3003,7 @@ SequenceTypeAlgorithms.test("find/Predicate") {
     expectEqual(
       test.expected,
       result.map { $0.position },
-      stackTrace: test.loc.withCurrentLoc())
+      stackTrace: SourceLocStack().with(test.loc))
   }
 }
 

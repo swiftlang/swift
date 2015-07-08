@@ -191,28 +191,24 @@ func getPositiveSubnormal_Float64() -> Float64 {
 
 func checkFloatingPointComparison_${FloatSelf}(
   expected: ExpectedComparisonResult,
-  _ lhs: ${FloatSelf}, _ rhs: ${FloatSelf}, _ stackTrace: SourceLocStack
+  _ lhs: ${FloatSelf}, _ rhs: ${FloatSelf},
+  //===--- TRACE boilerplate ----------------------------------------------===//
+  // @autoclosure _ message: ()->String = "",
+  showFrame: Bool = true,
+  stackTrace: SourceLocStack = SourceLocStack(),  
+  file: String = __FILE__, line: UWord = __LINE__
 ) {
-  let collectMoreInfo = { () -> String in
-    "expected: lhs=\(lhs) \(expected) rhs=\(rhs)"
-  }
-  expectEqual(expected.isEQ(), lhs == rhs,
-    collectMoreInfo(), stackTrace: stackTrace.withCurrentLoc())
-  expectEqual(expected.isNE(), lhs != rhs,
-    collectMoreInfo(), stackTrace: stackTrace.withCurrentLoc())
-  checkHashable(expected.isEQ(), lhs, rhs,
-    collectMoreInfo(), stackTrace: stackTrace.withCurrentLoc())
+  let newTrace = stackTrace.pushIf(showFrame, file: file, line: line)
+  let message = { "expected: lhs=\(lhs) \(expected) rhs=\(rhs)" }
+  expectEqual(expected.isEQ(), lhs == rhs, message(), stackTrace: newTrace)
+  expectEqual(expected.isNE(), lhs != rhs, message(), stackTrace: newTrace)
+  checkHashable(expected.isEQ(), lhs, rhs, message(), stackTrace: newTrace)
 
-  expectEqual(expected.isLT(), lhs < rhs,
-    collectMoreInfo(), stackTrace: stackTrace.withCurrentLoc())
-  expectEqual(expected.isLE(), lhs <= rhs,
-    collectMoreInfo(), stackTrace: stackTrace.withCurrentLoc())
-  expectEqual(expected.isGE(), lhs >= rhs,
-    collectMoreInfo(), stackTrace: stackTrace.withCurrentLoc())
-  expectEqual(expected.isGT(), lhs > rhs,
-    collectMoreInfo(), stackTrace: stackTrace.withCurrentLoc())
-  checkComparable(expected, lhs, rhs,
-    collectMoreInfo(), stackTrace: stackTrace.withCurrentLoc())
+  expectEqual(expected.isLT(), lhs < rhs, message(), stackTrace: newTrace)
+  expectEqual(expected.isLE(), lhs <= rhs, message(), stackTrace: newTrace)
+  expectEqual(expected.isGE(), lhs >= rhs, message(), stackTrace: newTrace)
+  expectEqual(expected.isGT(), lhs > rhs, message(), stackTrace: newTrace)
+  checkComparable(expected, lhs, rhs, message(), stackTrace: newTrace)
 }
 
 FloatingPoint.test("${FloatSelf}/{Comparable,Hashable,Equatable}") {
@@ -250,8 +246,7 @@ FloatingPoint.test("${FloatSelf}/{Comparable,Hashable,Equatable}") {
       if lhs.isZero && rhs.isZero {
         // Special case: 0.0 and -0.0 compare equal.
         checkFloatingPointComparison_${FloatSelf}(
-          ExpectedComparisonResult.EQ,
-          lhs, rhs, SourceLocStack().withCurrentLoc())
+          ExpectedComparisonResult.EQ, lhs, rhs)
       } else if lhs.isNaN || rhs.isNaN {
         // Special case: NaN is unordered wrt other values.
         // - equality comparison with NaN returns false,
@@ -271,7 +266,7 @@ FloatingPoint.test("${FloatSelf}/{Comparable,Hashable,Equatable}") {
             (lhsIdx == rhsIdx ?
               ExpectedComparisonResult.EQ :
               ExpectedComparisonResult.GT),
-          lhs, rhs, SourceLocStack().withCurrentLoc())
+          lhs, rhs)
       }
     }
   }
