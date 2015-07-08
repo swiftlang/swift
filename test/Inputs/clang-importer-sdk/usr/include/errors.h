@@ -40,6 +40,15 @@
 
 + (void)doTheThing:(NSInteger)whichThing __attribute__((swift, unavailable));
 + (BOOL)doTheThing:(NSInteger)whichThing error:(NSError **)error;
+
++ (BOOL) bound: (NSError**) err __attribute__((swift_error(nonnull_error)));
++ (float) bounce: (NSError**) err __attribute__((swift_error(nonnull_error)));
++ (void) flounce: (NSError**) err __attribute__((swift_error(nonnull_error)));
++ (int) ounce: (NSError**) err __attribute__((swift_error(zero_result)));
++ (int) once: (NSError**) err __attribute__((swift_error(nonzero_result)));
++ (BOOL) sconce: (NSError**) err __attribute__((swift_error(zero_result)));
++ (BOOL) scotch: (NSError**) err __attribute__((swift_error(nonzero_result)));
++ (BOOL) scout: (NSError**) err __attribute__((swift_error(none)));
 @end
 
 @interface ReallyErrorProne : ErrorProne

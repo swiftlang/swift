@@ -696,6 +696,10 @@ namespace {
           wantResultType = true;
           break;
 
+        case ForeignErrorConvention::ZeroPreservedResult:
+          OS << "ZeroPreservedResult";
+          break;
+
         case ForeignErrorConvention::NilResult:
           OS << "NilResult";
           break;

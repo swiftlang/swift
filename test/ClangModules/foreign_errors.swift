@@ -83,3 +83,16 @@ class VeryErrorProne : ErrorProne {
 func testConflictWithUnavailable() throws {
   try ErrorProne.doTheThing(42)
 }
+
+// rdar://21715350
+func testSwiftError() throws {
+  var err: NSError?
+  let _: Bool = try ErrorProne.bound()
+  let _: Float = try ErrorProne.bounce()
+  let _: () = try ErrorProne.flounce()
+  let _: CInt = try ErrorProne.ounce()
+  let _: () = try ErrorProne.once()
+  let _: () = try ErrorProne.sconce()
+  let _: () = try ErrorProne.scotch()
+  let _: Bool = ErrorProne.scout(&err)
+}

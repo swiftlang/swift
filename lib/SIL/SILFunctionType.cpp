@@ -553,6 +553,7 @@ static CanSILFunctionType getSILFunctionType(SILModule &M,
       break;
 
     // These conventions don't require changes to the formal error type.
+    case ForeignErrorConvention::ZeroPreservedResult:
     case ForeignErrorConvention::NonNilError:
       break;
     }

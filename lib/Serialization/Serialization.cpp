@@ -1854,6 +1854,8 @@ static ForeignErrorConventionKind getRawStableForeignErrorConventionKind(
     return ForeignErrorConventionKind::ZeroResult;
   case ForeignErrorConvention::NonZeroResult:
     return ForeignErrorConventionKind::NonZeroResult;
+  case ForeignErrorConvention::ZeroPreservedResult:
+    return ForeignErrorConventionKind::ZeroPreservedResult;
   case ForeignErrorConvention::NilResult:
     return ForeignErrorConventionKind::NilResult;
   case ForeignErrorConvention::NonNilError:
@@ -1875,6 +1877,7 @@ void Serializer::writeForeignErrorConvention(const ForeignErrorConvention &fec){
     resultTypeID = addTypeRef(fec.getResultType());
     break;
 
+  case ForeignErrorConvention::ZeroPreservedResult:
   case ForeignErrorConvention::NilResult:
   case ForeignErrorConvention::NonNilError:
     resultTypeID = 0;

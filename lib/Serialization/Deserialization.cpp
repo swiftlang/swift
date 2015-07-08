@@ -4004,6 +4004,8 @@ decodeRawStableForeignErrorConventionKind(uint8_t kind) {
     return ForeignErrorConvention::ZeroResult;
   case static_cast<uint8_t>(ForeignErrorConventionKind::NonZeroResult):
     return ForeignErrorConvention::NonZeroResult;
+  case static_cast<uint8_t>(ForeignErrorConventionKind::ZeroPreservedResult):
+    return ForeignErrorConvention::ZeroPreservedResult;
   case static_cast<uint8_t>(ForeignErrorConventionKind::NilResult):
     return ForeignErrorConvention::NilResult;
   case static_cast<uint8_t>(ForeignErrorConventionKind::NonNilError):
@@ -4079,6 +4081,11 @@ Optional<ForeignErrorConvention> ModuleFile::maybeReadForeignErrorConvention() {
                                                     owned, replaced,
                                                     canErrorParameterType,
                                                     canResultType);
+
+  case ForeignErrorConvention::ZeroPreservedResult:
+    return ForeignErrorConvention::getZeroPreservedResult(errorParameterIndex,
+                                                          owned, replaced,
+                                                       canErrorParameterType);
 
   case ForeignErrorConvention::NilResult:
     return ForeignErrorConvention::getNilResult(errorParameterIndex,

@@ -51,7 +51,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 203; // Last change: add @box type
+const uint16_t VERSION_MINOR = 204; // Last change: add ZeroPreservedResult
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -118,11 +118,12 @@ using FunctionTypeRepresentationField = BCFixed<4>;
 enum class ForeignErrorConventionKind : uint8_t {
   ZeroResult,
   NonZeroResult,
+  ZeroPreservedResult,
   NilResult,
   NonNilError,
 };
 
-using ForeignErrorConventionKindField = BCFixed<2>;
+using ForeignErrorConventionKindField = BCFixed<3>;
 
 // These IDs must \em not be renumbered or reordered without incrementing
 // VERSION_MAJOR.

@@ -344,6 +344,7 @@ private:
         break;
 
       case ForeignErrorConvention::NonNilError:
+      case ForeignErrorConvention::ZeroPreservedResult:
         break;
       }
     }

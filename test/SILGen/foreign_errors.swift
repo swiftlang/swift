@@ -180,3 +180,37 @@ class ExtremelyErrorProne : ErrorProne {
 }
 // CHECK: sil hidden @_TFC14foreign_errors19ExtremelyErrorProne9conflict3fS0_FzTPSs9AnyObject_5errorT__T_
 // CHECK: sil hidden @_TToFC14foreign_errors19ExtremelyErrorProne9conflict3fS0_FzTPSs9AnyObject_5errorT__T_ : $@convention(objc_method) (AnyObject, AutoreleasingUnsafeMutablePointer<Optional<NSError>>, ExtremelyErrorProne) -> Bool
+
+// These conventions are usable because of swift_error. rdar://21715350
+func testNonNilError() throws -> Float {
+  return try ErrorProne.bounce()
+}
+// CHECK: sil hidden @_TF14foreign_errors15testNonNilErrorFzT_Sf :
+// CHECK:   [[T0:%.*]] = metatype $@thick ErrorProne.Type
+// CHECK:   [[T1:%.*]] = class_method [volatile] [[T0]] : $@thick ErrorProne.Type, #ErrorProne.bounce!1.foreign : ErrorProne.Type -> () throws -> Float , $@convention(objc_method) (AutoreleasingUnsafeMutablePointer<Optional<NSError>>, @objc_metatype ErrorProne.Type) -> Float
+// CHECK:   [[OPTERR:%.*]] = alloc_stack $Optional<NSError>
+// CHECK:   [[RESULT:%.*]] = apply [[T1]](
+// CHECK:   assign {{%.*}} to [[OPTERR]]#1
+// CHECK:   [[T0:%.*]] = load [[OPTERR]]#1
+// CHECK:   switch_enum [[T0]] : $Optional<NSError>, case #Optional.Some!enumelt.1: [[ERROR_BB:bb[0-9]+]], case #Optional.None!enumelt: [[NORMAL_BB:bb[0-9]+]]
+// CHECK: [[NORMAL_BB]]:
+// CHECK-NOT: release
+// CHECK:   return [[RESULT]]
+// CHECK: [[ERROR_BB]]
+
+func testPreservedResult() throws -> CInt {
+  return try ErrorProne.ounce()
+}
+// CHECK: sil hidden @_TF14foreign_errors19testPreservedResultFzT_VSs5Int32
+// CHECK:   [[T0:%.*]] = metatype $@thick ErrorProne.Type
+// CHECK:   [[T1:%.*]] = class_method [volatile] [[T0]] : $@thick ErrorProne.Type, #ErrorProne.ounce!1.foreign : ErrorProne.Type -> () throws -> Int32 , $@convention(objc_method) (AutoreleasingUnsafeMutablePointer<Optional<NSError>>, @objc_metatype ErrorProne.Type) -> Int32
+// CHECK:   [[OPTERR:%.*]] = alloc_stack $Optional<NSError>
+// CHECK:   [[RESULT:%.*]] = apply [[T1]](
+// CHECK:   [[T0:%.*]] = struct_extract [[RESULT]]
+// CHECK:   [[T1:%.*]] = integer_literal $[[PRIM:Builtin.Int[0-9]+]], 0
+// CHECK:   [[T2:%.*]] = builtin "cmp_eq"([[T0]] : $[[PRIM]], [[T1]] : $[[PRIM]])
+// CHECK:   cond_br [[T2]], [[ERROR_BB:bb[0-9]+]], [[NORMAL_BB:bb[0-9]+]]
+// CHECK: [[NORMAL_BB]]:
+// CHECK-NOT: release
+// CHECK:   return [[RESULT]]
+// CHECK: [[ERROR_BB]]

@@ -2681,6 +2681,14 @@ bool TypeChecker::isRepresentableInObjC(
                           errorResultType);
       break;
 
+    case ForeignErrorConvention::ZeroPreservedResult:
+      errorConvention = ForeignErrorConvention::getZeroPreservedResult(
+                          errorParameterIndex,
+                          ForeignErrorConvention::IsNotOwned,
+                          ForeignErrorConvention::IsNotReplaced,
+                          canErrorParameterType);
+      break;
+
     case ForeignErrorConvention::NilResult:
       errorConvention = ForeignErrorConvention::getNilResult(
                           errorParameterIndex,

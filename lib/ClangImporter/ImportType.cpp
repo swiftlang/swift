@@ -1330,6 +1330,9 @@ namespace {
       case FEC::NonZeroResult:
         return FEC::getNonZeroResult(ParamIndex, IsOwned, ReplaceParamWithVoid,
                                      ParamType, OrigResultType);
+      case FEC::ZeroPreservedResult:
+        return FEC::getZeroPreservedResult(ParamIndex, IsOwned,
+                                           ReplaceParamWithVoid, ParamType);
       case FEC::NilResult:
         return FEC::getNilResult(ParamIndex, IsOwned, ReplaceParamWithVoid,
                                  ParamType);
@@ -1382,17 +1385,76 @@ static bool isErrorOutParameter(const clang::ParmVarDecl *param,
   return false;
 }
 
+static bool isBoolType(ClangImporter::Implementation &importer, Type type) {
+  if (auto nominalType = type->getAs<NominalType>()) {
+    return nominalType->getDecl() == importer.SwiftContext.getBoolDecl();
+  }
+  return false;
+}
+
+static bool isIntegerType(Type type) {
+  // Look through arbitrarily many struct abstractions.
+  while (auto structDecl = type->getStructOrBoundGenericStruct()) {
+    // Require the struct to have exactly one stored property.
+    auto properties = structDecl->getStoredProperties();
+    auto i = properties.begin(), e = properties.end();
+    if (i == e) return false;
+
+    VarDecl *property = *i;
+    if (++i != e) return false;
+    type = property->getType();
+  }
+
+  return type->is<BuiltinIntegerType>();
+}
+
 static Optional<ForeignErrorConvention::Kind>
 classifyMethodErrorHandling(ClangImporter::Implementation &importer,
                             const clang::ObjCMethodDecl *clangDecl,
                             Type importedResultType) {
   // TODO: opt out any non-standard methods here?
 
-  // For bool results, a zero value is an error.
-  if (auto nominalType = importedResultType->getAs<NominalType>()) {
-    if (nominalType->getDecl() == importer.SwiftContext.getBoolDecl()) {
-      return ForeignErrorConvention::ZeroResult;
+  // Check for an explicit attribute.
+  if (auto attr = clangDecl->getAttr<clang::SwiftErrorAttr>()) {
+    switch (attr->getConvention()) {
+    case clang::SwiftErrorAttr::None:
+      return None;
+
+    case clang::SwiftErrorAttr::NonNullError:
+      return ForeignErrorConvention::NonNilError;
+
+    // Only honor null_result if we actually imported as a
+    // non-optional type.
+    case clang::SwiftErrorAttr::NullResult:
+      if (importedResultType->getAnyOptionalObjectType())
+        return ForeignErrorConvention::NilResult;
+      return None;
+
+    // Preserve the original result type on a zero_result unless we
+    // imported it as Bool.
+    case clang::SwiftErrorAttr::ZeroResult:
+      if (isBoolType(importer, importedResultType)) {
+        return ForeignErrorConvention::ZeroResult;
+      } else if (isIntegerType(importedResultType)) {
+        return ForeignErrorConvention::ZeroPreservedResult;
+      }
+      return None;
+
+    // There's no reason to do the same for nonzero_result because the
+    // only meaningful value remaining would be zero.
+    case clang::SwiftErrorAttr::NonZeroResult:
+      if (isIntegerType(importedResultType))
+        return ForeignErrorConvention::NonZeroResult;
+      return None;
     }
+    llvm_unreachable("bad swift_error kind");
+  }
+
+  // Otherwise, apply the default rules.
+
+  // For bool results, a zero value is an error.
+  if (isBoolType(importer, importedResultType)) {
+    return ForeignErrorConvention::ZeroResult;
   }
 
   // For optional reference results, a nil value is normally an error.
@@ -1587,6 +1649,7 @@ considerErrorImport(ClangImporter::Implementation &importer,
              "result type of NilResult convention was not imported as optional");
       break;
 
+    case ForeignErrorConvention::ZeroPreservedResult:
     case ForeignErrorConvention::NonNilError:
       break;
     }

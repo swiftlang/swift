@@ -41,6 +41,10 @@ public:
     /// field of integer type.
     NonZeroResult,
 
+    /// An error is indicated by a zero result, but the rest of the
+    /// result is meaningful.
+    ZeroPreservedResult,
+
     /// An error is indicated by a nil result.  The function has been
     /// imported as returning a non-optional type (which is not
     /// address-only).
@@ -103,6 +107,14 @@ public:
              parameterType, resultType };
   }
 
+  static ForeignErrorConvention getZeroPreservedResult(unsigned parameterIndex,
+                                                       IsOwned_t isOwned,
+                                                       IsReplaced_t isReplaced,
+                                                       CanType parameterType) {
+    return { ZeroPreservedResult, parameterIndex, isOwned, isReplaced,
+             parameterType };
+  }
+
   static ForeignErrorConvention getNilResult(unsigned parameterIndex,
                                              IsOwned_t isOwned,
                                              IsReplaced_t isReplaced,
@@ -114,7 +126,7 @@ public:
                                                IsOwned_t isOwned,
                                                IsReplaced_t isReplaced,
                                                CanType parameterType) {
-    return { NilResult, parameterIndex, isOwned, isReplaced, parameterType };
+    return { NonNilError, parameterIndex, isOwned, isReplaced, parameterType };
   }
 
   /// Returns the error convention in use.
