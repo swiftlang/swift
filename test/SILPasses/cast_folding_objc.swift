@@ -122,4 +122,40 @@ public func testFailingBridgedCastFromSwiftToObjC(s: String) -> NSInteger {
   return s as! NSInteger
 }
 
+// Check that class instances may be cast to potentially-class metatypes.
+// CHECK-LABEL: sil [noinline] @{{.*}}testCastNSObjectToAnyClass{{.*}}
+// CHECK:         unconditional_checked_cast_addr
+@inline(never)
+public func testCastNSObjectToAnyClass(o: NSObject) -> AnyClass {
+  return o as! AnyClass
+}
+
+// CHECK-LABEL: sil [noinline] @{{.*}}testCastNSObjectToClassObject{{.*}}
+// CHECK:         unconditional_checked_cast_addr
+@inline(never)
+public func testCastNSObjectToClassObject(o: NSObject) -> NSObject.Type {
+  return o as! NSObject.Type
+}
+
+// CHECK-LABEL: sil [noinline] @{{.*}}testCastNSObjectToAnyType{{.*}}
+// CHECK:         unconditional_checked_cast_addr
+@inline(never)
+public func testCastNSObjectToAnyType(o: NSObject) -> Any.Type {
+  return o as! Any.Type
+}
+
+// CHECK-LABEL: sil [noinline] @{{.*}}testCastNSObjectToEveryType{{.*}}
+// CHECK:         unconditional_checked_cast_addr
+@inline(never)
+public func testCastNSObjectToEveryType<T>(o: NSObject) -> T.Type {
+  return o as! T.Type
+}
+
+// CHECK-LABEL: sil [noinline] @{{.*}}testCastNSObjectToNonClassType
+// CHECK:         builtin "int_trap"
+@inline(never)
+public func testCastNSObjectToNonClassType(o: NSObject) -> Int.Type {
+  return o as! Int.Type
+}
+
 print("test0=\(test0())")

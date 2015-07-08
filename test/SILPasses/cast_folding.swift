@@ -194,11 +194,6 @@ func cast30(o: AnyObject) -> Bool {
   return o is P.Type
 }
 
-func cast31(x: X) -> Bool {
-  // Fails always, because a class instance cannot be a metatype
-  return x is P.Type
-}
-
 func cast32(p: P) -> Bool {
   // Fails always, because a metatype cannot conform to a protocol
   return p is P.Type
@@ -683,16 +678,6 @@ func test30() -> Bool {
     return cast30(X())
 }
 
-// CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding6test31FT_Sb
-// CHECK: bb0
-// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
-// CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1
-@inline(never)
-func test31() -> Bool {
-    return cast31(X())
-}
-
 // CHECK-LABEL: sil hidden [noinline] @_TF12cast_folding6test32FT_Sb
 // CHECK: bb0
 // CHECK: checked_cast
@@ -861,8 +846,6 @@ print("test28_3=\(test28_3))")
 print("test29=\(test29())")
 
 print("test30=\(test30())")
-
-print("test31=\(test31())")
 
 print("test32=\(test32())")
 

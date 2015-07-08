@@ -365,22 +365,39 @@ swift::classifyDynamicCast(Module *M,
     }
   }
 
-  // If the source is not existential or an archetype, and the destination
-  // is a metatype, there is no way the cast can succeed.
-  if (target->is<AnyMetatypeType>()) return DynamicCastFeasibility::WillFail;
-
   // Class casts.
   auto sourceClass = source.getClassOrBoundGenericClass();
   auto targetClass = target.getClassOrBoundGenericClass();
-  if (sourceClass && targetClass) {
-    if (target->isSuperclassOf(source, nullptr))
-      return DynamicCastFeasibility::WillSucceed;
-    if (source->isSuperclassOf(target, nullptr))
-      return DynamicCastFeasibility::MaySucceed;
+  if (sourceClass) {
+    if (targetClass) {
+      if (target->isSuperclassOf(source, nullptr))
+        return DynamicCastFeasibility::WillSucceed;
+      if (source->isSuperclassOf(target, nullptr))
+        return DynamicCastFeasibility::MaySucceed;
 
-    // FIXME: bridged types, e.g. CF <-> NS (but not for metatypes).
-    return DynamicCastFeasibility::WillFail;
+      // FIXME: bridged types, e.g. CF <-> NS (but not for metatypes).
+      return DynamicCastFeasibility::WillFail;
+    }
+
+    // In the Objective-C runtime, class metatypes are also class instances.
+    // The cast may succeed if the target type can be inhabited by a class
+    // metatype.
+    // TODO: Narrow this to the sourceClass being exactly NSObject.
+    if (M->getASTContext().LangOpts.EnableObjCInterop) {
+      if (auto targetMeta = dyn_cast<MetatypeType>(target)) {
+        if (isa<ArchetypeType>(targetMeta.getInstanceType())
+            || targetMeta.getInstanceType()->mayHaveSuperclass())
+          return DynamicCastFeasibility::MaySucceed;
+      } else if (isa<ExistentialMetatypeType>(target)) {
+        return DynamicCastFeasibility::MaySucceed;
+      }
+    }
   }
+
+  // If the source is not existential, an archetype, or (under the ObjC runtime)
+  // a class, and the destination is a metatype, there is no way the cast can
+  // succeed.
+  if (target->is<AnyMetatypeType>()) return DynamicCastFeasibility::WillFail;
 
   // FIXME: tuple conversions?
 
