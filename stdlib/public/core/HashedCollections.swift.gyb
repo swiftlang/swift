@@ -1733,7 +1733,8 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   //
 
   internal var _bucketMask: Int {
-    return capacity - 1
+    // The capacity is not negative, therefore subtracting 1 will not overflow.
+    return capacity &- 1
   }
 
   internal func _bucket(k: Key) -> Int {
@@ -1741,11 +1742,13 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
   }
 
   internal func _next(bucket: Int) -> Int {
-    return (bucket + 1) & _bucketMask
+    // Bucket is within 0 and capacity. Therefore adding 1 does not overflow.
+    return (bucket &+ 1) & _bucketMask
   }
 
   internal func _prev(bucket: Int) -> Int {
-    return (bucket - 1) & _bucketMask
+    // Bucket is not negative. Therefore subtracting 1 does not overflow.
+    return (bucket &- 1) & _bucketMask
   }
 
   /// Search for a given key starting from the specified bucket.
