@@ -578,13 +578,7 @@ extension ${Self} : _ArrayType {
       S : SequenceType
       where S.Generator.Element == Element
   >(newElements: S) {
-    // Calling a helper free function instead of writing the code inline
-    // because of:
-    //
-    // <rdar://problem/16954386> Type checker assertion: Unable to solve for
-    // call to witness?
-
-    _${Self}Extend(&self, sequence: newElements)
+    self += newElements
   }
 
   /// Remove an element from the end of the ${Self} in O(1).
@@ -676,13 +670,6 @@ extension ${Self} : _ArrayType {
   public func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element> {
     return _extractOrCopyToNativeArrayBuffer(self._buffer)
   }
-}
-
-internal func _${Self}Extend<
-    Element, S : SequenceType
-    where S.Generator.Element == Element
->(inout a: ${Self}<Element>, sequence: S) {
-  a += sequence
 }
 
 extension ${Self} : _Reflectable {
