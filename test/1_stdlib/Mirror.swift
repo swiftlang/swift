@@ -713,7 +713,7 @@ mirrors.test("PlaygroundQuickLook") {
   struct X {}
   switch PlaygroundQuickLook(reflecting: X()) {
   case .Text(let text):
-    expectTrue(text.hasSuffix(".(X #1)()")) { text }
+    expectTrue(text.hasSuffix(".(X #1)()"), text)
   default:
     expectTrue(false)
   }

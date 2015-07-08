@@ -25,12 +25,12 @@ private func compareAnythingAtAll(x: AnyObject, y: AnyObject)
 NSSetAPI.test("initWithObjects") {
   let result = NSSet(objects: 1, "two")
   // using the descriptions of 1 and "two" are fine for these tests.
-  expectEqualsUnordered([1, "two"], result, compareAnythingAtAll)
+  expectEqualsUnordered([1, "two"], result, compare: compareAnythingAtAll)
 }
 
 NSSetAPI.test("ArrayLiteralConvertible") {
   let result: NSSet = [1, "two"]
-  expectEqualsUnordered([1, "two"], result, compareAnythingAtAll)
+  expectEqualsUnordered([1, "two"], result, compare: compareAnythingAtAll)
 }
 
 NSSetAPI.test("CustomStringConvertible") {
@@ -48,12 +48,12 @@ NSOrderedSetAPI.test("SequenceType") {
 
 NSOrderedSetAPI.test("initWithObjects") {
   let result = NSOrderedSet(objects: 1, "two")
-  expectEqualsUnordered([1, "two"], result, compareAnythingAtAll)
+  expectEqualsUnordered([1, "two"], result, compare: compareAnythingAtAll)
 }
 
 NSOrderedSetAPI.test("ArrayLiteralConvertible") {
   let result: NSOrderedSet = [1, "two"]
-  expectEqualsUnordered([1, "two"], result, compareAnythingAtAll)
+  expectEqualsUnordered([1, "two"], result, compare: compareAnythingAtAll)
 }
 
 NSOrderedSetAPI.test("CustomStringConvertible") {

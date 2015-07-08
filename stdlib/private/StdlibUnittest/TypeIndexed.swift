@@ -48,16 +48,14 @@ public func <=> <T: Comparable>(
 
 public func expectEqual<V: Comparable>(
   expected: DictionaryLiteral<Any.Type, V>, _ actual: TypeIndexed<V>,
-  stackTrace: SourceLocStack? = nil,
-  file: String = __FILE__, line: UWord = __LINE__,
-  collectMoreInfo: (()->String)? = nil
+  @autoclosure _ message: ()->String = "",
+  showFrame: Bool = true,
+  stackTrace: SourceLocStack = SourceLocStack(),  
+  file: String = __FILE__, line: UWord = __LINE__
 ) {
   expectEqualsUnordered(
     expected.map { (TypeIdentifier($0.0), $0.1) },
     actual.byType,
-    { $0 <=> $1 },
-    stackTrace: stackTrace, file: file,
-    line: line, collectMoreInfo: collectMoreInfo
-  )
+    message(), stackTrace: stackTrace) { $0 <=> $1 }
 }
 

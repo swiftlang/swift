@@ -367,9 +367,7 @@ SequenceTypeAlgorithms.test("GeneratorSequence/GeneratorType/empty") {
     expectType(
       GeneratorSequence<MinimalGenerator<OpaqueValue<Int>>>.self,
       &g)
-    checkGenerator(
-      data, g, { $0.value == $1.value },
-      resiliencyChecks: .none)
+    checkGenerator(data, g, resiliencyChecks: .none) { $0.value == $1.value }
   }
   if true {
     let data: [OpaqueValue<Int>] = []
@@ -378,7 +376,7 @@ SequenceTypeAlgorithms.test("GeneratorSequence/GeneratorType/empty") {
     expectType(
       GeneratorSequence<IndexingGenerator<Array<OpaqueValue<Int>>>>.self,
       &g)
-    checkGenerator(data, g, { $0.value == $1.value })
+    checkGenerator(data, g) { $0.value == $1.value }
   }
 }
 
@@ -390,9 +388,7 @@ SequenceTypeAlgorithms.test("GeneratorSequence/GeneratorType") {
     expectType(
       GeneratorSequence<MinimalGenerator<OpaqueValue<Int>>>.self,
       &g)
-    checkGenerator(
-      data, g, { $0.value == $1.value },
-      resiliencyChecks: .none)
+    checkGenerator(data, g, resiliencyChecks: .none) { $0.value == $1.value }
   }
   if true {
     let data: [OpaqueValue<Int>] = []
@@ -401,7 +397,7 @@ SequenceTypeAlgorithms.test("GeneratorSequence/GeneratorType") {
     expectType(
       GeneratorSequence<IndexingGenerator<Array<OpaqueValue<Int>>>>.self,
       &g)
-    checkGenerator(data, g, { $0.value == $1.value })
+    checkGenerator(data, g) { $0.value == $1.value }
   }
 }
 
@@ -413,9 +409,7 @@ SequenceTypeAlgorithms.test("GeneratorSequence/SequenceType/empty") {
     expectType(
       GeneratorSequence<MinimalGenerator<OpaqueValue<Int>>>.self,
       &g)
-    checkSequence(
-      data, g, { $0.value == $1.value },
-      resiliencyChecks: .none)
+    checkSequence(data, g, resiliencyChecks: .none) { $0.value == $1.value }
   }
   if true {
     let data = [ 10, 20, 30 ].map { OpaqueValue($0) }
@@ -424,7 +418,7 @@ SequenceTypeAlgorithms.test("GeneratorSequence/SequenceType/empty") {
     expectType(
       GeneratorSequence<IndexingGenerator<Array<OpaqueValue<Int>>>>.self,
       &g)
-    checkSequence(data, g, { $0.value == $1.value })
+    checkSequence(data, g) { $0.value == $1.value }
   }
 }
 
@@ -436,9 +430,7 @@ SequenceTypeAlgorithms.test("GeneratorSequence/SequenceType") {
     expectType(
       GeneratorSequence<MinimalGenerator<OpaqueValue<Int>>>.self,
       &g)
-    checkSequence(
-      data, g, { $0.value == $1.value },
-      resiliencyChecks: .none)
+    checkSequence(data, g, resiliencyChecks: .none) { $0.value == $1.value }
   }
   if true {
     let data = [ 10, 20, 30 ].map { OpaqueValue($0) }
@@ -447,7 +439,7 @@ SequenceTypeAlgorithms.test("GeneratorSequence/SequenceType") {
     expectType(
       GeneratorSequence<IndexingGenerator<Array<OpaqueValue<Int>>>>.self,
       &g)
-    checkSequence(data, g, { $0.value == $1.value })
+    checkSequence(data, g) { $0.value == $1.value }
   }
 }
 
@@ -504,13 +496,13 @@ SequenceTypeAlgorithms.test("enumerate") {
     expectType(
       EnumerateSequence<MinimalSequence<OpaqueValue<Int>>>.self,
       &result)
+    
     checkSequence(
       test.expected.map {
         (index: $0.0, element: OpaqueValue($0.1))
       } as [Element],
-      result, compareElements,
-      resiliencyChecks: .none,
-      test.loc.withCurrentLoc())
+      result,
+      resiliencyChecks: .none, sameValue: compareElements)
     expectEqual([], s.map { $0.value }, "sequence should be consumed")
   }
 }
@@ -1328,10 +1320,10 @@ SequenceTypeAlgorithms.test("filter/SequenceType/Semantics") {
         test.sequence.count, timesClosureWasCalled,
         "filter() should be eager and should only call its predicate"
         + "once per element")
-      expectGE(2 * result.count, result.capacity) {
+      expectGE(
+        2 * result.count, result.capacity,
         "filter() should not reserve capacity (it does not know how much the"
-        + "predicate will filter out)"
-      }
+        + "predicate will filter out)")
     }
   }
 }
@@ -1453,9 +1445,10 @@ SequenceTypeAlgorithms.test("filter/CollectionType/${Implementation}Implementati
         test.sequence, s.map { $0.value }, "collection should not be consumed")
       expectEqual(test.sequence.count, timesClosureWasCalled,
         "filter() should be eager and should only call its predicate once per element")
-      expectGE(2 * result.count, result.capacity) {
-        "filter() should not reserve capacity (it does not know how much the predicate will filter out)"
-      }
+      expectGE(
+        2 * result.count, result.capacity,
+        "filter() should not reserve capacity"
+        + "(it does not know how much the predicate will filter out)")
     }
   }
 }
@@ -1831,10 +1824,13 @@ SequenceTypeAlgorithms.test("flatMap/SequenceType") {
         test.expected, result.map { $0.value },
         stackTrace: test.loc.withCurrentLoc())
       expectEqual([], s.map { $0.value }, "sequence should be consumed")
-      expectEqual(test.sequence.count, timesClosureWasCalled, "map() should be eager and should only call its predicate once per element")
-      expectGE(2 * result.count, result.capacity) {
-        "flatMap() should not reserve capacity"
-      }
+      expectEqual(
+        test.sequence.count, timesClosureWasCalled,
+        "map() should be eager and should only call its predicate"
+        + "once per element")
+      expectGE(
+        2 * result.count, result.capacity,
+        "flatMap() should not reserve capacity")
     }
   }
 }
@@ -1904,10 +1900,13 @@ SequenceTypeAlgorithms.test("flatMap/SequenceType/TransformProducesOptional") {
         test.expected, result.map { $0.value },
         stackTrace: test.loc.withCurrentLoc())
       expectEqual([], s.map { $0.value }, "sequence should be consumed")
-      expectEqual(test.sequence.count, timesClosureWasCalled, "flatMap() should be eager and should only call its predicate once per element")
-      expectGE(2 * result.count, result.capacity) {
-        "flatMap() should not reserve capacity"
-      }
+      expectEqual(
+        test.sequence.count, timesClosureWasCalled,
+        "flatMap() should be eager and should only call its predicate"
+        + "once per element")
+      expectGE(
+        2 * result.count, result.capacity,
+        "flatMap() should not reserve capacity")
     }
   }
 }
@@ -2023,19 +2022,18 @@ SequenceTypeAlgorithms.test("zip") {
     // Check for expected result and check the Zip2Sequence's SequenceType
     // conformance.
     checkSequence(
-      test.expected.map { (OpaqueValue($0), OpaqueValue($1)) },
-      result,
-      compareElements,
-      test.loc.withCurrentLoc())
+      test.expected.map { (OpaqueValue($0), OpaqueValue($1)) }, result,
+      stackTrace: SourceLocStack().with(test.loc), sameValue: compareElements)
+    
     // Check leftovers *after* doing checkSequence(), not before, to ensure
     // that checkSequence() didn't force us to consume more elements than
     // needed.
     expectEqual(
       test.expectedLeftoverSequence, s.map { $0.value },
-      stackTrace: test.loc.withCurrentLoc())
+      stackTrace: SourceLocStack().with(test.loc))
     expectEqual(
       test.expectedLeftoverOther, other.map { $0.value },
-      stackTrace: test.loc.withCurrentLoc())
+      stackTrace: SourceLocStack().with(test.loc))
   }
 }
 
@@ -3216,7 +3214,7 @@ SequenceTypeAlgorithms.test("forAllPermutations") {
     forAllPermutations(0) {
       permutations.append($0)
     }
-    expectEqualSequence([] as [[Int]], permutations, { $0 == $1 })
+    expectEqualSequence([] as [[Int]], permutations) { $0 == $1 }
   }
 
   if true {
@@ -3224,7 +3222,7 @@ SequenceTypeAlgorithms.test("forAllPermutations") {
     forAllPermutations(1) {
       permutations.append($0)
     }
-    expectEqualSequence([ [ 0 ] ] as [[Int]], permutations, { $0 == $1 })
+    expectEqualSequence([[ 0 ]] as [[Int]], permutations) { $0 == $1 }
   }
 
   if true {
@@ -3233,12 +3231,7 @@ SequenceTypeAlgorithms.test("forAllPermutations") {
       permutations.append($0)
     }
     expectEqualSequence(
-      [
-        [ 0, 1 ],
-        [ 1, 0 ]
-      ] as [[Int]],
-      permutations,
-      { $0 == $1 })
+      [[ 0, 1 ], [ 1, 0 ]] as [[Int]], permutations) { $0 == $1 }
   }
 
   if true {
@@ -3255,8 +3248,7 @@ SequenceTypeAlgorithms.test("forAllPermutations") {
         [ 2, 0, 1 ],
         [ 2, 1, 0 ],
       ] as [[Int]],
-      permutations,
-      { $0 == $1 })
+      permutations) { $0 == $1 }
   }
 
   if true {
@@ -3273,8 +3265,7 @@ SequenceTypeAlgorithms.test("forAllPermutations") {
         [ 30, 10, 20 ],
         [ 30, 20, 10 ],
       ] as [[Int]],
-      permutations,
-      { $0 == $1 })
+      permutations) { $0 == $1 }
   }
 }
 

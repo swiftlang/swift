@@ -319,8 +319,8 @@ AssertionsTestSuite.test("expectFailure/Pass") {
 }
 // CHECK: [ RUN      ] Assertions.expectFailure/Pass
 // CHECK: out>>> check failed at
-// CHECK: out>>> expected: "1" (of type Swift.Int)
-// CHECK: out>>> actual: "2" (of type Swift.Int)
+// CHECK: out>>> expected: 1 (of type Swift.Int)
+// CHECK: out>>> actual: 2 (of type Swift.Int)
 // CHECK: [       OK ] Assertions.expectFailure/Pass
 
 AssertionsTestSuite.test("expectFailure/UXPass")

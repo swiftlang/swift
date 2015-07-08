@@ -794,9 +794,10 @@ func _checkArrayFastEnumerationImpl(
   _ convertValue: (AnyObject) -> Int
 ) {
   let expectedContentsWithoutIdentity =
-    _makeExpectedArrayContents(expected)
+  _makeExpectedArrayContents(expected)
+  
   var expectedContents = [ExpectedArrayElement]()
-
+  
   for i in 0..<3 {
     var actualContents = [ExpectedArrayElement]()
     let sink = {
@@ -808,17 +809,17 @@ func _checkArrayFastEnumerationImpl(
 
     useEnumerator(a, makeEnumerator(), sink)
 
-    expectTrue(_equalsWithoutElementIdentity(
-      expectedContentsWithoutIdentity, actualContents)) {
+    expectTrue(
+      _equalsWithoutElementIdentity(
+        expectedContentsWithoutIdentity, actualContents),
       "expected: \(expectedContentsWithoutIdentity)\n" +
-      "actual: \(actualContents)\n"
-    }
+      "actual: \(actualContents)\n")
 
     if i == 0 {
       expectedContents = actualContents
     }
-    // FIXME: delayed bridging for Swift.Array
-    //expectEqualSequence(expectedContents, actualContents)
+    
+    expectEqualSequence(expectedContents, actualContents)
   }
 }
 
@@ -940,11 +941,11 @@ func _checkSetFastEnumerationImpl(
 
     useEnumerator(s, makeEnumerator(), sink)
 
-    expectTrue(_equalsUnorderedWithoutElementIdentity(
-      expectedContentsWithoutIdentity, actualContents)) {
+    expectTrue(
+      _equalsUnorderedWithoutElementIdentity(
+        expectedContentsWithoutIdentity, actualContents),
       "expected: \(expectedContentsWithoutIdentity)\n" +
-      "actual: \(actualContents)\n"
-    }
+      "actual: \(actualContents)\n")
 
     if i == 0 {
       expectedContents = actualContents
@@ -1161,11 +1162,11 @@ func _checkDictionaryFastEnumerationImpl(
 
     useEnumerator(d, makeEnumerator(), sink)
 
-    expectTrue(_equalsUnorderedWithoutElementIdentity(
-      expectedContentsWithoutIdentity, actualContents)) {
+    expectTrue(
+      _equalsUnorderedWithoutElementIdentity(
+        expectedContentsWithoutIdentity, actualContents),
       "expected: \(expectedContentsWithoutIdentity)\n" +
-      "actual: \(actualContents)\n"
-    }
+      "actual: \(actualContents)\n")
 
     if i == 0 {
       expectedContents = actualContents

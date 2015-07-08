@@ -156,9 +156,8 @@ ArrayTestSuite.test("${array_type}/init(SequenceType)") {
 
   expectEqual(1, SequenceWithCustomUnderestimateCount.timesUnderestimateCountWasCalled)
 
-  expectEqualSequence([], Array(base).map { $0.value }) {
-    "sequence should be consumed"
-  }
+  expectEqualSequence(
+    [], Array(base).map { $0.value }, "sequence should be consumed")
 }
 
 ArrayTestSuite.test("${array_type}/Sliceable/Enums") {
@@ -663,10 +662,9 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.BridgeUsingAs") {
     var result = nsa as Array
     expectTrue(isCocoaArray(result))
     expectType(Array<AnyObject>.self, &result)
-    checkSequence(
-      source.map { TestObjCValueTy($0) as AnyObject },
-      result,
-      { ($0 as! TestObjCValueTy).value == ($1 as! TestObjCValueTy).value })
+    checkSequence(source.map { TestObjCValueTy($0) as AnyObject }, result) {
+      ($0 as! TestObjCValueTy).value == ($1 as! TestObjCValueTy).value
+    }
   }
   if true {
     let source = [ 10, 20, 30 ]
@@ -674,10 +672,9 @@ ArrayTestSuite.test("BridgedFromObjC.Verbatim.BridgeUsingAs") {
     var result = nsa as! Array<TestObjCValueTy>
     expectTrue(isCocoaArray(result))
     expectType(Array<TestObjCValueTy>.self, &result)
-    checkSequence(
-      source.map { TestObjCValueTy($0) },
-      result,
-      { $0.value == $1.value })
+    checkSequence(source.map { TestObjCValueTy($0) }, result) {
+      $0.value == $1.value
+    }
   }
 }
 
@@ -687,10 +684,9 @@ ArrayTestSuite.test("BridgedFromObjC.Nonverbatim.BridgeUsingAs") {
   var result = nsa as! Array<TestBridgedValueTy>
   expectTrue(isNativeArray(result))
   expectType(Array<TestBridgedValueTy>.self, &result)
-  checkSequence(
-    source.map { TestBridgedValueTy($0) },
-    result,
-    { $0.value == $1.value })
+  checkSequence(source.map { TestBridgedValueTy($0) }, result) {
+    $0.value == $1.value
+  }
 }
 
 

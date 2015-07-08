@@ -85,15 +85,11 @@ extension GeneratorOfOne where Element : TestProtocol1 {
 LazyTestSuite.test("GeneratorOfOne") {
   checkGenerator(
     [] as Array<OpaqueValue<Int>>,
-    GeneratorOfOne(nil as Optional<OpaqueValue<Int>>),
-    { $0.value == $1.value },
-    SourceLocStack().withCurrentLoc())
+    GeneratorOfOne(nil as Optional<OpaqueValue<Int>>)) { $0.value == $1.value }
 
   checkGenerator(
     [ OpaqueValue(42) ] as Array<OpaqueValue<Int>>,
-    GeneratorOfOne(OpaqueValue(42)),
-    { $0.value == $1.value },
-    SourceLocStack().withCurrentLoc())
+    GeneratorOfOne(OpaqueValue(42))) { $0.value == $1.value }
 }
 
 //===----------------------------------------------------------------------===//
@@ -129,8 +125,8 @@ extension EmptyGenerator where Element : TestProtocol1 {
 LazyTestSuite.test("EmptyGenerator") {
   checkGenerator(
     [] as Array<OpaqueValue<Int>>,
-    EmptyGenerator<OpaqueValue<Int>>(),
-    { $0.value == $1.value })
+    EmptyGenerator<OpaqueValue<Int>>())
+    { $0.value == $1.value }
 }
 
 // FIXME: trap tests.
@@ -240,9 +236,8 @@ LazyTestSuite.test("LazySequence.array") {
   // storage.
   expectEqual(1, SequenceWithCustomUnderestimateCount.timesUnderestimateCountWasCalled)
 
-  expectEqualSequence([], Array(base).map { $0.value }) {
-    "sequence should be consumed"
-  }
+  expectEqualSequence(
+    [], Array(base).map { $0.value }, "sequence should be consumed")
 }
 
 %for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:

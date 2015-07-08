@@ -92,6 +92,11 @@ public struct SourceLocStack {
     stackTrace: SourceLocStack = SourceLocStack(),  
     file: String = __FILE__, line: UWord = __LINE__'''
 
+  # When the parameter list would start with a ${TRACE}, we use 
+  # ${TRACE1} instead, to avoid the warning about an extraneous 
+  # '_' on the first parameter.
+  TRACE1 = TRACE.replace(' _ ', ' ', 1) 
+  
   stackTrace = 'stackTrace.pushIf(showFrame, file: file, line: line)'
 
   trace = 'message(),\n  stackTrace: ' + stackTrace
@@ -121,9 +126,8 @@ public func expectFailure(body: () -> ()) {
   body()
   let endAnyExpectFailed = _anyExpectFailed
   _anyExpectFailed = false
-  expectTrue(endAnyExpectFailed) {
-    "running `body` should produce an expected failure"
-  }
+  expectTrue(
+    endAnyExpectFailed, "running `body` should produce an expected failure")
   _anyExpectFailed = _anyExpectFailed || startAnyExpectFailed
 }
 
@@ -152,8 +156,8 @@ public func expectEqual<T>(
 ) {
   if !equal(expected, actual) {
     expectationFailure(
-      "expected: \"\(expected)\" (of type \(expected.dynamicType))\n"
-      + "actual: \"\(actual)\" (of type \(expected.dynamicType))",
+      "expected: \(String(reflecting: expected)) (of type \(expected.dynamicType))\n"
+      + "actual: \(String(reflecting: actual)) (of type \(expected.dynamicType))",
       trace: ${trace}
     )
   }
@@ -206,89 +210,35 @@ public func expectEqual${Generic}(
   expectEqual(expected, actual, ${trace}, showFrame: false) { $0 == $1 }
 }
 
-func _expectNotEqual${Generic}(
-    expected: ${EquatableType}, actual: ${EquatableType},
-    file: String = __FILE__, line: UWord = __LINE__,
-    collectMoreInfo: (()->String)? = nil
-) {
-  if expected == actual {
-    _anyExpectFailed = true
-    print("check failed at \(file), line \(line)")
-    print("unexpected value: \"\(actual)\" (of type \(actual.dynamicType))")
-    if collectMoreInfo != nil { print(collectMoreInfo!()) }
-    print("")
-  }
-}
-
 public func expectOptionalEqual${Generic}(
-    expected: ${EquatableType}, _ actual: ${EquatableType}?,
-    file: String = __FILE__, line: UWord = __LINE__
-) {
+    expected: ${EquatableType}, _ actual: ${EquatableType}?, ${TRACE}) {
   if (actual == nil) || expected != actual! {
-    _anyExpectFailed = true
-    print("check failed at \(file), line \(line)")
-    print("expected: \"\(expected)\" (of type \(expected.dynamicType))")
-    print("actual: \"\(actual)\" (of type \(actual.dynamicType))")
-    print("")
+    expectationFailure(
+      "expected: \"\(expected)\" (of type \(expected.dynamicType))"
+      + "actual: \"\(actual)\" (of type \(actual.dynamicType))",
+      trace: ${trace})
   }
 }
 
 %end
 
-%for ComparableType in ['Int']:
-
-public func expectLT(
-  expected: ${ComparableType}, _ actual: ${ComparableType},
-  stackTrace: SourceLocStack? = nil,
-  file: String = __FILE__, line: UWord = __LINE__,
-  collectMoreInfo: (()->String)? = nil
-) {
-  if !(expected < actual) {
-    _anyExpectFailed = true
-    print("check failed at \(file), line \(line)")
-    _printStackTrace(stackTrace)
-    print("expected: \"\(expected)\"")
-    print("actual: \"\(actual)\"")
-    if collectMoreInfo != nil { print(collectMoreInfo!()) }
-    print("")
+public func expectLT(lhs: Int, _ rhs: Int, ${TRACE}) {
+  if !(lhs < rhs) {
+    expectationFailure("\(lhs) < \(rhs)", trace: ${trace})
   }
 }
 
-public func expectLE(
-  expected: ${ComparableType}, _ actual: ${ComparableType},
-  stackTrace: SourceLocStack? = nil,
-  file: String = __FILE__, line: UWord = __LINE__,
-  collectMoreInfo: (()->String)? = nil
-) {
-  if !(expected <= actual) {
-    _anyExpectFailed = true
-    print("check failed at \(file), line \(line)")
-    _printStackTrace(stackTrace)
-    print("expected: \"\(expected)\"")
-    print("actual: \"\(actual)\"")
-    if collectMoreInfo != nil { print(collectMoreInfo!()) }
-    print("")
+public func expectLE(lhs: Int, _ rhs: Int, ${TRACE}) {
+  if !(lhs <= rhs) {
+    expectationFailure("\(lhs) <= \(rhs)", trace: ${trace})
   }
 }
 
-public func expectGE(
-  expected: ${ComparableType}, _ actual: ${ComparableType},
-  stackTrace: SourceLocStack? = nil,
-  file: String = __FILE__, line: UWord = __LINE__,
-  collectMoreInfo: (()->String)? = nil
-) {
-  if !(expected >= actual) {
-    _anyExpectFailed = true
-    print("check failed at \(file), line \(line)")
-    _printStackTrace(stackTrace)
-    print("expected: \"\(expected)\"")
-    print("actual: \"\(actual)\"")
-    if collectMoreInfo != nil { print(collectMoreInfo!()) }
-    print("")
+public func expectGE(lhs: Int, _ rhs: Int, ${TRACE}) {
+  if !(lhs >= rhs) {
+    expectationFailure("\(lhs) >= \(rhs)", trace: ${trace})
   }
 }
-
-%end
 
 public func expectType<T>(_: T.Type, inout _ x: T) {}
 public func expectEqualType<T>(_: T.Type, _: T.Type) {}
@@ -359,97 +309,41 @@ public func assertionFailure() -> AssertionResult {
   return AssertionResult(isPass: false)
 }
 
-public func expectUnreachable(
-  stackTrace: SourceLocStack? = nil,
-  file: String = __FILE__, line: UWord = __LINE__,
-  collectMoreInfo: (()->String)? = nil
-) {
-  _anyExpectFailed = true
-  print("check failed at \(file), line \(line)")
-  _printStackTrace(stackTrace)
-  print("this code should not be executed")
-  if collectMoreInfo != nil { print(collectMoreInfo!()) }
-  print("")
+public func expectUnreachable(${TRACE1}) {
+  expectationFailure("this code should not be executed", trace: ${trace})
 }
 
-public func expectUnreachableCatch(
-  error: ErrorType,
-  stackTrace: SourceLocStack? = nil,
-  file: String = __FILE__, line: UWord = __LINE__,
-  collectMoreInfo: (()->String)? = nil
-) {
-  _anyExpectFailed = true
-  print("check failed at \(file), line \(line)")
-  _printStackTrace(stackTrace)
-  print("error should not be thrown: \"\(error)\"")
-  if collectMoreInfo != nil { print(collectMoreInfo!()) }
-  print("")
+public func expectUnreachableCatch(error: ErrorType, ${TRACE}) {
+  expectationFailure(
+    "error should not be thrown: \"\(error)\"", trace: ${trace})
 }
 
 %for BoolType in ['Bool', 'AssertionResult']:
 
-public func expectTrue(
-    actual: ${BoolType},
-    stackTrace: SourceLocStack? = nil,
-    file: String = __FILE__, line: UWord = __LINE__,
-    collectMoreInfo: (()->String)? = nil
-) {
+public func expectTrue(actual: ${BoolType}, ${TRACE}) {
   if !actual {
-    _anyExpectFailed = true
-    print("check failed at \(file), line \(line)")
-    _printStackTrace(stackTrace)
-    print("expected: true")
-    print("actual: \(actual)")
-    if collectMoreInfo != nil { print(collectMoreInfo!()) }
-    print("")
+    expectationFailure("expected: true", trace: ${trace})
   }
 }
 
-public func expectFalse(
-    actual: ${BoolType},
-    stackTrace: SourceLocStack? = nil,
-    file: String = __FILE__, line: UWord = __LINE__,
-    collectMoreInfo: (()->String)? = nil
-) {
+public func expectFalse(actual: ${BoolType}, ${TRACE}) {
   if actual {
-    _anyExpectFailed = true
-    print("check failed at \(file), line \(line)")
-    _printStackTrace(stackTrace)
-    print("expected: false")
-    print("actual: \(actual)")
-    if collectMoreInfo != nil { print(collectMoreInfo!()) }
-    print("")
+    expectationFailure("expected: false", trace: ${trace})
   }
 }
 
 %end
 
-public func expectEmpty<T>(
-    value: Optional<T>,
-    stackTrace: SourceLocStack? = nil,
-    file: String = __FILE__, line: UWord = __LINE__,
-    collectMoreInfo: (()->String)? = nil
-) {
+public func expectEmpty<T>(value: T?, ${TRACE}) {
   if value != nil {
-    _anyExpectFailed = true
-    print("check failed at \(file), line \(line)")
-    _printStackTrace(stackTrace)
-    print("expected optional to be empty")
-    print("actual: \"\(value)\"")
-    if collectMoreInfo != nil { print(collectMoreInfo!()) }
-    print("")
+    expectationFailure(
+      "expected optional to be empty\nactual: \"\(value)\"", trace: ${trace})
   }
 }
 
-public func expectNotEmpty<T>(
-    value: Optional<T>,
-    file: String = __FILE__, line: UWord = __LINE__
-) -> T? {
+public func expectNotEmpty<T>(value: T?, ${TRACE}) -> T? {
   if value == nil {
-    _anyExpectFailed = true
-    print("check failed at \(file), line \(line)")
-    print("expected optional to be non-empty")
-    print("")
+    expectationFailure("expected optional to be non-empty", trace: ${trace})
   }
   return value
 }
@@ -1589,10 +1483,9 @@ public func checkGenerator<
 >(
   expected: ${Expected},
   _ generator: G,
-  _ sameValue: (${Element}, ${Element}) -> Bool,
+  ${TRACE},
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
-  _ stackTrace: SourceLocStack,
-  collectMoreInfo: (()->String)? = nil
+  sameValue: (${Element}, ${Element}) -> Bool
 ) {
   // Copying a `GeneratorType` is allowed.
   var mutableGen = generator
@@ -1601,72 +1494,31 @@ public func checkGenerator<
     actual.append(e)
   }
   expectEqualSequence(
-    expected, actual, sameValue,
-    stackTrace: stackTrace.withCurrentLoc(),
-    collectMoreInfo: collectMoreInfo)
+    expected, actual, ${trace}, sameValue: sameValue)
 
   if resiliencyChecks.callNextOnExhaustedGenerator {
     // Having returned `.None` once, a `GeneratorType` should not generate more
     // elements.
     for _ in 0..<10 {
-      expectEmpty(
-        mutableGen.next(),
-        stackTrace: stackTrace.withCurrentLoc(),
-        collectMoreInfo: collectMoreInfo)
+      expectEmpty(mutableGen.next(), ${trace})
     }
   }
 }
 
 public func checkGenerator<
   ${genericParam}, G : GeneratorType
-  where G.Element == ${Element}
->(
-  expected: ${Expected},
-  _ generator: G,
-  _ sameValue: (${Element}, ${Element}) -> Bool,
-  resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
-  file: String = __FILE__, line: UWord = __LINE__,
-  collectMoreInfo: (()->String)? = nil
-) {
-  checkGenerator(
-    expected, generator, sameValue,
-    resiliencyChecks: resiliencyChecks,
-    SourceLocStack().with(SourceLoc(file, line)),
-    collectMoreInfo: collectMoreInfo)
-}
-
-public func checkGenerator<
-  ${genericParam}, G : GeneratorType
   where G.Element == ${Element}, ${Element} : Equatable
 >(
   expected: ${Expected},
   _ generator: G,
+  ${TRACE},
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
-  _ stackTrace: SourceLocStack,
-  collectMoreInfo: (()->String)? = nil
+  sameValue: (${Element}, ${Element}) -> Bool
 ) {
   checkGenerator(
-    expected, generator, { $0 == $1 },
-    resiliencyChecks: resiliencyChecks,
-    stackTrace.withCurrentLoc(),
-    collectMoreInfo: collectMoreInfo)
-}
-
-public func checkGenerator<
-  ${genericParam}, G : GeneratorType
-  where G.Element == ${Element}, ${Element} : Equatable
->(
-  expected: ${Expected},
-  _ generator: G,
-  resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
-  file: String = __FILE__, line: UWord = __LINE__,
-  collectMoreInfo: (()->String)? = nil
-) {
-  checkGenerator(
-    expected, generator, { $0 == $1 },
-    resiliencyChecks: resiliencyChecks,
-    SourceLocStack().with(SourceLoc(file, line)),
-    collectMoreInfo: collectMoreInfo)
+    expected, generator, ${trace},
+    resiliencyChecks: resiliencyChecks, showFrame: false
+  ) { $0 == $1 }
 }
 
 public func checkSequence<
@@ -1675,72 +1527,32 @@ public func checkSequence<
 >(
   expected: ${Expected},
   _ sequence: S,
-  _ sameValue: (${Element}, ${Element}) -> Bool,
+  ${TRACE},
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
-  _ stackTrace: SourceLocStack,
-  collectMoreInfo: (()->String)? = nil
+  sameValue: (${Element}, ${Element}) -> Bool
 ) {
   let expectedCount: Int = numericCast(expected.count)
   checkGenerator(
-    expected, sequence.generate(), sameValue,
+    expected, sequence.generate(), ${trace},
     resiliencyChecks: resiliencyChecks,
-    stackTrace.withCurrentLoc())
+    sameValue: sameValue)
   expectGE(
-    expectedCount, sequence.underestimateCount(),
-    stackTrace: stackTrace.withCurrentLoc(),
-    collectMoreInfo: collectMoreInfo)
+    expectedCount, sequence.underestimateCount(), ${trace})
 }
 
 public func checkSequence<
   ${genericParam}, S : SequenceType
-  where S.Generator.Element == ${Element}
+  where S.Generator.Element == ${Element}, S.Generator.Element : Equatable
 >(
   expected: ${Expected},
   _ sequence: S,
-  _ sameValue: (${Element}, ${Element}) -> Bool,
-  resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
-  file: String = __FILE__, line: UWord = __LINE__,
-  collectMoreInfo: (()->String)? = nil
+  ${TRACE},
+  resiliencyChecks: CollectionMisuseResiliencyChecks = .all
 ) {
   checkSequence(
-    expected, sequence, sameValue,
-    resiliencyChecks: resiliencyChecks,
-    SourceLocStack().with(SourceLoc(file, line)),
-    collectMoreInfo: collectMoreInfo)
-}
-
-public func checkSequence<
-  ${genericParam}, S : SequenceType
-  where S.Generator.Element == ${Element}, ${Element} : Equatable
->(
-  expected: ${Expected},
-  _ sequence: S,
-  resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
-  _ stackTrace: SourceLocStack,
-  collectMoreInfo: (()->String)? = nil
-) {
-  checkSequence(
-    expected, sequence, { $0 == $1 },
-    resiliencyChecks: resiliencyChecks,
-    stackTrace.withCurrentLoc(),
-    collectMoreInfo: collectMoreInfo)
-}
-
-public func checkSequence<
-  ${genericParam}, S : SequenceType
-  where S.Generator.Element == ${Element}, ${Element} : Equatable
->(
-  expected: ${Expected},
-  _ sequence: S,
-  resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
-  file: String = __FILE__, line: UWord = __LINE__,
-  collectMoreInfo: (()->String)? = nil
-) {
-  checkSequence(
-    expected, sequence, { $0 == $1 },
-    resiliencyChecks: resiliencyChecks,
-    SourceLocStack().with(SourceLoc(file, line)),
-    collectMoreInfo: collectMoreInfo)
+    expected, sequence, ${trace},
+    resiliencyChecks: resiliencyChecks, showFrame: false
+  ) { $0 == $1 }
 }
 
 %for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
@@ -1756,15 +1568,11 @@ public func check${traversal}Collection<
   resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
   sameValue: (${Element}, ${Element}) -> Bool
 ) {
-  // FIXME: temporary shim
-  let messageShim = message()
   // A `CollectionType` is a multi-pass `SequenceType`.
   for _ in 0..<3 {
     checkSequence(
-      expected, collection, sameValue,
-      resiliencyChecks: resiliencyChecks,
-      stackTrace.withCurrentLoc(),
-      collectMoreInfo: { messageShim })
+      expected, collection, ${trace},
+      resiliencyChecks: resiliencyChecks, sameValue: sameValue)
   }
 
   let expectedArray = Array(expected)
@@ -1840,21 +1648,15 @@ public func check${traversal}Collection<
       }
 
       expectEqualSequence(
-        allIndices, allIndices2,
-        stackTrace: stackTrace.withCurrentLoc()) {
-        "iteration should not invalidate indices"
-      }
+        allIndices, allIndices2, "iteration should not invalidate indices",
+        stackTrace: ${stackTrace})
 
       expectEqualSequence(
-        expectedArray,
-        allIndices.map { collection[$0] },
-        sameValue,
-        stackTrace: stackTrace.withCurrentLoc())
+        expectedArray, allIndices.map { collection[$0] },
+        stackTrace: ${stackTrace}, sameValue: sameValue)
       expectEqualSequence(
-        expectedArray,
-        allIndices2.map { collection[$0] },
-        sameValue,
-        stackTrace: stackTrace.withCurrentLoc())
+        expectedArray, allIndices2.map { collection[$0] },
+        stackTrace: ${stackTrace}, sameValue: sameValue)
     }
   }
 
@@ -2002,15 +1804,8 @@ public func expectEqualSequence<
   Actual: SequenceType
   where Expected.Generator.Element == Actual.Generator.Element,
      Expected.Generator.Element : Equatable
->(
-    expected: Expected, _ actual: Actual,
-    stackTrace: SourceLocStack? = nil,
-    file: String = __FILE__, line: UWord = __LINE__,
-    collectMoreInfo: (()->String)? = nil
-) {
-  expectEqualSequence(
-    expected, actual, { $0 == $1 }, stackTrace: stackTrace,
-    file: file, line: line, collectMoreInfo: collectMoreInfo)
+>(expected: Expected, _ actual: Actual, ${TRACE}) {
+  expectEqualSequence(expected, actual, ${trace}) { $0 == $1 }
 }
 
 public func expectEqualSequence<
@@ -2020,38 +1815,22 @@ public func expectEqualSequence<
   U : Equatable
   where Expected.Generator.Element == Actual.Generator.Element,
      Expected.Generator.Element == (T, U)
->(
-    expected: Expected, _ actual: Actual,
-    stackTrace: SourceLocStack? = nil,
-    file: String = __FILE__, line: UWord = __LINE__,
-    collectMoreInfo: (()->String)? = nil
-) {
+>(expected: Expected, _ actual: Actual, ${TRACE}) {
   expectEqualSequence(
-    expected, actual,
-    { (lhs: (T, U), rhs: (T, U)) in lhs.0 == rhs.0 && lhs.1 == rhs.1 },
-    stackTrace: stackTrace, file: file, line: line,
-    collectMoreInfo: collectMoreInfo)
+    expected, actual, ${trace}) { $0.0 == $1.0 && $0.1 == $1.1 }
 }
 
 public func expectEqualSequence<
   Expected: SequenceType,
   Actual: SequenceType
   where Expected.Generator.Element == Actual.Generator.Element
->(
-    expected: Expected, _ actual: Actual,
-    _ sameValue: (Expected.Generator.Element, Expected.Generator.Element)->Bool,
-    stackTrace: SourceLocStack? = nil,
-    file: String = __FILE__, line: UWord = __LINE__,
-    collectMoreInfo: (()->String)? = nil
-) {
+>(expected: Expected, _ actual: Actual, ${TRACE},
+  sameValue: (Expected.Generator.Element, Expected.Generator.Element)->Bool) {
+  
   if !expected.elementsEqual(actual, isEquivalent: sameValue) {
-    _anyExpectFailed = true
-    print("check failed at \(file), line \(line)")
-    _printStackTrace(stackTrace)
-    print("expected elements: \"\(expected)\"")
-    print("actual: \"\(actual)\" (of type \(actual.dynamicType))")
-    if collectMoreInfo != nil { print(collectMoreInfo!()) }
-    print("")
+    expectationFailure("expected elements: \"\(expected)\"\n"
+      + "actual: \"\(actual)\" (of type \(actual.dynamicType))",
+      trace: ${trace})
   }
 }
 
@@ -2060,20 +1839,16 @@ public func expectEqualsUnordered<
     Actual : SequenceType
     where Expected.Generator.Element == Actual.Generator.Element
 >(
-    expected: Expected, _ actual: Actual,
-    _ compare: (Expected.Generator.Element, Expected.Generator.Element)
-      -> ExpectedComparisonResult,
-    stackTrace: SourceLocStack? = nil,
-    file: String = __FILE__, line: UWord = __LINE__,
-    collectMoreInfo: (()->String)? = nil
+  expected: Expected, _ actual: Actual, ${TRACE},
+  compare: (Expected.Generator.Element, Expected.Generator.Element)
+    -> ExpectedComparisonResult
 ) {
   let x: [Expected.Generator.Element] =
     expected.sort(compose(compare, { $0.isLT() }))
   let y: [Actual.Generator.Element] =
     actual.sort(compose(compare, { $0.isLT() }))
   expectEqualSequence(
-    x, y, compose(compare, { $0.isEQ() }), stackTrace: stackTrace,
-    file: file, line: line, collectMoreInfo: collectMoreInfo)
+    x, y, ${trace}, sameValue: compose(compare, { $0.isEQ() }))
 }
 
 public func expectEqualsUnordered<
@@ -2083,40 +1858,19 @@ public func expectEqualsUnordered<
   Expected.Generator.Element == Actual.Generator.Element,
   Expected.Generator.Element : Comparable
 >(
-  expected: Expected, _ actual: Actual,
-  stackTrace: SourceLocStack? = nil,
-  file: String = __FILE__, line: UWord = __LINE__,
-  collectMoreInfo: (()->String)? = nil
+  expected: Expected, _ actual: Actual, ${TRACE}
 ) {
-  func compare(
-    lhs: Expected.Generator.Element,
-    rhs: Expected.Generator.Element
-  ) -> ExpectedComparisonResult {
-    if lhs < rhs {
-      return .LT
-    }
-    if lhs == rhs {
-      return .EQ
-    }
-    return .GT
+  expectEqualsUnordered(expected, actual, ${trace}) {
+    $0 < $1 ? .LT : $0 == $1 ? .EQ : .GT
   }
-  expectEqualsUnordered(
-    expected, actual, compare,
-    stackTrace: stackTrace.map { $0.withCurrentLoc() },
-    file: file, line: line, collectMoreInfo: collectMoreInfo)
 }
 
 public func expectEqualsUnordered<T : Comparable>(
-  expected: [T], _ actual: [T],
-  stackTrace: SourceLocStack? = nil,
-  file: String = __FILE__, line: UWord = __LINE__,
-  collectMoreInfo: (()->String)? = nil
+  expected: [T], _ actual: [T], ${TRACE}
 ) {
   let x = expected.sort()
   let y = actual.sort()
-  expectEqualSequence(
-    x, y, { $0 == $1 }, stackTrace: stackTrace,
-    file: file, line: line, collectMoreInfo: collectMoreInfo)
+  expectEqualSequence(x, y, ${trace})
 }
 
 /// A nominal type that is equivalent to a tuple of two elements.
@@ -2142,27 +1896,6 @@ func < <T>(lhs: Pair<T>, rhs: Pair<T>) -> Bool {
     [ rhs.first, rhs.second ])
 }
 
-public func expectEqualsUnordered<T : Comparable>(
-  expected: [(T, T)], _ actual: [(T, T)],
-  stackTrace: SourceLocStack? = nil,
-  file: String = __FILE__, line: UWord = __LINE__,
-  collectMoreInfo: (()->String)? = nil
-) {
-  let x = expected.sort { Pair($0.0, $0.1) < Pair($1.0, $1.1) }
-  let y = actual.sort { Pair($0.0, $0.1) < Pair($1.0, $1.1) }
-  expectEqualSequence(
-    x, y, { Pair($0.0, $0.1) == Pair($1.0, $1.1) }, stackTrace: stackTrace,
-    file: file, line: line, collectMoreInfo: collectMoreInfo)
-}
-
-/*
-
-This code crashes the compiler.  If we could use this code, we wouldn't need
-the explicit overload for [(T, T)].
-
-rdar://problem/19792730
-rdar://problem/19792768
-
 public func expectEqualsUnordered<
     Expected : SequenceType,
     Actual : SequenceType,
@@ -2171,26 +1904,21 @@ public func expectEqualsUnordered<
       Expected.Generator.Element == Actual.Generator.Element,
       Expected.Generator.Element == (T, T)
 >(
-    expected: Expected, _ actual: Actual,
-    stackTrace: SourceLocStack? = nil,
-    file: String = __FILE__, line: UWord = __LINE__,
-    collectMoreInfo: (()->String)? = nil
+    expected: Expected, _ actual: Actual, ${TRACE}
 ) {
   func comparePairLess(lhs: (T, T), rhs: (T, T)) -> Bool {
-    return lexicographicalCompare([ lhs.0, lhs.1 ], [ rhs.0, rhs.1 ])
+    return [ lhs.0, lhs.1 ].lexicographicalCompare([ rhs.0, rhs.1 ])
   }
 
-  let x: [(T, T)] = sorted(Array(expected), comparePairLess)
-  let y: [(T, T)] = sorted(Array(actual), comparePairLess)
+  let x: [(T, T)] = Array(expected).sort(comparePairLess)
+  let y: [(T, T)] = Array(actual).sort(comparePairLess)
 
   func comparePairEquals(lhs: (T, T), rhs: (T, T)) -> Bool {
     return lhs.0 == rhs.0 && lhs.1 == rhs.1
   }
 
-  expectEqualSequence(
-    x, y, comparePairEquals, stackTrace: stackTrace,
-    file: file, line: line, collectMoreInfo: collectMoreInfo)
-}*/
+  expectEqualSequence(x, y, ${trace}, sameValue: comparePairEquals)
+}
 
 public func expectEqualFunctionsForDomain<ArgumentType, Result : Equatable>(
     arguments: [ArgumentType], _ function1: ArgumentType -> Result,
@@ -2332,7 +2060,7 @@ public struct MinimalGenerator<T> : GeneratorType {
   public func next() -> T? {
     if _sharedState.i == _sharedState.data.count {
       if isConsumed {
-        expectUnreachable() { "next() was called on a consumed generator" }
+        expectUnreachable("next() was called on a consumed generator")
       }
       ++_privateState.returnedNilCounter
       return nil
@@ -2647,9 +2375,9 @@ public struct MinimalRandomAccessIndex : RandomAccessIndexType {
   public func advancedBy(n: Int) -> MinimalRandomAccessIndex {
     let newPosition = position + n
     expectLE(startIndex, newPosition)
-    expectGE(endIndex, newPosition) { "position=\(self.position) startIndex=\(self.startIndex)" }/*{
-      "position=\(self.position) n=\(n) startIndex=\(self.startIndex) endIndex=\(self.endIndex)"
-    }*/
+    expectGE(
+      endIndex, newPosition,
+      "position=\(self.position) startIndex=\(self.startIndex)")
     return MinimalRandomAccessIndex(
       position: newPosition, startIndex: startIndex, endIndex: endIndex)
   }

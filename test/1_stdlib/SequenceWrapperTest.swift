@@ -30,22 +30,22 @@ func expectWrapperDispatch<R1, R2>(
   @autoclosure directOperation: ()->R1,
   @autoclosure _ indirectOperation: ()->R2,
   _ counters: TypeIndexed<Int>,
-  stackTrace: SourceLocStack? = nil,
-  file: String = __FILE__, line: UWord = __LINE__,
-  collectMoreInfo: (()->String)? = nil
+  //===--- TRACE boilerplate ----------------------------------------------===//
+  @autoclosure _ message: ()->String = "",
+  showFrame: Bool = true,
+  stackTrace: SourceLocStack = SourceLocStack(),  
+  file: String = __FILE__, line: UWord = __LINE__
 ) {
   counters.reset()
   _ = directOperation()
   expectEqual(
-    [base.selfType: 1], counters, stackTrace: stackTrace,
-    file: file, line: line, collectMoreInfo: collectMoreInfo
-  )
+    [base.selfType: 1], counters,
+    message(), stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
   counters.reset()
   _ = indirectOperation()
   expectEqual(
-    [base.selfType: 1, indirect.selfType: 1], counters, stackTrace: stackTrace,
-    file: file, line: line, collectMoreInfo: collectMoreInfo
-  )
+    [base.selfType: 1, indirect.selfType: 1], counters,
+    message(), stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
 }
 
 sequenceWrapperTests.test("Dispatch/generate") {

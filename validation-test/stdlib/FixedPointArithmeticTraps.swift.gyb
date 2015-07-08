@@ -16,24 +16,28 @@ import StdlibUnittest
 
 func expectOverflow<T>(
   res: (T, overflow: Bool),
-  file: String = __FILE__, line: UWord = __LINE__
+  //===--- TRACE boilerplate ----------------------------------------------===//
+  @autoclosure _ message: ()->String = "",
+    showFrame: Bool = true,
+    stackTrace: SourceLocStack = SourceLocStack(),  
+    file: String = __FILE__, line: UWord = __LINE__
 ) {
   expectTrue(
-    res.overflow,
-    stackTrace: SourceLoc(file, line).withCurrentLoc()) {
-    "expected overflow"
-  }
+    res.overflow, "expected overflow",
+    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
 }
 
 func expectNoOverflow<T>(
   res: (T, overflow: Bool),
-  file: String = __FILE__, line: UWord = __LINE__
+  //===--- TRACE boilerplate ----------------------------------------------===//
+  @autoclosure _ message: ()->String = "",
+    showFrame: Bool = true,
+    stackTrace: SourceLocStack = SourceLocStack(),  
+    file: String = __FILE__, line: UWord = __LINE__
 ) {
   expectFalse(
-    res.overflow,
-    stackTrace: SourceLoc(file, line).withCurrentLoc()) {
-    "expected no overflow"
-  }
+    res.overflow, "expected no overflow",
+    stackTrace: stackTrace.pushIf(showFrame, file: file, line: line))
 }
 
 %{
@@ -288,52 +292,52 @@ FixedPointTruncationTraps.test("SignedToSignedTruncation/dest=sign-overflow") {
   // Test that we check if we overflow on the sign bit.
   var x = getInt16(128)
   expectCrashLater()
-  Int8(x)
+  _ = Int8(x)
 }
 
 FixedPointTruncationTraps.test("SignedToUnsignedTruncation/src=-1") {
   var x = getInt32(-1)
   expectCrashLater()
-  UInt8(x)
+  _ = UInt8(x)
 }
 
 FixedPointTruncationTraps.test("SignedToUnignedSameSize/src=min") {
   var x = getInt8(-128)
   expectCrashLater()
-  UInt16(x)
+  _ = UInt16(x)
 }
 
 
 FixedPointTruncationTraps.test("SignedToUnsignedTruncation/src=max") {
   var x = getInt32(0xFFFFFFF)
   expectCrashLater()
-  UInt16(x)
+  _ = UInt16(x)
 }
 
 FixedPointTruncationTraps.test("UnsignedToSignedTruncation/dest=sign-overflow") {
   // Test that we check if we overflow on the sign bit.
   var x = getUInt16(128)
   expectCrashLater()
-  Int8(x)
+  _ = Int8(x)
 }
 
 FixedPointTruncationTraps.test("UnsignedToUnsignedTruncation/src=max") {
   var x = getUInt32(0xFFFFFFFF)
   expectCrashLater()
-  UInt16(x)
+  _ = UInt16(x)
 }
 
 // Same size conversions.
 FixedPointTruncationTraps.test("SignedToUnsignedSameSize") {
   var x = getInt8(-2)
   expectCrashLater()
-  UInt8(x)
+  _ = UInt8(x)
 }
 
 FixedPointTruncationTraps.test("UnsignedToSignedSameSize") {
   var x = getUInt8(128)
   expectCrashLater()
-  Int8(x)
+  _ = Int8(x)
 }
 
 runAllTests()

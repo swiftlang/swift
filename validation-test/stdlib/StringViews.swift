@@ -93,7 +93,7 @@ tests.test("index-mapping/character-to-utf8") {
       i in (0..<3).map {
         winter.utf8[advance(i.samePositionIn(winter.utf8), $0)]
       }
-    }, ==)
+    }, sameValue: ==)
 
   expectEqual(winter.utf8.endIndex, winter.endIndex.samePositionIn(winter.utf8))
   
@@ -130,7 +130,7 @@ tests.test("index-mapping/unicode-scalar-to-utf8") {
       i in (0..<3).map {
         winter.utf8[advance(i.samePositionIn(winter.utf8), $0)]
       }
-    }, ==)
+    }, sameValue: ==)
 
   expectEqual(
     winter.utf8.endIndex,
@@ -173,7 +173,7 @@ tests.test("index-mapping/utf16-to-utf8") {
       i16 in i16.samePositionIn(winter.utf8).map {
         i8 in (0..<3).map { winter.utf8[advance(i8, $0)] }
       } ?? []
-    }, ==)
+    }, sameValue: ==)
 
   expectNotEmpty(winter.utf16.endIndex.samePositionIn(winter.utf8))
   expectEqual(
@@ -212,7 +212,7 @@ tests.test("index-mapping/utf8-to-unicode-scalar") {
       i in i.samePositionIn(winter.unicodeScalars).map {
         winter.unicodeScalars[$0]
       }
-    }, ==
+    }, sameValue: ==
   )
 
   expectNotEmpty(winter.utf8.endIndex.samePositionIn(winter.unicodeScalars))
@@ -226,7 +226,7 @@ tests.test("index-mapping/utf8-to-unicode-scalar") {
       i in i.samePositionIn(summer.unicodeScalars).map {
         summer.unicodeScalars[$0]
       }
-    }, ==
+    }, sameValue: ==
   )
 
   expectNotEmpty(summer.utf8.endIndex.samePositionIn(summer.unicodeScalars))
@@ -252,7 +252,7 @@ tests.test("index-mapping/utf16-to-unicode-scalar") {
       i in i.samePositionIn(winter.unicodeScalars).map {
         winter.unicodeScalars[$0]
       }
-    }, ==
+    }, sameValue: ==
   )
 
   expectNotEmpty(winter.utf16.endIndex.samePositionIn(winter.unicodeScalars))
@@ -266,7 +266,7 @@ tests.test("index-mapping/utf16-to-unicode-scalar") {
       i in i.samePositionIn(summer.unicodeScalars).map {
         summer.unicodeScalars[$0]
       }
-    }, ==
+    }, sameValue: ==
   )
 
   expectNotEmpty(summer.utf16.endIndex.samePositionIn(summer.unicodeScalars))
@@ -291,7 +291,8 @@ tests.test("index-mapping/character-to-utf16") {
     
     winter.characters.indices.map {
       winter.utf16[$0.samePositionIn(winter.utf16)]
-    }, ==)
+    },
+    sameValue: ==)
 
   expectEqual(winter.utf16.endIndex, winter.endIndex.samePositionIn(winter.utf16))
   
@@ -359,7 +360,7 @@ tests.test("index-mapping/utf8-to-utf16") {
       $0.samePositionIn(winter.utf16).map {
         winter.utf16[$0]
       }
-    }, ==)
+    }, sameValue: ==)
 
   expectNotEmpty(winter.utf8.endIndex.samePositionIn(winter.utf16))
   expectEqual(
@@ -429,8 +430,7 @@ tests.test("index-mapping/utf8-to-unicode-scalar") {
       i in i.samePositionIn(winter.unicodeScalars).map {
         winter.unicodeScalars[$0]
       }
-    }, ==
-  )
+    }, sameValue: ==)
 
   expectNotEmpty(winter.utf8.endIndex.samePositionIn(winter.unicodeScalars))
   expectEqual(
@@ -443,8 +443,7 @@ tests.test("index-mapping/utf8-to-unicode-scalar") {
       i in i.samePositionIn(summer.unicodeScalars).map {
         summer.unicodeScalars[$0]
       }
-    }, ==
-  )
+    }, sameValue: ==)
 
   expectNotEmpty(summer.utf8.endIndex.samePositionIn(summer.unicodeScalars))
   expectEqual(
@@ -470,8 +469,7 @@ tests.test("index-mapping/utf16-to-unicode-scalar") {
       i in i.samePositionIn(winter.unicodeScalars).map {
         winter.unicodeScalars[$0]
       }
-    }, ==
-  )
+    }, sameValue: ==)
 
   expectNotEmpty(winter.utf16.endIndex.samePositionIn(winter.unicodeScalars))
   expectEqual(
@@ -484,8 +482,7 @@ tests.test("index-mapping/utf16-to-unicode-scalar") {
       i in i.samePositionIn(summer.unicodeScalars).map {
         summer.unicodeScalars[$0]
       }
-    }, ==
-  )
+    }, sameValue: ==)
 
   expectNotEmpty(summer.utf16.endIndex.samePositionIn(summer.unicodeScalars))
   expectEqual(
@@ -507,9 +504,7 @@ tests.test("index-mapping/unicode-scalar-to-character") {
       i in i.samePositionIn(winter).map {
         winter[$0]
       }
-    },
-    ==
-  )
+    }, sameValue: ==)
 
   expectEqual(winter.endIndex, winter.unicodeScalars.endIndex.samePositionIn(winter)!)
   
@@ -544,8 +539,7 @@ tests.test("index-mapping/utf8-to-character") {
       (i:String.UTF8Index)->Character? in i.samePositionIn(winter).map {
         winter[$0]
       }
-    }, ==
-  )
+    }, sameValue: ==)
 
   expectNotEmpty(winter.utf8.endIndex.samePositionIn(winter))
   expectEqual(
@@ -575,8 +569,7 @@ tests.test("index-mapping/utf16-to-character") {
       i in i.samePositionIn(winter).map {
         winter[$0]
       }
-    }, ==
-  )
+    }, sameValue: ==)
 
   expectNotEmpty(winter.utf16.endIndex.samePositionIn(winter))
   expectEqual(

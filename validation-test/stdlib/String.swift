@@ -1130,9 +1130,8 @@ StringTests.test("String.append(_: Character)") {
         s.append(input)
         expectEqualSequence(
           Array(base.characters) + [ input ],
-          Array(s.characters)) {
-          "baseIdx=\(baseIdx) inputIdx=\(inputIdx)"
-        }
+          Array(s.characters),
+          "baseIdx=\(baseIdx) inputIdx=\(inputIdx)")
       }
     }
   }

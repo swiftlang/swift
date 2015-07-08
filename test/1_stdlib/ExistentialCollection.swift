@@ -73,7 +73,7 @@ tests.test("AnyGenerator.init()/traps") {
     expectCrashLater()
   }
 
-  AnyGenerator<OpaqueValue<Int>>()
+  _ = AnyGenerator<OpaqueValue<Int>>()
 }
 
 
@@ -134,11 +134,7 @@ tests.test("AnySequence.init(SequenceType)") {
     let base = MinimalSequence<OpaqueValue<Int>>([])
     var s = AnySequence(base)
     expectType(AnySequence<OpaqueValue<Int>>.self, &s)
-    checkSequence(
-      [],
-      s,
-      { $0.value == $1.value },
-      resiliencyChecks: .none)
+    checkSequence([], s, resiliencyChecks: .none) { $0.value == $1.value }
   }
   if true {
     let intData = [ 1, 2, 3, 5, 8, 13, 21 ]
@@ -146,11 +142,7 @@ tests.test("AnySequence.init(SequenceType)") {
     let base = MinimalSequence(data)
     var s = AnySequence(base)
     expectType(AnySequence<OpaqueValue<Int>>.self, &s)
-    checkSequence(
-      data,
-      s,
-      { $0.value == $1.value },
-      resiliencyChecks: .none)
+    checkSequence(data, s, resiliencyChecks: .none) { $0.value == $1.value }
   }
 }
 
@@ -160,11 +152,7 @@ tests.test("AnySequence.init(() -> Generator)") {
       return MinimalGenerator<OpaqueValue<Int>>([])
     }
     expectType(AnySequence<OpaqueValue<Int>>.self, &s)
-    checkSequence(
-      [],
-      s,
-      { $0.value == $1.value },
-      resiliencyChecks: .none)
+    checkSequence([], s, resiliencyChecks: .none) { $0.value == $1.value }
   }
   if true {
     let intData = [ 1, 2, 3, 5, 8, 13, 21 ]
@@ -173,11 +161,7 @@ tests.test("AnySequence.init(() -> Generator)") {
       return MinimalGenerator(data)
     }
     expectType(AnySequence<OpaqueValue<Int>>.self, &s)
-    checkSequence(
-      data,
-      s,
-      { $0.value == $1.value },
-      resiliencyChecks: .none)
+    checkSequence(data, s, resiliencyChecks: .none) { $0.value == $1.value }
   }
 }
 
