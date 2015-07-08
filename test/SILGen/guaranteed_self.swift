@@ -452,8 +452,8 @@ public protocol SequenceType : SequenceDefaultsType {
 
 
 extension FakeArray : SequenceType {
-  typealias Element = FakeElement
-  typealias Generator = FakeGenerator
+  public typealias Element = FakeElement
+  public typealias Generator = FakeGenerator
 
   func _containsElement(_: Element) {}
 }

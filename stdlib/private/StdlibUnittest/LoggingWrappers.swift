@@ -42,7 +42,7 @@ public class GeneratorLog {
 public struct LoggingGenerator<Base: GeneratorType>
   : GeneratorType, LoggingType {
 
-  typealias Log = GeneratorLog
+  public typealias Log = GeneratorLog
   
   public init(_ base: Base) {
     self.base = base
@@ -87,8 +87,8 @@ public struct LoggingRangeReplaceableCollection<
   Base: RangeReplaceableCollectionType
 > : RangeReplaceableCollectionType, LoggingType {
 
-  typealias Index = Base.Index
-  typealias Log = RangeReplaceableCollectionLog
+  public typealias Index = Base.Index
+  public typealias Log = RangeReplaceableCollectionLog
 
   public var base: Base
 
@@ -219,7 +219,7 @@ public class SequenceLog {
 
 public struct LoggingSequence<Base: SequenceType> : SequenceType, LoggingType {
 
-  typealias Log = SequenceLog
+  public typealias Log = SequenceLog
   
   public init(_ base: Base) {
     self.base = base
@@ -302,7 +302,7 @@ public class CollectionLog : SequenceLog {
 public struct LoggingCollection<Base : CollectionType>
   : CollectionType, LoggingType {
 
-  typealias Log = CollectionLog
+  public typealias Log = CollectionLog
 
   public init(_ base: Base) {
     self.base = base

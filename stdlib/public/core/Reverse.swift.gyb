@@ -58,7 +58,7 @@ public struct ${Index}<Base : ${IndexProtocol}> : ${IndexProtocol} {
 
   /// A type that can represent the number of steps between pairs of
   /// `${Index}` values where one value is reachable from the other.
-  typealias Distance = Base.Distance
+  public typealias Distance = Base.Distance
 
 %   if traversal == 'RandomAccess':
   /// Return the minimum number of applications of `successor` or

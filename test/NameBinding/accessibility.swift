@@ -133,3 +133,18 @@ let boxUnboxInt: PrivateBox<Int>.ValueType = 0 // expected-error {{constant must
 let boxFloat: PrivateBox<Int>.AlwaysFloat = 0 // expected-error {{constant must be declared private because its type uses a private type}}
 #endif
 
+
+#if !ACCESS_DISABLED
+struct ConformerByTypeAlias : TypeProto {
+  private typealias TheType = Int // expected-error {{type alias 'TheType' must be declared internal because it matches a requirement in internal protocol 'TypeProto'}} {{3-10=internal}}
+}
+
+struct ConformerByLocalType : TypeProto {
+  private struct TheType {} // expected-error {{struct 'TheType' must be declared internal because it matches a requirement in internal protocol 'TypeProto'}} {{3-10=internal}}
+}
+
+private struct PrivateConformerByLocalType : TypeProto {
+  private struct TheType {} // okay
+}
+#endif
+

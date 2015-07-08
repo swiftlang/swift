@@ -246,7 +246,7 @@ public struct _prext_MapGenerator<
 public struct _prext_MapSequence<Base : SequenceType, T>
   : _prext_LazySequenceType, _SequenceWrapperType {
 
-  typealias Elements = _prext_MapSequence
+  public typealias Elements = _prext_MapSequence
   
   /// Return a *generator* over the elements of this *sequence*.
   ///
@@ -356,8 +356,8 @@ extension BidirectionalIndexType where Self : _prext_ReverseIndexType {
 
 public struct _prext_ReverseIndex<Base_: BidirectionalIndexType>
 : BidirectionalIndexType, _prext_ReverseIndexType {
-  typealias Base = Base_
-  typealias Distance = Base_.Distance
+  public typealias Base = Base_
+  public typealias Distance = Base_.Distance
   
   internal init(_ base: Base) { self._base = base }
   internal let _base: Base
@@ -370,7 +370,7 @@ public func == <I> (lhs: _prext_ReverseIndex<I>, rhs: _prext_ReverseIndex<I>) ->
 public struct _prext_ReverseRandomAccessIndex<Base: RandomAccessIndexType>
   : RandomAccessIndexType, _prext_ReverseIndexType {
 
-  typealias Distance = Base.Distance
+  public typealias Distance = Base.Distance
   
   internal init(_ base: Base) { self._base = base }
   internal let _base: Base
@@ -426,8 +426,8 @@ public struct _prext_ReverseCollection<
   Base_ : CollectionType where Base_.Index : BidirectionalIndexType
 > : _ReverseCollectionType {
   
-  typealias Index = _prext_ReverseIndex<Base_.Index>
-  typealias Generator = IndexingGenerator<_prext_ReverseCollection>
+  public typealias Index = _prext_ReverseIndex<Base_.Index>
+  public typealias Generator = IndexingGenerator<_prext_ReverseCollection>
   
   public init(_ base: Base_) {
     self._base = base

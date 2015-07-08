@@ -349,7 +349,7 @@ extension ${Self} : RandomAccessIndexType {
   // HACK: Disable indexing and slicing Ranges of IntegerType types
   // outside of a generic context.  See the implementation of Range
   // for details of how this works.
-  typealias _DisabledRangeIndex = ${Self}
+  public typealias _DisabledRangeIndex = ${Self}
 
   /// Returns the next consecutive value after `self`.
   ///

@@ -2241,7 +2241,7 @@ public protocol _MinimalIndexType {}
 
 public struct ${Index} : ForwardIndexType {
 % if Distance != '':
-  typealias Distance = ${Distance}
+  public typealias Distance = ${Distance}
 % end
 
   public init(
@@ -2861,8 +2861,8 @@ public struct DefaultedSequence<Element> : StrictSequenceType {
 public struct DefaultedForwardCollection<Element>
   : StrictForwardCollectionType {
 
-  typealias Generator = MinimalGenerator<Element>
-  typealias Index = MinimalForwardIndex
+  public typealias Generator = MinimalGenerator<Element>
+  public typealias Index = MinimalForwardIndex
 
   public let base: MinimalForwardCollection<Element>
 

@@ -812,6 +812,14 @@ ERROR(witness_not_accessible_type,sema_tcd,none,
       "|subscript%select{| setter}2}0 must be as accessible as its enclosing "
       "type because it matches a requirement in protocol %4",
       (RequirementKind, DeclName, bool, Accessibility, DeclName))
+ERROR(type_witness_not_accessible_proto,sema_tcd,none,
+      "%0 %1 must be declared %select{PRIVATE|internal|public}2 because it "
+      "matches a requirement in %select{PRIVATE|internal|public}2 protocol %3",
+      (DescriptiveDeclKind, DeclName, Accessibility, DeclName))
+ERROR(type_witness_not_accessible_type,sema_tcd,none,
+      "%0 %1 must be as accessible as its enclosing type because it "
+      "matches a requirement in protocol %3",
+      (DescriptiveDeclKind, DeclName, Accessibility, DeclName))
 
 ERROR(protocol_refine_access,sema_tcd,none,
       "%select{protocol must be declared %select{private|internal|PUBLIC}2 "

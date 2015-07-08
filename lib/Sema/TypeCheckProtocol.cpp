@@ -1738,8 +1738,32 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
     return;
   }
 
-  // If there was no type declaration, synthesize one.
-  if (!typeDecl) {
+  if (typeDecl) {
+    // Check access.
+    Accessibility requiredAccess =
+      std::min(Proto->getFormalAccess(),
+               Adoptee->getAnyNominal()->getFormalAccess());
+
+    if (typeDecl->getFormalAccess() < requiredAccess) {
+      diagnoseOrDefer(assocType, false,
+        [typeDecl, requiredAccess, assocType](
+          TypeChecker &tc, NormalProtocolConformance *conformance) {
+        auto proto = conformance->getProtocol();
+        bool protoForcesAccess = (requiredAccess == proto->getFormalAccess());
+        auto diagKind = protoForcesAccess
+                          ? diag::type_witness_not_accessible_proto
+                          : diag::type_witness_not_accessible_type;
+        auto diag = tc.diagnose(typeDecl, diagKind,
+                                typeDecl->getDescriptiveKind(),
+                                typeDecl->getFullName(),
+                                requiredAccess,
+                                proto->getName());
+        fixItAccessibility(diag, typeDecl, requiredAccess);
+      });
+    }
+  } else {
+    // If there was no type declaration, synthesize one.
+
     // If we're just setting an error, double-check that nobody has
     // introduced a type declaration since we deduced one. This can
     // happen when type-checking a different conformance deduces a
