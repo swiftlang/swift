@@ -448,11 +448,9 @@ public:
       CounterExpr &ThenCounter = assignCounter(IS->getThenStmt());
       assignCounter(IS->getElseStmt(),
                     CounterExpr::Sub(getCurrentCounter(), ThenCounter));
-    } else if (auto *US = dyn_cast<GuardStmt>(S)) {
-      assignCounter(US, CounterExpr::Zero());
-      CounterExpr &BodyCounter = assignCounter(US->getBody());
-      assignCounter(US->getBody(),
-                    CounterExpr::Sub(getCurrentCounter(), BodyCounter));
+    } else if (auto *GS = dyn_cast<GuardStmt>(S)) {
+      assignCounter(GS, CounterExpr::Zero());
+      CounterExpr &BodyCounter = assignCounter(GS->getBody());
 
     } else if (auto *WS = dyn_cast<WhileStmt>(S)) {
       assignCounter(WS, CounterExpr::Zero());

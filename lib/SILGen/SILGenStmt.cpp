@@ -407,6 +407,7 @@ void StmtEmitter::visitGuardStmt(GuardStmt *S) {
     // Note that we don't push break/continue locations since they aren't valid
     // in this statement.
     SavedInsertionPoint savedIP(SGF, bodyBB.getBlock());
+    SGF.emitProfilerIncrement(S->getBody());
     SGF.emitStmt(S->getBody());
 
     // The body block must end in a noreturn call, return, break etc.  It
