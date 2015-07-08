@@ -280,10 +280,26 @@ void swift::changeBranchTarget(TermInst *T, unsigned EdgeIdx,
     return;
   }
 
+  case ValueKind::TryApplyInst: {
+    auto *TAI = dyn_cast<TryApplyInst>(T);
+    assert((EdgeIdx == 0 || EdgeIdx == 1) && "Invalid edge index");
+    auto *NormalBB = !EdgeIdx ? NewDest : TAI->getNormalBB();
+    auto *ErrorBB = EdgeIdx ? NewDest : TAI->getErrorBB();
+    SmallVector<SILValue, 4> Arguments;
+    for (auto &Op : TAI->getArgumentOperands())
+      Arguments.push_back(Op.get());
+
+    B.createTryApply(TAI->getLoc(), TAI->getCallee(),
+                     TAI->getSubstCalleeSILType(), TAI->getSubstitutions(),
+                     Arguments, NormalBB, ErrorBB);
+
+    TAI->eraseFromParent();
+    return;
+  }
+
   case ValueKind::AutoreleaseReturnInst:
   case ValueKind::ReturnInst:
   case ValueKind::ThrowInst:
-  case ValueKind::TryApplyInst:
   case ValueKind::UnreachableInst:
     llvm_unreachable("Branch target cannot be changed for this terminator instruction!");
   }
@@ -513,6 +529,15 @@ static void getEdgeArgs(TermInst *T, unsigned EdgeIdx, SILBasicBlock *NewEdgeBB,
   }
   if (auto CBI = dyn_cast<CheckedCastAddrBranchInst>(T)) {
     auto SuccBB = EdgeIdx == 0 ? CBI->getSuccessBB() : CBI->getFailureBB();
+    if (!SuccBB->getNumBBArg())
+      return;
+    Args.push_back(
+        SILValue(NewEdgeBB->createBBArg(SuccBB->getBBArg(0)->getType()), 0));
+    return;
+  }
+
+  if (auto *TAI = dyn_cast<TryApplyInst>(T)) {
+    auto *SuccBB = EdgeIdx == 0 ? TAI->getNormalBB() : TAI->getErrorBB();
     if (!SuccBB->getNumBBArg())
       return;
     Args.push_back(
