@@ -639,45 +639,8 @@ public:
   void visitMarkFunctionEscapeInst(MarkFunctionEscapeInst *i) {
     llvm_unreachable("mark_function_escape is not valid in canonical SIL");
   }
-  void visitDebugValueInst(DebugValueInst *i) {
-    if (!IGM.DebugInfo)
-      return;
-
-    VarDecl *Decl = i->getDecl();
-    if (!Decl || ArgEmitted.lookup(Decl))
-      return;
-
-    auto SILVal = i->getOperand();
-    if (isa<SILUndef>(SILVal))
-      return;
-
-    StringRef Name = Decl->getNameStr();
-    Explosion e = getLoweredExplosion(SILVal);
-    DebugTypeInfo DbgTy(Decl, Decl->getType(), getTypeInfo(SILVal.getType()));
-
-    // Put the value in memory if necessary.
-    // Emit an -O0 shadow copy for the explosion.
-    llvm::SmallVector<llvm::Value *, 8> Copy;
-    emitShadowCopy(e.claimAll(), Name, Copy);
-    emitDebugVariableDeclaration(Copy, DbgTy,
-                                 i->getDebugScope(), Name);
-  }
-  void visitDebugValueAddrInst(DebugValueAddrInst *i) {
-    if (!IGM.DebugInfo)
-      return;
-    VarDecl *Decl = i->getDecl();
-    if (!Decl || ArgEmitted.lookup(Decl))
-      return;
-
-    auto SILVal = i->getOperand();
-    if (isa<SILUndef>(SILVal))
-      return;
-
-    StringRef Name = Decl->getName().str();
-    auto Val = getLoweredAddress(SILVal).getAddress();
-    DebugTypeInfo DbgTy(Decl, Decl->getType(), getTypeInfo(SILVal.getType()));
-    emitDebugVariableDeclaration(Val, DbgTy, i->getDebugScope(), Name);
-  }
+  void visitDebugValueInst(DebugValueInst *i);
+  void visitDebugValueAddrInst(DebugValueAddrInst *i);
   void visitLoadWeakInst(LoadWeakInst *i);
   void visitStoreWeakInst(StoreWeakInst *i);
   void visitRetainValueInst(RetainValueInst *i);
@@ -3057,6 +3020,46 @@ void IRGenSILFunction::visitStoreInst(swift::StoreInst *i) {
   cast<LoadableTypeInfo>(type).initialize(*this, source, dest);
 }
 
+void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
+  if (!IGM.DebugInfo)
+    return;
+
+  VarDecl *Decl = i->getDecl();
+  if (!Decl || ArgEmitted.lookup(Decl))
+    return;
+
+  auto SILVal = i->getOperand();
+  if (isa<SILUndef>(SILVal))
+    return;
+
+  StringRef Name = Decl->getNameStr();
+  Explosion e = getLoweredExplosion(SILVal);
+  DebugTypeInfo DbgTy(Decl, Decl->getType(), getTypeInfo(SILVal.getType()));
+
+  // Put the value into a stack slot at -Onone.
+  llvm::SmallVector<llvm::Value *, 8> Copy;
+  emitShadowCopy(e.claimAll(), Name, Copy);
+  emitDebugVariableDeclaration(Copy, DbgTy, i->getDebugScope(), Name);
+}
+
+void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
+  if (!IGM.DebugInfo)
+    return;
+  VarDecl *Decl = i->getDecl();
+  if (!Decl || ArgEmitted.lookup(Decl))
+    return;
+
+  auto SILVal = i->getOperand();
+  if (isa<SILUndef>(SILVal))
+    return;
+
+  StringRef Name = Decl->getName().str();
+  auto Addr = getLoweredAddress(SILVal).getAddress();
+  DebugTypeInfo DbgTy(Decl, Decl->getType(), getTypeInfo(SILVal.getType()));
+  // Put the value into a stack slot at -Onone and emit a debug intrinsic.
+  emitDebugVariableDeclaration(emitShadowCopy(Addr, Name), DbgTy,
+                               i->getDebugScope(), Name);
+}
 
 void IRGenSILFunction::visitLoadWeakInst(swift::LoadWeakInst *i) {
   Address source = getLoweredAddress(i->getOperand());
