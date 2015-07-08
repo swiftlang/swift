@@ -439,12 +439,20 @@ class ExecutionContext:
     def appendText(self, text, file, line):
         # see if we need to inject a line marker
         if self.lineDirective:
-            if (file,line) != self.lastFileLine and (
-                len(self.resultText) == 0
-                or self.resultText[-1].endswith('\n')):
-                self.resultText.append(
-                    '%s %d "%s"\n' % (self.lineDirective, line + 1, file)
-                )
+            if (file,line) != self.lastFileLine:
+                # We can only insert the line directive at a line break
+                if len(self.resultText) == 0 \
+                   or self.resultText[-1].endswith('\n'):
+                    self.resultText.append('%s %d "%s"\n' % (self.lineDirective, line + 1, file))
+                # But if the new text contains any line breaks, we can create one
+                elif '\n' in text:
+                    i = text.find('\n')
+                    self.resultText.append(text[:i + 1])
+                    self.lastFileLine = (self.lastFileLine[0], self.lastFileLine[1] + 1)
+                    # and try again
+                    self.appendText(text[i + 1:], file, line)
+                    return
+                    
         self.resultText.append(text)
         self.lastFileLine = (file, line + text.count('\n'))
         
