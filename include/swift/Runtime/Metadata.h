@@ -1854,6 +1854,15 @@ struct ExistentialMetatypeMetadata : public Metadata {
   static bool classof(const Metadata *metadata) {
     return metadata->getKind() == MetadataKind::ExistentialMetatype;
   }
+
+  /// Return true iff all the protocol constraints are @objc.
+  bool isObjC() const {
+    return isClassBounded() && Flags.getNumWitnessTables() == 0;
+  }
+
+  bool isClassBounded() const {
+    return Flags.getClassConstraint() == ProtocolClassConstraint::Class;
+  }
 };
 
 /// \brief The header in front of a generic metadata template.

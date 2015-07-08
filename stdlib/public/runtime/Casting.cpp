@@ -971,6 +971,10 @@ _dynamicCastUnknownClassToExistential(const void *object,
       return nullptr;
     case ProtocolDispatchStrategy::ObjC:
 #if SWIFT_OBJC_INTEROP
+      // All classes conform to AnyObject.
+      if (protocol->Flags.getSpecialProtocol() == SpecialProtocol::AnyObject)
+        break;
+
       if (!_swift_objectConformsToObjCProtocol(object, protocol))
         return nullptr;
       break;
@@ -2779,10 +2783,48 @@ static bool _dynamicCastClassToValueViaObjCBridgeable(
 // conformance to a given protocol.  See ../core/BridgeObjectiveC.swift for
 // documentation.
 //===----------------------------------------------------------------------===//
+
+extern "C" const _ObjectiveCBridgeableWitnessTable
+_TWPVSs19_BridgeableMetatypeSs21_ObjectiveCBridgeableSs;
+
 static const _ObjectiveCBridgeableWitnessTable *
 findBridgeWitness(const Metadata *T) {
   auto w = swift_conformsToProtocol(T, &_TMpSs21_ObjectiveCBridgeable);
-  return reinterpret_cast<const _ObjectiveCBridgeableWitnessTable *>(w);
+  if (LLVM_LIKELY(w))
+    return reinterpret_cast<const _ObjectiveCBridgeableWitnessTable *>(w);
+  // Class and ObjC existential metatypes can be bridged, but metatypes can't
+  // directly conform to protocols yet. Use a stand-in conformance for a type
+  // that looks like a metatype value if the metatype can be bridged.
+  switch (T->getKind()) {
+  case MetadataKind::Metatype: {
+    auto metaTy = static_cast<const MetatypeMetadata *>(T);
+    if (metaTy->InstanceType->isAnyClass())
+      return &_TWPVSs19_BridgeableMetatypeSs21_ObjectiveCBridgeableSs;
+    break;
+  }
+  case MetadataKind::ExistentialMetatype: {
+    auto existentialMetaTy =
+      static_cast<const ExistentialMetatypeMetadata *>(T);
+    if (existentialMetaTy->isObjC())
+      return &_TWPVSs19_BridgeableMetatypeSs21_ObjectiveCBridgeableSs;
+    break;
+  }
+
+  case MetadataKind::Class:
+  case MetadataKind::Struct:
+  case MetadataKind::Enum:
+  case MetadataKind::Opaque:
+  case MetadataKind::Tuple:
+  case MetadataKind::Function:
+  case MetadataKind::Existential:
+  case MetadataKind::ObjCClassWrapper:
+  case MetadataKind::ForeignClass:
+  case MetadataKind::HeapLocalVariable:
+  case MetadataKind::HeapGenericLocalVariable:
+  case MetadataKind::ErrorObject:
+    break;
+  }
+  return nullptr;
 }
 
 /// \param value passed at +1, consumed.

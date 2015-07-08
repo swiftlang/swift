@@ -72,6 +72,54 @@ public protocol _ObjectiveCBridgeable {
   ) -> Bool
 }
 
+//===--- Bridging for metatypes -------------------------------------------===//
+
+/// A stand-in for a value of metatype type.
+///
+/// The language and runtime do not yet support protocol conformances for
+/// structural types like metatypes. However, we can use a struct that contains
+/// a metatype, make it conform to to _ObjectiveCBridgeable, and its witness table
+/// will be ABI-compatible with one that directly provided conformance to the
+/// metatype type itself.
+public struct _BridgeableMetatype: _ObjectiveCBridgeable {
+  internal var value: AnyObject.Type
+
+  public typealias _ObjectiveCType = AnyObject
+
+  public static func _isBridgedToObjectiveC() -> Bool {
+    return true
+  }
+
+  public static func _getObjectiveCType() -> Any.Type {
+    return AnyObject.self
+  }
+
+  public func _bridgeToObjectiveC() -> AnyObject {
+    return value
+  }
+
+  public static func _forceBridgeFromObjectiveC(
+    source: AnyObject,
+    inout result: _BridgeableMetatype?
+  ) {
+    result = _BridgeableMetatype(value: source as! AnyObject.Type)
+  }
+
+  public static func _conditionallyBridgeFromObjectiveC(
+    source: AnyObject,
+    inout result: _BridgeableMetatype?
+  ) -> Bool {
+    if let type = source as? AnyObject.Type {
+      result = _BridgeableMetatype(value: type)
+      return true
+    }
+
+    result = nil
+    return false
+  }
+}
+
+
 //===--- Bridging facilities written in Objective-C -----------------------===//
 // Functions that must discover and possibly use an arbitrary type's
 // conformance to a given protocol.  See ../runtime/Metadata.cpp for
