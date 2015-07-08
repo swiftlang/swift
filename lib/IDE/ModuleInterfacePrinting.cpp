@@ -20,7 +20,9 @@
 #include "swift/Basic/PrimitiveParsing.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/Parse/Token.h"
 #include "swift/Serialization/ModuleFile.h"
+#include "swift/Subsystems.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
@@ -394,6 +396,51 @@ void swift::ide::printSubmoduleInterface(
         Printer << "\n";
     }
   }
+}
+
+static SourceLoc getDeclStartPosition(SourceFile &File) {
+  llvm::Optional<SourceLoc> Winner;
+  SourceManager &SM = File.getASTContext().SourceMgr;
+  for (auto D : File.Decls) {
+    auto Start = !D->getRawComment().isEmpty() &&
+      SM.isBeforeInBuffer(D->getRawComment().Comments[0].Range.getStart(),
+                          D->getSourceRange().Start) ?
+        D->getRawComment().Comments[0].Range.getStart() :
+        D->getSourceRange().Start;
+
+    if (Winner.hasValue()) {
+      if (SM.isBeforeInBuffer(Start, Winner.getValue())) {
+        Winner = Start;
+      }
+    } else {
+      Winner = Start;
+    }
+  }
+  return Winner.hasValue() ? Winner.getValue() : SourceLoc();
+}
+
+static void printUntilFirstDeclStarts(SourceFile &File, ASTPrinter &Printer) {
+  if (!File.getBufferID().hasValue())
+    return;
+  auto DeclStartLoc = getDeclStartPosition(File);
+  auto &SM = File.getASTContext().SourceMgr;
+  auto Tokens = swift::tokenize(File.getASTContext().LangOpts, SM,
+                                File.getBufferID().getValue());
+
+  for (auto It = Tokens.begin(); It < Tokens.end() &&
+       (DeclStartLoc.isInvalid() || SM.isBeforeInBuffer(It->getLoc(),
+                                                        DeclStartLoc)); ++ It) {
+    Printer << It->getText();
+  }
+}
+
+void swift::ide::printSwiftSourceInterface(SourceFile &File,
+                                           ASTPrinter &Printer,
+                                           const PrintOptions &Options) {
+
+  // We print all comments before the fist line of Swift code.
+  printUntilFirstDeclStarts(File, Printer);
+  File.print(Printer, Options);
 }
 
 void swift::ide::printHeaderInterface(

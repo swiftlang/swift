@@ -20,6 +20,7 @@ namespace swift {
 class ASTContext;
 class ASTPrinter;
 class ModuleDecl;
+class SourceFile;
 struct PrintOptions;
 
 namespace ide {
@@ -51,6 +52,11 @@ void printSubmoduleInterface(ModuleDecl *M, ArrayRef<StringRef> FullModuleName,
 /// objc header importing feature.
 void printHeaderInterface(StringRef Filename, ASTContext &Ctx,
                           ASTPrinter &Printer, const PrintOptions &Options);
+
+
+/// Print the interface for a given swift source file.
+void printSwiftSourceInterface(SourceFile &File, ASTPrinter &Printer,
+                               const PrintOptions &Options);
 
 } // namespace ide
 
