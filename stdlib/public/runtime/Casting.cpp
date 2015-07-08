@@ -1684,7 +1684,7 @@ static bool _dynamicCastMetatypeToExistentialMetatype(OpaqueValue *dest,
   // metatype correctly and then recurse, letting the recursive call
   // fill in the conformance information correctly.
 
-  // Proactively set the destination metatype so that we can tail-recurse,
+  // Proactively set the destination metatype so that we can tail-recur,
   // unless we've already done so.  There's no harm in doing this even if
   // the cast fails.
   if (writeDestMetatype)
@@ -1782,7 +1782,12 @@ static bool _dynamicCastToExistentialMetatype(OpaqueValue *dest,
 
   case MetadataKind::Class:
   case MetadataKind::ObjCClassWrapper:
-  case MetadataKind::ForeignClass:
+  case MetadataKind::ForeignClass: {
+    void *object = *reinterpret_cast<void**>(src);
+    return _dynamicCastUnknownClassToExistentialMetatype(dest, object,
+                                                         targetType, flags);
+  }
+
   case MetadataKind::Function:
   case MetadataKind::HeapLocalVariable:
   case MetadataKind::HeapGenericLocalVariable:
