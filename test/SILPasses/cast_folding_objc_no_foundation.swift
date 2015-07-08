@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -O -emit-sil %s | tee /tmp/xxx | FileCheck %s
 // REQUIRES: objc_interop
+// REQUIRES: disabled
 
 // Note: no 'import Foundation'
 
