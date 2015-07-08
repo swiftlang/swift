@@ -206,7 +206,7 @@ void Expr::forEachChildExpr(const std::function<void(Expr*)> &callback) {
     }
     bool walkToDeclPre(Decl *D) override { return false; }
     bool walkToTypeReprPre(TypeRepr *T) override { return false; }
-
+    bool walkToTypeLocPre(TypeLoc &TL) override { return false; }
   };
   
   this->walk(ChildWalker(callback, this));

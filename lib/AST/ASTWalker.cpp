@@ -127,14 +127,11 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitExtensionDecl(ExtensionDecl *ED) {
-    if (TypeRepr *T = ED->getExtendedTypeLoc().getTypeRepr()) {
-      if (doIt(T))
+    if (doIt(ED->getExtendedTypeLoc()))
+      return true;
+    for (auto &Inherit : ED->getInherited()) {
+      if (doIt(Inherit))
         return true;
-    }
-    for (auto Inherit : ED->getInherited()) {
-      if (TypeRepr *T = Inherit.getTypeRepr())
-        if (doIt(T))
-          return true;
     }
     for (Decl *M : ED->getMembers()) {
       if (doIt(M))
@@ -186,9 +183,8 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitTypeAliasDecl(TypeAliasDecl *TAD) {
-    if (TypeRepr *T = TAD->getUnderlyingTypeLoc().getTypeRepr())
-      if (doIt(T))
-        return true;
+    if (doIt(TAD->getUnderlyingTypeLoc()))
+      return true;
     return false;
   }
 
@@ -197,10 +193,9 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   bool visitNominalTypeDecl(NominalTypeDecl *NTD) {
-    for (auto Inherit : NTD->getInherited()) {
-      if (TypeRepr *T = Inherit.getTypeRepr())
-        if (doIt(T))
-          return true;
+    for (auto &Inherit : NTD->getInherited()) {
+      if (doIt(Inherit))
+        return true;
     }
     for (Decl *Member : NTD->getMembers())
       if (doIt(Member))
@@ -222,10 +217,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       SD->setIndices(NewPattern);
     else
       return true;
-    if (SD->getElementTypeLoc().getTypeRepr())
-      if (doIt(SD->getElementTypeLoc().getTypeRepr()))
-        return true;
-    return false;
+    return doIt(SD->getElementTypeLoc());
   }
 
   bool visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
@@ -240,8 +232,8 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     }
 
     if (auto *FD = dyn_cast<FuncDecl>(AFD))
-      if (!FD->isAccessor() && FD->getBodyResultTypeLoc().getTypeRepr())
-        if (doIt(FD->getBodyResultTypeLoc().getTypeRepr()))
+      if (!FD->isAccessor())
+        if (doIt(FD->getBodyResultTypeLoc()))
           return true;
 
     if (AFD->getBody(/*canSynthesize=*/false)) {
@@ -309,9 +301,8 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   Expr *visitDiscardAssignmentExpr(DiscardAssignmentExpr *E) { return E; }
   Expr *visitTypeExpr(TypeExpr *E) {
     if (!E->isImplicit())
-      if (TypeRepr *tyR = E->getTypeRepr())
-        if (doIt(tyR))
-          return nullptr;
+      if (doIt(E->getTypeLoc()))
+        return nullptr;
 
     return E;
   }
@@ -488,9 +479,8 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       return nullptr;
 
     for (auto &TyLoc : E->getUnresolvedParams()) {
-      if (TyLoc.getTypeRepr())
-        if (doIt(TyLoc.getTypeRepr()))
-          return nullptr;
+      if (doIt(TyLoc))
+        return nullptr;
     }
 
     return E;
@@ -593,7 +583,7 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       return nullptr;
 
     if (expr->hasExplicitResultType())
-      if (doIt(expr->getExplicitResultTypeLoc().getTypeRepr()))
+      if (doIt(expr->getExplicitResultTypeLoc()))
         return nullptr;
 
     // Handle single-expression closures.
@@ -676,9 +666,8 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
       E->setSubExpr(Sub);
     }
 
-    if (auto TyR = E->getCastTypeLoc().getTypeRepr())
-      if (doIt(TyR))
-        return nullptr;
+    if (doIt(E->getCastTypeLoc()))
+      return nullptr;
 
     return E;
   }
@@ -905,6 +894,21 @@ public:
       }
     }
     return false;
+  }
+
+  bool doIt(TypeLoc &TL) {
+    if (!Walker.walkToTypeLocPre(TL))
+      return false;
+
+    // No "visit" since TypeLocs are not a class hierarchy.  Clients can do what
+    // they want in walkToTypeLocPre.
+
+    if (auto typerepr = TL.getTypeRepr())
+      if (doIt(typerepr))
+        return true;
+
+    // If we didn't bail out, do post-order visitation.
+    return !Walker.walkToTypeLocPost(TL);
   }
 
   /// Returns true on failure.
@@ -1276,8 +1280,8 @@ Pattern *Traversal::visitTypedPattern(TypedPattern *P) {
     P->setSubPattern(newSub);
   else
     return nullptr;
-  if (!P->isImplicit() && P->getTypeLoc().getTypeRepr())
-    if (doIt(P->getTypeLoc().getTypeRepr()))
+  if (!P->isImplicit())
+    if (doIt(P->getTypeLoc()))
       return nullptr;
   return P;
 }
@@ -1290,8 +1294,8 @@ Pattern *Traversal::visitIsPattern(IsPattern *P) {
       return nullptr;
     }
   }
-  if (!P->isImplicit() && P->getCastTypeLoc().getTypeRepr())
-    if (doIt(P->getCastTypeLoc().getTypeRepr()))
+  if (!P->isImplicit())
+    if (doIt(P->getCastTypeLoc()))
       return nullptr;
   return P;
 }

@@ -985,7 +985,6 @@ bool TypeChecker::typeCheckExpression(
        ExprTypeCheckListener *listener) {
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
-  
   // Construct a constraint system from this expression.
   ConstraintSystem cs(*this, dc, ConstraintSystemFlags::AllowFixes);
   CleanupIllFormedExpressionRAII cleanup(Context, expr);
