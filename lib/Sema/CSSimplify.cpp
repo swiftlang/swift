@@ -2566,7 +2566,9 @@ static bool containsProtocolSelf(Type type) {
 /// it from being used in an existential reference.
 static bool isUnavailableInExistential(TypeChecker &tc, ValueDecl *decl) {
   Type type = decl->getInterfaceType();
-
+  if (!type) // FIXME: deal with broken recursion
+    return true;
+  
   // For a function or constructor, skip the implicit 'this'.
   if (auto afd = dyn_cast<AbstractFunctionDecl>(decl)) {
     type = type->castTo<AnyFunctionType>()->getResult();

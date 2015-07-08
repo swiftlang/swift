@@ -1275,7 +1275,7 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
 
     // Validate the declaration.
     tc.validateDecl(other);
-    if (other->isInvalid())
+    if (other->isInvalid() || !other->hasType())
       continue;
 
     // Skip declarations in other files.
@@ -5726,10 +5726,17 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
   // because those are validated as part of their context.
   if (D->getKind() != DeclKind::GenericTypeParam) {
     auto dc = D->getDeclContext();
-    if (auto nominal = dyn_cast<NominalTypeDecl>(dc))
+    if (auto nominal = dyn_cast<NominalTypeDecl>(dc)) {
+      if (nominal->isBeingTypeChecked())
+        return;
+
       validateDecl(nominal, false);
-    else if (auto ext = dyn_cast<ExtensionDecl>(dc))
+    } else if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
+      if (ext->isBeingTypeChecked())
+        return;
+
       validateExtension(ext);
+    }
   }
 
   switch (D->getKind()) {

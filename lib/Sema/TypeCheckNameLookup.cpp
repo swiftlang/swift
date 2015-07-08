@@ -341,7 +341,9 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
 
     // FIXME: This should happen before we attempt shadowing checks.
     validateDecl(typeDecl);
-
+    if (!typeDecl->hasType()) // FIXME: recursion-breaking hack
+      continue;
+    
     // If we found a member of a protocol type when looking into a non-protocol,
     // non-archetype type, only include this member in the result set if
     // this member was used as the default definition or otherwise inferred.

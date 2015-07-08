@@ -173,33 +173,20 @@ public protocol CollectionType : Indexable, SequenceType {
   var first: Generator.Element? { get }
 }
 
-// FIXME: Can't constrain with Generator == _IndexingGenerator<Self>, due
-// to <rdar://problem/21538521> Nonsense diagnostic, then crash.
-/// A protocol used only to identify `IndexingGenerator`.
-internal protocol _IndexingGeneratorType {}
-extension IndexingGenerator : _IndexingGeneratorType {}
-
 /// Supply the default `generate()` method for `CollectionType` models
 /// that accept the default associated `Generator`,
 /// `IndexingGenerator<Self>`.
-extension CollectionType where Generator : _IndexingGeneratorType  {
+extension CollectionType where Generator == IndexingGenerator<Self> {
   public func generate() -> IndexingGenerator<Self> {
     return IndexingGenerator(self)
   }
 }
 
 
-// FIXME: Can't constrain with SubSequence == Slice<Self>, due to
-// <rdar://problem/21538521> Nonsense diagnostic, then crash.  Therefore, use a
-// stand-in internal protocol.
-/// A protocol used only to identify `Slice`.
-internal protocol _SliceType {}
-extension Slice : _SliceType {}
-
 /// Supply the default "slicing" `subscript`  for `CollectionType` models
 /// that accept the default associated `SubSequence`, `Slice<Self>`.
-extension CollectionType where SubSequence : _SliceType {
-  public subscript(bounds: Range<Index>) -> Slice<Self> {
+extension CollectionType where SubSequence == Slice<Self> {
+  public subscript(bounds: Range<Self.Index>) -> Slice<Self> {
     return Slice(_base: self, bounds: bounds)
   }
 }
