@@ -2035,6 +2035,23 @@ public:
       Element(Element) {}
 
   EnumElementDecl *getElement() const { return Element; }
+
+  EnumDecl *getEnumDecl() const {
+    auto *E = getOperand().getType().getEnumOrBoundGenericEnum();
+    assert(E && "Operand of unchecked_enum_data must be of enum type");
+    return E;
+  }
+
+  unsigned getElementNo() const {
+    unsigned i = 0;
+    for (EnumElementDecl *E : getEnumDecl()->getAllElements()) {
+      if (E == Element)
+        return i;
+      ++i;
+    }
+    llvm_unreachable("An unchecked_enum_data's enumdecl should have at least "
+                     "on element, the element that is being extracted");
+  }
 };
 
 /// Projects the address of the data for a case inside an uninitialized enum in
@@ -2081,6 +2098,25 @@ public:
       Element(Element) {}
 
   EnumElementDecl *getElement() const { return Element; }
+
+  EnumDecl *getEnumDecl() const {
+    auto *E = getOperand().getType().getEnumOrBoundGenericEnum();
+    assert(E && "Operand of unchecked_take_enum_data_addr must be of enum"
+                " type");
+    return E;
+  }
+
+  unsigned getElementNo() const {
+    unsigned i = 0;
+    for (EnumElementDecl *E : getEnumDecl()->getAllElements()) {
+      if (E == Element)
+        return i;
+      ++i;
+    }
+    llvm_unreachable(
+        "An unchecked_enum_data_addr's enumdecl should have at least "
+        "on element, the element that is being extracted");
+  }
 };
 
 // Base class of all select instructions like select_enum, select_value, etc.
