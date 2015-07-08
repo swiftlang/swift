@@ -238,6 +238,17 @@ struct PrintOptions {
     result.SkipEmptyExtensionDecls = false;
     return result;
   }
+
+  /// Print in the style of quick help declaration.
+  static PrintOptions printQuickHelpDeclaration() {
+    PrintOptions PO;
+    PO.PrintDefaultParameterPlaceholder = true;
+    PO.PrintImplicitAttrs = false;
+    PO.PrintFunctionRepresentationAttrs = false;
+    PO.PrintDocumentationComments = false;
+    PO.ExcludeAttrList.push_back(DAK_Available);
+    return PO;
+  }
 };
 }
 

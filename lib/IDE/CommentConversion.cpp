@@ -347,11 +347,36 @@ static bool getClangDocumentationCommentAsXML(const clang::Decl *D,
   return true;
 }
 
+static void replaceObjcDeclarationsWithSwiftOnes(const Decl *D,
+                                                       StringRef Doc,
+                                                       raw_ostream &OS) {
+  StringRef Open = "<Declaration>";
+  StringRef Close = "</Declaration>";
+  PrintOptions Options = PrintOptions::printQuickHelpDeclaration();
+  std::string S;
+  llvm::raw_string_ostream SS(S);
+  D->print(SS, Options);
+  std::string Signature = SS.str();
+  auto OI = Doc.find(Open);
+  auto CI = Doc.find(Close);
+  if (StringRef::npos != OI && StringRef::npos != CI && CI > OI)
+    OS << Doc.substr(0, OI) << Open << Signature << Close <<
+      Doc.substr(CI + Close.size());
+  else
+    OS << Doc;
+}
+
 bool ide::getDocumentationCommentAsXML(const Decl *D, raw_ostream &OS) {
   auto MaybeClangNode = D->getClangNode();
   if (MaybeClangNode) {
-    if (auto *CD = MaybeClangNode.getAsDecl())
-      return getClangDocumentationCommentAsXML(CD, OS);
+    if (auto *CD = MaybeClangNode.getAsDecl()) {
+      std::string S;
+      llvm::raw_string_ostream SS(S);
+      if (getClangDocumentationCommentAsXML(CD, SS)) {
+        replaceObjcDeclarationsWithSwiftOnes(D, SS.str(), OS);
+        return true;
+      }
+    }
     return false;
   }
 
