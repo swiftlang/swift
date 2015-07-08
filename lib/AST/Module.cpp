@@ -1373,12 +1373,20 @@ void SourceFile::print(raw_ostream &OS, const PrintOptions &PO) {
 }
 
 void SourceFile::print(ASTPrinter &Printer, const PrintOptions &PO) {
+  std::set<DeclKind> MajorDeclKinds = {DeclKind::Class, DeclKind::Enum,
+    DeclKind::Extension, DeclKind::Protocol, DeclKind::Struct};
   for (auto decl : Decls) {
     if (!decl->shouldPrintInContext(PO))
       continue;
 
-    decl->print(Printer, PO);
-    Printer << "\n";
+    if(decl->print(Printer, PO)) {
+      Printer << "\n";
+
+      // For a major decl, we print an empty line after it.
+      if (MajorDeclKinds.find(decl->getKind()) != MajorDeclKinds.end()) {
+        Printer << "\n";
+      }
+    }
   }
 }
 
