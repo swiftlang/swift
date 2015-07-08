@@ -375,21 +375,21 @@ func canBeClass<T>(_: T) {
 
 // CHECK-LABEL: sil hidden @_TF8builtins18canBeClassMetatype
 func canBeClassMetatype<T>(_: T) {
-  // CHECK: integer_literal $Builtin.Int8, 1
+  // CHECK: integer_literal $Builtin.Int8, 0
   typealias OT = O.Type
   Builtin.canBeClass(OT.self)
-  // CHECK: integer_literal $Builtin.Int8, 1
+  // CHECK: integer_literal $Builtin.Int8, 0
   typealias OP1T = OP1.Type
   Builtin.canBeClass(OP1T.self)
   // -- FIXME: protocol<...> doesn't parse as a value
   typealias ObjCCompoT = protocol<OP1, OP2>.Type
-  // CHECK: integer_literal $Builtin.Int8, 1
+  // CHECK: integer_literal $Builtin.Int8, 0
   Builtin.canBeClass(ObjCCompoT.self)
 
   // CHECK: integer_literal $Builtin.Int8, 0
   typealias ST = S.Type
   Builtin.canBeClass(ST.self)
-  // CHECK: integer_literal $Builtin.Int8, 1
+  // CHECK: integer_literal $Builtin.Int8, 0
   typealias CT = C.Type
   Builtin.canBeClass(CT.self)
   // CHECK: integer_literal $Builtin.Int8, 0
@@ -399,7 +399,7 @@ func canBeClassMetatype<T>(_: T) {
   // CHECK: integer_literal $Builtin.Int8, 0
   Builtin.canBeClass(MixedCompoT.self)
 
-  // CHECK: builtin "canBeClass"<T.Type>
+  // CHECK: integer_literal $Builtin.Int8, 0
   typealias TT = T.Type
   Builtin.canBeClass(TT.self)
 }

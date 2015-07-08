@@ -158,4 +158,109 @@ public func testCastNSObjectToNonClassType(o: NSObject) -> Int.Type {
   return o as! Int.Type
 }
 
+// CHECK-LABEL: sil [noinline] @{{.*}}testCastAnyObjectToAnyClass{{.*}}
+// CHECK:         unconditional_checked_cast_addr
+@inline(never)
+public func testCastAnyObjectToAnyClass(o: AnyObject) -> AnyClass {
+  return o as! AnyClass
+}
+
+// CHECK-LABEL: sil [noinline] @{{.*}}testCastAnyObjectToClassObject{{.*}}
+// CHECK:         unconditional_checked_cast_addr
+@inline(never)
+public func testCastAnyObjectToClassObject(o: AnyObject) -> AnyObject.Type {
+  return o as! AnyObject.Type
+}
+
+// CHECK-LABEL: sil [noinline] @{{.*}}testCastAnyObjectToAnyType{{.*}}
+// CHECK:         unconditional_checked_cast_addr
+@inline(never)
+public func testCastAnyObjectToAnyType(o: AnyObject) -> Any.Type {
+  return o as! Any.Type
+}
+
+// CHECK-LABEL: sil [noinline] @{{.*}}testCastAnyObjectToEveryType{{.*}}
+// CHECK:         unconditional_checked_cast_addr
+@inline(never)
+public func testCastAnyObjectToEveryType<T>(o: AnyObject) -> T.Type {
+  return o as! T.Type
+}
+
+// CHECK-LABEL: sil [noinline] @{{.*}}testCastAnyObjectToNonClassType
+// CHECK:         builtin "int_trap"
+@inline(never)
+public func testCastAnyObjectToNonClassType(o: AnyObject) -> Int.Type {
+  return o as! Int.Type
+}
+
+// CHECK-LABEL: sil [noinline] @{{.*}}testCastAnyToAnyClass{{.*}}
+// CHECK:         unconditional_checked_cast_addr
+@inline(never)
+public func testCastAnyToAnyClass(o: Any) -> AnyClass {
+  return o as! AnyClass
+}
+
+// CHECK-LABEL: sil [noinline] @{{.*}}testCastAnyToClassObject{{.*}}
+// CHECK:         unconditional_checked_cast_addr
+@inline(never)
+public func testCastAnyToClassObject(o: Any) -> AnyObject.Type {
+  return o as! AnyObject.Type
+}
+
+// CHECK-LABEL: sil [noinline] @{{.*}}testCastAnyToAnyType{{.*}}
+// CHECK:         unconditional_checked_cast_addr
+@inline(never)
+public func testCastAnyToAnyType(o: Any) -> Any.Type {
+  return o as! Any.Type
+}
+
+// CHECK-LABEL: sil [noinline] @{{.*}}testCastAnyToEveryType{{.*}}
+// CHECK:         unconditional_checked_cast_addr
+@inline(never)
+public func testCastAnyToEveryType<T>(o: Any) -> T.Type {
+  return o as! T.Type
+}
+
+// CHECK-LABEL: sil [noinline] @{{.*}}testCastAnyToNonClassType
+// CHECK:         unconditional_checked_cast_addr
+@inline(never)
+public func testCastAnyToNonClassType(o: Any) -> Int.Type {
+  return o as! Int.Type
+}
+
+// CHECK-LABEL: sil [noinline] @{{.*}}testCastEveryToAnyClass{{.*}}
+// CHECK:         unconditional_checked_cast_addr
+@inline(never)
+public func testCastEveryToAnyClass<T>(o: T) -> AnyClass {
+  return o as! AnyClass
+}
+
+// CHECK-LABEL: sil [noinline] @{{.*}}testCastEveryToClassObject{{.*}}
+// CHECK:         unconditional_checked_cast_addr
+@inline(never)
+public func testCastEveryToClassObject<T>(o: T) -> AnyObject.Type {
+  return o as! AnyObject.Type
+}
+
+// CHECK-LABEL: sil [noinline] @{{.*}}testCastEveryToAnyType{{.*}}
+// CHECK:         unconditional_checked_cast_addr
+@inline(never)
+public func testCastEveryToAnyType<T>(o: T) -> Any.Type {
+  return o as! Any.Type
+}
+
+// CHECK-LABEL: sil [noinline] @{{.*}}testCastEveryToEveryType{{.*}}
+// CHECK:         unconditional_checked_cast_addr
+@inline(never)
+public func testCastEveryToEveryType<T, U>(o: U) -> T.Type {
+  return o as! T.Type
+}
+
+// CHECK-LABEL: sil [noinline] @{{.*}}testCastEveryToNonClassType
+// CHECK:         unconditional_checked_cast_addr
+@inline(never)
+public func testCastEveryToNonClassType<T>(o: T) -> Int.Type {
+  return o as! Int.Type
+}
+
 print("test0=\(test0())")

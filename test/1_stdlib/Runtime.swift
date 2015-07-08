@@ -256,14 +256,14 @@ Runtime.test("_isClassOrObjCExistential") {
   expectTrue(_isClassOrObjCExistential_Opaque(AnyObject.self))
 
   // AnyClass == AnyObject.Type
-  expectTrue(_isClassOrObjCExistential(AnyClass.self))
-  expectTrue(_isClassOrObjCExistential_Opaque(AnyClass.self))
+  expectFalse(_isClassOrObjCExistential(AnyClass.self))
+  expectFalse(_isClassOrObjCExistential_Opaque(AnyClass.self))
 
   expectFalse(_isClassOrObjCExistential(AnyObject.Protocol.self))
   expectFalse(_isClassOrObjCExistential_Opaque(AnyObject.Protocol.self))
 
-  expectTrue(_isClassOrObjCExistential(NSObjectCanary.Type.self))
-  expectTrue(_isClassOrObjCExistential_Opaque(NSObjectCanary.Type.self))
+  expectFalse(_isClassOrObjCExistential(NSObjectCanary.Type.self))
+  expectFalse(_isClassOrObjCExistential_Opaque(NSObjectCanary.Type.self))
 }
 
 Runtime.test("_canBeClass") {

@@ -1813,6 +1813,26 @@ bool TypeBase::isSuperclassOf(Type ty, LazyResolver *resolver) {
 }
 
 static bool isBridgeableObjectType(CanType type) {
+  // Metatypes aren't always trivially bridgeable unless they've been
+  // SIL-lowered to have an @objc representation.
+  if (auto metaTy = dyn_cast<AnyMetatypeType>(type)) {
+    if (!metaTy->hasRepresentation())
+      return false;
+
+    if (metaTy->getRepresentation() != MetatypeRepresentation::ObjC)
+      return false;
+
+    if (auto metatype = dyn_cast<MetatypeType>(type)) {
+      CanType instanceType = metatype.getInstanceType();
+      return instanceType->mayHaveSuperclass();
+    }
+
+    // @objc protocol metatypes.
+    if (auto metatype = dyn_cast<ExistentialMetatypeType>(type)) {
+      return metatype.getInstanceType()->isObjCExistentialType();
+    }
+  }
+
   // Classes and class-constrained archetypes.
   if (type->mayHaveSuperclass())
     return true;
@@ -1829,17 +1849,6 @@ static bool isBridgeableObjectType(CanType type) {
   } else if (auto fnType = dyn_cast<SILFunctionType>(type)) {
     return fnType->getRepresentation()
       == SILFunctionType::Representation::Block;
-  }
-
-  // Class metatypes.
-  if (auto metatype = dyn_cast<MetatypeType>(type)) {
-    CanType instanceType = metatype.getInstanceType();
-    return instanceType->mayHaveSuperclass();
-  }
-
-  // @objc protocol metatypes.
-  if (auto metatype = dyn_cast<ExistentialMetatypeType>(type)) {
-    return metatype.getInstanceType()->isObjCExistentialType();
   }
 
   return false;
@@ -3239,8 +3248,6 @@ TypeTraitResult TypeBase::canBeClass() {
     return TypeTraitResult::Is;
 
   CanType self = getCanonicalType();
-  if (auto m = dyn_cast<AnyMetatypeType>(self))
-    self = m.getInstanceType();
 
   // Dependent types might be bound to classes.
   if (isa<SubstitutableType>(self))

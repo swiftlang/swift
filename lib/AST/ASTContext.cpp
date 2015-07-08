@@ -3335,6 +3335,14 @@ ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
     }
   }
 
+  if (auto metaTy = type->getAs<MetatypeType>())
+    if (metaTy->getInstanceType()->mayHaveSuperclass())
+      return type;
+
+  if (auto existentialMetaTy = type->getAs<ExistentialMetatypeType>())
+    if (existentialMetaTy->getInstanceType()->isObjCExistentialType())
+      return type;
+
   // Retrieve the _BridgedToObjectiveC protocol.
   auto bridgedProto = getProtocol(KnownProtocolKind::_ObjectiveCBridgeable);
   if (!bridgedProto)

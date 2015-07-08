@@ -2552,20 +2552,6 @@ static inline bool swift_isClassOrObjCExistentialImpl(const Metadata *T) {
       static_cast<const ExistentialTypeMetadata *>(T)->isObjC())
     return true;
   
-  // Class metadata records are also objects with ObjC interop.
-  if (kind == MetadataKind::Metatype) {
-    auto metaT = static_cast<const MetatypeMetadata *>(T);
-    return metaT->InstanceType->isAnyClass();
-  }
-  
-  if (kind == MetadataKind::ExistentialMetatype) {
-    auto xmT = static_cast<const ExistentialMetatypeMetadata *>(T);
-    if (xmT->InstanceType->getKind() == MetadataKind::Existential)
-      return static_cast<const ExistentialTypeMetadata *>(xmT->InstanceType)
-        ->isObjC();
-    return false;
-  }
-  
   // Blocks are ObjC objects.
   if (kind == MetadataKind::Function) {
     auto fT = static_cast<const FunctionTypeMetadata *>(T);

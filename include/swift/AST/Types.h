@@ -594,12 +594,14 @@ public:
   bool hasRetainablePointerRepresentation();
 
   /// Determines whether this type has a bridgable object
-  /// representation, i.e., whether it is representable as a single
+  /// representation, i.e., whether it is always represented as a single
   /// (non-nil) pointer that can be unknown-retained and
   /// unknown-released.
   ///
-  /// This predicate covers all types that could be placed into an
-  /// AnyObject.
+  /// This predicate covers all types that can be placed into an
+  /// AnyObject without ever requiring a representation change. Note that this
+  /// excludes ObjC class metatypes, which may need to be wrapped or unwrapped
+  /// when converting from native representation to AnyObject representation.
   bool isBridgeableObjectType();
 
   /// Determine whether this type is a potentially-bridged value type.
@@ -771,7 +773,8 @@ public:
   /// Return the name of the type as a string, for use in diagnostics only.
   std::string getString(const PrintOptions &PO = PrintOptions()) const;
   
-  /// Return whether this type is or can be substituted for a class type.
+  /// Return whether this type is or can be substituted for a bridgeable
+  /// object type.
   TypeTraitResult canBeClass();
   
   /// Returns true if the type conforms to protocols using witnesses from the
