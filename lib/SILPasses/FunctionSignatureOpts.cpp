@@ -44,6 +44,70 @@ STATISTIC(NumCallSitesOptimized, "Total call sites optimized");
 STATISTIC(NumSROAArguments, "Total SROA argumments optimized");
 
 //===----------------------------------------------------------------------===//
+//                                  Utility
+//===----------------------------------------------------------------------===//
+
+/// Returns true if I is a release instruction.
+static bool isRelease(SILInstruction *I) {
+  switch (I->getKind()) {
+  case ValueKind::StrongReleaseInst:
+  case ValueKind::ReleaseValueInst:
+    return true;
+  default:
+    return false;
+  }
+}
+
+/// Returns .Some(I) if I is a release that is the only non-debug instruction
+/// with side-effects in the use-def graph originating from Arg. Returns
+/// .Some(nullptr), if all uses from the arg were either debug insts or do not
+/// have side-effects. Returns .None if there were any non-release instructions
+/// with side-effects in the use-def graph from Arg or if there were multiple
+/// release instructions with side-effects in the use-def graph from Arg.
+static llvm::Optional<NullablePtr<SILInstruction>>
+getNonTrivialNonDebugReleaseUse(SILArgument *Arg) {
+  llvm::SmallVector<SILInstruction *, 8> Worklist;
+  llvm::SmallPtrSet<SILInstruction *, 8> SeenInsts;
+  llvm::Optional<SILInstruction *> Result;
+
+  for (Operand *I : getNonDebugUses(SILValue(Arg)))
+    Worklist.push_back(I->getUser());
+
+  while (!Worklist.empty()) {
+    SILInstruction *U = Worklist.pop_back_val();
+    if (!SeenInsts.insert(U).second)
+      continue;
+
+    // If U is a terminator inst, return false.
+    if (isa<TermInst>(U))
+      return None;
+
+    // If U has side effects...
+    if (U->mayHaveSideEffects()) {
+      // And is not a release_value, return None.
+      if (!isRelease(U))
+        return None;
+
+      // If we have already seen a release of some sort, bail.
+      if (Result.hasValue())
+        return None;
+
+      // Otherwise, set result to that value.
+      Result = U;
+      continue;
+    }
+
+    // Otherwise add all non-debug uses of I to the worklist.
+    for (Operand *I : getNonDebugUses(*U))
+      Worklist.push_back(I->getUser());
+  }
+
+  if (!Result.hasValue())
+    return NullablePtr<SILInstruction>();
+  return NullablePtr<SILInstruction>(Result.getValue());
+}
+
+//===----------------------------------------------------------------------===//
 //                             Argument Analysis
 //===----------------------------------------------------------------------===//
 
@@ -85,13 +149,10 @@ struct ArgumentDescriptor {
   /// to the original argument. The reason why we do this is to make sure we
   /// have access to the original argument's state if we modify the argument
   /// when optimizing.
-  ArgumentDescriptor(llvm::BumpPtrAllocator &BPA, SILArgument *A,
-                     bool isABIRequired)
+  ArgumentDescriptor(llvm::BumpPtrAllocator &BPA, SILArgument *A)
     : Arg(A), Index(A->getIndex()), ParameterInfo(A->getParameterInfo()),
-      Decl(A->getDecl()), CalleeRelease(),
+      Decl(A->getDecl()), IsDead(false), CalleeRelease(),
       ProjTree(A->getModule(), BPA, A->getType()) {
-
-    IsDead = hasNoUsesExceptDebug(A) && !isABIRequired;
     ProjTree.computeUsesAndLiveness(A);
   }
 
@@ -266,15 +327,24 @@ unsigned
 ArgumentDescriptor::
 updateOptimizedBBArgs(SILBuilder &Builder, SILBasicBlock *BB,
                       unsigned ArgOffset) {
-  // If this argument is dead delete this argument and return ArgOffset.
+  // If this argument is completely dead, delete this argument and return
+  // ArgOffset.
   if (IsDead) {
-    // There maybe still debug instructions which we have to delete.
-    SILArgument *Arg = BB->getBBArg(ArgOffset);
-    while (!Arg->use_empty()) {
-      auto *User = Arg->use_begin()->getUser();
-      assert(isDebugInst(User));
-      User->eraseFromParent();
+    // If we have a callee release and we are dead, set the callee release's
+    // operand to undef. We do not need it to have the argument anymore, but we
+    // do need the instruction to be non-null.
+    //
+    // TODO: This should not be necessary.
+    if (CalleeRelease) {
+      SILType CalleeReleaseTy = CalleeRelease->getOperand(0).getType();
+      CalleeRelease->setOperand(0, SILUndef::get(CalleeReleaseTy,
+                                                 Builder.getModule()));
     }
+
+    // We should be able to recursively delete all of the remaining
+    // instructions.
+    SILArgument *Arg = BB->getBBArg(ArgOffset);
+    eraseUsesOfValue(Arg, true);
     BB->eraseBBArg(ArgOffset);
     return ArgOffset;
   }
@@ -357,6 +427,7 @@ class FunctionAnalyzer {
   llvm::SmallVector<ArgumentDescriptor, 8> ArgDescList;
 
 public:
+  ArrayRef<ArgumentDescriptor> getArgList() const { return ArgDescList; }
   FunctionAnalyzer() = delete;
   FunctionAnalyzer(const FunctionAnalyzer &) = delete;
   FunctionAnalyzer(FunctionAnalyzer &&) = delete;
@@ -415,10 +486,16 @@ FunctionAnalyzer::analyze() {
   // argument.
   ConsumedArgToEpilogueReleaseMatcher ArgToEpilogueReleaseMap(RCIA, F);
   for (unsigned i = 0, e = Args.size(); i != e; ++i) {
-    ArgumentDescriptor A(Allocator, Args[i], isArgumentABIRequired(Args[i]));
+    ArgumentDescriptor A(Allocator, Args[i]);
     bool HaveOptimizedArg = false;
 
-    if (A.IsDead) {
+    bool isABIRequired = isArgumentABIRequired(Args[i]);
+    auto OnlyRelease = getNonTrivialNonDebugReleaseUse(Args[i]);
+
+    // If this argument is not ABI required and has not uses except for debug
+    // instructions, remove it.
+    if (!isABIRequired && OnlyRelease && OnlyRelease.getValue().isNull()) {
+      A.IsDead = true;
       HaveOptimizedArg = true;
       ++NumDeadArgsEliminated;
     }
@@ -427,6 +504,9 @@ FunctionAnalyzer::analyze() {
     // at the end of this function if our argument is an @owned parameter.
     if (A.hasConvention(ParameterConvention::Direct_Owned)) {
       if (auto *Release = ArgToEpilogueReleaseMap.releaseForArgument(A.Arg)) {
+        if (OnlyRelease && OnlyRelease.getValue().getPtrOrNull() == Release) {
+          A.IsDead = true;
+        }
         A.CalleeRelease = Release;
         HaveOptimizedArg = true;
         ++NumOwnedConvertedToGuaranteed;
@@ -529,7 +609,6 @@ llvm::SmallString<64> FunctionAnalyzer::getOptimizedName() {
       const ArgumentDescriptor &Arg = ArgDescList[i];
       if (Arg.IsDead) {
         FSSM.setArgumentDead(i);
-        continue;
       }
 
       // If we have an @owned argument and found a callee release for it,
@@ -538,7 +617,9 @@ llvm::SmallString<64> FunctionAnalyzer::getOptimizedName() {
         FSSM.setArgumentOwnedToGuaranteed(i);
       }
 
-      if (Arg.shouldExplode()) {
+      // If this argument is not dead and we can explode it, add 's' to the
+      // mangling.
+      if (Arg.shouldExplode() && !Arg.IsDead) {
         FSSM.setArgumentSROA(i);
       }
     }
@@ -552,6 +633,16 @@ llvm::SmallString<64> FunctionAnalyzer::getOptimizedName() {
 //===----------------------------------------------------------------------===//
 //                                Main Routine
 //===----------------------------------------------------------------------===//
+
+static bool isSupportedCallee(SILValue Callee) {
+  switch (Callee->getKind()) {
+  case ValueKind::FunctionRefInst:
+  case ValueKind::ThinToThickFunctionInst:
+    return true;
+  default:
+    return false;
+  }
+}
 
 /// This function takes in OldF and all callsites of OldF and rewrites the
 /// callsites to call the new function.
@@ -570,9 +661,7 @@ rewriteApplyInstToCallNewFunction(FunctionAnalyzer &Analyzer, SILFunction *NewF,
     if (!AI)
       continue;
 
-    // We don't have support for the handling of argument indices that
-    // we need when we have an apply of a partial_apply.
-    if (isa<PartialApplyInst>(AI->getCallee()))
+    if (!isSupportedCallee(AI->getCallee()))
       continue;
 
     SILBuilderWithScope<16> Builder(AI);
@@ -671,8 +760,11 @@ moveFunctionBodyToNewFunctionWithName(SILFunction *F,
   MutableArrayRef<ArgumentDescriptor> ArgDescs = Analyzer.getArgDescList();
   unsigned ArgOffset = 0;
   SILBuilderWithScope<16> Builder(NewFEntryBB->begin(),
-                                  NewFEntryBB->getParent()->getDebugScope());
+                                  NewFEntryBB->getParent()->getDebugScope());  
   for (auto &ArgDesc : ArgDescs) {
+    // We always need to reset the insertion point in case we delete the first
+    // instruction.
+    Builder.setInsertionPoint(NewFEntryBB->begin());
     DEBUG(llvm::dbgs() << "Updating arguments at ArgOffset: " << ArgOffset
           << " for: " << *ArgDesc.Arg);
     ArgOffset = ArgDesc.updateOptimizedBBArgs(Builder, NewFEntryBB, ArgOffset);
@@ -727,8 +819,10 @@ optimizeFunctionSignature(llvm::BumpPtrAllocator &BPA,
   ++NumFunctionSignaturesOptimized;
 
   DEBUG(for (auto *Edge : CallSites) {
-      llvm::dbgs()  << "        CALLSITE: " <<
-        *Edge->getApply().getInstruction();
+      auto *AI = Edge->getApply().getInstruction();
+      llvm::dbgs() << "        CALLSITE: " << *AI;
+      llvm::dbgs() << "            CALLER: "
+                   << AI->getFunction()->getName() << "\n";
   });
 
   llvm::SmallString<64> NewFName = Analyzer.getOptimizedName();

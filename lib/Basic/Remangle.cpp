@@ -482,9 +482,6 @@ void Remangler::mangleFunctionSignatureSpecializationParam(Node *node) {
   auto kind = FunctionSigSpecializationParamKind(kindValue);
 
   switch (kind) {
-  case FunctionSigSpecializationParamKind::Dead:
-    Out << "d_";
-    return;
   case FunctionSigSpecializationParamKind::ConstantPropFunction:
     Out << "cpfr";
     mangleIdentifier(node->getChild(1).get());
@@ -527,6 +524,9 @@ void Remangler::mangleFunctionSignatureSpecializationParam(Node *node) {
     Out << "i_";
     return;
   default:
+    if (kindValue &
+        unsigned(FunctionSigSpecializationParamKind::Dead))
+      Out << 'd';
     if (kindValue &
         unsigned(FunctionSigSpecializationParamKind::OwnedToGuaranteed))
       Out << 'g';

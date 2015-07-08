@@ -240,17 +240,17 @@ void FunctionSignatureSpecializationMangler::mangleArgument(
     return;
   }
 
-  if (ArgMod == ArgumentModifierIntBase(ArgumentModifier::Dead)) {
-    os << "d";
-    return;
-  }
-
   if (ArgMod == ArgumentModifierIntBase(ArgumentModifier::InOutToValue)) {
     os << "i";
     return;
   }
 
   bool hasSomeMod = false;
+  if (ArgMod & ArgumentModifierIntBase(ArgumentModifier::Dead)) {
+    os << "d";
+    hasSomeMod = true;
+  }
+
   if (ArgMod & ArgumentModifierIntBase(ArgumentModifier::OwnedToGuaranteed)) {
     os << "g";
     hasSomeMod = true;

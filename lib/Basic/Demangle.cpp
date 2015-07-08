@@ -773,11 +773,6 @@ private:
       // First handle options.
       if (Mangled.nextIf("n_")) {
         // Leave the parameter empty.
-      } else if (Mangled.nextIf("d_")) {
-        auto result = FUNCSIGSPEC_CREATE_PARAM_KIND(Dead);
-        if (!result)
-          return nullptr;
-        param->addChild(result);
       } else if (Mangled.nextIf("cp")) {
         if (!demangleFuncSigSpecializationConstantProp(param))
           return nullptr;
@@ -792,6 +787,11 @@ private:
       } else {
         // Otherwise handle option sets.
         unsigned Value = 0;
+        if (Mangled.nextIf('d')) {
+          Value |=
+            unsigned(FunctionSigSpecializationParamKind::Dead);
+        }
+
         if (Mangled.nextIf('g')) {
           Value |=
               unsigned(FunctionSigSpecializationParamKind::OwnedToGuaranteed);
@@ -801,7 +801,7 @@ private:
           Value |= unsigned(FunctionSigSpecializationParamKind::SROA);
         }
 
-        if (!Mangled.nextIf("_"))
+        if (!Mangled.nextIf('_'))
           return nullptr;
 
         if (!Value)
@@ -2572,7 +2572,6 @@ unsigned NodePrinter::printFunctionSigSpecializationParam(NodePointer pointer,
   unsigned V = firstChild->getIndex();
   auto K = FunctionSigSpecializationParamKind(V);
   switch (K) {
-  case FunctionSigSpecializationParamKind::Dead:
   case FunctionSigSpecializationParamKind::InOutToValue:
     print(pointer->getChild(Idx++));
     return Idx;
@@ -2635,7 +2634,8 @@ unsigned NodePrinter::printFunctionSigSpecializationParam(NodePointer pointer,
 
   assert(
       ((V & unsigned(FunctionSigSpecializationParamKind::OwnedToGuaranteed)) ||
-       (V & unsigned(FunctionSigSpecializationParamKind::SROA))) &&
+       (V & unsigned(FunctionSigSpecializationParamKind::SROA)) ||
+       (V & unsigned(FunctionSigSpecializationParamKind::Dead))) &&
       "Invalid OptionSet");
   print(pointer->getChild(Idx++));
   return Idx;
@@ -3009,26 +3009,30 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
   case Node::Kind::FunctionSignatureSpecializationParamKind: {
     uint64_t raw = pointer->getIndex();
 
-    bool convertedToGuaranteed =
-        raw & uint64_t(FunctionSigSpecializationParamKind::OwnedToGuaranteed);
-    if (convertedToGuaranteed) {
+    bool printedOptionSet = false;
+    if (raw & uint64_t(FunctionSigSpecializationParamKind::Dead)) {
+      printedOptionSet = true;
+      Printer << "Dead";
+    }
+
+    if (raw & uint64_t(FunctionSigSpecializationParamKind::OwnedToGuaranteed)) {
+      if (printedOptionSet)
+        Printer << " and ";
+      printedOptionSet = true;
       Printer << "Owned To Guaranteed";
     }
 
     if (raw & uint64_t(FunctionSigSpecializationParamKind::SROA)) {
-      if (convertedToGuaranteed)
+      if (printedOptionSet)
         Printer << " and ";
       Printer << "Exploded";
       return;
     }
 
-    if (convertedToGuaranteed)
+    if (printedOptionSet)
       return;
 
     switch (FunctionSigSpecializationParamKind(raw)) {
-    case FunctionSigSpecializationParamKind::Dead:
-      Printer << "Dead";
-      break;
     case FunctionSigSpecializationParamKind::InOutToValue:
       Printer << "Value Promoted from InOut";
       break;
@@ -3050,6 +3054,7 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     case FunctionSigSpecializationParamKind::ClosureProp:
       Printer << "Closure Propagated";
       break;
+    case FunctionSigSpecializationParamKind::Dead:
     case FunctionSigSpecializationParamKind::OwnedToGuaranteed:
     case FunctionSigSpecializationParamKind::SROA:
       unreachable("option sets should have been handled earlier");

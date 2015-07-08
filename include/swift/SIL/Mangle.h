@@ -146,15 +146,15 @@ class FunctionSignatureSpecializationMangler
   enum class ArgumentModifier : ArgumentModifierIntBase {
     // Option Space 4 bits (i.e. 16 options).
     Unmodified=0,
-    Dead=1,
-    ConstantProp=2,
-    ClosureProp=3,
-    InOutToValue=4,
+    ConstantProp=1,
+    ClosureProp=2,
+    InOutToValue=3,
     First_Option=0, Last_Option=31,
 
     // Option Set Space. 12 bits (i.e. 12 option).
-    OwnedToGuaranteed=32,
-    SROA=64,
+    Dead=32,
+    OwnedToGuaranteed=64,
+    SROA=128,
     First_OptionSetEntry=32, LastOptionSetEntry=32768,
   };
 

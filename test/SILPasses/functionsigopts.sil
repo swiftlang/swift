@@ -132,9 +132,11 @@ bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
 // CHECK: release_value
 sil [fragile] @owned_to_guaranteed_simple_singlebb_callee : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
+  %1 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
   release_value %0 : $Builtin.NativeObject
-  %1 = tuple()
-  return %1 : $()
+  %2 = tuple()
+  return %2 : $()
 }
 
 // Callee to make sure we handle multiple callees properly.
@@ -180,6 +182,8 @@ bb0(%0 : $Builtin.NativeObject):
 // CHECK: release_value %1 : $Builtin.NativeObject
 sil [fragile] @owned_to_guaranteed_multibb_callee_with_release_in_exit : $@convention(thin) (Builtin.Int1, @owned Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.Int1, %1 : $Builtin.NativeObject):
+  %9999 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %9999(%1) : $@convention(thin) (Builtin.NativeObject) -> ()
   cond_br undef, bb1, bb2
 
 bb1:
@@ -210,6 +214,8 @@ bb2:
 // CHECK-LABEL: sil [fragile] [thunk] @owned_to_guaranteed_simple_singlebb_multiple_arg_callee : $@convention(thin) (Builtin.Int1, @owned Builtin.NativeObject, Builtin.Int1) -> () {
 sil [fragile] @owned_to_guaranteed_simple_singlebb_multiple_arg_callee : $@convention(thin) (Builtin.Int1, @owned Builtin.NativeObject, Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1, %1 : $Builtin.NativeObject, %2 : $Builtin.Int1):
+  %9999 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %9999(%1) : $@convention(thin) (Builtin.NativeObject) -> ()
   cond_br %0, bb1, bb2
 
 bb1:
@@ -230,6 +236,9 @@ bb3:
 // CHECK: release_value [[INPUT_PTR2]] : $Builtin.NativeObject
 sil [fragile] @owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_1 : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
+  %9999 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %9999(%1) : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %9999(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
   cond_br undef, bb1, bb2
 
 bb1:
@@ -248,6 +257,9 @@ bb2:
 // CHECK: release_value [[INPUT_PTR2]] : $Builtin.NativeObject
 sil [fragile] @owned_to_guaranteed_multibb_callee_with_release_in_exit_two_args_2 : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
+  %9999 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %9999(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %9999(%1) : $@convention(thin) (Builtin.NativeObject) -> ()
   %2 = function_ref @create_object : $@convention(thin) () -> Builtin.NativeObject
   %3 = apply %2() : $@convention(thin) () -> Builtin.NativeObject
   cond_br undef, bb1(%3 : $Builtin.NativeObject), bb2(%3 : $Builtin.NativeObject)
@@ -259,8 +271,8 @@ bb2(%5 : $Builtin.NativeObject):
   strong_release %5 : $Builtin.NativeObject
   strong_release %0 : $Builtin.NativeObject
   strong_release %1 : $Builtin.NativeObject
-  %9999 = tuple()
-  return %9999 : $()
+  %6 = tuple()
+  return %6 : $()
 }
 
 // CHECK-LABEL: sil [fragile] @owned_to_guaranteed_simple_singlebb_multiple_arg_caller : $@convention(thin) (Builtin.NativeObject, Builtin.NativeObject) -> () {
@@ -321,9 +333,11 @@ bb0(%0 : $Builtin.NativeObject, %1 : $Builtin.NativeObject):
 // CHECK: release_value
 sil [fragile] [_semantics "array.foobar"] @array_semantic : $@convention(method) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : $Builtin.NativeObject):
+  %1 = function_ref @user : $@convention(thin) (Builtin.NativeObject) -> ()
+  apply %1(%0) : $@convention(thin) (Builtin.NativeObject) -> ()
   release_value %0 : $Builtin.NativeObject
-  %1 = tuple()
-  return %1 : $()
+  %2 = tuple()
+  return %2 : $()
 }
 
 // CHECK-LABEL: sil [fragile] @array_semantic_caller : $@convention(thin) (Builtin.NativeObject) -> () {
@@ -395,6 +409,9 @@ bb0(%0 : $Builtin.Int32):
 
 // CHECK-LABEL: sil [fragile] @_TTSf4d_g__owned_to_guaranteed_multibb_callee_with_release_in_exit : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 // CHECK: bb0(
+// CHECK-NEXT:  function_ref user
+// CHECK-NEXT:  function_ref @user
+// CHECK-NEXT:  apply
 // CHECK-NEXT:  cond_br undef, bb1, bb2
 // CHECK: bb1:
 // CHECK-NEXT:  br bb2
@@ -410,5 +427,8 @@ bb0(%0 : $Builtin.Int32):
 
 // CHECK-LABEL: sil [fragile] @_TTSf4g__array_semantic : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 // CHECK: bb0(%0 : $Builtin.NativeObject)
-// CHECK-NEXT:  %1 = tuple ()
-// CHECK-NEXT:  return %1
+// CHECK-NEXT:  function_ref user
+// CHECK-NEXT:  function_ref @user
+// CHECK-NEXT:  apply
+// CHECK-NEXT:  tuple
+// CHECK-NEXT:  return

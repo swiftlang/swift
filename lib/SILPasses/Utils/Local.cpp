@@ -33,14 +33,15 @@ using namespace swift;
 ///
 /// This routine only examines the state of the instruction at hand.
 bool
-swift::isInstructionTriviallyDead(SILInstruction *I) {
+swift::isInstructionTriviallyDead(SILInstruction *I,
+                                  bool DeleteDebug) {
   // At Onone, consider all uses, including the debug_info.
   // This way, debug_info is preserved at Onone.
   if (!I->use_empty() &&
       I->getModule().getOptions().Optimization <= SILOptions::SILOptMode::None)
     return false;
 
-  if (!hasNoUsesExceptDebug(I) || isa<TermInst>(I))
+  if ((!DeleteDebug && !hasNoUsesExceptDebug(I)) || isa<TermInst>(I))
     return false;
 
   if (auto *BI = dyn_cast<BuiltinInst>(I)) {
@@ -77,7 +78,8 @@ namespace {
 
 bool swift::
 recursivelyDeleteTriviallyDeadInstructions(ArrayRef<SILInstruction *> IA,
-                                           bool Force, CallbackTy Callback) {
+                                           bool Force, CallbackTy Callback,
+                                           bool DeleteDebug) {
   // Delete these instruction and others that become dead after it's deleted.
   llvm::SmallPtrSet<SILInstruction *, 8> DeadInsts;
   for (auto I : IA) {
@@ -140,19 +142,21 @@ recursivelyDeleteTriviallyDeadInstructions(ArrayRef<SILInstruction *> IA,
 /// \return Returns true if any instructions were deleted.
 bool swift::recursivelyDeleteTriviallyDeadInstructions(SILInstruction *I,
                                                        bool Force,
-                                                       CallbackTy Callback) {
+                                                       CallbackTy Callback,
+                                                       bool DeleteDebug) {
 
   ArrayRef<SILInstruction *> AI = ArrayRef<SILInstruction *>(I);
-  return recursivelyDeleteTriviallyDeadInstructions(AI, Force, Callback);
+  return recursivelyDeleteTriviallyDeadInstructions(AI, Force, Callback,
+                                                    DeleteDebug);
 }
 
-void swift::eraseUsesOfInstruction(SILInstruction *Inst) {
+void swift::eraseUsesOfInstruction(SILInstruction *Inst, bool DeleteDebug) {
   for (auto UI : Inst->getUses()) {
     auto *User = UI->getUser();
 
     // If the instruction itself has any uses, recursively zap them so that
     // nothing uses this instruction.
-    eraseUsesOfInstruction(User);
+    eraseUsesOfInstruction(User, DeleteDebug);
 
     // Walk through the operand list and delete any random instructions that
     // will become trivially dead when this instruction is removed.
@@ -162,7 +166,35 @@ void swift::eraseUsesOfInstruction(SILInstruction *Inst) {
         // Don't recursively delete the pointer we're getting in.
         if (OpI != Inst) {
           Op.drop();
-          recursivelyDeleteTriviallyDeadInstructions(OpI);
+          recursivelyDeleteTriviallyDeadInstructions(OpI, false,
+                                                     [](SILInstruction *){},
+                                                     DeleteDebug);
+        }
+      }
+    }
+
+    User->eraseFromParent();
+  }
+}
+
+void swift::eraseUsesOfValue(SILValue V, bool DeleteDebug) {
+  for (auto UI : V.getUses()) {
+    auto *User = UI->getUser();
+
+    // If the instruction itself has any uses, recursively zap them so that
+    // nothing uses this instruction.
+    eraseUsesOfValue(User, DeleteDebug);
+
+    // Walk through the operand list and delete any random instructions that
+    // will become trivially dead when this instruction is removed.
+    for (auto &Op : User->getAllOperands()) {
+      if (auto *OpI = dyn_cast<SILInstruction>(Op.get())) {
+        // Don't recursively delete the pointer we're getting in.
+        if (Op.get() != V) {
+          Op.drop();
+          recursivelyDeleteTriviallyDeadInstructions(OpI, false,
+                                                     [](SILInstruction *){},
+                                                     DeleteDebug);
         }
       }
     }
