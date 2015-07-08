@@ -577,10 +577,10 @@ func testOuterE() {
 }
 // NESTED_NOMINAL_DECL_E_1: Begin completions
 // NESTED_NOMINAL_DECL_E_1-DAG: Decl[LocalVar]/Local:            self[#Nested1.Nested2#]{{; name=.+$}}
-// NESTED_NOMINAL_DECL_E_1-DAG: Decl[FreeFunction]/Local:        dFunc5()[#Void#]; name=dFunc5()
-// NESTED_NOMINAL_DECL_E_1-DAG: Decl[FreeFunction]/Local:        dFunc4()[#Void#]; name=dFunc4()
-// NESTED_NOMINAL_DECL_E_1-DAG: Decl[InstanceMethod]/OutNominal: dFunc3()[#Void#]; name=dFunc3()
-// NESTED_NOMINAL_DECL_E_1-DAG: Decl[InstanceMethod]/OutNominal: dFunc2()[#Void#]; name=dFunc2()
-// NESTED_NOMINAL_DECL_E_1-DAG: Decl[FreeFunction]/Local:        dFunc2()[#Void#]; name=dFunc2()
-// NESTED_NOMINAL_DECL_E_1-DAG: Decl[FreeFunction]/Local:        dFunc1()[#Void#]; name=dFunc1()
+// NESTED_NOMINAL_DECL_E_1-DAG: Decl[FreeFunction]/Local:        dFunc5[#<<error type>>#]{{; name=.+$}}
+// NESTED_NOMINAL_DECL_E_1-DAG: Decl[FreeFunction]/Local:        dFunc4[#<<error type>>#]{{; name=.+$}}
+// NESTED_NOMINAL_DECL_E_1-DAG: Decl[InstanceMethod]/OutNominal: dFunc3[#<<error type>>#]{{; name=.+$}}
+// NESTED_NOMINAL_DECL_E_1-DAG: Decl[InstanceMethod]/OutNominal: dFunc2[#<<error type>>#]{{; name=.+$}}
+// NESTED_NOMINAL_DECL_E_1-DAG: Decl[FreeFunction]/Local:        dFunc2[#<<error type>>#]{{; name=.+$}}
+// NESTED_NOMINAL_DECL_E_1-DAG: Decl[FreeFunction]/Local:        dFunc1[#<<error type>>#]{{; name=.+$}}
 // NESTED_NOMINAL_DECL_E_1: End completions

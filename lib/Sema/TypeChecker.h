@@ -458,7 +458,7 @@ private:
   llvm::DenseSet<CanType> CIntegerTypes;
   
   /// The set of expressions currently being analyzed for failures.
-  llvm::DenseMap<Expr*, Expr*> DiagnosedExprs;
+  llvm::DenseSet<Expr *> DiagnosedExprs;
 
   /// A set of types that are representable in Objective-C, but require
   /// non-trivial bridging.
@@ -1629,11 +1629,11 @@ public:
   void checkInitializerErrorHandling(Initializer *I, Expr *E);
   void checkEnumElementErrorHandling(EnumElementDecl *D);
 
-  void addExprForDiagnosis(Expr *E1, Expr *Result) {
-    DiagnosedExprs[E1] = Result;
+  void addExprForDiagnosis(Expr *E) {
+    DiagnosedExprs.insert(E);
   }
-  Expr *exprIsBeingDiagnosed(Expr *E) {
-    return DiagnosedExprs[E];
+  bool exprIsBeingDiagnosed(Expr *E) {
+    return DiagnosedExprs.count(E) != 0;
   }
 
   /// If an expression references 'self.init' or 'super.init' in an
@@ -1655,16 +1655,14 @@ public:
 /// \brief RAII object that cleans up the given expression if not explicitly
 /// disabled.
 class CleanupIllFormedExpressionRAII {
-  ASTContext &Context;
+  constraints::ConstraintSystem &cs;
   Expr **expr;
   
 public:
-  CleanupIllFormedExpressionRAII(ASTContext &Context, Expr *&expr)
-    : Context(Context), expr(&expr) { }
+  CleanupIllFormedExpressionRAII(constraints::ConstraintSystem &cs, Expr *&expr)
+  : cs(cs), expr(&expr) { }
   
   ~CleanupIllFormedExpressionRAII();
-  
-  static void doIt(Expr *expr, ASTContext &Context);
   
   /// \brief Disable the cleanup of this expression; it doesn't need it.
   void disable() {
