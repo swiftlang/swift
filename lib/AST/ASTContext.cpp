@@ -3313,8 +3313,8 @@ DeclName::DeclName(ASTContext &C, Identifier baseName,
 }
 
 Optional<Type>
-ASTContext::getBridgedToObjC(const DeclContext *dc, bool inExpression,
-                             Type type, LazyResolver *resolver) const {
+ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
+                             LazyResolver *resolver) const {
   if (type->isBridgeableObjectType())
     return type;
   // Retrieve the _BridgedToObjectiveC protocol.
@@ -3346,7 +3346,7 @@ ASTContext::getBridgedToObjC(const DeclContext *dc, bool inExpression,
       if (arg->hasTypeVariable())
         continue;
 
-      if (!getBridgedToObjC(dc, inExpression, arg, resolver))
+      if (!getBridgedToObjC(dc, arg, resolver))
         return None;
     }
   }

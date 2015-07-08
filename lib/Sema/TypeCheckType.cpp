@@ -152,7 +152,6 @@ Type TypeChecker::getNSErrorType(DeclContext *dc) {
 
 Type 
 TypeChecker::getDynamicBridgedThroughObjCClass(DeclContext *dc,
-                                               bool inExpression,
                                                Type dynamicType,
                                                Type valueType) {
   // We can only bridge from class or Objective-C existential types.
@@ -164,7 +163,7 @@ TypeChecker::getDynamicBridgedThroughObjCClass(DeclContext *dc,
   if (!valueType->isPotentiallyBridgedValueType())
     return Type();
 
-  return getBridgedToObjC(dc, inExpression, valueType);
+  return getBridgedToObjC(dc, valueType);
 }
 
 void TypeChecker::forceExternalDeclMembers(NominalTypeDecl *nominalDecl) {
@@ -2415,7 +2414,7 @@ static bool isBridgedToObjectiveCClass(DeclContext *dc, Type type) {
 
   // Determine whether this type is bridged to Objective-C.
   ASTContext &ctx = type->getASTContext();
-  Optional<Type> bridged = ctx.getBridgedToObjC(dc, false, type,
+  Optional<Type> bridged = ctx.getBridgedToObjC(dc, type,
                                                 ctx.getLazyResolver());
   if (!bridged)
     return false;
@@ -2910,9 +2909,8 @@ bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,
   return false;
 }
 
-Type TypeChecker::getBridgedToObjC(const DeclContext *dc, bool inExpression,
-                                   Type type) {
-  if (auto bridged = Context.getBridgedToObjC(dc, inExpression, type, this))
+Type TypeChecker::getBridgedToObjC(const DeclContext *dc, Type type) {
+  if (auto bridged = Context.getBridgedToObjC(dc, type, this))
     return *bridged;
   return nullptr;
 }
@@ -2967,7 +2965,7 @@ bool TypeChecker::isRepresentableInObjC(const DeclContext *DC, Type T) {
     if (auto boundGeneric = T->getAs<BoundGenericType>()) {
       if (boundGeneric->getDecl() == arrayDecl) {
         auto elementType = boundGeneric->getGenericArgs()[0];
-        return !getBridgedToObjC(DC, false, elementType).isNull();
+        return !getBridgedToObjC(DC, elementType).isNull();
       }
     }
   }
@@ -2978,12 +2976,12 @@ bool TypeChecker::isRepresentableInObjC(const DeclContext *DC, Type T) {
       if (boundGeneric->getDecl() == dictDecl) {
         // The key type must be bridged to Objective-C.
         auto keyType = boundGeneric->getGenericArgs()[0];
-        if (getBridgedToObjC(DC, false, keyType).isNull())
+        if (getBridgedToObjC(DC, keyType).isNull())
           return false;
 
         // The value type must be bridged to Objective-C.
         auto valueType = boundGeneric->getGenericArgs()[1];
-        if (getBridgedToObjC(DC, false, valueType).isNull())
+        if (getBridgedToObjC(DC, valueType).isNull())
           return false;
 
         return true;
@@ -2996,7 +2994,7 @@ bool TypeChecker::isRepresentableInObjC(const DeclContext *DC, Type T) {
     if (auto boundGeneric = T->getAs<BoundGenericType>()) {
       if (boundGeneric->getDecl() == setDecl) {
         auto elementType = boundGeneric->getGenericArgs()[0];
-        return !getBridgedToObjC(DC, false, elementType).isNull();
+        return !getBridgedToObjC(DC, elementType).isNull();
       }
     }
   }

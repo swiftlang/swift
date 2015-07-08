@@ -3313,8 +3313,7 @@ ObjCSubscriptKind SubscriptDecl::getObjCSubscriptKind(
   if (Type objectTy = indexTy->getAnyOptionalObjectType())
     indexTy = objectTy;
 
-  if (getASTContext().getBridgedToObjC(getDeclContext(), false, indexTy,
-                                       resolver))
+  if (getASTContext().getBridgedToObjC(getDeclContext(), indexTy, resolver))
     return ObjCSubscriptKind::Keyed;
 
   return ObjCSubscriptKind::None;

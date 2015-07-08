@@ -1540,8 +1540,7 @@ static void emitMatchingRCAdjustmentsForCall(ApplyInst *Call, SILValue OnX) {
 static bool isCastTypeKnownToSucceed(SILType Type, SILModule &Mod) {
   auto *M = Mod.getSwiftModule();
   return M->getASTContext()
-      .getBridgedToObjC(M, /*inExpression*/ false, Type.getSwiftRValueType(),
-                        nullptr)
+      .getBridgedToObjC(M, Type.getSwiftRValueType(), nullptr)
       .hasValue();
 }
 

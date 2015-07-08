@@ -2577,7 +2577,7 @@ namespace {
 
         if (auto baseMetaTy = baseTy->getAs<MetatypeType>()) {
           auto &tc = cs.getTypeChecker();
-          auto classTy = tc.getBridgedToObjC(cs.DC, true,
+          auto classTy = tc.getBridgedToObjC(cs.DC,
                                              baseMetaTy->getInstanceType());
           
           // FIXME: We're dropping side effects in the base here!

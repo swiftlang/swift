@@ -1090,25 +1090,17 @@ public:
   /// \param dc The declaration context from which we will look for
   /// bridging.
   ///
-  /// \param inExpression Whether this type is being used in an expression or
-  /// local declaration. This affects what sort of dependencies are recorded
-  /// when resolving the type.
-  ///
   /// \param type The value type being queried, e.g., String.
   ///
   /// \returns the class type to which the given type is bridged, or null if it
   /// is not bridged.
-  Type getBridgedToObjC(const DeclContext *dc, bool inExpression, Type type);
+  Type getBridgedToObjC(const DeclContext *dc, Type type);
 
   /// Find the Objective-C class that bridges between a value of the given
   /// dynamic type and the given value type.
   ///
   /// \param dc The declaration context from which we will look for
   /// bridging.
-  ///
-  /// \param inExpression Whether this type is being used in an expression or
-  /// local declaration. This affects what sort of dependencies are recorded
-  /// when resolving the type.
   ///
   /// \param dynamicType A dynamic type from which we are bridging. Class and
   /// Objective-C protocol types can be used for bridging.
@@ -1119,7 +1111,7 @@ public:
   /// type as an Objective-C class, e.g., \c NSString represents \c
   /// String, or a null type if there is no such type or if the
   /// dynamic type isn't something we can start from.
-  Type getDynamicBridgedThroughObjCClass(DeclContext *dc, bool inExpression,
+  Type getDynamicBridgedThroughObjCClass(DeclContext *dc,
                                          Type dynamicType,
                                          Type valueType);
 

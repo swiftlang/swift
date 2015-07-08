@@ -45,8 +45,7 @@ mayBridgeToObjectiveC(Module *M, CanType T) {
   if (T->isAnyExistentialType())
     return true;
   
-  if (M->getASTContext().getBridgedToObjC(M, /*inExpression*/ false,
-                                          T, nullptr))
+  if (M->getASTContext().getBridgedToObjC(M, T, nullptr))
     return true;
 
   return false;
@@ -409,7 +408,7 @@ swift::classifyDynamicCast(Module *M,
     // Try to get the ObjC type which is bridged to target type.
     assert(!target.isAnyExistentialType());
     Optional<Type> ObjCTy = M->getASTContext().getBridgedToObjC(
-        M, /*inExpression*/ false, target, nullptr);
+        M, target, nullptr);
     if (ObjCTy) {
       // If the bridged ObjC type is known, check if
       // source type can be cast into it.
@@ -424,7 +423,7 @@ swift::classifyDynamicCast(Module *M,
     // Try to get the ObjC type which is bridged to source type.
     assert(!source.isAnyExistentialType());
     Optional<Type> ObjCTy = M->getASTContext().getBridgedToObjC(
-        M, /*inExpression*/ false, source, nullptr);
+        M, source, nullptr);
     if (ObjCTy) {
       // If the bridged ObjC type is known, check if
       // this type can be cast into target type.

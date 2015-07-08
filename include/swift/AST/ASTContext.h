@@ -468,7 +468,6 @@ public:
   
   /// Get the Objective-C type that a Swift type bridges to, if any.
   Optional<Type> getBridgedToObjC(const DeclContext *dc,
-                                  bool inExpression,
                                   Type type,
                                   LazyResolver *resolver) const;
 
