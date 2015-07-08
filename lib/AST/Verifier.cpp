@@ -390,6 +390,13 @@ struct ASTNodeBase {};
     void verifyChecked(Decl *D) {}
 
     void verifyChecked(Type type) {
+      llvm::SmallPtrSet<ArchetypeType *, 4> visitedArchetypes;
+      verifyChecked(type, visitedArchetypes);
+    }
+
+    void verifyChecked(
+           Type type,
+           llvm::SmallPtrSet<ArchetypeType *, 4> &visitedArchetypes) {
       if (!type)
         return;
 
@@ -401,6 +408,10 @@ struct ASTNodeBase {};
 
       bool foundError = type.findIf([&](Type type) -> bool {
         if (auto archetype = type->getAs<ArchetypeType>()) {
+          // Only visit each archetype once.
+          if (!visitedArchetypes.insert(archetype).second)
+            return false;
+
           // We should know about archetypes corresponding to opened
           // existerntial archetypes.
           if (archetype->getOpenedExistentialType()) {
@@ -452,6 +463,8 @@ struct ASTNodeBase {};
                 return true;
               }
             }
+
+            verifyChecked(nested.second.getValue(), visitedArchetypes);
           }
         }
 
