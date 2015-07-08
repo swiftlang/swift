@@ -27,3 +27,32 @@ public protocol CT : ST, _CDT {
 
 // CHECK: sil_witness_table <T where T : _CDT> _S<T>: CT module witnesses_canonical {
 // associated_type_protocol (_SS: _CDT): _S<_S<T>>: specialize <T = _S<T>> (<T where T : _CDT> _S<T>: _CDT module witnesses_canonical)
+
+// rdar://problem/21599502 -- make sure we get requirements on
+// associated types from protocols we inherit.
+public protocol P1 { }
+public protocol P2 { }
+
+public protocol Q1 {
+  typealias Assoc : P1
+}
+
+public protocol Q2 {
+  typealias Assoc : P2
+}
+
+public protocol Q3 : Q1, Q2 {
+  typealias Assoc
+}
+
+struct XP : P1, P2 { }
+
+struct XQ3 : Q3 {
+  typealias Assoc = XP
+}
+
+// CHECK: sil_witness_table XQ3: Q3 module witnesses_canonical {
+// CHECK:  associated_type Assoc: XP
+// CHECK:  associated_type_protocol (Assoc: P1): XP: P1 module witnesses_canonical
+// CHECK:  associated_type_protocol (Assoc: P2): XP: P2 module witnesses_canonical
+// CHECK: }

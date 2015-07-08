@@ -879,8 +879,10 @@ static void addMinimumProtocols(Type T,
     }
 
     if (Visited.insert(Proto->getDecl()).second) {
+      Stack.push_back(Proto->getDecl());
       for (auto Inherited : Proto->getDecl()->getInheritedProtocols(nullptr))
-        addProtocols(Inherited->getDeclaredType(), Stack);
+        addMinimumProtocols(Inherited->getDeclaredType(), Protocols, Known,
+                            Visited, Stack, ZappedAny);
     }
     return;
   }

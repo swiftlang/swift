@@ -541,6 +541,28 @@ void TypeChecker::checkInheritanceClause(Decl *decl,
     inherited.setInvalidType(Context);
   }
 
+  // For an associated type, find associated types with the same name
+  // in inherited protocols and add their conformances.
+  if (auto assocType = dyn_cast<AssociatedTypeDecl>(decl)) {
+    auto proto = cast<ProtocolDecl>(assocType->getDeclContext());
+    for (auto inheritedProto : proto->getInheritedProtocols(this)) {
+      SmallVector<ValueDecl *, 4> lookupResults;
+      unsigned subOptions
+        = NL_QualifiedDefault & ~(NL_RemoveNonVisible | NL_RemoveOverridden);
+      inheritedProto->lookupQualified(inheritedProto->getDeclaredType(),
+                                      assocType->getName(), subOptions, this,
+                                      lookupResults);
+
+      for (auto member : lookupResults) {
+        if (auto inheritedAssoc = dyn_cast<AssociatedTypeDecl>(member)) {
+          validateDecl(inheritedAssoc);
+          auto conforming = inheritedAssoc->getConformingProtocols(this);
+          allProtocols.insert(conforming.begin(), conforming.end());
+        }
+      }
+    }
+  }
+
   // Record the protocols to which this declaration conforms along with the
   // superclass.
   auto allProtocolsCopy = Context.AllocateCopy(allProtocols);
@@ -5912,6 +5934,14 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
           .getAsArchetype();
         if (!archetype)
           return;
+
+#ifndef NDEBUG
+        auto conformingProtocols = assocType->getConformingProtocols(this);
+        SmallVector<ProtocolDecl *, 4> protocols(conformingProtocols.begin(),
+                                                 conformingProtocols.end());
+        ProtocolType::canonicalizeProtocols(protocols);
+        assert(llvm::makeArrayRef(protocols) == archetype->getConformsTo());
+#endif
         assocType->setArchetype(archetype);
       }
     }
