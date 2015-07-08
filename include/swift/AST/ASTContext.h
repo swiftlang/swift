@@ -357,6 +357,15 @@ public:
   /// Retrieve the declaration of Swift.Int.
   NominalTypeDecl *getIntDecl() const;
 
+  /// Retrieve the declaration of Swift.UInt.
+  NominalTypeDecl *getUIntDecl() const;
+
+  /// Retrieve the declaration of Swift.Float.
+  NominalTypeDecl *getFloatDecl() const;
+
+  /// Retrieve the declaration of Swift.Double.
+  NominalTypeDecl *getDoubleDecl() const;
+
   /// Retrieve the declaration of Swift.String.
   NominalTypeDecl *getStringDecl() const;
 

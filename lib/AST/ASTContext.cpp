@@ -79,6 +79,21 @@ struct ASTContext::Implementation {
 
   llvm::StringMap<char, llvm::BumpPtrAllocator&> IdentifierTable;
 
+  /// The declaration of Swift.Bool.
+  NominalTypeDecl *BoolDecl = nullptr;
+
+  /// The declaration of Swift.Int.
+  NominalTypeDecl *IntDecl = nullptr;
+
+  /// The declaration of Swift.UInt.
+  NominalTypeDecl *UIntDecl = nullptr;
+
+  /// The declaration of Swift.Float.
+  NominalTypeDecl *FloatDecl = nullptr;
+
+  /// The declaration of Swift.Double.
+  NominalTypeDecl *DoubleDecl = nullptr;
+
   /// The declaration of Swift.String.
   NominalTypeDecl *StringDecl = nullptr;
 
@@ -453,60 +468,59 @@ void ASTContext::lookupInSwiftModule(
   M->lookupValue({ }, identifier, NLKind::UnqualifiedLookup, results);
 }
 
-NominalTypeDecl *ASTContext::getBoolDecl() const {
-  SmallVector<ValueDecl*, 1> results;
-  lookupInSwiftModule("Bool", results);
-  for (auto result : results) {
-    if (auto nominal = dyn_cast<NominalTypeDecl>(result)) {
-      return nominal;
-    }
-  }
-  return nullptr;
-}
-
-NominalTypeDecl *ASTContext::getIntDecl() const {
-  SmallVector<ValueDecl*, 1> results;
-  lookupInSwiftModule("Int", results);
-  for (auto result : results) {
-    if (auto nominal = dyn_cast<NominalTypeDecl>(result)) {
-      return nominal;
-    }
-  }
-  return nullptr;
-}
-
-NominalTypeDecl *ASTContext::getStringDecl() const {
-  if (Impl.StringDecl) return Impl.StringDecl;
-
-  SmallVector<ValueDecl*, 1> results;
-  lookupInSwiftModule("String", results);
-  for (auto result : results) {
-    if (auto nominal = dyn_cast<NominalTypeDecl>(result)) {
-      Impl.StringDecl = nominal;
-      return Impl.StringDecl;
-    }
-  }
-  return nullptr;
-}
-
 /// Find the generic implementation declaration for the named syntactic-sugar
 /// type.
-static NominalTypeDecl *findStdlibType(const ASTContext &ctx, StringRef name) {
+static NominalTypeDecl *findStdlibType(const ASTContext &ctx, StringRef name,
+                                       unsigned genericParams) {
   // Find all of the declarations with this name in the Swift module.
   SmallVector<ValueDecl *, 1> results;
   ctx.lookupInSwiftModule(name, results);
   for (auto result : results) {
     if (auto nominal = dyn_cast<NominalTypeDecl>(result)) {
-      if (auto params = nominal->getGenericParams()) {
-        if (params->size() == 1) {
-          // We found it.
-          return nominal;
-        }
+      auto params = nominal->getGenericParams();
+      if (genericParams == (params == nullptr ? 0 : params->size())) {
+        // We found it.
+        return nominal;
       }
     }
   }
-
   return nullptr;
+}
+
+NominalTypeDecl *ASTContext::getBoolDecl() const {
+  if (!Impl.BoolDecl)
+    Impl.BoolDecl = findStdlibType(*this, "Bool", 0);
+  return Impl.BoolDecl;
+}
+
+NominalTypeDecl *ASTContext::getIntDecl() const {
+  if (!Impl.IntDecl)
+    Impl.IntDecl = findStdlibType(*this, "Int", 0);
+  return Impl.IntDecl;
+}
+
+NominalTypeDecl *ASTContext::getUIntDecl() const {
+  if (!Impl.UIntDecl)
+    Impl.UIntDecl = findStdlibType(*this, "UInt", 0);
+  return Impl.UIntDecl;
+}
+
+NominalTypeDecl *ASTContext::getFloatDecl() const {
+  if (!Impl.FloatDecl)
+    Impl.FloatDecl = findStdlibType(*this, "Float", 0);
+  return Impl.FloatDecl;
+}
+
+NominalTypeDecl *ASTContext::getDoubleDecl() const {
+  if (!Impl.DoubleDecl)
+    Impl.DoubleDecl = findStdlibType(*this, "Double", 0);
+  return Impl.DoubleDecl;
+}
+
+NominalTypeDecl *ASTContext::getStringDecl() const {
+  if (!Impl.StringDecl)
+    Impl.StringDecl = findStdlibType(*this, "String", 0);
+  return Impl.StringDecl;
 }
 
 CanType ASTContext::getExceptionType() const {
@@ -524,36 +538,19 @@ NominalTypeDecl *ASTContext::getExceptionTypeDecl() const {
 
 NominalTypeDecl *ASTContext::getArrayDecl() const {
   if (!Impl.ArrayDecl)
-    Impl.ArrayDecl = findStdlibType(*this, "Array");
-
+    Impl.ArrayDecl = findStdlibType(*this, "Array", 1);
   return Impl.ArrayDecl;
 }
 
 NominalTypeDecl *ASTContext::getSetDecl() const {
   if (!Impl.SetDecl)
-    Impl.SetDecl = findStdlibType(*this, "Set");
-
+    Impl.SetDecl = findStdlibType(*this, "Set", 1);
   return Impl.SetDecl;
 }
 
 NominalTypeDecl *ASTContext::getDictionaryDecl() const {
-  if (!Impl.DictionaryDecl) {
-    // Find all of the declarations with this name in the Swift module.
-    SmallVector<ValueDecl *, 1> results;
-    lookupInSwiftModule("Dictionary", results);
-    for (auto result : results) {
-      if (auto nominal = dyn_cast<NominalTypeDecl>(result)) {
-        if (auto params = nominal->getGenericParams()) {
-          if (params->size() == 2) {
-            Impl.DictionaryDecl = nominal;
-            break;
-          }
-        }
-      }
-    }
-
-  }
-
+  if (!Impl.DictionaryDecl)
+    Impl.DictionaryDecl = findStdlibType(*this, "Dictionary", 2);
   return Impl.DictionaryDecl;
 }
 
@@ -571,7 +568,7 @@ EnumDecl *ASTContext::getOptionalDecl(OptionalTypeKind kind) const {
 EnumDecl *ASTContext::getOptionalDecl() const {
   if (!Impl.OptionalDecl)
     Impl.OptionalDecl
-      = dyn_cast_or_null<EnumDecl>(findStdlibType(*this, "Optional"));
+      = dyn_cast_or_null<EnumDecl>(findStdlibType(*this, "Optional", 1));
 
   return Impl.OptionalDecl;
 }
@@ -626,7 +623,7 @@ EnumDecl *ASTContext::getImplicitlyUnwrappedOptionalDecl() const {
   if (!Impl.ImplicitlyUnwrappedOptionalDecl)
     Impl.ImplicitlyUnwrappedOptionalDecl
       = dyn_cast_or_null<EnumDecl>(
-          findStdlibType(*this, "ImplicitlyUnwrappedOptional"));
+          findStdlibType(*this, "ImplicitlyUnwrappedOptional", 1));
 
   return Impl.ImplicitlyUnwrappedOptionalDecl;
 }
@@ -648,7 +645,7 @@ EnumElementDecl *ASTContext::getImplicitlyUnwrappedOptionalNoneDecl() const {
 NominalTypeDecl *ASTContext::getUnsafeMutablePointerDecl() const {
   if (!Impl.UnsafeMutablePointerDecl)
     Impl.UnsafeMutablePointerDecl = findStdlibType(
-      *this, "UnsafeMutablePointer");
+      *this, "UnsafeMutablePointer", 1);
   
   return Impl.UnsafeMutablePointerDecl;
 }
@@ -656,7 +653,7 @@ NominalTypeDecl *ASTContext::getUnsafeMutablePointerDecl() const {
 NominalTypeDecl *ASTContext::getUnsafePointerDecl() const {
   if (!Impl.UnsafePointerDecl)
     Impl.UnsafePointerDecl
-      = findStdlibType(*this, "UnsafePointer");
+      = findStdlibType(*this, "UnsafePointer", 1);
   
   return Impl.UnsafePointerDecl;
 }
@@ -664,7 +661,7 @@ NominalTypeDecl *ASTContext::getUnsafePointerDecl() const {
 NominalTypeDecl *ASTContext::getAutoreleasingUnsafeMutablePointerDecl() const {
   if (!Impl.AutoreleasingUnsafeMutablePointerDecl)
     Impl.AutoreleasingUnsafeMutablePointerDecl
-      = findStdlibType(*this, "AutoreleasingUnsafeMutablePointer");
+      = findStdlibType(*this, "AutoreleasingUnsafeMutablePointer", 1);
   
   return Impl.AutoreleasingUnsafeMutablePointerDecl;
 }
@@ -717,7 +714,7 @@ ASTContext::getPointerMemoryPropertyDecl(PointerTypeKind ptrKind) const {
 
 NominalTypeDecl *ASTContext::getCFunctionPointerDecl() const {
   if (!Impl.CFunctionPointerDecl)
-    Impl.CFunctionPointerDecl = findStdlibType(*this, "CFunctionPointer");
+    Impl.CFunctionPointerDecl = findStdlibType(*this, "CFunctionPointer", 1);
   
   return Impl.CFunctionPointerDecl;
 }
