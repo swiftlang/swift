@@ -276,7 +276,7 @@ swift::classifyDynamicCast(Module *M,
     // If isSourceTypeExact is true, we know we are casting the result of a
     // MetatypeInst instruction.
     if (isSourceTypeExact) {
-      // If source or target are existentials, then it can be casted
+      // If source or target are existentials, then it can be cast
       // successfully only into itself.
       if ((target.isAnyExistentialType() || source.isAnyExistentialType()) &&
           target != source)
@@ -303,18 +303,18 @@ swift::classifyDynamicCast(Module *M,
               : DynamicCastFeasibility::WillFail);
 
     // If both metatypes are class metatypes, check if classes can be
-    // casted.
+    // cast.
     if (source.getClassOrBoundGenericClass() &&
         target.getClassOrBoundGenericClass())
       return classifyDynamicCast(M, source, target, false, isWholeModuleOpts);
 
-    // Different structs cannot be casted to each other.
+    // Different structs cannot be cast to each other.
     if (source.getStructOrBoundGenericStruct() &&
         target.getStructOrBoundGenericStruct() &&
         source != target)
       return DynamicCastFeasibility::WillFail;
 
-    // Different enums cannot be casted to each other.
+    // Different enums cannot be cast to each other.
     if (source.getEnumOrBoundGenericEnum() &&
         target.getEnumOrBoundGenericEnum() &&
         source != target)
@@ -395,7 +395,7 @@ swift::classifyDynamicCast(Module *M,
         M, /*inExpression*/ false, target, nullptr);
     if (ObjCTy) {
       // If the bridged ObjC type is known, check if
-      // source type can be casted into it.
+      // source type can be cast into it.
       return classifyDynamicCast(M, source,
           ObjCTy.getValue().getCanonicalTypeOrNull(),
           /* isSourceTypeExact */ false, isWholeModuleOpts);
@@ -410,7 +410,7 @@ swift::classifyDynamicCast(Module *M,
         M, /*inExpression*/ false, source, nullptr);
     if (ObjCTy) {
       // If the bridged ObjC type is known, check if
-      // this type can be casted into target type.
+      // this type can be cast into target type.
       return classifyDynamicCast(M,
           ObjCTy.getValue().getCanonicalTypeOrNull(),
           target,
