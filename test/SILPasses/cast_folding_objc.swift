@@ -39,7 +39,7 @@ func cast0(o: AnyObject) -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @_TF17cast_folding_objc5test0FT_Sb
 // CHECK: bb0
-// Check that cast is not elmiminated even though cast0 is a conversion
+// Check that cast is not eliminated even though cast0 is a conversion
 // from a class to struct, because it casts to a struct implementing
 // the _BridgedToObjectiveC protocol
 // CHECK: checked_cast
@@ -89,7 +89,7 @@ public func testMayBeBridgedCastFromObjCtoSwift(o: AnyObject) -> Int {
 
 // Check that this cast does not get eliminated, because
 // the compiler does not statically know if this object
-// is NSNumber can can be converted into Int.
+// is NSString can can be converted into String.
 // CHECK-LABEL: sil [noinline] @_TF17cast_folding_objc41testConditionalBridgedCastFromObjCtoSwiftFPSs9AnyObject_GSqSS_
 // CHECK: unconditional_checked_cast_addr
 // CHECK: return

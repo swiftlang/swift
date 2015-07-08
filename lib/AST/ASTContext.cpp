@@ -3312,30 +3312,27 @@ DeclName::DeclName(ASTContext &C, Identifier baseName,
 Optional<Type>
 ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
                              LazyResolver *resolver) const {
+  if (!LangOpts.EnableObjCInterop)
+    return None;
+
   if (type->isBridgeableObjectType())
     return type;
-  // Retrieve the _BridgedToObjectiveC protocol.
-  auto bridgedProto = getProtocol(KnownProtocolKind::_ObjectiveCBridgeable);
-  if (!bridgedProto)
-    return None;
-  
-  // Check whether the type conforms to _BridgedToObjectiveC.
-  auto conformance
-    = dc->getParentModule()->lookupConformance(type, bridgedProto, resolver);
-  
-  switch (conformance.getInt()) {
-  case ConformanceKind::Conforms:
-    // The type conforms, and we know the conformance, so we can look up the
-    // bridged type below.
-    break;
-  case ConformanceKind::UncheckedConforms:
-    // The type conforms, but we don't have a conformance yet. Return
-    // Optional(nullptr) to signal this.
-    return Type();
-  case ConformanceKind::DoesNotConform:
-    return None;
+
+  // Whitelist certain types even if Foundation is not imported, to ensure
+  // that casts from AnyObject to one of these types are not optimized away.
+  bool knownBridgedToObjC = false;
+  if (auto ntd = type->getAnyNominal()) {
+    knownBridgedToObjC = (ntd == getBoolDecl() ||
+                          ntd == getIntDecl() ||
+                          ntd == getUIntDecl() ||
+                          ntd == getFloatDecl() ||
+                          ntd == getDoubleDecl() ||
+                          ntd == getArrayDecl() ||
+                          ntd == getDictionaryDecl() ||
+                          ntd == getSetDecl() ||
+                          ntd == getStringDecl());
   }
-  
+
   // If the type is generic, check whether its generic arguments are also
   // bridged to Objective-C.
   if (auto bgt = type->getAs<BoundGenericType>()) {
@@ -3347,7 +3344,33 @@ ASTContext::getBridgedToObjC(const DeclContext *dc, Type type,
         return None;
     }
   }
-  
+
+  // Retrieve the _BridgedToObjectiveC protocol.
+  auto bridgedProto = getProtocol(KnownProtocolKind::_ObjectiveCBridgeable);
+  if (!bridgedProto)
+    return None;
+
+  // Check whether the type conforms to _BridgedToObjectiveC.
+  auto conformance
+    = dc->getParentModule()->lookupConformance(type, bridgedProto, resolver);
+
+  switch (conformance.getInt()) {
+  case ConformanceKind::Conforms:
+    // The type conforms, and we know the conformance, so we can look up the
+    // bridged type below.
+    break;
+  case ConformanceKind::UncheckedConforms:
+    // The type conforms, but we don't have a conformance yet. Return
+    // Optional(nullptr) to signal this.
+    return Type();
+  case ConformanceKind::DoesNotConform:
+    // If we haven't imported Foundation but this is a whitelisted type,
+    // behave as above.
+    if (knownBridgedToObjC)
+      return Type();
+    return None;
+  }
+
   // Find the type we bridge to.
   return ProtocolConformance::getTypeWitnessByName(type,
                                                conformance.getPointer(),
