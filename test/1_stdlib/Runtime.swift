@@ -780,6 +780,46 @@ Runtime.test("Generic class ObjC runtime names") {
                                                   GenericEnum<GenericEnum<Int>>>.self))
 }
 
+Runtime.test("casting AnyObject to class metatypes") {
+  do {
+    var ao: AnyObject = SomeClass()
+    expectTrue(ao as? AnyClass == nil)
+
+    ao = SomeNSObjectSubclass()
+    expectTrue(ao as? AnyClass == nil)
+
+    ao = SomeClass.self
+    expectTrue(ao as? AnyClass == SomeClass.self)
+    expectTrue(ao as? SomeClass.Type == SomeClass.self)
+
+    ao = SomeNSObjectSubclass.self
+    expectTrue(ao as? AnyClass == SomeNSObjectSubclass.self)
+    expectTrue(ao as? SomeNSObjectSubclass.Type == SomeNSObjectSubclass.self)
+  }
+
+  do {
+    var a: Any = SomeClass()
+    expectTrue(a as? AnyClass == nil)
+
+    a = SomeNSObjectSubclass()
+    expectTrue(a as? AnyClass == nil)
+
+    a = SomeClass.self
+    expectTrue(a as? AnyClass == SomeClass.self)
+    expectTrue(a as? SomeClass.Type == SomeClass.self)
+  }
+
+  do {
+    var nso: NSObject = SomeNSObjectSubclass()
+    expectTrue(nso as? AnyClass == nil)
+    
+    nso = (SomeNSObjectSubclass.self as AnyObject) as! NSObject
+    // FIXME: Optimized out by SIL's classifyDynamicCast
+    expectFalse(nso as? AnyClass == SomeNSObjectSubclass.self)
+    expectFalse(nso as? SomeNSObjectSubclass.Type == SomeNSObjectSubclass.self)
+  }
+}
+
 var RuntimeFoundationWrappers = TestSuite("RuntimeFoundationWrappers")
 
 RuntimeFoundationWrappers.test("_stdlib_NSObject_isEqual/NoLeak") {

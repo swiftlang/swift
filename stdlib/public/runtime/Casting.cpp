@@ -1515,7 +1515,20 @@ static bool _dynamicCastMetatypeToMetatype(OpaqueValue *dest,
 
 /// Check whether an unknown class instance is actually a class object.
 static const Metadata *_getUnknownClassAsMetatype(void *object) {
-  // Class values are currently never metatypes (?).
+#if SWIFT_OBJC_INTEROP
+  // Objective-C class metadata are objects, so an AnyObject (or NSObject)
+  // may refer to a class object.
+
+  // Test whether the object's isa is a metaclass, which indicates that the
+  // object is a class.
+
+  Class isa = object_getClass((id)object);
+  if (class_isMetaClass(isa)) {
+    return swift_getObjCClassMetadata((const ClassMetadata *)object);
+  }
+#endif
+
+  // Class values are currently never metatypes in the native runtime.
   return nullptr;
 }
 
@@ -1530,7 +1543,7 @@ static bool _dynamicCastUnknownClassToMetatype(OpaqueValue *dest,
   if (flags & DynamicCastFlags::Unconditional)
     swift_dynamicCastFailure(_swift_getClass(object), targetType);
   if (flags & DynamicCastFlags::DestroyOnFailure)
-    swift_release((HeapObject*) object);
+    swift_unknownRelease((HeapObject*) object);
   return false;
 }
 
@@ -1601,7 +1614,7 @@ static bool _dynamicCastToMetatype(OpaqueValue *dest,
   case MetadataKind::Class:
   case MetadataKind::ObjCClassWrapper:
   case MetadataKind::ForeignClass: {
-    auto object = reinterpret_cast<void**>(src);
+    void *object = *reinterpret_cast<void**>(src);
     return _dynamicCastUnknownClassToMetatype(dest, object, targetType, flags);
   }
 
@@ -1698,7 +1711,7 @@ static bool _dynamicCastUnknownClassToExistentialMetatype(OpaqueValue *dest,
   if (flags & DynamicCastFlags::Unconditional)
     swift_dynamicCastFailure(_swift_getClass(object), targetType);
   if (flags & DynamicCastFlags::DestroyOnFailure)
-    swift_release((HeapObject*) object);
+    swift_unknownRelease((HeapObject*) object);
   return false;
 }
 
