@@ -83,15 +83,10 @@ struct MapRegionCounters : public ASTWalker {
   }
 
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-    switch (E->getKind()) {
-    default:
-      break;
-    case ExprKind::AutoClosure:
-    case ExprKind::Closure:
-    case ExprKind::If:
+    if (auto *IE = dyn_cast<IfExpr>(E))
+      CounterMap[IE->getThenExpr()] = NextCounter++;
+    else if (isa<AutoClosureExpr>(E) || isa<ClosureExpr>(E))
       CounterMap[E] = NextCounter++;
-      break;
-    }
     return {true, E};
   }
 };
@@ -557,21 +552,20 @@ public:
     if (!RegionStack.empty())
       extendRegion(E);
 
-    switch (E->getKind()) {
-    default:
-      break;
-    case ExprKind::AutoClosure:
+    if (isa<AutoClosureExpr>(E)) {
       // Autoclosures look strange if there isn't a region, since it looks like
       // control flow starts partway through an expression. For now we skip
       // these so we don't get odd behaviour in default arguments and the like,
       // but in the future we should consider creating appropriate regions for
       // those expressions.
-      if (RegionStack.empty())
-        break;
-      SWIFT_FALLTHROUGH;
-    case ExprKind::Closure:
+      if (!RegionStack.empty())
+        assignCounter(E);
+    } else if (isa<ClosureExpr>(E)) {
       assignCounter(E);
-      break;
+    } else if (auto *IE = dyn_cast<IfExpr>(E)) {
+      CounterExpr &ThenCounter = assignCounter(IE->getThenExpr());
+      assignCounter(IE->getElseExpr(),
+                    CounterExpr::Sub(getCurrentCounter(), ThenCounter));
     }
 
     if (hasCounter(E))

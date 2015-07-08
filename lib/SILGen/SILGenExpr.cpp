@@ -2582,7 +2582,7 @@ RValue RValueEmitter::visitIfExpr(IfExpr *E, SGFContext C) {
                                        SGF.getLoweredType(E->getType()));
     
     cond.enterTrue(SGF);
-    SGF.emitProfilerIncrement(E);
+    SGF.emitProfilerIncrement(E->getThenExpr());
     SILValue trueValue;
     {
       auto TE = E->getThenExpr();
@@ -2616,7 +2616,7 @@ RValue RValueEmitter::visitIfExpr(IfExpr *E, SGFContext C) {
                                        /*hasFalse*/ true,
                                        /*invertCondition*/ false);
     cond.enterTrue(SGF);
-    SGF.emitProfilerIncrement(E);
+    SGF.emitProfilerIncrement(E->getThenExpr());
     {
       auto TE = E->getThenExpr();
       FullExpr trueScope(SGF.Cleanups, CleanupLocation(TE));
