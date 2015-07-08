@@ -902,7 +902,8 @@ static Type resolveIdentTypeComponent(
 // FIXME: Merge this with diagAvailability in MiscDiagnostics.cpp.
 static bool checkTypeDeclAvailability(Decl *TypeDecl, IdentTypeRepr *IdType,
                                       SourceLoc Loc, DeclContext *DC,
-                                      TypeChecker &TC) {
+                                      TypeChecker &TC,
+                                      bool AllowPotentiallyUnavailableProtocol) {
 
   if (auto CI = dyn_cast<ComponentIdentTypeRepr>(IdType)) {
     if (auto Attr = AvailableAttr::isUnavailable(TypeDecl)) {
@@ -954,6 +955,9 @@ static bool checkTypeDeclAvailability(Decl *TypeDecl, IdentTypeRepr *IdType,
                             CI->getIdentifier());
     }
 
+    if (AllowPotentiallyUnavailableProtocol && isa<ProtocolDecl>(TypeDecl))
+      return false;
+
     // Check for potential unavailability because of the minimum
     // deployment version.
     // We should probably unify this checking for deployment-version API
@@ -972,16 +976,19 @@ static bool checkTypeDeclAvailability(Decl *TypeDecl, IdentTypeRepr *IdType,
 
 
 static bool diagnoseAvailability(Type ty, IdentTypeRepr *IdType, SourceLoc Loc,
-                                 DeclContext *DC, TypeChecker &TC) {
+                                 DeclContext *DC, TypeChecker &TC,
+                                 bool AllowPotentiallyUnavailableProtocol) {
   if (auto *NAT = dyn_cast<NameAliasType>(ty.getPointer())) {
-    if (checkTypeDeclAvailability(NAT->getDecl(), IdType, Loc, DC, TC))
+    if (checkTypeDeclAvailability(NAT->getDecl(), IdType, Loc, DC, TC,
+                                  AllowPotentiallyUnavailableProtocol))
       return true;
   }
 
   // Look through substituted types to diagnose when the original
   // type is marked unavailable.
   if (auto *ST = dyn_cast<SubstitutedType>(ty.getPointer())) {
-    if (diagnoseAvailability(ST->getOriginal(), IdType, Loc, DC, TC)) {
+    if (diagnoseAvailability(ST->getOriginal(), IdType, Loc, DC, TC,
+                             AllowPotentiallyUnavailableProtocol)) {
       return true;
     }
   }
@@ -990,7 +997,8 @@ static bool diagnoseAvailability(Type ty, IdentTypeRepr *IdType, SourceLoc Loc,
   if (canTy.isNull())
     return false;
   if (auto NTD = canTy.getAnyNominal())
-    return checkTypeDeclAvailability(NTD, IdType, Loc, DC, TC);
+    return checkTypeDeclAvailability(NTD, IdType, Loc, DC, TC,
+                                     AllowPotentiallyUnavailableProtocol);
 
   return false;
 }
@@ -1021,10 +1029,20 @@ Type TypeChecker::resolveIdentifierType(DeclContext *DC,
     return ty;
   }
 
+  // We allow a type to conform to a protocol that is less available than
+  // the type itself. This enables a type to retroactively model or directly
+  // conform to a protocl only available on newer OSes and yet still be used on
+  // older OSes.
+  // To support this, inside inheritance clauses we allow references to
+  // protocols that are unavailable in the current type refinement context.
+  bool AllowPotentiallyUnavailableProtocol =
+      options.contains(TR_InheritanceClause);
+
   // Check the availability of the type. Skip checking for SIL.
   if (!(options & TR_SILType) && !(options & TR_AllowUnavailable) &&
       diagnoseAvailability(result, IdType,
-                           Components.back()->getIdLoc(), DC, *this)) {
+                           Components.back()->getIdLoc(), DC, *this,
+                           AllowPotentiallyUnavailableProtocol)) {
     Type ty = ErrorType::get(Context);
     Components.back()->setValue(ty);
     return ty;

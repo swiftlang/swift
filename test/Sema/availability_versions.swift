@@ -885,15 +885,58 @@ class SubWithLargerMemberAvailability : SuperWithLimitedMemberAvailability {
 // Inheritance and availability
 
 @available(OSX, introduced=10.10)
+protocol ProtocolAvailableOn10_9 {
+}
+
+@available(OSX, introduced=10.10)
 protocol ProtocolAvailableOn10_10 {
+}
+
+@available(OSX, introduced=10.9)
+protocol ProtocolAvailableOn10_9InheritingFromProtocolAvailableOn10_10 : ProtocolAvailableOn10_10 {
+}
+
+@available(OSX, introduced=10.10)
+protocol ProtocolAvailableOn10_10InheritingFromProtocolAvailableOn10_9 : ProtocolAvailableOn10_9 {
 }
 
 @available(OSX, introduced=10.9)
 class SubclassAvailableOn10_9OfClassAvailableOn10_10 : ClassAvailableOn10_10 { // expected-error {{'ClassAvailableOn10_10' is only available on OS X 10.10 or newer}}
 }
 
+// We allow nominal types to conform to protocols that are less available than the types themselves.
 @available(OSX, introduced=10.9)
-class ClassAvailableOn10_9AdoptingProtocolAvailableOn10_10 : ProtocolAvailableOn10_10 { // expected-error {{'ProtocolAvailableOn10_10' is only available on OS X 10.10 or newer}}
+class ClassAvailableOn10_9AdoptingProtocolAvailableOn10_10 : ProtocolAvailableOn10_10 {
+}
+
+func castToUnavailableProtocol() {
+  let o: ClassAvailableOn10_9AdoptingProtocolAvailableOn10_10 = ClassAvailableOn10_9AdoptingProtocolAvailableOn10_10()
+
+  let _: ProtocolAvailableOn10_10 = o // expected-error {{'ProtocolAvailableOn10_10' is only available on OS X 10.10 or newer}}
+      // expected-note@-1 {{add @available attribute to enclosing global function}}
+      // expected-note@-2 {{add 'if #available' version check}}
+
+  let _ = o as ProtocolAvailableOn10_10 // expected-error {{'ProtocolAvailableOn10_10' is only available on OS X 10.10 or newer}}
+      // expected-note@-1 {{add @available attribute to enclosing global function}}
+      // expected-note@-2 {{add 'if #available' version check}}
+}
+
+@available(OSX, introduced=10.9)
+class SubclassAvailableOn10_9OfClassAvailableOn10_10AlsoAdoptingProtocolAvailableOn10_10 : ClassAvailableOn10_10 { // expected-error {{'ClassAvailableOn10_10' is only available on OS X 10.10 or newer}}
+}
+
+class SomeGenericClass<T> { }
+
+@available(OSX, introduced=10.9)
+class SubclassAvailableOn10_9OfSomeGenericClassOfProtocolAvailableOn10_10 : SomeGenericClass<ProtocolAvailableOn10_10> { // expected-error {{'ProtocolAvailableOn10_10' is only available on OS X 10.10 or newer}}
+}
+
+func GenericWhereClause<T where T: ProtocolAvailableOn10_10>(t: T) { // expected-error +{{'ProtocolAvailableOn10_10' is only available on OS X 10.10 or newer}}
+      // expected-note@-1 +{{add @available attribute to enclosing global function}}
+}
+
+func GenericSignature<T : ProtocolAvailableOn10_10>(t: T) { // expected-error +{{'ProtocolAvailableOn10_10' is only available on OS X 10.10 or newer}}
+      // expected-note@-1 +{{add @available attribute to enclosing global function}}
 }
 
 // Extensions
@@ -929,6 +972,11 @@ extension ClassToExtend {
   extension ClassToExtend { } // expected-error {{declaration is only valid at file scope}}
 }
 
+// We allow protocol extensions for protocols that are less available than the
+// conforming class.
+extension ClassToExtend : ProtocolAvailableOn10_10 {
+
+}
 
 @available(OSX, introduced=10.10)
 extension ClassToExtend { // expected-note {{enclosing scope here}}

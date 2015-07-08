@@ -48,8 +48,13 @@ class ClassExtendingUnvailableClass : NSAvailableOn10_10 { // expected-error {{'
     // expected-note@-1 {{add @available attribute to enclosing class}}
 }
 
-class ClassAdoptingUnavailableProtocol : NSProtocolAvailableOn10_10 { // expected-error {{'NSProtocolAvailableOn10_10' is only available on OS X 10.10 or newer}}
-    // expected-note@-1 {{add @available attribute to enclosing class}}
+// We allow classes to conform to potentially unavailable protocols
+class ClassAdoptingUnavailableProtocol : NSProtocolAvailableOn10_10 {
+}
+
+class SomeSoonToBeConformingClass { }
+
+extension SomeSoonToBeConformingClass : NSProtocolAvailableOn10_10 {
 }
 
 // Enums from Objective-C
