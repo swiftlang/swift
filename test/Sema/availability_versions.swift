@@ -1355,7 +1355,7 @@ class ConformsWithUnavailableFunctionInSuperClass : SuperHasMethodF, HasMethodF 
   // greater.
 }
 
-class ConformsByOverriddingFunctionInSuperClass : SuperHasMethodF, HasMethodF {
+class ConformsByOverridingFunctionInSuperClass : SuperHasMethodF, HasMethodF {
   // Now the witness is this f() (which is always available) and not the f()
   // from the super class, so conformance is safe.
   override func f(p: Int) { }
@@ -1385,8 +1385,14 @@ extension HasNoMethodF3 : HasMethodF {
   func f(p: Int) { }
 }
 
+@available(OSX, introduced=10.10)
 protocol HasMethodFOn10_10 {
   func f(p: Int) // expected-note {{protocol requirement here}}
+}
+
+class ConformsToUnavailableProtocolWithUnavailableWitness : HasMethodFOn10_10 {
+  @available(OSX, introduced=10.10)
+  func f(p: Int) { }
 }
 
 @available(OSX, introduced=10.10)
@@ -1394,6 +1400,37 @@ class HasNoMethodF4 { }
 @available(OSX, introduced=10.11)
 extension HasNoMethodF4 : HasMethodFOn10_10 { // expected-note {{conformance introduced here}}
   func f(p: Int) { } // expected-error {{protocol 'HasMethodFOn10_10' requires 'f' to be available on OS X 10.10 and newer}}
+}
+
+@available(OSX, introduced=10.10)
+protocol HasTakesClassAvailableOn10_10 {
+  func takesClassAvailableOn10_10(o: ClassAvailableOn10_10) // expected-note 2{{protocol requirement here}}
+}
+
+class AttemptsToConformToHasTakesClassAvailableOn10_10 : HasTakesClassAvailableOn10_10 { // expected-note {{conformance introduced here}}
+  @available(OSX, introduced=10.11)
+  func takesClassAvailableOn10_10(o: ClassAvailableOn10_10) { // expected-error {{protocol 'HasTakesClassAvailableOn10_10' requires 'takesClassAvailableOn10_10' to be available on OS X 10.10 and newer}}
+  }
+}
+
+class ConformsToHasTakesClassAvailableOn10_10 : HasTakesClassAvailableOn10_10 {
+  @available(OSX, introduced=10.10)
+  func takesClassAvailableOn10_10(o: ClassAvailableOn10_10) {
+  }
+}
+
+class TakesClassAvailableOn10_10_A { }
+extension TakesClassAvailableOn10_10_A : HasTakesClassAvailableOn10_10 { // expected-note {{conformance introduced here}}
+  @available(OSX, introduced=10.11)
+  func takesClassAvailableOn10_10(o: ClassAvailableOn10_10) { // expected-error {{protocol 'HasTakesClassAvailableOn10_10' requires 'takesClassAvailableOn10_10' to be available on OS X 10.10 and newer}}
+  }
+}
+
+class TakesClassAvailableOn10_10_B { }
+extension TakesClassAvailableOn10_10_B : HasTakesClassAvailableOn10_10 {
+  @available(OSX, introduced=10.10)
+  func takesClassAvailableOn10_10(o: ClassAvailableOn10_10) {
+  }
 }
 
 

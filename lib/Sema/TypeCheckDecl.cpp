@@ -5712,10 +5712,11 @@ bool TypeChecker::isAvailabilitySafeForConformance(
   // on every version where the conforming declaration is available, if the
   // requirement is available then the witness is available as well.
   // We do this by checking that (an over-approximation of) the intersection of
-  // the requirement's available range with the conforming declaration's
-  // available range is fully contained in (an over-approximation of) the
-  // intersection of the witnesses's available range with the conforming
-  // type's available range.
+  // the requirement's available range with both the conforming declaration's
+  // available range and the protocol's available range is fully contained in
+  // (an over-approximation of) the intersection of the witnesses's available
+  // range with both the conforming type's available range and the protocol
+  // declaration's available range.
   VersionRange witnessRange = TypeChecker::availableRange(witness, Context);
   requiredRange = TypeChecker::availableRange(requirement, Context);
 
@@ -5725,6 +5726,13 @@ bool TypeChecker::isAvailabilitySafeForConformance(
   // Constrain over-approximates intersection of version ranges.
   witnessRange.constrainWith(rangeOfConformingDecl);
   requiredRange.constrainWith(rangeOfConformingDecl);
+
+  ProtocolDecl *protocolDecl = conformance->getProtocol();
+  VersionRange rangeOfProtocolDecl =
+      overApproximateOSVersionsAtLocation(protocolDecl->getLoc(), protocolDecl);
+
+  witnessRange.constrainWith(rangeOfProtocolDecl);
+  requiredRange.constrainWith(rangeOfProtocolDecl);
 
   return requiredRange.isContainedIn(witnessRange);
 }
