@@ -101,6 +101,9 @@ print("[\(advance(F(3), 99, F(5)).x)]")
 // CHECK-NEXT: F.successor: 3
 // CHECK-NEXT: F.successor: 4
 // CHECK-NEXT: [5]
+// -------- Starting at the limit ----------
+print("[\(advance(F(3), 99, F(3)).x)]")
+// CHECK-NEXT: [3]
 
 print("<B>")
 // CHECK-NEXT: <B>
@@ -131,6 +134,11 @@ print("[\(advance(B(13), -99, B(11)).x)]")
 // CHECK-NEXT: B.predecessor: 13
 // CHECK-NEXT: B.predecessor: 12
 // CHECK-NEXT: [11]
+// -------- Starting at the limit ----------
+print("[\(advance(B(3), 99, B(3)).x)]")
+// CHECK-NEXT: [3]
+print("[\(advance(B(3), -5, B(3)).x)]")
+// CHECK-NEXT: [3]
 
 
 print("<R>")
@@ -168,6 +176,14 @@ print("[\(advance(R(16), 99, R(13)).x)]")
 // CHECK-NEXT: R.distanceTo: 16, 13
 // CHECK-NEXT: R.advancedBy: 16, 99
 // CHECK-NEXT: [115]
+// -------- Starting at the limit ----------
+print("[\(advance(R(3), 99, R(3)).x)]")
+// CHECK-NEXT: R.distanceTo: 3, 3
+// CHECK-NEXT: [3]
+print("[\(advance(R(3), -5, R(3)).x)]")
+// CHECK-NEXT: R.distanceTo: 3, 3
+// CHECK-NEXT: [3]
+
 
 print("all done.")
 // CHECK-NEXT: all done.

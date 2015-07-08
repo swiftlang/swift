@@ -334,19 +334,10 @@ public func ~> <T : RandomAccessIndexType>(
 ) -> T {
   let n = rest.1.0
   let end = rest.1.1
-
   let d = start.distanceTo(end)
-  let amount = n
-  if n < 0 {
-    if d < 0 && d > n {
-      return end
-    }
+  if d == 0 || (d > 0 ? d <= n : d >= n) {
+    return end
   }
-  else {
-    if d > 0 && d < n {
-      return end
-    }
-  }
-  return start.advancedBy(amount)
+  return start.advancedBy(n)
 }
 
