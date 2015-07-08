@@ -1297,7 +1297,7 @@ void swift::installCommonValueWitnesses(ValueWitnessTable *vwtable) {
     return;
   }
   
-  if (vwtable->flags.isBitwiseTakable()) {
+  if (flags.isBitwiseTakable()) {
     // Use POD value witnesses for operations that do an initializeWithTake.
     if (flags.isInlineStorage()) {
       vwtable->initializeWithTake = pod_direct_initializeWithTake;
@@ -1319,7 +1319,7 @@ void swift::installCommonValueWitnesses(ValueWitnessTable *vwtable) {
     return;
   }
 
-  if (!vwtable->flags.isInlineStorage()) {
+  if (!flags.isInlineStorage()) {
     // For values stored out-of-line, initializeBufferWithTakeOfBuffer is
     // always a memcpy.
     vwtable->initializeBufferWithTakeOfBuffer
