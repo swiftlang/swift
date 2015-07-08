@@ -24,7 +24,7 @@ class ModuleDecl;
 class Stmt;
 class Pattern;
 class TypeRepr;
-class TypeLoc;
+struct TypeLoc;
 
 /// \brief An abstract class used to traverse an AST.
 class ASTWalker {
