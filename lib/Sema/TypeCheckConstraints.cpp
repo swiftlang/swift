@@ -819,69 +819,49 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
 
 /// \brief Clean up the given ill-formed expression, removing any references
 /// to type variables and setting error types on erroneous expression nodes.
-static Expr *cleanupIllFormedExpression(ASTContext &context,
-                                        ConstraintSystem *cs, Expr *expr) {
+void CleanupIllFormedExpressionRAII::doIt(Expr *expr, ASTContext &Context) {
   class CleanupIllFormedExpression : public ASTWalker {
     ASTContext &context;
-
+    
   public:
-    CleanupIllFormedExpression(ASTContext &context, ConstraintSystem *cs)
-      : context(context) { }
-
+    CleanupIllFormedExpression(ASTContext &context) : context(context) { }
+    
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      if (auto closure = dyn_cast<ClosureExpr>(expr)) {
-        closure->getParams()->forEachVariable([&](VarDecl *VD) {
-          if (VD->hasType()) {
-            Type T = VD->getType();
-            if (T->hasTypeVariable()) {
-              T = ErrorType::get(context);
-              VD->setInvalid();
-            }
-            VD->overwriteType(T);
-          } else {
-            VD->setType(ErrorType::get(context));
-            VD->setInvalid();
-          }
-        });
-      }
-
-      return { true, expr };
+      auto closure = dyn_cast<ClosureExpr>(expr);
+      if (!closure)
+        return { true, expr };
+  
+      
+      bool closureIsValid = true;
+      closure->getParams()->forEachVariable([&](VarDecl *VD) {
+        if (VD->hasType() && !VD->getType()->hasTypeVariable())
+          return;
+          
+        VD->overwriteType(ErrorType::get(context));
+        VD->setInvalid();
+        closureIsValid = false;
+      });
+      
+      return { closureIsValid, expr };
     }
-
+    
     Expr *walkToExprPost(Expr *expr) override {
-      Type type;
-      if (expr->getType()) {
-        type = expr->getType();
-      }
-
+      Type type = expr->getType();
+      
       if (!type || type->hasTypeVariable())
         expr->setType(ErrorType::get(context));
-      else
-        expr->setType(type);
       return expr;
     }
-
-    bool walkToDeclPre(Decl *D) override {
-      // Ensure that declarations inside the closure are marked as invalid.
-      // Alternatively, we could type check them anyway, even if inferring the
-      // type of the closure failed.
-      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-        AFD->overwriteType(ErrorType::get(context));
-      }
-      return true;
-    }
   };
-
-  if (!expr)
-    return expr;
   
-  return expr->walk(CleanupIllFormedExpression(context, cs));
+  if (expr)
+    expr->walk(CleanupIllFormedExpression(Context));
 }
 
+
 CleanupIllFormedExpressionRAII::~CleanupIllFormedExpressionRAII() {
-  if (expr) {
-    *expr = cleanupIllFormedExpression(cs.getASTContext(), &cs, *expr);
-  }
+  if (expr)
+    CleanupIllFormedExpressionRAII::doIt(*expr, Context);
 }
 
 /// Pre-check the expression, validating any types that occur in the
@@ -895,7 +875,7 @@ static bool preCheckExpression(TypeChecker &tc, Expr *&expr, DeclContext *dc) {
   }
 
   // Pre-check failed. Clean up and return.
-  expr = cleanupIllFormedExpression(dc->getASTContext(), nullptr, expr);
+  CleanupIllFormedExpressionRAII::doIt(expr, tc.Context);
   return true;
 }
 
@@ -1005,9 +985,13 @@ bool TypeChecker::typeCheckExpression(
        ExprTypeCheckListener *listener) {
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
+  
   // Construct a constraint system from this expression.
   ConstraintSystem cs(*this, dc, ConstraintSystemFlags::AllowFixes);
-  CleanupIllFormedExpressionRAII cleanup(cs, expr);
+  CleanupIllFormedExpressionRAII cleanup(Context, expr);
+
+  Expr *origExpr = expr;
+  CleanupIllFormedExpressionRAII cleanup2(Context, origExpr);
 
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
@@ -1042,6 +1026,9 @@ bool TypeChecker::typeCheckExpression(
 
   expr = result;
   cleanup.disable();
+  
+  if (origExpr == expr)
+    cleanup2.disable();
   return false;
 }
 
@@ -1053,7 +1040,7 @@ Optional<Type> TypeChecker::getTypeOfExpressionWithoutApplying(
 
   // Construct a constraint system from this expression.
   ConstraintSystem cs(*this, dc, ConstraintSystemFlags::AllowFixes);
-  CleanupIllFormedExpressionRAII cleanup(cs, expr);
+  CleanupIllFormedExpressionRAII cleanup(Context, expr);
 
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
@@ -1164,7 +1151,7 @@ bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc,
 
   // Construct a constraint system from this expression.
   ConstraintSystem cs(*this, dc, ConstraintSystemFlags::AllowFixes);
-  CleanupIllFormedExpressionRAII cleanup(cs, expr);
+  CleanupIllFormedExpressionRAII cleanup(Context, expr);
   if (auto generatedExpr = cs.generateConstraintsShallow(expr))
     expr = generatedExpr;
   else
@@ -1869,7 +1856,7 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc) {
   // TODO: need to add kind arg?
   // Construct a constraint system from this expression.
   ConstraintSystem cs(*this, dc, ConstraintSystemFlags::AllowFixes);
-  CleanupIllFormedExpressionRAII cleanup(cs, expr);
+  CleanupIllFormedExpressionRAII cleanup(Context, expr);
 
   // If there is a type that we're expected to convert to, add the conversion
   // constraint.

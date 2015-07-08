@@ -373,16 +373,6 @@ struct ASTNodeBase {};
         verifyChecked(P->getType());
     }
     void verifyCheckedAlways(Decl *D) {
-      if (!D->isInvalid() &&
-          D->getAttrs().hasAttribute<OverrideAttr>()) {
-        if (!isa<ClassDecl>(D->getDeclContext()) &&
-            !isa<ExtensionDecl>(D->getDeclContext())) {
-          PrettyStackTraceDecl debugStack("verifying override", D);
-          Out << "'override' attribute outside of a class\n";
-          D->dump(Out);
-          abort();
-        }
-      }
     }
 
     template<typename T>
@@ -655,6 +645,19 @@ struct ASTNodeBase {};
           abort();
         }
       }
+      
+      if (D->getAttrs().hasAttribute<OverrideAttr>()) {
+        if (!D->isInvalid() && D->hasType() &&
+            !isa<ClassDecl>(D->getDeclContext()) &&
+            !isa<ExtensionDecl>(D->getDeclContext())) {
+          PrettyStackTraceDecl debugStack("verifying override", D);
+          Out << "'override' attribute outside of a class\n";
+          D->dump(Out);
+          abort();
+        }
+      }
+
+      
       verifyCheckedAlwaysBase(D);
     }
 

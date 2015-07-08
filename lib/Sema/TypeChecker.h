@@ -1655,15 +1655,17 @@ public:
 /// \brief RAII object that cleans up the given expression if not explicitly
 /// disabled.
 class CleanupIllFormedExpressionRAII {
-  constraints::ConstraintSystem &cs;
+  ASTContext &Context;
   Expr **expr;
   
 public:
-  CleanupIllFormedExpressionRAII(constraints::ConstraintSystem &cs, Expr *&expr)
-  : cs(cs), expr(&expr) { }
-  
+  CleanupIllFormedExpressionRAII(ASTContext &Context, Expr *&expr)
+    : Context(Context), expr(&expr) { }
+
   ~CleanupIllFormedExpressionRAII();
-  
+
+  static void doIt(Expr *expr, ASTContext &Context);
+
   /// \brief Disable the cleanup of this expression; it doesn't need it.
   void disable() {
     expr = nullptr;

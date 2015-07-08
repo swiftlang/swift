@@ -2386,7 +2386,7 @@ bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
     return true;
   }
   
-  CleanupIllFormedExpressionRAII cleanup(*CS, expr);
+  CleanupIllFormedExpressionRAII cleanup(CS->getASTContext(), expr);
 
   expr->setType(ErrorType::get(CS->getASTContext()));
   
@@ -2428,7 +2428,7 @@ bool FailureDiagnosis::visitUnaryExpr(ApplyExpr *applyExpr) {
   assert(expr->getKind() == ExprKind::PostfixUnary ||
          expr->getKind() == ExprKind::PrefixUnary);
   
-  CleanupIllFormedExpressionRAII cleanup(*CS, expr);
+  CleanupIllFormedExpressionRAII cleanup(CS->getASTContext(), expr);
   
   auto argExpr = applyExpr->getArg();
   auto argType = getTypeOfIndependentSubExpression(argExpr);
@@ -2541,7 +2541,7 @@ FailureDiagnosis::collectCalleeCandidateInfo(ConstraintLocator *locator,
 }
 
 bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
-  CleanupIllFormedExpressionRAII cleanup(*CS, expr);
+  CleanupIllFormedExpressionRAII cleanup(CS->getASTContext(), expr);
   
   auto indexExpr = SE->getIndex();
   auto baseExpr = SE->getBase();
@@ -2617,7 +2617,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
 }
 
 bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
-  CleanupIllFormedExpressionRAII cleanup(*CS, expr);
+  CleanupIllFormedExpressionRAII cleanup(CS->getASTContext(), expr);
   
   auto fnExpr = callExpr->getFn();
   auto argExpr = callExpr->getArg();
@@ -2806,7 +2806,7 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
 }
 
 bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
-  CleanupIllFormedExpressionRAII cleanup(*CS, expr);
+  CleanupIllFormedExpressionRAII cleanup(CS->getASTContext(), expr);
   auto destExpr = assignExpr->getDest();
   auto srcExpr = assignExpr->getSrc();
   
@@ -2835,7 +2835,7 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
 }
 
 bool FailureDiagnosis::visitInOutExpr(InOutExpr *inoutExpr) {
-  CleanupIllFormedExpressionRAII cleanup(*CS, expr);
+  CleanupIllFormedExpressionRAII cleanup(CS->getASTContext(), expr);
   auto addressedExpr = inoutExpr->getSubExpr();
 
   auto subExprType = getTypeOfIndependentSubExpression(addressedExpr);
@@ -2853,7 +2853,7 @@ bool FailureDiagnosis::visitInOutExpr(InOutExpr *inoutExpr) {
 }
 
 bool FailureDiagnosis::visitCoerceExpr(CoerceExpr *coerceExpr) {
-  CleanupIllFormedExpressionRAII cleanup(*CS, expr);
+  CleanupIllFormedExpressionRAII cleanup(CS->getASTContext(), expr);
 
   Expr *subExpr = coerceExpr->getSubExpr();
   Type subType = getTypeOfIndependentSubExpression(subExpr);
@@ -2886,7 +2886,7 @@ bool FailureDiagnosis::visitCoerceExpr(CoerceExpr *coerceExpr) {
 
 bool FailureDiagnosis::
 visitForcedCheckedCastExpr(ForcedCheckedCastExpr *castExpr) {
-  CleanupIllFormedExpressionRAII cleanup(*CS, expr);
+  CleanupIllFormedExpressionRAII cleanup(CS->getASTContext(), expr);
 
   Expr *subExpr = castExpr->getSubExpr();
   Type subType = getTypeOfIndependentSubExpression(subExpr);
@@ -2918,7 +2918,7 @@ visitForcedCheckedCastExpr(ForcedCheckedCastExpr *castExpr) {
 }
 
 bool FailureDiagnosis::visitForceValueExpr(ForceValueExpr *FVE) {
-  CleanupIllFormedExpressionRAII cleanup(*CS, expr);
+  CleanupIllFormedExpressionRAII cleanup(CS->getASTContext(), expr);
   
   auto argExpr = FVE->getSubExpr();
   auto argType = getTypeOfIndependentSubExpression(argExpr);
