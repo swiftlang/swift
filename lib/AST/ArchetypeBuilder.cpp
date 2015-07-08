@@ -477,8 +477,41 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
     if (auto concreteType
           = representative->ArchetypeOrConcreteType.getAsConcreteType()) {
       if (concreteType->hasTypeParameter()) {
+        // If we already know the concrete type is recursive, just
+        // return an error. It will be diagnosed elsewhere.
+        if (representative->RecursiveConcreteType) {
+          return NestedType::forConcreteType(
+                   ErrorType::get(builder.getASTContext()));
+        }
+
+        // If we're already substituting a concrete type, mark this
+        // potential archetype as having a recursive concrete type.
+        if (representative->SubstitutingConcreteType) {
+          representative->RecursiveConcreteType = true;
+          return NestedType::forConcreteType(
+                   ErrorType::get(builder.getASTContext()));
+        }
+
+        representative->SubstitutingConcreteType = true;
+        NestedType result = NestedType::forConcreteType(
+                              substConcreteTypesForDependentTypes(
+                                builder,
+                                concreteType));
+        representative->SubstitutingConcreteType = false;
+
+        // If all went well, we're done.
+        if (!representative->RecursiveConcreteType)
+          return result;
+
+        // Otherwise, we found that the concrete type is recursive,
+        // complain and return an error.
+        builder.Diags.diagnose(SameTypeSource->getLoc(),
+                               diag::recursive_same_type_constraint,
+                               getDependentType(builder, false),
+                               concreteType);
+
         return NestedType::forConcreteType(
-                 substConcreteTypesForDependentTypes(builder, concreteType));
+                 ErrorType::get(builder.getASTContext()));
       }
     }
 

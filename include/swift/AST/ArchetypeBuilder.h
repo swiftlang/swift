@@ -410,6 +410,14 @@ class ArchetypeBuilder::PotentialArchetype {
   /// be resolved.
   unsigned Invalid : 1;
 
+  /// Whether we are currently substituting into the concrete type of
+  /// this potential archetype.
+  unsigned SubstitutingConcreteType : 1;
+
+  /// Whether we have detected recursion during the substitution of
+  /// the concrete type.
+  unsigned RecursiveConcreteType : 1;
+
   /// The references to this nested type that occur in the source code
   /// that were unresolved (at least at some point).
   llvm::TinyPtrVector<ComponentIdentTypeRepr *> UnresolvedReferences;
@@ -421,7 +429,8 @@ class ArchetypeBuilder::PotentialArchetype {
   /// associated type.
   PotentialArchetype(PotentialArchetype *Parent, Identifier Name)
     : ParentOrParam(Parent), NameOrAssociatedType(Name), Representative(this),
-      IsRecursive(false), Invalid(false)
+      IsRecursive(false), Invalid(false), SubstitutingConcreteType(false),
+      RecursiveConcreteType(false)
   { 
     assert(Parent != nullptr && "Not an associated type?");
     EquivalenceClass.push_back(this);
@@ -430,7 +439,8 @@ class ArchetypeBuilder::PotentialArchetype {
   /// \brief Construct a new potential archetype for an associated type.
   PotentialArchetype(PotentialArchetype *Parent, AssociatedTypeDecl *AssocType)
     : ParentOrParam(Parent), NameOrAssociatedType(AssocType), 
-      Representative(this), IsRecursive(false), Invalid(false)
+      Representative(this), IsRecursive(false), Invalid(false),
+      SubstitutingConcreteType(false), RecursiveConcreteType(false)
   { 
     assert(Parent != nullptr && "Not an associated type?");
     EquivalenceClass.push_back(this);
@@ -442,7 +452,9 @@ class ArchetypeBuilder::PotentialArchetype {
                      Identifier Name)
     : ParentOrParam(GenericParam), RootProtocol(RootProtocol), 
       NameOrAssociatedType(Name), Representative(this), IsRecursive(false),
-      Invalid(false) {
+      Invalid(false), SubstitutingConcreteType(false),
+      RecursiveConcreteType(false)
+  {
     EquivalenceClass.push_back(this);
   }
 
