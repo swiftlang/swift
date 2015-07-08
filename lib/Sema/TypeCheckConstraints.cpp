@@ -2305,6 +2305,20 @@ CheckedCastKind TypeChecker::typeCheckCheckedCast(Type fromType,
       return CheckedCastKind::BridgeFromObjectiveC;
   }
 
+  // Objective-C metaclasses are subclasses of NSObject in the ObjC runtime,
+  // so casts from NSObject to potentially-class metatypes may succeed.
+  if (auto nsObject = cs.TC.getNSObjectType(dc)) {
+    if (fromType->isEqual(nsObject)) {
+      if (auto toMeta = toType->getAs<MetatypeType>()) {
+        if (toMeta->getInstanceType()->mayHaveSuperclass()
+            || toMeta->getInstanceType()->is<ArchetypeType>())
+          return CheckedCastKind::ValueCast;
+      }
+      if (toType->is<ExistentialMetatypeType>())
+        return CheckedCastKind::ValueCast;
+    }
+  }
+
   // We can conditionally cast from NSError to an ErrorType-conforming type.
   // This is handled in the runtime, so it doesn't need a special cast kind.
   auto errorTypeProto = Context.getProtocol(KnownProtocolKind::ErrorType);
