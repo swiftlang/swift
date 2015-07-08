@@ -450,7 +450,7 @@ public:
                     CounterExpr::Sub(getCurrentCounter(), ThenCounter));
     } else if (auto *GS = dyn_cast<GuardStmt>(S)) {
       assignCounter(GS, CounterExpr::Zero());
-      CounterExpr &BodyCounter = assignCounter(GS->getBody());
+      assignCounter(GS->getBody());
 
     } else if (auto *WS = dyn_cast<WhileStmt>(S)) {
       assignCounter(WS, CounterExpr::Zero());
