@@ -133,9 +133,6 @@ struct ASTContext::Implementation {
   NominalTypeDecl *AutoreleasingUnsafeMutablePointerDecl = nullptr;
   VarDecl *AutoreleasingUnsafeMutablePointerMemoryDecl = nullptr;
 
-  /// The declaration of Swift.CFunctionPointer<T -> U>.
-  NominalTypeDecl *CFunctionPointerDecl = nullptr;
-
   /// The declaration of Swift.Void.
   TypeAliasDecl *VoidDecl = nullptr;
 
@@ -710,13 +707,6 @@ ASTContext::getPointerMemoryPropertyDecl(PointerTypeKind ptrKind) const {
                              *this);
   }
   llvm_unreachable("bad pointer kind");
-}
-
-NominalTypeDecl *ASTContext::getCFunctionPointerDecl() const {
-  if (!Impl.CFunctionPointerDecl)
-    Impl.CFunctionPointerDecl = findStdlibType(*this, "CFunctionPointer", 1);
-  
-  return Impl.CFunctionPointerDecl;
 }
 
 TypeAliasDecl *ASTContext::getVoidDecl() const {

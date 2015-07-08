@@ -925,13 +925,6 @@ private:
       return true;
     }
 
-    if (SD == ctx.getCFunctionPointerDecl()) {
-      assert(BGT->getGenericArgs().size() == 1);
-      auto FT = BGT->getGenericArgs()[0]->castTo<FunctionType>();
-      printFunctionType(FT, '*', OTK_ImplicitlyUnwrappedOptional);
-      return true;
-    }
-
     // Everything from here on is some kind of pointer type.
     bool isConst;
     if (SD == ctx.getUnsafePointerDecl()) {
