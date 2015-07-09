@@ -110,5 +110,11 @@ func useUnavailableObjCClass() {
 
 useUnavailableObjCClass()
 
+// Allow protocol extensions of weakly-linked classes.
+protocol SomeSwiftProtocol { }
+@available(OSX 1066.0, iOS 1066.0, watchOS 1066.0, tvOS 1066.0, *)
+extension UnavailableObjCClass : SomeSwiftProtocol {
+}
+
 // CHECK-NEXT: Done
 print("Done")

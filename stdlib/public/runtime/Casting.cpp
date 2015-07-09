@@ -2107,12 +2107,16 @@ const {
   case ProtocolConformanceTypeKind::UniqueIndirectClass:
     // The class may be ObjC, in which case we need to instantiate its Swift
     // metadata.
-    return swift_getObjCClassMetadata(*getIndirectClass());
+    if (auto *ClassMetadata = *getIndirectClass())
+      return swift_getObjCClassMetadata(ClassMetadata);
+    return nullptr;
       
   case ProtocolConformanceTypeKind::UniqueDirectClass:
     // The class may be ObjC, in which case we need to instantiate its Swift
     // metadata.
-    return swift_getObjCClassMetadata(getDirectClass());
+    if (auto *ClassMetadata = getDirectClass())
+      return swift_getObjCClassMetadata(ClassMetadata);
+    return nullptr;
       
   case ProtocolConformanceTypeKind::UniqueGenericPattern:
   case ProtocolConformanceTypeKind::Universal:
