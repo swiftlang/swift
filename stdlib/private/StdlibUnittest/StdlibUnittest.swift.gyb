@@ -1559,13 +1559,68 @@ extension ExpectedComparisonResult : CustomStringConvertible {
   }
 }
 
+/// Test that the elements of `instances` satisfy the semantic
+/// requirements of `Comparable`, using `oracle` to generate comparison
+/// expectations from pairs of positions in `instances`.
+///
+/// - Note: `oracle` is also checked for conformance to the
+///   laws.
+public func checkComparable<
+  Instances: CollectionType where Instances.Generator.Element : Comparable
+>(
+  instances: Instances,
+  oracle: (Instances.Index, Instances.Index) -> ExpectedComparisonResult,
+  ${TRACE}
+) {
+  // Also checks that equality is consistent with comparison and that
+  // the oracle obeys the equality laws
+  checkEquatable(instances, oracle: { oracle($0, $1).isEQ() }, ${trace})
+  
+  for i in instances.indices {
+    let x = instances[i]
+
+    expectFalse(x < x, ${trace})
+    expectFalse(x > x, ${trace})
+    expectTrue(x <= x, ${trace})
+    expectTrue(x >= x, ${trace})
+    
+    for j in instances.indices where i != j {
+      let y = instances[j]
+      
+      let expected = oracle(i, j)
+      
+      expectEqual(
+        expected.flip(), oracle(j, i),
+        "bad oracle: missing antisymmetry: "
+        + "(\(String(reflecting: i)), \(String(reflecting: j)))",
+        stackTrace: ${stackTrace})
+      
+      expectEqual(expected.isLT(), x < y, ${trace})
+      expectEqual(expected.isLE(), x <= y, ${trace})
+      expectEqual(expected.isGE(), x >= y, ${trace})
+      expectEqual(expected.isGT(), x > y, ${trace})
+      
+      for k in instances.indices {
+        let expected2 = oracle(j, k)
+        if expected == expected2 {
+          expectEqual(
+            expected, oracle(i, k),
+            "bad oracle: missing transitivity "
+            + "(\(String(reflecting: i)), \(String(reflecting: j)), "
+            + "\(String(reflecting: k)))", stackTrace: ${stackTrace})
+        }
+      }
+    }
+  }
+}
+
 public func checkComparable<T : Comparable>(
   expected: ExpectedComparisonResult, _ lhs: T, _ rhs: T, ${TRACE}
 ) {
-  expectEqual(expected.isLT(), lhs < rhs, ${trace})
-  expectEqual(expected.isLE(), lhs <= rhs, ${trace})
-  expectEqual(expected.isGE(), lhs >= rhs, ${trace})
-  expectEqual(expected.isGT(), lhs > rhs, ${trace})
+  checkComparable(
+    [lhs, rhs],
+    oracle: { [[ .EQ,  expected], [ expected.flip(), .EQ]][$0][$1] },
+    ${trace})
 }
 
 public struct CollectionMisuseResiliencyChecks {
