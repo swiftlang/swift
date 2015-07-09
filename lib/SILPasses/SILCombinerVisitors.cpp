@@ -63,6 +63,59 @@ SILInstruction *SILCombiner::visitStructExtractInst(StructExtractInst *SEI) {
                                                         SEI->getType());
 }
 
+SILInstruction*
+SILCombiner::visitAllocExistentialBoxInst(AllocExistentialBoxInst *AEBI) {
+
+  // Optimize away the pattern below that happens when exceptions are created
+  // and in some cases, due to inlining, are not needed.
+  //
+  //   %6 = alloc_existential_box $ErrorType, $ColorError
+  //   %7 = enum $VendingMachineError, #ColorError.Red
+  //   store %7 to %6#1 : $*ColorError
+  //   debug_value %6#0 : $ErrorType
+  //   strong_release %6#0 : $ErrorType
+
+  StoreInst *SingleStore = nullptr;
+  StrongReleaseInst *SingleRelease = nullptr;
+
+  // For each user U of the alloc_existential_box...
+  for (auto U : getNonDebugUses(*AEBI)) {
+    // Record stores into the box.
+    if (auto *SI = dyn_cast<StoreInst>(U->getUser())) {
+      // If this is not the only store into the box then bail out.
+      if (SingleStore) return nullptr;
+      SingleStore = SI;
+      continue;
+    }
+
+    // Record releases of the box.
+    if (auto *RI = dyn_cast<StrongReleaseInst>(U->getUser())) {
+      // If this is not the only release of the box then bail out.
+      if (SingleRelease) return nullptr;
+      SingleRelease = RI;
+      continue;
+    }
+
+    // If there are other users to the box then bail out.
+    return nullptr;
+  }
+
+  if (SingleStore && SingleRelease) {
+    // Release the value that was stored into the existential box. The box
+    // is going away so we need to release the stored value now.
+    Builder->setInsertionPoint(SingleStore);
+    Builder->createReleaseValue(AEBI->getLoc(), SingleStore->getSrc());
+
+    // Erase the instruction that stores into the box and the release that
+    // releases the box, and finally, release the box.
+    eraseInstFromFunction(*SingleRelease);
+    eraseInstFromFunction(*SingleStore);
+    return eraseInstFromFunction(*AEBI);
+  }
+
+  return nullptr;
+}
+
 SILInstruction *SILCombiner::visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI) {
   // Promote switch_enum_addr to switch_enum if the enum is loadable.
   //   switch_enum_addr %ptr : $*Optional<SomeClass>, case ...

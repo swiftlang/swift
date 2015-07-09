@@ -2576,3 +2576,46 @@ bb0(%0 : $@sil_unowned NClass, %1 : $@sil_unowned NClass):
   release_value %0 : $@sil_unowned NClass  
   return %0 : $@sil_unowned NClass
 }
+
+
+enum VendingMachineError: ErrorType {
+    case InvalidSelection
+    case InsufficientFunds(required: Double)
+    case OutOfStock
+}
+
+// Check that we can delete exceptions if we can inline the `throw`
+// block into the `try` block.
+// CHECK-LABEL: @RemoveUnusedException
+// CHECK-NOT: alloc_existential_box
+// CHECK-NOT: enum $VendingMachineError
+// CHECK: return
+sil hidden @RemoveUnusedException : $@convention(thin) (Int32) -> (Double, @error ErrorType) {
+bb0(%0 : $Int32):
+  debug_value %0 : $Int32  // let x               // id: %1
+  %2 = integer_literal $Builtin.Int32, 10         // user: %4
+  %3 = struct_extract %0 : $Int32, #Int32.value   // user: %4
+  %4 = builtin "cmp_sgt_Int32"(%3 : $Builtin.Int32, %2 : $Builtin.Int32) : $Builtin.Int1 // user: %5
+  cond_br %4, bb1, bb2                            // id: %5
+
+bb1:                                              // Preds: bb0
+  %6 = alloc_existential_box $ErrorType, $VendingMachineError // users: %8, %9, %13
+  %7 = enum $VendingMachineError, #VendingMachineError.OutOfStock!enumelt // user: %8
+  store %7 to %6#1 : $*VendingMachineError        // id: %8
+  debug_value %6#0 : $ErrorType  // let error     // id: %9
+  %10 = float_literal $Builtin.FPIEEE80, 0x3FFF8000000000000000 // 1 // user: %11
+  %11 = builtin "fptrunc_FPIEEE80_FPIEEE64"(%10 : $Builtin.FPIEEE80) : $Builtin.FPIEEE64 // user: %12
+  %12 = struct $Double (%11 : $Builtin.FPIEEE64)  // user: %14
+  strong_release %6#0 : $ErrorType                // id: %13
+  br bb3(%12 : $Double)                           // id: %14
+
+bb2:                                              // Preds: bb0
+  %15 = float_literal $Builtin.FPIEEE80, 0x40008000000000000000 // 2 // user: %16
+  %16 = builtin "fptrunc_FPIEEE80_FPIEEE64"(%15 : $Builtin.FPIEEE80) : $Builtin.FPIEEE64 // user: %17
+  %17 = struct $Double (%16 : $Builtin.FPIEEE64)  // user: %18
+  br bb3(%17 : $Double)                           // id: %18
+
+bb3(%19 : $Double):                               // Preds: bb1 bb2
+  return %19 : $Double                            // id: %20
+}
+
