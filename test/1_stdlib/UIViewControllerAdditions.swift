@@ -5,6 +5,8 @@
 
 // REQUIRES: OS=ios
 
+// REQUIRES: disabled
+
 import UIKit
 
 // _TtC1a15View1Controller.nib
