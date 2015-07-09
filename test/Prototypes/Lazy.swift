@@ -3,63 +3,6 @@
 
 import StdlibUnittest
 
-//===--- SequenceWrapper.swift - sequence/collection wrapper protocols ----===//
-//
-// This source file is part of the Swift.org open source project
-//
-// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
-// Licensed under Apache License v2.0 with Runtime Library Exception
-//
-// See http://swift.org/LICENSE.txt for license information
-// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
-//
-//===----------------------------------------------------------------------===//
-//
-//  To create a SequenceType or CollectionType that forwards
-//  requirements to an underlying SequenceType or CollectionType,
-//  have it conform to one of these protocols.
-//
-//===----------------------------------------------------------------------===//
-
-/// A type that is just a wrapper over some base Sequence
-internal protocol _SequenceWrapperType {
-  typealias Base : SequenceType
-  typealias Generator : GeneratorType = Base.Generator
-  
-  var _base: Base {get}
-}
-
-extension SequenceType
-  where Self : _SequenceWrapperType, Self.Generator == Self.Base.Generator {
-  /// Return a *generator* over the elements of this *sequence*.
-  ///
-  /// - Complexity: O(1).
-  public func generate() -> Base.Generator {
-    return self._base.generate()
-  }
-
-  public func underestimateCount() -> Int {
-    return _base.underestimateCount()
-  }
-
-  public func _customContainsEquatableElement(
-    element: Base.Generator.Element
-  ) -> Bool? { 
-    return _base._customContainsEquatableElement(element)
-  }
-  
-  /// Copy a Sequence into an array.
-  public func _initializeTo(ptr: UnsafeMutablePointer<Base.Generator.Element>) {
-    return _base._initializeTo(ptr)
-  }
-}
-
-internal protocol _CollectionWrapperType : _SequenceWrapperType {
-  typealias Base : CollectionType
-  typealias Index : ForwardIndexType = Base.Index
-  var _base: Base {get}
-}
-
 extension CollectionType
   where Self : _CollectionWrapperType, Self.Index == Self.Base.Index {
   /// The position of the first element in a non-empty collection.
@@ -135,7 +78,7 @@ extension _prext_LazySequenceType where Self : _SequenceWrapperType {
 /// A sequence that forwards its implementation to an underlying
 /// sequence instance while exposing lazy computations as methods.
 public struct _prext_LazySequence<Base_ : SequenceType> : _SequenceWrapperType {
-  var _base: Base_
+  public var _base: Base_
 }
 
 /// Augment `s` with lazy methods such as `map`, `filter`, etc.
@@ -152,10 +95,13 @@ public extension SequenceType
 
 //===--- LazyCollection.swift ---------------------------------*- swift -*-===//
 //
-//                     The LLVM Compiler Infrastructure
+// This source file is part of the Swift.org open source project
 //
-// This file is distributed under the University of Illinois Open Source
-// License. See LICENSE.TXT for details.
+// Copyright (c) 2014 - 2015 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See http://swift.org/LICENSE.txt for license information
+// See http://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
 
@@ -182,8 +128,8 @@ extension _prext_LazyCollectionType where Self : _CollectionWrapperType {
 public struct _prext_LazyCollection<Base_ : CollectionType>
   : /*_prext_LazyCollectionType,*/ _CollectionWrapperType {
 
-  typealias Base = Base_
-  typealias Index = Base.Index
+  public typealias Base = Base_
+  public typealias Index = Base.Index
   
   /// Construct an instance with `base` as its underlying Collection
   /// instance.
@@ -256,8 +202,8 @@ public struct _prext_MapSequence<Base : SequenceType, T>
       _base: _base.generate(), _transform: _transform)
   }
 
-  var _base: Base
-  var _transform: (Base.Generator.Element)->T
+  public var _base: Base
+  internal var _transform: (Base.Generator.Element)->T
 }
 
 //===--- Collections ------------------------------------------------------===//
@@ -291,7 +237,7 @@ public struct _prext_MapCollection<Base : CollectionType, T>
     return _base.underestimateCount()
   }
 
-  var _base: Base
+  public var _base: Base
   var _transform: (Base.Generator.Element)->T
 }
 
@@ -359,8 +305,8 @@ public struct _prext_ReverseIndex<Base_: BidirectionalIndexType>
   public typealias Base = Base_
   public typealias Distance = Base_.Distance
   
-  internal init(_ base: Base) { self._base = base }
-  internal let _base: Base
+  public init(_ base: Base) { self._base = base }
+  public let _base: Base
 }
 
 public func == <I> (lhs: _prext_ReverseIndex<I>, rhs: _prext_ReverseIndex<I>) -> Bool {
@@ -372,8 +318,8 @@ public struct _prext_ReverseRandomAccessIndex<Base: RandomAccessIndexType>
 
   public typealias Distance = Base.Distance
   
-  internal init(_ base: Base) { self._base = base }
-  internal let _base: Base
+  public init(_ base: Base) { self._base = base }
+  public let _base: Base
 
   /// Return the minimum number of applications of `successor` or
   /// `predecessor` required to reach `other` from `self`.
