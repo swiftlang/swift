@@ -255,4 +255,35 @@ ErrorTypeBridgingTests.test("enum-to-NSError round trip") {
   }
 }
 
+class SomeNSErrorSubclass: NSError {}
+
+
+ErrorTypeBridgingTests.test("Thrown NSError identity is preserved") {
+  do {
+    let e = NSError(domain: "ClericalError", code: 219,
+                    userInfo: ["yeah": "yeah"])
+    do {
+      throw e
+    } catch let e2 as NSError {
+      expectTrue(e === e2)
+      expectTrue(e2.userInfo["yeah"] as? String == "yeah")
+    } catch {
+      expectUnreachable()
+    }
+  }
+
+  do {
+    let f = SomeNSErrorSubclass(domain: "ClericalError", code: 219,
+                                userInfo: ["yeah": "yeah"])
+    do {
+      throw f
+    } catch let f2 as NSError {
+      expectTrue(f === f2)
+      expectTrue(f2.userInfo["yeah"] as? String == "yeah")
+    } catch {
+      expectUnreachable()
+    }
+  }
+}
+
 runAllTests()

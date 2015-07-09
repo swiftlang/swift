@@ -1848,6 +1848,11 @@ bool swift::swift_dynamicCast(OpaqueValue *dest,
     // If the destination type is an NSError, and the source type is an
     // ErrorType, then the cast can succeed by NSError bridging.
     if (targetType == getNSErrorTypeMetadata()) {
+      // Don't rebridge if the source is already some kind of NSError.
+      if (srcType->isAnyClass()
+          && swift_dynamicCastObjCClass(*reinterpret_cast<id*>(src),
+               static_cast<const ObjCClassWrapperMetadata*>(targetType)->Class))
+        return succeed();
       if (auto srcErrorTypeWitness = findErrorTypeWitness(srcType)) {
         auto error = dynamicCastValueToNSError(src, srcType,
                                                srcErrorTypeWitness, flags);
