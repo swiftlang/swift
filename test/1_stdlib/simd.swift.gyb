@@ -150,6 +150,43 @@ simdTestSuite.test("vector elements") {
 % end # for type in scalar_types
 }
 
+% for type in scalar_types:
+// ----
+%   if type not in float_types:
+// ----
+%     for size in [2,3,4]:
+// ----
+%       vectype = ctype[type] + str(size)
+
+extension ${vectype}: Equatable {}
+public func ==(a: ${vectype}, b: ${vectype}) -> Bool {
+% for i in xrange(0, size):
+  if (a${component[i]} != b${component[i]}) { return false }
+% end
+  return true
+}
+
+simdTestSuite.test("${vectype} wrapping arithmetic") {
+
+  expectEqual(${vectype}(.max) &+ ${vectype}(1),
+              ${vectype}(.min))
+
+  expectEqual(${vectype}(.min) &- ${vectype}(1),
+              ${vectype}(.max))
+
+  expectEqual(${vectype}(.max) &* ${vectype}(.max),
+              ${vectype}(1))
+  expectEqual(${vectype}(.max) &* .max,
+              ${vectype}(1))
+  expectEqual(.max &* ${vectype}(.max),
+              ${vectype}(1))
+}
+
+%     end
+%   end
+% end
+
+
 simdTestSuite.test("vector debugDescription") {
   var f2 = float2(1, 2)
   expectEqual("float2(1.0, 2.0)", f2.debugDescription)
