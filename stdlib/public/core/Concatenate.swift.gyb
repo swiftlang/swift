@@ -117,6 +117,7 @@ func _concatenate<
 %   Index = '_Concatenate%sIndex' % traversal
 %   IndexProtocol = '%sIndexType' % traversal
 
+
 /// A wrapper for a `${IndexProtocol}` for a collection of
 /// collections, that can be used to index the inner elements.
 public // @testable
@@ -126,8 +127,10 @@ struct ${Index}<
           C.Generator.Element: CollectionType,
           C.Generator.Element.Index : ${IndexProtocol}
 > : ${IndexProtocol} {
-  typealias Outer = C.Index
-  typealias Inner = C.Generator.Element.Index
+  internal typealias Outer = C.Index
+  internal typealias Inner = C.Generator.Element.Index
+  internal typealias _Self = ${Index}
+  
   var _data: C
   var _outer: Outer
   var _inner: Inner?
@@ -138,21 +141,12 @@ struct ${Index}<
     self._inner = inner
   }
 
-  static func adjustForward(
-    data: C, var _ outer: Outer, _ inner: Inner?
-  ) -> ${Index} {
-    if _fastPath(inner != nil) {
-      if _fastPath(inner! != data[outer].endIndex) {
-        return ${Index}(data, outer, inner)
-      }
-      ++outer
+  // Find the startIndex for the given underlying collection
+  internal static func _startIndex(data: C) -> _Self {
+    if let outer = data.indexOf({ !$0.isEmpty }) {
+      return _Self(data, outer, data[outer].startIndex)
     }
-    for ; outer != data.endIndex ; ++outer {
-      if !data[outer].isEmpty {
-        return ${Index}(data, outer, data[outer].startIndex)
-      }
-    }
-    return ${Index}(data, outer, nil)
+    return _Self(data, data.endIndex, nil)
   }
 
   /// Returns the next consecutive value after `self`.
@@ -160,7 +154,21 @@ struct ${Index}<
   /// - Requires: the next value is representable.
   public // @testable
   func successor() -> ${Index} {
-    return ${Index}.adjustForward(_data, _outer, _inner!.successor())
+    var inner = _inner!.successor()
+    if _fastPath(inner != _data[_outer].endIndex) {
+      return _Self(_data, _outer, inner)
+    }
+
+    // FIXME: once we can constrain _Element == Generator.Element, we
+    // can use indexOf on a slice, which would be more logical.
+    
+    // Don't use slicing syntax here until we can guarantee index
+    // mapping back from a collection's SubSequence to the collection.
+    let tailIndices = _outer.successor()..<_data.endIndex
+    if let outer = tailIndices.indexOf({ !_data[$0].isEmpty }) {
+      return _Self(_data, outer, _data[outer].startIndex)
+    }
+    return _Self(_data, _data.endIndex, nil)
   }
 
   % if traversal == 'Bidirectional':
@@ -218,7 +226,7 @@ struct ${View}<
   /// In an empty collection, `startIndex == endIndex`.
   public // @testable
   var startIndex: Index {
-    return ${Index}.adjustForward(_base, _base.startIndex, nil)
+    return ${Index}._startIndex(_base)
   }
 
   /// The collection's "past the end" position.
