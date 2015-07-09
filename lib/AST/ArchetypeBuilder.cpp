@@ -543,6 +543,7 @@ ArchetypeBuilder::PotentialArchetype::getType(ArchetypeBuilder &builder) {
 
       LazyResolver *resolver = mod.getASTContext().getLazyResolver();
       assert(resolver && "need a lazy resolver");
+      (void) resolver;
 
       // Resolve the member type.
       auto depMemberType = getDependentType(builder, false)
