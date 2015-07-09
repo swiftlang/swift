@@ -1897,8 +1897,12 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure() {
   
   
   auto overloadChoice = overloadConstraint->getOverloadChoice();
-  auto overloadName = overloadChoice.getDecl()->getName();
-  
+  std::string overloadName = overloadChoice.getDecl()->getNameStr();
+
+  if (auto *CD = dyn_cast<ConstructorDecl>(overloadChoice.getDecl()))
+    if (auto *SD = CD->getImplicitSelfDecl())
+      overloadName = SD->getType()->getInOutObjectType().getString() + ".init";
+
   // Get the referenced expression from the failed constraint.
   auto anchor = expr;
   if (auto locator = overloadConstraint->getLocator()) {
@@ -1924,7 +1928,7 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure() {
   
   if (argType.isNull() || argType->is<TypeVariableType>()) {
     CS->TC.diagnose(anchor->getLoc(), diag::cannot_find_appropriate_overload,
-                    overloadName.str())
+                    overloadName)
        .highlight(anchor->getSourceRange());
     return true;
   }
@@ -1957,16 +1961,16 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure() {
   if (argType->getAs<TupleType>()) {
     CS->TC.diagnose(apply->getFn()->getLoc(),
                     diag::cannot_find_appropriate_overload_with_type_list,
-                    overloadName.str(), getTypeListString(argType))
+                    overloadName, getTypeListString(argType))
     .highlight(apply->getSourceRange());
   } else {
     CS->TC.diagnose(apply->getFn()->getLoc(),
                     diag::cannot_find_appropriate_overload_with_type,
-                    overloadName.str(), getTypeListString(argType))
+                    overloadName, getTypeListString(argType))
     .highlight(apply->getSourceRange());
   }
   
-  suggestPotentialOverloads(overloadName.str(), apply->getLoc(),
+  suggestPotentialOverloads(overloadName, apply->getLoc(),
                             Candidates, candidateCloseness);
   return true;
 }

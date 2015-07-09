@@ -16,7 +16,7 @@ class D : B {
   }
 
   init(e:Int) {
-    super.init('x') // expected-error{{could not find an overload for 'init' that accepts the supplied arguments}}
+    super.init('x') // expected-error{{could not find an overload for 'B.init' that accepts the supplied arguments}}
   }
 
   init(f:Int) {
@@ -24,7 +24,7 @@ class D : B {
   }
 
   init(g:Int) {
-    super.init("aoeu") // expected-error{{could not find an overload for 'init' that accepts the supplied arguments}}
+    super.init("aoeu") // expected-error{{could not find an overload for 'B.init' that accepts the supplied arguments}}
   }
 
   init(h:Int) {
