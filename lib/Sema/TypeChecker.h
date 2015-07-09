@@ -458,7 +458,7 @@ private:
   llvm::DenseSet<CanType> CIntegerTypes;
   
   /// The set of expressions currently being analyzed for failures.
-  llvm::DenseSet<Expr *> DiagnosedExprs;
+  llvm::DenseMap<Expr*, Expr*> DiagnosedExprs;
 
   /// A set of types that are representable in Objective-C, but require
   /// non-trivial bridging.
@@ -1629,11 +1629,11 @@ public:
   void checkInitializerErrorHandling(Initializer *I, Expr *E);
   void checkEnumElementErrorHandling(EnumElementDecl *D);
 
-  void addExprForDiagnosis(Expr *E) {
-    DiagnosedExprs.insert(E);
+  void addExprForDiagnosis(Expr *E1, Expr *Result) {
+    DiagnosedExprs[E1] = Result;
   }
-  bool exprIsBeingDiagnosed(Expr *E) {
-    return DiagnosedExprs.count(E) != 0;
+  Expr *exprIsBeingDiagnosed(Expr *E) {
+    return DiagnosedExprs[E];
   }
 
   /// If an expression references 'self.init' or 'super.init' in an

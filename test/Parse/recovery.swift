@@ -646,4 +646,10 @@ let curlyQuotes2 = “hello world!"
 let ￼tryx  = 123        // expected-error 2 {{invalid character in source file}}  {{5-8= }}
 
 
+// <rdar://problem/21369926> Malformed Swift Enums crash playground service
+enum Rank: Int {
+  case Ace = 1
+  case Two = 2.1  // expected-error {{'Double' is not convertible to 'Int'}}
+}
+
 

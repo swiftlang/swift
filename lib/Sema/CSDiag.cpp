@@ -1631,7 +1631,7 @@ class FailureDiagnosis :public ASTVisitor<FailureDiagnosis, /*exprresult*/bool>{
   friend class ASTVisitor<FailureDiagnosis, /*exprresult*/bool>;
   
   Expr *expr = nullptr;
-  ConstraintSystem *CS = nullptr;
+  ConstraintSystem *const CS;
   
   // Specific constraint kinds used, in conjunction with the expression node,
   // to determine the appropriate diagnostic.
@@ -1653,11 +1653,21 @@ public:
   /// kind of expression that could not be type checked.
   bool diagnoseGeneralFailure();
   
-  /// If the type check failure on the expression is a top-level one, obtain a
-  /// type or any sub expressions by potentially re-typechecking in a
-  /// context-free manner.
-  Type getTypeOfIndependentSubExpression(Expr *subExpr);
-  
+  /// Unless we've already done this, retypecheck the specified subexpression on
+  /// its own, without including any contextual constraints or parent expr
+  /// nodes.  This is more likely to succeed than type checking the original
+  /// expression.
+  ///
+  /// This can return a new expression (for e.g. when a UnresolvedDeclRef gets
+  /// resolved) and returns null when the subexpression fails to typecheck.
+  Expr *typeCheckIndependentSubExpression(Expr *subExpr);
+
+  Type getTypeOfTypeCheckedIndependentSubExpression(Expr *subExpr) {
+    auto e = typeCheckIndependentSubExpression(subExpr);
+    return e ? e->getType() : Type();
+  }
+
+
   /// Attempt to diagnose a specific failure from the info we've collected from
   /// the failed constraint system.
   bool diagnoseFailure();
@@ -2006,10 +2016,11 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure() {
     
     return true;
   }
-  
-  auto fromType = getTypeOfIndependentSubExpression(anchor);
-  
-  if (fromType->getAs<ErrorType>())
+
+  Type fromType;
+  if (auto sub = typeCheckIndependentSubExpression(anchor))
+    fromType = sub->getType();
+  else
     fromType = types.first.getPointer();
 
   fromType = fromType->getRValueType();
@@ -2066,15 +2077,21 @@ bool FailureDiagnosis::diagnoseGeneralFailure() {
          diagnoseGeneralConversionFailure();
 }
 
-Type FailureDiagnosis::getTypeOfIndependentSubExpression(Expr *subExpr) {
-  Type resultType = subExpr->getType();
 
+/// Unless we've already done this, retypecheck the specified subexpression on
+/// its own, without including any contextual constraints or parent expr
+/// nodes.  This is more likely to succeed than type checking the original
+/// expression.
+///
+/// This can return a new expression (for e.g. when a UnresolvedDeclRef gets
+/// resolved) and returns null when the subexpression fails to typecheck.
+Expr *FailureDiagnosis::typeCheckIndependentSubExpression(Expr *subExpr) {
   // Track if this sub-expression is currently being diagnosed.
-  if (CS->TC.exprIsBeingDiagnosed(subExpr))
-    return resultType;
+  if (Expr *res = CS->TC.exprIsBeingDiagnosed(subExpr))
+    return res;
   
   // FIXME: expressions are never removed from this set.
-  CS->TC.addExprForDiagnosis(subExpr);
+  CS->TC.addExprForDiagnosis(subExpr, subExpr);
   
   if (!isa<ClosureExpr>(subExpr) &&
       (isa<ApplyExpr>(subExpr) || isa<ArrayExpr>(subExpr) ||
@@ -2089,17 +2106,8 @@ Type FailureDiagnosis::getTypeOfIndependentSubExpression(Expr *subExpr) {
         
     // Passing 'true' to the 'discardedExpr' arg preserves the lvalue type of
     // the expression.
-    if (CS->TC.typeCheckExpression(subExpr, CS->DC, Type(), Type(),
-                                   /*discardedExpr=*/true)) {
-      // If recursive type checking failed, then an error was emitted, tell the
-      // caller that we are done diagnosing things to avoid multiple
-      // diagnostics.
-      resultType = ErrorType::get(CS->getASTContext());
-    } else {
-      // Otherwise, if type checking succeeded, the resultant type is the type
-      // on the expr node.
-      resultType = subExpr->getType();
-    }
+    bool hadError = CS->TC.typeCheckExpression(subExpr, CS->DC, Type(), Type(),
+                                               /*discardedExpr=*/true);
 
     // This is a terrible hack to get around the fact that typeCheckExpression()
     // might change subExpr to point to a new OpenExistentialExpr. In that case,
@@ -2108,15 +2116,19 @@ Type FailureDiagnosis::getTypeOfIndependentSubExpression(Expr *subExpr) {
     // no OpenExistentialExpr, which breaks invariants enforced by the
     // ASTChecker.
     CS->TC.eraseOpenedExistentials(subExpr);
- 
-    // Reset the type of the previous expression. This prevents stale type
-    // variable data from being leaked out of the temporary constraint system.
-    if (preCheckedExpr != subExpr)
-      preCheckedExpr->setType(resultType);
+        
+    // If recursive type checking failed, then an error was emitted, tell the
+    // caller that we are done diagnosing things to avoid multiple
+    // diagnostics.
+    if (hadError) {
+      preCheckedExpr->setType(ErrorType::get(CS->getASTContext()));
+      return nullptr;
+    }
+
+    CS->TC.addExprForDiagnosis(preCheckedExpr, subExpr);
   }
   
-  assert(resultType);
-  return resultType;
+  return subExpr;
 }
 
 bool FailureDiagnosis::diagnoseContextualConversionError(Type exprResultType) {
@@ -2374,10 +2386,12 @@ FailureDiagnosis::collectCalleeCandidateInfo(Expr *fn, Type actualArgsType,
 }
 
 bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
-  auto argExpr = cast<TupleExpr>(binop->getArg());
-  auto argTuple = getTypeOfIndependentSubExpression(argExpr)->
-        getAs<TupleType>();
-  
+  auto argExpr =
+    cast_or_null<TupleExpr>(typeCheckIndependentSubExpression(binop->getArg()));
+  if (!argExpr) return true;
+
+  auto argTuple = argExpr->getType()->getAs<TupleType>();
+
   // If the argument type is not a tuple, we've posted the diagnostic
   // recursively.
   if (!argTuple)
@@ -2392,8 +2406,8 @@ bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
     
     // Otherwise, whatever the result type of the call happened to be must not
     // have been what we were looking for.
-    auto resultTy = getTypeOfIndependentSubExpression(binop);
-    if (isErrorTypeKind(resultTy))
+    auto resultTy = getTypeOfTypeCheckedIndependentSubExpression(binop);
+    if (!resultTy)
       return true;
     
     if (typeIsNotSpecialized(resultTy))
@@ -2448,14 +2462,13 @@ bool FailureDiagnosis::visitUnaryExpr(ApplyExpr *applyExpr) {
          expr->getKind() == ExprKind::PrefixUnary);
   
   CleanupIllFormedExpressionRAII cleanup(CS->getASTContext(), expr);
-  
-  auto argExpr = applyExpr->getArg();
-  auto argType = getTypeOfIndependentSubExpression(argExpr);
-  
-  // If the argument type is an error, we've posted the diagnostic
-  // recursively.
-  if (isErrorTypeKind(argType))
-    return true;
+
+  auto argExpr = typeCheckIndependentSubExpression(applyExpr->getArg());
+
+  // If the argument type is an error, we've posted the diagnostic recursively.
+  if (!argExpr) return true;
+
+  auto argType = argExpr->getType();
 
   CandidateCloseness candidateCloseness;
   auto Candidates = collectCalleeCandidateInfo(applyExpr->getFn(), argType,
@@ -2466,8 +2479,8 @@ bool FailureDiagnosis::visitUnaryExpr(ApplyExpr *applyExpr) {
   if (candidateCloseness == CC_ExactMatch) {
     // Otherwise, whatever the result type of the call happened to be must not
     // have been what we were looking for.
-    auto resultTy = getTypeOfIndependentSubExpression(applyExpr);
-    if (isErrorTypeKind(resultTy))
+    auto resultTy = getTypeOfTypeCheckedIndependentSubExpression(applyExpr);
+    if (!resultTy)
       return true;
     
     if (typeIsNotSpecialized(resultTy))
@@ -2562,16 +2575,14 @@ FailureDiagnosis::collectCalleeCandidateInfo(ConstraintLocator *locator,
 bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
   CleanupIllFormedExpressionRAII cleanup(CS->getASTContext(), expr);
   
-  auto indexExpr = SE->getIndex();
-  auto baseExpr = SE->getBase();
-  
-  auto indexType = getTypeOfIndependentSubExpression(indexExpr);
-  if (isErrorTypeKind(indexType))
-    return true;
-  
-  auto baseType = getTypeOfIndependentSubExpression(baseExpr);
-  if (isErrorTypeKind(baseType))
-    return true;
+  auto indexExpr = typeCheckIndependentSubExpression(SE->getIndex());
+  if (!indexExpr) return true;
+
+  auto baseExpr = typeCheckIndependentSubExpression(SE->getBase());
+  if (!baseExpr) return true;
+
+  auto indexType = indexExpr->getType();
+  auto baseType = baseExpr->getType();
 
   // See if the subscript got resolved.
   auto loc = CS->getConstraintLocator(SE, ConstraintLocator::SubscriptMember);
@@ -2596,8 +2607,8 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
   if (candidateCloseness == CC_ExactMatch) {
     // Otherwise, the return type of the subscript happened to not have been
     // what we were looking for.
-    auto resultTy = getTypeOfIndependentSubExpression(SE);
-    if (isErrorTypeKind(resultTy))
+    auto resultTy = getTypeOfTypeCheckedIndependentSubExpression(SE);
+    if (!resultTy)
       return true;
     
     if (!typeIsNotSpecialized(resultTy)) {
@@ -2713,7 +2724,7 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
   Type argType;
 
   if (auto *PE = dyn_cast<ParenExpr>(argExpr)) {
-    argType = getTypeOfIndependentSubExpression(PE->getSubExpr());
+    argType = getTypeOfTypeCheckedIndependentSubExpression(PE->getSubExpr());
   } else if (auto *TE = dyn_cast<TupleExpr>(argExpr)) {
     // FIXME: This should all just be a matter of getting type type of the
     // sub-expression, but this doesn't work well when the argument list contains
@@ -2723,15 +2734,15 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
       containsInOutExprs |= isa<InOutExpr>(elt);
     
     if (!containsInOutExprs) {
-      argType = getTypeOfIndependentSubExpression(TE);
+      argType = getTypeOfTypeCheckedIndependentSubExpression(TE);
     } else {
       // If InOutExprs are in play, get the simplified type of each element and
       // rebuild the aggregate :-(
       SmallVector<TupleTypeElt, 4> resultElts;
 
       for (unsigned i = 0, e = TE->getNumElements(); i != e; i++) {
-        auto elType = getTypeOfIndependentSubExpression(TE->getElement(i));
-        if (isErrorTypeKind(elType))
+        auto elType = getTypeOfTypeCheckedIndependentSubExpression(TE->getElement(i));
+        if (!elType)
           return true; // already diagnosed.
 
         Identifier elName = TE->getElementName(i);
@@ -2743,10 +2754,11 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
     }
     
   } else {
-    argType = getTypeOfIndependentSubExpression(unwrapParenExpr(argExpr));
+    argType =
+        getTypeOfTypeCheckedIndependentSubExpression(unwrapParenExpr(argExpr));
   }
   
-  if (isErrorTypeKind(argType))
+  if (!argType)
     return true; // already diagnosed.
 
   // If we have an argument list (i.e., a scalar, or a non-zero-element tuple)
@@ -2826,18 +2838,21 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
 
 bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
   CleanupIllFormedExpressionRAII cleanup(CS->getASTContext(), expr);
-  auto destExpr = assignExpr->getDest();
-  auto srcExpr = assignExpr->getSrc();
-  
-  auto srcType = getTypeOfIndependentSubExpression(srcExpr);
-  // If the source type is already an error type, we've likely already posted
-  // an error due to a contextual type conversion error.
-  if (isErrorTypeKind(srcType))
+  // Diagnose obvious assignments to literals.
+  if (isa<LiteralExpr>(assignExpr->getDest()->getSemanticsProvidingExpr())) {
+    CS->TC.diagnose(assignExpr->getLoc(), diag::cannot_assign_to_literal);
     return true;
+  }
 
-  auto destType = getTypeOfIndependentSubExpression(destExpr);
-  if (isErrorTypeKind(destType))
-    return true;
+  // If the source type is already an error type, we've already posted an error.
+  auto srcExpr = typeCheckIndependentSubExpression(assignExpr->getSrc());
+  if (!srcExpr) return true;
+
+  auto destExpr = typeCheckIndependentSubExpression(assignExpr->getDest());
+  if (!destExpr) return true;
+
+  auto destType = destExpr->getType();
+  auto srcType = srcExpr->getType();
 
   // If the result type is a non-lvalue, then we are failing because it is
   // immutable and that's not a great thing to assign to.
@@ -2853,16 +2868,15 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
   return true;
 }
 
-bool FailureDiagnosis::visitInOutExpr(InOutExpr *inoutExpr) {
+bool FailureDiagnosis::visitInOutExpr(InOutExpr *IOE) {
   CleanupIllFormedExpressionRAII cleanup(CS->getASTContext(), expr);
-  auto addressedExpr = inoutExpr->getSubExpr();
+  auto subExpr = typeCheckIndependentSubExpression(IOE->getSubExpr());
 
-  auto subExprType = getTypeOfIndependentSubExpression(addressedExpr);
+  auto subExprType = subExpr->getType();
 
-  
   // The common cause is that the operand is not an lvalue.
   if (!subExprType->isLValueType()) {
-    diagnoseSubElementFailure(addressedExpr, inoutExpr->getLoc(), *CS,
+    diagnoseSubElementFailure(subExpr, IOE->getLoc(), *CS,
                               diag::cannot_pass_rvalue_inout_subelement,
                               diag::cannot_pass_rvalue_inout);
     return true;
@@ -2871,32 +2885,29 @@ bool FailureDiagnosis::visitInOutExpr(InOutExpr *inoutExpr) {
   return diagnoseGeneralFailure();
 }
 
-bool FailureDiagnosis::visitCoerceExpr(CoerceExpr *coerceExpr) {
+bool FailureDiagnosis::visitCoerceExpr(CoerceExpr *CE) {
   CleanupIllFormedExpressionRAII cleanup(CS->getASTContext(), expr);
 
-  Expr *subExpr = coerceExpr->getSubExpr();
-  Type subType = getTypeOfIndependentSubExpression(subExpr);
-  if (isErrorTypeKind(subType)) {
-    return true;
-  }
+  Expr *subExpr = typeCheckIndependentSubExpression(CE->getSubExpr());
+  if (!subExpr) return true;
+  Type subType = subExpr->getType();
 
   std::pair<Type, Type> conversionTypes(nullptr, nullptr);
   if (conversionConstraint &&
       conversionConstraint->getKind() == ConstraintKind::ExplicitConversion &&
       conversionConstraint->getLocator()->getAnchor() == expr) {
-    conversionTypes = getBoundTypesFromConstraint(CS, coerceExpr,
-                                                       conversionConstraint);
+    conversionTypes = getBoundTypesFromConstraint(CS, CE, conversionConstraint);
   } else {
     conversionTypes.first = subType->getLValueOrInOutObjectType();
-    conversionTypes.second = coerceExpr->getType();
+    conversionTypes.second = CE->getType();
   }
 
   if (conversionTypes.first && conversionTypes.second) {
-    CS->TC.diagnose(coerceExpr->getLoc(), diag::invalid_relation,
+    CS->TC.diagnose(CE->getLoc(), diag::invalid_relation,
                     Failure::TypesNotConvertible - Failure::TypesNotEqual,
                     getUserFriendlyTypeName(conversionTypes.first),
                     getUserFriendlyTypeName(conversionTypes.second))
-      .highlight(coerceExpr->getSourceRange());
+      .highlight(CE->getSourceRange());
     return true;
   }
 
@@ -2904,32 +2915,32 @@ bool FailureDiagnosis::visitCoerceExpr(CoerceExpr *coerceExpr) {
 }
 
 bool FailureDiagnosis::
-visitForcedCheckedCastExpr(ForcedCheckedCastExpr *castExpr) {
+visitForcedCheckedCastExpr(ForcedCheckedCastExpr *FCE) {
   CleanupIllFormedExpressionRAII cleanup(CS->getASTContext(), expr);
 
-  Expr *subExpr = castExpr->getSubExpr();
-  Type subType = getTypeOfIndependentSubExpression(subExpr);
-  if (isErrorTypeKind(subType)) {
-    return true;
-  }
+  Expr *subExpr = typeCheckIndependentSubExpression(FCE->getSubExpr());
+  if (!subExpr) return true;
+
+  Type subType = subExpr->getType();
+
 
   std::pair<Type, Type> conversionTypes(nullptr, nullptr);
   if (conversionConstraint &&
       conversionConstraint->getKind() == ConstraintKind::CheckedCast &&
       conversionConstraint->getLocator()->getAnchor() == expr) {
-    conversionTypes = getBoundTypesFromConstraint(CS, castExpr,
-                                                       conversionConstraint);
+    conversionTypes = getBoundTypesFromConstraint(CS, FCE,
+                                                  conversionConstraint);
   } else {
     conversionTypes.first = subType->getLValueOrInOutObjectType();
-    conversionTypes.second = castExpr->getType();
+    conversionTypes.second = FCE->getType();
   }
 
   if (conversionTypes.first && conversionTypes.second) {
-    CS->TC.diagnose(castExpr->getLoc(), diag::invalid_relation,
+    CS->TC.diagnose(FCE->getLoc(), diag::invalid_relation,
                     Failure::TypesNotConvertible - Failure::TypesNotEqual,
                     getUserFriendlyTypeName(conversionTypes.first),
                     getUserFriendlyTypeName(conversionTypes.second))
-      .highlight(castExpr->getSourceRange());
+      .highlight(FCE->getSourceRange());
     return true;
   }
 
@@ -2939,14 +2950,10 @@ visitForcedCheckedCastExpr(ForcedCheckedCastExpr *castExpr) {
 bool FailureDiagnosis::visitForceValueExpr(ForceValueExpr *FVE) {
   CleanupIllFormedExpressionRAII cleanup(CS->getASTContext(), expr);
   
-  auto argExpr = FVE->getSubExpr();
-  auto argType = getTypeOfIndependentSubExpression(argExpr);
-  
-  // If the argument type is an error, we've posted the diagnostic
-  // recursively.
-  if (isErrorTypeKind(argType))
-    return true;
-  
+  auto argExpr = typeCheckIndependentSubExpression(FVE->getSubExpr());
+  if (!argExpr) return true;
+  auto argType = argExpr->getType();
+
   // If the subexpression type checks as a non-optional type, then that is the
   // error.  Produce a specific diagnostic about this.
   if (argType->getOptionalObjectType().isNull()) {
@@ -2979,7 +2986,7 @@ bool FailureDiagnosis::visitExpr(Expr *E) {
     if (errorInSubExpr) return;
     
     // Otherwise this subexpr is an error if type checking it produces an error.
-    errorInSubExpr |= isErrorTypeKind(getTypeOfIndependentSubExpression(Child));
+    errorInSubExpr |= !getTypeOfTypeCheckedIndependentSubExpression(Child);
   });
   
   // If any of the children were errors, we're done.
@@ -3005,10 +3012,10 @@ bool FailureDiagnosis::diagnoseFailure() {
   // be type checked on its own (even to an incomplete type) then that is where
   // we focus our attention.  If we do find a type, we use it to check for
   // contextual type mismatches.
-  auto subExprTy = getTypeOfIndependentSubExpression(expr);
+  auto subExprTy = getTypeOfTypeCheckedIndependentSubExpression(expr);
   
-  // We've already caught the error.
-  if (subExprTy->getAs<ErrorType>())
+  // We've already diagnosed the error.
+  if (!subExprTy)
     return true;
   
   // If there is a contextual type that mismatches, diagnose it as the problem.
@@ -3033,8 +3040,7 @@ bool ConstraintSystem::diagnoseFailureForExpr(Expr *expr) {
   // case of error recovery, the "_" expression may be left alone with no
   // constraints for us to derive an error from. In that case, we'll fall back
   // to the "outside assignment" error.
-  if (ActiveConstraints.empty() &&
-      InactiveConstraints.empty() &&
+  if (ActiveConstraints.empty() && InactiveConstraints.empty() &&
       !failedConstraint) {
 
     if (isa<DiscardAssignmentExpr>(expr)) {
