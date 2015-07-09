@@ -86,13 +86,6 @@ public func _prext_lazy<S : SequenceType>(s: S) -> _prext_LazySequence<S> {
   return _prext_LazySequence(_base: s)
 }
 
-public extension SequenceType
-  where Self.Generator == Self, Self : GeneratorType {
-  public func generate() -> Self {
-    return self
-  }
-}
-
 //===--- LazyCollection.swift ---------------------------------*- swift -*-===//
 //
 // This source file is part of the Swift.org open source project
