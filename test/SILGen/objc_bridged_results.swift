@@ -129,4 +129,4 @@ func testPerformSelector(obj: NSObject) {
   // CHECK: [[RESULT:%[0-9]+]] = apply [[METHOD]]({{%[0-9]+}}, {{%[0-9]+}}, %0)
   _ = obj.performSelector("foo", withObject: nil)
   // CHECK-NOT: {{(retain|release).+}}[[RESULT]]
-  } // CHECK: {{^}$}}
+} // CHECK: {{^}$}}
