@@ -827,49 +827,38 @@ void CleanupIllFormedExpressionRAII::doIt(Expr *expr, ASTContext &Context) {
     CleanupIllFormedExpression(ASTContext &context) : context(context) { }
     
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      auto closure = dyn_cast<ClosureExpr>(expr);
-      if (!closure)
-        return { true, expr };
-
-      // If it's a non-single expression closure, we don't want to walk into it,
-      // but we still want to erase any type variables in the signature.
-      bool recurse = closure->hasSingleExpressionBody();
-
-      closure->getParams()->forEachVariable([&](VarDecl *VD) {
-        if (VD->hasType() && !VD->getType()->hasTypeVariable())
-          return;
-          
-        VD->overwriteType(ErrorType::get(context));
-        VD->setInvalid();
-      });
-
-      // If we have initializer expressions, we might need to erase
-      // types from there.
-      closure->getParams()->forEachNode([&](Pattern *P) {
-        if (auto TP = dyn_cast<TuplePattern>(P)) {
-          for (auto TPE : TP->getElements()) {
-            if (TPE.getInit()) {
-              recurse = true;
-              break;
-            }
-          }
-        }
-      });
-
-      // If we're not recursing, erase type variables from the closure
-      // expression's type itself.
-      if (!recurse)
-        walkToExprPost(expr);
-
-      return { recurse, expr };
-    }
-    
-    Expr *walkToExprPost(Expr *expr) override {
+      // If the type of this expression has a type variable or is invalid,
+      // overwrite it with ErrorType.
       Type type = expr->getType();
-      
       if (!type || type->hasTypeVariable())
         expr->setType(ErrorType::get(context));
-      return expr;
+
+      return { true, expr };
+    }
+
+    // If we find a TypeLoc (e.g. in an as? expr) with a type variable, rewrite
+    // it.
+    bool walkToTypeLocPre(TypeLoc &TL) override {
+      if (TL.getType() && TL.getType()->hasTypeVariable())
+        TL.setType(Type(), /*was validated*/false);
+      return true;
+    }
+
+    bool walkToDeclPre(Decl *D) override {
+      // This handles parameter decls in ClosureExprs.
+      if (auto VD = dyn_cast<ValueDecl>(D)) {
+        if (VD->hasType() && VD->getType()->hasTypeVariable()) {
+          VD->overwriteType(ErrorType::get(context));
+          VD->setInvalid();
+        }
+      }
+      return true;
+    }
+
+    // Don't walk into statements.  This handles the BraceStmt in
+    // non-single-expr closures, so we don't walk into their body.
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+      return { false, S };
     }
   };
   
