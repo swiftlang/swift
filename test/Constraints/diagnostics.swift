@@ -197,4 +197,13 @@ protocol r21553065Protocol {}
 class r21553065Class<T : AnyObject> {}
 _ = r21553065Class<r21553065Protocol>()  // expected-error {{protocol type 'r21553065Protocol' does not conform to protocol 'AnyObject' because 'r21553065Protocol' is not declared @objc}}
 
+// Type variables not getting erased with nested closures
+struct Toe {
+  let toenail: Nail // expected-error {{use of undeclared type 'Nail'}}
 
+  func clip() {
+    toenail.inspect { x in // expected-error {{'Toe' does not have a member named 'toenail'}}
+      toenail.inspect { y in }
+    }
+  }
+}

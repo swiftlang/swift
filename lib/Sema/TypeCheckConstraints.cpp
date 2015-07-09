@@ -830,19 +830,38 @@ void CleanupIllFormedExpressionRAII::doIt(Expr *expr, ASTContext &Context) {
       auto closure = dyn_cast<ClosureExpr>(expr);
       if (!closure)
         return { true, expr };
-  
-      
-      bool closureIsValid = true;
+
+      // If it's a non-single expression closure, we don't want to walk into it,
+      // but we still want to erase any type variables in the signature.
+      bool recurse = closure->hasSingleExpressionBody();
+
       closure->getParams()->forEachVariable([&](VarDecl *VD) {
         if (VD->hasType() && !VD->getType()->hasTypeVariable())
           return;
           
         VD->overwriteType(ErrorType::get(context));
         VD->setInvalid();
-        closureIsValid = false;
       });
-      
-      return { closureIsValid, expr };
+
+      // If we have initializer expressions, we might need to erase
+      // types from there.
+      closure->getParams()->forEachNode([&](Pattern *P) {
+        if (auto TP = dyn_cast<TuplePattern>(P)) {
+          for (auto TPE : TP->getElements()) {
+            if (TPE.getInit()) {
+              recurse = true;
+              break;
+            }
+          }
+        }
+      });
+
+      // If we're not recursing, erase type variables from the closure
+      // expression's type itself.
+      if (!recurse)
+        walkToExprPost(expr);
+
+      return { recurse, expr };
     }
     
     Expr *walkToExprPost(Expr *expr) override {
