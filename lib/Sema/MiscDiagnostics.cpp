@@ -559,8 +559,15 @@ static bool diagnoseExplicitUnavailability(TypeChecker &TC, const ValueDecl *D,
   case UnconditionalAvailabilityKind::None:
   case UnconditionalAvailabilityKind::Unavailable:
     if (!Attr->Rename.empty()) {
-      TC.diagnose(Loc, diag::availability_decl_unavailable_rename, Name,
-                  Attr->Rename).fixItReplace(R, Attr->Rename);
+      if (Attr->Message.empty()) {
+        TC.diagnose(Loc, diag::availability_decl_unavailable_rename, Name,
+                    Attr->Rename)
+          .fixItReplace(R, Attr->Rename);
+      } else {
+        TC.diagnose(Loc, diag::availability_decl_unavailable_rename_msg, Name,
+                    Attr->Rename, Attr->Message)
+          .fixItReplace(R, Attr->Rename);
+      }
     } else if (Attr->Message.empty()) {
       TC.diagnose(Loc, diag::availability_decl_unavailable, Name).highlight(R);
     } else {
