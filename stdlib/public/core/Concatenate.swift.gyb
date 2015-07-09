@@ -52,13 +52,6 @@ struct _ConcatenateSequenceGenerator<
     while true
   }
 
-  /// `_ConcatenateSequenceGenerator` is also a `SequenceType`, so it
-  /// `generate`'s a copy of itself.
-  public // @testable
-  func generate() -> _ConcatenateSequenceGenerator {
-    return self
-  }
-
   var _outer: Outer
   var _inner: Outer.Element.Generator? = nil
 }

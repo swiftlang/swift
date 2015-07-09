@@ -27,12 +27,6 @@ public struct EmptyGenerator<Element> : GeneratorType, SequenceType {
   /// Construct an instance.
   public init() {}
 
-  /// `EmptyGenerator` is also a `SequenceType`, so it `generate`'s
-  /// a copy of itself.
-  public func generate() -> EmptyGenerator {
-    return self
-  }
-
   /// Return `nil`, indicating that there are no more elements.
   public mutating func next() -> Element? {
     return nil

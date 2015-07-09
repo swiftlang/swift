@@ -90,6 +90,13 @@ public protocol SequenceType {
   func _initializeTo(ptr: UnsafeMutablePointer<Generator.Element>)
 }
 
+extension SequenceType
+  where Self.Generator == Self, Self : GeneratorType {
+  public func generate() -> Self {
+    return self
+  }
+}
+
 extension SequenceType {
   /// Return a value less than or equal to the number of elements in
   /// `self`, **nondestructively**.
@@ -186,13 +193,6 @@ public struct GeneratorSequence<
   ///   has returned `nil`.
   public mutating func next() -> Base.Element? {
     return _base.next()
-  }
-
-  /// Returns a *generator* over the elements of this *sequence*.
-  ///
-  /// - Complexity: O(1).
-  public func generate() -> GeneratorSequence {
-    return self
   }
 
   internal var _base: Base

@@ -24,12 +24,6 @@ public struct UnsafeBufferPointerGenerator<Element>
     return position == end ? nil : (position++).memory
   }
 
-  /// `UnsafeBufferPointerGenerator` is also a `SequenceType`, so it
-  /// `generate`'s a copy of itself.
-  public func generate() -> UnsafeBufferPointerGenerator {
-    return self
-  }
-
   var position, end: UnsafePointer<Element>
 }
 

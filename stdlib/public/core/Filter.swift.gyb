@@ -30,12 +30,6 @@ public struct FilterGenerator<
     }
   }
 
-  /// `FilterGenerator` is also a `SequenceType`, so it `generate`'s
-  /// a copy of itself.
-  public func generate() -> FilterGenerator {
-    return self
-  }
-
   var _base: Base
   var _include: (Base.Element)->Bool
 }

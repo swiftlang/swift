@@ -121,11 +121,6 @@ public struct UnsafeMutableAudioBufferListPointer {
 }
 
 extension UnsafeMutableAudioBufferListPointer : MutableCollectionType {
-  public func generate()
-    -> IndexingGenerator<UnsafeMutableAudioBufferListPointer> {
-    return IndexingGenerator(self)
-  }
-
   /// Always zero, which is the index of the first `AudioBuffer`.
   public var startIndex: Int {
     return 0

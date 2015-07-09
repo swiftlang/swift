@@ -212,16 +212,6 @@ public struct EnumerateGenerator<
     if b == nil { return .None }
     return .Some((index: count++, element: b!))
   }
-
-  /// A type whose instances can produce the elements of this
-  /// sequence, in order.
-  public typealias Generator = EnumerateGenerator<Base>
-
-  /// `EnumerateGenerator` is also a `SequenceType`, so it
-  /// `generate`s a copy of itself.
-  public func generate() -> Generator {
-    return self
-  }
 }
 
 /// The `SequenceType` returned by `enumerate()`.  `EnumerateSequence`

@@ -21,12 +21,6 @@ public struct GeneratorOfOne<Element> : GeneratorType, SequenceType {
     self.elements = element
   }
 
-  /// `GeneratorOfOne` is also a `SequenceType`, so it `generate`s a
-  /// copy of itself.
-  public func generate() -> GeneratorOfOne {
-    return self
-  }
-
   /// Advance to the next element and return it, or `nil` if no next
   /// element exists.
   ///

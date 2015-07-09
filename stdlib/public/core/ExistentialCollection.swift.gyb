@@ -58,10 +58,7 @@ public class AnyGenerator<Element> : _AnyGeneratorBase, GeneratorType {
 
 /// Every `GeneratorType` can also be a `SequenceType`.  Note that
 /// traversing the sequence consumes the generator.
-extension AnyGenerator : SequenceType {
-  /// Returns `self`.
-  public func generate() -> AnyGenerator { return self }
-}
+extension AnyGenerator : SequenceType {}
 
 //===--- Generic Factories ------------------------------------------------===//
 // The following two functions should be initializers, but we can't

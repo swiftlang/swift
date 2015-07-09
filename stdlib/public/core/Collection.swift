@@ -388,17 +388,6 @@ public struct PermutationGenerator<
     return result != nil ? seq[result!] : .None
   }
 
-  /// A type whose instances can produce the elements of this
-  /// sequence, in order.
-  public typealias Generator = PermutationGenerator
-
-  /// Return a *generator* over the elements of this *sequence*.
-  ///
-  /// - Complexity: O(1).
-  public func generate() -> Generator {
-    return self
-  }
-
   /// Construct a *generator* over a permutation of `elements` given
   /// by `indices`.
   ///

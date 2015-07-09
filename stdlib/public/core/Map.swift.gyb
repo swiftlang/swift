@@ -33,12 +33,6 @@ public struct MapGenerator<
     return nil
   }
 
-  /// `MapGenerator` is also a `SequenceType`, so it
-  /// `generate`'s a copy of itself.
-  public func generate() -> MapGenerator {
-    return self
-  }
-
   var _base: Base
   var _transform: (Base.Element)->Element
 }

@@ -34,12 +34,6 @@ public struct RangeGenerator<
     return startIndex++
   }
 
-  /// `RangeGenerator` is also a `SequenceType`, so it
-  /// `generate`'s a copy of itself.
-  public func generate() -> RangeGenerator<Element> {
-    return self
-  }
-
   /// The lower bound of the remaining range.
   public var startIndex: Element
 
