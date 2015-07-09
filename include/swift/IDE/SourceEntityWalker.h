@@ -102,6 +102,9 @@ public:
   /// This method is called when a Module is referenced in source.
   virtual bool visitModuleReference(ModuleEntity Mod, CharSourceRange Range);
 
+  /// Whether walk into the inactive region in a #if config statement.
+  virtual bool shouldWalkInactiveConfigRegion() { return false; }
+
 protected:
   SourceEntityWalker() = default;
   SourceEntityWalker(const SourceEntityWalker &) = default;

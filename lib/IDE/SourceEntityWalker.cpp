@@ -150,6 +150,16 @@ bool SemaAnnotator::walkToDeclPost(Decl *D) {
 
 std::pair<bool, Stmt *> SemaAnnotator::walkToStmtPre(Stmt *S) {
   bool TraverseChildren = SEWalker.walkToStmtPre(S);
+  if (TraverseChildren && SEWalker.shouldWalkInactiveConfigRegion()) {
+    if (auto *ICS = dyn_cast<IfConfigStmt>(S)) {
+      TraverseChildren = false;
+      for(auto Clause : ICS->getClauses()) {
+        for (auto Member : Clause.Elements) {
+          Member.walk(*this);
+        }
+      }
+    }
+  }
   return { TraverseChildren, S };
 }
 
