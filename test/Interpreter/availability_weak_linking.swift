@@ -83,7 +83,7 @@ useClassThatWillBeExtendedToConformToUnavailableObjCProtocol()
 // references it -- it is not weakly linked.)
 
 @objc
-class ClassConformingToUnannotatedUnavailableObjCProtocol : NSObject, UnavailableObjCProtocol {
+class ClassConformingToUnannotatedUnavailableObjCProtocol : NSObject, UnannotatedUnavailableObjCProtocol {
   func someMethod() {
     print("Executed ClassConformingToUnannotatedUnavailableObjCProtocol.someMethod()")
   }
@@ -93,12 +93,11 @@ func useClassConformingToUnannotatedUnavailableObjCProtocol() {
   let o = ClassConformingToUnannotatedUnavailableObjCProtocol()
   o.someMethod()
 
-  if #available(OSX 1066.0, iOS 1066.0, watchOS 1066.0, tvOS 1066.0, *) {
-    let oAsUP: UnavailableObjCProtocol = o as UnavailableObjCProtocol
-    oAsUP.someMethod()
-  }
+  let oAsUP: UnannotatedUnavailableObjCProtocol = (o as AnyObject) as! UnannotatedUnavailableObjCProtocol
+  oAsUP.someMethod()
 }
 
+// CHECK-NEXT: Executed ClassConformingToUnannotatedUnavailableObjCProtocol.someMethod()
 // CHECK-NEXT: Executed ClassConformingToUnannotatedUnavailableObjCProtocol.someMethod()
 useClassConformingToUnannotatedUnavailableObjCProtocol()
 
