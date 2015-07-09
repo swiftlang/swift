@@ -52,7 +52,7 @@ void *MetadataAllocator::alloc(size_t size) {
     auto mem = mmap(nullptr, (size + pagesizeMask) & ~pagesizeMask,
                     PROT_READ|PROT_WRITE, MAP_ANON|MAP_PRIVATE,
                     -1, 0);
-    if (next == MAP_FAILED)
+    if (mem == MAP_FAILED)
       crash("unable to allocate memory for metadata cache");
     return mem;
   }
