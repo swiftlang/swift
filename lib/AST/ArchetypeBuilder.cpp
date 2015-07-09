@@ -824,7 +824,7 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
           // archetype.
           if (InheritedProto == Proto || InheritedProto->inheritsFrom(Proto)) {
             // FIXME: Drop InheritedProto!
-            if (!AssocPA->isRecursive()) {
+            if (!AssocPA->isRecursive() && !AssocType->getArchetype()) {
               Diags.diagnose(AssocType->getLoc(),
                              diag::recursive_requirement_reference);
             }

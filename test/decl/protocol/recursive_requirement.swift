@@ -11,7 +11,7 @@ struct Oroborous : Foo {
 
 // More involved tests
 protocol P {
- typealias A : P // expected-error 7{{type may not reference itself as a requirement}}
+ typealias A : P // expected-error 2{{type may not reference itself as a requirement}}
 }
 
 struct X<T: P> {
@@ -23,7 +23,7 @@ func f<T : P>(z: T) {
 
 
 protocol PP2 {
-  typealias A : P2 = Self // expected-error 9{{type may not reference itself as a requirement}}
+  typealias A : P2 = Self // expected-error 2{{type may not reference itself as a requirement}}
 }
 
 protocol P2 : PP2 {
@@ -43,7 +43,7 @@ func f<T : P2>(z: T) {
 
 
 protocol P3 {
- typealias A: P4 = Self // expected-error 9{{type may not reference itself as a requirement}}
+ typealias A: P4 = Self // expected-error 2{{type may not reference itself as a requirement}}
 }
 
 protocol P4 : P3 {}
