@@ -5948,7 +5948,8 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         SmallVector<ProtocolDecl *, 4> protocols(conformingProtocols.begin(),
                                                  conformingProtocols.end());
         ProtocolType::canonicalizeProtocols(protocols);
-        assert(llvm::makeArrayRef(protocols) == archetype->getConformsTo());
+        assert(llvm::makeArrayRef(protocols) == archetype->getConformsTo() ||
+               archetype->getIsRecursive());
 #endif
         assocType->setArchetype(archetype);
       }

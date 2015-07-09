@@ -2,7 +2,7 @@
 
 // Basic test of requirements
 protocol Foo {
-  typealias Bar : Foo
+  typealias Bar : Foo // expected-error 2{{type may not reference itself as a requirement}}
 }
 
 struct Oroborous : Foo {
@@ -11,7 +11,7 @@ struct Oroborous : Foo {
 
 // More involved tests
 protocol P {
- typealias A : P
+ typealias A : P // expected-error 7{{type may not reference itself as a requirement}}
 }
 
 struct X<T: P> {
@@ -23,7 +23,7 @@ func f<T : P>(z: T) {
 
 
 protocol PP2 {
-  typealias A : P2 = Self
+  typealias A : P2 = Self // expected-error 9{{type may not reference itself as a requirement}}
 }
 
 protocol P2 : PP2 {
@@ -43,7 +43,7 @@ func f<T : P2>(z: T) {
 
 
 protocol P3 {
- typealias A: P4 = Self
+ typealias A: P4 = Self // expected-error 9{{type may not reference itself as a requirement}}
 }
 
 protocol P4 : P3 {}
@@ -56,7 +56,7 @@ struct Y3 : DeclaredP {
 struct X3<T:P4> {}
 
 func f2<T:P4>(a: T) {
- _ = X3<T.A>()
+ _ = X3<T.A>() // expected-error{{type 'T.A' does not conform to protocol 'P4'}}
 }
 
 f2(Y3())

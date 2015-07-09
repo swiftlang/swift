@@ -556,8 +556,7 @@ public:
   /// \brief Retrieve (or create) a nested type with the given name.
   PotentialArchetype *getNestedType(Identifier Name,
                                     ArchetypeBuilder &builder,
-                                    ComponentIdentTypeRepr *reference,
-                                    Identifier *parentName = nullptr);
+                                    ComponentIdentTypeRepr *reference);
 
   /// \brief Retrieve (or build) the type corresponding to the potential
   /// archetype.

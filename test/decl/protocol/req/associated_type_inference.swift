@@ -201,3 +201,17 @@ extension P3 where Assoc == Int {
 
 struct X4 : P4 { } // expected-error{{type 'X4' does not conform to protocol 'P3'}}
 
+// rdar://problem/21738889
+protocol P5 {
+  typealias A = Int
+}
+
+struct X5<T : P5> : P5 {
+  typealias A = T.A
+}
+
+protocol P6 : P5 {
+  typealias A : P5 = X5<Self>
+}
+
+extension P6 where A == X5<Self> { }

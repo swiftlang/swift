@@ -372,8 +372,7 @@ auto ArchetypeBuilder::PotentialArchetype::getArchetypeAnchor()
 auto ArchetypeBuilder::PotentialArchetype::getNestedType(
        Identifier nestedName,
        ArchetypeBuilder &builder,
-       ComponentIdentTypeRepr *reference,
-       Identifier *parentName) -> PotentialArchetype * {
+       ComponentIdentTypeRepr *reference) -> PotentialArchetype * {
   // Retrieve the nested type from the representation of this set.
   if (Representative != this)
     return getRepresentative()->getNestedType(nestedName, builder, reference);
@@ -389,55 +388,41 @@ auto ArchetypeBuilder::PotentialArchetype::getNestedType(
     return nested.front();
   }
 
-  // FIXME: The fact that we've been checking for "new" nested archetypes on
-  // a purely lexical basis is both fragile and not-quite-correct. We need
-  // to move to a lazier model for adding conformance requirements that will
-  // allow us to deal with recursive dependencies without comparing identifier
-  // names.
-  if (parentName &&
-      this->getParent() &&
-      (*parentName == this->getParent()->getName() ||
-       this->getParent()->getName().str().equals("Self") ||
-       this->getParent()->getName() == this->getName()) &&
-      nestedName == this->getName()) {
-    nested.push_back(this);
-  } else {
-    // Attempt to resolve this nested type to an associated type
-    // of one of the protocols to which the parent potential
-    // archetype conforms.
-    for (const auto &conforms : ConformsTo) {
-      for (auto member : conforms.first->lookupDirect(nestedName)) {
-        auto assocType = dyn_cast<AssociatedTypeDecl>(member);
-        if (!assocType)
-          continue;
+  // Attempt to resolve this nested type to an associated type
+  // of one of the protocols to which the parent potential
+  // archetype conforms.
+  for (const auto &conforms : ConformsTo) {
+    for (auto member : conforms.first->lookupDirect(nestedName)) {
+      auto assocType = dyn_cast<AssociatedTypeDecl>(member);
+      if (!assocType)
+        continue;
 
-        // Resolve this nested type to this associated type.
-        auto pa = new PotentialArchetype(this, assocType);
+      // Resolve this nested type to this associated type.
+      auto pa = new PotentialArchetype(this, assocType);
 
-        // If we have resolved this nested type to more than one associated
-        // type, create same-type constraints between them.
-        if (!nested.empty()) {
-          pa->Representative = nested.front()->getRepresentative();
-          pa->Representative->EquivalenceClass.push_back(pa);
-          pa->SameTypeSource = RequirementSource(RequirementSource::Inferred,
-                                                 SourceLoc());
-        }
-
-        // Add this resolved nested type.
-        nested.push_back(pa);
+      // If we have resolved this nested type to more than one associated
+      // type, create same-type constraints between them.
+      if (!nested.empty()) {
+        pa->Representative = nested.front()->getRepresentative();
+        pa->Representative->EquivalenceClass.push_back(pa);
+        pa->SameTypeSource = RequirementSource(RequirementSource::Inferred,
+                                               SourceLoc());
       }
-    }
 
-    // We couldn't resolve the nested type yet, so create an
-    // unresolved associated type.  
-    if (nested.empty()) {
-      nested.push_back(new PotentialArchetype(this, nestedName));
-      ++builder.Impl->NumUnresolvedNestedTypes;
-      if (reference)
-        nested.back()->UnresolvedReferences.push_back(reference);
+      // Add this resolved nested type.
+      nested.push_back(pa);
     }
   }
-  
+
+  // We couldn't resolve the nested type yet, so create an
+  // unresolved associated type.
+  if (nested.empty()) {
+    nested.push_back(new PotentialArchetype(this, nestedName));
+    ++builder.Impl->NumUnresolvedNestedTypes;
+    if (reference)
+      nested.back()->UnresolvedReferences.push_back(reference);
+  }
+
   return nested.front();
 }
 
@@ -826,10 +811,7 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
   for (auto Member : Proto->getMembers()) {
     if (auto AssocType = dyn_cast<AssociatedTypeDecl>(Member)) {
       // Add requirements placed directly on this associated type.
-      auto parentName = Proto->getName();
-      auto AssocPA = T->getNestedType(AssocType->getName(), *this, nullptr,
-                                      &parentName);
-      
+      auto AssocPA = T->getNestedType(AssocType->getName(), *this, nullptr);
       if (AssocPA != T) {
         auto superclassAndConformsTo = Impl->getConformsTo(AssocType);
         if (auto superclassTy = superclassAndConformsTo.first) {
@@ -840,7 +822,12 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
         for (auto InheritedProto : superclassAndConformsTo.second) {
           // If it's a recursive requirement, add it directly to the associated
           // archetype.
-          if (Proto == InheritedProto) {
+          if (InheritedProto == Proto || InheritedProto->inheritsFrom(Proto)) {
+            // FIXME: Drop InheritedProto!
+            if (!AssocPA->isRecursive()) {
+              Diags.diagnose(AssocType->getLoc(),
+                             diag::recursive_requirement_reference);
+            }
             AssocPA->setIsRecursive();
             AssocPA->addConformance(Proto, Source, *this);
             continue;
@@ -1025,6 +1012,7 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
       return true;
     }
 
+    assert(conformance.getPointer() && "No conformance pointer?");
     conformances[protocol] = conformance.getPointer();
   }
   
@@ -1038,6 +1026,8 @@ bool ArchetypeBuilder::addSameTypeRequirementToConcrete(
   for (auto nested : T->getNestedTypes()) {
     AssociatedTypeDecl *assocType
       = nested.second.front()->getResolvedAssociatedType();
+    assert(conformances.count(assocType->getProtocol()) > 0
+           && "missing conformance?");
     auto witness = conformances[assocType->getProtocol()]
           ->getTypeWitness(assocType, getLazyResolver());
     auto witnessType = witness.getReplacement();
