@@ -154,7 +154,7 @@ struct ${Index}<
   /// - Requires: the next value is representable.
   public // @testable
   func successor() -> ${Index} {
-    var inner = _inner!.successor()
+    let inner = _inner!.successor()
     if _fastPath(inner != _data[_outer].endIndex) {
       return _Self(_data, _outer, inner)
     }
