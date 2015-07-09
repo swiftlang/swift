@@ -248,8 +248,6 @@ class FooUnavailableMembers : FooClassBase {
   func availabilityObsoletedMsg()
   @available(OSX, unavailable, message="x")
   func availabilityUnavailableMsg()
-  @available(*, unavailable, message="'performSelector' methods are unavailable")
-  func performSelectorWithMagic(cmd: COpaquePointer)
   init!()
   convenience init!(float f: Float)
 }

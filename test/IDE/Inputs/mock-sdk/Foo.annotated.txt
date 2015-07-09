@@ -248,8 +248,6 @@ class <loc>FooClassDerived</loc> : <ref:Class>FooClassBase</ref>, <ref:Protocol>
   func <loc>availabilityObsoletedMsg()</loc></decl>
   <decl:Func>@available(OSX, unavailable, message="x")
   func <loc>availabilityUnavailableMsg()</loc></decl>
-  <decl:Func>@available(*, unavailable, message="'performSelector' methods are unavailable")
-  func <loc>performSelectorWithMagic(cmd: <ref:Struct>COpaquePointer</ref>)</loc></decl>
   <decl:Constructor><loc>init!()</loc></decl>
   <decl:Constructor>convenience <loc>init!(float f: <ref:Struct>Float</ref>)</loc></decl>
 }</decl>

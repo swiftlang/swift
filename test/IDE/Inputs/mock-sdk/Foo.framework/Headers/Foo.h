@@ -254,8 +254,6 @@ struct _InternalStruct {
 - (void)availabilityDeprecatedMsg __attribute__((availability(macosx, deprecated=10.1, message="x")));
 - (void)availabilityObsoletedMsg __attribute__((availability(macosx, obsoleted=10.1, message="x")));
 - (void)availabilityUnavailableMsg __attribute__((availability(macosx, unavailable, message="x")));
-
-- (void)performSelectorWithMagic:(SEL)cmd;
 @end
 
 typedef struct __attribute__((objc_bridge(id))) __FooCFType *FooCFTypeRef;

@@ -1742,6 +1742,21 @@ Type ClangImporter::Implementation::importMethodType(
 
     swiftResultTy = importType(resultType, resultKind,
                                isFromSystemModule, OptionalityOfReturn);
+
+    if (clangDecl->getMethodFamily() == clang::OMF_performSelector) {
+      // performSelector methods that return 'id' should be imported into Swift
+      // as returning Unmanaged<AnyObject>.
+      Type nonOptionalTy =
+         swiftResultTy->getAnyOptionalObjectType(OptionalityOfReturn);
+      if (!nonOptionalTy)
+        nonOptionalTy = swiftResultTy;
+
+      if (nonOptionalTy->isAnyClassReferenceType()) {
+        swiftResultTy = getUnmanagedType(*this, nonOptionalTy);
+        if (OptionalityOfReturn != OTK_None)
+          swiftResultTy = OptionalType::get(OptionalityOfReturn, swiftResultTy);
+      }
+    }
   }
   if (!swiftResultTy)
     return Type();

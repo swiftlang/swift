@@ -7,12 +7,16 @@ typedef long NSInteger;
 - (id) copyWithZone: (void*)zone;
 @end
 
+SEL sel_registerName(const char *);
+
 @interface NSObject
 + (NSObject*) alloc;
 - (NSObject*) init;
 + (NSObject*) new;
 + (void) load;
 + (void) initialize;
+
+- (id)performSelector:(SEL)selector withObject:(id)object;
 
 @property (readonly, copy) NSString *description;
 

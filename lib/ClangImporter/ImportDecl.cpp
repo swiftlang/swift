@@ -5234,16 +5234,6 @@ void ClangImporter::Implementation::importAttributes(
 
   // Add implicit attributes.
   if (auto MD = dyn_cast<clang::ObjCMethodDecl>(ClangDecl)) {
-    // Ban uses of 'performSelector'.
-    auto sel = MD->getSelector();
-    if (sel.getNameForSlot(0).startswith("performSelector") ||
-        sel.getNameForSlot(0).startswith("makeObjectsPerformSelector")) {
-      auto attr = AvailableAttr::createUnconditional(C,
-                    "'performSelector' methods are unavailable");
-      MappedDecl->getAttrs().add(attr);
-      return;
-    }
-
     Optional<api_notes::ObjCMethodInfo> knownMethod;
     if (NewContext)
       knownMethod = getKnownObjCMethod(MD, NewContext);

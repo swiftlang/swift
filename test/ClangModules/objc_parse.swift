@@ -36,7 +36,10 @@ func instanceMethods(b: B) {
   b.setEnabled(true)
 
   // SEL
-  b.performSelector("isEqual:", withObject:b) // expected-error {{'performSelector(_:withObject:)' is unavailable: 'performSelector' methods are unavailable}}
+  b.performSelector("isEqual:", withObject:b)
+  if let result = b.performSelector("getAsProto", withObject:nil) {
+    _ = result.takeUnretainedValue()
+  }
 
   // Renaming of redundant parameters.
   b.performAdd(1, withValue:2, withValue2:3, withValue:4) // expected-error{{argument 'withValue' must precede argument 'withValue2'}}
@@ -54,11 +57,6 @@ func instanceMethods(b: B) {
   var prot = NSObjectProtocol.self
   b.`protocol`(prot, hasThing:obj)
   b.doThing(obj, `protocol`: prot)
-}
-
-func testNSArrayMethods(a: NSArray, b: B) {
-  a.makeObjectsPerformSelector("isEqual") // expected-error {{'performSelector' methods are unavailable}}
-  a.makeObjectsPerformSelector("isEqual", withObject:b) // expected-error {{'performSelector' methods are unavailable}}
 }
 
 // Class method invocation
@@ -210,7 +208,7 @@ func testProtocolMethods(b: B, p2m: P2.Type) {
 }
 
 func testId(x: AnyObject) {
-  x.performSelector!("foo:", withObject: x) // expected-error{{'performSelector(_:withObject:)' is unavailable: 'performSelector' methods are unavailable}}
+  x.performSelector!("foo:", withObject: x)
 
   x.performAdd(1, withValue: 2, withValue: 3, withValue2: 4)
   x.performAdd!(1, withValue: 2, withValue: 3, withValue2: 4)
