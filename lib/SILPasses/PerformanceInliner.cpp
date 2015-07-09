@@ -125,7 +125,7 @@ namespace {
     
     // The apply instruction in the caller (null if this is the tracker of the
     // callee).
-    ApplyInst *AI;
+    FullApplySite AI;
     
     // Walks through address projections and (optionally) collects them.
     // Returns the base address, i.e. the first address which is not a
@@ -143,7 +143,7 @@ namespace {
       if (SILArgument *arg = dyn_cast<SILArgument>(value)) {
         if (AI && arg->isFunctionArg() && arg->getFunction() == F) {
           // Continue at the caller.
-          return AI->getArgument(arg->getIndex());
+          return AI.getArgument(arg->getIndex());
         }
       }
       return SILValue();
@@ -170,12 +170,12 @@ namespace {
     
     // Constructor for the caller function.
     ConstantTracker(SILFunction *function) :
-      F(function), callerTracker(nullptr), AI(nullptr)
+      F(function), callerTracker(nullptr), AI()
     { }
     
     // Constructor for the callee function.
     ConstantTracker(SILFunction *function, ConstantTracker *caller,
-                    ApplyInst *callerApply) :
+                    FullApplySite callerApply) :
        F(function), callerTracker(caller), AI(callerApply)
     { }
     
@@ -230,19 +230,19 @@ namespace {
     llvm::DenseMap<FullApplySite, FullApplySite> OriginMap;
     llvm::DenseSet<FullApplySite> RemovedApplies;
 
-    SILFunction *getEligibleFunction(ApplyInst *AI, CallGraph &CG);
+    SILFunction *getEligibleFunction(FullApplySite AI, CallGraph &CG);
     
-    bool isProfitableToInline(ApplyInst *AI, unsigned loopDepthOfAI,
+    bool isProfitableToInline(FullApplySite AI, unsigned loopDepthOfAI,
                               DominanceAnalysis *DA,
                               SILLoopAnalysis *LA,
                               ConstantTracker &constTracker);
     
-    void visitColdBlocks(SmallVectorImpl<ApplyInst *> &AppliesToInline,
+    void visitColdBlocks(SmallVectorImpl<FullApplySite> &AppliesToInline,
                          SILBasicBlock *root, DominanceInfo *DT,
                          CallGraph &CG);
 
     void collectAppliesToInline(SILFunction *Caller,
-                                SmallVectorImpl<ApplyInst *> &Applies,
+                                SmallVectorImpl<FullApplySite> &Applies,
                                 DominanceAnalysis *DA,
                                 SILLoopAnalysis *LA,
                                 CallGraph &CG);
@@ -566,7 +566,7 @@ bool SILPerformanceInliner::applyTargetsOriginFunction(FullApplySite Apply,
 
 // Returns the callee of an apply_inst if it is basically inlinable.
 SILFunction *SILPerformanceInliner::
-getEligibleFunction(ApplyInst *AI, CallGraph &CG) {
+getEligibleFunction(FullApplySite AI, CallGraph &CG) {
  
   SILFunction *Callee = getReferencedFunction(AI);
   
@@ -612,7 +612,7 @@ getEligibleFunction(ApplyInst *AI, CallGraph &CG) {
   }
   
   // We don't support this yet.
-  if (AI->hasSubstitutions()) {
+  if (AI.hasSubstitutions()) {
     DEBUG(llvm::dbgs() << "        FAIL: Generic substitutions on " <<
           Callee->getName() << ".\n");
     return nullptr;
@@ -626,7 +626,7 @@ getEligibleFunction(ApplyInst *AI, CallGraph &CG) {
     return nullptr;
   }
 
-  SILFunction *Caller = AI->getFunction();
+  SILFunction *Caller = AI.getFunction();
   
   // Check for trivial recursions.
   if (Callee == Caller) {
@@ -724,7 +724,7 @@ static SILBasicBlock *getTakenBlock(TermInst *term,
 }
 
 /// Return true if inlining this call site is profitable.
-bool SILPerformanceInliner::isProfitableToInline(ApplyInst *AI,
+bool SILPerformanceInliner::isProfitableToInline(FullApplySite AI,
                                               unsigned loopDepthOfAI,
                                               DominanceAnalysis *DA,
                                               SILLoopAnalysis *LA,
@@ -796,7 +796,7 @@ bool SILPerformanceInliner::isProfitableToInline(ApplyInst *AI,
   if (testThreshold >= 0) {
     // We are in testing mode.
     Threshold = testThreshold;
-  } else if (AI->getFunction()->isThunk()) {
+  } else if (AI.getFunction()->isThunk()) {
     // Only inline trivial functions into thunks (which will not increase the
     // code size).
     Threshold = TrivialFunctionThreshold;
@@ -1022,7 +1022,7 @@ bool SILPerformanceInliner::devirtualizeAndSpecializeApplies(
 }
 
 void SILPerformanceInliner::collectAppliesToInline(SILFunction *Caller,
-                                          SmallVectorImpl<ApplyInst *> &Applies,
+                                        SmallVectorImpl<FullApplySite> &Applies,
                                                    DominanceAnalysis *DA,
                                                    SILLoopAnalysis *LA,
                                                    CallGraph &CG) {
@@ -1034,18 +1034,19 @@ void SILPerformanceInliner::collectAppliesToInline(SILFunction *Caller,
 
   // Go through all instructions and find candidates for inlining.
   // We do this in dominance order for the constTracker.
-  SmallVector<ApplyInst *, 8> InitialCandidates;
+  SmallVector<FullApplySite, 8> InitialCandidates;
   while (SILBasicBlock *block = domOrder.getNext()) {
     constTracker.beginBlock();
     unsigned loopDepth = LI->getLoopDepth(block);
     for (auto I = block->begin(), E = block->end(); I != E; ++I) {
       constTracker.trackInst(&*I);
-      
-      auto *AI = dyn_cast<ApplyInst>(I);
-      if (!AI)
+
+      if (!FullApplySite::isa(I))
         continue;
 
-      DEBUG(llvm::dbgs() << "    Check:" << *AI);
+      FullApplySite AI = FullApplySite(I);
+
+      DEBUG(llvm::dbgs() << "    Check:" << *I);
 
       auto *Callee = getEligibleFunction(AI, CG);
       if (Callee) {
@@ -1101,7 +1102,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
   // First step: collect all the functions we want to inline.  We
   // don't change anything yet so that the dominator information
   // remains valid.
-  SmallVector<ApplyInst *, 8> AppliesToInline;
+  SmallVector<FullApplySite, 8> AppliesToInline;
   collectAppliesToInline(Caller, AppliesToInline, DA, LA, CG);
 
   if (AppliesToInline.empty())
@@ -1112,10 +1113,10 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
     SILFunction *Callee = getReferencedFunction(AI);
     assert(Callee && "apply_inst does not have a direct callee anymore");
 
-    DEBUG(llvm::dbgs() << "    Inline:" <<  *AI);
+    DEBUG(llvm::dbgs() << "    Inline:" <<  *AI.getInstruction());
     
     SmallVector<SILValue, 8> Args;
-    for (const auto &Arg : AI->getArguments())
+    for (const auto &Arg : AI.getArguments())
       Args.push_back(Arg);
     
     FullApplyCollector Collector;
@@ -1125,7 +1126,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
     TypeSubstitutionMap ContextSubs;
     SILInliner Inliner(*Caller, *Callee,
                        SILInliner::InlineKind::PerformanceInline,
-                       ContextSubs, AI->getSubstitutions(),
+                       ContextSubs, AI.getSubstitutions(),
                        Collector.getCallback());
     auto Success = Inliner.inlineFunction(AI, Args);
     (void) Success;
@@ -1147,7 +1148,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller,
     Editor.replaceApplyWithNew(AI, AppliesFromInlinee);
 
     RemovedApplies.insert(AI);
-    recursivelyDeleteTriviallyDeadInstructions(AI, true);
+    recursivelyDeleteTriviallyDeadInstructions(AI.getInstruction(), true);
 
     NewApplies.insert(NewApplies.end(), AppliesFromInlinee.begin(),
                       AppliesFromInlinee.end());
@@ -1269,7 +1270,7 @@ void SILPerformanceInliner::inlineDevirtualizeAndSpecialize(
 
 // Find functions in cold blocks which are forced to be inlined.
 // All other functions are not inlined in cold blocks.
-void SILPerformanceInliner::visitColdBlocks(SmallVectorImpl<ApplyInst *> &
+void SILPerformanceInliner::visitColdBlocks(SmallVectorImpl<FullApplySite> &
                                             AppliesToInline,
                                             SILBasicBlock *Root,
                                             DominanceInfo *DT,
