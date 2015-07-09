@@ -338,6 +338,13 @@ ERROR(invalid_tuple_size,sema_tcc,none,
 ERROR(invalid_tuple_element_unused,sema_tcc,none,
       "tuple element of type %0 unused when converting tuple to %1",
       (Type, Type))
+ERROR(did_not_call_function,sema_tcc,none,
+      "function value was used as a property; add () to call it",
+      ())
+ERROR(did_not_call_method,sema_tcc,none,
+      "method %0 was used as a property; add () to call it",
+      (Identifier))
+
 ERROR(does_not_have_member,sema_tcc,none,
       "%0 does not have a member named %1",
       (Type, DeclName))

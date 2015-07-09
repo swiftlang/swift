@@ -812,23 +812,42 @@ static bool diagnoseFailure(ConstraintSystem &cs,
   }
 
   case Failure::DoesNotHaveMember:
-  case Failure::DoesNotHaveNonMutatingMember:
+  case Failure::DoesNotHaveNonMutatingMember: {
     if (auto moduleTy = failure.getFirstType()->getAs<ModuleType>()) {
       tc.diagnose(loc, diag::no_member_of_module,
                   moduleTy->getModule()->getName(),
                   failure.getName())
         .highlight(range1).highlight(range2);
-    } else {
-      bool IsNoMember = failure.getKind() == Failure::DoesNotHaveMember;
-
-      tc.diagnose(loc, IsNoMember ? diag::does_not_have_member :
-                                    diag::does_not_have_non_mutating_member,
-                  failure.getFirstType(),
-                  failure.getName())
-        .highlight(range1).highlight(range2);
+      break;
     }
-    break;
+
+    // If the base of this property access is a function that takes an empty
+    // argument list, then the most likely problem is that the user wanted to
+    // call the function, e.g. in "a.b.c" where they had to write "a.b().c".
+    // Produce a specific diagnostic + fixit for this situation.
+    auto baseFTy = failure.getFirstType()->getAs<AnyFunctionType>();
+    if (baseFTy &&baseFTy->getInput()->isEqual(tc.Context.TheEmptyTupleType)){
+      SourceLoc insertLoc = locator->getAnchor()->getEndLoc();
+      
+      if (auto *UDE = dyn_cast<UnresolvedDotExpr>(locator->getAnchor())) {
+        tc.diagnose(loc, diag::did_not_call_method, UDE->getName())
+          .fixItInsertAfter(insertLoc, "()");
+        break;
+      }
+      
+      tc.diagnose(loc, diag::did_not_call_function)
+        .fixItInsertAfter(insertLoc, "()");
+      break;
+    }
     
+    bool IsNoMember = failure.getKind() == Failure::DoesNotHaveMember;
+    tc.diagnose(loc, IsNoMember ? diag::does_not_have_member :
+                                  diag::does_not_have_non_mutating_member,
+                failure.getFirstType(),
+                failure.getName())
+      .highlight(range1).highlight(range2);
+    break;
+  }
   case Failure::DoesNotHaveInitOnInstance: {
     // Diagnose 'super.init', which can only appear inside another initializer,
     // specially.

@@ -207,3 +207,15 @@ struct Toe {
     }
   }
 }
+
+// <rdar://problem/21447318> dot'ing through a partially applied member produces poor diagnostic
+class r21447318 {
+  var x = 42
+  func doThing() -> r21447318 { return self }
+}
+
+func test21447318(a : r21447318, b : () -> r21447318) {
+  a.doThing.doThing()  // expected-error {{method 'doThing' was used as a property; add () to call it}} {{12-12=()}}
+  
+  b.doThing() // expected-error {{function value was used as a property; add () to call it}} {{4-4=()}}
+}
