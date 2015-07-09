@@ -33,6 +33,9 @@ import Darwin
 %     vecsize = (8 if type == 'Double' else 4)*(2 if size == 2 else 4)
 %     extractelement = "extractelement_" + llvm_vectype + "_Int32"
 %     insertelement = "insertelement_" + llvm_vectype + "_" + llvm_type[type] + "_Int32"
+%     is_floating = type in floating_types
+%     wrap = "" if is_floating else "&"
+
 
 /// A vector of ${cardinal[size]} `${type}`.  This corresponds to the C and
 /// Obj-C type `vector_${vectype}` and the C++ type `simd::${vectype}`.
@@ -148,9 +151,9 @@ public struct ${vectype} :
 
 /// Vector sum of `lhs` and `rhs`.
 @inline(__always)
-public func +(lhs: ${vectype}, rhs: ${vectype}) -> ${vectype} {
+public func ${wrap}+(lhs: ${vectype}, rhs: ${vectype}) -> ${vectype} {
   return ${vectype}(_bits:
-%if type in floating_types:
+%if is_floating:
     Builtin.fadd_${llvm_vectype}(
 %else:
     Builtin.add_${llvm_vectype}(
@@ -160,9 +163,9 @@ public func +(lhs: ${vectype}, rhs: ${vectype}) -> ${vectype} {
 
 /// Vector difference of `lhs` and `rhs`.
 @inline(__always)
-public func -(lhs: ${vectype}, rhs: ${vectype}) -> ${vectype} {
+public func ${wrap}-(lhs: ${vectype}, rhs: ${vectype}) -> ${vectype} {
   return ${vectype}(_bits:
-%if type in floating_types:
+%if is_floating:
     Builtin.fsub_${llvm_vectype}(
 %else:
     Builtin.sub_${llvm_vectype}(
@@ -173,15 +176,15 @@ public func -(lhs: ${vectype}, rhs: ${vectype}) -> ${vectype} {
 /// Negation of `rhs`.
 @inline(__always)
 public prefix func -(rhs: ${vectype}) -> ${vectype} {
-  return ${vectype}(0) - rhs
+  return ${vectype}(0) ${wrap}- rhs
 }
 
 /// Elementwise product of `lhs` and `rhs`.  A.k.a. the Hadamard or Schur
 /// product of the two vectors.
 @inline(__always)
-public func *(lhs: ${vectype}, rhs: ${vectype}) -> ${vectype} {
+public func ${wrap}*(lhs: ${vectype}, rhs: ${vectype}) -> ${vectype} {
   return ${vectype}(_bits:
-%if type in floating_types:
+%if is_floating:
     Builtin.fmul_${llvm_vectype}(
 %else:
     Builtin.mul_${llvm_vectype}(
@@ -194,7 +197,7 @@ public func *(lhs: ${vectype}, rhs: ${vectype}) -> ${vectype} {
 @inline(__always)
 public func /(lhs: ${vectype}, rhs: ${vectype}) -> ${vectype} {
   return ${vectype}(_bits:
-%if type in floating_types:
+%if is_floating:
     Builtin.fdiv_${llvm_vectype}(
 %else:
     Builtin.sdiv_${llvm_vectype}(
@@ -203,6 +206,7 @@ public func /(lhs: ${vectype}, rhs: ${vectype}) -> ${vectype} {
 }
 
 /// Add `rhs` to `lhs`.
+% if is_floating:
 @inline(__always)
 public func +=(inout lhs: ${vectype}, rhs: ${vectype}) -> Void {
   lhs = lhs + rhs
@@ -219,6 +223,7 @@ public func -=(inout lhs: ${vectype}, rhs: ${vectype}) -> Void {
 public func *=(inout lhs: ${vectype}, rhs: ${vectype}) -> Void {
   lhs = lhs * rhs
 }
+% end
 
 /// Divide `lhs` by `rhs` (elementwise).
 @inline(__always)
@@ -228,21 +233,23 @@ public func /=(inout lhs: ${vectype}, rhs: ${vectype}) -> Void {
 
 /// Scalar-Vector product.
 @inline(__always)
-public func *(lhs: ${type}, rhs: ${vectype}) -> ${vectype} {
-  return ${vectype}(lhs) * rhs
+public func ${wrap}*(lhs: ${type}, rhs: ${vectype}) -> ${vectype} {
+  return ${vectype}(lhs) ${wrap}* rhs
 }
 
 /// Scalar-Vector product.
 @inline(__always)
-public func *(lhs: ${vectype}, rhs: ${type}) -> ${vectype} {
-  return lhs * ${vectype}(rhs)
+public func ${wrap}*(lhs: ${vectype}, rhs: ${type}) -> ${vectype} {
+  return lhs ${wrap}* ${vectype}(rhs)
 }
 
+% if is_floating:
 /// Scales `lhs` by `rhs`.
 @inline(__always)
 public func *=(inout lhs: ${vectype}, rhs: ${type}) -> Void {
   lhs = lhs * rhs
 }
+% end
 
 /// Elementwise absolute value of a vector.  The result is a vector of the same
 /// length with all elements positive.
@@ -309,7 +316,7 @@ public func clamp(x: ${vectype},
 /// Sum of the elements of the vector.
 @inline(__always)
 public func reduce_add(x: ${vectype}) -> ${type} {
-  return ${' + '.join(map(lambda x:'x.'+x, component[:size]))}
+  return ${(' '+wrap+'+ ').join(map(lambda x:'x.'+x, component[:size]))}
 }
 
 /// Minimum element of the vector.
@@ -324,7 +331,7 @@ public func reduce_max(x: ${vectype}) -> ${type} {
   return max(${', '.join(map(lambda x:'x.'+x, component[:size]))})
 }
 
-%     if type in floating_types:
+%     if is_floating:
 
 /// Sign of a vector.  Each lane contains -1 if the corresponding lane of `x`
 /// is less than zero, +1 if the corresponding lane of `x` is greater than
@@ -519,9 +526,9 @@ public func refract(x: ${vectype},
   return ${vectype}(0)
 }
 
-%     end # if type in floating_types
+%     end # if is_floating
 %   end # for size in [2, 3, 4]
-%   if type in floating_types:
+%   if is_floating:
 //  Scalar versions of common operations:
 
 /// Returns -1 if `x < 0`, +1 if `x > 0`, and 0 otherwise (`sign(NaN)` is 0).
@@ -562,7 +569,67 @@ public func cross(x: ${ctype[type]}3,
                          -> ${ctype[type]}3 {
   return ${ctype[type]}3(x.y*y.z - x.z*y.y, x.z*y.x - x.x*y.z, x.x*y.y - x.y*y.x)
 }
-%   end # type in floating_types
+
+%   else: # !is_floating
+
+// Integer vector types only support wrapping arithmetic. Make the non-wrapping
+// operators unavailable so that fixits guide users to the unchecked operations.
+
+@available(*, unavailable, renamed="&+",
+           message="integer vector types do not support checked arithmetic; use the wrapping operations instead")
+public func +(x: ${vectype}, y: ${vectype}) -> ${vectype} {
+  fatalError("unavailable function cannot be called")
+}
+
+@available(*, unavailable, renamed="&-",
+           message="integer vector types do not support checked arithmetic; use the wrapping operations instead")
+public func -(x: ${vectype}, y: ${vectype}) -> ${vectype} {
+  fatalError("unavailable function cannot be called")
+}
+
+@available(*, unavailable, renamed="&*",
+           message="integer vector types do not support checked arithmetic; use the wrapping operations instead")
+public func *(x: ${vectype}, y: ${vectype}) -> ${vectype} {
+  fatalError("unavailable function cannot be called")
+}
+
+@available(*, unavailable, renamed="&*",
+           message="integer vector types do not support checked arithmetic; use the wrapping operations instead")
+public func *(x: ${vectype}, y: ${type}) -> ${vectype} {
+  fatalError("unavailable function cannot be called")
+}
+
+@available(*, unavailable, renamed="&*",
+           message="integer vector types do not support checked arithmetic; use the wrapping operations instead")
+public func *(x: ${type}, y: ${vectype}) -> ${vectype} {
+  fatalError("unavailable function cannot be called")
+}
+
+@available(*, unavailable,
+           message="integer vector types do not support checked arithmetic; use the wrapping operation 'x = x &+ y' instead")
+public func +=(inout x: ${vectype}, y: ${vectype}) {
+  fatalError("unavailable function cannot be called")
+}
+
+@available(*, unavailable,
+           message="integer vector types do not support checked arithmetic; use the wrapping operation 'x = x &- y' instead")
+public func -=(inout x: ${vectype}, y: ${vectype}) {
+  fatalError("unavailable function cannot be called")
+}
+
+@available(*, unavailable,
+           message="integer vector types do not support checked arithmetic; use the wrapping operation 'x = x &* y' instead")
+public func *=(inout x: ${vectype}, y: ${vectype}) {
+  fatalError("unavailable function cannot be called")
+}
+
+@available(*, unavailable,
+           message="integer vector types do not support checked arithmetic; use the wrapping operation 'x = x &* y' instead")
+public func *=(inout x: ${vectype}, y: ${type}) {
+  fatalError("unavailable function cannot be called")
+}
+
+%   end # is_floating
 % end # for type in scalar_types
 
 % for type in floating_types:
