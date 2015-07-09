@@ -505,7 +505,7 @@ void ClangCommentPrinter::printDeclPre(const Decl *D) {
 void ClangCommentPrinter::printDeclPost(const Decl *D) {
   OtherPrinter.printDeclPost(D);
   for (auto CommentText : PendingComments) {
-    *this << " " << CommentText;
+    *this << " " << ASTPrinter::sanitizeUtf8(CommentText);
   }
   PendingComments.clear();
   if (auto ClangN = D->getClangNode())
@@ -596,7 +596,7 @@ void ClangCommentPrinter::printComment(StringRef RawText, unsigned StartCol) {
   trimLeadingWhitespaceFromLines(RawText, WhitespaceToTrim, Lines);
 
   for (auto Line : Lines) {
-    *this << Line << "\n";
+    *this << ASTPrinter::sanitizeUtf8(Line) << "\n";
     printIndent();
   }
 }

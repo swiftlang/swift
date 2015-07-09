@@ -87,6 +87,9 @@ public:
     PendingDeclLocCallback = D;
   }
 
+  /// To sanitize a malformatted utf8 string to a well-formatted one.
+  static std::string sanitizeUtf8(StringRef Text);
+
 private:
   virtual void anchor();
 };

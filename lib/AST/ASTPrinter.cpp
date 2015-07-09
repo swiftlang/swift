@@ -36,11 +36,37 @@
 #include "clang/AST/Decl.h"
 #include "clang/Basic/Module.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "llvm/Support/ConvertUTF.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include <algorithm>
 
 using namespace swift;
+
+std::string ASTPrinter::sanitizeUtf8(StringRef Text) {
+  llvm::SmallString<256> Builder;
+  Builder.reserve(Text.size());
+  const UTF8* Data = reinterpret_cast<const UTF8*>(Text.begin());
+  const UTF8* End = reinterpret_cast<const UTF8*>(Text.end());
+  StringRef Replacement = "\ufffd";
+  while (Data < End) {
+    auto Step = getNumBytesForUTF8(*Data);
+    if (Data + Step > End) {
+      Builder.append(Replacement);
+      break;
+    }
+
+    if (isLegalUTF8Sequence(Data, Data + Step)) {
+      Builder.append(Data, Data + Step);
+    } else {
+
+      // If malformatted, add replacement characters.
+      Builder.append(Replacement);
+    }
+    Data += Step;
+  }
+  return Builder.str();
+}
 
 void ASTPrinter::anchor() {}
 
@@ -186,7 +212,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
     trimLeadingWhitespaceFromLines(RawText, WhitespaceToTrim, Lines);
 
     for (auto Line : Lines) {
-      Printer << Line;
+      Printer << ASTPrinter::sanitizeUtf8(Line);
       Printer.printNewline();
     }
   }
