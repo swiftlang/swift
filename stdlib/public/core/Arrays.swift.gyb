@@ -581,6 +581,18 @@ extension ${Self} : _ArrayType {
     self += newElements
   }
 
+  // An overload of extend that uses the += that is optimized for
+  // collections.
+  /// Append the elements of `newElements` to `self`.
+  ///
+  /// - Complexity: O(*length of result*).
+  public mutating func extend<
+      C : CollectionType
+      where C.Generator.Element == Element
+  >(newElements: C) {
+    self += newElements
+  }
+
   /// Remove an element from the end of the ${Self} in O(1).
   ///
   /// - Requires: `count > 0`.
