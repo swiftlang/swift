@@ -29,7 +29,7 @@ extension CollectionType where Index : BidirectionalIndexType {
 }
 
 //===----------------------------------------------------------------------===//
-// find()
+// indexOf()
 //===----------------------------------------------------------------------===//
 
 extension CollectionType where ${GElement} : Equatable {
