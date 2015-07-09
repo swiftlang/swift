@@ -565,10 +565,9 @@ public:
 
   /// Emit debug info for a function argument or a local variable.
   template <typename StorageType>
-  void emitDebugVariableDeclaration(StorageType Storage,
-                                    DebugTypeInfo Ty,
-                                    SILDebugScope *DS,
-                                    StringRef Name) {
+  void emitDebugVariableDeclaration(StorageType Storage, DebugTypeInfo Ty,
+                                    SILDebugScope *DS, StringRef Name,
+                                    IndirectionKind Indirection = DirectValue) {
     assert(IGM.DebugInfo && "debug info not enabled");
 
     auto VD = cast<VarDecl>(Ty.getDecl());
@@ -576,18 +575,15 @@ public:
     if (N) {
       if (!ArgEmitted.lookup(VD)) {
         PrologueLocation AutoRestore(IGM.DebugInfo, Builder);
-        IGM.DebugInfo->
-          emitArgVariableDeclaration(Builder, Storage,
-                                     Ty, DS, Name, N, DirectValue);
+        IGM.DebugInfo->emitArgVariableDeclaration(Builder, Storage, Ty, DS,
+                                                  Name, N, Indirection);
         ArgEmitted[VD] = true;
       }
     } else
-      IGM.DebugInfo->
-        emitStackVariableDeclaration(Builder, Storage,
-                                     Ty, DS, Name, DirectValue);
+      IGM.DebugInfo->emitStackVariableDeclaration(Builder, Storage, Ty, DS,
+                                                  Name, Indirection);
   }
 
-  
   void emitFailBB() {
     if (!FailBBs.empty()) {
       // Move the trap basic blocks to the end of the function.
@@ -3057,8 +3053,9 @@ void IRGenSILFunction::visitDebugValueAddrInst(DebugValueAddrInst *i) {
   auto Addr = getLoweredAddress(SILVal).getAddress();
   DebugTypeInfo DbgTy(Decl, Decl->getType(), getTypeInfo(SILVal.getType()));
   // Put the value into a stack slot at -Onone and emit a debug intrinsic.
-  emitDebugVariableDeclaration(emitShadowCopy(Addr, Name), DbgTy,
-                               i->getDebugScope(), Name);
+  auto *Copy = emitShadowCopy(Addr, Name);
+  emitDebugVariableDeclaration(Copy, DbgTy, i->getDebugScope(), Name,
+                               Copy == Addr ? DirectValue : IndirectValue);
 }
 
 void IRGenSILFunction::visitLoadWeakInst(swift::LoadWeakInst *i) {

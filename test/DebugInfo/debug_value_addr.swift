@@ -11,8 +11,9 @@
 // CHECK: entry:
 // CHECK-NEXT: %[[TADDR:.*]] = alloca
 // CHECK: store %swift.opaque* %0, %swift.opaque** %[[TADDR:.*]],
-// CHECK-NEXT: call void @llvm.dbg.declare({{.*}}%[[TADDR]]
-
+// CHECK-NEXT: call void @llvm.dbg.declare({{.*}}%[[TADDR]],
+// CHECK-SAME:                             {{.*}}, metadata ![[EXPR:.*]])
+// CHECK: ![[EXPR]] = !DIExpression(DW_OP_deref)
 struct S<T> {
   var a : T
   func foo() {}
