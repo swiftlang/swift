@@ -1,5 +1,7 @@
 // RUN: %target-parse-verify-swift
 
+// XFAIL: linux
+
 @override // expected-error {{'override' can only be specified on class members}} expected-error {{'override' is a declaration modifier, not an attribute}}
 func virtualAttributeCanNotBeUsedInSource() {}
 
