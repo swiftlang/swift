@@ -1460,44 +1460,52 @@ public func checkHashable<T : Hashable>(
     [lhs, rhs], equalityOracle: { expectedEqual || $0 == $1 }, ${trace})
 }
 
-/// Test that the elements of `instances` satisfy the semantic
-/// requirements of `_Incrementable`, using `equalityOracle` to
+% for inc, protocol, op, successor, end in (
+%  ('inc', '_Incrementable', '++', 'successor', 'end'),
+%  ('dec', 'BidirectionalIndexType', '--', 'predecessor', 'start')):
+
+/// Test that the elements of `instances` satisfy
+/// ${'some of ' if inc == 'dec' else ''}the semantic
+/// requirements of `${protocol}`, using `equalityOracle` to
 /// generate equality expectations from pairs of positions in
 /// `instances`.
 ///
-/// - Precondition: `endIndex` is reachable from all elements of
-///   instances
-public func checkIncrementable<
-  Instances: CollectionType where Instances.Generator.Element : _Incrementable
+/// - Precondition: ${'''`endIndex` is reachable from all 
+///   elements of `instances`.''' if inc == 'inc' else '''all
+///   elements of `instances` are reachable from `startIndex`.'''}
+public func check${inc.capitalize()}rementable<
+  Instances: CollectionType
+  where Instances.Generator.Element : ${protocol}
 >(
   instances: Instances,
   equalityOracle: (Instances.Index, Instances.Index)->Bool,
-  endIndex: Instances.Generator.Element, ${TRACE}
+  ${end}Index: Instances.Generator.Element, ${TRACE}
 ) {
   checkEquatable(instances, oracle: equalityOracle, ${trace})
   for i in instances {
-    if i != endIndex {
-      let next = i.successor()
-      // Successor gets us a new index value
+    if i != ${end}Index {
+      let next = i.${successor}()
+      // ${successor} gets us a new index value
       expectNotEqual(i, next, ${trace})
 
-      // Which is the same as if we apply _successorInPlace
+      // Which is the same as if we apply _${successor}InPlace
       var j = i
-      j._successorInPlace()
+      j._${successor}InPlace()
       expectEqual(j, next, ${trace})
 
-      // Post-increment works
+      // Post-${inc}rement works
       j = i
-      expectEqual(j++, i, ${trace})
+      expectEqual(j${op}, i, ${trace})
       expectEqual(j, next, ${trace})
 
-      // Pre-increment works
+      // Pre-${inc}rement works
       j = i
-      expectEqual(++j, next, ${trace})
+      expectEqual(${op}j, next, ${trace})
       expectEqual(j, next, ${trace})
     }
   }
 }
+%end
 
 public enum ExpectedComparisonResult {
   case LT, EQ, GT
@@ -1573,11 +1581,40 @@ public struct CollectionMisuseResiliencyChecks {
   }
 }
 
+internal func _checkIncrementalAdvance<
+  Instances: CollectionType where Instances.Generator.Element : ForwardIndexType
+>(
+  instances: Instances,
+  equalityOracle: (Instances.Index, Instances.Index)->Bool,
+  limit: Instances.Generator.Element,
+  sign: Instances.Generator.Element.Distance, // 1 or -1
+  next: (Instances.Generator.Element)->Instances.Generator.Element,
+  ${TRACE}
+) {
+  for i in instances {
+    let d = sign > 0 ? distance(i, limit) : -distance(limit, i)
+
+    var offset: Instances.Generator.Element.Distance = 0
+    for _ in 0...(d * sign).toIntMax() {
+      let j = advance(i, offset)
+      let k = advance(i, offset + sign, limit)
+      let jAtLimit = offset == d
+      if jAtLimit {
+        expectEqual(limit, j, ${trace})
+      }
+      expectEqual(jAtLimit ? j : next(j), k, ${trace})
+      offset += sign
+    }
+  }
+}
+
 /// Test that the elements of `instances` satisfy the semantic
-/// requirements of `ForwardIndex`, using `equalityOracle` to generate
-/// equality expectations from pairs of positions in `instances`.
+/// requirements of `ForwardIndexType`, using `equalityOracle` to
+/// generate equality expectations from pairs of positions in
+/// `instances`.
 ///
-/// - Precondition: `endIndex` is reachable from all elements of instances
+/// - Precondition: `endIndex` is reachable from all elements of
+///   `instances`
 public func checkForwardIndex<
   Instances: CollectionType where Instances.Generator.Element : ForwardIndexType
 >(
@@ -1590,19 +1627,40 @@ public func checkForwardIndex<
   checkIncrementable(
     instances, equalityOracle: equalityOracle, endIndex: endIndex, ${trace})
 
-  for i in instances {
-    let count = distance(i, endIndex)
-    
-    for var offset: Index.Distance = 0; offset <= count; ++offset {
-      let j = advance(i, offset)
-      let k = advance(i, offset + 1, endIndex)
-      let jAtEnd = offset == count
-      if jAtEnd {
-        expectEqual(endIndex, j, ${trace})
-      }
-      expectEqual(jAtEnd ? j : j.successor(), k, ${trace})
-    }
-  }
+  _checkIncrementalAdvance(
+    instances, equalityOracle: equalityOracle, limit: endIndex,
+    sign: 1, next: { $0.successor() }, ${trace})
+}
+
+/// Test that the elements of `instances` satisfy the semantic
+/// requirements of `BidirectionalIndexType`, using `equalityOracle`
+/// to generate equality expectations from pairs of positions in
+/// `instances`.
+///
+/// - Preconditions:
+///   - all elements of `instances` are reachable from `startIndex`.
+///   - `endIndex` is reachable from all elements of `instances`.
+public func checkBidirectionalIndex<
+  Instances: CollectionType
+  where Instances.Generator.Element : BidirectionalIndexType
+>(
+  instances: Instances,
+  equalityOracle: (Instances.Index, Instances.Index)->Bool,
+  startIndex: Instances.Generator.Element, 
+  endIndex: Instances.Generator.Element,
+  ${TRACE}
+) {
+  typealias Index = Instances.Generator.Element
+
+  checkForwardIndex(
+    instances, equalityOracle: equalityOracle, endIndex: endIndex)
+
+  checkDecrementable(
+    instances, equalityOracle: equalityOracle, startIndex: startIndex, ${trace})
+
+  _checkIncrementalAdvance(
+    instances, equalityOracle: equalityOracle, limit: startIndex,
+    sign: -1, next: { $0.predecessor() }, ${trace})
 }
 
 // Generate two overloads: one for _UnitTestArray (which will get
@@ -1711,17 +1769,28 @@ public func check${traversal}Collection<
       resiliencyChecks: resiliencyChecks, sameValue: sameValue)
   }
 
-  // Build a function that advances up to 5 positions without passing
-  // endIndex.  Don't use advance() to do this because we'll be
-  // testing advance in checkForwardIndex.
+  // advances up to 1 positions without passing endIndex.  Don't use
+  // advance() to do this because it's under test here.
   let next = { $0 == collection.endIndex ? $0 : $0.successor() }
-  let advance5 = { next(next(next(next(next($0))))) }
 
-  let partWay = advance5(collection.startIndex)
+  // advances up to 5 positions without passing endIndex.  Picking a
+  // small constant to avoid complexity explosion on large input
+  // collections.
+  let next5 = { next(next(next(next(next($0))))) }
+
+  let partWay0 = next5(collection.startIndex)
+  let partWay1 = next5(partWay0)
+% if traversal == 'Forward':
   checkForwardIndex(
-    collection.startIndex..<partWay, equalityOracle: { $0 == $1 },
-    endIndex: advance5(partWay), ${trace})
-  
+    collection.startIndex..<partWay0, equalityOracle: { $0 == $1 },
+    endIndex: partWay1, ${trace})
+% else:
+  checkBidirectionalIndex(
+    partWay0..<partWay1, equalityOracle: { $0 == $1 },
+    startIndex: collection.startIndex,
+    endIndex: next5(partWay1), ${trace})
+% end
+
   let expectedArray = Array(expected)
 
   expectEqual(
