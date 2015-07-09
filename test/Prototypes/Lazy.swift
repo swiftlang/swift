@@ -3,34 +3,6 @@
 
 import StdlibUnittest
 
-extension CollectionType
-  where Self : _CollectionWrapperType, Self.Index == Self.Base.Index {
-  /// The position of the first element in a non-empty collection.
-  ///
-  /// In an empty collection, `startIndex == endIndex`.
-  public var startIndex: Base.Index {
-    return _base.startIndex
-  }
-  
-  /// The collection's "past the end" position.
-  ///
-  /// `endIndex` is not a valid argument to `subscript`, and is always
-  /// reachable from `startIndex` by zero or more applications of
-  /// `successor()`.
-  public var endIndex: Base.Index {
-    return _base.endIndex
-  }
-
-  /// Access the element at `position`.
-  ///
-  /// - Requires: `position` is a valid position in `self` and
-  ///   `position != endIndex`.
-  public subscript(position: Base.Index) -> Base.Generator.Element {
-    return _base[position]
-  }
-}
-
-//===--- New stuff --------------------------------------------------------===//
 public protocol _prext_LazySequenceType : SequenceType {
   /// A SequenceType that can contain the same elements as this one,
   /// possibly with a simpler type.
@@ -206,7 +178,7 @@ public struct _prext_MapSequence<Base : SequenceType, T>
 /// These elements are computed lazily, each time they're read, by
 /// calling the transform function on a base element.
 public struct _prext_MapCollection<Base : CollectionType, T>
-  : _prext_LazyCollectionType, _CollectionWrapperType {
+  : _prext_LazyCollectionType/*, _CollectionWrapperType*/ {
 
   public var startIndex: Base.Index { return _base.startIndex }
   public var endIndex: Base.Index { return _base.endIndex }
