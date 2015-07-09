@@ -90,6 +90,8 @@ public protocol SequenceType {
   func _initializeTo(ptr: UnsafeMutablePointer<Generator.Element>)
 }
 
+/// A default generate() function for `GeneratorType` instances that
+/// are declared to conform to `SequenceType`
 extension SequenceType
   where Self.Generator == Self, Self : GeneratorType {
   public func generate() -> Self {

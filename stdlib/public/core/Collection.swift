@@ -58,15 +58,6 @@ public protocol Indexable {
   subscript(position: Index) -> _Element {get}
 }
 
-/// A default generate() function for `GeneratorType` instances that
-/// are declared to conform to `SequenceType`
-extension SequenceType where Self : GeneratorType {
-  /// Returns `self`.
-  public func generate() -> Self {
-    return self
-  }
-}
-
 /// A *generator* for an arbitrary *collection*.  Provided `C`
 /// conforms to the other requirements of `Indexable`,
 /// `IndexingGenerator<C>` can be used as the result of `C`'s
