@@ -1763,6 +1763,40 @@ public func checkBidirectionalIndex<
     sign: -1, next: { $0.predecessor() }, ${trace})
 }
 
+/// Test that the elements of `instances` satisfy the semantic
+/// requirements of `RandomAccessIndexType`, using 
+/// `advanceOracle` and 'distanceOracle' to generate expectations
+/// about the results of `advancedBy` and `distanceTo` from pairs of
+/// positions in `instances` and `distances`.
+///
+/// - Preconditions:
+///   - all elements of `instances` are reachable from `startIndex`.
+///   - `endIndex` is reachable from all elements of `instances`.
+public func checkRandomAccessIndex<
+  Instances: CollectionType, Distances: CollectionType
+  where Instances.Generator.Element : RandomAccessIndexType,
+    Distances.Generator.Element == Instances.Generator.Element.Distance,
+    Instances.Generator.Element.Distance == Instances.Generator.Element.Stride
+>(
+  instances: Instances, distances: Distances,
+  distanceOracle:
+    (Instances.Index, Instances.Index) -> Distances.Generator.Element,
+  advanceOracle:
+    (Instances.Index, Distances.Index) -> Instances.Generator.Element,
+  startIndex: Instances.Generator.Element, 
+  endIndex: Instances.Generator.Element,
+  ${TRACE}
+) {
+  checkBidirectionalIndex(
+    instances, equalityOracle: { distanceOracle($0, $1) == 0 },
+    startIndex: startIndex, endIndex: endIndex, ${trace})
+
+  checkStrideable(
+    instances, strides: distances,
+    distanceOracle: distanceOracle,
+    advanceOracle: advanceOracle, ${trace})
+}
+
 // Generate two overloads: one for _UnitTestArray (which will get
 // picked up when the caller passes a literal), and another that
 // accepts any appropriate Collection type.
@@ -1856,6 +1890,9 @@ public func check${traversal}Collection<
   where
   C.Generator.Element == ${Element},
   C.Index : ${traversal}IndexType
+%  if traversal == 'RandomAccess':
+  , C.Index.Stride == C.Index.Distance
+% end
 >(
   expected: ${Expected}, _ collection: C,
   ${TRACE},
@@ -1884,9 +1921,48 @@ public func check${traversal}Collection<
   checkForwardIndex(
     collection.startIndex..<partWay0, equalityOracle: { $0 == $1 },
     endIndex: partWay1, ${trace})
-% else:
+% elif traversal == 'Bidirectional':
   checkBidirectionalIndex(
     partWay0..<partWay1, equalityOracle: { $0 == $1 },
+    startIndex: collection.startIndex,
+    endIndex: next5(partWay1), ${trace})
+% else:
+
+%   assert(traversal == 'RandomAccess')
+  typealias Distance = C.Index.Distance
+  let count: Distance  = collection.count
+  let offset0 = min(5, count)
+  let offset1 = min(10, count)
+  let offset2 = min(15, count)
+
+  let distanceCandidates: [Distance] = [
+    -11, -7, -5, -3, -2, -1, 0, 1, 2, 3, 5, 7, 11]
+
+  let distances = distanceCandidates.filter {
+    $0 + offset0 >= 0 && $0 + offset1 <= count
+  }
+
+  func nextN(n: C.Index.Distance, var _ i: C.Index) -> C.Index {
+    if n < 0 {
+      for _ in 0 ..< -(n.toIntMax()) {
+        --i
+      }
+    }
+    else {
+      for _ in 0..<n.toIntMax() {
+        ++i
+      }
+    }
+    return i
+  }
+
+  let instances = Array(partWay0..<partWay1)
+  typealias Distances = [Distance]
+  checkRandomAccessIndex(
+    instances,
+    distances: distances,
+    distanceOracle: { (x:Int,y:Int) in Distance(IntMax(y - x)) },
+    advanceOracle: { x,y in nextN(distances[y], instances[x]) },
     startIndex: collection.startIndex,
     endIndex: next5(partWay1), ${trace})
 % end
@@ -1981,6 +2057,9 @@ public func check${traversal}Collection<
   C.Generator.Element == ${Element},
   C.Index : ${traversal}IndexType,
   ${Element} : Equatable
+%  if traversal == 'RandomAccess':
+  , C.Index.Stride == C.Index.Distance
+% end
 >(
   expected: ${Expected}, _ collection: C,
   ${TRACE},
