@@ -2768,6 +2768,8 @@ public:
       return false;
     else if (isa<AutoreleaseReturnInst>(StartBlock->getTerminator()))
       return false;
+    else if (isa<ThrowInst>(StartBlock->getTerminator()))
+      return false;
 
     // Recursively check all successors.
     for (const auto &SuccBB : StartBlock->getSuccessors())
@@ -2821,7 +2823,8 @@ public:
                   "dealloc_stack does not match most recent alloc_stack");
           stack.pop_back();
         }
-        if (isa<ReturnInst>(&i) || isa<AutoreleaseReturnInst>(&i)) {
+        if (isa<ReturnInst>(&i) || isa<AutoreleaseReturnInst>(&i) ||
+            isa<ThrowInst>(&i)) {
           require(stack.empty(),
                   "return with alloc_stacks that haven't been deallocated");
         }

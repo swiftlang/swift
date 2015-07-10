@@ -1479,14 +1479,15 @@ SILValue LifetimeChecker::handleConditionalInitAssign() {
                             TheMemory.getFunction().getDebugScope());
   SILType IVType =
     SILType::getBuiltinIntegerType(NumMemoryElements, Module.getASTContext());
-  auto Alloc = B.createAllocStack(Loc, IVType);
+  auto *Alloc = B.createAllocStack(Loc, IVType);
   
   // Find all the return blocks in the function, inserting a dealloc_stack
   // before the return.
   for (auto &BB : TheMemory.getFunction()) {
-    if (auto *RI = dyn_cast<ReturnInst>(BB.getTerminator())) {
-      B.setInsertionPoint(RI);
-      B.createDeallocStack(Loc, SILValue(Alloc, 0));
+    auto *Term = BB.getTerminator();
+    if (isa<ReturnInst>(Term) || isa<ThrowInst>(Term)) {
+      B.setInsertionPoint(Term);
+      B.createDeallocStack(Loc, Alloc->getContainerResult());
     }
   }
   
