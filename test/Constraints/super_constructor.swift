@@ -16,7 +16,7 @@ class D : B {
   }
 
   init(e:Int) {
-    super.init('x') // expected-error{{could not find an overload for 'B.init' that accepts the supplied arguments}}
+    super.init('x') // expected-error{{expression does not conform to type 'CharacterLiteralConvertible'}}
   }
 
   init(f:Int) {
@@ -24,7 +24,8 @@ class D : B {
   }
 
   init(g:Int) {
-    super.init("aoeu") // expected-error{{could not find an overload for 'B.init' that accepts the supplied arguments}}
+    super.init("aoeu") // expected-error{{cannot invoke 'B.init' with an argument list of type '(String)'}}
+    // expected-note @-1 {{overloads for 'B.init' exist with these partially matching parameter lists: (x: Int), (a: UnicodeScalar), (b: UnicodeScalar), (z: Float)}}
   }
 
   init(h:Int) {

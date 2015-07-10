@@ -65,7 +65,7 @@ enum E1 {
 // Ill-formed initializer delegation: no matching constructor
 class Z0 {
   init() { // expected-error {{designated initializer for 'Z0' cannot delegate (with 'self.init'); did you mean this to be a convenience initializer?}}
-    self.init(5, 5) // expected-error{{cannot invoke 'Z0.init' with an argument list of type '(integer, integer)'}} expected-note{{delegation occurs here}}
+    self.init(5, 5) // expected-error{{cannot invoke 'Z0.init' with an argument list of type '(Int, Int)'}} expected-note{{delegation occurs here}}
   }
 
   init(value: Int) { /* ... */ }
@@ -74,7 +74,7 @@ class Z0 {
 
 struct Z1 {
   init() {
-    self.init(5, 5) // expected-error{{cannot invoke 'Z1.init' with an argument list of type '(integer, integer)'}}
+    self.init(5, 5) // expected-error{{cannot invoke 'Z1.init' with an argument list of type '(Int, Int)'}}
   }
 
   init(value: Int) { /* ... */ }
@@ -86,7 +86,7 @@ enum Z2 {
   case B
 
   init() {
-    self.init(5, 5) // expected-error{{cannot invoke 'Z2.init' with an argument list of type '(integer, integer)'}}
+    self.init(5, 5) // expected-error{{cannot invoke 'Z2.init' with an argument list of type '(Int, Int)'}}
   }
 
   init(value: Int) { /* ... */ }
@@ -312,11 +312,11 @@ func foo<T: C where T: P>(x: T, y: T.Type) {
 
 class TestOverloadSets {
   convenience init() {
-    self.init(5, 5) // expected-error{{cannot invoke 'TestOverloadSets.init' with an argument list of type '(integer, integer)'}}
+    self.init(5, 5) // expected-error{{cannot invoke 'TestOverloadSets.init' with an argument list of type '(Int, Int)'}}
   }
   
   convenience init(a : Z0) {
-    self.init(42 as Int8) // expected-error{{cannot invoke 'TestOverloadSets.init' with an argument of type '(Int8)'}}
+    self.init(42 as Int8) // expected-error{{cannot invoke 'TestOverloadSets.init' with an argument list of type '(Int8)'}}
     // expected-note @-1 {{overloads for 'TestOverloadSets.init' exist with these partially matching parameter lists: (a: Z0), (value: Int), (value: Double)}}
   }
   

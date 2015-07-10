@@ -1894,9 +1894,15 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure() {
   // Do some sanity checking based on the call: e.g. make sure we're invoking
   // the overloaded decl, not using it as an argument.
   Type argType;
-  if (call && isa<ApplyExpr>(call) &&
-      cast<ApplyExpr>(call)->getFn()->getSemanticsProvidingExpr() == anchor)
-    argType = getDiagnosticTypeFromExpr(call);
+  if (auto *AE = dyn_cast_or_null<ApplyExpr>(call)) {
+    if (AE->getFn()->getSemanticsProvidingExpr() == anchor) {
+#if 0
+      argType = getTypeOfTypeCheckedIndependentSubExpression(AE->getArg());
+#else
+      argType = AE->getArg()->getType();
+#endif
+    }
+  }
   
   if (argType.isNull() || argType->is<TypeVariableType>()) {
     CS->TC.diagnose(anchor->getLoc(), diag::cannot_find_appropriate_overload,
@@ -1904,6 +1910,7 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure() {
        .highlight(anchor->getSourceRange());
     return true;
   }
+  
   
   // Otherwise, we have a good grasp on what is going on: we have a call of an
   // unresolve overload set.  Try to dig out the candidates.
@@ -2721,8 +2728,12 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
     overloadName = instanceType->getString();
   } else if (auto UDE = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
     overloadName = UDE->getName().str().str();
-  } else if (isa<UnresolvedConstructorExpr>(fnExpr)) {
-    overloadName = "init";
+  } else if (auto *UCE = dyn_cast<UnresolvedConstructorExpr>(fnExpr)) {
+    auto selfTy = UCE->getSubExpr()->getType()->getLValueOrInOutObjectType();
+    if (selfTy->hasTypeVariable())
+      overloadName = "init";
+    else
+      overloadName = selfTy.getString() + ".init";
   } else {
     isClosureInvocation = true;
     
@@ -2731,7 +2742,8 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
   }
   // TODO: Handle dot_syntax_call_expr "fn" as a non-closure value.
   // TODO: need a concept of an uncurry level.
-
+  
+  
   // If we have an argument list (i.e., a scalar, or a non-zero-element tuple)
   // then diagnose with some specificity about the arguments.
   if (!isa<TupleExpr>(argExpr) ||
@@ -3002,6 +3014,10 @@ bool FailureDiagnosis::diagnoseFailure() {
 /// Given a specific expression and the remnants of the failed constraint
 /// system, produce a specific diagnostic.
 bool ConstraintSystem::diagnoseFailureForExpr(Expr *expr) {
+  if (auto *RB = dyn_cast<RebindSelfInConstructorExpr>(expr))
+    expr = RB->getSubExpr();
+  
+  
   FailureDiagnosis diagnosis(expr, this);
   
   // Now, attempt to diagnose the failure from the info we've collected.
