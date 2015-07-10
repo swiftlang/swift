@@ -708,3 +708,52 @@ TEST(MetadataTest, getExistentialTypeMetadata_class) {
       return ex3;
     });
 }
+
+static const void *AllocatedBuffer = nullptr;
+static const void *DeallocatedBuffer = nullptr;
+
+namespace swift {
+  void installCommonValueWitnesses(ValueWitnessTable *vwtable);
+}
+
+
+TEST(MetadataTest, installCommonValueWitnesses_pod_indirect) {
+  ValueWitnessTable testTable;
+  FullMetadata<Metadata> testMetadata{{&testTable}, {MetadataKind::Opaque}};
+
+  // rdar://problem/21375421 - pod_indirect_initializeBufferWithTakeOfBuffer
+  // should move ownership of a fixed-size buffer.
+
+  testTable.size = sizeof(ValueBuffer) + 1;
+  testTable.flags = ValueWitnessFlags()
+    .withAlignment(alignof(ValueBuffer))
+    .withPOD(true)
+    .withBitwiseTakable(true);
+  testTable.stride = sizeof(ValueBuffer) + alignof(ValueBuffer);
+
+  installCommonValueWitnesses(&testTable);
+
+  // Replace allocateBuffer and destroyBuffer with logging versions.
+  testTable.allocateBuffer =
+    [](ValueBuffer *buf, const Metadata *self) -> OpaqueValue * {
+      void *mem = malloc(self->getValueWitnesses()->size);
+      *reinterpret_cast<void**>(buf) = mem;
+      AllocatedBuffer = mem;
+
+      return reinterpret_cast<OpaqueValue *>(mem);
+    };
+  testTable.destroyBuffer =
+    [](ValueBuffer *buf, const Metadata *self) -> void {
+      void *mem = *reinterpret_cast<void**>(buf);
+      DeallocatedBuffer = mem;
+
+      free(mem);
+    };
+
+  ValueBuffer buf1, buf2;
+  testTable.allocateBuffer(&buf1, &testMetadata);
+  testTable.initializeBufferWithTakeOfBuffer(&buf2, &buf1, &testMetadata);
+  testTable.destroyBuffer(&buf2, &testMetadata);
+
+  EXPECT_EQ(AllocatedBuffer, DeallocatedBuffer);
+}

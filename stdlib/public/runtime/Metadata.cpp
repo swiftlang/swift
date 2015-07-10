@@ -1142,8 +1142,11 @@ static OpaqueValue *pod_indirect_initializeBufferWithCopyOfBuffer(
   memcpy(destBuf, srcBuf, wtable->size);
   return destBuf;
 }
-#define pod_indirect_initializeBufferWithTakeOfBuffer \
-  pod_indirect_initializeBufferWithCopyOfBuffer
+
+static OpaqueValue *pod_indirect_initializeBufferWithTakeOfBuffer(
+                    ValueBuffer *dest, ValueBuffer *src, const Metadata *self) {
+  memcpy(dest, src, sizeof(ValueBuffer));
+}
 
 static OpaqueValue *pod_indirect_projectBuffer(ValueBuffer *buffer,
                                                const Metadata *self) {
