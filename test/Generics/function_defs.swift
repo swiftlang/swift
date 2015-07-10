@@ -106,6 +106,7 @@ func testOverload<Ovl : Overload, OtherOvl : Overload>(ovl: Ovl, ovl2: Ovl,
   a = ovl2.f1(a)
 
   other.f1(a) // expected-error{{cannot invoke 'f1' with an argument list of type '(Ovl.A)'}}
+              //expected-note @-1 {{expected an argument list of type '(Self.A)'}}
   
   // Overloading based on context
   var f3i : (Int) -> Int = ovl.f3

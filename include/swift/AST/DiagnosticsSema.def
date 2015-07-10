@@ -141,9 +141,6 @@ ERROR(cannot_apply_initializer_to_args,sema,none,
       "cannot invoke initializer for type '%0' with an argument list of type "
       "'%1'", (StringRef,StringRef))
 
-NOTE(expected_certain_args,sema_nb,none,
-      "expected an argument list of type '%0'", (StringRef))
-
 ERROR(cannot_find_appropriate_overload_with_list,sema,none,
       "cannot find an overload for '%0' that accepts an argument list of"
       " type '%1'", (StringRef, StringRef))
@@ -169,6 +166,9 @@ NOTE(mult_stmt_closures_require_explicit_result,sema,none,
 
 ERROR(invalid_trailing_closure_target,sema,none,
       "unexpected trailing closure", ())
+
+NOTE(suggest_expected_match,sema,none,
+     "expected an argument list of type '%0'", (StringRef))
 
 NOTE(suggest_partial_overloads,sema,none,
       "overloads for '%0' exist with these partially matching parameter "

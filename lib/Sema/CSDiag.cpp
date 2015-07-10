@@ -1717,11 +1717,9 @@ private:
   /// Given a set of parameter lists from an overload group, and a list of
   /// arguments, emit a diagnostic indicating any partially matching overloads.
   void suggestPotentialOverloads(StringRef functionName, SourceLoc loc,
-                                 const SmallVectorImpl<Type> &paramLists,
-                                 Type argType);
-  void suggestPotentialOverloads(StringRef functionName, SourceLoc loc,
                                  ArrayRef<ValueDecl*> candidates,
-                                 CandidateCloseness closeness);
+                                 CandidateCloseness closeness,
+                                 bool isCallExpr = false);
   
   bool visitExpr(Expr *E);
 
@@ -2101,6 +2099,7 @@ Expr *FailureDiagnosis::typeCheckIndependentSubExpression(Expr *subExpr) {
   if (!isa<ClosureExpr>(subExpr) &&
       (isa<ApplyExpr>(subExpr) || isa<ArrayExpr>(subExpr) ||
        isa<ForceValueExpr>(subExpr) ||
+       //isa<UnresolvedDotExpr>(subExpr) ||
        typeIsNotSpecialized(subExpr->getType()))) {
     
     // Store off the sub-expression, in case a new one is provided via the
@@ -2179,68 +2178,27 @@ bool FailureDiagnosis::diagnoseContextualConversionError(Type exprResultType) {
   return true;
 }
 
-// FIXME: Remove this!
-void FailureDiagnosis::suggestPotentialOverloads(StringRef functionName,
-                                                 SourceLoc loc,
-                               const SmallVectorImpl<Type> &paramLists,
-                                                 Type argType) {
-  // FIXME: This is arbitrary.
-  if (argType->isVoid())
-    return;
-
-  auto argTypeElts = decomposeArgumentType(argType);
-
-  std::string suggestionText = "";
-  std::map<std::string, bool> dupes;
-
-  for (auto paramList : paramLists) {
-    auto paramTypeElts = decomposeArgumentType(paramList);
-
-    if (paramTypeElts.size() != argTypeElts.size())
-      continue;
-  /// FIXME: Right now, a "matching" overload is one with a parameter whose type
-  /// is identical to one of the argument types. We can obviously do something
-  /// more sophisticated with this.
-    for (size_t i = 0, e = paramTypeElts.size(); i != e; i++) {
-      auto pt = paramTypeElts[i];
-      auto at = argTypeElts[i];
-      if (pt->isEqual(at->getRValueType())) {
-        auto typeListString = getTypeListString(paramList);
-        if (!dupes[typeListString]) {
-          dupes[typeListString] = true;
-          if (!suggestionText.empty())
-            suggestionText += ", ";
-          suggestionText += typeListString;
-        }
-        break;
-      }
-    }
-  }
-  
-  if (suggestionText.empty())
-    return;
-  
-  CS->TC.diagnose(loc, diag::suggest_partial_overloads,
-                  functionName, suggestionText);
-}
-
 void FailureDiagnosis::
 suggestPotentialOverloads(StringRef functionName, SourceLoc loc,
                           ArrayRef<ValueDecl*> candidates,
-                          CandidateCloseness closeness) {
+                          CandidateCloseness closeness,
+                          bool isCallExpr) {
   
   // If the candidate list is has no near matches to the actual types, don't
   // print out a candidate list, it will just be noise.
-  if (closeness == CC_ArgumentCountMismatch ||
-      closeness == CC_GeneralMismatch)
-    return;
+  if ((closeness == CC_ArgumentCountMismatch ||
+       closeness == CC_GeneralMismatch)) {
+    
+    // FIXME: This is arbitrary.
+    if (candidates.size() != 1 || !isCallExpr)
+      return;
+  }
   
   std::string suggestionText = "";
   std::set<std::string> dupes;
   
   // FIXME2: For (T,T) & (Self, Self), emit this as two candidates, one using
   // the LHS and one using the RHS type for T's.
-  
   for (auto decl : candidates) {
     Type paramListType;
     
@@ -2269,8 +2227,13 @@ suggestPotentialOverloads(StringRef functionName, SourceLoc loc,
   if (suggestionText.empty())
     return;
   
-  CS->TC.diagnose(loc, diag::suggest_partial_overloads,
-                  functionName, suggestionText);
+  if (dupes.size() == 1) {
+    CS->TC.diagnose(loc, diag::suggest_expected_match,
+                    suggestionText);
+  } else {
+    CS->TC.diagnose(loc, diag::suggest_partial_overloads,
+                    functionName, suggestionText);
+  }
 }
 
 
@@ -2309,9 +2272,23 @@ static FailureDiagnosis::CandidateCloseness
 evaluateCloseness(Type candArgListType, ArrayRef<Type> actualArgs) {
   auto candArgs = decomposeArgumentType(candArgListType);
 
-  // FIXME: This isn't handling varargs.
-  if (actualArgs.size() != candArgs.size())
+  // FIXME: This isn't handling varargs, and isn't handling default values
+  // either.
+  if (actualArgs.size() != candArgs.size()) {
+    // If the candidate is varargs, and if there are more arguments specified
+    // than required, consider this a general mismatch.
+    // TODO: we could catalog the remaining entries if they *do* match up.
+    if (auto *TT = candArgListType->getAs<TupleType>()) {
+      if (!TT->getElements().empty()) {
+        if (TT->getElements().back().isVararg() &&
+            actualArgs.size() >= TT->getElements().size()-1)
+          return FailureDiagnosis::CC_GeneralMismatch;
+      }
+    }
+    
+    
     return FailureDiagnosis::CC_ArgumentCountMismatch;
+  }
   
   // Count the number of mismatched arguments.
   unsigned mismatchingArgs = 0;
@@ -2336,6 +2313,8 @@ evaluateCloseness(Type candArgListType, ArrayRef<Type> actualArgs) {
   if (mismatchingArgs == 1)
     return FailureDiagnosis::CC_OneArgumentMismatch;
 
+  // TODO: Keyword argument mismatches.
+  
   return FailureDiagnosis::CC_GeneralMismatch;
 }
 
@@ -2351,6 +2330,16 @@ FailureDiagnosis::collectCalleeCandidateInfo(Expr *fn, Type actualArgsType,
   } else if (auto overloadedDRE = dyn_cast<OverloadedDeclRefExpr>(fn)) {
     result.append(overloadedDRE->getDecls().begin(),
                   overloadedDRE->getDecls().end());
+  } else if (auto TE = dyn_cast<TypeExpr>(fn)) {
+    // It's always a metatype type, so use the instance type name.
+    auto instanceType = TE->getType()->getAs<MetatypeType>()->getInstanceType();
+    
+    // TODO: figure out right value for isKnownPrivate
+    if (!instanceType->getAs<TupleType>()) {
+      auto ctors = CS->TC.lookupConstructors(CS->DC, instanceType);
+      for (auto ctor : ctors)
+        result.push_back(ctor);
+    }
   } else if (overloadConstraint) {
     result.push_back(overloadConstraint->getOverloadChoice().getDecl());
   } else {
@@ -2654,6 +2643,9 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
 bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
   CleanupIllFormedExpressionRAII cleanup(CS->getASTContext(), expr);
   
+  // FIXME: Should be calculating types of sub-exprs in a consistent way.
+  //auto fnExpr = typeCheckIndependentSubExpression(callExpr->getFn());
+  //if (!fnExpr) return true;
   auto fnExpr = callExpr->getFn();
   auto argExpr = callExpr->getArg();
   
@@ -2661,58 +2653,32 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
   if (isErrorTypeKind(fnExpr->getType()))
     return true;
 
-
   std::string overloadName = "";
 
   bool isClosureInvocation = false;
   bool isInvalidTrailingClosureTarget = false;
   bool isInitializer = false;
   bool isOverloadedFn = false;
-  
-  llvm::SmallVector<Type, 16> paramLists;
 
+  CandidateCloseness candidateCloseness;
+  auto Candidates = collectCalleeCandidateInfo(fnExpr, argExpr->getType(),
+                                               candidateCloseness);
+
+  
   // Obtain the function's name, and collect any parameter lists for diffing
   // purposes.
   if (auto DRE = dyn_cast<DeclRefExpr>(fnExpr)) {
     overloadName = DRE->getDecl()->getNameStr();
-    
-    if (auto fnType = DRE->getDecl()->getType()->getAs<AnyFunctionType>()) {
-      paramLists.push_back(fnType->getInput());
-    }
-    
   } else if (auto ODRE = dyn_cast<OverloadedDeclRefExpr>(fnExpr)) {
     isOverloadedFn = true;
     overloadName = ODRE->getDecls()[0]->getNameStr().str();
-    
-    // Collect the parameters for later use.
-    for (auto D : ODRE->getDecls()) {
-      if (auto fnType = D->getType()->getAs<AnyFunctionType>()) {
-        paramLists.push_back(fnType->getInput());
-      }
-    }
-    
-  } else if (auto TE = dyn_cast<TypeExpr>(fnExpr)) {
+  } else if (isa<TypeExpr>(fnExpr)) {
     isInitializer = true;
-    
+    isOverloadedFn = Candidates.size() > 1;
     // It's always a metatype type, so use the instance type name.
-    auto instanceType = TE->getType()->getAs<MetatypeType>()->getInstanceType();
+    auto instanceType =
+      fnExpr->getType()->castTo<MetatypeType>()->getInstanceType();
     overloadName = instanceType->getString();
-
-    // TODO: figure out right value for isKnownPrivate
-    if (!instanceType->getAs<TupleType>()) {
-      auto ctors = CS->TC.lookupConstructors(CS->DC, instanceType);
-      for (auto ctor : ctors) {
-        if (auto fnType = ctor->getType()->getAs<AnyFunctionType>()) {
-          // skip type argument
-          if (auto fnType2 = fnType->getResult()->getAs<AnyFunctionType>()) {
-            paramLists.push_back(fnType2->getInput());
-          }
-        }
-      }
-    }
-    if (paramLists.size() > 1)
-      isOverloadedFn = true;
-
   } else if (auto UDE = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
     overloadName = UDE->getName().str().str();
   } else if (isa<UnresolvedConstructorExpr>(fnExpr)) {
@@ -2724,7 +2690,7 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
     isInvalidTrailingClosureTarget = !isa<ClosureExpr>(unwrappedExpr);
   }
   // TODO: Handle dot_syntax_call_expr "fn" as a non-closure value.
-
+  // TODO: need a concept of an uncurry level.
 
   Type argType;
 
@@ -2746,7 +2712,8 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
       SmallVector<TupleTypeElt, 4> resultElts;
 
       for (unsigned i = 0, e = TE->getNumElements(); i != e; i++) {
-        auto elType = getTypeOfTypeCheckedIndependentSubExpression(TE->getElement(i));
+        auto elType =
+          getTypeOfTypeCheckedIndependentSubExpression(TE->getElement(i));
         if (!elType)
           return true; // already diagnosed.
 
@@ -2820,22 +2787,9 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
   }
   
   // Did the user intend on invoking a different overload?
-  if (!paramLists.empty()) {
-    if (!isOverloadedFn) {
-      std::string paramString = "";
-
-      if (!paramLists[0]->isVoid()) {
-        paramString = getTypeListString(paramLists[0]);
-        
-        CS->TC.diagnose(argExpr->getLoc(),
-                        diag::expected_certain_args,
-                        paramString);
-      }
-    } else {
-      suggestPotentialOverloads(overloadName, fnExpr->getLoc(),
-                                paramLists, argType);
-    }
-  }
+  suggestPotentialOverloads(overloadName, fnExpr->getLoc(),
+                            Candidates, candidateCloseness,
+                            /*isCallExpr*/true);
   
   expr->setType(ErrorType::get(CS->getASTContext()));
   return true;

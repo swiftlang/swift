@@ -180,10 +180,10 @@ func test_subscript(inout x2: X2, i: Int, j: Int, inout value: Int, no: NoSubscr
   ovl[(i, j)] = value
 
   value = ovl[(i, j, i)] // expected-error{{cannot subscript a value of type 'OverloadedSubscript' with an index of type '(Int, Int, Int)'}}
-  // expected-note @-1 {{overloads for 'subscript' exist with these partially matching parameter lists: (Int)}}
+  // expected-note @-1 {{expected an argument list of type '(Int)'}}
 
   ret[i] // expected-error{{multiple candidates fail to match based on result type}}
-  // expected-note @-1 {{overloads for 'subscript' exist with these partially matching parameter lists: (Int)}}
+  // expected-note @-1 {{expected an argument list of type '(Int)'}}
 
   value = ret[i]
   ret[i] = value
@@ -225,11 +225,11 @@ func testSubscript1(s1 : SubscriptTest1) {
   
   // FIXME: This is a bug, it should not be ambiguous. rdar://18741539
   if s1["hello"] {}  // expected-error {{multiple candidates fail to match based on result type}}
-  // expected-note @-1 {{overloads for 'subscript' exist with these partially matching parameter lists: (String)}}
+  // expected-note @-1 {{expected an argument list of type '(String)'}}
   
   
   let _ = s1["hello"]  // expected-error {{multiple candidates fail to match based on result type}}
-  // expected-note @-1 {{overloads for 'subscript' exist with these partially matching parameter lists: (String)}}
+  // expected-note @-1 {{expected an argument list of type '(String)'}}
 }
 
 struct SubscriptTest2 {
@@ -245,5 +245,5 @@ func testSubscript1(s2 : SubscriptTest2) {
   
   
   let b = s2[1, "foo"] // expected-error {{cannot subscript a value of type 'SubscriptTest2' with an index of type '(Int, String)'}}
-  // expected-note @-1 {{overloads for 'subscript' exist with these partially matching parameter lists: (String, String)}}
+  // expected-note @-1 {{expected an argument list of type '(String, String)'}}
 }

@@ -38,7 +38,7 @@ var d : Double
 
 // Tuple size mismatch.
 f1(  // expected-error {{cannot invoke 'f1' with an argument list of type '((Int) -> Int)'}}
-   f4 // expected-note {{expected an argument list of type '((Int, Float) -> Int)'}}
+   f4 // expected-note @-1 {{expected an argument list of type '((Int, Float) -> Int)'}}
    ) 
 
 // Tuple element unused.
@@ -57,11 +57,11 @@ f0(i, // expected-error {{cannot invoke 'f0' with an argument list of type '(Int
 
 // Function result not a subtype.
 f1( // expected-error {{cannot invoke 'f1' with an argument list of type '((Int, Float) -> ())'}}
-   f0 // expected-note{{expected an argument list of type '((Int, Float) -> Int)'}}
+   f0 // expected-note @-1 {{expected an argument list of type '((Int, Float) -> Int)'}}
    )
 
 f3( // expected-error {{cannot invoke 'f3' with an argument list of type '((((Int) -> Int)) -> Int)'}}
-   f2 // expected-note{{expected an argument list of type '(((Int) -> Float) -> Int)'}}
+   f2 // expected-note @-1 {{expected an argument list of type '(((Int) -> Float) -> Int)'}}
    )
 
 // FIXME: Can't test same-type diagnostic yet.
@@ -169,8 +169,8 @@ class r20201968C {
 
 // <rdar://problem/21459429> QoI: Poor compilation error calling assert
 func r21459429(a : Int) {
-  // expected-note @+1 {{overloads for '!=' exist with these partially matching parameter lists: (Int, Int)}}
   assert(a != nil, "ASSERT COMPILATION ERROR") // expected-error {{binary operator '!=' cannot be applied to operands of type 'Int' and 'nil'}}
+  // expected-note @-1 {{expected an argument list of type '(Int, Int)'}}
 }
 
 

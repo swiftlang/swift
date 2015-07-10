@@ -480,6 +480,7 @@ func conversionTest(inout a: Double, inout b: Int) {
   var pi_f1 = Float(pi_f)
   var pi_d1 = Double(pi_d)
   var pi_s1 = SpecialPi(pi_s) // expected-error {{cannot invoke initializer for type 'SpecialPi' with an argument list of type '(SpecialPi)'}}
+  // expected-note @-1 {{expected an argument list of type '()'}}
 
   var pi_f2 = Float(getPi()) // expected-error {{ambiguous use of 'getPi'}}
   var pi_d2 = Double(getPi()) // expected-error {{ambiguous use of 'getPi'}}
@@ -681,13 +682,14 @@ func testOptionalTypeParsing(a : AnyObject) -> String {
 func testParenExprInTheWay() {
   let x = 42
   
-  // expected-note @+1 {{overloads for '&' exist with these partially matching parameter lists: (Int, Int)}}
   if x & 4.0 {}  // expected-error {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}}
-  // expected-note @+1 {{overloads for '&' exist with these partially matching parameter lists: (Int, Int)}}
-  if (x & 4.0) {}   // expected-error {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}}
+  // expected-note @-1 {{expected an argument list of type '(Int, Int)'}}
 
-  // expected-note @+1 {{overloads for '&' exist with these partially matching parameter lists: (Int, Int)}}
+  if (x & 4.0) {}   // expected-error {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}}
+  // expected-note @-1 {{expected an argument list of type '(Int, Int)'}}
+
   if !(x & 4.0) {}  // expected-error {{binary operator '&' cannot be applied to operands of type 'Int' and 'Double'}}
+  // expected-note @-1 {{expected an argument list of type '(Int, Int)'}}
 
   
   if x & x {} // expected-error {{'Int' is not convertible to 'BooleanType'}}

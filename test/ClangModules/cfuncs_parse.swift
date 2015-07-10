@@ -7,6 +7,7 @@ import cfuncs
 func test_cfunc1(i: Int) {
   cfunc1() // okay
   cfunc1(i) // expected-error{{cannot invoke 'cfunc1' with an argument list of type '(Int)'}}
+  // expected-note @-1 {{expected an argument list of type '()'}}
 }
 
 func test_cfunc2(i: Int) {

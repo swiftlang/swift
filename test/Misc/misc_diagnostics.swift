@@ -42,6 +42,8 @@ func noParams() -> Int { return 0 }
 func takesAndReturnsInt(i: Int) -> Int { return 0 }
 
 takesInt(noParams(1)) // expected-error{{cannot invoke 'noParams' with an argument list of type '(Int)'}}
+// expected-note @-1 {{expected an argument list of type '()'}}
+
 takesInt(takesAndReturnsInt("")) // expected-error{{cannot invoke 'takesAndReturnsInt' with an argument list of type '(String)'}} expected-note{{expected an argument list of type '(Int)'}}
 
 // Test error recovery for type expressions.
@@ -88,6 +90,7 @@ let _: String = testIS1() // expected-error {{'Int' is not convertible to 'Strin
 
 func insertA<T>(inout array : [T], elt : T) {
   array.append(T); // expected-error {{cannot invoke 'append' with an argument list of type '((T).Type)'}}
+  // expected-note @-1 {{expected an argument list of type '(Element)'}}
 }
 
 // <rdar://problem/17875634> can't append to array of tuples
@@ -99,10 +102,13 @@ func test17875634() {
 
   match += (1, 2) // expected-error{{binary operator '+=' cannot be applied to operands of type '[(Int, Int)]' and '(Int, Int)'}}
   match += (row, col) // expected-error{{binary operator '+=' cannot be applied to operands of type '[(Int, Int)]' and '(Int, Int)'}}
+
   match += coord // expected-error{{binary operator '+=' cannot be applied to operands of type '[(Int, Int)]' and '(Int, Int)'}}
 
   match.append(row, col) // expected-error{{cannot invoke 'append' with an argument list of type '(Int, Int)'}}
+  // expected-note @-1 {{expected an argument list of type '(Element)'}}
   match.append(1, 2) // expected-error{{cannot invoke 'append' with an argument list of type '(Int, Int)'}}
+  // expected-note @-1 {{expected an argument list of type '(Element)'}}
 
   match.append(coord)
   match.append((1, 2))

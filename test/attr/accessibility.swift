@@ -50,8 +50,8 @@ private( // expected-error{{expected 'set' as subject of 'private' modifier}}
 var unterminatedEmptySubject = 0
 
 // Check that the parser made it here.
-duplicateAttr(1) // expected-error{{}}
-
+duplicateAttr(1) // expected-error{{cannot invoke 'duplicateAttr' with an argument list of type '(Int)'}}
+// expected-note @-1 {{expected an argument list of type '()'}}
 
 // CHECK ALLOWED DECLS
 private import Swift // expected-error {{'private' modifier cannot be applied to this declaration}}
