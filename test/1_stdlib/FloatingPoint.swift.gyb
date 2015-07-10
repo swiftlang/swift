@@ -5,6 +5,8 @@
 
 // XFAIL: interpret
 
+// REQUIRES: disabled
+
 import Swift
 import StdlibUnittest
 
