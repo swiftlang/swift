@@ -1623,6 +1623,51 @@ public func checkComparable<T : Comparable>(
     ${trace})
 }
 
+
+/// Test that the elements of `instances` satisfy the semantic
+/// requirements of `Strideable`, using `advanceOracle` and
+/// 'distanceOracle' to generate expectations about the results of
+/// `advancedBy` and `distanceTo` from pairs of positions in
+/// `instances` and `strides`.
+///
+/// - Note: `oracle` is also checked for conformance to the
+///   laws.
+public func checkStrideable<
+  Instances: CollectionType, Strides: CollectionType
+  where Instances.Generator.Element : Strideable,
+    Strides.Generator.Element == Instances.Generator.Element.Stride
+>(
+  instances: Instances, strides: Strides,
+  distanceOracle:
+    (Instances.Index, Instances.Index) -> Strides.Generator.Element,
+  advanceOracle:
+    (Instances.Index, Strides.Index) -> Instances.Generator.Element,
+  ${TRACE}
+) {
+  checkComparable(
+    instances,
+    oracle: {
+      let d = distanceOracle($1, $0);
+      return d < 0 ? .LT : d == 0 ? .EQ : .GT
+    },
+    ${trace})
+  
+  for i in instances.indices {
+    let x = instances[i]
+    expectEqual(x, x.advancedBy(0))
+    
+    for j in strides.indices {
+      let y = strides[j]
+      expectEqual(advanceOracle(i, j), x.advancedBy(y))
+    }
+
+    for j in instances.indices {
+      let y = instances[j]
+      expectEqual(distanceOracle(i, j), x.distanceTo(y))
+    }
+  }
+}
+
 public struct CollectionMisuseResiliencyChecks {
   public var callNextOnExhaustedGenerator: Bool = true
 
