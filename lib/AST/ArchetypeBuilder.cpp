@@ -850,10 +850,11 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
 bool ArchetypeBuilder::addSuperclassRequirement(PotentialArchetype *T,
                                                 Type Superclass,
                                                 RequirementSource Source) {
-  // If T already has a superclass, make sure it's the same superclass.
-  // FIXME: We should compute the meet here.
+  // If T already has a superclass, make sure it's related.
   if (T->Superclass) {
-    if (!T->Superclass->isEqual(Superclass)) {
+    if (T->Superclass->isSuperclassOf(Superclass, nullptr)) {
+      T->Superclass = Superclass;
+    } else if (!Superclass->isSuperclassOf(T->Superclass, nullptr)) {
       Diags.diagnose(Source.getLoc(),
                      diag::requires_superclass_conflict, T->getName(),
                      T->Superclass, Superclass)

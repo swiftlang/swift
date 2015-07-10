@@ -44,7 +44,7 @@ func call_f0(a: A, b: B, other: Other) {
 
 // Declaration errors
 func f1<T : A where T : Other>(_: T) { } // expected-error{{generic parameter 'T' cannot be a subclass of both 'A' and 'Other'}}
-func f2<T : A where T : B>(_: T) { } // FIXME: expected-error{{cannot be a subclass}}
+func f2<T : A where T : B>(_: T) { }
 
 class X<T> {
   func f() -> T {}

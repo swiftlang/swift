@@ -62,7 +62,29 @@ class Box<T : Fox> {
   func unpack(x: X1<T>) {}
 }
 
-// FIXME: Infer superclass requirements.
+// ----------------------------------------------------------------------------
+// Superclass requirements
+// ----------------------------------------------------------------------------
+
+// Compute meet of two superclass requirements correctly.
+class Carnivora {}
+class Canidae : Carnivora {}
+
+struct U<T : Carnivora> {}
+
+struct V<T : Canidae> {}
+
+// CHECK-LABEL: .inferSuperclassRequirement1@
+// CHECK-NEXT: Requirements:
+// CHECK-NEXT:   T witness marker
+// CHECK-NEXT:   T : Canidae
+func inferSuperclassRequirement1<T : Carnivora>(v: V<T>) {}
+
+// CHECK-LABEL: .inferSuperclassRequirement2@
+// CHECK-NEXT: Requirements:
+// CHECK-NEXT:   T witness marker
+// CHECK-NEXT:   T : Canidae
+func inferSuperclassRequirement2<T : Canidae>(v: U<T>) {}
 
 // ----------------------------------------------------------------------------
 // Same-type requirements

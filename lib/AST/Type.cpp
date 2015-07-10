@@ -1808,6 +1808,8 @@ bool TypeBase::isSuperclassOf(Type ty, LazyResolver *resolver) {
   do {
     if (ty->isEqual(this))
       return true;
+    if (ty->getAnyNominal() && ty->getAnyNominal()->isInvalid())
+      return false;
   } while ((ty = ty->getSuperclass(resolver)));
   return false;
 }
