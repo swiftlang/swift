@@ -3288,7 +3288,10 @@ namespace {
       case TaggedSwiftRefcounted:
       case TaggedUnknownRefcounted: {
         auto parts = destructureLoadableEnum(IGF, src);
-        
+
+        // Hold onto the original payload, so we can pass it on as the copy.
+        auto origPayload = parts.payload;
+
         // Mask the tag bits out of the payload, if any.
         maskTagBitsFromPayload(IGF, parts.payload);
 
@@ -3297,7 +3300,7 @@ namespace {
                                           getRefcountedPtrType(IGF.IGM), 0);
         retainRefcountedPayload(IGF, ptr);
 
-        parts.payload.explode(IGF.IGM, dest);
+        origPayload.explode(IGF.IGM, dest);
         if (parts.extraTagBits)
           dest.add(parts.extraTagBits);
         return;
