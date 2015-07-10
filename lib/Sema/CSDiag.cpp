@@ -1193,13 +1193,6 @@ static Constraint *getConstraintChoice(Constraint *constraint,
   return nullptr;
 }
 
-static Constraint *getComponentConstraint(Constraint *constraint) {
-  if (constraint->getKind() != ConstraintKind::Disjunction)
-    return constraint;
-  
-  return constraint->getNestedConstraints().front();
-}
-
 /// For a given expression type, extract the appropriate type for a constraint-
 /// based diagnostic.
 static Type getDiagnosticTypeFromExpr(Expr *expr) {
@@ -1637,13 +1630,9 @@ class FailureDiagnosis :public ASTVisitor<FailureDiagnosis, /*exprresult*/bool>{
   // to determine the appropriate diagnostic.
   Constraint *conversionConstraint = nullptr;
   Constraint *overloadConstraint = nullptr;
-  Constraint *fallbackConstraint = nullptr;
-  Constraint *activeConformanceConstraint = nullptr;
   Constraint *valueMemberConstraint = nullptr;
   Constraint *argumentConstraint = nullptr;
-  Constraint *disjunctionConversionConstraint = nullptr;
   Constraint *conformanceConstraint = nullptr;
-  Constraint *bridgeToObjCConstraint = nullptr;
   
 public:
   
@@ -1750,17 +1739,8 @@ FailureDiagnosis::FailureDiagnosis(Expr *expr, ConstraintSystem *cs)
   : expr(expr), CS(cs) {
   assert(expr && CS);
   
-  // Collect and categorize constraint information from the failed system.
-  
-  if (!CS->getActiveConstraints().empty()) {
-    // If any active conformance constraints are in the system, we know that
-    // any inactive constraints are in its service. Capture the constraint and
-    // present this information to the user.
-    auto *constraint = &CS->getActiveConstraints().front();
-    
-    activeConformanceConstraint = getComponentConstraint(constraint);
-  }
-  
+  Constraint *fallbackConstraint = nullptr;
+  Constraint *disjunctionConversionConstraint = nullptr;
   for (auto & constraintRef : CS->getConstraints()) {
     auto constraint = &constraintRef;
     
@@ -1774,8 +1754,7 @@ FailureDiagnosis::FailureDiagnosis(Expr *expr, ConstraintSystem *cs)
     
     // Store off conversion constraints, favoring existing conversion
     // constraints.
-    if ((!(activeConformanceConstraint ||
-           conformanceConstraint) || constraint->isFavored()) &&
+    if ((!conformanceConstraint || constraint->isFavored()) &&
         constraint->getKind() == ConstraintKind::ConformsTo) {
       conformanceConstraint = constraint;
     }
@@ -1789,7 +1768,7 @@ FailureDiagnosis::FailureDiagnosis(Expr *expr, ConstraintSystem *cs)
     
     // A missed argument conversion can result in better error messages when
     // a user passes the wrong arguments to a function application.
-    if ((!argumentConstraint || constraint->isFavored())) {
+    if (!argumentConstraint || constraint->isFavored()) {
       argumentConstraint = getConstraintChoice(constraint,
                                                ConstraintKind::
                                                ArgumentTupleConversion);
@@ -1797,7 +1776,7 @@ FailureDiagnosis::FailureDiagnosis(Expr *expr, ConstraintSystem *cs)
     
     // Overload resolution failures are often nicely descriptive, so store
     // off the first one we find.
-    if ((!overloadConstraint || constraint->isFavored())) {
+    if (!overloadConstraint || constraint->isFavored()) {
       overloadConstraint = getConstraintChoice(constraint,
                                                ConstraintKind::BindOverload);
     }
@@ -1810,12 +1789,6 @@ FailureDiagnosis::FailureDiagnosis(Expr *expr, ConstraintSystem *cs)
          constraint->getKind() == ConstraintKind::ArgumentTupleConversion)) {
           conversionConstraint = constraint;
         }
-    
-    // Also check for bridging failures.
-    if ((!bridgeToObjCConstraint || constraint->isFavored()) &&
-        constraint->getKind() == ConstraintKind::BridgedToObjectiveC) {
-      bridgeToObjCConstraint = constraint;
-    }
     
     // When all else fails, inspect a potential conjunction or disjunction for a
     // consituent conversion.
@@ -2981,12 +2954,6 @@ bool FailureDiagnosis::visitExpr(Expr *E) {
 
 bool FailureDiagnosis::diagnoseFailure() {
   assert(CS && expr);
-  
-  // If a bridging conversion slips through, treat it as ambiguous.
-  if (bridgeToObjCConstraint) {
-    CS->TC.diagnose(expr->getLoc(), diag::type_of_expression_is_ambiguous);
-    return true;
-  }
   
   // Our general approach is to do a depth first traversal of the broken
   // expression tree, type checking as we go.  If we find a subtree that cannot
