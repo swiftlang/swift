@@ -739,60 +739,6 @@ void TypeChecker::diagnoseAmbiguousMemberType(Type baseTy,
   }
 }
 
-Optional<VersionRange> TypeChecker::annotatedAvailableRange(const Decl *D,
-                                                            ASTContext &Ctx) {
-  Optional<VersionRange> AnnotatedRange;
-
-  for (auto Attr : D->getAttrs()) {
-    auto *AvailAttr = dyn_cast<AvailableAttr>(Attr);
-    if (AvailAttr == NULL || !AvailAttr->Introduced.hasValue() ||
-        !AvailAttr->isActivePlatform(Ctx)) {
-      continue;
-    }
-
-    VersionRange AttrRange =
-        VersionRange::allGTE(AvailAttr->Introduced.getValue());
-
-    // If we have multiple introduction versions, we will conservatively
-    // assume the worst case scenario. We may want to be more precise here
-    // in the future or emit a diagnostic.
-
-    if (AnnotatedRange.hasValue()) {
-      AnnotatedRange.getValue().meetWith(AttrRange);
-    } else {
-      AnnotatedRange = AttrRange;
-    }
-  }
-
-  return AnnotatedRange;
-}
-
-VersionRange TypeChecker::availableRange(const Decl *D, ASTContext &Ctx) {
-  Optional<VersionRange> AnnotatedRange = annotatedAvailableRange(D, Ctx);
-  if (AnnotatedRange.hasValue()) {
-    return AnnotatedRange.getValue();
-  }
-
-  // Unlike other declarations, extensions can be used without referring to them
-  // by name (they don't have one) in the source. For this reason, when checking
-  // the available range of a declaration we also need to check to see if it is
-  // immediately contained in an extension and use the extension's availability
-  // if the declaration does not have an explicit @available attribute
-  // itself. This check relies on the fact that we cannot have nested
-  // extensions.
-
-  DeclContext *DC = D->getDeclContext();
-  if (auto *ED = dyn_cast<ExtensionDecl>(DC)) {
-    AnnotatedRange = annotatedAvailableRange(ED, Ctx);
-    if (AnnotatedRange.hasValue()) {
-      return AnnotatedRange.getValue();
-    }
-  }
-
-  // Treat unannotated declarations as always available.
-  return VersionRange::all();
-}
-
 /// Returns the first availability attribute on the declaration that is active
 /// on the target platform.
 static const AvailableAttr *getActiveAvailableAttribute(const Decl *D,
@@ -930,7 +876,8 @@ private:
     // The potential versions in the declaration are constrained by both
     // the declared availability of the declaration and the potential versions
     // of its lexical context.
-    VersionRange DeclVersionRange = TypeChecker::availableRange(D, TC.Context);
+    VersionRange DeclVersionRange =
+        swift::AvailabilityInference::availableRange(D, TC.Context);
     DeclVersionRange.meetWith(getCurrentTRC()->getPotentialVersions());
     
     TypeRefinementContext *NewTRC =
@@ -1331,7 +1278,7 @@ TypeChecker::overApproximateOSVersionsAtLocation(SourceLoc loc,
     loc = D->getLoc();
 
     Optional<VersionRange> Range =
-        TypeChecker::annotatedAvailableRange(D, Context);
+        AvailabilityInference::annotatedAvailableRange(D, Context);
 
     if (Range.hasValue()) {
       OverApproximateVersionRange.constrainWith(Range.getValue());
@@ -1354,7 +1301,8 @@ bool TypeChecker::isDeclAvailable(const Decl *D, SourceLoc referenceLoc,
                                   const DeclContext *referenceDC,
                                   VersionRange &OutAvailableRange) {
 
-  VersionRange safeRangeUnderApprox = TypeChecker::availableRange(D, Context);
+  VersionRange safeRangeUnderApprox =
+      AvailabilityInference::availableRange(D, Context);
   VersionRange runningOSOverApprox = overApproximateOSVersionsAtLocation(
       referenceLoc, referenceDC);
   

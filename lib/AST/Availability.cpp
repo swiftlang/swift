@@ -18,6 +18,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/Availability.h"
 #include "swift/AST/PlatformKind.h"
+#include "swift/AST/TypeWalker.h"
 
 using namespace swift;
 
@@ -118,4 +119,86 @@ void AvailabilityInference::applyInferredAvailableAttrs(
     auto *Attr = createAvailableAttr(Pair.first, Pair.second, Context);
     Attrs.add(Attr);
   }
+}
+
+Optional<VersionRange>
+AvailabilityInference::annotatedAvailableRange(const Decl *D, ASTContext &Ctx) {
+  Optional<VersionRange> AnnotatedRange;
+
+  for (auto Attr : D->getAttrs()) {
+    auto *AvailAttr = dyn_cast<AvailableAttr>(Attr);
+    if (AvailAttr == NULL || !AvailAttr->Introduced.hasValue() ||
+        !AvailAttr->isActivePlatform(Ctx)) {
+      continue;
+    }
+
+    VersionRange AttrRange =
+        VersionRange::allGTE(AvailAttr->Introduced.getValue());
+
+    // If we have multiple introduction versions, we will conservatively
+    // assume the worst case scenario. We may want to be more precise here
+    // in the future or emit a diagnostic.
+
+    if (AnnotatedRange.hasValue()) {
+      AnnotatedRange.getValue().meetWith(AttrRange);
+    } else {
+      AnnotatedRange = AttrRange;
+    }
+  }
+
+  return AnnotatedRange;
+}
+
+VersionRange AvailabilityInference::availableRange(const Decl *D,
+                                                   ASTContext &Ctx) {
+  Optional<VersionRange> AnnotatedRange = annotatedAvailableRange(D, Ctx);
+  if (AnnotatedRange.hasValue()) {
+    return AnnotatedRange.getValue();
+  }
+
+  // Unlike other declarations, extensions can be used without referring to them
+  // by name (they don't have one) in the source. For this reason, when checking
+  // the available range of a declaration we also need to check to see if it is
+  // immediately contained in an extension and use the extension's availability
+  // if the declaration does not have an explicit @available attribute
+  // itself. This check relies on the fact that we cannot have nested
+  // extensions.
+
+  DeclContext *DC = D->getDeclContext();
+  if (auto *ED = dyn_cast<ExtensionDecl>(DC)) {
+    AnnotatedRange = annotatedAvailableRange(ED, Ctx);
+    if (AnnotatedRange.hasValue()) {
+      return AnnotatedRange.getValue();
+    }
+  }
+
+  // Treat unannotated declarations as always available.
+  return VersionRange::all();
+}
+
+namespace {
+/// Infers the availability required to access a type.
+class AvailabilityInferenceTypeWalker : public TypeWalker {
+public:
+  ASTContext &AC;
+  VersionRange AvailableRange = VersionRange::all();
+
+  AvailabilityInferenceTypeWalker(ASTContext &AC) : AC(AC) {}
+
+  virtual Action walkToTypePre(Type ty) {
+    if (auto *nominalDecl = ty.getCanonicalTypeOrNull().getAnyNominal()) {
+      AvailableRange.meetWith(
+          AvailabilityInference::availableRange(nominalDecl, AC));
+    }
+
+    return Action::Continue;
+  }
+};
+};
+
+
+VersionRange AvailabilityInference::inferForType(Type t) {
+  AvailabilityInferenceTypeWalker walker(t->getASTContext());
+  t.walk(walker);
+  return walker.AvailableRange;
 }

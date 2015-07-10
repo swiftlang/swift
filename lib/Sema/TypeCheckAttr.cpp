@@ -820,7 +820,8 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *attr) {
 
   while (EnclosingDecl) {
     EnclosingAnnotatedRange =
-        TypeChecker::annotatedAvailableRange(EnclosingDecl, TC.Context);
+        AvailabilityInference::annotatedAvailableRange(EnclosingDecl,
+                                                       TC.Context);
 
     if (EnclosingAnnotatedRange.hasValue())
       break;

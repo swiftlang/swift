@@ -171,3 +171,15 @@ class UserClass : UnannotatedFrameworkProtocol {
     set(newValue) { }
   }
 }
+
+func callViaUnannotatedFrameworkProtocol(p: UnannotatedFrameworkProtocol) {
+  let _ = p.returnSomething() // expected-error {{'returnSomething()' is only available on OS X 10.10 or newer}}
+      // expected-note@-1 {{add @available attribute to enclosing global function}}
+      // expected-note@-2 {{add 'if #available' version check}}
+}
+
+func callViaAnnotatedFrameworkProtocol(p: AnnotatedFrameworkProtocol) {
+  // We won't synthesize availability for AnnotatedFrameworkProtocol because
+  // the protocol has an availability annotation on it.
+  let _ = p.returnSomething()
+}

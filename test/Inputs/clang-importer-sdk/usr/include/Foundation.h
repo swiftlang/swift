@@ -790,6 +790,7 @@ __attribute__((availability(macosx,introduced=10.11)))
 
 @end
 
+/// Aaa.  UnannotatedFrameworkProtocol.  Bbb.
 @protocol UnannotatedFrameworkProtocol
 -(void)doSomethingWithClass:(AnnotatedFrameworkClass * __nullable)k;
 -(void)doSomethingWithNonNullableClass:(AnnotatedFrameworkClass * __nonnull)k;
@@ -802,6 +803,12 @@ __attribute__((availability(macosx,introduced=10.11)))
 
 @property(nonnull) AnnotatedFrameworkClass *someProperty;
 
+@end
+
+/// Aaa.  AnnotatedFrameworkProtocol.  Bbb.
+__attribute__((availability(macosx,introduced=10.9)))
+@protocol AnnotatedFrameworkProtocol
+-(AnnotatedFrameworkClass * __nullable)returnSomething;
 @end
 
 @interface UnusedResults : NSObject

@@ -1502,16 +1502,6 @@ public:
   /// potentially unavailable API elements
   /// @{
 
-  /// \brief Returns the version range on which a declaration is available
-  ///  We assume a declaration without an annotation is always available.
-  static VersionRange availableRange(const Decl *D, ASTContext &C);
-
-  /// \brief Returns the version range on which the declaration for which
-  /// declaration is annotated as available, or None if the declaration
-  /// has not availability annotation.
-  static Optional<VersionRange> annotatedAvailableRange(const Decl *D,
-                                                        ASTContext &C);
-
   /// \brief Returns true if the availability of the overridding declaration
   /// makes it a safe override, given the availability of the base declation.
   bool isAvailabilitySafeForOverride(ValueDecl *override, ValueDecl *base);

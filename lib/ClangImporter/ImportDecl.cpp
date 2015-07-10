@@ -4087,6 +4087,21 @@ namespace {
 
         members.push_back(member);
       }
+
+      // Hack to deal with unannotated Objective-C protocols. If the protocol
+      // comes from clang and is not annotated and the protocol requirement
+      // itself is not annotated, then infer availability of the requirement
+      // based on its types. This makes it possible for a type to conform to an
+      // Objective-C protocol that is missing annotations but whose requirements
+      // use types that are less available than the conforming type.
+      auto *proto = dyn_cast<ProtocolDecl>(swiftContext);
+      if (!proto || proto->getAttrs().hasAttribute<AvailableAttr>())
+          return;
+
+      for (Decl *member : members) {
+        inferProtocolMemberAvailability(member);
+      }
+
     }
 
     static bool
@@ -4448,6 +4463,39 @@ namespace {
       VD->getAttrs().add(attr);
     }
 
+    /// Synthesize availability attributes for protocol requirements
+    /// based on availability of the types mentioned in the requirements.
+    void inferProtocolMemberAvailability(Decl *member) {
+      // Don't synthesize attributes if there is already an
+      // availability annotation.
+      if (member->getAttrs().hasAttribute<AvailableAttr>())
+        return;
+
+      auto *valueDecl = dyn_cast<ValueDecl>(member);
+      if (!valueDecl)
+        return;
+
+      VersionRange requiredRange =
+      AvailabilityInference::inferForType(valueDecl->getType());
+
+      if (!requiredRange.hasLowerEndpoint())
+        return;
+
+      ASTContext &C = Impl.SwiftContext;
+      clang::VersionTuple noVersion;
+      auto AvAttr = new (C) AvailableAttr(SourceLoc(), SourceRange(),
+                                          targetPlatform(C.LangOpts),
+                                          /*message=*/StringRef(),
+                                          /*rename=*/StringRef(),
+                                          requiredRange.getLowerEndpoint(),
+                                          /*deprecated=*/noVersion,
+                                          /*obsoleted=*/noVersion,
+                                          UnconditionalAvailabilityKind::None,
+                                          /*implicit=*/false);
+
+      valueDecl->getAttrs().add(AvAttr);
+    }
+    
     Decl *VisitObjCProtocolDecl(const clang::ObjCProtocolDecl *decl) {
       Identifier name = Impl.importName(decl);
       if (name.empty())

@@ -17,6 +17,7 @@
 #ifndef SWIFT_AST_AVAILABILITY_H
 #define SWIFT_AST_AVAILABILITY_H
 
+#include "swift/AST/Type.h"
 #include "swift/Basic/LLVM.h"
 #include "clang/Basic/VersionTuple.h"
 #include "llvm/ADT/Optional.h"
@@ -207,6 +208,19 @@ public:
   applyInferredAvailableAttrs(Decl *ToDecl,
                                  ArrayRef<const Decl *> InferredFromDecls,
                                  ASTContext &Context);
+
+  static VersionRange inferForType(Type t);
+
+  /// \brief Returns the version range on which a declaration is available
+  ///  We assume a declaration without an annotation is always available.
+  static VersionRange availableRange(const Decl *D, ASTContext &C);
+
+  /// \brief Returns the version range on which the declaration for which
+  /// declaration is annotated as available, or None if the declaration
+  /// has not availability annotation.
+  static Optional<VersionRange> annotatedAvailableRange(const Decl *D,
+                                                        ASTContext &C);
+
 };
 
 } // end namespace swift

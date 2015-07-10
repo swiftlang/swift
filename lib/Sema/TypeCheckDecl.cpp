@@ -5686,54 +5686,11 @@ bool TypeChecker::isAvailabilitySafeForOverride(ValueDecl *override,
   // API availability ranges are contravariant: make sure the version range
   // of an overridden declaration is fully contained in the range of the
   // overriding declaration.
-  VersionRange overrideRange = TypeChecker::availableRange(override,
-                                                           Context);
-  VersionRange baseRange = TypeChecker::availableRange(base, Context);
+  VersionRange overrideRange = AvailabilityInference::availableRange(override,
+                                                                     Context);
+  VersionRange baseRange = AvailabilityInference::availableRange(base, Context);
 
   return baseRange.isContainedIn(overrideRange);
-}
-
-namespace {
-/// Infers the availability required to access a type.
-class AvailabilityInferenceTypeWalker : public TypeWalker {
-public:
-  ASTContext &AC;
-  VersionRange AvailableRange = VersionRange::all();
-
-  AvailabilityInferenceTypeWalker(ASTContext &AC) : AC(AC) {}
-
-  virtual Action walkToTypePre(Type ty) {
-    if (auto *nominalDecl = ty.getCanonicalTypeOrNull().getAnyNominal()) {
-      AvailableRange.meetWith(TypeChecker::availableRange(nominalDecl, AC));
-    }
-
-    return Action::Continue;
-  }
-};
-};
-
-
-/// Infer the available range for a function from its parameter and return
-/// types.
-static VersionRange inferAvailableRange(FuncDecl *funcDecl, ASTContext &AC) {
-  AvailabilityInferenceTypeWalker walker(AC);
-
-  funcDecl->getResultType().walk(walker);
-
-  for (Pattern *pattern : funcDecl->getBodyParamPatterns()) {
-    pattern->getType().walk(walker);
-  }
-
-  return walker.AvailableRange;
-}
-
-/// Infer the available range for a property from its type.
-static VersionRange inferAvailableRange(VarDecl *varDecl, ASTContext &AC) {
-  AvailabilityInferenceTypeWalker walker(AC);
-
-  varDecl->getType().walk(walker);
-
-  return walker.AvailableRange;
 }
 
 bool TypeChecker::isAvailabilitySafeForConformance(
@@ -5760,8 +5717,9 @@ bool TypeChecker::isAvailabilitySafeForConformance(
   // (an over-approximation of) the intersection of the witnesses's available
   // range with both the conforming type's available range and the protocol
   // declaration's available range.
-  VersionRange witnessRange = TypeChecker::availableRange(witness, Context);
-  requiredRange = TypeChecker::availableRange(requirement, Context);
+  VersionRange witnessRange = AvailabilityInference::availableRange(witness,
+                                                                    Context);
+  requiredRange = AvailabilityInference::availableRange(requirement, Context);
 
   VersionRange rangeOfConformingDecl = overApproximateOSVersionsAtLocation(
       conformingDecl->getLoc(), conformingDecl);
@@ -5776,33 +5734,6 @@ bool TypeChecker::isAvailabilitySafeForConformance(
 
   witnessRange.constrainWith(rangeOfProtocolDecl);
   requiredRange.constrainWith(rangeOfProtocolDecl);
-
-  if (requiredRange.isContainedIn(witnessRange))
-    return true;
-
-  // Hack to deal with unannotated Objective-C protocols. If the protocol
-  // comes from clang and is not annotated and the protocol requirement itself
-  // is not annotated, then infer availability of the requirement based
-  // on its types. This makes it possible for a type to conform to an
-  // Objective-C protocol that is missing annotations but whose requirements
-  // use types that are less available than the conforming type.
-
-  if (!protocolDecl->hasClangNode())
-    return false;
-
-  if (protocolDecl->getAttrs().hasAttribute<AvailableAttr>() ||
-      requirement->getAttrs().hasAttribute<AvailableAttr>()) {
-    return false;
-  }
-
-  VersionRange inferredRequiredRange = VersionRange::all();
-  if (auto *requirementFuncDecl = dyn_cast<FuncDecl>(requirement)) {
-    inferredRequiredRange = inferAvailableRange(requirementFuncDecl, Context);
-  } else if (auto *requirementVarDecl = dyn_cast<VarDecl>(requirement)) {
-    inferredRequiredRange = inferAvailableRange(requirementVarDecl, Context);
-  }
-
-  requiredRange.constrainWith(inferredRequiredRange);
 
   return requiredRange.isContainedIn(witnessRange);
 }
