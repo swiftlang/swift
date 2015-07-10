@@ -5,8 +5,6 @@
 
 // XFAIL: interpret
 
-// REQUIRES: disabled
-
 import Swift
 import StdlibUnittest
 
@@ -277,6 +275,7 @@ FloatingPoint.test("${FloatSelf}/{Comparable,Hashable,Equatable}") {
 % end
 
 % for Self in ['Float32', 'Float64', 'Float80']:
+#if ${'arch(i386) || arch(x86_64)' if Self == 'Float80' else 'true'}
 FloatingPoint.test("${Self}/Strideable") {
   // FIXME: the test data could probably be better chosen here, to
   // exercise more cases.  Note: NaNs (and possibly Infs) are singular
@@ -288,6 +287,7 @@ FloatingPoint.test("${Self}/Strideable") {
     distanceOracle: { instances[$1] - instances[$0] },
     advanceOracle: { instances[$0] + instances[$1] })
 }
+#endif
 % end
 
 // FIXME: implement Float80 tests after Float80 is implemented.
