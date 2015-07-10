@@ -55,7 +55,11 @@ func mutablePointerToObjC(path: String) throws -> NSString {
   return try NSString(contentsOfFile: path)
 }
 
-func objcStructs(s: StructOfNSStrings) {
+func objcStructs(s: StructOfNSStrings, sb: StructOfBlocks) {
   // Struct fields must not be bridged.
-  _ = s.nsstr! as NSString
+  _ = s.nsstr! as Bool // expected-error {{'Unmanaged<NSString>' is not convertible to 'Bool'}}
+
+  // FIXME: Blocks should also be Unmanaged.
+  _ = sb.block as Bool // expected-error {{'@convention(block) () -> Void' is not convertible to 'Bool'}}
+  sb.block() // okay
 }
