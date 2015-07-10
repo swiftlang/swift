@@ -972,8 +972,8 @@ static bool diagnoseFailure(ConstraintSystem &cs,
         return true;
       }
       
-      tc.diagnose(loc, diag::forcing_injected_optional,
-                  failure.getFirstType())
+      tc.diagnose(loc, diag::invalid_force_unwrap,
+                  getUserFriendlyTypeName(failure.getFirstType()))
         .highlight(force->getSourceRange())
         .fixItRemove(force->getExclaimLoc());
       
@@ -981,8 +981,8 @@ static bool diagnoseFailure(ConstraintSystem &cs,
     }
     
     if (auto bind = dyn_cast_or_null<BindOptionalExpr>(anchor)) {
-      tc.diagnose(loc, diag::binding_injected_optional,
-                  failure.getFirstType())
+      tc.diagnose(loc, diag::invalid_optional_chain,
+                  getUserFriendlyTypeName(failure.getFirstType()))
         .highlight(bind->getSourceRange())
         .fixItRemove(bind->getQuestionLoc());
       
@@ -1726,6 +1726,7 @@ private:
   bool visitExpr(Expr *E);
 
   bool visitForceValueExpr(ForceValueExpr *FVE);
+  bool visitBindOptionalExpr(BindOptionalExpr *BOE);
 
   bool visitBinaryExpr(BinaryExpr *BE);
   bool visitUnaryExpr(ApplyExpr *AE);
@@ -2971,6 +2972,28 @@ bool FailureDiagnosis::visitForceValueExpr(ForceValueExpr *FVE) {
   
   return diagnoseGeneralFailure();
 }
+
+bool FailureDiagnosis::visitBindOptionalExpr(BindOptionalExpr *BOE) {
+  CleanupIllFormedExpressionRAII cleanup(CS->getASTContext(), expr);
+
+  auto argExpr = typeCheckIndependentSubExpression(BOE->getSubExpr());
+  if (!argExpr) return true;
+  auto argType = argExpr->getType();
+
+  // If the subexpression type checks as a non-optional type, then that is the
+  // error.  Produce a specific diagnostic about this.
+  if (argType->getOptionalObjectType().isNull()) {
+    CS->TC.diagnose(BOE->getQuestionLoc(), diag::invalid_optional_chain,
+                    getUserFriendlyTypeName(argType))
+      .highlight(BOE->getSourceRange())
+      .fixItRemove(BOE->getQuestionLoc());
+    expr->setType(ErrorType::get(CS->getASTContext()));
+    return true;
+  }
+
+  return diagnoseGeneralFailure();
+}
+
 
 bool FailureDiagnosis::
 visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E) {

@@ -25,10 +25,10 @@ func test0(a: AnyObject) {
 }
 
 func test1(a: A) {
-  a?.do_a() // expected-error {{operand of postfix '?' should have optional type; type is 'A'}} {{4-5=}}
-  a!.do_a() // expected-error {{operand of postfix '!' should have optional type; type is 'A'}} {{4-5=}}
+  a?.do_a() // expected-error {{cannot use optional chaining on non-optional value of type 'A'}} {{4-5=}}
+  a!.do_a() // expected-error {{cannot force unwrap value of non-optional type 'A'}} {{4-5=}}
   // Produce a specialized diagnostic here?
-  a.do_a?() // expected-error {{operand of postfix '?' should have optional type; type is '() -> ()'}} {{9-10=}}
+  a.do_a?() // expected-error {{cannot use optional chaining on non-optional value of type '() -> ()'}} {{9-10=}}
 }
 
 // <rdar://problem/15508756>

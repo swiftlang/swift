@@ -219,3 +219,15 @@ func test21447318(a : r21447318, b : () -> r21447318) {
   
   b.doThing() // expected-error {{function value was used as a property; add () to call it}} {{4-4=()}}
 }
+
+// <rdar://problem/20409366> Diagnostics for init calls should print the class name
+class r20409366C {
+  init(a : Int) {}
+  init?(a : r20409366C) {
+    let req = r20409366C(a: 42)?  // expected-error {{cannot use optional chaining on non-optional value of type 'r20409366C'}} {{32-33=}}
+  }
+}
+
+
+
+

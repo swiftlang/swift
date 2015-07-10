@@ -330,6 +330,9 @@ ERROR(invalid_relation,sema_tcc,none,
       (unsigned, StringRef, StringRef))
 ERROR(invalid_force_unwrap,sema_tcc,none,
       "cannot force unwrap value of non-optional type '%0'", (StringRef))
+ERROR(invalid_optional_chain,sema_tcc,none,
+      "cannot use optional chaining on non-optional value of type '%0'",
+      (StringRef))
 
 
 ERROR(invalid_tuple_size,sema_tcc,none,
@@ -1483,14 +1486,9 @@ ERROR(option_type_broken,sema_tce,none,
       "type 'Optional' is broken", ())
 
 ERROR(broken_bool,sema_tce,none, "type 'Bool' is broken", ())
-ERROR(binding_injected_optional,sema_tce,none,
-      "operand of postfix '?' should have optional type; type is %0", (Type))
 ERROR(binding_explicit_downcast,sema_tce,none,
       "operand of postfix '?' is a forced downcast to type %0; use 'as?' to "
       "perform a conditional downcast", (Type))
-
-ERROR(forcing_injected_optional,sema_tce,none,
-      "operand of postfix '!' should have optional type; type is %0", (Type))
 
 ERROR(forcing_explicit_downcast,sema_tce,none,
       "extraneous postfix '!'; forced downcast already produces a non-optional "

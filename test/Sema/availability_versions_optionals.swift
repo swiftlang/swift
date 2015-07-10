@@ -13,7 +13,7 @@ func referencesToGlobalVariables() {
   // Definitely available symbols should have their declared type.
   let _: Int = globalAvailableOn10_9
   
-  let _: Int = globalAvailableOn10_9! // expected-error {{operand of postfix '!' should have optional type; type is 'Int'}}
+  let _: Int = globalAvailableOn10_9! // expected-error {{cannot force unwrap value of non-optional type 'Int'}}
   
   // Potentially unavailable declarations with optional types should be doubly optional
   

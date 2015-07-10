@@ -55,8 +55,8 @@ immIUO.immS = S() // expected-error{{cannot assign to property: 'immS' is a 'let
 func foo(x: Int) {}
 
 var nonOptional: S = S()
-_ = nonOptional! // expected-error{{operand of postfix '!' should have optional type; type is 'S'}}
-_ = nonOptional!.x // expected-error{{operand of postfix '!' should have optional type; type is 'S'}}
+_ = nonOptional! // expected-error{{cannot force unwrap value of non-optional type 'S'}}
+_ = nonOptional!.x // expected-error{{cannot force unwrap value of non-optional type 'S'}}
 
 class C {}
 class D: C {}
