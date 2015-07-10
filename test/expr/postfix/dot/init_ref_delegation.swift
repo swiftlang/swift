@@ -308,3 +308,22 @@ func foo<T: C where T: P>(x: T, y: T.Type) {
 
 }
 
+
+
+class TestOverloadSets {
+  convenience init() {
+    self.init(5, 5) // expected-error{{cannot invoke 'TestOverloadSets.init' with an argument list of type '(integer, integer)'}}
+  }
+  
+  convenience init(a : Z0) {
+    self.init(42 as Int8) // expected-error{{cannot invoke 'TestOverloadSets.init' with an argument of type '(Int8)'}}
+    // expected-note @-1 {{overloads for 'TestOverloadSets.init' exist with these partially matching parameter lists: (a: Z0), (value: Int), (value: Double)}}
+  }
+  
+  init(value: Int) { /* ... */ }
+  init(value: Double) { /* ... */ }
+}
+
+
+
+

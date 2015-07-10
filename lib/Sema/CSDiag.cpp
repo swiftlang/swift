@@ -2648,6 +2648,52 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
   if (isErrorTypeKind(fnExpr->getType()))
     return true;
 
+  // Get the expression result of type checking the arguments to the call
+  // independently, so we have some idea of what we're working with.
+  if (auto *PE = dyn_cast<ParenExpr>(argExpr)) {
+    argExpr = typeCheckIndependentSubExpression(PE->getSubExpr());
+  } else if (auto *TE = dyn_cast<TupleExpr>(argExpr)) {
+    // FIXME: This should all just be a matter of getting type type of the
+    // sub-expression, but this doesn't work well when the argument list
+    // contains InOutExprs.  Special case them to avoid producing poor
+    // diagnostics.
+    bool containsInOutExprs = false;
+    for (auto elt : TE->getElements())
+      containsInOutExprs |= isa<InOutExpr>(elt);
+    
+    if (!containsInOutExprs) {
+      argExpr = typeCheckIndependentSubExpression(TE);
+    } else {
+      // If InOutExprs are in play, get the simplified type of each element and
+      // rebuild the aggregate :-(
+      SmallVector<TupleTypeElt, 4> resultEltTys;
+      SmallVector<Expr*, 4> resultElts;
+      
+      for (unsigned i = 0, e = TE->getNumElements(); i != e; i++) {
+        auto elExpr = typeCheckIndependentSubExpression(TE->getElement(i));
+        if (!elExpr)
+          return true; // already diagnosed.
+        
+        resultElts.push_back(elExpr);
+        resultEltTys.push_back({elExpr->getType(), TE->getElementName(i)});
+      }
+      
+      auto TT = TupleType::get(resultEltTys, CS->getASTContext());
+      argExpr = TupleExpr::create(CS->getASTContext(), TE->getLParenLoc(),
+                                  resultElts, TE->getElementNames(),
+                                  TE->getElementNameLocs(),
+                                  TE->getRParenLoc(), TE->hasTrailingClosure(),
+                                  TE->isImplicit(), TT);
+    }
+    
+  } else {
+    argExpr = typeCheckIndependentSubExpression(unwrapParenExpr(argExpr));
+  }
+  
+  if (!argExpr)
+    return true; // already diagnosed.
+  
+  
   std::string overloadName = "";
 
   bool isClosureInvocation = false;
@@ -2659,7 +2705,6 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
   auto Candidates = collectCalleeCandidateInfo(fnExpr, argExpr->getType(),
                                                candidateCloseness);
 
-  
   // Obtain the function's name, and collect any parameter lists for diffing
   // purposes.
   if (auto DRE = dyn_cast<DeclRefExpr>(fnExpr)) {
@@ -2687,52 +2732,11 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
   // TODO: Handle dot_syntax_call_expr "fn" as a non-closure value.
   // TODO: need a concept of an uncurry level.
 
-  Type argType;
-
-  if (auto *PE = dyn_cast<ParenExpr>(argExpr)) {
-    argType = getTypeOfTypeCheckedIndependentSubExpression(PE->getSubExpr());
-  } else if (auto *TE = dyn_cast<TupleExpr>(argExpr)) {
-    // FIXME: This should all just be a matter of getting type type of the
-    // sub-expression, but this doesn't work well when the argument list contains
-    // InOutExprs.  Special case them to avoid producing poor diagnostics.
-    bool containsInOutExprs = false;
-    for (auto elt : TE->getElements())
-      containsInOutExprs |= isa<InOutExpr>(elt);
-    
-    if (!containsInOutExprs) {
-      argType = getTypeOfTypeCheckedIndependentSubExpression(TE);
-    } else {
-      // If InOutExprs are in play, get the simplified type of each element and
-      // rebuild the aggregate :-(
-      SmallVector<TupleTypeElt, 4> resultElts;
-
-      for (unsigned i = 0, e = TE->getNumElements(); i != e; i++) {
-        auto elType =
-          getTypeOfTypeCheckedIndependentSubExpression(TE->getElement(i));
-        if (!elType)
-          return true; // already diagnosed.
-
-        Identifier elName = TE->getElementName(i);
-
-        resultElts.push_back({elType, elName});
-      }
-      
-      argType = TupleType::get(resultElts, CS->getASTContext());
-    }
-    
-  } else {
-    argType =
-        getTypeOfTypeCheckedIndependentSubExpression(unwrapParenExpr(argExpr));
-  }
-  
-  if (!argType)
-    return true; // already diagnosed.
-
   // If we have an argument list (i.e., a scalar, or a non-zero-element tuple)
   // then diagnose with some specificity about the arguments.
   if (!isa<TupleExpr>(argExpr) ||
       cast<TupleExpr>(argExpr)->getNumElements() != 0) {
-    std::string argString = getTypeListString(argType);
+    std::string argString = getTypeListString(argExpr->getType());
     
     if (isOverloadedFn) {
       CS->TC.diagnose(fnExpr->getLoc(),
