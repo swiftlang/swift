@@ -52,6 +52,7 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_AUTOCLOSURE_1 | FileCheck %s -check-prefix=AUTOCLOSURE_STRING
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_SWITCH_CASE_1 | FileCheck %s -check-prefix=TOP_LEVEL_SWITCH_CASE_1
 
 // Test code completion in top-level code.
 //
@@ -267,6 +268,12 @@ switch (0, 42) {
 }
 
 func resyncParserB10() {}
+
+// rdar://21661308
+switch 1 {
+  case #^TOP_LEVEL_SWITCH_CASE_1^#
+}
+// TOP_LEVEL_SWITCH_CASE_1: Begin completions
 
 //===--- Don't add any tests after this line.
 // These declarations should not show up in top-level code completion results

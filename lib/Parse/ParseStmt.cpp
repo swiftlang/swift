@@ -849,8 +849,8 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
 
   // Do some special-case code completion for the start of the pattern.
   if (P.Tok.is(tok::code_complete)) {
+    setErrorResult();
     if (P.CodeCompletion) {
-      setErrorResult();
       switch (parsingContext) {
       case GuardedPatternContext::Case:
         P.CodeCompletion->completeCaseStmtBeginning();
@@ -861,18 +861,20 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
       }
       P.consumeToken();
     } else {
+      result.ThePattern = patternResult.get();
       status.setHasCodeCompletion();
       return;
     }
   }
   if (parsingContext == GuardedPatternContext::Case &&
       P.Tok.is(tok::period) && P.peekToken().is(tok::code_complete)) {
+    setErrorResult();
     if (P.CodeCompletion) {
-      setErrorResult();
       P.consumeToken();
       P.CodeCompletion->completeCaseStmtDotPrefix();
       P.consumeToken();
     } else {
+      result.ThePattern = patternResult.get();
       status.setHasCodeCompletion();
       return;
     }
