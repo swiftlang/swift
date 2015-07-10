@@ -136,3 +136,38 @@ class SubclassOfNSClassWithMethodFromNSProtocolWithOptionalRequirement : NSClass
 class SubclassWithItsOwnAvailableWitnessOfNSClassWithMethodFromNSProtocolWithOptionalRequirement : NSClassWithMethodFromNSProtocolWithOptionalRequirement {
   override func optionalRequirement() { }
 }
+
+// Inference of protocol requirement availability when checking conformance to
+// unannotated Objective-C protocols
+class UserClass : UnannotatedFrameworkProtocol {
+
+  @available(OSX 10.10, *)
+  @objc
+  func doSomethingWithClass(k: AnnotatedFrameworkClass?) { }
+
+  @available(OSX 10.10, *)
+  @objc
+  func doSomethingWithNonNullableClass(k: AnnotatedFrameworkClass) { }
+
+  @available(OSX 10.10, *)
+  @objc
+  func doSomethingWithIUOClass(k: AnnotatedFrameworkClass!) { }
+
+  @objc
+  @available(OSX 10.10, *)
+  func returnSomething() -> AnnotatedFrameworkClass? {
+    return nil
+  }
+
+  @objc
+  func noUnavailableTypesInSignature() { }
+
+  @objc @available(OSX 10.11, *)
+  func doSomethingWithClass(k: AnnotatedFrameworkClass, andLaterClass lk: AnnotatedLaterFrameworkClass) { }
+
+  @available(OSX 10.10, *)
+  @objc var someProperty: AnnotatedFrameworkClass {
+    get { return AnnotatedFrameworkClass() }
+    set(newValue) { }
+  }
+}

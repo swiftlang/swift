@@ -780,6 +780,30 @@ typedef struct NonNilableReferences {
 -(void)optionalRequirement  __attribute__((availability(macosx, introduced=10.10)));
 @end
 
+__attribute__((availability(macosx,introduced=10.10)))
+@interface AnnotatedFrameworkClass : NSObject
+
+@end
+
+__attribute__((availability(macosx,introduced=10.11)))
+@interface AnnotatedLaterFrameworkClass : NSObject
+
+@end
+
+@protocol UnannotatedFrameworkProtocol
+-(void)doSomethingWithClass:(AnnotatedFrameworkClass * __nullable)k;
+-(void)doSomethingWithNonNullableClass:(AnnotatedFrameworkClass * __nonnull)k;
+-(void)doSomethingWithIUOClass:(AnnotatedFrameworkClass * __null_unspecified)k;
+-(AnnotatedFrameworkClass * __nullable)returnSomething;
+
+-(void)noUnavailableTypesInSignature;
+
+-(void)doSomethingWithClass:(AnnotatedFrameworkClass * __nonnull)k andLaterClass:(AnnotatedLaterFrameworkClass * __nonnull)lk;
+
+@property(nonnull) AnnotatedFrameworkClass *someProperty;
+
+@end
+
 @interface UnusedResults : NSObject
 -(NSInteger)producesResult __attribute__((warn_unused_result));
 @end
