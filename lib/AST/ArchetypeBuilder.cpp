@@ -1157,10 +1157,21 @@ class ArchetypeBuilder::InferRequirementsWalker : public TypeWalker {
   ArchetypeBuilder &Builder;
   SourceLoc Loc;
   bool HadError = false;
+  unsigned Depth;
+
+  /// We cannot add requirements to archetypes from outer generic parameter
+  /// lists.
+  bool isOuterArchetype(PotentialArchetype *PA) {
+    unsigned ParamDepth = PA->getRootParam()->getDepth();
+    assert(ParamDepth <= Depth);
+    return ParamDepth < Depth;
+  }
 
 public:
-  InferRequirementsWalker(ArchetypeBuilder &builder, SourceLoc loc)
-    : Builder(builder), Loc(loc) { }
+  InferRequirementsWalker(ArchetypeBuilder &builder,
+                          SourceLoc loc,
+                          unsigned Depth)
+    : Builder(builder), Loc(loc), Depth(Depth) { }
 
   bool hadError() const { return HadError; }
 
@@ -1192,13 +1203,17 @@ public:
         break;
 
       case RequirementKind::SameType: {
-        auto firstType = req.getFirstType().subst(&Builder.getModule(), 
-                                                  substitutions,
-                                                  SubstOptions::IgnoreMissing);
+        auto firstType = req.getFirstType().subst(
+                           &Builder.getModule(),
+                           substitutions,
+                           SubstOptions::IgnoreMissing);
         if (!firstType)
           break;
 
         auto firstPA = Builder.resolveArchetype(firstType);
+
+        if (firstPA && isOuterArchetype(firstPA))
+          return Action::Continue;
 
         auto secondType = req.getSecondType().subst(
                             &Builder.getModule(), 
@@ -1237,7 +1252,10 @@ public:
         if (!subjectPA) {
           break;
         }
-        
+
+        if (isOuterArchetype(subjectPA))
+          return Action::Continue;
+
         if (auto proto = req.getSecondType()->getAs<ProtocolType>()) {
           if (Builder.addConformanceRequirement(subjectPA, proto->getDecl(),
                                                 source)) {
@@ -1259,20 +1277,28 @@ public:
   }
 };
 
-bool ArchetypeBuilder::inferRequirements(TypeLoc type) {
+bool ArchetypeBuilder::inferRequirements(TypeLoc type,
+                                         GenericParamList *genericParams) {
   if (!type.getType())
     return true;
+  if (genericParams == nullptr)
+    return false;
   // FIXME: Crummy source-location information.
-  InferRequirementsWalker walker(*this, type.getSourceRange().Start);
+  InferRequirementsWalker walker(*this, type.getSourceRange().Start,
+                                 genericParams->getDepth());
   type.getType().walk(walker);
   return walker.hadError();
 }
 
-bool ArchetypeBuilder::inferRequirements(Pattern *pattern) {
+bool ArchetypeBuilder::inferRequirements(Pattern *pattern,
+                                         GenericParamList *genericParams) {
   if (!pattern->hasType())
     return true;
+  if (genericParams == nullptr)
+    return false;
   // FIXME: Crummy source-location information.
-  InferRequirementsWalker walker(*this, pattern->getSourceRange().Start);
+  InferRequirementsWalker walker(*this, pattern->getSourceRange().Start,
+                                 genericParams->getDepth());
   pattern->getType().walk(walker);
   return walker.hadError();
 }

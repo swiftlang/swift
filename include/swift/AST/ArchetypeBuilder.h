@@ -260,7 +260,7 @@ public:
   /// because the type \c Dictionary<K,V> cannot be formed without it.
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool inferRequirements(TypeLoc type);
+  bool inferRequirements(TypeLoc type, GenericParamList *genericParams);
 
   /// Infer requirements from the given pattern, recursively.
   ///
@@ -276,7 +276,7 @@ public:
   /// because the type \c Dictionary<K,V> cannot be formed without it.
   ///
   /// \returns true if an error occurred, false otherwise.
-  bool inferRequirements(Pattern *pattern);
+  bool inferRequirements(Pattern *pattern, GenericParamList *genericParams);
 
   /// Finalize the set of requirements, performing any remaining checking
   /// required before generating archetypes.

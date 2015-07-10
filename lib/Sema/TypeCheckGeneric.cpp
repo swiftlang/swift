@@ -252,7 +252,7 @@ static bool checkGenericParameters(TypeChecker &tc, ArchetypeBuilder *builder,
 
       // Infer requirements from the inherited types.
       for (const auto &inherited : param->getInherited()) {
-        if (builder->inferRequirements(inherited))
+        if (builder->inferRequirements(inherited, genericParams))
           invalid = true;
       }
     }
@@ -538,7 +538,9 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
   func->setIsBeingTypeChecked();
 
   // Check the generic parameter list.
-  checkGenericParameters(tc, builder, func->getGenericParams(),
+  auto genericParams = func->getGenericParams();
+
+  checkGenericParameters(tc, builder, genericParams,
                          func->getDeclContext(), resolver);
 
   // Check the parameter patterns.
@@ -550,7 +552,7 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
 
     // Infer requirements from the pattern.
     if (builder) {
-      builder->inferRequirements(pattern);
+      builder->inferRequirements(pattern, genericParams);
     }
   }
 
@@ -565,7 +567,7 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
 
       // Infer requirements from it.
       if (builder && fn->getBodyResultTypeLoc().getTypeRepr()) {
-        builder->inferRequirements(fn->getBodyResultTypeLoc());
+        builder->inferRequirements(fn->getBodyResultTypeLoc(), genericParams);
       }
     }
   }

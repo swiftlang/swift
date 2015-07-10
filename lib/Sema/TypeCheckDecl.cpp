@@ -920,7 +920,7 @@ static void checkGenericParamList(ArchetypeBuilder &builder,
 
     // Infer requirements from the "inherited" types.
     for (auto &inherited : GP->getInherited()) {
-      builder.inferRequirements(inherited);
+      builder.inferRequirements(inherited, genericParams);
     }
   }
 
@@ -4110,12 +4110,12 @@ public:
 
         // Infer requirements from parameter patterns.
         for (auto pattern : FD->getBodyParamPatterns()) {
-          builder.inferRequirements(pattern);
+          builder.inferRequirements(pattern, gp);
         }
 
         // Infer requirements from the result type.
         if (!FD->getBodyResultTypeLoc().isNull()) {
-          builder.inferRequirements(FD->getBodyResultTypeLoc());
+          builder.inferRequirements(FD->getBodyResultTypeLoc(), gp);
         }
 
         // Revert all of the types within the signature of the function.
@@ -5491,7 +5491,7 @@ public:
         }
 
         // Infer requirements from the parameters of the constructor.
-        builder.inferRequirements(CD->getBodyParamPatterns()[1]);
+        builder.inferRequirements(CD->getBodyParamPatterns()[1], gp);
 
         // Revert the constructor signature so it can be type-checked with
         // archetypes below.
@@ -6272,7 +6272,7 @@ static Type checkExtensionGenericParams(
       }
     }
     
-    return builder.inferRequirements(extendedTypeInfer);
+    return builder.inferRequirements(extendedTypeInfer, genericParams);
   };
 
   ext->setIsBeingTypeChecked(true);

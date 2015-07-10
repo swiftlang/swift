@@ -49,6 +49,19 @@ struct InferFromConstructor {
 }
 
 
+// Don't infer requirements for outer generic parameters.
+class Fox : P1 {
+  func p1() {}
+}
+
+class Box<T : Fox> {
+// CHECK-LABEL: .unpack@
+// CHECK-NEXT: Requirements:
+// CHECK-NEXT:   T witness marker
+// CHECK-NEXT:   T : Fox [outer]
+  func unpack(x: X1<T>) {}
+}
+
 // FIXME: Infer superclass requirements.
 
 // ----------------------------------------------------------------------------
