@@ -72,6 +72,7 @@ struct S : P2 {
   typealias Element = Int
   func each(@autoclosure closure: () -> ()) {
     overloadedEach(self, closure) // expected-error {{cannot find an overload for 'overloadedEach' that accepts an argument list of type '(S, @autoclosure () -> ())'}}
+    // expected-note @-1 {{overloads for 'overloadedEach' exist with these partially matching parameter lists: (O, () -> ()), (P, () -> ())}}
   }
 }
 

@@ -2166,11 +2166,10 @@ suggestPotentialOverloads(StringRef functionName, SourceLoc loc,
   
   // If the candidate list is has no near matches to the actual types, don't
   // print out a candidate list, it will just be noise.
-  if ((closeness == CC_ArgumentCountMismatch ||
-       closeness == CC_GeneralMismatch)) {
+  if (closeness == CC_GeneralMismatch) {
     
-    // FIXME: This is arbitrary.
-    if (candidates.size() != 1 || !isCallExpr)
+    // FIXME: This is arbitrary, we should use the same policy for operators.
+    if (!isCallExpr)
       return;
   }
   
