@@ -186,7 +186,7 @@ const clang::Type *getClangFunctionParameterType(const clang::Type *ty,
   // TODO: adjust for error type parameter.
 
   // If we're asking about parameters, we'd better have a FunctionProtoType.
-  auto fnType = cast<clang::FunctionProtoType>(getClangFunctionType(ty));
+  auto fnType = getClangFunctionType(ty)->castAs<clang::FunctionProtoType>();
   assert(index < fnType->getNumParams());
   return fnType->getParamType(index).getTypePtr();
 }
@@ -194,7 +194,7 @@ const clang::Type *getClangFunctionParameterType(const clang::Type *ty,
 static
 const clang::Type *getClangArrayElementType(const clang::Type *ty,
                                             unsigned index) {
-  return cast<clang::ArrayType>(ty)->getElementType().getTypePtr();
+  return ty->castAsArrayTypeUnsafe()->getElementType().getTypePtr();
 }
 
 static bool isVoidLike(CanType type) {
