@@ -1,8 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/main.swift
 // RUN: %S/../../utils/line-directive %t/main.swift -- %target-swift-frontend -parse -verify %t/main.swift
 
-// XFAIL: *
-
 // Pending a fix for <rdar://problem/19434979>, remove exact diagnostic strings.
 
 func testUnaryMinusInUnsigned() {
@@ -65,24 +63,24 @@ func test_truncatingBitPatternAPIIsStableAcrossPlatforms() {
   Int64(truncatingBitPattern: Int(0)) // expected-error {{extraneous argument label 'truncatingBitPattern:' in call}}
   Int(truncatingBitPattern: Int(0))   // expected-error {{cannot find an initializer for type 'Int' that accepts an argument list of type}} expected-note {{overloads for 'Int' exist with these partially matching parameter lists: }}
 
-  UInt(truncatingBitPattern: UInt8(0))  // expected-error {{cannot find an initializer for type 'UInt' that accepts an argument list of type}} expected-note {{overloads for 'UInt' exist with these partially matching parameter lists: }}
-  UInt(truncatingBitPattern: UInt16(0)) // expected-error {{cannot find an initializer for type 'UInt' that accepts an argument list of type}} expected-note {{overloads for 'UInt' exist with these partially matching parameter lists: }}
-  UInt(truncatingBitPattern: UInt32(0)) // expected-error {{cannot find an initializer for type 'UInt' that accepts an argument list of type}} expected-note {{overloads for 'UInt' exist with these partially matching parameter lists: }}
+  UInt(truncatingBitPattern: UInt8(0))  // expected-error {{cannot invoke initializer for type 'UInt' with an argument list of type '(truncatingBitPattern: UInt8)}} expected-note {{expected an argument list of type '(UInt8)'}}
+  UInt(truncatingBitPattern: UInt16(0))  // expected-error {{cannot invoke initializer for type 'UInt' with an argument list of type '(truncatingBitPattern: UInt16)}} expected-note {{expected an argument list of type '(UInt16)'}}
+  UInt(truncatingBitPattern: UInt32(0))  // expected-error {{cannot invoke initializer for type 'UInt' with an argument list of type '(truncatingBitPattern: UInt32)}} expected-note {{expected an argument list of type '(UInt32)'}}
   UInt(truncatingBitPattern: UInt64(0)) // expected-warning{{unused}}
 
-  Int(truncatingBitPattern: UInt8(0))  // expected-error {{cannot find an initializer for type 'Int' that accepts an argument list of type}} expected-note {{overloads for 'Int' exist with these partially matching parameter lists: }}
-  Int(truncatingBitPattern: UInt16(0)) // expected-error {{cannot find an initializer for type 'Int' that accepts an argument list of type}} expected-note {{overloads for 'Int' exist with these partially matching parameter lists: }}
-  Int(truncatingBitPattern: UInt32(0)) // expected-error {{cannot find an initializer for type 'Int' that accepts an argument list of type}} expected-note {{overloads for 'Int' exist with these partially matching parameter lists: }}
+  Int(truncatingBitPattern: UInt8(0))  // expected-error {{cannot invoke initializer for type 'Int' with an argument list of type '(truncatingBitPattern: UInt8)}} expected-note {{expected an argument list of type '(UInt8)'}}
+  Int(truncatingBitPattern: UInt16(0))  // expected-error {{cannot invoke initializer for type 'Int' with an argument list of type '(truncatingBitPattern: UInt16)}} expected-note {{expected an argument list of type '(UInt16)'}}
+  Int(truncatingBitPattern: UInt32(0))  // expected-error {{cannot invoke initializer for type 'Int' with an argument list of type '(truncatingBitPattern: UInt32)}} expected-note {{expected an argument list of type '(UInt32)'}}
   Int(truncatingBitPattern: UInt64(0)) // expected-warning{{unused}}
 
-  UInt(truncatingBitPattern: Int8(0))  // expected-error {{cannot find an initializer for type 'UInt' that accepts an argument list of type}} expected-note {{overloads for 'UInt' exist with these partially matching parameter lists: }}
-  UInt(truncatingBitPattern: Int16(0)) // expected-error {{cannot find an initializer for type 'UInt' that accepts an argument list of type}} expected-note {{overloads for 'UInt' exist with these partially matching parameter lists: }}
-  UInt(truncatingBitPattern: Int32(0)) // expected-error {{cannot find an initializer for type 'UInt' that accepts an argument list of type}} expected-note {{overloads for 'UInt' exist with these partially matching parameter lists: }}
+  UInt(truncatingBitPattern: Int8(0))  // expected-error {{cannot invoke initializer for type 'UInt' with an argument list of type '(truncatingBitPattern: Int8)}} expected-note {{expected an argument list of type '(Int8)'}}
+  UInt(truncatingBitPattern: Int16(0))  // expected-error {{cannot invoke initializer for type 'UInt' with an argument list of type '(truncatingBitPattern: Int16)}} expected-note {{expected an argument list of type '(Int16)'}}
+  UInt(truncatingBitPattern: Int32(0))  // expected-error {{cannot invoke initializer for type 'UInt' with an argument list of type '(truncatingBitPattern: Int32)}} expected-note {{expected an argument list of type '(Int32)'}}
   UInt(truncatingBitPattern: Int64(0)) // expected-warning{{unused}}
 
-  Int(truncatingBitPattern: Int8(0))  // expected-error {{cannot find an initializer for type 'Int' that accepts an argument list of type}} expected-note {{overloads for 'Int' exist with these partially matching parameter lists: }}
-  Int(truncatingBitPattern: Int16(0)) // expected-error {{cannot find an initializer for type 'Int' that accepts an argument list of type}} expected-note {{overloads for 'Int' exist with these partially matching parameter lists: }}
-  Int(truncatingBitPattern: Int32(0)) // expected-error {{cannot find an initializer for type 'Int' that accepts an argument list of type}} expected-note {{overloads for 'Int' exist with these partially matching parameter lists: }}
+  Int(truncatingBitPattern: Int8(0))  // expected-error {{cannot invoke initializer for type 'Int' with an argument list of type '(truncatingBitPattern: Int8)}} expected-note {{expected an argument list of type '(Int8)'}}
+  Int(truncatingBitPattern: Int16(0))  // expected-error {{cannot invoke initializer for type 'Int' with an argument list of type '(truncatingBitPattern: Int16)}} expected-note {{expected an argument list of type '(Int16)'}}
+  Int(truncatingBitPattern: Int32(0))  // expected-error {{cannot invoke initializer for type 'Int' with an argument list of type '(truncatingBitPattern: Int32)}} expected-note {{expected an argument list of type '(Int32)'}}
   Int(truncatingBitPattern: Int64(0)) // expected-warning{{unused}}
 }
 
