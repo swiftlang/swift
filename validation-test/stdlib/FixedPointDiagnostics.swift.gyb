@@ -1,6 +1,8 @@
 // RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/main.swift
 // RUN: %S/../../utils/line-directive %t/main.swift -- %target-swift-frontend -parse -verify %t/main.swift
 
+// XFAIL: *
+
 // Pending a fix for <rdar://problem/19434979>, remove exact diagnostic strings.
 
 func testUnaryMinusInUnsigned() {
