@@ -672,7 +672,7 @@ clang::CanQualType ClangTypeConverter::convert(IRGenModule &IGM, CanType type) {
         return ctx.getCanonicalType(ptrTy);
       }
     } else if (decl == IGM.Context.getBoolDecl()) {
-      // FIXME: rdar://problem/21131808
+      // FIXME: Handle _Bool and DarwinBoolean.
       auto &ctx = IGM.getClangASTContext();
       auto &TI = ctx.getTargetInfo();
       if (TI.useSignedCharForObjCBool()) {

@@ -1166,7 +1166,8 @@ namespace {
       if (!SwiftType)
         SwiftType = Impl.importType(Decl->getUnderlyingType(),
                                     ImportTypeKind::Abstract,
-                                    isInSystemModule(DC));
+                                    isInSystemModule(DC),
+                                    /*isFullyBridgeable*/false);
 
       if (!SwiftType)
         return nullptr;
@@ -1594,7 +1595,8 @@ namespace {
       // Compute the underlying type.
       auto underlyingType = Impl.importType(decl->getIntegerType(),
                                             ImportTypeKind::Enum,
-                                            isInSystemModule(dc));
+                                            isInSystemModule(dc),
+                                            /*isFullyBridgeable*/false);
       if (!underlyingType)
         return nullptr;
 
@@ -1686,7 +1688,8 @@ namespace {
         // Compute the underlying type of the enumeration.
         auto underlyingType = Impl.importType(decl->getIntegerType(),
                                               ImportTypeKind::Enum,
-                                              isInSystemModule(dc));
+                                              isInSystemModule(dc),
+                                              /*isFullyBridgeable*/false);
         if (!underlyingType)
           return nullptr;
 
@@ -1769,7 +1772,8 @@ namespace {
         // Compute the underlying type.
         auto underlyingType = Impl.importType(decl->getIntegerType(),
                                               ImportTypeKind::Enum,
-                                              isInSystemModule(dc));
+                                              isInSystemModule(dc),
+                                              /*isFullyBridgeable*/false);
         if (!underlyingType)
           return nullptr;
         
@@ -2069,7 +2073,8 @@ namespace {
         auto &clangContext = Impl.getClangASTContext();
         auto type = Impl.importType(clangContext.getTagDeclType(clangEnum),
                                     ImportTypeKind::Value,
-                                    isInSystemModule(dc));
+                                    isInSystemModule(dc),
+                                    /*isFullyBridgeable*/false);
         if (!type)
           return nullptr;
         // FIXME: Importing the type will recursively revisit this same
@@ -2099,7 +2104,8 @@ namespace {
         auto enumType = Impl.importType(
                           Impl.getClangASTContext().getTagDeclType(clangEnum),
                           ImportTypeKind::Value,
-                          isInSystemModule(dc));
+                          isInSystemModule(dc),
+                          /*isFullyBridgeable*/false);
         if (!enumType)
           return nullptr;
         // FIXME: Importing the type will can recursively revisit this same
@@ -2155,7 +2161,8 @@ namespace {
 
       auto type = Impl.importType(decl->getType(),
                                   ImportTypeKind::Variable,
-                                  isInSystemModule(dc));
+                                  isInSystemModule(dc),
+                                  /*isFullyBridgeable*/false);
       if (!type)
         return nullptr;
 
@@ -2254,7 +2261,8 @@ namespace {
 
       auto type = Impl.importType(decl->getType(),
                                   ImportTypeKind::RecordField,
-                                  isInSystemModule(dc));
+                                  isInSystemModule(dc),
+                                  /*isFullyBridgeable*/false);
       if (!type)
         return nullptr;
 
@@ -2314,7 +2322,8 @@ namespace {
       Type type = Impl.importType(decl->getType(),
                                   (isAudited ? ImportTypeKind::AuditedVariable
                                    : ImportTypeKind::Variable),
-                                  isInSystemModule(dc));
+                                  isInSystemModule(dc),
+                                  /*isFullyBridgeable*/false);
 
       if (!type)
         return nullptr;
@@ -3931,7 +3940,8 @@ namespace {
       auto clangGetter = cast<clang::ObjCMethodDecl>(getter->getClangDecl());
       auto type = Impl.importType(clangGetter->getReturnType(),
                                   ImportTypeKind::Property,
-                                  isInSystemModule(dc));
+                                  isInSystemModule(dc),
+                                  /*isFullyBridgeable*/true);
       if (!type)
         return nullptr;
       

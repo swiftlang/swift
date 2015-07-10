@@ -98,7 +98,8 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
   if (const clang::Expr *parsed = parseNumericLiteral<>(Impl, tok)) {
     auto clangTy = parsed->getType();
     auto type = Impl.importType(clangTy, ImportTypeKind::Value,
-                                isInSystemModule(DC));
+                                isInSystemModule(DC),
+                                /*isFullyBridgeable*/false);
     if (!type)
       return nullptr;
 
@@ -340,7 +341,8 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
 
       auto clangTy = base->getType();
       auto type = impl.importType(clangTy, ImportTypeKind::Value,
-                                  isInSystemModule(DC));
+                                  isInSystemModule(DC),
+                                  /*isFullyBridgeable*/false);
       if (!type)
         return nullptr;
 

@@ -3118,7 +3118,7 @@ void TypeChecker::fillObjCRepresentableTypeCache(const DeclContext *DC) {
   }
 #include "swift/SIL/BridgedTypes.def"
 
-  Identifier ID_Darwin = Context.getIdentifier("Darwin");
+  Identifier ID_Darwin = Context.Id_Darwin;
   if (auto DarwinModule = Context.getLoadedModule(ID_Darwin)) {
     StdlibTypeNames.clear();
     StdlibTypeNames.push_back(Context.getIdentifier("DarwinBoolean"));

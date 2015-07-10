@@ -964,11 +964,16 @@ public:
   /// \param isUsedInSystemModule Tells us that the use of the type is comming
   ///        from system module.
   ///
+  /// \param canFullyBridgeTypes True if we can bridge types losslessly.
+  ///        This is an additional guarantee on top of the ImportTypeKind
+  ///        cases that allow bridging, and applies to the entire type.
+  ///
   /// \returns The imported type, or null if this type could
   /// not be represented in Swift.
   Type importType(clang::QualType type,
                   ImportTypeKind kind,
                   bool isUsedInSystemModule,
+                  bool canFullyBridgeTypes,
                   OptionalTypeKind optional = OTK_ImplicitlyUnwrappedOptional);
 
   /// \brief Import the given function type.

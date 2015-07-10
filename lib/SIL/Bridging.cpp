@@ -118,21 +118,28 @@ Type TypeConverter::getLoweredBridgedType(AbstractionPattern pattern,
   case SILFunctionTypeRepresentation::Block:
     // Map native types back to bridged types.
 
-    auto clangTy = pattern.isClangType() ? pattern.getClangType() : nullptr;
+    bool canBridgeBool = (rep == SILFunctionTypeRepresentation::ObjCMethod);
 
     // Look through optional types.
     OptionalTypeKind optKind;
     if (auto valueTy = t->getAnyOptionalObjectType(optKind)) {
-      auto ty = getLoweredCBridgedType(valueTy, clangTy, false);
+      pattern = pattern.transformType([](CanType patternTy) {
+        return CanType(patternTy->getAnyOptionalObjectType());
+      });
+      auto ty = getLoweredCBridgedType(pattern, valueTy, canBridgeBool, false);
       return ty ? OptionalType::get(optKind, ty) : ty;
     }
-    return getLoweredCBridgedType(t, clangTy, purpose == ForResult);
+    return getLoweredCBridgedType(pattern, t, canBridgeBool,
+                                  purpose == ForResult);
   }
 };
 
-Type TypeConverter::getLoweredCBridgedType(Type t,
-                                           const clang::Type *clangTy,
+Type TypeConverter::getLoweredCBridgedType(AbstractionPattern pattern,
+                                           Type t,
+                                           bool canBridgeBool,
                                            bool bridgedCollectionsAreOptional) {
+  auto clangTy = pattern.isClangType() ? pattern.getClangType() : nullptr;
+
   // Bridge String back to NSString.
   auto nativeStringTy = getStringType();
   if (nativeStringTy && t->isEqual(nativeStringTy)) {
@@ -142,12 +149,19 @@ Type TypeConverter::getLoweredCBridgedType(Type t,
     return bridgedTy;
   }
 
-  // Bridge Bool back to ObjC bool, unless the original Clang type was _Bool.
+  // Bridge Bool back to ObjC bool, unless the original Clang type was _Bool
+  // or the Darwin Boolean type.
   auto nativeBoolTy = getBoolType();
   if (nativeBoolTy && t->isEqual(nativeBoolTy)) {
-    if (clangTy && clangTy->isBooleanType())
-      return t;
-    return getObjCBoolType();
+    if (clangTy) {
+      if (clangTy->isBooleanType())
+        return t;
+      if (clangTy->isSpecificBuiltinType(clang::BuiltinType::UChar))
+        return getDarwinBooleanType();
+    }
+    if (clangTy || canBridgeBool)
+      return getObjCBoolType();
+    return t;
   }
 
   // Class metatypes bridge to ObjC metatypes.
@@ -177,11 +191,24 @@ Type TypeConverter::getLoweredCBridgedType(Type t,
     case SILFunctionType::Representation::ObjCMethod:
     case SILFunctionType::Representation::WitnessMethod:
       return t;
-    case SILFunctionType::Representation::Thick:
+    case SILFunctionType::Representation::Thick: {
       // Thick functions (TODO: conditionally) get bridged to blocks.
-      return FunctionType::get(funTy->getInput(), funTy->getResult(),
+      // This bridging is more powerful than usual block bridging, however,
+      // so we use the ObjCMethod representation.
+      Type newInput =
+          getBridgedInputType(SILFunctionType::Representation::ObjCMethod,
+                              pattern.getFunctionInputType(),
+                              funTy->getInput()->getCanonicalType());
+      Type newResult =
+          getBridgedResultType(SILFunctionType::Representation::ObjCMethod,
+                               pattern.getFunctionResultType(),
+                               funTy->getResult()->getCanonicalType(),
+                               /*non-optional*/false);
+
+      return FunctionType::get(newInput, newResult,
                                funTy->getExtInfo().withSILRepresentation(
                                        SILFunctionType::Representation::Block));
+    }
     }
   }
 

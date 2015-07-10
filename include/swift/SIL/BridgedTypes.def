@@ -45,11 +45,13 @@ BRIDGING_KNOWN_TYPE(Foundation, NSSet)
 BRIDGING_KNOWN_TYPE(Foundation, NSError)
 BRIDGING_KNOWN_TYPE(Swift, String)
 BRIDGING_KNOWN_TYPE(ObjectiveC, ObjCBool)
+BRIDGING_KNOWN_TYPE(Darwin, DarwinBoolean)
 BRIDGING_KNOWN_TYPE(Swift, Bool)
 BRIDGING_KNOWN_TYPE(Swift, ErrorType)
 
 BRIDGE_TYPE(Foundation, NSString, Swift, String, true)
 BRIDGE_TYPE(ObjectiveC, ObjCBool, Swift, Bool, false)
+BRIDGE_TYPE(Darwin, DarwinBoolean, Swift, Bool, false)
 
 #undef BRIDGING_KNOWN_TYPE
 #undef BRIDGE_TYPE

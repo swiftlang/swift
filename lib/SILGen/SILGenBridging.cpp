@@ -124,18 +124,33 @@ static ManagedValue emitBridgeBoolToObjCBool(SILGenFunction &gen,
   return gen.emitManagedRValueWithCleanup(result);
 }
 
-static ManagedValue emitBridgeObjCBoolToBool(SILGenFunction &gen,
-                                             SILLocation loc,
-                                             ManagedValue objcBool) {
+static ManagedValue emitBridgeBoolToDarwinBoolean(SILGenFunction &gen,
+                                                  SILLocation loc,
+                                                  ManagedValue swiftBool) {
+  // func _convertBoolToDarwinBoolean(Bool) -> DarwinBoolean
+  SILValue boolToDarwinBooleanFn
+    = gen.emitGlobalFunctionRef(loc, gen.SGM.getBoolToDarwinBooleanFn());
+
+  SILType resultTy =
+      gen.getLoweredLoadableType(gen.SGM.Types.getDarwinBooleanType());
+
+  SILValue result = gen.B.createApply(loc, boolToDarwinBooleanFn,
+                                      boolToDarwinBooleanFn.getType(),
+                                      resultTy, {}, swiftBool.forward(gen));
+  return gen.emitManagedRValueWithCleanup(result);
+}
+
+static ManagedValue emitBridgeForeignBoolToBool(SILGenFunction &gen,
+                                                SILLocation loc,
+                                                ManagedValue foreignBool,
+                                                SILDeclRef bridgingFnRef) {
   // func _convertObjCBoolToBool(ObjCBool) -> Bool
-  SILValue objcBoolToBoolFn
-    = gen.emitGlobalFunctionRef(loc, gen.SGM.getObjCBoolToBoolFn());
+  SILValue bridgingFn = gen.emitGlobalFunctionRef(loc, bridgingFnRef);
 
   SILType resultTy = gen.getLoweredLoadableType(gen.SGM.Types.getBoolType());
 
-  SILValue result = gen.B.createApply(loc, objcBoolToBoolFn,
-                                      objcBoolToBoolFn.getType(),
-                                      resultTy, {}, objcBool.forward(gen));
+  SILValue result = gen.B.createApply(loc, bridgingFn, bridgingFn.getType(),
+                                      resultTy, {}, foreignBool.forward(gen));
   return gen.emitManagedRValueWithCleanup(result);
 }
 
@@ -518,10 +533,16 @@ static ManagedValue emitCBridgedToNativeValue(SILGenFunction &gen,
                                       emitCBridgedToNativeValue);
   }
 
-  // Bridge Bool to ObjCBool when requested.
-  if (loweredNativeTy == gen.SGM.Types.getBoolType() &&
-      loweredBridgedTy == gen.SGM.Types.getObjCBoolType()) {
-    return emitBridgeObjCBoolToBool(gen, loc, v);
+  // Bridge Bool to ObjCBool or DarwinBoolean when requested.
+  if (loweredNativeTy == gen.SGM.Types.getBoolType()) {
+    if (loweredBridgedTy == gen.SGM.Types.getObjCBoolType()) {
+      return emitBridgeForeignBoolToBool(gen, loc, v,
+                                         gen.SGM.getObjCBoolToBoolFn());
+    }
+    if (loweredBridgedTy == gen.SGM.Types.getDarwinBooleanType()) {
+      return emitBridgeForeignBoolToBool(gen, loc, v,
+                                         gen.SGM.getDarwinBooleanToBoolFn());
+    }
   }
 
   // Bridge Objective-C to thick metatypes.

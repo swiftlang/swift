@@ -59,6 +59,9 @@ namespace {
       /// The source type is 'BOOL'.
       BOOL,
 
+      /// The source type is 'Boolean'.
+      Boolean,
+
       /// The source type is 'NSString'.
       NSString,
 
@@ -105,6 +108,7 @@ namespace {
       case None:
       case Void:
       case BOOL:
+      case Boolean:
       case NSString:
       case NSUInteger:
       case ObjCPointer:
@@ -141,8 +145,9 @@ namespace {
 
   bool canImportAsOptional(ImportHint hint) {
     switch (hint) {
-    case ImportHint::BOOL:
     case ImportHint::None:
+    case ImportHint::BOOL:
+    case ImportHint::Boolean:
     case ImportHint::NSUInteger:
     case ImportHint::Reference:
     case ImportHint::Void:
@@ -199,11 +204,14 @@ namespace {
   {
     ClangImporter::Implementation &Impl;
     bool IsUsedInSystemModule;
-    
+    bool CanFullyBridgeTypes;
+
   public:
     SwiftTypeConverter(ClangImporter::Implementation &impl,
-                       bool isUsedInSystemModule)
-      : Impl(impl), IsUsedInSystemModule(isUsedInSystemModule) {}
+                       bool isUsedInSystemModule,
+                       bool canFullyBridgeTypes)
+      : Impl(impl), IsUsedInSystemModule(isUsedInSystemModule),
+        CanFullyBridgeTypes(canFullyBridgeTypes) {}
 
     using TypeVisitor::Visit;
     ImportResult Visit(clang::QualType type) {
@@ -318,7 +326,8 @@ namespace {
       else
         pointeeType = Impl.importType(pointeeQualType,
                                       ImportTypeKind::Pointee,
-                                      IsUsedInSystemModule);
+                                      IsUsedInSystemModule,
+                                      /*can fully bridge*/false);
 
       // If the pointed-to type is unrepresentable in Swift, import as
       // COpaquePointer.
@@ -366,7 +375,8 @@ namespace {
       // Block pointer types are mapped to function types.
       Type pointeeType = Impl.importType(type->getPointeeType(),
                                          ImportTypeKind::Abstract,
-                                         IsUsedInSystemModule);
+                                         IsUsedInSystemModule,
+                                         CanFullyBridgeTypes);
       if (!pointeeType)
         return Type();
       FunctionType *fTy = pointeeType->castTo<FunctionType>();
@@ -404,7 +414,8 @@ namespace {
       
       Type elementType = Impl.importType(type->getElementType(),
                                          ImportTypeKind::Pointee,
-                                         IsUsedInSystemModule);
+                                         IsUsedInSystemModule,
+                                         /*can fully bridge*/false);
       if (!elementType)
         return Type();
       
@@ -459,7 +470,8 @@ namespace {
       // for this to be audited.
       auto resultTy = Impl.importType(type->getReturnType(),
                                       ImportTypeKind::Result,
-                                      IsUsedInSystemModule);
+                                      IsUsedInSystemModule,
+                                      CanFullyBridgeTypes);
       if (!resultTy)
         return Type();
 
@@ -468,7 +480,8 @@ namespace {
              paramEnd = type->param_type_end();
            param != paramEnd; ++param) {
         auto swiftParamTy = Impl.importType(*param, ImportTypeKind::Parameter,
-                                            IsUsedInSystemModule);
+                                            IsUsedInSystemModule,
+                                            CanFullyBridgeTypes);
         if (!swiftParamTy)
           return Type();
 
@@ -490,7 +503,8 @@ namespace {
       // Import functions without prototypes as functions with no parameters.
       auto resultTy = Impl.importType(type->getReturnType(),
                                       ImportTypeKind::Result,
-                                      IsUsedInSystemModule);
+                                      IsUsedInSystemModule,
+                                      CanFullyBridgeTypes);
       if (!resultTy)
         return Type();
 
@@ -534,6 +548,9 @@ namespace {
 
         if (type->getDecl()->getName() == "BOOL") {
           hint = ImportHint::BOOL;
+        } else if (type->getDecl()->getName() == "Boolean") {
+          // FIXME: Darwin only?
+          hint = ImportHint::Boolean;
         } else if (type->getDecl()->getName() == "NSUInteger") {
           hint = ImportHint::NSUInteger;
         } else if (isImportedCFPointer(type->desugar(), mappedType)) {
@@ -546,7 +563,9 @@ namespace {
       // Otherwise, recurse on the underlying type in order to compute
       // the hint correctly.
       } else {
-        auto underlyingResult = Visit(type->desugar());
+        SwiftTypeConverter innerConverter(Impl, IsUsedInSystemModule,
+                                          /*can fully bridge*/false);
+        auto underlyingResult = innerConverter.Visit(type->desugar());
         assert(underlyingResult.AbstractType->isEqual(mappedType) &&
                "typedef without special typedef kind was mapped "
                "differently from its underlying type?");
@@ -647,6 +666,7 @@ namespace {
             Type elementType = Impl.importType(typeArgs[0],
                                                ImportTypeKind::BridgedValue,
                                                IsUsedInSystemModule,
+                                               CanFullyBridgeTypes,
                                                OTK_None);
             return { importedType,
                      ImportHint(ImportHint::NSArray, elementType) };
@@ -662,10 +682,12 @@ namespace {
             Type keyType = Impl.importType(typeArgs[0],
                                            ImportTypeKind::BridgedValue,
                                            IsUsedInSystemModule,
+                                           CanFullyBridgeTypes,
                                            OTK_None);
             Type objectType = Impl.importType(typeArgs[1],
                                               ImportTypeKind::BridgedValue,
                                               IsUsedInSystemModule,
+                                              CanFullyBridgeTypes,
                                               OTK_None);
             if (keyType.isNull() != objectType.isNull()) {
               keyType = nullptr;
@@ -687,6 +709,7 @@ namespace {
             Type elementType = Impl.importType(typeArgs[0],
                                                ImportTypeKind::BridgedValue,
                                                IsUsedInSystemModule,
+                                               CanFullyBridgeTypes,
                                                OTK_None);
             return { importedType,
                      ImportHint(ImportHint::NSSet, elementType) };
@@ -805,6 +828,7 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
                                         ImportTypeKind importKind,
                                         ImportHint hint,
                                         bool isUsedInSystemModule,
+                                        bool canFullyBridgeTypes,
                                         OptionalTypeKind optKind) {
   if (importKind == ImportTypeKind::Abstract) {
     return importedType;
@@ -832,7 +856,8 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
     // Import the underlying type.
     auto objectType = impl.importType(refType->getPointeeType(),
                                       ImportTypeKind::Pointee,
-                                      isUsedInSystemModule);
+                                      isUsedInSystemModule,
+                                      canFullyBridgeTypes);
     if (!objectType)
       return nullptr;
 
@@ -935,9 +960,11 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
     importedType = FunctionType::get(fTy->getInput(), fTy->getResult(), einfo);
   }
 
-  // Turn BOOL into Bool in contexts that can bridge types.
-  if (hint == ImportHint::BOOL && canBridgeTypes(importKind)) {
-    return impl.getNamedSwiftType(impl.getStdlibModule(), "Bool");
+  // Turn BOOL and DarwinBoolean into Bool in contexts that can bridge types
+  // losslessly.
+  if ((hint == ImportHint::BOOL || hint == ImportHint::Boolean) &&
+      canFullyBridgeTypes && canBridgeTypes(importKind)) {
+    return impl.SwiftContext.getBoolDecl()->getDeclaredType();
   }
 
   // When NSUInteger is used as an enum's underlying type or if it does not come
@@ -1023,6 +1050,7 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
 Type ClangImporter::Implementation::importType(clang::QualType type,
                                                ImportTypeKind importKind,
                                                bool isUsedInSystemModule,
+                                               bool canFullyBridgeTypes,
                                                OptionalTypeKind optionality) {
   if (type.isNull())
     return Type();
@@ -1062,13 +1090,14 @@ Type ClangImporter::Implementation::importType(clang::QualType type,
   }
 
   // Perform abstract conversion, ignoring how the type is actually used.
-  SwiftTypeConverter converter(*this, isUsedInSystemModule);
+  SwiftTypeConverter converter(*this, isUsedInSystemModule,canFullyBridgeTypes);
   auto importResult = converter.Visit(type);
 
   // Now fix up the type based on we're concretely using it.
   return adjustTypeForConcreteImport(*this, type, importResult.AbstractType,
                                      importKind, importResult.Hint,
                                      isUsedInSystemModule,
+                                     canFullyBridgeTypes,
                                      optionality);
 }
 
@@ -1099,7 +1128,7 @@ Type ClangImporter::Implementation::importPropertyType(
       optionality = translateNullability(*nullability);
   }
   return importType(decl->getType(), ImportTypeKind::Property,
-                    isFromSystemModule, optionality);
+                    isFromSystemModule, /*isFullyBridgeable*/true, optionality);
 }
 
 /// Get a bit vector indicating which arguments are non-null for a
@@ -1193,6 +1222,7 @@ Type ClangImporter::Implementation::importFunctionType(
                                     ? ImportTypeKind::AuditedResult
                                     : ImportTypeKind::Result),
                                   isFromSystemModule,
+                                  /*isFullyBridgeable*/true,
                                   OptionalityOfReturn);
   if (!swiftResultTy)
     return Type();
@@ -1236,7 +1266,9 @@ Type ClangImporter::Implementation::importFunctionType(
 
     // Import the parameter type into Swift.
     Type swiftParamTy = importType(paramTy, importKind,
-                                   isFromSystemModule, OptionalityOfParam);
+                                   isFromSystemModule,
+                                   /*isFullyBridgeable*/true,
+                                   OptionalityOfParam);
     if (!swiftParamTy)
       return Type();
 
@@ -1741,13 +1773,15 @@ Type ClangImporter::Implementation::importMethodType(
     }
 
     swiftResultTy = importType(resultType, resultKind,
-                               isFromSystemModule, OptionalityOfReturn);
+                               isFromSystemModule, /*isFullyBridgeable*/true,
+                               OptionalityOfReturn);
 
-    if (clangDecl->getMethodFamily() == clang::OMF_performSelector) {
+    if (swiftResultTy &&
+        clangDecl->getMethodFamily() == clang::OMF_performSelector) {
       // performSelector methods that return 'id' should be imported into Swift
       // as returning Unmanaged<AnyObject>.
       Type nonOptionalTy =
-         swiftResultTy->getAnyOptionalObjectType(OptionalityOfReturn);
+          swiftResultTy->getAnyOptionalObjectType(OptionalityOfReturn);
       if (!nonOptionalTy)
         nonOptionalTy = swiftResultTy;
 
@@ -1834,6 +1868,7 @@ Type ClangImporter::Implementation::importMethodType(
       swiftParamTy = importType(paramTy,
                                 ImportTypeKind::PropertyAccessor,
                                 isFromSystemModule,
+                                /*isFullyBridgeable*/true,
                                 optionalityOfParam);
     } else {
       ImportTypeKind importKind = ImportTypeKind::Parameter;
@@ -1843,7 +1878,7 @@ Type ClangImporter::Implementation::importMethodType(
         importKind = ImportTypeKind::CFUnretainedOutParameter;
       
       swiftParamTy = importType(paramTy, importKind, isFromSystemModule,
-                                optionalityOfParam);
+                                /*isFullyBridgeable*/true, optionalityOfParam);
     }
     if (!swiftParamTy)
       return Type();

@@ -137,6 +137,8 @@ getBridgingFn(Optional<SILDeclRef> &cacheSlot,
                          ToKind(ToTy)); \
   }
 
+GET_BRIDGING_FN(Darwin, REQUIRED, Bool, REQUIRED, DarwinBoolean)
+GET_BRIDGING_FN(Darwin, REQUIRED, DarwinBoolean, REQUIRED, Bool)
 GET_BRIDGING_FN(ObjectiveC, REQUIRED, Bool, REQUIRED, ObjCBool)
 GET_BRIDGING_FN(ObjectiveC, REQUIRED, ObjCBool, REQUIRED, Bool)
 GET_BRIDGING_FN(Foundation, OPTIONAL, NSError, REQUIRED, ErrorType)

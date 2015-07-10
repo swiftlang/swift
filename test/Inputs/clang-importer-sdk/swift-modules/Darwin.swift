@@ -28,3 +28,12 @@ public struct DarwinBoolean : BooleanType, BooleanLiteralConvertible {
     self.init(value)
   }
 }
+
+public // COMPILER_INTRINSIC
+func _convertBoolToDarwinBoolean(x: Bool) -> DarwinBoolean {
+  return DarwinBoolean(x)
+}
+public // COMPILER_INTRINSIC
+func _convertDarwinBooleanToBool(x: DarwinBoolean) -> Bool {
+  return Bool(x)
+}

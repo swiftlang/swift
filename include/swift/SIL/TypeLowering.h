@@ -811,7 +811,8 @@ public:
   ArrayRef<CapturedValue> getLoweredLocalCaptures(AnyFunctionRef fn);
   
 private:
-  Type getLoweredCBridgedType(Type t, const clang::Type *clangTy,
+  Type getLoweredCBridgedType(AbstractionPattern pattern, Type t,
+                              bool canBridgeBool,
                               bool bridgedCollectionsAreOptional);
 
   CanType getBridgedInputType(SILFunctionTypeRepresentation rep,

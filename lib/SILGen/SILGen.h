@@ -117,6 +117,8 @@ public:
   Optional<SILDeclRef> NSSetToSetFn;
   Optional<SILDeclRef> BoolToObjCBoolFn;
   Optional<SILDeclRef> ObjCBoolToBoolFn;
+  Optional<SILDeclRef> BoolToDarwinBooleanFn;
+  Optional<SILDeclRef> DarwinBooleanToBoolFn;
   Optional<SILDeclRef> NSErrorToErrorTypeFn;
   Optional<SILDeclRef> ErrorTypeToNSErrorFn;
 
@@ -334,6 +336,8 @@ public:
   SILDeclRef getNSSetToSetFn();
   SILDeclRef getBoolToObjCBoolFn();
   SILDeclRef getObjCBoolToBoolFn();
+  SILDeclRef getBoolToDarwinBooleanFn();
+  SILDeclRef getDarwinBooleanToBoolFn();
   SILDeclRef getNSErrorToErrorTypeFn();
   SILDeclRef getErrorTypeToNSErrorFn();
   

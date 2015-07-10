@@ -60,9 +60,18 @@ public func ==(lhs: DarwinBoolean, rhs: DarwinBoolean) -> Bool {
   return lhs.boolValue == rhs.boolValue
 }
 
+public // COMPILER_INTRINSIC
+func _convertBoolToDarwinBoolean(x: Bool) -> DarwinBoolean {
+  return DarwinBoolean(x)
+}
+public // COMPILER_INTRINSIC
+func _convertDarwinBooleanToBool(x: DarwinBoolean) -> Bool {
+  return Bool(x)
+}
+
 // FIXME: We can't make the fully-generic versions @transparent due to
 // rdar://problem/19418937, so here are some @transparent overloads
-// for ObjCBool
+// for DarwinBoolean.
 @transparent
 public func && <T : BooleanType>(
   lhs: T, @autoclosure rhs: () -> DarwinBoolean
