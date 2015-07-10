@@ -194,6 +194,12 @@ FoundationTestSuite.test("rdar://17584531") {
   expectEqual("Optional(255)", String(dict2["id"]))
 }
 
+FoundationTestSuite.test("DarwinBoolean smoke test") {
+  expectFalse(CFEqual("abc" as NSString as CFString, "def" as NSString as CFString))
+
+  let _: CFArrayEqualCallBack = { DarwinBoolean($0 == $1) }
+}
+
 #if os(OSX)
 FoundationTestSuite.test("NSRectEdge/constants") {
   // Check that the following constants have the correct type and value.

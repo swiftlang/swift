@@ -93,7 +93,7 @@ func callBlocks(x: Foo,
   // CHECK: apply [[BAS]]([[H_BLOCK]]
 
   // CHECK: [[G_BLOCK:%.*]] = copy_block {{%.*}} : $@convention(block) (NSString) -> @autoreleased NSString
-  // CHECK: enum $Optional<@convention(block) String -> String>, #Optional.Some!enumelt.1, [[G_BLOCK]]
+  // CHECK: enum $Optional<@convention(block) NSString -> NSString>, #Optional.Some!enumelt.1, [[G_BLOCK]]
 
   return (x.foo(f, x: 0), x.bar(g, x: "one"), x.bas(h, x: "two"), x.optFunc(g, x: "three"))
 }

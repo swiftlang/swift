@@ -37,6 +37,12 @@ public struct ObjCBool : BooleanType {
 }
 #endif
 
+extension ObjCBool : BooleanLiteralConvertible {
+  public init(booleanLiteral: Bool) {
+    self.init(booleanLiteral)
+  }
+}
+
 public struct Selector : StringLiteralConvertible {
   private var ptr : COpaquePointer
 
