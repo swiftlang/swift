@@ -113,8 +113,8 @@ func testMixedSignArithmetic() {
 
     // These tests are expected to start failing when we get improved diagnostics.
     var y: Stride = 0
-    y += ${T}(1)        // expected-error {{binary operator '+=' cannot be applied to operands of type 'Stride' and '${T}'}} expected-note {{overloads for '+=' exist with these partially matching parameter lists:}}
-    y -= ${T}(1)        // expected-error {{binary operator '-=' cannot be applied to operands of type 'Stride' and '${T}'}} expected-note {{overloads for '-=' exist with these partially matching parameter lists:}}
+    y += ${T}(1)        // expected-error {{binary operator '+=' cannot be applied to operands of type 'Stride' and '${T}'}} expected-note {{expected an argument list of type}}
+    y -= ${T}(1)        // expected-error {{binary operator '-=' cannot be applied to operands of type 'Stride' and '${T}'}} expected-note {{expected an argument list of type}}
   }
 % end
 }
