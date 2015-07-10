@@ -41,6 +41,7 @@ func mutablePointerArguments(p: UnsafeMutablePointer<Int>,
   // We don't allow these conversions outside of function arguments.
   var x: UnsafeMutablePointer<Int> = &i // expected-error{{}}
   x = &ii // expected-error{{}}
+  _ = x
 }
 
 func mutableVoidPointerArguments(p: UnsafeMutablePointer<Int>,
@@ -68,9 +69,10 @@ func mutableVoidPointerArguments(p: UnsafeMutablePointer<Int>,
   takesMutableVoidPointer(ff) // expected-error{{}} expected-note{{}}
 
   // We don't allow these conversions outside of function arguments.
-  var x: UnsafeMutablePointer<Void> = &i // expected-error{{}}
+  var x: UnsafeMutablePointer<Void> = &i // expected-error{{'inout Int' is not convertible to 'UnsafeMutablePointer<Void>'}}
   x = p // expected-error{{}}
   x = &ii // expected-error{{}}
+  _ = x
 }
 
 func constPointerArguments(p: UnsafeMutablePointer<Int>,
@@ -172,7 +174,7 @@ func autoreleasingPointerArguments(p: UnsafeMutablePointer<Int>,
   takesAutoreleasingPointer(&cc) // expected-error{{}} expected-note{{}}
   takesAutoreleasingPointer(&dd) // expected-error{{}} expected-note{{}}
 
-  var x: AutoreleasingUnsafeMutablePointer<C> = &c // expected-error{{}}
+  let _: AutoreleasingUnsafeMutablePointer<C> = &c // expected-error{{}}
 }
 
 func pointerConstructor(x: UnsafeMutablePointer<Int>) -> UnsafeMutablePointer<Float> {

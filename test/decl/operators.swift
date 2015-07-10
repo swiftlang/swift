@@ -31,6 +31,7 @@ func test() {
   // Produce a diagnostic for using the result of an assignment as a value.
   // rdar://12961094
   useInt(x = y)  // expected-error{{cannot invoke 'useInt' with an argument list of type '()'}} expected-note{{expected an argument list of type '(Int)'}}
+  _ = x
 }
 
 prefix operator ~~ {}

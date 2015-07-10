@@ -100,6 +100,7 @@ infix operator **** {
 
 func ****(_: Int, _: String) { }
 i **** i // expected-error{{binary operator '****' cannot be applied to two Int operands}}
+// expected-note @-1 {{expected an argument list of type '(Int, String)'}}
 
 infix operator ***~ {
   associativity left
@@ -108,6 +109,7 @@ infix operator ***~ {
 
 func ***~(_: Int, _: String) { }
 i ***~ i // expected-error{{binary operator '***~' cannot be applied to two Int operands}}
+// expected-note @-1 {{expected an argument list of type '(Int, String)'}}
 
 // <rdar://problem/20142523>
 // FIXME: poor diagnostic, to be fixed in 20142462. For now, we just want to

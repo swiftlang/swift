@@ -2101,13 +2101,10 @@ Expr *FailureDiagnosis::typeCheckIndependentSubExpression(Expr *subExpr) {
     // ASTChecker.
     CS->TC.eraseOpenedExistentials(subExpr);
         
-    // If recursive type checking failed, then an error was emitted, tell the
-    // caller that we are done diagnosing things to avoid multiple
-    // diagnostics.
-    if (hadError) {
-      preCheckedExpr->setType(ErrorType::get(CS->getASTContext()));
+    // If recursive type checking failed, then an error was emitted.  Return
+    // null to indicate this to the caller.
+    if (hadError)
       return nullptr;
-    }
 
     CS->TC.addExprForDiagnosis(preCheckedExpr, subExpr);
   }
@@ -2414,10 +2411,6 @@ bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
     return true;
   }
   
-  CleanupIllFormedExpressionRAII cleanup(CS->getASTContext(), expr);
-
-  expr->setType(ErrorType::get(CS->getASTContext()));
-  
   // A common error is to apply an operator that only has an inout LHS (e.g. +=)
   // to non-lvalues (e.g. a local let).  Produce a nice diagnostic for this
   // case.
@@ -2444,10 +2437,8 @@ bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
       .highlight(argExpr->getElement(1)->getSourceRange());
   }
   
-  // FIXME: This is a hack to avoid printing candidate sets
-  if (isa<OverloadedDeclRefExpr>(binop->getFn()))
-    suggestPotentialOverloads(overloadName, binop->getLoc(),
-                              Candidates, candidateCloseness);
+  suggestPotentialOverloads(overloadName, binop->getLoc(),
+                            Candidates, candidateCloseness);
   return true;
 }
 
@@ -2456,8 +2447,6 @@ bool FailureDiagnosis::visitUnaryExpr(ApplyExpr *applyExpr) {
   assert(expr->getKind() == ExprKind::PostfixUnary ||
          expr->getKind() == ExprKind::PrefixUnary);
   
-  CleanupIllFormedExpressionRAII cleanup(CS->getASTContext(), expr);
-
   auto argExpr = typeCheckIndependentSubExpression(applyExpr->getArg());
 
   // If the argument type is an error, we've posted the diagnostic recursively.
@@ -2486,11 +2475,7 @@ bool FailureDiagnosis::visitUnaryExpr(ApplyExpr *applyExpr) {
       .highlight(applyExpr->getSourceRange());
     return true;
   }
-  
-  expr->setType(ErrorType::get(CS->getASTContext()));
 
-  
-  
   // A common error is to apply an operator that only has inout forms (e.g. ++)
   // to non-lvalues (e.g. a local let).  Produce a nice diagnostic for this
   // case.
@@ -2509,10 +2494,8 @@ bool FailureDiagnosis::visitUnaryExpr(ApplyExpr *applyExpr) {
   CS->TC.diagnose(argExpr->getLoc(), diag::cannot_apply_unop_to_arg,
                   overloadName, argTyName);
   
-  // FIXME: This is a hack to avoid printing candidate sets
-  if (isa<OverloadedDeclRefExpr>(applyExpr->getFn()))
-    suggestPotentialOverloads(overloadName, argExpr->getLoc(),
-                              Candidates, candidateCloseness);
+  suggestPotentialOverloads(overloadName, argExpr->getLoc(),
+                            Candidates, candidateCloseness);
   return true;
 }
 
@@ -2568,8 +2551,6 @@ FailureDiagnosis::collectCalleeCandidateInfo(ConstraintLocator *locator,
 }
 
 bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
-  CleanupIllFormedExpressionRAII cleanup(CS->getASTContext(), expr);
-  
   auto indexExpr = typeCheckIndependentSubExpression(SE->getIndex());
   if (!indexExpr) return true;
 
@@ -2627,8 +2608,6 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     return true;
   }
 
-  expr->setType(ErrorType::get(CS->getASTContext()));
-
   auto indexTypeName = getUserFriendlyTypeName(indexType);
   auto baseTypeName = getUserFriendlyTypeName(baseType);
   
@@ -2642,8 +2621,6 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
 }
 
 bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
-  CleanupIllFormedExpressionRAII cleanup(CS->getASTContext(), expr);
-  
   // FIXME: Should be calculating types of sub-exprs in a consistent way.
   //auto fnExpr = typeCheckIndependentSubExpression(callExpr->getFn());
   //if (!fnExpr) return true;
@@ -2800,13 +2777,10 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
   suggestPotentialOverloads(overloadName, fnExpr->getLoc(),
                             Candidates, candidateCloseness,
                             /*isCallExpr*/true);
-  
-  expr->setType(ErrorType::get(CS->getASTContext()));
   return true;
 }
 
 bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
-  CleanupIllFormedExpressionRAII cleanup(CS->getASTContext(), expr);
   // Diagnose obvious assignments to literals.
   if (isa<LiteralExpr>(assignExpr->getDest()->getSemanticsProvidingExpr())) {
     CS->TC.diagnose(assignExpr->getLoc(), diag::cannot_assign_to_literal);
@@ -2838,7 +2812,6 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
 }
 
 bool FailureDiagnosis::visitInOutExpr(InOutExpr *IOE) {
-  CleanupIllFormedExpressionRAII cleanup(CS->getASTContext(), expr);
   auto subExpr = typeCheckIndependentSubExpression(IOE->getSubExpr());
 
   auto subExprType = subExpr->getType();
@@ -2855,8 +2828,6 @@ bool FailureDiagnosis::visitInOutExpr(InOutExpr *IOE) {
 }
 
 bool FailureDiagnosis::visitCoerceExpr(CoerceExpr *CE) {
-  CleanupIllFormedExpressionRAII cleanup(CS->getASTContext(), expr);
-
   Expr *subExpr = typeCheckIndependentSubExpression(CE->getSubExpr());
   if (!subExpr) return true;
   Type subType = subExpr->getType();
@@ -2885,13 +2856,10 @@ bool FailureDiagnosis::visitCoerceExpr(CoerceExpr *CE) {
 
 bool FailureDiagnosis::
 visitForcedCheckedCastExpr(ForcedCheckedCastExpr *FCE) {
-  CleanupIllFormedExpressionRAII cleanup(CS->getASTContext(), expr);
-
   Expr *subExpr = typeCheckIndependentSubExpression(FCE->getSubExpr());
   if (!subExpr) return true;
 
   Type subType = subExpr->getType();
-
 
   std::pair<Type, Type> conversionTypes(nullptr, nullptr);
   if (conversionConstraint &&
@@ -2917,8 +2885,6 @@ visitForcedCheckedCastExpr(ForcedCheckedCastExpr *FCE) {
 }
 
 bool FailureDiagnosis::visitForceValueExpr(ForceValueExpr *FVE) {
-  CleanupIllFormedExpressionRAII cleanup(CS->getASTContext(), expr);
-  
   auto argExpr = typeCheckIndependentSubExpression(FVE->getSubExpr());
   if (!argExpr) return true;
   auto argType = argExpr->getType();
@@ -2930,7 +2896,6 @@ bool FailureDiagnosis::visitForceValueExpr(ForceValueExpr *FVE) {
                     getUserFriendlyTypeName(argType))
       .fixItRemove(FVE->getExclaimLoc())
       .highlight(FVE->getSourceRange());
-    expr->setType(ErrorType::get(CS->getASTContext()));
     return true;
   }
   
@@ -2938,8 +2903,6 @@ bool FailureDiagnosis::visitForceValueExpr(ForceValueExpr *FVE) {
 }
 
 bool FailureDiagnosis::visitBindOptionalExpr(BindOptionalExpr *BOE) {
-  CleanupIllFormedExpressionRAII cleanup(CS->getASTContext(), expr);
-
   auto argExpr = typeCheckIndependentSubExpression(BOE->getSubExpr());
   if (!argExpr) return true;
   auto argType = argExpr->getType();
@@ -2951,7 +2914,6 @@ bool FailureDiagnosis::visitBindOptionalExpr(BindOptionalExpr *BOE) {
                     getUserFriendlyTypeName(argType))
       .highlight(BOE->getSourceRange())
       .fixItRemove(BOE->getQuestionLoc());
-    expr->setType(ErrorType::get(CS->getASTContext()));
     return true;
   }
 

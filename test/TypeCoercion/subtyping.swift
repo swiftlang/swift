@@ -26,7 +26,7 @@ func protocolConformance(@autoclosure ac1: () -> CustomStringConvertible,
                          @autoclosure ip1: () -> IsPrintable1) {
   var f1 : (fp : FormattedPrintable) -> CustomStringConvertible = fp_to_p
   var f2 : (p : CustomStringConvertible) -> FormattedPrintable = p_to_fp
-  var f3 : (p : CustomStringConvertible) -> IsPrintable1 = p_to_ip1
+  let f3 : (p : CustomStringConvertible) -> IsPrintable1 = p_to_ip1
 
   // FIXME: closures make ABI conversions explicit. rdar://problem/19517003
   f1 = { f2(p: $0) } // okay

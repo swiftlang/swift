@@ -110,12 +110,15 @@ func testOutParametersGood() {
 }
 
 func testOutParametersBad() {
-  var fridge: CCRefrigerator?
-  CCRefrigeratorCreateIndirect(fridge) // expected-error {{cannot invoke}} expected-note {{'(UnsafeMutablePointer<CCRefrigerator?>)'}}
+  let fridge: CCRefrigerator?
+  CCRefrigeratorCreateIndirect(fridge) // expected-error {{cannot invoke 'CCRefrigeratorCreateIndirect' with an argument list of type '(CCRefrigerator?)'}} 
+  // expected-note @-1 {{expected an argument list of type '(UnsafeMutablePointer<CCRefrigerator?>)'}}
 
-  var power: CCPowerSupply?
-  CCRefrigeratorGetPowerSupplyIndirect(0, power) // expected-error {{cannot invoke}} expected-note {{'(CCRefrigerator!, AutoreleasingUnsafeMutablePointer<CCPowerSupply?>)'}}
+  let power: CCPowerSupply?
+  CCRefrigeratorGetPowerSupplyIndirect(0, power) // expected-error {{cannot invoke 'CCRefrigeratorGetPowerSupplyIndirect' with an argument list of type '(Int, CCPowerSupply?)'}}
+    // expected-note @-1 {{expected an argument list of type '(CCRefrigerator!, AutoreleasingUnsafeMutablePointer<CCPowerSupply?>)'}}
 
-  var item: CCItem?
-  CCRefrigeratorGetItemUnaudited(0, 0, item) // expected-error {{cannot invoke}} expected-note {{'(CCRefrigerator!, UInt32, UnsafeMutablePointer<Unmanaged<CCItem>?>)'}}
+  let item: CCItem?
+  CCRefrigeratorGetItemUnaudited(0, 0, item) // expected-error {{cannot invoke 'CCRefrigeratorGetItemUnaudited' with an argument list of type '(Int, Int, CCItem?)'}}
+  // expected-note @-1 {{expected an argument list of type '(CCRefrigerator!, UInt32, UnsafeMutablePointer<Unmanaged<CCItem>?>)'}}
 }
