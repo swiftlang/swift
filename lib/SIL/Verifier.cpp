@@ -2950,11 +2950,11 @@ public:
     // SILFunctionType is non-polymorphic.
     if (F->getContextGenericParams()) {
       require(FTy->isPolymorphic(),
-              "generic function definition must have context archetypes");
-    } else {
-      require(!FTy->isPolymorphic(),
               "non-generic function definitions cannot have context "
               "archetypes");
+    } else {
+      require(!FTy->isPolymorphic(),
+              "generic function definition must have context archetypes");
     }
 
     // Otherwise, verify the body of the function.
