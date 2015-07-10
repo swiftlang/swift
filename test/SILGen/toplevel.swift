@@ -59,10 +59,34 @@ func print_y() {
 // CHECK: [[Y:%[0-9]+]] = mark_uninitialized [var] [[Y1]]
 // CHECK: assign {{.*}} to [[Y]]
 // CHECK: [[PRINT_Y:%[0-9]+]] = function_ref @_TF8toplevel7print_yFT_T_
-// CHECK: [[RET:%[0-9]+]] = struct $Int32
-// CHECK: return [[RET]]
 y = 1
 print_y()
+
+
+// CHECK: [[VARADDR:%[0-9]+]] = global_addr @_Tv8toplevel21NotInitializedIntegerSi
+// CHECK-NEXT: [[VARMUI:%[0-9]+]] = mark_uninitialized [var] [[VARADDR]] : $*Int
+// CHECK-NEXT: mark_function_escape [[VARMUI]] : $*Int
+
+
+
+// <rdar://problem/21753262> Bug in DI when it comes to initialization of global "let" variables
+let NotInitializedInteger : Int
+func fooUsesUninitializedValue() {
+  _ = NotInitializedInteger
+}
+
+fooUsesUninitializedValue()
+NotInitializedInteger = 10
+fooUsesUninitializedValue()
+
+
+
+
+// CHECK: [[RET:%[0-9]+]] = struct $Int32
+// CHECK: return [[RET]]
+
+
+
 
 // CHECK-LABEL: sil hidden @_TF8toplevel7print_xFT_T_
 

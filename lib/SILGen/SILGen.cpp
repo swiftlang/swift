@@ -421,12 +421,9 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
 
     for (auto capture : AFD->getCaptureInfo().getCaptures()) {
       // Decls captured by value don't escape.
-      if (auto *CaptureVD = dyn_cast<VarDecl>(capture.getDecl()))
-        if (CaptureVD->isLet())
-          continue;
-
       auto It = TopLevelSGF->VarLocs.find(capture.getDecl());
-      if (It == TopLevelSGF->VarLocs.end())
+      if (It == TopLevelSGF->VarLocs.end() ||
+          !It->getSecond().value.getType().isAddress())
         continue;
 
       Captures.push_back(It->second.value);
