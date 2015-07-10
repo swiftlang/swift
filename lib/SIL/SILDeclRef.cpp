@@ -174,11 +174,22 @@ Optional<AnyFunctionRef> SILDeclRef::getAnyFunctionRef() const {
 }
 
 static SILLinkage getLinkageForLocalContext(DeclContext *dc) {
+  auto isClangImported = [](AbstractFunctionDecl *fn) -> bool {
+    if (fn->hasClangNode())
+      return true;
+    if (auto func = dyn_cast<FuncDecl>(fn))
+      if (auto storage = func->getAccessorStorageDecl())
+        return storage->hasClangNode();
+    return false;
+  };
+
   while (!dc->isModuleScopeContext()) {
     // Local definitions in transparent contexts are forced public because
     // external references to them can be exposed by mandatory inlining.
+    // For Clang-imported decls, though, the closure should get re-synthesized
+    // on use.
     if (auto fn = dyn_cast<AbstractFunctionDecl>(dc))
-      if (fn->isTransparent())
+      if (fn->isTransparent() && !isClangImported(fn))
         return SILLinkage::Public;
     // Check that this local context is not itself in a local transparent
     // context.
