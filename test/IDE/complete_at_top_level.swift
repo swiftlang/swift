@@ -269,13 +269,35 @@ switch (0, 42) {
 
 func resyncParserB10() {}
 
+// rdar://20738314
+if true {
+    var z = #^TOP_LEVEL_STMT_10^#
+} else {
+    assertionFailure("Shouldn't be here")
+}
+
+func resyncParserB11() {}
+
+// rdar://21346928
+func optStr() -> String? { return nil }
+let x = (optStr() ?? "autoclosure").#^TOP_LEVEL_AUTOCLOSURE_1^#
+// AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal:      characters[#String.CharacterView#]
+// AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal:      utf16[#String.UTF16View#]
+// AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal:      utf8[#String.UTF8View#]
+
+func resyncParserB12() {}
+
 // rdar://21661308
 switch 1 {
   case #^TOP_LEVEL_SWITCH_CASE_1^#
 }
 // TOP_LEVEL_SWITCH_CASE_1: Begin completions
 
-//===--- Don't add any tests after this line.
+func resyncParserB13() {}
+
+//
+//===--- DON'T ADD ANY TESTS AFTER THIS LINE.
+//
 // These declarations should not show up in top-level code completion results
 // because forward references are not allowed at the top level.
 
@@ -289,17 +311,3 @@ extension FooStruct {
 
 var varAtEOF : Int
 // NEGATIVE-NOT: varAtEOF
-
-// rdar://20738314
-if true {
-    var z = #^TOP_LEVEL_STMT_10^#
-} else {
-    assertionFailure("Shouldn't be here")
-}
-
-// rdar://21346928
-func optStr() -> String? { return nil }
-let x = (optStr() ?? "autoclosure").#^TOP_LEVEL_AUTOCLOSURE_1^#
-// AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal:      characters[#String.CharacterView#]
-// AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal:      utf16[#String.UTF16View#]
-// AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal:      utf8[#String.UTF8View#]
