@@ -11,7 +11,7 @@
 // at run time.
 // RUN: mv %t/FakeUnavailableObjCFramework.framework %t/FakeUnavailableObjCFramework-MovedAside.framework
 
-// RUN: %target-run %t/UseWeaklinkedUnavailableObjcFramework | FileCheck %s
+// RUN: %target-run %t/UseWeaklinkedUnavailableObjCFramework | FileCheck %s
 
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
