@@ -23,15 +23,15 @@ public let noErr: OSStatus = 0
 ///
 /// The C type is a typedef for `unsigned char`.
 public struct DarwinBoolean : BooleanType, BooleanLiteralConvertible {
-  var value: UInt8
+  var _value: UInt8
 
   public init(_ value: Bool) {
-    self.value = value ? 1 : 0
+    self._value = value ? 1 : 0
   }
 
   /// The value of `self`, expressed as a `Bool`.
   public var boolValue: Bool {
-    return value != 0
+    return _value != 0
   }
 
   /// Create an instance initialized to `value`.

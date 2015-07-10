@@ -1,4 +1,4 @@
-// RUN: %target-run-stdlib-swift
+// RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
 // REQUIRES: objc_interop
@@ -13,15 +13,15 @@ DarwinBooleanAPI.test("init") {
     let nativeTrue = true
     let true1 = DarwinBoolean(nativeTrue)
     let true2: DarwinBoolean = true
-    expectEqual(1, true1.value)
-    expectEqual(1, true2.value)
+    expectEqual(1, unsafeBitCast(true1, UInt8.self))
+    expectEqual(1, unsafeBitCast(true2, UInt8.self))
   }
   do {
     let nativeFalse = false
     let false1 = DarwinBoolean(nativeFalse)
     let false2: DarwinBoolean = false
-    expectEqual(0, false1.value)
-    expectEqual(0, false2.value)
+    expectEqual(0, unsafeBitCast(false1, UInt8.self))
+    expectEqual(0, unsafeBitCast(false2, UInt8.self))
   }
 }
 
@@ -40,8 +40,8 @@ DarwinBooleanAPI.test("boolValue") {
 }
 
 DarwinBooleanAPI.test("boolValue/extra values") {
-  var otherValue: DarwinBoolean = false
-  otherValue.value = 2
+  let rawValue: UInt8 = 2
+  let otherValue = unsafeBitCast(rawValue, DarwinBoolean.self)
   expectTrue(otherValue.boolValue)
 }
 
@@ -77,8 +77,8 @@ DarwinBooleanAPI.test("Equatable") {
 DarwinBooleanAPI.test("Equatable/extra values") {
   let trueValue: DarwinBoolean = true
   let falseValue: DarwinBoolean = false
-  var otherValue: DarwinBoolean = false
-  otherValue.value = 2
+  let rawValue: UInt8 = 2
+  let otherValue = unsafeBitCast(rawValue, DarwinBoolean.self)
   checkEquatable(true, trueValue, otherValue)
   checkEquatable(false, falseValue, otherValue)
 }

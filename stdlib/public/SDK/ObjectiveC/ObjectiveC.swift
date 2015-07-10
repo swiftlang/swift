@@ -25,31 +25,31 @@ import ObjectiveC
 public struct ObjCBool : BooleanType, BooleanLiteralConvertible {
 #if os(OSX) || (os(iOS) && (arch(i386) || arch(arm)))
   // On OS X and 32-bit iOS, Objective-C's BOOL type is a "signed char".
-  var value: Int8
+  var _value: Int8
 
   init(_ value: Int8) {
-    self.value = value
+    self._value = value
   }
 
   public init(_ value: Bool) {
-    self.value = value ? 1 : 0
+    self._value = value ? 1 : 0
   }
 
 #else
   // Everywhere else it is C/C++'s "Bool"
-  var value : Bool
+  var _value : Bool
 
   public init(_ value: Bool) {
-    self.value = value
+    self._value = value
   }
 #endif
 
   /// The value of `self`, expressed as a `Bool`.
   public var boolValue: Bool {
 #if os(OSX) || (os(iOS) && (arch(i386) || arch(arm)))
-    return value != 0
+    return _value != 0
 #else
-    return value
+    return _value
 #endif
   }
 
