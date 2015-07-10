@@ -13,6 +13,29 @@
 import Foundation
 @exported import UIKit
 
+
+//===----------------------------------------------------------------------===//
+// Equatable types.
+//===----------------------------------------------------------------------===//
+
+@transparent // @fragile
+public func == (lhs: UIEdgeInsets, rhs: UIEdgeInsets) -> Bool {
+  return lhs.top == rhs.top  && 
+         lhs.left == rhs.left &&
+         lhs.bottom == rhs.bottom &&
+         lhs.right == rhs.right
+}
+
+extension UIEdgeInsets : Equatable {}
+
+@transparent // @fragile
+public func == (lhs: UIOffset, rhs: UIOffset) -> Bool {
+  return lhs.horizontal == rhs.horizontal  &&
+         lhs.vertical == rhs.vertical
+}
+
+extension UIOffset : Equatable {}
+
 // These are un-imported macros in UIKit.
 
 //===----------------------------------------------------------------------===//
