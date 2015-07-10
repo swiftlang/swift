@@ -18,6 +18,66 @@
 //===----------------------------------------------------------------------===//
 public let noErr: OSStatus = 0
 
+/// The `Boolean` type declared in MacTypes.h and used throughout Core
+/// Foundation.
+///
+/// The C type is a typedef for `unsigned char`.
+public struct DarwinBoolean : BooleanType, BooleanLiteralConvertible {
+  var value: UInt8
+
+  public init(_ value: Bool) {
+    self.value = value ? 1 : 0
+  }
+
+  /// The value of `self`, expressed as a `Bool`.
+  public var boolValue: Bool {
+    return value != 0
+  }
+
+  /// Create an instance initialized to `value`.
+  @transparent
+  public init(booleanLiteral value: Bool) {
+    self.init(value)
+  }
+}
+
+extension DarwinBoolean : _Reflectable {
+  /// Returns a mirror that reflects `self`.
+  public func _getMirror() -> _MirrorType {
+    return _reflect(boolValue)
+  }
+}
+
+extension DarwinBoolean : CustomStringConvertible {
+  /// A textual representation of `self`.
+  public var description: String {
+    return self.boolValue.description
+  }
+}
+
+extension DarwinBoolean : Equatable {}
+public func ==(lhs: DarwinBoolean, rhs: DarwinBoolean) -> Bool {
+  return lhs.boolValue == rhs.boolValue
+}
+
+// FIXME: We can't make the fully-generic versions @transparent due to
+// rdar://problem/19418937, so here are some @transparent overloads
+// for ObjCBool
+@transparent
+public func && <T : BooleanType>(
+  lhs: T, @autoclosure rhs: () -> DarwinBoolean
+) -> Bool {
+  return lhs.boolValue ? rhs().boolValue : false
+}
+
+@transparent
+public func || <T : BooleanType>(
+  lhs: T, @autoclosure rhs: () -> DarwinBoolean
+) -> Bool {
+  return lhs.boolValue ? true : rhs().boolValue
+}
+
+
 //===----------------------------------------------------------------------===//
 // sys/errno.h
 //===----------------------------------------------------------------------===//

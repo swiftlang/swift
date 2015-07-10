@@ -725,7 +725,10 @@ private:
         = { "SEL", true };
       specialNames[{ID_ObjectiveC, ctx.getIdentifier("NSZone")}] 
         = { "NSZone *", true };
-      
+
+      specialNames[{ctx.getIdentifier("Darwin"),
+                    ctx.getIdentifier("DarwinBoolean")}] = { "Boolean", false};
+
       // Use typedefs we set up for SIMD vector types.
 #define MAP_SIMD_TYPE(BASENAME, __) \
       specialNames[{ctx.Id_simd, ctx.getIdentifier(#BASENAME "2")}] \

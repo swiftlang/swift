@@ -204,6 +204,7 @@ clang::CanQualType GenClangType::visitStructType(CanStructType type) {
   CHECK_NAMED_TYPE("CGFloat", convertMemberType(swiftDecl, "NativeType"));
   CHECK_NAMED_TYPE("COpaquePointer", ctx.VoidPtrTy);
   CHECK_NAMED_TYPE("CVaListPointer", getClangDecayedVaListType(ctx));
+  CHECK_NAMED_TYPE("DarwinBoolean", ctx.UnsignedCharTy);
   CHECK_NAMED_TYPE("NSZone", ctx.VoidPtrTy);
   CHECK_NAMED_TYPE("ObjCBool", ctx.ObjCBuiltinBoolTy);
   CHECK_NAMED_TYPE("Selector", getClangSelectorType(ctx));

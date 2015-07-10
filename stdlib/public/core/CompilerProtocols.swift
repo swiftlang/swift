@@ -18,8 +18,8 @@
 /// the condition in control statements (`if`, `while`, C-style `for`)
 /// and other logical value contexts (e.g., `case` statement guards).
 ///
-/// Only two types provided by Swift, `Bool` and `ObjCBool`, conform
-/// to `BooleanType`. Expanding this set to include types that
+/// Only three types provided by Swift, `Bool`, `DarwinBoolean`, and `ObjCBool`,
+/// conform to `BooleanType`. Expanding this set to include types that
 /// represent more than simple boolean values is discouraged.
 public protocol BooleanType {
   /// The value of `self`, expressed as a `Bool`.

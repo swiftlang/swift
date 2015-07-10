@@ -3118,6 +3118,13 @@ void TypeChecker::fillObjCRepresentableTypeCache(const DeclContext *DC) {
   }
 #include "swift/SIL/BridgedTypes.def"
 
+  Identifier ID_Darwin = Context.getIdentifier("Darwin");
+  if (auto DarwinModule = Context.getLoadedModule(ID_Darwin)) {
+    StdlibTypeNames.clear();
+    StdlibTypeNames.push_back(Context.getIdentifier("DarwinBoolean"));
+    lookupLibraryTypes(*this, DarwinModule, StdlibTypeNames, ObjCMappedTypes);
+  }
+
   Identifier ID_ObjectiveC = Context.Id_ObjectiveC;
   if (auto ObjCModule = Context.getLoadedModule(ID_ObjectiveC)) {
     StdlibTypeNames.clear();
