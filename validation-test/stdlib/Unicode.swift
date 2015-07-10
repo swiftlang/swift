@@ -2266,7 +2266,7 @@ StringCookedViews.test("UTF8ForNonContiguousUTF16Extra") {
     var bytes: [UInt8] = [ 97, 98, 99 ]
     var cfstring: CFString = CFStringCreateWithBytesNoCopy(
       kCFAllocatorDefault, bytes, bytes.count,
-      CFStringBuiltInEncodings.MacRoman.rawValue, 0, kCFAllocatorNull)
+      CFStringBuiltInEncodings.MacRoman.rawValue, false, kCFAllocatorNull)
 
     // Sanity checks to make sure we are testing the code path that does UTF-8
     // encoding itself, instead of dispatching to CF.
@@ -2289,7 +2289,7 @@ StringCookedViews.test("UTF8ForNonContiguousUTF16Extra") {
   if true {
     var bytes: [UInt8] = [ 97, 98, 99 ]
     var cfstring: CFString = CFStringCreateWithBytes(kCFAllocatorDefault,
-        bytes, bytes.count, CFStringBuiltInEncodings.MacRoman.rawValue, 0)
+        bytes, bytes.count, CFStringBuiltInEncodings.MacRoman.rawValue, false)
 
     // Sanity checks to make sure we are testing the code path that does UTF-8
     // encoding itself, instead of dispatching to CF.
