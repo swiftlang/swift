@@ -1146,6 +1146,7 @@ static OpaqueValue *pod_indirect_initializeBufferWithCopyOfBuffer(
 static OpaqueValue *pod_indirect_initializeBufferWithTakeOfBuffer(
                     ValueBuffer *dest, ValueBuffer *src, const Metadata *self) {
   memcpy(dest, src, sizeof(ValueBuffer));
+  return *reinterpret_cast<OpaqueValue**>(dest);
 }
 
 static OpaqueValue *pod_indirect_projectBuffer(ValueBuffer *buffer,
