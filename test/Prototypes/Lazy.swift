@@ -43,20 +43,36 @@ extension _prext_LazySequenceType where Elements == Self {
   public var elements: Self { return self }
 }
 
-extension _prext_LazySequenceType where Self : _SequenceWrapperType {
-  public var elements: Base { return _base }
-}
-
 /// A sequence that forwards its implementation to an underlying
 /// sequence instance while exposing lazy computations as methods.
-public struct _prext_LazySequence<Base_ : SequenceType> : _SequenceWrapperType {
+public struct _prext_LazySequence<Base_ : SequenceType>
+  : _prext_LazySequenceType, _SequenceWrapperType {
   public var _base: Base_
 }
 
 /// Augment `s` with lazy methods such as `map`, `filter`, etc.
-public func _prext_lazy<S : SequenceType>(s: S) -> _prext_LazySequence<S> {
-  return _prext_LazySequence(_base: s)
+extension SequenceType {
+  public var _prext_lazy: _prext_LazySequence<Self> {
+    return _prext_LazySequence(_base: self)
+  }
 }
+//===--- LazySequence tests -----------------------------------------------===//
+var tests = TestSuite("Lazy")
+
+tests.test("LazySequence") {
+  let expected = (0..<100).map { OpaqueValue($0) }
+  var g0 = MinimalSequence(expected)._prext_lazy.generate()
+  var a = g0.next()!
+  expectType(OpaqueValue<Int>.self, &a)
+  checkSequence(
+    expected, MinimalSequence(expected)._prext_lazy,
+    resiliencyChecks: .none
+  ) {
+    (x: OpaqueValue<Int>, y: OpaqueValue<Int>) -> Bool in 
+    x.value == y.value
+  }
+}
+
 
 //===--- LazyCollection.swift ---------------------------------*- swift -*-===//
 //
@@ -84,14 +100,10 @@ extension _prext_LazyCollectionType where Elements == Self {
   public var elements: Self { return self }
 }
 
-extension _prext_LazyCollectionType where Self : _CollectionWrapperType {
-  public var elements: Base { return _base }
-}
-
 /// A collection that forwards its implementation to an underlying
 /// collection instance while exposing lazy computations as methods.
 public struct _prext_LazyCollection<Base_ : CollectionType>
-  : /*_prext_LazyCollectionType,*/ _CollectionWrapperType {
+  : _prext_LazyCollectionType {
 
   public typealias Base = Base_
   public typealias Index = Base.Index
@@ -102,18 +114,58 @@ public struct _prext_LazyCollection<Base_ : CollectionType>
     self._base = base
   }
 
-  public var _base: Base_
+  public var elements: Base { return _base }
 
-  // FIXME: Why is this needed?
-  // public var elements: Base { return _base }
+  internal var _base: Base_
+}
+
+extension _prext_LazyCollection : SequenceType {
+  public func generate() -> Base.Generator { return _base.generate() }
+  public func underestimateCount() -> Int { return _base.underestimateCount() }
+
+  public func _copyToNativeArrayBuffer() 
+     -> _ContiguousArrayBuffer<Base.Generator.Element> {
+    return _base._copyToNativeArrayBuffer()
+  }
+  
+  public func _initializeTo(ptr: UnsafeMutablePointer<Base.Generator.Element>) {
+    return _base._initializeTo(ptr)
+  }
+
+  public func _customContainsEquatableElement(
+    element: Base.Generator.Element
+  ) -> Bool? { 
+    return _base._customContainsEquatableElement(element)
+  }
+}
+
+extension _prext_LazyCollection : CollectionType {
+  /// The position of the first element in a non-empty collection.
+  ///
+  /// In an empty collection, `startIndex == endIndex`.
+  public var startIndex: Base.Index {
+    return _base.startIndex
+  }
+  
+  /// The collection's "past the end" position.
+  ///
+  /// `endIndex` is not a valid argument to `subscript`, and is always
+  /// reachable from `startIndex` by zero or more applications of
+  /// `successor()`.
+  public var endIndex: Base.Index {
+    return _base.endIndex
+  }
+
+  /// Access the element at `position`.
+  ///
+  /// - Requires: `position` is a valid position in `self` and
+  ///   `position != endIndex`.
+  public subscript(position: Base.Index) -> Base.Generator.Element {
+    return _base[position]
+  }
 }
 
 /// Augment `s` with lazy methods such as `map`, `filter`, etc.
-public func _prext_lazy<Base: CollectionType>(s: Base) -> _prext_LazyCollection<Base> {
-  return _prext_LazyCollection(s)
-}
-
-
 //===--- Map.swift --------------------------------------------------------===//
 //
 //                     The LLVM Compiler Infrastructure
@@ -178,7 +230,7 @@ public struct _prext_MapSequence<Base : SequenceType, T>
 /// These elements are computed lazily, each time they're read, by
 /// calling the transform function on a base element.
 public struct _prext_MapCollection<Base : CollectionType, T>
-  : _prext_LazyCollectionType/*, _CollectionWrapperType*/ {
+  : _prext_LazyCollectionType {
 
   public var startIndex: Base.Index { return _base.startIndex }
   public var endIndex: Base.Index { return _base.endIndex }
@@ -318,15 +370,9 @@ extension CollectionType
 }
 
 extension CollectionType
-  where Self : _ReverseCollectionType, Self.Base.Index : BidirectionalIndexType {
-  public var startIndex : _prext_ReverseIndex<Self.Base.Index> {
-    return _prext_ReverseIndex(_base.endIndex)
-  }
-}
-
-extension CollectionType
   where Self : _ReverseCollectionType, Self.Index.Base == Self.Base.Index
 {
+  public var startIndex : Index { return Self.Index(_base.endIndex) }
   public var endIndex : Index { return Self.Index(_base.startIndex) }
   public subscript(position: Index) -> Self.Base.Generator.Element {
     return _base[position._base.predecessor()]
@@ -347,10 +393,35 @@ public struct _prext_ReverseCollection<
   public let _base: Base_
 }
 
-print(_prext_ReverseCollection(0..<12).startIndex)
-print(_prext_ReverseCollection(0..<12).array)
-print(_prext_ReverseCollection("foobar".characters).array)
-print(_prext_ReverseCollection("foobar".characters).startIndex)
+public struct _prext_ReverseRandomAccessCollection<
+  Base_ : CollectionType where Base_.Index : RandomAccessIndexType
+> : _ReverseCollectionType {
+  
+  public typealias Index = _prext_ReverseRandomAccessIndex<Base_.Index>
+  public typealias Generator = IndexingGenerator<
+    _prext_ReverseRandomAccessCollection
+  >
+  
+  public init(_ base: Base_) {
+    self._base = base
+  }
+
+  public let _base: Base_
+}
+
+tests.test("ReverseCollection") {
+
+  let expected = Array(stride(from: 11, through: 0, by: -1))
+  let r = 0..<12
+  checkRandomAccessCollection(
+    expected,
+    _prext_ReverseRandomAccessCollection(r))
+  
+  checkBidirectionalCollection(
+    "raboof".characters,
+    _prext_ReverseCollection("foobar".characters))
+}
+
 
 /*****
 /// The lazy `CollectionType` returned by `reverse(c)` where `c` is a
@@ -564,11 +635,5 @@ extension _prext_LazySequenceType {
   }
 }
 */
-
-var tests = TestSuite("Lazy")
-
-tests.test("basics") {
-  
-}
 
 runAllTests()
