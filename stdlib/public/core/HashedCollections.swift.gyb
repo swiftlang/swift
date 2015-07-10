@@ -2425,10 +2425,18 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
   internal func _getBridgedKey(i: _Native${Self}Index<${TypeParameters}>) ->
     AnyObject {
     if _fastPath(_isClassOrObjCExistential(Key.self)) {
+%if Self == 'Set':
+      return _bridgeToObjectiveCUnconditional(nativeStorage.assertingGet(i))
+%elif Self == 'Dictionary':
       return _bridgeToObjectiveCUnconditional(nativeStorage.assertingGet(i).0)
+%end
     }
     bridgeEverything()
+%if Self == 'Set':
+    return bridgedNativeStorage.assertingGet(i.offset)
+%elif Self == 'Dictionary':
     return bridgedNativeStorage.assertingGet(i.offset).0
+%end
   }
 
 %if Self == 'Set':

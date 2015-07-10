@@ -77,12 +77,6 @@ func SA5_test(a: SA4, b: SA4) {
   a.foo = b.foo
 }
 
-func SA6_test(ai: Int) {
-  var a = ai
-  a = a.0 // expected-error {{assigning a variable to itself}}
-  a.0 = a // expected-error {{assigning a variable to itself}}
-}
-
 class SA_Deep1 {
   class Foo {
     var aThing = String()

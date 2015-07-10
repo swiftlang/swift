@@ -3047,14 +3047,6 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
     Type rawValueType;
     if (name.isSimpleName()
         && !name.getBaseName().str().getAsInteger(10, index)) {
-      // ".0" on a scalar just refers to the underlying scalar value.
-      if (index == 0) {
-        OverloadChoice identityChoice(baseTy, OverloadChoiceKind::BaseType);
-        addBindOverloadConstraint(memberTy, identityChoice,
-                                  constraint.getLocator());
-        return SolutionKind::Solved;
-      }
-
       recordFailure(constraint.getLocator(), Failure::DoesNotHaveMember,
                     baseObjTy, name);
 
