@@ -158,7 +158,7 @@ static void writeCompilationRecord(StringRef path, StringRef argsHash,
   out << "inputs: \n";
 
   for (auto &entry : inputs) {
-    out << "\t" << llvm::yaml::escape(entry.first->getValue()) << ": ";
+    out << "\t\"" << llvm::yaml::escape(entry.first->getValue()) << "\": ";
 
     switch (entry.second.status) {
     case CompileJobAction::InputInfo::UpToDate:
