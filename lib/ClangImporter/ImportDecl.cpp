@@ -4096,7 +4096,7 @@ namespace {
       // use types that are less available than the conforming type.
       auto *proto = dyn_cast<ProtocolDecl>(swiftContext);
       if (!proto || proto->getAttrs().hasAttribute<AvailableAttr>())
-          return;
+        return;
 
       for (Decl *member : members) {
         inferProtocolMemberAvailability(member);
@@ -4476,7 +4476,7 @@ namespace {
         return;
 
       VersionRange requiredRange =
-      AvailabilityInference::inferForType(valueDecl->getType());
+          AvailabilityInference::inferForType(valueDecl->getType());
 
       if (!requiredRange.hasLowerEndpoint())
         return;
