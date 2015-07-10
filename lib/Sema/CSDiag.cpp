@@ -2313,11 +2313,26 @@ FailureDiagnosis::collectCalleeCandidateInfo(Expr *fn, Type actualArgsType,
       for (auto ctor : ctors)
         result.push_back(ctor);
     }
-  } else if (overloadConstraint) {
-    result.push_back(overloadConstraint->getOverloadChoice().getDecl());
   } else {
-    return result;
+    // Scan to see if we have a disjunction constraint for this callee.
+    for (auto &constraint : CS->getConstraints()) {
+      if (constraint.getKind() != ConstraintKind::Disjunction) continue;
+      
+      auto locator = constraint.getLocator();
+      if (!locator || locator->getAnchor() != fn) continue;
+      
+      for (auto *bindOverload : constraint.getNestedConstraints()) {
+        auto c = bindOverload->getOverloadChoice();
+        if (c.isDecl())
+          result.push_back(c.getDecl());
+      }
+      break;
+    }
   }
+  
+  // If we couldn't find anything, give up.
+  if (result.empty())
+    return result;
 
   // Now that we have the candidate list, figure out what the best matches from
   // the candidate list are, and remove all the ones that aren't at that level.
@@ -2330,6 +2345,13 @@ FailureDiagnosis::collectCalleeCandidateInfo(Expr *fn, Type actualArgsType,
     if (!fnType) {
       closenessList.push_back(FailureDiagnosis::CC_GeneralMismatch);
       continue;
+    }
+    
+    // FIXME: This is a bit of a hack, we should look at the uncurry level of
+    // this.
+    if (auto *FD = dyn_cast<AbstractFunctionDecl>(decl)) {
+      if (FD->getImplicitSelfDecl()) // Strip the self member.
+        fnType = fnType->getResult()->castTo<AnyFunctionType>();
     }
 
     closenessList.push_back(evaluateCloseness(fnType->getInput(), actualArgs));

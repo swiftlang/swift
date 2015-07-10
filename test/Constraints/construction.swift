@@ -94,7 +94,7 @@ b as! Derived
 Int(i) // expected-warning{{unused}}
 i as Int
 Z(z) // expected-error{{cannot find an initializer for type 'Z' that accepts an argument list of type '(Z)'}}
-// expected-note @-1 {{overloads for 'Z' exist with these partially matching parameter lists: (), (UnicodeScalar), (String), (Int, Int)}}
+// expected-note @-1 {{overloads for 'Z' exist with these partially matching parameter lists: (UnicodeScalar), (String)}}
 z as Z
 
 // Construction from inouts.
