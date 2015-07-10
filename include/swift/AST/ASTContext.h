@@ -411,6 +411,9 @@ public:
   /// Retrieve the declaration of Swift.AutoreleasingUnsafeMutablePointer<T>.
   NominalTypeDecl *getAutoreleasingUnsafeMutablePointerDecl() const;
 
+  /// Retrieve the declaration of Swift.Unmanaged<T>.
+  NominalTypeDecl *getUnmanagedDecl() const;
+
   /// Retrieve the declaration of the "memory" property of a pointer type.
   VarDecl *getPointerMemoryPropertyDecl(PointerTypeKind ptrKind) const;
 

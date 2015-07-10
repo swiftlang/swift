@@ -143,6 +143,7 @@ class NotObjC {}
 // CHECK-NEXT: - (IBAction)actionMethod:(id __nonnull)_;
 // CHECK-NEXT: - (void)methodWithReservedParameterNames:(id __nonnull)long_ protected:(id __nonnull)protected_;
 // CHECK-NEXT: - (void)honorRenames:(CustomName * __nonnull)_;
+// CHECK-NEXT: - (Methods * __nullable __unsafe_unretained)unmanaged:(id __nonnull __unsafe_unretained)_;
 // CHECK-NEXT: init
 // CHECK-NEXT: @end
 @objc class Methods {
@@ -192,6 +193,8 @@ class NotObjC {}
   func methodWithReservedParameterNames(long: AnyObject, protected: AnyObject) {}
 
   func honorRenames(_: ClassWithCustomName) {}
+
+  func unmanaged(_: Unmanaged<AnyObject>) -> Unmanaged<Methods>? { return nil }
 }
 
 typealias AliasForNSRect = NSRect
@@ -346,6 +349,7 @@ public class NonObjCClass { }
 // CHECK-NEXT: @property (nonatomic, weak) Properties * __nullable weakOther;
 // CHECK-NEXT: @property (nonatomic, assign) Properties * __nonnull unownedOther;
 // CHECK-NEXT: @property (nonatomic, unsafe_unretained) Properties * __nonnull unmanagedOther;
+// CHECK-NEXT: @property (nonatomic, unsafe_unretained) Properties * __nullable unmanagedByDecl;
 // CHECK-NEXT: @property (nonatomic, weak) id <MyProtocol> __nullable weakProto;
 // CHECK-NEXT: @property (nonatomic) CFTypeRef __nullable weakCF;
 // CHECK-NEXT: @property (nonatomic) CFStringRef __nullable weakCFString;
@@ -395,6 +399,7 @@ public class NonObjCClass { }
   weak var weakOther: Properties?
   unowned var unownedOther: Properties = .shared
   unowned(unsafe) var unmanagedOther: Properties = .shared
+  var unmanagedByDecl: Unmanaged<Properties>?
 
   weak var weakProto: MyProtocol?
   weak var weakCF: CFTypeRef?

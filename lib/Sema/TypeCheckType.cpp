@@ -2191,27 +2191,6 @@ static void describeObjCReason(TypeChecker &TC, const ValueDecl *VD,
   }
 }
 
-static bool isClassOrObjCProtocol(Type T) {
-  if (auto *CT = T->getAs<ClassType>())
-    return CT->getDecl()->isObjC();
-
-  SmallVector<ProtocolDecl *, 4> Protocols;
-  if (T->isExistentialType(Protocols)) {
-    if (Protocols.empty()) {
-      // protocol<> is not @objc.
-      return false;
-    }
-    // Check that all protocols are @objc.
-    for (auto PD : Protocols) {
-      if (!PD->isObjC())
-        return false;
-    }
-    return true;
-  }
-
-  return false;
-}
-
 static Type getFunctionParamType(const Pattern *P) {
   if (auto *TP = dyn_cast<TypedPattern>(P))
     return TP->getType();
@@ -2818,6 +2797,27 @@ bool TypeChecker::isRepresentableInObjC(const SubscriptDecl *SD,
   return Result;
 }
 
+static bool isObjCClassOrProtocol(Type T) {
+  if (auto *CT = T->getAs<ClassType>())
+    return CT->getDecl()->isObjC();
+
+  SmallVector<ProtocolDecl *, 4> Protocols;
+  if (T->isExistentialType(Protocols)) {
+    if (Protocols.empty()) {
+      // protocol<> is not @objc.
+      return false;
+    }
+    // Check that all protocols are @objc.
+    for (auto PD : Protocols) {
+      if (!PD->isObjC())
+        return false;
+    }
+    return true;
+  }
+
+  return false;
+}
+
 /// True if T is representable as a non-nullable ObjC pointer type.
 static bool isUnknownObjectType(Type T) {
   // FIXME: Return true for closures, and for anything bridged to a class type.
@@ -2826,11 +2826,11 @@ static bool isUnknownObjectType(Type T) {
   if (auto MTT = T->getAs<AnyMetatypeType>())
     T = MTT->getInstanceType();
 
-  if (isClassOrObjCProtocol(T))
+  if (isObjCClassOrProtocol(T))
     return true;
 
   if (auto dynSelf = T->getAs<DynamicSelfType>())
-    return isClassOrObjCProtocol(dynSelf->getSelfType());
+    return isObjCClassOrProtocol(dynSelf->getSelfType());
 
   return false;
 }
@@ -2858,10 +2858,21 @@ bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,
   if (isUnknownObjectType(T))
     return true;
 
-  // TODO: maybe Optional<UnsafeMutablePointer<T>> should be okay?
-  if (wasOptional) return false;
+  auto NTD = T->getAnyNominal();
 
-  if (auto NTD = T->getAnyNominal()) {
+  if (NTD == Context.getUnmanagedDecl()) {
+    auto BGT = T->getAs<BoundGenericType>();
+    if (!BGT)
+      return false;
+    assert(BGT->getGenericArgs().size() == 1);
+    return isUnknownObjectType(BGT->getGenericArgs().front());
+  }
+
+  // TODO: maybe Optional<UnsafeMutablePointer<T>> should be okay?
+  if (wasOptional)
+    return false;
+
+  if (NTD) {
     // If the type was imported from Clang, it is representable in Objective-C.
     if (NTD->hasClangNode())
       return true;
@@ -2889,6 +2900,7 @@ bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,
       }
       }
     }
+
   }
 
   // If it's a mapped type, it's representable.

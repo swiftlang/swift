@@ -539,7 +539,8 @@ private:
       os << ", unsafe_unretained";
     } else {
       Type copyTy = ty;
-      if (auto unwrappedTy = copyTy->getAnyOptionalObjectType())
+      OptionalTypeKind optionalType;
+      if (auto unwrappedTy = copyTy->getAnyOptionalObjectType(optionalType))
         copyTy = unwrappedTy;
       if (auto nominal = copyTy->getStructOrBoundGenericStruct()) {
         if (nominal == ctx.getArrayDecl() ||
@@ -547,6 +548,14 @@ private:
             nominal == ctx.getSetDecl() ||
             nominal == ctx.getStringDecl()) {
           os << ", copy";
+        } else if (nominal == ctx.getUnmanagedDecl()) {
+          os << ", unsafe_unretained";
+          // Don't print unsafe_unretained twice.
+          if (auto boundTy = copyTy->getAs<BoundGenericType>()) {
+            ty = boundTy->getGenericArgs().front();
+            if (optionalType != OTK_None)
+              ty = OptionalType::get(optionalType, ty);
+          }
         }
       } else if (auto fnTy = copyTy->getAs<FunctionType>()) {
         switch (fnTy->getRepresentation()) {
@@ -925,6 +934,14 @@ private:
       }
 
       printNullability(optionalKind);
+      return true;
+    }
+
+    if (SD == ctx.getUnmanagedDecl()) {
+      auto args = BGT->getGenericArgs();
+      assert(args.size() == 1);
+      visitPart(args.front(), optionalKind);
+      os << " __unsafe_unretained";
       return true;
     }
 

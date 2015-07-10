@@ -808,17 +808,13 @@ static bool isCFAudited(ImportTypeKind importKind) {
 /// Turn T into Unmanaged<T>.
 static Type getUnmanagedType(ClangImporter::Implementation &impl,
                              Type payloadType) {
-  Module *stdlib = impl.getStdlibModule();
-  if (!stdlib) return payloadType;
-  Type unmanagedType = impl.getNamedSwiftType(stdlib, "Unmanaged");
-  if (!unmanagedType) return payloadType;
-  auto unboundTy = unmanagedType->getAs<UnboundGenericType>();
-  if (!unboundTy || unboundTy->getDecl()->getGenericParams()->size() != 1)
+  NominalTypeDecl *unmanagedDecl = impl.SwiftContext.getUnmanagedDecl();
+  if (!unmanagedDecl || unmanagedDecl->getGenericParams()->size() != 1)
     return payloadType;
 
-  Type unmanagedClassType =
-    BoundGenericType::get(unboundTy->getDecl(), /*parent*/ Type(),
-                          payloadType);
+  Type unmanagedClassType = BoundGenericType::get(unmanagedDecl,
+                                                  /*parent*/ Type(),
+                                                  payloadType);
   return unmanagedClassType;
 }
 
@@ -923,10 +919,8 @@ static Type adjustTypeForConcreteImport(ClangImporter::Implementation &impl,
       return Type();
 
     auto boundGenericBase = boundGenericTy->getDecl();
-    if (boundGenericBase->getName().str() != "Unmanaged" ||
-        boundGenericBase->getModuleContext() != impl.getStdlibModule()) {
+    if (boundGenericBase != impl.SwiftContext.getUnmanagedDecl())
       return Type();
-    }
 
     assert(boundGenericTy->getGenericArgs().size() == 1 &&
            "signature of Unmanaged has changed");

@@ -152,3 +152,26 @@ class Singleton : NSObject {
     return 7.7
   }
 }
+
+class HasUnmanaged : NSObject {
+  // CHECK-LABEL: sil hidden [transparent] @_TToFC15objc_properties12HasUnmanagedg3refGSqGVSs9UnmanagedPSs9AnyObject___
+  // CHECK: [[NATIVE:%.+]] = function_ref @_TFC15objc_properties12HasUnmanagedg3refGSqGVSs9UnmanagedPSs9AnyObject___
+  // CHECK: [[RESULT:%.+]] = apply [[NATIVE]](%0)
+  // CHECK-NOT: {{(retain|release)}}
+  // CHECK: strong_release %0 : $HasUnmanaged
+  // CHECK-NOT: {{(retain|release)}}
+  // CHECK: return [[RESULT]] : $Optional<Unmanaged<AnyObject>>
+
+  // CHECK-LABEL: sil hidden [transparent] @_TToFC15objc_properties12HasUnmanageds3refGSqGVSs9UnmanagedPSs9AnyObject___
+  // CHECK-NOT: {{(retain|release)}}
+  // CHECK: strong_retain %1 : $HasUnmanaged
+  // CHECK-NOT: {{(retain|release)}}
+  // CHECK: [[NATIVE:%.+]] = function_ref @_TFC15objc_properties12HasUnmanageds3refGSqGVSs9UnmanagedPSs9AnyObject___
+  // CHECK-NOT: {{(retain|release)}}
+  // CHECK: apply [[NATIVE]](%0, %1)
+  // CHECK-NOT: {{(retain|release)}}
+  // CHECK: strong_release %1 : $HasUnmanaged
+  // CHECK-NOT: {{(retain|release)}}
+  // CHECK: return
+  var ref: Unmanaged<AnyObject>?
+}
