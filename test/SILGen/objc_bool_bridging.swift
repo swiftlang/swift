@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen %s -import-objc-header %S/Inputs/BoolBridgingTests.h | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-cpu --check-prefix=CHECK-%target-os-%target-cpu
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen %s -import-objc-header %S/Inputs/BoolBridgingTests.h | FileCheck %s --check-prefix=CHECK $(test '%target-os' = 'macosx' -o '(' '%target-os' = 'ios' -a '%target-ptrsize' = '32' ')' && echo '--check-prefix=CHECK-OBJCBOOL')
 
 // REQUIRES: objc_interop
 
@@ -13,12 +13,12 @@ public func testFunctions() {
   // CHECK-NOT: convert
   _ = testCBool(true)
 
-  // CHECK: [[FUNC_2:%.+]] = function_ref @testObjCBool
-  // CHECK: [[BOOL_TO_OBJCBOOL:%.+]] = function_ref @_TF10ObjectiveC22_convertBoolToObjCBoolFSbVS_8ObjCBool
-  // CHECK: [[INPUT_2:%.+]] = apply [[BOOL_TO_OBJCBOOL]]({{%.+}})
-  // CHECK: [[RESULT_2:%.+]] = apply [[FUNC_2]]({{%.+}}) : $@convention(c) (ObjCBool) -> ObjCBool
-  // CHECK: [[OBJCBOOL_TO_BOOL:%.+]] = function_ref @_TF10ObjectiveC22_convertObjCBoolToBoolFVS_8ObjCBoolSb
-  // CHECK: = apply [[OBJCBOOL_TO_BOOL]]([[RESULT_2]])
+  // CHECK-OBJCBOOL: [[FUNC_2:%.+]] = function_ref @testObjCBool
+  // CHECK-OBJCBOOL: [[BOOL_TO_OBJCBOOL:%.+]] = function_ref @_TF10ObjectiveC22_convertBoolToObjCBoolFSbVS_8ObjCBool
+  // CHECK-OBJCBOOL: [[INPUT_2:%.+]] = apply [[BOOL_TO_OBJCBOOL]]({{%.+}})
+  // CHECK-OBJCBOOL: [[RESULT_2:%.+]] = apply [[FUNC_2]]({{%.+}}) : $@convention(c) (ObjCBool) -> ObjCBool
+  // CHECK-OBJCBOOL: [[OBJCBOOL_TO_BOOL:%.+]] = function_ref @_TF10ObjectiveC22_convertObjCBoolToBoolFVS_8ObjCBoolSb
+  // CHECK-OBJCBOOL: = apply [[OBJCBOOL_TO_BOOL]]([[RESULT_2]])
   _ = testObjCBool(true)
 
   // CHECK: [[FUNC_3:%.+]] = function_ref @testDarwinBoolean
@@ -39,12 +39,12 @@ public func testMethods(x: Test) {
   // CHECK-NOT: convert
   _ = x.testCBool(true)
 
-  // CHECK: [[METHOD_2:%.+]] = class_method [volatile] %0 : $Test, #Test.testObjCBool!1.foreign
-  // CHECK: [[BOOL_TO_OBJCBOOL:%.+]] = function_ref @_TF10ObjectiveC22_convertBoolToObjCBoolFSbVS_8ObjCBool
-  // CHECK: [[INPUT_2:%.+]] = apply [[BOOL_TO_OBJCBOOL]]({{%.+}})
-  // CHECK: [[RESULT_2:%.+]] = apply [[METHOD_2]]([[INPUT_2]], %0) : $@convention(objc_method) (ObjCBool, Test) -> ObjCBool
-  // CHECK: [[OBJCBOOL_TO_BOOL:%.+]] = function_ref @_TF10ObjectiveC22_convertObjCBoolToBoolFVS_8ObjCBoolSb
-  // CHECK: = apply [[OBJCBOOL_TO_BOOL]]([[RESULT_2]])
+  // CHECK-OBJCBOOL: [[METHOD_2:%.+]] = class_method [volatile] %0 : $Test, #Test.testObjCBool!1.foreign
+  // CHECK-OBJCBOOL: [[BOOL_TO_OBJCBOOL:%.+]] = function_ref @_TF10ObjectiveC22_convertBoolToObjCBoolFSbVS_8ObjCBool
+  // CHECK-OBJCBOOL: [[INPUT_2:%.+]] = apply [[BOOL_TO_OBJCBOOL]]({{%.+}})
+  // CHECK-OBJCBOOL: [[RESULT_2:%.+]] = apply [[METHOD_2]]([[INPUT_2]], %0) : $@convention(objc_method) (ObjCBool, Test) -> ObjCBool
+  // CHECK-OBJCBOOL: [[OBJCBOOL_TO_BOOL:%.+]] = function_ref @_TF10ObjectiveC22_convertObjCBoolToBoolFVS_8ObjCBoolSb
+  // CHECK-OBJCBOOL: = apply [[OBJCBOOL_TO_BOOL]]([[RESULT_2]])
   _ = x.testObjCBool(true)
 
   // CHECK: [[METHOD_3:%.+]] = class_method [volatile] %0 : $Test, #Test.testDarwinBoolean!1.foreign
@@ -64,10 +64,10 @@ public func testProperties(x: Test) {
   // CHECK: apply [[SETTER_1]]({{%.+}}, %0) : $@convention(objc_method) (Bool, Test) -> ()
   x.propCBool = true
 
-  // CHECK: [[SETTER_2:%.+]] = class_method [volatile] %0 : $Test, #Test.propObjCBool!setter.1.foreign
-  // CHECK: [[BOOL_TO_OBJCBOOL:%.+]] = function_ref @_TF10ObjectiveC22_convertBoolToObjCBoolFSbVS_8ObjCBool
-  // CHECK: [[INPUT_2:%.+]] = apply [[BOOL_TO_OBJCBOOL]]({{%.+}})
-  // CHECK: apply [[SETTER_2]]([[INPUT_2]], %0) : $@convention(objc_method) (ObjCBool, Test) -> ()
+  // CHECK-OBJCBOOL: [[SETTER_2:%.+]] = class_method [volatile] %0 : $Test, #Test.propObjCBool!setter.1.foreign
+  // CHECK-OBJCBOOL: [[BOOL_TO_OBJCBOOL:%.+]] = function_ref @_TF10ObjectiveC22_convertBoolToObjCBoolFSbVS_8ObjCBool
+  // CHECK-OBJCBOOL: [[INPUT_2:%.+]] = apply [[BOOL_TO_OBJCBOOL]]({{%.+}})
+  // CHECK-OBJCBOOL: apply [[SETTER_2]]([[INPUT_2]], %0) : $@convention(objc_method) (ObjCBool, Test) -> ()
   x.propObjCBool = true
 
   // CHECK: [[SETTER_3:%.+]] = class_method [volatile] %0 : $Test, #Test.propDarwinBoolean!setter.1.foreign
@@ -82,11 +82,11 @@ public func testFunctionPointers() {
   // CHECK: = function_ref @_TToFF18objc_bool_bridging20testFunctionPointersFT_T_U_FSbSb : $@convention(c) (Bool) -> Bool
   let x: CBoolFn = { $0 }
   _ = x(true)
-
-  // CHECK: = function_ref @_TToFF18objc_bool_bridging20testFunctionPointersFT_T_U0_FV10ObjectiveC8ObjCBoolS1_ : $@convention(c) (ObjCBool) -> ObjCBool
+  
+  // CHECK-OBJCBOOL: = function_ref @_TToFF18objc_bool_bridging20testFunctionPointersFT_T_U0_FV10ObjectiveC8ObjCBoolS1_ : $@convention(c) (ObjCBool) -> ObjCBool
   let y: ObjCBoolFn = { $0 }
   _ = y(true)
-
+  
   // CHECK: = function_ref @_TToFF18objc_bool_bridging20testFunctionPointersFT_T_U1_FV6Darwin13DarwinBooleanS1_ : $@convention(c) (DarwinBoolean) -> DarwinBoolean
   let z: DarwinBooleanFn = { $0 }
   _ = z(true)
@@ -100,13 +100,13 @@ public func testFunctionPointers() {
 // CHECK: [[RESULT:%.+]] = apply [[NATIVE]](%0) : $@convention(thin) (Bool) -> Bool
 // CHECK: return [[RESULT]] : $Bool
 
-// CHECK-LABEL: sil shared @_TFF18objc_bool_bridging20testFunctionPointersFT_T_U0_FV10ObjectiveC8ObjCBoolS1_
-// CHECK: return %0 : $ObjCBool
+// CHECK-OBJCBOOL-LABEL: sil shared @_TFF18objc_bool_bridging20testFunctionPointersFT_T_U0_FV10ObjectiveC8ObjCBoolS1_
+// CHECK-OBJCBOOL: return %0 : $ObjCBool
 
-// CHECK-LABEL: sil shared @_TToFF18objc_bool_bridging20testFunctionPointersFT_T_U0_FV10ObjectiveC8ObjCBoolS1_
-// CHECK: [[NATIVE:%.+]] = function_ref @_TFF18objc_bool_bridging20testFunctionPointersFT_T_U0_FV10ObjectiveC8ObjCBoolS1_
-// CHECK: [[RESULT:%.+]] = apply [[NATIVE]](%0) : $@convention(thin) (ObjCBool) -> ObjCBool
-// CHECK: return [[RESULT]] : $ObjCBool
+// CHECK-OBJCBOOL-LABEL: sil shared @_TToFF18objc_bool_bridging20testFunctionPointersFT_T_U0_FV10ObjectiveC8ObjCBoolS1_
+// CHECK-OBJCBOOL: [[NATIVE:%.+]] = function_ref @_TFF18objc_bool_bridging20testFunctionPointersFT_T_U0_FV10ObjectiveC8ObjCBoolS1_
+// CHECK-OBJCBOOL: [[RESULT:%.+]] = apply [[NATIVE]](%0) : $@convention(thin) (ObjCBool) -> ObjCBool
+// CHECK-OBJCBOOL: return [[RESULT]] : $ObjCBool
 
 // CHECK-LABEL: sil shared @_TFF18objc_bool_bridging20testFunctionPointersFT_T_U1_FV6Darwin13DarwinBooleanS1_
 // CHECK: return %0 : $DarwinBoolean
@@ -121,11 +121,11 @@ public func testBlocks() {
   // CHECK: = function_ref @_TFF18objc_bool_bridging10testBlocksFT_T_U_FSbSb : $@convention(thin) (Bool) -> Bool
   let x: CBoolBlock = { $0 }
   _ = x(true)
-
-  // CHECK: = function_ref @_TFF18objc_bool_bridging10testBlocksFT_T_U0_FV10ObjectiveC8ObjCBoolS1_ : $@convention(thin) (ObjCBool) -> ObjCBool
+  
+  // CHECK-OBJCBOOL: = function_ref @_TFF18objc_bool_bridging10testBlocksFT_T_U0_FV10ObjectiveC8ObjCBoolS1_ : $@convention(thin) (ObjCBool) -> ObjCBool
   let y: ObjCBoolBlock = { $0 }
   _ = y(true)
-
+  
   // CHECK: = function_ref @_TFF18objc_bool_bridging10testBlocksFT_T_U1_FV6Darwin13DarwinBooleanS1_ : $@convention(thin) (DarwinBoolean) -> DarwinBoolean
   let z: DarwinBooleanBlock = { $0 }
   _ = z(true)
@@ -137,12 +137,12 @@ public func testBlockProps(x: Test) {
   // CHECK: [[SETTER_1:%.+]] = class_method [volatile] %0 : $Test, #Test.propCBoolBlock!setter.1.foreign
   // CHECK: = apply [[SETTER_1]]({{%.+}}, %0) : $@convention(objc_method) (@convention(block) (Bool) -> Bool, Test) -> ()
   x.propCBoolBlock = { $0 }
-
-  // CHECK: = function_ref @_TFF18objc_bool_bridging14testBlockPropsFCSo4TestT_U0_FSbSb : $@convention(thin) (Bool) -> Bool
-  // CHECK: [[SETTER_2:%.+]] = class_method [volatile] %0 : $Test, #Test.propObjCBoolBlock!setter.1.foreign
-  // CHECK: = apply [[SETTER_2]]({{%.+}}, %0) : $@convention(objc_method) (@convention(block) (ObjCBool) -> ObjCBool, Test) -> ()
+  
+  // CHECK-OBJCBOOL: = function_ref @_TFF18objc_bool_bridging14testBlockPropsFCSo4TestT_U0_FSbSb : $@convention(thin) (Bool) -> Bool
+  // CHECK-OBJCBOOL: [[SETTER_2:%.+]] = class_method [volatile] %0 : $Test, #Test.propObjCBoolBlock!setter.1.foreign
+  // CHECK-OBJCBOOL: = apply [[SETTER_2]]({{%.+}}, %0) : $@convention(objc_method) (@convention(block) (ObjCBool) -> ObjCBool, Test) -> ()
   x.propObjCBoolBlock = { $0 }
-
+  
   // CHECK: = function_ref @_TFF18objc_bool_bridging14testBlockPropsFCSo4TestT_U1_FSbSb : $@convention(thin) (Bool) -> Bool
   // CHECK: [[SETTER_3:%.+]] = class_method [volatile] %0 : $Test, #Test.propDarwinBooleanBlock!setter.1.foreign
   // CHECK: = apply [[SETTER_3]]({{%.+}}, %0) : $@convention(objc_method) (@convention(block) (DarwinBoolean) -> DarwinBoolean, Test) -> ()
@@ -156,11 +156,11 @@ public func testFunctionPointerMethods(x: Test) {
   // CHECK: [[RESULT_1:%.+]] = apply [[METHOD_1]]([[CLOSURE_1]], %0)
   // CHECK: function_ref @_TTRXFdCb_dSb_dSb_XFo_dSb_dSb_
   _ = x.testCBoolFnToBlock { $0 }
-
-  // CHECK: [[METHOD_2:%.+]] = class_method [volatile] %0 : $Test, #Test.testObjCBoolFnToBlock!1.foreign
-  // CHECK: [[CLOSURE_2:%.+]] = function_ref @_TToFF18objc_bool_bridging26testFunctionPointerMethodsFCSo4TestT_U0_FV10ObjectiveC8ObjCBoolS2_ : $@convention(c) (ObjCBool) -> ObjCBool
-  // CHECK: [[RESULT_2:%.+]] = apply [[METHOD_2]]([[CLOSURE_2]], %0)
-  // CHECK: function_ref @_TTRXFdCb_dV10ObjectiveC8ObjCBool_dS0__XFo_dSb_dSb_
+  
+  // CHECK-OBJCBOOL: [[METHOD_2:%.+]] = class_method [volatile] %0 : $Test, #Test.testObjCBoolFnToBlock!1.foreign
+  // CHECK-OBJCBOOL: [[CLOSURE_2:%.+]] = function_ref @_TToFF18objc_bool_bridging26testFunctionPointerMethodsFCSo4TestT_U0_FV10ObjectiveC8ObjCBoolS2_ : $@convention(c) (ObjCBool) -> ObjCBool
+  // CHECK-OBJCBOOL: [[RESULT_2:%.+]] = apply [[METHOD_2]]([[CLOSURE_2]], %0)
+  // CHECK-OBJCBOOL: function_ref @_TTRXFdCb_dV10ObjectiveC8ObjCBool_dS0__XFo_dSb_dSb_
   _ = x.testObjCBoolFnToBlock { $0 }
 
   // CHECK: [[METHOD_3:%.+]] = class_method [volatile] %0 : $Test, #Test.testDarwinBooleanFnToBlock!1.foreign
@@ -172,15 +172,15 @@ public func testFunctionPointerMethods(x: Test) {
 
 class NewClass : NSObject {
   // CHECK-LABEL: sil hidden @_TFC18objc_bool_bridging8NewClass12takesClosurefS0_FFSbSbT_ : $@convention(method) (@owned @callee_owned (Bool) -> Bool, @guaranteed NewClass) -> () {
-  // CHECK-LABEL: sil hidden @_TToFC18objc_bool_bridging8NewClass12takesClosurefS0_FFSbSbT_ : $@convention(objc_method) (@convention(block) (ObjCBool) -> ObjCBool, NewClass) -> () {
+  // CHECK-OBJCBOOL-LABEL: sil hidden @_TToFC18objc_bool_bridging8NewClass12takesClosurefS0_FFSbSbT_ : $@convention(objc_method) (@convention(block) (ObjCBool) -> ObjCBool, NewClass) -> () {
   func takesClosure(_: (Bool) -> Bool) {}
 
   // CHECK-LABEL: sil hidden @_TFC18objc_bool_bridging8NewClass15takesCBoolBlockfS0_FbSbSbT_ : $@convention(method) (@owned @convention(block) (Bool) -> Bool, @guaranteed NewClass) -> () {
   // CHECK-LABEL: sil hidden @_TToFC18objc_bool_bridging8NewClass15takesCBoolBlockfS0_FbSbSbT_ : $@convention(objc_method) (@convention(block) (Bool) -> Bool, NewClass) -> () {
   func takesCBoolBlock(_: @convention(block) (Bool) -> Bool) {}
 
-  // CHECK-LABEL: sil hidden @_TFC18objc_bool_bridging8NewClass18takesObjCBoolBlockfS0_FbV10ObjectiveC8ObjCBoolS2_T_ : $@convention(method) (@owned @convention(block) (ObjCBool) -> ObjCBool, @guaranteed NewClass) -> () {
-  // CHECK-LABEL: sil hidden @_TToFC18objc_bool_bridging8NewClass18takesObjCBoolBlockfS0_FbV10ObjectiveC8ObjCBoolS2_T_ : $@convention(objc_method) (@convention(block) (ObjCBool) -> ObjCBool, NewClass) -> () {
+  // CHECK-OBJCBOOL-LABEL: sil hidden @_TFC18objc_bool_bridging8NewClass18takesObjCBoolBlockfS0_FbV10ObjectiveC8ObjCBoolS2_T_ : $@convention(method) (@owned @convention(block) (ObjCBool) -> ObjCBool, @guaranteed NewClass) -> () {
+  // CHECK-OBJCBOOL-LABEL: sil hidden @_TToFC18objc_bool_bridging8NewClass18takesObjCBoolBlockfS0_FbV10ObjectiveC8ObjCBoolS2_T_ : $@convention(objc_method) (@convention(block) (ObjCBool) -> ObjCBool, NewClass) -> () {
   func takesObjCBoolBlock(_: @convention(block) (ObjCBool) -> ObjCBool) {}
 
   // CHECK-LABEL: sil hidden @_TFC18objc_bool_bridging8NewClass23takesDarwinBooleanBlockfS0_FbV6Darwin13DarwinBooleanS2_T_ : $@convention(method) (@owned @convention(block) (DarwinBoolean) -> DarwinBoolean, @guaranteed NewClass) -> () {
