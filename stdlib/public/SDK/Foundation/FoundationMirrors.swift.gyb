@@ -120,11 +120,26 @@ ${getMirrorDecl("NSSet","MembershipContainer")} {
   var quickLookObject: PlaygroundQuickLook? { return nil }
 }
 
+${getMirrorDecl("NSString")} {
+  ${getMirrorBoilerplate("NSString")}
+  
+  var count: Int { get { return 0 } }
+  
+  subscript(_: Int) -> (String, _MirrorType) {
+    _preconditionFailure("_MirrorType access out of bounds")
+  }
+  
+  var summary: String { get { return _value as String } }
+  
+  var quickLookObject: PlaygroundQuickLook? { return .Some(.Text(summary)) }
+}
+
 // conformances
 ${getMirrorConformance("NSURL")}
 ${getMirrorConformance("NSRange")}
 ${getMirrorConformance("NSDate")}
 ${getMirrorConformance("NSSet","MembershipContainer")}
+${getMirrorConformance("NSString")}
 
 extension NSArray : _Reflectable {
   /// Returns a mirror that reflects `self`.
@@ -137,11 +152,5 @@ extension NSDictionary : _Reflectable {
   public func _getMirror() -> _MirrorType {
     let dict: [NSObject : AnyObject] = _convertNSDictionaryToDictionary(self)
     return _reflect(dict)
-  }
-}
-extension NSString : _Reflectable {
-  /// Returns a mirror that reflects `self`.
-  public func _getMirror() -> _MirrorType {
-    return _reflect(self as String)
   }
 }
