@@ -2423,7 +2423,8 @@ ParserResult<CaseStmt> Parser::parseStmtCase() {
   } else if (Status.isSuccess()) {
     diagnose(CaseLoc, diag::case_stmt_without_body,
              CaseLabelItems.back().isDefault())
-        .highlight(SourceRange(CaseLoc, ColonLoc));
+        .highlight(SourceRange(CaseLoc, ColonLoc))
+        .fixItInsertAfter(ColonLoc, " break");
   }
   BraceStmt *Body;
   if (BodyItems.empty()) {

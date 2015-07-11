@@ -410,4 +410,12 @@ func matching_pattern_recursion() {
   }
 }
 
+// <rdar://problem/18776073> Swift's break operator in switch should be indicated in errors
+func r18776073(a : Int?) {
+  switch a {
+    case nil:   // expected-error {{'case' label in a 'switch' should have at least one executable statement}} {{14-14= break}}
+    case _?: break
+  }
+}
+
 
