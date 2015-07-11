@@ -138,15 +138,20 @@ public:
 
   /// Flags that can be used to control name lookup.
 enum class TypeCheckExprFlags {
-  /// Whether we know that the
+  /// Whether we know that the result of the expression is discarded.  This
+  /// disables constraints forcing an lvalue result to be loadable.
   IsDiscarded = 0x01,
+  
+  /// Whether the client wants to disable the structural syntactic restrictions
+  /// that we force for style or other reasons.
+  DisableStructuralChecks = 0x02
 };
   
 typedef OptionSet<TypeCheckExprFlags> TypeCheckExprOptions;
 
 inline TypeCheckExprFlags operator|(TypeCheckExprFlags flag1,
                                     TypeCheckExprFlags flag2) {
-  return TypeCheckExprFlags(flag1) | flag2;
+  return TypeCheckExprFlags((unsigned)flag1 | (unsigned)flag2);
 }
 
   
@@ -169,7 +174,7 @@ typedef OptionSet<NameLookupFlags> NameLookupOptions;
 
 inline NameLookupOptions operator|(NameLookupFlags flag1,
                                    NameLookupFlags flag2) {
-  return NameLookupOptions(flag1) | flag2;
+  return NameLookupOptions((unsigned)flag1 | (unsigned)flag2);
 }
 
 /// Default options for member name lookup.

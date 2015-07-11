@@ -5361,7 +5361,8 @@ ExprRewriter::convertUnavailableToOptional(Expr *expr, ValueDecl *decl,
 
   if (!cs.TC.getLangOpts().EnableExperimentalUnavailableAsOptional) {
     // If the unavailable as optional feature is not enabled, we do not perform
-    // a conversion; instead we will diagnose in swift::performExprDiagnostics().
+    // a conversion; instead we will diagnose in
+    // performSyntacticExprDiagnostics().
     return expr;
   }
 

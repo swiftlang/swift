@@ -820,8 +820,9 @@ static void diagAvailability(TypeChecker &TC, const Expr *E,
 // High-level entry points.
 //===--------------------------------------------------------------------===//
 
-void swift::performExprDiagnostics(TypeChecker &TC, const Expr *E,
-                                   const DeclContext *DC) {
+/// \brief Emit diagnostics for syntactic restrictions on a given expression.
+void swift::performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
+                                            const DeclContext *DC) {
   diagSelfAssignment(TC, E);
   diagSyntacticUseRestrictions(TC, E);
   diagRecursivePropertyAccess(TC, E, DC);

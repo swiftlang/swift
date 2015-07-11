@@ -903,13 +903,6 @@ bool ExprTypeCheckListener::suppressDiagnostics() const {
   return false;
 }
 
-static void diagnoseExpr(TypeChecker &TC, const Expr *E,
-                         const DeclContext *DC,
-                         const ExprTypeCheckListener *listener) {
-  if (listener && listener->suppressDiagnostics())
-    return;
-  performExprDiagnostics(TC, E, DC);
-}
 
 bool TypeChecker::solveForExpression(
     Expr *&expr, DeclContext *dc, Type convertType, Type contextualType,
@@ -1030,7 +1023,12 @@ bool TypeChecker::typeCheckExpression(
     }
   }
 
-  diagnoseExpr(*this, result, dc, listener);
+  // Unless the client has disabled them, perform syntactic checks on the
+  // expression now.
+  if (!options.contains(TypeCheckExprFlags::DisableStructuralChecks)) {
+    if (!listener || !listener->suppressDiagnostics())
+      performSyntacticExprDiagnostics(*this, result, dc);
+  }
 
   expr = result;
   cleanup.disable();

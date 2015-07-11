@@ -2088,20 +2088,14 @@ Expr *FailureDiagnosis::typeCheckIndependentSubExpression(Expr *subExpr) {
   bool unhandledSubExprs =
     // NilLiteralExpr cannot ever be typechecked without context.
     isa<NilLiteralExpr>(subExpr) ||
-    // TypeExprs don't need to be type checked, they are fully resolved.
-    // Checking them complains about needing .self after them.
-    isa<TypeExpr>(subExpr) ||
   
     // TupleExpr often contains things that cannot be typechecked without
     // context (usually from a parameter list).
     isa<TupleExpr>(subExpr) ||
+  
     // InOutExpr needs contextual information otherwise we complain about it not
     // being in an argument context.
-    isa<InOutExpr>(subExpr) ||
-  
-    // @noescape declrefexprs are not allowed as a sole reference, they are
-    // syntactically required to be nested inside an call argument.
-    isa<DeclRefExpr>(subExpr);
+    isa<InOutExpr>(subExpr);
   
   
   if (!unhandledSubExprs ||
@@ -2113,10 +2107,19 @@ Expr *FailureDiagnosis::typeCheckIndependentSubExpression(Expr *subExpr) {
 
     CS->TC.eraseTypeData(subExpr);
         
-    // Passing 'true' to the 'discardedExpr' arg preserves the lvalue type of
+    // Claim that the result is discarded to preserve the lvalue type of
     // the expression.
+    //
+    // Disable structural checks, because we know that the overall expression
+    // has type constraint problems, and we don't want to know about any
+    // syntactic issues in a well-typed subexpression (which might be because
+    // the context is missing).
+    auto options = TypeCheckExprFlags::IsDiscarded|
+                   TypeCheckExprFlags::DisableStructuralChecks;
+    
+    
     bool hadError = CS->TC.typeCheckExpression(subExpr, CS->DC, Type(), Type(),
-                                               TypeCheckExprFlags::IsDiscarded);
+                                               options);
 
     // This is a terrible hack to get around the fact that typeCheckExpression()
     // might change subExpr to point to a new OpenExistentialExpr. In that case,
