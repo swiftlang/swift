@@ -176,6 +176,35 @@ JoinTestSuite.test("${ArrayType}") {
 
 %end
 
+JoinTestSuite.test("ReservesCapacity") {
+  if true {
+    let r = join(MinimalForwardRangeReplaceableCollection<Int>([]), [])
+    expectEqual(0, r.reservedCapacity)
+  }
+  if true {
+    let r = join(MinimalForwardRangeReplaceableCollection([ 42 ]),
+        [ MinimalForwardRangeReplaceableCollection([]) ])
+    expectEqual(0, r.reservedCapacity)
+  }
+
+  if true {
+    let r = join(MinimalForwardRangeReplaceableCollection([ 42 ]),
+        [ MinimalForwardRangeReplaceableCollection([ 1 ]),
+          MinimalForwardRangeReplaceableCollection([ 2, 3, 4 ]),
+          MinimalForwardRangeReplaceableCollection([ 5, 6, 7 ]) ])
+    expectEqual(9, r.reservedCapacity)
+    expectEqual([ 1, 42, 2, 3, 4, 42, 5, 6, 7 ], r.elements)
+  }
+  if true {
+    let r = join(MinimalForwardRangeReplaceableCollection([ 42, 4242 ]),
+        [ MinimalForwardRangeReplaceableCollection([ 1 ]),
+          MinimalForwardRangeReplaceableCollection([ 2, 3, 4 ]),
+          MinimalForwardRangeReplaceableCollection([ 5, 6, 7 ]) ])
+    expectEqual(11, r.reservedCapacity)
+    expectEqual([ 1, 42, 4242, 2, 3, 4, 42, 4242, 5, 6, 7 ], r.elements)
+  }
+}
+
 func join<S: SequenceType where S.Generator.Element == String>(
   separator: String, _ elements: S
 ) -> String {
