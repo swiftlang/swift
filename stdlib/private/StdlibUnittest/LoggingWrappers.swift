@@ -309,11 +309,6 @@ public struct LoggingCollection<Base : CollectionType>
     self.base = base
   }
 
-  public func generate() -> LoggingGenerator<Base.Generator> {
-    ++Log.generate[selfType]
-    return LoggingGenerator(base.generate())
-  }
-
   public var startIndex: Base.Index {
     ++CollectionLog.startIndex[selfType]
     return base.startIndex
@@ -354,6 +349,63 @@ public struct LoggingCollection<Base : CollectionType>
   public var first: Base.Generator.Element? {
     ++CollectionLog.first[selfType]
     return base.first
+  }
+
+  //===--- SequenceType requirements --------------------------------------===//
+  public func generate() -> LoggingGenerator<Base.Generator> {
+    ++Log.generate[selfType]
+    return LoggingGenerator(base.generate())
+  }
+
+  public func underestimateCount() -> Int {
+    ++Log.underestimateCount[selfType]
+    return base.underestimateCount()
+  }
+
+  public func map<T>(
+    @noescape transform: (Base.Generator.Element) -> T
+  ) -> [T] {
+    ++Log.map[selfType]
+    return base.map(transform)
+  }
+
+  public func filter(
+    @noescape includeElement: (Base.Generator.Element) -> Bool
+  ) -> [Base.Generator.Element] {
+    ++Log.filter[selfType]
+    return base.filter(includeElement)
+  }
+  
+  public func _customContainsEquatableElement(
+    element: Base.Generator.Element
+  ) -> Bool? {
+    ++Log._customContainsEquatableElement[selfType]
+    return base._customContainsEquatableElement(element)
+  }
+  
+  /// If `self` is multi-pass (i.e., a `CollectionType`), invoke
+  /// `preprocess` on `self` and return its result.  Otherwise, return
+  /// `nil`.
+  public func _preprocessingPass<R>(
+    preprocess: (LoggingCollection)->R
+  ) -> R? {
+    ++Log._preprocessingPass[selfType]
+    return base._preprocessingPass { _ in preprocess(self) }
+  }
+
+  /// Create a native array buffer containing the elements of `self`,
+  /// in the same order.
+  public func _copyToNativeArrayBuffer()
+    -> _ContiguousArrayBuffer<Base.Generator.Element> {
+    ++Log._copyToNativeArrayBuffer[selfType]
+    return base._copyToNativeArrayBuffer()
+  }
+
+  /// Copy a Sequence into an array.
+  public func _initializeTo(ptr: UnsafeMutablePointer<Base.Generator.Element>)
+    -> UnsafeMutablePointer<Base.Generator.Element> {
+    ++Log._initializeTo[selfType]
+    return base._initializeTo(ptr)
   }
 
   public var base: Base
