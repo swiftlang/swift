@@ -1737,6 +1737,7 @@ private:
   bool visitForcedCheckedCastExpr(ForcedCheckedCastExpr *FCCE);
   bool visitIfExpr(IfExpr *IE);
   bool visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E);
+  bool visitClosureExpr(ClosureExpr *CE);
 };
 } // end anonymous namespace.
 
@@ -1902,11 +1903,10 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure() {
   Type argType;
   if (auto *AE = dyn_cast_or_null<ApplyExpr>(call)) {
     if (AE->getFn()->getSemanticsProvidingExpr() == anchor) {
-#if 0
-      argType = getTypeOfTypeCheckedIndependentSubExpression(AE->getArg());
-#else
+      // FIXME: Need to enable this to get resolved types for the function, but
+      // must tolerate contextually resolved exprs first to handle curried cases
+      //argType = getTypeOfTypeCheckedIndependentSubExpression(AE->getArg());
       argType = AE->getArg()->getType();
-#endif
     }
   }
   
@@ -2981,6 +2981,22 @@ visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E) {
   return diagnoseGeneralFailure();
 }
 
+
+bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
+
+  // ClosureExprs are likely to get some clever handling in the future, but for
+  // now we need to defend against type variables from our constraint system
+  // leaking into recursive constraints systems formed when checking the body
+  // of the closure.  These typevars come into them when the body does name
+  // lookups against the parameter decls.  Handle this by rewriting the
+  // arguments to ErrorType for now.
+  CE->getParams()->forEachVariable([&](VarDecl *VD) {
+    if (VD->getType()->hasTypeVariable())
+      VD->overwriteType(ErrorType::get(CS->getASTContext()));
+  });
+  
+  return visitExpr(CE);
+}
 
 bool FailureDiagnosis::visitExpr(Expr *E) {
   // Check each of our immediate children to see if any of them are
