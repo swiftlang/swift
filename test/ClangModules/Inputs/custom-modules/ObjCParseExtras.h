@@ -139,3 +139,7 @@ __weak id globalWeakVar;
 @optional
 - (void)setBar:(id)bar;
 @end
+
+
+typedef NSObject <NSCopying> *CopyableNSObject;
+typedef SomeCell <NSCopying> *CopyableSomeCell;

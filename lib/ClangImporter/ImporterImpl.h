@@ -941,6 +941,9 @@ public:
   /// \brief Retrieve the NSObject type.
   Type getNSObjectType();
 
+  /// \brief Retrieve the NSObject protocol type.
+  Type getNSObjectProtocolType();
+
   /// \brief Retrieve the NSCopying protocol type.
   Type getNSCopyingType();
 

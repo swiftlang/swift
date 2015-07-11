@@ -16,4 +16,6 @@ print(DISPATCH_QUEUE_CONCURRENT.description)
 print(dispatch_data_empty.description)
 // CHECK-NEXT: <>
 
-
+// Check upcasts and downcasts.
+let mainQueue = dispatch_get_main_queue() as AnyObject
+print(mainQueue is dispatch_queue_t)

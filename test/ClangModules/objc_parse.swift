@@ -492,3 +492,19 @@ func testUnusedResults(ur: UnusedResults) {
 func testCStyle() {
   ExtraSelectors.cStyle(0, 1, 2) // expected-error{{'ExtraSelectors.Type' does not have a member named 'cStyle'}}
 }
+
+func testProtocolQualified(obj: CopyableNSObject, cell: CopyableSomeCell,
+                           plainObj: NSObject, plainCell: SomeCell) {
+  _ = obj as NSObject // expected-error {{'CopyableNSObject' is not convertible to 'NSObject'; did you mean to use 'as!' to force downcast?}}
+  _ = obj as NSObjectProtocol
+  _ = obj as NSCopying
+  _ = obj as SomeCell // expected-error {{'CopyableNSObject' is not convertible to 'SomeCell'; did you mean to use 'as!' to force downcast?}}
+
+  _ = cell as NSObject
+  _ = cell as NSObjectProtocol
+  _ = cell as NSCopying // expected-error {{'CopyableSomeCell' is not convertible to 'NSCopying'; did you mean to use 'as!' to force downcast?}}
+  _ = cell as SomeCell
+  
+  _ = plainObj as CopyableNSObject // expected-error {{'NSObject' is not convertible to 'CopyableNSObject'; did you mean to use 'as!' to force downcast?}}
+  _ = plainCell as CopyableSomeCell // FIXME: This is not really typesafe.
+}

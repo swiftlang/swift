@@ -654,6 +654,31 @@ namespace {
 
         Type importedType = imported->getDeclaredType();
 
+        if (!type->qual_empty()) {
+          // As a special case, turn 'NSObject <NSCopying>' into
+          // 'id <NSObject, NSCopying>', which can be imported more usefully.
+          Type nsObjectTy = Impl.getNSObjectType();
+          if (nsObjectTy && importedType->isEqual(nsObjectTy)) {
+            SmallVector<clang::ObjCProtocolDecl *, 4> protocols{
+              type->qual_begin(), type->qual_end()
+            };
+            auto *nsObjectProto =
+                Impl.getNSObjectProtocolType()->getAnyNominal();
+            auto *clangProto =
+                cast<clang::ObjCProtocolDecl>(nsObjectProto->getClangDecl());
+            protocols.push_back(
+                const_cast<clang::ObjCProtocolDecl *>(clangProto));
+
+            clang::ASTContext &clangCtx = Impl.getClangASTContext();
+            clang::QualType protosOnlyType =
+                clangCtx.getObjCObjectType(clangCtx.ObjCBuiltinIdTy,
+                                           /*type args*/{},
+                                           protocols,
+                                           /*kindof*/false);
+            return Visit(clangCtx.getObjCObjectPointerType(protosOnlyType));
+          }
+        }
+
         if (imported->hasName() &&
             imported->getName().str() == "NSString") {
           return { importedType, ImportHint::NSString };
@@ -2136,9 +2161,10 @@ bool ClangImporter::Implementation::matchesNSObjectBound(Type type) {
   return false;
 }
 
-Type ClangImporter::Implementation::getNSCopyingType() {
-  auto &sema = Instance->getSema();
-  auto clangName = &getClangASTContext().Idents.get("NSCopying");
+static Type getNamedProtocolType(ClangImporter::Implementation &impl,
+                                 StringRef name) {
+  auto &sema = impl.getClangSema();
+  auto clangName = &sema.getASTContext().Idents.get(name);
   assert(clangName);
 
   // Perform name lookup into the global scope.
@@ -2148,7 +2174,7 @@ Type ClangImporter::Implementation::getNSCopyingType() {
     return Type();
 
   for (auto decl : lookupResult) {
-    if (auto swiftDecl = importDecl(decl->getUnderlyingDecl())) {
+    if (auto swiftDecl = impl.importDecl(decl->getUnderlyingDecl())) {
       if (auto protoDecl = dyn_cast<ProtocolDecl>(swiftDecl)) {
         return protoDecl->getDeclaredType();
       }
@@ -2156,6 +2182,14 @@ Type ClangImporter::Implementation::getNSCopyingType() {
   }
 
   return Type();
+}
+
+Type ClangImporter::Implementation::getNSCopyingType() {
+  return getNamedProtocolType(*this, "NSCopying");
+}
+
+Type ClangImporter::Implementation::getNSObjectProtocolType() {
+  return getNamedProtocolType(*this, "NSObject");
 }
 
 Type ClangImporter::Implementation::getCFStringRefType() {
