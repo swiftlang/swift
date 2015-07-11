@@ -177,8 +177,8 @@ extension CollectionType where Generator == IndexingGenerator<Self> {
 /// Supply the default "slicing" `subscript`  for `CollectionType` models
 /// that accept the default associated `SubSequence`, `Slice<Self>`.
 extension CollectionType where SubSequence == Slice<Self> {
-  public subscript(bounds: Range<Index>) -> Slice<Self> {
-    return Slice(base: self, bounds: bounds)
+  public subscript(bounds: Range<Self.Index>) -> Slice<Self> {
+    return Slice(_base: self, bounds: bounds)
   }
 }
 
