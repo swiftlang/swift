@@ -70,8 +70,10 @@ extension SequenceType
     return _base._copyToNativeArrayBuffer()
   }
 
-  /// Copy a Sequence into an array.
-  public func _initializeTo(ptr: UnsafeMutablePointer<Base.Generator.Element>) {
+  /// Copy a Sequence into an array, returning one past the last
+  /// element initialized.
+  public func _initializeTo(ptr: UnsafeMutablePointer<Base.Generator.Element>)
+    -> UnsafeMutablePointer<Base.Generator.Element> {
     return _base._initializeTo(ptr)
   }
 }
@@ -143,7 +145,8 @@ extension CollectionType
   }
 
   /// Copy a Sequence into an array.
-  public func _initializeTo(ptr: UnsafeMutablePointer<Base.Generator.Element>) {
+  public func _initializeTo(ptr: UnsafeMutablePointer<Base.Generator.Element>)
+    -> UnsafeMutablePointer<Base.Generator.Element> {
     return _base._initializeTo(ptr)
   }
 }

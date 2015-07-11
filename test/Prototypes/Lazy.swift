@@ -144,7 +144,9 @@ extension _prext_LazyCollection : SequenceType {
     return _base._copyToNativeArrayBuffer()
   }
   
-  public func _initializeTo(ptr: UnsafeMutablePointer<Base.Generator.Element>) {
+  public func _initializeTo(
+    ptr: UnsafeMutablePointer<Base.Generator.Element>
+  ) -> UnsafeMutablePointer<Base.Generator.Element> {
     return _base._initializeTo(ptr)
   }
 

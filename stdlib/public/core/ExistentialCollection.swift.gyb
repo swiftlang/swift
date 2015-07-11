@@ -125,7 +125,9 @@ internal class _AnySequenceBox {
   func _underestimateCount() -> Int  {_abstract()}
   // FIXME: can't traffic in UnsafeMutablePointer<Element> and
   // _ContiguousArrayBuffer<Element> here due to <rdar://20164041>
-  func _initializeTo(ptr: UnsafeMutablePointer<Void>) {_abstract()}
+  func _initializeTo(ptr: UnsafeMutablePointer<Void>) -> UnsafeMutablePointer<Void> {
+    _abstract()
+  }
   func _copyToNativeArrayBuffer() -> _ContiguousArrayStorageBase {_abstract()}
 }
 
@@ -154,8 +156,9 @@ internal class _${Kind}Box<S : ${Kind}Type>
   override func _underestimateCount() -> Int {
     return _base.underestimateCount()
   }
-  override func _initializeTo(ptr: UnsafeMutablePointer<Void>) {
-    _base._initializeTo(UnsafeMutablePointer(ptr))
+  override func _initializeTo(ptr: UnsafeMutablePointer<Void>) 
+    -> UnsafeMutablePointer<Void> {
+    return UnsafeMutablePointer(_base._initializeTo(UnsafeMutablePointer(ptr)))
   }
   override func _copyToNativeArrayBuffer() -> _ContiguousArrayStorageBase {
     return _base._copyToNativeArrayBuffer()._storage
@@ -241,8 +244,9 @@ extension Any${Kind} {
     return _box._underestimateCount()
   }
   
-  public func _initializeTo(ptr: UnsafeMutablePointer<Element>) {
-    _box._initializeTo(UnsafeMutablePointer(ptr))
+  public func _initializeTo(ptr: UnsafeMutablePointer<Element>)
+    -> UnsafeMutablePointer<Element> {
+    return UnsafeMutablePointer(_box._initializeTo(UnsafeMutablePointer(ptr)))
   }
   
   public func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Element> {

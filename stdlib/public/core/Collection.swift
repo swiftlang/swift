@@ -262,16 +262,20 @@ extension CollectionType {
 extension SequenceType
   where Self : _ArrayType, Self.Element == Self.Generator.Element {
   // A fast implementation for when you are backed by a contiguous array.
-  public func _initializeTo(ptr: UnsafeMutablePointer<Generator.Element>) {
+  public func _initializeTo(ptr: UnsafeMutablePointer<Generator.Element>)
+    -> UnsafeMutablePointer<Generator.Element> {
     let s = self._baseAddressIfContiguous
     if s != nil {
-      ptr.initializeFrom(s, count: self.count)
+      let count = self.count
+      ptr.initializeFrom(s, count: count)
       _fixLifetime(self._owner)
+      return ptr + count
     } else {
       var p = ptr
       for x in self {
         p++.initialize(x)
       }
+      return p
     }
   }
 }

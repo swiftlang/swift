@@ -1864,8 +1864,25 @@ public func checkSequence<
     expected, sequence.generate(), ${trace},
     resiliencyChecks: resiliencyChecks,
     sameValue: sameValue)
+
   expectGE(
     expectedCount, sequence.underestimateCount(), ${trace})
+
+  // Check that _initializeTo does the right thing if we can do so
+  // without destroying the sequence.
+  sequence._preprocessingPass { (sequence)->Void in 
+    var count = 0
+    for _ in sequence { ++count }
+    let buf = UnsafeMutablePointer<S.Generator.Element>.alloc(count)
+    let end = sequence._initializeTo(buf)
+    expectTrue(end == buf + count, "_initializeTo returned the wrong value")
+    var j = expected.startIndex
+    for i in 0..<(end - buf) {
+      expectTrue(sameValue(expected[j++], buf[i]))
+    }
+    buf.destroy(end - buf)
+    buf.dealloc(count)
+  }
 }
 
 public func checkSequence<

@@ -86,8 +86,10 @@ public protocol SequenceType {
   /// in the same order.
   func _copyToNativeArrayBuffer() -> _ContiguousArrayBuffer<Generator.Element>
 
-  /// Copy a Sequence into an array.
+  /// Copy a Sequence into an array, returning one past the last
+  /// element initialized.
   func _initializeTo(ptr: UnsafeMutablePointer<Generator.Element>)
+    -> UnsafeMutablePointer<Generator.Element>
 }
 
 /// A default generate() function for `GeneratorType` instances that
@@ -159,11 +161,13 @@ public func underestimateCount<T : SequenceType>(x: T) -> Int {
 }
 
 extension SequenceType {
-  public func _initializeTo(ptr: UnsafeMutablePointer<Generator.Element>) {
+  public func _initializeTo(ptr: UnsafeMutablePointer<Generator.Element>)
+    -> UnsafeMutablePointer<Generator.Element> {
     var p = UnsafeMutablePointer<Generator.Element>(ptr)
     for x in GeneratorSequence(self.generate()) {
       p++.initialize(x)
     }
+    return p
   }
 }
 
