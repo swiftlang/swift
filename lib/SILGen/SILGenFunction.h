@@ -32,20 +32,6 @@ class ManagedValue;
 class RValue;
 class TemporaryInitialization;
 
-/// Represents a temporary allocation.
-struct Materialize {
-  /// The address of the allocation.
-  SILValue address;
-  
-  /// The cleanup to dispose of the value before deallocating the buffer.
-  /// This cleanup can be killed by calling the consume method.
-  CleanupHandle valueCleanup;
-  
-  /// Load and claim ownership of the value in the buffer. Does not deallocate
-  /// the buffer.
-  ManagedValue claim(SILGenFunction &gen, SILLocation loc);
-};
-
 /// How a method is dispatched.
 enum class MethodDispatch {
   // The method implementation can be referenced statically.
@@ -973,8 +959,6 @@ public:
                                 SILDeclRef function,
                                 ArrayRef<Substitution> forwardSubs,
                                 AnyFunctionRef TheClosure);
-  
-  Materialize emitMaterialize(SILLocation loc, ManagedValue v);
   
   ArgumentSource prepareAccessorBaseArg(SILLocation loc, ManagedValue base,
                                         SILDeclRef accessor);

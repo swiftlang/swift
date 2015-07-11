@@ -251,7 +251,7 @@ public:
   ///
   /// \param base - always an address, but possibly an r-value
   virtual void writeback(SILGenFunction &gen, SILLocation loc,
-                         ManagedValue base, Materialize temporary,
+                         ManagedValue base, ManagedValue temporary,
                          ArrayRef<SILValue> otherInfo) &&;
 };
 

@@ -364,7 +364,9 @@ struct FailableModel: FailableRequirement, IUOFailableRequirement {
 
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWV9witnesses13FailableModelS_22IUOFailableRequirementS_FS1_CuRq_S1__fMq_FT3fooSi_GSQq__
   // CHECK: bb0([[SELF:%[0-9]+]] : $*ImplicitlyUnwrappedOptional<FailableModel>, [[FOO:%[0-9]+]] : $Int, [[META:%[0-9]+]] : $@thick FailableModel.Type):
-  // CHECK: select_enum_addr [[RESULT_ADDR:%[0-9]+]]#1
+  // CHECK: [[FN:%.*]] = function_ref @_TFV9witnesses13FailableModelCfMS0_FT3fooSi_GSqS0__
+  // CHECK: [[RESULT:%.*]] = apply [[FN]](
+  // CHECK: select_enum [[RESULT]] : $Optional<FailableModel>,
   // CHECK: cond_br
   // CHECK: enum $ImplicitlyUnwrappedOptional<FailableModel>, #ImplicitlyUnwrappedOptional.None!enumelt
   init?(foo: Int) {}
@@ -413,8 +415,8 @@ final class FailableClassModel: FailableClassRequirement, IUOFailableClassRequir
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses18FailableClassModelS_24FailableClassRequirementS_FS1_CuRq_S1__fMq_FT3fooSi_GSqq__
 
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses18FailableClassModelS_27IUOFailableClassRequirementS_FS1_CuRq_S1__fMq_FT3fooSi_GSQq__
-  // CHECK: select_enum_addr
-  // CHECK: unchecked_take_enum_data_addr
+  // CHECK: select_enum
+  // CHECK: unchecked_enum_data
   // CHECK: enum $ImplicitlyUnwrappedOptional{{.*}}Some
   // CHECK: enum $ImplicitlyUnwrappedOptional{{.*}}None
   // CHECK: return [[RESULT:%[0-9]+]] : $ImplicitlyUnwrappedOptional<FailableClassModel>
@@ -430,8 +432,8 @@ final class IUOFailableClassModel: NonFailableClassRefinement, IUOFailableClassR
   init!(foo: Int) {}
 
   // CHECK-LABEL: sil hidden [transparent] [thunk] @_TTWC9witnesses21IUOFailableClassModelS_24FailableClassRequirementS_FS1_CuRq_S1__fMq_FT3fooSi_GSqq__
-  // CHECK: select_enum_addr
-  // CHECK: unchecked_take_enum_data_addr
+  // CHECK: select_enum
+  // CHECK: unchecked_enum_data
   // CHECK: enum $Optional{{.*}}Some
   // CHECK: enum $Optional{{.*}}None
   // CHECK: return {{.*}} : $Optional<IUOFailableClassModel>

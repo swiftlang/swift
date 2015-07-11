@@ -43,7 +43,7 @@ struct LLVM_LIBRARY_VISIBILITY LValueWriteback {
   SILLocation loc;
   std::unique_ptr<LogicalPathComponent> component;
   ManagedValue base;
-  Materialize temp;
+  ManagedValue temp;
   SmallVector<SILValue, 2> ExtraInfo;
 
   ~LValueWriteback() {}
@@ -53,7 +53,7 @@ struct LLVM_LIBRARY_VISIBILITY LValueWriteback {
   LValueWriteback() = default;
   LValueWriteback(SILLocation loc,
                   std::unique_ptr<LogicalPathComponent> &&comp,
-                  ManagedValue base, Materialize temp,
+                  ManagedValue base, ManagedValue temp,
                   ArrayRef<SILValue> extraInfo)
     : loc(loc), component(std::move(comp)), base(base), temp(temp) {
     ExtraInfo.append(extraInfo.begin(), extraInfo.end());
@@ -93,28 +93,6 @@ void SILGenFunction::freeWritebackStack() {
   assert((!WritebackStack || WritebackStack->empty()) &&
          "entries remaining on writeback stack at end of function!");
   delete WritebackStack;
-}
-
-Materialize SILGenFunction::emitMaterialize(SILLocation loc, ManagedValue v) {
-  // Address-only values are already materialized.
-  if (v.getType().isAddress()) {
-    assert(v.getType().isAddressOnly(SGM.M) && "can't materialize an l-value");
-    return Materialize{v.getValue(), v.getCleanup()};
-  }
-  
-  assert(!v.isLValue() && "materializing a non-address-only lvalue?!");
-  auto &lowering = getTypeLowering(v.getType().getSwiftType());
-  
-  // We don't use getBufferForExprResult here because the result of a
-  // materialization is *not* the value, but an address of the value.
-  SILValue tmpMem = emitTemporaryAllocation(loc, v.getType());
-  v.forwardInto(*this, loc, tmpMem);
-  
-  CleanupHandle valueCleanup = CleanupHandle::invalid();
-  if (!lowering.isTrivial())
-    valueCleanup = enterDestroyCleanup(tmpMem);
-  
-  return Materialize{tmpMem, valueCleanup};
 }
 
 //===----------------------------------------------------------------------===//
@@ -229,34 +207,26 @@ ManagedValue LogicalPathComponent::getMaterialized(SILGenFunction &gen,
 
   // Push a writeback for the temporary.
   gen.getWritebackStack().emplace_back(loc, std::move(clonedComponent), base,
-                                       Materialize{temporary.getValue(),
-                                                   temporary.getCleanup()},
-                                       ArrayRef<SILValue>());
+                                       temporary, ArrayRef<SILValue>());
   return temporary.borrow();
 }
 
 void LogicalPathComponent::writeback(SILGenFunction &gen, SILLocation loc,
-                                     ManagedValue base, Materialize temporary,
+                                     ManagedValue base, ManagedValue temporary,
                                      ArrayRef<SILValue> otherInfo) && {
   assert(otherInfo.empty() && "unexpected otherInfo parameter!");
-  ManagedValue mv = temporary.claim(gen, loc);
-  std::move(*this).set(gen, loc, RValue(gen, loc, getSubstFormalType(), mv),
-                       base);
-}
 
-ManagedValue Materialize::claim(SILGenFunction &gen, SILLocation loc) {
-  auto &addressTL = gen.getTypeLowering(address.getType());
-  if (addressTL.isAddressOnly()) {
-    // We can use the temporary as an address-only rvalue directly.
-    return ManagedValue(address, valueCleanup);
+  // Load the value from the temporary if it's not address-only.
+  assert(temporary.getType().isAddress());
+  auto &tempTL = gen.getTypeLowering(temporary.getType());
+  if (!tempTL.isAddressOnly()) {
+    temporary = gen.emitLoad(loc, temporary.forward(gen), tempTL,
+                             SGFContext(), IsTake);
   }
 
-  // A materialized temporary is always its own type-of-rvalue because
-  // we did a semantic load to produce it in the first place.
-
-  if (valueCleanup.isValid())
-    gen.Cleanups.forwardCleanup(valueCleanup);
-  return gen.emitLoad(loc, address, addressTL, SGFContext(), IsTake);
+  std::move(*this).set(gen, loc, RValue(gen, loc, getSubstFormalType(),
+                                        temporary),
+                       base);
 }
 
 WritebackScope::WritebackScope(SILGenFunction &g)
@@ -859,15 +829,14 @@ namespace {
       // access for stored properties with didSet.
       gen.getWritebackStack().emplace_back(loc, std::move(clonedComponent),
                                            base,
-                                           Materialize{address,
-                                                       CleanupHandle::invalid()},
+                                           ManagedValue::forUnmanaged(address),
                                            extraInfo);
 
       return ManagedValue::forLValue(address);
     }
 
     void writeback(SILGenFunction &gen, SILLocation loc,
-                   ManagedValue base, Materialize temporary,
+                   ManagedValue base, ManagedValue temporary,
                    ArrayRef<SILValue> extraInfo) && override {
       // If we don't have otherInfo, we don't have to conditionalize
       // the writeback.
@@ -935,7 +904,7 @@ namespace {
         }
 
         SILValue temporaryPointer =
-          gen.B.createAddressToPointer(loc, temporary.address,
+          gen.B.createAddressToPointer(loc, temporary.getValue(),
                                        SILType::getRawPointerType(ctx));
 
         gen.B.createApply(loc, callback, {
@@ -1093,7 +1062,7 @@ namespace {
     }
 
     void writeback(SILGenFunction &gen, SILLocation loc,
-                   ManagedValue base, Materialize temporary,
+                   ManagedValue base, ManagedValue temporary,
                    ArrayRef<SILValue> otherInfo) && override {
       gen.B.createStrongUnpin(loc, base.forward(gen));
     }
@@ -1160,7 +1129,7 @@ namespace {
         std::unique_ptr<LogicalPathComponent>
           component(new UnpinPseudoComponent(getTypeData()));
         gen.getWritebackStack().emplace_back(loc, std::move(component),
-                                             result.second, Materialize(),
+                                             result.second, ManagedValue(),
                                              ArrayRef<SILValue>());
         return result.first;
       }

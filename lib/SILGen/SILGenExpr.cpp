@@ -2277,13 +2277,8 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
       break;
     }
     case OTK_None: {
-      // Materialize the value so we can pass it to
-      // emitCheckedGetOptionalValueFrom, which requires it to be indirect.
-      auto mat = SGF.emitMaterialize(E, newSelf);
-
-      auto matMV = ManagedValue(mat.address, mat.valueCleanup);
       // If the current constructor is not failable, force out the value.
-      newSelf = SGF.emitCheckedGetOptionalValueFrom(E, matMV,
+      newSelf = SGF.emitCheckedGetOptionalValueFrom(E, newSelf,
                                          SGF.getTypeLowering(newSelf.getType()),
                                          SGFContext());
       break;
