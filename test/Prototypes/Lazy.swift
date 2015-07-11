@@ -59,11 +59,8 @@ extension SequenceType {
 //===--- LazySequence tests -----------------------------------------------===//
 var tests = TestSuite("Lazy")
 
-tests.test("LazySequence") {
+tests.test("LazySequence/SequenceType") {
   let expected = (0..<100).map { OpaqueValue($0) }
-  var g0 = MinimalSequence(expected)._prext_lazy.generate()
-  var a = g0.next()!
-  expectType(OpaqueValue<Int>.self, &a)
   checkSequence(
     expected, MinimalSequence(expected)._prext_lazy,
     resiliencyChecks: .none
@@ -71,6 +68,25 @@ tests.test("LazySequence") {
     (x: OpaqueValue<Int>, y: OpaqueValue<Int>) -> Bool in 
     x.value == y.value
   }
+}
+
+tests.test("LazySequence/Passthrough") {
+  // Test that LazySequence passes operations that might be optimized
+  // through to its underlying sequence.
+  var a = (0..<100).map { OpaqueValue($0) }
+  let base = LoggingSequence(a)
+  let s = base._prext_lazy
+  _ = s.generate()
+  let baseType = base.dynamicType
+  expectEqual(1, SequenceLog.generate[baseType])
+  _ = s.underestimateCount()
+  expectEqual(1, SequenceLog.underestimateCount[baseType])
+  _ = s._customContainsEquatableElement( OpaqueValue(0) )
+  expectEqual(1, SequenceLog._customContainsEquatableElement[baseType])
+  _ = s._copyToNativeArrayBuffer()
+  expectEqual(1, SequenceLog._copyToNativeArrayBuffer[baseType])
+  _ = s._initializeTo(&a)
+  expectEqual(1, SequenceLog._initializeTo[baseType])
 }
 
 
