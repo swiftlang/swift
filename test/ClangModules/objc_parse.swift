@@ -171,7 +171,7 @@ func keyedSubscripting(b: B, idx: A, a: A) {
   dict[NSString()] = a
   let value = dict[NSString()]
 
-  dict[nil] = a // expected-error {{cannot assign a value of type 'A' to a value of type 'AnyObject?'}}
+  dict[nil] = a // expected-error {{type 'NSCopying' does not conform to protocol 'NilLiteralConvertible'}}
   let q = dict[nil]  // expected-error {{type 'NSCopying' does not conform to protocol 'NilLiteralConvertible'}}
   _ = q
 }

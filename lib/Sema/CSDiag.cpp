@@ -1472,9 +1472,14 @@ resolveImmutableBase(Expr *expr, ConstraintSystem &CS) {
   if (auto *SE = dyn_cast<SubscriptExpr>(expr)) {
     // If we found a decl for the subscript, check to see if it is a set-only
     // subscript decl.
-    auto loc = CS.getConstraintLocator(SE, ConstraintLocator::SubscriptMember);
-    auto *member =
-      dyn_cast_or_null<SubscriptDecl>(findResolvedMemberRef(loc, CS));
+    SubscriptDecl *member = nullptr;
+    if (SE->hasDecl())
+      member = dyn_cast_or_null<SubscriptDecl>(SE->getDecl().getDecl());
+    
+    if (!member) {
+      auto loc = CS.getConstraintLocator(SE,ConstraintLocator::SubscriptMember);
+      member = dyn_cast_or_null<SubscriptDecl>(findResolvedMemberRef(loc, CS));
+    }
 
     // If it isn't settable, return it.
     if (member) {
@@ -2077,12 +2082,30 @@ Expr *FailureDiagnosis::typeCheckIndependentSubExpression(Expr *subExpr) {
   // FIXME: expressions are never removed from this set.
   CS->TC.addExprForDiagnosis(subExpr, subExpr);
   
-  if (!isa<ClosureExpr>(subExpr) &&
-      (isa<ApplyExpr>(subExpr) || isa<ArrayExpr>(subExpr) ||
-       isa<ForceValueExpr>(subExpr) ||
-       isa<AssignExpr>(subExpr) ||
-       isa<IfExpr>(subExpr) ||
-       typeIsNotSpecialized(subExpr->getType()))) {
+  if (isa<ClosureExpr>(subExpr))
+    return subExpr;
+  
+  bool unhandledSubExprs =
+    // NilLiteralExpr cannot ever be typechecked without context.
+    isa<NilLiteralExpr>(subExpr) ||
+    // TypeExprs don't need to be type checked, they are fully resolved.
+    // Checking them complains about needing .self after them.
+    isa<TypeExpr>(subExpr) ||
+  
+    // TupleExpr often contains things that cannot be typechecked without
+    // context (usually from a parameter list).
+    isa<TupleExpr>(subExpr) ||
+    // InOutExpr needs contextual information otherwise we complain about it not
+    // being in an argument context.
+    isa<InOutExpr>(subExpr) ||
+  
+    // @noescape declrefexprs are not allowed as a sole reference, they are
+    // syntactically required to be nested inside an call argument.
+    isa<DeclRefExpr>(subExpr);
+  
+  
+  if (!unhandledSubExprs ||
+      typeIsNotSpecialized(subExpr->getType())) {
     
     // Store off the sub-expression, in case a new one is provided via the
     // type check operation.

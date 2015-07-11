@@ -91,7 +91,7 @@ func badTest1() {
 }
 func badTest2() {
   var x = 0
-  x = Swift //  expected-error {{cannot assign a value of type 'module<Swift>' to a value of type 'Int'}}
+  x = Swift //  expected-error {{expected module member name after module name}} expected-error {{cannot assign a value of type 'module<Swift>' to a value of type 'Int'}}
   _ = x
 }
 func badTest3() {

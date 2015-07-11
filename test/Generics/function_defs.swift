@@ -143,7 +143,7 @@ protocol IntSubscriptable {
   subscript (index : Int) -> ElementType { get  }
 }
 
-// expected-note @+1 2 {{mark parameter with 'var' to make it mutable}}
+// expected-note @+1 {{mark parameter with 'var' to make it mutable}}
 func subscripting<T : protocol<Subscriptable, IntSubscriptable>>(t: T) {
   var index = t.getIndex()
   var value = t.getValue()
@@ -152,7 +152,7 @@ func subscripting<T : protocol<Subscriptable, IntSubscriptable>>(t: T) {
   value = t[index]
   t[index] = value // expected-error{{cannot assign through subscript: 't' is a 'let' constant}}
   element = t[17]
-  t[42] = element // expected-error{{cannot assign through subscript: 't' is a 'let' constant}}
+  t[42] = element // expected-error{{cannot assign through subscript: subscript is get-only}}
 
   t[value] = 17 // expected-error{{cannot subscript a value of type 'T' with an index of type 'T.Value'}}
   // expected-note @-1 {{overloads for 'subscript' exist with these partially matching parameter lists: (Self.Index), (Int)}}
