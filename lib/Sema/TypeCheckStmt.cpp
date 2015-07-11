@@ -403,7 +403,7 @@ public:
                                        RS->isImplicit());
     }
 
-    auto failed = TC.typeCheckExpression(E, DC, ResultTy, Type(), false);
+    auto failed = TC.typeCheckExpression(E, DC, ResultTy);
     RS->setResult(E);
     
     if (failed) {
@@ -421,7 +421,7 @@ public:
     Type exnType = TC.getExceptionType(DC, TS->getThrowLoc());
     if (!exnType) return TS;
     
-    auto failed = TC.typeCheckExpression(E, DC, exnType, Type(), false);
+    auto failed = TC.typeCheckExpression(E, DC, exnType);
     TS->setSubExpr(E);
 
     if (failed) return nullptr;
@@ -434,7 +434,7 @@ public:
     TC.typeCheckDecl(DS->getTempDecl(), /*isFirstPass*/false);
 
     Expr *theCall = DS->getCallExpr();
-    if (!TC.typeCheckExpression(theCall, DC, Type(), Type(), false))
+    if (!TC.typeCheckExpression(theCall, DC))
       return nullptr;
     DS->setCallExpr(theCall);
     
@@ -523,7 +523,7 @@ public:
 
     if (auto *Initializer = FS->getInitializer().getPtrOrNull()) {
       if (TC.typeCheckExpression(Initializer, DC, Type(), Type(),
-                                 /*discardedExpr=*/true))
+                                 TypeCheckExprFlags::IsDiscarded))
         return nullptr;
       FS->setInitializer(Initializer);
     }
@@ -536,7 +536,7 @@ public:
 
     if (auto *Increment = FS->getIncrement().getPtrOrNull()) {
       if (TC.typeCheckExpression(Increment, DC, Type(), Type(),
-                                 /*discardedExpr=*/true))
+                                 TypeCheckExprFlags::IsDiscarded))
         return nullptr;
       FS->setIncrement(Increment);
     }
@@ -815,13 +815,7 @@ public:
   Stmt *visitSwitchStmt(SwitchStmt *S) {
     // Type-check the subject expression.
     Expr *subjectExpr = S->getSubjectExpr();
-    bool hadTypeError = false;
-
-    if (TC.typeCheckExpression(subjectExpr, DC, Type(), Type(),
-                               /*discardedExpr=*/false)) {
-      hadTypeError = true;
-    }
-    
+    bool hadTypeError = TC.typeCheckExpression(subjectExpr, DC);
     subjectExpr = TC.coerceToMaterializable(subjectExpr);
     
     if (!subjectExpr)
@@ -1063,10 +1057,13 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
         break;
 
       // Type check the expression.
+      TypeCheckExprOptions options;
       bool isDiscarded = !(IsREPL && isa<TopLevelCodeDecl>(DC))
         && !TC.Context.LangOpts.Playground
         && !TC.Context.LangOpts.DebuggerSupport;
-      if (TC.typeCheckExpression(SubExpr, DC, Type(), Type(), isDiscarded)) {
+      if (isDiscarded) options = TypeCheckExprFlags::IsDiscarded;
+      
+      if (TC.typeCheckExpression(SubExpr, DC, Type(), Type(), options)) {
         elem = SubExpr;
         continue;
       }
@@ -1133,8 +1130,7 @@ static void checkDefaultArguments(TypeChecker &tc, Pattern *pattern,
 
         // Type-check the initializer, then flag that we did so.
         if (tc.typeCheckExpression(e, initContext,
-                                   field.getPattern()->getType(), Type(),
-                                   /*discardedExpr=*/false))
+                                   field.getPattern()->getType()))
           field.getInit()->setExpr(field.getInit()->getExpr(), true);
         else
           field.getInit()->setExpr(e, true);
@@ -1246,11 +1242,12 @@ Expr* TypeChecker::constructCallToSuperInit(ConstructorDecl *ctor,
     virtual bool suppressDiagnostics() const { return true; }
   } listener;
 
-  if (!typeCheckExpression(r, ctor, Type(), Type(), /*discardedExpr=*/true,
-                           FreeTypeVariableBinding::Disallow, &listener))
-    return r;
-
-  return 0;
+  if (typeCheckExpression(r, ctor, Type(), Type(),
+                          TypeCheckExprFlags::IsDiscarded,
+                          FreeTypeVariableBinding::Disallow, &listener))
+    return nullptr;
+  
+  return r;
 }
 
 /// Check a super.init call.

@@ -477,10 +477,10 @@ public:
                    Added<Expr *> &parsedExpr) {
     DiagnosticEngine diags(Ctx.SourceMgr);
     ErrorGatherer errorGatherer(diags);
-    const bool discardedExpr = false;
   
     TypeChecker TC(Ctx, diags);
-    TC.typeCheckExpression(*parsedExpr, DC, Type(), Type(), discardedExpr,
+    TC.typeCheckExpression(*parsedExpr, DC, Type(), Type(),
+                           TypeCheckExprOptions(),
                            FreeTypeVariableBinding::GenericParameters);
     
     if (*parsedExpr) {

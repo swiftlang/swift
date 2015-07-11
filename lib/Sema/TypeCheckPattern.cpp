@@ -1115,8 +1115,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
         Expr *init = initHandle->getExpr();
         if (initHandle->alreadyChecked()) {
           // Nothing to do
-        } else if (typeCheckExpression(init, dc, CoercionType, Type(),
-                                       /*discardedExpr=*/false)) {
+        } else if (typeCheckExpression(init, dc, CoercionType)) {
           initHandle->setExpr(initHandle->getExpr(), true);
         } else {
           initHandle->setExpr(init, true);

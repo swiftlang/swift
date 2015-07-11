@@ -2714,9 +2714,7 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
     // Check the raw value expr, if we have one.
     if (auto *rawValue = elt->getRawValueExpr()) {
       Expr *typeCheckedExpr = rawValue;
-      if (!TC.typeCheckExpression(typeCheckedExpr, ED, rawTy,
-                                  /*contextualType=*/Type(),
-                                  /*discarded=*/false)) {
+      if (!TC.typeCheckExpression(typeCheckedExpr, ED, rawTy)) {
         elt->setTypeCheckedRawValueExpr(typeCheckedExpr);
       }
       lastExplicitValueElt = elt;
@@ -2730,7 +2728,7 @@ static void checkEnumRawValues(TypeChecker &TC, EnumDecl *ED) {
       }
       elt->setRawValueExpr(nextValue);
       Expr *typeChecked = nextValue;
-      if (!TC.typeCheckExpression(typeChecked, ED, rawTy, Type(), false))
+      if (!TC.typeCheckExpression(typeChecked, ED, rawTy))
         elt->setTypeCheckedRawValueExpr(typeChecked);
     }
     prevValue = elt->getRawValueExpr();
@@ -5279,8 +5277,7 @@ public:
           TC.diagnose(rawValue->getLoc(), diag::enum_raw_value_without_raw_type);
           // Recover by setting the raw type as this element's type.
           Expr *typeCheckedExpr = rawValue;
-          if (!TC.typeCheckExpression(typeCheckedExpr, ED, rawTy, Type(),
-                                      /*inExpression=*/false)) {
+          if (!TC.typeCheckExpression(typeCheckedExpr, ED, rawTy)) {
             EED->setTypeCheckedRawValueExpr(typeCheckedExpr);
             TC.checkEnumElementErrorHandling(EED);
           }
@@ -6897,7 +6894,7 @@ void TypeChecker::addImplicitEnumConformances(EnumDecl *ED) {
     if (elt->getTypeCheckedRawValueExpr()) continue;
     Expr *typeChecked = elt->getRawValueExpr();
     Type rawTy = ArchetypeBuilder::mapTypeIntoContext(ED, ED->getRawType());
-    bool error = typeCheckExpression(typeChecked, ED, rawTy, Type(), false);
+    bool error = typeCheckExpression(typeChecked, ED, rawTy);
     assert(!error); (void)error;
     elt->setTypeCheckedRawValueExpr(typeChecked);
     checkEnumElementErrorHandling(elt);

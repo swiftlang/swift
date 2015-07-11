@@ -674,7 +674,7 @@ Optional<Type> swift::getTypeOfCompletionContextExpr(ASTContext &Ctx,
   TypeChecker TC(Ctx, diags);
   // Try to solve for the actual type of the expression.
   if (auto T = TC.getTypeOfExpressionWithoutApplying(
-          parsedExpr, DC, Type(), Type(), /*discardedExpr=*/true,
+          parsedExpr, DC, Type(), Type(),
           FreeTypeVariableBinding::GenericParameters))
     return T;
 

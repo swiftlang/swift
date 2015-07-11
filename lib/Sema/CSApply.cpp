@@ -3676,8 +3676,7 @@ getCallerDefaultArg(TypeChecker &tc, DeclContext *dc,
   // literal expression.
   Expr *init = new (tc.Context) MagicIdentifierLiteralExpr(magicKind, loc,
                                                            /*Implicit=*/true);
-  bool invalid = tc.typeCheckExpression(init, dc, defArg.second, Type(),
-                                        /*discardedExpr=*/false);
+  bool invalid = tc.typeCheckExpression(init, dc, defArg.second);
   assert(!invalid && "conversion cannot fail");
   (void)invalid;
   return {init, defArg.first};

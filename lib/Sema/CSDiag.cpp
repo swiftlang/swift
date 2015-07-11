@@ -2116,7 +2116,7 @@ Expr *FailureDiagnosis::typeCheckIndependentSubExpression(Expr *subExpr) {
     // Passing 'true' to the 'discardedExpr' arg preserves the lvalue type of
     // the expression.
     bool hadError = CS->TC.typeCheckExpression(subExpr, CS->DC, Type(), Type(),
-                                               /*discardedExpr=*/true);
+                                               TypeCheckExprFlags::IsDiscarded);
 
     // This is a terrible hack to get around the fact that typeCheckExpression()
     // might change subExpr to point to a new OpenExistentialExpr. In that case,

@@ -136,6 +136,21 @@ public:
   }
 };
 
+  /// Flags that can be used to control name lookup.
+enum class TypeCheckExprFlags {
+  /// Whether we know that the
+  IsDiscarded = 0x01,
+};
+  
+typedef OptionSet<TypeCheckExprFlags> TypeCheckExprOptions;
+
+inline TypeCheckExprFlags operator|(TypeCheckExprFlags flag1,
+                                    TypeCheckExprFlags flag2) {
+  return TypeCheckExprFlags(flag1) | flag2;
+}
+
+  
+  
 /// Flags that can be used to control name lookup.
 enum class NameLookupFlags {
   /// Whether we know that this lookup is always a private dependency.
@@ -928,7 +943,7 @@ public:
   ///
   /// \see typeCheckExpression
   bool solveForExpression(Expr *&expr, DeclContext *dc, Type convertType,
-                          Type contextualType, bool discardedExpr,
+                          Type contextualType,
                           FreeTypeVariableBinding allowFreeTypeVariables,
                           ExprTypeCheckListener *listener,
                           constraints::ConstraintSystem &cs,
@@ -968,8 +983,7 @@ public:
   /// inform the type of the expression, it won't result in a conversion
   /// constraint being applied to the expression.)
   ///
-  /// \param discardedExpr True if the result of this expression will be
-  /// discarded.
+  /// \param options Options that control how type checking is performed.
   ///
   /// \param allowFreeTypeVariables Whether free type variables are allowed in
   /// the solution, and what to do with them.
@@ -980,9 +994,9 @@ public:
   ///
   /// \returns true if an error occurred, false otherwise.
   bool typeCheckExpression(Expr *&expr, DeclContext *dc,
-                           Type convertType,
-                           Type contextualType,
-                           bool discardedExpr,
+                           Type convertType = Type(),
+                           Type contextualType = Type(),
+                           TypeCheckExprOptions options =TypeCheckExprOptions(),
                            FreeTypeVariableBinding allowFreeTypeVariables
                              = FreeTypeVariableBinding::Disallow,
                            ExprTypeCheckListener *listener = nullptr);
@@ -1014,7 +1028,7 @@ public:
   /// FIXME: expr may still be modified...
   Optional<Type> getTypeOfExpressionWithoutApplying(
       Expr *&expr, DeclContext *dc, Type convertType, Type contextualType,
-      bool discardedExpr, FreeTypeVariableBinding allowFreeTypeVariables =
+      FreeTypeVariableBinding allowFreeTypeVariables =
                               FreeTypeVariableBinding::Disallow,
       ExprTypeCheckListener *listener = nullptr);
 

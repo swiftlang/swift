@@ -913,7 +913,7 @@ static void diagnoseExpr(TypeChecker &TC, const Expr *E,
 
 bool TypeChecker::solveForExpression(
     Expr *&expr, DeclContext *dc, Type convertType, Type contextualType,
-    bool discardedExpr, FreeTypeVariableBinding allowFreeTypeVariables,
+    FreeTypeVariableBinding allowFreeTypeVariables,
     ExprTypeCheckListener *listener, ConstraintSystem &cs,
     SmallVectorImpl<Solution> &viable) {
 
@@ -988,7 +988,7 @@ bool TypeChecker::typeCheckExpression(
        Expr *&expr, DeclContext *dc,
        Type convertType,
        Type contextualType,
-       bool discardedExpr,
+       TypeCheckExprOptions options,
        FreeTypeVariableBinding allowFreeTypeVariables,
        ExprTypeCheckListener *listener) {
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
@@ -1002,13 +1002,14 @@ bool TypeChecker::typeCheckExpression(
 
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
-  if (solveForExpression(expr, dc, convertType, contextualType, discardedExpr,
+  if (solveForExpression(expr, dc, convertType, contextualType,
                          allowFreeTypeVariables, listener, cs, viable))
     return true;
 
   // Apply the solution to the expression.
   auto &solution = viable[0];
-  auto result = cs.applySolution(solution, expr, convertType, discardedExpr,
+  bool isDiscarded = options.contains(TypeCheckExprFlags::IsDiscarded);
+  auto result = cs.applySolution(solution, expr, convertType, isDiscarded,
                                  listener && listener->suppressDiagnostics());
   if (!result) {
     // Failure already diagnosed, above, as part of applying the solution.
@@ -1041,7 +1042,7 @@ bool TypeChecker::typeCheckExpression(
 
 Optional<Type> TypeChecker::getTypeOfExpressionWithoutApplying(
     Expr *&expr, DeclContext *dc, Type convertType, Type contextualType,
-    bool discardedExpr, FreeTypeVariableBinding allowFreeTypeVariables,
+    FreeTypeVariableBinding allowFreeTypeVariables,
     ExprTypeCheckListener *listener) {
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
@@ -1051,7 +1052,7 @@ Optional<Type> TypeChecker::getTypeOfExpressionWithoutApplying(
 
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
-  if (solveForExpression(expr, dc, convertType, contextualType, discardedExpr,
+  if (solveForExpression(expr, dc, convertType, contextualType,
                          allowFreeTypeVariables, listener, cs, viable))
     return None;
 
@@ -1299,7 +1300,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
   // Type-check the initializer.
   bool hadError = typeCheckExpression(initializer, DC, Type(),
-                                      contextualType, /*discardedExpr=*/false,
+                                      contextualType, TypeCheckExprFlags(),
                                       FreeTypeVariableBinding::Disallow,
                                       &listener);
 
@@ -1501,7 +1502,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
   assert(seq && "type-checking an uninitialized for-each statement?");
 
   // Type-check the for-each loop sequence and element pattern.
-  if (typeCheckExpression(seq, dc, Type(), Type(), /*discardedExpr=*/false,
+  if (typeCheckExpression(seq, dc, Type(), Type(), TypeCheckExprFlags(),
                           FreeTypeVariableBinding::Disallow, &listener))
     return true;
 
@@ -1592,7 +1593,7 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
   };
 
   ConditionListener listener;
-  return typeCheckExpression(expr, dc, Type(), Type(), /*discardedExpr=*/false,
+  return typeCheckExpression(expr, dc, Type(), Type(), TypeCheckExprFlags(),
                              FreeTypeVariableBinding::Disallow,
                              &listener);
 }
