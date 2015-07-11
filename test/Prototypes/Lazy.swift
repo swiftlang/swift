@@ -50,12 +50,12 @@ public struct _prext_LazySequence<Base_ : SequenceType>
   public var _base: Base_
 }
 
-/// Augment `s` with lazy methods such as `map`, `filter`, etc.
 extension SequenceType {
   public var _prext_lazy: _prext_LazySequence<Self> {
     return _prext_LazySequence(_base: self)
   }
 }
+
 //===--- LazySequence tests -----------------------------------------------===//
 var tests = TestSuite("Lazy")
 
@@ -200,6 +200,40 @@ extension _prext_LazyCollection : CollectionType {
   public subscript(position: Base.Index) -> Base.Generator.Element {
     return _base[position]
   }
+}
+
+/// Augment `self` with lazy methods such as `map`, `filter`, etc.
+extension CollectionType {
+  public var _prext_lazy: _prext_LazyCollection<Self> {
+    return _prext_LazyCollection(self)
+  }
+}
+
+//===--- LazyCollection tests ---------------------------------------------===//
+
+tests.test("LazyCollection/CollectionType") {
+  let expected = (0..<100).map { OpaqueValue($0) }
+  let base = MinimalForwardCollection(expected)
+  var actual = base._prext_lazy
+  
+  expectType(
+    _prext_LazyCollection<MinimalForwardCollection<OpaqueValue<Int>>>.self,
+    &actual)
+
+  checkForwardCollection(
+    expected, base._prext_lazy, resiliencyChecks: .none
+  ) { $0.value == $1.value }
+}
+
+tests.test("LazyCollection/Passthrough") {
+  let expected = (0..<100).map { OpaqueValue($0) }
+  let base = LoggingCollection(expected)
+  
+  expectSequencePassthrough(
+    base._prext_lazy,
+    base: base._prext_lazy._base,
+    arbitraryElement: OpaqueValue(0),
+    count: Int(expected.count))
 }
 
 /// Augment `s` with lazy methods such as `map`, `filter`, etc.
