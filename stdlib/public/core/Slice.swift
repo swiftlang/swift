@@ -22,11 +22,11 @@ public struct Slice<Base : Indexable> : CollectionType {
   }
 
   public subscript(bounds: Range<Index>) -> Slice {
-    return Slice(_base: _base, bounds: bounds)
+    return Slice(base: _base, bounds: bounds)
   }
 
-  internal init(_base: Base, bounds: Range<Index>) {
-    self._base = _base
+  public init(base: Base, bounds: Range<Index>) {
+    self._base = base
     self.startIndex = bounds.startIndex
     self.endIndex = bounds.endIndex
   }

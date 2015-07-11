@@ -2416,7 +2416,7 @@ func expectCollectionIndexIsMinimalForwardIndex<
 
 SequenceTypeAlgorithms.test("Slice/AssociatedTypes") {
   let c = MinimalForwardCollection([ OpaqueValue(1) ])
-  var slice = c[c.indices]
+  var slice = Slice(base: c, bounds: c.indices)
   expectType(
     Slice<MinimalForwardCollection<OpaqueValue<Int>>>.self,
     &slice)
@@ -2431,41 +2431,54 @@ SequenceTypeAlgorithms.test("Slice/AssociatedTypes") {
   }
 }
 
-SequenceTypeAlgorithms.test("Slice.{startIndex,endIndex}") {
+SequenceTypeAlgorithms.test("Slice/init(base:bounds:)") {
   for test in subscriptRangeTests {
     let c = MinimalForwardCollection(test.collection)
-    var slice = c[c.indices]
-    expectType(
-      Slice<MinimalForwardCollection<OpaqueValue<Int>>>.self,
-      &slice)
-    let bounds = test.boundsIn(c)
-    var result = slice[bounds]
+    var result = Slice(base: c, bounds: test.boundsIn(c))
     expectType(
       Slice<MinimalForwardCollection<OpaqueValue<Int>>>.self,
       &result)
 
-    expectEqual(bounds.startIndex, result.startIndex)
-    expectEqual(bounds.endIndex, result.endIndex)
+    checkForwardCollection(
+      test.expected,
+      result,
+      { $0.value == $1.value },
+      test.loc.withCurrentLoc())
+  }
+}
+
+SequenceTypeAlgorithms.test("Slice.{startIndex,endIndex}") {
+  for test in subscriptRangeTests {
+    let c = MinimalForwardCollection(test.collection)
+    let bounds = test.boundsIn(c)
+    var slice = Slice(base: c, bounds: bounds)
+    expectType(
+      Slice<MinimalForwardCollection<OpaqueValue<Int>>>.self,
+      &slice)
+
+    expectEqual(bounds.startIndex, slice.startIndex)
+    expectEqual(bounds.endIndex, slice.endIndex)
   }
 }
 
 SequenceTypeAlgorithms.test("Slice.subscript(_: Index)") {
   for test in subscriptRangeTests {
     let c = MinimalForwardCollection(test.collection)
-    var slice = c[c.indices]
+    let bounds = test.boundsIn(c)
+    var slice = Slice(base: c, bounds: bounds)
     expectType(
       Slice<MinimalForwardCollection<OpaqueValue<Int>>>.self,
       &slice)
-    let bounds = test.boundsIn(c)
-    var result = slice[bounds]
-    expectType(
-      Slice<MinimalForwardCollection<OpaqueValue<Int>>>.self,
-      &result)
 
     for i in bounds {
-      var element = result[i]
+      var element = slice[i]
       expectType(OpaqueValue<Int>.self, &element)
       expectEqual(c[i].value, element.value)
+    }
+
+    // `Slice` allows out-of-bounds indices.
+    for i in c.indices {
+      expectEqual(c[i].value, slice[i].value)
     }
   }
 }
@@ -2473,7 +2486,7 @@ SequenceTypeAlgorithms.test("Slice.subscript(_: Index)") {
 SequenceTypeAlgorithms.test("Slice.subscript(_: Range<Index>)") {
   for test in subscriptRangeTests {
     let c = MinimalForwardCollection(test.collection)
-    var slice = c[c.indices]
+    var slice = Slice(base: c, bounds: c.indices)
     expectType(
       Slice<MinimalForwardCollection<OpaqueValue<Int>>>.self,
       &slice)
@@ -2484,6 +2497,16 @@ SequenceTypeAlgorithms.test("Slice.subscript(_: Range<Index>)") {
       &result)
 
     checkForwardCollection(test.expected, result) { $0.value == $1.value }
+
+    if true {
+      // `Slice` allows out-of-bounds slicing.
+      let reSlicedToFullExtent = slice[c.indices]
+      checkForwardCollection(
+        test.collection,
+        reSlicedToFullExtent,
+        { $0.value == $1.value },
+        test.loc.withCurrentLoc())
+    }
   }
 }
 
