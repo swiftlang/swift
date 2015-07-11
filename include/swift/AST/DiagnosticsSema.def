@@ -757,7 +757,8 @@ ERROR(extension_protocol_inheritance,sema_tcd,none,
 ERROR(extension_protocol_type_definition,sema_tcd,none,
       "type %0 cannot be defined within a protocol extension", (DeclName))
 ERROR(extension_protocol_via_typealias,sema_tcd,none,
-      "protocol %0 cannot be extended via typealias %1", (Type, Type))
+      "protocol %0 in the module being compiled cannot be extended via a "
+      "typealias", (Type))
 ERROR(extension_anyobject,sema_tcd,none,
       "'AnyObject' protocol cannot be extended", ())
 

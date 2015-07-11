@@ -883,7 +883,10 @@ extension BadProto1 {
 
 protocol BadProto3 { }
 typealias BadProto4 = BadProto3
-extension BadProto4 { } // expected-error{{protocol 'BadProto3' cannot be extended via typealias 'BadProto4'}}{{11-20=BadProto3}}
+extension BadProto4 { } // expected-error{{protocol 'BadProto3' in the module being compiled cannot be extended via a typealias}}{{11-20=BadProto3}}
+
+typealias RawRepresentableAlias = RawRepresentable
+extension RawRepresentableAlias { } // okay
 
 extension AnyObject { } // expected-error{{'AnyObject' protocol cannot be extended}}
 

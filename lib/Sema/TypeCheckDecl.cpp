@@ -6372,7 +6372,19 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
   }
 
   // If we're extending a protocol, check the generic parameters.
-  if (auto protoType = dyn_cast<ProtocolType>(extendedType.getPointer())) {
+  if (auto proto = extendedType->getAs<ProtocolType>()) {
+    if (!isa<ProtocolType>(extendedType.getPointer()) &&
+        proto->getDecl()->getParentModule() == ext->getParentModule()) {
+      // Protocols in the same module cannot be extended via a typealias;
+      // we could end up being unable to resolve the generic signature.
+      diagnose(ext->getLoc(), diag::extension_protocol_via_typealias, proto)
+        .fixItReplace(ext->getExtendedTypeLoc().getSourceRange(),
+                      proto->getDecl()->getName().str());
+      ext->setInvalid();
+      ext->getExtendedTypeLoc().setInvalidType(Context);
+      return;
+    }
+
     GenericSignature *sig = nullptr;
     extendedType = checkExtensionGenericParams(*this, ext,
                                                ext->getExtendedType(),
@@ -6390,22 +6402,11 @@ void TypeChecker::validateExtension(ExtensionDecl *ext) {
     // Speculatively ban extension of AnyObject; it won't be a
     // protocol forever, and we don't want to allow code that we know
     // we'll break later.
-    if (protoType->getDecl()->isSpecificProtocol(
+    if (proto->getDecl()->isSpecificProtocol(
           KnownProtocolKind::AnyObject)) {
       diagnose(ext, diag::extension_anyobject)
         .highlight(ext->getExtendedTypeLoc().getSourceRange());
     }
-    return;
-  }
-
-  // Protocols cannot be extended via a typealias.
-  if (auto proto = extendedType->getAs<ProtocolType>()) {
-    diagnose(ext->getLoc(), diag::extension_protocol_via_typealias,
-             proto, extendedType)
-      .fixItReplace(ext->getExtendedTypeLoc().getSourceRange(),
-                    proto->getDecl()->getName().str());
-    ext->setInvalid();
-    ext->getExtendedTypeLoc().setInvalidType(Context);
     return;
   }
 }
