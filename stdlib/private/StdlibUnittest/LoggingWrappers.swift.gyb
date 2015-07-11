@@ -217,72 +217,6 @@ public class SequenceLog {
   public static var _initializeTo = TypeIndexed(0)
 }
 
-public struct LoggingSequence<Base: SequenceType> : SequenceType, LoggingType {
-
-  public typealias Log = SequenceLog
-  
-  public init(_ base: Base) {
-    self.base = base
-  }
-  
-  public func generate() -> LoggingGenerator<Base.Generator> {
-    ++Log.generate[selfType]
-    return LoggingGenerator(base.generate())
-  }
-
-  public func underestimateCount() -> Int {
-    ++Log.underestimateCount[selfType]
-    return base.underestimateCount()
-  }
-
-  public func map<T>(
-    @noescape transform: (Base.Generator.Element) -> T
-  ) -> [T] {
-    ++Log.map[selfType]
-    return base.map(transform)
-  }
-
-  public func filter(
-    @noescape includeElement: (Base.Generator.Element) -> Bool
-  ) -> [Base.Generator.Element] {
-    ++Log.filter[selfType]
-    return base.filter(includeElement)
-  }
-  
-  public func _customContainsEquatableElement(
-    element: Base.Generator.Element
-  ) -> Bool? {
-    ++Log._customContainsEquatableElement[selfType]
-    return base._customContainsEquatableElement(element)
-  }
-  
-  /// If `self` is multi-pass (i.e., a `CollectionType`), invoke
-  /// `preprocess` on `self` and return its result.  Otherwise, return
-  /// `nil`.
-  public func _preprocessingPass<R>(
-    preprocess: (LoggingSequence)->R
-  ) -> R? {
-    ++Log._preprocessingPass[selfType]
-    return base._preprocessingPass { _ in preprocess(self) }
-  }
-
-  /// Create a native array buffer containing the elements of `self`,
-  /// in the same order.
-  public func _copyToNativeArrayBuffer()
-    -> _ContiguousArrayBuffer<Base.Generator.Element> {
-    ++Log._copyToNativeArrayBuffer[selfType]
-    return base._copyToNativeArrayBuffer()
-  }
-
-  /// Copy a Sequence into an array.
-  public func _initializeTo(ptr: UnsafeMutablePointer<Base.Generator.Element>)
-    -> UnsafeMutablePointer<Base.Generator.Element> {
-    ++Log._initializeTo[selfType]
-    return base._initializeTo(ptr)
-  }
-  
-  public var base: Base
-}
 
 public class CollectionLog : SequenceLog {
   public class func dispatchTester<C : CollectionType>(
@@ -300,15 +234,16 @@ public class CollectionLog : SequenceLog {
   public static var first = TypeIndexed(0)
 }
 
-public struct LoggingCollection<Base : CollectionType>
-  : CollectionType, LoggingType {
+% for Kind in 'Sequence', 'Collection':
+public struct Logging${Kind}<Base: ${Kind}Type> : ${Kind}Type, LoggingType {
 
-  public typealias Log = CollectionLog
-
+  public typealias Log = ${Kind}Log
+  
   public init(_ base: Base) {
     self.base = base
   }
 
+%   if Kind == 'Collection':
   public var startIndex: Base.Index {
     ++CollectionLog.startIndex[selfType]
     return base.startIndex
@@ -350,8 +285,8 @@ public struct LoggingCollection<Base : CollectionType>
     ++CollectionLog.first[selfType]
     return base.first
   }
-
-  //===--- SequenceType requirements --------------------------------------===//
+%   end
+  
   public func generate() -> LoggingGenerator<Base.Generator> {
     ++Log.generate[selfType]
     return LoggingGenerator(base.generate())
@@ -387,7 +322,7 @@ public struct LoggingCollection<Base : CollectionType>
   /// `preprocess` on `self` and return its result.  Otherwise, return
   /// `nil`.
   public func _preprocessingPass<R>(
-    preprocess: (LoggingCollection)->R
+    preprocess: (Logging${Kind})->R
   ) -> R? {
     ++Log._preprocessingPass[selfType]
     return base._preprocessingPass { _ in preprocess(self) }
@@ -407,9 +342,10 @@ public struct LoggingCollection<Base : CollectionType>
     ++Log._initializeTo[selfType]
     return base._initializeTo(ptr)
   }
-
+  
   public var base: Base
 }
+% end
 
 public func expectCustomizable<
   T : WrapperType where
