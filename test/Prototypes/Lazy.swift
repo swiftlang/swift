@@ -61,34 +61,53 @@ var tests = TestSuite("Lazy")
 
 tests.test("LazySequence/SequenceType") {
   let expected = (0..<100).map { OpaqueValue($0) }
-  checkSequence(
-    expected, MinimalSequence(expected)._prext_lazy,
-    resiliencyChecks: .none
-  ) {
-    (x: OpaqueValue<Int>, y: OpaqueValue<Int>) -> Bool in 
-    x.value == y.value
+  var actual = MinimalSequence(expected)._prext_lazy
+  
+  expectType(
+    _prext_LazySequence<MinimalSequence<OpaqueValue<Int>>>.self, &actual)
+  
+  checkSequence(expected, actual, resiliencyChecks: .none) {
+    $0.value == $1.value
   }
 }
 
-tests.test("LazySequence/Passthrough") {
-  // Test that LazySequence passes operations that might be optimized
-  // through to its underlying sequence.
-  var a = (0..<100).map { OpaqueValue($0) }
-  let base = LoggingSequence(a)
-  let s = base._prext_lazy
-  _ = s.generate()
+func expectSequencePassthrough<
+  S : SequenceType, Base : SequenceType
+  where S : _prext_LazySequenceType, Base : LoggingType,
+    Base.Generator.Element == S.Generator.Element
+>(s: S, base: Base, arbitraryElement: S.Generator.Element, count: Int) {
   let baseType = base.dynamicType
+  
+  _ = s.generate()
   expectEqual(1, SequenceLog.generate[baseType])
   _ = s.underestimateCount()
   expectEqual(1, SequenceLog.underestimateCount[baseType])
-  _ = s._customContainsEquatableElement( OpaqueValue(0) )
+  _ = s._customContainsEquatableElement(arbitraryElement)
   expectEqual(1, SequenceLog._customContainsEquatableElement[baseType])
   _ = s._copyToNativeArrayBuffer()
   expectEqual(1, SequenceLog._copyToNativeArrayBuffer[baseType])
-  _ = s._initializeTo(&a)
+  
+  let buf = UnsafeMutablePointer<S.Generator.Element>.alloc(count)
+  
+  let end = s._initializeTo(buf)
+  expectTrue(end <= buf + count)
+  
+  buf.destroy(end - buf)
+  buf.dealloc(count)
+  
   expectEqual(1, SequenceLog._initializeTo[baseType])
 }
 
+tests.test("LazySequence/Passthrough") {
+  // Test that operations that might be optimized are passed
+  // through to the underlying sequence.
+  let a = (0..<100).map { OpaqueValue($0) }
+  let base = LoggingSequence(a)
+  
+  expectSequencePassthrough(
+    base._prext_lazy,
+    base: base, arbitraryElement: OpaqueValue(0), count: a.count)
+}
 
 //===--- LazyCollection.swift ---------------------------------*- swift -*-===//
 //
