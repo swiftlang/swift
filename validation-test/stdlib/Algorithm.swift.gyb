@@ -3054,7 +3054,7 @@ var _timesWithUnsafeMutableBufferPointerIfSupportedWasCalled: Int = 0
 
 %   for Traversal in [ 'Forward', 'RandomAccess' ]:
 
-struct MinimalMutable${Traversal}CollectionWith${Implementation}WithUnsafeMutableBufferPointerIfSupported<T>
+struct Minimal${Traversal}MutableCollectionWith${Implementation}WithUnsafeMutableBufferPointerIfSupported<T>
   : MutableCollectionType {
 
   init(_ data: [T]) {
@@ -3105,7 +3105,7 @@ struct MinimalMutable${Traversal}CollectionWith${Implementation}WithUnsafeMutabl
   mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     @noescape body: (inout UnsafeMutableBufferPointer<T>) -> R
   ) -> R? {
-    ++MinimalMutable${Traversal}CollectionWith${Implementation}WithUnsafeMutableBufferPointerIfSupported.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled
+    ++Minimal${Traversal}MutableCollectionWith${Implementation}WithUnsafeMutableBufferPointerIfSupported.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled
     return _data._withUnsafeMutableBufferPointerIfSupported(body)
   }
 
@@ -3129,7 +3129,7 @@ func callGenericWithUnsafeMutableBufferPointerIfSupported<
 % for Implementation in [ 'Default', 'Custom' ]:
 
 func callStaticWithUnsafeMutableBufferPointerIfSupported<R>(
-  inout collection: MinimalMutableForwardCollectionWith${Implementation}WithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>,
+  inout collection: MinimalForwardMutableCollectionWith${Implementation}WithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>,
   @noescape body: (inout UnsafeMutableBufferPointer<OpaqueValue<Int>>) -> R
 ) -> R? {
   return collection._withUnsafeMutableBufferPointerIfSupported(body)
@@ -3143,18 +3143,18 @@ func callStaticWithUnsafeMutableBufferPointerIfSupported<R>(
 
 SequenceTypeAlgorithms.test("MutableCollectionType._withUnsafeMutableBufferPointerIfSupported()/${Implementation}Implementation/${dispatch}") {
   let data = [ 1, 2, 3, 4, 5 ]
-  var collection = MinimalMutableForwardCollectionWith${Implementation}WithUnsafeMutableBufferPointerIfSupported(
+  var collection = MinimalForwardMutableCollectionWith${Implementation}WithUnsafeMutableBufferPointerIfSupported(
     data.map { OpaqueValue($0) })
   if true {
 %     if Implementation == 'Custom':
-    MinimalMutableForwardCollectionWith${Implementation}WithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled = 0
+    MinimalForwardMutableCollectionWith${Implementation}WithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled = 0
     var result = collection._withUnsafeMutableBufferPointerIfSupported {
       (inout buffer: UnsafeMutableBufferPointer<OpaqueValue<Int>>) in
       return OpaqueValue(Array(buffer))
     }
     expectType(Optional<OpaqueValue<Array<OpaqueValue<Int>>>>.self, &result)
     expectEqual(data, result!.value.map { $0.value })
-    expectEqual(1, MinimalMutableForwardCollectionWith${Implementation}WithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled)
+    expectEqual(1, MinimalForwardMutableCollectionWith${Implementation}WithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled)
 %     else:
     var result = collection._withUnsafeMutableBufferPointerIfSupported {
       (inout buffer: UnsafeMutableBufferPointer<OpaqueValue<Int>>) -> OpaqueValue<Int> in
@@ -3379,7 +3379,7 @@ SequenceTypeAlgorithms.test("partition/${'Predicate' if predicate else 'WhereEle
         sequenceAsArray.append(OpaqueValue(0xffff, identity: 0xffff))
 %       end
 
-        var s = MinimalMutableRandomAccessCollection<OpaqueValue<Int>>(
+        var s = MinimalRandomAccessMutableCollection<OpaqueValue<Int>>(
           sequenceAsArray)
 
 %       if slice:
@@ -3407,7 +3407,7 @@ SequenceTypeAlgorithms.test("partition/${'Predicate' if predicate else 'WhereEle
         sequenceAsArray.append(CustomComparableValue(0xffff, identity: 0xffff))
 %       end
 
-        var s = MinimalMutableRandomAccessCollection<CustomComparableValue>(
+        var s = MinimalRandomAccessMutableCollection<CustomComparableValue>(
           sequenceAsArray)
 
 %       if slice:
@@ -3456,7 +3456,7 @@ SequenceTypeAlgorithms.test("partition/${'Predicate' if predicate else 'WhereEle
     for i in 0..<7 {
       forAllPermutations(i) { (sequence) in
 %   if predicate:
-        var s = MinimalMutableRandomAccessCollection<OpaqueValue<Int>>(
+        var s = MinimalRandomAccessMutableCollection<OpaqueValue<Int>>(
           sequence.map { OpaqueValue($0) })
         let closureLifetimeTracker = LifetimeTracked(0)
         expectEqual(1, LifetimeTracked.instances)
@@ -3466,7 +3466,7 @@ SequenceTypeAlgorithms.test("partition/${'Predicate' if predicate else 'WhereEle
           return comparisonPredicate(lhs.value, rhs.value)
         }
 %    else:
-        var s = MinimalMutableRandomAccessCollection<CustomComparableValue>(
+        var s = MinimalRandomAccessMutableCollection<CustomComparableValue>(
           sequence.map { CustomComparableValue($0) })
         CustomComparableValue.equalImpl = {
           !comparisonPredicate($0, $1) &&
@@ -3510,7 +3510,7 @@ SequenceTypeAlgorithms.test("sort/${'Predicate' if predicate else 'WhereElementI
             OpaqueValue($0, identity: $1)
           }
 
-        var s = MinimalMutableRandomAccessCollection<OpaqueValue<Int>>(
+        var s = MinimalRandomAccessMutableCollection<OpaqueValue<Int>>(
           sequenceAsArray)
 
         let result = s.sort { $0.value < $1.value }
@@ -3520,7 +3520,7 @@ SequenceTypeAlgorithms.test("sort/${'Predicate' if predicate else 'WhereElementI
             CustomComparableValue($0, identity: $1)
           }
 
-        var s = MinimalMutableRandomAccessCollection<CustomComparableValue>(
+        var s = MinimalRandomAccessMutableCollection<CustomComparableValue>(
           sequenceAsArray)
 
         let result = s.sort()
@@ -3548,20 +3548,20 @@ SequenceTypeAlgorithms.test("sort/CustomImplementation/${'Predicate' if predicat
 
   let data = [ 5, 4, 3, 2, 1 ]
 %     if predicate:
-  var collection = MinimalMutableForwardCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported(
+  var collection = MinimalForwardMutableCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported(
     data.map { MinimalComparableValue($0) })
 %   else:
-  var collection = MinimalMutableForwardCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported(
+  var collection = MinimalForwardMutableCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported(
     data.map { OpaqueValue($0) })
 %   end
-  MinimalMutableForwardCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled = 0
+  MinimalForwardMutableCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled = 0
 %   if predicate:
   let result = collection.sort()
 %   else:
   let result = collection.sort { $0.value < $1.value }
 %   end
   // The collection is copied into an array before sorting.
-  expectEqual(0, MinimalMutableForwardCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled)
+  expectEqual(0, MinimalForwardMutableCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled)
 
   expectEqual([ 1, 2, 3, 4, 5 ], result.map { $0.value })
 }
@@ -3575,13 +3575,13 @@ SequenceTypeAlgorithms.test("sort/${'Predicate' if predicate else 'WhereElementI
     for i in 0..<7 {
       forAllPermutations(i) { (sequence) in
 %   if predicate:
-        var s = MinimalMutableRandomAccessCollection<OpaqueValue<Int>>(
+        var s = MinimalRandomAccessMutableCollection<OpaqueValue<Int>>(
           sequence.map { OpaqueValue($0) })
         let result = s.sort {
           comparisonPredicate($0.value, $1.value)
         }
 %    else:
-        var s = MinimalMutableRandomAccessCollection<CustomComparableValue>(
+        var s = MinimalRandomAccessMutableCollection<CustomComparableValue>(
           sequence.map { CustomComparableValue($0) })
         CustomComparableValue.equalImpl = {
           !comparisonPredicate($0, $1) &&
@@ -3620,15 +3620,15 @@ SequenceTypeAlgorithms.test("partition/CustomImplementation/${'Predicate' if pre
           MinimalComparableValue($0, identity: $1)
         }
 %   end
-      var s = MinimalMutableRandomAccessCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported(
+      var s = MinimalRandomAccessMutableCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported(
         sequenceAsArray)
-      MinimalMutableRandomAccessCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled = 0
+      MinimalRandomAccessMutableCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled = 0
 %   if predicate:
       let pivot = s.partition(s.indices) { $0.value < $1.value }
 %   else:
       let pivot = s.partition(s.indices)
 %   end
-      expectEqual(1, MinimalMutableRandomAccessCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled)
+      expectEqual(1, MinimalRandomAccessMutableCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled)
 
       // Check that we didn't lose any elements.
       expectEqualsUnordered(0..<sequence.count, s.map { $0.identity })
@@ -3666,7 +3666,7 @@ SequenceTypeAlgorithms.test("sortInPlace/${'Predicate' if predicate else 'WhereE
             OpaqueValue($0, identity: $1)
           }
 
-        var s = MinimalMutableRandomAccessCollection<OpaqueValue<Int>>(
+        var s = MinimalRandomAccessMutableCollection<OpaqueValue<Int>>(
           sequenceAsArray)
 
         s.sortInPlace { $0.value < $1.value }
@@ -3676,7 +3676,7 @@ SequenceTypeAlgorithms.test("sortInPlace/${'Predicate' if predicate else 'WhereE
             CustomComparableValue($0, identity: $1)
           }
 
-        var s = MinimalMutableRandomAccessCollection<CustomComparableValue>(
+        var s = MinimalRandomAccessMutableCollection<CustomComparableValue>(
           sequenceAsArray)
 
         s.sortInPlace()
@@ -3717,15 +3717,15 @@ SequenceTypeAlgorithms.test("partition/CustomImplementation/${'Predicate' if pre
             MinimalComparableValue($0, identity: $1)
           }
 %   end
-        var s = MinimalMutableRandomAccessCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported(
+        var s = MinimalRandomAccessMutableCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported(
         sequenceAsArray)
-        MinimalMutableRandomAccessCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled = 0
+        MinimalRandomAccessMutableCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled = 0
 %   if predicate:
         let pivot = s.partition(s.indices) { $0.value < $1.value }
 %   else:
         let pivot = s.partition(s.indices)
 %   end
-        expectEqual(1, MinimalMutableRandomAccessCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled)
+        expectEqual(1, MinimalRandomAccessMutableCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled)
 
         // Check that we didn't lose any elements.
         expectEqualsUnordered(0..<sequence.count, s.map { $0.identity })
@@ -3754,13 +3754,13 @@ SequenceTypeAlgorithms.test("sortInPlace/${'Predicate' if predicate else 'WhereE
     for i in 0..<7 {
       forAllPermutations(i) { (sequence) in
 %   if predicate:
-        var s = MinimalMutableRandomAccessCollection<OpaqueValue<Int>>(
+        var s = MinimalRandomAccessMutableCollection<OpaqueValue<Int>>(
           sequence.map { OpaqueValue($0) })
         s.sortInPlace {
           comparisonPredicate($0.value, $1.value)
         }
 %    else:
-        var s = MinimalMutableRandomAccessCollection<CustomComparableValue>(
+        var s = MinimalRandomAccessMutableCollection<CustomComparableValue>(
           sequence.map { CustomComparableValue($0) })
         CustomComparableValue.equalImpl = {
           !comparisonPredicate($0, $1) &&

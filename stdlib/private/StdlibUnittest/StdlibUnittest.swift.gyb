@@ -179,7 +179,13 @@ public func expectNotEqual<T : Equatable>(expected: T, _ actual: T, ${TRACE}) {
 public func expectOptionalEqual<T : Equatable>(
   expected: T, _ actual: T?, ${TRACE}
 ) {
-  if (actual == nil) || expected != actual! {
+  expectOptionalEqual(expected, actual, ${trace}, showFrame: false) {$0 == $1}
+}
+
+public func expectOptionalEqual<T>(
+  expected: T, _ actual: T?, ${TRACE}, sameValue equal: (T,T)->Bool
+) {
+  if (actual == nil) || !equal(expected, actual!) {
     expectationFailure(
       "expected: \"\(expected)\" (of type \(expected.dynamicType))\n"
       + "actual: \"\(actual)\" (of type \(actual.dynamicType))",
@@ -1840,8 +1846,7 @@ public func checkGenerator<
   expected: ${Expected},
   _ generator: G,
   ${TRACE},
-  resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
-  sameValue: (${Element}, ${Element}) -> Bool
+  resiliencyChecks: CollectionMisuseResiliencyChecks = .all
 ) {
   checkGenerator(
     expected, generator, ${trace},
@@ -2791,17 +2796,17 @@ public func == (
 extension MinimalRandomAccessIndex : _MinimalIndexType {}
 
 //===----------------------------------------------------------------------===//
-// Minimal***Collection
+// Minimal***[Mutable]?Collection
 //===----------------------------------------------------------------------===//
 
 % for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
 %   for mutable in [ False, True ]:
 // This comment is a workaround for <rdar://problem/18900352> gyb miscompiles nested loops
-%     Protocol = 'Strict%s%sCollectionType' % ('Mutable' if mutable else '', traversal)
-%     Self = 'Minimal%s%sCollection' % ('Mutable' if mutable else '', traversal)
+%     Protocol = 'Strict%s%sCollectionType' % (traversal, 'Mutable' if mutable else '')
+%     Self = 'Minimal%s%sCollection' % (traversal, 'Mutable' if mutable else '')
 %     Index = 'Minimal%sIndex' % traversal
 
-public protocol ${Protocol} : CollectionType {
+public protocol ${Protocol} : ${'MutableCollectionType' if mutable else 'CollectionType'} {
   typealias Element
   init(base: ${Self}<Element>)
 %     if mutable:
@@ -3247,27 +3252,51 @@ public struct DefaultedSequence<Element> : StrictSequenceType {
   }
 }
 
+% for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
+
 /// A Collection that uses as many default implementations as
 /// `CollectionType` can provide.
-public struct DefaultedForwardCollection<Element>
-  : StrictForwardCollectionType {
+public struct Defaulted${traversal}Collection<Element>
+  : Strict${traversal}CollectionType {
 
+  public typealias Base = Minimal${traversal}Collection<Element>
   public typealias Generator = MinimalGenerator<Element>
-  public typealias Index = MinimalForwardIndex
+  public typealias Index = Minimal${traversal}Index
 
-  public let base: MinimalForwardCollection<Element>
+  public let base: Base
 
-  public init(base: MinimalForwardCollection<Element>) {
+  public init(base: Base) {
     self.base = base
+  }
+
+  public init(_ array: [Element]) {
+    self.base = Base(array)
   }
 }
 
-public struct DefaultedForwardRangeReplaceableCollection<Element>
-  : StrictForwardRangeReplaceableCollectionType {
+public struct Defaulted${traversal}MutableCollection<Element>
+  : Strict${traversal}MutableCollectionType {
 
-  public typealias Base = MinimalForwardRangeReplaceableCollection<Element>
+  public typealias Base = Minimal${traversal}MutableCollection<Element>
   public typealias Generator = MinimalGenerator<Element>
-  public typealias Index = MinimalForwardIndex
+  public typealias Index = Minimal${traversal}Index
+  public var base: Base
+
+  public init(base: Base) {
+    self.base = base
+  }
+
+  public init(_ array: [Element]) {
+    self.base = Base(array)
+  }
+}
+
+public struct Defaulted${traversal}RangeReplaceableCollection<Element>
+  : Strict${traversal}RangeReplaceableCollectionType {
+
+  public typealias Base = Minimal${traversal}RangeReplaceableCollection<Element>
+  public typealias Generator = MinimalGenerator<Element>
+  public typealias Index = Minimal${traversal}Index
   public var base: Base
 
   public init() {
@@ -3282,6 +3311,8 @@ public struct DefaultedForwardRangeReplaceableCollection<Element>
     self.base = Base(array)
   }
 }
+
+% end
 
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)
