@@ -231,5 +231,16 @@ class r20409366C {
 }
 
 
+// <rdar://problem/18800223> QoI: wrong compiler error when swift ternary operator branches don't match
+func r18800223(i : Int) {
+  // 20099385
+  _ = i == 0 ? "" : i  // expected-error {{result values in '? :' expression have mismatching types 'String' and 'Int'}}
 
+  // 19648528
+  _ = true ? [i] : i // expected-error {{result values in '? :' expression have mismatching types '[Int]' and 'Int'}}
 
+  
+  var buttonTextColor: String?
+  _ = (buttonTextColor != nil) ? 42 : {}; // expected-error {{result values in '? :' expression have mismatching types 'Int' and '() -> _'}}
+
+}

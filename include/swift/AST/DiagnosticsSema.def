@@ -333,7 +333,9 @@ ERROR(invalid_force_unwrap,sema_tcc,none,
 ERROR(invalid_optional_chain,sema_tcc,none,
       "cannot use optional chaining on non-optional value of type '%0'",
       (StringRef))
-
+ERROR(if_expr_cases_mismatch,sema_tcc,none,
+      "result values in '? :' expression have mismatching types '%0' and '%1'",
+      (StringRef, StringRef))
 
 ERROR(invalid_tuple_size,sema_tcc,none,
       "tuple types %0 and %1 have a different number of elements (%2 vs. %3)",

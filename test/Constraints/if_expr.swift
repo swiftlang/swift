@@ -33,7 +33,10 @@ useDouble(b)
 useDouble(c)
 useDouble(d)
 
-var z = true ? a : b // expected-error{{type of expression is ambiguous without more context}} 
+var z = true ? a : b // expected-error{{result values in '? :' expression have mismatching types 'Int' and 'Double'}}
+var _ = a ? b : b // expected-error{{type 'Int' does not conform to protocol 'BooleanType'}}
+
+
 
 var e = true ? B() : B() // should infer B
 var f = true ? B() : D1() // should infer B

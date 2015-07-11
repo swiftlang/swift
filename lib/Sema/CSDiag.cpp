@@ -1723,13 +1723,14 @@ private:
   bool visitPostfixUnaryExpr(PostfixUnaryExpr *PUE) {
     return visitUnaryExpr(PUE);
   }
-      
+  
   bool visitSubscriptExpr(SubscriptExpr *SE);
   bool visitCallExpr(CallExpr *CE);
   bool visitAssignExpr(AssignExpr *AE);
   bool visitInOutExpr(InOutExpr *IOE);
   bool visitCoerceExpr(CoerceExpr *CE);
   bool visitForcedCheckedCastExpr(ForcedCheckedCastExpr *FCCE);
+  bool visitIfExpr(IfExpr *IE);
   bool visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E);
 };
 } // end anonymous namespace.
@@ -2079,7 +2080,8 @@ Expr *FailureDiagnosis::typeCheckIndependentSubExpression(Expr *subExpr) {
   if (!isa<ClosureExpr>(subExpr) &&
       (isa<ApplyExpr>(subExpr) || isa<ArrayExpr>(subExpr) ||
        isa<ForceValueExpr>(subExpr) ||
-       //isa<UnresolvedDotExpr>(subExpr) ||
+       isa<AssignExpr>(subExpr) ||
+       isa<IfExpr>(subExpr) ||
        typeIsNotSpecialized(subExpr->getType()))) {
     
     // Store off the sub-expression, in case a new one is provided via the
@@ -2920,6 +2922,31 @@ bool FailureDiagnosis::visitBindOptionalExpr(BindOptionalExpr *BOE) {
   return diagnoseGeneralFailure();
 }
 
+bool FailureDiagnosis::visitIfExpr(IfExpr *IE) {
+  // If type checking of the IfExpr failed, but each of the subexprs got their
+  // own concrete types, then either the condition wasn't a boolean type, or
+  // the true/false arms didn't match.  If the condition wasn't of boolean type,
+  // we should have seen this already as an unavoidable failure.  That means
+  // that the only reason we could be here is because of a true/false arm
+  // mismatch.
+  if (!typeCheckIndependentSubExpression(IE->getCondExpr()))
+    return true;
+
+  auto trueExpr = typeCheckIndependentSubExpression(IE->getThenExpr());
+  if (!trueExpr) return true;
+
+  auto falseExpr = typeCheckIndependentSubExpression(IE->getElseExpr());
+  if (!falseExpr) return true;
+
+  
+  CS->TC.diagnose(IE->getColonLoc(), diag::if_expr_cases_mismatch,
+                  getUserFriendlyTypeName(trueExpr->getType()),
+                  getUserFriendlyTypeName(falseExpr->getType()))
+    .highlight(trueExpr->getSourceRange())
+    .highlight(falseExpr->getSourceRange());
+  return true;
+}
+
 
 bool FailureDiagnosis::
 visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E) {
@@ -2939,7 +2966,7 @@ bool FailureDiagnosis::visitExpr(Expr *E) {
     if (errorInSubExpr) return;
     
     // Otherwise this subexpr is an error if type checking it produces an error.
-    errorInSubExpr |= !getTypeOfTypeCheckedIndependentSubExpression(Child);
+    errorInSubExpr |= !typeCheckIndependentSubExpression(Child);
   });
   
   // If any of the children were errors, we're done.
