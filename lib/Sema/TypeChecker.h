@@ -1019,9 +1019,6 @@ public:
   /// inform the type of the expression, it won't result in a conversion
   /// constraint being applied to the expression.)
   ///
-  /// \param discardedExpr True if the result of this expression will be
-  /// discarded.
-  ///
   /// \param allowFreeTypeVariables Whether free type variables are allowed in
   /// the solution, and what to do with them.
   ///
