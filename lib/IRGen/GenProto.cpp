@@ -2191,13 +2191,6 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     return;
   }
 
-  // TODO
-  case ValueWitness::GetEnumTag:
-  case ValueWitness::InplaceProjectEnumData: {
-    IGF.Builder.CreateUnreachable();
-    return;
-  }
-
   case ValueWitness::Size:
   case ValueWitness::Flags:
   case ValueWitness::Stride:
@@ -2814,11 +2807,6 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
     // queried for extra inhabitants.
     return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
   }
-
-  /// TODO:
-  case ValueWitness::GetEnumTag:
-  case ValueWitness::InplaceProjectEnumData:
-    return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
   }
   llvm_unreachable("bad value witness kind");
 

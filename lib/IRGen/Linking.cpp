@@ -52,8 +52,6 @@ static StringRef mangleValueWitness(ValueWitness witness) {
   case ValueWitness::InitializeArrayWithTakeBackToFront: return "tT";
   case ValueWitness::StoreExtraInhabitant: return "xs";
   case ValueWitness::GetExtraInhabitantIndex: return "xg";
-  case ValueWitness::GetEnumTag: return "ug";
-  case ValueWitness::InplaceProjectEnumData: return "up";
       
   case ValueWitness::Size:
   case ValueWitness::Flags:

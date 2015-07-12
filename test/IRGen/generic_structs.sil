@@ -43,9 +43,9 @@ import Builtin
 // -- placeholder for size, flags, stride
 // CHECK:   i8* null, i8* null, i8* null
 // -- extra inhabitants
+// CHECK:   i8* null,
 // CHECK:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_TwxsV15generic_structs13SingleDynamic to i8*),
-// CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_TwxgV15generic_structs13SingleDynamic to i8*),
-// CHECK:   i8* null }
+// CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_TwxgV15generic_structs13SingleDynamic to i8*) }
 // CHECK-NOT: @_TWVV15generic_structs13SingleDynamic
 
 // -- Nominal type descriptor for generic struct with protocol requirements

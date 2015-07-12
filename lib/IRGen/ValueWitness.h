@@ -232,25 +232,6 @@ enum class ValueWitness : unsigned {
   /// the Enum_HasExtraInhabitants bit of the flags.
   First_ExtraInhabitantValueWitness,
   
-  ///   void (*storeExtraInhabitant)(T *obj, unsigned index, M *self);
-  ///
-  /// Given an invalid object of this type, store the representation of an
-  /// extra inhabitant of the type. The object will remain invalid, because
-  /// an extra inhabitant is by definition an invalid representation of the
-  /// type. index must be less than numExtraInhabitants.
-  StoreExtraInhabitant = First_ExtraInhabitantValueWitness,
-  
-  ///   int (*getExtraInhabitantIndex)(T *obj, M *self);
-  ///
-  /// Given an invalid object of this type with an extra inhabitant
-  /// representation, returns the index of the extra inhabitant representation.
-  /// Returns -1 if the object is a valid value of the type. If non-negative,
-  /// the return value is the same index that can be passed to
-  /// storeExtraInhabitant to reproduce the representation.
-  GetExtraInhabitantIndex,
-  
-  Last_ExtraInhabitantValueWitnessFunction = GetExtraInhabitantIndex,
-  
   ///   size_t extraInhabitantFlags;
   ///
   /// These bits are always present if the extra inhabitants witnesses are:
@@ -265,31 +246,31 @@ enum class ValueWitness : unsigned {
   ///   spare bits in the type representation.
   /// - The SpareBitsShiftMask bits contain the (host-endian) bit offset of the
   ///   lowest spare bit.
-  ExtraInhabitantFlags,
-  
-  Last_ExtraInhabitantValueWitness = ExtraInhabitantFlags,
-  
-  /// The following value witnesses are conditionally present if the witnessed
-  /// type is an enum.
-  First_EnumValueWitness,
-  
-  ///   unsigned (*getEnumTag)(T *obj, M *self);
+  ExtraInhabitantFlags = First_ExtraInhabitantValueWitness,
+
+  First_ExtraInhabitantValueWitnessFunction,
+
+  ///   void (*storeExtraInhabitant)(T *obj, unsigned index, M *self);
   ///
-  /// Given a valid object of this enum type, extracts the tag value indicating
-  /// which case of the enum is inhabited.
-  GetEnumTag = First_EnumValueWitness,
+  /// Given an invalid object of this type, store the representation of an
+  /// extra inhabitant of the type. The object will remain invalid, because
+  /// an extra inhabitant is by definition an invalid representation of the
+  /// type. index must be less than numExtraInhabitants.
+  StoreExtraInhabitant = First_ExtraInhabitantValueWitnessFunction,
   
-  ///   U *(*inplaceProjectEnumData)(T *obj, unsigned tag, M *self);
+  ///   int (*getExtraInhabitantIndex)(T *obj, M *self);
   ///
-  /// Given a valid object of this enum type with the given tag, destructively
-  /// extracts the associated data for that tag inplace, and returns a pointer
-  /// to the data. The tag must match the result of getEnumTag for the value;
-  /// it is not validated prior to the operation.
-  InplaceProjectEnumData,
+  /// Given an invalid object of this type with an extra inhabitant
+  /// representation, returns the index of the extra inhabitant representation.
+  /// Returns -1 if the object is a valid value of the type. If non-negative,
+  /// the return value is the same index that can be passed to
+  /// storeExtraInhabitant to reproduce the representation.
+  GetExtraInhabitantIndex,
   
-  Last_EnumValueWitness = InplaceProjectEnumData,
-  
-  Last_ValueWitness = Last_EnumValueWitness,
+  Last_ExtraInhabitantValueWitnessFunction = GetExtraInhabitantIndex,
+  Last_ExtraInhabitantValueWitness = Last_ExtraInhabitantValueWitnessFunction,
+
+  Last_ValueWitness = Last_ExtraInhabitantValueWitness,
 };
 
 // The namespaces here are to force the enumerators to be scoped.  We don't
@@ -348,11 +329,9 @@ enum {
 static inline bool isValueWitnessFunction(ValueWitness witness) {
   auto ord = unsigned(witness);
   return ord < NumRequiredValueWitnessFunctions
-    || (ord >= unsigned(ValueWitness::First_ExtraInhabitantValueWitness)
+    || (ord >= unsigned(ValueWitness::First_ExtraInhabitantValueWitnessFunction)
         && ord <= unsigned(
-                       ValueWitness::Last_ExtraInhabitantValueWitnessFunction))
-    || (ord >= unsigned(ValueWitness::First_EnumValueWitness)
-        && ord <= unsigned(ValueWitness::Last_EnumValueWitness));
+                       ValueWitness::Last_ExtraInhabitantValueWitnessFunction));
 }
 
 } // end namespace irgen

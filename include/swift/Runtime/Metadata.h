@@ -631,19 +631,21 @@ struct ValueWitnessTable {
 /// These entry points are available only if the HasExtraInhabitants flag bit is
 /// set in the 'flags' field.
 struct ExtraInhabitantsValueWitnessTable : ValueWitnessTable {
+  value_witness_types::extraInhabitantFlags extraInhabitantFlags;
   value_witness_types::storeExtraInhabitant *storeExtraInhabitant;
   value_witness_types::getExtraInhabitantIndex *getExtraInhabitantIndex;
-  value_witness_types::extraInhabitantFlags extraInhabitantFlags;
-  
+
   constexpr ExtraInhabitantsValueWitnessTable()
-    : ValueWitnessTable{}, storeExtraInhabitant(nullptr),
-      getExtraInhabitantIndex(nullptr), extraInhabitantFlags() {}
+    : ValueWitnessTable{}, extraInhabitantFlags(),
+      storeExtraInhabitant(nullptr),
+      getExtraInhabitantIndex(nullptr)  {}
   constexpr ExtraInhabitantsValueWitnessTable(const ValueWitnessTable &base,
                             value_witness_types::storeExtraInhabitant *sei,
                             value_witness_types::getExtraInhabitantIndex *geii,
                             value_witness_types::extraInhabitantFlags eif)
-    : ValueWitnessTable(base), storeExtraInhabitant(sei),
-      getExtraInhabitantIndex(geii), extraInhabitantFlags(eif) {}
+    : ValueWitnessTable(base), extraInhabitantFlags(eif),
+      storeExtraInhabitant(sei),
+      getExtraInhabitantIndex(geii) {}
 
   static bool classof(const ValueWitnessTable *table) {
     return table->flags.hasExtraInhabitants();

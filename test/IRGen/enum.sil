@@ -119,9 +119,9 @@ import Swift
 // CHECK: @_TMPdO4enum16DynamicSingleton = global { {{.*}}* } {
 // CHECK:   %swift.type* (%swift.type_pattern*, i8**)* [[DYNAMIC_SINGLETON_CREATE:@create_generic_metadata[0-9]*]]
 // CHECK:   @_TMnO4enum16DynamicSingleton
-// CHECK:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_TwxsO4enum16DynamicSingleton to i8*),
-// CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_TwxgO4enum16DynamicSingleton to i8*),
 // CHECK:   i8* null
+// CHECK:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_TwxsO4enum16DynamicSingleton to i8*)
+// CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_TwxgO4enum16DynamicSingleton to i8*)
 
 // -- No-payload enums have extra inhabitants in
 //    their value witness table.
@@ -133,12 +133,12 @@ import Swift
 // CHECK:   i8* inttoptr ([[WORD]] 262144 to i8*),
 // -- stride
 // CHECK:   i8* inttoptr ([[WORD]] 1 to i8*),
-// -- storeExtraInhabitant
-// CHECK:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_TwxsO4enum10NoPayloads to i8*),
-// -- getExtraInhabitantIndex
-// CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_TwxgO4enum10NoPayloads to i8*),
 // -- num extra inhabitants (256 - 3 valid states)
 // CHECK:   i8* inttoptr ([[WORD]] 253 to i8*)
+// -- storeExtraInhabitant
+// CHECK:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_TwxsO4enum10NoPayloads to i8*)
+// -- getExtraInhabitantIndex
+// CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_TwxgO4enum10NoPayloads to i8*)
 // CHECK: ] 
 
 // -- Single-payload enums take unused extra inhabitants from their payload
@@ -151,20 +151,20 @@ import Swift
 // CHECK:   i8* inttoptr ([[WORD]] 262144 to i8*),
 // -- stride
 // CHECK:   i8* inttoptr ([[WORD]] 1 to i8*),
-// -- storeExtraInhabitant
-// CHECK:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_TwxsO4enum19SinglePayloadNested to i8*),
-// -- getExtraInhabitantIndex
-// CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_TwxgO4enum19SinglePayloadNested to i8*),
 // -- num extra inhabitants (253 from payload - 3 empty cases)
 // CHECK:   i8* inttoptr ([[WORD]] 250 to i8*)
+// -- storeExtraInhabitant
+// CHECK:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_TwxsO4enum19SinglePayloadNested to i8*)
+// -- getExtraInhabitantIndex
+// CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_TwxgO4enum19SinglePayloadNested to i8*)
 // CHECK: ] 
 
 
 // CHECK: @_TMPdO4enum20DynamicSinglePayload = global { {{.*}}* } {
 // CHECK:   %swift.type* (%swift.type_pattern*, i8**)* [[DYNAMIC_SINGLE_PAYLOAD_CREATE:@create_generic_metadata[.0-9]*]]
-// CHECK:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_TwxsO4enum20DynamicSinglePayload to i8*),
-// CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_TwxgO4enum20DynamicSinglePayload to i8*),
 // CHECK:   i8* null
+// CHECK:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_TwxsO4enum20DynamicSinglePayload to i8*)
+// CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_TwxgO4enum20DynamicSinglePayload to i8*)
 
 // CHECK: @_TWVO4enum18MultiPayloadNested = constant [20 x i8*] [
 // CHECK:   i8* inttoptr ([[WORD]] 9 to i8*),
@@ -2533,8 +2533,8 @@ entry:
 // CHECK:   [[XI_BIT:%.*]] = icmp ne [[WORD]] [[XI_FLAG]], 0
 // CHECK:   br i1 [[XI_BIT]], label %[[HAS_XI:[0-9]+]], label %[[HAS_NO_XI:[0-9]+]]
 // CHECK: ; <label>:[[HAS_XI]]
-// CHECK:   [[XI_FLAGS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 22
-// CHECK:   [[T_XI_FLAGS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[T_VWT]], i32 22
+// CHECK:   [[XI_FLAGS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 20
+// CHECK:   [[T_XI_FLAGS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[T_VWT]], i32 20
 // CHECK:   [[T_XI_FLAGS:%.*]] = load i8*, i8** [[T_XI_FLAGS_ADDR]]
 // CHECK:   store i8* [[T_XI_FLAGS]], i8** [[XI_FLAGS_ADDR]]
 // CHECK:   br label %[[HAS_NO_XI]]
