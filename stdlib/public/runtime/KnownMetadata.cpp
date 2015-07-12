@@ -56,7 +56,7 @@ const ValueWitnessTable swift::_TWVBi64_ =
 const ValueWitnessTable swift::_TWVBi128_ =
   ValueWitnessTableForBox<NativeBox<int128_like, 16>>::table;
 const ValueWitnessTable swift::_TWVBi256_ =
-  ValueWitnessTableForBox<NativeBox<int256_like, 16>>::table;
+  ValueWitnessTableForBox<NativeBox<int256_like, 32>>::table;
 
 /// The basic value-witness table for Swift object pointers.
 const ExtraInhabitantsValueWitnessTable swift::_TWVBo =
