@@ -140,6 +140,26 @@ SILInstruction *SILCombiner::visitSwitchEnumAddrInst(SwitchEnumAddrInst *SEAI) {
 }
 
 SILInstruction *SILCombiner::visitSelectEnumAddrInst(SelectEnumAddrInst *SEAI) {
+  // Canonicalize a select_enum_addr: if the default refers to exactly one case,
+  // then replace the default with that case.
+  if (SEAI->hasDefault()) {
+    NullablePtr<EnumElementDecl> elementDecl = SEAI->getUniqueCaseForDefault();
+    if (elementDecl.isNonNull()) {
+      // Construct a new instruction by copying all the case entries.
+      SmallVector<std::pair<EnumElementDecl *, SILValue>, 4> CaseValues;
+      for (int idx = 0, numIdcs = SEAI->getNumCases(); idx < numIdcs; idx++) {
+        CaseValues.push_back(SEAI->getCase(idx));
+      }
+      // Add the default-entry of the original instruction as case-entry.
+      CaseValues.push_back(
+          std::make_pair(elementDecl.get(), SEAI->getDefaultResult()));
+
+      return SelectEnumAddrInst::create(SEAI->getLoc(), SEAI->getEnumOperand(),
+                                        SEAI->getType(), SILValue(), CaseValues,
+                                        *SEAI->getFunction());
+    }
+  }
+
   // Promote select_enum_addr to select_enum if the enum is loadable.
   //   = select_enum_addr %ptr : $*Optional<SomeClass>, case ...
   //     ->
@@ -2647,28 +2667,48 @@ visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI) {
   return nullptr;
 }
 
-SILInstruction *SILCombiner::visitSelectEnumInst(SelectEnumInst *EIT) {
+SILInstruction *SILCombiner::visitSelectEnumInst(SelectEnumInst *SEI) {
+  // Canonicalize a select_enum: if the default refers to exactly one case, then
+  // replace the default with that case.
+  if (SEI->hasDefault()) {
+    NullablePtr<EnumElementDecl> elementDecl = SEI->getUniqueCaseForDefault();
+    if (elementDecl.isNonNull()) {
+      // Construct a new instruction by copying all the case entries.
+      SmallVector<std::pair<EnumElementDecl *, SILValue>, 4> CaseValues;
+      for (int idx = 0, numIdcs = SEI->getNumCases(); idx < numIdcs; idx++) {
+        CaseValues.push_back(SEI->getCase(idx));
+      }
+      // Add the default-entry of the original instruction as case-entry.
+      CaseValues.push_back(
+          std::make_pair(elementDecl.get(), SEI->getDefaultResult()));
+
+      return SelectEnumInst::create(SEI->getLoc(), SEI->getEnumOperand(),
+                                    SEI->getType(), SILValue(), CaseValues,
+                                    *SEI->getFunction());
+    }
+  }
+
   // TODO: We should be able to flat-out replace the select_enum instruction
   // with the selected value in another pass. For parity with the enum_is_tag
   // combiner pass, handle integer literals for now.
-  auto *EI = dyn_cast<EnumInst>(EIT->getEnumOperand());
+  auto *EI = dyn_cast<EnumInst>(SEI->getEnumOperand());
   if (!EI)
     return nullptr;
 
   SILValue selected;
-  for (unsigned i = 0, e = EIT->getNumCases(); i < e; ++i) {
-    auto casePair = EIT->getCase(i);
+  for (unsigned i = 0, e = SEI->getNumCases(); i < e; ++i) {
+    auto casePair = SEI->getCase(i);
     if (casePair.first == EI->getElement()) {
       selected = casePair.second;
       break;
     }
   }
   if (!selected)
-    selected = EIT->getDefaultResult();
+    selected = SEI->getDefaultResult();
 
-  if (auto inst = dyn_cast<IntegerLiteralInst>(selected)) {
-    return IntegerLiteralInst::create(inst->getLoc(), inst->getType(),
-                                      inst->getValue(), *EIT->getFunction());
+  if (auto *ILI = dyn_cast<IntegerLiteralInst>(selected)) {
+    return IntegerLiteralInst::create(ILI->getLoc(), ILI->getType(),
+                                      ILI->getValue(), *SEI->getFunction());
   }
 
   return nullptr;

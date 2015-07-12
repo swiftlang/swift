@@ -15,7 +15,6 @@
 #include "swift/SILAnalysis/ValueTracking.h"
 #include "swift/SILPasses/Utils/Local.h"
 #include "swift/SIL/PatternMatch.h"
-#include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
 
 using namespace swift;
@@ -34,7 +33,6 @@ namespace {
     SILValue visitStructExtractInst(StructExtractInst *SEI);
     SILValue visitEnumInst(EnumInst *EI);
     SILValue visitSelectEnumInst(SelectEnumInst *SEI);
-    SILValue visitSelectEnumAddrInst(SelectEnumAddrInst *SEI);
     SILValue visitUncheckedEnumDataInst(UncheckedEnumDataInst *UEDI);
     SILValue visitAddressToPointerInst(AddressToPointerInst *ATPI);
     SILValue visitPointerToAddressInst(PointerToAddressInst *PTAI);
@@ -209,49 +207,7 @@ SILValue InstSimplifier::visitSelectEnumInst(SelectEnumInst *SEI) {
     return SEI->getCaseResult(EI->getElement());
   }
 
-  // Canonicalize a select_enum: if the default refers to exactly one case, then
-  // replace the default with that case.
-  if (!SEI->hasDefault())
-    return SILValue();
-
-  NullablePtr<EnumElementDecl> elementDecl = SEI->getUniqueCaseForDefault();
-  if (elementDecl.isNull())
-    return SILValue();
-  
-  // Construct a new instruction by copying all the case entries.
-  SmallVector<std::pair<EnumElementDecl*, SILValue>, 4> CaseValues;
-  for (int idx = 0, numIdcs = SEI->getNumCases(); idx < numIdcs; idx++) {
-    CaseValues.push_back(SEI->getCase(idx));
-  }
-  // Add the default-entry of the original instruction as case-entry.
-  CaseValues.push_back(
-      std::make_pair(elementDecl.get(), SEI->getDefaultResult()));
-
-  return SILBuilderWithScope<1>(SEI).createSelectEnum(SEI->getLoc(),
-                 SEI->getEnumOperand(), SEI->getType(), SILValue(), CaseValues);
-}
-
-SILValue InstSimplifier::visitSelectEnumAddrInst(SelectEnumAddrInst *SEI) {
-  // Canonicalize a select_enum_addr: if the default refers to exactly one case,
-  // then replace the default with that case.
-  if (!SEI->hasDefault())
-    return SILValue();
-
-  NullablePtr<EnumElementDecl> elementDecl = SEI->getUniqueCaseForDefault();
-  if (elementDecl.isNull())
-    return SILValue();
-  
-  // Construct a new instruction by copying all the case entries.
-  SmallVector<std::pair<EnumElementDecl*, SILValue>, 4> CaseValues;
-  for (int idx = 0, numIdcs = SEI->getNumCases(); idx < numIdcs; idx++) {
-    CaseValues.push_back(SEI->getCase(idx));
-  }
-  // Add the default-entry of the original instruction as case-entry.
-  CaseValues.push_back(
-      std::make_pair(elementDecl.get(), SEI->getDefaultResult()));
-
-  return SILBuilderWithScope<1>(SEI).createSelectEnumAddr(SEI->getLoc(),
-                    SEI->getEnumOperand(), SEI->getType(), nullptr, CaseValues);
+  return SILValue();
 }
 
 SILValue InstSimplifier::visitEnumInst(EnumInst *EI) {
