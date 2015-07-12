@@ -4697,14 +4697,6 @@ namespace {
                                               flags.getIntValue()));
     }
 
-    void addValueWitnessTable() {
-      // Build a fresh value witness table.  FIXME: this is actually
-      // unnecessary --- every existential type will have the exact
-      // same value witness table.
-      CanType type = CanType(Protocol->getDeclaredType());
-      Fields.push_back(emitValueWitnessTable(IGM, type));
-    }
-
     llvm::Constant *getInit() {
       return llvm::ConstantStruct::get(IGM.ProtocolDescriptorStructTy,
                                        Fields);
