@@ -234,7 +234,19 @@ public class CollectionLog : SequenceLog {
   public static var first = TypeIndexed(0)
 }
 
-% for Kind in 'Sequence', 'Collection':
+public class MutableCollectionLog : CollectionLog {
+  public class func dispatchTester<C : MutableCollectionType>(
+    c: C
+  ) -> LoggingMutableCollection<LoggingMutableCollection<C>> {
+    return LoggingMutableCollection(LoggingMutableCollection(c))
+  }
+  public static var subscriptIndexSet = TypeIndexed(0)
+  public static var _withUnsafeMutableBufferPointerIfSupported = TypeIndexed(0)
+  public static var _withUnsafeMutableBufferPointerIfSupportedNonNilReturns =
+    TypeIndexed(0)
+}
+
+% for Kind in 'Sequence', 'Collection', 'MutableCollection':
 public struct Logging${Kind}<Base: ${Kind}Type> : ${Kind}Type, LoggingType {
 
   public typealias Log = ${Kind}Log
@@ -243,50 +255,71 @@ public struct Logging${Kind}<Base: ${Kind}Type> : ${Kind}Type, LoggingType {
     self.base = base
   }
 
-%   if Kind == 'Collection':
+%   if Kind == 'Collection' or Kind == 'MutableCollection':
   public var startIndex: Base.Index {
-    ++CollectionLog.startIndex[selfType]
+    ++Log.startIndex[selfType]
     return base.startIndex
   }
 
   public var endIndex: Base.Index {
-    ++CollectionLog.endIndex[selfType]
+    ++Log.endIndex[selfType]
     return base.endIndex
   }
 
   public subscript(position: Base.Index) -> Base.Generator.Element {
-    ++CollectionLog.subscriptIndex[selfType]
-    return base[position]
+    get {
+      ++Log.subscriptIndex[selfType]
+      return base[position]
+    }
+%     if Kind == 'MutableCollection':
+    set {
+      ++Log.subscriptIndexSet[selfType]
+      base[position] = newValue
+    }
+%     end
   }
 
   public subscript(bounds: Range<Base.Index>) -> Base.SubSequence {
-    ++CollectionLog.subscriptRange[selfType]
+    ++Log.subscriptRange[selfType]
     return base[bounds]
   }
 
   public var isEmpty: Bool {
-    ++CollectionLog.isEmpty[selfType]
+    ++Log.isEmpty[selfType]
     return base.isEmpty
   }
 
   public var count: Base.Index.Distance {
-    ++CollectionLog.count[selfType]
+    ++Log.count[selfType]
     return base.count
   }
 
   public func _customIndexOfEquatableElement(
     element: Base.Generator.Element
   ) -> Base.Index?? {
-    ++CollectionLog._customIndexOfEquatableElement[selfType]
+    ++Log._customIndexOfEquatableElement[selfType]
     return base._customIndexOfEquatableElement(element)
   }
 
   public var first: Base.Generator.Element? {
-    ++CollectionLog.first[selfType]
+    ++Log.first[selfType]
     return base.first
   }
 %   end
-  
+
+%   if Kind == 'MutableCollection':
+  public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
+    @noescape body: (inout UnsafeMutableBufferPointer<Generator.Element>) -> R
+  ) -> R? {
+    ++Log._withUnsafeMutableBufferPointerIfSupported[selfType]
+    let result = base._withUnsafeMutableBufferPointerIfSupported(body)
+    if result != nil {
+      ++Log._withUnsafeMutableBufferPointerIfSupportedNonNilReturns[selfType]
+    }
+    return result
+  }
+%   end
+
   public func generate() -> LoggingGenerator<Base.Generator> {
     ++Log.generate[selfType]
     return LoggingGenerator(base.generate())

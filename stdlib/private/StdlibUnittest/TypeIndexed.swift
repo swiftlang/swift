@@ -14,6 +14,21 @@ protocol Resettable : AnyObject {
   func reset()
 }
 
+public class ResettableValue<Value> : Resettable {
+  public init(_ value: Value) {
+    self.defaultValue = value
+    self.value = value
+    _allResettables.append(self)
+  }
+
+  public func reset() {
+    value = defaultValue
+  }
+
+  public let defaultValue: Value
+  public var value: Value
+}
+
 internal var _allResettables: [Resettable] = []
 
 public class TypeIndexed<Value> : Resettable {

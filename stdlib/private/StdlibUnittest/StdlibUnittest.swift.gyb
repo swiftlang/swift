@@ -3209,8 +3209,13 @@ public func == (
 /// This type can be used to check that generic functions don't rely on any
 /// other conformances.
 public struct MinimalComparableValue : Equatable, Comparable {
-  public static var timesEqualEqualWasCalled: Int = 0
-  public static var timesLessWasCalled: Int = 0
+  public static var timesEqualEqualWasCalled = ResettableValue(0)
+  public static var timesLessWasCalled = ResettableValue(0)
+
+  public static var equalImpl =
+    ResettableValue<(Int, Int) -> Bool>({ $0 == $1 })
+  public static var lessImpl =
+    ResettableValue<(Int, Int) -> Bool>({ $0 < $1 })
 
   public var value: Int
   public var identity: Int
@@ -3230,16 +3235,16 @@ public func == (
   lhs: MinimalComparableValue,
   rhs: MinimalComparableValue
 ) -> Bool {
-  ++MinimalComparableValue.timesEqualEqualWasCalled
-  return lhs.value == rhs.value
+  ++MinimalComparableValue.timesEqualEqualWasCalled.value
+  return MinimalComparableValue.equalImpl.value(lhs.value, rhs.value)
 }
 
 public func < (
   lhs: MinimalComparableValue,
   rhs: MinimalComparableValue
 ) -> Bool {
-  ++MinimalComparableValue.timesLessWasCalled
-  return lhs.value < rhs.value
+  ++MinimalComparableValue.timesLessWasCalled.value
+  return MinimalComparableValue.lessImpl.value(lhs.value, rhs.value)
 }
 
 /// A Sequence that uses as many default implementations as
@@ -3280,6 +3285,7 @@ public struct Defaulted${traversal}MutableCollection<Element>
   public typealias Base = Minimal${traversal}MutableCollection<Element>
   public typealias Generator = MinimalGenerator<Element>
   public typealias Index = Minimal${traversal}Index
+
   public var base: Base
 
   public init(base: Base) {
@@ -3297,6 +3303,7 @@ public struct Defaulted${traversal}RangeReplaceableCollection<Element>
   public typealias Base = Minimal${traversal}RangeReplaceableCollection<Element>
   public typealias Generator = MinimalGenerator<Element>
   public typealias Index = Minimal${traversal}Index
+
   public var base: Base
 
   public init() {

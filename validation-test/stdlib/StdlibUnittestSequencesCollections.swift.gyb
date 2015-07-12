@@ -253,5 +253,68 @@ ${Self}TestSuite.test("removeRange()/IndexInvalidation/DifferentMutationEpoch") 
 
 %end
 
+var SequenceTypeAlgorithms = TestSuite("SequenceTypeAlgorithms")
+
+SequenceTypeAlgorithms.test("forAllPermutations") {
+  if true {
+    var permutations: [[Int]] = []
+    forAllPermutations(0) {
+      permutations.append($0)
+    }
+    expectEqualSequence([] as [[Int]], permutations) { $0 == $1 }
+  }
+
+  if true {
+    var permutations: [[Int]] = []
+    forAllPermutations(1) {
+      permutations.append($0)
+    }
+    expectEqualSequence([[ 0 ]] as [[Int]], permutations) { $0 == $1 }
+  }
+
+  if true {
+    var permutations: [[Int]] = []
+    forAllPermutations(2) {
+      permutations.append($0)
+    }
+    expectEqualSequence(
+      [[ 0, 1 ], [ 1, 0 ]] as [[Int]], permutations) { $0 == $1 }
+  }
+
+  if true {
+    var permutations: [[Int]] = []
+    forAllPermutations(3) {
+      permutations.append($0)
+    }
+    expectEqualSequence(
+      [
+        [ 0, 1, 2 ],
+        [ 0, 2, 1 ],
+        [ 1, 0, 2 ],
+        [ 1, 2, 0 ],
+        [ 2, 0, 1 ],
+        [ 2, 1, 0 ],
+      ] as [[Int]],
+      permutations) { $0 == $1 }
+  }
+
+  if true {
+    var permutations: [[Int]] = []
+    forAllPermutations([ 10, 20, 30 ]) {
+      permutations.append($0)
+    }
+    expectEqualSequence(
+      [
+        [ 10, 20, 30 ],
+        [ 10, 30, 20 ],
+        [ 20, 10, 30 ],
+        [ 20, 30, 10 ],
+        [ 30, 10, 20 ],
+        [ 30, 20, 10 ],
+      ] as [[Int]],
+      permutations) { $0 == $1 }
+  }
+}
+
 runAllTests()
 

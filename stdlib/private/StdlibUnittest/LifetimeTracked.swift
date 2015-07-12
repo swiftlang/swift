@@ -11,10 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 public final class LifetimeTracked : ForwardIndexType, CustomStringConvertible {
-  public init(_ value: Int) {
+  public init(_ value: Int, identity: Int = 0) {
     ++LifetimeTracked.instances
     serialNumber = ++LifetimeTracked._nextSerialNumber
     self.value = value
+    self.identity = identity
   }
 
   deinit {
@@ -39,6 +40,7 @@ public final class LifetimeTracked : ForwardIndexType, CustomStringConvertible {
   internal static var _nextSerialNumber = 0
   
   public let value: Int
+  public var identity: Int
   public var serialNumber: Int = 0
 }
 

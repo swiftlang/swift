@@ -132,3 +132,48 @@ extension TypeIdentifier
     return "TypeIdentifier(\(description))"
   }
 }
+
+func _forAllPermutationsImpl(
+  index: Int, _ size: Int,
+  inout _ perm: [Int], inout _ visited: [Bool],
+  _ body: ([Int]) -> ()
+) {
+  if index == size {
+    body(perm)
+    return
+  }
+
+  for i in 0..<size {
+    if visited[i] {
+      continue
+    }
+    visited[i] = true
+    perm[index] = i
+    _forAllPermutationsImpl(index + 1, size, &perm, &visited, body)
+    visited[i] = false
+  }
+}
+
+/// Generate all permutations.
+public func forAllPermutations(size: Int, body: ([Int]) -> ()) {
+  if size == 0 {
+    return
+  }
+
+  var permutation = [Int](count: size, repeatedValue: 0)
+  var visited = [Bool](count: size, repeatedValue: false)
+  _forAllPermutationsImpl(0, size, &permutation, &visited, body)
+}
+
+/// Generate all permutations.
+public func forAllPermutations<S : SequenceType>(
+  sequence: S, body: ([S.Generator.Element]) -> ()
+) {
+  let data = Array(sequence)
+  forAllPermutations(data.count) {
+    (indices: [Int]) in
+    body(indices.map { data[$0] })
+    return ()
+  }
+}
+

@@ -165,16 +165,6 @@ struct A<T> : MutableSliceable {
   var impl: Array<T>
 }
 
-func withInvalidOrderings(body: ((Int,Int)->Bool)->Void) {
-  // Test some ordering predicates that don't create strict weak orderings
-  body { (_,_) in true }
-  body { (_,_) in false }
-  var i = 0
-  body { (_,_) in i++ % 2 == 0 }
-  body { (_,_) in i++ % 3 == 0 }
-  body { (_,_) in i++ % 5 == 0 }
-}
-
 func randomArray() -> A<Int> {
   let count = Int(rand32(exclusiveUpperBound: 50))
   return A(randArray(count))
@@ -998,41 +988,6 @@ SequenceTypeAlgorithms.test("lexicographicalCompare/Predicate") {
 // contains()
 //===----------------------------------------------------------------------===//
 
-// These tests are shared between find() and contains().
-struct FindTest {
-  let expected: Int?
-  let element: MinimalEquatableValue
-  let sequence: [MinimalEquatableValue]
-  let expectedLeftoverSequence: [MinimalEquatableValue]
-  let loc: SourceLoc
-
-  init(
-    _ expected: Int?, _ element: Int, _ sequence: [Int],
-    _ expectedLeftoverSequence: [Int],
-    file: String = __FILE__, line: UWord = __LINE__
-  ) {
-    self.expected = expected
-    self.element = MinimalEquatableValue(element)
-    self.sequence = sequence.map { MinimalEquatableValue($0) }
-    self.expectedLeftoverSequence = expectedLeftoverSequence.map {
-      MinimalEquatableValue($0)}
-    self.loc = SourceLoc(file, line, comment: "test data")
-  }
-}
-
-let findTests = [
-  FindTest(nil, 42, [], []),
-
-  FindTest(nil, 42, [ 1 ], []),
-  FindTest(0, 1, [ 1 ], []),
-
-  FindTest(nil, 42, [ 1, 2, 3, 4 ], []),
-  FindTest(0, 1, [ 1, 2, 3, 4 ], [ 2, 3, 4 ]),
-  FindTest(1, 2, [ 1, 2, 3, 4 ], [ 3, 4 ]),
-  FindTest(2, 3, [ 1, 2, 3, 4 ], [ 4 ]),
-  FindTest(3, 4, [ 1, 2, 3, 4 ], []),
-]
-
 typealias StrictSequenceOfEquatable = MinimalSequence<MinimalEquatableValue>
 
 // FIXME: rename in StdlibUnittest
@@ -1044,27 +999,12 @@ SequenceTypeAlgorithms.test("contains/WhereElementIsEquatable/dispatch") {
   expectCustomizable(tester, tester.log._customContainsEquatableElement)
 }
 
-SequenceTypeAlgorithms.test("contains/WhereElementIsEquatable/semantics") {
-  for test in findTests {
-    let s = StrictSequenceOfEquatable(MinimalSequence(test.sequence))
-    
-    expectEqual(
-      test.expected != nil,
-      s.contains(test.element),
-      stackTrace: SourceLocStack().with(test.loc))
-    
-    expectEqualSequence(
-      test.expectedLeftoverSequence, s, stackTrace: SourceLocStack().with(test.loc))
-  }
-}
-
 func callStaticContains(
   set: Set<MinimalHashableValue>,
   _ element: MinimalHashableValue
 ) -> Bool {
   return set.contains(element)
 }
-
 
 func callGenericContains<
   S : SequenceType where S.Generator.Element : Equatable
@@ -2310,86 +2250,12 @@ SequenceTypeAlgorithms.test("CollectionType.generate()/CustomImplementation") {
 // CollectionType.subscript(_: Range<Index>), CollectionType.SubSequence
 //===----------------------------------------------------------------------===//
 
-struct SubscriptRangeTest {
-  let expected: [OpaqueValue<Int>]
-  let collection: [OpaqueValue<Int>]
-  let bounds: Range<Int>
-  let loc: SourceLoc
-
-  func boundsIn<C : CollectionType>(c: C) -> Range<C.Index> {
-    let i = c.startIndex
-    return Range(
-      start: advance(i, numericCast(bounds.startIndex)),
-      end: advance(i, numericCast(bounds.endIndex)))
-  }
-
-  init(
-    expected: [Int], collection: [Int], bounds: Range<Int>,
-    file: String = __FILE__, line: UWord = __LINE__
-  ) {
-    self.expected = expected.map { OpaqueValue($0) }
-    self.collection = collection.map { OpaqueValue($0) }
-    self.bounds = bounds
-    self.loc = SourceLoc(file, line, comment: "test data")
-  }
-}
-
-let subscriptRangeTests = [
-  // Slice an empty collection.
-  SubscriptRangeTest(
-    expected: [],
-    collection: [],
-    bounds: 0..<0),
-
-  // Slice to the full extent.
-  SubscriptRangeTest(
-    expected: [ 10, 20, 30 ],
-    collection: [ 10, 20, 30 ],
-    bounds: 0..<3),
-
-  // Slice a prefix.
-  SubscriptRangeTest(
-    expected: [ 10, 20, ],
-    collection: [ 10, 20, 30 ],
-    bounds: 0..<2),
-
-  // Slice a suffix.
-  SubscriptRangeTest(
-    expected: [ 20, 30 ],
-    collection: [ 10, 20, 30 ],
-    bounds: 1..<3),
-
-  // Slice the middle part.
-  SubscriptRangeTest(
-    expected: [ 20 ],
-    collection: [ 10, 20, 30 ],
-    bounds: 1..<2),
-
-  // Slice the middle part.
-  SubscriptRangeTest(
-    expected: [ 20, 30, 40 ],
-    collection: [ 10, 20, 30, 40, 50, 60 ],
-    bounds: 1..<4),
-]
-
 SequenceTypeAlgorithms.test("subscript(_: Range<Index>)/Dispatch") {
   let tester = CollectionLog.dispatchTester([OpaqueValue(1)])
   _ = tester[tester.startIndex..<tester.endIndex]
   let log = tester.log
   let log2 = tester.log.subscriptRange
   expectCustomizable(tester, tester.log.subscriptRange)
-}
-
-SequenceTypeAlgorithms.test("subscript(_: Range<Index>)/Semantics") {
-  for test in subscriptRangeTests {
-    let c = DefaultedForwardCollection<OpaqueValue<Int>>(test.collection)
-    var result = c[test.boundsIn(c)]
-
-    // FIXME: improve checkForwardCollection to check the SubSequence type.
-    checkForwardCollection(
-      test.expected, result, resiliencyChecks: .none) { $0.value == $1.value }
-
-  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -2502,449 +2368,41 @@ SequenceTypeAlgorithms.test("Slice.subscript(_: Range<Index>)") {
 // isEmpty
 //===----------------------------------------------------------------------===//
 
-struct MinimalForwardCollectionWithDefaultIsEmpty : CollectionType {
-  init(count: Int) {
-    self._count = count
-  }
-
-  var startIndex: MinimalForwardIndex {
-    return MinimalForwardIndex(position: 0, startIndex: 0, endIndex: _count)
-  }
-
-  var endIndex: MinimalForwardIndex {
-    return MinimalForwardIndex(
-      position: _count, startIndex: 0, endIndex: _count)
-  }
-
-  subscript(i: MinimalForwardIndex) -> OpaqueValue<Int> {
-    expectUnreachable()
-    return OpaqueValue(i.position + 1)
-  }
-
-  var _count: Int
+SequenceTypeAlgorithms.test("isEmpty/dispatch") {
+  let tester = CollectionLog.dispatchTester([OpaqueValue(1)])
+  _ = tester.isEmpty
+  expectCustomizable(tester, tester.log.isEmpty)
 }
-
-func callStaticIsEmpty(
-  collection: MinimalForwardCollectionWithDefaultIsEmpty
-) -> Bool {
-  return collection.isEmpty
-}
-
-func callGenericIsEmpty<C : CollectionType>(collection: C) -> Bool {
-  return collection.isEmpty
-}
-
-% for dispatch in [ 'Static', 'Generic' ]:
-
-SequenceTypeAlgorithms.test("isEmpty/DefaultImplementation/${dispatch}") {
-  if true {
-    let s = MinimalForwardCollectionWithDefaultIsEmpty(count: 0)
-    expectTrue(call${dispatch}IsEmpty(s))
-  }
-  if true {
-    let s = MinimalForwardCollectionWithDefaultIsEmpty(count: 1)
-    expectFalse(call${dispatch}IsEmpty(s))
-  }
-}
-
-% end
-
-struct MinimalForwardCollectionWithCustomIsEmpty : CollectionType {
-  static var timesIsEmptyWasColled: Int = 0
-
-  init(count: Int) {
-    self._count = count
-  }
-
-  var startIndex: MinimalForwardIndex {
-    expectUnreachable()
-    return MinimalForwardIndex(position: 0, startIndex: 0, endIndex: _count)
-  }
-
-  var endIndex: MinimalForwardIndex {
-    expectUnreachable()
-    return MinimalForwardIndex(
-      position: _count, startIndex: 0, endIndex: _count)
-  }
-
-  subscript(i: MinimalForwardIndex) -> OpaqueValue<Int> {
-    expectUnreachable()
-    return OpaqueValue(i.position + 1)
-  }
-
-  var isEmpty: Bool {
-    ++MinimalForwardCollectionWithCustomIsEmpty.timesIsEmptyWasColled
-    return _count == 0
-  }
-
-  var _count: Int
-}
-
-func callStaticIsEmpty(
-  collection: MinimalForwardCollectionWithCustomIsEmpty
-) -> Bool {
-  return collection.isEmpty
-}
-
-% for dispatch in [ 'Static', 'Generic' ]:
-
-SequenceTypeAlgorithms.test("isEmpty/CustomImplementation/${dispatch}") {
-  if true {
-    let s = MinimalForwardCollectionWithCustomIsEmpty(count: 0)
-    MinimalForwardCollectionWithCustomIsEmpty.timesIsEmptyWasColled = 0
-    expectTrue(call${dispatch}IsEmpty(s))
-    expectEqual(1, MinimalForwardCollectionWithCustomIsEmpty.timesIsEmptyWasColled)
-  }
-  if true {
-    let s = MinimalForwardCollectionWithCustomIsEmpty(count: 1)
-    MinimalForwardCollectionWithCustomIsEmpty.timesIsEmptyWasColled = 0
-    expectFalse(call${dispatch}IsEmpty(s))
-    expectEqual(1, MinimalForwardCollectionWithCustomIsEmpty.timesIsEmptyWasColled)
-  }
-}
-
-% end
 
 //===----------------------------------------------------------------------===//
 // first
 //===----------------------------------------------------------------------===//
 
-struct MinimalForwardCollectionWithDefaultFirst : CollectionType {
-  init(_ data: [OpaqueValue<Int>]) {
-    self._data = MinimalForwardCollection(data)
-  }
-
-  var startIndex: MinimalForwardIndex {
-    return _data.startIndex
-  }
-
-  var endIndex: MinimalForwardIndex {
-    return _data.endIndex
-  }
-
-  subscript(i: MinimalForwardIndex) -> OpaqueValue<Int> {
-    expectEqual(startIndex, i)
-    return _data[i]
-  }
-
-  var _data: MinimalForwardCollection<OpaqueValue<Int>>
-}
-
-func callStaticFirst(
-  collection: MinimalForwardCollectionWithDefaultFirst
-) -> OpaqueValue<Int>? {
-  return collection.first
-}
-
-func callGenericFirst<C : CollectionType>(collection: C)
-  -> C.Generator.Element? {
-
-  return collection.first
-}
-
-% for dispatch in [ 'Static', 'Generic' ]:
-
-SequenceTypeAlgorithms.test("first/DefaultImplementation/${dispatch}") {
-  if true {
-    let s = MinimalForwardCollectionWithDefaultFirst([])
-    expectEmpty(call${dispatch}First(s))
-  }
-  if true {
-    let s = MinimalForwardCollectionWithDefaultFirst([
-      OpaqueValue<Int>(1, identity: 10),
-      OpaqueValue<Int>(2, identity: 20)
-    ])
-    if let result = call${dispatch}First(s) {
-      expectEqual(1, result.value)
-      expectEqual(10, result.identity)
-    } else {
-      expectUnreachable()
-    }
-  }
-}
-
-% end
-
-struct MinimalForwardCollectionWithCustomFirst : CollectionType {
-  static var timesFirstWasColled: Int = 0
-
-  init(_ data: [OpaqueValue<Int>]) {
-    self._data = MinimalForwardCollection(data)
-  }
-
-  var startIndex: MinimalForwardIndex {
-    expectUnreachable()
-    return _data.startIndex
-  }
-
-  var endIndex: MinimalForwardIndex {
-    expectUnreachable()
-    return _data.endIndex
-  }
-
-  subscript(i: MinimalForwardIndex) -> OpaqueValue<Int> {
-    expectUnreachable()
-    return _data[i]
-  }
-
-  var first: OpaqueValue<Int>? {
-    ++MinimalForwardCollectionWithCustomFirst.timesFirstWasColled
-    return _data.first
-  }
-
-  var _data: MinimalForwardCollection<OpaqueValue<Int>>
-}
-
-func callStaticFirst(
-  collection: MinimalForwardCollectionWithCustomFirst
-) -> OpaqueValue<Int>? {
-  return collection.first
-}
-
-% for dispatch in [ 'Static', 'Generic' ]:
-
-SequenceTypeAlgorithms.test("first/CustomImplementation/${dispatch}") {
-  if true {
-    let s = MinimalForwardCollectionWithCustomFirst([])
-    MinimalForwardCollectionWithCustomFirst.timesFirstWasColled = 0
-    expectEmpty(call${dispatch}First(s))
-    expectEqual(1, MinimalForwardCollectionWithCustomFirst.timesFirstWasColled)
-  }
-  if true {
-    let s = MinimalForwardCollectionWithCustomFirst([
-      OpaqueValue<Int>(1, identity: 10),
-      OpaqueValue<Int>(2, identity: 20)
-    ])
-    MinimalForwardCollectionWithCustomFirst.timesFirstWasColled = 0
-    if let result = call${dispatch}First(s) {
-      expectEqual(1, result.value)
-      expectEqual(10, result.identity)
-    } else {
-      expectUnreachable()
-    }
-
-    expectEqual(1, MinimalForwardCollectionWithCustomFirst.timesFirstWasColled)
-  }
-}
-
-% end
-
-//===----------------------------------------------------------------------===//
-// last
-//===----------------------------------------------------------------------===//
-
-SequenceTypeAlgorithms.test("last") {
-  if true {
-    let s = MinimalBidirectionalCollection<OpaqueValue<Int>>([])
-    expectEmpty(s.last)
-  }
-  if true {
-    let s = MinimalBidirectionalCollection<OpaqueValue<Int>>([
-      OpaqueValue<Int>(1, identity: 10),
-      OpaqueValue<Int>(2, identity: 20)
-    ])
-    if let result = s.last {
-      expectEqual(2, result.value)
-      expectEqual(20, result.identity)
-    } else {
-      expectUnreachable()
-    }
-  }
+SequenceTypeAlgorithms.test("first/dispatch") {
+  let tester = CollectionLog.dispatchTester([OpaqueValue(1)])
+  _ = tester.first
+  expectCustomizable(tester, tester.log.first)
 }
 
 //===----------------------------------------------------------------------===//
 // count
 //===----------------------------------------------------------------------===//
 
-% for Implementation in [ 'Default', 'Custom' ]:
-
-struct MinimalForwardCollectionWith${Implementation}Count : CollectionType {
-  init(count: Int) {
-    self._count = count
-  }
-
-  var startIndex: MinimalForwardInt32Index {
-    return MinimalForwardInt32Index(
-      position: 0,
-      startIndex: 0,
-      endIndex: _count)
-  }
-
-  var endIndex: MinimalForwardInt32Index {
-    return MinimalForwardInt32Index(
-      position: _count,
-      startIndex: 0,
-      endIndex: _count)
-  }
-
-  subscript(i: MinimalForwardInt32Index) -> OpaqueValue<Int> {
-    return OpaqueValue(i.position + 1)
-  }
-
-  var _count: Int
-
-%   if Implementation == 'Custom':
-
-  static var timesCountWasCalled: Int = 0
-
-  var count: Int32 {
-    ++MinimalForwardCollectionWithCustomCount.timesCountWasCalled
-    return Int32(_count)
-  }
-
-%   end
+SequenceTypeAlgorithms.test("count/dispatch") {
+  let tester = CollectionLog.dispatchTester([OpaqueValue(1)])
+  _ = tester.count
+  expectCustomizable(tester, tester.log.count)
 }
-
-% end
-
-func callGenericCount<C : CollectionType>(collection: C) -> C.Index.Distance {
-  return collection.count
-}
-
-% for Implementation in [ 'Default', 'Custom' ]:
-
-SequenceTypeAlgorithms.test("CollectionType.count/${Implementation}Implementation") {
-  for count in [ 0, 5 ] {
-    let collection = MinimalForwardCollectionWith${Implementation}Count(count: count)
-
-    if true {
-      // Check the return type of the function when called statically.
-%   if Implementation == 'Custom':
-      MinimalForwardCollectionWithCustomCount.timesCountWasCalled = 0
-%   end
-      var result = collection.count
-      expectType(Int32.self, &result)
-      expectEqual(Int32(count), result)
-%   if Implementation == 'Custom':
-      expectEqual(1, MinimalForwardCollectionWithCustomCount.timesCountWasCalled)
-%   end
-    }
-
-    if true {
-      // Check the return type of the function when called generically.
-%   if Implementation == 'Custom':
-      MinimalForwardCollectionWithCustomCount.timesCountWasCalled = 0
-%   end
-      var result = callGenericCount(collection)
-      expectType(Int32.self, &result)
-      expectEqual(Int32(count), result)
-%   if Implementation == 'Custom':
-      expectEqual(1, MinimalForwardCollectionWithCustomCount.timesCountWasCalled)
-%   end
-    }
-
-    checkForwardCollection(
-      Array(1..<count+1).map { OpaqueValue($0) } as [OpaqueValue<Int>],
-      collection
-    ) { $0.value == $1.value }
-  }
-}
-
-% end
 
 //===----------------------------------------------------------------------===//
-// find()
+// indexOf()
 //===----------------------------------------------------------------------===//
 
-func callStaticFind(
-  collection: MinimalForwardCollection<MinimalEquatableValue>,
-  _ element: MinimalEquatableValue
-) -> MinimalForwardCollection<MinimalEquatableValue>.Index? {
-  return collection.indexOf(element)
+SequenceTypeAlgorithms.test("indexOf/WhereElementIsEquatable/dispatch") {
+  let tester = CollectionLog.dispatchTester([MinimalEquatableValue(1)])
+  _ = tester.indexOf(MinimalEquatableValue(1))
+  expectCustomizable(tester, tester.log._customIndexOfEquatableElement)
 }
-
-func callGenericFind<
-  C : CollectionType where C.Generator.Element : Equatable
->(collection: C, _ element: C.Generator.Element) -> C.Index? {
-  return collection.indexOf(element)
-}
-
-% for dispatch in [ 'Static', 'Generic' ]:
-
-SequenceTypeAlgorithms.test("find/WhereElementIsEquatable/${dispatch}") {
-  for test in findTests {
-    let s = MinimalForwardCollection<MinimalEquatableValue>(test.sequence)
-    expectEqual(
-      test.expected,
-      call${dispatch}Find(s, test.element).map { $0.position },
-      stackTrace: SourceLocStack().with(test.loc))
-  }
-}
-
-% end
-
-struct CollectionWithCustomFindMethod<
-  Base: CollectionType where Base.Generator.Element : Equatable
-> : CollectionType {
-  var timesFindWasCalled = Box(0)
-
-  typealias Element = Base.Generator.Element
-  internal let _elements: [Element]
-
-  init(_ elements: Base) {
-    self._elements = elements.map { $0 }
-  }
-
-  func generate() -> MinimalGenerator<Element> {
-    // Lie from our generate() method about sequence contents.
-    // Tests using this type should not call generate() anyway.
-    expectUnreachable()
-    return MinimalSequence<Element>([]).generate()
-  }
-
-  var startIndex: MinimalForwardIndex {
-    return MinimalForwardIndex(
-      position: 0, startIndex: 0, endIndex: _elements.endIndex)
-  }
-
-  var endIndex: MinimalForwardIndex {
-    return MinimalForwardIndex(
-      position: _elements.endIndex,
-      startIndex: 0,
-      endIndex: _elements.endIndex)
-  }
-
-  subscript(i: MinimalForwardIndex) -> Element {
-    return _elements[i.position]
-  }
-
-  func _customIndexOfEquatableElement(
-    element: Element
-  ) -> MinimalForwardIndex?? {
-    ++timesFindWasCalled.value
-    for i in _elements.indices {
-      if _elements[i] == element {
-        return MinimalForwardIndex(
-          position: i,
-          startIndex: 0,
-          endIndex: _elements.endIndex)
-      }
-    }
-    return Optional(nil)
-  }
-}
-
-func callStaticFind(
-  sequence: CollectionWithCustomFindMethod<[MinimalEquatableValue]>,
-  _ element: MinimalEquatableValue
-) -> CollectionWithCustomFindMethod<[MinimalEquatableValue]>.Index? {
-  return sequence.indexOf(element)
-}
-
-% for dispatch in [ 'Static', 'Generic' ]:
-
-SequenceTypeAlgorithms.test("find/WhereElementIsEquatable/CustomImplementation/${dispatch}") {
-  for test in findTests {
-    let s = CollectionWithCustomFindMethod(test.sequence)
-    expectEqual(
-      test.expected,
-      call${dispatch}Find(s, test.element).map { $0.position },
-      stackTrace: SourceLocStack().with(test.loc))
-    expectEqual(1, s.timesFindWasCalled.value)
-  }
-}
-
-% end
 
 // FIXME: underscores are a workaround for:
 // <rdar://problem/20582358> Commenting out one line determines whether a
@@ -3000,46 +2458,6 @@ SequenceTypeAlgorithms.test("Set<T>.find/CustomImplementation/${dispatch}") {
 
 % end
 
-SequenceTypeAlgorithms.test("find/Predicate") {
-  for test in findTests {
-    let s = MinimalForwardCollection<OpaqueValue<Int>>(
-      test.sequence.map { OpaqueValue($0.value) })
-    let closureLifetimeTracker = LifetimeTracked(0)
-    expectEqual(1, LifetimeTracked.instances)
-    let result = s.indexOf {
-      (candidate) in
-      _blackHole(closureLifetimeTracker)
-      return candidate.value == test.element.value
-    }
-    expectEqual(
-      test.expected,
-      result.map { $0.position },
-      stackTrace: SourceLocStack().with(test.loc))
-  }
-}
-
-//===----------------------------------------------------------------------===//
-// indices
-//===----------------------------------------------------------------------===//
-
-SequenceTypeAlgorithms.test("indices") {
-  if true {
-    let s = MinimalForwardCollection<OpaqueValue<Int>>([])
-    let indices = s.indices
-    expectEqual(s.startIndex, indices.startIndex)
-    expectEqual(s.endIndex, indices.endIndex)
-  }
-  if true {
-    let s = MinimalForwardCollection<OpaqueValue<Int>>([
-      OpaqueValue<Int>(1, identity: 10),
-      OpaqueValue<Int>(2, identity: 20)
-    ])
-    let indices = s.indices
-    expectEqual(s.startIndex, indices.startIndex)
-    expectEqual(s.endIndex, indices.endIndex)
-  }
-}
-
 //===----------------------------------------------------------------------===//
 // MutableCollectionType
 //===----------------------------------------------------------------------===//
@@ -3048,737 +2466,122 @@ SequenceTypeAlgorithms.test("indices") {
 // _withUnsafeMutableBufferPointerIfSupported()
 //===----------------------------------------------------------------------===//
 
-var _timesWithUnsafeMutableBufferPointerIfSupportedWasCalled: Int = 0
-
-% for Implementation in [ 'Default', 'Custom' ]:
-
-%   for Traversal in [ 'Forward', 'RandomAccess' ]:
-
-struct Minimal${Traversal}MutableCollectionWith${Implementation}WithUnsafeMutableBufferPointerIfSupported<T>
-  : MutableCollectionType {
-
-  init(_ data: [T]) {
-    self._data = data
-    self._count = data.count
-  }
-
-  var startIndex: Minimal${Traversal}Index {
-    return Minimal${Traversal}Index(
-      position: 0,
-      startIndex: 0,
-      endIndex: _count)
-  }
-
-  var endIndex: Minimal${Traversal}Index {
-    return Minimal${Traversal}Index(
-      position: _count,
-      startIndex: 0,
-      endIndex: _count)
-  }
-
-  subscript(i: Minimal${Traversal}Index) -> T {
-    get {
-      return _data[i.position]
-    }
-    set {
-      _data[i.position] = newValue
-    }
-  }
-
-  var _data: [T]
-
-  // Store 'count' separately from 'data' to prevent inout violations in
-  // '_withUnsafeMutableBufferPointerIfSupported'.
-  var _count: Int
-
-%     if Implementation == 'Custom':
-
-  static var timesWithUnsafeMutableBufferPointerIfSupportedWasCalled: Int {
-    get {
-      return _timesWithUnsafeMutableBufferPointerIfSupportedWasCalled
-    }
-    set {
-      _timesWithUnsafeMutableBufferPointerIfSupportedWasCalled = newValue
-    }
-  }
-
-  mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    @noescape body: (inout UnsafeMutableBufferPointer<T>) -> R
-  ) -> R? {
-    ++Minimal${Traversal}MutableCollectionWith${Implementation}WithUnsafeMutableBufferPointerIfSupported.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled
-    return _data._withUnsafeMutableBufferPointerIfSupported(body)
-  }
-
-%     end
-
+SequenceTypeAlgorithms.test("_withUnsafeMutableBufferPointerIfSupported/dispatch") {
+  var tester = MutableCollectionLog.dispatchTester([OpaqueValue(1)])
+  _ = tester._withUnsafeMutableBufferPointerIfSupported { _ in () }
+  expectCustomizable(tester, tester.log._withUnsafeMutableBufferPointerIfSupported)
 }
-
-%   end
-
-% end
-
-func callGenericWithUnsafeMutableBufferPointerIfSupported<
-  C : MutableCollectionType, R
->(
-  inout collection: C,
-  @noescape body: (inout UnsafeMutableBufferPointer<C.Generator.Element>) -> R
-) -> R? {
-  return collection._withUnsafeMutableBufferPointerIfSupported(body)
-}
-
-% for Implementation in [ 'Default', 'Custom' ]:
-
-func callStaticWithUnsafeMutableBufferPointerIfSupported<R>(
-  inout collection: MinimalForwardMutableCollectionWith${Implementation}WithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>,
-  @noescape body: (inout UnsafeMutableBufferPointer<OpaqueValue<Int>>) -> R
-) -> R? {
-  return collection._withUnsafeMutableBufferPointerIfSupported(body)
-}
-
-% end
-
-% for Implementation in [ 'Default', 'Custom' ]:
-
-%   for dispatch in [ 'Static', 'Generic' ]:
-
-SequenceTypeAlgorithms.test("MutableCollectionType._withUnsafeMutableBufferPointerIfSupported()/${Implementation}Implementation/${dispatch}") {
-  let data = [ 1, 2, 3, 4, 5 ]
-  var collection = MinimalForwardMutableCollectionWith${Implementation}WithUnsafeMutableBufferPointerIfSupported(
-    data.map { OpaqueValue($0) })
-  if true {
-%     if Implementation == 'Custom':
-    MinimalForwardMutableCollectionWith${Implementation}WithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled = 0
-    var result = collection._withUnsafeMutableBufferPointerIfSupported {
-      (inout buffer: UnsafeMutableBufferPointer<OpaqueValue<Int>>) in
-      return OpaqueValue(Array(buffer))
-    }
-    expectType(Optional<OpaqueValue<Array<OpaqueValue<Int>>>>.self, &result)
-    expectEqual(data, result!.value.map { $0.value })
-    expectEqual(1, MinimalForwardMutableCollectionWith${Implementation}WithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled)
-%     else:
-    var result = collection._withUnsafeMutableBufferPointerIfSupported {
-      (inout buffer: UnsafeMutableBufferPointer<OpaqueValue<Int>>) -> OpaqueValue<Int> in
-      expectUnreachable()
-      return OpaqueValue(42)
-    }
-    expectType(Optional<OpaqueValue<Int>>.self, &result)
-    expectEmpty(result)
-%     end
-  }
-}
-
-%   end
-
-% end
 
 //===----------------------------------------------------------------------===//
-// partition()
+// Standard collection tests
 //===----------------------------------------------------------------------===//
 
-func _forAllPermutationsImpl(
-  index: Int, _ size: Int,
-  inout _ perm: [Int], inout _ visited: [Bool],
-  _ body: ([Int]) -> ()
-) {
-  if index == size {
-    body(perm)
-    return
-  }
-
-  for i in 0..<size {
-    if visited[i] {
-      continue
-    }
-    visited[i] = true
-    perm[index] = i
-    _forAllPermutationsImpl(index + 1, size, &perm, &visited, body)
-    visited[i] = false
-  }
+func identity(element: OpaqueValue<Int>) -> OpaqueValue<Int> {
+  return element
+}
+func identityEq(element: MinimalEquatableValue) -> MinimalEquatableValue {
+  return element
+}
+func identityComp(element: MinimalComparableValue) -> MinimalComparableValue {
+  return element
 }
 
-/// Generate all permutations.
-func forAllPermutations(size: Int, body: ([Int]) -> ()) {
-  if size == 0 {
-    return
-  }
+% for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
+%   for base_kind in [ 'Defaulted', 'Minimal' ]:
+// This comment is a workaround for <rdar://problem/18900352> gyb miscompiles nested loops
+%     for mutable in [ False, True ]:
+// This comment is a workaround for <rdar://problem/18900352> gyb miscompiles nested loops
+%       Base = "%s%s%sCollection" % (base_kind, traversal, 'Mutable' if mutable else '')
 
-  var permutation = [Int](count: size, repeatedValue: 0)
-  var visited = [Bool](count: size, repeatedValue: false)
-  _forAllPermutationsImpl(0, size, &permutation, &visited, body)
-}
+if true {
+  var checksAdded: Box<Set<String>> = Box([])
 
-/// Generate all permutations.
-func forAllPermutations<S : SequenceType>(
-  sequence: S, body: ([S.Generator.Element]) -> ()
-) {
-  let data = Array(sequence)
-  forAllPermutations(data.count) {
-    (indices: [Int]) in
-    body(indices.map { data[$0] })
-    return ()
-  }
-}
+  SequenceTypeAlgorithms.add${traversal}CollectionTests(
+    makeCollection: { (elements: [OpaqueValue<Int>]) in
+      return ${Base}(elements)
+    },
+    wrapValue: identity,
+    extractValue: identity,
+    makeCollectionOfEquatable: { (elements: [MinimalEquatableValue]) in
+      return ${Base}(elements)
+    },
+    wrapValueIntoEquatable: identityEq,
+    extractValueFromEquatable: identityEq,
+    checksAdded: checksAdded)
 
-SequenceTypeAlgorithms.test("forAllPermutations") {
-  if true {
-    var permutations: [[Int]] = []
-    forAllPermutations(0) {
-      permutations.append($0)
-    }
-    expectEqualSequence([] as [[Int]], permutations) { $0 == $1 }
-  }
-
-  if true {
-    var permutations: [[Int]] = []
-    forAllPermutations(1) {
-      permutations.append($0)
-    }
-    expectEqualSequence([[ 0 ]] as [[Int]], permutations) { $0 == $1 }
-  }
-
-  if true {
-    var permutations: [[Int]] = []
-    forAllPermutations(2) {
-      permutations.append($0)
-    }
-    expectEqualSequence(
-      [[ 0, 1 ], [ 1, 0 ]] as [[Int]], permutations) { $0 == $1 }
-  }
-
-  if true {
-    var permutations: [[Int]] = []
-    forAllPermutations(3) {
-      permutations.append($0)
-    }
-    expectEqualSequence(
-      [
-        [ 0, 1, 2 ],
-        [ 0, 2, 1 ],
-        [ 1, 0, 2 ],
-        [ 1, 2, 0 ],
-        [ 2, 0, 1 ],
-        [ 2, 1, 0 ],
-      ] as [[Int]],
-      permutations) { $0 == $1 }
-  }
-
-  if true {
-    var permutations: [[Int]] = []
-    forAllPermutations([ 10, 20, 30 ]) {
-      permutations.append($0)
-    }
-    expectEqualSequence(
-      [
-        [ 10, 20, 30 ],
-        [ 10, 30, 20 ],
-        [ 20, 10, 30 ],
-        [ 20, 30, 10 ],
-        [ 30, 10, 20 ],
-        [ 30, 20, 10 ],
-      ] as [[Int]],
-      permutations) { $0 == $1 }
-  }
-}
-
-public struct CustomComparableValue : Equatable, Comparable {
-  public static var timesEqualEqualWasCalled: Int = 0
-  public static var timesLessWasCalled: Int = 0
-
-  public static var equalImpl: (Int, Int) -> Bool = { $0 == $1 }
-  public static var lessImpl: (Int, Int) -> Bool = { $0 < $1 }
-
-  public var value: Int
-  public var identity: Int
-
-  public init(_ value: Int) {
-    self.value = value
-    self.identity = 0
-  }
-
-  public init(_ value: Int, identity: Int) {
-    self.value = value
-    self.identity = identity
-  }
-}
-
-public func == (
-  lhs: CustomComparableValue,
-  rhs: CustomComparableValue
-) -> Bool {
-  ++CustomComparableValue.timesEqualEqualWasCalled
-  return CustomComparableValue.equalImpl(lhs.value, rhs.value)
-}
-
-public func < (
-  lhs: CustomComparableValue,
-  rhs: CustomComparableValue
-) -> Bool {
-  ++CustomComparableValue.timesLessWasCalled
-  return CustomComparableValue.lessImpl(lhs.value, rhs.value)
-}
-
-// These tests are shared between partition() and sort().
-struct PartitionExhaustiveTest {
-  let sequence: [Int]
-  let loc: SourceLoc
-
-  init(
-    _ sequence: [Int],
-    file: String = __FILE__, line: UWord = __LINE__
-  ) {
-    self.sequence = sequence
-    self.loc = SourceLoc(file, line, comment: "test data")
-  }
-}
-
-let partitionExhaustiveTests = [
-  PartitionExhaustiveTest([]),
-  PartitionExhaustiveTest([ 10 ]),
-  PartitionExhaustiveTest([ 10, 10 ]),
-  PartitionExhaustiveTest([ 10, 20 ]),
-  PartitionExhaustiveTest([ 10, 10, 10 ]),
-  PartitionExhaustiveTest([ 10, 10, 20 ]),
-  PartitionExhaustiveTest([ 10, 20, 20 ]),
-  PartitionExhaustiveTest([ 10, 20, 30 ]),
-  PartitionExhaustiveTest([ 10, 10, 10, 10 ]),
-  PartitionExhaustiveTest([ 10, 10, 10, 20 ]),
-  PartitionExhaustiveTest([ 10, 10, 20, 20 ]),
-  PartitionExhaustiveTest([ 10, 20, 30, 40 ]),
-  PartitionExhaustiveTest([ 10, 10, 10, 10, 10 ]),
-  PartitionExhaustiveTest([ 10, 10, 10, 20, 20 ]),
-  PartitionExhaustiveTest([ 10, 10, 10, 20, 30 ]),
-  PartitionExhaustiveTest([ 10, 10, 20, 20, 30 ]),
-  PartitionExhaustiveTest([ 10, 10, 20, 30, 40 ]),
-  PartitionExhaustiveTest([ 10, 20, 30, 40, 50 ]),
-  PartitionExhaustiveTest([ 10, 20, 30, 40, 50, 60 ]),
-  PartitionExhaustiveTest([ 10, 10, 10, 10, 10, 20, 20 ]),
-  PartitionExhaustiveTest([ 10, 20, 30, 40, 50, 60, 70 ]),
-]
-
-% for predicate in [ False, True ]:
-
-SequenceTypeAlgorithms.test("partition/${'Predicate' if predicate else 'WhereElementIsEquatable'}") {
-%   if not predicate:
-  CustomComparableValue.equalImpl = { $0 == $1 }
-  CustomComparableValue.lessImpl = { $0 < $1 }
-%   end
-
-  for test in partitionExhaustiveTests {
-    forAllPermutations(test.sequence) { (sequence) in
-%   for slice in [ False, True ]:
-      if true {
-%     if predicate:
-        var sequenceAsArray: [OpaqueValue<Int>] =
-          zip(sequence, 0..<sequence.count).map {
-            OpaqueValue($0, identity: $1)
-          }
-
-%       if slice:
-        sequenceAsArray.insert(
-          OpaqueValue(0xfffe, identity: 0xfffe), atIndex: 0)
-        sequenceAsArray.append(OpaqueValue(0xffff, identity: 0xffff))
+%       if mutable:
+  SequenceTypeAlgorithms.add${traversal}MutableCollectionTests(
+    makeCollection: { (elements: [OpaqueValue<Int>]) in
+      return ${Base}(elements)
+    },
+    wrapValue: identity,
+    extractValue: identity,
+    makeCollectionOfEquatable: { (elements: [MinimalEquatableValue]) in
+      return ${Base}(elements)
+    },
+    wrapValueIntoEquatable: identityEq,
+    extractValueFromEquatable: identityEq,
+    makeCollectionOfComparable: { (elements: [MinimalComparableValue]) in
+      return ${Base}(elements)
+    },
+    wrapValueIntoComparable: identityComp,
+    extractValueFromComparable: identityComp,
+    checksAdded: checksAdded,
+    withUnsafeMutableBufferPointerIsSupported: false)
 %       end
+}
 
-        var s = MinimalRandomAccessMutableCollection<OpaqueValue<Int>>(
-          sequenceAsArray)
+if true {
+  var checksAdded: Box<Set<String>> = Box([])
 
-%       if slice:
-        let indices = s.startIndex.successor()..<s.endIndex.predecessor()
-%       else:
-        let indices = s.indices
+  SequenceTypeAlgorithms.add${traversal}CollectionTests(
+    makeCollection: { (elements: [LifetimeTracked]) in
+      return ${Base}(elements)
+    },
+    wrapValue: { (element: OpaqueValue<Int>) in
+      LifetimeTracked(element.value, identity: element.identity)
+    },
+    extractValue: { (element: LifetimeTracked) in
+      OpaqueValue(element.value, identity: element.identity)
+    },
+    makeCollectionOfEquatable: { (elements: [MinimalEquatableValue]) in
+      // FIXME: use LifetimeTracked.
+      return ${Base}(elements)
+    },
+    wrapValueIntoEquatable: identityEq,
+    extractValueFromEquatable: identityEq,
+    checksAdded: checksAdded)
+
+%       if mutable:
+  SequenceTypeAlgorithms.add${traversal}MutableCollectionTests(
+    makeCollection: { (elements: [LifetimeTracked]) in
+      return ${Base}(elements)
+    },
+    wrapValue: { (element: OpaqueValue<Int>) in
+      LifetimeTracked(element.value, identity: element.identity)
+    },
+    extractValue: { (element: LifetimeTracked) in
+      OpaqueValue(element.value, identity: element.identity)
+    },
+    makeCollectionOfEquatable: { (elements: [MinimalEquatableValue]) in
+      // FIXME: use LifetimeTracked.
+      return ${Base}(elements)
+    },
+    wrapValueIntoEquatable: identityEq,
+    extractValueFromEquatable: identityEq,
+    makeCollectionOfComparable: { (elements: [MinimalComparableValue]) in
+      // FIXME: use LifetimeTracked.
+      return ${Base}(elements)
+    },
+    wrapValueIntoComparable: identityComp,
+    extractValueFromComparable: identityComp,
+    checksAdded: checksAdded,
+    withUnsafeMutableBufferPointerIsSupported: false)
 %       end
+}
 
-        let closureLifetimeTracker = LifetimeTracked(0)
-        expectEqual(1, LifetimeTracked.instances)
-        let pivot = s.partition(indices) {
-          (lhs, rhs) in
-          _blackHole(closureLifetimeTracker)
-          return lhs.value < rhs.value
-        }
-%     else:
-        var sequenceAsArray: [CustomComparableValue] =
-          zip(sequence, 0..<sequence.count).map {
-            CustomComparableValue($0, identity: $1)
-          }
-
-%       if slice:
-        sequenceAsArray.insert(
-          CustomComparableValue(0xfffe, identity: 0xfffe), atIndex: 0)
-        sequenceAsArray.append(CustomComparableValue(0xffff, identity: 0xffff))
-%       end
-
-        var s = MinimalRandomAccessMutableCollection<CustomComparableValue>(
-          sequenceAsArray)
-
-%       if slice:
-        let indices = s.startIndex.successor()..<s.endIndex.predecessor()
-%       else:
-        let indices = s.indices
-%       end
-
-        let pivot = s.partition(indices)
 %     end
-
-        // Check that we didn't lose any elements.
-%       if slice:
-        expectEqual(0xfffe, s.first!.identity)
-        expectEqual(0xffff, s.last!.identity)
-        var identities = s.map { $0.identity }
-        identities.removeLast()
-        identities.removeAtIndex(0)
-        expectEqualsUnordered(0..<sequence.count, identities)
-%       else:
-        expectEqualsUnordered(0..<sequence.count, s.map { $0.identity })
-%     end
-
-        // All the elements in the first partition are less than the pivot
-        // value.
-        for i in indices.startIndex..<pivot {
-          expectLT(s[i].value, s[pivot].value)
-        }
-        // All the elements in the second partition are greater or equal to
-        // the pivot value.
-        for i in pivot..<indices.endIndex {
-          expectLE(s[pivot].value, s[i].value)
-        }
-      }
 %   end
-    }
-  }
-}
-
-% end
-
-% for predicate in [ False, True ]:
-
-SequenceTypeAlgorithms.test("partition/${'Predicate' if predicate else 'WhereElementIsEquatable'}/InvalidOrderings") {
-  withInvalidOrderings { (comparisonPredicate) in
-    for i in 0..<7 {
-      forAllPermutations(i) { (sequence) in
-%   if predicate:
-        var s = MinimalRandomAccessMutableCollection<OpaqueValue<Int>>(
-          sequence.map { OpaqueValue($0) })
-        let closureLifetimeTracker = LifetimeTracked(0)
-        expectEqual(1, LifetimeTracked.instances)
-        let pivot = s.partition(s.indices) {
-          (lhs, rhs) in
-          _blackHole(closureLifetimeTracker)
-          return comparisonPredicate(lhs.value, rhs.value)
-        }
-%    else:
-        var s = MinimalRandomAccessMutableCollection<CustomComparableValue>(
-          sequence.map { CustomComparableValue($0) })
-        CustomComparableValue.equalImpl = {
-          !comparisonPredicate($0, $1) &&
-          !comparisonPredicate($1, $0)
-        }
-        CustomComparableValue.lessImpl = {
-          comparisonPredicate($0, $1)
-        }
-        let pivot = s.partition(s.indices)
-%    end
-
-        // Weak postcondition: we didn't lose any elements.
-        expectEqualsUnordered(0..<i, s.map { $0.value })
-
-        expectTrue(0 <= s[pivot].value && s[pivot].value < i)
-      }
-    }
-  }
-}
-
-% end
-
-//===----------------------------------------------------------------------===//
-// sort()
-//===----------------------------------------------------------------------===//
-
-% for predicate in [ False, True ]:
-
-SequenceTypeAlgorithms.test("sort/${'Predicate' if predicate else 'WhereElementIsEquatable'}") {
-%   if not predicate:
-  CustomComparableValue.equalImpl = { $0 == $1 }
-  CustomComparableValue.lessImpl = { $0 < $1 }
-%   end
-
-  for test in partitionExhaustiveTests {
-    forAllPermutations(test.sequence) { (sequence) in
-      if true {
-%   if predicate:
-        var sequenceAsArray: [OpaqueValue<Int>] =
-          zip(sequence, 0..<sequence.count).map {
-            OpaqueValue($0, identity: $1)
-          }
-
-        var s = MinimalRandomAccessMutableCollection<OpaqueValue<Int>>(
-          sequenceAsArray)
-
-        let result = s.sort { $0.value < $1.value }
-%   else:
-        var sequenceAsArray: [CustomComparableValue] =
-          zip(sequence, 0..<sequence.count).map {
-            CustomComparableValue($0, identity: $1)
-          }
-
-        var s = MinimalRandomAccessMutableCollection<CustomComparableValue>(
-          sequenceAsArray)
-
-        let result = s.sort()
-%   end
-
-        // Check that we didn't lose any elements.
-        expectEqualsUnordered(0..<sequence.count, result.map { $0.identity })
-
-        // Check that the elements are sorted.
-        if result.count >= 2 {
-          for i in result.startIndex..<result.endIndex.predecessor() {
-            expectLE(result[i].value, result[i.successor()].value)
-          }
-        }
-      }
-    }
-  }
-}
-
-SequenceTypeAlgorithms.test("sort/CustomImplementation/${'Predicate' if predicate else 'WhereElementIsEquatable'}") {
-%   if not predicate:
-  CustomComparableValue.equalImpl = { $0 == $1 }
-  CustomComparableValue.lessImpl = { $0 < $1 }
-%   end
-
-  let data = [ 5, 4, 3, 2, 1 ]
-%     if predicate:
-  var collection = MinimalForwardMutableCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported(
-    data.map { MinimalComparableValue($0) })
-%   else:
-  var collection = MinimalForwardMutableCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported(
-    data.map { OpaqueValue($0) })
-%   end
-  MinimalForwardMutableCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled = 0
-%   if predicate:
-  let result = collection.sort()
-%   else:
-  let result = collection.sort { $0.value < $1.value }
-%   end
-  // The collection is copied into an array before sorting.
-  expectEqual(0, MinimalForwardMutableCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled)
-
-  expectEqual([ 1, 2, 3, 4, 5 ], result.map { $0.value })
-}
-
-% end
-
-% for predicate in [ False, True ]:
-
-SequenceTypeAlgorithms.test("sort/${'Predicate' if predicate else 'WhereElementIsEquatable'}/InvalidOrderings") {
-  withInvalidOrderings { (comparisonPredicate) in
-    for i in 0..<7 {
-      forAllPermutations(i) { (sequence) in
-%   if predicate:
-        var s = MinimalRandomAccessMutableCollection<OpaqueValue<Int>>(
-          sequence.map { OpaqueValue($0) })
-        let result = s.sort {
-          comparisonPredicate($0.value, $1.value)
-        }
-%    else:
-        var s = MinimalRandomAccessMutableCollection<CustomComparableValue>(
-          sequence.map { CustomComparableValue($0) })
-        CustomComparableValue.equalImpl = {
-          !comparisonPredicate($0, $1) &&
-          !comparisonPredicate($1, $0)
-        }
-        CustomComparableValue.lessImpl = {
-          comparisonPredicate($0, $1)
-        }
-        let result = s.sort()
-%    end
-
-        // Weak postcondition: we didn't lose any elements.
-        expectEqualsUnordered(0..<i, result.map { $0.value })
-      }
-    }
-  }
-}
-
-SequenceTypeAlgorithms.test("partition/CustomImplementation/${'Predicate' if predicate else 'WhereElementIsEquatable'}") {
-%   if not predicate:
-  CustomComparableValue.equalImpl = { $0 == $1 }
-  CustomComparableValue.lessImpl = { $0 < $1 }
-%   end
-
-  for test in partitionExhaustiveTests {
-    forAllPermutations(test.sequence) { (sequence) in
-
-%     if predicate:
-      var sequenceAsArray: [OpaqueValue<Int>] =
-        zip(sequence, 0..<sequence.count).map {
-          OpaqueValue($0, identity: $1)
-        }
-%   else:
-      var sequenceAsArray: [MinimalComparableValue] =
-        zip(sequence, 0..<sequence.count).map {
-          MinimalComparableValue($0, identity: $1)
-        }
-%   end
-      var s = MinimalRandomAccessMutableCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported(
-        sequenceAsArray)
-      MinimalRandomAccessMutableCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled = 0
-%   if predicate:
-      let pivot = s.partition(s.indices) { $0.value < $1.value }
-%   else:
-      let pivot = s.partition(s.indices)
-%   end
-      expectEqual(1, MinimalRandomAccessMutableCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled)
-
-      // Check that we didn't lose any elements.
-      expectEqualsUnordered(0..<sequence.count, s.map { $0.identity })
-
-      // All the elements in the first partition are less than the pivot
-      // value.
-      for i in s.startIndex..<pivot {
-        expectLT(s[i].value, s[pivot].value)
-      }
-      // All the elements in the second partition are greater or equal to
-      // the pivot value.
-      for i in pivot..<s.endIndex {
-        expectLE(s[pivot].value, s[i].value)
-      }
-    }
-  }
-}
-
-% end
-
-% for predicate in [ False, True ]:
-
-SequenceTypeAlgorithms.test("sortInPlace/${'Predicate' if predicate else 'WhereElementIsEquatable'}") {
-%   if not predicate:
-  CustomComparableValue.equalImpl = { $0 == $1 }
-  CustomComparableValue.lessImpl = { $0 < $1 }
-%   end
-
-  for test in partitionExhaustiveTests {
-    forAllPermutations(test.sequence) { (sequence) in
-      if true {
-%   if predicate:
-        var sequenceAsArray: [OpaqueValue<Int>] =
-          zip(sequence, 0..<sequence.count).map {
-            OpaqueValue($0, identity: $1)
-          }
-
-        var s = MinimalRandomAccessMutableCollection<OpaqueValue<Int>>(
-          sequenceAsArray)
-
-        s.sortInPlace { $0.value < $1.value }
-%   else:
-        var sequenceAsArray: [CustomComparableValue] =
-          zip(sequence, 0..<sequence.count).map {
-            CustomComparableValue($0, identity: $1)
-          }
-
-        var s = MinimalRandomAccessMutableCollection<CustomComparableValue>(
-          sequenceAsArray)
-
-        s.sortInPlace()
-%   end
-
-        // Check that we didn't lose any elements.
-        expectEqualsUnordered(0..<sequence.count, s.map { $0.identity })
-
-        // Check that the elements are sorted.
-        if s.count >= 2 {
-          for i in s.startIndex..<s.endIndex.predecessor() {
-            expectLE(s[i].value, s[i.successor()].value)
-          }
-        }
-      }
-    }
-  }
-}
-
-SequenceTypeAlgorithms.test("partition/CustomImplementation/${'Predicate' if predicate else 'WhereElementIsEquatable'}/InvalidOrderings") {
-  withInvalidOrderings { (comparisonPredicate) in
-    for i in 0..<7 {
-      forAllPermutations(i) { (sequence) in
-
-%   if not predicate:
-        CustomComparableValue.equalImpl = { $0 == $1 }
-        CustomComparableValue.lessImpl = { $0 < $1 }
-%   end
-
-%     if predicate:
-        var sequenceAsArray: [OpaqueValue<Int>] =
-          zip(sequence, 0..<sequence.count).map {
-            OpaqueValue($0, identity: $1)
-          }
-%   else:
-        var sequenceAsArray: [MinimalComparableValue] =
-          zip(sequence, 0..<sequence.count).map {
-            MinimalComparableValue($0, identity: $1)
-          }
-%   end
-        var s = MinimalRandomAccessMutableCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported(
-        sequenceAsArray)
-        MinimalRandomAccessMutableCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled = 0
-%   if predicate:
-        let pivot = s.partition(s.indices) { $0.value < $1.value }
-%   else:
-        let pivot = s.partition(s.indices)
-%   end
-        expectEqual(1, MinimalRandomAccessMutableCollectionWithCustomWithUnsafeMutableBufferPointerIfSupported<OpaqueValue<Int>>.timesWithUnsafeMutableBufferPointerIfSupportedWasCalled)
-
-        // Check that we didn't lose any elements.
-        expectEqualsUnordered(0..<sequence.count, s.map { $0.identity })
-
-        // All the elements in the first partition are less than the pivot
-        // value.
-        for i in s.startIndex..<pivot {
-          expectLT(s[i].value, s[pivot].value)
-        }
-        // All the elements in the second partition are greater or equal to
-        // the pivot value.
-        for i in pivot..<s.endIndex {
-          expectLE(s[pivot].value, s[i].value)
-        }
-      }
-    }
-  }
-}
-
-% end
-
-% for predicate in [ False, True ]:
-
-SequenceTypeAlgorithms.test("sortInPlace/${'Predicate' if predicate else 'WhereElementIsEquatable'}/InvalidOrderings") {
-  withInvalidOrderings { (comparisonPredicate) in
-    for i in 0..<7 {
-      forAllPermutations(i) { (sequence) in
-%   if predicate:
-        var s = MinimalRandomAccessMutableCollection<OpaqueValue<Int>>(
-          sequence.map { OpaqueValue($0) })
-        s.sortInPlace {
-          comparisonPredicate($0.value, $1.value)
-        }
-%    else:
-        var s = MinimalRandomAccessMutableCollection<CustomComparableValue>(
-          sequence.map { CustomComparableValue($0) })
-        CustomComparableValue.equalImpl = {
-          !comparisonPredicate($0, $1) &&
-          !comparisonPredicate($1, $0)
-        }
-        CustomComparableValue.lessImpl = {
-          comparisonPredicate($0, $1)
-        }
-        s.sortInPlace()
-%    end
-
-        // Weak postcondition: we didn't lose any elements.
-        expectEqualsUnordered(0..<i, s.map { $0.value })
-      }
-    }
-  }
-}
-
 % end
 
 runAllTests()
