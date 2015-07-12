@@ -18,6 +18,7 @@
 
 #define DEBUG_TYPE "swift-arc-opts"
 #include "swift/LLVMPasses/Passes.h"
+#include "swift/Basic/NullablePtr.h"
 #include "LLVMARCOpts.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
@@ -71,60 +72,147 @@ DisableARCReturn3Opt(
 //                            Utility Functions
 //===----------------------------------------------------------------------===//
 
-/// getRetain - Return a callable function for swift_retain.  F is the function
-/// being operated on, ObjectPtrTy is an instance of the object pointer type to
-/// use, and Cache is a null-initialized place to make subsequent requests
-/// faster.
-static Constant *getRetain(Function &F, Type *ObjectPtrTy, Constant *&Cache) {
-  if (Cache) return Cache;
+namespace {
 
-  auto AttrList = AttributeSet::get(F.getContext(),
-                                    AttributeSet::FunctionIndex,
-                                    Attribute::NoUnwind);
+/// A class for building ARC entry points. It is a composition wrapper around an
+/// IRBuilder and a constant Cache. It can not be moved or copied. It is meant
+/// to be created once and passed around by reference.
+class ARCEntryPointBuilder {
+  // The builder which we are wrapping.
+  IRBuilder<> B;
 
-  Module *M = F.getParent();
-  return Cache = M->getOrInsertFunction("swift_retain", AttrList,
-                                        ObjectPtrTy, ObjectPtrTy, NULL);
-}
+  // The constant cache.
+  NullablePtr<Constant> Retain;
+  NullablePtr<Constant> RetainNoResult;
+  NullablePtr<Constant> RetainAndReturnThree;
 
-/// getRetainNoResult - Return a callable function for swift_retain_noresult.
-/// F is the function being operated on, ObjectPtrTy is an instance of the
-/// object pointer type to use, and Cache is a null-initialized place to make
-/// subsequent requests faster.
-static Constant *getRetainNoResult(Function &F, Type *ObjectPtrTy,
-                                   Constant *&Cache) {
-  if (Cache) return Cache;
+  // The type cache.
+  NullablePtr<Type> ObjectPtrTy;
 
-  auto AttrList = AttributeSet::get(F.getContext(), 1, Attribute::NoCapture);
-  AttrList = AttrList.addAttribute(F.getContext(),
-                                   AttributeSet::FunctionIndex,
-                                   Attribute::NoUnwind);
-  Module *M = F.getParent();
-  return Cache = M->getOrInsertFunction("swift_retain_noresult", AttrList,
-                                        Type::getVoidTy(F.getContext()),
-                                        ObjectPtrTy, NULL);
-}
+public:
+  ARCEntryPointBuilder(Function &F) : B(F.begin()), Retain(), RetainNoResult(), RetainAndReturnThree(), ObjectPtrTy() {}
+  ~ARCEntryPointBuilder() = default;
+  ARCEntryPointBuilder(ARCEntryPointBuilder &&) = delete;
+  ARCEntryPointBuilder(const ARCEntryPointBuilder &) = delete;
 
-/// getRetainAndReturnThree - Return a callable function for
-/// swift_retainAndReturnThree.  F is the function being operated on,
-/// ObjectPtrTy is an instance of the object pointer type to use, and Cache is a
-/// null-initialized place to make subsequent requests faster.
-static Constant *getRetainAndReturnThree(Function &F, Type *ObjectPtrTy,
-                                         Constant *&Cache) {
-  if (Cache) return Cache;
+  ARCEntryPointBuilder &operator=(const ARCEntryPointBuilder &) = delete;
+  void operator=(ARCEntryPointBuilder &&C) = delete;
 
-  auto AttrList = AttributeSet::get(F.getContext(),
-                                    AttributeSet::FunctionIndex,
-                                    Attribute::NoUnwind);
-  Module *M = F.getParent();
+  void setInsertPoint(Instruction *I) {
+    B.SetInsertPoint(I);
+  }
 
-  Type *Int64Ty = Type::getInt64Ty(F.getContext());
-  Type *RetTy = StructType::get(Int64Ty, Int64Ty, Int64Ty, NULL);
+  CallInst *createRetainNoResult(Value *V) {
+    V = B.CreatePointerCast(V, getObjectPtrTy());
+    return B.CreateCall(getRetainNoResult(), V);
+  }
 
-  return Cache = M->getOrInsertFunction("swift_retainAndReturnThree", AttrList,
-                                        RetTy, ObjectPtrTy,
-                                        Int64Ty, Int64Ty, Int64Ty, NULL);
-}
+  Value *createInsertValue(Value *V1, Value *V2, unsigned Idx) {
+    return B.CreateInsertValue(V1, V2, Idx);
+  }
+
+  Value *createExtractValue(Value *V, unsigned Idx) {
+    return B.CreateExtractValue(V, Idx);
+  }
+
+  Value *createIntToPtr(Value *V, Type *Ty) {
+    return B.CreateIntToPtr(V, Ty);
+  }
+
+  CallInst *createRetain(Value *V) {
+    // Cast just to make sure that we have the right type.
+    V = B.CreatePointerCast(V, getObjectPtrTy());
+
+    // Create the call.
+    CallInst *CI = B.CreateCall(getRetain(), V);
+    CI->setTailCall(true);
+    return CI;
+  }
+
+  CallInst *createRetainAndReturnThree(Value *HeapObject, Value *I0, Value *I1,
+                                       Value *I2) {
+    // Change to support all architectures.
+    Type *Int64Ty = B.getInt64Ty();
+
+    if (isa<PointerType>(I0->getType()))
+      I0 = B.CreatePtrToInt(I0, Int64Ty);
+    if (isa<PointerType>(I1->getType()))
+      I1 = B.CreatePtrToInt(I1, Int64Ty);
+    if (isa<PointerType>(I2->getType()))
+      I2 = B.CreatePtrToInt(I2, Int64Ty);
+
+    HeapObject = B.CreatePointerCast(HeapObject, getObjectPtrTy());
+    auto *CI =
+      B.CreateCall(getRetainAndReturnThree(), {HeapObject, I0, I1, I2});
+    CI->setTailCall(true);
+    return CI;
+  }
+
+private:
+  Module &getModule() {
+    return *B.GetInsertBlock()->getModule();
+  }
+
+  /// getRetain - Return a callable function for swift_retain.
+  Constant *getRetain() {
+    if (Retain)
+      return Retain.get();;
+    auto *ObjectPtrTy = getObjectPtrTy();
+
+    auto &M = getModule();
+    auto AttrList = AttributeSet::get(
+        M.getContext(), AttributeSet::FunctionIndex, Attribute::NoUnwind);
+    Retain = M.getOrInsertFunction("swift_retain", AttrList, ObjectPtrTy,
+                                   ObjectPtrTy, nullptr);
+    return Retain.get();
+  }
+
+  /// getRetainNoResult - Return a callable function for swift_retain_noresult.
+  Constant *getRetainNoResult() {
+    if (RetainNoResult)
+      return RetainNoResult.get();
+    auto *ObjectPtrTy = getObjectPtrTy();
+    auto &M = getModule();
+    auto AttrList = AttributeSet::get(M.getContext(), 1, Attribute::NoCapture);
+    AttrList = AttrList.addAttribute(
+        M.getContext(), AttributeSet::FunctionIndex, Attribute::NoUnwind);
+    RetainNoResult = M.getOrInsertFunction(
+        "swift_retain_noresult", AttrList,
+        Type::getVoidTy(M.getContext()), ObjectPtrTy, nullptr);
+    return RetainNoResult.get();
+  }
+
+  /// getRetainAndReturnThree - Return a callable function for
+  /// swift_retainAndReturnThree.
+  Constant *getRetainAndReturnThree() {
+    if (RetainAndReturnThree)
+      return RetainAndReturnThree.get();
+
+    auto *ObjectPtrTy = getObjectPtrTy();
+    auto &M = getModule();
+    auto AttrList = AttributeSet::get(
+        M.getContext(), AttributeSet::FunctionIndex, Attribute::NoUnwind);
+
+    Type *Int64Ty = Type::getInt64Ty(M.getContext());
+    Type *RetTy = StructType::get(Int64Ty, Int64Ty, Int64Ty, nullptr);
+
+    RetainAndReturnThree = M.getOrInsertFunction(
+        "swift_retainAndReturnThree", AttrList, RetTy, ObjectPtrTy,
+        Int64Ty, Int64Ty, Int64Ty, nullptr);
+    return RetainAndReturnThree.get();
+  }
+
+  Type *getObjectPtrTy() {
+    if (ObjectPtrTy)
+      return ObjectPtrTy.get();
+    auto &M = getModule();
+    ObjectPtrTy = M.getTypeByName("swift.refcounted")->getPointerTo();
+    assert(ObjectPtrTy && "Could not find the swift heap object type by name");
+    return ObjectPtrTy.get();
+  }
+};
+
+} // end anonymous namespace
 
 //===----------------------------------------------------------------------===//
 //                          Input Function Canonicalizer
@@ -184,9 +272,7 @@ static void updateCallValueUses(CallInst &CI, unsigned EltNo) {
 /// replaced with swift_retain_noresult.
 ///
 /// This also does some trivial peep-hole optimizations as we go.
-static bool canonicalizeInputFunction(Function &F) {
-  Constant *RetainNoResultCache = 0;
-
+static bool canonicalizeInputFunction(Function &F, ARCEntryPointBuilder &B) {
   bool Changed = false;
   for (auto &BB : F)
   for (auto I = BB.begin(); I != BB.end(); ) {
@@ -224,12 +310,8 @@ static bool canonicalizeInputFunction(Function &F) {
       if (!CI.use_empty())
         Inst.replaceAllUsesWith(ArgVal);
 
-      // Insert a call to swift_retain_noresult to replace this and reset the
-      // iterator so that we visit it next.
-      I = CallInst::Create(getRetainNoResult(F, ArgVal->getType(),
-                                             RetainNoResultCache),
-                           ArgVal, "", &CI);
-      I->setDebugLoc(CI.getDebugLoc());
+      B.setInsertPoint(&CI);
+      I = B.createRetainNoResult(ArgVal);
       CI.eraseFromParent();
       Changed = true;
       break;
@@ -256,13 +338,8 @@ static bool canonicalizeInputFunction(Function &F) {
       // into another function.  In this case, there is no return anymore.
       CallInst &CI = cast<CallInst>(Inst);
 
-      IRBuilder<> B(&CI);
-      B.SetCurrentDebugLocation(CI.getDebugLoc());
-      Type *HeapObjectTy = CI.getArgOperand(0)->getType();
-
-      // Reprocess starting at the new swift_retain_noresult.
-      I = B.CreateCall(getRetainNoResult(F, HeapObjectTy, RetainNoResultCache),
-                       CI.getArgOperand(0));
+      B.setInsertPoint(&CI);
+      I = B.createRetainNoResult(CI.getArgOperand(0));
 
       // See if we can eliminate all of the extractvalue's that are hanging off
       // the swift_retainAndReturnThree.  This is important to eliminate casts
@@ -276,9 +353,9 @@ static bool canonicalizeInputFunction(Function &F) {
       // but correct code.
       if (!CI.use_empty()) {
         Value *V = UndefValue::get(CI.getType());
-        V = B.CreateInsertValue(V, CI.getArgOperand(1), 0U);
-        V = B.CreateInsertValue(V, CI.getArgOperand(2), 1U);
-        V = B.CreateInsertValue(V, CI.getArgOperand(3), 2U);
+        V = B.createInsertValue(V, CI.getArgOperand(1), 0U);
+        V = B.createInsertValue(V, CI.getArgOperand(2), 1U);
+        V = B.createInsertValue(V, CI.getArgOperand(3), 2U);
         CI.replaceAllUsesWith(V);
       }
 
@@ -919,11 +996,12 @@ bool SwiftARCOpt::runOnFunction(Function &F) {
     return false;
 
   bool Changed = false;
+  ARCEntryPointBuilder B(F);
 
   // First thing: canonicalize swift_retain and similar calls so that nothing
   // uses their result.  This exposes the copy that the function does to the
   // optimizer.
-  Changed |= canonicalizeInputFunction(F);
+  Changed |= canonicalizeInputFunction(F, B);
 
   // Next, do a pass with a couple of optimizations:
   // 1) release() motion, eliminating retain/release pairs when it turns out
@@ -947,7 +1025,7 @@ bool SwiftARCOpt::runOnFunction(Function &F) {
 /// of the three values was retained right before the return, into a
 /// swift_retainAndReturnThree call.  This is particularly common when returning
 /// a string or array slice.
-static bool optimizeReturn3(ReturnInst *TheReturn) {
+static bool optimizeReturn3(ReturnInst *TheReturn, ARCEntryPointBuilder &B) {
   if (DisableARCReturn3Opt)
     return false;
 
@@ -1031,42 +1109,24 @@ static bool optimizeReturn3(ReturnInst *TheReturn) {
   Value *RetainedObject = TheRetain->getArgOperand(0);
 
   // Insert any new instructions before the return.
-  IRBuilder<> B(TheReturn);
-  B.SetCurrentDebugLocation(TheReturn->getDebugLoc());
-  Type *Int64Ty = B.getInt64Ty();
-
-  // The swift_retainAndReturnThree function takes the three arguments as i64.
-  // Cast the arguments to i64 if needed.
-
-  // Update the element with a cast to i64 if needed.
-  for (Value *&Elt : RetVals) {
-    if (isa<PointerType>(Elt->getType()))
-      Elt = B.CreatePtrToInt(Elt, Int64Ty);
-  }
-
-  // Call swift_retainAndReturnThree with our pointer to retain and the three
-  // i64's.
-  Function &F = *TheReturn->getParent()->getParent();
-  Constant *Cache = 0;  // Not utilized.
-  Value *LibCall = getRetainAndReturnThree(F,RetainedObject->getType(),Cache);
-  CallInst *NR = B.CreateCall(
-      LibCall, {RetainedObject, RetVals[0],RetVals[1], RetVals[2]});
-  NR->setTailCall(true);
+  B.setInsertPoint(TheReturn);
+  CallInst *NR = B.createRetainAndReturnThree(RetainedObject, RetVals[0],
+                                              RetVals[1], RetVals[2]);
 
   // The return type of the libcall is (i64,i64,i64).  Since at least one of
   // the pointers is a pointer (we retained it afterall!) we have to unpack
   // the elements, bitcast at least that one, and then repack to the proper
   // type expected by the ret instruction.
   for (unsigned i = 0; i != 3; ++i) {
-    RetVals[i] = B.CreateExtractValue(NR, i);
+    RetVals[i] = B.createExtractValue(NR, i);
     if (RetVals[i]->getType() != RetSTy->getElementType(i))
-      RetVals[i] = B.CreateIntToPtr(RetVals[i], RetSTy->getElementType(i));
+      RetVals[i] = B.createIntToPtr(RetVals[i], RetSTy->getElementType(i));
   }
 
   // Repack into an aggregate that can be returned.
   Value *RV = UndefValue::get(RetVal->getType());
   for (unsigned i = 0; i != 3; ++i)
-    RV = B.CreateInsertValue(RV, RetVals[i], i);
+    RV = B.createInsertValue(RV, RetVals[i], i);
 
   // Return the right thing and zap any instruction tree of inserts that
   // existed just to feed the old return.
@@ -1101,7 +1161,7 @@ static bool optimizeReturn3(ReturnInst *TheReturn) {
 /// Coming into this function, we assume that the code is in canonical form:
 /// none of these calls have any uses of their return values.
 bool SwiftARCExpandPass::runOnFunction(Function &F) {
-  Constant *RetainCache = nullptr;
+  ARCEntryPointBuilder B(F);
   bool Changed = false;
 
   SmallVector<ReturnInst*, 8> Returns;
@@ -1137,13 +1197,8 @@ bool SwiftARCExpandPass::runOnFunction(Function &F) {
       case RT_RetainNoResult: {
         Value *ArgVal = cast<CallInst>(Inst).getArgOperand(0);
 
-        // First step: rewrite swift_retain_noresult to swift_retain, exposing
-        // the result value.
-        CallInst &CI =
-           *CallInst::Create(getRetain(F, ArgVal->getType(), RetainCache),
-                             ArgVal, "", &Inst);
-        CI.setDebugLoc(Inst.getDebugLoc());
-        CI.setTailCall(true);
+        B.setInsertPoint(&Inst);
+        CallInst &CI = *B.createRetain(ArgVal);
         Inst.eraseFromParent();
 
         if (!isa<Instruction>(ArgVal))
@@ -1256,7 +1311,7 @@ bool SwiftARCExpandPass::runOnFunction(Function &F) {
   // FIXME: optimizeReturn3() implementation assumes 64-bit
   if (llvm::Triple(F.getParent()->getTargetTriple()).getArchName() == "x86_64")
     for (ReturnInst *RI : Returns)
-      Changed |= optimizeReturn3(RI);
+      Changed |= optimizeReturn3(RI, B);
 
   return Changed;
 }
