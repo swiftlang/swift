@@ -19,5 +19,11 @@ f3({ print($0) })
 func f4(a: Int..., b: Int) { } // expected-error{{'...' must be on the last parameter}}
 
 // rdar://16008564
-func inout_variadic(inout i: Int...) {  // expected-error {{inout arguments cannot be variadic}}
+func inoutVariadic(inout i: Int...) {  // expected-error {{inout arguments cannot be variadic}}
+}
+
+// rdar://19722429
+func invalidVariadic(e: NonExistentType) { // expected-error {{use of undeclared type 'NonExistentType'}}
+  { (e: ExtraCrispy...) in }() // expected-error {{use of undeclared type 'ExtraCrispy'}}
+  // expected-error@-1 {{unable to infer closure type in the current context}}
 }

@@ -4204,7 +4204,9 @@ inline TupleTypeElt::TupleTypeElt(Type ty,
   : NameAndVariadic(name, isVariadic),
     TyAndDefaultArg(ty.getPointer(), defArg)
 {
-  assert(!isVariadic || isa<ArraySliceType>(ty.getPointer()) ||
+  assert(!isVariadic ||
+         isa<ErrorType>(ty.getPointer()) ||
+         isa<ArraySliceType>(ty.getPointer()) ||
          (isa<BoundGenericType>(ty.getPointer()) &&
           ty->castTo<BoundGenericType>()->getGenericArgs().size() == 1));
 }
@@ -4213,8 +4215,12 @@ inline Type TupleTypeElt::getVarargBaseTy(Type VarArgT) {
   TypeBase *T = VarArgT.getPointer();
   if (ArraySliceType *AT = dyn_cast<ArraySliceType>(T))
     return AT->getBaseType();
-  // It's the stdlib Array<T>.
-  return cast<BoundGenericType>(T)->getGenericArgs()[0];
+  if (BoundGenericType *BGT = dyn_cast<BoundGenericType>(T)) {
+    // It's the stdlib Array<T>.
+    return BGT->getGenericArgs()[0];
+  }
+  assert(isa<ErrorType>(T));
+  return T;
 }
 
 inline Identifier SubstitutableType::getName() const {
