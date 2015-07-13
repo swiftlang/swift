@@ -15,39 +15,14 @@ import StdlibUnittest
 //
 //===----------------------------------------------------------------------===//
 
-/// The `GeneratorType` used by `_prext_FilterSequence` and
-/// `_prext_FilterCollection`.
-public struct _prext_FilterGenerator<
-  Base: GeneratorType
-> : GeneratorType, SequenceType {
-  /// Advance to the next element and return it, or `nil` if no next
-  /// element exists.
-  ///
-  /// - Requires: `next()` has not been applied to a copy of `self`
-  ///   since the copy was made, and no preceding call to `self.next()`
-  ///   has returned `nil`.
-  public mutating func next() -> Base.Element? {
-    var n: Base.Element?
-    for/*ever*/;; {
-      n = _base.next()
-      if n != nil ? _include(n!) : true {
-        return n
-      }
-    }
-  }
-
-  var _base: Base
-  var _include: (Base.Element)->Bool
-}
-
 /// The lazy `SequenceType` returned by `filter(c)` where `c` is a
 /// `SequenceType`.
 public struct _prext_FilterSequence<Base : SequenceType> : _prext_LazySequenceType {
   /// Return a *generator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> _prext_FilterGenerator<Base.Generator> {
-    return _prext_FilterGenerator(_base: _base.generate(), _include: _include)
+  public func generate() -> FilterGenerator<Base.Generator> {
+    return FilterGenerator(_base: _base.generate(), _include: _include)
   }
 
   var _base: Base
@@ -167,8 +142,8 @@ public struct _prext_FilterCollection<Base : CollectionType> : _prext_LazyCollec
   /// Return a *generator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> _prext_FilterGenerator<Base.Generator> {
-    return _prext_FilterGenerator(_base: _base.generate(), _include: _include)
+  public func generate() -> FilterGenerator<Base.Generator> {
+    return FilterGenerator(_base: _base.generate(), _include: _include)
   }
 
   var _base: Base
