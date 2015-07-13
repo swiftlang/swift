@@ -158,8 +158,8 @@ public func expectEqual<T>(
 ) {
   if !equal(expected, actual) {
     expectationFailure(
-      "expected: \(String(reflecting: expected)) (of type \(expected.dynamicType))\n"
-      + "actual: \(String(reflecting: actual)) (of type \(expected.dynamicType))",
+      "expected: \(String(reflecting: expected)) (of type \(String(reflecting: expected.dynamicType)))\n"
+      + "actual: \(String(reflecting: actual)) (of type \(String(reflecting: actual.dynamicType)))",
       trace: ${trace}
     )
   }
@@ -168,7 +168,7 @@ public func expectEqual<T>(
 public func expectNotEqual<T : Equatable>(expected: T, _ actual: T, ${TRACE}) {
   if expected == actual {
     expectationFailure(
-      "unexpected value: \"\(actual)\" (of type \(actual.dynamicType))",
+      "unexpected value: \"\(actual)\" (of type \(String(reflecting: actual.dynamicType)))",
       trace: ${trace}
     )
   }
@@ -187,8 +187,8 @@ public func expectOptionalEqual<T>(
 ) {
   if (actual == nil) || !equal(expected, actual!) {
     expectationFailure(
-      "expected: \"\(expected)\" (of type \(expected.dynamicType))\n"
-      + "actual: \"\(actual)\" (of type \(actual.dynamicType))",
+      "expected: \"\(expected)\" (of type \(String(reflecting: expected.dynamicType)))\n"
+      + "actual: \"\(actual)\" (of type \(String(reflecting: actual.dynamicType)))",
       trace: ${trace})
   }
 }
@@ -197,8 +197,8 @@ public func expectEqual<T : Equatable>(expected: T?, _ actual: T?, ${TRACE}) {
   if (actual == nil) != (expected == nil)
     || actual != nil && expected! != actual! {
     expectationFailure(
-      "expected: \"\(expected)\" (of type \(expected.dynamicType))\n"
-      + "actual: \"\(actual)\" (of type \(actual.dynamicType))",
+      "expected: \"\(expected)\" (of type \(String(reflecting: expected.dynamicType)))\n"
+      + "actual: \"\(actual)\" (of type \(String(reflecting: actual.dynamicType)))",
       trace: ${trace})
   }
 }
@@ -222,8 +222,8 @@ public func expectOptionalEqual${Generic}(
     expected: ${EquatableType}, _ actual: ${EquatableType}?, ${TRACE}) {
   if (actual == nil) || expected != actual! {
     expectationFailure(
-      "expected: \"\(expected)\" (of type \(expected.dynamicType))"
-      + "actual: \"\(actual)\" (of type \(actual.dynamicType))",
+      "expected: \"\(expected)\" (of type \(String(reflecting: expected.dynamicType)))"
+      + "actual: \"\(actual)\" (of type \(String(reflecting: actual.dynamicType)))",
       trace: ${trace})
   }
 }
@@ -2242,7 +2242,7 @@ public func expectEqualSequence<
   
   if !expected.elementsEqual(actual, isEquivalent: sameValue) {
     expectationFailure("expected elements: \"\(expected)\"\n"
-      + "actual: \"\(actual)\" (of type \(actual.dynamicType))",
+      + "actual: \"\(actual)\" (of type \(String(reflecting: actual.dynamicType)))",
       trace: ${trace})
   }
 }
