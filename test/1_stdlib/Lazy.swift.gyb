@@ -486,13 +486,20 @@ tests.test("LazyCollection/Passthrough") {
   CollectionLog.first.expectIncrement(baseType) { _ = s.first }
 }
 
-//===--- Sequences --------------------------------------------------------===//
+//===--- Map --------------------------------------------------------------===//
 
 tests.test("MapSequence") {
   let base = MinimalSequence(
     [2, 3, 5, 7, 11].map { OpaqueValue($0) })._prext_lazy
 
-  var mapped = base.map { OpaqueValue(Double($0.value) / 2.0) }
+  var calls = 0
+  var mapped = base.map {
+    (x: OpaqueValue<Int>)->OpaqueValue<Double> in
+    ++calls
+    return OpaqueValue(Double(x.value) / 2.0)
+  }
+
+  expectEqual(0, calls)
   
   expectType(
     _prext_MapSequence<
@@ -505,6 +512,8 @@ tests.test("MapSequence") {
   checkSequence(expected, mapped, resiliencyChecks: .none) {
     $0.value == $1.value
   }
+  
+  expectEqual(expected.count, calls)
 }
 
 //===--- Collections ------------------------------------------------------===//
@@ -514,7 +523,13 @@ tests.test("MapCollection/${traversal}") {
   let base = Minimal${traversal}Collection(
     [2, 3, 5, 7, 11].map { OpaqueValue($0) })._prext_lazy
 
-  var mapped = base.map { OpaqueValue(Double($0.value) / 2.0) }
+  var calls = 0
+  var mapped = base.map {
+    (x: OpaqueValue<Int>)->OpaqueValue<Double> in
+    ++calls
+    return OpaqueValue(Double(x.value) / 2.0)
+  }
+  expectEqual(0, calls)
   
   expectType(
     _prext_MapCollection<
@@ -527,9 +542,12 @@ tests.test("MapCollection/${traversal}") {
   check${traversal}Collection(expected, mapped, resiliencyChecks: .none) {
     $0.value == $1.value
   }
+  
+  expectEqual(expected.count, calls)
 }
 %end
 
+//===--- Reverse ----------------------------------------------------------===//
 tests.test("ReverseCollection") {
 
   let expected = Array(stride(from: 11, through: 0, by: -1))
