@@ -1207,7 +1207,7 @@ public:
         auto firstType = req.getFirstType().subst(
                            &Builder.getModule(),
                            substitutions,
-                           SubstOptions::IgnoreMissing);
+                           SubstFlags::IgnoreMissing);
         if (!firstType)
           break;
 
@@ -1219,7 +1219,7 @@ public:
         auto secondType = req.getSecondType().subst(
                             &Builder.getModule(), 
                             substitutions,
-                            SubstOptions::IgnoreMissing);
+                            SubstFlags::IgnoreMissing);
         if (!secondType)
           break;
         auto secondPA = Builder.resolveArchetype(secondType);
@@ -1245,7 +1245,7 @@ public:
         auto subjectType = req.getFirstType().subst(
                              &Builder.getModule(),
                              substitutions,
-                             SubstOptions::IgnoreMissing);
+                             SubstFlags::IgnoreMissing);
         if (!subjectType)
           break;
 

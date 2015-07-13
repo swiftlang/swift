@@ -22,6 +22,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/TypeAlignments.h"
+#include "swift/Basic/OptionSet.h"
 #include <functional>
 #include <string>
 
@@ -48,50 +49,18 @@ class TypeWalker;
 /// replacements.
 typedef llvm::DenseMap<TypeBase *, Type> TypeSubstitutionMap;
 
-/// Options for performing substitutions into a type.
-class SubstOptions {
-public:
-  /// Describes the kind of options.
-  enum OptionsKind : unsigned {
-    /// If a type cannot be produced because some member type is
-    /// missing, return the identity type rather than a null type.
-    IgnoreMissing = 0x01,
-  };
-
-private:
-  unsigned Options = 0;
-  NormalProtocolConformance *Conformance = nullptr;
-
-public:
-  SubstOptions() { }
-  SubstOptions(NoneType) { }
-  SubstOptions(OptionsKind options,
-               NormalProtocolConformance *conformance = nullptr)
-    : Options(options), Conformance(conformance) { }
-
-  /// Whether to ignore missing member types.
-  bool ignoreMissing() const { return Options & IgnoreMissing; }
-
-  /// Retrieve the protocol conformance whose not-already-available
-  /// type witnesses will be treated as missing.
-  NormalProtocolConformance *getSkippedConformance() const {
-    return Conformance;
-  }
-
-  friend SubstOptions &operator|=(SubstOptions &lhs, const SubstOptions &rhs) {
-    lhs.Options |= rhs.Options;
-    assert((!lhs.Conformance || !rhs.Conformance ||
-            lhs.Conformance == rhs.Conformance) &&
-           "skipped protocol conformance collision");
-    if (rhs.Conformance)
-      lhs.Conformance = rhs.Conformance;
-    return lhs;
-  }
+/// Flags that can be passed when substituting into a type.
+enum class SubstFlags {
+  /// If a type cannot be produced because some member type is
+  /// missing, return the identity type rather than a null type.
+  IgnoreMissing = 0x01,
 };
 
-inline SubstOptions::OptionsKind operator|(SubstOptions::OptionsKind lhs,
-                                           SubstOptions::OptionsKind rhs) {
-  return static_cast<SubstOptions::OptionsKind>(lhs | rhs);
+/// Options for performing substitutions into a type.
+typedef OptionSet<SubstFlags> SubstOptions;
+
+inline SubstOptions operator|(SubstFlags lhs, SubstFlags rhs) {
+  return SubstOptions(lhs) | rhs;
 }
 
 /// Type - This is a simple value object that contains a pointer to a type

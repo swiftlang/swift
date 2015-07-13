@@ -2716,7 +2716,7 @@ static Type getWitnessTypeForMatching(TypeChecker &tc,
   }
 
   Module *module = conformance->getDeclContext()->getParentModule();
-  return type.subst(module, substitutions, SubstOptions::IgnoreMissing);
+  return type.subst(module, substitutions, SubstFlags::IgnoreMissing);
 }
 
 /// Remove the 'self' type from the given type, if it's a method type.
@@ -2984,7 +2984,7 @@ void ConformanceChecker::resolveTypeWitnesses() {
     Type defaultType = assocType->getDefaultDefinitionLoc().getType().subst(
                          DC->getParentModule(),
                          substitutions,
-                         SubstOptions::IgnoreMissing);
+                         SubstFlags::IgnoreMissing);
     if (!defaultType)
       return Type();
 

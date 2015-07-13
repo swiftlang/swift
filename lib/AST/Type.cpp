@@ -2276,8 +2276,8 @@ FunctionType *PolymorphicFunctionType::substGenericArgs(Module *module,
   assert(args.empty()
          && "number of args did not match number of generic params");
   
-  Type input = getInput().subst(module, map, SubstOptions::IgnoreMissing);
-  Type result = getResult().subst(module, map, SubstOptions::IgnoreMissing);
+  Type input = getInput().subst(module, map, SubstFlags::IgnoreMissing);
+  Type result = getResult().subst(module, map, SubstFlags::IgnoreMissing);
   return FunctionType::get(input, result, getExtInfo());
 }
 
@@ -2301,8 +2301,8 @@ FunctionType *PolymorphicFunctionType::substGenericArgs(Module *module,
   TypeSubstitutionMap map
     = getGenericParams().getSubstitutionMap(subs);
   
-  Type input = getInput().subst(module, map, SubstOptions::IgnoreMissing);
-  Type result = getResult().subst(module, map, SubstOptions::IgnoreMissing);
+  Type input = getInput().subst(module, map, SubstFlags::IgnoreMissing);
+  Type result = getResult().subst(module, map, SubstFlags::IgnoreMissing);
   return FunctionType::get(input, result, getExtInfo());
 }
 
@@ -2316,8 +2316,8 @@ GenericFunctionType::substGenericArgs(Module *M, ArrayRef<Type> args) const {
     subs.insert(std::make_pair(params[i], args[i]));
   }
   
-  Type input = getInput().subst(M, subs, SubstOptions::IgnoreMissing);
-  Type result = getResult().subst(M, subs, SubstOptions::IgnoreMissing);
+  Type input = getInput().subst(M, subs, SubstFlags::IgnoreMissing);
+  Type result = getResult().subst(M, subs, SubstFlags::IgnoreMissing);
   return FunctionType::get(input, result, getExtInfo());
 }
 
@@ -2379,9 +2379,9 @@ const {
       unappliedReqts.push_back(
         Requirement(RequirementKind::SameType,
                     reqt.getFirstType().subst(M, subs,
-                                              SubstOptions::IgnoreMissing),
+                                              SubstFlags::IgnoreMissing),
                     reqt.getSecondType().subst(M, subs,
-                                               SubstOptions::IgnoreMissing)));
+                                               SubstFlags::IgnoreMissing)));
       continue;
     }
     }
@@ -2391,8 +2391,8 @@ const {
   GenericSignature *sig = GenericSignature::get(unappliedParams,
                                                 unappliedReqts);
   
-  Type input = getInput().subst(M, subs, SubstOptions::IgnoreMissing);
-  Type result = getResult().subst(M, subs, SubstOptions::IgnoreMissing);
+  Type input = getInput().subst(M, subs, SubstFlags::IgnoreMissing);
+  Type result = getResult().subst(M, subs, SubstFlags::IgnoreMissing);
   return GenericFunctionType::get(sig, input, result, getExtInfo());
 }
 
@@ -2435,8 +2435,8 @@ GenericFunctionType::substGenericArgs(Module *M, ArrayRef<Substitution> args) {
   TypeSubstitutionMap subs
     = getGenericSignature()->getSubstitutionMap(args);
 
-  Type input = getInput().subst(M, subs, SubstOptions::IgnoreMissing);
-  Type result = getResult().subst(M, subs, SubstOptions::IgnoreMissing);
+  Type input = getInput().subst(M, subs, SubstFlags::IgnoreMissing);
+  Type result = getResult().subst(M, subs, SubstFlags::IgnoreMissing);
   return FunctionType::get(input, result, getExtInfo());
 }
 
@@ -2537,7 +2537,9 @@ Type Type::subst(Module *module, TypeSubstitutionMap &substitutions,
                  SubstOptions options) const {
   /// Return the original type or a null type, depending on the 'ignoreMissing'
   /// flag.
-  auto failed = [&](Type t){ return options.ignoreMissing() ? t : Type(); };
+  auto failed = [&](Type t){
+    return options.contains(SubstFlags::IgnoreMissing) ? t : Type();
+  };
   
   return transform([&](Type type) -> Type {
     assert(!isa<SILFunctionType>(type.getPointer()) &&

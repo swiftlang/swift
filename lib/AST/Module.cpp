@@ -696,7 +696,7 @@ ArrayRef<Substitution> BoundGenericType::getSubstitutions(
     // Substitute into the type.
     SubstOptions options;
     if (hasTypeVariables)
-      options |= SubstOptions::IgnoreMissing;
+      options |= SubstFlags::IgnoreMissing;
     auto type = Type(archetype).subst(module, substitutions, options);
     if (!type)
       type = ErrorType::get(module->getASTContext());

@@ -989,7 +989,7 @@ bool TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
   Module *module = dc->getParentModule();
   for (const auto &req : genericSig->getRequirements()) {
     Type firstType = req.getFirstType().subst(module, substitutions,
-                                              SubstOptions::IgnoreMissing);
+                                              SubstFlags::IgnoreMissing);
     if (firstType.isNull()) {
       // Another requirement will fail later; just continue.
       continue;
@@ -998,7 +998,7 @@ bool TypeChecker::checkGenericArguments(DeclContext *dc, SourceLoc loc,
     Type secondType = req.getSecondType();
     if (secondType) {
       secondType = secondType.subst(module, substitutions,
-                                    SubstOptions::IgnoreMissing);
+                                    SubstFlags::IgnoreMissing);
       if (secondType.isNull()) {
         // Another requirement will fail later; just continue.
         continue;
