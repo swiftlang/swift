@@ -1263,7 +1263,7 @@ getBoundTypesFromConstraint(ConstraintSystem *CS, Expr *expr,
         auto impl = typeVariableType->getImpl();
         if (auto archetypeType = impl.getArchetype()) {
           type2 = archetypeType;
-        } else {
+        } else if (impl.getLocator()) {
           auto implAnchor = impl.getLocator()->getAnchor();
           auto anchorType = implAnchor->getType();
           
@@ -1653,7 +1653,7 @@ public:
   /// type checking the original expression.
   ///
   /// This mention may only be used on immediate children of the current expr
-  /// node.
+  /// node, because ClosureExpr parameters need to be treated specially.
   ///
   /// This can return a new expression (for e.g. when a UnresolvedDeclRef gets
   /// resolved) and returns null when the subexpression fails to typecheck.
@@ -1665,6 +1665,11 @@ public:
     return e ? e->getType() : Type();
   }
 
+  /// This is the same as typeCheckChildIndependently, but works on an arbitrary
+  /// subexpression of the current node because it handles ClosureExpr parents
+  /// of the specified node.
+  Expr *typeCheckArbitrarySubExprIndependently(Expr *subExpr);
+  
 
   /// Attempt to diagnose a specific failure from the info we've collected from
   /// the failed constraint system.
@@ -1849,6 +1854,10 @@ bool FailureDiagnosis::diagnoseGeneralValueMemberFailure() {
       anchor = locator->getAnchor();
   }
 
+  // Retypecheck the anchor type, which is the base of the member expression.
+  anchor = typeCheckArbitrarySubExprIndependently(anchor);
+  if (!anchor) return true;
+  
   auto type = anchor->getType();
 
   if (typeIsNotSpecialized(type)) {
@@ -2011,7 +2020,7 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure() {
   }
 
   Type fromType;
-  if (auto sub = typeCheckChildIndependently(anchor))
+  if (auto sub = typeCheckArbitrarySubExprIndependently(anchor))
     fromType = sub->getType();
   else
     fromType = types.first.getPointer();
@@ -2120,8 +2129,6 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr) {
     // the context is missing).
     auto options = TypeCheckExprFlags::IsDiscarded|
                    TypeCheckExprFlags::DisableStructuralChecks;
-    
-    
     bool hadError = CS->TC.typeCheckExpression(subExpr, CS->DC, Type(), Type(),
                                                options);
 
@@ -2143,6 +2150,42 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr) {
   
   return subExpr;
 }
+
+/// This is the same as typeCheckChildIndependently, but works on an arbitrary
+/// subexpression of the current node because it handles ClosureExpr parents
+/// of the specified node.
+Expr *FailureDiagnosis::typeCheckArbitrarySubExprIndependently(Expr *subExpr) {
+  if (subExpr == expr) return typeCheckChildIndependently(subExpr);
+  
+  // Construct a parent map for the expr tree we're investigating.
+  auto parentMap = expr->getParentMap();
+  
+  bool hasInvalidArguments = false;
+  
+  // Walk the parents of the specified expression, handling any ClosureExprs.
+  for (Expr *node = parentMap[subExpr]; node != expr; node = parentMap[node]) {
+    auto *CE = dyn_cast<ClosureExpr>(node);
+    if (!CE) continue;
+    
+    // If we have a ClosureExpr parent of the specified node, check to make sure
+    // none of its arguments are type variables.  If so, these type variables
+    // would be accessible to name lookup of the subexpression and may thus leak
+    // in.  Reset them to ErrorType for safe measures.
+    CE->getParams()->forEachVariable([&](VarDecl *VD) {
+      hasInvalidArguments |= VD->getType()->hasTypeVariable();
+    });
+  }
+  
+  // If there are any problematic closure arguments, just deny re-typechecking
+  // the subexpression.  There is no argument type we can provide that would
+  // do justice to the situation.
+  if (hasInvalidArguments)
+    return subExpr;
+  
+  // Otherwise, we're ok to type check the subexpr.
+  return typeCheckChildIndependently(subExpr);
+}
+
 
 bool FailureDiagnosis::diagnoseContextualConversionError(Type exprResultType) {
   TypeBase *contextualType = CS->getConversionType(expr);
@@ -2653,18 +2696,10 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
 }
 
 bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
-  // FIXME: Should be calculating types of sub-exprs in a consistent way.
-  //auto fnExpr = typeCheckIndependentSubExpression(callExpr->getFn());
-  //if (!fnExpr) return true;
-  auto fnExpr = callExpr->getFn();
-  auto argExpr = callExpr->getArg();
-  
-  // An error was posted elsewhere.
-  if (isErrorTypeKind(fnExpr->getType()))
-    return true;
 
   // Get the expression result of type checking the arguments to the call
   // independently, so we have some idea of what we're working with.
+  auto argExpr = callExpr->getArg();
   if (auto *PE = dyn_cast<ParenExpr>(argExpr)) {
     argExpr = typeCheckChildIndependently(PE->getSubExpr());
   } else if (auto *TE = dyn_cast<TupleExpr>(argExpr)) {
@@ -2708,7 +2743,15 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
   if (!argExpr)
     return true; // already diagnosed.
   
+  // FIXME: Should be calculating types of sub-exprs in a consistent way.
+  //auto fnExpr = typeCheckChildIndependently(callExpr->getFn(), true);
+  //if (!fnExpr) return true;
+  auto fnExpr = callExpr->getFn();
   
+  // An error was posted elsewhere.
+  if (isErrorTypeKind(fnExpr->getType()))
+    return true;
+
   std::string overloadName = "";
 
   bool isClosureInvocation = false;
