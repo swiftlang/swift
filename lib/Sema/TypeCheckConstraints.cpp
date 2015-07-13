@@ -899,16 +899,11 @@ Expr *ExprTypeCheckListener::appliedSolution(Solution &solution, Expr *expr) {
   return expr;
 }
 
-bool ExprTypeCheckListener::suppressDiagnostics() const {
-  return false;
-}
-
-
 bool TypeChecker::solveForExpression(
     Expr *&expr, DeclContext *dc, Type convertType, Type contextualType,
     FreeTypeVariableBinding allowFreeTypeVariables,
     ExprTypeCheckListener *listener, ConstraintSystem &cs,
-    SmallVectorImpl<Solution> &viable) {
+    SmallVectorImpl<Solution> &viable, bool suppressDiagnostics) {
 
   // First, pre-check the expression, validating any types that occur in the
   // expression and folding sequence expressions.
@@ -948,7 +943,7 @@ bool TypeChecker::solveForExpression(
 
   // Attempt to solve the constraint system.
   if (cs.solve(viable, allowFreeTypeVariables)) {
-    if (listener && listener->suppressDiagnostics())
+    if (suppressDiagnostics)
       return true;
 
     // Try to provide a decent diagnostic.
@@ -993,17 +988,21 @@ bool TypeChecker::typeCheckExpression(
   Expr *origExpr = expr;
   CleanupIllFormedExpressionRAII cleanup2(Context, origExpr);
 
+  bool suppressDiagnostics =
+    options.contains(TypeCheckExprFlags::SuppressDiagnostics);
+
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
   if (solveForExpression(expr, dc, convertType, contextualType,
-                         allowFreeTypeVariables, listener, cs, viable))
+                         allowFreeTypeVariables, listener, cs, viable,
+                         suppressDiagnostics))
     return true;
 
   // Apply the solution to the expression.
   auto &solution = viable[0];
   bool isDiscarded = options.contains(TypeCheckExprFlags::IsDiscarded);
   auto result = cs.applySolution(solution, expr, convertType, isDiscarded,
-                                 listener && listener->suppressDiagnostics());
+                                 suppressDiagnostics);
   if (!result) {
     // Failure already diagnosed, above, as part of applying the solution.
     return true;
@@ -1025,10 +1024,9 @@ bool TypeChecker::typeCheckExpression(
 
   // Unless the client has disabled them, perform syntactic checks on the
   // expression now.
-  if (!options.contains(TypeCheckExprFlags::DisableStructuralChecks)) {
-    if (!listener || !listener->suppressDiagnostics())
-      performSyntacticExprDiagnostics(*this, result, dc);
-  }
+  if (!suppressDiagnostics &&
+      !options.contains(TypeCheckExprFlags::DisableStructuralChecks))
+    performSyntacticExprDiagnostics(*this, result, dc);
 
   expr = result;
   cleanup.disable();
@@ -1051,7 +1049,8 @@ Optional<Type> TypeChecker::getTypeOfExpressionWithoutApplying(
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
   if (solveForExpression(expr, dc, convertType, contextualType,
-                         allowFreeTypeVariables, listener, cs, viable))
+                         allowFreeTypeVariables, listener, cs, viable,
+                         /*suppressDiagnostics*/false))
     return None;
 
   // Get the expression's simplified type.

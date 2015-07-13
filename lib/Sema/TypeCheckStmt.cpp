@@ -1235,16 +1235,9 @@ Expr* TypeChecker::constructCallToSuperInit(ConstructorDecl *ctor,
                                       /*Implicit=*/true);
   r = new (Context) CallExpr(r, args, /*Implicit=*/true);
 
-  /// Expression type checking listener for the generated call to super ensures
-  /// that we suppress diagnostics.
-  class NoDiagnosticsListener : public ExprTypeCheckListener {
-  public:
-    virtual bool suppressDiagnostics() const { return true; }
-  } listener;
-
   if (typeCheckExpression(r, ctor, Type(), Type(),
-                          TypeCheckExprFlags::IsDiscarded,
-                          FreeTypeVariableBinding::Disallow, &listener))
+                          TypeCheckExprFlags::IsDiscarded | 
+                          TypeCheckExprFlags::SuppressDiagnostics))
     return nullptr;
   
   return r;

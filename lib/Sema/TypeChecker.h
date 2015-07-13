@@ -144,7 +144,10 @@ enum class TypeCheckExprFlags {
   
   /// Whether the client wants to disable the structural syntactic restrictions
   /// that we force for style or other reasons.
-  DisableStructuralChecks = 0x02
+  DisableStructuralChecks = 0x02,
+
+  /// Set if the client wants diagnostics suppressed.
+  SuppressDiagnostics = 0x04
 };
   
 typedef OptionSet<TypeCheckExprFlags> TypeCheckExprOptions;
@@ -245,12 +248,6 @@ public:
   /// failure.
   virtual Expr *appliedSolution(constraints::Solution &solution,
                                 Expr *expr);
-
-  /// The callback is consulted before reporting the diagnostics in case
-  /// typechecking fails.
-  ///
-  /// \returns true if diagnostic reporting should be suppressed.
-  virtual bool suppressDiagnostics() const;
 };
 
 /// Flags that describe the context of type checking a pattern or
@@ -952,7 +949,8 @@ public:
                           FreeTypeVariableBinding allowFreeTypeVariables,
                           ExprTypeCheckListener *listener,
                           constraints::ConstraintSystem &cs,
-                          SmallVectorImpl<constraints::Solution> &viable);
+                          SmallVectorImpl<constraints::Solution> &viable,
+                          bool suppressDiagnostics);
 
   /// \name Name lookup
   ///
