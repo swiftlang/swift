@@ -573,7 +573,7 @@ tests.test("ReverseCollection") {
 
 
 
-//===--- Filter.swift ------------------------------------------------------===//
+//===--- Filter.swift -----------------------------------------------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
