@@ -419,8 +419,7 @@ static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
 
   // Solve the system. If the first extension is at least as specialized as the
   // second, we're done.
-  SmallVector<Solution, 1> solutions;
-  return !cs.solve(solutions, FreeTypeVariableBinding::Disallow);
+  return !cs.solveSingle(FreeTypeVariableBinding::Disallow);
 }
 
 /// \brief Determine whether the first declaration is as "specialized" as
@@ -591,12 +590,13 @@ static bool isDeclAsSpecializedAs(TypeChecker &tc, DeclContext *dc,
   }
 
   // Solve the system.
-  SmallVector<Solution, 1> solutions;
-  if (cs.solve(solutions, FreeTypeVariableBinding::Allow))
+  auto solution = cs.solveSingle(FreeTypeVariableBinding::Allow);
+
+  if (!solution)
     return false;
 
   // Ban value-to-optional conversions.
-  return solutions[0].getFixedScore().Data[SK_ValueToOptional] == 0;
+  return solution->getFixedScore().Data[SK_ValueToOptional] == 0;
 }
 
 Comparison TypeChecker::compareDeclarations(DeclContext *dc,

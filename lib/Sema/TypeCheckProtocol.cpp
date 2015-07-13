@@ -1276,12 +1276,10 @@ matchWitness(ConformanceChecker &cc, TypeChecker &tc,
                       ArrayRef<OptionalAdjustment> optionalAdjustments) 
                         -> RequirementMatch {
     // Try to solve the system.
-    SmallVector<Solution, 1> solutions;
-    if (cs->solve(solutions, FreeTypeVariableBinding::Allow)) {
+    auto solution = cs->solveSingle(FreeTypeVariableBinding::Allow);
+    if (!solution)
       return RequirementMatch(witness, MatchKind::TypeConflict,
                               witnessType);
-    }
-    auto &solution = solutions.front();
 
     // Success. Form the match result.
     RequirementMatch result(witness,
@@ -1297,11 +1295,10 @@ matchWitness(ConformanceChecker &cc, TypeChecker &tc,
       auto witnessDC = witness->getPotentialGenericDeclContext();
       
       // Compute the set of substitutions we'll need for the witness.
-      solution.computeSubstitutions(witness->getInterfaceType(),
-                                    witnessDC,
-                                    openedFullWitnessType,
-                                    witnessLocator,
-                                    result.WitnessSubstitutions);
+      solution->computeSubstitutions(witness->getInterfaceType(),
+                                     witnessDC, openedFullWitnessType,
+                                     witnessLocator,
+                                     result.WitnessSubstitutions);
     }
     
     return result;
@@ -4016,6 +4013,5 @@ bool TypeChecker::isProtocolExtensionUsable(DeclContext *dc, Type type,
   cs.addConstraint(ConstraintKind::Bind, selfTypeVar, type, nullptr);
 
   // If we can solve the solution, the protocol extension is usable.
-  SmallVector<Solution, 1> solutions;
-  return !cs.solve(solutions);
+  return cs.solveSingle().hasValue();
 }

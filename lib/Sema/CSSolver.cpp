@@ -1108,6 +1108,23 @@ static bool tryTypeVariableBindings(
   return !anySolved;
 }
 
+/// \brief Solve the system of constraints.
+///
+/// \param allowFreeTypeVariables How to bind free type variables in
+/// the solution.
+///
+/// \returns a solution if a single unambiguous one could be found, or None if
+/// ambiguous or unsolvable.
+Optional<Solution>
+ConstraintSystem::solveSingle(FreeTypeVariableBinding allowFreeTypeVariables) {
+  SmallVector<Solution, 4> solutions;
+  if (solve(solutions, allowFreeTypeVariables) ||
+      solutions.size() != 1)
+    return Optional<Solution>();
+
+  return std::move(solutions[0]);
+}
+
 bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
                              FreeTypeVariableBinding allowFreeTypeVariables) {
   // If there is no solver state, this is the top-level call. Create solver

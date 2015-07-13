@@ -2294,6 +2294,16 @@ private:
              FreeTypeVariableBinding allowFreeTypeVariables
                = FreeTypeVariableBinding::Disallow);
 
+  /// \brief Solve the system of constraints.
+  ///
+  /// \param allowFreeTypeVariables How to bind free type variables in
+  /// the solution.
+  ///
+  /// \returns a solution if a single unambiguous one could be found, or None if
+  /// ambiguous or unsolvable.
+  Optional<Solution> solveSingle(FreeTypeVariableBinding allowFreeTypeVariables
+                                    = FreeTypeVariableBinding::Disallow);
+
 private:
   // \brief Compare two solutions to the same set of constraints.
   ///

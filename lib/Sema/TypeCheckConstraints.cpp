@@ -1733,8 +1733,7 @@ bool TypeChecker::typesSatisfyConstraint(Type type1, Type type2,
                                          ConstraintKind kind, DeclContext *dc) {
   ConstraintSystem cs(*this, dc, ConstraintSystemOptions());
   cs.addConstraint(kind, type1, type2, cs.getConstraintLocator(nullptr));
-  SmallVector<Solution, 1> solutions;
-  return !cs.solve(solutions);
+  return cs.solveSingle().hasValue();
 }
 
 bool TypeChecker::isSubtypeOf(Type type1, Type type2, DeclContext *dc) {
@@ -1778,8 +1777,7 @@ bool TypeChecker::isSubstitutableFor(Type type, ArchetypeType *archetype,
   }
 
   // Solve the system.
-  SmallVector<Solution, 1> solution;
-  return !cs.solve(solution);
+  return cs.solveSingle().hasValue();
 }
 
 Expr *TypeChecker::coerceToRValue(Expr *expr) {
