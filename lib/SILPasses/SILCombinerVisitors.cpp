@@ -2656,13 +2656,28 @@ SILInstruction *
 SILCombiner::
 visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI) {
   // (unchecked_bitwise_cast Y->Z (unchecked_bitwise_cast X->Y x))
+  // OR (unchecked_trivial_cast Y->Z (unchecked_bitwise_cast X->Y x))
   //   ->
   // (unchecked_bitwise_cast X->Z x)
-  if (auto *Op = dyn_cast<UncheckedBitwiseCastInst>(UBCI->getOperand())) {
+  SILValue Oper;
+  if (match(UBCI->getOperand(),
+            m_CombineOr(m_UncheckedBitwiseCastInst(m_SILValue(Oper)),
+                        m_UncheckedTrivialBitCastInst(m_SILValue(Oper))))) {
     return new (UBCI->getModule()) UncheckedBitwiseCastInst(UBCI->getLoc(),
-                                                      Op->getOperand(),
-                                                      UBCI->getType());
+                                                            Oper,
+                                                            UBCI->getType());
   }
+  if (UBCI->getType().isTrivial(UBCI->getModule()))
+    return new (UBCI->getModule())
+      UncheckedTrivialBitCastInst(UBCI->getLoc(),
+                                  UBCI->getOperand(),
+                                  UBCI->getType());
+
+  if (UBCI->getType().canBitCastAsSingleRef()
+      && UBCI->getOperand().getType().canBitCastAsSingleRef())
+    return new (UBCI->getModule()) UncheckedRefBitCastInst(UBCI->getLoc(),
+                                                           UBCI->getOperand(),
+                                                           UBCI->getType());
 
   return nullptr;
 }

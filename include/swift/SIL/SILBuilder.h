@@ -452,13 +452,7 @@ public:
   // Create the appropriate cast instruction based on result type.
   SILInstruction *createUncheckedBitCast(SILLocation Loc,
                                          SILValue Op,
-                                         SILType Ty) {
-    auto &M = F.getModule();
-    if (Ty.isTrivial(M))
-      return insert(new (M) UncheckedTrivialBitCastInst(Loc, Op, Ty));
-    else
-      return insert(new (M) UncheckedRefBitCastInst(Loc, Op, Ty));
-  }
+                                         SILType Ty);
 
   RefToBridgeObjectInst *createRefToBridgeObject(SILLocation Loc,
                                                  SILValue Ref,

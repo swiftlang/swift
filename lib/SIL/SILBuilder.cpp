@@ -42,6 +42,22 @@ SILType SILBuilder::getPartialApplyResultType(SILType origTy, unsigned argCount,
   return SILType::getPrimitiveObjectType(appliedFnType);
 }
 
+// Create the appropriate cast instruction based on result type.
+SILInstruction *SILBuilder::createUncheckedBitCast(SILLocation Loc,
+                                                   SILValue Op,
+                                                   SILType Ty) {
+  auto &M = F.getModule();
+  if (Ty.isTrivial(M))
+    return insert(new (M) UncheckedTrivialBitCastInst(Loc, Op, Ty));
+
+  if (Op.getType().canBitCastAsSingleRef() && Ty.canBitCastAsSingleRef())
+    return insert(new (M) UncheckedRefBitCastInst(Loc, Op, Ty));
+
+  // The destination type is nontrivial, and may be smaller than the source
+  // type, so RC identity cannot be assumed.
+  return insert(new (M) UncheckedBitwiseCastInst(Loc, Op, Ty));
+}
+
 BranchInst *SILBuilder::createBranch(SILLocation Loc,
                                      SILBasicBlock *TargetBlock,
                                      OperandValueArrayRef Args) {

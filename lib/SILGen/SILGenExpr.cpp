@@ -3014,9 +3014,14 @@ static bool emitOptimizedOptionalEvaluation(OptionalEvaluationExpr *E,
   if (optInit == nullptr) {
     auto subMV = SGF.emitRValueAsSingleValue(BO->getSubExpr());
     SILValue result;
-    result = SGF.B.createUncheckedBitCast(E, subMV.forward(SGF),
-                                          optTL.getLoweredType());
-    
+    if (optTL.isTrivial())
+      result = SGF.B.createUncheckedTrivialBitCast(E, subMV.forward(SGF),
+                                                   optTL.getLoweredType());
+    else
+      // The optional object type is the same, so we assume the optional types
+      // are layout identical, allowing the use of unchecked_ref_bit_cast.
+      result = SGF.B.createUncheckedRefBitCast(E, subMV.forward(SGF),
+                                               optTL.getLoweredType());
     LoadableResult = result;
     return true;
   }
