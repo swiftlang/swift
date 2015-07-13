@@ -77,25 +77,26 @@ func expectSequencePassthrough<
     Base.Generator.Element == S.Generator.Element
 >(s: S, base: Base, arbitraryElement: S.Generator.Element, count: Int) {
   let baseType = base.dynamicType
+
+  SequenceLog.generate.expectIncrement(baseType) { _ = s.generate() }
+  SequenceLog.underestimateCount.expectIncrement(baseType) {
+    _ = s.underestimateCount()
+  }
+  SequenceLog._customContainsEquatableElement.expectIncrement(baseType) {
+    _ = s._customContainsEquatableElement(arbitraryElement)
+  }
+  SequenceLog._copyToNativeArrayBuffer.expectIncrement(baseType) {
+    _ = s._copyToNativeArrayBuffer()
+  }
   
-  _ = s.generate()
-  expectEqual(1, SequenceLog.generate[baseType])
-  _ = s.underestimateCount()
-  expectEqual(1, SequenceLog.underestimateCount[baseType])
-  _ = s._customContainsEquatableElement(arbitraryElement)
-  expectEqual(1, SequenceLog._customContainsEquatableElement[baseType])
-  _ = s._copyToNativeArrayBuffer()
-  expectEqual(1, SequenceLog._copyToNativeArrayBuffer[baseType])
+  SequenceLog._initializeTo.expectIncrement(baseType) { ()->Void in
+    let buf = UnsafeMutablePointer<S.Generator.Element>.alloc(count)
   
-  let buf = UnsafeMutablePointer<S.Generator.Element>.alloc(count)
-  
-  let end = s._initializeTo(buf)
-  expectTrue(end <= buf + count)
-  
-  buf.destroy(end - buf)
-  buf.dealloc(count)
-  
-  expectEqual(1, SequenceLog._initializeTo[baseType])
+    let end = s._initializeTo(buf)
+    expectTrue(end <= buf + count)
+    buf.destroy(end - buf)
+    buf.dealloc(count)
+  }
 }
 
 tests.test("LazySequence/Passthrough") {
@@ -200,6 +201,49 @@ extension _prext_LazyCollection : CollectionType {
   public subscript(position: Base.Index) -> Base.Generator.Element {
     return _base[position]
   }
+
+
+  // Slice's init is internal; enable when we put this in the stdlib because 
+#if false 
+  /// Returns a collection representing a contiguous sub-range of
+  /// `self`'s elements.
+  ///
+  /// - Complexity: O(1)
+  public subscript(bounds: Range<Index>) -> _prext_LazyCollection<Slice<Base>> {
+    return Slice(_base, bounds: bounds)._prext_lazy
+  }
+#endif
+  
+  /// Returns `true` iff `self` is empty.
+  public var isEmpty: Bool {
+    return _base.isEmpty
+  }
+
+  /// Returns the number of elements.
+  ///
+  /// - Complexity: O(1) if `Index` conforms to `RandomAccessIndexType`;
+  ///   O(N) otherwise.
+  public var count: Index.Distance {
+    return _base.count
+  }
+  
+  // The following requirement enables dispatching for indexOf when
+  // the element type is Equatable.
+  
+  /// Returns `Optional(Optional(index))` if an element was found;
+  /// `nil` otherwise.
+  ///
+  /// - Complexity: O(N).
+  public func _customIndexOfEquatableElement(
+    element: Base.Generator.Element
+  ) -> Index?? {
+    return _base._customIndexOfEquatableElement(element)
+  }
+
+  /// Returns the first element of `self`, or `nil` if `self` is empty.
+  public var first: Base.Generator.Element? {
+    return _base.first
+  }
 }
 
 /// Augment `self` with lazy methods such as `map`, `filter`, etc.
@@ -234,6 +278,27 @@ tests.test("LazyCollection/Passthrough") {
     base: base._prext_lazy._base,
     arbitraryElement: OpaqueValue(0),
     count: Int(expected.count))
+
+  let s = base._prext_lazy
+  let baseType = base.dynamicType
+  let startIndex = CollectionLog.startIndex.expectIncrement(baseType) {
+    s.startIndex
+  }
+  
+  let endIndex = CollectionLog.endIndex.expectIncrement(baseType) {
+    s.endIndex
+  }
+  
+  CollectionLog.subscriptIndex.expectIncrement(baseType) { _ = s[startIndex] }
+  CollectionLog.subscriptRange.expectUnchanged(baseType) {
+    _ = s[startIndex..<endIndex]
+  }
+  CollectionLog.isEmpty.expectIncrement(baseType) { _ = s.isEmpty }
+  CollectionLog.count.expectIncrement(baseType) { _ = s.count }
+  CollectionLog._customIndexOfEquatableElement.expectIncrement(baseType) {
+    _ = s._customIndexOfEquatableElement(OpaqueValue(0))
+  }
+  CollectionLog.first.expectIncrement(baseType) { _ = s.first }
 }
 
 /// Augment `s` with lazy methods such as `map`, `filter`, etc.
