@@ -43,12 +43,10 @@ STATISTIC(NumRefCountOpsRemoved, "Total number of increments removed");
 /// \p Ptr is a non-trivial value without reference-semantics.
 static SILInstruction *createIncrement(SILValue Ptr, SILInstruction *InsertPt) {
   // Set up the builder we use to insert at our insertion point.
-  SILBuilder B(InsertPt);
-
-  // TODO: What is the correct SILLocation to use here? If the InsertPt is a
-  // terminator, then we will have the wrong location type and hit an assertion.
-  // Also: what scope?
-  auto Loc = SILFileLocation(SourceLoc());
+  SILBuilderWithScope<1> B(InsertPt);
+  // To avoid a jumpy line table at -Onone, inherit the location and
+  // scope from InsertPt.
+  auto Loc = InsertPt->getLoc();
 
   // If Ptr is refcounted itself, create the strong_retain and
   // return.
@@ -64,12 +62,10 @@ static SILInstruction *createIncrement(SILValue Ptr, SILInstruction *InsertPt) {
 /// if \p Ptr is a non-trivial value without reference-semantics.
 static SILInstruction *createDecrement(SILValue Ptr, SILInstruction *InsertPt) {
   // Setup the builder we will use to insert at our insertion point.
-  SILBuilder B(InsertPt);
-
-  // TODO: What is the correct SILLocation to use here? If the InsertPt is a
-  // terminator, then we will have the wrong location type and hit an assertion.
-  // Also: what scope?
-  auto Loc = SILFileLocation(SourceLoc());
+  SILBuilderWithScope<1> B(InsertPt);
+  // To avoid a jumpy line table at -Onone, inherit the location and
+  // scope from InsertPt.
+  auto Loc = InsertPt->getLoc();
 
   // If Ptr has reference semantics itself, create a strong_release.
   if (Ptr.getType().isReferenceCounted(B.getModule()))
