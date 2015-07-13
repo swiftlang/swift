@@ -3206,7 +3206,7 @@ static void requireRefCountedType(IRGenSILFunction &IGF,
                                   SourceLoc loc,
                                   SILType silType) {
   auto operType = silType.getSwiftRValueType();
-  auto valueType = operType->getOptionalObjectType();
+  auto valueType = operType->getAnyOptionalObjectType();
   auto objType = valueType ? valueType : operType;
   if (objType->mayHaveSuperclass()
       || objType->isClassExistentialType()

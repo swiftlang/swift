@@ -670,5 +670,15 @@ func isUniqueOrPinned_native(inout ref: Builtin.BridgeObject) -> Bool {
   return Builtin.isUniqueOrPinned_native(&ref)
 }
 
+// ImplicitlyUnwrappedOptional argument to isUnique.
+// CHECK-LABEL: define hidden i1 @_TF8builtins11isUniqueIUOFRGSqBo_Bi1_(%{{.*}}* nocapture dereferenceable({{.*}})) {{.*}} {
+// CHECK-NEXT: entry:
+// CHECK: call i1 @swift_isUniquelyReferenced_native(%swift.refcounted*
+// CHECK: ret i1
+func isUniqueIUO(inout ref: Builtin.NativeObject?) -> Bool {
+  var iuo : Builtin.NativeObject! = ref
+  return Builtin.isUnique(&iuo)
+}
+
 // CHECK: ![[R]] = !{i64 0, i64 9223372036854775807}
 
