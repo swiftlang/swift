@@ -953,10 +953,6 @@ NOTE(declared_protocol_conformance_here,sema_tcd,none,
 
 ERROR(redundant_conformance,sema_tcd,none,
       "redundant conformance of %0 to protocol %1", (Type, DeclName))
-ERROR(ambiguous_conformance,sema_tcd,none,
-      "ambiguous implied conformance of %0 to protocol %1 (via %2) requires "
-      "explicit conformance",
-      (Type, DeclName, DeclName))
 NOTE(protocol_conformance_implied_here,sema_tcd,none,
      "implied protocol conformance %0 here can be made explicit", (Identifier))
 WARNING(optional_req_nonobjc_near_match,sema_tcd,none,

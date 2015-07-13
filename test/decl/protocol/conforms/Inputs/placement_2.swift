@@ -16,10 +16,7 @@ struct MFMultipleImplicit3 : P4 { }
 
 struct MFMultipleImplicit4 : P4 { }
 
-// ---------------------------------------------------------------------------
-// Multiple implicit conformances, with ambiguities
-// ---------------------------------------------------------------------------
-struct MFBadMultipleImplicit1 : P2a { } // expected-note{{'MFBadMultipleImplicit1' implicitly conforms to protocol 'P1' (via conformance to 'P2a') here}}
+struct MFMultipleImplicit5 : P2a { }
 
 // ---------------------------------------------------------------------------
 // Explicit conformances conflicting with inherited conformances

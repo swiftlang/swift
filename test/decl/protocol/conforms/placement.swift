@@ -58,12 +58,8 @@ extension MultipleImplicit5 : P2a, P2b { }
 struct MultipleImplicit6 : P4 { }
 extension MultipleImplicit6 : P3a { }
 
-// ---------------------------------------------------------------------------
-// Multiple implicit conformances, with ambiguities
-// ---------------------------------------------------------------------------
-struct BadMultipleImplicit1 : P2a { } // expected-note{{'BadMultipleImplicit1' implicitly conforms to protocol 'P1' (via conformance to 'P2a') here}}
-extension BadMultipleImplicit1 : P2b { } // expected-error{{ambiguous implied conformance of 'BadMultipleImplicit1' to protocol 'P1' (via 'P2b') requires explicit conformance}}
-// expected-note@-1{{implied protocol conformance 'P1' here can be made explicit}}{{34-34=P1, }}
+struct MultipleImplicit7 : P2a { }
+extension MultipleImplicit7 : P2b { }
 
 // ---------------------------------------------------------------------------
 // Multiple implicit conformances, ambiguity resolved via explicit conformance
@@ -158,11 +154,7 @@ extension MFMultipleImplicit3 : P1 { }
 
 extension MFMultipleImplicit4 : P3a { }
 
-// ---------------------------------------------------------------------------
-// Multiple implicit conformances, with ambiguities
-// ---------------------------------------------------------------------------
-extension MFBadMultipleImplicit1 : P2b { } // expected-error{{ambiguous implied conformance of 'MFBadMultipleImplicit1' to protocol 'P1' (via 'P2b') requires explicit conformance}}
-// expected-note@-1{{implied protocol conformance 'P1' here can be made explicit}}{{36-36=P1, }}
+extension MFMultipleImplicit5 : P2b { }
 
 // ---------------------------------------------------------------------------
 // Explicit conformances conflicting with inherited conformances

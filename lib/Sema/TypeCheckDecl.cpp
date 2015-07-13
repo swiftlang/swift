@@ -2867,22 +2867,10 @@ public:
       if (!existingDecl)
         existingDecl = cast<ExtensionDecl>(diag.ExistingDC);
 
-      // If both this conformance and the diagnosed conformance were
-      // implied, complain about the ambiguity.
-      if (diag.Kind == ConformanceEntryKind::Implied) {
-        TC.diagnose(diag.Loc, diag::ambiguous_conformance,
-                    D->getDeclaredTypeInContext(),
-                    diag.Protocol->getName(),
-                    diag.ExplicitProtocol->getName());
-        TC.diagnose(diag.Loc, diag::protocol_conformance_implied_here,
-                    diag.Protocol->getName())
-          .fixItInsert(diag.Loc, (diag.Protocol->getName().str() + ", ").str());
-      } else {
-        // Otherwise, complain about redundant conformances.
-        TC.diagnose(diag.Loc, diag::redundant_conformance,
-                    D->getDeclaredTypeInContext(),
-                    diag.Protocol->getName());
-      }
+      // Complain about redundant conformances.
+      TC.diagnose(diag.Loc, diag::redundant_conformance,
+                  D->getDeclaredTypeInContext(),
+                  diag.Protocol->getName());
 
       TC.diagnose(existingDecl, diag::declared_protocol_conformance_here,
                   D->getDeclaredTypeInContext(),

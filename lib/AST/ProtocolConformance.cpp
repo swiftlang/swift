@@ -1545,13 +1545,16 @@ ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
     return Ordering::Before;
   }
 
-  // Both the left- and right-hand sides are implied, so use the
-  // stated explicit conformances to determine where the conformance
-  // should go.
+  // Both the left- and right-hand sides are implied, so determine where the
+  // conformance should go.
   assert(lhsKind == ConformanceEntryKind::Implied &&
          "Expected implied conformance");
   assert(rhsKind == ConformanceEntryKind::Implied &&
          "Expected implied conformance");
+  diagnoseSuperseded = false;
+
+  // First, try to use the stated explicit conformances to determine where the
+  // conformance should go.
   auto lhsExplicit = lhs->getDeclaredConformance();
   auto lhsExplicitProtocol = lhsExplicit->getProtocol();
   auto rhsExplicit = rhs->getDeclaredConformance();
@@ -1562,7 +1565,6 @@ ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
     // side supersedes the right-hand side.
     for (auto rhsProtocol : rhsExplicitProtocol->getAllProtocols()) {
       if (rhsProtocol == lhsExplicitProtocol) {
-        diagnoseSuperseded = false;
         return Ordering::Before;
       }
     }
@@ -1572,26 +1574,51 @@ ConformanceLookupTable::Ordering ConformanceLookupTable::compareConformances(
     // side supersedes the left-hand side.
     for (auto lhsProtocol : lhsExplicitProtocol->getAllProtocols()) {
       if (lhsProtocol == rhsExplicitProtocol) {
-        diagnoseSuperseded = false;
         return Ordering::After;
       }
     }
-
-    // There is no ordering between the two explicit conformances. If
-    // they land in different contexts, diagnose the problem.
-    diagnoseSuperseded = lhs->getDeclContext() != rhs->getDeclContext();
   }
 
-  // If we get here when lhsExplicitProtocol == rhsExplicitProtocol,
-  // supersede without diagnosing. Either it's well-formed because the
-  // two implicit conformances come from exactly the same explicit
-  // conformance (e.g., due to the protocol inherance graph being a
-  // DAG rather than a tree) or we will already be diagnosing the
-  // redundant explicit conformance, and don't want to introduce
-  // redundant diagnostics.
+  // If the two conformances come from the same file, pick the first context
+  // in the file.
+  auto lhsSF = lhs->getDeclContext()->getParentSourceFile();
+  auto rhsSF = rhs->getDeclContext()->getParentSourceFile();
+  if (lhsSF && lhsSF == rhsSF) {
+    ASTContext &ctx = lhsSF->getASTContext();
+    return ctx.SourceMgr.isBeforeInBuffer(lhs->getDeclaredLoc(),
+                                          rhs->getDeclaredLoc())
+             ? Ordering::Before
+             : Ordering::After;
+  }
 
-  // FIXME: Deterministic ordering.
-  return Ordering::Before;
+  // Otherwise, pick the earlier file unit.
+  auto lhsFileUnit
+    = dyn_cast<FileUnit>(lhs->getDeclContext()->getModuleScopeContext());
+  auto rhsFileUnit
+    = dyn_cast<FileUnit>(rhs->getDeclContext()->getModuleScopeContext());
+  assert(lhsFileUnit && rhsFileUnit && "Not from a file unit?");
+  if (lhsFileUnit == rhsFileUnit) {
+    // If the file units are the same, just pick arbitrarily; we're not
+    // actually emitting anything.
+    // FIXME: Only because we're synthesizing conformances for deserialized
+    // protocols. Once that's no longer true (because we're serializing
+    // everything appropriately in the module), we should assert that this
+    // does not happen.
+    assert(!lhsSF && !rhsSF && "Source files shouldn't conflict");
+    return Ordering::Before;
+  }
+  auto module = lhs->getDeclContext()->getParentModule();
+  assert(lhs->getDeclContext()->getParentModule()
+           == rhs->getDeclContext()->getParentModule() &&
+         "conformances should be in the same module");
+  for (auto file : module->getFiles()) {
+    if (file == lhsFileUnit)
+      return Ordering::Before;
+    if (file == rhsFileUnit)
+      return Ordering::After;
+  }
+
+  llvm_unreachable("files weren't in the parent module?");
 }
 
 bool ConformanceLookupTable::resolveConformances(NominalTypeDecl *nominal,
