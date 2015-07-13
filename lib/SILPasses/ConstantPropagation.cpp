@@ -665,7 +665,31 @@ case BuiltinValueKind::id:
     SILBuilderWithScope<1> B(BI);
     return B.createFloatLiteral(Loc, BI->getType(), TruncVal);
   }
-      
+
+  case BuiltinValueKind::FPTrunc: {
+    // Get the value. It should be a constant in most cases.
+    auto *V = dyn_cast<FloatLiteralInst>(Args[0]);
+    if (!V)
+      return nullptr;
+    APFloat TruncVal = V->getValue();
+    Type DestTy = Builtin.Types[1];
+    bool loosesInfo;
+    APFloat::opStatus ConversionStatus = TruncVal.convert(
+        DestTy->castTo<BuiltinFloatType>()->getAPFloatSemantics(),
+        APFloat::rmNearestTiesToEven, &loosesInfo);
+    SILLocation Loc = BI->getLoc();
+
+    // Check if conversion was successful.
+    if (ConversionStatus != APFloat::opStatus::opOK &&
+        ConversionStatus != APFloat::opStatus::opInexact) {
+      return nullptr;
+    }
+
+    // The call to the builtin should be replaced with the constant value.
+    SILBuilderWithScope<1> B(BI);
+    return B.createFloatLiteral(Loc, BI->getType(), TruncVal);
+  }
+
   case BuiltinValueKind::AssumeNonNegative: {
     auto *V = dyn_cast<IntegerLiteralInst>(Args[0]);
     if (!V)

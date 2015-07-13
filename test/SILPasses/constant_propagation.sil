@@ -401,3 +401,17 @@ sil @constant_assume_non_negative : $@convention(thin) () -> Builtin.Word {
   %1 = builtin "assumeNonNegative_Word"(%0 : $Builtin.Word) : $Builtin.Word
   return %0 : $Builtin.Word
 }
+
+// CHECK-LABEL: sil @constant_fold_fptrunc
+// CHECK: bb0:
+// CHECK-NEXT: %0 = float_literal
+// CHECK-NEXT: %1 = tuple ()
+// CHECK-NEXT: return
+// CHECK-NEXT: }
+sil @constant_fold_fptrunc : $@convention(thin) () -> () {
+bb0:
+  %0 = float_literal $Builtin.FPIEEE80, 0x4000C90E5604189374BC // 3.14149999999999999991 // user: %1
+  %1 = builtin "fptrunc_FPIEEE80_FPIEEE64"(%0 : $Builtin.FPIEEE80) : $Builtin.FPIEEE64 // user: %2
+  %3 = tuple ()
+  return %3 : $()                             // id: %3
+}
