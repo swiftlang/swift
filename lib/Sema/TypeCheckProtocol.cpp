@@ -2581,6 +2581,10 @@ ConformanceChecker::inferTypeWitnessesViaValueWitnesses(ValueDecl *req) {
       std::remove_if(witnessResult.Inferred.begin(),
                      witnessResult.Inferred.end(),
                      [&](const std::pair<AssociatedTypeDecl *, Type> &result) {
+                       // Filter out errors.
+                       if (result.second->is<ErrorType>())
+                         return true;
+
                        // Filter out duplicates.
                        if (!known.insert({result.first,
                                          result.second->getCanonicalType()})
@@ -2712,8 +2716,7 @@ static Type getWitnessTypeForMatching(TypeChecker &tc,
   }
 
   Module *module = conformance->getDeclContext()->getParentModule();
-  return type.subst(module, substitutions,
-                    SubstOptions(SubstOptions::IgnoreMissing, conformance));
+  return type.subst(module, substitutions, SubstOptions::IgnoreMissing);
 }
 
 /// Remove the 'self' type from the given type, if it's a method type.
@@ -2888,6 +2891,13 @@ namespace {
 void ConformanceChecker::resolveTypeWitnesses() {
   llvm::SetVector<AssociatedTypeDecl *> unresolvedAssocTypes;
 
+  // Track when we are checking type witnesses.
+  ProtocolConformanceState initialState = Conformance->getState();
+  Conformance->setState(ProtocolConformanceState::CheckingTypeWitnesses);
+  defer([&] {
+    Conformance->setState(initialState);
+  });
+
   for (auto member : Proto->getMembers()) {
     auto assocType = dyn_cast<AssociatedTypeDecl>(member);
     if (!assocType)
@@ -3036,27 +3046,50 @@ void ConformanceChecker::resolveTypeWitnesses() {
 
       // Check for completeness of the solution
       for (auto assocType : unresolvedAssocTypes) {
-        auto typeWitness = typeWitnesses.begin(assocType);
-        if (typeWitness == typeWitnesses.end()) {
-          // We don't have a type witness for this associated type.
-          
-          // If we can form a default type, do so.
-          if (Type defaultType = computeDefaultTypeWitness(assocType)) {
-            typeWitnesses.insert(assocType, {defaultType, reqDepth});
-            continue;
-          }
-
-          // If we can derive a type witness, do so.
-          if (Type derivedType = computeDerivedTypeWitness(assocType)) {
-            typeWitnesses.insert(assocType, {derivedType, reqDepth});
-            continue;
-          }
-
-          // The solution is incomplete.
+        // Local function to record a missing associated type.
+        auto recordMissing = [&] {
           if (!missingTypeWitness)
             missingTypeWitness = assocType;
-          return;
+        };
+
+        auto typeWitness = typeWitnesses.begin(assocType);
+        if (typeWitness != typeWitnesses.end()) {
+          // The solution contains an error.
+          if (typeWitness->first->is<ErrorType>()) {
+            recordMissing();
+            return;
+          }
+
+          continue;
         }
+
+        // We don't have a type witness for this associated type.
+
+        // If we can form a default type, do so.
+        if (Type defaultType = computeDefaultTypeWitness(assocType)) {
+          if (defaultType->is<ErrorType>()) {
+            recordMissing();
+            return;
+          }
+
+          typeWitnesses.insert(assocType, {defaultType, reqDepth});
+          continue;
+        }
+
+        // If we can derive a type witness, do so.
+        if (Type derivedType = computeDerivedTypeWitness(assocType)) {
+          if (derivedType->is<ErrorType>()) {
+            recordMissing();
+            return;
+          }
+
+          typeWitnesses.insert(assocType, {derivedType, reqDepth});
+          continue;
+        }
+
+        // The solution is incomplete.
+        recordMissing();
+        return;
       }
 
       // Determine whether there is already a solution with the same
@@ -3211,6 +3244,9 @@ void ConformanceChecker::resolveTypeWitnesses() {
 
     return;
   }
+
+  // Error cases follow.
+  Conformance->setInvalid();
 
   // We're going to produce an error below. Mark each unresolved
   // associated type witness as erroneous.
@@ -3422,7 +3458,7 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
 
   if (requirement->isInvalid()) {
     // FIXME: Note that there is no witness?
-    Conformance->setState(ProtocolConformanceState::Invalid);
+    Conformance->setInvalid();
     return;
   }
 
@@ -3439,7 +3475,7 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
   for (auto assocType : getReferencedAssociatedTypes(requirement)) {
     if (Conformance->getTypeWitness(assocType, nullptr).getReplacement()
           ->is<ErrorType>()) {
-      Conformance->setState(ProtocolConformanceState::Invalid);    
+      Conformance->setInvalid();
       return;
     }
   }
@@ -3450,7 +3486,7 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
     return;
   
   case ResolveWitnessResult::ExplicitFailed:
-    Conformance->setState(ProtocolConformanceState::Invalid);
+    Conformance->setInvalid();
     return;
 
   case ResolveWitnessResult::Missing:
@@ -3464,7 +3500,7 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
     return;
 
   case ResolveWitnessResult::ExplicitFailed:
-    Conformance->setState(ProtocolConformanceState::Invalid);
+    Conformance->setInvalid();
     return;
 
   case ResolveWitnessResult::Missing:
@@ -3478,7 +3514,7 @@ void ConformanceChecker::resolveSingleWitness(ValueDecl *requirement) {
     return;
 
   case ResolveWitnessResult::ExplicitFailed:
-    Conformance->setState(ProtocolConformanceState::Invalid);
+    Conformance->setInvalid();
     return;
 
   case ResolveWitnessResult::Missing:
@@ -3506,7 +3542,7 @@ void ConformanceChecker::checkConformance() {
   // FIXME: Not really true. We could check witnesses that don't involve the
   // failed associated types.
   if (AlreadyComplained) {
-    Conformance->setState(ProtocolConformanceState::Invalid);
+    Conformance->setInvalid();
     return;
   }
 
@@ -3520,12 +3556,11 @@ void ConformanceChecker::checkConformance() {
       TC.checkGenericArguments(DC, Loc, noteLoc, Proto->getDeclaredType(),
                                Proto->getGenericSignature(),
                                {Adoptee})) {
-    Conformance->setState(ProtocolConformanceState::Invalid);
+    Conformance->setInvalid();
     return;
   }
 
   // Check non-type requirements.
-  bool invalid = false;
   for (auto member : Proto->getMembers()) {
     auto requirement = dyn_cast<ValueDecl>(member);
     if (!requirement)
@@ -3551,7 +3586,7 @@ void ConformanceChecker::checkConformance() {
       TC.validateDecl(requirement, true);
 
     if (requirement->isInvalid()) {
-      invalid = true;
+      Conformance->setInvalid();
       continue;
     }
 
@@ -3566,7 +3601,7 @@ void ConformanceChecker::checkConformance() {
       continue;
 
     case ResolveWitnessResult::ExplicitFailed:
-      invalid = true;
+      Conformance->setInvalid();
       continue;
 
     case ResolveWitnessResult::Missing:
@@ -3580,7 +3615,7 @@ void ConformanceChecker::checkConformance() {
       continue;
 
     case ResolveWitnessResult::ExplicitFailed:
-      invalid = true;
+      Conformance->setInvalid();
       continue;
 
     case ResolveWitnessResult::Missing:
@@ -3594,7 +3629,7 @@ void ConformanceChecker::checkConformance() {
       continue;
 
     case ResolveWitnessResult::ExplicitFailed:
-      invalid = true;
+      Conformance->setInvalid();
       continue;
 
     case ResolveWitnessResult::Missing:
@@ -3604,12 +3639,6 @@ void ConformanceChecker::checkConformance() {
   }
 
   emitDelayedDiags();
-
-  if (AlreadyComplained || invalid) {
-    Conformance->setState(ProtocolConformanceState::Invalid);
-  } else {
-    Conformance->setState(ProtocolConformanceState::Complete);
-  }
 }
 
 static void diagnoseConformanceFailure(TypeChecker &TC, Type T,
@@ -3643,7 +3672,7 @@ void ConformanceChecker::diagnoseOrDefer(
        ValueDecl *requirement, bool isError,
        std::function<void(TypeChecker &, NormalProtocolConformance *)> fn) {
   if (isError)
-    Conformance->setState(ProtocolConformanceState::Invalid);
+    Conformance->setInvalid();
 
   if (SuppressDiagnostics) {
     // Stash this in the ASTContext for later emission.
@@ -3689,15 +3718,17 @@ checkConformsToProtocol(TypeChecker &TC,
     // Check the conformance below.
     break;
 
+  case ProtocolConformanceState::CheckingTypeWitnesses:
   case ProtocolConformanceState::Checking:
-  case ProtocolConformanceState::Complete:
     // Nothing to do.
     return conformance;
 
-  case ProtocolConformanceState::Invalid:
-    // Emit any delayed diagnostics and return.
-    // FIXME: Should we complete checking to emit more diagnostics?
-    ConformanceChecker(TC, conformance, false).emitDelayedDiags();
+  case ProtocolConformanceState::Complete:
+    if (conformance->isInvalid()) {
+      // Emit any delayed diagnostics and return.
+      // FIXME: Should we complete checking to emit more diagnostics?
+      ConformanceChecker(TC, conformance, false).emitDelayedDiags();
+    }
     return conformance;
   }
 
@@ -3710,12 +3741,13 @@ checkConformsToProtocol(TypeChecker &TC,
 
   // Note that we are checking this conformance now.
   conformance->setState(ProtocolConformanceState::Checking);
+  defer([&] { conformance->setState(ProtocolConformanceState::Complete); });
 
   // If the protocol requires a class, non-classes are a non-starter.
   if (Proto->requiresClass() && !canT->getClassOrBoundGenericClass()) {
     TC.diagnose(ComplainLoc, diag::non_class_cannot_conform_to_class_protocol,
                 T, Proto->getDeclaredType());
-    conformance->setState(ProtocolConformanceState::Invalid);
+    conformance->setInvalid();
     return conformance;
   }
 
@@ -3727,7 +3759,7 @@ checkConformsToProtocol(TypeChecker &TC,
         TC.diagnose(ComplainLoc,
                     diag::foreign_class_cannot_conform_to_objc_protocol,
                     T, Proto->getDeclaredType());
-        conformance->setState(ProtocolConformanceState::Invalid);
+        conformance->setInvalid();
         return conformance;
       }
   }
@@ -3737,7 +3769,7 @@ checkConformsToProtocol(TypeChecker &TC,
   if (Proto->hasMissingRequirements()) {
     TC.diagnose(ComplainLoc, diag::protocol_has_missing_requirements,
                 T, Proto->getDeclaredType());
-    conformance->setState(ProtocolConformanceState::Invalid);
+    conformance->setInvalid();
     return conformance;
   }
 
@@ -3759,7 +3791,7 @@ checkConformsToProtocol(TypeChecker &TC,
                     InheritedProto->getDeclaredType());
       }
       
-      conformance->setState(ProtocolConformanceState::Invalid);
+      conformance->setInvalid();
       return conformance;
     }
   }

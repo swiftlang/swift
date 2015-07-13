@@ -2497,11 +2497,13 @@ static Type getMemberForBaseType(Module *module,
       return Type();
 
     case ConformanceKind::Conforms:
-      // If we're supposed to skip this conformance's unsatisfied type
+      // If we have an unsatisfied type witness while we're checking the
+      // conformances we're supposed to skip this conformance's unsatisfied type
       // witnesses, and we have an unsatisfied type witness, return
       // "missing".
-      if (conformance.getPointer()->getRootNormalConformance()
-            == options.getSkippedConformance() &&
+      if (conformance.getPointer() &&
+          conformance.getPointer()->getRootNormalConformance()->getState()
+            == ProtocolConformanceState::CheckingTypeWitnesses &&
           !conformance.getPointer()->hasTypeWitness(assocType, nullptr))
         return Type();
 

@@ -1661,7 +1661,6 @@ struct ASTNodeBase {};
 
       switch (conformance->getState()) {
       case ProtocolConformanceState::Complete:
-      case ProtocolConformanceState::Invalid:
         // More checking below.
         break;
         
@@ -1669,6 +1668,7 @@ struct ASTNodeBase {};
         // Ignore incomplete conformances; we didn't need them.
         return;
 
+      case ProtocolConformanceState::CheckingTypeWitnesses:
       case ProtocolConformanceState::Checking:
         dumpRef(decl);
         Out << " has a protocol conformance that is still being checked "

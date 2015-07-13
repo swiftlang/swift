@@ -233,7 +233,8 @@ ConcreteDeclRef NormalProtocolConformance::getWitness(
   if (known != Mapping.end()) {
     return known->second;
   } else {
-    assert(!isComplete() && "Resolver did not resolve requirement");
+    assert((!isComplete() || isInvalid()) &&
+           "Resolver did not resolve requirement");
     return ConcreteDeclRef();
   }
 }

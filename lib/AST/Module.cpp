@@ -731,6 +731,11 @@ ArrayRef<Substitution> BoundGenericType::getSubstitutions(
     ++index;
   }
 
+  // Before recording substitutions, make sure we didn't end up doing it
+  // recursively.
+  if (auto known = ctx.getSubstitutions(canon, gpContext))
+    return *known;
+
   // Copy and record the substitutions.
   auto permanentSubs = ctx.AllocateCopy(resultSubstitutions,
                                         hasTypeVariables

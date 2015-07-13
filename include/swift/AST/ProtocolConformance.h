@@ -69,17 +69,16 @@ enum class ProtocolConformanceKind {
 };
 
 /// Describes the state of a protocol conformance, which may be complete,
-/// incomplete, or invalid.
+/// incomplete, or currently being checked.
 enum class ProtocolConformanceState {
-  /// The conformance has been fully checked and is complete and well-formed.
+  /// The conformance has been fully checked.
   Complete,
   /// The conformance is known but is not yet complete.
   Incomplete,
+  /// The conformance's type witnesses are currently being resolved.
+  CheckingTypeWitnesses,
   /// The conformance is being checked.
   Checking,
-  /// The conformance has been found to be invalid and should not be
-  /// used.
-  Invalid
 };
 
 /// \brief Describes how a particular type conforms to a given protocol,
@@ -119,19 +118,18 @@ public:
   /// Retrieve the state of this conformance.
   ProtocolConformanceState getState() const;
 
-  /// Determine whether this conformance is complete and well-formed.
+  /// Determine whether this conformance is complete.
   bool isComplete() const {
     return getState() == ProtocolConformanceState::Complete;
   }
 
   /// Determine whether this conformance is invalid.
-  bool isInvalid() const {
-    return getState() == ProtocolConformanceState::Invalid;
-  }
+  bool isInvalid() const;
 
   /// Determine whether this conformance is incomplete.
   bool isIncomplete() const {
     return getState() == ProtocolConformanceState::Incomplete ||
+           getState() == ProtocolConformanceState::CheckingTypeWitnesses ||
            getState() == ProtocolConformanceState::Checking;
   }
 
@@ -295,7 +293,9 @@ class NormalProtocolConformance : public ProtocolConformance,
 
   /// The declaration context containing the ExtensionDecl or
   /// NominalTypeDecl that declared the conformance.
-  DeclContext *DC;
+  ///
+  /// Also stores the "invalid" bit.
+  llvm::PointerIntPair<DeclContext *, 1, bool> DCAndInvalid;
 
   /// \brief The mapping of individual requirements in the protocol over to
   /// the declarations that satisfy those requirements.
@@ -319,7 +319,7 @@ class NormalProtocolConformance : public ProtocolConformance,
                             SourceLoc loc, DeclContext *dc,
                             ProtocolConformanceState state)
     : ProtocolConformance(ProtocolConformanceKind::Normal, conformingType),
-      ProtocolAndState(protocol, state), Loc(loc), DC(dc)
+      ProtocolAndState(protocol, state), Loc(loc), DCAndInvalid(dc, false)
   {
   }
 
@@ -332,7 +332,7 @@ public:
 
   /// Get the declaration context that contains the conforming extension or
   /// nominal type declaration.
-  DeclContext *getDeclContext() const { return DC; }
+  DeclContext *getDeclContext() const { return DCAndInvalid.getPointer(); }
 
   /// Retrieve the state of this conformance.
   ProtocolConformanceState getState() const {
@@ -343,6 +343,12 @@ public:
   void setState(ProtocolConformanceState state) {
     ProtocolAndState.setInt(state);
   }
+
+  /// Determine whether this conformance is invalid.
+  bool isInvalid() const { return DCAndInvalid.getInt(); }
+
+  /// Mark this conformance as invalid.
+  void setInvalid() { DCAndInvalid.setInt(true); }
 
   /// Retrieve the type witness substitution and type decl (if one exists)
   /// for the given associated type.
@@ -627,6 +633,10 @@ public:
     return conformance->getKind() == ProtocolConformanceKind::Inherited;
   }
 };
+
+inline bool ProtocolConformance::isInvalid() const {
+  return getRootNormalConformance()->isInvalid();
+}
 
 } // end namespace swift
 
