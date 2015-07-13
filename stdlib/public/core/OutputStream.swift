@@ -379,7 +379,7 @@ public func toDebugString<T>(x: T) -> String {
 @inline(never)
 @_semantics("stdlib_binary_only")
 public func print<T, TargetStream : OutputStreamType>(
-  value: T, inout _ target: TargetStream, appendNewline: Bool
+  value: T, inout _ target: TargetStream, appendNewline: Bool = true
 ) {
   target._lock()
   _print_unlocked(value, &target)
@@ -387,15 +387,6 @@ public func print<T, TargetStream : OutputStreamType>(
     target.write("\n")
   }
   target._unlock()
-}
-
-@inline(never)
-@_semantics("stdlib_binary_only")
-public func print<T, TargetStream : OutputStreamType>(
-  value: T, inout _ target: TargetStream
-) {
-  // FIXME: workaround for rdar://20775669
-  print(value, &target, appendNewline: true)
 }
 
 /// Writes the textual representation of `value`, and an optional newline,
@@ -414,7 +405,7 @@ public func print<T, TargetStream : OutputStreamType>(
 ///   newline.
 @inline(never)
 @_semantics("stdlib_binary_only")
-public func print<T>(value: T, appendNewline: Bool) {
+public func print<T>(value: T, appendNewline: Bool = true) {
   var target = _Stdout()
   target._lock()
   _print_unlocked(value, &target)
@@ -422,13 +413,6 @@ public func print<T>(value: T, appendNewline: Bool) {
     target.write("\n")
   }
   target._unlock()
-}
-
-@inline(never)
-@_semantics("stdlib_binary_only")
-public func print<T>(value: T) {
-  // FIXME: workaround for rdar://20775669
-  print(value, appendNewline: true)
 }
 
 //===----------------------------------------------------------------------===//
