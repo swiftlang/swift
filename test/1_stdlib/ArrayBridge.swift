@@ -222,7 +222,7 @@ func testBridgedVerbatim() {
 
   // Verify that NSArray class methods are inherited by a Swift bridging class.
   // CHECK-NEXT: Swift.{{.*}}Array
-  print(basesConvertedToNSArray.dynamicType)
+  debugPrint(basesConvertedToNSArray.dynamicType)
   // CHECK-NEXT: true
   print(basesConvertedToNSArray.dynamicType.supportsSecureCoding())
 

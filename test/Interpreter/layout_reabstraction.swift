@@ -5,12 +5,12 @@ struct S {}
 struct Q {}
 
 func printMetatype<T>(x: Any, _: T.Type) {
-  print(x as! T.Type)
+  debugPrint(x as! T.Type)
 }
 
 func printMetatypeConditional<T>(x: Any, _: T.Type) {
   if let y = x as? T.Type {
-    print(y)
+    debugPrint(y)
   } else {
     print("nope")
   }
@@ -20,7 +20,7 @@ var any: Any = S.self
 // CHECK: downcast in substituted context:
 print("downcast in substituted context:")
 // CHECK-NEXT: main.S
-print(any as! S.Type)
+debugPrint(any as! S.Type)
 // CHECK-NEXT: nope
 if let q = any as? Q.Type {
   print(q)

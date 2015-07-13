@@ -2739,7 +2739,8 @@ void NodePrinter::printSimplifiedEntityType(NodePointer context,
 void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) {
   // Common code for handling entities.
   auto printEntity = [&](bool hasName, bool hasType, StringRef extraName) {
-    printContext(pointer->getChild(0));
+    if (Options.QualifyEntities)
+      printContext(pointer->getChild(0));
 
     bool printType = (hasType && !suppressType);
     bool useParens = (printType && asContext);
@@ -2777,10 +2778,12 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
   case Node::Kind::Extension:
     assert((pointer->getNumChildren() == 2 || pointer->getNumChildren() == 3)
            && "Extension expects 2 or 3 children.");
-    Printer << "ext.";
-    // Print the module where extension is defined.
-    print(pointer->getChild(0), true);
-    Printer << ".";
+    if (Options.QualifyEntities) {
+      Printer << "ext.";
+      // Print the module where extension is defined.
+      print(pointer->getChild(0), true);
+      Printer << ".";
+    }
     print(pointer->getChild(1), asContext);
     if (pointer->getNumChildren() == 3)
       print(pointer->getChild(2), true);
@@ -2937,7 +2940,7 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     print(pointer->getChild(0));
     return;
   case Node::Kind::NonObjCAttribute:
-    Printer << "@!objc ";
+    Printer << "@nonobjc ";
     return;
   case Node::Kind::ObjCAttribute:
     Printer << "@objc ";

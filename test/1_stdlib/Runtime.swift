@@ -1249,12 +1249,12 @@ Reflection.test("Enum/IndirectGeneric/DefaultMirror") {
   let x = Foo<String>.Foo(22)
   let y = Foo<String>.Bar("twenty-two")
 
-  expectEqual("\(x)", "a.Foo<Swift.String>.Foo(22)")
-  expectEqual("\(y)", "a.Foo<Swift.String>.Bar(\"twenty-two\")")
+  expectEqual("\(x)", "Foo(22)")
+  expectEqual("\(y)", "Bar(\"twenty-two\")")
 
   let list = List.Cons(first: 0, rest: .Cons(first: 1, rest: .Nil))
   expectEqual("\(list)",
-              "a.List<Swift.Int>.Cons(0, a.List<Swift.Int>.Cons(1, a.List<Swift.Int>.Nil))")
+              "Cons(0, a.List<Swift.Int>.Cons(1, a.List<Swift.Int>.Nil))")
 }
 
 /// A type that provides its own mirror.
@@ -2061,7 +2061,19 @@ Reflection.test("Name of metatype of artificial subclass") {
   obj.addObserver(obj, forKeyPath: "foo", options: [.New], context: &KVOHandle)
   obj.removeObserver(obj, forKeyPath: "foo")
 
-  expectEqual("\(obj.dynamicType)", "a.TestArtificialSubclass")
+  expectEqual("\(obj.dynamicType)", "TestArtificialSubclass")
+}
+
+Reflection.test("Indirect enum payload") {
+  let x = Foo<String>.Foo(22)
+  let y = Foo<String>.Bar("twenty-two")
+
+  expectEqual("\(x)", "Foo(22)")
+  expectEqual("\(y)", "Bar(\"twenty-two\")")
+
+  let list = List.Cons(first: 0, rest: .Cons(first: 1, rest: .Nil))
+  expectEqual("\(list)",
+              "Cons(0, a.List<Swift.Int>.Cons(1, a.List<Swift.Int>.Nil))")
 }
 
 var BitTwiddlingTestSuite = TestSuite("BitTwiddling")

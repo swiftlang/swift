@@ -150,8 +150,8 @@ class DodgyBank : Bank {
   }
 }
 
-// CHECK: main.Account(owner: "A")
-// CHECK: main.Account(owner: "Bank fees")
+// CHECK: Account(owner: "A")
+// CHECK: Account(owner: "Bank fees")
 // CHECK: nil
 // CHECK: Optional(main.Account(owner: "A"))
 

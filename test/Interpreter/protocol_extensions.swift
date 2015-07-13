@@ -276,17 +276,17 @@ class Sub: Super {}
 protocol Init { init(x: Int) }
 extension Init { init() { self.init(x: 17) } }
 
-// CHECK: 17 main.Super
+// CHECK: 17 Super
 Super()
 
-// CHECK: 17 main.Sub
+// CHECK: 17 Sub
 Sub()
 
-// CHECK: 17 main.Super
+// CHECK: 17 Super
 var sup: Super.Type = Super.self
 sup.init()
 
-// CHECK: 17 main.Sub
+// CHECK: 17 Sub
 sup = Sub.self
 sup.init()
 

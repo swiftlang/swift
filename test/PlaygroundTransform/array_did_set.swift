@@ -15,11 +15,11 @@ var s = S()
 s.a = [3,2]
 s.a.append(300)
 
-// CHECK: [{{.*}}] $builtin_log[s='main.S(a: [])']
+// CHECK: [{{.*}}] $builtin_log[s='S(a: [])']
 // CHECK-NEXT: [{{.*}}] $builtin_log_scope_entry
 // CHECK-NEXT: [{{.*}}] $builtin_print<appendNewline=true>['Set']
 // CHECK-NEXT: [{{.*}}] $builtin_log_scope_exit
-// CHECK-NEXT: [{{.*}}] $builtin_log[s='main.S(a: [3, 2])']
+// CHECK-NEXT: [{{.*}}] $builtin_log[s='S(a: [3, 2])']
 // CHECK-NEXT: [{{.*}}] $builtin_log_scope_entry
 // CHECK-NEXT: [{{.*}}] $builtin_print<appendNewline=true>['Set']
 // CHECK-NEXT: [{{.*}}] $builtin_log_scope_exit

@@ -87,14 +87,20 @@ public typealias Printable = CustomStringConvertible
 // Default (ad-hoc) printing
 //===----------------------------------------------------------------------===//
 
-/// Do our best to print a value that can not be printed directly.
+/// Do our best to print a value that cannot be printed directly.
 internal func _adHocPrint<T, TargetStream : OutputStreamType>(
-    value: T, inout _ target: TargetStream
+    value: T, inout _ target: TargetStream, isDebugPrint: Bool
 ) {
+  func printTypeName(type: Any.Type) {
+    // Print type names without qualification, unless we're debugPrint'ing.
+    target.write(_typeName(type, qualified: isDebugPrint))
+  }
+
   let mirror = _reflect(value)
+  switch mirror {
   // Checking the mirror kind is not a good way to implement this, but we don't
   // have a more expressive reflection API now.
-  if mirror is _TupleMirror {
+  case is _TupleMirror:
     target.write("(")
     var first = true
     for i in 0..<mirror.count {
@@ -108,10 +114,9 @@ internal func _adHocPrint<T, TargetStream : OutputStreamType>(
       debugPrint(elt, &target, appendNewline: false)
     }
     target.write(")")
-    return
-  }
-  if mirror is _StructMirror {
-    print(mirror.summary, &target, appendNewline: false)
+
+  case is _StructMirror:
+    printTypeName(mirror.valueType)
     target.write("(")
     var first = true
     for i in 0..<mirror.count {
@@ -126,10 +131,20 @@ internal func _adHocPrint<T, TargetStream : OutputStreamType>(
       debugPrint(elementMirror.value, &target, appendNewline: false)
     }
     target.write(")")
-    return
-  }
-  if mirror is _EnumMirror {
-    print(mirror.summary, &target, appendNewline: false)
+
+  case let enumMirror as _EnumMirror:
+    if let caseName = String.fromCString(enumMirror.caseName) {
+      // Write the qualified type name in debugPrint.
+      if isDebugPrint {
+        target.write(_typeName(mirror.valueType))
+        target.write(".")
+      }
+      target.write(caseName)
+    } else {
+      // If the case name is garbage, just print the type name.
+      printTypeName(mirror.valueType)
+    }
+
     if mirror.count == 0 {
       return
     }
@@ -141,9 +156,13 @@ internal func _adHocPrint<T, TargetStream : OutputStreamType>(
     target.write("(")
     debugPrint(payload.value, &target, appendNewline: false)
     target.write(")")
-    return
+
+  case is _MetatypeMirror:
+    printTypeName(mirror.value as! Any.Type)
+
+  default:
+    print(mirror.summary, &target, appendNewline: false)
   }
-  print(mirror.summary, &target, appendNewline: false)
 }
 
 @inline(never)
@@ -165,7 +184,7 @@ internal func _print_unlocked<T, TargetStream : OutputStreamType>(
     return
   }
 
-  _adHocPrint(value, &target)
+  _adHocPrint(value, &target, isDebugPrint: false)
 }
 
 /// Returns the result of `print`'ing `x` into a `String`.
@@ -210,7 +229,7 @@ public func _debugPrint_unlocked<T, TargetStream : OutputStreamType>(
     return
   }
 
-  _adHocPrint(value, &target)
+  _adHocPrint(value, &target, isDebugPrint: true)
 }
 
 //===----------------------------------------------------------------------===//

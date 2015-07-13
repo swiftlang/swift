@@ -41,11 +41,11 @@ public func _bridgeErrorTypeToNSError(e: ErrorType) -> AnyObject
 /// throws an error.
 @asmname("swift_unexpectedError")
 public func _unexpectedError(error: ErrorType) {
-  preconditionFailure("'try!' expression unexpectedly raised an error: \(error)")
+  preconditionFailure("'try!' expression unexpectedly raised an error: \(String(reflecting: error))")
 }
 
 /// Invoked by the compiler when code at top level throws an uncaught error.
 @asmname("swift_errorInMain")
 public func _errorInMain(error: ErrorType) {
-  fatalError("Error raised at top level: \(error)")
+  fatalError("Error raised at top level: \(String(reflecting: error))")
 }

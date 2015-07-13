@@ -35,7 +35,7 @@ var tt = testit(Mystruct())
 var tt2 = testit2(Mystruct())
 
 // CHECK: a.Mystruct.Type
-print(tt)
+debugPrint(tt)
 
 // CHECK: a.Mystruct.Type.Type
-print(tt2)
+debugPrint(tt2)

@@ -2618,7 +2618,8 @@ swift_demangleSimpleClass(const char *mangledName,
   
 
 /// Return the type name for a given type metadata.
-std::string nameForMetadata(const Metadata *type);
+std::string nameForMetadata(const Metadata *type,
+                            bool qualified = true);
 
 } // end namespace swift
 

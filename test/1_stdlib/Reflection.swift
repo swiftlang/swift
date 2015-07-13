@@ -173,6 +173,100 @@ print("\(intArrayMirror[0].0): \(intArrayMirror[0].1.summary)")
 // CHECK-NEXT: [4]: 5
 print("\(intArrayMirror[4].0): \(intArrayMirror[4].1.summary)")
 
+// Simple enum with no payload
+
+// CHECK-NEXT: Enum tests
+print("Enum tests")
+
+enum JustSomeEnum {case A,ß}
+
+// CHECK-NEXT: A
+print(JustSomeEnum.A)
+// CHECK-NEXT: JustSomeEnum.A
+debugPrint(JustSomeEnum.A)
+
+// CHECK-NEXT: ß
+print(JustSomeEnum.ß)
+// CHECK-NEXT: JustSomeEnum.ß
+debugPrint(JustSomeEnum.ß)
+
+// CHECK-NEXT: 0
+print(_reflect(JustSomeEnum.A).count)
+
+enum Highlander {case ThereCanOnlyBeOne}
+
+// Singleton enums have an empty representation
+
+// CHECK-NEXT: ThereCanOnlyBeOne
+print(Highlander.ThereCanOnlyBeOne)
+// CHECK-NEXT: Highlander.ThereCanOnlyBeOne
+debugPrint(Highlander.ThereCanOnlyBeOne)
+
+// Single payload enum
+
+enum Pet {
+  case Cat
+  case Volleyball(String, Int)
+}
+
+// CHECK-NEXT: Cat
+print(Pet.Cat)
+// CHECK-NEXT: Pet.Cat
+debugPrint(Pet.Cat)
+// CHECK-NEXT: Volleyball("Wilson", 2000)
+print(Pet.Volleyball("Wilson", 2000))
+// CHECK-NEXT: Pet.Volleyball("Wilson", 2000)
+debugPrint(Pet.Volleyball("Wilson", 2000))
+
+// CHECK-NEXT: 1
+print(_reflect(Pet.Volleyball("Wilson", 2000)).count)
+
+// Single payload enum with single case
+enum Exaggeration<T> {
+  case Claim(T)
+}
+
+// CHECK-NEXT: Claim([])
+print(Exaggeration<Array<Int>>.Claim([]))
+// CHECK-NEXT: Exaggeration<Swift.Array<Swift.Int>>.Claim([])
+debugPrint(Exaggeration<Array<Int>>.Claim([]))
+
+// CHECK-NEXT: 1
+print(_reflect(Exaggeration<Array<Int>>.Claim([])).count)
+
+// Multi-payload enum
+enum Hylomorphism {
+  case Yin(Int)
+  case Yang(Int)
+}
+
+// CHECK-NEXT: Hylomorphism
+print(Hylomorphism.Yin(5))
+
+// CHECK-NEXT: 0
+print(_reflect(Hylomorphism.Yin(5)).count)
+
+// Multi-payload enum with generic type arguments
+// This one has enough metadata to get the tag and payload out
+enum Transportation<T, S> {
+  case Horse(T)
+  case Motorbike
+  case Roadster(S)
+}
+
+// CHECK-NEXT: Horse(31337)
+print(Transportation<Int, String>.Horse(31337))
+// CHECK-NEXT: Transportation<Swift.Int, Swift.String>.Horse(31337)
+debugPrint(Transportation<Int, String>.Horse(31337))
+
+// CHECK-NEXT: 1
+print(_reflect(Transportation<Int, String>.Horse(31337)).count)
+
+// CHECK-NEXT: Roadster("Porsche")
+print(Transportation<Int, String>.Roadster("Porsche"))
+// CHECK-NEXT: Transportation<Swift.Int, Swift.String>.Roadster("Porsche")
+debugPrint(Transportation<Int, String>.Roadster("Porsche"))
+
 var justSomeFunction = { (x:Int)->Int in return x + 1 }
 // CHECK-NEXT: (Function)
 print(_reflect(justSomeFunction).summary)

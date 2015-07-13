@@ -695,21 +695,33 @@ func test_ObjectPrinting() {
 test_ObjectPrinting()
 // CHECK: test_ObjectPrinting done
 
-func test_ThickMetatypePrintingImpl<T>(thickMetatype: T.Type, _ expected: String) {
-  printedIs(thickMetatype, expected)
-  printedIs([ thickMetatype ], "[" + expected + "]")
+func test_ThickMetatypePrintingImpl<T>(
+    thickMetatype: T.Type,
+    _ expectedPrint: String,
+    _ expectedDebug: String
+) {
+  printedIs(thickMetatype, expectedPrint)
+  printedIs([ thickMetatype ], "[" + expectedPrint + "]")
+  debugPrintedIs(thickMetatype, expectedDebug)
+  debugPrintedIs([ thickMetatype ], "[" + expectedDebug + "]")
 }
 
 func test_gcMetatypePrinting() {
   let structMetatype = StructPrintable.self
-  printedIs(structMetatype, "a.StructPrintable")
-  printedIs([ structMetatype ], "[a.StructPrintable]")
-  test_ThickMetatypePrintingImpl(structMetatype, "a.StructPrintable")
+  printedIs(structMetatype, "StructPrintable")
+  debugPrintedIs(structMetatype, "a.StructPrintable")
+  printedIs([ structMetatype ], "[StructPrintable]")
+  debugPrintedIs([ structMetatype ], "[a.StructPrintable]")
+  test_ThickMetatypePrintingImpl(structMetatype, "StructPrintable",
+    "a.StructPrintable")
 
   let classMetatype = ClassPrintable.self
-  printedIs(classMetatype, "a.ClassPrintable")
-  printedIs([ classMetatype ], "[a.ClassPrintable]")
-  test_ThickMetatypePrintingImpl(classMetatype, "a.ClassPrintable")
+  printedIs(classMetatype, "ClassPrintable")
+  debugPrintedIs(classMetatype, "a.ClassPrintable")
+  printedIs([ classMetatype ], "[ClassPrintable]")
+  debugPrintedIs([ classMetatype ], "[a.ClassPrintable]")
+  test_ThickMetatypePrintingImpl(classMetatype, "ClassPrintable",
+    "a.ClassPrintable")
 
   print("test_gcMetatypePrinting done")
 }
@@ -831,13 +843,22 @@ func test_ArbitraryStructPrinting() {
     [ WithoutDescription(1), WithoutDescription(2), WithoutDescription(3) ]
   printedIs(
     arrayOfArbitraryStructs,
+    "[WithoutDescription(x: 1), WithoutDescription(x: 2), WithoutDescription(x: 3)]")
+  debugPrintedIs(
+    arrayOfArbitraryStructs,
     "[a.WithoutDescription(x: 1), a.WithoutDescription(x: 2), a.WithoutDescription(x: 3)]")
 
   printedIs(
     EmptyStructWithoutDescription(),
+    "EmptyStructWithoutDescription()")
+  debugPrintedIs(
+    EmptyStructWithoutDescription(),
     "a.EmptyStructWithoutDescription()")
 
   printedIs(
+    ValuesWithoutDescription(1.25, "abc", [ 1, 2, 3 ]),
+    "ValuesWithoutDescription<Double, String, Array<Int>>(t: 1.25, u: \"abc\", v: [1, 2, 3])")
+  debugPrintedIs(
     ValuesWithoutDescription(1.25, "abc", [ 1, 2, 3 ]),
     "a.ValuesWithoutDescription<Swift.Double, Swift.String, Swift.Array<Swift.Int>>(t: 1.25, u: \"abc\", v: [1, 2, 3])")
 
@@ -847,7 +868,8 @@ test_ArbitraryStructPrinting()
 // CHECK: test_ArbitraryStructPrinting done
 
 func test_MetatypePrinting() {
-  printedIs(Int.self, "Swift.Int")
+  printedIs(Int.self, "Int")
+  debugPrintedIs(Int.self, "Swift.Int")
 
   print("test_MetatypePrinting done")
 }
@@ -868,7 +890,7 @@ func test_StringInterpolation() {
   assertEquals("nan", "\(0 / 0.0)")
 
   assertEquals("<[►1◀︎, ►2◀︎, ►3◀︎]>", "<\([ StructPrintable(1), StructPrintable(2), StructPrintable(3) ])>")
-  assertEquals("a.WithoutDescription(x: 1)", "\(WithoutDescription(1))")
+  assertEquals("WithoutDescription(x: 1)", "\(WithoutDescription(1))")
 
   print("test_StringInterpolation done")
 }

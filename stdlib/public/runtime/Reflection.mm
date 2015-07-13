@@ -1293,8 +1293,9 @@ MirrorReturn swift::swift_unsafeReflectAny(HeapObject *owner,
 }
 
 extern "C" void
-swift_stdlib_getDemangledMetatypeName(const Metadata *type, String *outString) {
-  std::string name = nameForMetadata(type);
+swift_stdlib_getDemangledMetatypeName(const Metadata *type,
+                                      bool qualified, String *outString) {
+  std::string name = nameForMetadata(type, qualified);
   swift_stringFromUTF8InRawMemory(outString, name.data(), name.length());
 }
 
@@ -1336,7 +1337,9 @@ static void swift_stdlib_getDemangledTypeNameImpl(OpaqueValue *value,
   case MetadataKind::Metatype:
   case MetadataKind::ObjCClassWrapper:
   case MetadataKind::ForeignClass:
-    return swift_stdlib_getDemangledMetatypeName(dynamicType, result);
+    return swift_stdlib_getDemangledMetatypeName(dynamicType,
+                                                 /*qualified*/ true,
+                                                 result);
 
   // Values should never use these metadata kinds.
   case MetadataKind::HeapLocalVariable:

@@ -85,13 +85,16 @@ namespace {
 
 static void _buildNameForMetadata(const Metadata *type,
                                   TypeSyntaxLevel level,
+                                  bool qualified,
                                   std::string &result);
 
 static void _buildNominalTypeName(const NominalTypeDescriptor *ntd,
                                   const Metadata *type,
+                                  bool qualified,
                                   std::string &result) {
   auto options = Demangle::DemangleOptions();
   options.DisplayDebuggerGeneratedModule = false;
+  options.QualifyEntities = qualified;
 
   // Demangle the basic type name.
   result += Demangle::demangleTypeAsString(ntd->Name,
@@ -109,7 +112,8 @@ static void _buildNominalTypeName(const NominalTypeDescriptor *ntd,
          i < e; ++i, ++genericParam) {
       if (i > 0)
         result += ", ";
-      _buildNameForMetadata(*genericParam, TypeSyntaxLevel::Type, result);
+      _buildNameForMetadata(*genericParam, TypeSyntaxLevel::Type, qualified,
+                            result);
     }
     
     result += ">";
@@ -125,8 +129,10 @@ static const char *_getProtocolName(const ProtocolDescriptor *protocol) {
 }
 
 static void _buildExistentialTypeName(const ProtocolDescriptorList *protocols,
+                                      bool qualified,
                                       std::string &result) {
   auto options = Demangle::DemangleOptions();
+  options.QualifyEntities = qualified;
   options.DisplayDebuggerGeneratedModule = false;
 
   // If there's only one protocol, the existential type name is the protocol
@@ -154,6 +160,7 @@ static void _buildExistentialTypeName(const ProtocolDescriptorList *protocols,
 }
 
 static void _buildFunctionTypeName(const FunctionTypeMetadata *func,
+                                   bool qualified,
                                    std::string &result) {
 
   if (func->getNumArguments() == 1) {
@@ -165,6 +172,7 @@ static void _buildFunctionTypeName(const FunctionTypeMetadata *func,
     if (auto tupleMetadata = dyn_cast<TupleTypeMetadata>(firstArgument)) {
           _buildNameForMetadata(tupleMetadata,
                                 TypeSyntaxLevel::TypeSimple,
+                                qualified,
                                 result);
     } else {
       if (isInout)
@@ -172,6 +180,7 @@ static void _buildFunctionTypeName(const FunctionTypeMetadata *func,
 
       _buildNameForMetadata(firstArgument,
                             TypeSyntaxLevel::TypeSimple,
+                            qualified,
                             result);
     }
   } else {
@@ -181,7 +190,8 @@ static void _buildFunctionTypeName(const FunctionTypeMetadata *func,
         bool isInout = func->getArguments()[i].getFlag();
         if (isInout)
           result += "inout ";
-        _buildNameForMetadata(arg, TypeSyntaxLevel::TypeSimple, result);
+        _buildNameForMetadata(arg, TypeSyntaxLevel::TypeSimple,
+                              qualified, result);
         if (i < func->getNumArguments() - 1) {
           result += ", ";
         }
@@ -196,13 +206,15 @@ static void _buildFunctionTypeName(const FunctionTypeMetadata *func,
   result += " -> ";
   _buildNameForMetadata(func->ResultType,
                         TypeSyntaxLevel::Type,
+                        qualified,
                         result);
 }
 
 // Build a user-comprehensible name for a type.
 static void _buildNameForMetadata(const Metadata *type,
-                           TypeSyntaxLevel level,
-                           std::string &result) {
+                                  TypeSyntaxLevel level,
+                                  bool qualified,
+                                  std::string &result) {
   auto options = Demangle::DemangleOptions();
   options.DisplayDebuggerGeneratedModule = false;
                              
@@ -221,14 +233,14 @@ static void _buildNameForMetadata(const Metadata *type,
     }
 #endif
     return _buildNominalTypeName(classType->getDescription(),
-                                    classType,
+                                    classType, qualified,
                                     result);
   }
   case MetadataKind::Enum:
   case MetadataKind::Struct: {
     auto structType = static_cast<const StructMetadata *>(type);
     return _buildNominalTypeName(structType->Description,
-                                 type, result);
+                                 type, qualified, result);
   }
   case MetadataKind::ObjCClassWrapper: {
 #if SWIFT_OBJC_INTEROP
@@ -248,12 +260,13 @@ static void _buildNameForMetadata(const Metadata *type,
   }
   case MetadataKind::Existential: {
     auto exis = static_cast<const ExistentialTypeMetadata *>(type);
-    _buildExistentialTypeName(&exis->Protocols, result);
+    _buildExistentialTypeName(&exis->Protocols, qualified, result);
     return;
   }
   case MetadataKind::ExistentialMetatype: {
     auto metatype = static_cast<const ExistentialMetatypeMetadata *>(type);
     _buildNameForMetadata(metatype->InstanceType, TypeSyntaxLevel::TypeSimple,
+                          qualified,
                           result);
     result += ".Type";
     return;
@@ -278,7 +291,7 @@ static void _buildNameForMetadata(const Metadata *type,
       break;
     }
     
-    _buildFunctionTypeName(func, result);
+    _buildFunctionTypeName(func, qualified, result);
 
     if (level >= TypeSyntaxLevel::TypeSimple)
       result += ")";
@@ -287,7 +300,7 @@ static void _buildNameForMetadata(const Metadata *type,
   case MetadataKind::Metatype: {
     auto metatype = static_cast<const MetatypeMetadata *>(type);
     _buildNameForMetadata(metatype->InstanceType, TypeSyntaxLevel::TypeSimple,
-                          result);
+                          qualified, result);
     if (metatype->InstanceType->isAnyExistentialType())
       result += ".Protocol";
     else
@@ -301,7 +314,7 @@ static void _buildNameForMetadata(const Metadata *type,
     for (unsigned i = 0, e = tuple->NumElements; i < e; ++i) {
       if (i > 0)
         result += ", ";
-      _buildNameForMetadata(elts[i].Type, TypeSyntaxLevel::Type,
+      _buildNameForMetadata(elts[i].Type, TypeSyntaxLevel::Type, qualified,
                             result);
     }
     result += ")";
@@ -321,9 +334,10 @@ static void _buildNameForMetadata(const Metadata *type,
 }
 
 // Return a user-comprehensible name for the given type.
-std::string swift::nameForMetadata(const Metadata *type) {
+std::string swift::nameForMetadata(const Metadata *type,
+                                   bool qualified) {
   std::string result;
-  _buildNameForMetadata(type, TypeSyntaxLevel::Type, result);
+  _buildNameForMetadata(type, TypeSyntaxLevel::Type, qualified, result);
   return result;
 }
 

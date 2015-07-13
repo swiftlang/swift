@@ -70,12 +70,15 @@ func _withUninitializedString<R>(
 public func _stdlib_getDemangledTypeNameImpl<T>(value: T, _ result: UnsafeMutablePointer<String>)
 
 @asmname("swift_stdlib_getDemangledMetatypeName")
-public func _stdlib_getDemangledMetatypeNameImpl(type: Any.Type, _ result: UnsafeMutablePointer<String>)
+public func _stdlib_getDemangledMetatypeNameImpl(type: Any.Type, qualified: Bool, _ result: UnsafeMutablePointer<String>)
 
-/// Returns the demangled name of a metatype.
-public func _typeName(type: Any.Type) -> String {
+@asmname("swift_stdlib_getDemangledUnqualifiedMetatypeName")
+public func _stdlib_getDemangledUnqualifiedMetatypeNameImpl(type: Any.Type, _ result: UnsafeMutablePointer<String>)
+
+/// Returns the demangled qualified name of a metatype.
+public func _typeName(type: Any.Type, qualified: Bool = true) -> String {
   let stringPtr = UnsafeMutablePointer<String>.alloc(1)
-  _stdlib_getDemangledMetatypeNameImpl(type, stringPtr)
+  _stdlib_getDemangledMetatypeNameImpl(type, qualified: qualified, stringPtr)
   let result = stringPtr.move()
   stringPtr.dealloc(1)
   return result

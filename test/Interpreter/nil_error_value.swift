@@ -19,5 +19,5 @@ do {
   try NilError.throwIt()
 } catch {
   // CHECK: error was: Foundation._GenericObjCError.NilError
-  print("error was: \(error)")
+  print("error was: \(String(reflecting: error))")
 }
