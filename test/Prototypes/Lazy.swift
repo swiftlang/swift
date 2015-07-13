@@ -506,35 +506,6 @@ tests.test("ReverseCollection") {
 }
 
 
-/*****
-/// The lazy `CollectionType` returned by `reverse(c)` where `c` is a
-/// `CollectionType` with an `Index` conforming to `${IndexProtocol}`.
-public struct _prext_ReverseCollection<Base_ : CollectionType where Base_.Index : BidirectionalIndexType> : _CollectionWrapperType {
-
-  typealias Base = Base_
-  typealias Index = _prext_ReverseIndex<Base.Index>
-  
-  public init(_ base: Base) {
-    self._base = base
-  }
-
-  public let _base: Base
-}
-
-extension _prext_ReverseCollection : __prext_ReverseCollectionType, _prext_LazyCollectionType  {}
-
-extension CollectionType where Index : BidirectionalIndexType {
-  /// Return a `_prext_ReverseCollection` over `self`.  
-  public func reverse() -> _prext_ReverseCollection<Self> {
-    return _prext_ReverseCollection<Self>(
-      _prext_ReverseCollection<Self>(self)
-    )
-  }
-}
-
- // ${'Local Variables'}:
- // eval: (read-only-mode 1)
- // End:
 
 
 //===--- Filter.swift ------------------------------------------------------===//
@@ -717,6 +688,5 @@ extension _prext_LazySequenceType {
     return _prext_FilterSequence(_base: self.elements, _include: includeElement)
   }
 }
-*/
 
 runAllTests()
