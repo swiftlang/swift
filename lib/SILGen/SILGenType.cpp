@@ -418,7 +418,7 @@ public:
     if (isa<ProtocolDecl>(theType))
       return;
 
-    for (auto *conformance : theType->getAllConformances(/*sorted=*/true)) {
+    for (auto *conformance : theType->getLocalConformances()) {
       if (conformance->isComplete() &&
           isa<NormalProtocolConformance>(conformance))
         SGM.getWitnessTable(conformance);
