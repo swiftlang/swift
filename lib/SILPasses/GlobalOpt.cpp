@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "globalopt"
 #include "swift/Basic/DemangleWrappers.h"
 #include "swift/SIL/CFG.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILAnalysis/ColdBlockInfo.h"
 #include "swift/SILAnalysis/DominanceAnalysis.h"
@@ -49,7 +50,20 @@ class SILGlobalOpt {
 
   // Map each global initializer to a list of call sites.
   typedef SmallVector<ApplyInst *, 4> GlobalInitCalls;
+  typedef SmallVector<LoadInst *, 4> GlobalLoads;
   llvm::MapVector<SILFunction*, GlobalInitCalls> GlobalInitCallMap;
+
+  // The following mappings are used if this is a compilation
+  // in scripting mode and global variables are accessed without
+  // addressors.
+
+  // Map each global let variable to a set of loads from it.
+  llvm::MapVector<SILGlobalVariable*, GlobalLoads> GlobalLoadMap;
+  // Map each global let variable to the store instruction which initializes it.
+  llvm::MapVector<SILGlobalVariable*, StoreInst *> GlobalVarStore;
+  // Variables in this set should not be processed by this pass
+  // anymore.
+  llvm::SmallPtrSet<SILGlobalVariable*, 16> GlobalVarSkipProcessing;
 
   // Mark any block that this pass has determined to be inside a loop.
   llvm::DenseSet<SILBasicBlock*> LoopBlocks;
@@ -70,6 +84,10 @@ public:
 
 protected:
   void collectGlobalInitCall(ApplyInst *AI);
+  void collectGlobalLoad(LoadInst *SI, SILGlobalVariable *SILG);
+  void collectGlobalStore(StoreInst *SI, SILGlobalVariable *SILG);
+  void collectGlobalAccess(GlobalAddrInst *GAI);
+  SILGlobalVariable *getVariableOfGlobalInit(SILFunction *AddrF);
   bool isInLoop(SILBasicBlock *CurBB);
   void placeInitializers(SILFunction *InitF, ArrayRef<ApplyInst*> Calls);
 
@@ -79,6 +97,7 @@ protected:
   // Set the static initializer and remove "once" from addressor if a global can
   // be statically initialized.
   void optimizeInitializer(SILFunction *AddrF, GlobalInitCalls &Calls);
+  void optimizeGlobalAccess(SILGlobalVariable *SILG, StoreInst *SI);
   // Replace loads from a global variable by the known value.
   void replaceLoadsByKnownValue(BuiltinInst *CallToOnce,
                                 SILFunction *AddrF,
@@ -86,6 +105,49 @@ protected:
                                 SILGlobalVariable *SILG,
                                 GlobalInitCalls &Calls);
 };
+
+/// Helper class to copy only a set of SIL instructions providing in the
+/// constructor.
+class InstructionsCloner : public SILClonerWithScopes<InstructionsCloner> {
+  friend class SILVisitor<InstructionsCloner>;
+  friend class SILCloner<InstructionsCloner>;
+
+  SmallVectorImpl<SILInstruction *> &Insns;
+
+  protected:
+  SILBasicBlock *FromBB, *DestBB;
+
+  public:
+  // A map of old to new available values.
+  SmallVector<std::pair<ValueBase *, SILValue>, 16> AvailVals;
+
+  InstructionsCloner(SILFunction &F,
+                     SmallVectorImpl<SILInstruction *> &Insns,
+                     SILBasicBlock *Dest = nullptr)
+    : SILClonerWithScopes(F), Insns(Insns), FromBB(nullptr), DestBB(Dest) {}
+
+  void process(SILInstruction *I) { visit(I); }
+
+  SILBasicBlock *remapBasicBlock(SILBasicBlock *BB) { return BB; }
+
+  SILValue remapValue(SILValue Value) {
+    return SILCloner<InstructionsCloner>::remapValue(Value);
+  }
+
+  void postProcess(SILInstruction *Orig, SILInstruction *Cloned) {
+    DestBB->getInstList().push_back(Cloned);
+    SILClonerWithScopes<InstructionsCloner>::postProcess(Orig, Cloned);
+    AvailVals.push_back(std::make_pair(Orig, SILValue(Cloned, 0)));
+  }
+
+  // Clone all instructions from Insns into DestBB
+  void clone() {
+    for (auto I : Insns) {
+      process(I);
+    }
+  }
+};
+
 } // namespace
 
 /// If this is a call to a global initializer, map it.
@@ -99,6 +161,164 @@ void SILGlobalOpt::collectGlobalInitCall(ApplyInst *AI) {
     return;
 
   GlobalInitCallMap[F].push_back(AI);
+}
+
+/// If this is a read from a global let variable, map it.
+void SILGlobalOpt::collectGlobalLoad(LoadInst *LI, SILGlobalVariable *SILG) {
+  assert(SILG);
+  //assert(SILG->isLet());
+
+  // This is read from a let variable.
+  // Figure out if the value of this variable is statitcally known.
+  GlobalLoadMap[SILG].push_back(LI);
+}
+
+/// Check if a given type is a simple type, i.e. a builtin
+/// integer or floating point type.
+static bool isSimpleType(SILType Ty, SILModule& Module) {
+  auto *NominalTy = Ty.getNominalOrBoundGenericNominal();
+
+  if (!NominalTy)
+    return false;
+
+  ASTContext &Ctx = Module.getASTContext();
+
+  if (dyn_cast<BuiltinIntegerType>(Ty.getSwiftRValueType()) ||
+      NominalTy == Ctx.getUIntDecl() ||
+      NominalTy == Ctx.getIntDecl() ||
+      NominalTy == Ctx.getFloatDecl() ||
+      NominalTy == Ctx.getDoubleDecl())
+    return true;
+
+  return false;
+}
+
+/// Check if the value of V is computed by means of a simple initialization.
+/// Store the actual SILValue into Val and the reversed list of instructions
+/// initializing it in Insns.
+/// The check is performed by recursively walking the computation of the
+/// SIL value being analyzed.
+static bool analyzeStaticInitializer(SILValue V,
+                                     SILInstruction *&Val,
+                                     SmallVectorImpl<SILInstruction *> &Insns) {
+  Val = nullptr;
+  auto I = dyn_cast<SILInstruction>(V);
+  if (!I)
+    return false;
+
+  while (true) {
+    Insns.push_back(I);
+    if (auto *SI = dyn_cast<StructInst>(I)) {
+      Val = SI;
+      if (!isSimpleType(SI->getType(), I->getModule()))
+        return false;
+      I = dyn_cast<SILInstruction>(SI->getOperand(0).getDef());
+    } else {
+      if (auto *bi = dyn_cast<BuiltinInst>(I)) {
+        switch (bi->getBuiltinInfo().ID) {
+        case BuiltinValueKind::FPTrunc:
+          if (auto *LI = dyn_cast<LiteralInst>(bi->getArguments()[0])) {
+            I = LI;
+            continue;
+          }
+          break;
+        default:
+          return false;
+        }
+      }
+
+      if (I->getKind() == ValueKind::IntegerLiteralInst
+          || I->getKind() == ValueKind::FloatLiteralInst
+          || I->getKind() == ValueKind::StringLiteralInst)
+        return true;
+      return false;
+    }
+  }
+  return false;
+}
+
+/// Generate accessor from the initialization code whose
+/// result is stored by a given store instruction.
+static SILFunction *genGetterFromInit(StoreInst *Store,
+                                        SILGlobalVariable *SILG) {
+  auto *varDecl = SILG->getDecl();
+  llvm::SmallString<20> accessorBuffer;
+  llvm::raw_svector_ostream accessorStream(accessorBuffer);
+  Mangle::Mangler accessorMangler(accessorStream);
+  accessorMangler.mangleGlobalGetterEntity(varDecl);
+
+  // Check if an accessor was generated already.
+  if (auto *F = Store->getModule().lookUpFunction(accessorStream.str()))
+    return F;
+
+  // Find the code that performs the initialization first.
+  // Recursively walk the SIL value being assigned to the SILG.
+
+  auto V = Store->getSrc();
+
+  SILInstruction *InitValue = nullptr;
+  SmallVector<SILInstruction *, 8> ReverseInsns;
+  SmallVector<SILInstruction *, 8> Insns;
+  ReverseInsns.push_back(Store);
+  ReverseInsns.push_back(dyn_cast<SILInstruction>(Store->getDest()));
+  if (!analyzeStaticInitializer(V, InitValue, ReverseInsns))
+    return nullptr;
+
+  // Produce a correct order of instructions.
+  while (!ReverseInsns.empty()) {
+    Insns.push_back(ReverseInsns.pop_back_val());
+  }
+
+  // Generate a getter from the global init function without side-effects.
+  auto refType = varDecl->getType().getCanonicalTypeOrNull();
+  // Function takes no arguments and returns refType
+  SILResultInfo ResultInfo(refType, ResultConvention::Owned);
+  SILFunctionType::ExtInfo EInfo;
+  EInfo = EInfo.withRepresentation(SILFunctionType::Representation::Thin);
+  auto LoweredType = SILFunctionType::get(nullptr, EInfo,
+      ParameterConvention::Direct_Owned, { }, ResultInfo, None,
+      Store->getModule().getASTContext());
+  auto *AccessorF = Store->getModule().getOrCreateFunction(Store->getLoc(),
+      accessorStream.str(), SILLinkage::PrivateExternal, LoweredType,
+      IsBare_t::IsBare, IsTransparent_t::IsNotTransparent,
+      IsFragile_t::IsFragile);
+
+  auto *EntryBB = AccessorF->createBasicBlock();
+  // Copy instructions into AccessorF
+  InstructionsCloner Cloner(*Store->getFunction(), Insns, EntryBB);
+  Cloner.clone();
+  AccessorF->setInlined();
+
+  // Find the store instruction
+  auto BB = EntryBB;
+  SILValue Val;
+  for (auto &I : *BB) {
+    if (StoreInst *SI = dyn_cast<StoreInst>(&I)) {
+      Val = SI->getSrc();
+      SILBuilderWithScope<1> B(SI);
+      B.createReturn(SI->getLoc(), Val);
+      eraseUsesOfInstruction(SI);
+      recursivelyDeleteTriviallyDeadInstructions(SI, true);
+      //recursivelyDeleteTriviallyDeadInstructions(Store, true);
+      return AccessorF;
+    }
+  }
+
+  Store->getModule().getFunctionList().addNodeToList(AccessorF);
+  return AccessorF;
+}
+
+/// If this is a read from a global let variable, map it.
+void SILGlobalOpt::collectGlobalStore(StoreInst *SI, SILGlobalVariable *SILG) {
+
+  if (GlobalVarStore.count(SILG)) {
+    // There is more then one assignment to a given global variable.
+    // Therefore we don't know its value.
+    GlobalVarSkipProcessing.insert(SILG);
+  }
+
+  // Figure out if the value of this variable is statically known.
+  GlobalVarStore[SILG] = SI;
 }
 
 /// Return the callee of a once call.
@@ -287,7 +507,7 @@ void SILGlobalOpt::placeInitializers(SILFunction *InitF,
 }
 
 /// Create an accessor function from the intializer function.
-static SILFunction *genAccessorFromInit(SILFunction *InitF, VarDecl *varDecl) {
+static SILFunction *genGetterFromInit(SILFunction *InitF, VarDecl *varDecl) {
   // Generate a getter from the global init function without side-effects.
   llvm::SmallString<20> accessorBuffer;
   llvm::raw_svector_ostream accessorStream(accessorBuffer);
@@ -336,8 +556,6 @@ static SILFunction *genAccessorFromInit(SILFunction *InitF, VarDecl *varDecl) {
   return AccessorF;
 }
 
-
-
 /// Find the globalinit_func by analyzing the body of the addressor.
 static SILFunction *findInitializer(SILModule *Module, SILFunction *AddrF,
                                     BuiltinInst *&CallToOnce) {
@@ -384,6 +602,8 @@ replaceLoadsByKnownValue(BuiltinInst *CallToOnce, SILFunction *AddrF,
                          GlobalInitCalls &Calls) {
   assert(isAssignedOnlyOnceInInitializer(SILG) &&
          "The value of the initializer should be known at compile-time");
+  assert(SILG->getDecl() &&
+         "Decl corresponding to the global variable should be known");
   eraseUsesOfInstruction(CallToOnce);
   recursivelyDeleteTriviallyDeadInstructions(CallToOnce, true);
 
@@ -401,7 +621,7 @@ replaceLoadsByKnownValue(BuiltinInst *CallToOnce, SILFunction *AddrF,
   }
 
   // Generate a getter from InitF which returns the value of the global.
-  auto *AccessorF = genAccessorFromInit(InitF, SILG->getDecl());
+  auto *AccessorF = genGetterFromInit(InitF, SILG->getDecl());
 
   // Replace all calls of addressor by calls of accessor.
   for (int i = 0, e = Calls.size(); i < e; ++i) {
@@ -489,7 +709,7 @@ void SILGlobalOpt::optimizeInitializer(SILFunction *AddrF, GlobalInitCalls &Call
         SILG->getName() << '\n');
 
   // Remove "once" call from the addressor.
-  if (!isAssignedOnlyOnceInInitializer(SILG)) {
+  if (!isAssignedOnlyOnceInInitializer(SILG) || !SILG->getDecl()) {
     CallToOnce->eraseFromParent();
     SILG->setInitializer(InitF);
     HasChanged = true;
@@ -498,6 +718,159 @@ void SILGlobalOpt::optimizeInitializer(SILFunction *AddrF, GlobalInitCalls &Call
 
   replaceLoadsByKnownValue(CallToOnce, AddrF, InitF, SILG, Calls);
   HasChanged = true;
+}
+
+SILGlobalVariable *SILGlobalOpt::getVariableOfGlobalInit(SILFunction *AddrF) {
+  if (AddrF->isGlobalInit()) {
+    // If the addressor contains a single "once" call, it calls globalinit_func,
+    // and the globalinit_func is called by "once" from a single location,
+    // continue; otherwise bail.
+    BuiltinInst *CallToOnce;
+    auto *InitF = findInitializer(Module, AddrF, CallToOnce);
+
+    if (!InitF || !InitF->getName().startswith("globalinit_")
+        || InitializerCount[InitF] > 1)
+      return nullptr;
+
+    // If the globalinit_func is trivial, continue; otherwise bail.
+    auto *SILG = SILGlobalVariable::getVariableOfStaticInitializer(InitF);
+    if (!SILG || !SILG->isDefinition())
+      return nullptr;
+
+    return SILG;
+  }
+  return nullptr;
+}
+
+static bool canBeChangedExternally(SILGlobalVariable *SILG) {
+  // Use access specifiers from the declarations,
+  // if possible.
+  if (auto *Decl = SILG->getDecl()) {
+    auto Access = Decl->getFormalAccess();
+    if (Access == Accessibility::Private)
+      return false;
+    if (Access == Accessibility::Internal &&
+        SILG->getModule().isWholeModule())
+      return false;
+    return true;
+  }
+
+  if (SILG->getLinkage() == SILLinkage::Private)
+    return false;
+
+  if (SILG->getLinkage() == SILLinkage::Hidden
+      && SILG->getModule().isWholeModule()) {
+    return false;
+  }
+
+  return true;
+}
+
+/// If this is a read from a global let variable, map it.
+void SILGlobalOpt::collectGlobalAccess(GlobalAddrInst *GAI) {
+  auto *SILG = GAI->getReferencedGlobal();
+  if (!SILG)
+    return;
+
+  if (!SILG->isLet()) {
+    // We cannot determine the value for global variables which could be
+    // changed externally at run-time.
+    if (canBeChangedExternally(SILG))
+      return;
+  }
+
+  if (GlobalVarSkipProcessing.count(SILG))
+    return;
+
+  if (!isSimpleType(SILG->getLoweredType(), *Module)) {
+    GlobalVarSkipProcessing.insert(SILG);
+    return;
+  }
+
+  // Ignore any accesses inside addressors for SILG
+  auto *F = GAI->getFunction();
+  auto GlobalVar = getVariableOfGlobalInit(F);
+  if (GlobalVar == SILG)
+    return;
+
+  if (!SILG->getDecl())
+    return;
+
+  SILValue V = GAI;
+  for (auto Use : getNonDebugUses(V)) {
+    if (auto *SI = dyn_cast<StoreInst>(Use->getUser())) {
+      if (SI->getDest() == GAI)
+        collectGlobalStore(SI, SILG);
+      continue;
+    }
+
+    if (auto *LI = dyn_cast<LoadInst>(Use->getUser())) {
+      if (LI->getOperand() == GAI)
+        collectGlobalLoad(LI, SILG);
+      continue;
+    }
+
+    // %1 = struct_element_addr %x, field
+    // load %1
+    //->
+    // %3 = apply accessor
+    // struct_extract %3
+    if (auto *SEAI = dyn_cast<StructElementAddrInst>(Use->getUser())) {
+      if (SEAI->getOperand() == GAI && SEAI->hasOneUse())
+        if (auto *LI = dyn_cast<LoadInst>(SEAI->use_begin()->getUser()))
+          collectGlobalLoad(LI, SILG);
+      continue;
+    }
+
+    // This global is not initialized by a simple
+    // constant value at this moment.
+    GlobalVarSkipProcessing.insert(SILG);
+    break;
+  }
+}
+
+/// Optimize access to the global variable, which is known
+/// to have a constant value. Replace all loads from the
+/// global address by invocations of an accessor that returns
+/// the value of this variable.
+void SILGlobalOpt::optimizeGlobalAccess(SILGlobalVariable *SILG,
+                                        StoreInst *SI) {
+  DEBUG(llvm::dbgs() << "GlobalOpt: use static initializer for " <<
+        SILG->getName() << '\n');
+
+  if (GlobalVarSkipProcessing.count(SILG))
+    return;
+
+  if (//!isAssignedOnlyOnceInInitializer(SILG) ||
+      !SILG->getDecl()) {
+    return;
+  }
+
+  if (!GlobalLoadMap.count(SILG))
+    return;
+
+  // Generate accessor only if there are any loads from this variable.
+  SILFunction *AccessorF = genGetterFromInit(SI, SILG);
+  if (!AccessorF)
+    return;
+
+  // Iterate over all loads and replace them by values.
+  // TODO: In principle, we could invoke the accessor only once
+  // inside each function that loads from the global. This
+  // invocation should happen at the common dominator of all
+  // loads inside this function.
+  for (auto *Load: GlobalLoadMap[SILG]) {
+    SILBuilderWithScope<1> B(Load);
+    auto *AccessorRef = B.createFunctionRef(Load->getLoc(), AccessorF);
+    SILInstruction *Value = B.createApply(Load->getLoc(), AccessorRef, {});
+    if (auto *SEAI = dyn_cast<StructElementAddrInst>(Load->getOperand())) {
+      Value = B.createStructExtract(Load->getLoc(), Value, SEAI->getField());
+    }
+    Load->replaceAllUsesWith(Value);
+    Load->eraseFromParent();
+    HasChanged = true;
+  }
+
 }
 
 bool SILGlobalOpt::run() {
@@ -517,13 +890,21 @@ bool SILGlobalOpt::run() {
         } else if (ApplyInst *AI = dyn_cast<ApplyInst>(&I)) {
           if (!IsCold)
             collectGlobalInitCall(AI);
+        } else if (GlobalAddrInst *GAI = dyn_cast<GlobalAddrInst>(&I)) {
+            collectGlobalAccess(GAI);
         }
     }
   }
+
   for (auto &InitCalls : GlobalInitCallMap) {
     // Optimize the addressors if possible.
     optimizeInitializer(InitCalls.first, InitCalls.second);
     placeInitializers(InitCalls.first, InitCalls.second);
+  }
+
+  for (auto &Init : GlobalVarStore) {
+    // Optimize the access to globals if possible.
+    optimizeGlobalAccess(Init.first, Init.second);
   }
 
   return HasChanged;

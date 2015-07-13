@@ -84,11 +84,21 @@ class C {
  static func foo() {}
 }
 
+// CHECK-LABEL: sil [noinline] @_TF25globalopt_let_propagation15test_let_doubleFT_Sd
+// CHECK: bb0:
+// CHECK-NEXT: float_literal
+// CHECK-NEXT: struct
+// CHECK: return
 @inline(never)
 public func test_let_double() -> Double {
   return PI + 1.0
 }
 
+// CHECK-LABEL: sil [noinline] @_TF25globalopt_let_propagation12test_let_intFT_Si
+// CHECK: bb0:
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: struct
+// CHECK: return
 @inline(never)
 public func test_let_int() -> Int {
   return I + 1
@@ -99,11 +109,21 @@ public func test_let_string() -> String {
   return S
 }
 
+// CHECK-LABEL: sil [noinline] @_TF25globalopt_let_propagation23test_let_double_complexFT_Sd
+// CHECK: bb0:
+// CHECK-NEXT: float_literal
+// CHECK-NEXT: struct
+// CHECK: return
 @inline(never)
 public func test_let_double_complex() -> Double {
   return PI + ONE + PROP1
 }
 
+// CHECK-LABEL: sil [noinline] @_TF25globalopt_let_propagation20test_let_int_complexFT_Si
+// CHECK: bb0:
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: struct
+// CHECK: return
 @inline(never)
 public func test_let_int_complex() -> Int {
   return I + J + VOLUME1 + VOLUME2 + VOLUME3 + PROP2
@@ -221,4 +241,3 @@ public func test_var_double() -> Double {
 public func test_var_int() -> Int {
   return VI + 1
 }
-
