@@ -28,9 +28,6 @@ enum RT_Kind {
   // void swift_retain_noresult(SwiftHeapObject *object)
   RT_RetainNoResult,
 
-  // (i64,i64,i64) swift_retainAndReturnThree(SwiftHeapObject *obj, i64,i64,i64)
-  RT_RetainAndReturnThree,
-
   /// void swift_release(SwiftHeapObject *object)
   RT_Release,
 
@@ -81,7 +78,6 @@ inline RT_Kind classifyInstruction(const llvm::Instruction &I) {
     .Case("swift_retain_noresult", RT_RetainNoResult)
     .Case("swift_release", RT_Release)
     .Case("swift_allocObject", RT_AllocObject)
-    .Case("swift_retainAndReturnThree", RT_RetainAndReturnThree)
     .Case("objc_release", RT_ObjCRelease)
     .Case("objc_retain", RT_ObjCRetain)
     .Case("swift_bridgeObjectRetain", RT_BridgeRetain)

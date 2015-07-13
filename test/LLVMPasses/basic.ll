@@ -16,7 +16,6 @@ declare %swift.refcounted* @swift_allocObject(%swift.heapmetadata* , i64, i64) n
 declare void @swift_release(%swift.refcounted* nocapture)
 declare %swift.refcounted* @swift_retain(%swift.refcounted* ) nounwind
 declare void @swift_retain_noresult(%swift.refcounted* nocapture) nounwind
-declare { i64, i64, i64 } @swift_retainAndReturnThree(%swift.refcounted* , i64, i64 , i64 )
 declare void @swift_fixLifetime(%swift.refcounted* ) nounwind
 declare %swift.bridge* @swift_bridgeObjectRetain(%swift.bridge*)
 declare void @swift_bridgeObjectRelease(%swift.bridge*)
@@ -40,35 +39,6 @@ entry:
   tail call void @swift_bridgeObjectRelease(%swift.bridge* %v)
   call void @user(%swift.refcounted* %0) nounwind
   ret void
-}
-
-; retain3_test2 - This shows a case where something else (eg inlining an already
-; optimized function) has given us a swift_retainAndReturnThree that we need to
-; destructure and reassemble.
-
-
-; CHECK-LABEL: @retain3_test2
-; CHECK: insertvalue
-; CHECK-NEXT: insertvalue
-; CHECK-NEXT: insertvalue
-; CHECK-NEXT: call void @swift_retain_noresult(%swift.refcounted* %2), !dbg
-; CHECK-NEXT: ret
-
-define { i8*, i64, %swift.refcounted* } @retain3_test2(i8*, i64, %swift.refcounted*) nounwind {
-entry:
-  %x = ptrtoint i8* %0 to i64
-  %z = ptrtoint %swift.refcounted* %2 to i64
-  
-  %3 = call { i64, i64, i64 } @swift_retainAndReturnThree(%swift.refcounted* %2, i64 %x, i64 %1, i64 %z), !dbg !0
-  %a = extractvalue { i64, i64, i64 } %3, 0
-  %b = extractvalue { i64, i64, i64 } %3, 1
-  %c = extractvalue { i64, i64, i64 } %3, 2
-  %a1 = inttoptr i64 %a to i8*
-  %c1 = inttoptr i64 %c to %swift.refcounted*
-  %4 = insertvalue { i8*, i64, %swift.refcounted* } undef, i8* %a1, 0
-  %5 = insertvalue { i8*, i64, %swift.refcounted* } %4, i64 %b, 1
-  %6 = insertvalue { i8*, i64, %swift.refcounted* } %5, %swift.refcounted* %c1, 2
-  ret { i8*, i64, %swift.refcounted* } %6
 }
 
 ; retain_motion1 - This shows motion of a retain across operations that can't

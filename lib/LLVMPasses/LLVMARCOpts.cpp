@@ -55,18 +55,9 @@ STATISTIC(NumAllocateReleasePairs,
           "Number of swift allocate/release pairs eliminated");
 STATISTIC(NumStoreOnlyObjectsEliminated,
           "Number of swift stored-only objects eliminated");
-STATISTIC(NumReturnThreeTailCallsFormed,
-          "Number of swift_retainAndReturnThree tail calls formed");
 
 llvm::cl::opt<bool>
 DisableARCOpts("disable-llvm-arc-opts", llvm::cl::init(false));
-
-// FIXME: swift_retainAndReturnThree optimization disabled because of:
-// <rdar://problem/21665665> ARC optimizer inserts calls to
-// swift_retainAndReturnThree, which does not exist
-llvm::cl::opt<bool>
-DisableARCReturn3Opt(
-    "disable-llvm-arc-return3-opt", llvm::cl::init(true));
 
 //===----------------------------------------------------------------------===//
 //                            Utility Functions
@@ -84,13 +75,13 @@ class ARCEntryPointBuilder {
   // The constant cache.
   NullablePtr<Constant> Retain;
   NullablePtr<Constant> RetainNoResult;
-  NullablePtr<Constant> RetainAndReturnThree;
 
   // The type cache.
   NullablePtr<Type> ObjectPtrTy;
 
 public:
-  ARCEntryPointBuilder(Function &F) : B(F.begin()), Retain(), RetainNoResult(), RetainAndReturnThree(), ObjectPtrTy() {}
+  ARCEntryPointBuilder(Function &F) : B(F.begin()), Retain(), RetainNoResult(),
+                                      ObjectPtrTy() {}
   ~ARCEntryPointBuilder() = default;
   ARCEntryPointBuilder(ARCEntryPointBuilder &&) = delete;
   ARCEntryPointBuilder(const ARCEntryPointBuilder &) = delete;
@@ -129,25 +120,6 @@ public:
     return CI;
   }
 
-  CallInst *createRetainAndReturnThree(Value *HeapObject, Value *I0, Value *I1,
-                                       Value *I2) {
-    // Change to support all architectures.
-    Type *Int64Ty = B.getInt64Ty();
-
-    if (isa<PointerType>(I0->getType()))
-      I0 = B.CreatePtrToInt(I0, Int64Ty);
-    if (isa<PointerType>(I1->getType()))
-      I1 = B.CreatePtrToInt(I1, Int64Ty);
-    if (isa<PointerType>(I2->getType()))
-      I2 = B.CreatePtrToInt(I2, Int64Ty);
-
-    HeapObject = B.CreatePointerCast(HeapObject, getObjectPtrTy());
-    auto *CI =
-      B.CreateCall(getRetainAndReturnThree(), {HeapObject, I0, I1, I2});
-    CI->setTailCall(true);
-    return CI;
-  }
-
 private:
   Module &getModule() {
     return *B.GetInsertBlock()->getModule();
@@ -182,26 +154,6 @@ private:
     return RetainNoResult.get();
   }
 
-  /// getRetainAndReturnThree - Return a callable function for
-  /// swift_retainAndReturnThree.
-  Constant *getRetainAndReturnThree() {
-    if (RetainAndReturnThree)
-      return RetainAndReturnThree.get();
-
-    auto *ObjectPtrTy = getObjectPtrTy();
-    auto &M = getModule();
-    auto AttrList = AttributeSet::get(
-        M.getContext(), AttributeSet::FunctionIndex, Attribute::NoUnwind);
-
-    Type *Int64Ty = Type::getInt64Ty(M.getContext());
-    Type *RetTy = StructType::get(Int64Ty, Int64Ty, Int64Ty, nullptr);
-
-    RetainAndReturnThree = M.getOrInsertFunction(
-        "swift_retainAndReturnThree", AttrList, RetTy, ObjectPtrTy,
-        Int64Ty, Int64Ty, Int64Ty, nullptr);
-    return RetainAndReturnThree.get();
-  }
-
   Type *getObjectPtrTy() {
     if (ObjectPtrTy)
       return ObjectPtrTy.get();
@@ -217,53 +169,6 @@ private:
 //===----------------------------------------------------------------------===//
 //                          Input Function Canonicalizer
 //===----------------------------------------------------------------------===//
-
-/// updateCallValueUses - We have something like this:
-///   %z = ptrtoint %swift.refcounted* %2 to i64
-///   %3 = call { i64, i64, i64 }
-///           @swift_retainAndReturnThree(..., i64 %x, i64 %1, i64 %z)
-///   %a = extractvalue { i64, i64, i64 } %3, 0
-///   %b = extractvalue { i64, i64, i64 } %3, 1
-///   %c = extractvalue { i64, i64, i64 } %3, 2
-///   %a1 = inttoptr i64 %a to i8*
-///   %c1 = inttoptr i64 %c to %swift.refcounted*
-///
-/// This function is invoked three times (once each for the three arg/retvalues
-/// that need to be replaced) and tries a best effort to patch up things to
-/// avoid all the casts.  "Inst" coming into here is the call to
-/// swift_retainAndReturnThree or to an extract that returns all three words.
-///
-static void updateCallValueUses(CallInst &CI, unsigned EltNo) {
-  Value *Op = CI.getArgOperand(1+EltNo);
-  for (auto UI = CI.user_begin(), E = CI.user_end(); UI != E; ++UI) {
-    ExtractValueInst *Extract = dyn_cast<ExtractValueInst>(*UI);
-
-    // Make sure this extract is relevant to EltNo.
-    if (Extract == 0 || Extract->getNumIndices() != 1 ||
-        Extract->getIndices()[0] != EltNo)
-      continue;
-
-    // Both the input and result should be i64's.
-    assert(Extract->getType() == Op->getType() && "Should have i64's here");
-
-    for (auto UI2 = Extract->user_begin(), E = Extract->user_end(); UI2 != E; ){
-      IntToPtrInst *ExtractUser = dyn_cast<IntToPtrInst>(*UI2++);
-      PtrToIntInst *OpCast = dyn_cast<PtrToIntInst>(Op);
-      if (ExtractUser && OpCast &&
-          OpCast->getOperand(0)->getType() == ExtractUser->getType()) {
-        ExtractUser->replaceAllUsesWith(OpCast->getOperand(0));
-        ExtractUser->eraseFromParent();
-      }
-    }
-
-    // Stitch up anything other than the ptrtoint -> inttoptr.
-    Extract->replaceAllUsesWith(Op);
-
-    // Zap the dead ExtractValue's.
-    RecursivelyDeleteTriviallyDeadInstructions(Extract);
-    return;
-  }
-}
 
 /// canonicalizeInputFunction - Functions like swift_retain return an
 /// argument as a low-level performance optimization.  This makes it difficult
@@ -329,41 +234,6 @@ static bool canonicalizeInputFunction(Function &F, ARCEntryPointBuilder &B) {
       }
       break;
     }
-    case RT_RetainAndReturnThree: {
-      // (a,b,c) = swift_retainAndReturnThree(obj, d,e,f)
-      // -> swift_retain_noresult(obj)
-      // -> (a,b,c) = (d,e,f)
-      //
-      // The important case of doing this is when this function has been inlined
-      // into another function.  In this case, there is no return anymore.
-      CallInst &CI = cast<CallInst>(Inst);
-
-      B.setInsertPoint(&CI);
-      I = B.createRetainNoResult(CI.getArgOperand(0));
-
-      // See if we can eliminate all of the extractvalue's that are hanging off
-      // the swift_retainAndReturnThree.  This is important to eliminate casts
-      // that will block optimizations and generally results in better IR.  Note
-      // that this is just a best-effort attempt though.
-      updateCallValueUses(CI, 0);
-      updateCallValueUses(CI, 1);
-      updateCallValueUses(CI, 2);
-
-      // If our best-effort wasn't good enough, fall back to generating terrible
-      // but correct code.
-      if (!CI.use_empty()) {
-        Value *V = UndefValue::get(CI.getType());
-        V = B.createInsertValue(V, CI.getArgOperand(1), 0U);
-        V = B.createInsertValue(V, CI.getArgOperand(2), 1U);
-        V = B.createInsertValue(V, CI.getArgOperand(3), 2U);
-        CI.replaceAllUsesWith(V);
-      }
-
-      CI.eraseFromParent();
-      Changed = true;
-      break;
-    }
-
     case RT_ObjCRelease: {
       CallInst &CI = cast<CallInst>(Inst);
       Value *ArgVal = CI.getArgOperand(0);
@@ -436,7 +306,6 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB) {
 
     switch (classifyInstruction(*BBI)) {
     case RT_Retain: // Canonicalized away, shouldn't exist.
-    case RT_RetainAndReturnThree:
       llvm_unreachable("these entrypoints should be canonicalized away");
     case RT_NoMemoryAccessed:
       // Skip over random instructions that don't touch memory.  They don't need
@@ -574,7 +443,6 @@ static bool performLocalRetainMotion(CallInst &Retain, BasicBlock &BB) {
     // of the same pointer.
     switch (classifyInstruction(CurInst)) {
     case RT_Retain: // Canonicalized away, shouldn't exist.
-    case RT_RetainAndReturnThree:
       llvm_unreachable("these entrypoints should be canonicalized away");
     case RT_NoMemoryAccessed:
     case RT_AllocObject:
@@ -721,7 +589,6 @@ static DtorKind analyzeDestructor(Value *P) {
 
       case RT_Retain:                // x = swift_retain(y)
       case RT_BridgeRetain:          // x = swift_bridgeRetain(y)
-      case RT_RetainAndReturnThree:  // swift_retainAndReturnThree(obj,a,b,c)
       case RT_RetainNoResult: {      // swift_retain_noresult(obj)
 
         // Ignore retains of the "self" object, no ressurection is possible.
@@ -817,7 +684,6 @@ static bool performStoreOnlyObjectElimination(CallInst &Allocation,
     // Okay, this is the first time we've seen this instruction, proceed.
     switch (classifyInstruction(*I)) {
     case RT_Retain:
-    case RT_RetainAndReturnThree:
       llvm_unreachable("These should be canonicalized away");
 
     case RT_AllocObject:
@@ -1015,132 +881,6 @@ bool SwiftARCOpt::runOnFunction(Function &F) {
   return Changed;
 }
 
-
-
-//===----------------------------------------------------------------------===//
-//                      Return Argument Optimizer
-//===----------------------------------------------------------------------===//
-
-/// optimizeReturn3 - Look to see if we can optimize "ret (a,b,c)" - where one
-/// of the three values was retained right before the return, into a
-/// swift_retainAndReturnThree call.  This is particularly common when returning
-/// a string or array slice.
-static bool optimizeReturn3(ReturnInst *TheReturn, ARCEntryPointBuilder &B) {
-  if (DisableARCReturn3Opt)
-    return false;
-
-  // Ignore ret void.
-  if (TheReturn->getNumOperands() == 0) return false;
-
-  // See if this is a return of three things.
-  Value *RetVal = TheReturn->getOperand(0);
-  StructType *RetSTy = dyn_cast<StructType>(RetVal->getType());
-  if (RetSTy == 0 || RetSTy->getNumElements() != 3) return false;
-
-  // See if we can find scalars that feed into the return instruction.  If not,
-  // bail out.
-  Value *RetVals[3];
-  for (unsigned i = 0; i != 3; ++i) {
-    RetVals[i] = FindInsertedValue(RetVal, i);
-    if (RetVals[i] == 0) return false;
-
-    // If the scalar isn't int64 or pointer type, we can't transform it.
-    if (!isa<PointerType>(RetVals[i]->getType()) &&
-        !RetVals[i]->getType()->isIntegerTy(64))
-      return false;
-  }
-
-  // The ARC optimizer will push the retains to be immediately before the
-  // return, past any insertvalues.  We tolerate other non-memory instructions
-  // though, in case other optimizations have moved them around.  Collect all
-  // the retain candidates.
-  SmallDenseMap<Value*, CallInst*, 8> RetainedPointers;
-
-  for (BasicBlock::iterator BBI = TheReturn,E = TheReturn->getParent()->begin();
-       BBI != E; ) {
-    Instruction &I = *--BBI;
-
-    switch (classifyInstruction(I)) {
-    case RT_Retain: {
-      // Collect retained pointers.  If a pointer is multiply retained, it
-      // doesn't matter which one we aquire.
-      CallInst &TheRetain = cast<CallInst>(I);
-      RetainedPointers[TheRetain.getArgOperand(0)] = &TheRetain;
-      break;
-    }
-    case RT_NoMemoryAccessed:
-      // If the instruction doesn't access memory, ignore it.
-      break;
-    default:
-      // Otherwise, break out of the for loop.
-      BBI = E;
-      break;
-    }
-  }
-
-  // If there are no retain candidates, we can't form a return3.
-  if (RetainedPointers.empty())
-    return false;
-
-  // Check to see if any of the values returned is retained.  If so, we can form
-  // a return3, which makes the retain a tail call.
-  CallInst *TheRetain = 0;
-  for (unsigned i = 0; i != 3; ++i) {
-    // If the return value is also retained, we found our retain.
-    TheRetain = RetainedPointers[RetVals[i]];
-    if (TheRetain) break;
-
-    // If we're returning the result of a known retain, then we can also handle
-    // it.
-    if (CallInst *CI = dyn_cast<CallInst>(RetVals[i]))
-      if (classifyInstruction(*CI) == RT_Retain) {
-        TheRetain = RetainedPointers[CI->getArgOperand(0)];
-        if (TheRetain) break;
-      }
-  }
-
-  // If none of the three values was retained, we can't form a return3.
-  if (TheRetain == 0)
-    return false;
-
-  // Okay, there is, which means we can perform the transformation.  Get the
-  // argument to swift_retain (the result will be zapped when we zap the call)
-  // as the object to retain (of %swift.refcounted* type).
-  Value *RetainedObject = TheRetain->getArgOperand(0);
-
-  // Insert any new instructions before the return.
-  B.setInsertPoint(TheReturn);
-  CallInst *NR = B.createRetainAndReturnThree(RetainedObject, RetVals[0],
-                                              RetVals[1], RetVals[2]);
-
-  // The return type of the libcall is (i64,i64,i64).  Since at least one of
-  // the pointers is a pointer (we retained it afterall!) we have to unpack
-  // the elements, bitcast at least that one, and then repack to the proper
-  // type expected by the ret instruction.
-  for (unsigned i = 0; i != 3; ++i) {
-    RetVals[i] = B.createExtractValue(NR, i);
-    if (RetVals[i]->getType() != RetSTy->getElementType(i))
-      RetVals[i] = B.createIntToPtr(RetVals[i], RetSTy->getElementType(i));
-  }
-
-  // Repack into an aggregate that can be returned.
-  Value *RV = UndefValue::get(RetVal->getType());
-  for (unsigned i = 0; i != 3; ++i)
-    RV = B.createInsertValue(RV, RetVals[i], i);
-
-  // Return the right thing and zap any instruction tree of inserts that
-  // existed just to feed the old return.
-  TheReturn->setOperand(0, RV);
-  RecursivelyDeleteTriviallyDeadInstructions(RetVal);
-
-  // Zap the retain that we're subsuming and we're done!
-  if (!TheRetain->use_empty())
-    TheRetain->replaceAllUsesWith(RetainedObject);
-  TheRetain->eraseFromParent();
-  ++NumReturnThreeTailCallsFormed;
-  return true;
-}
-
 //===----------------------------------------------------------------------===//
 //                        SwiftARCExpandPass Pass
 //===----------------------------------------------------------------------===//
@@ -1193,7 +933,6 @@ bool SwiftARCExpandPass::runOnFunction(Function &F) {
         continue;
       case RT_Retain:
         llvm_unreachable("This should be canonicalized away!");
-      case RT_RetainAndReturnThree:
       case RT_RetainNoResult: {
         Value *ArgVal = cast<CallInst>(Inst).getArgOperand(0);
 
@@ -1304,14 +1043,6 @@ bool SwiftARCExpandPass::runOnFunction(Function &F) {
         Changed = true;
     }
   }
-
-  // Scan through all the returns to see if there are any that can be optimized.
-  // FIXME: swift_retainAndReturnThree runtime call
-  // is currently implemented only on x86_64.
-  // FIXME: optimizeReturn3() implementation assumes 64-bit
-  if (llvm::Triple(F.getParent()->getTargetTriple()).getArchName() == "x86_64")
-    for (ReturnInst *RI : Returns)
-      Changed |= optimizeReturn3(RI, B);
 
   return Changed;
 }
