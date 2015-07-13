@@ -516,7 +516,18 @@ tests.test("MapSequence") {
   expectEqual(expected.count, calls)
 }
 
-//===--- Collections ------------------------------------------------------===//
+tests.test("MapSequence/Passthrough") {
+  let expected = (0..<100).map { OpaqueValue($0) }
+  let base = LoggingSequence(expected)
+  let mapped = base._prext_lazy.map { OpaqueValue(Double($0.value) / 2.0) }
+  CollectionLog.underestimateCount.expectIncrement(base.dynamicType) {
+    _ = mapped.underestimateCount()
+  }
+  // Not exactly passthrough because we wrap the result
+  CollectionLog.generate.expectIncrement(base.dynamicType) {
+    _ = mapped.generate()
+  }
+}
 
 % for traversal in 'Forward', 'Bidirectional', 'RandomAccess':
 tests.test("MapCollection/${traversal}") {
@@ -542,10 +553,43 @@ tests.test("MapCollection/${traversal}") {
   check${traversal}Collection(expected, mapped, resiliencyChecks: .none) {
     $0.value == $1.value
   }
-  
-  expectEqual(expected.count, calls)
+
+  // check${traversal}Collection makes multiple passes over the input,
+  // so we test that each element was transformed *at least* once.
+  expectLE(expected.count, calls)
 }
 %end
+
+tests.test("MapCollection/Passthrough") {
+  let expected = (0..<100).map { OpaqueValue($0) }
+  let base = LoggingCollection(expected)
+  let mapped = base._prext_lazy.map { OpaqueValue(Double($0.value) / 2.0) }
+  
+  let startIndex = CollectionLog.startIndex.expectIncrement(base.dynamicType) {
+    mapped.startIndex
+  }
+  let endIndex = CollectionLog.endIndex.expectIncrement(base.dynamicType) {
+    mapped.endIndex
+  }
+  // Not exactly passthrough, because mapping transforms the result
+  CollectionLog.subscriptIndex.expectIncrement(base.dynamicType) {
+    _ = mapped[startIndex]
+  }
+  CollectionLog.isEmpty.expectIncrement(base.dynamicType) {
+    _ = mapped.isEmpty
+  }
+  CollectionLog.first.expectIncrement(base.dynamicType) {
+    _ = mapped.first
+  }
+  CollectionLog.underestimateCount.expectIncrement(base.dynamicType) {
+    _ = mapped.underestimateCount()
+  }
+  // Not exactly passthrough because we wrap the result
+  CollectionLog.generate.expectIncrement(base.dynamicType) {
+    _ = mapped.generate()
+  }
+}
+
 
 //===--- Reverse ----------------------------------------------------------===//
 tests.test("ReverseCollection") {
