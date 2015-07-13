@@ -2289,10 +2289,21 @@ private:
   /// \param allowFreeTypeVariables How to bind free type variables in
   /// the solution.
   ///
-  /// \returns true if an error occurred, false otherwise.
+  /// \returns true if there is no single, complete solution to the system.
   bool solve(SmallVectorImpl<Solution> &solutions,
              FreeTypeVariableBinding allowFreeTypeVariables
                = FreeTypeVariableBinding::Disallow);
+
+  /// \brief Solve the system of constraints.
+  ///
+  /// \param solutions The set of solutions to this system of constraints.
+  ///
+  /// \param allowFreeTypeVariables How to bind free type variables in
+  /// the solution.
+  ///
+  /// \returns true if there are no solutions
+  bool solveRec(SmallVectorImpl<Solution> &solutions,
+             FreeTypeVariableBinding allowFreeTypeVariables);
 
   /// \brief Solve the system of constraints.
   ///

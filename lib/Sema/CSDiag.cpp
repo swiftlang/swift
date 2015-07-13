@@ -3180,7 +3180,7 @@ bool ConstraintSystem::salvage(SmallVectorImpl<Solution> &viable,
     this->solverState = &state;
 
     // Solve the system.
-    solve(viable);
+    solveRec(viable, FreeTypeVariableBinding::Disallow);
 
     // Check whether we have a best solution; this can happen if we found
     // a series of fixes that worked.

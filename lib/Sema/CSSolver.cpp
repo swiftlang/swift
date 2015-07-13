@@ -1020,7 +1020,7 @@ static bool tryTypeVariableBindings(
                        typeVar,
                        type,
                        typeVar->getImpl().getLocator());
-      if (!cs.solve(solutions, allowFreeTypeVariables))
+      if (!cs.solveRec(solutions, allowFreeTypeVariables))
         anySolved = true;
 
       if (tc.getLangOpts().DebugConstraintSolver) {
@@ -1127,31 +1127,31 @@ ConstraintSystem::solveSingle(FreeTypeVariableBinding allowFreeTypeVariables) {
 
 bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
                              FreeTypeVariableBinding allowFreeTypeVariables) {
-  // If there is no solver state, this is the top-level call. Create solver
-  // state and begin recursion.
-  if (!solverState) {
-    // Set up solver state.
-    SolverState state(*this);
-    this->solverState = &state;
+  assert(!solverState && "use solveRec for recursive calls");
+  // Set up solver state.
+  SolverState state(*this);
+  this->solverState = &state;
 
-    // Solve the system.
-    solve(solutions, allowFreeTypeVariables);
+  // Solve the system.
+  solveRec(solutions, allowFreeTypeVariables);
 
-    // If there is more than one viable system, attempt to pick the best
-    // solution.
-    if (solutions.size() > 1) {
-      if (auto best = findBestSolution(solutions, /*minimize=*/false)) {
-        if (*best != 0)
-          solutions[0] = std::move(solutions[*best]);
-        solutions.erase(solutions.begin() + 1, solutions.end());
-      }
+  // If there is more than one viable system, attempt to pick the best
+  // solution.
+  if (solutions.size() > 1) {
+    if (auto best = findBestSolution(solutions, /*minimize=*/false)) {
+      if (*best != 0)
+        solutions[0] = std::move(solutions[*best]);
+      solutions.erase(solutions.begin() + 1, solutions.end());
     }
-
-    // Remove the solver state.
-    this->solverState = nullptr;
-    return solutions.size() != 1;
   }
 
+  // Remove the solver state.
+  this->solverState = nullptr;
+  return solutions.size() != 1;
+}
+
+bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
+                                FreeTypeVariableBinding allowFreeTypeVariables){
   // If we already failed, or simplification fails, we're done.
   if (failedConstraint || simplify()) {
     return true;
@@ -1660,7 +1660,7 @@ bool ConstraintSystem::solveSimplified(
     // Record this as a generated constraint.
     solverState->generatedConstraints.push_back(constraint);
 
-    if (!solve(solutions, allowFreeTypeVariables)) {
+    if (!solveRec(solutions, allowFreeTypeVariables)) {
       firstSolvedConstraint = constraint;
 
       // If we see a tuple-to-tuple conversion that succeeded, we're done.
