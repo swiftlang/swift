@@ -419,7 +419,7 @@ static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
 
   // Solve the system. If the first extension is at least as specialized as the
   // second, we're done.
-  return !cs.solveSingle(FreeTypeVariableBinding::Disallow);
+  return !cs.solveSingle();
 }
 
 /// \brief Determine whether the first declaration is as "specialized" as
