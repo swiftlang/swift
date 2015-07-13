@@ -418,7 +418,9 @@ public:
     if (isa<ProtocolDecl>(theType))
       return;
 
-    for (auto *conformance : theType->getLocalConformances()) {
+    for (auto *conformance : theType->getLocalConformances(
+                               ConformanceLookupKind::All,
+                               nullptr, /*sorted=*/true)) {
       if (conformance->isComplete() &&
           isa<NormalProtocolConformance>(conformance))
         SGM.getWitnessTable(conformance);
@@ -519,7 +521,9 @@ public:
     if (!e->getExtendedType()->isExistentialType()) {
       // Emit witness tables for protocol conformances introduced by the
       // extension.
-      for (auto *conformance : e->getLocalConformances()) {
+      for (auto *conformance : e->getLocalConformances(
+                                 ConformanceLookupKind::All,
+                                 nullptr, /*sorted=*/true)) {
         if (conformance->isComplete() &&
             isa<NormalProtocolConformance>(conformance))
           SGM.getWitnessTable(conformance);

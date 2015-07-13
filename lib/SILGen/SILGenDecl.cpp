@@ -1066,7 +1066,9 @@ void SILGenModule::emitExternalDefinition(Decl *d) {
   case DeclKind::Struct:
   case DeclKind::Class: {
     // Emit witness tables.
-    for (auto c : cast<NominalTypeDecl>(d)->getLocalConformances()) {
+    for (auto c : cast<NominalTypeDecl>(d)->getLocalConformances(
+                    ConformanceLookupKind::All,
+                    nullptr, /*sorted=*/true)) {
       if (Types.protocolRequiresWitnessTable(c->getProtocol()) &&
           c->isComplete() && isa<NormalProtocolConformance>(c))
         emitExternalWitnessTable(c);

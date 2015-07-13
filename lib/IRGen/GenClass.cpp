@@ -871,7 +871,8 @@ namespace {
     /// protocol conformances.
     void visitConformances(DeclContext *dc) {
       for (auto conformance : dc->getLocalConformances(
-                                ConformanceLookupKind::OnlyExplicit)) {
+                                ConformanceLookupKind::OnlyExplicit,
+                                nullptr, /*sorted=*/true)) {
         ProtocolDecl *proto = conformance->getProtocol();
         if (!proto->isObjC())
           continue;

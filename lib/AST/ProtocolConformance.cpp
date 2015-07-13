@@ -1955,6 +1955,42 @@ void ConformanceLookupTable::getAllProtocols(
   // FIXME: sort the protocols in some canonical order?
 }
 
+/// Compare two protocol conformances to place them in some canonical order.
+static int compareProtocolConformances(ProtocolConformance * const *lhsPtr,
+                                       ProtocolConformance * const *rhsPtr) {
+  ProtocolConformance *lhs = *lhsPtr;
+  ProtocolConformance *rhs = *rhsPtr;
+
+  // If the two conformances are normal conformances with locations,
+  // sort by location.
+  if (auto lhsNormal = dyn_cast<NormalProtocolConformance>(lhs)) {
+    if (auto rhsNormal = dyn_cast<NormalProtocolConformance>(rhs)) {
+      if (lhsNormal->getLoc().isValid() && rhsNormal->getLoc().isValid()) {
+        ASTContext &ctx = lhs->getDeclContext()->getASTContext();
+        unsigned lhsBuffer
+          = ctx.SourceMgr.findBufferContainingLoc(lhsNormal->getLoc());
+        unsigned rhsBuffer
+          = ctx.SourceMgr.findBufferContainingLoc(rhsNormal->getLoc());
+
+        // If the buffers are the same, use source location ordering.
+        if (lhsBuffer == rhsBuffer) {
+          return ctx.SourceMgr.isBeforeInBuffer(lhsNormal->getLoc(),
+                                                rhsNormal->getLoc());
+        }
+
+        // Otherwise, order by buffer identifier.
+        return StringRef(ctx.SourceMgr.getIdentifierForBuffer(lhsBuffer))
+                 .compare(ctx.SourceMgr.getIdentifierForBuffer(rhsBuffer));
+      }
+    }
+  }
+
+  // Otherwise, sort by protocol.
+  ProtocolDecl *lhsProto = lhs->getProtocol();
+  ProtocolDecl *rhsProto = rhs->getProtocol();
+  return ProtocolType::compareProtocols(&lhsProto, &rhsProto);
+}
+
 void ConformanceLookupTable::getAllConformances(
        NominalTypeDecl *nominal,
        LazyResolver *resolver,
@@ -1971,39 +2007,10 @@ void ConformanceLookupTable::getAllConformances(
     }
   }
 
+  // If requested, sort the results.
   if (sorted) {
-    // If requested, sort the results.
-    ASTContext &ctx = nominal->getASTContext();
-    std::sort(scratch.begin(), scratch.end(), [&](ProtocolConformance *lhs,
-                                                  ProtocolConformance *rhs) {
-      // If the two conformances are normal conformances with locations,
-      // sort by location.
-      if (auto lhsNormal = dyn_cast<NormalProtocolConformance>(lhs)) {
-        if (auto rhsNormal = dyn_cast<NormalProtocolConformance>(rhs)) {
-          if (lhsNormal->getLoc().isValid() && rhsNormal->getLoc().isValid()) {
-            unsigned lhsBuffer
-              = ctx.SourceMgr.findBufferContainingLoc(lhsNormal->getLoc());
-            unsigned rhsBuffer
-              = ctx.SourceMgr.findBufferContainingLoc(rhsNormal->getLoc());
-
-            // If the buffers are the same, use source location ordering.
-            if (lhsBuffer == rhsBuffer) {
-              return ctx.SourceMgr.isBeforeInBuffer(lhsNormal->getLoc(),
-                                                    rhsNormal->getLoc());
-            }
-
-            // Otherwise, order by buffer identifier.
-            return StringRef(ctx.SourceMgr.getIdentifierForBuffer(lhsBuffer))
-                   < StringRef(ctx.SourceMgr.getIdentifierForBuffer(rhsBuffer));
-          }
-        }
-      }
-
-      // Otherwise, sort by protocol.
-      ProtocolDecl *lhsProto = lhs->getProtocol();
-      ProtocolDecl *rhsProto = rhs->getProtocol();
-      return ProtocolType::compareProtocols(&lhsProto, &rhsProto) < 0;
-    });
+    llvm::array_pod_sort(scratch.begin(), scratch.end(),
+                         &compareProtocolConformances);
   }
 }
 
@@ -2188,7 +2195,8 @@ NominalTypeDecl::getSatisfiedProtocolRequirementsForMember(
 SmallVector<ProtocolDecl *, 2>
 DeclContext::getLocalProtocols(
   ConformanceLookupKind lookupKind,
-  SmallVectorImpl<ConformanceDiagnostic> *diagnostics) const
+  SmallVectorImpl<ConformanceDiagnostic> *diagnostics,
+  bool sorted) const
 {
   SmallVector<ProtocolDecl *, 2> result;
 
@@ -2207,13 +2215,21 @@ DeclContext::getLocalProtocols(
     &result,
     nullptr,
     diagnostics);
+
+  /// Sort if requred.
+  if (sorted) {
+    llvm::array_pod_sort(result.begin(), result.end(),
+                         &ProtocolType::compareProtocols);
+  }
+
   return result;
 }
 
 SmallVector<ProtocolConformance *, 2>
 DeclContext::getLocalConformances(
   ConformanceLookupKind lookupKind,
-  SmallVectorImpl<ConformanceDiagnostic> *diagnostics) const
+  SmallVectorImpl<ConformanceDiagnostic> *diagnostics,
+  bool sorted) const
 {
   SmallVector<ProtocolConformance *, 2> result;
 
@@ -2236,5 +2252,12 @@ DeclContext::getLocalConformances(
     nullptr,
     &result,
     diagnostics);
+
+  // If requested, sort the results.
+  if (sorted) {
+    llvm::array_pod_sort(result.begin(), result.end(),
+                         &compareProtocolConformances);
+  }
+
   return result;
 }

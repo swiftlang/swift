@@ -1985,7 +1985,9 @@ void Serializer::writeDecl(const Decl *D) {
     writeGenericParams(extension->getGenericParams(), DeclTypeAbbrCodes);
     writeRequirements(extension->getGenericRequirements());
     writeMembers(extension->getMembers(), isClassExtension);
-    writeConformances(extension->getLocalConformances(),
+    writeConformances(extension->getLocalConformances(
+                        ConformanceLookupKind::All,
+                        nullptr, /*sorted=*/true),
                       DeclTypeAbbrCodes);
 
     break;
@@ -2161,7 +2163,9 @@ void Serializer::writeDecl(const Decl *D) {
     writeGenericParams(theStruct->getGenericParams(), DeclTypeAbbrCodes);
     writeRequirements(theStruct->getGenericRequirements());
     writeMembers(theStruct->getMembers(), false);
-    writeConformances(theStruct->getLocalConformances(),
+    writeConformances(theStruct->getLocalConformances(
+                        ConformanceLookupKind::All,
+                        nullptr, /*sorted=*/true),
                       DeclTypeAbbrCodes);
     break;
   }
@@ -2191,7 +2195,9 @@ void Serializer::writeDecl(const Decl *D) {
     writeGenericParams(theEnum->getGenericParams(), DeclTypeAbbrCodes);
     writeRequirements(theEnum->getGenericRequirements());
     writeMembers(theEnum->getMembers(), false);
-    writeConformances(theEnum->getLocalConformances(),
+    writeConformances(theEnum->getLocalConformances(
+                        ConformanceLookupKind::All,
+                        nullptr, /*sorted=*/true),
                       DeclTypeAbbrCodes);
     break;
   }
@@ -2224,7 +2230,9 @@ void Serializer::writeDecl(const Decl *D) {
     writeGenericParams(theClass->getGenericParams(), DeclTypeAbbrCodes);
     writeRequirements(theClass->getGenericRequirements());
     writeMembers(theClass->getMembers(), true);
-    writeConformances(theClass->getLocalConformances(),
+    writeConformances(theClass->getLocalConformances(
+                        ConformanceLookupKind::All,
+                        nullptr, /*sorted=*/true),
                       DeclTypeAbbrCodes);
     break;
   }

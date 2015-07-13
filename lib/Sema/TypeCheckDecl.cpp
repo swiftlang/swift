@@ -2845,7 +2845,8 @@ public:
     SmallVector<ConformanceDiagnostic, 4> diagnostics;
     SmallVector<ProtocolDecl *, 4> protocols;
     for (auto conformance : D->getLocalConformances(ConformanceLookupKind::All,
-                                                    &diagnostics)) {
+                                                    &diagnostics,
+                                                    /*sorted=*/true)) {
       // Check and record normal conformances.
       if (auto normal = dyn_cast<NormalProtocolConformance>(conformance)) {
         TC.checkConformance(normal);
