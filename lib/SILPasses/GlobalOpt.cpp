@@ -23,6 +23,7 @@
 #include "llvm/ADT/SCCIterator.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+#include "swift/AST/Mangle.h"
 using namespace swift;
 
 namespace {
@@ -77,7 +78,13 @@ protected:
   void collectOnceCall(BuiltinInst *AI);
   // Set the static initializer and remove "once" from addressor if a global can
   // be statically initialized.
-  void optimizeInitializer(SILFunction *AddrF);
+  void optimizeInitializer(SILFunction *AddrF, GlobalInitCalls &Calls);
+  // Replace loads from a global variable by the known value.
+  void replaceLoadsByKnownValue(BuiltinInst *CallToOnce,
+                                SILFunction *AddrF,
+                                SILFunction *InitF,
+                                SILGlobalVariable *SILG,
+                                GlobalInitCalls &Calls);
 };
 } // namespace
 
@@ -279,6 +286,58 @@ void SILGlobalOpt::placeInitializers(SILFunction *InitF,
   }
 }
 
+/// Create an accessor function from the intializer function.
+static SILFunction *genAccessorFromInit(SILFunction *InitF, VarDecl *varDecl) {
+  // Generate a getter from the global init function without side-effects.
+  llvm::SmallString<20> accessorBuffer;
+  llvm::raw_svector_ostream accessorStream(accessorBuffer);
+  Mangle::Mangler accessorMangler(accessorStream);
+  accessorMangler.mangleGlobalGetterEntity(varDecl);
+  auto refType = varDecl->getType().getCanonicalTypeOrNull();
+  // Function takes no arguments and returns refType
+  SILResultInfo ResultInfo(refType, ResultConvention::Owned);
+  SILFunctionType::ExtInfo EInfo;
+  EInfo = EInfo.withRepresentation(SILFunctionType::Representation::Thin);
+  auto LoweredType = SILFunctionType::get(nullptr, EInfo,
+      ParameterConvention::Direct_Owned, { }, ResultInfo, None,
+      InitF->getASTContext());
+  auto *AccessorF = InitF->getModule().getOrCreateFunction(InitF->getLocation(),
+      accessorStream.str(), SILLinkage::PrivateExternal, LoweredType,
+      IsBare_t::IsBare, IsTransparent_t::IsNotTransparent,
+      IsFragile_t::IsFragile);
+
+  auto *EntryBB = AccessorF->createBasicBlock();
+  // Copy InitF into AccessorF
+  BasicBlockCloner Cloner(InitF->begin(), EntryBB);
+  Cloner.clone();
+  AccessorF->setInlined();
+
+  // Find the store instruction
+  auto BB = EntryBB;
+  SILValue Val;
+  SILInstruction *Store;
+  for (auto &I : *BB) {
+    if (StoreInst *SI = dyn_cast<StoreInst>(&I)) {
+      Val = SI->getSrc();
+      Store = SI;
+      continue;
+    }
+
+    if (ReturnInst *RI = dyn_cast<ReturnInst>(&I)) {
+      SILBuilderWithScope<1> B(RI);
+      B.createReturn(RI->getLoc(), Val);
+      eraseUsesOfInstruction(RI);
+      recursivelyDeleteTriviallyDeadInstructions(RI, true);
+      recursivelyDeleteTriviallyDeadInstructions(Store, true);
+      return AccessorF;
+    }
+  }
+  InitF->getModule().getFunctionList().addNodeToList(AccessorF);
+  return AccessorF;
+}
+
+
+
 /// Find the globalinit_func by analyzing the body of the addressor.
 static SILFunction *findInitializer(SILModule *Module, SILFunction *AddrF,
                                     BuiltinInst *&CallToOnce) {
@@ -307,10 +366,106 @@ static SILFunction *findInitializer(SILModule *Module, SILFunction *AddrF,
   return getCalleeOfOnceCall(CallToOnce);
 }
 
+/// Checks if a given global variable is assigned only once.
+static bool isAssignedOnlyOnceInInitializer(SILGlobalVariable *SILG) {
+  if (SILG->isLet())
+    return true;
+  // TODO: If we can prove that a given global variable
+  // is assigned only once, during initialization, then
+  // we can treat it as if it is a let.
+  // If this global is internal or private, it should be
+  return false;
+}
+
+/// Replace loads from a global variable by the known value.
+void SILGlobalOpt::
+replaceLoadsByKnownValue(BuiltinInst *CallToOnce, SILFunction *AddrF,
+                         SILFunction *InitF, SILGlobalVariable *SILG,
+                         GlobalInitCalls &Calls) {
+  assert(isAssignedOnlyOnceInInitializer(SILG) &&
+         "The value of the initializer should be known at compile-time");
+  eraseUsesOfInstruction(CallToOnce);
+  recursivelyDeleteTriviallyDeadInstructions(CallToOnce, true);
+
+  // Make this addressor transparent.
+  AddrF->setTransparent(IsTransparent_t::IsTransparent);
+  for (int i = 0, e = Calls.size(); i < e; ++i) {
+    auto &Call = Calls[i];
+    SILBuilderWithScope<1> B(Call);
+    SmallVector<SILValue, 1> Args;
+    auto *NewAI = B.createApply(Call->getLoc(), Call->getCallee(), Args);
+    SILValue(Call, 0).replaceAllUsesWith(SILValue(NewAI, 0));
+    eraseUsesOfInstruction(Call);
+    recursivelyDeleteTriviallyDeadInstructions(Call, true);
+    Calls[i] = NewAI;
+  }
+
+  // Generate a getter from InitF which returns the value of the global.
+  auto *AccessorF = genAccessorFromInit(InitF, SILG->getDecl());
+
+  // Replace all calls of addressor by calls of accessor.
+  for (int i = 0, e = Calls.size(); i < e; ++i) {
+    ApplyInst *&Call = Calls[i];
+
+    // Now find all uses of Call. They all should be loads, so that
+    // we can replace it.
+    bool isValid = true;
+    for (auto Use : Call->getUses()) {
+      if (!isa<PointerToAddressInst>(Use->getUser())) {
+        isValid = false;
+        break;
+      }
+    }
+
+    if (!isValid)
+      continue;
+
+    SILBuilderWithScope<1> B(Call);
+    SmallVector<SILValue, 1> Args;
+    auto *AccessorRef = B.createFunctionRef(Call->getLoc(), AccessorF);
+    auto *NewAI = B.createApply(Call->getLoc(), AccessorRef, Args);
+
+    for (auto Use : Call->getUses()) {
+      auto *PTAI = dyn_cast<PointerToAddressInst>(Use->getUser());
+      assert(PTAI && "All uses should be pointer_to_address");
+      for (auto PTAIUse : PTAI->getUses()) {
+        LoadInst *LI = dyn_cast<LoadInst>(PTAIUse->getUser());
+        if (LI) {
+          //assert(LI && "All uses should be loads");
+          SILValue(LI, 0).replaceAllUsesWith(SILValue(NewAI, 0));
+          recursivelyDeleteTriviallyDeadInstructions(LI, true);
+          continue;
+        }
+        StructElementAddrInst *SEAI = dyn_cast<StructElementAddrInst>(
+            PTAIUse->getUser());
+        if (SEAI) {
+          for (auto SEAIUse : SEAI->getUses()) {
+            LoadInst *LI = dyn_cast<LoadInst>(SEAIUse->getUser());
+            if (LI) {
+              //assert(LI && "All uses should be loads");
+              auto *SEI = B.createStructExtract(SEAI->getLoc(), NewAI,
+                  SEAI->getField());
+              SILValue(LI, 0).replaceAllUsesWith(SILValue(SEI, 0));
+              recursivelyDeleteTriviallyDeadInstructions(LI, true);
+              continue;
+            }
+            continue;
+          }
+        }
+      }
+    }
+    eraseUsesOfInstruction(Call);
+    recursivelyDeleteTriviallyDeadInstructions(Call, true);
+  }
+
+  Calls.clear();
+  SILG->setInitializer(InitF);
+}
+
 /// We analyze the body of globalinit_func to see if it can be statically
 /// initialized. If yes, we set the initial value of the SILGlobalVariable and
 /// remove the "once" call to globalinit_func from the addressor.
-void SILGlobalOpt::optimizeInitializer(SILFunction *AddrF) {
+void SILGlobalOpt::optimizeInitializer(SILFunction *AddrF, GlobalInitCalls &Calls) {
   if (UnhandledOnceCallee)
     return;
 
@@ -334,9 +489,14 @@ void SILGlobalOpt::optimizeInitializer(SILFunction *AddrF) {
         SILG->getName() << '\n');
 
   // Remove "once" call from the addressor.
-  CallToOnce->eraseFromParent();
-  SILG->setInitializer(InitF);
+  if (!isAssignedOnlyOnceInInitializer(SILG)) {
+    CallToOnce->eraseFromParent();
+    SILG->setInitializer(InitF);
+    HasChanged = true;
+    return;
+  }
 
+  replaceLoadsByKnownValue(CallToOnce, AddrF, InitF, SILG, Calls);
   HasChanged = true;
 }
 
@@ -362,7 +522,7 @@ bool SILGlobalOpt::run() {
   }
   for (auto &InitCalls : GlobalInitCallMap) {
     // Optimize the addressors if possible.
-    optimizeInitializer(InitCalls.first);
+    optimizeInitializer(InitCalls.first, InitCalls.second);
     placeInitializers(InitCalls.first, InitCalls.second);
   }
 

@@ -174,6 +174,7 @@ void AddSSAPasses(SILPassManager &PM, OptimizationLevelKind OpLevel) {
   PM.addMem2Reg();
 
   // Perform classsic SSA optimizations.
+  PM.addGlobalOpt();
   PM.addPerformanceConstantPropagation();
   PM.addDCE();
   PM.addCSE();
