@@ -50,6 +50,7 @@ SILGlobalVariable::SILGlobalVariable(SILModule &Module, SILLinkage Linkage,
     Fragile(IsFragile),
 	VDecl(Decl) {
   IsDeclaration = isAvailableExternally(Linkage);
+  setLet(Decl ? Decl->isLet() : false);
   InitializerF = nullptr;
   Module.silGlobals.push_back(this);
 }

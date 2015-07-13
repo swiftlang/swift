@@ -63,6 +63,10 @@ private:
   /// Currently this flag is set for all global variables in the stdlib.
   unsigned Fragile : 1;
   
+  /// Whether this is a 'let' property, which can only be initialized
+  /// once (either in its declaration, or once later), making it immutable.
+  unsigned IsLet : 1;
+
   /// The VarDecl associated with this SILGlobalVariable. For debugger purpose.
   VarDecl *VDecl;
 
@@ -107,6 +111,10 @@ public:
   bool isFragile() const { return Fragile != 0; }
   void setFragile(bool isFrag) { Fragile = isFrag ? 1 : 0; }
   
+  /// Is this an immutable 'let' property?
+  bool isLet() const { return IsLet; }
+  void setLet(bool isLet) { IsLet = isLet; }
+
   VarDecl *getDecl() const { return VDecl; }
 
   SILFunction *getInitializer() const { return InitializerF; }

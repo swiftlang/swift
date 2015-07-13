@@ -696,10 +696,17 @@ static bool parseSILOptional(bool &Result, SILParser &SP, StringRef Expected) {
 static bool parseDeclSILOptional(bool *isTransparent, bool *isFragile,
                                  bool *isThunk, bool *isGlobalInit,
                                  Inline_t *inlineStrategy,
+                                 bool *isLet,
                                  std::string *Semantics, EffectsKind *MRK,
                                  Parser &P) {
   while (P.consumeIf(tok::l_square)) {
-    if (P.Tok.isNot(tok::identifier)) {
+    if (isLet && P.Tok.is(tok::kw_let)) {
+      *isLet = true;
+      P.consumeToken(tok::kw_let);
+      P.parseToken(tok::r_square, diag::expected_in_attribute_list);
+      continue;
+    }
+    else if (P.Tok.isNot(tok::identifier)) {
       P.diagnose(P.Tok, diag::expected_in_attribute_list);
       return true;
     } else if (isTransparent && P.Tok.getText() == "transparent")
@@ -3526,7 +3533,7 @@ bool Parser::parseDeclSIL() {
   EffectsKind MRK = EffectsKind::Unspecified;
   if (parseSILLinkage(FnLinkage, *this) ||
       parseDeclSILOptional(&isTransparent, &isFragile, &isThunk, &isGlobalInit,
-                           &inlineStrategy, &Semantics, &MRK, *this) ||
+                           &inlineStrategy, nullptr, &Semantics, &MRK, *this) ||
       parseToken(tok::at_sign, diag::expected_sil_function_name) ||
       parseIdentifier(FnName, FnNameLoc, diag::expected_sil_function_name) ||
       parseToken(tok::colon, diag::expected_sil_type))
@@ -3639,13 +3646,14 @@ bool Parser::parseSILGlobal() {
   SILType GlobalType;
   SourceLoc NameLoc;
   bool isFragile = false;
+  bool isLet = false;
 
   // Inform the lexer that we're lexing the body of the SIL declaration.
   Lexer::SILBodyRAII Tmp(*L);
   Scope S(this, ScopeKind::TopLevel);
   if (parseSILLinkage(GlobalLinkage, *this) ||
       parseDeclSILOptional(nullptr, &isFragile, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, *this) ||
+                           nullptr, &isLet, nullptr, nullptr, *this) ||
       parseToken(tok::at_sign, diag::expected_sil_value_name) ||
       parseIdentifier(GlobalName, NameLoc, diag::expected_sil_value_name) ||
       parseToken(tok::colon, diag::expected_sil_type))
@@ -3665,6 +3673,7 @@ bool Parser::parseSILGlobal() {
                                        GlobalName.str(),GlobalType,
                                        SILFileLocation(NameLoc));
 
+  GV->setLet(isLet);
   // Parse static initializer if exists.
   if (State.P.consumeIf(tok::comma)) {
     Identifier Name;
@@ -4048,7 +4057,7 @@ bool Parser::parseSILWitnessTable() {
   
   bool isFragile = false;
   if (parseDeclSILOptional(nullptr, &isFragile, nullptr, nullptr,
-                           nullptr, nullptr, nullptr, *this))
+                           nullptr, nullptr, nullptr, nullptr, *this))
     return true;
 
   Scope S(this, ScopeKind::TopLevel);

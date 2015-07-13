@@ -212,7 +212,8 @@ namespace sil_block {
     BCFixed<1>,        // fragile
     TypeIDField,
     DeclIDField,
-    BCFixed<1>           // Is this a declaration.
+    BCFixed<1>,          // Is this a declaration.
+    BCFixed<1>           // Is this a let variable.
   >;
 
   using SILFunctionLayout = BCRecordLayout<

@@ -1499,7 +1499,8 @@ void SILSerializer::writeSILGlobalVar(const SILGlobalVariable &g) {
                               SILAbbrCodes[GlobalVarLayout::Code],
                               toStableSILLinkage(g.getLinkage()),
                               (unsigned)g.isFragile(),
-                              TyID, dID, unsigned(!g.isDefinition()));
+                              TyID, dID, unsigned(!g.isDefinition()),
+                              unsigned(g.isLet()));
 }
 
 void SILSerializer::writeSILVTable(const SILVTable &vt) {

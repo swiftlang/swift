@@ -1621,6 +1621,9 @@ void SILGlobalVariable::print(llvm::raw_ostream &OS, bool Verbose) const {
   if (isFragile())
     OS << "[fragile] ";
   
+  if (isLet())
+    OS << "[let] ";
+
   printName(OS);
   OS << " : " << LoweredType;
 
