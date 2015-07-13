@@ -1045,6 +1045,218 @@ Reflection.test("Struct/Generic/DefaultMirror") {
   }
 }
 
+enum NoPayloadEnumWithDefaultMirror {
+  case A, ß
+}
+
+Reflection.test("Enum/NoPayload/DefaultMirror") {
+  do {
+    let value = NoPayloadEnumWithDefaultMirror.A
+    var output = ""
+    dump(value, &output)
+
+    let expected =
+      "- a.NoPayloadEnumWithDefaultMirror.A\n"
+
+    expectEqual(expected, output)
+  }
+  do {
+    let value = NoPayloadEnumWithDefaultMirror.ß
+    var output = ""
+    dump(value, &output)
+
+    let expected =
+      "- a.NoPayloadEnumWithDefaultMirror.ß\n"
+
+    expectEqual(expected, output)
+  }
+}
+
+enum SingletonNonGenericEnumWithDefaultMirror {
+  case OnlyOne(Int)
+}
+
+Reflection.test("Enum/SingletonNonGeneric/DefaultMirror") {
+  do {
+    let value = SingletonNonGenericEnumWithDefaultMirror.OnlyOne(5)
+    var output = ""
+    dump(value, &output)
+
+    let expected =
+      "▿ a.SingletonNonGenericEnumWithDefaultMirror.OnlyOne\n" +
+      "  - OnlyOne: 5\n"
+
+    expectEqual(expected, output)
+  }
+}
+
+enum SingletonGenericEnumWithDefaultMirror<T> {
+  case OnlyOne(T)
+}
+
+Reflection.test("Enum/SingletonGeneric/DefaultMirror") {
+  do {
+    let value = SingletonGenericEnumWithDefaultMirror.OnlyOne("IIfx")
+    var output = ""
+    dump(value, &output)
+
+    let expected =
+      "▿ a.SingletonGenericEnumWithDefaultMirror<Swift.String>.OnlyOne\n" +
+      "  - OnlyOne: IIfx\n"
+
+    expectEqual(expected, output)
+  }
+}
+
+enum SinglePayloadNonGenericEnumWithDefaultMirror {
+  case Cat
+  case Dog
+  case Volleyball(String, Int)
+}
+
+Reflection.test("Enum/SinglePayloadNonGeneric/DefaultMirror") {
+  do {
+    let value = [SinglePayloadNonGenericEnumWithDefaultMirror.Cat,
+                 SinglePayloadNonGenericEnumWithDefaultMirror.Dog]
+    var output = ""
+    dump(value, &output)
+
+    let expected =
+      "▿ 2 elements\n" +
+      "  - [0]: a.SinglePayloadNonGenericEnumWithDefaultMirror.Cat\n" +
+      "  - [1]: a.SinglePayloadNonGenericEnumWithDefaultMirror.Dog\n"
+
+    expectEqual(expected, output)
+  }
+  do {
+    let value = SinglePayloadNonGenericEnumWithDefaultMirror.Volleyball("Wilson", 2000)
+    var output = ""
+    dump(value, &output)
+
+    let expected =
+      "▿ a.SinglePayloadNonGenericEnumWithDefaultMirror.Volleyball\n" +
+      "  ▿ Volleyball: (2 elements)\n" +
+      "    - .0: Wilson\n" +
+      "    - .1: 2000\n"
+
+    expectEqual(expected, output)
+  }
+}
+
+enum SinglePayloadGenericEnumWithDefaultMirror<T, U> {
+  case Well
+  case Faucet
+  case Pipe(T, U)
+}
+
+Reflection.test("Enum/SinglePayloadGeneric/DefaultMirror") {
+  do {
+    let value = SinglePayloadGenericEnumWithDefaultMirror<Int, [Int]>.Faucet
+    var output = ""
+    dump(value, &output)
+
+    let expected =
+      "- a.SinglePayloadGenericEnumWithDefaultMirror<Swift.Int, Swift.Array<Swift.Int>>.Faucet\n"
+
+    expectEqual(expected, output)
+  }
+  do {
+    let value = SinglePayloadGenericEnumWithDefaultMirror<Int, [Int]>.Pipe(408, [415])
+    var output = ""
+    dump(value, &output)
+
+    let expected =
+      "▿ a.SinglePayloadGenericEnumWithDefaultMirror<Swift.Int, Swift.Array<Swift.Int>>.Pipe\n" +
+      "  ▿ Pipe: (2 elements)\n" +
+      "    - .0: 408\n" +
+      "    ▿ .1: 1 element\n" +
+      "      - [0]: 415\n"
+
+    expectEqual(expected, output)
+  }
+}
+
+enum MultiPayloadNonGenericEnumWithDefaultMirror {
+  case Classic(mhz: Int)
+  case Performa(model: Int)
+}
+
+// FIXME: not yet implemented
+Reflection.test("Enum/MultiPayloadNonGeneric/DefaultMirror") {
+  do {
+    let value = MultiPayloadNonGenericEnumWithDefaultMirror.Classic(mhz: 16)
+    var output = ""
+    dump(value, &output)
+
+    let expected =
+      "- a.MultiPayloadNonGenericEnumWithDefaultMirror\n"
+
+    expectEqual(expected, output)
+  }
+  do {
+    let value = MultiPayloadNonGenericEnumWithDefaultMirror.Performa(model: 220)
+    var output = ""
+    dump(value, &output)
+
+    let expected =
+      "- a.MultiPayloadNonGenericEnumWithDefaultMirror\n"
+
+    expectEqual(expected, output)
+  }
+}
+
+enum MultiPayloadGenericEnumWithDefaultMirror<T, U> {
+  case Centris(ram: T)
+  case Quadra(hdd: U)
+}
+
+Reflection.test("Enum/MultiPayloadGeneric/DefaultMirror") {
+  do {
+    let value = MultiPayloadGenericEnumWithDefaultMirror<Int, String>.Centris(ram: 4096)
+    var output = ""
+    dump(value, &output)
+
+    let expected =
+      "▿ a.MultiPayloadGenericEnumWithDefaultMirror<Swift.Int, Swift.String>.Centris\n" +
+      "  - Centris: 4096\n"
+
+    expectEqual(expected, output)
+  }
+  do {
+    let value = MultiPayloadGenericEnumWithDefaultMirror<Int, String>.Quadra(hdd: "160MB")
+    var output = ""
+    dump(value, &output)
+
+    let expected =
+      "▿ a.MultiPayloadGenericEnumWithDefaultMirror<Swift.Int, Swift.String>.Quadra\n" +
+      "  - Quadra: 160MB\n"
+
+    expectEqual(expected, output)
+  }
+}
+
+enum Foo<T> {
+  indirect case Foo(Int)
+  case Bar(T)
+}
+
+enum List<T> {
+  case Nil
+  indirect case Cons(first: T, rest: List<T>)
+}
+
+Reflection.test("Enum/IndirectGeneric/DefaultMirror") {
+  let x = Foo<String>.Foo(22)
+  let y = Foo<String>.Bar("twenty-two")
+
+  expectEqual("\(x)", "a.Foo<Swift.String>.Foo(22)")
+  expectEqual("\(y)", "a.Foo<Swift.String>.Bar(\"twenty-two\")")
+
+  let list = List.Cons(first: 0, rest: .Cons(first: 1, rest: .Nil))
+  expectEqual("\(list)",
+              "a.List<Swift.Int>.Cons(0, a.List<Swift.Int>.Cons(1, a.List<Swift.Int>.Nil))")
+}
+
 /// A type that provides its own mirror.
 struct BrilliantMirror : _MirrorType {
   let _value: Brilliant
@@ -1850,36 +2062,6 @@ Reflection.test("Name of metatype of artificial subclass") {
   obj.removeObserver(obj, forKeyPath: "foo")
 
   expectEqual("\(obj.dynamicType)", "a.TestArtificialSubclass")
-}
-
-enum Foo<T> {
-  indirect case Foo(Int)
-  case Bar(T)
-}
-
-enum List<T> {
-  case Nil
-  indirect case Cons(first: T, rest: List<T>)
-}
-
-let x = List.Cons(first: 0, rest: .Cons(first: 1, rest: .Nil))
-switch x {
-case .Cons(_, .Cons(let second, .Nil)):
-  print(second)
-default:
-  print(x)
-}
-
-Reflection.test("Indirect enum payload") {
-  let x = Foo<String>.Foo(22)
-  let y = Foo<String>.Bar("twenty-two")
-
-  expectEqual("\(x)", "a.Foo<Swift.String>.Foo(22)")
-  expectEqual("\(y)", "a.Foo<Swift.String>.Bar(\"twenty-two\")")
-
-  let list = List.Cons(first: 0, rest: .Cons(first: 1, rest: .Nil))
-  expectEqual("\(list)",
-              "a.List<Swift.Int>.Cons(0, a.List<Swift.Int>.Cons(1, a.List<Swift.Int>.Nil))")
 }
 
 var BitTwiddlingTestSuite = TestSuite("BitTwiddling")
