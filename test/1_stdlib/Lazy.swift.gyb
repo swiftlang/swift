@@ -366,5 +366,182 @@ extension ReverseRandomAccessIndex where Base : TestProtocol1 {
   }
 }
 
+var tests = TestSuite("NewLazy")
+
+tests.test("LazySequence/SequenceType") {
+  let expected = (0..<100).map { OpaqueValue($0) }
+  var actual = MinimalSequence(expected)._prext_lazy
+  
+  expectType(
+    _prext_LazySequence<MinimalSequence<OpaqueValue<Int>>>.self, &actual)
+
+  // Asking for .lazy again doesn't re-wrap the type
+  var again = actual._prext_lazy
+  expectType(
+    _prext_LazySequence<MinimalSequence<OpaqueValue<Int>>>.self, &again)
+  
+  var elements = actual.elements
+
+  // Expect .elements to strip a lazy wrapper
+  expectType(MinimalSequence<OpaqueValue<Int>>.self, &elements)
+
+  checkSequence(expected, actual, resiliencyChecks: .none) {
+    $0.value == $1.value
+  }
+}
+
+func expectSequencePassthrough<
+  S : SequenceType, Base : SequenceType
+  where S : _prext_LazySequenceType, Base : LoggingType,
+    Base.Generator.Element == S.Generator.Element
+>(s: S, base: Base, arbitraryElement: S.Generator.Element, count: Int) {
+  let baseType = base.dynamicType
+
+  SequenceLog.generate.expectIncrement(baseType) { _ = s.generate() }
+  SequenceLog.underestimateCount.expectIncrement(baseType) {
+    _ = s.underestimateCount()
+  }
+  SequenceLog._customContainsEquatableElement.expectIncrement(baseType) {
+    _ = s._customContainsEquatableElement(arbitraryElement)
+  }
+  SequenceLog._copyToNativeArrayBuffer.expectIncrement(baseType) {
+    _ = s._copyToNativeArrayBuffer()
+  }
+  
+  SequenceLog._initializeTo.expectIncrement(baseType) { ()->Void in
+    let buf = UnsafeMutablePointer<S.Generator.Element>.alloc(count)
+  
+    let end = s._initializeTo(buf)
+    expectTrue(end <= buf + count)
+    buf.destroy(end - buf)
+    buf.dealloc(count)
+  }
+}
+
+tests.test("LazySequence/Passthrough") {
+  // Test that operations that might be optimized are passed
+  // through to the underlying sequence.
+  let a = (0..<100).map { OpaqueValue($0) }
+  let base = LoggingSequence(a)
+  
+  expectSequencePassthrough(
+    base._prext_lazy,
+    base: base, arbitraryElement: OpaqueValue(0), count: a.count)
+}
+
+% for traversal in 'Forward', 'Bidirectional', 'RandomAccess':
+tests.test("LazyCollection/CollectionType/${traversal}") {
+  let expected = (0..<100).map { OpaqueValue($0) }
+  let base = Minimal${traversal}Collection(expected)
+  var actual = base._prext_lazy
+  
+  expectType(
+    _prext_LazyCollection<Minimal${traversal}Collection<OpaqueValue<Int>>>.self,
+    &actual)
+
+  // Asking for .lazy again doesn't re-wrap the type
+  var again = actual._prext_lazy
+  expectType(
+    _prext_LazyCollection<Minimal${traversal}Collection<OpaqueValue<Int>>>.self,
+    &again)
+  
+  check${traversal}Collection(
+    expected, base._prext_lazy, resiliencyChecks: .none
+  ) { $0.value == $1.value }
+
+  var elements = base._prext_lazy.elements
+  expectType(Minimal${traversal}Collection<OpaqueValue<Int>>.self, &elements)
+}
+% end
+
+tests.test("LazyCollection/Passthrough") {
+  let expected = (0..<100).map { OpaqueValue($0) }
+  let base = LoggingCollection(expected)
+  
+  expectSequencePassthrough(
+    base._prext_lazy,
+    base: base._prext_lazy._base,
+    arbitraryElement: OpaqueValue(0),
+    count: Int(expected.count))
+
+  let s = base._prext_lazy
+  let baseType = base.dynamicType
+  let startIndex = CollectionLog.startIndex.expectIncrement(baseType) {
+    s.startIndex
+  }
+  
+  let endIndex = CollectionLog.endIndex.expectIncrement(baseType) {
+    s.endIndex
+  }
+  
+  CollectionLog.subscriptIndex.expectIncrement(baseType) { _ = s[startIndex] }
+  CollectionLog.subscriptRange.expectUnchanged(baseType) {
+    _ = s[startIndex..<endIndex]
+  }
+  CollectionLog.isEmpty.expectIncrement(baseType) { _ = s.isEmpty }
+  CollectionLog.count.expectIncrement(baseType) { _ = s.count }
+  CollectionLog._customIndexOfEquatableElement.expectIncrement(baseType) {
+    _ = s._customIndexOfEquatableElement(OpaqueValue(0))
+  }
+  CollectionLog.first.expectIncrement(baseType) { _ = s.first }
+}
+
+//===--- Sequences --------------------------------------------------------===//
+
+tests.test("MapSequence") {
+  let base = MinimalSequence(
+    [2, 3, 5, 7, 11].map { OpaqueValue($0) })._prext_lazy
+
+  var mapped = base.map { OpaqueValue(Double($0.value) / 2.0) }
+  
+  expectType(
+    _prext_MapSequence<
+      MinimalSequence<OpaqueValue<Int>>, 
+      OpaqueValue<Double>>.self,
+    &mapped)
+  
+  let expected = [ 1.0, 1.5, 2.5, 3.5, 5.5 ].map {OpaqueValue($0)}
+  
+  checkSequence(expected, mapped, resiliencyChecks: .none) {
+    $0.value == $1.value
+  }
+}
+
+//===--- Collections ------------------------------------------------------===//
+
+% for traversal in 'Forward', 'Bidirectional', 'RandomAccess':
+tests.test("MapCollection/${traversal}") {
+  let base = Minimal${traversal}Collection(
+    [2, 3, 5, 7, 11].map { OpaqueValue($0) })._prext_lazy
+
+  var mapped = base.map { OpaqueValue(Double($0.value) / 2.0) }
+  
+  expectType(
+    _prext_MapCollection<
+      Minimal${traversal}Collection<OpaqueValue<Int>>, 
+      OpaqueValue<Double>>.self,
+    &mapped)
+  
+  let expected = [ 1.0, 1.5, 2.5, 3.5, 5.5 ].map {OpaqueValue($0)}
+  
+  check${traversal}Collection(expected, mapped, resiliencyChecks: .none) {
+    $0.value == $1.value
+  }
+}
+%end
+
+tests.test("ReverseCollection") {
+
+  let expected = Array(stride(from: 11, through: 0, by: -1))
+  let r = 0..<12
+  checkRandomAccessCollection(
+    expected,
+    r._prext_reverse)
+  
+  checkBidirectionalCollection(
+    "raboof".characters,
+    "foobar".characters._prext_reverse)
+}
+
 runAllTests()
 

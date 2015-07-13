@@ -37,6 +37,104 @@ public struct MapGenerator<
   var _transform: (Base.Element)->Element
 }
 
+/// A `SequenceType` whose elements consist of those in a `Base`
+/// `SequenceType` passed through a transform function returning `Element`.
+/// These elements are computed lazily, each time they're read, by
+/// calling the transform function on a base element.
+public struct _prext_MapSequence<Base : SequenceType, Element>
+  : _prext_LazySequenceType/*, _SequenceWrapperType*/ {
+
+  public typealias Elements = _prext_MapSequence
+  
+  /// Return a *generator* over the elements of this *sequence*.
+  ///
+  /// - Complexity: O(1).
+  public func generate() -> MapGenerator<Base.Generator, Element> {
+    return MapGenerator(_base: _base.generate(), _transform: _transform)
+  }
+
+  /// Return a value less than or equal to the number of elements in
+  /// `self`, **nondestructively**.
+  ///
+  /// - Complexity: O(N).
+  public func underestimateCount() -> Int {
+    return _base.underestimateCount()
+  }
+  
+  public var _base: Base
+  internal var _transform: (Base.Generator.Element)->Element
+}
+
+//===--- Collections ------------------------------------------------------===//
+
+/// A `CollectionType` whose elements consist of those in a `Base`
+/// `CollectionType` passed through a transform function returning `Element`.
+/// These elements are computed lazily, each time they're read, by
+/// calling the transform function on a base element.
+public struct _prext_MapCollection<Base : CollectionType, Element>
+  : _prext_LazyCollectionType {
+
+  public var startIndex: Base.Index { return _base.startIndex }
+  public var endIndex: Base.Index { return _base.endIndex }
+  
+  /// Access the element at `position`.
+  ///
+  /// - Requires: `position` is a valid position in `self` and
+  ///   `position != endIndex`.
+  public subscript(position: Base.Index) -> Element {
+    return _transform(_base[position])
+  }
+
+  /// Returns `true` iff `self` is empty.
+  public var isEmpty: Bool { return _base.isEmpty }
+
+  public var first: Element? { return _base.first.map(_transform) }
+  
+
+  /// Returns a *generator* over the elements of this *sequence*.
+  ///
+  /// - Complexity: O(1).
+  public func generate() -> MapGenerator<Base.Generator, Element> {
+    return MapGenerator(_base: _base.generate(), _transform: _transform)
+  }
+
+  public func underestimateCount() -> Int {
+    return _base.underestimateCount()
+  }
+
+  public var _base: Base
+  var _transform: (Base.Generator.Element)->Element
+}
+
+//===--- Support for lazy(s) ----------------------------------------------===//
+
+extension _prext_LazySequenceType {
+  /// Return a `_prext_MapSequence` over this `Sequence`.  The elements of
+  /// the result are computed lazily, each time they are read, by
+  /// calling `transform` function on a base element.
+  public func map<U>(
+    transform: (Elements.Generator.Element) -> U
+  ) -> _prext_MapSequence<Self.Elements, U> {
+    return _prext_MapSequence(_base: self.elements, _transform: transform)
+  }
+}
+
+extension _prext_LazyCollectionType {
+  /// Return a `_prext_MapCollection` over this `Collection`.  The elements of
+  /// the result are computed lazily, each time they are read, by
+  /// calling `transform` function on a base element.
+  public func map<U>(
+    transform: (Elements.Generator.Element) -> U
+  ) -> _prext_MapCollection<Self.Elements, U> {
+    return _prext_MapCollection(_base: self.elements, _transform: transform)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Implementations we are replacing
+//===----------------------------------------------------------------------===//
+
+
 //===--- Sequences --------------------------------------------------------===//
 
 /// A `SequenceType` whose elements consist of those in a `Base`

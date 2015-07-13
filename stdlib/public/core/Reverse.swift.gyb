@@ -10,6 +10,142 @@
 //
 //===----------------------------------------------------------------------===//
 
+internal protocol _prext_ReverseIndexType : BidirectionalIndexType {
+  typealias Base : BidirectionalIndexType
+  
+  /// A type that can represent the number of steps between pairs of
+  /// `_prext_ReverseIndex` values where one value is reachable from the other.
+  typealias Distance: _SignedIntegerType = Base.Distance
+  
+  var _base: Base { get }
+  init(_ base: Base)
+}
+
+/// A wrapper for a `BidirectionalIndexType` that reverses its
+/// direction of traversal.
+extension BidirectionalIndexType where Self : _prext_ReverseIndexType {
+  /// Returns the next consecutive value after `self`.
+  ///
+  /// - Requires: The next value is representable.
+  public func successor() -> Self {
+    return Self(_base.predecessor())
+  }
+
+  /// Returns the previous consecutive value before `self`.
+  ///
+  /// - Requires: The previous value is representable.
+  public func predecessor() -> Self {
+    return Self(_base.successor())
+  }
+}
+
+public struct _prext_ReverseIndex<Base_: BidirectionalIndexType>
+: BidirectionalIndexType, _prext_ReverseIndexType {
+  public typealias Base = Base_
+  public typealias Distance = Base_.Distance
+  
+  public init(_ base: Base) { self._base = base }
+  public let _base: Base
+}
+
+public func == <I> (lhs: _prext_ReverseIndex<I>, rhs: _prext_ReverseIndex<I>) -> Bool {
+  return lhs._base == rhs._base
+}
+
+public struct _prext_ReverseRandomAccessIndex<Base: RandomAccessIndexType>
+  : RandomAccessIndexType, _prext_ReverseIndexType {
+
+  public typealias Distance = Base.Distance
+  
+  public init(_ base: Base) { self._base = base }
+  public let _base: Base
+
+  /// Return the minimum number of applications of `successor` or
+  /// `predecessor` required to reach `other` from `self`.
+  ///
+  /// - Complexity: O(1).
+  public func distanceTo(other: _prext_ReverseRandomAccessIndex) -> Distance {
+    return other._base.distanceTo(_base)
+  }
+
+  /// Return `self` offset by `n` steps.
+  ///
+  /// - Returns: If `n > 0`, the result of applying `successor` to
+  ///   `self` `n` times.  If `n < 0`, the result of applying
+  ///   `predecessor` to `self` `-n` times. Otherwise, `self`.
+  ///
+  /// - Complexity: O(1).
+  public func advancedBy(amount: Distance) -> _prext_ReverseRandomAccessIndex {
+    return _prext_ReverseRandomAccessIndex(_base.advancedBy(-amount))
+  }
+}
+
+internal protocol _ReverseCollectionType : _prext_LazyCollectionType, _CollectionWrapperType {
+  typealias Index : _prext_ReverseIndexType
+}
+
+extension CollectionType
+  where Self : _ReverseCollectionType, Self.Base.Index : RandomAccessIndexType {
+  public var startIndex : _prext_ReverseRandomAccessIndex<Self.Base.Index> {
+    return _prext_ReverseRandomAccessIndex(_base.endIndex)
+  }
+}
+
+extension CollectionType
+  where Self : _ReverseCollectionType, Self.Index.Base == Self.Base.Index
+{
+  public var startIndex : Index { return Self.Index(_base.endIndex) }
+  public var endIndex : Index { return Self.Index(_base.startIndex) }
+  public subscript(position: Index) -> Self.Base.Generator.Element {
+    return _base[position._base.predecessor()]
+  }
+}
+
+public struct _prext_ReverseCollection<
+  Base_ : CollectionType where Base_.Index : BidirectionalIndexType
+> : _ReverseCollectionType {
+  
+  public typealias Index = _prext_ReverseIndex<Base_.Index>
+  public typealias Generator = IndexingGenerator<_prext_ReverseCollection>
+  
+  public init(_ base: Base_) {
+    self._base = base
+  }
+
+  public let _base: Base_
+}
+
+public struct _prext_ReverseRandomAccessCollection<
+  Base_ : CollectionType where Base_.Index : RandomAccessIndexType
+> : _ReverseCollectionType {
+  
+  public typealias Index = _prext_ReverseRandomAccessIndex<Base_.Index>
+  public typealias Generator = IndexingGenerator<
+    _prext_ReverseRandomAccessCollection
+  >
+  
+  public init(_ base: Base_) {
+    self._base = base
+  }
+
+  public let _base: Base_
+}
+
+extension CollectionType where Index : BidirectionalIndexType {
+  public var _prext_reverse: _prext_ReverseCollection<Self> {
+    return _prext_ReverseCollection(self)
+  }
+}
+
+extension CollectionType where Index : RandomAccessIndexType {
+  public var _prext_reverse: _prext_ReverseRandomAccessCollection<Self> {
+    return _prext_ReverseRandomAccessCollection(self)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// Implementations we are replacing
+//===----------------------------------------------------------------------===//
 
 /// Return an `Array` containing the elements of `source` in reverse
 /// order.
