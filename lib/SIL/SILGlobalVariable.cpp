@@ -99,6 +99,18 @@ static bool analyzeStaticInitializer(SILFunction *F, SILInstruction *&Val,
       if (ti->getNumOperands())
         return false;
     } else {
+
+      if (auto *bi = dyn_cast<BuiltinInst>(&I)) {
+        switch (bi->getBuiltinInfo().ID) {
+        case BuiltinValueKind::FPTrunc:
+          if (isa<LiteralInst>(bi->getArguments()[0]))
+            continue;
+          break;
+        default:
+          return false;
+        }
+      }
+
       if (I.getKind() != ValueKind::ReturnInst &&
           I.getKind() != ValueKind::StructInst &&
           I.getKind() != ValueKind::IntegerLiteralInst &&
