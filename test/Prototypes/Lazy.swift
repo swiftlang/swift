@@ -480,17 +480,29 @@ public struct _prext_ReverseRandomAccessCollection<
   public let _base: Base_
 }
 
+extension CollectionType where Index : BidirectionalIndexType {
+  var _prext_reverse: _prext_ReverseCollection<Self> {
+    return _prext_ReverseCollection(self)
+  }
+}
+
+extension CollectionType where Index : RandomAccessIndexType {
+  var _prext_reverse: _prext_ReverseRandomAccessCollection<Self> {
+    return _prext_ReverseRandomAccessCollection(self)
+  }
+}
+
 tests.test("ReverseCollection") {
 
   let expected = Array(stride(from: 11, through: 0, by: -1))
   let r = 0..<12
   checkRandomAccessCollection(
     expected,
-    _prext_ReverseRandomAccessCollection(r))
+    r._prext_reverse)
   
   checkBidirectionalCollection(
     "raboof".characters,
-    _prext_ReverseCollection("foobar".characters))
+    "foobar".characters._prext_reverse)
 }
 
 
