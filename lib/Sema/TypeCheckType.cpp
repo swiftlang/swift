@@ -193,14 +193,14 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
              genericParam->getDeclaredType()->castTo<GenericTypeParamType>());
   }
 
-  // If we're referring to a generic type and no generic arguments have been
-  // provided, and we are in the context of that generic type or one of its
-  // extensions, imply the generic arguments
+  // If we are referring to a type within its own context, and we have either
+  // a generic type with no generic arguments or a non-generic type, use the
+  // type within the context.
   if (auto nominal = dyn_cast<NominalTypeDecl>(typeDecl)) {
     
     this->forceExternalDeclMembers(nominal);
     
-    if (nominal->getGenericParams() && !isSpecialized) {
+    if (!nominal->getGenericParams() || !isSpecialized) {
       for (DeclContext *dc = fromDC; dc; dc = dc->getParent()) {
         switch (dc->getContextKind()) {
         case DeclContextKind::Module:
