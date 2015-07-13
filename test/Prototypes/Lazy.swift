@@ -48,11 +48,18 @@ extension _prext_LazySequenceType where Elements == Self {
 public struct _prext_LazySequence<Base_ : SequenceType>
   : _prext_LazySequenceType, _SequenceWrapperType {
   public var _base: Base_
+  public var elements: Base_ { return _base }
 }
 
 extension SequenceType {
   public var _prext_lazy: _prext_LazySequence<Self> {
     return _prext_LazySequence(_base: self)
+  }
+}
+
+extension _prext_LazySequenceType {
+  public var _prext_lazy: Self { // Don't re-wrap already-lazy sequences
+    return self
   }
 }
 
@@ -65,7 +72,17 @@ tests.test("LazySequence/SequenceType") {
   
   expectType(
     _prext_LazySequence<MinimalSequence<OpaqueValue<Int>>>.self, &actual)
+
+  // Asking for .lazy again doesn't re-wrap the type
+  var again = actual._prext_lazy
+  expectType(
+    _prext_LazySequence<MinimalSequence<OpaqueValue<Int>>>.self, &again)
   
+  var elements = actual.elements
+
+  // Expect .elements to strip a lazy wrapper
+  expectType(MinimalSequence<OpaqueValue<Int>>.self, &elements)
+
   checkSequence(expected, actual, resiliencyChecks: .none) {
     $0.value == $1.value
   }
@@ -253,6 +270,12 @@ extension CollectionType {
   }
 }
 
+extension _prext_LazyCollectionType {
+  public var _prext_lazy: Self { // Don't re-wrap already-lazy collections
+    return self
+  }
+}
+
 //===--- LazyCollection tests ---------------------------------------------===//
 
 tests.test("LazyCollection/CollectionType") {
@@ -264,9 +287,18 @@ tests.test("LazyCollection/CollectionType") {
     _prext_LazyCollection<MinimalForwardCollection<OpaqueValue<Int>>>.self,
     &actual)
 
+  // Asking for .lazy again doesn't re-wrap the type
+  var again = actual._prext_lazy
+  expectType(
+    _prext_LazyCollection<MinimalForwardCollection<OpaqueValue<Int>>>.self,
+    &again)
+  
   checkForwardCollection(
     expected, base._prext_lazy, resiliencyChecks: .none
   ) { $0.value == $1.value }
+
+  var elements = base._prext_lazy.elements
+  expectType(MinimalForwardCollection<OpaqueValue<Int>>.self, &elements)
 }
 
 tests.test("LazyCollection/Passthrough") {
@@ -339,33 +371,41 @@ public struct _prext_MapGenerator<
 //===--- Sequences --------------------------------------------------------===//
 
 /// A `SequenceType` whose elements consist of those in a `Base`
-/// `SequenceType` passed through a transform function returning `T`.
+/// `SequenceType` passed through a transform function returning `Element`.
 /// These elements are computed lazily, each time they're read, by
 /// calling the transform function on a base element.
-public struct _prext_MapSequence<Base : SequenceType, T>
-  : _prext_LazySequenceType, _SequenceWrapperType {
+public struct _prext_MapSequence<Base : SequenceType, Element>
+  : _prext_LazySequenceType/*, _SequenceWrapperType*/ {
 
   public typealias Elements = _prext_MapSequence
   
   /// Return a *generator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> _prext_MapGenerator<Base.Generator,T> {
+  public func generate() -> _prext_MapGenerator<Base.Generator, Element> {
     return _prext_MapGenerator(
       _base: _base.generate(), _transform: _transform)
   }
 
+  /// Return a value less than or equal to the number of elements in
+  /// `self`, **nondestructively**.
+  ///
+  /// - Complexity: O(N).
+  public func underestimateCount() -> Int {
+    return _base.underestimateCount()
+  }
+  
   public var _base: Base
-  internal var _transform: (Base.Generator.Element)->T
+  internal var _transform: (Base.Generator.Element)->Element
 }
 
 //===--- Collections ------------------------------------------------------===//
 
 /// A `CollectionType` whose elements consist of those in a `Base`
-/// `CollectionType` passed through a transform function returning `T`.
+/// `CollectionType` passed through a transform function returning `Element`.
 /// These elements are computed lazily, each time they're read, by
 /// calling the transform function on a base element.
-public struct _prext_MapCollection<Base : CollectionType, T>
+public struct _prext_MapCollection<Base : CollectionType, Element>
   : _prext_LazyCollectionType {
 
   public var startIndex: Base.Index { return _base.startIndex }
@@ -375,14 +415,20 @@ public struct _prext_MapCollection<Base : CollectionType, T>
   ///
   /// - Requires: `position` is a valid position in `self` and
   ///   `position != endIndex`.
-  public subscript(position: Base.Index) -> T {
+  public subscript(position: Base.Index) -> Element {
     return _transform(_base[position])
   }
+
+  /// Returns `true` iff `self` is empty.
+  public var isEmpty: Bool { return _base.isEmpty }
+
+  public var first: Element? { return _base.first.map(_transform) }
+  
 
   /// Returns a *generator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  public func generate() -> _prext_MapGenerator<Base.Generator, T> {
+  public func generate() -> _prext_MapGenerator<Base.Generator, Element> {
     return _prext_MapGenerator(_base: _base.generate(), _transform: _transform)
   }
 
@@ -391,7 +437,7 @@ public struct _prext_MapCollection<Base : CollectionType, T>
   }
 
   public var _base: Base
-  var _transform: (Base.Generator.Element)->T
+  var _transform: (Base.Generator.Element)->Element
 }
 
 //===--- Support for lazy(s) ----------------------------------------------===//
@@ -415,6 +461,25 @@ extension _prext_LazyCollectionType {
     transform: (Elements.Generator.Element) -> U
   ) -> _prext_MapCollection<Self.Elements, U> {
     return _prext_MapCollection(_base: self.elements, _transform: transform)
+  }
+}
+
+tests.test("MapSequence") {
+  let base = MinimalSequence(
+    [2, 3, 5, 7, 11].map { OpaqueValue($0) })._prext_lazy
+
+  var mapped = base.map { OpaqueValue(Double($0.value) / 2.0) }
+  
+  expectType(
+    _prext_MapSequence<
+      MinimalSequence<OpaqueValue<Int>>, 
+      OpaqueValue<Double>>.self,
+    &mapped)
+  
+  let expected = [ 1.0, 1.5, 2.5, 3.5, 5.5 ].map {OpaqueValue($0)}
+  
+  checkSequence(expected, mapped, resiliencyChecks: .none) {
+    $0.value == $1.value
   }
 }
 
