@@ -1982,6 +1982,31 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
   }
 }
 
+static bool shouldEmitCategory(IRGenModule &IGM, ExtensionDecl *ext) {
+  for (auto conformance : ext->getLocalConformances()) {
+    if (conformance->getProtocol()->isObjC())
+      return true;
+  }
+
+  for (auto member : ext->getMembers()) {
+    if (auto func = dyn_cast<FuncDecl>(member)) {
+      if (requiresObjCMethodDescriptor(func))
+        return true;
+    } else if (auto constructor = dyn_cast<ConstructorDecl>(member)) {
+      if (requiresObjCMethodDescriptor(constructor))
+        return true;
+    } else if (auto var = dyn_cast<VarDecl>(member)) {
+      if (requiresObjCPropertyDescriptor(IGM, var))
+        return true;
+    } else if (auto subscript = dyn_cast<SubscriptDecl>(member)) {
+      if (requiresObjCSubscriptDescriptor(IGM, subscript))
+        return true;
+    }
+  }
+
+  return false;
+}
+
 void IRGenModule::emitExtension(ExtensionDecl *ext) {
   emitNestedTypeDecls(ext->getMembers());
 
@@ -1992,57 +2017,7 @@ void IRGenModule::emitExtension(ExtensionDecl *ext) {
   if (!origClass)
     return;
 
-  bool needsCategory = false;
-  if (!needsCategory) {
-    for (auto conformance : ext->getLocalConformances()) {
-      if (conformance->getProtocol()->isObjC()) {
-        needsCategory = true;
-        break;
-      }
-    }
-  }
-  if (!needsCategory) {
-    for (auto member : ext->getMembers()) {
-      if (auto func = dyn_cast<FuncDecl>(member)) {
-        if (requiresObjCMethodDescriptor(func)) {
-          needsCategory = true;
-          break;
-        }
-        continue;
-      }
-
-      if (auto constructor = dyn_cast<ConstructorDecl>(member)) {
-        if (requiresObjCMethodDescriptor(constructor)) {
-          needsCategory = true;
-          break;
-        }
-        continue;
-      }
-
-      if (auto var = dyn_cast<VarDecl>(member)) {
-        if (requiresObjCPropertyDescriptor(*this, var)) {
-          // Don't emit getters/setters for @NSManagedAttr properties.
-          // FIXME: We should still emit property metadata.
-          if (var->getAttrs().hasAttribute<NSManagedAttr>())
-            break;
-
-          needsCategory = true;
-          break;
-        }
-        continue;
-      }
-
-      if (auto subscript = dyn_cast<SubscriptDecl>(member)) {
-        if (requiresObjCSubscriptDescriptor(*this, subscript)) {
-          needsCategory = true;
-          break;
-        }
-        continue;
-      }
-    }
-  }
-  
-  if (needsCategory) {
+  if (shouldEmitCategory(*this, ext)) {
     assert(origClass && !origClass->isForeign() &&
            "CF types cannot have categories emitted");
     llvm::Constant *category = emitCategoryData(*this, ext);

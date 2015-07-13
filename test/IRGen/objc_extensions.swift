@@ -84,7 +84,7 @@ extension Gizmo {
 class Hoozit : NSObject {
 }
 
-// CHECK: @"_CATEGORY_INSTANCE_METHODS__TtC15objc_extensions6Hoozit_$_objc_extensions" = private constant
+// CHECK-LABEL: @"_CATEGORY_INSTANCE_METHODS__TtC15objc_extensions6Hoozit_$_objc_extensions" = private constant
 // CHECK:   i32 24,
 // CHECK:   i32 1,
 // CHECK:   [1 x { i8*, i8*, i8* }] [{ i8*, i8*, i8* } {
@@ -94,7 +94,7 @@ class Hoozit : NSObject {
 // CHECK:   }]
 // CHECK: }, section "__DATA, __objc_const", align 8
 
-// CHECK: @"_CATEGORY_CLASS_METHODS__TtC15objc_extensions6Hoozit_$_objc_extensions" = private constant
+// CHECK-LABEL: @"_CATEGORY_CLASS_METHODS__TtC15objc_extensions6Hoozit_$_objc_extensions" = private constant
 // CHECK:   i32 24,
 // CHECK:   i32 1,
 // CHECK:   [1 x { i8*, i8*, i8* }] [{ i8*, i8*, i8* } {
@@ -104,7 +104,7 @@ class Hoozit : NSObject {
 // CHECK:   }]
 // CHECK: }, section "__DATA, __objc_const", align 8
 
-// CHECK: @"_CATEGORY__TtC15objc_extensions6Hoozit_$_objc_extensions" = private constant
+// CHECK-LABEL: @"_CATEGORY__TtC15objc_extensions6Hoozit_$_objc_extensions" = private constant
 // CHECK:   i8* getelementptr inbounds ([16 x i8], [16 x i8]* [[CATEGORY_NAME]], i64 0, i64 0),
 // CHECK:   %swift.type* getelementptr inbounds ({{.*}} @_TMdC15objc_extensions6Hoozit {{.*}}),
 // CHECK:   {{.*}} @"_CATEGORY_INSTANCE_METHODS__TtC15objc_extensions6Hoozit_$_objc_extensions",
@@ -120,7 +120,7 @@ extension Hoozit {
 
 class SwiftOnly { }
 
-// CHECK: @"_CATEGORY_INSTANCE_METHODS__TtC15objc_extensions9SwiftOnly_$_objc_extensions" = private constant
+// CHECK-LABEL: @"_CATEGORY_INSTANCE_METHODS__TtC15objc_extensions9SwiftOnly_$_objc_extensions" = private constant
 // CHECK:   i32 24,
 // CHECK:   i32 1,
 // CHECK:   [1 x { i8*, i8*, i8* }] [{ i8*, i8*, i8* } {
@@ -144,4 +144,16 @@ extension Wotsit {
 
 extension NSObject {
   private enum SomeEnum { case X }
+}
+
+/*
+ * Make sure that @NSManaged causes a category to be generated.
+ */
+class NSDogcow : NSObject {}
+
+// CHECK: [[NAME:@.*]] = private unnamed_addr constant [5 x i8] c"woof\00"
+// CHECK: [[ATTR:@.*]] = private unnamed_addr constant [7 x i8] c"Tq,N,D\00"
+// CHECK: @"_CATEGORY_PROPERTIES__TtC15objc_extensions8NSDogcow_$_objc_extensions" = private constant {{.*}} [[NAME]], {{.*}} [[ATTR]], {{.*}}, section "__DATA, __objc_const", align 8
+extension NSDogcow {
+  @NSManaged var woof: Int
 }
