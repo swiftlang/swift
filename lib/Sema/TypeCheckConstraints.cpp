@@ -1064,43 +1064,42 @@ Optional<Type> TypeChecker::getTypeOfExpressionWithoutApplying(
   return exprType;
 }
 
-/// Private class to "cleanse" an expression tree of types. This is done in the
-/// case of a typecheck failure, where we may want to re-typecheck partially-
-/// typechecked subexpressions in a context-free manner.
-class TypeNullifier : public ASTWalker {
-public:
-  std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-    
-    // Preserve module expr type data to prevent further lookups.
-    if (auto *declRef = dyn_cast<DeclRefExpr>(expr))
-      if (isa<ModuleDecl>(declRef->getDecl()))
-        return { false, expr };
-    
-    expr->setType(nullptr);
-    
-    if (auto cast = dyn_cast<ExplicitCastExpr>(expr)) {
-      if (cast->getCastTypeLoc().getTypeRepr())
-        cast->getCastTypeLoc().setType(nullptr);
-    } else if (auto typeExpr = dyn_cast<TypeExpr>(expr)) {
-      if (typeExpr->getTypeLoc().getTypeRepr())
-        typeExpr->getTypeLoc().setType(nullptr);
-    } else if (auto unresolvedSpec = dyn_cast<UnresolvedSpecializeExpr>(expr)) {
-      for (auto &arg : unresolvedSpec->getUnresolvedParams()) {
-        if (arg.getTypeRepr())
-          arg.setType(nullptr);
-      }
-    }
-
-    return { true, expr };
-  }
-
-  std::pair<bool, Pattern*> walkToPatternPre(Pattern *pattern) override {
-    pattern->setType(nullptr);
-    return { true, pattern };
-  }
-};
-
 void TypeChecker::eraseTypeData(Expr *&expr) {
+  /// Private class to "cleanse" an expression tree of types. This is done in the
+  /// case of a typecheck failure, where we may want to re-typecheck partially-
+  /// typechecked subexpressions in a context-free manner.
+  class TypeNullifier : public ASTWalker {
+  public:
+    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      // Preserve module expr type data to prevent further lookups.
+      if (auto *declRef = dyn_cast<DeclRefExpr>(expr))
+        if (isa<ModuleDecl>(declRef->getDecl()))
+          return { false, expr };
+      
+      expr->setType(nullptr);
+      return { true, expr };
+    }
+    
+    // If we find a TypeLoc (e.g. in an as? expr) with a type variable, rewrite
+    // it.
+    bool walkToTypeLocPre(TypeLoc &TL) override {
+      if (TL.getTypeRepr())
+        TL.setType(Type(), /*was validated*/false);
+      return true;
+    }
+    
+    std::pair<bool, Pattern*> walkToPatternPre(Pattern *pattern) override {
+      pattern->setType(nullptr);
+      return { true, pattern };
+    }
+    
+    // Don't walk into statements.  This handles the BraceStmt in
+    // non-single-expr closures, so we don't walk into their body.
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+      return { false, S };
+    }
+  };
+
   expr->walk(TypeNullifier());
 }
 
