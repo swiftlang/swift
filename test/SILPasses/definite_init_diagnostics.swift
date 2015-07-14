@@ -1301,5 +1301,9 @@ extension ProtocolInitTest {
     i = ii                // expected-error {{'self' used before chaining to another self.init requirement}}
     self = unsafeBitCast(0, Self.self)
   }
+
+  init(test4 ii: Int) {
+    i = ii         // expected-error {{'self' used before chaining to another self.init requirement}}
+  }                // expected-error {{protocol extension initializer never chained to 'self.init'}}
 }
 
