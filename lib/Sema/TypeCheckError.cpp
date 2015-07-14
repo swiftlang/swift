@@ -1181,6 +1181,11 @@ public:
     }
   }
 
+  /// Mark that the current context is covered by a 'try'.
+  void setTryCovered() {
+    IsInTry = true;
+  }
+
 private:
   ShouldRecurse_t checkClosure(ClosureExpr *E) {
     ContextScope scope(*this, Context::forClosure(E));
@@ -1302,7 +1307,7 @@ private:
       if (!CurContext.handles(classification.getResult())) {
         CurContext.diagnoseUnhandledThrowSite(TC, E, isTryCovered,
                                               classification.getThrowsReason());
-      } else if (!isTryCovered && !TC.Context.LangOpts.EnableThrowWithoutTry) {
+      } else if (!isTryCovered) {
         CurContext.diagnoseUncoveredThrowSite(TC, E,
                                               classification.getThrowsReason());
       }
@@ -1353,6 +1358,11 @@ private:
 
 void TypeChecker::checkTopLevelErrorHandling(TopLevelCodeDecl *code) {
   CheckErrorCoverage checker(*this, Context::forTopLevelCode(code));
+
+  // In some language modes, we allow top-level code to omit 'try' marking.
+  if (Context.LangOpts.EnableThrowWithoutTry)
+    checker.setTryCovered();
+
   code->getBody()->walk(checker);
 }
 
