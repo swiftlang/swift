@@ -141,6 +141,8 @@ void swift::ide::printSubmoduleInterface(
        const PrintOptions &Options) {
   auto AdjustedOptions = Options;
   adjustPrintOptions(AdjustedOptions);
+  auto PrintInternalProtocol = Options.PrintInternalStdlibProtocols &&
+                               M->isStdlibModule();
 
   SmallVector<Decl *, 1> Decls;
   M->getDisplayDecls(Decls);
@@ -207,6 +209,10 @@ void swift::ide::printSubmoduleInterface(
     // If requested, skip unavailable declarations.
     if (Options.SkipUnavailable && D->getAttrs().isUnavailable(SwiftContext))
       continue;
+
+    if (PrintInternalProtocol && ASTPrinter::isInternalProtocol(D)) {
+      SwiftDecls.push_back(D);
+    }
 
     // Skip declarations that are not accessible.
     if (auto *VD = dyn_cast<ValueDecl>(D)) {

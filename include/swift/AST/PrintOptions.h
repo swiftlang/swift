@@ -144,6 +144,10 @@ struct PrintOptions {
   /// Whether we are printing part of SIL body.
   bool PrintInSILBody = false;
 
+  /// Wheter we print the internal protocols in stdlib whose names start with no
+  /// '_'. rdar://21515803
+  bool PrintInternalStdlibProtocols = false;
+
   enum class ArgAndParamPrintingMode {
     ArgumentOnly,
     MatchSource,
@@ -198,6 +202,7 @@ struct PrintOptions {
     result.PrintFunctionRepresentationAttrs = false;
     result.PrintOverrideKeyword = false;
     result.AccessibilityFilter = Accessibility::Public;
+    result.PrintInternalStdlibProtocols = true;
     return result;
   }
 
@@ -212,6 +217,7 @@ struct PrintOptions {
     result.PrintDocumentationComments = false;
     result.PrintRegularClangComments = false;
     result.PrintAccessibility = false;
+    result.PrintInternalStdlibProtocols = true;
     return result;
   }
 
