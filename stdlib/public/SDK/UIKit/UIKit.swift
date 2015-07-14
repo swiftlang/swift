@@ -198,8 +198,11 @@ struct _UIViewMirror : _MirrorType {
           }
       
           UIGraphicsBeginImageContextWithOptions(bounds.size, false, 0.0)
-      
-          let ctx = UIGraphicsGetCurrentContext()
+
+          // UIKit is about to update this to be optional, so make it work
+          // with both older and newer SDKs. (In this context it should always
+          // be present.)
+          let ctx: CGContext! = UIGraphicsGetCurrentContext()
           UIColor(white:1.0, alpha:0.0).set()
           CGContextFillRect(ctx, bounds)
           _v.layer.renderInContext(ctx)
