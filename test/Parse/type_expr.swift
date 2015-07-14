@@ -54,6 +54,9 @@ func unqualifiedType() {
 
   _ = Foo // expected-error{{expected member name or constructor call after type name}} expected-note{{add arguments}} expected-note{{use '.self'}}
   _ = Foo.dynamicType // expected-error{{'.dynamicType' is not allowed after a type name}}
+
+  _ = Bad // expected-error{{expected member name or constructor call after type name}}
+  // expected-note@-1{{use '.self' to reference the type object}}{{10-10=.self}}
 }
 
 func qualifiedType() {

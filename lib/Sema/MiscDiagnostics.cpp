@@ -305,10 +305,20 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E) {
         }
       }
 
+      // Is this a protocol metatype?
+
       TC.diagnose(E->getStartLoc(), diag::value_of_metatype_type);
-      // Add fixits to insert '()' or '.self'.
-      TC.diagnose(E->getEndLoc(), diag::add_parens_to_type)
-        .fixItInsertAfter(E->getEndLoc(), "()");
+
+      // Add fix-t to insert '()', unless this is a protocol metatype.
+      bool isProtocolMetatype = false;
+      if (auto metaTy = E->getType()->getAs<MetatypeType>())
+        isProtocolMetatype = metaTy->getInstanceType()->is<ProtocolType>();
+      if (!isProtocolMetatype) {
+        TC.diagnose(E->getEndLoc(), diag::add_parens_to_type)
+          .fixItInsertAfter(E->getEndLoc(), "()");
+      }
+
+      // Add fix-it to insert ".self".
       TC.diagnose(E->getEndLoc(), diag::add_self_to_type)
         .fixItInsertAfter(E->getEndLoc(), ".self");
     }
