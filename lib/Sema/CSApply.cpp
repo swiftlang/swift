@@ -956,7 +956,7 @@ namespace {
 
         ref->setType(refType);
 
-        closeExistential(ref, /*force=*/true);
+        closeExistential(ref, /*force=*/openedExistential);
 
         return ref;
       }
@@ -997,7 +997,7 @@ namespace {
         // Reference to an unbound instance method.
         Expr *result = new (context) DotSyntaxBaseIgnoredExpr(base, dotLoc,
                                                               ref);
-        closeExistential(result, /*force=*/true);
+        closeExistential(result, /*force=*/openedExistential);
         return result;
       } else {
         assert((!baseIsInstance || member->isInstanceMember()) &&

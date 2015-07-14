@@ -71,3 +71,17 @@ extension P2 {
 func testP2(pt: P2.Type) {
   pt.init().elements
 }
+
+// rdar://problem/21597711
+protocol P3 {
+  func withP3(fn: (P3) -> ())
+}
+
+class Something {
+  func takeP3(p: P3) { }
+}
+
+
+func testP3(p: P3, something: Something) {
+  p.withP3(Something.takeP3(something))
+}
