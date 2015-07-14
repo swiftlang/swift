@@ -645,10 +645,13 @@ namespace {
         if (!fnTy)
           return false;
         
-        // Figure out the parameter type.
+        // Figure out the parameter type, accounting for the implicit 'self' if
+        // necessary.
         if (auto *FD = dyn_cast<AbstractFunctionDecl>(value)) {
           if (FD->getImplicitSelfDecl()) {
-            fnTy = fnTy->getResult()->castTo<AnyFunctionType>();
+            if (auto resFnTy = fnTy->getResult()->getAs<AnyFunctionType>()) {
+              fnTy = resFnTy;
+            }
           }
         }
         Type paramTy = fnTy->getInput();

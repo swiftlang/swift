@@ -694,3 +694,12 @@ func testParenExprInTheWay() {
   
   if x & x {} // expected-error {{'Int' is not convertible to 'BooleanType'}}
 }
+
+// <rdar://problem/21352576> Mixed method/property overload groups can cause a crash during constraint optimization
+public struct TestPropMethodOverloadGroup {
+    public typealias Hello = String
+    public let apply:(Hello) -> Int
+    public func apply(input:Hello) -> Int {
+        return apply(input)
+    }
+}
