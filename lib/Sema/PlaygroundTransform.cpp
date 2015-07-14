@@ -448,7 +448,6 @@ public:
   };
 
   class ErrorFinder : public ASTWalker {
-  private:
     bool error = false;
   public:
     ErrorFinder () { }
@@ -479,9 +478,7 @@ public:
     ErrorGatherer errorGatherer(diags);
   
     TypeChecker TC(Ctx, diags);
-    TC.typeCheckExpression(*parsedExpr, DC, Type(), Type(),
-                           TypeCheckExprOptions(),
-                           FreeTypeVariableBinding::GenericParameters);
+    TC.typeCheckExpression(*parsedExpr, DC);
     
     if (*parsedExpr) {
       ErrorFinder errorFinder;
