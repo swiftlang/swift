@@ -372,7 +372,7 @@ extension _ArrayBuffer {
 
   @inline(never)
   func _getElementSlowPath(i: Int) -> AnyObject {
-    assert(_isClassOrObjCExistential(Element.self), "Only single reference elements can be indexed here.")
+    _sanityCheck(_isClassOrObjCExistential(Element.self), "Only single reference elements can be indexed here.")
     let element: AnyObject
     if _isNative {
       // _isValidSubscript does no subscript checking for the slow path.
