@@ -45,6 +45,7 @@ struct LLVM_LIBRARY_VISIBILITY LValueWriteback {
   ManagedValue base;
   ManagedValue temp;
   SmallVector<SILValue, 2> ExtraInfo;
+  CleanupHandle cleanup;
 
   ~LValueWriteback() {}
   LValueWriteback(LValueWriteback&&) = default;
@@ -54,8 +55,10 @@ struct LLVM_LIBRARY_VISIBILITY LValueWriteback {
   LValueWriteback(SILLocation loc,
                   std::unique_ptr<LogicalPathComponent> &&comp,
                   ManagedValue base, ManagedValue temp,
-                  ArrayRef<SILValue> extraInfo)
-    : loc(loc), component(std::move(comp)), base(base), temp(temp) {
+                  ArrayRef<SILValue> extraInfo,
+                  CleanupHandle cleanup)
+    : loc(loc), component(std::move(comp)), base(base), temp(temp),
+      cleanup(cleanup) {
     ExtraInfo.append(extraInfo.begin(), extraInfo.end());
   }
 
@@ -75,11 +78,22 @@ struct LLVM_LIBRARY_VISIBILITY LValueWriteback {
     component->diagnoseWritebackConflict(rhs.component.get(), loc, rhs.loc,SGF);
   }
 
-  void performWriteback(SILGenFunction &gen) && {
-    std::move(*component).writeback(gen, loc, base, temp, ExtraInfo);
+  void performWriteback(SILGenFunction &gen, bool isFinal) {
+    component->writeback(gen, loc, base, temp, ExtraInfo, isFinal);
   }
 };
 }
+}
+
+namespace {
+  class LValueWritebackCleanup : public Cleanup {
+    unsigned Depth;
+  public:
+    LValueWritebackCleanup(unsigned depth) : Depth(depth) {}
+    void emit(SILGenFunction &gen, CleanupLocation loc) override {
+      gen.getWritebackStack()[Depth].performWriteback(gen, /*isFinal*/ false);
+    }
+  };
 }
 
 std::vector<LValueWriteback> &SILGenFunction::getWritebackStack() {
@@ -93,6 +107,22 @@ void SILGenFunction::freeWritebackStack() {
   assert((!WritebackStack || WritebackStack->empty()) &&
          "entries remaining on writeback stack at end of function!");
   delete WritebackStack;
+}
+
+/// Push a writeback onto the current LValueWriteback stack.
+static void pushWriteback(SILGenFunction &gen,
+                          SILLocation loc,
+                          std::unique_ptr<LogicalPathComponent> &&comp,
+                          ManagedValue base, ManagedValue temp,
+                          ArrayRef<SILValue> extraInfo) {
+  assert(gen.InWritebackScope);
+
+  // Push a cleanup to execute the writeback consistently.
+  auto &stack = gen.getWritebackStack();
+  gen.Cleanups.pushCleanup<LValueWritebackCleanup>(stack.size());
+  auto cleanup = gen.Cleanups.getTopCleanup();
+
+  stack.emplace_back(loc, std::move(comp), base, temp, extraInfo, cleanup);
 }
 
 //===----------------------------------------------------------------------===//
@@ -206,27 +236,35 @@ ManagedValue LogicalPathComponent::getMaterialized(SILGenFunction &gen,
                                                 std::move(*this));
 
   // Push a writeback for the temporary.
-  gen.getWritebackStack().emplace_back(loc, std::move(clonedComponent), base,
-                                       temporary, ArrayRef<SILValue>());
+  pushWriteback(gen, loc, std::move(clonedComponent), base, temporary, {});
   return temporary.borrow();
 }
 
 void LogicalPathComponent::writeback(SILGenFunction &gen, SILLocation loc,
                                      ManagedValue base, ManagedValue temporary,
-                                     ArrayRef<SILValue> otherInfo) && {
+                                     ArrayRef<SILValue> otherInfo, bool isFinal) {
   assert(otherInfo.empty() && "unexpected otherInfo parameter!");
 
-  // Load the value from the temporary if it's not address-only.
+  // Load the value from the temporary unless the type is address-only
+  // and this is the final use, in which case we can just consume the
+  // value as-is.
   assert(temporary.getType().isAddress());
   auto &tempTL = gen.getTypeLowering(temporary.getType());
-  if (!tempTL.isAddressOnly()) {
-    temporary = gen.emitLoad(loc, temporary.forward(gen), tempTL,
-                             SGFContext(), IsTake);
+  if (!tempTL.isAddressOnly() || !isFinal) {
+    if (isFinal) temporary.forward(gen);
+    temporary = gen.emitLoad(loc, temporary.getValue(), tempTL,
+                             SGFContext(), IsTake_t(isFinal));
   }
+  RValue rvalue(gen, loc, getSubstFormalType(), temporary);
 
-  std::move(*this).set(gen, loc, RValue(gen, loc, getSubstFormalType(),
-                                        temporary),
-                       base);
+  // Don't consume cleanups on the base if this isn't final.
+  if (!isFinal) { base = ManagedValue::forUnmanaged(base.getValue()); }
+
+  // Clone the component if this isn't final.
+  std::unique_ptr<LogicalPathComponent> clonedComponent =
+    (isFinal ? nullptr : clone(gen, loc));
+  LogicalPathComponent *component = (isFinal ? this : &*clonedComponent);
+  std::move(*component).set(gen, loc, std::move(rvalue), base);
 }
 
 WritebackScope::WritebackScope(SILGenFunction &g)
@@ -255,6 +293,9 @@ void WritebackScope::popImpl() {
   while (prevIndex-- > savedDepth) {
     auto index = prevIndex;
 
+    // Deactivate the cleanup.
+    gen->Cleanups.setCleanupState(stack[index].cleanup, CleanupState::Dead);
+
     // Attempt to diagnose problems where obvious aliasing introduces illegal
     // code.  We do a simple N^2 comparison here to detect this because it is
     // extremely unlikely more than a few writebacks are active at once.
@@ -266,7 +307,7 @@ void WritebackScope::popImpl() {
     //
     // This evaluates arbitrary code, so it's best to be paranoid
     // about iterators on the stack.
-    std::move(stack[index]).performWriteback(*gen);
+    stack[index].performWriteback(*gen, /*isFinal*/ true);
   }
 
   assert(depthAtPop == stack.size() &&
@@ -827,22 +868,20 @@ namespace {
       // TODO: maybe needsWriteback should be a thin function pointer
       // to which we pass the base?  That would let us use direct
       // access for stored properties with didSet.
-      gen.getWritebackStack().emplace_back(loc, std::move(clonedComponent),
-                                           base,
-                                           ManagedValue::forUnmanaged(address),
-                                           extraInfo);
+      pushWriteback(gen, loc, std::move(clonedComponent), base,
+                    ManagedValue::forUnmanaged(address), extraInfo);
 
       return ManagedValue::forLValue(address);
     }
 
     void writeback(SILGenFunction &gen, SILLocation loc,
                    ManagedValue base, ManagedValue temporary,
-                   ArrayRef<SILValue> extraInfo) && override {
+                   ArrayRef<SILValue> extraInfo, bool isFinal) override {
       // If we don't have otherInfo, we don't have to conditionalize
       // the writeback.
       if (extraInfo.empty()) {
-        std::move(*this).LogicalPathComponent::writeback(gen, loc, base,
-                                                         temporary, extraInfo);
+        LogicalPathComponent::writeback(gen, loc, base, temporary, extraInfo,
+                                        isFinal);
         return;
       }
 
@@ -883,8 +922,9 @@ namespace {
         SILType metatypeType = callbackType->getParameters().back().getSILType();
 
         // We need to borrow the base here.  We can't just consume it
-        // because we're in conditionally-executed code.  We also need
-        // to pass it indirectly.
+        // because we're in conditionally-executed code (and because
+        // this might be a non-final use).  We also need to pass it
+        // indirectly.
         SILValue baseAddress;
         SILValue baseMetatype;
         if (base) {
@@ -1063,8 +1103,14 @@ namespace {
 
     void writeback(SILGenFunction &gen, SILLocation loc,
                    ManagedValue base, ManagedValue temporary,
-                   ArrayRef<SILValue> otherInfo) && override {
-      gen.B.createStrongUnpin(loc, base.forward(gen));
+                   ArrayRef<SILValue> otherInfo, bool isFinal) override {
+      // If this is final, we can consume the owner (stored as
+      // 'base').  If it isn't, we actually need to retain it, because
+      // we've still got a release active.
+      SILValue baseValue = (isFinal ? base.forward(gen) : base.getValue());
+      if (!isFinal) gen.B.createRetainValue(loc, baseValue);
+
+      gen.B.createStrongUnpin(loc, baseValue);
     }
 
     void print(raw_ostream &OS) const override {
@@ -1128,9 +1174,8 @@ namespace {
       case AddressorKind::NativePinning: {
         std::unique_ptr<LogicalPathComponent>
           component(new UnpinPseudoComponent(getTypeData()));
-        gen.getWritebackStack().emplace_back(loc, std::move(component),
-                                             result.second, ManagedValue(),
-                                             ArrayRef<SILValue>());
+        pushWriteback(gen, loc, std::move(component), result.second,
+                      ManagedValue(), {});
         return result.first;
       }
       }

@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -emit-silgen -verify %s | FileCheck %s
+// RUN: %target-swift-frontend -parse-stdlib -emit-silgen -verify %s | FileCheck %s
+
+import Swift
 
 class Cat {}
 
@@ -444,3 +446,209 @@ class BaseThrowingInit : HasThrowingInit {
 // CHECK-NEXT: [[T3:%.*]] = null_class $BaseThrowingInit
 // CHECK-NEXT: store [[T3]] to [[MARKED_BOX]]
 // CHECK-NEXT: apply [[T2]](%0, [[T1]])
+
+// Cleanups for writebacks.
+
+protocol Supportable {
+  mutating func support() throws
+}
+protocol Buildable {
+  typealias Structure : Supportable
+  var firstStructure: Structure { get set }
+  subscript(name: String) -> Structure { get set }
+}
+func supportFirstStructure<B: Buildable>(inout b: B) throws {
+  try b.firstStructure.support()
+}
+// CHECK-LABEL: sil hidden @_TF6errors21supportFirstStructureuRq_S_9Buildable_FzRq_T_ : $@convention(thin) <B where B : Buildable, B.Structure : Supportable> (@inout B) -> @error ErrorType {
+// CHECK: [[SUPPORT:%.*]] = witness_method $B.Structure, #Supportable.support!1 :
+// CHECK: [[MATBUFFER:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
+// CHECK: [[BUFFER:%.*]] = alloc_stack $B.Structure
+// CHECK: [[BUFFER_CAST:%.*]] = address_to_pointer [[BUFFER]]#1 : $*B.Structure to $Builtin.RawPointer
+// CHECK: [[MAT:%.*]] = witness_method $B, #Buildable.firstStructure!materializeForSet.1 :
+// CHECK: [[T1:%.*]] = apply [[MAT]]<B, B.Structure>([[BUFFER_CAST]], [[MATBUFFER]]#1, [[BASE:%.*#1]])
+// CHECK: [[T2:%.*]] = tuple_extract [[T1]] : {{.*}}, 0
+// CHECK: [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to $*B.Structure
+// CHECK: [[CALLBACK:%.*]] = tuple_extract [[T1]] : {{.*}}, 1
+// CHECK: [[T4:%.*]] = mark_dependence [[T3]] : $*B.Structure on [[BASE]] : $*B
+// CHECK: try_apply [[SUPPORT]]<B.Structure>([[T4]]) : {{.*}}, normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERROR:bb[0-9]+]]
+
+// CHECK: [[BB_NORMAL]]
+// CHECK: switch_enum [[CALLBACK]]
+// CHECK: apply
+// CHECK: dealloc_stack [[BUFFER]]
+// CHECK: dealloc_stack [[MATBUFFER]]
+// CHECK: return
+
+// CHECK: [[BB_ERROR]]([[ERROR:%.*]] : $ErrorType):
+// CHECK: switch_enum [[CALLBACK]]
+// CHECK: apply
+// CHECK: dealloc_stack [[BUFFER]]
+// CHECK: dealloc_stack [[MATBUFFER]]
+// CHECK: throw [[ERROR]]
+
+func supportStructure<B: Buildable>(inout b: B, name: String) throws {
+  try b[name].support()
+}
+// CHECK-LABEL: sil hidden @_TF6errors16supportStructureuRq_S_9Buildable_FzTRq_4nameSS_T_
+// CHECK: [[SUPPORT:%.*]] = witness_method $B.Structure, #Supportable.support!1 :
+// CHECK: retain_value [[INDEX:%1]] : $String
+// CHECK: [[MATBUFFER:%.*]] = alloc_stack $Builtin.UnsafeValueBuffer
+// CHECK: [[BUFFER:%.*]] = alloc_stack $B.Structure
+// CHECK: [[BUFFER_CAST:%.*]] = address_to_pointer [[BUFFER]]#1 : $*B.Structure to $Builtin.RawPointer
+// CHECK: [[MAT:%.*]] = witness_method $B, #Buildable.subscript!materializeForSet.1 :
+// CHECK: [[T1:%.*]] = apply [[MAT]]<B, B.Structure>([[BUFFER_CAST]], [[MATBUFFER]]#1, [[INDEX]], [[BASE:%.*#1]])
+// CHECK: [[T2:%.*]] = tuple_extract [[T1]] : {{.*}}, 0
+// CHECK: [[T3:%.*]] = pointer_to_address [[T2]] : $Builtin.RawPointer to $*B.Structure
+// CHECK: [[CALLBACK:%.*]] = tuple_extract [[T1]] : {{.*}}, 1
+// CHECK: [[T4:%.*]] = mark_dependence [[T3]] : $*B.Structure on [[BASE]] : $*B
+// CHECK: try_apply [[SUPPORT]]<B.Structure>([[T4]]) : {{.*}}, normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERROR:bb[0-9]+]]
+
+// CHECK: [[BB_NORMAL]]
+// CHECK: switch_enum [[CALLBACK]]
+// CHECK: apply
+// CHECK: dealloc_stack [[BUFFER]]
+// CHECK: dealloc_stack [[MATBUFFER]]
+// CHECK: release_value [[INDEX]] : $String
+// CHECK: return
+
+// CHECK: [[BB_ERROR]]([[ERROR:%.*]] : $ErrorType):
+// CHECK: switch_enum [[CALLBACK]]
+// CHECK: apply
+// CHECK: dealloc_stack [[BUFFER]]
+// CHECK: dealloc_stack [[MATBUFFER]]
+// CHECK: release_value [[INDEX]] : $String
+// CHECK: throw [[ERROR]]
+
+struct Pylon {
+  var name: String
+  mutating func support() throws {}
+}
+struct Bridge {
+  var mainPylon : Pylon
+  subscript(name: String) -> Pylon {
+    get {
+      return mainPylon
+    }
+    set {}
+  }
+}
+func supportStructure(inout b: Bridge, name: String) throws {
+  try b[name].support()
+}
+// CHECK:    sil hidden @_TF6errors16supportStructureFzTRVS_6Bridge4nameSS_T_ :
+// CHECK:      [[SUPPORT:%.*]] = function_ref @_TFV6errors5Pylon7supportfRS0_FzT_T_ 
+// CHECK:      retain_value [[INDEX:%1]] : $String
+// CHECK-NEXT: retain_value [[INDEX]] : $String
+// CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $Pylon
+// CHECK-NEXT: [[BASE:%.*]] = load [[B:%2#1]] : $*Bridge
+// CHECK-NEXT: retain_value [[BASE]]
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: [[GETTER:%.*]] = function_ref @_TFV6errors6Bridgeg9subscriptFSSVS_5Pylon :
+// CHECK-NEXT: [[T0:%.*]] = apply [[GETTER]]([[INDEX]], [[BASE]])
+// CHECK-NEXT: release_value [[BASE]]
+// CHECK-NEXT: store [[T0]] to [[TEMP]]#1
+// CHECK-NEXT: try_apply [[SUPPORT]]([[TEMP]]#1) : {{.*}}, normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERROR:bb[0-9]+]]
+
+// CHECK:    [[BB_NORMAL]]
+// CHECK-NEXT: [[T0:%.*]] = load [[TEMP]]#1
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: [[SETTER:%.*]] = function_ref @_TFV6errors6Bridges9subscriptFSSVS_5Pylon :
+// CHECK-NEXT: apply [[SETTER]]([[T0]], [[INDEX]], [[B]])
+// CHECK-NEXT: dealloc_stack [[TEMP]]#0
+// CHECK-NEXT: release_value [[INDEX]] : $String
+// CHECK-NEXT: copy_addr
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: tuple ()
+// CHECK-NEXT: return
+
+//   We end up with ugly redundancy here because we don't want to
+//   consume things during cleanup emission.  It's questionable.
+// CHECK:    [[BB_ERROR]]([[ERROR:%.*]] : $ErrorType):
+// CHECK-NEXT: [[T0:%.*]] = load [[TEMP]]#1
+// CHECK-NEXT: retain_value [[T0]]
+// CHECK-NEXT: retain_value [[INDEX]] : $String
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: [[SETTER:%.*]] = function_ref @_TFV6errors6Bridges9subscriptFSSVS_5Pylon :
+// CHECK-NEXT: apply [[SETTER]]([[T0]], [[INDEX]], [[B]])
+// CHECK-NEXT: destroy_addr [[TEMP]]#1
+// CHECK-NEXT: dealloc_stack [[TEMP]]#0
+// CHECK-NEXT: release_value [[INDEX]] : $String
+// CHECK-NEXT: release_value [[INDEX]] : $String
+// CHECK-NEXT: copy_addr
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: throw [[ERROR]]
+
+struct OwnedBridge {
+  var owner : Builtin.UnknownObject
+  subscript(name: String) -> Pylon {
+    addressWithOwner { return (nil, owner) }
+    mutableAddressWithOwner { return (nil, owner) }
+  }
+}
+func supportStructure(inout b: OwnedBridge, name: String) throws {
+  try b[name].support()
+}
+// CHECK: sil hidden @_TF6errors16supportStructureFzTRVS_11OwnedBridge4nameSS_T_ :
+// CHECK:      [[SUPPORT:%.*]] = function_ref @_TFV6errors5Pylon7supportfRS0_FzT_T_ 
+// CHECK:      retain_value [[INDEX:%1]] : $String
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: [[ADDRESSOR:%.*]] = function_ref @_TFV6errors11OwnedBridgeaO9subscriptFSSVS_5Pylon :
+// CHECK-NEXT: [[T0:%.*]] = apply [[ADDRESSOR]]([[INDEX]], [[BASE:%2#1]])
+// CHECK-NEXT: [[T1:%.*]] = tuple_extract [[T0]] : {{.*}}, 0
+// CHECK-NEXT: [[OWNER:%.*]] = tuple_extract [[T0]] : {{.*}}, 1
+// CHECK-NEXT: [[T3:%.*]] = struct_extract [[T1]]
+// CHECK-NEXT: [[T4:%.*]] = pointer_to_address [[T3]]
+// CHECK-NEXT: [[T5:%.*]] = mark_dependence [[T4]] : $*Pylon on [[OWNER]]
+// CHECK-NEXT: try_apply [[SUPPORT]]([[T5]]) : {{.*}}, normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERROR:bb[0-9]+]]
+// CHECK:    [[BB_NORMAL]]
+// CHECK-NEXT: strong_release [[OWNER]] : $Builtin.UnknownObject
+// CHECK-NEXT: release_value [[INDEX]] : $String
+// CHECK-NEXT: copy_addr
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: tuple ()
+// CHECK-NEXT: return
+// CHECK:    [[BB_ERROR]]([[ERROR:%.*]] : $ErrorType):
+// CHECK-NEXT: strong_release [[OWNER]] : $Builtin.UnknownObject
+// CHECK-NEXT: release_value [[INDEX]] : $String
+// CHECK-NEXT: copy_addr
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: throw [[ERROR]]
+
+struct PinnedBridge {
+  var owner : Builtin.NativeObject
+  subscript(name: String) -> Pylon {
+    addressWithPinnedNativeOwner { return (nil, owner) }
+    mutableAddressWithPinnedNativeOwner { return (nil, owner) }
+  }
+}
+func supportStructure(inout b: PinnedBridge, name: String) throws {
+  try b[name].support()
+}
+// CHECK: sil hidden @_TF6errors16supportStructureFzTRVS_12PinnedBridge4nameSS_T_ :
+// CHECK:      [[SUPPORT:%.*]] = function_ref @_TFV6errors5Pylon7supportfRS0_FzT_T_ 
+// CHECK:      retain_value [[INDEX:%1]] : $String
+// CHECK-NEXT: function_ref
+// CHECK-NEXT: [[ADDRESSOR:%.*]] = function_ref @_TFV6errors12PinnedBridgeap9subscriptFSSVS_5Pylon :
+// CHECK-NEXT: [[T0:%.*]] = apply [[ADDRESSOR]]([[INDEX]], [[BASE:%2#1]])
+// CHECK-NEXT: [[T1:%.*]] = tuple_extract [[T0]] : {{.*}}, 0
+// CHECK-NEXT: [[OWNER:%.*]] = tuple_extract [[T0]] : {{.*}}, 1
+// CHECK-NEXT: [[T3:%.*]] = struct_extract [[T1]]
+// CHECK-NEXT: [[T4:%.*]] = pointer_to_address [[T3]]
+// CHECK-NEXT: [[T5:%.*]] = mark_dependence [[T4]] : $*Pylon on [[OWNER]]
+// CHECK-NEXT: try_apply [[SUPPORT]]([[T5]]) : {{.*}}, normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERROR:bb[0-9]+]]
+// CHECK:    [[BB_NORMAL]]
+// CHECK-NEXT: strong_unpin [[OWNER]] : $Optional<Builtin.NativeObject>
+// CHECK-NEXT: release_value [[INDEX]] : $String
+// CHECK-NEXT: copy_addr
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: tuple ()
+// CHECK-NEXT: return
+// CHECK:    [[BB_ERROR]]([[ERROR:%.*]] : $ErrorType):
+// CHECK-NEXT: retain_value [[OWNER]]
+// CHECK-NEXT: strong_unpin [[OWNER]] : $Optional<Builtin.NativeObject>
+// CHECK-NEXT: release_value [[OWNER]]
+// CHECK-NEXT: release_value [[INDEX]] : $String
+// CHECK-NEXT: copy_addr
+// CHECK-NEXT: strong_release
+// CHECK-NEXT: throw [[ERROR]]
