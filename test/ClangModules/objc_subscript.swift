@@ -40,3 +40,16 @@ class KeySubscript4Sub : KeySubscript4 {
     set { }
   }
 }
+
+class ConformsToKeySubscriptProto1 : KeySubscriptProto1 {
+  @objc subscript (s: String) -> String? {
+    return s
+  }
+}
+
+class ConformsToKeySubscriptProto2 : KeySubscriptProto2 {
+  @objc subscript (s: String!) -> String! {
+    get { return s }
+    set { }
+  }
+}

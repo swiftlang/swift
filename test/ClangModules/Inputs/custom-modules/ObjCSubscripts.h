@@ -20,3 +20,12 @@
 - (nullable NSString *)objectForKeyedSubscript:(nonnull NSArray *)subscript;
 - (void)setObject:(nullable NSString *)object forKeyedSubscript:(nonnull NSArray *)key;
 @end
+
+@protocol KeySubscriptProto1
+- (nullable NSString *)objectForKeyedSubscript:(nonnull NSString *)subscript;
+@end
+
+@protocol KeySubscriptProto2
+- (NSString *)objectForKeyedSubscript:(NSString *)subscript;
+- (void)setObject:(NSString *)object forKeyedSubscript:(NSString *)key;
+@end

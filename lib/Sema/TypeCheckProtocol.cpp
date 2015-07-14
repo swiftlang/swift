@@ -1663,7 +1663,8 @@ void ConformanceChecker::recordOptionalWitness(ValueDecl *requirement) {
 
   // If the requirement is @objc, note that we have an unsatisfied
   // optional @objc requirement.
-  if (requirement->isObjC()) {
+  if (requirement->isObjC() &&
+      !requirement->getAttrs().isUnavailable(TC.Context)) {
     // If we're not suppressing diagnostics, look for a non-@objc near
     // match.
     if (!SuppressDiagnostics)
