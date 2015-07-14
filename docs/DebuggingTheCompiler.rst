@@ -113,6 +113,15 @@ debugging press <CTRL>-C on the LLDB prompt.
 Note that this only works in Xcode if the PATH variable in the scheme's
 environment setting contains the path to the dot tool.
 
+Other Utilities
+```````````````
+
+To view the CFG of a function (or code region) in a SIL file, you can use the
+script ``swift/utils/viewcfg``. It also works for LLVM IR files.
+The script reads the SIL (or LLVM IR) code from stdin and displays the dot
+graph file. Note: .dot files should be associated with the Graphviz app.
+
+
 Using Breakpoints
 `````````````````
 
