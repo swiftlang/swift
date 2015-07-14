@@ -494,8 +494,12 @@ DeclContext::isCascadingContextForLookup(bool functionsAreNonCascading) const {
     // FIXME: duplicated from computeDefaultAccessibility in TypeCheckDecl.cpp.
     if (auto *AA = extension->getAttrs().getAttribute<AccessibilityAttr>())
       return AA->getAccess() > Accessibility::Private;
-    if (Type extendedTy = extension->getExtendedType())
-      return extendedTy->getAnyNominal()->isCascadingContextForLookup(true);
+    if (Type extendedTy = extension->getExtendedType()) {
+
+      // Need to check if extendedTy is ErrorType
+      if (extendedTy->getAnyNominal())
+        return extendedTy->getAnyNominal()->isCascadingContextForLookup(true);
+    }
     break;
   }
   }
