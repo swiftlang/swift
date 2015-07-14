@@ -245,7 +245,7 @@ void NormalProtocolConformance::setWitness(ValueDecl *requirement,
   assert(getProtocol() == cast<ProtocolDecl>(requirement->getDeclContext()) &&
          "requirement in wrong protocol");
   assert(Mapping.count(requirement) == 0 && "Witness already known");
-  assert(!isComplete() && "Conformance already complete?");
+  assert((!isComplete() || isInvalid()) && "Conformance already complete?");
   Mapping[requirement] = witness;
 }
 
