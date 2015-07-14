@@ -1275,6 +1275,8 @@ class DerivedThrowingInitializer : ThrowingInitializer {
 protocol ProtocolInitTest {
   init()
   init(a : Int)
+
+  var i: Int { get set }
 }
 
 extension ProtocolInitTest {
@@ -1284,6 +1286,20 @@ extension ProtocolInitTest {
   init(b : Float) {
     self.init(a: 42)  // ok
   }
-}
 
+  init(test1 ii: Int) {
+    i = ii         // expected-error {{use of 'self' in delegating initializer before self.init is called}}
+    self.init()
+  }
+
+  init(test2 ii: Int) {
+    self = unsafeBitCast(0, Self.self)
+    i = ii
+  }
+
+  init(test3 ii: Int) {
+    i = ii                // expected-error {{'self' used before chaining to another self.init requirement}}
+    self = unsafeBitCast(0, Self.self)
+  }
+}
 

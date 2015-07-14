@@ -117,6 +117,9 @@ ERROR(self_use_before_fully_init,sil_analysis,none,
       "super.init initializes self}2", (Identifier, bool, bool))
 ERROR(use_of_self_before_fully_init,sil_analysis,none,
       "'self' used before all stored properties are initialized", ())
+ERROR(use_of_self_before_fully_init_protocol,sil_analysis,none,
+      "'self' used before chaining to another self.init requirement", ())
+
 
 NOTE(stored_property_not_initialized,sil_analysis,none,
      "'%0' not initialized", (StringRef))

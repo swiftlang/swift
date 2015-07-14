@@ -711,9 +711,10 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
         // individual sub-member is passed as inout, then we model that as an
         // inout use.
         auto Kind = DIUseKind::InOutUse;
-        if (TheMemory.isStructInitSelf() && Pointer == TheMemory.getAddress())
+        if ((TheMemory.isStructInitSelf() || TheMemory.isProtocolInitSelf()) &&
+            Pointer == TheMemory.getAddress())
           Kind = DIUseKind::Escape;
-          
+ 
         addElementUses(BaseEltNo, PointeeType, User, Kind);
         continue;
       }

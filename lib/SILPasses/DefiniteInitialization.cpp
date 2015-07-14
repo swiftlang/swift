@@ -397,9 +397,11 @@ namespace {
 
     void handleStoreUse(unsigned UseID);
     void handleInOutUse(const DIMemoryUse &Use);
+    void handleEscapeUse(const DIMemoryUse &Use);
 
     void handleLoadUseFailure(const DIMemoryUse &InstInfo,
                               bool IsSuperInitComplete);
+
     void handleSuperInitUse(const DIMemoryUse &InstInfo);
     void handleSelfInitUse(DIMemoryUse &InstInfo);
     void updateInstructionForInitState(DIMemoryUse &InstInfo);
@@ -518,6 +520,13 @@ bool LifetimeChecker::shouldEmitError(SILInstruction *Inst) {
 void LifetimeChecker::noteUninitializedMembers(const DIMemoryUse &Use) {
   assert(TheMemory.isAnyInitSelf() && !TheMemory.isDelegatingInit() &&
          "Not an designated initializer");
+
+  // Root protocol initializers (ones that reassign to self, not delegating to
+  // self.init) have no members to initialize and self itself has already been
+  // reported to be uninit in the primary diagnostic.
+  if (TheMemory.isProtocolInitSelf())
+    return;
+
 
   // Determine which members, specifically are uninitialized.
   AvailabilitySet Liveness =
@@ -666,47 +675,8 @@ void LifetimeChecker::doIt() {
     case DIUseKind::InOutUse:
       handleInOutUse(Use);
       break;
-
     case DIUseKind::Escape:
-      if (!isInitializedAtUse(Use)) {
-        Diag<StringRef> DiagMessage;
-
-        // This is a use of an uninitialized value.  Emit a diagnostic.
-        if (TheMemory.isDelegatingInit()) {
-          DiagMessage = diag::self_use_before_init_in_delegatinginit;
-          
-          // If this is a load with a single user that is a return, then this is
-          // a return before self.init.   Emit a specific diagnostic.
-          if (auto *LI = dyn_cast<LoadInst>(Inst))
-            if (LI->hasOneUse() &&
-                isa<ReturnInst>((*LI->use_begin())->getUser())) {
-              if (shouldEmitError(Inst))
-                diagnose(Module, Inst->getLoc(),
-                         diag::return_from_init_without_self_init);
-              break;
-            }
-          if (isa<ReturnInst>(Inst)) {
-            if (shouldEmitError(Inst))
-              diagnose(Module, Inst->getLoc(),
-                       diag::return_from_init_without_self_init);
-            break;
-          }
-        } else if (isa<ApplyInst>(Inst) && TheMemory.isStructInitSelf()) {
-          if (shouldEmitError(Inst)) {
-            diagnose(Module, Inst->getLoc(),
-                     diag::use_of_self_before_fully_init);
-            noteUninitializedMembers(Use);
-          }
-          break;
-        } else if (isa<MarkFunctionEscapeInst>(Inst))
-          DiagMessage = diag::global_variable_function_use_uninit;
-        else if (isa<AddressToPointerInst>(Inst))
-          DiagMessage = diag::variable_addrtaken_before_initialized;
-        else
-          DiagMessage = diag::variable_escape_before_initialized;
-
-        diagnoseInitError(Use, DiagMessage);
-      }
+      handleEscapeUse(Use);
       break;
     case DIUseKind::SuperInit:
       handleSuperInitUse(Use);
@@ -738,6 +708,7 @@ void LifetimeChecker::doIt() {
   if (!ConditionalDestroys.empty())
     handleConditionalDestroys(ControlVariable);
 }
+
 
 void LifetimeChecker::handleStoreUse(unsigned UseID) {
   DIMemoryUse &InstInfo = Uses[UseID];
@@ -910,6 +881,60 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
     }
     return;
   }
+}
+
+void LifetimeChecker::handleEscapeUse(const DIMemoryUse &Use) {
+  // The value must be fully initialized at all escape points.  If not, diagnose
+  // the error.
+  if (isInitializedAtUse(Use))
+    return;
+
+  auto Inst = Use.Inst;
+
+  // This is a use of an uninitialized value.  Emit a diagnostic.
+  if (TheMemory.isDelegatingInit()) {
+    // If this is a load with a single user that is a return, then this is
+    // a return before self.init.   Emit a specific diagnostic.
+    if (auto *LI = dyn_cast<LoadInst>(Inst))
+      if (LI->hasOneUse() &&
+          isa<ReturnInst>((*LI->use_begin())->getUser())) {
+        if (!shouldEmitError(Inst)) return;
+        diagnose(Module, Inst->getLoc(),
+                 diag::return_from_init_without_self_init);
+        return;
+      }
+    if (isa<ReturnInst>(Inst)) {
+      if (!shouldEmitError(Inst)) return;
+      diagnose(Module, Inst->getLoc(),
+               diag::return_from_init_without_self_init);
+      return;
+    }
+
+    return diagnoseInitError(Use, diag::self_use_before_init_in_delegatinginit);
+  }
+
+  if (isa<ApplyInst>(Inst) && TheMemory.isAnyInitSelf() &&
+      !TheMemory.isClassInitSelf()) {
+    if (!shouldEmitError(Inst)) return;
+
+    auto diagID = diag::use_of_self_before_fully_init;
+    if (TheMemory.isProtocolInitSelf())
+      diagID = diag::use_of_self_before_fully_init_protocol;
+
+    diagnose(Module, Inst->getLoc(), diagID);
+    noteUninitializedMembers(Use);
+    return;
+  }
+
+  Diag<StringRef> DiagMessage;
+  if (isa<MarkFunctionEscapeInst>(Inst))
+    DiagMessage = diag::global_variable_function_use_uninit;
+  else if (isa<AddressToPointerInst>(Inst))
+    DiagMessage = diag::variable_addrtaken_before_initialized;
+  else
+    DiagMessage = diag::variable_escape_before_initialized;
+
+  diagnoseInitError(Use, DiagMessage);
 }
 
 
@@ -1170,12 +1195,16 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
     return;
   }
 
-  // If this is a load of self in a struct/enum initializer, then it must be a
-  // use of 'self' before all the stored properties are set up.
+  // If this is a load of self in a struct/enum/protocol initializer, then it
+  // must be a use of 'self' before all the stored properties are set up.
   if (isa<LoadInst>(Inst) && TheMemory.isAnyInitSelf() &&
       !TheMemory.isClassInitSelf()) {
     if (!shouldEmitError(Inst)) return;
-    diagnose(Module, Inst->getLoc(), diag::use_of_self_before_fully_init);
+
+    auto diagID = diag::use_of_self_before_fully_init;
+    if (TheMemory.isProtocolInitSelf())
+      diagID = diag::use_of_self_before_fully_init_protocol;
+    diagnose(Module, Inst->getLoc(), diagID);
     noteUninitializedMembers(Use);
     return;
   }
