@@ -1287,6 +1287,7 @@ extension ProtocolInitTest {
     self.init(a: 42)  // ok
   }
 
+  // <rdar://problem/21684596> QoI: Poor DI diagnostic in protocol extension initializer
   init(test1 ii: Int) {
     i = ii         // expected-error {{use of 'self' in delegating initializer before self.init is called}}
     self.init()
