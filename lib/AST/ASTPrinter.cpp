@@ -43,16 +43,6 @@
 
 using namespace swift;
 
-bool ASTPrinter::isInternalProtocol(const Decl *D) {
-  if (auto Pro = dyn_cast<ProtocolDecl>(D)) {
-    if (!Pro->getNameStr().startswith("_") &&
-        Pro->getFormalAccess() == Accessibility::Internal) {
-      return true;
-    }
-  }
-  return false;
-}
-
 std::string ASTPrinter::sanitizeUtf8(StringRef Text) {
   llvm::SmallString<256> Builder;
   Builder.reserve(Text.size());
@@ -627,12 +617,6 @@ void PrintAST::printPatternType(const Pattern *P) {
 }
 
 bool PrintAST::shouldPrint(const Decl *D) {
-  if (D->getModuleContext()->isStdlibModule() &&
-      ASTPrinter::isInternalProtocol(D) &&
-      Options.PrintInternalStdlibProtocols) {
-    return true;
-  }
-
   if (Options.SkipDeinit && isa<DestructorDecl>(D)) {
     return false;
   }
@@ -1346,10 +1330,7 @@ void PrintAST::visitProtocolDecl(ProtocolDecl *decl) {
 
   printInherited(decl, explicitClass);
   if (Options.TypeDefinitions) {
-    if (!Options.PrintInternalStdlibProtocols ||
-        !ASTPrinter::isInternalProtocol(decl) ||
-        !decl->getModuleContext()->isStdlibModule())
-      printMembers(decl->getMembers());
+    printMembers(decl->getMembers());
   }
 }
 

@@ -87,8 +87,6 @@ public:
     PendingDeclLocCallback = D;
   }
 
-  static bool isInternalProtocol(const Decl *D);
-
   /// To sanitize a malformatted utf8 string to a well-formatted one.
   static std::string sanitizeUtf8(StringRef Text);
 
