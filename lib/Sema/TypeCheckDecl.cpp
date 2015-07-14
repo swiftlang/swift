@@ -7160,6 +7160,10 @@ static void validateAttributes(TypeChecker &TC, Decl *D) {
 void TypeChecker::fixAbstractFunctionNames(InFlightDiagnostic &diag,
                                            AbstractFunctionDecl *func,
                                            DeclName targetName) {
+  // There is no reasonable way to fix an implicitly-generated function.
+  if (func->isImplicit())
+    return;
+
   auto name = func->getFullName();
   
   // Fix the name of the function itself.
@@ -7183,7 +7187,6 @@ void TypeChecker::fixAbstractFunctionNames(InFlightDiagnostic &diag,
     
     // Find the location to update or insert.
     SourceLoc loc;
-    bool needColon = false;
     if (tuplePattern) {
       auto origPattern = tuplePattern->getElement(i).getPattern();
       if (auto param = cast_or_null<ParamDecl>(origPattern->getSingleVar())) {
@@ -7215,7 +7218,6 @@ void TypeChecker::fixAbstractFunctionNames(InFlightDiagnostic &diag,
         }
 
         if (param->isImplicit()) {
-          needColon = true;
           loc = origPattern->getLoc();
         } else {
           continue;
@@ -7225,35 +7227,25 @@ void TypeChecker::fixAbstractFunctionNames(InFlightDiagnostic &diag,
       if (auto any = dyn_cast<AnyPattern>(
                        origPattern->getSemanticsProvidingPattern())) {
         if (any->isImplicit()) {
-          needColon = true;
           loc = origPattern->getLoc();
         } else {
-          needColon = false;
           loc = any->getLoc();
         }
       } else {
         loc = origPattern->getLoc();
-        needColon = true;
       }
     } else if (auto paren = dyn_cast<ParenPattern>(pattern)) {
       loc = paren->getSubPattern()->getLoc();
-      needColon = true;
-
-      // FIXME: Representation doesn't let us fix this easily.
-      if (targetArg.empty())
-        continue;
-
     } else {
       loc = pattern->getLoc();
-      needColon = true;
     }
     
-    assert(!targetArg.empty() && "Must have a name here");
-    llvm::SmallString<8> replacement;
-    replacement += targetArg.str();
-    if (needColon)
-      replacement += ": ";
-    
+    StringRef replacement;
+    if (targetArg.empty())
+      replacement = "_";
+    else
+      replacement = targetArg.str();
+
     diag.fixItInsert(loc, replacement);
   }
   

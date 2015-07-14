@@ -33,3 +33,12 @@ protocol LabeledRequirement {
 struct UnlabeledWitness : LabeledRequirement {
   func method(x _: Loadable) {}
 }
+
+// rdar://problem/21333445
+protocol P2 {
+	init(_ : Int) // expected-note{{requirement 'init' declared here}}
+}
+
+struct XP2 : P2 { // expected-error{{initializer 'init(foo:)' has different argument names from those required by protocol 'P2' ('init')}}
+  let foo: Int 
+}
