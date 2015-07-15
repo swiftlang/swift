@@ -2505,7 +2505,7 @@ enum Target {
   case SomeFriends([UInt])
 }
 
-// Ensure that we genereate IR that does not run into verification
+// Ensure that we generate IR that does not run into verification
 // issues for the case where there is a single tag bit and extra
 // enhabitants.
 // CHECK-LABEL: define void @generate_conditional_branch
