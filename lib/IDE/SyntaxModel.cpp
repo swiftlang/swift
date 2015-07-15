@@ -257,6 +257,7 @@ public:
   bool walkToDeclPost(Decl *D) override;
   bool walkToTypeReprPre(TypeRepr *T) override;
   std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override;
+  bool shouldWalkIntoFunctionGenericParams() override { return true; }
 
 private:
   bool annotateIfConfigConditionIdentifiers(Expr *Cond);

@@ -2219,6 +2219,10 @@ private:
       OS << LineCol.first << ':' << LineCol.second;
     }
   }
+
+  bool shouldWalkIntoFunctionGenericParams() override {
+    return false;
+  }
 };
 
 } // unnamed namespace

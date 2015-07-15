@@ -41,6 +41,9 @@ public:
   bool isDone() const { return Cancelled; }
 
 private:
+  bool shouldWalkIntoFunctionGenericParams() override {
+    return SEWalker.shouldWalkIntoFunctionGenericParams();
+  }
   bool walkToDeclPre(Decl *D) override;
   std::pair<bool, Expr *> walkToExprPre(Expr *E) override;
   bool walkToTypeReprPre(TypeRepr *T) override;

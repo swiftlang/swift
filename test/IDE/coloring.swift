@@ -186,7 +186,7 @@ protocol Prot2 : Prot {}
 // CHECK: <kw>class</kw> SubCls : <type>MyCls</type>, <type>Prot</type> {}
 class SubCls : MyCls, Prot {}
 
-// CHECK: <kw>func</kw> genFn<T : Prot <kw>where</kw> T.Blarg : Prot2>(<kw>_</kw>: <type>T</type>) -> <type>Int</type> {}
+// CHECK: <kw>func</kw> genFn<T : <type>Prot</type> <kw>where</kw> <type>T</type>.<type>Blarg</type> : Prot2>(<kw>_</kw>: <type>T</type>) -> <type>Int</type> {}{{$}}
 func genFn<T : Prot where T.Blarg : Prot2>(_: T) -> Int {}
 
 func f(x: Int) -> Int {
@@ -302,6 +302,9 @@ func test5() -> Int {
   // CHECK: <kw>return</kw> <int>0</int>
   return 0
 }
+
+func test6<T : Prot>(x: T) {}
+// CHECK: <kw>func</kw> test6<T : <type>Prot</type>>(x: <type>T</type>) {}{{$}}
 
 // http://whatever.com?ee=2&yy=1 and radar://123456
 /* http://whatever.com FIXME: see in http://whatever.com/fixme

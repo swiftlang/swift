@@ -105,6 +105,8 @@ public:
   /// Whether walk into the inactive region in a #if config statement.
   virtual bool shouldWalkInactiveConfigRegion() { return false; }
 
+  virtual bool shouldWalkIntoFunctionGenericParams() { return true; }
+
 protected:
   SourceEntityWalker() = default;
   SourceEntityWalker(const SourceEntityWalker &) = default;

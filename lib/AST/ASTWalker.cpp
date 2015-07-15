@@ -224,6 +224,36 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
 #ifndef NDEBUG
     PrettyStackTraceDecl debugStack("walking into body of", AFD);
 #endif
+    if (Walker.shouldWalkIntoFunctionGenericParams() &&
+        AFD->getGenericParams()) {
+
+      // Visit generic params
+      for (auto &P : AFD->getGenericParams()->getParams()) {
+        if (doIt(P))
+          return true;
+        for(auto Inherit : P->getInherited()) {
+          if (doIt(Inherit))
+            return true;
+        }
+      }
+
+      // Visit param conformance
+      for (auto &Req : AFD->getGenericParams()->getRequirements()) {
+        switch (Req.getKind()) {
+        case RequirementKind::SameType:
+          if (doIt(Req.getFirstTypeLoc()) || doIt(Req.getSecondTypeLoc()))
+            return true;
+          break;
+        case RequirementKind::Conformance:
+          if (doIt(Req.getSubjectLoc()))
+            return true;
+          break;
+        case RequirementKind::WitnessMarker:
+          break;
+        }
+      }
+    }
+
     for (auto &P : AFD->getBodyParamPatterns()) {
       if (Pattern *NewPattern = doIt(P))
         P = NewPattern;

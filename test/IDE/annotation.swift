@@ -81,7 +81,7 @@ class SubCls : MyCls, Prot {
   var protocolProperty2 = 0
 }
 
-// CHECK: func <Func>genFn</Func><T : Prot where T.Blarg : Prot2>(<Param>p</Param> : T) -> <iStruct@>Int</iStruct> {}
+// CHECK: func <Func>genFn</Func><<GenericTypeParam>T</GenericTypeParam> : <Protocol@64:10>Prot</Protocol> where T.Blarg : Prot2>(<Param>p</Param> : T) -> <iStruct@>Int</iStruct> {}{{$}}
 func genFn<T : Prot where T.Blarg : Prot2>(p : T) -> Int {}
 
 func test(x: Int) {
@@ -259,6 +259,9 @@ c10.meth(0, withFloat: 0)
 func test7(int x: Int, andThis y: Float) {}
 // CHECK: <Func@[[@LINE-1]]:6>test7</Func>(<Func@[[@LINE-1]]:6>int</Func>: 0, <Func@[[@LINE-1]]:6>andThis</Func>: 0)
 test7(int: 0, andThis: 0)
+
+func test8<T : Prot2>(x: T) {}
+// CHECK: func <Func>test8</Func><<GenericTypeParam>T</GenericTypeParam> : <Protocol@71:10>Prot2</Protocol>>(<Param>x</Param>: T) {}{{$}}
 
 class C11 {
   // CHECK: var <Var>a</Var>: <iStruct@>Int</iStruct> = { var <Var>tmp</Var> = 0; return <Var@[[@LINE+1]]:22>tmp</Var> }()

@@ -178,6 +178,10 @@ public:
   /// failure.
   virtual bool walkToTypeReprPost(TypeRepr *T) { return true; }
 
+  /// This method configures whether the walker should explore into the generic
+  /// params in an AbstractFunctionDecl.
+  virtual bool shouldWalkIntoFunctionGenericParams() { return false; }
+
 protected:
   ASTWalker() = default;
   ASTWalker(const ASTWalker &) = default;
