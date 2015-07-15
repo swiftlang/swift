@@ -17,7 +17,7 @@ import StdlibUnittest
 
 /// The lazy `SequenceType` returned by `filter(c)` where `c` is a
 /// `SequenceType`.
-public struct _prext_FilterSequence<Base : SequenceType> : _prext_LazySequenceType {
+public struct _prext_LazyFilterSequence<Base : SequenceType> : _prext_LazySequenceType {
   /// Return a *generator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
@@ -29,13 +29,13 @@ public struct _prext_FilterSequence<Base : SequenceType> : _prext_LazySequenceTy
   var _include: (Base.Generator.Element)->Bool
 }
 
-/// The `Index` used for subscripting a `_prext_FilterCollection`.
+/// The `Index` used for subscripting a `_prext_LazyFilterCollection`.
 ///
-/// - Note: The performance of advancing a `_prext_FilterIndex` depends on
+/// - Note: The performance of advancing a `_prext_LazyFilterIndex` depends on
 ///   how sparsely the filtering predicate is satisfied, and its
 ///   conformance to `ForwardIndexType` needs to be understood in that
 ///   context.
-public struct _prext_FilterIndex<
+public struct _prext_LazyFilterIndex<
   Base: CollectionType
 > : ForwardIndexType {
   /// Returns the next consecutive value after `self`.
@@ -43,15 +43,15 @@ public struct _prext_FilterIndex<
   /// - Requires: The next value is representable.
   /// - Complexity: O(M), where M is the number of following elements
   ///   in the underlying sequence that don't satisfy the predicate.
-  public func successor() -> _prext_FilterIndex {
+  public func successor() -> _prext_LazyFilterIndex {
     for nextPos in _pos.successor()..<_end {
       if _include(_base[nextPos]) {
-        return _prext_FilterIndex(
+        return _prext_LazyFilterIndex(
           _pos: nextPos, _end: _end,
           _base: _base, _include: _include)
       }
     }
-    return _prext_FilterIndex(
+    return _prext_LazyFilterIndex(
       _pos: _end, _end: _end, _base: _base, _include: _include)
   }
   
@@ -63,8 +63,8 @@ public struct _prext_FilterIndex<
 
 /// Returns `true` iff `lhs` is identical to `rhs`.
 public func == <Base: CollectionType>(
-  lhs: _prext_FilterIndex<Base>,
-  rhs: _prext_FilterIndex<Base>
+  lhs: _prext_LazyFilterIndex<Base>,
+  rhs: _prext_LazyFilterIndex<Base>
 ) -> Bool {
   return lhs._pos == rhs._pos
 }
@@ -75,20 +75,20 @@ public func == <Base: CollectionType>(
 ///
 /// * The O(1) guarantee of our `Index` would be iffy at best, since
 ///   it advances an underlying `Index` until the predicate is
-///   satisfied.  Be aware that a `_prext_FilterCollection` may not offer
+///   satisfied.  Be aware that a `_prext_LazyFilterCollection` may not offer
 ///   the expected efficiency for this reason.
 ///
 /// * Constructing an `Array` from a `CollectionType` measures the length
 ///   of the collection before traversing it to read the elements.
 ///   This causes the filter predicate to be called twice for each
 ///   element of the underlying collection, which is surprising.
-public struct _prext_FilterCollection<Base : CollectionType> : _prext_LazyCollectionType {
+public struct _prext_LazyFilterCollection<Base : CollectionType> : _prext_LazyCollectionType {
 
   /// A type that represents a valid position in the collection.
   ///
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript.
-  public typealias Index = _prext_FilterIndex<Base>
+  public typealias Index = _prext_LazyFilterIndex<Base>
 
   /// Construct an instance containing the elements of `base` that
   /// satisfy `predicate`.
@@ -114,7 +114,7 @@ public struct _prext_FilterCollection<Base : CollectionType> : _prext_LazyCollec
       }
       ++first
     }
-    return _prext_FilterIndex(
+    return _prext_LazyFilterIndex(
       _pos: first, _end: _base.endIndex, _base: _base, _include: _include)
   }
 
@@ -126,7 +126,7 @@ public struct _prext_FilterCollection<Base : CollectionType> : _prext_LazyCollec
   ///
   /// - Complexity: O(1).
   public var endIndex: Index {
-    return _prext_FilterIndex(
+    return _prext_LazyFilterIndex(
       _pos: _base.endIndex, _end: _base.endIndex,
       _base: _base, _include: _include)
   }
@@ -151,14 +151,14 @@ public struct _prext_FilterCollection<Base : CollectionType> : _prext_LazyCollec
 }
 
 extension _prext_LazySequenceType {
-  /// Return a `_prext_FilterSequence` that uses this sequence as a base.
+  /// Return a `_prext_LazyFilterSequence` that uses this sequence as a base.
   /// The elements to be included in the result are computed lazily,
   /// each time the result is traversed, by calling the
   /// `includeElement` function on elements of the base sequence.
   public func filter(
     includeElement: (Elements.Generator.Element)->Bool
-  ) -> _prext_FilterSequence<Self.Elements> {
-    return _prext_FilterSequence(_base: self.elements, _include: includeElement)
+  ) -> _prext_LazyFilterSequence<Self.Elements> {
+    return _prext_LazyFilterSequence(_base: self.elements, _include: includeElement)
   }
 }
 

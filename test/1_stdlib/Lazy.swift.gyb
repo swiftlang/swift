@@ -502,7 +502,7 @@ tests.test("MapSequence") {
   expectEqual(0, calls)
   
   expectType(
-    _prext_MapSequence<
+    _prext_LazyMapSequence<
       MinimalSequence<OpaqueValue<Int>>, 
       OpaqueValue<Double>>.self,
     &mapped)
@@ -543,7 +543,7 @@ tests.test("MapCollection/${traversal}") {
   expectEqual(0, calls)
   
   expectType(
-    _prext_MapCollection<
+    _prext_LazyMapCollection<
       Minimal${traversal}Collection<OpaqueValue<Int>>, 
       OpaqueValue<Double>>.self,
     &mapped)

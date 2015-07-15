@@ -41,10 +41,10 @@ public struct MapGenerator<
 /// `SequenceType` passed through a transform function returning `Element`.
 /// These elements are computed lazily, each time they're read, by
 /// calling the transform function on a base element.
-public struct _prext_MapSequence<Base : SequenceType, Element>
+public struct _prext_LazyMapSequence<Base : SequenceType, Element>
   : _prext_LazySequenceType/*, _SequenceWrapperType*/ {
 
-  public typealias Elements = _prext_MapSequence
+  public typealias Elements = _prext_LazyMapSequence
   
   /// Return a *generator* over the elements of this *sequence*.
   ///
@@ -71,7 +71,7 @@ public struct _prext_MapSequence<Base : SequenceType, Element>
 /// `CollectionType` passed through a transform function returning `Element`.
 /// These elements are computed lazily, each time they're read, by
 /// calling the transform function on a base element.
-public struct _prext_MapCollection<Base : CollectionType, Element>
+public struct _prext_LazyMapCollection<Base : CollectionType, Element>
   : _prext_LazyCollectionType {
 
   public var startIndex: Base.Index { return _base.startIndex }
@@ -109,24 +109,24 @@ public struct _prext_MapCollection<Base : CollectionType, Element>
 //===--- Support for lazy(s) ----------------------------------------------===//
 
 extension _prext_LazySequenceType {
-  /// Return a `_prext_MapSequence` over this `Sequence`.  The elements of
+  /// Return a `_prext_LazyMapSequence` over this `Sequence`.  The elements of
   /// the result are computed lazily, each time they are read, by
   /// calling `transform` function on a base element.
   public func map<U>(
     transform: (Elements.Generator.Element) -> U
-  ) -> _prext_MapSequence<Self.Elements, U> {
-    return _prext_MapSequence(_base: self.elements, _transform: transform)
+  ) -> _prext_LazyMapSequence<Self.Elements, U> {
+    return _prext_LazyMapSequence(_base: self.elements, _transform: transform)
   }
 }
 
 extension _prext_LazyCollectionType {
-  /// Return a `_prext_MapCollection` over this `Collection`.  The elements of
+  /// Return a `_prext_LazyMapCollection` over this `Collection`.  The elements of
   /// the result are computed lazily, each time they are read, by
   /// calling `transform` function on a base element.
   public func map<U>(
     transform: (Elements.Generator.Element) -> U
-  ) -> _prext_MapCollection<Self.Elements, U> {
-    return _prext_MapCollection(_base: self.elements, _transform: transform)
+  ) -> _prext_LazyMapCollection<Self.Elements, U> {
+    return _prext_LazyMapCollection(_base: self.elements, _transform: transform)
   }
 }
 
