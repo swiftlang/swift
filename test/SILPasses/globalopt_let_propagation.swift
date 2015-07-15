@@ -14,6 +14,26 @@ let VOLUME1 = I * J
 let VOLUME2 = J * 2
 let VOLUME3 = I + 10
  
+
+
+struct IntWrapper1 {
+  let val: Int
+}
+
+struct IntWrapper2 {
+  let val: IntWrapper1
+}
+
+struct IntWrapper3 {
+  let val: IntWrapper2
+}
+
+struct IntWrapper4 {
+  let val:  IntWrapper2
+  let val2: IntWrapper1
+}
+
+
 var PROP1: Double {
    return PI
 }
@@ -53,6 +73,10 @@ struct B {
  }
 
  static func foo() {}
+
+ static let IW3 = IntWrapper3(val: IntWrapper2(val: IntWrapper1(val: 10)))
+
+ static let IW4 = IntWrapper4(val: IntWrapper2(val: IntWrapper1(val: 10)), val2: IntWrapper1(val: 100))
 }
 
 // Define some static let variables inside a class.
@@ -82,6 +106,10 @@ class C {
  }
 
  static func foo() {}
+
+ static let IW3 = IntWrapper3(val: IntWrapper2(val: IntWrapper1(val: 10)))
+
+ static let IW4 = IntWrapper4(val: IntWrapper2(val: IntWrapper1(val: 10)), val2: IntWrapper1(val: 100))
 }
 
 // CHECK-LABEL: sil [noinline] @_TF25globalopt_let_propagation15test_let_doubleFT_Sd
@@ -241,3 +269,50 @@ public func test_var_double() -> Double {
 public func test_var_int() -> Int {
   return VI + 1
 }
+
+// CHECK-LABEL: sil [noinline] @_TF25globalopt_let_propagation33test_static_class_let_wrapped_intFT_Si
+// CHECK: bb0:
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: struct
+// CHECK: return
+@inline(never)
+public func test_static_class_let_wrapped_int() -> Int {
+  return C.IW3.val.val.val + 1
+}
+
+// CHECK-LABEL: sil [noinline] @_TF25globalopt_let_propagation34test_static_struct_let_wrapped_intFT_Si
+// CHECK: bb0:
+// CHECK-NEXT: integer_literal
+// CHECK-NEXT: struct
+// CHECK: return
+@inline(never)
+public func test_static_struct_let_wrapped_int() -> Int {
+  return B.IW3.val.val.val + 1
+}
+
+// Test accessing multiple Int fields wrapped into multiple structs, where each struct may have
+// multiple fields.
+// CHECK-LABEL: sil [noinline] @_TF25globalopt_let_propagation51test_static_struct_let_struct_wrapped_multiple_intsFT_Si
+// CHECK: bb0:
+// CHECK-NOT: global_addr
+// CHECK: integer_literal
+// CHECK: struct
+// CHECK: return
+@inline(never)
+public func test_static_struct_let_struct_wrapped_multiple_ints() -> Int {
+  return B.IW4.val.val.val + B.IW4.val2.val + 1
+}
+
+// Test accessing multiple Int fields wrapped into multiple structs, where each struct may have
+// multiple fields.
+// CHECK-LABEL: sil [noinline] @_TF25globalopt_let_propagation50test_static_class_let_struct_wrapped_multiple_intsFT_Si
+// CHECK: bb0:
+// CHECK-NOT: global_addr
+// CHECK: integer_literal
+// CHECK: struct
+// CHECK: return
+@inline(never)
+public func test_static_class_let_struct_wrapped_multiple_ints() -> Int {
+  return C.IW4.val.val.val + C.IW4.val2.val + 1
+}
+

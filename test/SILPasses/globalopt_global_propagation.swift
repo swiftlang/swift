@@ -140,3 +140,50 @@ public func test_global_take_address() -> Int {
   takeInout(&IVITakenAddress)
   return IVITakenAddress + PVITakenAddress
 }
+
+struct IntWrapper1 {
+  let val: Int
+}
+
+struct IntWrapper2 {
+  let val: IntWrapper1
+}
+
+struct IntWrapper3 {
+  let val: IntWrapper2
+}
+
+struct IntWrapper4 {
+  let val:  IntWrapper2
+  let val2: IntWrapper1
+}
+
+let IW3 = IntWrapper3(val: IntWrapper2(val: IntWrapper1(val: 10)))
+
+
+let IW4 = IntWrapper4(val: IntWrapper2(val: IntWrapper1(val: 10)), val2: IntWrapper1(val: 100))
+
+// Test accessing single Int wrapped into multiple structs, where each struct has only one field.
+// CHECK-LABEL: sil [noinline] @_TF28globalopt_global_propagation34test_let_struct_wrapped_single_intFT_Si
+// CHECK: bb0:
+// CHECK-NOT: global_addr
+// CHECK: integer_literal
+// CHECK: struct
+// CHECK: return
+@inline(never)
+public func test_let_struct_wrapped_single_int() -> Int {
+  return IW3.val.val.val + 1
+}
+
+// Test accessing multiple Int fields wrapped into multiple structs, where each struct may have
+// multiple fields.
+// CHECK-LABEL: sil [noinline] @_TF28globalopt_global_propagation37test_let_struct_wrapped_multiple_intsFT_Si
+// CHECK: bb0:
+// CHECK-NOT: global_addr
+// CHECK: integer_literal
+// CHECK: struct
+// CHECK: return
+@inline(never)
+public func test_let_struct_wrapped_multiple_ints() -> Int {
+  return IW4.val.val.val + IW4.val2.val + 1
+}

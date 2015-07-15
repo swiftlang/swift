@@ -119,7 +119,7 @@ func getVal() -> Int32 {
 
 // Global let
 let gx: Int32 = getVal()
-let gy: Int32 = 1
+let gy: Int32 = getVal()
 
 func sum3() -> Int32 {
     // gx and gy should be loaded only once.
