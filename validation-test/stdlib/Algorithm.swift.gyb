@@ -1852,6 +1852,50 @@ SequenceTypeAlgorithms.test("flatMap/SequenceType/TransformProducesOptional") {
 }
 
 //===----------------------------------------------------------------------===//
+// forEach()
+//===----------------------------------------------------------------------===//
+
+/// This test performs a side effect on each element of `sequence`. The expected
+/// side effect for the purposes of testing is to append each element to an
+/// external array, which can be compared to `sequence`.
+struct ForEachTest {
+  let sequence: [Int]
+  let loc: SourceLoc
+
+  init(
+    _ sequence: [Int],
+    file: String = __FILE__, line: UWord = __LINE__
+  ) {
+    self.sequence = sequence
+    self.loc = SourceLoc(file, line, comment: "test data")
+  }
+}
+
+SequenceTypeAlgorithms.test("forEach/dispatch") {
+  let tester = SequenceLog.dispatchTester([OpaqueValue(1)])
+  tester.forEach { print($0) }
+  expectCustomizable(tester, tester.log.forEach)
+}
+
+SequenceTypeAlgorithms.test("forEach/semantics") {
+  var tests = [
+    ForEachTest([]),
+    ForEachTest([1010]),
+    ForEachTest([1010, 2020, 3030, 4040, 5050]),
+  ]
+
+  for test in tests {
+    var elements = Array<Int>()
+    let s = MinimalSequence(test.sequence.map(OpaqueValue.init))
+    s.forEach {
+      elements.append($0.value)
+    }
+    expectEqualSequence(test.sequence, elements,
+        stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // zip()
 //===----------------------------------------------------------------------===//
 
