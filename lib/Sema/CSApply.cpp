@@ -1333,7 +1333,6 @@ namespace {
     Expr *buildOtherConstructorRef(Type openedFullType,
                                    ConstructorDecl *ctor, SourceLoc loc,
                                    ConstraintLocatorBuilder locator,
-                                   bool isDelegating,
                                    bool implicit) {
       auto &tc = cs.getTypeChecker();
       auto &ctx = tc.Context;
@@ -1368,29 +1367,8 @@ namespace {
       }
 
       // Build the constructor reference.
-      Expr *refExpr = new (ctx) OtherConstructorDeclRefExpr(ref, loc, implicit,
-                                                            resultTy);
-
-      // A non-failable initializer cannot delegate to a failable
-      // initializer.
-      if (auto inCtor = dyn_cast<ConstructorDecl>(cs.DC)) {
-        if (ctor->getFailability() == OTK_Optional &&
-            inCtor->getFailability() == OTK_None) {
-          // If we're suppressing diagnostics, just fail.
-          if (SuppressDiagnostics)
-            return nullptr;
-
-          // Note: we can't actually patch up the AST here, because we
-          // might have already type-checked calls to this initializer, so
-          // put the Fix-It on a note.
-          tc.diagnose(loc, diag::delegate_chain_nonoptional_to_optional, 
-                      !isDelegating, ctor->getFullName());
-          tc.diagnose(inCtor->getLoc(), diag::init_propagate_failure)
-            .fixItInsertAfter(inCtor->getLoc(), "?");
-        }
-      }
-
-      return refExpr;
+      return new (ctx) OtherConstructorDeclRefExpr(ref, loc, implicit,
+                                                   resultTy);
     }
 
     /// Bridge the given value to its corresponding Objective-C object
@@ -2355,7 +2333,6 @@ namespace {
                         cs.getConstraintLocator(
                           expr,
                           ConstraintLocator::ConstructorMember),
-                        !expr->getSubExpr()->isSuperExpr(),
                         expr->isImplicit());
       auto *call
         = new (cs.getASTContext()) DotSyntaxCallExpr(ctorRef,
@@ -2980,6 +2957,70 @@ namespace {
     }
 
     Expr *visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *expr) {
+      // A non-failable initializer cannot delegate to a failable
+      // initializer.
+      OptionalTypeKind calledOTK;
+      Type valueTy
+        = expr->getSubExpr()->getType()->getAnyOptionalObjectType(calledOTK);
+      auto inCtor = cast<ConstructorDecl>(cs.DC->getInnermostMethodContext());
+      if (calledOTK == OTK_Optional && inCtor->getFailability() == OTK_None) {
+        // If we're suppressing diagnostics, just fail.
+        if (SuppressDiagnostics)
+          return nullptr;
+
+        // Dig out the OtherConstructorRefExpr. Note that this is the reverse
+        // of what we do in in pre-checking.
+        OtherConstructorDeclRefExpr *otherCtorRef = nullptr;
+        Expr *candidate = expr->getSubExpr();
+        bool isDelegating;
+        while (true) {
+          // Look through identity expressions.
+          if (auto identity = dyn_cast<IdentityExpr>(candidate)) {
+            candidate = identity->getSubExpr();
+            continue;
+          }
+
+          // Look through force-value expressions.
+          if (auto force = dyn_cast<ForceValueExpr>(candidate)) {
+            candidate = force->getSubExpr();
+            continue;
+          }
+
+          // We hit an application, find the constructor reference.
+          auto apply = cast<ApplyExpr>(candidate);
+          otherCtorRef = dyn_cast<OtherConstructorDeclRefExpr>(
+                           apply->getFn()->getSemanticsProvidingExpr());
+          if (otherCtorRef) {
+            isDelegating = !apply->getArg()->isSuperExpr();
+            break;
+          }
+
+          candidate = apply->getFn();
+          continue;
+        }
+
+        // Give the user the option of adding '!' or making the enclosing
+        // initializer failable.
+        auto &tc = cs.getTypeChecker();
+        auto &ctx = tc.Context;
+
+        ConstructorDecl *ctor = otherCtorRef->getDecl();
+        tc.diagnose(otherCtorRef->getLoc(),
+                    diag::delegate_chain_nonoptional_to_optional,
+                    !isDelegating, ctor->getFullName());
+        tc.diagnose(otherCtorRef->getLoc(), diag::init_force_unwrap)
+          .fixItInsertAfter(otherCtorRef->getLoc(), "!");
+        tc.diagnose(inCtor->getLoc(), diag::init_propagate_failure)
+          .fixItInsertAfter(inCtor->getLoc(), "?");
+
+        // Recover by injecting the force operation (the first option).
+        Expr *newSub = new (ctx) ForceValueExpr(expr->getSubExpr(),
+                                                expr->getEndLoc());
+        newSub->setType(valueTy);
+        newSub->setImplicit();
+        expr->setSubExpr(newSub);
+      }
+
       return expr;
     }
 

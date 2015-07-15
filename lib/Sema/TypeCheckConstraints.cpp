@@ -444,12 +444,34 @@ namespace {
   class PreCheckExpression : public ASTWalker {
     TypeChecker &TC;
     DeclContext *DC;
+
+    /// A stack of expressions being walked, used to determine where to
+    /// insert RebindSelfInConstructorExpr nodes.
+    llvm::SmallVector<Expr *, 8> ExprStack;
+
+    /// The 'self' variable to use when rebinding 'self' in a constructor.
+    VarDecl *UnresolvedCtorSelf = nullptr;
+
+    /// The expression that will be wrapped by a RebindSelfInConstructorExpr
+    /// node when visited.
+    Expr *UnresolvedCtorRebindTarget = nullptr;
+
   public:
     PreCheckExpression(TypeChecker &tc, DeclContext *dc) : TC(tc), DC(dc) { }
 
     bool walkToClosureExprPre(ClosureExpr *expr);
 
     std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      // Local function used to finish up processing before returning. Every
+      // return site should call through here.
+      auto finish = [&](bool recursive, Expr *expr) {
+        // If we're going to recurse, record this expression on the stack.
+        if (recursive)
+          ExprStack.push_back(expr);
+
+        return std::make_pair(recursive, expr);
+      };
+
       // For capture lists, we typecheck the decls they contain.
       if (auto captureList = dyn_cast<CaptureListExpr>(expr)) {
         // Validate the capture list.
@@ -459,18 +481,18 @@ namespace {
           TC.typeCheckDecl(capture.Var, true);
           TC.typeCheckDecl(capture.Var, false);
         }
-        return { true, expr };
+        return finish(true, expr);
       }
 
       // For closures, type-check the patterns and result type as written,
       // but do not walk into the body. That will be type-checked after
       // we've determine the complete function type.
       if (auto closure = dyn_cast<ClosureExpr>(expr))
-        return { walkToClosureExprPre(closure), expr };
+        return finish(walkToClosureExprPre(closure), expr);
 
       if (auto unresolved = dyn_cast<UnresolvedDeclRefExpr>(expr)) {
         TC.checkForForbiddenPrefix(unresolved);
-        return { true, TC.resolveDeclRefExpr(unresolved, DC) };
+        return finish(true, TC.resolveDeclRefExpr(unresolved, DC));
       }
 
       if (auto PlaceholderE = dyn_cast<EditorPlaceholderExpr>(expr)) {
@@ -478,13 +500,17 @@ namespace {
           if (!TC.validateType(PlaceholderE->getTypeLoc(), DC))
             expr->setType(PlaceholderE->getTypeLoc().getType());
         }
-        return { true, expr };
+        return finish(true, expr);
       }
 
-      return { true, expr };
+      return finish(true, expr);
     }
 
     Expr *walkToExprPost(Expr *expr) override {
+      // Remove this expression from the stack.
+      assert(ExprStack.back() == expr);
+      ExprStack.pop_back();
+
       // Fold sequence expressions.
       if (auto seqExpr = dyn_cast<SequenceExpr>(expr))
         return TC.foldSequence(seqExpr, DC);
@@ -531,16 +557,65 @@ namespace {
 
       // A 'self.init' or 'super.init' application inside a constructor will
       // evaluate to void, with the initializer's result implicitly rebound
-      // to 'self'. Wrap (apply (unresolved_constructor)) in a RebindSelf expr
-      // to represent this.
-      if (auto apply = dyn_cast<ApplyExpr>(expr)) {
-        if (auto nestedCtor
-              = dyn_cast<UnresolvedConstructorExpr>(apply->getFn())) {
-          if (auto self
-                = TC.getSelfForInitDelegationInConstructor(DC, nestedCtor)) {
-            return new (TC.Context) RebindSelfInConstructorExpr(expr, self);
+      // to 'self'. Recognize the unresolved constructor expression and
+      // determine where to place the RebindSelfInConstructorExpr node.
+      // When updating this logic, also update CSApply's
+      // visitRebindSelfInConstructorExpr.
+      if (auto nestedCtor = dyn_cast<UnresolvedConstructorExpr>(expr)) {
+        if (auto self
+              = TC.getSelfForInitDelegationInConstructor(DC, nestedCtor)) {
+          // Walk our ancestor expressions looking for the appropriate place
+          // to insert the RebindSelfInConstructorExpr.
+          Expr *target = nullptr;
+          bool foundApply = false;
+          for (auto ancestor : reversed(ExprStack)) {
+            // Recognize applications.
+            if (auto apply = dyn_cast<ApplyExpr>(ancestor)) {
+              // If we already saw an application, we're done.
+              if (foundApply)
+                break;
+
+              // If the function being called is not our unresolved initializer
+              // reference, we're done.
+              if (apply->getFn()->getSemanticsProvidingExpr() != nestedCtor)
+                break;
+
+              foundApply = true;
+              target = ancestor;
+              continue;
+            }
+
+            // Look through identity and force-value expressions.
+            // FIXME: For now, don't look through 'try' or 'try!', because
+            // DI cannot handle it.
+            if ((isa<IdentityExpr>(ancestor) ||
+                 isa<ForceValueExpr>(ancestor)) &&
+                !(isa<ForceTryExpr>(ancestor) || isa<TryExpr>(ancestor))) {
+              if (target)
+                target = ancestor;
+              continue;
+            }
+
+            // No other expression kinds are permitted.
+            break;
+          }
+
+          // If we found a rebind target, note the insertion point.
+          if (target) {
+            UnresolvedCtorRebindTarget = target;
+            UnresolvedCtorSelf = self;
           }
         }
+      }
+
+      // If the expression we've found is the intended target of an
+      // RebindSelfInConstructorExpr, wrap it in the
+      // RebindSelfInConstructorExpr.
+      if (expr == UnresolvedCtorRebindTarget) {
+        expr = new (TC.Context) RebindSelfInConstructorExpr(expr,
+                                                            UnresolvedCtorSelf);
+        UnresolvedCtorRebindTarget = nullptr;
+        return expr;
       }
 
       // If this is a sugared type that needs to be folded into a single

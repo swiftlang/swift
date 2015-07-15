@@ -1429,6 +1429,8 @@ ERROR(chain_convenience_init,sema_tce,none,
 ERROR(delegate_chain_nonoptional_to_optional,sema_tce,none,
       "a non-failable initializer cannot %select{delegate|chain}0 to "
       "failable initializer %1 written with 'init?'", (bool, DeclName))
+NOTE(init_force_unwrap,sema_tce,none,
+     "force potentially-failing result with '!'", ())
 NOTE(init_propagate_failure,sema_tce,none,
      "propagate the failure with 'init?'", ())
 

@@ -51,10 +51,15 @@ class Sub : Super {
 
   init(nonfail: Int) { // expected-note{{propagate the failure with 'init?'}}{{7-7=?}}
     super.init(fail: "boom") // expected-error{{a non-failable initializer cannot chain to failable initializer 'init(fail:)' written with 'init?'}}
+    // expected-note@-1{{force potentially-failing result with '!'}}{{15-15=!}}
   }
 
   init(nonfail2: Int) { // okay, traps on nil
     super.init(failIUO: "boom")
+  }
+
+  init(nonfail3: Int) {
+    super.init(fail: "boom")!
   }
 
   override init?(fail: String) {
@@ -92,6 +97,11 @@ extension Super {
 
   convenience init(convenienceNonFailFail: String) { // expected-note{{propagate the failure with 'init?'}}{{19-19=?}}
     self.init(fail: convenienceNonFailFail) // expected-error{{a non-failable initializer cannot delegate to failable initializer 'init(fail:)' written with 'init?'}}
+    // expected-note@-1{{force potentially-failing result with '!'}}{{14-14=!}}
+  }
+
+  convenience init(convenienceNonFailFailForce: String) {
+    self.init(fail: convenienceNonFailFailForce)!
   }
 
   convenience init(convenienceNonFailFailIUO: String) { // okay, trap on failure
@@ -126,6 +136,11 @@ extension Super {
 struct SomeStruct {
    init(nonFail: Int) { // expected-note{{propagate the failure with 'init?'}}{{8-8=?}}
     self.init(fail: nonFail) // expected-error{{a non-failable initializer cannot delegate to failable initializer 'init(fail:)' written with 'init?'}}
+    // expected-note@-1{{force potentially-failing result with '!'}}{{14-14=!}}
+  }
+
+   init(nonFail2: Int) {
+    self.init(fail: nonFail2)!
   }
 
   init?(fail: Int) {}
