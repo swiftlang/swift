@@ -1529,10 +1529,13 @@ void SILFunction::print(llvm::raw_ostream &OS, bool Verbose,
 
   if (isFragile())
     OS << "[fragile] ";
-  
-  if (isThunk())
-    OS << "[thunk] ";
-  
+
+  switch (isThunk()) {
+  case IsNotThunk: break;
+  case IsThunk: OS << "[thunk] "; break;
+  case IsReabstractionThunk: OS << "[reabstraction_thunk] "; break;
+  }
+
   if (isGlobalInit())
     OS << "[global_init] ";
   

@@ -102,7 +102,7 @@ class Test: NSObject {
   func blockTakesBlock() -> (Int -> Int) -> Int {}
 }
 
-// CHECK-LABEL: sil shared [transparent] [thunk] @_TTRXFo_oXFo_dSi_dSi__dSi_XFdCb_dXFdCb_dSi_dSi__dSi_
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_oXFo_dSi_dSi__dSi_XFdCb_dXFdCb_dSi_dSi__dSi_
 // CHECK:         [[BLOCK_COPY:%.*]] = copy_block [[ORIG_BLOCK:%.*]] :
 // CHECK:         [[CLOSURE:%.*]] = partial_apply {{%.*}}([[BLOCK_COPY]])
 // CHECK:         [[RESULT:%.*]] = apply {{%.*}}([[CLOSURE]])

@@ -441,7 +441,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
                              nullptr, loc,
                              IsNotBare, IsTransparent_t(isTransparent == 1),
                              IsFragile_t(isFragile == 1),
-                             IsThunk_t(isThunk == 1), SILFunction::NotRelevant,
+                             IsThunk_t(isThunk), SILFunction::NotRelevant,
                              (Inline_t)inlineStrategy);
     fn->setGlobalInit(isGlobal == 1);
     fn->setEffectsKind((EffectsKind)effect);

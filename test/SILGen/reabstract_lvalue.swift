@@ -31,8 +31,8 @@ func reabstractFunctionInOut() {
   consumeGenericInOut(&minimallyAbstracted)
 }
 
-// CHECK-LABEL: sil shared [transparent] [thunk] @_TTRXFo_dSi_dSd_XFo_iSi_iSd_ : $@convention(thin) (@out Double, @in Int, @owned @callee_owned (Int) -> Double) -> ()
-// CHECK-LABEL: sil shared [transparent] [thunk] @_TTRXFo_iSi_iSd_XFo_dSi_dSd_ : $@convention(thin) (Int, @owned @callee_owned (@out Double, @in Int) -> ()) -> Double
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_dSi_dSd_XFo_iSi_iSd_ : $@convention(thin) (@out Double, @in Int, @owned @callee_owned (Int) -> Double) -> ()
+// CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @_TTRXFo_iSi_iSd_XFo_dSi_dSd_ : $@convention(thin) (Int, @owned @callee_owned (@out Double, @in Int) -> ()) -> Double
 
 // CHECK-LABEL: sil hidden @_TF17reabstract_lvalue23reabstractMetatypeInOutFT_T_ : $@convention(thin) () -> ()
 func reabstractMetatypeInOut() {

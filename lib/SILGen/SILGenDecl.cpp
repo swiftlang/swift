@@ -1718,5 +1718,5 @@ getOrCreateReabstractionThunk(GenericParamList *thunkContextParams,
                                      buffer.str(),
                                      thunkType,
                                      IsBare, IsTransparent,
-                                     Fragile, IsThunk);
+                                     Fragile, IsReabstractionThunk);
 }

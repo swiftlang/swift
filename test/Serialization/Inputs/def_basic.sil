@@ -1116,6 +1116,17 @@ entry(%x : $Class1, %w : $Builtin.Word):
   return undef : $()
 }
 
+// CHECK-LABEL: sil {{.*}} [reabstraction_thunk] @a_reabstraction_thunk : $@convention(thin) () -> ()
+sil [reabstraction_thunk] @a_reabstraction_thunk : $@convention(thin) () -> () {
+  %1 = tuple()
+  return %1 : $()
+}
+// CHECK-LABEL: sil {{.*}} [thunk] @a_regular_thunk : $@convention(thin) () -> () {
+sil [thunk] @a_regular_thunk : $@convention(thin) () -> () {
+  %1 = tuple()
+  return %1 : $()
+}
+
 class Foo {
   subscript (x: Int, y: Int) -> Int32 { get set }
   var x: Int
@@ -1164,6 +1175,7 @@ bb0(%0 : $Int32, %1 : $Int, %2 : $Int, %3 : $Foo):
   %17 = tuple ()                                  // user: %18
   return %17 : $()
 }
+
 
 // CHECK-LABEL: sil_vtable Foo {
 // CHECK: #Foo.subscript!getter.1: _TFC3tmp3Foog9subscriptFT1xSi1ySi_Si
@@ -1318,6 +1330,8 @@ bb0:
   %128 = function_ref @select_enum : $@convention(thin) (@in Beth) -> ()
   %228 = function_ref @existential_box : $@convention(thin) (SomeError) -> ()
   %129 = function_ref @bridge_object : $@convention(thin) (@owned Class1, Builtin.Word) -> ()
+  %150 = function_ref @a_reabstraction_thunk: $@convention(thin) () -> ()
+  %151 = function_ref @a_regular_thunk: $@convention(thin) () -> ()
 
   %119 = tuple ()
   return %119 : $()

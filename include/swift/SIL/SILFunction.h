@@ -34,7 +34,7 @@ class SILModule;
 enum IsBare_t { IsNotBare, IsBare };
 enum IsTransparent_t { IsNotTransparent, IsTransparent };
 enum Inline_t { InlineDefault, NoInline, AlwaysInline };
-enum IsThunk_t { IsNotThunk, IsThunk };
+enum IsThunk_t { IsNotThunk, IsThunk, IsReabstractionThunk };
 
 /// SILFunction - A function body that has been lowered to SIL. This consists of
 /// zero or more SIL SILBasicBlock objects that contain the SILInstruction
@@ -101,11 +101,11 @@ private:
   /// functions in the stdlib.
   unsigned Fragile : 1;
 
-  /// Specifies if this function is a thunk.
+  /// Specifies if this function is a thunk or an reabstraction thunk.
   ///
   /// The inliner uses this information to avoid inlining (non-trivial)
   /// functions into the thunk.
-  unsigned Thunk : 1;
+  unsigned Thunk : 2;
 
   /// The visiblity of the parent class, if this is a method which is contained
   /// in the vtable of that class.

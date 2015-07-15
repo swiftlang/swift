@@ -694,7 +694,7 @@ static bool parseSILOptional(bool &Result, SILParser &SP, StringRef Expected) {
 }
 
 static bool parseDeclSILOptional(bool *isTransparent, bool *isFragile,
-                                 bool *isThunk, bool *isGlobalInit,
+                                 IsThunk_t *isThunk, bool *isGlobalInit,
                                  Inline_t *inlineStrategy,
                                  bool *isLet,
                                  std::string *Semantics, EffectsKind *MRK,
@@ -714,7 +714,9 @@ static bool parseDeclSILOptional(bool *isTransparent, bool *isFragile,
     else if (isFragile && P.Tok.getText() == "fragile")
       *isFragile = true;
     else if (isThunk && P.Tok.getText() == "thunk")
-      *isThunk = true;
+      *isThunk = IsThunk;
+    else if (isThunk && P.Tok.getText() == "reabstraction_thunk")
+      *isThunk = IsReabstractionThunk;
     else if (isGlobalInit && P.Tok.getText() == "global_init")
       *isGlobalInit = true;
     else if (inlineStrategy && P.Tok.getText() == "noinline")
@@ -3526,7 +3528,7 @@ bool Parser::parseDeclSIL() {
   Scope S(this, ScopeKind::TopLevel);
   bool isTransparent = false;
   bool isFragile = false;
-  bool isThunk = false;
+  IsThunk_t isThunk = IsNotThunk;
   bool isGlobalInit = false;
   Inline_t inlineStrategy = InlineDefault;
   std::string Semantics;
