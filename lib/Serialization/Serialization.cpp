@@ -3733,10 +3733,52 @@ void Serializer::writeDocToStream(raw_ostream &os, ModuleOrSourceFile DC) {
   S.writeToStream(os);
 }
 
+static inline bool
+withOutputFile(ASTContext &ctx, StringRef outputPath,
+               llvm::function_ref<void(raw_ostream &)> action){
+  namespace path = llvm::sys::path;
+  clang::CompilerInstance Clang;
+
+  std::string tmpFilePath;
+  {
+    std::error_code EC;
+    std::unique_ptr<llvm::raw_pwrite_stream> out =
+      Clang.createOutputFile(outputPath, EC,
+                             /*binary=*/true,
+                             /*removeOnSignal=*/true,
+                             /*inputPath=*/"",
+                             path::extension(outputPath),
+                             /*temporary=*/true,
+                             /*createDirs=*/false,
+                             /*finalPath=*/nullptr,
+                             &tmpFilePath);
+
+    if (!out) {
+      StringRef problematicPath =
+          tmpFilePath.empty() ? outputPath : StringRef(tmpFilePath);
+      ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output,
+                         problematicPath, EC.message());
+      return true;
+    }
+
+    action(*out);
+  }
+
+  if (!tmpFilePath.empty()) {
+    std::error_code EC = swift::moveFileIfDifferent(tmpFilePath, outputPath);
+    if (EC) {
+      ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output,
+                         outputPath, EC.message());
+      return true;
+    }
+  }
+
+  return false;
+}
+
 void swift::serialize(ModuleOrSourceFile DC,
                       const SerializationOptions &options,
                       const SILModule *M) {
-  namespace path = llvm::sys::path;
   assert(options.OutputPath && options.OutputPath[0] != '\0');
 
   if (strcmp("-", options.OutputPath) == 0) {
@@ -3746,61 +3788,17 @@ void swift::serialize(ModuleOrSourceFile DC,
     return;
   }
 
-  clang::CompilerInstance Clang;
-
-  std::string tmpFilePath;
-  std::error_code EC;
-  std::unique_ptr<llvm::raw_pwrite_stream> out =
-    Clang.createOutputFile(options.OutputPath, EC,
-                           /*binary=*/true,
-                           /*removeOnSignal=*/true,
-                           /*inputPath=*/"",
-                           path::extension(options.OutputPath),
-                           /*temporary=*/true,
-                           /*createDirs=*/false,
-                           /*finalPath=*/nullptr,
-                           &tmpFilePath);
-
-  if (!out) {
-    getContext(DC).Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                                  tmpFilePath, EC.message());
+  bool hadError = withOutputFile(getContext(DC), options.OutputPath,
+                                 [&](raw_ostream &out) {
+    Serializer::writeToStream(out, DC, M, options);
+  });
+  if (hadError)
     return;
-  }
-
-  Serializer::writeToStream(*out, DC, M, options);
-
-  EC = swift::moveFileIfDifferent(tmpFilePath, options.OutputPath);
-  if (EC) {
-    getContext(DC).Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                                  options.OutputPath, EC.message());
-    return;
-  }
 
   if (options.DocOutputPath && options.DocOutputPath[0] != '\0') {
-    std::unique_ptr<llvm::raw_pwrite_stream> docOut =
-      Clang.createOutputFile(options.OutputPath, EC,
-                             /*binary=*/true,
-                             /*removeOnSignal=*/true,
-                             /*inputPath=*/"",
-                             path::extension(options.OutputPath),
-                             /*temporary=*/true,
-                             /*createDirs=*/false,
-                             /*finalPath=*/nullptr,
-                             &tmpFilePath);
-
-    if (!out) {
-      getContext(DC).Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                                    tmpFilePath, EC.message());
-      return;
-    }
-
-    Serializer::writeDocToStream(*docOut, DC);
-
-    EC = swift::moveFileIfDifferent(tmpFilePath, options.DocOutputPath);
-    if (EC) {
-      getContext(DC).Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                                    options.DocOutputPath, EC.message());
-      return;
-    }
+    (void)withOutputFile(getContext(DC), options.DocOutputPath,
+                         [&](raw_ostream &out) {
+      Serializer::writeDocToStream(out, DC);
+    });
   }
 }
