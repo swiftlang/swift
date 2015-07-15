@@ -444,20 +444,25 @@ func autorelease(o: O) {
   Builtin.unreachable()
 }
 
-// CHECK-LABEL: sil hidden @_TF8builtins15reinterpretCastFCS_1CTBwCS_1DGSqS0___ : $@convention(thin) (@owned C) -> @owned (Builtin.Word, D, Optional<C>)
-// CHECK-NEXT:  bb0(%0 : $C):
+// CHECK-LABEL: sil hidden @_TF8builtins15reinterpretCastFTCS_1C1xBw_TBwCS_1DGSqS0__S0__ : $@convention(thin) (@owned C, Builtin.Word) -> @owned (Builtin.Word, D, Optional<C>, C)
+// CHECK-NEXT:  bb0(%0 : $C, %1 : $Builtin.Word):
+// CHECK-NEXT:    debug_value
 // CHECK-NEXT:    debug_value
 // CHECK-NEXT:    strong_retain %0 : $C
 // CHECK-NEXT:    unchecked_trivial_bit_cast %0 : $C to $Builtin.Word
 // CHECK-NEXT:    unchecked_ref_bit_cast %0 : $C to $D
 // CHECK-NEXT:    unchecked_ref_bit_cast %0 : $C to $Optional<C>
+// CHECK-NEXT:    unchecked_bitwise_cast %1 : $Builtin.Word to $C
+// CHECK-NEXT:    strong_retain %{{.*}} : $C
+// CHECK-NOT:     strong_retain
 // CHECK-NOT:     strong_release
 // CHECK-NOT:     release_value
 // CHECK:         return
-func reinterpretCast(c: C) -> (Builtin.Word, D, C?) {
+func reinterpretCast(c: C, x: Builtin.Word) -> (Builtin.Word, D, C?, C) {
   return (Builtin.reinterpretCast(c) as Builtin.Word,
           Builtin.reinterpretCast(c) as D,
-          Builtin.reinterpretCast(c) as C?)
+          Builtin.reinterpretCast(c) as C?,
+          Builtin.reinterpretCast(x) as C)
 }
 
 // CHECK-LABEL: sil hidden @_TF8builtins19reinterpretAddrOnlyu0_rFq_q0_

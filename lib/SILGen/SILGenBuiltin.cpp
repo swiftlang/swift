@@ -535,20 +535,19 @@ static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &gen,
   }
   
 
-  // Create the appropriate bitcast, leaving the cleanup on the
-  // original value for trivial result types or forwarding the cleanup
-  // onto the new value for non-trivial types.
-  
-  // TODO: Could try to pick which of the original or destination
-  // types has a cheaper cleanup.
+  // Create the appropriate bitcast based on the source and dest types.
   auto &in = args[0];
   SILValue out = gen.B.createUncheckedBitCast(loc, in.getValue(),
                                               toTL.getLoweredType());
 
+  // Leave the cleanup on the original value unless the source and dest types
+  // have identical cleanup.
   if (toTL.isTrivial())
     return ManagedValue::forUnmanaged(out);
-  else
+  else if (isa<UncheckedRefBitCastInst>(out))
     return ManagedValue(out, in.getCleanup());
+  else
+    return gen.emitManagedRetain(loc, out, toTL);
 }
 
 /// Specialized emitter for Builtin.castToBridgeObject.
