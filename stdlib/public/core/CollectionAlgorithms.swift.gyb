@@ -229,10 +229,14 @@ ${sortIsUnstableForPredicate}
 ${orderingRequirementForPredicate}
   @warn_unused_result(${'mutable_variant="sortInPlace"' if Self == 'MutableCollectionType' else ''})
   public func sort(
-    isOrderedBefore: (Generator.Element, Generator.Element) -> Bool
+    @noescape isOrderedBefore: (Generator.Element, Generator.Element) -> Bool
   ) -> [Generator.Element] {
+    typealias IsOrderedBefore = (Generator.Element, Generator.Element) -> Bool
+    let escapableIsOrderedBefore =
+      unsafeBitCast(isOrderedBefore, IsOrderedBefore.self)
+
     var result = ContiguousArray(self)
-    result.sortInPlace(isOrderedBefore)
+    result.sortInPlace(escapableIsOrderedBefore)
     return Array(result)
   }
 }
@@ -269,18 +273,25 @@ ${sortIsUnstableForPredicate}
   ///
 ${orderingRequirementForPredicate}
   public mutating func sortInPlace(
-    isOrderedBefore: (Generator.Element, Generator.Element) -> Bool
+    @noescape isOrderedBefore: (Generator.Element, Generator.Element) -> Bool
   ) {
     let didSortUnsafeBuffer: Void? =
       _withUnsafeMutableBufferPointerIfSupported {
       (bufferPointer) -> () in
-      bufferPointer.sortInPlace(isOrderedBefore)
+      typealias IsOrderedBefore = (Generator.Element, Generator.Element) -> Bool
+      let escapableIsOrderedBefore =
+        unsafeBitCast(isOrderedBefore, IsOrderedBefore.self)
+
+      bufferPointer.sortInPlace(escapableIsOrderedBefore)
       return ()
     }
     if didSortUnsafeBuffer == nil {
       typealias IsOrderedBefore =
         (Generator.Element, Generator.Element) -> Bool
-      _introSort(&self, self.indices, isOrderedBefore)
+      let escapableIsOrderedBefore =
+        unsafeBitCast(isOrderedBefore, IsOrderedBefore.self)
+
+      _introSort(&self, self.indices, escapableIsOrderedBefore)
     }
   }
 }
