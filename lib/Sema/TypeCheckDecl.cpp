@@ -5960,6 +5960,8 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
       markAsObjC(*this, proto, isObjC);
     }
+
+    ValidatedTypes.insert(proto);
     break;
   }
       

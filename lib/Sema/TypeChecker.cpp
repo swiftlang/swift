@@ -404,6 +404,8 @@ static void typeCheckFunctionsAndExternalDecls(TypeChecker &TC) {
     // FIXME: If we're not planning to run SILGen, this is wasted effort.
     while (!TC.ValidatedTypes.empty()) {
       auto nominal = TC.ValidatedTypes.pop_back_val();
+      if (nominal->isInvalid() || TC.Context.hadError())
+        continue;
 
       Optional<bool> lazyVarsAlreadyHaveImplementation;
 
