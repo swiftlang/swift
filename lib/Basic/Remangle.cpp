@@ -651,7 +651,7 @@ void Remangler::mangleValueWitness(Node *node) {
     case ValueWitnessKind::StoreExtraInhabitant: return "xs";
     case ValueWitnessKind::GetExtraInhabitantIndex: return "xg";
     case ValueWitnessKind::GetEnumTag: return "ug";
-    case ValueWitnessKind::InplaceProjectEnumData: return "up";
+    case ValueWitnessKind::DestructiveProjectEnumData: return "up";
     }
     unreachable("bad value witness kind");
   };

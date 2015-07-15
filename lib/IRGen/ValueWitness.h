@@ -219,6 +219,8 @@ enum class ValueWitness : unsigned {
   ///
   /// The Enum_HasSpareBits bit is set if the type's binary representation
   /// has unused bits.
+  ///
+  /// The HasEnumWitnesses bit is set if the type is an enum type.
   Flags,
 
   ///   size_t stride;
@@ -270,7 +272,21 @@ enum class ValueWitness : unsigned {
   Last_ExtraInhabitantValueWitnessFunction = GetExtraInhabitantIndex,
   Last_ExtraInhabitantValueWitness = Last_ExtraInhabitantValueWitnessFunction,
 
-  Last_ValueWitness = Last_ExtraInhabitantValueWitness,
+  /// The following value witnesses are conditionally present if the witnessed
+  /// type is an enum.
+  First_EnumValueWitness,
+
+  ///   unsigned (*getEnumTag)(T *obj, M *self);
+  /// Given a valid object of this enum type, extracts the tag value indicating
+  /// which case of the enum is inhabited.
+  GetEnumTag = First_EnumValueWitness,
+  ///   U *(*destructiveProjectEnumData)(T *obj, unsigned tag, M *self);
+  /// Given a valid object of this enum type, destructively extracts the
+  /// associated payload and returns a pointer to that payload.
+  DestructiveProjectEnumData,
+  Last_EnumValueWitness = DestructiveProjectEnumData,
+
+  Last_ValueWitness = Last_EnumValueWitness,
 };
 
 // The namespaces here are to force the enumerators to be scoped.  We don't
@@ -301,6 +317,9 @@ namespace ValueWitnessFlags {
 
     IsNonBitwiseTakable = 0x100000,
 
+    /// If Flags & HasEnumWitnesses, then enum value witnesses are present in
+    /// the value witness table.
+    HasEnumWitnesses = 0x00200000,
   };
 }
   
@@ -329,9 +348,11 @@ enum {
 static inline bool isValueWitnessFunction(ValueWitness witness) {
   auto ord = unsigned(witness);
   return ord < NumRequiredValueWitnessFunctions
-    || (ord >= unsigned(ValueWitness::First_ExtraInhabitantValueWitnessFunction)
+    || (ord >= unsigned(ValueWitness::First_ExtraInhabitantValueWitness)
         && ord <= unsigned(
-                       ValueWitness::Last_ExtraInhabitantValueWitnessFunction));
+                       ValueWitness::Last_ExtraInhabitantValueWitnessFunction))
+    || (ord >= unsigned(ValueWitness::First_EnumValueWitness)
+        && ord <= unsigned(ValueWitness::Last_EnumValueWitness));
 }
 
 } // end namespace irgen

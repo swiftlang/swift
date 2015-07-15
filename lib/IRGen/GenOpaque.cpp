@@ -158,6 +158,29 @@ static llvm::Type *createWitnessType(IRGenModule &IGM, ValueWitness index) {
     return llvm::FunctionType::get(indexTy, args, /*isVarArg*/ false)
       ->getPointerTo();
   }
+  
+  /// unsigned (*getEnumTag)(T *obj, M *self);
+  case ValueWitness::GetEnumTag: {
+    llvm::Type *ptrTy = IGM.OpaquePtrTy;
+    llvm::Type *metaTy = IGM.TypeMetadataPtrTy;
+    llvm::Type *indexTy = IGM.Int32Ty;
+
+    llvm::Type *args[] = {ptrTy, metaTy};
+
+    return llvm::FunctionType::get(indexTy, args, /*isVarArg*/ false)
+      ->getPointerTo();
+  }
+
+  /// U *(*destructiveProjectEnumData)(T *obj, M *self);
+  case ValueWitness::DestructiveProjectEnumData: {
+    llvm::Type *ptrTy = IGM.OpaquePtrTy;
+    llvm::Type *metaTy = IGM.TypeMetadataPtrTy;
+
+    llvm::Type *args[] = {ptrTy, metaTy};
+
+    return llvm::FunctionType::get(ptrTy, args, /*isVarArg*/ false)
+      ->getPointerTo();
+  }
 
   case ValueWitness::Size:
   case ValueWitness::Flags:
@@ -228,6 +251,10 @@ static StringRef getValueWitnessLabel(ValueWitness index) {
     return "getExtraInhabitantIndex";
   case ValueWitness::ExtraInhabitantFlags:
     return "extraInhabitantFlags";
+  case ValueWitness::GetEnumTag:
+    return "getEnumTag";
+  case ValueWitness::DestructiveProjectEnumData:
+    return "destructiveProjectEnumData";
   }
   llvm_unreachable("bad value witness index");
 }

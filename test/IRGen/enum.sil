@@ -125,12 +125,12 @@ import Swift
 
 // -- No-payload enums have extra inhabitants in
 //    their value witness table.
-// CHECK: @_TWVO4enum10NoPayloads = constant [23 x i8*] [
+// CHECK: @_TWVO4enum10NoPayloads = constant [25 x i8*] [
 // -- ...
 // -- size
 // CHECK:   i8* inttoptr ([[WORD]] 1 to i8*),
-// -- flags                 0x4_0000 - alignment 1, has extra inhabitants
-// CHECK:   i8* inttoptr ([[WORD]] 262144 to i8*),
+// -- flags                 0x24_0000 - alignment 1, has extra inhabitants and enum witnesses
+// CHECK:   i8* inttoptr ([[WORD]] 2359296 to i8*),
 // -- stride
 // CHECK:   i8* inttoptr ([[WORD]] 1 to i8*),
 // -- num extra inhabitants (256 - 3 valid states)
@@ -143,12 +143,12 @@ import Swift
 
 // -- Single-payload enums take unused extra inhabitants from their payload
 //    as their own.
-// CHECK: @_TWVO4enum19SinglePayloadNested = constant [23 x i8*] [
+// CHECK: @_TWVO4enum19SinglePayloadNested = constant [25 x i8*] [
 // -- ...
 // -- size
 // CHECK:   i8* inttoptr ([[WORD]] 1 to i8*),
 // -- flags                 0x4_0000 - alignment 1, has extra inhabitants
-// CHECK:   i8* inttoptr ([[WORD]] 262144 to i8*),
+// CHECK:   i8* inttoptr ([[WORD]] 2359296 to i8*),
 // -- stride
 // CHECK:   i8* inttoptr ([[WORD]] 1 to i8*),
 // -- num extra inhabitants (253 from payload - 3 empty cases)
@@ -166,7 +166,7 @@ import Swift
 // CHECK:   i8* bitcast (void (%swift.opaque*, i32, %swift.type*)* @_TwxsO4enum20DynamicSinglePayload to i8*)
 // CHECK:   i8* bitcast (i32 (%swift.opaque*, %swift.type*)* @_TwxgO4enum20DynamicSinglePayload to i8*)
 
-// CHECK: @_TWVO4enum18MultiPayloadNested = constant [20 x i8*] [
+// CHECK: @_TWVO4enum18MultiPayloadNested = constant [25 x i8*] [
 // CHECK:   i8* inttoptr ([[WORD]] 9 to i8*),
 // CHECK:   i8* inttoptr ([[WORD]] 16 to i8*)
 // CHECK: ]
@@ -2518,14 +2518,17 @@ entry:
 // CHECK:   [[T_SIZE_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[T_VWT]], i32 17
 // CHECK:   [[T_SIZE:%.*]] = load i8*, i8** [[T_SIZE_ADDR]]
 // CHECK:   store i8* [[T_SIZE]], i8** [[SIZE_ADDR]]
-// CHECK:   [[FLAGS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 18
-// CHECK:   [[T_FLAGS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[T_VWT]], i32 18
-// CHECK:   [[T_FLAGS:%.*]] = load i8*, i8** [[T_FLAGS_ADDR]]
-// CHECK:   store i8* [[T_FLAGS]], i8** [[FLAGS_ADDR]]
 // CHECK:   [[STRIDE_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 19
 // CHECK:   [[T_STRIDE_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[T_VWT]], i32 19
 // CHECK:   [[T_STRIDE:%.*]] = load i8*, i8** [[T_STRIDE_ADDR]]
 // CHECK:   store i8* [[T_STRIDE]], i8** [[STRIDE_ADDR]]
+// CHECK:   [[FLAGS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 18
+// CHECK:   [[T_FLAGS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[T_VWT]], i32 18
+// CHECK:   [[T_FLAGS:%.*]] = load i8*, i8** [[T_FLAGS_ADDR]]
+// CHECK:   [[T_FLAGS_INT:%.*]] = ptrtoint i8* [[T_FLAGS]] to i64
+// CHECK:   [[T_FLAGS_INT_2:%.*]] = or i64 [[T_FLAGS_INT]], 2097152
+// CHECK:   [[T_FLAGS_2:%.*]] = inttoptr i64 [[T_FLAGS_INT_2]] to i8*
+// CHECK:   store i8* [[T_FLAGS_2]], i8** [[FLAGS_ADDR]]
 // -- Test the 'has extra inhabitants' bit and carry over the extra inhabitants
 //    flag if set.
 // CHECK:   [[T_FLAGS_VAL:%.*]] = ptrtoint i8* [[T_FLAGS]] to [[WORD]]

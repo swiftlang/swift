@@ -233,6 +233,11 @@ public:
 
   /// \group Indirect enum operations
   
+  /// Return the enum case tag for the given value.
+  virtual llvm::Value *emitGetEnumTag(IRGenFunction &IGF,
+                                      Address enumAddr,
+                                      SILType T) const = 0;
+
   /// Project the address of the data for a case. Does not check or modify
   /// the referenced enum value.
   /// Corresponds to the SIL 'init_enum_data_addr' instruction.
@@ -255,6 +260,14 @@ public:
   virtual Address destructiveProjectDataForLoad(IRGenFunction &IGF,
                                                 EnumElementDecl *elt,
                                                 Address enumAddr) const = 0;
+
+  /// Clears tag bits from within the payload of an enum in memory and
+  /// projects the address of the data for a case. Does not check
+  /// the referenced enum value.
+  /// Used for the ProjectCasePayload function pointer in the enum's
+  /// NominalTypeDescriptor.
+  virtual void destructiveProjectDataForLoad(IRGenFunction &IGF,
+                                             Address enumAddr) const = 0;
 
   /// Return an i1 value that indicates whether the specified indirect enum
   /// value holds the specified case.  This is a light-weight form of a switch.

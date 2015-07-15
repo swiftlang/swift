@@ -73,18 +73,18 @@ void irgen::EnumImplStrategy::initializeFromParams(IRGenFunction &IGF,
 }
 
 llvm::Constant *EnumImplStrategy::emitCaseNames(IRGenModule &IGM) const {
-    // Build the list of case names, payload followed by no-payload.
-    llvm::SmallString<64> fieldNames;
-    for (auto &payloadCase : getElementsWithPayload()) {
-      fieldNames.append(payloadCase.decl->getName().str());
-      fieldNames.push_back('\0');
-    }
-    for (auto &noPayloadCase : getElementsWithNoPayload()) {
-      fieldNames.append(noPayloadCase.decl->getName().str());
-      fieldNames.push_back('\0');
-    }
-    // The final null terminator is provided by getAddrOfGlobalString.
-    return IGM.getAddrOfGlobalString(fieldNames);
+  // Build the list of case names, payload followed by no-payload.
+  llvm::SmallString<64> fieldNames;
+  for (auto &payloadCase : getElementsWithPayload()) {
+    fieldNames.append(payloadCase.decl->getName().str());
+    fieldNames.push_back('\0');
+  }
+  for (auto &noPayloadCase : getElementsWithNoPayload()) {
+    fieldNames.append(noPayloadCase.decl->getName().str());
+    fieldNames.push_back('\0');
+  }
+  // The final null terminator is provided by getAddrOfGlobalString.
+  return IGM.getAddrOfGlobalString(fieldNames);
 }
 
 llvm::Value *irgen::EnumImplStrategy::
@@ -141,14 +141,20 @@ namespace {
                                       EnumDecl *theEnum,
                                       llvm::StructType *enumTy) override;
 
-    virtual llvm::Value *
+    llvm::Value *
+    emitGetEnumTag(IRGenFunction &IGF, Address enumAddr, SILType T)
+    const override {
+      return llvm::ConstantInt::get(IGF.IGM.Int32Ty, 0);
+    }
+
+    llvm::Value *
     emitValueCaseTest(IRGenFunction &IGF,
                       Explosion &value,
                       EnumElementDecl *Case) const override {
       value.claim(getExplosionSize());
       return IGF.Builder.getInt1(true);
     }
-    virtual llvm::Value *
+    llvm::Value *
     emitIndirectCaseTest(IRGenFunction &IGF, SILType T,
                          Address enumAddr,
                          EnumElementDecl *Case) const override {
@@ -213,6 +219,10 @@ namespace {
                                           EnumElementDecl *elt,
                                           Address enumAddr) const override {
       return getSingletonAddress(IGF, enumAddr);
+    }
+
+    void destructiveProjectDataForLoad(IRGenFunction &IGF,
+                                       Address enumAddr) const override {
     }
 
     void storeTag(IRGenFunction &IGF,
@@ -364,19 +374,41 @@ namespace {
       Address vwtAddr(vwtable, IGF.IGM.getPointerAlignment());
       Address eltVWTAddr(eltVWT, IGF.IGM.getPointerAlignment());
 
-      auto copyWitnessFromElt = [&](ValueWitness witness) -> llvm::Value* {
-        Address dest = IGF.Builder.CreateConstArrayGEP(vwtAddr,
+      auto getWitnessDestAndSrc = [&](ValueWitness witness,
+                                      Address *dest,
+                                      Address *src) {
+        *dest = IGF.Builder.CreateConstArrayGEP(vwtAddr,
                                    unsigned(witness), IGF.IGM.getPointerSize());
-        Address src = IGF.Builder.CreateConstArrayGEP(eltVWTAddr,
+        *src = IGF.Builder.CreateConstArrayGEP(eltVWTAddr,
                                    unsigned(witness), IGF.IGM.getPointerSize());
+      };
+
+      auto copyWitnessFromElt = [&](ValueWitness witness) {
+        Address dest, src;
+        getWitnessDestAndSrc(witness, &dest, &src);
         auto val = IGF.Builder.CreateLoad(src);
         IGF.Builder.CreateStore(val, dest);
-        return val;
       };
 
       copyWitnessFromElt(ValueWitness::Size);
-      auto flags = copyWitnessFromElt(ValueWitness::Flags);
       copyWitnessFromElt(ValueWitness::Stride);
+
+      // Copy flags over, adding HasEnumWitnesses flag
+      auto copyFlagsFromElt = [&](ValueWitness witness) -> llvm::Value* {
+        Address dest, src;
+        getWitnessDestAndSrc(witness, &dest, &src);
+        auto val = IGF.Builder.CreateLoad(src);
+        auto ewFlag = IGF.Builder.CreatePtrToInt(val, IGF.IGM.SizeTy);
+        auto ewMask
+          = IGF.IGM.getSize(Size(ValueWitnessFlags::HasEnumWitnesses));
+        ewFlag = IGF.Builder.CreateOr(ewFlag, ewMask);
+        auto flag = IGF.Builder.CreateIntToPtr(ewFlag,
+                                              dest.getType()->getElementType());
+        IGF.Builder.CreateStore(flag, dest);
+        return val;
+      };
+
+      auto flags = copyFlagsFromElt(ValueWitness::Flags);
 
       // If the original type had extra inhabitants, carry over its
       // extra inhabitant flags.
@@ -514,7 +546,15 @@ namespace {
     }
 
     bool needsPayloadSizeInMetadata() const override { return false; }
-    
+
+    llvm::Value *
+    emitGetEnumTag(IRGenFunction &IGF, Address enumAddr, SILType T)
+    const override {
+      Explosion value;
+      loadAsTake(IGF, enumAddr, value);
+      return value.claimNext();
+    }
+
     llvm::Value *emitValueCaseTest(IRGenFunction &IGF,
                                    Explosion &value,
                                    EnumElementDecl *Case) const override {
@@ -593,6 +633,10 @@ namespace {
     Address destructiveProjectDataForLoad(IRGenFunction &IGF,
                                           EnumElementDecl *elt,
                                           Address enumAddr) const override {
+      llvm_unreachable("cannot project data for no-payload cases");
+    }
+    void destructiveProjectDataForLoad(IRGenFunction &IGF,
+                                       Address enumAddr) const override {
       llvm_unreachable("cannot project data for no-payload cases");
     }
 
@@ -1163,8 +1207,8 @@ namespace {
   public:
     SinglePayloadEnumImplStrategy(IRGenModule &IGM,
                                   TypeInfoKind tik, unsigned NumElements,
-                                   std::vector<Element> &&WithPayload,
-                                   std::vector<Element> &&WithNoPayload)
+                                  std::vector<Element> &&WithPayload,
+                                  std::vector<Element> &&WithNoPayload)
       : PayloadEnumImplStrategyBase(IGM, tik, NumElements,
                                 std::move(WithPayload),
                                 std::move(WithNoPayload),
@@ -1202,6 +1246,33 @@ namespace {
       return NumExtraInhabitantTagValues;
     }
 
+    llvm::Value *
+    emitGetEnumTag(IRGenFunction &IGF, Address enumAddr, SILType T)
+    const override {
+      // FIXME: get the below working and factor out common code surrounding
+      // calls to swift_getGetEnumCaseSinglePayload()
+#if false
+      SILType payloadT = getPayloadType(IGF.IGM, T);
+      auto payloadTI = getPayloadTypeInfo();
+      auto payloadAddr = projectPayloadData(IGF, enumAddr);
+      auto value = payloadTI->getExtraInhabitantIndex(IGF,
+                                                      payloadAddr, payloadT);
+#endif
+
+      auto payloadMetadata = emitPayloadMetadataForLayout(IGF, T);
+      auto numEmptyCases = llvm::ConstantInt::get(IGF.IGM.Int32Ty,
+                                                  ElementsWithNoPayload.size());
+
+      auto opaqueAddr = IGF.Builder.CreateBitCast(enumAddr.getAddress(),
+                                                  IGF.IGM.OpaquePtrTy);
+
+      auto value = IGF.Builder.CreateCall(
+                                  IGF.IGM.getGetEnumCaseSinglePayloadFn(),
+                                  {opaqueAddr, payloadMetadata, numEmptyCases});
+      return IGF.Builder.CreateAdd(value,
+                                   llvm::ConstantInt::get(IGF.IGM.Int32Ty, 1));
+    }
+
     /// The payload for a single-payload enum is always placed in front and
     /// will never have interleaved tag bits, so we can just bitcast the enum
     /// address to the payload type for either injection or projection of the
@@ -1221,6 +1292,9 @@ namespace {
       assert(elt == getPayloadElement() && "cannot project no-data case");
       return projectPayloadData(IGF, enumAddr);
     }
+    void destructiveProjectDataForLoad(IRGenFunction &IGF,
+                                       Address enumAddr) const override {
+    }
 
     TypeInfo *completeEnumTypeLayout(TypeConverter &TC,
                                       SILType Type,
@@ -1237,7 +1311,7 @@ namespace {
                                     llvm::StructType *enumTy);
 
   public:
-    virtual llvm::Value *
+    llvm::Value *
     emitIndirectCaseTest(IRGenFunction &IGF, SILType T,
                          Address enumAddr,
                          EnumElementDecl *Case) const override {
@@ -1268,7 +1342,7 @@ namespace {
       return Phi;
     }
 
-    virtual llvm::Value *
+    llvm::Value *
     emitValueCaseTest(IRGenFunction &IGF,
                       Explosion &value,
                       EnumElementDecl *Case) const override {
@@ -2767,8 +2841,14 @@ namespace {
     }
 
   public:
-    
-    virtual llvm::Value *
+
+    llvm::Value *
+    emitGetEnumTag(IRGenFunction &IGF, Address enumAddr, SILType T)
+    const override {
+      return loadPayloadTag(IGF, enumAddr, T);
+    }
+
+    llvm::Value *
     emitIndirectCaseTest(IRGenFunction &IGF, SILType T,
                          Address enumAddr,
                          EnumElementDecl *Case) const override {
@@ -2802,7 +2882,7 @@ namespace {
       return IGF.Builder.CreateICmpEQ(tag, expectedTag);
     }
     
-    virtual llvm::Value *
+    llvm::Value *
     emitValueCaseTest(IRGenFunction &IGF, Explosion &value,
                       EnumElementDecl *Case) const override {
       auto &C = IGF.IGM.getLLVMContext();
@@ -3755,6 +3835,21 @@ namespace {
                                payloadI->ti->getStorageType()->getPointerTo());
     }
     
+    /// Clear any tag bits stored in the payload area of the given address.
+    void destructiveProjectDataForLoad(IRGenFunction &IGF,
+                                       Address enumAddr) const override {
+      // If the case has non-zero tag bits stored in spare bits, we need to
+      // mask them out before the data can be read.
+      unsigned numSpareBits = PayloadTagBits.count();
+      if (numSpareBits > 0) {
+        Address payloadAddr = projectPayload(IGF, enumAddr);
+        auto payload = EnumPayload::load(IGF, payloadAddr, PayloadSchema);
+        auto spareBitMask = ~PayloadTagBits.asAPInt();
+        payload.emitApplyAndMask(IGF, spareBitMask);
+        payload.store(IGF, payloadAddr);
+      }
+    }
+
     llvm::Value *emitPayloadMetadataArrayForLayout(IRGenFunction &IGF,
                                                    SILType T) const {
       auto numPayloads = ElementsWithPayload.size();

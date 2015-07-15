@@ -96,7 +96,7 @@ enum class ValueWitnessKind {
   StoreExtraInhabitant,
   GetExtraInhabitantIndex,
   GetEnumTag,
-  InplaceProjectEnumData
+  DestructiveProjectEnumData
 };
 
 enum class Directness {

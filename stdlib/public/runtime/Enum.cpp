@@ -115,6 +115,7 @@ swift::swift_initEnumValueWitnessTableSinglePayload(ValueWitnessTable *vwtable,
   vwtable->size = size;
   vwtable->flags = payloadWitnesses->flags
     .withExtraInhabitants(unusedExtraInhabitants > 0)
+    .withEnumWitnesses(true)
     .withInlineStorage(ValueWitnessTable::isValueInline(size, align));
   vwtable->stride = llvm::RoundUpToAlignment(size, align);
   
@@ -147,7 +148,6 @@ swift::swift_initEnumValueWitnessTableSinglePayload(ValueWitnessTable *vwtable,
       .withNumExtraInhabitants(unusedExtraInhabitants);
   }
 }
-
 
 int
 swift::swift_getEnumCaseSinglePayload(const OpaqueValue *value,
@@ -292,6 +292,7 @@ swift::swift_initEnumMetadataMultiPayload(ValueWitnessTable *vwtable,
     .withBitwiseTakable(isBT)
     // TODO: Extra inhabitants
     .withExtraInhabitants(false)
+    .withEnumWitnesses(true)
     .withInlineStorage(ValueWitnessTable::isValueInline(totalSize, alignMask+1))
     ;
   vwtable->stride = (totalSize + alignMask) & ~alignMask;

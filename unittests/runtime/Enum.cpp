@@ -29,6 +29,8 @@ ExtraInhabitantsValueWitnessTable Int8WithExtraInhabitantValueWitness
     _TWVBi8_.flags.withExtraInhabitants(true),
     _TWVBi8_.stride
   },
+  // extraInhabitantFlags
+  ExtraInhabitantFlags().withNumExtraInhabitants(2),
   // storeExtraInhabitant
   [](OpaqueValue *dest, int index, const Metadata *self) {
     *reinterpret_cast<uint8_t*>(dest) = 254 + index;
@@ -39,9 +41,7 @@ ExtraInhabitantsValueWitnessTable Int8WithExtraInhabitantValueWitness
     if (byte >= 254)
       return byte - 254;
     return -1;
-  },
-  // extraInhabitantFlags
-  ExtraInhabitantFlags().withNumExtraInhabitants(2)
+  }
 };
 
 FullMetadata<OpaqueMetadata> XI_TMdBi8_ = {

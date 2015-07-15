@@ -1865,7 +1865,7 @@ namespace {
                          NominalTypeDecl *type,
                          ArrayRef<FieldTypeInfo> fieldTypes) {
     // The accessor function has the following signature:
-    // const Metadata * const *getFieldTypes(const Metadata *T);
+    // const Metadata * const *(*GetFieldTypes)(const Metadata *T);
     auto metadataArrayPtrTy = IGM.TypeMetadataPtrTy->getPointerTo();
     auto fnTy = llvm::FunctionType::get(metadataArrayPtrTy,
                                         IGM.TypeMetadataPtrTy,
@@ -1898,11 +1898,11 @@ namespace {
     return getFieldTypeAccessorFn(IGM, type, types);
   }
   
-  /// Build a field type accessor for enum payloads.
+  /// Build a case type accessor for enum payloads.
   static llvm::Function *
   getFieldTypeAccessorFn(IRGenModule &IGM,
                          NominalTypeDecl *type,
-                         ArrayRef<EnumImplStrategy::Element> enumElements){
+                         ArrayRef<EnumImplStrategy::Element> enumElements) {
     SmallVector<FieldTypeInfo, 4> types;
     for (auto &elt : enumElements) {
       assert(elt.decl->hasArgumentType() && "enum case doesn't have arg?!");

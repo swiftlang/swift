@@ -125,6 +125,7 @@ class ValueWitnessFlags {
     HasExtraInhabitants = 0x00040000,
     HasSpareBits =  0x00080000,
     IsNonBitwiseTakable = 0x00100000,
+    HasEnumWitnesses = 0x00200000,
     // Everything else is reserved.
   };
   int_type Data;
@@ -188,10 +189,19 @@ public:
   /// If true, then the extra inhabitant value witness table entries are
   /// available in this type's value witness table.
   bool hasExtraInhabitants() const { return Data & HasExtraInhabitants; }
+  /// True if this type's binary representation is that of an enum, and the
+  /// enum value witness table entries are avaialble in this type's value
+  /// witness table.
+  bool hasEnumWitnesses() const { return Data & HasEnumWitnesses; }
   constexpr ValueWitnessFlags
   withExtraInhabitants(bool hasExtraInhabitants) const {
     return ValueWitnessFlags((Data & ~HasExtraInhabitants) |
                                (hasExtraInhabitants ? HasExtraInhabitants : 0));
+  }
+  constexpr ValueWitnessFlags
+  withEnumWitnesses(bool hasEnumWitnesses) const {
+    return ValueWitnessFlags((Data & ~HasEnumWitnesses) |
+                             (hasEnumWitnesses ? HasEnumWitnesses : 0));
   }
 };
   
@@ -504,6 +514,9 @@ typedef ValueWitnessFlags flags;
 /// between array elements.  This value may be zero.  This value is always
 /// a multiple of the alignment.
 typedef size_t stride;
+
+/// Flags which describe extra inhabitants.
+typedef ExtraInhabitantFlags extraInhabitantFlags;
   
 /// Store an extra inhabitant, named by a unique positive or zero index,
 /// into the given uninitialized storage for the type.
@@ -515,9 +528,16 @@ typedef void storeExtraInhabitant(OpaqueValue *dest,
 /// address, or return -1 if there is a valid value at the address.
 typedef int getExtraInhabitantIndex(const OpaqueValue *src,
                                     const Metadata *self);
-  
-/// Flags which describe extra inhabitants.
-typedef ExtraInhabitantFlags extraInhabitantFlags;
+
+/// Given a valid object of this enum type, extracts the tag value indicating
+/// which case of the enum is inhabited.
+typedef unsigned getEnumTag(const OpaqueValue *src,
+                            const Metadata *self);
+
+/// Given a valid object of this enum type, extracts the tag value indicating
+/// which case of the enum is inhabited.
+typedef OpaqueValue *destructiveProjectEnumData(OpaqueValue *src,
+                                                const Metadata *self);
 
 } // end namespace value_witness_types
 
@@ -625,6 +645,15 @@ struct ValueWitnessTable {
   /// We don't want to use those here because we need to avoid accidentally
   /// introducing ABI dependencies on LLVM structures.
   const struct ExtraInhabitantsValueWitnessTable *_asXIVWT() const;
+
+  /// Assert that this value witness table is an enum value witness table
+  /// and return it as such.
+  ///
+  /// This has an awful name because it's supposed to be internal to
+  /// this file.  Code outside this file should use LLVM's cast/dyn_cast.
+  /// We don't want to use those here because we need to avoid accidentally
+  /// introducing ABI dependencies on LLVM structures.
+  const struct EnumValueWitnessTable *_asEVWT() const;
 };
   
 /// A value-witness table with extra inhabitants entry points.
@@ -638,11 +667,12 @@ struct ExtraInhabitantsValueWitnessTable : ValueWitnessTable {
   constexpr ExtraInhabitantsValueWitnessTable()
     : ValueWitnessTable{}, extraInhabitantFlags(),
       storeExtraInhabitant(nullptr),
-      getExtraInhabitantIndex(nullptr)  {}
-  constexpr ExtraInhabitantsValueWitnessTable(const ValueWitnessTable &base,
+      getExtraInhabitantIndex(nullptr) {}
+  constexpr ExtraInhabitantsValueWitnessTable(
+                            const ValueWitnessTable &base,
+                            value_witness_types::extraInhabitantFlags eif,
                             value_witness_types::storeExtraInhabitant *sei,
-                            value_witness_types::getExtraInhabitantIndex *geii,
-                            value_witness_types::extraInhabitantFlags eif)
+                            value_witness_types::getExtraInhabitantIndex *geii)
     : ValueWitnessTable(base), extraInhabitantFlags(eif),
       storeExtraInhabitant(sei),
       getExtraInhabitantIndex(geii) {}
@@ -652,12 +682,42 @@ struct ExtraInhabitantsValueWitnessTable : ValueWitnessTable {
   }
 };
 
+/// A value-witness table with enum entry points.
+/// These entry points are available only if the HasEnumWitnesses flag bit is
+/// set in the 'flags' field.
+struct EnumValueWitnessTable : ExtraInhabitantsValueWitnessTable {
+  value_witness_types::getEnumTag *getEnumTag;
+  value_witness_types::destructiveProjectEnumData *destructiveProjectEnumData;
+
+  constexpr EnumValueWitnessTable()
+    : ExtraInhabitantsValueWitnessTable(),
+      getEnumTag(nullptr),
+      destructiveProjectEnumData(nullptr) {}
+  constexpr EnumValueWitnessTable(
+          const ExtraInhabitantsValueWitnessTable &base,
+          value_witness_types::getEnumTag *getEnumTag,
+          value_witness_types::destructiveProjectEnumData *destructiveProjectEnumData)
+    : ExtraInhabitantsValueWitnessTable(base),
+      getEnumTag(getEnumTag),
+      destructiveProjectEnumData(destructiveProjectEnumData) {}
+
+  static bool classof(const ValueWitnessTable *table) {
+    return table->flags.hasEnumWitnesses();
+  }
+};
+
 inline const ExtraInhabitantsValueWitnessTable *
 ValueWitnessTable::_asXIVWT() const {
   assert(ExtraInhabitantsValueWitnessTable::classof(this));
   return static_cast<const ExtraInhabitantsValueWitnessTable *>(this);
 }
   
+inline const EnumValueWitnessTable *
+ValueWitnessTable::_asEVWT() const {
+  assert(EnumValueWitnessTable::classof(this));
+  return static_cast<const EnumValueWitnessTable *>(this);
+}
+
 inline unsigned ValueWitnessTable::getNumExtraInhabitants() const {
   // If the table does not have extra inhabitant witnesses, then there are zero.
   if (!flags.hasExtraInhabitants())
@@ -931,6 +991,13 @@ public:
   }
   void vw_storeExtraInhabitant(OpaqueValue *value, int index) const {
     getValueWitnesses()->_asXIVWT()->storeExtraInhabitant(value, index, this);
+  }
+
+  unsigned vw_getEnumTag(const OpaqueValue *value) const {
+    return getValueWitnesses()->_asEVWT()->getEnumTag(value, this);
+  }
+  OpaqueValue *vw_destructiveProjectEnumData(OpaqueValue *value) const {
+    return getValueWitnesses()->_asEVWT()->destructiveProjectEnumData(value, this);
   }
   
   /// Get the nominal type descriptor if this metadata describes a nominal type,

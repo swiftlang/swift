@@ -294,8 +294,8 @@ static StringRef toString(ValueWitnessKind k) {
     return "getExtraInhabitantIndex";
   case ValueWitnessKind::GetEnumTag:
     return "getEnumTag";
-  case ValueWitnessKind::InplaceProjectEnumData:
-    return "inplaceProjectEnumData";
+  case ValueWitnessKind::DestructiveProjectEnumData:
+    return "destructiveProjectEnumData";
   }
   unreachable("bad value witness kind");
 }
@@ -480,7 +480,7 @@ private:
     if (c1 == 'u' && c2 == 'g')
       return ValueWitnessKind::GetEnumTag;
     if (c1 == 'u' && c2 == 'p')
-      return ValueWitnessKind::InplaceProjectEnumData;
+      return ValueWitnessKind::DestructiveProjectEnumData;
     return None;
   }
 

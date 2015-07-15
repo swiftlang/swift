@@ -2191,6 +2191,37 @@ static void buildValueWitnessFunction(IRGenModule &IGM,
     return;
   }
 
+  case ValueWitness::GetEnumTag: {
+    auto &strategy = getEnumImplStrategy(IGM, concreteType);
+
+    llvm::Value *value = getArg(argv, "value");
+    getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
+
+    auto enumTy = type.getStorageType()->getPointerTo();
+    value = IGF.Builder.CreateBitCast(value, enumTy);
+    auto enumAddr = type.getAddressForPointer(value);
+
+    llvm::Value *result = strategy.emitGetEnumTag(IGF, enumAddr, concreteType);
+    result = IGF.Builder.CreateZExtOrTrunc(result, IGF.IGM.Int32Ty);
+
+    IGF.Builder.CreateRet(result);
+    return;
+  }
+
+  case ValueWitness::DestructiveProjectEnumData: {
+    llvm::Value *value = getArg(argv, "value");
+    getArgAsLocalSelfTypeMetadata(IGF, argv, abstractType);
+
+    auto &strategy = getEnumImplStrategy(IGM, concreteType);
+    if (strategy.getElementsWithPayload().size() > 0) {
+      strategy.destructiveProjectDataForLoad(
+          IGF, Address(value, type.getBestKnownAlignment()));
+    }
+
+    IGF.Builder.CreateRet(value);
+    return;
+  }
+
   case ValueWitness::Size:
   case ValueWitness::Flags:
   case ValueWitness::Stride:
@@ -2751,10 +2782,12 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
   }
 
   case ValueWitness::Flags: {
+    uint64_t flags = 0;
+
     // If we locally know that the type has fixed layout, we can emit
     // meaningful flags for it.
     if (auto *fixedTI = dyn_cast<FixedTypeInfo>(&concreteTI)) {
-      uint64_t flags = fixedTI->getFixedAlignment().getValue() - 1;
+      flags |= fixedTI->getFixedAlignment().getValue() - 1;
       if (!fixedTI->isPOD(ResilienceScope::Local))
         flags |= ValueWitnessFlags::IsNonPOD;
       assert(packing == FixedPacking::OffsetZero ||
@@ -2767,13 +2800,13 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
 
       if (!fixedTI->isBitwiseTakable(ResilienceScope::Local))
         flags |= ValueWitnessFlags::IsNonBitwiseTakable;
-
-      auto value = IGM.getSize(Size(flags));
-      return llvm::ConstantExpr::getIntToPtr(value, IGM.Int8PtrTy);
     }
 
-    // Just fill in null here if the type can't be statically laid out.
-    return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+    if (concreteType.getEnumOrBoundGenericEnum())
+      flags |= ValueWitnessFlags::HasEnumWitnesses;
+
+    auto value = IGM.getSize(Size(flags));
+    return llvm::ConstantExpr::getIntToPtr(value, IGM.Int8PtrTy);
   }
 
   case ValueWitness::Stride: {
@@ -2786,13 +2819,19 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
 
   case ValueWitness::StoreExtraInhabitant:
   case ValueWitness::GetExtraInhabitantIndex: {
-    assert(concreteTI.mayHaveExtraInhabitants(IGM));
+    if (!concreteTI.mayHaveExtraInhabitants(IGM)) {
+      assert(concreteType.getEnumOrBoundGenericEnum());
+      return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+    }
 
     goto standard;
   }
 
   case ValueWitness::ExtraInhabitantFlags: {
-    assert(concreteTI.mayHaveExtraInhabitants(IGM));
+    if (!concreteTI.mayHaveExtraInhabitants(IGM)) {
+      assert(concreteType.getEnumOrBoundGenericEnum());
+      return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
+    }
 
     // If we locally know that the type has fixed layout, we can emit
     // meaningful flags for it.
@@ -2807,6 +2846,11 @@ static llvm::Constant *getValueWitness(IRGenModule &IGM,
     // queried for extra inhabitants.
     return llvm::ConstantPointerNull::get(IGM.Int8PtrTy);
   }
+
+  case ValueWitness::GetEnumTag:
+  case ValueWitness::DestructiveProjectEnumData:
+    assert(concreteType.getEnumOrBoundGenericEnum());
+    goto standard;
   }
   llvm_unreachable("bad value witness kind");
 
@@ -3004,9 +3048,18 @@ static void addValueWitnesses(IRGenModule &IGM, FixedPacking packing,
                                     packing, abstractType, concreteType,
                                     concreteTI));
   }
-  if (concreteTI.mayHaveExtraInhabitants(IGM)) {
+  if (concreteType.getEnumOrBoundGenericEnum() ||
+      concreteTI.mayHaveExtraInhabitants(IGM)) {
     for (auto i = unsigned(ValueWitness::First_ExtraInhabitantValueWitness);
          i <= unsigned(ValueWitness::Last_ExtraInhabitantValueWitness);
+         ++i) {
+      table.push_back(getValueWitness(IGM, ValueWitness(i), packing,
+                                      abstractType, concreteType, concreteTI));
+    }
+  }
+  if (concreteType.getEnumOrBoundGenericEnum()) {
+    for (auto i = unsigned(ValueWitness::First_EnumValueWitness);
+         i <= unsigned(ValueWitness::Last_EnumValueWitness);
          ++i) {
       table.push_back(getValueWitness(IGM, ValueWitness(i), packing,
                                       abstractType, concreteType, concreteTI));

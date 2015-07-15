@@ -49,8 +49,8 @@ extern "C" void swift_initEnumValueWitnessTableSinglePayload(
                                                     const Metadata *payload,
                                                     unsigned emptyCases);
 
-/// \brief Return an integer value representing which case of a single-payload
-///        enum is inhabited.
+/// \brief Faster variant of the above which avoids digging into the enum type
+/// metadata when the caller already has the payload information handy.
 ///
 /// \param value - pointer to the enum value.
 /// \param payload - type metadata for the payload case of the enum.
@@ -60,8 +60,8 @@ extern "C" void swift_initEnumValueWitnessTableSinglePayload(
 ///          returns a value greater than or equal to zero and less than
 ///          emptyCases.
 extern "C" int swift_getEnumCaseSinglePayload(const OpaqueValue *value,
-                                               const Metadata *payload,
-                                               unsigned emptyCases);
+                                              const Metadata *payload,
+                                              unsigned emptyCases);
 
 /// \brief Store the tag value for the given case into a single-payload enum,
 ///        whose associated payload (if any) has already been initialized.
@@ -88,6 +88,11 @@ extern "C" void swift_initEnumMetadataMultiPayload(ValueWitnessTable *vwtable,
 
 /// \brief Return an integer value representing which case of a multi-payload
 ///        enum is inhabited.
+///
+/// \param value - pointer to the enum value.
+/// \param enumType - type metadata for the enum.
+///
+/// \returns The index of the enum case.
 extern "C" unsigned swift_getEnumCaseMultiPayload(const OpaqueValue *value,
                                                   const EnumMetadata *enumType);
   

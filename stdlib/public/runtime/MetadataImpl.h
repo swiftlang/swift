@@ -930,9 +930,9 @@ template <class Witnesses> struct ValueWitnessTableGenerator<Witnesses, true> {
       Witnesses::flags,
       Witnesses::stride,
     },
+    Witnesses::extraInhabitantFlags,
     Witnesses::storeExtraInhabitant,
     Witnesses::getExtraInhabitantIndex,
-    Witnesses::extraInhabitantFlags,
   };
 };
 
