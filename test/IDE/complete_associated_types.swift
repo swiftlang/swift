@@ -267,11 +267,11 @@ func testBrokenConformances1() {
   StructWithBrokenConformance.#^BROKEN_CONFORMANCE_1^#
 }
 // BROKEN_CONFORMANCE_1: Begin completions, 52 items
-BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        DefaultedTypeCommonA[#DefaultedTypeCommonA#]; name=DefaultedTypeCommonA
-BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        DefaultedTypeCommonB[#DefaultedTypeCommonB#]; name=DefaultedTypeCommonB
-BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        FooBaseDefaultedTypeB[#FooBaseDefaultedTypeB#]; name=FooBaseDefaultedTypeB
-BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        DeducedTypeCommonA[#DeducedTypeCommonA#]; name=DeducedTypeCommonA
-BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        DeducedTypeCommonB[#DeducedTypeCommonB#]; name=DeducedTypeCommonB
+// BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        DefaultedTypeCommonA[#DefaultedTypeCommonA#]; name=DefaultedTypeCommonA
+// BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        DefaultedTypeCommonB[#DefaultedTypeCommonB#]; name=DefaultedTypeCommonB
+// BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        FooBaseDefaultedTypeB[#FooBaseDefaultedTypeB#]; name=FooBaseDefaultedTypeB
+// BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        DeducedTypeCommonA[#DeducedTypeCommonA#]; name=DeducedTypeCommonA
+// BROKEN_CONFORMANCE_1-DAG: Decl[TypeAlias]/CurrNominal:        DeducedTypeCommonB[#DeducedTypeCommonB#]; name=DeducedTypeCommonB
 // BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceCommonA({#self: Self#})[#() -> Self.DeducedTypeCommonA#]{{; name=.+$}}
 // BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceCommonB({#self: Self#})[#() -> Self.DeducedTypeCommonB#]{{; name=.+$}}
 // BROKEN_CONFORMANCE_1-DAG: Decl[InstanceMethod]/Super:         deduceFooBaseB({#self: Self#})[#() -> Int#]{{; name=.+$}}
