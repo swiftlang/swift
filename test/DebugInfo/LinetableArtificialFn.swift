@@ -3,9 +3,9 @@
 // Verify that a helper function that is generated on-the-fly does
 // not mess up the linetable of the calling function.
 
+// CHECK: _TFSiCfMSiFT22_builtinIntegerLiteralBi2048__Si{{.*}}(i2048 -2)
 // CHECK: store {{(i32|i64)}} {{.*}}getelementptr
 // CHECK: store {{(i32|i64)}} {{.*}}getelementptr{{.*}}, !dbg ![[DBG:[0-9]+]]
-// CHECK-NEXT: _TFSiCfMSiFT22_builtinIntegerLiteralBi2048__Si{{.*}}(i2048 -2)
 // CHECK-NOT: ![[DBG]] = !{i32 0, i32 0,
 
 class TurnBasedPolicy {

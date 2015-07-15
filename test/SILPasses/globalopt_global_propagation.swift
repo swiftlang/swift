@@ -170,6 +170,13 @@ let IW4 = IntWrapper4(val: IntWrapper2(val: IntWrapper1(val: 10)), val2: IntWrap
 // CHECK: integer_literal
 // CHECK: struct
 // CHECK: return
+
+// CHECK-WMO-LABEL: sil [noinline] @_TF28globalopt_global_propagation34test_let_struct_wrapped_single_intFT_Si
+// CHECK-WMO: bb0:
+// CHECK-WMO-NOT: global_addr
+// CHECK-WMO: integer_literal
+// CHECK-WMO: struct
+// CHECK-WMO: return
 @inline(never)
 public func test_let_struct_wrapped_single_int() -> Int {
   return IW3.val.val.val + 1
@@ -183,7 +190,39 @@ public func test_let_struct_wrapped_single_int() -> Int {
 // CHECK: integer_literal
 // CHECK: struct
 // CHECK: return
+
+// CHECK-WMO-LABEL: sil [noinline] @_TF28globalopt_global_propagation37test_let_struct_wrapped_multiple_intsFT_Si
+// CHECK-WMO: bb0:
+// CHECK-WMO-NOT: global_addr
+// CHECK-WMO: integer_literal
+// CHECK-WMO: struct
+// CHECK-WMO: return
 @inline(never)
 public func test_let_struct_wrapped_multiple_ints() -> Int {
   return IW4.val.val.val + IW4.val2.val + 1
+}
+
+
+let IT1 = ((10, 20), 30, 40)
+
+let IT2 = (100, 200, 300)
+
+// Test accessing multiple Int fields wrapped into multiple tuples, where each tuple may have
+// multiple fields.
+// CHECK-LABEL: sil [noinline] @_TF28globalopt_global_propagation27test_let_tuple_wrapped_intsFT_Si
+// CHECK: bb0:
+// CHECK-NOT: global_addr
+// CHECK: integer_literal
+// CHECK: struct
+// CHECK: return
+
+// CHECK-WMO-LABEL: sil [noinline] @_TF28globalopt_global_propagation27test_let_tuple_wrapped_intsFT_Si
+// CHECK-WMO: bb0:
+// CHECK-WMO-NOT: global_addr
+// CHECK-WMO: integer_literal
+// CHECK-WMO: struct
+// CHECK-WMO: return
+@inline(never)
+public func test_let_tuple_wrapped_ints() -> Int {
+  return IT1.0.0 + IT2.1
 }

@@ -92,11 +92,9 @@ static bool analyzeStaticInitializer(SILFunction *F, SILInstruction *&Val,
       HasStore = true;
       Val = dyn_cast<SILInstruction>(SI->getSrc().getDef());
 
-      // We only handle StructInst being stored to a global variable for now.
-      if (!isa<StructInst>(Val))
-        return false;
-    } else if (auto *ti = dyn_cast<TupleInst>(&I)) {
-      if (ti->getNumOperands())
+      // We only handle StructInst and TupleInst being stored to a
+      // global variable for now.
+      if (!isa<StructInst>(Val) && !isa<TupleInst>(Val))
         return false;
     } else {
 
@@ -113,6 +111,7 @@ static bool analyzeStaticInitializer(SILFunction *F, SILInstruction *&Val,
 
       if (I.getKind() != ValueKind::ReturnInst &&
           I.getKind() != ValueKind::StructInst &&
+          I.getKind() != ValueKind::TupleInst &&
           I.getKind() != ValueKind::IntegerLiteralInst &&
           I.getKind() != ValueKind::FloatLiteralInst &&
           I.getKind() != ValueKind::StringLiteralInst)

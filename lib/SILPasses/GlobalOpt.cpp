@@ -240,6 +240,17 @@ static bool analyzeStaticInitializer(SILValue V,
           return false;
       }
       return true;
+    } if (auto *TI = dyn_cast<TupleInst>(I)) {
+      // If it is not a tuple which is a simple type, bail.
+      if (!isSimpleType(TI->getType(), I->getModule()))
+        return false;
+      for (auto &Op: TI->getAllOperands()) {
+        // If one of the struct instruction operands is not
+        // a simple initializer, bail.
+        if (!analyzeStaticInitializer(Op.get(), Insns))
+          return false;
+      }
+      return true;
     } else {
       if (auto *bi = dyn_cast<BuiltinInst>(I)) {
         switch (bi->getBuiltinInfo().ID) {
@@ -647,6 +658,14 @@ static void replaceLoadSequence(SILInstruction *I,
     return;
   }
 
+  if (auto *TEAI = dyn_cast<TupleElementAddrInst>(I)) {
+    auto *TEI = B.createTupleExtract(TEAI->getLoc(), Value, TEAI->getFieldNo());
+    for (auto TEAIUse : TEAI->getUses()) {
+      replaceLoadSequence(TEAIUse->getUser(), TEI, B);
+    }
+    return;
+  }
+
   llvm_unreachable("Unknown instruction sequence for reading from a global");
 }
 
@@ -672,6 +691,12 @@ static SILInstruction *convertLoadSequence(SILInstruction *I,
     Value = convertLoadSequence(dyn_cast<SILInstruction>(SEAI->getOperand()), Value, B);
     auto *SEI = B.createStructExtract(SEAI->getLoc(), Value, SEAI->getField());
     return SEI;
+  }
+
+  if(auto *TEAI = dyn_cast<TupleElementAddrInst>(I)) {
+    Value = convertLoadSequence(dyn_cast<SILInstruction>(TEAI->getOperand()), Value, B);
+    auto *TEI = B.createTupleExtract(TEAI->getLoc(), Value, TEAI->getFieldNo());
+    return TEI;
   }
 
   llvm_unreachable("Unknown instruction sequence for reading from a global");
@@ -844,6 +869,11 @@ static LoadInst *getValidLoad(SILInstruction *I, SILInstruction *V) {
   if (auto *SEAI = dyn_cast<StructElementAddrInst>(I)) {
     if (SEAI->getOperand() == V && SEAI->hasOneUse())
       return getValidLoad(SEAI->use_begin()->getUser(), SEAI);
+  }
+
+  if (auto *TEAI = dyn_cast<TupleElementAddrInst>(I)) {
+    if (TEAI->getOperand() == V && TEAI->hasOneUse())
+      return getValidLoad(TEAI->use_begin()->getUser(), TEAI);
   }
 
   return nullptr;

@@ -77,6 +77,10 @@ struct B {
  static let IW3 = IntWrapper3(val: IntWrapper2(val: IntWrapper1(val: 10)))
 
  static let IW4 = IntWrapper4(val: IntWrapper2(val: IntWrapper1(val: 10)), val2: IntWrapper1(val: 100))
+
+ static let IT1 = ((10, 20), 30, 40)
+
+ static let IT2 = (100, 200, 300)
 }
 
 // Define some static let variables inside a class.
@@ -110,6 +114,10 @@ class C {
  static let IW3 = IntWrapper3(val: IntWrapper2(val: IntWrapper1(val: 10)))
 
  static let IW4 = IntWrapper4(val: IntWrapper2(val: IntWrapper1(val: 10)), val2: IntWrapper1(val: 100))
+
+ static let IT1 = ((10, 20), 30, 40)
+
+ static let IT2 = (100, 200, 300)
 }
 
 // CHECK-LABEL: sil [noinline] @_TF25globalopt_let_propagation15test_let_doubleFT_Sd
@@ -316,3 +324,28 @@ public func test_static_class_let_struct_wrapped_multiple_ints() -> Int {
   return C.IW4.val.val.val + C.IW4.val2.val + 1
 }
 
+// Test accessing multiple Int fields wrapped into multiple tuples, where each tuple may have
+// multiple fields.
+// CHECK-LABEL: sil [noinline] @_TF25globalopt_let_propagation41test_static_struct_let_tuple_wrapped_intsFT_Si
+// CHECK: bb0:
+// CHECK-NOT: global_addr
+// CHECK: integer_literal
+// CHECK: struct
+// CHECK: return
+@inline(never)
+public func test_static_struct_let_tuple_wrapped_ints() -> Int {
+  return B.IT1.0.0 + B.IT2.1
+}
+
+// Test accessing multiple Int fields wrapped into multiple tuples, where each tuple may have
+// multiple fields.
+// CHECK-LABEL: sil [noinline] @_TF25globalopt_let_propagation40test_static_class_let_tuple_wrapped_intsFT_Si
+// CHECK: bb0:
+// CHECK-NOT: global_addr
+// CHECK: integer_literal
+// CHECK: struct
+// CHECK: return
+@inline(never)
+public func test_static_class_let_tuple_wrapped_ints() -> Int {
+  return C.IT1.0.0 + C.IT2.1
+}
