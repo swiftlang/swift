@@ -1373,6 +1373,16 @@ struct ASTNodeBase {};
       verifyCheckedBase(E);
     }
 
+    void verifyChecked(AnyTryExpr *E) {
+      PrettyStackTraceExpr debugStack(Ctx, "verifying AnyTryExpr", E);
+      if (!E->getType()->isEqual(E->getSubExpr()->getType())) {
+        Out << "Unexpected types in AnyTryExpr\n";
+        abort();
+      }
+
+      verifyCheckedBase(E);
+    }
+
     void verifyChecked(TupleShuffleExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying TupleShuffleExpr", E);
 

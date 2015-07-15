@@ -1454,6 +1454,11 @@ namespace {
       return expr->getType();
     }
 
+    Type visitAnyTryExpr(AnyTryExpr *expr) {
+      expr->setType(expr->getSubExpr()->getType());
+      return expr->getType();
+    }
+
     Type visitParenExpr(ParenExpr *expr) {
       auto &ctx = CS.getASTContext();
       expr->setType(ParenType::get(ctx, expr->getSubExpr()->getType()));

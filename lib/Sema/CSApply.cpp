@@ -2637,6 +2637,11 @@ namespace {
       return expr;
     }
 
+    Expr *visitAnyTryExpr(AnyTryExpr *expr) {
+      expr->setType(expr->getSubExpr()->getType());
+      return expr;
+    }
+
     Expr *visitParenExpr(ParenExpr *expr) {
       auto &ctx = cs.getASTContext();
       expr->setType(ParenType::get(ctx, expr->getSubExpr()->getType()));
@@ -3723,17 +3728,36 @@ getCallerDefaultArg(TypeChecker &tc, DeclContext *dc,
   return {init, defArg.first};
 }
 
+static Expr *lookThroughIdentityExprs(Expr *expr) {
+  while (true) {
+    if (auto ident = dyn_cast<IdentityExpr>(expr)) {
+      expr = ident;
+    } else if (auto ident = dyn_cast<AnyTryExpr>(expr)) {
+      expr = ident;
+    } else {
+      return expr;
+    }
+  }
+}
+
 /// Rebuild the ParenTypes for the given expression, whose underlying expression
-/// should be set to the given type.
-static Type rebuildParenType(ASTContext &ctx, Expr *expr, Type type) {
+/// should be set to the given type.  This has to apply to exactly the same
+/// levels of sugar that were stripped off by lookThroughIdentityExprs.
+static Type rebuildIdentityExprs(ASTContext &ctx, Expr *expr, Type type) {
   if (auto paren = dyn_cast<ParenExpr>(expr)) {
-    type = rebuildParenType(ctx, paren->getSubExpr(), type);
+    type = rebuildIdentityExprs(ctx, paren->getSubExpr(), type);
     paren->setType(ParenType::get(ctx, type));
     return paren->getType();
   }
 
   if (auto ident = dyn_cast<IdentityExpr>(expr)) {
-    type = rebuildParenType(ctx, ident->getSubExpr(), type);
+    type = rebuildIdentityExprs(ctx, ident->getSubExpr(), type);
+    ident->setType(type);
+    return ident->getType();
+  }
+
+  if (auto ident = dyn_cast<AnyTryExpr>(expr)) {
+    type = rebuildIdentityExprs(ctx, ident->getSubExpr(), type);
     ident->setType(type);
     return ident->getType();
   }
@@ -3749,9 +3773,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
   auto &tc = cs.getTypeChecker();
 
   // Capture the tuple expression, if there is one.
-  Expr *innerExpr = expr;
-  while (auto paren = dyn_cast<IdentityExpr>(innerExpr))
-    innerExpr = paren->getSubExpr();
+  Expr *innerExpr = lookThroughIdentityExprs(expr);
   TupleExpr *fromTupleExpr = dyn_cast<TupleExpr>(innerExpr);
 
   /// Check each of the tuple elements in the destination.
@@ -3921,7 +3943,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
     fromTupleExpr->setType(fromTupleType);
 
     // Update the types of parentheses around the tuple expression.
-    rebuildParenType(cs.getASTContext(), expr, fromTupleType);
+    rebuildIdentityExprs(cs.getASTContext(), expr, fromTupleType);
   }
 
   // Compute the re-sugared tuple type.
@@ -3933,7 +3955,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
     fromTupleExpr->setType(toSugarType);
 
     // Update the types of parentheses around the tuple expression.
-    rebuildParenType(cs.getASTContext(), expr, toSugarType);
+    rebuildIdentityExprs(cs.getASTContext(), expr, toSugarType);
 
     return expr;
   }

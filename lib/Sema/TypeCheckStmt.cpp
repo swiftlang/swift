@@ -982,18 +982,19 @@ static void diagnoseIgnoredExpr(TypeChecker &TC, Expr *E) {
     return;
   }
 
+  auto valueE = E->getValueProvidingExpr();
+
   // If we have an OptionalEvaluationExpr at the top level, then someone is
   // "optional chaining" and ignoring the result.  Produce a diagnostic if it
   // doesn't make sense to ignore it.
-  if (auto *OEE =
-        dyn_cast<OptionalEvaluationExpr>(E->getSemanticsProvidingExpr()))
+  if (auto *OEE = dyn_cast<OptionalEvaluationExpr>(valueE))
     if (auto *IIO = dyn_cast<InjectIntoOptionalExpr>(OEE->getSubExpr()))
       return diagnoseIgnoredExpr(TC, IIO->getSubExpr());
 
   // FIXME: Complain about literals
 
   // Check if we have a call to a function marked warn_unused_result.
-  if (auto call = dyn_cast<CallExpr>(E->getSemanticsProvidingExpr())) {
+  if (auto call = dyn_cast<CallExpr>(valueE)) {
     // Dig through all levels of calls.
     Expr *fn = call->getFn()->getSemanticsProvidingExpr();
     bool baseIsLValue = false;

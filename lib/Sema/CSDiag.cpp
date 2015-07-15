@@ -519,6 +519,11 @@ ResolvedLocator constraints::resolveLocatorToDecl(
       continue;
     }
 
+    if (auto tryExpr = dyn_cast<AnyTryExpr>(anchor)) {
+      anchor = tryExpr->getSubExpr();
+      continue;
+    }
+
     if (auto constructor = dyn_cast<ConstructorRefCallExpr>(anchor)) {
       anchor = constructor->getFn();
       continue;
@@ -1908,7 +1913,7 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure() {
   // diagnostic.
   Expr *call = expr->getParentMap()[anchor];
   // Ignore parens around the callee.
-  while (call && isa<IdentityExpr>(call))
+  while (call && (isa<IdentityExpr>(call) || isa<AnyTryExpr>(call)))
     call = expr->getParentMap()[call];
   
   // Do some sanity checking based on the call: e.g. make sure we're invoking

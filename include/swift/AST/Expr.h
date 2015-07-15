@@ -1391,6 +1391,70 @@ public:
     return E->getKind() == ExprKind::UnresolvedMember;
   }
 };
+
+/// AnyTryExpr - An abstract superclass for 'try' and 'try!'.
+///
+/// These are like IdentityExpr in some ways, but they're a bit too
+/// semantic differentiated to just always look through.
+class AnyTryExpr : public Expr {
+  Expr *SubExpr;
+  SourceLoc TryLoc;
+
+public:
+  AnyTryExpr(ExprKind kind, SourceLoc tryLoc, Expr *sub,
+             Type type, bool implicit)
+    : Expr(kind, implicit, type), SubExpr(sub), TryLoc(tryLoc) {}
+
+  SourceLoc getLoc() const { return SubExpr->getLoc(); }
+  Expr *getSubExpr() const { return SubExpr; }
+  void setSubExpr(Expr *E) { SubExpr = E; }
+
+  SourceLoc getTryLoc() const { return TryLoc; }
+
+  SourceLoc getStartLoc() const { return TryLoc; }
+  SourceLoc getEndLoc() const { return getSubExpr()->getEndLoc(); }
+
+  static bool classof(const Expr *e) {
+    return e->getKind() >= ExprKind::First_AnyTryExpr
+        && e->getKind() <= ExprKind::Last_AnyTryExpr;
+  }
+};
+
+/// TryExpr - A 'try' surrounding an expression, marking that the
+/// expression contains code which might throw.
+///
+/// getSemanticsProvidingExpr() looks through this because it doesn't
+/// provide the value and only very specific clients care where the
+/// 'try' was written.
+class TryExpr : public AnyTryExpr {
+public:
+  TryExpr(SourceLoc tryLoc, Expr *sub, Type type = Type(),
+          bool implicit = false)
+    : AnyTryExpr(ExprKind::Try, tryLoc, sub, type, implicit) {}
+
+  static bool classof(const Expr *e) {
+    return e->getKind() == ExprKind::Try;
+  }
+};
+
+/// ForceTryExpr - A 'try!' surrounding an expression, marking that
+/// the expression contains code which might throw, but that the code
+/// should dynamically assert if it does.
+class ForceTryExpr : public AnyTryExpr {
+  SourceLoc ExclaimLoc;
+
+public:
+  ForceTryExpr(SourceLoc tryLoc, Expr *sub, SourceLoc exclaimLoc,
+               Type type = Type(), bool implicit = false)
+    : AnyTryExpr(ExprKind::ForceTry, tryLoc, sub, type, implicit),
+      ExclaimLoc(exclaimLoc) {}
+
+  SourceLoc getExclaimLoc() const { return ExclaimLoc; }
+
+  static bool classof(const Expr *e) {
+    return e->getKind() == ExprKind::ForceTry;
+  }
+};
   
 /// An expression node that does not affect the evaluation of its subexpression.
 class IdentityExpr : public Expr {
@@ -1435,50 +1499,6 @@ public:
   
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::DotSelf;
-  }
-};
-
-/// TryExpr - A 'try' surrounding an expression, marking that the
-/// expression contains code which might throw.
-class TryExpr : public IdentityExpr {
-  SourceLoc Loc;
-
-public:
-  TryExpr(SourceLoc loc, Expr *sub, Type type = Type(),
-          bool implicit = false)
-    : IdentityExpr(ExprKind::Try, sub, type, implicit), Loc(loc) {}
-
-  SourceLoc getTryLoc() const { return Loc; }
-
-  SourceLoc getStartLoc() const { return Loc; }
-  SourceLoc getEndLoc() const { return getSubExpr()->getEndLoc(); }
-
-  static bool classof(const Expr *e) {
-    return e->getKind() == ExprKind::Try;
-  }
-};
-
-/// ForceTryExpr - A 'try!' surrounding an expression, marking that
-/// the expression contains code which might throw, but that the code
-/// should dynamically assert if it does.
-class ForceTryExpr : public IdentityExpr {
-  SourceLoc TryLoc;
-  SourceLoc ExclaimLoc;
-
-public:
-  ForceTryExpr(SourceLoc tryLoc, Expr *sub, SourceLoc exclaimLoc,
-          Type type = Type(), bool implicit = false)
-    : IdentityExpr(ExprKind::ForceTry, sub, type, implicit),
-      TryLoc(tryLoc), ExclaimLoc(exclaimLoc) {}
-
-  SourceLoc getTryLoc() const { return TryLoc; }
-  SourceLoc getExclaimLoc() const { return ExclaimLoc; }
-
-  SourceLoc getStartLoc() const { return TryLoc; }
-  SourceLoc getEndLoc() const { return getSubExpr()->getEndLoc(); }
-
-  static bool classof(const Expr *e) {
-    return e->getKind() == ExprKind::ForceTry;
   }
 };
   

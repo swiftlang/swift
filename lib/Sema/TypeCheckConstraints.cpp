@@ -1893,6 +1893,14 @@ Expr *TypeChecker::coerceToMaterializable(Expr *expr) {
     return paren;
   }
 
+  // Walk into 'try' and 'try!' expressions to update the subexpression.
+  if (auto tryExpr = dyn_cast<AnyTryExpr>(expr)) {
+    auto sub = coerceToMaterializable(tryExpr->getSubExpr());
+    tryExpr->setSubExpr(sub);
+    tryExpr->setType(sub->getType());
+    return tryExpr;
+  }
+
   // Walk into tuples to update the subexpressions.
   if (auto tuple = dyn_cast<TupleExpr>(expr)) {
     bool anyChanged = false;

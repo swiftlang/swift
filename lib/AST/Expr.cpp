@@ -161,6 +161,9 @@ Expr *Expr::getSemanticsProvidingExpr() {
   if (IdentityExpr *IE = dyn_cast<IdentityExpr>(this))
     return IE->getSubExpr()->getSemanticsProvidingExpr();
 
+  if (TryExpr *TE = dyn_cast<TryExpr>(this))
+    return TE->getSubExpr()->getSemanticsProvidingExpr();
+
   if (DefaultValueExpr *DE = dyn_cast<DefaultValueExpr>(this))
     return DE->getSubExpr()->getSemanticsProvidingExpr();
   
@@ -168,10 +171,15 @@ Expr *Expr::getSemanticsProvidingExpr() {
 }
 
 Expr *Expr::getValueProvidingExpr() {
-  // For now, this is totally equivalent to the above.
+  Expr *E = getSemanticsProvidingExpr();
+
+  if (auto TE = dyn_cast<ForceTryExpr>(this))
+    return TE->getSubExpr()->getValueProvidingExpr();
+
   // TODO:
   //   - tuple literal projection, which may become interestingly idiomatic
-  return getSemanticsProvidingExpr();
+
+  return E;
 }
 
 

@@ -652,3 +652,11 @@ func supportStructure(inout b: PinnedBridge, name: String) throws {
 // CHECK-NEXT: copy_addr
 // CHECK-NEXT: strong_release
 // CHECK-NEXT: throw [[ERROR]]
+
+// ! peepholes its argument with getSemanticsProvidingExpr().
+// Test that that doesn't look through try!.
+// rdar://21515402
+func testForcePeephole(f: () throws -> Int?) -> Int {
+  let x = (try! f())!
+  return x
+}

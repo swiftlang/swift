@@ -156,10 +156,8 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
     return nullptr;
 
   // If the left-hand-side is a 'try', hoist it up.
-  IdentityExpr *tryEval = nullptr;
-  if ((tryEval = dyn_cast<TryExpr>(LHS))) {
-    LHS = tryEval->getSubExpr();
-  } else if ((tryEval = dyn_cast<ForceTryExpr>(LHS))) {
+  AnyTryExpr *tryEval = dyn_cast<AnyTryExpr>(LHS);
+  if (tryEval) {
     LHS = tryEval->getSubExpr();
   }
   
@@ -188,7 +186,7 @@ static Expr *makeBinOp(TypeChecker &TC, Expr *Op, Expr *LHS, Expr *RHS,
   //   x ? try foo() : try bar() $#! 1
   // assuming $#! is some crazy operator with lower precedence
   // than the conditional operator.
-  if (isa<TryExpr>(RHS) || isa<ForceTryExpr>(RHS)) {
+  if (isa<AnyTryExpr>(RHS)) {
     if (isa<IfExpr>(Op) || infixData.isAssignment()) {
       if (!isEndOfSequence) {
         if (isa<IfExpr>(Op)) {
