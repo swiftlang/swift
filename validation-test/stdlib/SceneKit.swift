@@ -3,7 +3,8 @@
 
 // REQUIRES: objc_interop
 
-// REQUIRES: rdar20738778
+// <rdar://problem/20738811>
+// REQUIRES: OS=macosx
 
 import StdlibUnittest
 import SceneKit
