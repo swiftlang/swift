@@ -43,7 +43,7 @@
 using namespace llvm;
 using namespace swift;
 using swift::SwiftARCOpt;
-using swift::SwiftARCExpandPass;
+using swift::SwiftARCContract;
 
 STATISTIC(NumNoopDeleted,
           "Number of no-op swift calls eliminated");
@@ -882,25 +882,21 @@ bool SwiftARCOpt::runOnFunction(Function &F) {
 }
 
 //===----------------------------------------------------------------------===//
-//                        SwiftARCExpandPass Pass
+//                        SwiftARCContractPass Pass
 //===----------------------------------------------------------------------===//
 
-/// performARCExpansion - This implements the very late (just before code
-/// generation) lowering processes that we do to expose low level performance
-/// optimizations and take advantage of special features of the ABI.  These
-/// expansion steps can foil the general mid-level optimizer, so they are done
-/// very, very, late.
+/// This implements the very late (just before code generation) lowering
+/// processes that we do to expose low level performance optimizations and take
+/// advantage of special features of the ABI.  These expansion steps can foil
+/// the general mid-level optimizer, so they are done very, very, late.
 ///
 /// Expansions include:
 ///   - Lowering retain calls to swift_retain (which return the retained
 ///     argument) to lower register pressure.
-///   - Forming calls to swift_retainAndReturnThree when the last thing in a
-///     function is to retain one of its result values, and when it returns
-///     exactly three values.
 ///
 /// Coming into this function, we assume that the code is in canonical form:
 /// none of these calls have any uses of their return values.
-bool SwiftARCExpandPass::runOnFunction(Function &F) {
+bool SwiftARCContract::runOnFunction(Function &F) {
   ARCEntryPointBuilder B(F);
   bool Changed = false;
 
@@ -1049,14 +1045,14 @@ bool SwiftARCExpandPass::runOnFunction(Function &F) {
 
 
 namespace llvm {
-  void initializeSwiftARCExpandPassPass(PassRegistry&);
+  void initializeSwiftARCContractPass(PassRegistry&);
 }
 
-char SwiftARCExpandPass::ID = 0;
-INITIALIZE_PASS(SwiftARCExpandPass,
-                "swift-arc-expand", "Swift ARC expansion", false, false)
+char SwiftARCContract::ID = 0;
+INITIALIZE_PASS(SwiftARCContract,
+                "swift-arc-contract", "Swift ARC contraction", false, false)
 
-llvm::FunctionPass *swift::createSwiftARCExpandPass() {
-  initializeSwiftARCExpandPassPass(*llvm::PassRegistry::getPassRegistry());
-  return new SwiftARCExpandPass();
+llvm::FunctionPass *swift::createSwiftARCContractPass() {
+  initializeSwiftARCContractPass(*llvm::PassRegistry::getPassRegistry());
+  return new SwiftARCContract();
 }

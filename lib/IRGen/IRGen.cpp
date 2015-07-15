@@ -65,10 +65,10 @@ static void addSwiftARCOptPass(const PassManagerBuilder &Builder,
     PM.add(createSwiftARCOptPass());
 }
 
-static void addSwiftExpandPass(const PassManagerBuilder &Builder,
+static void addSwiftContractPass(const PassManagerBuilder &Builder,
                                PassManagerBase &PM) {
   if (Builder.OptLevel > 0)
-    PM.add(createSwiftARCExpandPass());
+    PM.add(createSwiftARCContractPass());
 }
 
 // FIXME: Copied from clang/lib/CodeGen/CGObjCMac.cpp. 
@@ -156,12 +156,12 @@ static bool performLLVM(IRGenOptions &Opts, DiagnosticEngine &Diags,
   }
 
   // If the optimizer is enabled, we run the ARCOpt pass in the scalar optimizer
-  // and the Expand pass as late as possible.
+  // and the Contract pass as late as possible.
   if (!Opts.DisableLLVMARCOpts) {
     PMBuilder.addExtension(PassManagerBuilder::EP_ScalarOptimizerLate,
                            addSwiftARCOptPass);
     PMBuilder.addExtension(PassManagerBuilder::EP_OptimizerLast,
-                           addSwiftExpandPass);
+                           addSwiftContractPass);
   }
   
   // Configure the function passes.

@@ -54,7 +54,7 @@ namespace swift {
     SwiftARCOpt();
   };
 
-  class SwiftARCExpandPass : public llvm::FunctionPass {
+  class SwiftARCContract : public llvm::FunctionPass {
     virtual void getAnalysisUsage(llvm::AnalysisUsage &AU) const override {
       AU.setPreservesCFG();
     }
@@ -62,7 +62,7 @@ namespace swift {
 
   public:
     static char ID;
-    SwiftARCExpandPass() : llvm::FunctionPass(ID) {}
+    SwiftARCContract() : llvm::FunctionPass(ID) {}
   };
 
 } // end namespace swift

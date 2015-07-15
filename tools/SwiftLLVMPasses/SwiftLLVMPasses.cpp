@@ -18,5 +18,5 @@ static RegisterPass<swift::SwiftAliasAnalysis>
   AA("swift-aa", "Swift Alias Analysis", false, true);
 static RegisterPass<swift::SwiftARCOpt>
   AO("swift-arc-optimize", "Swift ARC optimization");
-static RegisterPass<swift::SwiftARCExpandPass>
-  AE("swift-arc-expand", "Swift ARC expansion");
+static RegisterPass<swift::SwiftARCContract>
+  AE("swift-arc-contract", "Swift ARC contract");
