@@ -4495,6 +4495,9 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
   setLoweredExplosion(SILValue(i, 0), e);
 }
 
+static llvm::Constant *getConstantValue(IRGenModule &IGM, llvm::StructType *STy,
+                                        TupleInst *TI);
+
 /// Generate ConstantStruct for StructInst.
 static llvm::Constant *getConstantValue(IRGenModule &IGM, llvm::StructType *STy,
                                         StructInst *SI) {
@@ -4503,6 +4506,9 @@ static llvm::Constant *getConstantValue(IRGenModule &IGM, llvm::StructType *STy,
          "mismatch StructInst with its lowered StructType!");
   for (unsigned i = 0, e = STy->getNumElements(); i != e; ++i) {
     if (auto *Elem = dyn_cast<StructInst>(SI->getOperand(i)))
+      Elts.push_back(getConstantValue(IGM,
+                     cast<llvm::StructType>(STy->getElementType(i)), Elem));
+    else if (auto *Elem = dyn_cast<TupleInst>(SI->getOperand(i)))
       Elts.push_back(getConstantValue(IGM,
                      cast<llvm::StructType>(STy->getElementType(i)), Elem));
     else if (auto *ILI = dyn_cast<IntegerLiteralInst>(SI->getOperand(i)))
@@ -4517,6 +4523,31 @@ static llvm::Constant *getConstantValue(IRGenModule &IGM, llvm::StructType *STy,
   return llvm::ConstantStruct::get(STy, Elts);
 }
 
+
+/// Generate ConstantStruct for StructInst.
+static llvm::Constant *getConstantValue(IRGenModule &IGM, llvm::StructType *STy,
+                                        TupleInst *TI) {
+  SmallVector<llvm::Constant*, 32> Elts;
+  assert(TI->getNumOperands() == STy->getNumElements() &&
+         "mismatch StructInst with its lowered StructType!");
+  for (unsigned i = 0, e = STy->getNumElements(); i != e; ++i) {
+    if (auto *Elem = dyn_cast<StructInst>(TI->getOperand(i)))
+      Elts.push_back(getConstantValue(IGM,
+                     cast<llvm::StructType>(STy->getElementType(i)), Elem));
+    else if (auto *Elem = dyn_cast<TupleInst>(TI->getOperand(i)))
+      Elts.push_back(getConstantValue(IGM,
+                     cast<llvm::StructType>(STy->getElementType(i)), Elem));
+    else if (auto *ILI = dyn_cast<IntegerLiteralInst>(TI->getOperand(i)))
+      Elts.push_back(getConstantInt(IGM, ILI));
+    else if (auto *FLI = dyn_cast<FloatLiteralInst>(TI->getOperand(i)))
+      Elts.push_back(getConstantFP(IGM, FLI));
+    else if (auto *SLI = dyn_cast<StringLiteralInst>(TI->getOperand(i)))
+      Elts.push_back(getAddrOfString(IGM, SLI->getValue(), SLI->getEncoding()));
+    else
+      llvm_unreachable("Unexpected SILInstruction in static initializer!");
+  }
+  return llvm::ConstantStruct::get(STy, Elts);
+}
 
 void IRGenModule::emitSILStaticInitializer() {
   SmallVector<SILFunction*, 8> StaticInitializers;
@@ -4533,11 +4564,24 @@ void IRGenModule::emitSILStaticInitializer() {
     if (!gvar || !gvar->hasInitializer())
       continue;
 
-    auto *STy = dyn_cast<llvm::StructType>(gvar->getInitializer()->getType());
-    assert(STy && "We only handle StructType for now!");
+    if (auto *STy = dyn_cast<llvm::StructType>(gvar->getInitializer()->getType())) {
+      auto *InitValue = v.getValueOfStaticInitializer();
 
-    // Get the StructInst that we write to the SILGlobalVariable.
-    auto *SI = cast<StructInst>(v.getValueOfStaticInitializer());
-    gvar->setInitializer(getConstantValue(*this, STy, SI));
+      // Get the StructInst that we write to the SILGlobalVariable.
+      if (auto *SI = dyn_cast<StructInst>(InitValue)) {
+        gvar->setInitializer(getConstantValue(*this, STy, SI));
+        continue;
+      }
+
+      // Get the TupleInst that we write to the SILGlobalVariable.
+      if (auto *TI = dyn_cast<TupleInst>(InitValue)) {
+        gvar->setInitializer(getConstantValue(*this, STy, TI));
+        continue;
+      }
+
+      llvm_unreachable("We only handle StructInst and TupleInst for now!");
+    }
+
+    llvm_unreachable("We only handle StructType for now!");
   }
 }
