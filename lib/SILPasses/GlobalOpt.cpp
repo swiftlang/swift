@@ -201,48 +201,19 @@ void SILGlobalOpt::collectGlobalLoad(LoadInst *LI, SILGlobalVariable *SILG) {
 }
 
 /// Check if a given type is a simple type, i.e. a builtin
-/// integer or floating point type or a struct whose members
+/// integer or floating point type or a struct/tuple whose members
 /// are of simple types.
 /// TODO: Cache the "simple" flag for types to avoid repeating checks.
-static bool isSimpleType(CanType Ty, SILModule& Module) {
-  if (!Ty)
+static bool isSimpleType(SILType SILTy, SILModule& Module) {
+  // Classes can never be initialized statically at compile-time.
+  if (SILTy.getClassOrBoundGenericClass()) {
     return false;
-
-  if (isa<BuiltinIntegerType>(Ty) || isa<BuiltinFloatType>(Ty))
-    return true;
-
-  // Classes cannot be initialized statically.
-  if (Ty.getClassOrBoundGenericClass())
-    return false;
-
-  auto *NominalTy = Ty.getNominalOrBoundGenericNominal();
-
-  if (NominalTy) {
-    ASTContext &Ctx = Module.getASTContext();
-
-    if (NominalTy == Ctx.getUIntDecl() ||
-        NominalTy == Ctx.getIntDecl() ||
-        NominalTy == Ctx.getFloatDecl() ||
-        NominalTy == Ctx.getDoubleDecl())
-      return true;
   }
 
-  // If it is a struct containing only simple types, it is OK.
-  if (auto StructTy = dyn_cast<StructType>(Ty)) {
-    // Check all the non-static members, which have a storage.
-    auto *SD = StructTy->getDecl();
-    for (auto Member : SD->getMembers()) {
-      if (auto *VD = dyn_cast<VarDecl>(Member)) {
-        if (!VD->isStatic() && VD->hasStorage()) {
-          if (!isSimpleType(VD->getType().getCanonicalTypeOrNull(), Module))
-            return false;
-        }
-      }
-    }
-    return true;
-  }
+  if (!SILTy.isTrivial(Module))
+    return false;
 
-  return false;
+  return true;
 }
 
 /// Check if the value of V is computed by means of a simple initialization.
@@ -260,7 +231,7 @@ static bool analyzeStaticInitializer(SILValue V,
     Insns.push_back(I);
     if (auto *SI = dyn_cast<StructInst>(I)) {
       // If it is not a struct which is a simple type, bail.
-      if (!isSimpleType(SI->getType().getSwiftRValueType(), I->getModule()))
+      if (!isSimpleType(SI->getType(), I->getModule()))
         return false;
       for (auto &Op: SI->getAllOperands()) {
         // If one of the struct instruction operands is not
@@ -894,7 +865,7 @@ void SILGlobalOpt::collectGlobalAccess(GlobalAddrInst *GAI) {
   if (GlobalVarSkipProcessing.count(SILG))
     return;
 
-  if (!isSimpleType(SILG->getLoweredType().getSwiftRValueType(), *Module)) {
+  if (!isSimpleType(SILG->getLoweredType(), *Module)) {
     GlobalVarSkipProcessing.insert(SILG);
     return;
   }
