@@ -311,10 +311,20 @@ static void copyOrInitValuesInto(Initialization *init,
     return;
   }
   
+  bool implodeTuple = false;
+
+  if (auto Address = init->getAddressOrNull()) {
+  if (isa<GlobalAddrInst>(init->getAddress()) &&
+      gen.getTypeLowering(type).getLoweredType().isTrivial(gen.SGM.M)) {
+      // Implode tuples in initialization of globals if they are
+      // of trivial types.
+      implodeTuple = true;
+    }
+  }
   
   // If we can satisfy the tuple type by breaking up the aggregate
   // initialization, do so.
-  if (init->canSplitIntoSubelementAddresses()) {
+  if (!implodeTuple && init->canSplitIntoSubelementAddresses()) {
     SmallVector<InitializationPtr, 4> subInitBuf;
     auto subInits = init->getSubInitializationsForTuple(gen, type,
                                                         subInitBuf, loc);

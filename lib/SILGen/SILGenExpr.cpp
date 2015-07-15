@@ -1668,7 +1668,19 @@ RValue RValueEmitter::visitTupleExpr(TupleExpr *E, SGFContext C) {
 
   // If we have an Initialization, emit the tuple elements into its elements.
   if (Initialization *I = C.getEmitInto()) {
-    if (I->canSplitIntoSubelementAddresses()) {
+
+    bool implodeTuple = false;
+
+    if (auto Address = I->getAddressOrNull()) {
+      if (isa<GlobalAddrInst>(Address) &&
+          SGF.getTypeLowering(type).getLoweredType().isTrivial(SGF.SGM.M)) {
+        // Implode tuples in initialization of globals if they are
+        // of trivial types.
+        implodeTuple = true;
+      }
+    }
+
+    if (!implodeTuple && I->canSplitIntoSubelementAddresses()) {
       SmallVector<InitializationPtr, 4> subInitializationBuf;
       auto subInitializations =
         I->getSubInitializationsForTuple(SGF, type, subInitializationBuf,
