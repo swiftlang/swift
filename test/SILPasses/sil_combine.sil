@@ -2636,3 +2636,30 @@ bb3(%19 : $Double):                               // Preds: bb1 bb2
   return %19 : $Double                            // id: %20
 }
 
+sil [reabstraction_thunk] @_TTRXFo_oSS_dSb_XFo_iSS_iSb_ : $@convention(thin) (@out Bool, @in String, @owned @callee_owned (@owned String) -> Bool) -> ()
+sil [reabstraction_thunk] @_TTRXFo_iSS_iSb_XFo_oSS_dSb_ : $@convention(thin) (@owned String, @owned @callee_owned (@out Bool, @in String) -> ()) -> Bool
+
+// CHECK-LABEL: sil @remove_identity_reabstraction_thunks
+// CHECK:  [[STK:%.*]] = alloc_stack $@callee_owned (@owned String) -> Bool
+// CHECK-NOT: partial_apply
+// CHECK:  store %0 to [[STK]]#1
+// CHECK:  [[LD:%.*]] = load [[STK]]#1
+// CHECK:  strong_release [[LD]]
+// CHECK:  dealloc_stack [[STK]]#0
+
+sil @remove_identity_reabstraction_thunks : $@convention(thin) (@owned @callee_owned (@owned String) -> Bool) -> () {
+bb0(%0 : $@callee_owned (@owned String) -> Bool):
+  %1 = alloc_stack $@callee_owned (@owned String) -> Bool
+  // function_ref reabstraction thunk helper from @callee_owned (@owned Swift.String) -> (@unowned Swift.Bool) to @callee_owned (@in Swift.String) -> (@out Swift.Bool)
+  %2 = function_ref @_TTRXFo_oSS_dSb_XFo_iSS_iSb_ : $@convention(thin) (@out Bool, @in String, @owned @callee_owned (@owned String) -> Bool) -> ()
+  %3 = partial_apply %2(%0) : $@convention(thin) (@out Bool, @in String, @owned @callee_owned (@owned String) -> Bool) -> ()
+  // function_ref reabstraction thunk helper from @callee_owned (@in Swift.String) -> (@out Swift.Bool) to @callee_owned (@owned Swift.String) -> (@unowned Swift.Bool)
+  %4 = function_ref @_TTRXFo_iSS_iSb_XFo_oSS_dSb_ : $@convention(thin) (@owned String, @owned @callee_owned (@out Bool, @in String) -> ()) -> Bool
+  %5 = partial_apply %4(%3) : $@convention(thin) (@owned String, @owned @callee_owned (@out Bool, @in String) -> ()) -> Bool
+  store %5 to %1#1 : $*@callee_owned (@owned String) -> Bool
+  %6 = load %1#1 : $*@callee_owned (@owned String) -> Bool
+  strong_release %6 : $@callee_owned (@owned String) -> Bool
+  dealloc_stack %1#0 : $*@local_storage @callee_owned (@owned String) -> Bool
+  %7 = tuple ()
+  return %7 : $()
+}

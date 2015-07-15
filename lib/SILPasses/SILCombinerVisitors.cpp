@@ -487,6 +487,74 @@ SILInstruction *SILCombiner::visitRetainValueInst(RetainValueInst *RVI) {
   return nullptr;
 }
 
+
+/// Check that this is a partial apply of a reabstraction thunk and return the
+/// argument of the partial apply if it is.
+static SILValue
+isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI, bool requireSingleUse) {
+  if (requireSingleUse) {
+    SILValue PAIVal(PAI, 0);
+    if (!hasOneNonDebugUse(PAIVal))
+      return SILValue();
+  }
+
+  if (PAI->getNumArguments() != 1)
+    return SILValue();
+
+  auto *FRI = dyn_cast<FunctionRefInst>(PAI->getCallee());
+  if (!FRI)
+    return SILValue();
+  auto *Fun = FRI->getReferencedFunction();
+  if (!Fun)
+    return SILValue();
+
+  // Make sure we have a reabstraction thunk.
+  if (Fun->isThunk() != IsReabstractionThunk)
+    return SILValue();
+
+  // The argument should be a closure.
+  auto Arg = PAI->getArgument(0);
+  if (!Arg.getType().is<SILFunctionType>() ||
+      !Arg.getType().isReferenceCounted(PAI->getFunction()->getModule()))
+    return SILValue();
+
+  return PAI->getArgument(0);
+}
+
+/// Remove pointless reabstraction thunk closures.
+///   partial_apply %reabstraction_thunk_typeAtoB(
+///      partial_apply %reabstraction_thunk_typeBtoA %closure_typeB))
+///   ->
+///   %closure_typeB
+static bool foldInverseReabstractionThunks(PartialApplyInst *PAI,
+                                           SILCombiner *Combiner) {
+  auto PAIArg = isPartialApplyOfReabstractionThunk(PAI, false);
+  if (!PAIArg)
+    return false;
+
+  auto *PAI2 = dyn_cast<PartialApplyInst>(PAIArg);
+  if (!PAI2)
+    return false;
+
+  auto PAI2Arg = isPartialApplyOfReabstractionThunk(PAI2, true);
+  if (!PAI2Arg)
+    return false;
+
+  // The types must match.
+  if (PAI->getType() != PAI2->getArgument(0).getType())
+    return false;
+
+  // Replace the partial_apply(partial_apply(X)) by X and remove the
+  // partial_applies.
+
+  Combiner->replaceInstUsesWith(*PAI, PAI2->getArgument(0).getDef());
+  Combiner->eraseInstFromFunction(*PAI);
+  assert(PAI2->use_empty() && "Should not have any uses");
+  Combiner->eraseInstFromFunction(*PAI2);
+
+  return true;
+}
+
 SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
   // partial_apply without any substitutions or arguments is just a
   // thin_to_thick_function.
@@ -494,6 +562,12 @@ SILInstruction *SILCombiner::visitPartialApplyInst(PartialApplyInst *PAI) {
     return new (PAI->getModule()) ThinToThickFunctionInst(PAI->getLoc(),
                                                           PAI->getCallee(),
                                                           PAI->getType());
+
+  // partial_apply %reabstraction_thunk_typeAtoB(
+  //    partial_apply %reabstraction_thunk_typeBtoA %closure_typeB))
+  // -> %closure_typeB
+  if (foldInverseReabstractionThunks(PAI, this))
+    return nullptr;
 
   tryOptimizeApplyOfPartialApply(PAI);
 
