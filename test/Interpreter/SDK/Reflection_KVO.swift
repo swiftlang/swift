@@ -25,10 +25,10 @@ class ValueObserver: NSObject {
 		observedValue.removeObserver(self, forKeyPath: "amount")
 	}
 	
-	override func observeValueForKeyPath(keyPath: String?, ofObject object: AnyObject?, change: [NSObject : AnyObject]?, context: UnsafeMutablePointer<Void>) {
+	override func observeValueForKeyPath(keyPath: String?, ofObject object: AnyObject?, change: [String : AnyObject]?, context: UnsafeMutablePointer<Void>) {
 		if context == &observeContext {
       if let change_ = change {
-        if let amount = change_[NSKeyValueChangeNewKey as NSString] as? Int {
+        if let amount = change_[NSKeyValueChangeNewKey as String] as? Int {
           print("Observed value updated to \(amount)")
         }
       }
