@@ -35,6 +35,8 @@ public protocol Indexable {
   /// The position of the first element in a non-empty collection.
   ///
   /// In an empty collection, `startIndex == endIndex`.
+  ///
+  /// - Complexity: O(1)
   var startIndex: Index {get}
 
   /// The collection's "past the end" position.
@@ -42,6 +44,8 @@ public protocol Indexable {
   /// `endIndex` is not a valid argument to `subscript`, and is always
   /// reachable from `startIndex` by zero or more applications of
   /// `successor()`.
+  ///
+  /// - Complexity: O(1)
   var endIndex: Index {get}
 
   // The declaration of _Element and subscript here is a trick used to
@@ -55,6 +59,8 @@ public protocol Indexable {
   typealias _Element
 
   /// Returns the element at the given `position`.
+  ///
+  /// - Complexity: O(1)
   subscript(position: Index) -> _Element {get}
 }
 
@@ -185,11 +191,15 @@ extension CollectionType where SubSequence == Slice<Self> {
 /// Default implementations of core requirements
 extension CollectionType {
   /// Returns `true` iff `self` is empty.
+  ///
+  /// - Complexity: O(1)
   public var isEmpty: Bool {
     return startIndex == endIndex
   }
 
   /// Returns the first element of `self`, or `nil` if `self` is empty.
+  ///
+  /// - Complexity: O(1)
   public var first: Generator.Element? {
     return isEmpty ? nil : self[startIndex]
   }
@@ -325,6 +335,8 @@ public protocol MutableCollectionType : CollectionType {
   ///
   /// - Requires: `position` indicates a valid position in `self` and
   ///   `position != endIndex`.
+  ///
+  /// - Complexity: O(1)
   subscript(position: Index) -> Generator.Element {get set}
 
   /// Call `body(p)`, where `p` is a pointer to the collection's
