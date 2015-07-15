@@ -988,9 +988,6 @@ public:
   ///
   /// \param options Options that control how type checking is performed.
   ///
-  /// \param allowFreeTypeVariables Whether free type variables are allowed in
-  /// the solution, and what to do with them.
-  ///
   /// \param listener If non-null, a listener that will be notified of important
   /// events in the type checking of this expression, and which can introduce
   /// additional constraints.
@@ -1000,8 +997,6 @@ public:
                            Type convertType = Type(),
                            Type contextualType = Type(),
                            TypeCheckExprOptions options =TypeCheckExprOptions(),
-                           FreeTypeVariableBinding allowFreeTypeVariables
-                             = FreeTypeVariableBinding::Disallow,
                            ExprTypeCheckListener *listener = nullptr);
 
   /// \brief Type check the given expression and return its type without

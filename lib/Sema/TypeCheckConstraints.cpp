@@ -977,7 +977,6 @@ bool TypeChecker::typeCheckExpression(
        Type convertType,
        Type contextualType,
        TypeCheckExprOptions options,
-       FreeTypeVariableBinding allowFreeTypeVariables,
        ExprTypeCheckListener *listener) {
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
@@ -994,8 +993,8 @@ bool TypeChecker::typeCheckExpression(
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
   if (solveForExpression(expr, dc, convertType, contextualType,
-                         allowFreeTypeVariables, listener, cs, viable,
-                         suppressDiagnostics))
+                         FreeTypeVariableBinding::Disallow, listener, cs,
+                         viable, suppressDiagnostics))
     return true;
 
   // Apply the solution to the expression.
@@ -1297,7 +1296,6 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
   // Type-check the initializer.
   bool hadError = typeCheckExpression(initializer, DC, Type(),
                                       contextualType, TypeCheckExprFlags(),
-                                      FreeTypeVariableBinding::Disallow,
                                       &listener);
 
   if (hadError && !pattern->hasType()) {
@@ -1499,7 +1497,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
 
   // Type-check the for-each loop sequence and element pattern.
   if (typeCheckExpression(seq, dc, Type(), Type(), TypeCheckExprFlags(),
-                          FreeTypeVariableBinding::Disallow, &listener))
+                          &listener))
     return true;
 
   return false;
@@ -1590,7 +1588,6 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
 
   ConditionListener listener;
   return typeCheckExpression(expr, dc, Type(), Type(), TypeCheckExprFlags(),
-                             FreeTypeVariableBinding::Disallow,
                              &listener);
 }
 
