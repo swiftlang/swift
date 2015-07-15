@@ -1530,11 +1530,11 @@ namespace {
             swi->addCase(llvm::ConstantInt::get(C, APInt(ExtraTagBitCount, i)),
                          bb);
           }
-
-          // Continue by emitting the extra inhabitant dispatch, if any.
-          if (extraInhabitantCount > 0)
-            IGF.Builder.emitBlock(tagBitBlocks[0]);
         }
+
+        // Continue by emitting the extra inhabitant dispatch, if any.
+        if (extraInhabitantCount > 0)
+          IGF.Builder.emitBlock(tagBitBlocks[0]);
       }
 
       // If there are no extra tag bits, or they're set to zero, then we either
