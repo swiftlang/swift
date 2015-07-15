@@ -512,7 +512,7 @@ func checkPartition_${'Predicate' if predicate else 'WhereElementIsComparable'}(
   if true {
 %     if predicate:
     let extract = extractValue
-    var elements: [OpaqueValue<Int>] =
+    ${'var' if slice else 'let'} elements: [OpaqueValue<Int>] =
       zip(sequence, 0..<sequence.count).map {
         OpaqueValue($0, identity: $1)
       }
@@ -529,7 +529,7 @@ func checkPartition_${'Predicate' if predicate else 'WhereElementIsComparable'}(
     MinimalComparableValue.lessImpl.value = lessImpl
 
     let extract = extractValueFromComparable
-    var elements: [MinimalComparableValue] =
+    ${'var' if slice else 'let'} elements: [MinimalComparableValue] =
       zip(sequence, 0..<sequence.count).map {
         MinimalComparableValue($0, identity: $1)
       }
@@ -561,7 +561,7 @@ func checkPartition_${'Predicate' if predicate else 'WhereElementIsComparable'}(
 %     end
 
     // Check that we didn't lose any elements.
-    var identities = c.map { extract($0).identity }
+    ${'var' if slice else 'let'} identities = c.map { extract($0).identity }
 %     if slice:
     expectEqual(0xfffe, extract(c.first!).identity)
     expectEqual(0xffff, extract(c.last!).identity)
