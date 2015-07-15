@@ -586,11 +586,7 @@ namespace {
             }
 
             // Look through identity and force-value expressions.
-            // FIXME: For now, don't look through 'try' or 'try!', because
-            // DI cannot handle it.
-            if ((isa<IdentityExpr>(ancestor) ||
-                 isa<ForceValueExpr>(ancestor)) &&
-                !(isa<ForceTryExpr>(ancestor) || isa<TryExpr>(ancestor))) {
+            if (isa<IdentityExpr>(ancestor) ||isa<ForceValueExpr>(ancestor)) {
               if (target)
                 target = ancestor;
               continue;

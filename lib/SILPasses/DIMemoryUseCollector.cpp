@@ -988,13 +988,18 @@ static SILInstruction *isSuperInitUse(UpcastInst *Inst) {
 /// isSelfInitUse - Return true if this apply_inst is a call to self.init.
 static bool isSelfInitUse(SILInstruction *I) {
   auto *LocExpr = I->getLoc().getAsASTNode<ApplyExpr>();
-  
+
   // If we have the rebind_self_in_constructor_expr, then the call is the
   // sub-expression.
   if (!LocExpr)
-    if (auto *RB = I->getLoc().getAsASTNode<RebindSelfInConstructorExpr>())
-      LocExpr = dyn_cast<ApplyExpr>(RB->getSubExpr());
-  
+    if (auto *RB = I->getLoc().getAsASTNode<RebindSelfInConstructorExpr>()) {
+      auto subExpr = RB->getSubExpr();
+      // Look through TryExpr.  TODO: ForceTryExpr?
+      if (auto *TE = dyn_cast<TryExpr>(subExpr))
+        subExpr = TE->getSubExpr();
+      LocExpr = dyn_cast<ApplyExpr>(subExpr);
+    }
+
   if (!LocExpr) {
     // If we're reading a .sil file, treat a call to "selfinit" as a
     // self.init call as a hack to allow us to write testcases.
