@@ -1160,6 +1160,10 @@ bool Module::isStdlibModule() const {
   return !getParent() && getName() == getASTContext().StdlibModuleName;
 }
 
+bool Module::isSwiftShimsModule() const {
+  return !getParent() && getName() == getASTContext().SwiftShimsModuleName;
+}
+
 bool Module::isBuiltinModule() const {
   return this == getASTContext().TheBuiltinModule;
 }

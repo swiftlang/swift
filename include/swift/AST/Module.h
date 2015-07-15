@@ -526,6 +526,9 @@ public:
   /// \returns true if this module is the "swift" standard library module.
   bool isStdlibModule() const;
 
+  /// \returns true if this module is the "SwiftShims" module;
+  bool isSwiftShimsModule() const;
+
   /// \returns true if this module is the "builtin" module.
   bool isBuiltinModule() const;
 

@@ -385,7 +385,8 @@ bool Decl::isPrivateStdlibDecl(bool whitelistProtocols) const {
     return ExtD->getExtendedType().isPrivateStdlibType();
 
   DeclContext *DC = D->getDeclContext()->getModuleScopeContext();
-  if (DC->getParentModule()->isBuiltinModule())
+  if (DC->getParentModule()->isBuiltinModule() ||
+      DC->getParentModule()->isSwiftShimsModule())
     return true;
   if (!DC->getParentModule()->isSystemModule())
     return false;

@@ -189,6 +189,9 @@ public:
   /// The name of the standard library module "Swift".
   Identifier StdlibModuleName;
 
+  /// The name of the SwiftShims module "SwiftShims".
+  Identifier SwiftShimsModuleName;
+
   /// Note: in non-NDEBUG builds, tracks the context of each archetype
   /// type, which can be very useful for debugging.
   llvm::DenseMap<ArchetypeType *, DeclContext *> ArchetypeContexts;
