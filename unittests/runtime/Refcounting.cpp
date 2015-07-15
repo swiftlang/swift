@@ -97,3 +97,26 @@ TEST(RefcountingTest, pin_pin_unpin_unpin) {
   swift_unpin(object);
   EXPECT_EQ(1u, value);
 }
+
+TEST(RefcountingTest, retain_release_n) {
+  size_t value = 0;
+  auto object = allocTestObject(&value, 1);
+  EXPECT_EQ(0u, value);
+  auto retainResult = swift_retain_n(object, 32);
+  EXPECT_EQ(object, retainResult);
+  retainResult = swift_retain(object);
+  EXPECT_EQ(object, retainResult);
+  EXPECT_EQ(0u, value);
+  EXPECT_EQ(34u, swift_retainCount(object));
+  swift_release_n(object, 31);
+  EXPECT_EQ(0u, value);
+  EXPECT_EQ(3u, swift_retainCount(object));
+  swift_release(object);
+  EXPECT_EQ(0u, value);
+  EXPECT_EQ(2u, swift_retainCount(object));
+  swift_release_n(object, 1);
+  EXPECT_EQ(0u, value);
+  EXPECT_EQ(1u, swift_retainCount(object));
+  swift_release(object);
+  EXPECT_EQ(1u, value);
+}

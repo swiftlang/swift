@@ -150,6 +150,8 @@ extern "C" void swift_slowDealloc(void *ptr, size_t bytes, size_t alignMask);
 extern "C" HeapObject *swift_retain(HeapObject *object);
 extern "C" void swift_retain_noresult(HeapObject *object);
 
+extern "C" HeapObject *swift_retain_n(HeapObject *object, uint32_t n);
+
 static inline HeapObject *_swift_retain_inlined(HeapObject *object) {
   if (object) {
     object->refCount.increment();
@@ -195,6 +197,10 @@ extern "C" void swift_unpin(HeapObject *object);
 ///      - maybe a variant that can assume a non-null object
 /// It's unlikely that a custom CC would be beneficial here.
 extern "C" void swift_release(HeapObject *object);
+
+/// Atomically decrements the retain count of an object n times. If the retain
+/// count reaches zero, the object is destroyed
+extern "C" void swift_release_n(HeapObject *object, uint32_t n);
 
 /// ObjC compatibility. Never call this.
 extern "C" size_t swift_retainCount(HeapObject *object);
