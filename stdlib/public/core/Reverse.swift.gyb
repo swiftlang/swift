@@ -80,8 +80,10 @@ public struct _prext_ReverseRandomAccessIndex<Base: RandomAccessIndexType>
   }
 }
 
-internal protocol _ReverseCollectionType : _prext_LazyCollectionType, _CollectionWrapperType {
+internal protocol _ReverseCollectionType : CollectionType {
   typealias Index : _prext_ReverseIndexType
+  typealias Base : CollectionType
+  var _base: Base {get}
 }
 
 extension CollectionType
@@ -104,31 +106,31 @@ extension CollectionType
 public struct _prext_ReverseCollection<
   Base_ : CollectionType where Base_.Index : BidirectionalIndexType
 > : _ReverseCollectionType {
-  
-  public typealias Index = _prext_ReverseIndex<Base_.Index>
+  public typealias Base = Base_
+  public typealias Index = _prext_ReverseIndex<Base.Index>
   public typealias Generator = IndexingGenerator<_prext_ReverseCollection>
   
-  public init(_ base: Base_) {
+  public init(_ base: Base) {
     self._base = base
   }
 
-  public let _base: Base_
+  public let _base: Base
 }
 
 public struct _prext_ReverseRandomAccessCollection<
   Base_ : CollectionType where Base_.Index : RandomAccessIndexType
 > : _ReverseCollectionType {
-  
-  public typealias Index = _prext_ReverseRandomAccessIndex<Base_.Index>
+  public typealias Base = Base_
+  public typealias Index = _prext_ReverseRandomAccessIndex<Base.Index>
   public typealias Generator = IndexingGenerator<
     _prext_ReverseRandomAccessCollection
   >
   
-  public init(_ base: Base_) {
+  public init(_ base: Base) {
     self._base = base
   }
 
-  public let _base: Base_
+  public let _base: Base
 }
 
 extension CollectionType where Index : BidirectionalIndexType {
@@ -140,6 +142,22 @@ extension CollectionType where Index : BidirectionalIndexType {
 extension CollectionType where Index : RandomAccessIndexType {
   public var _prext_reverse: _prext_ReverseRandomAccessCollection<Self> {
     return _prext_ReverseRandomAccessCollection(self)
+  }
+}
+
+extension _prext_LazyCollection where Base_.Index : BidirectionalIndexType {
+  public var _prext_reverse: _prext_LazyCollection<
+    _prext_ReverseCollection<Base_>
+  > {
+    return _prext_ReverseCollection(_base)._prext_lazy
+  }
+}
+
+extension _prext_LazyCollection where Base_.Index : RandomAccessIndexType {
+  public var _prext_reverse: _prext_LazyCollection<
+    _prext_ReverseRandomAccessCollection<Base_>
+  > {
+    return _prext_ReverseRandomAccessCollection(_base)._prext_lazy
   }
 }
 

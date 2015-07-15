@@ -599,10 +599,63 @@ tests.test("ReverseCollection") {
   checkRandomAccessCollection(
     expected,
     r._prext_reverse)
+
+  // Check that the reverse collection is still eager
+  do {
+    var calls = 0
+    _ = r._prext_reverse.map { _ in ++calls }
+    expectEqual(r.count, calls)
+  }
   
   checkBidirectionalCollection(
     "raboof".characters,
     "foobar".characters._prext_reverse)
+
+  // Check that the reverse collection is still eager
+  do {
+    var calls = 0
+    _ = "foobar".characters._prext_reverse.map { _ in ++calls }
+    expectEqual("foobar".characters.count, calls)
+  }
+}
+
+enum _Void {}
+struct ExpectType<T> {
+  static func test(_: T){ print("T") }
+  static func test(_: Any) { fatalError() }
+  static func test(_: Any) -> _Void { fatalError() }
+}
+
+tests.test("ReverseCollection/Lazy") {
+  // Check that reversing a lazy collection, or lazy-ing a reverse
+  // collection, produces the same lazy reverse collection.
+  do {
+    typealias Expected = _prext_LazyCollection<
+      _prext_ReverseRandomAccessCollection<Array<Int>>
+    >
+    
+    let base = Array(stride(from: 11, through: 0, by: -1))
+    ExpectType<Expected>.test(base._prext_reverse._prext_lazy)
+    ExpectType<Expected>.test(base._prext_lazy._prext_reverse)
+    
+    var calls = 0
+    _ = base._prext_reverse._prext_lazy.map { _ in ++calls }
+    expectEqual(0, calls)
+  }
+
+  do {
+    typealias Expected = _prext_LazyCollection<
+      _prext_ReverseCollection<String.CharacterView>
+    >
+    
+    let base = "foobar".characters
+    ExpectType<Expected>.test(base._prext_reverse._prext_lazy)
+    ExpectType<Expected>.test(base._prext_lazy._prext_reverse)
+    
+    var calls = 0
+    _ = base._prext_reverse._prext_lazy.map { _ in ++calls }
+    expectEqual(0, calls)
+  }
 }
 
 runAllTests()
