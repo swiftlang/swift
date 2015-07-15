@@ -152,9 +152,9 @@ enum class TypeCheckExprFlags {
   
 typedef OptionSet<TypeCheckExprFlags> TypeCheckExprOptions;
 
-inline TypeCheckExprFlags operator|(TypeCheckExprFlags flag1,
-                                    TypeCheckExprFlags flag2) {
-  return TypeCheckExprFlags((unsigned)flag1 | (unsigned)flag2);
+inline TypeCheckExprOptions operator|(TypeCheckExprFlags flag1,
+                                      TypeCheckExprFlags flag2) {
+  return TypeCheckExprOptions(flag1) | flag2;
 }
 
   
@@ -177,7 +177,7 @@ typedef OptionSet<NameLookupFlags> NameLookupOptions;
 
 inline NameLookupOptions operator|(NameLookupFlags flag1,
                                    NameLookupFlags flag2) {
-  return NameLookupOptions((unsigned)flag1 | (unsigned)flag2);
+  return NameLookupOptions(flag1) | flag2;
 }
 
 /// Default options for member name lookup.

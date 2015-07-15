@@ -119,6 +119,16 @@ public:
     lhs.Storage &= ~rhs.Storage;
     return lhs;
   }
+
+private:
+  template <typename T>
+  static auto _checkResultTypeOperatorOr(T t) -> decltype(t | t) { return T(); }
+
+  static void _checkResultTypeOperatorOr(...) {}
+
+  static_assert(!std::is_same<decltype(_checkResultTypeOperatorOr(Flags())),
+                              Flags>::value,
+                "operator| should produce an OptionSet");
 };
 
 }
