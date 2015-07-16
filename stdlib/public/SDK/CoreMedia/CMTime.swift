@@ -12,6 +12,16 @@
 
 @exported import CoreMedia // Clang module
 
+extension CMTime {
+  public init(seconds: Double, preferredTimeScale: CMTimeScale) {
+    self = CMTimeMakeWithSeconds(seconds, preferredTimeScale)
+  }
+
+  public init(value: CMTimeValue, timescale: CMTimeScale) {
+    self = CMTimeMake(value, timescale)
+  }
+}
+
 // CMTIME_IS_VALID
 // CMTIME_IS_INVALID
 // CMTIME_IS_POSITIVEINFINITY
