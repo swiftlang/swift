@@ -2211,6 +2211,9 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
   }
 
   // Check all of the designated initializers in the direct superclass.
+  // Note: This should be treated as a lookup for intra-module dependency
+  // purposes, but a subclass already depends on its superclasses and any
+  // extensions for many other reasons.
   for (auto member : superclassDecl->lookupDirect(ctx.Id_init)) {
     if (AvailableAttr::isUnavailable(member))
       continue;

@@ -3942,7 +3942,10 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
         return;
 
     if (auto nominal = T->getAnyNominal()) {
-      tracker->addUsedMember({nominal, Identifier()},
+      // FIXME: 'deinit' is being used as a dummy identifier here. Really we
+      // don't care about /any/ of the type's members, only that it conforms to
+      // the protocol.
+      tracker->addUsedMember({nominal, Context.Id_deinit},
                              DC->isCascadingContextForLookup(InExpression));
     }
   };

@@ -1828,6 +1828,9 @@ bool ASTContext::diagnoseUnintendedObjCMethodOverrides(SourceFile &sf) {
 
     // Look for a method that we have overridden in one of our
     // superclasses.
+    // Note: This should be treated as a lookup for intra-module dependency
+    // purposes, but a subclass already depends on its superclasses and any
+    // extensions for many other reasons.
     auto selector = method->getObjCSelector(nullptr);
     AbstractFunctionDecl *overriddenMethod
       = lookupObjCMethodInType(classDecl->getSuperclass(),
