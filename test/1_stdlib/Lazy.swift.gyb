@@ -488,7 +488,7 @@ tests.test("LazyCollection/Passthrough") {
 
 //===--- Map --------------------------------------------------------------===//
 
-tests.test("MapSequence") {
+tests.test("LazyMapSequence") {
   let base = MinimalSequence(
     [2, 3, 5, 7, 11].map { OpaqueValue($0) })._prext_lazy
 
@@ -530,7 +530,7 @@ tests.test("MapSequence/Passthrough") {
 }
 
 % for traversal in 'Forward', 'Bidirectional', 'RandomAccess':
-tests.test("MapCollection/${traversal}") {
+tests.test("LazyMapCollection/${traversal}") {
   let base = Minimal${traversal}Collection(
     [2, 3, 5, 7, 11].map { OpaqueValue($0) })._prext_lazy
 
@@ -560,7 +560,7 @@ tests.test("MapCollection/${traversal}") {
 }
 %end
 
-tests.test("MapCollection/Passthrough") {
+tests.test("LazyMapCollection/Passthrough") {
   let expected = (0..<100).map { OpaqueValue($0) }
   let base = LoggingCollection(expected)
   let mapped = base._prext_lazy.map { OpaqueValue(Double($0.value) / 2.0) }
@@ -656,6 +656,57 @@ tests.test("ReverseCollection/Lazy") {
     _ = base._prext_reverse._prext_lazy.map { _ in ++calls }
     expectEqual(0, calls)
   }
+}
+
+tests.test("LazyFilterSequence") {
+  let base = MinimalSequence((0..<100).map { OpaqueValue($0)})
+
+  var calls = 0
+  let filtered = base._prext_lazy.filter {
+    x in ++calls;
+    return x.value % 2 == 0
+  }
+  expectEqual(calls, 0, "filtering was eager!")
+  
+  ExpectType<
+    _prext_LazyFilterSequence<MinimalSequence<OpaqueValue<Int>>>
+  >.test(filtered)
+
+  checkSequence(
+    stride(from: 0, to: 100, by: 2).map { OpaqueValue($0) }, filtered,
+    resiliencyChecks: .none
+  ) { 
+    $0.value == $1.value 
+  }
+  expectEqual(100, calls)
+}
+
+tests.test("LazyFilterCollection") {
+  let base = MinimalForwardCollection((0..<100).map { OpaqueValue($0)})
+
+  var calls = 0
+  let filtered = base._prext_lazy.filter {
+    x in ++calls;
+    return x.value % 2 == 0
+  }
+  expectEqual(calls, 0, "filtering was eager!")
+  
+  ExpectType<
+    _prext_LazyFilterCollection<MinimalForwardCollection<OpaqueValue<Int>>>
+  >.test(filtered)
+  
+  checkForwardCollection(
+    stride(from: 0, to: 100, by: 2).map { OpaqueValue($0) }, filtered,
+    resiliencyChecks: .none
+  ) {
+    $0.value == $1.value
+  }
+
+  expectGE(calls, 100)
+  let oldCalls = calls
+  _ = filtered.first
+  expectLT(oldCalls, calls)
+  expectGE(oldCalls + 2, calls)
 }
 
 runAllTests()
