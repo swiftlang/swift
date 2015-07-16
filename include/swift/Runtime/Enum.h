@@ -23,7 +23,6 @@ struct OpaqueValue;
 struct ValueWitnessTable;
 struct Metadata;
 struct EnumMetadata;
-struct TypeLayout;
 
 /// \brief Initialize the value witness table for a generic, single-payload
 ///        enum instance.
@@ -34,7 +33,7 @@ struct TypeLayout;
 /// \param emptyCases - the number of empty cases in the enum.
 extern "C" void swift_initEnumValueWitnessTableSinglePayload(
                                                     ValueWitnessTable *vwtable,
-                                                    const TypeLayout *payload,
+                                                    const Metadata *payload,
                                                     unsigned emptyCases);
 
 /// \brief Faster variant of the above which avoids digging into the enum type
@@ -70,9 +69,9 @@ extern "C" void swift_storeEnumTagSinglePayload(OpaqueValue *value,
 /// \brief Initialize the value witness table for a generic, multi-payload
 ///        enum instance.
 extern "C" void swift_initEnumMetadataMultiPayload(ValueWitnessTable *vwtable,
-                                       EnumMetadata *enumType,
-                                       unsigned numPayloads,
-                                       const TypeLayout * const *payloadTypes);
+                                         EnumMetadata *enumType,
+                                         unsigned numPayloads,
+                                         const Metadata * const *payloadTypes);
 
 /// \brief Return an integer value representing which case of a multi-payload
 ///        enum is inhabited.

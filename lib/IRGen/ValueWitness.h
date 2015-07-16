@@ -191,13 +191,10 @@ enum class ValueWitness : unsigned {
 
   Last_RequiredValueWitnessFunction = InitializeArrayWithTakeBackToFront,
 
-  /// The offset at which type layout witnesses begin.
-  First_TypeLayoutWitness,
-
   ///   size_t size;
   ///
   /// The required storage size of a single object of this type.
-  Size = First_TypeLayoutWitness,
+  Size,
 
   ///   size_t flags;
   ///
@@ -232,8 +229,7 @@ enum class ValueWitness : unsigned {
   Stride,
   
   Last_RequiredValueWitness = Stride,
-  Last_RequiredTypeLayoutWitness = Last_RequiredValueWitness,
-
+  
   /// The following value witnesses are conditionally present based on
   /// the Enum_HasExtraInhabitants bit of the flags.
   First_ExtraInhabitantValueWitness,
@@ -253,8 +249,6 @@ enum class ValueWitness : unsigned {
   /// - The SpareBitsShiftMask bits contain the (host-endian) bit offset of the
   ///   lowest spare bit.
   ExtraInhabitantFlags = First_ExtraInhabitantValueWitness,
-
-  Last_TypeLayoutWitness = ExtraInhabitantFlags,
 
   First_ExtraInhabitantValueWitnessFunction,
 
@@ -349,10 +343,6 @@ enum {
   
   MaxNumValueWitnesses
     = unsigned(ValueWitness::Last_ValueWitness) + 1,
-  MaxNumTypeLayoutWitnesses
-    = unsigned(ValueWitness::Last_TypeLayoutWitness)
-      - unsigned(ValueWitness::First_TypeLayoutWitness)
-      + 1,
 };
 
 static inline bool isValueWitnessFunction(ValueWitness witness) {

@@ -366,21 +366,21 @@ namespace {
              "empty singleton enum should not be dynamic!");
 
       // Get the value witness table for the element.
-      SILType eltTy = T.getEnumElementType(ElementsWithPayload[0].decl,
-                                           *IGM.SILMod);
-      llvm::Value *eltLayout = IGF.emitTypeLayoutRef(eltTy);
+      CanType eltTy
+       = ElementsWithPayload[0].decl->getArgumentType()->getCanonicalType();
+      llvm::Value *eltVWT
+        = IGF.emitValueWitnessTableRef(eltTy);
 
       Address vwtAddr(vwtable, IGF.IGM.getPointerAlignment());
-      Address eltLayoutAddr(eltLayout, IGF.IGM.getPointerAlignment());
+      Address eltVWTAddr(eltVWT, IGF.IGM.getPointerAlignment());
 
       auto getWitnessDestAndSrc = [&](ValueWitness witness,
                                       Address *dest,
                                       Address *src) {
         *dest = IGF.Builder.CreateConstArrayGEP(vwtAddr,
                                    unsigned(witness), IGF.IGM.getPointerSize());
-        *src = IGF.Builder.CreateConstArrayGEP(eltLayoutAddr,
-          unsigned(witness) - unsigned(ValueWitness::First_TypeLayoutWitness),
-          IGF.IGM.getPointerSize());
+        *src = IGF.Builder.CreateConstArrayGEP(eltVWTAddr,
+                                   unsigned(witness), IGF.IGM.getPointerSize());
       };
 
       auto copyWitnessFromElt = [&](ValueWitness witness) {
@@ -2390,15 +2390,13 @@ namespace {
 
       // Ask the runtime to do our layout using the payload metadata and number
       // of empty cases.
-      auto payloadTy = T.getEnumElementType(ElementsWithPayload[0].decl,
-                                            *IGM.SILMod);
-      auto payloadLayout = IGF.emitTypeLayoutRef(payloadTy);
+      auto payloadMetadata = emitPayloadMetadataForLayout(IGF, T);
       auto emptyCasesVal = llvm::ConstantInt::get(IGF.IGM.Int32Ty,
                                                   ElementsWithNoPayload.size());
 
       IGF.Builder.CreateCall(
                     IGF.IGM.getInitEnumValueWitnessTableSinglePayloadFn(),
-                    {vwtable, payloadLayout, emptyCasesVal});
+                    {vwtable, payloadMetadata, emptyCasesVal});
     }
 
     /// \group Extra inhabitants
@@ -3852,9 +3850,10 @@ namespace {
       }
     }
 
-    llvm::Value *emitPayloadLayoutArray(IRGenFunction &IGF, SILType T) const {
+    llvm::Value *emitPayloadMetadataArrayForLayout(IRGenFunction &IGF,
+                                                   SILType T) const {
       auto numPayloads = ElementsWithPayload.size();
-      auto metadataBufferTy = llvm::ArrayType::get(IGF.IGM.Int8PtrPtrTy,
+      auto metadataBufferTy = llvm::ArrayType::get(IGF.IGM.TypeMetadataPtrTy,
                                                    numPayloads);
       auto metadataBuffer = IGF.createAlloca(metadataBufferTy,
                                              IGF.IGM.getPointerAlignment(),
@@ -3868,7 +3867,7 @@ namespace {
         
         auto payloadTy = T.getEnumElementType(elt.decl, *IGF.IGM.SILMod);
         
-        auto metadata = IGF.emitTypeLayoutRef(payloadTy);
+        auto metadata = IGF.emitTypeMetadataRefForLayout(payloadTy);
         
         IGF.Builder.CreateStore(metadata, eltAddr);
       }
@@ -3884,13 +3883,13 @@ namespace {
       if (TIK >= Fixed) return;
       
       // Ask the runtime to set up the metadata record for a dynamic enum.
-      auto payloadLayoutArray = emitPayloadLayoutArray(IGF, T);
+      auto payloadMetadataArray = emitPayloadMetadataArrayForLayout(IGF, T);
       auto numPayloadsVal = llvm::ConstantInt::get(IGF.IGM.SizeTy,
                                                    ElementsWithPayload.size());
 
       IGF.Builder.CreateCall(IGF.IGM.getInitEnumMetadataMultiPayloadFn(),
                              {vwtable, metadata, numPayloadsVal,
-                              payloadLayoutArray});
+                              payloadMetadataArray});
     }
 
     /// \group Extra inhabitants

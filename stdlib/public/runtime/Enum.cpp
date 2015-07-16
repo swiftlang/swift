@@ -76,11 +76,12 @@ static inline void small_memcpy(void *dest, const void *src, unsigned count) {
 
 void
 swift::swift_initEnumValueWitnessTableSinglePayload(ValueWitnessTable *vwtable,
-                                                const TypeLayout *payloadLayout,
-                                                unsigned emptyCases) {
-  size_t payloadSize = payloadLayout->size;
+                                                     const Metadata *payload,
+                                                     unsigned emptyCases) {
+  auto *payloadWitnesses = payload->getValueWitnesses();
+  size_t payloadSize = payloadWitnesses->getSize();
   unsigned payloadNumExtraInhabitants
-    = payloadLayout->getNumExtraInhabitants();
+    = payloadWitnesses->getNumExtraInhabitants();
   
   unsigned unusedExtraInhabitants = 0;
   
@@ -96,9 +97,9 @@ swift::swift_initEnumValueWitnessTableSinglePayload(ValueWitnessTable *vwtable,
                                       1 /*payload case*/);
   }
   
-  size_t align = payloadLayout->flags.getAlignment();
+  size_t align = payloadWitnesses->getAlignment();
   vwtable->size = size;
-  vwtable->flags = payloadLayout->flags
+  vwtable->flags = payloadWitnesses->flags
     .withExtraInhabitants(unusedExtraInhabitants > 0)
     .withEnumWitnesses(true)
     .withInlineStorage(ValueWitnessTable::isValueInline(size, align));
@@ -111,7 +112,6 @@ swift::swift_initEnumValueWitnessTableSinglePayload(ValueWitnessTable *vwtable,
   // nil-aware. Most single-refcounted types will use the standard
   // value witness tables for NativeObject or UnknownObject. This isn't
   // foolproof but should catch the common case of optional class types.
-#if OPTIONAL_OBJECT_OPTIMIZATION
   auto payloadVWT = payload->getValueWitnesses();
   if (emptyCases == 1
       && (payloadVWT == &_TWVBo
@@ -123,12 +123,8 @@ swift::swift_initEnumValueWitnessTableSinglePayload(ValueWitnessTable *vwtable,
     FOR_ALL_FUNCTION_VALUE_WITNESSES(COPY_PAYLOAD_WITNESS)
 #undef COPY_PAYLOAD_WITNESS
   } else {
-#endif
     installCommonValueWitnesses(vwtable);
-#if OPTIONAL_OBJECT_OPTIMIZATION
   }
-#endif
-
 
   // If the payload has extra inhabitants left over after the ones we used,
   // forward them as our own.
@@ -251,19 +247,19 @@ swift::swift_storeEnumTagSinglePayload(OpaqueValue *value,
 
 void
 swift::swift_initEnumMetadataMultiPayload(ValueWitnessTable *vwtable,
-                                     EnumMetadata *enumType,
-                                     unsigned numPayloads,
-                                     const TypeLayout * const *payloadLayouts) {
+                                          EnumMetadata *enumType,
+                                          unsigned numPayloads,
+                                          const Metadata * const *payloadTypes){
   // Accumulate the layout requirements of the payloads.
   size_t payloadSize = 0, alignMask = 0;
   bool isPOD = true, isBT = true;
   for (unsigned i = 0; i < numPayloads; ++i) {
-    const TypeLayout *payloadLayout = payloadLayouts[i];
+    const Metadata *payload = payloadTypes[i];
     payloadSize
-      = std::max(payloadSize, (size_t)payloadLayout->size);
-    alignMask |= payloadLayout->flags.getAlignmentMask();
-    isPOD &= payloadLayout->flags.isPOD();
-    isBT &= payloadLayout->flags.isBitwiseTakable();
+      = std::max(payloadSize, (size_t)payload->getValueWitnesses()->size);
+    alignMask |= payload->getValueWitnesses()->getAlignmentMask();
+    isPOD &= payload->getValueWitnesses()->isPOD();
+    isBT &= payload->getValueWitnesses()->isBitwiseTakable();
   }
   
   // Store the max payload size in the metadata.

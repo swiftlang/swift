@@ -249,14 +249,7 @@ void emitInitializeArrayBackToFront(IRGenFunction &IGF,
                                     llvm::Value *count,
                                     SILType T,
                                     IsTake_t take);
-
-/// If a type is visibly a singleton aggregate (a tuple with one element, a
-/// struct with one field, or an enum with a single payload case), return the
-/// type of its field, which it is guaranteed to have identical layout to.
-SILType getSingletonAggregateFieldType(IRGenModule &IGM,
-                                       SILType t,
-                                       ResilienceScope scope);
-
+  
 } // end namespace irgen
 } // end namespace swift
 

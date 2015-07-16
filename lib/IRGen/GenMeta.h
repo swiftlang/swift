@@ -271,7 +271,7 @@ namespace irgen {
   
   /// Get the runtime identifier for a special protocol, if any.
   SpecialProtocol getSpecialProtocolID(ProtocolDecl *P);
-
+  
 } // end namespace irgen
 } // end namespace swift
 
