@@ -126,6 +126,18 @@ public protocol RangeReplaceableCollectionType : CollectionType {
 
   mutating func _customRemoveLast() -> Generator.Element?
 
+  /// Remove the element at `startIndex` and return it.
+  ///
+  /// - Complexity: O(`self.count`)
+  /// - Requires: `!self.isEmpty`.
+  mutating func removeFirst() -> Generator.Element
+
+  /// Remove the first `n` elements.
+  ///
+  /// - Complexity: O(`self.count`)
+  /// - Requires: `!self.isEmpty`.
+  mutating func removeFirst(n: Int)
+
   /// Remove the indicated `subRange` of elements.
   ///
   /// Invalidates all indices with respect to `self`.
@@ -143,6 +155,7 @@ public protocol RangeReplaceableCollectionType : CollectionType {
   ///
   /// - Complexity: O(`self.count`).
   mutating func removeAll(keepCapacity keepCapacity: Bool /*= false*/)
+
 }
 
 //===----------------------------------------------------------------------===//
@@ -183,6 +196,19 @@ extension RangeReplaceableCollectionType {
 
   public mutating func removeRange(subRange: Range<Index>) {
     replaceRange(subRange, with: EmptyCollection())
+  }
+
+  public mutating func removeFirst(n: Int) {
+    _precondition(!isEmpty, "can't remove items from an empty collection")
+    let end = advance(startIndex, numericCast(n))
+    removeRange(startIndex..<end)
+  }
+
+  public mutating func removeFirst() -> Generator.Element {
+    _precondition(!isEmpty, "can't remove first element from an empty collection")
+    let firstElement = first!
+    removeFirst(1)
+    return firstElement
   }
 
   public mutating func removeAll(keepCapacity keepCapacity: Bool = false) {

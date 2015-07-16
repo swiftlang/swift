@@ -54,6 +54,18 @@ RangeReplaceableTestSuite.test("removeRange/dispatch") {
   expectCustomizable(tester, tester.log.removeRange)
 }
 
+RangeReplaceableTestSuite.test("removeFirst/dispatch") {
+  var tester = RangeReplaceableCollectionLog.dispatchTester([ OpaqueValue(1) ])
+  tester.removeFirst()
+  expectCustomizable(tester, tester.log.removeFirst)
+}
+
+RangeReplaceableTestSuite.test("removeFirst(n)/dispatch") {
+  var tester = RangeReplaceableCollectionLog.dispatchTester([ OpaqueValue(1) ])
+  tester.removeFirst(1)
+  expectCustomizable(tester, tester.log.removeFirstN)
+}
+
 RangeReplaceableTestSuite.test("removeAll/dispatch") {
   var tester = RangeReplaceableCollectionLog.dispatchTester([ OpaqueValue(1) ])
   tester.removeAll(keepCapacity: false)

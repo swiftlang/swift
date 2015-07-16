@@ -203,6 +203,21 @@ internal struct RemoveRangeTest {
   }
 }
 
+internal struct RemoveFirstNTest {
+  let collection: [OpaqueValue<Int>]
+  let numberToRemove: Int
+  let expected: [Int]
+  let loc: SourceLoc
+
+  init(collection: [Int], numberToRemove: Int, expected: [Int],
+      file: String = __FILE__, line: UWord = __LINE__) {
+    self.collection = collection.map(OpaqueValue.init)
+    self.numberToRemove = numberToRemove
+    self.expected = expected
+    self.loc = SourceLoc(file, line, comment: "removeFirst(n: Int) test data")
+  }
+}
+
 internal struct RemoveAllTest {
   let collection: [OpaqueValue<Int>]
   let expected: [Int]
@@ -625,6 +640,82 @@ self.test("\(testNamePrefix).removeAtIndex()/semantics") {
       extractValue(removedElement).value,
       stackTrace: SourceLocStack().with(test.loc))
   }
+}
+
+//===----------------------------------------------------------------------===//
+// removeFirst()
+//===----------------------------------------------------------------------===//
+
+self.test("\(testNamePrefix).removeFirst()/semantics") {
+  if true {
+    var c = makeWrappedCollection([OpaqueValue(1010)])
+    let removedElement = c.removeFirst()
+    expectEqual(1010, extractValue(removedElement).value)
+    expectEqualSequence([], c.map { extractValue($0).value })
+  }
+
+  if true {
+    var c = makeWrappedCollection([1010, 2020, 3030].map(OpaqueValue.init))
+    let removedElement = c.removeFirst()
+    expectEqual(1010, extractValue(removedElement).value)
+    expectEqualSequence([2020, 3030], c.map { extractValue($0).value })
+  }
+}
+
+self.test("\(testNamePrefix).removeFirst()/empty/semantics") {
+  expectCrashLater()
+  var c = makeWrappedCollection(Array<OpaqueValue<Int>>())
+  let removedElement = c.removeFirst() // Should trap.
+}
+
+//===----------------------------------------------------------------------===//
+// removeFirst(n: Int)
+//===----------------------------------------------------------------------===//
+
+self.test("\(testNamePrefix).removeFirst(n: Int)/semantics") {
+  let tests: [RemoveFirstNTest] = [
+    RemoveFirstNTest(
+      collection: [1010],
+      numberToRemove: 1,
+      expected: []
+    ),
+    RemoveFirstNTest(
+      collection: [1010, 2020, 3030, 4040, 5050],
+      numberToRemove: 1,
+      expected: [2020, 3030, 4040, 5050]
+    ),
+    RemoveFirstNTest(
+      collection: [1010, 2020, 3030, 4040, 5050],
+      numberToRemove: 5,
+      expected: []
+    ),
+    RemoveFirstNTest(
+      collection: [1010, 2020, 3030, 4040, 5050],
+      numberToRemove: 5,
+      expected: []
+    ),
+  ]
+  for test in tests {
+    var c = makeWrappedCollection(test.collection)
+    c.removeFirst(test.numberToRemove)
+    expectEqualSequence(
+      test.expected,
+      c.map { extractValue($0).value },
+      stackTrace: SourceLocStack().with(test.loc)
+    )
+  }
+}
+
+self.test("\(testNamePrefix).removeFirst(n: Int)/removeTooMany/semantics") {
+  expectCrashLater()
+  var c = makeWrappedCollection([1010, 2020, 3030].map(OpaqueValue.init))
+  c.removeFirst(5) // Should trap.
+}
+
+self.test("\(testNamePrefix).removeFirst(n: Int)/empty/semantics") {
+  expectCrashLater()
+  var c = makeWrappedCollection(Array<OpaqueValue<Int>>())
+  let removedElement = c.removeFirst() // Should trap.
 }
 
 //===----------------------------------------------------------------------===//
