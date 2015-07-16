@@ -15,7 +15,7 @@
 @asmname("GK_Swift_GKEntity_componentForClass")
 internal func GK_Swift_GKEntity_componentForClass(
   self_: AnyObject,
-  _ componentClass: AnyClass) -> AnyObject?
+  _ componentClass: AnyObject) -> AnyObject?
 
 @available(iOS, introduced=9.0)
 @available(OSX, introduced=10.11)
@@ -25,14 +25,14 @@ extension GKEntity {
   public func componentForClass<ComponentType : GKComponent>(
     componentClass: ComponentType.Type) -> ComponentType? {
     return GK_Swift_GKEntity_componentForClass(
-      self, componentClass as AnyClass) as! ComponentType?
+      self, componentClass) as! ComponentType?
   }
 }
 
 @asmname("GK_Swift_GKStateMachine_stateForClass")
 internal func GK_Swift_GKStateMachine_stateForClass(
   self_: AnyObject,
-  _ stateClass: AnyClass) -> AnyObject?
+  _ stateClass: AnyObject) -> AnyObject?
 
 @available(iOS, introduced=9.0)
 @available(OSX, introduced=10.11)
@@ -42,6 +42,6 @@ extension GKStateMachine {
   public func stateForClass<StateType : GKState>(
     stateClass: StateType.Type) -> StateType? {
     return GK_Swift_GKStateMachine_stateForClass(
-      self, stateClass as AnyClass) as! StateType?
+      self, stateClass) as! StateType?
   }
 }

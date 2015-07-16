@@ -1327,7 +1327,7 @@ extension NSKeyedUnarchiver {
   @available(OSX 10.11, iOS 9.0, *)
   public class func unarchiveTopLevelObjectWithData(data: NSData) throws -> AnyObject? {
     var error: NSError?
-    let result = NS_Swift_NSKeyedUnarchiver_unarchiveObjectWithData(self as AnyClass, data as AnyObject, &error)
+    let result = NS_Swift_NSKeyedUnarchiver_unarchiveObjectWithData(self, data as AnyObject, &error)
     try resolveError(error)
     return result
   }
