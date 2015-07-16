@@ -1979,41 +1979,12 @@ void Driver::printHelp(bool ShowHidden) const {
                       IncludedFlagsBitmask, ExcludedFlagsBitmask);
 }
 
-static void setTargetFromArch(DiagnosticEngine &diags, llvm::Triple &target,
-                              StringRef archName) {
-  llvm::Triple::ArchType archValue
-    = tools::darwin::getArchTypeForDarwinArchName(archName);
-  if (archValue != llvm::Triple::UnknownArch) {
-    target.setArch(archValue);
-  } else {
-    diags.diagnose(SourceLoc(), diag::error_invalid_arch, archName);
-  }
+static llvm::Triple computeTargetTriple(StringRef DefaultTargetTriple) {
+  return llvm::Triple(DefaultTargetTriple);
 }
 
-static llvm::Triple computeTargetTriple(DiagnosticEngine &diags,
-                                        StringRef DefaultTargetTriple,
-                                        const ArgList &Args,
-                                        StringRef DarwinArchName) {
-  // FIXME: need to check -target for overrides
-
-  llvm::Triple target(DefaultTargetTriple);
-
-  // Handle Darwin-specific options available here.
-  if (target.isOSDarwin()) {
-    // If an explict Darwin arch name is given, that trumps all.
-    if (!DarwinArchName.empty())
-      setTargetFromArch(diags, target, DarwinArchName);
-  }
-
-  // TODO: handle other target/pseudo-target flags as necessary.
-
-  return target;
-}
-
-const ToolChain *Driver::getToolChain(const ArgList &Args,
-                                      StringRef DarwinArchName) const {
-  llvm::Triple Target = computeTargetTriple(Diags, DefaultTargetTriple, Args,
-                                            DarwinArchName);
+const ToolChain *Driver::getToolChain(const ArgList &Args) const {
+  llvm::Triple Target = computeTargetTriple(DefaultTargetTriple);
 
   ToolChain *&TC = ToolChains[Target.str()];
   if (!TC) {

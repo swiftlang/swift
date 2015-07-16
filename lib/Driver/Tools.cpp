@@ -621,23 +621,6 @@ AutolinkExtract::constructArgumentList(const JobAction &JA,
 
 /// Darwin Tools
 
-llvm::Triple::ArchType darwin::getArchTypeForDarwinArchName(StringRef Arch) {
-  return llvm::StringSwitch<llvm::Triple::ArchType>(Arch)
-    .Cases("i386", "i486", "i486SX", "i586", "i686", llvm::Triple::x86)
-    .Cases("pentium", "pentpro", "pentIIm3", "pentIIm5", "pentium4",
-           llvm::Triple::x86)
-
-    .Case("x86_64", llvm::Triple::x86_64)
-
-    .Case("arm64", llvm::Triple::aarch64)
-
-    .Cases("arm", "armv4t", "armv5", "armv6", "armv6m", llvm::Triple::arm)
-    .Cases("armv7", "armv7em", "armv7f", "armv7k", "armv7m", llvm::Triple::arm)
-    .Cases("armv7s", "xscale", llvm::Triple::arm)
-
-    .Default(llvm::Triple::UnknownArch);
-}
-
 static void addVersionString(const ArgList &inputArgs, ArgStringList &arguments,
                              unsigned major, unsigned minor, unsigned micro) {
   llvm::SmallString<8> buf;

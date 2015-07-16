@@ -138,8 +138,6 @@ protected:
 
 namespace darwin {
 
-llvm::Triple::ArchType getArchTypeForDarwinArchName(StringRef DarwinArchName);
-
 class LLVM_LIBRARY_VISIBILITY Linker : public ToolchainTool {
 public:
   explicit Linker(const ToolChain &TC)
