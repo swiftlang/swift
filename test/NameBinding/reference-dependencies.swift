@@ -293,7 +293,7 @@ extension OtherFileTypeToBeExtended : ExtensionProto {
   private func foo() {}
 }
 private extension OtherFileTypeToBeExtended {
-  func bar() {}
+  var bar: Bool { return false }
 }
 
 struct Sentinel2 {}

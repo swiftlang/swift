@@ -129,8 +129,26 @@ static void findNominals(llvm::SetVector<const NominalTypeDecl *, V, S> &list,
 
 static bool declIsPrivate(const Decl *member) {
   auto *VD = dyn_cast<ValueDecl>(member);
-  if (!VD)
-    return false;
+  if (!VD) {
+    switch (member->getKind()) {
+    case DeclKind::Import:
+    case DeclKind::PatternBinding:
+    case DeclKind::EnumCase:
+    case DeclKind::TopLevelCode:
+    case DeclKind::IfConfig:
+      return true;
+
+    case DeclKind::Extension:
+    case DeclKind::InfixOperator:
+    case DeclKind::PrefixOperator:
+    case DeclKind::PostfixOperator:
+      return false;
+
+    default:
+      llvm_unreachable("everything else is a ValueDecl");
+    }
+  }
+
   return VD->getFormalAccess() == Accessibility::Private;
 }
 
