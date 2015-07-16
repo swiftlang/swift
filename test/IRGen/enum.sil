@@ -2561,9 +2561,9 @@ bb4:
 // CHECK:   [[FLAGS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], i32 18
 // CHECK:   [[T_FLAGS_ADDR:%.*]] = getelementptr inbounds i8*, i8** [[T_LAYOUT]], i32 1
 // CHECK:   [[T_FLAGS:%.*]] = load i8*, i8** [[T_FLAGS_ADDR]]
-// CHECK:   [[T_FLAGS_INT:%.*]] = ptrtoint i8* [[T_FLAGS]] to i64
-// CHECK:   [[T_FLAGS_INT_2:%.*]] = or i64 [[T_FLAGS_INT]], 2097152
-// CHECK:   [[T_FLAGS_2:%.*]] = inttoptr i64 [[T_FLAGS_INT_2]] to i8*
+// CHECK:   [[T_FLAGS_INT:%.*]] = ptrtoint i8* [[T_FLAGS]] to [[WORD]]
+// CHECK:   [[T_FLAGS_INT_2:%.*]] = or [[WORD]] [[T_FLAGS_INT]], 2097152
+// CHECK:   [[T_FLAGS_2:%.*]] = inttoptr [[WORD]] [[T_FLAGS_INT_2]] to i8*
 // CHECK:   store i8* [[T_FLAGS_2]], i8** [[FLAGS_ADDR]]
 // -- Test the 'has extra inhabitants' bit and carry over the extra inhabitants
 //    flag if set.

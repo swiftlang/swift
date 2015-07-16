@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir %s | FileCheck %s
+// RUN: %target-swift-frontend -emit-ir %s | FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize
 
 class C {}
 
@@ -36,10 +36,10 @@ struct TypeLayoutTest<T> {
   // CHECK:    store i8** getelementptr inbounds ([3 x i8*], [3 x i8*]* @type_layout_16_8_0_pod, i32 0, i32 0)
   var d: SMult
   // CHECK-64:    store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_16_8_7fffffff_bt, i32 0, i32 0)
-  // CHECK-32:    store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_8_4_7fffffff_bt, i32 0, i32 0)
+  // CHECK-32:    store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_8_4_1000_bt, i32 0, i32 0)
   var e: SMult2
   // CHECK-64:    store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_16_8_7fffffff_bt, i32 0, i32 0)
-  // CHECK-32:    store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_8_4_7fffffff_bt, i32 0, i32 0)
+  // CHECK-32:    store i8** getelementptr inbounds ([4 x i8*], [4 x i8*]* @type_layout_8_4_1000_bt, i32 0, i32 0)
   var f: SMult3
   // -- Single-case enum, shares layout of its field (Builtin.Int64)
   // CHECK:       store i8** getelementptr inbounds (i8*, i8** @_TWVBi64_, i32 17)

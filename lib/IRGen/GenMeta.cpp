@@ -1513,21 +1513,9 @@ namespace {
     }
 
     llvm::Value *visitReferenceStorageType(CanReferenceStorageType type) {
-      // Reference storage types all have the same layout for their storage
-      // qualification and the reference counting of their underlying object.
-
-      auto getReferenceCountingForReferent
-        = [&](CanType referent) -> ReferenceCounting {
-          // For generic types, use unknown reference counting.
-          if (isa<ArchetypeType>(referent)
-              || referent->isExistentialType())
-            return ReferenceCounting::Unknown;
-
-          if (auto classDecl = referent->getClassOrBoundGenericClass())
-            return getReferenceCountingForClass(IGF.IGM, classDecl);
-
-          llvm_unreachable("unexpected referent for ref storage type");
-        };
+      // Other reference storage types all have the same layout for their
+      // storage qualification and the reference counting of their underlying
+      // object.
 
       auto &C = IGF.IGM.Context;
       CanType referent;
@@ -1542,6 +1530,27 @@ namespace {
         referent = type.getReferentType();
         break;
       }
+
+      // Reference storage types with witness tables need open-coded layouts.
+      // TODO: Maybe we could provide prefabs for 1 witness table.
+      SmallVector<ProtocolDecl*, 2> protocols;
+      if (referent.isAnyExistentialType(protocols))
+        for (auto *proto : protocols)
+          if (IGF.IGM.SILMod->Types.protocolRequiresWitnessTable(proto))
+            return visitType(type);
+
+      auto getReferenceCountingForReferent
+        = [&](CanType referent) -> ReferenceCounting {
+          // For generic types, use unknown reference counting.
+          if (isa<ArchetypeType>(referent)
+              || referent->isExistentialType())
+            return ReferenceCounting::Unknown;
+
+          if (auto classDecl = referent->getClassOrBoundGenericClass())
+            return getReferenceCountingForClass(IGF.IGM, classDecl);
+
+          llvm_unreachable("unexpected referent for ref storage type");
+        };
 
       CanType valueWitnessReferent;
       switch (getReferenceCountingForReferent(referent)) {
