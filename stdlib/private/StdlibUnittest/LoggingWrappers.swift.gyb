@@ -331,9 +331,9 @@ public struct Logging${Kind}<Base: ${Kind}Type> : ${Kind}Type, LoggingType {
     return base.underestimateCount()
   }
 
-  public func forEach(@noescape performAction: (Base.Generator.Element) -> ()) {
+  public func forEach(@noescape body: (Base.Generator.Element) -> ()) {
     ++Log.forEach[selfType]
-    base.forEach(performAction)
+    base.forEach(body)
   }
 
   public func map<T>(

@@ -73,8 +73,8 @@ public protocol SequenceType {
     @noescape includeElement: (Generator.Element) -> Bool
   ) -> [Generator.Element]
 
-  /// Call `performAction` on each element in `self`.
-  func forEach(@noescape performAction: (Generator.Element) -> ())
+  /// Call `body` on each element in `self`.
+  func forEach(@noescape body: (Generator.Element) -> ())
 
   func _customContainsEquatableElement(
     element: Generator.Element
@@ -156,10 +156,10 @@ extension SequenceType {
 }
 
 extension SequenceType {
-  /// Call `performAction` on each element in `self`.
-  public func forEach(@noescape performAction: (Generator.Element) -> ()) {
+  /// Call `body` on each element in `self`.
+  public func forEach(@noescape body: (Generator.Element) -> ()) {
     for element in self {
-      performAction(element)
+      body(element)
     }
   }
 }
