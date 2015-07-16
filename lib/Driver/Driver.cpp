@@ -509,6 +509,11 @@ std::unique_ptr<Compilation> Driver::buildCompilation(
   if (ShowIncrementalBuildDecisions)
     C->setShowsIncrementalBuildDecisions();
 
+  // This has to happen after building jobs, because otherwise we won't even
+  // emit .swiftdeps files for the next build.
+  if (rebuildEverything)
+    C->disableIncrementalBuild();
+
   if (OFM) {
     if (auto *masterOutputMap = OFM->getOutputMapForSingleOutput()) {
       C->setCompilationRecordPath(masterOutputMap->lookup(types::TY_SwiftDeps));
