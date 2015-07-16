@@ -27,7 +27,8 @@ enum class DependencyGraphImpl::DependencyKind : uint8_t {
   TopLevelName = 1 << 0,
   DynamicLookupName = 1 << 1,
   NominalType = 1 << 2,
-  ExternalFile = 1 << 3,
+  NominalTypeMember = 1 << 3,
+  ExternalFile = 1 << 4,
 };
 enum class DependencyGraphImpl::DependencyFlags : uint8_t {
   IsCascading = 1 << 0
@@ -87,6 +88,8 @@ parseDependencyFile(llvm::MemoryBuffer &buffer,
       .Case("depends-top-level", std::make_pair(DependencyKind::TopLevelName,
                                                 DependencyDirection::Depends))
       .Case("depends-nominal", std::make_pair(DependencyKind::NominalType,
+                                              DependencyDirection::Depends))
+      .Case("depends-member", std::make_pair(DependencyKind::NominalTypeMember,
                                              DependencyDirection::Depends))
       .Case("depends-dynamic-lookup",
             std::make_pair(DependencyKind::DynamicLookupName,
@@ -97,27 +100,66 @@ parseDependencyFile(llvm::MemoryBuffer &buffer,
                                                  DependencyDirection::Provides))
       .Case("provides-nominal", std::make_pair(DependencyKind::NominalType,
                                                DependencyDirection::Provides))
+      .Case("provides-member", std::make_pair(DependencyKind::NominalTypeMember,
+                                              DependencyDirection::Provides))
       .Case("provides-dynamic-lookup",
             std::make_pair(DependencyKind::DynamicLookupName,
                            DependencyDirection::Provides));
 
     auto *entries = cast<yaml::SequenceNode>(i->getValue());
-    for (const yaml::Node &rawEntry : *entries) {
-      auto *entry = cast<yaml::ScalarNode>(&rawEntry);
+    if (dirAndKind.first == DependencyKind::NominalTypeMember) {
+      // Handle member dependencies specially. Rather than being a single
+      // string, they come in the form ["{MangledBaseName}", "memberName"].
+      for (yaml::Node &rawEntry : *entries) {
+        bool isCascading = rawEntry.getRawTag() != "!private";
 
-      auto &callback =
-        (dirAndKind.second == DependencyDirection::Depends) ? dependsCallback
-                                                            : providesCallback;
+        auto &entry = cast<yaml::SequenceNode>(rawEntry);
+        auto iter = entry.begin();
+        auto &base = cast<yaml::ScalarNode>(*iter);
+        ++iter;
+        auto &member = cast<yaml::ScalarNode>(*iter);
+        ++iter;
+        // FIXME: LLVM's YAML support doesn't implement == correctly for end
+        // iterators.
+        assert(!(iter != entry.end()));
 
-      switch (callback(entry->getValue(scratch), dirAndKind.first,
-                       entry->getRawTag() != "!private")) {
-      case LoadResult::HadError:
-        return LoadResult::HadError;
-      case LoadResult::UpToDate:
-        break;
-      case LoadResult::AffectsDownstream:
-        result = LoadResult::AffectsDownstream;
-        break;
+        bool isDepends = dirAndKind.second == DependencyDirection::Depends;
+        auto &callback = isDepends ? dependsCallback : providesCallback;
+
+        // Smash the type and member names together so we can continue using
+        // StringMap.
+        SmallString<64> appended;
+        appended += base.getValue(scratch);
+        appended.push_back('\0');
+        appended += member.getValue(scratch);
+
+        switch (callback(appended.str(), dirAndKind.first, isCascading)) {
+        case LoadResult::HadError:
+          return LoadResult::HadError;
+        case LoadResult::UpToDate:
+          break;
+        case LoadResult::AffectsDownstream:
+          result = LoadResult::AffectsDownstream;
+          break;
+        }
+      }
+    } else {
+      for (const yaml::Node &rawEntry : *entries) {
+        auto &entry = cast<yaml::ScalarNode>(rawEntry);
+
+        bool isDepends = dirAndKind.second == DependencyDirection::Depends;
+        auto &callback = isDepends ? dependsCallback : providesCallback;
+
+        switch (callback(entry.getValue(scratch), dirAndKind.first,
+                         entry.getRawTag() != "!private")) {
+        case LoadResult::HadError:
+          return LoadResult::HadError;
+        case LoadResult::UpToDate:
+          break;
+        case LoadResult::AffectsDownstream:
+          result = LoadResult::AffectsDownstream;
+          break;
+        }
       }
     }
   }
@@ -302,6 +344,7 @@ void DependencyGraphImpl::MarkTracerImpl::printPath(
     printItem(entry.Node);
     if (entry.KindMask.contains(DependencyKind::TopLevelName)) {
       out << " provides top-level name '" << entry.Name << "'\n";
+
     } else if (entry.KindMask.contains(DependencyKind::NominalType)) {
       SmallString<64> name{entry.Name};
       if (name.front() == 'P')
@@ -309,8 +352,28 @@ void DependencyGraphImpl::MarkTracerImpl::printPath(
       out << " provides type '"
           << swift::demangle_wrappers::demangleTypeAsString(name.str())
           << "'\n";
+
+    } else if (entry.KindMask.contains(DependencyKind::NominalTypeMember)) {
+      SmallString<64> name{entry.Name};
+      size_t splitPoint = name.find('\0');
+      assert(splitPoint != StringRef::npos);
+
+      StringRef typePart;
+      if (name.front() == 'P') {
+        name[splitPoint] = '_';
+        typePart = name.str().slice(0, splitPoint+1);
+      } else {
+        typePart = name.str().slice(0, splitPoint);
+      }
+      StringRef memberPart = name.str().substr(splitPoint+1);
+
+      out << " provides member '" << memberPart << "' of type '"
+          << swift::demangle_wrappers::demangleTypeAsString(typePart)
+          << "'\n";
+
     } else if (entry.KindMask.contains(DependencyKind::DynamicLookupName)) {
       out << " provides AnyObject member '" << entry.Name << "'\n";
+
     } else {
       llvm_unreachable("not a dependency kind between nodes");
     }

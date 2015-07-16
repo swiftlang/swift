@@ -20,6 +20,10 @@ TEST(DependencyGraph, BasicLoad) {
             LoadResult::UpToDate);
   EXPECT_EQ(graph.loadFromString(i++, "depends-dynamic-lookup: [k, l]"),
             LoadResult::UpToDate);
+  EXPECT_EQ(graph.loadFromString(i++, "provides-member: [[m, mm], [n, nn]]"),
+            LoadResult::UpToDate);
+  EXPECT_EQ(graph.loadFromString(i++, "depends-member: [[o, oo], [p, pp]]"),
+            LoadResult::UpToDate);
   EXPECT_EQ(graph.loadFromString(i++, "depends-external: [/foo, /bar]"),
             LoadResult::UpToDate);
 
@@ -113,6 +117,31 @@ TEST(DependencyGraph, IndependentDepKinds2) {
   EXPECT_EQ(0u, marked.size());
   EXPECT_FALSE(graph.isMarked(0));
   EXPECT_TRUE(graph.isMarked(1));
+}
+
+TEST(DependencyGraph, IndependentMembers) {
+  DependencyGraph<uintptr_t> graph;
+
+  EXPECT_EQ(graph.loadFromString(0, "provides-member: [[a,aa]]"),
+            LoadResult::UpToDate);
+  EXPECT_EQ(graph.loadFromString(1, "depends-member: [[a,bb]]"),
+            LoadResult::UpToDate);
+  EXPECT_EQ(graph.loadFromString(2, "depends-member: [[a,\"\"]]"),
+            LoadResult::UpToDate);
+  EXPECT_EQ(graph.loadFromString(3, "depends-member: [[b,aa]]"),
+            LoadResult::UpToDate);
+  EXPECT_EQ(graph.loadFromString(4, "depends-member: [[b,bb]]"),
+            LoadResult::UpToDate);
+
+  SmallVector<uintptr_t, 4> marked;
+
+  graph.markTransitive(marked, 0);
+  EXPECT_EQ(0u, marked.size());
+  EXPECT_TRUE(graph.isMarked(0));
+  EXPECT_FALSE(graph.isMarked(1));
+  EXPECT_FALSE(graph.isMarked(2));
+  EXPECT_FALSE(graph.isMarked(3));
+  EXPECT_FALSE(graph.isMarked(4));
 }
 
 TEST(DependencyGraph, SimpleDependent) {
@@ -267,6 +296,32 @@ TEST(DependencyGraph, SimpleDependent6) {
   EXPECT_EQ(graph.loadFromString(0, "provides-dynamic-lookup: [a, b, c]"),
             LoadResult::UpToDate);
   EXPECT_EQ(graph.loadFromString(1, "depends-dynamic-lookup: [x, b, z]"),
+            LoadResult::UpToDate);
+
+  SmallVector<uintptr_t, 4> marked;
+
+  graph.markTransitive(marked, 0);
+  EXPECT_EQ(1u, marked.size());
+  EXPECT_EQ(1u, marked.front());
+  EXPECT_TRUE(graph.isMarked(0));
+  EXPECT_TRUE(graph.isMarked(1));
+
+  marked.clear();
+  graph.markTransitive(marked, 0);
+  EXPECT_EQ(0u, marked.size());
+  EXPECT_TRUE(graph.isMarked(0));
+  EXPECT_TRUE(graph.isMarked(1));
+}
+
+
+TEST(DependencyGraph, SimpleDependentMember) {
+  DependencyGraph<uintptr_t> graph;
+
+  EXPECT_EQ(graph.loadFromString(0,
+                                 "provides-member: [[a,aa], [b,bb], [c,cc]]"),
+            LoadResult::UpToDate);
+  EXPECT_EQ(graph.loadFromString(1,
+                                 "depends-member: [[x, xx], [b,bb], [z,zz]]"),
             LoadResult::UpToDate);
 
   SmallVector<uintptr_t, 4> marked;
