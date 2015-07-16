@@ -2545,7 +2545,7 @@ private:
        !isDebuggerGeneratedModule(context))
     {
       print(context, /*asContext*/ true);
-      if (context->getKind() == Node::Kind::Module && Options.Simplified)
+      if (context->getKind() == Node::Kind::Module && !Options.DisplayModuleNames)
           return;
       Printer << '.';
     }
@@ -2753,9 +2753,11 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     if (printType) {
       NodePointer type = pointer->getChild(1 + unsigned(hasName));
       if (useColonForEntityType(pointer, type)) {
-        Printer << " : ";
-        print(type);
-      } else if (Options.Simplified) {
+        if (Options.DisplayEntityTypes) {
+          Printer << " : ";
+          print(type);
+        }
+      } else if (!Options.DisplayEntityTypes) {
         printSimplifiedEntityType(pointer->getChild(0), type);
       } else {
         Printer << " ";
@@ -2808,6 +2810,7 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     printChildren(pointer);
     return;
   case Node::Kind::Suffix:
+    if (!Options.DisplayUnmangledSuffix) return;
     Printer << " with unmangled suffix " << QuotedString(pointer->getText());
     return;
   case Node::Kind::Initializer:
@@ -2847,7 +2850,7 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     Printer << " in " << pointer->getChild(0)->getText() << ')';
     return;
   case Node::Kind::Module:
-    if (!Options.Simplified)
+    if (Options.DisplayModuleNames)
       Printer << pointer->getText();
     return;
   case Node::Kind::Identifier:
@@ -2956,6 +2959,10 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     return;
   case Node::Kind::FunctionSignatureSpecialization:
   case Node::Kind::GenericSpecialization: {
+    if (!Options.DisplayGenericSpecializations) {
+      Printer << "specialized ";
+      return;
+    }
     if (pointer->getKind() == Node::Kind::FunctionSignatureSpecialization) {
       Printer << "function signature specialization <";
     } else {
@@ -3110,14 +3117,22 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     return;
   }
   case Node::Kind::PartialApplyForwarder:
-    Printer << "partial apply forwarder";
+    if (Options.ShortenPartialApply)
+      Printer << "partial apply";
+    else
+      Printer << "partial apply forwarder";
+
     if (pointer->hasChildren()) {
       Printer << " for ";
       print(pointer->getFirstChild());
     }
     return;
   case Node::Kind::PartialApplyObjCForwarder:
-    Printer << "partial apply ObjC forwarder";
+    if (Options.ShortenPartialApply)
+      Printer << "partial apply";
+    else
+      Printer << "partial apply ObjC forwarder";
+
     if (pointer->hasChildren()) {
       Printer << " for ";
       print(pointer->getFirstChild());
@@ -3133,6 +3148,10 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
   }
   case Node::Kind::ReabstractionThunk:
   case Node::Kind::ReabstractionThunkHelper: {
+    if (Options.ShortenThunk) {
+      Printer << "thunk";
+      return;
+    }
     Printer << "reabstraction thunk ";
     if (pointer->getKind() == Node::Kind::ReabstractionThunkHelper)
       Printer << "helper ";
@@ -3175,8 +3194,9 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     print(pointer->getChild(0));
     return;
   case Node::Kind::ValueWitness:
-    Printer << toString(ValueWitnessKind(pointer->getIndex()))
-            << " value witness for ";
+    Printer << toString(ValueWitnessKind(pointer->getIndex()));
+    if (Options.ShortenValueWitness) Printer << " for ";
+    else Printer << " value witness for ";
     print(pointer->getFirstChild());
     return;
   case Node::Kind::ValueWitnessTable:
@@ -3289,6 +3309,10 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     // Don't print for now.
     return;
   case Node::Kind::QualifiedArchetype: {
+    if (Options.ShortenArchetype) {
+      Printer << "(archetype)";
+      return;
+    }
     if (pointer->getNumChildren() < 2)
       return;
     NodePointer number = pointer->getChild(0);
@@ -3374,7 +3398,7 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     NodePointer child1 = pointer->getChild(1);
     NodePointer child2 = pointer->getChild(2);
     print(child0);
-    if (!Options.Simplified) {
+    if (Options.DisplayProtocolConformances) {
       Printer << " : ";
       print(child1);
       Printer << " in ";
@@ -3428,11 +3452,15 @@ void NodePrinter::print(NodePointer pointer, bool asContext, bool suppressType) 
     }
     
     if (depth != numChildren) {
-      Printer << " where ";
-      for (unsigned i = depth; i < numChildren; ++i) {
-        if (i > depth)
-          Printer << ", ";
-        print(pointer->getChild(i));
+      if (!Options.DisplayWhereClauses) {
+        Printer << " where ...";
+      } else {
+        Printer << " where ";
+        for (unsigned i = depth; i < numChildren; ++i) {
+          if (i > depth)
+            Printer << ", ";
+          print(pointer->getChild(i));
+        }
       }
     }
     Printer << '>';

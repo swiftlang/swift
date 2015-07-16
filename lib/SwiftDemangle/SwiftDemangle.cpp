@@ -54,11 +54,9 @@ size_t swift_demangle_getDemangledName(const char *MangledName,
 size_t swift_demangle_getSimplifiedDemangledName(const char *MangledName,
                                                  char *OutputBuffer,
                                                  size_t Length) {
-  swift::Demangle::DemangleOptions DemangleOptions;
-  DemangleOptions.SynthesizeSugarOnTypes = true;
-  DemangleOptions.Simplified = true;
+  auto Opts = swift::Demangle::DemangleOptions::SimplifiedUIDemangleOptions();
   return swift_demangle_getDemangledName_Options(MangledName, OutputBuffer,
-                                                 Length, DemangleOptions);
+                                                 Length, Opts);
 }
 
 size_t fnd_get_demangled_name(const char *MangledName, char *OutputBuffer,

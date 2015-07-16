@@ -102,7 +102,8 @@ int main(int argc, char **argv) {
 
   swift::Demangle::DemangleOptions options;
   options.SynthesizeSugarOnTypes = !DisableSugar;
-  options.Simplified = Simplified;
+  if (Simplified)
+    options = swift::Demangle::DemangleOptions::SimplifiedUIDemangleOptions();
 
   if (InputNames.empty()) {
     CompactMode = true;

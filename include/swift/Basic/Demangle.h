@@ -32,9 +32,35 @@ struct DemangleOptions {
   bool DisplayTypeOfIVarFieldOffset = true;
   bool DisplayDebuggerGeneratedModule = true;
   bool QualifyEntities = true;
-  bool Simplified = false;
+  bool DisplayUnmangledSuffix = true;
+  bool DisplayModuleNames = true;
+  bool DisplayGenericSpecializations = true;
+  bool DisplayProtocolConformances = true;
+  bool DisplayWhereClauses = true;
+  bool DisplayEntityTypes = true;
+  bool ShortenPartialApply = false;
+  bool ShortenThunk = false;
+  bool ShortenValueWitness = false;
+  bool ShortenArchetype = false;
 
   DemangleOptions() {}
+
+  static DemangleOptions SimplifiedUIDemangleOptions() {
+    auto Opt = DemangleOptions();
+    Opt.SynthesizeSugarOnTypes = true;
+    Opt.QualifyEntities = false;
+    Opt.DisplayUnmangledSuffix = false;
+    Opt.DisplayModuleNames = false;
+    Opt.DisplayGenericSpecializations = false;
+    Opt.DisplayProtocolConformances = false;
+    Opt.DisplayWhereClauses = false;
+    Opt.DisplayEntityTypes = false;
+    Opt.ShortenPartialApply = true;
+    Opt.ShortenThunk = true;
+    Opt.ShortenValueWitness = true;
+    Opt.ShortenArchetype = true;
+    return Opt;
+  };
 };
 
 class Node;
