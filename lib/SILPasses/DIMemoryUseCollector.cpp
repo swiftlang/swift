@@ -737,8 +737,8 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       continue;
     }
 
-    // init_existential_addr is modeled as an initialization store, where the uses
-    // are treated as subelement accesses.
+    // init_existential_addr is modeled as an initialization store, where the
+    // uses are treated as subelement accesses.
     if (isa<InitExistentialAddrInst>(User)) {
       assert(!InStructSubElement &&
              "init_existential_addr should not apply to struct subelements");
@@ -987,37 +987,43 @@ static SILInstruction *isSuperInitUse(UpcastInst *Inst) {
 
 /// isSelfInitUse - Return true if this apply_inst is a call to self.init.
 static bool isSelfInitUse(SILInstruction *I) {
-  auto *LocExpr = I->getLoc().getAsASTNode<ApplyExpr>();
-
-  // If we have the rebind_self_in_constructor_expr, then the call is the
-  // sub-expression.
-  if (!LocExpr)
-    if (auto *RB = I->getLoc().getAsASTNode<RebindSelfInConstructorExpr>()) {
-      auto subExpr = RB->getSubExpr();
-      // Look through TryExpr.  TODO: ForceTryExpr?
-      if (auto *TE = dyn_cast<TryExpr>(subExpr))
-        subExpr = TE->getSubExpr();
-      LocExpr = dyn_cast<ApplyExpr>(subExpr);
-    }
-
-  if (!LocExpr) {
-    // If we're reading a .sil file, treat a call to "selfinit" as a
-    // self.init call as a hack to allow us to write testcases.
-    if (I->getLoc().is<SILFileLocation>()) {
-      if (auto *AI = dyn_cast<ApplyInst>(I))
-        if (auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee()))
-          if (FRI->getReferencedFunction()->getName().startswith("selfinit"))
-            return true;
-
-      // If this is a copy_addr to a delegating self MUI, then we treat it as a
-      // self init for the purposes of testcases.
-      if (auto *CAI = dyn_cast<CopyAddrInst>(I))
-        if (auto *MUI = dyn_cast<MarkUninitializedInst>(CAI->getDest()))
-          if (MUI->isDelegatingSelf())
-            return true;
-    }
+  // If we're reading a .sil file, treat a call to "selfinit" as a
+  // self.init call as a hack to allow us to write testcases.
+  if (I->getLoc().is<SILFileLocation>()) {
+    if (auto *AI = dyn_cast<ApplyInst>(I))
+      if (auto *FRI = dyn_cast<FunctionRefInst>(AI->getCallee()))
+        if (FRI->getReferencedFunction()->getName().startswith("selfinit"))
+          return true;
+    
+    // If this is a copy_addr to a delegating self MUI, then we treat it as a
+    // self init for the purposes of testcases.
+    if (auto *CAI = dyn_cast<CopyAddrInst>(I))
+      if (auto *MUI = dyn_cast<MarkUninitializedInst>(CAI->getDest()))
+        if (MUI->isDelegatingSelf())
+          return true;
     return false;
   }
+
+  // Otherwise, a super.init call must have location info, and must be an expr
+  // to be considered.
+  auto *LocExpr = I->getLoc().getAsASTNode<Expr>();
+  if (!LocExpr) return false;
+
+  // If this is a force_value_expr, it might be a self.init()! call, look
+  // through it.
+  if (auto *FVE = dyn_cast<ForceValueExpr>(LocExpr))
+    LocExpr = FVE->getSubExpr();
+  
+  // If we have the rebind_self_in_constructor_expr, then the call is the
+  // sub-expression.
+  if (auto *RB = dyn_cast<RebindSelfInConstructorExpr>(LocExpr)) {
+    LocExpr = RB->getSubExpr();
+    // Look through TryExpr or ForceValueExpr, but not both.
+    if (auto *TE = dyn_cast<TryExpr>(LocExpr))
+      LocExpr = TE->getSubExpr();
+    else if (auto *FVE = dyn_cast<ForceValueExpr>(LocExpr))
+      LocExpr = FVE->getSubExpr();
+ }
 
   // This is a self.init call if structured like this:
   // (call_expr type='SomeClass'
@@ -1025,11 +1031,12 @@ static bool isSelfInitUse(SILInstruction *I) {
   //     (other_constructor_ref_expr implicit decl=SomeClass.init)
   //     (decl_ref_expr type='SomeClass', "self"))
   //   (...some argument...)
-  LocExpr = dyn_cast<ApplyExpr>(LocExpr->getFn());
-  if (!LocExpr || !isa<OtherConstructorDeclRefExpr>(LocExpr->getFn()))
-    return false;
-
-  return true;
+  if (auto AE = dyn_cast<ApplyExpr>(LocExpr)) {
+    if ((AE = dyn_cast<ApplyExpr>(AE->getFn())) &&
+        isa<OtherConstructorDeclRefExpr>(AE->getFn()))
+      return true;
+  }
+  return false;
 }
 
 
