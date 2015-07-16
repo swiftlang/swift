@@ -3497,6 +3497,27 @@ SetTestSuite.test("indexOf") {
   expectEmpty(s1.indexOf(999))
 }
 
+SetTestSuite.test("popFirst") {
+  // Empty
+  if true {
+    var s = Set<Int>()
+    let popped = s.popFirst()
+    expectEmpty(popped)
+    expectTrue(s.isEmpty)
+  }
+
+  if true {
+    var popped = [Int]()
+    var s = Set([1010, 2020, 3030])
+    let expected = Array(s)
+    while let element = s.popFirst() {
+      popped.append(element)
+    }
+    expectEqualSequence(expected, Array(popped))
+    expectTrue(s.isEmpty)
+  }
+}
+
 SetTestSuite.test("_customIndexOfEquatableElement") {
   let s1 = Set([1010, 2020, 3030, 4040, 5050, 6060])
   let foundIndex1 = s1._customIndexOfEquatableElement(1010)!!

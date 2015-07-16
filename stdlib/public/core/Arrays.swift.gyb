@@ -1250,6 +1250,29 @@ extension Array {
 }
 #endif
 
+extension Array {
+  /// If `!self.isEmpty`, remove the last element and return it, otherwise
+  /// return `nil`.
+  ///
+  /// - Complexity: O(`self.count`) if the array is bridged,
+  ///   otherwise O(1).
+  public mutating func popLast() -> Element? {
+    guard !isEmpty else { return nil }
+    return removeLast()
+  }
+}
+
+extension ContiguousArray {
+  /// If `!self.isEmpty`, remove the last element and return it, otherwise
+  /// return `nil`.
+  ///
+  /// - Complexity: O(1)
+  public mutating func popLast() -> Element? {
+    guard !isEmpty else { return nil }
+    return removeLast()
+  }
+}
+
 // ${'Local Variables'}:
 // eval: (read-only-mode 1)
 // End:

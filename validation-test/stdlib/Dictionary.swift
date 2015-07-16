@@ -3852,6 +3852,32 @@ DictionaryTestSuite.test("getObjects:andKeys:") {
   expectEqual(["two", "one"] as [NSString], Array(values))
 }
 
+DictionaryTestSuite.test("popFirst") {
+  // Empty
+  if true {
+    var d = [Int: Int]()
+    let popped = d.popFirst()
+    expectEmpty(popped)
+  }
+
+  if true {
+    var popped = [(Int, Int)]()
+    var d: [Int: Int] = [
+      1010: 1010,
+      2020: 2020,
+      3030: 3030,
+    ]
+    let expected = Array(d)
+    while let element = d.popFirst() {
+      popped.append(element)
+    }
+    expectEqualSequence(expected, Array(popped)) {
+      $0.0 == $1.0 && $0.1 == $1.1
+    }
+    expectTrue(d.isEmpty)
+  }
+}
+
 DictionaryTestSuite.setUp {
   resetLeaksOfDictionaryKeysValues()
 }

@@ -261,6 +261,28 @@ ArrayTestSuite.test("${array_type}/flatMap") {
 
 % end
 
+% for Kind in ['Array', 'ContiguousArray']:
+ArrayTestSuite.test("${Kind}/popLast") {
+  // Empty
+  if true {
+    var a = ${Kind}<Int>()
+    let popped = a.popLast()
+    expectEmpty(popped)
+    expectTrue(a.isEmpty)
+  }
+
+  if true {
+    var popped = [Int]()
+    var a: ${Kind}<Int> = [1010, 2020, 3030]
+    while let element = a.popLast() {
+      popped.append(element)
+    }
+    expectEqualSequence([1010, 2020, 3030], popped.reverse())
+    expectTrue(a.isEmpty)
+  }
+}
+% end
+
 //===----------------------------------------------------------------------===//
 // _withUnsafeMutableBufferPointerIfSupported()
 //===----------------------------------------------------------------------===//

@@ -3841,6 +3841,19 @@ public struct _${Self}Builder<${TypeParametersDecl}> {
   }
 }
 
+extension ${Self} {
+  /// If `!self.isEmpty`, return the first key-value pair in the sequence of
+  /// elements, otherwise return `nil`.
+  ///
+  /// - Complexity: Amortized O(1)
+  public mutating func popFirst() -> Element? {
+    guard !isEmpty else { return nil }
+    let element = self[startIndex]
+    removeAtIndex(startIndex)
+    return element
+  }
+}
+
 //===--- Bridging ---------------------------------------------------------===//
 
 #if _runtime(_ObjC)

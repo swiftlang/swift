@@ -188,6 +188,31 @@ extension CollectionType where SubSequence == Slice<Self> {
   }
 }
 
+extension CollectionType where SubSequence == Self {
+  /// If `!self.isEmpty`, remove the first element and return it, otherwise
+  /// return `nil`.
+  ///
+  /// - Complexity: O(`self.count`)
+  public mutating func popFirst() -> Generator.Element? {
+    guard !isEmpty else { return nil }
+    let element = first!
+    self = self[startIndex.successor()..<endIndex]
+    return element
+  }
+
+  /// If `!self.isEmpty`, remove the last element and return it, otherwise
+  /// return `nil`.
+  ///
+  /// - Complexity: O(`self.count`)
+  public mutating func popLast() -> Generator.Element? {
+    guard !isEmpty else { return nil }
+    let lastElementIndex = advance(startIndex, numericCast(count) - 1)
+    let element = self[lastElementIndex]
+    self = self[startIndex..<lastElementIndex]
+    return element
+  }
+}
+
 /// Default implementations of core requirements
 extension CollectionType {
   /// Returns `true` iff `self` is empty.
