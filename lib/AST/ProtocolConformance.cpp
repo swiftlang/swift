@@ -1078,11 +1078,9 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
   llvm::SetVector<ExtensionDecl *> &delayedExtensionDecls
     = DelayedExtensionDecls[static_cast<unsigned>(stage)];
   nominal->prepareExtensions();
-  for (auto next = lastProcessed.getPointer()
-                     ? lastProcessed.getPointer()->NextExtension.getPointer()
-                     : nominal->FirstExtension;
-       next;
-       next = next->NextExtension.getPointer()) {
+  while (auto next = lastProcessed.getPointer()
+                       ? lastProcessed.getPointer()->NextExtension.getPointer()
+                       : nominal->FirstExtension) {
     lastProcessed.setPointer(next);
 
     // If we have conformances we can load, do so.
