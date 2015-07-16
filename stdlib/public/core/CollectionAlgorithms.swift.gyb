@@ -231,9 +231,10 @@ ${orderingRequirementForPredicate}
   public func sort(
     @noescape isOrderedBefore: (Generator.Element, Generator.Element) -> Bool
   ) -> [Generator.Element] {
-    typealias IsOrderedBefore = (Generator.Element, Generator.Element) -> Bool
+    typealias EscapingBinaryPredicate =
+       (Generator.Element, Generator.Element) -> Bool
     let escapableIsOrderedBefore =
-      unsafeBitCast(isOrderedBefore, IsOrderedBefore.self)
+      unsafeBitCast(isOrderedBefore, EscapingBinaryPredicate.self)
 
     var result = ContiguousArray(self)
     result.sortInPlace(escapableIsOrderedBefore)
@@ -275,19 +276,20 @@ ${orderingRequirementForPredicate}
   public mutating func sortInPlace(
     @noescape isOrderedBefore: (Generator.Element, Generator.Element) -> Bool
   ) {
-    typealias IsOrderedBefore = (Generator.Element, Generator.Element) -> Bool
+    typealias EscapingBinaryPredicate =
+      (Generator.Element, Generator.Element) -> Bool
     let didSortUnsafeBuffer: Void? =
       _withUnsafeMutableBufferPointerIfSupported {
       (bufferPointer) -> () in
       let escapableIsOrderedBefore =
-        unsafeBitCast(isOrderedBefore, IsOrderedBefore.self)
+        unsafeBitCast(isOrderedBefore, EscapingBinaryPredicate.self)
 
       bufferPointer.sortInPlace(escapableIsOrderedBefore)
       return ()
     }
     if didSortUnsafeBuffer == nil {
       let escapableIsOrderedBefore =
-        unsafeBitCast(isOrderedBefore, IsOrderedBefore.self)
+        unsafeBitCast(isOrderedBefore, EscapingBinaryPredicate.self)
 
       _introSort(&self, self.indices, escapableIsOrderedBefore)
     }
