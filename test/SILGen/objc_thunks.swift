@@ -197,25 +197,11 @@ class Hoozit : Gizmo {
   // CHECK: [[SELF_BOX:%[0-9]+]] = alloc_box $Hoozit
   // CHECK: [[SELFMUI:%[0-9]+]] = mark_uninitialized [derivedself] [[SELF_BOX]]#1
   // CHECK: [[GIZMO:%[0-9]+]] = upcast [[SELF:%[0-9]+]] : $Hoozit to $Gizmo
-  // CHECK-NEXT: [[SUPERMETHOD:%[0-9]+]] = super_method [volatile] [[SELF]] : $Hoozit, #Gizmo.init!initializer.1.foreign : Gizmo.Type -> (bellsOn: Int) -> Gizmo! , $@convention(objc_method) (Int, @owned Gizmo) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
-  // CHECK-NEXT: [[T0:%.*]] = null_class $Hoozit
-  // CHECK-NEXT: store [[T0]] to [[SELFMUI]] : $*Hoozit
+  // CHECK: [[SUPERMETHOD:%[0-9]+]] = super_method [volatile] [[SELF]] : $Hoozit, #Gizmo.init!initializer.1.foreign : Gizmo.Type -> (bellsOn: Int) -> Gizmo! , $@convention(objc_method) (Int, @owned Gizmo) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
   // CHECK-NEXT: [[SELF_REPLACED:%[0-9]+]] = apply [[SUPERMETHOD]](%0, [[X:%[0-9]+]]) : $@convention(objc_method) (Int, @owned Gizmo) -> @owned ImplicitlyUnwrappedOptional<Gizmo>
   // CHECK-NOT: unconditional_checked_cast downcast [[SELF_REPLACED]] : $Gizmo to $Hoozit
+  // CHECK: function_ref @_TFSs36_getImplicitlyUnwrappedOptionalValueurFGSQq__q_
   // CHECK: unchecked_ref_cast
-  // CHECK-NEXT: store [[SELF:%[0-9]+]] to [[SELFMUI]] : $*Hoozit
-  // CHECK-NEXT: [[NONNULL:%[0-9]+]] = is_nonnull [[SELF]] : $Hoozit
-  // CHECK-NEXT: cond_br [[NONNULL]], [[NONNULL_BB:bb[0-9]+]], [[NULL_BB:bb[0-9]+]]
-  // CHECK: [[NULL_BB]]:
-  // CHECK:   br [[EPILOG_BB:bb[0-9]+]]
-
-  // CHECK: [[NONNULL_BB]]:
-  // CHECK:   [[OTHER_REF:%[0-9]+]] = function_ref @_TF11objc_thunks5otherFT_T_ : $@convention(thin) () -> ()
-  // CHECK-NEXT: apply [[OTHER_REF]]() : $@convention(thin) () -> ()
-  // CHECK-NEXT: br [[EPILOG_BB]]
-
-  // CHECK: [[EPILOG_BB]]:
-  // CHECK-NOT: super_method
   // CHECK: return
   override init(bellsOn x : Int) {
     super.init(bellsOn: x)

@@ -2968,9 +2968,11 @@ namespace {
       Type valueTy
         = expr->getSubExpr()->getType()->getAnyOptionalObjectType(calledOTK);
       auto inCtor = cast<ConstructorDecl>(cs.DC->getInnermostMethodContext());
-      if (calledOTK == OTK_Optional && inCtor->getFailability() == OTK_None) {
+      if (calledOTK != OTK_None && inCtor->getFailability() == OTK_None) {
+        bool isError = (calledOTK == OTK_Optional);
+
         // If we're suppressing diagnostics, just fail.
-        if (SuppressDiagnostics)
+        if (isError && SuppressDiagnostics)
           return nullptr;
 
         // Dig out the OtherConstructorRefExpr. Note that this is the reverse
@@ -3004,19 +3006,21 @@ namespace {
           continue;
         }
 
-        // Give the user the option of adding '!' or making the enclosing
-        // initializer failable.
         auto &tc = cs.getTypeChecker();
         auto &ctx = tc.Context;
 
-        ConstructorDecl *ctor = otherCtorRef->getDecl();
-        tc.diagnose(otherCtorRef->getLoc(),
-                    diag::delegate_chain_nonoptional_to_optional,
-                    !isDelegating, ctor->getFullName());
-        tc.diagnose(otherCtorRef->getLoc(), diag::init_force_unwrap)
-          .fixItInsertAfter(otherCtorRef->getLoc(), "!");
-        tc.diagnose(inCtor->getLoc(), diag::init_propagate_failure)
-          .fixItInsertAfter(inCtor->getLoc(), "?");
+        if (isError) {
+          // Give the user the option of adding '!' or making the enclosing
+          // initializer failable.
+          ConstructorDecl *ctor = otherCtorRef->getDecl();
+          tc.diagnose(otherCtorRef->getLoc(),
+                      diag::delegate_chain_nonoptional_to_optional,
+                      !isDelegating, ctor->getFullName());
+          tc.diagnose(otherCtorRef->getLoc(), diag::init_force_unwrap)
+            .fixItInsertAfter(otherCtorRef->getLoc(), "!");
+          tc.diagnose(inCtor->getLoc(), diag::init_propagate_failure)
+            .fixItInsertAfter(inCtor->getLoc(), "?");
+        }
 
         // Recover by injecting the force operation (the first option).
         Expr *newSub = new (ctx) ForceValueExpr(expr->getSubExpr(),

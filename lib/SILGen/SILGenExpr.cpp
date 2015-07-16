@@ -2248,56 +2248,35 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
     SGF.B.createStore(E, Zero, selfAddr);
   }
   
-  // If the delegated-to initializer can fail, check for the potential failure.
-  switch (failability) {
-  case OTK_None:
-    // Not failable.
-    break;
+  // If both the delegated-to initializer and our enclosing initializer can
+  // fail, deal with the failure.
+  if (failability != OTK_None && ctorDecl->getFailability() != OTK_None) {
+    SILBasicBlock *someBB = SGF.createBasicBlock();
 
-  case OTK_Optional:
-  case OTK_ImplicitlyUnwrappedOptional: {
-    // If the current constructor is not failable, abort.
-    switch (ctorDecl->getFailability()) {
-    case OTK_Optional:
-    case OTK_ImplicitlyUnwrappedOptional: {
-      SILBasicBlock *someBB = SGF.createBasicBlock();
+    auto hasValue = SGF.emitDoesOptionalHaveValue(E, newSelf.getValue());
 
-      auto hasValue = SGF.emitDoesOptionalHaveValue(E, newSelf.getValue());
-      
-      assert(SGF.FailDest.isValid() && "too big to fail");
-      
-      // On the failure case, we don't need to clean up the 'self' returned
-      // by the call to the other constructor, since we know it is nil and
-      // therefore dynamically trivial.
-      if (newSelf.getCleanup().isValid())
-        SGF.Cleanups.setCleanupState(newSelf.getCleanup(),
-                                     CleanupState::Dormant);
-      auto noneBB = SGF.Cleanups.emitBlockForCleanups(SGF.FailDest, E);
-      if (newSelf.getCleanup().isValid())
-        SGF.Cleanups.setCleanupState(newSelf.getCleanup(),
-                                     CleanupState::Active);
-      
-      SGF.B.createCondBranch(E, hasValue, someBB, noneBB);
-      
-      // Otherwise, project out the value and carry on.
-      SGF.B.emitBlock(someBB);
-      
-      // If the current constructor is not failable, force out the value.
-      newSelf = SGF.emitUncheckedGetOptionalValueFrom(E, newSelf,
-                                      SGF.getTypeLowering(newSelf.getType()),
-                                                      SGFContext());
-      break;
-    }
-    case OTK_None: {
-      // If the current constructor is not failable, force out the value.
-      newSelf = SGF.emitCheckedGetOptionalValueFrom(E, newSelf,
-                                         SGF.getTypeLowering(newSelf.getType()),
-                                         SGFContext());
-      break;
-    }
-    }
-    break;
-  }
+    assert(SGF.FailDest.isValid() && "too big to fail");
+
+    // On the failure case, we don't need to clean up the 'self' returned
+    // by the call to the other constructor, since we know it is nil and
+    // therefore dynamically trivial.
+    if (newSelf.getCleanup().isValid())
+      SGF.Cleanups.setCleanupState(newSelf.getCleanup(),
+                                   CleanupState::Dormant);
+    auto noneBB = SGF.Cleanups.emitBlockForCleanups(SGF.FailDest, E);
+    if (newSelf.getCleanup().isValid())
+      SGF.Cleanups.setCleanupState(newSelf.getCleanup(),
+                                   CleanupState::Active);
+
+    SGF.B.createCondBranch(E, hasValue, someBB, noneBB);
+
+    // Otherwise, project out the value and carry on.
+    SGF.B.emitBlock(someBB);
+
+    // If the current constructor is not failable, force out the value.
+    newSelf = SGF.emitUncheckedGetOptionalValueFrom(E, newSelf,
+                                    SGF.getTypeLowering(newSelf.getType()),
+                                                    SGFContext());
   }
   
   // If we called a superclass constructor, cast down to the subclass.
