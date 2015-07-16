@@ -29,6 +29,10 @@ struct GuineaPig {
   init?(alwaysFail: Void) {
     return nil
   }
+
+  init(forceNeverFail: ()) {
+    self.init(fail: false)!
+  }
 }
 
 // CHECK: it's alive
@@ -138,6 +142,13 @@ struct Chimera {
     if failAfter { return nil }
   }
 }
+
+print("--") // CHECK-NEXT: --
+
+// CHECK-NEXT: died
+_ = GuineaPig(forceNeverFail: ())
+
+print("--") // CHECK-NEXT: --
 
 // CHECK-NEXT: it's dead
 if let q = Chimera(failBefore: true) {
