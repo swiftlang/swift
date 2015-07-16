@@ -3,9 +3,6 @@
 
 // REQUIRES: objc_interop
 
-// <rdar://problem/20738811>
-// REQUIRES: OS=macosx
-
 import StdlibUnittest
 import SceneKit
 
@@ -128,7 +125,14 @@ if #available(iOS 8.0, *) {
     expectEqual(1, element.bytesPerIndex)
   }
 
-  SceneKitTests.test("SCNSceneSource.entryWithIdentifier(uid:withClass:)") {
+  SceneKitTests.test("SCNSceneSource.entryWithIdentifier(uid:withClass:)")
+    .skip(.iOSAny("does not support COLLADA files"))
+    .skip(.iOSSimulatorAny("does not support COLLADA files"))
+    .skip(.TVOSAny("does not support COLLADA files"))
+    .skip(.TVOSSimulatorAny("does not support COLLADA files"))
+    .skip(.watchOSAny("does not support COLLADA files"))
+    .skip(.watchOSSimulatorAny("does not support COLLADA files"))
+    .code {
     let sceneDescription =
       "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
       "<COLLADA xmlns=\"http://www.collada.org/2005/11/COLLADASchema\" version=\"1.4.1\">" +
