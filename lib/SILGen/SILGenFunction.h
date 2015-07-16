@@ -1030,7 +1030,7 @@ public:
 
   void emitSemanticStore(SILLocation loc, SILValue value,
                          SILValue dest, const TypeLowering &destTL,
-                         IsInitialization_t isInit);
+                         IsTake_t isTake, IsInitialization_t isInit);
   
   SILValue emitConversionFromSemanticValue(SILLocation loc,
                                            SILValue semanticValue,

@@ -1335,7 +1335,7 @@ namespace {
 
       gen.emitSemanticStore(loc,
                             std::move(value).forwardAsSingleValue(gen, loc),
-                            base.getValue(), TL, IsNotInitialization);
+                            base.getValue(), TL, IsTake, IsNotInitialization);
     }
 
     std::unique_ptr<LogicalPathComponent>
@@ -2281,6 +2281,7 @@ static void emitStoreOfSemanticRValue(SILGenFunction &gen,
                                       SILValue value,
                                       SILValue dest,
                                       const TypeLowering &valueTL,
+                                      IsTake_t isTake,
                                       IsInitialization_t isInit) {
   auto storageType = dest.getType();
 
@@ -2290,7 +2291,8 @@ static void emitStoreOfSemanticRValue(SILGenFunction &gen,
     gen.B.createStoreWeak(loc, value, dest, isInit);
 
     // store_weak doesn't take ownership of the input, so cancel it out.
-    gen.B.emitReleaseValueAndFold(loc, value);
+    if (isTake)
+      gen.B.emitReleaseValueAndFold(loc, value);
     return;
   }
 
@@ -2301,7 +2303,8 @@ static void emitStoreOfSemanticRValue(SILGenFunction &gen,
       gen.B.createRefToUnowned(loc, value, storageType.getObjectType());
     gen.B.createUnownedRetain(loc, unownedValue);
     emitUnloweredStoreOfCopy(gen.B, loc, unownedValue, dest, isInit);
-    gen.B.emitStrongReleaseAndFold(loc, value);
+    if (isTake)
+      gen.B.emitStrongReleaseAndFold(loc, value);
     return;
   }
 
@@ -2311,7 +2314,8 @@ static void emitStoreOfSemanticRValue(SILGenFunction &gen,
     auto unmanagedValue =
       gen.B.createRefToUnmanaged(loc, value, storageType.getObjectType());
     emitUnloweredStoreOfCopy(gen.B, loc, unmanagedValue, dest, isInit);
-    gen.B.emitStrongReleaseAndFold(loc, value);
+    if (isTake)
+      gen.B.emitStrongReleaseAndFold(loc, value);
     return;
   }
 
@@ -2363,6 +2367,7 @@ void SILGenFunction::emitSemanticStore(SILLocation loc,
                                        SILValue rvalue,
                                        SILValue dest,
                                        const TypeLowering &destTL,
+                                       IsTake_t isTake,
                                        IsInitialization_t isInit) {
   assert(destTL.getLoweredType().getAddressType() == dest.getType());
 
@@ -2370,15 +2375,16 @@ void SILGenFunction::emitSemanticStore(SILLocation loc,
   if (rvalue.getType() == destTL.getLoweredType()) {
     assert(destTL.isAddressOnly() == rvalue.getType().isAddress());
     if (rvalue.getType().isAddress()) {
-      B.createCopyAddr(loc, rvalue, dest, IsTake, isInit);
+      B.createCopyAddr(loc, rvalue, dest, isTake, isInit);
     } else {
+      if (!isTake)
+        destTL.emitRetainValue(B, loc, rvalue);
       emitUnloweredStoreOfCopy(B, loc, rvalue, dest, isInit);
     }
     return;
   }
-
   auto &rvalueTL = getTypeLowering(rvalue.getType());
-  emitStoreOfSemanticRValue(*this, loc, rvalue, dest, rvalueTL, isInit);
+  emitStoreOfSemanticRValue(*this, loc, rvalue, dest, rvalueTL, isTake, isInit);
 }
 
 /// Convert a semantic rvalue to a value of storage type.
