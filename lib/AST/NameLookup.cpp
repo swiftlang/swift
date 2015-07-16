@@ -1377,7 +1377,7 @@ bool DeclContext::lookupQualified(Type type,
     stack.pop_back();
 
     if (tracker)
-      tracker->addUsedNominal(current, isLookupCascading);
+      tracker->addUsedMember({current, member.getBaseName()},isLookupCascading);
 
     // Make sure we've resolved implicit constructors, if we need them.
     if (member.getBaseName() == ctx.Id_init && typeResolver)

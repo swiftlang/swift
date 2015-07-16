@@ -34,7 +34,9 @@ public: \
 
   TRACKED_SET(Identifier, TopLevelName)
   TRACKED_SET(Identifier, DynamicLookupName)
-  TRACKED_SET(const NominalTypeDecl *, UsedNominal)
+
+  using MemberPair = std::pair<const NominalTypeDecl *, Identifier>;
+  TRACKED_SET(MemberPair, UsedMember)
 
 #undef TRACKED_SET
 };

@@ -2855,8 +2855,8 @@ public:
       }
 
       if (tracker)
-        tracker->addUsedNominal(conformance->getProtocol(),
-                                !isPrivateConformer(D));
+        tracker->addUsedMember({conformance->getProtocol(), Identifier()},
+                               !isPrivateConformer(D));
     }
 
     D->overrideProtocols(TC.Context.AllocateCopy(protocols));
@@ -3558,7 +3558,7 @@ public:
                          diag::class_here, path);
       }
     }
-    
+
     // If this class needs an implicit constructor, add it.
     if (!IsFirstPass)
       TC.addImplicitConstructors(CD);
@@ -3576,9 +3576,16 @@ public:
       checkRequiredInClassInits(CD);
 
     if (!IsFirstPass) {
-      // Check that we don't inherit from a final class.
       if (auto superclassTy = CD->getSuperclass()) {
         ClassDecl *Super = superclassTy->getClassOrBoundGenericClass();
+
+        if (auto *SF = CD->getParentSourceFile()) {
+          if (auto *tracker = SF->getReferencedNameTracker()) {
+            bool isPrivate = CD->getFormalAccess() == Accessibility::Private;
+            tracker->addUsedMember({Super, Identifier()}, !isPrivate);
+          }
+        }
+
         if (Super->isFinal()) {
           TC.diagnose(CD, diag::inheritance_from_final_class,
                       Super->getName());
@@ -3633,7 +3640,7 @@ public:
         if (auto *tracker = SF->getReferencedNameTracker()) {
           bool isNonPrivate = (PD->getFormalAccess() != Accessibility::Private);
           for (auto *parentProto : PD->getInheritedProtocols(nullptr))
-            tracker->addUsedNominal(parentProto, isNonPrivate);
+            tracker->addUsedMember({parentProto, Identifier()}, isNonPrivate);
         }
       }
     }

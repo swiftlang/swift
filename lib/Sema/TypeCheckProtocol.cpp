@@ -3942,8 +3942,8 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
         return;
 
     if (auto nominal = T->getAnyNominal()) {
-      tracker->addUsedNominal(nominal,
-                              DC->isCascadingContextForLookup(InExpression));
+      tracker->addUsedMember({nominal, Identifier()},
+                             DC->isCascadingContextForLookup(InExpression));
     }
   };
 

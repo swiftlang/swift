@@ -321,12 +321,24 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
     out << "\"" << escape(entry.first) << "\"\n";
   }
 
-  // FIXME: Sort these?
-  out << "depends-nominal:\n";
-  for (auto &entry : tracker->getUsedNominals()) {
-    assert(entry.first != nullptr);
-    if (entry.first->hasAccessibility() &&
-        entry.first->getFormalAccess() == Accessibility::Private)
+  out << "depends-member:\n";
+  auto &memberLookupTable = tracker->getUsedMembers();
+  using TableEntryTy = std::pair<ReferencedNameTracker::MemberPair, bool>;
+  std::vector<TableEntryTy> sortedMembers{
+    memberLookupTable.begin(), memberLookupTable.end()
+  };
+  llvm::array_pod_sort(sortedMembers.begin(), sortedMembers.end(),
+                       [](const TableEntryTy *lhs,
+                          const TableEntryTy *rhs) -> int {
+    if (lhs->first.first->getName() != rhs->first.first->getName())
+      return lhs->first.first->getName().compare(rhs->first.first->getName());
+    return lhs->first.second.compare(rhs->first.second);
+  });
+  
+  for (auto &entry : sortedMembers) {
+    assert(entry.first.first != nullptr);
+    if (entry.first.first->hasAccessibility() &&
+        entry.first.first->getFormalAccess() == Accessibility::Private)
       continue;
 
     Mangle::Mangler mangler(out, /*debug style=*/false, /*Unicode=*/true);
@@ -334,8 +346,30 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
     if (!entry.second)
       out << "!private ";
     out << "\"";
-    mangler.mangleContext(entry.first, Mangle::Mangler::BindGenerics::None);
+    mangler.mangleContext(entry.first.first,
+                          Mangle::Mangler::BindGenerics::None);
+    out << "\"";
+    if (!entry.first.second.empty())
+      out << " # " << escape(entry.first.second);
+    out << "\n";
+  }
+
+  out << "depends-nominal:\n";
+  const NominalTypeDecl *prev = nullptr;
+  for (auto &entry : sortedMembers) {
+    if (prev == entry.first.first)
+      continue;
+
+    Mangle::Mangler mangler(out, /*debug style=*/false, /*Unicode=*/true);
+    out << "- ";
+    if (!entry.second)
+      out << "!private ";
+    out << "\"";
+    mangler.mangleContext(entry.first.first,
+                          Mangle::Mangler::BindGenerics::None);
     out << "\"\n";
+
+    prev = entry.first.first;
   }
 
   // FIXME: Sort these?
