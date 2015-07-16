@@ -109,7 +109,7 @@ public struct _prext_LazyMapCollection<Base : CollectionType, Element>
 //===--- Support for lazy(s) ----------------------------------------------===//
 
 extension _prext_LazySequenceType {
-  /// Return a `_prext_LazyMapSequence` over this `Sequence`.  The elements of
+  /// Return a `LazyMapSequence` over this `Sequence`.  The elements of
   /// the result are computed lazily, each time they are read, by
   /// calling `transform` function on a base element.
   public func map<U>(
@@ -120,7 +120,7 @@ extension _prext_LazySequenceType {
 }
 
 extension _prext_LazyCollectionType {
-  /// Return a `_prext_LazyMapCollection` over this `Collection`.  The elements of
+  /// Return a `LazyMapCollection` over this `Collection`.  The elements of
   /// the result are computed lazily, each time they are read, by
   /// calling `transform` function on a base element.
   public func map<U>(

@@ -71,9 +71,9 @@ public struct _prext_LazyFilterSequence<Base : SequenceType>
   internal var _predicate: (Base.Generator.Element)->Bool
 }
 
-/// The `Index` used for subscripting a `_prext_LazyFilterCollection`.
+/// The `Index` used for subscripting a `LazyFilterCollection`.
 ///
-/// - Note: The performance of advancing a `_prext_LazyFilterIndex`
+/// - Note: The performance of advancing a `LazyFilterIndex`
 ///   depends on how sparsely the filtering predicate is satisfied,
 ///   and may not offer the usual performance given by models of
 ///   `ForwardIndexType`.
@@ -114,11 +114,11 @@ public func == <Base: CollectionType>(
 /// A lazy `CollectionType` wrapper that includes the elements of an
 /// underlying collection that satisfy a predicate.
 ///
-/// - Note: The performance of advancing a `_prext_LazyFilterIndex`
+/// - Note: The performance of advancing a `LazyFilterIndex`
 ///   depends on how sparsely the filtering predicate is satisfied,
 ///   and may not offer the usual performance given by models of
 ///   `ForwardIndexType`.  Be aware, therefore, that general operations
-///   on `_prext_LazyFilterCollection` instances may not have the
+///   on `LazyFilterCollection` instances may not have the
 ///   documented complexity.
 public struct _prext_LazyFilterCollection<
   Base : CollectionType

@@ -15,7 +15,7 @@ public protocol _prext_LazyCollectionType : CollectionType, _prext_LazySequenceT
   /// possibly with a simpler type.
   ///
   /// This associated type is used to keep the result type of
-  /// `lazy(x).operation` from growing a `_prext_LazyCollection` layer.
+  /// `lazy(x).operation` from growing a `LazyCollection` layer.
   typealias Elements: CollectionType = Self
 
 }

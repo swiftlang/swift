@@ -31,7 +31,7 @@
 ///
 /// To add new lazy sequence operations, extend this protocol with
 /// methods that return lazy wrappers that are themselves
-/// `_prext_LazySequenceType`s.  For example, given an eager `scan`
+/// `LazySequenceType`s.  For example, given an eager `scan`
 /// method defined as follows
 ///
 ///     extension SequenceType {
@@ -74,7 +74,7 @@
 ///     }
 ///     
 ///     struct LazyScanSequence<Base: SequenceType, ResultElement>
-///       : _prext_LazySequenceType // Chained operations on self are lazy, too
+///       : LazySequenceType // Chained operations on self are lazy, too
 ///     {
 ///       func generate() -> LazyScanGenerator<Base.Generator, ResultElement> {
 ///         return LazyScanGenerator(
@@ -88,7 +88,7 @@
 ///
 /// and finally, we can give all lazy sequences a lazy `scan` method:
 ///     
-///     extension _prext_LazySequenceType {
+///     extension LazySequenceType {
 ///       /// Returns a sequence containing the results of
 ///       ///
 ///       ///   p.reduce(initial, combine: combine)
@@ -139,7 +139,7 @@ public protocol _prext_LazySequenceType : SequenceType {
   ///
   /// When implementing lazy operations, wrapping `elements` instead
   /// of `self` can prevent result types from growing an extra
-  /// `_prext_LazySequence` layer.  For example,
+  /// `LazySequence` layer.  For example,
   ///
   /// Note: this property need not be implemented by conforming types,
   /// it has a default implementation in a protocol extension that
