@@ -1246,19 +1246,11 @@ namespace {
       return NumExtraInhabitantTagValues;
     }
 
+    /// Emit a call into the runtime to get the current enum case; this is
+    /// an internal form that returns -1 in the payload case, or an index of
+    /// an empty case.
     llvm::Value *
-    emitGetEnumTag(IRGenFunction &IGF, Address enumAddr, SILType T)
-    const override {
-      // FIXME: get the below working and factor out common code surrounding
-      // calls to swift_getGetEnumCaseSinglePayload()
-#if false
-      SILType payloadT = getPayloadType(IGF.IGM, T);
-      auto payloadTI = getPayloadTypeInfo();
-      auto payloadAddr = projectPayloadData(IGF, enumAddr);
-      auto value = payloadTI->getExtraInhabitantIndex(IGF,
-                                                      payloadAddr, payloadT);
-#endif
-
+    emitGetEnumCase(IRGenFunction &IGF, Address enumAddr, SILType T) const {
       auto payloadMetadata = emitPayloadMetadataForLayout(IGF, T);
       auto numEmptyCases = llvm::ConstantInt::get(IGF.IGM.Int32Ty,
                                                   ElementsWithNoPayload.size());
@@ -1266,9 +1258,18 @@ namespace {
       auto opaqueAddr = IGF.Builder.CreateBitCast(enumAddr.getAddress(),
                                                   IGF.IGM.OpaquePtrTy);
 
-      auto value = IGF.Builder.CreateCall(
-                                  IGF.IGM.getGetEnumCaseSinglePayloadFn(),
-                                  {opaqueAddr, payloadMetadata, numEmptyCases});
+      return IGF.Builder.CreateCall(
+                 IGF.IGM.getGetEnumCaseSinglePayloadFn(),
+                 {opaqueAddr, payloadMetadata, numEmptyCases});
+    }
+
+    /// Emit a call into the runtime to get the current enum case; this form
+    /// is used for reflection where we want the payload cases to start at
+    /// zero.
+    llvm::Value *
+    emitGetEnumTag(IRGenFunction &IGF, Address enumAddr, SILType T)
+    const override {
+      auto value = emitGetEnumCase(IGF, enumAddr, T);
       return IGF.Builder.CreateAdd(value,
                                    llvm::ConstantInt::get(IGF.IGM.Int32Ty, 1));
     }
@@ -1605,12 +1606,6 @@ namespace {
                            ArrayRef<std::pair<EnumElementDecl*,
                                               llvm::BasicBlock*>> dests,
                            llvm::BasicBlock *defaultDest) const {
-      auto payloadMetadata = emitPayloadMetadataForLayout(IGF, T);
-      auto numEmptyCases = llvm::ConstantInt::get(IGF.IGM.Int32Ty,
-                                                  ElementsWithNoPayload.size());
-      auto opaqueAddr = IGF.Builder.CreateBitCast(addr.getAddress(),
-                                                  IGF.IGM.OpaquePtrTy);
-
       // Create a map of the destination blocks for quicker lookup.
       llvm::DenseMap<EnumElementDecl*,llvm::BasicBlock*> destMap(dests.begin(),
                                                                   dests.end());
@@ -1624,9 +1619,7 @@ namespace {
       }
 
       // Ask the runtime to find the case index.
-      auto caseIndex = IGF.Builder.CreateCall(
-                            IGF.IGM.getGetEnumCaseSinglePayloadFn(),
-                            {opaqueAddr, payloadMetadata, numEmptyCases});
+      auto caseIndex = emitGetEnumCase(IGF, addr, T);
 
       // Switch on the index.
       auto *swi = IGF.Builder.CreateSwitch(caseIndex, defaultDest);
@@ -1863,17 +1856,8 @@ namespace {
       auto *payloadBB = llvm::BasicBlock::Create(C);
       auto *noPayloadBB = llvm::BasicBlock::Create(C);
 
-      // Look up the metadata for the payload.
-      llvm::Value *metadata = emitPayloadMetadataForLayout(IGF, T);
-
       // Ask the runtime what case we have.
-      llvm::Value *opaqueAddr = IGF.Builder.CreateBitCast(addr.getAddress(),
-                                                          IGF.IGM.OpaquePtrTy);
-      llvm::Value *numCases = llvm::ConstantInt::get(IGF.IGM.Int32Ty,
-                                                 ElementsWithNoPayload.size());
-      llvm::Value *which = IGF.Builder.CreateCall(
-                                       IGF.IGM.getGetEnumCaseSinglePayloadFn(),
-                                       {opaqueAddr, metadata, numCases});
+      llvm::Value *which = emitGetEnumCase(IGF, addr, T);
 
       // If it's -1 then we have the payload.
       llvm::Value *hasPayload = IGF.Builder.CreateICmpEQ(which,
