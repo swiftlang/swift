@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -verify %s
+// RUN: %target-swift-frontend -emit-sil -disable-objc-attr-requires-foundation-module -verify %s
 
 // High-level tests that DI accepts and rejects failure from failable
 // initializers properly.
@@ -164,5 +164,149 @@ struct ThrowAddrOnlyStruct<T> {
   
   init(a : Int) throws {
     try self.init()
+  }
+}
+
+// Delegation to other failable initializers
+struct S1 {
+  init?(a: Int64) { return nil }
+
+  init!(b: Int64) {
+    self.init(a: b)! // unnecessary-but-correct '!'
+  }
+
+  init(c: Int64) {
+    self.init(a: c)! // necessary '!'
+  }
+
+  init(d: Int64) {
+    self.init(b: d)! // unnecessary-but-correct '!'
+  }
+}
+
+enum E1 {
+  case A
+
+  init?(a: Int64) { self = .A }
+
+  init!(b: Int64) {
+    self.init(a: b)! // unnecessary-but-correct '!'
+  }
+
+  init(c: Int64) {
+    self.init(a: c)! // necessary '!'
+  }
+
+  init(d: Int64) {
+    self.init(b: d)! // unnecessary-but-correct '!'
+  }
+}
+
+class C1 {
+  var member: Int64
+
+  init?(a: Int64) {
+    self.member = a
+  }
+
+  convenience init!(b: Int64) {
+    self.init(a: b)! // unnecessary-but-correct '!'
+  }
+
+  convenience init(c: Int64) {
+    self.init(a: c)! // necessary '!'
+  }
+
+  convenience init(d: Int64) {
+    self.init(b: d)! // unnecessary-but-correct '!'
+  }
+}
+
+// Chaining to failable initializers in a superclass
+class C2 : C1 {
+  var otherMember: Int64
+
+  init(e: Int64) {
+    self.otherMember = e
+    super.init(a: e)! // necessary '!'
+  }
+
+  init!(f: Int64) {
+    self.otherMember = f
+    super.init(a: f)! // unnecessary-but-correct '!'
+  }
+}
+
+// Delegating to failable initializers from a protocol extension to a
+// protocol.
+protocol P1 {
+  init?(p1: Int64)
+}
+
+extension P1 {
+  init!(p1a: Int64) {
+    self.init(p1: p1a)! // unnecessary-but-correct '!'
+  }
+
+  init(p1b: Int64) {
+    self.init(p1: p1b)! // necessary '!'
+  }
+}
+
+protocol P2 : class {
+  init?(p2: Int64)
+}
+
+extension P2 {
+  init!(p2a: Int64) {
+    self.init(p2: p2a)! // unnecessary-but-correct '!'
+  }
+
+  init(p2b: Int64) {
+    self.init(p2: p2b)! // necessary '!'
+  }
+}
+
+@objc protocol P3 {
+  init?(p3: Int64)
+}
+
+extension P3 {
+  init!(p3a: Int64) {
+    self.init(p3: p3a)! // unnecessary-but-correct '!'
+  }
+
+  init(p3b: Int64) {
+    self.init(p3: p3b)! // necessary '!'
+  }
+}
+
+// Delegating to failable initializers from a protocol extension to a
+// protocol extension.
+extension P1 {
+  init?(p1c: Int64) {
+    self.init(p1: p1c)
+  }
+
+  init!(p1d: Int64) {
+    self.init(p1c: p1d)! // unnecessary-but-correct '!'
+  }
+
+  init(p1e: Int64) {
+    self.init(p1c: p1e)! // necessary '!'
+  }
+}
+
+extension P2 {
+  init?(p2c: Int64) {
+    self.init(p2: p2c)
+  }
+
+  init!(p2d: Int64) {
+    self.init(p2c: p2d)! // unnecessary-but-correct '!'
+  }
+
+  init(p2e: Int64) {
+    self.init(p2c: p2e)! // necessary '!'
   }
 }

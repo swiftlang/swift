@@ -54,6 +54,10 @@ class Sub : Super {
     // expected-note@-1{{force potentially-failing result with '!'}}{{15-15=!}}
   }
 
+  convenience init(forceNonfail: Int) {
+    self.init(nonfail: forceNonfail)! // expected-error{{cannot force unwrap value of non-optional type 'Sub'}}
+  }
+
   init(nonfail2: Int) { // okay, traps on nil
     super.init(failIUO: "boom")
   }

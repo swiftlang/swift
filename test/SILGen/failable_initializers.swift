@@ -112,6 +112,17 @@ struct LoadableStruct {
   init(delegatesNormIUO: Bool) {
     self.init(iuo: true)
   }
+
+  // CHECK-LABEL: sil hidden @_TFV21failable_initializers14LoadableStructCfMS0_FT14delegateToFail
+  init(delegateToFail: C) {
+    // CHECK: bb0([[C:%[0-9]+]] : $C, [[SELF_META:%[0-9]+]] : $@thin LoadableStruct.Type):
+    // CHECK:   [[SELF_BOX:%[0-9]+]] = alloc_box $LoadableStruct
+    // CHECK:   [[SELF:%[0-9]+]] = mark_uninitialized [delegatingself] [[SELF_BOX]]#1 : $*LoadableStruct
+    // CHECK:   function_ref @_TFV21failable_initializers14LoadableStructCfMS0_FT10alwaysFailCS_1C_GSqS0__
+    // CHECK:   function_ref @_TFSs17_getOptionalValueurFGSqq__q_ : $@convention(thin) <τ_0_0> (@out τ_0_0, @in Optional<τ_0_0>) -> ()
+    // CHECK: ret
+    self.init(alwaysFail: delegateToFail)!
+  }
 }
 
 struct AddressOnlyStruct {
