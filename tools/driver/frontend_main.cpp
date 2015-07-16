@@ -115,15 +115,14 @@ static bool emitMakeDependencies(DiagnosticEngine &diags,
   return false;
 }
 
-template <typename V, typename S>
-static void findNominals(llvm::SetVector<const NominalTypeDecl *, V, S> &list,
+static void findNominals(llvm::MapVector<const NominalTypeDecl *, bool> &found,
                          DeclRange members) {
   for (const Decl *D : members) {
     auto nominal = dyn_cast<NominalTypeDecl>(D);
     if (!nominal)
       continue;
-    list.insert(nominal);
-    findNominals(list, nominal->getMembers(/*forceDelayed=*/false));
+    found[nominal] |= true;
+    findNominals(found, nominal->getMembers(/*forceDelayed=*/false));
   }
 }
 
@@ -193,7 +192,8 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
 
   out << "### Swift dependencies file v0 ###\n";
 
-  llvm::SmallSetVector<const NominalTypeDecl *, 16> extendedNominals;
+  llvm::MapVector<const NominalTypeDecl *, bool> extendedNominals;
+  llvm::SmallVector<const ExtensionDecl *, 8> extensionsWithJustMembers;
 
   out << "provides-top-level:\n";
   for (const Decl *D : SF->Decls) {
@@ -214,13 +214,19 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
           NTD->getFormalAccess() == Accessibility::Private) {
         break;
       }
-      if (std::all_of(ED->getInherited().begin(), ED->getInherited().end(),
-                      extendedTypeIsPrivate) &&
-          std::all_of(ED->getMembers().begin(), ED->getMembers().end(),
-                      declIsPrivate)) {
-        break;
+
+      bool justMembers = std::all_of(ED->getInherited().begin(),
+                                     ED->getInherited().end(),
+                                     extendedTypeIsPrivate);
+      if (justMembers) {
+        if (std::all_of(ED->getMembers().begin(), ED->getMembers().end(),
+                        declIsPrivate)) {
+          break;
+        } else {
+          extensionsWithJustMembers.push_back(ED);
+        }
       }
-      extendedNominals.insert(NTD);
+      extendedNominals[NTD] |= !justMembers;
       findNominals(extendedNominals, ED->getMembers());
       break;
     }
@@ -243,7 +249,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
         break;
       }
       out << "- \"" << escape(NTD->getName()) << "\"\n";
-      extendedNominals.insert(NTD);
+      extendedNominals[NTD] |= true;
       findNominals(extendedNominals, NTD->getMembers());
       break;
     }
@@ -281,11 +287,42 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
   }
 
   out << "provides-nominal:\n";
-  for (auto nominal : extendedNominals) {
+  for (auto entry : extendedNominals) {
+    if (!entry.second)
+      continue;
     Mangle::Mangler mangler(out, /*debug style=*/false, /*Unicode=*/true);
     out << "- \"";
-    mangler.mangleContext(nominal, Mangle::Mangler::BindGenerics::None);
+    mangler.mangleContext(entry.first, Mangle::Mangler::BindGenerics::None);
     out << "\"\n";
+  }
+
+  out << "provides-member:\n";
+  for (auto entry : extendedNominals) {
+    Mangle::Mangler mangler(out, /*debug style=*/false, /*Unicode=*/true);
+    out << "- [\"";
+    mangler.mangleContext(entry.first, Mangle::Mangler::BindGenerics::None);
+    out << "\", \"\"]\n";
+  }
+
+  // This is also part of "provides-member".
+  for (auto *ED : extensionsWithJustMembers) {
+    SmallString<32> mangledName;
+    {
+      llvm::raw_svector_ostream nameOut(mangledName);
+      Mangle::Mangler mangler(nameOut, /*debug style=*/false, /*Unicode=*/true);
+      mangler.mangleContext(ED->getExtendedType()->getAnyNominal(),
+                            Mangle::Mangler::BindGenerics::None);
+    }
+
+    for (auto *member : ED->getMembers()) {
+      auto *VD = dyn_cast<ValueDecl>(member);
+      if (!VD || !VD->hasName() ||
+          VD->getFormalAccess() == Accessibility::Private) {
+        continue;
+      }
+      out << "- [\"" << mangledName.str() << "\", \""
+          << escape(VD->getName()) << "\"]\n";
+    }
   }
 
   if (SF->getASTContext().LangOpts.EnableObjCInterop) {
@@ -345,13 +382,13 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
     out << "- ";
     if (!entry.second)
       out << "!private ";
-    out << "\"";
+    out << "[\"";
     mangler.mangleContext(entry.first.first,
                           Mangle::Mangler::BindGenerics::None);
-    out << "\"";
+    out << "\", \"";
     if (!entry.first.second.empty())
-      out << " # " << escape(entry.first.second);
-    out << "\n";
+      out << escape(entry.first.second);
+    out << "\"]\n";
   }
 
   out << "depends-nominal:\n";

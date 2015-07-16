@@ -27,11 +27,22 @@
 // CHECK-NEXT: "V4main10IntWrapper"
 // CHECK-NEXT: "VV4main10IntWrapper16InnerForNoReason"
 // CHECK-NEXT: "C4main8Subclass"
-// CHECK-NEXT: "PSs23ArrayLiteralConvertible"
-// CHECK-NEXT: "Si"
 // CHECK-NEXT: "VE4mainSi10InnerToInt"
 // CHECK: "V4main9Sentinel1"
 // CHECK-NEXT: "V4main9Sentinel2"
+
+// CHECK-LABEL: {{^provides-member:$}}
+// CHECK-NEXT: - ["V4main10IntWrapper", ""]
+// CHECK-NEXT: - ["VV4main10IntWrapper16InnerForNoReason", ""]
+// CHECK-NEXT: - ["C4main8Subclass", ""]
+// CHECK-NEXT: - ["PSs23ArrayLiteralConvertible", ""]
+// CHECK-NEXT: - ["Si", ""]
+// CHECK-NEXT: - ["VE4mainSi10InnerToInt", ""]
+// CHECK: - ["V4main9Sentinel1", ""]
+// CHECK-NEXT: - ["V4main9Sentinel2", ""]
+// CHECK: - ["PSs23ArrayLiteralConvertible", "useless"]
+// CHECK-NEXT: - ["PSs23ArrayLiteralConvertible", "useless2"]
+// CHECK-NEXT: - ["Si", "InnerToInt"]
 
 // CHECK-LABEL: {{^depends-top-level:$}}
 
@@ -134,10 +145,10 @@ func lookUpManyTopLevelNames() {
   // NEGATIVE-NOT: "CInt"
   let CInt = "abc"
 
-  // NEGATIVE-NOT: "max"
+  // NEGATIVE-NOT: - "max"
   print(Int.max)
 
-  // NEGATIVE-NOT: "Stride"
+  // NEGATIVE-NOT: - "Stride"
   let _: Int.Stride = 0
 
   // CHECK-DAG: !private "OtherFileOuterType"
@@ -298,6 +309,48 @@ private extension OtherFileTypeToBeExtended {
 
 struct Sentinel2 {}
 
+
+// CHECK-LABEL: {{^depends-member:$}}
+// CHECK-DAG: - ["V4main10IntWrapper", ""]
+// CHECK-DAG: - ["PSs10Comparable", ""]
+// CHECK-DAG: - ["C4main18ClassFromOtherFile", ""]
+// CHECK-DAG: - !private ["Si", ""]
+// CHECK-DAG: - ["PSs23FloatLiteralConvertible", ""]
+// CHECK-DAG: - !private ["PSs31UnicodeScalarLiteralConvertible", ""]
+// CHECK-DAG: - !private ["PSs10Strideable", "Stride"]
+// CHECK-DAG: - !private ["Sa", "Element"]
+// CHECK-DAG: - !private ["Sa", "reduce"]
+// CHECK-DAG: - !private ["Sb", "_getBuiltinLogicValue"]
+// CHECK-DAG: - !private ["VSs10Dictionary", "Key"]
+// CHECK-DAG: - !private ["VSs10Dictionary", "Value"]
+// CHECK-DAG: - !private ["V4main17OtherFileIntArray", ""]
+// CHECK-DAG: - !private ["V4main18OtherFileOuterType", "InnerType"]
+// CHECK-DAG: - !private ["VV4main18OtherFileOuterType9InnerType", "init"]
+// CHECK-DAG: - !private ["VV4main18OtherFileOuterType9InnerType", "sharedConstant"]
+// CHECK-DAG: - !private ["VV4main26OtherFileSecretTypeWrapper10SecretType", "constant"]
+// CHECK-DAG: - !private ["V4main25OtherFileProtoImplementor", ""]
+// CHECK-DAG: - !private ["V4main26OtherFileProtoImplementor2", ""]
+// CHECK-DAG: - !private ["V4main28OtherFileProtoNonImplementor", ""]
+// CHECK-DAG: - !private ["VSs14EmptyGenerator", "Element"]
+// CHECK-DAG: - !private ["VSs14EmptyGenerator", "init"]
+// CHECK-DAG: - !private ["VSs17IndexingGenerator", "Element"]
+// CHECK-DAG: - ["O4main13OtherFileEnum", "Value"]
+// CHECK-DAG: - !private ["V4main20OtherFileEnumWrapper", "Enum"]
+
+// CHECK-DAG: - ["V4main14TopLevelStruct", "ValueType"]
+// CHECK-DAG: - ["V4main15TopLevelStruct2", "ValueType"]
+// CHECK-DAG: - ["V4main15TopLevelStruct3", "ValueType"]
+// CHECK-DAG: - ["V4main15TopLevelStruct4", "ValueType"]
+// CHECK-DAG: - !private ["V4main21PrivateTopLevelStruct", "ValueType"]
+// CHECK-DAG: - !private ["V4main22PrivateTopLevelStruct2", "ValueType"]
+// CHECK-DAG: - !private ["V4main22PrivateTopLevelStruct3", "ValueType"]
+// CHECK-DAG: - !private ["V4main22PrivateTopLevelStruct4", "ValueType"]
+
+// CHECK-DAG: - ["P4main14TopLevelProto1", ""]
+// CHECK-DAG: - ["P4main14TopLevelProto2", ""]
+// CHECK-DAG: - !private ["P4main13PrivateProto1", ""]
+// CHECK-DAG: - !private ["P4main13PrivateProto2", ""]
+// CHECK-DAG: - !private ["P4main13PrivateProto3", ""]
 
 // CHECK-LABEL: {{^depends-nominal:$}}
 // CHECK-DAG: - "V4main10IntWrapper"
