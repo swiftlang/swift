@@ -215,3 +215,61 @@ protocol P6 : P5 {
 }
 
 extension P6 where A == X5<Self> { }
+
+// rdar://problem/21774092
+protocol P7 {
+  typealias A
+  typealias B
+  func f() -> A
+  func g() -> B
+}
+
+struct X7<T> { }
+
+extension P7 {
+  func g() -> X7<A> { return X7() }
+}
+
+struct Y7<T> : P7 {
+  func f() -> Int { return 0 }
+}
+
+struct MyAnySequence<Element> : MySequenceType {
+  typealias SubSequence = MyAnySequence<Element>
+  func generate() -> MyAnyGenerator<Element> {
+    return MyAnyGenerator<Element>()
+  }
+}
+
+struct MyAnyGenerator<T> : MyGeneratorType {
+  typealias Element = T
+}
+
+protocol MyGeneratorType {
+  typealias Element
+}
+
+protocol MySequenceType {
+  typealias Generator : MyGeneratorType
+  typealias SubSequence
+
+  func foo() -> SubSequence
+  func generate() -> Generator
+}
+
+extension MySequenceType {
+  func foo() -> MyAnySequence<Generator.Element> {
+    return MyAnySequence()
+  }
+}
+
+struct SomeStruct<Element> : MySequenceType {
+  let element: Element
+  init(_ element: Element) {
+    self.element = element
+  }
+
+  func generate() -> MyAnyGenerator<Element> {
+    return MyAnyGenerator<Element>()
+  }
+}

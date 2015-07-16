@@ -2776,10 +2776,7 @@ ConformanceChecker::inferTypeWitnessesViaValueWitness(ValueDecl *req,
       auto proto = Conformance->getProtocol();
       if (auto assocType = getReferencedAssocTypeOfProtocol(firstDepMember,
                                                             proto)) {
-        // If the witness type does not contain type parameters, add it.
-        if (!secondType->hasTypeParameter()) {
-          Inferred.Inferred.push_back({assocType, secondType});
-        }
+        Inferred.Inferred.push_back({assocType, secondType});
       }
 
       // Always allow mismatches here.
@@ -3033,6 +3030,80 @@ void ConformanceChecker::resolveTypeWitnesses() {
     return derivedType;
   };
 
+  // Local function that folds dependent member types with non-dependent
+  // bases into actual member references.
+  std::function<Type(Type)> foldDependentMemberTypes;
+  foldDependentMemberTypes = [&](Type type) -> Type {
+    if (auto depMemTy = type->getAs<DependentMemberType>()) {
+      auto baseTy = depMemTy->getBase().transform(foldDependentMemberTypes);
+      if (baseTy.isNull() || baseTy->hasTypeParameter())
+        return nullptr;
+
+      auto assocType = depMemTy->getAssocType();
+      if (!assocType)
+        return nullptr;
+
+      // Try to substitute into the base type.
+      if (Type result = depMemTy->substBaseType(DC->getParentModule(), baseTy)){
+        return result;
+      }
+
+      // If that failed, check whether it's because of the conformance we're
+      // evaluating.
+      ProtocolConformance *localConformance = nullptr;
+      if (!TC.conformsToProtocol(baseTy, assocType->getProtocol(), DC, None,
+                                 &localConformance) ||
+          !localConformance ||
+          localConformance->getRootNormalConformance() != Conformance) {
+        return nullptr;
+      }
+
+      // Find the tentative type witness for this associated type.
+      auto known = typeWitnesses.begin(assocType);
+      if (known == typeWitnesses.end())
+        return nullptr;
+
+      return known->first.transform(foldDependentMemberTypes);
+    }
+
+    // The presence of a generic type parameter indicates that we
+    // cannot use this type binding.
+    if (type->is<GenericTypeParamType>()) {
+      return nullptr;
+    }
+
+    return type;
+
+  };
+
+  // Local function that checks the current (complete) set of type witnesses
+  // to determine whether they meet all of the requirements and to deal with
+  // substitution of type witness bindings into other type witness bindings.
+  auto checkCurrentTypeWitnesses = [&]() -> bool {
+    // Fold the dependent member types within this type.
+    for (auto member : Proto->getMembers()) {
+      if (auto assocType = dyn_cast<AssociatedTypeDecl>(member)) {
+        if (Conformance->hasTypeWitness(assocType))
+          continue;
+
+        // If the type binding does not have a type parameter, there's nothing
+        // to do.
+        auto known = typeWitnesses.begin(assocType);
+        assert(known != typeWitnesses.end());
+        if (!known->first->hasTypeParameter())
+          continue;
+
+        Type replaced = known->first.transform(foldDependentMemberTypes);
+        if (replaced.isNull())
+          return true;
+
+        known->first = replaced;
+      }
+    }
+
+    return false;
+  };
+
   // Local function to perform the depth-first search of the solution
   // space.
   std::function<void(unsigned)> findSolutions;
@@ -3087,6 +3158,11 @@ void ConformanceChecker::resolveTypeWitnesses() {
 
         // The solution is incomplete.
         recordMissing();
+        return;
+      }
+
+      /// Check the current set of type witnesses.
+      if (checkCurrentTypeWitnesses()) {
         return;
       }
 

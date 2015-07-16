@@ -2526,7 +2526,8 @@ static Type getMemberForBaseType(Module *module,
 Type DependentMemberType::substBaseType(Module *module,
                                         Type substBase,
                                         LazyResolver *resolver) {
-  if (substBase.getPointer() == getBase().getPointer())
+  if (substBase.getPointer() == getBase().getPointer() &&
+      substBase->hasTypeParameter())
     return this;
 
   return getMemberForBaseType(module, substBase, getAssocType(), getName(),
