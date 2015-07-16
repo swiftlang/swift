@@ -811,6 +811,15 @@ __attribute__((availability(macosx,introduced=10.9)))
 -(AnnotatedFrameworkClass * __nullable)returnSomething;
 @end
 
+/// Aaa.  FrameworkClassConformingToUnannotatedFrameworkProtocol.  Bbb.
+@interface FrameworkClassConformingToUnannotatedFrameworkProtocol : NSObject <UnannotatedFrameworkProtocol>
+@end
+
+/// Aaa.  LaterFrameworkClassConformingToUnannotatedFrameworkProtocol.  Bbb.
+__attribute__((availability(macosx,introduced=10.11)))
+@interface LaterFrameworkClassConformingToUnannotatedFrameworkProtocol : NSObject <UnannotatedFrameworkProtocol>
+@end
+
 @interface UnusedResults : NSObject
 -(NSInteger)producesResult __attribute__((warn_unused_result));
 @end

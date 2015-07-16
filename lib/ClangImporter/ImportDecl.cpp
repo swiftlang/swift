@@ -879,6 +879,46 @@ static bool isCFTypeDecl(const clang::TypedefNameDecl *Decl) {
   return false;
 }
 
+/// Synthesize availability attributes for protocol requirements
+/// based on availability of the types mentioned in the requirements.
+static void inferProtocolMemberAvailability(ClangImporter::Implementation &impl,
+                                            DeclContext *dc, Decl *member) {
+  // Don't synthesize attributes if there is already an
+  // availability annotation.
+  if (member->getAttrs().hasAttribute<AvailableAttr>())
+    return;
+
+  auto *valueDecl = dyn_cast<ValueDecl>(member);
+  if (!valueDecl)
+    return;
+
+  VersionRange requiredRange =
+      AvailabilityInference::inferForType(valueDecl->getType());
+
+  ASTContext &C = impl.SwiftContext;
+
+  VersionRange containingDeclRange = AvailabilityInference::availableRange(
+      dc->getInnermostDeclarationDeclContext(), C);
+
+  requiredRange.constrainWith(containingDeclRange);
+
+  if (!requiredRange.hasLowerEndpoint())
+    return;
+
+  clang::VersionTuple noVersion;
+  auto AvAttr = new (C) AvailableAttr(SourceLoc(), SourceRange(),
+                                      targetPlatform(C.LangOpts),
+                                      /*message=*/StringRef(),
+                                      /*rename=*/StringRef(),
+                                      requiredRange.getLowerEndpoint(),
+                                      /*deprecated=*/noVersion,
+                                      /*obsoleted=*/noVersion,
+                                      UnconditionalAvailabilityKind::None,
+                                      /*implicit=*/false);
+
+  valueDecl->getAttrs().add(AvAttr);
+}
+
 namespace {
   typedef ClangImporter::Implementation::EnumKind EnumKind;
 
@@ -4099,7 +4139,7 @@ namespace {
         return;
 
       for (Decl *member : members) {
-        inferProtocolMemberAvailability(member);
+        inferProtocolMemberAvailability(Impl, swiftContext, member);
       }
 
     }
@@ -4461,39 +4501,6 @@ namespace {
       auto attr = AvailableAttr::createUnconditional(Impl.SwiftContext,
                                                         message);
       VD->getAttrs().add(attr);
-    }
-
-    /// Synthesize availability attributes for protocol requirements
-    /// based on availability of the types mentioned in the requirements.
-    void inferProtocolMemberAvailability(Decl *member) {
-      // Don't synthesize attributes if there is already an
-      // availability annotation.
-      if (member->getAttrs().hasAttribute<AvailableAttr>())
-        return;
-
-      auto *valueDecl = dyn_cast<ValueDecl>(member);
-      if (!valueDecl)
-        return;
-
-      VersionRange requiredRange =
-          AvailabilityInference::inferForType(valueDecl->getType());
-
-      if (!requiredRange.hasLowerEndpoint())
-        return;
-
-      ASTContext &C = Impl.SwiftContext;
-      clang::VersionTuple noVersion;
-      auto AvAttr = new (C) AvailableAttr(SourceLoc(), SourceRange(),
-                                          targetPlatform(C.LangOpts),
-                                          /*message=*/StringRef(),
-                                          /*rename=*/StringRef(),
-                                          requiredRange.getLowerEndpoint(),
-                                          /*deprecated=*/noVersion,
-                                          /*obsoleted=*/noVersion,
-                                          UnconditionalAvailabilityKind::None,
-                                          /*implicit=*/false);
-
-      valueDecl->getAttrs().add(AvAttr);
     }
     
     Decl *VisitObjCProtocolDecl(const clang::ObjCProtocolDecl *decl) {
@@ -5588,6 +5595,10 @@ ClangImporter::Implementation::importMirroredDecl(const clang::NamedDecl *decl,
 
     // Map the Clang attributes onto Swift attributes.
     importAttributes(decl, result);
+
+    // Infer the same availability for the mirrored declaration as we would for
+    // the protocol member it is mirroring.
+    inferProtocolMemberAvailability(*this, dc, result);
   }
   if (result || !converter.hadForwardDeclaration())
     ImportedProtocolDecls[{{canon, forceClassMethod}, dc}] = result;

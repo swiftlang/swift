@@ -183,3 +183,25 @@ func callViaAnnotatedFrameworkProtocol(p: AnnotatedFrameworkProtocol) {
   // the protocol has an availability annotation on it.
   let _ = p.returnSomething()
 }
+
+class SubclassOfFrameworkClassConformingToUnannotatedFrameworkProtocol : FrameworkClassConformingToUnannotatedFrameworkProtocol {
+  @available(OSX 10.10, *)
+  override func doSomethingWithNonNullableClass(k: AnnotatedFrameworkClass) {
+  }
+
+  @available(OSX 10.10, *)
+  override var someProperty: AnnotatedFrameworkClass {
+    get { return AnnotatedFrameworkClass() }
+    set(newValue) { }
+  }
+
+  @available(OSX 10.11, *)
+  override func doSomethingWithIUOClass(k: AnnotatedFrameworkClass!) { } // expected-error {{'doSomethingWithIUOClass' must be as available as declaration it overrides}}
+}
+
+@available(OSX 10.11, *)
+class SubclassOfLaterFameworkClassConformingToUnannotatedFrameworkProtocol : LaterFrameworkClassConformingToUnannotatedFrameworkProtocol {
+  @available(OSX 10.11, *)
+  override func doSomethingWithNonNullableClass(k: AnnotatedFrameworkClass) {
+  }
+}
