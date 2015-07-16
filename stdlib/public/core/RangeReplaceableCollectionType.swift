@@ -347,5 +347,5 @@ public func +<
   return lhs
 }
 
-@available(*, unavailable, message="'ExtensibleCollectionType' has been folded into 'RangeReplaceableCollectionType'")
+@available(*, unavailable, renamed="RangeReplaceableCollectionType")
 public typealias ExtensibleCollectionType = RangeReplaceableCollectionType
