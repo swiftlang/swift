@@ -956,23 +956,23 @@ bool SwiftARCContract::runOnFunction(Function &F) {
   ARCEntryPointBuilder B(F);
   bool Changed = false;
 
-  SmallVector<ReturnInst*, 8> Returns;
+  SmallVector<ReturnInst *, 8> Returns;
 
   // Since all of the calls are canonicalized, we know that we can just walk
   // through the function and collect the interesting heap object definitions by
   // getting the argument to these functions.
-  DenseMap<Value*, TinyPtrVector<Instruction*>> DefsOfValue;
+  DenseMap<Value *, TinyPtrVector<Instruction *>> DefsOfValue;
 
   // Keep track of which order we see values in since iteration over a densemap
   // isn't in a deterministic order, and isn't efficient anyway.
-  SmallVector<Value*, 16> DefOrder;
+  SmallVector<Value *, 16> DefOrder;
 
   // Do a first pass over the function, collecting all interesting definitions.
   // In this pass, we rewrite any intra-block uses that we can, since the
   // SSAUpdater doesn't handle them.
-  DenseMap<Value*, Value*> LocalUpdates;
+  DenseMap<Value *, Value *> LocalUpdates;
   for (BasicBlock &BB : F) {
-    for (auto II = BB.begin(), E = BB.end(); II != E; ) {
+    for (auto II = BB.begin(), IE = BB.end(); II != IE; ) {
       // Preincrement iterator to avoid iteration issues in the loop.
       Instruction &Inst = *II++;
 
@@ -986,7 +986,7 @@ bool SwiftARCContract::runOnFunction(Function &F) {
       case RT_Retain:
         llvm_unreachable("This should be canonicalized away!");
       case RT_RetainNoResult: {
-        Value *ArgVal = cast<CallInst>(Inst).getArgOperand(0);
+        auto *ArgVal = cast<CallInst>(Inst).getArgOperand(0);
 
         B.setInsertPoint(&Inst);
         CallInst &CI = *B.createRetain(ArgVal);
@@ -995,7 +995,7 @@ bool SwiftARCContract::runOnFunction(Function &F) {
         if (!isa<Instruction>(ArgVal))
           continue;
 
-        TinyPtrVector<Instruction*> &GlobalEntry = DefsOfValue[ArgVal];
+        TinyPtrVector<Instruction *> &GlobalEntry = DefsOfValue[ArgVal];
 
         // If this is the first definition of a value for the argument that
         // we've seen, keep track of it in DefOrder.
@@ -1028,7 +1028,7 @@ bool SwiftARCContract::runOnFunction(Function &F) {
       case RT_ObjCRelease:
       case RT_ObjCRetain:  // TODO: Could chain together objc_retains.
         // Remember returns in the first pass.
-        if (ReturnInst *RI = dyn_cast<ReturnInst>(&Inst))
+        if (auto *RI = dyn_cast<ReturnInst>(&Inst))
           Returns.push_back(RI);
 
         // Just remap any uses in the value.
@@ -1053,12 +1053,12 @@ bool SwiftARCContract::runOnFunction(Function &F) {
     // If Ptr is an instruction, remember its block.  If not, use the entry
     // block as its block (it must be an argument, constant, etc).
     BasicBlock *PtrBlock;
-    if (Instruction *PI = dyn_cast<Instruction>(Ptr))
+    if (auto *PI = dyn_cast<Instruction>(Ptr))
       PtrBlock = PI->getParent();
     else
       PtrBlock = &F.getEntryBlock();
 
-    TinyPtrVector<Instruction*> &Defs = DefsOfValue[Ptr];
+    TinyPtrVector<Instruction *> &Defs = DefsOfValue[Ptr];
     // This is the same problem as SSA construction, so we just use LLVM's
     // SSAUpdater, with each retain as a definition of the virtual value.
     SSAUpdater Updater;
@@ -1066,7 +1066,7 @@ bool SwiftARCContract::runOnFunction(Function &F) {
 
     // Set the return value of each of these calls as a definition of the
     // virtual value.
-    for (auto D : Defs)
+    for (auto *D : Defs)
       Updater.AddAvailableValue(D->getParent(), D);
 
     // If we didn't add a definition for Ptr's block, then Ptr itself is
@@ -1084,7 +1084,7 @@ bool SwiftARCContract::runOnFunction(Function &F) {
 
       // If the use is in the same block that defines it and the User is not a
       // PHI node, then this is a local use that shouldn't be rewritten.
-      Instruction *User = cast<Instruction>(U.getUser());
+      auto *User = cast<Instruction>(U.getUser());
       if (User->getParent() == PtrBlock && !isa<PHINode>(User))
         continue;
 
