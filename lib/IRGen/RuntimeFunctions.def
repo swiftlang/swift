@@ -556,36 +556,36 @@ FUNCTION(InitClassMetadataUniversal,
          ATTRS(NoUnwind))
 
 // void swift_initStructMetadata_UniversalStrategy(size_t numFields,
-//                                                 Metadata * const *fieldTypes,
-//                                                 size_t *fieldOffsets,
+//                                              TypeLayout * const *fieldTypes,
+//                                              size_t *fieldOffsets,
 //                                              value_witness_table_t *vwtable);
 FUNCTION(InitStructMetadataUniversal,
          swift_initStructMetadata_UniversalStrategy, RuntimeCC,
          RETURNS(VoidTy),
-         ARGS(SizeTy, TypeMetadataPtrTy->getPointerTo(),
+         ARGS(SizeTy, Int8PtrPtrTy->getPointerTo(),
               SizeTy->getPointerTo(), WitnessTablePtrTy),
          ATTRS(NoUnwind))
 
 // void swift_initEnumValueWitnessTableSinglePayload(value_witness_table_t *vwt,
-//                                                   Metadata *payload,
+//                                                   TypeLayout *payload,
 //                                                   unsigned num_empty_cases);
 FUNCTION(InitEnumValueWitnessTableSinglePayload,
          swift_initEnumValueWitnessTableSinglePayload,
          RuntimeCC,
          RETURNS(VoidTy),
-         ARGS(WitnessTablePtrTy, TypeMetadataPtrTy, Int32Ty),
+         ARGS(WitnessTablePtrTy, Int8PtrPtrTy, Int32Ty),
          ATTRS(NoUnwind))
 
 // void swift_initEnumMetadataMultiPayload(value_witness_table_t *vwt,
 //                                         Metadata *enumType,
 //                                         size_t numPayloads,
-//                                         Metadata * const *payloadTypes);
+//                                         TypeLayout * const *payloadTypes);
 FUNCTION(InitEnumMetadataMultiPayload,
          swift_initEnumMetadataMultiPayload,
          RuntimeCC,
          RETURNS(VoidTy),
          ARGS(WitnessTablePtrTy, TypeMetadataPtrTy, SizeTy,
-              TypeMetadataPtrTy->getPointerTo(0)),
+              Int8PtrPtrTy->getPointerTo(0)),
          ATTRS(NoUnwind))
 
 // int swift_getEnumCaseSinglePayload(opaque_t *obj, Metadata *payload,

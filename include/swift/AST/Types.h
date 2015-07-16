@@ -3877,6 +3877,11 @@ public:
   }
 };
 BEGIN_CAN_TYPE_WRAPPER(ReferenceStorageType, Type)
+  static CanReferenceStorageType get(CanType referent, Ownership ownership) {
+    return CanReferenceStorageType(ReferenceStorageType::get(referent,
+                                                   ownership,
+                                                   referent->getASTContext()));
+  }
   PROXY_CAN_TYPE_SIMPLE_GETTER(getReferentType)
 END_CAN_TYPE_WRAPPER(ReferenceStorageType, Type)
 

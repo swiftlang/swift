@@ -1338,6 +1338,249 @@ llvm::Value *IRGenFunction::emitTypeMetadataRefForLayout(SILType type) {
   return EmitTypeMetadataRefForLayout(*this).visit(type.getSwiftRValueType());
 }
 
+namespace {
+
+  /// A visitor class for emitting a reference to a type layout struct.
+  /// There are a few ways we can emit it:
+  ///
+  /// - If the type is fixed-layout and we have visibility of its value
+  ///   witness table (or one close enough), we can project the layout struct
+  ///   from it.
+  /// - If the type is fixed layout, we can emit our own copy of the layout
+  ///   struct.
+  /// - If the type is dynamic-layout, we have to instantiate its metadata
+  ///   and project out its metadata. (FIXME: This leads to deadlocks in
+  ///   recursive cases, though we can avoid many deadlocks because most
+  ///   valid recursive types bottom out in fixed-sized types like classes
+  ///   or pointers.)
+  class EmitTypeLayoutRef
+    : public CanTypeVisitor<EmitTypeLayoutRef, llvm::Value *> {
+  private:
+    IRGenFunction &IGF;
+  public:
+    EmitTypeLayoutRef(IRGenFunction &IGF) : IGF(IGF) {}
+
+    llvm::Value *emitFromValueWitnessTablePointer(llvm::Value *vwtable) {
+      llvm::Value *indexConstant = llvm::ConstantInt::get(IGF.IGM.Int32Ty,
+                               (unsigned)ValueWitness::First_TypeLayoutWitness);
+      return IGF.Builder.CreateInBoundsGEP(IGF.IGM.Int8PtrTy, vwtable,
+                                           indexConstant);
+    }
+
+    /// Emit the type layout by projecting it from a value witness table to
+    /// which we have linkage.
+    llvm::Value *emitFromValueWitnessTable(CanType t) {
+      auto *vwtable = IGF.IGM.getAddrOfValueWitnessTable(t);
+      return emitFromValueWitnessTablePointer(vwtable);
+    }
+
+    /// Emit the type layout by projecting it from dynamic type metadata.
+    llvm::Value *emitFromTypeMetadata(CanType t) {
+      auto *vwtable = IGF.emitValueWitnessTableRefForLayout(
+                                            SILType::getPrimitiveObjectType(t));
+      return emitFromValueWitnessTablePointer(vwtable);
+    }
+
+    bool hasVisibleValueWitnessTable(CanType t) const {
+      // Some builtin and structural types have value witnesses exported from
+      // the runtime.
+      auto &C = IGF.IGM.Context;
+      if (t == C.TheEmptyTupleType
+          || t == C.TheNativeObjectType
+          || t == C.TheUnknownObjectType
+          || t == C.TheBridgeObjectType)
+        return true;
+      if (auto intTy = dyn_cast<BuiltinIntegerType>(t)) {
+        auto width = intTy->getWidth();
+        if (width.isPointerWidth())
+          return true;
+        if (width.isFixedWidth()) {
+          switch (width.getFixedWidth()) {
+          case 8:
+          case 16:
+          case 32:
+          case 64:
+          case 128:
+          case 256:
+            return true;
+          default:
+            return false;
+          }
+        }
+        return false;
+      }
+
+      // TODO: If a nominal type is in the same source file as we're currently
+      // emitting, we would be able to see its value witness table.
+      return false;
+    }
+
+    /// Fallback default implementation.
+    llvm::Value *visitType(CanType t) {
+      auto silTy = SILType::getPrimitiveObjectType(t);
+      auto &ti = IGF.getTypeInfo(silTy);
+
+      // If the type is in the same source file, or has a common value
+      // witness table exported from the runtime, we can project from the
+      // value witness table instead of emitting a new record.
+      if (hasVisibleValueWitnessTable(t))
+        return emitFromValueWitnessTable(t);
+
+      // If the type is a singleton aggregate, the field's layout is equivalent
+      // to the aggregate's.
+      if (SILType singletonFieldTy = getSingletonAggregateFieldType(IGF.IGM,
+                                             silTy, ResilienceScope::Component))
+        return visit(singletonFieldTy.getSwiftRValueType());
+
+      // If the type is fixed-layout, emit a copy of its layout.
+      if (auto fixed = dyn_cast<FixedTypeInfo>(&ti)) {
+
+        return IGF.IGM.emitFixedTypeLayout(t, *fixed);
+      }
+
+      return emitFromTypeMetadata(t);
+    }
+      
+    llvm::Value *visitAnyFunctionType(CanAnyFunctionType type) {
+      llvm_unreachable("not a SIL type");
+    }
+      
+    llvm::Value *visitSILFunctionType(CanSILFunctionType type) {
+      // All function types have the same layout regardless of arguments or
+      // abstraction level. Use the value witness table for
+      // @convention(blah) () -> () from the runtime.
+      auto &C = type->getASTContext();
+      switch (type->getRepresentation()) {
+      case SILFunctionType::Representation::Thin:
+      case SILFunctionType::Representation::Method:
+      case SILFunctionType::Representation::WitnessMethod:
+      case SILFunctionType::Representation::ObjCMethod:
+      case SILFunctionType::Representation::CFunctionPointer:
+        // A thin function looks like a plain pointer.
+        // FIXME: Except for extra inhabitants?
+        return emitFromValueWitnessTable(C.TheRawPointerType);
+      case SILFunctionType::Representation::Thick:
+        // All function types look like () -> ().
+        return emitFromValueWitnessTable(
+                CanFunctionType::get(C.TheEmptyTupleType, C.TheEmptyTupleType));
+      case SILFunctionType::Representation::Block:
+        // All block types look like Builtin.UnknownObject.
+        return emitFromValueWitnessTable(C.TheUnknownObjectType);
+      }
+    }
+
+    llvm::Value *visitAnyMetatypeType(CanAnyMetatypeType type) {
+      
+      assert(type->hasRepresentation()
+             && "not a lowered metatype");
+
+      switch (type->getRepresentation()) {
+      case MetatypeRepresentation::Thin: {
+        // Thin metatypes are empty, so they look like the empty tuple type.
+        return emitFromValueWitnessTable(IGF.IGM.Context.TheEmptyTupleType);
+      }
+      case MetatypeRepresentation::Thick:
+      case MetatypeRepresentation::ObjC:
+        // Thick metatypes look like pointers with spare bits.
+        return emitFromValueWitnessTable(
+                     CanMetatypeType::get(IGF.IGM.Context.TheNativeObjectType));
+      }
+    }
+
+    llvm::Value *visitAnyClassType(ClassDecl *classDecl) {
+      // All class types have the same layout.
+      switch (getReferenceCountingForClass(IGF.IGM, classDecl)) {
+      case ReferenceCounting::Native:
+        return emitFromValueWitnessTable(IGF.IGM.Context.TheNativeObjectType);
+
+      case ReferenceCounting::ObjC:
+      case ReferenceCounting::Block:
+      case ReferenceCounting::Unknown:
+        return emitFromValueWitnessTable(IGF.IGM.Context.TheUnknownObjectType);
+
+      case ReferenceCounting::Bridge:
+      case ReferenceCounting::Error:
+        llvm_unreachable("classes shouldn't have this kind of refcounting");
+      }
+    }
+
+    llvm::Value *visitClassType(CanClassType type) {
+      return visitAnyClassType(type->getClassOrBoundGenericClass());
+    }
+
+    llvm::Value *visitBoundGenericClassType(CanBoundGenericClassType type) {
+      return visitAnyClassType(type->getClassOrBoundGenericClass());
+    }
+
+    llvm::Value *visitReferenceStorageType(CanReferenceStorageType type) {
+      // Reference storage types all have the same layout for their storage
+      // qualification and the reference counting of their underlying object.
+
+      auto getReferenceCountingForReferent
+        = [&](CanType referent) -> ReferenceCounting {
+          // For generic types, use unknown reference counting.
+          if (isa<ArchetypeType>(referent)
+              || referent->isExistentialType())
+            return ReferenceCounting::Unknown;
+
+          if (auto classDecl = referent->getClassOrBoundGenericClass())
+            return getReferenceCountingForClass(IGF.IGM, classDecl);
+
+          llvm_unreachable("unexpected referent for ref storage type");
+        };
+
+      auto &C = IGF.IGM.Context;
+      CanType referent;
+      switch (type->getOwnership()) {
+      case Ownership::Strong:
+        llvm_unreachable("shouldn't be a ReferenceStorageType");
+      case Ownership::Weak:
+        referent = type.getReferentType().getAnyOptionalObjectType();
+        break;
+      case Ownership::Unmanaged:
+      case Ownership::Unowned:
+        referent = type.getReferentType();
+        break;
+      }
+
+      CanType valueWitnessReferent;
+      switch (getReferenceCountingForReferent(referent)) {
+      case ReferenceCounting::Unknown:
+      case ReferenceCounting::Block:
+      case ReferenceCounting::ObjC:
+        valueWitnessReferent = C.TheUnknownObjectType;
+        break;
+
+      case ReferenceCounting::Native:
+        valueWitnessReferent = C.TheNativeObjectType;
+        break;
+
+      case ReferenceCounting::Bridge:
+        valueWitnessReferent = C.TheBridgeObjectType;
+        break;
+
+      case ReferenceCounting::Error:
+        llvm_unreachable("shouldn't be possible");
+      }
+
+      // Get the reference storage type of the builtin object whose value
+      // witness we can borrow.
+      if (type->getOwnership() == Ownership::Weak)
+        valueWitnessReferent = OptionalType::get(valueWitnessReferent)
+          ->getCanonicalType();
+
+      auto valueWitnessType = CanReferenceStorageType::get(valueWitnessReferent,
+                                                       type->getOwnership());
+      return emitFromValueWitnessTable(valueWitnessType);
+    }
+  };
+
+} // end anonymous namespace
+
+llvm::Value *IRGenFunction::emitTypeLayoutRef(SILType type) {
+  return EmitTypeLayoutRef(*this).visit(type.getSwiftRValueType());
+}
+
 /// Produce the heap metadata pointer for the given class type.  For
 /// Swift-defined types, this is equivalent to the metatype for the
 /// class, but for Objective-C-defined types, this is the class

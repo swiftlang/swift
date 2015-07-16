@@ -925,9 +925,9 @@ static size_t roundUpToAlignMask(size_t size, size_t alignMask) {
 /// final layout characteristics of the type.
 /// FUNCTOR should have signature:
 ///   void (size_t index, const Metadata *type, size_t offset)
-template<typename FUNCTOR>
+template<typename FUNCTOR, typename LAYOUT>
 void performBasicLayout(BasicLayout &layout,
-                        const Metadata * const *elements,
+                        const LAYOUT * const *elements,
                         size_t numElements,
                         FUNCTOR &&f) {
   size_t size = layout.size;
@@ -938,17 +938,17 @@ void performBasicLayout(BasicLayout &layout,
     auto elt = elements[i];
 
     // Lay out this element.
-    auto eltVWT = elt->getValueWitnesses();
-    size = roundUpToAlignMask(size, eltVWT->getAlignmentMask());
+    const TypeLayout *eltLayout = elt->getTypeLayout();
+    size = roundUpToAlignMask(size, eltLayout->flags.getAlignmentMask());
 
     // Report this record to the functor.
     f(i, elt, size);
 
     // Update the size and alignment of the aggregate..
-    size += eltVWT->size;
-    alignMask = std::max(alignMask, eltVWT->getAlignmentMask());
-    if (!eltVWT->isPOD()) isPOD = false;
-    if (!eltVWT->isBitwiseTakable()) isBitwiseTakable = false;
+    size += eltLayout->size;
+    alignMask = std::max(alignMask, eltLayout->flags.getAlignmentMask());
+    if (!eltLayout->flags.isPOD()) isPOD = false;
+    if (!eltLayout->flags.isBitwiseTakable()) isBitwiseTakable = false;
   }
   bool isInline = ValueWitnessTable::isValueInline(size, alignMask + 1);
 
@@ -1250,8 +1250,8 @@ static OpaqueValue *pod_direct_initializeArrayWithTakeFrontToBack(
 #define pod_indirect_initializeArrayWithTakeBackToFront \
   pod_direct_initializeArrayWithTakeFrontToBack
 
-static constexpr uintptr_t sizeWithAlignmentMask(uintptr_t size,
-                                                 uintptr_t alignmentMask) {
+static constexpr uint64_t sizeWithAlignmentMask(uint64_t size,
+                                                uint64_t alignmentMask) {
   return (size << 16) | alignmentMask;
 }
 
@@ -1291,6 +1291,9 @@ void swift::installCommonValueWitnesses(ValueWitnessTable *vwtable) {
       break;
     case sizeWithAlignmentMask(16, 15):
       commonVWT = &_TWVBi128_;
+      break;
+    case sizeWithAlignmentMask(32, 31):
+      commonVWT = &_TWVBi256_;
       break;
     }
     
@@ -1337,12 +1340,12 @@ void swift::installCommonValueWitnesses(ValueWitnessTable *vwtable) {
 /// Initialize the value witness table and struct field offset vector for a
 /// struct, using the "Universal" layout strategy.
 void swift::swift_initStructMetadata_UniversalStrategy(size_t numFields,
-                                     const Metadata * const *fieldTypes,
+                                     const TypeLayout * const *fieldTypes,
                                      size_t *fieldOffsets,
                                      ValueWitnessTable *vwtable) {
   auto layout = BasicLayout::initialForValueType();
   performBasicLayout(layout, fieldTypes, numFields,
-    [&](size_t i, const Metadata *fieldType, size_t offset) {
+    [&](size_t i, const TypeLayout *fieldType, size_t offset) {
       fieldOffsets[i] = offset;
     });
 
@@ -1355,11 +1358,10 @@ void swift::swift_initStructMetadata_UniversalStrategy(size_t numFields,
 
   // We have extra inhabitants if the first element does.
   // FIXME: generalize this.
-  if (auto firstFieldVWT = dyn_cast<ExtraInhabitantsValueWitnessTable>(
-                                        fieldTypes[0]->getValueWitnesses())) {
+  if (fieldTypes[0]->flags.hasExtraInhabitants()) {
     vwtable->flags = vwtable->flags.withExtraInhabitants(true);
     auto xiVWT = cast<ExtraInhabitantsValueWitnessTable>(vwtable);
-    xiVWT->extraInhabitantFlags = firstFieldVWT->extraInhabitantFlags;
+    xiVWT->extraInhabitantFlags = fieldTypes[0]->getExtraInhabitantFlags();
 
     // The compiler should already have initialized these.
     assert(xiVWT->storeExtraInhabitant);
