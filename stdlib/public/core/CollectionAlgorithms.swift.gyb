@@ -275,10 +275,10 @@ ${orderingRequirementForPredicate}
   public mutating func sortInPlace(
     @noescape isOrderedBefore: (Generator.Element, Generator.Element) -> Bool
   ) {
+    typealias IsOrderedBefore = (Generator.Element, Generator.Element) -> Bool
     let didSortUnsafeBuffer: Void? =
       _withUnsafeMutableBufferPointerIfSupported {
       (bufferPointer) -> () in
-      typealias IsOrderedBefore = (Generator.Element, Generator.Element) -> Bool
       let escapableIsOrderedBefore =
         unsafeBitCast(isOrderedBefore, IsOrderedBefore.self)
 
@@ -286,8 +286,6 @@ ${orderingRequirementForPredicate}
       return ()
     }
     if didSortUnsafeBuffer == nil {
-      typealias IsOrderedBefore =
-        (Generator.Element, Generator.Element) -> Bool
       let escapableIsOrderedBefore =
         unsafeBitCast(isOrderedBefore, IsOrderedBefore.self)
 
