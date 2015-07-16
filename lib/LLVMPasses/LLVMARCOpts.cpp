@@ -986,12 +986,21 @@ class SwiftARCContractImpl {
 
 public:
   SwiftARCContractImpl(Function &InF) : Changed(false), F(InF), B(F) {}
+
+  // The top level run routine of the pass.
   bool run();
+
+private:
+  // Perform single basic block optimizations.
+  //
+  // This means changing retain_no_return into retains, finding return values,
+  // and merging retains, releases.
+  void performSingleBBOpts();
 };
 
 } // end anonymous namespace
 
-bool SwiftARCContractImpl::run() {
+void SwiftARCContractImpl::performSingleBBOpts() {
   // Do a first pass over the function, collecting all interesting definitions.
   // In this pass, we rewrite any intra-block uses that we can, since the
   // SSAUpdater doesn't handle them.
@@ -1070,6 +1079,12 @@ bool SwiftARCContractImpl::run() {
     }
     LocalUpdates.clear();
   }
+}
+
+bool SwiftARCContractImpl::run() {
+  // Perform single BB optimizations and gather information in prepration for
+  // the multiple BB optimizations.
+  performSingleBBOpts();
 
   // Now that we've collected all of the interesting heap object values that are
   // passed into argument-returning functions, rewrite uses of these pointers
@@ -1098,7 +1113,6 @@ bool SwiftARCContractImpl::run() {
     // available in its block.
     if (!Updater.HasValueForBlock(PtrBlock))
       Updater.AddAvailableValue(PtrBlock, Ptr);
-
 
     // Rewrite uses of Ptr to their optimized forms.
     for (auto UI = Ptr->user_begin(), E = Ptr->user_end(); UI != E; ) {
