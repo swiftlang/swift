@@ -941,32 +941,57 @@ bool SwiftARCOpt::runOnFunction(Function &F) {
 //                        SwiftARCContractPass Pass
 //===----------------------------------------------------------------------===//
 
+/// Pimpl implementation of SwiftARCContractPass.
+namespace {
+
 /// This implements the very late (just before code generation) lowering
 /// processes that we do to expose low level performance optimizations and take
 /// advantage of special features of the ABI.  These expansion steps can foil
 /// the general mid-level optimizer, so they are done very, very, late.
 ///
-/// Expansions include:
-///   - Lowering retain calls to swift_retain (which return the retained
-///     argument) to lower register pressure.
+/// Optimizations include:
+///
+///   - Lowering "retain no return" calls to swift_retain (which return the
+///     retained argument) to lower register pressure.
+///
+///   - Merging together retain and release calls into retain_n, release_n
+///   - calls.
 ///
 /// Coming into this function, we assume that the code is in canonical form:
 /// none of these calls have any uses of their return values.
-bool SwiftARCContract::runOnFunction(Function &F) {
-  ARCEntryPointBuilder B(F);
-  bool Changed = false;
+class SwiftARCContractImpl {
+  /// Was a change made while running the optimization.
+  bool Changed;
 
+  /// The function that we are processing.
+  Function &F;
+
+  /// The entry point builder that is used to construct ARC entry points.
+  ARCEntryPointBuilder B;
+
+  /// A list of returns that is valid only after the first initial traversal of
+  /// F.
   SmallVector<ReturnInst *, 8> Returns;
 
-  // Since all of the calls are canonicalized, we know that we can just walk
-  // through the function and collect the interesting heap object definitions by
-  // getting the argument to these functions.
+  /// Since all of the calls are canonicalized, we know that we can just walk
+  /// through the function and collect the interesting heap object definitions
+  /// by getting the argument to these functions.
   DenseMap<Value *, TinyPtrVector<Instruction *>> DefsOfValue;
 
-  // Keep track of which order we see values in since iteration over a densemap
-  // isn't in a deterministic order, and isn't efficient anyway.
+  /// Keep track of which order we see values in since iteration over a densemap
+  /// isn't in a deterministic order, and isn't efficient anyway.
+  ///
+  /// TODO: Maybe this should be merged into DefsOfValue in a MapVector?
   SmallVector<Value *, 16> DefOrder;
 
+public:
+  SwiftARCContractImpl(Function &InF) : Changed(false), F(InF), B(F) {}
+  bool run();
+};
+
+} // end anonymous namespace
+
+bool SwiftARCContractImpl::run() {
   // Do a first pass over the function, collecting all interesting definitions.
   // In this pass, we rewrite any intra-block uses that we can, since the
   // SSAUpdater doesn't handle them.
@@ -1097,6 +1122,10 @@ bool SwiftARCContract::runOnFunction(Function &F) {
   }
 
   return Changed;
+}
+
+bool SwiftARCContract::runOnFunction(Function &F) {
+  return SwiftARCContractImpl(F).run();
 }
 
 
