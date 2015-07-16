@@ -32,6 +32,7 @@
 #include "llvm/Transforms/Utils/SSAUpdater.h"
 #include "llvm/Transforms/Utils/Local.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -80,6 +81,7 @@ class ARCEntryPointBuilder {
   // The constant cache.
   NullablePtr<Constant> Retain;
   NullablePtr<Constant> RetainNoResult;
+  NullablePtr<Constant> CheckUnowned;
   NullablePtr<Constant> RetainN;
   NullablePtr<Constant> ReleaseN;
 
@@ -123,6 +125,15 @@ public:
 
     // Create the call.
     CallInst *CI = B.CreateCall(getRetain(), V);
+    CI->setTailCall(true);
+    return CI;
+  }
+  
+  CallInst *createCheckUnowned(Value *V) {
+    // Cast just to make sure that we have the right type.
+    V = B.CreatePointerCast(V, getObjectPtrTy());
+    
+    CallInst *CI = B.CreateCall(getCheckUnowned(), V);
     CI->setTailCall(true);
     return CI;
   }
@@ -175,6 +186,21 @@ private:
         "swift_retain_noresult", AttrList,
         Type::getVoidTy(M.getContext()), ObjectPtrTy, nullptr);
     return RetainNoResult.get();
+  }
+  
+  Constant *getCheckUnowned() {
+    if (CheckUnowned)
+      return CheckUnowned.get();
+    
+    auto *ObjectPtrTy = getObjectPtrTy();
+    auto &M = getModule();
+    auto AttrList = AttributeSet::get(M.getContext(), 1, Attribute::NoCapture);
+    AttrList = AttrList.addAttribute(
+        M.getContext(), AttributeSet::FunctionIndex, Attribute::NoUnwind);
+    CheckUnowned = M.getOrInsertFunction("swift_checkUnowned", AttrList,
+                                          Type::getVoidTy(M.getContext()),
+                                          ObjectPtrTy, nullptr);
+    return CheckUnowned.get();
   }
 
   /// getRetainN - Return a callable function for swift_retain_n.
@@ -249,6 +275,8 @@ static bool canonicalizeInputFunction(Function &F, ARCEntryPointBuilder &B) {
     case RT_AllocObject:
     case RT_FixLifetime:
     case RT_NoMemoryAccessed:
+    case RT_RetainUnowned:
+    case RT_CheckUnowned:
       break;
     case RT_RetainNoResult: {
       CallInst &CI = cast<CallInst>(Inst);
@@ -450,6 +478,8 @@ static bool performLocalReleaseMotion(CallInst &Release, BasicBlock &BB) {
     }
 
     case RT_FixLifetime:
+    case RT_RetainUnowned:
+    case RT_CheckUnowned:
     case RT_Unknown:
       // Otherwise, we have reached something that we do not understand. Do not
       // attempt to shorten the lifetime of this object beyond this point so we
@@ -506,6 +536,7 @@ static bool performLocalRetainMotion(CallInst &Retain, BasicBlock &BB) {
       llvm_unreachable("these entrypoints should be canonicalized away");
     case RT_NoMemoryAccessed:
     case RT_AllocObject:
+    case RT_CheckUnowned:
       // Skip over random instructions that don't touch memory.  They don't need
       // protection by retain/release.
       break;
@@ -516,6 +547,7 @@ static bool performLocalRetainMotion(CallInst &Retain, BasicBlock &BB) {
     case RT_RetainNoResult:
     case RT_UnknownRetain:
     case RT_BridgeRetain:
+    case RT_RetainUnowned:
     case RT_ObjCRetain: {  // swift_retain_noresult(obj)
       //CallInst &ThisRetain = cast<CallInst>(CurInst);
       //Value *ThisRetainedObject = ThisRetain.getArgOperand(0);
@@ -644,10 +676,12 @@ static DtorKind analyzeDestructor(Value *P) {
       case RT_NoMemoryAccessed:
       case RT_AllocObject:
       case RT_FixLifetime:
+      case RT_CheckUnowned:
         // Skip over random instructions that don't touch memory in the caller.
         continue;
 
       case RT_Retain:                // x = swift_retain(y)
+      case RT_RetainUnowned:
       case RT_BridgeRetain:          // x = swift_bridgeRetain(y)
       case RT_RetainNoResult: {      // swift_retain_noresult(obj)
 
@@ -766,6 +800,7 @@ static bool performStoreOnlyObjectElimination(CallInst &Allocation,
     case RT_Release:
     case RT_RetainNoResult:
     case RT_FixLifetime:
+    case RT_CheckUnowned:
       // It is perfectly fine to eliminate various retains and releases of this
       // object: we are zapping all accesses or none.
       break;
@@ -779,6 +814,7 @@ static bool performStoreOnlyObjectElimination(CallInst &Allocation,
     case RT_UnknownRelease:
     case RT_BridgeRetain:
     case RT_BridgeRelease:
+    case RT_RetainUnowned:
 
       // Otherwise, this really is some unhandled instruction.  Bail out.
       return false;
@@ -838,13 +874,126 @@ static bool performStoreOnlyObjectElimination(CallInst &Allocation,
   return true;
 }
 
+/// Gets the underlying address of a load.
+static Value *getBaseAddress(Value *val) {
+  for (;;) {
+    if (auto *GEP = dyn_cast<GetElementPtrInst>(val)) {
+      val = GEP->getPointerOperand();
+      continue;
+    }
+    if (auto *BC = dyn_cast<BitCastInst>(val)) {
+      val = BC->getOperand(0);
+      continue;
+    }
+    return val;
+  }
+}
+
+/// Replaces
+///
+///   strong_retain_unowned %x
+///   ... // speculatively executable instructions, including loads from %x
+///   strong_release %x
+///
+/// with
+///
+///   ... // speculatively executable instructions, including loads from %x
+///   check_unowned %x
+///
+static bool performLocalRetainUnownedOpt(CallInst *Retain, BasicBlock &BB,
+                                         ARCEntryPointBuilder &B) {
+  Value *RetainedObject = Retain->getArgOperand(0);
+  Value *LoadBaseAddr = getBaseAddress(RetainedObject);
+  
+  BasicBlock::iterator BBI = Retain, BBE = BB.getTerminator();
+  
+  // Scan until we get to the end of the block.
+  for (++BBI; BBI != BBE; ++BBI) {
+    Instruction &I = *BBI;
+    
+    if (classifyInstruction(I) == RT_Release) {
+      CallInst *ThisRelease = cast<CallInst>(&I);
+      
+      // Is this the trailing release of the unowned-retained reference?
+      if (ThisRelease->getArgOperand(0) != RetainedObject)
+        return false;
+      
+      // Replace the trailing release with a check_unowned.
+      B.setInsertPoint(ThisRelease);
+      B.createCheckUnowned(RetainedObject);
+      Retain->eraseFromParent();
+      ThisRelease->eraseFromParent();
+      ++NumRetainReleasePairs;
+      return true;
+    }
+    if (auto *LI = dyn_cast<LoadInst>(&I)) {
+      // Accept loads from the unowned-referenced object. This may load garbage
+      // values, but they are not used until the final check_unowned succeeds.
+      if (getBaseAddress(LI->getPointerOperand()) == LoadBaseAddr)
+        continue;
+    }
+    // Other than loads from the unowned-referenced object we only accept
+    // speculatively executable instructions.
+    if (!isSafeToSpeculativelyExecute(&I))
+      return false;
+  }
+  return false;
+}
+
+/// Removes redundant check_unowned calls if they check the same reference and
+/// there is no instruction inbetween which could decrement the reference count.
+static void performRedundantCheckUnownedRemoval(BasicBlock &BB) {
+  DenseSet<Value *> checkedValues;
+  for (BasicBlock::iterator BBI = BB.begin(), E = BB.end(); BBI != E; ) {
+    // Preincrement the iterator to avoid invalidation and out trouble.
+    Instruction &I = *BBI++;
+    switch (classifyInstruction(I)) {
+      case RT_NoMemoryAccessed:
+      case RT_AllocObject:
+      case RT_FixLifetime:
+      case RT_RetainNoResult:
+      case RT_UnknownRetain:
+      case RT_BridgeRetain:
+      case RT_RetainUnowned:
+      case RT_ObjCRetain:
+        // All this cannot decrement reference counts.
+        continue;
+
+      case RT_CheckUnowned: {
+        Value *Arg = cast<CallInst>(&I)->getArgOperand(0);
+        if (checkedValues.count(Arg) != 0) {
+          // We checked this reference already -> delete the second check.
+          I.eraseFromParent();
+        } else {
+          // Record the check.
+          checkedValues.insert(Arg);
+        }
+        continue;
+      }
+        
+      case RT_Unknown:
+        // Loads cannot affect the retain.
+        if (isa<LoadInst>(I) || isa<StoreInst>(I) || isa<MemIntrinsic>(I))
+          continue;
+        break;
+        
+      default:
+        break;
+    }
+    // We found some potential reference decrementing instruction. Bail out.
+    checkedValues.clear();
+  }
+}
+
 /// performGeneralOptimizations - This does a forward scan over basic blocks,
 /// looking for interesting local optimizations that can be done.
-static bool performGeneralOptimizations(Function &F) {
+static bool performGeneralOptimizations(Function &F, ARCEntryPointBuilder &B) {
   bool Changed = false;
 
   // TODO: This is a really trivial local algorithm.  It could be much better.
   for (BasicBlock &BB : F) {
+    SmallVector<CallInst *, 8> RetainUnownedInsts;
+    
     for (BasicBlock::iterator BBI = BB.begin(), E = BB.end(); BBI != E; ) {
       // Preincrement the iterator to avoid invalidation and out trouble.
       Instruction &I = *BBI++;
@@ -877,7 +1026,22 @@ static bool performGeneralOptimizations(Function &F) {
         }
         break;
       }
+      case RT_RetainUnowned:
+        RetainUnownedInsts.push_back(cast<CallInst>(&I));
+        break;
       }
+    }
+    // Delay the retain-unowned optimization until we finished with all other
+    // optimizations in this block. The retain-unowned optimization will benefit
+    // from the release-motion.
+    bool CheckUnknownInserted = false;
+    for (auto *RetainUnowned : RetainUnownedInsts) {
+      if (performLocalRetainUnownedOpt(RetainUnowned, BB, B))
+        CheckUnknownInserted = true;
+    }
+    if (CheckUnknownInserted) {
+      Changed = true;
+      performRedundantCheckUnownedRemoval(BB);
     }
   }
   return Changed;
@@ -936,7 +1100,7 @@ bool SwiftARCOpt::runOnFunction(Function &F) {
   // 2) deletion of stored-only objects - objects that are allocated and
   //    potentially retained and released, but are only stored to and don't
   //    escape.
-  Changed |= performGeneralOptimizations(F);
+  Changed |= performGeneralOptimizations(F, B);
 
   return Changed;
 }
@@ -1077,6 +1241,8 @@ void SwiftARCContractImpl::performSingleBBOpts() {
       case RT_UnknownRetain:
       case RT_BridgeRelease:
       case RT_BridgeRetain:
+      case RT_RetainUnowned:
+      case RT_CheckUnowned:
       case RT_ObjCRelease:
       case RT_ObjCRetain:
         // Just remap any uses in the value.

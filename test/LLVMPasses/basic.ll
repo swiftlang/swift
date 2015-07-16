@@ -19,8 +19,10 @@ declare void @swift_retain_noresult(%swift.refcounted* nocapture) nounwind
 declare void @swift_fixLifetime(%swift.refcounted* ) nounwind
 declare %swift.bridge* @swift_bridgeObjectRetain(%swift.bridge*)
 declare void @swift_bridgeObjectRelease(%swift.bridge*)
+declare void @swift_retainUnowned(%swift.refcounted*)
 
 declare void @user(%swift.refcounted *) nounwind
+declare void @unknown_func()
 
 ; CHECK-LABEL: @trivial_retain_release(
 ; CHECK-NEXT: entry:
@@ -155,6 +157,137 @@ define void @move_retain_but_not_release_across_objc_fix_lifetime(%swift.refcoun
   call void @user(%swift.refcounted* %A) nounwind
   call void @swift_fixLifetime(%swift.refcounted* %A) nounwind
   tail call void @swift_release(%swift.refcounted* %A) nounwind
+  ret void
+}
+
+; CHECK-LABEL: @optimize_retain_unowned
+; CHECK-NEXT: bitcast
+; CHECK-NEXT: load
+; CHECK-NEXT: add
+; CHECK-NEXT: load
+; CHECK-NEXT: call void @swift_checkUnowned
+; CHECK-NEXT: ret
+define void @optimize_retain_unowned(%swift.refcounted* %A) {
+  tail call void @swift_retainUnowned(%swift.refcounted* %A)
+  %value = bitcast %swift.refcounted* %A to i64*
+
+  ; loads from the %A and speculatively executable instructions
+  %L1 = load i64, i64* %value, align 8
+  %R1 = add i64 %L1, 1
+  %L2 = load i64, i64* %value, align 8
+
+  tail call void @swift_release(%swift.refcounted* %A)
+  ret void
+}
+
+; CHECK-LABEL: @dont_optimize_retain_unowned
+; CHECK-NEXT: call void @swift_retainUnowned
+; CHECK-NEXT: bitcast
+; CHECK-NEXT: load
+; CHECK-NEXT: load
+; CHECK-NEXT: call void @swift_release
+; CHECK-NEXT: ret
+define void @dont_optimize_retain_unowned(%swift.refcounted* %A) {
+  tail call void @swift_retainUnowned(%swift.refcounted* %A)
+  %value = bitcast %swift.refcounted* %A to i64**
+
+  %L1 = load i64*, i64** %value, align 8
+  ; Use of a potential garbabe address from a load of %A.
+  %L2 = load i64, i64* %L1, align 8
+
+  tail call void @swift_release(%swift.refcounted* %A)
+  ret void
+}
+
+; CHECK-LABEL: @dont_optimize_retain_unowned2
+; CHECK-NEXT: call void @swift_retainUnowned
+; CHECK-NEXT: store
+; CHECK-NEXT: call void @swift_release
+; CHECK-NEXT: ret
+define void @dont_optimize_retain_unowned2(%swift.refcounted* %A, i32* %B) {
+  tail call void @swift_retainUnowned(%swift.refcounted* %A)
+
+  ; store to an unknown address
+  store i32 42, i32* %B
+
+  tail call void @swift_release(%swift.refcounted* %A)
+  ret void
+}
+
+; CHECK-LABEL: @dont_optimize_retain_unowned3
+; CHECK-NEXT: call void @swift_retainUnowned
+; CHECK-NEXT: call void @unknown_func
+; CHECK-NEXT: call void @swift_release
+; CHECK-NEXT: ret
+define void @dont_optimize_retain_unowned3(%swift.refcounted* %A) {
+  tail call void @swift_retainUnowned(%swift.refcounted* %A)
+
+  ; call of an unknown function
+  call void @unknown_func()
+
+  tail call void @swift_release(%swift.refcounted* %A)
+  ret void
+}
+
+; CHECK-LABEL: @dont_optimize_retain_unowned4
+; CHECK-NEXT: call void @swift_retainUnowned
+; CHECK-NEXT: call void @swift_retain_noresult
+; CHECK-NEXT: call void @swift_release
+; CHECK-NEXT: ret
+define void @dont_optimize_retain_unowned4(%swift.refcounted* %A, %swift.refcounted* %B) {
+  tail call void @swift_retainUnowned(%swift.refcounted* %A)
+
+  ; retain of an unknown reference (%B could be equal to %A)
+  tail call void @swift_retain_noresult(%swift.refcounted* %B)
+
+  tail call void @swift_release(%swift.refcounted* %A)
+  ret void
+}
+
+; CHECK-LABEL: @remove_redundant_check_unowned
+; CHECK-NEXT: bitcast
+; CHECK-NEXT: load
+; CHECK-NEXT: call void @swift_checkUnowned
+; CHECK-NEXT: load
+; CHECK-NEXT: store
+; CHECK-NEXT: load
+; CHECK-NEXT: ret
+define void @remove_redundant_check_unowned(%swift.refcounted* %A, %swift.refcounted* %B, i64* %C) {
+  tail call void @swift_retainUnowned(%swift.refcounted* %A)
+  %addr = bitcast %swift.refcounted* %A to i64*
+  %L1 = load i64, i64* %addr, align 8
+  tail call void @swift_release(%swift.refcounted* %A)
+
+  ; Instructions which cannot do a release.
+  %L2 = load i64, i64* %C, align 8
+  store i64 42, i64* %C
+
+  tail call void @swift_retainUnowned(%swift.refcounted* %A)
+  %L3 = load i64, i64* %addr, align 8
+  tail call void @swift_release(%swift.refcounted* %A)
+  ret void
+}
+
+; CHECK-LABEL: @dont_remove_redundant_check_unowned
+; CHECK-NEXT: bitcast
+; CHECK-NEXT: load
+; CHECK-NEXT: call void @swift_checkUnowned
+; CHECK-NEXT: call void @unknown_func
+; CHECK-NEXT: load
+; CHECK-NEXT: call void @swift_checkUnowned
+; CHECK-NEXT: ret
+define void @dont_remove_redundant_check_unowned(%swift.refcounted* %A, %swift.refcounted* %B, i64* %C) {
+  tail call void @swift_retainUnowned(%swift.refcounted* %A)
+  %addr = bitcast %swift.refcounted* %A to i64*
+  %L1 = load i64, i64* %addr, align 8
+  tail call void @swift_release(%swift.refcounted* %A)
+
+  ; Could do a release of %A
+  call void @unknown_func()
+
+  tail call void @swift_retainUnowned(%swift.refcounted* %A)
+  %L3 = load i64, i64* %addr, align 8
+  tail call void @swift_release(%swift.refcounted* %A)
   ret void
 }
 

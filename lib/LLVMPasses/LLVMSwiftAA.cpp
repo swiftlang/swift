@@ -35,6 +35,8 @@ SwiftAliasAnalysis::getModRefInfo(ImmutableCallSite CS,
   case RT_AllocObject:
   case RT_NoMemoryAccessed:
   case RT_Retain:
+  case RT_RetainUnowned:
+  case RT_CheckUnowned:
   case RT_RetainNoResult:
   case RT_ObjCRetain:
   case RT_BridgeRetain:

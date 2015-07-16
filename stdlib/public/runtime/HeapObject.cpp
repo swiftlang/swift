@@ -392,6 +392,15 @@ void swift::swift_retainUnowned(HeapObject *object) {
     _swift_abortRetainUnowned(object);
 }
 
+void swift::swift_checkUnowned(HeapObject *object) {
+  if (!object) return;
+  assert(object->weakRefCount.getCount() &&
+         "object is not currently weakly retained");
+
+  if (object->refCount.isDeallocating())
+    _swift_abortRetainUnowned(object);
+}
+
 // Declared extern "C" LLVM_LIBRARY_VISIBILITY above.
 void _swift_release_dealloc(HeapObject *object) {
   asFullMetadata(object->metadata)->destroy(object);

@@ -338,6 +338,9 @@ extern "C" void swift_weakRelease(HeapObject *value);
 /// deallocated.
 extern "C" void swift_retainUnowned(HeapObject *value);
 
+/// Aborts if the object has been deallocated.
+extern "C" void swift_checkUnowned(HeapObject *value);
+
 /// A weak reference value object.  This is ABI.
 struct WeakReference {
   HeapObject *Value;
