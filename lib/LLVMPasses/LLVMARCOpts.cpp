@@ -19,6 +19,7 @@
 #define DEBUG_TYPE "swift-arc-opts"
 #include "swift/LLVMPasses/Passes.h"
 #include "swift/Basic/NullablePtr.h"
+#include "swift/Basic/Fallthrough.h"
 #include "LLVMARCOpts.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
@@ -56,6 +57,9 @@ STATISTIC(NumAllocateReleasePairs,
           "Number of swift allocate/release pairs eliminated");
 STATISTIC(NumStoreOnlyObjectsEliminated,
           "Number of swift stored-only objects eliminated");
+STATISTIC(NumRetainReleasesEliminatedByMergingIntoRetainReleaseN,
+          "Number of retain/release eliminated by merging into "
+          "retain_n/release_n");
 
 llvm::cl::opt<bool>
 DisableARCOpts("disable-llvm-arc-opts", llvm::cl::init(false));
@@ -134,7 +138,7 @@ public:
   CallInst *createReleaseN(Value *V, uint32_t n) {
     // Cast just to make sure we have the right object type.
     V = B.CreatePointerCast(V, getObjectPtrTy());
-    CallInst *CI = B.CreateCall(getRetainN(), {V, getIntConstant(n)});
+    CallInst *CI = B.CreateCall(getReleaseN(), {V, getIntConstant(n)});
     CI->setTailCall(true);
     return CI;
   }
@@ -216,7 +220,7 @@ private:
   Constant *getIntConstant(uint32_t constant) {
     auto &M = getModule();
     auto *Int32Ty = Type::getInt32Ty(M.getContext());
-    return Constant::getIntegerValue(Int32Ty, APInt(64, constant));
+    return Constant::getIntegerValue(Int32Ty, APInt(32, constant));
   }
 };
 
@@ -944,6 +948,12 @@ bool SwiftARCOpt::runOnFunction(Function &F) {
 /// Pimpl implementation of SwiftARCContractPass.
 namespace {
 
+struct LocalState {
+  Value *CurrentLocalUpdate;
+  TinyPtrVector<CallInst *> RetainList;
+  TinyPtrVector<CallInst *> ReleaseList;
+};
+
 /// This implements the very late (just before code generation) lowering
 /// processes that we do to expose low level performance optimizations and take
 /// advantage of special features of the ABI.  These expansion steps can foil
@@ -968,10 +978,6 @@ class SwiftARCContractImpl {
 
   /// The entry point builder that is used to construct ARC entry points.
   ARCEntryPointBuilder B;
-
-  /// A list of returns that is valid only after the first initial traversal of
-  /// F.
-  SmallVector<ReturnInst *, 8> Returns;
 
   /// Since all of the calls are canonicalized, we know that we can just walk
   /// through the function and collect the interesting heap object definitions
@@ -1002,9 +1008,10 @@ private:
 
 void SwiftARCContractImpl::performSingleBBOpts() {
   // Do a first pass over the function, collecting all interesting definitions.
+
   // In this pass, we rewrite any intra-block uses that we can, since the
   // SSAUpdater doesn't handle them.
-  DenseMap<Value *, Value *> LocalUpdates;
+  DenseMap<Value *, LocalState> PtrToLocalStateMap;
   for (BasicBlock &BB : F) {
     for (auto II = BB.begin(), IE = BB.end(); II != IE; ) {
       // Preincrement iterator to avoid iteration issues in the loop.
@@ -1026,7 +1033,7 @@ void SwiftARCContractImpl::performSingleBBOpts() {
         CallInst &CI = *B.createRetain(ArgVal);
         Inst.eraseFromParent();
 
-        if (!isa<Instruction>(ArgVal))
+        if (!isa<Instruction>(ArgVal) && !isa<Argument>(ArgVal))
           continue;
 
         TinyPtrVector<Instruction *> &GlobalEntry = DefsOfValue[ArgVal];
@@ -1036,23 +1043,34 @@ void SwiftARCContractImpl::performSingleBBOpts() {
         if (GlobalEntry.empty())
           DefOrder.push_back(ArgVal);
 
+        LocalState &LocalEntry = PtrToLocalStateMap[ArgVal];
+
         // Check to see if there is already an entry for this basic block.  If
         // there is another local entry, switch to using the local value and
         // remove the previous value from the GlobalEntry.
-        Value *&LocalEntry = LocalUpdates[ArgVal];
-        if (LocalEntry) {
+        if (LocalEntry.CurrentLocalUpdate) {
           Changed = true;
-          CI.setArgOperand(0, LocalEntry);
-          assert(GlobalEntry.back() == LocalEntry && "Local/Global mismatch?");
+          CI.setArgOperand(0, LocalEntry.CurrentLocalUpdate);
+          assert(GlobalEntry.back() == LocalEntry.CurrentLocalUpdate &&
+                 "Local/Global mismatch?");
           GlobalEntry.pop_back();
         }
 
-        LocalEntry = &CI;
+        LocalEntry.CurrentLocalUpdate = &CI;
+        LocalEntry.RetainList.push_back(&CI);
         GlobalEntry.push_back(&CI);
         continue;
       }
+      case RT_Release: {
+        // Stash any releases that we see.
+        auto *CI = cast<CallInst>(&Inst);
+        auto *ArgVal = CI->getArgOperand(0);
+
+        LocalState &LocalEntry = PtrToLocalStateMap[ArgVal];
+        LocalEntry.ReleaseList.push_back(CI);
+        SWIFT_FALLTHROUGH;
+      }
       case RT_Unknown:
-      case RT_Release:
       case RT_AllocObject:
       case RT_NoMemoryAccessed:
       case RT_UnknownRelease:
@@ -1060,24 +1078,76 @@ void SwiftARCContractImpl::performSingleBBOpts() {
       case RT_BridgeRelease:
       case RT_BridgeRetain:
       case RT_ObjCRelease:
-      case RT_ObjCRetain:  // TODO: Could chain together objc_retains.
-        // Remember returns in the first pass.
-        if (auto *RI = dyn_cast<ReturnInst>(&Inst))
-          Returns.push_back(RI);
-
+      case RT_ObjCRetain:
         // Just remap any uses in the value.
         break;
       }
 
       // Check to see if there are any uses of a value in the LocalUpdates
       // map.  If so, remap it now to the locally defined version.
-      for (unsigned i = 0, e = Inst.getNumOperands(); i != e; ++i)
-        if (Value *V = LocalUpdates.lookup(Inst.getOperand(i))) {
-          Changed = true;
-          Inst.setOperand(i, V);
+      for (unsigned i = 0, e = Inst.getNumOperands(); i != e; ++i) {
+        auto Iter = PtrToLocalStateMap.find(Inst.getOperand(i));
+        if (Iter != PtrToLocalStateMap.end()) {
+          if (Value *V = Iter->second.CurrentLocalUpdate) {
+            Changed = true;
+            Inst.setOperand(i, V);
+          }
         }
+      }
     }
-    LocalUpdates.clear();
+
+    // Now go through all of our pointers and merge all of the retains with the
+    // first retain we saw and all of the releases with the last release we saw.
+    for (auto &P : PtrToLocalStateMap) {
+      Value *ArgVal = P.first;
+      auto &RetainList = P.second.RetainList;
+      if (RetainList.size() > 1) {
+        // Create the retainN call right by the first retain.
+        B.setInsertPoint(RetainList[0]);
+        auto &CI = *B.createRetainN(ArgVal, RetainList.size());
+
+        // Change GlobalEntry to track the new retainN instruction instead of
+        // the last retain that was seen.
+        TinyPtrVector<Instruction *> &GlobalEntry = DefsOfValue[ArgVal];
+        GlobalEntry.pop_back();
+        GlobalEntry.push_back(&CI);
+
+        // Replace all uses of the retain instructions with our new retainN and
+        // then delete them.
+        for (auto *Inst : RetainList) {
+          Inst->replaceAllUsesWith(&CI);
+          Inst->eraseFromParent();
+          NumRetainReleasesEliminatedByMergingIntoRetainReleaseN++;
+        }
+
+        NumRetainReleasesEliminatedByMergingIntoRetainReleaseN--;
+      }
+      // We do not technically need to clear our retain list, but it is better
+      // not to keep dangling pointers in memory to be safe in light of future
+      // changes.
+      RetainList.clear();
+
+      auto &ReleaseList = P.second.ReleaseList;
+      if (ReleaseList.size() > 1) {
+        // Create the releaseN call right by the last release.
+        B.setInsertPoint(ReleaseList[ReleaseList.size() - 1]);
+        B.createReleaseN(ArgVal, ReleaseList.size());
+
+        // Remove all old release instructions.
+        for (auto *Inst : ReleaseList) {
+          Inst->eraseFromParent();
+          NumRetainReleasesEliminatedByMergingIntoRetainReleaseN++;
+        }
+
+        NumRetainReleasesEliminatedByMergingIntoRetainReleaseN--;
+      }
+      // We do not technically need to clear our release list, but it is better
+      // not to keep dangling pointers in memory to be safe in light of future
+      // changes.
+      ReleaseList.clear();
+    }
+
+    PtrToLocalStateMap.clear();
   }
 }
 
@@ -1115,6 +1185,9 @@ bool SwiftARCContractImpl::run() {
       Updater.AddAvailableValue(PtrBlock, Ptr);
 
     // Rewrite uses of Ptr to their optimized forms.
+    //
+    // NOTE: We are assuming that our Ptrs are not constants meaning that we
+    // know that users can not be constant expressions.
     for (auto UI = Ptr->user_begin(), E = Ptr->user_end(); UI != E; ) {
       // Make sure to increment the use iterator before potentially rewriting
       // it.
@@ -1141,7 +1214,6 @@ bool SwiftARCContractImpl::run() {
 bool SwiftARCContract::runOnFunction(Function &F) {
   return SwiftARCContractImpl(F).run();
 }
-
 
 namespace llvm {
   void initializeSwiftARCContractPass(PassRegistry&);

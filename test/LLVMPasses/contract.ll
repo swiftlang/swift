@@ -11,6 +11,7 @@ declare void @swift_release(%swift.refcounted* nocapture)
 declare %swift.refcounted* @swift_retain(%swift.refcounted* ) nounwind
 declare void @swift_retain_noresult(%swift.refcounted* nocapture) nounwind
 declare void @swift_fixLifetime(%swift.refcounted*)
+declare void @user(%swift.refcounted*)
 
 ; CHECK-LABEL: define void @fixlifetime_removal(i8*) {
 ; CHECK-NOT: call void swift_fixLifetime
@@ -30,6 +31,82 @@ define void @swift_contractNoresultTest(%swift.refcounted* %A) {
   ret void
 }
 
+; CHECK-LABEL: define %swift.refcounted* @swift_contractRetainN(%swift.refcounted* %A) {
+; CHECK: entry:
+; CHECK-NEXT: br i1 undef
+; CHECK: bb1:
+; CHECK-NEXT: [[RET1:%.+]] = tail call %swift.refcounted* @swift_retain_n(%swift.refcounted* %A, i32 2)
+; CHECK-NEXT: call void @user(%swift.refcounted* [[RET1]])
+; CHECK-NEXT: call void @user(%swift.refcounted* [[RET1]])
+; CHECK-NEXT: br label %bb3
+; CHECK: bb2:
+; CHECK-NEXT: call void @user(%swift.refcounted* %A)
+; CHECK-NEXT: [[RET2:%.+]] = tail call %swift.refcounted* @swift_retain(%swift.refcounted* %A)
+; CHECK-NEXT: call void @user(%swift.refcounted* [[RET2]])
+; CHECK-NEXT: br label %bb3
+; CHECK: bb3:
+; CHECK-NEXT: [[PHIRESULT:%.+]] = phi %swift.refcounted* [ [[RET2]], %bb2 ], [ [[RET1]], %bb1 ]
+; CHECK-NEXT: [[RET3:%.+]] = tail call %swift.refcounted* @swift_retain(%swift.refcounted* [[PHIRESULT]])
+; CHECK-NEXT: ret %swift.refcounted* [[RET3]]
+define %swift.refcounted* @swift_contractRetainN(%swift.refcounted* %A) {
+entry:
+  br i1 undef, label %bb1, label %bb2
+
+bb1:
+  tail call void @swift_retain_noresult(%swift.refcounted* %A)
+  call void @user(%swift.refcounted* %A)
+  tail call void @swift_retain_noresult(%swift.refcounted* %A)
+  call void @user(%swift.refcounted* %A)
+  br label %bb3
+
+bb2:
+  call void @user(%swift.refcounted* %A)
+  tail call void @swift_retain_noresult(%swift.refcounted* %A)
+  call void @user(%swift.refcounted* %A)
+  br label %bb3
+
+bb3:
+  tail call void @swift_retain_noresult(%swift.refcounted* %A)
+  ret %swift.refcounted* %A
+}
+
+; CHECK-LABEL: define %swift.refcounted* @swift_contractReleaseN(%swift.refcounted* %A) {
+; CHECK: entry:
+; CHECK-NEXT: br i1 undef
+; CHECK: bb1:
+; CHECK-NEXT: call void @user(%swift.refcounted* %A)
+; CHECK-NEXT: tail call void @swift_release_n(%swift.refcounted* %A, i32 2)
+; CHECK-NEXT: call void @user(%swift.refcounted* %A)
+; CHECK-NEXT: br label %bb3
+; CHECK: bb2:
+; CHECK-NEXT: call void @user(%swift.refcounted* %A)
+; CHECK-NEXT: tail call void @swift_release(%swift.refcounted* %A)
+; CHECK-NEXT: call void @user(%swift.refcounted* %A)
+; CHECK-NEXT: br label %bb3
+; CHECK: bb3:
+; CHECK-NEXT: tail call void @swift_release(%swift.refcounted* %A)
+; CHECK-NEXT: ret %swift.refcounted* %A
+define %swift.refcounted* @swift_contractReleaseN(%swift.refcounted* %A) {
+entry:
+  br i1 undef, label %bb1, label %bb2
+
+bb1:
+  tail call void @swift_release(%swift.refcounted* %A)
+  call void @user(%swift.refcounted* %A)
+  tail call void @swift_release(%swift.refcounted* %A)
+  call void @user(%swift.refcounted* %A)
+  br label %bb3
+
+bb2:
+  call void @user(%swift.refcounted* %A)
+  tail call void @swift_release(%swift.refcounted* %A)
+  call void @user(%swift.refcounted* %A)
+  br label %bb3
+
+bb3:
+  tail call void @swift_release(%swift.refcounted* %A)
+  ret %swift.refcounted* %A
+}
 
 !llvm.dbg.cu = !{!1}
 !llvm.module.flags = !{!4}
