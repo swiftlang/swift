@@ -3009,6 +3009,10 @@ case TypeKind::Id:
     if (dependentBase.getPointer() == dependent->getBase().getPointer())
       return *this;
 
+    if (auto assocType = dependent->getAssocType())
+      return DependentMemberType::get(dependentBase, assocType,
+                                      Ptr->getASTContext());
+
     return DependentMemberType::get(dependentBase, dependent->getName(),
                                     Ptr->getASTContext());
   }
