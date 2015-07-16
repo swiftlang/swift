@@ -1350,3 +1350,42 @@ bb0(%0 : $Builtin.NativeObject):
   apply %9999() : $@convention(thin) @noreturn () -> ()
   unreachable
 }
+
+class URefd {
+}
+
+class Cont {
+  unowned var x : URefd
+  unowned var y : URefd
+
+  init()
+}
+
+// CHECK-LABEL: sil @sink_unowned_to_ref_through_args
+// CHECK:        [[LD1:%[0-9]+]] = load
+// CHECK-NEXT:   br bb3([[LD1]] : $@sil_unowned URefd)
+// CHECK:        [[LD2:%[0-9]+]] = load
+// CHECK-NEXT:   br bb3([[LD2]] : $@sil_unowned URefd)
+// CHECK:      bb3([[ARG:%[0-9]+]] : $@sil_unowned URefd):
+// CHECK-NEXT:   [[R:%[0-9]+]] = unowned_to_ref [[ARG]]
+// CHECK-NEXT:   return [[R]]
+sil @sink_unowned_to_ref_through_args : $@convention(thin) (Builtin.Int1, Cont) -> URefd {
+bb0(%0 : $Builtin.Int1, %1 : $Cont):
+  cond_br %0, bb1, bb2
+
+bb1:
+  %x1 = ref_element_addr %1 : $Cont, #Cont.x
+  %x2 = load %x1 : $*@sil_unowned URefd
+  %x3 = unowned_to_ref %x2 : $@sil_unowned URefd to $URefd
+  br bb3(%x3 : $URefd)
+
+bb2:
+  %y1 = ref_element_addr %1 : $Cont, #Cont.y
+  %y2 = load %y1 : $*@sil_unowned URefd
+  %y3 = unowned_to_ref %y2 : $@sil_unowned URefd to $URefd
+  br bb3(%y3 : $URefd)
+
+bb3(%12 : $URefd):
+  return %12 : $URefd
+}
+

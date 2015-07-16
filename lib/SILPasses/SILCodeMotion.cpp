@@ -206,6 +206,16 @@ SILInstruction *findIdenticalInBlock(SILBasicBlock *BB, SILInstruction *Iden,
 static llvm::Optional<unsigned>
 cheaperToPassOperandsAsArguments(SILInstruction *First,
                                  SILInstruction *Second) {
+  
+  // This will further enable to sink strong_retain_unowned instructions,
+  // which provides more opportinities for the unowned-optimization in
+  // LLVMARCOpts.
+  UnownedToRefInst *UTORI1 = dyn_cast<UnownedToRefInst>(First);
+  UnownedToRefInst *UTORI2 = dyn_cast<UnownedToRefInst>(Second);
+  if (UTORI1 && UTORI2) {
+    return 0;
+  }
+
   // TODO: Add more cases than Struct
   StructInst *FirstStruct = dyn_cast<StructInst>(First);
   StructInst *SecondStruct = dyn_cast<StructInst>(Second);
