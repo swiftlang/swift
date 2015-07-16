@@ -809,7 +809,7 @@ public:
   /// \returns The imported declaration, or null if this declaration could not
   /// be represented in Swift.
   Decl *importMirroredDecl(const clang::NamedDecl *decl, DeclContext *dc,
-                           bool forceClassMethod = false);
+                           ProtocolDecl *proto, bool forceClassMethod = false);
 
   /// \brief Import the given Clang declaration context into Swift.
   ///

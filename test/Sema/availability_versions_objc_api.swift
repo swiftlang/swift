@@ -165,6 +165,10 @@ class UserClass : UnannotatedFrameworkProtocol {
   @objc @available(OSX 10.11, *)
   func doSomethingWithClass(k: AnnotatedFrameworkClass, andLaterClass lk: AnnotatedLaterFrameworkClass) { }
 
+  @objc
+  @available(OSX 10.12, *)
+  func someMethodWithAvailability() { }
+
   @available(OSX 10.10, *)
   @objc var someProperty: AnnotatedFrameworkClass {
     get { return AnnotatedFrameworkClass() }
@@ -203,5 +207,24 @@ class SubclassOfFrameworkClassConformingToUnannotatedFrameworkProtocol : Framewo
 class SubclassOfLaterFameworkClassConformingToUnannotatedFrameworkProtocol : LaterFrameworkClassConformingToUnannotatedFrameworkProtocol {
   @available(OSX 10.11, *)
   override func doSomethingWithNonNullableClass(k: AnnotatedFrameworkClass) {
+  }
+
+  @available(OSX 10.12, *)
+  override func someMethodWithAvailability() { }
+}
+
+class SubclassOfFrameworkClassConformingToLaterAnnotatedFrameworkProtocol : FrameworkClassConformingToLaterAnnotatedFrameworkProtocol {
+
+  @available(OSX 10.11, *)
+  override func returnSomething() -> AnnotatedFrameworkClass? {
+  }
+
+  @available(OSX 10.12, *)
+  override func someMethodWithAvailability() { }
+
+  @available(OSX 10.11, *)
+  override var someProperty: AnnotatedFrameworkClass {
+    get { return AnnotatedFrameworkClass() }
+    set(newValue) { }
   }
 }

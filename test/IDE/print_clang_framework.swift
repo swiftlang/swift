@@ -76,6 +76,8 @@
 // FOUNDATION-NEXT: {{^}}  func noUnavailableTypesInSignature(){{$}}
 // FOUNDATION-NEXT: {{^}}  @available(OSX 10.11, *){{$}}
 // FOUNDATION-NEXT: {{^}}  func doSomethingWithClass(k: AnnotatedFrameworkClass, andLaterClass lk: AnnotatedLaterFrameworkClass){{$}}
+// FOUNDATION-NEXT: {{^}}  @available(OSX 10.12, *)
+// FOUNDATION-NEXT: {{^}}  func someMethodWithAvailability()
 // FOUNDATION-NEXT: {{^}}  @available(OSX 10.10, *){{$}}
 // FOUNDATION-NEXT: {{^}}  var someProperty: AnnotatedFrameworkClass { get set }{{$}}
 
@@ -98,6 +100,8 @@
 // FOUNDATION-NEXT: {{^}}  func noUnavailableTypesInSignature(){{$}}
 // FOUNDATION-NEXT: {{^}}  @available(OSX 10.11, *){{$}}
 // FOUNDATION-NEXT: {{^}}  func doSomethingWithClass(k: AnnotatedFrameworkClass, andLaterClass lk: AnnotatedLaterFrameworkClass){{$}}
+// FOUNDATION-NEXT: {{^}}  @available(OSX 10.12, *)
+// FOUNDATION-NEXT: {{^}}  func someMethodWithAvailability()
 // FOUNDATION-NEXT: {{^}}  @available(OSX 10.10, *){{$}}
 // FOUNDATION-NEXT: {{^}}  var someProperty: AnnotatedFrameworkClass{{$}}
 
@@ -117,6 +121,23 @@
 // FOUNDATION-NEXT: {{^}}  func noUnavailableTypesInSignature(){{$}}
 // FOUNDATION-NEXT: {{^}}  @available(OSX 10.11, *){{$}}
 // FOUNDATION-NEXT: {{^}}  func doSomethingWithClass(k: AnnotatedFrameworkClass, andLaterClass lk: AnnotatedLaterFrameworkClass){{$}}
+// FOUNDATION-NEXT: {{^}}  @available(OSX 10.12, *)
+// FOUNDATION-NEXT: {{^}}  func someMethodWithAvailability()
 // FOUNDATION-NEXT: {{^}}  @available(OSX 10.11, *){{$}}
 // FOUNDATION-NEXT: {{^}}  var someProperty: AnnotatedFrameworkClass{{$}}
+}
+
+// FOUNDATION-LABEL: /// Aaa.  FrameworkClassConformingToLaterAnnotatedFrameworkProtocol.  Bbb.
+// FOUNDATION-NEXT: {{^}}class FrameworkClassConformingToLaterAnnotatedFrameworkProtocol : NSObject, LaterAnnotatedFrameworkProtocol {
+// FOUNDATION-NEXT: {{^}}  init()
+// FOUNDATION-NEXT: {{^}}  @available(OSX 10.11, *)
+// FOUNDATION-NEXT: {{^}}  func returnSomething() -> AnnotatedFrameworkClass?
+// FOUNDATION-NEXT: {{^}}  @available(OSX 10.11, *)
+// FOUNDATION-NEXT: {{^}}  func doSomethingWithClass(k: AnnotatedFrameworkClass, andLaterClass lk: AnnotatedLaterFrameworkClass)
+// FOUNDATION-NEXT: {{^}}  @available(OSX 10.11, *)
+// FOUNDATION-NEXT: {{^}}  func noUnavailableTypesInSignature()
+// FOUNDATION-NEXT: {{^}}  @available(OSX 10.12, *)
+// FOUNDATION-NEXT: {{^}}  func someMethodWithAvailability()
+// FOUNDATION-NEXT: {{^}}  @available(OSX 10.11, *)
+// FOUNDATION-NEXT: {{^}}  var someProperty: AnnotatedFrameworkClass
 }

@@ -801,6 +801,8 @@ __attribute__((availability(macosx,introduced=10.11)))
 
 -(void)doSomethingWithClass:(AnnotatedFrameworkClass * __nonnull)k andLaterClass:(AnnotatedLaterFrameworkClass * __nonnull)lk;
 
+-(void)someMethodWithAvailability __attribute__((availability(macosx,introduced=10.12)));
+
 @property(nonnull) AnnotatedFrameworkClass *someProperty;
 
 @end
@@ -818,6 +820,20 @@ __attribute__((availability(macosx,introduced=10.9)))
 /// Aaa.  LaterFrameworkClassConformingToUnannotatedFrameworkProtocol.  Bbb.
 __attribute__((availability(macosx,introduced=10.11)))
 @interface LaterFrameworkClassConformingToUnannotatedFrameworkProtocol : NSObject <UnannotatedFrameworkProtocol>
+@end
+
+/// Aaa.  LaterAnnotatedFrameworkProtocol.  Bbb.
+__attribute__((availability(macosx,introduced=10.11)))
+@protocol LaterAnnotatedFrameworkProtocol
+-(AnnotatedFrameworkClass * __nullable)returnSomething;
+-(void)doSomethingWithClass:(AnnotatedFrameworkClass * __nonnull)k andLaterClass:(AnnotatedLaterFrameworkClass * __nonnull)lk;
+-(void)noUnavailableTypesInSignature;
+-(void)someMethodWithAvailability __attribute__((availability(macosx,introduced=10.12)));
+@property(nonnull) AnnotatedFrameworkClass *someProperty;
+@end
+
+/// Aaa.  FrameworkClassConformingToLaterAnnotatedFrameworkProtocol.  Bbb.
+@interface FrameworkClassConformingToLaterAnnotatedFrameworkProtocol : NSObject<LaterAnnotatedFrameworkProtocol>
 @end
 
 @interface UnusedResults : NSObject

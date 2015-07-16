@@ -879,6 +879,29 @@ static bool isCFTypeDecl(const clang::TypedefNameDecl *Decl) {
   return false;
 }
 
+/// Add an AvailableAttr to the declaration for the given
+/// version range.
+static void applyAvailableAttribute(Decl *decl, VersionRange &range,
+                                    ASTContext &C) {
+  // If the range is "all", this is the same as not having an available
+  // attribute.
+  if (!range.hasLowerEndpoint())
+    return;
+
+  clang::VersionTuple noVersion;
+  auto AvAttr = new (C) AvailableAttr(SourceLoc(), SourceRange(),
+                                      targetPlatform(C.LangOpts),
+                                      /*message=*/StringRef(),
+                                      /*rename=*/StringRef(),
+                                      range.getLowerEndpoint(),
+                                      /*deprecated=*/noVersion,
+                                      /*obsoleted=*/noVersion,
+                                      UnconditionalAvailabilityKind::None,
+                                      /*implicit=*/false);
+
+  decl->getAttrs().add(AvAttr);
+}
+
 /// Synthesize availability attributes for protocol requirements
 /// based on availability of the types mentioned in the requirements.
 static void inferProtocolMemberAvailability(ClangImporter::Implementation &impl,
@@ -902,21 +925,7 @@ static void inferProtocolMemberAvailability(ClangImporter::Implementation &impl,
 
   requiredRange.constrainWith(containingDeclRange);
 
-  if (!requiredRange.hasLowerEndpoint())
-    return;
-
-  clang::VersionTuple noVersion;
-  auto AvAttr = new (C) AvailableAttr(SourceLoc(), SourceRange(),
-                                      targetPlatform(C.LangOpts),
-                                      /*message=*/StringRef(),
-                                      /*rename=*/StringRef(),
-                                      requiredRange.getLowerEndpoint(),
-                                      /*deprecated=*/noVersion,
-                                      /*obsoleted=*/noVersion,
-                                      UnconditionalAvailabilityKind::None,
-                                      /*implicit=*/false);
-
-  valueDecl->getAttrs().add(AvAttr);
+  applyAvailableAttribute(valueDecl, requiredRange, C);
 }
 
 namespace {
@@ -4235,7 +4244,7 @@ namespace {
             if (inNearbyCategory)
               continue;
 
-            if (auto imported = Impl.importMirroredDecl(objcProp, dc)) {
+            if (auto imported = Impl.importMirroredDecl(objcProp, dc, proto)) {
               members.push_back(imported);
               // FIXME: We should mirror properties of the root class onto the
               // metatype.
@@ -4272,14 +4281,14 @@ namespace {
           }
 
           // Import the method.
-          if (auto imported = Impl.importMirroredDecl(objcMethod, dc)) {
+          if (auto imported = Impl.importMirroredDecl(objcMethod, dc, proto)) {
             members.push_back(imported);
           }
 
           // Import instance methods of a root class also as class methods.
           if (isRoot && objcMethod->isInstanceMethod()) {
             if (auto classImport = Impl.importMirroredDecl(objcMethod,
-                                                           dc, true))
+                                                           dc, proto, true))
               members.push_back(classImport);
           }
         }
@@ -5564,6 +5573,7 @@ Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
 Decl *
 ClangImporter::Implementation::importMirroredDecl(const clang::NamedDecl *decl,
                                                   DeclContext *dc,
+                                                  ProtocolDecl *proto,
                                                   bool forceClassMethod) {
   if (!decl)
     return nullptr;
@@ -5596,9 +5606,17 @@ ClangImporter::Implementation::importMirroredDecl(const clang::NamedDecl *decl,
     // Map the Clang attributes onto Swift attributes.
     importAttributes(decl, result);
 
-    // Infer the same availability for the mirrored declaration as we would for
-    // the protocol member it is mirroring.
-    inferProtocolMemberAvailability(*this, dc, result);
+    if (proto->getAttrs().hasAttribute<AvailableAttr>()) {
+      if (!result->getAttrs().hasAttribute<AvailableAttr>()) {
+        VersionRange protoRange =
+            AvailabilityInference::availableRange(proto, SwiftContext);
+        applyAvailableAttribute(result, protoRange, SwiftContext);
+      }
+    } else {
+      // Infer the same availability for the mirrored declaration as we would for
+      // the protocol member it is mirroring.
+      inferProtocolMemberAvailability(*this, dc, result);
+    }
   }
   if (result || !converter.hadForwardDeclaration())
     ImportedProtocolDecls[{{canon, forceClassMethod}, dc}] = result;
