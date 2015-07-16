@@ -23,6 +23,7 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/IR/Module.h"
+#include "llvm/ADT/APInt.h"
 #include "llvm/Pass.h"
 #include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Analysis/InstructionSimplify.h"
@@ -75,6 +76,8 @@ class ARCEntryPointBuilder {
   // The constant cache.
   NullablePtr<Constant> Retain;
   NullablePtr<Constant> RetainNoResult;
+  NullablePtr<Constant> RetainN;
+  NullablePtr<Constant> ReleaseN;
 
   // The type cache.
   NullablePtr<Type> ObjectPtrTy;
@@ -120,6 +123,22 @@ public:
     return CI;
   }
 
+  CallInst *createRetainN(Value *V, uint32_t n) {
+    // Cast just to make sure that we have the right object type.
+    V = B.CreatePointerCast(V, getObjectPtrTy());
+    CallInst *CI = B.CreateCall(getRetainN(), {V, getIntConstant(n)});
+    CI->setTailCall(true);
+    return CI;
+  }
+
+  CallInst *createReleaseN(Value *V, uint32_t n) {
+    // Cast just to make sure we have the right object type.
+    V = B.CreatePointerCast(V, getObjectPtrTy());
+    CallInst *CI = B.CreateCall(getRetainN(), {V, getIntConstant(n)});
+    CI->setTailCall(true);
+    return CI;
+  }
+
 private:
   Module &getModule() {
     return *B.GetInsertBlock()->getModule();
@@ -154,6 +173,37 @@ private:
     return RetainNoResult.get();
   }
 
+  /// getRetainN - Return a callable function for swift_retain_n.
+  Constant *getRetainN() {
+    if (RetainN)
+      return RetainN.get();
+    auto *ObjectPtrTy = getObjectPtrTy();
+    auto &M = getModule();
+
+    auto *Int32Ty = Type::getInt32Ty(M.getContext());
+    auto AttrList = AttributeSet::get(
+        M.getContext(), AttributeSet::FunctionIndex, Attribute::NoUnwind);
+    RetainN = M.getOrInsertFunction("swift_retain_n", AttrList, ObjectPtrTy,
+                                    ObjectPtrTy, Int32Ty, nullptr);
+    return RetainN.get();
+  }
+
+  /// Return a callable function for swift_release_n.
+  Constant *getReleaseN() {
+    if (ReleaseN)
+      return ReleaseN.get();
+    auto *ObjectPtrTy = getObjectPtrTy();
+    auto &M = getModule();
+
+    auto *Int32Ty = Type::getInt32Ty(M.getContext());
+    auto AttrList = AttributeSet::get(
+        M.getContext(), AttributeSet::FunctionIndex, Attribute::NoUnwind);
+    ReleaseN = M.getOrInsertFunction("swift_release_n", AttrList,
+                                     Type::getVoidTy(M.getContext()),
+                                     ObjectPtrTy, Int32Ty, nullptr);
+    return ReleaseN.get();
+  }
+
   Type *getObjectPtrTy() {
     if (ObjectPtrTy)
       return ObjectPtrTy.get();
@@ -161,6 +211,12 @@ private:
     ObjectPtrTy = M.getTypeByName("swift.refcounted")->getPointerTo();
     assert(ObjectPtrTy && "Could not find the swift heap object type by name");
     return ObjectPtrTy.get();
+  }
+
+  Constant *getIntConstant(uint32_t constant) {
+    auto &M = getModule();
+    auto *Int32Ty = Type::getInt32Ty(M.getContext());
+    return Constant::getIntegerValue(Int32Ty, APInt(64, constant));
   }
 };
 
