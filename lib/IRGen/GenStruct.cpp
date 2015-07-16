@@ -397,8 +397,8 @@ namespace {
                             SILType T) const override {
       // Get the field offset vector.
       llvm::Value *fieldVector = emitAddressOfFieldOffsetVector(IGF,
-                                    T.getStructOrBoundGenericStruct(),
-                                    metadata).getAddress();
+                                              T.getStructOrBoundGenericStruct(),
+                                              metadata).getAddress();
 
       // Collect the stored properties of the type.
       llvm::SmallVector<VarDecl*, 4> storedProperties;
@@ -406,17 +406,17 @@ namespace {
                         ->getStoredProperties()) {
         storedProperties.push_back(prop);
       }
-      // Fill out an array with the field type metadata records.
+      // Fill out an array with the field type layout records.
       Address fields = IGF.createAlloca(
-                       llvm::ArrayType::get(IGF.IGM.TypeMetadataPtrTy,
+                       llvm::ArrayType::get(IGF.IGM.Int8PtrPtrTy,
                                             storedProperties.size()),
                        IGF.IGM.getPointerAlignment(), "structFields");
-      fields = IGF.Builder.CreateBitCast(fields,
-                                     IGF.IGM.TypeMetadataPtrTy->getPointerTo());
+
+      fields = IGF.Builder.CreateStructGEP(fields, 0, Size(0));
       unsigned index = 0;
       for (auto prop : storedProperties) {
         auto propTy = T.getFieldType(prop, *IGF.IGM.SILMod);
-        llvm::Value *metadata = IGF.emitTypeMetadataRefForLayout(propTy);
+        llvm::Value *metadata = IGF.emitTypeLayoutRef(propTy);
         Address field = IGF.Builder.CreateConstArrayGEP(fields, index,
                                                       IGF.IGM.getPointerSize());
         IGF.Builder.CreateStore(metadata, field);

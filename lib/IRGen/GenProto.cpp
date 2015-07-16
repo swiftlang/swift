@@ -3120,6 +3120,89 @@ llvm::Constant *irgen::emitValueWitnessTable(IRGenModule &IGM,
   return llvm::ConstantExpr::getBitCast(global, IGM.WitnessTablePtrTy);
 }
 
+llvm::Constant *IRGenModule::emitFixedTypeLayout(CanType t,
+                                                 const FixedTypeInfo &ti) {
+  auto silTy = SILType::getPrimitiveAddressType(t);
+  // Collect the interesting information that gets encoded in a type layout
+  // record, to see if there's one we can reuse.
+  unsigned size = ti.getFixedSize().getValue();
+  unsigned align = ti.getFixedAlignment().getValue();
+
+  bool pod = ti.isPOD(ResilienceScope::Component);
+  bool bt = ti.isBitwiseTakable(ResilienceScope::Component);
+  unsigned numExtraInhabitants = ti.getFixedExtraInhabitantCount(*this);
+
+  // Try to use common type layouts exported by the runtime.
+  llvm::Constant *commonValueWitnessTable = nullptr;
+  if (pod && bt && numExtraInhabitants == 0) {
+    if (size == 0)
+      commonValueWitnessTable =
+        getAddrOfValueWitnessTable(Context.TheEmptyTupleType);
+    if (   (size ==  1 && align ==  1)
+        || (size ==  2 && align ==  2)
+        || (size ==  4 && align ==  4)
+        || (size ==  8 && align ==  8)
+        || (size == 16 && align == 16)
+        || (size == 32 && align == 32))
+      commonValueWitnessTable =
+        getAddrOfValueWitnessTable(BuiltinIntegerType::get(size * 8, Context)
+                                     ->getCanonicalType());
+  }
+
+  if (commonValueWitnessTable) {
+    auto index = llvm::ConstantInt::get(Int32Ty,
+                               (unsigned)ValueWitness::First_TypeLayoutWitness);
+    return llvm::ConstantExpr::getGetElementPtr(Int8PtrTy,
+                                                commonValueWitnessTable,
+                                                index);
+  }
+
+  // Otherwise, see if a layout has been emitted with these characteristics
+  // already.
+  FixedLayoutKey key{size, numExtraInhabitants, align, pod, bt};
+
+  auto found = PrivateFixedLayouts.find(key);
+  if (found != PrivateFixedLayouts.end())
+    return found->second;
+
+  // Emit the layout values.
+  SmallVector<llvm::Constant *, MaxNumTypeLayoutWitnesses> witnesses;
+  FixedPacking packing = ti.getFixedPacking(*this);
+  for (auto witness = ValueWitness::First_TypeLayoutWitness;
+       witness <= ValueWitness::Last_RequiredTypeLayoutWitness;
+       witness = ValueWitness(unsigned(witness) + 1)) {
+    witnesses.push_back(getValueWitness(*this, witness,
+                                        packing, t, silTy, ti));
+  }
+
+  if (ti.mayHaveExtraInhabitants(*this))
+    for (auto witness = ValueWitness::First_ExtraInhabitantValueWitness;
+         witness <= ValueWitness::Last_TypeLayoutWitness;
+         witness = ValueWitness(unsigned(witness) + 1))
+      witnesses.push_back(getValueWitness(*this, witness,
+                                          packing, t, silTy, ti));
+
+  auto layoutTy = llvm::ArrayType::get(Int8PtrTy, witnesses.size());
+  auto layoutVal = llvm::ConstantArray::get(layoutTy, witnesses);
+
+  llvm::Constant *layoutVar
+    = new llvm::GlobalVariable(Module, layoutTy, /*constant*/ true,
+        llvm::GlobalValue::PrivateLinkage, layoutVal,
+        "type_layout_" + llvm::Twine(size)
+                       + "_" + llvm::Twine(align)
+                       + "_" + llvm::Twine::utohexstr(numExtraInhabitants)
+                       + (pod ? "_pod" :
+                          bt  ? "_bt"  : ""));
+
+  auto zero = llvm::ConstantInt::get(Int32Ty, 0);
+  llvm::Constant *indices[] = {zero, zero};
+  layoutVar = llvm::ConstantExpr::getGetElementPtr(layoutTy, layoutVar,
+                                                   indices);
+
+  PrivateFixedLayouts.insert({key, layoutVar});
+  return layoutVar;
+}
+
 /// Emit the elements of a dependent value witness table template into a
 /// vector.
 void irgen::emitDependentValueWitnessTablePattern(IRGenModule &IGM,

@@ -2124,3 +2124,38 @@ bool TypeConverter::isExemplarArchetype(ArchetypeType *arch) const {
 }
 #endif
 
+SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM,
+                                              SILType t, ResilienceScope scope){
+  if (auto tuple = t.getAs<TupleType>())
+    if (tuple->getNumElements() == 1)
+      return t.getTupleElementType(0);
+
+  // TODO: Consider resilience for structs and enums.
+  if (auto structDecl = t.getStructOrBoundGenericStruct()) {
+    // C ABI wackiness may cause a single-field struct to have different layout
+    // from its field.
+    if (structDecl->hasUnreferenceableStorage()
+        || structDecl->hasClangNode())
+      return SILType();
+
+    // If there's only one stored property, we have the layout of its field.
+    auto allFields = structDecl->getStoredProperties();
+    auto field = allFields.begin();
+    if (std::next(field) == allFields.end())
+      return t.getFieldType(*field, *IGM.SILMod);
+
+    return SILType();
+  }
+
+  if (auto enumDecl = t.getEnumOrBoundGenericEnum()) {
+    auto allCases = enumDecl->getAllElements();
+    auto theCase = allCases.begin();
+    if (std::next(theCase) == allCases.end()
+        && (*theCase)->hasArgumentType())
+      return t.getEnumElementType(*theCase, *IGM.SILMod);
+
+    return SILType();
+  }
+
+  return SILType();
+}

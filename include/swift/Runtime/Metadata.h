@@ -566,6 +566,8 @@ extern "C" OpaqueValue *swift_copyPOD(OpaqueValue *dest,
   MACRO(initializeArrayWithTakeFrontToBack) \
   MACRO(initializeArrayWithTakeBackToFront)
 
+struct TypeLayout;
+
 /// A value-witness table.  A value witness table is built around
 /// the requirements of some specific type.  The information in
 /// a value-witness table is intended to be sufficient to lay out
@@ -654,6 +656,11 @@ struct ValueWitnessTable {
   /// We don't want to use those here because we need to avoid accidentally
   /// introducing ABI dependencies on LLVM structures.
   const struct EnumValueWitnessTable *_asEVWT() const;
+
+  /// Get the type layout record within this value witness table.
+  const TypeLayout *getTypeLayout() const {
+    return reinterpret_cast<const TypeLayout *>(&size);
+  }
 };
   
 /// A value-witness table with extra inhabitants entry points.
@@ -706,6 +713,48 @@ struct EnumValueWitnessTable : ExtraInhabitantsValueWitnessTable {
   }
 };
 
+/// A type layout record. This is the subset of the value witness table that is
+/// necessary to perform dependent layout of generic value types. It excludes
+/// the value witness functions and includes only the size, alignment,
+/// extra inhabitants, and miscellaneous flags about the type.
+struct TypeLayout {
+  value_witness_types::size size;
+  value_witness_types::flags flags;
+  value_witness_types::stride stride;
+
+private:
+  // Only available if the "hasExtraInhabitants" flag is set.
+  value_witness_types::extraInhabitantFlags extraInhabitantFlags;
+
+  void _static_assert_layout();
+public:
+  value_witness_types::extraInhabitantFlags getExtraInhabitantFlags() const {
+    assert(flags.hasExtraInhabitants());
+    return extraInhabitantFlags;
+  }
+
+  const TypeLayout *getTypeLayout() const { return this; }
+
+  /// The number of extra inhabitants, that is, bit patterns that do not form
+  /// valid values of the type, in this type's binary representation.
+  unsigned getNumExtraInhabitants() const;
+};
+
+inline void TypeLayout::_static_assert_layout() {
+  #define CHECK_TYPE_LAYOUT_OFFSET(FIELD)                               \
+    static_assert(offsetof(ExtraInhabitantsValueWitnessTable, FIELD)    \
+                    - offsetof(ExtraInhabitantsValueWitnessTable, size) \
+                  == offsetof(TypeLayout, FIELD),                       \
+                  "layout of " #FIELD " in TypeLayout doesn't match "   \
+                  "value witness table")
+  CHECK_TYPE_LAYOUT_OFFSET(size);
+  CHECK_TYPE_LAYOUT_OFFSET(flags);
+  CHECK_TYPE_LAYOUT_OFFSET(stride);
+  CHECK_TYPE_LAYOUT_OFFSET(extraInhabitantFlags);
+
+  #undef CHECK_TYPE_LAYOUT_OFFSET
+}
+
 inline const ExtraInhabitantsValueWitnessTable *
 ValueWitnessTable::_asXIVWT() const {
   assert(ExtraInhabitantsValueWitnessTable::classof(this));
@@ -723,6 +772,13 @@ inline unsigned ValueWitnessTable::getNumExtraInhabitants() const {
   if (!flags.hasExtraInhabitants())
     return 0;
   return this->_asXIVWT()->extraInhabitantFlags.getNumExtraInhabitants();
+}
+
+inline unsigned TypeLayout::getNumExtraInhabitants() const {
+  // If the table does not have extra inhabitant witnesses, then there are zero.
+  if (!flags.hasExtraInhabitants())
+    return 0;
+  return extraInhabitantFlags.getNumExtraInhabitants();
 }
 
 // Standard value-witness tables.
@@ -969,6 +1025,10 @@ public:
 
   const ValueWitnessTable *getValueWitnesses() const {
     return asFullMetadata(this)->ValueWitnesses;
+  }
+
+  const TypeLayout *getTypeLayout() const {
+    return getValueWitnesses()->getTypeLayout();
   }
 
   void setValueWitnesses(const ValueWitnessTable *table) {
@@ -2366,7 +2426,7 @@ swift_getTupleTypeMetadata3(const Metadata *elt0, const Metadata *elt1,
 /// Initialize the value witness table and struct field offset vector for a
 /// struct, using the "Universal" layout strategy.
 extern "C" void swift_initStructMetadata_UniversalStrategy(size_t numFields,
-                                         const Metadata * const *fieldTypes,
+                                         const TypeLayout * const *fieldTypes,
                                          size_t *fieldOffsets,
                                          ValueWitnessTable *vwtable);
 
@@ -2378,11 +2438,11 @@ struct ClassFieldLayout {
 /// Initialize the field offset vector for a dependent-layout class, using the
 /// "Universal" layout strategy.
 extern "C" void swift_initClassMetadata_UniversalStrategy(ClassMetadata *self,
-                                            const ClassMetadata *super,
-                                            size_t numFields,
+                                      const ClassMetadata *super,
+                                      size_t numFields,
                                       const ClassFieldLayout *fieldLayouts,
-                                            size_t *fieldOffsets);
-  
+                                      size_t *fieldOffsets);
+
 /// \brief Fetch a uniqued metadata for a metatype type.
 extern "C" const MetatypeMetadata *
 swift_getMetatypeMetadata(const Metadata *instanceType);

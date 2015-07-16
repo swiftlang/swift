@@ -202,6 +202,12 @@ public:
   // values in the maximally-abstracted representation of the type; this is
   // correct for all uses of reabstractable values in opaque contexts.
   llvm::Value *emitTypeMetadataRef(CanType type);
+
+  // Emit a reference to a type layout record for the given type. The referenced
+  // data is enough to lay out an aggregate containing a value of the type, but
+  // can't uniquely represent the type or perform value witness operations on
+  // it.
+  llvm::Value *emitTypeLayoutRef(SILType type);
   
   // Emit a reference to a metadata object that can be used for layout, but
   // cannot be used to identify a type. This will produce a layout appropriate
