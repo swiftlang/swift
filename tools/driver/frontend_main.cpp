@@ -164,6 +164,12 @@ static bool extendedTypeIsPrivate(TypeLoc inheritedType) {
   return std::all_of(protocols.begin(), protocols.end(), declIsPrivate);
 }
 
+template <typename StreamTy>
+static void mangleTypeAsContext(StreamTy &&out, const NominalTypeDecl *type) {
+  Mangle::Mangler mangler(out, /*debug style=*/false, /*Unicode=*/true);
+  mangler.mangleContext(type, Mangle::Mangler::BindGenerics::None);
+}
+
 /// Emits a Swift-style dependencies file.
 static bool emitReferenceDependencies(DiagnosticEngine &diags,
                                       SourceFile *SF,
@@ -290,29 +296,23 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
   for (auto entry : extendedNominals) {
     if (!entry.second)
       continue;
-    Mangle::Mangler mangler(out, /*debug style=*/false, /*Unicode=*/true);
     out << "- \"";
-    mangler.mangleContext(entry.first, Mangle::Mangler::BindGenerics::None);
+    mangleTypeAsContext(out, entry.first);
     out << "\"\n";
   }
 
   out << "provides-member:\n";
   for (auto entry : extendedNominals) {
-    Mangle::Mangler mangler(out, /*debug style=*/false, /*Unicode=*/true);
     out << "- [\"";
-    mangler.mangleContext(entry.first, Mangle::Mangler::BindGenerics::None);
+    mangleTypeAsContext(out, entry.first);
     out << "\", \"\"]\n";
   }
 
   // This is also part of "provides-member".
   for (auto *ED : extensionsWithJustMembers) {
     SmallString<32> mangledName;
-    {
-      llvm::raw_svector_ostream nameOut(mangledName);
-      Mangle::Mangler mangler(nameOut, /*debug style=*/false, /*Unicode=*/true);
-      mangler.mangleContext(ED->getExtendedType()->getAnyNominal(),
-                            Mangle::Mangler::BindGenerics::None);
-    }
+    mangleTypeAsContext(llvm::raw_svector_ostream(mangledName),
+                        ED->getExtendedType()->getAnyNominal());
 
     for (auto *member : ED->getMembers()) {
       auto *VD = dyn_cast<ValueDecl>(member);
@@ -367,9 +367,19 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
   llvm::array_pod_sort(sortedMembers.begin(), sortedMembers.end(),
                        [](const TableEntryTy *lhs,
                           const TableEntryTy *rhs) -> int {
+    if (lhs->first.first == rhs->first.first)
+      return lhs->first.second.compare(rhs->first.second);
+
     if (lhs->first.first->getName() != rhs->first.first->getName())
       return lhs->first.first->getName().compare(rhs->first.first->getName());
-    return lhs->first.second.compare(rhs->first.second);
+
+    // Break type name ties by mangled name.
+    SmallString<32> lhsMangledName, rhsMangledName;
+    mangleTypeAsContext(llvm::raw_svector_ostream(lhsMangledName),
+                        lhs->first.first);
+    mangleTypeAsContext(llvm::raw_svector_ostream(rhsMangledName),
+                        rhs->first.first);
+    return lhsMangledName.str().compare(rhsMangledName.str());
   });
   
   for (auto &entry : sortedMembers) {
@@ -378,13 +388,11 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
         entry.first.first->getFormalAccess() == Accessibility::Private)
       continue;
 
-    Mangle::Mangler mangler(out, /*debug style=*/false, /*Unicode=*/true);
     out << "- ";
     if (!entry.second)
       out << "!private ";
     out << "[\"";
-    mangler.mangleContext(entry.first.first,
-                          Mangle::Mangler::BindGenerics::None);
+    mangleTypeAsContext(out, entry.first.first);
     out << "\", \"";
     if (!entry.first.second.empty())
       out << escape(entry.first.second);
@@ -392,21 +400,23 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
   }
 
   out << "depends-nominal:\n";
-  const NominalTypeDecl *prev = nullptr;
-  for (auto &entry : sortedMembers) {
-    if (prev == entry.first.first)
+  for (auto i = sortedMembers.begin(), e = sortedMembers.end(); i != e; ++i) {
+    bool isCascading = i->second;
+    while (i+1 != e && i[0].first.first == i[1].first.first) {
+      ++i;
+      isCascading |= i->second;
+    }
+
+    if (i->first.first->hasAccessibility() &&
+        i->first.first->getFormalAccess() == Accessibility::Private)
       continue;
 
-    Mangle::Mangler mangler(out, /*debug style=*/false, /*Unicode=*/true);
     out << "- ";
-    if (!entry.second)
+    if (!isCascading)
       out << "!private ";
     out << "\"";
-    mangler.mangleContext(entry.first.first,
-                          Mangle::Mangler::BindGenerics::None);
+    mangleTypeAsContext(out, i->first.first);
     out << "\"\n";
-
-    prev = entry.first.first;
   }
 
   // FIXME: Sort these?

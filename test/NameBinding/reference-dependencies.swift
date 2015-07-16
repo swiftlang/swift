@@ -20,6 +20,9 @@
 // CHECK-NEXT: "overloadedOnProto"
 // CHECK-NEXT: "topLevelComputedProperty"
 // CHECK-NEXT: "lookUpManyTopLevelNames"
+// CHECK-NEXT: "TopLevelForMemberLookup"
+// CHECK-NEXT: "lookUpMembers"
+// CHECK-NEXT: "publicUseOfMember"
 // CHECK-NEXT: "Outer"
 // CHECK: "eof"
 
@@ -203,6 +206,18 @@ func lookUpManyTopLevelNames() {
   overloadedOnProto(otherFileGetNonImpl())
 }
 
+struct TopLevelForMemberLookup {
+  static func m1() {}
+  static func m2() {}
+  static func m3() {}
+}
+
+func lookUpMembers() {
+  TopLevelForMemberLookup.m1()
+  TopLevelForMemberLookup.m3()
+}
+public let publicUseOfMember = TopLevelForMemberLookup.m2()
+
 struct Outer {
   struct Inner {
     func method() {
@@ -376,6 +391,8 @@ struct Sentinel2 {}
 // CHECK-DAG: !private "V4main20OtherFileEnumWrapper"
 // CHECK-DAG: !private "V4main20OtherFileEnumWrapper"
 // CHECK-DAG: !private "V4main20OtherFileEnumWrapper"
+
+// CHECK-DAG: - "V4main23TopLevelForMemberLookup"
 
 // CHECK-DAG: - "V4main14TopLevelStruct"
 // CHECK-DAG: - "V4main15TopLevelStruct2"
