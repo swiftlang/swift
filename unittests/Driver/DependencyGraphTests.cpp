@@ -8,37 +8,43 @@ TEST(DependencyGraph, BasicLoad) {
   DependencyGraph<uintptr_t> graph;
   uintptr_t i = 0;
 
-  EXPECT_EQ(graph.loadFromString(i++, "top-level: [a, b]"),
+  EXPECT_EQ(graph.loadFromString(i++, "depends-top-level: [a, b]"),
             LoadResult::UpToDate);
-  EXPECT_EQ(graph.loadFromString(i++, "member-access: [c, d]"),
+  EXPECT_EQ(graph.loadFromString(i++, "depends-nominal: [c, d]"),
             LoadResult::UpToDate);
-  EXPECT_EQ(graph.loadFromString(i++, "provides: [e, f]"),
+  EXPECT_EQ(graph.loadFromString(i++, "provides-top-level: [e, f]"),
             LoadResult::UpToDate);
-  EXPECT_EQ(graph.loadFromString(i++, "nominals: [g, h]"),
+  EXPECT_EQ(graph.loadFromString(i++, "provides-nominal: [g, h]"),
             LoadResult::UpToDate);
-  EXPECT_EQ(graph.loadFromString(i++, "class-members: [i, j]"),
+  EXPECT_EQ(graph.loadFromString(i++, "provides-dynamic-lookup: [i, j]"),
             LoadResult::UpToDate);
-  EXPECT_EQ(graph.loadFromString(i++, "dynamic-lookup: [k, l]"),
+  EXPECT_EQ(graph.loadFromString(i++, "depends-dynamic-lookup: [k, l]"),
             LoadResult::UpToDate);
-  EXPECT_EQ(graph.loadFromString(i++, "cross-module: [/foo, /bar]"),
+  EXPECT_EQ(graph.loadFromString(i++, "depends-external: [/foo, /bar]"),
             LoadResult::UpToDate);
 
   EXPECT_EQ(graph.loadFromString(i++,
-                                 "nominals: [a, b]\n"
-                                 "provides: [b, c]\n"
-                                 "member-access: [c, d]\n"
-                                 "top-level: [d, a]\n"),
+                                 "provides-nominal: [a, b]\n"
+                                 "provides-top-level: [b, c]\n"
+                                 "depends-nominal: [c, d]\n"
+                                 "depends-top-level: [d, a]\n"),
             LoadResult::UpToDate);
 }
 
 TEST(DependencyGraph, IndependentNodes) {
   DependencyGraph<uintptr_t> graph;
 
-  EXPECT_EQ(graph.loadFromString(0, "top-level: [a]\nprovides: [a0]"),
+  EXPECT_EQ(graph.loadFromString(0,
+                                 "depends-top-level: [a]\n"
+                                 "provides-top-level: [a0]"),
             LoadResult::UpToDate);
-  EXPECT_EQ(graph.loadFromString(1, "top-level: [b]\nprovides: [b0]"),
+  EXPECT_EQ(graph.loadFromString(1,
+                                 "depends-top-level: [b]\n"
+                                 "provides-top-level: [b0]"),
             LoadResult::UpToDate);
-  EXPECT_EQ(graph.loadFromString(2, "top-level: [c]\nprovides: [c0]"),
+  EXPECT_EQ(graph.loadFromString(2,
+                                 "depends-top-level: [c]\n"
+                                 "provides-top-level: [c0]"),
             LoadResult::UpToDate);
 
   SmallVector<uintptr_t, 4> marked;
@@ -72,9 +78,13 @@ TEST(DependencyGraph, IndependentNodes) {
 TEST(DependencyGraph, IndependentDepKinds) {
   DependencyGraph<uintptr_t> graph;
 
-  EXPECT_EQ(graph.loadFromString(0, "member-access: [a]\nnominals: [b]"),
+  EXPECT_EQ(graph.loadFromString(0,
+                                 "depends-nominal: [a]\n"
+                                 "provides-nominal: [b]"),
             LoadResult::UpToDate);
-  EXPECT_EQ(graph.loadFromString(1, "top-level: [b]\nprovides: [a]"),
+  EXPECT_EQ(graph.loadFromString(1,
+                                 "depends-top-level: [b]\n"
+                                 "provides-top-level: [a]"),
             LoadResult::UpToDate);
 
   SmallVector<uintptr_t, 4> marked;
@@ -88,9 +98,13 @@ TEST(DependencyGraph, IndependentDepKinds) {
 TEST(DependencyGraph, IndependentDepKinds2) {
   DependencyGraph<uintptr_t> graph;
 
-  EXPECT_EQ(graph.loadFromString(0, "member-access: [a]\nnominals: [b]"),
+  EXPECT_EQ(graph.loadFromString(0,
+                                 "depends-nominal: [a]\n"
+                                 "provides-nominal: [b]"),
             LoadResult::UpToDate);
-  EXPECT_EQ(graph.loadFromString(1, "top-level: [b]\nprovides: [a]"),
+  EXPECT_EQ(graph.loadFromString(1,
+                                 "depends-top-level: [b]\n"
+                                 "provides-top-level: [a]"),
             LoadResult::UpToDate);
 
   SmallVector<uintptr_t, 4> marked;
@@ -104,9 +118,9 @@ TEST(DependencyGraph, IndependentDepKinds2) {
 TEST(DependencyGraph, SimpleDependent) {
   DependencyGraph<uintptr_t> graph;
 
-  EXPECT_EQ(graph.loadFromString(0, "provides: [a, b, c]"),
+  EXPECT_EQ(graph.loadFromString(0, "provides-top-level: [a, b, c]"),
             LoadResult::UpToDate);
-  EXPECT_EQ(graph.loadFromString(1, "top-level: [x, b, z]"),
+  EXPECT_EQ(graph.loadFromString(1, "depends-top-level: [x, b, z]"),
             LoadResult::UpToDate);
 
   SmallVector<uintptr_t, 4> marked;
@@ -127,9 +141,9 @@ TEST(DependencyGraph, SimpleDependent) {
 TEST(DependencyGraph, SimpleDependentReverse) {
   DependencyGraph<uintptr_t> graph;
 
-  EXPECT_EQ(graph.loadFromString(0, "top-level: [a, b, c]"),
+  EXPECT_EQ(graph.loadFromString(0, "depends-top-level: [a, b, c]"),
             LoadResult::UpToDate);
-  EXPECT_EQ(graph.loadFromString(1, "provides: [x, b, z]"),
+  EXPECT_EQ(graph.loadFromString(1, "provides-top-level: [x, b, z]"),
             LoadResult::UpToDate);
 
   SmallVector<uintptr_t, 4> marked;
@@ -150,9 +164,9 @@ TEST(DependencyGraph, SimpleDependentReverse) {
 TEST(DependencyGraph, SimpleDependent2) {
   DependencyGraph<uintptr_t> graph;
 
-  EXPECT_EQ(graph.loadFromString(0, "nominals: [a, b, c]"),
+  EXPECT_EQ(graph.loadFromString(0, "provides-nominal: [a, b, c]"),
             LoadResult::UpToDate);
-  EXPECT_EQ(graph.loadFromString(1, "member-access: [x, b, z]"),
+  EXPECT_EQ(graph.loadFromString(1, "depends-nominal: [x, b, z]"),
             LoadResult::UpToDate);
 
   SmallVector<uintptr_t, 4> marked;
@@ -173,9 +187,11 @@ TEST(DependencyGraph, SimpleDependent2) {
 TEST(DependencyGraph, SimpleDependent3) {
   DependencyGraph<uintptr_t> graph;
 
-  EXPECT_EQ(graph.loadFromString(0, "nominals: [a]\nprovides: [a]"),
+  EXPECT_EQ(graph.loadFromString(0,
+                                 "provides-nominal: [a]\n"
+                                 "provides-top-level: [a]"),
             LoadResult::UpToDate);
-  EXPECT_EQ(graph.loadFromString(1, "member-access: [a]"),
+  EXPECT_EQ(graph.loadFromString(1, "depends-nominal: [a]"),
             LoadResult::UpToDate);
 
   SmallVector<uintptr_t, 4> marked;
@@ -196,9 +212,11 @@ TEST(DependencyGraph, SimpleDependent3) {
 TEST(DependencyGraph, SimpleDependent4) {
   DependencyGraph<uintptr_t> graph;
 
-  EXPECT_EQ(graph.loadFromString(0, "nominals: [a]"),
+  EXPECT_EQ(graph.loadFromString(0, "provides-nominal: [a]"),
             LoadResult::UpToDate);
-  EXPECT_EQ(graph.loadFromString(1, "member-access: [a]\ntop-level: [a]"),
+  EXPECT_EQ(graph.loadFromString(1,
+                                 "depends-nominal: [a]\n"
+                                 "depends-top-level: [a]"),
             LoadResult::UpToDate);
 
   SmallVector<uintptr_t, 4> marked;
@@ -219,9 +237,13 @@ TEST(DependencyGraph, SimpleDependent4) {
 TEST(DependencyGraph, SimpleDependent5) {
   DependencyGraph<uintptr_t> graph;
 
-  EXPECT_EQ(graph.loadFromString(0, "nominals: [a]\nprovides: [a]"),
+  EXPECT_EQ(graph.loadFromString(0,
+                                 "provides-nominal: [a]\n"
+                                 "provides-top-level: [a]"),
             LoadResult::UpToDate);
-  EXPECT_EQ(graph.loadFromString(1, "member-access: [a]\ntop-level: [a]"),
+  EXPECT_EQ(graph.loadFromString(1,
+                                 "depends-nominal: [a]\n"
+                                 "depends-top-level: [a]"),
             LoadResult::UpToDate);
 
   SmallVector<uintptr_t, 4> marked;
@@ -242,9 +264,9 @@ TEST(DependencyGraph, SimpleDependent5) {
 TEST(DependencyGraph, SimpleDependent6) {
   DependencyGraph<uintptr_t> graph;
 
-  EXPECT_EQ(graph.loadFromString(0, "class-members: [a, b, c]"),
+  EXPECT_EQ(graph.loadFromString(0, "provides-dynamic-lookup: [a, b, c]"),
             LoadResult::UpToDate);
-  EXPECT_EQ(graph.loadFromString(1, "dynamic-lookup: [x, b, z]"),
+  EXPECT_EQ(graph.loadFromString(1, "depends-dynamic-lookup: [x, b, z]"),
             LoadResult::UpToDate);
 
   SmallVector<uintptr_t, 4> marked;
@@ -271,11 +293,11 @@ static bool contains(const Range &range, const T &value) {
 TEST(DependencyGraph, MultipleDependentsSame) {
   DependencyGraph<uintptr_t> graph;
 
-  EXPECT_EQ(graph.loadFromString(0, "nominals: [a, b, c]"),
+  EXPECT_EQ(graph.loadFromString(0, "provides-nominal: [a, b, c]"),
             LoadResult::UpToDate);
-  EXPECT_EQ(graph.loadFromString(1, "member-access: [x, b, z]"),
+  EXPECT_EQ(graph.loadFromString(1, "depends-nominal: [x, b, z]"),
             LoadResult::UpToDate);
-  EXPECT_EQ(graph.loadFromString(2, "member-access: [q, b, s]"),
+  EXPECT_EQ(graph.loadFromString(2, "depends-nominal: [q, b, s]"),
             LoadResult::UpToDate);
 
   SmallVector<uintptr_t, 4> marked;
@@ -299,11 +321,11 @@ TEST(DependencyGraph, MultipleDependentsSame) {
 TEST(DependencyGraph, MultipleDependentsDifferent) {
   DependencyGraph<uintptr_t> graph;
 
-  EXPECT_EQ(graph.loadFromString(0, "nominals: [a, b, c]"),
+  EXPECT_EQ(graph.loadFromString(0, "provides-nominal: [a, b, c]"),
             LoadResult::UpToDate);
-  EXPECT_EQ(graph.loadFromString(1, "member-access: [x, b, z]"),
+  EXPECT_EQ(graph.loadFromString(1, "depends-nominal: [x, b, z]"),
             LoadResult::UpToDate);
-  EXPECT_EQ(graph.loadFromString(2, "member-access: [q, r, c]"),
+  EXPECT_EQ(graph.loadFromString(2, "depends-nominal: [q, r, c]"),
             LoadResult::UpToDate);
 
   SmallVector<uintptr_t, 4> marked;
@@ -327,11 +349,13 @@ TEST(DependencyGraph, MultipleDependentsDifferent) {
 TEST(DependencyGraph, ChainedDependents) {
   DependencyGraph<uintptr_t> graph;
 
-  EXPECT_EQ(graph.loadFromString(0, "nominals: [a, b, c]"),
+  EXPECT_EQ(graph.loadFromString(0, "provides-nominal: [a, b, c]"),
             LoadResult::UpToDate);
-  EXPECT_EQ(graph.loadFromString(1, "member-access: [x, b]\nnominals: [z]"),
+  EXPECT_EQ(graph.loadFromString(1,
+                                 "depends-nominal: [x, b]\n"
+                                 "provides-nominal: [z]"),
             LoadResult::UpToDate);
-  EXPECT_EQ(graph.loadFromString(2, "member-access: [z]"),
+  EXPECT_EQ(graph.loadFromString(2, "depends-nominal: [z]"),
             LoadResult::UpToDate);
 
   SmallVector<uintptr_t, 4> marked;
@@ -355,17 +379,23 @@ TEST(DependencyGraph, ChainedDependents) {
 TEST(DependencyGraph, MarkTwoNodes) {
   DependencyGraph<uintptr_t> graph;
 
-  EXPECT_EQ(graph.loadFromString(0, "nominals: [a, b]"),
+  EXPECT_EQ(graph.loadFromString(0, "provides-nominal: [a, b]"),
             LoadResult::UpToDate);
-  EXPECT_EQ(graph.loadFromString(1, "member-access: [a]\nnominals: [z]"),
+  EXPECT_EQ(graph.loadFromString(1,
+                                 "depends-nominal: [a]\n"
+                                 "provides-nominal: [z]"),
             LoadResult::UpToDate);
-  EXPECT_EQ(graph.loadFromString(2, "member-access: [z]"),
+  EXPECT_EQ(graph.loadFromString(2, "depends-nominal: [z]"),
             LoadResult::UpToDate);
-  EXPECT_EQ(graph.loadFromString(10,"nominals: [y, z]\nmember-access: [q]"),
+  EXPECT_EQ(graph.loadFromString(10,
+                                 "provides-nominal: [y, z]\n"
+                                 "depends-nominal: [q]"),
             LoadResult::UpToDate);
-  EXPECT_EQ(graph.loadFromString(11, "member-access: [y]"),
+  EXPECT_EQ(graph.loadFromString(11, "depends-nominal: [y]"),
             LoadResult::UpToDate);
-  EXPECT_EQ(graph.loadFromString(12, "member-access: [q]\nnominals: [q]"),
+  EXPECT_EQ(graph.loadFromString(12,
+                                 "depends-nominal: [q]\n"
+                                 "provides-nominal: [q]"),
             LoadResult::UpToDate);
 
   SmallVector<uintptr_t, 4> marked;
@@ -396,11 +426,11 @@ TEST(DependencyGraph, MarkTwoNodes) {
 TEST(DependencyGraph, MarkOneNodeTwice) {
   DependencyGraph<uintptr_t> graph;
 
-  EXPECT_EQ(graph.loadFromString(0, "nominals: [a]"),
+  EXPECT_EQ(graph.loadFromString(0, "provides-nominal: [a]"),
             LoadResult::UpToDate);
-  EXPECT_EQ(graph.loadFromString(1, "member-access: [a]"),
+  EXPECT_EQ(graph.loadFromString(1, "depends-nominal: [a]"),
             LoadResult::UpToDate);
-  EXPECT_EQ(graph.loadFromString(2, "member-access: [b]"),
+  EXPECT_EQ(graph.loadFromString(2, "depends-nominal: [b]"),
             LoadResult::UpToDate);
 
   SmallVector<uintptr_t, 4> marked;
@@ -413,7 +443,7 @@ TEST(DependencyGraph, MarkOneNodeTwice) {
   EXPECT_FALSE(graph.isMarked(2));
 
   // Reload 0.
-  EXPECT_EQ(graph.loadFromString(0, "nominals: [b]"),
+  EXPECT_EQ(graph.loadFromString(0, "provides-nominal: [b]"),
             LoadResult::UpToDate);
   marked.clear();
 
@@ -428,11 +458,11 @@ TEST(DependencyGraph, MarkOneNodeTwice) {
 TEST(DependencyGraph, MarkOneNodeTwice2) {
   DependencyGraph<uintptr_t> graph;
 
-  EXPECT_EQ(graph.loadFromString(0, "nominals: [a]"),
+  EXPECT_EQ(graph.loadFromString(0, "provides-nominal: [a]"),
             LoadResult::UpToDate);
-  EXPECT_EQ(graph.loadFromString(1, "member-access: [a]"),
+  EXPECT_EQ(graph.loadFromString(1, "depends-nominal: [a]"),
             LoadResult::UpToDate);
-  EXPECT_EQ(graph.loadFromString(2, "member-access: [b]"),
+  EXPECT_EQ(graph.loadFromString(2, "depends-nominal: [b]"),
             LoadResult::UpToDate);
 
   SmallVector<uintptr_t, 4> marked;
@@ -445,7 +475,7 @@ TEST(DependencyGraph, MarkOneNodeTwice2) {
   EXPECT_FALSE(graph.isMarked(2));
 
   // Reload 0.
-  EXPECT_EQ(graph.loadFromString(0, "nominals: [a, b]"),
+  EXPECT_EQ(graph.loadFromString(0, "provides-nominal: [a, b]"),
             LoadResult::UpToDate);
   marked.clear();
 
@@ -460,11 +490,11 @@ TEST(DependencyGraph, MarkOneNodeTwice2) {
 TEST(DependencyGraph, NotTransitiveOnceMarked) {
   DependencyGraph<uintptr_t> graph;
 
-  EXPECT_EQ(graph.loadFromString(0, "nominals: [a]"),
+  EXPECT_EQ(graph.loadFromString(0, "provides-nominal: [a]"),
             LoadResult::UpToDate);
-  EXPECT_EQ(graph.loadFromString(1, "member-access: [a]"),
+  EXPECT_EQ(graph.loadFromString(1, "depends-nominal: [a]"),
             LoadResult::UpToDate);
-  EXPECT_EQ(graph.loadFromString(2, "member-access: [b]"),
+  EXPECT_EQ(graph.loadFromString(2, "depends-nominal: [b]"),
             LoadResult::UpToDate);
 
   SmallVector<uintptr_t, 4> marked;
@@ -476,7 +506,9 @@ TEST(DependencyGraph, NotTransitiveOnceMarked) {
   EXPECT_FALSE(graph.isMarked(2));
 
   // Reload 1.
-  EXPECT_EQ(graph.loadFromString(1, "member-access: [a]\nnominals: [b]"),
+  EXPECT_EQ(graph.loadFromString(1,
+                                 "depends-nominal: [a]\n"
+                                 "provides-nominal: [b]"),
             LoadResult::UpToDate);
   marked.clear();
 
@@ -498,11 +530,15 @@ TEST(DependencyGraph, NotTransitiveOnceMarked) {
 TEST(DependencyGraph, DependencyLoops) {
   DependencyGraph<uintptr_t> graph;
 
-  EXPECT_EQ(graph.loadFromString(0, "provides: [a, b, c]\ntop-level: [a]"),
+  EXPECT_EQ(graph.loadFromString(0,
+                                 "provides-top-level: [a, b, c]\n"
+                                 "depends-top-level: [a]"),
             LoadResult::UpToDate);
-  EXPECT_EQ(graph.loadFromString(1, "provides: [x]\ntop-level: [x, b, z]"),
+  EXPECT_EQ(graph.loadFromString(1,
+                                 "provides-top-level: [x]\n"
+                                 "depends-top-level: [x, b, z]"),
             LoadResult::UpToDate);
-  EXPECT_EQ(graph.loadFromString(2, "top-level: [x]"),
+  EXPECT_EQ(graph.loadFromString(2, "depends-top-level: [x]"),
             LoadResult::UpToDate);
 
   SmallVector<uintptr_t, 4> marked;
@@ -526,9 +562,9 @@ TEST(DependencyGraph, DependencyLoops) {
 TEST(DependencyGraph, MarkIntransitive) {
   DependencyGraph<uintptr_t> graph;
 
-  EXPECT_EQ(graph.loadFromString(0, "provides: [a, b, c]"),
+  EXPECT_EQ(graph.loadFromString(0, "provides-top-level: [a, b, c]"),
             LoadResult::UpToDate);
-  EXPECT_EQ(graph.loadFromString(1, "top-level: [x, b, z]"),
+  EXPECT_EQ(graph.loadFromString(1, "depends-top-level: [x, b, z]"),
             LoadResult::UpToDate);
 
   EXPECT_TRUE(graph.markIntransitive(0));
@@ -547,9 +583,9 @@ TEST(DependencyGraph, MarkIntransitive) {
 TEST(DependencyGraph, MarkIntransitiveTwice) {
   DependencyGraph<uintptr_t> graph;
 
-  EXPECT_EQ(graph.loadFromString(0, "provides: [a, b, c]"),
+  EXPECT_EQ(graph.loadFromString(0, "provides-top-level: [a, b, c]"),
             LoadResult::UpToDate);
-  EXPECT_EQ(graph.loadFromString(1, "top-level: [x, b, z]"),
+  EXPECT_EQ(graph.loadFromString(1, "depends-top-level: [x, b, z]"),
             LoadResult::UpToDate);
 
   EXPECT_TRUE(graph.markIntransitive(0));
@@ -564,9 +600,9 @@ TEST(DependencyGraph, MarkIntransitiveTwice) {
 TEST(DependencyGraph, MarkIntransitiveThenIndirect) {
   DependencyGraph<uintptr_t> graph;
 
-  EXPECT_EQ(graph.loadFromString(0, "provides: [a, b, c]"),
+  EXPECT_EQ(graph.loadFromString(0, "provides-top-level: [a, b, c]"),
             LoadResult::UpToDate);
-  EXPECT_EQ(graph.loadFromString(1, "top-level: [x, b, z]"),
+  EXPECT_EQ(graph.loadFromString(1, "depends-top-level: [x, b, z]"),
             LoadResult::UpToDate);
 
   EXPECT_TRUE(graph.markIntransitive(1));
@@ -584,7 +620,7 @@ TEST(DependencyGraph, MarkIntransitiveThenIndirect) {
 TEST(DependencyGraph, SimpleExternal) {
   DependencyGraph<uintptr_t> graph;
 
-  EXPECT_EQ(graph.loadFromString(0, "cross-module: [/foo, /bar]"),
+  EXPECT_EQ(graph.loadFromString(0, "depends-external: [/foo, /bar]"),
             LoadResult::UpToDate);
 
   EXPECT_TRUE(contains(graph.getExternalDependencies(), "/foo"));
@@ -604,7 +640,7 @@ TEST(DependencyGraph, SimpleExternal) {
 TEST(DependencyGraph, SimpleExternal2) {
   DependencyGraph<uintptr_t> graph;
 
-  EXPECT_EQ(graph.loadFromString(0, "cross-module: [/foo, /bar]"),
+  EXPECT_EQ(graph.loadFromString(0, "depends-external: [/foo, /bar]"),
             LoadResult::UpToDate);
 
   SmallVector<uintptr_t, 4> marked;
@@ -621,9 +657,13 @@ TEST(DependencyGraph, SimpleExternal2) {
 TEST(DependencyGraph, ChainedExternal) {
   DependencyGraph<uintptr_t> graph;
 
-  EXPECT_EQ(graph.loadFromString(0, "cross-module: [/foo]\nprovides: [a]"),
+  EXPECT_EQ(graph.loadFromString(0,
+                                 "depends-external: [/foo]\n"
+                                 "provides-top-level: [a]"),
             LoadResult::UpToDate);
-  EXPECT_EQ(graph.loadFromString(1, "cross-module: [/bar]\ntop-level: [a]"),
+  EXPECT_EQ(graph.loadFromString(1,
+                                 "depends-external: [/bar]\n"
+                                 "depends-top-level: [a]"),
             LoadResult::UpToDate);
 
   EXPECT_TRUE(contains(graph.getExternalDependencies(), "/foo"));
@@ -645,9 +685,13 @@ TEST(DependencyGraph, ChainedExternal) {
 TEST(DependencyGraph, ChainedExternalReverse) {
   DependencyGraph<uintptr_t> graph;
 
-  EXPECT_EQ(graph.loadFromString(0, "cross-module: [/foo]\nprovides: [a]"),
+  EXPECT_EQ(graph.loadFromString(0,
+                                 "depends-external: [/foo]\n"
+                                 "provides-top-level: [a]"),
             LoadResult::UpToDate);
-  EXPECT_EQ(graph.loadFromString(1, "cross-module: [/bar]\ntop-level: [a]"),
+  EXPECT_EQ(graph.loadFromString(1,
+                                 "depends-external: [/bar]\n"
+                                 "depends-top-level: [a]"),
             LoadResult::UpToDate);
 
   SmallVector<uintptr_t, 4> marked;
@@ -674,9 +718,13 @@ TEST(DependencyGraph, ChainedExternalReverse) {
 TEST(DependencyGraph, ChainedExternalPreMarked) {
   DependencyGraph<uintptr_t> graph;
 
-  EXPECT_EQ(graph.loadFromString(0, "cross-module: [/foo]\nprovides: [a]"),
+  EXPECT_EQ(graph.loadFromString(0,
+                                 "depends-external: [/foo]\n"
+                                 "provides-top-level: [a]"),
             LoadResult::UpToDate);
-  EXPECT_EQ(graph.loadFromString(1, "cross-module: [/bar]\ntop-level: [a]"),
+  EXPECT_EQ(graph.loadFromString(1,
+                                 "depends-external: [/bar]\n"
+                                 "depends-top-level: [a]"),
             LoadResult::UpToDate);
 
   graph.markIntransitive(0);

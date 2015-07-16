@@ -1,3 +1,3 @@
 # Dependencies after compilation:
-nominals: [g]
-member-access: [f]
+provides-nominal: [g]
+depends-nominal: [f]

@@ -4,7 +4,7 @@
 // RUN: FileCheck %s < %t.swiftdeps
 // RUN: FileCheck -check-prefix=NEGATIVE %s < %t.swiftdeps
 
-// CHECK-LABEL: {{^provides:$}}
+// CHECK-LABEL: {{^provides-top-level:$}}
 // CHECK-NEXT: "IntWrapper"
 // CHECK-NEXT: "=="
 // CHECK-NEXT: "<"
@@ -23,7 +23,7 @@
 // CHECK-NEXT: "Outer"
 // CHECK: "eof"
 
-// CHECK-LABEL: {{^nominals:$}}
+// CHECK-LABEL: {{^provides-nominal:$}}
 // CHECK-NEXT: "V4main10IntWrapper"
 // CHECK-NEXT: "VV4main10IntWrapper16InnerForNoReason"
 // CHECK-NEXT: "C4main8Subclass"
@@ -33,7 +33,7 @@
 // CHECK: "V4main9Sentinel1"
 // CHECK-NEXT: "V4main9Sentinel2"
 
-// CHECK-LABEL: {{^top-level:$}}
+// CHECK-LABEL: {{^depends-top-level:$}}
 
 // CHECK-DAG: - "Comparable"
 struct IntWrapper: Comparable {
@@ -299,7 +299,7 @@ private extension OtherFileTypeToBeExtended {
 struct Sentinel2 {}
 
 
-// CHECK-LABEL: {{^member-access:$}}
+// CHECK-LABEL: {{^depends-nominal:$}}
 // CHECK-DAG: - "V4main10IntWrapper"
 // CHECK-DAG: - "PSs10Comparable"
 // CHECK-DAG: - "C4main18ClassFromOtherFile"

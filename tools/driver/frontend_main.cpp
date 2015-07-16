@@ -195,7 +195,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
 
   llvm::SmallSetVector<const NominalTypeDecl *, 16> extendedNominals;
 
-  out << "provides:\n";
+  out << "provides-top-level:\n";
   for (const Decl *D : SF->Decls) {
     switch (D->getKind()) {
     case DeclKind::Module:
@@ -280,7 +280,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
     }
   }
 
-  out << "nominals:\n";
+  out << "provides-nominal:\n";
   for (auto nominal : extendedNominals) {
     Mangle::Mangler mangler(out, /*debug style=*/false, /*Unicode=*/true);
     out << "- \"";
@@ -292,7 +292,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
     // FIXME: This requires a traversal of the whole file to compute.
     // We should (a) see if there's a cheaper way to keep it up to date,
     // and/or (b) see if we can fast-path cases where there's no ObjC involved.
-    out << "class-members:\n";
+    out << "provides-dynamic-lookup:\n";
     class ValueDeclPrinter : public VisibleDeclConsumer {
     private:
       raw_ostream &out;
@@ -312,7 +312,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
   ReferencedNameTracker *tracker = SF->getReferencedNameTracker();
 
   // FIXME: Sort these?
-  out << "top-level:\n";
+  out << "depends-top-level:\n";
   for (auto &entry : tracker->getTopLevelNames()) {
     assert(!entry.first.empty());
     out << "- ";
@@ -322,7 +322,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
   }
 
   // FIXME: Sort these?
-  out << "member-access:\n";
+  out << "depends-nominal:\n";
   for (auto &entry : tracker->getUsedNominals()) {
     assert(entry.first != nullptr);
     if (entry.first->hasAccessibility() &&
@@ -339,7 +339,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
   }
 
   // FIXME: Sort these?
-  out << "dynamic-lookup:\n";
+  out << "depends-dynamic-lookup:\n";
   for (auto &entry : tracker->getDynamicLookupNames()) {
     assert(!entry.first.empty());
     out << "- ";
@@ -348,7 +348,7 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
     out << "\"" << escape(entry.first) << "\"\n";
   }
 
-  out << "cross-module:\n";
+  out << "depends-external:\n";
   for (auto &entry : depTracker.getDependencies()) {
     out << "- \"" << llvm::yaml::escape(entry) << "\"\n";
   }

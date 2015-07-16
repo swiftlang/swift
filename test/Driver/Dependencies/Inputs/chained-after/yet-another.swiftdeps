@@ -1,2 +1,2 @@
 # Dependencies before compilation:
-member-access: [z]
+depends-nominal: [z]

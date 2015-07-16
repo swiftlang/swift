@@ -14,7 +14,7 @@
 // CHECK-BASIC: Swift.swiftmodule
 // CHECK-BASIC-NOT: :
 
-// CHECK-BASIC-YAML-LABEL: cross-module:
+// CHECK-BASIC-YAML-LABEL: depends-external:
 // CHECK-BASIC-YAML-NOT: empty.swift
 // CHECK-BASIC-YAML: "{{.*}}/Swift.swiftmodule"
 // CHECK-BASIC-YAML-NOT: {{:$}}
@@ -53,7 +53,7 @@
 // CHECK-IMPORT-DAG: Inputs/dependencies/module.modulemap
 // CHECK-IMPORT-NOT: :
 
-// CHECK-IMPORT-YAML-LABEL: cross-module:
+// CHECK-IMPORT-YAML-LABEL: depends-external:
 // CHECK-IMPORT-YAML-NOT: dependencies.swift
 // CHECK-IMPORT-YAML-DAG: "{{.*}}Inputs/dependencies/$$$$$.h"
 // CHECK-IMPORT-YAML-DAG: "{{.*}}Inputs/dependencies/extra-header.h"

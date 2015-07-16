@@ -8,7 +8,7 @@
 
 import Foundation
 
-// CHECK-LABEL: class-members:
+// CHECK-LABEL: provides-dynamic-lookup:
 
 @objc class Base : NSObject {
   // CHECK-DAG: - "foo"
@@ -33,7 +33,7 @@ import Foundation
 
 func getAnyObject() -> AnyObject? { return nil }
 
-// CHECK-LABEL: dynamic-lookup:
+// CHECK-LABEL: depends-dynamic-lookup:
 
 func testDynamicLookup(obj: AnyObject) {
   // CHECK-DAG: - !private "foo"
@@ -59,6 +59,6 @@ func testDynamicLookup(obj: AnyObject) {
 // CHECK-DAG: - "counter"
 let globalUse = getAnyObject()?.counter
 
-// NEGATIVE-LABEL: dynamic-lookup:
+// NEGATIVE-LABEL: depends-dynamic-lookup:
 // NEGATIVE-NOT: "cat1Method"
 // NEGATIVE-NOT: "unusedProp"

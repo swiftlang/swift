@@ -1,3 +1,3 @@
 # Dependencies after compilation:
-top-level: [a]
-cross-module: ["./main1-external", "./main2-external"]
+depends-top-level: [a]
+depends-external: ["./main1-external", "./main2-external"]

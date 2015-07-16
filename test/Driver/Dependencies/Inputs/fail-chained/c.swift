@@ -1,3 +1,3 @@
 # Dependencies after compilation:
-provides: [c]
-top-level: [bad]
+provides-top-level: [c]
+depends-top-level: [bad]

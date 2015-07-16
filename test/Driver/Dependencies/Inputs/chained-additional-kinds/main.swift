@@ -1,3 +1,3 @@
 # Dependencies after compilation:
-top-level: [a]
-class-members: [z]
+depends-top-level: [a]
+provides-dynamic-lookup: [z]

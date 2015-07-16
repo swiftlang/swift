@@ -1,2 +1,2 @@
 # Dependencies after compilation:
-provides: [a]
+provides-top-level: [a]

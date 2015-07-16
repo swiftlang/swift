@@ -1,2 +1,2 @@
 # Dependencies after compilation:
-dynamic-lookup: [z]
+depends-dynamic-lookup: [z]

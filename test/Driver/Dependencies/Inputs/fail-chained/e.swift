@@ -1,3 +1,3 @@
 # Dependencies after compilation:
-provides: [e]
-top-level: [!private bad]
+provides-top-level: [e]
+depends-top-level: [!private bad]

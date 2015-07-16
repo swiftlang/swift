@@ -1,2 +1,2 @@
 # Dependencies after compilation:
-nominals: [e]
+provides-nominal: [e]

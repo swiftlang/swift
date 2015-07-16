@@ -1,3 +1,3 @@
 # Dependencies after compilation:
-top-level: [!private a]
-nominals: [z]
+depends-top-level: [!private a]
+provides-nominal: [z]

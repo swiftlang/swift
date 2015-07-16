@@ -1,2 +1,2 @@
 # Dependencies after compilation:
-top-level: [!private a]
+depends-top-level: [!private a]

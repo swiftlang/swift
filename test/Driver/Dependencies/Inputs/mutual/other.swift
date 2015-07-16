@@ -1,3 +1,3 @@
 # Dependencies after compilation:
-top-level: [b]
-provides: [a]
+depends-top-level: [b]
+provides-top-level: [a]

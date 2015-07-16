@@ -1,3 +1,3 @@
 # Dependencies after compilation:
-top-level: [a]
-nominals: [z]
+depends-top-level: [a]
+provides-nominal: [z]

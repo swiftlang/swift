@@ -84,20 +84,22 @@ parseDependencyFile(llvm::MemoryBuffer &buffer,
     using KindPair = std::pair<DependencyKind, DependencyDirection>;
 
     KindPair dirAndKind = llvm::StringSwitch<KindPair>(key->getValue(scratch))
-      .Case("top-level", std::make_pair(DependencyKind::TopLevelName,
-                                        DependencyDirection::Depends))
-      .Case("member-access", std::make_pair(DependencyKind::NominalType,
-                                            DependencyDirection::Depends))
-      .Case("dynamic-lookup", std::make_pair(DependencyKind::DynamicLookupName,
+      .Case("depends-top-level", std::make_pair(DependencyKind::TopLevelName,
+                                                DependencyDirection::Depends))
+      .Case("depends-nominal", std::make_pair(DependencyKind::NominalType,
                                              DependencyDirection::Depends))
-      .Case("cross-module", std::make_pair(DependencyKind::ExternalFile,
-                                           DependencyDirection::Depends))
-      .Case("provides", std::make_pair(DependencyKind::TopLevelName,
-                                       DependencyDirection::Provides))
-      .Case("nominals", std::make_pair(DependencyKind::NominalType,
-                                       DependencyDirection::Provides))
-      .Case("class-members", std::make_pair(DependencyKind::DynamicLookupName,
-                                            DependencyDirection::Provides));
+      .Case("depends-dynamic-lookup",
+            std::make_pair(DependencyKind::DynamicLookupName,
+                           DependencyDirection::Depends))
+      .Case("depends-external", std::make_pair(DependencyKind::ExternalFile,
+                                               DependencyDirection::Depends))
+      .Case("provides-top-level", std::make_pair(DependencyKind::TopLevelName,
+                                                 DependencyDirection::Provides))
+      .Case("provides-nominal", std::make_pair(DependencyKind::NominalType,
+                                               DependencyDirection::Provides))
+      .Case("provides-dynamic-lookup",
+            std::make_pair(DependencyKind::DynamicLookupName,
+                           DependencyDirection::Provides));
 
     auto *entries = cast<yaml::SequenceNode>(i->getValue());
     for (const yaml::Node &rawEntry : *entries) {
