@@ -109,7 +109,8 @@ extension TestSuite {
     wrapValueIntoEquatable: (MinimalEquatableValue) -> SequenceWithEquatableElement.Generator.Element,
     extractValueFromEquatable: ((SequenceWithEquatableElement.Generator.Element) -> MinimalEquatableValue),
 
-    checksAdded: Box<Set<String>> = Box([])
+    checksAdded: Box<Set<String>> = Box([]),
+    resiliencyChecks: CollectionMisuseResiliencyChecks = .all
   ) {
 
     if checksAdded.value.contains(__FUNCTION__) {

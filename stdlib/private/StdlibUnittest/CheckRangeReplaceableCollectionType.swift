@@ -291,7 +291,9 @@ extension TestSuite {
     wrapValueIntoEquatable: (MinimalEquatableValue) -> CollectionWithEquatableElement.Generator.Element,
     extractValueFromEquatable: ((CollectionWithEquatableElement.Generator.Element) -> MinimalEquatableValue),
 
-    checksAdded: Box<Set<String>> = Box([])
+    checksAdded: Box<Set<String>> = Box([]),
+    resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
+    outOfBoundsIndexOffset: Int = 1
   ) {
 
     if checksAdded.value.contains(__FUNCTION__) {
@@ -307,7 +309,9 @@ extension TestSuite {
       makeCollectionOfEquatable: makeCollectionOfEquatable,
       wrapValueIntoEquatable: wrapValueIntoEquatable,
       extractValueFromEquatable: extractValueFromEquatable,
-      checksAdded: checksAdded)
+      checksAdded: checksAdded,
+      resiliencyChecks: resiliencyChecks,
+      outOfBoundsIndexOffset: outOfBoundsIndexOffset)
 
     func makeWrappedCollection(elements: [OpaqueValue<Int>]) -> Collection {
       return makeCollection(elements.map(wrapValue))
@@ -1077,7 +1081,9 @@ self.test("\(testNamePrefix).OperatorPlus") {
     wrapValueIntoEquatable: (MinimalEquatableValue) -> CollectionWithEquatableElement.Generator.Element,
     extractValueFromEquatable: ((CollectionWithEquatableElement.Generator.Element) -> MinimalEquatableValue),
 
-    checksAdded: Box<Set<String>> = Box([])
+    checksAdded: Box<Set<String>> = Box([]),
+    resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
+    outOfBoundsIndexOffset: Int = 1
   ) {
 
     if checksAdded.value.contains(__FUNCTION__) {
@@ -1093,7 +1099,9 @@ self.test("\(testNamePrefix).OperatorPlus") {
       makeCollectionOfEquatable: makeCollectionOfEquatable,
       wrapValueIntoEquatable: wrapValueIntoEquatable,
       extractValueFromEquatable: extractValueFromEquatable,
-      checksAdded: checksAdded)
+      checksAdded: checksAdded,
+      resiliencyChecks: resiliencyChecks,
+      outOfBoundsIndexOffset: outOfBoundsIndexOffset)
 
     addBidirectionalCollectionTests(
       testNamePrefix,
@@ -1103,7 +1111,9 @@ self.test("\(testNamePrefix).OperatorPlus") {
       makeCollectionOfEquatable: makeCollectionOfEquatable,
       wrapValueIntoEquatable: wrapValueIntoEquatable,
       extractValueFromEquatable: extractValueFromEquatable,
-      checksAdded: checksAdded)
+      checksAdded: checksAdded,
+      resiliencyChecks: resiliencyChecks,
+      outOfBoundsIndexOffset: outOfBoundsIndexOffset)
 
     func makeWrappedCollection(elements: [OpaqueValue<Int>]) -> Collection {
       return makeCollection(elements.map(wrapValue))
@@ -1176,7 +1186,9 @@ self.test("\(testNamePrefix).removeLast()/whereIndexIsBidirectional/semantics/em
     wrapValueIntoEquatable: (MinimalEquatableValue) -> CollectionWithEquatableElement.Generator.Element,
     extractValueFromEquatable: ((CollectionWithEquatableElement.Generator.Element) -> MinimalEquatableValue),
 
-    checksAdded: Box<Set<String>> = Box([])
+    checksAdded: Box<Set<String>> = Box([]),
+    resiliencyChecks: CollectionMisuseResiliencyChecks = .all,
+    outOfBoundsIndexOffset: Int = 1
   ) {
 
     if checksAdded.value.contains(__FUNCTION__) {
@@ -1192,7 +1204,9 @@ self.test("\(testNamePrefix).removeLast()/whereIndexIsBidirectional/semantics/em
       makeCollectionOfEquatable: makeCollectionOfEquatable,
       wrapValueIntoEquatable: wrapValueIntoEquatable,
       extractValueFromEquatable: extractValueFromEquatable,
-      checksAdded: checksAdded)
+      checksAdded: checksAdded,
+      resiliencyChecks: resiliencyChecks,
+      outOfBoundsIndexOffset: outOfBoundsIndexOffset)
 
     addRandomAccessCollectionTests(
       testNamePrefix,
@@ -1202,7 +1216,9 @@ self.test("\(testNamePrefix).removeLast()/whereIndexIsBidirectional/semantics/em
       makeCollectionOfEquatable: makeCollectionOfEquatable,
       wrapValueIntoEquatable: wrapValueIntoEquatable,
       extractValueFromEquatable: extractValueFromEquatable,
-      checksAdded: checksAdded)
+      checksAdded: checksAdded,
+      resiliencyChecks: resiliencyChecks,
+      outOfBoundsIndexOffset: outOfBoundsIndexOffset)
 
     testNamePrefix += String(Collection.Type)
 

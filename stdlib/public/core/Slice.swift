@@ -18,10 +18,14 @@ public struct Slice<Base : Indexable> : CollectionType {
   public let endIndex: Index
 
   public subscript(index: Index) -> Base._Element {
+    Index._failEarlyRangeCheck(index, bounds: startIndex..<endIndex)
     return _base[index]
   }
 
   public subscript(bounds: Range<Index>) -> Slice {
+    Index._failEarlyRangeCheck2(
+      bounds.startIndex, rangeEnd: bounds.endIndex,
+      boundsStart: startIndex, boundsEnd: endIndex)
     return Slice(base: _base, bounds: bounds)
   }
 

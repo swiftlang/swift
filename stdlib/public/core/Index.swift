@@ -133,6 +133,52 @@ public protocol ForwardIndexType : _Incrementable {
   func _distanceTo(_: Self) -> Distance
   func ~> (start:Self, _ : (_Advance, Distance)) -> Self
   func ~> (start:Self, _ : (_Advance, (Distance, Self))) -> Self
+
+  /// Performs a range check in O(1), or a no-op when a range check is not
+  /// implementable in O(1).
+  ///
+  /// The range check, if performed, is equivalent to:
+  ///
+  ///     precondition(bounds.contains(index))
+  ///
+  /// Use this function to perform a cheap range check for QoI purposes when
+  /// memory safety is not a concern.  Do not rely on this range check for
+  /// memory safety.
+  ///
+  /// The default implementation for forward and bidirectional indices is a
+  /// no-op.  The default implementation for random access indices performs a
+  /// range check.
+  ///
+  /// - Complexity: O(1).
+  static func _failEarlyRangeCheck(index: Self, bounds: Range<Self>)
+
+  /// Performs a range check in O(1), or a no-op when a range check is not
+  /// implementable in O(1).
+  ///
+  /// The range check, if performed, is equivalent to:
+  ///
+  ///     precondition(
+  ///       bounds.contains(range.startIndex) ||
+  ///       range.startIndex == bounds.endIndex)
+  ///     precondition(
+  ///       bounds.contains(range.endIndex) ||
+  ///       range.endIndex == bounds.endIndex)
+  ///
+  /// Use this function to perform a cheap range check for QoI purposes when
+  /// memory safety is not a concern.  Do not rely on this range check for
+  /// memory safety.
+  ///
+  /// The default implementation for forward and bidirectional indices is a
+  /// no-op.  The default implementation for random access indices performs a
+  /// range check.
+  ///
+  /// - Complexity: O(1).
+  static func _failEarlyRangeCheck2(
+    rangeStart: Self, rangeEnd: Self, boundsStart: Self, boundsEnd: Self)
+  // FIXME: the suffix `2` in the name, and passing `startIndex` and `endIndex`
+  // separately (rather than as a range) are workarounds for a compiler defect.
+  // <rdar://problem/21855350> Rejects-valid: rejects code that has two Self
+  // types in non-direct-argument-type position
 }
 
 // advance and distance implementations
@@ -148,6 +194,16 @@ extension ForwardIndexType {
       ++p
     }
     return count
+  }
+
+  public static func _failEarlyRangeCheck(index: Self, bounds: Range<Self>) {
+    // Can't perform range checks in O(1) on forward indices.
+  }
+
+  public static func _failEarlyRangeCheck2(
+    rangeStart: Self, rangeEnd: Self, boundsStart: Self, boundsEnd: Self
+  ) {
+    // Can't perform range checks in O(1) on forward indices.
   }
 }
 
@@ -315,8 +371,36 @@ extension RandomAccessIndexType {
     let end = other
     return self.distanceTo(end)
   }
-}
 
+  public static func _failEarlyRangeCheck(index: Self, bounds: Range<Self>) {
+    _precondition(
+      bounds.startIndex <= index,
+      "index is out of bounds: index designates a position before bounds.startIndex")
+    _precondition(
+      index < bounds.endIndex,
+      "index is out of bounds: index designates the bounds.endIndex position or a position after it")
+  }
+
+  public static func _failEarlyRangeCheck2(
+    rangeStart: Self, rangeEnd: Self, boundsStart: Self, boundsEnd: Self
+  ) {
+    let range = rangeStart..<rangeEnd
+    let bounds = boundsStart..<boundsEnd
+    _precondition(
+      bounds.startIndex <= range.startIndex,
+      "range.startIndex is out of bounds: index designates a position before bounds.startIndex")
+    _precondition(
+      bounds.startIndex <= range.endIndex,
+      "range.endIndex is out of bounds: index designates a position before bounds.startIndex")
+
+    _precondition(
+      range.startIndex <= bounds.endIndex,
+      "range.startIndex is out of bounds: index designates a position after bounds.endIndex")
+    _precondition(
+      range.endIndex <= bounds.endIndex,
+      "range.startIndex is out of bounds: index designates a position after bounds.endIndex")
+  }
+}
 
 /// Do not use this operator directly; call advance(start, n) instead.
 @transparent

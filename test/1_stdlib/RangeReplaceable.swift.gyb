@@ -90,30 +90,37 @@ func identityEq(element: MinimalEquatableValue) -> MinimalEquatableValue {
 // This comment is a workaround for <rdar://problem/18900352> gyb miscompiles nested loops
 %     Base = "%s%sRangeReplaceableCollection" % (base_kind, traversal)
 
-RangeReplaceableTestSuite.add${traversal}RangeReplaceableCollectionTests(
-  makeCollection: { (elements: [OpaqueValue<Int>]) in
-    return ${Base}(elements)
-  },
-  wrapValue: identity,
-  extractValue: identity,
-  makeCollectionOfEquatable: { (elements: [MinimalEquatableValue]) in
-    return ${Base}(elements)
-  },
-  wrapValueIntoEquatable: identityEq,
-  extractValueFromEquatable: identityEq)
+if true {
+  var resiliencyChecks = CollectionMisuseResiliencyChecks.all
+  resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .ExpectationFailure
 
-RangeReplaceableTestSuite.add${traversal}RangeReplaceableCollectionTests(
-  makeCollection: { (elements: [LifetimeTracked]) in
-    return ${Base}(elements)
-  },
-  wrapValue: { (element: OpaqueValue<Int>) in LifetimeTracked(element.value) },
-  extractValue: { (element: LifetimeTracked) in OpaqueValue(element.value) },
-  makeCollectionOfEquatable: { (elements: [MinimalEquatableValue]) in
-    // FIXME: use LifetimeTracked.
-    return ${Base}(elements)
-  },
-  wrapValueIntoEquatable: identityEq,
-  extractValueFromEquatable: identityEq)
+  RangeReplaceableTestSuite.add${traversal}RangeReplaceableCollectionTests(
+    makeCollection: { (elements: [OpaqueValue<Int>]) in
+      return ${Base}(elements)
+    },
+    wrapValue: identity,
+    extractValue: identity,
+    makeCollectionOfEquatable: { (elements: [MinimalEquatableValue]) in
+      return ${Base}(elements)
+    },
+    wrapValueIntoEquatable: identityEq,
+    extractValueFromEquatable: identityEq,
+    resiliencyChecks: resiliencyChecks)
+
+  RangeReplaceableTestSuite.add${traversal}RangeReplaceableCollectionTests(
+    makeCollection: { (elements: [LifetimeTracked]) in
+      return ${Base}(elements)
+    },
+    wrapValue: { (element: OpaqueValue<Int>) in LifetimeTracked(element.value) },
+    extractValue: { (element: LifetimeTracked) in OpaqueValue(element.value) },
+    makeCollectionOfEquatable: { (elements: [MinimalEquatableValue]) in
+      // FIXME: use LifetimeTracked.
+      return ${Base}(elements)
+    },
+    wrapValueIntoEquatable: identityEq,
+    extractValueFromEquatable: identityEq,
+    resiliencyChecks: resiliencyChecks)
+}
 
 %   end
 % end

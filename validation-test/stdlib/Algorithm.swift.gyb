@@ -2327,8 +2327,8 @@ SequenceTypeAlgorithms.test("Slice/AssociatedTypes") {
 
 SequenceTypeAlgorithms.test("Slice/init(base:bounds:)") {
   for test in subscriptRangeTests {
-    let c = MinimalForwardCollection(test.collection)
-    var result = Slice(base: c, bounds: test.boundsIn(c))
+    let base = MinimalForwardCollection(test.collection)
+    var result = Slice(base: base, bounds: test.boundsIn(base))
     expectType(
       Slice<MinimalForwardCollection<OpaqueValue<Int>>>.self,
       &result)
@@ -2343,9 +2343,9 @@ SequenceTypeAlgorithms.test("Slice/init(base:bounds:)") {
 
 SequenceTypeAlgorithms.test("Slice.{startIndex,endIndex}") {
   for test in subscriptRangeTests {
-    let c = MinimalForwardCollection(test.collection)
-    let bounds = test.boundsIn(c)
-    var slice = Slice(base: c, bounds: bounds)
+    let base = MinimalForwardCollection(test.collection)
+    let bounds = test.boundsIn(base)
+    var slice = Slice(base: base, bounds: bounds)
     expectType(
       Slice<MinimalForwardCollection<OpaqueValue<Int>>>.self,
       &slice)
@@ -2357,9 +2357,9 @@ SequenceTypeAlgorithms.test("Slice.{startIndex,endIndex}") {
 
 SequenceTypeAlgorithms.test("Slice.subscript(_: Index)") {
   for test in subscriptRangeTests {
-    let c = MinimalForwardCollection(test.collection)
-    let bounds = test.boundsIn(c)
-    var slice = Slice(base: c, bounds: bounds)
+    let base = MinimalForwardCollection(test.collection)
+    let bounds = test.boundsIn(base)
+    var slice = Slice(base: base, bounds: bounds)
     expectType(
       Slice<MinimalForwardCollection<OpaqueValue<Int>>>.self,
       &slice)
@@ -2367,22 +2367,27 @@ SequenceTypeAlgorithms.test("Slice.subscript(_: Index)") {
     for i in bounds {
       var element = slice[i]
       expectType(OpaqueValue<Int>.self, &element)
-      expectEqual(c[i].value, element.value)
+      expectEqual(base[i].value, element.value)
     }
 
-    // `Slice` allows out-of-bounds indices.
-    // This is not a part of the API contract.  This check is just a change
-    // detector.
-    for i in c.indices {
-      expectEqual(c[i].value, slice[i].value)
+    for (i, index) in base.indices.enumerate() {
+      if test.bounds.contains(i) {
+        expectEqual(base[index].value, slice[index].value)
+      } else {
+        // `Slice` disallows out-of-bounds indices when the underlying index
+        // type can perform a range check.
+        expectFailure {
+          _blackHole(slice[index])
+        }
+      }
     }
   }
 }
 
 SequenceTypeAlgorithms.test("Slice.subscript(_: Range<Index>)") {
   for test in subscriptRangeTests {
-    let c = MinimalForwardCollection(test.collection)
-    var slice = Slice(base: c, bounds: c.indices)
+    let base = MinimalForwardCollection(test.collection)
+    var slice = Slice(base: base, bounds: base.indices)
     expectType(
       Slice<MinimalForwardCollection<OpaqueValue<Int>>>.self,
       &slice)
@@ -2394,16 +2399,19 @@ SequenceTypeAlgorithms.test("Slice.subscript(_: Range<Index>)") {
 
     checkForwardCollection(test.expected, result) { $0.value == $1.value }
 
-    if true {
-      // `Slice` allows out-of-bounds slicing.
-      // This is not a part of the API contract.  This check is just a change
-      // detector.
-      let reSlicedToFullExtent = slice[c.indices]
+    if test.bounds == test.collection.indices {
+      let reSliced = result[base.indices]
       checkForwardCollection(
         test.collection,
-        reSlicedToFullExtent,
+        reSliced,
         stackTrace: SourceLocStack().with(test.loc))
         { $0.value == $1.value }
+    } else {
+      // `Slice` disallows out-of-bounds slicing when the underlying index type
+      // can perform a range check.
+      expectFailure {
+        _blackHole(result[base.indices])
+      }
     }
   }
 }
@@ -2517,7 +2525,7 @@ SequenceTypeAlgorithms.test("_withUnsafeMutableBufferPointerIfSupported/dispatch
 }
 
 //===----------------------------------------------------------------------===//
-// Standard collection tests
+// Standard sequence and collection tests
 //===----------------------------------------------------------------------===//
 
 func identity(element: OpaqueValue<Int>) -> OpaqueValue<Int> {
@@ -2530,6 +2538,27 @@ func identityComp(element: MinimalComparableValue) -> MinimalComparableValue {
   return element
 }
 
+% for Base in [ 'DefaultedSequence', 'MinimalSequence' ]:
+if true {
+  let checksAdded: Box<Set<String>> = Box([])
+  let resiliencyChecks = CollectionMisuseResiliencyChecks.all
+
+  SequenceTypeAlgorithms.addSequenceTests(
+    makeSequence: { (elements: [OpaqueValue<Int>]) in
+      return ${Base}(elements)
+    },
+    wrapValue: identity,
+    extractValue: identity,
+    makeSequenceOfEquatable: { (elements: [MinimalEquatableValue]) in
+      return ${Base}(elements)
+    },
+    wrapValueIntoEquatable: identityEq,
+    extractValueFromEquatable: identityEq,
+    checksAdded: checksAdded,
+    resiliencyChecks: resiliencyChecks)
+}
+% end
+
 % for traversal in [ 'Forward', 'Bidirectional', 'RandomAccess' ]:
 %   for base_kind in [ 'Defaulted', 'Minimal' ]:
 // This comment is a workaround for <rdar://problem/18900352> gyb miscompiles nested loops
@@ -2537,8 +2566,11 @@ func identityComp(element: MinimalComparableValue) -> MinimalComparableValue {
 // This comment is a workaround for <rdar://problem/18900352> gyb miscompiles nested loops
 %       Base = "%s%s%sCollection" % (base_kind, traversal, 'Mutable' if mutable else '')
 
+// Test collections using value types as elements.
 if true {
   var checksAdded: Box<Set<String>> = Box([])
+  var resiliencyChecks = CollectionMisuseResiliencyChecks.all
+  resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .ExpectationFailure
 
   SequenceTypeAlgorithms.add${traversal}CollectionTests(
     makeCollection: { (elements: [OpaqueValue<Int>]) in
@@ -2551,7 +2583,8 @@ if true {
     },
     wrapValueIntoEquatable: identityEq,
     extractValueFromEquatable: identityEq,
-    checksAdded: checksAdded)
+    checksAdded: checksAdded,
+    resiliencyChecks: resiliencyChecks)
 
 %       if mutable:
   SequenceTypeAlgorithms.add${traversal}MutableCollectionTests(
@@ -2571,12 +2604,16 @@ if true {
     wrapValueIntoComparable: identityComp,
     extractValueFromComparable: identityComp,
     checksAdded: checksAdded,
+    resiliencyChecks: resiliencyChecks,
     withUnsafeMutableBufferPointerIsSupported: false)
 %       end
 }
 
+// Test collections using a reference type as element.
 if true {
   var checksAdded: Box<Set<String>> = Box([])
+  var resiliencyChecks = CollectionMisuseResiliencyChecks.all
+  resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .ExpectationFailure
 
   SequenceTypeAlgorithms.add${traversal}CollectionTests(
     makeCollection: { (elements: [LifetimeTracked]) in
@@ -2594,7 +2631,8 @@ if true {
     },
     wrapValueIntoEquatable: identityEq,
     extractValueFromEquatable: identityEq,
-    checksAdded: checksAdded)
+    checksAdded: checksAdded,
+    resiliencyChecks: resiliencyChecks)
 
 %       if mutable:
   SequenceTypeAlgorithms.add${traversal}MutableCollectionTests(
@@ -2620,8 +2658,60 @@ if true {
     wrapValueIntoComparable: identityComp,
     extractValueFromComparable: identityComp,
     checksAdded: checksAdded,
+    resiliencyChecks: resiliencyChecks,
     withUnsafeMutableBufferPointerIsSupported: false)
 %       end
+}
+
+// Test Slice<Base> of various collections using value types as elements.
+if true {
+  func makeCollection(elements: [OpaqueValue<Int>])
+    -> Slice<${Base}<OpaqueValue<Int>>> {
+    let baseElements =
+      [ -9999, -9998, -9997 ].map { OpaqueValue($0) } + elements
+    let base = ${Base}(baseElements)
+    return Slice(
+      base: base,
+      bounds: advance(base.startIndex, numericCast(3))..<base.endIndex)
+  }
+
+  func makeCollectionOfEquatable(elements: [MinimalEquatableValue])
+    -> Slice<${Base}<MinimalEquatableValue>> {
+    let baseElements =
+      [ -9999, -9998, -9997 ].map { MinimalEquatableValue($0) } + elements
+    let base = ${Base}(baseElements)
+    return Slice(
+      base: base,
+      bounds: advance(base.startIndex, numericCast(3))..<base.endIndex)
+  }
+
+  func makeCollectionOfComparable(elements: [MinimalComparableValue])
+    -> Slice<${Base}<MinimalComparableValue>> {
+    let baseElements =
+      [ -9999, -9998, -9997 ].map { MinimalComparableValue($0) } + elements
+    let base = ${Base}(baseElements)
+    return Slice(
+      base: base,
+      bounds: advance(base.startIndex, numericCast(3))..<base.endIndex)
+  }
+
+  var checksAdded: Box<Set<String>> = Box([])
+  var resiliencyChecks = CollectionMisuseResiliencyChecks.all
+  resiliencyChecks.creatingOutOfBoundsIndicesBehavior = .ExpectationFailure
+  resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior = .Trap
+  resiliencyChecks.subscriptRangeOnOutOfBoundsRangesBehavior
+    = .ExpectationFailure
+
+  SequenceTypeAlgorithms.add${traversal}CollectionTests(
+    makeCollection: makeCollection,
+    wrapValue: identity,
+    extractValue: identity,
+    makeCollectionOfEquatable: makeCollectionOfEquatable,
+    wrapValueIntoEquatable: identityEq,
+    extractValueFromEquatable: identityEq,
+    checksAdded: checksAdded,
+    resiliencyChecks: resiliencyChecks,
+    outOfBoundsIndexOffset: 4)
 }
 
 %     end

@@ -242,6 +242,12 @@ public func expectLE(lhs: Int, _ rhs: Int, ${TRACE}) {
   }
 }
 
+public func expectGT(lhs: Int, _ rhs: Int, ${TRACE}) {
+  if !(lhs > rhs) {
+    expectationFailure("\(lhs) > \(rhs)", trace: ${trace})
+  }
+}
+
 public func expectGE(lhs: Int, _ rhs: Int, ${TRACE}) {
   if !(lhs >= rhs) {
     expectationFailure("\(lhs) >= \(rhs)", trace: ${trace})
@@ -1675,7 +1681,16 @@ public func checkStrideable<
 }
 
 public struct CollectionMisuseResiliencyChecks {
+  public enum FailureKind {
+    case None
+    case Trap
+    case ExpectationFailure
+  }
+
   public var callNextOnExhaustedGenerator: Bool = true
+  public var creatingOutOfBoundsIndicesBehavior: FailureKind = .Trap
+  public var subscriptOnOutOfBoundsIndicesBehavior: FailureKind = .Trap
+  public var subscriptRangeOnOutOfBoundsRangesBehavior: FailureKind = .Trap
 
   public static var all: CollectionMisuseResiliencyChecks {
     return CollectionMisuseResiliencyChecks()
@@ -1683,7 +1698,10 @@ public struct CollectionMisuseResiliencyChecks {
 
   public static var none: CollectionMisuseResiliencyChecks {
     return CollectionMisuseResiliencyChecks(
-      callNextOnExhaustedGenerator: false)
+      callNextOnExhaustedGenerator: false,
+      creatingOutOfBoundsIndicesBehavior: .None,
+      subscriptOnOutOfBoundsIndicesBehavior: .None,
+      subscriptRangeOnOutOfBoundsRangesBehavior: .None)
   }
 }
 
@@ -2661,6 +2679,25 @@ public struct ${Index} : ForwardIndexType {
       position: position + 1, startIndex: startIndex, endIndex: endIndex)
   }
 
+  public static func _failEarlyRangeCheck(
+    index: ${Index}, bounds: Range<${Index}>
+  ) {
+    expectLE(bounds.startIndex.position, index.position)
+    expectGT(bounds.endIndex.position, index.position)
+  }
+
+  public static func _failEarlyRangeCheck2(
+    rangeStart: ${Index}, rangeEnd: ${Index},
+    boundsStart: ${Index}, boundsEnd: ${Index}
+  ) {
+    let range = rangeStart..<rangeEnd
+    let bounds = boundsStart..<boundsEnd
+    expectLE(bounds.startIndex.position, range.startIndex.position)
+    expectGE(bounds.endIndex.position, range.startIndex.position)
+    expectLE(bounds.startIndex.position, range.endIndex.position)
+    expectGE(bounds.endIndex.position, range.endIndex.position)
+  }
+
   public let bufferSnapshot: MinimalCollectionBufferSnapshot?
 
   public let position: Int
@@ -2708,6 +2745,28 @@ public struct MinimalBidirectionalIndex : BidirectionalIndexType {
     return MinimalBidirectionalIndex(
       buffer: bufferSnapshot?.buffer,
       position: position - 1, startIndex: startIndex, endIndex: endIndex)
+  }
+
+  public static func _failEarlyRangeCheck(
+    index: MinimalBidirectionalIndex,
+    bounds: Range<MinimalBidirectionalIndex>
+  ) {
+    expectLE(bounds.startIndex.position, index.position)
+    expectGT(bounds.endIndex.position, index.position)
+  }
+
+  public static func _failEarlyRangeCheck2(
+    rangeStart: MinimalBidirectionalIndex,
+    rangeEnd: MinimalBidirectionalIndex,
+    boundsStart: MinimalBidirectionalIndex,
+    boundsEnd: MinimalBidirectionalIndex
+  ) {
+    let range = rangeStart..<rangeEnd
+    let bounds = boundsStart..<boundsEnd
+    expectLE(bounds.startIndex.position, range.startIndex.position)
+    expectGE(bounds.endIndex.position, range.startIndex.position)
+    expectLE(bounds.startIndex.position, range.endIndex.position)
+    expectGE(bounds.endIndex.position, range.endIndex.position)
   }
 
   public let bufferSnapshot: MinimalCollectionBufferSnapshot?
@@ -2776,6 +2835,28 @@ public struct MinimalRandomAccessIndex : RandomAccessIndexType {
       "position=\(self.position) startIndex=\(self.startIndex)")
     return MinimalRandomAccessIndex(
       position: newPosition, startIndex: startIndex, endIndex: endIndex)
+  }
+
+  public static func _failEarlyRangeCheck(
+    index: MinimalRandomAccessIndex,
+    bounds: Range<MinimalRandomAccessIndex>
+  ) {
+    expectLE(bounds.startIndex.position, index.position)
+    expectGT(bounds.endIndex.position, index.position)
+  }
+
+  public static func _failEarlyRangeCheck2(
+    rangeStart: MinimalRandomAccessIndex,
+    rangeEnd: MinimalRandomAccessIndex,
+    boundsStart: MinimalRandomAccessIndex,
+    boundsEnd: MinimalRandomAccessIndex
+  ) {
+    let range = rangeStart..<rangeEnd
+    let bounds = boundsStart..<boundsEnd
+    expectLE(bounds.startIndex.position, range.startIndex.position)
+    expectGE(bounds.endIndex.position, range.startIndex.position)
+    expectLE(bounds.startIndex.position, range.endIndex.position)
+    expectGE(bounds.endIndex.position, range.endIndex.position)
   }
 
   public let bufferSnapshot: MinimalCollectionBufferSnapshot?
