@@ -1117,6 +1117,41 @@ static bool wouldIntroduceCriticalEdge(TermInst *T, SILBasicBlock *DestBB) {
   return true;
 }
 
+/// Returns the original boolean value, looking through possible invert
+/// builtins. The paramter \p Inverted is inverted if the returned original
+/// value is the inverted value of the passed \p Cond.
+/// If \p onlyAcceptSingleUse is true and the operand of an invert builtin has
+/// more than one use, an invalid SILValue() is returned.
+static SILValue skipInvert(SILValue Cond, bool &Inverted,
+                           bool onlyAcceptSingleUse) {
+  while (auto *BI = dyn_cast<BuiltinInst>(Cond)) {
+    
+    if (onlyAcceptSingleUse && !BI->hasOneUse())
+      return SILValue();
+    
+    OperandValueArrayRef Args = BI->getArguments();
+    
+    if (BI->getBuiltinInfo().ID == BuiltinValueKind::Xor) {
+      // Check if it's a boolean invertion of the condition.
+      if (auto *IL = dyn_cast<IntegerLiteralInst>(Args[1])) {
+        if (IL->getValue().isAllOnesValue()) {
+          Cond = Args[0];
+          Inverted = !Inverted;
+          continue;
+        }
+      } else if (auto *IL = dyn_cast<IntegerLiteralInst>(Args[0])) {
+        if (IL->getValue().isAllOnesValue()) {
+          Cond = Args[1];
+          Inverted = !Inverted;
+          continue;
+        }
+      }
+    }
+    break;
+  }
+  return Cond;
+}
+
 /// \brief Returns the first cond_fail if it is the first side-effect
 /// instruction in this block.
 static CondFailInst *getFistCondFail(SILBasicBlock *BB) {
@@ -1131,18 +1166,29 @@ static CondFailInst *getFistCondFail(SILBasicBlock *BB) {
   return CondFail;
 }
 
-/// \brief Is the first side-effect instruction in this block a cond_fail that
-/// is guarantueed to fail.
-static bool isCondFailBlock(SILBasicBlock *BB,
-                            CondFailInst *&OrigCondFailInst) {
+/// If the first side-effect instruction in this block is a cond_fail that
+/// is guarantueed to fail, it is returned.
+/// The \p Cond is the condition from a cond_br in the predecessor block. The
+/// cond_fail must only fail if \p BB is entered through this predecessor block.
+/// If \p Inverted is true, \p BB is on the false-edge of the cond_br.
+static CondFailInst *getUnConditionalFail(SILBasicBlock *BB, SILValue Cond,
+                                          bool Inverted) {
   CondFailInst *CondFail = getFistCondFail(BB);
   if (!CondFail)
-    return false;
+    return nullptr;
+  
+  // The simple case: check if it is a "cond_fail 1".
   auto *IL = dyn_cast<IntegerLiteralInst>(CondFail->getOperand());
-  if (!IL)
-    return false;
-  OrigCondFailInst = CondFail;
-  return IL->getValue() != 0;
+  if (IL && IL->getValue() != 0)
+    return CondFail;
+
+  // Check if the cond_fail has the same condition as the cond_br in the
+  // predecessor block.
+  Cond = skipInvert(Cond, Inverted, false);
+  SILValue CondFailCond = skipInvert(CondFail->getOperand(), Inverted, false);
+  if (Cond == CondFailCond && !Inverted)
+    return CondFail;
+  return nullptr;
 }
 
 /// \brief Creates a new cond_fail instruction, optionally with an xor inverted
@@ -1195,7 +1241,6 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
     auto LiveArgs =  isFalse ? FalseArgs : TrueArgs;
     auto *LiveBlock =  isFalse ? FalseSide : TrueSide;
     auto *DeadBlock = !isFalse ? FalseSide : TrueSide;
-    auto *ThisBB = BI->getParent();
 
     SILBuilderWithScope<1>(BI).createBranch(BI->getLoc(), LiveBlock, LiveArgs);
     BI->eraseFromParent();
@@ -1368,26 +1413,27 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
   // TrueSide:
   //   cond_fail 1
   //
-  bool IsTrueSideFailing;
-  CondFailInst *OrigCFI = nullptr;
-  if ((IsTrueSideFailing = isCondFailBlock(TrueSide, OrigCFI)) ||
-      isCondFailBlock(FalseSide, OrigCFI)) {
-    auto LiveArgs =  IsTrueSideFailing ? FalseArgs : TrueArgs;
-    auto *LiveBlock =  IsTrueSideFailing ? FalseSide : TrueSide;
-    auto *DeadBlock = !IsTrueSideFailing ? FalseSide : TrueSide;
-    auto *ThisBB = BI->getParent();
-    auto CFCondition = BI->getCondition();
-
-    // If the false side is failing, negate the branch condition.
+  auto CFCondition = BI->getCondition();
+  if (auto *TrueCFI = getUnConditionalFail(TrueSide, CFCondition, false)) {
     SILBuilderWithScope<1> Builder(BI);
-    createCondFail(OrigCFI, CFCondition, !IsTrueSideFailing, Builder);
-    SILBuilderWithScope<1>(BI).createBranch(BI->getLoc(), LiveBlock, LiveArgs);
+    createCondFail(TrueCFI, CFCondition, false, Builder);
+    SILBuilderWithScope<1>(BI).createBranch(BI->getLoc(), FalseSide, FalseArgs);
 
     BI->eraseFromParent();
-
     addToWorklist(ThisBB);
-    simplifyAfterDroppingPredecessor(DeadBlock);
-    addToWorklist(LiveBlock);
+    simplifyAfterDroppingPredecessor(TrueSide);
+    addToWorklist(FalseSide);
+    return true;
+  }
+  if (auto *FalseCFI = getUnConditionalFail(FalseSide, CFCondition, true)) {
+    SILBuilderWithScope<1> Builder(BI);
+    createCondFail(FalseCFI, CFCondition, true, Builder);
+    SILBuilderWithScope<1>(BI).createBranch(BI->getLoc(), TrueSide, TrueArgs);
+    
+    BI->eraseFromParent();
+    addToWorklist(ThisBB);
+    simplifyAfterDroppingPredecessor(FalseSide);
+    addToWorklist(TrueSide);
     return true;
   }
 
@@ -1774,35 +1820,14 @@ static bool tryMoveCondFailToPreds(SILBasicBlock *BB) {
     return false;
   
   // Find the underlying condition value of the cond_fail.
-  SILValue cond = CFI->getOperand();
+  // We only accept sinlge uses. This is not a correctness check, but we only
+  // want to to the optimization if the condition gets dead after moving the
+  // cond_fail.
   bool inverted = false;
-  while (auto *BI = dyn_cast<BuiltinInst>(cond)) {
-    
-    // This is not a correctness check, but we only want to to the optimization
-    // if the condition gets dead after moving the cond_fail.
-    if (!BI->hasOneUse())
-      return false;
-    
-    OperandValueArrayRef Args = BI->getArguments();
-    
-    if (BI->getBuiltinInfo().ID == BuiltinValueKind::Xor) {
-      // Check if it's a boolean invertion of the condition.
-      if (auto *IL = dyn_cast<IntegerLiteralInst>(Args[1])) {
-        if (IL->getValue().isAllOnesValue()) {
-          cond = Args[0];
-          inverted = !inverted;
-          continue;
-        }
-      } else if (auto *IL = dyn_cast<IntegerLiteralInst>(Args[0])) {
-        if (IL->getValue().isAllOnesValue()) {
-          cond = Args[1];
-          inverted = !inverted;
-          continue;
-        }
-      }
-    }
-    break;
-  }
+  SILValue cond = skipInvert(CFI->getOperand(), inverted, true);
+  if (!cond)
+    return false;
+  
   // Check if the condition is a single-used argument in the current block.
   SILArgument *condArg = dyn_cast<SILArgument>(cond);
   if (!condArg || !condArg->hasOneUse())

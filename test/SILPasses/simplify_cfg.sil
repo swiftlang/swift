@@ -1478,6 +1478,103 @@ bb2:
   return %r : $()
 }
 
+// CHECK-LABEL: sil @remove_cond_fail_same_cond_in_true
+// CHECK: bb0([[COND:%[0-9]*]]
+// CHECK-NOT: bb
+// CHECK: cond_fail [[COND]]
+// CHECK: bb1:
+// CHECK: return
+sil @remove_cond_fail_same_cond_in_true : $@convention(thin)(Builtin.Int1, Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
+  cond_br %0, bb1, bb2
+bb1:
+  cond_fail %0 : $Builtin.Int1
+  unreachable
+bb2:
+  // Make bb1 not dominated from bb0 to prevent that dominator based
+  // simplification does the same thing.
+  %55 = function_ref @external_f : $@convention(thin) ()->()
+  apply %55() : $@convention(thin) ()->()
+  cond_br %1, bb1, bb3
+bb3:
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @remove_cond_fail_same_cond_in_false
+// CHECK: bb0([[COND:%[0-9]*]]
+// CHECK-NOT: bb
+// CHECK: [[INV:%[0-9]*]] = builtin "xor_Int1"([[COND]]
+// CHECK-NOT: bb
+// CHECK: cond_fail [[INV]]
+// CHECK: bb1:
+// CHECK: return
+sil @remove_cond_fail_same_cond_in_false : $@convention(thin)(Builtin.Int1, Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
+  cond_br %0, bb2, bb1
+bb1:
+  %i1 = integer_literal $Builtin.Int1, -1
+  %i2 = builtin "xor_Int1"(%0 : $Builtin.Int1, %i1 : $Builtin.Int1) : $Builtin.Int1
+  cond_fail %i2 : $Builtin.Int1
+  unreachable
+bb2:
+  // Make bb1 not dominated from bb0 to prevent that dominator based
+  // simplification does the same thing.
+  %55 = function_ref @external_f : $@convention(thin) ()->()
+  apply %55() : $@convention(thin) ()->()
+  cond_br %1, bb1, bb3
+bb3:
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @remove_cond_fail_same_cond_in_false2
+// CHECK: bb0([[COND:%[0-9]*]]
+// CHECK-NOT: bb
+// CHECK: cond_fail [[COND]]
+// CHECK: bb1:
+// CHECK: return
+sil @remove_cond_fail_same_cond_in_false2 : $@convention(thin)(Builtin.Int1, Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
+  %i1 = integer_literal $Builtin.Int1, -1
+  %i2 = builtin "xor_Int1"(%0 : $Builtin.Int1, %i1 : $Builtin.Int1) : $Builtin.Int1
+  cond_br %i2, bb2, bb1
+bb1:
+  cond_fail %0 : $Builtin.Int1
+  unreachable
+bb2:
+  // Make bb1 not dominated from bb0 to prevent that dominator based
+  // simplification does the same thing.
+  %55 = function_ref @external_f : $@convention(thin) ()->()
+  apply %55() : $@convention(thin) ()->()
+  cond_br %1, bb1, bb3
+bb3:
+  %2 = tuple()
+  return %2 : $()
+}
+
+// CHECK-LABEL: sil @dont_remove_cond_fail_same_cond_in_false
+// CHECK: bb0([[COND:%[0-9]*]]
+// CHECK-NEXT: cond_br
+// CHECK: bb1:
+// CHECK-NEXT: cond_fail [[COND]]
+// CHECK: return
+sil @dont_remove_cond_fail_same_cond_in_false : $@convention(thin)(Builtin.Int1, Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
+  cond_br %0, bb2, bb1
+bb1:
+  cond_fail %0 : $Builtin.Int1
+  unreachable
+bb2:
+  // Make bb1 not dominated from bb0.
+  %55 = function_ref @external_f : $@convention(thin) ()->()
+  apply %55() : $@convention(thin) ()->()
+  cond_br %1, bb1, bb3
+bb3:
+  %2 = tuple()
+  return %2 : $()
+}
+
 // CHECK-LABEL: sil @move_cond_fail
 // CHECK:      bb1:
 // CHECK-NEXT:   apply
