@@ -3735,9 +3735,9 @@ getCallerDefaultArg(TypeChecker &tc, DeclContext *dc,
 static Expr *lookThroughIdentityExprs(Expr *expr) {
   while (true) {
     if (auto ident = dyn_cast<IdentityExpr>(expr)) {
-      expr = ident;
-    } else if (auto ident = dyn_cast<AnyTryExpr>(expr)) {
-      expr = ident;
+      expr = ident->getSubExpr();
+    } else if (auto anyTry = dyn_cast<AnyTryExpr>(expr)) {
+      expr = anyTry->getSubExpr();
     } else {
       return expr;
     }

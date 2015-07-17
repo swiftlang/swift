@@ -107,4 +107,15 @@ func invalidPatternCrash(let k : Int) {
   }
 }
 
+// <rdar://problem/21875219> Tuple to tuple conversion with IdentityExpr / AnyTryExpr hang
+class Paws {
+  init() throws {}
+}
 
+func scruff() -> (AnyObject?, ErrorType?) {
+  do {
+    return try (Paws(), nil)
+  } catch {
+    return (nil, error)
+  }
+}
