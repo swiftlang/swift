@@ -1647,7 +1647,12 @@ class FailureDiagnosis :public ASTVisitor<FailureDiagnosis, /*exprresult*/bool>{
 public:
   
   FailureDiagnosis(Expr *expr, ConstraintSystem *CS);
-     
+
+  template<typename ...ArgTypes>
+  InFlightDiagnostic diagnose(ArgTypes &&...Args) {
+    return CS->TC.diagnose(std::forward<ArgTypes>(Args)...);
+  }
+
   /// Attempt to diagnose a failure without taking into account the specific
   /// kind of expression that could not be type checked.
   bool diagnoseGeneralFailure();
@@ -1868,12 +1873,11 @@ bool FailureDiagnosis::diagnoseGeneralValueMemberFailure() {
   auto type = anchor->getType();
 
   if (typeIsNotSpecialized(type)) {
-    CS->TC.diagnose(anchor->getLoc(), diag::could_not_find_member,
-                    memberName)
+    diagnose(anchor->getLoc(), diag::could_not_find_member, memberName)
       .highlight(anchor->getSourceRange());
   } else {
-    CS->TC.diagnose(anchor->getLoc(), diag::could_not_find_member_type,
-                    getUserFriendlyTypeName(type), memberName)
+    diagnose(anchor->getLoc(), diag::could_not_find_member_type,
+             getUserFriendlyTypeName(type), memberName)
       .highlight(anchor->getSourceRange());
   }
   
@@ -1931,8 +1935,8 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure() {
   }
   
   if (argType.isNull() || argType->is<TypeVariableType>()) {
-    CS->TC.diagnose(anchor->getLoc(), diag::cannot_find_appropriate_overload,
-                    overloadName)
+    diagnose(anchor->getLoc(), diag::cannot_find_appropriate_overload,
+             overloadName)
        .highlight(anchor->getSourceRange());
     return true;
   }
@@ -1964,15 +1968,15 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure() {
 
   
   if (argType->getAs<TupleType>()) {
-    CS->TC.diagnose(apply->getFn()->getLoc(),
-                    diag::cannot_find_appropriate_overload_with_type_list,
-                    overloadName, getTypeListString(argType))
-    .highlight(apply->getSourceRange());
+    diagnose(apply->getFn()->getLoc(),
+             diag::cannot_find_appropriate_overload_with_type_list,
+             overloadName, getTypeListString(argType))
+      .highlight(apply->getSourceRange());
   } else {
-    CS->TC.diagnose(apply->getFn()->getLoc(),
-                    diag::cannot_find_appropriate_overload_with_type,
-                    overloadName, getTypeListString(argType))
-    .highlight(apply->getSourceRange());
+    diagnose(apply->getFn()->getLoc(),
+             diag::cannot_find_appropriate_overload_with_type,
+             overloadName, getTypeListString(argType))
+      .highlight(apply->getSourceRange());
   }
   
   suggestPotentialOverloads(overloadName, apply->getLoc(),
@@ -2008,9 +2012,8 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure() {
                                                             constraint);
   
   if (argumentConstraint) {
-    CS->TC.diagnose(anchor->getLoc(), diag::could_not_convert_argument,
-                    types.first).
-    highlight(anchor->getSourceRange());
+    diagnose(anchor->getLoc(), diag::could_not_convert_argument, types.first)
+      .highlight(anchor->getSourceRange());
     return true;
   }
     
@@ -2018,11 +2021,9 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure() {
   // variable and just print the conformance.
   if ((constraint->getKind() == ConstraintKind::ConformsTo) &&
       types.first->getAs<TypeVariableType>()) {
-    CS->TC.diagnose(anchor->getLoc(),
-                    diag::single_expression_conformance_failure,
-                    types.first)
-    .highlight(anchor->getSourceRange());
-    
+    diagnose(anchor->getLoc(), diag::single_expression_conformance_failure,
+             types.first)
+      .highlight(anchor->getSourceRange());
     return true;
   }
 
@@ -2048,7 +2049,7 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure() {
     if (isa<ClosureExpr>(anchor))
       diagID = diag::cannot_infer_closure_type;
       
-    CS->TC.diagnose(anchor->getLoc(), diagID)
+    diagnose(anchor->getLoc(), diagID)
       .highlight(anchor->getSourceRange());
     
     return true;
@@ -2057,24 +2058,22 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure() {
   // Special case the diagnostic for a function result-type mismatch.
   if (anchor->isReturnExpr()) {
     if (toType->isVoid()) {
-      CS->TC.diagnose(anchor->getLoc(),
-                      diag::cannot_return_value_from_void_func);
-      
+      diagnose(anchor->getLoc(), diag::cannot_return_value_from_void_func);
       return true;
     }
     
-    CS->TC.diagnose(anchor->getLoc(), diag::cannot_convert_to_return_type,
-                    fromType, toType)
+    diagnose(anchor->getLoc(), diag::cannot_convert_to_return_type,
+             fromType, toType)
       .highlight(anchor->getSourceRange());
     
     return true;
   }
   
-  CS->TC.diagnose(anchor->getLoc(), diag::invalid_relation,
-                  Failure::TypesNotConvertible - Failure::TypesNotEqual,
-                  getUserFriendlyTypeName(fromType),
-                  getUserFriendlyTypeName(toType))
-  .highlight(anchor->getSourceRange());
+  diagnose(anchor->getLoc(), diag::invalid_relation,
+           Failure::TypesNotConvertible - Failure::TypesNotEqual,
+           getUserFriendlyTypeName(fromType),
+           getUserFriendlyTypeName(toType))
+    .highlight(anchor->getSourceRange());
   
   return true;
 }
@@ -2215,24 +2214,23 @@ bool FailureDiagnosis::diagnoseContextualConversionError(Type exprResultType) {
   // specific error.
   if (expr->isReturnExpr()) {
     if (contextualType->isVoid()) {
-      CS->TC.diagnose(expr->getLoc(), diag::cannot_return_value_from_void_func)
+      diagnose(expr->getLoc(), diag::cannot_return_value_from_void_func)
         .highlight(expr->getSourceRange());
     } else {
-      CS->TC.diagnose(expr->getLoc(), diag::cannot_convert_to_return_type,
-                      exprResultType, contextualType)
+      diagnose(expr->getLoc(), diag::cannot_convert_to_return_type,
+               exprResultType, contextualType)
         .highlight(expr->getSourceRange());
     }
     return true;
   }
 
   
-  CS->TC.diagnose(expr->getLoc(),
-                  diag::invalid_relation,
-                  Failure::FailureKind::TypesNotConvertible -
+  diagnose(expr->getLoc(), diag::invalid_relation,
+           Failure::FailureKind::TypesNotConvertible -
                       Failure::FailureKind::TypesNotEqual,
-                  getUserFriendlyTypeName(exprResultType),
-                  getUserFriendlyTypeName(contextualType))
-  .highlight(expr->getSourceRange());
+           getUserFriendlyTypeName(exprResultType),
+           getUserFriendlyTypeName(contextualType))
+    .highlight(expr->getSourceRange());
   
   return true;
 }
@@ -2289,11 +2287,9 @@ suggestPotentialOverloads(StringRef functionName, SourceLoc loc,
     return;
   
   if (dupes.size() == 1) {
-    CS->TC.diagnose(loc, diag::suggest_expected_match,
-                    suggestionText);
+    diagnose(loc, diag::suggest_expected_match, suggestionText);
   } else {
-    CS->TC.diagnose(loc, diag::suggest_partial_overloads,
-                    functionName, suggestionText);
+    diagnose(loc, diag::suggest_partial_overloads, functionName,suggestionText);
   }
 }
 
@@ -2491,8 +2487,8 @@ bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
     if (typeIsNotSpecialized(resultTy))
       resultTy = Candidates[0]->getType()->castTo<FunctionType>()->getResult();
     
-    CS->TC.diagnose(binop->getLoc(), diag::result_type_no_match,
-                    getUserFriendlyTypeName(resultTy))
+    diagnose(binop->getLoc(), diag::result_type_no_match,
+             getUserFriendlyTypeName(resultTy))
       .highlight(binop->getSourceRange());
     return true;
   }
@@ -2512,13 +2508,13 @@ bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
   std::string overloadName = Candidates[0]->getNameStr();
   assert(!overloadName.empty());
   if (argTyName1.compare(argTyName2)) {
-    CS->TC.diagnose(binop->getLoc(), diag::cannot_apply_binop_to_args,
-                    overloadName, argTyName1, argTyName2)
+    diagnose(binop->getLoc(), diag::cannot_apply_binop_to_args,
+             overloadName, argTyName1, argTyName2)
       .highlight(argExpr->getElement(0)->getSourceRange())
       .highlight(argExpr->getElement(1)->getSourceRange());
   } else {
-    CS->TC.diagnose(binop->getLoc(), diag::cannot_apply_binop_to_same_args,
-                    overloadName, argTyName1)
+    diagnose(binop->getLoc(), diag::cannot_apply_binop_to_same_args,
+             overloadName, argTyName1)
       .highlight(argExpr->getElement(0)->getSourceRange())
       .highlight(argExpr->getElement(1)->getSourceRange());
   }
@@ -2556,8 +2552,8 @@ bool FailureDiagnosis::visitUnaryExpr(ApplyExpr *applyExpr) {
     if (typeIsNotSpecialized(resultTy))
       resultTy = Candidates[0]->getType()->castTo<FunctionType>()->getResult();
     
-    CS->TC.diagnose(applyExpr->getLoc(), diag::result_type_no_match,
-                    getUserFriendlyTypeName(resultTy))
+    diagnose(applyExpr->getLoc(), diag::result_type_no_match,
+             getUserFriendlyTypeName(resultTy))
       .highlight(applyExpr->getSourceRange());
     return true;
   }
@@ -2577,8 +2573,8 @@ bool FailureDiagnosis::visitUnaryExpr(ApplyExpr *applyExpr) {
   std::string overloadName = Candidates[0]->getNameStr();
   assert(!overloadName.empty());
 
-  CS->TC.diagnose(argExpr->getLoc(), diag::cannot_apply_unop_to_arg,
-                  overloadName, argTyName);
+  diagnose(argExpr->getLoc(), diag::cannot_apply_unop_to_arg, overloadName,
+           argTyName);
   
   suggestPotentialOverloads(overloadName, argExpr->getLoc(),
                             Candidates, candidateCloseness);
@@ -2647,12 +2643,13 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
   auto baseType = baseExpr->getType();
 
   // See if the subscript got resolved.
-  auto loc = CS->getConstraintLocator(SE, ConstraintLocator::SubscriptMember);
+  auto locator =
+    CS->getConstraintLocator(SE, ConstraintLocator::SubscriptMember);
 
   auto decomposedIndexType = decomposeArgumentType(indexType);
   
   CandidateCloseness candidateCloseness;
-  auto Candidates = collectCalleeCandidateInfo(loc, candidateCloseness,
+  auto Candidates = collectCalleeCandidateInfo(locator, candidateCloseness,
      [&](ValueDecl *decl) -> CandidateCloseness {
     // Classify how close this match is.  Non-subscript decls don't match.
     auto *SD = dyn_cast<SubscriptDecl>(decl);
@@ -2672,7 +2669,11 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     return std::max(evaluateCloseness(SD->getIndicesType(),decomposedIndexType),
                     selfConstraint);
   });
- 
+
+  // Any diagnostics should be emitted with the caret pointing at the [ in the
+  // subscript expression.
+  SourceLoc loc = indexExpr->getStartLoc();
+
   // TODO: Is there any reason to check for CC_NonLValueInOut here?
   
   if (candidateCloseness == CC_ExactMatch) {
@@ -2689,7 +2690,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
       // produced.
       resultTy = Candidates[0]->getType()->castTo<FunctionType>()->getResult();
     } else {
-      CS->TC.diagnose(SE->getLoc(), diag::result_type_no_match_ambiguous)
+      diagnose(loc, diag::result_type_no_match_ambiguous)
         .highlight(SE->getSourceRange());
       suggestPotentialOverloads("subscript", SE->getLoc(),
                                 Candidates, candidateCloseness);
@@ -2697,8 +2698,8 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     }
     
     // Only one choice.
-    CS->TC.diagnose(SE->getLoc(), diag::result_type_no_match,
-                    getUserFriendlyTypeName(resultTy))
+    diagnose(indexExpr->getLoc(), diag::result_type_no_match,
+             getUserFriendlyTypeName(resultTy))
       .highlight(SE->getSourceRange());
     return true;
   }
@@ -2706,8 +2707,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
   // If the closes matches all mismatch on self, we either have something that
   // cannot be subscripted, or an ambiguity.
   if (candidateCloseness == CC_SelfMismatch) {
-    CS->TC.diagnose(SE->getLoc(), diag::cannot_subscript_base,
-                    getUserFriendlyTypeName(baseType))
+    diagnose(loc, diag::cannot_subscript_base,getUserFriendlyTypeName(baseType))
       .highlight(SE->getBase()->getSourceRange());
     // FIXME: Should suggest overload set, but we're not ready for that until
     // it points to candidates and identifies the self type in the diagnostic.
@@ -2722,8 +2722,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
   
   assert(!indexTypeName.empty() && !baseTypeName.empty());
   
-  CS->TC.diagnose(indexExpr->getLoc(), diag::cannot_subscript_with_index,
-                  baseTypeName, indexTypeName);
+  diagnose(loc, diag::cannot_subscript_with_index, baseTypeName, indexTypeName);
 
   suggestPotentialOverloads("subscript", SE->getLoc(),
                             Candidates, candidateCloseness);
@@ -2837,31 +2836,26 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
     std::string argString = getTypeListString(argExpr->getType());
     
     if (isOverloadedFn) {
-      CS->TC.diagnose(fnExpr->getLoc(),
-                      isInitializer ?
-                      diag::cannot_find_appropriate_initializer_with_list :
-                      diag::cannot_find_appropriate_overload_with_list,
-                      overloadName,
-                      argString);
+      diagnose(fnExpr->getLoc(),
+               isInitializer ?
+               diag::cannot_find_appropriate_initializer_with_list :
+               diag::cannot_find_appropriate_overload_with_list,
+               overloadName, argString);
     } else if (!isClosureInvocation) {
-      CS->TC.diagnose(fnExpr->getLoc(),
-                      isInitializer ?
-                      diag::cannot_apply_initializer_to_args :
-                      diag::cannot_apply_function_to_args,
-                      overloadName,
-                      argString);
+      diagnose(fnExpr->getLoc(),
+               isInitializer ?
+               diag::cannot_apply_initializer_to_args :
+               diag::cannot_apply_function_to_args,
+               overloadName, argString);
     } else if (isInvalidTrailingClosureTarget) {
-      CS->TC.diagnose(fnExpr->getLoc(),
-                      diag::invalid_trailing_closure_target);
+      diagnose(fnExpr->getLoc(), diag::invalid_trailing_closure_target);
     } else {
-      CS->TC.diagnose(fnExpr->getLoc(),
-                      diag::cannot_invoke_closure,
-                      argString);
+      diagnose(fnExpr->getLoc(), diag::cannot_invoke_closure, argString);
     }
   } else {
     // Otherwise, emit diagnostics that say "no arguments".
     if (isClosureInvocation) {
-      CS->TC.diagnose(fnExpr->getLoc(), diag::cannot_infer_closure_type);
+      diagnose(fnExpr->getLoc(), diag::cannot_infer_closure_type);
       
       if (!isInvalidTrailingClosureTarget) {
         auto closureExpr = cast<ClosureExpr>(unwrapParenExpr(fnExpr));
@@ -2869,17 +2863,17 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
         if (!closureExpr->hasSingleExpressionBody() &&
             !closureExpr->hasExplicitResultType() &&
             !closureExpr->getBody()->getElements().empty()) {
-          CS->TC.diagnose(fnExpr->getLoc(),
-                          diag::mult_stmt_closures_require_explicit_result);
+          diagnose(fnExpr->getLoc(),
+                   diag::mult_stmt_closures_require_explicit_result);
         }
       }
       
     } else {
-      CS->TC.diagnose(fnExpr->getLoc(),
-                      isInitializer ?
-                        diag::cannot_find_initializer_with_no_params :
-                        diag::cannot_find_overload_with_no_params,
-                      overloadName);
+      diagnose(fnExpr->getLoc(),
+               isInitializer ?
+                 diag::cannot_find_initializer_with_no_params :
+                 diag::cannot_find_overload_with_no_params,
+               overloadName);
     }
   }
   
@@ -2893,7 +2887,7 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
 bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
   // Diagnose obvious assignments to literals.
   if (isa<LiteralExpr>(assignExpr->getDest()->getSemanticsProvidingExpr())) {
-    CS->TC.diagnose(assignExpr->getLoc(), diag::cannot_assign_to_literal);
+    diagnose(assignExpr->getLoc(), diag::cannot_assign_to_literal);
     return true;
   }
 
@@ -2916,8 +2910,8 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
 
   auto destTypeName = getUserFriendlyTypeName(destType);
   auto srcTypeName = getUserFriendlyTypeName(srcType);
-  CS->TC.diagnose(srcExpr->getLoc(), diag::cannot_assign_values, srcTypeName,
-                  destTypeName);
+  diagnose(srcExpr->getLoc(), diag::cannot_assign_values, srcTypeName,
+           destTypeName);
   return true;
 }
 
@@ -2953,10 +2947,10 @@ bool FailureDiagnosis::visitCoerceExpr(CoerceExpr *CE) {
   }
 
   if (conversionTypes.first && conversionTypes.second) {
-    CS->TC.diagnose(CE->getLoc(), diag::invalid_relation,
-                    Failure::TypesNotConvertible - Failure::TypesNotEqual,
-                    getUserFriendlyTypeName(conversionTypes.first),
-                    getUserFriendlyTypeName(conversionTypes.second))
+    diagnose(CE->getLoc(), diag::invalid_relation,
+             Failure::TypesNotConvertible - Failure::TypesNotEqual,
+             getUserFriendlyTypeName(conversionTypes.first),
+             getUserFriendlyTypeName(conversionTypes.second))
       .highlight(CE->getSourceRange());
     return true;
   }
@@ -2983,10 +2977,10 @@ visitForcedCheckedCastExpr(ForcedCheckedCastExpr *FCE) {
   }
 
   if (conversionTypes.first && conversionTypes.second) {
-    CS->TC.diagnose(FCE->getLoc(), diag::invalid_relation,
-                    Failure::TypesNotConvertible - Failure::TypesNotEqual,
-                    getUserFriendlyTypeName(conversionTypes.first),
-                    getUserFriendlyTypeName(conversionTypes.second))
+    diagnose(FCE->getLoc(), diag::invalid_relation,
+             Failure::TypesNotConvertible - Failure::TypesNotEqual,
+             getUserFriendlyTypeName(conversionTypes.first),
+             getUserFriendlyTypeName(conversionTypes.second))
       .highlight(FCE->getSourceRange());
     return true;
   }
@@ -3002,8 +2996,8 @@ bool FailureDiagnosis::visitForceValueExpr(ForceValueExpr *FVE) {
   // If the subexpression type checks as a non-optional type, then that is the
   // error.  Produce a specific diagnostic about this.
   if (argType->getOptionalObjectType().isNull()) {
-    CS->TC.diagnose(FVE->getLoc(), diag::invalid_force_unwrap,
-                    getUserFriendlyTypeName(argType))
+    diagnose(FVE->getLoc(), diag::invalid_force_unwrap,
+             getUserFriendlyTypeName(argType))
       .fixItRemove(FVE->getExclaimLoc())
       .highlight(FVE->getSourceRange());
     return true;
@@ -3020,8 +3014,8 @@ bool FailureDiagnosis::visitBindOptionalExpr(BindOptionalExpr *BOE) {
   // If the subexpression type checks as a non-optional type, then that is the
   // error.  Produce a specific diagnostic about this.
   if (argType->getOptionalObjectType().isNull()) {
-    CS->TC.diagnose(BOE->getQuestionLoc(), diag::invalid_optional_chain,
-                    getUserFriendlyTypeName(argType))
+    diagnose(BOE->getQuestionLoc(), diag::invalid_optional_chain,
+             getUserFriendlyTypeName(argType))
       .highlight(BOE->getSourceRange())
       .fixItRemove(BOE->getQuestionLoc());
     return true;
@@ -3047,9 +3041,9 @@ bool FailureDiagnosis::visitIfExpr(IfExpr *IE) {
   if (!falseExpr) return true;
 
   
-  CS->TC.diagnose(IE->getColonLoc(), diag::if_expr_cases_mismatch,
-                  getUserFriendlyTypeName(trueExpr->getType()),
-                  getUserFriendlyTypeName(falseExpr->getType()))
+  diagnose(IE->getColonLoc(), diag::if_expr_cases_mismatch,
+           getUserFriendlyTypeName(trueExpr->getType()),
+           getUserFriendlyTypeName(falseExpr->getType()))
     .highlight(trueExpr->getSourceRange())
     .highlight(falseExpr->getSourceRange());
   return true;
