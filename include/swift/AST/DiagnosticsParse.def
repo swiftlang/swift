@@ -199,7 +199,7 @@ ERROR(autoclosure_not_on_enums,attribute_parsing,none,
       "@autoclosure is only allowed on parameters, not on enum cases", ())
 
 ERROR(enum_case_dot_prefix,decl_parsing,none,
-      "extraneous '.' in enum case declaration", ())
+      "extraneous '.' in enum 'case' declaration", ())
 
 
 // Variable getters/setters

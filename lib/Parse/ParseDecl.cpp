@@ -2016,8 +2016,11 @@ ParserStatus Parser::parseDecl(SmallVectorImpl<Decl*> &Entries,
       Entries.push_back(DeclResult.get());
   }
 
-  if (Status.isSuccess() && Tok.is(tok::semi))
-    Entries.back()->TrailingSemiLoc = consumeToken(tok::semi);
+  if (Tok.is(tok::semi)) {
+    SourceLoc TrailingSemiLoc = consumeToken(tok::semi);
+    if (Status.isSuccess())
+      Entries.back()->TrailingSemiLoc = TrailingSemiLoc;
+  }
 
   if (Status.isSuccess()) {
     // If we parsed 'class' or 'static', but didn't handle it above, complain
@@ -4190,9 +4193,10 @@ ParserStatus Parser::parseDeclEnumCase(ParseDeclOptions Flags,
       }
       if (CommaLoc.isValid()) {
         diagnose(Tok, diag::expected_identifier_after_case_comma);
+        Status.setIsParseError();
         return Status;
       }
-      diagnose(CaseLoc, diag::expected_identifier_in_decl, "enum case");
+      diagnose(CaseLoc, diag::expected_identifier_in_decl, "enum 'case'");
     } else if (DotLoc.isValid()) {
       diagnose(DotLoc, diag::enum_case_dot_prefix)
         .fixItRemove(DotLoc);

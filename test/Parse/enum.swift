@@ -113,14 +113,19 @@ enum Recovery3 {
   case UE2(): // expected-error {{'case' label can only appear inside a 'switch' statement}}
 }
 enum Recovery4 {
-  case Self Self // expected-error {{expected identifier in enum case declaration}} expected-error {{consecutive declarations on a line must be separated by ';'}} expected-error {{expected declaration}}
+  case Self Self // expected-error {{expected identifier in enum 'case' declaration}} expected-error {{consecutive declarations on a line must be separated by ';'}} expected-error {{expected declaration}}
 }
 enum Recovery5 {
-  case .UE3 // expected-error {{extraneous '.' in enum case declaration}} {{8-9=}}
+  case .UE3 // expected-error {{extraneous '.' in enum 'case' declaration}} {{8-9=}}
   case .UE4, .UE5
-  // expected-error@-1{{extraneous '.' in enum case declaration}} {{8-9=}}
-  // expected-error@-2{{extraneous '.' in enum case declaration}} {{14-15=}}
+  // expected-error@-1{{extraneous '.' in enum 'case' declaration}} {{8-9=}}
+  // expected-error@-2{{extraneous '.' in enum 'case' declaration}} {{14-15=}}
 }
+enum Recovery6 {
+  case Snout, _; // expected-error {{expected identifier after comma in enum 'case' declaration}}
+  case _; // expected-error {{expected identifier in enum 'case' declaration}}
+  case Tusk, // expected-error {{expected pattern}}
+} // expected-error {{expected identifier after comma in enum 'case' declaration}}
 
 enum RawTypeEmpty : Int {} // expected-error {{an enum with no cases cannot declare a raw type}}
 // expected-error@-1{{type 'RawTypeEmpty' does not conform to protocol 'RawRepresentable'}}
