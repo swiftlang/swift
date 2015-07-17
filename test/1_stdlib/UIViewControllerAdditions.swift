@@ -5,8 +5,6 @@
 
 // REQUIRES: OS=ios
 
-// REQUIRES: disabled
-
 import UIKit
 
 // _TtC1a15View1Controller.nib
@@ -49,12 +47,12 @@ print("tag 4 4=\(v4.view.tag) you're it")
 // CHECK: tag 4 4=4 you're it
 
 let v5 = View5Controller(nibName:nil, bundle:bundle)
-print("tag 5 0=\(v5.view.tag) you're it")
-// CHECK: tag 5 0=0 you're it
+print("tag 5 5=\(v5.view.tag) you're it")
+// CHECK: tag 5 5=5 you're it
 
 let v6 = View6Controller(nibName:nil, bundle:bundle)
-print("tag 6 0=\(v6.view.tag) you're it")
-// CHECK: tag 6 0=0 you're it
+print("tag 6 6=\(v6.view.tag) you're it")
+// CHECK: tag 6 6=6 you're it
 
 let v7 = MissingViewController(nibName:nil, bundle:bundle)
 print("tag 7 0=\(v7.view.tag) you're it")
