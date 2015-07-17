@@ -16,7 +16,7 @@ struct ReferenceStorageTypeLayout<T> {
   // -- ObjC-refcounted class
   // CHECK: store i8** getelementptr inbounds (i8*, i8** @_TWVXoBO, i32 17)
   unowned(safe)   var cs:  C
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_TWVXuBO, i32 17)
+  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_TWVMBo, i32 17)
   unowned(unsafe) var cu:  C
   // CHECK: store i8** getelementptr inbounds (i8*, i8** @_TWVXwGSqBO_, i32 17)
   weak            var cwo: C?
@@ -26,7 +26,7 @@ struct ReferenceStorageTypeLayout<T> {
   // -- Pure ObjC protocols are unknown-refcounted
   // CHECK: store i8** getelementptr inbounds (i8*, i8** @_TWVXoBO, i32 17)
   unowned(safe)   var ps:  P
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_TWVXuBO, i32 17)
+  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_TWVMBo, i32 17)
   unowned(unsafe) var pu:  P
   // CHECK: store i8** getelementptr inbounds (i8*, i8** @_TWVXwGSqBO_, i32 17)
   weak            var pwo: P?
@@ -35,7 +35,7 @@ struct ReferenceStorageTypeLayout<T> {
 
   // CHECK: store i8** getelementptr inbounds (i8*, i8** @_TWVXoBO, i32 17)
   unowned(safe)   var pqs:  protocol<P, Q>
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_TWVXuBO, i32 17)
+  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_TWVMBo, i32 17)
   unowned(unsafe) var pqu:  protocol<P, Q>
   // CHECK: store i8** getelementptr inbounds (i8*, i8** @_TWVXwGSqBO_, i32 17)
   weak            var pqwo: protocol<P, Q>?

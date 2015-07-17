@@ -827,6 +827,66 @@ Runtime.test("casting AnyObject to class metatypes") {
   }
 }
 
+class Malkovich: Malkovichable {
+  var malkovich: String { return "malkovich" }
+}
+protocol Malkovichable: class {
+  var malkovich: String { get }
+}
+
+struct GenericStructWithReferenceStorage<T> {
+  var a: T
+  unowned(safe)   var unownedConcrete: Malkovich
+  unowned(unsafe) var unmanagedConcrete: Malkovich
+  weak            var weakConcrete: Malkovich?
+
+  unowned(safe)   var unownedProto: Malkovichable
+  unowned(unsafe) var unmanagedProto: Malkovichable
+  weak            var weakProto: Malkovichable?
+}
+
+func exerciseReferenceStorageInGenericContext<T>(
+    x: GenericStructWithReferenceStorage<T>,
+    forceCopy y: GenericStructWithReferenceStorage<T>
+) {
+  expectEqual(x.unownedConcrete.malkovich, "malkovich")
+  expectEqual(x.unmanagedConcrete.malkovich, "malkovich")
+  expectEqual(x.weakConcrete!.malkovich, "malkovich")
+  expectEqual(x.unownedProto.malkovich, "malkovich")
+  expectEqual(x.unmanagedProto.malkovich, "malkovich")
+  expectEqual(x.weakProto!.malkovich, "malkovich")
+
+  expectEqual(y.unownedConcrete.malkovich, "malkovich")
+  expectEqual(y.unmanagedConcrete.malkovich, "malkovich")
+  expectEqual(y.weakConcrete!.malkovich, "malkovich")
+  expectEqual(y.unownedProto.malkovich, "malkovich")
+  expectEqual(y.unmanagedProto.malkovich, "malkovich")
+  expectEqual(y.weakProto!.malkovich, "malkovich")
+}
+
+Runtime.test("Struct layout with reference storage types") {
+  let malkovich = Malkovich()
+
+  let x = GenericStructWithReferenceStorage(a:                 malkovich,
+                                            unownedConcrete:   malkovich,
+                                            unmanagedConcrete: malkovich,
+                                            weakConcrete:      malkovich,
+                                            unownedProto:      malkovich,
+                                            unmanagedProto:    malkovich,
+                                            weakProto:         malkovich)
+  exerciseReferenceStorageInGenericContext(x, forceCopy: x)
+
+  expectEqual(x.unownedConcrete.malkovich, "malkovich")
+  expectEqual(x.unmanagedConcrete.malkovich, "malkovich")
+  expectEqual(x.weakConcrete!.malkovich, "malkovich")
+  expectEqual(x.unownedProto.malkovich, "malkovich")
+  expectEqual(x.unmanagedProto.malkovich, "malkovich")
+  expectEqual(x.weakProto!.malkovich, "malkovich")
+
+  // Make sure malkovich lives long enough.
+  print(malkovich)
+}
+
 var RuntimeFoundationWrappers = TestSuite("RuntimeFoundationWrappers")
 
 RuntimeFoundationWrappers.test("_stdlib_NSObject_isEqual/NoLeak") {

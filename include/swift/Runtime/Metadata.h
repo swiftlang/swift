@@ -795,12 +795,16 @@ extern "C" const ValueWitnessTable _TWVBi256_;    // Builtin.Int256
 // The object-pointer table can be used for arbitrary Swift refcounted
 // pointer types.
 extern "C" const ExtraInhabitantsValueWitnessTable _TWVBo; // Builtin.NativeObject
+extern "C" const ExtraInhabitantsValueWitnessTable _TWVXoBo; // unowned Builtin.NativeObject
+extern "C" const ValueWitnessTable _TWVXwGSqBo_; // weak Builtin.NativeObject?
 
 extern "C" const ExtraInhabitantsValueWitnessTable _TWVBb; // Builtin.BridgeObject
 
 #if SWIFT_OBJC_INTEROP
 // The ObjC-pointer table can be used for arbitrary ObjC pointer types.
 extern "C" const ExtraInhabitantsValueWitnessTable _TWVBO; // Builtin.UnknownObject
+extern "C" const ExtraInhabitantsValueWitnessTable _TWVXoBO; // unowned Builtin.UnknownObject
+extern "C" const ValueWitnessTable _TWVXwGSqBO_; // weak Builtin.UnknownObject?
 #endif
 
 // The () -> () table can be used for arbitrary function types.

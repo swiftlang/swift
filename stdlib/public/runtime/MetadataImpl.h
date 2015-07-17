@@ -73,6 +73,7 @@ namespace metadataimpl {
 //   static constexpr size_t alignment;
 //   static constexpr size_t stride;
 //   static constexpr bool isPOD;
+//   static constexpr bool isBitwiseTakable;
 //   static constexpr unsigned numExtraInhabitants;
 //   static void destroy(T *);
 //   static T *initializeWithCopy(T *dest, T *src);
@@ -280,6 +281,98 @@ struct SwiftRetainableBox :
   }
 };
 
+/// A box implementation class for Swift unowned object pointers.
+struct SwiftUnownedRetainableBox :
+    RetainableBoxBase<SwiftUnownedRetainableBox, HeapObject*> {
+  static HeapObject *retain(HeapObject *obj) {
+    swift_weakRetain(obj);
+    return obj;
+  }
+
+  static void release(HeapObject *obj) {
+    swift_weakRelease(obj);
+  }
+};
+
+/// CRTP base class for weak reference boxes.
+template<typename Impl, typename T>
+struct WeakRetainableBoxBase {
+  using type = T;
+  static constexpr size_t size = sizeof(type);
+  static constexpr size_t alignment = alignof(type);
+  static constexpr size_t stride = sizeof(type);
+  static constexpr bool isPOD = false;
+  static constexpr bool isBitwiseTakable = false;
+  static constexpr unsigned numExtraInhabitants = 0;
+
+  // The implementation must provide implementations of:
+  //   static void destroy(T *);
+  //   static T *initializeWithCopy(T *dest, T *src);
+  //   static T *initializeWithTake(T *dest, T *src);
+  //   static T *assignWithCopy(T *dest, T *src);
+  //   static T *assignWithTake(T *dest, T *src);
+  // The array value witnesses are implemented pessimistically assuming the
+  // type is nontrivially copyable and takable.
+
+  static void destroyArray(T *arr, size_t n) {
+    while (n--)
+      Impl::destroy(arr++);
+  }
+  
+  static T *initializeArrayWithCopy(T *dest, T *src, size_t n) {
+    T *r = dest;
+    while (n--)
+      Impl::initializeWithCopy(dest++, src++);
+    return r;
+  }
+  
+  static T *initializeArrayWithTakeFrontToBack(T *dest, T *src, size_t n) {
+    T *r = dest;
+    while (n--)
+      Impl::initializeWithTake(dest++, src++);
+    return r;
+  }
+  static T *initializeArrayWithTakeBackToFront(T *dest, T *src, size_t n) {
+    T *r = dest;
+
+    dest += n;
+    src  += n;
+
+    while (n--)
+      Impl::initializeWithTake(--dest, --src);
+
+    return r;
+  }
+};
+
+/// A box implementation class for Swift weak object pointers.
+struct SwiftWeakRetainableBox :
+    WeakRetainableBoxBase<SwiftWeakRetainableBox, WeakReference> {
+  static void destroy(WeakReference *ref) {
+    swift_weakDestroy(ref);
+  }
+  static WeakReference *initializeWithCopy(WeakReference *dest,
+                                           WeakReference *src) {
+    swift_weakCopyInit(dest, src);
+    return dest;
+  }
+  static WeakReference *initializeWithTake(WeakReference *dest,
+                                           WeakReference *src) {
+    swift_weakTakeInit(dest, src);
+    return dest;
+  }
+  static WeakReference *assignWithCopy(WeakReference *dest,
+                                       WeakReference *src) {
+    swift_weakCopyAssign(dest, src);
+    return dest;
+  }
+  static WeakReference *assignWithTake(WeakReference *dest,
+                                       WeakReference *src) {
+    swift_weakTakeAssign(dest, src);
+    return dest;
+  }
+};
+
 #if SWIFT_OBJC_INTEROP
 extern "C" void *objc_retain(void *obj);
 extern "C" void objc_release(void *obj);
@@ -297,6 +390,51 @@ struct ObjCRetainableBox : RetainableBoxBase<ObjCRetainableBox, void*> {
     objc_release(obj);
   }
 };
+
+/// A box implementation class for unowned Objective-C object pointers.
+struct ObjCUnownedRetainableBox
+    : RetainableBoxBase<ObjCUnownedRetainableBox, void*> {
+  static constexpr unsigned numExtraInhabitants =
+    swift_getHeapObjectExtraInhabitantCount();
+
+  static void *retain(void *obj) {
+    swift_unknownWeakRetain(obj);
+    return obj;
+  }
+
+  static void release(void *obj) {
+    swift_unknownWeakRelease(obj);
+  }
+};
+
+/// A box implementation class for Swift weak object pointers.
+struct ObjCWeakRetainableBox :
+    WeakRetainableBoxBase<ObjCWeakRetainableBox, WeakReference> {
+  static void destroy(WeakReference *ref) {
+    swift_unknownWeakDestroy(ref);
+  }
+  static WeakReference *initializeWithCopy(WeakReference *dest,
+                                           WeakReference *src) {
+    swift_unknownWeakCopyInit(dest, src);
+    return dest;
+  }
+  static WeakReference *initializeWithTake(WeakReference *dest,
+                                           WeakReference *src) {
+    swift_unknownWeakTakeInit(dest, src);
+    return dest;
+  }
+  static WeakReference *assignWithCopy(WeakReference *dest,
+                                       WeakReference *src) {
+    swift_unknownWeakCopyAssign(dest, src);
+    return dest;
+  }
+  static WeakReference *assignWithTake(WeakReference *dest,
+                                       WeakReference *src) {
+    swift_unknownWeakTakeAssign(dest, src);
+    return dest;
+  }
+};
+
 #endif
 
 /// A box implementation class for unknown-retainable object pointers.

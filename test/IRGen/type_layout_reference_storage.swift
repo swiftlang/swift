@@ -12,7 +12,7 @@ struct ReferenceStorageTypeLayout<T> {
   // -- Known-Swift-refcounted type
   // CHECK: store i8** getelementptr inbounds (i8*, i8** @_TWVXoBo, i32 17)
   unowned(safe)   var cs:  C
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_TWVXuBo, i32 17)
+  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_TWVMBo, i32 17)
   unowned(unsafe) var cu:  C
   // CHECK: store i8** getelementptr inbounds (i8*, i8** @_TWVXwGSqBo_, i32 17)
   weak            var cwo: C?
@@ -49,7 +49,7 @@ struct ReferenceStorageTypeLayout<T> {
   // -- Unknown-refcounted existential without witness tables.
   // CHECK: store i8** getelementptr inbounds (i8*, i8** @_TWVXo[[UNKNOWN:B[Oo]]], i32 17)
   unowned(safe)   var aos:  AnyObject
-  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_TWVXu[[UNKNOWN]], i32 17)
+  // CHECK: store i8** getelementptr inbounds (i8*, i8** @_TWVMBo, i32 17)
   unowned(unsafe) var aou:  AnyObject
   // CHECK: store i8** getelementptr inbounds (i8*, i8** @_TWVXwGSq[[UNKNOWN]]_, i32 17)
   weak            var aowo: AnyObject?

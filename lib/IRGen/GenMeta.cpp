@@ -1539,6 +1539,13 @@ namespace {
           if (IGF.IGM.SILMod->Types.protocolRequiresWitnessTable(proto))
             return visitType(type);
 
+      // Unmanaged references are plain pointers with extra inhabitants,
+      // which look like thick metatypes.
+      if (type->getOwnership() == Ownership::Unmanaged) {
+        auto metatype = CanMetatypeType::get(C.TheNativeObjectType);
+        return emitFromValueWitnessTable(metatype);
+      }
+
       auto getReferenceCountingForReferent
         = [&](CanType referent) -> ReferenceCounting {
           // For generic types, use unknown reference counting.

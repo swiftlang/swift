@@ -62,6 +62,14 @@ const ValueWitnessTable swift::_TWVBi256_ =
 const ExtraInhabitantsValueWitnessTable swift::_TWVBo =
   ValueWitnessTableForBox<SwiftRetainableBox>::table;
 
+/// The basic value-witness table for Swift unowned pointers.
+const ExtraInhabitantsValueWitnessTable swift::_TWVXoBo =
+  ValueWitnessTableForBox<SwiftUnownedRetainableBox>::table;
+
+/// The basic value-witness table for Swift weak pointers.
+const ValueWitnessTable swift::_TWVXwGSqBo_ =
+  ValueWitnessTableForBox<SwiftWeakRetainableBox>::table;
+
 /// The value-witness table for pointer-aligned unmanaged pointer types.
 const ExtraInhabitantsValueWitnessTable swift::_TWVMBo =
   ValueWitnessTableForBox<PointerPointerBox>::table;
@@ -85,6 +93,15 @@ static const ValueWitnessTable _TWVBB =
 /// The basic value-witness table for ObjC object pointers.
 const ExtraInhabitantsValueWitnessTable swift::_TWVBO =
   ValueWitnessTableForBox<ObjCRetainableBox>::table;
+
+/// The basic value-witness table for ObjC unowned pointers.
+const ExtraInhabitantsValueWitnessTable swift::_TWVXoBO =
+  ValueWitnessTableForBox<ObjCUnownedRetainableBox>::table;
+
+/// The basic value-witness table for ObjC unowned pointers.
+const ValueWitnessTable swift::_TWVXwGSqBO_ =
+  ValueWitnessTableForBox<ObjCWeakRetainableBox>::table;
+
 #endif
 
 /*** Functions ***************************************************************/
