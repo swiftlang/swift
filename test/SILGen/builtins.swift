@@ -483,7 +483,8 @@ func reinterpretAddrOnlyToTrivial<T>(t: T) -> Int {
 func reinterpretAddrOnlyLoadable<T>(a: Int, _ b: T) -> (T, Int) {
   // CHECK: [[BUF:%.*]] = alloc_stack $Int
   // CHECK: store {{%.*}} to [[BUF]]#1
-  // CHECK: unchecked_addr_cast [[BUF]]#1 : $*Int to $*T
+  // CHECK: [[RES1:%.*]] = unchecked_addr_cast [[BUF]]#1 : $*Int to $*T
+  // CHECK: copy_addr [[RES1]] to [initialization]
   return (Builtin.reinterpretCast(a) as T,
   // CHECK: [[RES:%.*]] = unchecked_addr_cast {{%.*}} : $*T to $*Int
   // CHECK: load [[RES]]

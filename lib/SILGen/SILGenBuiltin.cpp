@@ -517,37 +517,34 @@ static ManagedValue emitBuiltinReinterpretCast(SILGenFunction &gen,
     auto toAddr = gen.B.createUncheckedAddrCast(loc, fromAddr,
                                       toTL.getLoweredType().getAddressType());
     
-    SILValue toValue;
-    // Load the destination value if it's loadable.
+    // Load and retain the destination value if it's loadable. Leave the cleanup
+    // on the original value since we don't know anything about it's type.
     if (toTL.isLoadable()) {
-      toValue = gen.B.createLoad(loc, toAddr);
-    } else {
-      toValue = toAddr;
+      SILValue val = gen.B.createLoad(loc, toAddr);
+      return gen.emitManagedRetain(loc, val, toTL);
     }
-    
-    // Forward it along with the original cleanup.
-    // TODO: Could try to pick which of the original or destination types has
-    // a cheaper cleanup.
+    // Leave the cleanup on the original value.
     if (toTL.isTrivial())
-      return ManagedValue::forUnmanaged(toValue);
-    
-    return ManagedValue(toValue, args[0].getCleanup());
-  }
-  
+      return ManagedValue::forUnmanaged(toAddr);
 
+    // Initialize the +1 result buffer without taking the incoming value. The
+    // source and destination cleanups will be independent.
+    auto buffer = gen.getBufferForExprResult(loc, toTL.getLoweredType(), C);
+    gen.B.createCopyAddr(loc, toAddr, buffer, IsNotTake, IsInitialization);
+    return gen.manageBufferForExprResult(buffer, toTL, C);
+  }
   // Create the appropriate bitcast based on the source and dest types.
   auto &in = args[0];
   SILValue out = gen.B.createUncheckedBitCast(loc, in.getValue(),
                                               toTL.getLoweredType());
 
-  // Leave the cleanup on the original value unless the source and dest types
-  // have identical cleanup.
-  if (toTL.isTrivial())
-    return ManagedValue::forUnmanaged(out);
-  else if (isa<UncheckedRefBitCastInst>(out))
+  // If the cast reduces to unchecked_ref_bit_cast, then the source and dest
+  // have identical cleanup, so just forward the cleanup as an optimization.
+  if (isa<UncheckedRefBitCastInst>(out))
     return ManagedValue(out, in.getCleanup());
-  else
-    return gen.emitManagedRetain(loc, out, toTL);
+
+  // Otherwise leave the original cleanup and retain the cast value.
+  return gen.emitManagedRetain(loc, out, toTL);
 }
 
 /// Specialized emitter for Builtin.castToBridgeObject.
