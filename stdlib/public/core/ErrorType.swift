@@ -17,6 +17,12 @@ public protocol ErrorType {
   var _code: Int { get }
 }
 
+extension ErrorType {
+  public var _domain: String {
+    return String(reflecting: self.dynamicType)
+  }
+}
+
 #if _runtime(_ObjC)
 // Helper functions for the C++ runtime to have easy access to domain and
 // code as Objective-C values.

@@ -94,9 +94,9 @@ struct DefaultStruct : ErrorType { }
 class DefaultClass : ErrorType { }
 
 ErrorTypeTests.test("default domain and code") {
-  expectEqual(DefaultStruct()._domain, "DefaultStruct")
+  expectEqual(DefaultStruct()._domain, "main.DefaultStruct")
   expectEqual(DefaultStruct()._code, 0)
-  expectEqual(DefaultClass()._domain, "DefaultClass")
+  expectEqual(DefaultClass()._domain, "main.DefaultClass")
   expectEqual(DefaultClass()._code, 0)
 }
 

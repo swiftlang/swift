@@ -26,72 +26,6 @@
 using namespace swift;
 using namespace DerivedConformance;
 
-static void deriveBodyErrorType_domain(AbstractFunctionDecl *domainDecl) {
-  // enum SomeEnum {
-  //   @derived
-  //   var domain: String {
-  //     return "\(self.dynamicType)"
-  //   }
-  // }
-
-  auto &C = domainDecl->getASTContext();
-
-  auto selfRef = createSelfDeclRef(domainDecl);
-  DynamicTypeExpr *selfDynamicType
-    = new (C) DynamicTypeExpr(selfRef, SourceLoc(), Type());
-  selfDynamicType->setImplicit();
-  
-  Expr *segmentElts[] = {
-    selfDynamicType,
-  };
-  auto segments = C.AllocateCopy(segmentElts);
-  auto string = new (C) InterpolatedStringLiteralExpr(SourceLoc(), segments);
-  string->setImplicit();
-  
-  auto ret = new (C) ReturnStmt(SourceLoc(), string, /*implicit*/ true);
-  auto body = BraceStmt::create(C, SourceLoc(),
-                              ASTNode(ret),
-                              SourceLoc());
-  domainDecl->setBody(body);
-}
-
-static ValueDecl *deriveErrorType_domain(TypeChecker &tc, Decl *parentDecl,
-                                         NominalTypeDecl *nominal) {
-  // enum SomeEnum {
-  //   @derived
-  //   var domain: String {
-  //     return "\(self.dynamicType)"
-  //   }
-  // }
-
-  // Note that for @objc enums the format is assumed to be "MyModule.SomeEnum".
-  // If this changes, please change PrintAsObjC as well.
-  
-  ASTContext &C = tc.Context;
-  
-  auto stringTy = C.getStringDecl()->getDeclaredType();
-  Type nominalType = cast<DeclContext>(parentDecl)->getDeclaredTypeInContext();
-
-  // Define the getter.
-  auto getterDecl = declareDerivedPropertyGetter(tc, parentDecl, nominal,
-                                                 nominalType, stringTy,
-                                                 stringTy);
-  getterDecl->setBodySynthesizer(&deriveBodyErrorType_domain);
-  
-  // Define the property.
-  VarDecl *propDecl;
-  PatternBindingDecl *pbDecl;
-  std::tie(propDecl, pbDecl)
-    = declareDerivedReadOnlyProperty(tc, parentDecl, nominal, C.Id_domain_,
-                                     stringTy, stringTy, getterDecl);
-
-  auto dc = cast<IterableDeclContext>(parentDecl);
-  dc->addMember(getterDecl);
-  dc->addMember(propDecl);
-  dc->addMember(pbDecl);
-  return propDecl;
-}
-
 static void deriveBodyErrorType_enum_code(AbstractFunctionDecl *codeDecl) {
   // enum SomeEnum {
   //   case A,B,C,D
@@ -244,9 +178,7 @@ ValueDecl *DerivedConformance::deriveErrorType(TypeChecker &tc,
                                                Decl *parentDecl,
                                                NominalTypeDecl *type,
                                                ValueDecl *requirement) {
-  if (requirement->getName() == tc.Context.Id_domain_)
-    return deriveErrorType_domain(tc, parentDecl, type);
-  else if (requirement->getName() == tc.Context.Id_code_)
+  if (requirement->getName() == tc.Context.Id_code_)
     return deriveErrorType_code(tc, parentDecl, type);
   
   tc.diagnose(requirement->getLoc(),

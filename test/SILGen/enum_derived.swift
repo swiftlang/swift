@@ -35,7 +35,6 @@ enum E {
 
 extension def_enum.TrafficLight : ErrorType {}
 
-// CHECK-LABEL: define { i8*, {{.*}} } @_TFE12enum_derivedO8def_enum12TrafficLightg7_domainSS(i2) #0
 // CHECK-LABEL: define i{{32|64}} @_TFE12enum_derivedO8def_enum12TrafficLightg5_codeSi(i2)
 
 
