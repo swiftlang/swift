@@ -1526,7 +1526,9 @@ TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
     // for potential unavailability. Note that if D is a global in script
     // mode (which are not lazy) then we will already have returned
     // a diagnosis above.
-    bool lazilyInitializedStored = VD->isStatic() || DC->isModuleScopeContext();
+    bool lazilyInitializedStored = VD->isStatic() ||
+                                   VD->getAttrs().hasAttribute<LazyAttr>() ||
+                                   DC->isModuleScopeContext();
 
     if (VD->hasStorage() && !lazilyInitializedStored) {
       return diag::availability_stored_property_no_potential;

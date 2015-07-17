@@ -1243,13 +1243,22 @@ class ClassForFixit {
       // expected-error@-1 {{'ClassAvailableOn10_10' is only available on OS X 10.10 or newer}}
       // expected-note@-2 {{add @available attribute to enclosing class}} {{1-1=@available(OSX 10.10, *)\n}}
 
-  // We should really suggest a Fix-It adding @available() to the lazy var.
-  // rdar://problem/20968204
   lazy var fixitForReferenceInLazyPropertyType: ClassAvailableOn10_10? = nil
       // expected-error@-1 {{'ClassAvailableOn10_10' is only available on OS X 10.10 or newer}}
-      // expected-note@-2 {{add @available attribute to enclosing class}} {{1-1=@available(OSX 10.10, *)\n}}
+      // expected-note@-2 {{add @available attribute to enclosing var}} {{3-3=@available(OSX 10.10, *)\n  }}
+      // expected-note@-3 {{add @available attribute to enclosing class}} {{1-1=@available(OSX 10.10, *)\n}}
 
-  static var fixitForReferenceInLazyPropertyType: ClassAvailableOn10_10? = nil
+  private lazy var fixitForReferenceInPrivateLazyPropertyType: ClassAvailableOn10_10? = nil
+      // expected-error@-1 {{'ClassAvailableOn10_10' is only available on OS X 10.10 or newer}}
+      // expected-note@-2 {{add @available attribute to enclosing var}} {{3-3=@available(OSX 10.10, *)\n  }}
+      // expected-note@-3 {{add @available attribute to enclosing class}} {{1-1=@available(OSX 10.10, *)\n}}
+
+  lazy private var fixitForReferenceInLazyPrivatePropertyType: ClassAvailableOn10_10? = nil
+      // expected-error@-1 {{'ClassAvailableOn10_10' is only available on OS X 10.10 or newer}}
+      // expected-note@-2 {{add @available attribute to enclosing var}} {{3-3=@available(OSX 10.10, *)\n  }}
+      // expected-note@-3 {{add @available attribute to enclosing class}} {{1-1=@available(OSX 10.10, *)\n}}
+
+  static var fixitForReferenceInStaticPropertyType: ClassAvailableOn10_10? = nil
       // expected-error@-1 {{'ClassAvailableOn10_10' is only available on OS X 10.10 or newer}}
       // expected-note@-2 {{add @available attribute to enclosing class var}} {{3-3=@available(OSX 10.10, *)\n  }}
       // expected-note@-3 {{add @available attribute to enclosing class}} {{1-1=@available(OSX 10.10, *)\n}}

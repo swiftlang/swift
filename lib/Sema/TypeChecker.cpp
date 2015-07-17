@@ -1774,11 +1774,26 @@ static void fixAvailabilityForDecl(SourceRange ReferenceRange, const Decl *D,
   // syntax to suggest the Fix-It may differ from the declaration to which
   // we attach availability attributes in the abstract syntax tree during
   // parsing.
-  D = concreteSyntaxDeclForAvailableAttribute(D);
+  const Decl *ConcDecl = concreteSyntaxDeclForAvailableAttribute(D);
 
-  SourceLoc InsertLoc = D->getAttrs().getStartLoc(/*forModifiers=*/false);
+  DescriptiveDeclKind KindForDiagnostic = ConcDecl->getDescriptiveKind();
+  SourceLoc InsertLoc;
+
+  // To avoid exposing the pattern binding declaration to the user, get the
+  // descriptive kind from one of the VarDecls. We get the the Fix-It
+  // location from the PatternBindingDecl unless the VarDecl has attributes,
+  // in which case we get the start location of the VarDecl attributes.
+  DeclAttributes AttrsForLoc;
+  if (KindForDiagnostic == DescriptiveDeclKind::PatternBinding) {
+    KindForDiagnostic = D->getDescriptiveKind();
+    AttrsForLoc = D->getAttrs();
+  } else {
+    InsertLoc = ConcDecl->getAttrs().getStartLoc(/*forModifiers=*/false);
+  }
+
+  InsertLoc = D->getAttrs().getStartLoc(/*forModifiers=*/false);
   if (InsertLoc.isInvalid()) {
-    InsertLoc = D->getStartLoc();
+    InsertLoc = ConcDecl->getStartLoc();
   }
 
   if (InsertLoc.isInvalid())
@@ -1792,19 +1807,9 @@ static void fixAvailabilityForDecl(SourceRange ReferenceRange, const Decl *D,
     llvm::raw_string_ostream Out(AttrText);
 
     PlatformKind Target = targetPlatform(TC.getLangOpts());
-    Out << "@available(" << platformString(Target)
-        << " " << RequiredRange.getLowerEndpoint().getAsString()
-        << ", *)\n" << OriginalIndent;
-  }
-
-  DescriptiveDeclKind KindForDiagnostic = D->getDescriptiveKind();
-
-  // To avoid exposing the pattern binding declaration to the user, get the
-  // descriptive kind from one of the VarDecls while still using the Fix-It
-  // location from the PatternBindingDecl.
-  if (KindForDiagnostic == DescriptiveDeclKind::PatternBinding) {
-    KindForDiagnostic =
-        abstractSyntaxDeclForAvailableAttribute(D)->getDescriptiveKind();
+    Out << "@available(" << platformString(Target) << " "
+        << RequiredRange.getLowerEndpoint().getAsString() << ", *)\n"
+        << OriginalIndent;
   }
 
   TC.diagnose(ReferenceRange.Start, diag::availability_add_attribute,
