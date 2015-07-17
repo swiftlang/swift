@@ -1688,6 +1688,8 @@ public:
     CC_ExactMatch,             // This is a perfect match for the arguments.
     CC_NonLValueInOut,         // First argument is inout but no lvalue present.
     CC_OneArgumentMismatch,    // All arguments except one match.
+    CC_SelfMismatch,           // Self argument mismatches.
+    CC_ArgumentMismatch,       // Argument list mismatch.
     CC_ArgumentCountMismatch,  // This candidate has wrong # arguments.
     CC_GeneralMismatch         // Something else is wrong.
   };
@@ -2262,7 +2264,10 @@ suggestPotentialOverloads(StringRef functionName, SourceLoc loc,
       paramListType = FD->getType();
       if (FD->getImplicitSelfDecl()) // Strip the self member.
         paramListType = paramListType->castTo<AnyFunctionType>()->getResult();
-      paramListType = paramListType->castTo<AnyFunctionType>()->getInput();
+      if (auto FT = paramListType->getAs<AnyFunctionType>())
+        paramListType = FT->getInput();
+      else
+        continue;
     } else if (auto *SD = dyn_cast<SubscriptDecl>(decl)) {
       paramListType = SD->getIndicesType();
     }
@@ -2367,7 +2372,8 @@ evaluateCloseness(Type candArgListType, ArrayRef<Type> actualArgs) {
     return FailureDiagnosis::CC_NonLValueInOut;
   
   if (mismatchingArgs == 1)
-    return FailureDiagnosis::CC_OneArgumentMismatch;
+    return actualArgs.size() != 1 ? FailureDiagnosis::CC_OneArgumentMismatch :
+                                    FailureDiagnosis::CC_ArgumentMismatch;
 
   // TODO: Keyword argument mismatches.
   
@@ -2652,10 +2658,19 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     auto *SD = dyn_cast<SubscriptDecl>(decl);
     if (!SD) return CC_GeneralMismatch;
     
-    // TODO: Do we need to consider the baseType matching or not?
+    // Check to make sure the base expr type is convertible to the expected base
+    // type.
+     auto selfConstraint = CC_ExactMatch;
+    auto instanceTy =
+      SD->getGetter()->getImplicitSelfDecl()->getType()->getInOutObjectType();
+    if (!typeIsNotSpecialized(baseType) &&
+        !CS->TC.isConvertibleTo(baseType, instanceTy, CS->DC)) {
+      selfConstraint = CC_SelfMismatch;
+    }
 
     // Explode out multi-index subscripts to find the best match.
-    return evaluateCloseness(SD->getIndicesType(), decomposedIndexType);
+    return std::max(evaluateCloseness(SD->getIndicesType(),decomposedIndexType),
+                    selfConstraint);
   });
  
   // TODO: Is there any reason to check for CC_NonLValueInOut here?
@@ -2688,6 +2703,20 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     return true;
   }
 
+  // If the closes matches all mismatch on self, we either have something that
+  // cannot be subscripted, or an ambiguity.
+  if (candidateCloseness == CC_SelfMismatch) {
+    CS->TC.diagnose(SE->getLoc(), diag::cannot_subscript_base,
+                    getUserFriendlyTypeName(baseType))
+      .highlight(SE->getBase()->getSourceRange());
+    // FIXME: Should suggest overload set, but we're not ready for that until
+    // it points to candidates and identifies the self type in the diagnostic.
+    //suggestPotentialOverloads("subscript", SE->getLoc(), Candidates,
+    //                          candidateCloseness);
+    return true;
+  }
+
+  
   auto indexTypeName = getUserFriendlyTypeName(indexType);
   auto baseTypeName = getUserFriendlyTypeName(baseType);
   
@@ -2695,6 +2724,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
   
   CS->TC.diagnose(indexExpr->getLoc(), diag::cannot_subscript_with_index,
                   baseTypeName, indexTypeName);
+
   suggestPotentialOverloads("subscript", SE->getLoc(),
                             Candidates, candidateCloseness);
   return true;

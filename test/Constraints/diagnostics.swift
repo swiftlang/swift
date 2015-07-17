@@ -182,7 +182,7 @@ struct StructWithOptionalArray {
 }
 
 func testStructWithOptionalArray(foo: StructWithOptionalArray) -> Int {
-  return foo.array[0]  // expected-error {{result type 'Element' does not match expected type}}
+  return foo.array[0]  // expected-error {{cannot subscript a value of type '[Int]?'}}
 }
 
 

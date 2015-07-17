@@ -119,6 +119,11 @@ ERROR(cannot_subscript_with_index,sema,none,
       "cannot subscript a value of type '%0' with an index of type '%1'",
       (StringRef, StringRef))
 
+ERROR(cannot_subscript_base,sema,none,
+      "cannot subscript a value of type '%0'",
+      (StringRef))
+
+
 ERROR(cannot_assign_values,sema,none,
       "cannot assign a value of type '%0' to a value of type '%1'",
       (StringRef, StringRef))
