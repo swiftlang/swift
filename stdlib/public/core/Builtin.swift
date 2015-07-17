@@ -478,14 +478,13 @@ internal func _isUniqueOrPinned<T>(inout object: T) -> Bool {
 public // @testable
 func _isUnique_native<T>(inout object: T) -> Bool {
   // This could be a bridge object, single payload enum, or plain old
-  // reference. Any any case it's non pointer bits must be zero.
-  //
-  // FIXME: We should be able to do:
-  // _sanityCheck((_bitPattern(object) & _objectPointerSpareBits) == 0)
-  // _sanityCheck(_usesNativeSwiftReferenceCounting(
-  //   (Builtin.convertFromRawPointer(
-  //      Builtin.reinterpretCastToRawPointer(object))
-  //    as AnyObject).dynamicType))
+  // reference. Any any case it's non pointer bits must be zero, so
+  // force cast it to BridgeObject and check the spare bits.
+  _sanityCheck(
+    (_bitPattern(Builtin.reinterpretCast(object)) & _objectPointerSpareBits)
+    == 0)
+  _sanityCheck(_usesNativeSwiftReferenceCounting(
+      (Builtin.reinterpretCast(object) as AnyObject).dynamicType))
   return Bool(Builtin.isUnique_native(&object))
 }
 
@@ -496,7 +495,10 @@ public // @testable
 func _isUniqueOrPinned_native<T>(inout object: T) -> Bool {
   // This could be a bridge object, single payload enum, or plain old
   // reference. Any any case it's non pointer bits must be zero.
-  //
-  // FIXME: We should be able to sanityCheck as shown in isUnique_native.
+  _sanityCheck(
+    (_bitPattern(Builtin.reinterpretCast(object)) & _objectPointerSpareBits)
+    == 0)
+  _sanityCheck(_usesNativeSwiftReferenceCounting(
+      (Builtin.reinterpretCast(object) as AnyObject).dynamicType))
   return Bool(Builtin.isUniqueOrPinned_native(&object))
 }
