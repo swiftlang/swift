@@ -271,7 +271,13 @@ if #available(OSX 10.11, iOS 9.0, *) {
 
     // decode said data
 
+    // first confirm .decodeObjectWithClasses overlay requires NSSet
     var KU = NSKeyedUnarchiver(forReadingWithData: mutableData)
+    let nonTopLevelResult = KU.decodeObjectOfClasses(NSSet(array: [NSPredicate.self]), forKey: KEY)
+    expectTrue(nonTopLevelResult != nil)
+    KU.finishDecoding()
+
+    KU = NSKeyedUnarchiver(forReadingWithData: mutableData)
     do {
       // decodeObjectForKey(_:) throws
       let decoded1 = try KU.decodeTopLevelObjectForKey(KEY) as? NSPredicate

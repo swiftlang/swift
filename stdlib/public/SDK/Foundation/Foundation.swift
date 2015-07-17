@@ -1280,6 +1280,18 @@ internal func resolveError(error: NSError?) throws {
 }
 
 extension NSCoder {
+  @nonobjc
+  public func decodeObjectOfClasses(classes: NSSet?, forKey key: String) -> AnyObject? {
+    var classesAsNSObjects: Set<NSObject>? = nil
+    if let theClasses = classes {
+      classesAsNSObjects =
+        Set(GeneratorSequence(NSFastGenerator(theClasses)).map {
+          unsafeBitCast($0, NSObject.self)
+        })
+    }
+    return self.__decodeObjectOfClasses(classesAsNSObjects, forKey: key)
+  }
+
   @available(OSX 10.11, iOS 9.0, *)
   public func decodeTopLevelObject() throws -> AnyObject? {
     var error: NSError?

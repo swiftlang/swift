@@ -1122,37 +1122,28 @@ DictionaryTestSuite.test("init(dictionaryLiteral:)") {
 //===---
 
 func getAsNSDictionary(d: Dictionary<Int, Int>) -> NSDictionary {
-  let keys = NSMutableArray()
-  let values = NSMutableArray()
-  for (k, v) in d {
-    keys.addObject(TestObjCKeyTy(k))
-    values.addObject(TestObjCValueTy(v))
-  }
+  let keys = Array(d.keys.map { TestObjCKeyTy($0) })
+  let values = Array(d.values.map { TestObjCValueTy($0) })
+
   // Return an `NSMutableDictionary` to make sure that it has a unique
   // pointer identity.
-  return NSMutableDictionary(objects: values as [AnyObject], forKeys: keys as [AnyObject])
+  return NSMutableDictionary(objects: values, forKeys: keys)
 }
 
 func getAsEquatableNSDictionary(d: Dictionary<Int, Int>) -> NSDictionary {
-  let keys = NSMutableArray()
-  let values = NSMutableArray()
-  for (k, v) in d {
-    keys.addObject(TestObjCKeyTy(k))
-    values.addObject(TestObjCEquatableValueTy(v))
-  }
+  let keys = Array(d.keys.map { TestObjCKeyTy($0) })
+  let values = Array(d.values.map { TestObjCEquatableValueTy($0) })
+
   // Return an `NSMutableDictionary` to make sure that it has a unique
   // pointer identity.
-  return NSMutableDictionary(objects: values as [AnyObject], forKeys: keys as [AnyObject])
+  return NSMutableDictionary(objects: values, forKeys: keys)
 }
 
 func getAsNSMutableDictionary(d: Dictionary<Int, Int>) -> NSMutableDictionary {
-  let keys = NSMutableArray()
-  let values = NSMutableArray()
-  for (k, v) in d {
-    keys.addObject(TestObjCKeyTy(k))
-    values.addObject(TestObjCValueTy(v))
-  }
-  return NSMutableDictionary(objects: values as [AnyObject], forKeys: keys as [AnyObject])
+  let keys = Array(d.keys.map { TestObjCKeyTy($0) })
+  let values = Array(d.values.map { TestObjCValueTy($0) })
+
+  return NSMutableDictionary(objects: values, forKeys: keys)
 }
 
 func getBridgedVerbatimDictionary() -> Dictionary<NSObject, AnyObject> {
@@ -1198,14 +1189,10 @@ func getBridgedNonverbatimEquatableDictionary(d: Dictionary<Int, Int>) -> Dictio
 }
 
 func getHugeBridgedVerbatimDictionaryHelper() -> NSDictionary {
-  let keys = NSMutableArray()
-  let values = NSMutableArray()
-  for i in 1...32 {
-    keys.addObject(TestObjCKeyTy(i))
-    values.addObject(TestObjCValueTy(1000 + i))
-  }
+  let keys = (1...32).map { TestObjCKeyTy($0) }
+  let values = (1...32).map { TestObjCValueTy(1000 + $0) }
 
-  return NSDictionary(objects: values as [AnyObject], forKeys: keys as [AnyObject])
+  return NSMutableDictionary(objects: values, forKeys: keys)
 }
 
 func getHugeBridgedVerbatimDictionary() -> Dictionary<NSObject, AnyObject> {
@@ -2841,17 +2828,10 @@ DictionaryTestSuite.test("BridgedToObjC.Value_ValueTypeCustomBridged") {
 //===---
 
 func getRoundtripBridgedNSDictionary() -> NSDictionary {
-  let keys = NSMutableArray()
-  keys.addObject(TestObjCKeyTy(10))
-  keys.addObject(TestObjCKeyTy(20))
-  keys.addObject(TestObjCKeyTy(30))
+  let keys = [ 10, 20, 30 ].map { TestObjCKeyTy($0) }
+  let values = [ 1010, 1020, 1030 ].map { TestObjCValueTy($0) }
 
-  let values = NSMutableArray()
-  values.addObject(TestObjCValueTy(1010))
-  values.addObject(TestObjCValueTy(1020))
-  values.addObject(TestObjCValueTy(1030))
-
-  let nsd = NSDictionary(objects: values as [AnyObject], forKeys: keys as [AnyObject])
+  let nsd = NSDictionary(objects: values, forKeys: keys)
 
   let d: Dictionary<NSObject, AnyObject> = _convertNSDictionaryToDictionary(nsd)
 
@@ -2873,7 +2853,7 @@ DictionaryTestSuite.test("BridgingRoundtrip") {
     let kv = ((key as! TestObjCKeyTy).value, (value as! TestObjCValueTy).value)
     pairs.append(kv)
   }
-  assert(equalsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ]))
+  expectEqualsUnordered(pairs, [ (10, 1010), (20, 1020), (30, 1030) ])
 }
 
 //===---
@@ -2881,17 +2861,10 @@ DictionaryTestSuite.test("BridgingRoundtrip") {
 //===---
 
 DictionaryTestSuite.test("NSDictionaryToDictionaryCoversion") {
-  let keys = NSMutableArray()
-  keys.addObject(TestObjCKeyTy(10))
-  keys.addObject(TestObjCKeyTy(20))
-  keys.addObject(TestObjCKeyTy(30))
+  let keys = [ 10, 20, 30 ].map { TestObjCKeyTy($0) }
+  let values = [ 1010, 1020, 1030 ].map { TestObjCValueTy($0) }
 
-  let values = NSMutableArray()
-  values.addObject(TestObjCValueTy(1010))
-  values.addObject(TestObjCValueTy(1020))
-  values.addObject(TestObjCValueTy(1030))
-
-  let nsd = NSDictionary(objects: values as [AnyObject], forKeys: keys as [AnyObject])
+  let nsd = NSDictionary(objects: values, forKeys: keys)
 
   let d: Dictionary = nsd as Dictionary
 
