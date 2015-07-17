@@ -1266,8 +1266,9 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
     return;
 
   ReferencedNameTracker *tracker = currentFile->getReferencedNameTracker();
-  tc.validateAccessibility(current);
-  bool isCascading = (current->getFormalAccess() > Accessibility::Private);
+  bool isCascading = true;
+  if (current->hasAccessibility())
+    isCascading = (current->getFormalAccess() > Accessibility::Private);
 
   // Find other potential definitions.
   SmallVector<ValueDecl *, 4> otherDefinitionsVec;

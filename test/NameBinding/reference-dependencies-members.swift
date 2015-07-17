@@ -57,11 +57,14 @@ extension OtherStruct {
   // PROVIDES-MEMBER-DAG: - ["{{.+}}11OtherStruct", ""]
   // PROVIDES-MEMBER-DAG: - ["{{.+}}11OtherStruct", "foo"]
   // PROVIDES-MEMBER-DAG: - ["{{.+}}11OtherStruct", "bar"]
-  // DEPENDS-MEMBER-NEGATIVE-NOT: - ["{{.+}}11OtherStruct", ""]
+  // PROVIDES-MEMBER-NEGATIVE-NOT: "baz"
   // DEPENDS-MEMBER-DAG: - ["{{.+}}11OtherStruct", "foo"]
   // DEPENDS-MEMBER-DAG: - ["{{.+}}11OtherStruct", "bar"]
+  // DEPENDS-MEMBER-DAG: - !private ["{{.+}}11OtherStruct", "baz"]
+  // DEPENDS-MEMBER-NEGATIVE-NOT: - ["{{.+}}11OtherStruct", ""]
   func foo() {}
   var bar: () { return () }
+  private func baz() {}
 }
 
 // PROVIDES-NOMINAL-NEGATIVE-LABEL: {{^depends-nominal:$}}
