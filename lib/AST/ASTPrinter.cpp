@@ -240,7 +240,7 @@ class PrintAST : public ASTVisitor<PrintAST> {
     }
   }
 
-  void printDocumentationComment(Decl *D) {
+  void printDocumentationComment(const Decl *D) {
     if (!Options.PrintDocumentationComments)
       return;
 
@@ -1139,9 +1139,6 @@ void PrintAST::visitExtensionDecl(ExtensionDecl *decl) {
 }
 
 void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
-  if (decl->isStatic())
-    printStaticKeyword(decl->getCorrectStaticSpelling());
-
   // FIXME: We're not printing proper "{ get set }" annotations in pattern
   // binding decls.  As a hack, scan the decl to find out if any of the
   // variables are immutable, and if so, we print as 'let'.  This allows us to
@@ -1153,6 +1150,11 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
     });
     if (anyVar) break;
   }
+
+  if (anyVar)
+    printDocumentationComment(anyVar);
+  if (decl->isStatic())
+    printStaticKeyword(decl->getCorrectStaticSpelling());
 
   // FIXME: PatternBindingDecls don't have attributes themselves, so just assume
   // the variables all have the same attributes. This isn't exactly true
