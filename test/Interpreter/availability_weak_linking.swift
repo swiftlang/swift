@@ -3,6 +3,7 @@
 // RUN: %target-clang -dynamiclib %S/Inputs/FakeUnavailableObjCFramework.m -fmodules -F %t -framework Foundation -o %t/FakeUnavailableObjCFramework.framework/FakeUnavailableObjCFramework
 
 // RUN: %target-build-swift -F %t %s -o %t/UseWeaklinkedUnavailableObjCFramework
+// RUN: %target-build-swift -O -F %t %s -o %t/UseWeaklinkedUnavailableObjCFramework.opt
 
 // These tests emulate deploying back to an older OS where newer APIs are not
 // available by linking to an Objective-C framework where APIs have been
@@ -12,6 +13,7 @@
 // RUN: mv %t/FakeUnavailableObjCFramework.framework %t/FakeUnavailableObjCFramework-MovedAside.framework
 
 // RUN: %target-run %t/UseWeaklinkedUnavailableObjCFramework | FileCheck %s
+// RUN: %target-run %t/UseWeaklinkedUnavailableObjCFramework.opt | FileCheck %s
 
 // REQUIRES: objc_interop
 // REQUIRES: executable_test
@@ -102,16 +104,45 @@ func useClassConformingToUnannotatedUnavailableObjCProtocol() {
 // CHECK-NEXT: Executed ClassConformingToUnannotatedUnavailableObjCProtocol.someMethod()
 useClassConformingToUnannotatedUnavailableObjCProtocol()
 
+func printClassMetadataViaGeneric<T>() -> T {
+  print("\(T.self)")
+  fatalError("This should never be called")
+}
+
 func useUnavailableObjCClass() {
   if #available(OSX 1066.0, iOS 1066.0, watchOS 1066.0, tvOS 1066.0, *) {
     let o = UnavailableObjCClass()
     o.someMethod()
   }
+
+  for var i = 0; i < getInt(5); ++i {
+    if #available(OSX 1066.0, iOS 1066.0, watchOS 1066.0, tvOS 1066.0, *) {
+      let o: UnavailableObjCClass = printClassMetadataViaGeneric()
+      _blackHole(o)
+    }
+  }
+
+  class SomeClass { }
+  let someObject: AnyObject = _opaqueIdentity(SomeClass() as AnyObject)
+
+  for var i = 0; i < getInt(5); ++i {
+    if #available(OSX 1066.0, iOS 1066.0, watchOS 1066.0, tvOS 1066.0, *) {
+      let isUnavailable = someObject is UnavailableObjCClass
+      _blackHole(isUnavailable)
+    }
+  }
+
+  for var i = 0; i < getInt(5); ++i {
+    if #available(OSX 1066.0, iOS 1066.0, watchOS 1066.0, tvOS 1066.0, *) {
+      let asUnavailable = someObject as? UnavailableObjCClass
+      _blackHole(asUnavailable)
+    }
+  }
 }
 
 useUnavailableObjCClass()
 
-// Allow protocol extensions of weakly-linked classes.
+// Allow extending a weakly-linked class to conform to a protocol.
 protocol SomeSwiftProtocol { }
 @available(OSX 1066.0, iOS 1066.0, watchOS 1066.0, tvOS 1066.0, *)
 extension UnavailableObjCClass : SomeSwiftProtocol {
