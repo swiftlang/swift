@@ -564,7 +564,7 @@ static ManagedValue emitBuiltinCastToBridgeObject(SILGenFunction &gen,
   if (!subs[0].getReplacement()->mayHaveSuperclass() &&
       !subs[0].getReplacement()->isClassExistentialType()) {
     gen.SGM.diagnose(loc, diag::invalid_sil_builtin,
-                     "castToNativeObject source must be a class");
+                     "castToBridgeObject source must be a class");
     SILValue undef = SILUndef::get(objPointerType, gen.SGM.M);
     return ManagedValue::forUnmanaged(undef);
   }
