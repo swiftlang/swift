@@ -4132,6 +4132,7 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
   if (Flags & PD_DisallowNominalTypes) {
     diagnose(EnumLoc, diag::disallowed_type);
     Status.setIsParseError();
+    UD->setInvalid();
   }
 
   return DCC.fixupParserResult(Status, UD);
@@ -4399,6 +4400,7 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
   if (Flags & PD_DisallowNominalTypes) {
     diagnose(StructLoc, diag::disallowed_type);
     Status.setIsParseError();
+    SD->setInvalid();
   }
 
   return DCC.fixupParserResult(Status, SD);
@@ -4482,6 +4484,7 @@ ParserResult<ClassDecl> Parser::parseDeclClass(SourceLoc ClassLoc,
   if (Flags & PD_DisallowNominalTypes) {
     diagnose(ClassLoc, diag::disallowed_type);
     Status.setIsParseError();
+    CD->setInvalid();
   }
 
   return DCC.fixupParserResult(Status, CD);
@@ -4574,9 +4577,11 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   if (Flags & PD_DisallowNominalTypes) {
     diagnose(ProtocolLoc, diag::disallowed_type);
     Status.setIsParseError();
+    Proto->setInvalid();
   } else if (!DCC.movedToTopLevel() && !(Flags & PD_AllowTopLevel)) {
     diagnose(ProtocolLoc, diag::decl_inner_scope);
     Status.setIsParseError();
+    Proto->setInvalid();
   }
 
   return DCC.fixupParserResult(Status, Proto);
