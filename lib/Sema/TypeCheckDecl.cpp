@@ -1247,8 +1247,16 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
   if (current->alreadyCheckedRedeclaration())
     return;
 
+  // If there's no type yet, come back to it later.
+  if (!current->hasType())
+    return;
+
   // Make sure we don't do this checking again.
   current->setCheckedRedeclaration(true);
+
+  // Ignore invalid and anonymous declarations.
+  if (current->isInvalid() || !current->hasName())
+    return;
 
   // If this declaration isn't from a source file, don't check it.
   // FIXME: Should restrict this to the source file we care about.
@@ -1257,13 +1265,8 @@ static void checkRedeclaration(TypeChecker &tc, ValueDecl *current) {
   if (!currentFile || currentDC->isLocalContext())
     return;
 
-  tc.validateDecl(current);
-
-  // Ignore invalid and anonymous declarations.
-  if (current->isInvalid() || !current->hasName())
-    return;
-
   ReferencedNameTracker *tracker = currentFile->getReferencedNameTracker();
+  tc.validateAccessibility(current);
   bool isCascading = (current->getFormalAccess() > Accessibility::Private);
 
   // Find other potential definitions.
