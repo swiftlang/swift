@@ -110,6 +110,8 @@ public func - (minuend: CMTime, subtrahend: CMTime) -> CMTime {
   return CMTimeSubtract(minuend, subtrahend)
 }
 
+extension CMTime : Equatable, Comparable {}
+
 // CMTimeCompare
 public func < (time1: CMTime, time2: CMTime) -> Bool {
   return CMTimeCompare(time1, time2) < 0
