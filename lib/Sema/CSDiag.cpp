@@ -2670,6 +2670,10 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
                     selfConstraint);
   });
 
+  // Any diagnostics should be emitted with the caret pointing at the [ in the
+  // subscript expression.
+  SourceLoc loc = indexExpr->getStartLoc();
+
   // TODO: Is there any reason to check for CC_NonLValueInOut here?
   
   if (candidateCloseness == CC_ExactMatch) {
@@ -2686,7 +2690,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
       // produced.
       resultTy = Candidates[0]->getType()->castTo<FunctionType>()->getResult();
     } else {
-      diagnose(SE->getLoc(), diag::result_type_no_match_ambiguous)
+      diagnose(loc, diag::result_type_no_match_ambiguous)
         .highlight(SE->getSourceRange());
       suggestPotentialOverloads("subscript", SE->getLoc(),
                                 Candidates, candidateCloseness);
@@ -2694,7 +2698,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     }
     
     // Only one choice.
-    diagnose(SE->getLoc(), diag::result_type_no_match,
+    diagnose(indexExpr->getLoc(), diag::result_type_no_match,
              getUserFriendlyTypeName(resultTy))
       .highlight(SE->getSourceRange());
     return true;
@@ -2703,8 +2707,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
   // If the closes matches all mismatch on self, we either have something that
   // cannot be subscripted, or an ambiguity.
   if (candidateCloseness == CC_SelfMismatch) {
-    diagnose(SE->getLoc(),
-             diag::cannot_subscript_base,getUserFriendlyTypeName(baseType))
+    diagnose(loc, diag::cannot_subscript_base,getUserFriendlyTypeName(baseType))
       .highlight(SE->getBase()->getSourceRange());
     // FIXME: Should suggest overload set, but we're not ready for that until
     // it points to candidates and identifies the self type in the diagnostic.
@@ -2719,8 +2722,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
   
   assert(!indexTypeName.empty() && !baseTypeName.empty());
   
-  diagnose(SE->getLoc(), diag::cannot_subscript_with_index,
-           baseTypeName, indexTypeName);
+  diagnose(loc, diag::cannot_subscript_with_index, baseTypeName, indexTypeName);
 
   suggestPotentialOverloads("subscript", SE->getLoc(),
                             Candidates, candidateCloseness);

@@ -1814,7 +1814,6 @@ public:
     return TheDecl;
   }
 
-  SourceLoc getLoc() const { return Index->getStartLoc(); }
   SourceLoc getStartLoc() const { return Base->getStartLoc(); }
   SourceLoc getEndLoc() const { return Index->getEndLoc(); }
   
