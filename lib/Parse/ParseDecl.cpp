@@ -2504,15 +2504,8 @@ ParserResult<IfConfigDecl> Parser::parseDeclIfConfig(ParseDeclOptions Flags) {
       diagnose(Tok, diag::expected_close_after_else);
   }
 
-  // Parse the #endif
-  SourceLoc EndLoc = Tok.getLoc();
-  bool HadMissingEnd = false;
-  if (parseToken(tok::pound_endif, diag::expected_close_to_config_stmt)) {
-    HadMissingEnd = true;
-    skipUntilConfigBlockClose();
-  }
-  else if (!Tok.isAtStartOfLine() && Tok.isNot(tok::eof))
-    diagnose(Tok.getLoc(), diag::extra_tokens_config_directive);
+  SourceLoc EndLoc;
+  bool HadMissingEnd = parseConfigEndIf(EndLoc);
 
   IfConfigDecl *ICD = new (Context) IfConfigDecl(CurDeclContext,
                                                  Context.AllocateCopy(Clauses),

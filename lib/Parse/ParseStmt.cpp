@@ -1633,17 +1633,9 @@ ParserResult<Stmt> Parser::parseStmtIfConfig(BraceItemListKind Kind) {
       diagnose(Tok, diag::expected_close_after_else);
   }
 
-  // Parse the #endif
-  SourceLoc EndLoc = Tok.getLoc();
-  bool HadMissingEnd = false;
-  if (parseToken(tok::pound_endif, diag::expected_close_to_config_stmt)) {
-    HadMissingEnd = true;
-    EndLoc = PreviousLoc;
-    skipUntilConfigBlockClose();
-  } else if (!Tok.isAtStartOfLine() && Tok.isNot(tok::eof))
-    diagnose(Tok.getLoc(), diag::extra_tokens_config_directive);
+  SourceLoc EndLoc;
+  bool HadMissingEnd = parseConfigEndIf(EndLoc);
 
-  
   auto *ICS = new (Context) IfConfigStmt(Context.AllocateCopy(Clauses),
                                          EndLoc, HadMissingEnd);
   return makeParserResult(ICS);

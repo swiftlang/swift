@@ -456,15 +456,18 @@ public:
 
   void skipUntilDeclRBrace(tok T1, tok T2 = tok::unknown);
   
-  /// \brief Skip until the next '#else', '#endif' or until eof.
-  void skipUntilConfigBlockClose();
-
   /// Skip a single token, but match parentheses, braces, and square brackets.
   ///
   /// Note: this does \em not match angle brackets ("<" and ">")! These are
   /// matched in the source when they refer to a generic type,
   /// but not when used as comparison operators.
   void skipSingle();
+
+  /// \brief Skip until the next '#else', '#endif' or until eof.
+  void skipUntilConfigBlockClose();
+
+  /// Parse an #endif.
+  bool parseConfigEndIf(SourceLoc &Loc);
 
 public:
   InFlightDiagnostic diagnose(SourceLoc Loc, Diagnostic Diag) {
@@ -1174,10 +1177,6 @@ public:
 
   /// Evaluate the conditional configuration expression of an #if statement
   bool evaluateConfigConditionExpr(Expr *configExpr);
-  
-  /// Decide whether the current token pointing to an #if block should be parsed
-  /// as a statement or as a declaration
-  bool isStartOfIfConfigDecl();
 
   //===--------------------------------------------------------------------===//
   // Generics Parsing

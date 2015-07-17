@@ -457,6 +457,17 @@ void Parser::skipUntilConfigBlockClose() {
   }
 }
 
+bool Parser::parseConfigEndIf(SourceLoc &Loc) {
+  Loc = Tok.getLoc();
+  if (parseToken(tok::pound_endif, diag::expected_close_to_config_stmt)) {
+    Loc = PreviousLoc;
+    skipUntilConfigBlockClose();
+    return true;
+  } else if (!Tok.isAtStartOfLine() && Tok.isNot(tok::eof))
+    diagnose(Tok.getLoc(), diag::extra_tokens_config_directive);
+  return false;
+}
+
 Parser::StructureMarkerRAII::StructureMarkerRAII(Parser &parser,
                                                  const Token &tok)
   : P(parser)
