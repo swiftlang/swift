@@ -39,3 +39,8 @@ func foo() -> Int {
 }
 
 func goo(var e : ErrorType) {}
+
+struct Test1 : RawOptionSetType {
+  init(rawValue: Int) {}
+  var rawValue: Int { return 0 }
+}
