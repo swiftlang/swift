@@ -226,6 +226,9 @@ int main(int argc, char **argv) {
   SILOpts.VerifyAll = EnableSILVerifyAll;
   SILOpts.RemoveRuntimeAsserts = RemoveRuntimeAsserts;
   SILOpts.AssertConfig = AssertConfId;
+  if (OptimizationGroup != OptGroup::Diagnostics)
+    SILOpts.Optimization = SILOptions::SILOptMode::Optimize;
+
 
   // Load the input file.
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
