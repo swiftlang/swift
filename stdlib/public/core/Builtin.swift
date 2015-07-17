@@ -383,8 +383,7 @@ internal func _makeNativeBridgeObject(
 
 /// Create a `BridgeObject` around the given `objCObject`.
 @inline(__always)
-public // @testable
-func _makeObjCBridgeObject(
+internal func _makeObjCBridgeObject(
   objCObject: AnyObject
 ) -> Builtin.BridgeObject {
   return _makeBridgeObject(
