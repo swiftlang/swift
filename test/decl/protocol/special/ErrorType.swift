@@ -30,3 +30,9 @@ let notAnErrorDomain: String = NotAnError.A._domain // expected-error{{'NotAnErr
 let notAnErrorCode: Int = NotAnError.A._code // expected-error{{'NotAnError' does not have a member named '_code'}}
 
 enum EmptyErrorDomain: ErrorType {}
+
+struct ErrorStruct : ErrorType {
+}
+
+class ErrorClass : ErrorType {
+}

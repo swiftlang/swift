@@ -26,12 +26,7 @@
 using namespace swift;
 using namespace DerivedConformance;
 
-static bool canDeriveConformance(NominalTypeDecl *type) {
-  // The type must be an enum.
-  return isa<EnumDecl>(type);
-}
-
-static void deriveBodyErrorType_enum_domain(AbstractFunctionDecl *domainDecl) {
+static void deriveBodyErrorType_domain(AbstractFunctionDecl *domainDecl) {
   // enum SomeEnum {
   //   @derived
   //   var domain: String {
@@ -60,9 +55,8 @@ static void deriveBodyErrorType_enum_domain(AbstractFunctionDecl *domainDecl) {
   domainDecl->setBody(body);
 }
 
-static ValueDecl *deriveErrorType_enum_domain(TypeChecker &tc,
-                                              Decl *parentDecl,
-                                              EnumDecl *enumDecl) {
+static ValueDecl *deriveErrorType_domain(TypeChecker &tc, Decl *parentDecl,
+                                         NominalTypeDecl *nominal) {
   // enum SomeEnum {
   //   @derived
   //   var domain: String {
@@ -76,18 +70,19 @@ static ValueDecl *deriveErrorType_enum_domain(TypeChecker &tc,
   ASTContext &C = tc.Context;
   
   auto stringTy = C.getStringDecl()->getDeclaredType();
-  Type enumType = cast<DeclContext>(parentDecl)->getDeclaredTypeInContext();
+  Type nominalType = cast<DeclContext>(parentDecl)->getDeclaredTypeInContext();
 
   // Define the getter.
-  auto getterDecl = declareDerivedPropertyGetter(tc, parentDecl, enumDecl,
-                                                 enumType, stringTy, stringTy);
-  getterDecl->setBodySynthesizer(&deriveBodyErrorType_enum_domain);
+  auto getterDecl = declareDerivedPropertyGetter(tc, parentDecl, nominal,
+                                                 nominalType, stringTy,
+                                                 stringTy);
+  getterDecl->setBodySynthesizer(&deriveBodyErrorType_domain);
   
   // Define the property.
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
   std::tie(propDecl, pbDecl)
-    = declareDerivedReadOnlyProperty(tc, parentDecl, enumDecl, C.Id_domain_,
+    = declareDerivedReadOnlyProperty(tc, parentDecl, nominal, C.Id_domain_,
                                      stringTy, stringTy, getterDecl);
 
   auto dc = cast<IterableDeclContext>(parentDecl);
@@ -178,9 +173,30 @@ static void deriveBodyErrorType_enum_code(AbstractFunctionDecl *codeDecl) {
   codeDecl->setBody(body);
 }
 
-static ValueDecl *deriveErrorType_enum_code(TypeChecker &tc,
-                                            Decl *parentDecl,
-                                            EnumDecl *enumDecl) {
+static void deriveBodyErrorType_zero_code(AbstractFunctionDecl *codeDecl) {
+  // struct SomeStruct {
+  //   @derived
+  //   var code: Int { return 0 }
+  // }
+  //
+  // TODO: Some convenient way to override the code if that's desired.
+
+  auto parentDC = codeDecl->getDeclContext();
+  ASTContext &C = parentDC->getASTContext();
+
+  auto returnExpr = new (C) IntegerLiteralExpr("0", SourceLoc(),
+                                               /*implicit*/ true);
+  auto returnStmt = new (C) ReturnStmt(SourceLoc(), returnExpr,
+                                       /*implicit*/ true);
+
+  auto body = BraceStmt::create(C, SourceLoc(),
+                                ASTNode(returnStmt), SourceLoc());
+
+  codeDecl->setBody(body);
+}
+
+static ValueDecl *deriveErrorType_code(TypeChecker &tc, Decl *parentDecl,
+                                       NominalTypeDecl *nominal) {
   // enum SomeEnum {
   //   case A,B,C,D
   //
@@ -198,20 +214,22 @@ static ValueDecl *deriveErrorType_enum_code(TypeChecker &tc,
   ASTContext &C = tc.Context;
   
   auto intTy = C.getIntDecl()->getDeclaredType();
-  Type enumType = cast<DeclContext>(parentDecl)->getDeclaredTypeInContext();
+  Type nominalType = cast<DeclContext>(parentDecl)->getDeclaredTypeInContext();
 
   // Define the getter.
-  auto getterDecl = declareDerivedPropertyGetter(tc, parentDecl, enumDecl,
-                                                 enumType, intTy, intTy);
-  getterDecl->setBodySynthesizer(&deriveBodyErrorType_enum_code);
-  
+  auto getterDecl = declareDerivedPropertyGetter(tc, parentDecl, nominal,
+                                                 nominalType, intTy, intTy);
+  if (isa<EnumDecl>(nominal))
+    getterDecl->setBodySynthesizer(&deriveBodyErrorType_enum_code);
+  else
+    getterDecl->setBodySynthesizer(&deriveBodyErrorType_zero_code);
+
   // Define the property.
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
   std::tie(propDecl, pbDecl)
-    = declareDerivedReadOnlyProperty(tc, parentDecl, enumDecl, C.Id_code_,
-                                     intTy, intTy,
-                                     getterDecl);
+    = declareDerivedReadOnlyProperty(tc, parentDecl, nominal, C.Id_code_,
+                                     intTy, intTy, getterDecl);
   
   auto dc = cast<IterableDeclContext>(parentDecl);
   dc->addMember(getterDecl);
@@ -226,15 +244,10 @@ ValueDecl *DerivedConformance::deriveErrorType(TypeChecker &tc,
                                                Decl *parentDecl,
                                                NominalTypeDecl *type,
                                                ValueDecl *requirement) {
-  if (!canDeriveConformance(type))
-    return nullptr;
-  
-  auto enumType = cast<EnumDecl>(type);
-  
   if (requirement->getName() == tc.Context.Id_domain_)
-    return deriveErrorType_enum_domain(tc, parentDecl, enumType);
+    return deriveErrorType_domain(tc, parentDecl, type);
   else if (requirement->getName() == tc.Context.Id_code_)
-    return deriveErrorType_enum_code(tc, parentDecl, enumType);
+    return deriveErrorType_code(tc, parentDecl, type);
   
   tc.diagnose(requirement->getLoc(),
               diag::broken_errortype_requirement);
@@ -310,7 +323,7 @@ ValueDecl *DerivedConformance::deriveBridgedNSError(TypeChecker &tc,
                                                     Decl *parentDecl,
                                                     NominalTypeDecl *type,
                                                     ValueDecl *requirement) {
-  if (!canDeriveConformance(type))
+  if (!isa<EnumDecl>(type))
     return nullptr;
 
   auto enumType = cast<EnumDecl>(type);

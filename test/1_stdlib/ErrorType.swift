@@ -90,6 +90,16 @@ ErrorTypeTests.test("dynamic casts") {
   expectEqual(NoisyErrorDeathCount, NoisyErrorLifeCount)
 }
 
+struct DefaultStruct : ErrorType { }
+class DefaultClass : ErrorType { }
+
+ErrorTypeTests.test("default domain and code") {
+  expectEqual(DefaultStruct()._domain, "DefaultStruct")
+  expectEqual(DefaultStruct()._code, 0)
+  expectEqual(DefaultClass()._domain, "DefaultClass")
+  expectEqual(DefaultClass()._code, 0)
+}
+
 enum SillyError: ErrorType { case JazzHands }
 
 ErrorTypeTests.test("try!")

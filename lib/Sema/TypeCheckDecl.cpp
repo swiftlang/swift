@@ -3423,16 +3423,17 @@ public:
     if (!IsFirstPass) {
       checkAccessibility(TC, SD);
     }
-    
+
+    if (!(IsFirstPass || SD->isInvalid())) {
+      checkExplicitConformance(SD, SD->getDeclaredTypeInContext());
+    }
+
     // Visit each of the members.
     for (Decl *Member : SD->getMembers())
       visit(Member);
     for (Decl *Global : SD->getDerivedGlobalDecls())
       visit(Global);
 
-    if (!(IsFirstPass || SD->isInvalid())) {
-      checkExplicitConformance(SD, SD->getDeclaredTypeInContext());
-    }
     TC.checkDeclAttributes(SD);
   }
 
@@ -3578,6 +3579,10 @@ public:
 
     TC.addImplicitDestructor(CD);
 
+    if (!(IsFirstPass || CD->isInvalid())) {
+      checkExplicitConformance(CD, CD->getDeclaredTypeInContext());
+    }
+
     for (Decl *Member : CD->getMembers())
       visit(Member);
     for (Decl *global : CD->getDerivedGlobalDecls())
@@ -3607,9 +3612,6 @@ public:
       }
 
       checkAccessibility(TC, CD);
-    }
-    if (!(IsFirstPass || CD->isInvalid())) {
-      checkExplicitConformance(CD, CD->getDeclaredTypeInContext());
     }
 
     TC.checkDeclAttributes(CD);

@@ -1453,7 +1453,8 @@ void ConformanceLookupTable::expandImpliedConformances(NominalTypeDecl *nominal,
     // implicitly conforms to _ObjectiveCBridgeableErrorType, via the known
     // protocol _BridgedNSError.
     if (conformingProtocol->isSpecificProtocol(KnownProtocolKind::ErrorType) &&
-        isa<EnumDecl>(nominal) && nominal->isObjC()) {
+        isa<EnumDecl>(nominal) && nominal->isObjC() &&
+        cast<EnumDecl>(nominal)->hasOnlyCasesWithoutAssociatedValues()) {
       ASTContext &ctx = nominal->getASTContext();
       if (auto bridgedNSError
             = ctx.getProtocol(KnownProtocolKind::_BridgedNSError)) {

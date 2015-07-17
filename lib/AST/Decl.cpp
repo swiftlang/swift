@@ -1815,7 +1815,11 @@ bool NominalTypeDecl::derivesProtocolConformance(ProtocolDecl *protocol) const {
   auto knownProtocol = protocol->getKnownProtocolKind();
   if (!knownProtocol)
     return false;
-  
+
+  // All nominal types can derive their ErrorType conformance.
+  if (*knownProtocol == KnownProtocolKind::ErrorType)
+    return true;
+
   if (auto *enumDecl = dyn_cast<EnumDecl>(this)) {
     switch (*knownProtocol) {
     // Enums with raw types can implicitly derive their RawRepresentable
@@ -1829,13 +1833,9 @@ bool NominalTypeDecl::derivesProtocolConformance(ProtocolDecl *protocol) const {
     case KnownProtocolKind::Hashable:
       return enumDecl->hasOnlyCasesWithoutAssociatedValues();
     
-    // Enums can explicitly derive their ErrorType conformance.
-    case KnownProtocolKind::ErrorType:
-      return true;
-
     // @objc enums can explicitly derive their _BridgedNSError conformance.
     case KnownProtocolKind::_BridgedNSError:
-      return isObjC();
+      return isObjC() && enumDecl->hasOnlyCasesWithoutAssociatedValues();
 
     default:
       return false;
