@@ -352,7 +352,8 @@ bool SILLinkerVisitor::process() {
     if (!shouldImportFunction(Fn))
       continue;
 
-//    llvm::dbgs() << "Process imports in function: " << Fn->getName() << "\n";
+    DEBUG(llvm::dbgs() << "Process imports in function: "
+                       << Fn->getName() << "\n");
 
     for (auto &BB : *Fn) {
       for (auto &I : BB) {
@@ -382,7 +383,8 @@ bool SILLinkerVisitor::process() {
               }
             }
 
-//            llvm::dbgs() << "Imported function: " << F->getName() << "\n";
+            DEBUG(llvm::dbgs() << "Imported function: "
+                               << F->getName() << "\n");
             F->setBare(IsBare);
 
             if (F->isExternalDeclaration()) {
