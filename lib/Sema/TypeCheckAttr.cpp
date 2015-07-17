@@ -123,6 +123,12 @@ public:
     }
   }
 
+  void visitWarnUnqualifiedAccessAttr(WarnUnqualifiedAccessAttr *attr) {
+    if (!D->getDeclContext()->isTypeContext()) {
+      diagnoseAndRemoveAttr(attr, diag::attr_methods_only, attr);
+    }
+  }
+
   void visitIBActionAttr(IBActionAttr *attr);
   void visitLazyAttr(LazyAttr *attr);
   void visitIBDesignableAttr(IBDesignableAttr *attr);
@@ -625,6 +631,7 @@ public:
     IGNORED_ATTR(RequiresStoredPropertyInits)
     IGNORED_ATTR(SILStored)
     IGNORED_ATTR(Testable)
+    IGNORED_ATTR(WarnUnqualifiedAccess)
 #undef IGNORED_ATTR
 
   void visitAvailableAttr(AvailableAttr *attr);

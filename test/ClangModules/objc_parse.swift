@@ -508,3 +508,29 @@ func testProtocolQualified(obj: CopyableNSObject, cell: CopyableSomeCell,
   _ = plainObj as CopyableNSObject // expected-error {{'NSObject' is not convertible to 'CopyableNSObject'; did you mean to use 'as!' to force downcast?}}
   _ = plainCell as CopyableSomeCell // FIXME: This is not really typesafe.
 }
+
+extension Printing {
+  func testImplicitWarnUnqualifiedAccess() {
+    print() // expected-warning {{use of 'print' treated as a reference to instance method in class 'Printing'}}
+    // expected-note@-1 {{use 'self.' to silence this warning}}
+    // expected-note@-2 {{use 'Swift.' to reference the global function}}
+
+    print(self) // expected-warning {{use of 'print' treated as a reference to instance method in class 'Printing'}}
+    // expected-note@-1 {{use 'self.' to silence this warning}}
+    // expected-note@-2 {{use 'Swift.' to reference the global function}}
+
+    print(self, options: self) // no-warning
+  }
+
+  static func testImplicitWarnUnqualifiedAccess() {
+    print() // expected-warning {{use of 'print' treated as a reference to class method in class 'Printing'}}
+    // expected-note@-1 {{use 'self.' to silence this warning}}
+    // expected-note@-2 {{use 'Swift.' to reference the global function}}
+
+    print(self) // expected-warning {{use of 'print' treated as a reference to class method in class 'Printing'}}
+    // expected-note@-1 {{use 'self.' to silence this warning}}
+    // expected-note@-2 {{use 'Swift.' to reference the global function}}
+
+    print(self, options: self) // no-warning
+  }
+}

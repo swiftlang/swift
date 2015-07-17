@@ -5379,6 +5379,21 @@ void ClangImporter::Implementation::importAttributes(
         }
   }
 
+  // Hack: mark any method named "print" with less than two parameters as
+  // warn_unqualified_access.
+  if (auto MD = dyn_cast<FuncDecl>(MappedDecl)) {
+    if (MD->getName().str() == "print" &&
+        MD->getDeclContext()->isTypeContext()) {
+      auto *formalParams = MD->getBodyParamPatterns()[1];
+      if (formalParams->numTopLevelVariables() <= 1) {
+        // Use a non-implicit attribute so it shows up in the generated
+        // interface.
+        MD->getAttrs().add(
+            new (C) WarnUnqualifiedAccessAttr(/*implicit*/false));
+      }
+    }
+  }
+
   // Map __attribute__((warn_unused_result)).
   if (ClangDecl->hasAttr<clang::WarnUnusedResultAttr>()) {
     MappedDecl->getAttrs().add(new (C) WarnUnusedResultAttr(SourceLoc(),

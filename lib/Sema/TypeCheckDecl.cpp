@@ -4930,6 +4930,7 @@ public:
     UNINTERESTING_ATTR(Testable)
 
     UNINTERESTING_ATTR(WarnUnusedResult)
+    UNINTERESTING_ATTR(WarnUnqualifiedAccess)
 
 #undef UNINTERESTING_ATTR
 

@@ -143,3 +143,14 @@ __weak id globalWeakVar;
 
 typedef NSObject <NSCopying> *CopyableNSObject;
 typedef SomeCell <NSCopying> *CopyableSomeCell;
+
+
+@interface Printing : NSObject
+- (void)print;
+- (void)print:(id)thing;
+- (void)print:(id)thing options:(id)options;
+
++ (void)print;
++ (void)print:(id)thing;
++ (void)print:(id)thing options:(id)options;
+@end

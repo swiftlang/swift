@@ -144,6 +144,11 @@
 @property (strong, nullable) CALayer *layer;
 @property (readonly, copy, nonnull) NSArray *trackingAreas;
 @property (copy, nonnull) NSArray *subviews;
+
+- (void)print:(id)sender;
+@end
+
+@interface NSBox : NSView
 @end
 
 @interface NSView(NSKeyboardUI)

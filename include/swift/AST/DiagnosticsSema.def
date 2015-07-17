@@ -573,6 +573,8 @@ ERROR(no_objc_tagged_pointer_not_class_protocol,sema_tcd,none,
 ERROR(swift_native_objc_runtime_base_not_on_root_class,sema_tcd,none,
       "@_swift_native_objc_runtime_base_not_on_root_class can only be applied "
       "to root classes", ())
+ERROR(attr_methods_only,sema_tcd,none,
+      "only methods can be declared %0", (DeclAttribute))
 ERROR(access_control_in_protocol,sema_tcd,none,
       "%0 modifier cannot be used in protocols", (DeclAttribute))
 ERROR(access_control_setter,sema_tcd,none,
@@ -1693,6 +1695,18 @@ NOTE(add_parens_to_type,tce_sema,none,
      "add arguments after the type to construct a value of the type", ())
 NOTE(add_self_to_type,tce_sema,none,
      "use '.self' to reference the type object", ())
+
+WARNING(warn_unqualified_access,tce_sema,none,
+        "use of %0 treated as a reference to %1 in %2 %3",
+        (Identifier, DescriptiveDeclKind, DescriptiveDeclKind, DeclName))
+NOTE(fix_unqualified_access_member,tce_sema,none,
+     "use 'self.' to silence this warning", ())
+NOTE(fix_unqualified_access_top_level,tce_sema,none,
+     "use '%0' to reference the %1",
+     (StringRef, DescriptiveDeclKind, Identifier))
+NOTE(fix_unqualified_access_top_level_multi,tce_sema,none,
+     "use '%0' to reference the %1 in module %2",
+     (StringRef, DescriptiveDeclKind, Identifier))
 
 ERROR(type_of_metatype,tce_sema,none,
       "'.dynamicType' is not allowed after a type name", ())

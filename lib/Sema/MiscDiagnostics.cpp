@@ -16,8 +16,9 @@
 
 #include "MiscDiagnostics.h"
 #include "TypeChecker.h"
-#include "swift/Basic/SourceManager.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/NameLookup.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/ADT/MapVector.h"
 using namespace swift;
@@ -106,8 +107,11 @@ static void diagUnreachableCode(TypeChecker &TC, const Stmt *S) {
 ///   - Metatype names cannot generally be used as values: they need a "T.self"
 ///     qualification unless used in narrow case (e.g. T() for construction).
 ///   - '_' may only exist on the LHS of an assignment expression.
+///   - warn_unqualified_access values must not be accessed except via qualified
+///     lookup.
 ///
-static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E) {
+static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
+                                         const DeclContext *DC) {
   class DiagnoseWalker : public ASTWalker {
     SmallPtrSet<Expr*, 4> AlreadyDiagnosedMetatypes;
     SmallPtrSet<DeclRefExpr*, 4> AlreadyDiagnosedNoEscapes;
@@ -116,8 +120,9 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E) {
     SmallPtrSet<DiscardAssignmentExpr*, 2> CorrectDiscardAssignmentExprs;
   public:
     TypeChecker &TC;
+    const DeclContext *DC;
 
-    DiagnoseWalker(TypeChecker &TC) : TC(TC) {}
+    DiagnoseWalker(TypeChecker &TC, const DeclContext *DC) : TC(TC), DC(DC) {}
 
     // Not interested in going outside a basic expression.
     std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
@@ -148,6 +153,9 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E) {
 
         // Verify noescape parameter uses.
         checkNoEscapeParameterUse(DRE, nullptr);
+
+        // Verify warn_unqualified_access uses.
+        checkUnqualifiedAccessUse(DRE);
       }
       if (auto *MRE = dyn_cast<MemberRefExpr>(Base))
         if (isa<TypeDecl>(MRE->getMember().getDecl()))
@@ -322,9 +330,81 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E) {
       TC.diagnose(E->getEndLoc(), diag::add_self_to_type)
         .fixItInsertAfter(E->getEndLoc(), ".self");
     }
+
+    void checkUnqualifiedAccessUse(const DeclRefExpr *DRE) {
+      const Decl *D = DRE->getDecl();
+      if (!D->getAttrs().hasAttribute<WarnUnqualifiedAccessAttr>())
+        return;
+
+      if (auto *parentExpr = Parent.getAsExpr()) {
+        if (auto *ignoredBase = dyn_cast<DotSyntaxBaseIgnoredExpr>(parentExpr)){
+          if (!ignoredBase->isImplicit())
+            return;
+        }
+        if (auto *calledBase = dyn_cast<DotSyntaxCallExpr>(parentExpr)) {
+          if (!calledBase->isImplicit())
+            return;
+        }
+      }
+
+      const auto *VD = cast<ValueDecl>(D);
+      const TypeDecl *declParent =
+          VD->getDeclContext()->isNominalTypeOrNominalTypeExtensionContext();
+      if (!declParent) {
+        assert(VD->getDeclContext()->isModuleScopeContext());
+        declParent = VD->getDeclContext()->getParentModule();
+      }
+
+      TC.diagnose(DRE->getLoc(), diag::warn_unqualified_access,
+                  VD->getName(), VD->getDescriptiveKind(),
+                  declParent->getDescriptiveKind(), declParent->getFullName());
+      TC.diagnose(VD, diag::decl_declared_here, VD->getName());
+
+      if (VD->getDeclContext()->isTypeContext()) {
+        TC.diagnose(DRE->getLoc(), diag::fix_unqualified_access_member)
+          .fixItInsert(DRE->getStartLoc(), "self.");
+      }
+
+      DeclContext *topLevelContext = DC->getModuleScopeContext();
+      UnqualifiedLookup lookup(VD->getBaseName(), topLevelContext, &TC,
+                               /*knownPrivate*/true);
+
+      // Group results by module. Pick an arbitrary result from each module.
+      llvm::SmallDenseMap<const ModuleDecl*,const ValueDecl*,4> resultsByModule;
+      for (auto &result : lookup.Results) {
+        const ValueDecl *value = result.getValueDecl();
+        resultsByModule.insert(std::make_pair(value->getModuleContext(),value));
+      }
+
+      // Sort by module name.
+      using ModuleValuePair = std::pair<const ModuleDecl *, const ValueDecl *>;
+      SmallVector<ModuleValuePair, 4> sortedResults{
+        resultsByModule.begin(), resultsByModule.end()
+      };
+      llvm::array_pod_sort(sortedResults.begin(), sortedResults.end(),
+                           [](const ModuleValuePair *lhs,
+                              const ModuleValuePair *rhs) {
+        return lhs->first->getName().compare(rhs->first->getName());
+      });
+
+      auto topLevelDiag = diag::fix_unqualified_access_top_level;
+      if (sortedResults.size() > 1)
+        topLevelDiag = diag::fix_unqualified_access_top_level_multi;
+
+      for (const ModuleValuePair &pair : sortedResults) {
+        DescriptiveDeclKind k = pair.second->getDescriptiveKind();
+
+        SmallString<32> namePlusDot = pair.first->getName().str();
+        namePlusDot.push_back('.');
+
+        TC.diagnose(DRE->getLoc(), topLevelDiag,
+                    namePlusDot, k, pair.first->getName())
+          .fixItInsert(DRE->getStartLoc(), namePlusDot);
+      }
+    }
   };
 
-  DiagnoseWalker Walker(TC);
+  DiagnoseWalker Walker(TC, DC);
   const_cast<Expr *>(E)->walk(Walker);
 }
 
@@ -834,7 +914,7 @@ static void diagAvailability(TypeChecker &TC, const Expr *E,
 void swift::performSyntacticExprDiagnostics(TypeChecker &TC, const Expr *E,
                                             const DeclContext *DC) {
   diagSelfAssignment(TC, E);
-  diagSyntacticUseRestrictions(TC, E);
+  diagSyntacticUseRestrictions(TC, E, DC);
   diagRecursivePropertyAccess(TC, E, DC);
   diagnoseImplicitSelfUseInClosure(TC, E, DC);
   diagAvailability(TC, E, DC);
