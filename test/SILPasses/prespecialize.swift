@@ -9,7 +9,7 @@
 // Look for generic specialization <Swift.Int with Swift.Int : Swift.ForwardIndexType in Swift, Swift.Int with Swift.Int : Swift._SignedIntegerType in Swift, Swift.Int with Swift.Int : Swift._BuiltinIntegerLiteralConvertible in Swift, Swift.Int> of Swift.RangeGenerator.next <A where A: Swift.ForwardIndexType> (inout Swift.RangeGenerator<A>)() -> Swift.Optional<A>
 // CHECK: function_ref @_TTSg5SiSiSs16ForwardIndexTypeSs_SiSiSs18_SignedIntegerTypeSs_SiSiSs33_BuiltinIntegerLiteralConvertibleSs_Si___TFVSs14RangeGenerator4nextuRq_Ss16ForwardIndexType_fRGS_q__FT_GSqq__
 // Look for generic specialization <Swift.Int> of Swift.Array.subscript.getter : (Swift.Int) -> A
-// CHECK: function_ref @_TTSg5Si___TFSag9subscriptFSiq_
+// CHECK: function_ref {{@_TTSg5Si___TFSag9subscriptFSiq_|@_TTSg5Si___TFSaap9subscriptFSiq_}}
 // CHECK: return
 @inline(never)
 public func test(inout a: [Int], size: Int) {
