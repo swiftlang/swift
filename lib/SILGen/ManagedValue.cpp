@@ -92,24 +92,16 @@ void ManagedValue::forwardInto(SILGenFunction &gen, SILLocation loc,
                                SILValue address) {
   if (hasCleanup())
     forwardCleanup(gen);
-
-  // Do not take this value unless it has an active cleanup. For example,
-  // unchecked_addr_cast of trivial to nontrivial type produces a value that
-  // would normally require a release but is returned as +0.
-  IsTake_t isTake = isPlusZeroRValueOrTrivial() ? IsNotTake : IsTake;
   auto &addrTL = gen.getTypeLowering(address.getType());
-  gen.emitSemanticStore(loc, getValue(), address, addrTL, isTake,
-                        IsInitialization);
+  gen.emitSemanticStore(loc, getValue(), address, addrTL, IsInitialization);
 }
 
 void ManagedValue::assignInto(SILGenFunction &gen, SILLocation loc,
                               SILValue address) {
   if (hasCleanup())
     forwardCleanup(gen);
-
-  // As with forwardInto, do not take this value unless its cleanup is active.
-  IsTake_t isTake = isPlusZeroRValueOrTrivial() ? IsNotTake : IsTake;
+  
   auto &addrTL = gen.getTypeLowering(address.getType());
-  gen.emitSemanticStore(loc, getValue(), address, addrTL, isTake,
+  gen.emitSemanticStore(loc, getValue(), address, addrTL,
                         IsNotInitialization);
 }
