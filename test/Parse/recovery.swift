@@ -313,6 +313,15 @@ struct ErrorTypeInVarDecl11 {
   var v2 : Int
 }
 
+func ErrorTypeInPattern1(_: protocol<) { } // expected-error {{expected identifier for type name}}
+
+func ErrorTypeInPattern2(_: protocol<F) { } // expected-error {{expected '>' to complete protocol composition type}}
+// expected-note@-1 {{to match this opening '<'}}
+// expected-error@-2 {{use of undeclared type 'F'}}
+
+func ErrorTypeInPattern3(_: protocol<F,) { } // expected-error {{expected identifier for type name}}
+// expected-error@-1 {{use of undeclared type 'F'}}
+
 struct ErrorGenericParameterList1< // expected-error {{expected an identifier to name generic parameter}} expected-error {{expected '{' in struct}}
 
 struct ErrorGenericParameterList2<T // expected-error {{expected '>' to complete generic parameter list}} expected-note {{to match this opening '<'}} expected-error {{expected '{' in struct}}

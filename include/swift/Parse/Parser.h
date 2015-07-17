@@ -442,7 +442,7 @@ public:
   /// \brief Skip until a token that starts with '>'.  Applies heuristics that
   /// are suitable when trying to find the end of a list of generic parameters,
   /// generic arguments, or list of types in a protocol composition.
-  void skipUntilGreaterInTypeList();
+  void skipUntilGreaterInTypeList(bool protocolComposition=false);
 
   /// skipUntilDeclStmtRBrace - Skip to the next decl or '}'.
   void skipUntilDeclRBrace();

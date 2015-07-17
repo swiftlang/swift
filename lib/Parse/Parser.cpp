@@ -390,7 +390,7 @@ void Parser::skipUntilAnyOperator() {
     skipSingle();
 }
 
-void Parser::skipUntilGreaterInTypeList() {
+void Parser::skipUntilGreaterInTypeList(bool protocolComposition) {
   while (true) {
     switch (Tok.getKind()) {
     case tok::eof:
@@ -407,10 +407,19 @@ void Parser::skipUntilGreaterInTypeList() {
       return;
     break;
 
+    case tok::l_paren:
+    case tok::r_paren:
+    case tok::l_square:
+    case tok::r_square:
+      // In generic type parameter list, skip '[' ']' '(' ')', because they
+      // can appear in types.
+      if (protocolComposition)
+        return;
+      break;
+
     default:
       if (Tok.isAnyOperator() && startsWithGreater(Tok))
         return;
-      // Skip '[' ']' '(' ')', because they can appear in types.
       break;
     }
     skipSingle();

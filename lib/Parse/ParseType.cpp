@@ -414,7 +414,7 @@ ParserResult<ProtocolCompositionTypeRepr> Parser::parseTypeComposition() {
   } while (consumeIf(tok::comma));
   
   // Check for the terminating '>'.
-  SourceLoc EndLoc = Tok.getLoc();
+  SourceLoc EndLoc = PreviousLoc;
   if (!startsWithGreater(Tok)) {
     if (Status.isSuccess()) {
       diagnose(Tok, diag::expected_rangle_protocol);
@@ -423,7 +423,7 @@ ParserResult<ProtocolCompositionTypeRepr> Parser::parseTypeComposition() {
     }
 
     // Skip until we hit the '>'.
-    skipUntilGreaterInTypeList();
+    skipUntilGreaterInTypeList(/*protocolComposition=*/true);
     if (startsWithGreater(Tok))
       EndLoc = consumeStartingGreater();    
   } else {
