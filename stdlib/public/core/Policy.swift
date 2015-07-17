@@ -74,6 +74,7 @@ public typealias _MaxBuiltinFloatType = Builtin.FPIEEE64
 /// The protocol to which all types implicitly conform.
 public typealias Any = protocol<>
 
+#if _runtime(_ObjC)
 /// The protocol to which all classes implicitly conform.
 ///
 /// When used as a concrete type, all known `@objc` methods and
@@ -108,10 +109,16 @@ public typealias Any = protocol<>
 /// (Final extension methods are OK though.)
 ///
 /// - SeeAlso: `AnyClass`
-#if _runtime(_ObjC)
-@objc public protocol AnyObject: class {}
+@objc
+public protocol AnyObject : class {}
 #else
-public protocol AnyObject: class {}
+/// The protocol to which all classes implicitly conform.
+///
+/// This protocol *must* not have any method or property requirements.
+/// (Final extension methods are OK though.)
+///
+/// - SeeAlso: `AnyClass`
+public protocol AnyObject : class {}
 #endif
 
 // FIXME: AnyObject should have an alternate version for non-objc without
