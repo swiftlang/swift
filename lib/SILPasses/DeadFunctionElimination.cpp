@@ -73,6 +73,18 @@ protected:
     if (F->getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod)
       return true;
 
+    // If function is marked as "keep-as-public", don't remove it.
+    // Change its linkage to public, so that other applications can refer to it.
+    // It is important that this transformation is done at the end of
+    // a pipeline, as it may break some optimizations.
+    if (F->isKeepAsPublic()) {
+      F->setLinkage(SILLinkage::Public);
+      F->setFragile(IsFragile_t::IsNotFragile);
+      DEBUG(llvm::dbgs() << "DFE: Preserve the specialization "
+                         << F->getName() << '\n');
+      return true;
+    }
+
     return false;
   }
 

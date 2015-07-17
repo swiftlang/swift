@@ -32,6 +32,9 @@ ApplySite trySpecializeApplyOfGeneric(ApplySite Apply,
                                       SILFunction *&NewFunction,
           llvm::SmallVectorImpl<FullApplyCollector::value_type> &NewApplyPairs);
 
+/// Checks if a given mangled name could be a name of a whitelisted specialization.
+bool isWhitelistedSpecialization(StringRef SpecName);
+
 } // end namespace swift
 
 #endif

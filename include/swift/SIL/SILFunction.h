@@ -120,6 +120,12 @@ private:
   /// The linkage of the function.
   unsigned Linkage : NumSILLinkageBits;
 
+  /// This flags indicates if a function can be
+  /// eliminated by dead function elimination.
+  /// If it is unset, DFE will preserve the function
+  /// and make it public.
+  unsigned KeepAsPublic: 1;
+
   /// This is the number of uses of this SILFunction inside the SIL.
   /// It does not include references from debug scopes.
   unsigned RefCount = 0;
@@ -195,7 +201,7 @@ public:
   }
 
   bool canBeDeleted() const {
-    return !getRefCount() && !isZombie();
+    return !getRefCount() && !isZombie() && !isKeepAsPublic();
   }
 
   /// Return the number of entities referring to this function (other
@@ -411,6 +417,9 @@ public:
 
   StringRef getSemanticsAttr() const { return SemanticsAttr; }
   void setSemanticsAttr(StringRef attr) { SemanticsAttr = attr; }
+
+  bool isKeepAsPublic() const { return KeepAsPublic; }
+  void setKeepAsPublic(bool keep) { KeepAsPublic = keep; }
 
   /// Retrieve the generic parameter list containing the contextual archetypes
   /// of the function.

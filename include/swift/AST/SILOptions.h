@@ -69,6 +69,9 @@ public:
   /// Optimization mode being used.
   SILOptMode Optimization = SILOptMode::NotSet;
 
+  /// Are we using pre-specialized generic specializations.
+  bool UsePrespecialized = false;
+
   enum AssertConfiguration: unsigned {
     // Used by standard library code to distinguish between a debug and release
     // build.

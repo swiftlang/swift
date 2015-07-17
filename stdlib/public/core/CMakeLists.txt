@@ -128,6 +128,7 @@ set(SWIFTLIB_SOURCES
   SliceBuffer.swift
   VarArgs.swift
   Zip.swift
+  Prespecialized.swift
   )
 
 set(swift_core_link_flags)
