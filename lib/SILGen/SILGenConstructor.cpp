@@ -58,7 +58,7 @@ static RValue emitImplicitValueConstructorArg(SILGenFunction &gen,
     SILValue arg = new (gen.F.getModule()) SILArgument(gen.F.begin(),
                                                        gen.getLoweredType(ty),
                                                        VD);
-    return RValue(gen, loc, ty, ManagedValue::forUnmanaged(arg));
+    return RValue(gen, loc, ty, gen.emitManagedRValueWithCleanup(arg));
   }
 }
 
