@@ -79,6 +79,10 @@ static void addCommentToList(SmallVectorImpl<SingleRawComment> &Comments,
   // TODO: consider producing warnings when we decide not to merge comments.
 
   if (SRC.isOrdinary()) {
+    // Skip gyb comments that are line number markers.
+    if (SRC.RawText.startswith("// ###"))
+      return;
+
     Comments.clear();
     return;
   }

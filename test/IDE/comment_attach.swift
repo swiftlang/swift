@@ -209,6 +209,13 @@ func emptyBlockDocComment() {}
 /**/
 func weirdBlockDocComment() {}
 
+/// docCommentWithGybLineNumber Aaa.
+/// Bbb.
+// ###line 1010
+/// Ccc.
+// ###line 1010
+func docCommentWithGybLineNumber() {}
+
 /**
 func unterminatedBlockDocComment() {}
 
@@ -295,3 +302,4 @@ func unterminatedBlockDocComment() {}
 // CHECK-NEXT: comment_attach.swift:196:37: Func/decl_protocol_1.<setter for decl_protocol_1.propertyWithGetSet> RawComment=none
 // CHECK-NEXT: comment_attach.swift:207:6: Func/emptyBlockDocComment RawComment=[/***/]
 // CHECK-NEXT: comment_attach.swift:210:6: Func/weirdBlockDocComment RawComment=[/**/]
+// CHECK-NEXT: comment_attach.swift:217:6: Func/docCommentWithGybLineNumber RawComment=[/// docCommentWithGybLineNumber Aaa.\n/// Bbb.\n/// Ccc.\n]
