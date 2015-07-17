@@ -1,4 +1,4 @@
-Name:            GameKit
+Name:            GameCenter
 Classes:
   - Name: GKLocalPlayer
     Methods:
