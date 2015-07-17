@@ -1978,8 +1978,8 @@ public func check${traversal}Collection<
   let distanceCandidates: [Distance] = [
     -11, -7, -5, -3, -2, -1, 0, 1, 2, 3, 5, 7, 11]
 
-  let distances = distanceCandidates.filter {
-    $0 + offset0 >= 0 && $0 + offset1 <= count
+  let distances = distanceCandidates.filter { (x: Distance) -> Bool in
+    x + offset0 >= 0 && x + offset1 <= count
   }
 
   func nextN(n: C.Index.Distance, var _ i: C.Index) -> C.Index {
@@ -2248,7 +2248,10 @@ public func expectEqualSequence<
      Expected.Generator.Element == (T, U)
 >(expected: Expected, _ actual: Actual, ${TRACE}) {
   expectEqualSequence(
-    expected, actual, ${trace}) { $0.0 == $1.0 && $0.1 == $1.1 }
+    expected, actual, ${trace}) {
+    (lhs: (T, U), rhs: (T, U)) -> Bool in
+    lhs.0 == rhs.0 && lhs.1 == rhs.1
+  }
 }
 
 public func expectEqualSequence<
