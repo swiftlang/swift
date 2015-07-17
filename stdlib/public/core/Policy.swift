@@ -105,21 +105,17 @@ public typealias Any = protocol<>
 ///       return x.getCValue() // x.getCValue is implicitly unwrapped. // <===
 ///     }
 ///
-/// This protocol *must* not have any method or property requirements.
-/// (Final extension methods are OK though.)
-///
 /// - SeeAlso: `AnyClass`
 @objc
 public protocol AnyObject : class {}
 #else
 /// The protocol to which all classes implicitly conform.
 ///
-/// This protocol *must* not have any method or property requirements.
-/// (Final extension methods are OK though.)
-///
 /// - SeeAlso: `AnyClass`
 public protocol AnyObject : class {}
 #endif
+// Implementation note: the `AnyObject` protocol *must* not have any method or
+// property requirements.
 
 // FIXME: AnyObject should have an alternate version for non-objc without
 // the @objc attribute, but AnyObject needs to be not be an address-only
