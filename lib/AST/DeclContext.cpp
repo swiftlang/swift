@@ -54,6 +54,9 @@ DeclContext::isNominalTypeOrNominalTypeExtensionContext() const {
     auto ED = cast<ExtensionDecl>(this);
     auto type = ED->getExtendedType();
 
+    if (type.isNull() || type->is<ErrorType>())
+      return nullptr;
+
     if (auto ND = type->getNominalOrBoundGenericNominal())
       return ND;
 

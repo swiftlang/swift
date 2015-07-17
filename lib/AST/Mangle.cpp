@@ -232,7 +232,7 @@ void Mangler::mangleContext(const DeclContext *ctx, BindGenerics shouldBind) {
     auto ExtD = cast<ExtensionDecl>(ctx);
     auto ExtTy = ExtD->getExtendedType();
     // Recover from erroneous extension.
-    if (ExtTy->is<ErrorType>())
+    if (ExtTy.isNull() || ExtTy->is<ErrorType>())
       return mangleContext(ExtD->getDeclContext(), shouldBind);
 
     auto decl = ExtTy->getAnyNominal();
