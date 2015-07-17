@@ -1049,6 +1049,10 @@ ERROR(override_less_available,sema_tcd,none,
       "overriding %0 must be as available as declaration it overrides",
       (Identifier))
 
+ERROR(override_accessor_less_available,sema_tcd,none,
+      "overriding %0 for %1 must be as available as declaration it overrides",
+      (DescriptiveDeclKind, Identifier))
+
 ERROR(override_let_property,sema_tcd,none,
       "cannot override immutable 'let' property %0 with the getter of a 'var'",
       (Identifier))

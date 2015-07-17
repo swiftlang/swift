@@ -5059,6 +5059,16 @@ public:
     if (isRedundantAccessorOverrideAvailabilityDiagnostic(TC, override, base))
       return false;
 
+    if (auto *FD = dyn_cast<FuncDecl>(override)) {
+      if (FD->isAccessor()) {
+        TC.diagnose(override, diag::override_accessor_less_available,
+                    FD->getDescriptiveKind(),
+                    FD->getAccessorStorageDecl()->getName());
+        TC.diagnose(base, diag::overridden_here);
+        return true;
+      }
+    }
+
     TC.diagnose(override, diag::override_less_available, override->getName());
     TC.diagnose(base, diag::overridden_here);
 

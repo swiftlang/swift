@@ -830,13 +830,13 @@ class SubWithLimitedMemberAvailability : SuperWithAlwaysAvailableMembers {
   override var setterShouldAlwaysBeAvailableProperty: Int {
     get { return 9 }
     @available(OSX, introduced=10.10)
-    set(newVal) {} // expected-error {{overriding '_' must be as available as declaration it overrides}}
+    set(newVal) {} // expected-error {{overriding setter for 'setterShouldAlwaysBeAvailableProperty' must be as available as declaration it overrides}}
     // This is a terrible diagnostic. rdar://problem/20427938
   }
 
   override var getterShouldAlwaysBeAvailableProperty: Int {
     @available(OSX, introduced=10.10)
-    get { return 9 } // expected-error {{overriding '_' must be as available as declaration it overrides}}
+    get { return 9 } // expected-error {{overriding getter for 'getterShouldAlwaysBeAvailableProperty' must be as available as declaration it overrides}}
     set(newVal) {}
   }
 }
