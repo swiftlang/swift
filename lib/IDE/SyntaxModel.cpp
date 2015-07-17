@@ -188,7 +188,7 @@ struct StructureElement {
     :StructureNode(StructureNode), ASTNode(ASTNode) { }
 };
 
-static const std::vector<std::string> URLPro = {
+static const std::vector<std::string> URLProtocols = {
 
   // Use RegexStrURL:
   "acap", "afp", "afs", "cid", "data", "fax", "feed", "file", "ftp", "go",
@@ -234,26 +234,11 @@ class ModelASTWalker : public ASTWalker {
   unsigned BufferID;
   std::vector<StructureElement> SubStructureStack;
   SourceLoc LastLoc;
-  std::regex URLRxs[3] = {
-    std::regex{ RegexStrURL, std::regex::ECMAScript | std::regex::nosubs },
-    std::regex{ RegexStrMailURL, std::regex::ECMAScript | std::regex::nosubs },
-    std::regex{ RegexStrRadarURL, std::regex::ECMAScript | std::regex::nosubs }};
+  static const std::regex URLRxs[3];
+  static const std::regex DocCommentRxs[3];
 
-  std::regex DocCommentRxs[3] = {
-    std::regex {
-      RegexStrParameter,
-      std::regex::egrep | std::regex::icase | std::regex::optimize
-    },
-    std::regex {
-      RegexStrDocCommentParametersHeading,
-      std::regex::egrep | std::regex::icase | std::regex::optimize
-    },
-    std::regex { RegexStrDocCommentField,
-      std::regex::egrep | std::regex::icase | std::regex::optimize
-    }
-  };
-
-  Optional<SyntaxNode> parseFieldNode(StringRef Text, StringRef OrigText, SourceLoc OrigLoc);
+  Optional<SyntaxNode> parseFieldNode(StringRef Text, StringRef OrigText,
+                                      SourceLoc OrigLoc);
 
 public:
   SyntaxModelWalker &Walker;
@@ -276,7 +261,8 @@ public:
   bool shouldWalkIntoFunctionGenericParams() override { return true; }
 
 private:
-  bool findUrlStartingLoc(StringRef Text, unsigned &Start, std::regex& Regex);
+  static bool findUrlStartingLoc(StringRef Text, unsigned &Start,
+                                 std::regex& Regex);
   bool annotateIfConfigConditionIdentifiers(Expr *Cond);
   bool handleAttrs(const DeclAttributes &Attrs);
   bool handleAttrs(const TypeAttributes &Attrs);
@@ -306,6 +292,27 @@ private:
   bool searchForURL(CharSourceRange Range);
   bool findFieldsInDocCommentLine(SyntaxNode Node);
   bool findFieldsInDocCommentBlock(SyntaxNode Node);
+};
+
+const std::regex ModelASTWalker::URLRxs[3] =  {
+    std::regex{ RegexStrURL, std::regex::ECMAScript | std::regex::nosubs },
+    std::regex{ RegexStrMailURL, std::regex::ECMAScript | std::regex::nosubs },
+    std::regex{ RegexStrRadarURL, std::regex::ECMAScript | std::regex::nosubs }
+};
+
+const std::regex ModelASTWalker::DocCommentRxs[3] = {
+  std::regex {
+    RegexStrParameter,
+    std::regex::egrep | std::regex::icase | std::regex::optimize
+  },
+  std::regex {
+    RegexStrDocCommentParametersHeading,
+    std::regex::egrep | std::regex::icase | std::regex::optimize
+  },
+  std::regex {
+    RegexStrDocCommentField,
+    std::regex::egrep | std::regex::icase | std::regex::optimize
+  }
 };
 
 SyntaxStructureKind syntaxStructureKindFromNominalTypeDecl(NominalTypeDecl *N) {
@@ -1179,24 +1186,27 @@ bool ModelASTWalker::processComment(CharSourceRange Range) {
 bool ModelASTWalker::findUrlStartingLoc(StringRef Text,
                                         unsigned &Start,
                                         std::regex &Regex) {
-  static const auto MailToPosition = std::find(URLPro.begin(), URLPro.end(),
+  static const auto MailToPosition = std::find(URLProtocols.begin(),
+                                               URLProtocols.end(),
                                                "mailto");
-  static const auto RadarPosition = std::find(URLPro.begin(), URLPro.end(),
+  static const auto RadarPosition = std::find(URLProtocols.begin(),
+                                              URLProtocols.end(),
                                               "radar");
-  auto Index = Text.find("://");
-  if (Index != StringRef::npos) {
-    for (auto It = URLPro.begin(); It != URLPro.end(); ++ It) {
-      if (Index >= It->size() &&
-          Text.substr(Index - It->size(), It->size()) == *It) {
-        Start = Index - It->size();
-        if (It < MailToPosition)
-          Regex = URLRxs[0];
-        else if (It < RadarPosition)
-          Regex = URLRxs[1];
-        else
-          Regex = URLRxs[2];
-        return true;
-      }
+  auto Index = Text.find(":");
+  if (Index == StringRef::npos)
+    return false;
+
+  for (auto It = URLProtocols.begin(); It != URLProtocols.end(); ++ It) {
+    if (Index >= It->size() &&
+        Text.substr(Index - It->size(), It->size()) == *It) {
+      Start = Index - It->size();
+      if (It < MailToPosition)
+        Regex = URLRxs[0];
+      else if (It < RadarPosition)
+        Regex = URLRxs[1];
+      else
+        Regex = URLRxs[2];
+      return true;
     }
   }
   return false;
@@ -1209,7 +1219,7 @@ bool ModelASTWalker::searchForURL(CharSourceRange Range) {
   StringRef Text = OrigText;
   while (1) {
     std::match_results<StringRef::iterator> Matches;
-    std::regex &Regex = URLRxs[0];
+    std::regex Regex;
     unsigned Start;
     if (findUrlStartingLoc(Text, Start, Regex) &&
         std::regex_search(Text.substr(Start).begin(),
