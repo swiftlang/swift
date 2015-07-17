@@ -118,7 +118,7 @@ static void deriveBodyErrorType_zero_code(AbstractFunctionDecl *codeDecl) {
   auto parentDC = codeDecl->getDeclContext();
   ASTContext &C = parentDC->getASTContext();
 
-  auto returnExpr = new (C) IntegerLiteralExpr("0", SourceLoc(),
+  auto returnExpr = new (C) IntegerLiteralExpr("1", SourceLoc(),
                                                /*implicit*/ true);
   auto returnStmt = new (C) ReturnStmt(SourceLoc(), returnExpr,
                                        /*implicit*/ true);

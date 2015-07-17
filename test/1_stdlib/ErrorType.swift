@@ -95,9 +95,9 @@ class DefaultClass : ErrorType { }
 
 ErrorTypeTests.test("default domain and code") {
   expectEqual(DefaultStruct()._domain, "main.DefaultStruct")
-  expectEqual(DefaultStruct()._code, 0)
+  expectEqual(DefaultStruct()._code, 1)
   expectEqual(DefaultClass()._domain, "main.DefaultClass")
-  expectEqual(DefaultClass()._code, 0)
+  expectEqual(DefaultClass()._code, 1)
 }
 
 enum SillyError: ErrorType { case JazzHands }

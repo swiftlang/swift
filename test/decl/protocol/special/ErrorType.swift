@@ -36,3 +36,11 @@ struct ErrorStruct : ErrorType {
 
 class ErrorClass : ErrorType {
 }
+
+struct ErrorStruct2 { }
+
+extension ErrorStruct2 : ErrorType { }
+
+class ErrorClass2 { }
+
+extension ErrorClass2 : ErrorType { }
