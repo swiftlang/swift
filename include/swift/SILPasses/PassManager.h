@@ -38,10 +38,10 @@ class SILPassManager {
   SILModule *Mod;
 
   /// The list of transformations to run.
-  llvm::SmallVector<SILTransform*, 16> Transformations;
+  llvm::SmallVector<SILTransform *, 16> Transformations;
 
   /// A list of registered analysis.
-  llvm::SmallVector<SILAnalysis*, 16> Analysis;
+  llvm::SmallVector<SILAnalysis *, 16> Analysis;
 
   // Name of the current optimization stage for diagnostics.
   std::string StageName;
@@ -74,9 +74,9 @@ class SILPassManager {
   /// \brief Searches for an analysis of type T in the list of registered
   /// analysis. If the analysis is not found, the program terminates.
   template<typename T>
-  T* getAnalysis() {
+  T *getAnalysis() {
     for (SILAnalysis *A : Analysis)
-      if (T* R = llvm::dyn_cast<T>(A))
+      if (T *R = llvm::dyn_cast<T>(A))
         return R;
 
     llvm_unreachable("Unable to find analysis for requested type.");
@@ -164,7 +164,7 @@ class SILPassManager {
 
   protected:
   bool runFunctionPasses(
-    llvm::ArrayRef<SILFunctionTransform*> FuncTransforms);
+    llvm::ArrayRef<SILFunctionTransform *> FuncTransforms);
 };
 
 } // end namespace swift
