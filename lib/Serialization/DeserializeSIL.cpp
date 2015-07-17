@@ -510,7 +510,7 @@ SILFunction *SILDeserializer::readSILFunction(DeclID FID,
   NumDeserializedFunc++;
   scratch.clear();
 
-  assert(!fn->getContextGenericParams()
+  assert(!(fn->getContextGenericParams() && !fn->empty())
          && "function already has context generic params?!");
   if (contextParams)
     fn->setContextGenericParams(contextParams);

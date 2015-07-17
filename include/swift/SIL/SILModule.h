@@ -381,6 +381,14 @@ public:
                     LinkingMode LinkAll=LinkingMode::LinkNormal,
                     std::function<void(SILFunction *)> Callback =nullptr);
 
+  /// Attempt to link a function by mangled name. Returns true if linking
+  /// succeeded, false otherwise.
+  ///
+  /// \return false if the linking failed.
+  bool linkFunction(StringRef Name,
+                    LinkingMode LinkAll=LinkingMode::LinkNormal,
+                    std::function<void(SILFunction *)> Callback =nullptr);
+
   /// Link in all Witness Tables in the module.
   void linkAllWitnessTables();
 

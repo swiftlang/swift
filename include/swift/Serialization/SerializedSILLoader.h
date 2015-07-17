@@ -81,6 +81,7 @@ public:
 
   SILFunction *lookupSILFunction(SILFunction *Callee);
   SILFunction *lookupSILFunction(SILDeclRef Decl);
+  SILFunction *lookupSILFunction(StringRef Name);
   SILVTable *lookupVTable(Identifier Name);
   SILVTable *lookupVTable(const ClassDecl *C) {
     return lookupVTable(C->getName());

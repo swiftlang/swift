@@ -61,6 +61,10 @@ public:
   /// Process F, recursively deserializing any thing F may reference.
   bool processFunction(SILFunction *F);
 
+  /// Process Name, recursively deserializing any thing function with name Name
+  /// may reference.
+  bool processFunction(StringRef Name);
+
   /// Process Decl, recursively deserializing any thing that
   /// the SILFunction corresponding to Decl may reference.
   bool processDeclRef(SILDeclRef Decl);

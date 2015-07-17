@@ -502,6 +502,12 @@ bool SILModule::linkFunction(SILDeclRef Decl, SILModule::LinkingMode Mode,
                           ExternalSource, Callback).processDeclRef(Decl);
 }
 
+bool SILModule::linkFunction(StringRef Name, SILModule::LinkingMode Mode,
+                             std::function<void(SILFunction *)> Callback) {
+  return SILLinkerVisitor(*this, getSILLoader(), Mode,
+                          ExternalSource, Callback).processFunction(Name);
+}
+
 void SILModule::linkAllWitnessTables() {
   getSILLoader()->getAllWitnessTables();
 }

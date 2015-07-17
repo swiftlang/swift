@@ -107,6 +107,32 @@ bool SILLinkerVisitor::processDeclRef(SILDeclRef Decl) {
   return true;
 }
 
+/// Process Decl, recursively deserializing any thing Decl may reference.
+bool SILLinkerVisitor::processFunction(StringRef Name) {
+  if (Mode == LinkingMode::LinkNone)
+    return false;
+
+  // If F is a declaration, first deserialize it.
+  auto *NewFn = Loader->lookupSILFunction(Name);
+
+  if (!NewFn || NewFn->isExternalDeclaration())
+    return false;
+
+  // Notify client of new deserialized function.
+  if (Callback)
+    Callback(NewFn);
+
+  ++NumFuncLinked;
+
+  // Try to transitively deserialize everything referenced by NewFn.
+  Worklist.push_back(NewFn);
+  process();
+
+  // Since we successfully processed at least one function, return true.
+  return true;
+}
+
+
 /// Deserialize the VTable mapped to C if it exists and all SIL the VTable
 /// transitively references.
 ///
@@ -326,6 +352,8 @@ bool SILLinkerVisitor::process() {
     if (!shouldImportFunction(Fn))
       continue;
 
+//    llvm::dbgs() << "Process imports in function: " << Fn->getName() << "\n";
+
     for (auto &BB : *Fn) {
       for (auto &I : BB) {
         // Should we try linking?
@@ -354,6 +382,7 @@ bool SILLinkerVisitor::process() {
               }
             }
 
+//            llvm::dbgs() << "Imported function: " << F->getName() << "\n";
             F->setBare(IsBare);
 
             if (F->isExternalDeclaration()) {
