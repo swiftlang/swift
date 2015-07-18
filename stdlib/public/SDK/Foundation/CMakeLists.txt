@@ -7,6 +7,6 @@ add_swift_library(swiftFoundation IS_SDK_OVERLAY
   NSValue.swift
   Thunks.mm
 
-  SWIFT_MODULE_DEPENDS ObjectiveC CoreGraphics Dispatch Security
+  SWIFT_MODULE_DEPENDS ObjectiveC CoreGraphics Dispatch
   FRAMEWORK_DEPENDS Foundation)
 
