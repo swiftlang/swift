@@ -407,7 +407,7 @@ struct ObjCUnownedRetainableBox
   }
 };
 
-/// A box implementation class for Swift weak object pointers.
+/// A box implementation class for ObjC weak object pointers.
 struct ObjCWeakRetainableBox :
     WeakRetainableBoxBase<ObjCWeakRetainableBox, WeakReference> {
   static void destroy(WeakReference *ref) {
