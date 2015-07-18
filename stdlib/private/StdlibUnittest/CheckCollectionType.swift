@@ -183,7 +183,7 @@ self.test("\(testNamePrefix).generate()/semantics") {
 if resiliencyChecks.creatingOutOfBoundsIndicesBehavior != .None {
   self.test("\(testNamePrefix).Index/OutOfBounds/Right/NonEmpty") {
     let c = makeWrappedCollection([ 1010, 2020, 3030 ].map { OpaqueValue($0) })
-    var index = c.endIndex
+    let index = c.endIndex
     if resiliencyChecks.creatingOutOfBoundsIndicesBehavior == .Trap {
       expectCrashLater()
       _blackHole(advance(index, numericCast(outOfBoundsIndexOffset)))
@@ -196,7 +196,7 @@ if resiliencyChecks.creatingOutOfBoundsIndicesBehavior != .None {
 
   self.test("\(testNamePrefix).Index/OutOfBounds/Right/Empty") {
     let c = makeWrappedCollection([])
-    var index = c.endIndex
+    let index = c.endIndex
     if resiliencyChecks.creatingOutOfBoundsIndicesBehavior == .Trap {
       expectCrashLater()
       _blackHole(advance(index, numericCast(outOfBoundsIndexOffset)))
@@ -430,7 +430,7 @@ self.test("\(testNamePrefix).last") {
 if resiliencyChecks.creatingOutOfBoundsIndicesBehavior != .None {
   self.test("\(testNamePrefix).Index/OutOfBounds/Left/NonEmpty") {
     let c = makeWrappedCollection([ 1010, 2020, 3030 ].map { OpaqueValue($0) })
-    var index = c.startIndex
+    let index = c.startIndex
     if resiliencyChecks.creatingOutOfBoundsIndicesBehavior == .Trap {
       expectCrashLater()
       _blackHole(advance(index, numericCast(-outOfBoundsIndexOffset)))
@@ -443,7 +443,7 @@ if resiliencyChecks.creatingOutOfBoundsIndicesBehavior != .None {
 
   self.test("\(testNamePrefix).Index/OutOfBounds/Left/Empty") {
     let c = makeWrappedCollection([])
-    var index = c.startIndex
+    let index = c.startIndex
     if resiliencyChecks.creatingOutOfBoundsIndicesBehavior == .Trap {
       expectCrashLater()
       _blackHole(advance(index, numericCast(-outOfBoundsIndexOffset)))

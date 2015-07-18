@@ -669,7 +669,7 @@ self.test("\(testNamePrefix).removeFirst()/semantics") {
 self.test("\(testNamePrefix).removeFirst()/empty/semantics") {
   expectCrashLater()
   var c = makeWrappedCollection(Array<OpaqueValue<Int>>())
-  let removedElement = c.removeFirst() // Should trap.
+  _ = c.removeFirst() // Should trap.
 }
 
 //===----------------------------------------------------------------------===//
@@ -719,7 +719,7 @@ self.test("\(testNamePrefix).removeFirst(n: Int)/removeTooMany/semantics") {
 self.test("\(testNamePrefix).removeFirst(n: Int)/empty/semantics") {
   expectCrashLater()
   var c = makeWrappedCollection(Array<OpaqueValue<Int>>())
-  let removedElement = c.removeFirst() // Should trap.
+  _ = c.removeFirst() // Should trap.
 }
 
 //===----------------------------------------------------------------------===//
