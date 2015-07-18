@@ -2104,56 +2104,62 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr) {
   if (isa<ClosureExpr>(subExpr))
     return subExpr;
   
-  bool unhandledSubExprs =
-    // NilLiteralExpr cannot ever be typechecked without context.
-    isa<NilLiteralExpr>(subExpr) ||
+  // These expression types can never be checked without their enclosing
+  // context, so don't try - it would just make bogus diagnostics.
+  if (isa<NilLiteralExpr>(subExpr) ||
   
-    // TupleExpr often contains things that cannot be typechecked without
-    // context (usually from a parameter list).
-    isa<TupleExpr>(subExpr) ||
+      // A '_' is only allowed on the LHS of an assignment, so we can't descend
+      // past the AssignExpr.  This is a problem below because we're not
+      // allowing ambiguous solutions for subexprs, and thus the code below is
+      // forced to diagnose "discard_expr_outside_of_assignment".  This should
+      // really allow ambiguous expressions and diagnose it only in MiscDiags.
+      isa<DiscardAssignmentExpr>(subExpr))
+    return subExpr;
   
-    // InOutExpr needs contextual information otherwise we complain about it not
-    // being in an argument context.
-    isa<InOutExpr>(subExpr);
+  // TupleExpr often contains things that cannot be typechecked without
+  // context (usually from a parameter list), but we do it if they already have
+  // an unspecialized type.
+  // FIXME: This is a total hack.
+  if ((isa<TupleExpr>(subExpr) ||
+      
+       // InOutExpr needs contextual information otherwise we complain about it
+       // not being in an argument context.
+       isa<InOutExpr>(subExpr)) &&
+      !typeIsNotSpecialized(subExpr->getType()))
+    return subExpr;
   
-  
-  if (!unhandledSubExprs ||
-      typeIsNotSpecialized(subExpr->getType())) {
-    
-    // Store off the sub-expression, in case a new one is provided via the
-    // type check operation.
-    Expr *preCheckedExpr = subExpr;
+  // Store off the sub-expression, in case a new one is provided via the
+  // type check operation.
+  Expr *preCheckedExpr = subExpr;
 
-    CS->TC.eraseTypeData(subExpr);
-        
-    // Claim that the result is discarded to preserve the lvalue type of
-    // the expression.
-    //
-    // Disable structural checks, because we know that the overall expression
-    // has type constraint problems, and we don't want to know about any
-    // syntactic issues in a well-typed subexpression (which might be because
-    // the context is missing).
-    auto options = TypeCheckExprFlags::IsDiscarded|
-                   TypeCheckExprFlags::DisableStructuralChecks;
-    bool hadError = CS->TC.typeCheckExpression(subExpr, CS->DC, Type(), Type(),
-                                               options);
+  CS->TC.eraseTypeData(subExpr);
+      
+  // Claim that the result is discarded to preserve the lvalue type of
+  // the expression.
+  //
+  // Disable structural checks, because we know that the overall expression
+  // has type constraint problems, and we don't want to know about any
+  // syntactic issues in a well-typed subexpression (which might be because
+  // the context is missing).
+  auto options = TypeCheckExprFlags::IsDiscarded|
+                 TypeCheckExprFlags::DisableStructuralChecks;
+  bool hadError = CS->TC.typeCheckExpression(subExpr, CS->DC, Type(), Type(),
+                                             options);
 
-    // This is a terrible hack to get around the fact that typeCheckExpression()
-    // might change subExpr to point to a new OpenExistentialExpr. In that case,
-    // since the caller passed subExpr by value here, they would be left
-    // holding on to an expression containing open existential types but
-    // no OpenExistentialExpr, which breaks invariants enforced by the
-    // ASTChecker.
-    CS->TC.eraseOpenedExistentials(subExpr);
-        
-    // If recursive type checking failed, then an error was emitted.  Return
-    // null to indicate this to the caller.
-    if (hadError)
-      return nullptr;
+  // This is a terrible hack to get around the fact that typeCheckExpression()
+  // might change subExpr to point to a new OpenExistentialExpr. In that case,
+  // since the caller passed subExpr by value here, they would be left
+  // holding on to an expression containing open existential types but
+  // no OpenExistentialExpr, which breaks invariants enforced by the
+  // ASTChecker.
+  CS->TC.eraseOpenedExistentials(subExpr);
+      
+  // If recursive type checking failed, then an error was emitted.  Return
+  // null to indicate this to the caller.
+  if (hadError)
+    return nullptr;
 
-    CS->TC.addExprForDiagnosis(preCheckedExpr, subExpr);
-  }
-  
+  CS->TC.addExprForDiagnosis(preCheckedExpr, subExpr);
   return subExpr;
 }
 
@@ -3136,7 +3142,6 @@ bool ConstraintSystem::diagnoseFailureForExpr(Expr *expr) {
   // to the "outside assignment" error.
   if (ActiveConstraints.empty() && InactiveConstraints.empty() &&
       !failedConstraint) {
-
     if (isa<DiscardAssignmentExpr>(expr)) {
       TC.diagnose(expr->getLoc(), diag::discard_expr_outside_of_assignment)
         .highlight(expr->getSourceRange());
