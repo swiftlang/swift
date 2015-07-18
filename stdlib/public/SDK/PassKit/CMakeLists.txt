@@ -2,6 +2,8 @@ add_swift_library(swiftPassKit IS_SDK_OVERLAY
   PassKit.swift
   TARGET_SDKS IOS IOS_SIMULATOR WATCHOS WATCHOS_SIMULATOR
   SWIFT_MODULE_DEPENDS Foundation UIKit
-  SWIFT_COMPILE_FLAGS_WATCHOS Contacts -Xfrontend -disable-autolink-framework -Xfrontend CoreText
+  SWIFT_MODULE_DEPENDS_OSX Contacts
+  SWIFT_MODULE_DEPENDS_IOS_TVOS Contacts
+  SWIFT_COMPILE_FLAGS_WATCHOS -Xfrontend -disable-autolink-framework -Xfrontend CoreText
   FRAMEWORK_DEPENDS PassKit
 )
