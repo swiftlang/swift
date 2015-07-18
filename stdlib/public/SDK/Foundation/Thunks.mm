@@ -34,7 +34,7 @@ NS_Swift_NSCoder_decodeObject(id NS_RELEASES_ARGUMENT __nonnull self_,
   NSCoder *coder = (NSCoder *)self_;
   id result = nil;
   if (error) {
-    result = [coder decodeObjectAndReturnError:error];
+    result = [coder decodeTopLevelObjectAndReturnError:error];
   } else {
     result = [coder decodeObject];
   }
@@ -49,7 +49,7 @@ NS_Swift_NSCoder_decodeObjectForKey(id NS_RELEASES_ARGUMENT __nonnull self_,
   NSCoder *coder = (NSCoder *)self_;
   id result = nil;
   if (error) {
-    result = [coder decodeObjectForKey:key error:error];
+    result = [coder decodeTopLevelObjectForKey:key error:error];
   } else {
     result = [coder decodeObjectForKey:key];
   }
@@ -67,7 +67,7 @@ NS_Swift_NSCoder_decodeObjectOfClassForKey(
   NSCoder *coder = (NSCoder *)self_;
   id result = nil;
   if (error) {
-    result = [coder decodeObjectOfClass:cls forKey:key error:error];
+    result = [coder decodeTopLevelObjectOfClass:cls forKey:key error:error];
   } else {
     result = [coder decodeObjectOfClass:cls forKey:key];
   }
@@ -85,7 +85,7 @@ NS_Swift_NSCoder_decodeObjectOfClassesForKey(
   NSCoder *coder = (NSCoder *)self_;
   id result = nil;
   if (error) {
-    result = [coder decodeObjectOfClasses:classes forKey:key error:error];
+    result = [coder decodeTopLevelObjectOfClasses:classes forKey:key error:error];
   } else {
     result = [coder decodeObjectOfClasses:classes forKey:key];
   }
@@ -102,7 +102,7 @@ NS_Swift_NSKeyedUnarchiver_unarchiveObjectWithData(
     NSError *__nullable *__nullable error) {
   id result = nil;
   if (error) {
-    result = [Self_ unarchiveObjectWithData:data error:error];
+    result = [Self_ unarchiveTopLevelObjectWithData:data error:error];
   } else {
     result = [Self_ unarchiveObjectWithData:data];
   }
