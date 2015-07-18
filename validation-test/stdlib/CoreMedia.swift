@@ -15,14 +15,14 @@ CoreMediaTests.test("OverlaySmokeTest") {
   expectTrue(CMTimeRangeMake(CMTimeMake(1, 10), CMTimeMake(2, 20)).isValid)
 }
 
-CoreMediaTests.test("CMTime(value:timescale)") {
+CoreMediaTests.test("CMTime(value:timescale:)") {
   let time = CMTime(value: 7, timescale: 1)
   expectTrue(time.isValid)
   expectEqual(7, time.value)
   expectEqual(1, time.timescale)
 }
 
-CoreMediaTests.test("CMTime(seconds:preferredTimeScale)") {
+CoreMediaTests.test("CMTime(seconds:preferredTimeScale:)") {
   let time = CMTime(seconds: 7.0, preferredTimeScale: 600)
   expectTrue(time.isValid)
   expectEqual(7.0, time.seconds)
@@ -41,6 +41,14 @@ CoreMediaTests.test("CMTime/Comparable") {
     return instances[i].0 <=> instances[j].0
   }
   checkComparable(instances.map { $0.1 }, oracle: comparisonOracle)
+}
+
+CoreMediaTests.test("CMTimeRange(start:end:)") {
+  let start = CMTime(seconds: 10.0, preferredTimeScale: 600)
+  let end = CMTime(seconds: 20.0, preferredTimeScale: 600)
+  let range = CMTimeRange(start: start, end: end)
+  expectEqual(start, range.start)
+  expectEqual(end, range.end)
 }
 
 CoreMediaTests.test("CMTimeRange/Equatable") {

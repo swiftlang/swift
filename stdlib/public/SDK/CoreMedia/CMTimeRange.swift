@@ -21,7 +21,12 @@
 // CMTimeRangeGetIntersection
 // CMTimeRangeContainsTime
 // CMTimeRangeContainsTimeRange
+// CMTimeRangeFromTimeToTime
 extension CMTimeRange {
+  public init(start: CMTime, end: CMTime) {
+    self = CMTimeRangeFromTimeToTime(start, end)
+  }
+
   public var isValid: Bool {
     return self.start.isValid &&
       self.duration.isValid && (self.duration.epoch == 0)
