@@ -21,6 +21,10 @@ import Swift
 import SwiftShims
 import StdlibUnittest
 
+#if _runtime(_ObjC)
+import Foundation
+#endif
+
 var tests = TestSuite("Builtins")
 
 class X {}
@@ -42,6 +46,52 @@ tests.test("_isUniquelyReferenced/OptionalNativeObject") {
   var x: Builtin.NativeObject? = nil
   expectFalse(_getBool(Builtin.isUnique(&x)))
 }
+
+#if _runtime(_ObjC)
+class XObjC : NSObject {}
+
+tests.test("_isUnique_native/SpareBitTrap")
+  .skip(.Custom(
+    { !_isStdlibInternalChecksEnabled() },
+    reason: "sanity checks are disabled in this build of stdlib"))
+  .code {
+  // Fake an ObjC pointer.
+  var b = _makeObjCBridgeObject(X())
+  expectCrashLater()
+  _isUnique_native(&b)
+}
+
+tests.test("_isUniqueOrPinned_native/SpareBitTrap")
+  .skip(.Custom(
+    { !_isStdlibInternalChecksEnabled() },
+    reason: "sanity checks are disabled in this build of stdlib"))
+  .code {
+  // Fake an ObjC pointer.
+  var b = _makeObjCBridgeObject(X())
+  expectCrashLater()
+  _isUniqueOrPinned_native(&b)
+}
+
+tests.test("_isUnique_native/NonNativeTrap")
+  .skip(.Custom(
+    { !_isStdlibInternalChecksEnabled() },
+    reason: "sanity checks are disabled in this build of stdlib"))
+  .code {
+  var x = XObjC()
+  expectCrashLater()
+  _isUnique_native(&x)
+}
+
+tests.test("_isUniqueOrPinned_native/NonNativeTrap")
+  .skip(.Custom(
+    { !_isStdlibInternalChecksEnabled() },
+    reason: "sanity checks are disabled in this build of stdlib"))
+  .code {
+  var x = XObjC()
+  expectCrashLater()
+  _isUniqueOrPinned_native(&x)
+}
+#endif // _ObjC
 
 var x = 27
 
