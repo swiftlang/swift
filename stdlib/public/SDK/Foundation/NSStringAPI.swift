@@ -1257,6 +1257,7 @@ extension String {
   /// Returns a representation of the `String` using a given
   /// encoding to determine the percent escapes necessary to convert
   /// the `String` into a legal URL string.
+  @available(*, deprecated, message="Use stringByAddingPercentEncodingWithAllowedCharacters(_:) instead, which always uses the recommended UTF-8 encoding, and which encodes for a specific URL component or subcomponent since each URL component or subcomponent has different rules for what characters are valid.")
   public func stringByAddingPercentEscapesUsingEncoding(
     encoding: NSStringEncoding
   ) -> String? {
@@ -1411,6 +1412,7 @@ extension String {
   /// Returns a new string made by replacing in the `String`
   /// all percent escapes with the matching characters as determined
   /// by a given encoding.
+  @available(*, deprecated, message="Use stringByRemovingPercentEncoding instead, which always uses the recommended UTF-8 encoding.")
   public func stringByReplacingPercentEscapesUsingEncoding(
     encoding: NSStringEncoding
   ) -> String? {
