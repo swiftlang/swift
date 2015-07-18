@@ -566,8 +566,8 @@ extension Dictionary {
 /// deferred.
 @_semantics("convertFromObjectiveC")
 public func _convertNSDictionaryToDictionary<
-    Key : Hashable, Value>(d: NSDictionary?)
-    -> [Key : Value] {
+  Key : Hashable, Value
+>(d: NSDictionary?) -> [Key : Value] {
   // Note: there should be *a good justification* for doing something else
   // than just dispatching to `_forceBridgeFromObjectiveC`.
   if _slowPath(d == nil) { return [:] }
@@ -590,7 +590,7 @@ public func _convertNSDictionaryToDictionary<
 /// The cast can fail if bridging fails.  The actual checks and bridging can be
 /// deferred.
 public func _convertDictionaryToNSDictionary<Key, Value>(
-    d: [Key : Value]
+  d: [Key : Value]
 ) -> NSDictionary {
 
   // Note: there should be *a good justification* for doing something else
@@ -718,12 +718,10 @@ final public class NSFastGenerator : GeneratorType {
 }
 
 extension NSArray : SequenceType {
-  final public
-
   /// Return a *generator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
-  func generate() -> NSFastGenerator {
+  final public func generate() -> NSFastGenerator {
     return NSFastGenerator(self)
   }
 }
@@ -1069,16 +1067,14 @@ extension NSExpression {
 }
 
 extension NSString {
-  public
-  convenience init(format: NSString, _ args: CVarArgType...) {
+  public convenience init(format: NSString, _ args: CVarArgType...) {
     // We can't use withVaList because 'self' cannot be captured by a closure
     // before it has been initialized.
     let va_args = getVaList(args)
     self.init(format: format as String, arguments: va_args)
   }
 
-  public
-  convenience init(
+  public convenience init(
     format: NSString, locale: NSLocale?, _ args: CVarArgType...
   ) {
     // We can't use withVaList because 'self' cannot be captured by a closure
@@ -1087,8 +1083,7 @@ extension NSString {
     self.init(format: format as String, locale: locale, arguments: va_args)
   }
 
-  public
-  class func localizedStringWithFormat(
+  public class func localizedStringWithFormat(
     format: NSString, _ args: CVarArgType...
   ) -> Self {
     return withVaList(args) {
@@ -1096,8 +1091,7 @@ extension NSString {
     }
   }
 
-  public
-  func stringByAppendingFormat(format: NSString, _ args: CVarArgType...)
+  public func stringByAppendingFormat(format: NSString, _ args: CVarArgType...)
   -> NSString {
     return withVaList(args) {
       self.stringByAppendingString(NSString(format: format as String, arguments: $0) as String) as NSString
@@ -1106,8 +1100,7 @@ extension NSString {
 }
 
 extension NSMutableString {
-  public
-  func appendFormat(format: NSString, _ args: CVarArgType...) {
+  public func appendFormat(format: NSString, _ args: CVarArgType...) {
     return withVaList(args) {
       self.appendString(NSString(format: format as String, arguments: $0) as String)
     }
@@ -1116,8 +1109,7 @@ extension NSMutableString {
 
 extension NSArray {
   // Overlay: - (instancetype)initWithObjects:(id)firstObj, ...
-  public
-  convenience init(objects elements: AnyObject...) {
+  public convenience init(objects elements: AnyObject...) {
     // - (instancetype)initWithObjects:(const id [])objects count:(NSUInteger)cnt;
     let x = _extractOrCopyToNativeArrayBuffer(elements._buffer)
     // Use Imported:
@@ -1131,16 +1123,14 @@ extension NSArray {
 
 extension NSOrderedSet {
   // - (instancetype)initWithObjects:(id)firstObj, ...
-  public
-  convenience init(objects elements: AnyObject...) {
+  public convenience init(objects elements: AnyObject...) {
     self.init(array: elements)
   }
 }
 
 extension NSSet {
   // - (instancetype)initWithObjects:(id)firstObj, ...
-  public
-  convenience init(objects elements: AnyObject...) {
+  public convenience init(objects elements: AnyObject...) {
     self.init(array: elements)
   }
 }
