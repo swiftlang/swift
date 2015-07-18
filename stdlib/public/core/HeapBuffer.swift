@@ -52,16 +52,20 @@ class _HeapBufferStorage<Value,Element> : NonObjectiveCBase {
 }
 
 /// Management API for `_HeapBufferStorage<Value, Element>`
-internal struct _HeapBuffer<Value, Element> : Equatable {
+public // @testable
+struct _HeapBuffer<Value, Element> : Equatable {
   /// A default type to use as a backing store.
   typealias Storage = _HeapBufferStorage<Value, Element>
 
   // _storage is passed inout to _isUnique.  Although its value
   // is unchanged, it must appear mutable to the optimizer.
   var _storage: Builtin.NativeObject?
+
+  public // @testable
   var storage: AnyObject? {
     return _storage.map { Builtin.castFromNativeObject($0) }
   }
+
   static func _valueOffset() -> Int {
     return _roundUpToAlignment(sizeof(_HeapObject.self), alignof(Value.self))
   }
@@ -91,6 +95,7 @@ internal struct _HeapBuffer<Value, Element> : Equatable {
       _HeapBuffer._valueOffset() + _address)
   }
 
+  public // @testable
   var baseAddress: UnsafeMutablePointer<Element> {
     return UnsafeMutablePointer(_HeapBuffer._elementOffset() + _address)
   }
@@ -117,6 +122,7 @@ internal struct _HeapBuffer<Value, Element> : Equatable {
     self._storage = .None
   }
 
+  public // @testable
   init(_ storage: _HeapBufferStorage<Value,Element>) {
     self._storage = Builtin.castToNativeObject(storage)
   }
@@ -139,6 +145,7 @@ internal struct _HeapBuffer<Value, Element> : Equatable {
 
   /// Create a `_HeapBuffer` with `self.value = initializer` and
   /// `self._capacity() >= capacity`.
+  public // @testable
   init(
     _ storageClass: AnyClass,
     _ initializer: Value, _ capacity: Int
@@ -159,6 +166,7 @@ internal struct _HeapBuffer<Value, Element> : Equatable {
     self._value.initialize(initializer)
   }
 
+  public // @testable
   var value : Value {
     unsafeAddress {
       return UnsafePointer(_value)
@@ -190,16 +198,19 @@ internal struct _HeapBuffer<Value, Element> : Equatable {
     return _HeapBuffer(nativeStorage: x)
   }
 
+  public // @testable
   mutating func isUniquelyReferenced() -> Bool {
     return _isUnique(&_storage)
   }
 
+  public // @testable
   mutating func isUniquelyReferencedOrPinned() -> Bool {
     return _isUniqueOrPinned(&_storage)
   }
 }
 
 // HeapBuffers are equal when they reference the same buffer
+public // @testable
 func == <Value, Element> (
   lhs: _HeapBuffer<Value, Element>,
   rhs: _HeapBuffer<Value, Element>) -> Bool {
