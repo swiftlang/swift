@@ -709,5 +709,65 @@ tests.test("LazyFilterCollection") {
   expectGE(oldCalls + 2, calls)
 }
 
+do {
+  struct Sample {
+    var expected: Range<Int>
+    var data: [Range<Int>]
+  }
+  
+  let flattenSamples: [Sample] = [
+    Sample(
+      expected: 0..<8, data: [ 1..<1, 0..<5, 7..<7, 5..<7, 7..<8 ]),
+    Sample(expected: 0..<8, data: [ 0..<5, 7..<7, 5..<7, 7..<8 ]),
+    Sample(
+      expected: 0..<8, data: [ 1..<1, 0..<5, 7..<7, 5..<7, 7..<8, 11..<11 ]),
+    Sample(
+      expected: 0..<16, data: [ 0..<10, 14..<14, 10..<14, 14..<16, 22..<22 ]),
+    Sample(expected: 0..<0, data: [ 11..<11 ]),
+    Sample(expected: 0..<0, data: [ 3..<3, 11..<11 ]),
+    Sample(expected: 0..<0, data: []),
+  ]
+
+  for sample in flattenSamples {
+    let expected = sample.expected
+    let data = sample.data
+    
+    tests.test("FlattenSequence/\(data)") {
+      let base = MinimalSequence(data.map { MinimalSequence($0) })
+      typealias Base = MinimalSequence<MinimalSequence<Int>>
+      
+      checkSequence(expected, base._prext_flatten, resiliencyChecks: .none)
+      
+      typealias Flattened = _prext_FlattenSequence<Base>
+      ExpectType<Flattened>.test(base._prext_flatten)
+      
+      typealias Lazy = _prext_LazySequence<_prext_FlattenSequence<Base>>
+      ExpectType<Lazy>.test(base._prext_flatten._prext_lazy)
+      ExpectType<Lazy>.test(base._prext_lazy._prext_flatten)
+    }
+
+  % for traversal in 'Forward', 'Bidirectional':
+  %   t = '' if traversal == 'Forward' else traversal
+    tests.test("Flatten${t}Collection/\(data)") {
+      let base = Minimal${traversal}Collection(
+        data.map { Minimal${traversal}Collection($0) })
+      
+      typealias Base = Minimal${traversal}Collection<
+      Minimal${traversal}Collection<Int>>
+      
+      check${traversal}Collection(
+        expected, base._prext_flatten, resiliencyChecks: .none)
+      
+      typealias Flattened = _prext_Flatten${t}Collection<Base>
+      ExpectType<Flattened>.test(base._prext_flatten)
+      
+      typealias Lazy = _prext_LazyCollection<_prext_Flatten${t}Collection<Base>>
+      ExpectType<Lazy>.test(base._prext_flatten._prext_lazy)
+      ExpectType<Lazy>.test(base._prext_lazy._prext_flatten)
+    }
+  % end
+  }
+}
+
 runAllTests()
 
