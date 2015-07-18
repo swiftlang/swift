@@ -30,8 +30,8 @@ where
 /// Compute the prefix sum of `seq`.
 public func scan<
   S : SequenceType, U
->(seq: S, _ initial: U, _ combine: (U, S.Generator.Element) -> U) -> _UnitTestArray<U> {
-  var result = _UnitTestArray<U>()
+>(seq: S, _ initial: U, _ combine: (U, S.Generator.Element) -> U) -> Array<U> {
+  var result = Array<U>()
   result.reserveCapacity(seq.underestimateCount())
   var runningResult = initial
   for element in seq {
@@ -41,7 +41,7 @@ public func scan<
   return result
 }
 
-public func randomShuffle<T>(a: _UnitTestArray<T>) -> _UnitTestArray<T> {
+public func randomShuffle<T>(a: Array<T>) -> Array<T> {
   var result = a
   for var i = a.count - 1; i != 0; --i {
     // FIXME: 32 bits are not enough in general case!
@@ -58,11 +58,11 @@ public func gather<
   IndicesSequence.Generator.Element == C.Index
 >(
   collection: C, _ indices: IndicesSequence
-) -> _UnitTestArray<C.Generator.Element> {
-  return _UnitTestArray(indices.map { collection[$0] })
+) -> Array<C.Generator.Element> {
+  return Array(indices.map { collection[$0] })
 }
 
-public func scatter<T>(a: _UnitTestArray<T>, _ idx: _UnitTestArray<Int>) -> _UnitTestArray<T> {
+public func scatter<T>(a: Array<T>, _ idx: Array<Int>) -> Array<T> {
   var result = a
   for i in 0..<a.count {
     result[idx[i]] = a[i]
@@ -71,14 +71,14 @@ public func scatter<T>(a: _UnitTestArray<T>, _ idx: _UnitTestArray<Int>) -> _Uni
 }
 
 public func withArrayOfCStrings<R>(
-  args: _UnitTestArray<String>, _ body: (Array<UnsafeMutablePointer<CChar>>) -> R
+  args: Array<String>, _ body: (Array<UnsafeMutablePointer<CChar>>) -> R
 ) -> R {
 
-  let argsLengths = _UnitTestArray(args.map { $0.utf8.count + 1 })
+  let argsLengths = Array(args.map { $0.utf8.count + 1 })
   let argsOffsets = [ 0 ] + scan(argsLengths, 0, +)
   let argsBufferSize = argsOffsets.last!
 
-  var argsBuffer = _UnitTestArray<UInt8>()
+  var argsBuffer = Array<UInt8>()
   argsBuffer.reserveCapacity(argsBufferSize)
   for arg in args {
     argsBuffer.extend(arg.utf8)

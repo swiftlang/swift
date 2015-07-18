@@ -15,7 +15,7 @@ import StdlibUnittestFoundationExtras
 import Foundation
 
 %{
-all_array_types = [ 'ContiguousArray', 'ArraySlice', 'Array', '_UnitTestArray' ]
+all_array_types = [ 'ContiguousArray', 'ArraySlice', 'Array' ]
 }%
 
 extension Array {
@@ -31,12 +31,6 @@ extension ArraySlice {
 }
 
 extension ContiguousArray {
-  var identity: UnsafePointer<Void> {
-    return self._buffer.identity
-  }
-}
-
-extension _UnitTestArray {
   var identity: UnsafePointer<Void> {
     return self._buffer.identity
   }

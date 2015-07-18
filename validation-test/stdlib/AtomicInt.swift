@@ -111,7 +111,7 @@ struct AtomicInt_fetchAndAdd_1_RaceTest : RaceTestWithPerTrialDataType {
     }
   }
 
-  func evaluateObservations(observations: _UnitTestArray<Observation>,
+  func evaluateObservations(observations: Array<Observation>,
       _ sink: (RaceTestObservationEvaluation) -> ()) {
     for observation in observations {
       switch observation {
@@ -191,7 +191,7 @@ struct AtomicInt_fetchAndAdd_ReleaseAtomicStores_1_RaceTest
     }
   }
 
-  func evaluateObservations(observations: _UnitTestArray<Observation>,
+  func evaluateObservations(observations: Array<Observation>,
       _ sink: (RaceTestObservationEvaluation) -> ()) {
     for observation in observations {
       switch observation {
@@ -276,7 +276,7 @@ struct AtomicInt_fetchAndAdd_ReleaseAtomicStores_2_RaceTest
     }
   }
 
-  func evaluateObservations(observations: _UnitTestArray<Observation>,
+  func evaluateObservations(observations: Array<Observation>,
       _ sink: (RaceTestObservationEvaluation) -> ()) {
     for observation in observations {
       switch observation {
@@ -401,7 +401,7 @@ struct AtomicInt_fetchAndAdd_ReleaseNonAtomicStores_RaceTest
     }
   }
 
-  func evaluateObservations(observations: _UnitTestArray<Observation>,
+  func evaluateObservations(observations: Array<Observation>,
       _ sink: (RaceTestObservationEvaluation) -> ()) {
     for observation in observations {
       switch observation {
@@ -483,7 +483,7 @@ struct AtomicInitializeARCRefRaceTest : RaceTestWithPerTrialDataType {
     return observation
   }
 
-  func evaluateObservations(observations: _UnitTestArray<Observation>,
+  func evaluateObservations(observations: Array<Observation>,
       _ sink: (RaceTestObservationEvaluation) -> ()) {
     let ref = observations[0].uw2
     if observations.contains({ $0.uw2 != ref }) {

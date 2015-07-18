@@ -16,7 +16,7 @@ import StdlibUnittest
 # We test for bounds-checking traps for both reading and writing
 # both single elements and slices of all three different array
 # types.
-array_types = ('Array', 'ContiguousArray', 'ArraySlice', '_UnitTestArray')
+array_types = ('Array', 'ContiguousArray', 'ArraySlice')
 
 def bounds_trap(index, expr_to_write):
   global io

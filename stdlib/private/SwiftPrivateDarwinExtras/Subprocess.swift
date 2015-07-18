@@ -19,7 +19,7 @@ import Glibc
 
 /// Calls POSIX `pipe()`.
 func posixPipe() -> (readFD: CInt, writeFD: CInt) {
-  var fds: _UnitTestArray<CInt> = [ -1, -1 ]
+  var fds: Array<CInt> = [ -1, -1 ]
   var _: Void = fds.withUnsafeMutableBufferPointer {
     (fds) in
     let ptr = fds.baseAddress
@@ -32,7 +32,7 @@ func posixPipe() -> (readFD: CInt, writeFD: CInt) {
 
 /// Start the same executable as a child process, redirecting its stdout and
 /// stderr.
-public func spawnChild(args: _UnitTestArray<String>)
+public func spawnChild(args: Array<String>)
   -> (pid: pid_t, stdinFD: CInt, stdoutFD: CInt, stderrFD: CInt) {
   var fileActions = posix_spawn_file_actions_t()
   if posix_spawn_file_actions_init(&fileActions) != 0 {
@@ -79,7 +79,7 @@ public func spawnChild(args: _UnitTestArray<String>)
   }
 
   var pid: pid_t = -1
-  let spawnResult = withArrayOfCStrings([ Process.arguments[0] ] as _UnitTestArray + args) {
+  let spawnResult = withArrayOfCStrings([ Process.arguments[0] ] as Array + args) {
     posix_spawn(
       &pid, Process.arguments[0], &fileActions, nil, $0, _getEnviron())
   }
@@ -111,7 +111,7 @@ public func spawnChild(args: _UnitTestArray<String>)
 }
 
 internal func _readAll(fd: CInt) -> String {
-  var buffer = _UnitTestArray<UInt8>(count: 1024, repeatedValue: 0)
+  var buffer = Array<UInt8>(count: 1024, repeatedValue: 0)
   var usedBytes = 0
   while true {
     let readResult: ssize_t = buffer.withUnsafeMutableBufferPointer {
@@ -174,7 +174,7 @@ public func posixWaitpid(pid: pid_t) -> ProcessTerminationStatus {
   preconditionFailure("did not understand what happened to child process")
 }
 
-public func runChild(args: _UnitTestArray<String>)
+public func runChild(args: Array<String>)
   -> (stdout: String, stderr: String, status: ProcessTerminationStatus) {
   let (pid, _, stdoutFD, stderrFD) = spawnChild(args)
 

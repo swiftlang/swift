@@ -30,7 +30,6 @@
     ('ContiguousArray', 'a ContiguousArray'),
     ('ArraySlice', 'an `ArraySlice`'),
     ('Array', 'an `Array`'),
-    ('_UnitTestArray', 'a `_UnitTestArray`')
   ]
 }%
 
@@ -162,8 +161,6 @@ if True:
 /// elements match or can be bridged to `Element`, is deferred until the
 /// first element access.'''
 # FIXME: Write about Array up/down-casting.
-    elif Self == '_UnitTestArray':
-      SelfDocComment = "\n/// Temporary"
     else:
       raise AssertionError('Unhandled case: ' + Self)
 }%
