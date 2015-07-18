@@ -279,6 +279,8 @@ extension TestSuite {
     CollectionWithEquatableElement : RangeReplaceableCollectionType
     where
     Collection.SubSequence : CollectionType,
+    Collection.SubSequence.SubSequence : CollectionType,
+    Collection.SubSequence == Collection.SubSequence.SubSequence,
     Collection.SubSequence.Generator.Element == Collection.Generator.Element,
     CollectionWithEquatableElement.Generator.Element : Equatable
   >(
@@ -1069,6 +1071,8 @@ self.test("\(testNamePrefix).OperatorPlus") {
     Collection.Index : BidirectionalIndexType,
     CollectionWithEquatableElement.Index : BidirectionalIndexType,
     Collection.SubSequence : CollectionType,
+    Collection.SubSequence.SubSequence : CollectionType,
+    Collection.SubSequence == Collection.SubSequence.SubSequence,
     Collection.SubSequence.Generator.Element == Collection.Generator.Element,
     CollectionWithEquatableElement.Generator.Element : Equatable
   >(
@@ -1175,6 +1179,9 @@ self.test("\(testNamePrefix).removeLast()/whereIndexIsBidirectional/semantics/em
     CollectionWithEquatableElement.Index : RandomAccessIndexType,
     Collection.SubSequence : CollectionType,
     Collection.SubSequence.Generator.Element == Collection.Generator.Element,
+    Collection.SubSequence.SubSequence : CollectionType,
+    Collection.SubSequence == Collection.SubSequence.SubSequence,
+    Collection.SubSequence == Collection.SubSequence.SubSequence,
     CollectionWithEquatableElement.Generator.Element : Equatable
   >(
     var testNamePrefix: String = "",

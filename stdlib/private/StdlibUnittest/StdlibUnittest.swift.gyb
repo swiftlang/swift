@@ -82,7 +82,7 @@ public struct SourceLocStack {
   public func print() {
     let top = locs.first!
     Swift.print("check failed at \(top.file), line \(top.line)")
-    _printStackTrace(SourceLocStack(_locs: Array(dropFirst(locs))))
+    _printStackTrace(SourceLocStack(_locs: Array(locs.dropFirst())))
   }
 }
 
@@ -2639,7 +2639,7 @@ public func expectSameBuffer(
     "lhs and rhs point to different buffers",
     stackTrace: ${stackTrace}
   )
-  
+
   if expected?.buffer._id == actual?.buffer._id {
     expectEqual(
       expected?.mutationEpoch, actual?.mutationEpoch,
@@ -2836,6 +2836,7 @@ public struct MinimalRandomAccessIndex : RandomAccessIndexType {
       endIndex, newPosition,
       "position=\(self.position) startIndex=\(self.startIndex)")
     return MinimalRandomAccessIndex(
+      buffer: bufferSnapshot?.buffer,
       position: newPosition, startIndex: startIndex, endIndex: endIndex)
   }
 

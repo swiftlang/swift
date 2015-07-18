@@ -224,6 +224,11 @@ public class SequenceLog {
   public static var underestimateCount = TypeIndexed(0)
   public static var map = TypeIndexed(0)
   public static var filter = TypeIndexed(0)
+  public static var dropFirst = TypeIndexed(0)
+  public static var dropLast = TypeIndexed(0)
+  public static var prefix = TypeIndexed(0)
+  public static var suffix = TypeIndexed(0)
+  public static var split = TypeIndexed(0)
   public static var _customContainsEquatableElement = TypeIndexed(0)
   public static var _preprocessingPass = TypeIndexed(0)
   public static var _copyToNativeArrayBuffer = TypeIndexed(0)
@@ -239,8 +244,11 @@ public class CollectionLog : SequenceLog {
   }
   public static var startIndex = TypeIndexed(0)
   public static var endIndex = TypeIndexed(0)
+  public static var prefixUpTo = TypeIndexed(0)
+  public static var prefixThrough = TypeIndexed(0)
   public static var subscriptIndex = TypeIndexed(0)
   public static var subscriptRange = TypeIndexed(0)
+  public static var suffixFrom = TypeIndexed(0)
   public static var isEmpty = TypeIndexed(0)
   public static var count = TypeIndexed(0)
   public static var _customIndexOfEquatableElement = TypeIndexed(0)
@@ -361,14 +369,63 @@ public struct Logging${Kind}<Base: ${Kind}Type> : ${Kind}Type, LoggingType {
     ++Log.filter[selfType]
     return base.filter(includeElement)
   }
-  
+
+  public func dropFirst(n: Int) -> Base.SubSequence {
+    ++Log.dropFirst[selfType]
+    return base.dropFirst(n)
+  }
+
+  public func dropLast(n: Int) -> Base.SubSequence {
+    ++Log.dropLast[selfType]
+    return base.dropLast(n)
+  }
+
+  public func prefix(maxLength: Int) -> Base.SubSequence {
+    ++Log.prefix[selfType]
+    return base.prefix(maxLength)
+  }
+
+  public func suffix(maxLength: Int) -> Base.SubSequence {
+    ++Log.suffix[selfType]
+    return base.suffix(maxLength)
+  }
+
+  public func split(
+    maxSplit: Int = Int.max,
+    allowEmptySlices: Bool = false,
+    @noescape isSeparator: (Base.Generator.Element) -> Bool
+  ) -> [Base.SubSequence] {
+    ++Log.split[selfType]
+    return base.split(maxSplit, allowEmptySlices: allowEmptySlices,
+        isSeparator: isSeparator)
+  }
+
+%   if Kind == 'Collection' or Kind == 'MutableCollection':
+
+  public func prefixUpTo(end: Index) -> Base.SubSequence {
+    ++Log.prefixUpTo[selfType]
+    return base.prefixUpTo(end)
+  }
+
+  public func suffixFrom(start: Index) -> Base.SubSequence {
+    ++Log.suffixFrom[selfType]
+    return base.suffixFrom(start)
+  }
+
+  public func prefixThrough(position: Index) -> Base.SubSequence {
+    ++Log.prefixThrough[selfType]
+    return base.prefixThrough(position)
+  }
+
+%   end
+
   public func _customContainsEquatableElement(
     element: Base.Generator.Element
   ) -> Bool? {
     ++Log._customContainsEquatableElement[selfType]
     return base._customContainsEquatableElement(element)
   }
-  
+
   /// If `self` is multi-pass (i.e., a `CollectionType`), invoke
   /// `preprocess` on `self` and return its result.  Otherwise, return
   /// `nil`.

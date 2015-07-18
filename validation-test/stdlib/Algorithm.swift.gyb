@@ -19,32 +19,6 @@ public func == (
   return Array(lhs) == Array(rhs)
 }
 
-Algorithm.test("split") {
-  expectEqual(
-    [ "foo", "  bar baz " ].map { $0.unicodeScalars },
-    split("  foo   bar baz ".unicodeScalars, maxSplit: 1) { $0._isSpace() })
-
-  expectEqual(
-    [ "foo", "bar", "baz" ].map { $0.unicodeScalars },
-    split(
-      "  foo   bar baz ".unicodeScalars, allowEmptySlices: false) {
-      $0._isSpace()
-    })
-
-  expectEqual(
-    [ "", "", "foo", "", "", "bar", "baz", "" ].map { $0.unicodeScalars },
-    split(
-      "  foo   bar baz ".unicodeScalars, allowEmptySlices: true) {
-      $0._isSpace()
-    })
-
-  expectEqual(
-    [ "", "", "foo   bar baz " ].map { $0.unicodeScalars },
-    split(
-      "  foo   bar baz ".unicodeScalars, allowEmptySlices: true, maxSplit: 2,
-      isSeparator: { $0._isSpace() }))
-}
-
 // FIXME(prext): move this struct to the point of use.
 struct StartsWithTest {
   let expected: Bool
@@ -1928,6 +1902,56 @@ SequenceTypeAlgorithms.test("forEach/semantics") {
 }
 
 //===----------------------------------------------------------------------===//
+// dropFirst()
+//===----------------------------------------------------------------------===//
+
+SequenceTypeAlgorithms.test("dropFirst/dispatch") {
+  var tester = SequenceLog.dispatchTester([OpaqueValue(1)])
+  tester.dropFirst(1)
+  expectCustomizable(tester, tester.log.dropFirst)
+}
+
+//===----------------------------------------------------------------------===//
+// dropLast()
+//===----------------------------------------------------------------------===//
+
+SequenceTypeAlgorithms.test("dropLast/dispatch") {
+  var tester = SequenceLog.dispatchTester([OpaqueValue(1)])
+  tester.dropLast(1)
+  expectCustomizable(tester, tester.log.dropLast)
+}
+
+//===----------------------------------------------------------------------===//
+// prefix()
+//===----------------------------------------------------------------------===//
+
+SequenceTypeAlgorithms.test("prefix/dispatch") {
+  var tester = SequenceLog.dispatchTester([OpaqueValue(1)])
+  tester.prefix(1)
+  expectCustomizable(tester, tester.log.prefix)
+}
+
+//===----------------------------------------------------------------------===//
+// suffix()
+//===----------------------------------------------------------------------===//
+
+SequenceTypeAlgorithms.test("suffix/dispatch") {
+  var tester = SequenceLog.dispatchTester([OpaqueValue(1)])
+  tester.suffix(1)
+  expectCustomizable(tester, tester.log.suffix)
+}
+
+//===----------------------------------------------------------------------===//
+// split()
+//===----------------------------------------------------------------------===//
+
+SequenceTypeAlgorithms.test("SequenceType/split/dispatch") {
+  var tester = SequenceLog.dispatchTester([OpaqueValue(1)])
+  tester.split { $0.value == 1 }
+  expectCustomizable(tester, tester.log.split)
+}
+
+//===----------------------------------------------------------------------===//
 // zip()
 //===----------------------------------------------------------------------===//
 
@@ -2541,6 +2565,46 @@ SequenceTypeAlgorithms.test("Set<T>.find/CustomImplementation/${dispatch}") {
 }
 
 % end
+
+//===----------------------------------------------------------------------===//
+// CollectionType.split()
+//===----------------------------------------------------------------------===//
+
+SequenceTypeAlgorithms.test("CollectionType/split/dispatch") {
+  var tester = CollectionLog.dispatchTester([OpaqueValue(1)])
+  tester.split { $0.value == 1 }
+  expectCustomizable(tester, tester.log.split)
+}
+
+//===----------------------------------------------------------------------===//
+// prefixThrough()
+//===----------------------------------------------------------------------===//
+
+SequenceTypeAlgorithms.test("CollectionType/prefixThrough/dispatch") {
+  var tester = CollectionLog.dispatchTester([1, 2, 3].map(OpaqueValue.init))
+  tester.prefixThrough(1)
+  expectCustomizable(tester, tester.log.prefixThrough)
+}
+
+//===----------------------------------------------------------------------===//
+// prefixUpTo()
+//===----------------------------------------------------------------------===//
+
+SequenceTypeAlgorithms.test("CollectionType/prefixUpTo/dispatch") {
+  var tester = CollectionLog.dispatchTester([OpaqueValue(1)])
+  tester.prefixUpTo(1)
+  expectCustomizable(tester, tester.log.prefixUpTo)
+}
+
+//===----------------------------------------------------------------------===//
+// suffixFrom()
+//===----------------------------------------------------------------------===//
+
+SequenceTypeAlgorithms.test("CollectionType/suffixFrom/dispatch") {
+  var tester = CollectionLog.dispatchTester([1, 2, 3].map(OpaqueValue.init))
+  tester.suffixFrom(1)
+  expectCustomizable(tester, tester.log.suffixFrom)
+}
 
 //===----------------------------------------------------------------------===//
 // MutableCollectionType

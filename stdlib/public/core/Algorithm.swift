@@ -104,49 +104,14 @@ public func max<T : Comparable>(x: T, _ y: T, _ z: T, _ rest: T...) -> T {
 ///
 /// - parameter allowEmptySlices: If `true`, an empty slice is produced in
 ///   the result for each pair of consecutive.
+@available(*, unavailable, message="Use the split() method instead.")
 public func split<S : CollectionType, R : BooleanType>(
   elements: S,
   maxSplit: Int = Int.max,
   allowEmptySlices: Bool = false,
   @noescape isSeparator: (S.Generator.Element) -> R
   ) -> [S.SubSequence] {
-
-  var result = Array<S.SubSequence>()
-
-  // FIXME: could be simplified pending <rdar://problem/15032945>
-  // (ternary operator not resolving some/none)
-  var startIndex: Optional<S.Index>
-     = allowEmptySlices ? .Some(elements.startIndex) : .None
-  var splits = 0
-
-  for j in elements.indices {
-    if isSeparator(elements[j]) {
-      if startIndex != nil {
-        let i = startIndex!
-        result.append(elements[i..<j])
-        startIndex = .Some(j.successor())
-        if ++splits >= maxSplit {
-          break
-        }
-        if !allowEmptySlices {
-          startIndex = .None
-        }
-      }
-    }
-    else {
-      if startIndex == nil {
-        startIndex = .Some(j)
-      }
-    }
-  }
-
-  switch startIndex {
-  case let i?:
-    result.append(elements[i..<elements.endIndex])
-  default:
-    ()
-  }
-  return result
+  fatalError("unavailable function can't be called")
 }
 
 /// Returns `true` iff the the initial elements of `s` are equal to `prefix`.

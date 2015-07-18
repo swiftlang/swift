@@ -141,12 +141,27 @@ public protocol CollectionType : Indexable, SequenceType {
 
   /// Returns the element at the given `position`.
   subscript(position: Index) -> Generator.Element {get}
-  
+
   /// Returns a collection representing a contiguous sub-range of
   /// `self`'s elements.
   ///
   /// - Complexity: O(1)
   subscript(bounds: Range<Index>) -> SubSequence {get}
+
+  /// Returns `self[startIndex..<end]`
+  ///
+  /// - Complexity: O(1)
+  func prefixUpTo(end: Index) -> SubSequence
+
+  /// Returns `self[start..<endIndex]`
+  ///
+  /// - Complexity: O(1)
+  func suffixFrom(start: Index) -> SubSequence
+
+  /// Returns `prefixUpTo(position.successor())`
+  ///
+  /// - Complexity: O(1)
+  func prefixThrough(position: Index) -> SubSequence
 
   /// Returns `true` iff `self` is empty.
   var isEmpty: Bool { get }
@@ -178,7 +193,6 @@ extension CollectionType where Generator == IndexingGenerator<Self> {
     return IndexingGenerator(self)
   }
 }
-
 
 /// Supply the default "slicing" `subscript`  for `CollectionType` models
 /// that accept the default associated `SubSequence`, `Slice<Self>`.
@@ -228,7 +242,7 @@ extension CollectionType {
   public var first: Generator.Element? {
     return isEmpty ? nil : self[startIndex]
   }
-  
+
   /// Returns a value less than or equal to the number of elements in
   /// `self`, *nondestructively*.
   ///
@@ -244,7 +258,7 @@ extension CollectionType {
   public var count: Index.Distance {
     return distance(startIndex, endIndex)
   }
-  
+
   /// Customization point for `SequenceType.indexOf()`.
   ///
   /// Define this method if the collection can find an element in less than
@@ -261,7 +275,10 @@ extension CollectionType {
   }
 }
 
-/// Algorithms
+//===----------------------------------------------------------------------===//
+// Default implementations for CollectionType
+//===----------------------------------------------------------------------===//
+
 extension CollectionType {
   /// Return an `Array` containing the results of mapping `transform`
   /// over `self`.
@@ -291,6 +308,166 @@ extension CollectionType {
     let escapableIncludeElement =
       unsafeBitCast(includeElement, IncludeElement.self)
     return Array(lazy(self).filter(escapableIncludeElement))
+  }
+
+  /// Returns a subsequence containing all but the first `n` elements.
+  ///
+  /// - Requires: `n >= 0`
+  /// - Complexity: O(`n`)
+  public func dropFirst(n: Int) -> SubSequence {
+    _precondition(n >= 0, "Can't drop a negative number of elements from a collection")
+    let start = advance(startIndex, numericCast(n), endIndex)
+    return self[start..<endIndex]
+  }
+
+  /// Returns a subsequence containing all but the last `n` elements.
+  ///
+  /// - Requires: `n >= 0`
+  /// - Complexity: O(`self.count`)
+  public func dropLast(n: Int) -> SubSequence {
+    _precondition(n >= 0, "Can't drop a negative number of elements from a collection")
+    let amount = max(0, numericCast(count) - n)
+    let end = advance(startIndex, numericCast(amount), endIndex)
+    return self[startIndex..<end]
+  }
+
+  /// Returns a subsequence, up to `maxLength` in length, containing the
+  /// initial elements.
+  ///
+  /// If `maxLength` exceeds `self.count`, the result contains all
+  /// the elements of `self`.
+  ///
+  /// - Requires: `maxLength >= 0`
+  /// - Complexity: O(`maxLength`)
+  public func prefix(maxLength: Int) -> SubSequence {
+    _precondition(maxLength >= 0, "Can't take a prefix of negative length from a collection")
+    let end = advance(startIndex, numericCast(maxLength), endIndex)
+    return self[startIndex..<end]
+  }
+
+  /// Returns a slice, up to `maxLength` in length, containing the
+  /// final elements of `s`.
+  ///
+  /// If `maxLength` exceeds `s.count`, the result contains all
+  /// the elements of `s`.
+  ///
+  /// - Requires: `maxLength >= 0`
+  /// - Complexity: O(`self.count`)
+  public func suffix(maxLength: Int) -> SubSequence {
+    _precondition(maxLength >= 0, "Can't take a suffix of negative length from a collection")
+    let amount = max(0, numericCast(count) - maxLength)
+    let start = advance(startIndex, numericCast(amount), endIndex)
+    return self[start..<endIndex]
+  }
+
+  /// Returns `self[startIndex..<end]`
+  ///
+  /// - Complexity: O(1)
+  public func prefixUpTo(end: Index) -> SubSequence {
+    return self[startIndex..<end]
+  }
+
+  /// Returns `self[start..<endIndex]`
+  ///
+  /// - Complexity: O(1)
+  public func suffixFrom(start: Index) -> SubSequence {
+    return self[start..<endIndex]
+  }
+
+  /// Returns `prefixUpTo(position.successor())`
+  ///
+  /// - Complexity: O(1)
+  public func prefixThrough(position: Index) -> SubSequence {
+    return prefixUpTo(position.successor())
+  }
+
+  /// Returns the maximal `SubSequence`s of `self`, in order, that
+  /// don't contain elements satisfying the predicate `isSeparator`.
+  ///
+  /// - Parameter maxSplits: The maximum number of `SubSequence`s to
+  ///   return, minus 1.
+  ///   If `maxSplit + 1` `SubSequence`s are returned, the last one is
+  ///   a suffix of `self` containing the remaining elements.
+  ///   The default value is `Int.max`.
+  ///
+  /// - Parameter allowEmptySubsequences: If `true`, an empty `SubSequence`
+  ///   is produced in the result for each pair of consecutive elements
+  ///   satisfying `isSeparator`.
+  ///   The default value is `false`.
+  ///
+  /// - Requires: `maxSplit >= 0`
+  public func split(
+    maxSplit: Int = Int.max,
+    allowEmptySlices: Bool = false,
+    @noescape isSeparator: (Generator.Element) -> Bool
+  ) -> [SubSequence] {
+    _precondition(maxSplit >= 0, "Must take zero or more splits")
+    var result: [SubSequence] = []
+
+    var start: Optional<Index> = allowEmptySlices ? startIndex : Optional.None
+    var splits = 0
+
+    for j in indices {
+      if isSeparator(self[j]) {
+        if let i = start {
+          result.append(self[i..<j])
+          start = j.successor()
+          if ++splits >= maxSplit {
+            return result
+          }
+          if !allowEmptySlices {
+            start = .None
+          }
+        }
+      }
+      else {
+        if start == nil {
+          start = .Some(j)
+        }
+      }
+    }
+
+    if let i = start {
+      result.append(self[i..<endIndex])
+    }
+    return result
+  }
+}
+
+extension CollectionType where Generator.Element : Equatable {
+  public func _split(
+    separator: Generator.Element,
+    maxSplit: Int = Int.max,
+    allowEmptySlices: Bool = false
+  ) -> [SubSequence] {
+  return split(maxSplit, allowEmptySlices: allowEmptySlices,
+      isSeparator: { $0 == separator })
+  }
+}
+
+extension CollectionType where Index : BidirectionalIndexType {
+  /// Returns a subsequence containing all but the last `n` elements.
+  ///
+  /// - Requires: `n >= 0`
+  /// - Complexity: O(`n`)
+  public func dropLast(n: Int) -> SubSequence {
+    _precondition(n >= 0, "Can't drop a negative number of elements from a collection")
+    let end = advance(endIndex, numericCast(-n), startIndex)
+    return self[startIndex..<end]
+  }
+
+  /// Returns a slice, up to `maxLength` in length, containing the
+  /// final elements of `s`.
+  ///
+  /// If `maxLength` exceeds `s.count`, the result contains all
+  /// the elements of `s`.
+  ///
+  /// - Requires: `maxLength >= 0`
+  /// - Complexity: O(`maxLength`)
+  public func suffix(maxLength: Int) -> SubSequence {
+    _precondition(maxLength >= 0, "Can't take a suffix of negative length from a collection")
+    let start = advance(endIndex, numericCast(-maxLength), startIndex)
+    return self[start..<endIndex]
   }
 }
 
@@ -440,51 +617,29 @@ public protocol MutableSliceable : CollectionType, MutableCollectionType {
   subscript(_: Range<Index>) -> SubSequence { get set }
 }
 
-/// Returns a slice containing all but the first element of `s`.
-///
-/// - Requires: `s` is non-empty.
+@available(*, unavailable, message="Use the dropFirst() method instead.") 
 public func dropFirst<Seq : CollectionType>(s: Seq) -> Seq.SubSequence {
-  return s[s.startIndex.successor()..<s.endIndex]
+  fatalError("unavailable function can't be called")
 }
 
-/// Returns a slice containing all but the last element of `s`.
-///
-/// - Requires: `s` is non-empty.
+@available(*, unavailable, message="Use the dropLast() method instead.")
 public func dropLast<
   S : CollectionType
   where S.Index: BidirectionalIndexType
 >(s: S) -> S.SubSequence {
-  return s[s.startIndex..<s.endIndex.predecessor()]
+  fatalError("unavailable function can't be called")
 }
 
-/// Returns a slice, up to `maxLength` in length, containing the
-/// initial elements of `s`.
-///
-/// If `maxLength` exceeds `s.count`, the result contains all
-/// the elements of `s`.
-///
-/// - Complexity: O(1)+K when `S.Index` conforms to
-///   `RandomAccessIndexType` and O(N)+K otherwise, where K is the cost
-///   of slicing `s`.
+@available(*, unavailable, message="Use the prefix() method.")
 public func prefix<S : CollectionType>(s: S, _ maxLength: Int) -> S.SubSequence {
-  let index = advance(s.startIndex, max(0, numericCast(maxLength)), s.endIndex)
-  return s[s.startIndex..<index]
+  fatalError("unavailable function can't be called")
 }
 
-/// Returns a slice, up to `maxLength` in length, containing the
-/// final elements of `s`.
-///
-/// If `maxLength` exceeds `s.count`, the result contains all
-/// the elements of `s`.
-///
-/// - Complexity: O(1)+K when `S.Index` conforms to
-///   `RandomAccessIndexType` and O(N)+K otherwise, where K is the cost
-///   of slicing `s`.
+@available(*, unavailable, message="Use the suffix() method instead.")
 public func suffix<
   S : CollectionType where S.Index: BidirectionalIndexType
 >(s: S, _ maxLength: Int) -> S.SubSequence {
-  let index = advance(s.endIndex, -max(0, numericCast(maxLength)), s.startIndex)
-  return s[index..<s.endIndex]
+  fatalError("unavailable function can't be called")
 }
 
 @available(*, unavailable, renamed="CollectionType")

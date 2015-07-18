@@ -21,7 +21,8 @@ struct CollectionWithBadSubSequence : CollectionType {
     fatalError("unreachable")
   }
 
-  // expected-note@+1 {{possibly intended match 'SubSequence' does not conform to 'Indexable'}}
+  // expected-note@+2 {{possibly intended match 'SubSequence' does not conform to 'Indexable'}}
+  // expected-note@+1 {{possibly intended match}}
   typealias SubSequence = OpaqueValue<Int8>
 }
 

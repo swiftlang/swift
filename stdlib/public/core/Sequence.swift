@@ -48,6 +48,13 @@ public protocol SequenceType {
   /// encapsulates its iteration state.
   typealias Generator : GeneratorType
 
+  // FIXME: should be constrained to SequenceType
+  // (<rdar://problem/20715009> Implement recursive protocol
+  // constraints)
+
+  /// A type that represents a subsequence of some of the elements.
+  typealias SubSequence
+
   /// Return a *generator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
@@ -77,6 +84,57 @@ public protocol SequenceType {
   /// would produce the elements.
   func forEach(@noescape body: (Generator.Element) -> ())
 
+  /// Returns a subsequence containing all but the first `n` elements.
+  ///
+  /// - Requires: `n >= 0`
+  /// - Complexity: O(`n`)
+  func dropFirst(n: Int) -> SubSequence
+
+  /// Returns a subsequence containing all but the last `n` elements.
+  ///
+  /// - Requires: `self` is a finite sequence.
+  /// - Requires: `n >= 0`
+  /// - Complexity: O(`self.count`)
+  func dropLast(n: Int) -> SubSequence
+
+  /// Returns a subsequence, up to `maxLength` in length, containing the
+  /// initial elements.
+  ///
+  /// If `maxLength` exceeds `self.count`, the result contains all
+  /// the elements of `self`.
+  ///
+  /// - Requires: `maxLength >= 0`
+  func prefix(maxLength: Int) -> SubSequence
+
+  /// Returns a slice, up to `maxLength` in length, containing the
+  /// final elements of `s`.
+  ///
+  /// If `maxLength` exceeds `s.count`, the result contains all
+  /// the elements of `s`.
+  ///
+  /// - Requires: `self` is a finite sequence.
+  /// - Requires: `maxLength >= 0`
+  func suffix(maxLength: Int) -> SubSequence
+
+  /// Returns the maximal `SubSequence`s of `self`, in order, that
+  /// don't contain elements satisfying the predicate `isSeparator`.
+  ///
+  /// - Parameter maxSplits: The maximum number of `SubSequence`s to
+  ///   return, minus 1.
+  ///   If `maxSplit + 1` `SubSequence`s are returned, the last one is
+  ///   a suffix of `self` containing the remaining elements.
+  ///   The default value is `Int.max`.
+  ///
+  /// - Parameter allowEmptySubsequences: If `true`, an empty `SubSequence`
+  ///   is produced in the result for each pair of consecutive elements
+  ///   satisfying `isSeparator`.
+  ///   The default value is `false`.
+  ///
+  /// - Requires: `maxSplit >= 0`
+  func split(maxSplit: Int, allowEmptySlices: Bool,
+    @noescape isSeparator: (Generator.Element) -> Bool
+  ) -> [SubSequence]
+
   func _customContainsEquatableElement(
     element: Generator.Element
   ) -> Bool?
@@ -105,19 +163,80 @@ extension SequenceType
   }
 }
 
-extension SequenceType {
-  /// Return a value less than or equal to the number of elements in
-  /// `self`, **nondestructively**.
-  ///
-  /// - Complexity: O(N).
-  public func underestimateCount() -> Int {
-    return 0
+/// A sequence that lazily consumes and drops `n` elements from an underlying
+/// `Base` generator before possibly returning the first available element.
+///
+/// The underlying generator's sequence may be infinite.
+///
+/// This is a class - we require reference semantics to keep track
+/// of how many elements we've already dropped from the underlying sequence.
+internal class _DropFirstSequence<Base : GeneratorType>
+    : SequenceType, GeneratorType {
+
+  internal var generator: Base
+  internal let limit: Int
+  internal var dropped: Int
+
+  internal init(_ generator: Base, limit: Int, dropped: Int = 0) {
+    self.generator = generator
+    self.limit = limit
+    self.dropped = dropped
   }
 
-  public func _preprocessingPass<R>(preprocess: (Self)->R) -> R? {
+  internal func generate() -> _DropFirstSequence<Base> {
+    return self
+  }
+
+  internal func next() -> Base.Element? {
+    while dropped < limit {
+      if generator.next() == nil {
+        dropped = limit
+        return nil
+      }
+      ++dropped
+    }
+    return generator.next()
+  }
+}
+
+/// A sequence that only consumes up to `n` elements from an underlying
+/// `Base` generator.
+///
+/// The underlying generator's sequence may be infinite.
+///
+/// This is a class - we require reference semantics to keep track
+/// of how many elements we've already taken from the underlying sequence.
+internal class _PrefixSequence<Base : GeneratorType> : SequenceType, GeneratorType {
+  internal let maxLength: Int
+  internal var generator: Base
+  internal var taken: Int
+
+  internal init(_ generator: Base, maxLength: Int, taken: Int = 0) {
+    self.generator = generator
+    self.maxLength = maxLength
+    self.taken = taken
+  }
+
+  internal func generate() -> _PrefixSequence<Base> {
+    return self
+  }
+
+  internal func next() -> Base.Element? {
+    if taken >= maxLength { return nil }
+    ++taken
+
+    if let next = generator.next() {
+      return next
+    }
+
+    taken = maxLength
     return nil
   }
 }
+
+//===----------------------------------------------------------------------===//
+// Default implementations for SequenceType
+//===----------------------------------------------------------------------===//
 
 extension SequenceType {
   /// Return an `Array` containing the results of mapping `transform`
@@ -132,9 +251,7 @@ extension SequenceType {
     let escapableTransform = unsafeBitCast(transform, Transform.self)
     return Array<T>(lazy(self).map(escapableTransform))
   }
-}
 
-extension SequenceType {
   /// Return an `Array` containing the elements of `self`,
   /// in order, that satisfy the predicate `includeElement`.
   public func filter(
@@ -146,9 +263,165 @@ extension SequenceType {
       unsafeBitCast(includeElement, IncludeElement.self)
     return Array(lazy(self).filter(escapableIncludeElement))
   }
-}
 
-extension SequenceType {
+  /// Returns a subsequence containing all but the first `n` elements.
+  ///
+  /// - Requires: `n >= 0`
+  /// - Complexity: O(`n`)
+  public func dropFirst(n: Int) -> AnySequence<Generator.Element> {
+    _precondition(n >= 0, "Can't drop a negative number of elements from a sequence")
+    if n == 0 { return AnySequence(self) }
+    // If this is already a _DropFirstSequence, we need to fold in
+    // the current drop count and drop limit so no data is lost.
+    //
+    // i.e. [1,2,3,4].dropFirst(1).dropFirst(1) should be equivalent to
+    // [1,2,3,4].dropFirst(2).
+    // FIXME: <rdar://problem/21885675> Use method dispatch to fold
+    // _PrefixSequence and _DropFirstSequence counts
+    if let any = self as? AnySequence<Generator.Element>,
+       let box = any._box as? _SequenceBox<_DropFirstSequence<Generator>> {
+      let base = box._base
+      let folded = _DropFirstSequence(base.generator, limit: base.limit + n,
+          dropped: base.dropped)
+      return AnySequence(folded)
+    }
+
+    return AnySequence(_DropFirstSequence(generate(), limit: n))
+  }
+
+  /// Returns a subsequence containing all but the last `n` elements.
+  ///
+  /// - Requires: `self` is a finite collection.
+  /// - Requires: `n >= 0`
+  /// - Complexity: O(`self.count`)
+  public func dropLast(n: Int) -> AnySequence<Generator.Element> {
+    _precondition(n >= 0, "Can't drop a negative number of elements from a sequence")
+    if n == 0 { return AnySequence(self) }
+    // FIXME: <rdar://problem/21885650> Create reusable RingBuffer<T>
+    // Put incoming elements from this sequence in a holding tank, a ring buffer
+    // of size <= n. If more elements keep coming in, pull them out of the
+    // holding tank into the result, an `Array`. This saves
+    // `n` * sizeof(Generator.Element) of memory, because slices keep the entire
+    // memory of an `Array` alive.
+    var result: [Generator.Element] = []
+    var ringBuffer: [Generator.Element] = []
+    var i = ringBuffer.startIndex
+
+    for element in self {
+      if ringBuffer.count < n {
+        ringBuffer.append(element)
+      } else {
+        result.append(ringBuffer[i])
+        ringBuffer[i] = element
+        i = i.successor() % n
+      }
+    }
+    return AnySequence(result)
+  }
+
+  public func prefix(maxLength: Int) -> AnySequence<Generator.Element> {
+    _precondition(maxLength >= 0, "Can't take a prefix of negative length from a sequence")
+    if maxLength == 0 {
+      return AnySequence(EmptyCollection<Generator.Element>())
+    }
+    // FIXME: <rdar://problem/21885675> Use method dispatch to fold
+    // _PrefixSequence and _DropFirstSequence counts
+    if let any = self as? AnySequence<Generator.Element>,
+       let box = any._box as? _SequenceBox<_PrefixSequence<Generator>> {
+      let base = box._base
+      let folded = _PrefixSequence(
+        base.generator,
+        maxLength: min(base.maxLength, maxLength),
+        taken: base.taken)
+      return AnySequence(folded)
+    }
+    return AnySequence(_PrefixSequence(generate(), maxLength: maxLength))
+  }
+
+  public func suffix(maxLength: Int) -> AnySequence<Generator.Element> {
+    _precondition(maxLength >= 0, "Can't take a suffix of negative length from a sequence")
+    if maxLength == 0 { return AnySequence([]) }
+    // FIXME: <rdar://problem/21885650> Create reusable RingBuffer<T>
+    // Put incoming elements into a ring buffer to save space. Once all
+    // elements are consumed, reorder the ring buffer into an `Array`
+    // and return it. This saves memory for sequences particularly longer
+    // than `maxLength`.
+    var ringBuffer: [Generator.Element] = []
+    ringBuffer.reserveCapacity(min(maxLength, underestimateCount()))
+
+    var start = ringBuffer.startIndex
+    var end = ringBuffer.startIndex
+
+    for element in self {
+      if ringBuffer.count < maxLength {
+        ringBuffer.append(element)
+      } else {
+        end = end.successor() % maxLength
+        ringBuffer[start] = element
+        start = start.successor() % maxLength
+      }
+    }
+
+    // FIXME: Use a lazy concatenating sequence around two slices
+    // of the ring buffer instead of creating a reordered copy.
+    // rdar://problem/21885925
+    var result: [Generator.Element] = []
+    result.reserveCapacity(max(ringBuffer.count, maxLength))
+
+    result.extend(ringBuffer[start..<max(ringBuffer.count, end)])
+
+    if end <= start {
+      result.extend(ringBuffer[0..<start])
+    }
+    return AnySequence(result)
+  }
+
+  public func split(
+    maxSplit: Int = Int.max,
+    allowEmptySlices: Bool = false,
+    @noescape isSeparator: (Generator.Element) -> Bool
+  ) -> [AnySequence<Generator.Element>] {
+    _precondition(maxSplit >= 0, "Must take zero or more splits")
+    var result: [AnySequence<Generator.Element>] = []
+    var subSequence: [Generator.Element] = []
+
+    func appendSubsequence() -> Bool {
+      if subSequence.isEmpty && !allowEmptySlices {
+        return false
+      }
+      result.append(AnySequence(subSequence))
+      return true
+    }
+
+    for element in self {
+      if isSeparator(element) {
+        if !appendSubsequence() {
+          continue
+        }
+        if result.count == maxSplit {
+          return result
+        }
+        subSequence = []
+      } else {
+        subSequence.append(element)
+      }
+    }
+    appendSubsequence()
+    return result
+  }
+
+  /// Return a value less than or equal to the number of elements in
+  /// `self`, **nondestructively**.
+  ///
+  /// - Complexity: O(N).
+  public func underestimateCount() -> Int {
+    return 0
+  }
+
+  public func _preprocessingPass<R>(preprocess: (Self)->R) -> R? {
+    return nil
+  }
+
   public func _customContainsEquatableElement(
     element: Generator.Element
   ) -> Bool? {
@@ -163,6 +436,32 @@ extension SequenceType {
       body(element)
     }
   }
+}
+
+extension SequenceType where Generator.Element : Equatable {
+  public func _split(
+    separator: Generator.Element,
+    maxSplit: Int = Int.max,
+    allowEmptySlices: Bool = false
+  ) -> [AnySequence<Generator.Element>] {
+    return split(maxSplit, allowEmptySlices: allowEmptySlices,
+        isSeparator: { $0 == separator })
+  }
+}
+
+extension SequenceType {
+  /// Returns a subsequence containing all but the first element.
+  ///
+  /// - Requires: `n >= 0`
+  /// - Complexity: O(`n`)
+  public func dropFirst() -> SubSequence { return dropFirst(1) }
+
+  /// Returns a subsequence containing all but the last element.
+  ///
+  /// - Requires: `self` is a finite sequence.
+  /// - Requires: `n >= 0`
+  /// - Complexity: O(`self.count`)
+  public func dropLast() -> SubSequence  { return dropLast(1) }
 }
 
 /// Return an underestimate of the number of elements in the given

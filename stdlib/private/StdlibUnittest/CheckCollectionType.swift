@@ -39,6 +39,51 @@ public struct SubscriptRangeTest {
   }
 }
 
+public struct PrefixThroughTest {
+  public var collection: [Int]
+  public let position: Int
+  public let expected: [Int]
+  public let loc: SourceLoc
+
+  init(collection: [Int], position: Int, expected: [Int],
+      file: String = __FILE__, line: UWord = __LINE__) {
+    self.collection = collection
+    self.position = position
+    self.expected = expected
+    self.loc = SourceLoc(file, line, comment: "prefix() test data")
+  }
+}
+
+public struct PrefixUpToTest {
+  public var collection: [Int]
+  public let end: Int
+  public let expected: [Int]
+  public let loc: SourceLoc
+
+  public init(collection: [Int], end: Int, expected: [Int],
+      file: String = __FILE__, line: UWord = __LINE__) {
+    self.collection = collection
+    self.end = end
+    self.expected = expected
+    self.loc = SourceLoc(file, line, comment: "prefix() test data")
+  }
+}
+
+public struct SuffixFromTest {
+  public var collection: [Int]
+  public let start: Int
+  public let expected: [Int]
+  public let loc: SourceLoc
+
+  init(collection: [Int], start: Int, expected: [Int],
+      file: String = __FILE__, line: UWord = __LINE__) {
+    self.collection = collection
+    self.start = start
+    self.expected = expected
+    self.loc = SourceLoc(file, line, comment: "prefix() test data")
+  }
+}
+
 public let subscriptRangeTests = [
   // Slice an empty collection.
   SubscriptRangeTest(
@@ -107,6 +152,65 @@ public let subscriptRangeTests = [
     count: 6),
 ]
 
+public let prefixUpToTests = [
+  PrefixUpToTest(
+    collection: [],
+    end: 0,
+    expected: []
+  ),
+  PrefixUpToTest(
+    collection: [1010, 2020, 3030, 4040, 5050],
+    end: 3,
+    expected: [1010, 2020, 3030]
+  ),
+  PrefixUpToTest(
+    collection: [1010, 2020, 3030, 4040, 5050],
+    end: 5,
+    expected: [1010, 2020, 3030, 4040, 5050]
+  ),
+]
+
+public let prefixThroughTests = [
+  PrefixThroughTest(
+    collection: [1010, 2020, 3030, 4040, 5050],
+    position: 0,
+    expected: [1010]
+  ),
+  PrefixThroughTest(
+    collection: [1010, 2020, 3030, 4040, 5050],
+    position: 2,
+    expected: [1010, 2020, 3030]
+  ),
+  PrefixThroughTest(
+    collection: [1010, 2020, 3030, 4040, 5050],
+    position: 4,
+    expected: [1010, 2020, 3030, 4040, 5050]
+  ),
+]
+
+public let suffixFromTests = [
+  SuffixFromTest(
+    collection: [],
+    start: 0,
+    expected: []
+  ),
+  SuffixFromTest(
+    collection: [1010, 2020, 3030, 4040, 5050],
+    start: 0,
+    expected: [1010, 2020, 3030, 4040, 5050]
+  ),
+  SuffixFromTest(
+    collection: [1010, 2020, 3030, 4040, 5050],
+    start: 3,
+    expected: [4040, 5050]
+  ),
+  SuffixFromTest(
+    collection: [1010, 2020, 3030, 4040, 5050],
+    start: 5,
+    expected: []
+  ),
+]
+
 extension TestSuite {
   public func addForwardCollectionTests<
     Collection : CollectionType,
@@ -114,6 +218,8 @@ extension TestSuite {
     where
     Collection.SubSequence : CollectionType,
     Collection.SubSequence.Generator.Element == Collection.Generator.Element,
+    Collection.SubSequence.SubSequence : CollectionType,
+    Collection.SubSequence == Collection.SubSequence.SubSequence,
     CollectionWithEquatableElement.Generator.Element : Equatable
   >(
     var testNamePrefix: String = "",
@@ -355,6 +461,121 @@ self.test("\(testNamePrefix).indices") {
 }
 
 //===----------------------------------------------------------------------===//
+// dropFirst()
+//===----------------------------------------------------------------------===//
+
+self.test("\(testNamePrefix).dropFirst/semantics") {
+  for test in dropFirstTests {
+    let s = makeWrappedCollection(test.sequence.map(OpaqueValue.init))
+    let result = s.dropFirst(test.dropElements)
+    expectEqualSequence(
+      test.expected, result.map(extractValue).map { $0.value },
+      stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// dropLast()
+//===----------------------------------------------------------------------===//
+
+self.test("\(testNamePrefix).dropLast/semantics") {
+  for test in dropLastTests {
+    let s = makeWrappedCollection(test.sequence.map(OpaqueValue.init))
+    let result = s.dropLast(test.dropElements)
+    expectEqualSequence(test.expected, result.map(extractValue).map { $0.value },
+      stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// prefix()
+//===----------------------------------------------------------------------===//
+
+self.test("\(testNamePrefix).prefix/semantics") {
+  for test in prefixTests {
+    let s = makeWrappedCollection(test.sequence.map(OpaqueValue.init))
+    let result = s.prefix(test.maxLength)
+    expectEqualSequence(test.expected, result.map(extractValue).map { $0.value },
+      stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// suffix()
+//===----------------------------------------------------------------------===//
+
+self.test("\(testNamePrefix).suffix/semantics") {
+  for test in suffixTests {
+    let s = makeWrappedCollection(test.sequence.map(OpaqueValue.init))
+    let result = s.suffix(test.maxLength)
+    expectEqualSequence(test.expected, result.map(extractValue).map { $0.value },
+      stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// split()
+//===----------------------------------------------------------------------===//
+
+self.test("\(testNamePrefix).split/semantics") {
+  for test in splitTests {
+    let s = makeWrappedCollection(test.sequence.map(OpaqueValue.init))
+    let result = s.split(test.maxSplit,
+        allowEmptySlices: test.allowEmptySlices) {
+      extractValue($0).value == test.separator
+    }
+    expectEqualSequence(test.expected, result.map {
+      $0.map {
+        extractValue($0).value
+      }
+    },
+    stackTrace: SourceLocStack().with(test.loc)) { $0 == $1 }
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// prefixThrough()
+//===----------------------------------------------------------------------===//
+
+self.test("\(testNamePrefix).prefixThrough/semantics") {
+  for test in prefixThroughTests {
+    let c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
+    let index = advance(c.startIndex, numericCast(test.position))
+    let result = c.prefixThrough(index)
+    expectEqualSequence(test.expected, result.map(extractValue).map { $0.value },
+      stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// prefixUpTo()
+//===----------------------------------------------------------------------===//
+
+self.test("\(testNamePrefix).prefixUpTo/semantics") {
+  for test in prefixUpToTests {
+    let c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
+    let index = advance(c.startIndex, numericCast(test.end))
+    let result = c.prefixUpTo(index)
+    expectEqualSequence(test.expected, result.map(extractValue).map { $0.value },
+      stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// suffixFrom()
+//===----------------------------------------------------------------------===//
+
+self.test("\(testNamePrefix).suffixFrom/semantics") {
+  for test in suffixFromTests {
+    let c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
+    let index = advance(c.startIndex, numericCast(test.start))
+    let result = c.suffixFrom(index)
+    expectEqualSequence(test.expected, result.map(extractValue).map { $0.value },
+      stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+
+//===----------------------------------------------------------------------===//
 
   } // addForwardCollectionTests
 
@@ -366,6 +587,8 @@ self.test("\(testNamePrefix).indices") {
     CollectionWithEquatableElement.Index : BidirectionalIndexType,
     Collection.SubSequence : CollectionType,
     Collection.SubSequence.Generator.Element == Collection.Generator.Element,
+    Collection.SubSequence.SubSequence : CollectionType,
+    Collection.SubSequence == Collection.SubSequence.SubSequence,
     CollectionWithEquatableElement.Generator.Element : Equatable
   >(
     var testNamePrefix: String = "",
@@ -492,6 +715,32 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
 }
 
 //===----------------------------------------------------------------------===//
+// dropLast()
+//===----------------------------------------------------------------------===//
+
+self.test("\(testNamePrefix).dropLast/semantics") {
+  for test in dropLastTests {
+    let s = makeWrappedCollection(test.sequence.map(OpaqueValue.init))
+    let result = s.dropLast(test.dropElements)
+    expectEqualSequence(test.expected, result.map(extractValue).map { $0.value },
+      stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// suffix()
+//===----------------------------------------------------------------------===//
+
+self.test("\(testNamePrefix).suffix/semantics") {
+  for test in suffixTests {
+    let s = makeWrappedCollection(test.sequence.map(OpaqueValue.init))
+    let result = s.suffix(test.maxLength)
+    expectEqualSequence(test.expected, result.map(extractValue).map { $0.value },
+      stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+
+//===----------------------------------------------------------------------===//
 
   } // addBidirectionalCollectionTests
 
@@ -503,6 +752,8 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
     CollectionWithEquatableElement.Index : RandomAccessIndexType,
     Collection.SubSequence : CollectionType,
     Collection.SubSequence.Generator.Element == Collection.Generator.Element,
+    Collection.SubSequence.SubSequence : CollectionType,
+    Collection.SubSequence == Collection.SubSequence.SubSequence,
     CollectionWithEquatableElement.Generator.Element : Equatable
   >(
     var testNamePrefix: String = "",
@@ -537,6 +788,38 @@ if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
       outOfBoundsIndexOffset: outOfBoundsIndexOffset)
 
     testNamePrefix += String(Collection.Type)
+
+    func makeWrappedCollection(elements: [OpaqueValue<Int>]) -> Collection {
+      return makeCollection(elements.map(wrapValue))
+    }
+
+//===----------------------------------------------------------------------===//
+// prefix()
+//===----------------------------------------------------------------------===//
+
+self.test("\(testNamePrefix).prefix/semantics") {
+  for test in prefixTests {
+    let s = makeWrappedCollection(test.sequence.map(OpaqueValue.init))
+    let result = s.prefix(test.maxLength)
+    expectEqualSequence(test.expected, result.map(extractValue).map { $0.value },
+      stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// suffix()
+//===----------------------------------------------------------------------===//
+
+self.test("\(testNamePrefix).suffix/semantics") {
+  for test in suffixTests {
+    let s = makeWrappedCollection(test.sequence.map(OpaqueValue.init))
+    let result = s.suffix(test.maxLength)
+    expectEqualSequence(test.expected, result.map(extractValue).map { $0.value },
+      stackTrace: SourceLocStack().with(test.loc))
+  }
+}
+
+//===----------------------------------------------------------------------===//
   } // addRandomAccessCollectionTests
 }
 
