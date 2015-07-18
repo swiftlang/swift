@@ -1,5 +1,7 @@
 // RUN: %target-swift-frontend  %s -Onone -Xllvm -use-prespecialized -emit-sil | FileCheck %s
 
+// REQUIRES: optimized_stdlib
+
 // Check that pre-specialization works at -Onone.
 // This test requires the standrad library to be compiled with pre-specializations!
 
