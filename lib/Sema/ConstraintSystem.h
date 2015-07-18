@@ -1240,9 +1240,6 @@ private:
 
   /// Types used in fixes.
   std::vector<Type> FixedTypes;
-  
-  /// Unavailability reasons used in overload choices.
-  std::vector<UnavailabilityReason> UnavailabilityReasons;
 
   /// \brief The set of remembered disjunction choices used to reach
   /// the current constraint system.
@@ -2382,10 +2379,6 @@ public:
   /// \param type The set type to inspect.
   /// \returns the base type of the set.
   Type getBaseTypeForSetType(TypeBase *type);
-  
-  /// Returns the type to use when the passed-in declaration type is potentially
-  /// unavailable.
-  Type getTypeWhenUnavailable(Type declType);
   
   /// \brief Set whether or not the expression being solved is too complex and
   /// has exceeded the solver's memory threshold.

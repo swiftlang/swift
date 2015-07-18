@@ -858,14 +858,7 @@ namespace {
         CS.getConstraintLocator(expr, ConstraintLocator::Member);
       auto tv = CS.createTypeVariable(memberLocator, TVO_CanBindToLValue);
       
-      // When the member is a property, this availability is for the
-      // property itself and not for the getter or setter individually.
-      // Unfortunately, this means that we do not support the scenario where
-      // a getter and a setter have different availabilities.
-      Optional<UnavailabilityReason> reason =
-          CS.TC.checkDeclarationAvailability(decl, expr->getLoc(), CS.DC);
-      OverloadChoice choice(base->getType(), decl, /*isSpecialized=*/false, CS,
-                            reason);
+      OverloadChoice choice(base->getType(), decl, /*isSpecialized=*/false, CS);
       auto locator = CS.getConstraintLocator(expr, ConstraintLocator::Member);
       CS.addBindOverloadConstraint(tv, choice, locator);
       return tv;
@@ -950,9 +943,8 @@ namespace {
       // a known subscript here. This might be cleaner if we split off a new
       // UnresolvedSubscriptExpr from SubscriptExpr.
       if (decl) {
-        Optional<UnavailabilityReason> reason;
         OverloadChoice choice(base->getType(), decl, /*isSpecialized=*/false,
-                              CS, reason);
+                              CS);
         CS.addBindOverloadConstraint(fnTy, choice, subscriptMemberLocator);
       } else {
         CS.addValueMemberConstraint(baseTy, Context.Id_subscript,
@@ -1121,26 +1113,12 @@ namespace {
 
       auto locator = CS.getConstraintLocator(E);
       
-      Optional<UnavailabilityReason> reason =
-          CS.TC.checkDeclarationAvailability(E->getDecl(),E->getLoc(), CS.DC);
-      
-      // If reason is not None and EnableExperimentalUnavailableAsOptional
-      // is turned on, the type system will report the reference
-      // as having an optional type when the it is resolved.
-      // The diagnostic for when this optional does not type check is
-      // currently not very helpful.
-      // FIXME: When reporting a fix for an optional, we should include
-      // the version range when the declaration is available.
-      
-      
       // Create an overload choice referencing this declaration and immediately
       // resolve it. This records the overload for use later.
       auto tv = CS.createTypeVariable(locator, TVO_CanBindToLValue);
       CS.resolveOverload(locator, tv,
                          OverloadChoice(Type(), E->getDecl(),
-                                        E->isSpecialized(),
-                                        CS,
-                                        reason));
+                                        E->isSpecialized(), CS));
       
       if (E->getDecl()->getType() &&
           !E->getDecl()->getType()->getAs<TypeVariableType>()) {
@@ -1247,14 +1225,9 @@ namespace {
         if (decls[i]->isInvalid())
           continue;
 
-        // If the overload is potentially unavailable, record the reason
-        // in the overload choice.
-        auto unavailReason =
-            CS.TC.checkDeclarationAvailability(decls[i], expr->getLoc(), CS.DC);
-        
         choices.push_back(OverloadChoice(Type(), decls[i],
                                          expr->isSpecialized(),
-                                         CS, unavailReason));
+                                         CS));
       }
 
       // If there are no valid overloads, give up.
@@ -1283,12 +1256,9 @@ namespace {
         if (decls[i]->isInvalid())
           continue;
 
-        auto unavailReason =
-            CS.TC.checkDeclarationAvailability(decls[i], expr->getLoc(), CS.DC);
-        
         choices.push_back(OverloadChoice(baseTy, decls[i],
                                          /*isSpecialized=*/false,
-                                         CS, unavailReason));
+                                         CS));
       }
 
       // If there are no valid overloads, give up.

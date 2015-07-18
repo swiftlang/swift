@@ -243,9 +243,6 @@ namespace {
     RValue visitPointerToPointerExpr(PointerToPointerExpr *E, SGFContext C);
     RValue visitForeignObjectConversionExpr(ForeignObjectConversionExpr *E,
                                             SGFContext C);
-    
-    RValue visitUnavailableToOptionalExpr(UnavailableToOptionalExpr *E,
-                                          SGFContext C);
   };
 }
 
@@ -3654,74 +3651,6 @@ RValue RValueEmitter::visitForeignObjectConversionExpr(
                         SGF.getLoweredType(E->getType())),
                       orig.getCleanup());
   return RValue(SGF, E, E->getType()->getCanonicalType(), result);
-}
-
-
-RValue
-RValueEmitter::visitUnavailableToOptionalExpr(UnavailableToOptionalExpr *E,
-                                              SGFContext C) {
-  // Emit construction of an optional value for E's declaration reference.
-  // The value will be .None if the underlying declaration reference is
-  // unavailable and .Some(rvalue) if the declaration is available.
-
-  // E must have an optional type.
-  assert(E->getType().getPointer()->getOptionalObjectType().getPointer());
-
-  Expr *unavailExpr = E->getSubExpr();
-
-  SILType silOptType = SGF.getLoweredType(E->getType());
-  SILLocation loc(E);
-
-  SILValue allocatedOptional = SGF.emitTemporaryAllocation(loc, silOptType);
-
-  // Emit the check for availability
-  SILValue isAvailable;
-  const UnavailabilityReason &Reason = E->getReason();
-  switch (Reason.getReasonKind()) {
-  case UnavailabilityReason::Kind::RequiresOSVersionRange:
-    isAvailable = SGF.emitOSVersionRangeCheck(loc,
-                                          Reason.getRequiredOSVersionRange());
-    break;
-
-  case UnavailabilityReason::Kind::ExplicitlyWeakLinked:
-    // We don't handle explicit weak linking yet.
-    // In the future, we will do so by converting the global variable
-    // lvalue to an address and comparing to 0.
-    llvm_unreachable("Unimplemented optional for weakly-linked global");
-  }
-
-  Condition cond = SGF.emitCondition(isAvailable, loc);
-  cond.enterTrue(SGF);
-  {
-    ArgumentSource source;
-    if (E->getSubExpr()->getType()->getAs<LValueType>()) {
-      // If the unavailable expression is an lvalue, we will load it.
-      auto lval = SGF.emitLValue(unavailExpr, AccessKind::Read);
-      ManagedValue loadedValue = SGF.emitLoadOfLValue(loc, std::move(lval), C);
-      source = ArgumentSource(
-          loc, RValue(SGF, loc, lval.getSubstFormalType(), loadedValue));
-    } else {
-      source = ArgumentSource(unavailExpr);
-    }
-
-    SGF.emitInjectOptionalValueInto(loc, std::move(source), allocatedOptional,
-                                    SGF.getTypeLowering(silOptType));
-  }
-  cond.exitTrue(SGF);
-
-  cond.enterFalse(SGF);
-  {
-    // If the declaration is not available, inject .None.
-    SGF.emitInjectOptionalNothingInto(loc, allocatedOptional,
-                                      SGF.getTypeLowering(silOptType));
-  }
-  cond.exitFalse(SGF);
-  cond.complete(SGF);
-
-  ManagedValue managedValue = SGF.emitLoad(
-      loc, allocatedOptional, SGF.getTypeLowering(silOptType), C, IsNotTake);
-
-  return RValue(SGF, E, managedValue);
 }
 
 RValue SILGenFunction::emitRValue(Expr *E, SGFContext C) {

@@ -1390,17 +1390,6 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
         = getTypeOfReference(choice.getDecl(), isTypeReference,
                              choice.isSpecialized(), locator);
     }
-
-    if (choice.isPotentiallyUnavailable()) {
-      // For the moment, we do not treat constructors as optional
-      // when potentially unavailable, even when
-      // ExperimentalEnableUnavailableAsOptional is turned on.
-      if (choice.getDecl()->getKind() != DeclKind::Constructor) {
-        // Strip lvalue-ness and make type optional to reflect fact
-        // that declaration may not be available.
-        refType = getTypeWhenUnavailable(refType);
-      }
-    }
     
     if (choice.getDecl()->getAttrs().hasAttribute<OptionalAttr>() &&
         !isa<SubscriptDecl>(choice.getDecl())) {

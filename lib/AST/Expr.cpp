@@ -412,7 +412,6 @@ bool Expr::canAppendCallParentheses() const {
   case ExprKind::DerivedToBase:
   case ExprKind::ArchetypeToSuper:
   case ExprKind::InjectIntoOptional:
-  case ExprKind::UnavailableToOptional:
   case ExprKind::ClassMetatypeToObject:
   case ExprKind::ExistentialMetatypeToObject:
   case ExprKind::ProtocolMetatypeToObject:

@@ -427,21 +427,6 @@ namespace {
     Expr *coerceImplicitlyUnwrappedOptionalToValue(Expr *expr, Type objTy,
                                          ConstraintLocatorBuilder locator);
 
-    /// \brief Convert an expression that references a potentially unavailable
-    /// declaration to an optional reflecting the potential unavailability.
-    Expr *convertUnavailableToOptional(Expr *expr, ValueDecl *decl,
-                                       SourceLoc declRefLoc,
-                                       const UnavailabilityReason &reason);
-    
-    /// \brief Emit a diagnostic if the chosen overload is potentially
-    /// unavailable.
-    void diagnoseIfOverloadChoiceUnavailable(OverloadChoice choice,
-                                             SourceRange referenceRange);
-    
-    /// \brief Emit a diagnostic if the declaration is not available at
-    /// the reference location.
-    void diagnoseIfDeclUnavailable(ValueDecl *D, SourceRange ReferenceRange);
-    
   public:
     /// \brief Build a reference to the given declaration.
     Expr *buildDeclRef(ValueDecl *decl, SourceLoc loc, Type openedType,
@@ -1005,32 +990,6 @@ namespace {
         apply = new (context) DotSyntaxCallExpr(ref, dotLoc, base);
       }
       return finishApply(apply, openedType, nullptr);
-    }
-    
-    /// \brief Build a reference to a potentially unavailable member.
-    Expr *buildUnavailableMemberRef(Expr *base, Type openedFullType,
-                                    SourceLoc dotLoc, ValueDecl *member,
-                                    SourceLoc memberLoc, Type openedType,
-                                    ConstraintLocatorBuilder locator,
-                                    ConstraintLocatorBuilder memberLocator,
-                                    bool implicit,
-                                    AccessSemantics semantics,
-                                    bool isDynamic,
-                                    Optional<UnavailabilityReason> reason) {
-
-      // Let buildMemberRef() do the heavy lifting.
-      Expr *ref = buildMemberRef(base, openedFullType, dotLoc, member,
-                                 memberLoc, openedType, locator, memberLocator,
-                                 implicit, semantics, isDynamic);
-
-      // Wrap in a conversion expression if the member reference
-      // may not be available.
-      if (reason.hasValue()) {
-        ref = convertUnavailableToOptional(ref, member, memberLoc,
-                                           reason.getValue());
-      }
-
-      return ref;
     }
     
     /// \brief Describes either a type or the name of a type to be resolved.
@@ -2208,11 +2167,6 @@ namespace {
                                   locator, expr->isSpecialized(),
                                   expr->isImplicit(),
                                   expr->getAccessSemantics());
-      
-      if (choice.isPotentiallyUnavailable()) {
-        newRef = convertUnavailableToOptional(newRef,decl, expr->getLoc(),
-                                              choice.getReasonUnavailable(cs));
-      }
 
       recordUnsupportedPartialApply(expr, newRef);
 
@@ -2317,14 +2271,6 @@ namespace {
           tc.diagnose(expr->getDotLoc(), diag::bad_init_ref_base, hasSuper);
         }
       }
-
-      // If EnableExperimentalUnavailableAsOptional is turned on, we diagnose
-      // unavailability here rather than treating the initializer as optional.
-      // We may want to do eventually treat unavailable OtherConstructorRefs,
-      // as optional, but perhaps only inside failable initializers.
-      if (cs.TC.getLangOpts().EnableExperimentalUnavailableAsOptional) {
-        diagnoseIfOverloadChoiceUnavailable(choice, expr->getConstructorLoc());
-      }
       
       // Build a partial application of the delegated initializer.
       Expr *ctorRef = buildOtherConstructorRef(
@@ -2370,11 +2316,6 @@ namespace {
 
       if (auto newDeclRef = dyn_cast<DeclRefExpr>(newRef))
         recordUnsupportedPartialApply(newDeclRef, newDeclRef);
-
-      if (choice.isPotentiallyUnavailable()) {
-        newRef = convertUnavailableToOptional(newRef, decl, expr->getLoc(),
-                                              choice.getReasonUnavailable(cs));
-      }
       
       return newRef;
     }
@@ -2421,13 +2362,9 @@ namespace {
       auto memberLocator = cs.getConstraintLocator(expr,
                                                    ConstraintLocator::Member);
       auto selected = getOverloadChoice(memberLocator);
-      Optional<UnavailabilityReason> reason;
-      if (selected.choice.isPotentiallyUnavailable()) {
-        reason = selected.choice.getReasonUnavailable(cs);
-      }
       bool isDynamic
         = selected.choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
-      return buildUnavailableMemberRef(expr->getBase(),
+      return buildMemberRef(expr->getBase(),
                             selected.openedFullType,
                             expr->getDotLoc(),
                             selected.choice.getDecl(), expr->getNameLoc(),
@@ -2436,8 +2373,7 @@ namespace {
                             memberLocator,
                             expr->isImplicit(),
                             expr->getAccessSemantics(),
-                            isDynamic,
-                            reason);
+                            isDynamic);
     }
 
     Expr *visitDynamicMemberRefExpr(DynamicMemberRefExpr *expr) {
@@ -2537,10 +2473,6 @@ namespace {
                                                    ConstraintLocator::Member);
       auto selected = getOverloadChoice(memberLocator);
 
-      Optional<UnavailabilityReason> reason;
-      if (selected.choice.isPotentiallyUnavailable()) {
-        reason = selected.choice.getReasonUnavailable(cs);
-      }
       switch (selected.choice.getKind()) {
       case OverloadChoiceKind::DeclViaBridge: {
         // Look through an implicitly unwrapped optional.
@@ -2574,18 +2506,17 @@ namespace {
       case OverloadChoiceKind::DeclViaDynamic: {
         bool isDynamic
           = selected.choice.getKind() == OverloadChoiceKind::DeclViaDynamic;
-        auto member = buildUnavailableMemberRef(base,
-                                                selected.openedFullType,
-                                                dotLoc,
-                                                selected.choice.getDecl(),
-                                                nameLoc,
-                                                selected.openedType,
-                                                cs.getConstraintLocator(expr),
-                                                memberLocator,
-                                                implicit,
-                                                AccessSemantics::Ordinary,
-                                                isDynamic,
-                                                reason);
+        auto member = buildMemberRef(base,
+                                     selected.openedFullType,
+                                     dotLoc,
+                                     selected.choice.getDecl(),
+                                     nameLoc,
+                                     selected.openedType,
+                                     cs.getConstraintLocator(expr),
+                                     memberLocator,
+                                     implicit,
+                                     AccessSemantics::Ordinary,
+                                     isDynamic);
 
         return member;
       }
@@ -5420,47 +5351,6 @@ Expr *ExprRewriter::convertLiteral(Expr *literal,
   return literal;
 }
 
-Expr *
-ExprRewriter::convertUnavailableToOptional(Expr *expr, ValueDecl *decl,
-                                           SourceLoc declRefLoc,
-                                           const UnavailabilityReason &reason) {
-  assert(!cs.TC.getLangOpts().DisableAvailabilityChecking);
-
-  if (!cs.TC.getLangOpts().EnableExperimentalUnavailableAsOptional) {
-    // If the unavailable as optional feature is not enabled, we do not perform
-    // a conversion; instead we will diagnose in
-    // performSyntacticExprDiagnostics().
-    return expr;
-  }
-
-  // Lift the type to optional.
-  Type unavailTy = cs.getTypeWhenUnavailable(expr->getType());
-
-  return new (cs.getASTContext())
-      UnavailableToOptionalExpr(expr, reason, unavailTy);
-}
-
-void
-ExprRewriter::diagnoseIfOverloadChoiceUnavailable(OverloadChoice choice,
-                                                  SourceRange referenceRange) {
-  if (choice.isPotentiallyUnavailable()) {
-    assert(!cs.TC.getLangOpts().DisableAvailabilityChecking);
-    cs.TC.diagnosePotentialUnavailability(choice.getDecl(), referenceRange, dc,
-                                          choice.getReasonUnavailable(cs));
-  }
-}
-
-void ExprRewriter::diagnoseIfDeclUnavailable(ValueDecl *D,
-                                             SourceRange referenceRange) {
-  auto unavailReason =
-      cs.TC.checkDeclarationAvailability(D, referenceRange.Start, dc);
-  
-  if (unavailReason.hasValue()) {
-    cs.TC.diagnosePotentialUnavailability(D, referenceRange, dc,
-                                          unavailReason.getValue());
-  }
-}
-
 /// Determine whether the given type refers to a non-final class (or
 /// dynamic self of one).
 static bool isNonFinalClass(Type type) {
@@ -5628,12 +5518,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   // We have the constructor.
   auto choice = selected->choice;
   auto decl = choice.getDecl();
-
-  // We diagnose unavailability here, but do not yet convert to an optional,
-  // even when EnableExperimentalTreatOptionalAsUnavailable is turned on.
-  if (cs.TC.getLangOpts().EnableExperimentalUnavailableAsOptional) {
-    diagnoseIfOverloadChoiceUnavailable(choice, fn->getEndLoc());
-  }
   
   // Consider the constructor decl reference expr 'implicit', but the
   // constructor call expr itself has the apply's 'implicitness'.

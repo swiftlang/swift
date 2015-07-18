@@ -73,10 +73,6 @@ namespace swift {
     /// \brief Disable API availability checking.
     bool DisableAvailabilityChecking = false;
     
-    /// \brief Enable experimental treatment of potentially unavailable
-    /// symbols as optionals.
-    bool EnableExperimentalUnavailableAsOptional = false;
-    
     /// \brief Enable features useful for running in the debugger.
     bool DebuggerSupport = false;
 

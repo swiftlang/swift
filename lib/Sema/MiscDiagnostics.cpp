@@ -716,11 +716,7 @@ static bool diagAvailability(TypeChecker &TC, const ValueDecl *D,
     TC.diagnoseDeprecated(R, DC, Attr, D->getFullName());
   }
   
-  // We only diagnose potentially unavailability here if availability checking
-  // is turned on, but we are not treating unavailable symbols as having
-  // optional type.
-  if (TC.getLangOpts().DisableAvailabilityChecking ||
-      TC.getLangOpts().EnableExperimentalUnavailableAsOptional) {
+  if (TC.getLangOpts().DisableAvailabilityChecking) {
     return false;
   }
 
@@ -828,8 +824,7 @@ private:
       return;
     }
 
-    if (TC.getLangOpts().DisableAvailabilityChecking ||
-        TC.getLangOpts().EnableExperimentalUnavailableAsOptional) {
+    if (TC.getLangOpts().DisableAvailabilityChecking) {
       return;
     }
 

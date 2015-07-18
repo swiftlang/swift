@@ -1994,11 +1994,6 @@ public:
     printRec(E->getSubExpr());
     OS << ')';
   }
-  void visitUnavailableToOptionalExpr(UnavailableToOptionalExpr *E) {
-    printCommon(E, "unavailable_to_optional_expr") << '\n';
-    printRec(E->getSubExpr());
-    OS << ')';
-  }
   void visitEditorPlaceholderExpr(EditorPlaceholderExpr *E) {
     printCommon(E, "editor_placeholder_expr") << '\n';
     auto *TyR = E->getTypeLoc().getTypeRepr();

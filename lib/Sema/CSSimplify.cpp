@@ -2934,16 +2934,14 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
             
             if (argType->isEqual(favoredType)) {
               favoredChoice = OverloadChoice(baseTy, constructor,
-                                           /*isSpecialized=*/false, *this,
-                                           unavailReason);
+                                           /*isSpecialized=*/false, *this);
             }
           }
         }
       }
       
       choices.push_back(OverloadChoice(baseTy, constructor,
-                                       /*isSpecialized=*/false, *this,
-                                       unavailReason));
+                                       /*isSpecialized=*/false, *this));
     }
 
 
@@ -3238,12 +3236,8 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       choices.push_back(OverloadChoice::getDeclViaUnwrappedOptional(ovlBaseTy,
                                                                     result));
     } else {
-      SourceLoc anchorLoc = constraint.getLocator()->getAnchor()->getLoc();
-      auto unavailReason = TC.checkDeclarationAvailability(result, anchorLoc,
-                                                           DC);
       choices.push_back(OverloadChoice(ovlBaseTy, result,
-                                       /*isSpecialized=*/false, *this,
-                                       unavailReason));
+                                       /*isSpecialized=*/false, *this));
     }
   };
 
@@ -3681,14 +3675,6 @@ Type ConstraintSystem::getBaseTypeForSetType(TypeBase *type) {
 
   type->dump();
   llvm_unreachable("attempted to extract a base type from a non-set type");
-}
-
-Type ConstraintSystem::getTypeWhenUnavailable(Type declType) {
-  if (!TC.getLangOpts().EnableExperimentalUnavailableAsOptional) {
-    return declType;
-  }
-  // Drop lvalue-ness and make optional.
-  return OptionalType::get(declType->getRValueType());
 }
 
 static Type getBaseTypeForPointer(ConstraintSystem &cs, TypeBase *type) {

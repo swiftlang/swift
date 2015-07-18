@@ -24,38 +24,10 @@ using namespace swift;
 using namespace constraints;
 
 OverloadChoice::OverloadChoice(
-    Type base, ValueDecl *value, bool isSpecialized, ConstraintSystem &CS,
-    const Optional<UnavailabilityReason> &reasonUnavailable)
+    Type base, ValueDecl *value, bool isSpecialized, ConstraintSystem &CS)
     : BaseAndBits(base, isSpecialized ? IsSpecializedBit : 0) {
   assert((reinterpret_cast<uintptr_t>(value) & (uintptr_t)0x03) == 0 &&
          "Badly aligned decl");
 
   DeclOrKind = reinterpret_cast<uintptr_t>(value);
-  UnavailableReasonData = compactUnavailableReasonData(CS, reasonUnavailable);
-}
-
-uint16_t OverloadChoice::compactUnavailableReasonData(
-    ConstraintSystem &CS, const Optional<UnavailabilityReason> &reason) {
-  // A value of 0 indicates no reason (that is, that the overload choice is
-  // always available).
-  if (!reason.hasValue()) {
-    return 0;
-  }
-
-  // If there is a reason, we add it to UnavailabilityReasons and encode the
-  // index in our compact representation. We could get more fancy here by
-  // hashing the reason but, for the moment, we take a similar approach to that
-  // that taken by Fix.
-  unsigned index = CS.UnavailabilityReasons.size();
-  CS.UnavailabilityReasons.push_back(reason.getValue());
-
-  // Encode the reason as the index into UnavailabilityReasons + 1.
-  return index + 1;
-}
-
-const UnavailabilityReason &
-OverloadChoice::getReasonUnavailable(ConstraintSystem &CS) const {
-  assert(UnavailableReasonData != 0);
-  unsigned index = UnavailableReasonData - 1;
-  return CS.UnavailabilityReasons[index];
 }

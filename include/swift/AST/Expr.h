@@ -2188,27 +2188,6 @@ public:
     return E->getKind() == ExprKind::InjectIntoOptional;
   }
 };
-
-/// Conversion from a potentially unavailable declaration reference to an
-/// optional.
-class UnavailableToOptionalExpr : public ImplicitConversionExpr {
-
-  /// The reason the referenced declaration is potentially unavailable.
-  UnavailabilityReason Reason;
-
-public:
-  UnavailableToOptionalExpr(Expr *subExpr, UnavailabilityReason Reason,
-                            Type ty)
-      : ImplicitConversionExpr(ExprKind::UnavailableToOptional, subExpr, ty),
-        Reason(Reason) {}
-
-  /// Returns the reason the reference is potentially unavailable.
-  const UnavailabilityReason &getReason() const { return Reason; }
-  
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::UnavailableToOptional;
-  }
-};
   
 /// Convert the address of an lvalue to a raw pointer.
 class LValueToPointerExpr : public ImplicitConversionExpr {
