@@ -128,7 +128,7 @@
 ///   creates and discards an array. `sum` would be better implemented
 ///   using `reduce`].
 public protocol _prext_LazySequenceType : SequenceType {
-  /// A SequenceType that can contain the same elements as this one,
+  /// A `SequenceType` that can contain the same elements as this one,
   /// possibly with a simpler type.
   ///
   /// - See also: `elements`

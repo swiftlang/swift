@@ -10,38 +10,56 @@
 //
 //===----------------------------------------------------------------------===//
 
-public protocol _prext_LazyCollectionType : CollectionType, _prext_LazySequenceType {
-  /// A CollectionType that can contain the same elements as this one,
+/// A collection on which normally-eager operations such as `map` and
+/// `filter` are implemented lazily.
+///
+/// Please see `LazySequenceType` for background; `LazyCollectionType`
+/// is an analogous component, but for collections.
+///
+/// To add new lazy collection operations, extend this protocol with
+/// methods that return lazy wrappers that are themselves
+/// `LazyColectionType`s.
+///
+/// - See Also: `LazySequenceType`, `LazyCollection`
+public protocol _prext_LazyCollectionType
+  : CollectionType, _prext_LazySequenceType {
+  /// A `CollectionType` that can contain the same elements as this one,
   /// possibly with a simpler type.
   ///
-  /// This associated type is used to keep the result type of
-  /// `lazy(x).operation` from growing a `LazyCollection` layer.
+  /// - See also: `elements`
   typealias Elements: CollectionType = Self
 
 }
 
+/// When there's no special associated `Elements` type, the `elements`
+/// property is provided.
 extension _prext_LazyCollectionType where Elements == Self {
+  /// Identical to `self`.
   public var elements: Self { return self }
 }
 
-/// A collection that forwards its implementation to an underlying
-/// collection instance while exposing lazy computations as methods.
+/// A collection containing the same elements as a `Base_` collection,
+/// but on which some operations such as `map` and `filter` are
+/// implemented lazily.
+///
+/// - See also: `LazySequenceType`, `LazyCollection`
 public struct _prext_LazyCollection<Base_ : CollectionType>
   : _prext_LazyCollectionType {
 
+  /// The type of the underlying collection
   public typealias Base = Base_
   public typealias Index = Base.Index
   
   /// Construct an instance with `base` as its underlying Collection
   /// instance.
-  public init(_ base: Base_) {
+  public init(_ base: Base) {
     self._base = base
   }
 
   public typealias Elements = Base
   public var elements: Base { return _base }
 
-  internal var _base: Base_
+  internal var _base: Base
 }
 
 extension _prext_LazyCollection : SequenceType {
