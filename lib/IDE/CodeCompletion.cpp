@@ -680,6 +680,7 @@ class CodeCompletionCallbacksImpl : public CodeCompletionCallbacks {
     NominalMemberBeginning,
     AttributeBegin,
     AttributeDeclParen,
+    PoundAvailablePlatform,
   };
 
   CompletionKind Kind = CompletionKind::None;
@@ -807,6 +808,8 @@ public:
   void completeDeclAttrParam(DeclAttrKind DK, int Index) override;
   void completeNominalMemberBeginning(
       SmallVectorImpl<StringRef> &Keywords) override;
+
+  void completePoundAvailablePlatform() override;
 
   void addKeywords(CodeCompletionResultSink &Sink);
 
@@ -2045,6 +2048,12 @@ public:
     }
   }
 
+  void getPoundAvailablePlatformCompletions() {
+
+    // The platform names should be identical to those in @available.
+    getAttributeDeclParamCompletions(DAK_Available, 0);
+  }
+
   void getTypeCompletionsInDeclContext(SourceLoc Loc) {
     Kind = LookupKind::TypeInDeclContext;
     lookupVisibleDecls(*this, CurrDeclContext, TypeResolver.get(),
@@ -2319,6 +2328,11 @@ void CodeCompletionCallbacksImpl::completeExprSuperDot(SuperRefExpr *SRE) {
   CurDeclContext = P.CurDeclContext;
 }
 
+void CodeCompletionCallbacksImpl::completePoundAvailablePlatform() {
+  Kind = CompletionKind::PoundAvailablePlatform;
+  CurDeclContext = P.CurDeclContext;
+}
+
 void CodeCompletionCallbacksImpl::completeTypeSimpleBeginning() {
   Kind = CompletionKind::TypeSimpleBeginning;
   CurDeclContext = P.CurDeclContext;
@@ -2465,6 +2479,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink) {
   case CompletionKind::DotExpr:
   case CompletionKind::AttributeDeclParen:
   case CompletionKind::AttributeBegin:
+  case CompletionKind::PoundAvailablePlatform:
     break;
 
   case CompletionKind::PostfixExprBeginning:
@@ -2672,6 +2687,10 @@ void CodeCompletionCallbacksImpl::doneParsing() {
   }
   case CompletionKind::AttributeDeclParen: {
     Lookup.getAttributeDeclParamCompletions(AttrKind, AttrParamIndex);
+    break;
+  }
+  case CompletionKind::PoundAvailablePlatform: {
+    Lookup.getPoundAvailablePlatformCompletions();
     break;
   }
   }

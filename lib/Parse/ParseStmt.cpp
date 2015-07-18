@@ -1029,6 +1029,9 @@ Parser::parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs) {
     if (auto *Spec = SpecResult.getPtrOrNull()) {
       Specs.push_back(Spec);
     } else {
+      if (SpecResult.hasCodeCompletion()) {
+        return makeParserCodeCompletionStatus();
+      }
       Status.setIsParseError();
     }
 

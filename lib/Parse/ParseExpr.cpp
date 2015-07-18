@@ -891,6 +891,8 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
     // context.
     diagnose(Tok.getLoc(), diag::availability_query_outside_if_stmt_guard);
     auto res = parseStmtConditionPoundAvailable();
+    if (res.hasCodeCompletion())
+      return makeParserCodeCompletionStatus();
     if (res.isParseError() || res.isNull())
       return nullptr;
     Result = makeParserResult(
@@ -2266,6 +2268,14 @@ ParserResult<VersionConstraintAvailabilitySpec>
 Parser::parseVersionConstraintSpec() {
   Identifier PlatformIdentifier;
   SourceLoc PlatformLoc;
+  if (Tok.is(tok::code_complete)) {
+    consumeToken();
+    if (CodeCompletion) {
+      CodeCompletion->completePoundAvailablePlatform();
+    }
+    return makeParserCodeCompletionStatus();
+  }
+
   if (parseIdentifier(PlatformIdentifier, PlatformLoc,
                       diag::avail_query_expected_platform_name)) {
     return nullptr;
