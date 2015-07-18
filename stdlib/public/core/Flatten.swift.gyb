@@ -97,13 +97,13 @@ extension _prext_LazySequenceType
 % for traversal in ('Forward', 'Bidirectional'):
 %   t = '' if traversal == 'Forward' else traversal
 %   Collection = '_prext_Flatten%sCollection' % t
-%   whereClause = 'where Base.Generator.Element : CollectionType'
+%   constraints = 'Base.Generator.Element : CollectionType'
 %   if traversal == 'Bidirectional':
-%     whereClause += ''' , Base.Index : BidirectionalIndexType, 
+%     constraints += ''' , Base.Index : BidirectionalIndexType, 
 %       Base.Generator.Element.Index : BidirectionalIndexType'''
 %   Index = Collection + 'Index'
 public struct ${Index}<
-  Base: CollectionType ${whereClause}
+  Base: CollectionType where ${constraints}
 > : ${traversal}IndexType {
   /// Returns the next consecutive value after `self`.
   ///
@@ -178,7 +178,7 @@ public func == <Base> (lhs: ${Index}<Base>, rhs: ${Index}<Base>) -> Bool {
 /// The elements of this view are a concatenation of the elements of
 /// each collection in the base.
 public struct ${Collection}<
-  Base: CollectionType ${whereClause}
+  Base: CollectionType where ${constraints}
 > : CollectionType {
   /// A type that represents a valid position in the collection.
   ///
@@ -227,14 +227,16 @@ public struct ${Collection}<
   internal var _base: Base
 }
 
-extension CollectionType ${whereClause.replace('Base.', '')} {
+extension CollectionType where ${constraints.replace('Base.', '')} {
   public var _prext_flatten: ${Collection}<Self> {
     return ${Collection}(self)
   }
 }
 
 extension _prext_LazyCollectionType
-  ${whereClause.replace('Base.', 'Elements.')} {
+  where ${constraints.replace('Base.', '')}, 
+  ${constraints.replace('Base.', 'Elements.')},
+  Generator.Element == Elements.Generator.Element {
   public var _prext_flatten: _prext_LazyCollection<${Collection}<Elements>> {
     return ${Collection}(elements)._prext_lazy
   }

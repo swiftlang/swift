@@ -145,19 +145,21 @@ extension CollectionType where Index : RandomAccessIndexType {
   }
 }
 
-extension _prext_LazyCollection where Base_.Index : BidirectionalIndexType {
+extension _prext_LazyCollectionType
+where Index : BidirectionalIndexType, Elements.Index : BidirectionalIndexType {
   public var _prext_reverse: _prext_LazyCollection<
-    _prext_ReverseCollection<Base_>
+    _prext_ReverseCollection<Elements>
   > {
-    return _prext_ReverseCollection(_base)._prext_lazy
+    return _prext_ReverseCollection(elements)._prext_lazy
   }
 }
 
-extension _prext_LazyCollection where Base_.Index : RandomAccessIndexType {
+extension _prext_LazyCollectionType
+where Index : RandomAccessIndexType, Elements.Index : RandomAccessIndexType {
   public var _prext_reverse: _prext_LazyCollection<
-    _prext_ReverseRandomAccessCollection<Base_>
+    _prext_ReverseRandomAccessCollection<Elements>
   > {
-    return _prext_ReverseRandomAccessCollection(_base)._prext_lazy
+    return _prext_ReverseRandomAccessCollection(elements)._prext_lazy
   }
 }
 

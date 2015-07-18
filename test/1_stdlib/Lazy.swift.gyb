@@ -630,17 +630,24 @@ tests.test("ReverseCollection/Lazy") {
   // Check that reversing a lazy collection, or lazy-ing a reverse
   // collection, produces the same lazy reverse collection.
   do {
-    typealias Expected = _prext_LazyCollection<
-      _prext_ReverseRandomAccessCollection<Array<Int>>
-    >
     
-    let base = Array(stride(from: 11, through: 0, by: -1))
-    ExpectType<Expected>.test(base._prext_reverse._prext_lazy)
-    ExpectType<Expected>.test(base._prext_lazy._prext_reverse)
+    let base = Array(
+      stride(from: 11, through: 0, by: -1))._prext_lazy.map { $0 }
+    
+    typealias Base = _prext_LazyMapCollection<[Int], Int>
+    ExpectType<Base>.test(base)
+    
+    typealias LazyReversedBase = _prext_LazyCollection<
+      _prext_ReverseRandomAccessCollection<Base>>
+
+    let reversed = base._prext_reverse
+    ExpectType<LazyReversedBase>.test(reversed)
     
     var calls = 0
-    _ = base._prext_reverse._prext_lazy.map { _ in ++calls }
+    let reversedAndMapped = reversed.map { (x)->Int in ++calls; return x }
     expectEqual(0, calls)
+    checkRandomAccessCollection(0...11, reversedAndMapped)
+    expectNotEqual(0, calls)
   }
 
   do {
@@ -648,13 +655,21 @@ tests.test("ReverseCollection/Lazy") {
       _prext_ReverseCollection<String.CharacterView>
     >
     
-    let base = "foobar".characters
-    ExpectType<Expected>.test(base._prext_reverse._prext_lazy)
-    ExpectType<Expected>.test(base._prext_lazy._prext_reverse)
+    let base = "foobar".characters._prext_lazy.map { $0 }
+    typealias Base = _prext_LazyMapCollection<String.CharacterView, Character>
+    ExpectType<Base>.test(base)
+    
+    typealias LazyReversedBase = _prext_LazyCollection<
+      _prext_ReverseCollection<Base>>
+
+    let reversed = base._prext_reverse
+    ExpectType<LazyReversedBase>.test(reversed)
     
     var calls = 0
-    _ = base._prext_reverse._prext_lazy.map { _ in ++calls }
+    let reversedAndMapped = reversed.map { (x)->Character in ++calls; return x }
     expectEqual(0, calls)
+    checkBidirectionalCollection("raboof".characters, reversedAndMapped)
+    expectNotEqual(0, calls)
   }
 }
 
@@ -733,37 +748,61 @@ do {
     let data = sample.data
     
     tests.test("FlattenSequence/\(data)") {
-      let base = MinimalSequence(data.map { MinimalSequence($0) })
-      typealias Base = MinimalSequence<MinimalSequence<Int>>
-      
+      var base = MinimalSequence(data.map { MinimalSequence($0) })
       checkSequence(expected, base._prext_flatten, resiliencyChecks: .none)
+
+      // Checking that _prext_flatten doesn't introduce laziness
       
-      typealias Flattened = _prext_FlattenSequence<Base>
-      ExpectType<Flattened>.test(base._prext_flatten)
-      
-      typealias Lazy = _prext_LazySequence<_prext_FlattenSequence<Base>>
-      ExpectType<Lazy>.test(base._prext_flatten._prext_lazy)
-      ExpectType<Lazy>.test(base._prext_lazy._prext_flatten)
+      // checkSequence consumed base, so reassign
+      base = MinimalSequence(data.map { MinimalSequence($0) })
+      let flattened = base._prext_flatten
+      var calls = 0
+      _ = flattened.map { _ in ++calls }
+      expectEqual(
+        expected.count, calls,
+        "unexpected laziness in \(flattened.dynamicType)")
     }
 
+    tests.test("FlattenSequence/Lazy/\(data)") {
+      // Checking that _prext_flatten doesn't remove laziness
+      let base = MinimalSequence(
+        data.map { MinimalSequence($0) }
+      )._prext_lazy.map { $0 }
+
+      let flattened = base._prext_flatten
+      var calls = 0
+      _ = flattened.map { _ in ++calls }
+      expectEqual(0, calls, "unexpected eagerness in \(flattened.dynamicType)")
+    }
+    
   % for traversal in 'Forward', 'Bidirectional':
   %   t = '' if traversal == 'Forward' else traversal
     tests.test("Flatten${t}Collection/\(data)") {
       let base = Minimal${traversal}Collection(
         data.map { Minimal${traversal}Collection($0) })
-      
-      typealias Base = Minimal${traversal}Collection<
-      Minimal${traversal}Collection<Int>>
-      
-      check${traversal}Collection(
-        expected, base._prext_flatten, resiliencyChecks: .none)
-      
-      typealias Flattened = _prext_Flatten${t}Collection<Base>
-      ExpectType<Flattened>.test(base._prext_flatten)
-      
-      typealias Lazy = _prext_LazyCollection<_prext_Flatten${t}Collection<Base>>
-      ExpectType<Lazy>.test(base._prext_flatten._prext_lazy)
-      ExpectType<Lazy>.test(base._prext_lazy._prext_flatten)
+
+      let flattened = base._prext_flatten
+      check${traversal}Collection(expected, flattened, resiliencyChecks: .none)
+
+      // Checking that _prext_flatten doesn't introduce laziness
+      var calls = 0
+      _ = flattened.map { _ in ++calls }
+      expectLE(
+        expected.count, calls,
+        "unexpected laziness in \(flattened.dynamicType)")
+    }
+    
+    tests.test("Flatten${t}Collection/Lazy\(data)") {
+      // Checking that _prext_flatten doesn't remove laziness
+      let base = Minimal${traversal}Collection(
+        data.map { Minimal${traversal}Collection($0) }
+      )._prext_lazy.map { $0 }
+
+      let flattened = base._prext_flatten
+    
+      var calls = 0
+      _ = flattened.map { _ in ++calls }
+      expectEqual(0, calls, "unexpected eagerness in \(flattened.dynamicType)")
     }
   % end
   }
