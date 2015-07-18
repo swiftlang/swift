@@ -349,31 +349,24 @@ extension SequenceType {
     var ringBuffer: [Generator.Element] = []
     ringBuffer.reserveCapacity(min(maxLength, underestimateCount()))
 
-    var start = ringBuffer.startIndex
-    var end = ringBuffer.startIndex
+    var i = ringBuffer.startIndex
 
     for element in self {
       if ringBuffer.count < maxLength {
         ringBuffer.append(element)
       } else {
-        end = end.successor() % maxLength
-        ringBuffer[start] = element
-        start = start.successor() % maxLength
+        ringBuffer[i] = element
+        i = i.successor() % maxLength
       }
     }
 
-    // FIXME: Use a lazy concatenating sequence around two slices
-    // of the ring buffer instead of creating a reordered copy.
-    // rdar://problem/21885925
-    var result: [Generator.Element] = []
-    result.reserveCapacity(max(ringBuffer.count, maxLength))
-
-    result.extend(ringBuffer[start..<max(ringBuffer.count, end)])
-
-    if end <= start {
-      result.extend(ringBuffer[0..<start])
+    if distance(ringBuffer.startIndex, i) > 0 {
+      return AnySequence(_lazyConcatenate([
+        ringBuffer[i..<ringBuffer.endIndex],
+        ringBuffer[0..<i]
+      ]))
     }
-    return AnySequence(result)
+    return AnySequence(ringBuffer)
   }
 
   public func split(
