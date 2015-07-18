@@ -47,6 +47,7 @@ set(SWIFTLIB_ESSENTIAL
   Filter.swift.gyb
   FixedPoint.swift.gyb
   Flatten.swift.gyb
+  FlatMap.swift
   FloatingPoint.swift.gyb
   FloatingPointOperations.swift.gyb
   FloatingPointParsing.swift.gyb

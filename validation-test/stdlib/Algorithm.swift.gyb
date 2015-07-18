@@ -1750,7 +1750,6 @@ SequenceTypeAlgorithms.test("flatMap/SequenceType") {
         test.sequence.map { OpaqueValue($0) },
         underestimatedCount: underestimateCountBehavior)
       let closureLifetimeTracker = LifetimeTracked(0)
-      expectEqual(1, LifetimeTracked.instances)
       var timesClosureWasCalled = 0
       var result = s.flatMap {
         (element: OpaqueValue<Int>) -> MinimalSequence<OpaqueValue<Int32>> in
@@ -1763,10 +1762,10 @@ SequenceTypeAlgorithms.test("flatMap/SequenceType") {
       expectEqual(
         test.expected, result.map { $0.value },
         stackTrace: SourceLocStack().with(test.loc))
-      expectEqual([], s.map { $0.value }, "sequence should be consumed")
+      expectTrue(Array(s).isEmpty, "sequence should be consumed")
       expectEqual(
         test.sequence.count, timesClosureWasCalled,
-        "map() should be eager and should only call its predicate"
+        "flatMap() should be eager and should only call its predicate"
         + "once per element")
       expectGE(
         2 * result.count, result.capacity,
@@ -1774,6 +1773,39 @@ SequenceTypeAlgorithms.test("flatMap/SequenceType") {
     }
   }
 }
+
+% for Kind in 'Sequence', 'ForwardCollection', 'BidirectionalCollection':
+%   Minimal = 'Minimal' + Kind
+SequenceTypeAlgorithms.test("flatMap/${Kind}/Lazy") {
+  for test in flatMapTests {
+    let s = ${Minimal}<OpaqueValue<Int>>(
+      test.sequence.map { OpaqueValue($0) })
+    let closureLifetimeTracker = LifetimeTracked(0)
+    var timesClosureWasCalled = 0
+    var result = s._prext_lazy.flatMap {
+      (element: OpaqueValue<Int>) -> ${Minimal}<OpaqueValue<Int32>> in
+      _blackHole(closureLifetimeTracker)
+      ++timesClosureWasCalled
+      return ${Minimal}<OpaqueValue<Int32>>(
+        test.transform(element.value).map { OpaqueValue(Int32($0)) })
+    }
+    expectEqual(0, timesClosureWasCalled, "Unexpected eagerness")
+    check${Kind}(
+      test.expected.map { OpaqueValue($0) }, result,
+      stackTrace: SourceLocStack().with(test.loc),
+      resiliencyChecks: .none
+    ) { $0.value == $1.value }
+
+    % if Kind == 'Sequence':
+    expectTrue(Array(s).isEmpty, "sequence should be consumed")
+    expectEqual(
+      test.sequence.count, timesClosureWasCalled,
+      "iterating a lazy flatMap() should call the predicate"
+      + "once per element")
+    % end
+  }
+}
+% end
 
 struct FlatMapToOptionalTest {
   let expected: [Int32]
@@ -1839,7 +1871,7 @@ SequenceTypeAlgorithms.test("flatMap/SequenceType/TransformProducesOptional") {
       expectEqual(
         test.expected, result.map { $0.value },
         stackTrace: SourceLocStack().with(test.loc))
-      expectEqual([], s.map { $0.value }, "sequence should be consumed")
+      expectTrue(Array(s).isEmpty, "sequence should be consumed")
       expectEqual(
         test.sequence.count, timesClosureWasCalled,
         "flatMap() should be eager and should only call its predicate"
