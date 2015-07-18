@@ -80,8 +80,19 @@ public protocol SequenceType {
     @noescape includeElement: (Generator.Element) -> Bool
   ) -> [Generator.Element]
 
-  /// Call `body` on each element in `self` in the same order as the generator
-  /// would produce the elements.
+  /// Call `body` on each element in `self`.
+  ///
+  ///     sequence.forEach {
+  ///       // body code
+  ///     }
+  ///
+  /// is equivalent to:
+  ///
+  ///     for element in sequence {
+  ///       // body code
+  ///     }
+  ///
+  /// - Complexity: O(`self.count`)
   func forEach(@noescape body: (Generator.Element) -> ())
 
   /// Returns a subsequence containing all but the first `n` elements.
@@ -424,6 +435,18 @@ extension SequenceType {
 
 extension SequenceType {
   /// Call `body` on each element in `self`.
+  ///
+  ///     sequence.forEach {
+  ///       // body code
+  ///     }
+  ///
+  /// is equivalent to:
+  ///
+  ///     for element in sequence {
+  ///       // body code
+  ///     }
+  ///
+  /// - Complexity: O(`self.count`)
   public func forEach(@noescape body: (Generator.Element) -> ()) {
     for element in self {
       body(element)
