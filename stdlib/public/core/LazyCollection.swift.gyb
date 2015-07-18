@@ -38,16 +38,24 @@ extension _prext_LazyCollectionType where Elements == Self {
   public var elements: Self { return self }
 }
 
-/// A collection containing the same elements as a `Base_` collection,
+/// A collection containing the same elements as a `Base` collection,
 /// but on which some operations such as `map` and `filter` are
 /// implemented lazily.
 ///
 /// - See also: `LazySequenceType`, `LazyCollection`
-public struct _prext_LazyCollection<Base_ : CollectionType>
+public struct _prext_LazyCollection<Base : CollectionType>
   : _prext_LazyCollectionType {
 
   /// The type of the underlying collection
-  public typealias Base = Base_
+  public typealias Elements = Base
+
+  /// The underlying collection
+  public var elements: Elements { return _base }
+
+  /// A type that represents a valid position in the collection.
+  ///
+  /// Valid indices consist of the position of every element and a
+  /// "past the end" position that's not valid for use as a subscript.
   public typealias Index = Base.Index
   
   /// Construct an instance with `base` as its underlying Collection
@@ -55,9 +63,6 @@ public struct _prext_LazyCollection<Base_ : CollectionType>
   public init(_ base: Base) {
     self._base = base
   }
-
-  public typealias Elements = Base
-  public var elements: Base { return _base }
 
   internal var _base: Base
 }
