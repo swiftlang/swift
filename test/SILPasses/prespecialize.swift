@@ -3,7 +3,7 @@
 // REQUIRES: optimized_stdlib
 
 // Check that pre-specialization works at -Onone.
-// This test requires the standrad library to be compiled with pre-specializations!
+// This test requires the standard library to be compiled with pre-specializations!
 
 // CHECK-LABEL: sil [noinline] @_TF13prespecialize4testFTRGSaSi_4sizeSi_T_ 
 // Look for generic specialization <Swift.Int with Swift.Int : Swift.ForwardIndexType in Swift, Swift.Int with Swift.Int : Swift._SignedIntegerType in Swift, Swift.Int with Swift.Int : Swift._BuiltinIntegerLiteralConvertible in Swift, Swift.Int> of Swift.Range.generate <A where A: Swift.ForwardIndexType> (Swift.Range<A>)() -> Swift.RangeGenerator<A>
