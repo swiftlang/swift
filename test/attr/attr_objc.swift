@@ -78,7 +78,7 @@ class subject_getterSetter1 {
     }
   }
 
-  var observingAccesorsVar1: Int = 0 {
+  var observingAccessorsVar1: Int = 0 {
     @objc
     willSet { // expected-error {{observing accessors are not allowed to be marked @objc}}
     }

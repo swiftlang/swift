@@ -175,3 +175,22 @@ class HasUnmanaged : NSObject {
   // CHECK: return
   var ref: Unmanaged<AnyObject>?
 }
+
+
+// <rdar://problem/21544588> crash when overriding non-@objc property with @objc property.
+class NonObjCBaseClass : NSObject {
+  @nonobjc var property: Int {
+    get { return 0 }
+    set {}
+  }
+}
+
+@objc class ObjCSubclass : NonObjCBaseClass {
+  @objc override var property: Int {
+    get { return 1 }
+    set {}
+  }
+}
+
+// CHECK-LABEL: sil hidden @_TToFC15objc_properties12ObjCSubclassg8propertySi
+// CHECK-LABEL: sil hidden @_TToFC15objc_properties12ObjCSubclasss8propertySi

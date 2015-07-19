@@ -176,8 +176,7 @@ bool SILGenModule::requiresObjCMethodEntryPoint(FuncDecl *method) {
   // the @NSManagedAttr attribute is present.
   if (method->isGetterOrSetter()) {
     auto asd = method->getAccessorStorageDecl();
-    return asd->hasObjCGetterAndSetter() &&
-           !asd->getAttrs().hasAttribute<NSManagedAttr>();
+    return asd->isObjC() && !asd->getAttrs().hasAttribute<NSManagedAttr>();
   }
 
   return method->isObjC() || method->getAttrs().hasAttribute<IBActionAttr>();
@@ -486,8 +485,7 @@ public:
 
   void visitAbstractStorageDecl(AbstractStorageDecl *asd) {
     // FIXME: Default implementations in protocols.
-    if (asd->hasObjCGetterAndSetter() &&
-        !isa<ProtocolDecl>(asd->getDeclContext()))
+    if (asd->isObjC() && !isa<ProtocolDecl>(asd->getDeclContext()))
       SGM.emitObjCPropertyMethodThunks(asd);
   }
 };
@@ -581,7 +579,7 @@ public:
   }
 
   void visitAbstractStorageDecl(AbstractStorageDecl *vd) {
-    if (vd->hasObjCGetterAndSetter())
+    if (vd->isObjC())
       SGM.emitObjCPropertyMethodThunks(vd);
   }
 };
