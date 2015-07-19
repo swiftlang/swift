@@ -17,7 +17,7 @@ RangeReplaceableTestSuite.test("append/dispatch") {
 
 RangeReplaceableTestSuite.test("extend/dispatch") {
   var tester = RangeReplaceableCollectionLog.dispatchTester([ OpaqueValue(1) ])
-  tester.extend([ 2, 3 ].map { OpaqueValue($0) })
+  tester.extend([ 2, 3 ].map(OpaqueValue.init))
   expectCustomizable(tester, tester.log.extend)
 }
 
@@ -30,7 +30,7 @@ RangeReplaceableTestSuite.test("insert/dispatch") {
 RangeReplaceableTestSuite.test("splice/dispatch") {
   var tester = RangeReplaceableCollectionLog.dispatchTester([ OpaqueValue(1) ])
   tester.splice(
-    [ 2, 3 ].map { OpaqueValue($0) },
+    [ 2, 3 ].map(OpaqueValue.init),
     atIndex: tester.base.endIndex)
   expectCustomizable(tester, tester.log.splice)
 }
@@ -49,7 +49,7 @@ RangeReplaceableTestSuite.test("removeLast/whereIndexIsBidirectional/dispatch") 
 
 RangeReplaceableTestSuite.test("removeRange/dispatch") {
   var tester = RangeReplaceableCollectionLog.dispatchTester(
-    [ 1, 2, 3 ].map { OpaqueValue($0) })
+    [ 1, 2, 3 ].map(OpaqueValue.init))
   tester.removeRange(tester.base.startIndex..<tester.base.endIndex)
   expectCustomizable(tester, tester.log.removeRange)
 }

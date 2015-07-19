@@ -138,7 +138,7 @@ tests.test("AnySequence.init(SequenceType)") {
   }
   if true {
     let intData = [ 1, 2, 3, 5, 8, 13, 21 ]
-    let data = intData.map { OpaqueValue($0) }
+    let data = intData.map(OpaqueValue.init)
     let base = MinimalSequence(data)
     var s = AnySequence(base)
     expectType(AnySequence<OpaqueValue<Int>>.self, &s)
@@ -156,7 +156,7 @@ tests.test("AnySequence.init(() -> Generator)") {
   }
   if true {
     let intData = [ 1, 2, 3, 5, 8, 13, 21 ]
-    let data = intData.map { OpaqueValue($0) }
+    let data = intData.map(OpaqueValue.init)
     var s = AnySequence {
       return MinimalGenerator(data)
     }

@@ -69,8 +69,8 @@ internal struct ReplaceRangeTest {
     rangeSelection: RangeSelection, expected: [Int],
     file: String = __FILE__, line: UWord = __LINE__
   ) {
-    self.collection = collection.map { OpaqueValue($0) }
-    self.newElements = newElements.map { OpaqueValue($0) }
+    self.collection = collection.map(OpaqueValue.init)
+    self.newElements = newElements.map(OpaqueValue.init)
     self.rangeSelection = rangeSelection
     self.expected = expected
     self.loc = SourceLoc(file, line, comment: "replaceRange() test data")
@@ -87,7 +87,7 @@ internal struct AppendTest {
     collection: [Int], newElement: Int, expected: [Int],
     file: String = __FILE__, line: UWord = __LINE__
   ) {
-    self.collection = collection.map { OpaqueValue($0) }
+    self.collection = collection.map(OpaqueValue.init)
     self.newElement = OpaqueValue(newElement)
     self.expected = expected
     self.loc = SourceLoc(file, line, comment: "append() test data")
@@ -104,8 +104,8 @@ internal struct ExtendTest {
     collection: [Int], newElements: [Int], expected: [Int],
     file: String = __FILE__, line: UWord = __LINE__
   ) {
-    self.collection = collection.map { OpaqueValue($0) }
-    self.newElements = newElements.map { OpaqueValue($0) }
+    self.collection = collection.map(OpaqueValue.init)
+    self.newElements = newElements.map(OpaqueValue.init)
     self.expected = expected
     self.loc = SourceLoc(file, line, comment: "append() test data")
   }
@@ -122,7 +122,7 @@ internal struct InsertTest {
     collection: [Int], newElement: Int, indexSelection: IndexSelection,
     expected: [Int], file: String = __FILE__, line: UWord = __LINE__
   ) {
-    self.collection = collection.map { OpaqueValue($0) }
+    self.collection = collection.map(OpaqueValue.init)
     self.newElement = OpaqueValue(newElement)
     self.indexSelection = indexSelection
     self.expected = expected
@@ -141,8 +141,8 @@ internal struct SpliceTest {
     collection: [Int], newElements: [Int], indexSelection: IndexSelection,
     expected: [Int], file: String = __FILE__, line: UWord = __LINE__
   ) {
-    self.collection = collection.map { OpaqueValue($0) }
-    self.newElements = newElements.map { OpaqueValue($0) }
+    self.collection = collection.map(OpaqueValue.init)
+    self.newElements = newElements.map(OpaqueValue.init)
     self.indexSelection = indexSelection
     self.expected = expected
     self.loc = SourceLoc(file, line, comment: "splice() test data")
@@ -161,7 +161,7 @@ internal struct RemoveAtIndexTest {
     expectedRemovedElement: Int, expectedCollection: [Int],
     file: String = __FILE__, line: UWord = __LINE__
   ) {
-    self.collection = collection.map { OpaqueValue($0) }
+    self.collection = collection.map(OpaqueValue.init)
     self.indexSelection = indexSelection
     self.expectedRemovedElement = expectedRemovedElement
     self.expectedCollection = expectedCollection
@@ -179,7 +179,7 @@ internal struct RemoveLastTest {
     collection: [Int], expectedRemovedElement: Int, expectedCollection: [Int],
     file: String = __FILE__, line: UWord = __LINE__
   ) {
-    self.collection = collection.map { OpaqueValue($0) }
+    self.collection = collection.map(OpaqueValue.init)
     self.expectedRemovedElement = expectedRemovedElement
     self.expectedCollection = expectedCollection
     self.loc = SourceLoc(file, line, comment: "removeLast() test data")
@@ -196,7 +196,7 @@ internal struct RemoveRangeTest {
     collection: [Int], rangeSelection: RangeSelection, expected: [Int],
     file: String = __FILE__, line: UWord = __LINE__
   ) {
-    self.collection = collection.map { OpaqueValue($0) }
+    self.collection = collection.map(OpaqueValue.init)
     self.rangeSelection = rangeSelection
     self.expected = expected
     self.loc = SourceLoc(file, line, comment: "removeRange() test data")
@@ -227,7 +227,7 @@ internal struct RemoveAllTest {
     collection: [Int], expected: [Int],
     file: String = __FILE__, line: UWord = __LINE__
   ) {
-    self.collection = collection.map { OpaqueValue($0) }
+    self.collection = collection.map(OpaqueValue.init)
     self.expected = expected
     self.loc = SourceLoc(file, line, comment: "removeAll() test data")
   }
@@ -242,7 +242,7 @@ internal struct ReserveCapacityTest {
     collection: [Int], requestedCapacity: Int,
     file: String = __FILE__, line: UWord = __LINE__
   ) {
-    self.collection = collection.map { OpaqueValue($0) }
+    self.collection = collection.map(OpaqueValue.init)
     self.requestedCapacity = requestedCapacity
     self.loc = SourceLoc(file, line, comment: "removeAll() test data")
   }
@@ -258,8 +258,8 @@ internal struct OperatorPlusTest {
     lhs: [Int], rhs: [Int], expected: [Int],
     file: String = __FILE__, line: UWord = __LINE__
   ) {
-    self.lhs = lhs.map { OpaqueValue($0) }
-    self.rhs = rhs.map { OpaqueValue($0) }
+    self.lhs = lhs.map(OpaqueValue.init)
+    self.rhs = rhs.map(OpaqueValue.init)
     self.expected = expected
     self.loc = SourceLoc(file, line, comment: "`func +` test data")
   }

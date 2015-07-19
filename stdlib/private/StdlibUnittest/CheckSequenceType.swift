@@ -24,9 +24,9 @@ public struct FindTest {
   ) {
     self.expected = expected
     self.element = MinimalEquatableValue(element)
-    self.sequence = sequence.map { MinimalEquatableValue($0) }
-    self.expectedLeftoverSequence = expectedLeftoverSequence.map {
-      MinimalEquatableValue($0)}
+    self.sequence = sequence.map(MinimalEquatableValue.init)
+    self.expectedLeftoverSequence = expectedLeftoverSequence.map(
+      MinimalEquatableValue.init)
     self.loc = SourceLoc(file, line, comment: "test data")
   }
 }

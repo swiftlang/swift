@@ -126,7 +126,7 @@ extension TestSuite {
 
 if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
   self.test("\(testNamePrefix).subscript(_: Index)/OutOfBounds/Right/NonEmpty/Set") {
-    var c = makeWrappedCollection([ 1010, 2020, 3030 ].map { OpaqueValue($0) })
+    var c = makeWrappedCollection([ 1010, 2020, 3030 ].map(OpaqueValue.init))
     var index = c.endIndex
     if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
       expectCrashLater()
@@ -391,7 +391,7 @@ self.test("\(testNamePrefix).sort/${'Predicate' if predicate else 'WhereElementI
 
 if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
   self.test("\(testNamePrefix).subscript(_: Index)/OutOfBounds/Left/NonEmpty/Set") {
-    var c = makeWrappedCollection([ 1010, 2020, 3030 ].map { OpaqueValue($0) })
+    var c = makeWrappedCollection([ 1010, 2020, 3030 ].map(OpaqueValue.init))
     var index = c.startIndex
     if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
       expectCrashLater()

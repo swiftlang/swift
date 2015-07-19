@@ -31,8 +31,8 @@ public struct SubscriptRangeTest {
     count: Int,
     file: String = __FILE__, line: UWord = __LINE__
   ) {
-    self.expected = expected.map { OpaqueValue($0) }
-    self.collection = collection.map { OpaqueValue($0) }
+    self.expected = expected.map(OpaqueValue.init)
+    self.collection = collection.map(OpaqueValue.init)
     self.bounds = bounds
     self.count = count
     self.loc = SourceLoc(file, line, comment: "test data")
@@ -288,7 +288,7 @@ self.test("\(testNamePrefix).generate()/semantics") {
 
 if resiliencyChecks.creatingOutOfBoundsIndicesBehavior != .None {
   self.test("\(testNamePrefix).Index/OutOfBounds/Right/NonEmpty") {
-    let c = makeWrappedCollection([ 1010, 2020, 3030 ].map { OpaqueValue($0) })
+    let c = makeWrappedCollection([ 1010, 2020, 3030 ].map(OpaqueValue.init))
     let index = c.endIndex
     if resiliencyChecks.creatingOutOfBoundsIndicesBehavior == .Trap {
       expectCrashLater()
@@ -335,7 +335,7 @@ self.test("\(testNamePrefix).subscript(_: Index)/semantics") {
 
 if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
   self.test("\(testNamePrefix).subscript(_: Index)/OutOfBounds/Right/NonEmpty/Get") {
-    var c = makeWrappedCollection([ 1010, 2020, 3030 ].map { OpaqueValue($0) })
+    var c = makeWrappedCollection([ 1010, 2020, 3030 ].map(OpaqueValue.init))
     var index = c.endIndex
     if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .Trap {
       expectCrashLater()
@@ -652,7 +652,7 @@ self.test("\(testNamePrefix).last") {
 
 if resiliencyChecks.creatingOutOfBoundsIndicesBehavior != .None {
   self.test("\(testNamePrefix).Index/OutOfBounds/Left/NonEmpty") {
-    let c = makeWrappedCollection([ 1010, 2020, 3030 ].map { OpaqueValue($0) })
+    let c = makeWrappedCollection([ 1010, 2020, 3030 ].map(OpaqueValue.init))
     let index = c.startIndex
     if resiliencyChecks.creatingOutOfBoundsIndicesBehavior == .Trap {
       expectCrashLater()
@@ -684,7 +684,7 @@ if resiliencyChecks.creatingOutOfBoundsIndicesBehavior != .None {
 
 if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior != .None {
   self.test("\(testNamePrefix).subscript(_: Index)/OutOfBounds/Left/NonEmpty/Get") {
-    var c = makeWrappedCollection([ 1010, 2020, 3030 ].map { OpaqueValue($0) })
+    var c = makeWrappedCollection([ 1010, 2020, 3030 ].map(OpaqueValue.init))
     var index = c.startIndex
     if resiliencyChecks.subscriptOnOutOfBoundsIndicesBehavior == .Trap {
       expectCrashLater()

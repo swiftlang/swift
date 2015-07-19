@@ -14,7 +14,7 @@ import StdlibUnittest
 var ${Self}TestSuite = TestSuite("${Self}")
 
 ${Self}TestSuite.test("startIndex/SameBuffer") {
-  var c1 = ${Self}([ 1010, 2020, 3030 ].map { OpaqueValue($0) })
+  var c1 = ${Self}([ 1010, 2020, 3030 ].map(OpaqueValue.init))
   let c2 = c1
   expectEqual(c1.startIndex, c1.startIndex)
   expectEqual(c2.startIndex, c2.startIndex)
@@ -24,8 +24,8 @@ ${Self}TestSuite.test("startIndex/SameBuffer") {
 
 
 ${Self}TestSuite.test("startIndex/DifferentBuffer") {
-  let c1 = ${Self}([ 1010, 2020, 3030 ].map { OpaqueValue($0) })
-  let c2 = ${Self}([ 1010, 2020, 3030 ].map { OpaqueValue($0) })
+  let c1 = ${Self}([ 1010, 2020, 3030 ].map(OpaqueValue.init))
+  let c2 = ${Self}([ 1010, 2020, 3030 ].map(OpaqueValue.init))
   expectEqual(c1.startIndex, c1.startIndex)
   expectEqual(c2.startIndex, c2.startIndex)
   let i1 = c1.startIndex
@@ -36,8 +36,8 @@ ${Self}TestSuite.test("startIndex/DifferentBuffer") {
 }
 
 ${Self}TestSuite.test("endIndex/DifferentBuffer") {
-  let c1 = ${Self}([ 1010, 2020, 3030 ].map { OpaqueValue($0) })
-  let c2 = ${Self}([ 1010, 2020, 3030 ].map { OpaqueValue($0) })
+  let c1 = ${Self}([ 1010, 2020, 3030 ].map(OpaqueValue.init))
+  let c2 = ${Self}([ 1010, 2020, 3030 ].map(OpaqueValue.init))
   expectEqual(c1.endIndex, c1.endIndex)
   expectEqual(c2.endIndex, c2.endIndex)
   let i1 = c1.endIndex
@@ -48,7 +48,7 @@ ${Self}TestSuite.test("endIndex/DifferentBuffer") {
 }
 
 ${Self}TestSuite.test("reserveCapacity()/IndexInvalidation/DifferentBuffer") {
-  var c1 = ${Self}([ 1010, 2020, 3030 ].map { OpaqueValue($0) })
+  var c1 = ${Self}([ 1010, 2020, 3030 ].map(OpaqueValue.init))
   let c2 = c1
   let i = c1.startIndex
   c1.reserveCapacity(0)
@@ -59,7 +59,7 @@ ${Self}TestSuite.test("reserveCapacity()/IndexInvalidation/DifferentBuffer") {
 }
 
 ${Self}TestSuite.test("reserveCapacity()/IndexInvalidation/DifferentMutationEpoch") {
-  var c = ${Self}([ 1010, 2020, 3030 ].map { OpaqueValue($0) })
+  var c = ${Self}([ 1010, 2020, 3030 ].map(OpaqueValue.init))
   let i = c.startIndex
   c.reserveCapacity(0)
   expectFailure {
@@ -68,7 +68,7 @@ ${Self}TestSuite.test("reserveCapacity()/IndexInvalidation/DifferentMutationEpoc
 }
 
 ${Self}TestSuite.test("append()/IndexInvalidation/DifferentBuffer") {
-  var c1 = ${Self}([ 1010, 2020, 3030 ].map { OpaqueValue($0) })
+  var c1 = ${Self}([ 1010, 2020, 3030 ].map(OpaqueValue.init))
   let c2 = c1
   let i = c1.startIndex
   c1.append(OpaqueValue(4040))
@@ -79,7 +79,7 @@ ${Self}TestSuite.test("append()/IndexInvalidation/DifferentBuffer") {
 }
 
 ${Self}TestSuite.test("append()/IndexInvalidation/DifferentMutationEpoch") {
-  var c = ${Self}([ 1010, 2020, 3030 ].map { OpaqueValue($0) })
+  var c = ${Self}([ 1010, 2020, 3030 ].map(OpaqueValue.init))
   let i = c.startIndex
   c.append(OpaqueValue(4040))
   expectFailure {
@@ -88,10 +88,10 @@ ${Self}TestSuite.test("append()/IndexInvalidation/DifferentMutationEpoch") {
 }
 
 ${Self}TestSuite.test("extend()/IndexInvalidation/DifferentBuffer") {
-  var c1 = ${Self}([ 1010, 2020, 3030 ].map { OpaqueValue($0) })
+  var c1 = ${Self}([ 1010, 2020, 3030 ].map(OpaqueValue.init))
   let c2 = c1
   let i = c1.startIndex
-  c1.extend([ 4040, 5050 ].map { OpaqueValue($0) })
+  c1.extend([ 4040, 5050 ].map(OpaqueValue.init))
   expectFailure {
     _ = i == c1.startIndex
   }
@@ -99,21 +99,21 @@ ${Self}TestSuite.test("extend()/IndexInvalidation/DifferentBuffer") {
 }
 
 ${Self}TestSuite.test("extend()/IndexInvalidation/DifferentMutationEpoch") {
-  var c = ${Self}([ 1010, 2020, 3030 ].map { OpaqueValue($0) })
+  var c = ${Self}([ 1010, 2020, 3030 ].map(OpaqueValue.init))
   let i = c.startIndex
-  c.extend([ 4040, 5050 ].map { OpaqueValue($0) })
+  c.extend([ 4040, 5050 ].map(OpaqueValue.init))
   expectFailure {
     _ = i == c.startIndex
   }
 }
 
 ${Self}TestSuite.test("replaceRange()/IndexInvalidation/DifferentBuffer") {
-  var c1 = ${Self}([ 1010, 2020, 3030 ].map { OpaqueValue($0) })
+  var c1 = ${Self}([ 1010, 2020, 3030 ].map(OpaqueValue.init))
   let c2 = c1
   let i = c1.startIndex
   c1.replaceRange(
     c1.endIndex..<c1.endIndex,
-    with: [ 4040, 5050 ].map { OpaqueValue($0) })
+    with: [ 4040, 5050 ].map(OpaqueValue.init))
   expectFailure {
     _ = i == c1.startIndex
   }
@@ -121,18 +121,18 @@ ${Self}TestSuite.test("replaceRange()/IndexInvalidation/DifferentBuffer") {
 }
 
 ${Self}TestSuite.test("replaceRange()/IndexInvalidation/DifferentMutationEpoch") {
-  var c = ${Self}([ 1010, 2020, 3030 ].map { OpaqueValue($0) })
+  var c = ${Self}([ 1010, 2020, 3030 ].map(OpaqueValue.init))
   let i = c.startIndex
   c.replaceRange(
     c.endIndex..<c.endIndex,
-    with: [ 4040, 5050 ].map { OpaqueValue($0) })
+    with: [ 4040, 5050 ].map(OpaqueValue.init))
   expectFailure {
     _ = i == c.startIndex
   }
 }
 
 ${Self}TestSuite.test("insert()/IndexInvalidation/DifferentBuffer") {
-  var c1 = ${Self}([ 1010, 2020, 3030 ].map { OpaqueValue($0) })
+  var c1 = ${Self}([ 1010, 2020, 3030 ].map(OpaqueValue.init))
   let c2 = c1
   let i = c1.startIndex
   c1.insert(OpaqueValue(4040), atIndex: c1.endIndex)
@@ -143,7 +143,7 @@ ${Self}TestSuite.test("insert()/IndexInvalidation/DifferentBuffer") {
 }
 
 ${Self}TestSuite.test("insert()/IndexInvalidation/DifferentMutationEpoch") {
-  var c = ${Self}([ 1010, 2020, 3030 ].map { OpaqueValue($0) })
+  var c = ${Self}([ 1010, 2020, 3030 ].map(OpaqueValue.init))
   let i = c.startIndex
   c.insert(OpaqueValue(4040), atIndex: c.endIndex)
   expectFailure {
@@ -152,10 +152,10 @@ ${Self}TestSuite.test("insert()/IndexInvalidation/DifferentMutationEpoch") {
 }
 
 ${Self}TestSuite.test("splice()/IndexInvalidation/DifferentBuffer") {
-  var c1 = ${Self}([ 1010, 2020, 3030 ].map { OpaqueValue($0) })
+  var c1 = ${Self}([ 1010, 2020, 3030 ].map(OpaqueValue.init))
   let c2 = c1
   let i = c1.startIndex
-  c1.splice([ 4040, 5050 ].map { OpaqueValue($0) }, atIndex: c1.endIndex)
+  c1.splice([ 4040, 5050 ].map(OpaqueValue.init), atIndex: c1.endIndex)
   expectFailure {
     _ = i == c1.startIndex
   }
@@ -163,16 +163,16 @@ ${Self}TestSuite.test("splice()/IndexInvalidation/DifferentBuffer") {
 }
 
 ${Self}TestSuite.test("splice()/IndexInvalidation/DifferentMutationEpoch") {
-  var c = ${Self}([ 1010, 2020, 3030 ].map { OpaqueValue($0) })
+  var c = ${Self}([ 1010, 2020, 3030 ].map(OpaqueValue.init))
   let i = c.startIndex
-  c.splice([ 4040, 5050 ].map { OpaqueValue($0) }, atIndex: c.endIndex)
+  c.splice([ 4040, 5050 ].map(OpaqueValue.init), atIndex: c.endIndex)
   expectFailure {
     _ = i == c.startIndex
   }
 }
 
 ${Self}TestSuite.test("removeAtIndex()/IndexInvalidation/DifferentBuffer") {
-  var c1 = ${Self}([ 1010, 2020, 3030 ].map { OpaqueValue($0) })
+  var c1 = ${Self}([ 1010, 2020, 3030 ].map(OpaqueValue.init))
   let c2 = c1
   let i = c1.startIndex
   c1.removeAtIndex(c1.startIndex)
@@ -183,7 +183,7 @@ ${Self}TestSuite.test("removeAtIndex()/IndexInvalidation/DifferentBuffer") {
 }
 
 ${Self}TestSuite.test("removeAtIndex()/IndexInvalidation/DifferentMutationEpoch") {
-  var c = ${Self}([ 1010, 2020, 3030 ].map { OpaqueValue($0) })
+  var c = ${Self}([ 1010, 2020, 3030 ].map(OpaqueValue.init))
   let i = c.startIndex
   c.removeAtIndex(c.startIndex)
   expectFailure {
@@ -192,7 +192,7 @@ ${Self}TestSuite.test("removeAtIndex()/IndexInvalidation/DifferentMutationEpoch"
 }
 
 ${Self}TestSuite.test("removeLast()/IndexInvalidation/DifferentBuffer") {
-  var c1 = ${Self}([ 1010, 2020, 3030 ].map { OpaqueValue($0) })
+  var c1 = ${Self}([ 1010, 2020, 3030 ].map(OpaqueValue.init))
   let c2 = c1
   let i = c1.startIndex
   c1.removeLast()
@@ -203,7 +203,7 @@ ${Self}TestSuite.test("removeLast()/IndexInvalidation/DifferentBuffer") {
 }
 
 ${Self}TestSuite.test("removeLast()/IndexInvalidation/DifferentMutationEpoch") {
-  var c = ${Self}([ 1010, 2020, 3030 ].map { OpaqueValue($0) })
+  var c = ${Self}([ 1010, 2020, 3030 ].map(OpaqueValue.init))
   let i = c.startIndex
   c.removeLast()
   expectFailure {
@@ -212,7 +212,7 @@ ${Self}TestSuite.test("removeLast()/IndexInvalidation/DifferentMutationEpoch") {
 }
 
 ${Self}TestSuite.test("removeRange()/IndexInvalidation/DifferentBuffer") {
-  var c1 = ${Self}([ 1010, 2020, 3030 ].map { OpaqueValue($0) })
+  var c1 = ${Self}([ 1010, 2020, 3030 ].map(OpaqueValue.init))
   let c2 = c1
   let i = c1.startIndex
   c1.removeRange(c1.startIndex..<c1.startIndex)
@@ -223,7 +223,7 @@ ${Self}TestSuite.test("removeRange()/IndexInvalidation/DifferentBuffer") {
 }
 
 ${Self}TestSuite.test("removeRange()/IndexInvalidation/DifferentMutationEpoch") {
-  var c = ${Self}([ 1010, 2020, 3030 ].map { OpaqueValue($0) })
+  var c = ${Self}([ 1010, 2020, 3030 ].map(OpaqueValue.init))
   let i = c.startIndex
   c.removeRange(c.startIndex..<c.startIndex)
   expectFailure {
@@ -232,7 +232,7 @@ ${Self}TestSuite.test("removeRange()/IndexInvalidation/DifferentMutationEpoch") 
 }
 
 ${Self}TestSuite.test("removeAll()/IndexInvalidation/DifferentBuffer") {
-  var c1 = ${Self}([ 1010, 2020, 3030 ].map { OpaqueValue($0) })
+  var c1 = ${Self}([ 1010, 2020, 3030 ].map(OpaqueValue.init))
   let c2 = c1
   let i = c1.startIndex
   c1.removeAll(keepCapacity: true)
@@ -243,7 +243,7 @@ ${Self}TestSuite.test("removeAll()/IndexInvalidation/DifferentBuffer") {
 }
 
 ${Self}TestSuite.test("removeRange()/IndexInvalidation/DifferentMutationEpoch") {
-  var c = ${Self}([ 1010, 2020, 3030 ].map { OpaqueValue($0) })
+  var c = ${Self}([ 1010, 2020, 3030 ].map(OpaqueValue.init))
   let i = c.startIndex
   c.removeAll(keepCapacity: true)
   expectFailure {
