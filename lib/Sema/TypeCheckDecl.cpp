@@ -3697,25 +3697,6 @@ public:
 
     TC.checkForForbiddenPrefix(FD);
 
-    // Observing accessors (and their generated regular accessors) may have
-    // the type of the var inferred.
-    if (AbstractStorageDecl *ASD = FD->getAccessorStorageDecl()) {
-      if (ASD->hasObservers()) {
-        TC.validateDecl(ASD);
-        Type valueTy = ASD->getType()->getReferenceStorageReferent();
-        if (FD->isObservingAccessor() || (FD->isSetter() && FD->isImplicit())) {
-          unsigned firstParamIdx = FD->getParent()->isTypeContext();
-          auto *firstParamPattern = FD->getBodyParamPatterns()[firstParamIdx];
-          auto *tuplePattern = cast<TuplePattern>(firstParamPattern);
-          auto *paramPattern = tuplePattern->getElements().front().getPattern();
-          auto *paramTypePattern = cast<TypedPattern>(paramPattern);
-          paramTypePattern->getTypeLoc().setType(valueTy, true);
-        } else if (FD->isGetter() && FD->isImplicit()) {
-          FD->getBodyResultTypeLoc().setType(valueTy, true);
-        }
-      }
-    }
-
     FD->setIsBeingTypeChecked();
 
     bool badType = false;
@@ -4099,6 +4080,25 @@ public:
     // Check whether the return type is dynamic 'Self'.
     if (checkDynamicSelfReturn(FD))
       isInvalid = true;
+
+    // Observing accessors (and their generated regular accessors) may have
+    // the type of the var inferred.
+    if (AbstractStorageDecl *ASD = FD->getAccessorStorageDecl()) {
+      if (ASD->hasObservers()) {
+        TC.validateDecl(ASD);
+        Type valueTy = ASD->getType()->getReferenceStorageReferent();
+        if (FD->isObservingAccessor() || (FD->isSetter() && FD->isImplicit())) {
+          unsigned firstParamIdx = FD->getParent()->isTypeContext();
+          auto *firstParamPattern = FD->getBodyParamPatterns()[firstParamIdx];
+          auto *tuplePattern = cast<TuplePattern>(firstParamPattern);
+          auto *paramPattern = tuplePattern->getElements().front().getPattern();
+          auto *paramTypePattern = cast<TypedPattern>(paramPattern);
+          paramTypePattern->getTypeLoc().setType(valueTy, true);
+        } else if (FD->isGetter() && FD->isImplicit()) {
+          FD->getBodyResultTypeLoc().setType(valueTy, true);
+        }
+      }
+    }
 
     // Before anything else, set up the 'self' argument correctly if present.
     GenericParamList *outerGenericParams = nullptr;

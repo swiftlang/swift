@@ -208,6 +208,56 @@ var disambiguateImplicitGet2: Int = takeIntTrailingClosure {
 
 
 //===---
+// Observed properties
+//===---
+
+class C {
+  var prop1 = 42 {
+    didSet { }
+  }
+  var prop2 = false {
+    willSet { }
+  }
+  var prop3: Int? = nil {
+    didSet { }
+  }
+  var prop4: Bool? = nil {
+    willSet { }
+  }
+}
+
+protocol TrivialInitType {
+  init()
+}
+
+class CT<T : TrivialInitType> {
+  var prop1 = 42 {
+    didSet { }
+  }
+  var prop2 = false {
+    willSet { }
+  }
+  var prop3: Int? = nil {
+    didSet { }
+  }
+  var prop4: Bool? = nil {
+    willSet { }
+  }
+  var prop5: T? = nil {
+    didSet { }
+  }
+  var prop6: T? = nil {
+    willSet { }
+  }
+  var prop7 = T() {
+    didSet { }
+  }
+  var prop8 = T() {
+    willSet { }
+  }
+}
+
+//===---
 // Parsing problems
 //===---
 
