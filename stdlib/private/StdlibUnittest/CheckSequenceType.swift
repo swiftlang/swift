@@ -591,7 +591,7 @@ self.test("\(testNamePrefix).prefix/semantics/equivalence") {
   }
 }
 
-self.test("prefix/semantics/negative") {
+self.test("\(testNamePrefix).prefix/semantics/negative") {
   let s = makeWrappedSequence([1010, 2020, 3030].map(OpaqueValue.init))
   expectCrashLater()
   _ = s.prefix(-1)
