@@ -922,10 +922,6 @@ private:
       }
     }
     
-    if (auto *funcDecl = dyn_cast<AbstractFunctionDecl>(D)) {
-      return funcDecl->getBodyKind() != AbstractFunctionDecl::BodyKind::None;
-    }
-    
     return true;
   }
 

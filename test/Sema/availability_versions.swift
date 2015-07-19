@@ -517,6 +517,12 @@ func accessUnavailableProperties(o: ClassWithUnavailableProperties) {
       // expected-note@-2 {{add 'if #available' version check}}
 }
 
+// asmname
+
+@asmname("SomeName")
+@available(OSX, introduced=10.10)
+func funcWithasmnameAvailableOn10_10(p: ClassAvailableOn10_10?) -> ClassAvailableOn10_10
+
 // Enums
 
 @available(OSX, introduced=10.10)
@@ -1328,6 +1334,19 @@ func testForFixitWithNestedMemberRefExpr() {
 }
 
 // Protocol Conformances
+
+protocol ProtocolWithRequirementMentioningUnavailable {
+  func hasUnavailableParameter(p: ClassAvailableOn10_10) // expected-error +{{'ClassAvailableOn10_10' is only available on OS X 10.10 or newer}}
+      // expected-note@-1 +{{add @available attribute to enclosing instance method}}
+      // expected-note@-2 +{{add @available attribute to enclosing protocol}}
+
+  func hasUnavailableReturn() -> ClassAvailableOn10_10 // expected-error +{{'ClassAvailableOn10_10' is only available on OS X 10.10 or newer}}
+      // expected-note@-1 +{{add @available attribute to enclosing instance method}}
+      // expected-note@-2 +{{add @available attribute to enclosing protocol}}
+
+  @available(OSX 10.10, *)
+  func hasUnavailableWithAnnotation(p: ClassAvailableOn10_10) -> ClassAvailableOn10_10
+}
 
 protocol HasMethodF {
   typealias T
