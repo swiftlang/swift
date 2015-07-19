@@ -517,8 +517,8 @@ self.test("\(testNamePrefix).dropFirst/semantics/dropFirst()==dropFirst(1)") {
 }
 
 self.test("\(testNamePrefix).dropFirst/semantics/negative") {
+  let s = makeWrappedSequence([1010, 2020, 3030].map(OpaqueValue.init))
   expectCrashLater()
-  var s = makeWrappedSequence([1010, 2020, 3030].map(OpaqueValue.init))
   s.dropFirst(-1)
 }
 
@@ -554,8 +554,8 @@ self.test("\(testNamePrefix).dropLast/semantics/equivalence") {
 }
 
 self.test("\(testNamePrefix).dropLast/semantics/negative") {
+  let s = makeWrappedSequence([1010, 2020, 3030].map(OpaqueValue.init))
   expectCrashLater()
-  var s = makeWrappedSequence([1010, 2020, 3030].map(OpaqueValue.init))
   s.dropLast(-1)
 }
 
@@ -592,8 +592,8 @@ self.test("\(testNamePrefix).prefix/semantics/equivalence") {
 }
 
 self.test("prefix/semantics/negative") {
+  let s = makeWrappedSequence([1010, 2020, 3030].map(OpaqueValue.init))
   expectCrashLater()
-  var s = makeWrappedSequence([1010, 2020, 3030].map(OpaqueValue.init))
   _ = s.prefix(-1)
 }
 
@@ -630,9 +630,9 @@ self.test("\(testNamePrefix).suffix/semantics/equivalence") {
 }
 
 self.test("\(testNamePrefix).suffix/semantics/negative") {
+  let s = makeWrappedSequence([1010, 2020, 3030].map(OpaqueValue.init))
   expectCrashLater()
-  var s = makeWrappedSequence([1010, 2020, 3030].map(OpaqueValue.init))
-  let _ = s.suffix(-1)
+  _ = s.suffix(-1)
 }
 
 //===----------------------------------------------------------------------===//
