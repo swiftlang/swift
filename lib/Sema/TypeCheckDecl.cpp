@@ -5807,6 +5807,9 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     if (!resolveTypeParams || typeParam->getArchetype()) {
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeParam)) {
         DeclChecker(*this, false, false).visitAssociatedTypeDecl(assocType);
+
+        if (!assocType->hasType())
+          assocType->computeType();
       }
 
       break;
@@ -5825,6 +5828,9 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     case DeclContextKind::NominalTypeDecl: {
       auto nominal = cast<NominalTypeDecl>(DC);
       typeCheckDecl(nominal, true);
+      if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeParam))
+        if (!assocType->hasType())
+          assocType->computeType();
       if (!typeParam->hasAccessibility())
         typeParam->setAccessibility(nominal->getFormalAccess());
       break;
@@ -5843,6 +5849,9 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         typeCheckDecl(extension, true);
       auto fn = cast<AbstractFunctionDecl>(DC);
       typeCheckDecl(fn, true);
+      if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeParam))
+        if (!assocType->hasType())
+          assocType->computeType();
       if (!typeParam->hasAccessibility())
         typeParam->setAccessibility(fn->getFormalAccess());
       break;
@@ -5958,6 +5967,8 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         assert(llvm::makeArrayRef(protocols) == archetype->getConformsTo() ||
                archetype->getIsRecursive());
 #endif
+        if (!assocType->hasType())
+          assocType->computeType();
         assocType->setArchetype(archetype);
       }
     }

@@ -2082,11 +2082,7 @@ AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
                                        TypeLoc defaultDefinition)
   : AbstractTypeParamDecl(DeclKind::AssociatedType, dc, name, nameLoc),
     KeywordLoc(keywordLoc), DefaultDefinition(defaultDefinition)
-{
-  auto &ctx = dc->getASTContext();
-  auto type = new (ctx, AllocationArena::Permanent) AssociatedTypeType(this);
-  setType(MetatypeType::get(type, ctx));
-}
+{}
 
 AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
                                        Identifier name, SourceLoc nameLoc,
@@ -2097,7 +2093,10 @@ AssociatedTypeDecl::AssociatedTypeDecl(DeclContext *dc, SourceLoc keywordLoc,
     ResolverContextData(resolverData)
 {
   assert(Resolver && "missing resolver");
-  auto &ctx = dc->getASTContext();
+}
+
+void AssociatedTypeDecl::computeType() {
+  auto &ctx = getASTContext();
   auto type = new (ctx, AllocationArena::Permanent) AssociatedTypeType(this);
   setType(MetatypeType::get(type, ctx));
 }

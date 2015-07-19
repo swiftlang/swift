@@ -2155,6 +2155,7 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                                     defaultDefinitionID);
     declOrOffset = assocType;
 
+    assocType->computeType();
     assocType->setAccessibility(cast<ProtocolDecl>(DC)->getFormalAccess());
     assocType->setSuperclass(getType(superclassID));
     assocType->setArchetype(getType(archetypeID)->castTo<ArchetypeType>());

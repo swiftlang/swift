@@ -2621,6 +2621,10 @@ public:
     return const_cast<AssociatedTypeDecl *>(this)->getDefaultDefinitionLoc();
   }
 
+  /// computeType - Compute the type (and declared type) of this associated
+  /// type; can only be called after the alias type has been resolved.
+  void computeType();
+
   SourceLoc getStartLoc() const { return KeywordLoc; }
   SourceRange getSourceRange() const;
 
