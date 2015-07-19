@@ -1574,9 +1574,7 @@ namespace {
       insertResult.first->second = element;
 
       // Give the enum element the appropriate type.
-      auto argTy = MetatypeType::get(theEnum->getDeclaredType());
-      element->overwriteType(FunctionType::get(argTy,
-                                               theEnum->getDeclaredType()));
+      element->computeType();
 
       Impl.importAttributes(decl, element);
 

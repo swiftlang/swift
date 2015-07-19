@@ -4042,6 +4042,24 @@ SourceRange EnumElementDecl::getSourceRange() const {
   return {getStartLoc(), getNameLoc()};
 }
 
+void EnumElementDecl::computeType() {
+  EnumDecl *ED = getParentEnum();
+
+  Type resultTy = ED->getDeclaredTypeInContext();
+  Type argTy = MetatypeType::get(resultTy);
+
+  // The type of the enum element is either (T) -> T or (T) -> ArgType -> T.
+  if (getArgumentType())
+    resultTy = FunctionType::get(getArgumentType(), resultTy);
+
+  if (auto gp = ED->getGenericParamsOfContext())
+    resultTy = PolymorphicFunctionType::get(argTy, resultTy, gp);
+  else
+    resultTy = FunctionType::get(argTy, resultTy);
+
+  setType(resultTy);
+}
+
 Type EnumElementDecl::getArgumentInterfaceType() const {
   if (!hasArgumentType())
     return nullptr;

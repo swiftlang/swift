@@ -5170,6 +5170,8 @@ public:
         static_cast<unsigned>(ElementRecursiveness::NotRecursive);
   }
 
+  void computeType();
+
   bool hasArgumentType() const { return !ArgumentType.getType().isNull(); }
   Type getArgumentType() const { return ArgumentType.getType(); }
   Type getArgumentInterfaceType() const;

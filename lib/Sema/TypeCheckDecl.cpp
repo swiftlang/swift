@@ -5272,7 +5272,6 @@ public:
     TC.checkDeclAttributesEarly(EED);
 
     EnumDecl *ED = EED->getParentEnum();
-    Type ElemTy = ED->getDeclaredTypeInContext();
 
     if (!EED->hasAccessibility())
       EED->setAccessibility(ED->getFormalAccess());
@@ -5321,38 +5320,19 @@ public:
       EED->setRecursiveness(ElementRecursiveness::NotRecursive);
     }
 
-    // If we have a simple element, just set the type.
-    if (EED->getArgumentType().isNull()) {
-      Type argTy = MetatypeType::get(ElemTy);
-      Type fnTy;
-      if (auto gp = ED->getGenericParamsOfContext())
-        fnTy = PolymorphicFunctionType::get(argTy, ElemTy, gp);
-      else
-        fnTy = FunctionType::get(argTy, ElemTy);
-      EED->setType(fnTy);
-      
-      // Test for type parameters, as opposed to a generic decl context, in
-      // case the enclosing enum type was illegally declared inside of a generic
-      // context. (In that case, we'll post a diagnostic while visiting the
-      // parent enum.)
-      if (EED->getParentEnum()->getGenericParams())
-        computeEnumElementInterfaceType(EED);
-      return;
-    }
+    // Set the type of the enum element.
+    EED->computeType();
 
-    Type fnTy = FunctionType::get(EED->getArgumentType(), ElemTy);
-    if (auto gp = ED->getGenericParamsOfContext())
-      fnTy = PolymorphicFunctionType::get(MetatypeType::get(ElemTy),
-                                          fnTy, gp);
-    else
-      fnTy = FunctionType::get(MetatypeType::get(ElemTy), fnTy);
-    EED->setType(fnTy);
-
-    if (EED->getParentEnum()->getGenericParams())
+    // Test for type parameters, as opposed to a generic decl context, in
+    // case the enclosing enum type was illegally declared inside of a generic
+    // context. (In that case, we'll post a diagnostic while visiting the
+    // parent enum.)
+    if (ED->getGenericParams())
       computeEnumElementInterfaceType(EED);
 
     // Require the carried type to be materializable.
-    if (!EED->getArgumentType()->isMaterializable()) {
+    if (EED->getArgumentType() &&
+        !EED->getArgumentType()->isMaterializable()) {
       TC.diagnose(EED->getLoc(), diag::enum_element_not_materializable);
       EED->overwriteType(ErrorType::get(TC.Context));
       EED->setInvalid();
