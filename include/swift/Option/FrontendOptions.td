@@ -187,10 +187,6 @@ def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,
   HelpText<"Disable checking for potentially unavailable APIs">;
 
-def enable_availability_checking_in_implicit_functions : Flag<["-"],
-  "enable-availability-checking-in-implicit-functions">,
-  HelpText<"Enable checking availability in implicit functions">;
-
 def enable_character_literals : Flag<["-"], "enable-character-literals">,
   HelpText<"Enable legacy character literals">;
 
