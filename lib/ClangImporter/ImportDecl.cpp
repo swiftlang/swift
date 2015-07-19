@@ -1166,6 +1166,7 @@ namespace {
                                       TypeLoc::withoutLoc(SwiftType),
                                       DC);
 
+              aliasWithoutRef->computeType();
               SwiftType = aliasWithoutRef->getDeclaredType();
               NameMapping = MappedTypeNameKind::DefineOnly;
 
@@ -1228,6 +1229,7 @@ namespace {
                                       Loc,
                                       TypeLoc::withoutLoc(SwiftType),
                                       DC);
+      Result->computeType();
       return Result;
     }
 

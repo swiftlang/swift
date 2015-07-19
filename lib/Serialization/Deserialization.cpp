@@ -2062,6 +2062,8 @@ Decl *ModuleFile::getDecl(DeclID DID, Optional<DeclContext *> ForcedContext) {
                                            SourceLoc(), underlyingType, DC);
     declOrOffset = alias;
 
+    alias->computeType();
+
     if (auto accessLevel = getActualAccessibility(rawAccessLevel)) {
       alias->setAccessibility(*accessLevel);
     } else {

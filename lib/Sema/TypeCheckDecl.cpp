@@ -3244,6 +3244,9 @@ public:
     TC.checkDeclAttributesEarly(TAD);
     TC.computeAccessibility(TAD);
     if (!IsSecondPass) {
+      if (!TAD->hasType())
+        TAD->computeType();
+
       TypeResolutionOptions options;
       if (!TAD->getDeclContext()->isTypeContext())
         options |= TR_GlobalTypeAlias;
@@ -3263,9 +3266,8 @@ public:
 
       // We create TypeAliasTypes with invalid underlying types, so we
       // need to propagate recursive properties now.
-      if (TAD->hasUnderlyingType())
-        TAD->getAliasType()->setRecursiveProperties(
-                         TAD->getUnderlyingType()->getRecursiveProperties());
+      TAD->getAliasType()->setRecursiveProperties(
+                       TAD->getUnderlyingType()->getRecursiveProperties());
 
       if (!isa<ProtocolDecl>(TAD->getDeclContext()))
         TC.checkInheritanceClause(TAD);
@@ -5807,6 +5809,11 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
   case DeclKind::TypeAlias: {
     // Type aliases may not have an underlying type yet.
     auto typeAlias = cast<TypeAliasDecl>(D);
+
+    // Compute the declared type.
+    if (!typeAlias->hasType())
+      typeAlias->computeType();
+
     if (typeAlias->getUnderlyingTypeLoc().getTypeRepr() &&
         !typeAlias->getUnderlyingTypeLoc().wasValidated())
       typeCheckDecl(typeAlias, true);

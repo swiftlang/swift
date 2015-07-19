@@ -2438,6 +2438,10 @@ public:
     return UnderlyingTy.getType();
   }
 
+  /// computeType - Compute the type (and declared type) of this type alias;
+  /// can only be called after the alias type has been resolved.
+  void computeType();
+
   /// \brief Determine whether this type alias has an underlying type.
   bool hasUnderlyingType() const { return !UnderlyingTy.getType().isNull(); }
 

@@ -1787,6 +1787,7 @@ void ConformanceChecker::recordTypeWitness(AssociatedTypeDecl *assocType,
                                                     TypeLoc::withoutLoc(type),
                                                     DC);
     Type metaType = MetatypeType::get(type);
+    aliasDecl->computeType();
     aliasDecl->setImplicit();
     if (type->is<ErrorType>())
       aliasDecl->setInvalid();

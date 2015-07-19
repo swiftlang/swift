@@ -1768,9 +1768,9 @@ SourceLoc ValueDecl::getAttributeInsertionLoc(bool forModifier) const {
 
 Type TypeDecl::getDeclaredType() const {
   if (auto TAD = dyn_cast<TypeAliasDecl>(this)) {
-    if (isa<ErrorType>(TAD->getType()->getCanonicalType())) {
+    if (TAD->hasType() && TAD->getType()->is<ErrorType>())
       return TAD->getType();
-    }
+
     return TAD->getAliasType();
   }
   if (auto typeParam = dyn_cast<AbstractTypeParamDecl>(this)) {
@@ -2043,7 +2043,11 @@ TypeAliasDecl::TypeAliasDecl(SourceLoc TypeAliasLoc, Identifier Name,
   // Set the type of the TypeAlias to the right MetatypeType.
   ASTContext &Ctx = getASTContext();
   AliasTy = new (Ctx, AllocationArena::Permanent) NameAliasType(this);
-  setType(MetatypeType::get(AliasTy, Ctx));
+}
+
+void TypeAliasDecl::computeType() {
+  ASTContext &ctx = getASTContext();
+  setType(MetatypeType::get(AliasTy, ctx));
 }
 
 SourceRange TypeAliasDecl::getSourceRange() const {
