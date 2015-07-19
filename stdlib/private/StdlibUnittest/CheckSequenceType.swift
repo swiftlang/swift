@@ -387,6 +387,22 @@ public let suffixTests = [
   ),
 ]
 
+/// This test performs a side effect on each element of `sequence`. The expected
+/// side effect for the purposes of testing is to append each element to an
+/// external array, which can be compared to `sequence`.
+internal struct ForEachTest {
+  let sequence: [Int]
+  let loc: SourceLoc
+
+  init(
+    _ sequence: [Int],
+    file: String = __FILE__, line: UWord = __LINE__
+  ) {
+    self.sequence = sequence
+    self.loc = SourceLoc(file, line, comment: "test data")
+  }
+}
+
 extension TestSuite {
   public func addSequenceTests<
     Sequence : SequenceType,
@@ -636,6 +652,32 @@ self.test("\(testNamePrefix).split/semantics") {
       }
     },
     stackTrace: SourceLocStack().with(test.loc)) { $0 == $1 }
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// forEach()
+//===----------------------------------------------------------------------===//
+
+self.test("\(testNamePrefix).forEach/semantics") {
+  let tests: [ForEachTest] = [
+    ForEachTest([]),
+    ForEachTest([1010]),
+    ForEachTest([1010, 2020, 3030, 4040, 5050]),
+  ]
+
+  for test in tests {
+    var elements: [Int] = []
+    let closureLifetimeTracker = LifetimeTracked(0)
+    let s = makeWrappedSequence(test.sequence.map(OpaqueValue.init))
+    s.forEach {
+      (element) in
+      _blackHole(closureLifetimeTracker)
+      elements.append(extractValue(element).value)
+    }
+    expectEqualSequence(
+      test.sequence, elements,
+      stackTrace: SourceLocStack().with(test.loc))
   }
 }
 
