@@ -129,6 +129,8 @@ public:
     DumpAST, ///< Parse, type-check, and dump AST
     PrintAST, ///< Parse, type-check, and pretty-print AST
 
+    DumpTRC, ///< Parse, type-check, and dump type refinement context hierarchy
+
     EmitSILGen, ///< Emit raw SIL
     EmitSIL, ///< Emit canonical SIL
 

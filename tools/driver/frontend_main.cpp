@@ -24,6 +24,7 @@
 #include "swift/AST/Mangle.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ReferencedNameTracker.h"
+#include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/Fallthrough.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/SourceManager.h"
@@ -665,7 +666,8 @@ static bool performCompile(CompilerInstance &Instance,
   // so dump or print the main source file and return.
   if (Action == FrontendOptions::DumpParse ||
       Action == FrontendOptions::DumpAST ||
-      Action == FrontendOptions::PrintAST) {
+      Action == FrontendOptions::PrintAST ||
+      Action == FrontendOptions::DumpTRC) {
     SourceFile *SF = PrimarySourceFile;
     if (!SF) {
       SourceFileKind Kind = Invocation.getSourceFileKind();
@@ -673,6 +675,8 @@ static bool performCompile(CompilerInstance &Instance,
     }
     if (Action == FrontendOptions::PrintAST)
       SF->print(llvm::outs(), PrintOptions::printEverything());
+    else if (Action == FrontendOptions::DumpTRC)
+      SF->getTypeRefinementContext()->dump(llvm::errs(), Context.SourceMgr);
     else
       SF->dump();
     return false;

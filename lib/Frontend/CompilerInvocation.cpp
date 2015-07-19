@@ -166,6 +166,8 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       Action = FrontendOptions::DumpParse;
     } else if (Opt.matches(OPT_dump_ast)) {
       Action = FrontendOptions::DumpAST;
+    } else if (Opt.matches(OPT_dump_trc)) {
+      Action = FrontendOptions::DumpTRC;
     } else if (Opt.matches(OPT_print_ast)) {
       Action = FrontendOptions::PrintAST;
     } else if (Opt.matches(OPT_repl) ||
@@ -336,6 +338,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::DumpParse:
     case FrontendOptions::DumpAST:
     case FrontendOptions::PrintAST:
+    case FrontendOptions::DumpTRC:
       // Textual modes.
       Opts.setSingleOutputFilename("-");
       break;
@@ -523,6 +526,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::DumpParse:
     case FrontendOptions::DumpAST:
     case FrontendOptions::PrintAST:
+    case FrontendOptions::DumpTRC:
     case FrontendOptions::Immediate:
     case FrontendOptions::REPL:
       Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_dependencies);
@@ -547,6 +551,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::DumpParse:
     case FrontendOptions::DumpAST:
     case FrontendOptions::PrintAST:
+    case FrontendOptions::DumpTRC:
     case FrontendOptions::Immediate:
     case FrontendOptions::REPL:
       Diags.diagnose(SourceLoc(), diag::error_mode_cannot_emit_header);
@@ -573,6 +578,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::DumpParse:
     case FrontendOptions::DumpAST:
     case FrontendOptions::PrintAST:
+    case FrontendOptions::DumpTRC:
     case FrontendOptions::EmitSILGen:
     case FrontendOptions::Immediate:
     case FrontendOptions::REPL:

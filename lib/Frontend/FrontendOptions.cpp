@@ -23,6 +23,7 @@ bool FrontendOptions::actionHasOutput() const {
   case DumpParse:
   case DumpAST:
   case PrintAST:
+  case DumpTRC:
     return false;
   case EmitSILGen:
   case EmitSIL:
@@ -49,6 +50,7 @@ bool FrontendOptions::actionIsImmediate() const {
   case DumpParse:
   case DumpAST:
   case PrintAST:
+  case DumpTRC:
   case EmitSILGen:
   case EmitSIL:
   case EmitSIBGen:
