@@ -97,6 +97,10 @@ func functionWithStmtCondition() {
   }  
 }
 
+// CHECK-NEXT: {{^}}  (decl versions=[10.10,+Inf) decl=functionWithWhile()
+// CHECK-NEXT: {{^}}    (condition_following_availability versions=[10.11,+Inf)
+// CHECK-NEXT: {{^}}    (while_body versions=[10.11,+Inf)
+// CHECK-NEXT: {{^}}      (decl versions=[10.13,+Inf) decl=funcInWhileBody()
 @available(OSX 10.10, *)
 func functionWithWhile() {
   while #available(OSX 10.11, *),

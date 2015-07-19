@@ -78,10 +78,63 @@ public:
     WhileStmtBody
   };
 
-  using IntroNode =
-    llvm::PointerUnion4<SourceFile *, Decl *, Stmt *, PoundAvailableInfo *>;
-
 private:
+
+  /// Represents the AST node that introduced a refinement context.
+  class IntroNode {
+    Reason IntroReason;
+    union {
+      SourceFile *SF;
+      Decl *D;
+      IfStmt *IS;
+      PoundAvailableInfo *PAI;
+      GuardStmt *GS;
+      WhileStmt *WS;
+    };
+
+  public:
+    IntroNode(SourceFile *SF) : IntroReason(Reason::Root), SF(SF) {}
+    IntroNode(Decl *D) : IntroReason(Reason::Decl), D(D) {}
+    IntroNode(IfStmt *IS) : IntroReason(Reason::IfStmtThenBranch), IS(IS) {}
+    IntroNode(PoundAvailableInfo *PAI)
+        : IntroReason(Reason::ConditionFollowingAvailabilityQuery), PAI(PAI) {}
+    IntroNode(GuardStmt *GS)
+        : IntroReason(Reason::GuardStmtFallthrough), GS(GS) {}
+    IntroNode(WhileStmt *WS) : IntroReason(Reason::WhileStmtBody), WS(WS) {}
+
+    Reason getReason() const { return IntroReason; }
+
+    SourceFile *getAsSourceFile() const {
+      assert(IntroReason == Reason::Root);
+      return SF;
+    }
+
+    Decl *getAsDecl() const {
+      assert(IntroReason == Reason::Decl);
+      return D;
+    }
+
+    IfStmt *getAsIfStmt() const {
+      assert(IntroReason == Reason::IfStmtThenBranch);
+      return IS;
+    }
+
+    PoundAvailableInfo *getAsPoundAvailableInfo() const {
+      assert(IntroReason == Reason::ConditionFollowingAvailabilityQuery);
+      return PAI;
+    }
+
+    GuardStmt *getAsGuardStmt() const {
+      assert(IntroReason == Reason::GuardStmtFallthrough);
+      return GS;
+    }
+
+    WhileStmt *getAsWhileStmt() const {
+      assert(IntroReason == Reason::WhileStmtBody);
+      return WS;
+    }
+  };
+
   /// The AST node that introduced this context.
   IntroNode Node;
 

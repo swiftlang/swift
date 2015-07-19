@@ -144,19 +144,19 @@ void TypeRefinementContext::dump(raw_ostream &OS, SourceManager &SrcMgr) const {
 SourceLoc TypeRefinementContext::getIntroductionLoc() const {
   switch (getReason()) {
   case Reason::Decl:
-    return Node.get<Decl *>()->getLoc();
+    return Node.getAsDecl()->getLoc();
 
   case Reason::IfStmtThenBranch:
-    return cast<IfStmt>(Node.get<Stmt *>())->getIfLoc();
+    return Node.getAsIfStmt()->getIfLoc();
 
   case Reason::ConditionFollowingAvailabilityQuery:
-    return Node.get<PoundAvailableInfo*>()->getStartLoc();
+    return Node.getAsPoundAvailableInfo()->getStartLoc();
 
   case Reason::GuardStmtFallthrough:
-    return cast<GuardStmt>(Node.get<Stmt *>())->getGuardLoc();
+    return Node.getAsGuardStmt()->getGuardLoc();
 
   case Reason::WhileStmtBody:
-    return cast<WhileStmt>(Node.get<Stmt *>())->getStartLoc();
+    return Node.getAsWhileStmt()->getStartLoc();
 
   case Reason::Root:
     return SourceLoc();
@@ -171,7 +171,7 @@ void TypeRefinementContext::print(raw_ostream &OS, SourceManager &SrcMgr,
   OS << " versions=" << PotentialVersions.getAsString();
 
   if (getReason() == Reason::Decl) {
-    Decl *D = getIntroductionNode().get<Decl *>();
+    Decl *D = Node.getAsDecl();
     OS << " decl=";
     if (auto VD = dyn_cast<ValueDecl>(D)) {
       OS << VD->getFullName();
@@ -195,29 +195,7 @@ void TypeRefinementContext::print(raw_ostream &OS, SourceManager &SrcMgr,
 }
 
 TypeRefinementContext::Reason TypeRefinementContext::getReason() const {
-  if (Node.is<Decl *>()) {
-    return Reason::Decl;
-  } else if (Node.is<PoundAvailableInfo*>()) {
-    return Reason::ConditionFollowingAvailabilityQuery;
-  } else if (Node.is<Stmt *>()) {
-    Stmt *S = Node.get<Stmt *>();
-    if (isa<IfStmt>(S)) {
-      // We will need an additional bit to discriminate when we add
-      // refinement contexts for Else branches.
-      return Reason::IfStmtThenBranch;
-    }
-
-    if (isa<GuardStmt>(S)) {
-      return Reason::GuardStmtFallthrough;
-    }
-
-    if (isa<WhileStmt>(S)) {
-      return Reason::WhileStmtBody;
-    }
-  } else if (Node.is<SourceFile *>()) {
-    return Reason::Root;
-  }
-  llvm_unreachable("Unhandled introduction node");
+  return Node.getReason();
 }
 
 StringRef TypeRefinementContext::getReasonName(Reason R) {
