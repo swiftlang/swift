@@ -49,3 +49,12 @@ func testStringIsNotASequence(s: String) {
   acceptsSequence(s) // expected-error {{cannot invoke 'acceptsSequence' with an argument list of type '(String)'}} expected-note {{expected an argument list of type '(S)'}}
 }
 
+func testStringDeprecation(hello: String) {
+  let hello2 = hello
+    .stringByAddingPercentEscapesUsingEncoding(NSUTF8StringEncoding) // expected-warning{{'stringByAddingPercentEscapesUsingEncoding' is deprecated}}
+
+  _ = hello2?
+    .stringByReplacingPercentEscapesUsingEncoding(NSUTF8StringEncoding) // expected-warning{{'stringByReplacingPercentEscapesUsingEncoding' is deprecated}}
+
+
+}
