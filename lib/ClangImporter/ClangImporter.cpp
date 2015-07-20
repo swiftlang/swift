@@ -192,22 +192,16 @@ void ClangImporter::clearTypeResolver() {
 #define SHIMS_INCLUDE_FLAG "-I"
 #endif
 
-std::unique_ptr<ClangImporter>
-ClangImporter::create(ASTContext &ctx,
-                      const ClangImporterOptions &importerOpts,
-                      DependencyTracker *tracker) {
-
+static void
+getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
+                             ASTContext &ctx,
+                             const ClangImporterOptions &importerOpts) {
   const llvm::Triple &triple = ctx.LangOpts.Target;
-
-  std::unique_ptr<ClangImporter> importer{
-    new ClangImporter(ctx, importerOpts, tracker)
-  };
-
   SearchPathOptions &searchPathOpts = ctx.SearchPathOpts;
 
   // Construct the invocation arguments for the current target.
   // Add target-independent options first.
-  std::vector<std::string> invocationArgStrs = {
+  invocationArgStrs.insert(invocationArgStrs.end(), {
     // Enable modules.
     "-fmodules",
 
@@ -215,17 +209,16 @@ ClangImporter::create(ASTContext &ctx,
     "-fsyntax-only",
 
     "-femit-all-decls",
-    "-target", triple.str(),
     SHIMS_INCLUDE_FLAG, searchPathOpts.RuntimeResourcePath,
     "-fretain-comments-from-system-headers",
     "-fmodules-validate-system-headers",
     "-Werror=non-modular-include-in-framework-module",
     "-Xclang", "-fmodule-feature", "-Xclang", "swift",
-  };
+  });
 
   // Set C language options.
   if (triple.isOSDarwin()) {
-    std::vector<std::string> extraArgs = {
+    invocationArgStrs.insert(invocationArgStrs.end(), {
       // Darwin uses Objective-C ARC.
       "-x", "objective-c", "-std=gnu11", "-fobjc-arc", "-fblocks",
 
@@ -254,22 +247,16 @@ ClangImporter::create(ASTContext &ctx,
 
       // Request new APIs from CoreImage.
       "-DSWIFT_SDK_OVERLAY_COREIMAGE_EPOCH=1",
-    };
-    invocationArgStrs.insert(invocationArgStrs.end(), extraArgs.begin(),
-                             extraArgs.end());
+    });
   } else {
-    std::vector<std::string> extraArgs = {
+    invocationArgStrs.insert(invocationArgStrs.end(), {
       // Non-Darwin platforms don't use the Objective-C runtime, so they can
       // not import Objective-C modules.
       //
       // Just use the most feature-rich C language mode.
       "-x", "c", "-std=gnu11",
-    };
-    invocationArgStrs.insert(invocationArgStrs.end(), extraArgs.begin(),
-                             extraArgs.end());
+    });
   }
-
-  invocationArgStrs.push_back(Implementation::moduleImportBufferName);
 
   if (triple.isOSDarwin()) {
     std::string minVersionBuf;
@@ -309,22 +296,6 @@ ClangImporter::create(ASTContext &ctx,
     invocationArgStrs.push_back(std::move(minVersionOpt.str()));
   }
 
-  if (ctx.LangOpts.EnableAppExtensionRestrictions) {
-    invocationArgStrs.push_back("-fapplication-extension");
-  }
-
-  if (!importerOpts.TargetCPU.empty()) {
-    invocationArgStrs.push_back("-mcpu=" + importerOpts.TargetCPU);
-
-  } else if (triple.isOSDarwin()) {
-    // Special case: arm64 defaults to the "cyclone" CPU for Darwin,
-    // but Clang only detects this if we use -arch.
-    if (triple.getArch() == llvm::Triple::aarch64 ||
-        triple.getArch() == llvm::Triple::aarch64_be) {
-      invocationArgStrs.push_back("-mcpu=cyclone");
-    }
-  }
-
   if (searchPathOpts.SDKPath.empty()) {
     invocationArgStrs.push_back("-Xclang");
     invocationArgStrs.push_back("-nostdsysteminc");
@@ -356,6 +327,51 @@ ClangImporter::create(ASTContext &ctx,
     invocationArgStrs.push_back("-fmodules-cache-path=");
     invocationArgStrs.back().append(moduleCachePath);
   }
+}
+
+static void
+getEmbedBitcodeInvocationArguments(std::vector<std::string> &invocationArgStrs,
+                                   ASTContext &ctx,
+                                   const ClangImporterOptions &importerOpts) {
+  invocationArgStrs.insert(invocationArgStrs.end(), {
+    // Backend mode.
+    "-fembed-bitcode",
+
+    // ...but Clang isn't doing the emission.
+    "-fsyntax-only",
+
+    "-x", "ir",
+  });
+}
+
+static void
+addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
+                             ASTContext &ctx,
+                             const ClangImporterOptions &importerOpts) {
+  using ImporterImpl = ClangImporter::Implementation;
+  const llvm::Triple &triple = ctx.LangOpts.Target;
+  SearchPathOptions &searchPathOpts = ctx.SearchPathOpts;
+
+  invocationArgStrs.push_back("-target");
+  invocationArgStrs.push_back(triple.str());
+
+  invocationArgStrs.push_back(ImporterImpl::moduleImportBufferName);
+
+  if (ctx.LangOpts.EnableAppExtensionRestrictions) {
+    invocationArgStrs.push_back("-fapplication-extension");
+  }
+
+  if (!importerOpts.TargetCPU.empty()) {
+    invocationArgStrs.push_back("-mcpu=" + importerOpts.TargetCPU);
+
+  } else if (triple.isOSDarwin()) {
+    // Special case: arm64 defaults to the "cyclone" CPU for Darwin,
+    // but Clang only detects this if we use -arch.
+    if (triple.getArch() == llvm::Triple::aarch64 ||
+        triple.getArch() == llvm::Triple::aarch64_be) {
+      invocationArgStrs.push_back("-mcpu=cyclone");
+    }
+  }
 
   const std::string &overrideResourceDir = importerOpts.OverrideResourceDir;
   if (overrideResourceDir.empty()) {
@@ -382,6 +398,28 @@ ClangImporter::create(ASTContext &ctx,
   for (auto extraArg : importerOpts.ExtraArgs) {
     invocationArgStrs.push_back(extraArg);
   }
+}
+
+std::unique_ptr<ClangImporter>
+ClangImporter::create(ASTContext &ctx,
+                      const ClangImporterOptions &importerOpts,
+                      DependencyTracker *tracker) {
+
+  std::unique_ptr<ClangImporter> importer{
+    new ClangImporter(ctx, importerOpts, tracker)
+  };
+
+  std::vector<std::string> invocationArgStrs;
+
+  switch (importerOpts.Mode) {
+  case ClangImporterOptions::Modes::Normal:
+    getNormalInvocationArguments(invocationArgStrs, ctx, importerOpts);
+    break;
+  case ClangImporterOptions::Modes::EmbedBitcode:
+    getEmbedBitcodeInvocationArguments(invocationArgStrs, ctx, importerOpts);
+    break;
+  }
+  addCommonInvocationArguments(invocationArgStrs, ctx, importerOpts);
 
   if (importerOpts.DumpClangDiagnostics) {
     llvm::errs() << "clang '";
@@ -474,6 +512,9 @@ ClangImporter::create(ASTContext &ctx,
   // FIXME: We shouldn't need to do this, the target should be immutable once
   // created. This complexity should be lifted elsewhere.
   instance.getTarget().adjust(instance.getLangOpts());
+
+  if (importerOpts.Mode == ClangImporterOptions::Modes::EmbedBitcode)
+    return importer;
 
   bool canBegin = action->BeginSourceFile(instance,
                                           instance.getFrontendOpts().Inputs[0]);

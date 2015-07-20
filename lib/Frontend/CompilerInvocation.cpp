@@ -769,6 +769,9 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
 
   Opts.DumpClangDiagnostics |= Args.hasArg(OPT_dump_clang_diagnostics);
 
+  if (Args.hasArg(OPT_embed_bitcode))
+    Opts.Mode = ClangImporterOptions::Modes::EmbedBitcode;
+
   return false;
 }
 

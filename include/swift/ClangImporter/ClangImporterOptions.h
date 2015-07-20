@@ -35,6 +35,18 @@ public:
   /// Equivalent to Clang's -mcpu=.
   std::string TargetCPU;
 
+  /// \see Mode
+  enum class Modes {
+    /// Set up Clang for importing modules into Swift and generating IR from
+    /// Swift code.
+    Normal,
+    /// Set up Clang for backend compilation only.
+    EmbedBitcode
+  };
+
+  /// Controls how Clang is initially set up.
+  Modes Mode = Modes::Normal;
+
   /// If true, matched getter-like and setter-like methods will be imported as
   /// properties.
   bool InferImplicitProperties = false;
