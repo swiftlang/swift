@@ -17,6 +17,7 @@
 #include "swift/Basic/Fallthrough.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/ADT/Statistic.h"
+#include "llvm/IR/Verifier.h"
 #include "llvm/Transforms/Utils/SSAUpdater.h"
 
 using namespace llvm;
@@ -81,14 +82,73 @@ public:
   bool run();
 
 private:
-  // Perform single basic block optimizations.
-  //
-  // This means changing retain_no_return into retains, finding return values,
-  // and merging retains, releases.
+  /// Perform single basic block optimizations.
+  ///
+  /// This means changing retain_no_return into retains, finding return values,
+  /// and merging retains, releases.
   void performSingleBBOpts();
+
+  /// Perform the RRN Optimization given the current state that we are
+  /// tracking. This is called at the end of BBs and if we run into an unknown
+  /// call.
+  void
+  performRRNOptimization(DenseMap<Value *, LocalState> &PtrToLocalStateMap);
 };
 
 } // end anonymous namespace
+
+void SwiftARCContractImpl::
+performRRNOptimization(DenseMap<Value *, LocalState> &PtrToLocalStateMap) {
+  // Go through all of our pointers and merge all of the retains with the
+  // first retain we saw and all of the releases with the last release we saw.
+  for (auto &P : PtrToLocalStateMap) {
+    Value *ArgVal = P.first;
+    auto &RetainList = P.second.RetainList;
+    if (RetainList.size() > 1) {
+      // Create the retainN call right by the first retain.
+      B.setInsertPoint(RetainList[0]);
+      auto &CI = *B.createRetainN(RetainList[0]->getArgOperand(0),
+                                  RetainList.size());
+
+      // Change the Local Entry to be the new retainN call.
+      P.second.CurrentLocalUpdate = &CI;
+
+      // Change GlobalEntry to track the new retainN instruction instead of
+      // the last retain that was seen.
+      TinyPtrVector<Instruction *> &GlobalEntry = DefsOfValue[ArgVal];
+      GlobalEntry.pop_back();
+      GlobalEntry.push_back(&CI);
+
+      // Replace all uses of the retain instructions with our new retainN and
+      // then delete them.
+      for (auto *Inst : RetainList) {
+        Inst->replaceAllUsesWith(&CI);
+        Inst->eraseFromParent();
+        NumRetainReleasesEliminatedByMergingIntoRetainReleaseN++;
+      }
+
+      NumRetainReleasesEliminatedByMergingIntoRetainReleaseN--;
+    }
+    RetainList.clear();
+
+    auto &ReleaseList = P.second.ReleaseList;
+    if (ReleaseList.size() > 1) {
+      // Create the releaseN call right by the last release.
+      auto *OldCI = ReleaseList[ReleaseList.size() - 1];
+      B.setInsertPoint(OldCI);
+      B.createReleaseN(OldCI->getArgOperand(0), ReleaseList.size());
+
+      // Remove all old release instructions.
+      for (auto *Inst : ReleaseList) {
+        Inst->eraseFromParent();
+        NumRetainReleasesEliminatedByMergingIntoRetainReleaseN++;
+      }
+
+      NumRetainReleasesEliminatedByMergingIntoRetainReleaseN--;
+    }
+    ReleaseList.clear();
+  }
+}
 
 void SwiftARCContractImpl::performSingleBBOpts() {
   // Do a first pass over the function, collecting all interesting definitions.
@@ -101,7 +161,8 @@ void SwiftARCContractImpl::performSingleBBOpts() {
       // Preincrement iterator to avoid iteration issues in the loop.
       Instruction &Inst = *II++;
 
-      switch (classifyInstruction(Inst)) {
+      auto Kind = classifyInstruction(Inst);
+      switch (Kind) {
       // Delete all fix lifetime instructions. After llvm-ir they have no use
       // and show up as calls in the final binary.
       case RT_FixLifetime:
@@ -180,59 +241,34 @@ void SwiftARCContractImpl::performSingleBBOpts() {
           }
         }
       }
+
+      if (Kind != RT_Unknown)
+        continue;
+      
+      // If we have an unknown call, we need to create any retainN calls we
+      // have seen. The reason why is that we do not want to move retains,
+      // releases over isUniquelyReferenced calls. Specifically imagine this:
+      //
+      // retain(x); unknown(x); release(x); isUniquelyReferenced(x); retain(x);
+      //
+      // In this case we would with this optimization merge the last retain
+      // with the first. This would then create an additional copy. The
+      // release side of this is:
+      //
+      // retain(x); unknown(x); release(x); isUniquelyReferenced(x); release(x);
+      //
+      // Again in such a case by merging the first release with the second
+      // release, we would be introducing an additional copy.
+      //
+      // Thus if we see an unknown call we merge together all retains and
+      // releases before. This could be made more aggressive through
+      // appropriate alias analysis and usage of LLVM's function attributes to
+      // determine that a function does not touch globals.
+      performRRNOptimization(PtrToLocalStateMap);
     }
 
-    // Now go through all of our pointers and merge all of the retains with the
-    // first retain we saw and all of the releases with the last release we saw.
-    for (auto &P : PtrToLocalStateMap) {
-      Value *ArgVal = P.first;
-      auto &RetainList = P.second.RetainList;
-      if (RetainList.size() > 1) {
-        // Create the retainN call right by the first retain.
-        B.setInsertPoint(RetainList[0]);
-        auto &CI = *B.createRetainN(ArgVal, RetainList.size());
-
-        // Change GlobalEntry to track the new retainN instruction instead of
-        // the last retain that was seen.
-        TinyPtrVector<Instruction *> &GlobalEntry = DefsOfValue[ArgVal];
-        GlobalEntry.pop_back();
-        GlobalEntry.push_back(&CI);
-
-        // Replace all uses of the retain instructions with our new retainN and
-        // then delete them.
-        for (auto *Inst : RetainList) {
-          Inst->replaceAllUsesWith(&CI);
-          Inst->eraseFromParent();
-          NumRetainReleasesEliminatedByMergingIntoRetainReleaseN++;
-        }
-
-        NumRetainReleasesEliminatedByMergingIntoRetainReleaseN--;
-      }
-      // We do not technically need to clear our retain list, but it is better
-      // not to keep dangling pointers in memory to be safe in light of future
-      // changes.
-      RetainList.clear();
-
-      auto &ReleaseList = P.second.ReleaseList;
-      if (ReleaseList.size() > 1) {
-        // Create the releaseN call right by the last release.
-        B.setInsertPoint(ReleaseList[ReleaseList.size() - 1]);
-        B.createReleaseN(ArgVal, ReleaseList.size());
-
-        // Remove all old release instructions.
-        for (auto *Inst : ReleaseList) {
-          Inst->eraseFromParent();
-          NumRetainReleasesEliminatedByMergingIntoRetainReleaseN++;
-        }
-
-        NumRetainReleasesEliminatedByMergingIntoRetainReleaseN--;
-      }
-      // We do not technically need to clear our release list, but it is better
-      // not to keep dangling pointers in memory to be safe in light of future
-      // changes.
-      ReleaseList.clear();
-    }
-
+    // Perform the RRNOptimization.
+    performRRNOptimization(PtrToLocalStateMap);
     PtrToLocalStateMap.clear();
   }
 }
