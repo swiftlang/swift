@@ -14,7 +14,7 @@ var SceneKitTests = TestSuite("SceneKit")
 if #available(iOS 8.0, OSX 10.10, *) {
   let scn_vec3_ref = SCNVector3Make(1, 2, 3)
   let scn_vec4_ref = SCNVector4Make(1, 2, 3, 4)
-  let scn_mat4_ref = SCNMatrix4Scale(SCNMatrix4Translate(SCNMatrix4MakeRotation(CGFloat(M_PI), 1, 0, 0), 1, 2, 3), 10, 20, 30)
+  let scn_mat4_ref = SCNMatrix4Scale(SCNMatrix4Translate(SCNMatrix4MakeRotation(SCNFloat(M_PI), 1, 0, 0), 1, 2, 3), 10, 20, 30)
 
   // MARK: Exposing SCNFloat
 
