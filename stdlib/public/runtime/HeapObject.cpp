@@ -288,6 +288,7 @@ static HeapObject *_swift_retain_(HeapObject *object) {
 auto swift::_swift_retain = _swift_retain_;
 
 HeapObject *swift::swift_retain_n(HeapObject *object, uint32_t n) {
+  SWIFT_RETAIN();
   return _swift_retain_n(object, n);
 }
 static HeapObject *_swift_retain_n_(HeapObject *object, uint32_t n) {
@@ -310,6 +311,7 @@ static void _swift_release_(HeapObject *object) {
 auto swift::_swift_release = _swift_release_;
 
 void swift::swift_release_n(HeapObject *object, uint32_t n) {
+  SWIFT_RELEASE();
   return _swift_release_n(object, n);
 }
 static void _swift_release_n_(HeapObject *object, uint32_t n) {
