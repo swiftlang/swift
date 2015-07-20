@@ -12,7 +12,7 @@
 
 #include <stdlib.h>
 
-#include "swift/FunctionNameDemangle/FunctionNameDemangle.h"
+#include "swift/SwiftDemangle/SwiftDemangle.h"
 #include "gtest/gtest.h"
 
 TEST(FunctionNameDemangleTests, CorrectlyDemangles) {

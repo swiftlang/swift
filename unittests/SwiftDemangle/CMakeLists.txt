@@ -1,9 +1,9 @@
-if(TARGET functionNameDemangle)
-  add_swift_unittest(FunctionNameDemangleTests
+if(TARGET swiftDemangle)
+  add_swift_unittest(SwiftDemangleTests
     DemangleTest.cpp
     )
 
-  target_link_libraries(FunctionNameDemangleTests
-    functionNameDemangle
+  target_link_libraries(SwiftDemangleTests
+    swiftDemangle
     )
 endif()
