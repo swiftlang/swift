@@ -2912,10 +2912,6 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
       if (isExistential &&
           isUnavailableInExistential(getTypeChecker(), constructor))
         continue;
-
-      SourceLoc anchorLoc = constraint.getLocator()->getAnchor()->getLoc();
-      auto unavailReason = TC.checkDeclarationAvailability(constructor,
-                                                           anchorLoc, DC);
       
       // If the invocation's argument expression has a favored constraint,
       // use that information to determine whether a specific overload for
