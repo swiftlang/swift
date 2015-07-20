@@ -639,11 +639,14 @@ self.test("\(testNamePrefix).suffix/semantics/negative") {
 // split()
 //===----------------------------------------------------------------------===//
 
-self.test("\(testNamePrefix).split/semantics") {
+self.test("\(testNamePrefix).split/closure/semantics") {
   for test in splitTests {
+    let closureLifetimeTracker = LifetimeTracked(0)
+    expectEqual(1, LifetimeTracked.instances)
     let s: Sequence = makeWrappedSequence(test.sequence.map(OpaqueValue.init))
     let result = s.split(test.maxSplit,
       allowEmptySlices: test.allowEmptySlices) {
+      _blackHole(closureLifetimeTracker)
       return extractValue($0).value == test.separator
     }
     expectEqualSequence(test.expected, result.map {
@@ -653,6 +656,36 @@ self.test("\(testNamePrefix).split/semantics") {
     },
     stackTrace: SourceLocStack().with(test.loc)) { $0 == $1 }
   }
+}
+
+self.test("\(testNamePrefix).split/separator/semantics") {
+  for test in splitTests {
+    let s = makeWrappedSequenceWithEquatableElement(
+      test.sequence.map(MinimalEquatableValue.init)
+    )
+    let separator = wrapValueIntoEquatable(MinimalEquatableValue(test.separator))
+    let result = s.split(
+      separator,
+      maxSplit: test.maxSplit,
+      allowEmptySlices: test.allowEmptySlices)
+    expectEqualSequence(
+      test.expected,
+      result.map {
+        $0.map {
+          extractValueFromEquatable($0).value
+        }
+      },
+      stackTrace: SourceLocStack().with(test.loc)) { $0 == $1 }
+  }
+}
+
+self.test("\(testNamePrefix).split/semantics/negativeMaxSplit") {
+  expectCrashLater()
+  let s = makeWrappedSequenceWithEquatableElement([MinimalEquatableValue(1)])
+  let separator = MinimalEquatableValue(1)
+  let result = s.split(
+    -1,
+    allowEmptySlices: true) { extractValueFromEquatable($0) == separator }
 }
 
 //===----------------------------------------------------------------------===//

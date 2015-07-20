@@ -435,7 +435,22 @@ extension CollectionType {
 }
 
 extension CollectionType where Generator.Element : Equatable {
-  public func _split(
+  /// Returns the maximal `SubSequence`s of `self`, in order, around a
+  /// `separator` element.
+  ///
+  /// - Parameter maxSplits: The maximum number of `SubSequence`s to
+  ///   return, minus 1.
+  ///   If `maxSplit + 1` `SubSequence`s are returned, the last one is
+  ///   a suffix of `self` containing the remaining elements.
+  ///   The default value is `Int.max`.
+  ///
+  /// - Parameter allowEmptySubsequences: If `true`, an empty `SubSequence`
+  ///   is produced in the result for each pair of consecutive elements
+  ///   satisfying `isSeparator`.
+  ///   The default value is `false`.
+  ///
+  /// - Requires: `maxSplit >= 0`
+  public func split(
     separator: Generator.Element,
     maxSplit: Int = Int.max,
     allowEmptySlices: Bool = false
