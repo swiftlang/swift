@@ -75,6 +75,18 @@ static bool isOpenedAnyObject(Type type) {
          protocols[0]->isSpecificProtocol(KnownProtocolKind::AnyObject);
 }
 
+/// \brief Return true if this solution isn't fully resolved.  This happens
+/// when type checking useing the FreeTypeVariableBinding::Allow family of
+/// flags.
+bool Solution::hasUnresolvedTypeVars() const {
+  for (auto type : typeBindings)
+    if (type.first->isEqual(type.second))
+      return true;
+
+  return false;
+}
+
+
 Type Solution::computeSubstitutions(
        Type origType, DeclContext *dc,
        Type openedType,
@@ -6512,7 +6524,7 @@ Expr *TypeChecker::callWitness(Expr *base, DeclContext *dc,
   SmallVector<Solution, 1> solutions;
   
   // If the system failed to produce a solution, post any available diagnostics.
-  if(cs.solve(solutions)) {
+  if (cs.solve(solutions) || solutions.size() != 1) {
     cs.salvage(solutions, base);
     return nullptr;
   }

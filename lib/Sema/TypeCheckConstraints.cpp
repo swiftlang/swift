@@ -974,7 +974,7 @@ bool TypeChecker::solveForExpression(
     Expr *&expr, DeclContext *dc, Type convertType, Type contextualType,
     FreeTypeVariableBinding allowFreeTypeVariables,
     ExprTypeCheckListener *listener, ConstraintSystem &cs,
-    SmallVectorImpl<Solution> &viable, bool suppressDiagnostics) {
+    SmallVectorImpl<Solution> &viable, TypeCheckExprOptions options) {
 
   // First, pre-check the expression, validating any types that occur in the
   // expression and folding sequence expressions.
@@ -1013,8 +1013,10 @@ bool TypeChecker::solveForExpression(
   }
 
   // Attempt to solve the constraint system.
-  if (cs.solve(viable, allowFreeTypeVariables)) {
-    if (suppressDiagnostics)
+  if (cs.solve(viable, allowFreeTypeVariables) ||
+      (viable.size() != 1 &&
+       !options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables))) {
+    if (options.contains(TypeCheckExprFlags::SuppressDiagnostics))
       return true;
 
     // Try to provide a decent diagnostic.
@@ -1027,20 +1029,28 @@ bool TypeChecker::solveForExpression(
     // The system was salvaged; continue on as if nothing happened.
   }
 
-  auto &solution = viable[0];
   if (getLangOpts().DebugConstraintSolver) {
     auto &log = Context.TypeCheckerDebug->getStream();
-    log << "---Solution---\n";
-    solution.dump(log);
+    if (viable.size() == 1) {
+      log << "---Solution---\n";
+      viable[0].dump(log);
+    } else {
+      for (unsigned i = 0, e = viable.size(); i != e; ++i) {
+        log << "--- Solution #" << i << " ---\n";
+        viable[i].dump(log);
+      }
+    }
   }
 
   // Notify the listener that we have a solution.
   if (listener) {
-    listener->solvedConstraints(solution);
+    assert(viable.size() == 1 && "Can only inform listener of one solution");
+    listener->solvedConstraints(viable[0]);
   }
 
   return false;
 }
+
 
 #pragma mark High-level entry points
 bool TypeChecker::typeCheckExpression(
@@ -1061,13 +1071,27 @@ bool TypeChecker::typeCheckExpression(
   bool suppressDiagnostics =
     options.contains(TypeCheckExprFlags::SuppressDiagnostics);
 
+  // If the client can handle unresolved type variables, leave them in the
+  // system.
+  auto allowFreeTypeVariables = FreeTypeVariableBinding::Disallow;
+  if (options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables))
+    allowFreeTypeVariables = FreeTypeVariableBinding::Allow;
+
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
   if (solveForExpression(expr, dc, convertType, contextualType,
-                         FreeTypeVariableBinding::Disallow, listener, cs,
-                         viable, suppressDiagnostics))
+                         allowFreeTypeVariables, listener, cs, viable, options))
     return true;
 
+  // If the client allows the solution to have unresolved type expressions,
+  // check for them now.  We cannot apply the solution with unresolved TypeVars,
+  // because they will leak out into arbitrary places in the resultant AST.
+  if (options.contains(TypeCheckExprFlags::AllowUnresolvedTypeVariables) &&
+      (viable.size() != 1 || viable[0].hasUnresolvedTypeVars())) {
+    expr->setType(ErrorType::get(Context));
+    return false;
+  }
+  
   // Apply the solution to the expression.
   auto &solution = viable[0];
   bool isDiscarded = options.contains(TypeCheckExprFlags::IsDiscarded);
@@ -1120,7 +1144,7 @@ Optional<Type> TypeChecker::getTypeOfExpressionWithoutApplying(
   SmallVector<Solution, 4> viable;
   if (solveForExpression(expr, dc, convertType, contextualType,
                          allowFreeTypeVariables, listener, cs, viable,
-                         /*suppressDiagnostics*/false))
+                         TypeCheckExprOptions()))
     return None;
 
   // Get the expression's simplified type.
@@ -1248,7 +1272,8 @@ bool TypeChecker::typeCheckExpressionShallow(Expr *&expr, DeclContext *dc,
 
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
-  if (cs.solve(viable) && cs.salvage(viable, expr)) {
+  if ((cs.solve(viable) || viable.size() != 1) &&
+      cs.salvage(viable, expr)) {
     return true;
   }
 
@@ -1951,7 +1976,8 @@ bool TypeChecker::convertToType(Expr *&expr, Type type, DeclContext *dc) {
 
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
-  if (cs.solve(viable) && cs.salvage(viable, expr)) {
+  if ((cs.solve(viable) || viable.size() != 1) &&
+      cs.salvage(viable, expr)) {
     return true;
   }
 

@@ -147,7 +147,14 @@ enum class TypeCheckExprFlags {
   DisableStructuralChecks = 0x02,
 
   /// Set if the client wants diagnostics suppressed.
-  SuppressDiagnostics = 0x04
+  SuppressDiagnostics = 0x04,
+
+  /// If set, the client wants a best-effort solution to the constraint system,
+  /// but can tolerate a solution where all of the constraints are solved, but
+  /// not all type variables have been determined.  In this case, the constraint
+  /// system is not applied to the expression AST, but the ConstraintSystem is
+  /// left in-tact.
+  AllowUnresolvedTypeVariables = 0x08
 };
   
 typedef OptionSet<TypeCheckExprFlags> TypeCheckExprOptions;
@@ -950,7 +957,7 @@ public:
                           ExprTypeCheckListener *listener,
                           constraints::ConstraintSystem &cs,
                           SmallVectorImpl<constraints::Solution> &viable,
-                          bool suppressDiagnostics);
+                          TypeCheckExprOptions options);
 
   /// \name Name lookup
   ///

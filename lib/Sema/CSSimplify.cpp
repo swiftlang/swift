@@ -37,7 +37,7 @@ bool MatchCallArgumentListener::relabelArguments(ArrayRef<Identifier> newNames){
 }
 
 /// Produce a score (smaller is better) comparing a parameter name and
-/// potentially-typod argument name.
+/// potentially-typo'd argument name.
 ///
 /// \param paramName The name of the parameter.
 /// \param argName The name of the argument.

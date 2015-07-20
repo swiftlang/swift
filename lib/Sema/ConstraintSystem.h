@@ -988,6 +988,11 @@ public:
   /// \brief Retrieve the fixed type for the given type variable.
   Type getFixedType(TypeVariableType *typeVar) const;
 
+  /// \brief Return true if this solution isn't fully resolved.  This happens
+  /// when type checking useing the FreeTypeVariableBinding::Allow family of
+  /// flags.
+  bool hasUnresolvedTypeVars() const;
+
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump() const LLVM_ATTRIBUTE_USED,
       "only for use within the debugger");
@@ -1416,11 +1421,11 @@ public:
   /// \brief Retrieve the AST context.
   ASTContext &getASTContext() const { return TC.Context; }
 
-private:
   /// \brief Determine whether this constraint system has any free type
   /// variables.
   bool hasFreeTypeVariables();
 
+private:
   /// \brief Finalize this constraint system; we're done attempting to solve
   /// it.
   ///
@@ -2286,7 +2291,9 @@ private:
   /// \param allowFreeTypeVariables How to bind free type variables in
   /// the solution.
   ///
-  /// \returns true if there is no single, complete solution to the system.
+  /// \returns true if an error occurred, false otherwise.  Note that multiple
+  /// ambiguous solutions for the same constraint system are considered to be
+  /// success by this API.
   bool solve(SmallVectorImpl<Solution> &solutions,
              FreeTypeVariableBinding allowFreeTypeVariables
                = FreeTypeVariableBinding::Disallow);

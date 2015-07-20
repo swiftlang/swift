@@ -1668,7 +1668,8 @@ public:
   /// This can return a new expression (for e.g. when a UnresolvedDeclRef gets
   /// resolved) and returns null when the subexpression fails to typecheck.
   ///
-  Expr *typeCheckChildIndependently(Expr *subExpr);
+  Expr *typeCheckChildIndependently(Expr *subExpr,
+                                    bool allowUnresolved = false);
 
   Type getTypeOfTypeCheckedChildIndependently(Expr *subExpr) {
     auto e = typeCheckChildIndependently(subExpr);
@@ -2085,6 +2086,83 @@ bool FailureDiagnosis::diagnoseGeneralFailure() {
          diagnoseGeneralConversionFailure();
 }
 
+namespace {
+  class ExprTypeSaver {
+    llvm::DenseMap<Expr*, Type> ExprTypes;
+    llvm::DenseMap<TypeLoc*, std::pair<Type, bool>> TypeLocTypes;
+    llvm::DenseMap<Pattern*, Type> PatternTypes;
+  public:
+
+    void save(Expr *E) {
+      struct TypeSaver : public ASTWalker {
+        ExprTypeSaver *TS;
+        TypeSaver(ExprTypeSaver *TS) : TS(TS) {}
+        
+        std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+          TS->ExprTypes[expr] = expr->getType();
+          return { true, expr };
+        }
+        
+        bool walkToTypeLocPre(TypeLoc &TL) override {
+          if (TL.getTypeRepr() && TL.getType())
+            TS->TypeLocTypes[&TL] = { TL.getType(), TL.wasValidated() };
+          return true;
+        }
+        
+        std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
+          if (P->hasType())
+            TS->PatternTypes[P] = P->getType();
+          return { true, P };
+        }
+        
+        // Don't walk into statements.  This handles the BraceStmt in
+        // non-single-expr closures, so we don't walk into their body.
+        std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+          return { false, S };
+        }
+      };
+      
+      E->walk(TypeSaver(this));
+    }
+    
+    void restore(Expr *E) {
+      struct TypeRestorer : public ASTWalker {
+        ExprTypeSaver *TS;
+        TypeRestorer(ExprTypeSaver *TS) : TS(TS) {}
+        
+        std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+          auto it = TS->ExprTypes.find(expr);
+          if (it != TS->ExprTypes.end())
+            expr->setType(it->second);
+          return { true, expr };
+        }
+        
+        bool walkToTypeLocPre(TypeLoc &TL) override {
+          auto it = TS->TypeLocTypes.find(&TL);
+          if (it != TS->TypeLocTypes.end())
+            TL.setType(it->second.first, it->second.second);
+          return true;
+        }
+        
+        std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
+          auto it = TS->PatternTypes.find(P);
+          if (it != TS->PatternTypes.end())
+            P->setType(it->second);
+          return { true, P };
+        }
+        
+        // Don't walk into statements.  This handles the BraceStmt in
+        // non-single-expr closures, so we don't walk into their body.
+        std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+          return { false, S };
+        }
+      };
+      
+      E->walk(TypeRestorer(this));
+    }
+  };
+}
+
 
 /// Unless we've already done this, retypecheck the specified subexpression on
 /// its own, without including any contextual constraints or parent expr
@@ -2093,7 +2171,8 @@ bool FailureDiagnosis::diagnoseGeneralFailure() {
 ///
 /// This can return a new expression (for e.g. when a UnresolvedDeclRef gets
 /// resolved) and returns null when the subexpression fails to typecheck.
-Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr) {
+Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr,
+                                                    bool allowUnresolved) {
   // Track if this sub-expression is currently being diagnosed.
   if (Expr *res = CS->TC.exprIsBeingDiagnosed(subExpr))
     return res;
@@ -2128,6 +2207,10 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr) {
       !typeIsNotSpecialized(subExpr->getType()))
     return subExpr;
   
+  
+  ExprTypeSaver SavedTypeData;
+  SavedTypeData.save(subExpr);
+  
   // Store off the sub-expression, in case a new one is provided via the
   // type check operation.
   Expr *preCheckedExpr = subExpr;
@@ -2143,6 +2226,10 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr) {
   // the context is missing).
   auto options = TypeCheckExprFlags::IsDiscarded|
                  TypeCheckExprFlags::DisableStructuralChecks;
+  
+  if (allowUnresolved)
+    options = options | TypeCheckExprFlags::AllowUnresolvedTypeVariables;
+
   bool hadError = CS->TC.typeCheckExpression(subExpr, CS->DC, Type(), Type(),
                                              options);
 
@@ -2159,6 +2246,13 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr) {
   if (hadError)
     return nullptr;
 
+  // If we type checked the result but failed to get a usable output from it,
+  // just pretend as though nothing happened.
+  if (subExpr->getType()->is<ErrorType>()) {
+    subExpr = preCheckedExpr;
+    SavedTypeData.restore(subExpr);
+  }
+  
   CS->TC.addExprForDiagnosis(preCheckedExpr, subExpr);
   return subExpr;
 }
@@ -2782,8 +2876,6 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
     return true; // already diagnosed.
   
   // FIXME: Should be calculating types of sub-exprs in a consistent way.
-  //auto fnExpr = typeCheckChildIndependently(callExpr->getFn(), true);
-  //if (!fnExpr) return true;
   auto fnExpr = callExpr->getFn();
   
   // An error was posted elsewhere.

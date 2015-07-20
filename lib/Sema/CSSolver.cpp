@@ -1147,7 +1147,9 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
 
   // Remove the solver state.
   this->solverState = nullptr;
-  return solutions.size() != 1;
+  
+  // We fail if there is no solution.
+  return solutions.empty();
 }
 
 bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
@@ -1162,7 +1164,7 @@ bool ConstraintSystem::solveRec(SmallVectorImpl<Solution> &solutions,
   // If there are no constraints remaining, we're done. Save this solution.
   if (InactiveConstraints.empty()) {
     // If this solution is worse than the best solution we've seen so far,
-    // skipt it.
+    // skip it.
     if (worseThanBestSolution())
       return true;
 
@@ -1545,10 +1547,8 @@ bool ConstraintSystem::solveSimplified(
       bool anyNonConformanceConstraints = false;
       for (auto &constraint : InactiveConstraints) {
         if (constraint.getKind() == ConstraintKind::ConformsTo ||
-            constraint.getKind() == ConstraintKind::SelfObjectOfProtocol)
-          continue;
-
-        if (constraint.getKind() == ConstraintKind::TypeMember)
+            constraint.getKind() == ConstraintKind::SelfObjectOfProtocol ||
+            constraint.getKind() == ConstraintKind::TypeMember)
           continue;
 
         anyNonConformanceConstraints = true;
