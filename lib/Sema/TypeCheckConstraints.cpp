@@ -1051,22 +1051,86 @@ bool TypeChecker::solveForExpression(
   return false;
 }
 
+namespace {
+  /// ExprCleanser - This class is used by typeCheckExpression to ensure that in
+  /// no situation will an expr node be left with a dangling type variable stuck
+  /// to it.  Often type checking will create new AST nodes and replace old ones
+  /// (e.g. by turning an UnresolvedDotExpr into a MemberRefExpr).  These nodes
+  /// might be left with pointers into the temporary constraint system through
+  /// their type variables, and we don't want pointers into the original AST to
+  /// dereference these now-dangling types.
+  class ExprCleanser {
+    llvm::SmallVector<Expr*,4> Exprs;
+    llvm::SmallVector<TypeLoc*, 4> TypeLocs;
+    llvm::SmallVector<Pattern*, 4> Patterns;
+  public:
+
+    ExprCleanser(Expr *E) {
+      struct ExprCleanserImpl : public ASTWalker {
+        ExprCleanser *TS;
+        ExprCleanserImpl(ExprCleanser *TS) : TS(TS) {}
+
+        std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+          TS->Exprs.push_back(expr);
+          return { true, expr };
+        }
+
+        bool walkToTypeLocPre(TypeLoc &TL) override {
+          TS->TypeLocs.push_back(&TL);
+          return true;
+        }
+
+        std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
+          TS->Patterns.push_back(P);
+          return { true, P };
+        }
+
+        // Don't walk into statements.  This handles the BraceStmt in
+        // non-single-expr closures, so we don't walk into their body.
+        std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+          return { false, S };
+        }
+      };
+
+      E->walk(ExprCleanserImpl(this));
+    }
+
+    ~ExprCleanser() {
+      // Check each of the expression nodes to verify that there are no type
+      // variables hanging out.  If so, just nuke the type.
+      for (auto E : Exprs) {
+        if (E->getType() && E->getType()->hasTypeVariable())
+          E->setType(Type());
+      }
+
+      for (auto TL : TypeLocs) {
+        if (TL->getTypeRepr() && TL->getType() &&
+            TL->getType()->hasTypeVariable())
+          TL->setType(Type(), false);
+      }
+
+      for (auto P : Patterns) {
+        if (P->hasType() && P->getType()->hasTypeVariable())
+          P->setType(Type());
+      }
+    }
+  };
+}
+
+
 
 #pragma mark High-level entry points
-bool TypeChecker::typeCheckExpression(
-       Expr *&expr, DeclContext *dc,
-       Type convertType,
-       Type contextualType,
-       TypeCheckExprOptions options,
-       ExprTypeCheckListener *listener) {
+bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
+                                      Type convertType,
+                                      Type contextualType,
+                                      TypeCheckExprOptions options,
+                                      ExprTypeCheckListener *listener) {
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
   // Construct a constraint system from this expression.
   ConstraintSystem cs(*this, dc, ConstraintSystemFlags::AllowFixes);
   CleanupIllFormedExpressionRAII cleanup(Context, expr);
-
-  Expr *origExpr = expr;
-  CleanupIllFormedExpressionRAII cleanup2(Context, origExpr);
+  ExprCleanser cleanup2(expr);
 
   bool suppressDiagnostics =
     options.contains(TypeCheckExprFlags::SuppressDiagnostics);
@@ -1124,9 +1188,6 @@ bool TypeChecker::typeCheckExpression(
 
   expr = result;
   cleanup.disable();
-  
-  if (origExpr == expr)
-    cleanup2.disable();
   return false;
 }
 
