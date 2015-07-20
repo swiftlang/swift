@@ -464,32 +464,67 @@ static bool isEnumReflectable(const Metadata *type) {
   if (Description.CaseNames == nullptr)
     return false;
 
+  // No metadata for multi-payload enums with non-trivial layout yet
+  if (Description.getNumPayloadCases() > 1 && !Enum->hasPayloadSize())
+    return false;
+
   return true;
 }
 
-static void getEnumMirrorInfo(const OpaqueValue *value,
+static void getEnumMirrorInfo(HeapObject *owner,
+                              const OpaqueValue *value,
                               const Metadata *type,
-                              unsigned *tagPtr,
                               const Metadata **payloadTypePtr,
-                              bool *indirectPtr) {
+                              bool *indirectPtr,
+                              int *tagPtr) {
   const auto Enum = static_cast<const EnumMetadata *>(type);
   const auto &Description = Enum->Description->Enum;
 
+  unsigned emptyCases = Description.getNumEmptyCases();
   unsigned payloadCases = Description.getNumPayloadCases();
 
-  unsigned tag = type->vw_getEnumTag(value);
-  auto payload = Description.GetCaseTypes(type)[tag];
-  const Metadata *payloadType = payload.getType();
-  bool indirect = payload.isIndirect();
-  if (static_cast<unsigned>(tag) >= payloadCases)
-    payloadType = nullptr;
+  const Metadata *payloadType;
+  int tag;
+  bool indirect;
 
-  if (tagPtr)
-    *tagPtr = tag;
-  if (payloadTypePtr)
-    *payloadTypePtr = payloadType;
-  if (indirectPtr)
-    *indirectPtr = indirect;
+  switch (Description.getNumPayloadCases()) {
+  case 0:
+    payloadType = nullptr;
+    indirect = false;
+    tag = swift_getEnumCaseSimple(value, emptyCases);
+    break;
+  case 1: {
+    auto payload = Description.GetCaseTypes(type)[0];
+    const Metadata *payloadLayout;
+    if (payload.isIndirect())
+      payloadLayout = &_TMdBo.base;
+    else
+      payloadLayout = payload.getType();
+    payloadType = payload.getType();
+    tag = swift_getEnumCaseSinglePayload(value, payloadLayout, emptyCases);
+    if (tag != -1) {
+      payloadType = nullptr;
+      indirect = false;
+    } else {
+      indirect = payload.isIndirect();
+    }
+    tag++;
+    break;
+  }
+  default: {
+    tag = swift_getEnumCaseMultiPayload(value, Enum);
+    auto payload = Description.GetCaseTypes(type)[tag];
+    payloadType = payload.getType();
+    indirect = payload.isIndirect();
+    if (static_cast<unsigned>(tag) >= payloadCases)
+      payloadType = nullptr;
+    break;
+  }
+  }
+
+  *payloadTypePtr = payloadType;
+  *tagPtr = tag;
+  *indirectPtr = indirect;
 }
 
 extern "C"
@@ -502,8 +537,11 @@ const char *swift_EnumMirror_caseName(HeapObject *owner,
   const auto Enum = static_cast<const EnumMetadata *>(type);
   const auto &Description = Enum->Description->Enum;
 
-  unsigned tag;
-  getEnumMirrorInfo(value, type, &tag, nullptr, nullptr);
+  const Metadata *payloadType;
+  bool indirect;
+  int tag;
+
+  getEnumMirrorInfo(owner, value, type, &payloadType, &indirect, &tag);
   return getFieldName(Description.CaseNames, tag);
 }
 
@@ -515,7 +553,11 @@ intptr_t swift_EnumMirror_count(HeapObject *owner,
     return 0;
 
   const Metadata *payloadType;
-  getEnumMirrorInfo(value, type, nullptr, &payloadType, nullptr);
+  bool indirect;
+  int tag;
+
+  getEnumMirrorInfo(owner, value, type, &payloadType, &indirect, &tag);
+
   return (payloadType != nullptr) ? 1 : 0;
 }
 
@@ -529,22 +571,16 @@ StringMirrorTuple swift_EnumMirror_subscript(intptr_t i,
   const auto Enum = static_cast<const EnumMetadata *>(type);
   const auto &Description = Enum->Description->Enum;
 
-  unsigned tag;
   const Metadata *payloadType;
   bool indirect;
+  int tag;
 
-  getEnumMirrorInfo(value, type, &tag, &payloadType, &indirect);
-
-  // Copy the payload since the projection is destructive.
-  BoxPair pair = swift_allocBox(type);
-
-  owner = pair.heapObject;
-  type->vw_initializeWithTake(pair.value, const_cast<OpaqueValue *>(value));
-  value = type->vw_destructiveProjectEnumData(pair.value);
+  getEnumMirrorInfo(owner, value, type, &payloadType, &indirect, &tag);
 
   // If the payload is indirect, we need to jump through the box to get it.
   if (indirect) {
     owner = *reinterpret_cast<HeapObject * const *>(value);
+
     value = swift_projectBox(const_cast<HeapObject *>(owner));
   }
 
