@@ -667,7 +667,7 @@ static bool performCompile(CompilerInstance &Instance,
   if (Action == FrontendOptions::DumpParse ||
       Action == FrontendOptions::DumpAST ||
       Action == FrontendOptions::PrintAST ||
-      Action == FrontendOptions::DumpTRC) {
+      Action == FrontendOptions::DumpTypeRefinementContexts) {
     SourceFile *SF = PrimarySourceFile;
     if (!SF) {
       SourceFileKind Kind = Invocation.getSourceFileKind();
@@ -675,7 +675,7 @@ static bool performCompile(CompilerInstance &Instance,
     }
     if (Action == FrontendOptions::PrintAST)
       SF->print(llvm::outs(), PrintOptions::printEverything());
-    else if (Action == FrontendOptions::DumpTRC)
+    else if (Action == FrontendOptions::DumpTypeRefinementContexts)
       SF->getTypeRefinementContext()->dump(llvm::errs(), Context.SourceMgr);
     else
       SF->dump();
