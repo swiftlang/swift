@@ -247,6 +247,7 @@ struct PrintOptions {
     PO.PrintFunctionRepresentationAttrs = false;
     PO.PrintDocumentationComments = false;
     PO.ExcludeAttrList.push_back(DAK_Available);
+    PO.SkipPrivateStdlibDecls = true;
     return PO;
   }
 };
