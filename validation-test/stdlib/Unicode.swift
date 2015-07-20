@@ -2296,7 +2296,7 @@ StringCookedViews.test("UTF8ForNonContiguousUTF16Extra") {
     // CFStringCreateWithBytes() usually allocates zero-terminated ASCII
     // or UTF-16, in which case one of the fast paths will succeed.
     // This test operates only when CF creates a tagged pointer string object.
-    if (object_getClassName(cfstring) == "NSTaggedPointerString") {
+    if strcmp(object_getClassName(cfstring), "NSTaggedPointerString") == 0 {
       assert(
         CFStringGetCStringPtr(
           cfstring, CFStringBuiltInEncodings.ASCII.rawValue) == nil)
