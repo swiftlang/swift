@@ -1804,6 +1804,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
                                    ConversionRestrictionKind::BridgeToNSError);
     }
     
+    // Pointer arguments to non-operator calls can be converted from
+    // pointer-compatible types.
     // Pointer arguments can be converted from pointer-compatible types.
     if (kind >= TypeMatchKind::ArgumentConversion) {
       if (auto bgt2 = type2->getAs<BoundGenericType>()) {
@@ -1834,7 +1836,10 @@ ConstraintSystem::matchTypes(Type type1, Type type2, TypeMatchKind kind,
                                      ConversionRestrictionKind::InoutToPointer);
           }
           
-          if (!(flags & TMF_ApplyingOperatorParameter)) {
+          if (!(flags & TMF_ApplyingOperatorParameter) &&
+              // Operators cannot use these implicit conversions.
+              (kind == TypeMatchKind::ArgumentConversion ||
+               kind == TypeMatchKind::ArgumentTupleConversion)) {
             auto bgt1 = type1->getAs<BoundGenericType>();
 
             // We can potentially convert from an UnsafeMutablePointer

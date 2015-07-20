@@ -129,9 +129,9 @@ func rdar16786220(var let c: Int) -> () { // expected-error {{parameter may not 
 // <rdar://problem/17763388> ambiguous operator emits same candidate multiple times
 infix operator !!! {}
 
-func !!!<T>(lhs: Array<T>, rhs: Array<T>) -> Bool { return false }  // expected-note {{found this candidate}}
-func !!!<T>(lhs: UnsafePointer<T>, rhs: UnsafePointer<T>) -> Bool { return false } // expected-note {{found this candidate}}
-[1] !!! [1]  // expected-error {{ambiguous use of operator '!!!'}}
+func !!!<T>(lhs: Array<T>, rhs: Array<T>) -> Bool { return false }
+func !!!<T>(lhs: UnsafePointer<T>, rhs: UnsafePointer<T>) -> Bool { return false }
+[1] !!! [1]   // unambiguously picking the array overload.
 
 
 // <rdar://problem/16786168> Functions currently permit 'var inout' parameters
