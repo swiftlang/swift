@@ -195,7 +195,6 @@ struct PrintOptions {
     result.PrintImplicitAttrs = false;
     result.ExcludeAttrList.push_back(DAK_Exported);
     result.ExcludeAttrList.push_back(DAK_Inline);
-    result.PrintFunctionRepresentationAttrs = false;
     result.PrintOverrideKeyword = false;
     result.AccessibilityFilter = Accessibility::Public;
     return result;
@@ -212,6 +211,7 @@ struct PrintOptions {
     result.PrintDocumentationComments = false;
     result.PrintRegularClangComments = false;
     result.PrintAccessibility = false;
+    result.PrintFunctionRepresentationAttrs = false;
     return result;
   }
 
