@@ -122,6 +122,13 @@ static void _buildNominalTypeName(const NominalTypeDescriptor *ntd,
 
 static const char *_getProtocolName(const ProtocolDescriptor *protocol) {
   const char *name = protocol->Name;
+
+  // An Objective-C protocol's name is unmangled.
+#if SWIFT_OBJC_INTEROP
+  if (!protocol->Flags.isSwift())
+    return name;
+#endif
+
   // Protocol names are emitted with the _Tt prefix so that ObjC can
   // recognize them as mangled Swift names.
   assert(name[0] == '_' && name[1] == 'T' && name[2] == 't');
