@@ -25,5 +25,4 @@ func inoutVariadic(inout i: Int...) {  // expected-error {{inout arguments canno
 // rdar://19722429
 func invalidVariadic(e: NonExistentType) { // expected-error {{use of undeclared type 'NonExistentType'}}
   { (e: ExtraCrispy...) in }() // expected-error {{use of undeclared type 'ExtraCrispy'}}
-  // expected-error@-1 {{unable to infer closure type in the current context}}
 }

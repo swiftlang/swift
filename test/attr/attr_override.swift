@@ -172,12 +172,12 @@ protocol P {
 override func f() { } // expected-error{{'override' can only be specified on class members}}
 
 // Invalid 'override' on declarations inside closures.
-var rdar16654075a = { // expected-error {{unable to infer closure type in the current context}}
-  override func foo() {}
+var rdar16654075a = {
+  override func foo() {}  // expected-error{{'override' can only be specified on class members}}
 }
-var rdar16654075b = { // expected-error {{unable to infer closure type in the current context}}
+var rdar16654075b = {
   class A {
-    override func foo() {}
+    override func foo() {}  // expected-error{{method does not override any method from its superclass}}
   }
 }
 var rdar16654075c = { () -> () in

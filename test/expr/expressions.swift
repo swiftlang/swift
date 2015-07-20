@@ -62,8 +62,7 @@ func basictest() {
   var tuple6 = (1 2)  // expected-error {{expected ',' separator}} {{18-18=,}}
 
   // Brace expressions.
-  // FIXME: Defaulting to () -> () for function expressions?
-  var brace3 = { // expected-error{{unable to infer closure type in the current context}}
+  var brace3 = {
     var brace2 = 42  // variable shadowing.
     brace2+7
   }

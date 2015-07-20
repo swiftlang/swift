@@ -241,12 +241,12 @@ func r18800223(i : Int) {
 
   
   var buttonTextColor: String?
-  _ = (buttonTextColor != nil) ? 42 : {}; // expected-error {{result values in '? :' expression have mismatching types 'Int' and '() -> _'}}
+  _ = (buttonTextColor != nil) ? 42 : {$0}; // expected-error {{result values in '? :' expression have mismatching types 'Int' and '(_) -> _'}}
 }
 
 // <rdar://problem/21883806> Bogus "'_' can only appear in a pattern or on the left side of an assignment" is back
 // FIXME: This diagnostic is really bad.
-_ = { }  // expected-error {{cannot assign a value of type '() -> _' to a value of type '@lvalue _'}}
+_ = { $0 }  // expected-error {{cannot assign a value of type '(_) -> _' to a value of type '@lvalue _'}}
 
 
 

@@ -784,13 +784,18 @@ static bool diagnoseFailure(ConstraintSystem &cs,
     // If this is conversion failure due to a return statement with an argument
     // that cannot be coerced to the result type of the function, emit a
     // specific error.
-    if (expr->isReturnExpr()) {
-      if (failure.getSecondType()->isVoid()) {
+    if (expr->isReturnExpr() &&
+        expr->getValueProvidingExpr() == anchor) {
+      auto actualType = cs.simplifyType(expr->getType())->getRValueType();
+      auto expectedType =
+        AnyFunctionRef::fromFunctionDeclContext(cs.DC).getBodyResultType();
+
+      if (expectedType->isVoid()) {
         tc.diagnose(loc, diag::cannot_return_value_from_void_func)
           .highlight(range1).highlight(range2);
       } else {
         tc.diagnose(loc, diag::cannot_convert_to_return_type,
-                    failure.getFirstType(), failure.getSecondType())
+                    actualType, expectedType)
           .highlight(range1).highlight(range2);
       }
       

@@ -86,7 +86,7 @@ func illformed() throws {
       try genError()
 
     // TODO: this recovery is terrible
-    } catch MSV.CarriesInt(let i) where i == genError()) { // expected-error {{call can throw, but errors cannot be thrown out of a catch guard expression}} expected-error {{expected '{'}} expected-error {{braced block of statements is an unused closure}} expected-error {{type of expression is ambiguous without more context}}
+    } catch MSV.CarriesInt(let i) where i == genError()) { // expected-error {{call can throw, but errors cannot be thrown out of a catch guard expression}} expected-error {{expected '{'}} expected-error {{braced block of statements is an unused closure}} expected-error {{expression resolves to an unused function}}
     }
 }
 

@@ -33,7 +33,7 @@ func passClosure() {
   
   takeClosure {
     $0 = 42     // expected-error{{cannot assign to value: '$0' is a 'let' constant}}
-    42
+    return 42
   }
   
   takeClosure { (a : Int) -> Int in // expected-note {{mark parameter with 'var' to make it mutable}}

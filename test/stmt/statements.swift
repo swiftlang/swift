@@ -139,7 +139,7 @@ func for_loop() {
   for j = 0, k = 52; j < k; ++j, --k { }
   // rdar://19540536
   // expected-error@+4{{expected var declaration in a 'for' statement}}
-  // expected-error@+3{{type of expression is ambiguous without more context}}
+  // expected-error@+3{{expression resolves to an unused function}}
   // expected-error@+2{{expected an attribute name}}
   // expected-error@+1{{braced block of statements is an unused closure}}
   for @ {}
@@ -403,7 +403,7 @@ func test_is_as_patterns() {
 // <rdar://problem/21387308> Fuzzing SourceKit: crash in Parser::parseStmtForEach(...)
 func matching_pattern_recursion() {
   switch 42 {
-  case {  // expected-error {{function produces expected type 'Range<Int>'; did you mean to call it with '()'?}}
+  case {  // expected-error {{binary operator '~=' cannot be applied to operands of type '() -> ()' and 'Int'}}
       for i in zs {
       }
   }: break

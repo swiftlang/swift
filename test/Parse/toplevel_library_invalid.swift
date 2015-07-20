@@ -4,7 +4,7 @@ let x = 42
 x + x; // expected-error {{expressions are not allowed at the top level}}
 x + x; // expected-error {{expressions are not allowed at the top level}}
 // Make sure we don't crash on closures at the top level
-({ }) // expected-error {{expressions are not allowed at the top level}} expected-error{{type of expression is ambiguous without more context}}
+({ }) // expected-error {{expressions are not allowed at the top level}} expected-error{{expression resolves to an unused function}}
 ({ 5 }()) // expected-error {{expressions are not allowed at the top level}}
 
 // FIXME: Too many errors for this.

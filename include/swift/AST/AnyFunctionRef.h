@@ -41,6 +41,16 @@ public:
     assert(ACE && "should have a closure");
   }
 
+  /// Construct an AnyFunctionRef from a decl context that's known to
+  /// be some sort of function.
+  static AnyFunctionRef fromFunctionDeclContext(DeclContext *dc) {
+    if (auto fn = dyn_cast<AbstractFunctionDecl>(dc)) {
+      return fn;
+    } else {
+      return cast<AbstractClosureExpr>(dc);
+    }
+  }
+
   CaptureInfo &getCaptureInfo() const {
     if (auto *AFD = TheFunction.dyn_cast<AbstractFunctionDecl *>())
       return AFD->getCaptureInfo();

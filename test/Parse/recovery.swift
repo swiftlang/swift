@@ -89,14 +89,14 @@ func missingControllingExprInIf() {
 
   // It is debatable if we should do recovery here and parse { true } as the
   // body, but the error message should be sensible.
-  if { true } { // expected-error {{missing condition in an 'if' statement}} expected-error {{braced block of statements is an unused closure}} expected-error{{type of expression is ambiguous without more context}} expected-error{{consecutive statements on a line must be separated by ';'}}
+  if { true } { // expected-error {{missing condition in an 'if' statement}} expected-error {{braced block of statements is an unused closure}} expected-error{{expression resolves to an unused function}} expected-error{{consecutive statements on a line must be separated by ';'}}
   }
 
   if { true }() { // expected-error {{missing condition in an 'if' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} expected-error{{unexpected trailing closure}}
   }
 
   // <rdar://problem/18940198>
-  if { { } } // expected-error{{missing condition in an 'if' statement}} expected-error{{braced block of statements is an unused closure}} expected-error {{type of expression is ambiguous without more context}}
+  if { { } } // expected-error{{missing condition in an 'if' statement}} expected-error{{braced block of statements is an unused closure}} expected-error {{expression resolves to an unused function}}
 }
 
 func missingControllingExprInWhile() {
@@ -111,14 +111,14 @@ func missingControllingExprInWhile() {
 
   // It is debatable if we should do recovery here and parse { true } as the
   // body, but the error message should be sensible.
-  while { true } { // expected-error {{missing condition in a 'while' statement}} expected-error {{braced block of statements is an unused closure}} expected-error{{type of expression is ambiguous without more context}} expected-error{{consecutive statements on a line must be separated by ';'}}
+  while { true } { // expected-error {{missing condition in a 'while' statement}} expected-error {{braced block of statements is an unused closure}} expected-error{{expression resolves to an unused function}} expected-error{{consecutive statements on a line must be separated by ';'}}
   }
 
   while { true }() { // expected-error {{missing condition in a 'while' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} expected-error{{unexpected trailing closure}}
   }
 
   // <rdar://problem/18940198>
-  while { { } } // expected-error{{missing condition in a 'while' statement}} expected-error{{braced block of statements is an unused closure}} expected-error {{type of expression is ambiguous without more context}}
+  while { { } } // expected-error{{missing condition in a 'while' statement}} expected-error{{braced block of statements is an unused closure}} expected-error {{expression resolves to an unused function}}
 }
 
 func missingControllingExprInRepeatWhile() {
@@ -175,7 +175,7 @@ func missingControllingExprInFor() {
   }
 
   // A trailing closure is not accepted for the condition.
-  for ; acceptsClosure { 42 }; { // expected-error{{does not conform to protocol 'BooleanType'}} expected-error{{type of expression is ambiguous without more context}}
+  for ; acceptsClosure { 42 }; { // expected-error{{does not conform to protocol 'BooleanType'}} expected-error{{expression resolves to an unused function}}
 // expected-error@-1{{expected ';' in 'for' statement}}
 // expected-error@-2{{braced block}}
   }

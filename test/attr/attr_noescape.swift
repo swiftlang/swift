@@ -90,6 +90,7 @@ class SomeClass {
       takesNoEscapeClosure { foo() }  // expected-error {{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}}
       doesEscape { foo(); return 0 }  // expected-error {{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}}
       takesNoEscapeClosure { foo(); return 0 }  // expected-error {{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}}
+      return 0
     }
     takesNoEscapeClosure {
       func inner() { foo() }
@@ -100,6 +101,7 @@ class SomeClass {
       takesNoEscapeClosure { foo() } // okay
       doesEscape { foo(); return 0 } // expected-error {{call to method 'foo' in closure requires explicit 'self.' to make capture semantics explicit}}
       takesNoEscapeClosure { foo(); return 0 } // okay
+      return 0
     }
 
     struct Outer {

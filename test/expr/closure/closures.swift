@@ -63,7 +63,7 @@ func funcdecl5(a: Int, _ y: Int) {
   // Pattern doesn't need to name arguments.
   func6(fn: { _,_ in 4 })
   
-  var fn = {} // FIXME: maybe? expected-error{{unable to infer closure type in the current context}}
+  var fn = {}
   var fn2 = { 4 }
   
   
@@ -104,7 +104,7 @@ assert(f0(1) == 1)
 
 
 var selfRef = { selfRef() } // expected-error {{variable used within its own initial value}}
-var nestedSelfRef = { // expected-error {{unable to infer closure type in the current context}}
+var nestedSelfRef = {
   var recursive = { nestedSelfRef() } // expected-error {{variable used within its own initial value}}
   recursive()
 }
@@ -223,13 +223,13 @@ var closureWithObservedProperty: () -> () = {
 
 ;
 
-{}() // expected-error{{statement cannot begin with a closure expression}} expected-note{{explicitly discard the result of the closure by assigning to '_'}} expected-error{{unable to infer closure type in the current context}}
+{}() // expected-error{{statement cannot begin with a closure expression}} expected-note{{explicitly discard the result of the closure by assigning to '_'}}
 
 
 
 // rdar://19179412 - Crash on valid code.
 func rdar19179412() -> Int -> Int {
-  return { x in
+  return { x in //expected-error {{cannot convert return expression of type '(_) -> ()' to expected return type 'Int -> Int'}}
     class A {
       let d : Int = 0
     }
