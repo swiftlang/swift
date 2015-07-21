@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend  %s -Onone -Xllvm -use-prespecialized -emit-sil | FileCheck %s
+// RUN: %target-swift-frontend  %s -Onone -Xllvm -emit-sil | FileCheck %s
 
 // REQUIRES: optimized_stdlib
 
