@@ -253,10 +253,12 @@ public struct ${Self}<Element>
   }
 #endif
 
-  /// Access the elements indicated by the given half-open `subRange`.
-  ///
-  /// - Complexity: O(1).
-  public subscript(subRange: Range<Int>) -> ArraySlice<Element> {
+  /// A type that can represent a sub-range of ${a_Self}.
+  public typealias SubSlice = ArraySlice<Element>
+
+  /// Access the elements indicated by the given half-open
+  /// `subRange`.  O(1).
+  public subscript(subRange: Range<Int>) -> SubSlice {
     get {
       _checkIndex(subRange.startIndex)
       _checkIndex(subRange.endIndex)
