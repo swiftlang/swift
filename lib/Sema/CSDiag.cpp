@@ -1376,14 +1376,6 @@ static bool typeIsNotSpecialized(Type type) {
   return type->hasTypeVariable();
 }
 
-/// Determine if the type is an error type, or its metatype.
-static bool isErrorTypeKind(Type t) {
-  if (auto mt = t->getAs<MetatypeType>())
-    t = mt->getInstanceType();
-  
-  return t->is<ErrorType>();
-}
-
 /// Conveniently unwrap a paren expression, if necessary.
 static Expr *unwrapParenExpr(Expr *e) {
   if (auto parenExpr = dyn_cast<ParenExpr>(e))
@@ -2930,11 +2922,6 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
   
   auto fnExpr = typeCheckChildIndependently(callExpr->getFn(), true);
   if (!fnExpr) return true;
-
-  // FIXME: An error was posted elsewhere.  Protocol verification isn't plumbed
-  // in correctly.
-  if (isErrorTypeKind(fnExpr->getType()))
-    return true;
 
   // If we resolved a concrete expression for the callee, and it has
   // non-function/non-metatype type, then we cannot call it!

@@ -64,7 +64,7 @@ meta2(A<B>.C<D>.self, 0)
 // TODO: parse empty <> list
 //A<>.c() // e/xpected-error{{xxx}}
 
-A<B, D>.c() // expected-error{{generic type 'A' specialized with too many type parameters (got 2, but expected 1)}} expected-error {{'<<error type>>.Type' does not have a member named 'c'}}
+A<B, D>.c() // expected-error{{generic type 'A' specialized with too many type parameters (got 2, but expected 1)}}
 
 A<B?>(x: 0) // parses as type // expected-warning{{unused}}
 a < b ? c : d

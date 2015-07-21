@@ -1152,7 +1152,7 @@ namespace {
       } else {
         type = E->getTypeLoc().getType();
       }
-      if (!type) return Type();
+      if (!type || type->is<ErrorType>()) return Type();
       
       auto locator = CS.getConstraintLocator(E);
       type = CS.openType(type, locator);
