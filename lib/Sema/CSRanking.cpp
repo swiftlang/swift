@@ -393,6 +393,18 @@ static bool isProtocolExtensionAsSpecializedAs(TypeChecker &tc,
   assert(dc1->isProtocolExtensionContext());
   assert(dc2->isProtocolExtensionContext());
 
+  // If one of the protocols being extended inherits the other, prefer the
+  // more specialized protocol.
+  auto proto1 = dc1->isProtocolExtensionContext();
+  auto proto2 = dc2->isProtocolExtensionContext();
+  if (proto1 != proto2) {
+    if (proto1->inheritsFrom(proto2))
+      return true;
+    if (proto2->inheritsFrom(proto1))
+      return false;
+  }
+
+
   // If the two generic signatures are identical, neither is as specialized
   // as the other.
   GenericSignature *sig1 = dc1->getGenericSignatureOfContext();

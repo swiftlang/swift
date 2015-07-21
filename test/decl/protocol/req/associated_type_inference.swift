@@ -181,8 +181,6 @@ public class CorePromise<T> : Thenable { // expected-error{{type 'CorePromise<T>
 // rdar://problem/21559670
 protocol P3 {
   typealias Assoc = Int
-  // expected-note@-1{{ambiguous inference of associated type 'Assoc': 'Int' vs. 'Float'}}
-  // expected-note@-2{{using associated type default 'Int'}}
   typealias Assoc2
   func foo(x: Assoc2) -> Assoc?
 }
@@ -191,7 +189,6 @@ protocol P4 : P3 { }
 
 extension P4 {
   func foo(x: Int) -> Float? { return 0 }
-  // expected-note@-1{{matching requirement 'foo' to this declaration inferred associated type to 'Float'}}
 }
 
 extension P3 where Assoc == Int {
@@ -199,7 +196,7 @@ extension P3 where Assoc == Int {
 }
 
 
-struct X4 : P4 { } // expected-error{{type 'X4' does not conform to protocol 'P3'}}
+struct X4 : P4 { }
 
 // rdar://problem/21738889
 protocol P5 {
@@ -305,4 +302,27 @@ func testZ10() -> Z10.A {
   var zA: Z10.A
   zA = P9A()
   return zA
+}
+
+// rdar://problem/21926788
+protocol P11 {
+  typealias A
+  typealias B
+  func foo() -> B
+}
+
+extension P11 where A == Int {
+  func foo() -> Int { return 0 }
+}
+
+protocol P12 : P11 {
+
+}
+
+extension P12 {
+  func foo() -> String { return "" }
+}
+
+struct X12 : P12 {
+  typealias A = String
 }

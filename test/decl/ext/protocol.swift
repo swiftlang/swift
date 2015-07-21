@@ -735,11 +735,11 @@ protocol PConstrained3 : PConstrained2 {
 }
 
 extension PConstrained2 where Self.AssocTypePC2 : PInherit1 {
-  final func pc2() -> Bool { return true } // expected-note{{found this candidate}}
+  final func pc2() -> Bool { return true }
 }
 
 extension PConstrained3 {
-  final func pc2() -> String { return "hello" } // expected-note{{found this candidate}}
+  final func pc2() -> String { return "hello" }
 }
 
 struct SConstrained3a : PConstrained3 {
@@ -755,7 +755,7 @@ func testSConstrained3(sc3a: SConstrained3a, sc3b: SConstrained3b) {
   s = "hello"
   _ = s
 
-  sc3b.pc2() // expected-error{{ambiguous use of 'pc2'}}
+  sc3b.pc2()
   s = sc3b.pc2()
   var _: Bool = sc3b.pc2()
 }
