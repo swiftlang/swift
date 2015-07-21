@@ -273,3 +273,36 @@ struct SomeStruct<Element> : MySequenceType {
     return MyAnyGenerator<Element>()
   }
 }
+
+// rdar://problem/21883828 - ranking of solutions
+protocol P8 {
+}
+
+protocol P9 : P8 {
+}
+
+protocol P10 {
+  typealias A
+
+  func foo() -> A
+}
+
+struct P8A { }
+struct P9A { }
+
+extension P8 {
+  func foo() -> P8A { return P8A() }
+}
+
+extension P9 {
+  func foo() -> P9A { return P9A() }
+}
+
+struct Z10 : P9, P10 {
+}
+
+func testZ10() -> Z10.A {
+  var zA: Z10.A
+  zA = P9A()
+  return zA
+}

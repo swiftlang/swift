@@ -3232,7 +3232,18 @@ void ConformanceChecker::resolveTypeWitnesses() {
           // type, we're okay.
           if (known->first->isEqual(typeWitness.second))
             continue;
-          
+
+          // If one has a type parameter remaining but the other does not,
+          // drop the one with the type parameter.
+          if (known->first->hasTypeParameter()
+              != typeWitness.second->hasTypeParameter()) {
+            if (typeWitness.second->hasTypeParameter())
+              continue;
+
+            known->first = typeWitness.second;
+            continue;
+          }
+
           if (!typeWitnessConflict ||
               numTypeWitnesses > numTypeWitnessesBeforeConflict) {
             typeWitnessConflict = {typeWitness.first,
@@ -3305,6 +3316,69 @@ void ConformanceChecker::resolveTypeWitnesses() {
                                 bestNumValueWitnessesInProtocolExtensions;
                      }),
       solutions.end());
+  }
+
+  // If we (still) have more than one solution, find the one with
+  // more-specialized witnesses.
+  if (solutions.size() > 1) {
+    // Local function to compare two solutions.
+    auto compareSolutions = [&](const InferredTypeWitnessesSolution &first,
+                                const InferredTypeWitnessesSolution &second) {
+      assert(first.ValueWitnesses.size() == second.ValueWitnesses.size());
+      bool firstBetter = false;
+      bool secondBetter = false;
+      for (unsigned i = 0, n = first.ValueWitnesses.size(); i != n; ++i) {
+        assert(first.ValueWitnesses[i].first == second.ValueWitnesses[i].first);
+        auto firstWitness = first.ValueWitnesses[i].second;
+        auto secondWitness = second.ValueWitnesses[i].second;
+        if (firstWitness == secondWitness)
+          continue;
+
+        switch (TC.compareDeclarations(DC, firstWitness, secondWitness)) {
+        case Comparison::Better:
+          if (secondBetter)
+            return false;
+
+          firstBetter = true;
+          break;
+
+        case Comparison::Worse:
+          if (firstBetter)
+            return false;
+
+          secondBetter = true;
+          break;
+
+        case Comparison::Unordered:
+          break;
+        }
+      }
+
+      return firstBetter;
+    };
+
+    // Find a solution that's at least as good as the solutions that follow it.
+    unsigned bestIdx = 0;
+    for (unsigned i = 1, n = solutions.size(); i != n; ++i) {
+      if (compareSolutions(solutions[i], solutions[bestIdx]))
+        bestIdx = i;
+    }
+
+    // Make sure that solution is better than any of the other solutions
+    bool ambiguous = false;
+    for (unsigned i = 1, n = solutions.size(); i != n; ++i) {
+      if (i != bestIdx && !compareSolutions(solutions[bestIdx], solutions[i])) {
+        ambiguous = true;
+        break;
+      }
+    }
+
+    // If we had a best solution, keep just that solution.
+    if (!ambiguous) {
+      if (bestIdx != 0)
+        solutions[0] = std::move(solutions[bestIdx]);
+      solutions.erase(solutions.begin() + 1, solutions.end());
+    }
   }
 
   // If we found a single solution, take it.
