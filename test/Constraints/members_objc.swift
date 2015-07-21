@@ -16,5 +16,5 @@ func archetype<T: P2>(p2 : T) {
 }
 
 func archetypeMeta<T: P2>(p2 : T) {
-  _ = T.bar // FIXME: not yet diagnosed
+  _ = T.bar // expected-error {{partial application of method in @objc protocol is not allowed}}
 }

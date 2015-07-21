@@ -2175,14 +2175,10 @@ namespace {
 
       // FIXME: Cannibalize the existing DeclRefExpr rather than allocating a
       // new one?
-      Expr *newRef = buildDeclRef(decl, expr->getLoc(), selected.openedFullType,
+      return buildDeclRef(decl, expr->getLoc(), selected.openedFullType,
                                   locator, expr->isSpecialized(),
                                   expr->isImplicit(),
                                   expr->getAccessSemantics());
-
-      recordUnsupportedPartialApply(expr, newRef);
-
-      return newRef;
     }
 
     Expr *visitSuperRefExpr(SuperRefExpr *expr) {
@@ -2296,15 +2292,6 @@ namespace {
         = new (cs.getASTContext()) DotSyntaxCallExpr(ctorRef,
                                                      expr->getDotLoc(),
                                                      expr->getSubExpr());
-      
-      // Partial applications of delegated initializers aren't allowed, and
-      // don't really make sense to begin with.
-      InvalidPartialApplications.insert({
-        call,
-        {1, arg->isSuperExpr() ? PartialApplication::SuperInit
-                               : PartialApplication::SelfInit}
-      });
-      
       return finishApply(call, expr->getType(),
                          ConstraintLocatorBuilder(
                            cs.getConstraintLocator(expr)));
@@ -2321,15 +2308,9 @@ namespace {
       auto choice = selected.choice;
       auto decl = choice.getDecl();
 
-      Expr *newRef = buildDeclRef(decl, expr->getLoc(), selected.openedFullType,
-                                  locator, expr->isSpecialized(),
-                                  expr->isImplicit(),
-                                  AccessSemantics::Ordinary);
-
-      if (auto newDeclRef = dyn_cast<DeclRefExpr>(newRef))
-        recordUnsupportedPartialApply(newDeclRef, newDeclRef);
-      
-      return newRef;
+      return buildDeclRef(decl, expr->getLoc(), selected.openedFullType,
+                          locator, expr->isSpecialized(), expr->isImplicit(),
+                          AccessSemantics::Ordinary);
     }
 
     Expr *visitOverloadedMemberRefExpr(OverloadedMemberRefExpr *expr) {
@@ -2446,26 +2427,6 @@ namespace {
     }
     
   private:
-    // Selector for the partial_application_of_function_invalid diagnostic
-    // message.
-    struct PartialApplication {
-      unsigned level : 29;
-      enum : unsigned {
-        Function,
-        MutatingMethod,
-        ObjCProtocolMethod,
-        SuperInit,
-        SelfInit,
-      };
-      unsigned kind : 3;
-    };
-
-    // Partial applications of functions with inout parameters is not permitted,
-    // so we track them to ensure they are fully applied. The map value is the
-    // number of remaining applications.
-    llvm::SmallDenseMap<Expr*, PartialApplication, 2>
-      InvalidPartialApplications;
-    
     /// A list of "suspicious" optional injections that come from
     /// forced downcasts.
     SmallVector<InjectIntoOptionalExpr *, 4> SuspiciousOptionalInjections;
@@ -2800,108 +2761,10 @@ namespace {
       llvm_unreachable("Already type-checked");
     }
 
-    /// If this is an application of a function that cannot be partially
-    /// applied, arrange for us to check that it gets fully applied.
-    void recordUnsupportedPartialApply(DeclRefExpr *expr, Expr *fnExpr) {
-      bool requiresFullApply = false;
-      unsigned kind;
-
-      auto fn = dyn_cast<FuncDecl>(expr->getDecl());
-      if (!fn)
-        return;
-
-      // @objc protocol methods cannot be partially applied.
-      if (auto proto = fn->getDeclContext()->isProtocolOrProtocolExtensionContext()) {
-        if (proto->isObjC()) {
-          requiresFullApply = true;
-          kind = PartialApplication::ObjCProtocolMethod;
-        }
-      }
-
-      if (requiresFullApply) {
-        // We need to apply all argument clauses.
-        InvalidPartialApplications.insert({
-          fnExpr, {fn->getNaturalArgumentCount(), kind}
-        });
-      }
-    }
-
-    /// If this is an application of a function that cannot be partially
-    /// applied, arrange for us to check that it gets fully applied.
-    void recordUnsupportedPartialApply(ApplyExpr *expr, Expr *fnExpr) {
-      bool requiresFullApply = false;
-      unsigned kind;
-
-      auto fnDeclRef = dyn_cast<DeclRefExpr>(fnExpr);
-      if (!fnDeclRef)
-        return;
-
-      recordUnsupportedPartialApply(fnDeclRef, fnExpr);
-
-      auto fn = dyn_cast<FuncDecl>(fnDeclRef->getDecl());
-      if (!fn)
-        return;
-
-      if (fn->isInstanceMember())
-        kind = PartialApplication::MutatingMethod;
-      else
-        kind = PartialApplication::Function;
-
-      // Functions with inout parameters cannot be partially applied.
-      auto argTy = expr->getArg()->getType();
-      if (auto tupleTy = argTy->getAs<TupleType>()) {
-        for (auto eltTy : tupleTy->getElementTypes()) {
-          if (eltTy->getAs<InOutType>()) {
-            requiresFullApply = true;
-            break;
-          }
-        }
-      } else if (argTy->getAs<InOutType>()) {
-        requiresFullApply = true;
-      }
-
-      if (requiresFullApply) {
-        // We need to apply all argument clauses.
-        InvalidPartialApplications.insert({
-          fnExpr, {fn->getNaturalArgumentCount(), kind}
-        });
-      }
-    }
-
-    /// See if this application advanced a partial value type application.
-    void advancePartialApplyExpr(ApplyExpr *expr, Expr *result) {
-      Expr *fnExpr = expr->getFn()->getSemanticsProvidingExpr();
-      if (auto forceExpr = dyn_cast<ForceValueExpr>(fnExpr))
-        fnExpr = forceExpr->getSubExpr()->getSemanticsProvidingExpr();
-      if (auto dotSyntaxExpr = dyn_cast<DotSyntaxBaseIgnoredExpr>(fnExpr))
-        fnExpr = dotSyntaxExpr->getRHS();
-
-      recordUnsupportedPartialApply(expr, fnExpr);
-
-      auto foundApplication = InvalidPartialApplications.find(fnExpr);
-      if (foundApplication == InvalidPartialApplications.end())
-        return;
-
-      unsigned level = foundApplication->second.level;
-      assert(level > 0);
-      InvalidPartialApplications.erase(foundApplication);
-      if (level > 1) {
-        // We have remaining argument clauses.
-        InvalidPartialApplications.insert({
-          result, {level - 1, foundApplication->second.kind}
-        });
-      }
-    }
-
     Expr *visitApplyExpr(ApplyExpr *expr) {
-      auto result = finishApply(expr, expr->getType(),
+      return finishApply(expr, expr->getType(),
                          ConstraintLocatorBuilder(
                            cs.getConstraintLocator(expr)));
-
-      // Record a partial value type application, if necessary.
-      advancePartialApplyExpr(expr, result);
-
-      return result;
     }
 
     Expr *visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *expr) {
@@ -3492,14 +3355,7 @@ namespace {
       assert(ExprStack.empty());
       assert(OpenedExistentials.empty());
 
-      // Check that all value type methods were fully applied.
       auto &tc = cs.getTypeChecker();
-      for (auto &unapplied : InvalidPartialApplications) {
-        unsigned kind = unapplied.second.kind;
-        tc.diagnose(unapplied.first->getLoc(),
-                    diag::partial_application_of_function_invalid,
-                    kind);
-      }
 
       // Look at all of the suspicious optional injections
       for (auto injection : SuspiciousOptionalInjections) {
@@ -5475,8 +5331,6 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     apply->setArg(arg);
     apply->setType(fnType->getResult());
     apply->setIsSuper(isSuper);
-
-    advancePartialApplyExpr(apply, apply);
 
     assert(!apply->getType()->is<PolymorphicFunctionType>() &&
            "Polymorphic function type slipped through");

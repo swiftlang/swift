@@ -109,6 +109,8 @@ static void diagUnreachableCode(TypeChecker &TC, const Stmt *S) {
 ///   - '_' may only exist on the LHS of an assignment expression.
 ///   - warn_unqualified_access values must not be accessed except via qualified
 ///     lookup.
+///   - Partial application of some decls isn't allowed due to implementation
+///     limitations.
 ///
 static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
                                          const DeclContext *DC) {
@@ -124,6 +126,149 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
     DiagnoseWalker(TypeChecker &TC, const DeclContext *DC) : TC(TC), DC(DC) {}
 
+    // Selector for the partial_application_of_function_invalid diagnostic
+    // message.
+    struct PartialApplication {
+      unsigned level : 29;
+      enum : unsigned {
+        Function,
+        MutatingMethod,
+        ObjCProtocolMethod,
+        SuperInit,
+        SelfInit,
+      };
+      unsigned kind : 3;
+    };
+
+    // Partial applications of functions that are not permitted.  This is
+    // tracked in post-order and unravelled as subsequent applications complete
+    // the call (or not).
+    llvm::SmallDenseMap<Expr*, PartialApplication,2> InvalidPartialApplications;
+
+    ~DiagnoseWalker() {
+      for (auto &unapplied : InvalidPartialApplications) {
+        unsigned kind = unapplied.second.kind;
+        TC.diagnose(unapplied.first->getLoc(),
+                    diag::partial_application_of_function_invalid,
+                    kind);
+      }
+    }
+
+    /// If this is an application of a function that cannot be partially
+    /// applied, arrange for us to check that it gets fully applied.
+    void recordUnsupportedPartialApply(DeclRefExpr *expr) {
+      bool requiresFullApply = false;
+      unsigned kind;
+
+      auto fn = dyn_cast<FuncDecl>(expr->getDecl());
+      if (!fn)
+        return;
+
+      // @objc protocol methods cannot be partially applied.
+      if (auto proto = fn->getDeclContext()->isProtocolOrProtocolExtensionContext()) {
+        if (proto->isObjC()) {
+          requiresFullApply = true;
+          kind = PartialApplication::ObjCProtocolMethod;
+        }
+      }
+
+      if (requiresFullApply) {
+        // We need to apply all argument clauses.
+        InvalidPartialApplications.insert({
+          expr, {fn->getNaturalArgumentCount(), kind}
+        });
+      }
+    }
+
+    /// If this is an application of a function that cannot be partially
+    /// applied, arrange for us to check that it gets fully applied.
+    void recordUnsupportedPartialApply(ApplyExpr *expr, Expr *fnExpr) {
+
+      if (isa<OtherConstructorDeclRefExpr>(fnExpr)) {
+        auto kind = expr->getArg()->isSuperExpr()
+                  ? PartialApplication::SuperInit
+                  : PartialApplication::SelfInit;
+
+        // Partial applications of delegated initializers aren't allowed, and
+        // don't really make sense to begin with.
+        InvalidPartialApplications.insert({ expr, {1, kind} });
+        return;
+      }
+
+      auto fnDeclRef = dyn_cast<DeclRefExpr>(fnExpr);
+      if (!fnDeclRef)
+        return;
+
+      recordUnsupportedPartialApply(fnDeclRef);
+
+      auto fn = dyn_cast<FuncDecl>(fnDeclRef->getDecl());
+      if (!fn)
+        return;
+
+      unsigned kind =
+        fn->isInstanceMember() ? PartialApplication::MutatingMethod
+                               : PartialApplication::Function;
+      bool requiresFullApply = false;
+
+      // Functions with inout parameters cannot be partially applied.
+      auto argTy = expr->getArg()->getType();
+      if (auto tupleTy = argTy->getAs<TupleType>()) {
+        for (auto eltTy : tupleTy->getElementTypes()) {
+          if (eltTy->getAs<InOutType>()) {
+            requiresFullApply = true;
+            break;
+          }
+        }
+      } else if (argTy->getAs<InOutType>()) {
+        requiresFullApply = true;
+      }
+
+      if (requiresFullApply) {
+        // We need to apply all argument clauses.
+        InvalidPartialApplications.insert({
+          fnExpr, {fn->getNaturalArgumentCount(), kind}
+        });
+      }
+    }
+
+    /// This method is called in post-order over the AST to validate that
+    /// methods are fully applied when they can't support partial application.
+    void checkInvalidPartialApplication(Expr *E) {
+      if (auto DRE = dyn_cast<DeclRefExpr>(E)) {
+        recordUnsupportedPartialApply(DRE);
+        return;
+      }
+
+      if (auto AE = dyn_cast<ApplyExpr>(E)) {
+        Expr *fnExpr = AE->getFn()->getSemanticsProvidingExpr();
+        if (auto forceExpr = dyn_cast<ForceValueExpr>(fnExpr))
+          fnExpr = forceExpr->getSubExpr()->getSemanticsProvidingExpr();
+        if (auto dotSyntaxExpr = dyn_cast<DotSyntaxBaseIgnoredExpr>(fnExpr))
+          fnExpr = dotSyntaxExpr->getRHS();
+
+        // Check to see if this is a potentially unsupported partial
+        // application.
+        recordUnsupportedPartialApply(AE, fnExpr);
+
+        // If this is adding a level to an active partial application, advance
+        // it to the next level.
+        auto foundApplication = InvalidPartialApplications.find(fnExpr);
+        if (foundApplication == InvalidPartialApplications.end())
+          return;
+
+        unsigned level = foundApplication->second.level;
+        auto kind = foundApplication->second.kind;
+        assert(level > 0);
+        InvalidPartialApplications.erase(foundApplication);
+        if (level > 1) {
+          // We have remaining argument clauses.
+          InvalidPartialApplications.insert({ AE, {level - 1, kind} });
+        }
+        return;
+      }
+
+    }
+
     // Not interested in going outside a basic expression.
     std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
       return { false, S };
@@ -134,7 +279,6 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
     bool walkToDeclPre(Decl *D) override { return false; }
     bool walkToTypeReprPre(TypeRepr *T) override { return true; }
 
-    
     std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
       // See through implicit conversions of the expression.  We want to be able
       // to associate the parent of this expression with the ultimate callee.
@@ -217,7 +361,12 @@ static void diagSyntacticUseRestrictions(TypeChecker &TC, const Expr *E,
 
       return { true, E };
     }
-    
+
+    Expr *walkToExprPost(Expr *E) override {
+      checkInvalidPartialApplication(E);
+      return E;
+    }
+
     /// Scout out the specified destination of an AssignExpr to recursively
     /// identify DiscardAssignmentExpr in legal places.  We can only allow them
     /// in simple pattern-like expressions, so we reject anything complex here.
