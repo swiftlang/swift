@@ -380,6 +380,9 @@ extension SequenceType {
   /// is equivalent to
   ///
   ///     Array(s.map(transform)._prext_flatten)
+  ///
+  /// - Complexity: O(*M* + *N*), where *M* is the length of `self`
+  ///   and *N* is the length of the result.
   public func flatMap<S : SequenceType>(
     transform: (${GElement}) -> S
   ) -> [S.${GElement}] {
@@ -392,8 +395,11 @@ extension SequenceType {
 }
 
 extension SequenceType {
-  /// Return an `Array` containing the non-nil results of mapping `transform`
-  /// over `self`.
+  /// Return an `Array` containing the non-nil results of mapping
+  /// `transform` over `self`.
+  ///
+  /// - Complexity: O(*M* + *N*), where *M* is the length of `self`
+  ///   and *N* is the length of the result.
   public func flatMap<T>(
     @noescape transform: (${GElement}) -> T?
   ) -> [T] {
