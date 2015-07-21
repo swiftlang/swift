@@ -372,8 +372,14 @@ extension CollectionType where Index : RandomAccessIndexType {
 //===----------------------------------------------------------------------===//
 
 extension SequenceType {
-  /// Return an `Array` containing concatenated results of mapping `transform`
-  /// over `self`.
+  /// Return an `Array` containing the concatenated results of mapping
+  /// `transform` over `self`.
+  ///
+  ///     s.flatMap(transform)
+  ///
+  /// is equivalent to
+  ///
+  ///     Array(s.map(transform)._prext_flatten)
   public func flatMap<S : SequenceType>(
     transform: (${GElement}) -> S
   ) -> [S.${GElement}] {
