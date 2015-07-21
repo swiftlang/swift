@@ -683,7 +683,7 @@ self.test("\(testNamePrefix).split/semantics/negativeMaxSplit") {
   expectCrashLater()
   let s = makeWrappedSequenceWithEquatableElement([MinimalEquatableValue(1)])
   let separator = MinimalEquatableValue(1)
-  let result = s.split(
+  _ = s.split(
     -1,
     allowEmptySlices: true) { extractValueFromEquatable($0) == separator }
 }
