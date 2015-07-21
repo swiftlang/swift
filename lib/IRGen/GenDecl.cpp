@@ -200,6 +200,8 @@ public:
     if (!requiresObjCPropertyDescriptor(IGM, prop)) return;
 
     // FIXME: register property metadata in addition to the methods.
+    // ObjC doesn't have a notion of class properties, so we'd only do this
+    // for instance properties.
 
     // Don't emit getters/setters for @NSManagedAttr properties.
     if (prop->getAttrs().hasAttribute<NSManagedAttr>())
@@ -212,7 +214,8 @@ public:
     // the runtime to unique the selector.
     llvm::Value *sel = Builder.CreateCall(IGM.getObjCSelRegisterNameFn(),
                                           name);
-    llvm::Value *getterArgs[] = {classMetadata, sel, imp, types};
+    auto theClass = prop->isStatic() ? metaclassMetadata : classMetadata;
+    llvm::Value *getterArgs[] = {theClass, sel, imp, types};
     Builder.CreateCall(class_replaceMethod, getterArgs);
 
     if (prop->isSettable(prop->getDeclContext())) {
@@ -220,13 +223,14 @@ public:
                                     name, types, imp);
       sel = Builder.CreateCall(IGM.getObjCSelRegisterNameFn(),
                                name);
-      llvm::Value *setterArgs[] = {classMetadata, sel, imp, types};
+      llvm::Value *setterArgs[] = {theClass, sel, imp, types};
       
       Builder.CreateCall(class_replaceMethod, setterArgs);
     }
   }
 
   void visitSubscriptDecl(SubscriptDecl *subscript) {
+    assert(!subscript->isStatic() && "objc doesn't support class subscripts");
     if (!requiresObjCSubscriptDescriptor(IGM, subscript)) return;
     
     llvm::Constant *name, *imp, *types;
