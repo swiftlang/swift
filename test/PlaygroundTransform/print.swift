@@ -5,29 +5,36 @@
 // RUN: %target-run %t/main | FileCheck %s
 // REQUIRES: executable_test
 
-var a = 2
-print(a) // with newline
-print(a, appendNewline: true) // with newline
-print(a, appendNewline: false) // no newline
+var str : String = ""
 
-var b = 3
-debugPrint(b+1) // with newline
-debugPrint(b+1, appendNewline: true) // with newline
-debugPrint(b+1, appendNewline: false) // no newline
+print("One")
+print("One", 2)
+print("One", &str)
+print("One", appendNewline:true)
+print("One", appendNewline:false)
+print("One", &str, appendNewline:true)
+print("One", &str, appendNewline:false)
 
-debugPrint(b+1, appendNewline: { false }())
+debugPrint("One")
+debugPrint("One", 2)
+debugPrint("One", &str)
+debugPrint("One", appendNewline:true)
+debugPrint("One", appendNewline:false)
+debugPrint("One", &str, appendNewline:true)
+debugPrint("One", &str, appendNewline:false)
 
-// CHECK: [{{.*}}] $builtin_log[a='2']
-// CHECK-NEXT: [{{.*}}] $builtin_print<appendNewline=true>['2']
-// CHECK-NEXT: [{{.*}}] $builtin_print<appendNewline=true>['2']
-// CHECK-NEXT: [{{.*}}] $builtin_print<appendNewline=false>['2']
-// CHECK-NEXT: [{{.*}}] $builtin_log[b='3']
-// CHECK-NEXT: [{{.*}}] $builtin_debugPrint<appendNewline=true>['4']
-// CHECK-NEXT: [{{.*}}] $builtin_debugPrint<appendNewline=true>['4']
-// CHECK-NEXT: [{{.*}}] $builtin_debugPrint<appendNewline=false>['4']
-// CHECK-NEXT: [{{.*}}] $builtin_log_scope_entry
-// CHECK-NEXT: [{{.*}}] $builtin_log[='false']
-// CHECK-NEXT: [{{.*}}] $builtin_log_scope_exit
-// CHECK-NEXT: [{{.*}}] $builtin_log_scope_exit
-// CHECK-NEXT: [{{.*}}] $builtin_debugPrint<appendNewline=false>['4']
+// CHECK: [{{.*}}] $builtin_print<>['One']
+// CHECK-NEXT: [{{.*}}] $builtin_print<>['("One", 2)']
+// CHECK-NEXT: [{{.*}}] $builtin_print<stream>['One']
+// CHECK-NEXT: [{{.*}}] $builtin_print<appendNewline=true>['One']
+// CHECK-NEXT: [{{.*}}] $builtin_print<appendNewline=false>['One']
+// CHECK-NEXT: [{{.*}}] $builtin_print<stream, appendNewline=true>['One']
+// CHECK-NEXT: [{{.*}}] $builtin_print<stream, appendNewline=false>['One']
+// CHECK-NEXT: [{{.*}}] $builtin_debugPrint<>['One']
+// CHECK-NEXT: [{{.*}}] $builtin_debugPrint<>['("One", 2)']
+// CHECK-NEXT: [{{.*}}] $builtin_debugPrint<stream>['One']
+// CHECK-NEXT: [{{.*}}] $builtin_debugPrint<appendNewline=true>['One']
+// CHECK-NEXT: [{{.*}}] $builtin_debugPrint<appendNewline=false>['One']
+// CHECK-NEXT: [{{.*}}] $builtin_debugPrint<stream, appendNewline=true>['One']
+// CHECK-NEXT: [{{.*}}] $builtin_debugPrint<stream, appendNewline=false>['One']
 
