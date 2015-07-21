@@ -29,7 +29,7 @@ func f4(x: Int) -> Int { }
 
 func f5<T : P2>(_ : T) { }
 
-func f10<T : P, U : P where T.SomeType == U.SomeType>(t: T, _ u: U) {}
+func f6<T : P, U : P where T.SomeType == U.SomeType>(t: T, _ u: U) {}
 
 var i : Int
 var d : Double
@@ -303,3 +303,50 @@ func r20789423() {
   }
 
 }
+
+
+
+func f7(a: Int)(b : Int) -> Int {
+  return a+b
+}
+
+f7(1)(b: 1)
+f7(1.0)(2)       // expected-error {{cannot invoke 'f7' with an argument list of type '(Double)'}}
+// expected-note @-1 {{expected an argument list of type '(Int)'}}
+
+f7(1)(1.0)       // expected-error {{cannot invoke value of type '(b: Int) -> Int' with argument list '(Double)'}}
+
+let f8 = f7(2)
+f8(b: 1)
+f8(10)          // expected-error {{missing argument label 'b:' in call}}
+f8(1.0)         // expected-error {{cannot invoke 'f8' with an argument list of type '(Double)'}}
+
+class CurriedClass {
+  func method1() {}
+  func method2(a: Int)(b : Int) {}
+}
+
+let c = CurriedClass()
+_ = c.method1
+c.method1(1)         // expected-error {{cannot invoke 'method1' with an argument list of type '(Int)'}}
+_ = c.method2(1)
+_ = c.method2(1.0)   // expected-error {{cannot invoke 'method2' with an argument list of type '(Double)'}}
+c.method2(1)(b: 2)
+c.method2(1)(c: 2)   // expected-error {{incorrect argument label in call (have 'c:', expected 'b:')}}
+c.method2(1)(c: 2.0) // expected-error {{cannot invoke value of type '(b: Int) -> ()' with argument list '(c: Double)'}}
+c.method2(1)(b: 2.0) // expected-error {{cannot invoke value of type '(b: Int) -> ()' with argument list '(b: Double)'}}
+c.method2(1.0)(b: 2) // expected-error {{cannot invoke 'method2' with an argument list of type '(Double)'}}
+c.method2(1.0)(b: 2.0) // expected-error {{cannot invoke 'method2' with an argument list of type '(Double)'}}
+
+CurriedClass.method1(c)()
+_ = CurriedClass.method1(c)
+CurriedClass.method1(c)(1)         // expected-error {{cannot invoke value of type '() -> ()' with argument list '(Int)'}}
+CurriedClass.method1(2.0)(1)       // expected-error {{cannot invoke 'method1' with an argument list of type '(Double)'}}
+CurriedClass.method2(c)(32)(b: 1)
+_ = CurriedClass.method2(c)
+_ = CurriedClass.method2(c)(32)
+CurriedClass.method2(c)(1.0)(b: 1) // expected-error {{cannot invoke value of type '(Int) -> (b: Int) -> ()' with argument list '(Double)'}}
+CurriedClass.method2(c)(1)(b: 1.0) // expected-error {{cannot invoke value of type '(b: Int) -> ()' with argument list '(b: Double)'}}
+CurriedClass.method2(c)(2)(c: 1.0) // expected-error {{cannot invoke value of type '(b: Int) -> ()' with argument list '(c: Double)'}}
+
+
