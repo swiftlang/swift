@@ -1644,10 +1644,13 @@ namespace {
     /// Analyze a function expr and break it into a candidate set.  On failure,
     /// this leaves the candidate list empty.
     CalleeCandidateInfo(Expr *Fn, Type actualArgsType, ConstraintSystem *CS);
-    
+
+    typedef const std::function<CandidateCloseness(ValueDecl*)>
+      &ClosenessPredicate;
+
     /// Analyze a locator for a SubscriptExpr for its candidate set.
     CalleeCandidateInfo(ConstraintLocator *locator, ConstraintSystem *CS,
-       const std::function<CandidateCloseness(ValueDecl*)> &closenessPredicate);
+                        ClosenessPredicate predicate);
     
     unsigned size() const { return candidates.size(); }
     ValueDecl *operator[](unsigned i) const {
@@ -1659,6 +1662,9 @@ namespace {
     /// overloads.
     void suggestPotentialOverloads(StringRef functionName, SourceLoc loc,
                                    bool isCallExpr = false);
+
+  private:
+    void filterCandidatesList(ClosenessPredicate predicate);
   };
 }
 
@@ -1713,10 +1719,43 @@ evaluateCloseness(Type candArgListType, ArrayRef<Type> actualArgs) {
   return CC_GeneralMismatch;
 }
 
+/// Given a candidate list, this computes the narrowest closeness to the match
+/// we're looking for and filters out any worse matches.  The predicate
+/// indicates how close a given candidate is to the desired match.
+void CalleeCandidateInfo::filterCandidatesList(ClosenessPredicate predicate) {
+  closeness = CC_GeneralMismatch;
+
+  // If we couldn't find anything, give up.
+  if (candidates.empty())
+    return;
+
+  // Now that we have the candidate list, figure out what the best matches from
+  // the candidate list are, and remove all the ones that aren't at that level.
+  SmallVector<CandidateCloseness, 4> closenessList;
+  closenessList.reserve(candidates.size());
+  for (auto decl : candidates) {
+    closenessList.push_back(predicate(decl));
+    closeness = std::min(closeness, closenessList.back());
+  }
+
+  // Now that we know the minimum closeness, remove all the elements that aren't
+  // as close.
+  unsigned NextElt = 0;
+  for (unsigned i = 0, e = candidates.size(); i != e; ++i) {
+    // If this decl in the result list isn't a close match, ignore it.
+    if (closeness != closenessList[i])
+      continue;
+
+    // Otherwise, preserve it.
+    candidates[NextElt++] = candidates[i];
+  }
+
+  candidates.erase(candidates.begin()+NextElt, candidates.end());
+}
+
 
 CalleeCandidateInfo::CalleeCandidateInfo(Expr *fn, Type actualArgsType,
                                          ConstraintSystem *CS) : CS(CS) {
-  closeness = CC_GeneralMismatch;
 
   if (auto declRefExpr = dyn_cast<DeclRefExpr>(fn)) {
     candidates.push_back(declRefExpr->getDecl());
@@ -1749,24 +1788,15 @@ CalleeCandidateInfo::CalleeCandidateInfo(Expr *fn, Type actualArgsType,
       break;
     }
   }
-  
-  // If we couldn't find anything, give up.
-  if (candidates.empty())
-    return;
 
   // Now that we have the candidate list, figure out what the best matches from
   // the candidate list are, and remove all the ones that aren't at that level.
   auto actualArgs = decomposeArgumentType(actualArgsType);
-  SmallVector<CandidateCloseness, 4> closenessList;
-  closenessList.reserve(candidates.size());
-  for (auto decl : candidates) {
+  filterCandidatesList([&](ValueDecl *decl) -> CandidateCloseness {
     // If the decl has a non-function type, it obviously doesn't match.
     auto fnType = decl->getType()->getAs<AnyFunctionType>();
-    if (!fnType) {
-      closenessList.push_back(CC_GeneralMismatch);
-      continue;
-    }
-    
+    if (!fnType) return CC_GeneralMismatch;
+
     // FIXME: This is a bit of a hack, we should look at the uncurry level of
     // this.
     if (auto *FD = dyn_cast<AbstractFunctionDecl>(decl)) {
@@ -1774,31 +1804,13 @@ CalleeCandidateInfo::CalleeCandidateInfo(Expr *fn, Type actualArgsType,
         fnType = fnType->getResult()->castTo<AnyFunctionType>();
     }
 
-    closenessList.push_back(evaluateCloseness(fnType->getInput(), actualArgs));
-    closeness = std::min(closeness, closenessList.back());
-  }
-
-  // Now that we know the minimum closeness, remove all the elements that aren't
-  // as close.
-  unsigned NextElt = 0;
-  for (unsigned i = 0, e = candidates.size(); i != e; ++i) {
-    // If this decl in the result list isn't a close match, ignore it.
-    if (closeness != closenessList[i])
-      continue;
-    
-    // Otherwise, preserve it.
-    candidates[NextElt++] = candidates[i];
-  }
-  
-  candidates.erase(candidates.begin()+NextElt, candidates.end());
+    return evaluateCloseness(fnType->getInput(), actualArgs);
+  });
 }
 
 CalleeCandidateInfo::CalleeCandidateInfo(ConstraintLocator *locator,
                                          ConstraintSystem *CS,
-     const std::function<CandidateCloseness(ValueDecl*)> &closenessPredicate)
- : CS(CS) {
-  closeness = CC_GeneralMismatch;
-  
+                                         ClosenessPredicate predicate): CS(CS) {
   if (auto decl = findResolvedMemberRef(locator, *CS)) {
     // If the decl is fully resolved, add it.
     candidates.push_back(decl);
@@ -1817,29 +1829,8 @@ CalleeCandidateInfo::CalleeCandidateInfo(ConstraintLocator *locator,
       }
     }
   }
-  
-  // Now that we have the candidate list, figure out what the best matches from
-  // the candidate list are, and remove all the ones that aren't at that level.
-  SmallVector<CandidateCloseness, 4> closenessList;
-  closenessList.reserve(candidates.size());
-  for (auto decl : candidates) {
-    closenessList.push_back(closenessPredicate(decl));
-    closeness = std::min(closeness, closenessList.back());
-  }
-  
-  // Now that we know the minimum closeness, remove all the elements that aren't
-  // as close.
-  unsigned NextElt = 0;
-  for (unsigned i = 0, e = candidates.size(); i != e; ++i) {
-    // If this decl in the result list isn't a close match, ignore it.
-    if (closeness != closenessList[i])
-      continue;
-    
-    // Otherwise, preserve it.
-    candidates[NextElt++] = candidates[i];
-  }
-  
-  candidates.erase(candidates.begin()+NextElt, candidates.end());
+
+  filterCandidatesList(predicate);
 }
 
 
