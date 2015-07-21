@@ -118,6 +118,7 @@ void CleanupManager::emitBranchAndCleanups(JumpDest Dest,
 void CleanupManager::emitCleanupsForReturn(CleanupLocation Loc) {
   SILGenBuilder &B = Gen.getBuilder();
   assert(B.hasValidInsertionPoint() && "Emitting return in invalid spot");
+  (void) B;
   emitCleanups(Stack.stable_end(), Loc, /*popCleanups=*/false);
 }
 
