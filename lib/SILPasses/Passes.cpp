@@ -48,6 +48,12 @@ llvm::cl::opt<bool>
     SILViewSILGenCFG("sil-view-silgen-cfg", llvm::cl::init(false),
                llvm::cl::desc("Enable the sil cfg viewer pass before diagnostics"));
 
+llvm::cl::opt<bool>
+    SILUsePrespecialized("use-prespecialized", llvm::cl::init(false),
+               llvm::cl::Hidden,
+               llvm::cl::desc("Enable the use of pre-specialized functions from "
+                              "standard library at -Onone and -Odebug"));
+
 using namespace swift;
 
 // Enumerates the optimization kinds that we do in SIL.
@@ -350,12 +356,13 @@ void swift::runSILPassesForOnone(SILModule &Module) {
   SILPassManager PM(&Module, "Onone");
   registerAnalysisPasses(PM);
 
-  // Enable the pre-specialized mode by default
-  Module.getOptions().UsePrespecialized = true;
-  // First specialize user-code.
-  PM.addGenericSpecializer();
-  PM.run();
-  PM.resetAndRemoveTransformations();
+  if (SILUsePrespecialized) {
+    Module.getOptions().UsePrespecialized = true;
+    // First specialize user-code.
+    PM.addGenericSpecializer();
+    PM.run();
+    PM.resetAndRemoveTransformations();
+  }
 
   // Don't keep external functions from stdlib and other modules.
   // We don't want that our unoptimized version will be linked instead
