@@ -1409,9 +1409,10 @@ bb0(%0 : $Builtin.NativeObject):
   return %2 : $()
 }
 
+// For now make sure we don't eliminate this.
 // CHECK-LABEL: sil @guaranteed_is_always_known_safe : $@convention(thin) (@guaranteed @box Builtin.Int32) -> () {
-// CHECK-NOT: retain
-// CHECK-NOT: release
+// CHECK: retain
+// CHECK: release
 sil @guaranteed_is_always_known_safe : $@convention(thin) (@guaranteed @box Builtin.Int32) -> () {
 bb0(%0 : $@box Builtin.Int32):
   %1 = function_ref @user : $@convention(thin) (@box Builtin.Int32) -> ()
