@@ -59,7 +59,7 @@ func functionAvailableOn10_10() {
 
 // Don't allow script-mode globals to marked potentially unavailable. Their
 // initializers are eagerly executed.
-@available(OSX, introduced=10.10) // expected-error {{global variable cannot be marked potentially unavailable with 'introduced=' in script mode}}
+@available(OSX, introduced=10.10) // expected-error {{global variable cannot be marked potentially unavailable with '@available' in script mode}}
 var potentiallyUnavailableGlobalInScriptMode: Int = globalFuncAvailableOn10_10()
 
 // Still allow other availability annotations on script-mode globals
@@ -301,13 +301,13 @@ class SubOfClassWithUnavailableInitializer : SuperWithWithUnavailableInitializer
 
 class ClassWithUnavailableProperties {
 
-  @available(OSX, introduced=10.9) // expected-error {{stored properties cannot be marked potentially unavailable with 'introduced='}}
+  @available(OSX, introduced=10.9) // expected-error {{stored properties cannot be marked potentially unavailable with '@available'}}
   var nonLazyAvailableOn10_9Stored: Int = 9
 
-  @available(OSX, introduced=10.10) // expected-error {{stored properties cannot be marked potentially unavailable with 'introduced='}}
+  @available(OSX, introduced=10.10) // expected-error {{stored properties cannot be marked potentially unavailable with '@available'}}
   var nonLazyAvailableOn10_10Stored : Int = 10
 
-  @available(OSX, introduced=10.10) // expected-error {{stored properties cannot be marked potentially unavailable with 'introduced='}}
+  @available(OSX, introduced=10.10) // expected-error {{stored properties cannot be marked potentially unavailable with '@available'}}
   let nonLazyLetAvailableOn10_10Stored : Int = 10
 
   // Make sure that we don't emit a Fix-It to mark a stored property as potentially unavailable.
