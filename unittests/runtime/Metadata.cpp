@@ -728,7 +728,8 @@ TEST(MetadataTest, installCommonValueWitnesses_pod_indirect) {
   testTable.flags = ValueWitnessFlags()
     .withAlignment(alignof(ValueBuffer))
     .withPOD(true)
-    .withBitwiseTakable(true);
+    .withBitwiseTakable(true)
+    .withInlineStorage(false);
   testTable.stride = sizeof(ValueBuffer) + alignof(ValueBuffer);
 
   installCommonValueWitnesses(&testTable);
@@ -749,11 +750,16 @@ TEST(MetadataTest, installCommonValueWitnesses_pod_indirect) {
 
       free(mem);
     };
-
-  ValueBuffer buf1, buf2;
-  testTable.allocateBuffer(&buf1, &testMetadata);
-  testTable.initializeBufferWithTakeOfBuffer(&buf2, &buf1, &testMetadata);
-  testTable.destroyBuffer(&buf2, &testMetadata);
+  struct {
+    ValueBuffer buffer;
+    uintptr_t canary;
+  } buf1{{}, {0x5A5A5A5AU}}, buf2{{}, {0xA5A5A5A5U}};
+  testTable.allocateBuffer(&buf1.buffer, &testMetadata);
+  testTable.initializeBufferWithTakeOfBuffer(&buf2.buffer, &buf1.buffer,
+                                             &testMetadata);
+  testTable.destroyBuffer(&buf2.buffer, &testMetadata);
 
   EXPECT_EQ(AllocatedBuffer, DeallocatedBuffer);
+  EXPECT_EQ(buf1.canary, (uintptr_t)0x5A5A5A5AU);
+  EXPECT_EQ(buf2.canary, (uintptr_t)0xA5A5A5A5U);
 }
