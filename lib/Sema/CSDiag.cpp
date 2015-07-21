@@ -2572,7 +2572,7 @@ bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
   // of independent type-checking; just use the standard diagnostics
   // paths.
   auto argExpr = dyn_cast<TupleExpr>(checkedArgExpr);
-  if (!argExpr) return false;
+  if (!argExpr) return diagnoseGeneralFailure();
 
   auto argTuple = argExpr->getType()->getAs<TupleType>();
 
