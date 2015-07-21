@@ -12,6 +12,10 @@
 
 extension _prext_LazySequenceType where
 Generator.Element == Elements.Generator.Element {
+  /// Returns the concatenated results of mapping `transform` over
+  /// `self`.  Equivalent to 
+  ///
+  ///     self.map(transform).flatten
   public func flatMap<Intermediate: SequenceType>(
     transform: (Generator.Element)->Intermediate
   ) -> _prext_LazySequence<
@@ -22,6 +26,10 @@ Generator.Element == Elements.Generator.Element {
 
 extension _prext_LazyCollectionType
 where Generator.Element == Elements.Generator.Element{
+  /// Returns the concatenated results of mapping `transform` over
+  /// `self`.  Equivalent to 
+  ///
+  ///     self.map(transform).flatten
   public func flatMap<Intermediate: CollectionType>(
     transform: (Generator.Element)->Intermediate
   ) -> _prext_LazyCollection<
@@ -36,6 +44,10 @@ extension _prext_LazyCollectionType
 where Generator.Element == Elements.Generator.Element,
 Elements.Index : BidirectionalIndexType
 {
+  /// Returns the concatenated results of mapping `transform` over
+  /// `self`.  Equivalent to 
+  ///
+  ///     self.map(transform).flatten
   public func flatMap<
     Intermediate: CollectionType
     where Intermediate.Index : BidirectionalIndexType
