@@ -194,11 +194,7 @@ else:
     while true {
       switch (g1.next(), g2.next()) {
       case let (e1?, e2?):
-%   if preds:
-        if !isEquivalent(e1, e2) {
-%   else:
-        if e1 != e2 {
-%   end
+        if ${'!isEquivalent(e1, e2)' if preds else 'e1 != e2'} {
           return false
         }
       case (_?, nil),
