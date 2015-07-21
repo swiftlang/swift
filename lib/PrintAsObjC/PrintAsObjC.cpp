@@ -195,7 +195,7 @@ private:
     }
 
     if (Type superTy = CD->getSuperclass())
-      os << " : " << superTy->getClassOrBoundGenericClass()->getName();
+      os << " : " << getNameForObjC(superTy->getClassOrBoundGenericClass());
     printProtocols(CD->getLocalProtocols(ConformanceLookupKind::OnlyExplicit));
     os << "\n";
     printMembers(CD->getMembers());
@@ -204,7 +204,8 @@ private:
 
   void visitExtensionDecl(ExtensionDecl *ED) {
     auto baseClass = ED->getExtendedType()->getClassOrBoundGenericClass();
-    os << "@interface " << baseClass->getName()
+
+    os << "@interface " << getNameForObjC(baseClass)
        << " (SWIFT_EXTENSION(" << ED->getModuleContext()->getName() << "))";
     printProtocols(ED->getLocalProtocols(ConformanceLookupKind::OnlyExplicit));
     os << "\n";
@@ -480,7 +481,7 @@ private:
 
     auto argTy = genericTy->getGenericArgs().front();
     if (auto classDecl = argTy->getClassOrBoundGenericClass())
-      os << "IBOutletCollection(" << classDecl->getName() << ") ";
+      os << "IBOutletCollection(" << getNameForObjC(classDecl) << ") ";
     else
       os << "IBOutletCollection(id) ";
     return true;
@@ -1065,7 +1066,7 @@ private:
     if (auto classTy = instanceTy->getAs<ClassType>()) {
       const ClassDecl *CD = classTy->getDecl();
       if (CD->isObjC())
-        os << "SWIFT_METATYPE(" << CD->getName() << ")";
+        os << "SWIFT_METATYPE(" << getNameForObjC(CD) << ")";
       else
         os << "Class";
       printNullability(optionalKind);

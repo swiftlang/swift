@@ -74,6 +74,13 @@ class ClassWithCustomName {
 // CHECK-NEXT: @end
 @objc(CustomName2)
 class ClassWithCustomName2 {}
+  
+// CHECK-LABEL: SWIFT_CLASS_NAMED("ClassWithCustomNameSub")
+// CHECK-NEXT: @interface CustomNameSub : CustomName{{$}}
+// CHECK-NEXT: init
+// CHECK-NEXT: @end
+@objc(CustomNameSub)
+class ClassWithCustomNameSub : ClassWithCustomName {}
 
 
 // CHECK-LABEL: @interface ClassWithNSObjectProtocol <NSObject>
@@ -130,6 +137,7 @@ class NotObjC {}
 // CHECK-NEXT: + (SWIFT_METATYPE(Methods) __nullable)maybeGetSelf;
 // CHECK-NEXT: - (Methods * __null_unspecified)uncheckedGetSelf;
 // CHECK-NEXT: + (SWIFT_METATYPE(Methods) __null_unspecified)uncheckedGetSelf;
+// CHECK-NEXT: + (SWIFT_METATYPE(CustomName) __nonnull)getCustomNameType;
 // CHECK-NEXT: - (void)testParens:(NSInteger)a;
 // CHECK-NEXT: - (void)testIgnoredParam:(NSInteger)_;
 // CHECK-NEXT: - (void)testIgnoredParams:(NSInteger)_ again:(NSInteger)_;
@@ -172,6 +180,10 @@ class NotObjC {}
   class func maybeGetSelf() -> Methods.Type? { return self }
   func uncheckedGetSelf() -> Methods! { return self }
   class func uncheckedGetSelf() -> Methods.Type! { return self }
+
+  class func getCustomNameType() -> ClassWithCustomName.Type {
+    return ClassWithCustomName.self
+  }
 
   func testParens(a: ((Int))) {}
 
@@ -363,7 +375,7 @@ public class NonObjCClass { }
 // CHECK-NEXT: @property (nonatomic, copy) NSSet<NSString *> * __nonnull stringSet;
 // CHECK-NEXT: @property (nonatomic, copy) NSSet * __nonnull intSet;
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(Properties) NSArray<Properties *> * __null_unspecified outletCollection;
-// CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(Properties) NSArray<Properties *> *  __nullable outletCollectionOptional;
+// CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(CustomName) NSArray<CustomName *> *  __nullable outletCollectionOptional;
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(id) NSArray * __nullable outletCollectionAnyObject;
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(id) NSArray<id <NSObject>> * __nullable outletCollectionProto;
 // CHECK-NEXT: + (NSInteger)staticInt;
@@ -417,7 +429,7 @@ public class NonObjCClass { }
   var intSet: Set<Int> = []
 
   @IBOutlet var outletCollection: [Properties]!
-  @IBOutlet var outletCollectionOptional: [Properties]? = []
+  @IBOutlet var outletCollectionOptional: [ClassWithCustomName]? = []
   @IBOutlet var outletCollectionAnyObject: [AnyObject]?
   @IBOutlet var outletCollectionProto: [NSObjectProtocol]?
 

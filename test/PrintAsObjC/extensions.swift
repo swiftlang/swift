@@ -64,6 +64,20 @@ extension A4 {
   @objc class Inner {}
 }
 
+// CHECK-LABEL: @interface CustomName{{$}}
+// CHECK-NEXT: init
+// CHECK-NEXT: @end
+@objc(CustomName)
+class ClassWithCustomName {
+}
+
+// CHECK-LABEL: @interface CustomName (SWIFT_EXTENSION(extensions))
+// CHECK-NEXT: - (void)foo;
+// CHECK-NEXT: @end
+extension ClassWithCustomName {
+  func foo() {}
+}
+
 // NEGATIVE-NOT: CGColor
 extension CGColor {
   func anyOldMethod() {}
