@@ -1,14 +1,11 @@
 // RUN: %target-run-stdlib-swift | FileCheck %s
 // REQUIRES: executable_test
 
-// XFAIL: linux
-
-// rdar://20981649 is tracking the fix for compiling this test optimized.
-// XFAIL: swift_test_mode_optimize
-// XFAIL: swift_test_mode_optimize_unchecked
+// REQUIRES: objc_interop
 
 import Foundation
 import Swift
+
 // ==== Tests =====
 
 func hex(x: UInt64) -> String { return String(x, radix:16) }

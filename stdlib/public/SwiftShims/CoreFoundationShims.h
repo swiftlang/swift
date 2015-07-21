@@ -50,39 +50,39 @@ typedef unsigned char _swift_shims_Boolean;
 typedef __swift_uint16_t _swift_shims_UniChar;
 
 // Buffer is nullable in case the string is zero-length.
-void CFStringGetCharacters(_swift_shims_CFStringRef __nonnull theString,
+void _swift_stdlib_CFStringGetCharacters(_swift_shims_CFStringRef __nonnull theString,
                            _swift_shims_CFRange range,
                            _swift_shims_UniChar *__nullable buffer);
 
-const _swift_shims_UniChar *__nullable CFStringGetCharactersPtr(
+const _swift_shims_UniChar *__nullable _swift_stdlib_CFStringGetCharactersPtr(
     _swift_shims_CFStringRef __nonnull theString);
 
 _swift_shims_CFIndex
-    CFStringGetLength(_swift_shims_CFStringRef __nonnull theString);
+    _swift_stdlib_CFStringGetLength(_swift_shims_CFStringRef __nonnull theString);
 
-_swift_shims_CFStringRef __nonnull CFStringCreateWithSubstring(
+_swift_shims_CFStringRef __nonnull _swift_stdlib_CFStringCreateWithSubstring(
     _swift_shims_CFAllocatorRef __nullable alloc,
     _swift_shims_CFStringRef __nonnull str, _swift_shims_CFRange range);
 
 _swift_shims_UniChar
-CFStringGetCharacterAtIndex(_swift_shims_CFStringRef __nonnull theString,
+_swift_stdlib_CFStringGetCharacterAtIndex(_swift_shims_CFStringRef __nonnull theString,
                             _swift_shims_CFIndex idx);
 
-_swift_shims_CFStringRef __nonnull CFStringCreateCopy(
+_swift_shims_CFStringRef __nonnull _swift_stdlib_CFStringCreateCopy(
     _swift_shims_CFAllocatorRef __nullable alloc,
     _swift_shims_CFStringRef __nonnull theString);
 
-const char *__nullable CFStringGetCStringPtr(
+const char *__nullable _swift_stdlib_CFStringGetCStringPtr(
     _swift_shims_CFStringRef __nonnull theString,
     _swift_shims_CFStringEncoding encoding);
 
 _swift_shims_CFComparisonResult
-CFStringCompare(_swift_shims_CFStringRef __nonnull theString1,
+_swift_stdlib_CFStringCompare(_swift_shims_CFStringRef __nonnull theString1,
                 _swift_shims_CFStringRef __nonnull theString2,
                 _swift_shims_CFStringCompareFlags compareOptions);
 
 _swift_shims_Boolean
-CFStringFindWithOptions(_swift_shims_CFStringRef __nonnull theString,
+_swift_stdlib_CFStringFindWithOptions(_swift_shims_CFStringRef __nonnull theString,
                         _swift_shims_CFStringRef __nonnull stringToFind,
                         _swift_shims_CFRange rangeToSearch,
                         _swift_shims_CFStringCompareFlags searchOptions,
