@@ -252,10 +252,10 @@ takesVoidFunc({()->Int in 0}) // expected-error {{cannot invoke 'takesVoidFunc' 
 Void(0) // expected-error{{cannot invoke initializer for type 'Void' with an argument list of type '(Int)'}}
 _ = {0}
 
-let samples = { // expected-error{{unable to infer closure type in the current context}} expected-note{{multi-statement closures require an explicit return type}}
+let samples = { //  expected-note{{multi-statement closures require an explicit return type}}
           if (i > 10) { return true }
           else { return false }
-        }()
+        }()  // expected-error{{cannot invoke closure expression with an argument list of type '()'}}
 
 // <rdar://problem/19756953> Swift error: cannot capture '$0' before it is declared
 func f(fp : (Bool, Bool)-> Bool) {}

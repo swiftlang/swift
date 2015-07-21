@@ -258,13 +258,13 @@ _ = 4(1)  // expected-error {{cannot call value of non-function type 'Int'}}
 // <rdar://problem/21784170> Incongruous `unexpected trailing closure` error in `init` function which is cast and called without trailing closure.
 func rdar21784170() {
   let initial = (1.0 as Double, 2.0 as Double)
-  (Array.init as (Double...) -> Array<Double>)(initial as (Double, Double)) // expected-error {{unexpected trailing closure}}
+  (Array.init as (Double...) -> Array<Double>)(initial as (Double, Double)) // expected-error {{cannot invoke value of type '(Double...) -> Array<Double>' with argument list '(Double, Double)'}}
 }
 
 // <rdar://problem/21829141> BOGUS: unexpected trailing closure
 func expect<T, U>(_: T)(_: U.Type) {}
 func expect<T, U>(_: T, _: Int = 1)(_: U.Type) {}
-expect(Optional(3))(Optional<Int>.self)  // expected-error {{unexpected trailing closure}}
+expect(Optional(3))(Optional<Int>.self)  // expected-error {{cannot invoke value of function type with argument list '(Optional<Int>.Type)'}}
 
 // <rdar://problem/19804707> Swift Enum Scoping Oddity
 func rdar19804707() {
@@ -291,8 +291,8 @@ func r20789423() {
   let p: C
   print(p.f(p)())  // expected-error {{cannot invoke 'f' with an argument list of type '(C)'}}
   
-  // FIXME: We should be getting a "multi-statement closures require an explicit return type" note.
   let _f = { (v: Int) in  // expected-error {{unable to infer closure type in the current context}}
+    // expected-note @-1 {{multi-statement closures require an explicit return type}}
     print("a")
     return "hi"
   }

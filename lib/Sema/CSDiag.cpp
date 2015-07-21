@@ -2046,9 +2046,19 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure() {
     auto diagID = diag::type_of_expression_is_ambiguous;
     if (isa<ClosureExpr>(anchor))
       diagID = diag::cannot_infer_closure_type;
-      
+    
     diagnose(anchor->getLoc(), diagID)
       .highlight(anchor->getSourceRange());
+
+    if (auto *CE = dyn_cast<ClosureExpr>(anchor)) {
+      if (!CE->hasSingleExpressionBody() &&
+          !CE->hasExplicitResultType() &&
+          !CE->getBody()->getElements().empty()) {
+        diagnose(CE->getLoc(),
+                 diag::mult_stmt_closures_require_explicit_result);
+      }
+    }
+
     
     return true;
   }
@@ -2935,9 +2945,6 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
     return true;
   }
   
-  bool isClosureInvocation = false;
-  bool isInvalidTrailingClosureTarget = false;
-
   CandidateCloseness candidateCloseness;
   // TODO: need a concept of an uncurry level.
   auto Candidates = collectCalleeCandidateInfo(fnExpr, argExpr->getType(),
@@ -2947,60 +2954,68 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
   bool isInitializer = isa<TypeExpr>(fnExpr);
   // Obtain the function's name.
   auto overloadName = getCalleeName(fnExpr, isOverloadedFn, Candidates);
+  
+  std::string argString = getTypeListString(argExpr->getType());
+
+  // If we couldn't get the name of the callee, then it must be something of a
+  // more complex "value of function type".
   if (overloadName.empty()) {
-    isClosureInvocation = true;
+    // The most common unnamed value of closure type is a ClosureExpr, so
+    // special case it.
+    if (auto CE = dyn_cast<ClosureExpr>(fnExpr->getSemanticsProvidingExpr())) {
+      if (typeIsNotSpecialized(fnExpr->getType()))
+        diagnose(argExpr->getStartLoc(), diag::cannot_invoke_closure, argString)
+          .highlight(fnExpr->getSourceRange());
+      else
+        diagnose(argExpr->getStartLoc(), diag::cannot_invoke_closure_type,
+                 getUserFriendlyTypeName(fnExpr->getType()), argString)
+          .highlight(fnExpr->getSourceRange());
+      
+      // If this is a multi-statement closure with no explicit result type, emit
+      // a note to clue the developer in.
+      if (!CE->hasSingleExpressionBody() &&
+          !CE->hasExplicitResultType() &&
+          !CE->getBody()->getElements().empty()) {
+        diagnose(fnExpr->getLoc(),
+                 diag::mult_stmt_closures_require_explicit_result);
+      }
+
+    } else if (typeIsNotSpecialized(fnExpr->getType())) {
+      diagnose(argExpr->getStartLoc(), diag::cannot_call_function_value,
+               argString)
+        .highlight(fnExpr->getSourceRange());
+    } else {
+      diagnose(argExpr->getStartLoc(), diag::cannot_call_value_of_function_type,
+                getUserFriendlyTypeName(fnExpr->getType()), argString)
+        .highlight(fnExpr->getSourceRange());
+    }
     
-    auto unwrappedExpr = unwrapParenExpr(fnExpr);
-    isInvalidTrailingClosureTarget = !isa<ClosureExpr>(unwrappedExpr);
+    return true;
   }
 
   
   // If we have an argument list (i.e., a scalar, or a non-zero-element tuple)
   // then diagnose with some specificity about the arguments.
-  if (!isa<TupleExpr>(argExpr) ||
-      cast<TupleExpr>(argExpr)->getNumElements() != 0) {
-    std::string argString = getTypeListString(argExpr->getType());
-    
-    if (isOverloadedFn) {
-      diagnose(fnExpr->getLoc(),
-               isInitializer ?
-               diag::cannot_find_appropriate_initializer_with_list :
-               diag::cannot_find_appropriate_overload_with_list,
-               overloadName, argString);
-    } else if (!isClosureInvocation) {
-      diagnose(fnExpr->getLoc(),
-               isInitializer ?
-               diag::cannot_apply_initializer_to_args :
-               diag::cannot_apply_function_to_args,
-               overloadName, argString);
-    } else if (isInvalidTrailingClosureTarget) {
-      diagnose(fnExpr->getLoc(), diag::invalid_trailing_closure_target);
-    } else {
-      diagnose(fnExpr->getLoc(), diag::cannot_invoke_closure, argString);
-    }
-  } else {
+  if (isa<TupleExpr>(argExpr) &&
+      cast<TupleExpr>(argExpr)->getNumElements() == 0) {
     // Otherwise, emit diagnostics that say "no arguments".
-    if (isClosureInvocation) {
-      diagnose(fnExpr->getLoc(), diag::cannot_infer_closure_type);
-      
-      if (!isInvalidTrailingClosureTarget) {
-        auto closureExpr = cast<ClosureExpr>(unwrapParenExpr(fnExpr));
-        
-        if (!closureExpr->hasSingleExpressionBody() &&
-            !closureExpr->hasExplicitResultType() &&
-            !closureExpr->getBody()->getElements().empty()) {
-          diagnose(fnExpr->getLoc(),
-                   diag::mult_stmt_closures_require_explicit_result);
-        }
-      }
-      
-    } else {
-      diagnose(fnExpr->getLoc(),
-               isInitializer ?
-                 diag::cannot_find_initializer_with_no_params :
-                 diag::cannot_find_overload_with_no_params,
-               overloadName);
-    }
+    diagnose(fnExpr->getLoc(),
+             isInitializer ?
+             diag::cannot_find_initializer_with_no_params :
+             diag::cannot_find_overload_with_no_params,
+             overloadName);
+  } else if (isOverloadedFn) {
+    diagnose(fnExpr->getLoc(),
+             isInitializer ?
+             diag::cannot_find_appropriate_initializer_with_list :
+             diag::cannot_find_appropriate_overload_with_list,
+             overloadName, argString);
+  } else {
+    diagnose(fnExpr->getLoc(),
+             isInitializer ?
+             diag::cannot_apply_initializer_to_args :
+             diag::cannot_apply_function_to_args,
+             overloadName, argString);
   }
   
   // Did the user intend on invoking a different overload?
