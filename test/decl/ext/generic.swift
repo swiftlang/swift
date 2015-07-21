@@ -134,7 +134,7 @@ func genericClassEquatable<T : Equatable>(gc: GenericClass<T>, x: T, y: T) {
 }
 
 func genericClassNotEquatable<T>(gc: GenericClass<T>, x: T, y: T) {
-  gc.foo(x, y: y) // expected-error{{cannot invoke 'foo' with an argument list of type '(T, y: T)'}}
+  gc.foo(x, y: y) // expected-error{{'GenericClass<T>' is not convertible to 'Equatable'}}
 }
 
 

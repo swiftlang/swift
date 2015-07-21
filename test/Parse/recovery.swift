@@ -92,7 +92,7 @@ func missingControllingExprInIf() {
   if { true } { // expected-error {{missing condition in an 'if' statement}} expected-error {{braced block of statements is an unused closure}} expected-error{{expression resolves to an unused function}} expected-error{{consecutive statements on a line must be separated by ';'}}
   }
 
-  if { true }() { // expected-error {{missing condition in an 'if' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} expected-error{{unexpected trailing closure}}
+  if { true }() { // expected-error {{missing condition in an 'if' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} expected-error{{cannot call value of non-function type '()'}}
   }
 
   // <rdar://problem/18940198>
@@ -114,7 +114,7 @@ func missingControllingExprInWhile() {
   while { true } { // expected-error {{missing condition in a 'while' statement}} expected-error {{braced block of statements is an unused closure}} expected-error{{expression resolves to an unused function}} expected-error{{consecutive statements on a line must be separated by ';'}}
   }
 
-  while { true }() { // expected-error {{missing condition in a 'while' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} expected-error{{unexpected trailing closure}}
+  while { true }() { // expected-error {{missing condition in a 'while' statement}} expected-error{{consecutive statements on a line must be separated by ';'}} expected-error{{cannot call value of non-function type '()'}}
   }
 
   // <rdar://problem/18940198>
@@ -236,7 +236,7 @@ func missingControllingExprInSwitch() {
     case _: return // expected-error{{'case' label can only appear inside a 'switch' statement}}
   }
 
-  switch { 42 }() { // expected-error {{expected expression in 'switch' statement}} expected-error {{all statements inside a switch must be covered by a 'case' or 'default'}} expected-error {{consecutive statements on a line must be separated by ';'}} expected-error {{unexpected trailing closure}}
+  switch { 42 }() { // expected-error {{expected expression in 'switch' statement}} expected-error {{all statements inside a switch must be covered by a 'case' or 'default'}} expected-error {{consecutive statements on a line must be separated by ';'}} expected-error {{cannot call value of non-function type '()'}}
     case _: return // expected-error{{'case' label can only appear inside a 'switch' statement}}
   }
 }

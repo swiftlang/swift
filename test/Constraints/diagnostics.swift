@@ -121,9 +121,10 @@ func rdar20142523() {
   })
 }
 
+// <rdar://problem/21080030> Bad diagnostic for invalid method call in boolean expression: (_, IntegerLiteralConvertible)' is not convertible to 'IntegerLiteralConvertible
 func rdar21080030() {
   var s = "Hello"
-  if s.characters.count() == 0 {} // expected-error{{cannot invoke 'count' with no arguments}}
+  if s.characters.count() == 0 {} // expected-error{{cannot call value of non-function type 'Distance'}}
 }
 
 // <rdar://problem/21248136> QoI: problem with return type inference mis-diagnosed as invalid arguments
@@ -251,7 +252,7 @@ _ = { $0 }  // expected-error {{cannot assign a value of type '(_) -> _' to a va
 
 
 _ = 4()   // expected-error {{invalid use of '()' to call a value of non-function type 'Int'}}
-_ = 4(1)  // expected-error {{unexpected trailing closure}}
+_ = 4(1)  // expected-error {{cannot call value of non-function type 'Int'}}
 
 
 // <rdar://problem/21784170> Incongruous `unexpected trailing closure` error in `init` function which is cast and called without trailing closure.
@@ -276,8 +277,8 @@ func rdar19804707() {
   knownOps = Op.BinaryOperator{$1 - $0}
 
   knownOps = .BinaryOperator({$1 - $0})
-  knownOps = .BinaryOperator(){$1 - $0} // expected-error {{unexpected trailing closure}}
-  knownOps = .BinaryOperator{$1 - $0}   // expected-error {{unexpected trailing closure}}
+  knownOps = .BinaryOperator(){$1 - $0} // expected-error {{could not find member 'BinaryOperator'}}
+  knownOps = .BinaryOperator{$1 - $0}   // expected-error {{could not find member 'BinaryOperator'}}
 }
 
 
@@ -288,7 +289,7 @@ func r20789423() {
   }
 
   let p: C
-  println(p.f(p)())  // expected-error {{unable to infer closure type in the current context}}
+  print(p.f(p)())  // expected-error {{cannot invoke 'f' with an argument list of type '(C)'}}
   
   // FIXME: We should be getting a "multi-statement closures require an explicit return type" note.
   let _f = { (v: Int) in  // expected-error {{unable to infer closure type in the current context}}

@@ -150,6 +150,9 @@ ERROR(cannot_find_appropriate_overload_with_list,sema,none,
       "cannot find an overload for '%0' that accepts an argument list of"
       " type '%1'", (StringRef, StringRef))
 
+ERROR(cannot_call_non_function_value,sema,none,
+      "cannot call value of non-function type '%0'", (StringRef))
+
 ERROR(cannot_find_appropriate_initializer_with_list,sema,none,
       "cannot find an initializer for type '%0' that accepts an argument list"
       " of type '%1'", (StringRef, StringRef))

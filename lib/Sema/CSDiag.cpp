@@ -2834,6 +2834,49 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
   return true;
 }
 
+
+// FIXME: Hyper-redundant with collectCalleeCandidateInfo!
+static std::string getCalleeName(Expr *fnExpr, bool &isOverloadedFn,
+                                 ArrayRef<ValueDecl*> candidates) {
+  // Obtain the function's name, and collect any parameter lists for diffing
+  // purposes.
+  if (auto DRE = dyn_cast<DeclRefExpr>(fnExpr))
+    return DRE->getDecl()->getNameStr();
+
+  if (auto ODRE = dyn_cast<OverloadedDeclRefExpr>(fnExpr)) {
+    isOverloadedFn = true;
+    return ODRE->getDecls()[0]->getNameStr().str();
+  }
+
+  if (isa<TypeExpr>(fnExpr)) {
+    isOverloadedFn = candidates.size() > 1;
+    // It's always a metatype type, so use the instance type name.
+    auto instanceType =
+      fnExpr->getType()->castTo<MetatypeType>()->getInstanceType();
+    return instanceType->getString();
+  }
+
+  if (auto UDE = dyn_cast<UnresolvedDotExpr>(fnExpr))
+    return UDE->getName().str().str();
+
+  if (auto *UCE = dyn_cast<UnresolvedConstructorExpr>(fnExpr)) {
+    auto selfTy = UCE->getSubExpr()->getType()->getLValueOrInOutObjectType();
+    if (selfTy->hasTypeVariable())
+      return "init";
+    else
+      return selfTy.getString() + ".init";
+  }
+
+  if (auto DSCE = dyn_cast<DotSyntaxCallExpr>(fnExpr))
+    return getCalleeName(DSCE->getFn(), isOverloadedFn, candidates);
+
+  if (auto *DSBI = dyn_cast<DotSyntaxBaseIgnoredExpr>(fnExpr))
+    return getCalleeName(DSBI->getRHS(), isOverloadedFn, candidates);
+
+  return "";
+}
+
+
 bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
 
   // Get the expression result of type checking the arguments to the call
@@ -2882,55 +2925,45 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
   if (!argExpr)
     return true; // already diagnosed.
   
-  // FIXME: Should be calculating types of sub-exprs in a consistent way.
-  auto fnExpr = callExpr->getFn();
-  
-  // An error was posted elsewhere.
+  auto fnExpr = typeCheckChildIndependently(callExpr->getFn(), true);
+  if (!fnExpr) return true;
+
+  // FIXME: An error was posted elsewhere.  Protocol verification isn't plumbed
+  // in correctly.
   if (isErrorTypeKind(fnExpr->getType()))
     return true;
 
-  std::string overloadName = "";
-
+  // If we resolved a concrete expression for the callee, and it has
+  // non-function/non-metatype type, then we cannot call it!
+  if (!typeIsNotSpecialized(fnExpr->getType()) &&
+      !fnExpr->getType()->is<AnyFunctionType>() &&
+      !fnExpr->getType()->is<MetatypeType>()) {
+    diagnose(callExpr->getArg()->getStartLoc(),
+             diag::cannot_call_non_function_value,
+             getUserFriendlyTypeName(fnExpr->getType()))
+      .highlight(fnExpr->getSourceRange());
+    return true;
+  }
+  
   bool isClosureInvocation = false;
   bool isInvalidTrailingClosureTarget = false;
-  bool isInitializer = false;
-  bool isOverloadedFn = false;
 
   CandidateCloseness candidateCloseness;
+  // TODO: need a concept of an uncurry level.
   auto Candidates = collectCalleeCandidateInfo(fnExpr, argExpr->getType(),
                                                candidateCloseness);
 
-  // Obtain the function's name, and collect any parameter lists for diffing
-  // purposes.
-  if (auto DRE = dyn_cast<DeclRefExpr>(fnExpr)) {
-    overloadName = DRE->getDecl()->getNameStr();
-  } else if (auto ODRE = dyn_cast<OverloadedDeclRefExpr>(fnExpr)) {
-    isOverloadedFn = true;
-    overloadName = ODRE->getDecls()[0]->getNameStr().str();
-  } else if (isa<TypeExpr>(fnExpr)) {
-    isInitializer = true;
-    isOverloadedFn = Candidates.size() > 1;
-    // It's always a metatype type, so use the instance type name.
-    auto instanceType =
-      fnExpr->getType()->castTo<MetatypeType>()->getInstanceType();
-    overloadName = instanceType->getString();
-  } else if (auto UDE = dyn_cast<UnresolvedDotExpr>(fnExpr)) {
-    overloadName = UDE->getName().str().str();
-  } else if (auto *UCE = dyn_cast<UnresolvedConstructorExpr>(fnExpr)) {
-    auto selfTy = UCE->getSubExpr()->getType()->getLValueOrInOutObjectType();
-    if (selfTy->hasTypeVariable())
-      overloadName = "init";
-    else
-      overloadName = selfTy.getString() + ".init";
-  } else {
+  bool isOverloadedFn = false;
+  bool isInitializer = isa<TypeExpr>(fnExpr);
+  // Obtain the function's name.
+  auto overloadName = getCalleeName(fnExpr, isOverloadedFn, Candidates);
+  if (overloadName.empty()) {
     isClosureInvocation = true;
     
     auto unwrappedExpr = unwrapParenExpr(fnExpr);
     isInvalidTrailingClosureTarget = !isa<ClosureExpr>(unwrappedExpr);
   }
-  // TODO: Handle dot_syntax_call_expr "fn" as a non-closure value.
-  // TODO: need a concept of an uncurry level.
-  
+
   
   // If we have an argument list (i.e., a scalar, or a non-zero-element tuple)
   // then diagnose with some specificity about the arguments.

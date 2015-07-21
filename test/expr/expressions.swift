@@ -586,7 +586,7 @@ func test() {
   var x = Foo()
 
   // rdar://15708430
-  (&x).method()  // expected-error {{cannot invoke 'method' with no arguments}}
+  (&x).method()  // expected-error {{'inout Foo' is not identical to 'Foo'}}
 }
 
 

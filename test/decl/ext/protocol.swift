@@ -211,15 +211,13 @@ extension P4 where Self.AssocP4 == Bool {
 }
 
 func testP4(s4a: S4a, s4b: S4b, s4c: S4c, s4d: S4d) {
-  s4a.extP4a() // expected-error{{cannot invoke 'extP4a' with no arguments}}
-  // expected-note @-1 {{expected an argument list of type '()'}}
+  s4a.extP4a() // expected-error{{could not find an overload for 'extP4a' that accepts the supplied arguments}}
   s4b.extP4a() // ok
-  s4c.extP4a() // expected-error{{cannot invoke 'extP4a' with no arguments}}
-  // expected-note @-1 {{expected an argument list of type '()'}}
+  s4c.extP4a() // expected-error{{could not find an overload for 'extP4a' that accepts the supplied arguments}}
   s4c.extP4Int() // okay
   var b1 = s4d.extP4a() // okay, "Bool" version
   b1 = true // checks type above
-  s4d.extP4Int() // expected-error{{cannot invoke 'extP4Int' with no arguments}}
+  s4d.extP4Int() // expected-error{{'() -> ()' is not convertible to 'AssocP4'}}
   _ = b1
 }
 

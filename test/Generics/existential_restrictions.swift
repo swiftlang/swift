@@ -85,5 +85,5 @@ func foo() {
   // generic no overloads error path. The error should actually talk
   // about the return type, and this can happen in other contexts as well;
   // <rdar://problem/21248136> tracks improving QoI here.
-  allMine.takeAll() // expected-error{{cannot invoke 'takeAll' with no arguments}}
+  allMine.takeAll() // expected-error{{'() -> ()' is not convertible to '_BuiltinIntegerLiteralConvertible'}}
 }

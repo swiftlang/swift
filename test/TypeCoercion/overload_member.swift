@@ -73,7 +73,6 @@ func test_mixed_overload(a: A, x: X, y: Y) {
 
   
   A.mixed(x) // expected-error{{cannot invoke 'mixed' with an argument list of type '(X)'}}
-  // expected-note @-1 {{expected an argument list of type '(x: X)'}}
   var x2 = A.mixed(a)(x: x)
   x2 = x
   var y2 = A.mixed(y: y)
@@ -160,7 +159,6 @@ extension A {
 
   class func test_mixed_overload_static(a a: A, x: X, y: Y) {
     mixed(x) // expected-error{{cannot invoke 'mixed' with an argument list of type '(X)'}}
-    // expected-note @-1 {{expected an argument list of type '(x: X)'}}
     var x2 = mixed(a)(x: x)
     x2 = x
     var y2 = mixed(y: y)
