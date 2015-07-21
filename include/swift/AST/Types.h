@@ -3076,7 +3076,7 @@ public:
   }
 };
   
-/// The type T[], which is always sugar for a library type.
+/// The type [T], which is always sugar for a library type.
 class ArraySliceType : public SyntaxSugarType {
   ArraySliceType(const ASTContext &ctx, Type base,
                  RecursiveTypeProperties properties)
