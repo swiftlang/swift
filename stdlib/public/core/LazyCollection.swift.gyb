@@ -18,7 +18,7 @@
 ///
 /// To add new lazy collection operations, extend this protocol with
 /// methods that return lazy wrappers that are themselves
-/// `LazyColectionType`s.
+/// `LazyCollectionType`s.
 ///
 /// - See Also: `LazySequenceType`, `LazyCollection`
 public protocol _prext_LazyCollectionType
@@ -67,8 +67,19 @@ public struct _prext_LazyCollection<Base : CollectionType>
   internal var _base: Base
 }
 
+/// Forward implementations to the base collection, to pick up any
+/// optimizations it might implement.
 extension _prext_LazyCollection : SequenceType {
+  
+  /// Return a *generator* over the elements of this *sequence*.
+  ///
+  /// - Complexity: O(1).
   public func generate() -> Base.Generator { return _base.generate() }
+  
+  /// Return a value less than or equal to the number of elements in
+  /// `self`, **nondestructively**.
+  ///
+  /// - Complexity: O(N).
   public func underestimateCount() -> Int { return _base.underestimateCount() }
 
   public func _copyToNativeArrayBuffer() 
@@ -156,12 +167,18 @@ extension _prext_LazyCollection : CollectionType {
 
 /// Augment `self` with lazy methods such as `map`, `filter`, etc.
 extension CollectionType {
+  /// A collection with contents identical to `self`, but on which
+  /// normally-eager operations such as `map` and `filter` are
+  /// implemented lazily.
+  ///
+  /// - See Also: `LazySequenceType`, `LazyCollectionType`.
   public var _prext_lazy: _prext_LazyCollection<Self> {
     return _prext_LazyCollection(self)
   }
 }
 
 extension _prext_LazyCollectionType {
+  /// Identical to `self`.
   public var _prext_lazy: Self { // Don't re-wrap already-lazy collections
     return self
   }
