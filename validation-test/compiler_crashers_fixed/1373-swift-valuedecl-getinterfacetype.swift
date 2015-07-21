@@ -1,5 +1,4 @@
 // RUN: not %target-swift-frontend %s -parse
-// XFAIL: linux
 
 
 // Distributed under the terms of the MIT license
