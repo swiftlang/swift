@@ -1632,20 +1632,73 @@ namespace {
     CC_GeneralMismatch         // Something else is wrong.
   };
 
+  /// This is a candidate for a callee, along with an uncurry level.
+  ///
+  /// The uncurry level specifies how far much of a curried value has already
+  /// been applied.  For example, in a funcdecl of:
+  ///     func f(a:Int)(b:Double) -> Int
+  /// Uncurry level of 0 indicates that we're looking at the "a" argument, an
+  /// uncurry level of 1 indicates that we're looking at the "b" argument.
+  struct UncurriedCandidate {
+    ValueDecl *decl;
+    unsigned level;
+
+    AnyFunctionType *getUncurriedFunctionType() const {
+      auto type = decl->getType();
+
+      // If this is an operator func decl in a type context, the 'self' isn't
+      // actually going to be applied.
+      if (auto *fd = dyn_cast<FuncDecl>(decl))
+        if (fd->isOperator() && fd->getDeclContext()->isTypeContext())
+          type = type->castTo<AnyFunctionType>()->getResult();
+
+      for (unsigned i = 0, e = level; i != e; ++i) {
+        auto funcTy = type->getAs<AnyFunctionType>();
+        if (!funcTy) return nullptr;
+        type = funcTy->getResult();
+      }
+
+      return type->getAs<AnyFunctionType>();
+    }
+
+    /// Given a function candidate with an uncurry level, return the parameter
+    /// type at the specified uncurry level.  If there is an error getting to
+    /// the specified input, this returns a null Type.
+    Type getArgumentType() const {
+      if (auto *funcTy = getUncurriedFunctionType())
+        return funcTy->getInput();
+      return Type();
+    }
+
+    /// Given a function candidate with an uncurry level, return the parameter
+    /// type at the specified uncurry level.  If there is an error getting to
+    /// the specified input, this returns a null Type.
+    Type getResultType() const {
+      if (auto *funcTy = getUncurriedFunctionType())
+        return funcTy->getResult();
+      return Type();
+    }
+  };
+
+
   /// This struct represents an analyzed function pointer to determine the
   /// candidates that could be called, or the one concrete decl that will be
   /// called if not ambiguous.
   class CalleeCandidateInfo {
     ConstraintSystem *CS;
   public:
-    SmallVector<ValueDecl*, 4> candidates;
+
+    /// This is the list of candidates identified.
+    SmallVector<UncurriedCandidate, 4> candidates;
+
+    /// This tracks how close the match is.
     CandidateCloseness closeness;
     
     /// Analyze a function expr and break it into a candidate set.  On failure,
     /// this leaves the candidate list empty.
     CalleeCandidateInfo(Expr *Fn, Type actualArgsType, ConstraintSystem *CS);
 
-    typedef const std::function<CandidateCloseness(ValueDecl*)>
+    typedef const std::function<CandidateCloseness(UncurriedCandidate)>
       &ClosenessPredicate;
 
     /// Analyze a locator for a SubscriptExpr for its candidate set.
@@ -1653,7 +1706,7 @@ namespace {
                         ClosenessPredicate predicate);
     
     unsigned size() const { return candidates.size(); }
-    ValueDecl *operator[](unsigned i) const {
+    UncurriedCandidate operator[](unsigned i) const {
       return candidates[i];
     }
     
@@ -1667,6 +1720,42 @@ namespace {
     void filterCandidatesList(ClosenessPredicate predicate);
   };
 }
+
+
+/// Given a candidate list, this computes the narrowest closeness to the match
+/// we're looking for and filters out any worse matches.  The predicate
+/// indicates how close a given candidate is to the desired match.
+void CalleeCandidateInfo::filterCandidatesList(ClosenessPredicate predicate) {
+  closeness = CC_GeneralMismatch;
+
+  // If we couldn't find anything, give up.
+  if (candidates.empty())
+    return;
+
+  // Now that we have the candidate list, figure out what the best matches from
+  // the candidate list are, and remove all the ones that aren't at that level.
+  SmallVector<CandidateCloseness, 4> closenessList;
+  closenessList.reserve(candidates.size());
+  for (auto decl : candidates) {
+    closenessList.push_back(predicate(decl));
+    closeness = std::min(closeness, closenessList.back());
+  }
+
+  // Now that we know the minimum closeness, remove all the elements that aren't
+  // as close.
+  unsigned NextElt = 0;
+  for (unsigned i = 0, e = candidates.size(); i != e; ++i) {
+    // If this decl in the result list isn't a close match, ignore it.
+    if (closeness != closenessList[i])
+      continue;
+
+    // Otherwise, preserve it.
+    candidates[NextElt++] = candidates[i];
+  }
+
+  candidates.erase(candidates.begin()+NextElt, candidates.end());
+}
+
 
 /// Determine how close an argument list is to an already decomposed argument
 /// list.
@@ -1719,49 +1808,16 @@ evaluateCloseness(Type candArgListType, ArrayRef<Type> actualArgs) {
   return CC_GeneralMismatch;
 }
 
-/// Given a candidate list, this computes the narrowest closeness to the match
-/// we're looking for and filters out any worse matches.  The predicate
-/// indicates how close a given candidate is to the desired match.
-void CalleeCandidateInfo::filterCandidatesList(ClosenessPredicate predicate) {
-  closeness = CC_GeneralMismatch;
-
-  // If we couldn't find anything, give up.
-  if (candidates.empty())
-    return;
-
-  // Now that we have the candidate list, figure out what the best matches from
-  // the candidate list are, and remove all the ones that aren't at that level.
-  SmallVector<CandidateCloseness, 4> closenessList;
-  closenessList.reserve(candidates.size());
-  for (auto decl : candidates) {
-    closenessList.push_back(predicate(decl));
-    closeness = std::min(closeness, closenessList.back());
-  }
-
-  // Now that we know the minimum closeness, remove all the elements that aren't
-  // as close.
-  unsigned NextElt = 0;
-  for (unsigned i = 0, e = candidates.size(); i != e; ++i) {
-    // If this decl in the result list isn't a close match, ignore it.
-    if (closeness != closenessList[i])
-      continue;
-
-    // Otherwise, preserve it.
-    candidates[NextElt++] = candidates[i];
-  }
-
-  candidates.erase(candidates.begin()+NextElt, candidates.end());
-}
-
-
 CalleeCandidateInfo::CalleeCandidateInfo(Expr *fn, Type actualArgsType,
                                          ConstraintSystem *CS) : CS(CS) {
+  fn = fn->getSemanticsProvidingExpr();
 
   if (auto declRefExpr = dyn_cast<DeclRefExpr>(fn)) {
-    candidates.push_back(declRefExpr->getDecl());
+    candidates.push_back({ declRefExpr->getDecl(), 0 });
   } else if (auto overloadedDRE = dyn_cast<OverloadedDeclRefExpr>(fn)) {
-    candidates.append(overloadedDRE->getDecls().begin(),
-                      overloadedDRE->getDecls().end());
+    for (auto cand : overloadedDRE->getDecls()) {
+      candidates.push_back({ cand, 0 });
+    }
   } else if (auto TE = dyn_cast<TypeExpr>(fn)) {
     // It's always a metatype type, so use the instance type name.
     auto instanceType = TE->getType()->getAs<MetatypeType>()->getInstanceType();
@@ -1770,9 +1826,17 @@ CalleeCandidateInfo::CalleeCandidateInfo(Expr *fn, Type actualArgsType,
     if (!instanceType->getAs<TupleType>()) {
       auto ctors = CS->TC.lookupConstructors(CS->DC, instanceType);
       for (auto ctor : ctors)
-        candidates.push_back(ctor);
+        candidates.push_back({ ctor, 1 });
     }
   } else {
+    unsigned uncurryLevel = 0;
+
+    // Calls to super.init() are automatically uncurried one level.
+    if (isa<UnresolvedConstructorExpr>(fn) ||
+        isa<UnresolvedDotExpr>(fn) ||
+        isa<MemberRefExpr>(fn))
+      uncurryLevel = 1;
+
     // Scan to see if we have a disjunction constraint for this callee.
     for (auto &constraint : CS->getConstraints()) {
       if (constraint.getKind() != ConstraintKind::Disjunction) continue;
@@ -1781,30 +1845,28 @@ CalleeCandidateInfo::CalleeCandidateInfo(Expr *fn, Type actualArgsType,
       if (!locator || locator->getAnchor() != fn) continue;
       
       for (auto *bindOverload : constraint.getNestedConstraints()) {
+        if (bindOverload->getKind() != ConstraintKind::BindOverload)
+          continue;
         auto c = bindOverload->getOverloadChoice();
         if (c.isDecl())
-          candidates.push_back(c.getDecl());
+          candidates.push_back({ c.getDecl(), uncurryLevel });
       }
-      break;
+
+      // If we found some candidates, then we're done.
+      if (!candidates.empty())
+        break;
     }
   }
 
   // Now that we have the candidate list, figure out what the best matches from
   // the candidate list are, and remove all the ones that aren't at that level.
   auto actualArgs = decomposeArgumentType(actualArgsType);
-  filterCandidatesList([&](ValueDecl *decl) -> CandidateCloseness {
-    // If the decl has a non-function type, it obviously doesn't match.
-    auto fnType = decl->getType()->getAs<AnyFunctionType>();
-    if (!fnType) return CC_GeneralMismatch;
-
-    // FIXME: This is a bit of a hack, we should look at the uncurry level of
-    // this.
-    if (auto *FD = dyn_cast<AbstractFunctionDecl>(decl)) {
-      if (FD->getImplicitSelfDecl()) // Strip the self member.
-        fnType = fnType->getResult()->castTo<AnyFunctionType>();
-    }
-
-    return evaluateCloseness(fnType->getInput(), actualArgs);
+  filterCandidatesList([&](UncurriedCandidate candidate) -> CandidateCloseness {
+    auto inputType = candidate.getArgumentType();
+    // If this isn't a function or isn't valid at this uncurry level, treat it
+    // as a general mismatch.
+    if (!inputType) return CC_GeneralMismatch;
+    return evaluateCloseness(inputType, actualArgs);
   });
 }
 
@@ -1813,7 +1875,7 @@ CalleeCandidateInfo::CalleeCandidateInfo(ConstraintLocator *locator,
                                          ClosenessPredicate predicate): CS(CS) {
   if (auto decl = findResolvedMemberRef(locator, *CS)) {
     // If the decl is fully resolved, add it.
-    candidates.push_back(decl);
+    candidates.push_back({ decl, 0 });
   } else {
     // Otherwise, look for a disjunction between different candidates.
     for (auto &constraint : CS->getConstraints()) {
@@ -1825,7 +1887,7 @@ CalleeCandidateInfo::CalleeCandidateInfo(ConstraintLocator *locator,
       for (auto *bindOverload : constraint.getNestedConstraints()) {
         auto c = bindOverload->getOverloadChoice();
         if (c.isDecl())
-          candidates.push_back(c.getDecl());
+          candidates.push_back({ c.getDecl(), 0 });
       }
     }
   }
@@ -1854,19 +1916,13 @@ suggestPotentialOverloads(StringRef functionName, SourceLoc loc,
   
   // FIXME2: For (T,T) & (Self, Self), emit this as two candidates, one using
   // the LHS and one using the RHS type for T's.
-  for (auto decl : candidates) {
+  for (auto cand : candidates) {
     Type paramListType;
-    
-    if (auto *FD = dyn_cast<AbstractFunctionDecl>(decl)) {
-      paramListType = FD->getType();
-      if (FD->getImplicitSelfDecl()) // Strip the self member.
-        paramListType = paramListType->castTo<AnyFunctionType>()->getResult();
-      if (auto FT = paramListType->getAs<AnyFunctionType>())
-        paramListType = FT->getInput();
-      else
-        continue;
-    } else if (auto *SD = dyn_cast<SubscriptDecl>(decl)) {
+
+    if (auto *SD = dyn_cast<SubscriptDecl>(cand.decl)) {
       paramListType = SD->getIndicesType();
+    } else {
+      paramListType = cand.getArgumentType();
     }
     if (paramListType.isNull())
       continue;
@@ -2638,7 +2694,7 @@ bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
       return true;
     
     if (typeIsNotSpecialized(resultTy))
-      resultTy = calleeInfo[0]->getType()->castTo<FunctionType>()->getResult();
+      resultTy = calleeInfo[0].getResultType();
     
     diagnose(binop->getLoc(), diag::result_type_no_match,
              getUserFriendlyTypeName(resultTy))
@@ -2658,7 +2714,7 @@ bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
   
   auto argTyName1 = getUserFriendlyTypeName(argTuple->getElementType(0));
   auto argTyName2 = getUserFriendlyTypeName(argTuple->getElementType(1));
-  std::string overloadName = calleeInfo[0]->getNameStr();
+  std::string overloadName = calleeInfo[0].decl->getNameStr();
   assert(!overloadName.empty());
   if (argTyName1.compare(argTyName2)) {
     diagnose(binop->getLoc(), diag::cannot_apply_binop_to_args,
@@ -2700,7 +2756,7 @@ bool FailureDiagnosis::visitUnaryExpr(ApplyExpr *applyExpr) {
       return true;
     
     if (typeIsNotSpecialized(resultTy))
-      resultTy = calleeInfo[0]->getType()->castTo<FunctionType>()->getResult();
+      resultTy = calleeInfo[0].getResultType();
     
     diagnose(applyExpr->getLoc(), diag::result_type_no_match,
              getUserFriendlyTypeName(resultTy))
@@ -2720,7 +2776,7 @@ bool FailureDiagnosis::visitUnaryExpr(ApplyExpr *applyExpr) {
   }
 
   auto argTyName = getUserFriendlyTypeName(argType);
-  std::string overloadName = calleeInfo[0]->getNameStr();
+  std::string overloadName = calleeInfo[0].decl->getNameStr();
   assert(!overloadName.empty());
 
   diagnose(argExpr->getLoc(), diag::cannot_apply_unop_to_arg, overloadName,
@@ -2747,14 +2803,15 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
   auto decomposedIndexType = decomposeArgumentType(indexType);
   
   CalleeCandidateInfo calleeInfo(locator, CS,
-                                 [&](ValueDecl *decl) -> CandidateCloseness {
+                           [&](UncurriedCandidate cand) -> CandidateCloseness
+  {
     // Classify how close this match is.  Non-subscript decls don't match.
-    auto *SD = dyn_cast<SubscriptDecl>(decl);
+    auto *SD = dyn_cast<SubscriptDecl>(cand.decl);
     if (!SD) return CC_GeneralMismatch;
     
     // Check to make sure the base expr type is convertible to the expected base
     // type.
-     auto selfConstraint = CC_ExactMatch;
+    auto selfConstraint = CC_ExactMatch;
     auto instanceTy =
       SD->getGetter()->getImplicitSelfDecl()->getType()->getInOutObjectType();
     if (!typeIsNotSpecialized(baseType) &&
@@ -2781,7 +2838,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     } else if (calleeInfo.size() == 1) {
       // If we have one candidate, the result must be what that candidate
       // produced.
-      resultTy = calleeInfo[0]->getType()->castTo<FunctionType>()->getResult();
+      resultTy = calleeInfo[0].getResultType();
     } else {
       diagnose(SE->getLoc(), diag::result_type_no_match_ambiguous)
         .highlight(SE->getSourceRange());
@@ -2824,7 +2881,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
 
 // FIXME: Hyper-redundant with collectCalleeCandidateInfo!
 static std::string getCalleeName(Expr *fnExpr, bool &isOverloadedFn,
-                                 ArrayRef<ValueDecl*> candidates) {
+                                 ArrayRef<UncurriedCandidate> candidates) {
   // Obtain the function's name, and collect any parameter lists for diffing
   // purposes.
   if (auto DRE = dyn_cast<DeclRefExpr>(fnExpr))

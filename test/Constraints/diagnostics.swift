@@ -320,6 +320,7 @@ let f8 = f7(2)
 f8(b: 1)
 f8(10)          // expected-error {{missing argument label 'b:' in call}}
 f8(1.0)         // expected-error {{cannot invoke 'f8' with an argument list of type '(Double)'}}
+// expected-note @-1 {{expected an argument list of type '(b: Int)'}}
 
 class CurriedClass {
   func method1() {}
