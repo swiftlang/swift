@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+// FIXME: rename to LazyFilterGenerator (_prext_)
 /// A generator that produces the elements produced by some base
 /// generator that also satisfy a given predicate.
 ///
@@ -36,12 +37,21 @@ public struct FilterGenerator<
 
   /// Creates an instance that produces the elements `x` of `base`
   /// for which `predicate(x) == true`.
-  public init(base: Base, predicate: (Base.Element)->Bool) {
+  public init(
+    _ base: Base,
+    _prext_whereElementsSatisfy predicate: (Base.Element)->Bool
+  ) {
     self._base = base
     self._predicate = predicate
   }
-  
+
+  /// The underlying generator whose elements are being filtered
+  public var base: Base { return _base }
+
   internal var _base: Base
+  
+  /// The predicate used to determine which elements produced by
+  /// `base` are also produced by `self`.
   internal var _predicate: (Base.Element)->Bool
 }
 
@@ -51,56 +61,78 @@ public struct FilterGenerator<
 /// - Note: `s.lazy.filter { ... }`, for an arbitrary sequence `s`,
 ///   is a `LazyFilterSequence`.
 public struct _prext_LazyFilterSequence<Base : SequenceType>
-: _prext_LazySequenceType {
+  : _prext_LazySequenceType {
   
   /// Return a *generator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
   public func generate() -> FilterGenerator<Base.Generator> {
-    return FilterGenerator(base: _base.generate(), predicate: _predicate)
+    return FilterGenerator(
+      base.generate(), _prext_whereElementsSatisfy: _include)
   }
 
   /// Creates an instance consisting of the elements `x` of `base` for
   /// which `predicate(x) == true`.
-  public init(base: Base, predicate: (Base.Generator.Element)->Bool) {
-    self._base = base
-    self._predicate = predicate
+  public init(
+    _ base: Base,
+    _prext_whereElementsSatisfy predicate: (Base.Generator.Element)->Bool
+  ) {
+    self.base = base
+    self._include = predicate
   }
-  
-  internal var _base: Base
-  internal var _predicate: (Base.Generator.Element)->Bool
+
+  /// The underlying sequence whose elements are being filtered
+  public let base: Base
+
+  /// The predicate used to determine which elements of `base` are
+  /// also elements of `self`.
+  internal let _include: (Base.Generator.Element)->Bool
 }
 
 /// The `Index` used for subscripting a `LazyFilterCollection`.
 ///
+/// The positions of a `LazyFilterIndex` correspond to those positions
+/// `p` in its underlying collection `c` such that `c[p]`
+/// satisfies the predicate with which the `LazyFilterIndex` was
+/// initialized.
+/// 
 /// - Note: The performance of advancing a `LazyFilterIndex`
 ///   depends on how sparsely the filtering predicate is satisfied,
 ///   and may not offer the usual performance given by models of
 ///   `ForwardIndexType`.
 public struct _prext_LazyFilterIndex<
-  Base: CollectionType
+  BaseElements: CollectionType
 > : ForwardIndexType {
   /// Returns the next consecutive value after `self`.
   ///
   /// - Requires: The next value is representable.
-  /// - Complexity: O(M), where M is the number of following elements
-  ///   in the underlying sequence that don't satisfy the predicate.
+  ///
+  /// - Complexity: Amortized O(M), where M is the average distance in
+  ///   the base collection between elements that satisfy the
+  ///   predicate.
+  ///
+  /// - Note: this operation may not satisfy the expected complexity
+  ///   for models of `ForwardIndexType`.
   public func successor() -> _prext_LazyFilterIndex {
-    for nextPos in _pos.successor()..<_end {
-      if _predicate(_base[nextPos]) {
+    for p in base.successor()..<_baseElements.endIndex {
+      if _include(_baseElements[p]) {
         return _prext_LazyFilterIndex(
-          _pos: nextPos, _end: _end,
-          _base: _base, _predicate: _predicate)
+          _baseElements: _baseElements, base: p, _include: _include)
       }
     }
     return _prext_LazyFilterIndex(
-      _pos: _end, _end: _end, _base: _base, _predicate: _predicate)
+      _baseElements: _baseElements, base: _baseElements.endIndex,
+      _include: _include)
   }
-  
-  internal var _pos: Base.Index
-  internal var _end: Base.Index
-  internal var _base: Base
-  internal var _predicate: (Base.Generator.Element)->Bool
+
+  internal let _baseElements: BaseElements
+
+  /// The position corresponding to `self` in the underlying collection.
+  public let base: BaseElements.Index
+
+  /// The predicate used to determine which elements of `base` are
+  /// also elements of `self`.
+  internal let _include: (BaseElements.Generator.Element)->Bool
 }
 
 /// Returns `true` iff `lhs` is identical to `rhs`.
@@ -108,7 +140,7 @@ public func == <Base: CollectionType>(
   lhs: _prext_LazyFilterIndex<Base>,
   rhs: _prext_LazyFilterIndex<Base>
 ) -> Bool {
-  return lhs._pos == rhs._pos
+  return lhs.base == rhs.base
 }
 
 /// A lazy `CollectionType` wrapper that includes the elements of an
@@ -134,7 +166,7 @@ public struct _prext_LazyFilterCollection<
   /// satisfy `predicate`.
   public init(
     _ base: Base,
-    includeElement predicate: (Base.Generator.Element)->Bool
+    _prext_whereElementsSatisfy predicate: (Base.Generator.Element)->Bool
   ) {
     self._base = base
     self._predicate = predicate
@@ -155,7 +187,7 @@ public struct _prext_LazyFilterCollection<
       ++first
     }
     return _prext_LazyFilterIndex(
-      _pos: first, _end: _base.endIndex, _base: _base, _predicate: _predicate)
+      _baseElements: _base, base: first, _include: _predicate)
   }
 
   /// The collection's "past the end" position.
@@ -167,8 +199,7 @@ public struct _prext_LazyFilterCollection<
   /// - Complexity: O(1).
   public var endIndex: Index {
     return _prext_LazyFilterIndex(
-      _pos: _base.endIndex, _end: _base.endIndex,
-      _base: _base, _predicate: _predicate)
+      _baseElements: _base, base: _base.endIndex, _include: _predicate)
   }
 
   /// Access the element at `position`.
@@ -176,14 +207,15 @@ public struct _prext_LazyFilterCollection<
   /// - Requires: `position` is a valid position in `self` and
   /// `position != endIndex`.
   public subscript(position: Index) -> Base.Generator.Element {
-    return _base[position._pos]
+    return _base[position.base]
   }
 
   /// Return a *generator* over the elements of this *sequence*.
   ///
   /// - Complexity: O(1).
   public func generate() -> FilterGenerator<Base.Generator> {
-    return FilterGenerator(base: _base.generate(), predicate: _predicate)
+    return FilterGenerator(
+      _base.generate(), _prext_whereElementsSatisfy: _predicate)
   }
 
   var _base: Base
@@ -198,10 +230,10 @@ extension _prext_LazySequenceType {
   ///   traversal step invokes `predicate` on one or more underlying
   ///   elements.
   public func filter(
-    includeElement predicate: (Elements.Generator.Element)->Bool
+    predicate: (Elements.Generator.Element)->Bool
   ) -> _prext_LazyFilterSequence<Self.Elements> {
     return _prext_LazyFilterSequence(
-      base: self.elements, predicate: predicate)
+      self.elements, _prext_whereElementsSatisfy: predicate)
   }
 }
 
@@ -213,9 +245,10 @@ extension _prext_LazyCollectionType {
   ///   traversal step invokes `predicate` on one or more underlying
   ///   elements.
   public func filter(
-    includeElement predicate: (Elements.Generator.Element)->Bool
+    predicate: (Elements.Generator.Element)->Bool
   ) -> _prext_LazyFilterCollection<Self.Elements> {
-    return _prext_LazyFilterCollection(self.elements, includeElement: predicate)
+    return _prext_LazyFilterCollection(
+      self.elements, _prext_whereElementsSatisfy: predicate)
   }
 }
 
@@ -230,7 +263,8 @@ public struct FilterSequence<Base : SequenceType> : SequenceType {
   ///
   /// - Complexity: O(1).
   public func generate() -> FilterGenerator<Base.Generator> {
-    return FilterGenerator(base: _base.generate(), predicate: _include)
+    return FilterGenerator(
+      _base.generate(), _prext_whereElementsSatisfy: _include)
   }
 
   var _base: Base
@@ -343,7 +377,8 @@ public struct FilterCollection<Base : CollectionType> : CollectionType {
   ///
   /// - Complexity: O(1).
   public func generate() -> FilterGenerator<Base.Generator> {
-    return FilterGenerator(base: _base.generate(), predicate: _include)
+    return FilterGenerator(
+      _base.generate(), _prext_whereElementsSatisfy: _include)
   }
 
   var _base: Base
