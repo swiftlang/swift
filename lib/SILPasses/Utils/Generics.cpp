@@ -254,26 +254,21 @@ ApplySite swift::trySpecializeApplyOfGeneric(ApplySite Apply,
   SILFunction *NewF = nullptr;
   auto &M = Apply.getInstruction()->getModule();
   // If we already have this specialization, reuse it.
-  auto PrevF = M.lookUpFunction(ClonedName);
-  if (PrevF) {
-    if (PrevF->getLinkage() != SILLinkage::SharedExternal ||
-        !M.getOptions().UsePrespecialized)
-      NewF = PrevF;
+  if (auto PrevF = M.lookUpFunction(ClonedName)) {
+    NewF = PrevF;
   } else {
     PrevF = lookupExistingSpecialization(M, ClonedName);
 
     if (PrevF) {
+      // The bodies of existing specializations cannot be used,
+      // as they may refer to non-public symbols.
+      if (PrevF->isDefinition())
+        PrevF->convertToDeclaration();
+
       if (hasPublicVisibility(PrevF->getLinkage())) {
-        // The bodies of existing specializations cannot be used,
-        // as they may refer to non-public symbols.
-        if (PrevF->isDefinition())
-          PrevF->convertToDeclaration();
         NewF = PrevF;
         NewF->setLinkage(SILLinkage::PublicExternal);
         // Ignore body for -Onone and -Odebug.
-        assert((NewF->isExternalDeclaration() ||
-                convertExtenralDefinitionIntoDeclaration(NewF)) &&
-              "Could not remove body of the found specialization");
         if (!convertExtenralDefinitionIntoDeclaration(NewF)) {
           DEBUG(llvm::dbgs()
                   << "Could not remove body of: " << ClonedName << '\n';);
@@ -281,24 +276,20 @@ ApplySite swift::trySpecializeApplyOfGeneric(ApplySite Apply,
 
         DEBUG(
           llvm::dbgs() << "Found existing specialization for: "
-                       << ClonedName << '\n';
+                           << ClonedName << '\n';
           auto DemangledNameString =
             swift::Demangle::demangleSymbolAsString(NewF->getName());
           llvm::dbgs() << DemangledNameString << "\n\n");
       } else {
         // Forget about this function.
-        DEBUG(llvm::dbgs()
-                << "Cannot reuse the specialization: "
-                << swift::Demangle::demangleSymbolAsString(PrevF->getName())
-                << "\n");
-        // TODO: It would be nice to jut remove this function from the module.
-        // But this is not possible, because SILDeserializer keeps a reference
-        // to this function and currently there is no implemented API to
-        // remove a specific reference from the SIL cache.
-        // So, this function stays in the final SIL, even though it is not
-        // used at all.
-        // M.eraseFunction(PrevF);
-        return ApplySite();
+        llvm::dbgs() << "Cannot reuse the specialization: "
+                     << swift::Demangle::demangleSymbolAsString(PrevF->getName()) << "\n";
+        if (!PrevF->getRefCount())
+          M.eraseFunction(PrevF);
+        else {
+          // FIXME: We need to do something here.
+          return ApplySite();
+        }
       }
     }
   }
