@@ -5,5 +5,5 @@
 // http://www.openradar.me/17317691
 
 func f() {
-    ({}) // expected-error {{type of expression is ambiguous without more context}}
+    ({}) // expected-error {{expression resolves to an unused function}}
 }

@@ -7,5 +7,5 @@ var f = 1
 var e: Int -> Int = {
     return $0
 }
-let d: Int =  { c, b in
-}(f, e) // expected-error {{missing return in a closure expected to return 'Int'}}
+let d: Int =  { c, b in // expected-error {{'()' is not convertible to 'Int'}}
+}(f, e)

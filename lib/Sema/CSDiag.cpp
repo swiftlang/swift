@@ -2565,8 +2565,10 @@ FailureDiagnosis::collectCalleeCandidateInfo(Expr *fn, Type actualArgsType,
 }
 
 bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
+  // Pre-checking can turn (T,U) into a TypeExpr.  That doesn't happen
+  // except in independent type-checking like this, so just ignore it.
   auto argExpr =
-    cast_or_null<TupleExpr>(typeCheckChildIndependently(binop->getArg()));
+    dyn_cast_or_null<TupleExpr>(typeCheckChildIndependently(binop->getArg()));
   if (!argExpr) return true;
 
   auto argTuple = argExpr->getType()->getAs<TupleType>();
