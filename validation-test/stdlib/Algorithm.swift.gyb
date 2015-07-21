@@ -123,7 +123,7 @@ struct A<T> : MutableSliceable {
     }
   }
 
-  subscript(r: Range<Int>) -> Array<T>.SubSlice {
+  subscript(r: Range<Int>) -> Array<T>.SubSequence {
     get {
       expectTrue(r.startIndex >= 0 && r.startIndex <= impl.count)
       expectTrue(r.endIndex >= 0 && r.endIndex <= impl.count)
