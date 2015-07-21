@@ -81,4 +81,9 @@ func tuple_bind(x: (Int, String)?) -> String? {
   // CHECK-NOT: release_value [[STRING]]
 }
 
-
+// rdar://21883752 - We were crashing on this function because the deallocation happened
+// out of scope.
+// CHECK-LABEL: sil hidden @_TF8optional16crash_on_deallocFTGVSs10DictionarySiGSaSi___T_
+func crash_on_dealloc(var dict : [Int : [Int]] = [:]) {
+  dict[1]?.append(2)
+}

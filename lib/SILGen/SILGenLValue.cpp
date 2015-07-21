@@ -79,6 +79,7 @@ struct LLVM_LIBRARY_VISIBILITY LValueWriteback {
   }
 
   void performWriteback(SILGenFunction &gen, bool isFinal) {
+    Scope S(gen.Cleanups, CleanupLocation::get(loc));
     component->writeback(gen, loc, base, temp, ExtraInfo, isFinal);
   }
 };
