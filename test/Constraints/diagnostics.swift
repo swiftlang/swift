@@ -324,6 +324,7 @@ f8(1.0)         // expected-error {{cannot invoke 'f8' with an argument list of 
 class CurriedClass {
   func method1() {}
   func method2(a: Int)(b : Int) {}
+  func method3(a: Int, b : Int) {}
 }
 
 let c = CurriedClass()
@@ -345,8 +346,28 @@ CurriedClass.method1(2.0)(1)       // expected-error {{cannot invoke 'method1' w
 CurriedClass.method2(c)(32)(b: 1)
 _ = CurriedClass.method2(c)
 _ = CurriedClass.method2(c)(32)
+_ = CurriedClass.method2(1,2)      // expected-error {{extra argument in call}}
 CurriedClass.method2(c)(1.0)(b: 1) // expected-error {{cannot invoke value of type '(Int) -> (b: Int) -> ()' with argument list '(Double)'}}
 CurriedClass.method2(c)(1)(b: 1.0) // expected-error {{cannot invoke value of type '(b: Int) -> ()' with argument list '(b: Double)'}}
 CurriedClass.method2(c)(2)(c: 1.0) // expected-error {{cannot invoke value of type '(b: Int) -> ()' with argument list '(c: Double)'}}
 
 
+CurriedClass.method3(c)(32, b: 1)
+_ = CurriedClass.method3(c)
+_ = CurriedClass.method3(c)(1, 2)        // expected-error {{missing argument label 'b:' in call}}
+_ = CurriedClass.method3(c)(1, b: 2)(32) // expected-error {{cannot call value of non-function type '()'}}
+_ = CurriedClass.method3(1, 2)           // expected-error {{extra argument in call}}
+CurriedClass.method3(c)(1.0, b: 1)       // expected-error {{cannot invoke value of type '(Int, b: Int) -> ()' with argument list '(Double, b: Int)'}}
+CurriedClass.method3(c)(1)               // expected-error {{cannot invoke value of type '(Int, b: Int) -> ()' with argument list '(Int)'}}
+CurriedClass.method3(c)(c: 1.0)          // expected-error {{missing argument for parameter 'b' in call}}
+
+
+extension CurriedClass {
+  func f() {
+    method3(1, b: 2)
+    method3()            // expected-error {{missing argument for parameter #1 in call}}
+
+    method3(42)          // expected-error {{cannot invoke 'method3' with an argument list of type '(Int)'}}
+    method3(self)        // expected-error {{missing argument for parameter 'b' in call}}
+  }
+}
