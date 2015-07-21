@@ -145,6 +145,15 @@ static bool cacheSpecialization(SILModule &M, SILFunction *F) {
   // Do not remove functions from the white-list. Keep them around.
   // Change their linkage to public, so that other applications can refer to it.
 
+  // Remove the conditional compilation, once the pre-specialization feature
+  // is not hidden anymore and is enabled by default. Right now, unconditionally
+  // cache specializations of any generic functions from the stdlib.
+#if 0
+  // Only cache, if user asked to do so.
+  if (!M.getOptions().UsePrespecialized)
+    return false;
+#endif
+
   if (M.getOptions().Optimization == SILOptions::SILOptMode::Optimize &&
       F->getLinkage() != SILLinkage::Public &&
       F->getModule().getSwiftModule()->getName().str() == STDLIB_NAME) {
