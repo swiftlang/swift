@@ -144,6 +144,9 @@ struct PrintOptions {
   /// Whether we are printing part of SIL body.
   bool PrintInSILBody = false;
 
+  /// Whether to use an empty line to separate two members in a single decl.
+  bool EmptyLineBetweenMembers = false;
+
   enum class ArgAndParamPrintingMode {
     ArgumentOnly,
     MatchSource,

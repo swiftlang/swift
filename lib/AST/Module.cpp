@@ -1390,15 +1390,11 @@ void SourceFile::print(ASTPrinter &Printer, const PrintOptions &PO) {
   for (auto decl : Decls) {
     if (!decl->shouldPrintInContext(PO))
       continue;
-
-    if(decl->print(Printer, PO)) {
+    // For a major decl, we print an empty line before it.
+    if (MajorDeclKinds.find(decl->getKind()) != MajorDeclKinds.end())
       Printer << "\n";
-
-      // For a major decl, we print an empty line after it.
-      if (MajorDeclKinds.find(decl->getKind()) != MajorDeclKinds.end()) {
-        Printer << "\n";
-      }
-    }
+    if(decl->print(Printer, PO))
+      Printer << "\n";
   }
 }
 

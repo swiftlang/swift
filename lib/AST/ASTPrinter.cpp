@@ -222,7 +222,6 @@ class PrintAST : public ASTVisitor<PrintAST> {
     if (RC.isEmpty())
       return;
 
-    Printer.printNewline();
     indent();
 
     SmallVector<StringRef, 8> Lines;
@@ -885,6 +884,8 @@ void PrintAST::printMembers(DeclRange members, bool needComma) {
       if (!member->shouldPrintInContext(Options))
         continue;
 
+      if (Options.EmptyLineBetweenMembers)
+        Printer.printNewline();
       indent();
       visit(member);
       if (needComma && std::next(i) != iEnd)
@@ -1691,7 +1692,6 @@ void PrintAST::visitEnumCaseDecl(EnumCaseDecl *decl) {
 void PrintAST::visitEnumElementDecl(EnumElementDecl *decl) {
   if (!decl->shouldPrintInContext(Options))
     return;
-
   printDocumentationComment(decl);
   // In cases where there is no parent EnumCaseDecl (such as imported or
   // deserialized elements), print the element independently.
