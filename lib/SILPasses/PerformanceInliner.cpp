@@ -846,7 +846,9 @@ static bool isProfitableInColdBlock(SILFunction *Callee) {
 FullApplySite SILPerformanceInliner::devirtualizeUpdatingCallGraph(
                                                             FullApplySite Apply,
                                                                 CallGraph &CG) {
-  auto *AI = cast<ApplyInst>(Apply.getInstruction());
+  auto *AI = dyn_cast<ApplyInst>(Apply.getInstruction());
+  if (!AI)
+    return FullApplySite();
 
   auto *NewInst = tryDevirtualizeApply(AI);
   if (!NewInst)
