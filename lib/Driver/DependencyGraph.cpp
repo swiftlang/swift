@@ -47,11 +47,13 @@ DependencyGraphImpl::MarkTracerImpl::~MarkTracerImpl() = default;
 using LoadResult = DependencyGraphImpl::LoadResult;
 using DependencyKind = DependencyGraphImpl::DependencyKind;
 using DependencyCallbackTy = LoadResult(StringRef, DependencyKind, bool);
+using InterfaceHashCallbackTy = LoadResult(StringRef);
 
 static LoadResult
 parseDependencyFile(llvm::MemoryBuffer &buffer,
                     llvm::function_ref<DependencyCallbackTy> providesCallback,
-                    llvm::function_ref<DependencyCallbackTy> dependsCallback) {
+                    llvm::function_ref<DependencyCallbackTy> dependsCallback,
+                    llvm::function_ref<InterfaceHashCallbackTy> interfaceHashCallback) {
   namespace yaml = llvm::yaml;
 
   // FIXME: Switch to a format other than YAML.
@@ -70,6 +72,7 @@ parseDependencyFile(llvm::MemoryBuffer &buffer,
 
   LoadResult result = LoadResult::UpToDate;
   SmallString<64> scratch;
+
   // FIXME: LLVM's YAML support does incremental parsing in such a way that
   // for-range loops break.
   for (auto i = topLevelMap->begin(), e = topLevelMap->end(); i != e; ++i) {
@@ -77,93 +80,105 @@ parseDependencyFile(llvm::MemoryBuffer &buffer,
       continue;
 
     auto *key = cast<yaml::ScalarNode>(i->getKey());
+    StringRef keyString = key->getValue(scratch);
+    LoadResult resultUpdate;
 
-    enum class DependencyDirection : bool {
-      Depends,
-      Provides
-    };
-    using KindPair = std::pair<DependencyKind, DependencyDirection>;
+    if (keyString == "interface-hash") {
+      auto *value = cast<yaml::ScalarNode>(i->getValue());
+      StringRef valueString = value->getValue(scratch);
+      resultUpdate = interfaceHashCallback(valueString);
 
-    KindPair dirAndKind = llvm::StringSwitch<KindPair>(key->getValue(scratch))
-      .Case("depends-top-level", std::make_pair(DependencyKind::TopLevelName,
-                                                DependencyDirection::Depends))
-      .Case("depends-nominal", std::make_pair(DependencyKind::NominalType,
-                                              DependencyDirection::Depends))
-      .Case("depends-member", std::make_pair(DependencyKind::NominalTypeMember,
-                                             DependencyDirection::Depends))
-      .Case("depends-dynamic-lookup",
-            std::make_pair(DependencyKind::DynamicLookupName,
-                           DependencyDirection::Depends))
-      .Case("depends-external", std::make_pair(DependencyKind::ExternalFile,
-                                               DependencyDirection::Depends))
-      .Case("provides-top-level", std::make_pair(DependencyKind::TopLevelName,
-                                                 DependencyDirection::Provides))
-      .Case("provides-nominal", std::make_pair(DependencyKind::NominalType,
-                                               DependencyDirection::Provides))
-      .Case("provides-member", std::make_pair(DependencyKind::NominalTypeMember,
-                                              DependencyDirection::Provides))
-      .Case("provides-dynamic-lookup",
-            std::make_pair(DependencyKind::DynamicLookupName,
-                           DependencyDirection::Provides));
-
-    auto *entries = cast<yaml::SequenceNode>(i->getValue());
-    if (dirAndKind.first == DependencyKind::NominalTypeMember) {
-      // Handle member dependencies specially. Rather than being a single
-      // string, they come in the form ["{MangledBaseName}", "memberName"].
-      for (yaml::Node &rawEntry : *entries) {
-        bool isCascading = rawEntry.getRawTag() != "!private";
-
-        auto &entry = cast<yaml::SequenceNode>(rawEntry);
-        auto iter = entry.begin();
-        auto &base = cast<yaml::ScalarNode>(*iter);
-        ++iter;
-        auto &member = cast<yaml::ScalarNode>(*iter);
-        ++iter;
-        // FIXME: LLVM's YAML support doesn't implement == correctly for end
-        // iterators.
-        assert(!(iter != entry.end()));
-
-        bool isDepends = dirAndKind.second == DependencyDirection::Depends;
-        auto &callback = isDepends ? dependsCallback : providesCallback;
-
-        // Smash the type and member names together so we can continue using
-        // StringMap.
-        SmallString<64> appended;
-        appended += base.getValue(scratch);
-        appended.push_back('\0');
-        appended += member.getValue(scratch);
-
-        switch (callback(appended.str(), dirAndKind.first, isCascading)) {
-        case LoadResult::HadError:
-          return LoadResult::HadError;
-        case LoadResult::UpToDate:
-          break;
-        case LoadResult::AffectsDownstream:
-          result = LoadResult::AffectsDownstream;
-          break;
-        }
-      }
     } else {
-      for (const yaml::Node &rawEntry : *entries) {
-        auto &entry = cast<yaml::ScalarNode>(rawEntry);
+      enum class DependencyDirection : bool {
+        Depends,
+        Provides
+      };
+      using KindPair = std::pair<DependencyKind, DependencyDirection>;
 
-        bool isDepends = dirAndKind.second == DependencyDirection::Depends;
-        auto &callback = isDepends ? dependsCallback : providesCallback;
+      KindPair dirAndKind = llvm::StringSwitch<KindPair>(key->getValue(scratch))
+        .Case("depends-top-level",
+              std::make_pair(DependencyKind::TopLevelName,
+                             DependencyDirection::Depends))
+        .Case("depends-nominal",
+              std::make_pair(DependencyKind::NominalType,
+                             DependencyDirection::Depends))
+        .Case("depends-member",
+              std::make_pair(DependencyKind::NominalTypeMember,
+                             DependencyDirection::Depends))
+        .Case("depends-dynamic-lookup",
+              std::make_pair(DependencyKind::DynamicLookupName,
+                             DependencyDirection::Depends))
+        .Case("depends-external",
+              std::make_pair(DependencyKind::ExternalFile,
+                             DependencyDirection::Depends))
+        .Case("provides-top-level",
+              std::make_pair(DependencyKind::TopLevelName,
+                             DependencyDirection::Provides))
+        .Case("provides-nominal",
+              std::make_pair(DependencyKind::NominalType,
+                             DependencyDirection::Provides))
+        .Case("provides-member",
+              std::make_pair(DependencyKind::NominalTypeMember,
+                             DependencyDirection::Provides))
+        .Case("provides-dynamic-lookup",
+              std::make_pair(DependencyKind::DynamicLookupName,
+                             DependencyDirection::Provides));
 
-        switch (callback(entry.getValue(scratch), dirAndKind.first,
-                         entry.getRawTag() != "!private")) {
-        case LoadResult::HadError:
-          return LoadResult::HadError;
-        case LoadResult::UpToDate:
-          break;
-        case LoadResult::AffectsDownstream:
-          result = LoadResult::AffectsDownstream;
-          break;
+      auto *entries = cast<yaml::SequenceNode>(i->getValue());
+      if (dirAndKind.first == DependencyKind::NominalTypeMember) {
+        // Handle member dependencies specially. Rather than being a single
+        // string, they come in the form ["{MangledBaseName}", "memberName"].
+        for (yaml::Node &rawEntry : *entries) {
+          bool isCascading = rawEntry.getRawTag() != "!private";
+
+          auto &entry = cast<yaml::SequenceNode>(rawEntry);
+          auto iter = entry.begin();
+          auto &base = cast<yaml::ScalarNode>(*iter);
+          ++iter;
+          auto &member = cast<yaml::ScalarNode>(*iter);
+          ++iter;
+          // FIXME: LLVM's YAML support doesn't implement == correctly for end
+          // iterators.
+          assert(!(iter != entry.end()));
+
+          bool isDepends = dirAndKind.second == DependencyDirection::Depends;
+          auto &callback = isDepends ? dependsCallback : providesCallback;
+
+          // Smash the type and member names together so we can continue using
+          // StringMap.
+          SmallString<64> appended;
+          appended += base.getValue(scratch);
+          appended.push_back('\0');
+          appended += member.getValue(scratch);
+
+          resultUpdate = callback(appended.str(), dirAndKind.first,
+                                  isCascading);
+        }
+      } else {
+        for (const yaml::Node &rawEntry : *entries) {
+          auto &entry = cast<yaml::ScalarNode>(rawEntry);
+
+          bool isDepends = dirAndKind.second == DependencyDirection::Depends;
+          auto &callback = isDepends ? dependsCallback : providesCallback;
+
+          resultUpdate = callback(entry.getValue(scratch), dirAndKind.first,
+                                  entry.getRawTag() != "!private");
         }
       }
     }
+
+    // After processing this entry, we now know more about the node as a whole.
+    switch (resultUpdate) {
+    case LoadResult::HadError:
+      return LoadResult::HadError;
+    case LoadResult::UpToDate:
+      break;
+    case LoadResult::AffectsDownstream:
+      result = LoadResult::AffectsDownstream;
+      break;
+    }
   }
-  
+
   return result;
 }
 
@@ -228,7 +243,26 @@ LoadResult DependencyGraphImpl::loadFromBuffer(const void *node,
     return LoadResult::UpToDate;
   };
 
-  return parseDependencyFile(buffer, providesCallback, dependsCallback);
+  auto interfaceHashCallback = [this, node](StringRef hash) -> LoadResult {
+    auto insertResult = InterfaceHashes.insert(std::make_pair(node, hash));
+
+    if (insertResult.second) {
+      // Treat a newly-added hash as up-to-date. This includes the initial
+      // load of the file.
+      return LoadResult::UpToDate;
+    }
+
+    auto iter = insertResult.first;
+    if (hash != iter->second) {
+      iter->second = hash;
+      return LoadResult::AffectsDownstream;
+    }
+
+    return LoadResult::UpToDate;
+  };
+
+  return parseDependencyFile(buffer, providesCallback, dependsCallback,
+                             interfaceHashCallback);
 }
 
 void DependencyGraphImpl::markExternal(SmallVectorImpl<const void *> &visited,

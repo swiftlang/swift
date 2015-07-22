@@ -1552,10 +1552,15 @@ static void addAuxiliaryOutput(Compilation &C, CommandOutput &output,
 /// mtime has not changed), adjust the Job's condition accordingly.
 static void
 handleCompileJobCondition(Job *J, CompileJobAction::InputInfo inputInfo,
-                          StringRef input) {
+                          StringRef input, bool alwaysRebuildDependents) {
   if (inputInfo.status == CompileJobAction::InputInfo::NewlyAdded) {
     J->setCondition(Job::Condition::NewlyAdded);
     return;
+  }
+
+  if (!alwaysRebuildDependents) {
+    // Default all non-newly added files to being rebuilt without cascading.
+    J->setCondition(Job::Condition::RunWithoutCascading);
   }
 
   llvm::sys::fs::file_status inputStatus;
@@ -1847,7 +1852,10 @@ Job *Driver::buildJobsForAction(Compilation &C, const Action *A,
   if (!J->getOutput().getAdditionalOutputForType(types::TY_SwiftDeps).empty()) {
     if (InputActions.size() == 1) {
       auto compileJob = cast<CompileJobAction>(A);
-      handleCompileJobCondition(J, compileJob->getInputInfo(), BaseInput);
+      bool alwaysRebuildDependents =
+          C.getArgs().hasArg(options::OPT_driver_always_rebuild_dependents);
+      handleCompileJobCondition(J, compileJob->getInputInfo(), BaseInput,
+                                alwaysRebuildDependents);
     }
   }
 

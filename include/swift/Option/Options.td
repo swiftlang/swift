@@ -86,6 +86,10 @@ def driver_show_incremental : Flag<["-"], "driver-show-incremental">,
   InternalDebugOpt,
   HelpText<"With -v, dump information about why files are being rebuilt">;
 
+def driver_always_rebuild_dependents :
+  Flag<["-"], "driver-always-rebuild-dependents">, InternalDebugOpt,
+  HelpText<"Always rebuild dependents of files that have been modified">;
+
 def driver_mode : Joined<["--"], "driver-mode=">, Flags<[HelpHidden]>,
   HelpText<"Set the driver mode to either 'swift' or 'swiftc'">;
 

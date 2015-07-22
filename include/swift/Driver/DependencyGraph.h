@@ -123,6 +123,12 @@ private:
   /// this dependency graph.
   llvm::StringSet<> ExternalDependencies;
 
+  /// The interface hash for each node. This determines if the interface of
+  /// a modified file has changed.
+  ///
+  /// \sa SourceFile::getInterfaceHash
+  llvm::DenseMap<const void *, std::string> InterfaceHashes;
+
   LoadResult loadFromBuffer(const void *node, llvm::MemoryBuffer &buffer);
 
   // FIXME: We should be able to use llvm::mapped_iterator for this, but

@@ -4,9 +4,9 @@
 // RUN: cd %t && %swiftc_driver -c -module-name main -driver-print-bindings ./main.swift ./other.swift ./yet-another.swift -incremental -output-file-map %t/output.json 2>&1 | FileCheck %s -check-prefix=MUST-EXEC
 
 // MUST-EXEC-NOT: warning
-// MUST-EXEC: inputs: ["./main.swift"], output: {{[{].*[}]$}}
-// MUST-EXEC: inputs: ["./other.swift"], output: {{[{].*[}]$}}
-// MUST-EXEC: inputs: ["./yet-another.swift"], output: {{[{].*[}]$}}
+// MUST-EXEC: inputs: ["./main.swift"], output: {{[{].*[}]}}, condition: run-without-cascading
+// MUST-EXEC: inputs: ["./other.swift"], output: {{[{].*[}]}}, condition: run-without-cascading
+// MUST-EXEC: inputs: ["./yet-another.swift"], output: {{[{].*[}]}}, condition: run-without-cascading
 
 // RUN: cd %t && %swiftc_driver -c -module-name main -driver-use-frontend-path %S/Inputs/update-dependencies.py ./main.swift ./other.swift ./yet-another.swift -incremental -output-file-map %t/output.json
 // RUN: cd %t && %swiftc_driver -c -module-name main -driver-print-bindings ./main.swift ./other.swift ./yet-another.swift -incremental -output-file-map %t/output.json 2>&1 | FileCheck %s -check-prefix=NO-EXEC
