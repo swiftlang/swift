@@ -827,13 +827,7 @@ std::string ClangImporter::getBridgingHeaderContents(StringRef headerPath,
 Module *ClangImporter::loadModule(
     SourceLoc importLoc,
     ArrayRef<std::pair<Identifier, SourceLoc>> path) {
-  // Don't even try to load the module if the Clang context is in a bad way.
-  // It could cause a crash.
   auto &clangContext = Impl.getClangASTContext();
-  auto &clangDiags = clangContext.getDiagnostics();
-  if (clangDiags.hasFatalErrorOccurred())
-    return nullptr;
-
   auto &clangHeaderSearch = Impl.getClangPreprocessor().getHeaderSearchInfo();
 
   // Look up the top-level module first, to see if it exists at all.
