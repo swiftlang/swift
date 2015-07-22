@@ -54,6 +54,18 @@ extension Float80 {
 
 var FloatingPoint = TestSuite("FloatingPoint")
 
+func positiveOne<T: IntegerLiteralConvertible>() -> T {
+  return 1
+}
+func negativeOne<T: IntegerLiteralConvertible>() -> T {
+  return -1
+}
+
+FloatingPoint.test("Float/IntegerLiteralConvertible") {
+  expectEqual(positiveOne(),  1.0 as Float)
+  expectEqual(negativeOne(), -1.0 as Float)
+}
+
 // Tests the float and int conversions work correctly. Each case is special.
 FloatingPoint.test("Float/UInt8") {
   expectEqual(UInt8.min, UInt8(Float(UInt8.min)))
@@ -97,6 +109,11 @@ FloatingPoint.test("Float/Int64") {
   expectEqual(Int64.min, Int64(Float(Int64.min)))
   expectCrashLater()
   expectEqual(Int64.max, Int64(Float(Int64.max)))
+}
+
+FloatingPoint.test("Double/IntegerLiteralConvertible") {
+  expectEqual(positiveOne(),  1.0 as Double)
+  expectEqual(negativeOne(), -1.0 as Double)
 }
 
 FloatingPoint.test("Double/UInt8") {
@@ -156,6 +173,11 @@ FloatingPoint.test("Double/HashValueZero") {
 }
 
 #if arch(i386) || arch(x86_64)
+
+FloatingPoint.test("Float80/IntegerLiteralConvertible") {
+  expectEqual(positiveOne(),  1.0 as Float80)
+  expectEqual(negativeOne(), -1.0 as Float80)
+}
 
 FloatingPoint.test("Float80/HashValueZero") {
   let zero: Float80 = getFloat80(0.0)

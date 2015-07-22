@@ -366,7 +366,7 @@ extension ${Self} : _BuiltinIntegerLiteralConvertible, IntegerLiteralConvertible
 
   /// Create an instance initialized to `value`.
   public init(integerLiteral value: Int64) {
-    self = ${Self}(_bits: Builtin.uitofp_Int64_FPIEEE${bits}(value.value))
+    self = ${Self}(_bits: Builtin.sitofp_Int64_FPIEEE${bits}(value.value))
   }
 }
 
