@@ -2023,11 +2023,13 @@ final internal class _Native${Self}StorageKeyNSEnumerator<
   internal var endIndex: Index
 
   //
-  // ${Self} -> NS${Self} bridging.
+  // NSEnumerator implementation.
+  //
+  // Do not call any of these methods from the standard library!
   //
 
   @objc
-  internal func bridgingNextObject() -> AnyObject? {
+  internal func nextObject() -> AnyObject? {
     if nextIndex == endIndex {
       return nil
     }
@@ -2036,7 +2038,8 @@ final internal class _Native${Self}StorageKeyNSEnumerator<
     return bridgedKey
   }
 
-  internal func bridgingCountByEnumeratingWithState(
+  @objc
+  internal func countByEnumeratingWithState(
     state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>,
     count: Int
@@ -2062,35 +2065,6 @@ final internal class _Native${Self}StorageKeyNSEnumerator<
     unmanagedObjects[0] = bridgedKey
     state.memory = theState
     return 1
-  }
-
-  // Don't implement a custom `bridgingCountByEnumeratingWithState` function.
-  // `NSEnumerator` will provide a default implementation for us that is just
-  // as fast as ours could be.  The issue is that there is some strange code
-  // out there that wants to break out of a fast enumeration loop and continue
-  // consuming elements of `NSEnumerator`.  Thus, fast enumeration on
-  // `NSEnumerator` can not provide more than one element at a time, so it is
-  // not fast anymore.
-
-  //
-  // NSEnumerator implementation.
-  //
-  // Do not call any of these methods from the standard library!
-  //
-
-  @objc
-  internal func nextObject() -> AnyObject? {
-    return bridgingNextObject()
-  }
-
-  @objc
-  internal func countByEnumeratingWithState(
-    state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
-    objects: UnsafeMutablePointer<AnyObject>,
-    count: Int
-  ) -> Int {
-    return bridgingCountByEnumeratingWithState(
-      state, objects: objects, count: count)
   }
 }
 #endif
