@@ -135,7 +135,7 @@ import SwiftShims
 //   | +-------------------------------+     |
 //   +---------------------------------------+
 //
-// `_NativeDictionaryStorageOwnerBase` is an `NSDictionary` subclass.  It can
+// `_NativeDictionaryStorageOwner` is an `NSDictionary` subclass.  It can
 // be returned to Objective-C during bridging if both `Key` and `Value`
 // bridge verbatim.
 //
@@ -1999,75 +1999,16 @@ internal struct _BridgedNative${Self}Storage {
   }
 }
 
-/// This class exists only to work around a compiler limitation.
-/// Specifically, we can not have @objc members in a generic class.  When this
-/// limitation is gone, this class can be folded into
-/// `_Native${Self}StorageNSEnumerator`.
-@objc
-internal class _Native${Self}StorageKeyNSEnumeratorBase
-  : _SwiftNativeNSEnumerator, _NSEnumeratorType {
-
-  internal init(dummy: (Int, ())) {}
-
-  internal func bridgingNextObject(dummy: ()) -> AnyObject? {
-    _sanityCheckFailure("'bridgingNextObject' should be overridden")
-  }
-
-  internal func bridgingCountByEnumeratingWithState(
-    state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
-    objects: UnsafeMutablePointer<AnyObject>,
-    count: Int,
-    dummy: ()
-  ) -> Int {
-    _sanityCheckFailure("'countByEnumeratingWithState' should be overridden")
-  }
-
-  // Don't implement a custom `bridgingCountByEnumeratingWithState` function.
-  // `NSEnumerator` will provide a default implementation for us that is just
-  // as fast as ours could be.  The issue is that there is some strange code
-  // out there that wants to break out of a fast enumeration loop and continue
-  // consuming elements of `NSEnumerator`.  Thus, fast enumeration on
-  // `NSEnumerator` can not provide more than one element at a time, so it is
-  // not fast anymore.
-
-  //
-  // NSEnumerator implementation.
-  //
-  // Do not call any of these methods from the standard library!
-  //
-
-  @objc
-  internal required override init() {
-    _sanityCheckFailure("don't call this designated initializer")
-  }
-
-  @objc
-  internal func nextObject() -> AnyObject? {
-    return bridgingNextObject(())
-  }
-
-  @objc
-  internal func countByEnumeratingWithState(
-    state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
-    objects: UnsafeMutablePointer<AnyObject>,
-    count: Int
-  ) -> Int {
-    return bridgingCountByEnumeratingWithState(
-      state, objects: objects, count: count, dummy: ())
-  }
-}
-
-@objc
 final internal class _Native${Self}StorageKeyNSEnumerator<
   ${TypeParametersDecl}
 >
-  : _Native${Self}StorageKeyNSEnumeratorBase {
+  : _SwiftNativeNSEnumerator, _NSEnumeratorType {
 
   internal typealias NativeStorageOwner =
     _Native${Self}StorageOwner<${TypeParameters}>
   internal typealias Index = _Native${Self}Index<${TypeParameters}>
 
-  internal required init() {
+  internal override required init() {
     _sanityCheckFailure("don't call this designated initializer")
   }
 
@@ -2075,7 +2016,6 @@ final internal class _Native${Self}StorageKeyNSEnumerator<
     self.nativeStorageOwner = nativeStorageOwner
     nextIndex = nativeStorageOwner.nativeStorage.startIndex
     endIndex = nativeStorageOwner.nativeStorage.endIndex
-    super.init(dummy: (0, ()))
   }
 
   internal var nativeStorageOwner: NativeStorageOwner
@@ -2086,7 +2026,8 @@ final internal class _Native${Self}StorageKeyNSEnumerator<
   // ${Self} -> NS${Self} bridging.
   //
 
-  internal override func bridgingNextObject(dummy: ()) -> AnyObject? {
+  @objc
+  internal func bridgingNextObject() -> AnyObject? {
     if nextIndex == endIndex {
       return nil
     }
@@ -2095,11 +2036,10 @@ final internal class _Native${Self}StorageKeyNSEnumerator<
     return bridgedKey
   }
 
-  internal override func bridgingCountByEnumeratingWithState(
+  internal func bridgingCountByEnumeratingWithState(
     state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>,
-    count: Int,
-    dummy: ()
+    count: Int
   ) -> Int {
     var theState = state.memory
     if theState.state == 0 {
@@ -2123,80 +2063,24 @@ final internal class _Native${Self}StorageKeyNSEnumerator<
     state.memory = theState
     return 1
   }
-}
 
-/// This class exists only to work around a compiler limitation.
-/// Specifically, we can not have objc members in a generic class.  When this
-/// limitation is gone, this class can be folded into
-/// `_Native${Self}StorageOwner`.
-@objc
-internal class _Native${Self}StorageOwnerBase
-  : _SwiftNativeNS${Self}, _NS${Self}CoreType {
-
-  internal override init() {}
-
-  // Empty tuple is a workaround for
-  // <rdar://problem/16824792> Overriding functions and properties in a generic
-  // subclass of an @objc class has no effect
-  internal var bridgingCount: (Int, ()) {
-    _sanityCheckFailure("'bridgingCount' should be overridden")
-  }
-
-  // Empty tuple is a workaround for
-  // <rdar://problem/16824792> Overriding functions and properties in a generic
-  internal func bridgingObjectForKey(aKey: AnyObject, dummy: ()) -> AnyObject? {
-    _sanityCheckFailure("'bridgingObjectForKey' should be overridden")
-  }
-
-  // Empty tuple is a workaround for
-  // <rdar://problem/16824792> Overriding functions and properties in a generic
-  internal func bridgingKeyEnumerator(dummy: ()) -> _NSEnumeratorType {
-    _sanityCheckFailure("'bridgingKeyEnumerator' should be overridden")
-  }
-
-  internal func bridgingCountByEnumeratingWithState(
-    state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
-    objects: UnsafeMutablePointer<AnyObject>,
-    count: Int,
-    dummy: ()
-  ) -> Int {
-    _sanityCheckFailure("'countByEnumeratingWithState' should be overridden")
-  }
-
-%if Self == 'Set':
+  // Don't implement a custom `bridgingCountByEnumeratingWithState` function.
+  // `NSEnumerator` will provide a default implementation for us that is just
+  // as fast as ours could be.  The issue is that there is some strange code
+  // out there that wants to break out of a fast enumeration loop and continue
+  // consuming elements of `NSEnumerator`.  Thus, fast enumeration on
+  // `NSEnumerator` can not provide more than one element at a time, so it is
+  // not fast anymore.
 
   //
-  // NSSet implementation.
+  // NSEnumerator implementation.
   //
-  // Do not call any of these methods from the standard library!  Use only
-  // `nativeStorage`.
+  // Do not call any of these methods from the standard library!
   //
 
   @objc
-  internal required init(objects: UnsafePointer<AnyObject?>, count: Int) {
-    _sanityCheckFailure("don't call this designated initializer")
-  }
-
-  @objc
-  internal var count: Int {
-    return bridgingCount.0
-  }
-
-  @objc
-  internal func member(object: AnyObject) -> AnyObject? {
-    return bridgingObjectForKey(object, dummy: ())
-  }
-
-  @objc
-  internal func objectEnumerator() -> _NSEnumeratorType {
-    return bridgingKeyEnumerator(())
-  }
-
-  @objc
-  internal func copyWithZone(zone: _SwiftNSZone) -> AnyObject {
-    // Instances of this class should be visible outside of standard library as
-    // having `NSSet` type, which is immutable.
-    return self
+  internal func nextObject() -> AnyObject? {
+    return bridgingNextObject()
   }
 
   @objc
@@ -2206,78 +2090,9 @@ internal class _Native${Self}StorageOwnerBase
     count: Int
   ) -> Int {
     return bridgingCountByEnumeratingWithState(
-      state, objects: objects, count: count, dummy: ())
+      state, objects: objects, count: count)
   }
-
-%elif Self == 'Dictionary':
-  //
-  // NSDictionary implementation.
-  //
-  // Do not call any of these methods from the standard library!  Use only
-  // `nativeStorage`.
-  //
-
-  @objc
-  internal required init(
-    objects: UnsafePointer<AnyObject?>,
-    forKeys: UnsafePointer<Void>,
-    count: Int
-  ) {
-    _sanityCheckFailure("don't call this designated initializer")
-  }
-
-  @objc
-  internal var count: Int {
-    return bridgingCount.0
-  }
-
-  @objc
-  internal func objectForKey(aKey: AnyObject) -> AnyObject? {
-    return bridgingObjectForKey(aKey, dummy: ())
-  }
-
-  @objc
-  internal func keyEnumerator() -> _NSEnumeratorType {
-    return bridgingKeyEnumerator(())
-  }
-
-  @objc
-  internal func copyWithZone(zone: _SwiftNSZone) -> AnyObject {
-    // Instances of this class should be visible outside of standard library as
-    // having `NSDictionary` type, which is immutable.
-    return self
-  }
-
-  @objc
-  internal func countByEnumeratingWithState(
-    state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
-    objects: UnsafeMutablePointer<AnyObject>,
-    count: Int
-  ) -> Int {
-    return bridgingCountByEnumeratingWithState(
-      state, objects: objects, count: count, dummy: ())
-  }
-
-  @objc
-  internal func getObjects(
-    objects: UnsafeMutablePointer<AnyObject>,
-    andKeys keys: UnsafeMutablePointer<AnyObject>
-  ) {
-    bridgedAllKeysAndValues(objects, keys)
-  }
-
-  @objc
-  internal func bridgedAllKeysAndValues(
-    objects: UnsafeMutablePointer<AnyObject>,
-    _ keys: UnsafeMutablePointer<AnyObject>
-  ) {
-    _sanityCheckFailure("'bridgedAllKeysAndValues' should be overridden")
-  }
-%end
-
 }
-#else
-internal class _Native${Self}StorageOwnerBase {}
 #endif
 
 /// This class is an artifact of the COW implementation.  This class only
@@ -2293,7 +2108,7 @@ internal class _Native${Self}StorageOwnerBase {}
 /// during bridging.  `${Self}Index` points directly to
 /// `_Native${Self}Storage`.
 final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
-  : _Native${Self}StorageOwnerBase {
+  : _SwiftNativeNS${Self}, _NS${Self}CoreType {
 
   internal typealias NativeStorage = _Native${Self}Storage<${TypeParameters}>
 #if _runtime(_ObjC)
@@ -2303,23 +2118,6 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
 %if Self == 'Set':
   internal typealias Key = Element
   internal typealias Value = Element
-%end
-
-%if Self == 'Set':
-  internal required init(
-    objects: UnsafePointer<AnyObject?>,
-    count: Int
-  ) {
-    _sanityCheckFailure("don't call this designated initializer")
-  }
-%elif Self == 'Dictionary':
-  internal required init(
-    objects: UnsafePointer<AnyObject?>,
-    forKeys: UnsafePointer<Void>,
-    count: Int
-  ) {
-    _sanityCheckFailure("don't call this designated initializer")
-  }
 %end
 
   internal init(minimumCapacity: Int = 2) {
@@ -2341,6 +2139,81 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
   internal var nativeStorage: NativeStorage
 
 #if _runtime(_ObjC)
+
+%if Self == 'Set':
+
+  //
+  // NSSet implementation.
+  //
+  // Do not call any of these methods from the standard library!  Use only
+  // `nativeStorage`.
+  //
+
+  @objc
+  internal required init(objects: UnsafePointer<AnyObject?>, count: Int) {
+    _sanityCheckFailure("don't call this designated initializer")
+  }
+
+  @objc
+  internal func member(object: AnyObject) -> AnyObject? {
+    return bridgingObjectForKey(object)
+  }
+
+  @objc
+  internal func objectEnumerator() -> _NSEnumeratorType {
+    return bridgingKeyEnumerator(())
+  }
+
+  @objc
+  internal func copyWithZone(zone: _SwiftNSZone) -> AnyObject {
+    // Instances of this class should be visible outside of standard library as
+    // having `NSSet` type, which is immutable.
+    return self
+  }
+
+%elif Self == 'Dictionary':
+  //
+  // NSDictionary implementation.
+  //
+  // Do not call any of these methods from the standard library!  Use only
+  // `nativeStorage`.
+  //
+
+  @objc
+  internal required init(
+    objects: UnsafePointer<AnyObject?>,
+    forKeys: UnsafePointer<Void>,
+    count: Int
+  ) {
+    _sanityCheckFailure("don't call this designated initializer")
+  }
+
+  @objc
+  internal func objectForKey(aKey: AnyObject) -> AnyObject? {
+    return bridgingObjectForKey(aKey)
+  }
+
+  @objc
+  internal func keyEnumerator() -> _NSEnumeratorType {
+    return bridgingKeyEnumerator(())
+  }
+
+  @objc
+  internal func copyWithZone(zone: _SwiftNSZone) -> AnyObject {
+    // Instances of this class should be visible outside of standard library as
+    // having `NSDictionary` type, which is immutable.
+    return self
+  }
+
+  @objc
+  internal func getObjects(
+    objects: UnsafeMutablePointer<AnyObject>,
+    andKeys keys: UnsafeMutablePointer<AnyObject>
+  ) {
+    bridgedAllKeysAndValues(objects, keys)
+  }
+%end
+
   /// Returns the pointer to the stored property, which contains bridged
   /// ${Self} elements.
   internal var _heapBufferBridgedPtr: UnsafeMutablePointer<AnyObject?> {
@@ -2461,7 +2334,7 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
     return bridgedNativeStorage.assertingGet(i.offset).1
   }
 
-  internal override func bridgedAllKeysAndValues(
+  internal func bridgedAllKeysAndValues(
     objects: UnsafeMutablePointer<AnyObject>,
     _ keys: UnsafeMutablePointer<AnyObject>
   ) {
@@ -2516,11 +2389,12 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
   // ${Self} -> NS${Self} bridging
   //
 
-  internal override var bridgingCount: (Int, ()) {
-    return (nativeStorage.count, ())
+  @objc
+  internal var count: Int {
+    return nativeStorage.count
   }
 
-  internal override func bridgingObjectForKey(aKey: AnyObject, dummy: ())
+  internal func bridgingObjectForKey(aKey: AnyObject)
     -> AnyObject? {
     let nativeKey = _forceBridgeFromObjectiveC(aKey, Key.self)
     let (i, found) = nativeStorage._find(
@@ -2531,15 +2405,15 @@ final internal class _Native${Self}StorageOwner<${TypeParametersDecl}>
     return nil
   }
 
-  internal override func bridgingKeyEnumerator(dummy: ()) -> _NSEnumeratorType {
+  internal func bridgingKeyEnumerator() -> _NSEnumeratorType {
     return _Native${Self}StorageKeyNSEnumerator<${TypeParameters}>(self)
   }
 
-  internal override func bridgingCountByEnumeratingWithState(
+  @objc
+  internal func countByEnumeratingWithState(
     state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>,
-    count: Int,
-    dummy: ()
+    count: Int
   ) -> Int {
     var theState = state.memory
     if theState.state == 0 {
@@ -3868,7 +3742,7 @@ extension ${Self} {
       _precondition(_isBridgedToObjectiveC(Value.self),
         "Value is not bridged to Objective-C")
 %end
-      return nativeOwner as _Native${Self}StorageOwnerBase
+      return nativeOwner as _Native${Self}StorageOwner<${TypeParameters}>
 
     case _Variant${Self}Storage.Cocoa(let cocoaStorage):
       return cocoaStorage.cocoa${Self}
