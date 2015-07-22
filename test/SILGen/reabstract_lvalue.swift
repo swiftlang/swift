@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | tee /tmp/xx | FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | FileCheck %s
 
 struct MyMetatypeIsThin {}
 
