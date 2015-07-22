@@ -160,4 +160,10 @@ public protocol _NSSetCoreType :
 public protocol _NSSetType : _NSSetCoreType {
 }
 
+#else
+
+public protocol _NSArrayCoreType {}
+public protocol _NSDictionaryCoreType {}
+public protocol _NSSetCoreType {}
+
 #endif

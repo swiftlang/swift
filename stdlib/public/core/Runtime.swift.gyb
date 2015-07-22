@@ -463,4 +463,10 @@ public func _stdlib_initializeReturnAutoreleased() {
   _stdlib_ReturnAutoreleasedDummy().initializeReturnAutoreleased()
 #endif
 }
+#else
+
+class _SwiftNativeNSArray {}
+class _SwiftNativeNSDictionary {}
+class _SwiftNativeNSSet {}
+
 #endif
