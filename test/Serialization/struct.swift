@@ -86,3 +86,12 @@ struct TestLetProperties {
     _ = b.pattyCount
   }
 }
+
+#if false
+// FIXME: <rdar://problem/21933630>
+extension Burger {
+  init(double pattyCount: Int) {
+    self.pattyCount = pattyCount * 2
+  }
+}
+#endif
