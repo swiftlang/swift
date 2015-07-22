@@ -82,6 +82,12 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
     assert(Second.isNull() && "Type property with second type");
     break;
 
+  case ConstraintKind::Defaultable:
+    assert(!First.isNull());
+    assert(!Second.isNull());
+    assert(!Member && "Defaultable constraint cannot have a member");
+    break;
+
   case ConstraintKind::BindOverload:
     llvm_unreachable("Wrong constructor for overload binding constraint");
 
@@ -170,6 +176,10 @@ Constraint *Constraint::clone(ConstraintSystem &cs) const {
   case ConstraintKind::TypeMember:
     return create(cs, getKind(), getFirstType(), Type(), getMember(), 
                   getLocator());
+
+  case ConstraintKind::Defaultable:
+    return create(cs, getKind(), getFirstType(), getSecondType(),
+                  getMember(), getLocator());
 
   case ConstraintKind::Archetype:
   case ConstraintKind::Class:
@@ -303,6 +313,9 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm) const {
   case ConstraintKind::BridgedToObjectiveC:
     Out << " is bridged to an Objective-C type";
     skipSecond = true;
+    break;
+  case ConstraintKind::Defaultable:
+    Out << " can default to ";
     break;
   case ConstraintKind::Conjunction:
   case ConstraintKind::Disjunction:
@@ -511,6 +524,7 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::ValueMember:
   case ConstraintKind::DynamicTypeOf:
   case ConstraintKind::OptionalObject:
+  case ConstraintKind::Defaultable:
     constraint->getSecondType()->getTypeVariables(typeVars);
     SWIFT_FALLTHROUGH;
 

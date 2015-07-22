@@ -229,7 +229,7 @@ var closureWithObservedProperty: () -> () = {
 
 // rdar://19179412 - Crash on valid code.
 func rdar19179412() -> Int -> Int {
-  return { x in //expected-error {{cannot convert return expression of type '(_) -> ()' to expected return type 'Int -> Int'}}
+  return { x in
     class A {
       let d : Int = 0
     }
@@ -279,4 +279,8 @@ class TestClassWithStaticMethod {
   }
 }
 
-
+// Test that we can infer () as the result type of these closures.
+func genericOne<T>(a: () -> T) {}
+func genericTwo<T>(a: () -> T, _ b: () -> T) {}
+genericOne {}
+genericTwo({}, {})

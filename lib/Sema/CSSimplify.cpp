@@ -3410,6 +3410,19 @@ ConstraintSystem::simplifyBridgedToObjectiveCConstraint(
 }
 
 ConstraintSystem::SolutionKind
+ConstraintSystem::simplifyDefaultableConstraint(const Constraint &constraint) {
+  // Leave the constraint around if the first variable is still opaque.
+  auto baseTy = simplifyForTypePropertyConstraint(*this,
+                                                  constraint.getFirstType());
+  if (!baseTy)
+    return SolutionKind::Unsolved;
+
+  // Otherwise, any type is fine.
+  return SolutionKind::Solved;
+}
+
+
+ConstraintSystem::SolutionKind
 ConstraintSystem::simplifyDynamicTypeOfConstraint(const Constraint &constraint) {
   // Solve forward.
   TypeVariableType *typeVar2;
@@ -3642,6 +3655,7 @@ static TypeMatchKind getTypeMatchKind(ConstraintKind kind) {
   case ConstraintKind::Archetype:
   case ConstraintKind::Class:
   case ConstraintKind::BridgedToObjectiveC:
+  case ConstraintKind::Defaultable:
     llvm_unreachable("Type properties don't involve type matches");
 
   case ConstraintKind::Conjunction:
@@ -4519,6 +4533,9 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
 
   case ConstraintKind::Class:
     return simplifyClassConstraint(constraint);
+
+  case ConstraintKind::Defaultable:
+    return simplifyDefaultableConstraint(constraint);
 
   case ConstraintKind::Conjunction:
     // Process all of the constraints in the conjunction.

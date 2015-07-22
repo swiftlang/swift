@@ -435,10 +435,10 @@ void constraints::simplifyLocator(Expr *&anchor,
 
     case ConstraintLocator::ClosureResult:
       if (auto CE = dyn_cast<ClosureExpr>(anchor)) {
-        if (auto body = CE->getSingleExpressionBody()) {
+        if (CE->hasSingleExpressionBody()) {
           targetAnchor = nullptr;
           targetPath.clear();
-          anchor = body;
+          anchor = CE->getSingleExpressionBody();
           path = path.slice(1);
           continue;
         }

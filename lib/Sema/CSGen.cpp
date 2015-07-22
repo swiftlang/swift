@@ -1883,15 +1883,21 @@ namespace {
         funcTy = expr->getExplicitResultTypeLoc().getType();
       } else if (!crt.isNull()) {
         funcTy = crt;
-      } else if (closureHasNoResult(expr)) {
-        funcTy = TupleType::getEmpty(CS.getASTContext());
       } else{
+        auto locator =
+          CS.getConstraintLocator(expr, ConstraintLocator::ClosureResult);
+
         // If no return type was specified, create a fresh type
         // variable for it.
-        funcTy = CS.createTypeVariable(
-                   CS.getConstraintLocator(expr,
-                                           ConstraintLocator::ClosureResult),
-                   /*options=*/0);
+        funcTy = CS.createTypeVariable(locator, /*options=*/0);
+
+        // Allow it to default to () if there are no return statements.
+        if (closureHasNoResult(expr)) {
+          CS.addConstraint(ConstraintKind::Defaultable,
+                           funcTy,
+                           TupleType::getEmpty(CS.getASTContext()),
+                           locator);
+        }
       }
 
       // Walk through the patterns in the func expression, backwards,

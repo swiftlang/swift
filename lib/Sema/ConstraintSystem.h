@@ -2238,6 +2238,9 @@ private:
   SolutionKind simplifyBridgedToObjectiveCConstraint(const Constraint
                                                                 &constraint);
 
+  /// \brief Attempt to simplify the given defaultable constraint.
+  SolutionKind simplifyDefaultableConstraint(const Constraint &c);
+
   /// \brief Simplify the given constaint.
   SolutionKind simplifyConstraint(const Constraint &constraint);
 

@@ -633,6 +633,7 @@ static bool shouldBindToValueType(Constraint *constraint)
   case ConstraintKind::Archetype:
   case ConstraintKind::Class:
   case ConstraintKind::BridgedToObjectiveC:
+  case ConstraintKind::Defaultable:
   case ConstraintKind::Conjunction:
   case ConstraintKind::Disjunction:
     llvm_unreachable("shouldBindToValueType() may only be called on "
@@ -658,6 +659,7 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
   PotentialBindings result;
   llvm::SmallPtrSet<CanType, 4> exactTypes;
   llvm::SmallPtrSet<ProtocolDecl *, 4> literalProtocols;
+  bool hasDefaultableConstraint = false;
   auto &tc = cs.getTypeChecker();
   for (auto constraint : constraints) {
     // Only visit each constraint once.
@@ -689,6 +691,11 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
     case ConstraintKind::BridgedToObjectiveC:
       // Constraints from which we can't do anything.
       // FIXME: Record this somehow?
+      continue;
+
+    case ConstraintKind::Defaultable:
+      // Do these in a separate pass.
+      hasDefaultableConstraint = true;
       continue;
 
     case ConstraintKind::Conjunction:
@@ -925,6 +932,19 @@ static PotentialBindings getPotentialBindings(ConstraintSystem &cs,
                          coveredLiteralProtocols.count(*binding.DefaultedProtocol) > 0;
                        }),
         result.Bindings.end());
+    }
+  }
+
+  // If we haven't found any other bindings yet, go ahead and consider
+  // the defaulting constraints.
+  if (result.Bindings.empty() && hasDefaultableConstraint) {
+    for (Constraint *constraint : constraints) {
+      if (constraint->getKind() != ConstraintKind::Defaultable)
+        continue;
+
+      result.Bindings.push_back({constraint->getSecondType(),
+                                 AllowedBindingKind::Exact,
+                                 None});
     }
   }
 

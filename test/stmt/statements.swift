@@ -403,7 +403,8 @@ func test_is_as_patterns() {
 // <rdar://problem/21387308> Fuzzing SourceKit: crash in Parser::parseStmtForEach(...)
 func matching_pattern_recursion() {
   switch 42 {
-  case {  // expected-error {{binary operator '~=' cannot be applied to operands of type '() -> ()' and 'Int'}}
+  // FIXME: this is a terrible diagnostic
+  case {  // expected-error {{function produces expected type 'Range<Int>'; did you mean to call it with '()'?}}
       for i in zs {
       }
   }: break
