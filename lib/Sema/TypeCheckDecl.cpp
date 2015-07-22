@@ -50,7 +50,7 @@ namespace {
 /// Float and integer literals are additionally keyed by numeric equivalence.
 struct RawValueKey {
   enum class Kind : uint8_t {
-    String, UnicodeScalar, Float, Int, Tombstone, Empty
+    String, Float, Int, Tombstone, Empty
   } kind;
   
   struct IntValueTy {
@@ -108,10 +108,6 @@ struct RawValueKey {
       }
       return;
     }
-    case ExprKind::CharacterLiteral:
-      kind = Kind::UnicodeScalar;
-      charValue = cast<CharacterLiteralExpr>(expr)->getValue();
-      return;
     case ExprKind::StringLiteral:
       kind = Kind::String;
       stringValue = cast<StringLiteralExpr>(expr)->getValue();
@@ -161,8 +157,6 @@ public:
     case RawValueKey::Kind::Int:
       return DenseMapInfo<uint64_t>::getHashValue(k.intValue.v0) &
              DenseMapInfo<uint64_t>::getHashValue(k.intValue.v1);
-    case RawValueKey::Kind::UnicodeScalar:
-      return DenseMapInfo<uint32_t>::getHashValue(k.charValue);
     case RawValueKey::Kind::String:
       return llvm::HashString(k.stringValue);
     case RawValueKey::Kind::Empty:
@@ -182,8 +176,6 @@ public:
     case RawValueKey::Kind::Int:
       return a.intValue.v0 == b.intValue.v0 &&
              a.intValue.v1 == b.intValue.v1;
-    case RawValueKey::Kind::UnicodeScalar:
-      return a.charValue == b.charValue;
     case RawValueKey::Kind::String:
       return a.stringValue.equals(b.stringValue);
     case RawValueKey::Kind::Empty:

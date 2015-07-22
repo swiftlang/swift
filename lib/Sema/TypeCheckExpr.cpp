@@ -534,14 +534,8 @@ Type TypeChecker::getDefaultType(ProtocolDecl *protocol, DeclContext *dc) {
   Type *type = nullptr;
   const char *name = nullptr;
 
-  // CharacterLiteralConvertible -> CharacterLiteralType
-  if (protocol == getProtocol(SourceLoc(),
-                              KnownProtocolKind::CharacterLiteralConvertible)) {
-    type = &CharacterLiteralType;
-    name = "CharacterLiteralType";
-  }
   // UnicodeScalarLiteralConvertible -> UnicodeScalarType
-  else if (protocol ==
+  if (protocol ==
            getProtocol(
                SourceLoc(),
                KnownProtocolKind::UnicodeScalarLiteralConvertible)) {

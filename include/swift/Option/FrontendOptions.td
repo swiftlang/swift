@@ -187,9 +187,6 @@ def disable_availability_checking : Flag<["-"],
   "disable-availability-checking">,
   HelpText<"Disable checking for potentially unavailable APIs">;
 
-def enable_character_literals : Flag<["-"], "enable-character-literals">,
-  HelpText<"Enable legacy character literals">;
-
 def enable_objc_implicit_properties :
   Flag<["-"], "enable-objc-implicit-properties">,
   HelpText<"Import Objective-C \"implicit properties\" as properties">;

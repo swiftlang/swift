@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift -enable-character-literals
+// RUN: %target-parse-verify-swift
 
 /* block comments */
 /* /* nested too */ */
@@ -188,7 +188,6 @@ func missing_semicolons() {
   var w = 321
   func g() {}
   g() ++w             // expected-error{{consecutive statements}} {{6-6=;}}
-  var y = w'g'        // expected-error{{consecutive statements}} {{12-12=;}} // expected-error {{expression does not conform to type 'CharacterLiteralConvertible'}}
   var z = w"hello"    // expected-error{{consecutive statements}} {{12-12=;}}
   class  C {}class  C2 {} // expected-error{{consecutive statements}} {{14-14=;}}
   struct S {}struct S2 {} // expected-error{{consecutive statements}} {{14-14=;}}

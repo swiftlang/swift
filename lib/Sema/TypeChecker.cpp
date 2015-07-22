@@ -117,10 +117,6 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(Expr *expr) {
     return getProtocol(expr->getLoc(),
                        KnownProtocolKind::BooleanLiteralConvertible);
 
-  if (isa<CharacterLiteralExpr>(expr))
-    return getProtocol(expr->getLoc(),
-                       KnownProtocolKind::CharacterLiteralConvertible);
-
   if (const auto *SLE = dyn_cast<StringLiteralExpr>(expr)) {
     if (SLE->isSingleUnicodeScalar())
       return getProtocol(

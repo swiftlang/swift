@@ -306,9 +306,6 @@ public:
   IntegerLiteralInst *createIntegerLiteral(IntegerLiteralExpr *E) {
     return insert(IntegerLiteralInst::create(E, F));
   }
-  IntegerLiteralInst *createIntegerLiteral(CharacterLiteralExpr *E) {
-    return insert(IntegerLiteralInst::create(E, F));
-  }
   IntegerLiteralInst *createIntegerLiteral(SILLocation Loc, SILType Ty,
                                            intmax_t Value) {
     return insert(IntegerLiteralInst::create(Loc, Ty, Value, F));

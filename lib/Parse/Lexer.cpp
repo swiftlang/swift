@@ -1008,75 +1008,6 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, bool StopAtDoubleQuote,
   return CharValue;
 }
 
-
-/// lexCharacterLiteral:
-///   character_literal ::= '([^'\\\n\r]|character_escape)'
-void Lexer::lexCharacterLiteral() {
-  const char *TokStart = CurPtr-1;
-  assert(*TokStart == '\'' && "Unexpected start");
-  
-  unsigned CharValue = lexCharacter(CurPtr, false, true);
-
-  // If we have '', we have an invalid character literal.
-  if (CharValue == ~0U) {
-    diagnose(TokStart, diag::lex_invalid_character_literal);
-    if (*CurPtr == '\'')
-      ++CurPtr;
-    return formToken(tok::character_literal, TokStart);
-  }
-
-  // If this wasn't a normal character, then this is a malformed character.
-  if (CharValue == ~1U) {
-    // Skip until we see a single quote, newline, or EOF, whatever comes first.
-    while (true) {
-      const char C = *CurPtr;
-      if (C == '\n' || C == '\r' || C == '\'' || C == 0)
-        break;
-      CurPtr++;
-    }
-
-    // If we successfully skipped to the single quote, assume that it
-    // terminates the character literal and eat it now.
-    if (*CurPtr == '\'')
-      ++CurPtr;
-    return formToken(tok::character_literal, TokStart);
-  }
-
-  if (*CurPtr != '\'') {
-    // Skip until we see a single quote, newline, or EOF, whatever comes first.
-    while (true) {
-      const char C = *CurPtr;
-      if (C == '\n' || C == '\r' || C == '\'' || C == 0)
-        break;
-      CurPtr++;
-    }
-
-    // If we successfully skipped to the single quote, assume that it
-    // terminates the character literal and eat it now.
-    if (*CurPtr == '\'') {
-      diagnose(TokStart, diag::lex_invalid_multi_code_point_character_literal);
-      ++CurPtr;
-    } else {
-      diagnose(TokStart, diag::lex_unterminated_character_literal);
-    }
-    return formToken(tok::unknown, TokStart);
-  }
-  ++CurPtr;
-  return formToken(tok::character_literal, TokStart);
-}
-
-uint32_t Lexer::getEncodedCharacterLiteral(const Token &Tok) {
-  assert(Tok.is(tok::character_literal));
-  const char *CharStart = Tok.getText().data() + 1;
-  uint32_t CodePoint = lexCharacter(CharStart, false, false);
-  if (CodePoint == ~0U || CodePoint == ~1U) {
-    // We have already diagnosed an error.  Return REPLACEMENT CHARACTER as the
-    // value.
-    return 0xFFFD;
-  }
-  return CodePoint;
-}
-
 /// skipToEndOfInterpolatedExpression - Given the first character after a \(
 /// sequence in a string literal (the start of an interpolated expression), 
 /// scan forward to the end of the interpolated expression and return the end.
@@ -1409,11 +1340,6 @@ Restart:
   const char *TokStart = CurPtr;
   
   switch (*CurPtr++) {
-  case '\'':
-    if (LangOpts.EnableCharacterLiterals)
-      return lexCharacterLiteral();
-  SWIFT_FALLTHROUGH;
-
   default: {
     char const *tmp = CurPtr-1;
     if (advanceIfValidStartOfIdentifier(tmp, BufferEnd))

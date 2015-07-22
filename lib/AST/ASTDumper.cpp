@@ -1411,10 +1411,6 @@ public:
       << ')';
   }
 
-  void visitCharacterLiteralExpr(CharacterLiteralExpr *E) {
-    printCommon(E, "character_literal_expr") << " value=" << E->getValue()<<')';
-  }
-
   void printStringEncoding(StringLiteralExpr::Encoding encoding) {
     switch (encoding) {
     case StringLiteralExpr::UTF8: OS << "utf8"; break;

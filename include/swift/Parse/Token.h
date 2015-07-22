@@ -36,7 +36,6 @@ enum class tok {
   integer_literal,
   floating_literal,
   string_literal,
-  character_literal,
   sil_local_name,      // %42 in SIL mode.
   pound_if,
   pound_else,

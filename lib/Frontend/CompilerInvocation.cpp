@@ -647,8 +647,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.DisableAvailabilityChecking |=
       Args.hasArg(OPT_disable_availability_checking);
   
-  Opts.EnableCharacterLiterals |= Args.hasArg(OPT_enable_character_literals);
-
   if (auto A = Args.getLastArg(OPT_enable_access_control,
                                OPT_disable_access_control)) {
     Opts.EnableAccessControl

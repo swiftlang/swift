@@ -41,7 +41,6 @@ public typealias IntegerLiteralType = Int
 public typealias FloatLiteralType = Double
 /// The default type for an otherwise-unconstrained Boolean literal.
 public typealias BooleanLiteralType = Bool
-// typealias CharacterLiteralType = ?
 /// The default type for an otherwise-unconstrained unicode scalar literal.
 public typealias UnicodeScalarType = String
 /// The default type for an otherwise-unconstrained Unicode extended

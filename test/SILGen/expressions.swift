@@ -1,20 +1,10 @@
 // RUN: rm -rf %t
 // RUN: mkdir %t
 // RUN: echo "public var x = Int()" | %target-swift-frontend -module-name FooBar -emit-module -o %t -
-// RUN: %target-swift-frontend -parse-stdlib -emit-silgen %s -I%t -enable-character-literals -disable-access-control | FileCheck %s
+// RUN: %target-swift-frontend -parse-stdlib -emit-silgen %s -I%t -disable-access-control | FileCheck %s
 
 import Swift
 import FooBar
-
-typealias CharacterLiteralType = SillyCharacter
-
-struct SillyCharacter :
-    _BuiltinCharacterLiteralConvertible, CharacterLiteralConvertible {
-
-  init(_builtinCharacterLiteral value: Builtin.Int32) { }
-
-  init(characterLiteral value: SillyCharacter) { }
-}
 
 struct SillyString : _BuiltinStringLiteralConvertible, StringLiteralConvertible {
   init(_builtinUnicodeScalarLiteral value: Builtin.Int32) {}
@@ -71,14 +61,12 @@ struct SillyUTF16String : _BuiltinUTF16StringLiteralConvertible, StringLiteralCo
 func literals() {
   var a = 1
   var b = 1.25
-  var c = 'x'
   var d = "foö"
   var e:SillyString = "foo"
 }
 // CHECK-LABEL: sil hidden @_TF11expressions8literalsFT_T_
 // CHECK: integer_literal $Builtin.Int2048, 1
 // CHECK: float_literal $Builtin.FPIEEE{{64|80}}, {{0x3FF4000000000000|0x3FFFA000000000000000}}
-// CHECK: integer_literal $Builtin.Int32, 120
 // CHECK: string_literal utf16 "foö"
 // CHECK: string_literal utf8 "foo"
 

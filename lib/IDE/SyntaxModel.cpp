@@ -108,7 +108,6 @@ SyntaxModelContext::SyntaxModelContext(SourceFile &SrcFile)
       case tok::integer_literal: Kind = SyntaxNodeKind::Integer; break;
       case tok::floating_literal: Kind = SyntaxNodeKind::Floating; break;
       case tok::string_literal: Kind = SyntaxNodeKind::String; break;
-      case tok::character_literal: Kind = SyntaxNodeKind::Character; break;
       case tok::comment:
         if (Tok.getText().startswith("///"))
           Kind = SyntaxNodeKind::DocCommentLine;

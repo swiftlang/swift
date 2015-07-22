@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift -enable-character-literals
+// RUN: %target-parse-verify-swift
 
 //===----------------------------------------------------------------------===//
 // Tests and samples.
@@ -406,7 +406,6 @@ var st_u10 = " \u{0010FFFD} "  // Last valid codepoint, 0xFFFE and 0xFFFF are re
 var st_u11 = " \u{00110000} "  // expected-error {{invalid unicode scalar}}
 
 func stringliterals() {
- var ch_a = 'ab // expected-error {{unterminated character literal}}
 
   // rdar://11385385
   var x = 4

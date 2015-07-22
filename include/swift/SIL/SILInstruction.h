@@ -31,7 +31,6 @@
 
 namespace swift {
 
-class CharacterLiteralExpr;
 class DeclRefExpr;
 class FloatLiteralExpr;
 class FuncDecl;
@@ -945,7 +944,7 @@ public:
 };
 
 /// IntegerLiteralInst - Encapsulates an integer constant, as defined originally
-/// by an an IntegerLiteralExpr or CharacterLiteralExpr.
+/// by an IntegerLiteralExpr.
 class IntegerLiteralInst : public LiteralInst {
   unsigned numBits;
 
@@ -953,7 +952,6 @@ class IntegerLiteralInst : public LiteralInst {
 
 public:
   static IntegerLiteralInst *create(IntegerLiteralExpr *E, SILFunction &B);
-  static IntegerLiteralInst *create(CharacterLiteralExpr *E, SILFunction &B);
   static IntegerLiteralInst *create(SILLocation Loc, SILType Ty,
                                     intmax_t Value, SILFunction &B);
   static IntegerLiteralInst *create(SILLocation Loc, SILType Ty,

@@ -31,9 +31,6 @@ namespace swift {
   /// provide compiler debugging facilities.
   class LangOptions {
   public:
-
-    /// \brief Enable legacy character literals.
-    bool EnableCharacterLiterals = false;
     
     /// \brief Whether we are debugging the constraint solver.
     ///

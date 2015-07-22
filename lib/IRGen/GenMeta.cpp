@@ -4823,7 +4823,6 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::_DestructorSafeContainer:
   case KnownProtocolKind::ArrayLiteralConvertible:
   case KnownProtocolKind::BooleanLiteralConvertible:
-  case KnownProtocolKind::CharacterLiteralConvertible:
   case KnownProtocolKind::DictionaryLiteralConvertible:
   case KnownProtocolKind::ExtendedGraphemeClusterLiteralConvertible:
   case KnownProtocolKind::FloatLiteralConvertible:
@@ -4835,7 +4834,6 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::_ColorLiteralConvertible:
   case KnownProtocolKind::_ImageLiteralConvertible:
   case KnownProtocolKind::_BuiltinBooleanLiteralConvertible:
-  case KnownProtocolKind::_BuiltinCharacterLiteralConvertible:
   case KnownProtocolKind::_BuiltinExtendedGraphemeClusterLiteralConvertible:
   case KnownProtocolKind::_BuiltinFloatLiteralConvertible:
   case KnownProtocolKind::_BuiltinIntegerLiteralConvertible:

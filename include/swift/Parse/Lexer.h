@@ -340,9 +340,6 @@ public:
     return getStringLiteralSegments(Str, Segments, Diags);
   }
 
-  /// \brief Return the UTF32 codepoint for the specified character literal.
-  uint32_t getEncodedCharacterLiteral(const Token &Tok);
-
   static SourceLoc getSourceLoc(const char *Loc) {
     return SourceLoc(llvm::SMLoc::getFromPointer(Loc));
   }
@@ -410,7 +407,6 @@ private:
 
   unsigned lexCharacter(const char *&CurPtr,
                         bool StopAtDoubleQuote, bool EmitDiagnostics);
-  void lexCharacterLiteral();
   void lexStringLiteral();
   void lexEscapedIdentifier();
 

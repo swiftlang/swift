@@ -349,13 +349,6 @@ IntegerLiteralInst::create(IntegerLiteralExpr *E, SILFunction &F) {
                 E->getValue(), F);
 }
 
-IntegerLiteralInst *
-IntegerLiteralInst::create(CharacterLiteralExpr *E, SILFunction &F) {
-  return create(E,
-              SILType::getPrimitiveObjectType(E->getType()->getCanonicalType()),
-              E->getValue(), F);
-}
-
 /// getValue - Return the APInt for the underlying integer literal.
 APInt IntegerLiteralInst::getValue() const {
   return APInt(numBits,

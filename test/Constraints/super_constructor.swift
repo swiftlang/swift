@@ -1,4 +1,4 @@
-// RUN: %target-parse-verify-swift -parse-as-library -enable-character-literals
+// RUN: %target-parse-verify-swift -parse-as-library 
 
 struct S {
   init() {
@@ -13,10 +13,6 @@ class D : B {
 
   init(a:Int) {
     super.init()
-  }
-
-  init(e:Int) {
-    super.init('x') // expected-error{{expression does not conform to type 'CharacterLiteralConvertible'}}
   }
 
   init(f:Int) {

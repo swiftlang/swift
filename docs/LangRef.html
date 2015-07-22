@@ -1677,7 +1677,6 @@ ill-formed if the type does not conform to the protocol.</p>
   <pre class="grammar">
     expr-literal ::= <a href="#integer_literal">integer_literal</a>
     expr-literal ::= <a href="#floating_literal">floating_literal</a>
-    expr-literal ::= <a href="#character_literal">character_literal</a>
     expr-literal ::= <a href="#string_literal">string_literal</a>
     expr-literal ::= expr-array
     expr-literal ::= expr-dictionary
@@ -1696,7 +1695,7 @@ ill-formed if the type does not conform to the protocol.</p>
      depending on its lexical form.  The type of the literal is inferred
      based on its context.  If there is no contextual type information for an
      expression, all unresolved types are inferred to 'IntegerLiteralType'
-     type, to 'FloatLiteralType', to 'CharacterLiteralType', and to
+     type, to 'FloatLiteralType', and to
      'StringLiteralType', respectively.
      If a literal is used and these types are not defined, then the code is
      malformed.</p>

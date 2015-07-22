@@ -109,16 +109,6 @@ public protocol BooleanLiteralConvertible {
   init(booleanLiteral value: BooleanLiteralType)
 }
 
-internal protocol _BuiltinCharacterLiteralConvertible {
-  init(_builtinCharacterLiteral value: Builtin.Int32)
-}
-
-internal protocol CharacterLiteralConvertible {
-  typealias CharacterLiteralType : _BuiltinCharacterLiteralConvertible
-  /// Create an instance initialized to `value`.
-  init(characterLiteral value: CharacterLiteralType)
-}
-
 public protocol _BuiltinUnicodeScalarLiteralConvertible {
   init(_builtinUnicodeScalarLiteral value: Builtin.Int32)
 }

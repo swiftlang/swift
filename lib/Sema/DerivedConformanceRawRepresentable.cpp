@@ -36,8 +36,6 @@ static LiteralExpr *cloneRawLiteralExpr(ASTContext &C, LiteralExpr *expr) {
       cast<IntegerLiteralExpr>(clone)->setNegative(expr->getLoc());
   } else if (isa<NilLiteralExpr>(expr)) {
     clone = new (C) NilLiteralExpr(expr->getLoc());
-  } else if (auto charLit = dyn_cast<CharacterLiteralExpr>(expr)) {
-    clone = new (C) CharacterLiteralExpr(charLit->getValue(), expr->getLoc());
   } else if (auto stringLit = dyn_cast<StringLiteralExpr>(expr)) {
     clone = new (C) StringLiteralExpr(stringLit->getValue(), expr->getLoc());
   } else if (auto floatLit = dyn_cast<FloatLiteralExpr>(expr)) {

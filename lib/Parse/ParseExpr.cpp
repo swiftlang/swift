@@ -643,7 +643,6 @@ MagicIdentifierLiteralExpr::Kind getMagicIdentifierLiteralKind(tok Kind) {
 ///     integer_literal
 ///     floating_literal
 ///     string_literal
-///     character_literal
 ///     nil
 ///     true
 ///     false
@@ -719,14 +718,6 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
                                                            /*Implicit=*/false));
     break;
   }
-  case tok::character_literal: {
-    uint32_t Codepoint = L->getEncodedCharacterLiteral(Tok);
-    SourceLoc Loc = consumeToken(tok::character_literal);
-    Result = makeParserResult(
-        new (Context) CharacterLiteralExpr(Codepoint, Loc));
-    break;
-  }
-  
   case tok::at_sign:
     // Objective-C programmers habitually type @"foo", so recover gracefully
     // with a fixit.  If this isn't @"foo", just handle it like an unknown

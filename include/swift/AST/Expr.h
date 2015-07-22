@@ -620,24 +620,6 @@ public:
   }
 };
   
-/// CharacterLiteral - Character literal, like 'x'.  After semantic analysis
-/// assigns types, this is guaranteed to only have a 32-bit BuiltinIntegerType.
-class CharacterLiteralExpr : public LiteralExpr {
-  uint32_t Val;
-  SourceLoc Loc;
-public:
-  CharacterLiteralExpr(uint32_t Val, SourceLoc Loc)
-    : LiteralExpr(ExprKind::CharacterLiteral, /*Implicit=*/false),
-      Val(Val), Loc(Loc) {}
-  
-  uint32_t getValue() const { return Val; }
-  SourceRange getSourceRange() const { return Loc; }
-  
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::CharacterLiteral;
-  }
-};
-  
 /// StringLiteralExpr - String literal, like '"foo"'.  After semantic
 /// analysis assigns types, this is guaranteed to only have a
 /// BuiltinRawPointerType.

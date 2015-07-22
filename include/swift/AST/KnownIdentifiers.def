@@ -82,10 +82,6 @@ IDENTIFIER(BooleanLiteralType)
 IDENTIFIER_(builtinBooleanLiteral)
 IDENTIFIER(booleanLiteral)
 
-IDENTIFIER(CharacterLiteralType)
-IDENTIFIER(characterLiteral)
-IDENTIFIER_(builtinCharacterLiteral)
-
 IDENTIFIER(ExtendedGraphemeClusterLiteralType)
 IDENTIFIER_(builtinExtendedGraphemeClusterLiteral)
 IDENTIFIER(extendedGraphemeClusterLiteral)

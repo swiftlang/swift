@@ -1748,47 +1748,6 @@ namespace {
                diag::builtin_boolean_literal_broken_proto);
     }
 
-    Expr *visitCharacterLiteralExpr(CharacterLiteralExpr *expr) {
-      auto &tc = cs.getTypeChecker();
-      ProtocolDecl *protocol
-        = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::CharacterLiteralConvertible);
-      ProtocolDecl *builtinProtocol
-        = tc.getProtocol(expr->getLoc(),
-                         KnownProtocolKind::_BuiltinCharacterLiteralConvertible);
-
-      // For type-sugar reasons, prefer the spelling of the default literal
-      // type.
-      auto type = simplifyType(expr->getType());
-      if (auto defaultType = tc.getDefaultType(protocol, dc)) {
-        if (defaultType->isEqual(type))
-          type = defaultType;
-      }
-
-      DeclName initName(tc.Context, tc.Context.Id_init,
-                        { tc.Context.Id_characterLiteral });
-      DeclName builtinInitName(tc.Context, tc.Context.Id_init,
-                               { tc.Context.Id_builtinCharacterLiteral });
-      return convertLiteral(
-               expr,
-               type,
-               expr->getType(),
-               protocol,
-               tc.Context.Id_CharacterLiteralType,
-               initName,
-               builtinProtocol,
-               Type(BuiltinIntegerType::get(32, tc.Context)),
-               builtinInitName,
-               [] (Type type) -> bool {
-                 if (auto builtinInt = type->getAs<BuiltinIntegerType>()) {
-                   return builtinInt->isFixedWidth(32);
-                 }
-                 return false;
-               },
-               diag::character_literal_broken_proto,
-               diag::builtin_character_literal_broken_proto);
-    }
-
     Expr *handleStringLiteralExpr(LiteralExpr *expr) {
       auto stringLiteral = dyn_cast<StringLiteralExpr>(expr);
       auto magicLiteral = dyn_cast<MagicIdentifierLiteralExpr>(expr);

@@ -630,8 +630,6 @@ static bool areCertainlyEqualIndices(const Expr *e1, const Expr *e2) {
     return bl1->getValue() == cast<BooleanLiteralExpr>(e2)->getValue();
   if (auto *sl1 = dyn_cast<StringLiteralExpr>(e1))
     return sl1->getValue() == cast<StringLiteralExpr>(e2)->getValue();
-  if (auto *cl1 = dyn_cast<CharacterLiteralExpr>(e1))
-    return cl1->getValue() == cast<CharacterLiteralExpr>(e2)->getValue();
   
   // Compare tuple expressions.
   if (auto *te1 = dyn_cast<TupleExpr>(e1)) {

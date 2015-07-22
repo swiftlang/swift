@@ -310,7 +310,6 @@ bool Expr::canAppendCallParentheses() const {
   case ExprKind::IntegerLiteral:
   case ExprKind::FloatLiteral:
   case ExprKind::BooleanLiteral:
-  case ExprKind::CharacterLiteral:
   case ExprKind::StringLiteral:
   case ExprKind::InterpolatedStringLiteral:
   case ExprKind::MagicIdentifierLiteral:
