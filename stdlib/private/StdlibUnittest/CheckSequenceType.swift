@@ -679,13 +679,20 @@ self.test("\(testNamePrefix).split/separator/semantics") {
   }
 }
 
-self.test("\(testNamePrefix).split/semantics/negativeMaxSplit") {
-  expectCrashLater()
+self.test("\(testNamePrefix).split/semantics/closure/negativeMaxSplit") {
   let s = makeWrappedSequenceWithEquatableElement([MinimalEquatableValue(1)])
   let separator = MinimalEquatableValue(1)
+  expectCrashLater()
   _ = s.split(
     -1,
     allowEmptySlices: true) { extractValueFromEquatable($0) == separator }
+}
+
+self.test("\(testNamePrefix).split/semantics/separator/negativeMaxSplit") {
+  let s = makeWrappedSequenceWithEquatableElement([MinimalEquatableValue(1)])
+  let separator = wrapValueIntoEquatable(MinimalEquatableValue(1))
+  expectCrashLater()
+  _ = s.split(separator, maxSplit: -1, allowEmptySlices: true)
 }
 
 //===----------------------------------------------------------------------===//
