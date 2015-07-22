@@ -3368,6 +3368,12 @@ enum class ArtificialMainKind : uint8_t {
   UIApplicationMain,
 };
 
+enum class ObjCClassKind : uint8_t {
+  NonObjC,
+  ObjCMembers,
+  ObjC
+};
+
 /// ClassDecl - This is the declaration of a class, for example:
 ///
 ///    class Complex { var R : Double, I : Double }
@@ -3470,6 +3476,11 @@ public:
   /// \param resolver Used to resolve the signatures of initializers, which is
   /// required for name lookup.
   bool inheritsSuperclassInitializers(LazyResolver *resolver);
+
+  /// Figure out if this class has any @objc ancestors, in which case it should
+  /// have implicitly @objc members. Note that a class with generic ancestry
+  /// might have implicitly @objc members, but will never itself be @objc.
+  ObjCClassKind checkObjCAncestry() const;
 
   /// Retrieve the name to use for this class when interoperating with
   /// the Objective-C runtime.

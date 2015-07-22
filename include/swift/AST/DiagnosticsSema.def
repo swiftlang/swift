@@ -2105,6 +2105,9 @@ ERROR(objc_in_extension_context,sema_objc,none,
       "%select{method|initializer|variable|subscript}0 in a "
       "protocol extension cannot be represented in "
       "Objective-C", (int))
+ERROR(objc_for_generic_class,sema_objc,none,
+      "generic subclasses of '@objc' classes cannot have an explicit '@objc' "
+      "attribute because they are not directly visible from Objective-C", ())
 ERROR(objc_getter_for_nonobjc_property,sema_tcd,none,
       "'@objc' getter for non-'@objc' property", ())
 ERROR(objc_getter_for_nonobjc_subscript,sema_tcd,none,

@@ -2241,6 +2241,36 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
   return true;
 }
 
+ObjCClassKind ClassDecl::checkObjCAncestry() const {
+  llvm::DenseSet<const ClassDecl *> visited;
+  bool genericAncestry = false;
+  const ClassDecl *CD = this;
+
+  while (CD) {
+    // If we hit circularity, we will diagnose at some point in typeCheckDecl().
+    // However we have to explicitly guard against that here because we get
+    // called as part of validateDecl().
+    if (!visited.insert(CD).second)
+      break;
+
+    if (CD->isGenericContext())
+      genericAncestry = true;
+
+    if (CD->isObjC()) {
+      if (genericAncestry)
+        return ObjCClassKind::ObjCMembers;
+      return ObjCClassKind::ObjC;
+    }
+
+    const ClassDecl *superclassDecl = nullptr;
+    if (CD->hasSuperclass())
+      superclassDecl = CD->getSuperclass()->getClassOrBoundGenericClass();
+    CD = superclassDecl;
+  }
+
+  return ObjCClassKind::NonObjC;
+}
+
 /// Mangle the name of a protocol or class for use in the Objective-C
 /// runtime.
 static StringRef mangleObjCRuntimeName(const NominalTypeDecl *nominal,

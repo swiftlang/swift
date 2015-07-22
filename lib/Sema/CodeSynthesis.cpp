@@ -2296,7 +2296,7 @@ void TypeChecker::addImplicitDestructor(ClassDecl *CD) {
 
   DD->setImplicit();
 
-  // Type-check the constructor declaration.
+  // Type-check the destructor declaration.
   typeCheckDecl(DD, /*isFirstPass=*/true);
 
   // Create an empty body for the destructor.

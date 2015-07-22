@@ -2297,8 +2297,12 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
 }
 
 /// Figure out if a declaration should be exported to Objective C.
-static Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
+static Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
+                                             const ValueDecl *VD,
                                              bool allowImplicit = false){
+  if (!TC.Context.LangOpts.EnableObjCInterop)
+    return None;
+
   ProtocolDecl *protocolContext =
       dyn_cast<ProtocolDecl>(VD->getDeclContext());
   bool isMemberOfObjCProtocol =
@@ -2332,13 +2336,13 @@ static Optional<ObjCReason> shouldMarkAsObjC(const ValueDecl *VD,
   else if (VD->getFormalAccess() == Accessibility::Private)
     return None;
 
-  // If this declaration is part of an @objc class, make it implicitly
-  // @objc. However, if the declaration cannot be represented as @objc,
-  // don't diagnose.
+  // If this declaration is part of a class with implicitly @objc members,
+  // make it implicitly @objc. However, if the declaration cannot be represented
+  // as @objc, don't diagnose.
   Type contextTy = VD->getDeclContext()->getDeclaredTypeInContext();
-  auto classContext = contextTy->getClassOrBoundGenericClass();
-  if (classContext && classContext->isObjC())
-    return ObjCReason::DoNotDiagnose;
+  if (auto classDecl = contextTy->getClassOrBoundGenericClass())
+    if (classDecl->checkObjCAncestry() != ObjCClassKind::NonObjC)
+      return ObjCReason::DoNotDiagnose;
 
   return None;
 }
@@ -3179,7 +3183,7 @@ public:
 
       // A subscript is ObjC-compatible if it's explicitly @objc, or a
       // member of an ObjC-compatible class or protocol.
-      Optional<ObjCReason> isObjC = shouldMarkAsObjC(SD);
+      Optional<ObjCReason> isObjC = shouldMarkAsObjC(TC, SD);
 
       if (isObjC && !TC.isRepresentableInObjC(SD, *isObjC))
         isObjC = None;
@@ -4194,7 +4198,7 @@ public:
         }
       }
 
-      Optional<ObjCReason> isObjC = shouldMarkAsObjC(FD);
+      Optional<ObjCReason> isObjC = shouldMarkAsObjC(TC, FD);
 
       ProtocolDecl *protocolContext = dyn_cast<ProtocolDecl>(
           FD->getDeclContext());
@@ -5580,7 +5584,7 @@ public:
     // of an ObjC-compatible class.
     Type ContextTy = CD->getDeclContext()->getDeclaredTypeInContext();
     if (ContextTy) {
-      Optional<ObjCReason> isObjC = shouldMarkAsObjC(CD,
+      Optional<ObjCReason> isObjC = shouldMarkAsObjC(TC, CD,
           /*allowImplicit=*/true);
 
       Optional<ForeignErrorConvention> errorConvention;
@@ -5747,6 +5751,25 @@ void TypeChecker::typeCheckDecl(Decl *D, bool isFirstPass) {
   DeclChecker(*this, isFirstPass, isSecondPass).visit(D);
 }
 
+static Optional<ObjCReason> shouldMarkClassAsObjC(TypeChecker &TC,
+                                                  const ClassDecl *CD) {
+  if (!TC.Context.LangOpts.EnableObjCInterop)
+    return None;
+
+  ObjCClassKind kind = CD->checkObjCAncestry();
+
+  if (auto attr = CD->getAttrs().getAttribute<ObjCAttr>()) {
+    if (kind == ObjCClassKind::ObjC)
+      return ObjCReason::ExplicitlyObjC;
+    if (kind == ObjCClassKind::ObjCMembers)
+      TC.diagnose(attr->getLocation(), diag::objc_for_generic_class);
+  }
+
+  if (kind == ObjCClassKind::ObjC)
+    return ObjCReason::ImplicitlyObjC;
+
+  return None;
+}
 
 void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
   if (hasEnabledForbiddenTypecheckPrefix())
@@ -5898,21 +5921,17 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     checkInheritanceClause(D);
     validateAttributes(*this, D);
 
-    // Mark a class as @objc. This must happen before checking its members.
+    // A class is @objc if it does not have generic ancestry, and it either has
+    // an explicit @objc attribute, or its superclass is @objc.
     if (auto CD = dyn_cast<ClassDecl>(nominal)) {
-      ClassDecl *superclassDecl = nullptr;
-      if (CD->hasSuperclass())
-        superclassDecl = CD->getSuperclass()->getClassOrBoundGenericClass();
-
-      Optional<ObjCReason> isObjC;
-      if (CD->getAttrs().hasAttribute<ObjCAttr>() ||
-          (superclassDecl && superclassDecl->isObjC()))
-        isObjC = ObjCReason::ImplicitlyObjC;
+      Optional<ObjCReason> isObjC = shouldMarkClassAsObjC(*this, CD);
       markAsObjC(*this, CD, isObjC);
 
       // Determine whether we require in-class initializers.
       if (CD->getAttrs().hasAttribute<RequiresStoredPropertyInitsAttr>() ||
-          (superclassDecl && superclassDecl->requiresStoredPropertyInits()))
+          (CD->hasSuperclass() &&
+           CD->getSuperclass()->getClassOrBoundGenericClass()
+             ->requiresStoredPropertyInits()))
         CD->setRequiresStoredPropertyInits(true);
     }
 
@@ -6079,7 +6098,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       if (Type contextType = VD->getDeclContext()->getDeclaredTypeInContext()) {
         // If this is a property, check if it needs to be exposed to
         // Objective-C.
-        Optional<ObjCReason> isObjC = shouldMarkAsObjC(VD);
+        Optional<ObjCReason> isObjC = shouldMarkAsObjC(*this, VD);
 
         if (isObjC && !isRepresentableInObjC(VD, *isObjC))
           isObjC = None;

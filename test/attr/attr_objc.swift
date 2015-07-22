@@ -158,8 +158,8 @@ class subject_class1 { // no-error
 class subject_class2 : Protocol_Class1, PlainProtocol { // no-error
 }
 
-@objc
-class subject_genericClass<T> { // no-error
+@objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute}}
+class subject_genericClass<T> {
   @objc
   var subject_instanceVar: Int // no-error
 
@@ -288,7 +288,7 @@ class ConcreteContext3 {
 }
 
 func genericContext1<T>(_: T) {
-  @objc
+  @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute}}
   class subject_inGenericContext {} // expected-error{{type 'subject_inGenericContext' nested in generic function 'genericContext1' is not allowed}}
 
   class subject_constructor_inGenericContext { // expected-error{{type 'subject_constructor_inGenericContext' nested in generic function 'genericContext1' is not allowed}}
@@ -308,7 +308,7 @@ func genericContext1<T>(_: T) {
 }
 
 class GenericContext2<T> {
-  @objc
+  @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute}}
   class subject_inGenericContext {} // expected-error{{nested in generic type}}
 
   @objc
@@ -317,7 +317,7 @@ class GenericContext2<T> {
 
 class GenericContext3<T> {
   class MoreNested { // expected-error{{nested in generic type}}
-    @objc
+    @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute}}
     class subject_inGenericContext {} // expected-error{{nested in generic type}}
 
     @objc
@@ -1304,15 +1304,17 @@ class infer_instanceVar1 {
 }
 
 @objc
+class ObjCBase {}
+
 class infer_instanceVar2<
     GP_Unconstrained,
     GP_PlainClass : PlainClass,
     GP_PlainProtocol : PlainProtocol,
     GP_Class_ObjC : Class_ObjC1,
     GP_Protocol_Class : Protocol_Class1,
-    GP_Protocol_ObjC : Protocol_ObjC1> {
-// CHECK-LABEL: @objc class infer_instanceVar2<{{.*}}> {
-  init() {}
+    GP_Protocol_ObjC : Protocol_ObjC1> : ObjCBase {
+// CHECK-LABEL: class infer_instanceVar2<{{.*}}> : ObjCBase {
+  override init() {}
 
   var var_GP_Unconstrained: GP_Unconstrained
 // CHECK-LABEL: {{^}}  var var_GP_Unconstrained: GP_Unconstrained

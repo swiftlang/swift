@@ -346,7 +346,7 @@ withoutContext(TypeResolutionOptions options) {
 /// Describes the reason why are we trying to apply @objc to a declaration.
 ///
 /// Should only affect diagnostics. If you change this enum, also change
-// the OBJC_ATTR_SELECT macro in DiagnosticsSema.def.
+/// the OBJC_ATTR_SELECT macro in DiagnosticsSema.def.
 enum class ObjCReason {
   DoNotDiagnose,
   ExplicitlyDynamic,

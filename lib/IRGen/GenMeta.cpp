@@ -2879,7 +2879,7 @@ namespace {
     void addValueWitnessTable() {
       ClassDecl *cls = Target;
       
-      auto type = cls->isObjC()
+      auto type = (cls->checkObjCAncestry() != ObjCClassKind::NonObjC)
         ? CanType(this->IGM.Context.TheUnknownObjectType)
         : CanType(this->IGM.Context.TheNativeObjectType);
       auto wtable = this->IGM.getAddrOfValueWitnessTable(type);

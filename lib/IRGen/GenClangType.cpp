@@ -326,7 +326,7 @@ clang::CanQualType GenClangType::visitClassType(CanClassType type) {
   auto &clangCtx = getClangASTContext();
   // produce the clang type INTF * if it is imported ObjC object.
   auto swiftDecl = type->getDecl();
-  if (swiftDecl->isObjC()) {
+  if (swiftDecl->checkObjCAncestry() != ObjCClassKind::NonObjC) {
     clang::IdentifierInfo *ForwardClassId =
       &clangCtx.Idents.get(swiftDecl->getName().get());
     auto *CDecl = clang::ObjCInterfaceDecl::Create(

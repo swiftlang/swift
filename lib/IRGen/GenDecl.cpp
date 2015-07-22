@@ -1597,7 +1597,8 @@ llvm::Constant *IRGenModule::getAddrOfMetaclassObject(ClassDecl *decl,
                                                 ForDefinition_t forDefinition) {
   assert(!decl->isGenericContext()
          && "generic classes do not have a static metaclass object");
-  if (decl->isObjC() || decl->hasClangNode()) {
+  if (decl->checkObjCAncestry() != ObjCClassKind::NonObjC ||
+      decl->hasClangNode()) {
     return getAddrOfObjCMetaclass(decl, forDefinition);
   } else {
     return getAddrOfSwiftMetaclassStub(decl, forDefinition);

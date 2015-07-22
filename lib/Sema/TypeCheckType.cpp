@@ -2855,11 +2855,14 @@ bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,
     wasOptional = true;
   }
 
+  // T can be represented in Objective-C if T is an @objc class or protocol.
   if (isUnknownObjectType(T))
     return true;
 
   auto NTD = T->getAnyNominal();
 
+  // Unmanaged<T> can be represented in Objective-C if T is an @objc class
+  // or protocol.
   if (NTD == Context.getUnmanagedDecl()) {
     auto BGT = T->getAs<BoundGenericType>();
     if (!BGT)
