@@ -1284,13 +1284,19 @@ namespace {
     }
     Address projectDataForStore(IRGenFunction &IGF, EnumElementDecl *elt,
                                 Address enumAddr) const override {
-      assert(elt == getPayloadElement() && "cannot project no-data case");
+      // Addresses of empty values can be undefined.
+      if (elt != getPayloadElement())
+        return IGF.getTypeInfoForUnlowered(elt->getArgumentType())
+          .getUndefAddress();
       return projectPayloadData(IGF, enumAddr);
     }
     Address destructiveProjectDataForLoad(IRGenFunction &IGF,
                                           EnumElementDecl *elt,
                                           Address enumAddr) const override {
-      assert(elt == getPayloadElement() && "cannot project no-data case");
+      // Addresses of empty values can be undefined.
+      if (elt != getPayloadElement())
+        return IGF.getTypeInfoForUnlowered(elt->getArgumentType())
+          .getUndefAddress();
       return projectPayloadData(IGF, enumAddr);
     }
     void destructiveProjectDataForLoad(IRGenFunction &IGF,
@@ -3691,8 +3697,11 @@ namespace {
                                    ElementsWithPayload.end(),
          [&](const Element &e) { return e.decl == elt; });
 
-      assert(payloadI != ElementsWithPayload.end() &&
-             "cannot project a no-payload case");
+      // Empty payload addresses can be left undefined.
+      if (payloadI == ElementsWithPayload.end()) {
+        return IGF.getTypeInfoForUnlowered(elt->getArgumentType())
+          .getUndefAddress();
+      }
 
       // Payloads are all placed at the beginning of the value.
       return IGF.Builder.CreateBitCast(enumAddr,
@@ -3809,8 +3818,11 @@ namespace {
                                ElementsWithPayload.end(),
                                [&](const Element &e) { return e.decl == elt; });
 
-      assert(payloadI != ElementsWithPayload.end() &&
-             "cannot project a no-payload case");
+      // Empty payload addresses can be left undefined.
+      if (payloadI == ElementsWithPayload.end()) {
+        return IGF.getTypeInfoForUnlowered(elt->getArgumentType())
+          .getUndefAddress();
+      }
 
       unsigned index = payloadI - ElementsWithPayload.begin();
 
