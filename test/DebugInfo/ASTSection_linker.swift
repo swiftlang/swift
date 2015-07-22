@@ -19,5 +19,5 @@
 // CHECK: Loaded module ASTSection from
 // CHECK: - Target: {{.+}}-{{.+}}-{{.+}}
 // CHECK: - SDK path: /fake/sdk/path{{$}}
-// CHECK: - -Xcc options: -DA -DB
+// CHECK: - -Xcc options: -working-directory {{.+}} -DA -DB
 // CHECK: Importing ASTSection... ok!
