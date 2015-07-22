@@ -820,6 +820,36 @@ self.test("\(testNamePrefix).suffix/semantics") {
 }
 
 //===----------------------------------------------------------------------===//
+// removeFirst()
+//===----------------------------------------------------------------------===//
+self.test("\(testNamePrefix).removeFirst/semantics") {
+  if true {
+    var c = makeWrappedCollection([OpaqueValue(1010)])
+    var slice = c[c.startIndex..<c.endIndex]
+    let removedElement = slice.removeFirst()
+    expectEqual(1010, extractValue(removedElement).value)
+    expectEqualSequence([1010], c.map { extractValue($0).value })
+    expectEqualSequence([], slice.map { extractValue($0).value })
+  }
+
+  if true {
+    var c = makeWrappedCollection([1010, 2020, 3030].map(OpaqueValue.init))
+    var slice = c[c.startIndex..<c.endIndex]
+    let removedElement = slice.removeFirst()
+    expectEqual(1010, extractValue(removedElement).value)
+    expectEqualSequence([1010, 2020, 3030], c.map { extractValue($0).value })
+    expectEqualSequence([2020, 3030], slice.map { extractValue($0).value })
+  }
+}
+
+self.test("\(testNamePrefix).removeFirst/empty/semantics") {
+  var c = makeWrappedCollection(Array<OpaqueValue<Int>>())
+  var slice = c[c.startIndex..<c.startIndex]
+  expectCrashLater()
+  _ = slice.removeFirst() // Should trap.
+}
+
+//===----------------------------------------------------------------------===//
   } // addRandomAccessCollectionTests
 }
 

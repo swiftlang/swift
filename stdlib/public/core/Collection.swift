@@ -486,6 +486,15 @@ extension CollectionType where Index : BidirectionalIndexType {
   }
 }
 
+extension CollectionType where SubSequence == Self {
+  public mutating func removeFirst() -> Generator.Element {
+    _precondition(!isEmpty, "can't remove items from an empty collection")
+    let element = first!
+    self = self[startIndex.successor()..<endIndex]
+    return element
+  }
+}
+
 extension SequenceType
   where Self : _ArrayType, Self.Element == Self.Generator.Element {
   // A fast implementation for when you are backed by a contiguous array.
