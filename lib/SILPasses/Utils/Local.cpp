@@ -1293,6 +1293,10 @@ optimizeBridgedCasts(SILInstruction *Inst,
        !source.getStructOrBoundGenericStruct()))
     return nullptr;
 
+  // Casts involving non-bound generic types cannot be optimized.
+  if (source->hasArchetype() || target->hasArchetype())
+    return nullptr;
+
   auto BridgedTargetTy = getCastFromObjC(M, source, target);
   if (!BridgedTargetTy)
     return nullptr;

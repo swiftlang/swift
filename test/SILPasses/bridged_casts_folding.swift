@@ -620,6 +620,44 @@ public func testCondCastSwiftToNSSetString() -> NSSet? {
   return setOpt
 }
 
+// Casts involving generics cannot be optimized.
+
+// CHECK-LABEL: sil [noinline] @_TF21bridged_casts_folding25testForcedCastFromGenericurFq_CSo8NSString
+// CHECK: unconditional_checked
+// CHECK: return
+@inline(never)
+public func testForcedCastFromGeneric<T>(x: T) -> NSString {
+  var set: NSString = x as! NSString
+  return set
+}
+
+// CHECK-LABEL: sil [noinline] @_TF21bridged_casts_folding23testForcedCastToGenericurFq_q_
+// CHECK: unconditional_checked
+// CHECK: return
+@inline(never)
+public func testForcedCastToGeneric<T>(x: T) -> T {
+  var set: T = nsString as! T
+  return set
+}
+
+// CHECK-LABEL: sil [noinline] @_TF21bridged_casts_folding23testCondCastFromGenericurFq_GSqCSo8NSString_
+// CHECK: checked_cast_addr_br
+// CHECK: return
+@inline(never)
+public func testCondCastFromGeneric<T>(x: T) -> NSString? {
+  var setOpt: NSString? = x as? NSString
+  return setOpt
+}
+
+// CHECK-LABEL: sil [noinline] @_TF21bridged_casts_folding21testCondCastToGenericurFq_GSqq__
+// CHECK: checked_cast_addr_br
+// CHECK: return
+@inline(never)
+public func testCondCastToGeneric<T>(x: T) -> T? {
+  var setOpt: T? = nsString as? T
+  return setOpt
+}
+
 
 // Run-time tests
 
