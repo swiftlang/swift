@@ -97,11 +97,6 @@ NSStringAPIs.test("localizedStringWithFormat(_:...)") {
   }
 }
 
-NSStringAPIs.test("pathWithComponents(_:)") {
-  expectEqual("flugelhorn/baritone/bass",
-    String.pathWithComponents(["flugelhorn", "baritone", "bass"]))
-}
-
 NSStringAPIs.test("init(contentsOfFile:encoding:error:)") {
   let (existingPath, nonExistentPath) = createNSStringTemporaryFile()
 
@@ -554,20 +549,6 @@ NSStringAPIs.test("fastestEncoding") {
   expectTrue(availableEncodings.contains("abc".fastestEncoding))
 }
 
-NSStringAPIs.test("fileSystemRepresentation()") {
-  if true {
-    let expectedStr = "abc\0".utf8.map { Int8(bitPattern: $0) }
-    expectEqual(expectedStr, "abc".fileSystemRepresentation())
-  }
-
-  // On OSX file system representation is Unicode NFD.
-  // This test might need to be adjusted for other systems.
-  if true {
-    let expectedStr = "\u{305f}\u{3099}くてん\0".utf8.map { Int8(bitPattern: $0) }
-    expectEqual(expectedStr, "だくてん".fileSystemRepresentation())
-  }
-}
-
 NSStringAPIs.test("getBytes(_:maxLength:usedLength:encoding:options:range:remainingRange:)") {
   let s = "abc абв def где gh жз zzz"
   let startIndex = advance(s.startIndex, 8)
@@ -697,54 +678,6 @@ NSStringAPIs.test("getCString(_:maxLength:encoding:)") {
       count: bufferLength, repeatedValue: CChar(bitPattern: 0xff))
     let result = illFormedUTF16.getCString(&buffer, maxLength: 100,
       encoding: NSUTF8StringEncoding)
-    expectFalse(result)
-  }
-}
-
-NSStringAPIs.test("getFileSystemRepresentation(_:maxLength:)") {
-  // On OSX file system representation is Unicode NFD.
-  // This test might need to be adjusted for other systems.
-  var s = "abc だくてん"
-  if true {
-    // The largest buffer that can not accomodate the string plus null terminator.
-    let bufferLength = 19
-    var buffer = Array(
-      count: bufferLength, repeatedValue: CChar(bitPattern: 0xff))
-    let result = s.getFileSystemRepresentation(&buffer, maxLength: 100)
-    expectFalse(result)
-  }
-  if true {
-    // The smallest buffer where the result can fit.
-    let bufferLength = 20
-    var expectedStr = "abc \u{305f}\u{3099}くてん\0".utf8.map {
-      CChar(bitPattern: $0)
-    }
-    while (expectedStr.count != bufferLength) {
-      expectedStr.append(CChar(bitPattern: 0xff))
-    }
-    var buffer = Array(
-      count: bufferLength, repeatedValue: CChar(bitPattern: 0xff))
-    let result = s.getFileSystemRepresentation(
-      &buffer, maxLength: bufferLength)
-    expectTrue(result)
-    expectEqualSequence(expectedStr, buffer)
-  }
-  if true {
-    // Limit buffer size with 'maxLength'.
-    let bufferLength = 100
-    var buffer = Array(
-      count: bufferLength, repeatedValue: CChar(bitPattern: 0xff))
-    let result = s.getFileSystemRepresentation(&buffer, maxLength: 19)
-    expectFalse(result)
-  }
-  if true {
-    // String with unpaired surrogates.
-    let illFormedUTF16 = NonContiguousNSString([ 0xd800 ]) as String
-    let bufferLength = 100
-    var buffer = Array(
-      count: bufferLength, repeatedValue: CChar(bitPattern: 0xff))
-    let result = illFormedUTF16.getFileSystemRepresentation(
-      &buffer, maxLength: 100)
     expectFalse(result)
   }
 }
@@ -1327,17 +1260,6 @@ func getHomeDir() -> String {
 #endif
 }
 
-NSStringAPIs.test("stringByAbbreviatingWithTildeInPath") {
-  let s = getHomeDir() + "/abcde.txt"
-  expectEqual("~/abcde.txt", s.stringByAbbreviatingWithTildeInPath)
-}
-
-NSStringAPIs.test("stringByAddingPercentEncodingWithAllowedCharacters(_:)") {
-  expectOptionalEqual("ab%63d %D0%B0%D0%B1%D0%B2%D0%B3",
-    "abcd абвг".stringByAddingPercentEncodingWithAllowedCharacters(
-      NSCharacterSet(charactersInString: "abd ")))
-}
-
 NSStringAPIs.test("stringByAddingPercentEscapesUsingEncoding(_:)") {
   expectEmpty(
     "abcd абвг".stringByAddingPercentEscapesUsingEncoding(
@@ -1367,15 +1289,6 @@ NSStringAPIs.test("stringByAppendingPathComponent(_:)") {
   expectEqual("/tmp/a.txt", "/tmp".stringByAppendingPathComponent("a.txt"))
 }
 
-NSStringAPIs.test("stringByAppendingPathExtension(_:)") {
-  expectEmpty("".stringByAppendingPathExtension(""))
-  expectOptionalEqual("a.txt.", "a.txt".stringByAppendingPathExtension(""))
-  expectEmpty("".stringByAppendingPathExtension("txt"))
-  expectOptionalEqual("a.txt", "a".stringByAppendingPathExtension("txt"))
-  expectOptionalEqual("a.txt.old", "a.txt".stringByAppendingPathExtension("old"))
-  expectOptionalEqual("/tmp/a.txt.old", "/tmp/a.txt".stringByAppendingPathExtension("old"))
-}
-
 NSStringAPIs.test("stringByAppendingString(_:)") {
   expectEqual("", "".stringByAppendingString(""))
   expectEqual("a", "a".stringByAppendingString(""))
@@ -1388,19 +1301,6 @@ NSStringAPIs.test("stringByDeletingLastPathComponent") {
   expectEqual("/", "/".stringByDeletingLastPathComponent)
   expectEqual("/", "/tmp".stringByDeletingLastPathComponent)
   expectEqual("/tmp", "/tmp/a.txt".stringByDeletingLastPathComponent)
-}
-
-NSStringAPIs.test("stringByDeletingPathExtension") {
-  expectEqual("", "".stringByDeletingPathExtension)
-  expectEqual("/", "/".stringByDeletingPathExtension)
-  expectEqual("/tmp", "/tmp".stringByDeletingPathExtension)
-  expectEqual("/tmp/a", "/tmp/a.txt".stringByDeletingPathExtension)
-  expectEqual("/tmp/a.txt", "/tmp/a.txt.old".stringByDeletingPathExtension)
-}
-
-NSStringAPIs.test("stringByExpandingTildeInPath") {
-  let s = getHomeDir() + "/abcde.txt"
-  expectEqual(s, "~/abcde.txt".stringByExpandingTildeInPath)
 }
 
 NSStringAPIs.test("stringByFoldingWithOptions(_:locale:)") {

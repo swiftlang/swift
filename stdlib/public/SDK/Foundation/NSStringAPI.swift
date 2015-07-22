@@ -172,6 +172,7 @@ extension String {
 
   /// Returns a string built from the strings in a given array
   /// by concatenating them with a path separator between each pair.
+  @available(*, unavailable, message="Use pathWithComponents on NSString instead.")
   public static func pathWithComponents(components: [String]) -> String {
     return NSString.pathWithComponents(components)
   }
@@ -610,6 +611,7 @@ extension String {
   // - (const char *)fileSystemRepresentation
 
   /// Returns a file system-specific representation of the `String`.
+  @available(*, unavailable, message="Use fileSystemRepresentation on NSString instead.")
   public func fileSystemRepresentation() -> [CChar] {
     return _persistCString(_ns.fileSystemRepresentation)!
   }
@@ -672,6 +674,7 @@ extension String {
   /// fills a buffer with a C-string in a format and encoding suitable
   /// for use with file-system calls.
   /// - Note: will store a maximum of `min(buffer.count, maxLength)` bytes.
+  @available(*, unavailable, message="Use getFileSystemRepresentation on NSString instead.")
   public func getFileSystemRepresentation(
     inout buffer: [CChar], maxLength: Int) -> Bool {
     return _ns.getFileSystemRepresentation(
@@ -919,6 +922,7 @@ extension String {
   // @property NSString lastPathComponent;
 
   /// Returns the last path component of the `String`.
+  @available(*, unavailable, message="Use lastPathComponent on NSString instead.")
   public var lastPathComponent: String {
     return _ns.lastPathComponent
   }
@@ -1047,6 +1051,7 @@ extension String {
 
   /// Returns an array of NSString objects containing, in
   /// order, each path component of the `String`.
+  @available(*, unavailable, message="Use pathComponents on NSString instead.")
   public var pathComponents: [String] {
     return _ns.pathComponents
   }
@@ -1055,6 +1060,7 @@ extension String {
 
   /// Interprets the `String` as a path and returns the
   /// `String`’s extension, if any.
+  @available(*, unavailable, message="Use pathExtension on NSString instead.")
   public var pathExtension: String {
     return _ns.pathExtension
   }
@@ -1223,6 +1229,7 @@ extension String {
   /// Returns a new string that replaces the current home
   /// directory portion of the current path with a tilde (`~`)
   /// character.
+  @available(*, unavailable, message="Use stringByAbbreviatingWithTildeInPath on NSString instead.")
   public var stringByAbbreviatingWithTildeInPath: String {
     return _ns.stringByAbbreviatingWithTildeInPath
   }
@@ -1279,6 +1286,7 @@ extension String {
   // - (NSString *)stringByAppendingPathComponent:(NSString *)aString
 
   /// Returns a new string made by appending to the `String` a given string.
+  @available(*, unavailable, message="Use stringByAppendingPathComponent on NSString instead.")
   public func stringByAppendingPathComponent(aString: String) -> String {
     return _ns.stringByAppendingPathComponent(aString)
   }
@@ -1287,6 +1295,7 @@ extension String {
 
   /// Returns a new string made by appending to the `String` an
   /// extension separator followed by a given extension.
+  @available(*, unavailable, message="Use stringByAppendingPathExtension on NSString instead.")
   public func stringByAppendingPathExtension(ext: String) -> String? {
     // FIXME: This method can return nil in practice, for example when self is
     // an empty string.  OTOH, this is not documented, documentatios says that
@@ -1310,6 +1319,7 @@ extension String {
   /// Returns a new string made by deleting the last path
   /// component from the `String`, along with any final path
   /// separator.
+  @available(*, unavailable, message="Use stringByDeletingLastPathComponent on NSString instead.")
   public var stringByDeletingLastPathComponent: String {
     return _ns.stringByDeletingLastPathComponent
   }
@@ -1318,6 +1328,7 @@ extension String {
 
   /// Returns a new string made by deleting the extension (if
   /// any, and only the last) from the `String`.
+  @available(*, unavailable, message="Use stringByDeletingPathExtension on NSString instead.")
   public var stringByDeletingPathExtension: String {
     return _ns.stringByDeletingPathExtension
   }
@@ -1326,6 +1337,7 @@ extension String {
 
   /// Returns a new string made by expanding the initial
   /// component of the `String` to its full path value.
+  @available(*, unavailable, message="Use stringByExpandingTildeInPath on NSString instead.")
   public var stringByExpandingTildeInPath: String {
     return _ns.stringByExpandingTildeInPath
   }
@@ -1423,6 +1435,7 @@ extension String {
 
   /// Returns a new string made from the `String` by resolving
   /// all symbolic links and standardizing path.
+  @available(*, unavailable, message="Use stringByResolvingSymlinksInPath on NSString instead.")
   public var stringByResolvingSymlinksInPath: String {
     return _ns.stringByResolvingSymlinksInPath
   }
@@ -1431,6 +1444,7 @@ extension String {
 
   /// Returns a new string made by removing extraneous path
   /// components from the `String`.
+  @available(*, unavailable, message="Use stringByStandardizingPath on NSString instead.")
   public var stringByStandardizingPath: String {
     return _ns.stringByStandardizingPath
   }
@@ -1447,6 +1461,7 @@ extension String {
 
   /// Returns an array of strings made by separately appending
   /// to the `String` each string in in a given array.
+  @available(*, unavailable, message="Use stringsByAppendingPaths on NSString instead.")
   public func stringsByAppendingPaths(paths: [String]) -> [String] {
     return _ns.stringsByAppendingPaths(paths)
   }
