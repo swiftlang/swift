@@ -76,3 +76,13 @@ struct TestStaticProperties {
     _ = StaticProperties.baz
   }
 }
+
+struct TestLetProperties {
+  init(b: Burger) {
+    _ = b.pattyCount
+  }
+
+  func flip(b: Burger) {
+    _ = b.pattyCount
+  }
+}

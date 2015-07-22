@@ -133,3 +133,7 @@ public extension Pair {
     return (second, first)
   }
 }
+
+public struct Burger {
+  public let pattyCount: Int
+}

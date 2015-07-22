@@ -2985,9 +2985,6 @@ static bool isSettable(const AbstractStorageDecl *decl) {
 /// is a let member in an initializer.
 bool VarDecl::isSettable(const DeclContext *UseDC,
                          const DeclRefExpr *base) const {
-  // 'let' properties are immutable, but enforcement of this is enforced by
-  // SIL level passes.  If the 'let' property has an initializer, it can never
-  // be reassigned, so we model it as not settable here.
   if (isLet()) {
     // If the decl has a value bound to it but has no PBD, then it is
     // initialized.
@@ -3008,21 +3005,22 @@ bool VarDecl::isSettable(const DeclContext *UseDC,
         
       // If this init is defined inside of the same type (or in an extension
       // thereof) as the let property, then it is mutable.
-      if (CDC->isTypeContext() &&
-          CDC->getDeclaredTypeInContext()->getAnyNominal() ==
-          getDeclContext()->getDeclaredTypeInContext()->getAnyNominal()) {
+      if (!CDC->isTypeContext() ||
+          CDC->getDeclaredTypeInContext()->getAnyNominal() !=
+          getDeclContext()->getDeclaredTypeInContext()->getAnyNominal())
+        return false;
 
-        if (base && CD->getImplicitSelfDecl() != base->getDecl())
-          return false;
+      if (base && CD->getImplicitSelfDecl() != base->getDecl())
+        return false;
 
-        // If this is a convenience initializer (i.e. one that calls
-        // self.init), then let properties are never mutable in it.  They are
-        // only mutable in designated initializers.
-        if (CD->getDelegatingOrChainedInitKind(nullptr) ==
-            ConstructorDecl::BodyInitKind::Delegating)
-          return false;
-        return true;
-      }
+      // If this is a convenience initializer (i.e. one that calls
+      // self.init), then let properties are never mutable in it.  They are
+      // only mutable in designated initializers.
+      if (CD->getDelegatingOrChainedInitKind(nullptr) ==
+          ConstructorDecl::BodyInitKind::Delegating)
+        return false;
+
+      return true;
     } else {
       // Normal variables (e.g. globals) are only mutable in the context of the
       // declaration.  To handle top-level code properly, we look through
