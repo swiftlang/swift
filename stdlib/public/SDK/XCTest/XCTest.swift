@@ -212,7 +212,7 @@ public func XCTAssertFalse(@autoclosure expression: () -> BooleanType, _ message
   }
 }
 
-public func XCTAssertEqual<T : Equatable>(@autoclosure expression1: () -> T, @autoclosure _ expression2: () -> T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertEqual<T : Equatable>(@autoclosure expression1: () -> T?, @autoclosure _ expression2: () -> T?, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.Equal
   
   // evaluate each expression exactly once
@@ -226,15 +226,12 @@ public func XCTAssertEqual<T : Equatable>(@autoclosure expression1: () -> T, @au
   
   switch result {
   case .Success:
-    let expressionValue1 = expressionValue1Optional!
-    let expressionValue2 = expressionValue2Optional!
-    
-    if expressionValue1 != expressionValue2 {
+    if expressionValue1Optional != expressionValue2Optional {
       // TODO: @auto_string expression1
       // TODO: @auto_string expression2
       
-      let expressionValueStr1 = "\(expressionValue1)"
-      let expressionValueStr2 = "\(expressionValue2)"
+      let expressionValueStr1 = "\(expressionValue1Optional)"
+      let expressionValueStr2 = "\(expressionValue2Optional)"
       
       _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionValueStr1 as NSString, expressionValueStr2 as NSString), message, file, line)
     }
@@ -393,7 +390,7 @@ public func XCTAssertEqual<T, U : Equatable>(@autoclosure expression1: () -> [T:
   }
 }
 
-public func XCTAssertNotEqual<T : Equatable>(@autoclosure expression1: () -> T, @autoclosure _ expression2: () -> T, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
+public func XCTAssertNotEqual<T : Equatable>(@autoclosure expression1: () -> T?, @autoclosure _ expression2: () -> T?, _ message: String = "", file: String = __FILE__, line: UInt = __LINE__) -> Void {
   let assertionType = _XCTAssertionType.NotEqual
   
   // evaluate each expression exactly once
@@ -407,15 +404,12 @@ public func XCTAssertNotEqual<T : Equatable>(@autoclosure expression1: () -> T, 
   
   switch result {
   case .Success:
-    let expressionValue1 = expressionValue1Optional!
-    let expressionValue2 = expressionValue2Optional!
-    
-    if expressionValue1 == expressionValue2 {
+    if expressionValue1Optional == expressionValue2Optional {
       // TODO: @auto_string expression1
       // TODO: @auto_string expression2
       
-      let expressionValueStr1 = "\(expressionValue1)"
-      let expressionValueStr2 = "\(expressionValue2)"
+      let expressionValueStr1 = "\(expressionValue1Optional)"
+      let expressionValueStr2 = "\(expressionValue2Optional)"
       
       _XCTRegisterFailure(true, _XCTFailureDescription(assertionType, 0, expressionValueStr1 as NSString, expressionValueStr2 as NSString), message, file, line)
     }
