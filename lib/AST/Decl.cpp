@@ -2242,8 +2242,8 @@ bool ClassDecl::inheritsSuperclassInitializers(LazyResolver *resolver) {
 }
 
 ObjCClassKind ClassDecl::checkObjCAncestry() const {
-  llvm::DenseSet<const ClassDecl *> visited;
-  bool genericAncestry = false;
+  llvm::SmallPtrSet<const ClassDecl *, 8> visited;
+  bool genericAncestry = false, isObjC = false;
   const ClassDecl *CD = this;
 
   while (CD) {
@@ -2256,11 +2256,8 @@ ObjCClassKind ClassDecl::checkObjCAncestry() const {
     if (CD->isGenericContext())
       genericAncestry = true;
 
-    if (CD->isObjC()) {
-      if (genericAncestry)
-        return ObjCClassKind::ObjCMembers;
-      return ObjCClassKind::ObjC;
-    }
+    if (CD->isObjC())
+      isObjC = true;
 
     const ClassDecl *superclassDecl = nullptr;
     if (CD->hasSuperclass())
@@ -2268,7 +2265,12 @@ ObjCClassKind ClassDecl::checkObjCAncestry() const {
     CD = superclassDecl;
   }
 
-  return ObjCClassKind::NonObjC;
+
+  if (!isObjC)
+    return ObjCClassKind::NonObjC;
+  if (genericAncestry)
+    return ObjCClassKind::ObjCMembers;
+  return ObjCClassKind::ObjC;
 }
 
 /// Mangle the name of a protocol or class for use in the Objective-C

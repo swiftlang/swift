@@ -2300,6 +2300,8 @@ static void checkAccessibility(TypeChecker &TC, const Decl *D) {
 static Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
                                              const ValueDecl *VD,
                                              bool allowImplicit = false){
+  assert(!isa<ClassDecl>(VD));
+
   if (!TC.Context.LangOpts.EnableObjCInterop)
     return None;
 
@@ -5751,6 +5753,8 @@ void TypeChecker::typeCheckDecl(Decl *D, bool isFirstPass) {
   DeclChecker(*this, isFirstPass, isSecondPass).visit(D);
 }
 
+// A class is @objc if it does not have generic ancestry, and it either has
+// an explicit @objc attribute, or its superclass is @objc.
 static Optional<ObjCReason> shouldMarkClassAsObjC(TypeChecker &TC,
                                                   const ClassDecl *CD) {
   if (!TC.Context.LangOpts.EnableObjCInterop)
@@ -5921,8 +5925,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     checkInheritanceClause(D);
     validateAttributes(*this, D);
 
-    // A class is @objc if it does not have generic ancestry, and it either has
-    // an explicit @objc attribute, or its superclass is @objc.
+    // Mark a class as @objc. This must happen before checking its members.
     if (auto CD = dyn_cast<ClassDecl>(nominal)) {
       Optional<ObjCReason> isObjC = shouldMarkClassAsObjC(*this, CD);
       markAsObjC(*this, CD, isObjC);

@@ -325,6 +325,8 @@ class GenericContext3<T> {
   }
 }
 
+@objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute}}
+class ConcreteSubclassOfGeneric : GenericContext3<Int> {}
 
 class subject_subscriptIndexed1 {
   @objc
