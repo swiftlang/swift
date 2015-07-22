@@ -753,7 +753,7 @@ TEST(MetadataTest, installCommonValueWitnesses_pod_indirect) {
   struct {
     ValueBuffer buffer;
     uintptr_t canary;
-  } buf1{{}, {0x5A5A5A5AU}}, buf2{{}, {0xA5A5A5A5U}};
+  } buf1{{}, 0x5A5A5A5AU}, buf2{{}, 0xA5A5A5A5U};
   testTable.allocateBuffer(&buf1.buffer, &testMetadata);
   testTable.initializeBufferWithTakeOfBuffer(&buf2.buffer, &buf1.buffer,
                                              &testMetadata);
