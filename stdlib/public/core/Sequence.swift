@@ -80,17 +80,24 @@ public protocol SequenceType {
     @noescape includeElement: (Generator.Element) -> Bool
   ) -> [Generator.Element]
 
-  /// Call `body` on each element in `self`.
+  /// Call `body` on each element in `self` in the same order as a
+  /// *for-in loop.*
   ///
   ///     sequence.forEach {
   ///       // body code
   ///     }
   ///
-  /// is equivalent to:
+  /// is similar to:
   ///
   ///     for element in sequence {
   ///       // body code
   ///     }
+  ///
+  /// - Note: You cannot use the `break` or `continue` statement to exit the
+  ///   current call of the `body` closure or skip subsequent calls.
+  /// - Note: Using the `return` statement in the `body` closure will only
+  ///   exit from the current call to `body`, not any outer scope, and won't
+  ///   skip subsequent calls.
   ///
   /// - Complexity: O(`self.count`)
   func forEach(@noescape body: (Generator.Element) -> ())
@@ -449,17 +456,24 @@ extension SequenceType {
 }
 
 extension SequenceType {
-  /// Call `body` on each element in `self`.
+  /// Call `body` on each element in `self` in the same order as a
+  /// *for-in loop.*
   ///
   ///     sequence.forEach {
   ///       // body code
   ///     }
   ///
-  /// is equivalent to:
+  /// is similar to:
   ///
   ///     for element in sequence {
   ///       // body code
   ///     }
+  ///
+  /// - Note: You cannot use the `break` or `continue` statement to exit the
+  ///   current call of the `body` closure or skip subsequent calls.
+  /// - Note: Using the `return` statement in the `body` closure will only
+  ///   exit from the current call to `body`, not any outer scope, and won't
+  ///   skip subsequent calls.
   ///
   /// - Complexity: O(`self.count`)
   public func forEach(@noescape body: (Generator.Element) -> ()) {
