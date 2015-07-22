@@ -46,7 +46,7 @@ public // COMPILER_INTRINSIC
 func _convertMutableArrayToPointerArgument<
   FromElement,
   ToPointer: _PointerType
->(inout a: Array<FromElement>) -> (AnyObject?, ToPointer) {
+>(inout a: [FromElement]) -> (AnyObject?, ToPointer) {
   // TODO: Putting a canary at the end of the array in checked builds might
   // be a good idea
 
@@ -63,7 +63,7 @@ public // COMPILER_INTRINSIC
 func _convertConstArrayToPointerArgument<
   FromElement,
   ToPointer: _PointerType
->(arr: Array<FromElement>) -> (AnyObject?, ToPointer) {
+>(arr: [FromElement]) -> (AnyObject?, ToPointer) {
   let (owner, raw) = arr._cPointerArgs()
   return (owner, ToPointer(raw))
 }

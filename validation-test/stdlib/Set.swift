@@ -988,7 +988,7 @@ SetTestSuite.test("COW.Fast.GenerateDoesNotReallocate") {
   var identity1 = unsafeBitCast(s, Word.self)
 
   var gen = s.generate()
-  var items = Array<Int>()
+  var items: [Int] = []
   while let value = gen.next() {
     items += [value]
   }
@@ -1001,7 +1001,7 @@ SetTestSuite.test("COW.Slow.GenerateDoesNotReallocate") {
   var identity1 = unsafeBitCast(s, Word.self)
 
   var gen = s.generate()
-  var items = Array<Int>()
+  var items: [Int] = []
   while let value = gen.next() {
     items.append(value.value)
   }
@@ -1884,7 +1884,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.Generate") {
   expectTrue(isCocoaSet(s))
 
   var gen = s.generate()
-  var members = Array<Int>()
+  var members: [Int] = []
   while let member = gen.next() {
     members.append((member as! TestObjCKeyTy).value)
   }
@@ -1903,7 +1903,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.Generate") {
   expectTrue(isNativeSet(s))
 
   var gen = s.generate()
-  var members = Array<Int>()
+  var members: [Int] = []
   while let member = gen.next() {
     members.append(member.value)
   }
@@ -2072,7 +2072,7 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.ArrayOfSets") {
   for i in 0..<3 {
     var s = a[i]
     var gen = s.generate()
-    var items = Array<Int>()
+    var items: [Int] = []
     while let value = gen.next() {
       let v = (value as! TestObjCKeyTy).value
       items.append(v)
@@ -2093,7 +2093,7 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.ArrayOfSets") {
   for i in 0..<3 {
     var d = a[i]
     var gen = d.generate()
-    var items = Array<Int>()
+    var items: [Int] = []
     while let value = gen.next() {
       items.append(value.value)
     }
@@ -2130,7 +2130,7 @@ SetTestSuite.test("BridgingRoundtrip") {
   let s = getRoundtripBridgedNSSet()
   let enumerator = s.objectEnumerator()
 
-  var items = Array<Int>()
+  var items: [Int] = []
   while let value = enumerator.nextObject() {
     let v = (value as! TestObjCKeyTy).value
     items.append(v)

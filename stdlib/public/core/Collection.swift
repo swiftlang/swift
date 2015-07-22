@@ -295,7 +295,7 @@ extension CollectionType {
     // `SequenceType.map()`, but it is more efficient, since here we
     // statically know that `self` is a collection, and `lazy(self)`
     // returns an instance of a different type.
-    return Array<T>(lazy(self).map(escapableTransform))
+    return Array(lazy(self).map(escapableTransform))
   }
 
   /// Returns an `Array` containing the elements of `self`,

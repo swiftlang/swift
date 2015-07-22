@@ -34,13 +34,13 @@ public var _stdlib_FD_SETSIZE: CInt {
 }
 
 public struct _stdlib_fd_set {
-  var _data: Array<UInt32>
+  var _data: [UInt32]
   static var _wordBits: Int {
     return sizeof(UInt32) * 8
   }
 
   public init() {
-    _data = Array<UInt32>(
+    _data = [UInt32](
       count: Int(_stdlib_FD_SETSIZE) / _stdlib_fd_set._wordBits,
       repeatedValue: 0)
   }

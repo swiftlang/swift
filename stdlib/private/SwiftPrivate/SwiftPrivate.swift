@@ -30,8 +30,8 @@ where
 /// Compute the prefix sum of `seq`.
 public func scan<
   S : SequenceType, U
->(seq: S, _ initial: U, _ combine: (U, S.Generator.Element) -> U) -> Array<U> {
-  var result = Array<U>()
+>(seq: S, _ initial: U, _ combine: (U, S.Generator.Element) -> U) -> [U] {
+  var result: [U] = []
   result.reserveCapacity(seq.underestimateCount())
   var runningResult = initial
   for element in seq {
@@ -41,7 +41,7 @@ public func scan<
   return result
 }
 
-public func randomShuffle<T>(a: Array<T>) -> Array<T> {
+public func randomShuffle<T>(a: [T]) -> [T] {
   var result = a
   for var i = a.count - 1; i != 0; --i {
     // FIXME: 32 bits are not enough in general case!
@@ -58,11 +58,11 @@ public func gather<
   IndicesSequence.Generator.Element == C.Index
 >(
   collection: C, _ indices: IndicesSequence
-) -> Array<C.Generator.Element> {
+) -> [C.Generator.Element] {
   return Array(indices.map { collection[$0] })
 }
 
-public func scatter<T>(a: Array<T>, _ idx: Array<Int>) -> Array<T> {
+public func scatter<T>(a: [T], _ idx: [Int]) -> [T] {
   var result = a
   for i in 0..<a.count {
     result[idx[i]] = a[i]
@@ -71,14 +71,14 @@ public func scatter<T>(a: Array<T>, _ idx: Array<Int>) -> Array<T> {
 }
 
 public func withArrayOfCStrings<R>(
-  args: Array<String>, _ body: (Array<UnsafeMutablePointer<CChar>>) -> R
+  args: [String], _ body: ([UnsafeMutablePointer<CChar>]) -> R
 ) -> R {
 
   let argsLengths = Array(args.map { $0.utf8.count + 1 })
   let argsOffsets = [ 0 ] + scan(argsLengths, 0, +)
   let argsBufferSize = argsOffsets.last!
 
-  var argsBuffer = Array<UInt8>()
+  var argsBuffer: [UInt8] = []
   argsBuffer.reserveCapacity(argsBufferSize)
   for arg in args {
     argsBuffer.extend(arg.utf8)

@@ -19,7 +19,7 @@ import Glibc
 
 /// Calls POSIX `pipe()`.
 func posixPipe() -> (readFD: CInt, writeFD: CInt) {
-  var fds: Array<CInt> = [ -1, -1 ]
+  var fds: [CInt] = [ -1, -1 ]
   var _: Void = fds.withUnsafeMutableBufferPointer {
     (fds) in
     let ptr = fds.baseAddress
@@ -32,7 +32,7 @@ func posixPipe() -> (readFD: CInt, writeFD: CInt) {
 
 /// Start the same executable as a child process, redirecting its stdout and
 /// stderr.
-public func spawnChild(args: Array<String>)
+public func spawnChild(args: [String])
   -> (pid: pid_t, stdinFD: CInt, stdoutFD: CInt, stderrFD: CInt) {
   var fileActions = posix_spawn_file_actions_t()
   if posix_spawn_file_actions_init(&fileActions) != 0 {
@@ -111,7 +111,7 @@ public func spawnChild(args: Array<String>)
 }
 
 internal func _readAll(fd: CInt) -> String {
-  var buffer = Array<UInt8>(count: 1024, repeatedValue: 0)
+  var buffer = [UInt8](count: 1024, repeatedValue: 0)
   var usedBytes = 0
   while true {
     let readResult: ssize_t = buffer.withUnsafeMutableBufferPointer {
@@ -174,7 +174,7 @@ public func posixWaitpid(pid: pid_t) -> ProcessTerminationStatus {
   preconditionFailure("did not understand what happened to child process")
 }
 
-public func runChild(args: Array<String>)
+public func runChild(args: [String])
   -> (stdout: String, stderr: String, status: ProcessTerminationStatus) {
   let (pid, _, stdoutFD, stderrFD) = spawnChild(args)
 

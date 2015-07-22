@@ -45,7 +45,7 @@ struct RaceTest1 : RaceTestWithPerTrialDataType {
     }
   }
 
-  func evaluateObservations(observations: Array<Observation>,
+  func evaluateObservations(observations: [Observation],
       _ sink: (RaceTestObservationEvaluation) -> ()) {
     for observation in observations {
       switch observation {

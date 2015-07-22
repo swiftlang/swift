@@ -43,7 +43,7 @@ public struct SourceLoc {
 }
 
 public struct SourceLocStack {
-  let locs: Array<SourceLoc>
+  let locs: [SourceLoc]
 
   public init() {
     locs = []
@@ -53,7 +53,7 @@ public struct SourceLocStack {
     locs = [ loc ]
   }
 
-  init(_locs: Array<SourceLoc>) {
+  init(_locs: [SourceLoc]) {
     locs = _locs
   }
 
@@ -392,7 +392,7 @@ extension ProcessTerminationStatus {
 }
 
 func _stdlib_getline() -> String? {
-  var result = Array<UInt8>()
+  var result: [UInt8] = []
   while true {
     let c = getchar()
     if c == EOF {
@@ -414,7 +414,7 @@ func _printDebuggingAdvice(fullTestName: String) {
     "--stdlib-unittest-in-process --stdlib-unittest-filter \"\(fullTestName)\"")
 }
 
-var _allTestSuites: Array<TestSuite> = []
+var _allTestSuites: [TestSuite] = []
 var _testSuiteNameToIndex: [String : Int] = [:]
 
 let _stdlibUnittestStreamPrefix = "__STDLIB_UNITTEST__"
@@ -483,7 +483,7 @@ struct _ParentProcess {
   mutating func _runTestInChild(testSuite: TestSuite, _ testName: String)
     -> (anyExpectFailed: Bool, seenExpectCrash: Bool,
         status: ProcessTerminationStatus?,
-        crashStdout: Array<String>, crashStderr: Array<String>) {
+        crashStdout: [String], crashStderr: [String]) {
     if _pid <= 0 {
       _spawnChild()
     }
@@ -505,8 +505,8 @@ struct _ParentProcess {
     var stderrSeenCrashDelimiter = false
     var stdoutEnd = false
     var stderrEnd = false
-    var capturedCrashStdout = Array<String>()
-    var capturedCrashStderr = Array<String>()
+    var capturedCrashStdout: [String] = []
+    var capturedCrashStderr: [String] = []
     var anyExpectFailedInChild = false
     while !((_childStdout.isEOF && _childStderr.isEOF) ||
       (stdoutEnd && stderrEnd)) {
@@ -617,9 +617,9 @@ struct _ParentProcess {
       print("StdlibUnittest: using filter: \(filter)")
     }
     for testSuite in _allTestSuites {
-      var uxpassedTests = Array<String>()
-      var failedTests = Array<String>()
-      var skippedTests = Array<String>()
+      var uxpassedTests: [String] = []
+      var failedTests: [String] = []
+      var skippedTests: [String] = []
       for t in testSuite._tests {
         let fullTestName = "\(testSuite.name).\(t.name)"
         if let filter = _filter where findSubstring(fullTestName, filter) == nil {
@@ -640,8 +640,8 @@ struct _ParentProcess {
 
         var expectCrash = false
         var childTerminationStatus: ProcessTerminationStatus? = nil
-        var crashStdout = Array<String>()
-        var crashStderr = Array<String>()
+        var crashStdout: [String] = []
+        var crashStderr: [String] = []
         if _runTestsInProcess {
           if t.stdinText != nil {
             print("The test \(fullTestName) requires stdin input and can't be run in-process, marking as failed")
@@ -850,8 +850,8 @@ public class TestSuite {
   struct _Test {
     let name: String
     let testLoc: SourceLoc
-    let xfail: Array<TestRunPredicate>
-    let skip: Array<TestRunPredicate>
+    let xfail: [TestRunPredicate]
+    let skip: [TestRunPredicate]
     let stdinText: String?
     let stdinEndsWithEOF: Bool
     let crashOutputMatches: [String]
@@ -863,12 +863,12 @@ public class TestSuite {
       return stdinText == nil
     }
 
-    func getActiveXFailPredicates() -> Array<TestRunPredicate> {
-      return Array(xfail.filter { $0.evaluate() })
+    func getActiveXFailPredicates() -> [TestRunPredicate] {
+      return xfail.filter { $0.evaluate() }
     }
 
-    func getActiveSkipPredicates() -> Array<TestRunPredicate> {
-      return Array(skip.filter { $0.evaluate() })
+    func getActiveSkipPredicates() -> [TestRunPredicate] {
+      return skip.filter { $0.evaluate() }
     }
   }
 
@@ -878,8 +878,8 @@ public class TestSuite {
     var _data: _Data = _Data()
 
     class _Data {
-      var _xfail: Array<TestRunPredicate> = []
-      var _skip: Array<TestRunPredicate> = []
+      var _xfail: [TestRunPredicate] = []
+      var _skip: [TestRunPredicate] = []
       var _stdinText: String? = nil
       var _stdinEndsWithEOF: Bool = false
       var _crashOutputMatches: [String] = []
@@ -926,7 +926,7 @@ public class TestSuite {
   }
 
   var name: String
-  var _tests: Array<_Test> = []
+  var _tests: [_Test] = []
 
   /// Code that is run before every test.
   var _testSetUpCode: (() -> ())?
@@ -981,7 +981,7 @@ public enum OSVersion : CustomStringConvertible {
   }
 }
 
-func _parseDottedVersion(s: String) -> Array<Int> {
+func _parseDottedVersion(s: String) -> [Int] {
   return Array(lazy(s._split(".")).map { Int($0)! })
 }
 
@@ -1840,7 +1840,7 @@ public func checkGenerator<
 ) {
   // Copying a `GeneratorType` is allowed.
   var mutableGen = generator
-  var actual: Array<${Element}> = []
+  var actual: [${Element}] = []
   while let e = mutableGen.next() {
     actual.append(e)
   }
@@ -2384,7 +2384,7 @@ public func expectEqualMethodsForDomain<
 }
 
 public func expectEqualUnicodeScalars(
-  expected: Array<UInt32>, _ actual: String, ${TRACE}) {
+  expected: [UInt32], _ actual: String, ${TRACE}) {
   let actualUnicodeScalars = Array(
     lazy(actual.unicodeScalars).map { $0.value })
   
@@ -2397,7 +2397,7 @@ public func expectEqualUnicodeScalars(
 }
 
 public func expectPrinted<T>(
-  expectedOneOf patterns: Array<String>, _ object: T, ${TRACE}
+  expectedOneOf patterns: [String], _ object: T, ${TRACE}
 ) {
   let actual = String(object)
   if !patterns.contains(actual) {
@@ -2415,7 +2415,7 @@ public func expectPrinted<T>(
 }
 
 public func expectDebugPrinted<T>(
-  expectedOneOf patterns: Array<String>, _ object: T, ${TRACE}
+  expectedOneOf patterns: [String], _ object: T, ${TRACE}
 ) {
   expectPrinted(expectedOneOf: patterns, String(reflecting: object), ${trace})
 }

@@ -260,7 +260,7 @@ extension SequenceType {
     // Cast away @noescape.
     typealias Transform = (Generator.Element) -> T
     let escapableTransform = unsafeBitCast(transform, Transform.self)
-    return Array<T>(lazy(self).map(escapableTransform))
+    return Array(lazy(self).map(escapableTransform))
   }
 
   /// Return an `Array` containing the elements of `self`,

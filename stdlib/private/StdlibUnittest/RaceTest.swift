@@ -92,7 +92,7 @@ public protocol RaceTestWithPerTrialDataType {
 
   /// Evaluates the observations made by all threads for a particular instance
   /// of `RaceData`.
-  func evaluateObservations(observations: Array<Observation>,
+  func evaluateObservations(observations: [Observation],
     _ sink: (RaceTestObservationEvaluation) -> ())
 }
 
@@ -317,7 +317,7 @@ public func == (lhs: Observation9Word, rhs: Observation9Word) -> Bool {
 
 /// A helper that is useful to implement
 /// `RaceTestWithPerTrialDataType.evaluateObservations()` in race tests.
-public func evaluateObservationsAllEqual<T : Equatable>(observations: Array<T>)
+public func evaluateObservationsAllEqual<T : Equatable>(observations: [T])
   -> RaceTestObservationEvaluation {
   let first = observations.first!
   for x in observations {
@@ -381,9 +381,9 @@ struct _RaceTestAggregatedEvaluations : CustomStringConvertible {
 // FIXME: protect this class against false sharing.
 class _RaceTestWorkerState<RT : RaceTestWithPerTrialDataType> {
   // FIXME: protect every element of 'raceData' against false sharing.
-  var raceData: Array<RT.RaceData> = []
-  var raceDataShuffle: Array<Int> = []
-  var observations: Array<RT.Observation> = []
+  var raceData: [RT.RaceData] = []
+  var raceDataShuffle: [Int] = []
+  var observations: [RT.Observation] = []
 }
 
 class _RaceTestSharedState<RT : RaceTestWithPerTrialDataType> {
@@ -392,8 +392,8 @@ class _RaceTestSharedState<RT : RaceTestWithPerTrialDataType> {
   var trialBarrier: _stdlib_Barrier
   var trialSpinBarrier: _stdlib_AtomicInt = _stdlib_AtomicInt()
 
-  var raceData: Array<RT.RaceData> = []
-  var workerStates: Array<_RaceTestWorkerState<RT>> = []
+  var raceData: [RT.RaceData] = []
+  var workerStates: [_RaceTestWorkerState<RT>] = []
   var aggregatedEvaluations: _RaceTestAggregatedEvaluations =
     _RaceTestAggregatedEvaluations()
 
@@ -454,7 +454,7 @@ func _masterThreadOneTrial<RT : RaceTestWithPerTrialDataType>(
     // FIXME: why doesn't the bracket syntax work?
     // <rdar://problem/18305718> Array sugar syntax does not work when used
     // with associated types
-    var observations = Array<RT.Observation>()
+    var observations: [RT.Observation] = []
     observations.reserveCapacity(racingThreadCount)
     for i in 0..<raceDataCount {
       for j in 0..<racingThreadCount {
