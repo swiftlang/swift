@@ -593,8 +593,9 @@ static bool shouldDisableCleanupOnFailurePath(ManagedValue value,
     
     // Elements without payloads are trivial.
     if (!elt->hasArgumentType()) continue;
-    
-    if (!SGF.getTypeLowering(elt->getArgumentType()).isTrivial())
+
+    auto eltTy = value.getType().getEnumElementType(elt, SGF.SGM.M);
+    if (!eltTy.isTrivial(SGF.SGM.M))
       return false;
   }
   return true;
@@ -662,6 +663,8 @@ emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
   if (value.getType().isAddress()) {
     // If the enum is address-only, take from the enum we have and load it if
     // the element value is loadable.
+    assert((eltTL.isTrivial() || value.hasCleanup())
+           && "must be able to consume value");
     eltValue = SGF.B.createUncheckedTakeEnumDataAddr(loc, value.forward(SGF),
                                                      ElementDecl, eltTy);
     // Load a loadable data value.
@@ -674,18 +677,32 @@ emitEnumMatch(ManagedValue value, EnumElementDecl *ElementDecl,
   
   // Now we have a +1 value.
   auto eltMV = SGF.emitManagedRValueWithCleanup(eltValue, eltTL);
+
+  // If the payload is indirect, project it out of the box.
+  if (ElementDecl->isIndirect() || ElementDecl->getParentEnum()->isIndirect()) {
+    SILValue boxedValue = SGF.B.createProjectBox(loc, eltMV.getValue());
+    auto &boxedTL = SGF.getTypeLowering(boxedValue.getType());
+    if (boxedTL.isLoadable())
+      boxedValue = SGF.B.createLoad(loc, boxedValue);
+
+    // We must treat the boxed value as +0 since it may be shared. Copy it if
+    // nontrivial.
+    // TODO: Should be able to hand it off at +0 in some cases.
+    eltMV = ManagedValue::forUnmanaged(boxedValue);
+    eltMV = eltMV.copyUnmanaged(SGF, loc);
+  }
   
   // Reabstract to the substituted type, if needed.
   CanType substEltTy =
     value.getSwiftType()->getTypeOfMember(SGF.SGM.M.getSwiftModule(),
-                                          ElementDecl, nullptr,
+                                      ElementDecl, nullptr,
                                       ElementDecl->getArgumentInterfaceType())
       ->getCanonicalType();
   
   eltMV = SGF.emitOrigToSubstValue(loc, eltMV,
                              AbstractionPattern(ElementDecl->getArgumentType()),
-                                   substEltTy);
-  
+                             substEltTy);
+
   // Pass the +1 value down into the sub initialization.
   subInit->copyOrInitValueInto(eltMV, /*is an init*/true, loc, SGF);
 }
