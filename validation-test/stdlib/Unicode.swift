@@ -1,9 +1,6 @@
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 
-// FIXME: rdar://21231163
-// XFAIL: swift_test_mode_optimize
-
 // FIXME: rdar://problem/19648117 Needs splitting objc parts out
 // XFAIL: linux
 
