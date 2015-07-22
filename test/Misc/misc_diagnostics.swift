@@ -90,6 +90,7 @@ let _: String = testIS1() // expected-error {{'Int' is not convertible to 'Strin
 
 func insertA<T>(inout array : [T], elt : T) {
   array.append(T); // expected-error {{cannot invoke 'append' with an argument list of type '((T).Type)'}}
+  // expected-note @-1 {{expected an argument list of type '(Element)'}}
 }
 
 // <rdar://problem/17875634> can't append to array of tuples
@@ -105,8 +106,10 @@ func test17875634() {
   match += coord // expected-error{{binary operator '+=' cannot be applied to operands of type '[(Int, Int)]' and '(Int, Int)'}}
 
   match.append(row, col) // expected-error{{cannot invoke 'append' with an argument list of type '(Int, Int)'}}
+  // expected-note @-1 {{expected an argument list of type '(Element)'}}
 
   match.append(1, 2) // expected-error{{cannot invoke 'append' with an argument list of type '(Int, Int)'}}
+  // expected-note @-1 {{expected an argument list of type '(Element)'}}
 
   match.append(coord)
   match.append((1, 2))

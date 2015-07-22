@@ -51,6 +51,7 @@ func instanceMethods(b: B) {
   b.description
   b.instanceTakesObjectClassTakesFloat(b)
   b.instanceTakesObjectClassTakesFloat(2.0) // expected-error{{cannot invoke 'instanceTakesObjectClassTakesFloat' with an argument list of type '(Double)'}}
+  // expected-note @-1 {{expected an argument list of type '(AnyObject!)'}}
 
   // Instance methods with keyword components
   var obj = NSObject()
@@ -71,6 +72,7 @@ func classMethods(b: B, other: NSObject) {
   B.description()
   B.instanceTakesObjectClassTakesFloat(2.0)
   B.instanceTakesObjectClassTakesFloat(other) // expected-error{{cannot invoke 'instanceTakesObjectClassTakesFloat' with an argument list of type '(NSObject)'}}
+  // expected-note @-1 {{expected an argument list of type '(Float)'}}
 
   // Call an instance method of NSObject.
   var c: AnyClass = B.myClass() // no-warning

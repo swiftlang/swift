@@ -12,5 +12,5 @@ var a : TheBuiltinInt64
 
 // Check that it really is Builtin.Int64.
 var wrapped = Int64(a) // okay
-var badWrapped = Int32(a) // expected-error{{cannot find an initializer for type 'Int32' that accepts an argument list of type '(TheBuiltinInt64)'}}
+var badWrapped = Int32(a) // expected-error{{cannot invoke initializer for type 'Int32' with an argument list of type '(TheBuiltinInt64)'}}
 // expected-note @-1 {{overloads for 'Int32' exist with}}

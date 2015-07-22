@@ -18,6 +18,7 @@ func doCompare<T : EqualComparable, U : EqualComparable>(t1: T, t2: T, u: U) -> 
   }
 
   return t1.isEqual(u) // expected-error {{cannot invoke 'isEqual' with an argument list of type '(U)'}}
+  // expected-note @-1 {{expected an argument list of type '(Self)'}}
 }
 
 protocol MethodLessComparable {
@@ -37,6 +38,7 @@ func existential<T : EqualComparable, U : EqualComparable>(t1: T, t2: T, u: U) {
   var eqComp : EqualComparable = t1 // expected-error{{protocol 'EqualComparable' can only be used as a generic constraint}}
   eqComp = u
   if t1.isEqual(eqComp) {} // expected-error{{cannot invoke 'isEqual' with an argument list of type '(EqualComparable)'}}
+  // expected-note @-1 {{expected an argument list of type '(Self)'}}
   if eqComp.isEqual(t2) {} // expected-error{{'EqualComparable' does not have a member named 'isEqual'}}
 }
 
@@ -106,8 +108,8 @@ func testOverload<Ovl : Overload, OtherOvl : Overload>(ovl: Ovl, ovl2: Ovl,
   a = ovl2.f1(a)
 
   other.f1(a) // expected-error{{cannot invoke 'f1' with an argument list of type '(Ovl.A)'}}
-              //expected-note @-1 {{overloads for 'f1' exist with these partially matching parameter lists: (Self.A), (Self.B)}}
-  
+  // expected-note @-1 {{overloads for 'f1' exist with these partially matching parameter lists: (Self.A), (Self.B)}}
+                                                        
   // Overloading based on context
   var f3i : (Int) -> Int = ovl.f3
   var f3f : (Float) -> Float = ovl.f3
@@ -171,6 +173,7 @@ func staticEqCheck<T : StaticEq, U : StaticEq>(t: T, u: U) {
   if T.isEqual(t, y: t) { return }
   if U.isEqual(u, y: u) { return }
   T.isEqual(t, y: u) // expected-error{{cannot invoke 'isEqual' with an argument list of type '(T, y: U)'}}
+  // expected-note @-1 {{expected an argument list of type '(Self, y: Self)'}}
 }
 
 //===----------------------------------------------------------------------===//

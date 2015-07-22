@@ -1687,6 +1687,7 @@ namespace {
   class CalleeCandidateInfo {
     ConstraintSystem *CS;
   public:
+    std::string declName;
 
     /// This is the list of candidates identified.
     SmallVector<UncurriedCandidate, 4> candidates;
@@ -1718,6 +1719,7 @@ namespace {
 
   private:
     void filterCandidatesList(ClosenessPredicate predicate);
+    void collectCalleeCandidates(Expr *fnExpr);
   };
 }
 
@@ -1808,19 +1810,29 @@ evaluateCloseness(Type candArgListType, ArrayRef<Type> actualArgs) {
   return CC_GeneralMismatch;
 }
 
-CalleeCandidateInfo::CalleeCandidateInfo(Expr *fn, Type actualArgsType,
-                                         ConstraintSystem *CS) : CS(CS) {
+
+void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn) {
   fn = fn->getSemanticsProvidingExpr();
 
   if (auto declRefExpr = dyn_cast<DeclRefExpr>(fn)) {
     candidates.push_back({ declRefExpr->getDecl(), 0 });
-  } else if (auto overloadedDRE = dyn_cast<OverloadedDeclRefExpr>(fn)) {
+    declName = declRefExpr->getDecl()->getNameStr().str();
+    return;
+  }
+
+  if (auto overloadedDRE = dyn_cast<OverloadedDeclRefExpr>(fn)) {
     for (auto cand : overloadedDRE->getDecls()) {
       candidates.push_back({ cand, 0 });
     }
-  } else if (auto TE = dyn_cast<TypeExpr>(fn)) {
+
+    if (!candidates.empty())
+      declName = candidates[0].decl->getNameStr().str();
+    return;
+  }
+
+  if (auto TE = dyn_cast<TypeExpr>(fn)) {
     // It's always a metatype type, so use the instance type name.
-    auto instanceType = TE->getType()->getAs<MetatypeType>()->getInstanceType();
+    auto instanceType =TE->getType()->castTo<MetatypeType>()->getInstanceType();
     
     // TODO: figure out right value for isKnownPrivate
     if (!instanceType->getAs<TupleType>()) {
@@ -1828,35 +1840,83 @@ CalleeCandidateInfo::CalleeCandidateInfo(Expr *fn, Type actualArgsType,
       for (auto ctor : ctors)
         candidates.push_back({ ctor, 1 });
     }
-  } else {
-    unsigned uncurryLevel = 0;
 
-    // Calls to super.init() are automatically uncurried one level.
-    if (isa<UnresolvedConstructorExpr>(fn) ||
-        isa<UnresolvedDotExpr>(fn) ||
-        isa<MemberRefExpr>(fn))
-      uncurryLevel = 1;
+    declName = instanceType->getString();
+    return;
+  }
 
-    // Scan to see if we have a disjunction constraint for this callee.
-    for (auto &constraint : CS->getConstraints()) {
-      if (constraint.getKind() != ConstraintKind::Disjunction) continue;
-      
-      auto locator = constraint.getLocator();
-      if (!locator || locator->getAnchor() != fn) continue;
-      
-      for (auto *bindOverload : constraint.getNestedConstraints()) {
-        if (bindOverload->getKind() != ConstraintKind::BindOverload)
-          continue;
-        auto c = bindOverload->getOverloadChoice();
-        if (c.isDecl())
-          candidates.push_back({ c.getDecl(), uncurryLevel });
-      }
+  if (auto *DSBI = dyn_cast<DotSyntaxBaseIgnoredExpr>(fn)) {
+    collectCalleeCandidates(DSBI->getRHS());
+    return;
+  }
 
-      // If we found some candidates, then we're done.
-      if (!candidates.empty())
-        break;
+
+  if (auto AE = dyn_cast<ApplyExpr>(fn)) {
+    collectCalleeCandidates(AE->getFn());
+
+    // If we found a candidate list with a recursive walk, try adjust the curry
+    // level for the applied subexpression in this call.
+    if (!candidates.empty()) {
+      for (auto &C : candidates)
+        C.level += 1;
+      return;
     }
   }
+
+  // Otherwise, we couldn't tell structurally what is going on here, so try to
+  // dig something out of the constraint system.
+  unsigned uncurryLevel = 0;
+
+  // The candidate list of an unresolved_dot_expr is the candidate list of the
+  // base uncurried by one level, and we refer to the name of the member, not to
+  // the name of any base.
+  if (auto UDE = dyn_cast<UnresolvedDotExpr>(fn)) {
+    declName = UDE->getName().str().str();
+    uncurryLevel = 1;
+  }
+  
+  // Calls to super.init() are automatically uncurried one level.
+  if (auto *UCE = dyn_cast<UnresolvedConstructorExpr>(fn)) {
+    uncurryLevel = 1;
+
+    auto selfTy = UCE->getSubExpr()->getType()->getLValueOrInOutObjectType();
+    if (selfTy->hasTypeVariable())
+      declName = "init";
+    else
+      declName = selfTy.getString() + ".init";
+  }
+  
+  if (isa<MemberRefExpr>(fn))
+    uncurryLevel = 1;
+
+  // Scan to see if we have a disjunction constraint for this callee.
+  for (auto &constraint : CS->getConstraints()) {
+    if (constraint.getKind() != ConstraintKind::Disjunction) continue;
+    
+    auto locator = constraint.getLocator();
+    if (!locator || locator->getAnchor() != fn) continue;
+    
+    for (auto *bindOverload : constraint.getNestedConstraints()) {
+      if (bindOverload->getKind() != ConstraintKind::BindOverload)
+        continue;
+      auto c = bindOverload->getOverloadChoice();
+      if (c.isDecl())
+        candidates.push_back({ c.getDecl(), uncurryLevel });
+    }
+
+    // If we found some candidates, then we're done.
+    if (candidates.empty()) continue;
+    
+    if (declName.empty())
+      declName = candidates[0].decl->getNameStr().str();
+    return;
+  }
+}
+
+
+CalleeCandidateInfo::CalleeCandidateInfo(Expr *fn, Type actualArgsType,
+                                         ConstraintSystem *CS) : CS(CS) {
+  collectCalleeCandidates(fn);
 
   // Now that we have the candidate list, figure out what the best matches from
   // the candidate list are, and remove all the ones that aren't at that level.
@@ -2878,49 +2938,6 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
   return true;
 }
 
-
-// FIXME: Hyper-redundant with collectCalleeCandidateInfo!
-static std::string getCalleeName(Expr *fnExpr, bool &isOverloadedFn,
-                                 ArrayRef<UncurriedCandidate> candidates) {
-  // Obtain the function's name, and collect any parameter lists for diffing
-  // purposes.
-  if (auto DRE = dyn_cast<DeclRefExpr>(fnExpr))
-    return DRE->getDecl()->getNameStr();
-
-  if (auto ODRE = dyn_cast<OverloadedDeclRefExpr>(fnExpr)) {
-    isOverloadedFn = true;
-    return ODRE->getDecls()[0]->getNameStr().str();
-  }
-
-  if (isa<TypeExpr>(fnExpr)) {
-    isOverloadedFn = candidates.size() > 1;
-    // It's always a metatype type, so use the instance type name.
-    auto instanceType =
-      fnExpr->getType()->castTo<MetatypeType>()->getInstanceType();
-    return instanceType->getString();
-  }
-
-  if (auto UDE = dyn_cast<UnresolvedDotExpr>(fnExpr))
-    return UDE->getName().str().str();
-
-  if (auto *UCE = dyn_cast<UnresolvedConstructorExpr>(fnExpr)) {
-    auto selfTy = UCE->getSubExpr()->getType()->getLValueOrInOutObjectType();
-    if (selfTy->hasTypeVariable())
-      return "init";
-    else
-      return selfTy.getString() + ".init";
-  }
-
-  if (auto DSCE = dyn_cast<DotSyntaxCallExpr>(fnExpr))
-    return getCalleeName(DSCE->getFn(), isOverloadedFn, candidates);
-
-  if (auto *DSBI = dyn_cast<DotSyntaxBaseIgnoredExpr>(fnExpr))
-    return getCalleeName(DSBI->getRHS(), isOverloadedFn, candidates);
-
-  return "";
-}
-
-
 bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
 
   // Get the expression result of type checking the arguments to the call
@@ -2984,15 +3001,11 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
     return true;
   }
   
-  // TODO: need a concept of an uncurry level.
   CalleeCandidateInfo calleeInfo(fnExpr, argExpr->getType(), CS);
 
-  bool isOverloadedFn = false;
   bool isInitializer = isa<TypeExpr>(fnExpr);
-  // Obtain the function's name.
-  auto overloadName = getCalleeName(fnExpr, isOverloadedFn,
-                                    calleeInfo.candidates);
-  
+  auto overloadName = calleeInfo.declName;
+
   std::string argString = getTypeListString(argExpr->getType());
 
   // If we couldn't get the name of the callee, then it must be something of a
@@ -3036,18 +3049,14 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
   // then diagnose with some specificity about the arguments.
   if (isa<TupleExpr>(argExpr) &&
       cast<TupleExpr>(argExpr)->getNumElements() == 0) {
+    // TODO: Fold "isInitializer" into the diagnostic as a bool.
+    
     // Otherwise, emit diagnostics that say "no arguments".
     diagnose(fnExpr->getLoc(),
              isInitializer ?
              diag::cannot_find_initializer_with_no_params :
              diag::cannot_find_overload_with_no_params,
              overloadName);
-  } else if (isOverloadedFn) {
-    diagnose(fnExpr->getLoc(),
-             isInitializer ?
-             diag::cannot_find_appropriate_initializer_with_list :
-             diag::cannot_find_appropriate_overload_with_list,
-             overloadName, argString);
   } else {
     diagnose(fnExpr->getLoc(),
              isInitializer ?

@@ -269,7 +269,8 @@ func rdar21784170() {
 // <rdar://problem/21829141> BOGUS: unexpected trailing closure
 func expect<T, U>(_: T)(_: U.Type) {}
 func expect<T, U>(_: T, _: Int = 1)(_: U.Type) {}
-expect(Optional(3))(Optional<Int>.self)  // expected-error {{cannot invoke value of function type with argument list '(Optional<Int>.Type)'}}
+expect(Optional(3))(Optional<Int>.self)  // expected-error {{cannot invoke 'expect' with an argument list of type '(Optional<Int>.Type)'}}
+// expected-note @-1 {{expected an argument list of type '(U.Type)'}}
 
 // <rdar://problem/19804707> Swift Enum Scoping Oddity
 func rdar19804707() {
@@ -295,6 +296,7 @@ func r20789423() {
 
   let p: C
   print(p.f(p)())  // expected-error {{cannot invoke 'f' with an argument list of type '(C)'}}
+  // expected-note @-1 {{expected an argument list of type '(Int)'}}
   
   let _f = { (v: Int) in  // expected-error {{unable to infer closure type in the current context}}
     // expected-note @-1 {{multi-statement closures require an explicit return type}}
@@ -314,7 +316,8 @@ f7(1)(b: 1)
 f7(1.0)(2)       // expected-error {{cannot invoke 'f7' with an argument list of type '(Double)'}}
 // expected-note @-1 {{expected an argument list of type '(Int)'}}
 
-f7(1)(1.0)       // expected-error {{cannot invoke value of type '(b: Int) -> Int' with argument list '(Double)'}}
+f7(1)(1.0)       // expected-error {{cannot invoke 'f7' with an argument list of type '(Double)'}}
+// expected-note @-1 {{expected an argument list of type '(b: Int)'}}
 
 let f8 = f7(2)
 f8(b: 1)
@@ -331,26 +334,38 @@ class CurriedClass {
 let c = CurriedClass()
 _ = c.method1
 c.method1(1)         // expected-error {{cannot invoke 'method1' with an argument list of type '(Int)'}}
+// expected-note @-1 {{expected an argument list of type '()'}}
 _ = c.method2(1)
 _ = c.method2(1.0)   // expected-error {{cannot invoke 'method2' with an argument list of type '(Double)'}}
+// expected-note @-1 {{expected an argument list of type '(Int)'}}
 c.method2(1)(b: 2)
 c.method2(1)(c: 2)   // expected-error {{incorrect argument label in call (have 'c:', expected 'b:')}}
-c.method2(1)(c: 2.0) // expected-error {{cannot invoke value of type '(b: Int) -> ()' with argument list '(c: Double)'}}
-c.method2(1)(b: 2.0) // expected-error {{cannot invoke value of type '(b: Int) -> ()' with argument list '(b: Double)'}}
+c.method2(1)(c: 2.0) // expected-error {{cannot invoke 'method2' with an argument list of type '(c: Double)'}}
+// expected-note @-1 {{expected an argument list of type '(b: Int)'}}
+c.method2(1)(b: 2.0) // expected-error {{cannot invoke 'method2' with an argument list of type '(b: Double)'}}
+// expected-note @-1 {{expected an argument list of type '(b: Int)'}}
 c.method2(1.0)(b: 2) // expected-error {{cannot invoke 'method2' with an argument list of type '(Double)'}}
+// expected-note @-1 {{expected an argument list of type '(Int)'}}
 c.method2(1.0)(b: 2.0) // expected-error {{cannot invoke 'method2' with an argument list of type '(Double)'}}
+// expected-note @-1 {{expected an argument list of type '(Int)'}}
 
 CurriedClass.method1(c)()
 _ = CurriedClass.method1(c)
-CurriedClass.method1(c)(1)         // expected-error {{cannot invoke value of type '() -> ()' with argument list '(Int)'}}
+CurriedClass.method1(c)(1)         // expected-error {{cannot invoke 'method1' with an argument list of type '(Int)'}}
+// expected-note @-1 {{expected an argument list of type '()'}}
 CurriedClass.method1(2.0)(1)       // expected-error {{cannot invoke 'method1' with an argument list of type '(Double)'}}
+// expected-note @-1 {{expected an argument list of type '(CurriedClass)'}}
+
 CurriedClass.method2(c)(32)(b: 1)
 _ = CurriedClass.method2(c)
 _ = CurriedClass.method2(c)(32)
 _ = CurriedClass.method2(1,2)      // expected-error {{extra argument in call}}
-CurriedClass.method2(c)(1.0)(b: 1) // expected-error {{cannot invoke value of type '(Int) -> (b: Int) -> ()' with argument list '(Double)'}}
-CurriedClass.method2(c)(1)(b: 1.0) // expected-error {{cannot invoke value of type '(b: Int) -> ()' with argument list '(b: Double)'}}
-CurriedClass.method2(c)(2)(c: 1.0) // expected-error {{cannot invoke value of type '(b: Int) -> ()' with argument list '(c: Double)'}}
+CurriedClass.method2(c)(1.0)(b: 1) // expected-error {{cannot invoke 'method2' with an argument list of type '(Double)'}}
+// expected-note @-1 {{expected an argument list of type '(Int)'}}
+CurriedClass.method2(c)(1)(b: 1.0) // expected-error {{cannot invoke 'method2' with an argument list of type '(b: Double)'}}
+// expected-note @-1 {{expected an argument list of type '(b: Int)'}}
+CurriedClass.method2(c)(2)(c: 1.0) // expected-error {{cannot invoke 'method2' with an argument list of type '(c: Double)'}}
+// expected-note @-1 {{expected an argument list of type '(b: Int)'}}
 
 
 CurriedClass.method3(c)(32, b: 1)
@@ -358,8 +373,11 @@ _ = CurriedClass.method3(c)
 _ = CurriedClass.method3(c)(1, 2)        // expected-error {{missing argument label 'b:' in call}}
 _ = CurriedClass.method3(c)(1, b: 2)(32) // expected-error {{cannot call value of non-function type '()'}}
 _ = CurriedClass.method3(1, 2)           // expected-error {{extra argument in call}}
-CurriedClass.method3(c)(1.0, b: 1)       // expected-error {{cannot invoke value of type '(Int, b: Int) -> ()' with argument list '(Double, b: Int)'}}
-CurriedClass.method3(c)(1)               // expected-error {{cannot invoke value of type '(Int, b: Int) -> ()' with argument list '(Int)'}}
+CurriedClass.method3(c)(1.0, b: 1)       // expected-error {{cannot invoke 'method3' with an argument list of type '(Double, b: Int)'}}
+// expected-note @-1 {{expected an argument list of type '(Int, b: Int)'}}
+CurriedClass.method3(c)(1)               // expected-error {{cannot invoke 'method3' with an argument list of type '(Int)'}}
+// expected-note @-1 {{expected an argument list of type '(Int, b: Int)'}}
+
 CurriedClass.method3(c)(c: 1.0)          // expected-error {{missing argument for parameter 'b' in call}}
 
 
@@ -369,6 +387,8 @@ extension CurriedClass {
     method3()            // expected-error {{missing argument for parameter #1 in call}}
 
     method3(42)          // expected-error {{cannot invoke 'method3' with an argument list of type '(Int)'}}
+    // expected-note @-1 {{expected an argument list of type '(Int, b: Int)'}}
+
     method3(self)        // expected-error {{missing argument for parameter 'b' in call}}
   }
 }

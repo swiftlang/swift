@@ -35,7 +35,7 @@ func testInstanceTypeFactoryMethodInherited() {
   _ = NSObjectFactorySub(double: 314159)
   // FIXME: Awful diagnostic
   _ = NSObjectFactorySub(float: 314159) // expected-error{{incorrect argument label in call (have 'float:', expected 'integer:')}}
-  let a = NSObjectFactorySub(buildingWidgets: ()) // expected-error{{cannot find an initializer for type 'NSObjectFactorySub' that accepts an argument list of type '(buildingWidgets: ())'}}
+  let a = NSObjectFactorySub(buildingWidgets: ()) // expected-error{{cannot invoke initializer for type 'NSObjectFactorySub' with an argument list of type '(buildingWidgets: ())'}}
   // expected-note @-1 {{overloads for 'NSObjectFactorySub' exist with these partially matching parameter lists: (integer: Int), (double: Double)}}
   _ = a
 }
