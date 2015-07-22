@@ -43,5 +43,5 @@
 // Check that cascading builds triggered by the build record are still
 // considered cascading.
 // RUN: cp -r %S/Inputs/mutual-interface-hash/*.swiftdeps %t
-// RUN: sed -E -e 's/"[^"]*does-not-change.swift":/& !dirty/' -i "" %t/main~buildrecord.swiftdeps
+// RUN: sed -E -e 's/"[^"]*does-not-change.swift":/& !dirty/' -i.prev %t/main~buildrecord.swiftdeps
 // RUN: cd %t && %swiftc_driver -c -driver-use-frontend-path %S/Inputs/update-dependencies.py -output-file-map %t/output.json -incremental ./does-change.swift ./does-not-change.swift -module-name main -j1 -v 2>&1 | FileCheck -check-prefix=CHECK-REBUILD-DEPENDENTS %s
