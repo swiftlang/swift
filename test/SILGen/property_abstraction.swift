@@ -89,3 +89,20 @@ func getF(x: Bar<Int, Int>) -> Int -> Int {
 func makeF(f: Int -> Int) -> Bar<Int, Int> {
   return Bar.F(f)
 }
+
+struct ArrayLike<T> {
+  subscript(x: ()) -> T { get {} set {} }
+}
+
+typealias Test20341012 = (title: (), action: () -> ())
+
+struct T20341012 {
+    private var options: ArrayLike<Test20341012> { get {} set {} }
+
+    // CHECK-LABEL: sil hidden @_TFV20property_abstraction9T203410121tfRS0_FT_T_
+    // CHECK:         [[TMP1:%.*]] = alloc_stack $(title: (), action: @callee_owned (@out (), @in ()) -> ())
+    // CHECK:         store {{.*}} to [[TMP1]]
+    mutating func t() {
+        _ = self.options[].title
+    }
+}

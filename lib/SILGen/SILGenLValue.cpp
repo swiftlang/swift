@@ -204,6 +204,13 @@ static ManagedValue emitGetIntoTemporary(SILGenFunction &gen,
     std::move(component).get(gen, loc, base, SGFContext(temporaryInit.get()));
 
   if (!value.isInContext()) {
+    if (value.getType().getSwiftRValueType()
+          != temporaryInit->getAddress().getType().getSwiftRValueType()) {
+      value = gen.emitSubstToOrigValue(loc, value,
+                                       component.getOrigFormalType(),
+                                       component.getSubstFormalType());
+    }
+
     value.forwardInto(gen, loc, temporaryInit->getAddress());
     temporaryInit->finishInitialization(gen);
   }
