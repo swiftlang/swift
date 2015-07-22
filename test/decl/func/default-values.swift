@@ -98,3 +98,21 @@ defaultArgTuplesNotMaterializable(identity(5))
 defaultArgTuplesNotMaterializable(identity((5, y: 10)))
 // expected-error@-1 {{cannot invoke 'defaultArgTuplesNotMaterializable' with an argument list of type '(Int, y: Int)'}}
 // expected-note@-2 {{expected an argument list of type '(Int, y: Int)'}}
+
+
+// rdar://problem/21799331
+func foo<T>(x: T, y: Bool = true) {}
+
+foo(true ? "foo" : "bar")
+
+func foo2<T>(x: T, y: Bool = true) {}
+
+extension Array {
+  func bar(x: Element -> Bool) -> Int? { return 0 }
+}
+
+foo2([].bar { $0 == "c" }!)
+
+// rdar://problem/21643052
+let a = ["1", "2"].map { Int($0) }
+

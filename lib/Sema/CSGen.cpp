@@ -1009,6 +1009,7 @@ namespace {
       // StringInterpolationConvertible protocol.
       auto locator = CS.getConstraintLocator(expr);
       auto tv = CS.createTypeVariable(locator, TVO_PrefersSubtypeBinding);
+      tv->getImpl().literalConformanceProto = interpolationProto;
       CS.addConstraint(ConstraintKind::ConformsTo, tv,
                        interpolationProto->getDeclaredType(),
                        locator);
