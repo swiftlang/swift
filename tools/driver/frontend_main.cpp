@@ -924,8 +924,11 @@ int frontend_main(ArrayRef<const char *>Args,
                                                                     MainAddr);
   Invocation.setMainExecutablePath(MainExecutablePath);
 
+  SmallString<128> workingDirectory;
+  llvm::sys::fs::current_path(workingDirectory);
+
   // Parse arguments.
-  if (Invocation.parseArgs(Args, Instance.getDiags())) {
+  if (Invocation.parseArgs(Args, Instance.getDiags(), workingDirectory)) {
     return 1;
   }
 

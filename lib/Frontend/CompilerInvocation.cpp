@@ -754,8 +754,10 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   return UnsupportedOS || UnsupportedArch;
 }
 
-static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
-                                   DiagnosticEngine &Diags) {
+static bool ParseClangImporterArgs(ClangImporterOptions &Opts,
+                                   ArgList &Args,
+                                   DiagnosticEngine &Diags,
+                                   StringRef workingDirectory) {
   using namespace options;
 
   if (const Arg *A = Args.getLastArg(OPT_module_cache_path)) {
@@ -770,6 +772,15 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
     Opts.ExtraArgs.push_back(A->getValue());
   }
 
+  if (!workingDirectory.empty()) {
+    // Provide a working directory to Clang as well if there are any -Xcc
+    // options, in case some of them are search-related. But do it at the
+    // beginning, so that an explicit -Xcc -working-directory will win.
+    Opts.ExtraArgs.insert(Opts.ExtraArgs.begin(), {
+      "-working-directory", workingDirectory
+    });
+  }
+
   Opts.InferImplicitProperties |=
     Args.hasArg(OPT_enable_objc_implicit_properties);
 
@@ -781,23 +792,35 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
   return false;
 }
 
-static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
-                                DiagnosticEngine &Diags) {
+static bool ParseSearchPathArgs(SearchPathOptions &Opts,
+                                ArgList &Args,
+                                DiagnosticEngine &Diags,
+                                StringRef workingDirectory) {
   using namespace options;
+  namespace path = llvm::sys::path;
+
+  auto resolveSearchPath =
+      [workingDirectory](StringRef searchPath) -> std::string {
+    if (workingDirectory.empty() || path::is_absolute(searchPath))
+      return searchPath;
+    SmallString<64> fullPath{workingDirectory};
+    path::append(fullPath, searchPath);
+    return fullPath.str();
+  };
 
   for (const Arg *A : make_range(Args.filtered_begin(OPT_I),
                                  Args.filtered_end())) {
-    Opts.ImportSearchPaths.push_back(A->getValue());
+    Opts.ImportSearchPaths.push_back(resolveSearchPath(A->getValue()));
   }
 
   for (const Arg *A : make_range(Args.filtered_begin(OPT_F),
                                  Args.filtered_end())) {
-    Opts.FrameworkSearchPaths.push_back(A->getValue());
+    Opts.FrameworkSearchPaths.push_back(resolveSearchPath(A->getValue()));
   }
 
   for (const Arg *A : make_range(Args.filtered_begin(OPT_L),
                                  Args.filtered_end())) {
-    Opts.LibrarySearchPaths.push_back(A->getValue());
+    Opts.LibrarySearchPaths.push_back(resolveSearchPath(A->getValue()));
   }
 
   if (const Arg *A = Args.getLastArg(OPT_sdk))
@@ -1091,7 +1114,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 }
 
 bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
-                                   DiagnosticEngine &Diags) {
+                                   DiagnosticEngine &Diags,
+                                   StringRef workingDirectory) {
   using namespace options;
 
   if (Args.empty())
@@ -1128,11 +1152,13 @@ bool CompilerInvocation::parseArgs(ArrayRef<const char *> Args,
     return true;
   }
 
-  if (ParseClangImporterArgs(ClangImporterOpts, *ParsedArgs, Diags)) {
+  if (ParseClangImporterArgs(ClangImporterOpts, *ParsedArgs, Diags,
+                             workingDirectory)) {
     return true;
   }
 
-  if (ParseSearchPathArgs(SearchPathOpts, *ParsedArgs, Diags)) {
+  if (ParseSearchPathArgs(SearchPathOpts, *ParsedArgs, Diags,
+                          workingDirectory)) {
     return true;
   }
 

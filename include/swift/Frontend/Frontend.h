@@ -73,8 +73,12 @@ public:
   /// default values given the /absence/ of a flag. This is because \c parseArgs
   /// may be used to modify an already partially configured invocation.
   ///
+  /// If non-empty, relative search paths are resolved relative to
+  /// \p workingDirectory.
+  ///
   /// \returns true if there was an error, false on success.
-  bool parseArgs(ArrayRef<const char *> Args, DiagnosticEngine &Diags);
+  bool parseArgs(ArrayRef<const char *> Args, DiagnosticEngine &Diags,
+                 StringRef workingDirectory = {});
 
   /// Sets specific options based on the given serialized Swift binary data.
   ///
