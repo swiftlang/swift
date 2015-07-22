@@ -585,6 +585,8 @@ ERROR(throws_after_function_result,type_parsing,none,
       "'throws' may only occur before '->'", ())
 ERROR(rethrows_after_function_result,type_parsing,none,
       "'rethrows' may only occur before '->'", ())
+ERROR(throw_in_function_type,type_parsing,none,
+      "expected throwing specifier; did you mean 'throws'?", ())
 
 // Enum Types
 ERROR(expected_expr_enum_case_raw_value,type_parsing,PointsToFirstBadToken,

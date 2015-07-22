@@ -97,3 +97,12 @@ func postThrows() -> Int throws { // expected-error{{'throws' may only occur bef
 func postRethrows(f: () throws -> Int) -> Int rethrows { // expected-error{{'rethrows' may only occur before '->'}}{{40-40=rethrows }}{{46-55=}}
   return try f()
 }
+
+// rdar://21328447
+func fixitThrow0() throw {} // expected-error{{expected throwing specifier; did you mean 'throws'?}} {{20-25=throws}}
+func fixitThrow1() throw -> Int {} // expected-error{{expected throwing specifier; did you mean 'throws'?}} {{20-25=throws}}
+func fixitThrow2() throws {
+  var _: (Int)
+  throw MSV.Foo
+  var _: Int throw -> Int // expected-error{{expected throwing specifier; did you mean 'throws'?}} {{14-19=throws}}
+}

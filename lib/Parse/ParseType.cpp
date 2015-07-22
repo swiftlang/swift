@@ -162,11 +162,20 @@ ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID) {
 
   if (ty.isNull())
     return nullptr;
-  
+
+  // Parse a throws specifier.  'throw' is probably a typo for 'throws',
+  // but in local contexts we could just be at the end of a statement,
+  // so we need to check for the arrow.
   ParserPosition beforeThrowsPos;
   SourceLoc throwsLoc;
   bool rethrows = false;
-  if (Tok.isAny(tok::kw_throws, tok::kw_rethrows)) {
+  if (Tok.isAny(tok::kw_throws, tok::kw_rethrows) ||
+      (Tok.is(tok::kw_throw) && peekToken().is(tok::arrow))) {
+    if (Tok.is(tok::kw_throw)) {
+      diagnose(Tok.getLoc(), diag::throw_in_function_type)
+        .fixItReplace(Tok.getLoc(), "throws");
+    }
+
     beforeThrowsPos = getParserPosition();
     rethrows = Tok.is(tok::kw_rethrows);
     throwsLoc = consumeToken();

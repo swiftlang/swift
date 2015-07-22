@@ -640,6 +640,10 @@ Parser::parseFunctionSignature(Identifier SimpleName,
   } else if (Tok.is(tok::kw_rethrows)) {
     throwsLoc = consumeToken();
     rethrows = true;
+  } else if (Tok.is(tok::kw_throw)) {
+    throwsLoc = consumeToken();
+    diagnose(throwsLoc, diag::throw_in_function_type)
+      .fixItReplace(throwsLoc, "throws");
   }
 
   SourceLoc arrowLoc;
