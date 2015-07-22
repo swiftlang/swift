@@ -46,7 +46,7 @@ public struct FilterGenerator<
   }
 
   /// The underlying generator whose elements are being filtered
-  public var base: Base { return _base }
+  public var _prext_base: Base { return _base }
 
   internal var _base: Base
   

@@ -33,8 +33,10 @@ public struct MapGenerator<
     return nil
   }
 
-  var _base: Base
-  var _transform: (Base.Element)->Element
+  public var _prext_base: Base { return _base }
+  
+  internal var _base: Base
+  internal var _transform: (Base.Element)->Element
 }
 
 /// A `SequenceType` whose elements consist of those in a `Base`
