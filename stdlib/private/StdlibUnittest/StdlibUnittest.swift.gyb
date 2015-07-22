@@ -268,10 +268,10 @@ public func expectSliceType<
   X.SubSequence == X
 >(sliceType: X.Type) {}
 
-/// A mutable slice is a `RangeReplaceableCollectionType` that when sliced
-/// returns an instance of itself.
+/// A mutable slice is a `MutableCollectionType` that when sliced returns an
+/// instance of itself.
 public func expectMutableSliceType<
-  X : RangeReplaceableCollectionType
+  X : MutableCollectionType
   where
   X.SubSequence == X
 >(mutableSliceType: X.Type) {}
