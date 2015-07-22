@@ -139,6 +139,8 @@ bool swift::parseIntoSourceFile(SourceFile &SF,
   Parser P(BufferID, SF, SIL, PersistentState);
   PrettyStackTraceParser StackTrace(P);
 
+  llvm::SaveAndRestore<bool> S(P.IsParsingInterfaceTokens, true);
+
   if (DelayedParseCB)
     P.setDelayedParsingCallbacks(DelayedParseCB);
 
@@ -300,6 +302,11 @@ const Token &Parser::peekToken() {
 SourceLoc Parser::consumeToken() {
   SourceLoc Loc = Tok.getLoc();
   assert(Tok.isNot(tok::eof) && "Lexing past eof!");
+
+  if (IsParsingInterfaceTokens && !Tok.getText().empty()) {
+    SF.recordInterfaceToken(Tok.getText());
+  }
+
   L->lex(Tok);
   PreviousLoc = Loc;
   return Loc;

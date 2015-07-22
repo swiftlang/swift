@@ -435,6 +435,10 @@ static bool emitReferenceDependencies(DiagnosticEngine &diags,
     out << "- \"" << llvm::yaml::escape(entry) << "\"\n";
   }
 
+  llvm::SmallString<32> interfaceHash;
+  SF->getInterfaceHash(interfaceHash);
+  out << "interface-hash: \"" << interfaceHash << "\"\n";
+
   return false;
 }
 
@@ -638,7 +642,8 @@ static bool performCompile(CompilerInstance &Instance,
   if (shouldTrackReferences)
     Instance.setReferencedNameTracker(&nameTracker);
 
-  if (Action == FrontendOptions::DumpParse)
+  if (Action == FrontendOptions::DumpParse ||
+      Action == FrontendOptions::DumpInterfaceHash)
     Instance.performParseOnly();
   else
     Instance.performSema();
@@ -667,7 +672,8 @@ static bool performCompile(CompilerInstance &Instance,
   if (Action == FrontendOptions::DumpParse ||
       Action == FrontendOptions::DumpAST ||
       Action == FrontendOptions::PrintAST ||
-      Action == FrontendOptions::DumpTypeRefinementContexts) {
+      Action == FrontendOptions::DumpTypeRefinementContexts ||
+      Action == FrontendOptions::DumpInterfaceHash) {
     SourceFile *SF = PrimarySourceFile;
     if (!SF) {
       SourceFileKind Kind = Invocation.getSourceFileKind();
@@ -677,6 +683,8 @@ static bool performCompile(CompilerInstance &Instance,
       SF->print(llvm::outs(), PrintOptions::printEverything());
     else if (Action == FrontendOptions::DumpTypeRefinementContexts)
       SF->getTypeRefinementContext()->dump(llvm::errs(), Context.SourceMgr);
+    else if (Action == FrontendOptions::DumpInterfaceHash)
+      SF->dumpInterfaceHash(llvm::errs());
     else
       SF->dump();
     return false;

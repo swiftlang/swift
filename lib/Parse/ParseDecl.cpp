@@ -3185,10 +3185,13 @@ bool Parser::parseGetSetImpl(ParseDeclOptions Flags, Pattern *Indices,
 
       // Parse the body.
       SmallVector<ASTNode, 16> Entries;
-      if (!isDelayedParsingEnabled())
-        parseBraceItems(Entries);
-      else
-        consumeGetSetBody(TheDecl, LBLoc);
+      {
+        llvm::SaveAndRestore<bool> T(IsParsingInterfaceTokens, false);
+        if (!isDelayedParsingEnabled())
+          parseBraceItems(Entries);
+        else
+          consumeGetSetBody(TheDecl, LBLoc);
+      }
 
       SourceLoc RBLoc;
       if (!isImplicitGet) {
@@ -3984,6 +3987,11 @@ Parser::parseDeclFunc(SourceLoc StaticLoc, StaticSpellingKind StaticSpelling,
 
     // Check to see if we have a "{" to start a brace statement.
     if (Tok.is(tok::l_brace)) {
+      // Record the curly braces but nothing inside.
+      SF.recordInterfaceToken("{");
+      SF.recordInterfaceToken("}");
+      llvm::SaveAndRestore<bool> T(IsParsingInterfaceTokens, false);
+
       if (Flags.contains(PD_InProtocol)) {
         diagnose(Tok, diag::protocol_method_with_body);
         skipUntilDeclRBrace();
@@ -4755,7 +4763,11 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   // '{'
   if (Tok.is(tok::l_brace)) {
-    
+    // Record the curly braces but nothing inside.
+    SF.recordInterfaceToken("{");
+    SF.recordInterfaceToken("}");
+    llvm::SaveAndRestore<bool> T(IsParsingInterfaceTokens, false);
+
     if (Flags.contains(PD_InProtocol)) {
       diagnose(Tok, diag::protocol_init_with_body);
       skipUntilDeclRBrace();
@@ -4822,6 +4834,11 @@ parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   // Parse the body.
   if (Tok.is(tok::l_brace)) {
+    // Record the curly braces but nothing inside.
+    SF.recordInterfaceToken("{");
+    SF.recordInterfaceToken("}");
+    llvm::SaveAndRestore<bool> T(IsParsingInterfaceTokens, false);
+
     ParseFunctionBody CC(*this, DD);
     if (!isDelayedParsingEnabled()) {
       ParserResult<BraceStmt> Body=parseBraceItemList(diag::invalid_diagnostic);

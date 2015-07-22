@@ -33,6 +33,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/MD5.h"
 
 namespace clang {
   class Module;
@@ -876,6 +877,10 @@ private:
   /// The source location of the main class.
   SourceLoc MainClassDiagLoc;
 
+  /// A hash of all interface-contributing tokens that have been lexed for
+  /// this source file so far.
+  llvm::MD5 InterfaceHash;
+
   /// \brief The ID for the memory buffer containing this file's source.
   ///
   /// May be -1, to indicate no association with a buffer.
@@ -1069,6 +1074,26 @@ public:
 
   /// Set the root refinement context for the file.
   void setTypeRefinementContext(TypeRefinementContext *TRC);
+
+  void recordInterfaceToken(StringRef token) {
+    assert(!token.empty());
+    InterfaceHash.update(token);
+    // Add null byte to separate tokens.
+    uint8_t a[1] = {0};
+    InterfaceHash.update(a);
+  }
+
+  void getInterfaceHash(llvm::SmallString<32> &str) {
+    llvm::MD5::MD5Result result;
+    InterfaceHash.final(result);
+    llvm::MD5::stringifyResult(result, str);
+  }
+
+  void dumpInterfaceHash(llvm::raw_ostream &out) {
+    llvm::SmallString<32> str;
+    getInterfaceHash(str);
+    out << str << '\n';
+  }
 };
 
 

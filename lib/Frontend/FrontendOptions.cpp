@@ -22,6 +22,7 @@ bool FrontendOptions::actionHasOutput() const {
   case Parse:
   case DumpParse:
   case DumpAST:
+  case DumpInterfaceHash:
   case PrintAST:
   case DumpTypeRefinementContexts:
     return false;
@@ -49,6 +50,7 @@ bool FrontendOptions::actionIsImmediate() const {
   case Parse:
   case DumpParse:
   case DumpAST:
+  case DumpInterfaceHash:
   case PrintAST:
   case DumpTypeRefinementContexts:
   case EmitSILGen:

@@ -168,6 +168,8 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
       Action = FrontendOptions::DumpAST;
     } else if (Opt.matches(OPT_dump_type_refinement_contexts)) {
       Action = FrontendOptions::DumpTypeRefinementContexts;
+    } else if (Opt.matches(OPT_dump_interface_hash)) {
+      Action = FrontendOptions::DumpInterfaceHash;
     } else if (Opt.matches(OPT_print_ast)) {
       Action = FrontendOptions::PrintAST;
     } else if (Opt.matches(OPT_repl) ||
@@ -336,6 +338,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
 
     case FrontendOptions::Parse:
     case FrontendOptions::DumpParse:
+    case FrontendOptions::DumpInterfaceHash:
     case FrontendOptions::DumpAST:
     case FrontendOptions::PrintAST:
     case FrontendOptions::DumpTypeRefinementContexts:
@@ -524,6 +527,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     switch (Opts.RequestedAction) {
     case FrontendOptions::NoneAction:
     case FrontendOptions::DumpParse:
+    case FrontendOptions::DumpInterfaceHash:
     case FrontendOptions::DumpAST:
     case FrontendOptions::PrintAST:
     case FrontendOptions::DumpTypeRefinementContexts:
@@ -549,6 +553,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     switch (Opts.RequestedAction) {
     case FrontendOptions::NoneAction:
     case FrontendOptions::DumpParse:
+    case FrontendOptions::DumpInterfaceHash:
     case FrontendOptions::DumpAST:
     case FrontendOptions::PrintAST:
     case FrontendOptions::DumpTypeRefinementContexts:
@@ -576,6 +581,7 @@ static bool ParseFrontendArgs(FrontendOptions &Opts, ArgList &Args,
     case FrontendOptions::NoneAction:
     case FrontendOptions::Parse:
     case FrontendOptions::DumpParse:
+    case FrontendOptions::DumpInterfaceHash:
     case FrontendOptions::DumpAST:
     case FrontendOptions::PrintAST:
     case FrontendOptions::DumpTypeRefinementContexts:

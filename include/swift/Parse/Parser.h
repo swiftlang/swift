@@ -82,6 +82,8 @@ public:
   ASTContext &Context;
   CodeCompletionCallbacks *CodeCompletion = nullptr;
   std::vector<std::pair<SourceLoc, std::vector<VarDecl*>>> AnonClosureVars;
+
+  bool IsParsingInterfaceTokens = false;
   
   /// DisabledVars is a list of variables for whom local name lookup is
   /// disabled.  This is used when parsing a PatternBindingDecl to reject self

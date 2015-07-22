@@ -260,4 +260,8 @@ def external_pass_pipeline_filename : Separate<["-"], "external-pass-pipeline-fi
     HelpText<"Use the pass pipeline defined by <pass_pipeline_file>">,
     MetaVarName<"<pass_pipeline_file>">;
 
+def dump_interface_hash : Flag<["-"], "dump-interface-hash">,
+   HelpText<"Parse input file(s) and dump interface token hash(es)">,
+   ModeOpt;
+
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]
