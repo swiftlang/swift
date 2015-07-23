@@ -392,3 +392,20 @@ extension CurriedClass {
     method3(self)        // expected-error {{missing argument for parameter 'b' in call}}
   }
 }
+
+
+// <rdar://problem/19870975> Incorrect diagnostic for failed member lookups within closures passed as arguments ("(_) -> _")
+func ident<T>(t: T) -> T {}
+var c = ident({1.DOESNT_EXIST}) // error: expected-error {{cannot invoke 'ident' with an argument list of type '(() -> _)'}}
+//expected-note @-1 {{expected an argument list of type '(T)'}}
+
+// <rdar://problem/20712541> QoI: Int/UInt mismatch produces useless error inside a block
+var afterMessageCount : Int? = nil
+
+func uintFunc() -> UInt {}
+func takeVoidVoidFn(a : () -> ()) {}
+takeVoidVoidFn { () -> Void in   // expected-error {{cannot invoke 'takeVoidVoidFn' with an argument list of type '(() -> Void)'}}
+  // expected-note @-1 {{expected an argument list of type '(() -> ())'}}
+  afterMessageCount = uintFunc()
+}
+
