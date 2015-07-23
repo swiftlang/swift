@@ -43,6 +43,14 @@ CoreMediaTests.test("CMTime/Comparable") {
   checkComparable(instances.map { $0.1 }, oracle: comparisonOracle)
 }
 
+CoreMediaTests.test("CMTimeRange(start:duration:)") {
+  let start = CMTime(seconds: 10.0, preferredTimescale: 600)
+  let duration = CMTime(seconds: 5.0, preferredTimescale: 600)
+  let range = CMTimeRange(start: start, duration: duration)
+  expectEqual(start, range.start)
+  expectEqual(duration, range.duration)
+}
+
 CoreMediaTests.test("CMTimeRange(start:end:)") {
   let start = CMTime(seconds: 10.0, preferredTimescale: 600)
   let end = CMTime(seconds: 20.0, preferredTimescale: 600)
