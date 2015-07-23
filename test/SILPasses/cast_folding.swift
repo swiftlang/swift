@@ -751,6 +751,29 @@ public func callForGenericCC(c: CC) {
   callFoo(c)
 }
 
+// Check that this conversion does not crash a compiler.
+@inline(never)
+public func test34() {
+  if let _ = A.self as? P {
+    print("A: dice")
+  } else {
+    print("A: no dice")
+  }
+}
+
+
+// Check that this conversion does not crash a compiler.
+@inline(never)
+public func test35() {
+  if let _ = X.self as? P {
+    print("X: dice")
+  } else {
+    print("X: no dice")
+  }
+}
+
+
+
 print("test0=\(test0())")
 
 print("test1=\(test1())")

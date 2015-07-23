@@ -1596,7 +1596,10 @@ optimizeCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *Inst) {
         MI = dyn_cast<MetatypeInst>(Src);
 
       if (MI) {
-        if (SuccessBB->getSinglePredecessor()) {
+        if (SuccessBB->getSinglePredecessor()
+            && canUseScalarCheckedCastInstructions(Inst->getModule(),
+                MI->getType().getSwiftRValueType(),
+                Dest.getType().getObjectType().getSwiftRValueType())) {
           SILBuilderWithScope<1> B(Inst);
           auto NewI = B.createCheckedCastBranch(
               Loc, false /*isExact*/, SILValue(MI, 0),
