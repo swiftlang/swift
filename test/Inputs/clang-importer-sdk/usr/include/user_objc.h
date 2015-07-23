@@ -43,3 +43,12 @@ typedef CF_OPTIONS(UInt32, FakeAudioComponentFlags) {
   kFakeAudioComponentFlag_LoadOutOfProcess  = 1,
   kFakeAudioComponentFlag_LoadInProcess     = 2,
 };
+
+// From <AudioUnit/AudioUnitProperties.h>
+// This enum has a digit immediately after the leading 'k'.
+typedef CF_ENUM(UInt32, AU3DMixerAttenuationCurve) {
+  k3DMixerAttenuationCurve_Power = 0,
+  k3DMixerAttenuationCurve_Exponential = 1,
+  k3DMixerAttenuationCurve_Inverse = 2,
+  k3DMixerAttenuationCurve_Linear = 3
+};

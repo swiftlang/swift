@@ -1500,10 +1500,15 @@ namespace {
         StringRef checkPrefix = commonPrefix;
 
         // Account for the 'kConstant' naming convention on enumerators.
-        if (checkPrefix[0] == 'k' &&
-            ((checkPrefix.size() >= 2 && clang::isUppercase(checkPrefix[1])) ||
-             !followedByNonIdentifier)) {
-          checkPrefix = checkPrefix.drop_front();
+        if (checkPrefix[0] == 'k') {
+          bool canDropK;
+          if (checkPrefix.size() >= 2)
+            canDropK = clang::isUppercase(checkPrefix[1]);
+          else
+            canDropK = !followedByNonIdentifier;
+
+          if (canDropK)
+            checkPrefix = checkPrefix.drop_front();
         }
 
         // Account for the enum being imported using

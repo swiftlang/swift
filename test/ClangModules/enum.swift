@@ -153,6 +153,8 @@ var minceFromMask: NSRuncingOptions = []
 
 // Strip leading 'k' in "kConstant".
 let calendarUnit: CFCalendarUnit = [.Year, .Weekday]
+// ...unless the next character is a non-identifier.
+let curve3D: AU3DMixerAttenuationCurve = .k3DMixerAttenuationCurve_Exponential
 
 // Match various plurals.
 let observingOpts: NSKeyValueObservingOptions = [.New, .Old]
