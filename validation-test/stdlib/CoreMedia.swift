@@ -22,20 +22,20 @@ CoreMediaTests.test("CMTime(value:timescale:)") {
   expectEqual(1, time.timescale)
 }
 
-CoreMediaTests.test("CMTime(seconds:preferredTimeScale:)") {
-  let time = CMTime(seconds: 7.0, preferredTimeScale: 600)
+CoreMediaTests.test("CMTime(seconds:preferredTimescale:)") {
+  let time = CMTime(seconds: 7.0, preferredTimescale: 600)
   expectTrue(time.isValid)
   expectEqual(7.0, time.seconds)
 }
 
 CoreMediaTests.test("CMTime/Comparable") {
   let instances: [(Int, CMTime)] = [
-    (-9999, CMTime(seconds: -Double.infinity, preferredTimeScale: 600)),
-    (10, CMTime(seconds: 10.0, preferredTimeScale: 600)),
-    (10, CMTime(seconds: 10.0, preferredTimeScale: 600)),
-    (20, CMTime(seconds: 20.0, preferredTimeScale: 600)),
-    (30, CMTime(seconds: 30.0, preferredTimeScale: 600)),
-    (9999, CMTime(seconds: Double.infinity, preferredTimeScale: 600)),
+    (-9999, CMTime(seconds: -Double.infinity, preferredTimescale: 600)),
+    (10, CMTime(seconds: 10.0, preferredTimescale: 600)),
+    (10, CMTime(seconds: 10.0, preferredTimescale: 600)),
+    (20, CMTime(seconds: 20.0, preferredTimescale: 600)),
+    (30, CMTime(seconds: 30.0, preferredTimescale: 600)),
+    (9999, CMTime(seconds: Double.infinity, preferredTimescale: 600)),
   ]
   func comparisonOracle(i: Int, j: Int) -> ExpectedComparisonResult {
     return instances[i].0 <=> instances[j].0
@@ -44,17 +44,17 @@ CoreMediaTests.test("CMTime/Comparable") {
 }
 
 CoreMediaTests.test("CMTimeRange(start:end:)") {
-  let start = CMTime(seconds: 10.0, preferredTimeScale: 600)
-  let end = CMTime(seconds: 20.0, preferredTimeScale: 600)
+  let start = CMTime(seconds: 10.0, preferredTimescale: 600)
+  let end = CMTime(seconds: 20.0, preferredTimescale: 600)
   let range = CMTimeRange(start: start, end: end)
   expectEqual(start, range.start)
   expectEqual(end, range.end)
 }
 
 CoreMediaTests.test("CMTimeRange/Equatable") {
-  let time10 = CMTime(seconds: 10.0, preferredTimeScale: 600)
-  let time20 = CMTime(seconds: 20.0, preferredTimeScale: 600)
-  let timeInf = CMTime(seconds: Double.infinity, preferredTimeScale: 600)
+  let time10 = CMTime(seconds: 10.0, preferredTimescale: 600)
+  let time20 = CMTime(seconds: 20.0, preferredTimescale: 600)
+  let timeInf = CMTime(seconds: Double.infinity, preferredTimescale: 600)
 
   let instances: [(Int, CMTimeRange)] = [
     (10, CMTimeRangeMake(time10, time10)),

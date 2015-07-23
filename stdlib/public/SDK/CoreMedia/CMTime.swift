@@ -13,8 +13,8 @@
 @exported import CoreMedia // Clang module
 
 extension CMTime {
-  public init(seconds: Double, preferredTimeScale: CMTimeScale) {
-    self = CMTimeMakeWithSeconds(seconds, preferredTimeScale)
+  public init(seconds: Double, preferredTimescale: CMTimeScale) {
+    self = CMTimeMakeWithSeconds(seconds, preferredTimescale)
   }
 
   public init(value: CMTimeValue, timescale: CMTimeScale) {
