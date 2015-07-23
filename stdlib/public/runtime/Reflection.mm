@@ -513,11 +513,14 @@ static void getEnumMirrorInfo(HeapObject *owner,
   }
   default: {
     tag = swift_getEnumCaseMultiPayload(value, Enum);
-    auto payload = Description.GetCaseTypes(type)[tag];
-    payloadType = payload.getType();
-    indirect = payload.isIndirect();
-    if (static_cast<unsigned>(tag) >= payloadCases)
-      payloadType = nullptr;
+    payloadType = nullptr;
+    indirect = false;
+
+    if (static_cast<unsigned>(tag) < payloadCases) {
+      auto payload = Description.GetCaseTypes(type)[tag];
+      payloadType = payload.getType();
+      indirect = payload.isIndirect();
+    }
     break;
   }
   }

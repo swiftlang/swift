@@ -1268,6 +1268,8 @@ Reflection.test("Enum/MultiPayloadNonGeneric/DefaultMirror") {
 enum MultiPayloadGenericEnumWithDefaultMirror<T, U> {
   case Centris(ram: T)
   case Quadra(hdd: U)
+  case PowerBook170
+  case PowerBookDuo220
 }
 
 Reflection.test("Enum/MultiPayloadGeneric/DefaultMirror") {
@@ -1290,6 +1292,26 @@ Reflection.test("Enum/MultiPayloadGeneric/DefaultMirror") {
     let expected =
       "▿ a.MultiPayloadGenericEnumWithDefaultMirror<Swift.Int, Swift.String>.Quadra\n" +
       "  - Quadra: 160MB\n"
+
+    expectEqual(expected, output)
+  }
+  do {
+    let value = MultiPayloadGenericEnumWithDefaultMirror<Int, String>.PowerBook170
+    var output = ""
+    dump(value, &output)
+
+    let expected =
+      "- a.MultiPayloadGenericEnumWithDefaultMirror<Swift.Int, Swift.String>.PowerBook170\n"
+
+    expectEqual(expected, output)
+  }
+  do {
+    let value = MultiPayloadGenericEnumWithDefaultMirror<Int, String>.PowerBookDuo220
+    var output = ""
+    dump(value, &output)
+
+    let expected =
+      "- a.MultiPayloadGenericEnumWithDefaultMirror<Swift.Int, Swift.String>.PowerBookDuo220\n"
 
     expectEqual(expected, output)
   }
