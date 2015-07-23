@@ -54,6 +54,12 @@
 
 // RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_SWITCH_CASE_1 | FileCheck %s -check-prefix=TOP_LEVEL_SWITCH_CASE_1
 
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_BEFORE_GUARD_NAME_1 | FileCheck %s -check-prefix=TOP_LEVEL_BEFORE_GUARD_NAME
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_BEFORE_GUARD_NAME_2 | FileCheck %s -check-prefix=TOP_LEVEL_BEFORE_GUARD_NAME
+
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_GUARD_1 | FileCheck %s -check-prefix=TOP_LEVEL_GUARD
+// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=TOP_LEVEL_GUARD_2 | FileCheck %s -check-prefix=TOP_LEVEL_GUARD
+
 // Test code completion in top-level code.
 //
 // This test is not meant to test that we can correctly form all kinds of
@@ -294,6 +300,23 @@ switch 1 {
 // TOP_LEVEL_SWITCH_CASE_1: Begin completions
 
 func resyncParserB13() {}
+
+#^TOP_LEVEL_BEFORE_GUARD_NAME_1^#
+// TOP_LEVEL_BEFORE_GUARD_NAME-NOT: name=guardedName
+
+guard let guardedName = 1 as Int? {
+  #^TOP_LEVEL_BEFORE_GUARD_NAME_2^#
+}
+
+#^TOP_LEVEL_GUARD_1^#
+
+func interstitial() {}
+
+#^TOP_LEVEL_GUARD_2^#
+// TOP_LEVEL_GUARD: Decl[LocalVar]/Local: guardedName[#Int#]; name=guardedName
+
+func resyncParserB14() {}
+  
 
 //
 //===--- DON'T ADD ANY TESTS AFTER THIS LINE.
