@@ -865,6 +865,12 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     SN.Dcl = D;
     SN.Kind = SyntaxStructureKind::EnumCase;
     SN.Range = charSourceRangeFromSourceRange(SM, D->getSourceRange());
+    for (auto *EnumElemD : EnumCaseD->getElements()) {
+      if (auto IA = EnumElemD->getAttrs().getAttribute<IndirectAttr>()) {
+        passNonTokenNode({SyntaxNodeKind::Keyword,
+                          charSourceRangeFromSourceRange(SM, IA->getLocation())});
+      }
+    }
     if (pushStructureNode(SN, D)) {
       // FIXME: ASTWalker walks enum elements as members of the enum decl, not
       // as members of the enum case decl. Walk them manually here so that they

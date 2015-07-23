@@ -1,6 +1,13 @@
 // RUN: %target-swift-ide-test -syntax-coloring -source-filename %s | FileCheck %s
 // RUN: %target-swift-ide-test -syntax-coloring -typecheck -source-filename %s | FileCheck %s
 
+
+enum List<T> {
+  case Nil
+  // CHECK: <kw>indirect</kw> <kw>case</kw> Cons(T, List)
+  indirect case Cons(T, List)
+}
+
 // CHECK: <kw>struct</kw> S {
 struct S {
   // CHECK: <kw>var</kw> x : <type>Int</type>
