@@ -4,7 +4,7 @@
 
 enum List<T> {
   case Nil
-  // CHECK: <kw>indirect</kw> <kw>case</kw> Cons(T, List)
+  // CHECK: <attr-builtin>indirect</attr-builtin> <kw>case</kw> Cons(T, List)
   indirect case Cons(T, List)
 }
 

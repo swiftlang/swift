@@ -865,10 +865,15 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     SN.Dcl = D;
     SN.Kind = SyntaxStructureKind::EnumCase;
     SN.Range = charSourceRangeFromSourceRange(SM, D->getSourceRange());
+
+    // We need to handle the special case where attributes semantically
+    // attach to enum element decls while syntactically locate before enum case decl.
+    // rdar://21927124
     for (auto *EnumElemD : EnumCaseD->getElements()) {
       for (auto *Att : EnumElemD->getAttrs()) {
-        if (Att->isDeclModifier()) {
-          passNonTokenNode({SyntaxNodeKind::Keyword,
+        if (Att->isDeclModifier() &&
+            SM.isBeforeInBuffer(Att->getLocation(), D->getSourceRange().Start)) {
+          passNonTokenNode({SyntaxNodeKind::AttributeBuiltin,
                             charSourceRangeFromSourceRange(SM,
                                                            Att->getLocation())});
         }
