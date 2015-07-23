@@ -16,56 +16,84 @@ internal protocol _prext_ReverseIndexType : BidirectionalIndexType {
   /// A type that can represent the number of steps between pairs of
   /// `ReverseIndex` values where one value is reachable from the other.
   typealias Distance: _SignedIntegerType = Base.Distance
-  
-  var _base: Base { get }
+
+  /// The successor position in the underlying (un-reversed)
+  /// collection.
+  ///
+  /// If `self` is `advance(c.reverse.startIndex, n)`, then:
+  /// - `self.base` is `advance(c.endIndex, -n)`.
+  /// - if `n` != `c.count`, then `c.reverse[self]` is 
+  ///   equivalent to `[self.base.predecessor()]`.
+  var base: Base { get }
+
   init(_ base: Base)
 }
 
-/// A wrapper for a `BidirectionalIndexType` that reverses its
-/// direction of traversal.
 extension BidirectionalIndexType where Self : _prext_ReverseIndexType {
   /// Returns the next consecutive value after `self`.
   ///
   /// - Requires: The next value is representable.
   public func successor() -> Self {
-    return Self(_base.predecessor())
+    return Self(base.predecessor())
   }
 
   /// Returns the previous consecutive value before `self`.
   ///
   /// - Requires: The previous value is representable.
   public func predecessor() -> Self {
-    return Self(_base.successor())
+    return Self(base.successor())
   }
 }
 
+/// A wrapper for a `BidirectionalIndexType` that reverses its
+/// direction of traversal.
 public struct _prext_ReverseIndex<Base_: BidirectionalIndexType>
 : BidirectionalIndexType, _prext_ReverseIndexType {
   public typealias Base = Base_
   public typealias Distance = Base_.Distance
   
-  public init(_ base: Base) { self._base = base }
-  public let _base: Base
+  public init(_ base: Base) { self.base = base }
+  
+  /// The successor position in the underlying (un-reversed)
+  /// collection.
+  ///
+  /// If `self` is `advance(c.reverse.startIndex, n)`, then:
+  /// - `self.base` is `advance(c.endIndex, -n)`.
+  /// - if `n` != `c.count`, then `c.reverse[self]` is 
+  ///   equivalent to `[self.base.predecessor()]`.
+  public let base: Base
 }
 
-public func == <I> (lhs: _prext_ReverseIndex<I>, rhs: _prext_ReverseIndex<I>) -> Bool {
-  return lhs._base == rhs._base
+public func == <I> (
+  lhs: _prext_ReverseIndex<I>, rhs: _prext_ReverseIndex<I>
+) -> Bool {
+  return lhs.base == rhs.base
 }
 
+/// A wrapper for a `RandomAccessIndexType` that reverses its
+/// direction of traversal.
 public struct _prext_ReverseRandomAccessIndex<Base: RandomAccessIndexType>
   : RandomAccessIndexType, _prext_ReverseIndexType {
 
   public typealias Distance = Base.Distance
   
-  public init(_ base: Base) { self._base = base }
-  public let _base: Base
+  public init(_ base: Base) { self.base = base }
+  
+  /// The successor position in the underlying (un-reversed)
+  /// collection.
+  ///
+  /// If `self` is `advance(c.reverse.startIndex, n)`, then:
+  /// - `self.base` is `advance(c.endIndex, -n)`.
+  /// - if `n` != `c.count`, then `c.reverse[self]` is 
+  ///   equivalent to `[self.base.predecessor()]`.
+  public let base: Base
 
   /// Return the minimum number of applications of `successor` or
   /// `predecessor` required to reach `other` from `self`.
   ///
   /// - Complexity: O(1).
   public func distanceTo(other: _prext_ReverseRandomAccessIndex) -> Distance {
-    return other._base.distanceTo(_base)
+    return other.base.distanceTo(base)
   }
 
   /// Return `self` offset by `n` steps.
@@ -76,7 +104,7 @@ public struct _prext_ReverseRandomAccessIndex<Base: RandomAccessIndexType>
   ///
   /// - Complexity: O(1).
   public func advancedBy(amount: Distance) -> _prext_ReverseRandomAccessIndex {
-    return _prext_ReverseRandomAccessIndex(_base.advancedBy(-amount))
+    return _prext_ReverseRandomAccessIndex(base.advancedBy(-amount))
   }
 }
 
@@ -99,7 +127,7 @@ extension CollectionType
   public var startIndex : Index { return Self.Index(_base.endIndex) }
   public var endIndex : Index { return Self.Index(_base.startIndex) }
   public subscript(position: Index) -> Self.Base.Generator.Element {
-    return _base[position._base.predecessor()]
+    return _base[position.base.predecessor()]
   }
 }
 
