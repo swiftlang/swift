@@ -866,9 +866,12 @@ bool ModelASTWalker::walkToDeclPre(Decl *D) {
     SN.Kind = SyntaxStructureKind::EnumCase;
     SN.Range = charSourceRangeFromSourceRange(SM, D->getSourceRange());
     for (auto *EnumElemD : EnumCaseD->getElements()) {
-      if (auto IA = EnumElemD->getAttrs().getAttribute<IndirectAttr>()) {
-        passNonTokenNode({SyntaxNodeKind::Keyword,
-                          charSourceRangeFromSourceRange(SM, IA->getLocation())});
+      for (auto *Att : EnumElemD->getAttrs()) {
+        if (Att->isDeclModifier()) {
+          passNonTokenNode({SyntaxNodeKind::Keyword,
+                            charSourceRangeFromSourceRange(SM,
+                                                           Att->getLocation())});
+        }
       }
     }
     if (pushStructureNode(SN, D)) {
