@@ -69,6 +69,21 @@ public struct PrefixUpToTest {
   }
 }
 
+internal struct RemoveFirstNTest {
+  let collection: [Int]
+  let numberToRemove: Int
+  let expected: [Int]
+  let loc: SourceLoc
+
+  init(collection: [Int], numberToRemove: Int, expected: [Int],
+      file: String = __FILE__, line: UWord = __LINE__) {
+    self.collection = collection
+    self.numberToRemove = numberToRemove
+    self.expected = expected
+    self.loc = SourceLoc(file, line, comment: "removeFirst(n: Int) test data")
+  }
+}
+
 public struct SuffixFromTest {
   public var collection: [Int]
   public let start: Int
@@ -207,6 +222,29 @@ public let suffixFromTests = [
   SuffixFromTest(
     collection: [1010, 2020, 3030, 4040, 5050],
     start: 5,
+    expected: []
+  ),
+]
+
+let removeFirstTests: [RemoveFirstNTest] = [
+  RemoveFirstNTest(
+    collection: [1010],
+    numberToRemove: 1,
+    expected: []
+  ),
+  RemoveFirstNTest(
+    collection: [1010, 2020, 3030, 4040, 5050],
+    numberToRemove: 1,
+    expected: [2020, 3030, 4040, 5050]
+  ),
+  RemoveFirstNTest(
+    collection: [1010, 2020, 3030, 4040, 5050],
+    numberToRemove: 5,
+    expected: []
+  ),
+  RemoveFirstNTest(
+    collection: [1010, 2020, 3030, 4040, 5050],
+    numberToRemove: 5,
     expected: []
   ),
 ]
@@ -822,27 +860,25 @@ self.test("\(testNamePrefix).suffix/semantics") {
 //===----------------------------------------------------------------------===//
 // removeFirst()
 //===----------------------------------------------------------------------===//
-self.test("\(testNamePrefix).removeFirst/semantics") {
-  if true {
-    var c = makeWrappedCollection([OpaqueValue(1010)])
+self.test("\(testNamePrefix).removeFirst/slice/semantics") {
+  for test in removeFirstTests.filter({ $0.numberToRemove == 1 }) {
+    var c = makeWrappedCollection(test.collection.map(OpaqueValue.init))
     var slice = c[c.startIndex..<c.endIndex]
     let removedElement = slice.removeFirst()
-    expectEqual(1010, extractValue(removedElement).value)
-    expectEqualSequence([1010], c.map { extractValue($0).value })
-    expectEqualSequence([], slice.map { extractValue($0).value })
-  }
-
-  if true {
-    var c = makeWrappedCollection([1010, 2020, 3030].map(OpaqueValue.init))
-    var slice = c[c.startIndex..<c.endIndex]
-    let removedElement = slice.removeFirst()
-    expectEqual(1010, extractValue(removedElement).value)
-    expectEqualSequence([1010, 2020, 3030], c.map { extractValue($0).value })
-    expectEqualSequence([2020, 3030], slice.map { extractValue($0).value })
+    expectEqual(test.collection.first, extractValue(removedElement).value)
+    expectEqualSequence(
+      test.expected,
+      slice.map { extractValue($0).value },
+      stackTrace: SourceLocStack().with(test.loc)
+    )
+    expectEqualSequence(
+      test.collection,
+      c.map { extractValue($0).value },
+      stackTrace: SourceLocStack().with(test.loc))
   }
 }
 
-self.test("\(testNamePrefix).removeFirst/empty/semantics") {
+self.test("\(testNamePrefix).removeFirst/slice/empty/semantics") {
   var c = makeWrappedCollection(Array<OpaqueValue<Int>>())
   var slice = c[c.startIndex..<c.startIndex]
   expectCrashLater()
