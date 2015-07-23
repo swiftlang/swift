@@ -2640,8 +2640,9 @@ TypeSubstitutionMap TypeBase::getMemberSubstitutions(DeclContext *dc) {
   LazyResolver *resolver = dc->getASTContext().getLazyResolver();
 
   // Find the superclass type with the context matching that of the member.
-  auto ownerNominal = dc->getDeclaredTypeOfContext()->getAnyNominal();
-  while (baseTy->getAnyNominal() != ownerNominal) {
+  auto ownerNominal = dc->isNominalTypeOrNominalTypeExtensionContext();
+  while (!baseTy->is<ErrorType>() &&
+         baseTy->getAnyNominal() != ownerNominal) {
     baseTy = baseTy->getSuperclass(resolver);
     assert(baseTy && "Couldn't find appropriate context");
   }
