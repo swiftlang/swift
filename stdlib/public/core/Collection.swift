@@ -298,18 +298,6 @@ extension CollectionType {
     return Array(lazy(self).map(escapableTransform))
   }
 
-  /// Returns an `Array` containing the elements of `self`,
-  /// in order, that satisfy the predicate `includeElement`.
-  public func filter(
-    @noescape includeElement: (Generator.Element) -> Bool
-  ) -> [Generator.Element] {
-    // Cast away @noescape.
-    typealias IncludeElement = (Generator.Element) -> Bool
-    let escapableIncludeElement =
-      unsafeBitCast(includeElement, IncludeElement.self)
-    return Array(lazy(self).filter(escapableIncludeElement))
-  }
-
   /// Returns a subsequence containing all but the first `n` elements.
   ///
   /// - Requires: `n >= 0`
