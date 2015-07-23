@@ -15,9 +15,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "NameLookupImpl.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/AST.h"
+#include "swift/AST/ASTVisitor.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
@@ -623,6 +623,195 @@ static void lookupVisibleMemberDecls(
     Consumer.foundDecl(DeclAndReason.D, DeclAndReason.Reason);
 }
 
+namespace {
+
+struct FindLocalVal : public StmtVisitor<FindLocalVal> {
+  const SourceManager &SM;
+  SourceLoc Loc;
+  VisibleDeclConsumer &Consumer;
+
+  FindLocalVal(const SourceManager &SM, SourceLoc Loc,
+               VisibleDeclConsumer &Consumer)
+      : SM(SM), Loc(Loc), Consumer(Consumer) {}
+
+  bool isReferencePointInRange(SourceRange R) {
+    return SM.rangeContainsTokenLoc(R, Loc);
+  }
+
+  void checkValueDecl(ValueDecl *D, DeclVisibilityKind Reason) {
+    Consumer.foundDecl(D, Reason);
+  }
+
+  void checkPattern(const Pattern *Pat, DeclVisibilityKind Reason) {
+    switch (Pat->getKind()) {
+    case PatternKind::Tuple:
+      for (auto &field : cast<TuplePattern>(Pat)->getElements())
+        checkPattern(field.getPattern(), Reason);
+      return;
+    case PatternKind::Paren:
+    case PatternKind::Typed:
+    case PatternKind::Var:
+      return checkPattern(Pat->getSemanticsProvidingPattern(), Reason);
+    case PatternKind::Named:
+      return checkValueDecl(cast<NamedPattern>(Pat)->getDecl(), Reason);
+
+    case PatternKind::NominalType: {
+      for (auto &elt : cast<NominalTypePattern>(Pat)->getElements())
+        checkPattern(elt.getSubPattern(), Reason);
+      return;
+    }
+    case PatternKind::EnumElement: {
+      auto *OP = cast<EnumElementPattern>(Pat);
+      if (OP->hasSubPattern())
+        checkPattern(OP->getSubPattern(), Reason);
+      return;
+    }
+    case PatternKind::OptionalSome:
+      checkPattern(cast<OptionalSomePattern>(Pat)->getSubPattern(), Reason);
+      return;
+
+    case PatternKind::Is: {
+      auto *isPat = cast<IsPattern>(Pat);
+      if (isPat->hasSubPattern())
+        checkPattern(isPat->getSubPattern(), Reason);
+      return;
+    }
+
+    // Handle non-vars.
+    case PatternKind::Bool:
+    case PatternKind::Expr:
+    case PatternKind::Any:
+      return;
+    }
+  }
+
+  void checkGenericParams(GenericParamList *Params,
+                          DeclVisibilityKind Reason) {
+    if (!Params)
+      return;
+
+    for (auto P : *Params)
+      checkValueDecl(P, Reason);
+  }
+
+  void checkSourceFile(const SourceFile &SF) {
+    for (Decl *D : SF.Decls)
+      if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D))
+        visit(TLCD->getBody());
+  }
+
+  void visitBreakStmt(BreakStmt *) {}
+  void visitContinueStmt(ContinueStmt *) {}
+  void visitFallthroughStmt(FallthroughStmt *) {}
+  void visitFailStmt(FailStmt *) {}
+  void visitReturnStmt(ReturnStmt *) {}
+  void visitThrowStmt(ThrowStmt *) {}
+  void visitDeferStmt(DeferStmt *DS) {
+    // Nothing in the defer is visible.
+  }
+
+  void checkStmtCondition(const StmtCondition &Cond) {
+    for (auto entry : Cond)
+      if (auto *P = entry.getPatternOrNull())
+        checkPattern(P, DeclVisibilityKind::LocalVariable);
+  }
+
+  void visitIfStmt(IfStmt *S) {
+    checkStmtCondition(S->getCond());
+    visit(S->getThenStmt());
+    if (S->getElseStmt())
+      visit(S->getElseStmt());
+  }
+  void visitGuardStmt(GuardStmt *S) {
+    checkStmtCondition(S->getCond());
+    visit(S->getBody());
+  }
+
+  void visitIfConfigStmt(IfConfigStmt * S) {
+    // Active members are attached to the enclosing declaration, so there's no
+    // need to walk anything within.
+  }
+  void visitWhileStmt(WhileStmt *S) {
+    checkStmtCondition(S->getCond());
+    visit(S->getBody());
+  }
+  void visitRepeatWhileStmt(RepeatWhileStmt *S) {
+    visit(S->getBody());
+  }
+  void visitDoStmt(DoStmt *S) {
+    visit(S->getBody());
+  }
+
+  void visitForStmt(ForStmt *S) {
+    if (!isReferencePointInRange(S->getSourceRange()))
+      return;
+    visit(S->getBody());
+    for (Decl *D : S->getInitializerVarDecls()) {
+      if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
+        checkValueDecl(VD, DeclVisibilityKind::LocalVariable);
+    }
+  }
+  void visitForEachStmt(ForEachStmt *S) {
+    if (!isReferencePointInRange(S->getSourceRange()))
+      return;
+    visit(S->getBody());
+    checkPattern(S->getPattern(), DeclVisibilityKind::LocalVariable);
+  }
+  void visitBraceStmt(BraceStmt *S) {
+    if (!isReferencePointInRange(S->getSourceRange()))
+      return;
+    for (auto elem : S->getElements()) {
+      if (Stmt *S = elem.dyn_cast<Stmt*>())
+        visit(S);
+    }
+    for (auto elem : S->getElements()) {
+      if (Decl *D = elem.dyn_cast<Decl*>()) {
+        if (ValueDecl *VD = dyn_cast<ValueDecl>(D))
+          checkValueDecl(VD, DeclVisibilityKind::LocalVariable);
+      }
+    }
+  }
+  
+  void visitSwitchStmt(SwitchStmt *S) {
+    if (!isReferencePointInRange(S->getSourceRange()))
+      return;
+    for (CaseStmt *C : S->getCases()) {
+      visit(C);
+    }
+  }
+
+  void visitCaseStmt(CaseStmt *S) {
+    if (!isReferencePointInRange(S->getSourceRange()))
+      return;
+    for (const auto &CLI : S->getCaseLabelItems()) {
+      checkPattern(CLI.getPattern(), DeclVisibilityKind::LocalVariable);
+    }
+    visit(S->getBody());
+  }
+
+  void visitDoCatchStmt(DoCatchStmt *S) {
+    if (!isReferencePointInRange(S->getSourceRange()))
+      return;
+    visit(S->getBody());
+    visitCatchClauses(S->getCatches());
+  }
+  void visitCatchClauses(ArrayRef<CatchStmt*> clauses) {
+    // TODO: some sort of binary search?
+    for (auto clause : clauses) {
+      visitCatchStmt(clause);
+    }
+  }
+  void visitCatchStmt(CatchStmt *S) {
+    if (!isReferencePointInRange(S->getSourceRange()))
+      return;
+    checkPattern(S->getErrorPattern(), DeclVisibilityKind::LocalVariable);
+    visit(S->getBody());
+  }
+  
+};
+  
+} // end anonymous namespace
+
 void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
                                const DeclContext *DC,
                                LazyResolver *TypeResolver,
@@ -652,11 +841,11 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
       // FIXME: when we can parse and typecheck the function body partially for
       // code completion, AFD->getBody() check can be removed.
       if (Loc.isValid() && AFD->getBody()) {
-        namelookup::FindLocalVal(SM, Loc, Consumer).visit(AFD->getBody());
+        FindLocalVal(SM, Loc, Consumer).visit(AFD->getBody());
       }
 
       for (auto *P : AFD->getBodyParamPatterns())
-        namelookup::FindLocalVal(SM, Loc, Consumer)
+        FindLocalVal(SM, Loc, Consumer)
             .checkPattern(P, DeclVisibilityKind::FunctionParameter);
 
       // Constructors and destructors don't have 'self' in parameter patterns.
@@ -682,7 +871,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
     } else if (auto ACE = dyn_cast<AbstractClosureExpr>(DC)) {
       if (Loc.isValid()) {
         auto CE = cast<ClosureExpr>(ACE);
-        namelookup::FindLocalVal(SM, Loc, Consumer).visit(CE->getBody());
+        FindLocalVal(SM, Loc, Consumer).visit(CE->getBody());
       }
     } else if (auto ED = dyn_cast<ExtensionDecl>(DC)) {
       ExtendedType = ED->getExtendedType();
@@ -699,7 +888,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
 
     // Check the generic parameters for something with the given name.
     if (GenericParams) {
-      namelookup::FindLocalVal(SM, Loc, Consumer)
+      FindLocalVal(SM, Loc, Consumer)
           .checkGenericParams(GenericParams,
                               DeclVisibilityKind::GenericParameter);
     }
@@ -714,7 +903,7 @@ void swift::lookupVisibleDecls(VisibleDeclConsumer &Consumer,
       // Look for local variables in top-level code; normally, the parser
       // resolves these for us, but it can't do the right thing for
       // local types.
-      namelookup::FindLocalVal(SM, Loc, Consumer).checkSourceFile(*SF);
+      FindLocalVal(SM, Loc, Consumer).checkSourceFile(*SF);
     }
 
     if (IncludeTopLevel) {
