@@ -1152,7 +1152,11 @@ namespace {
       // getters and setters funcdecls will be handled by their parent
       // var/subscript.
       if (method->isAccessor()) return;
-      
+
+      // Don't emit getters/setters for @NSManaged methods.
+      if (method->getAttrs().hasAttribute<NSManagedAttr>())
+        return;
+
       llvm::Constant *entry = emitObjCMethodDescriptor(IGM, method);
       // This pointer will be set if we need to store the extended method type
       // encoding.
@@ -1480,7 +1484,7 @@ namespace {
           if (llvm::Constant *prop = buildProperty(var))
             Properties.push_back(prop);
 
-        // Don't emit getter/setter descriptors for @NSManagedAttr properties.
+        // Don't emit getter/setter descriptors for @NSManaged properties.
         if (var->getAttrs().hasAttribute<NSManagedAttr>() ||
             // Don't emit descriptors for properties without accessors.
             var->getGetter() == nullptr)

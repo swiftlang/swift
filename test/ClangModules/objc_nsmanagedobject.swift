@@ -53,3 +53,7 @@ func accessOther(om: OtherManagedObject) -> String {
 func accessMine(obj: MyManagedObject) -> String {
   return obj.anotherManaged
 }
+
+func accessMyMethod(obj: MyManagedObject) {
+  obj.managedMethod()
+}

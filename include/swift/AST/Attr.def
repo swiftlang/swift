@@ -122,7 +122,7 @@ SIMPLE_DECL_ATTR(IBInspectable, IBInspectable,
 SIMPLE_DECL_ATTR(IBOutlet, IBOutlet,
                  OnVar, 14)
 
-SIMPLE_DECL_ATTR(NSManaged, NSManaged, OnVar, 15)
+SIMPLE_DECL_ATTR(NSManaged, NSManaged, OnVar | OnFunc, 15)
 
 SIMPLE_DECL_ATTR(lazy, Lazy, OnVar|DeclModifier, 16)
 

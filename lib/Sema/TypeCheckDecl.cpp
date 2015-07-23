@@ -3903,10 +3903,11 @@ public:
     if (decl->isInvalid() || decl->isImplicit() || decl->hasClangNode())
       return false;
 
-    // Functions can have asmname and semantics attributes.
+    // Functions can have asmname, semantics, and NSManaged attributes.
     if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
       if (func->getAttrs().hasAttribute<AsmnameAttr>() ||
-          func->getAttrs().hasAttribute<SemanticsAttr>())
+          func->getAttrs().hasAttribute<SemanticsAttr>() ||
+          func->getAttrs().hasAttribute<NSManagedAttr>())
         return false;
     }
 
@@ -4158,28 +4159,7 @@ public:
     validateAttributes(TC, FD);
 
     // Member functions need some special validation logic.
-    if (auto contextType = FD->getDeclContext()->getDeclaredTypeInContext()) {
-      // If this is a class member, mark it final if the class is final.
-      if (auto cls = contextType->getClassOrBoundGenericClass()) {
-        if (cls->isFinal() && !FD->isAccessor() &&
-            !FD->isFinal() && !FD->isDynamic()) {
-          makeFinal(TC.Context, FD);
-        }
-        // static func declarations in classes are synonyms
-        // for `class final func` declarations.
-        if (FD->getStaticSpelling() == StaticSpellingKind::KeywordStatic) {
-          auto finalAttr = FD->getAttrs().getAttribute<FinalAttr>();
-          if (finalAttr) {
-            auto finalRange = finalAttr->getRange();
-            if (finalRange.isValid())
-              TC.diagnose(finalRange.Start, diag::decl_already_final)
-                .highlight(finalRange)
-                .fixItRemove(finalRange);
-          }
-          makeFinal(TC.Context, FD);
-        }
-      }
-
+    if (FD->getDeclContext()->isTypeContext()) {
       if (!checkOverrides(TC, FD)) {
         // If a method has an 'override' keyword but does not
         // override anything, complain.
@@ -4238,6 +4218,29 @@ public:
     inferDynamic(TC.Context, FD);
 
     TC.checkDeclAttributes(FD);
+
+    // If this is a class member, mark it final if the class is final.
+    if (auto contextType = FD->getDeclContext()->getDeclaredTypeInContext()) {
+      if (auto cls = contextType->getClassOrBoundGenericClass()) {
+        if (cls->isFinal() && !FD->isAccessor() &&
+            !FD->isFinal() && !FD->isDynamic()) {
+          makeFinal(TC.Context, FD);
+        }
+        // static func declarations in classes are synonyms
+        // for `class final func` declarations.
+        if (FD->getStaticSpelling() == StaticSpellingKind::KeywordStatic) {
+          auto finalAttr = FD->getAttrs().getAttribute<FinalAttr>();
+          if (finalAttr) {
+            auto finalRange = finalAttr->getRange();
+            if (finalRange.isValid())
+              TC.diagnose(finalRange.Start, diag::decl_already_final)
+              .highlight(finalRange)
+              .fixItRemove(finalRange);
+          }
+          makeFinal(TC.Context, FD);
+        }
+      }
+    }
 
     // Check whether we have parameters with default arguments that follow a
     // closure parameter; warn about such things, because the closure will not

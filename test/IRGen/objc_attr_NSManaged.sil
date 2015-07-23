@@ -31,6 +31,7 @@ sil_vtable X {}
 
 @objc class SwiftGizmo : Gizmo {
   @objc @NSManaged var x: X
+  @objc @NSManaged func kvc()
 }
 sil @_TToFC19objc_attr_NSManaged1XcfMS0_FT_S0_ : $@convention(objc_method) (@owned X) -> @owned X {
 bb0(%0 : $X):

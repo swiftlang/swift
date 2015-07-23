@@ -109,13 +109,18 @@ private:
       if (auto *VD = dyn_cast<ValueDecl>(member))
         if (VD->isFinal() && VD->getOverriddenDecl() == nullptr)
           continue;
-      
+
+      // @NSManaged properties and methods don't have vtable entries.
+      if (member->getAttrs().hasAttribute<NSManagedAttr>())
+        continue;
+
       // Add entries for methods.
       if (auto fn = dyn_cast<FuncDecl>(member)) {
         // Ignore accessors.  These get added when their AbstractStorageDecl is
         // visited.
         if (fn->isAccessor())
           continue;
+
         addMethodEntries(fn);
       } else if (auto ctor = dyn_cast<ConstructorDecl>(member)) {
         // Stub constructors don't get an entry.
@@ -127,9 +132,6 @@ private:
       } else if (auto *asd = dyn_cast<AbstractStorageDecl>(member)) {
         // FIXME: Stored properties should either be final or have accessors.
         if (!asd->hasAccessorFunctions()) continue;
-
-        // @NSManaged properties don't have vtable entries.
-        if (asd->getAttrs().hasAttribute<NSManagedAttr>()) continue;
 
         addMethodEntries(asd->getGetter());
         if (auto *setter = asd->getSetter())

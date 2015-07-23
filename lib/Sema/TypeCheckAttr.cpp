@@ -333,12 +333,23 @@ void AttributeEarlyChecker::visitIBOutletAttr(IBOutletAttr *attr) {
 }
 
 void AttributeEarlyChecker::visitNSManagedAttr(NSManagedAttr *attr) {
-  // @NSManaged may only be used on properties.
-  auto *VD = cast<VarDecl>(D);
+  // @NSManaged only applies to instance methods and properties within a class.
+  if (cast<ValueDecl>(D)->isStatic() ||
+      !D->getDeclContext()->isClassOrClassExtensionContext()) {
+    return diagnoseAndRemoveAttr(attr,
+                                 diag::attr_NSManaged_not_instance_member);
+  }
 
-  // NSManaged only applies to non-class properties within a class.
-  if (VD->isStatic() || !VD->getDeclContext()->isClassOrClassExtensionContext())
-    return diagnoseAndRemoveAttr(attr, diag::attr_NSManaged_not_property);
+  if (auto *method = dyn_cast<FuncDecl>(D)) {
+    // Separate out the checks for methods.
+    if (method->hasBody())
+      return diagnoseAndRemoveAttr(attr, diag::attr_NSManaged_method_body);
+
+    return;
+  }
+
+  // Everything below deals with restrictions on @NSManaged properties.
+  auto *VD = cast<VarDecl>(D);
 
   if (VD->isLet())
     return diagnoseAndRemoveAttr(attr, diag::attr_NSManaged_let_property);

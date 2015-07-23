@@ -173,11 +173,14 @@ SILValue SILGenFunction::emitDynamicMethodRef(SILLocation loc,
 
 bool SILGenModule::requiresObjCMethodEntryPoint(FuncDecl *method) {
   // Property accessors should be generated alongside the property unless
-  // the @NSManagedAttr attribute is present.
+  // the @NSManaged attribute is present.
   if (method->isGetterOrSetter()) {
     auto asd = method->getAccessorStorageDecl();
     return asd->isObjC() && !asd->getAttrs().hasAttribute<NSManagedAttr>();
   }
+
+  if (method->getAttrs().hasAttribute<NSManagedAttr>())
+    return false;
 
   return method->isObjC() || method->getAttrs().hasAttribute<IBActionAttr>();
 }

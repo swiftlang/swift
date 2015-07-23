@@ -45,11 +45,12 @@ func method(@#^KEYWORD1^#) {}
 @#^KEYWORD2^#
 func method(){}
 
-// KEYWORD2:                  Begin completions, 8 items
+// KEYWORD2:                  Begin completions, 9 items
 // KEYWORD2-NEXT:             Keyword/None:                       available[#Func Attribute#]; name=available{{$}}
 // KEYWORD2-NEXT:             Keyword/None:                       objc[#Func Attribute#]; name=objc{{$}}
 // KEYWORD2-NEXT:             Keyword/None:                       noreturn[#Func Attribute#]; name=noreturn{{$}}
 // KEYWORD2-NEXT:             Keyword/None:                       IBAction[#Func Attribute#]; name=IBAction{{$}}
+// KEYWORD2-NEXT:             Keyword/None:                       NSManaged[#Func Attribute#]; name=NSManaged{{$}}
 // KEYWORD2-NEXT:             Keyword/None:                       inline[#Func Attribute#]; name=inline{{$}}
 // KEYWORD2-NEXT:             Keyword/None:                       nonobjc[#Func Attribute#]; name=nonobjc{{$}}
 // KEYWORD2-NEXT:             Keyword/None:                       warn_unused_result[#Func Attribute#]; name=warn_unused_result{{$}}

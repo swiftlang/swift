@@ -146,6 +146,11 @@ public:
   
   void visitFuncDecl(FuncDecl *method) {
     if (!requiresObjCMethodDescriptor(method)) return;
+
+    // Don't emit getters/setters for @NSManaged methods.
+    if (method->getAttrs().hasAttribute<NSManagedAttr>())
+      return;
+
     llvm::Constant *name, *imp, *types;
     emitObjCMethodDescriptorParts(IGM, method,
                                   /*extended*/false,
@@ -203,7 +208,7 @@ public:
     // ObjC doesn't have a notion of class properties, so we'd only do this
     // for instance properties.
 
-    // Don't emit getters/setters for @NSManagedAttr properties.
+    // Don't emit getters/setters for @NSManaged properties.
     if (prop->getAttrs().hasAttribute<NSManagedAttr>())
       return;
 

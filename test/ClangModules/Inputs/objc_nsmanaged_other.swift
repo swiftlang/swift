@@ -11,4 +11,6 @@ func getMyManagedObject() -> MyManagedObject {
 
 extension MyManagedObject {
   @NSManaged var anotherManaged: String
+
+  @NSManaged func managedMethod()
 }
