@@ -1166,6 +1166,15 @@ Reflection.test("Enum/SingletonGeneric/DefaultMirror") {
 
     expectEqual(expected, output)
   }
+  expectEqual(0, LifetimeTracked.instances)
+  do {
+    let value = SingletonGenericEnumWithDefaultMirror.OnlyOne(
+        LifetimeTracked(0))
+    expectEqual(1, LifetimeTracked.instances)
+    var output = ""
+    dump(value, &output)
+  }
+  expectEqual(0, LifetimeTracked.instances)
 }
 
 enum SinglePayloadNonGenericEnumWithDefaultMirror {
@@ -1189,7 +1198,8 @@ Reflection.test("Enum/SinglePayloadNonGeneric/DefaultMirror") {
     expectEqual(expected, output)
   }
   do {
-    let value = SinglePayloadNonGenericEnumWithDefaultMirror.Volleyball("Wilson", 2000)
+    let value = SinglePayloadNonGenericEnumWithDefaultMirror.Volleyball(
+        "Wilson", 2000)
     var output = ""
     dump(value, &output)
 
@@ -1221,7 +1231,8 @@ Reflection.test("Enum/SinglePayloadGeneric/DefaultMirror") {
     expectEqual(expected, output)
   }
   do {
-    let value = SinglePayloadGenericEnumWithDefaultMirror<Int, [Int]>.Pipe(408, [415])
+    let value = SinglePayloadGenericEnumWithDefaultMirror<Int, [Int]>.Pipe(
+        408, [415])
     var output = ""
     dump(value, &output)
 
@@ -1236,30 +1247,79 @@ Reflection.test("Enum/SinglePayloadGeneric/DefaultMirror") {
   }
 }
 
-enum MultiPayloadNonGenericEnumWithDefaultMirror {
+enum MultiPayloadTagBitsNonGenericEnumWithDefaultMirror {
   case Classic(mhz: Int)
   case Performa(model: Int)
 }
 
-// FIXME: not yet implemented
-Reflection.test("Enum/MultiPayloadNonGeneric/DefaultMirror") {
+Reflection.test("Enum/MultiPayloadTagBitsNonGeneric/DefaultMirror") {
   do {
-    let value = MultiPayloadNonGenericEnumWithDefaultMirror.Classic(mhz: 16)
+    let value = MultiPayloadTagBitsNonGenericEnumWithDefaultMirror.Classic(
+        mhz: 16)
     var output = ""
     dump(value, &output)
 
     let expected =
-      "- a.MultiPayloadNonGenericEnumWithDefaultMirror\n"
+      "▿ a.MultiPayloadTagBitsNonGenericEnumWithDefaultMirror.Classic\n" +
+      "  - Classic: 16\n"
 
     expectEqual(expected, output)
   }
   do {
-    let value = MultiPayloadNonGenericEnumWithDefaultMirror.Performa(model: 220)
+    let value = MultiPayloadTagBitsNonGenericEnumWithDefaultMirror.Performa(
+        model: 220)
     var output = ""
     dump(value, &output)
 
     let expected =
-      "- a.MultiPayloadNonGenericEnumWithDefaultMirror\n"
+      "▿ a.MultiPayloadTagBitsNonGenericEnumWithDefaultMirror.Performa\n" +
+      "  - Performa: 220\n"
+
+    expectEqual(expected, output)
+  }
+}
+
+class Floppy {
+  let capacity: Int
+
+  init(capacity: Int) { self.capacity = capacity }
+}
+
+class CDROM {
+  let capacity: Int
+
+  init(capacity: Int) { self.capacity = capacity }
+}
+
+enum MultiPayloadExtraInhabitantNonGenericEnumWithDefaultMirror {
+  case ClarisWorks(floppy: Floppy)
+  case HyperCard(cdrom: CDROM)
+}
+
+Reflection.test("Enum/MultiPayloadExtraInhabitantsNonGeneric/DefaultMirror") {
+  do {
+    let value = MultiPayloadExtraInhabitantNonGenericEnumWithDefaultMirror
+        .ClarisWorks(floppy: Floppy(capacity: 800))
+    var output = ""
+    dump(value, &output)
+
+    let expected =
+      "▿ a.MultiPayloadExtraInhabitantNonGenericEnumWithDefaultMirror.ClarisWorks\n" +
+      "  ▿ ClarisWorks: a.Floppy #0\n" +
+      "    - capacity: 800\n"
+
+    expectEqual(expected, output)
+  }
+  do {
+    let value = MultiPayloadExtraInhabitantNonGenericEnumWithDefaultMirror
+        .HyperCard(cdrom: CDROM(capacity: 600))
+    var output = ""
+    dump(value, &output)
+
+    let expected =
+      "▿ a.MultiPayloadExtraInhabitantNonGenericEnumWithDefaultMirror.HyperCard\n" +
+      "  ▿ HyperCard: a.CDROM #0\n" +
+      "    - capacity: 600\n"
 
     expectEqual(expected, output)
   }
@@ -1274,7 +1334,8 @@ enum MultiPayloadGenericEnumWithDefaultMirror<T, U> {
 
 Reflection.test("Enum/MultiPayloadGeneric/DefaultMirror") {
   do {
-    let value = MultiPayloadGenericEnumWithDefaultMirror<Int, String>.Centris(ram: 4096)
+    let value = MultiPayloadGenericEnumWithDefaultMirror<Int, String>
+        .Centris(ram: 4096)
     var output = ""
     dump(value, &output)
 
@@ -1315,6 +1376,16 @@ Reflection.test("Enum/MultiPayloadGeneric/DefaultMirror") {
 
     expectEqual(expected, output)
   }
+  expectEqual(0, LifetimeTracked.instances)
+  do {
+    let value = MultiPayloadGenericEnumWithDefaultMirror<LifetimeTracked,
+                                                         LifetimeTracked>
+        .Quadra(hdd: LifetimeTracked(0))
+    expectEqual(1, LifetimeTracked.instances)
+    var output = ""
+    dump(value, &output)
+  }
+  expectEqual(0, LifetimeTracked.instances)
 }
 
 enum Foo<T> {
@@ -2147,18 +2218,6 @@ Reflection.test("Name of metatype of artificial subclass") {
   obj.removeObserver(obj, forKeyPath: "foo")
 
   expectEqual("\(obj.dynamicType)", "TestArtificialSubclass")
-}
-
-Reflection.test("Indirect enum payload") {
-  let x = Foo<String>.Foo(22)
-  let y = Foo<String>.Bar("twenty-two")
-
-  expectEqual("\(x)", "Foo(22)")
-  expectEqual("\(y)", "Bar(\"twenty-two\")")
-
-  let list = List.Cons(first: 0, rest: .Cons(first: 1, rest: .Nil))
-  expectEqual("\(list)",
-              "Cons(0, a.List<Swift.Int>.Cons(1, a.List<Swift.Int>.Nil))")
 }
 
 var BitTwiddlingTestSuite = TestSuite("BitTwiddling")

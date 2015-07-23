@@ -74,20 +74,6 @@ static inline void small_memcpy(void *dest, const void *src, unsigned count) {
   }
 }
 
-
-int
-swift::swift_getEnumCaseSimple(const OpaqueValue *value, unsigned emptyCases) {
-  auto *valueAddr = reinterpret_cast<const uint8_t*>(value);
-  unsigned tag = 0;
-
-  // FIXME: endianness
-  unsigned numBytes = getNumTagBytes(0, emptyCases, 0);
-  if (numBytes != 0)
-    small_memcpy(&tag, valueAddr, numBytes);
-
-  return tag;
-}
-
 void
 swift::swift_initEnumValueWitnessTableSinglePayload(ValueWitnessTable *vwtable,
                                                 const TypeLayout *payloadLayout,
