@@ -2541,7 +2541,7 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr,
   CS->TC.addExprForDiagnosis(subExpr, subExpr);
   
   if (isa<ClosureExpr>(subExpr))
-    return subExpr;
+    allowUnresolved = true;
   
   // These expression types can never be checked without their enclosing
   // context, so don't try - it would just make bogus diagnostics.
@@ -3246,16 +3246,20 @@ visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E) {
 
 
 bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
-
   // ClosureExprs are likely to get some clever handling in the future, but for
   // now we need to defend against type variables from our constraint system
   // leaking into recursive constraints systems formed when checking the body
   // of the closure.  These typevars come into them when the body does name
-  // lookups against the parameter decls.  Handle this by rewriting the
-  // arguments to ErrorType for now.
+  // lookups against the parameter decls.
+  //
+  // Handle this by rewriting the arguments to Type().  CSGen has special
+  // handling for ParamDecls from closure arguments with null types.
+  //
+  // TODO: If there is a partial type available for the closure, we should apply
+  // whatever information we have about it to the paramdecls.
   CE->getParams()->forEachVariable([&](VarDecl *VD) {
     if (VD->getType()->hasTypeVariable())
-      VD->overwriteType(ErrorType::get(CS->getASTContext()));
+      VD->overwriteType(Type());
   });
   
   return visitExpr(CE);

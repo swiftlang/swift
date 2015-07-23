@@ -14,7 +14,7 @@ var closure3a : ()->()->(Int,Int) = {{ (4, 2) }} // multi-level closing.
 var closure3b : (Int,Int)->(Int)->(Int,Int) = {{ (4, 2) }} // expected-error{{tuple types '(Int, Int)' and '()' have a different number of elements (2 vs. 0)}}
 var closure4 : (Int,Int) -> Int = { $0 + $1 }
 var closure5 : (Double) -> Int =
-   { // expected-error {{'(_) -> Int' is not convertible to '(Double) -> Int'}}
+   { // expected-error {{'(Double) -> Double' is not convertible to '(Double) -> Int'}}
        $0 + 1.0 }
 
 var closure6 = $0  // expected-error {{anonymous closure argument not contained in a closure}}
@@ -58,7 +58,7 @@ func funcdecl5(a: Int, _ y: Int) {
   func6(fn: { a,b in a+b })
   
   // Infer incompatible type.
-  func6(fn: {a,b->Float in 4.0 })    // expected-error {{cannot convert return expression of type 'FloatLiteralConvertible' to expected return type 'Float'}}
+  func6(fn: {a,b->Float in 4.0 })    // expected-error {{cannot convert return expression of type 'Double' to expected return type 'Float'}}
 
   // Pattern doesn't need to name arguments.
   func6(fn: { _,_ in 4 })

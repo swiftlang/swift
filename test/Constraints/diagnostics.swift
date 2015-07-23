@@ -247,12 +247,12 @@ func r18800223(i : Int) {
 
   
   var buttonTextColor: String?
-  _ = (buttonTextColor != nil) ? 42 : {$0}; // expected-error {{result values in '? :' expression have mismatching types 'Int' and '(_) -> _'}}
+  _ = (buttonTextColor != nil) ? 42 : {$0}; // expected-error {{type of expression is ambiguous without more context}}
 }
 
 // <rdar://problem/21883806> Bogus "'_' can only appear in a pattern or on the left side of an assignment" is back
 // FIXME: This diagnostic is really bad.
-_ = { $0 }  // expected-error {{cannot assign a value of type '(_) -> _' to a value of type '@lvalue _'}}
+_ = { $0 }  // expected-error {{type of expression is ambiguous without more context}}
 
 
 
@@ -396,16 +396,14 @@ extension CurriedClass {
 
 // <rdar://problem/19870975> Incorrect diagnostic for failed member lookups within closures passed as arguments ("(_) -> _")
 func ident<T>(t: T) -> T {}
-var c = ident({1.DOESNT_EXIST}) // error: expected-error {{cannot invoke 'ident' with an argument list of type '(() -> _)'}}
-//expected-note @-1 {{expected an argument list of type '(T)'}}
+var c = ident({1.DOESNT_EXIST}) // error: expected-error {{value of type 'Int' has no member 'DOESNT_EXIST'}}
 
 // <rdar://problem/20712541> QoI: Int/UInt mismatch produces useless error inside a block
 var afterMessageCount : Int? = nil
 
 func uintFunc() -> UInt {}
 func takeVoidVoidFn(a : () -> ()) {}
-takeVoidVoidFn { () -> Void in   // expected-error {{cannot invoke 'takeVoidVoidFn' with an argument list of type '(() -> Void)'}}
-  // expected-note @-1 {{expected an argument list of type '(() -> ())'}}
-  afterMessageCount = uintFunc()
+takeVoidVoidFn { () -> Void in
+  afterMessageCount = uintFunc()  // expected-error {{'UInt' is not convertible to 'Int'}}
 }
 

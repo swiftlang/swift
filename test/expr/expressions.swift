@@ -111,7 +111,7 @@ func funcdecl7(a: Int, b: (c: Int, d: Int), third: (c: Int, d: Int)) -> Int {
 // Error recovery.
 func testfunc2 (_: ((), Int) -> Int) -> Int {}
 func errorRecovery() {
-  testfunc2({ $0 + 1 }) // expected-error{{cannot invoke 'testfunc2' with an argument list of type '((_) -> _)'}} expected-note{{expected an argument list of type '(((), Int) -> Int)'}}
+  testfunc2({ $0 + 1 }) // expected-error{{cannot invoke 'testfunc2' with an argument list of type '((Int) -> Int)'}} expected-note{{expected an argument list of type '(((), Int) -> Int)'}}
 
   enum union1 {
     case bar

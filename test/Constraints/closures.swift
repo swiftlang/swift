@@ -9,7 +9,7 @@ myMap(intArray, { x -> String in String(x) } )
 
 // Closures with too few parameters.
 func foo(x: (Int, Int) -> Int) {}
-foo({$0}) // expected-error{{cannot invoke 'foo' with an argument list of type '((_) -> _)'}} expected-note{{expected an argument list of type '((Int, Int) -> Int)'}}
+foo({$0}) // expected-error{{type of expression is ambiguous without more context}}
 
 struct X {}
 func mySort(array: [String], _ predicate: (String, String) -> Bool) -> [String] {}
@@ -27,7 +27,7 @@ struct X2 {
   func g() -> Float { return 0 }  
 }
 
-f0(X2(), {$0.g()})  // expected-error {{could not find member 'g'}}
+f0(X2(), {$0.g()})  // expected-error {{type of expression is ambiguous without more context}}
 
 // Autoclosure
 func f1(@autoclosure f f: () -> Int) { }
