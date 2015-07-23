@@ -319,3 +319,12 @@ func testGenericMethodCallACHandled<P: MyProto>(s: P) throws {
   P.static_callAC(raise()) // expected-error 2 {{call can throw but is not marked with 'try'}} expected-note {{call is to 'rethrows' function, but argument function can throw}}
   try P.static_callAC(raise())
 }
+
+/** Miscellaneous bugs **/
+
+// rdar://problem/21967164 - Non-throwing closures are incorrectly marked as throwing in rethrow contexts
+func rt1(@noescape predicate: () throws -> ()) rethrows { }
+rt1 { }
+
+func rt2(predicate: () throws -> ()) rethrows { }
+rt2 { }

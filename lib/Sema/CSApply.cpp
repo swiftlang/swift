@@ -4983,13 +4983,16 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       // If toType is a NoEscape or NoReturn function type and the expression is
       // a ClosureExpr, propagate these bits onto the ClosureExpr.  Do not
       // *remove* any bits that are already on the closure though.
-
+      // Note that in this case, we do not want to propagate the 'throws' bit
+      // to the closure type, as the closure has already been analyzed for
+      // throwing subexpressions.
       auto fromEI = fromFunc->getExtInfo(), toEI = toFunc->getExtInfo();
       if ((toEI.isNoEscape() && !fromEI.isNoEscape()) ||
           (toEI.isNoReturn() && !fromEI.isNoReturn())) {
         auto newToEI =
           toEI.withIsNoReturn(toEI.isNoReturn()|fromEI.isNoReturn())
-                .withNoEscape(toEI.isNoEscape()|fromEI.isNoEscape());
+                .withNoEscape(toEI.isNoEscape()|fromEI.isNoEscape())
+                .withThrows(toEI.throws()&fromEI.throws());
         auto newToType = FunctionType::get(fromFunc->getInput(),
                                            fromFunc->getResult(), newToEI);
         if (applyTypeToClosureExpr(expr, newToType)) {
