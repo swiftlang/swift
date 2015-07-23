@@ -565,7 +565,7 @@ func checkSortInPlace_${'Predicate' if predicate else 'WhereElementIsComparable'
   }
 }
 
-self.test("sortInPlace/${'Predicate' if predicate else 'WhereElementIsEquatable'}") {
+self.test("\(testNamePrefix).sortInPlace/${'Predicate' if predicate else 'WhereElementIsEquatable'}") {
   for test in partitionExhaustiveTests {
     forAllPermutations(test.sequence) { (sequence) in
       checkSortInPlace_${'Predicate' if predicate else 'WhereElementIsComparable'}(
@@ -577,7 +577,7 @@ self.test("sortInPlace/${'Predicate' if predicate else 'WhereElementIsEquatable'
   }
 }
 
-self.test("sortInPlace/${'Predicate' if predicate else 'WhereElementIsEquatable'}/InvalidOrderings") {
+self.test("\(testNamePrefix).sortInPlace/${'Predicate' if predicate else 'WhereElementIsEquatable'}/InvalidOrderings") {
   withInvalidOrderings { (comparisonPredicate) in
     for i in 0..<7 {
       forAllPermutations(i) { (sequence) in
@@ -702,7 +702,11 @@ self.test("\(testNamePrefix).partition/${'Predicate' if predicate else 'WhereEle
   }
 }
 
-self.test("partition/${'Predicate' if predicate else 'WhereElementIsComparable'}/InvalidOrderings") {
+self.test("\(testNamePrefix).partition/${'Predicate' if predicate else 'WhereElementIsComparable'}/InvalidOrderings")
+  .xfail(.Custom(
+    { findSubstring("\(testNamePrefix)", "DefaultedRandomAccessMutableCollection") != nil },
+    reason: "<rdar://problem/21780567> Code crashes in materializeForSet"))
+  .code {
   withInvalidOrderings { (comparisonPredicate) in
     for i in 0..<7 {
       forAllPermutations(i) { (sequence) in
