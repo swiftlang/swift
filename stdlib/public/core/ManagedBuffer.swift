@@ -16,7 +16,9 @@ import SwiftShims
 /// recognizably in the type system.
 ///
 /// - SeeAlso: `isUniquelyReferenced`
-public class NonObjectiveCBase {}
+public class NonObjectiveCBase {
+  public init() {}
+}
 
 /// A base class of `ManagedBuffer<Value,Element>`, used during
 /// instance creation.

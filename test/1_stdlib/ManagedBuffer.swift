@@ -18,6 +18,15 @@
 import StdlibUnittest
 import Foundation
 
+// Check that `NonObjectiveCBase` can be subclassed and the subclass can be
+// created.
+public class SubclassOfNonObjectiveCBase : NonObjectiveCBase {
+  public override init() {}
+}
+func createSubclassOfNonObjectiveCBase() {
+  _ = SubclassOfNonObjectiveCBase()
+}
+
 // Check that the generic parameters are called 'Value' and 'Element'.
 protocol TestProtocol1 {}
 
