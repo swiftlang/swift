@@ -47,10 +47,9 @@ extension BidirectionalIndexType where Self : _prext_ReverseIndexType {
 
 /// A wrapper for a `BidirectionalIndexType` that reverses its
 /// direction of traversal.
-public struct _prext_ReverseIndex<Base_: BidirectionalIndexType>
+public struct _prext_ReverseIndex<Base: BidirectionalIndexType>
 : BidirectionalIndexType, _prext_ReverseIndexType {
-  public typealias Base = Base_
-  public typealias Distance = Base_.Distance
+  public typealias Distance = Base.Distance
   
   public init(_ base: Base) { self.base = base }
   
