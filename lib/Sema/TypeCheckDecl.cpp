@@ -2294,9 +2294,6 @@ static Optional<ObjCReason> shouldMarkAsObjC(TypeChecker &TC,
                                              bool allowImplicit = false){
   assert(!isa<ClassDecl>(VD));
 
-  if (!TC.Context.LangOpts.EnableObjCInterop)
-    return None;
-
   ProtocolDecl *protocolContext =
       dyn_cast<ProtocolDecl>(VD->getDeclContext());
   bool isMemberOfObjCProtocol =
@@ -5752,9 +5749,6 @@ void TypeChecker::typeCheckDecl(Decl *D, bool isFirstPass) {
 // an explicit @objc attribute, or its superclass is @objc.
 static Optional<ObjCReason> shouldMarkClassAsObjC(TypeChecker &TC,
                                                   const ClassDecl *CD) {
-  if (!TC.Context.LangOpts.EnableObjCInterop)
-    return None;
-
   ObjCClassKind kind = CD->checkObjCAncestry();
 
   if (auto attr = CD->getAttrs().getAttribute<ObjCAttr>()) {
