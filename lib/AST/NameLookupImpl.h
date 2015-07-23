@@ -123,7 +123,8 @@ private:
   void checkStmtCondition(const StmtCondition &Cond) {
     for (auto entry : Cond)
       if (auto *P = entry.getPatternOrNull())
-        checkPattern(P, DeclVisibilityKind::LocalVariable);
+        if (!isReferencePointInRange(entry.getSourceRange()))
+          checkPattern(P, DeclVisibilityKind::LocalVariable);
   }
 
   void visitIfStmt(IfStmt *S) {

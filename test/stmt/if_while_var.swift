@@ -108,3 +108,11 @@ func testTypeAnnotations() {
   if case _ : Int8 = 19 {}  // expected-warning {{'if' condition is always true}}
 }
 
+func testShadowing(a: Int?, b: Int?, c: Int?, d: Int?) {
+  guard let a = a, let b = a > 0 ? b : nil else { return }
+  _ = b
+
+  if let c = c, let d = c > 0 ? d : nil {
+    _ = d
+  }
+}
