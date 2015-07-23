@@ -149,6 +149,54 @@ variadics2(x: 1)
 variadics2(z: 1, 2, 3, y: 2) // expected-error{{missing argument for parameter 'x' in call}}
 variadics2(z: 1, 2, 3, x: 1) // expected-error{{argument 'x' must precede argument 'z'}}
 
+func variadics3(x: Int..., y: Int = 2, z: Int = 3) { }
+
+// Using variadics (in-order, complete)
+variadics3(1, 2, 3, y: 0, z: 1)
+variadics3(1, y: 0, z: 1)
+variadics3(y: 0, z: 1)
+
+// Using variadics (in-order, some missing)
+variadics3(1, 2, 3, y: 0)
+variadics3(1, z: 1)
+variadics3(z: 1)
+
+variadics3(1, 2, 3, z: 1)
+variadics3(1, z: 1)
+variadics3(z: 1)
+
+variadics3(1, 2, 3)
+variadics3(1)
+variadics3()
+
+// Using variadics (out-of-order)
+variadics3(y: 0, 1, 2, 3) // expected-error{{missing argument label 'z:' in call}}
+variadics3(z: 1, 1) // FIXME: error here?
+
+func variadics4(x x: Int..., y: Int = 2, z: Int = 3) { }
+
+// Using variadics (in-order, complete)
+variadics4(x: 1, 2, 3, y: 0, z: 1)
+variadics4(x: 1, y: 0, z: 1)
+variadics4(y: 0, z: 1)
+
+// Using variadics (in-order, some missing)
+variadics4(x: 1, 2, 3, y: 0)
+variadics4(x: 1, z: 1)
+variadics4(z: 1)
+
+variadics4(x: 1, 2, 3, z: 1)
+variadics4(x: 1, z: 1)
+variadics4(z: 1)
+
+variadics4(x: 1, 2, 3)
+variadics4(x: 1)
+variadics4()
+
+// Using variadics (in-order, some missing)
+variadics4(y: 0, x: 1, 2, 3) // expected-error{{extra argument in call}}
+variadics4(z: 1, x: 1) // FIXME: error
+
 // -------------------------------------------
 // Missing arguments
 // -------------------------------------------

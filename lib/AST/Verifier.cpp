@@ -1401,15 +1401,15 @@ struct ASTNodeBase {};
         }
       };
 
-      unsigned varargsStartIndex = 0;
+      unsigned varargsIndex = 0;
       Type varargsType;
       unsigned callerDefaultArgIndex = 0;
       for (unsigned i = 0, e = E->getElementMapping().size(); i != e; ++i) {
         int subElem = E->getElementMapping()[i];
         if (subElem == TupleShuffleExpr::DefaultInitialize)
           continue;
-        if (subElem == TupleShuffleExpr::FirstVariadic) {
-          varargsStartIndex = i + 1;
+        if (subElem == TupleShuffleExpr::Variadic) {
+          varargsIndex = i;
           varargsType = TT->getElement(i).getVarargBaseTy();
           break;
         }
@@ -1426,11 +1426,9 @@ struct ASTNodeBase {};
           abort();
         }
       }
-      if (varargsStartIndex) {
-        unsigned i = varargsStartIndex, e = E->getElementMapping().size();
-        for (; i != e; ++i) {
-          unsigned subElem = E->getElementMapping()[i];
-          if (!getSubElementType(subElem)->isEqual(varargsType)) {
+      if (varargsType) {
+        for (auto sourceIdx : E->getVariadicArgs()) {
+          if (!getSubElementType(sourceIdx)->isEqual(varargsType)) {
             Out << "Vararg type mismatch in TupleShuffleExpr\n";
             abort();
           }
@@ -2275,30 +2273,35 @@ struct ASTNodeBase {};
     void verifyParsed(TuplePattern *TP) {
       PrettyStackTracePattern debugStack(Ctx, "verifying TuplePattern", TP);
 
-      if (TP->hasVararg()) {
-        auto *LastPattern = TP->getElements().back().getPattern();
-        if (!isa<TypedPattern>(LastPattern)) {
-          Out << "a vararg subpattern of a TuplePattern should be "
-                 "a TypedPattern\n";
-          abort();
+      for (const auto &elt : TP->getElements()) {
+        if (elt.hasEllipsis()) {
+          if (!isa<TypedPattern>(elt.getPattern())) {
+            Out << "a vararg subpattern of a TuplePattern should be "
+            "a TypedPattern\n";
+            abort();
+          }
         }
       }
+
       verifyParsedBase(TP);
     }
 
     void verifyChecked(TuplePattern *TP) {
       PrettyStackTracePattern debugStack(Ctx, "verifying TuplePattern", TP);
 
-      if (TP->hasVararg()) {
-        auto *LastPattern = TP->getElements().back().getPattern();
-        Type T = cast<TypedPattern>(LastPattern)->getType()->getCanonicalType();
-        if (auto *BGT = T->getAs<BoundGenericType>()) {
-          if (BGT->getDecl() == Ctx.getArrayDecl())
-            return;
+      for (const auto &elt : TP->getElements()) {
+        if (elt.hasEllipsis()) {
+          Type T = cast<TypedPattern>(elt.getPattern())->getType()
+                     ->getCanonicalType();
+          if (auto *BGT = T->getAs<BoundGenericType>()) {
+            if (BGT->getDecl() == Ctx.getArrayDecl())
+              continue;
+          }
+          Out << "a vararg subpattern of a TuplePattern has wrong type";
+          abort();
         }
-        Out << "a vararg subpattern of a TuplePattern has wrong type";
-        abort();
       }
+
       verifyCheckedBase(TP);
     }
 

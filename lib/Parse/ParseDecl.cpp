@@ -2607,7 +2607,6 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc,
       EndLoc = TypedPattern->getEndLoc();
     }
 
-    bool isVararg = false;
     if (Indices) {
       auto clonePattern = [&](const Pattern *p) -> Pattern* {
         return p->clone(P->Context, Pattern::Implicit);
@@ -2621,9 +2620,9 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc,
         for (const auto &elt : TP->getElements()) {
           ValueArgElements.push_back(
             TuplePatternElt(elt.getLabel(), elt.getLabelLoc(),
-                            clonePattern(elt.getPattern())));
+                            clonePattern(elt.getPattern()),
+                            elt.hasEllipsis()));
         }
-        isVararg = TP->hasVararg();
       }
 
       if (!ExplicitArgument) {
@@ -2633,7 +2632,7 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc,
     }
 
     ValueArg = TuplePattern::create(P->Context, StartLoc, ValueArgElements,
-                                    EndLoc, isVararg);
+                                    EndLoc);
     if (!ExplicitArgument)
       ValueArg->setImplicit();
   }
@@ -2682,7 +2681,7 @@ static FuncDecl *createAccessorFunc(SourceLoc DeclLoc,
     };
     auto makePairType = [&](TypeRepr *fst, TypeRepr *snd) -> TypeRepr* {
       return TupleTypeRepr::create(P->Context, {fst, snd}, SourceRange(),
-                                   SourceLoc());
+                                   SourceLoc(), 2);
     };
 
     switch (addressorKind) {

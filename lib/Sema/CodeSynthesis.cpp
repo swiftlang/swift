@@ -1932,7 +1932,7 @@ ConstructorDecl *swift::createImplicitConstructor(TypeChecker &tc,
       TypeLoc tyLoc = TypeLoc::withoutLoc(varType);
       pattern = new (context) TypedPattern(pattern, tyLoc);
       patternElts.push_back(TuplePatternElt(var->getName(), SourceLoc(),
-                                            pattern));
+                                            pattern, false));
     }
   }
 
@@ -2006,7 +2006,7 @@ static Expr *forwardArguments(TypeChecker &tc, ClassDecl *classDecl,
     SmallVector<Expr *, 4> values;
 
     // FIXME: Can't forward varargs yet.
-    if (bodyTuple->hasVararg()) {
+    if (bodyTuple->hasAnyEllipsis()) {
       tc.diagnose(classDecl->getLoc(),
                   diag::unsupported_synthesize_init_variadic,
                   classDecl->getDeclaredType());

@@ -179,7 +179,7 @@ bool constraints::computeTupleShuffle(TupleType *fromTuple, TupleType *toTuple,
         consumed[fromNext] = true;
         skipToNextAvailableInput();
       }
-      sources[i] = TupleShuffleExpr::FirstVariadic;
+      sources[i] = TupleShuffleExpr::Variadic;
       break;
     }
 
@@ -785,9 +785,9 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
            "SubscriptExpr doesn't work on implicit TypeExpr's, "
            "the TypeExpr should have been built correctly in the first place");
     
-    auto *NewTypeRepr =
-     new (TC.Context) TupleTypeRepr(TC.Context.AllocateCopy(InnerTypeRepr),
-                                    PE->getSourceRange(), SourceLoc());
+    auto *NewTypeRepr = TupleTypeRepr::create(TC.Context, InnerTypeRepr,
+                                              PE->getSourceRange(),
+                                              SourceLoc(), 1);
     return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
   }
   
@@ -817,9 +817,9 @@ TypeExpr *PreCheckExpression::simplifyTypeExpr(Expr *E) {
       Elts.push_back(eltTR);
      ++EltNo;
     }
-    auto *NewTypeRepr =
-      new (TC.Context) TupleTypeRepr(TC.Context.AllocateCopy(Elts),
-                                     TE->getSourceRange(), SourceLoc());
+    auto *NewTypeRepr = TupleTypeRepr::create(TC.Context, Elts,
+                                              TE->getSourceRange(),
+                                              SourceLoc(), Elts.size());
     return new (TC.Context) TypeExpr(TypeLoc(NewTypeRepr, Type()));
   }
   

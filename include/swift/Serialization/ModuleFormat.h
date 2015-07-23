@@ -51,7 +51,7 @@ const uint16_t VERSION_MAJOR = 0;
 /// To ensure that two separate changes don't silently get merged into one
 /// in source control, you should also update the comment to briefly
 /// describe what change you made.
-const uint16_t VERSION_MINOR = 207; // Last change: @NSManaged on methods
+const uint16_t VERSION_MINOR = 208; // Last change: tuple elt has ellipsis
 
 using DeclID = Fixnum<31>;
 using DeclIDField = BCFixed<31>;
@@ -995,14 +995,14 @@ namespace decls_block {
     TUPLE_PATTERN,
     TypeIDField, // type
     BCVBR<5>,    // arity
-    BCFixed<1>, // implicit?
-    BCFixed<1>  // has vararg?
+    BCFixed<1>   // implicit?
     // The elements trail the record.
   >;
 
   using TuplePatternEltLayout = BCRecordLayout<
     TUPLE_PATTERN_ELT,
     IdentifierIDField,     // label
+    BCFixed<1>,            // has ellipsis?
     DefaultArgumentField   // default argument
     // The element pattern trails the record.
   >;

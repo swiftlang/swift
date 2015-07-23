@@ -1171,14 +1171,13 @@ public:
           Builder.addComma();
         NeedComma = true;
 
-        // The last elt must be the vararg if there is one.
-        bool IsVarArg = i == end-1 && TP->hasVararg();
+        bool HasEllipsis = TupleElt.hasEllipsis();
         Type EltT = TupleElt.getPattern()->getType();
-        if (IsVarArg)
+        if (HasEllipsis)
           EltT = TupleTypeElt::getVarargBaseTy(EltT);
 
         Builder.addCallParameter(TupleElt.getPattern()->getBoundName(),
-                                 EltT, IsVarArg);
+                                 EltT, HasEllipsis);
       }
       return;
     }

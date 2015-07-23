@@ -455,8 +455,8 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
   Parser::StructureMarkerRAII ParsingTypeTuple(*this, Tok);
   SourceLoc RPLoc, LPLoc = consumeToken(tok::l_paren);
   SourceLoc EllipsisLoc;
+  unsigned EllipsisIdx;
   SmallVector<TypeRepr *, 8> ElementsR;
-  bool HadEllipsis = false;
 
   ParserStatus Status = parseList(tok::r_paren, LPLoc, RPLoc,
                                   tok::comma, /*OptionalSep=*/false,
@@ -522,25 +522,30 @@ ParserResult<TupleTypeRepr> Parser::parseTypeTupleBody() {
     }
 
     if (Tok.isEllipsis()) {
-      EllipsisLoc = consumeToken();
-      if (Tok.is(tok::r_paren)) {
-        HadEllipsis = true;
+      if (EllipsisLoc.isValid()) {
+        diagnose(Tok, diag::multiple_ellipsis_in_tuple)
+          .highlight(EllipsisLoc)
+          .fixItRemove(Tok.getLoc());
+        (void)consumeToken();
       } else {
-        diagnose(EllipsisLoc, diag::unexpected_ellipsis_in_tuple);
-        return makeParserError();
+        EllipsisLoc = consumeToken();
+        EllipsisIdx = ElementsR.size() - 1;
       }
     }
     return makeParserSuccess();
   });
 
-  if (HadEllipsis && ElementsR.empty()) {
-    diagnose(EllipsisLoc, diag::empty_tuple_ellipsis);
-    return nullptr;
+  if (EllipsisLoc.isValid() && ElementsR.empty()) {
+    EllipsisLoc = SourceLoc();
   }
 
-  return makeParserResult(Status, TupleTypeRepr::create(
-      Context, ElementsR, SourceRange(LPLoc, RPLoc),
-      HadEllipsis ? EllipsisLoc : SourceLoc()));
+  if (EllipsisLoc.isInvalid())
+    EllipsisIdx = ElementsR.size();
+
+  return makeParserResult(Status,
+                          TupleTypeRepr::create(Context, ElementsR,
+                                                SourceRange(LPLoc, RPLoc),
+                                                EllipsisLoc, EllipsisIdx));
 }
 
 
@@ -1014,12 +1019,13 @@ bool Parser::canParseTypeTupleBody() {
  
       if (!canParseType())
         return false;
+
+      if (Tok.isEllipsis())
+        consumeToken();
+
     } while (consumeIf(tok::comma));
   }
   
-  if (Tok.isEllipsis())
-    consumeToken();
-
   return consumeIf(tok::r_paren);
 }
 

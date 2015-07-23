@@ -485,13 +485,17 @@ mapParsedParameters(Parser &parser,
 
     // If this parameter had an ellipsis, check whether it's the last parameter.
     if (param.EllipsisLoc.isValid()) {
-      if (&param != &params.back()) {
-        parser.diagnose(param.EllipsisLoc, diag::parameter_ellipsis_not_at_end)
+      if (ellipsisLoc.isValid()) {
+        parser.diagnose(param.EllipsisLoc, diag::multiple_parameter_ellipsis)
+          .highlight(ellipsisLoc)
           .fixItRemove(param.EllipsisLoc);
+
         param.EllipsisLoc = SourceLoc();
       } else if (!isa<TypedPattern>(pattern)) {
         parser.diagnose(param.EllipsisLoc, diag::untyped_pattern_ellipsis)
           .highlight(pattern->getSourceRange());
+
+        param.EllipsisLoc = SourceLoc();
       } else {
         ellipsisLoc = param.EllipsisLoc;
       }
@@ -507,7 +511,9 @@ mapParsedParameters(Parser &parser,
     // Create the tuple pattern elements.
     auto defArgKind = getDefaultArgKind(param.DefaultArg);
     elements.push_back(TuplePatternElt(argName, param.FirstNameLoc, pattern,
-                                       param.DefaultArg, defArgKind));
+                                       param.EllipsisLoc.isValid(),
+                                       param.EllipsisLoc, param.DefaultArg,
+                                       defArgKind));
 
     if (argNames)
       argNames->push_back(argName);
@@ -515,9 +521,7 @@ mapParsedParameters(Parser &parser,
     isFirstParameter = false;
   }
 
-  return TuplePattern::createSimple(ctx, leftParenLoc, elements,
-                                    rightParenLoc, ellipsisLoc.isValid(),
-                                    ellipsisLoc);
+  return TuplePattern::createSimple(ctx, leftParenLoc, elements, rightParenLoc);
 }
 
 /// Parse a single parameter-clause.
@@ -710,8 +714,7 @@ Parser::parseConstructorArguments(DeclName &FullName, Pattern *&BodyPattern,
 
     // Create an empty tuple to recover.
     BodyPattern = TuplePattern::createSimple(Context, PreviousLoc, {},
-                                             PreviousLoc, false,
-                                             SourceLoc(), true);
+                                             PreviousLoc, true);
     FullName = DeclName(Context, Context.Id_init, { });
     return makeParserError();
   }
@@ -868,8 +871,13 @@ Parser::parsePatternTupleElement() {
   if (pattern.isNull())
     return std::make_pair(makeParserError(), None);
 
-  auto Elt = TuplePatternElt(Label, LabelLoc, pattern.get(), nullptr,
-                             DefaultArgumentKind::None);
+  // Consume the '...'.
+  SourceLoc ellipsisLoc;
+  if (Tok.isEllipsis())
+    ellipsisLoc = consumeToken();
+  auto Elt = TuplePatternElt(Label, LabelLoc, pattern.get(),
+                             ellipsisLoc.isValid(), ellipsisLoc,
+                             nullptr, DefaultArgumentKind::None);
 
   return std::make_pair(makeParserSuccess(), Elt);
 }
@@ -883,7 +891,7 @@ Parser::parsePatternTupleElement() {
 ParserResult<Pattern> Parser::parsePatternTuple() {
   StructureMarkerRAII ParsingPatternTuple(*this, Tok);
   SourceLoc LPLoc = consumeToken(tok::l_paren);
-  SourceLoc RPLoc, EllipsisLoc;
+  SourceLoc RPLoc;
 
   // Parse all the elements.
   SmallVector<TuplePatternElt, 8> elts;
@@ -906,9 +914,9 @@ ParserResult<Pattern> Parser::parsePatternTuple() {
     return makeParserSuccess();
   });
 
-  return makeParserResult(ListStatus, TuplePattern::createSimple(
-                                          Context, LPLoc, elts, RPLoc,
-                                          EllipsisLoc.isValid(), EllipsisLoc));
+  return makeParserResult(
+           ListStatus,
+           TuplePattern::createSimple(Context, LPLoc, elts, RPLoc));
 }
 
 /// Parse an optional type annotation on a pattern.

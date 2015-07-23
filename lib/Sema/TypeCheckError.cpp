@@ -717,12 +717,11 @@ private:
       } else if (srcIndex == TupleShuffleExpr::DefaultInitialize ||
                  srcIndex == TupleShuffleExpr::CallerDefaultInitialize) {
         // Nothing interesting from the source expression.
-      } else if (srcIndex == TupleShuffleExpr::FirstVariadic) {
+      } else if (srcIndex == TupleShuffleExpr::Variadic) {
         // Variadic arguments never contribute to 'rethrows'.
         // Assign the rest of the source elements parameter types that will
         // cause the recursive walker to ignore them.
-        for (++destIndex; destIndex != mapping.size(); ++destIndex) {
-          srcIndex = shuffle->getElementMapping()[destIndex];
+        for (unsigned srcIndex : shuffle->getVariadicArgs()) {
           assert(srcIndex >= 0 && "default-initialized variadic argument?");
           origSrcElts[srcIndex] =
             origParamTupleType->getASTContext().TheRawPointerType;

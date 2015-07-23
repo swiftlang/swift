@@ -393,19 +393,19 @@ Pattern *Pattern::clone(ASTContext &context,
       if (elt.getDefaultArgKind() != DefaultArgumentKind::None &&
           (options & Inherited)) {
         elts.push_back(TuplePatternElt(elt.getLabel(), elt.getLabelLoc(),
-                                       eltPattern, nullptr,
+                                       eltPattern, elt.hasEllipsis(),
+                                       elt.getEllipsisLoc(), nullptr,
                                        DefaultArgumentKind::Inherited));
       } else {
         elts.push_back(TuplePatternElt(elt.getLabel(), elt.getLabelLoc(),
-                                       eltPattern, elt.getInit(),
+                                       eltPattern, elt.hasEllipsis(),
+                                       elt.getEllipsisLoc(), elt.getInit(),
                                        elt.getDefaultArgKind()));
       }
     }
 
     result = TuplePattern::create(context, tuple->getLParenLoc(), elts,
-                                  tuple->getRParenLoc(),
-                                  tuple->hasVararg(),
-                                  tuple->getEllipsisLoc());
+                                  tuple->getRParenLoc());
     break;
   }
 
@@ -546,19 +546,19 @@ Pattern *Pattern::cloneForwardable(ASTContext &context, DeclContext *DC,
       if (elt.getDefaultArgKind() != DefaultArgumentKind::None &&
           (options & Inherited)) {
         elts.push_back(TuplePatternElt(elt.getLabel(), elt.getLabelLoc(),
-                                       eltPattern, nullptr,
+                                       eltPattern, elt.hasEllipsis(),
+                                       elt.getEllipsisLoc(), nullptr,
                                        DefaultArgumentKind::Inherited));
       } else {
         elts.push_back(TuplePatternElt(elt.getLabel(), elt.getLabelLoc(),
-                                       eltPattern, elt.getInit(),
+                                       eltPattern, elt.hasEllipsis(),
+                                       elt.getEllipsisLoc(), elt.getInit(),
                                        elt.getDefaultArgKind()));
       }
     }
 
     result = TuplePattern::create(context, tuple->getLParenLoc(), elts,
-                                  tuple->getRParenLoc(),
-                                  tuple->hasVararg(),
-                                  tuple->getEllipsisLoc());
+                                  tuple->getRParenLoc());
     break;
   }
 
@@ -683,17 +683,14 @@ Identifier NamedPattern::getBodyName() const {
 /// Allocate a new pattern that matches a tuple.
 TuplePattern *TuplePattern::create(ASTContext &C, SourceLoc lp,
                                    ArrayRef<TuplePatternElt> elts, SourceLoc rp,
-                                   bool hasVararg, SourceLoc ellipsis,
                                    Optional<bool> implicit) {
   if (!implicit.hasValue())
     implicit = !lp.isValid();
 
   unsigned n = elts.size();
-  void *buffer = C.Allocate(sizeof(TuplePattern) + n * sizeof(TuplePatternElt) +
-                            (hasVararg ? sizeof(SourceLoc) : 0),
+  void *buffer = C.Allocate(sizeof(TuplePattern) + n * sizeof(TuplePatternElt),
                             alignof(TuplePattern));
-  TuplePattern *pattern = ::new(buffer) TuplePattern(lp, n, rp, hasVararg,
-                                                     ellipsis, *implicit);
+  TuplePattern *pattern = ::new (buffer) TuplePattern(lp, n, rp, *implicit);
   memcpy(pattern->getElementsBuffer(), elts.data(),
          n * sizeof(TuplePatternElt));
   return pattern;
@@ -702,20 +699,19 @@ TuplePattern *TuplePattern::create(ASTContext &C, SourceLoc lp,
 Pattern *TuplePattern::createSimple(ASTContext &C, SourceLoc lp,
                                     ArrayRef<TuplePatternElt> elements,
                                     SourceLoc rp,
-                                    bool hasVararg, SourceLoc ellipsis,
                                     Optional<bool> implicit) {
   assert(lp.isValid() == rp.isValid());
 
   if (elements.size() == 1 &&
+      !elements[0].hasEllipsis() &&
       elements[0].getInit() == nullptr &&
       elements[0].getPattern()->getBoundName().empty() &&
-      elements[0].getPattern()->getBodyName().empty() &&
-      !hasVararg) {
+      elements[0].getPattern()->getBodyName().empty()) {
     auto &first = const_cast<TuplePatternElt&>(elements.front());
     return new (C) ParenPattern(lp, first.getPattern(), rp, implicit);
   }
 
-  return create(C, lp, elements, rp, hasVararg, ellipsis, implicit);
+  return create(C, lp, elements, rp, implicit);
 }
 
 SourceRange TuplePattern::getSourceRange() const {
@@ -726,6 +722,24 @@ SourceRange TuplePattern::getSourceRange() const {
     return {};
   return { Fields.front().getPattern()->getStartLoc(),
            Fields.back().getPattern()->getEndLoc() };
+}
+
+bool TuplePattern::hasAnyEllipsis() const {
+  for (const auto elt : getElements()) {
+    if (elt.hasEllipsis())
+      return true;
+  }
+
+  return false;
+}
+
+SourceLoc TuplePattern::getAnyEllipsisLoc() const {
+  for (const auto elt : getElements()) {
+    if (elt.hasEllipsis())
+      return elt.getEllipsisLoc();
+  }
+
+  return SourceLoc();
 }
 
 SourceRange TypedPattern::getSourceRange() const {

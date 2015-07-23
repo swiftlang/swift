@@ -609,10 +609,8 @@ ERROR(expected_rbracket_dictionary_type,type_parsing,PointsToFirstBadToken,
 // Tuple Types
 ERROR(expected_rparen_tuple_type_list,type_parsing,none,
       "expected ')' at end of tuple list", ())
-ERROR(empty_tuple_ellipsis,type_parsing,none,
-      "varargs used in tuple type with no fields", ())
-ERROR(unexpected_ellipsis_in_tuple,type_parsing,none,
-      "unexpected '...' before the end of a tuple list", ())
+ERROR(multiple_ellipsis_in_tuple,type_parsing,none,
+      "only a single element can be variadic", ())
 ERROR(tuple_type_init,pattern_parsing,none,
       "default argument not permitted in a tuple type", ())
 ERROR(protocol_method_argument_init,type_parsing,none,
@@ -653,8 +651,8 @@ ERROR(expected_rparen_parameter,decl_parsing,PointsToFirstBadToken,
       "expected ')' in parameter", ())
 ERROR(expected_parameter_type,decl_parsing,PointsToFirstBadToken,
       "expected parameter type following ':'", ())
-ERROR(parameter_ellipsis_not_at_end,decl_parsing,none,
-      "'...' must be on the last parameter", ())
+ERROR(multiple_parameter_ellipsis,decl_parsing,none,
+      "only a single variadic parameter '...' is permitted", ())
 ERROR(parameter_vararg_default,decl_parsing,none,
       "variadic parameter cannot have a default value", ())
 ERROR(parameter_backtick_missing_name,decl_parsing,PointsToFirstBadToken,

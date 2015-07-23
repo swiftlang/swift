@@ -368,7 +368,8 @@ public:
       Pattern *pattern = getSubExprPattern(E->getElement(i));
       patternElts.push_back(TuplePatternElt(E->getElementName(i),
                                             E->getElementNameLoc(i),
-                                            pattern));
+                                            pattern,
+                                            false));
     }
     
     return TuplePattern::create(TC.Context, E->getLoc(),
@@ -796,9 +797,9 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
     for (unsigned i = 0, e = tuplePat->getNumElements(); i != e; ++i) {
       TuplePatternElt &elt = tuplePat->getElement(i);
       Pattern *pattern = elt.getPattern();
-      bool isVararg = tuplePat->hasVararg() && i == e-1;
+      bool hasEllipsis = elt.hasEllipsis();
       TypeResolutionOptions eltOptions = elementOptions;
-      if (isVararg)
+      if (hasEllipsis)
         eltOptions |= TR_Variadic;
       if (typeCheckPattern(pattern, dc, eltOptions, resolver)){
         hadError = true;
@@ -812,7 +813,7 @@ bool TypeChecker::typeCheckPattern(Pattern *P, DeclContext *dc,
       typeElts.push_back(TupleTypeElt(pattern->getType(),
                                       elt.getLabel(),
                                       elt.getDefaultArgKind(),
-                                      isVararg));
+                                      hasEllipsis));
     }
 
     if (hadError) {
@@ -1082,7 +1083,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
     for (unsigned i = 0, e = TP->getNumElements(); i != e; ++i) {
       TuplePatternElt &elt = TP->getElement(i);
       Pattern *pattern = elt.getPattern();
-      bool isVararg = TP->hasVararg() && i == e-1;
+      bool hasEllipsis = elt.hasEllipsis();
 
       Type CoercionType;
       if (hadError)
@@ -1103,7 +1104,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
       }
       
       TypeResolutionOptions subOptions = options - TR_Variadic;
-      if (isVararg)
+      if (hasEllipsis)
         subOptions |= TR_Variadic;
       hadError |= coercePatternToType(pattern, dc, CoercionType, subOptions, 
                                       resolver);

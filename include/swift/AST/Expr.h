@@ -2259,8 +2259,8 @@ public:
     /// The element mapping value indicating that a field of the destination
     /// tuple should be default-initialized.
     DefaultInitialize = -1,
-    /// The element mapping value signaling the first variadic field.
-    FirstVariadic = -2,
+    /// The element mapping is part of the variadic field.
+    Variadic = -2,
     /// The element mapping value indicating that the field of the
     /// destination tuple should be default-initialized with an expression
     /// provided by the caller.
@@ -2288,16 +2288,21 @@ private:
   /// declaration.
   ConcreteDeclRef DefaultArgsOwner;
 
+  /// The arguments that are packed into the variadic element.
+  ArrayRef<unsigned> VariadicArgs;
+
   MutableArrayRef<Expr *> CallerDefaultArgs;
 
 public:
   TupleShuffleExpr(Expr *subExpr, ArrayRef<int> elementMapping, 
                    SourceIsScalar_t isSourceScalar,
                    ConcreteDeclRef defaultArgsOwner,
+                   ArrayRef<unsigned> VariadicArgs,
                    MutableArrayRef<Expr *> CallerDefaultArgs, Type ty)
     : ImplicitConversionExpr(ExprKind::TupleShuffle, subExpr, ty),
       ElementMapping(elementMapping), VarargsArrayTy(),
-      DefaultArgsOwner(defaultArgsOwner), CallerDefaultArgs(CallerDefaultArgs)
+      DefaultArgsOwner(defaultArgsOwner), VariadicArgs(VariadicArgs),
+      CallerDefaultArgs(CallerDefaultArgs)
   {
     TupleShuffleExprBits.IsSourceScalar = isSourceScalar;
   }
@@ -2320,6 +2325,9 @@ public:
   Type getVarargsArrayTypeOrNull() const {
     return VarargsArrayTy;
   }
+
+  /// Retrieve the argument indices for the variadic arguments.
+  ArrayRef<unsigned> getVariadicArgs() const { return VariadicArgs; }
 
   /// Retrieve the owner of the default arguments.
   ConcreteDeclRef getDefaultArgsOwner() const { return DefaultArgsOwner; }

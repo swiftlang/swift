@@ -222,8 +222,6 @@ namespace {
     }
     void visitTuplePattern(TuplePattern *P) {
       printCommon(P, "pattern_tuple");
-      if (P->hasVararg())
-        OS << " hasVararg";
 
       OS << " names=";
       interleave(P->getElements(),
@@ -236,6 +234,8 @@ namespace {
       for (auto &elt : P->getElements()) {
         OS << '\n';
         printRec(elt.getPattern());
+        if (elt.hasEllipsis())
+          OS << " ellipsis";
         if (elt.getInit()) {
           OS << '\n';
           printRec(elt.getInit()->getExpr());
@@ -1681,7 +1681,16 @@ public:
       if (i) OS << ", ";
       OS << E->getElementMapping()[i];
     }
-    OS << "]\n";
+    OS << "]";
+    OS << " variadic_sources=[";
+    interleave(E->getVariadicArgs(),
+               [&](unsigned source) {
+                 OS << source;
+               },
+               [&] { OS << ", "; });
+    OS << "]";
+
+    OS << "\n";
     printRec(E->getSubExpr());
     OS << ')';
   }

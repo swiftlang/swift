@@ -3730,7 +3730,7 @@ public:
       // Look through single-entry tuple elements, which can exist when there
       // are default values.
       if (auto *TP = dyn_cast<TuplePattern>(BodyPattern))
-        if (TP->getNumElements() == 1 && !TP->hasVararg())
+        if (TP->getNumElements() == 1 && !TP->getElement(0).hasEllipsis())
           BodyPattern =TP->getElement(0).getPattern();
       // Look through typedpatterns and parens.
       BodyPattern = BodyPattern->getSemanticsProvidingPattern();

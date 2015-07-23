@@ -55,8 +55,7 @@ class alignas(8) Pattern {
   class TuplePatternBitfields {
     friend class TuplePattern;
     unsigned : NumPatternBits;
-    unsigned HasVararg : 1;
-    unsigned NumElements : NumBitsAllocated - NumPatternBits - 1;
+    unsigned NumElements : NumBitsAllocated - NumPatternBits;
   };
 
   class TypedPatternBitfields {
@@ -272,20 +271,23 @@ public:
 class TuplePatternElt {
   Identifier Label;
   SourceLoc LabelLoc;
-  Pattern *ThePattern;
+  llvm::PointerIntPair<Pattern *, 1, bool> ThePatternAndEllipsis;
+  SourceLoc EllipsisLoc;
   ExprHandle *Init;
   DefaultArgumentKind DefArgKind;
 
 public:
   TuplePatternElt() = default;
   explicit TuplePatternElt(Pattern *P)
-    : ThePattern(P), Init(nullptr), DefArgKind(DefaultArgumentKind::None) {}
+    : ThePatternAndEllipsis(P, false), Init(nullptr), DefArgKind(DefaultArgumentKind::None) {}
 
   TuplePatternElt(Identifier Label, SourceLoc LabelLoc,
-                  Pattern *p, ExprHandle *init = nullptr,
+                  Pattern *p, bool hasEllipsis,
+                  SourceLoc ellipsisLoc = SourceLoc(),
+                  ExprHandle *init = nullptr,
                   DefaultArgumentKind defArgKind = DefaultArgumentKind::None)
-    : Label(Label), LabelLoc(LabelLoc),
-      ThePattern(p), Init(init), DefArgKind(defArgKind) {}
+    : Label(Label), LabelLoc(LabelLoc), ThePatternAndEllipsis(p, hasEllipsis),
+      EllipsisLoc(ellipsisLoc), Init(init), DefArgKind(defArgKind) {}
 
   Identifier getLabel() const { return Label; }
   SourceLoc getLabelLoc() const { return LabelLoc; }
@@ -294,9 +296,15 @@ public:
     LabelLoc = Loc;
   }
 
-  Pattern *getPattern() { return ThePattern; }
-  const Pattern *getPattern() const { return ThePattern; }
-  void setPattern(Pattern *p) { ThePattern = p; }
+  Pattern *getPattern() { return ThePatternAndEllipsis.getPointer(); }
+  const Pattern *getPattern() const {
+    return ThePatternAndEllipsis.getPointer();
+  }
+  
+  void setPattern(Pattern *p) { ThePatternAndEllipsis.setPointer(p); }
+
+  bool hasEllipsis() const { return ThePatternAndEllipsis.getInt(); }
+  SourceLoc getEllipsisLoc() const { return EllipsisLoc; }
 
   ExprHandle *getInit() const { return Init; }
 
@@ -307,7 +315,6 @@ public:
 /// A pattern consisting of a tuple of patterns.
 class TuplePattern : public Pattern {
   SourceLoc LPLoc, RPLoc;
-  // TuplePatternBits.HasVararg
   // TuplePatternBits.NumElements
 
   TuplePatternElt *getElementsBuffer() {
@@ -317,23 +324,10 @@ class TuplePattern : public Pattern {
     return reinterpret_cast<const TuplePatternElt *>(this + 1);
   }
 
-  SourceLoc *getEllipsisLocPtr() {
-    assert(TuplePatternBits.HasVararg);
-    return reinterpret_cast<SourceLoc *>(getElementsBuffer()+getNumElements());
-  }
-  const SourceLoc *getEllipsisLocPtr() const {
-    assert(TuplePatternBits.HasVararg);
-    return reinterpret_cast<const SourceLoc *>
-       (getElementsBuffer()+getNumElements());
-  }
-
-  TuplePattern(SourceLoc lp, unsigned numElements, SourceLoc rp, bool hasVararg,
-               SourceLoc ellipsis, bool implicit)
+  TuplePattern(SourceLoc lp, unsigned numElements, SourceLoc rp,
+               bool implicit)
       : Pattern(PatternKind::Tuple), LPLoc(lp), RPLoc(rp) {
     TuplePatternBits.NumElements = numElements;
-    TuplePatternBits.HasVararg = hasVararg;
-    if (hasVararg)
-      *getEllipsisLocPtr() = ellipsis;
     assert(lp.isValid() == rp.isValid());
     if (implicit)
       setImplicit();
@@ -342,16 +336,12 @@ class TuplePattern : public Pattern {
 public:
   static TuplePattern *create(ASTContext &C, SourceLoc lp,
                               ArrayRef<TuplePatternElt> elements, SourceLoc rp,
-                              bool hasVararg = false,
-                              SourceLoc ellipsis = SourceLoc(),
                               Optional<bool> implicit = None);
 
   /// \brief Create either a tuple pattern or a paren pattern, depending
   /// on the elements.
   static Pattern *createSimple(ASTContext &C, SourceLoc lp,
                                ArrayRef<TuplePatternElt> elements, SourceLoc rp,
-                               bool hasVararg = false,
-                               SourceLoc ellipsis = SourceLoc(),
                                Optional<bool> implicit = None);
 
   unsigned getNumElements() const {
@@ -369,16 +359,12 @@ public:
   const TuplePatternElt &getElement(unsigned i) const {return getElements()[i];}
   TuplePatternElt &getElement(unsigned i) { return getElements()[i]; }
 
-  bool hasVararg() const { return TuplePatternBits.HasVararg; }
-
   SourceLoc getLParenLoc() const { return LPLoc; }
   SourceLoc getRParenLoc() const { return RPLoc; }
   SourceRange getSourceRange() const;
-  SourceLoc getEllipsisLoc() const {
-    if (hasVararg())
-      return *getEllipsisLocPtr();
-    return SourceLoc();
-  }
+
+  bool hasAnyEllipsis() const;
+  SourceLoc getAnyEllipsisLoc() const;
 
   static bool classof(const Pattern *P) {
     return P->getKind() == PatternKind::Tuple;

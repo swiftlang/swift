@@ -800,7 +800,7 @@ void Serializer::writePattern(const Pattern *pattern) {
     unsigned abbrCode = DeclTypeAbbrCodes[TuplePatternLayout::Code];
     TuplePatternLayout::emitRecord(Out, ScratchRecord, abbrCode,
                                    addTypeRef(tuple->getType()),
-                                   tuple->getNumElements(), tuple->hasVararg(),
+                                   tuple->getNumElements(),
                                    tuple->isImplicit());
 
     abbrCode = DeclTypeAbbrCodes[TuplePatternEltLayout::Code];
@@ -808,6 +808,7 @@ void Serializer::writePattern(const Pattern *pattern) {
       // FIXME: Default argument expressions?
       TuplePatternEltLayout::emitRecord(
         Out, ScratchRecord, abbrCode, addIdentifierRef(elt.getLabel()),
+        elt.hasEllipsis(),
         getRawStableDefaultArgumentKind(elt.getDefaultArgKind()));
       writePattern(elt.getPattern());
     }

@@ -798,7 +798,8 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   }
 
   // Check each of the elements.
-  bool hasVarArg = false;
+  bool hasVariadic = false;
+  unsigned variadicIdx = sources.size();
   for (unsigned idx2 = 0, n = sources.size(); idx2 != n; ++idx2) {
     // Default-initialization always allowed for conversions.
     if (sources[idx2] == TupleShuffleExpr::DefaultInitialize) {
@@ -806,8 +807,10 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
     }
 
     // Variadic arguments handled below.
-    if (sources[idx2] == TupleShuffleExpr::FirstVariadic) {
-      hasVarArg = true;
+    if (sources[idx2] == TupleShuffleExpr::Variadic) {
+      assert(!hasVariadic && "Multiple variadic parameters");
+      hasVariadic = true;
+      variadicIdx = idx2;
       continue;
     }
 
@@ -831,8 +834,8 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   }
 
   // If we have variadic arguments to check, do so now.
-  if (hasVarArg) {
-    const auto &elt2 = tuple2->getElements().back();
+  if (hasVariadic) {
+    const auto &elt2 = tuple2->getElements()[variadicIdx];
     auto eltType2 = elt2.getVarargBaseTy();
 
     for (unsigned idx1 : variadicArguments) {

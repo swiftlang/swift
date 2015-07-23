@@ -1696,8 +1696,8 @@ namespace {
         SmallVector<TupleTypeElt, 4> tupleTypeElts;
         tupleTypeElts.reserve(tuplePat->getNumElements());
         for (unsigned i = 0, e = tuplePat->getNumElements(); i != e; ++i) {
-          auto tupleElt = tuplePat->getElement(i);
-          bool isVararg = tuplePat->hasVararg() && i == e-1;
+          auto &tupleElt = tuplePat->getElement(i);
+          bool hasEllipsis = tupleElt.hasEllipsis();
           Type eltTy = getTypeForPattern(tupleElt.getPattern(),forFunctionParam,
                                          locator.withPathElement(
                                            LocatorPathElt::getTupleElement(i)));
@@ -1705,7 +1705,7 @@ namespace {
           Type varArgBaseTy;
           tupleTypeElts.push_back(TupleTypeElt(eltTy, tupleElt.getLabel(),
                                                tupleElt.getDefaultArgKind(),
-                                               isVararg));
+                                               hasEllipsis));
         }
         return TupleType::get(tupleTypeElts, CS.getASTContext());
       }

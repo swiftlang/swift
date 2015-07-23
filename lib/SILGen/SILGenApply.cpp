@@ -2425,6 +2425,7 @@ namespace {
                      ConcreteDeclRef defaultArgsOwner,
                      ArrayRef<Expr*> callerDefaultArgs,
                      ArrayRef<int> elementMapping,
+                     ArrayRef<unsigned> variadicArgs,
                      Type varargsArrayType,
                      AbstractionPattern origParamType);
 
@@ -2595,6 +2596,7 @@ void ArgEmitter::emitShuffle(Expr *inner,
                              ConcreteDeclRef defaultArgsOwner,
                              ArrayRef<Expr*> callerDefaultArgs,
                              ArrayRef<int> elementMapping,
+                             ArrayRef<unsigned> variadicArgs,
                              Type varargsArrayType,
                              AbstractionPattern origParamType) {
   auto outerTuple = cast<TupleType>(outer->getType()->getCanonicalType());
@@ -2678,15 +2680,13 @@ void ArgEmitter::emitShuffle(Expr *inner,
 #endif
         innerExtents[innerIndex].Params = eltParams;
         origInnerElts[innerIndex] = origEltType;
-      } else if (innerIndex == TupleShuffleExpr::FirstVariadic) {
-        assert(outerIndex + 1 == outerTuple->getNumElements());
-
+      } else if (innerIndex == TupleShuffleExpr::Variadic) {
         auto &varargsField = outerTuple->getElement(outerIndex);
         assert(varargsField.isVararg());
         assert(!varargsInfo.hasValue() && "already had varargs entry?");
 
         CanType varargsEltType = CanType(varargsField.getVarargBaseTy());
-        unsigned numVarargs = elementMapping.size() - (outerIndex + 1);
+        unsigned numVarargs = variadicArgs.size();
         assert(canVarargsArrayType == substEltType);
 
         // Create the array value.
@@ -2711,9 +2711,9 @@ void ArgEmitter::emitShuffle(Expr *inner,
                                .getLoweredType().getSwiftRValueType(),
                              ParameterConvention::Indirect_In);
 
-          for (unsigned i = 0; i != numVarargs; ++i) {
+          unsigned i = 0;
+          for (unsigned innerIndex : variadicArgs) {
             // Find out where the next varargs element is coming from.
-            int innerIndex = elementMapping[outerIndex + 1 + i];
             assert(innerIndex >= 0 && "special source for varargs element??");
 #ifndef NDEBUG
             assert(!innerExtents[innerIndex].Used && "using element twice");
@@ -2722,7 +2722,7 @@ void ArgEmitter::emitShuffle(Expr *inner,
 
             // Set the destination index.
             innerExtents[innerIndex].HasDestIndex = true;
-            innerExtents[innerIndex].DestIndex = i;
+            innerExtents[innerIndex].DestIndex = i++;
 
             // Use the singleton param info we prepared before.
             innerExtents[innerIndex].Params = variadicParamInfo;
@@ -2851,7 +2851,7 @@ void ArgEmitter::emitShuffle(Expr *inner,
       emit(ArgumentSource(arg), origParamType.getTupleElementType(outerIndex));
 
     // If we're supposed to create a varargs array with the rest, do so.
-    } else if (innerIndex == TupleShuffleExpr::FirstVariadic) {
+    } else if (innerIndex == TupleShuffleExpr::Variadic) {
       auto &varargsField = outerTuple->getElement(outerIndex);
       assert(varargsField.isVararg() &&
              "Cannot initialize nonvariadic element");
@@ -2894,6 +2894,7 @@ void ArgEmitter::emitShuffle(TupleShuffleExpr *E,
               E->getDefaultArgsOwner(),
               E->getCallerDefaultArgs(),
               E->getElementMapping(),
+              E->getVariadicArgs(),
               E->getVarargsArrayTypeOrNull(),
               origParamType);
 }

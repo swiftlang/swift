@@ -2428,7 +2428,7 @@ public:
 ///
 /// \param variadicArgs Will be populated with all of the variadic arguments
 /// that will be placed into the variadic tuple element (i.e., at the index
-/// \c where \c consumed[i] is \c TupleShuffleExpr::FirstVariadic). The values
+/// \c where \c consumed[i] is \c TupleShuffleExpr::Variadic). The values
 /// are indices into the source tuple.
 ///
 /// \returns true if no tuple conversion is possible, false otherwise.

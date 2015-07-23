@@ -42,6 +42,9 @@ useNested((raw, raw2), n: raw3)
 // SIL:   {{%.+}} = apply [[VARIADIC]]({{%.+}}, {{%.+}}) : $@convention(thin) (Double, @owned Array<Int>) -> ()
 variadic(x: 2.5, 4, 5)
 
+// SIL:   [[VARIADIC:%.+]] = function_ref @_TF8def_func9variadic2FTGSaSi_1xSd_T_ : $@convention(thin) (@owned Array<Int>, Double) -> ()
+variadic2(1, 2, 3, x: 5.0)
+
 // SIL:   [[SLICE:%.+]] = function_ref @_TF8def_func5sliceFT1xGSaSi__T_ : $@convention(thin) (@owned Array<Int>) -> ()
 // SIL:   [[SLICE_SIZE:%.+]] = integer_literal $Builtin.Word, 3
 // SIL:   {{%.+}} = apply {{%.*}}<Int>([[SLICE_SIZE]])

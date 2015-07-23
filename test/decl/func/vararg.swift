@@ -16,7 +16,7 @@ func f3(a: (String) -> Void) { }
 f3({ print($0) })
 
 
-func f4(a: Int..., b: Int) { } // expected-error{{'...' must be on the last parameter}}
+func f4(a: Int..., b: Int) { }
 
 // rdar://16008564
 func inoutVariadic(inout i: Int...) {  // expected-error {{inout arguments cannot be variadic}}
@@ -26,3 +26,6 @@ func inoutVariadic(inout i: Int...) {  // expected-error {{inout arguments canno
 func invalidVariadic(e: NonExistentType) { // expected-error {{use of undeclared type 'NonExistentType'}}
   { (e: ExtraCrispy...) in }() // expected-error {{use of undeclared type 'ExtraCrispy'}}
 }
+
+func twoVariadics(a: Int..., b: Int...) { } // expected-error{{only a single variadic parameter '...' is permitted}}
+

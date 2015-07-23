@@ -465,9 +465,10 @@ void PrintAST::printPattern(const Pattern *pattern) {
       if (i != 0)
         Printer << ", ";
 
-      if (i == e - 1 && TP->hasVararg()) {
+      if (Elt.hasEllipsis()) {
         printTypedPattern(cast<TypedPattern>(Elt.getPattern()),
                           /*StripOuterSliceType=*/true);
+        Printer << "...";
       } else {
         printPattern(Elt.getPattern());
       }
@@ -479,8 +480,6 @@ void PrintAST::printPattern(const Pattern *pattern) {
         }
       }
     }
-    if (TP->hasVararg())
-      Printer << "...";
     Printer << ")";
     break;
   }
@@ -1524,16 +1523,15 @@ void PrintAST::printFunctionParameters(AbstractFunctionDecl *AFD) {
 
         printOneParameter(BodyTuple->getElement(i).getPattern(),
                           ArgNameIsAPIByDefault,
-                          /*StripOuterSliceType=*/i == e - 1 &&
-                            BodyTuple->hasVararg(),
+                          BodyTuple->getElement(i).hasEllipsis(),
                           /*Curried=*/CurrPattern > 0);
+        if (BodyTuple->getElement(i).hasEllipsis())
+          Printer << "...";
         if (Options.PrintDefaultParameterPlaceholder &&
             BodyTuple->getElement(i).getDefaultArgKind() !=
                 DefaultArgumentKind::None)
           Printer << " = default";
       }
-      if (BodyTuple->hasVararg())
-        Printer << "...";
       Printer << ")";
       continue;
     }
@@ -1731,12 +1729,11 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
 
           printOneParameter(BodyTuple->getElement(i).getPattern(),
                             /*ArgNameIsAPIByDefault=*/false,
-                            /*StripOuterSliceType=*/i == e - 1 &&
-                              BodyTuple->hasVararg(),
+                            BodyTuple->getElement(i).hasEllipsis(),
                             /*Curried=*/false);
+          if (BodyTuple->getElement(i).hasEllipsis())
+            Printer << "...";
         }
-        if (BodyTuple->hasVararg())
-          Printer << "...";
       } else {
         auto *BodyParen = cast<ParenPattern>(IndicePat);
         Printer << "(";

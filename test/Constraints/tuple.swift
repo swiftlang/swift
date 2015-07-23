@@ -45,7 +45,7 @@ var values = getIntFloat()
 func wantFloat(_: Float) {}
 wantFloat(values.float)
 
-var e : (x: Int..., y: Int) // expected-error{{unexpected '...' before the end of a tuple list}}
+var e : (x: Int..., y: Int) // expected-error{{cannot create a variadic tuple}}
 
 typealias Interval = (a:Int, b:Int)
 func takeInterval(x: Interval) {}
@@ -119,3 +119,24 @@ func scruff() -> (AnyObject?, ErrorType?) {
     return (nil, error)
   }
 }
+
+// Test variadics with trailing closures.
+func variadicWithTrailingClosure(x: Int..., y: Int = 2, fn: (Int, Int) -> Int) {
+}
+
+variadicWithTrailingClosure(1, 2, 3) { $0 + $1 }
+variadicWithTrailingClosure(1) { $0 + $1 }
+variadicWithTrailingClosure() { $0 + $1 }
+variadicWithTrailingClosure { $0 + $1 }
+
+variadicWithTrailingClosure(1, 2, 3, y: 0) { $0 + $1 }
+variadicWithTrailingClosure(1, y: 0) { $0 + $1 }
+variadicWithTrailingClosure(y: 0) { $0 + $1 }
+
+variadicWithTrailingClosure(1, 2, 3, y: 0, fn: +)
+variadicWithTrailingClosure(1, y: 0, fn: +)
+variadicWithTrailingClosure(y: 0, fn: +)
+
+variadicWithTrailingClosure(1, 2, 3, fn: +)
+variadicWithTrailingClosure(1, fn: +)
+variadicWithTrailingClosure(fn: +)

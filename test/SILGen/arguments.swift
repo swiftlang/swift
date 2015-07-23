@@ -73,6 +73,14 @@ variadic_arg_2(i)
 variadic_arg_2(i, f)
 variadic_arg_2(i, f, f, f)
 
+func variadic_arg_3(y: Float..., x: Int) {}
+// CHECK-LABEL: sil hidden @_TFSs14variadic_arg_3
+// CHECK: bb0([[Y:%[0-9]+]] : $Array<Float>, [[X:%[0-9]+]] : $Int):
+
+variadic_arg_3(x: i)
+variadic_arg_3(f, x: i)
+variadic_arg_3(f, f, f, x: i)
+
 protocol Runcible {}
 
 extension Int : Runcible {}

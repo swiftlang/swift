@@ -13,6 +13,7 @@ public func getSecond(_: Int, y: Int) -> Int {
 public func useNested(_: (x: Int, y: Int), n: Int) {}
 
 public func variadic(x x: Double, _ y: Int...) {}
+public func variadic2(y: Int..., x: Double) {}
 
 public func slice(x x: [Int]) {}
 public func optional(x x: Int?) {}

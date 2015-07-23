@@ -511,28 +511,34 @@ class TupleTypeRepr : public TypeRepr {
   SourceRange Parens;
   // FIXME: Tail allocation.
   SourceLoc Ellipsis;
+  unsigned EllipsisIdx;
 
 public:
   TupleTypeRepr(ArrayRef<TypeRepr *> Elements, SourceRange Parens,
-                SourceLoc Ellipsis)
+                SourceLoc Ellipsis, unsigned EllipsisIdx)
     : TypeRepr(TypeReprKind::Tuple), Elements(Elements),
-      Parens(Parens), Ellipsis(Ellipsis) {
+      Parens(Parens), Ellipsis(Ellipsis), EllipsisIdx(EllipsisIdx) {
   }
 
   ArrayRef<TypeRepr *> getElements() const { return Elements; }
   TypeRepr *getElement(unsigned i) const { return Elements[i]; }
   SourceRange getParens() const { return Parens; }
   SourceLoc getEllipsisLoc() const { return Ellipsis; }
+  unsigned getEllipsisIndex() const { return EllipsisIdx; }
   bool hasEllipsis() const { return Ellipsis.isValid(); }
 
-  void removeEllipsis() { Ellipsis = SourceLoc(); }
+  void removeEllipsis() {
+    Ellipsis = SourceLoc();
+    EllipsisIdx = Elements.size();
+  }
 
   bool isParenType() const {
     return Elements.size() == 1 && !isa<NamedTypeRepr>(Elements[0]);
   }
 
   static TupleTypeRepr *create(ASTContext &C, ArrayRef<TypeRepr *> Elements,
-                               SourceRange Parens, SourceLoc Ellipsis);
+                               SourceRange Parens, SourceLoc Ellipsis,
+                               unsigned EllipsisIdx);
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::Tuple;

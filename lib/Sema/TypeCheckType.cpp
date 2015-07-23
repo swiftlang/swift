@@ -2000,11 +2000,11 @@ Type TypeResolver::resolveTupleType(TupleTypeRepr *repr,
   }
 
   if (repr->hasEllipsis()) {
-    Type baseTy = elements.back().getType();
+    auto &element = elements[repr->getEllipsisIndex()];
+    Type baseTy = element.getType();
     Type fullTy = TC.getArraySliceType(repr->getEllipsisLoc(), baseTy);
-    Identifier name = elements.back().getName();
-    elements.back() = TupleTypeElt(fullTy, name, DefaultArgumentKind::None,
-                                   true);
+    Identifier name = element.getName();
+    element = TupleTypeElt(fullTy, name, DefaultArgumentKind::None, true);
   }
 
   return TupleType::get(elements, Context);
@@ -2250,9 +2250,10 @@ static bool isParamPatternRepresentableInObjC(TypeChecker &TC,
     unsigned NumParams = Fields.size();
 
     // Varargs are not representable in Objective-C.
-    if (TP->hasVararg()) {
+    if (TP->hasAnyEllipsis()) {
       if (Diagnose && Reason != ObjCReason::DoNotDiagnose) {
-        TC.diagnose(TP->getEllipsisLoc(), diag::objc_invalid_on_func_variadic,
+        TC.diagnose(TP->getAnyEllipsisLoc(),
+                    diag::objc_invalid_on_func_variadic,
                     getObjCDiagnosticAttrKind(Reason));
         describeObjCReason(TC, AFD, Reason);
       }

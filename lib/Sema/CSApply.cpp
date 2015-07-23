@@ -3539,7 +3539,8 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
   TupleExpr *fromTupleExpr = dyn_cast<TupleExpr>(innerExpr);
 
   /// Check each of the tuple elements in the destination.
-  bool hasVarArg = false;
+  bool hasVariadic = false;
+  unsigned variadicParamIdx = toTuple->getNumElements();
   bool anythingShuffled = false;
   bool hasInits = false;
   SmallVector<TupleTypeElt, 4> toSugarFields;
@@ -3585,10 +3586,11 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
     }
 
     // If this is the variadic argument, note it.
-    if (sources[i] == TupleShuffleExpr::FirstVariadic) {
-      assert(i == n-1 && "Vararg not at the end?");
+    if (sources[i] == TupleShuffleExpr::Variadic) {
+      assert(!hasVariadic && "two variadic parameters?");
       toSugarFields.push_back(toElt);
-      hasVarArg = true;
+      hasVariadic = true;
+      variadicParamIdx = i;
       anythingShuffled = true;
       continue;
     }
@@ -3650,15 +3652,14 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
 
   // Convert all of the variadic arguments to the destination type.
   ArraySliceType *arrayType = nullptr;
-  if (hasVarArg) {
-    Type toEltType = toTuple->getElements().back().getVarargBaseTy();
+  if (hasVariadic) {
+    Type toEltType = toTuple->getElements()[variadicParamIdx].getVarargBaseTy();
     for (int fromFieldIdx : variadicArgs) {
       const auto &fromElt = fromTuple->getElement(fromFieldIdx);
       Type fromEltType = fromElt.getType();
 
       // If the source and destination types match, there's nothing to do.
       if (toEltType->isEqual(fromEltType)) {
-        sources.push_back(fromFieldIdx);
         fromTupleExprFields[fromFieldIdx] = fromElt;
         continue;
       }
@@ -3682,7 +3683,6 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
         return nullptr;
 
       fromTupleExpr->setElement(fromFieldIdx, convertedElt);
-      sources.push_back(fromFieldIdx);
 
       fromTupleExprFields[fromFieldIdx] = TupleTypeElt(
                                             convertedElt->getType(),
@@ -3695,7 +3695,7 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
     if (tc.requireArrayLiteralIntrinsics(expr->getStartLoc()))
       return nullptr;
     arrayType = cast<ArraySliceType>(
-          toTuple->getElements().back().getType().getPointer());
+          toTuple->getElements()[variadicParamIdx].getType().getPointer());
   }
 
   // Compute the updated 'from' tuple type, since we may have
@@ -3725,11 +3725,13 @@ Expr *ExprRewriter::coerceTupleToTuple(Expr *expr, TupleType *fromTuple,
   // Create the tuple shuffle.
   ArrayRef<int> mapping = tc.Context.AllocateCopy(sources);
   auto callerDefaultArgsCopy = tc.Context.AllocateCopy(callerDefaultArgs);
-  auto shuffle = new (tc.Context) TupleShuffleExpr(expr, mapping,
-                                               TupleShuffleExpr::SourceIsTuple,
-                                                   defaultArgsOwner,
-                                                   callerDefaultArgsCopy,
-                                                   toSugarType);
+  auto shuffle = new (tc.Context) TupleShuffleExpr(
+                                    expr, mapping,
+                                    TupleShuffleExpr::SourceIsTuple,
+                                    defaultArgsOwner,
+                                    tc.Context.AllocateCopy(variadicArgs),
+                                    callerDefaultArgsCopy,
+                                    toSugarType);
   shuffle->setVarargsArrayType(arrayType);
   return shuffle;
 }
@@ -3805,12 +3807,18 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
 
   // Compute the elements of the resulting tuple.
   SmallVector<int, 4> elements;
+  SmallVector<unsigned, 1> variadicArgs;
   SmallVector<Expr*, 4> callerDefaultArgs;
   ConcreteDeclRef defaultArgsOwner = nullptr;
   i = 0;
   for (auto &field : toTuple->getElements()) {
     if (field.isVararg()) {
-      elements.push_back(TupleShuffleExpr::FirstVariadic);
+      elements.push_back(TupleShuffleExpr::Variadic);
+      if (i == toScalarIdx) {
+        variadicArgs.push_back(i);
+        ++i;
+        continue;
+      }
     }
 
     // If this is the scalar field, act like we're shuffling the 0th element.
@@ -3858,11 +3866,12 @@ Expr *ExprRewriter::coerceScalarToTuple(Expr *expr, TupleType *toTuple,
                             : TupleType::get(sugarFields, tc.Context);
 
   return new (tc.Context) TupleShuffleExpr(expr,
-                                           tc.Context.AllocateCopy(elements),
-                                           TupleShuffleExpr::SourceIsScalar,
-                                           defaultArgsOwner,
-                                    tc.Context.AllocateCopy(callerDefaultArgs),
-                                           destSugarTy);
+                            tc.Context.AllocateCopy(elements),
+                            TupleShuffleExpr::SourceIsScalar,
+                            defaultArgsOwner,
+                            tc.Context.AllocateCopy(variadicArgs),
+                            tc.Context.AllocateCopy(callerDefaultArgs),
+                            destSugarTy);
 }
 
 /// Collect the conformances for all the protocols of an existential type.
@@ -4122,6 +4131,7 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
   SmallVector<TupleTypeElt, 4> fromTupleExprFields(
                                  argTuple? argTuple->getNumElements() : 1);
   SmallVector<Expr*, 4> fromTupleExpr(argTuple? argTuple->getNumElements() : 1);
+  SmallVector<unsigned, 4> variadicArgs;
   SmallVector<Expr *, 2> callerDefaultArgs;
   ConcreteDeclRef defaultArgsOwner = nullptr;
   Type sliceType = nullptr;
@@ -4133,26 +4143,24 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
 
     // Handle variadic parameters.
     if (param.Variadic) {
-      assert(paramIdx == numParams-1 &&
-             "variadics must be at the end of the list");
-
       // Find the appropriate injection function.
       if (tc.requireArrayLiteralIntrinsics(arg->getStartLoc()))
         return nullptr;
 
       // Record this parameter.
       auto paramBaseType = param.Ty;
+      assert(sliceType.isNull() && "Multiple variadic parameters?");
       sliceType = tc.getArraySliceType(arg->getLoc(), paramBaseType);
       toSugarFields.push_back(TupleTypeElt(sliceType, param.Label,
                                            DefaultArgumentKind::None, true));
       anythingShuffled = true;
-      sources.push_back(TupleShuffleExpr::FirstVariadic);
+      sources.push_back(TupleShuffleExpr::Variadic);
 
       // Convert the arguments.
       for (auto argIdx : parameterBindings[paramIdx]) {
         auto arg = getArg(argIdx);
         auto argType = arg->getType();
-        sources.push_back(argIdx);
+        variadicArgs.push_back(argIdx);
 
         // If the argument type exactly matches, this just works.
         if (argType->isEqual(paramBaseType)) {
@@ -4160,14 +4168,6 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
                                                      getArgLabel(argIdx));
           fromTupleExpr[argIdx] = arg;
           continue;
-        }
-
-        // FIXME: If we're not converting directly from a tuple expression,
-        // we can't express this. LAME!
-        if (!argTuple && numParams > 1) {
-          tc.diagnose(arg->getLoc(), diag::tuple_conversion_not_expressible,
-                      arg->getType(), paramType);
-          return nullptr;
         }
 
         // Convert the argument.
@@ -4320,11 +4320,13 @@ Expr *ExprRewriter::coerceCallArguments(Expr *arg, Type paramType,
   // Create the tuple shuffle.
   ArrayRef<int> mapping = tc.Context.AllocateCopy(sources);
   auto callerDefaultArgsCopy = tc.Context.AllocateCopy(callerDefaultArgs);
-  auto shuffle = new (tc.Context) TupleShuffleExpr(arg, mapping,
-                                                   isSourceScalar,
-                                                   defaultArgsOwner,
-                                                   callerDefaultArgsCopy,
-                                                   paramType);
+  auto shuffle = new (tc.Context) TupleShuffleExpr(
+                                    arg, mapping,
+                                    isSourceScalar,
+                                    defaultArgsOwner,
+                                    tc.Context.AllocateCopy(variadicArgs),
+                                    callerDefaultArgsCopy,
+                                    paramType);
   shuffle->setVarargsArrayType(sliceType);
   return shuffle;
 }
@@ -6243,7 +6245,7 @@ static bool isVariadicWitness(AbstractFunctionDecl *afd) {
 
   auto params = afd->getBodyParamPatterns()[index];
   if (auto *tuple = dyn_cast<TuplePattern>(params)) {
-    return tuple->hasVararg();
+    return tuple->hasAnyEllipsis();
   }
 
   return false;

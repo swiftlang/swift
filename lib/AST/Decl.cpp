@@ -3911,7 +3911,8 @@ bool FuncDecl::isUnaryOperator() const {
   if (!argTuple)
     return true;
 
-  return argTuple->getNumElements() == 1 && !argTuple->hasVararg();
+  return argTuple->getNumElements() == 1 &&
+         !argTuple->getElement(0).hasEllipsis();
 }
 
 bool FuncDecl::isBinaryOperator() const {
@@ -3926,7 +3927,8 @@ bool FuncDecl::isBinaryOperator() const {
     return false;
   
   return argTuple->getNumElements() == 2
-    || (argTuple->getNumElements() == 1 && argTuple->hasVararg());
+    || (argTuple->getNumElements() == 1 &&
+        argTuple->getElement(0).hasEllipsis());
 }
 
 bool FuncDecl::isOverridingDecl(const FuncDecl *Method) const {
@@ -3980,7 +3982,8 @@ bool ConstructorDecl::isObjCZeroParameterWithLongSelector() const {
   const Pattern *paramPattern = getBodyParamPatterns()[1];
   Type paramType;
   if (auto tuplePattern = dyn_cast<TuplePattern>(paramPattern)) {
-    if (tuplePattern->getNumElements() != 1 || tuplePattern->hasVararg())
+    if (tuplePattern->getNumElements() != 1 ||
+        tuplePattern->getElement(0).hasEllipsis())
       return false;
 
     paramType = tuplePattern->getElement(0).getPattern()->getType();

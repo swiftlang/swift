@@ -304,11 +304,9 @@ Pattern *ModuleFile::maybeReadPattern() {
   case decls_block::TUPLE_PATTERN: {
     TypeID tupleTypeID;
     unsigned count;
-    bool hasVararg;
     bool isImplicit;
 
-    TuplePatternLayout::readRecord(scratch, tupleTypeID, count, hasVararg,
-                                   isImplicit);
+    TuplePatternLayout::readRecord(scratch, tupleTypeID, count, isImplicit);
 
     SmallVector<TuplePatternElt, 8> elements;
     for ( ; count > 0; --count) {
@@ -322,7 +320,9 @@ Pattern *ModuleFile::maybeReadPattern() {
       // FIXME: Add something for this record or remove it.
       IdentifierID labelID;
       uint8_t rawDefaultArg;
-      TuplePatternEltLayout::readRecord(scratch, labelID, rawDefaultArg);
+      bool hasEllipsis;
+      TuplePatternEltLayout::readRecord(scratch, labelID, hasEllipsis,
+                                        rawDefaultArg);
       Identifier label = getIdentifier(labelID);
 
       Pattern *subPattern = maybeReadPattern();
@@ -336,12 +336,12 @@ Pattern *ModuleFile::maybeReadPattern() {
         defaultArgKind = *defaultArg;
 
       elements.push_back(TuplePatternElt(label, SourceLoc(), subPattern,
+                                         hasEllipsis, SourceLoc(),
                                          nullptr, defaultArgKind));
     }
 
     auto result = TuplePattern::create(getContext(), SourceLoc(),
-                                       elements, SourceLoc(), hasVararg,
-                                       SourceLoc(), isImplicit);
+                                       elements, SourceLoc(), isImplicit);
     result->setType(getType(tupleTypeID));
     restoreOffset.reset();
     return result;

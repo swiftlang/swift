@@ -1980,9 +1980,9 @@ RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,
            shuffleIndex != TupleShuffleExpr::CallerDefaultInitialize &&
            "Only argument tuples can have default initializers & varargs");
 
-    // If the shuffle index is FirstVariadic, it is the beginning of the list of
-    // varargs inputs.  Save this case for last.
-    if (shuffleIndex != TupleShuffleExpr::FirstVariadic) {
+    // If the shuffle index is Variadic, the argument sources are stored
+    // separately.
+    if (shuffleIndex != TupleShuffleExpr::Variadic) {
       // Map from a different tuple element.
       result.addElement(std::move(elements[shuffleIndex]));
       continue;
@@ -1990,16 +1990,15 @@ RValue RValueEmitter::visitTupleShuffleExpr(TupleShuffleExpr *E,
 
     assert(field.isVararg() && "Cannot initialize nonvariadic element");
     
-    // Okay, we have a varargs tuple element.  All the remaining elements feed
-    // into the varargs portion of this, which is then constructed into an Array
-    // through an informal protocol captured by the InjectionFn in the
-    // TupleShuffleExpr.
+    // Okay, we have a varargs tuple element.  The separately-stored variadic
+    // elements feed into the varargs portion of this, which is then
+    // constructed into an Array through an informal protocol captured by the
+    // InjectionFn in the TupleShuffleExpr.
     assert(E->getVarargsArrayTypeOrNull() &&
            "no injection type for varargs tuple?!");
     SmallVector<ManagedValue, 4> variadicValues;
-    
-    while (shuffleIndexIterator != shuffleIndexEnd) {
-      unsigned sourceField = *shuffleIndexIterator++;
+
+    for (unsigned sourceField : E->getVariadicArgs()) {
       variadicValues.push_back(
                      std::move(elements[sourceField]).getAsSingleValue(SGF, E));
     }
