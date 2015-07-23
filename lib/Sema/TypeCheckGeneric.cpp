@@ -629,7 +629,7 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   // parameters as dependent, unresolved.
   DependentGenericTypeResolver dependentResolver(builder);
   if (checkGenericFuncSignature(*this, &builder, func, dependentResolver)) {
-    func->setType(ErrorType::get(Context));
+    func->overwriteType(ErrorType::get(Context));
     return true;
   }
 
@@ -647,7 +647,7 @@ bool TypeChecker::validateGenericFuncSignature(AbstractFunctionDecl *func) {
   revertGenericFuncSignature(func);
   CompleteGenericTypeResolver completeResolver(*this, builder);
   if (checkGenericFuncSignature(*this, nullptr, func, completeResolver)) {
-    func->setType(ErrorType::get(Context));
+    func->overwriteType(ErrorType::get(Context));
     return true;
   }
 

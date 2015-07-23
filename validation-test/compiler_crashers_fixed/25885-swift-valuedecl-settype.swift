@@ -1,8 +1,14 @@
-// RUN: not --crash %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -parse
 
 // Distributed under the terms of the MIT license
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-protocol P{func b:a protocol a{func a:a
+T:a
+a
+enum B<c: {
 func a
+func g
+func a<T T>:a class a<T
+func a:B A.
+func a<T where nc g
