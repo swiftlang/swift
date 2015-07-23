@@ -344,7 +344,7 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
   void checkSourceFile(const SourceFile &SF) {
     for (Decl *D : SF.Decls) {
       if (TopLevelCodeDecl *TLCD = dyn_cast<TopLevelCodeDecl>(D))
-        visit(TLCD->getBody());
+        visitBraceStmt(TLCD->getBody(), /*isTopLevel=*/true);
     }
   }
 
@@ -364,6 +364,17 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
       visit(S->getElseStmt());
   }
   void visitGuardStmt(GuardStmt *S) {
+    if (SM.isBeforeInBuffer(Loc, S->getStartLoc()))
+      return;
+
+    // Names in the guard aren't visible until after the pattern.
+    if (!IntersectsRange(S->getBody()->getSourceRange())) {
+      for (const StmtConditionElement &condition : S->getCond()) {
+        if (auto *pattern = condition.getPatternOrNull())
+          checkPattern(pattern, DeclVisibilityKind::LocalVariable);
+      }
+    }
+
     visit(S->getBody());
   }
   void visitIfConfigStmt(IfConfigStmt *S) {
@@ -413,9 +424,15 @@ struct FindLocalVal : public StmtVisitor<FindLocalVal> {
     visit(S->getBody());
     checkPattern(S->getPattern(), DeclVisibilityKind::LocalVariable);
   }
-  void visitBraceStmt(BraceStmt *S) {
-    if (!IntersectsRange(S->getSourceRange()))
-      return;
+  void visitBraceStmt(BraceStmt *S, bool isTopLevelCode = false) {
+    if (isTopLevelCode) {
+      if (SM.isBeforeInBuffer(Loc, S->getStartLoc()))
+        return;
+    } else {
+      if (!IntersectsRange(S->getSourceRange()))
+        return;
+    }
+
     for (auto elem : S->getElements()) {
       if (Stmt *S = elem.dyn_cast<Stmt*>())
         visit(S);

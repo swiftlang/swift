@@ -370,13 +370,16 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
 
         // If the parsed stmt was a GuardStmt, push the VarDecls into the
         // Entries list, so that they can be found by unqual name lookup later.
-        if (auto guard = dyn_cast_or_null<GuardStmt>(Result.dyn_cast<Stmt*>())){
-          for (const auto &elt : guard->getCond()) {
-            if (!elt.getPatternOrNull()) continue;
+        if (!IsTopLevel) {
+          auto resultStmt = Result.dyn_cast<Stmt*>();
+          if (auto guard = dyn_cast_or_null<GuardStmt>(resultStmt)) {
+            for (const auto &elt : guard->getCond()) {
+              if (!elt.getPatternOrNull()) continue;
 
-            elt.getPattern()->forEachVariable([&](VarDecl *VD) {
-              Entries.push_back(VD);
-            });
+              elt.getPattern()->forEachVariable([&](VarDecl *VD) {
+                Entries.push_back(VD);
+              });
+            }
           }
         }
       }
