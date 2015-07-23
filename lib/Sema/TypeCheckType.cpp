@@ -279,8 +279,7 @@ Type TypeChecker::resolveTypeInContext(TypeDecl *typeDecl,
   // Walk up through the type scopes to find the context where the type
   // declaration was found. When we find it, substitute the appropriate base
   // type.
-  Type ownerType = resolver->resolveTypeOfContext(ownerDC);
-  auto ownerNominal = ownerType->getAnyNominal();
+  auto ownerNominal = ownerDC->isNominalTypeOrNominalTypeExtensionContext();
   assert(ownerNominal && "Owner must be a nominal type");
   for (auto parentDC = fromDC; !parentDC->isModuleContext();
        parentDC = parentDC->getParent()) {
