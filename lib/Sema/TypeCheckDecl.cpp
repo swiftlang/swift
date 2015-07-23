@@ -5882,6 +5882,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     auto nominal = cast<NominalTypeDecl>(D);
     if (nominal->hasType())
       return;
+    nominal->computeType();
 
     // Check generic parameters, if needed.
     if (auto gp = nominal->getGenericParams()) {
@@ -5906,10 +5907,6 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
         finalizeGenericParamList(builder, gp, nominal, *this);
       }
     }
-
-    // Compute the declared type.
-    if (!nominal->hasType())
-      nominal->computeType();
 
     checkInheritanceClause(D);
     validateAttributes(*this, D);

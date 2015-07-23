@@ -296,3 +296,22 @@ protocol P8 {
 }
 
 func testP8<C : P8 where C.AssocOther == X6<C.AssocP8.AssocP7>>(c: C) { }
+
+// setGenericSignature() was getting called twice here
+struct Ghost<T> {}
+
+protocol Timewarp {
+  typealias Wormhole
+}
+
+struct Teleporter<A, B where A : Timewarp, A.Wormhole == Ghost<B>> {}
+
+struct Beam {}
+
+struct EventHorizon : Timewarp {
+  typealias Wormhole = Ghost<Beam>
+}
+
+func activate<T>(t: T) {}
+
+activate(Teleporter<EventHorizon, Beam>())
