@@ -267,9 +267,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollectionType {
   public mutating func extend<
     S : SequenceType where S.Generator.Element == UnicodeScalar
   >(newElements: S) {
-    _core.extend(
-      _lazyConcatenate(lazy(newElements).map { $0.utf16 })
-    )
+    _core.extend(newElements._prext_lazy.flatMap { $0.utf16 })
   }
   /// Replace the given `subRange` of elements with `newElements`.
   ///
@@ -284,7 +282,7 @@ extension String.UnicodeScalarView : RangeReplaceableCollectionType {
   ) {
     let rawSubRange = subRange.startIndex._position
       ..< subRange.endIndex._position
-    let lazyUTF16 = _lazyConcatenate(lazy(newElements).map { $0.utf16 })
+    let lazyUTF16 = newElements._prext_lazy.flatMap { $0.utf16 }
     _core.replaceRange(rawSubRange, with: lazyUTF16)
   }
 }

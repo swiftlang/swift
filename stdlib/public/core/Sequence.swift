@@ -267,7 +267,7 @@ extension SequenceType {
     // Cast away @noescape.
     typealias Transform = (Generator.Element) -> T
     let escapableTransform = unsafeBitCast(transform, Transform.self)
-    return Array(lazy(self).map(escapableTransform))
+    return Array(self._prext_lazy.map(escapableTransform))
   }
 
   /// Return an `Array` containing the elements of `self`,
@@ -279,7 +279,7 @@ extension SequenceType {
     typealias IncludeElement = (Generator.Element) -> Bool
     let escapableIncludeElement =
       unsafeBitCast(includeElement, IncludeElement.self)
-    return Array(lazy(self).filter(escapableIncludeElement))
+    return Array(self._prext_lazy.filter(escapableIncludeElement))
   }
 
   /// Returns a subsequence containing all but the first `n` elements.
