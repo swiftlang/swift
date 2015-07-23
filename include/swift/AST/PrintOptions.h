@@ -87,7 +87,7 @@ struct PrintOptions {
   bool SkipUnavailable = false;
 
   /// Whether to skip internal stdlib declarations.
-  bool SkipPrivateStdlibDecls = false;
+  bool SkipNonPublicSystemDecls = false;
 
   /// Whether to skip extensions that don't add protocols or no members.
   bool SkipEmptyExtensionDecls = true;
@@ -175,6 +175,7 @@ struct PrintOptions {
   /// Retrieve the set of options for verbose printing to users.
   static PrintOptions printVerbose() {
     PrintOptions result;
+    result.PrintAccessibility = true;
     result.TypeDefinitions = true;
     result.VarInitializers = true;
     result.PrintDefaultParameterPlaceholder = true;
@@ -192,14 +193,19 @@ struct PrintOptions {
     result.SynthesizeSugarOnTypes = true;
     result.SkipUnavailable = true;
     result.SkipImplicit = true;
-    result.SkipPrivateStdlibDecls = true;
+    result.SkipNonPublicSystemDecls = true;
     result.SkipDeinit = true;
     result.PrintUserInaccessibleAttrs = false;
     result.PrintImplicitAttrs = false;
     result.ExcludeAttrList.push_back(DAK_Exported);
     result.ExcludeAttrList.push_back(DAK_Inline);
     result.PrintOverrideKeyword = false;
-    result.AccessibilityFilter = Accessibility::Public;
+
+    // Show the internal interface for Swift modules. This will be a useful
+    // thing to see, particularly when viewing the interface for use in test
+    // targets. By using internal filter, we will not leak any internal/private
+    // system symbols because SkipNonPublicSystemDecls sets true.
+    result.AccessibilityFilter = Accessibility::Internal;
     return result;
   }
 
@@ -207,6 +213,7 @@ struct PrintOptions {
   /// documentation purposes.
   static PrintOptions printDocInterface() {
     PrintOptions result = PrintOptions::printInterface();
+    result.PrintAccessibility = false;
     result.SkipUnavailable = false;
     result.ExcludeAttrList.push_back(DAK_Available);
     result.ArgAndParamPrinting =
@@ -234,6 +241,7 @@ struct PrintOptions {
   /// This is only intended for debug output.
   static PrintOptions printEverything() {
     PrintOptions result = printVerbose();
+    result.PrintAccessibility = false;
     result.ExcludeAttrList.clear();
     result.PrintStorageRepresentationAttrs = true;
     result.AbstractAccessors = false;
@@ -250,7 +258,7 @@ struct PrintOptions {
     PO.PrintFunctionRepresentationAttrs = false;
     PO.PrintDocumentationComments = false;
     PO.ExcludeAttrList.push_back(DAK_Available);
-    PO.SkipPrivateStdlibDecls = true;
+    PO.SkipNonPublicSystemDecls = true;
     return PO;
   }
 };

@@ -372,7 +372,6 @@ public:
   bool visit(Decl *D) {
     if (!shouldPrint(D))
       return false;
-
     Printer.callPrintDeclPre(D);
     ASTVisitor::visit(D);
     Printer.printDeclPost(D);
@@ -615,6 +614,17 @@ void PrintAST::printPatternType(const Pattern *P) {
   }
 }
 
+static bool isPrivateOrInternal(const Decl *D) {
+  if (auto *VD = dyn_cast<ValueDecl>(D)) {
+    if (VD->hasAccessibility()) {
+      if (VD->getFormalAccess() == Accessibility::Internal ||
+          VD->getFormalAccess() == Accessibility::Private)
+        return true;
+    }
+  }
+  return false;
+}
+
 bool PrintAST::shouldPrint(const Decl *D) {
   if (Options.SkipDeinit && isa<DestructorDecl>(D)) {
     return false;
@@ -645,7 +655,7 @@ bool PrintAST::shouldPrint(const Decl *D) {
     }
   }
 
-  if (Options.SkipPrivateStdlibDecls && D->isPrivateStdlibDecl())
+  if (Options.SkipNonPublicSystemDecls && D->isPrivateStdlibDecl())
       return false;
 
   if (Options.SkipEmptyExtensionDecls && isa<ExtensionDecl>(D)) {
@@ -674,6 +684,12 @@ bool PrintAST::shouldPrint(const Decl *D) {
       if (ShouldPrint)
         return true;
     }
+    return false;
+  }
+
+  if (Options.SkipNonPublicSystemDecls &&
+      D->getModuleContext()->isSystemModule() &&
+      isPrivateOrInternal(D)) {
     return false;
   }
 
@@ -1213,7 +1229,7 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
   bool ShouldPrint = true;
   Type Ty = decl->getUnderlyingType();
   // If the underlying type is private, don't print it.
-  if (Options.SkipPrivateStdlibDecls && Ty && Ty.isPrivateStdlibType())
+  if (Options.SkipNonPublicSystemDecls && Ty && Ty.isPrivateStdlibType())
     ShouldPrint = false;
 
   if (ShouldPrint) {
@@ -1672,7 +1688,7 @@ void PrintAST::printEnumElement(EnumElementDecl *elt) {
 
   if (elt->hasArgumentType()) {
     Type Ty = elt->getArgumentType();
-    if (!Options.SkipPrivateStdlibDecls || !Ty.isPrivateStdlibType())
+    if (!Options.SkipNonPublicSystemDecls || !Ty.isPrivateStdlibType())
       Ty.print(Printer, Options);
   }
 }

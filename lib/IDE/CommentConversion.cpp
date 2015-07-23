@@ -280,6 +280,7 @@ void CommentToXMLConverter::visitDocComment(const DocComment *DC) {
 
   {
     PrintOptions PO = PrintOptions::printInterface();
+    PO.PrintAccessibility = false;
     PO.AccessibilityFilter = Accessibility::Private;
     PO.PrintDocumentationComments = false;
     PO.TypeDefinitions = false;
