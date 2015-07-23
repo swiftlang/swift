@@ -5,10 +5,11 @@ Index Invalidation Rules in the Swift Standard Library
 Points to consider
 ==================
 
-(1) Collections can have a value type or a reference type.
+(1) Collections can be implemented as value types or a reference types.
 
-(2) Copying a value of a value type, or copying a reference has well-defined
-    semantics built into the language and is not controllable by the user code.
+(2) Copying an instance of a value type, or copying a reference has
+    well-defined semantics built into the language and is not controllable by the
+    user code.
 
     Consequence: value-typed collections in Swift have to use copy-on-write for
     data stored out-of-line in reference-typed buffers.
@@ -36,7 +37,7 @@ An index that is valid for a certain collection designates an element of that
 collection or represents a one-past-end index.
 
 Operations that access collection elements require valid indexes (this includes
-accessing using subscript operator, slicing, swapping elements, removing
+accessing using the subscript operator, slicing, swapping elements, removing
 elements etc.)
 
 Using an invalid index to access elements of a collection leads to unspecified
@@ -62,20 +63,47 @@ user:
     APIs, are valid for ``C``.
     FIXME: disallow startIndex.predecessor(), endIndex.successor()
 
-(4) If an index ``I`` is valid for a collection ``C``, it is also valid for
+(4) **Indices of collections and slices freely interoperate.**
+
+    If an index ``I`` is valid for a collection ``C``, it is also valid for
+    slices of ``C``, provided that ``I`` was in the bounds that were passed to
+    the slicing subscript.
+
+    If an index ``I`` is valid for a slice obtained from a collection ``C``, it
+    is also valid for ``C`` itself.
+
+(5) If an index ``I`` is valid for a collection ``C``, it is also valid for
     a copy of ``C``.
 
-(5) If an index ``I`` is valid for a collection ``C``, it continues to be valid
+(6) If an index ``I`` is valid for a collection ``C``, it continues to be valid
     after a call to a non-mutating method on ``C``.
 
-(6) Calling a non-mutating method on a collection instance does not invalidate
+(7) Calling a non-mutating method on a collection instance does not invalidate
     any indexes.
 
-The following points apply to all collections, but specific collections can
-give different guarantees:
+(8) The setter of ``MutableCollection.subscript(_: Index)`` does not invalidate
+    any indices.
 
-(1) Calling a mutating method on a collection instance invalidates all indexes
-    for that collection instance.
+    Rationale:
+
+    - Replacing a collection element has runtime complexity O(1) and is not
+      considered a structural mutation.  Therefore, there seems to be no reason
+      for a collection model would need to invalidate indices from the
+      implementation point of view.
+
+    - Iterating over a collection and performing mutations in place is a common
+      pattern that Swift's collection library needs to support.  If replacing
+      individual collection elements would invalidate indices, many common
+      algorithms (like sorting) wouldn't be implementable directly with
+      indices; the code would need to maintain its own shadow indices, for
+      example, plain integers, that are not invalidated by mutations.
+
+The following points apply to all collections by default, but specific
+collection implementations can be less strict:
+
+(1) A call to a mutating method on a collection instance, except the setter of
+    ``MutableCollection.subscript(_: Index)``, invalidates all indices for that
+    collection instance.
 
 Consequences:
 
@@ -85,15 +113,6 @@ Consequences:
   or completely replace it.)
 
   * ``Swift.swap()`` does not invalidate any indexes.
-
-Additional guarantees for ``Swift.String``
-==========================================
-
-**Slicing does not invalidate indexes.**  If an index ``I`` is valid for a
-``String`` ``S``, it is also valid for a ``String`` instance obtained by
-slicing ``S``.
-
-FIXME: index should be in bounds of the slice.
 
 Additional guarantees for ``Swift.Array``, ``Swift.ContiguousArray``, ``Swift.ArraySlice``
 ==========================================================================================
