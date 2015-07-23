@@ -251,7 +251,6 @@ func r18800223(i : Int) {
 }
 
 // <rdar://problem/21883806> Bogus "'_' can only appear in a pattern or on the left side of an assignment" is back
-// FIXME: This diagnostic is really bad.
 _ = { $0 }  // expected-error {{type of expression is ambiguous without more context}}
 
 
@@ -407,3 +406,50 @@ takeVoidVoidFn { () -> Void in
   afterMessageCount = uintFunc()  // expected-error {{'UInt' is not convertible to 'Int'}}
 }
 
+// <rdar://problem/19997471> Swift: Incorrect compile error when calling a function inside a closure
+func f19997471(x: String) {}
+func f19997471(x: Int) {}
+
+func someGeneric19997471<T>(x: T) {
+  takeVoidVoidFn {
+    f19997471(x) // expected-error {{cannot invoke 'f19997471' with an argument list of type '(T)'}}
+     // expected-note @-1 {{overloads for 'f19997471' exist with these partially matching parameter lists: (String), (Int)}}
+  }
+}
+
+// <rdar://problem/20371273> Type errors inside anonymous functions don't provide enough information
+func f20371273() {
+  let x: [Int] = [1, 2, 3, 4]
+  let y: UInt = 4
+  x.filter { $0 == y }  // expected-error {{cannot invoke 'filter' with an argument list of type '((UInt) -> Bool)'}}
+   // expected-note @-1 {{expected an argument list of type '(@noescape (Self.Generator.Element) -> Bool)'}}
+}
+
+
+
+
+// <rdar://problem/20921068> Swift fails to compile: [0].map() { _ in let r = (1,2).0; return r }
+// FIXME: Should complain about not having a return type annotation in the closure.
+[0].map { _ in let r =  (1,2).0;  return r }  // expected-error {{cannot invoke 'map' with an argument list of type '((_) -> _)'}}
+
+// <rdar://problem/21078316> Less than useful error message when using map on optional dictionary type
+func rdar21078316() {
+  var foo : [String : String]?
+  var bar : [(String, String)]?
+  bar = foo.map { ($0, $1) }  // expected-error {{type of expression is ambiguous without more context}}
+}
+
+
+// <rdar://problem/20978044> QoI: Poor diagnostic when using an incorrect tuple element in a closure
+var numbers = [1, 2, 3]
+zip(numbers, numbers).filter { $0.1 > 1 && $0.2 > 1 }  // expected-error {{type of expression is ambiguous without more context}}
+
+
+
+// <rdar://problem/20868864> QoI: Cannot invoke 'function' with an argument list of type 'type'
+func foo20868864(callback: ([String]) -> ()) { }
+func rdar20868864(var s: String) {
+  foo20868864 { (strings: [String]) in
+    s = strings   // expected-error {{'[String]' is not convertible to 'String'}}
+  }
+}
