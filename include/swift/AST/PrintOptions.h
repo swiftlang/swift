@@ -205,7 +205,6 @@ struct PrintOptions {
   }
 
   /// Retrive the print options that are suitable to print the testable interface.
-  /// rdar://20680375
   static PrintOptions printTestableInterface() {
     PrintOptions result = printInterface();
     result.AccessibilityFilter = Accessibility::Internal;
