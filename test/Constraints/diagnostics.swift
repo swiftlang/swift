@@ -461,3 +461,12 @@ enum Color {
 }
 let _: (Int, Color) = [1,2].map({ ($0, .Unknown("")) }) // expected-error {{type of expression is ambiguous without more context}}
 
+
+func testTypeSugar(a : Int) {
+  typealias Stride = Int
+
+  let x = Stride(a)
+  x+"foo"            // expected-error {{binary operator '+' cannot be applied to operands of type 'Stride' and 'String'}}
+// expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (String, String), (Int, UnsafeMutablePointer<Memory>), (Int, UnsafePointer<Memory>)}}
+}
+

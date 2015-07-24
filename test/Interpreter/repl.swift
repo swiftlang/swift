@@ -74,9 +74,9 @@ f1 +
 
 func r13792487(x: Float64) -> Float64 { return x }
 r13792487(1234.0)
-// CHECK: Double = 1234.0{{$}}
+// CHECK: Float64 = 1234.0{{$}}
 r13792487(1234)
-// CHECK: Double = 1234.0{{$}}
+// CHECK: Float64 = 1234.0{{$}}
 
 var ab = (1,
 2)

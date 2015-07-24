@@ -52,8 +52,14 @@ static void substituteInputSugarArgumentType(Type argTy, CanType resultTy,
     return;
   }
   
-  if (argTy->getCanonicalType() != resultTy)
-    return;
+  if (argTy->getCanonicalType() != resultTy) {
+    // If the argument is a metatype of what we're looking for, propagate that.
+    if (auto MTT = argTy->getAs<MetatypeType>())
+      argTy = MTT->getInstanceType();
+
+    if (argTy->getCanonicalType() != resultTy)
+      return;
+  }
 
   // If this type is parenthesized, remove the parens.  We don't want to
   // propagate parens from arguments to the result type.
@@ -73,26 +79,54 @@ static void substituteInputSugarArgumentType(Type argTy, CanType resultTy,
   uniqueSugarTy = false;
 }
 
-/// If the inputs to an apply expression use a consistent "sugar" type
-/// (that is, a typealias or shorthand syntax) equivalent to the result type of
-/// the function, set the result type of the expression to that sugar type.
+/// If we can propagate type sugar from input arguments types to the result of
+/// an apply, do so.
+///
 Expr *TypeChecker::substituteInputSugarTypeForResult(ApplyExpr *E) {
   if (!E->getType() || E->getType()->is<ErrorType>())
     return E;
   
-  Type argTy = E->getArg()->getType();
-  
-  CanType resultTy = E->getFn()->getType()->castTo<FunctionType>()->getResult()
-    ->getCanonicalType();
-  
+  Type resultTy = E->getFn()->getType()->castTo<FunctionType>()->getResult();
+
+  /// Check to see if you have "x+y" (where x and y are type aliases) that match
+  // the canonical result type.  If so, propagate the sugar.
   Type resultSugarTy; // null if no sugar found, set when sugar found
   bool uniqueSugarTy = true; // true if a unique sugar mapping found
-  
-  substituteInputSugarArgumentType(argTy, resultTy,
+  substituteInputSugarArgumentType(E->getArg()->getType(),
+                                   resultTy->getCanonicalType(),
                                    resultSugarTy, uniqueSugarTy);
   
-  if (resultSugarTy && uniqueSugarTy)
+  if (resultSugarTy && uniqueSugarTy && E->getType()->isCanonical()) {
     E->setType(resultSugarTy);
+    return E;
+  }
+
+  // Otherwise check to see if this is a ConstructorRefExpr on a TypeExpr with
+  // sugar on it.  If so, propagate the sugar to the curried result function
+  // type.
+  if (isa<ConstructorRefCallExpr>(E) && isa<TypeExpr>(E->getArg())) {
+    auto resultSugar =
+      E->getArg()->getType()->castTo<MetatypeType>()->getInstanceType();
+
+    // The result of this apply is "(args) -> T" where T is the type being
+    // constructed.  Apply the sugar onto it.
+    if (auto FT = E->getType()->getAs<FunctionType>())
+      if (FT->getResult()->isEqual(resultSugar) && !resultSugar->isCanonical()){
+        auto NFT = FunctionType::get(FT->getInput(), resultSugar,
+                                     FT->getExtInfo());
+        E->setType(NFT);
+        return E;
+      }
+  }
+
+  // Otherwise, if the callee function had sugar on the result type, but it got
+  // dropped, make sure to propagate it along.
+  if (!resultTy->isCanonical() && E->getType()->isCanonical() &&
+      resultTy->isEqual(E->getType())) {
+    E->setType(resultTy);
+    return E;
+  }
+
 
   return E;
 }
