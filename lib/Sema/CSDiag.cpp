@@ -1697,15 +1697,23 @@ namespace {
     
     /// Analyze a function expr and break it into a candidate set.  On failure,
     /// this leaves the candidate list empty.
-    CalleeCandidateInfo(Expr *Fn, Type actualArgsType, ConstraintSystem *CS);
-
-    typedef const std::function<CandidateCloseness(UncurriedCandidate)>
-      &ClosenessPredicate;
+    CalleeCandidateInfo(Expr *Fn, ConstraintSystem *CS) : CS(CS) {
+      collectCalleeCandidates(Fn);
+    }
 
     /// Analyze a locator for a SubscriptExpr for its candidate set.
-    CalleeCandidateInfo(ConstraintLocator *locator, ConstraintSystem *CS,
-                        ClosenessPredicate predicate);
-    
+    CalleeCandidateInfo(ConstraintLocator *locator, ConstraintSystem *CS);
+
+    typedef const std::function<CandidateCloseness(UncurriedCandidate)>
+    &ClosenessPredicate;
+
+    /// After the candidate list is formed, it can be filtered down to discard
+    /// obviously mismatching candidates and compute a "closeness" for the
+    /// resultant set.
+    void filterList(Type actualArgsType);
+    void filterList(ClosenessPredicate predicate);
+
+
     unsigned size() const { return candidates.size(); }
     UncurriedCandidate operator[](unsigned i) const {
       return candidates[i];
@@ -1718,7 +1726,6 @@ namespace {
                                    bool isCallExpr = false);
 
   private:
-    void filterCandidatesList(ClosenessPredicate predicate);
     void collectCalleeCandidates(Expr *fnExpr);
   };
 }
@@ -1727,7 +1734,7 @@ namespace {
 /// Given a candidate list, this computes the narrowest closeness to the match
 /// we're looking for and filters out any worse matches.  The predicate
 /// indicates how close a given candidate is to the desired match.
-void CalleeCandidateInfo::filterCandidatesList(ClosenessPredicate predicate) {
+void CalleeCandidateInfo::filterList(ClosenessPredicate predicate) {
   closeness = CC_GeneralMismatch;
 
   // If we couldn't find anything, give up.
@@ -1913,15 +1920,14 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn) {
   }
 }
 
-
-CalleeCandidateInfo::CalleeCandidateInfo(Expr *fn, Type actualArgsType,
-                                         ConstraintSystem *CS) : CS(CS) {
-  collectCalleeCandidates(fn);
-
+/// After the candidate list is formed, it can be filtered down to discard
+/// obviously mismatching candidates and compute a "closeness" for the
+/// resultant set.
+void CalleeCandidateInfo::filterList(Type actualArgsType) {
   // Now that we have the candidate list, figure out what the best matches from
   // the candidate list are, and remove all the ones that aren't at that level.
   auto actualArgs = decomposeArgumentType(actualArgsType);
-  filterCandidatesList([&](UncurriedCandidate candidate) -> CandidateCloseness {
+  filterList([&](UncurriedCandidate candidate) -> CandidateCloseness {
     auto inputType = candidate.getArgumentType();
     // If this isn't a function or isn't valid at this uncurry level, treat it
     // as a general mismatch.
@@ -1931,8 +1937,7 @@ CalleeCandidateInfo::CalleeCandidateInfo(Expr *fn, Type actualArgsType,
 }
 
 CalleeCandidateInfo::CalleeCandidateInfo(ConstraintLocator *locator,
-                                         ConstraintSystem *CS,
-                                         ClosenessPredicate predicate): CS(CS) {
+                                         ConstraintSystem *CS) : CS(CS) {
   if (auto decl = findResolvedMemberRef(locator, *CS)) {
     // If the decl is fully resolved, add it.
     candidates.push_back({ decl, 0 });
@@ -1951,8 +1956,6 @@ CalleeCandidateInfo::CalleeCandidateInfo(ConstraintLocator *locator,
       }
     }
   }
-
-  filterCandidatesList(predicate);
 }
 
 
@@ -2322,8 +2325,9 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure() {
   // Otherwise, we have a good grasp on what is going on: we have a call of an
   // unresolve overload set.  Try to dig out the candidates.
   auto apply = cast<ApplyExpr>(call);
+  CalleeCandidateInfo calleeInfo(apply->getFn(), CS);
+  calleeInfo.filterList(argType);
 
-  CalleeCandidateInfo calleeInfo(apply->getFn(), argType, CS);
   
   // A common error is to apply an operator that only has an inout LHS (e.g. +=)
   // to non-lvalues (e.g. a local let).  Produce a nice diagnostic for this
@@ -2777,6 +2781,9 @@ Expr *FailureDiagnosis::typeCheckArgumentChildIndependently(Expr *argExpr,
 }
 
 bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
+  CalleeCandidateInfo calleeInfo(binop->getFn(), CS);
+  assert(!calleeInfo.candidates.empty() && "unrecognized binop function kind");
+
   auto checkedArgExpr = typeCheckArgumentChildIndependently(binop->getArg());
   if (!checkedArgExpr) return true;
 
@@ -2786,15 +2793,8 @@ bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
   auto argExpr = dyn_cast<TupleExpr>(checkedArgExpr);
   if (!argExpr) return diagnoseGeneralFailure();
 
-  auto argTuple = argExpr->getType()->getAs<TupleType>();
-
-  // If the argument type is not a tuple, we've posted the diagnostic
-  // recursively.
-  if (!argTuple)
-    return true;
-  
-  CalleeCandidateInfo calleeInfo(binop->getFn(), argTuple, CS);
-  assert(!calleeInfo.candidates.empty() && "unrecognized binop function kind");
+  auto argTupleType = argExpr->getType()->castTo<TupleType>();
+  calleeInfo.filterList(argTupleType);
 
   if (calleeInfo.closeness == CC_ExactMatch) {
     
@@ -2823,8 +2823,8 @@ bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
     return true;
   }
   
-  auto argTyName1 = getUserFriendlyTypeName(argTuple->getElementType(0));
-  auto argTyName2 = getUserFriendlyTypeName(argTuple->getElementType(1));
+  auto argTyName1 = getUserFriendlyTypeName(argTupleType->getElementType(0));
+  auto argTyName2 = getUserFriendlyTypeName(argTupleType->getElementType(1));
   std::string overloadName = calleeInfo[0].decl->getNameStr();
   assert(!overloadName.empty());
   if (argTyName1.compare(argTyName2)) {
@@ -2847,18 +2847,16 @@ bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
 bool FailureDiagnosis::visitUnaryExpr(ApplyExpr *applyExpr) {
   assert(expr->getKind() == ExprKind::PostfixUnary ||
          expr->getKind() == ExprKind::PrefixUnary);
-  
-  auto argExpr = typeCheckArgumentChildIndependently(applyExpr->getArg());
 
-  // If the argument type is an error, we've posted the diagnostic recursively.
+  CalleeCandidateInfo calleeInfo(applyExpr->getFn(), CS);
+  assert(!calleeInfo.candidates.empty() && "unrecognized unop function kind");
+
+  auto argExpr = typeCheckArgumentChildIndependently(applyExpr->getArg());
   if (!argExpr) return true;
 
   auto argType = argExpr->getType();
+  calleeInfo.filterList(argType);
 
-  CalleeCandidateInfo calleeInfo(applyExpr->getFn(), argType, CS);
-  assert(!calleeInfo.candidates.empty() && "unrecognized unop function kind");
-  
-  
   if (calleeInfo.closeness == CC_ExactMatch) {
     // Otherwise, whatever the result type of the call happened to be must not
     // have been what we were looking for.
@@ -2898,6 +2896,11 @@ bool FailureDiagnosis::visitUnaryExpr(ApplyExpr *applyExpr) {
 }
 
 bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
+  // See if the subscript got resolved.
+  auto locator =
+    CS->getConstraintLocator(SE, ConstraintLocator::SubscriptMember);
+  CalleeCandidateInfo calleeInfo(locator, CS);
+
   auto indexExpr = typeCheckArgumentChildIndependently(SE->getIndex());
   if (!indexExpr) return true;
 
@@ -2907,14 +2910,8 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
   auto indexType = indexExpr->getType();
   auto baseType = baseExpr->getType();
 
-  // See if the subscript got resolved.
-  auto locator =
-    CS->getConstraintLocator(SE, ConstraintLocator::SubscriptMember);
-
   auto decomposedIndexType = decomposeArgumentType(indexType);
-  
-  CalleeCandidateInfo calleeInfo(locator, CS,
-                           [&](UncurriedCandidate cand) -> CandidateCloseness
+  calleeInfo.filterList([&](UncurriedCandidate cand) -> CandidateCloseness
   {
     // Classify how close this match is.  Non-subscript decls don't match.
     auto *SD = dyn_cast<SubscriptDecl>(cand.decl);
@@ -2996,6 +2993,8 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
                                             TCC_AllowUnresolved);
   if (!fnExpr) return true;
 
+  CalleeCandidateInfo calleeInfo(fnExpr, CS);
+
   // If we resolved a concrete expression for the callee, and it has
   // non-function/non-metatype type, then we cannot call it!
   auto fnType = fnExpr->getType()->getRValueType();
@@ -3023,7 +3022,7 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
   if (!argExpr)
     return true; // already diagnosed.
 
-  CalleeCandidateInfo calleeInfo(fnExpr, argExpr->getType(), CS);
+  calleeInfo.filterList(argExpr->getType());
 
   bool isInitializer = isa<TypeExpr>(fnExpr);
   auto overloadName = calleeInfo.declName;
