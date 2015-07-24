@@ -201,6 +201,17 @@ void swift::ide::printSubmoduleInterface(
     }
   }
 
+  // Collect those submodules that are actually imported but have no import decls
+  // in the module.
+  llvm::SmallPtrSet<const clang::Module *, 16> NoImportSubModules;
+  if (InterestingClangModule) {
+    // Assume all submodules are missing.
+    for (auto It =InterestingClangModule->submodule_begin();
+         It != InterestingClangModule->submodule_end(); It ++) {
+      NoImportSubModules.insert(*It);
+    }
+  }
+
   // Separate the declarations that we are going to print into different
   // buckets.
   for (Decl *D : Decls) {
@@ -233,6 +244,9 @@ void swift::ide::printSubmoduleInterface(
 
     if (auto ID = dyn_cast<ImportDecl>(D)) {
       if (ShouldPrintImport(ID)) {
+        if (ID->getClangModule())
+          // Erase those submodules that are not missing.
+          NoImportSubModules.erase(ID->getClangModule());
         if (ID->getImportKind() == ImportKind::Module) {
           // Make sure we don't print duplicate imports, due to getting imports
           // for both a clang module and its overlay.
@@ -268,6 +282,11 @@ void swift::ide::printSubmoduleInterface(
       // Add Swift decls if we are printing the top-level module.
       SwiftDecls.push_back(D);
     }
+  }
+
+  // Create the missing import decls and add to the collector.
+  for (auto *SM : NoImportSubModules) {
+    ImportDecls.push_back(createImportDecl(M->getASTContext(), M, SM, {}));
   }
 
   auto &ClangSourceManager = Importer.getClangASTContext().getSourceManager();

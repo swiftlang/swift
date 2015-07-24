@@ -47,6 +47,8 @@ class ClangImporterOptions;
 class ClangModuleUnit;
 class ClangNode;
 class Decl;
+class DeclContext;
+class ImportDecl;
 class IRGenOptions;
 class LazyResolver;
 class ModuleDecl;
@@ -251,6 +253,8 @@ public:
   void printStatistics() const override;
 };
 
+ImportDecl *createImportDecl(ASTContext &Ctx, DeclContext *DC, ClangNode ClangN,
+                             ArrayRef<clang::Module *> Exported);
 }
 
 #endif

@@ -86,11 +86,6 @@ using clang::CompilerInvocation;
 
 #pragma mark Internal data structures
 
-static ImportDecl *createImportDecl(ASTContext &Ctx,
-                                    DeclContext *DC,
-                                    ClangNode ClangN,
-                                    ArrayRef<clang::Module *> Exported);
-
 namespace {
   class HeaderImportCallbacks : public clang::PPCallbacks {
     ClangImporter &Importer;
@@ -2643,7 +2638,7 @@ void ClangModuleUnit::getTopLevelDecls(SmallVectorImpl<Decl*> &results) const {
   results.append(extensions.begin(), extensions.end());
 }
 
-static ImportDecl *createImportDecl(ASTContext &Ctx,
+ImportDecl *swift::createImportDecl(ASTContext &Ctx,
                                     DeclContext *DC,
                                     ClangNode ClangN,
                                     ArrayRef<clang::Module *> Exported) {
