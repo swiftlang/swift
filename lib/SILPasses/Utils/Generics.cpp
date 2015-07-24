@@ -13,16 +13,14 @@
 #define DEBUG_TYPE "generic-specializer"
 
 #include "swift/Strings.h"
-
 #include "swift/SILPasses/Utils/Generics.h"
-
 #include "swift/SILPasses/Utils/GenericCloner.h"
 
 using namespace swift;
 
 // Create a new apply based on an old one, but with a different
 // function being applied.
-static ApplySite replaceWithSpecializedFunction(ApplySite AI,
+ApplySite swift::replaceWithSpecializedFunction(ApplySite AI,
                                                 SILFunction *NewF) {
   SILLocation Loc = AI.getLoc();
   ArrayRef<Substitution> Subst;
@@ -71,8 +69,7 @@ static bool convertExtenralDefinitionIntoDeclaration(SILFunction *F) {
   assert(F->isExternalDeclaration() &&
          "Function should be an external declaration");
 
-  DEBUG(llvm::dbgs() << "  removed external function " << F->getName()
-        << "\n");
+  DEBUG(llvm::dbgs() << "  removed external function " << F->getName() << "\n");
 
   return true;
 }
@@ -145,7 +142,7 @@ static bool cacheSpecialization(SILModule &M, SILFunction *F) {
   // Do not remove functions from the white-list. Keep them around.
   // Change their linkage to public, so that other applications can refer to it.
 
-  if (M.getOptions().Optimization == SILOptions::SILOptMode::Optimize &&
+  if (M.getOptions().Optimization >= SILOptions::SILOptMode::Optimize &&
       F->getLinkage() != SILLinkage::Public &&
       F->getModule().getSwiftModule()->getName().str() == STDLIB_NAME) {
     if (F->getLinkage() != SILLinkage::Public &&
@@ -196,6 +193,43 @@ static SILFunction *lookupExistingSpecialization(SILModule &M,
   return nullptr;
 }
 
+SILFunction *swift::getExistingSpecialization(SILModule &M,
+                                              StringRef FunctionName) {
+  auto *Specialization = lookupExistingSpecialization(M, FunctionName);
+  if (!Specialization)
+    return nullptr;
+  if (hasPublicVisibility(Specialization->getLinkage())) {
+    // The bodies of existing specializations cannot be used,
+    // as they may refer to non-public symbols.
+    if (Specialization->isDefinition())
+      Specialization->convertToDeclaration();
+    Specialization->setLinkage(SILLinkage::PublicExternal);
+    // Ignore body for -Onone and -Odebug.
+    assert((Specialization->isExternalDeclaration() ||
+            convertExtenralDefinitionIntoDeclaration(Specialization)) &&
+           "Could not remove body of the found specialization");
+    if (!convertExtenralDefinitionIntoDeclaration(Specialization)) {
+      DEBUG(
+          llvm::dbgs() << "Could not remove body of specialization: "
+                       << FunctionName << '\n');
+    }
+
+    DEBUG(
+        llvm::dbgs() << "Found existing specialization for: "
+                     << FunctionName << '\n';
+        llvm::dbgs() << swift::Demangle::demangleSymbolAsString(
+                            Specialization->getName()) << "\n\n");
+  } else {
+    // Forget about this function.
+    DEBUG(llvm::dbgs() << "Cannot reuse the specialization: "
+           << swift::Demangle::demangleSymbolAsString(Specialization->getName())
+           <<"\n");
+    return nullptr;
+  }
+
+  return Specialization;
+}
+
 ApplySite swift::trySpecializeApplyOfGeneric(ApplySite Apply,
                                              SILFunction *&NewFunction,
          llvm::SmallVectorImpl<FullApplyCollector::value_type> &NewApplyPairs) {
@@ -242,57 +276,9 @@ ApplySite swift::trySpecializeApplyOfGeneric(ApplySite Apply,
   }
   DEBUG(llvm::dbgs() << "    Specialized function " << ClonedName << '\n');
 
-  SILFunction *NewF = nullptr;
   auto &M = Apply.getInstruction()->getModule();
   // If we already have this specialization, reuse it.
-  auto PrevF = M.lookUpFunction(ClonedName);
-  if (PrevF) {
-    if (PrevF->getLinkage() != SILLinkage::SharedExternal ||
-        !M.getOptions().UsePrespecialized)
-      NewF = PrevF;
-  } else {
-    PrevF = lookupExistingSpecialization(M, ClonedName);
-
-    if (PrevF) {
-      if (hasPublicVisibility(PrevF->getLinkage())) {
-        // The bodies of existing specializations cannot be used,
-        // as they may refer to non-public symbols.
-        if (PrevF->isDefinition())
-          PrevF->convertToDeclaration();
-        NewF = PrevF;
-        NewF->setLinkage(SILLinkage::PublicExternal);
-        // Ignore body for -Onone and -Odebug.
-        assert((NewF->isExternalDeclaration() ||
-                convertExtenralDefinitionIntoDeclaration(NewF)) &&
-              "Could not remove body of the found specialization");
-        if (!convertExtenralDefinitionIntoDeclaration(NewF)) {
-          DEBUG(llvm::dbgs()
-                  << "Could not remove body of: " << ClonedName << '\n';);
-        }
-
-        DEBUG(
-          llvm::dbgs() << "Found existing specialization for: "
-                       << ClonedName << '\n';
-          auto DemangledNameString =
-            swift::Demangle::demangleSymbolAsString(NewF->getName());
-          llvm::dbgs() << DemangledNameString << "\n\n");
-      } else {
-        // Forget about this function.
-        DEBUG(llvm::dbgs()
-                << "Cannot reuse the specialization: "
-                << swift::Demangle::demangleSymbolAsString(PrevF->getName())
-                << "\n");
-        // TODO: It would be nice to jut remove this function from the module.
-        // But this is not possible, because SILDeserializer keeps a reference
-        // to this function and currently there is no implemented API to
-        // remove a specific reference from the SIL cache.
-        // So, this function stays in the final SIL, even though it is not
-        // used at all.
-        // M.eraseFunction(PrevF);
-        return ApplySite();
-      }
-    }
-  }
+  auto NewF = M.lookUpFunction(ClonedName);
 
   if (NewF) {
 #ifndef NDEBUG

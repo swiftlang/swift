@@ -35,6 +35,12 @@ ApplySite trySpecializeApplyOfGeneric(ApplySite Apply,
 /// Checks if a given mangled name could be a name of a whitelisted specialization.
 bool isWhitelistedSpecialization(StringRef SpecName);
 
+/// Create a new apply based on an old one, but with a different
+/// function being applied.
+ApplySite replaceWithSpecializedFunction(ApplySite AI, SILFunction *NewF);
+
+SILFunction *getExistingSpecialization(SILModule &M, StringRef FunctionName);
+
 } // end namespace swift
 
 #endif

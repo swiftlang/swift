@@ -147,6 +147,8 @@ PASS(StripDebugInfo, "strip-debug-info",
      "Strip debug info")
 PASS(SwiftArrayOpts, "array-specialize",
      "Specialize arrays")
+PASS(UsePrespecialized, "use-prespecialized",
+     "Use pre-specialized functions")
 PASS(ExternalDefsToDecls, "external-defs-to-decls",
      "Convert external definitions to decls")
 PASS_RANGE(AllPasses, AADumper, ExternalDefsToDecls)

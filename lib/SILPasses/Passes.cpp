@@ -353,7 +353,7 @@ void swift::runSILPassesForOnone(SILModule &Module) {
   // Enable the pre-specialized mode by default
   Module.getOptions().UsePrespecialized = true;
   // First specialize user-code.
-  PM.addGenericSpecializer();
+  PM.addUsePrespecialized();
   PM.run();
   PM.resetAndRemoveTransformations();
 
