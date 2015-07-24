@@ -2009,6 +2009,20 @@ suggestPotentialOverloads(StringRef functionName, SourceLoc loc,
   }
 }
 
+/// Flags that can be used to control name lookup.
+enum TCCFlags {
+  /// Don't force the subexpression to resolve to a specific type.  If the
+  /// subexpr is ambiguous, don't diagnose an error.
+  /// FIXME: this should always be on.
+  TCC_AllowUnresolved = 0x01,
+};
+
+typedef OptionSet<TCCFlags> TCCOptions;
+
+inline TCCOptions operator|(TCCFlags flag1, TCCFlags flag2) {
+  return TCCOptions(flag1) | flag2;
+}
+
 
 namespace {
 /// If a constraint system fails to converge on a solution for a given
@@ -2043,7 +2057,7 @@ public:
   /// Attempt to diagnose a failure without taking into account the specific
   /// kind of expression that could not be type checked.
   bool diagnoseGeneralFailure();
-  
+
   /// Unless we've already done this, retypecheck the specified child of the
   /// current expression on its own, without including any contextual
   /// constraints or the parent expr nodes.  This is more likely to succeed than
@@ -2056,10 +2070,11 @@ public:
   /// resolved) and returns null when the subexpression fails to typecheck.
   ///
   Expr *typeCheckChildIndependently(Expr *subExpr,
-                                    bool allowUnresolved = false);
+                                    TCCOptions options = TCCOptions());
 
-  Type getTypeOfTypeCheckedChildIndependently(Expr *subExpr) {
-    auto e = typeCheckChildIndependently(subExpr);
+  Type getTypeOfTypeCheckedChildIndependently(Expr *subExpr,
+                                            TCCOptions options = TCCOptions()) {
+    auto e = typeCheckChildIndependently(subExpr, options);
     return e ? e->getType() : Type();
   }
 
@@ -2067,10 +2082,11 @@ public:
   /// subexpression of the current node because it handles ClosureExpr parents
   /// of the specified node.
   Expr *typeCheckArbitrarySubExprIndependently(Expr *subExpr,
-                                               bool allowUnresolved = false);
-  
+                                             TCCOptions options = TCCOptions());
+
   /// Special magic to handle inout exprs and tuples in argument lists.
-  Expr *typeCheckArgumentChildIndependently(Expr *argExpr);
+  Expr *typeCheckArgumentChildIndependently(Expr *argExpr,
+                                            TCCOptions options = TCCOptions());
 
   /// Attempt to diagnose a specific failure from the info we've collected from
   /// the failed constraint system.
@@ -2287,7 +2303,8 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure() {
     if (AE->getFn()->getSemanticsProvidingExpr() == anchor) {
       // Type check the argument list independently to try to get a concrete
       // type (ignoring context).
-      auto argExpr = typeCheckArbitrarySubExprIndependently(AE->getArg(), true);
+      auto argExpr = typeCheckArbitrarySubExprIndependently(AE->getArg(),
+                                                           TCC_AllowUnresolved);
       if (!argExpr) return true;
 
       argType = argExpr->getType();
@@ -2537,7 +2554,7 @@ namespace {
 /// This can return a new expression (for e.g. when a UnresolvedDeclRef gets
 /// resolved) and returns null when the subexpression fails to typecheck.
 Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr,
-                                                    bool allowUnresolved) {
+                                                    TCCOptions options) {
   // Track if this sub-expression is currently being diagnosed.
   if (Expr *res = CS->TC.exprIsBeingDiagnosed(subExpr))
     return res;
@@ -2546,7 +2563,7 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr,
   CS->TC.addExprForDiagnosis(subExpr, subExpr);
   
   if (isa<ClosureExpr>(subExpr))
-    allowUnresolved = true;
+    options |= TCC_AllowUnresolved;
   
   // These expression types can never be checked without their enclosing
   // context, so don't try - it would just make bogus diagnostics.
@@ -2589,14 +2606,14 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr,
   // has type constraint problems, and we don't want to know about any
   // syntactic issues in a well-typed subexpression (which might be because
   // the context is missing).
-  auto options = TypeCheckExprFlags::IsDiscarded|
-                 TypeCheckExprFlags::DisableStructuralChecks;
-  
-  if (allowUnresolved)
-    options = options | TypeCheckExprFlags::AllowUnresolvedTypeVariables;
+  auto TCEOptions = TypeCheckExprFlags::IsDiscarded|
+                    TypeCheckExprFlags::DisableStructuralChecks;
+
+  if (options.contains(TCC_AllowUnresolved))
+    TCEOptions |= TypeCheckExprFlags::AllowUnresolvedTypeVariables;
 
   bool hadError = CS->TC.typeCheckExpression(subExpr, CS->DC, Type(),
-                                             Type(), options);
+                                             Type(), TCEOptions);
 
   // This is a terrible hack to get around the fact that typeCheckExpression()
   // might change subExpr to point to a new OpenExistentialExpr. In that case,
@@ -2626,9 +2643,9 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr,
 /// subexpression of the current node because it handles ClosureExpr parents
 /// of the specified node.
 Expr *FailureDiagnosis::
-typeCheckArbitrarySubExprIndependently(Expr *subExpr, bool allowUnresolved) {
+typeCheckArbitrarySubExprIndependently(Expr *subExpr, TCCOptions options) {
   if (subExpr == expr)
-    return typeCheckChildIndependently(subExpr, allowUnresolved);
+    return typeCheckChildIndependently(subExpr, options);
   
   // Construct a parent map for the expr tree we're investigating.
   auto parentMap = expr->getParentMap();
@@ -2649,7 +2666,7 @@ typeCheckArbitrarySubExprIndependently(Expr *subExpr, bool allowUnresolved) {
   }
   
   // Otherwise, we're ok to type check the subexpr.
-  return typeCheckChildIndependently(subExpr, allowUnresolved);
+  return typeCheckChildIndependently(subExpr, options);
 }
 
 
@@ -2727,9 +2744,10 @@ void ConstraintSystem::diagnoseAssignmentFailure(Expr *dest, Type destTy,
 
 
 /// Special magic to handle inout exprs and tuples in argument lists.
-Expr *FailureDiagnosis::typeCheckArgumentChildIndependently(Expr *argExpr) {
+Expr *FailureDiagnosis::typeCheckArgumentChildIndependently(Expr *argExpr,
+                                                            TCCOptions options){
   if (auto *PE = dyn_cast<ParenExpr>(argExpr))
-    return typeCheckChildIndependently(PE->getSubExpr());
+    return typeCheckChildIndependently(PE->getSubExpr(), options);
   
   // FIXME: This should all just be a matter of getting type type of the
   // sub-expression, but this doesn't work well when the argument list
@@ -2741,7 +2759,7 @@ Expr *FailureDiagnosis::typeCheckArgumentChildIndependently(Expr *argExpr) {
       containsInOutExprs |= isa<InOutExpr>(elt);
     
     if (!containsInOutExprs)
-      return typeCheckChildIndependently(TE);
+      return typeCheckChildIndependently(TE, options);
 
     // If InOutExprs are in play, get the simplified type of each element and
     // rebuild the aggregate :-(
@@ -2764,7 +2782,7 @@ Expr *FailureDiagnosis::typeCheckArgumentChildIndependently(Expr *argExpr) {
                              TE->isImplicit(), TT);
   }
   
-  return typeCheckChildIndependently(unwrapParenExpr(argExpr));
+  return typeCheckChildIndependently(unwrapParenExpr(argExpr), options);
 }
 
 bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
@@ -2983,7 +3001,8 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
 
 bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
   // Type check the function subexpression to resolve a type for it if possible.
-  auto fnExpr = typeCheckChildIndependently(callExpr->getFn(), true);
+  auto fnExpr = typeCheckChildIndependently(callExpr->getFn(),
+                                            TCC_AllowUnresolved);
   if (!fnExpr) return true;
 
   // If we resolved a concrete expression for the callee, and it has
@@ -2999,8 +3018,8 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
     return true;
   }
   
-  Type argType;  // Type of the argument list, if knowable.
 #if 0
+  Type argType;  // Type of the argument list, if knowable.
   if (auto FTy = fnType->getAs<AnyFunctionType>())
     if (!typeIsNotSpecialized(FTy->getInput()))
       argType = FTy->getInput();
