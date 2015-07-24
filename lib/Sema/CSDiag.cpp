@@ -44,10 +44,7 @@ return #Id;
 /// variables.
 static std::string getUserFriendlyTypeName(Type t) {
   assert(!t.isNull());
-  
-  // Unwrap any l-value types.
-  t = t->getRValueType();
-  
+
   if (auto tv = t->getAs<TypeVariableType>()) {
     if (tv->getImpl().literalConformanceProto) {
       Optional<KnownProtocolKind> kind =
@@ -1713,7 +1710,7 @@ namespace {
     void filterList(Type actualArgsType);
     void filterList(ClosenessPredicate predicate);
 
-
+    bool empty() const { return candidates.empty(); }
     unsigned size() const { return candidates.size(); }
     UncurriedCandidate operator[](unsigned i) const {
       return candidates[i];
@@ -1820,6 +1817,13 @@ evaluateCloseness(Type candArgListType, ArrayRef<Type> actualArgs) {
 
 void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn) {
   fn = fn->getSemanticsProvidingExpr();
+
+  // Treat a call to a load of a variable as a call to that variable, it is just
+  // the lvalue'ness being removed.
+  if (auto load = dyn_cast<LoadExpr>(fn)) {
+    if (isa<DeclRefExpr>(load->getSubExpr()))
+      return collectCalleeCandidates(load->getSubExpr());
+  }
 
   if (auto declRefExpr = dyn_cast<DeclRefExpr>(fn)) {
     candidates.push_back({ declRefExpr->getDecl(), 0 });
@@ -2018,6 +2022,10 @@ enum TCCFlags {
   /// subexpr is ambiguous, don't diagnose an error.
   /// FIXME: this should always be on.
   TCC_AllowUnresolved = 0x01,
+
+  /// Allow the result of the subexpression to be an lvalue.  If this is not
+  /// specified, any lvalue will be forced to be loaded into an rvalue.
+  TCC_AllowLValue = 0x02
 };
 
 typedef OptionSet<TCCFlags> TCCOptions;
@@ -2089,7 +2097,7 @@ public:
 
   /// Special magic to handle inout exprs and tuples in argument lists.
   Expr *typeCheckArgumentChildIndependently(Expr *argExpr,
-                                            TCCOptions options = TCCOptions());
+                                        const CalleeCandidateInfo &candidates);
 
   /// Attempt to diagnose a specific failure from the info we've collected from
   /// the failed constraint system.
@@ -2603,15 +2611,16 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr,
 
   CS->TC.eraseTypeData(subExpr);
       
-  // Claim that the result is discarded to preserve the lvalue type of
-  // the expression.
-  //
   // Disable structural checks, because we know that the overall expression
   // has type constraint problems, and we don't want to know about any
   // syntactic issues in a well-typed subexpression (which might be because
   // the context is missing).
-  auto TCEOptions = TypeCheckExprFlags::IsDiscarded|
-                    TypeCheckExprFlags::DisableStructuralChecks;
+  TypeCheckExprOptions TCEOptions = TypeCheckExprFlags::DisableStructuralChecks;
+
+  // Claim that the result is discarded to preserve the lvalue type of
+  // the expression.
+  if (options.contains(TCC_AllowLValue))
+    TCEOptions |= TypeCheckExprFlags::IsDiscarded;
 
   if (options.contains(TCC_AllowUnresolved))
     TCEOptions |= TypeCheckExprFlags::AllowUnresolvedTypeVariables;
@@ -2748,11 +2757,15 @@ void ConstraintSystem::diagnoseAssignmentFailure(Expr *dest, Type destTy,
 
 
 /// Special magic to handle inout exprs and tuples in argument lists.
-Expr *FailureDiagnosis::typeCheckArgumentChildIndependently(Expr *argExpr,
-                                                            TCCOptions options){
-  if (auto *PE = dyn_cast<ParenExpr>(argExpr))
-    return typeCheckChildIndependently(PE->getSubExpr(), options);
-  
+Expr *FailureDiagnosis::
+typeCheckArgumentChildIndependently(Expr *argExpr,
+                                    const CalleeCandidateInfo &candidates) {
+  // Grab one of the candidates (if present) and get its input list to help
+  // identify operators that have implicit inout arguments.
+  Type exampleInputType;
+  if (!candidates.empty())
+    exampleInputType = candidates[0].getArgumentType();
+
   // FIXME: This should all just be a matter of getting type type of the
   // sub-expression, but this doesn't work well when typeCheckChildIndependently
   // is over-conservative w.r.t. TupleExprs.
@@ -2760,9 +2773,18 @@ Expr *FailureDiagnosis::typeCheckArgumentChildIndependently(Expr *argExpr,
     // Get the simplified type of each element and rebuild the aggregate.
     SmallVector<TupleTypeElt, 4> resultEltTys;
     SmallVector<Expr*, 4> resultElts;
-    
+
+    TupleType *exampleInputTuple = nullptr;
+    if (exampleInputType)
+      exampleInputTuple = exampleInputType->getAs<TupleType>();
+
     for (unsigned i = 0, e = TE->getNumElements(); i != e; i++) {
-      auto elExpr = typeCheckChildIndependently(TE->getElement(i));
+      TCCOptions options;
+      if (exampleInputTuple && i < exampleInputTuple->getNumElements() &&
+          exampleInputTuple->getElementType(i)->is<InOutType>())
+        options |= TCC_AllowLValue;
+
+      auto elExpr = typeCheckChildIndependently(TE->getElement(i), options);
       if (!elExpr) return nullptr; // already diagnosed.
       
       resultElts.push_back(elExpr);
@@ -2776,7 +2798,11 @@ Expr *FailureDiagnosis::typeCheckArgumentChildIndependently(Expr *argExpr,
                              TE->getRParenLoc(), TE->hasTrailingClosure(),
                              TE->isImplicit(), TT);
   }
-  
+
+  TCCOptions options;
+  if (exampleInputType && exampleInputType->is<InOutType>())
+    options |= TCC_AllowLValue;
+
   return typeCheckChildIndependently(unwrapParenExpr(argExpr), options);
 }
 
@@ -2784,14 +2810,15 @@ bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
   CalleeCandidateInfo calleeInfo(binop->getFn(), CS);
   assert(!calleeInfo.candidates.empty() && "unrecognized binop function kind");
 
-  auto checkedArgExpr = typeCheckArgumentChildIndependently(binop->getArg());
+  auto checkedArgExpr = typeCheckArgumentChildIndependently(binop->getArg(),
+                                                            calleeInfo);
   if (!checkedArgExpr) return true;
 
   // Pre-checking can turn (T,U) into a TypeExpr.  That's an artifact
   // of independent type-checking; just use the standard diagnostics
   // paths.
   auto argExpr = dyn_cast<TupleExpr>(checkedArgExpr);
-  if (!argExpr) return diagnoseGeneralFailure();
+  if (!argExpr) return visitExpr(binop);
 
   auto argTupleType = argExpr->getType()->castTo<TupleType>();
   calleeInfo.filterList(argTupleType);
@@ -2822,9 +2849,11 @@ bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
                               diag::cannot_apply_lvalue_binop_to_rvalue);
     return true;
   }
-  
-  auto argTyName1 = getUserFriendlyTypeName(argTupleType->getElementType(0));
-  auto argTyName2 = getUserFriendlyTypeName(argTupleType->getElementType(1));
+
+  auto argType1 = argTupleType->getElementType(0)->getRValueType();
+  auto argType2 = argTupleType->getElementType(1)->getRValueType();
+  auto argTyName1 = getUserFriendlyTypeName(argType1);
+  auto argTyName2 = getUserFriendlyTypeName(argType2);
   std::string overloadName = calleeInfo[0].decl->getNameStr();
   assert(!overloadName.empty());
   if (argTyName1.compare(argTyName2)) {
@@ -2851,7 +2880,8 @@ bool FailureDiagnosis::visitUnaryExpr(ApplyExpr *applyExpr) {
   CalleeCandidateInfo calleeInfo(applyExpr->getFn(), CS);
   assert(!calleeInfo.candidates.empty() && "unrecognized unop function kind");
 
-  auto argExpr = typeCheckArgumentChildIndependently(applyExpr->getArg());
+  auto argExpr = typeCheckArgumentChildIndependently(applyExpr->getArg(),
+                                                     calleeInfo);
   if (!argExpr) return true;
 
   auto argType = argExpr->getType();
@@ -2901,7 +2931,8 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     CS->getConstraintLocator(SE, ConstraintLocator::SubscriptMember);
   CalleeCandidateInfo calleeInfo(locator, CS);
 
-  auto indexExpr = typeCheckArgumentChildIndependently(SE->getIndex());
+  auto indexExpr = typeCheckArgumentChildIndependently(SE->getIndex(),
+                                                       calleeInfo);
   if (!indexExpr) return true;
 
   auto baseExpr = typeCheckChildIndependently(SE->getBase());
@@ -3018,7 +3049,8 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
 
   // Get the expression result of type checking the arguments to the call
   // independently, so we have some idea of what we're working with.
-  auto argExpr = typeCheckArgumentChildIndependently(callExpr->getArg());
+  auto argExpr = typeCheckArgumentChildIndependently(callExpr->getArg(),
+                                                     calleeInfo);
   if (!argExpr)
     return true; // already diagnosed.
 
@@ -3095,7 +3127,8 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
   auto srcExpr = typeCheckChildIndependently(assignExpr->getSrc());
   if (!srcExpr) return true;
 
-  auto destExpr = typeCheckChildIndependently(assignExpr->getDest());
+  auto destExpr = typeCheckChildIndependently(assignExpr->getDest(),
+                                              TCC_AllowLValue);
   if (!destExpr) return true;
 
   auto destType = destExpr->getType();
@@ -3108,7 +3141,7 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
     return true;
   }
 
-  auto destTypeName = getUserFriendlyTypeName(destType);
+  auto destTypeName = getUserFriendlyTypeName(destType->getRValueType());
   auto srcTypeName = getUserFriendlyTypeName(srcType);
   diagnose(srcExpr->getLoc(), diag::cannot_assign_values, srcTypeName,
            destTypeName);
@@ -3116,7 +3149,8 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
 }
 
 bool FailureDiagnosis::visitInOutExpr(InOutExpr *IOE) {
-  auto subExpr = typeCheckChildIndependently(IOE->getSubExpr());
+  auto subExpr = typeCheckChildIndependently(IOE->getSubExpr(),
+                                             TCC_AllowLValue);
 
   auto subExprType = subExpr->getType();
 
