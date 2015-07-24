@@ -1665,9 +1665,9 @@ struct FlatMapTest {
   let loc: SourceLoc
 
   init(
-    _ expected: [Int32],
-    _ sequence: [Int],
-    _ transform: (Int) -> [Int32],
+    expected: [Int32],
+    sequence: [Int],
+    transform: (Int) -> [Int32],
     file: String = __FILE__, line: UWord = __LINE__
   ) {
     self.expected = expected
@@ -1677,41 +1677,101 @@ struct FlatMapTest {
   }
 }
 
+/// For a number of form `NNN_MMM`, returns an array of `NNN` numbers that all
+/// have `MMM` as their last three digits.
 func flatMapTransformation(x: Int) -> [Int32] {
-  let repetitions = x / 10
-  let identity = x % 10
+  let repetitions = x / 1000
+  let identity = x % 1000
   let range = (1..<(repetitions+1))
-  return range.map { Int32($0 * 10 + identity) }
+  return range.map { Int32($0 * 1000 + identity) }
 }
 
 let flatMapTests = [
   FlatMapTest(
-    [], [],
-    { (x: Int) -> [Int32] in expectUnreachable(); return [ 0xffff ] }),
-
-  FlatMapTest([], [ 1 ], { (x: Int) -> [Int32] in [] }),
-  FlatMapTest([], [ 1, 2 ], { (x: Int) -> [Int32] in [] }),
-  FlatMapTest([], [ 1, 2, 3 ], { (x: Int) -> [Int32] in [] }),
-
-  FlatMapTest([ 101 ], [ 1 ], { (x: Int) -> [Int32] in [ x + 100 ] }),
-  FlatMapTest([ 101, 102 ], [ 1, 2 ], { (x: Int) -> [Int32] in [ x + 100 ] }),
-  FlatMapTest(
-    [ 101, 102, 103 ], [ 1, 2, 3 ], { (x: Int) -> [Int32] in [ x + 100 ] }),
+    expected: [],
+    sequence: [],
+    transform: { (x: Int) -> [Int32] in
+      expectUnreachable()
+      return [ 0xffff ]
+    }),
 
   FlatMapTest(
-    [ 101, 201 ], [ 1 ],
-    { (x: Int) -> [Int32] in [ x + 100, x + 200 ] }),
+    expected: [],
+    sequence: [ 1 ],
+    transform: { (x: Int) -> [Int32] in [] }),
   FlatMapTest(
-    [ 101, 201, 102, 202 ], [ 1, 2 ],
-    { (x: Int) -> [Int32] in [ x + 100, x + 200 ] }),
+    expected: [],
+    sequence: [ 1, 2 ],
+    transform: { (x: Int) -> [Int32] in [] }),
   FlatMapTest(
-    [ 101, 201, 102, 202, 103, 203 ], [ 1, 2, 3 ],
-    { (x: Int) -> [Int32] in [ x + 100, x + 200 ] }),
+    expected: [],
+    sequence: [ 1, 2, 3 ],
+    transform: { (x: Int) -> [Int32] in [] }),
 
-  FlatMapTest([ 11, 15 ], [ 11, 2, 3, 4, 15 ], flatMapTransformation),
-  FlatMapTest([ 12, 13, 23 ], [ 1, 12, 23 ], flatMapTransformation),
   FlatMapTest(
-    [ 11, 21, 13, 23, 33, 14 ], [ 21, 2, 33, 14 ], flatMapTransformation),
+    expected: [ 101 ],
+    sequence: [ 1 ],
+    transform: { (x: Int) -> [Int32] in [ x + 100 ] }),
+  FlatMapTest(
+    expected: [ 101, 102 ],
+    sequence: [ 1, 2 ],
+    transform: { (x: Int) -> [Int32] in [ x + 100 ] }),
+  FlatMapTest(
+    expected: [ 101, 102, 103 ],
+    sequence: [ 1, 2, 3 ],
+    transform: { (x: Int) -> [Int32] in [ x + 100 ] }),
+
+  FlatMapTest(
+    expected: [ 101, 201 ],
+    sequence: [ 1 ],
+    transform: { (x: Int) -> [Int32] in [ x + 100, x + 200 ] }),
+  FlatMapTest(
+    expected: [ 101, 201, 102, 202 ],
+    sequence: [ 1, 2 ],
+    transform: { (x: Int) -> [Int32] in [ x + 100, x + 200 ] }),
+  FlatMapTest(
+    expected: [ 101, 201, 102, 202, 103, 203 ],
+    sequence: [ 1, 2, 3 ],
+    transform: { (x: Int) -> [Int32] in [ x + 100, x + 200 ] }),
+
+  FlatMapTest(
+    expected: [ 1_071, 1_075 ],
+    sequence: [ 1_071, 72, 73, 74, 1_075 ],
+    transform: flatMapTransformation),
+  FlatMapTest(
+    expected: [ 1_072, 1_073, 2_073 ],
+    sequence: [ 1, 1_072, 2_073 ],
+    transform: flatMapTransformation),
+  FlatMapTest(
+    expected: [ 1_071, 2_071, 1_073, 2_073, 3_073, 1_074 ],
+    sequence: [ 2_071, 2, 3_073, 1_074 ],
+    transform: flatMapTransformation),
+
+  FlatMapTest(
+    expected: [ 1_073, 1_076, 2_076, 1_079, 2_079, 3_079 ],
+    sequence: [ 1, 2, 1_073, 4, 5, 2_076, 7, 8, 3_079, 10, 11 ],
+    transform: flatMapTransformation),
+  FlatMapTest(
+    expected: [ 1_073, 1_076, 2_076, 1_079, 2_079, 3_079 ],
+    sequence: [ 1_073, 4, 5, 2_076, 7, 8, 3_079, 10, 11 ],
+    transform: flatMapTransformation),
+  FlatMapTest(
+    expected: [ 1_073, 1_076, 2_076, 1_079, 2_079, 3_079 ],
+    sequence: [ 1, 2, 1_073, 4, 5, 2_076, 7, 8, 3_079 ],
+    transform: flatMapTransformation),
+
+  FlatMapTest(
+    expected: [ 1_073, 1_076, 2_076, 1_079, 2_079, 3_079 ],
+    sequence: [ 1, 1_073, 4, 2_076, 7, 3_079, 10 ],
+    transform: flatMapTransformation),
+  FlatMapTest(
+    expected: [ 1_073, 1_076, 2_076, 1_079, 2_079, 3_079 ],
+    sequence: [ 1_073, 4, 2_076, 7, 3_079, 10 ],
+    transform: flatMapTransformation),
+  FlatMapTest(
+    expected: [ 1_073, 1_076, 2_076, 1_079, 2_079, 3_079 ],
+    sequence: [ 1, 1_073, 4, 2_076, 7, 3_079 ],
+    transform: flatMapTransformation),
 ]
 
 SequenceTypeAlgorithms.test("flatMap/SequenceType") {
