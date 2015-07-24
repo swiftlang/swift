@@ -130,43 +130,79 @@ extension CollectionType
   }
 }
 
+/// A Collection that presents the elements of its `Base` collection
+/// in reverse order.
+///
+/// - Note: This type is the result of `x.reverse()` where `x` is a
+///   collection having bidirectional indices.
 public struct _prext_ReverseCollection<
-  Base_ : CollectionType where Base_.Index : BidirectionalIndexType
+  Base : CollectionType where Base.Index : BidirectionalIndexType
 > : _ReverseCollectionType {
-  public typealias Base = Base_
-  public typealias Index = _prext_ReverseIndex<Base.Index>
-  public typealias Generator = IndexingGenerator<_prext_ReverseCollection>
-  
+  /// Creates an instance that presents the elements of `base` in
+  /// reverse order.
+  ///
+  /// - Complexity: O(1)
   public init(_ base: Base) {
     self._base = base
   }
 
+  /// A type that represents a valid position in the collection.
+  ///
+  /// Valid indices consist of the position of every element and a
+  /// "past the end" position that's not valid for use as a subscript.
+  public typealias Index = _prext_ReverseIndex<Base.Index>
+
+  /// A type that provides the *sequence*'s iteration interface and
+  /// encapsulates its iteration state.
+  public typealias Generator = IndexingGenerator<_prext_ReverseCollection>
+  
   public let _base: Base
 }
 
+/// A Collection that presents the elements of its `Base` collection
+/// in reverse order.
+///
+/// - Note: This type is the result of `x.reverse()` where `x` is a
+///   collection having random access indices.
 public struct _prext_ReverseRandomAccessCollection<
-  Base_ : CollectionType where Base_.Index : RandomAccessIndexType
+  Base : CollectionType where Base.Index : RandomAccessIndexType
 > : _ReverseCollectionType {
-  public typealias Base = Base_
-  public typealias Index = _prext_ReverseRandomAccessIndex<Base.Index>
-  public typealias Generator = IndexingGenerator<
-    _prext_ReverseRandomAccessCollection
-  >
-  
+  /// Creates an instance that presents the elements of `base` in
+  /// reverse order.
+  ///
+  /// - Complexity: O(1)
   public init(_ base: Base) {
     self._base = base
   }
+
+  /// A type that represents a valid position in the collection.
+  ///
+  /// Valid indices consist of the position of every element and a
+  /// "past the end" position that's not valid for use as a subscript.
+  public typealias Index = _prext_ReverseRandomAccessIndex<Base.Index>
+  
+  /// A type that provides the *sequence*'s iteration interface and
+  /// encapsulates its iteration state.
+  public typealias Generator = IndexingGenerator<
+    _prext_ReverseRandomAccessCollection
+  >
 
   public let _base: Base
 }
 
 extension CollectionType where Index : BidirectionalIndexType {
+  /// Return the elements of `self` in reverse order.
+  ///
+  /// - Complexity: O(1)
   public func _prext_reverse() -> _prext_ReverseCollection<Self> {
     return _prext_ReverseCollection(self)
   }
 }
 
 extension CollectionType where Index : RandomAccessIndexType {
+  /// Return the elements of `self` in reverse order.
+  ///
+  /// - Complexity: O(1)
   public func _prext_reverse() -> _prext_ReverseRandomAccessCollection<Self> {
     return _prext_ReverseRandomAccessCollection(self)
   }
@@ -174,6 +210,9 @@ extension CollectionType where Index : RandomAccessIndexType {
 
 extension _prext_LazyCollectionType
 where Index : BidirectionalIndexType, Elements.Index : BidirectionalIndexType {
+  /// Return the elements of `self` in reverse order.
+  ///
+  /// - Complexity: O(1)
   public func _prext_reverse() -> _prext_LazyCollection<
     _prext_ReverseCollection<Elements>
   > {
@@ -183,6 +222,9 @@ where Index : BidirectionalIndexType, Elements.Index : BidirectionalIndexType {
 
 extension _prext_LazyCollectionType
 where Index : RandomAccessIndexType, Elements.Index : RandomAccessIndexType {
+  /// Return the elements of `self` in reverse order.
+  ///
+  /// - Complexity: O(1)
   public func _prext_reverse() -> _prext_LazyCollection<
     _prext_ReverseRandomAccessCollection<Elements>
   > {
