@@ -132,7 +132,7 @@ Array
 The following semantic tags describe Array operations. The operations
 are first described in terms of the Array "state". Relations between the
 operations are formally defined below. 'Array' referes to the standard library
-Array<T>, ContigousArray<T>, and Slice<T> data-structures.
+Array<T>, ContigousArray<T>, and ArraySlice<T> data-structures.
 
 We consider the array state to consist of a set of disjoint elements
 and a storage descriptor that encapsulates nonelement data such as the
