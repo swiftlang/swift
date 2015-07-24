@@ -598,23 +598,23 @@ tests.test("ReverseCollection") {
   let r = 0..<12
   checkRandomAccessCollection(
     expected,
-    r._prext_reverse)
+    r._prext_reverse())
 
   // Check that the reverse collection is still eager
   do {
     var calls = 0
-    _ = r._prext_reverse.map { _ in ++calls }
+    _ = r._prext_reverse().map { _ in ++calls }
     expectEqual(r.count, calls)
   }
   
   checkBidirectionalCollection(
     "raboof".characters,
-    "foobar".characters._prext_reverse)
+    "foobar".characters._prext_reverse())
 
   // Check that the reverse collection is still eager
   do {
     var calls = 0
-    _ = "foobar".characters._prext_reverse.map { _ in ++calls }
+    _ = "foobar".characters._prext_reverse().map { _ in ++calls }
     expectEqual("foobar".characters.count, calls)
   }
 }
@@ -640,7 +640,7 @@ tests.test("ReverseCollection/Lazy") {
     typealias LazyReversedBase = _prext_LazyCollection<
       _prext_ReverseRandomAccessCollection<Base>>
 
-    let reversed = base._prext_reverse
+    let reversed = base._prext_reverse()
     ExpectType<LazyReversedBase>.test(reversed)
     
     var calls = 0
@@ -662,7 +662,7 @@ tests.test("ReverseCollection/Lazy") {
     typealias LazyReversedBase = _prext_LazyCollection<
       _prext_ReverseCollection<Base>>
 
-    let reversed = base._prext_reverse
+    let reversed = base._prext_reverse()
     ExpectType<LazyReversedBase>.test(reversed)
     
     var calls = 0

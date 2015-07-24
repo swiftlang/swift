@@ -161,20 +161,20 @@ public struct _prext_ReverseRandomAccessCollection<
 }
 
 extension CollectionType where Index : BidirectionalIndexType {
-  public var _prext_reverse: _prext_ReverseCollection<Self> {
+  public func _prext_reverse() -> _prext_ReverseCollection<Self> {
     return _prext_ReverseCollection(self)
   }
 }
 
 extension CollectionType where Index : RandomAccessIndexType {
-  public var _prext_reverse: _prext_ReverseRandomAccessCollection<Self> {
+  public func _prext_reverse() -> _prext_ReverseRandomAccessCollection<Self> {
     return _prext_ReverseRandomAccessCollection(self)
   }
 }
 
 extension _prext_LazyCollectionType
 where Index : BidirectionalIndexType, Elements.Index : BidirectionalIndexType {
-  public var _prext_reverse: _prext_LazyCollection<
+  public func _prext_reverse() -> _prext_LazyCollection<
     _prext_ReverseCollection<Elements>
   > {
     return _prext_ReverseCollection(elements)._prext_lazy
@@ -183,7 +183,7 @@ where Index : BidirectionalIndexType, Elements.Index : BidirectionalIndexType {
 
 extension _prext_LazyCollectionType
 where Index : RandomAccessIndexType, Elements.Index : RandomAccessIndexType {
-  public var _prext_reverse: _prext_LazyCollection<
+  public func _prext_reverse() -> _prext_LazyCollection<
     _prext_ReverseRandomAccessCollection<Elements>
   > {
     return _prext_ReverseRandomAccessCollection(elements)._prext_lazy
