@@ -42,8 +42,8 @@ class _SwiftNativeNSArrayWithContiguousStorage
 
   // Operate on our contiguous storage
   internal func withUnsafeBufferOfObjects<R>(
-    @noescape body: UnsafeBufferPointer<AnyObject> -> R
-  ) -> R {
+    @noescape body: UnsafeBufferPointer<AnyObject> throws -> R
+  ) rethrows -> R {
     _sanityCheckFailure(
       "Must override withUnsafeBufferOfObjects in derived classes")
   }
@@ -163,8 +163,8 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
   }
 
   internal override func withUnsafeBufferOfObjects<R>(
-    @noescape body: UnsafeBufferPointer<AnyObject> -> R
-  ) -> R {
+    @noescape body: UnsafeBufferPointer<AnyObject> throws -> R
+  ) rethrows -> R {
     repeat {
       var buffer: UnsafeBufferPointer<AnyObject>
       
@@ -197,9 +197,8 @@ extension _SwiftNativeNSArrayWithContiguousStorage: _NSArrayCoreType {
         continue // try again
       }
       
-      let result = body(buffer)
-      _fixLifetime(self)
-      return result
+      defer { _fixLifetime(self) }
+      return try body(buffer)
     }
     while true
   }
@@ -230,9 +229,9 @@ internal class _ContiguousArrayStorageBase
 
 #if _runtime(_ObjC)
   internal override func withUnsafeBufferOfObjects<R>(
-    @noescape body: UnsafeBufferPointer<AnyObject> -> R
-  ) -> R {
-    if let result = _withVerbatimBridgedUnsafeBuffer(body) {
+    @noescape body: UnsafeBufferPointer<AnyObject> throws -> R
+  ) rethrows -> R {
+    if let result = try _withVerbatimBridgedUnsafeBuffer(body) {
       return result
     }
     _sanityCheckFailure(
@@ -243,8 +242,8 @@ internal class _ContiguousArrayStorageBase
   /// `UnsafeBufferPointer` to the elements and return the result.
   /// Otherwise, return `nil`.
   internal func _withVerbatimBridgedUnsafeBuffer<R>(
-    @noescape body: UnsafeBufferPointer<AnyObject> -> R
-  ) -> R? {
+    @noescape body: UnsafeBufferPointer<AnyObject> throws -> R
+  ) rethrows -> R? {
     _sanityCheckFailure(
       "Concrete subclasses must implement _withVerbatimBridgedUnsafeBuffer")
   }

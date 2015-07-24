@@ -1,8 +1,10 @@
 // RUN: %target-sil-opt %s -simplify-cfg -verify | FileCheck %s
 
+// XFAIL: *
+
 // REQUIRES: objc_interop
-// FIXME: this test relies on standard library implementation details that are
-// only present with Objective-C runtime.
+// FIXME: this test relies on brittle standard library implementation details.
+// rdar://problem/21988500
 
 // Check that this SIL compiles without crashes. See rdar://20345557
 

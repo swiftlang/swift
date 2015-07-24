@@ -13,21 +13,19 @@
 /// Evaluate `f()` and return its result, ensuring that `x` is not
 /// destroyed before f returns.
 public func withExtendedLifetime<T, Result>(
-  x: T, @noescape _ f: () -> Result
-) -> Result {
-  let result = f()
-  _fixLifetime(x)
-  return result
+  x: T, @noescape _ f: () throws -> Result
+) rethrows -> Result {
+  defer { _fixLifetime(x) }
+  return try f()
 }
 
 /// Evaluate `f(x)` and return its result, ensuring that `x` is not
 /// destroyed before f returns.
 public func withExtendedLifetime<T, Result>(
-  x: T, @noescape _ f: T -> Result
-) -> Result {
-  let result = f(x)
-  _fixLifetime(x)
-  return result
+  x: T, @noescape _ f: T throws -> Result
+) rethrows -> Result {
+  defer { _fixLifetime(x) }
+  return try f(x)
 }
 
 extension String {
@@ -36,10 +34,10 @@ extension String {
   /// a nul-terminated array of char, ensuring that the array's
   /// lifetime extends through the execution of `f`.
   public func withCString<Result>(
-    @noescape f: UnsafePointer<Int8> -> Result
-  ) -> Result {
-    return self.nulTerminatedUTF8.withUnsafeBufferPointer {
-      f(UnsafePointer($0.baseAddress))
+    @noescape f: UnsafePointer<Int8> throws -> Result
+  ) rethrows -> Result {
+    return try self.nulTerminatedUTF8.withUnsafeBufferPointer {
+      try f(UnsafePointer($0.baseAddress))
     }
   }
 }
@@ -56,19 +54,20 @@ public func _fixLifetime<T>(x: T) {
 /// parameters (and default-constructible "out" parameters) by pointer.
 public func withUnsafeMutablePointer<T, Result>(
   inout arg: T,
-  @noescape _ body: UnsafeMutablePointer<T> -> Result
-) -> Result
+  @noescape _ body: UnsafeMutablePointer<T> throws -> Result
+) rethrows -> Result
 {
-  return body(UnsafeMutablePointer<T>(Builtin.addressof(&arg)))
+  return try body(UnsafeMutablePointer<T>(Builtin.addressof(&arg)))
 }
 
 /// Like `withUnsafeMutablePointer`, but passes pointers to `arg0` and `arg1`.
 public func withUnsafeMutablePointers<A0, A1, Result>(
   inout arg0: A0,
   inout _ arg1: A1,
-  @noescape _ body: (UnsafeMutablePointer<A0>, UnsafeMutablePointer<A1>) -> Result
-) -> Result {
-  return body(
+  @noescape _ body: (
+    UnsafeMutablePointer<A0>, UnsafeMutablePointer<A1>) throws -> Result
+) rethrows -> Result {
+  return try body(
     UnsafeMutablePointer<A0>(Builtin.addressof(&arg0)),
     UnsafeMutablePointer<A1>(Builtin.addressof(&arg1)))
 }
@@ -83,9 +82,9 @@ public func withUnsafeMutablePointers<A0, A1, A2, Result>(
     UnsafeMutablePointer<A0>,
     UnsafeMutablePointer<A1>,
     UnsafeMutablePointer<A2>
-  ) -> Result
-) -> Result {
-  return body(
+  ) throws -> Result
+) rethrows -> Result {
+  return try body(
     UnsafeMutablePointer<A0>(Builtin.addressof(&arg0)),
     UnsafeMutablePointer<A1>(Builtin.addressof(&arg1)),
     UnsafeMutablePointer<A2>(Builtin.addressof(&arg2)))
@@ -96,19 +95,19 @@ public func withUnsafeMutablePointers<A0, A1, A2, Result>(
 /// parameters (and default-constructible "out" parameters) by pointer.
 public func withUnsafePointer<T, Result>(
   inout arg: T,
-  @noescape _ body: UnsafePointer<T> -> Result
-) -> Result
+  @noescape _ body: UnsafePointer<T> throws -> Result
+) rethrows -> Result
 {
-  return body(UnsafePointer<T>(Builtin.addressof(&arg)))
+  return try body(UnsafePointer<T>(Builtin.addressof(&arg)))
 }
 
 /// Like `withUnsafePointer`, but passes pointers to `arg0` and `arg1`.
 public func withUnsafePointers<A0, A1, Result>(
   inout arg0: A0,
   inout _ arg1: A1,
-  @noescape _ body: (UnsafePointer<A0>, UnsafePointer<A1>) -> Result
-) -> Result {
-  return body(
+  @noescape _ body: (UnsafePointer<A0>, UnsafePointer<A1>) throws -> Result
+) rethrows -> Result {
+  return try body(
     UnsafePointer<A0>(Builtin.addressof(&arg0)),
     UnsafePointer<A1>(Builtin.addressof(&arg1)))
 }
@@ -123,9 +122,9 @@ public func withUnsafePointers<A0, A1, A2, Result>(
     UnsafePointer<A0>,
     UnsafePointer<A1>,
     UnsafePointer<A2>
-  ) -> Result
-) -> Result {
-  return body(
+  ) throws -> Result
+) rethrows -> Result {
+  return try body(
     UnsafePointer<A0>(Builtin.addressof(&arg0)),
     UnsafePointer<A1>(Builtin.addressof(&arg1)),
     UnsafePointer<A2>(Builtin.addressof(&arg2)))
