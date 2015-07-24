@@ -2750,19 +2750,10 @@ Expr *FailureDiagnosis::typeCheckArgumentChildIndependently(Expr *argExpr,
     return typeCheckChildIndependently(PE->getSubExpr(), options);
   
   // FIXME: This should all just be a matter of getting type type of the
-  // sub-expression, but this doesn't work well when the argument list
-  // contains InOutExprs and typeCheckChildIndependently is over-conservative
-  // w.r.t. TupleExprs.
+  // sub-expression, but this doesn't work well when typeCheckChildIndependently
+  // is over-conservative w.r.t. TupleExprs.
   if (auto *TE = dyn_cast<TupleExpr>(argExpr)) {
-    bool containsInOutExprs = true;
-    for (auto elt : TE->getElements())
-      containsInOutExprs |= isa<InOutExpr>(elt);
-    
-    if (!containsInOutExprs)
-      return typeCheckChildIndependently(TE, options);
-
-    // If InOutExprs are in play, get the simplified type of each element and
-    // rebuild the aggregate :-(
+    // Get the simplified type of each element and rebuild the aggregate.
     SmallVector<TupleTypeElt, 4> resultEltTys;
     SmallVector<Expr*, 4> resultElts;
     
