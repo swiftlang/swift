@@ -328,3 +328,17 @@ rt1 { }
 
 func rt2(predicate: () throws -> ()) rethrows { }
 rt2 { }
+
+
+enum SomeError : ErrorType {
+  case Badness
+}
+
+func testUnrelatedThrowsInRethrows(fn: () throws -> Void) rethrows {
+  try fn() // okay
+  try testUnrelatedThrowsInRethrows(fn) // okay
+
+  raise() // expected-error {{call can throw, but it is not marked with 'try' and the error is not handled; a function declared 'rethrows' may only throw if its parameter does}}
+  try raise() // expected-error {{call can throw, but the error is not handled; a function declared 'rethrows' may only throw if its parameter does}}
+  throw SomeError.Badness // expected-error {{a function declared 'rethrows' may only throw if its parameter does}}
+}

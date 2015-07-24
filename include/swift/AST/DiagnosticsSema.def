@@ -1907,14 +1907,14 @@ ERROR(throw_in_nonthrowing_function,sema,none,
       "is not declared 'throws'", ())
 
 ERROR(throwing_call_in_rethrows_function,sema,none,
-      "throwing call in 'rethrows' function is not to a parameter "
-      "function", ())
+      "call can throw, but the error is not handled; a function declared "
+      "'rethrows' may only throw if its parameter does", ())
 ERROR(tryless_throwing_call_in_rethrows_function,sema,none,
-      "throwing call in 'rethrows' function is not to a parameter "
-      "function and is not marked with 'try'", ())
+      "call can throw, but it is not marked with 'try' and "
+      "the error is not handled; a function declared "
+      "'rethrows' may only throw if its parameter does", ())
 ERROR(throw_in_rethrows_function,sema,none,
-      "'rethrows' function may only throw by calling a parameter "
-      "function", ())
+      "a function declared 'rethrows' may only throw if its parameter does", ())
 NOTE(because_rethrows_argument_throws,sema,none,
      "call is to 'rethrows' function, but argument function can throw", ())
 NOTE(because_rethrows_default_argument_throws,sema,none,
