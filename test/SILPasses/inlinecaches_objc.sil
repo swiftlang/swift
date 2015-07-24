@@ -9,7 +9,7 @@ import Swift
   @objc func ping()
 }
 
-sil @_TFC4main1X4pingfS0_FT_T_ : $@convention(method) (@owned X) -> ()
+sil @_TFC4main1X4pingfS0_FT_T_ : $@convention(method) (@guaranteed X) -> ()
 sil @_TFC4main1XcfMS0_FT_S0_ : $@convention(method) (@owned X) -> @owned X
 
 // CHECK-LABEL: _TFC4main1X4pingfS0_FT_T_
