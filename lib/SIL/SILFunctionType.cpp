@@ -888,6 +888,12 @@ CanSILFunctionType swift::getNativeSILFunctionType(SILModule &M,
 //                          Foreign SILFunctionTypes
 //===----------------------------------------------------------------------===//
 
+static bool isCFTypedef(const TypeLowering &tl, clang::QualType type) {
+  // If we imported a C pointer type as a non-trivial type, it was
+  // a foreign class type.
+  return !tl.isTrivial() && type->isPointerType();
+}
+
 /// Given nothing but a formal C parameter type that's passed
 /// indirectly, deduce the convention for it.
 ///
@@ -924,16 +930,6 @@ getDirectCParameterConvention(const clang::ParmVarDecl *param) {
   return getDirectCParameterConvention(param->getType());
 }
 
-/// Given nothing but a formal C result type, deduce the return
-/// convention for it.
-///
-/// Generally, whether the result is +1 is handled before ending up here.
-static ResultConvention getCResultConvention(clang::QualType type) {
-  if (type->isObjCRetainableType())
-    return ResultConvention::Autoreleased;
-  return ResultConvention::Unowned;
-}
-
 // FIXME: that should be Direct_Guaranteed
 const auto ObjCSelfConvention = ParameterConvention::Direct_Unowned;
 
@@ -962,27 +958,93 @@ namespace {
       return ParameterConvention::Direct_Unowned;
     }
 
-    ResultConvention getResult(const TypeLowering &tl) const override {
-      assert((!Method->hasAttr<clang::NSReturnsRetainedAttr>()
-              || !Method->hasAttr<clang::ObjCReturnsInnerPointerAttr>())
-             && "cannot be both returns_retained and returns_inner_pointer");
-      if (Method->hasAttr<clang::NSReturnsRetainedAttr>() ||
-          Method->hasAttr<clang::CFReturnsRetainedAttr>())
-        return ResultConvention::Owned;
+    clang::ObjCMethodFamily getMethodFamilyForCFResult() const {
+      // Trust an explicit attribute.
+      if (auto attr = Method->getAttr<clang::ObjCMethodFamilyAttr>()) {
+        switch (attr->getFamily()) {
+        case clang::ObjCMethodFamilyAttr::OMF_None:
+          return clang::OMF_None;
+        case clang::ObjCMethodFamilyAttr::OMF_alloc:
+          return clang::OMF_alloc;
+        case clang::ObjCMethodFamilyAttr::OMF_copy:
+          return clang::OMF_copy;
+        case clang::ObjCMethodFamilyAttr::OMF_init:
+          return clang::OMF_init;
+        case clang::ObjCMethodFamilyAttr::OMF_mutableCopy:
+          return clang::OMF_mutableCopy;
+        case clang::ObjCMethodFamilyAttr::OMF_new:
+          return clang::OMF_new;
+        }
+        llvm_unreachable("bad attribute value");
+      }
 
+      return Method->getSelector().getMethodFamily();
+    }
+
+    bool isImplicitPlusOneCFResult() const {
+      switch (getMethodFamilyForCFResult()) {
+      case clang::OMF_None:
+      case clang::OMF_dealloc:
+      case clang::OMF_finalize:
+      case clang::OMF_retain:
+      case clang::OMF_release:
+      case clang::OMF_autorelease:
+      case clang::OMF_retainCount:
+      case clang::OMF_self:
+      case clang::OMF_initialize:
+      case clang::OMF_performSelector:
+        return false;
+
+      case clang::OMF_alloc:
+      case clang::OMF_new:
+      case clang::OMF_mutableCopy:
+      case clang::OMF_copy:
+        return true;
+
+      case clang::OMF_init:
+        return Method->isInstanceMethod();
+      }
+      llvm_unreachable("bad method family");
+    }
+
+    ResultConvention getResult(const TypeLowering &tl) const override {
+      // If we imported the result as something trivial, we need to
+      // use one of the unowned conventions.
+      if (tl.isTrivial()) {
+        if (Method->hasAttr<clang::ObjCReturnsInnerPointerAttr>())
+          return ResultConvention::UnownedInnerPointer;
+        return ResultConvention::Unowned;
+      }
+
+      // Otherwise, the return type had better be a retainable object pointer.
+      auto resultType = Method->getReturnType();
+      assert(resultType->isObjCRetainableType() || isCFTypedef(tl, resultType));
+
+      // If it's retainable for the purposes of ObjC ARC, we can trust
+      // the presence of ns_returns_retained, because Clang will add
+      // that implicitly based on the method family.
+      if (resultType->isObjCRetainableType()) {
+        if (Method->hasAttr<clang::NSReturnsRetainedAttr>())
+          return ResultConvention::Owned;
+        return ResultConvention::Autoreleased;
+      }
+
+      // Otherwise, it's a CF return type, which unfortunately means
+      // we can't just trust getMethodFamily().  We should really just
+      // change that, but that's an annoying change to make to Clang
+      // right now.
+      assert(isCFTypedef(tl, resultType));
+
+      // Trust the explicit attributes.
+      if (Method->hasAttr<clang::CFReturnsRetainedAttr>())
+        return ResultConvention::Owned;
       if (Method->hasAttr<clang::CFReturnsNotRetainedAttr>())
         return ResultConvention::Autoreleased;
 
-      // Make sure we apply special lifetime-extension behavior to
-      // inner pointer results, unless we managed to import them with a
-      // managed type.
-      if (Method->hasAttr<clang::ObjCReturnsInnerPointerAttr>()) {
-        if (tl.isTrivial())
-          return ResultConvention::UnownedInnerPointer;
-        else
-          return ResultConvention::Autoreleased;
-      }
-      return getCResultConvention(Method->getReturnType());
+      // Otherwise, infer based on the method family.
+      if (isImplicitPlusOneCFResult())
+        return ResultConvention::Owned;
+      return ResultConvention::Autoreleased;
     }
 
     ParameterConvention
@@ -1042,9 +1104,11 @@ namespace {
     }
 
     ResultConvention getResult(const TypeLowering &tl) const override {
+      if (tl.isTrivial())
+        return ResultConvention::Unowned;
       if (FnType->getExtInfo().getProducesResult())
         return ResultConvention::Owned;
-      return getCResultConvention(FnType->getReturnType());
+      return ResultConvention::Autoreleased;
     }
 
     ParameterConvention
@@ -1078,12 +1142,6 @@ namespace {
         if (param->hasAttr<clang::CFConsumedAttr>())
           return ParameterConvention::Direct_Owned;
       return super::getDirectParameter(index, type);
-    }
-
-    static bool isCFTypedef(const TypeLowering &tl, clang::QualType type) {
-      // If we imported a C pointer type as a non-trivial type, it was
-      // a foreign class type.
-      return !tl.isTrivial() && type->isPointerType();
     }
 
     ResultConvention getResult(const TypeLowering &tl) const override {
