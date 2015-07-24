@@ -5,6 +5,9 @@
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/overload_vars.swift
 // RUN: %target-swift-frontend -parse %s -I %t -sdk "" -verify
 
+// RUN: not %target-swift-frontend -dump-ast %s -I %t -sdk "" > %t.astdump 2>&1
+// RUN: FileCheck %s < %t.astdump
+
 import overload_intFunctions
 import overload_boolFunctions
 import overload_vars
@@ -45,5 +48,32 @@ var _ : Int = TypeNameWins(42)
 
 TypeNameWins = 42 // expected-error {{ambiguous use of 'TypeNameWins'}}
 var _ : TypeNameWins // no-warning
+
+// rdar://problem/21739333
+protocol HasFooSub : HasFoo { }
+
+extension HasFooSub {
+  var foo: Int { return 0 }
+}
+
+// CHECK-LABEL: func_decl "testHasFooSub(_:)"
+func testHasFooSub(hfs: HasFooSub) -> Int {
+  // CHECK: return_stmt
+  // CHECK-NOT: func_decl
+  // CHECK: member_ref_expr{{.*}}decl=overload_vars.(file).HasFoo.foo
+  return hfs.foo
+}
+
+extension HasBar {
+  var bar: Int { return 0 }
+}
+
+// CHECK-LABEL: func_decl "testHasBar(_:)"
+func testHasBar(hb: HasBar) -> Int {
+  // CHECK: return_stmt
+  // CHECK-NOT: func_decl
+  // CHECK: member_ref_expr{{.*}}decl=overload_vars.(file).HasBar.bar
+  return hb.bar
+}
 
 

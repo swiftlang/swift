@@ -213,6 +213,11 @@ bool swift::removeShadowedDecls(SmallVectorImpl<ValueDecl*> &decls,
          }
         }
 
+        // Don't apply module-shadowing rules to members of protocol types.
+        if (isa<ProtocolDecl>(firstDecl->getDeclContext()) ||
+            isa<ProtocolDecl>(secondDecl->getDeclContext()))
+          continue;
+
         // Prefer declarations in the current module over those in another
         // module.
         // FIXME: This is a hack. We should query a (lazily-built, cached)
