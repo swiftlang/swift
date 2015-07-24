@@ -15,7 +15,7 @@ var closure : (Int, Int) -> Int = { $0 + $1 }
 
 var d_as_b : B = D()
 var b_as_d = B() as! D
-var bad_b_as_d : D = B()  // expected-error{{}}
+var bad_b_as_d : D = B()  // expected-error{{'B' is not convertible to 'D'}}
 
 var d = D()
 var b = B()
@@ -30,7 +30,7 @@ var bad_d_is_b:Bool = D() is B // expected-warning{{always true}}
 func base_class_archetype_casts<T : B>(t: T) {
   var _ : B = t
   _ = B() as! T
-  var _ : T = B() // expected-error{{}}
+  var _ : T = B() // expected-error{{'B' is not convertible to 'T'}}
 
   let b = B()
 
@@ -68,7 +68,7 @@ struct S12 : P1, P2 {
 func protocol_archetype_casts<T : P1>(t: T, p1: P1, p2: P2, p12: protocol<P1, P2>) {
   // Coercions.
   var _ : P1 = t
-  var _ : P2 = t // expected-error{{}}
+  var _ : P2 = t // expected-error{{type 'T' does not conform to protocol 'P2'}}
 
   // Checked unconditional casts.
   _ = p1 as! T

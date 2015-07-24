@@ -45,16 +45,22 @@ var h = true ? D1() : D1() // should infer D1
 var i = true ? D1() : D2() // should infer B
 
 useB(e)
-useD1(e) // expected-error{{}} expected-note{{}}
+useD1(e) // expected-error{{cannot invoke 'useD1' with an argument list of type '(B)'}}
+// expected-note @-1 {{expected an argument list of type '(D1)'}}
 useB(f)
-useD1(f) // expected-error{{}} expected-note{{}}
+useD1(f) // expected-error{{cannot invoke 'useD1' with an argument list of type '(B)'}}
+// expected-note @-1 {{expected an argument list of type '(D1)'}}
 useB(g)
-useD1(g) // expected-error{{}} expected-note{{}}
+useD1(g) // expected-error{{cannot invoke 'useD1' with an argument list of type '(B)'}}
+// expected-note @-1 {{expected an argument list of type '(D1)'}}
 useB(h)
 useD1(h)
 useB(i)
-useD1(i) // expected-error{{}} expected-note{{}}
-useD2(i) // expected-error{{}} expected-note{{}}
+useD1(i) // expected-error{{cannot invoke 'useD1' with an argument list of type '(B)'}}
+// expected-note @-1 {{expected an argument list of type '(D1)'}}
+useD2(i) // expected-error{{cannot invoke 'useD2' with an argument list of type '(B)'}}
+// expected-note @-1 {{expected an argument list of type '(D2)'}}
 
 var x = MyLogicValue() ? 1 : 0
-var y = 22 ? 1 : 0 // expected-error{{}}
+// FIXME: Not correct, this is a problem with the condition!
+var y = 22 ? 1 : 0 // expected-error{{result values in '? :' expression have mismatching types 'Int' and 'Int'}}

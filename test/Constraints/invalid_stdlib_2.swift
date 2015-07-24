@@ -3,7 +3,7 @@
 class Dictionary<K, V> : DictionaryLiteralConvertible { // expected-error {{type 'Dictionary<K, V>' does not conform to protocol 'DictionaryLiteralConvertible'}}
   typealias Key = K
   typealias Value = V
-  init(dictionaryLiteral xs: (K)...){} // expected-note {{}}
+  init(dictionaryLiteral xs: (K)...){} // expected-note {{candidate has non-matching type '(dictionaryLiteral: (K)...)'}}
 }
 
 func useDict<K, V>(d: Dictionary<K,V>) {}
