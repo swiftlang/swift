@@ -138,22 +138,17 @@ ERROR(cannot_pass_rvalue_inout,sema_tcs,none,
 ERROR(cannot_assign_to_literal,sema,none,
       "cannot assign to a literal value", ())
 
-ERROR(cannot_apply_function_to_args,sema,none,
-      "cannot invoke '%0' with an argument list of type "
-      "'%1'", (StringRef,StringRef))
+ERROR(cannot_call_with_no_params,sema,none,
+      "cannot invoke %select{|initializer for type }1'%0' with no arguments",
+      (StringRef, bool))
 
-ERROR(cannot_apply_initializer_to_args,sema,none,
-      "cannot invoke initializer for type '%0' with an argument list of type "
-      "'%1'", (StringRef,StringRef))
+ERROR(cannot_call_with_params, sema, none,
+      "cannot invoke %select{|initializer for type }2'%0' with an argument list"
+      " of type '%1'", (StringRef, StringRef, bool))
 
 ERROR(cannot_call_non_function_value,sema,none,
       "cannot call value of non-function type '%0'", (StringRef))
 
-ERROR(cannot_find_overload_with_no_params,sema,none,
-      "cannot invoke '%0' with no arguments", (StringRef))
-
-ERROR(cannot_find_initializer_with_no_params,sema,none,
-      "cannot invoke initializer for type '%0' with no arguments", (StringRef))
 
 ERROR(cannot_invoke_closure,sema,none,
       "cannot invoke closure expression with an argument list of type '%0'",

@@ -2936,6 +2936,23 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
 }
 
 bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
+  // Type check the function subexpression to resolve a type for it if possible.
+  auto fnExpr = typeCheckChildIndependently(callExpr->getFn(), true);
+  if (!fnExpr) return true;
+
+  // If we resolved a concrete expression for the callee, and it has
+  // non-function/non-metatype type, then we cannot call it!
+  auto fnType = fnExpr->getType()->getRValueType();
+  
+  if (!typeIsNotSpecialized(fnType) &&
+      !fnType->is<AnyFunctionType>() && !fnType->is<MetatypeType>()) {
+    diagnose(callExpr->getArg()->getStartLoc(),
+             diag::cannot_call_non_function_value,
+             getUserFriendlyTypeName(fnExpr->getType()))
+    .highlight(fnExpr->getSourceRange());
+    return true;
+  }
+
 
   // Get the expression result of type checking the arguments to the call
   // independently, so we have some idea of what we're working with.
@@ -2982,22 +2999,7 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
   
   if (!argExpr)
     return true; // already diagnosed.
-  
-  auto fnExpr = typeCheckChildIndependently(callExpr->getFn(), true);
-  if (!fnExpr) return true;
 
-  // If we resolved a concrete expression for the callee, and it has
-  // non-function/non-metatype type, then we cannot call it!
-  if (!typeIsNotSpecialized(fnExpr->getType()) &&
-      !fnExpr->getType()->is<AnyFunctionType>() &&
-      !fnExpr->getType()->is<MetatypeType>()) {
-    diagnose(callExpr->getArg()->getStartLoc(),
-             diag::cannot_call_non_function_value,
-             getUserFriendlyTypeName(fnExpr->getType()))
-      .highlight(fnExpr->getSourceRange());
-    return true;
-  }
-  
   CalleeCandidateInfo calleeInfo(fnExpr, argExpr->getType(), CS);
 
   bool isInitializer = isa<TypeExpr>(fnExpr);
@@ -3011,12 +3013,12 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
     // The most common unnamed value of closure type is a ClosureExpr, so
     // special case it.
     if (auto CE = dyn_cast<ClosureExpr>(fnExpr->getSemanticsProvidingExpr())) {
-      if (typeIsNotSpecialized(fnExpr->getType()))
+      if (typeIsNotSpecialized(fnType))
         diagnose(argExpr->getStartLoc(), diag::cannot_invoke_closure, argString)
           .highlight(fnExpr->getSourceRange());
       else
         diagnose(argExpr->getStartLoc(), diag::cannot_invoke_closure_type,
-                 getUserFriendlyTypeName(fnExpr->getType()), argString)
+                 getUserFriendlyTypeName(fnType), argString)
           .highlight(fnExpr->getSourceRange());
       
       // If this is a multi-statement closure with no explicit result type, emit
@@ -3028,13 +3030,13 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
                  diag::mult_stmt_closures_require_explicit_result);
       }
 
-    } else if (typeIsNotSpecialized(fnExpr->getType())) {
+    } else if (typeIsNotSpecialized(fnType)) {
       diagnose(argExpr->getStartLoc(), diag::cannot_call_function_value,
                argString)
         .highlight(fnExpr->getSourceRange());
     } else {
       diagnose(argExpr->getStartLoc(), diag::cannot_call_value_of_function_type,
-                getUserFriendlyTypeName(fnExpr->getType()), argString)
+                getUserFriendlyTypeName(fnType), argString)
         .highlight(fnExpr->getSourceRange());
     }
     
@@ -3046,20 +3048,12 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
   // then diagnose with some specificity about the arguments.
   if (isa<TupleExpr>(argExpr) &&
       cast<TupleExpr>(argExpr)->getNumElements() == 0) {
-    // TODO: Fold "isInitializer" into the diagnostic as a bool.
-    
-    // Otherwise, emit diagnostics that say "no arguments".
-    diagnose(fnExpr->getLoc(),
-             isInitializer ?
-             diag::cannot_find_initializer_with_no_params :
-             diag::cannot_find_overload_with_no_params,
-             overloadName);
+    // Emit diagnostics that say "no arguments".
+    diagnose(fnExpr->getLoc(), diag::cannot_call_with_no_params,
+             overloadName, isInitializer);
   } else {
-    diagnose(fnExpr->getLoc(),
-             isInitializer ?
-             diag::cannot_apply_initializer_to_args :
-             diag::cannot_apply_function_to_args,
-             overloadName, argString);
+    diagnose(fnExpr->getLoc(), diag::cannot_call_with_params,
+             overloadName, argString, isInitializer);
   }
   
   // Did the user intend on invoking a different overload?
