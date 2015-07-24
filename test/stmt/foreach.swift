@@ -29,12 +29,12 @@ struct BadGeneratorType1 {
 }
 
 struct BadContainer4 : SequenceType { // expected-error{{type 'BadContainer4' does not conform to protocol 'SequenceType'}}
-  typealias Generator = BadGeneratorType1 // expected-note{{possibly intended match 'Generator' does not conform to 'GeneratorType'}}
+  typealias Generator = BadGeneratorType1 // expected-note{{possibly intended match 'Generator' (aka 'BadGeneratorType1') does not conform to 'GeneratorType'}}
   func generate() -> BadGeneratorType1 { }
 }
 
 func bad_containers_4(bc: BadContainer4) {
-  for e in bc { } // expected-error{{'Generator' does not have a member named 'Element'}}
+  for e in bc { } // expected-error{{'Generator' (aka 'BadGeneratorType1') does not have a member named 'Element'}}
 }
 
 // Pattern type-checking

@@ -112,7 +112,7 @@ obj.bar!()
 obj.foo!(5)
 obj.foo!("hello")
 obj.wibble!()
-obj.wobble!() // expected-error{{'Id' does not have a member named 'wobble()'}}
+obj.wobble!() // expected-error{{'Id' (aka 'AnyObject') does not have a member named 'wobble()'}}
 obj.ext1!()
 obj.wonka!()
 
@@ -121,7 +121,7 @@ obj.bar()
 obj.foo(5)
 obj.foo("hello")
 obj.wibble()
-obj.wobble() // expected-error{{'Id' does not have a member named 'wobble()'}}
+obj.wobble() // expected-error{{'Id' (aka 'AnyObject') does not have a member named 'wobble()'}}
 obj.ext1()
 obj.wonka()
 
@@ -166,12 +166,12 @@ obj.ovl4()
 // Dynamic lookup cannot find members of a generic class (or a class
 // that's a member of anything generic), because we wouldn't be able
 // to figure out the generic arguments.
-var generic1Result = obj.generic1!(17) // expected-error{{'Id' does not have a member named 'generic1'}}
-obj.generic2!() // expected-error{{'Id' does not have a member named 'generic2()'}}
-obj.generic3!() // expected-error{{'Id' does not have a member named 'generic3()'}}
+var generic1Result = obj.generic1!(17) // expected-error{{'Id' (aka 'AnyObject') does not have a member named 'generic1'}}
+obj.generic2!() // expected-error{{'Id' (aka 'AnyObject') does not have a member named 'generic2()'}}
+obj.generic3!() // expected-error{{'Id' (aka 'AnyObject') does not have a member named 'generic3()'}}
 
 // Dynamic method lookup can't find non-[objc] members
-obj.generic4!(5) // expected-error{{'Id' does not have a member named 'generic4'}}
+obj.generic4!(5) // expected-error{{'Id' (aka 'AnyObject') does not have a member named 'generic4'}}
 
 // Find properties via dynamic lookup.
 var prop1Result : Int = obj.prop1!
@@ -201,7 +201,7 @@ class Z4<T where T : AnyObject> { }
 
 // Don't allow one to call instance methods on the Type via
 // dynamic method lookup.
-obj.dynamicType.foo!(obj)(5) // expected-error{{'Id.Type' does not have a member named 'foo'}}
+obj.dynamicType.foo!(obj)(5) // expected-error{{'Id.Type' (aka 'AnyObject.Type') does not have a member named 'foo'}}
 
 // Checked casts to AnyObject
 var p: P = Y()

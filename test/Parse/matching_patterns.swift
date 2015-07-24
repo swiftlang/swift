@@ -283,7 +283,7 @@ typealias NonNominal = (foo: Int, bar: UnicodeScalar)
 var nn = NonNominal.self
 
 switch nn {
-case NonNominal(): // expected-error{{non-nominal type 'NonNominal' cannot be used with property pattern syntax}}
+case NonNominal(): // expected-error{{non-nominal type 'NonNominal' (aka '(foo: Int, bar: UnicodeScalar)') cannot be used with property pattern syntax}}
   ()
 }
 

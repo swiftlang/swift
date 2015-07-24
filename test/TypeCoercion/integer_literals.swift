@@ -47,7 +47,7 @@ struct meters : IntegerLiteralConvertible {
 struct supermeters : IntegerLiteralConvertible { // expected-error{{type 'supermeters' does not conform to protocol 'IntegerLiteralConvertible'}}
   var value : meters
   
-  typealias IntegerLiteralType = meters // expected-note{{possibly intended match 'IntegerLiteralType' does not conform to '_BuiltinIntegerLiteralConvertible'}}
+  typealias IntegerLiteralType = meters // expected-note{{possibly intended match 'IntegerLiteralType' (aka 'meters') does not conform to '_BuiltinIntegerLiteralConvertible'}}
   init(_integerLiteral value: meters) {
     self.value = value
   }

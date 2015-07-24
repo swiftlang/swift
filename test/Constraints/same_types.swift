@@ -106,7 +106,7 @@ func fail4<
   T: Barrable
   where
   T.Bar == Y,
-  T.Bar.Foo == Z // expected-error{{generic parameter 'Foo' cannot be equal to both 'Foo' and 'Z'}}
+  T.Bar.Foo == Z // expected-error{{generic parameter 'Foo' cannot be equal to both 'Foo' (aka 'X') and 'Z'}}
 >(t: T) -> (Y, Z) {
   return (t.bar, t.bar.foo) // expected-error{{cannot convert return expression of type '(Y, X)' to expected return type '(Y, Z)'}}
 }

@@ -114,7 +114,7 @@ func test4() {
   var c = CGPoint(x: 2, y : 1)   // Using injected name.
 
   var e = CGPoint.x // expected-error {{'CGPoint.Type' does not have a member named 'x'}}
-  var f = OtherPoint.x  // expected-error {{'OtherPoint.Type' does not have a member named 'x'}}
+  var f = OtherPoint.x  // expected-error {{'OtherPoint.Type' (aka '(x: Int, y: Int).Type') does not have a member named 'x'}}
 }
 
 
@@ -249,8 +249,8 @@ var %% : distance -> distance // expected-error {{expected pattern}}
 
 func badTupleElement() {
   typealias X = (x : Int, y : Int)
-  var y = X.y // expected-error{{'X.Type' does not have a member named 'y'}}
-  var z = X.z // expected-error{{'X.Type' does not have a member named 'z'}}
+  var y = X.y // expected-error{{'X.Type' (aka '(x: Int, y: Int).Type') does not have a member named 'y'}}
+  var z = X.z // expected-error{{'X.Type' (aka '(x: Int, y: Int).Type') does not have a member named 'z'}}
 }
 
 enum Direction {

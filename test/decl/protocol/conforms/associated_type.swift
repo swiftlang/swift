@@ -6,6 +6,6 @@ protocol P { // expected-note{{requirement specified as '`Self`.AssocP' : 'C' [w
   typealias AssocP : C
 }
 
-struct X : P { // expected-error{{'P' requires that 'AssocP' inherit from 'C'}}
+struct X : P { // expected-error{{'P' requires that 'AssocP' (aka 'Int') inherit from 'C'}}
   typealias AssocP = Int
 }

@@ -5983,8 +5983,8 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
           errorExpr = prefixUnaryExpr->getArg();
         }
         
-        TC.diagnose(errorExpr->getLoc(),
-                       diag::optional_used_as_boolean, errorExpr->getType())
+        TC.diagnose(errorExpr->getLoc(), diag::optional_used_as_boolean,
+                    errorExpr->getType()->getRValueType())
         .fixItInsert(errorExpr->getStartLoc(), "(")
         .fixItInsertAfter(errorExpr->getEndLoc(), " != nil)");
         

@@ -16,7 +16,7 @@ func test(queue: dispatch_queue_t) {
   let _ = base as? dispatch_queue_t
 
   // Make sure the dispatch types are actually distinct types!
-  let _ = queue as dispatch_source_t // expected-error {{'dispatch_queue_t' is not convertible to 'dispatch_source_t'}}
+  let _ = queue as dispatch_source_t // expected-error {{'dispatch_queue_t' (aka 'OS_dispatch_queue') is not convertible to 'dispatch_source_t'}}
 }
 
 // Make sure you can extend a dispatch type via its common name.

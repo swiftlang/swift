@@ -293,7 +293,43 @@ static void formatDiagnosticArgument(StringRef Modifier,
     assert(Modifier.empty() && "Improper modifier for Type argument");
     
     // Strip extraneous parentheses; they add no value.
-    Out << '\'' << Arg.getAsType()->getWithoutParens() << '\'';
+    auto type = Arg.getAsType()->getWithoutParens();
+    Out << '\'' << type << '\'';
+
+
+    // Decide whether to show the desugared type or not.  We filter out some
+    // cases to avoid too much noise.
+    bool showAKA = !type->isCanonical();
+
+    // Substituted types are uninteresting sugar that prevents the heuristics
+    // below from kicking in.
+    if (showAKA)
+      if (auto *ST = dyn_cast<SubstitutedType>(type.getPointer()))
+        type = ST->getReplacementType();
+
+    // If we're complaining about a function type, don't "aka" just because of
+    // differences in the argument or result types.
+    if (showAKA && type->is<FunctionType>() &&
+        isa<FunctionType>(type.getPointer()))
+      showAKA = false;
+
+    // Don't unwrap intentional sugar types like T? or [T].
+    if (showAKA && (isa<SyntaxSugarType>(type.getPointer()) ||
+                    isa<DictionaryType>(type.getPointer())))
+      showAKA = false;
+
+    // If they are textually the same, don't show them.  This can happen when
+    // they are actually different types, because they exist in different scopes
+    // (e.g. everyone names their type parameters 'T').
+    if (showAKA && type->getString() == type->getCanonicalType()->getString())
+      showAKA = false;
+
+    // Don't show generic type parameters.
+    if (showAKA && type->getCanonicalType()->hasTypeParameter())
+      showAKA = false;
+
+    if (showAKA)
+      Out << " (aka '" << type->getCanonicalType() << "')";
     break;
   }
   case DiagnosticArgumentKind::TypeRepr:

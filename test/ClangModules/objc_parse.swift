@@ -496,17 +496,17 @@ func testCStyle() {
 
 func testProtocolQualified(obj: CopyableNSObject, cell: CopyableSomeCell,
                            plainObj: NSObject, plainCell: SomeCell) {
-  _ = obj as NSObject // expected-error {{'CopyableNSObject' is not convertible to 'NSObject'; did you mean to use 'as!' to force downcast?}}
+  _ = obj as NSObject // expected-error {{'CopyableNSObject' (aka 'protocol<NSCopying, NSObjectProtocol>') is not convertible to 'NSObject'; did you mean to use 'as!' to force downcast?}}
   _ = obj as NSObjectProtocol
   _ = obj as NSCopying
-  _ = obj as SomeCell // expected-error {{'CopyableNSObject' is not convertible to 'SomeCell'; did you mean to use 'as!' to force downcast?}}
+  _ = obj as SomeCell // expected-error {{'CopyableNSObject' (aka 'protocol<NSCopying, NSObjectProtocol>') is not convertible to 'SomeCell'; did you mean to use 'as!' to force downcast?}}
 
   _ = cell as NSObject
   _ = cell as NSObjectProtocol
-  _ = cell as NSCopying // expected-error {{'CopyableSomeCell' is not convertible to 'NSCopying'; did you mean to use 'as!' to force downcast?}}
+  _ = cell as NSCopying // expected-error {{'CopyableSomeCell' (aka 'SomeCell') is not convertible to 'NSCopying'; did you mean to use 'as!' to force downcast?}}
   _ = cell as SomeCell
   
-  _ = plainObj as CopyableNSObject // expected-error {{'NSObject' is not convertible to 'CopyableNSObject'; did you mean to use 'as!' to force downcast?}}
+  _ = plainObj as CopyableNSObject // expected-error {{'NSObject' is not convertible to 'CopyableNSObject' (aka 'protocol<NSCopying, NSObjectProtocol>'); did you mean to use 'as!' to force downcast?}}
   _ = plainCell as CopyableSomeCell // FIXME: This is not really typesafe.
 }
 

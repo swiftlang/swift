@@ -91,5 +91,5 @@ func constructExistentialValue(pm: P.Type) {
 typealias P1_and_P2 = protocol<P, P2>
 func constructExistentialCompositionValue(pm: protocol<P, P2>.Type) {
   _ = pm.init(int: 5)
-  _ = P1_and_P2(int: 5) // expected-error{{protocol type 'P1_and_P2' cannot be instantiated}}
+  _ = P1_and_P2(int: 5) // expected-error{{protocol type 'P1_and_P2' (aka 'protocol<P, P2>') cannot be instantiated}}
 }

@@ -160,7 +160,7 @@ struct SequenceY : SequenceType, GeneratorType {
 
 func useRangeOfPrintables(roi : RangeOfPrintables<[Int]>) {
   var rop : RangeOfPrintables<X> // expected-error{{type 'X' does not conform to protocol 'SequenceType'}}
-  var rox : RangeOfPrintables<SequenceY> // expected-error{{type 'Element' does not conform to protocol 'MyFormattedPrintable'}}
+  var rox : RangeOfPrintables<SequenceY> // expected-error{{type 'Element' (aka 'Y') does not conform to protocol 'MyFormattedPrintable'}}
 }
 
 struct HasNested<T> {
@@ -304,4 +304,4 @@ struct X4 : P, Q {
 
 struct X5<T, U where T: P, T: Q, T.AssocP == T.AssocQ> { } // expected-note{{requirement specified as 'T.AssocP' == 'T.AssocQ' [with T = X4]}}
 
-var y: X5<X4, Int> // expected-error{{'X5' requires the types 'AssocP' and 'AssocQ' be equivalent}}
+var y: X5<X4, Int> // expected-error{{'X5' requires the types 'AssocP' (aka 'Int') and 'AssocQ' (aka 'String') be equivalent}}
