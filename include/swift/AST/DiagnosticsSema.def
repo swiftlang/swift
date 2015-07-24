@@ -212,8 +212,9 @@ ERROR(serialization_module_too_new,sema,Fatal,
       "module file was created by a newer version of the compiler: %0",
       (StringRef))
 ERROR(serialization_module_too_old,sema,Fatal,
-      "module file was created by an older version of the compiler: %0",
-      (StringRef))
+      "module file was created by an older version of the compiler; "
+      "rebuild %0 and try again: %1",
+      (Identifier, StringRef))
 ERROR(serialization_missing_single_dependency,sema,Fatal,
       "missing required module '%0'", (StringRef))
 ERROR(serialization_missing_dependencies,sema,Fatal,

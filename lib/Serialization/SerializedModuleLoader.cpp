@@ -202,7 +202,7 @@ FileUnit *SerializedModuleLoader::loadAST(
     break;
   case serialization::Status::FormatTooOld:
     Ctx.Diags.diagnose(*diagLoc, diag::serialization_module_too_old,
-                       moduleBufferID);
+                       M.getName(), moduleBufferID);
     break;
   case serialization::Status::Malformed:
     Ctx.Diags.diagnose(*diagLoc, diag::serialization_malformed_module,
