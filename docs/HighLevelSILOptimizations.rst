@@ -131,7 +131,8 @@ Array
 
 The following semantic tags describe Array operations. The operations
 are first described in terms of the Array "state". Relations between the
-operations are formally defined below.
+operations are formally defined below. 'Array' referes to the standard library
+Array<T>, ContigousArray<T>, and Slice<T> data-structures.
 
 We consider the array state to consist of a set of disjoint elements
 and a storage descriptor that encapsulates nonelement data such as the
@@ -189,14 +190,15 @@ array.get_element_address(index: Int) -> UnsafeMutablePointer<Element>
 array.check_subscript(index: Int)
 
   Read the array count from the storage descriptor. Execute a ``trap``
-  if ``index < 0 || index >= count``. No elements are read. No state
-  is written. Despite being read only, this operation is control
+  if ``index < array.startIndex || index >= array.endIndex``. No elements are
+  read. No state is written. Despite being read only, this operation is control
   dependent.
 
 array.get_count() -> Int
 
-  Read the array count from the storage descriptor. No elements are
-  read. No state is written. This is neither guarded nor control dependent.
+  Read the array count (``array.endIndex - array.startIndex``) from the storage
+  descriptor. No elements are read. No state is written. This is neither guarded
+  nor control dependent.
 
 array.get_capacity() -> Int
 
