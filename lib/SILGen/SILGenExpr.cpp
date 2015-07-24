@@ -2207,7 +2207,7 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
   if (auto objTy = newSelfTy->getAnyOptionalObjectType(failability))
     newSelfTy = objTy;
   
-  bool isSuper = !newSelfTy->isEqual(selfTy);
+  bool requiresDowncast = !newSelfTy->isEqual(selfTy);
 
   // The subexpression consumes the current 'self' binding.
   assert(SGF.SelfInitDelegationState == SILGenFunction::NormalSelf
@@ -2268,15 +2268,16 @@ RValue RValueEmitter::visitRebindSelfInConstructorExpr(
                                                     SGFContext());
   }
   
-  // If we called a superclass constructor, cast down to the subclass.
-  if (isSuper) {
+  // If we called a constructor that requires a downcast, perform the downcast.
+  if (requiresDowncast) {
     assert(newSelf.getType().isObject() &&
            newSelf.getType().hasReferenceSemantics() &&
-           "delegating ctor type mismatch for non-reference type?!");
+           "ctor type mismatch for non-reference type?!");
     CleanupHandle newSelfCleanup = newSelf.getCleanup();
 
     SILValue newSelfValue;
-    auto destTy = SGF.getLoweredLoadableType(E->getSelf()->getType());
+    auto destTy = SGF.getLoweredLoadableType(
+                    E->getSelf()->getType()->getInOutObjectType());
 
     // Assume that the returned 'self' is the appropriate subclass
     // type (or a derived class thereof). Only Objective-C classes can

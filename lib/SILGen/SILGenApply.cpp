@@ -1356,6 +1356,62 @@ public:
       ApplyCallee->setSubstitutions(SGF, fn, substitutions, CallDepth-1);
   }
 
+  /// Walk the given \c selfArg expression that produces the appropriate
+  /// `self` for a call, applying the same transformations to the provided
+  /// \c selfValue (which might be a metatype).
+  ///
+  /// This is used for initializer delegation, so it covers only the narrow
+  /// subset of expressions used there.
+  ManagedValue emitCorrespondingSelfValue(ManagedValue selfValue,
+                                          Expr *selfArg) {
+    while (true) {
+      // Handle archetype-to-super and derived-to-base upcasts.
+      if (isa<ArchetypeToSuperExpr>(selfArg) ||
+          isa<DerivedToBaseExpr>(selfArg)) {
+        auto ice = cast<ImplicitConversionExpr>(selfArg);
+        auto resultTy = ice->getType()->getCanonicalType();
+
+        // If the 'self' value is a metatype, update the target type
+        // accordingly.
+        if (auto selfMetaTy
+                    = selfValue.getSwiftType()->getAs<AnyMetatypeType>()) {
+          resultTy = CanMetatypeType::get(resultTy,
+                                          selfMetaTy->getRepresentation());
+        }
+        auto loweredResultTy = SGF.getLoweredLoadableType(resultTy);
+        if (loweredResultTy != selfValue.getType()) {
+          auto upcast = SGF.B.createUpcast(ice,
+                                           selfValue.getValue(),
+                                           loweredResultTy);
+          selfValue = ManagedValue(upcast, selfValue.getCleanup());
+        }
+
+        selfArg = ice->getSubExpr();
+        continue;
+      }
+
+      // Skip over loads.
+      if (auto load = dyn_cast<LoadExpr>(selfArg)) {
+        selfArg = load->getSubExpr();
+        continue;
+      }
+
+      // Skip over inout expressions.
+      if (auto inout = dyn_cast<InOutExpr>(selfArg)) {
+        selfArg = inout->getSubExpr();
+        continue;
+      }
+
+      // Declaration references terminate the search.
+      if (isa<DeclRefExpr>(selfArg))
+        break;
+
+      llvm_unreachable("unhandled conversion for metatype value");
+    }
+
+    return selfValue;
+  }
+
   /// Try to emit the given application as initializer delegation.
   bool applyInitDelegation(ApplyExpr *expr) {
     // Dig out the constructor we're delegating to.
@@ -1383,11 +1439,14 @@ public:
     } else if (ctorRef->getDecl()->isFactoryInit()) {
       useAllocatingCtor = true;
     } else {
-      // We've established we're in a class initializer, so we've already
-      // allocated an instance, and only want to delegate its initialization.
+      // We've established we're in a class initializer or a protocol extension
+      // initializer for a class-bound protocol, In either case, we're
+      // delegating initialization, but we only have an instance in the former
+      // case.
       assert(isa<ClassDecl>(nominal)
              && "some new kind of init context we haven't implemented");
-      useAllocatingCtor = false;
+      useAllocatingCtor = static_cast<bool>(SGF.AllocatorMetatype) &&
+                          !ctorRef->getDecl()->isObjC();
     }
 
     // Load the 'self' argument.
@@ -1402,7 +1461,9 @@ public:
           selfFormalType->getInOutObjectType()->getCanonicalType());
 
       if (SGF.AllocatorMetatype)
-        self = ManagedValue::forUnmanaged(SGF.AllocatorMetatype);
+        self = emitCorrespondingSelfValue(
+                 ManagedValue::forUnmanaged(SGF.AllocatorMetatype),
+                 arg);
       else
         self = ManagedValue::forUnmanaged(SGF.emitMetatypeOfValue(expr, arg));
     } else {
@@ -1416,6 +1477,9 @@ public:
         
         self = allocateObjCObject(
                         ManagedValue::forUnmanaged(SGF.AllocatorMetatype), arg);
+
+        // Perform any adjustments needed to 'self'.
+        self = emitCorrespondingSelfValue(self, arg);
       } else {
         self = SGF.emitRValueAsSingleValue(arg);
       }
