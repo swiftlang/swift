@@ -404,3 +404,66 @@ func testPreferPropertyToMethod(obj: PropertyOrMethod) {
   let methodOnClassChecked: (PropertyOrMethod) -> Int = methodOnClass
 }
 */
+
+struct Foo { var foo: Int }
+
+protocol ExtendedWithMutatingMethods { }
+extension ExtendedWithMutatingMethods {
+  mutating func mutatingMethod() {}
+  var mutableProperty: Foo {
+    get { }
+    set { }
+  }
+  var nonmutatingProperty: Foo {
+    get { }
+    nonmutating set { }
+  }
+}
+
+class ClassExtendedWithMutatingMethods: ExtendedWithMutatingMethods {}
+class SubclassExtendedWithMutatingMethods: ClassExtendedWithMutatingMethods {}
+
+func testClassExtendedWithMutatingMethods(c: ClassExtendedWithMutatingMethods,
+                                     sub: SubclassExtendedWithMutatingMethods) {
+  c.mutatingMethod() // expected-error{{only has mutating members}}
+  c.mutableProperty = Foo(foo: 0) // todo-error{{...}}
+  c.mutableProperty.foo = 0 // todo-error{{...}}
+  c.nonmutatingProperty = Foo(foo: 0)
+  c.nonmutatingProperty.foo = 0 //
+  _ = c.mutableProperty
+  _ = c.mutableProperty.foo
+  _ = c.nonmutatingProperty
+  _ = c.nonmutatingProperty.foo
+
+  sub.mutatingMethod() // expected-error{{only has mutating members}}
+  sub.mutableProperty = Foo(foo: 0) // todo-error{{...}}
+  sub.mutableProperty.foo = 0 // todo-error{{...}}
+  sub.nonmutatingProperty = Foo(foo: 0)
+  sub.nonmutatingProperty.foo = 0
+  _ = sub.mutableProperty
+  _ = sub.mutableProperty.foo
+  _ = sub.nonmutatingProperty
+  _ = sub.nonmutatingProperty.foo
+
+  var mutableC = c
+  mutableC.mutatingMethod()
+  mutableC.mutableProperty = Foo(foo: 0)
+  mutableC.mutableProperty.foo = 0
+  mutableC.nonmutatingProperty = Foo(foo: 0)
+  mutableC.nonmutatingProperty.foo = 0
+  _ = mutableC.mutableProperty
+  _ = mutableC.mutableProperty.foo
+  _ = mutableC.nonmutatingProperty
+  _ = mutableC.nonmutatingProperty.foo
+
+  var mutableSub = sub
+  mutableSub.mutatingMethod()
+  mutableSub.mutableProperty = Foo(foo: 0)
+  mutableSub.mutableProperty.foo = 0
+  mutableSub.nonmutatingProperty = Foo(foo: 0)
+  mutableSub.nonmutatingProperty.foo = 0
+  _ = mutableSub.mutableProperty
+  _ = mutableSub.mutableProperty.foo
+  _ = mutableSub.nonmutatingProperty
+  _ = mutableSub.nonmutatingProperty.foo
+}

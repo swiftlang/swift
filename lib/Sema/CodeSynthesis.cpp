@@ -1832,8 +1832,9 @@ void swift::maybeAddAccessorsToVariable(VarDecl *var, TypeChecker &TC) {
     var->setIsBeingTypeChecked();
 
     auto *getter = createGetterPrototype(var, TC);
-    // lazy getters are mutating on an enclosing struct.
-    getter->setMutating();
+    // lazy getters are mutating on an enclosing value type.
+    if (!var->getDeclContext()->isClassOrClassExtensionContext())
+      getter->setMutating();
     getter->setAccessibility(var->getFormalAccess());
 
     VarDecl *newValueParam = nullptr;

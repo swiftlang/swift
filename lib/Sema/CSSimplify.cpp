@@ -3214,9 +3214,9 @@ ConstraintSystem::simplifyMemberConstraint(const Constraint &constraint) {
         return;
     }
 
-    // If we have an rvalue base of struct or enum type, make sure that the
+    // If we have an rvalue base, make sure that the
     // result isn't mutating (only valid on lvalues).
-    if (!isMetatype && !baseObjTy->hasReferenceSemantics() &&
+    if (!isMetatype &&
         !baseTy->is<LValueType>() && result->isInstanceMember()) {
       if (auto *FD = dyn_cast<FuncDecl>(result))
         if (FD->isMutating()) {
