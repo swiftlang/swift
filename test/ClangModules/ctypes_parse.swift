@@ -154,8 +154,8 @@ func testImportMacTypes() {
   var t10_qual : ctypes.Float64 = 0.0 // expected-error {{no type named 'Float64' in module 'ctypes'}}
 }
 
-var word: Word = 0
-var uword: UWord = 0
+var word: Int = 0
+var uword: UInt = 0
 
 func testImportStdintTypes() {
   var t9_unqual : Int = intptr_t_test

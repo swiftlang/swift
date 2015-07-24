@@ -66,7 +66,7 @@ final class AtomicInt4HeapInt2Int2RaceData {
 struct AtomicInt_fetchAndAdd_1_RaceTest : RaceTestWithPerTrialDataType {
   typealias RaceData = AtomicInt4RaceData
   typealias ThreadLocalData = Void
-  typealias Observation = Observation5Word
+  typealias Observation = Observation5Int
 
   func makeRaceData() -> RaceData {
     return RaceData(0, 0, 0, 0)
@@ -146,7 +146,7 @@ struct AtomicInt_fetchAndAdd_ReleaseAtomicStores_1_RaceTest
 
   typealias RaceData = AtomicInt4RaceData
   typealias ThreadLocalData = Void
-  typealias Observation = Observation5Word
+  typealias Observation = Observation5Int
 
   func makeRaceData() -> RaceData {
     return RaceData(0, 0, 0, 0)
@@ -215,7 +215,7 @@ struct AtomicInt_fetchAndAdd_ReleaseAtomicStores_2_RaceTest
 
   typealias RaceData = AtomicInt4RaceData
   typealias ThreadLocalData = Void
-  typealias Observation = Observation5Word
+  typealias Observation = Observation5Int
 
   func makeRaceData() -> RaceData {
     return RaceData(0, 0, 0, 0)
@@ -300,7 +300,7 @@ struct AtomicInt_fetchAndAdd_ReleaseNonAtomicStores_RaceTest
 
   typealias RaceData = AtomicInt4HeapInt2Int2RaceData
   typealias ThreadLocalData = Void
-  typealias Observation = Observation9Word
+  typealias Observation = Observation9Int
 
   func makeRaceData() -> RaceData {
     return RaceData(0, 0, 0, 0, 0, 0, 0, 0)
@@ -425,7 +425,7 @@ var dummyObjectCount = _stdlib_ShardedAtomicCounter()
 
 struct AtomicInitializeARCRefRaceTest : RaceTestWithPerTrialDataType {
   class DummyObject {
-    var payload: UWord = 0x12345678
+    var payload: UInt = 0x12345678
     var randomInt: Int
     var destroyedFlag: HeapBool
     init(destroyedFlag: HeapBool, randomInt: Int) {
@@ -450,7 +450,7 @@ struct AtomicInitializeARCRefRaceTest : RaceTestWithPerTrialDataType {
   }
 
   typealias ThreadLocalData = _stdlib_ShardedAtomicCounter.PRNG
-  typealias Observation = Observation4UWord
+  typealias Observation = Observation4UInt
 
   func makeRaceData() -> RaceData {
     return RaceData()
@@ -463,7 +463,7 @@ struct AtomicInitializeARCRefRaceTest : RaceTestWithPerTrialDataType {
   func thread1(
     raceData: RaceData, inout _ threadLocalData: ThreadLocalData
   ) -> Observation {
-    var observation = Observation4UWord(0, 0, 0, 0)
+    var observation = Observation4UInt(0, 0, 0, 0)
     var initializerDestroyed = HeapBool(false)
     if true {
       let initializer = DummyObject(
@@ -471,28 +471,28 @@ struct AtomicInitializeARCRefRaceTest : RaceTestWithPerTrialDataType {
         randomInt: threadLocalData.randomInt())
       let wonRace = _stdlib_atomicInitializeARCRef(
         object: raceData.atomicReferencePtr, desired: initializer)
-      observation.uw1 = wonRace ? 1 : 0
+      observation.data1 = wonRace ? 1 : 0
       if let ref =
         _stdlib_atomicLoadARCRef(object: raceData.atomicReferencePtr) {
         let dummy = ref as! DummyObject
-        observation.uw2 = unsafeBitCast(ref, UWord.self)
-        observation.uw3 = dummy.payload
+        observation.data2 = unsafeBitCast(ref, UInt.self)
+        observation.data3 = dummy.payload
       }
     }
-    observation.uw4 = initializerDestroyed.value ? 1 : 0
+    observation.data4 = initializerDestroyed.value ? 1 : 0
     return observation
   }
 
   func evaluateObservations(observations: [Observation],
       _ sink: (RaceTestObservationEvaluation) -> ()) {
-    let ref = observations[0].uw2
-    if observations.contains({ $0.uw2 != ref }) {
+    let ref = observations[0].data2
+    if observations.contains({ $0.data2 != ref }) {
       for observation in observations {
         sink(.FailureInteresting("mismatched reference, expected \(ref): \(observation)"))
       }
       return
     }
-    if observations.contains({ $0.uw3 != 0x12345678 }) {
+    if observations.contains({ $0.data3 != 0x12345678 }) {
       for observation in observations {
         sink(.FailureInteresting("wrong data: \(observation)"))
       }
@@ -502,7 +502,7 @@ struct AtomicInitializeARCRefRaceTest : RaceTestWithPerTrialDataType {
     var wonRace = 0
     var lostRace = 0
     for observation in observations {
-      switch (observation.uw1, observation.uw4) {
+      switch (observation.data1, observation.data4) {
       case (1, 0):
         // Won race, value not destroyed.
         ++wonRace

@@ -734,9 +734,9 @@ func slurpFastEnumerationFromObjC(
 
 struct ExpectedArrayElement : Comparable, CustomStringConvertible {
   var value: Int
-  var valueIdentity: UWord
+  var valueIdentity: UInt
 
-  init(value: Int, valueIdentity: UWord = 0) {
+  init(value: Int, valueIdentity: UInt = 0) {
     self.value = value
     self.valueIdentity = valueIdentity
   }
@@ -804,7 +804,7 @@ func _checkArrayFastEnumerationImpl(
       (value: AnyObject) in
       actualContents.append(ExpectedArrayElement(
         value: convertValue(value),
-        valueIdentity: unsafeBitCast(value, UWord.self)))
+        valueIdentity: unsafeBitCast(value, UInt.self)))
     }
 
     useEnumerator(a, makeEnumerator(), sink)
@@ -867,9 +867,9 @@ func checkArrayEnumeratorPartialFastEnumerationFromSwift(
 
 struct ExpectedSetElement : Comparable, CustomStringConvertible {
   var value: Int
-  var valueIdentity: UWord
+  var valueIdentity: UInt
 
-  init(value: Int, valueIdentity: UWord = 0) {
+  init(value: Int, valueIdentity: UInt = 0) {
     self.value = value
     self.valueIdentity = valueIdentity
   }
@@ -936,7 +936,7 @@ func _checkSetFastEnumerationImpl(
       (value: AnyObject) in
       actualContents.append(ExpectedSetElement(
         value: convertMember(value),
-        valueIdentity: unsafeBitCast(value, UWord.self)))
+        valueIdentity: unsafeBitCast(value, UInt.self)))
     }
 
     useEnumerator(s, makeEnumerator(), sink)
@@ -1074,10 +1074,10 @@ func slurpFastEnumerationFromObjC(
 struct ExpectedDictionaryElement : Comparable, CustomStringConvertible {
   var key: Int
   var value: Int
-  var keyIdentity: UWord
-  var valueIdentity: UWord
+  var keyIdentity: UInt
+  var valueIdentity: UInt
 
-  init(key: Int, value: Int, keyIdentity: UWord = 0, valueIdentity: UWord = 0) {
+  init(key: Int, value: Int, keyIdentity: UInt = 0, valueIdentity: UInt = 0) {
     self.key = key
     self.value = value
     self.keyIdentity = keyIdentity
@@ -1156,8 +1156,8 @@ func _checkDictionaryFastEnumerationImpl(
       actualContents.append(ExpectedDictionaryElement(
         key: convertKey(key),
         value: convertValue(value),
-        keyIdentity: unsafeBitCast(key, UWord.self),
-        valueIdentity: unsafeBitCast(value, UWord.self)))
+        keyIdentity: unsafeBitCast(key, UInt.self),
+        valueIdentity: unsafeBitCast(value, UInt.self)))
     }
 
     useEnumerator(d, makeEnumerator(), sink)

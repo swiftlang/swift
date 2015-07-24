@@ -19,14 +19,12 @@ func testUnaryMinusInUnsigned() {
 
 // Int and UInt are not identical to any fixed-size integer type
 var i   :  Int   = 0
-var w   :  Word  = i
 var i64 :  Int64 = i // expected-error {{'Int' is not convertible to 'Int64'}}
 var i32 :  Int32 = i // expected-error {{'Int' is not convertible to 'Int32'}}
 var i16 :  Int16 = i // expected-error {{'Int' is not convertible to 'Int16'}}
 var i8  :  Int8  = i // expected-error {{'Int' is not convertible to 'Int8'}}
 
 var u   : UInt   = 0
-var uw  : UWord  = u
 var u64 : UInt64 = u // expected-error {{'UInt' is not convertible to 'UInt64'}}
 var u32 : UInt32 = u // expected-error {{'UInt' is not convertible to 'UInt32'}}
 var u16 : UInt16 = u // expected-error {{'UInt' is not convertible to 'UInt16'}}
@@ -88,7 +86,7 @@ func testMixedSignArithmetic() {
   // Ensure that the generic arithmetic operators for Strideable don't
   // allow mixed-sign arithmetic to compile.  We create a deliberate
   // ambiguity in these cases.
-% for T in "UInt UWord UInt64 UInt32 UInt16 UInt8".split():
+% for T in "UInt UInt64 UInt32 UInt16 UInt8".split():
   if true {
     typealias Stride = ${T}.Stride
     ${T}(1) + 0          // OK
@@ -138,3 +136,7 @@ let s32_ops:  Int32 = testOps(5, 2)
 let u32_ops: UInt32 = testOps(5, 2)
 let s64_ops:  Int64 = testOps(5, 2)
 let u64_ops: UInt64 = testOps(5, 2)
+
+func useWord(w: Word) {} // expected-error {{'Word' has been renamed to 'Int'}}
+func useUWord(w: UWord) {} // expected-error {{'UWord' has been renamed to 'UInt'}}
+

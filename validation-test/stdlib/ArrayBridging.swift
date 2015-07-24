@@ -23,7 +23,7 @@ struct ArrayBridge_objectAtIndex_RaceTest : RaceTestWithPerTrialDataType {
   }
 
   typealias ThreadLocalData = Void
-  typealias Observation = Observation1UWord
+  typealias Observation = Observation1UInt
 
   func makeRaceData() -> RaceData {
     let nsa = getBridgedNSArrayOfValueTypeCustomBridged(numElements: 1)
@@ -39,7 +39,7 @@ struct ArrayBridge_objectAtIndex_RaceTest : RaceTestWithPerTrialDataType {
   ) -> Observation {
     let nsa = raceData.nsa
     let v: AnyObject = nsa.objectAtIndex(0)
-    return Observation(unsafeBitCast(v, UWord.self))
+    return Observation(unsafeBitCast(v, UInt.self))
   }
 
   func evaluateObservations(observations: [Observation],
@@ -58,7 +58,7 @@ struct ArrayBridge_FastEnumeration_ObjC_RaceTest :
   }
 
   typealias ThreadLocalData = Void
-  typealias Observation = Observation4UWord
+  typealias Observation = Observation4UInt
 
   func makeRaceData() -> RaceData {
     let nsa = getBridgedNSArrayOfValueTypeCustomBridged(numElements: 4)
@@ -76,10 +76,10 @@ struct ArrayBridge_FastEnumeration_ObjC_RaceTest :
     let objcValues = NSMutableArray()
     slurpFastEnumerationOfArrayFromObjCImpl(nsa, nsa, objcValues)
     return Observation(
-      unsafeBitCast(objcValues[0], UWord.self),
-      unsafeBitCast(objcValues[1], UWord.self),
-      unsafeBitCast(objcValues[2], UWord.self),
-      unsafeBitCast(objcValues[3], UWord.self))
+      unsafeBitCast(objcValues[0], UInt.self),
+      unsafeBitCast(objcValues[1], UInt.self),
+      unsafeBitCast(objcValues[2], UInt.self),
+      unsafeBitCast(objcValues[3], UInt.self))
   }
 
   func evaluateObservations(observations: [Observation],

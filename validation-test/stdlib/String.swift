@@ -8,8 +8,8 @@ import StdlibUnittest
 import Foundation
 
 extension String {
-  var bufferID: UWord {
-    return unsafeBitCast(_core._owner, UWord.self)
+  var bufferID: UInt {
+    return unsafeBitCast(_core._owner, UInt.self)
   }
   var nativeCapacity: Int {
     return _core.nativeBuffer!.capacity

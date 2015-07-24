@@ -149,11 +149,11 @@ func isOSAtLeast(major: Int, _ minor: Int, patch: Int = 0) -> Bool {
 
 func expectTagged(s: NSString, _ expected: Bool) -> NSString {
 #if arch(x86_64)
-  let mask: UWord = 0x8000000000000001
+  let mask: UInt = 0x8000000000000001
 #elseif arch(arm64)
-  let mask: UWord = 0x8000000000000000
+  let mask: UInt = 0x8000000000000000
 #else
-  let mask: UWord = 0
+  let mask: UInt = 0
 #endif
 
   var osSupportsTaggedStrings: Bool
@@ -170,7 +170,7 @@ func expectTagged(s: NSString, _ expected: Bool) -> NSString {
 
   let taggedStringsSupported = osSupportsTaggedStrings && mask != 0
 
-  let tagged = unsafeBitCast(s, UWord.self) & mask != 0
+  let tagged = unsafeBitCast(s, UInt.self) & mask != 0
 
   if taggedStringsSupported  &&  expected == tagged {
     // okay

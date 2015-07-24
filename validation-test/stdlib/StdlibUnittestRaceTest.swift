@@ -14,7 +14,7 @@ struct RaceTest1 : RaceTestWithPerTrialDataType {
   }
 
   typealias ThreadLocalData = Void
-  typealias Observation = Observation1UWord
+  typealias Observation = Observation1UInt
 
   func makeRaceData() -> RaceData {
     return RaceData()

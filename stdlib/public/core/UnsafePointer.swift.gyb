@@ -68,7 +68,7 @@ public struct ${Self}<Memory>
   ///
   /// This is a fundamentally unsafe conversion.
   @transparent
-  public init(bitPattern: Word) {
+  public init(bitPattern: Int) {
     self._rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
 
@@ -76,7 +76,7 @@ public struct ${Self}<Memory>
   ///
   /// This is a fundamentally unsafe conversion.
   @transparent
-  public init(bitPattern: UWord) {
+  public init(bitPattern: UInt) {
     self._rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
 

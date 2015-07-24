@@ -32,7 +32,7 @@ struct StartsWithTest {
     _ expected: Bool, _ sequence: [Int], _ prefix: [Int],
     _ expectedLeftoverSequence: [Int],
     _ expectedLeftoverPrefix: [Int],
-    file: String = __FILE__, line: UWord = __LINE__
+    file: String = __FILE__, line: UInt = __LINE__
   ) {
     self.expected = expected
     self.sequence = sequence
@@ -431,7 +431,7 @@ struct EnumerateTest {
 
   init(
     _ expected: [(Int, Int)], _ sequence: [Int],
-    file: String = __FILE__, line: UWord = __LINE__,
+    file: String = __FILE__, line: UInt = __LINE__,
     comment: String = ""
   ) {
     self.expected = expected
@@ -489,7 +489,7 @@ struct MinMaxElementTest {
     maxValue expectedMaxValue: Int?,
     index expectedMaxIndex: Int?,
     _ sequence: [Int],
-    file: String = __FILE__, line: UWord = __LINE__,
+    file: String = __FILE__, line: UInt = __LINE__,
     comment: String = ""
   ) {
     self.expectedMinValue = expectedMinValue
@@ -702,7 +702,7 @@ struct ElementsEqualTest {
     _ expected: Bool, _ sequence: [Int], _ other: [Int],
     _ expectedLeftoverSequence: [Int],
     _ expectedLeftoverOther: [Int],
-    file: String = __FILE__, line: UWord = __LINE__,
+    file: String = __FILE__, line: UInt = __LINE__,
     comment: String = ""
   ) {
     self.expected = expected
@@ -828,7 +828,7 @@ struct LexicographicalCompareTest {
     _ expected: ExpectedComparisonResult, _ sequence: [Int], _ other: [Int],
     _ expectedLeftoverSequence: [Int],
     _ expectedLeftoverOther: [Int],
-    file: String = __FILE__, line: UWord = __LINE__,
+    file: String = __FILE__, line: UInt = __LINE__,
     comment: String = ""
   ) {
     self.expected = expected
@@ -1046,7 +1046,7 @@ struct ReduceTest {
 
   init(
     _ sequence: [Int],
-    file: String = __FILE__, line: UWord = __LINE__
+    file: String = __FILE__, line: UInt = __LINE__
   ) {
     self.sequence = sequence
     self.loc = SourceLoc(file, line, comment: "test data")
@@ -1092,7 +1092,7 @@ struct ReverseTest {
 
   init(
     _ expected: [Int], _ sequence: [Int],
-    file: String = __FILE__, line: UWord = __LINE__
+    file: String = __FILE__, line: UInt = __LINE__
   ) {
     self.expected = expected
     self.sequence = sequence
@@ -1177,7 +1177,7 @@ struct FilterTest {
     _ expected: [Int],
     _ sequence: [Int],
     _ includeElement: (Int) -> Bool,
-    file: String = __FILE__, line: UWord = __LINE__
+    file: String = __FILE__, line: UInt = __LINE__
   ) {
     self.expected = expected
     self.sequence = sequence
@@ -1385,7 +1385,7 @@ struct MapTest {
     _ expected: [Int32],
     _ sequence: [Int],
     _ transform: (Int) -> Int32,
-    file: String = __FILE__, line: UWord = __LINE__
+    file: String = __FILE__, line: UInt = __LINE__
   ) {
     self.expected = expected
     self.sequence = sequence
@@ -1668,7 +1668,7 @@ struct FlatMapTest {
     expected: [Int32],
     sequence: [Int],
     transform: (Int) -> [Int32],
-    file: String = __FILE__, line: UWord = __LINE__
+    file: String = __FILE__, line: UInt = __LINE__
   ) {
     self.expected = expected
     self.sequence = sequence
@@ -1851,7 +1851,7 @@ struct FlatMapToOptionalTest {
     _ expected: [Int32],
     _ sequence: [Int],
     _ transform: (Int) -> Int32?,
-    file: String = __FILE__, line: UWord = __LINE__
+    file: String = __FILE__, line: UInt = __LINE__
   ) {
     self.expected = expected
     self.sequence = sequence
@@ -2012,7 +2012,7 @@ struct ZipTest {
     _ other: [Int32],
     leftovers expectedLeftoverSequence: [Int],
     _ expectedLeftoverOther: [Int32],
-    file: String = __FILE__, line: UWord = __LINE__
+    file: String = __FILE__, line: UInt = __LINE__
   ) {
     self.expected = expected
     self.sequence = sequence

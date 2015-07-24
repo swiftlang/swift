@@ -20,7 +20,7 @@ func expectOverflow<T>(
   @autoclosure _ message: ()->String = "",
     showFrame: Bool = true,
     stackTrace: SourceLocStack = SourceLocStack(),  
-    file: String = __FILE__, line: UWord = __LINE__
+    file: String = __FILE__, line: UInt = __LINE__
 ) {
   expectTrue(
     res.overflow, "expected overflow",
@@ -33,7 +33,7 @@ func expectNoOverflow<T>(
   @autoclosure _ message: ()->String = "",
     showFrame: Bool = true,
     stackTrace: SourceLocStack = SourceLocStack(),  
-    file: String = __FILE__, line: UWord = __LINE__
+    file: String = __FILE__, line: UInt = __LINE__
 ) {
   expectFalse(
     res.overflow, "expected no overflow",

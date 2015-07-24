@@ -144,175 +144,177 @@ public func == (
   }
 }
 
-/// An observation result that consists of one `UWord`.
-public struct Observation1UWord : Equatable, CustomStringConvertible {
-  public var uw1: UWord
+/// An observation result that consists of one `UInt`.
+public struct Observation1UInt : Equatable, CustomStringConvertible {
+  public var data1: UInt
 
-  public init(_ uw1: UWord) {
-    self.uw1 = uw1
+  public init(_ data1: UInt) {
+    self.data1 = data1
   }
 
   public var description: String {
-    return "(\(uw1))"
+    return "(\(data1))"
   }
 }
 
-public func == (lhs: Observation1UWord, rhs: Observation1UWord) -> Bool {
-  return lhs.uw1 == rhs.uw1
+public func == (lhs: Observation1UInt, rhs: Observation1UInt) -> Bool {
+  return lhs.data1 == rhs.data1
 }
 
-/// An observation result that consists of four `UWord`s.
-public struct Observation4UWord : Equatable, CustomStringConvertible {
-  public var uw1: UWord
-  public var uw2: UWord
-  public var uw3: UWord
-  public var uw4: UWord
+/// An observation result that consists of four `UInt`s.
+public struct Observation4UInt : Equatable, CustomStringConvertible {
+  public var data1: UInt
+  public var data2: UInt
+  public var data3: UInt
+  public var data4: UInt
 
-  public init(_ uw1: UWord, _ uw2: UWord, _ uw3: UWord, _ uw4: UWord) {
-    self.uw1 = uw1
-    self.uw2 = uw2
-    self.uw3 = uw3
-    self.uw4 = uw4
+  public init(_ data1: UInt, _ data2: UInt, _ data3: UInt, _ data4: UInt) {
+    self.data1 = data1
+    self.data2 = data2
+    self.data3 = data3
+    self.data4 = data4
   }
 
   public var description: String {
-    return "(\(uw1), \(uw2), \(uw3), \(uw4))"
+    return "(\(data1), \(data2), \(data3), \(data4))"
   }
 }
 
-public func == (lhs: Observation4UWord, rhs: Observation4UWord) -> Bool {
+public func == (lhs: Observation4UInt, rhs: Observation4UInt) -> Bool {
   return
-    lhs.uw1 == rhs.uw1 &&
-    lhs.uw2 == rhs.uw2 &&
-    lhs.uw3 == rhs.uw3 &&
-    lhs.uw4 == rhs.uw4
+    lhs.data1 == rhs.data1 &&
+    lhs.data2 == rhs.data2 &&
+    lhs.data3 == rhs.data3 &&
+    lhs.data4 == rhs.data4
 }
 
-/// An observation result that consists of three `Word`s.
-public struct Observation3Word : Equatable, CustomStringConvertible {
-  public var w1: Word
-  public var w2: Word
-  public var w3: Word
+/// An observation result that consists of three `Int`s.
+public struct Observation3Int : Equatable, CustomStringConvertible {
+  public var data1: Int
+  public var data2: Int
+  public var data3: Int
 
-  public init(_ w1: Word, _ w2: Word, _ w3: Word) {
-    self.w1 = w1
-    self.w2 = w2
-    self.w3 = w3
+  public init(_ data1: Int, _ data2: Int, _ data3: Int) {
+    self.data1 = data1
+    self.data2 = data2
+    self.data3 = data3
   }
 
   public var description: String {
-    return "(\(w1), \(w2), \(w3))"
+    return "(\(data1), \(data2), \(data3))"
   }
 }
 
-public func == (lhs: Observation3Word, rhs: Observation3Word) -> Bool {
+public func == (lhs: Observation3Int, rhs: Observation3Int) -> Bool {
   return
-    lhs.w1 == rhs.w1 &&
-    lhs.w2 == rhs.w2 &&
-    lhs.w3 == rhs.w3
+    lhs.data1 == rhs.data1 &&
+    lhs.data2 == rhs.data2 &&
+    lhs.data3 == rhs.data3
 }
 
-/// An observation result that consists of four `Word`s.
-public struct Observation4Word : Equatable, CustomStringConvertible {
-  public var w1: Word
-  public var w2: Word
-  public var w3: Word
-  public var w4: Word
+/// An observation result that consists of four `Int`s.
+public struct Observation4Int : Equatable, CustomStringConvertible {
+  public var data1: Int
+  public var data2: Int
+  public var data3: Int
+  public var data4: Int
 
-  public init(_ w1: Word, _ w2: Word, _ w3: Word, _ w4: Word) {
-    self.w1 = w1
-    self.w2 = w2
-    self.w3 = w3
-    self.w4 = w4
+  public init(_ data1: Int, _ data2: Int, _ data3: Int, _ data4: Int) {
+    self.data1 = data1
+    self.data2 = data2
+    self.data3 = data3
+    self.data4 = data4
   }
 
   public var description: String {
-    return "(\(w1), \(w2), \(w3), \(w4))"
+    return "(\(data1), \(data2), \(data3), \(data4))"
   }
 }
 
-public func == (lhs: Observation4Word, rhs: Observation4Word) -> Bool {
+public func == (lhs: Observation4Int, rhs: Observation4Int) -> Bool {
   return
-    lhs.w1 == rhs.w1 &&
-    lhs.w2 == rhs.w2 &&
-    lhs.w3 == rhs.w3 &&
-    lhs.w4 == rhs.w4
+    lhs.data1 == rhs.data1 &&
+    lhs.data2 == rhs.data2 &&
+    lhs.data3 == rhs.data3 &&
+    lhs.data4 == rhs.data4
 }
 
-/// An observation result that consists of five `Word`s.
-public struct Observation5Word : Equatable, CustomStringConvertible {
-  public var w1: Word
-  public var w2: Word
-  public var w3: Word
-  public var w4: Word
-  public var w5: Word
-
-  public init(_ w1: Word, _ w2: Word, _ w3: Word, _ w4: Word, _ w5: Word) {
-    self.w1 = w1
-    self.w2 = w2
-    self.w3 = w3
-    self.w4 = w4
-    self.w5 = w5
-  }
-
-  public var description: String {
-    return "(\(w1), \(w2), \(w3), \(w4), \(w5))"
-  }
-}
-
-public func == (lhs: Observation5Word, rhs: Observation5Word) -> Bool {
-  return
-    lhs.w1 == rhs.w1 &&
-    lhs.w2 == rhs.w2 &&
-    lhs.w3 == rhs.w3 &&
-    lhs.w4 == rhs.w4 &&
-    lhs.w5 == rhs.w5
-}
-
-/// An observation result that consists of nine `Word`s.
-public struct Observation9Word : Equatable, CustomStringConvertible {
-  public var w1: Word
-  public var w2: Word
-  public var w3: Word
-  public var w4: Word
-  public var w5: Word
-  public var w6: Word
-  public var w7: Word
-  public var w8: Word
-  public var w9: Word
+/// An observation result that consists of five `Int`s.
+public struct Observation5Int : Equatable, CustomStringConvertible {
+  public var data1: Int
+  public var data2: Int
+  public var data3: Int
+  public var data4: Int
+  public var data5: Int
 
   public init(
-    _ w1: Word, _ w2: Word, _ w3: Word, _ w4: Word,
-    _ w5: Word, _ w6: Word, _ w7: Word, _ w8: Word,
-    _ w9: Word
+    _ data1: Int, _ data2: Int, _ data3: Int, _ data4: Int, _ data5: Int
   ) {
-    self.w1 = w1
-    self.w2 = w2
-    self.w3 = w3
-    self.w4 = w4
-    self.w5 = w5
-    self.w6 = w6
-    self.w7 = w7
-    self.w8 = w8
-    self.w9 = w9
+    self.data1 = data1
+    self.data2 = data2
+    self.data3 = data3
+    self.data4 = data4
+    self.data5 = data5
   }
 
   public var description: String {
-    return "(\(w1), \(w2), \(w3), \(w4), \(w5), \(w6), \(w7), \(w8), \(w9))"
+    return "(\(data1), \(data2), \(data3), \(data4), \(data5))"
   }
 }
 
-public func == (lhs: Observation9Word, rhs: Observation9Word) -> Bool {
+public func == (lhs: Observation5Int, rhs: Observation5Int) -> Bool {
   return
-    lhs.w1 == rhs.w1 &&
-    lhs.w2 == rhs.w2 &&
-    lhs.w3 == rhs.w3 &&
-    lhs.w4 == rhs.w4 &&
-    lhs.w5 == rhs.w5 &&
-    lhs.w6 == rhs.w6 &&
-    lhs.w7 == rhs.w7 &&
-    lhs.w8 == rhs.w8 &&
-    lhs.w9 == rhs.w9
+    lhs.data1 == rhs.data1 &&
+    lhs.data2 == rhs.data2 &&
+    lhs.data3 == rhs.data3 &&
+    lhs.data4 == rhs.data4 &&
+    lhs.data5 == rhs.data5
+}
+
+/// An observation result that consists of nine `Int`s.
+public struct Observation9Int : Equatable, CustomStringConvertible {
+  public var data1: Int
+  public var data2: Int
+  public var data3: Int
+  public var data4: Int
+  public var data5: Int
+  public var data6: Int
+  public var data7: Int
+  public var data8: Int
+  public var data9: Int
+
+  public init(
+    _ data1: Int, _ data2: Int, _ data3: Int, _ data4: Int,
+    _ data5: Int, _ data6: Int, _ data7: Int, _ data8: Int,
+    _ data9: Int
+  ) {
+    self.data1 = data1
+    self.data2 = data2
+    self.data3 = data3
+    self.data4 = data4
+    self.data5 = data5
+    self.data6 = data6
+    self.data7 = data7
+    self.data8 = data8
+    self.data9 = data9
+  }
+
+  public var description: String {
+    return "(\(data1), \(data2), \(data3), \(data4), \(data5), \(data6), \(data7), \(data8), \(data9))"
+  }
+}
+
+public func == (lhs: Observation9Int, rhs: Observation9Int) -> Bool {
+  return
+    lhs.data1 == rhs.data1 &&
+    lhs.data2 == rhs.data2 &&
+    lhs.data3 == rhs.data3 &&
+    lhs.data4 == rhs.data4 &&
+    lhs.data5 == rhs.data5 &&
+    lhs.data6 == rhs.data6 &&
+    lhs.data7 == rhs.data7 &&
+    lhs.data8 == rhs.data8 &&
+    lhs.data9 == rhs.data9
 }
 
 /// A helper that is useful to implement

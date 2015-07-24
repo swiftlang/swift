@@ -12,8 +12,8 @@ import Glibc
 var StringTestSuite = TestSuite("String")
 
 extension String {
-  var bufferID: UWord {
-    return unsafeBitCast(_core._owner, UWord.self)
+  var bufferID: UInt {
+    return unsafeBitCast(_core._owner, UInt.self)
   }
   var capacityInBytes: Int {
     return _core.nativeBuffer!.capacity

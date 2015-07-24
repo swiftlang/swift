@@ -1765,7 +1765,7 @@ struct ComparisonTest {
   init(
     _ expectedUnicodeCollation: ExpectedComparisonResult,
     _ lhs: String, _ rhs: String,
-    file: String = __FILE__, line: UWord = __LINE__
+    file: String = __FILE__, line: UInt = __LINE__
   ) {
     self.expectedUnicodeCollation = expectedUnicodeCollation
     self.lhs = lhs

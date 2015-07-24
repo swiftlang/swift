@@ -28,13 +28,13 @@ public struct _StringCore {
   //===--------------------------------------------------------------------===//
   // Internals
   public var _baseAddress: COpaquePointer
-  var _countAndFlags: UWord
+  var _countAndFlags: UInt
   public var _owner: AnyObject?
 
   /// (private) create the implementation of a string from its component parts.
   init(
     baseAddress: COpaquePointer,
-    _countAndFlags: UWord,
+    _countAndFlags: UInt,
     owner: AnyObject?
   ) {
     self._baseAddress = baseAddress
@@ -75,12 +75,12 @@ public struct _StringCore {
   }
 
   /// Bitmask for the count part of `_countAndFlags`.
-  var _countMask: UWord {
-    return UWord.max >> 2
+  var _countMask: UInt {
+    return UInt.max >> 2
   }
 
   /// Bitmask for the flags part of `_countAndFlags`.
-  var _flagMask: UWord {
+  var _flagMask: UInt {
     return ~_countMask
   }
 
@@ -147,12 +147,12 @@ public struct _StringCore {
     self._baseAddress = baseAddress
 
     self._countAndFlags
-      = (UWord(elementShift) << (UWord._sizeInBits - 1))
-      | ((hasCocoaBuffer ? 1 : 0) << (UWord._sizeInBits - 2))
-      | UWord(count)
+      = (UInt(elementShift) << (UInt._sizeInBits - 1))
+      | ((hasCocoaBuffer ? 1 : 0) << (UInt._sizeInBits - 2))
+      | UInt(count)
 
     self._owner = owner
-    _sanityCheck(UWord(count) & _flagMask == 0, "String too long to represent")
+    _sanityCheck(UInt(count) & _flagMask == 0, "String too long to represent")
     _invariantCheck()
   }
 
@@ -187,15 +187,15 @@ public struct _StringCore {
       return Int(_countAndFlags & _countMask)
     }
     set(newValue) {
-      _sanityCheck(UWord(newValue) & _flagMask == 0)
-      _countAndFlags = (_countAndFlags & _flagMask) | UWord(newValue)
+      _sanityCheck(UInt(newValue) & _flagMask == 0)
+      _countAndFlags = (_countAndFlags & _flagMask) | UInt(newValue)
     }
   }
 
   /// Left shift amount to apply to an offset N so that when
   /// added to a UnsafeMutablePointer<RawByte>, it traverses N elements.
   var elementShift: Int {
-    return Int(_countAndFlags >> (UWord._sizeInBits - 1))
+    return Int(_countAndFlags >> (UInt._sizeInBits - 1))
   }
 
   /// The number of bytes per element.
@@ -216,7 +216,7 @@ public struct _StringCore {
 
   /// Are we using an `NSString` for storage?
   public var hasCocoaBuffer: Bool {
-    return Word((_countAndFlags << 1).value) < 0
+    return Int((_countAndFlags << 1).value) < 0
   }
 
   public var startASCII: UnsafeMutablePointer<UTF8.CodeUnit> {
@@ -272,12 +272,12 @@ public struct _StringCore {
       "subscript: subRange extends past String end")
 
     let newCount = subRange.endIndex - subRange.startIndex
-    _sanityCheck(UWord(newCount) & _flagMask == 0)
+    _sanityCheck(UInt(newCount) & _flagMask == 0)
 
     if hasContiguousStorage {
       return _StringCore(
         baseAddress: _pointerToNth(subRange.startIndex),
-        _countAndFlags: (_countAndFlags & _flagMask) | UWord(newCount),
+        _countAndFlags: (_countAndFlags & _flagMask) | UInt(newCount),
         owner: _owner)
     }
 #if _runtime(_ObjC)

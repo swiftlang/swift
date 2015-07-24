@@ -26,17 +26,17 @@ import ObjectiveC
 
 public struct SourceLoc {
   public let file: String
-  public let line: UWord
+  public let line: UInt
   public let comment: String?
 
-  public init(_ file: String, _ line: UWord, comment: String? = nil) {
+  public init(_ file: String, _ line: UInt, comment: String? = nil) {
     self.file = file
     self.line = line
     self.comment = comment
   }
 
   public func withCurrentLoc(
-      file: String = __FILE__, line: UWord = __LINE__
+      file: String = __FILE__, line: UInt = __LINE__
   ) -> SourceLocStack {
     return SourceLocStack(self).with(SourceLoc(file, line))
   }
@@ -68,13 +68,13 @@ public struct SourceLocStack {
   }
 
   public func pushIf(
-    showFrame: Bool, file: String, line: UWord
+    showFrame: Bool, file: String, line: UInt
   ) -> SourceLocStack {
     return showFrame ? self.with(SourceLoc(file, line)) : self
   }
 
   public func withCurrentLoc(
-      file: String = __FILE__, line: UWord = __LINE__
+      file: String = __FILE__, line: UInt = __LINE__
   ) -> SourceLocStack {
     return with(SourceLoc(file, line))
   }
@@ -90,7 +90,7 @@ public struct SourceLocStack {
   TRACE = '''@autoclosure _ message: ()->String = "",
     showFrame: Bool = true,
     stackTrace: SourceLocStack = SourceLocStack(),  
-    file: String = __FILE__, line: UWord = __LINE__'''
+    file: String = __FILE__, line: UInt = __LINE__'''
 
   # When the parameter list would start with a ${TRACE}, we use 
   # ${TRACE1} instead, to avoid the warning about an extraneous 
@@ -802,7 +802,7 @@ public class TestSuite {
 
   public func test(
     name: String,
-    file: String = __FILE__, line: UWord = __LINE__,
+    file: String = __FILE__, line: UInt = __LINE__,
     _ testFunction: () -> ()) {
     
     _TestBuilder(testSuite: self, name: name, loc: SourceLoc(file, line))
@@ -810,7 +810,7 @@ public class TestSuite {
   }
 
   public func test(
-    name: String, file: String = __FILE__, line: UWord = __LINE__
+    name: String, file: String = __FILE__, line: UInt = __LINE__
   ) -> _TestBuilder {
     return _TestBuilder(testSuite: self, name: name, loc: SourceLoc(file, line))
   }

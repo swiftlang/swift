@@ -298,8 +298,8 @@ struct _Buffer72 {
 @asmname("swift_float${bits}ToString")
 func _float${bits}ToStringImpl(
   buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
-  _ bufferLength: UWord, _ value: Float${bits}
-) -> UWord
+  _ bufferLength: UInt, _ value: Float${bits}
+) -> UInt
 
 func _float${bits}ToString(value: Float${bits}) -> String {
   _sanityCheck(sizeof(_Buffer32.self) == 32)
@@ -326,9 +326,9 @@ func _float${bits}ToString(value: Float${bits}) -> String {
 @asmname("swift_int64ToString")
 func _int64ToStringImpl(
   buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
-  _ bufferLength: UWord, _ value: Int64,
+  _ bufferLength: UInt, _ value: Int64,
   _ radix: Int64, _ uppercase: Bool
-) -> UWord
+) -> UInt
 
 func _int64ToString(
   value: Int64, radix: Int64 = 10, uppercase: Bool = false
@@ -363,8 +363,8 @@ func _int64ToString(
 @asmname("swift_uint64ToString")
 func _uint64ToStringImpl(
   buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
-  _ bufferLength: UWord, _ value: UInt64, _ radix: Int64, _ uppercase: Bool
-) -> UWord
+  _ bufferLength: UInt, _ value: UInt64, _ radix: Int64, _ uppercase: Bool
+) -> UInt
 
 public // @testable
 func _uint64ToString(
@@ -399,7 +399,7 @@ func _uint64ToString(
 
 func _rawPointerToString(value: Builtin.RawPointer) -> String {
   var result = _uint64ToString(
-    UInt64(unsafeBitCast(value, UWord.self)), radix: 16, uppercase: false)
+    UInt64(unsafeBitCast(value, UInt.self)), radix: 16, uppercase: false)
   for _ in 0..<(2 * sizeof(Builtin.RawPointer) - result.utf16.count) {
     result = "0" + result
   }

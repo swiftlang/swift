@@ -50,9 +50,6 @@ public func getInt64(x: Int64) -> Int64 { return _opaqueIdentity(x) }
 public func getInt(x: Int) -> Int { return _opaqueIdentity(x) }
 
 @inline(never)
-public func getWord(x: Word) -> Word { return _opaqueIdentity(x) }
-
-@inline(never)
 public func getUInt8(x: UInt8) -> UInt8 { return _opaqueIdentity(x) }
 
 @inline(never)
@@ -66,9 +63,6 @@ public func getUInt64(x: UInt64) -> UInt64 { return _opaqueIdentity(x) }
 
 @inline(never)
 public func getUInt(x: UInt) -> UInt { return _opaqueIdentity(x) }
-
-@inline(never)
-public func getUWord(x: UWord) -> UWord { return _opaqueIdentity(x) }
 
 @inline(never)
 public func getFloat32(x: Float32) -> Float32 { return _opaqueIdentity(x) }

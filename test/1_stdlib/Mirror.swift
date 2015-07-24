@@ -160,7 +160,7 @@ mirrors.test("Legacy") {
   
   func expectBMirror(
     mb: Mirror,   stackTrace: SourceLocStack = SourceLocStack(),
-    file: String = __FILE__, line: UWord = __LINE__
+    file: String = __FILE__, line: UInt = __LINE__
   ) {
     expectTrue(mb.subjectType == B.self,
       stackTrace: stackTrace, file: file, line: line)

@@ -26,17 +26,17 @@ struct ErrorTypeAsNSErrorRaceTest : RaceTestWithPerTrialDataType {
 
   func makeThreadLocalData() {}
 
-  func thread1(raceData: RaceData, inout _: Void) -> Observation3Word {
+  func thread1(raceData: RaceData, inout _: Void) -> Observation3Int {
     let ns = raceData.error as NSError
     // Use valueForKey to bypass bridging, so we can verify that the identity
     // of the unbridged NSString object is stable.
-    let domainWord: Word = unsafeBitCast(ns.valueForKey("domain"), Word.self)
-    let code: Word = ns.code
-    let userInfoWord: Word = unsafeBitCast(ns.valueForKey("userInfo"), Word.self)
-    return Observation3Word(domainWord, code, userInfoWord)
+    let domainInt: Int = unsafeBitCast(ns.valueForKey("domain"), Int.self)
+    let code: Int = ns.code
+    let userInfoInt: Int = unsafeBitCast(ns.valueForKey("userInfo"), Int.self)
+    return Observation3Int(domainInt, code, userInfoInt)
   }
 
-  func evaluateObservations(observations: [Observation3Word],
+  func evaluateObservations(observations: [Observation3Int],
       _ sink: (RaceTestObservationEvaluation) -> ()) {
     sink(evaluateObservationsAllEqual(observations))
   }

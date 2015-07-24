@@ -449,7 +449,6 @@ extension ${Self} {
 extension ${Self} : SignedNumberType {}
 % end
 
-%# FIXME: checked conversions of Word types
 // construction from other integer types
 @transparent
 extension ${Self} {
@@ -649,10 +648,10 @@ public func _assumeNonNegative(x: ${Self}) -> ${Self} {
 % end
 //===--- End loop over all integer types ----------------------------------===//
 
-/// A signed integer type that occupies one machine word.
+@available(*, unavailable, renamed="Int")
 public typealias Word = Int
 
-/// An unsigned integer type that occupies one machine word.
+@available(*, unavailable, renamed="UInt")
 public typealias UWord = UInt
 
 // ${'Local Variables'}:

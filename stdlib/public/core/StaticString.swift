@@ -75,7 +75,7 @@ public struct StaticString
     _precondition(
       !hasPointerRepresentation,
       "StaticString should have Unicode scalar representation")
-    return UnicodeScalar(UInt32(unsafeBitCast(_startPtrOrData, UWord.self)))
+    return UnicodeScalar(UInt32(unsafeBitCast(_startPtrOrData, UInt.self)))
   }
 
   /// If `self` stores a pointer to ASCII or UTF-8 code units, the
@@ -84,11 +84,11 @@ public struct StaticString
   /// If `self` stores a single Unicode scalar value, the value of
   /// `byteSize` is unspecified.
   @transparent
-  public var byteSize: Word {
+  public var byteSize: Int {
     _precondition(
       hasPointerRepresentation,
       "StaticString should have pointer representation")
-    return Word(_byteSize)
+    return Int(_byteSize)
   }
 
   /// `true` iff `self` stores a pointer to ASCII or UTF-8 code units.
@@ -158,7 +158,7 @@ public struct StaticString
     unicodeScalar: Builtin.Int32
   ) {
     self._startPtrOrData =
-      unsafeBitCast(UWord(UInt32(unicodeScalar)), COpaquePointer.self)._rawValue
+      unsafeBitCast(UInt(UInt32(unicodeScalar)), COpaquePointer.self)._rawValue
     self._byteSize = 0._builtinWordValue
     self._flags = UnicodeScalar(unicodeScalar).isASCII()
       ? (0x3 as UInt8).value

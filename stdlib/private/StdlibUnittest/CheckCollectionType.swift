@@ -29,7 +29,7 @@ public struct SubscriptRangeTest {
   public init(
     expected: [Int], collection: [Int], bounds: Range<Int>,
     count: Int,
-    file: String = __FILE__, line: UWord = __LINE__
+    file: String = __FILE__, line: UInt = __LINE__
   ) {
     self.expected = expected.map(OpaqueValue.init)
     self.collection = collection.map(OpaqueValue.init)
@@ -45,8 +45,10 @@ public struct PrefixThroughTest {
   public let expected: [Int]
   public let loc: SourceLoc
 
-  init(collection: [Int], position: Int, expected: [Int],
-      file: String = __FILE__, line: UWord = __LINE__) {
+  init(
+    collection: [Int], position: Int, expected: [Int],
+    file: String = __FILE__, line: UInt = __LINE__
+  ) {
     self.collection = collection
     self.position = position
     self.expected = expected
@@ -60,8 +62,10 @@ public struct PrefixUpToTest {
   public let expected: [Int]
   public let loc: SourceLoc
 
-  public init(collection: [Int], end: Int, expected: [Int],
-      file: String = __FILE__, line: UWord = __LINE__) {
+  public init(
+    collection: [Int], end: Int, expected: [Int],
+    file: String = __FILE__, line: UInt = __LINE__
+  ) {
     self.collection = collection
     self.end = end
     self.expected = expected
@@ -75,8 +79,10 @@ internal struct RemoveFirstNTest {
   let expected: [Int]
   let loc: SourceLoc
 
-  init(collection: [Int], numberToRemove: Int, expected: [Int],
-      file: String = __FILE__, line: UWord = __LINE__) {
+  init(
+    collection: [Int], numberToRemove: Int, expected: [Int],
+    file: String = __FILE__, line: UInt = __LINE__
+  ) {
     self.collection = collection
     self.numberToRemove = numberToRemove
     self.expected = expected
@@ -90,8 +96,10 @@ public struct SuffixFromTest {
   public let expected: [Int]
   public let loc: SourceLoc
 
-  init(collection: [Int], start: Int, expected: [Int],
-      file: String = __FILE__, line: UWord = __LINE__) {
+  init(
+    collection: [Int], start: Int, expected: [Int],
+    file: String = __FILE__, line: UInt = __LINE__
+  ) {
     self.collection = collection
     self.start = start
     self.expected = expected

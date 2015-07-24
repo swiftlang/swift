@@ -17,7 +17,7 @@ public struct PartitionExhaustiveTest {
 
   public init(
     _ sequence: [Int],
-    file: String = __FILE__, line: UWord = __LINE__
+    file: String = __FILE__, line: UInt = __LINE__
   ) {
     self.sequence = sequence
     self.loc = SourceLoc(file, line, comment: "test data")

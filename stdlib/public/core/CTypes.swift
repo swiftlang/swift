@@ -94,7 +94,7 @@ public struct COpaquePointer : Equatable, Hashable, NilLiteralConvertible {
   ///
   /// This is a fundamentally unsafe conversion.
   @transparent
-  public init(bitPattern: Word) {
+  public init(bitPattern: Int) {
     _rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
 
@@ -102,7 +102,7 @@ public struct COpaquePointer : Equatable, Hashable, NilLiteralConvertible {
   ///
   /// This is a fundamentally unsafe conversion.
   @transparent
-  public init(bitPattern: UWord) {
+  public init(bitPattern: UInt) {
     _rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
 

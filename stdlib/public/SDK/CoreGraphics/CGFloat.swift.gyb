@@ -657,7 +657,7 @@ public func yn(n: Int, _ x: CGFloat) -> CGFloat {
 extension CGFloat : _CVarArgPassedAsDouble, _CVarArgAlignedType {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs
-  public var _cVarArgEncoding: [Word] {
+  public var _cVarArgEncoding: [Int] {
     return native._cVarArgEncoding
   }
 

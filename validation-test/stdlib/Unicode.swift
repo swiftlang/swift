@@ -193,8 +193,10 @@ struct UTF8Test {
   let encoded: [UInt8]
   let loc: SourceLoc
 
-  init(_ scalars: [UInt32], _ encoded: [UInt8],
-       file: String = __FILE__, line: UWord = __LINE__) {
+  init(
+    _ scalars: [UInt32], _ encoded: [UInt8],
+    file: String = __FILE__, line: UInt = __LINE__
+  ) {
     self.scalars = scalars
     self.encoded = encoded
     self.loc = SourceLoc(file, line, comment: "test data")
@@ -399,9 +401,11 @@ struct UTF16Test {
   let encoded: [UInt16]
   let loc: SourceLoc
 
-  init(_ scalarsHead: [UInt32], _ scalarsRepairedTail: [UInt32],
-       _ encoded: [UInt16],
-       file: String = __FILE__, line: UWord = __LINE__) {
+  init(
+    _ scalarsHead: [UInt32], _ scalarsRepairedTail: [UInt32],
+    _ encoded: [UInt16],
+    file: String = __FILE__, line: UInt = __LINE__
+  ) {
     self.scalarsHead = scalarsHead
     self.scalarsRepairedTail = scalarsRepairedTail
     self.encoded = encoded

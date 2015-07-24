@@ -22,7 +22,7 @@ struct DictionaryBridge_objectForKey_RaceTest : RaceTestWithPerTrialDataType {
   }
 
   typealias ThreadLocalData = Void
-  typealias Observation = Observation1UWord
+  typealias Observation = Observation1UInt
 
   func makeRaceData() -> RaceData {
     let nsd = getBridgedNSDictionaryOfKeyValue_ValueTypesCustomBridged(
@@ -41,7 +41,7 @@ struct DictionaryBridge_objectForKey_RaceTest : RaceTestWithPerTrialDataType {
   ) -> Observation {
     let nsd = raceData.nsd
     let v: AnyObject? = nsd.objectForKey(key)
-    return Observation(unsafeBitCast(v, UWord.self))
+    return Observation(unsafeBitCast(v, UInt.self))
   }
 
   func evaluateObservations(observations: [Observation],
@@ -60,7 +60,7 @@ struct DictionaryBridge_KeyEnumerator_FastEnumeration_ObjC_RaceTest :
   }
 
   typealias ThreadLocalData = Void
-  typealias Observation = Observation4UWord
+  typealias Observation = Observation4UInt
 
   func makeRaceData() -> RaceData {
     let nsd = getBridgedNSDictionaryOfKeyValue_ValueTypesCustomBridged(
@@ -79,10 +79,10 @@ struct DictionaryBridge_KeyEnumerator_FastEnumeration_ObjC_RaceTest :
     let objcPairs = NSMutableArray()
     slurpFastEnumerationOfDictionaryFromObjCImpl(nsd, nsd, objcPairs)
     return Observation(
-      unsafeBitCast(objcPairs[0], UWord.self),
-      unsafeBitCast(objcPairs[1], UWord.self),
-      unsafeBitCast(objcPairs[2], UWord.self),
-      unsafeBitCast(objcPairs[3], UWord.self))
+      unsafeBitCast(objcPairs[0], UInt.self),
+      unsafeBitCast(objcPairs[1], UInt.self),
+      unsafeBitCast(objcPairs[2], UInt.self),
+      unsafeBitCast(objcPairs[3], UInt.self))
   }
 
   func evaluateObservations(observations: [Observation],

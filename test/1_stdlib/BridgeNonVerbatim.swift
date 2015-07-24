@@ -121,11 +121,11 @@ func testScope() {
 
   // Because the elements come back at +0, we really don't want to
   // treat them as objects, or we'll get double deletion
-  var objects: [Word] = [0, 0]
+  var objects: [Int] = [0, 0]
 
   objects.withUnsafeMutableBufferPointer {
     // FIXME: Can't elide signature and use $0 here <rdar://problem/17770732> 
-    (inout buf: UnsafeMutableBufferPointer<Word>)->() in
+    (inout buf: UnsafeMutableBufferPointer<Int>)->() in
     nsx.getObjects(
       UnsafeMutablePointer<AnyObject>(buf.baseAddress),
       range: _SwiftNSRange(location: 1, length: 2))

@@ -41,7 +41,7 @@ public protocol CVarArgType {
 
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
-  var _cVarArgEncoding: [Word] { get }
+  var _cVarArgEncoding: [Int] { get }
 }
 
 /// Floating point types need to be passed differently on x86_64
@@ -49,7 +49,7 @@ public protocol CVarArgType {
 public // SPI(CoreGraphics)
 protocol _CVarArgPassedAsDouble : CVarArgType {}
 
-/// Some types require alignment greater than Word on some architectures.
+/// Some types require alignment greater than Int on some architectures.
 public // SPI(CoreGraphics)
 protocol _CVarArgAlignedType : CVarArgType {
   /// Return the required alignment in bytes of 
@@ -100,9 +100,9 @@ public func getVaList(args: [CVarArgType]) -> CVaListPointer {
   return builder.va_list()
 }
 
-public func _encodeBitsAsWords<T : CVarArgType>(x: T) -> [Word] {
-  let result = [Word](
-    count: (sizeof(T.self) + sizeof(Word.self) - 1) / sizeof(Word.self),
+public func _encodeBitsAsWords<T : CVarArgType>(x: T) -> [Int] {
+  let result = [Int](
+    count: (sizeof(T.self) + sizeof(Int.self) - 1) / sizeof(Int.self),
     repeatedValue: 0)
   var tmp = x
   _memcpy(dest: UnsafeMutablePointer(result._baseAddressIfContiguous),
@@ -119,7 +119,7 @@ public func _encodeBitsAsWords<T : CVarArgType>(x: T) -> [Word] {
 extension Int : CVarArgType {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
-  public var _cVarArgEncoding: [Word] {
+  public var _cVarArgEncoding: [Int] {
     return _encodeBitsAsWords(self)
   }
 }
@@ -127,7 +127,7 @@ extension Int : CVarArgType {
 extension Int64 : CVarArgType, _CVarArgAlignedType {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
-  public var _cVarArgEncoding: [Word] {
+  public var _cVarArgEncoding: [Int] {
     return _encodeBitsAsWords(self)
   }
 
@@ -142,7 +142,7 @@ extension Int64 : CVarArgType, _CVarArgAlignedType {
 extension Int32 : CVarArgType {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
-  public var _cVarArgEncoding: [Word] {
+  public var _cVarArgEncoding: [Int] {
     return _encodeBitsAsWords(self)
   }
 }
@@ -150,7 +150,7 @@ extension Int32 : CVarArgType {
 extension Int16 : CVarArgType {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
-  public var _cVarArgEncoding: [Word] {
+  public var _cVarArgEncoding: [Int] {
     return _encodeBitsAsWords(CInt(self))
   }
 }
@@ -158,7 +158,7 @@ extension Int16 : CVarArgType {
 extension Int8 : CVarArgType {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
-  public var _cVarArgEncoding: [Word] {
+  public var _cVarArgEncoding: [Int] {
     return _encodeBitsAsWords(CInt(self))
   }
 }
@@ -167,7 +167,7 @@ extension Int8 : CVarArgType {
 extension UInt : CVarArgType {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
-  public var _cVarArgEncoding: [Word] {
+  public var _cVarArgEncoding: [Int] {
     return _encodeBitsAsWords(self)
   }
 }
@@ -175,7 +175,7 @@ extension UInt : CVarArgType {
 extension UInt64 : CVarArgType, _CVarArgAlignedType {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
-  public var _cVarArgEncoding: [Word] {
+  public var _cVarArgEncoding: [Int] {
     return _encodeBitsAsWords(self)
   }
 
@@ -190,7 +190,7 @@ extension UInt64 : CVarArgType, _CVarArgAlignedType {
 extension UInt32 : CVarArgType {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
-  public var _cVarArgEncoding: [Word] {
+  public var _cVarArgEncoding: [Int] {
     return _encodeBitsAsWords(self)
   }
 }
@@ -198,7 +198,7 @@ extension UInt32 : CVarArgType {
 extension UInt16 : CVarArgType {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
-  public var _cVarArgEncoding: [Word] {
+  public var _cVarArgEncoding: [Int] {
     return _encodeBitsAsWords(CUnsignedInt(self))
   }
 }
@@ -206,7 +206,7 @@ extension UInt16 : CVarArgType {
 extension UInt8 : CVarArgType {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
-  public var _cVarArgEncoding: [Word] {
+  public var _cVarArgEncoding: [Int] {
     return _encodeBitsAsWords(CUnsignedInt(self))
   }
 }
@@ -214,7 +214,7 @@ extension UInt8 : CVarArgType {
 extension COpaquePointer : CVarArgType {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
-  public var _cVarArgEncoding: [Word] {
+  public var _cVarArgEncoding: [Int] {
     return _encodeBitsAsWords(self)
   }
 }
@@ -222,7 +222,7 @@ extension COpaquePointer : CVarArgType {
 extension UnsafePointer : CVarArgType {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
-  public var _cVarArgEncoding: [Word] {
+  public var _cVarArgEncoding: [Int] {
     return _encodeBitsAsWords(self)
   }
 }
@@ -230,7 +230,7 @@ extension UnsafePointer : CVarArgType {
 extension UnsafeMutablePointer : CVarArgType {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
-  public var _cVarArgEncoding: [Word] {
+  public var _cVarArgEncoding: [Int] {
     return _encodeBitsAsWords(self)
   }
 }
@@ -238,7 +238,7 @@ extension UnsafeMutablePointer : CVarArgType {
 extension AutoreleasingUnsafeMutablePointer : CVarArgType {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
-  public var _cVarArgEncoding: [Word] {
+  public var _cVarArgEncoding: [Int] {
     return _encodeBitsAsWords(self)
   }
 }
@@ -246,7 +246,7 @@ extension AutoreleasingUnsafeMutablePointer : CVarArgType {
 extension Float : _CVarArgPassedAsDouble, _CVarArgAlignedType {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
-  public var _cVarArgEncoding: [Word] {
+  public var _cVarArgEncoding: [Int] {
     return _encodeBitsAsWords(Double(self))
   }
 
@@ -261,7 +261,7 @@ extension Float : _CVarArgPassedAsDouble, _CVarArgAlignedType {
 extension Double : _CVarArgPassedAsDouble, _CVarArgAlignedType {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs.
-  public var _cVarArgEncoding: [Word] {
+  public var _cVarArgEncoding: [Int] {
     return _encodeBitsAsWords(self)
   }
 
@@ -282,16 +282,16 @@ final public class VaListBuilder {
   func append(arg: CVarArgType) {
     // Write alignment padding if necessary.
     // This is needed on architectures where the ABI alignment of some 
-    // supported vararg type is greater than the alignment of Word.
+    // supported vararg type is greater than the alignment of Int.
     // FIXME: this implementation is not portable because
     // alignof differs from the ABI alignment on some architectures
 #if os(watchOS) && arch(arm)   // FIXME: rdar://21203036 should be arch(armv7k)
     if let arg = arg as? _CVarArgAlignedType {
-      let alignmentInWords = arg._cVarArgAlignment / sizeof(Word)
+      let alignmentInWords = arg._cVarArgAlignment / sizeof(Int)
       let misalignmentInWords = count % alignmentInWords
       if misalignmentInWords != 0 {
         let paddingInWords = alignmentInWords - misalignmentInWords
-        appendWords([Word](count: paddingInWords, repeatedValue: -1))
+        appendWords([Int](count: paddingInWords, repeatedValue: -1))
       }
     }
 #endif
@@ -308,7 +308,7 @@ final public class VaListBuilder {
   // but possibly more aligned than that.
   // FIXME: this should be packaged into a better storage type
 
-  func appendWords(words: [Word]) {
+  func appendWords(words: [Int]) {
     let newCount = count + words.count
     if newCount > allocated {
       let oldAllocated = allocated
@@ -331,21 +331,21 @@ final public class VaListBuilder {
     }
   }
 
-  func rawSizeAndAlignment(wordCount: Int) 
-    -> (Builtin.Word, Builtin.Word) {
-    return ((wordCount * strideof(Word.self))._builtinWordValue, 
+  func rawSizeAndAlignment(wordCount: Int) -> (Builtin.Word, Builtin.Word) {
+    return ((wordCount * strideof(Int.self))._builtinWordValue, 
       requiredAlignmentInBytes._builtinWordValue)
   }
 
-  func allocStorage(wordCount wordCount: Int) 
-    -> UnsafeMutablePointer<Word> {
+  func allocStorage(wordCount wordCount: Int) -> UnsafeMutablePointer<Int> {
     let (rawSize, rawAlignment) = rawSizeAndAlignment(wordCount)
     let rawStorage = Builtin.allocRaw(rawSize, rawAlignment)
-    return UnsafeMutablePointer<Word>(rawStorage)
+    return UnsafeMutablePointer<Int>(rawStorage)
   }
 
-  func deallocStorage(wordCount wordCount: Int, 
-    storage: UnsafeMutablePointer<Word>) {
+  func deallocStorage(
+    wordCount wordCount: Int,
+    storage: UnsafeMutablePointer<Int>
+  ) {
     let (rawSize, rawAlignment) = rawSizeAndAlignment(wordCount)
     Builtin.deallocRaw(storage._rawValue, rawSize, rawAlignment)
   }
@@ -360,7 +360,7 @@ final public class VaListBuilder {
   let requiredAlignmentInBytes = alignof(Double.self)
   var count = 0
   var allocated = 0
-  var storage: UnsafeMutablePointer<Word> = nil
+  var storage: UnsafeMutablePointer<Int> = nil
 }
 
 #else
@@ -371,9 +371,9 @@ final public class VaListBuilder {
 
   struct Header {
     var gp_offset = CUnsignedInt(0)
-    var fp_offset = CUnsignedInt(_x86_64CountGPRegisters * strideof(Word.self))
-    var overflow_arg_area: UnsafeMutablePointer<Word> = nil
-    var reg_save_area: UnsafeMutablePointer<Word> = nil
+    var fp_offset = CUnsignedInt(_x86_64CountGPRegisters * strideof(Int.self))
+    var overflow_arg_area: UnsafeMutablePointer<Int> = nil
+    var reg_save_area: UnsafeMutablePointer<Int> = nil
   }
 
   init() {
@@ -418,7 +418,7 @@ final public class VaListBuilder {
 
   final  // Property must be final since it is used by Builtin.addressof.
   var header = Header()
-  var storage: [Word]
+  var storage: [Int]
 }
 
 #endif

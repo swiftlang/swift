@@ -29,13 +29,13 @@ UnmanagedTests.test("fromOpaque()/trap")
 
 class FooClass {}
 
-UnmanagedTests.test("unsafeBitCast(Unmanaged, Word)") {
+UnmanagedTests.test("unsafeBitCast(Unmanaged, Int)") {
   let ref = FooClass()
   expectNotEqual(
     0,
     unsafeBitCast(
       Unmanaged.passUnretained(ref) as Unmanaged<AnyObject>,
-      Word.self))
+      Int.self))
   _fixLifetime(ref)
 }
 

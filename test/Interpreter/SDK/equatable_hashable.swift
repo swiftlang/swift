@@ -24,22 +24,6 @@ func test_ObjCBool() {
 // CHECK-NEXT: ObjCBool: hash = 1
 test_ObjCBool()
 
-func test_Word() {
-  let x: Word = 42
-  let hash = testHash(x)
-  print("Word: hash = \(hash)")
-}
-// CHECK-NEXT: Word: hash = 42
-test_Word()
-
-func test_UWord() {
-  let x: UWord = 42
-  let hash = testHash(x)
-  print("UWord: hash = \(hash)")
-}
-// CHECK-NEXT: UWord: hash = 42
-test_UWord()
-
 func testEquatable<E: Equatable>(x: E) {}
 
 func test_Equatable() {

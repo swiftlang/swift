@@ -31,7 +31,7 @@
 public func assert(
   @autoclosure condition: () -> Bool,
   @autoclosure _ message: () -> String = String(),
-  file: StaticString = __FILE__, line: UWord = __LINE__
+  file: StaticString = __FILE__, line: UInt = __LINE__
 ) {
   // Only assert in debug mode.
   if _isDebugAssertConfiguration() {
@@ -61,7 +61,7 @@ public func assert(
 public func precondition(
   @autoclosure condition: () -> Bool,
   @autoclosure _ message: () -> String = String(),
-  file: StaticString = __FILE__, line: UWord = __LINE__
+  file: StaticString = __FILE__, line: UInt = __LINE__
 ) {
   // Only check in debug and release mode.  In release mode just trap.
   if _isDebugAssertConfiguration() {
@@ -95,7 +95,7 @@ public func precondition(
 @inline(__always)
 public func assertionFailure(
   @autoclosure message: () -> String = String(),
-  file: StaticString = __FILE__, line: UWord = __LINE__
+  file: StaticString = __FILE__, line: UInt = __LINE__
 ) {
   if _isDebugAssertConfiguration() {
     _assertionFailed("fatal error", message(), file, line)
@@ -123,7 +123,7 @@ public func assertionFailure(
 @transparent @noreturn
 public func preconditionFailure(
   @autoclosure message: () -> String = String(),
-  file: StaticString = __FILE__, line: UWord = __LINE__
+  file: StaticString = __FILE__, line: UInt = __LINE__
 ) {
   // Only check in debug and release mode.  In release mode just trap.
   if _isDebugAssertConfiguration() {
@@ -138,7 +138,7 @@ public func preconditionFailure(
 @transparent @noreturn
 public func fatalError(
   @autoclosure message: () -> String = String(),
-  file: StaticString = __FILE__, line: UWord = __LINE__
+  file: StaticString = __FILE__, line: UInt = __LINE__
 ) {
   _assertionFailed("fatal error", message(), file, line)
 }
@@ -152,7 +152,7 @@ public func fatalError(
 @transparent
 public func _precondition(
   @autoclosure condition: () -> Bool, _ message: StaticString = StaticString(),
-  file: StaticString = __FILE__, line: UWord = __LINE__
+  file: StaticString = __FILE__, line: UInt = __LINE__
 ) {
   // Only check in debug and release mode. In release mode just trap.
   if _isDebugAssertConfiguration() {
@@ -168,7 +168,7 @@ public func _precondition(
 @transparent @noreturn
 public func _preconditionFailure(
   message: StaticString = StaticString(),
-  file: StaticString = __FILE__, line: UWord = __LINE__) {
+  file: StaticString = __FILE__, line: UInt = __LINE__) {
 
   _precondition(false, message, file:file, line: line)
 
@@ -181,7 +181,7 @@ public func _preconditionFailure(
 @transparent
 public func _overflowChecked<T>(
   args: (T, Bool),
-  file: StaticString = __FILE__, line: UWord = __LINE__
+  file: StaticString = __FILE__, line: UInt = __LINE__
 ) -> T {
   let (result, error) = args
   if _isDebugAssertConfiguration() {
@@ -205,7 +205,7 @@ public func _overflowChecked<T>(
 @transparent
 public func _debugPrecondition(
   @autoclosure condition: () -> Bool, _ message: StaticString = StaticString(),
-  file: StaticString = __FILE__, line: UWord = __LINE__
+  file: StaticString = __FILE__, line: UInt = __LINE__
 ) {
   // Only check in debug mode.
   if _isDebugAssertConfiguration() {
@@ -218,7 +218,7 @@ public func _debugPrecondition(
 @transparent @noreturn
 public func _debugPreconditionFailure(
   message: StaticString = StaticString(),
-  file: StaticString = __FILE__, line: UWord = __LINE__) {
+  file: StaticString = __FILE__, line: UInt = __LINE__) {
   if _isDebugAssertConfiguration() {
     _precondition(false, message, file: file, line: line)
   }
@@ -234,7 +234,7 @@ public func _debugPreconditionFailure(
 @transparent
 public func _sanityCheck(
   @autoclosure condition: () -> Bool, _ message: StaticString = StaticString(),
-  file: StaticString = __FILE__, line: UWord = __LINE__
+  file: StaticString = __FILE__, line: UInt = __LINE__
 ) {
 #if INTERNAL_CHECKS_ENABLED
   if !_branchHint(condition(), true) {
@@ -246,7 +246,7 @@ public func _sanityCheck(
 @transparent @noreturn
 public func _sanityCheckFailure(
   message: StaticString = StaticString(),
-  file: StaticString = __FILE__, line: UWord = __LINE__
+  file: StaticString = __FILE__, line: UInt = __LINE__
 ) {
   _sanityCheck(false, message, file: file, line: line)
   _conditionallyUnreachable()

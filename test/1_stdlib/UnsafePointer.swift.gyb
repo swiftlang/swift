@@ -58,42 +58,42 @@ var COpaquePointerTestSuite = TestSuite("COpaquePointer")
 
 ${SelfName}TestSuite.test("convertFromNil") {
   let ptr: ${SelfType} = nil
-  expectEqual(0, unsafeBitCast(ptr, Word.self))
+  expectEqual(0, unsafeBitCast(ptr, Int.self))
 }
 
 ${SelfName}TestSuite.test("initNoArgs") {
   let ptr = ${SelfType}()
-  expectEqual(0, unsafeBitCast(ptr, Word.self))
+  expectEqual(0, unsafeBitCast(ptr, Int.self))
 }
 
 ${SelfName}TestSuite.test("initFromCOpaquePointer") {
   let other = COpaquePointer(bitPattern: 0x12345678)
   let ptr = UnsafePointer<Float>(other)
-  expectEqual(0x12345678, unsafeBitCast(ptr, Word.self))
+  expectEqual(0x12345678, unsafeBitCast(ptr, Int.self))
 }
 
 ${SelfName}TestSuite.test("initFromUnsafePointer") {
   let other = UnsafePointer<Double>(bitPattern: 0x12345678)
   let ptr = ${SelfType}(other)
-  expectEqual(0x12345678, unsafeBitCast(ptr, Word.self))
+  expectEqual(0x12345678, unsafeBitCast(ptr, Int.self))
 }
 
 ${SelfName}TestSuite.test("initFromUnsafeMutablePointer") {
   let other = UnsafeMutablePointer<Double>(bitPattern: 0x12345678)
   let ptr = ${SelfType}(other)
-  expectEqual(0x12345678, unsafeBitCast(ptr, Word.self))
+  expectEqual(0x12345678, unsafeBitCast(ptr, Int.self))
 }
 
 ${SelfName}TestSuite.test("initFromInteger") {
   if true {
-    let word: Word = 0x12345678
+    let word: Int = 0x12345678
     let ptr = ${SelfType}(bitPattern: word)
-    expectEqual(word, unsafeBitCast(ptr, Word.self))
+    expectEqual(word, unsafeBitCast(ptr, Int.self))
   }
   if true {
-    let uword: UWord = 0x12345678
+    let uword: UInt = 0x12345678
     let ptr = ${SelfType}(bitPattern: uword)
-    expectEqual(uword, unsafeBitCast(ptr, UWord.self))
+    expectEqual(uword, unsafeBitCast(ptr, UInt.self))
   }
 }
 

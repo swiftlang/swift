@@ -254,7 +254,7 @@ public func == (lhs: NSObject, rhs: NSObject) -> Bool {
 extension NSObject : CVarArgType {
   /// Transform `self` into a series of machine words that can be
   /// appropriately interpreted by C varargs
-  public var _cVarArgEncoding: [Word] {
+  public var _cVarArgEncoding: [Int] {
     _autorelease(self)
     return _encodeBitsAsWords(self)
   }

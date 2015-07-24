@@ -11,7 +11,7 @@ import Swift
 func hex(x: UInt64) -> String { return String(x, radix:16) }
 
 func hexAddrVal<T>(x: T) -> String {
-  return "@0x" + hex(UInt64(unsafeBitCast(x, UWord.self)))
+  return "@0x" + hex(UInt64(unsafeBitCast(x, UInt.self)))
 }
 
 func hexAddr(x: AnyObject?) -> String {

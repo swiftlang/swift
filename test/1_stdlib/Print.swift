@@ -59,7 +59,7 @@ var failed = false
 
 func printedIs<T>(
     object: T, _ expected1: String, expected2: String? = nil,
-    file: StaticString = __FILE__, line: UWord = __LINE__
+    file: StaticString = __FILE__, line: UInt = __LINE__
 ) {
   var actual = String(object)
   var match = expected1 == actual
@@ -77,7 +77,7 @@ func printedIs<T>(
 
 func debugPrintedIs<T>(
     object: T, _ expected1: String, expected2: String? = nil,
-    file: StaticString = __FILE__, line: UWord = __LINE__
+    file: StaticString = __FILE__, line: UInt = __LINE__
 ) {
   var actual = ""
   debugPrint(object, &actual, appendNewline: false)
@@ -92,7 +92,7 @@ func debugPrintedIs<T>(
 
 func assertEquals(
     expected: String, _ actual: String,
-    file: StaticString = __FILE__, line: UWord = __LINE__
+    file: StaticString = __FILE__, line: UInt = __LINE__
 ) {
   if expected != actual {
     print("check failed at \(file), line \(line)")
@@ -455,7 +455,7 @@ func test_PointerPrinting() {
   let fourByteUP = UnsafeMutablePointer<Float>(bitPattern: 0xabcd1234 as UInt)
 
 #if !(arch(i386) || arch(arm))
-  let eightByteAddr: UWord = 0xabcddcba12344321
+  let eightByteAddr: UInt = 0xabcddcba12344321
   let eightByteUP = UnsafeMutablePointer<Float>(bitPattern: eightByteAddr)
 #endif
 

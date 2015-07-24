@@ -246,7 +246,7 @@ internal struct _UnmanagedAnyObjectArray {
 
   /// Underlying pointer, typed as an integer to escape from reference
   /// counting.
-  internal var value: UnsafeMutablePointer<Word>
+  internal var value: UnsafeMutablePointer<Int>
 
   internal init(_ up: UnsafeMutablePointer<AnyObject>) {
     self.value = UnsafeMutablePointer(up)
@@ -257,7 +257,7 @@ internal struct _UnmanagedAnyObjectArray {
       return _reinterpretCastToAnyObject(value[i])
     }
     nonmutating set(newValue) {
-      value[i] = unsafeBitCast(newValue, Word.self)
+      value[i] = unsafeBitCast(newValue, Int.self)
     }
   }
 }

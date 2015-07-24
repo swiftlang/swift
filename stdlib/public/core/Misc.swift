@@ -99,7 +99,7 @@ public func _stdlib_getDemangledTypeName<T>(value: T) -> String {
 @asmname("swift_stdlib_demangleName")
 func _stdlib_demangleNameImpl(
     mangledName: UnsafePointer<UInt8>,
-    _ mangledNameLength: UWord,
+    _ mangledNameLength: UInt,
     _ demangledName: UnsafeMutablePointer<String>)
 
 public func _stdlib_demangleName(mangledName: String) -> String {
@@ -108,7 +108,7 @@ public func _stdlib_demangleName(mangledName: String) -> String {
     (mangledNameUTF8) in
     let (_, demangledName) = _withUninitializedString {
       _stdlib_demangleNameImpl(
-        mangledNameUTF8.baseAddress, UWord(mangledNameUTF8.endIndex),
+        mangledNameUTF8.baseAddress, UInt(mangledNameUTF8.endIndex),
         $0)
     }
     return demangledName

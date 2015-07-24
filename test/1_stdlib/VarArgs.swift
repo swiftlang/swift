@@ -61,7 +61,7 @@ test_varArgs3()
 func test_varArgs4() {
   // Verify alignment of va_list contents.
   // On some architectures some types are better-
-  // aligned than Word and must be packaged with care.
+  // aligned than Int and must be packaged with care.
 
   let  i8 = Int8(1)
   let i16 = Int16(2)

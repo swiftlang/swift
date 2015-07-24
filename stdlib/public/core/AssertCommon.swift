@@ -58,27 +58,27 @@ func _isStdlibInternalChecksEnabled() -> Bool {
 
 @asmname("swift_reportFatalErrorInFile")
 func _reportFatalErrorInFile(
-  prefix: UnsafePointer<UInt8>, _ prefixLength: UWord,
-  _ message: UnsafePointer<UInt8>, _ messageLength: UWord,
-  _ file: UnsafePointer<UInt8>, _ fileLength: UWord,
-  _ line: UWord)
+  prefix: UnsafePointer<UInt8>, _ prefixLength: UInt,
+  _ message: UnsafePointer<UInt8>, _ messageLength: UInt,
+  _ file: UnsafePointer<UInt8>, _ fileLength: UInt,
+  _ line: UInt)
 
 @asmname("swift_reportFatalError")
 func _reportFatalError(
-  prefix: UnsafePointer<UInt8>, _ prefixLength: UWord,
-  _ message: UnsafePointer<UInt8>, _ messageLength: UWord)
+  prefix: UnsafePointer<UInt8>, _ prefixLength: UInt,
+  _ message: UnsafePointer<UInt8>, _ messageLength: UInt)
 
 @asmname("swift_reportUnimplementedInitializerInFile")
 func _reportUnimplementedInitializerInFile(
-  className: UnsafePointer<UInt8>, _ classNameLength: UWord,
-  _ initName: UnsafePointer<UInt8>, _ initNameLength: UWord,
-  _ file: UnsafePointer<UInt8>, _ fileLength: UWord,
-  _ line: UWord, _ column: UWord)
+  className: UnsafePointer<UInt8>, _ classNameLength: UInt,
+  _ initName: UnsafePointer<UInt8>, _ initNameLength: UInt,
+  _ file: UnsafePointer<UInt8>, _ fileLength: UInt,
+  _ line: UInt, _ column: UInt)
 
 @asmname("swift_reportUnimplementedInitializer")
 func _reportUnimplementedInitializer(
-  className: UnsafePointer<UInt8>, _ classNameLength: UWord,
-  _ initName: UnsafePointer<UInt8>, _ initNameLength: UWord)
+  className: UnsafePointer<UInt8>, _ classNameLength: UInt,
+  _ initName: UnsafePointer<UInt8>, _ initNameLength: UInt)
 
 /// This function should be used only in the implementation of user-level
 /// assertions.
@@ -88,7 +88,7 @@ func _reportUnimplementedInitializer(
 @noreturn @inline(never)
 func _assertionFailed(
   prefix: StaticString, _ message: StaticString,
-  _ file: StaticString, _ line: UWord
+  _ file: StaticString, _ line: UInt
 ) {
   prefix.withUTF8Buffer {
     (prefix) -> () in
@@ -97,9 +97,9 @@ func _assertionFailed(
       file.withUTF8Buffer {
         (file) -> () in
         _reportFatalErrorInFile(
-          prefix.baseAddress, UWord(prefix.count),
-          message.baseAddress, UWord(message.count),
-          file.baseAddress, UWord(file.count), line)
+          prefix.baseAddress, UInt(prefix.count),
+          message.baseAddress, UInt(message.count),
+          file.baseAddress, UInt(file.count), line)
         Builtin.int_trap()
       }
     }
@@ -115,7 +115,7 @@ func _assertionFailed(
 @noreturn @inline(never)
 func _assertionFailed(
   prefix: StaticString, _ message: String,
-  _ file: StaticString, _ line: UWord
+  _ file: StaticString, _ line: UInt
 ) {
   prefix.withUTF8Buffer {
     (prefix) -> () in
@@ -125,9 +125,9 @@ func _assertionFailed(
       file.withUTF8Buffer {
         (file) -> () in
         _reportFatalErrorInFile(
-          prefix.baseAddress, UWord(prefix.count),
-          messageUTF8.baseAddress, UWord(messageUTF8.count),
-          file.baseAddress, UWord(file.count), line)
+          prefix.baseAddress, UInt(prefix.count),
+          messageUTF8.baseAddress, UInt(messageUTF8.count),
+          file.baseAddress, UInt(file.count), line)
       }
     }
   }
@@ -143,7 +143,7 @@ func _assertionFailed(
 @noreturn @inline(never)
 @_semantics("stdlib_binary_only")
 func _fatalErrorMessage(prefix: StaticString, _ message: StaticString,
-                        _ file: StaticString, _ line: UWord) {
+                        _ file: StaticString, _ line: UInt) {
 #if INTERNAL_CHECKS_ENABLED
   prefix.withUTF8Buffer {
     (prefix) in
@@ -152,9 +152,9 @@ func _fatalErrorMessage(prefix: StaticString, _ message: StaticString,
       file.withUTF8Buffer {
         (file) in
         _reportFatalErrorInFile(
-          prefix.baseAddress, UWord(prefix.count),
-          message.baseAddress, UWord(message.count),
-          file.baseAddress, UWord(file.count), line)
+          prefix.baseAddress, UInt(prefix.count),
+          message.baseAddress, UInt(message.count),
+          file.baseAddress, UInt(file.count), line)
       }
     }
   }
@@ -164,8 +164,8 @@ func _fatalErrorMessage(prefix: StaticString, _ message: StaticString,
     message.withUTF8Buffer {
       (message) in
       _reportFatalError(
-        prefix.baseAddress, UWord(prefix.count),
-        message.baseAddress, UWord(message.count))
+        prefix.baseAddress, UInt(prefix.count),
+        message.baseAddress, UInt(message.count))
     }
   }
 #endif
@@ -180,8 +180,8 @@ public // COMPILER_INTRINSIC
 func _unimplemented_initializer(className: StaticString,
                                 initName: StaticString = __FUNCTION__,
                                 file: StaticString = __FILE__,
-                                line: UWord = __LINE__,
-                                column: UWord = __COLUMN__) {
+                                line: UInt = __LINE__,
+                                column: UInt = __COLUMN__) {
   // This function is marked @transparent so that it is inlined into the caller
   // (the initializer stub), and, depending on the build configuration,
   // redundant parameter values (__FILE__ etc.) are eliminated, and don't leak
@@ -195,9 +195,9 @@ func _unimplemented_initializer(className: StaticString,
         file.withUTF8Buffer {
           (file) in
           _reportUnimplementedInitializerInFile(
-            className.baseAddress, UWord(className.count),
-            initName.baseAddress, UWord(initName.count),
-            file.baseAddress, UWord(file.count), line, column)
+            className.baseAddress, UInt(className.count),
+            initName.baseAddress, UInt(initName.count),
+            file.baseAddress, UInt(file.count), line, column)
         }
       }
     }
@@ -207,8 +207,8 @@ func _unimplemented_initializer(className: StaticString,
       initName.withUTF8Buffer {
         (initName) in
         _reportUnimplementedInitializer(
-          className.baseAddress, UWord(className.count),
-          initName.baseAddress, UWord(initName.count))
+          className.baseAddress, UInt(className.count),
+          initName.baseAddress, UInt(initName.count))
       }
     }
   }

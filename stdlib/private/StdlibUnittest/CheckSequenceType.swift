@@ -20,7 +20,7 @@ public struct FindTest {
   public init(
     expected: Int?, element: Int, sequence: [Int],
     expectedLeftoverSequence: [Int],
-    file: String = __FILE__, line: UWord = __LINE__
+    file: String = __FILE__, line: UInt = __LINE__
   ) {
     self.expected = expected
     self.element = MinimalEquatableValue(element)
@@ -38,7 +38,7 @@ public struct DropFirstTest {
   public let loc: SourceLoc
 
   public init(sequence: [Int], dropElements: Int, expected: [Int],
-      file: String = __FILE__, line: UWord = __LINE__) {
+      file: String = __FILE__, line: UInt = __LINE__) {
     self.sequence = sequence
     self.dropElements = dropElements
     self.expected = expected
@@ -53,7 +53,7 @@ public struct DropLastTest {
   public let loc: SourceLoc
 
   public init(sequence: [Int], dropElements: Int, expected: [Int],
-      file: String = __FILE__, line: UWord = __LINE__) {
+      file: String = __FILE__, line: UInt = __LINE__) {
     self.sequence = sequence
     self.dropElements = dropElements
     self.expected = expected
@@ -68,7 +68,7 @@ public struct PrefixTest {
   public let loc: SourceLoc
 
   public init(sequence: [Int], maxLength: Int, expected: [Int],
-      file: String = __FILE__, line: UWord = __LINE__) {
+      file: String = __FILE__, line: UInt = __LINE__) {
     self.sequence = sequence
     self.maxLength = maxLength
     self.expected = expected
@@ -83,7 +83,7 @@ public struct SuffixTest {
   public let loc: SourceLoc
 
   public init(sequence: [Int], maxLength: Int, expected: [Int],
-      file: String = __FILE__, line: UWord = __LINE__) {
+      file: String = __FILE__, line: UInt = __LINE__) {
     self.sequence = sequence
     self.maxLength = maxLength
     self.expected = expected
@@ -100,7 +100,7 @@ public struct SplitTest {
   public let loc: SourceLoc
 
   public init(sequence: [Int], maxSplit: Int, separator: Int, expected: [[Int]],
-       allowEmptySlices: Bool, file: String = __FILE__, line: UWord = __LINE__) {
+       allowEmptySlices: Bool, file: String = __FILE__, line: UInt = __LINE__) {
     self.sequence = sequence
     self.maxSplit = maxSplit
     self.separator = separator
@@ -396,7 +396,7 @@ internal struct ForEachTest {
 
   init(
     _ sequence: [Int],
-    file: String = __FILE__, line: UWord = __LINE__
+    file: String = __FILE__, line: UInt = __LINE__
   ) {
     self.sequence = sequence
     self.loc = SourceLoc(file, line, comment: "test data")
