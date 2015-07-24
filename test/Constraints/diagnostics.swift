@@ -453,3 +453,11 @@ func rdar20868864(var s: String) {
     s = strings   // expected-error {{'[String]' is not convertible to 'String'}}
   }
 }
+
+// <rdar://problem/20491794> Error message does not tell me what the problem is
+enum Color {
+  case Red
+  case Unknown(description: String)
+}
+let _: (Int, Color) = [1,2].map({ ($0, .Unknown("")) }) // expected-error {{type of expression is ambiguous without more context}}
+
