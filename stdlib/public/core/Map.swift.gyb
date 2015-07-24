@@ -62,6 +62,13 @@ public struct _prext_LazyMapSequence<Base : SequenceType, Element>
   public func underestimateCount() -> Int {
     return _base.underestimateCount()
   }
+
+  /// Create an instance with elements `transform(x)` for each element
+  /// `x` of base.
+  public init(_ base: Base, transform: (Base.Generator.Element)->Element) {
+    self._base = base
+    self._transform = transform
+  }
   
   public var _base: Base
   internal var _transform: (Base.Generator.Element)->Element
@@ -111,6 +118,13 @@ public struct _prext_LazyMapCollection<Base : CollectionType, Element>
   public var count: Index.Distance {
     return _base.count
   }
+
+  /// Create an instance with elements `transform(x)` for each element
+  /// `x` of base.
+  public init(_ base: Base, transform: (Base.Generator.Element)->Element) {
+    self._base = base
+    self._transform = transform
+  }
   
   public var _base: Base
   var _transform: (Base.Generator.Element)->Element
@@ -124,8 +138,8 @@ extension _prext_LazySequenceType {
   /// calling `transform` function on a base element.
   public func map<U>(
     transform: (Elements.Generator.Element) -> U
-  ) -> _prext_LazyMapSequence<Self.Elements, U> {
-    return _prext_LazyMapSequence(_base: self.elements, _transform: transform)
+  ) -> _prext_LazyMapSequence<Elements, U> {
+    return _prext_LazyMapSequence(self.elements, transform: transform)
   }
 }
 
@@ -136,7 +150,7 @@ extension _prext_LazyCollectionType {
   public func map<U>(
     transform: (Elements.Generator.Element) -> U
   ) -> _prext_LazyMapCollection<Self.Elements, U> {
-    return _prext_LazyMapCollection(_base: self.elements, _transform: transform)
+    return _prext_LazyMapCollection(self.elements, transform: transform)
   }
 }
 
