@@ -2066,7 +2066,8 @@ public:
   /// This is the same as typeCheckChildIndependently, but works on an arbitrary
   /// subexpression of the current node because it handles ClosureExpr parents
   /// of the specified node.
-  Expr *typeCheckArbitrarySubExprIndependently(Expr *subExpr);
+  Expr *typeCheckArbitrarySubExprIndependently(Expr *subExpr,
+                                               bool allowUnresolved = false);
   
 
   /// Attempt to diagnose a specific failure from the info we've collected from
@@ -2282,10 +2283,12 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure() {
   Type argType;
   if (auto *AE = dyn_cast_or_null<ApplyExpr>(call)) {
     if (AE->getFn()->getSemanticsProvidingExpr() == anchor) {
-      // FIXME: Need to enable this to get resolved types for the function, but
-      // must tolerate contextually resolved exprs first to handle curried cases
-      //argType = getTypeOfTypeCheckedChildIndependently(AE->getArg());
-      argType = AE->getArg()->getType();
+      // Type check the argument list independently to try to get a concrete
+      // type (ignoring context).
+      auto argExpr = typeCheckArbitrarySubExprIndependently(AE->getArg(), true);
+      if (!argExpr) return true;
+
+      argType = argExpr->getType();
     }
   }
   
@@ -2540,7 +2543,7 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr,
   // FIXME: expressions are never removed from this set.
   CS->TC.addExprForDiagnosis(subExpr, subExpr);
   
-  if (isa<ClosureExpr>(subExpr))
+  if (auto CD = dyn_cast<ClosureExpr>(subExpr))
     allowUnresolved = true;
   
   // These expression types can never be checked without their enclosing
@@ -2620,13 +2623,12 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr,
 /// This is the same as typeCheckChildIndependently, but works on an arbitrary
 /// subexpression of the current node because it handles ClosureExpr parents
 /// of the specified node.
-Expr *FailureDiagnosis::typeCheckArbitrarySubExprIndependently(Expr *subExpr) {
+Expr *FailureDiagnosis::
+typeCheckArbitrarySubExprIndependently(Expr *subExpr, bool allowUnresolved) {
   if (subExpr == expr) return typeCheckChildIndependently(subExpr);
   
   // Construct a parent map for the expr tree we're investigating.
   auto parentMap = expr->getParentMap();
-  
-  bool hasInvalidArguments = false;
   
   // Walk the parents of the specified expression, handling any ClosureExprs.
   for (Expr *node = parentMap[subExpr]; node != expr; node = parentMap[node]) {
@@ -2636,20 +2638,15 @@ Expr *FailureDiagnosis::typeCheckArbitrarySubExprIndependently(Expr *subExpr) {
     // If we have a ClosureExpr parent of the specified node, check to make sure
     // none of its arguments are type variables.  If so, these type variables
     // would be accessible to name lookup of the subexpression and may thus leak
-    // in.  Reset them to ErrorType for safe measures.
+    // in.  Reset them to null types for safe measures.
     CE->getParams()->forEachVariable([&](VarDecl *VD) {
-      hasInvalidArguments |= VD->getType()->hasTypeVariable();
+      if (VD->getType()->hasTypeVariable() || VD->getType()->is<ErrorType>())
+        VD->overwriteType(Type());
     });
   }
   
-  // If there are any problematic closure arguments, just deny re-typechecking
-  // the subexpression.  There is no argument type we can provide that would
-  // do justice to the situation.
-  if (hasInvalidArguments)
-    return subExpr;
-  
   // Otherwise, we're ok to type check the subexpr.
-  return typeCheckChildIndependently(subExpr);
+  return typeCheckChildIndependently(subExpr, allowUnresolved);
 }
 
 
@@ -3258,7 +3255,7 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
   // TODO: If there is a partial type available for the closure, we should apply
   // whatever information we have about it to the paramdecls.
   CE->getParams()->forEachVariable([&](VarDecl *VD) {
-    if (VD->getType()->hasTypeVariable())
+    if (VD->getType()->hasTypeVariable() || VD->getType()->is<ErrorType>())
       VD->overwriteType(Type());
   });
   
