@@ -2069,8 +2069,6 @@ public:
   Expr *typeCheckArbitrarySubExprIndependently(Expr *subExpr,
                                                bool allowUnresolved = false);
   
-  /// Special magic to handle inout exprs and tuples in argument lists.
-  Expr *typeCheckArgumentChildIndependently(Expr *argExpr);
 
   /// Attempt to diagnose a specific failure from the info we've collected from
   /// the failed constraint system.
@@ -2595,8 +2593,8 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr,
   if (allowUnresolved)
     options = options | TypeCheckExprFlags::AllowUnresolvedTypeVariables;
 
-  bool hadError = CS->TC.typeCheckExpression(subExpr, CS->DC, Type(),
-                                             Type(), options);
+  bool hadError = CS->TC.typeCheckExpression(subExpr, CS->DC, Type(), Type(),
+                                             options);
 
   // This is a terrible hack to get around the fact that typeCheckExpression()
   // might change subExpr to point to a new OpenExistentialExpr. In that case,
@@ -2627,8 +2625,7 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr,
 /// of the specified node.
 Expr *FailureDiagnosis::
 typeCheckArbitrarySubExprIndependently(Expr *subExpr, bool allowUnresolved) {
-  if (subExpr == expr)
-    return typeCheckChildIndependently(subExpr, allowUnresolved);
+  if (subExpr == expr) return typeCheckChildIndependently(subExpr);
   
   // Construct a parent map for the expr tree we're investigating.
   auto parentMap = expr->getParentMap();
@@ -2725,50 +2722,8 @@ void ConstraintSystem::diagnoseAssignmentFailure(Expr *dest, Type destTy,
                             diag::assignment_lhs_not_lvalue);
 }
 
-
-/// Special magic to handle inout exprs and tuples in argument lists.
-Expr *FailureDiagnosis::typeCheckArgumentChildIndependently(Expr *argExpr) {
-  if (auto *PE = dyn_cast<ParenExpr>(argExpr))
-    return typeCheckChildIndependently(PE->getSubExpr());
-  
-  // FIXME: This should all just be a matter of getting type type of the
-  // sub-expression, but this doesn't work well when the argument list
-  // contains InOutExprs and typeCheckChildIndependently is over-conservative
-  // w.r.t. TupleExprs.
-  if (auto *TE = dyn_cast<TupleExpr>(argExpr)) {
-    bool containsInOutExprs = true;
-    for (auto elt : TE->getElements())
-      containsInOutExprs |= isa<InOutExpr>(elt);
-    
-    if (!containsInOutExprs)
-      return typeCheckChildIndependently(TE);
-
-    // If InOutExprs are in play, get the simplified type of each element and
-    // rebuild the aggregate :-(
-    SmallVector<TupleTypeElt, 4> resultEltTys;
-    SmallVector<Expr*, 4> resultElts;
-    
-    for (unsigned i = 0, e = TE->getNumElements(); i != e; i++) {
-      auto elExpr = typeCheckChildIndependently(TE->getElement(i));
-      if (!elExpr) return nullptr; // already diagnosed.
-      
-      resultElts.push_back(elExpr);
-      resultEltTys.push_back({elExpr->getType(), TE->getElementName(i)});
-    }
-    
-    auto TT = TupleType::get(resultEltTys, CS->getASTContext());
-    return TupleExpr::create(CS->getASTContext(), TE->getLParenLoc(),
-                             resultElts, TE->getElementNames(),
-                             TE->getElementNameLocs(),
-                             TE->getRParenLoc(), TE->hasTrailingClosure(),
-                             TE->isImplicit(), TT);
-  }
-  
-  return typeCheckChildIndependently(unwrapParenExpr(argExpr));
-}
-
 bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
-  auto checkedArgExpr = typeCheckArgumentChildIndependently(binop->getArg());
+  auto checkedArgExpr = typeCheckChildIndependently(binop->getArg());
   if (!checkedArgExpr) return true;
 
   // Pre-checking can turn (T,U) into a TypeExpr.  That's an artifact
@@ -2839,7 +2794,7 @@ bool FailureDiagnosis::visitUnaryExpr(ApplyExpr *applyExpr) {
   assert(expr->getKind() == ExprKind::PostfixUnary ||
          expr->getKind() == ExprKind::PrefixUnary);
   
-  auto argExpr = typeCheckArgumentChildIndependently(applyExpr->getArg());
+  auto argExpr = typeCheckChildIndependently(applyExpr->getArg());
 
   // If the argument type is an error, we've posted the diagnostic recursively.
   if (!argExpr) return true;
@@ -2889,7 +2844,7 @@ bool FailureDiagnosis::visitUnaryExpr(ApplyExpr *applyExpr) {
 }
 
 bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
-  auto indexExpr = typeCheckArgumentChildIndependently(SE->getIndex());
+  auto indexExpr = typeCheckChildIndependently(SE->getIndex());
   if (!indexExpr) return true;
 
   auto baseExpr = typeCheckChildIndependently(SE->getBase());
@@ -2980,7 +2935,6 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
   return true;
 }
 
-
 bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
   // Type check the function subexpression to resolve a type for it if possible.
   auto fnExpr = typeCheckChildIndependently(callExpr->getFn(), true);
@@ -2989,7 +2943,7 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
   // If we resolved a concrete expression for the callee, and it has
   // non-function/non-metatype type, then we cannot call it!
   auto fnType = fnExpr->getType()->getRValueType();
-
+  
   if (!typeIsNotSpecialized(fnType) &&
       !fnType->is<AnyFunctionType>() && !fnType->is<MetatypeType>()) {
     diagnose(callExpr->getArg()->getStartLoc(),
@@ -2998,18 +2952,51 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
     .highlight(fnExpr->getSourceRange());
     return true;
   }
-  
-  Type argType;  // Type of the argument list, if knowable.
-#if 0
-  if (auto FTy = fnType->getAs<AnyFunctionType>())
-    if (!typeIsNotSpecialized(FTy->getInput()))
-      argType = FTy->getInput();
-#endif
 
 
   // Get the expression result of type checking the arguments to the call
   // independently, so we have some idea of what we're working with.
-  auto argExpr = typeCheckArgumentChildIndependently(callExpr->getArg());
+  auto argExpr = callExpr->getArg();
+  if (auto *PE = dyn_cast<ParenExpr>(argExpr)) {
+    argExpr = typeCheckChildIndependently(PE->getSubExpr());
+  } else if (auto *TE = dyn_cast<TupleExpr>(argExpr)) {
+    // FIXME: This should all just be a matter of getting type type of the
+    // sub-expression, but this doesn't work well when the argument list
+    // contains InOutExprs.  Special case them to avoid producing poor
+    // diagnostics.
+    bool containsInOutExprs = false;
+    for (auto elt : TE->getElements())
+      containsInOutExprs |= isa<InOutExpr>(elt);
+    
+    if (!containsInOutExprs) {
+      argExpr = typeCheckChildIndependently(TE);
+    } else {
+      // If InOutExprs are in play, get the simplified type of each element and
+      // rebuild the aggregate :-(
+      SmallVector<TupleTypeElt, 4> resultEltTys;
+      SmallVector<Expr*, 4> resultElts;
+      
+      for (unsigned i = 0, e = TE->getNumElements(); i != e; i++) {
+        auto elExpr = typeCheckChildIndependently(TE->getElement(i));
+        if (!elExpr)
+          return true; // already diagnosed.
+        
+        resultElts.push_back(elExpr);
+        resultEltTys.push_back({elExpr->getType(), TE->getElementName(i)});
+      }
+      
+      auto TT = TupleType::get(resultEltTys, CS->getASTContext());
+      argExpr = TupleExpr::create(CS->getASTContext(), TE->getLParenLoc(),
+                                  resultElts, TE->getElementNames(),
+                                  TE->getElementNameLocs(),
+                                  TE->getRParenLoc(), TE->hasTrailingClosure(),
+                                  TE->isImplicit(), TT);
+    }
+    
+  } else {
+    argExpr = typeCheckChildIndependently(unwrapParenExpr(argExpr));
+  }
+  
   if (!argExpr)
     return true; // already diagnosed.
 

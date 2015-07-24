@@ -180,7 +180,7 @@ func test_subscript(inout x2: X2, i: Int, j: Int, inout value: Int, no: NoSubscr
   ovl[(i, j)] = value
 
   value = ovl[(i, j, i)] // expected-error{{cannot subscript a value of type 'OverloadedSubscript' with an index of type '(Int, Int, Int)'}}
-  // expected-note @-1 {{overloads for 'subscript' exist with these partially matching parameter lists: (Int), (Int, Int)}}
+  // expected-note @-1 {{expected an argument list of type '(Int)'}}
 
   ret[i] // expected-error{{multiple candidates fail to match based on result type}}
   // expected-note @-1 {{expected an argument list of type '(Int)'}}
