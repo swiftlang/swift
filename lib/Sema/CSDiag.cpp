@@ -2543,7 +2543,7 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr,
   // FIXME: expressions are never removed from this set.
   CS->TC.addExprForDiagnosis(subExpr, subExpr);
   
-  if (auto CD = dyn_cast<ClosureExpr>(subExpr))
+  if (isa<ClosureExpr>(subExpr))
     allowUnresolved = true;
   
   // These expression types can never be checked without their enclosing
