@@ -703,7 +703,7 @@ internal func _nativeUnicodeLowercaseString(str: String) -> String {
     capacity: str._core.count, initialSize: str._core.count, elementWidth: 2)
 
   // Try to write it out to the same length.
-  var dest = UnsafeMutablePointer<UTF16.CodeUnit>(buffer.start)
+  let dest = UnsafeMutablePointer<UTF16.CodeUnit>(buffer.start)
   let z = _swift_stdlib_unicode_strToLower(
     dest, Int32(str._core.count),
     str._core.startUTF16, Int32(str._core.count))
@@ -725,7 +725,7 @@ internal func _nativeUnicodeUppercaseString(str: String) -> String {
     capacity: str._core.count, initialSize: str._core.count, elementWidth: 2)
 
   // Try to write it out to the same length.
-  var dest = UnsafeMutablePointer<UTF16.CodeUnit>(buffer.start)
+  let dest = UnsafeMutablePointer<UTF16.CodeUnit>(buffer.start)
   let z = _swift_stdlib_unicode_strToUpper(
     dest, Int32(str._core.count),
     str._core.startUTF16, Int32(str._core.count))
