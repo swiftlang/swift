@@ -3401,10 +3401,6 @@ static Type getSelfTypeForContainer(AbstractFunctionDecl *theMethod,
     isMutating = true;
   }
 
-
-  if (outerGenericParams)
-    *outerGenericParams = nullptr;
-  
   Type selfTy = selfTypeOverride;
   if (!selfTy) {
     // For a protocol, the type of 'self' is the parameter type 'Self', not
