@@ -3721,30 +3721,6 @@ public:
       return;
     }
 
-    // Reject things like "func f(Int)" if it has a body, since this will
-    // implicitly name the argument 'f'.  Instead, suggest that the user write
-    // this as "func f(_: Int)".
-    if (FD->hasBody() && FD->getBodyParamPatterns().size() == 1) {
-      Pattern *BodyPattern = FD->getBodyParamPatterns()[0];
-      
-      // Look through single-entry tuple elements, which can exist when there
-      // are default values.
-      if (auto *TP = dyn_cast<TuplePattern>(BodyPattern))
-        if (TP->getNumElements() == 1 && !TP->getElement(0).hasEllipsis())
-          BodyPattern =TP->getElement(0).getPattern();
-      // Look through typedpatterns and parens.
-      BodyPattern = BodyPattern->getSemanticsProvidingPattern();
-      
-      if (auto *NP = dyn_cast<NamedPattern>(BodyPattern))
-        if (NP->getDecl()->getName() == FD->getName() && NP->isImplicit()) {
-          TC.diagnose(BodyPattern->getLoc(), diag::implied_name_no_argument)
-            .fixItInsert(BodyPattern->getLoc(), "_: ");
-          // Mark the decl as invalid to avoid inscrutable downstream errors.
-          NP->getDecl()->setInvalid();
-          NP->getDecl()->overwriteType(ErrorType::get(TC.Context));
-        }
-    }
-    
     Type funcTy = FD->getBodyResultTypeLoc().getType();
     if (!funcTy) {
       funcTy = TupleType::getEmpty(TC.Context);

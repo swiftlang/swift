@@ -634,8 +634,6 @@ ERROR(missing_in_class_init_3plus,sema_tcd,none,
 NOTE(requires_stored_property_inits_here,sema_tcd,none,
      "%select{superclass|class}1 %0 requires all stored properties to have "
      "initial values%select{| or use @NSManaged}2", (Type, bool, bool))
-ERROR(implied_name_no_argument,sema_tcd,none,
-      "no name specified for first argument, name it '_' to ignore it", ())
 ERROR(class_without_init,sema_tcd,none,
       "class %0 has no initializers", (Type))
 NOTE(note_no_in_class_init_1,sema_tcd,none,
