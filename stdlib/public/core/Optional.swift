@@ -25,20 +25,20 @@ public enum Optional<T> : _Reflectable, NilLiteralConvertible {
   public init(_ some: T) { self = .Some(some) }
 
   /// If `self == nil`, returns `nil`.  Otherwise, returns `f(self!)`.
-  public func map<U>(@noescape f: (T) throws -> U) rethrows -> U? {
+  public func map<U>(@noescape f: (T)->U) -> U? {
     switch self {
     case .Some(let y):
-      return .Some(try f(y))
+      return .Some(f(y))
     case .None:
       return .None
     }
   }
 
   /// Returns `nil` if `self` is nil, `f(self!)` otherwise.
-  public func flatMap<U>(@noescape f: (T) throws -> U?) rethrows -> U? {
+  public func flatMap<U>(@noescape f: (T)->U?) -> U? {
     switch self {
     case .Some(let y):
-      return try f(y)
+      return f(y)
     case .None:
       return .None
     }

@@ -37,7 +37,7 @@
 }
 
 // LITERAL4:         Begin completions
-// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   withCString({#(f): UnsafePointer<Int8> throws -> Result##UnsafePointer<Int8> throws -> Result#})[' rethrows'][#Result#]; name=withCString(f: UnsafePointer<Int8> throws -> Result) rethrows{{$}}
+// LITERAL4-DAG:     Decl[InstanceMethod]/CurrNominal:   withCString({#(f): UnsafePointer<Int8> -> Result##UnsafePointer<Int8> -> Result#})[#Result#]; name=withCString(f: UnsafePointer<Int8> -> Result){{$}}
 
 // FIXME: we should show the qualified String.Index type.
 // rdar://problem/20788802

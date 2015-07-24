@@ -415,14 +415,14 @@ extension _ArrayBuffer {
   /// underlying contiguous storage.  If no such storage exists, it is
   /// created on-demand.
   public func withUnsafeBufferPointer<R>(
-    @noescape body: (UnsafeBufferPointer<Element>) throws -> R
-  ) rethrows -> R {
+    @noescape body: (UnsafeBufferPointer<Element>) -> R
+  ) -> R {
     if _fastPath(_isNative) {
-      defer { _fixLifetime(self) }
-      return try body(UnsafeBufferPointer(start: self.baseAddress,
-                                          count: count))
+      let ret = body(UnsafeBufferPointer(start: self.baseAddress, count: count))
+      _fixLifetime(self)
+      return ret
     }
-    return try ContiguousArray(self).withUnsafeBufferPointer(body)
+    return ContiguousArray(self).withUnsafeBufferPointer(body)
   }
   
   /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
@@ -430,15 +430,16 @@ extension _ArrayBuffer {
   ///
   /// - Requires: Such contiguous storage exists or the buffer is empty.
   public mutating func withUnsafeMutableBufferPointer<R>(
-    @noescape body: (UnsafeMutableBufferPointer<Element>) throws -> R
-  ) rethrows -> R {
+    @noescape body: (UnsafeMutableBufferPointer<Element>) -> R
+  ) -> R {
     _sanityCheck(
       baseAddress != nil || count == 0,
       "Array is bridging an opaque NSArray; can't get a pointer to the elements"
     )
-    defer { _fixLifetime(self) }
-    return try body(
+    let ret = body(
       UnsafeMutableBufferPointer(start: baseAddress, count: count))
+    _fixLifetime(self)
+    return ret
   }
   
   /// An object that keeps the elements stored in this buffer alive.

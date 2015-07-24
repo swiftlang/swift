@@ -564,18 +564,14 @@ public protocol MutableCollectionType : CollectionType {
   /// same algorithm on `body`\ 's argument lets you trade safety for
   /// speed.
   mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    @noescape body: (
-      inout UnsafeMutableBufferPointer<Generator.Element>
-    ) throws -> R
-  ) rethrows -> R?
+    @noescape body: (inout UnsafeMutableBufferPointer<Generator.Element>) -> R
+  ) -> R?
 }
 
 extension MutableCollectionType {
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
-    @noescape body: (
-      inout UnsafeMutableBufferPointer<Generator.Element>
-    ) throws -> R
-  ) rethrows -> R? {
+  @noescape body: (inout UnsafeMutableBufferPointer<Generator.Element>) -> R
+  ) -> R? {
     return nil
   }
 }
