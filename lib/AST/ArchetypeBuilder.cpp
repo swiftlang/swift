@@ -1085,6 +1085,15 @@ bool ArchetypeBuilder::addRequirement(const RequirementRepr &Req) {
     RequirementSource source(RequirementSource::Explicit,
                              Req.getConstraintLoc().getSourceRange().Start);
     if (Req.getConstraint()->getClassOrBoundGenericClass()) {
+      // We don't currently allow superclasses to refer to type parameters.
+      if (Req.getConstraint()->hasTypeParameter()) {
+        Diags.diagnose(Req.getConstraintLoc().getSourceRange().Start,
+                       diag::dependent_superclass_constraint,
+                       Req.getConstraint());
+        return true;
+      }
+      
+
       return addSuperclassRequirement(PA, Req.getConstraint(), source);
     }
 

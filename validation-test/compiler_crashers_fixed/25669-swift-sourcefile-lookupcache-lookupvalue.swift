@@ -1,13 +1,8 @@
-// RUN: not --crash %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -parse
 
 // Distributed under the terms of the MIT license
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-func< {
-g: < {}
-S<func g
-class B{struct S
-enum S<T where g:T:d{
-func b< whereprotocol a
-{
+let:{struct B<T where B:A{typealias F=Int
+protocol a)func a<U

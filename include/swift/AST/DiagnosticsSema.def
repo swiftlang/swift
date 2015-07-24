@@ -1005,6 +1005,10 @@ ERROR(requires_same_type_conflict,sema_tcd,none,
 ERROR(requires_generic_param_same_type_does_not_conform,sema_tcd,none,
       "same-type constraint type %0 does not conform to required protocol %1",
       (Type, Identifier))
+ERROR(dependent_superclass_constraint,sema_tcd,none,
+      "superclass constraint %0 cannot depend on a type parameter",
+      (Type))
+
 ERROR(generic_param_access,sema_tcd,none,
       "%0 %select{must be declared %select{private|internal|PUBLIC}3"
       "|cannot be declared %select{PRIVATE|internal|public}2}1 because its "

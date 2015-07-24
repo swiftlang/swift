@@ -1,10 +1,9 @@
-// RUN: not --crash %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -parse
 
 // Distributed under the terms of the MIT license
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-struct B<T
-struct B<T where B:a{
-class u
-func a<T
+}
+struct d<f : e, g: e where g.h == f.h> : NSManagedObject {
+func b<T: A>() -> [T]

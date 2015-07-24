@@ -3419,16 +3419,16 @@ static Type getSelfTypeForContainer(AbstractFunctionDecl *theMethod,
         selfTy = self->getArchetype();
     }
   }
-  
+
+  // Capture the generic parameters, if requested.
+  if (outerGenericParams)
+    *outerGenericParams = dc->getGenericParamsOfContext();
+
   // If the self type couldn't be computed, or is the result of an
   // upstream error, return an error type.
   if (!selfTy || selfTy->is<ErrorType>())
     return ErrorType::get(dc->getASTContext());
-  
-  // Capture the generic parameters, if requested.
-  if (outerGenericParams)
-    *outerGenericParams = dc->getGenericParamsOfContext();
-  
+
   // 'static' functions have 'self' of type metatype<T>.
   if (isStatic)
     return MetatypeType::get(selfTy, dc->getASTContext());

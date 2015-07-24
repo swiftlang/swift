@@ -1,9 +1,9 @@
-// RUN: not --crash %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -parse
 
 // Distributed under the terms of the MIT license
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-}
-struct d<f : e, g: e where g.h == f.h> : NSManagedObject {
-func b<T: A>() -> [T]
+class B
+enum S<T where g:T
+class B<T where g:a{func B<s

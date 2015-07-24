@@ -9,3 +9,6 @@ protocol P3 : P2, class { } // expected-error{{'class' must come first in the re
 struct X : class { } // expected-error{{'class' requirement only applies to protocols}}
 
 
+// rdar://problem/21268222
+class Foo<T>{}
+class Bar<T, U where U : Foo<T>>{} // expected-error{{superclass constraint 'Foo<T>' cannot depend on a type parameter}}
