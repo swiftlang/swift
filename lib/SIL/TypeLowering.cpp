@@ -1433,6 +1433,22 @@ TypeConverter::getTypeLowering(AbstractionPattern origType,
     return *theInfo;
   }
 
+  // Lower the object type of boxes.
+  if (auto substBoxType = dyn_cast<SILBoxType>(substType)) {
+    AbstractionPattern origBoxed(origType.getAs<SILBoxType>()->getBoxedType());
+    SILType loweredBoxedType = getLoweredType(origBoxed,
+                                              substBoxType->getBoxedType());
+    auto loweredBoxType
+      = SILBoxType::get(loweredBoxedType.getSwiftRValueType());
+    auto loweredBoxSILType
+      = SILType::getPrimitiveObjectType(loweredBoxType);
+
+    auto *theInfo = new (*this, key.isDependent())
+      ReferenceTypeLowering(loweredBoxSILType);
+    insert(key, theInfo);
+    return *theInfo;
+  }
+
   // We need to lower function and metatype types within tuples.
   if (auto substTupleType = dyn_cast<TupleType>(substType)) {
     auto loweredType = getLoweredTupleType(*this, origType, substTupleType);
