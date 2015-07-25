@@ -17,27 +17,6 @@
 using namespace swift;
 using namespace constraints;
 
-/// Obtain the colloquial description for a known protocol kind.
-static std::string getDescriptionForKnownProtocolKind(KnownProtocolKind kind) {
-  switch (kind) {
-#define PROTOCOL(Id) \
-case KnownProtocolKind::Id: \
-return #Id;
-      
-#define LITERAL_CONVERTIBLE_PROTOCOL(Id, Description) \
-case KnownProtocolKind::Id: \
-return #Description;
-      
-#define BUILTIN_LITERAL_CONVERTIBLE_PROTOCOL(Id) \
-case KnownProtocolKind::Id: \
-return #Id;
-      
-#include "swift/AST/KnownProtocols.def"
-  }
-  
-  llvm_unreachable("unrecognized known protocol kind");
-}
-
 
 /// Obtain a "user friendly" type name. E.g., one that uses colloquial names
 /// for literal convertible protocols if necessary, and is devoid of type
@@ -45,21 +24,14 @@ return #Id;
 static std::string getUserFriendlyTypeName(Type t) {
   assert(!t.isNull());
 
-  if (auto tv = t->getAs<TypeVariableType>()) {
-    if (tv->getImpl().literalConformanceProto) {
-      Optional<KnownProtocolKind> kind =
-        tv->getImpl().literalConformanceProto->getKnownProtocolKind();
-      
-      if (kind.hasValue())
-        return getDescriptionForKnownProtocolKind(kind.getValue());
-    }
-  }
-
   // Remove parens from the other level of the type.
   if (auto *PT = dyn_cast<ParenType>(t.getPointer()))
     t = PT->getUnderlyingType();
   
-  return t.getString();
+  auto str = t.getString();
+  if (str == "NilLiteralConvertible")
+    str = "nil";
+  return str;
 }
 
 
