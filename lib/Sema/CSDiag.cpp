@@ -17,25 +17,6 @@
 using namespace swift;
 using namespace constraints;
 
-
-/// Obtain a "user friendly" type name. E.g., one that uses colloquial names
-/// for literal convertible protocols if necessary, and is devoid of type
-/// variables.
-static std::string getUserFriendlyTypeName(Type t) {
-  assert(!t.isNull());
-
-  // Remove parens from the other level of the type.
-  if (auto *PT = dyn_cast<ParenType>(t.getPointer()))
-    t = PT->getUnderlyingType();
-  
-  auto str = t.getString();
-  if (str == "NilLiteralConvertible")
-    str = "nil";
-  return str;
-}
-
-
-
 void Failure::dump(SourceManager *sm) const {
   dump(sm, llvm::errs());
 }
@@ -1374,10 +1355,7 @@ static std::string getTypeListString(Type type) {
     if (auto PT = dyn_cast<ParenType>(type.getPointer()))
       type = PT->getUnderlyingType();
 
-    std::string result = "(";
-    result += getUserFriendlyTypeName(type);
-    result += ')';
-    return result;
+    return "(" + type->getString() + ")";
   }
 
   std::string result = "(";
@@ -1390,9 +1368,9 @@ static std::string getTypeListString(Type type) {
     }
 
     if (!field.isVararg())
-      result += getUserFriendlyTypeName(field.getType());
+      result += field.getType()->getString();
     else {
-      result += getUserFriendlyTypeName(field.getVarargBaseTy());
+      result += field.getVarargBaseTy()->getString();
       result += "...";
     }
   }
@@ -2323,18 +2301,10 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure() {
     return true;
   }
 
-  
-  if (argType->getAs<TupleType>()) {
-    diagnose(apply->getFn()->getLoc(),
-             diag::cannot_find_appropriate_overload_with_type_list,
-             overloadName, getTypeListString(argType))
-      .highlight(apply->getSourceRange());
-  } else {
-    diagnose(apply->getFn()->getLoc(),
-             diag::cannot_find_appropriate_overload_with_type,
-             overloadName, getTypeListString(argType))
-      .highlight(apply->getSourceRange());
-  }
+  diagnose(apply->getFn()->getLoc(),
+           diag::cannot_find_appropriate_overload_with_type,
+           overloadName, getTypeListString(argType))
+    .highlight(apply->getSourceRange());
   
   calleeInfo.suggestPotentialOverloads(overloadName, apply->getLoc());
   return true;
