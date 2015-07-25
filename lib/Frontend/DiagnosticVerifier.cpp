@@ -37,7 +37,12 @@ namespace {
     // may appear (or not) an uncounted number of times.
     bool mayAppear = false;
 
-    std::string Str;
+    // This is the raw input buffer for the message text, the part in the
+    // {{...}}
+    StringRef MessageRange;
+    
+    // This is the message string with escapes expanded.
+    std::string MessageStr;
     unsigned LineNo = ~0U;
     
     std::vector<ExpectedFixIt> Fixits;
@@ -104,7 +109,7 @@ DiagnosticVerifier::findDiagnostic(const ExpectedDiagnosticInfo &Expected,
 
     // Verify the classification and string.
     if (I->getKind() != Expected.Classification ||
-        I->getMessage().find(Expected.Str) == StringRef::npos)
+        I->getMessage().find(Expected.MessageStr) == StringRef::npos)
       continue;
 
     // Okay, we found a match, hurray!
@@ -166,9 +171,11 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
 
   std::vector<ExpectedDiagnosticInfo> ExpectedDiagnostics;
   
-  auto addError = [&](const char *Loc, std::string message) {
+  auto addError = [&](const char *Loc, std::string message,
+                      ArrayRef<llvm::SMFixIt> FixIts = {}) {
     auto loc = SourceLoc(llvm::SMLoc::getFromPointer(Loc));
-    auto diag = SM.GetMessage(loc, llvm::SourceMgr::DK_Error, message, {}, {});
+    auto diag = SM.GetMessage(loc, llvm::SourceMgr::DK_Error, message,
+                              {}, FixIts);
     Errors.push_back(diag);
   };
   
@@ -265,7 +272,9 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
 
  
     llvm::SmallString<256> Buf;
-    Expected.Str = Lexer::getEncodedStringSegment(MatchStart.slice(2, End),Buf);
+    Expected.MessageRange = MatchStart.slice(2, End);
+    Expected.MessageStr =
+      Lexer::getEncodedStringSegment(Expected.MessageRange, Buf);
     if (PrevExpectedContinuationLine)
       Expected.LineNo = PrevExpectedContinuationLine;
     else
@@ -442,9 +451,11 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
 
     if (I == CapturedDiagnostics.end()) continue;
     
-    std::string message = getDiagKindString(expected.Classification) +
-                          " had incorrect message: " + I->getMessage().str();
-    addError(expected.Loc, message);
+    auto StartLoc = llvm::SMLoc::getFromPointer(expected.MessageRange.begin());
+    auto EndLoc = llvm::SMLoc::getFromPointer(expected.MessageRange.end());
+    
+    llvm::SMFixIt fixIt(llvm::SMRange{ StartLoc, EndLoc }, I->getMessage());
+    addError(expected.MessageRange.begin(), "incorrect message found", fixIt);
     CapturedDiagnostics.erase(I);
     ExpectedDiagnostics.erase(ExpectedDiagnostics.begin()+i);
   }
