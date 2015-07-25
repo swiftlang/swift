@@ -4163,7 +4163,7 @@ bool TypeChecker::isProtocolExtensionUsable(DeclContext *dc, Type type,
                  ConstraintLocatorBuilder(nullptr), replacements);
 
   // Bind the 'Self' type variable to the provided type.
-  CanType selfType = genericSig->getGenericParams()[0]->getCanonicalType();
+  CanType selfType = genericSig->getGenericParams().back()->getCanonicalType();
   auto selfTypeVar = replacements[selfType];
   cs.addConstraint(ConstraintKind::Bind, selfTypeVar, type, nullptr);
 

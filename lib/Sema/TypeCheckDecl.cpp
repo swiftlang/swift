@@ -5888,10 +5888,15 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       return;
     proto->computeType();
     
+    
     auto gp = proto->getGenericParams();
 
-    // Validate the generic type parameters.
+    // Validate the generic type signature, which is just <Self : P>.
     validateGenericTypeSignature(proto);
+
+    GenericParamList *outerGenericParams =
+        proto->getDeclContext()->getGenericParamsOfContext();
+    gp->setOuterParameters(outerGenericParams);
 
     revertGenericParamList(gp);
 

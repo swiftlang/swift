@@ -28,5 +28,5 @@ protocol CollectionType : _CollectionType, SequenceType {
   subscript(i: Index) -> Generator.Element {get set }
 }
 func insertionSort<C: Mutable> (inout elements: C, i: C.Index) { // expected-error {{use of undeclared type 'Mutable'}} expected-error {{'Index' is not a member type of 'C'}}
-  var x: C.Generator.Element = elements[i]
+  var x: C.Generator.Element = elements[i] // expected-error {{'Generator' is not a member type of 'C'}}
 }

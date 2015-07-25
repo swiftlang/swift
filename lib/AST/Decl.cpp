@@ -1719,7 +1719,7 @@ Type ValueDecl::getInterfaceType() const {
   if (auto assocType = dyn_cast<AssociatedTypeDecl>(this)) {
     auto proto = cast<ProtocolDecl>(getDeclContext());
     (void)proto->getType(); // make sure we've computed the type.
-    auto selfTy = proto->getGenericParamTypes()[0];
+    auto selfTy = proto->getGenericParamTypes().back();
     auto &ctx = getASTContext();
     InterfaceTy = DependentMemberType::get(
                     selfTy,
