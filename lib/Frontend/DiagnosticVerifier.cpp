@@ -19,6 +19,7 @@
 #include "swift/Parse/Lexer.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
+#include <fstream>
 using namespace swift;
 
 namespace {
@@ -82,8 +83,14 @@ namespace {
     /// verifyFile - After the file has been processed, check to see if we
     /// got all of the expected diagnostics and check to see if there were any
     /// unexpected ones.
-    bool verifyFile(unsigned BufferID);
+    bool verifyFile(unsigned BufferID, bool autoApplyFixes);
 
+    /// If there are any -verify errors (e.g. differences between expectations
+    /// and actual diagnostics produced), apply fixits to the original source
+    /// file and drop it back in place.
+    void autoApplyFixes(unsigned BufferID,
+                        ArrayRef<llvm::SMDiagnostic> diagnostics);
+    
   private:
     std::vector<llvm::SMDiagnostic>::iterator
     findDiagnostic(const ExpectedDiagnosticInfo &Expected,
@@ -157,7 +164,8 @@ static bool checkForFixIt(const ExpectedFixIt &Expected,
 /// \brief After the file has been processed, check to see if we got all of
 /// the expected diagnostics and check to see if there were any unexpected
 /// ones.
-bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
+bool DiagnosticVerifier::verifyFile(unsigned BufferID,
+                                    bool shouldAutoApplyFixes) {
   const SourceLoc BufferStartLoc = SM.getLocForBufferStart(BufferID);
   CharSourceRange EntireRange = SM.getRangeForBuffer(BufferID);
   StringRef InputFile = SM.extractText(EntireRange);
@@ -495,10 +503,64 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
   for (auto Err : Errors)
     SM.getLLVMSourceMgr().PrintMessage(llvm::errs(), Err);
   
+  // If auto-apply fixits is on, rewrite the original source file.
+  if (shouldAutoApplyFixes)
+    autoApplyFixes(BufferID, Errors);
+  
   return !Errors.empty();
 }
 
+/// If there are any -verify errors (e.g. differences between expectations
+/// and actual diagnostics produced), apply fixits to the original source
+/// file and drop it back in place.
+void DiagnosticVerifier::autoApplyFixes(unsigned BufferID,
+                                        ArrayRef<llvm::SMDiagnostic> diags) {
+  // Walk the list of diagnostics, pulling out any fixits into a array of just
+  // them.
+  SmallVector<llvm::SMFixIt, 4> FixIts;
+  for (auto &diag : diags)
+    FixIts.append(diag.getFixIts().begin(), diag.getFixIts().end());
 
+  // If we have no fixits to apply, avoid touching the file.
+  if (FixIts.empty())
+    return;
+  
+  // Sort the fixits by their start location.
+  std::sort(FixIts.begin(), FixIts.end(),
+            [&](const llvm::SMFixIt &lhs, const llvm::SMFixIt &rhs) -> bool {
+              return lhs.getRange().Start.getPointer()
+                   < rhs.getRange().Start.getPointer();
+            });
+
+  // Get the contents of the original source file.
+  auto memBuffer = SM.getLLVMSourceMgr().getMemoryBuffer(BufferID);
+  auto bufferRange = memBuffer->getBuffer();
+
+  // Apply the fixes, building up a new buffer as an std::string.
+  const char *LastPos = bufferRange.begin();
+  std::string Result;
+  
+  for (auto &fix : FixIts) {
+    // We cannot handle overlapping fixits, so assert that they don't happen.
+    assert(LastPos <= fix.getRange().Start.getPointer() &&
+           "Cannot handle overlapping fixits");
+    
+    // Keep anything from the last spot we've checked to the start of the fixit.
+    Result.append(LastPos, fix.getRange().Start.getPointer());
+    
+    // Replace the content covered by the fixit with the replacement text.
+    Result.append(fix.getText().begin(), fix.getText().end());
+    
+    // Next character to consider is at the end of the fixit.
+    LastPos = fix.getRange().End.getPointer();
+  }
+  
+  // Retain the end of the file.
+  Result.append(LastPos, bufferRange.end());
+  
+  std::ofstream outs(memBuffer->getBufferIdentifier());
+  outs << Result;
+}
 
 //===----------------------------------------------------------------------===//
 // Main entrypoints
@@ -527,10 +589,12 @@ bool swift::verifyDiagnostics(SourceManager &SM, ArrayRef<unsigned> BufferIDs) {
   auto *Verifier = (DiagnosticVerifier*)SM.getLLVMSourceMgr().getDiagContext();
   SM.getLLVMSourceMgr().setDiagHandler(nullptr, nullptr);
 
+  bool autoApplyFixes = false;
+  
   bool HadError = false;
 
   for (auto &BufferID : BufferIDs)
-    HadError |= Verifier->verifyFile(BufferID);
+    HadError |= Verifier->verifyFile(BufferID, autoApplyFixes);
 
   delete Verifier;
 
