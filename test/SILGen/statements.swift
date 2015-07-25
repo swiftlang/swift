@@ -501,6 +501,22 @@ func defer_test2(cond : Bool) {
   callee3()
 }
 
+func generic_callee_1<T>(_: T) {}
+func generic_callee_2<T>(_: T) {}
+func generic_callee_3<T>(_: T) {}
+
+// CHECK-LABEL: sil hidden @_TF10statements16defer_in_genericurFq_T_
+func defer_in_generic<T>(x: T) {
+  // CHECK: [[C3:%.*]] = function_ref @_TF10statements16generic_callee_3urFq_T_
+  // CHECK: apply [[C3]]<T>
+  // CHECK: [[C2:%.*]] = function_ref @_TFF10statements16defer_in_genericurFq_T_L0_6$deferfT_T_
+  // CHECK: apply [[C2]]<T>
+  // CHECK: [[C1:%.*]] = function_ref @_TFF10statements16defer_in_genericurFq_T_L_6$deferfT_T_
+  // CHECK: apply [[C1]]<T>
+  defer { generic_callee_1(x) }
+  defer { generic_callee_2(x) }
+  generic_callee_3(x)
+}
 
 
 protocol StaticFooProtocol { static func foo() }
