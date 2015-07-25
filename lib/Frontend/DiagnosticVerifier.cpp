@@ -34,7 +34,7 @@ namespace {
     llvm::SourceMgr::DiagKind Classification;
     unsigned MinCount, MaxCount;
     
-    StringRef Str;
+    std::string Str;
     unsigned LineNo;
     
     std::vector<ExpectedFixIt> Fixits;
