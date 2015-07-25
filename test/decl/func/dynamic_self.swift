@@ -124,7 +124,7 @@ func testCurryInstanceMethodSelf() {
   var produceY = Y.produceY
   var produceY2 = Y.instance
   produceY = produceY2
-  produceY2 = produceY
+  produceY2 = produceY   // expected-error {{cannot assign a value of type 'Y -> () -> Y' to a value of type 'X -> () -> Y'}}
 }
 
 class GX<T> {

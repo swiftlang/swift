@@ -1290,13 +1290,16 @@ ConstraintSystem::getTypeOfMemberReference(Type baseTy, ValueDecl *value,
     Type inputTy = TC.getProtocol(SourceLoc(), KnownProtocolKind::AnyObject)
                      ->getDeclaredTypeOfContext();
     type = FunctionType::get(inputTy, resultTy, funcTy->getExtInfo());
-  } else {
+  } else if (openedFnType->getInput()->hasTypeVariable()) {
     // For an unbound instance method reference, replace the 'Self'
     // parameter with the base type.
     auto selfTy = rebuildSelfTypeWithObjectType(openedFnType->getInput(),
                                                 baseObjTy);
     type = FunctionType::get(selfTy, openedFnType->getResult(),
                              openedFnType->getExtInfo());
+  } else {
+    // Otherwise, the type to use is just the instance type.
+    type = openedFnType;
   }
 
   // If we opened up any type variables, record the replacements.
