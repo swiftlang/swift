@@ -1,11 +1,14 @@
-// RUN: not --crash %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -parse
 
 // Distributed under the terms of the MIT license
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-func g<T>(v: Array) {
-typealias e {
+import Foundation
+class B : NSObject {
 }
-class A {
-var c, object2: T
+}
+func g<T> : A? {
+protocol C {
+typealias B : B.f : e
+public var c, i: T>?

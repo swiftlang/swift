@@ -1003,6 +1003,32 @@ void TypeChecker::revertGenericParamList(GenericParamList *genericParams) {
   }
 }
 
+static void markInvalidGenericSignature(AbstractFunctionDecl *AFD,
+                                        TypeChecker &TC) {
+  ArchetypeBuilder builder = TC.createArchetypeBuilder(AFD->getParentModule());
+  auto genericParams = AFD->getGenericParams();
+  
+  // If there is a parent context, add the generic parameters and requirements
+  // from that context.
+  addContextParamsAndRequirements(builder, AFD->getDeclContext());
+  
+  // If there aren't any generic parameters at this level, we're done.
+  if (!genericParams)
+    return;
+  
+  // Visit each of the generic parameters.
+  for (auto param : *genericParams)
+    builder.addGenericParameter(param);
+  
+  // Wire up the archetypes.
+  for (auto GP : *genericParams)
+    GP->setArchetype(builder.getArchetype(GP));
+
+  genericParams->setAllArchetypes(
+      TC.Context.AllocateCopy(builder.getAllArchetypes()));
+}
+
+
 /// Finalize the given generic parameter list, assigning archetypes to
 /// the generic parameters.
 static void finalizeGenericParamList(ArchetypeBuilder &builder,
@@ -4104,11 +4130,9 @@ public:
     else if (FD->getAttrs().hasAttribute<NonMutatingAttr>())
       FD->setMutating(false);
 
-    bool isInvalid = false;
-
     // Check whether the return type is dynamic 'Self'.
     if (checkDynamicSelfReturn(FD))
-      isInvalid = true;
+      FD->setInvalid();
 
     // Observing accessors (and their generated regular accessors) may have
     // the type of the var inferred.
@@ -4138,9 +4162,9 @@ public:
     if (auto gp = FD->getGenericParams()) {
       gp->setOuterParameters(outerGenericParams);
 
-      if (TC.validateGenericFuncSignature(FD))
-        isInvalid = true;
-      else {
+      if (TC.validateGenericFuncSignature(FD)) {
+        markInvalidGenericSignature(FD, TC);
+      } else {
         // Create a fresh archetype builder.
         ArchetypeBuilder builder =
           TC.createArchetypeBuilder(FD->getModuleContext());
@@ -4156,15 +4180,17 @@ public:
           builder.inferRequirements(FD->getBodyResultTypeLoc(), gp);
         }
 
-        // Revert all of the types within the signature of the function.
+        // Revert the types within the signature so it can be type-checked with
+        // archetypes below.
         TC.revertGenericFuncSignature(FD);
 
+        // Assign archetypes.
         finalizeGenericParamList(builder, FD->getGenericParams(), FD, TC);
       }
     } else if (outerGenericParams) {
-      if (TC.validateGenericFuncSignature(FD))
-        isInvalid = true;
-      else if (!FD->hasType()) {
+      if (TC.validateGenericFuncSignature(FD)) {
+        markInvalidGenericSignature(FD, TC);
+      } else if (!FD->hasType()) {
         // Revert all of the types within the signature of the function.
         TC.revertGenericFuncSignature(FD);
       } else {
@@ -5511,8 +5537,7 @@ public:
       gp->setOuterParameters(outerGenericParams);
 
       if (TC.validateGenericFuncSignature(CD)) {
-        CD->overwriteType(ErrorType::get(TC.Context));
-        CD->setInvalid();
+        markInvalidGenericSignature(CD, TC);
       } else {
         ArchetypeBuilder builder =
           TC.createArchetypeBuilder(CD->getModuleContext());
@@ -5527,7 +5552,7 @@ public:
         // Infer requirements from the parameters of the constructor.
         builder.inferRequirements(CD->getBodyParamPatterns()[1], gp);
 
-        // Revert the constructor signature so it can be type-checked with
+        // Revert the types within the signature so it can be type-checked with
         // archetypes below.
         TC.revertGenericFuncSignature(CD);
 
@@ -5536,7 +5561,6 @@ public:
       }
     } else if (outerGenericParams) {
       if (TC.validateGenericFuncSignature(CD)) {
-        CD->overwriteType(ErrorType::get(TC.Context));
         CD->setInvalid();
       } else {
         // Revert all of the types within the signature of the constructor.
@@ -5975,16 +5999,18 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
     if (proto->hasType())
       return;
     proto->computeType();
+    
+    auto gp = proto->getGenericParams();
 
     // Validate the generic type parameters.
     validateGenericTypeSignature(proto);
 
-    revertGenericParamList(proto->getGenericParams());
+    revertGenericParamList(gp);
 
     ArchetypeBuilder builder =
       createArchetypeBuilder(proto->getModuleContext());
-    checkGenericParamList(builder, proto->getGenericParams(), *this);
-    finalizeGenericParamList(builder, proto->getGenericParams(), proto, *this);
+    checkGenericParamList(builder, gp, *this);
+    finalizeGenericParamList(builder, gp, proto, *this);
 
     checkInheritanceClause(D);
     validateAttributes(*this, D);

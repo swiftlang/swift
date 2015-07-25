@@ -39,3 +39,17 @@ func typoAssoc4<T : P2 where T.Assocp2.assoc : P3>(_: T) { }
 // CHECK-NEXT:   T[.P2].AssocP2[.P1].Assoc : P3 [explicit
 // CHECK-NEXT:   T[.P2].AssocP2.assoc == T[.P2].AssocP2[.P1].Assoc [protocol
 // CHECK-NEXT: Generic signature
+
+
+// <rdar://problem/19620340>
+
+func typoFunc1<T : P1>(x: TypoType) { // expected-error{{use of undeclared type 'TypoType'}}
+  let _: T.Assoc -> () = { let _ = $0 }
+}
+
+func typoFunc2<T : P1>(x: TypoType, y: T) { // expected-error{{use of undeclared type 'TypoType'}}
+  let _: T.Assoc -> () = { let _ = $0 }
+}
+
+func typoFunc3<T : P1>(x: TypoType, y: T.Assoc -> ()) { // expected-error{{use of undeclared type 'TypoType'}}
+}

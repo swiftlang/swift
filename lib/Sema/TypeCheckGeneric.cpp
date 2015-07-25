@@ -90,6 +90,7 @@ Type PartialGenericTypeToArchetypeResolver::resolveGenericTypeParamType(
   if (!gpDecl)
     return Type(gp);
 
+
   auto archetype = gpDecl->getArchetype();
   if (!archetype)
     return Type(gp);
