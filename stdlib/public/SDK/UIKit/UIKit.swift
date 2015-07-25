@@ -207,7 +207,7 @@ struct _UIViewMirror : _MirrorType {
           CGContextFillRect(ctx, bounds)
           _v.layer.renderInContext(ctx)
 
-          let image = UIGraphicsGetImageFromCurrentImageContext()
+          let image: UIImage! = UIGraphicsGetImageFromCurrentImageContext()
       
           UIGraphicsEndImageContext()
       
