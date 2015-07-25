@@ -1152,29 +1152,6 @@ static Constraint *getConstraintChoice(Constraint *constraint,
   return nullptr;
 }
 
-/// For a given expression type, extract the appropriate type for a constraint-
-/// based diagnostic.
-static Type getDiagnosticTypeFromExpr(Expr *expr) {
-  
-  // For a forced checked cast expression or coerce expression, use the type of
-  // the sub-expression.
-  if (auto fcc = dyn_cast<ForcedCheckedCastExpr>(expr))
-    return fcc->getSubExpr()->getType();
-
-  if (auto coerceExpr = dyn_cast<CoerceExpr>(expr))
-    return coerceExpr->getSubExpr()->getType();
-  
-  // For an application expression, use the argument type.
-  if (auto applyExpr = dyn_cast<ApplyExpr>(expr))
-    return applyExpr->getArg()->getType();
-  
-  // For a subscript expression, use the index type.
-  if (auto subscriptExpr = dyn_cast<SubscriptExpr>(expr))
-    return subscriptExpr->getIndex()->getType();
-  
-  return expr->getType();
-}
-
 /// If a type variable was created for an opened literal expression, substitute
 /// in the default literal for the type variable's literal conformance.
 static Type substituteLiteralForTypeVariable(ConstraintSystem *CS,
@@ -1199,7 +1176,10 @@ static Type substituteLiteralForTypeVariable(ConstraintSystem *CS,
 static std::pair<Type, Type>
 getBoundTypesFromConstraint(ConstraintSystem *CS, Expr *expr,
                             Constraint *constraint) {
-  auto type1 = getDiagnosticTypeFromExpr(expr);
+  
+  auto anchor = simplifyLocatorToAnchor(*CS, constraint->getLocator());
+  auto type1 = anchor ? anchor->getType() : expr->getType();
+  
   auto type2 = constraint->getSecondType();
   
   if (type1->isEqual(type2))
