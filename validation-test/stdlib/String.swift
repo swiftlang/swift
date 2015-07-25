@@ -759,17 +759,17 @@ StringTests.test("reserveCapacity") {
   let id0 = s.bufferID
   let oldCap = s.capacity
   let x: Character = "x" // Help the typechecker - <rdar://problem/17128913>
-  s.splice(Repeat(count: s.capacity + 1, repeatedValue: x), atIndex: s.endIndex)
+  s.insertContentsOf(Repeat(count: s.capacity + 1, repeatedValue: x), at: s.endIndex)
   expectNotEqual(id0, s.bufferID)
   s = ""
   print("empty capacity \(s.capacity)")
   s.reserveCapacity(oldCap + 2)
   print("reserving \(oldCap + 2) -> \(s.capacity), width = \(s._core.elementWidth)")
   let id1 = s.bufferID
-  s.splice(Repeat(count: oldCap + 2, repeatedValue: x), atIndex: s.endIndex)
+  s.insertContentsOf(Repeat(count: oldCap + 2, repeatedValue: x), at: s.endIndex)
   print("extending by \(oldCap + 2) -> \(s.capacity), width = \(s._core.elementWidth)")
   expectEqual(id1, s.bufferID)
-  s.splice(Repeat(count: s.capacity + 100, repeatedValue: x), atIndex: s.endIndex)
+  s.insertContentsOf(Repeat(count: s.capacity + 100, repeatedValue: x), at: s.endIndex)
   expectNotEqual(id1, s.bufferID)
 }
 

@@ -151,21 +151,21 @@ ${Self}TestSuite.test("insert()/IndexInvalidation/DifferentMutationEpoch") {
   }
 }
 
-${Self}TestSuite.test("splice()/IndexInvalidation/DifferentBuffer") {
+${Self}TestSuite.test("insertContentsOf()/IndexInvalidation/DifferentBuffer") {
   var c1 = ${Self}([ 1010, 2020, 3030 ].map(OpaqueValue.init))
   let c2 = c1
   let i = c1.startIndex
-  c1.splice([ 4040, 5050 ].map(OpaqueValue.init), atIndex: c1.endIndex)
+  c1.insertContentsOf([ 4040, 5050 ].map(OpaqueValue.init), at: c1.endIndex)
   expectFailure {
     _ = i == c1.startIndex
   }
   _blackHole(c2)
 }
 
-${Self}TestSuite.test("splice()/IndexInvalidation/DifferentMutationEpoch") {
+${Self}TestSuite.test("insertContentsOf()/IndexInvalidation/DifferentMutationEpoch") {
   var c = ${Self}([ 1010, 2020, 3030 ].map(OpaqueValue.init))
   let i = c.startIndex
-  c.splice([ 4040, 5050 ].map(OpaqueValue.init), atIndex: c.endIndex)
+  c.insertContentsOf([ 4040, 5050 ].map(OpaqueValue.init), at: c.endIndex)
   expectFailure {
     _ = i == c.startIndex
   }

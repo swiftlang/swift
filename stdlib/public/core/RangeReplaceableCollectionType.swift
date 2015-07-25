@@ -113,9 +113,9 @@ public protocol RangeReplaceableCollectionType : CollectionType {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count + newElements.count`).
-  mutating func splice<
+  mutating func insertContentsOf<
     S : CollectionType where S.Generator.Element == Generator.Element
-  >(newElements: S, atIndex i: Index)
+  >(newElements: S, at i: Index)
 
   /// Remove the element at index `i`.
   ///
@@ -181,9 +181,9 @@ extension RangeReplaceableCollectionType {
     replaceRange(i..<i, with: CollectionOfOne(newElement))
   }
 
-  public mutating func splice<
+  public mutating func insertContentsOf<
     C : CollectionType where C.Generator.Element == Generator.Element
-  >(newElements: C, atIndex i: Index) {
+  >(newElements: C, at i: Index) {
     replaceRange(i..<i, with: newElements)
   }
 
@@ -260,7 +260,7 @@ public func insert<
 /// Invalidates all indices with respect to `x`.
 ///
 /// - Complexity: O(`x.count + newElements.count`).
-@available(*, unavailable, message="call the 'splice()' method on the collection")
+@available(*, unavailable, message="call the 'insertContentsOf()' method on the collection")
 public func splice<
     C: RangeReplaceableCollectionType,
     S : CollectionType where S.Generator.Element == C.Generator.Element

@@ -145,7 +145,7 @@ internal struct SpliceTest {
     self.newElements = newElements.map(OpaqueValue.init)
     self.indexSelection = indexSelection
     self.expected = expected
-    self.loc = SourceLoc(file, line, comment: "splice() test data")
+    self.loc = SourceLoc(file, line, comment: "insertContentsOf() test data")
   }
 }
 
@@ -504,10 +504,10 @@ self.test("\(testNamePrefix).insert()/semantics") {
 }
 
 //===----------------------------------------------------------------------===//
-// splice()
+// insertContentsOf()
 //===----------------------------------------------------------------------===//
 
-self.test("\(testNamePrefix).splice()/semantics") {
+self.test("\(testNamePrefix).insertContentsOf()/semantics") {
   let tests: [SpliceTest] = [
     SpliceTest(
       collection: [],
@@ -580,7 +580,7 @@ self.test("\(testNamePrefix).splice()/semantics") {
     var c = makeWrappedCollection(test.collection)
     let newElements =
       MinimalForwardCollection(test.newElements.map(wrapValue))
-    c.splice(newElements, atIndex: test.indexSelection.indexIn(c))
+    c.insertContentsOf(newElements, at: test.indexSelection.indexIn(c))
     expectEqualSequence(
       test.expected,
       c.map { extractValue($0).value },

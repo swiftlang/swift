@@ -650,11 +650,11 @@ extension String {
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`self.count + newElements.count`).
-  public mutating func splice<
+  public mutating func insertContentsOf<
     S : CollectionType where S.Generator.Element == Character
-  >(newElements: S, atIndex i: Index) {
+  >(newElements: S, at i: Index) {
     withMutableCharacters {
-      (inout v: CharacterView) in v.splice(newElements, atIndex: i)
+      (inout v: CharacterView) in v.insertContentsOf(newElements, at: i)
     }
   }
 

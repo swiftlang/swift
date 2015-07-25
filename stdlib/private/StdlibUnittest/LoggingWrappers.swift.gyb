@@ -72,7 +72,7 @@ public class RangeReplaceableCollectionLog {
   public static var removeFirstN = TypeIndexed(0)
   public static var replaceRange = TypeIndexed(0)
   public static var reserveCapacity = TypeIndexed(0)
-  public static var splice = TypeIndexed(0)
+  public static var insertContentsOf = TypeIndexed(0)
 
   public static func dispatchTester<C: RangeReplaceableCollectionType>(
     rrc: C
@@ -189,11 +189,11 @@ public struct LoggingRangeReplaceableCollection<
     base.reserveCapacity(n)
   }
 
-  public mutating func splice<
+  public mutating func insertContentsOf<
     C : CollectionType where C.Generator.Element == Base.Generator.Element
-  >(newElements: C, atIndex i: Base.Index) {
-    ++Log.splice[selfType]
-    base.splice(newElements, atIndex: i)
+  >(newElements: C, at i: Base.Index) {
+    ++Log.insertContentsOf[selfType]
+    base.insertContentsOf(newElements, at: i)
   }
 
   public func map<T>(

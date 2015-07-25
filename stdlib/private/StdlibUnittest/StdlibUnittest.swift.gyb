@@ -3154,11 +3154,11 @@ public struct ${Self}<T> : RangeReplaceableCollectionType {
     elements.insert(newElement, atIndex: i.position)
   }
 
-  public mutating func splice<
+  public mutating func insertContentsOf<
     S : CollectionType where S.Generator.Element == T
-  >(newElements: S, atIndex i: ${Index}) {
+  >(newElements: S, at i: ${Index}) {
     _willMutate()
-    elements.splice(newElements, atIndex: i.position)
+    elements.insertContentsOf(newElements, at: i.position)
   }
 
   public mutating func removeAtIndex(i: ${Index}) -> T {
