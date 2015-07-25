@@ -104,7 +104,7 @@ infix operator **** {
 }
 
 func ****(_: Int, _: String) { }
-i **** i // expected-error{{binary operator '****' cannot be applied to two Int operands}}
+i **** i // expected-error{{binary operator '****' cannot be applied to two 'Int' operands}}
 // expected-note @-1 {{expected an argument list of type '(Int, String)'}}
 
 infix operator ***~ {
@@ -113,7 +113,7 @@ infix operator ***~ {
 }
 
 func ***~(_: Int, _: String) { }
-i ***~ i // expected-error{{binary operator '***~' cannot be applied to two Int operands}}
+i ***~ i // expected-error{{binary operator '***~' cannot be applied to two 'Int' operands}}
 // expected-note @-1 {{expected an argument list of type '(Int, String)'}}
 
 // <rdar://problem/20142523>
@@ -178,7 +178,7 @@ class r20201968C {
 
 // <rdar://problem/21459429> QoI: Poor compilation error calling assert
 func r21459429(a : Int) {
-  assert(a != nil, "ASSERT COMPILATION ERROR") // expected-error {{binary operator '!=' cannot be applied to operands of type 'Int' and 'nil'}}
+  assert(a != nil, "ASSERT COMPILATION ERROR") // expected-error {{binary operator '!=' cannot be applied to operands of type 'Int' and 'NilLiteralConvertible'}}
   // expected-note @-1 {{expected an argument list of type '(Int, Int)'}}
 }
 
@@ -467,7 +467,7 @@ func testTypeSugar(a : Int) {
   typealias Stride = Int
 
   let x = Stride(a)
-  x+"foo"            // expected-error {{binary operator '+' cannot be applied to operands of type 'Stride' and 'String'}}
+  x+"foo"            // expected-error {{binary operator '+' cannot be applied to operands of type 'Stride' (aka 'Int') and 'String'}}
 // expected-note @-1 {{overloads for '+' exist with these partially matching parameter lists: (Int, Int), (String, String), (Int, UnsafeMutablePointer<Memory>), (Int, UnsafePointer<Memory>)}}
 }
 

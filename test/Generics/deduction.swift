@@ -223,7 +223,7 @@ protocol Addable {
   func +(x: Self, y: Self) -> Self
 }
 func addAddables<T : Addable, U>(x: T, y: T, u: U) -> T {
-  u + u // expected-error{{binary operator '+' cannot be applied to two U operands}}
+  u + u // expected-error{{binary operator '+' cannot be applied to two 'U' operands}}
   return x+y
 }
 

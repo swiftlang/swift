@@ -294,7 +294,8 @@ static void formatDiagnosticArgument(StringRef Modifier,
     
     // Strip extraneous parentheses; they add no value.
     auto type = Arg.getAsType()->getWithoutParens();
-    Out << '\'' << type << '\'';
+    std::string typeName = type->getString();
+    Out << '\'' << typeName << '\'';
 
 
     // Decide whether to show the desugared type or not.  We filter out some
@@ -321,7 +322,7 @@ static void formatDiagnosticArgument(StringRef Modifier,
     // If they are textually the same, don't show them.  This can happen when
     // they are actually different types, because they exist in different scopes
     // (e.g. everyone names their type parameters 'T').
-    if (showAKA && type->getString() == type->getCanonicalType()->getString())
+    if (showAKA && typeName == type->getCanonicalType()->getString())
       showAKA = false;
 
     // Don't show generic type parameters.

@@ -782,8 +782,7 @@ static bool diagnoseFailure(ConstraintSystem &cs,
 
     tc.diagnose(loc, diag::invalid_relation,
                 failure.getKind() - Failure::TypesNotEqual,
-                getUserFriendlyTypeName(failure.getFirstType()),
-                getUserFriendlyTypeName(failure.getSecondType()))
+                failure.getFirstType(), failure.getSecondType())
       .highlight(range1).highlight(range2);
     if (targetLocator && !useExprLoc)
       noteTargetOfDiagnostic(cs, failure, targetLocator);
@@ -952,7 +951,7 @@ static bool diagnoseFailure(ConstraintSystem &cs,
       }
       
       tc.diagnose(loc, diag::invalid_force_unwrap,
-                  getUserFriendlyTypeName(failure.getFirstType()))
+                  failure.getFirstType())
         .highlight(force->getSourceRange())
         .fixItRemove(force->getExclaimLoc());
       
@@ -961,7 +960,7 @@ static bool diagnoseFailure(ConstraintSystem &cs,
     
     if (auto bind = dyn_cast_or_null<BindOptionalExpr>(anchor)) {
       tc.diagnose(loc, diag::invalid_optional_chain,
-                  getUserFriendlyTypeName(failure.getFirstType()))
+                  failure.getFirstType())
         .highlight(bind->getSourceRange())
         .fixItRemove(bind->getQuestionLoc());
       
@@ -2234,7 +2233,7 @@ bool FailureDiagnosis::diagnoseGeneralValueMemberFailure() {
       .highlight(anchor->getSourceRange());
   } else {
     diagnose(anchor->getLoc(), diag::could_not_find_member_type,
-             getUserFriendlyTypeName(type), memberName)
+             type, memberName)
       .highlight(anchor->getSourceRange());
   }
   
@@ -2438,8 +2437,7 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure() {
   
   diagnose(anchor->getLoc(), diag::invalid_relation,
            Failure::TypesNotConvertible - Failure::TypesNotEqual,
-           getUserFriendlyTypeName(fromType),
-           getUserFriendlyTypeName(toType))
+           fromType, toType)
     .highlight(anchor->getSourceRange());
   
   return true;
@@ -2690,8 +2688,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError(Type exprResultType) {
   diagnose(expr->getLoc(), diag::invalid_relation,
            Failure::FailureKind::TypesNotConvertible -
                       Failure::FailureKind::TypesNotEqual,
-           getUserFriendlyTypeName(exprResultType),
-           getUserFriendlyTypeName(contextualType))
+           exprResultType, contextualType)
     .highlight(expr->getSourceRange());
   
   return true;
@@ -2806,8 +2803,7 @@ bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
     if (typeIsNotSpecialized(resultTy))
       resultTy = calleeInfo[0].getResultType();
     
-    diagnose(binop->getLoc(), diag::result_type_no_match,
-             getUserFriendlyTypeName(resultTy))
+    diagnose(binop->getLoc(), diag::result_type_no_match, resultTy)
       .highlight(binop->getSourceRange());
     return true;
   }
@@ -2824,18 +2820,16 @@ bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
 
   auto argType1 = argTupleType->getElementType(0)->getRValueType();
   auto argType2 = argTupleType->getElementType(1)->getRValueType();
-  auto argTyName1 = getUserFriendlyTypeName(argType1);
-  auto argTyName2 = getUserFriendlyTypeName(argType2);
   std::string overloadName = calleeInfo[0].decl->getNameStr();
   assert(!overloadName.empty());
-  if (argTyName1.compare(argTyName2)) {
+  if (!argType1->isEqual(argType2)) {
     diagnose(binop->getLoc(), diag::cannot_apply_binop_to_args,
-             overloadName, argTyName1, argTyName2)
+             overloadName, argType1, argType2)
       .highlight(argExpr->getElement(0)->getSourceRange())
       .highlight(argExpr->getElement(1)->getSourceRange());
   } else {
     diagnose(binop->getLoc(), diag::cannot_apply_binop_to_same_args,
-             overloadName, argTyName1)
+             overloadName, argType1)
       .highlight(argExpr->getElement(0)->getSourceRange())
       .highlight(argExpr->getElement(1)->getSourceRange());
   }
@@ -2869,8 +2863,7 @@ bool FailureDiagnosis::visitUnaryExpr(ApplyExpr *applyExpr) {
     if (typeIsNotSpecialized(resultTy))
       resultTy = calleeInfo[0].getResultType();
     
-    diagnose(applyExpr->getLoc(), diag::result_type_no_match,
-             getUserFriendlyTypeName(resultTy))
+    diagnose(applyExpr->getLoc(), diag::result_type_no_match, resultTy)
       .highlight(applyExpr->getSourceRange());
     return true;
   }
@@ -2886,12 +2879,10 @@ bool FailureDiagnosis::visitUnaryExpr(ApplyExpr *applyExpr) {
     return true;
   }
 
-  auto argTyName = getUserFriendlyTypeName(argType);
   std::string overloadName = calleeInfo[0].decl->getNameStr();
   assert(!overloadName.empty());
-
   diagnose(argExpr->getLoc(), diag::cannot_apply_unop_to_arg, overloadName,
-           argTyName);
+           argType);
   
   calleeInfo.suggestPotentialOverloads(overloadName, argExpr->getLoc());
   return true;
@@ -2958,8 +2949,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     }
     
     // Only one choice.
-    diagnose(SE->getLoc(), diag::result_type_no_match,
-             getUserFriendlyTypeName(resultTy))
+    diagnose(SE->getLoc(), diag::result_type_no_match, resultTy)
       .highlight(SE->getSourceRange());
     return true;
   }
@@ -2967,8 +2957,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
   // If the closes matches all mismatch on self, we either have something that
   // cannot be subscripted, or an ambiguity.
   if (calleeInfo.closeness == CC_SelfMismatch) {
-    diagnose(SE->getLoc(),
-             diag::cannot_subscript_base,getUserFriendlyTypeName(baseType))
+    diagnose(SE->getLoc(), diag::cannot_subscript_base, baseType)
       .highlight(SE->getBase()->getSourceRange());
     // FIXME: Should suggest overload set, but we're not ready for that until
     // it points to candidates and identifies the self type in the diagnostic.
@@ -2976,14 +2965,8 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
     return true;
   }
 
-  
-  auto indexTypeName = getUserFriendlyTypeName(indexType);
-  auto baseTypeName = getUserFriendlyTypeName(baseType);
-  
-  assert(!indexTypeName.empty() && !baseTypeName.empty());
-  
   diagnose(SE->getLoc(), diag::cannot_subscript_with_index,
-           baseTypeName, indexTypeName);
+           baseType, indexType);
 
   calleeInfo.suggestPotentialOverloads("subscript", SE->getLoc());
   return true;
@@ -3005,8 +2988,7 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
   if (!typeIsNotSpecialized(fnType) &&
       !fnType->is<AnyFunctionType>() && !fnType->is<MetatypeType>()) {
     diagnose(callExpr->getArg()->getStartLoc(),
-             diag::cannot_call_non_function_value,
-             getUserFriendlyTypeName(fnExpr->getType()))
+             diag::cannot_call_non_function_value, fnExpr->getType())
     .highlight(fnExpr->getSourceRange());
     return true;
   }
@@ -3044,7 +3026,7 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
           .highlight(fnExpr->getSourceRange());
       else
         diagnose(argExpr->getStartLoc(), diag::cannot_invoke_closure_type,
-                 getUserFriendlyTypeName(fnType), argString)
+                 fnType, argString)
           .highlight(fnExpr->getSourceRange());
       
       // If this is a multi-statement closure with no explicit result type, emit
@@ -3062,7 +3044,7 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
         .highlight(fnExpr->getSourceRange());
     } else {
       diagnose(argExpr->getStartLoc(), diag::cannot_call_value_of_function_type,
-                getUserFriendlyTypeName(fnType), argString)
+                fnType, argString)
         .highlight(fnExpr->getSourceRange());
     }
     
@@ -3113,10 +3095,8 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
     return true;
   }
 
-  auto destTypeName = getUserFriendlyTypeName(destType->getRValueType());
-  auto srcTypeName = getUserFriendlyTypeName(srcType);
-  diagnose(srcExpr->getLoc(), diag::cannot_assign_values, srcTypeName,
-           destTypeName);
+  diagnose(srcExpr->getLoc(), diag::cannot_assign_values, srcType,
+           destType->getRValueType());
   return true;
 }
 
@@ -3155,8 +3135,7 @@ bool FailureDiagnosis::visitCoerceExpr(CoerceExpr *CE) {
   if (conversionTypes.first && conversionTypes.second) {
     diagnose(CE->getLoc(), diag::invalid_relation,
              Failure::TypesNotConvertible - Failure::TypesNotEqual,
-             getUserFriendlyTypeName(conversionTypes.first),
-             getUserFriendlyTypeName(conversionTypes.second))
+             conversionTypes.first, conversionTypes.second)
       .highlight(CE->getSourceRange());
     return true;
   }
@@ -3185,8 +3164,7 @@ visitForcedCheckedCastExpr(ForcedCheckedCastExpr *FCE) {
   if (conversionTypes.first && conversionTypes.second) {
     diagnose(FCE->getLoc(), diag::invalid_relation,
              Failure::TypesNotConvertible - Failure::TypesNotEqual,
-             getUserFriendlyTypeName(conversionTypes.first),
-             getUserFriendlyTypeName(conversionTypes.second))
+             conversionTypes.first, conversionTypes.second)
       .highlight(FCE->getSourceRange());
     return true;
   }
@@ -3202,8 +3180,7 @@ bool FailureDiagnosis::visitForceValueExpr(ForceValueExpr *FVE) {
   // If the subexpression type checks as a non-optional type, then that is the
   // error.  Produce a specific diagnostic about this.
   if (argType->getOptionalObjectType().isNull()) {
-    diagnose(FVE->getLoc(), diag::invalid_force_unwrap,
-             getUserFriendlyTypeName(argType))
+    diagnose(FVE->getLoc(), diag::invalid_force_unwrap, argType)
       .fixItRemove(FVE->getExclaimLoc())
       .highlight(FVE->getSourceRange());
     return true;
@@ -3220,8 +3197,7 @@ bool FailureDiagnosis::visitBindOptionalExpr(BindOptionalExpr *BOE) {
   // If the subexpression type checks as a non-optional type, then that is the
   // error.  Produce a specific diagnostic about this.
   if (argType->getOptionalObjectType().isNull()) {
-    diagnose(BOE->getQuestionLoc(), diag::invalid_optional_chain,
-             getUserFriendlyTypeName(argType))
+    diagnose(BOE->getQuestionLoc(), diag::invalid_optional_chain, argType)
       .highlight(BOE->getSourceRange())
       .fixItRemove(BOE->getQuestionLoc());
     return true;
@@ -3248,8 +3224,7 @@ bool FailureDiagnosis::visitIfExpr(IfExpr *IE) {
 
   
   diagnose(IE->getColonLoc(), diag::if_expr_cases_mismatch,
-           getUserFriendlyTypeName(trueExpr->getType()),
-           getUserFriendlyTypeName(falseExpr->getType()))
+           trueExpr->getType(), falseExpr->getType())
     .highlight(trueExpr->getSourceRange())
     .highlight(falseExpr->getSourceRange());
   return true;

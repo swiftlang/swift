@@ -55,8 +55,8 @@ NOTE(while_converting_subscript_index,sema,none,
 //------------------------------------------------------------------------------
 
 ERROR(result_type_no_match,sema,none,
-      "result type '%0' does not match expected type",
-      (StringRef))
+      "result type %0 does not match expected type",
+      (Type))
 ERROR(result_type_no_match_ambiguous,sema,none,
       "multiple candidates fail to match based on result type",
       ())
@@ -77,7 +77,7 @@ ERROR(could_not_find_member,sema,none,
       "could not find member %0", (Identifier))
 
 ERROR(could_not_find_member_type,sema,none,
-      "value of type '%0' has no member %1", (StringRef, Identifier))
+      "value of type %0 has no member %1", (Type, Identifier))
 
 ERROR(could_not_convert_argument,sema,none,
       "cannot invoke function with an argument list of type %0", (Type))
@@ -91,16 +91,16 @@ ERROR(expression_too_complex,sema,none,
 
 ERROR(cannot_apply_binop_to_args,sema,none,
       "binary operator '%0' cannot be applied to operands of type "
-      "'%1' and '%2'",
-      (StringRef, StringRef, StringRef))
+      "%1 and %2",
+      (StringRef, Type, Type))
 
 ERROR(cannot_apply_binop_to_same_args,sema,none,
       "binary operator '%0' cannot be applied to two %1 operands",
-      (StringRef, StringRef))
+      (StringRef, Type))
 
 ERROR(cannot_apply_unop_to_arg,sema,none,
-      "unary operator '%0' cannot be applied to an operand of type '%1'",
-      (StringRef, StringRef))
+      "unary operator '%0' cannot be applied to an operand of type %1",
+      (StringRef, Type))
 
 ERROR(cannot_apply_lvalue_unop_to_subelement,sema_tcs,none,
       "cannot pass immutable value to mutating operator: %0",
@@ -116,17 +116,17 @@ ERROR(cannot_apply_lvalue_binop_to_rvalue,sema,none,
       "left side of mutating operator has immutable type %0", (Type))
 
 ERROR(cannot_subscript_with_index,sema,none,
-      "cannot subscript a value of type '%0' with an index of type '%1'",
-      (StringRef, StringRef))
+      "cannot subscript a value of type %0 with an index of type %1",
+      (Type, Type))
 
 ERROR(cannot_subscript_base,sema,none,
-      "cannot subscript a value of type '%0'",
-      (StringRef))
+      "cannot subscript a value of type %0",
+      (Type))
 
 
 ERROR(cannot_assign_values,sema,none,
-      "cannot assign a value of type '%0' to a value of type '%1'",
-      (StringRef, StringRef))
+      "cannot assign a value of type %0 to a value of type %1",
+      (Type, Type))
 
 ERROR(cannot_pass_rvalue_inout_subelement,sema_tcs,none,
       "cannot pass immutable value as inout argument: %0",
@@ -147,15 +147,15 @@ ERROR(cannot_call_with_params, sema, none,
       " of type '%1'", (StringRef, StringRef, bool))
 
 ERROR(cannot_call_non_function_value,sema,none,
-      "cannot call value of non-function type '%0'", (StringRef))
+      "cannot call value of non-function type %0", (Type))
 
 
 ERROR(cannot_invoke_closure,sema,none,
       "cannot invoke closure expression with an argument list of type '%0'",
       (StringRef))
 ERROR(cannot_invoke_closure_type,sema,none,
-      "cannot invoke closure of type '%0' with an argument list of type '%1'",
-      (StringRef, StringRef))
+      "cannot invoke closure of type %0 with an argument list of type '%1'",
+      (Type, StringRef))
 
 ERROR(cannot_infer_closure_type,sema,none,
       "unable to infer closure type in the current context", ())
@@ -166,8 +166,8 @@ ERROR(cannot_call_function_value,sema,none,
       "cannot invoke value of function type with argument list '%0'",
       (StringRef))
 ERROR(cannot_call_value_of_function_type,sema,none,
-      "cannot invoke value of type '%0' with argument list '%1'",
-      (StringRef, StringRef))
+      "cannot invoke value of type %0 with argument list '%1'",
+      (Type, StringRef))
 
 NOTE(suggest_expected_match,sema,none,
      "expected an argument list of type '%0'", (StringRef))
@@ -328,17 +328,17 @@ ERROR(load_of_explicit_lvalue,sema_tcc,none,
 // Expression Type Checking Errors
 //------------------------------------------------------------------------------
 ERROR(invalid_relation,sema_tcc,none,
-      "'%1' is not %select{identical to|a subtype of|"
-      "convertible to|constructible with|identical to}0 '%2'",
-      (unsigned, StringRef, StringRef))
+      "%1 is not %select{identical to|a subtype of|"
+      "convertible to|constructible with|identical to}0 %2",
+      (unsigned, Type, Type))
 ERROR(invalid_force_unwrap,sema_tcc,none,
-      "cannot force unwrap value of non-optional type '%0'", (StringRef))
+      "cannot force unwrap value of non-optional type %0", (Type))
 ERROR(invalid_optional_chain,sema_tcc,none,
-      "cannot use optional chaining on non-optional value of type '%0'",
-      (StringRef))
+      "cannot use optional chaining on non-optional value of type %0",
+      (Type))
 ERROR(if_expr_cases_mismatch,sema_tcc,none,
-      "result values in '? :' expression have mismatching types '%0' and '%1'",
-      (StringRef, StringRef))
+      "result values in '? :' expression have mismatching types %0 and %1",
+      (Type, Type))
 
 ERROR(invalid_tuple_size,sema_tcc,none,
       "tuple types %0 and %1 have a different number of elements (%2 vs. %3)",
