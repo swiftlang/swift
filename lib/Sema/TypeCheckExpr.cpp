@@ -485,9 +485,12 @@ static bool doesStorageProduceLValue(TypeChecker &TC,
   if (baseType->hasReferenceSemantics() || baseType->is<LValueType>())
     return true;
 
-  // If the base is an rvalue, then we only produce an lvalue if both
-  // the getter and setter are nonmutating.
-  return !storage->isGetterMutating() && storage->isSetterNonMutating();
+  // So the base is an rvalue value type. The only way an accessor can
+  // produce an lvalue is if we have a computed property where both the
+  // getter and setter are nonmutating.
+  return !storage->hasStorage() &&
+      !storage->isGetterMutating() &&
+      storage->isSetterNonMutating();
 }
 
 Type TypeChecker::getUnopenedTypeOfReference(ValueDecl *value, Type baseType,

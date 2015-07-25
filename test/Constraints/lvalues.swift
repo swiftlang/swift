@@ -182,3 +182,17 @@ func rdar19835413() {
     f1(UnsafeMutablePointer(pi))
   }
 }
+
+// <rdar://problem/21877598> Crash when accessing stored property without
+// setter from constructor
+protocol Radish {
+  var root: Int { get }
+}
+
+public struct Kale : Radish {
+  public let root : Int
+  public init() {
+    let _ = Kale().root
+    self.root = 0
+  }
+}

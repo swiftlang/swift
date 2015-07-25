@@ -996,9 +996,10 @@ bool ValueDecl::isAccessibleFrom(const DeclContext *DC) const {
 bool AbstractStorageDecl::isSetterAccessibleFrom(const DeclContext *DC) const {
   assert(isSettable(DC));
 
-  // If a property has accessors and does not have a synthesized accessor, it is
-  // still settable from the designated initializer constructor.
-  if (hasAccessorFunctions() && !getSetter() && hasStorage())
+  // If a stored property does not have a setter, it is still settable from the
+  // designated initializer constructor. In this case, don't check setter
+  // accessibility, it is not set.
+  if (hasStorage() && !isSettable(nullptr))
     return true;
   
   return checkAccessibility(DC, getDeclContext(), getSetterAccessibility());
