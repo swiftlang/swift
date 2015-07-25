@@ -784,6 +784,7 @@ public:
   void checkOwnershipAttr(VarDecl *D, OwnershipAttr *attr);
 
   void computeAccessibility(ValueDecl *D);
+  void computeDefaultAccessibility(ExtensionDecl *D);
 
   virtual void resolveAccessibility(ValueDecl *VD) override {
     validateAccessibility(VD);

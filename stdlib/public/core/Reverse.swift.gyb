@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-internal protocol _prext_ReverseIndexType : BidirectionalIndexType {
+public protocol _prext_ReverseIndexType : BidirectionalIndexType {
   typealias Base : BidirectionalIndexType
   
   /// A type that can represent the number of steps between pairs of
@@ -29,7 +29,7 @@ internal protocol _prext_ReverseIndexType : BidirectionalIndexType {
   init(_ base: Base)
 }
 
-extension BidirectionalIndexType where Self : _prext_ReverseIndexType {
+extension _prext_ReverseIndexType where Self : BidirectionalIndexType {
   /// Returns the next consecutive value after `self`.
   ///
   /// - Requires: The next value is representable.
@@ -107,21 +107,22 @@ public struct _prext_ReverseRandomAccessIndex<Base: RandomAccessIndexType>
   }
 }
 
-internal protocol _ReverseCollectionType : CollectionType {
+public protocol _ReverseCollectionType : CollectionType {
   typealias Index : _prext_ReverseIndexType
   typealias Base : CollectionType
   var _base: Base {get}
 }
 
-extension CollectionType
-  where Self : _ReverseCollectionType, Self.Base.Index : RandomAccessIndexType {
+extension _ReverseCollectionType
+  where Self : CollectionType, Self.Base.Index : RandomAccessIndexType
+{
   public var startIndex : _prext_ReverseRandomAccessIndex<Self.Base.Index> {
     return _prext_ReverseRandomAccessIndex(_base.endIndex)
   }
 }
 
-extension CollectionType
-  where Self : _ReverseCollectionType, Self.Index.Base == Self.Base.Index
+extension _ReverseCollectionType
+  where Self : CollectionType, Self.Index.Base == Self.Base.Index
 {
   public var startIndex : Index { return Self.Index(_base.endIndex) }
   public var endIndex : Index { return Self.Index(_base.startIndex) }

@@ -908,7 +908,7 @@ ExtensionDecl::ExtensionDecl(SourceLoc extensionLoc,
 {
   ExtensionDeclBits.Validated = false;
   ExtensionDeclBits.CheckedInheritanceClause = false;
-  ExtensionDeclBits.DefaultAccessLevel = 0;
+  ExtensionDeclBits.DefaultAndMaxAccessLevel = 0;
   ExtensionDeclBits.HaveConformanceLoader = false;
 }
 

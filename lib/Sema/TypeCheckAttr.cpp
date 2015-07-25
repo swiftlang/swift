@@ -1268,7 +1268,23 @@ void AttributeChecker::visitAccessibilityAttr(AccessibilityAttr *attr) {
       attr->setInvalid();
       return;
     }
+
   } else if (auto extension = dyn_cast<ExtensionDecl>(D->getDeclContext())) {
+    TC.computeDefaultAccessibility(extension);
+    if (attr->getAccess() > extension->getMaxAccessibility()) {
+      // FIXME: It would be nice to say what part of the requirements actually
+      // end up being problematic.
+      auto diag =
+          TC.diagnose(attr->getLocation(),
+                      diag::access_control_ext_requirement_member_more,
+                      attr->getAccess(),
+                      D->getDescriptiveKind(),
+                      extension->getMaxAccessibility());
+      swift::fixItAccessibility(diag, cast<ValueDecl>(D),
+                                extension->getMaxAccessibility());
+      return;
+    }
+
     auto extAttr = extension->getAttrs().getAttribute<AccessibilityAttr>();
     if (extAttr && attr->getAccess() > extAttr->getAccess()) {
       auto diag = TC.diagnose(attr->getLocation(),

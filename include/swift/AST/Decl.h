@@ -602,7 +602,12 @@ class alignas(1 << DeclAlignInBits) Decl {
     /// Whether this extension has already been validated.
     unsigned Validated : 1;
 
-    unsigned DefaultAccessLevel : 2;
+    /// An encoding of the default and maximum access level for this extension.
+    ///
+    /// This is encoded as (1 << maxAccess) | (1 << defaultAccess), which
+    /// works because the maximum is always greater than or equal to the
+    /// default. 0 represents an uncomputed value.
+    unsigned DefaultAndMaxAccessLevel : 3;
 
     /// Whether there is an active conformance loader for this
     /// extension.
@@ -1757,17 +1762,40 @@ public:
   }
 
   bool hasDefaultAccessibility() const {
-    return ExtensionDeclBits.DefaultAccessLevel != 0;
+    return ExtensionDeclBits.DefaultAndMaxAccessLevel != 0;
   }
 
   Accessibility getDefaultAccessibility() const {
     assert(hasDefaultAccessibility() && "not computed yet");
-    return static_cast<Accessibility>(ExtensionDeclBits.DefaultAccessLevel - 1);
+    if (ExtensionDeclBits.DefaultAndMaxAccessLevel &
+        (1 << static_cast<unsigned>(Accessibility::Private)))
+      return Accessibility::Private;
+    if (ExtensionDeclBits.DefaultAndMaxAccessLevel &
+        (1 << static_cast<unsigned>(Accessibility::Internal)))
+      return Accessibility::Internal;
+    return Accessibility::Public;
   }
 
-  void setDefaultAccessibility(Accessibility access) {
+  Accessibility getMaxAccessibility() const {
+    assert(hasDefaultAccessibility() && "not computed yet");
+    if (ExtensionDeclBits.DefaultAndMaxAccessLevel &
+        (1 << static_cast<unsigned>(Accessibility::Public)))
+      return Accessibility::Public;
+    if (ExtensionDeclBits.DefaultAndMaxAccessLevel &
+        (1 << static_cast<unsigned>(Accessibility::Internal)))
+      return Accessibility::Internal;
+    return Accessibility::Private;
+  }
+
+  void setDefaultAndMaxAccessibility(Accessibility defaultAccess,
+                                     Accessibility maxAccess) {
     assert(!hasDefaultAccessibility() && "default accessibility already set");
-    ExtensionDeclBits.DefaultAccessLevel = static_cast<unsigned>(access) + 1;
+    assert(maxAccess >= defaultAccess);
+    ExtensionDeclBits.DefaultAndMaxAccessLevel =
+        (1 << static_cast<unsigned>(defaultAccess)) |
+        (1 << static_cast<unsigned>(maxAccess));
+    assert(getDefaultAccessibility() == defaultAccess && "not enough bits");
+    assert(getMaxAccessibility() == maxAccess && "not enough bits");
   }
 
   /// \brief Retrieve the set of protocols to which this extension conforms.

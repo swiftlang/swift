@@ -1664,31 +1664,25 @@ public:
 } // end anonymous namespace
 
 
-static void computeDefaultAccessibility(TypeChecker &TC, ExtensionDecl *ED) {
+void TypeChecker::computeDefaultAccessibility(ExtensionDecl *ED) {
   if (ED->hasDefaultAccessibility())
     return;
 
-  if (auto *AA = ED->getAttrs().getAttribute<AccessibilityAttr>()) {
-    ED->setDefaultAccessibility(AA->getAccess());
-    return;
-  }
+  validateExtension(ED);
 
-  TC.validateExtension(ED);
-
-  // Default access = min(extended type, requirements, 'internal').
-  Accessibility access = Accessibility::Internal;
+  Accessibility maxAccess = Accessibility::Public;
 
   if (NominalTypeDecl *nominal = ED->getExtendedType()->getAnyNominal()) {
-    TC.validateDecl(nominal);
-    access = std::min(nominal->getFormalAccess(), access);
+    validateDecl(nominal);
+    maxAccess = nominal->getFormalAccess();
   }
 
   if (const GenericParamList *genericParams = ED->getGenericParams()) {
-    auto getTypeAccess = [&TC](const TypeLoc &TL) {
+    auto getTypeAccess = [this](const TypeLoc &TL) {
       if (!TL.getType())
         return Accessibility::Public;
-      auto &cache = TC.TypeAccessibilityCache;
-      return TypeAccessibilityChecker::getAccessibility(TL.getType(), cache);
+      return TypeAccessibilityChecker::getAccessibility(TL.getType(),
+                                                        TypeAccessibilityCache);
     };
 
     // Only check the trailing 'where' requirements. Other requirements come
@@ -1696,12 +1690,12 @@ static void computeDefaultAccessibility(TypeChecker &TC, ExtensionDecl *ED) {
     for (const RequirementRepr &req : genericParams->getTrailingRequirements()){
       switch (req.getKind()) {
       case RequirementKind::Conformance:
-        access = std::min(getTypeAccess(req.getSubjectLoc()), access);
-        access = std::min(getTypeAccess(req.getConstraintLoc()), access);
+        maxAccess = std::min(getTypeAccess(req.getSubjectLoc()), maxAccess);
+        maxAccess = std::min(getTypeAccess(req.getConstraintLoc()), maxAccess);
         break;
       case RequirementKind::SameType:
-        access = std::min(getTypeAccess(req.getFirstTypeLoc()), access);
-        access = std::min(getTypeAccess(req.getSecondTypeLoc()), access);
+        maxAccess = std::min(getTypeAccess(req.getFirstTypeLoc()), maxAccess);
+        maxAccess = std::min(getTypeAccess(req.getSecondTypeLoc()), maxAccess);
         break;
       case RequirementKind::WitnessMarker:
         break;
@@ -1709,7 +1703,23 @@ static void computeDefaultAccessibility(TypeChecker &TC, ExtensionDecl *ED) {
     }
   }
 
-  ED->setDefaultAccessibility(access);
+  Accessibility defaultAccess;
+  if (auto *AA = ED->getAttrs().getAttribute<AccessibilityAttr>())
+    defaultAccess = AA->getAccess();
+  else
+    defaultAccess = std::min(maxAccess, Accessibility::Internal);
+
+  // Normally putting a public member in an internal extension is harmless,
+  // because that member can never be used elsewhere. But if some of the types
+  // in the signature are public, it could actually end up getting picked in
+  // overload resolution. Therefore, we only enforce the maximum access if the
+  // extension has a 'where' clause.
+  if (ED->getTrailingWhereClause())
+    defaultAccess = std::min(defaultAccess, maxAccess);
+  else
+    maxAccess = Accessibility::Public;
+
+  ED->setDefaultAndMaxAccessibility(defaultAccess, maxAccess);
 }
 
 void TypeChecker::computeAccessibility(ValueDecl *D) {
@@ -1761,7 +1771,7 @@ void TypeChecker::computeAccessibility(ValueDecl *D) {
     }
     case DeclContextKind::ExtensionDecl: {
       auto extension = cast<ExtensionDecl>(DC);
-      computeDefaultAccessibility(*this, extension);
+      computeDefaultAccessibility(extension);
       D->setAccessibility(extension->getDefaultAccessibility());
     }
     }
@@ -5399,10 +5409,10 @@ public:
     // Check conformances before visiting members, since we might
     // synthesize bodies for derived conformances
     if (!IsFirstPass) {
-      computeDefaultAccessibility(TC, ED);
-      if (ED->getAttrs().hasAttribute<AccessibilityAttr>()) {
+      TC.computeDefaultAccessibility(ED);
+      if (auto *AA = ED->getAttrs().getAttribute<AccessibilityAttr>()) {
         checkGenericParamAccessibility(TC, ED->getGenericParams(), ED,
-                                       ED->getDefaultAccessibility());
+                                       AA->getAccess());
       }
       checkExplicitConformance(ED, ED->getExtendedType());
     }

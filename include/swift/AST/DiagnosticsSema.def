@@ -597,6 +597,10 @@ WARNING(access_control_ext_member_more,sema_tcd,none,
     "declaring %select{PRIVATE|an internal|a public}0 %1 in "
     "%select{a private|an internal|PUBLIC}2 extension",
     (Accessibility, DescriptiveDeclKind, Accessibility))
+ERROR(access_control_ext_requirement_member_more,sema_tcd,none,
+    "cannot declare %select{PRIVATE|an internal|a public}0 %1 in "
+    "an extension with %select{private|internal|PUBLIC}2 requirements",
+    (Accessibility, DescriptiveDeclKind, Accessibility))
 ERROR(access_control_extension_more,sema_tcd,none,
       "extension of %select{private|internal|PUBLIC}0 %1 cannot be "
       "declared %select{PRIVATE|internal|public}2",
