@@ -1222,7 +1222,6 @@ private:
   SmallVector<TypeVariableType *, 16> TypeVariables;
   llvm::DenseMap<Expr *, TypeBase *> ContextualTypes;
   llvm::DenseMap<Expr *, TypeBase *> FavoredTypes;
-  llvm::DenseMap<Expr *, TypeBase *> ConversionTypes;
 
 
   /// \brief The set of constraint restrictions used to reach the
@@ -1493,20 +1492,14 @@ public:
   TypeBase* getFavoredType(Expr *E) {
     return this->FavoredTypes[E];
   }
-  TypeBase* getConversionType(Expr *E) {
-    return this->ConversionTypes[E];
-  }
-
+ 
   void setContextualType(Expr *E, TypeBase *T) {
     this->ContextualTypes[E] = T;
   }
   void setFavoredType(Expr *E, TypeBase *T) {
     this->FavoredTypes[E] = T;
   }
-  void setConversionType(Expr *E, TypeBase *T) {
-    this->ConversionTypes[E] = T;
-  }
-
+ 
   /// \brief Retrieve the constraint locator for the given anchor and
   /// path, uniqued.
   ConstraintLocator *

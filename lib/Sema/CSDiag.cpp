@@ -2345,9 +2345,7 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure() {
 
   fromType = fromType->getRValueType();
   
-  auto toType = CS->getConversionType(anchor);
-  if (!toType)
-    toType = CS->getContextualType(anchor);
+  auto toType = CS->getContextualType(anchor);
   if (!toType)
     toType = types.second.getPointer();
   
@@ -2614,9 +2612,7 @@ typeCheckArbitrarySubExprIndependently(Expr *subExpr, Type conversionType,
 
 bool FailureDiagnosis::diagnoseContextualConversionError(Type exprResultType) {
   // Try to find the contextual type in a variety of ways.
-  Type contextualType = CS->getConversionType(expr);
-  if (!contextualType)
-    contextualType = CS->getContextualType(expr);
+  Type contextualType = CS->getContextualType(expr);
   
   if (conversionConstraint && conversionConstraint->isFavored() &&
       conversionConstraint->getLocator() &&
@@ -2757,20 +2753,10 @@ bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
   calleeInfo.filterList(argTupleType);
 
   if (calleeInfo.closeness == CC_ExactMatch) {
-    
     // Otherwise, whatever the result type of the call happened to be must not
-    // have been what we were looking for.
-    auto resultTy = getTypeOfTypeCheckedChildIndependently(binop);
-    if (!resultTy)
-      return true;
-    
-    if (typeIsNotSpecialized(resultTy))
-      resultTy = calleeInfo[0].getResultType();
-    
+    // have been what we were looking for - diagnose this as a conversion
+    // failure.
     return diagnoseGeneralConversionFailure();
-    diagnose(binop->getLoc(), diag::result_type_no_match, resultTy)
-      .highlight(binop->getSourceRange());
-    return true;
   }
   
   // A common error is to apply an operator that only has an inout LHS (e.g. +=)
