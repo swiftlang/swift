@@ -1608,6 +1608,62 @@ void swift::configureConstructorType(ConstructorDecl *ctor,
   ctor->setInitializerType(initFnType);
 }
 
+namespace {
+
+class TypeAccessibilityChecker : private TypeWalker {
+  using TypeAccessibilityCacheMap =
+    decltype(TypeChecker::TypeAccessibilityCache);
+  TypeAccessibilityCacheMap &Cache;
+  SmallVector<Accessibility, 8> AccessStack;
+
+  explicit TypeAccessibilityChecker(TypeAccessibilityCacheMap &cache)
+      : Cache(cache) {
+    // Always have something on the stack.
+    AccessStack.push_back(Accessibility::Private);
+  }
+
+  bool shouldVisitOriginalSubstitutedType() override { return true; }
+
+  Action walkToTypePre(Type ty) override {
+    // Assume failure until we post-visit this node.
+    // This will be correct as long as we don't ever have self-referential
+    // Types.
+    auto cached = Cache.find(ty);
+    if (cached != Cache.end()) {
+      AccessStack.back() = std::min(AccessStack.back(), cached->second);
+      return Action::SkipChildren;
+    }
+
+    Accessibility current;
+    if (auto alias = dyn_cast<NameAliasType>(ty.getPointer()))
+      current = alias->getDecl()->getFormalAccess();
+    else if (auto nominal = ty->getAnyNominal())
+      current = nominal->getFormalAccess();
+    else
+      current = Accessibility::Public;
+    AccessStack.push_back(current);
+
+    return Action::Continue;
+  }
+
+  Action walkToTypePost(Type ty) override {
+    Accessibility last = AccessStack.pop_back_val();
+    Cache[ty] = last;
+    AccessStack.back() = std::min(AccessStack.back(), last);
+    return Action::Continue;
+  }
+
+public:
+  static Accessibility getAccessibility(Type ty,
+                                        TypeAccessibilityCacheMap &cache) {
+    ty.walk(TypeAccessibilityChecker(cache));
+    return cache[ty];
+  }
+};
+
+} // end anonymous namespace
+
+
 static void computeDefaultAccessibility(TypeChecker &TC, ExtensionDecl *ED) {
   if (ED->hasDefaultAccessibility())
     return;
@@ -1617,15 +1673,43 @@ static void computeDefaultAccessibility(TypeChecker &TC, ExtensionDecl *ED) {
     return;
   }
 
-  TC.checkInheritanceClause(ED);
-  if (auto nominal = ED->getExtendedType()->getAnyNominal()) {
+  TC.validateExtension(ED);
+
+  // Default access = min(extended type, requirements, 'internal').
+  Accessibility access = Accessibility::Internal;
+
+  if (NominalTypeDecl *nominal = ED->getExtendedType()->getAnyNominal()) {
     TC.validateDecl(nominal);
-    ED->setDefaultAccessibility(std::min(nominal->getFormalAccess(),
-                                         Accessibility::Internal));
-  } else {
-    // Recover by assuming "internal", which is the most common thing anyway.
-    ED->setDefaultAccessibility(Accessibility::Internal);
+    access = std::min(nominal->getFormalAccess(), access);
   }
+
+  if (const GenericParamList *genericParams = ED->getGenericParams()) {
+    auto getTypeAccess = [&TC](const TypeLoc &TL) {
+      if (!TL.getType())
+        return Accessibility::Public;
+      auto &cache = TC.TypeAccessibilityCache;
+      return TypeAccessibilityChecker::getAccessibility(TL.getType(), cache);
+    };
+
+    // Only check the trailing 'where' requirements. Other requirements come
+    // from the extended type and have already been checked.
+    for (const RequirementRepr &req : genericParams->getTrailingRequirements()){
+      switch (req.getKind()) {
+      case RequirementKind::Conformance:
+        access = std::min(getTypeAccess(req.getSubjectLoc()), access);
+        access = std::min(getTypeAccess(req.getConstraintLoc()), access);
+        break;
+      case RequirementKind::SameType:
+        access = std::min(getTypeAccess(req.getFirstTypeLoc()), access);
+        access = std::min(getTypeAccess(req.getSecondTypeLoc()), access);
+        break;
+      case RequirementKind::WitnessMarker:
+        break;
+      }
+    }
+  }
+
+  ED->setDefaultAccessibility(access);
 }
 
 void TypeChecker::computeAccessibility(ValueDecl *D) {
@@ -1697,57 +1781,6 @@ void TypeChecker::computeAccessibility(ValueDecl *D) {
 }
 
 namespace {
-
-class TypeAccessibilityChecker : private TypeWalker {
-  using TypeAccessibilityCacheMap =
-    decltype(TypeChecker::TypeAccessibilityCache);
-  TypeAccessibilityCacheMap &Cache;
-  SmallVector<Accessibility, 8> AccessStack;
-
-  explicit TypeAccessibilityChecker(TypeAccessibilityCacheMap &cache)
-      : Cache(cache) {
-    // Always have something on the stack.
-    AccessStack.push_back(Accessibility::Private);
-  }
-
-  bool shouldVisitOriginalSubstitutedType() override { return true; }
-
-  Action walkToTypePre(Type ty) override {
-    // Assume failure until we post-visit this node.
-    // This will be correct as long as we don't ever have self-referential
-    // Types.
-    auto cached = Cache.find(ty);
-    if (cached != Cache.end()) {
-      AccessStack.back() = std::min(AccessStack.back(), cached->second);
-      return Action::SkipChildren;
-    }
-
-    Accessibility current;
-    if (auto alias = dyn_cast<NameAliasType>(ty.getPointer()))
-      current = alias->getDecl()->getFormalAccess();
-    else if (auto nominal = ty->getAnyNominal())
-      current = nominal->getFormalAccess();
-    else
-      current = Accessibility::Public;
-    AccessStack.push_back(current);
-
-    return Action::Continue;
-  }
-
-  Action walkToTypePost(Type ty) override {
-    Accessibility last = AccessStack.pop_back_val();
-    Cache[ty] = last;
-    AccessStack.back() = std::min(AccessStack.back(), last);
-    return Action::Continue;
-  }
-
-public:
-  static Accessibility getAccessibility(Type ty,
-                                        TypeAccessibilityCacheMap &cache) {
-    ty.walk(TypeAccessibilityChecker(cache));
-    return cache[ty];
-  }
-};
 
 class TypeAccessibilityDiagnoser : private ASTWalker {
   const ComponentIdentTypeRepr *minAccessibilityType = nullptr;
