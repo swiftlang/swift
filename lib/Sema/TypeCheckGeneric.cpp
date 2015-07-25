@@ -198,28 +198,30 @@ Type CompleteGenericTypeResolver::resolveTypeOfContext(DeclContext *dc) {
 /// Add the generic parameters and requirements from the parent context to the
 /// archetype builder.
 static void addContextParamsAndRequirements(ArchetypeBuilder &builder,
-                                            DeclContext *dc) {
+                                            DeclContext *dc,
+                                            bool adoptArchetypes) {
   if (!dc->isTypeContext())
     return;
 
   if (auto sig = dc->getGenericSignatureOfContext()) {
     // Add generic signature from this context.
-    builder.addGenericSignature(sig, false);
+    builder.addGenericSignature(sig, adoptArchetypes);
   }
 }
 
 /// Check the generic parameters in the given generic parameter list (and its
 /// parent generic parameter lists) according to the given resolver.
-static bool checkGenericParameters(TypeChecker &tc, ArchetypeBuilder *builder,
-                                   GenericParamList *genericParams,
-                                   DeclContext *parentDC,
-                                   GenericTypeResolver &resolver) {
+bool TypeChecker::checkGenericParamList(ArchetypeBuilder *builder,
+                                        GenericParamList *genericParams,
+                                        DeclContext *parentDC,
+                                        bool adoptArchetypes,
+                                        GenericTypeResolver *resolver) {
   bool invalid = false;
 
   // If there is a parent context, add the generic parameters and requirements
   // from that context.
   if (builder && parentDC)
-    addContextParamsAndRequirements(*builder, parentDC);
+    addContextParamsAndRequirements(*builder, parentDC, adoptArchetypes);
 
   // If there aren't any generic parameters at this level, we're done.
   if (!genericParams)
@@ -244,7 +246,7 @@ static bool checkGenericParameters(TypeChecker &tc, ArchetypeBuilder *builder,
     param->setDepth(depth);
 
     // Check the inheritance clause of this type parameter.
-    tc.checkInheritanceClause(param, &resolver);
+    checkInheritanceClause(param, resolver);
 
     if (builder) {
       // Add the generic parameter to the builder.
@@ -269,14 +271,14 @@ static bool checkGenericParameters(TypeChecker &tc, ArchetypeBuilder *builder,
     switch (req.getKind()) {
     case RequirementKind::Conformance: {
       // Validate the types.
-      if (tc.validateType(req.getSubjectLoc(), lookupDC, options, &resolver)) {
+      if (validateType(req.getSubjectLoc(), lookupDC, options, resolver)) {
         invalid = true;
         req.setInvalid();
         continue;
       }
 
-      if (tc.validateType(req.getConstraintLoc(), lookupDC, options,
-                          &resolver)) {
+      if (validateType(req.getConstraintLoc(), lookupDC, options,
+                       resolver)) {
         invalid = true;
         req.setInvalid();
         continue;
@@ -285,10 +287,10 @@ static bool checkGenericParameters(TypeChecker &tc, ArchetypeBuilder *builder,
       // FIXME: Feels too early to perform this check.
       if (!req.getConstraint()->isExistentialType() &&
           !req.getConstraint()->getClassOrBoundGenericClass()) {
-        tc.diagnose(genericParams->getWhereLoc(),
-                    diag::requires_conformance_nonprotocol,
-                    req.getSubjectLoc(), req.getConstraintLoc());
-        req.getConstraintLoc().setInvalidType(tc.Context);
+        diagnose(genericParams->getWhereLoc(),
+                 diag::requires_conformance_nonprotocol,
+                 req.getSubjectLoc(), req.getConstraintLoc());
+        req.getConstraintLoc().setInvalidType(Context);
         invalid = true;
         req.setInvalid();
         continue;
@@ -298,15 +300,15 @@ static bool checkGenericParameters(TypeChecker &tc, ArchetypeBuilder *builder,
     }
 
     case RequirementKind::SameType:
-      if (tc.validateType(req.getFirstTypeLoc(), lookupDC, options,
-                          &resolver)) {
+      if (validateType(req.getFirstTypeLoc(), lookupDC, options,
+                       resolver)) {
         invalid = true;
         req.setInvalid();
         continue;
       }
 
-      if (tc.validateType(req.getSecondTypeLoc(), lookupDC, options,
-                          &resolver)) {
+      if (validateType(req.getSecondTypeLoc(), lookupDC, options,
+                       resolver)) {
         invalid = true;
         req.setInvalid();
         continue;
@@ -541,8 +543,9 @@ static bool checkGenericFuncSignature(TypeChecker &tc,
   // Check the generic parameter list.
   auto genericParams = func->getGenericParams();
 
-  checkGenericParameters(tc, builder, genericParams,
-                         func->getDeclContext(), resolver);
+  tc.checkGenericParamList(builder, genericParams,
+                           func->getDeclContext(),
+                           false, &resolver);
 
   // Check the parameter patterns.
   for (auto pattern : func->getBodyParamPatterns()) {
@@ -856,8 +859,8 @@ GenericSignature *TypeChecker::validateGenericSignature(
   // Type check the generic parameters, treating all generic type
   // parameters as dependent, unresolved.
   DependentGenericTypeResolver dependentResolver(builder);  
-  if (checkGenericParameters(*this, &builder, genericParams, dc,
-                             dependentResolver)) {
+  if (checkGenericParamList(&builder, genericParams, dc,
+                            false, &dependentResolver)) {
     invalid = true;
   }
 
@@ -874,8 +877,8 @@ GenericSignature *TypeChecker::validateGenericSignature(
   // and type-check it again, completely.
   revertGenericParamList(genericParams);
   CompleteGenericTypeResolver completeResolver(*this, builder);
-  if (checkGenericParameters(*this, nullptr, genericParams, dc,
-                             completeResolver)) {
+  if (checkGenericParamList(nullptr, genericParams, dc,
+                            false, &completeResolver)) {
     invalid = true;
   }
 

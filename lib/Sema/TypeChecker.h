@@ -866,6 +866,14 @@ public:
   /// \returns true if an error occurred, or false otherwise.
   bool validateGenericTypeSignature(NominalTypeDecl *nominal);
 
+  /// Check the generic parameters in the given generic parameter list (and its
+  /// parent generic parameter lists) according to the given resolver.
+  bool checkGenericParamList(ArchetypeBuilder *builder,
+                             GenericParamList *genericParams,
+                             DeclContext *parentDC,
+                             bool adoptArchetypes = true,
+                             GenericTypeResolver *resolver = nullptr);
+
   /// Check the given set of generic arguments against the requirements in a
   /// generic signature.
   ///

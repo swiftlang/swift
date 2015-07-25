@@ -861,116 +861,6 @@ static void revertDependentPattern(Pattern *pattern) {
   }
 }
 
-/// Add the generic parameters and requirements from the parent context to the
-/// archetype builder.
-static void addContextParamsAndRequirements(ArchetypeBuilder &builder,
-                                            DeclContext *dc) {
-  if (!dc->isTypeContext())
-    return;
-
-  if (auto sig = dc->getGenericSignatureOfContext()) {
-    // Add generic signature from this context.
-    builder.addGenericSignature(sig, true);
-  }
-}
-
-/// Check the given generic parameter list, introduce the generic parameters
-/// and requirements into the archetype builder, but don't assign archetypes
-/// yet.
-static void checkGenericParamList(ArchetypeBuilder &builder,
-                                  GenericParamList *genericParams,
-                                  TypeChecker &TC) {
-  assert(genericParams && "Missing generic parameters");
-  unsigned Depth = genericParams->getDepth();
-
-  // Determine where and how to perform name lookup for the generic
-  // parameter lists and where clause.
-  TypeResolutionOptions options;
-  DeclContext *lookupDC = genericParams->begin()[0]->getDeclContext();
-  DeclContext *parentDC = lookupDC;
-  if (!lookupDC->isModuleScopeContext()) {
-    assert(isa<NominalTypeDecl>(lookupDC) || isa<ExtensionDecl>(lookupDC) ||
-           isa<AbstractFunctionDecl>(lookupDC) &&
-           "not a proper generic parameter context?");
-    options = TR_GenericSignature;
-    parentDC = lookupDC->getParent();
-  }
-
-  // Add outer parameters.
-  addContextParamsAndRequirements(builder, parentDC);
-
-  // Assign archetypes to each of the generic parameters.
-  for (auto GP : *genericParams) {
-    // Set the depth of this type parameter.
-    GP->setDepth(Depth);
-
-    // Check the constraints on the type parameter.
-    TC.checkInheritanceClause(GP);
-
-    // Add the generic parameter to the builder.
-    builder.addGenericParameter(GP);
-
-    // Infer requirements from the "inherited" types.
-    for (auto &inherited : GP->getInherited()) {
-      builder.inferRequirements(inherited, genericParams);
-    }
-  }
-
-  // Add the requirements clause to the builder, validating the types in
-  // the requirements clause along the way.
-  for (auto &Req : genericParams->getRequirements()) {
-    if (Req.isInvalid())
-      continue;
-
-    switch (Req.getKind()) {
-    case RequirementKind::Conformance: {
-      // Validate the types.
-      if (TC.validateType(Req.getSubjectLoc(), lookupDC, options)) {
-        Req.setInvalid();
-        continue;
-      }
-
-      if (TC.validateType(Req.getConstraintLoc(), lookupDC, options)) {
-        Req.setInvalid();
-        continue;
-      }
-
-      // FIXME: Feels too early to perform this check.
-      if (!Req.getConstraint()->isExistentialType() &&
-          !Req.getConstraint()->getClassOrBoundGenericClass()) {
-        TC.diagnose(genericParams->getWhereLoc(),
-                    diag::requires_conformance_nonprotocol,
-                    Req.getSubjectLoc(), Req.getConstraintLoc());
-        Req.getConstraintLoc().setInvalidType(TC.Context);
-        Req.setInvalid();
-        continue;
-      }
-      
-      break;
-    }
-
-    case RequirementKind::SameType:
-      if (TC.validateType(Req.getFirstTypeLoc(), lookupDC, options)) {
-        Req.setInvalid();
-        continue;
-      }
-
-      if (TC.validateType(Req.getSecondTypeLoc(), lookupDC, options)) {
-        Req.setInvalid();
-        continue;
-      }
-      
-      break;
-
-    case RequirementKind::WitnessMarker:
-      llvm_unreachable("value witness markers in syntactic requirement?");
-    }
-    
-    if (builder.addRequirement(Req))
-      Req.setInvalid();
-  }
-}
-
 /// Revert the dependent types within the given generic parameter list.
 void TypeChecker::revertGenericParamList(GenericParamList *genericParams) {
   // Revert the inherited clause of the generic parameter list.
@@ -1010,7 +900,11 @@ static void markInvalidGenericSignature(AbstractFunctionDecl *AFD,
   
   // If there is a parent context, add the generic parameters and requirements
   // from that context.
-  addContextParamsAndRequirements(builder, AFD->getDeclContext());
+  auto dc = AFD->getDeclContext();
+
+  if (dc->isTypeContext())
+    if (auto sig = dc->getGenericSignatureOfContext())
+      builder.addGenericSignature(sig, true);
   
   // If there aren't any generic parameters at this level, we're done.
   if (!genericParams)
@@ -1112,10 +1006,10 @@ bool TypeChecker::handleSILGenericParams(
                     SmallVectorImpl<ArchetypeBuilder *> &builders,
                     SmallVectorImpl<GenericParamList *> &gps,
                     DeclContext *DC) {
-  // We call checkGenericParamList on all lists, then call
-  // finalizeGenericParamList on all lists. After finalizeGenericParamList, the
-  // generic parameters will be assigned to archetypes. That will cause SameType
-  // requirement to have Archetypes inside.
+  // We call checkGenericParamList() on all lists, then call
+  // finalizeGenericParamList() on all lists. After finalizeGenericParamList(),
+  // the generic parameters will be assigned to archetypes. That will cause
+  // SameType requirement to have Archetypes inside.
 
   // Since the innermost GenericParamList is in the beginning of the vector,
   // we process in reverse order to handle the outermost list first.
@@ -1131,7 +1025,7 @@ bool TypeChecker::handleSILGenericParams(
       return true;
 
     revertGenericParamList(genericParams);
-    checkGenericParamList(builder, genericParams, *this);
+    checkGenericParamList(&builder, genericParams, DC);
     finalizeGenericParamList(builder, genericParams, DC, *this);
   }
   return false;
@@ -4168,7 +4062,7 @@ public:
         // Create a fresh archetype builder.
         ArchetypeBuilder builder =
           TC.createArchetypeBuilder(FD->getModuleContext());
-        checkGenericParamList(builder, gp, TC);
+        TC.checkGenericParamList(&builder, gp, FD->getDeclContext());
 
         // Infer requirements from parameter patterns.
         for (auto pattern : FD->getBodyParamPatterns()) {
@@ -4185,7 +4079,7 @@ public:
         TC.revertGenericFuncSignature(FD);
 
         // Assign archetypes.
-        finalizeGenericParamList(builder, FD->getGenericParams(), FD, TC);
+        finalizeGenericParamList(builder, gp, FD, TC);
       }
     } else if (outerGenericParams) {
       if (TC.validateGenericFuncSignature(FD)) {
@@ -5541,7 +5435,7 @@ public:
       } else {
         ArchetypeBuilder builder =
           TC.createArchetypeBuilder(CD->getModuleContext());
-        checkGenericParamList(builder, gp, TC);
+        TC.checkGenericParamList(&builder, gp, CD->getDeclContext());
 
         // Infer requirements from the parameters of the constructor.
         builder.inferRequirements(CD->getBodyParamPatterns()[1], gp);
@@ -5956,7 +5850,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
         ArchetypeBuilder builder =
           createArchetypeBuilder(nominal->getModuleContext());
-        checkGenericParamList(builder, gp, *this);
+        checkGenericParamList(&builder, gp, nominal->getDeclContext());
         finalizeGenericParamList(builder, gp, nominal, *this);
       }
     }
@@ -6003,7 +5897,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
 
     ArchetypeBuilder builder =
       createArchetypeBuilder(proto->getModuleContext());
-    checkGenericParamList(builder, gp, *this);
+    checkGenericParamList(&builder, gp, proto->getDeclContext());
     finalizeGenericParamList(builder, gp, proto, *this);
 
     checkInheritanceClause(D);
@@ -6372,7 +6266,7 @@ static Type checkExtensionGenericParams(
   // Validate the generic parameters for the last time.
   tc.revertGenericParamList(genericParams);
   ArchetypeBuilder builder = tc.createArchetypeBuilder(ext->getModuleContext());
-  checkGenericParamList(builder, genericParams, tc);
+  tc.checkGenericParamList(&builder, genericParams, ext->getDeclContext());
   inferExtendedTypeReqs(builder);
   finalizeGenericParamList(builder, genericParams, ext, tc);
 
