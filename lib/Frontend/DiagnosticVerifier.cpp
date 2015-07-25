@@ -22,16 +22,31 @@
 using namespace swift;
 
 namespace {
-  struct ExpectedDiagnosticInfo {
-    StringRef Str;
-    unsigned LineNo;
-    llvm::SourceMgr::DiagKind Classification;
-  };
-
   struct ExpectedFixIt {
+    const char *FixitLoc;
     unsigned StartCol;
     unsigned EndCol;
     std::string Text;
+  };
+
+  struct ExpectedDiagnosticInfo {
+    const char *Loc;
+    llvm::SourceMgr::DiagKind Classification;
+    unsigned MinCount, MaxCount;
+    
+    StringRef Str;
+    unsigned LineNo;
+    
+    std::vector<ExpectedFixIt> Fixits;
+
+    ExpectedDiagnosticInfo(const char *Loc,
+                           llvm::SourceMgr::DiagKind Classification,
+                           unsigned MinCount, unsigned MaxCount)
+      : Loc(Loc), Classification(Classification),
+        MinCount(MinCount), MaxCount(MaxCount) {
+      LineNo = ~0U;
+    }
+    
   };
 }
 
@@ -150,13 +165,15 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
 
   unsigned PrevExpectedContinuationLine = 0;
 
+  std::vector<ExpectedDiagnosticInfo> ExpectedDiagnostics;
+  
   // Scan the memory buffer looking for expected-note/warning/error.
   for (size_t Match = InputFile.find("expected-");
        Match != StringRef::npos; Match = InputFile.find("expected-", Match+1)) {
     // Process this potential match.  If we fail to process it, just move on to
     // the next match.
     StringRef MatchStart = InputFile.substr(Match);
-    const char *ExpectedStringStart = MatchStart.data();
+    const char *DiagnosticLoc = MatchStart.data();
 
     llvm::SourceMgr::DiagKind ExpectedClassification;
     if (MatchStart.startswith("expected-note")) {
@@ -243,15 +260,15 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
     size_t End = MatchStart.find("}}");
     if (End == StringRef::npos) {
       Errors.push_back(std::make_pair(MatchStart.data(),
-                                      "didn't find '}}' to match '{{' in expected-warning/note/error line"));
+        "didn't find '}}' to match '{{' in expected-warning/note/error line"));
       continue;
     }
 
-    ExpectedDiagnosticInfo Expected;
-    Expected.Classification = ExpectedClassification;
+    ExpectedDiagnosticInfo Expected(DiagnosticLoc, ExpectedClassification,
+                                    MinCount, MaxCount);
 
     llvm::SmallString<256> Buf;
-    Expected.Str = Lexer::getEncodedStringSegment(MatchStart.slice(2, End), Buf);
+    Expected.Str = Lexer::getEncodedStringSegment(MatchStart.slice(2, End),Buf);
     if (PrevExpectedContinuationLine)
       Expected.LineNo = PrevExpectedContinuationLine;
     else
@@ -268,107 +285,119 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
     else
       PrevExpectedContinuationLine = 0;
 
+    
+    // Scan for fix-its: {{10-14=replacement text}}
+    StringRef ExtraChecks = MatchStart.substr(End+2).ltrim(" \t");
+    while (ExtraChecks.startswith("{{")) {
+      // First make sure we have a closing "}}".
+      size_t EndLoc = ExtraChecks.find("}}");
+      if (EndLoc == StringRef::npos) {
+        Errors.push_back(std::make_pair(ExtraChecks.data(),
+                                        "didn't find '}}' to match '{{' in "
+                                        "fix-it verification"));
+        break;
+      }
+      
+      // Allow for close braces to appear in the replacement text.
+      while (EndLoc+2 < ExtraChecks.size() && ExtraChecks[EndLoc+2] == '}')
+        ++EndLoc;
+      
+      StringRef FixItStr = ExtraChecks.slice(2, EndLoc);
+      // Check for matching a later "}}" on a different line.
+      if (FixItStr.find_first_of("\r\n") != StringRef::npos) {
+        Errors.push_back(std::make_pair(ExtraChecks.data(),
+                                        "didn't find '}}' to match '{{' in "
+                                        "fix-it verification"));
+        break;
+      }
+      
+      // Prepare for the next round of checks.
+      ExtraChecks = ExtraChecks.substr(EndLoc+2).ltrim();
+      
+      // Parse the pieces of the fix-it.
+      size_t MinusLoc = FixItStr.find('-');
+      if (MinusLoc == StringRef::npos) {
+        Errors.push_back(std::make_pair(FixItStr.data(),
+                                        "expected '-' in fix-it verification"));
+        continue;
+      }
+      StringRef StartColStr = FixItStr.slice(0, MinusLoc);
+      StringRef AfterMinus = FixItStr.substr(MinusLoc+1);
+      
+      size_t EqualLoc = AfterMinus.find('=');
+      if (EqualLoc == StringRef::npos) {
+        Errors.push_back(std::make_pair(AfterMinus.data(),
+                                        "expected '=' after '-' in fix-it "
+                                        "verification"));
+        continue;
+      }
+      StringRef EndColStr = AfterMinus.slice(0, EqualLoc);
+      StringRef AfterEqual = AfterMinus.substr(EqualLoc+1);
+      
+      ExpectedFixIt FixIt;
+      FixIt.FixitLoc = StartColStr.data()-2;
+      if (StartColStr.getAsInteger(10, FixIt.StartCol)) {
+        Errors.push_back(std::make_pair(StartColStr.data(),
+                                        "invalid column number in fix-it "
+                                        "verification"));
+        continue;
+      }
+      if (EndColStr.getAsInteger(10, FixIt.EndCol)) {
+        Errors.push_back(std::make_pair(EndColStr.data(),
+                                        "invalid column number in fix-it "
+                                        "verification"));
+        continue;
+      }
+      
+      // Translate literal "\\n" into '\n', inefficiently.
+      StringRef fixItText = AfterEqual.slice(0, EndLoc);
+      for (const char *current = fixItText.begin(), *end = fixItText.end();
+           current != end; /* in loop */) {
+        if (*current == '\\' && current + 1 < end && *(current + 1) == 'n') {
+          FixIt.Text += '\n';
+          current += 2;
+        } else {
+          FixIt.Text += *current++;
+        }
+      }
+      
+      Expected.Fixits.push_back(FixIt);
+    }
+
+    ExpectedDiagnostics.push_back(Expected);
+  }
+
+  
+  // Make sure all the expected diagnostics appeared.
+  for (const auto &expected : ExpectedDiagnostics) {
     // Check to see if we had this expected diagnostic.
-    for (unsigned MatchCount = 0; MatchCount < MaxCount; MatchCount++) {
-      auto FoundDiagnosticIter = findDiagnostic(Expected, BufferName);
+    for (unsigned MatchCount = 0; MatchCount < expected.MaxCount; MatchCount++) {
+      auto FoundDiagnosticIter = findDiagnostic(expected, BufferName);
       if (FoundDiagnosticIter == CapturedDiagnostics.end()) {
-        if (MatchCount < MinCount) {
+        if (MatchCount < expected.MinCount) {
           std::string message =
-            "expected "+getDiagKindString(Expected.Classification) +
+            "expected "+getDiagKindString(expected.Classification) +
             " not produced";
-          Errors.push_back(std::make_pair(ExpectedStringStart, message));
+          Errors.push_back(std::make_pair(expected.Loc, message));
         }
         break;
       }
       auto &FoundDiagnostic = *FoundDiagnosticIter;
 
-      // Scan for fix-its: {{10-14=replacement text}}
-      StringRef ExtraChecks = MatchStart.substr(End+2).ltrim(" \t");
-      while (ExtraChecks.startswith("{{")) {
-        // First make sure we have a closing "}}".
-        size_t EndLoc = ExtraChecks.find("}}");
-        if (EndLoc == StringRef::npos) {
-          Errors.push_back(std::make_pair(ExtraChecks.data(),
-                                          "didn't find '}}' to match '{{' in "
-                                          "fix-it verification"));
-          break;
-        }
-
-        // Allow for close braces to appear in the replacement text.
-        while (EndLoc+2 < ExtraChecks.size() && ExtraChecks[EndLoc+2] == '}')
-          ++EndLoc;
-
-        StringRef FixItStr = ExtraChecks.slice(2, EndLoc);
-        // Check for matching a later "}}" on a different line.
-        if (FixItStr.find_first_of("\r\n") != StringRef::npos) {
-          Errors.push_back(std::make_pair(ExtraChecks.data(),
-                                          "didn't find '}}' to match '{{' in "
-                                          "fix-it verification"));
-          break;
-        }
-
-        // Prepare for the next round of checks.
-        ExtraChecks = ExtraChecks.substr(EndLoc+2).ltrim();
-
-        // Parse the pieces of the fix-it.
-        size_t MinusLoc = FixItStr.find('-');
-        if (MinusLoc == StringRef::npos) {
-          Errors.push_back(std::make_pair(FixItStr.data(),
-                                          "expected '-' in fix-it verification"));
-          continue;
-        }
-        StringRef StartColStr = FixItStr.slice(0, MinusLoc);
-        StringRef AfterMinus = FixItStr.substr(MinusLoc+1);
-
-        size_t EqualLoc = AfterMinus.find('=');
-        if (EqualLoc == StringRef::npos) {
-          Errors.push_back(std::make_pair(AfterMinus.data(),
-                                          "expected '=' after '-' in fix-it "
-                                          "verification"));
-          continue;
-        }
-        StringRef EndColStr = AfterMinus.slice(0, EqualLoc);
-        StringRef AfterEqual = AfterMinus.substr(EqualLoc+1);
-
-        ExpectedFixIt FixIt;
-        if (StartColStr.getAsInteger(10, FixIt.StartCol)) {
-          Errors.push_back(std::make_pair(StartColStr.data(),
-                                          "invalid column number in fix-it "
-                                          "verification"));
-          continue;
-        }
-        if (EndColStr.getAsInteger(10, FixIt.EndCol)) {
-          Errors.push_back(std::make_pair(EndColStr.data(),
-                                          "invalid column number in fix-it "
-                                          "verification"));
-          continue;
-        }
-
-        // Translate literal "\\n" into '\n', inefficiently.
-        StringRef fixItText = AfterEqual.slice(0, EndLoc);
-        for (const char *current = fixItText.begin(), *end = fixItText.end();
-             current != end; /* in loop */) {
-          if (*current == '\\' && current + 1 < end && *(current + 1) == 'n') {
-            FixIt.Text += '\n';
-            current += 2;
-          } else {
-            FixIt.Text += *current++;
-          }
-        }
-
-        // Finally, make sure the fix-it is present in the diagnostic.
-        if (!checkForFixIt(FixIt, FoundDiagnostic, InputFile)) {
+      // Verify that any expected fix-its are present in the diagnostic.
+      for (auto fixit : expected.Fixits) {
+        if (!checkForFixIt(fixit, FoundDiagnostic, InputFile)) {
           std::string Message;
           {
             llvm::raw_string_ostream OS(Message);
             OS << "expected fix-it not seen";
-
+            
             if (!FoundDiagnostic.getFixIts().empty()) {
               OS << "; actual fix-its:";
-
+              
               for (auto &ActualFixIt : FoundDiagnostic.getFixIts()) {
                 llvm::SMRange Range = ActualFixIt.getRange();
-
+                
                 OS << " {{"
                 << getColumnNumber(InputFile, Range.Start) << '-'
                 << getColumnNumber(InputFile, Range.End) << '='
@@ -377,9 +406,8 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
               }
             }
           }
-
-          Errors.push_back(std::make_pair(StartColStr.data()-2,
-                                          std::move(Message)));
+          
+          Errors.push_back(std::make_pair(fixit.FixitLoc, std::move(Message)));
         }
       }
 
@@ -389,7 +417,8 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
       CapturedDiagnostics.erase(FoundDiagnosticIter);
     }
   }
-
+  
+  
   // Verify that there are no diagnostics (in MemoryBuffer) left in the list.
   for (unsigned i = 0, e = CapturedDiagnostics.size(); i != e; ++i) {
     if (CapturedDiagnostics[i].getFilename() != BufferName)
