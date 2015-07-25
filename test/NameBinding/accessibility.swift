@@ -92,7 +92,7 @@ class ReplacingOverrider : Base {
 }
 
 protocol MethodProto {
-  func method() // expected-note + {{protocol requires function 'method()' with type '() -> ()'}}
+  func method() // expected-note * {{protocol requires function 'method()' with type '() -> ()'}}
 }
 
 extension OriginallyEmpty : MethodProto {}
@@ -104,7 +104,7 @@ extension Foo : MethodProto {} // expected-error {{type 'Foo' does not conform t
 
 
 protocol TypeProto {
-  typealias TheType // expected-note + {{protocol requires nested type 'TheType'}}
+  typealias TheType // expected-note * {{protocol requires nested type 'TheType'}}
 }
 
 extension OriginallyEmpty {}

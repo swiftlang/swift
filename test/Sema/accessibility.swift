@@ -4,12 +4,12 @@ public protocol PublicProto {
   func publicReq()
 }
 
-// expected-note@+1 + {{type declared here}}
+// expected-note@+1 * {{type declared here}}
 internal protocol InternalProto {
   func internalReq()
 }
 
-// expected-note@+1 + {{type declared here}}
+// expected-note@+1 * {{type declared here}}
 private protocol PrivateProto {
   func privateReq()
 }
@@ -22,7 +22,7 @@ public struct PublicStruct: PublicProto, InternalProto, PrivateProto {
   public var publicVar = 0
 }
 
-// expected-note@+1 + {{type declared here}}
+// expected-note@+1 * {{type declared here}}
 internal struct InternalStruct: PublicProto, InternalProto, PrivateProto {
   private func publicReq() {} // expected-error {{method 'publicReq()' must be as accessible as its enclosing type because it matches a requirement in protocol 'PublicProto'}} {{3-10=internal}}
   private func internalReq() {} // expected-error {{method 'internalReq()' must be declared internal because it matches a requirement in internal protocol 'InternalProto'}} {{3-10=internal}}
@@ -31,7 +31,7 @@ internal struct InternalStruct: PublicProto, InternalProto, PrivateProto {
   public var publicVar = 0 // expected-warning {{declaring a public var for an internal struct}} {{3-9=internal}}
 }
 
-// expected-note@+1 + {{type declared here}}
+// expected-note@+1 * {{type declared here}}
 private struct PrivateStruct: PublicProto, InternalProto, PrivateProto {
   private func publicReq() {}
   private func internalReq() {}
@@ -99,11 +99,11 @@ public struct PublicStructDefaultMethods: PublicProto, InternalProto, PrivatePro
 
 public class Base {
   required public init() {}
-  // expected-note@+1 + {{overridden declaration is here}}
+  // expected-note@+1 * {{overridden declaration is here}}
   public func foo() {}
-  // expected-note@+1 + {{overridden declaration is here}}
+  // expected-note@+1 * {{overridden declaration is here}}
   public internal(set) var bar: Int = 0
-  // expected-note@+1 + {{overridden declaration is here}}
+  // expected-note@+1 * {{overridden declaration is here}}
   public subscript () -> () { return () }
 }
 
@@ -232,9 +232,9 @@ public struct Initializers {
 
 
 public class PublicClass {}
-// expected-note@+1 + {{type declared here}}
+// expected-note@+1 * {{type declared here}}
 internal class InternalClass {}
-// expected-note@+1 + {{type declared here}}
+// expected-note@+1 * {{type declared here}}
 private class PrivateClass {}
 
 public protocol AssocTypes {
@@ -268,7 +268,7 @@ public protocol PublicRefinesPI : PrivateProto, InternalProto {} // expected-err
 public protocol PublicRefinesIP : InternalProto, PrivateProto {} // expected-error {{public protocol cannot refine a private protocol}}
 
 
-// expected-note@+1 + {{type declared here}}
+// expected-note@+1 * {{type declared here}}
 private typealias PrivateInt = Int
 enum DefaultRawPrivate : PrivateInt { // expected-error {{enum must be declared private because its raw type uses a private type}}
   case A

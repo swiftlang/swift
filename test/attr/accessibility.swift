@@ -145,10 +145,10 @@ private extension Properties : EmptyProto {} // expected-error {{'private' modif
 private(set) extension Properties : EmptyProto2 {} // expected-error {{'private' modifier cannot be applied to this declaration}}
 
 public struct PublicStruct {}
-internal struct InternalStruct {} // expected-note + {{declared here}}
-private struct PrivateStruct {} // expected-note + {{declared here}}
+internal struct InternalStruct {} // expected-note * {{declared here}}
+private struct PrivateStruct {} // expected-note * {{declared here}}
 
-protocol InternalProto { // expected-note + {{declared here}}
+protocol InternalProto { // expected-note * {{declared here}}
   typealias Assoc
 }
 public extension InternalProto {} // expected-error {{extension of internal protocol cannot be declared public}}

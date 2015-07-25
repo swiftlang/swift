@@ -937,12 +937,12 @@ class SomeGenericClass<T> { }
 class SubclassAvailableOn10_9OfSomeGenericClassOfProtocolAvailableOn10_10 : SomeGenericClass<ProtocolAvailableOn10_10> { // expected-error {{'ProtocolAvailableOn10_10' is only available on OS X 10.10 or newer}}
 }
 
-func GenericWhereClause<T where T: ProtocolAvailableOn10_10>(t: T) { // expected-error +{{'ProtocolAvailableOn10_10' is only available on OS X 10.10 or newer}}
-      // expected-note@-1 +{{add @available attribute to enclosing global function}}
+func GenericWhereClause<T where T: ProtocolAvailableOn10_10>(t: T) { // expected-error * {{'ProtocolAvailableOn10_10' is only available on OS X 10.10 or newer}}
+      // expected-note@-1 * {{add @available attribute to enclosing global function}}
 }
 
-func GenericSignature<T : ProtocolAvailableOn10_10>(t: T) { // expected-error +{{'ProtocolAvailableOn10_10' is only available on OS X 10.10 or newer}}
-      // expected-note@-1 +{{add @available attribute to enclosing global function}}
+func GenericSignature<T : ProtocolAvailableOn10_10>(t: T) { // expected-error * {{'ProtocolAvailableOn10_10' is only available on OS X 10.10 or newer}}
+      // expected-note@-1 * {{add @available attribute to enclosing global function}}
 }
 
 // Extensions
@@ -1336,13 +1336,13 @@ func testForFixitWithNestedMemberRefExpr() {
 // Protocol Conformances
 
 protocol ProtocolWithRequirementMentioningUnavailable {
-  func hasUnavailableParameter(p: ClassAvailableOn10_10) // expected-error +{{'ClassAvailableOn10_10' is only available on OS X 10.10 or newer}}
-      // expected-note@-1 +{{add @available attribute to enclosing instance method}}
-      // expected-note@-2 +{{add @available attribute to enclosing protocol}}
+  func hasUnavailableParameter(p: ClassAvailableOn10_10) // expected-error * {{'ClassAvailableOn10_10' is only available on OS X 10.10 or newer}}
+      // expected-note@-1 * {{add @available attribute to enclosing instance method}}
+      // expected-note@-2 * {{add @available attribute to enclosing protocol}}
 
-  func hasUnavailableReturn() -> ClassAvailableOn10_10 // expected-error +{{'ClassAvailableOn10_10' is only available on OS X 10.10 or newer}}
-      // expected-note@-1 +{{add @available attribute to enclosing instance method}}
-      // expected-note@-2 +{{add @available attribute to enclosing protocol}}
+  func hasUnavailableReturn() -> ClassAvailableOn10_10 // expected-error * {{'ClassAvailableOn10_10' is only available on OS X 10.10 or newer}}
+      // expected-note@-1 * {{add @available attribute to enclosing instance method}}
+      // expected-note@-2 * {{add @available attribute to enclosing protocol}}
 
   @available(OSX 10.10, *)
   func hasUnavailableWithAnnotation(p: ClassAvailableOn10_10) -> ClassAvailableOn10_10

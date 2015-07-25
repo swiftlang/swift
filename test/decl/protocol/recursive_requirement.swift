@@ -82,6 +82,6 @@ protocol AsExistentialAssocTypeAgainA {
   typealias Bar
 }
 protocol AsExistentialAssocTypeAgainB {
-  func aMethod(object : AsExistentialAssocTypeAgainA) // expected-error + {{protocol 'AsExistentialAssocTypeAgainA' can only be used as a generic constraint because it has Self or associated type requirements}}
+  func aMethod(object : AsExistentialAssocTypeAgainA) // expected-error * {{protocol 'AsExistentialAssocTypeAgainA' can only be used as a generic constraint because it has Self or associated type requirements}}
 }
 

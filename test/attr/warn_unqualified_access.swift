@@ -18,7 +18,7 @@ func topLevel() {
 
 class Base {
   @warn_unqualified_access
-  func a() {} // expected-note + {{declared here}}
+  func a() {} // expected-note * {{declared here}}
 
   @warn_unqualified_access
   func toBeOverridden() {} // no-warning
@@ -26,12 +26,12 @@ class Base {
 
 extension Base {
   @warn_unqualified_access
-  func b() {} // expected-note + {{declared here}}
+  func b() {} // expected-note * {{declared here}}
 }
 
 class Sub : Base {
   @warn_unqualified_access
-  func c() {} // expected-note + {{declared here}}
+  func c() {} // expected-note * {{declared here}}
 
   override func toBeOverridden() {}
 
@@ -66,9 +66,9 @@ func test(sub: Sub) {
 
 class Recovery {
   @warn_unqualified_access
-  func topLevel() {} // expected-note + {{declared here}}
+  func topLevel() {} // expected-note * {{declared here}}
   @warn_unqualified_access
-  func overloaded(x: Float) {} // expected-note + {{declared here}}
+  func overloaded(x: Float) {} // expected-note * {{declared here}}
 
   func test() {
     topLevel() // expected-warning {{use of 'topLevel' treated as a reference to instance method in class 'Recovery'}}

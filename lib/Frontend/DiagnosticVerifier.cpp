@@ -32,19 +32,19 @@ namespace {
   struct ExpectedDiagnosticInfo {
     const char *Loc;
     llvm::SourceMgr::DiagKind Classification;
-    unsigned MinCount, MaxCount;
     
+    // This is true if a '*' constraint is present to say that the diagnostic
+    // may appear (or not) an uncounted number of times.
+    bool mayAppear = false;
+
     std::string Str;
-    unsigned LineNo;
+    unsigned LineNo = ~0U;
     
     std::vector<ExpectedFixIt> Fixits;
 
     ExpectedDiagnosticInfo(const char *Loc,
-                           llvm::SourceMgr::DiagKind Classification,
-                           unsigned MinCount, unsigned MaxCount)
-      : Loc(Loc), Classification(Classification),
-        MinCount(MinCount), MaxCount(MaxCount) {
-      LineNo = ~0U;
+                           llvm::SourceMgr::DiagKind Classification)
+      : Loc(Loc), Classification(Classification) {
     }
     
   };
@@ -229,28 +229,24 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
       }
     }
 
-    unsigned MinCount = 1;
-    unsigned MaxCount = 1;
+    ExpectedDiagnosticInfo Expected(DiagnosticLoc, ExpectedClassification);
+
+    unsigned Count = 1;
     if (TextStartIdx > 0) {
       StringRef CountStr = MatchStart.substr(0, TextStartIdx).trim();
-      if (CountStr == "+") {
-        MinCount = 1;
-        MaxCount = std::numeric_limits<unsigned>::max();
-      } else if (CountStr == "?") {
-        MinCount = 0;
-        MaxCount = 1;
+      if (CountStr == "*") {
+        Expected.mayAppear = true;
       } else {
-        if (CountStr.getAsInteger(10, MinCount)) {
+        if (CountStr.getAsInteger(10, Count)) {
           Errors.push_back(std::make_pair(MatchStart.data(),
                                           "expected match count before '{{'"));
           continue;
         }
-        if (MinCount == 0) {
+        if (Count == 0) {
           Errors.push_back({ MatchStart.data(),
             "expected positive match count before '{{'" });
           continue;
         }
-        MaxCount = MinCount;
       }
 
       // Resync up to the '{{'.
@@ -264,9 +260,7 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
       continue;
     }
 
-    ExpectedDiagnosticInfo Expected(DiagnosticLoc, ExpectedClassification,
-                                    MinCount, MaxCount);
-
+ 
     llvm::SmallString<256> Buf;
     Expected.Str = Lexer::getEncodedStringSegment(MatchStart.slice(2, End),Buf);
     if (PrevExpectedContinuationLine)
@@ -364,60 +358,77 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
       Expected.Fixits.push_back(FixIt);
     }
 
-    ExpectedDiagnostics.push_back(Expected);
+    // Add the diagnostic the expected number of times.
+    for (; Count; --Count)
+      ExpectedDiagnostics.push_back(Expected);
   }
 
   
   // Make sure all the expected diagnostics appeared.
-  for (const auto &expected : ExpectedDiagnostics) {
+  std::reverse(ExpectedDiagnostics.begin(), ExpectedDiagnostics.end());
+  
+  for (unsigned i = ExpectedDiagnostics.size(); i != 0; ) {
+    --i;
+    auto &expected = ExpectedDiagnostics[i];
+    
     // Check to see if we had this expected diagnostic.
-    for (unsigned MatchCount = 0; MatchCount < expected.MaxCount; MatchCount++) {
-      auto FoundDiagnosticIter = findDiagnostic(expected, BufferName);
-      if (FoundDiagnosticIter == CapturedDiagnostics.end()) {
-        if (MatchCount < expected.MinCount) {
-          std::string message =
-            "expected "+getDiagKindString(expected.Classification) +
-            " not produced";
-          Errors.push_back(std::make_pair(expected.Loc, message));
-        }
-        break;
-      }
-      auto &FoundDiagnostic = *FoundDiagnosticIter;
+    auto FoundDiagnosticIter = findDiagnostic(expected, BufferName);
+    if (FoundDiagnosticIter == CapturedDiagnostics.end()) {
+      // Diagnostic didn't exist.  If this is a 'mayAppear' diagnostic, then
+      // we're ok.  Otherwise, leave it in the list.
+      if (expected.mayAppear)
+        ExpectedDiagnostics.erase(ExpectedDiagnostics.begin()+i);
+      continue;
+    }
+    
+    auto &FoundDiagnostic = *FoundDiagnosticIter;
 
-      // Verify that any expected fix-its are present in the diagnostic.
-      for (auto fixit : expected.Fixits) {
-        if (!checkForFixIt(fixit, FoundDiagnostic, InputFile)) {
-          std::string Message;
-          {
-            llvm::raw_string_ostream OS(Message);
-            OS << "expected fix-it not seen";
+    // Verify that any expected fix-its are present in the diagnostic.
+    for (auto fixit : expected.Fixits) {
+      if (!checkForFixIt(fixit, FoundDiagnostic, InputFile)) {
+        std::string Message;
+        {
+          llvm::raw_string_ostream OS(Message);
+          OS << "expected fix-it not seen";
+          
+          if (!FoundDiagnostic.getFixIts().empty()) {
+            OS << "; actual fix-its:";
             
-            if (!FoundDiagnostic.getFixIts().empty()) {
-              OS << "; actual fix-its:";
+            for (auto &ActualFixIt : FoundDiagnostic.getFixIts()) {
+              llvm::SMRange Range = ActualFixIt.getRange();
               
-              for (auto &ActualFixIt : FoundDiagnostic.getFixIts()) {
-                llvm::SMRange Range = ActualFixIt.getRange();
-                
-                OS << " {{"
-                << getColumnNumber(InputFile, Range.Start) << '-'
-                << getColumnNumber(InputFile, Range.End) << '='
-                << ActualFixIt.getText()
-                << "}}";
-              }
+              OS << " {{"
+              << getColumnNumber(InputFile, Range.Start) << '-'
+              << getColumnNumber(InputFile, Range.End) << '='
+              << ActualFixIt.getText()
+              << "}}";
             }
           }
-          
-          Errors.push_back(std::make_pair(fixit.FixitLoc, std::move(Message)));
         }
+        
+        Errors.push_back(std::make_pair(fixit.FixitLoc, std::move(Message)));
       }
-
-      // Actually remove the diagnostic from the list, so we don't match it
-      // again. We do have to do this after checking fix-its, though, because
-      // the diagnostic owns its fix-its.
-      CapturedDiagnostics.erase(FoundDiagnosticIter);
     }
+    
+    // Actually remove the diagnostic from the list, so we don't match it
+    // again. We do have to do this after checking fix-its, though, because
+    // the diagnostic owns its fix-its.
+    CapturedDiagnostics.erase(FoundDiagnosticIter);
+    
+    // We found the diagnostic, so remove it... unless we allow an arbitrary
+    // number of diagnostics, in which case we want to reprocess this.
+    if (expected.mayAppear)
+      ++i;
+    else
+      ExpectedDiagnostics.erase(ExpectedDiagnostics.begin()+i);
   }
-  
+
+  // Diagnose expected diagnostics that didn't appear.
+  for (auto const &expected : ExpectedDiagnostics) {
+    std::string message = "expected "+getDiagKindString(expected.Classification)
+      + " not produced";
+    Errors.push_back(std::make_pair(expected.Loc, message));
+  }
   
   // Verify that there are no diagnostics (in MemoryBuffer) left in the list.
   for (unsigned i = 0, e = CapturedDiagnostics.size(); i != e; ++i) {
