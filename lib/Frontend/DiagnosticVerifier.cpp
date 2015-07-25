@@ -422,8 +422,40 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
     else
       ExpectedDiagnostics.erase(ExpectedDiagnostics.begin()+i);
   }
+  
+  // Check to see if we have any incorrect diagnostics.  If so, diagnose them as
+  // such.
+  for (unsigned i = ExpectedDiagnostics.size(); i != 0; ) {
+    --i;
+    auto &expected = ExpectedDiagnostics[i];
+
+    // Check to see if any found diagnostics have the right line and
+    // classification, but the wrong text.
+    auto I = CapturedDiagnostics.begin();
+    for (auto E = CapturedDiagnostics.end(); I != E; ++I) {
+      // Verify the file and line of the diagnostic.
+      if (I->getLineNo() != (int)expected.LineNo ||
+          I->getFilename() != BufferName ||
+          I->getKind() != expected.Classification)
+        continue;
+      
+      // Otherwise, we found it, break out.
+      break;
+    }
+
+    if (I == CapturedDiagnostics.end()) continue;
+    
+    std::string message = getDiagKindString(expected.Classification) +
+                          " had incorrect message: " + I->getMessage().str();
+    Errors.push_back(std::make_pair(expected.Loc, message));
+    CapturedDiagnostics.erase(I);
+    ExpectedDiagnostics.erase(ExpectedDiagnostics.begin()+i);
+  }
+  
+  
 
   // Diagnose expected diagnostics that didn't appear.
+  std::reverse(ExpectedDiagnostics.begin(), ExpectedDiagnostics.end());
   for (auto const &expected : ExpectedDiagnostics) {
     std::string message = "expected "+getDiagKindString(expected.Classification)
       + " not produced";
