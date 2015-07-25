@@ -149,7 +149,6 @@ static bool checkForFixIt(const ExpectedFixIt &Expected,
   return false;
 }
 
-
 /// \brief After the file has been processed, check to see if we got all of
 /// the expected diagnostics and check to see if there were any unexpected
 /// ones.
@@ -161,11 +160,18 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
 
   // Queue up all of the diagnostics, allowing us to sort them and emit them in
   // file order.
-  std::vector<std::pair<const char *, std::string> > Errors;
+  std::vector<llvm::SMDiagnostic> Errors;
 
   unsigned PrevExpectedContinuationLine = 0;
 
   std::vector<ExpectedDiagnosticInfo> ExpectedDiagnostics;
+  
+  auto addError = [&](const char *Loc, std::string message) {
+    auto loc = SourceLoc(llvm::SMLoc::getFromPointer(Loc));
+    auto diag = SM.GetMessage(loc, llvm::SourceMgr::DK_Error, message, {}, {});
+    Errors.push_back(diag);
+  };
+  
   
   // Scan the memory buffer looking for expected-note/warning/error.
   for (size_t Match = InputFile.find("expected-");
@@ -193,16 +199,15 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
 
     size_t TextStartIdx = MatchStart.find("{{");
     if (TextStartIdx == StringRef::npos) {
-      Errors.push_back(std::make_pair(MatchStart.data(),
-                                      "expected {{ in expected-warning/note/error line"));
+      addError(MatchStart.data(),
+               "expected {{ in expected-warning/note/error line");
       continue;
     }
 
     int LineOffset = 0;
     if (TextStartIdx > 0 && MatchStart[0] == '@') {
       if (MatchStart[1] != '+' && MatchStart[1] != '-') {
-        Errors.push_back({ MatchStart.data(),
-          "expected '+'/'-' for line offset" });
+        addError(MatchStart.data(), "expected '+'/'-' for line offset");
         continue;
       }
       StringRef Offs;
@@ -223,8 +228,7 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
       }
 
       if (Offs.getAsInteger(10, LineOffset)) {
-        Errors.push_back({ MatchStart.data(),
-          "expected line offset before '{{'" });
+        addError(MatchStart.data(), "expected line offset before '{{'");
         continue;
       }
     }
@@ -238,13 +242,12 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
         Expected.mayAppear = true;
       } else {
         if (CountStr.getAsInteger(10, Count)) {
-          Errors.push_back(std::make_pair(MatchStart.data(),
-                                          "expected match count before '{{'"));
+          addError(MatchStart.data(), "expected match count before '{{'");
           continue;
         }
         if (Count == 0) {
-          Errors.push_back({ MatchStart.data(),
-            "expected positive match count before '{{'" });
+          addError(MatchStart.data(),
+                   "expected positive match count before '{{'");
           continue;
         }
       }
@@ -255,8 +258,8 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
 
     size_t End = MatchStart.find("}}");
     if (End == StringRef::npos) {
-      Errors.push_back(std::make_pair(MatchStart.data(),
-        "didn't find '}}' to match '{{' in expected-warning/note/error line"));
+      addError(MatchStart.data(),
+          "didn't find '}}' to match '{{' in expected-warning/note/error line");
       continue;
     }
 
@@ -286,9 +289,8 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
       // First make sure we have a closing "}}".
       size_t EndLoc = ExtraChecks.find("}}");
       if (EndLoc == StringRef::npos) {
-        Errors.push_back(std::make_pair(ExtraChecks.data(),
-                                        "didn't find '}}' to match '{{' in "
-                                        "fix-it verification"));
+        addError(ExtraChecks.data(),
+                 "didn't find '}}' to match '{{' in fix-it verification");
         break;
       }
       
@@ -299,9 +301,8 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
       StringRef FixItStr = ExtraChecks.slice(2, EndLoc);
       // Check for matching a later "}}" on a different line.
       if (FixItStr.find_first_of("\r\n") != StringRef::npos) {
-        Errors.push_back(std::make_pair(ExtraChecks.data(),
-                                        "didn't find '}}' to match '{{' in "
-                                        "fix-it verification"));
+        addError(ExtraChecks.data(), "didn't find '}}' to match '{{' in "
+                 "fix-it verification");
         break;
       }
       
@@ -311,8 +312,7 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
       // Parse the pieces of the fix-it.
       size_t MinusLoc = FixItStr.find('-');
       if (MinusLoc == StringRef::npos) {
-        Errors.push_back(std::make_pair(FixItStr.data(),
-                                        "expected '-' in fix-it verification"));
+        addError(FixItStr.data(), "expected '-' in fix-it verification");
         continue;
       }
       StringRef StartColStr = FixItStr.slice(0, MinusLoc);
@@ -320,9 +320,8 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
       
       size_t EqualLoc = AfterMinus.find('=');
       if (EqualLoc == StringRef::npos) {
-        Errors.push_back(std::make_pair(AfterMinus.data(),
-                                        "expected '=' after '-' in fix-it "
-                                        "verification"));
+        addError(AfterMinus.data(),
+                 "expected '=' after '-' in fix-it verification");
         continue;
       }
       StringRef EndColStr = AfterMinus.slice(0, EqualLoc);
@@ -331,15 +330,13 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
       ExpectedFixIt FixIt;
       FixIt.FixitLoc = StartColStr.data()-2;
       if (StartColStr.getAsInteger(10, FixIt.StartCol)) {
-        Errors.push_back(std::make_pair(StartColStr.data(),
-                                        "invalid column number in fix-it "
-                                        "verification"));
+        addError(StartColStr.data(),
+                 "invalid column number in fix-it verification");
         continue;
       }
       if (EndColStr.getAsInteger(10, FixIt.EndCol)) {
-        Errors.push_back(std::make_pair(EndColStr.data(),
-                                        "invalid column number in fix-it "
-                                        "verification"));
+        addError(EndColStr.data(),
+                 "invalid column number in fix-it verification");
         continue;
       }
       
@@ -406,7 +403,7 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
           }
         }
         
-        Errors.push_back(std::make_pair(fixit.FixitLoc, std::move(Message)));
+        addError(fixit.FixitLoc, std::move(Message));
       }
     }
     
@@ -447,7 +444,7 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
     
     std::string message = getDiagKindString(expected.Classification) +
                           " had incorrect message: " + I->getMessage().str();
-    Errors.push_back(std::make_pair(expected.Loc, message));
+    addError(expected.Loc, message);
     CapturedDiagnostics.erase(I);
     ExpectedDiagnostics.erase(ExpectedDiagnostics.begin()+i);
   }
@@ -459,7 +456,7 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
   for (auto const &expected : ExpectedDiagnostics) {
     std::string message = "expected "+getDiagKindString(expected.Classification)
       + " not produced";
-    Errors.push_back(std::make_pair(expected.Loc, message));
+    addError(expected.Loc, message);
   }
   
   // Verify that there are no diagnostics (in MemoryBuffer) left in the list.
@@ -470,20 +467,22 @@ bool DiagnosticVerifier::verifyFile(unsigned BufferID) {
     std::string Message =
       "unexpected "+getDiagKindString(CapturedDiagnostics[i].getKind())+
       " produced: "+CapturedDiagnostics[i].getMessage().str();
-    Errors.push_back(std::make_pair(
-                                    CapturedDiagnostics[i].getLoc().getPointer(),
-                                    Message));
+    addError(CapturedDiagnostics[i].getLoc().getPointer(),
+             Message);
   }
 
   // Sort the diagnostics by their address in the memory buffer as the primary
   // key.  This ensures that an "unexpected diagnostic" and
   // "expected diagnostic" in the same place are emitted next to each other.
-  std::sort(Errors.begin(), Errors.end());
+  std::sort(Errors.begin(), Errors.end(),
+            [&](const llvm::SMDiagnostic &lhs,
+                const llvm::SMDiagnostic &rhs) -> bool {
+              return lhs.getLoc().getPointer() < rhs.getLoc().getPointer();
+            });
 
   // Emit all of the queue'd up errors.
   for (auto Err : Errors)
-    SM.getLLVMSourceMgr().PrintMessage(llvm::SMLoc::getFromPointer(Err.first),
-                                       llvm::SourceMgr::DK_Error, Err.second);
+    SM.getLLVMSourceMgr().PrintMessage(llvm::errs(), Err);
   
   return !Errors.empty();
 }
