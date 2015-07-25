@@ -396,10 +396,10 @@ self.test("\(testNamePrefix).append()/semantics") {
 }
 
 //===----------------------------------------------------------------------===//
-// extend()
+// appendContentsOf()
 //===----------------------------------------------------------------------===//
 
-self.test("\(testNamePrefix).extend()/semantics") {
+self.test("\(testNamePrefix).appendContentsOf()/semantics") {
   let tests: [ExtendTest] = [
     ExtendTest(
       collection: [],
@@ -441,7 +441,7 @@ self.test("\(testNamePrefix).extend()/semantics") {
     var c = makeWrappedCollection(test.collection)
     let newElements =
       MinimalForwardCollection(test.newElements.map(wrapValue))
-    c.extend(newElements)
+    c.appendContentsOf(newElements)
     expectEqualSequence(
       test.expected,
       c.map { extractValue($0).value },

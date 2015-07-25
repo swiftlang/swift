@@ -82,7 +82,7 @@ public protocol RangeReplaceableCollectionType : CollectionType {
   mutating func append(x: Generator.Element)
 
   /*
-  The 'extend' requirement should be an operator, but the compiler crashes:
+  The 'appendContentsOf' requirement should be an operator, but the compiler crashes:
 
   <rdar://problem/16566712> Dependent type should have been substituted by Sema
   or SILGen
@@ -96,7 +96,7 @@ public protocol RangeReplaceableCollectionType : CollectionType {
   /// Append the elements of `newElements` to `self`.
   ///
   /// - Complexity: O(*length of result*).
-  mutating func extend<
+  mutating func appendContentsOf<
     S : SequenceType
     where S.Generator.Element == Generator.Element
   >(newElements: S)
@@ -167,7 +167,7 @@ extension RangeReplaceableCollectionType {
     insert(newElement, atIndex: endIndex)
   }
 
-  public mutating func extend<
+  public mutating func appendContentsOf<
     S : SequenceType where S.Generator.Element == Generator.Element
   >(newElements: S) {
     for element in newElements {
@@ -311,7 +311,7 @@ public func removeAll<
 /// Append elements from `newElements` to `x`.
 ///
 /// - Complexity: O(N).
-@available(*, unavailable, message="call the 'extend()' method on the collection")
+@available(*, unavailable, message="call the 'appendContentsOf()' method on the collection")
 public func extend<
     C: RangeReplaceableCollectionType,
     S : SequenceType where S.Generator.Element == C.Generator.Element
@@ -335,7 +335,7 @@ public func +<
     where S.Generator.Element == C.Generator.Element
 >(var lhs: C, rhs: S) -> C {
   // FIXME: what if lhs is a reference type?  This will mutate it.
-  lhs.extend(rhs)
+  lhs.appendContentsOf(rhs)
   return lhs
 }
 
@@ -346,8 +346,8 @@ public func +<
 >(lhs: S, rhs: C) -> C {
   var result = C()
   result.reserveCapacity(rhs.count + numericCast(rhs.underestimateCount()))
-  result.extend(lhs)
-  result.extend(rhs)
+  result.appendContentsOf(lhs)
+  result.appendContentsOf(rhs)
   return result
 }
 
@@ -358,7 +358,7 @@ public func +<
 >(var lhs: C, rhs: S) -> C {
   // FIXME: what if lhs is a reference type?  This will mutate it.
   lhs.reserveCapacity(lhs.count + numericCast(rhs.count))
-  lhs.extend(rhs)
+  lhs.appendContentsOf(rhs)
   return lhs
 }
 
@@ -369,7 +369,7 @@ public func +<
 >(var lhs: RRC1, rhs: RRC2) -> RRC1 {
   // FIXME: what if lhs is a reference type?  This will mutate it.
   lhs.reserveCapacity(lhs.count + numericCast(rhs.count))
-  lhs.extend(rhs)
+  lhs.appendContentsOf(rhs)
   return lhs
 }
 

@@ -48,7 +48,7 @@ protocol _ArrayType
   /// - Complexity: O(`count`).
   mutating func reserveCapacity(minimumCapacity: Int)
 
-  /// Operator form of `extend`.
+  /// Operator form of `appendContentsOf`.
   func += <
     S: SequenceType where S.Generator.Element == Generator.Element
   >(inout lhs: Self, rhs: S)

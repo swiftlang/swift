@@ -50,7 +50,7 @@ import SwiftShims
 ///
 ///     var a = "foo"
 ///     var b = a
-///     b.extend("bar")
+///     b.appendContentsOf("bar")
 ///     print("a=\(a), b=\(b)")     // a=foo, b=foobar
 ///
 /// Strings use Copy-on-Write so that their data is only copied
@@ -414,7 +414,7 @@ public func <(lhs: String, rhs: String) -> Bool {
 extension String {
 
   /// Append the elements of `other` to `self`.
-  public mutating func extend(other: String) {
+  public mutating func appendContentsOf(other: String) {
     _core.append(other._core)
   }
 
@@ -573,11 +573,13 @@ extension String {
     }
   }
   
-  public mutating func extend<
+  public mutating func appendContentsOf<
       S : SequenceType
   where S.Generator.Element == Character
   >(newElements: S) {
-    withMutableCharacters { (inout v: CharacterView) in v.extend(newElements) }
+    withMutableCharacters {
+      (inout v: CharacterView) in v.appendContentsOf(newElements)
+    }
   }
   
   /// Create an instance containing `characters`.

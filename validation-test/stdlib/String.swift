@@ -595,7 +595,7 @@ func asciiString<
   S: SequenceType where S.Generator.Element == Character
 >(content: S) -> String {
   var s = String()
-  s.extend(content)
+  s.appendContentsOf(content)
   expectEqual(1, s._core.elementWidth)
   return s
 }
@@ -617,11 +617,11 @@ StringTests.test("stringCoreExtensibility") {
         if k == 0 { expectEqual(1, x.elementWidth) }
         
         for i in 0..<length {
-          x.extend(
+          x.appendContentsOf(
             Repeat(count: 3, repeatedValue: i < boundary ? ascii : nonAscii))
         }
-        // Make sure we can extend wide storage with pure ASCII
-        x.extend(Repeat(count: 2, repeatedValue: ascii))
+        // Make sure we can append pure ASCII to wide storage
+        x.appendContentsOf(Repeat(count: 2, repeatedValue: ascii))
         
         expectEqualSequence(
           [UTF16.CodeUnit(UnicodeScalar("b").value)]
@@ -696,7 +696,7 @@ func makeStringCore(base: String) -> _StringCore {
   var x = _StringCore()
   // make sure some - but not all - replacements will have to grow the buffer
   x.reserveCapacity(base._core.count * 3 / 2)
-  x.extend(base._core)
+  x.appendContentsOf(base._core)
   // In case the core was widened and lost its capacity
   x.reserveCapacity(base._core.count * 3 / 2)
   return x

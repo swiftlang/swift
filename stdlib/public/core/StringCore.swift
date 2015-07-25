@@ -638,9 +638,9 @@ extension _StringCore : RangeReplaceableCollectionType {
             : representableAsASCII() && !newElements.contains { $0 > 0x7f } ? 1
             : 2
         ))
-      r.extend(self[0..<subRange.startIndex])
-      r.extend(newElements)
-      r.extend(self[subRange.endIndex..<count])
+      r.appendContentsOf(self[0..<subRange.startIndex])
+      r.appendContentsOf(newElements)
+      r.appendContentsOf(self[subRange.endIndex..<count])
       self = r
     }
   }
@@ -660,7 +660,7 @@ extension _StringCore : RangeReplaceableCollectionType {
     _copyInPlace(newSize: count, newCapacity: max(count, n), minElementWidth: 1)
   }
 
-  public mutating func extend<
+  public mutating func appendContentsOf<
     S : SequenceType
       where S.Generator.Element == UTF16.CodeUnit
   >(s: S) {

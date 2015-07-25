@@ -15,10 +15,10 @@ RangeReplaceableTestSuite.test("append/dispatch") {
   expectCustomizable(tester, tester.log.append)
 }
 
-RangeReplaceableTestSuite.test("extend/dispatch") {
+RangeReplaceableTestSuite.test("appendContentsOf/dispatch") {
   var tester = RangeReplaceableCollectionLog.dispatchTester([ OpaqueValue(1) ])
-  tester.extend([ 2, 3 ].map(OpaqueValue.init))
-  expectCustomizable(tester, tester.log.extend)
+  tester.appendContentsOf([ 2, 3 ].map(OpaqueValue.init))
+  expectCustomizable(tester, tester.log.appendContentsOf)
 }
 
 RangeReplaceableTestSuite.test("insert/dispatch") {

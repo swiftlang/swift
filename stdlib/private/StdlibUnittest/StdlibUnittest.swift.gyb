@@ -3131,11 +3131,11 @@ public struct ${Self}<T> : RangeReplaceableCollectionType {
     elements.append(x)
   }
 
-  public mutating func extend<
+  public mutating func appendContentsOf<
     S : SequenceType where S.Generator.Element == T
   >(newElements: S) {
     _willMutate()
-    elements.extend(newElements)
+    elements.appendContentsOf(newElements)
   }
 
   public mutating func replaceRange<

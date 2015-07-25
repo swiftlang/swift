@@ -294,14 +294,14 @@ extension String.CharacterView : RangeReplaceableCollectionType {
     switch c._representation {
     case .Small(let _63bits):
       let bytes = Character._smallValue(_63bits)
-      _core.extend(Character._SmallUTF16(bytes))
+      _core.appendContentsOf(Character._SmallUTF16(bytes))
     case .Large(_):
       _core.append(String(c)._core)
     }
   }
 
   /// Append the elements of `newElements` to `self`.
-  public mutating func extend<
+  public mutating func appendContentsOf<
       S : SequenceType
       where S.Generator.Element == Character
   >(newElements: S) {
@@ -317,7 +317,7 @@ extension String.CharacterView : RangeReplaceableCollectionType {
       where S.Generator.Element == Character
   >(_ characters: S) {
     self = String.CharacterView()
-    self.extend(characters)
+    self.appendContentsOf(characters)
   }
 }
 

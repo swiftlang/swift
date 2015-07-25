@@ -41,15 +41,15 @@ public func join<
   if separatorSize != 0 {
     var gen = elements.generate()
     if let first = gen.next() {
-      result.extend(first)
+      result.appendContentsOf(first)
       while let next = gen.next() {
-        result.extend(separator)
-        result.extend(next)
+        result.appendContentsOf(separator)
+        result.appendContentsOf(next)
       }
     }
   } else {
     for x in elements {
-      result.extend(x)
+      result.appendContentsOf(x)
     }
   }
 

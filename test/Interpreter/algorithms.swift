@@ -28,7 +28,7 @@ func flatten<Element, Sequence: SequenceType, InnerSequence: SequenceType
   var result = [Element]()
 
   for innerSequence in outerSequence {
-    result.extend(innerSequence)
+    result.appendContentsOf(innerSequence)
   }
 
   return result

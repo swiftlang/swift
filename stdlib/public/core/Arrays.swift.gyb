@@ -569,19 +569,19 @@ extension ${Self} : _ArrayType {
   /// Append the elements of `newElements` to `self`.
   ///
   /// - Complexity: O(*length of result*).
-  public mutating func extend<
+  public mutating func appendContentsOf<
       S : SequenceType
       where S.Generator.Element == Element
   >(newElements: S) {
     self += newElements
   }
 
-  // An overload of extend that uses the += that is optimized for
+  // An overload of `appendContentsOf()` that uses the += that is optimized for
   // collections.
   /// Append the elements of `newElements` to `self`.
   ///
   /// - Complexity: O(*length of result*).
-  public mutating func extend<
+  public mutating func appendContentsOf<
       C : CollectionType
       where C.Generator.Element == Element
   >(newElements: C) {

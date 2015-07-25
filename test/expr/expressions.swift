@@ -423,7 +423,7 @@ func stringliterals() {
 
 // <rdar://problem/17128913>
 var s = ""
-s.extend(["x"])
+s.appendContentsOf(["x"])
 
 //===----------------------------------------------------------------------===//
 // InOut arguments

@@ -81,7 +81,7 @@ public func withArrayOfCStrings<R>(
   var argsBuffer: [UInt8] = []
   argsBuffer.reserveCapacity(argsBufferSize)
   for arg in args {
-    argsBuffer.extend(arg.utf8)
+    argsBuffer.appendContentsOf(arg.utf8)
     argsBuffer.append(0)
   }
 
