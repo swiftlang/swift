@@ -2029,12 +2029,12 @@ public:
   /// This can return a new expression (for e.g. when a UnresolvedDeclRef gets
   /// resolved) and returns null when the subexpression fails to typecheck.
   ///
-  Expr *typeCheckChildIndependently(Expr *subExpr,
+  Expr *typeCheckChildIndependently(Expr *subExpr, Type conversionType = Type(),
                                     TCCOptions options = TCCOptions());
 
   Type getTypeOfTypeCheckedChildIndependently(Expr *subExpr,
                                             TCCOptions options = TCCOptions()) {
-    auto e = typeCheckChildIndependently(subExpr, options);
+    auto e = typeCheckChildIndependently(subExpr, Type(), options);
     return e ? e->getType() : Type();
   }
 
@@ -2042,6 +2042,7 @@ public:
   /// subexpression of the current node because it handles ClosureExpr parents
   /// of the specified node.
   Expr *typeCheckArbitrarySubExprIndependently(Expr *subExpr,
+                                               Type conversionType = Type(),
                                              TCCOptions options = TCCOptions());
 
   /// Special magic to handle inout exprs and tuples in argument lists.
@@ -2264,6 +2265,7 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure() {
       // Type check the argument list independently to try to get a concrete
       // type (ignoring context).
       auto argExpr = typeCheckArbitrarySubExprIndependently(AE->getArg(),
+                                                            Type(),
                                                            TCC_AllowUnresolved);
       if (!argExpr) return true;
 
@@ -2506,6 +2508,7 @@ namespace {
 /// This can return a new expression (for e.g. when a UnresolvedDeclRef gets
 /// resolved) and returns null when the subexpression fails to typecheck.
 Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr,
+                                                    Type conversionType,
                                                     TCCOptions options) {
   // Track if this sub-expression is currently being diagnosed.
   if (Expr *res = CS->TC.exprIsBeingDiagnosed(subExpr))
@@ -2562,10 +2565,10 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr,
   if (options.contains(TCC_AllowLValue))
     TCEOptions |= TypeCheckExprFlags::IsDiscarded;
 
-  if (options.contains(TCC_AllowUnresolved))
+  if (options.contains(TCC_AllowUnresolved) && !conversionType)
     TCEOptions |= TypeCheckExprFlags::AllowUnresolvedTypeVariables;
 
-  bool hadError = CS->TC.typeCheckExpression(subExpr, CS->DC, Type(),
+  bool hadError = CS->TC.typeCheckExpression(subExpr, CS->DC, conversionType,
                                              Type(), TCEOptions);
 
   // This is a terrible hack to get around the fact that typeCheckExpression()
@@ -2596,9 +2599,10 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr,
 /// subexpression of the current node because it handles ClosureExpr parents
 /// of the specified node.
 Expr *FailureDiagnosis::
-typeCheckArbitrarySubExprIndependently(Expr *subExpr, TCCOptions options) {
+typeCheckArbitrarySubExprIndependently(Expr *subExpr, Type conversionType,
+                                       TCCOptions options) {
   if (subExpr == expr)
-    return typeCheckChildIndependently(subExpr, options);
+    return typeCheckChildIndependently(subExpr, conversionType, options);
   
   // Construct a parent map for the expr tree we're investigating.
   auto parentMap = expr->getParentMap();
@@ -2619,7 +2623,7 @@ typeCheckArbitrarySubExprIndependently(Expr *subExpr, TCCOptions options) {
   }
   
   // Otherwise, we're ok to type check the subexpr.
-  return typeCheckChildIndependently(subExpr, options);
+  return typeCheckChildIndependently(subExpr, conversionType, options);
 }
 
 
@@ -2723,7 +2727,7 @@ typeCheckArgumentChildIndependently(Expr *argExpr,
           exampleInputTuple->getElementType(i)->is<InOutType>())
         options |= TCC_AllowLValue;
 
-      auto elExpr = typeCheckChildIndependently(TE->getElement(i), options);
+      auto elExpr = typeCheckChildIndependently(TE->getElement(i), Type(), options);
       if (!elExpr) return nullptr; // already diagnosed.
       
       resultElts.push_back(elExpr);
@@ -2742,7 +2746,7 @@ typeCheckArgumentChildIndependently(Expr *argExpr,
   if (exampleInputType && exampleInputType->is<InOutType>())
     options |= TCC_AllowLValue;
 
-  return typeCheckChildIndependently(unwrapParenExpr(argExpr), options);
+  return typeCheckChildIndependently(unwrapParenExpr(argExpr), Type(), options);
 }
 
 bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
@@ -2945,7 +2949,7 @@ bool FailureDiagnosis::visitSubscriptExpr(SubscriptExpr *SE) {
 
 bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
   // Type check the function subexpression to resolve a type for it if possible.
-  auto fnExpr = typeCheckChildIndependently(callExpr->getFn(),
+  auto fnExpr = typeCheckChildIndependently(callExpr->getFn(), Type(),
                                             TCC_AllowUnresolved);
   if (!fnExpr) return true;
 
@@ -3051,7 +3055,7 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
   auto srcExpr = typeCheckChildIndependently(assignExpr->getSrc());
   if (!srcExpr) return true;
 
-  auto destExpr = typeCheckChildIndependently(assignExpr->getDest(),
+  auto destExpr = typeCheckChildIndependently(assignExpr->getDest(), Type(),
                                               TCC_AllowLValue);
   if (!destExpr) return true;
 
@@ -3071,7 +3075,7 @@ bool FailureDiagnosis::visitAssignExpr(AssignExpr *assignExpr) {
 }
 
 bool FailureDiagnosis::visitInOutExpr(InOutExpr *IOE) {
-  auto subExpr = typeCheckChildIndependently(IOE->getSubExpr(),
+  auto subExpr = typeCheckChildIndependently(IOE->getSubExpr(), Type(),
                                              TCC_AllowLValue);
 
   auto subExprType = subExpr->getType();
