@@ -162,14 +162,13 @@ SourceLoc ThrowStmt::getEndLoc() const { return SubExpr->getEndLoc(); }
 
 
 SourceLoc DeferStmt::getEndLoc() const {
-  return getPatternBinding()->getEndLoc();
+  return tempDecl->getBody()->getEndLoc();
 }
 
 /// Dig the original users's body of the defer out for AST fidelity.
 BraceStmt *DeferStmt::getBodyAsWritten() const {
-  return cast<ClosureExpr>(tempDecl->getParentInitializer())->getBody();
+  return tempDecl->getBody();
 }
-
 
 bool LabeledStmt::isPossibleContinueTarget() const {
   switch (getKind()) {

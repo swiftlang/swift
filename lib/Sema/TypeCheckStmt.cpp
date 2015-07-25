@@ -320,8 +320,9 @@ public:
   
   bool isInDefer() const {
     if (!TheFunc.hasValue()) return false;
-    auto *CE = dyn_cast_or_null<ClosureExpr>(TheFunc->getAbstractClosureExpr());
-    return CE && CE->isDeferBody();
+    auto *FD = dyn_cast_or_null<FuncDecl>
+      (TheFunc.getValue().getAbstractFunctionDecl());
+    return FD && FD->isDeferBody();
   }
   
   template<typename StmtTy>
@@ -430,7 +431,6 @@ public:
   }
     
   Stmt *visitDeferStmt(DeferStmt *DS) {
-    TC.typeCheckDecl(DS->getPatternBinding(), /*isFirstPass*/false);
     TC.typeCheckDecl(DS->getTempDecl(), /*isFirstPass*/false);
 
     Expr *theCall = DS->getCallExpr();

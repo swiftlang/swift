@@ -24,9 +24,10 @@
 
 namespace swift {
   class ASTContext;
+  class ASTWalker;
   class Decl;
   class Expr;
-  class ASTWalker;
+  class FuncDecl;
   class Pattern;
   class PatternBindingDecl;
   class VarDecl;
@@ -180,34 +181,30 @@ public:
 /// The AST representation for a defer statement is a bit weird.  We model this
 /// as if they wrote:
 ///
-///    @noescape let tmpClosure = { body }
+///    func tmpClosure() { body }
 ///    tmpClosure()   // This is emitted on each path that needs to run this.
 ///
 /// As such, the body of the 'defer' is actually type checked within the
 /// closure's DeclContext.  We do this because of unfortunateness in SILGen,
-/// not every expression (e.g. OpenExistentialExpr can be multiply emitted in a
-/// composable way).  When this gets fixed, patches r27767 and r27768 can be
+/// some expressions (e.g. OpenExistentialExpr) cannot be multiply emitted in a
+/// composable way.  When this gets fixed, patches r27767 and r27768 can be
 /// reverted to go back to the simpler and more obvious representation.
 ///
 class DeferStmt : public Stmt {
   SourceLoc DeferLoc;
   
-  /// This is the pattern binding, which includes the initializer (a closure
-  /// expr).
-  PatternBindingDecl *patternBinding;
-  
-  /// This is the bound temp variable.
-  VarDecl *tempDecl;
+  /// This is the bound temp function.
+  FuncDecl *tempDecl;
 
   /// This is the invocation of the closure, which is to be emitted on any error
   /// paths.
   Expr *callExpr;
   
 public:
-  DeferStmt(SourceLoc DeferLoc, PatternBindingDecl *patternBinding,
-            VarDecl *tempDecl, Expr *callExpr)
+  DeferStmt(SourceLoc DeferLoc,
+            FuncDecl *tempDecl, Expr *callExpr)
     : Stmt(StmtKind::Defer, /*implicit*/false),
-      DeferLoc(DeferLoc), patternBinding(patternBinding), tempDecl(tempDecl),
+      DeferLoc(DeferLoc), tempDecl(tempDecl),
       callExpr(callExpr) {}
   
   SourceLoc getDeferLoc() const { return DeferLoc; }
@@ -215,8 +212,7 @@ public:
   SourceLoc getStartLoc() const { return DeferLoc; }
   SourceLoc getEndLoc() const;
 
-  PatternBindingDecl *getPatternBinding() const { return patternBinding; }
-  VarDecl *getTempDecl() const { return tempDecl; }
+  FuncDecl *getTempDecl() const { return tempDecl; }
   Expr *getCallExpr() const { return callExpr; }
   void setCallExpr(Expr *E) { callExpr = E; }
 

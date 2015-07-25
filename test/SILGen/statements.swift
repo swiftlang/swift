@@ -457,19 +457,17 @@ func defer_test1() {
   defer { callee2() }
   callee3()
   
-  // CHECK: [[C1:%.*]] = function_ref @{{.*}}_TFF10statements11defer_test1FT_T_U_FT_T_
-  // CHECK: [[C1T:%.*]] = thin_to_thick_function [[C1]]
-  // CHECK: [[C2:%.*]] = function_ref @{{.*}}_TFF10statements11defer_test1FT_T_U0_FT_T_
-  // CHECK: [[C2T:%.*]] = thin_to_thick_function [[C2]]
   // CHECK: [[C3:%.*]] = function_ref @{{.*}}callee3FT_T_
   // CHECK: apply [[C3]]
-  // CHECK: apply [[C2T]]
-  // CHECK: apply [[C1T]]
+  // CHECK: [[C2:%.*]] = function_ref @{{.*}}_TFF10statements11defer_test1FT_T_L0_6$deferFT_T_
+  // CHECK: apply [[C2]]
+  // CHECK: [[C1:%.*]] = function_ref @{{.*}}_TFF10statements11defer_test1FT_T_L_6$deferFT_T_
+  // CHECK: apply [[C1]]
 }
-// CHECK: sil shared @_TFF10statements11defer_test1FT_T_U_FT_T_
+// CHECK: sil shared @_TFF10statements11defer_test1FT_T_L_6$deferFT_T_
 // CHECK: function_ref @{{.*}}callee1FT_T_
 
-// CHECK: sil shared @_TFF10statements11defer_test1FT_T_U0_FT_T_
+// CHECK: sil shared @_TFF10statements11defer_test1FT_T_L0_6$deferFT_T_
 // CHECK: function_ref @{{.*}}callee2FT_T_
 
 // CHECK-LABEL: sil hidden @_TF10statements11defer_test2FSbT_
@@ -485,12 +483,11 @@ func defer_test2(cond : Bool) {
 // CHECK: cond_br [[CONDTRUE]], [[BODY:bb[0-9]+]], [[EXIT:bb[0-9]+]]
   while cond {
 // CHECK: [[BODY]]:
-  // CHECK: [[C1:%.*]] = function_ref @_TFF10statements11defer_test2FSbT_U_FT_T_
-  // CHECK: [[C1T:%.*]] = thin_to_thick_function [[C1]]
   // CHECK: [[C2:%.*]] = function_ref @{{.*}}callee2FT_T_
   // CHECK: apply [[C2]]
 
-  // CHECK: apply [[C1T]]
+  // CHECK: [[C1:%.*]] = function_ref @_TFF10statements11defer_test2FSbT_L_6$deferFT_T_
+  // CHECK: apply [[C1]]
   // CHECK: br [[EXIT]]
     defer { callee1() }
     callee2()

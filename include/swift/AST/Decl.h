@@ -5125,6 +5125,9 @@ public:
       return classof(fn);
     return false;
   }
+
+  /// True if the function is a defer body.
+  bool isDeferBody() const;
 };
   
 /// \brief This represents a 'case' declaration in an 'enum', which may declare

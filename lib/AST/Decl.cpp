@@ -4296,3 +4296,6 @@ void InfixOperatorDecl::collectOperatorKeywordRanges(SmallVectorImpl
   AddToRange(PrecedenceLoc, "precedence");
 }
 
+bool FuncDecl::isDeferBody() const {
+  return getName() == getASTContext().getIdentifier("$defer");
+}

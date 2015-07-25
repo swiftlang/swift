@@ -1028,8 +1028,7 @@ Stmt *Traversal::visitReturnStmt(ReturnStmt *RS) {
 }
 
 Stmt *Traversal::visitDeferStmt(DeferStmt *DS) {
-  if (doIt(DS->getPatternBinding()) ||
-      doIt(DS->getTempDecl()))
+  if (doIt(DS->getTempDecl()))
     return nullptr;
 
   if (Expr *Call = doIt(DS->getCallExpr()))

@@ -323,7 +323,7 @@ namespace {
 
 void StmtEmitter::visitDeferStmt(DeferStmt *S) {
   // Emit the closure for the defer, along with its binding.
-  SGF.visitPatternBindingDecl(S->getPatternBinding());
+  SGF.visitFuncDecl(S->getTempDecl());
 
   // Register a cleanup to invoke the closure on any exit paths.
   SGF.Cleanups.pushCleanup<DeferCleanup>(S->getDeferLoc(), S->getCallExpr());
