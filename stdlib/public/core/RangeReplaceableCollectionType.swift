@@ -319,6 +319,23 @@ public func extend<
   fatalError("unavailable function can't be called")
 }
 
+extension RangeReplaceableCollectionType {
+  @available(*, unavailable, renamed="appendContentsOf")
+  public mutating func extend<
+    S : SequenceType
+    where S.Generator.Element == Generator.Element
+  >(newElements: S) {
+    fatalError("unavailable function can't be called")
+  }
+
+  @available(*, unavailable, renamed="insertContentsOf")
+  public mutating func splice<
+    S : CollectionType where S.Generator.Element == Generator.Element
+  >(newElements: S, atIndex i: Index) {
+    fatalError("unavailable function can't be called")
+  }
+}
+
 /// Remove an element from the end of `x`  in O(1).
 ///
 /// - Requires: `x` is nonempty.

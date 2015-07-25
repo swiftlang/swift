@@ -219,3 +219,8 @@ struct MyCollection : Sliceable {} // expected-error {{'Sliceable' has been rena
 protocol MyProtocol : Sliceable {} // expected-error {{'Sliceable' has been renamed to 'CollectionType'}}
 func processCollection<E : Sliceable>(e: E) {} // expected-error {{'Sliceable' has been renamed to 'CollectionType'}}
 
+func renamedRangeReplaceableCollectionTypeMethods(var c: DefaultedForwardRangeReplaceableCollection<Int>) {
+  c.extend([ 10 ]) // expected-error {{'extend' has been renamed to 'appendContentsOf'}}
+  c.splice([ 10 ], atIndex: c.startIndex) // expected-error {{'splice(_:atIndex:)' has been renamed to 'insertContentsOf'}}
+}
+
