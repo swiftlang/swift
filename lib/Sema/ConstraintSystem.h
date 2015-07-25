@@ -1696,11 +1696,13 @@ public:
 
   /// \brief Add a constraint to the constraint system.
   void addConstraint(ConstraintKind kind, Type first, Type second,
-                     ConstraintLocator *locator) {
+                     ConstraintLocator *locator, bool isFavored = false) {
     assert(first && "Missing first type");
     assert(second && "Missing second type");
-    addConstraint(Constraint::create(*this, kind, first, second, DeclName(),
-                                     locator));
+    auto c = Constraint::create(*this, kind, first, second, DeclName(),
+                                locator);
+    if (isFavored) c->setFavored();
+    addConstraint(c);
   }
 
   /// Add a constraint that binds an overload set to a specific choice.

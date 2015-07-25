@@ -995,8 +995,7 @@ bool TypeChecker::solveForExpression(
   // constraint.
   if (convertType) {
     cs.addConstraint(ConstraintKind::Conversion, expr->getType(), convertType,
-                     cs.getConstraintLocator(expr));
-    cs.setConversionType(expr, convertType.getPointer());
+                     cs.getConstraintLocator(expr), /*isFavored*/ true);
   }
 
   // Notify the listener that we've built the constraint system.
@@ -1727,9 +1726,9 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
 
       // We use SelfObjectOfProtocol because an existential BooleanType is
       // allowed as a condition, but BooleanType is not self-conforming.
-      cs.addConstraint(ConstraintKind::SelfObjectOfProtocol, expr->getType(),
-                       logicValueType, cs.getConstraintLocator(OrigExpr));
-      cs.setConversionType(expr, logicValueType);
+      cs.addConstraint(ConstraintKind::SelfObjectOfProtocol,
+                       expr->getType(), logicValueType,
+                       cs.getConstraintLocator(OrigExpr), /*isFavored*/true);
       return false;
     }
 

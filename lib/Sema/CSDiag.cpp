@@ -1178,7 +1178,7 @@ getBoundTypesFromConstraint(ConstraintSystem *CS, Expr *expr,
                             Constraint *constraint) {
   
   auto anchor = simplifyLocatorToAnchor(*CS, constraint->getLocator());
-  auto type1 = anchor ? anchor->getType() : expr->getType();
+  auto type1 = anchor && anchor->getType() ? anchor->getType() :expr->getType();
   
   auto type2 = constraint->getSecondType();
   
@@ -2129,7 +2129,9 @@ FailureDiagnosis::FailureDiagnosis(Expr *expr, ConstraintSystem *cs)
     if ((!conversionConstraint || constraint->isFavored()) &&
         (constraint->getKind() == ConstraintKind::Conversion ||
          constraint->getKind() == ConstraintKind::ExplicitConversion ||
-         constraint->getKind() == ConstraintKind::ArgumentTupleConversion)) {
+         constraint->getKind() == ConstraintKind::ArgumentTupleConversion ||
+         constraint->getKind() == ConstraintKind::ConformsTo ||
+         constraint->getKind() == ConstraintKind::SelfObjectOfProtocol)) {
           conversionConstraint = constraint;
         }
     
@@ -2442,39 +2444,42 @@ namespace {
     }
     
     void restore(Expr *E) {
-      struct TypeRestorer : public ASTWalker {
-        ExprTypeSaver *TS;
-        TypeRestorer(ExprTypeSaver *TS) : TS(TS) {}
-        
-        std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-          auto it = TS->ExprTypes.find(expr);
-          if (it != TS->ExprTypes.end())
-            expr->setType(it->second);
-          return { true, expr };
-        }
-        
-        bool walkToTypeLocPre(TypeLoc &TL) override {
-          auto it = TS->TypeLocTypes.find(&TL);
-          if (it != TS->TypeLocTypes.end())
-            TL.setType(it->second.first, it->second.second);
-          return true;
-        }
-        
-        std::pair<bool, Pattern*> walkToPatternPre(Pattern *P) override {
-          auto it = TS->PatternTypes.find(P);
-          if (it != TS->PatternTypes.end())
-            P->setType(it->second);
-          return { true, P };
-        }
-        
-        // Don't walk into statements.  This handles the BraceStmt in
-        // non-single-expr closures, so we don't walk into their body.
-        std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-          return { false, S };
-        }
-      };
+      for (auto exprElt : ExprTypes)
+        exprElt.first->setType(exprElt.second);
       
-      E->walk(TypeRestorer(this));
+      for (auto typelocElt : TypeLocTypes)
+        typelocElt.first->setType(typelocElt.second.first,
+                                  typelocElt.second.second);
+      
+      for (auto patternElt : PatternTypes)
+        patternElt.first->setType(patternElt.second);
+      
+      // Done, don't do redundant work on destruction.
+      ExprTypes.clear();
+      TypeLocTypes.clear();
+      PatternTypes.clear();
+    }
+    
+    // On destruction, if a type got wiped out, reset it from null to its
+    // original type.  This is helpful because type checking a subexpression
+    // can lead to replacing the nodes in that subexpression.  However, the
+    // failed ConstraintSystem still has locators pointing to the old nodes,
+    // and if expr-specific diagnostics fail to turn up anything useful to say,
+    // we go digging through failed constraints, and expect their locators to
+    // still be meaningful.
+    ~ExprTypeSaver() {
+      for (auto exprElt : ExprTypes)
+        if (!exprElt.first->getType())
+          exprElt.first->setType(exprElt.second);
+      
+      for (auto typelocElt : TypeLocTypes)
+        if (!typelocElt.first->getType())
+          typelocElt.first->setType(typelocElt.second.first,
+                                    typelocElt.second.second);
+      
+      for (auto patternElt : PatternTypes)
+        if (!patternElt.first->hasType())
+          patternElt.first->setType(patternElt.second);
     }
   };
 }
@@ -2608,14 +2613,19 @@ typeCheckArbitrarySubExprIndependently(Expr *subExpr, Type conversionType,
 
 
 bool FailureDiagnosis::diagnoseContextualConversionError(Type exprResultType) {
-  TypeBase *contextualType = CS->getConversionType(expr);
-  
-  if (!contextualType) {
+  // Try to find the contextual type in a variety of ways.
+  Type contextualType = CS->getConversionType(expr);
+  if (!contextualType)
     contextualType = CS->getContextualType(expr);
-    if (!contextualType) {
-      return false;
-    }
-  }
+  
+  if (conversionConstraint && conversionConstraint->isFavored() &&
+      conversionConstraint->getLocator() &&
+      conversionConstraint->getLocator()->getAnchor() == expr)
+    contextualType = conversionConstraint->getSecondType();
+
+  if (!contextualType)
+    return false;
+
   if (exprResultType->isEqual(contextualType))
     return false;
   
@@ -2757,6 +2767,7 @@ bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
     if (typeIsNotSpecialized(resultTy))
       resultTy = calleeInfo[0].getResultType();
     
+    return diagnoseGeneralConversionFailure();
     diagnose(binop->getLoc(), diag::result_type_no_match, resultTy)
       .highlight(binop->getSourceRange());
     return true;
