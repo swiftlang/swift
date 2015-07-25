@@ -92,6 +92,12 @@ void ConstraintLocator::dump(SourceManager *sm) {
   llvm::errs() << "\n";
 }
 
+void ConstraintLocator::dump(ConstraintSystem *CS) {
+  dump(&CS->TC.Context.SourceMgr, llvm::errs());
+  llvm::errs() << "\n";
+}
+
+
 void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) {
   out << "locator@" << (void*) this << " [";
 

@@ -37,6 +37,7 @@ class Expr;
 class SourceManager;
 
 namespace constraints {
+  class ConstraintSystem;
 
 /// \brief Locates a given constraint within the expression being
 /// type-checked, which may refer down into subexpressions and parts of
@@ -488,6 +489,9 @@ public:
   /// \brief Produce a debugging dump of this locator.
   LLVM_ATTRIBUTE_DEPRECATED(
       void dump(SourceManager *SM) LLVM_ATTRIBUTE_USED,
+      "only for use within the debugger");
+  LLVM_ATTRIBUTE_DEPRECATED(
+      void dump(ConstraintSystem *CS) LLVM_ATTRIBUTE_USED,
       "only for use within the debugger");
 
   void dump(SourceManager *SM, raw_ostream &OS) LLVM_ATTRIBUTE_USED;
