@@ -844,37 +844,6 @@ do {
       _ = flattened.map { _ in ++calls }
       expectEqual(0, calls, "unexpected eagerness in \(flattened.dynamicType)")
     }
-    
-  % for traversal in 'Forward', 'Bidirectional':
-  %   t = '' if traversal == 'Forward' else traversal
-    tests.test("Flatten${t}Collection/\(data)") {
-      let base = Minimal${traversal}Collection(
-        data.map { Minimal${traversal}Collection($0) })
-
-      let flattened = base._prext_flatten
-      check${traversal}Collection(expected, flattened, resiliencyChecks: .none)
-
-      // Checking that _prext_flatten doesn't introduce laziness
-      var calls = 0
-      _ = flattened.map { _ in ++calls }
-      expectLE(
-        expected.count, calls,
-        "unexpected laziness in \(flattened.dynamicType)")
-    }
-    
-    tests.test("Flatten${t}Collection/Lazy\(data)") {
-      // Checking that _prext_flatten doesn't remove laziness
-      let base = Minimal${traversal}Collection(
-        data.map { Minimal${traversal}Collection($0) }
-      )._prext_lazy.map { $0 }
-
-      let flattened = base._prext_flatten
-    
-      var calls = 0
-      _ = flattened.map { _ in ++calls }
-      expectEqual(0, calls, "unexpected eagerness in \(flattened.dynamicType)")
-    }
-  % end
   }
 }
 

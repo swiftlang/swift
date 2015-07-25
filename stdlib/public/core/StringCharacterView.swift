@@ -276,7 +276,7 @@ extension String.CharacterView : RangeReplaceableCollectionType {
   ) {
     let rawSubRange = subRange.startIndex._base._position
       ..< subRange.endIndex._base._position
-    let lazyUTF16 = newElements._prext_lazy.flatMap { $0.utf16 }
+    let lazyUTF16 = _lazyConcatenate(lazy(newElements).map { $0.utf16 })
     _core.replaceRange(rawSubRange, with: lazyUTF16)
   }
 
