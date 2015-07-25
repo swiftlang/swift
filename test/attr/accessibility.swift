@@ -143,3 +143,32 @@ internal protocol EmptyProto {}
 internal protocol EmptyProto2 {}
 private extension Properties : EmptyProto {} // expected-error {{'private' modifier cannot be used with extensions that declare protocol conformances}}
 private(set) extension Properties : EmptyProto2 {} // expected-error {{'private' modifier cannot be applied to this declaration}}
+
+public struct PublicStruct {}
+internal struct InternalStruct {} // expected-note + {{declared here}}
+private struct PrivateStruct {} // expected-note + {{declared here}}
+
+protocol InternalProto {
+  typealias Assoc
+}
+public extension InternalProto {} // expected-error {{extension of internal protocol cannot be declared public}}
+internal extension InternalProto where Assoc == PublicStruct {}
+internal extension InternalProto where Assoc == InternalStruct {}
+internal extension InternalProto where Assoc == PrivateStruct {} // expected-error {{extension cannot be declared internal because its generic requirement uses a private type}}
+private extension InternalProto where Assoc == PublicStruct {}
+private extension InternalProto where Assoc == InternalStruct {}
+private extension InternalProto where Assoc == PrivateStruct {}
+
+public protocol PublicProto {
+  typealias Assoc
+}
+public extension PublicProto {}
+public extension PublicProto where Assoc == PublicStruct {}
+public extension PublicProto where Assoc == InternalStruct {} // expected-error {{extension cannot be declared public because its generic requirement uses an internal type}}
+public extension PublicProto where Assoc == PrivateStruct {} // expected-error {{extension cannot be declared public because its generic requirement uses a private type}}
+internal extension PublicProto where Assoc == PublicStruct {}
+internal extension PublicProto where Assoc == InternalStruct {}
+internal extension PublicProto where Assoc == PrivateStruct {} // expected-error {{extension cannot be declared internal because its generic requirement uses a private type}}
+private extension PublicProto where Assoc == PublicStruct {}
+private extension PublicProto where Assoc == InternalStruct {}
+private extension PublicProto where Assoc == PrivateStruct {}

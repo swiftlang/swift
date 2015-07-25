@@ -1825,17 +1825,16 @@ public:
 } // end anonymous namespace
 
 /// Checks if the accessibility of the type described by \p TL is at least
-/// \p access. If it isn't, calls \p diagnose with a TypeRepr representing the
-/// offending part of \p TL.
+/// \p contextAccess. If it isn't, calls \p diagnose with a TypeRepr
+/// representing the offending part of \p TL.
 ///
 /// The TypeRepr passed to \p diagnose may be null, in which case a particular
 /// part of the type that caused the problem could not be found.
 static void checkTypeAccessibility(
-    TypeChecker &TC, TypeLoc TL, const ValueDecl *contextDecl,
-    std::function<void(Accessibility, const TypeRepr *)> diagnose) {
+    TypeChecker &TC, TypeLoc TL, Accessibility contextAccess,
+    llvm::function_ref<void(Accessibility, const TypeRepr *)> diagnose) {
   // Don't spend time checking private access; this is always valid.
   // This includes local declarations.
-  Accessibility contextAccess = contextDecl->getFormalAccess();
   if (contextAccess == Accessibility::Private || !TL.getType())
     return;
 
@@ -1849,6 +1848,12 @@ static void checkTypeAccessibility(
   if (TypeRepr *TR = TL.getTypeRepr())
     complainRepr = TypeAccessibilityDiagnoser::findMinAccessibleType(TR);
   diagnose(typeAccess, complainRepr);
+}
+
+static void checkTypeAccessibility(
+    TypeChecker &TC, TypeLoc TL, const ValueDecl *context,
+    llvm::function_ref<void(Accessibility, const TypeRepr *)> diagnose) {
+  checkTypeAccessibility(TC, TL, context->getFormalAccess(), diagnose);
 }
 
 /// Highlights the given TypeRepr, and adds a note pointing to the type's
@@ -1873,7 +1878,8 @@ static void highlightOffendingType(TypeChecker &TC, InFlightDiagnostic &diag,
 
 static void checkGenericParamAccessibility(TypeChecker &TC,
                                            const GenericParamList *params,
-                                           const ValueDecl *owner) {
+                                           const Decl *owner,
+                                           Accessibility contextAccess) {
   if (!params)
     return;
 
@@ -1889,7 +1895,7 @@ static void checkGenericParamAccessibility(TypeChecker &TC,
     if (param->getInherited().empty())
       continue;
     assert(param->getInherited().size() == 1);
-    checkTypeAccessibility(TC, param->getInherited().front(), owner,
+    checkTypeAccessibility(TC, param->getInherited().front(), contextAccess,
                            [&](Accessibility typeAccess,
                                const TypeRepr *thisComplainRepr) {
       if (!minAccess || *minAccess > typeAccess) {
@@ -1911,15 +1917,15 @@ static void checkGenericParamAccessibility(TypeChecker &TC,
     };
     switch (requirement.getKind()) {
     case RequirementKind::Conformance:
-      checkTypeAccessibility(TC, requirement.getSubjectLoc(), owner,
+      checkTypeAccessibility(TC, requirement.getSubjectLoc(), contextAccess,
                              callback);
-      checkTypeAccessibility(TC, requirement.getConstraintLoc(), owner,
+      checkTypeAccessibility(TC, requirement.getConstraintLoc(), contextAccess,
                              callback);
       break;
     case RequirementKind::SameType:
-      checkTypeAccessibility(TC, requirement.getFirstTypeLoc(), owner,
+      checkTypeAccessibility(TC, requirement.getFirstTypeLoc(), contextAccess,
                              callback);
-      checkTypeAccessibility(TC, requirement.getSecondTypeLoc(), owner,
+      checkTypeAccessibility(TC, requirement.getSecondTypeLoc(), contextAccess,
                              callback);
       break;
     case RequirementKind::WitnessMarker:
@@ -1933,10 +1939,16 @@ static void checkGenericParamAccessibility(TypeChecker &TC,
       owner->getDeclContext()->isProtocolOrProtocolExtensionContext();
     auto diag = TC.diagnose(owner, diag::generic_param_access,
                             owner->getDescriptiveKind(), isExplicit,
-                            owner->getFormalAccess(), minAccess.getValue(),
+                            contextAccess, minAccess.getValue(),
                             accessibilityErrorKind);
     highlightOffendingType(TC, diag, complainRepr);
   }
+}
+
+static void checkGenericParamAccessibility(TypeChecker &TC,
+                                           const GenericParamList *params,
+                                           const ValueDecl *owner) {
+  checkGenericParamAccessibility(TC, params, owner, owner->getFormalAccess());
 }
 
 /// Checks the given declaration's accessibility to make sure it is valid given
@@ -5388,6 +5400,10 @@ public:
     // synthesize bodies for derived conformances
     if (!IsFirstPass) {
       computeDefaultAccessibility(TC, ED);
+      if (ED->getAttrs().hasAttribute<AccessibilityAttr>()) {
+        checkGenericParamAccessibility(TC, ED->getGenericParams(), ED,
+                                       ED->getDefaultAccessibility());
+      }
       checkExplicitConformance(ED, ED->getExtendedType());
     }
 
