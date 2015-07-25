@@ -2284,12 +2284,22 @@ bool FailureDiagnosis::diagnoseGeneralOverloadFailure() {
                               diag::cannot_apply_lvalue_binop_to_rvalue);
     return true;
   }
-
-  diagnose(apply->getFn()->getLoc(),
-           diag::cannot_find_appropriate_overload_with_type,
-           overloadName, getTypeListString(argType))
-    .highlight(apply->getSourceRange());
   
+  
+  // If we have an argument list (i.e., a scalar, or a non-zero-element tuple)
+  // then diagnose with some specificity about the arguments.
+  if (isa<TupleExpr>(apply->getArg()) &&
+      cast<TupleExpr>(apply->getArg())->getNumElements() == 0) {
+    // Emit diagnostics that say "no arguments".
+    diagnose(apply->getFn()->getLoc(), diag::cannot_call_with_no_params,
+             overloadName, /*isInitializer*/false)
+      .highlight(apply->getSourceRange());
+  } else {
+    diagnose(apply->getFn()->getLoc(), diag::cannot_call_with_params,
+             overloadName, getTypeListString(argType), /*isInitializer*/false)
+      .highlight(apply->getSourceRange());
+  }
+
   calleeInfo.suggestPotentialOverloads(overloadName, apply->getLoc());
   return true;
 }

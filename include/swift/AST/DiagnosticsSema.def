@@ -66,9 +66,6 @@ ERROR(cannot_find_appropriate_overload,sema,none,
       "could not find an overload for '%0' that accepts the supplied "
       "arguments", (StringRef))
 
-ERROR(cannot_find_appropriate_overload_with_type,sema,none,
-      "cannot invoke '%0' with an argument of type '%1'",
-      (StringRef, StringRef))
 ERROR(could_not_find_member,sema,none,
       "could not find member %0", (Identifier))
 
