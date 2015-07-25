@@ -2969,6 +2969,7 @@ public struct ${Self}<T> : ${'MutableCollectionType' if mutable else 'Collection
 
   public var startIndex: ${Index} {
     return ${Index}(
+      buffer: bufferIndirection.buffer,
       position: 0,
       startIndex: 0,
       endIndex: _elements.endIndex)
@@ -2976,6 +2977,7 @@ public struct ${Self}<T> : ${'MutableCollectionType' if mutable else 'Collection
 
   public var endIndex: ${Index} {
     return ${Index}(
+      buffer: bufferIndirection.buffer,
       position: _elements.endIndex,
       startIndex: 0,
       endIndex: _elements.endIndex)
@@ -2996,9 +2998,18 @@ public struct ${Self}<T> : ${'MutableCollectionType' if mutable else 'Collection
     return underestimatedCount
   }
 
+  internal mutating func _willMutate() {
+    if !isUniquelyReferencedNonObjC(&bufferIndirection) {
+      bufferIndirection = MinimalCollectionBufferIndirection()
+    }
+    bufferIndirection.buffer._willMutate()
+  }
+
   public var underestimatedCount: Int
 
   internal var _elements: [T]
+  public var bufferIndirection: MinimalCollectionBufferIndirection =
+    MinimalCollectionBufferIndirection()
 }
 
 %   end

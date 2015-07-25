@@ -112,15 +112,17 @@ public struct ${Index}<
   /// - Requires: the next value is representable.
   public func successor() -> ${Index} {
     let nextInner = _inner!.successor()
-    if _fastPath(nextInner != _base[_outer].endIndex) {
-      return ${Index}(_base, _outer, nextInner)
+    if _fastPath(nextInner != _innerCollection!.endIndex) {
+      return ${Index}(_base, _outer, nextInner, _innerCollection)
     }
-    let tailIndices = _outer.successor()..<_base.endIndex
-    if let nextOuter = tailIndices.indexOf({ !_base[$0].isEmpty }) {
-      return ${Index}(
-        _base, nextOuter, _base[nextOuter].startIndex)
+    for nextOuter in _outer.successor()..<_base.endIndex {
+      let nextInnerCollection = _base[nextOuter]
+      if !nextInnerCollection.isEmpty {
+        return ${Index}(
+          _base, nextOuter, nextInnerCollection.startIndex, nextInnerCollection)
+      }
     }
-    return ${Index}(_base, _base.endIndex, nil)
+    return ${Index}(_endIndexOfFlattened: _base)
   }
   
 % if traversal == 'Bidirectional':
@@ -128,26 +130,33 @@ public struct ${Index}<
   ///
   /// - Requires: The previous value is representable.
   public func predecessor() -> ${Index} {
-    var outer = _outer
-    var inner = _inner
+    var prevOuter = _outer
+    var prevInnerCollection = _innerCollection ?? _base[--prevOuter]
+    var prevInner = _inner ?? prevInnerCollection.endIndex
 
-    while inner == nil || inner! == _base[outer].startIndex {
-      inner = _base[--outer].endIndex
+    while prevInner == prevInnerCollection.startIndex {
+      prevInnerCollection = _base[--prevOuter]
+      prevInner = prevInnerCollection.endIndex
     }
-    return ${Index}(_base, outer, inner!.predecessor())
+
+    return ${Index}(
+      _base, prevOuter, prevInner.predecessor(), prevInnerCollection)
   }
 % end
 
   /// Construct the `startIndex` for a flattened view of `base`.
   internal init(_startIndexOfFlattened base: Base) {
-    if let outer = base.indexOf({ !$0.isEmpty }) {
-      self._base = base
-      self._outer = outer
-      self._inner = base[outer].startIndex
+    for outer in base.indices {
+      let innerCollection = base[outer]
+      if !innerCollection.isEmpty {
+        self._base = base
+        self._outer = outer
+        self._innerCollection = innerCollection
+        self._inner = innerCollection.startIndex
+        return
+      }
     }
-    else {
-      self = ${Index}(_endIndexOfFlattened: base)
-    }
+    self = ${Index}(_endIndexOfFlattened: base)
   }
 
   /// Construct the `endIndex` for a flattened view of `base`.
@@ -155,20 +164,24 @@ public struct ${Index}<
     self._base = _base
     self._outer = _base.endIndex
     self._inner = nil
+    self._innerCollection = nil
   }
 
   internal init(
     _ _base: Base,
     _ outer: Base.Index,
-    _ inner: Base.Generator.Element.Index?) {
+    _ inner: Base.Generator.Element.Index?,
+    _ innerCollection: Base.Generator.Element?) {
     self._base = _base
     self._outer = outer
     self._inner = inner
+    self._innerCollection = innerCollection
   }
   
   internal let _base: Base
   internal let _outer: Base.Index
   internal let _inner: Base.Generator.Element.Index?
+  internal let _innerCollection: Base.Generator.Element?
 }
 
 public func == <Base> (lhs: ${Index}<Base>, rhs: ${Index}<Base>) -> Bool {
@@ -223,7 +236,24 @@ public struct ${Collection}<
   public subscript(
     position: Index
   ) -> Base.Generator.Element.Generator.Element {
-    return _base[position._outer][position._inner!]
+    return position._innerCollection![position._inner!]
+  }
+
+  public func underestimateCount() -> Int {
+    // To return any estimate of the number of elements, we have to start
+    // evaluating the collections.  That is a bad default for `flatMap()`, so
+    // just return zero.
+    return 0
+  }
+
+  public func _copyToNativeArrayBuffer()
+    -> _ContiguousArrayBuffer<Base.Generator.Element.Generator.Element> {
+
+    // The default implementation of `_copyToNativeArrayBuffer` queries the
+    // `count` property, which materializes every inner collection.  This is a
+    // bad default for `flatMap()`.  So we treat `self` as a sequence and only
+    // rely on underestimated count.
+    return _copySequenceToNativeArrayBuffer(self)
   }
 
   internal var _base: Base
