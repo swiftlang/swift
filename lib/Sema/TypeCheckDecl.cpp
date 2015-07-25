@@ -5543,12 +5543,6 @@ public:
           TC.createArchetypeBuilder(CD->getModuleContext());
         checkGenericParamList(builder, gp, TC);
 
-        // Type check the constructor parameters.
-        if (semaFuncParamPatterns(CD)) {
-          CD->overwriteType(ErrorType::get(TC.Context));
-          CD->setInvalid();
-        }
-
         // Infer requirements from the parameters of the constructor.
         builder.inferRequirements(CD->getBodyParamPatterns()[1], gp);
 
