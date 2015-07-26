@@ -2,7 +2,8 @@
 
 func simple_default_args() {
   let _ : (Int) -> Int = {(x : Int = 1) in x+1} // expected-error{{default argument is only permitted for a non-curried function parameter}}
-  let _ : () -> Int = {(x : Int = 1) in x+1} // expected-error{{'(Int) -> Int' is not convertible to '() -> Int'}} expected-error {{default argument is only permitted for a non-curried function parameter}}
+  let _ : () -> Int = {(x : Int = 1) in x+1} // expected-error{{'()' is not a subtype of 'Int'}} expected-error {{default argument is only permitted for a non-curried function parameter}}
+  let _ : () -> Int = {(x : Int) in x+1} // expected-error{{'()' is not a subtype of 'Int'}}
 }
 
 func func_default_args() {
