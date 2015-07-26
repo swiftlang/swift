@@ -1048,9 +1048,6 @@ public:
   bool typeCheckExpressionShallow(Expr *&expr, DeclContext *dc,
                                   Type convertType = Type());
 
-  /// \brief Erase an expression tree's open existentials after a re-typecheck
-  /// operation.
-  void eraseOpenedExistentials(Expr *&expr);
 
   /// \brief Type check the given expression as a condition, which converts
   /// it to a logic value.
