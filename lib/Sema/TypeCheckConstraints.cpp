@@ -981,9 +981,12 @@ bool TypeChecker::solveForExpression(
   if (preCheckExpression(*this, expr, dc))
     return true;
 
-  if (!contextualType.isNull()) {
+  // Tell the constraint system what the contextual type is.  This informs
+  // diagnostics and is a hint for various performance optimizations.
+  if (!contextualType.isNull())
     cs.setContextualType(expr, contextualType.getPointer());
-  }
+  else if (!convertType.isNull())
+    cs.setContextualType(expr, convertType.getPointer());
 
   if (auto generatedExpr = cs.generateConstraints(expr))
     expr = generatedExpr;
