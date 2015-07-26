@@ -1020,9 +1020,6 @@ public:
   ///
   /// \param expr The expression to type-check.
   ///
-  /// \param convertType The type that the expression is being converted to,
-  /// or null if the expression is standalone.
-  ///
   /// \param allowFreeTypeVariables Whether free type variables are allowed in
   /// the solution, and what to do with them.
   ///
@@ -1033,7 +1030,7 @@ public:
   /// \returns the type of \p expr on success, None otherwise.
   /// FIXME: expr may still be modified...
   Optional<Type> getTypeOfExpressionWithoutApplying(
-      Expr *&expr, DeclContext *dc, Type convertType,
+      Expr *&expr, DeclContext *dc, 
       FreeTypeVariableBinding allowFreeTypeVariables =
                               FreeTypeVariableBinding::Disallow,
       ExprTypeCheckListener *listener = nullptr);

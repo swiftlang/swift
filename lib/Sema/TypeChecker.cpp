@@ -671,8 +671,8 @@ Optional<Type> swift::getTypeOfCompletionContextExpr(ASTContext &Ctx,
 
   TypeChecker TC(Ctx, diags);
   // Try to solve for the actual type of the expression.
-  if (auto T = TC.getTypeOfExpressionWithoutApplying(
-          parsedExpr, DC, Type(), FreeTypeVariableBinding::GenericParameters))
+  if (auto T = TC.getTypeOfExpressionWithoutApplying(parsedExpr, DC,
+                                   FreeTypeVariableBinding::GenericParameters))
     return T;
 
   // Try to recover by using the original unchecked type.

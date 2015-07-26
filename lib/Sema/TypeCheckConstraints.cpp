@@ -982,11 +982,6 @@ solveForExpression(Expr *&expr, DeclContext *dc, Type convertType,
   if (preCheckExpression(*this, expr, dc))
     return true;
 
-  // Tell the constraint system what the contextual type is.  This informs
-  // diagnostics and is a hint for various performance optimizations.
-  if (!convertType.isNull())
-    cs.setContextualType(expr, convertType.getPointer());
-
   if (auto generatedExpr = cs.generateConstraints(expr))
     expr = generatedExpr;
   else {
@@ -995,11 +990,9 @@ solveForExpression(Expr *&expr, DeclContext *dc, Type convertType,
 
   // If there is a type that we're expected to convert to, add the conversion
   // constraint.
-  if (convertType &&
-      !options.contains(TypeCheckExprFlags::ConvertTypeIsOnlyAHint)) {
+  if (convertType)
     cs.addConstraint(ConstraintKind::Conversion, expr->getType(), convertType,
                      cs.getConstraintLocator(expr), /*isFavored*/ true);
-  }
 
   // Notify the listener that we've built the constraint system.
   if (listener && listener->builtConstraints(cs, expr)) {
@@ -1133,6 +1126,16 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   CleanupIllFormedExpressionRAII cleanup(Context, expr);
   ExprCleanser cleanup2(expr);
 
+  // Tell the constraint system what the contextual type is.  This informs
+  // diagnostics and is a hint for various performance optimizations.
+  if (!convertType.isNull())
+    cs.setContextualType(expr, convertType.getPointer());
+
+  // If the convertType is *only* provided for that hint, then null it out so
+  // that we don't later treat it as an actual conversion constraint.
+  if (options.contains(TypeCheckExprFlags::ConvertTypeIsOnlyAHint))
+    convertType = Type();
+  
   bool suppressDiagnostics =
     options.contains(TypeCheckExprFlags::SuppressDiagnostics);
 
@@ -1160,9 +1163,6 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   // Apply the solution to the expression.
   auto &solution = viable[0];
   bool isDiscarded = options.contains(TypeCheckExprFlags::IsDiscarded);
-  if (options.contains(TypeCheckExprFlags::ConvertTypeIsOnlyAHint))
-    convertType = Type();
-  
   auto result = cs.applySolution(solution, expr, convertType, isDiscarded,
                                  suppressDiagnostics);
   if (!result) {
@@ -1195,10 +1195,10 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   return false;
 }
 
-Optional<Type> TypeChecker::getTypeOfExpressionWithoutApplying(
-    Expr *&expr, DeclContext *dc, Type convertType,
-    FreeTypeVariableBinding allowFreeTypeVariables,
-    ExprTypeCheckListener *listener) {
+Optional<Type> TypeChecker::
+getTypeOfExpressionWithoutApplying(Expr *&expr, DeclContext *dc,
+                                 FreeTypeVariableBinding allowFreeTypeVariables,
+                                   ExprTypeCheckListener *listener) {
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
 
   // Construct a constraint system from this expression.
@@ -1207,8 +1207,9 @@ Optional<Type> TypeChecker::getTypeOfExpressionWithoutApplying(
 
   // Attempt to solve the constraint system.
   SmallVector<Solution, 4> viable;
-  if (solveForExpression(expr, dc, convertType, allowFreeTypeVariables,
-                         listener, cs, viable, TypeCheckExprOptions()))
+  if (solveForExpression(expr, dc, /*convertType*/Type(),
+                         allowFreeTypeVariables, listener, cs, viable,
+                         TypeCheckExprOptions()))
     return None;
 
   // Get the expression's simplified type.
