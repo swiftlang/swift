@@ -223,12 +223,12 @@ class ThisDerived1 : ThisBase1 {
     self.baseInstanceVar = 42 // expected-error {{'ThisDerived1.Type' does not have a member named 'baseInstanceVar'}}
     self.baseProp = 42 // expected-error {{'ThisDerived1.Type' does not have a member named 'baseProp'}}
     self.baseFunc0() // expected-error {{missing argument}}
-    self.baseFunc0(ThisBase1())()
+    self.baseFunc0(ThisBase1())() // expected-error {{'ThisBase1 -> () -> ()' is not convertible to 'ThisDerived1 -> () -> ()'}}
     
     self.baseFunc0(ThisDerived1())()
     self.baseFunc1(42) // expected-error {{cannot invoke 'baseFunc1' with an argument list of type '(Int)'}}
     // expected-note @-1 {{expected an argument list of type '(ThisBase1)'}}
-    self.baseFunc1(ThisBase1())(42)
+    self.baseFunc1(ThisBase1())(42) // expected-error {{'ThisBase1 -> (Int) -> ()' is not convertible to 'ThisDerived1 -> (Int) -> ()'}}
     self.baseFunc1(ThisDerived1())(42)
     self[0] = 42.0 // expected-error {{'ThisDerived1.Type' does not have a member named 'subscript'}}
     self.baseStaticVar = 42
