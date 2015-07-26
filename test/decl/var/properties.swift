@@ -382,7 +382,7 @@ struct Y { }
 var y: Y
 var x20: X {
   get {
-    return y // expected-error{{cannot convert return expression of type 'Y' to expected return type 'X'}}
+    return y // expected-error{{cannot convert return expression of type 'Y' to return type 'X'}}
   }
   set {
     y = newValue // expected-error{{cannot assign a value of type 'X' to a value of type 'Y'}}
@@ -391,7 +391,7 @@ var x20: X {
 
 var x21: X {
   get {
-    return y // expected-error{{cannot convert return expression of type 'Y' to expected return type 'X'}}
+    return y // expected-error{{cannot convert return expression of type 'Y' to return type 'X'}}
   }
   set(v) {
     y = v // expected-error{{cannot assign a value of type 'X' to a value of type 'Y'}}

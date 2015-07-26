@@ -43,7 +43,7 @@ struct Repeated {
       return UnsafePointer(base)
     }
     unsafeAddress { // expected-error {{duplicate definition}}
-      return base // expected-error {{cannot convert return expression of type 'UnsafeMutablePointer<Int>' to expected return type 'UnsafePointer<Int>'}}
+      return base // expected-error {{cannot convert return expression of type 'UnsafeMutablePointer<Int>' to return type 'UnsafePointer<Int>'}}
     }
   }
 }

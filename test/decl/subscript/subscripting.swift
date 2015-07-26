@@ -62,7 +62,7 @@ struct Y1 {
 
   subscript(i: Int) -> Int {
     get {
-      return x // expected-error{{cannot convert return expression of type 'X' to expected return type 'Int'}}
+      return x // expected-error{{cannot convert return expression of type 'X' to return type 'Int'}}
     }
     set {
       x = newValue // expected-error{{cannot assign a value of type 'Int' to a value of type 'X'}}

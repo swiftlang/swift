@@ -65,12 +65,12 @@ func bridgeToAnyObject(s: BridgedStruct) -> AnyObject {
 }
 
 func bridgeFromObjC(c: BridgedClass) -> BridgedStruct {
-  return c // expected-error{{cannot convert return expression of type 'BridgedClass' to expected return type 'BridgedStruct'}}
+  return c // expected-error{{cannot convert return expression of type 'BridgedClass' to return type 'BridgedStruct'}}
   return c as BridgedStruct
 }
 
 func bridgeFromObjCDerived(s: BridgedClassSub) -> BridgedStruct {
-  return s // expected-error{{cannot convert return expression of type 'BridgedClassSub' to expected return type 'BridgedStruct'}}
+  return s // expected-error{{cannot convert return expression of type 'BridgedClassSub' to return type 'BridgedStruct'}}
   return s as BridgedStruct
 }
 

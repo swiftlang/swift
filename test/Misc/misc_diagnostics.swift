@@ -33,7 +33,7 @@ var f2: Float = 3.0
 var dd: Double = f1 - f2 // expected-error{{'Float' is not convertible to 'Double'}}
 
 func f() -> Bool {
-  return 1 + 1 // expected-error{{cannot convert return expression of type 'Int' to expected return type 'Bool'}}
+  return 1 + 1 // expected-error{{cannot convert return expression of type 'Int' to return type 'Bool'}}
 }
 
 // Test that nested diagnostics are properly surfaced.
@@ -60,7 +60,7 @@ func retV() { return true } // expected-error {{unexpected non-void return value
 func retAI() -> Int {
     let a = [""]
     let b = [""]
-    return (a + b) // expected-error {{cannot convert return expression of type '[String]' to expected return type 'Int'}}
+    return (a + b) // expected-error {{cannot convert return expression of type '[String]' to return type 'Int'}}
 }
 
 func bad_return1() {
@@ -68,7 +68,7 @@ func bad_return1() {
 }
 
 func bad_return2() -> (Int, Int) {
-  return 42  // expected-error {{cannot convert return expression of type 'Int' to expected return type '(Int, Int)'}}
+  return 42  // expected-error {{cannot convert return expression of type 'Int' to return type '(Int, Int)'}}
 }
 
 // <rdar://problem/14096697> QoI: Diagnostics for trying to return values from void functions

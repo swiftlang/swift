@@ -75,7 +75,7 @@ func fail2<
   where
   T.Foo == U.Foo, T.Foo == X, U.Foo == Y // expected-error{{generic parameter 'Foo' cannot be equal to both 'X' and 'Y'}}
 >(t: T, u: U) -> (X, Y) {
-  return (t.foo, u.foo) // expected-error{{cannot convert return expression of type '(X, X)' to expected return type '(X, Y)'}}
+  return (t.foo, u.foo) // expected-error{{cannot convert return expression of type '(X, X)' to return type '(X, Y)'}}
 }
 
 func test4<T: Barrable where T.Bar == Y>(t: T) -> Y {
@@ -87,7 +87,7 @@ func fail3<
   where
   T.Bar == X // expected-error{{'X' does not conform to required protocol 'Fooable'}}
 >(t: T) -> X {
-  return t.bar // expected-error{{cannot convert return expression of type 'T.Bar' to expected return type 'X'}}
+  return t.bar // expected-error{{cannot convert return expression of type 'T.Bar' to return type 'X'}}
 }
 
 func test5<T: Barrable where T.Bar.Foo == X>(t: T) -> X {
@@ -108,7 +108,7 @@ func fail4<
   T.Bar == Y,
   T.Bar.Foo == Z // expected-error{{generic parameter 'Foo' cannot be equal to both 'Foo' (aka 'X') and 'Z'}}
 >(t: T) -> (Y, Z) {
-  return (t.bar, t.bar.foo) // expected-error{{cannot convert return expression of type '(Y, X)' to expected return type '(Y, Z)'}}
+  return (t.bar, t.bar.foo) // expected-error{{cannot convert return expression of type '(Y, X)' to return type '(Y, Z)'}}
 }
 
 // TODO: repeat diagnostic
@@ -118,7 +118,7 @@ func fail5<
   T.Bar.Foo == Z,
   T.Bar == Y // expected-error 2{{generic parameter 'Foo' cannot be equal to both 'Z' and 'Foo'}}
 >(t: T) -> (Y, Z) {
-  return (t.bar, t.bar.foo) // expected-error{{cannot convert return expression of type '(Y, X)' to expected return type '(Y, Z)'}}
+  return (t.bar, t.bar.foo) // expected-error{{cannot convert return expression of type '(Y, X)' to return type '(Y, Z)'}}
 }
 
 func test8<T: Fooable where T.Foo == X, T.Foo == Y>(t: T) {} // expected-error{{generic parameter 'Foo' cannot be equal to both 'X' and 'Y'}}
@@ -130,7 +130,7 @@ func testAssocTypeEquivalence<
 }
 
 func fail6<T where T == Int>(t: T) -> Int { // expected-error{{same-type requirement makes generic parameter 'T' non-generic}}
-  return t // expected-error{{cannot convert return expression of type 'T' to expected return type 'Int'}}
+  return t // expected-error{{cannot convert return expression of type 'T' to return type 'Int'}}
 }
 
 func test8<
