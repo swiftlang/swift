@@ -1148,7 +1148,6 @@ enum class ConstraintSystemFlags {
 
 /// Options that affect the constraint system as a whole.
 typedef OptionSet<ConstraintSystemFlags> ConstraintSystemOptions;
-  
 
 /// \brief Describes a system of constraints on type variables, the
 /// solution of which assigns concrete types to each of the type variables.
@@ -1220,10 +1219,14 @@ private:
   bool HandlingFavoredConstraint = false;
 
   SmallVector<TypeVariableType *, 16> TypeVariables;
-  llvm::DenseMap<Expr *, TypeBase *> ContextualTypes;
   llvm::DenseMap<Expr *, TypeBase *> FavoredTypes;
 
-
+  /// There can only be a single contextual type on the root of the expression
+  /// being checked.  If specified, this holds its type along with the base
+  /// expression, and the purpose of it.
+  Type ContextualType;
+  Expr *ContextualTypeNode = nullptr;
+  
   /// \brief The set of constraint restrictions used to reach the
   /// current constraint system.
   ///
@@ -1486,20 +1489,22 @@ public:
     return TypeVariables;
   }
   
-  TypeBase* getContextualType(Expr *E) {
-    return this->ContextualTypes[E];
-  }
   TypeBase* getFavoredType(Expr *E) {
     return this->FavoredTypes[E];
-  }
- 
-  void setContextualType(Expr *E, TypeBase *T) {
-    this->ContextualTypes[E] = T;
   }
   void setFavoredType(Expr *E, TypeBase *T) {
     this->FavoredTypes[E] = T;
   }
  
+  void setContextualType(Expr *E, Type T) {
+    ContextualTypeNode = E;
+    ContextualType = T;
+  }
+
+  Type getContextualType(Expr *E) {
+    return E == ContextualTypeNode ? ContextualType : Type();
+  }
+  
   /// \brief Retrieve the constraint locator for the given anchor and
   /// path, uniqued.
   ConstraintLocator *
