@@ -1224,8 +1224,9 @@ private:
   /// There can only be a single contextual type on the root of the expression
   /// being checked.  If specified, this holds its type along with the base
   /// expression, and the purpose of it.
-  Type ContextualType;
-  Expr *ContextualTypeNode = nullptr;
+  Type contextualType;
+  Expr *contextualTypeNode = nullptr;
+  ContextualTypePurpose contextualTypePurpose = CTP_Unused;
   
   /// \brief The set of constraint restrictions used to reach the
   /// current constraint system.
@@ -1496,13 +1497,17 @@ public:
     this->FavoredTypes[E] = T;
   }
  
-  void setContextualType(Expr *E, Type T) {
-    ContextualTypeNode = E;
-    ContextualType = T;
+  void setContextualType(Expr *E, Type T, ContextualTypePurpose purpose) {
+    contextualTypeNode = E;
+    contextualType = T;
+    contextualTypePurpose = purpose;
   }
 
   Type getContextualType(Expr *E) {
-    return E == ContextualTypeNode ? ContextualType : Type();
+    return E == contextualTypeNode ? contextualType : Type();
+  }
+  ContextualTypePurpose getContextualTypePurpose() const {
+    return contextualTypePurpose;
   }
   
   /// \brief Retrieve the constraint locator for the given anchor and

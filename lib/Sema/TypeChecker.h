@@ -136,6 +136,23 @@ public:
   }
 };
 
+/// This specifies the purpose of the contextual type, when specified to
+/// typeCheckExpression.  This is used for diagnostic generation to produce more
+/// specified error messages when the conversion fails.
+///
+enum ContextualTypePurpose {
+  CTP_Unused,           ///< No contextual type is specified.
+  CTP_Initialization,   ///< Pattern binding initialization.
+  CTP_ReturnStmt,       ///< Value specified to a 'return' statement.
+  CTP_ThrowStmt,        ///< Value specified to a 'throw' statement.
+  CTP_EnumCaseRawValue, ///< Raw value specified for "case X = 42" in enum.
+  CTP_DefaultParameter, ///< Default value in parameter 'foo(a : Int = 42)'.
+
+  CTP_CannotFail,       ///< Conversion can never fail. abort() if it does.
+};
+
+  
+
 /// Flags that can be used to control name lookup.
 enum class TypeCheckExprFlags {
   /// Whether we know that the result of the expression is discarded.  This
@@ -170,8 +187,6 @@ inline TypeCheckExprOptions operator|(TypeCheckExprFlags flag1,
   return TypeCheckExprOptions(flag1) | flag2;
 }
 
-  
-  
 /// Flags that can be used to control name lookup.
 enum class NameLookupFlags {
   /// Whether we know that this lookup is always a private dependency.
@@ -998,6 +1013,11 @@ public:
   /// \param expr The expression to type-check, which will be modified in
   /// place.
   ///
+  /// \param convertTypePurpose When convertType is specified, this indicates
+  /// what the conversion is doing.  This allows diagnostics generation to
+  /// produce more specific and helpful error messages when the conversion fails
+  /// to be possible.
+  ///
   /// \param convertType The type that the expression is being converted to,
   /// or null if the expression is standalone.  If the 'ConvertTypeIsOnlyAHint'
   /// option is specified, then this is only a hint, it doesn't produce a full
@@ -1012,9 +1032,17 @@ public:
   /// \returns true if an error occurred, false otherwise.
   bool typeCheckExpression(Expr *&expr, DeclContext *dc,
                            Type convertType = Type(),
+                           ContextualTypePurpose convertTypePurpose =CTP_Unused,
                            TypeCheckExprOptions options =TypeCheckExprOptions(),
                            ExprTypeCheckListener *listener = nullptr);
 
+  bool typeCheckExpression(Expr *&expr, DeclContext *dc,
+                           ExprTypeCheckListener *listener) {
+    return typeCheckExpression(expr, dc, Type(), CTP_Unused,
+                               TypeCheckExprOptions(), listener);
+  }
+
+  
   /// \brief Type check the given expression and return its type without
   /// applying the solution.
   ///

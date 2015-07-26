@@ -2005,7 +2005,7 @@ public:
   /// This can return a new expression (for e.g. when a UnresolvedDeclRef gets
   /// resolved) and returns null when the subexpression fails to typecheck.
   ///
-  Expr *typeCheckChildIndependently(Expr *subExpr, Type conversionType = Type(),
+  Expr *typeCheckChildIndependently(Expr *subExpr, Type convertType = Type(),
                                     TCCOptions options = TCCOptions());
 
   Type getTypeOfTypeCheckedChildIndependently(Expr *subExpr,
@@ -2018,7 +2018,7 @@ public:
   /// subexpression of the current node because it handles ClosureExpr parents
   /// of the specified node.
   Expr *typeCheckArbitrarySubExprIndependently(Expr *subExpr,
-                                               Type conversionType = Type(),
+                                               Type convertType = Type(),
                                              TCCOptions options = TCCOptions());
 
   /// Special magic to handle inout exprs and tuples in argument lists.
@@ -2655,7 +2655,7 @@ static void eraseOpenedExistentials(Expr *&expr) {
 /// This can return a new expression (for e.g. when a UnresolvedDeclRef gets
 /// resolved) and returns null when the subexpression fails to typecheck.
 Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr,
-                                                    Type conversionType,
+                                                    Type convertType,
                                                     TCCOptions options) {
   // Track if this sub-expression is currently being diagnosed.
   if (Expr *res = CS->TC.exprIsBeingDiagnosed(subExpr))
@@ -2712,11 +2712,11 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr,
   if (options.contains(TCC_AllowLValue))
     TCEOptions |= TypeCheckExprFlags::IsDiscarded;
 
-  if (options.contains(TCC_AllowUnresolved) && !conversionType)
+  if (options.contains(TCC_AllowUnresolved) && !convertType)
     TCEOptions |= TypeCheckExprFlags::AllowUnresolvedTypeVariables;
 
-  bool hadError = CS->TC.typeCheckExpression(subExpr, CS->DC, conversionType,
-                                             TCEOptions);
+  bool hadError = CS->TC.typeCheckExpression(subExpr, CS->DC, convertType,
+                                             /*FIXME*/CTP_Unused, TCEOptions);
 
   // This is a terrible hack to get around the fact that typeCheckExpression()
   // might change subExpr to point to a new OpenExistentialExpr. In that case,
@@ -2725,7 +2725,7 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr,
   // no OpenExistentialExpr, which breaks invariants enforced by the
   // ASTChecker.
   eraseOpenedExistentials(subExpr);
-      
+  
   // If recursive type checking failed, then an error was emitted.  Return
   // null to indicate this to the caller.
   if (hadError)
@@ -2746,10 +2746,10 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr,
 /// subexpression of the current node because it handles ClosureExpr parents
 /// of the specified node.
 Expr *FailureDiagnosis::
-typeCheckArbitrarySubExprIndependently(Expr *subExpr, Type conversionType,
+typeCheckArbitrarySubExprIndependently(Expr *subExpr, Type convertType,
                                        TCCOptions options) {
   if (subExpr == expr)
-    return typeCheckChildIndependently(subExpr, conversionType, options);
+    return typeCheckChildIndependently(subExpr, convertType, options);
   
   // Construct a parent map for the expr tree we're investigating.
   auto parentMap = expr->getParentMap();
@@ -2783,7 +2783,7 @@ typeCheckArbitrarySubExprIndependently(Expr *subExpr, Type conversionType,
   llvm::SaveAndRestore<DeclContext*> SavedDC(CS->DC, newDC);
   
   // Otherwise, we're ok to type check the subexpr.
-  return typeCheckChildIndependently(subExpr, conversionType, options);
+  return typeCheckChildIndependently(subExpr, convertType, options);
 }
 
 

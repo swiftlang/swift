@@ -404,7 +404,7 @@ public:
                                        RS->isImplicit());
     }
 
-    auto failed = TC.typeCheckExpression(E, DC, ResultTy);
+    auto failed = TC.typeCheckExpression(E, DC, ResultTy, CTP_ReturnStmt);
     RS->setResult(E);
     
     if (failed) {
@@ -422,7 +422,7 @@ public:
     Type exnType = TC.getExceptionType(DC, TS->getThrowLoc());
     if (!exnType) return TS;
     
-    auto failed = TC.typeCheckExpression(E, DC, exnType);
+    auto failed = TC.typeCheckExpression(E, DC, exnType, CTP_ThrowStmt);
     TS->setSubExpr(E);
 
     if (failed) return nullptr;
@@ -522,7 +522,7 @@ public:
       TC.typeCheckDecl(D, /*isFirstPass*/false);
 
     if (auto *Initializer = FS->getInitializer().getPtrOrNull()) {
-      if (TC.typeCheckExpression(Initializer, DC, Type(),
+      if (TC.typeCheckExpression(Initializer, DC, Type(), CTP_Unused,
                                  TypeCheckExprFlags::IsDiscarded))
         return nullptr;
       FS->setInitializer(Initializer);
@@ -535,7 +535,7 @@ public:
     }
 
     if (auto *Increment = FS->getIncrement().getPtrOrNull()) {
-      if (TC.typeCheckExpression(Increment, DC, Type(),
+      if (TC.typeCheckExpression(Increment, DC, Type(), CTP_Unused,
                                  TypeCheckExprFlags::IsDiscarded))
         return nullptr;
       FS->setIncrement(Increment);
@@ -1064,7 +1064,7 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
         && !TC.Context.LangOpts.DebuggerSupport;
       if (isDiscarded) options = TypeCheckExprFlags::IsDiscarded;
       
-      if (TC.typeCheckExpression(SubExpr, DC, Type(), options)) {
+      if (TC.typeCheckExpression(SubExpr, DC, Type(), CTP_Unused, options)) {
         elem = SubExpr;
         continue;
       }
@@ -1130,8 +1130,8 @@ static void checkDefaultArguments(TypeChecker &tc, Pattern *pattern,
         }
 
         // Type-check the initializer, then flag that we did so.
-        if (tc.typeCheckExpression(e, initContext,
-                                   field.getPattern()->getType()))
+        if (tc.typeCheckExpression(e, initContext,field.getPattern()->getType(),
+                                   CTP_DefaultParameter))
           field.getInit()->setExpr(field.getInit()->getExpr(), true);
         else
           field.getInit()->setExpr(e, true);
@@ -1236,7 +1236,7 @@ Expr* TypeChecker::constructCallToSuperInit(ConstructorDecl *ctor,
                                       /*Implicit=*/true);
   r = new (Context) CallExpr(r, args, /*Implicit=*/true);
 
-  if (typeCheckExpression(r, ctor, Type(),
+  if (typeCheckExpression(r, ctor, Type(), CTP_Unused,
                           TypeCheckExprFlags::IsDiscarded | 
                           TypeCheckExprFlags::SuppressDiagnostics))
     return nullptr;

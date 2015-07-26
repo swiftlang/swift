@@ -1117,6 +1117,7 @@ namespace {
 #pragma mark High-level entry points
 bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
                                       Type convertType,
+                                      ContextualTypePurpose convertTypePurpose,
                                       TypeCheckExprOptions options,
                                       ExprTypeCheckListener *listener) {
   PrettyStackTraceExpr stackTrace(Context, "type-checking", expr);
@@ -1126,10 +1127,14 @@ bool TypeChecker::typeCheckExpression(Expr *&expr, DeclContext *dc,
   CleanupIllFormedExpressionRAII cleanup(Context, expr);
   ExprCleanser cleanup2(expr);
 
+  // Verify that a purpose was specified if a convertType was.
+  assert(!convertType == (convertTypePurpose == CTP_Unused) &&
+         "Purpose for conversion type was not specified");
+  
   // Tell the constraint system what the contextual type is.  This informs
   // diagnostics and is a hint for various performance optimizations.
   if (!convertType.isNull())
-    cs.setContextualType(expr, convertType.getPointer());
+    cs.setContextualType(expr, convertType.getPointer(), convertTypePurpose);
 
   // If the convertType is *only* provided for that hint, then null it out so
   // that we don't later treat it as an actual conversion constraint.
@@ -1368,10 +1373,16 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
   assert(initializer && "type-checking an uninitialized binding?");
   BindingListener listener(pattern, initializer, DC);
 
-  auto contextualType = pattern->hasType() ? pattern->getType() : Type();
-
+  Type contextualType;
+  auto contextualPurpose = CTP_Unused;
+  if (pattern->hasType()) {
+    contextualType = pattern->getType();
+    contextualPurpose = CTP_Initialization;
+  }
+    
   // Type-check the initializer.
   bool hadError =typeCheckExpression(initializer, DC, contextualType,
+                                     contextualPurpose,
                                      TypeCheckExprFlags::ConvertTypeIsOnlyAHint,
                                      &listener);
 
@@ -1573,7 +1584,7 @@ bool TypeChecker::typeCheckForEachBinding(DeclContext *dc, ForEachStmt *stmt) {
   assert(seq && "type-checking an uninitialized for-each statement?");
 
   // Type-check the for-each loop sequence and element pattern.
-  return typeCheckExpression(seq, dc, Type(), TypeCheckExprFlags(), &listener);
+  return typeCheckExpression(seq, dc, &listener);
 }
 
 /// \brief Compute the rvalue type of the given expression, which is the
@@ -1635,9 +1646,8 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
       auto &tc = cs.getTypeChecker();
       auto logicValueProto = tc.getProtocol(expr->getLoc(),
                                             KnownProtocolKind::BooleanType);
-      if (!logicValueProto) {
+      if (!logicValueProto)
         return true;
-      }
 
       auto logicValueType = logicValueProto->getDeclaredType();
 
@@ -1660,7 +1670,7 @@ bool TypeChecker::typeCheckCondition(Expr *&expr, DeclContext *dc) {
   };
 
   ConditionListener listener;
-  return typeCheckExpression(expr, dc, Type(), TypeCheckExprFlags(), &listener);
+  return typeCheckExpression(expr, dc, &listener);
 }
 
 bool TypeChecker::typeCheckStmtCondition(StmtCondition &cond, DeclContext *dc,
