@@ -194,6 +194,9 @@ import SwiftPrivate
 import Darwin
 import Dispatch
 
+// FIXME: port to Linux.
+// XFAIL: linux
+
 // A wrapper for pthread_t with platform-independent interface.
 public struct _stdlib_pthread_t : Equatable, Hashable {
   internal let _value: pthread_t
