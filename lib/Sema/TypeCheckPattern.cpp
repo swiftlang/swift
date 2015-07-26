@@ -1112,16 +1112,8 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
         elt.setPattern(pattern);
 
       // Type-check the initialization expression.
-      if (ExprHandle *initHandle = elt.getInit()) {
-        Expr *init = initHandle->getExpr();
-        if (initHandle->alreadyChecked()) {
-          // Nothing to do
-        } else if (typeCheckExpression(init, dc, CoercionType)) {
-          initHandle->setExpr(initHandle->getExpr(), true);
-        } else {
-          initHandle->setExpr(init, true);
-        }
-      }
+      assert(elt.getInit() &&
+             "Tuples cannot have default values, only parameters");
     }
 
     // For Swift 2.0, we ban single-element tuple patterns that have labels.
