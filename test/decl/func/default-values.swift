@@ -96,7 +96,7 @@ func defaultArgTuplesNotMaterializable(x: Int, y: Int = 0) {}
 
 defaultArgTuplesNotMaterializable(identity(5))
 defaultArgTuplesNotMaterializable(identity((5, y: 10)))
-// expected-error@-1 {{'Int2048' is not convertible to 'IntegerLiteralConvertible'}}
+// expected-error@-1 {{type 'Int2048' does not conform to protocol 'IntegerLiteralConvertible'}}
 
 
 // rdar://problem/21799331

@@ -21,8 +21,8 @@ let total = 15.0
 let count = 7
 let median = total / count // expected-error {{binary operator '/' cannot be applied to operands of type 'Double' and 'Int'}} expected-note {{overloads for '/' exist with these partially matching parameter lists: (Int, Int), (Double, Double)}}
 
-if (1) {} // expected-error{{'Int' is not convertible to 'BooleanType'}}
-if 1 {} // expected-error {{'Int' is not convertible to 'BooleanType'}}
+if (1) {} // expected-error{{type 'Int' does not conform to protocol 'BooleanType'}}
+if 1 {} // expected-error {{type 'Int' does not conform to protocol 'BooleanType'}}
 
 var a: [String] = [1] // expected-error{{'[Int]' is not convertible to '[String]'}}
 var b: Int = [1, 2, 3] // expected-error{{'[Int]' is not convertible to 'Int'}}

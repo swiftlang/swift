@@ -691,7 +691,7 @@ func testParenExprInTheWay() {
   // expected-note @-1 {{expected an argument list of type '(Int, Int)'}}
 
   
-  if x & x {} // expected-error {{'Int' is not convertible to 'BooleanType'}}
+  if x & x {} // expected-error {{type 'Int' does not conform to protocol 'BooleanType'}}
 }
 
 // <rdar://problem/21352576> Mixed method/property overload groups can cause a crash during constraint optimization

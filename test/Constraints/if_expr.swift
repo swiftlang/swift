@@ -62,5 +62,8 @@ useD2(i) // expected-error{{cannot invoke 'useD2' with an argument list of type 
 // expected-note @-1 {{expected an argument list of type '(D2)'}}
 
 var x = MyLogicValue() ? 1 : 0
-// FIXME: Not correct, this is a problem with the condition!
-var y = 22 ? 1 : 0 // expected-error{{result values in '? :' expression have mismatching types 'Int' and 'Int'}}
+var y = 22 ? 1 : 0 // expected-error{{type 'Int' does not conform to protocol 'BooleanType'}}
+
+_ = x ? x : x // expected-error {{type 'Int' does not conform to protocol 'BooleanType'}}
+_ = true ? x : 1.2 // expected-error {{result values in '? :' expression have mismatching types 'Int' and 'Double'}}
+

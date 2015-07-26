@@ -398,6 +398,25 @@ void constraints::simplifyLocator(Expr *&anchor,
       }
       break;
         
+    case ConstraintLocator::IfThen:
+      if (auto ITE = dyn_cast<IfExpr>(anchor)) {
+        targetAnchor = nullptr;
+        targetPath.clear();
+        anchor = ITE->getThenExpr();
+        path = path.slice(1);
+        continue;
+      }
+      break;
+    case ConstraintLocator::IfElse:
+      if (auto ITE = dyn_cast<IfExpr>(anchor)) {
+        targetAnchor = nullptr;
+        targetPath.clear();
+        anchor = ITE->getElseExpr();
+        path = path.slice(1);
+        continue;
+      }
+      break;
+        
     default:
       // FIXME: Lots of other cases to handle.
       break;
@@ -2397,8 +2416,28 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure() {
     return true;
   }
   
+  auto failureKind = Failure::FailureKind::TypesNotConvertible;
+  switch (constraint->getKind()) {
+  case ConstraintKind::ConformsTo:
+  case ConstraintKind::SelfObjectOfProtocol:
+    diagnose(anchor->getLoc(), diag::type_does_not_conform,
+             fromType, toType)
+      .highlight(expr->getSourceRange());
+      return true;
+      
+    case ConstraintKind::Subtype:
+      failureKind = Failure::FailureKind::TypesNotSubtypes;
+      break;
+    case ConstraintKind::Conversion:
+    case ConstraintKind::ExplicitConversion:
+      failureKind = Failure::FailureKind::TypesNotConvertible;
+      break;
+    case ConstraintKind::ArgumentTupleConversion:
+    default: break;
+  }
+  
   diagnose(anchor->getLoc(), diag::invalid_relation,
-           Failure::TypesNotConvertible - Failure::TypesNotEqual,
+           failureKind - Failure::TypesNotEqual,
            fromType, toType)
     .highlight(anchor->getSourceRange());
   
@@ -2517,7 +2556,8 @@ static void eraseTypeData(Expr *expr) {
       // and we don't want it to make
       //   Init.init(Init.init(<builtinliteral>))
       // preserve the type info to prevent this from happening.
-      if (isa<IntegerLiteralExpr>(expr) || isa<FloatLiteralExpr>(expr))
+      if (isa<IntegerLiteralExpr>(expr) || isa<FloatLiteralExpr>(expr) ||
+          isa<BooleanLiteralExpr>(expr))
         if (expr->getType()->is<BuiltinType>())
           return { false, expr };
       
@@ -2779,10 +2819,28 @@ bool FailureDiagnosis::diagnoseContextualConversionError(Type exprType) {
     }
     return true;
   }
+  
+  
+  // If the destination type is a protocol, then use conformsToProtocol to
+  // produce a more specific diagnostic.
+  if (auto *PT = contextualType->getAs<ProtocolType>()) {
+    if (!CS->TC.conformsToProtocol(exprType, PT->getDecl(), CS->DC,
+                                   ConformanceCheckFlags::InExpression,
+                                   nullptr, expr->getLoc()))
+      return true;
+  }
+  
 
   auto failureKind = Failure::FailureKind::TypesNotConvertible;
   if (foundConstraint) {
     switch (foundConstraint->getKind()) {
+    case ConstraintKind::ConformsTo:
+    case ConstraintKind::SelfObjectOfProtocol:
+      diagnose(expr->getLoc(), diag::type_does_not_conform,
+               exprType, contextualType)
+        .highlight(expr->getSourceRange());
+      return true;
+        
     case ConstraintKind::Subtype:
       failureKind = Failure::FailureKind::TypesNotSubtypes;
       break;
@@ -2791,8 +2849,6 @@ bool FailureDiagnosis::diagnoseContextualConversionError(Type exprType) {
       failureKind = Failure::FailureKind::TypesNotConvertible;
       break;
     case ConstraintKind::ArgumentTupleConversion:
-    case ConstraintKind::ConformsTo:
-    case ConstraintKind::SelfObjectOfProtocol:
     default: break;
     }
   }
@@ -3315,22 +3371,26 @@ bool FailureDiagnosis::visitBindOptionalExpr(BindOptionalExpr *BOE) {
 }
 
 bool FailureDiagnosis::visitIfExpr(IfExpr *IE) {
-  // If type checking of the IfExpr failed, but each of the subexprs got their
-  // own concrete types, then either the condition wasn't a boolean type, or
-  // the true/false arms didn't match.  If the condition wasn't of boolean type,
-  // we should have seen this already as an unavoidable failure.  That means
-  // that the only reason we could be here is because of a true/false arm
-  // mismatch.
-  if (!typeCheckChildIndependently(IE->getCondExpr()))
-    return true;
-
+  // Check all of the subexpressions independently.
+  auto condExpr = typeCheckChildIndependently(IE->getCondExpr());
+  if (!condExpr) return true;
   auto trueExpr = typeCheckChildIndependently(IE->getThenExpr());
   if (!trueExpr) return true;
 
   auto falseExpr = typeCheckChildIndependently(IE->getElseExpr());
   if (!falseExpr) return true;
 
+  // If the condition wasn't of boolean type, diagnose the problem.
+  auto booleanType = CS->TC.getProtocol(IE->getQuestionLoc(),
+                                        KnownProtocolKind::BooleanType);
+  if (!booleanType) return true;
   
+  if (!CS->TC.conformsToProtocol(condExpr->getType(), booleanType, CS->DC,
+                                 ConformanceCheckFlags::InExpression,
+                                 nullptr, condExpr->getLoc()))
+    return true;
+  
+  // Otherwise, the true/false result types must not be matching.
   diagnose(IE->getColonLoc(), diag::if_expr_cases_mismatch,
            trueExpr->getType(), falseExpr->getType())
     .highlight(trueExpr->getSourceRange())
