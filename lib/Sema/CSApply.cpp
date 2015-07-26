@@ -5808,7 +5808,7 @@ namespace {
 /// \brief Apply a given solution to the expression, producing a fully
 /// type-checked expression.
 Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
-                                      Type contextualType,
+                                      Type convertType,
                                       bool discardedExpr,
                                       bool suppressDiagnostics) {
   // If any fixes needed to be applied to arrive at this solution, resolve
@@ -6179,8 +6179,8 @@ Expr *ConstraintSystem::applySolution(Solution &solution, Expr *expr,
 
   // If we're supposed to convert the expression to some particular type,
   // do so now.
-  if (contextualType) {
-    result = rewriter.coerceToType(result, contextualType,
+  if (convertType) {
+    result = rewriter.coerceToType(result, convertType,
                                    getConstraintLocator(expr));
     if (!result)
       return nullptr;

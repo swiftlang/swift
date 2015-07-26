@@ -522,7 +522,7 @@ public:
       TC.typeCheckDecl(D, /*isFirstPass*/false);
 
     if (auto *Initializer = FS->getInitializer().getPtrOrNull()) {
-      if (TC.typeCheckExpression(Initializer, DC, Type(), Type(),
+      if (TC.typeCheckExpression(Initializer, DC, Type(),
                                  TypeCheckExprFlags::IsDiscarded))
         return nullptr;
       FS->setInitializer(Initializer);
@@ -535,7 +535,7 @@ public:
     }
 
     if (auto *Increment = FS->getIncrement().getPtrOrNull()) {
-      if (TC.typeCheckExpression(Increment, DC, Type(), Type(),
+      if (TC.typeCheckExpression(Increment, DC, Type(),
                                  TypeCheckExprFlags::IsDiscarded))
         return nullptr;
       FS->setIncrement(Increment);
@@ -1064,7 +1064,7 @@ Stmt *StmtChecker::visitBraceStmt(BraceStmt *BS) {
         && !TC.Context.LangOpts.DebuggerSupport;
       if (isDiscarded) options = TypeCheckExprFlags::IsDiscarded;
       
-      if (TC.typeCheckExpression(SubExpr, DC, Type(), Type(), options)) {
+      if (TC.typeCheckExpression(SubExpr, DC, Type(), options)) {
         elem = SubExpr;
         continue;
       }
@@ -1236,7 +1236,7 @@ Expr* TypeChecker::constructCallToSuperInit(ConstructorDecl *ctor,
                                       /*Implicit=*/true);
   r = new (Context) CallExpr(r, args, /*Implicit=*/true);
 
-  if (typeCheckExpression(r, ctor, Type(), Type(),
+  if (typeCheckExpression(r, ctor, Type(),
                           TypeCheckExprFlags::IsDiscarded | 
                           TypeCheckExprFlags::SuppressDiagnostics))
     return nullptr;

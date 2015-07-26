@@ -2363,11 +2363,10 @@ public:
   /// \brief Apply a given solution to the expression, producing a fully
   /// type-checked expression.
   ///
-  /// \param contextualType the contextual type to which the
+  /// \param convertType the contextual type to which the
   /// expression should be converted, if any.
   Expr *applySolution(Solution &solution, Expr *expr,
-                      Type contextualType,
-                      bool discardedExpr,
+                      Type convertType, bool discardedExpr,
                       bool suppressDiagnostics);
 
   /// \brief Apply a given solution to the expression to the top-level

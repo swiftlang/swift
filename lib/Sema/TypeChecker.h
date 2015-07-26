@@ -154,7 +154,13 @@ enum class TypeCheckExprFlags {
   /// not all type variables have been determined.  In this case, the constraint
   /// system is not applied to the expression AST, but the ConstraintSystem is
   /// left in-tact.
-  AllowUnresolvedTypeVariables = 0x08
+  AllowUnresolvedTypeVariables = 0x08,
+  
+  /// If set, the 'convertType' specified to typeCheckExpression should not
+  /// produce a conversion constraint, but it should be used to guide the
+  /// solution in terms of performance optimizations of the solver, and in terms
+  /// of guiding diagnostics.
+  ConvertTypeIsOnlyAHint = 0x10
 };
   
 typedef OptionSet<TypeCheckExprFlags> TypeCheckExprOptions;
@@ -960,7 +966,6 @@ public:
   ///
   /// \see typeCheckExpression
   bool solveForExpression(Expr *&expr, DeclContext *dc, Type convertType,
-                          Type contextualType,
                           FreeTypeVariableBinding allowFreeTypeVariables,
                           ExprTypeCheckListener *listener,
                           constraints::ConstraintSystem &cs,
@@ -994,12 +999,9 @@ public:
   /// place.
   ///
   /// \param convertType The type that the expression is being converted to,
-  /// or null if the expression is standalone.
-  ///
-  /// \param contextualType Contextual type information that can be applied to
-  /// the expression. (This is distinct from convertType in that while it can
-  /// inform the type of the expression, it won't result in a conversion
-  /// constraint being applied to the expression.)
+  /// or null if the expression is standalone.  If the 'ConvertTypeIsOnlyAHint'
+  /// option is specified, then this is only a hint, it doesn't produce a full
+  /// conversion constraint.
   ///
   /// \param options Options that control how type checking is performed.
   ///
@@ -1010,7 +1012,6 @@ public:
   /// \returns true if an error occurred, false otherwise.
   bool typeCheckExpression(Expr *&expr, DeclContext *dc,
                            Type convertType = Type(),
-                           Type contextualType = Type(),
                            TypeCheckExprOptions options =TypeCheckExprOptions(),
                            ExprTypeCheckListener *listener = nullptr);
 
@@ -1022,11 +1023,6 @@ public:
   /// \param convertType The type that the expression is being converted to,
   /// or null if the expression is standalone.
   ///
-  /// \param contextualType Contextual type information that can be applied to
-  /// the expression. (This is distinct from convertType in that while it can
-  /// inform the type of the expression, it won't result in a conversion
-  /// constraint being applied to the expression.)
-  ///
   /// \param allowFreeTypeVariables Whether free type variables are allowed in
   /// the solution, and what to do with them.
   ///
@@ -1037,7 +1033,7 @@ public:
   /// \returns the type of \p expr on success, None otherwise.
   /// FIXME: expr may still be modified...
   Optional<Type> getTypeOfExpressionWithoutApplying(
-      Expr *&expr, DeclContext *dc, Type convertType, Type contextualType,
+      Expr *&expr, DeclContext *dc, Type convertType,
       FreeTypeVariableBinding allowFreeTypeVariables =
                               FreeTypeVariableBinding::Disallow,
       ExprTypeCheckListener *listener = nullptr);

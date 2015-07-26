@@ -2658,7 +2658,7 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr,
     TCEOptions |= TypeCheckExprFlags::AllowUnresolvedTypeVariables;
 
   bool hadError = CS->TC.typeCheckExpression(subExpr, CS->DC, conversionType,
-                                             Type(), TCEOptions);
+                                             TCEOptions);
 
   // This is a terrible hack to get around the fact that typeCheckExpression()
   // might change subExpr to point to a new OpenExistentialExpr. In that case,
