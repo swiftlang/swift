@@ -25,7 +25,7 @@ class D : B {
   }
 
   init(h:Int) {
-    var y : B = super.init() // expected-error{{'()' is not convertible to 'B'}}
+    var _ : B = super.init() // expected-error{{'()' is not convertible to 'B'}}
   }
 
   init(d:Double) {

@@ -221,7 +221,8 @@ struct SubscriptTest1 {
 
 func testSubscript1(s1 : SubscriptTest1) {
   // FIXME: This is an overload ambiguity, Bool is just one choice.
-  let _ : Int = s1["hello"]  // expected-error {{'Bool' is not convertible to 'Int'}}
+  let _ : Int = s1["hello"]  // expected-error {{multiple candidates fail to match based on result type}}
+  // expected-note @-1 {{expected an argument list of type '(String)'}}
   
   // FIXME: This is a bug, it should not be ambiguous. rdar://18741539
   if s1["hello"] {}  // expected-error {{multiple candidates fail to match based on result type}}

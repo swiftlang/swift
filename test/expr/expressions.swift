@@ -139,7 +139,7 @@ acceptsInt(unknown_var) // expected-error {{use of unresolved identifier 'unknow
 
 
 // FIXME: Bogus error
-var test1a: (Int) -> (Int) -> Int = { { $0 } } // expected-error{{'Int' is not a subtype of '()'}}
+var test1a: (Int) -> (Int) -> Int = { { $0 } } // expected-error{{type of expression is ambiguous without more context}}
 var test1b = { 42 }
 var test1c = { { 42 } }
 var test1d = { { { 42 } } }
@@ -162,7 +162,7 @@ func test4() -> ((arg1: Int, arg2: Int) -> Int) {
 func test5() {
   let a: (Int, Int) = (1,2)
   var
-     _: ((Int) -> Int, Int) = a  // expected-error {{'Int' is not convertible to '(Int) -> Int'}}
+     _: ((Int) -> Int, Int) = a  // expected-error {{'(Int, Int)' is not convertible to '((Int) -> Int, Int)' (aka '(Int -> Int, Int)')}}
 
 
   let c: (a: Int, b: Int) = (1,2)
@@ -585,7 +585,8 @@ func test() {
   var x = Foo()
 
   // rdar://15708430
-  (&x).method()  // expected-error {{'inout Foo' is not identical to 'Foo'}}
+  (&x).method()  // expected-error {{'Foo' is not convertible to 'Foo'}}
+  // expected-error @-1 {{reference to 'Foo' not used to initialize a inout parameter}}
 }
 
 

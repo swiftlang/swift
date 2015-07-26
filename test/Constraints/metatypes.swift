@@ -5,7 +5,7 @@ class B : A {}
 
 let test0 : A.Type = A.self
 let test1 : A.Type = B.self
-let test2 : B.Type = A.self // expected-error {{'A' is not a subtype of 'B'}}
+let test2 : B.Type = A.self // expected-error {{'A.Type' is not convertible to 'B.Type'}}
 let test3 : AnyClass = A.self
 let test4 : AnyClass = B.self
 

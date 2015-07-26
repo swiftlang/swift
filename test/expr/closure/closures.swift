@@ -69,7 +69,7 @@ func funcdecl5(a: Int, _ y: Int) {
   var fn2 = { 4 }
   
   
-  var c : Int = { a,b-> Int in a+b} // expected-error{{'(_, _) -> Int' is not convertible to 'Int'}}
+  var c : Int = { a,b-> Int in a+b} // expected-error{{'(Int, Int) -> Int' is not convertible to 'Int'}}
   
   
 }

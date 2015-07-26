@@ -72,13 +72,13 @@ func testForcedDowncastBridge() {
 
   setR as! Set<BridgedToObjC>
   setO as! Set<BridgedToObjC>
-  setD as! Set<BridgedToObjC> // expected-error {{'ObjC' is not a subtype of 'DerivesObjC'}}
+  setD as! Set<BridgedToObjC> // expected-error {{'Set<DerivesObjC>' is not convertible to 'Set<BridgedToObjC>'}}
 
   // TODO: the diagnostic for the below two examples should indicate that 'as'
   // should be used instead of 'as!'
-  setB as! Set<Root> // expected-error {{'Root' is not a subtype of 'BridgedToObjC'}}
-  setB as! Set<ObjC> // expected-error {{'ObjC' is not a subtype of 'BridgedToObjC'}}
-  setB as! Set<DerivesObjC> // expected-error {{'DerivesObjC' is not a subtype of 'BridgedToObjC'}}
+  setB as! Set<Root> // expected-error {{'Set<BridgedToObjC>' is not convertible to 'Set<Root>'}}
+  setB as! Set<ObjC> // expected-error {{'Set<BridgedToObjC>' is not convertible to 'Set<ObjC>'}}
+  setB as! Set<DerivesObjC> // expected-error {{'Set<BridgedToObjC>' is not convertible to 'Set<DerivesObjC>'}}
 }
 
 func testConditionalDowncastBridge() {
@@ -89,11 +89,11 @@ func testConditionalDowncastBridge() {
 
   if let s = setR as? Set<BridgedToObjC> { }
   if let s = setO as? Set<BridgedToObjC> { }
-  if let s = setD as? Set<BridgedToObjC> { } // expected-error {{'ObjC' is not a subtype of 'DerivesObjC'}}
+  if let s = setD as? Set<BridgedToObjC> { } // expected-error {{'Set<DerivesObjC>' is not convertible to 'DerivesObjC'}}
 
-  if let s = setB as? Set<Root> { } // expected-error {{'Root' is not a subtype of 'BridgedToObjC'}}
-  if let s = setB as? Set<ObjC> { } // expected-error {{'ObjC' is not a subtype of 'BridgedToObjC'}}
-  if let s = setB as? Set<DerivesObjC> { } // expected-error {{'DerivesObjC' is not a subtype of 'BridgedToObjC'}}
+  if let s = setB as? Set<Root> { } // expected-error {{'Set<BridgedToObjC>' is not convertible to 'BridgedToObjC'}}
+  if let s = setB as? Set<ObjC> { } // expected-error {{'Set<BridgedToObjC>' is not convertible to 'BridgedToObjC'}}
+  if let s = setB as? Set<DerivesObjC> { } // expected-error {{'Set<BridgedToObjC>' is not convertible to 'BridgedToObjC'}}
 }
 
 

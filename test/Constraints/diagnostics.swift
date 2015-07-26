@@ -404,7 +404,7 @@ var afterMessageCount : Int? = nil
 func uintFunc() -> UInt {}
 func takeVoidVoidFn(a : () -> ()) {}
 takeVoidVoidFn { () -> Void in
-  afterMessageCount = uintFunc()  // expected-error {{'UInt' is not convertible to 'Int'}}
+  afterMessageCount = uintFunc()  // expected-error {{cannot assign a value of type 'UInt' to a value of type 'Int?'}}
 }
 
 // <rdar://problem/19997471> Swift: Incorrect compile error when calling a function inside a closure
@@ -451,7 +451,7 @@ zip(numbers, numbers).filter { $0.1 > 1 && $0.2 > 1 }  // expected-error {{type 
 func foo20868864(callback: ([String]) -> ()) { }
 func rdar20868864(var s: String) {
   foo20868864 { (strings: [String]) in
-    s = strings   // expected-error {{'[String]' is not convertible to 'String'}}
+    s = strings   // expected-error {{cannot assign a value of type '[String]' to a value of type 'String'}}
   }
 }
 

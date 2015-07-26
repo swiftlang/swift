@@ -39,7 +39,7 @@ dictCC as Dictionary<U, D> // expected-error{{'Dictionary<C, C>' is not converti
 dictCC as Dictionary<U, U> // expected-error{{'Dictionary<C, C>' is not convertible to 'Dictionary<U, U>'}}
 
 // Test dictionary conditional downcasts to unrelated types
-if let dictDU = dictCC as? Dictionary<D, U> { } // expected-error{{'U' is not a subtype of 'C'}}
-if let dictUD = dictCC as? Dictionary<U, D> { } // expected-error{{'U' is not a subtype of 'C'}}
-if let dictUU = dictCC as? Dictionary<U, U> { } // expected-error{{'U' is not a subtype of 'C'}}
+if let dictDU = dictCC as? Dictionary<D, U> { } // expected-error{{'Dictionary<C, C>' is not convertible to 'Dictionary<D, U>'}}
+if let dictUD = dictCC as? Dictionary<U, D> { } // expected-error{{'Dictionary<C, C>' is not convertible to 'Dictionary<U, D>'}}
+if let dictUU = dictCC as? Dictionary<U, U> { } // expected-error{{'Dictionary<C, C>' is not convertible to 'Dictionary<U, U>'}}
 

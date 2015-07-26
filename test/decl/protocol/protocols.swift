@@ -179,7 +179,7 @@ extension IntGeneratorType : SequenceViaStream {
 }
 
 struct NotSequence : SequenceViaStream { // expected-error{{type 'NotSequence' does not conform to protocol 'SequenceViaStream'}}
-  typealias SequenceStreamTypeType = Int // expected-note{{possibly intended match 'SequenceStreamTypeType' does not conform to 'GeneratorType'}}
+  typealias SequenceStreamTypeType = Int // expected-note{{possibly intended match 'SequenceStreamTypeType' (aka 'Int') does not conform to 'GeneratorType'}}
   func generate() -> Int {}
 }
 
@@ -244,8 +244,7 @@ struct WrongIsEqual : IsEqualComparable { // expected-error{{type 'WrongIsEqual'
 //===----------------------------------------------------------------------===//
 
 func existentialSequence(e: SequenceType) { // expected-error{{has Self or associated type requirements}}
-  // FIXME: Need a more specific diagnostic here.
-  var x = e.generate() // expected-error{{'SequenceType' does not have a member named 'generate'}}
+  var x = e.generate() // expected-error{{'SequenceType' is not convertible to 'GeneratorType'}}
   x.next()
   x.nonexistent()
 }

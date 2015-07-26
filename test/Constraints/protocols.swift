@@ -88,7 +88,7 @@ let _: () -> Any = {  // expected-error {{function signature '() -> Int' is not 
   return 0
 }
 
-let _: () -> Int = { // expected-error {{'String' is not a subtype of 'Int'}}
+let _: () -> Int = { // expected-error {{'() -> String' is not convertible to '() -> Int'}}
   () -> String in
   return ""
 }

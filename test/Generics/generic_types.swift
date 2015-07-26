@@ -185,7 +185,7 @@ func useNested(ii: Int, hni: HasNested<Int>,
   typealias InnerI = HasNested<Int>.Inner
   var innerI = InnerI(5)
   typealias InnerF = HasNested<Float>.Inner
-  var innerF : InnerF = innerI // expected-error{{'Int' is not identical to 'Float'}}
+  var innerF : InnerF = innerI // expected-error{{'InnerI' (aka 'HasNested<Int>.Inner') is not convertible to 'InnerF' (aka 'HasNested<Float>.Inner')}}
 
   innerI.identity(i)
   i = innerI.identity(i)

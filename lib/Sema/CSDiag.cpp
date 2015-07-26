@@ -13,7 +13,10 @@
 // This file implements diagnostics for the type checker.
 //
 //===----------------------------------------------------------------------===//
+
 #include "ConstraintSystem.h"
+#include "llvm/Support/SaveAndRestore.h"
+
 using namespace swift;
 using namespace constraints;
 
@@ -730,45 +733,8 @@ static bool diagnoseFailure(ConstraintSystem &cs,
   case Failure::TypesNotEqual:
   case Failure::TypesNotSubtypes:
   case Failure::TypesNotConstructible:
-  case Failure::FunctionTypesMismatch: {
-    // If this is conversion failure due to a return statement with an argument
-    // that cannot be coerced to the result type of the function, emit a
-    // specific error.
-    if (expr->isReturnExpr() &&
-        expr->getValueProvidingExpr() == anchor) {
-      auto actualType = cs.simplifyType(expr->getType())->getRValueType();
-      auto expectedType =
-        AnyFunctionRef::fromFunctionDeclContext(cs.DC).getBodyResultType();
-
-      if (expectedType->isVoid()) {
-        tc.diagnose(loc, diag::cannot_return_value_from_void_func)
-          .highlight(range1).highlight(range2);
-      } else {
-        tc.diagnose(loc, diag::cannot_convert_to_return_type,
-                    actualType, expectedType)
-          .highlight(range1).highlight(range2);
-      }
-      
-      if (targetLocator && !useExprLoc)
-        noteTargetOfDiagnostic(cs, failure, targetLocator);
-      return true;
-    }
-    
-    // We can do a better job of diagnosing application argument conversion
-    // failures elsewhere.
-    if (isa<ApplyExpr>(expr) ||
-        isa<InOutExpr>(expr) ||
-        isa<AssignExpr>(expr))
-      return false;
-
-    tc.diagnose(loc, diag::invalid_relation,
-                failure.getKind() - Failure::TypesNotEqual,
-                failure.getFirstType(), failure.getSecondType())
-      .highlight(range1).highlight(range2);
-    if (targetLocator && !useExprLoc)
-      noteTargetOfDiagnostic(cs, failure, targetLocator);
-    return true;
-  }
+  case Failure::FunctionTypesMismatch:
+    return false;
 
   case Failure::DoesNotHaveMember:
   case Failure::DoesNotHaveNonMutatingMember: {
@@ -1760,6 +1726,17 @@ void CalleeCandidateInfo::collectCalleeCandidates(Expr *fn) {
     return;
   }
 
+  if (auto declRefExpr = dyn_cast<OtherConstructorDeclRefExpr>(fn)) {
+    auto decl = declRefExpr->getDecl();
+    candidates.push_back({ decl, 0 });
+    
+    if (auto fTy = decl->getType()->getAs<AnyFunctionType>())
+      declName = fTy->getInput()->getRValueInstanceType()->getString()+".init";
+    else
+      declName = "init";
+    return;
+  }
+
   if (auto overloadedDRE = dyn_cast<OverloadedDeclRefExpr>(fn)) {
     for (auto cand : overloadedDRE->getDecls()) {
       candidates.push_back({ cand, 0 });
@@ -2529,6 +2506,11 @@ static void eraseTypeData(Expr *expr) {
         if (isa<ModuleDecl>(declRef->getDecl()))
           return { false, expr };
       
+      // Don't strip type info off OtherConstructorDeclRefExpr, because CSGen
+      // doesn't know how to reconstruct it.
+      if (isa<OtherConstructorDeclRefExpr>(expr))
+        return { false, expr };
+      
       // If a literal has a Builtin.Int or Builtin.FP type on it already,
       // then sema has already expanded out a call to
       //   Init.init(<builtinliteral>)
@@ -2674,10 +2656,17 @@ typeCheckArbitrarySubExprIndependently(Expr *subExpr, Type conversionType,
   // Construct a parent map for the expr tree we're investigating.
   auto parentMap = expr->getParentMap();
   
+  ClosureExpr *NearestClosure = nullptr;
+  
   // Walk the parents of the specified expression, handling any ClosureExprs.
-  for (Expr *node = parentMap[subExpr]; node != expr; node = parentMap[node]) {
+  for (Expr *node = parentMap[subExpr]; node && node != expr;
+       node = parentMap[node]) {
     auto *CE = dyn_cast<ClosureExpr>(node);
     if (!CE) continue;
+    
+    // Keep track of the innermost closure we see that we're jumping into.
+    if (!NearestClosure)
+      NearestClosure = CE;
     
     // If we have a ClosureExpr parent of the specified node, check to make sure
     // none of its arguments are type variables.  If so, these type variables
@@ -2688,6 +2677,12 @@ typeCheckArbitrarySubExprIndependently(Expr *subExpr, Type conversionType,
         VD->overwriteType(Type());
     });
   }
+
+  // When we're type checking a single-expression closure, we need to reset the
+  // DeclContext to this closure for the recursive type checking.  Otherwise,
+  // if there is a closure in the subexpression, we can violate invariants.
+  auto newDC = NearestClosure ? NearestClosure : CS->DC;
+  llvm::SaveAndRestore<DeclContext*> SavedDC(CS->DC, newDC);
   
   // Otherwise, we're ok to type check the subexpr.
   return typeCheckChildIndependently(subExpr, conversionType, options);
@@ -2785,13 +2780,28 @@ bool FailureDiagnosis::diagnoseContextualConversionError(Type exprType) {
     return true;
   }
 
-  
+  auto failureKind = Failure::FailureKind::TypesNotConvertible;
+  if (foundConstraint) {
+    switch (foundConstraint->getKind()) {
+    case ConstraintKind::Subtype:
+      failureKind = Failure::FailureKind::TypesNotSubtypes;
+      break;
+    case ConstraintKind::Conversion:
+    case ConstraintKind::ExplicitConversion:
+      failureKind = Failure::FailureKind::TypesNotConvertible;
+      break;
+    case ConstraintKind::ArgumentTupleConversion:
+    case ConstraintKind::ConformsTo:
+    case ConstraintKind::SelfObjectOfProtocol:
+    default: break;
+    }
+  }
+
   diagnose(expr->getLoc(), diag::invalid_relation,
-           Failure::FailureKind::TypesNotConvertible -
-                      Failure::FailureKind::TypesNotEqual,
+           failureKind - Failure::FailureKind::TypesNotEqual,
            exprType, contextualType)
     .highlight(expr->getSourceRange());
-  
+
   return true;
 }
 
@@ -3338,6 +3348,10 @@ visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *E) {
 
 
 bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
+  // If this is a complex leaf closure, give up.
+  if (!CE->hasSingleExpressionBody())
+    return diagnoseGeneralFailure();
+  
   // ClosureExprs are likely to get some clever handling in the future, but for
   // now we need to defend against type variables from our constraint system
   // leaking into recursive constraints systems formed when checking the body
@@ -3354,7 +3368,17 @@ bool FailureDiagnosis::visitClosureExpr(ClosureExpr *CE) {
       VD->overwriteType(Type());
   });
   
-  return visitExpr(CE);
+  // When we're type checking a single-expression closure, we need to reset the
+  // DeclContext to this closure for the recursive type checking.  Otherwise,
+  // if there is a closure in the subexpression, we can violate invariants.
+  {
+    llvm::SaveAndRestore<DeclContext*> SavedDC(CS->DC, CE);
+    if (!typeCheckChildIndependently(CE->getSingleExpressionBody()))
+      return true;
+  }
+  
+  // Otherwise, produce a generic error.
+  return diagnoseGeneralFailure();
 }
 
 bool FailureDiagnosis::visitExpr(Expr *E) {

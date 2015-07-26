@@ -173,23 +173,23 @@ let rdar16666631 = RDar16666631(i: 5, d: 6) // expected-error {{missing argument
 
 struct S {
   init() {
-    let x = S.init() // expected-warning{{}}
+    let _ = S.init()
     self.init()
-    let _ = self.init // expected-error{{}}
+    let _ = self.init // expected-error{{partial application of 'self.init' initializer delegation is not allowed}}
 
-    let z = self.init() // expected-warning{{}} expected-note{{}} expected-warning{{}}
+    let _ : () = self.init()
   }
 }
 
 class C {
-  convenience init() { // expected-note 11 {{}}
+  convenience init() { // expected-note 11 {{selected non-required initializer 'init()'}}
     self.init()
-    let x = self.init() // expected-warning{{}} expected-note{{}}
-    let y: C = self.init() // expected-error{{}}
-    let _: () -> C = self.init // expected-error{{}}
+    let _ = self.init()
+    let _: C = self.init() // expected-error{{'()' is not convertible to 'C'}}
+    let _: () -> C = self.init // expected-error{{partial application of 'self.init' initializer delegation is not allowed}}
   }
 
-  init(x: Int) {} // expected-note 11 {{}}
+  init(x: Int) {} // expected-note 11 {{selected non-required initializer 'init(x:)'}}
 
   required init(required: Double) {}
 }
@@ -197,16 +197,16 @@ class C {
 class D: C {
   override init(x: Int) {
     super.init(x: x)
-    let x = super.init() // expected-warning{{}} expected-note{{}}
-    let y: C = super.init() // expected-error{{}}
-    let _: () -> C = super.init // expected-error{{}}
+    let _ = super.init()
+    let _: C = super.init() // expected-error{{'()' is not convertible to 'C'}}
+    let _: () -> C = super.init // expected-error{{partial application of 'super.init' initializer chain is not allowed}}
   }
 
   func foo() {
-    self.init(x: 0) // expected-error{{}}
+    self.init(x: 0) // expected-error{{'init' is a member of the type; insert '.dynamicType' to initialize a new object of the same dynamic type}}
   }
   func bar() {
-    super.init(x: 0) // expected-error{{}}
+    super.init(x: 0) // expected-error{{'super.init' cannot be called outside of an initializer}}
   }
 
   class func zim() -> Self {
@@ -251,7 +251,7 @@ func init_tests() {
   var cs2a = C(x: 0)
   var cs3a = C()
 
-  var y = x.init() // expected-error{{}}
+  var y = x.init() // expected-error{{use of unresolved identifier 'x'}}
 }
 
 protocol P {
@@ -274,15 +274,15 @@ func foo<T: C where T: P>(x: T, y: T.Type) {
   var c3a = x.dynamicType.init() // expected-error{{'required' initializer}}
   var c4a = x.dynamicType.init(proto: "")
 
-  var ci1 = x.init(required: 0) // expected-error{{}}
-  var ci2 = x.init(x: 0) // expected-error{{}}
-  var ci3 = x.init() // expected-error{{}}
-  var ci4 = x.init(proto: "") // expected-error{{}}
+  var ci1 = x.init(required: 0) // expected-error{{'init' is a member of the type; insert '.dynamicType' to initialize a new object of the same dynamic type}}
+  var ci2 = x.init(x: 0) // expected-error{{'init' is a member of the type; insert '.dynamicType' to initialize a new object of the same dynamic type}}
+  var ci3 = x.init() // expected-error{{'init' is a member of the type; insert '.dynamicType' to initialize a new object of the same dynamic type}}
+  var ci4 = x.init(proto: "") // expected-error{{'init' is a member of the type; insert '.dynamicType' to initialize a new object of the same dynamic type}}
 
-  var ci1a = x(required: 0) // expected-error{{}}
-  var ci2a = x(x: 0) // expected-error{{}}
-  var ci3a = x() // expected-error{{}}
-  var ci4a = x(proto: "") // expected-error{{}}
+  var ci1a = x(required: 0) // expected-error{{cannot call value of non-function type 'T'}}
+  var ci2a = x(x: 0) // expected-error{{cannot call value of non-function type 'T'}}
+  var ci3a = x() // expected-error{{invalid use of '()' to call a value of non-function type 'T'}}
+  var ci4a = x(proto: "") // expected-error{{cannot call value of non-function type 'T'}}
 
   var cm1 = y.init(required: 0)
   var cm2 = y.init(x: 0) // expected-error{{'required' initializer}}
