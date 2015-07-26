@@ -1501,7 +1501,7 @@ namespace {
         // Is the array type a contextual type
         contextualArrayType = contextualType;
         contextualArrayElementType =
-            CS.getBaseTypeForArrayType(contextualType);
+            CS.getBaseTypeForArrayType(contextualType.getPointer());
         
         CS.addConstraint(ConstraintKind::ConformsTo, contextualType,
                          arrayProto->getDeclaredType(),
