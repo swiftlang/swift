@@ -1,8 +1,6 @@
 // RUN: rm -rf %t && mkdir -p %t && %S/../../utils/gyb %s -o %t/main.swift
 // RUN: %S/../../utils/line-directive %t/main.swift -- %target-swift-frontend -parse -verify %t/main.swift
 
-// Pending a fix for <rdar://problem/19434979>, remove exact diagnostic strings.
-
 func testUnaryMinusInUnsigned() {
   var a: UInt8 = -(1) // expected-error {{}} expected-note * {{}}
 
@@ -15,16 +13,16 @@ func testUnaryMinusInUnsigned() {
 
 // Int and UInt are not identical to any fixed-size integer type
 var i   :  Int   = 0
-var i64 :  Int64 = i // expected-error {{'Int' is not convertible to 'Int64'}}
-var i32 :  Int32 = i // expected-error {{'Int' is not convertible to 'Int32'}}
-var i16 :  Int16 = i // expected-error {{'Int' is not convertible to 'Int16'}}
-var i8  :  Int8  = i // expected-error {{'Int' is not convertible to 'Int8'}}
+var i64 :  Int64 = i // expected-error {{}}
+var i32 :  Int32 = i // expected-error {{}}
+var i16 :  Int16 = i // expected-error {{}}
+var i8  :  Int8  = i // expected-error {{}}
 
 var u   : UInt   = 0
-var u64 : UInt64 = u // expected-error {{'UInt' is not convertible to 'UInt64'}}
-var u32 : UInt32 = u // expected-error {{'UInt' is not convertible to 'UInt32'}}
-var u16 : UInt16 = u // expected-error {{'UInt' is not convertible to 'UInt16'}}
-var u8  : UInt8  = u // expected-error {{'UInt' is not convertible to 'UInt8'}}
+var u64 : UInt64 = u // expected-error {{}}
+var u32 : UInt32 = u // expected-error {{}}
+var u16 : UInt16 = u // expected-error {{}}
+var u8  : UInt8  = u // expected-error {{}}
 
 func expectSameType<T>(_: T.Type, _: T.Type) {}
 
@@ -87,28 +85,28 @@ func testMixedSignArithmetic() {
     typealias Stride = ${T}.Stride
     ${T}(1) + 0          // OK
     0 + ${T}(1)         // OK
-    ${T}(1) + Stride(0) // expected-error {{ambiguous use of operator '+'}}
-    Stride(1) + ${T}(0) // expected-error {{ambiguous use of operator '+'}}
-    ${T}(1) - Stride(0) // expected-error {{ambiguous use of operator '-'}}
+    ${T}(1) + Stride(0) // expected-error {{}} // ambiguous use of operator '+'
+    Stride(1) + ${T}(0) // expected-error {{}} // ambiguous use of operator '+'
+    ${T}(1) - Stride(0) // expected-error {{}} // ambiguous use of operator '-'
     var x: ${T} = 0
     x += 1              // OK
-    x += Stride(1)      // expected-error {{ambiguous use of operator '+='}}
-    x -= Stride(1)      // expected-error {{ambiguous use of operator '-='}}
+    x += Stride(1)      // expected-error {{}} // ambiguous use of operator '+='
+    x -= Stride(1)      // expected-error {{}} // ambiguous use of operator '-='
 
-    (x - x) as Stride   // expected-error {{ambiguous use of operator '-'}}
+    (x - x) as Stride   // expected-error {{}} // ambiguous use of operator '-'
 
     //===------------------------------------------------------------------===//
     // The following errors are different because they're not being
     // disabled by the ambiguity trick.
     //===------------------------------------------------------------------===//
 
-    (x + x) as Stride   // expected-error {{is not convertible to 'Stride'}}
-    Stride(1) - ${T}(0) // expected-error {{binary operator '-' cannot be applied to operands of type 'Stride' (aka 'Int') and '${T}'}} expected-note {{overloads for '-' exist with these partially matching parameter lists:}}
+    (x + x) as Stride   // expected-error {{}} // not convertible to 'Stride'
+    Stride(1) - ${T}(0) // expected-error {{}} expected-note {{}}
 
     // These tests are expected to start failing when we get improved diagnostics.
     var y: Stride = 0
-    y += ${T}(1)        // expected-error {{binary operator '+=' cannot be applied to operands of type 'Stride' (aka 'Int') and '${T}'}} expected-note {{expected an argument list of type}}
-    y -= ${T}(1)        // expected-error {{binary operator '-=' cannot be applied to operands of type 'Stride' (aka 'Int') and '${T}'}} expected-note {{expected an argument list of type}}
+    y += ${T}(1)        // expected-error {{}} expected-note {{}}
+    y -= ${T}(1)        // expected-error {{}} expected-note {{}}
   }
 % end
 }
