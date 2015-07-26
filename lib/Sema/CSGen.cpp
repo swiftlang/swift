@@ -2125,14 +2125,14 @@ namespace {
     Type visitIfExpr(IfExpr *expr) {
       // The conditional expression must conform to LogicValue.
       Expr *condExpr = expr->getCondExpr();
-      auto logicValue
+      auto booleanType
         = CS.getTypeChecker().getProtocol(expr->getQuestionLoc(),
                                           KnownProtocolKind::BooleanType);
-      if (!logicValue)
+      if (!booleanType)
         return Type();
 
       CS.addConstraint(ConstraintKind::ConformsTo, condExpr->getType(),
-                       logicValue->getDeclaredType(),
+                       booleanType->getDeclaredType(),
                        CS.getConstraintLocator(condExpr));
 
       // The branches must be convertible to a common type.
