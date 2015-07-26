@@ -88,7 +88,7 @@ let _: () -> Any = {  // expected-error {{function signature '() -> Int' is not 
   return 0
 }
 
-let _: () -> Int = { // expected-error {{'() -> String' is not convertible to '() -> Int'}}
+let _: () -> Int = { // expected-error {{cannot convert initializer of type '() -> String' to specified type '() -> Int'}}
   () -> String in
   return ""
 }

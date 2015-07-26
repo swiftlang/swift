@@ -2769,10 +2769,58 @@ bool FailureDiagnosis::diagnoseContextualConversionError(Type exprType) {
   // we can diagnose.
   if (exprType->is<TypeVariableType>())
     return false;
-
   
-  // Try to find the contextual type in a variety of ways.
-  Type contextualType = CS->getContextualType(expr);
+  // Try to find the contextual type in a variety of ways.  If the constraint
+  // system had a contextual type specified, we use it - it will have a purpose
+  // indicator which allows us to give a very "to the point" diagnostic.
+  if (Type contextualType = CS->getContextualType()) {
+    Diag<Type, Type> diagID;
+    
+    // If this is conversion failure due to a return statement with an argument
+    // that cannot be coerced to the result type of the function, emit a
+    // specific error.
+    switch (CS->getContextualTypePurpose()) {
+    case CTP_Unused:
+    case CTP_CannotFail:
+      assert(0 && "These contextual type purposes cannot fail with a "
+             "conversion type specified!");
+    case CTP_Initialization:
+      diagID = diag::cannot_convert_initializer_value;
+      break;
+    case CTP_ReturnStmt:
+      // Special case the "conversion to void" case.
+      if (contextualType->isVoid()) {
+        diagnose(expr->getLoc(), diag::cannot_return_value_from_void_func)
+          .highlight(expr->getSourceRange());
+        return true;
+      }
+
+      diagID = diag::cannot_convert_to_return_type;
+      break;
+    case CTP_ThrowStmt:
+      // The conversion destination of throw is always ErrorType (at the moment)
+      // if this ever expands, this should be a specific form like () is for
+      // return.
+      diagnose(expr->getLoc(), diag::cannot_convert_thrown_type, exprType)
+        .highlight(expr->getSourceRange());
+      return true;
+        
+    case CTP_EnumCaseRawValue:
+      diagID = diag::cannot_convert_raw_initializer_value;
+      break;
+    case CTP_DefaultParameter:
+      diagID = diag::cannot_convert_default_arg_value;
+      break;
+    }
+    
+    diagnose(expr->getLoc(), diagID, exprType, contextualType)
+      .highlight(expr->getSourceRange());
+    return true;
+  }
+  
+  
+  
+  
   
   Constraint *foundConstraint = nullptr;
   
@@ -2796,66 +2844,49 @@ bool FailureDiagnosis::diagnoseContextualConversionError(Type exprType) {
   };
 
   // Check the failed constraint, if present.
-  if (!contextualType) {
-    if (CS->failedConstraint)
-      checkConstraint(CS->failedConstraint);
+  if (CS->failedConstraint)
+    checkConstraint(CS->failedConstraint);
     
-    // Scan through all of the inactive constraints as well.
-    for (auto &constraint : CS->getConstraints())
-      checkConstraint(&constraint);
-  }
+  // Scan through all of the inactive constraints as well.
+  for (auto &constraint : CS->getConstraints())
+    checkConstraint(&constraint);
   
-  // If we found a conversion constraint, it provides the destination type.
-  if (foundConstraint) {
-    contextualType = foundConstraint->getSecondType();
-    
-    // The contextual type relates to the overall expression, but may be
-    // describing only part of the type.  Dive into the overall type to narrow
-    // it down based on the locator path.
-    for (auto &elt : foundConstraint->getLocator()->getPath()) {
-      switch (elt.getKind()) {
-      case ConstraintLocator::FunctionArgument:
-        if (auto FTy = exprType->getAs<AnyFunctionType>())
-          exprType = FTy->getInput();
-        else
-          return false;
-        break;
-      case ConstraintLocator::FunctionResult:
-        if (auto FTy = exprType->getAs<AnyFunctionType>())
-          exprType = FTy->getResult();
-        else
-          return false;
-        break;
-      default:
-        // Don't know how to process this path element yet.  Don't emit a
-        // warpo diagnostic.
+  // If we didn't find a conversion constraint, we have no type.
+  if (!foundConstraint)
+    return false;
+
+  Type contextualType = foundConstraint->getSecondType();
+  
+  // The contextual type relates to the overall expression, but may be
+  // describing only part of the type.  Dive into the overall type to narrow
+  // it down based on the locator path.
+  for (auto &elt : foundConstraint->getLocator()->getPath()) {
+    switch (elt.getKind()) {
+    case ConstraintLocator::FunctionArgument:
+      if (auto FTy = exprType->getAs<AnyFunctionType>())
+        exprType = FTy->getInput();
+      else
         return false;
-      }
+      break;
+    case ConstraintLocator::FunctionResult:
+      if (auto FTy = exprType->getAs<AnyFunctionType>())
+        exprType = FTy->getResult();
+      else
+        return false;
+      break;
+    default:
+      // Don't know how to process this path element yet.  Don't emit a
+      // warpo diagnostic.
+      return false;
     }
   }
 
-  if (!contextualType || typeIsNotSpecialized(contextualType))
-    return false;
-
+  // If we have a type that is the same as what we're looking for, we'd produce
+  // a "Int is not convertible to Int" diagnostic and look idiotic, so don't do
+  // that.
   if (exprType->isEqual(contextualType))
     return false;
-  
-  // If this is conversion failure due to a return statement with an argument
-  // that cannot be coerced to the result type of the function, emit a
-  // specific error.
-  if (CS->getContextualTypePurpose() == CTP_ReturnStmt) {
-    if (contextualType->isVoid()) {
-      diagnose(expr->getLoc(), diag::cannot_return_value_from_void_func)
-        .highlight(expr->getSourceRange());
-    } else {
-      diagnose(expr->getLoc(), diag::cannot_convert_to_return_type,
-               exprType, contextualType)
-        .highlight(expr->getSourceRange());
-    }
-    return true;
-  }
-  
-  
+
   // If the destination type is a protocol, then use conformsToProtocol to
   // produce a more specific diagnostic.
   if (auto *PT = contextualType->getAs<ProtocolType>()) {
@@ -2864,28 +2895,27 @@ bool FailureDiagnosis::diagnoseContextualConversionError(Type exprType) {
                                    nullptr, expr->getLoc()))
       return true;
   }
-  
 
-  auto failureKind = Failure::FailureKind::TypesNotConvertible;
-  if (foundConstraint) {
-    switch (foundConstraint->getKind()) {
-    case ConstraintKind::ConformsTo:
-    case ConstraintKind::SelfObjectOfProtocol:
-      diagnose(expr->getLoc(), diag::type_does_not_conform,
-               exprType, contextualType)
-        .highlight(expr->getSourceRange());
-      return true;
-        
-    case ConstraintKind::Subtype:
-      failureKind = Failure::FailureKind::TypesNotSubtypes;
-      break;
-    case ConstraintKind::Conversion:
-    case ConstraintKind::ExplicitConversion:
-      failureKind = Failure::FailureKind::TypesNotConvertible;
-      break;
-    case ConstraintKind::ArgumentTupleConversion:
-    default: break;
-    }
+  Failure::FailureKind failureKind;
+  switch (foundConstraint->getKind()) {
+  default: assert(0 && "This list out of sync with isConversionConstraint");
+  case ConstraintKind::ConformsTo:
+  case ConstraintKind::SelfObjectOfProtocol:
+    diagnose(expr->getLoc(), diag::type_does_not_conform,
+             exprType, contextualType)
+      .highlight(expr->getSourceRange());
+    return true;
+      
+  case ConstraintKind::Subtype:
+    failureKind = Failure::FailureKind::TypesNotSubtypes;
+    break;
+  case ConstraintKind::Conversion:
+  case ConstraintKind::ExplicitConversion:
+    failureKind = Failure::FailureKind::TypesNotConvertible;
+    break;
+  case ConstraintKind::ArgumentTupleConversion:
+    failureKind = Failure::FailureKind::TypesNotConvertible;
+    break;
   }
 
   diagnose(expr->getLoc(), diag::invalid_relation,

@@ -186,7 +186,7 @@ func checkHive(hive: Hive, b: Bee) {
 // Protocols
 func testProtocols(b: B, bp: BProto) {
   var bp2 : BProto = b
-  var b2 : B = bp // expected-error{{'BProto' is not convertible to 'B'}}
+  var b2 : B = bp // expected-error{{cannot convert initializer of type 'BProto' to specified type 'B'}}
   bp.method(1, withFloat:2.5)
   bp.method(1, withDouble:2.5) // expected-error{{incorrect argument label in call (have '_:withDouble:', expected '_:withFloat:')}}
   bp2 = b.getAsProto()

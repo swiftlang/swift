@@ -1503,9 +1503,13 @@ public:
     contextualTypePurpose = purpose;
   }
 
-  Type getContextualType(Expr *E) {
+  Type getContextualType(Expr *E) const {
     return E == contextualTypeNode ? contextualType : Type();
   }
+  Type getContextualType() const {
+    return contextualType;
+  }
+
   ContextualTypePurpose getContextualTypePurpose() const {
     return contextualTypePurpose;
   }

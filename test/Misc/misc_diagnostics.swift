@@ -15,7 +15,7 @@ var pi = 3.14159265358979
 var d: CGFloat = 2.0
 var dpi:CGFloat = d*pi // expected-error{{binary operator '*' cannot be applied to operands of type 'CGFloat' and 'Double'}} expected-note{{overloads for '*' exist with these partially matching parameter lists: (Double, Double), (CGFloat, CGFloat)}}
 
-let ff: CGFloat = floorf(20.0) // expected-error{{'Float' is not convertible to 'CGFloat'}}
+let ff: CGFloat = floorf(20.0) // expected-error{{cannot convert initializer of type 'Float' to specified type 'CGFloat'}}
 
 let total = 15.0
 let count = 7
@@ -24,13 +24,13 @@ let median = total / count // expected-error {{binary operator '/' cannot be app
 if (1) {} // expected-error{{type 'Int' does not conform to protocol 'BooleanType'}}
 if 1 {} // expected-error {{type 'Int' does not conform to protocol 'BooleanType'}}
 
-var a: [String] = [1] // expected-error{{'[Int]' is not convertible to '[String]'}}
-var b: Int = [1, 2, 3] // expected-error{{'[Int]' is not convertible to 'Int'}}
+var a: [String] = [1] // expected-error{{cannot convert initializer of type '[Int]' to specified type '[String]'}}
+var b: Int = [1, 2, 3] // expected-error{{cannot convert initializer of type '[Int]' to specified type 'Int'}}
 
 var f1: Float = 2.0
 var f2: Float = 3.0
 
-var dd: Double = f1 - f2 // expected-error{{'Float' is not convertible to 'Double'}}
+var dd: Double = f1 - f2 // expected-error{{cannot convert initializer of type 'Float' to specified type 'Double'}}
 
 func f() -> Bool {
   return 1 + 1 // expected-error{{cannot convert return expression of type 'Int' to return type 'Bool'}}
@@ -86,7 +86,7 @@ func ==(lhs:MyBadReturnClass, rhs:MyBadReturnClass) {
 
 
 func testIS1() -> Int { return 0 }
-let _: String = testIS1() // expected-error {{'Int' is not convertible to 'String'}}
+let _: String = testIS1() // expected-error {{cannot convert initializer of type 'Int' to specified type 'String'}}
 
 func insertA<T>(inout array : [T], elt : T) {
   array.append(T); // expected-error {{cannot invoke 'append' with an argument list of type '((T).Type)'}}

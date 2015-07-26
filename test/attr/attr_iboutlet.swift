@@ -19,7 +19,7 @@ class IBOutletWrapperTy {
   var value : IBOutletWrapperTy! = IBOutletWrapperTy() // no-warning
 
   @IBOutlet
-  class var staticValue: IBOutletWrapperTy = 52  // expected-error {{'Int' is not convertible to 'IBOutletWrapperTy'}}
+  class var staticValue: IBOutletWrapperTy = 52  // expected-error {{cannot convert initializer of type 'Int' to specified type 'IBOutletWrapperTy'}}
   // expected-error@-2 {{only instance properties can be declared @IBOutlet}}
   // expected-error@-2 {{class stored properties not yet supported}}
 

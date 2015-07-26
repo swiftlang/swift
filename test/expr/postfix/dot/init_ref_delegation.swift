@@ -185,7 +185,7 @@ class C {
   convenience init() { // expected-note 11 {{selected non-required initializer 'init()'}}
     self.init()
     let _ = self.init()
-    let _: C = self.init() // expected-error{{'()' is not convertible to 'C'}}
+    let _: C = self.init() // expected-error{{cannot convert initializer of type '()' to specified type 'C'}}
     let _: () -> C = self.init // expected-error{{partial application of 'self.init' initializer delegation is not allowed}}
   }
 
@@ -198,7 +198,7 @@ class D: C {
   override init(x: Int) {
     super.init(x: x)
     let _ = super.init()
-    let _: C = super.init() // expected-error{{'()' is not convertible to 'C'}}
+    let _: C = super.init() // expected-error{{cannot convert initializer of type '()' to specified type 'C'}}
     let _: () -> C = super.init // expected-error{{partial application of 'super.init' initializer chain is not allowed}}
   }
 

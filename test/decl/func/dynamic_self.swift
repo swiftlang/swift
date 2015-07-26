@@ -58,7 +58,7 @@ class C1 {
   // Type methods have a self of type Self.Type.
   class func factory(b: Bool) -> Self {
     // Check directly.
-    var x: Int = self // expected-error{{'Self.Type' is not convertible to 'Int'}}
+    var x: Int = self // expected-error{{cannot convert initializer of type 'Self.Type' to specified type 'Int'}}
 
     // Can't utter Self within the body of a method.
     var c1 = C1(int: 5) as Self // expected-error{{'Self' is only available in a protocol or as the result of a method in a class; did you mean 'C1'?}}
