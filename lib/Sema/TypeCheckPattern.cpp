@@ -1112,7 +1112,7 @@ bool TypeChecker::coercePatternToType(Pattern *&P, DeclContext *dc, Type type,
         elt.setPattern(pattern);
 
       // Type-check the initialization expression.
-      assert(elt.getInit() &&
+      assert(!elt.getInit() &&
              "Tuples cannot have default values, only parameters");
     }
 
