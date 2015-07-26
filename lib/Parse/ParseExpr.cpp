@@ -1828,9 +1828,6 @@ ParserResult<Expr> Parser::parseExprClosure() {
       bodyElements[0] = new (Context) ReturnStmt(SourceLoc(),
                                                  returnExpr);
     }
-    
-    if (returnExpr)
-      returnExpr->setIsReturnExpr();
   }
 
   // Set the body of the closure.

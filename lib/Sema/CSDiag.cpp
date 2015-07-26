@@ -2221,20 +2221,11 @@ bool FailureDiagnosis::diagnoseGeneralValueMemberFailure() {
 }
 
 bool FailureDiagnosis::diagnoseGeneralOverloadFailure() {
-  
-  // If this is a return expression with available conversion constraints,
-  // we can produce a better diagnostic by pointing out the return expression
-  // conversion failure.
-  if (expr->isReturnExpr() && (conversionConstraint || argumentConstraint))
-    if (diagnoseGeneralConversionFailure())
-      return true;
-  
   // In the absense of a better conversion constraint failure, point out the
   // inability to find an appropriate overload.
   if (!overloadConstraint)
     return false;
-  
-  
+ 
   auto overloadChoice = overloadConstraint->getOverloadChoice();
   std::string overloadName = overloadChoice.getDecl()->getNameStr();
 
@@ -2398,20 +2389,6 @@ bool FailureDiagnosis::diagnoseGeneralConversionFailure() {
       }
     }
 
-    
-    return true;
-  }
-  
-  // Special case the diagnostic for a function result-type mismatch.
-  if (anchor->isReturnExpr()) {
-    if (toType->isVoid()) {
-      diagnose(anchor->getLoc(), diag::cannot_return_value_from_void_func);
-      return true;
-    }
-    
-    diagnose(anchor->getLoc(), diag::cannot_convert_to_return_type,
-             fromType, toType)
-      .highlight(anchor->getSourceRange());
     
     return true;
   }
@@ -2866,7 +2843,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError(Type exprType) {
   // If this is conversion failure due to a return statement with an argument
   // that cannot be coerced to the result type of the function, emit a
   // specific error.
-  if (expr->isReturnExpr()) {
+  if (CS->getContextualTypePurpose() == CTP_ReturnStmt) {
     if (contextualType->isVoid()) {
       diagnose(expr->getLoc(), diag::cannot_return_value_from_void_func)
         .highlight(expr->getSourceRange());

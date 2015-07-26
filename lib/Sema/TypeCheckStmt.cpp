@@ -370,9 +370,6 @@ public:
     }
 
     Expr *E = RS->getResult();
-    
-    if (E)
-      E->setIsReturnExpr();
 
     // In an initializer, the only expression allowed is "nil", which indicates
     // failure from a failable initializer.
