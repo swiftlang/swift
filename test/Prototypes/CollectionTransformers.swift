@@ -285,23 +285,19 @@ final class _ForkJoinOneShotEvent {
 
   func set() {
     _mutex.withLock {
-      () -> () in
       if !_isSet {
         _isSet = true
         _cond.signal()
       }
-      return ()
     }
   }
 
   /// Establishes a happens-before relation between calls to set() and wait().
   func wait() {
     _mutex.withLock {
-      () -> () in
       while !_isSet {
         _cond.wait(_mutex)
       }
-      return ()
     }
   }
 
@@ -333,22 +329,18 @@ final class _ForkJoinWorkDeque<T> {
 
   var isEmpty: Bool {
     return _dequeMutex.withLock {
-      () -> Bool in
       return _deque.isEmpty
     }
   }
 
   func prepend(element: T) {
     _dequeMutex.withLock {
-      () -> () in
       _deque.append(element)
-      return ()
     }
   }
 
   func tryTakeFirst() -> T? {
     return _dequeMutex.withLock {
-      () -> T? in
       let result = _deque.last
       if _deque.count > 0 {
         _deque.removeLast()
@@ -359,7 +351,6 @@ final class _ForkJoinWorkDeque<T> {
 
   func tryTakeFirstTwo() -> (T?, T?) {
     return _dequeMutex.withLock {
-      () -> (T?, T?) in
       let result1 = _deque.last
       if _deque.count > 0 {
         _deque.removeLast()
@@ -374,15 +365,12 @@ final class _ForkJoinWorkDeque<T> {
 
   func append(element: T) {
     _dequeMutex.withLock {
-      () -> () in
       _deque.insert(element, atIndex: 0)
-      return ()
     }
   }
 
   func tryTakeLast() -> T? {
     return _dequeMutex.withLock {
-      () -> T? in
       let result = _deque.first
       if _deque.count > 0 {
         _deque.removeAtIndex(0)
@@ -393,7 +381,6 @@ final class _ForkJoinWorkDeque<T> {
 
   func takeAll() -> ContiguousArray<T> {
     return _dequeMutex.withLock {
-      () -> ContiguousArray<T> in
       let result = _deque
       _deque = []
       return result
@@ -406,7 +393,6 @@ final class _ForkJoinWorkDeque<T> {
     isEquivalent: (T, T) -> Bool
   ) -> Bool {
     return _dequeMutex.withLock {
-      () -> Bool in
       for i in _deque.indices {
         if isEquivalent(_deque[i], value) {
           _deque[i] = makeReplacement()
@@ -643,7 +629,6 @@ final public class ForkJoinPool {
 
   internal static func _getCurrentThread() -> _ForkJoinWorkerThread? {
     return _threadRegistryMutex.withLock {
-      () -> _ForkJoinWorkerThread? in
       return _threadRegistry[_stdlib_pthread_self()]
     }
   }
@@ -674,48 +659,32 @@ final public class ForkJoinPool {
 
   internal func _addRunningThread(thread: _ForkJoinWorkerThread) {
     ForkJoinPool._threadRegistryMutex.withLock {
-      () -> () in
       _runningThreadsMutex.withLock {
-        () -> () in
         _submissionQueuesMutex.withLock {
-          () -> () in
           _workDequesMutex.withLock {
-            () -> () in
             ForkJoinPool._threadRegistry[thread._tid!] = thread
             _runningThreads.append(thread)
             _submissionQueues.append(thread._submissionQueue)
             _workDeques.append(thread._workDeque)
-            return ()
           }
-          return ()
         }
-        return ()
       }
-      return ()
     }
   }
 
   internal func _removeRunningThread(thread: _ForkJoinWorkerThread) {
     ForkJoinPool._threadRegistryMutex.withLock {
-      () -> () in
       _runningThreadsMutex.withLock {
-        () -> () in
         _submissionQueuesMutex.withLock {
-          () -> () in
           _workDequesMutex.withLock {
-            () -> () in
             let i = _runningThreads.indexOf { $0 === thread }!
             ForkJoinPool._threadRegistry[thread._tid!] = nil
             _runningThreads.removeAtIndex(i)
             _submissionQueues.removeAtIndex(i)
             _workDeques.removeAtIndex(i)
-            return ()
           }
-          return ()
         }
-        return ()
       }
-      return ()
     }
   }
 
@@ -757,7 +726,6 @@ final public class ForkJoinPool {
 
   internal func _stealTask() -> ForkJoinTaskBase? {
     return _workDequesMutex.withLock {
-      () -> ForkJoinTaskBase? in
       let randomOffset = pickRandom(_workDeques.indices)
       let count = _workDeques.count
       for i in _workDeques.indices {
@@ -795,12 +763,10 @@ final public class ForkJoinPool {
       return
     }
     _submissionQueuesMutex.withLock {
-      () -> () in
       precondition(!_submissionQueues.isEmpty)
       for task in tasks {
         pickRandom(_submissionQueues).append(task)
       }
-      return ()
     }
   }
 
