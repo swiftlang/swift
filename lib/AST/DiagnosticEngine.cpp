@@ -316,7 +316,8 @@ static void formatDiagnosticArgument(StringRef Modifier,
 
     // Don't unwrap intentional sugar types like T? or [T].
     if (showAKA && (isa<SyntaxSugarType>(type.getPointer()) ||
-                    isa<DictionaryType>(type.getPointer())))
+                    isa<DictionaryType>(type.getPointer()) ||
+                    type->is<BuiltinType>()))
       showAKA = false;
 
     // If they are textually the same, don't show them.  This can happen when

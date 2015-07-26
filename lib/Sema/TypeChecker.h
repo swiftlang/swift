@@ -1055,10 +1055,6 @@ public:
   bool typeCheckExpressionShallow(Expr *&expr, DeclContext *dc,
                                   Type convertType = Type());
 
-  /// \brief "Nullify" an expression tree's type data, to make it suitable for
-  /// re-typecheck operations.
-  void eraseTypeData(Expr *&expr);
-  
   /// \brief Erase an expression tree's open existentials after a re-typecheck
   /// operation.
   void eraseOpenedExistentials(Expr *&expr);

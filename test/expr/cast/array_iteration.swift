@@ -16,8 +16,7 @@ for view in rootView.subviews as! [View] {
   doFoo()
 }
 
-// FIXME: Unhelpful diagnostic here.
-for view:View in rootView.subviews { // expected-error{{'Array<AnyObject>!' is not convertible to '_BuiltinIntegerLiteralConvertible'}}
+for view:View in rootView.subviews { // expected-error{{'Array<AnyObject>!' is not convertible to 'View'}}
   doFoo()
 }
 

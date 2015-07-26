@@ -1218,45 +1218,6 @@ Optional<Type> TypeChecker::getTypeOfExpressionWithoutApplying(
   return exprType;
 }
 
-void TypeChecker::eraseTypeData(Expr *&expr) {
-  /// Private class to "cleanse" an expression tree of types. This is done in the
-  /// case of a typecheck failure, where we may want to re-typecheck partially-
-  /// typechecked subexpressions in a context-free manner.
-  class TypeNullifier : public ASTWalker {
-  public:
-    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      // Preserve module expr type data to prevent further lookups.
-      if (auto *declRef = dyn_cast<DeclRefExpr>(expr))
-        if (isa<ModuleDecl>(declRef->getDecl()))
-          return { false, expr };
-      
-      expr->setType(nullptr);
-      return { true, expr };
-    }
-    
-    // If we find a TypeLoc (e.g. in an as? expr) with a type variable, rewrite
-    // it.
-    bool walkToTypeLocPre(TypeLoc &TL) override {
-      if (TL.getTypeRepr())
-        TL.setType(Type(), /*was validated*/false);
-      return true;
-    }
-    
-    std::pair<bool, Pattern*> walkToPatternPre(Pattern *pattern) override {
-      pattern->setType(nullptr);
-      return { true, pattern };
-    }
-    
-    // Don't walk into statements.  This handles the BraceStmt in
-    // non-single-expr closures, so we don't walk into their body.
-    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
-      return { false, S };
-    }
-  };
-
-  expr->walk(TypeNullifier());
-}
-
 /// Private class to "cleanse" an expression tree of open existentials. This is
 /// done in the case of a typecheck failure, after we re-typecheck partially-
 /// typechecked subexpressions in a context-free manner.
@@ -1404,7 +1365,7 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
 
       // Add a conversion constraint between the types.
       cs.addConstraint(ConstraintKind::Conversion, expr->getType(),
-                       InitType, Locator);
+                       InitType, Locator, /*isFavored*/true);
 
       // The expression has been pre-checked; save it in case we fail later.
       initializer = expr;

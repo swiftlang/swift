@@ -2077,11 +2077,38 @@ private:
 };
 } // end anonymous namespace.
 
+/// Return true if this constraint is a conversion or requirement between two
+/// types.
+static bool isConversionConstraint(const Constraint *C) {
+  switch (C->getKind()) {
+  case ConstraintKind::Conversion:
+  case ConstraintKind::ExplicitConversion:
+  case ConstraintKind::ArgumentTupleConversion:
+  case ConstraintKind::ConformsTo:
+  case ConstraintKind::SelfObjectOfProtocol:
+  case ConstraintKind::Subtype:
+    return true;
+    
+  default:
+    return false;
+  }
+}
+
+
 
 FailureDiagnosis::FailureDiagnosis(Expr *expr, ConstraintSystem *cs)
   : expr(expr), CS(cs) {
   assert(expr && CS);
   
+  // If the constraint system had a failure constraint, it takes precedence over
+  // other random constraints in the system.
+  if (auto constraint = CS->failedConstraint) {
+    if (constraint->getKind() == ConstraintKind::BindOverload) {
+      overloadConstraint = CS->failedConstraint;
+    } else if (isConversionConstraint(constraint))
+      conversionConstraint = CS->failedConstraint;
+  }
+    
   Constraint *fallbackConstraint = nullptr;
   Constraint *disjunctionConversionConstraint = nullptr;
   for (auto & constraintRef : CS->getConstraints()) {
@@ -2127,13 +2154,9 @@ FailureDiagnosis::FailureDiagnosis(Expr *expr, ConstraintSystem *cs)
     // Conversion constraints are also nicely descriptive, so we'll grab the
     // first one of those as well.
     if ((!conversionConstraint || constraint->isFavored()) &&
-        (constraint->getKind() == ConstraintKind::Conversion ||
-         constraint->getKind() == ConstraintKind::ExplicitConversion ||
-         constraint->getKind() == ConstraintKind::ArgumentTupleConversion ||
-         constraint->getKind() == ConstraintKind::ConformsTo ||
-         constraint->getKind() == ConstraintKind::SelfObjectOfProtocol)) {
-          conversionConstraint = constraint;
-        }
+        isConversionConstraint(constraint)) {
+      conversionConstraint = constraint;
+    }
     
     // When all else fails, inspect a potential conjunction or disjunction for a
     // consituent conversion.
@@ -2492,6 +2515,57 @@ namespace {
   };
 }
 
+/// \brief "Nullify" an expression tree's type data, to make it suitable for
+/// re-typecheck operations.
+static void eraseTypeData(Expr *expr) {
+  /// Private class to "cleanse" an expression tree of types. This is done in the
+  /// case of a typecheck failure, where we may want to re-typecheck partially-
+  /// typechecked subexpressions in a context-free manner.
+  class TypeNullifier : public ASTWalker {
+  public:
+    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
+      // Preserve module expr type data to prevent further lookups.
+      if (auto *declRef = dyn_cast<DeclRefExpr>(expr))
+        if (isa<ModuleDecl>(declRef->getDecl()))
+          return { false, expr };
+      
+      // If a literal has a Builtin.Int or Builtin.FP type on it already,
+      // then sema has already expanded out a call to
+      //   Init.init(<builtinliteral>)
+      // and we don't want it to make
+      //   Init.init(Init.init(<builtinliteral>))
+      // preserve the type info to prevent this from happening.
+      if (isa<IntegerLiteralExpr>(expr) || isa<FloatLiteralExpr>(expr))
+        if (expr->getType()->is<BuiltinType>())
+          return { false, expr };
+      
+      expr->setType(nullptr);
+      return { true, expr };
+    }
+    
+    // If we find a TypeLoc (e.g. in an as? expr) with a type variable, rewrite
+    // it.
+    bool walkToTypeLocPre(TypeLoc &TL) override {
+      if (TL.getTypeRepr())
+        TL.setType(Type(), /*was validated*/false);
+      return true;
+    }
+    
+    std::pair<bool, Pattern*> walkToPatternPre(Pattern *pattern) override {
+      pattern->setType(nullptr);
+      return { true, pattern };
+    }
+    
+    // Don't walk into statements.  This handles the BraceStmt in
+    // non-single-expr closures, so we don't walk into their body.
+    std::pair<bool, Stmt *> walkToStmtPre(Stmt *S) override {
+      return { false, S };
+    }
+  };
+  
+  expr->walk(TypeNullifier());
+}
+
 
 /// Unless we've already done this, retypecheck the specified subexpression on
 /// its own, without including any contextual constraints or parent expr
@@ -2545,7 +2619,7 @@ Expr *FailureDiagnosis::typeCheckChildIndependently(Expr *subExpr,
   // type check operation.
   Expr *preCheckedExpr = subExpr;
 
-  CS->TC.eraseTypeData(subExpr);
+  eraseTypeData(subExpr);
       
   // Disable structural checks, because we know that the overall expression
   // has type constraint problems, and we don't want to know about any
@@ -2620,24 +2694,81 @@ typeCheckArbitrarySubExprIndependently(Expr *subExpr, Type conversionType,
 }
 
 
-bool FailureDiagnosis::diagnoseContextualConversionError(Type exprResultType) {
+bool FailureDiagnosis::diagnoseContextualConversionError(Type exprType) {
+  // If we don't have a type for the expression afterall, there is nothing
+  // we can diagnose.
+  if (exprType->is<TypeVariableType>())
+    return false;
+
+  
   // Try to find the contextual type in a variety of ways.
   Type contextualType = CS->getContextualType(expr);
   
-  if (conversionConstraint && conversionConstraint->isFavored() &&
-      conversionConstraint->getLocator() &&
-      conversionConstraint->getLocator()->getAnchor() == expr)
-    contextualType = conversionConstraint->getSecondType();
-
-  if (!contextualType)
-    return false;
-
-  if (exprResultType->isEqual(contextualType))
-    return false;
+  Constraint *foundConstraint = nullptr;
   
-  if (exprResultType->getAs<TypeVariableType>())
-    return false;
+  auto checkConstraint = [&](Constraint *C) {
+    // Ignore non-conversion constraints.
+    if (!isConversionConstraint(C)) return;
+    
+    // If we already found a favored constraint, don't replace it.
+    if (foundConstraint && foundConstraint->isFavored())
+      return;
+    
+    // Ignore conversion constraints that aren't on the root expression.
+    if (!C->getLocator() || C->getLocator()->getAnchor() != expr)
+      return;
+
+    // Don't take a constraint that won't tell us anything.
+    if (typeIsNotSpecialized(C->getSecondType()))
+      return;
+    
+    foundConstraint = C;
+  };
+
+  // Check the failed constraint, if present.
+  if (!contextualType) {
+    if (CS->failedConstraint)
+      checkConstraint(CS->failedConstraint);
+    
+    // Scan through all of the inactive constraints as well.
+    for (auto &constraint : CS->getConstraints())
+      checkConstraint(&constraint);
+  }
   
+  // If we found a conversion constraint, it provides the destination type.
+  if (foundConstraint) {
+    contextualType = foundConstraint->getSecondType();
+    
+    // The contextual type relates to the overall expression, but may be
+    // describing only part of the type.  Dive into the overall type to narrow
+    // it down based on the locator path.
+    for (auto &elt : foundConstraint->getLocator()->getPath()) {
+      switch (elt.getKind()) {
+      case ConstraintLocator::FunctionArgument:
+        if (auto FTy = exprType->getAs<AnyFunctionType>())
+          exprType = FTy->getInput();
+        else
+          return false;
+        break;
+      case ConstraintLocator::FunctionResult:
+        if (auto FTy = exprType->getAs<AnyFunctionType>())
+          exprType = FTy->getResult();
+        else
+          return false;
+        break;
+      default:
+        // Don't know how to process this path element yet.  Don't emit a
+        // warpo diagnostic.
+        return false;
+      }
+    }
+  }
+
+  if (!contextualType || typeIsNotSpecialized(contextualType))
+    return false;
+
+  if (exprType->isEqual(contextualType))
+    return false;
   
   // If this is conversion failure due to a return statement with an argument
   // that cannot be coerced to the result type of the function, emit a
@@ -2648,7 +2779,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError(Type exprResultType) {
         .highlight(expr->getSourceRange());
     } else {
       diagnose(expr->getLoc(), diag::cannot_convert_to_return_type,
-               exprResultType, contextualType)
+               exprType, contextualType)
         .highlight(expr->getSourceRange());
     }
     return true;
@@ -2658,7 +2789,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError(Type exprResultType) {
   diagnose(expr->getLoc(), diag::invalid_relation,
            Failure::FailureKind::TypesNotConvertible -
                       Failure::FailureKind::TypesNotEqual,
-           exprResultType, contextualType)
+           exprType, contextualType)
     .highlight(expr->getSourceRange());
   
   return true;
@@ -2762,12 +2893,11 @@ bool FailureDiagnosis::visitBinaryExpr(BinaryExpr *binop) {
   auto argTupleType = argExpr->getType()->castTo<TupleType>();
   calleeInfo.filterList(argTupleType);
 
-  if (calleeInfo.closeness == CC_ExactMatch) {
-    // Otherwise, whatever the result type of the call happened to be must not
-    // have been what we were looking for - diagnose this as a conversion
-    // failure.
+  // Otherwise, whatever the result type of the call happened to be must not
+  // have been what we were looking for - diagnose this as a conversion
+  // failure.
+  if (calleeInfo.closeness == CC_ExactMatch)
     return diagnoseGeneralConversionFailure();
-  }
   
   // A common error is to apply an operator that only has an inout LHS (e.g. +=)
   // to non-lvalues (e.g. a local let).  Produce a nice diagnostic for this
@@ -2971,6 +3101,13 @@ bool FailureDiagnosis::visitCallExpr(CallExpr *callExpr) {
 
   calleeInfo.filterList(argExpr->getType());
 
+  // If we found an exact match, this must be a problem with a conversion from
+  // the result of the call to the expected type.  Diagnose this as a conversion
+  // failure.
+  if (calleeInfo.closeness == CC_ExactMatch)
+    return diagnoseGeneralFailure();
+
+  
   bool isInitializer = isa<TypeExpr>(fnExpr);
   auto overloadName = calleeInfo.declName;
 
@@ -3245,20 +3382,30 @@ bool FailureDiagnosis::visitExpr(Expr *E) {
 bool FailureDiagnosis::diagnoseFailure() {
   assert(CS && expr);
   
+  
   // Our general approach is to do a depth first traversal of the broken
   // expression tree, type checking as we go.  If we find a subtree that cannot
   // be type checked on its own (even to an incomplete type) then that is where
   // we focus our attention.  If we do find a type, we use it to check for
   // contextual type mismatches.
-  auto subExprTy = getTypeOfTypeCheckedChildIndependently(expr);
   
-  // We've already diagnosed the error.
-  if (!subExprTy)
-    return true;
-  
-  // If there is a contextual type that mismatches, diagnose it as the problem.
-  if (diagnoseContextualConversionError(subExprTy))
-    return true;
+  // If we're at the top-level of the expression fresh in from a client whose
+  // constraint system failed, check to see if we can type check the expression
+  // by itself.  If not, then we'll get a more specific failure in the
+  // subexpression.  If so, then we know it must be some conversion constraint
+  // binding the result of the expression to a type that fails.
+  if (!CS->TC.exprIsBeingDiagnosed(expr)) {
+    // Type check the expression independently of any contextual constraints.
+    auto subExprTy = getTypeOfTypeCheckedChildIndependently(expr);
+    
+    // If it failed an diagnosed something, then we're done.
+    if (!subExprTy) return true;
+    
+    // Otherwise, it is almost certainly a contextual constraint mismatch, dig
+    // one out.
+    if (diagnoseContextualConversionError(subExprTy))
+      return true;
+  }
 
   return visit(expr);
 }

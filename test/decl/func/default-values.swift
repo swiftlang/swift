@@ -96,8 +96,7 @@ func defaultArgTuplesNotMaterializable(x: Int, y: Int = 0) {}
 
 defaultArgTuplesNotMaterializable(identity(5))
 defaultArgTuplesNotMaterializable(identity((5, y: 10)))
-// expected-error@-1 {{cannot invoke 'defaultArgTuplesNotMaterializable' with an argument list of type '(Int, y: Int)'}}
-// expected-note@-2 {{expected an argument list of type '(Int, y: Int)'}}
+// expected-error@-1 {{'Int2048' is not convertible to 'IntegerLiteralConvertible'}}
 
 
 // rdar://problem/21799331
