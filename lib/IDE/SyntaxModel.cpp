@@ -265,7 +265,12 @@ private:
   bool annotateIfConfigConditionIdentifiers(Expr *Cond);
   bool handleAttrs(const DeclAttributes &Attrs);
   bool handleAttrs(const TypeAttributes &Attrs);
-  bool handleAttrRanges(ArrayRef<SourceRange> Ranges);
+
+  typedef std::pair<const DeclAttribute *, SourceRange> DeclAttributeAndRange;
+
+  bool handleSpecialDeclAttribute(const DeclAttribute *Decl,
+                                  std::vector<Token> &Toks);
+  bool handleAttrRanges(ArrayRef<DeclAttributeAndRange> DeclRanges);
 
   void handleStmtCondition(StmtCondition cond);
 
@@ -981,35 +986,86 @@ bool ModelASTWalker::annotateIfConfigConditionIdentifiers(Expr *Cond) {
   return true;
 }
 
+bool ModelASTWalker::handleSpecialDeclAttribute(const DeclAttribute *D,
+                                                std::vector<Token> &Toks) {
+  if (!D)
+    return false;
+  if (isa<AvailableAttr>(D)) {
+    std::vector<SourceLoc> PlatformLocs;
+    for (auto T : Toks) {
+      if (!SM.rangeContainsTokenLoc(D->getRangeWithAt(), T.getLoc()))
+        continue;
+#define AVAILABILITY_PLATFORM(X, PrettyName)                                  \
+      if (#X == T.getText()) {                                                \
+        PlatformLocs.push_back(T.getLoc());                                   \
+        continue;                                                             \
+      }
+#include "swift/AST/PlatformKinds.def"
+    }
+
+    unsigned I = 0;
+    for (; I < TokenNodes.size(); ++ I) {
+      auto Node = TokenNodes[I];
+      if (SM.isBeforeInBuffer(D->getRange().End, Node.Range.getStart()))
+        break;
+      if (Node.Range.contains(D->AtLoc)) {
+        if (!passNode({SyntaxNodeKind::AttributeBuiltin, Node.Range}))
+          break;
+        continue;
+      }
+      if (PlatformLocs.end() !=
+          std::find(PlatformLocs.begin(), PlatformLocs.end(),
+                    Node.Range.getStart())) {
+          if (!passNode({SyntaxNodeKind::Keyword, Node.Range}))
+            break;
+          continue;
+      }
+      if (!passNode(Node))
+        break;
+    }
+    TokenNodes = TokenNodes.slice(I);
+    return true;
+  }
+  return false;
+}
+
 bool ModelASTWalker::handleAttrs(const DeclAttributes &Attrs) {
-  SmallVector<SourceRange, 4> Ranges;
-  Attrs.getAttrRanges(Ranges);
-  return handleAttrRanges(Ranges);
+  SmallVector<DeclAttributeAndRange, 4> DeclRanges;
+  for (auto At : Attrs) {
+    if (At->getRangeWithAt().isValid())
+      DeclRanges.push_back(std::make_pair(At, At->getRangeWithAt()));
+  }
+  return handleAttrRanges(DeclRanges);
 }
 
 bool ModelASTWalker::handleAttrs(const TypeAttributes &Attrs) {
   SmallVector<SourceRange, 4> Ranges;
   Attrs.getAttrRanges(Ranges);
-  return handleAttrRanges(Ranges);
+  SmallVector<DeclAttributeAndRange, 4> DeclRanges;
+  for (auto R : Ranges) {
+    DeclRanges.push_back(std::make_pair(nullptr, R));
+  }
+  return handleAttrRanges(DeclRanges);
 }
 
-bool ModelASTWalker::handleAttrRanges(ArrayRef<SourceRange> Ranges) {
-  if (Ranges.empty())
+bool ModelASTWalker::handleAttrRanges(ArrayRef<DeclAttributeAndRange> DeclRanges) {
+  if (DeclRanges.empty())
     return true;
 
-  SmallVector<SourceRange, 4> SortedRanges(Ranges.begin(), Ranges.end());
+  SmallVector<DeclAttributeAndRange, 4> SortedRanges(DeclRanges.begin(),
+                                                     DeclRanges.end());
   std::sort(SortedRanges.begin(), SortedRanges.end(),
-            [&](SourceRange LHS, SourceRange RHS) {
-    return SM.isBeforeInBuffer(LHS.Start, RHS.End);
+            [&](DeclAttributeAndRange LHS, DeclAttributeAndRange RHS) {
+    return SM.isBeforeInBuffer(LHS.second.Start, RHS.second.End);
   });
-  Ranges = SortedRanges;
+  DeclRanges = SortedRanges;
 
-  SourceLoc BeginLoc = Ranges.front().Start;
+  SourceLoc BeginLoc = DeclRanges.front().second.Start;
 
   std::vector<Token> Toks = swift::tokenize(
       LangOpts, SM, BufferID,
       SM.getLocOffsetInBuffer(BeginLoc, BufferID),
-      SM.getLocOffsetInBuffer(Ranges.back().End, BufferID),
+      SM.getLocOffsetInBuffer(DeclRanges.back().second.End, BufferID),
       /*KeepComments=*/true,
       /*TokenizeInterpolatedString=*/false);
 
@@ -1020,24 +1076,29 @@ bool ModelASTWalker::handleAttrRanges(ArrayRef<SourceRange> Ranges) {
       return false;
 
     while (!TokenNodes.empty() &&
-           SM.rangeContainsTokenLoc(AttrRange, TokenNodes.front().Range.getStart()))
+           SM.rangeContainsTokenLoc(AttrRange,
+                                    TokenNodes.front().Range.getStart()))
       TokenNodes = TokenNodes.slice(1);
     return true;
   };
 
   for (auto Tok : Toks) {
-    if (Ranges.empty())
+    if (DeclRanges.empty())
       break;
-    if (Tok.getLoc() == Ranges.front().Start) {
-      auto R = Ranges.front();
-      Ranges = Ranges.slice(1);
-      if (!passAttrNode(R))
-        return false;
+    if (Tok.getLoc() == DeclRanges.front().second.Start) {
+      auto R = DeclRanges.front().second;
+      auto D = DeclRanges.front().first;
+      DeclRanges = DeclRanges.slice(1);
+      if (!handleSpecialDeclAttribute(D, Toks)) {
+        if (!passAttrNode(R))
+          return false;
+      }
     }
   }
 
-  if (!Ranges.empty()) {
-    if (!passAttrNode(Ranges.front()))
+  if (!DeclRanges.empty() &&
+      !handleSpecialDeclAttribute(DeclRanges.front().first, Toks)) {
+    if (!passAttrNode(DeclRanges.front().second))
       return false;
   }
 
