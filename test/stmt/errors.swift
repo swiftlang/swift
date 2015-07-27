@@ -12,6 +12,7 @@ func b() {}
 func c() {}
 func d() {}
 func e() {}
+func thrower() throws {}
 
 func opaque_error() -> ErrorType { return MSV.Foo }
 
@@ -104,4 +105,48 @@ func ten_helper(x: Int) {}
 func ten_helper(x: Int, y: Int) throws {}
 func ten() throws {
   try ten_helper(y: 0) // expected-error {{extraneous argument label 'y:' in call}}
+}
+
+// rdar://21074857
+func eleven_helper(fn: () -> ()) {}
+func eleven_one() {
+  eleven_helper {
+    do {
+      try thrower()
+    // FIXME: suppress the double-emission of the 'always true' warning
+    } catch let e as ErrorType { // expected-warning {{immutable value 'e' was never used}} expected-warning 2 {{'as' test is always true}}
+    }
+  }
+}
+func eleven_two() {
+  eleven_helper { // expected-error {{invalid conversion from throwing function of type '() throws -> _' to non-throwing function type '() -> ()'}}
+    do {
+      try thrower()
+    } catch let e as MSV {
+    }
+  }
+}
+
+enum Twelve { case Payload(Int) }
+func twelve_helper(fn: (Int, Int) -> ()) {}
+func twelve() {
+  twelve_helper { (a, b) in // expected-error {{invalid conversion from throwing function of type '(_, _) throws -> _' to non-throwing function type '(Int, Int) -> ()'}}
+    do {
+      try thrower()
+    } catch Twelve.Payload(a...b) {
+    }
+  }
+}
+
+struct Thirteen : ErrorType, Equatable {}
+func ==(a: Thirteen, b: Thirteen) -> Bool { return true }
+
+func thirteen_helper(fn: (Thirteen) -> ()) {}
+func thirteen() {
+  thirteen_helper { (a) in // expected-error {{invalid conversion from throwing function of type '(_) throws -> _' to non-throwing function type '(Thirteen) -> ()'}}
+    do {
+      try thrower()
+    } catch a {
+    }
+  }
 }

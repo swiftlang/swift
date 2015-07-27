@@ -884,34 +884,8 @@ public:
   }
 
   bool checkCatchStmt(CatchStmt *S) {
-    bool hadTypeError = false;
-
-    // Grab the standard exception type.
-    Type exnType = TC.getExceptionType(DC, S->getCatchLoc());
-
-    // Type-check the catch pattern.
-    Pattern *pattern = S->getErrorPattern();
-    if (Pattern *newPattern = TC.resolvePattern(pattern, DC,
-                                                /*isStmtCondition*/false)) {
-      pattern = newPattern;
-
-      // Coerce the pattern to the exception type.
-      if (!exnType ||
-          TC.coercePatternToType(pattern, DC, exnType, TR_InExpression)) {
-        // If that failed, be sure to give the variables error types
-        // before we type-check the guard.  (This will probably kill
-        // most of the type-checking, but maybe not.)
-        pattern->forEachVariable([&](VarDecl *var) {
-            var->overwriteType(ErrorType::get(TC.Context));
-            var->setInvalid();
-          });
-        hadTypeError = true;
-      }
-
-      S->setErrorPattern(pattern);
-    } else {
-      hadTypeError = true;
-    }
+    // Check the catch pattern.
+    bool hadTypeError = TC.typeCheckCatchPattern(S, DC);
 
     // Check the guard expression, if present.
     if (Expr *guard = S->getGuardExpr()) {
@@ -960,6 +934,38 @@ public:
 };
   
 } // end anonymous namespace
+
+bool TypeChecker::typeCheckCatchPattern(CatchStmt *S, DeclContext *DC) {
+  bool hadTypeError = false;
+
+  // Grab the standard exception type.
+  Type exnType = getExceptionType(DC, S->getCatchLoc());
+
+  Pattern *pattern = S->getErrorPattern();
+  if (Pattern *newPattern = resolvePattern(pattern, DC,
+                                           /*isStmtCondition*/false)) {
+    pattern = newPattern;
+
+    // Coerce the pattern to the exception type.
+    if (!exnType ||
+        coercePatternToType(pattern, DC, exnType, TR_InExpression)) {
+      // If that failed, be sure to give the variables error types
+      // before we type-check the guard.  (This will probably kill
+      // most of the type-checking, but maybe not.)
+      pattern->forEachVariable([&](VarDecl *var) {
+            var->overwriteType(ErrorType::get(Context));
+            var->setInvalid();
+        });
+      hadTypeError = true;
+    }
+
+    S->setErrorPattern(pattern);
+  } else {
+    hadTypeError = true;
+  }
+
+  return hadTypeError;
+}
   
 /// Check an expression whose result is not being used at all.
 static void diagnoseIgnoredExpr(TypeChecker &TC, Expr *E) {

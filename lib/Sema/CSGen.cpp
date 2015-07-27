@@ -1792,11 +1792,12 @@ namespace {
     }
     
     /// \brief Walk a closure AST to determine if it can throw.
-    static bool closureCanThrow(ClosureExpr *expr) {
+    bool closureCanThrow(ClosureExpr *expr) {
       // A walker that looks for 'try' or 'throw' expressions
       // that aren't nested within closures, nested declarations,
       // or exhaustive catches.
       class FindInnerThrows : public ASTWalker {
+        ConstraintSystem &CS;
         bool FoundThrow = false;
         
         std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
@@ -1825,6 +1826,67 @@ namespace {
           
           return true;
         }
+
+        bool isSyntacticallyExhaustive(DoCatchStmt *stmt) {
+          for (auto catchClause : stmt->getCatches()) {
+            if (isSyntacticallyExhaustive(catchClause))
+              return true;
+          }
+
+          return false;
+        }
+
+        bool isSyntacticallyExhaustive(CatchStmt *clause) {
+          // If it's obviously non-exhaustive, great.
+          if (clause->getGuardExpr())
+            return false;
+
+          // If we can show that it's exhaustive without full
+          // type-checking, great.
+          if (clause->isSyntacticallyExhaustive())
+            return true;
+
+          // Okay, resolve the pattern.
+          Pattern *pattern = clause->getErrorPattern();
+          pattern = CS.TC.resolvePattern(pattern, CS.DC,
+                                         /*isStmtCondition*/false);
+          if (!pattern) return false;
+
+          // Save that aside while we explore the type.
+          clause->setErrorPattern(pattern);
+
+          // Require the pattern to have a particular shape: a number
+          // of is-patterns applied to an irrefutable pattern.
+          pattern = pattern->getSemanticsProvidingPattern();
+          while (auto isp = dyn_cast<IsPattern>(pattern)) {
+            if (CS.TC.validateType(isp->getCastTypeLoc(), CS.DC,
+                                   TR_InExpression))
+              return false;
+
+            if (!isp->hasSubPattern()) {
+              pattern = nullptr;
+              break;
+            } else {
+              pattern = isp->getSubPattern()->getSemanticsProvidingPattern();
+            }
+          }
+          if (pattern && pattern->isRefutablePattern()) {
+            return false;
+          }
+
+          // Okay, now it should be safe to coerce the pattern.
+          // Pull the top-level pattern back out.
+          pattern = clause->getErrorPattern();
+          Type exnType = CS.TC.getExceptionType(CS.DC, clause->getCatchLoc());
+          if (!exnType ||
+              CS.TC.coercePatternToType(pattern, CS.DC, exnType,
+                                        TR_InExpression)) {
+            return false;
+          }
+
+          clause->setErrorPattern(pattern);
+          return clause->isSyntacticallyExhaustive();
+        }
         
         std::pair<bool, Stmt *> walkToStmtPre(Stmt *stmt) override {
           // If we've found a 'throw', record it and terminate the traversal.
@@ -1837,7 +1899,7 @@ namespace {
           if (auto doCatch = dyn_cast<DoCatchStmt>(stmt)) {
             // Only walk into the 'do' clause of a do/catch statement
             // if the catch isn't syntactically exhaustive.
-            if (!doCatch->isSyntacticallyExhaustive()) {
+            if (!isSyntacticallyExhaustive(doCatch)) {
               if (!doCatch->getBody()->walk(*this))
                 return { false, nullptr };
             }
@@ -1856,6 +1918,8 @@ namespace {
         }
         
       public:
+        FindInnerThrows(ConstraintSystem &cs) : CS(cs) {}
+
         bool foundThrow() { return FoundThrow; }
       };
       
@@ -1867,7 +1931,7 @@ namespace {
       if (!body)
         return false;
       
-      auto tryFinder = FindInnerThrows();
+      auto tryFinder = FindInnerThrows(CS);
       body->walk(tryFinder);
       return tryFinder.foundThrow();
     }

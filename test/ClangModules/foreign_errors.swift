@@ -96,3 +96,15 @@ func testSwiftError() throws {
   let _: () = try ErrorProne.scotch()
   let _: Bool = ErrorProne.scout(&err)
 }
+
+// rdar://21074857
+func needsNonThrowing(fn: () -> ()) {}
+func testNSErrorExhaustive() {
+  needsNonThrowing {
+    do {
+      try ErrorProne.fail()
+    } catch let e as NSError {
+      e
+    }
+  }
+}
