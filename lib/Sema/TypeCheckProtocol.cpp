@@ -3792,24 +3792,24 @@ void ConformanceChecker::checkConformance() {
 
 static void diagnoseConformanceFailure(TypeChecker &TC, Type T,
                                        ProtocolDecl *Proto,
+                                       DeclContext *DC,
                                        SourceLoc ComplainLoc) {
   if (T->is<ErrorType>())
     return;
 
   // If we're checking conformance of an existential type to a protocol,
   // do a little bit of extra work to produce a better diagnostic.
-  SmallVector<ProtocolDecl *, 2> protocols;
-  if (T->isExistentialType(protocols)) {
-    for (auto proto : protocols) {
-      if (!proto->isObjC()) {
-        TC.diagnose(ComplainLoc, diag::protocol_does_not_conform,
-                    T, Proto->getDeclaredType(), proto->getDeclaredType(), 0);
-        return;
-      }
+  if (T->isExistentialType() &&
+      TC.isSubtypeOf(T, Proto->getDeclaredType(), DC)) {
+
+    if (!T->isObjCExistentialType()) {
+      TC.diagnose(ComplainLoc, diag::protocol_does_not_conform_objc,
+                  T, Proto->getDeclaredType());
+      return;
     }
 
-    TC.diagnose(ComplainLoc, diag::protocol_does_not_conform,
-                T, Proto->getDeclaredType(), Proto->getDeclaredType(), 1);
+    TC.diagnose(ComplainLoc, diag::protocol_does_not_conform_static,
+                T, Proto->getDeclaredType());
     return;
   }
 
@@ -3838,7 +3838,7 @@ void ConformanceChecker::diagnoseOrDefer(
 
   // Complain that the type does not conform, once.
   if (isError && !AlreadyComplained) {
-    diagnoseConformanceFailure(TC, Adoptee, Proto, Loc);
+    diagnoseConformanceFailure(TC, Adoptee, Proto, DC, Loc);
     AlreadyComplained = true;
   }
 
@@ -4046,7 +4046,7 @@ bool TypeChecker::conformsToProtocol(Type T, ProtocolDecl *Proto,
 
   case ConformanceKind::DoesNotConform:
     if (ComplainLoc.isValid())
-      diagnoseConformanceFailure(*this, T, Proto, ComplainLoc);
+      diagnoseConformanceFailure(*this, T, Proto, DC, ComplainLoc);
     else
       recordDependency();
     return false;

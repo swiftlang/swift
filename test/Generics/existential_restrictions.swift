@@ -58,13 +58,13 @@ class GAO<T : AnyObject> {}
 func blackHole(t: Any) {}
 
 func testBindExistential() {
-  blackHole(GP<P>()) // expected-error{{protocol type 'P' does not conform to protocol 'P' because 'P' is not declared @objc}}
+  blackHole(GP<P>()) // expected-error{{using 'P' as a concrete type conforming to protocol 'P' is not supported}}
   blackHole(GOP<OP>())
-  blackHole(GCP<CP>()) // expected-error{{protocol type 'CP' does not conform to protocol 'CP' because 'CP' is not declared @objc}}
-  blackHole(GAO<P>()) // expected-error{{protocol type 'P' does not conform to protocol 'AnyObject' because 'P' is not declared @objc}}
+  blackHole(GCP<CP>()) // expected-error{{using 'CP' as a concrete type conforming to protocol 'CP' is not supported}}
+  blackHole(GAO<P>()) // expected-error{{type 'P' does not conform to protocol 'AnyObject'}}
   blackHole(GAO<OP>())
-  blackHole(GAO<CP>()) // expected-error{{protocol type 'CP' does not conform to protocol 'AnyObject' because 'CP' is not declared @objc}}
-  blackHole(GSP<SP>()) // expected-error{{protocol type 'SP' does not conform to protocol 'SP' because 'SP' defines static methods}}
+  blackHole(GAO<CP>()) // expected-error{{using 'CP' as a concrete type conforming to protocol 'AnyObject' is not supported}}
+  blackHole(GSP<SP>()) // expected-error{{'SP' cannot be used as a type conforming to protocol 'SP' because 'SP' has static requirements}}
   blackHole(GAO<AnyObject>())
 }
 

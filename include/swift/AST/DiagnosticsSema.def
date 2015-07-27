@@ -782,10 +782,13 @@ ERROR(extension_anyobject,sema_tcd,none,
 // Protocols
 ERROR(type_does_not_conform,sema_tcd,none,
       "type %0 does not conform to protocol %1", (Type, Type))
-ERROR(protocol_does_not_conform,sema_tcc,none,
-      "protocol type %0 does not conform to protocol %1 because "
-      "%select{%2 is not declared @objc|%2 defines static methods}3",
-      (Type, Type, Type, unsigned))
+ERROR(protocol_does_not_conform_objc,sema_tcc,none,
+      "using %0 as a concrete type conforming to protocol %1 is not supported",
+      (Type, Type))
+ERROR(protocol_does_not_conform_static,sema_tcc,none,
+      "%0 cannot be used as a type conforming to protocol %1 because %1 "
+      "has static requirements",
+      (Type, Type))
 ERROR(protocol_derivation_is_broken,sema_tcd,none,
       "protocol %0 is broken; cannot derive conformance for type %1", (Type, Type))
 ERROR(type_does_not_inherit,sema_tcd,none,
