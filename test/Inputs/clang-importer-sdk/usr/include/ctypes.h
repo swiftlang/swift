@@ -204,4 +204,9 @@ typedef struct ModRM {
   unsigned opcode;
 } ModRM;
 
+//===---
+// Arrays
+//===---
+void useArray(char x[4], char y[], char z[][8]);
+
 #endif

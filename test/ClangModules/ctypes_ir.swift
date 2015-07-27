@@ -22,10 +22,15 @@ func testAnonEnumSmall() {
   var a = AnonConstSmall2
 }
 
-func testStructWithFlexibleArray(s : StructWithFlexibleArray)
-{
+func testStructWithFlexibleArray(s : StructWithFlexibleArray) {
   var a = s.a
 }
 
 // Make sure flexible array struct member isn't represented in IR function signature as i0 (or at all). rdar://problem/18510461
 // CHECK-LABEL: define hidden void @_TF9ctypes_ir27testStructWithFlexibleArrayFVSC23StructWithFlexibleArrayT_(i32)
+
+typealias EightUp = (Int8, Int8, Int8, Int8, Int8, Int8, Int8, Int8)
+
+func testArrays(x: UnsafeMutablePointer<Int8>, y: UnsafeMutablePointer<Int8>, z: UnsafeMutablePointer<EightUp>) {
+  useArray(x, y, z)
+}

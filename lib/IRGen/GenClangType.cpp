@@ -275,8 +275,25 @@ ClangTypeConverter::reverseBuiltinTypeMapping(IRGenModule &IGM,
 }
 
 clang::CanQualType GenClangType::visitTupleType(CanTupleType type) {
-  if (type->getNumElements() == 0)
+  unsigned e = type->getNumElements();
+  if (e == 0)
     return getClangASTContext().VoidTy;
+
+  CanType eltTy = type.getElementType(0);
+  for (unsigned i = 1; i < e; i++) {
+    assert(eltTy == type.getElementType(i) &&
+           "Only tuples where all element types are equal "
+           "map to fixed-size arrays");
+  }
+
+  auto clangEltTy = Converter.convert(IGM, eltTy);
+  if (!clangEltTy) return clang::CanQualType();
+
+  APInt size(32, e);
+  auto &ctx = getClangASTContext();
+  return ctx.getCanonicalType(
+      ctx.getConstantArrayType(clangEltTy, size,
+          clang::ArrayType::Normal, 0));
 
   llvm_unreachable("Unexpected tuple type in Clang type generation!");
 }
