@@ -348,6 +348,8 @@ func foo(x: Int, y: Int) -> Int { return x + y }
 
 /// Brief.
 ///
+/// Simple case.
+///
 /// - Parameters:
 ///   - x: A number
 ///   - y: Another number
@@ -378,7 +380,6 @@ func bar(x: Int, y: Int) -> Int { return x + y }
   - $$$: Not a field.
 
   Empty field, OK:
-- REQUIRES:
 */
 func baz() {}
 // CHECK: <doc-comment-block>/**
@@ -388,7 +389,6 @@ func baz() {}
 // CHECK:   - <doc-comment-field>WARNING</doc-comment-field>: - WARNING: Should only have one field
 // CHECK:   - $$$: Not a field.
 // CHECK:   Empty field, OK:
-// CHECK: - REQUIRES:
 // CHECK: */</doc-comment-block>
 // CHECK: <kw>func</kw> baz() {}
 
