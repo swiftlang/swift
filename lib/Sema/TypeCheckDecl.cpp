@@ -5227,6 +5227,8 @@ public:
     if (!EED->hasAccessibility())
       EED->setAccessibility(ED->getFormalAccess());
     
+    EED->setIsBeingTypeChecked();
+
     // Only attempt to validate the argument type or raw value if the element
     // is not currenly being validated.
     if (EED->getRecursiveness() == ElementRecursiveness::NotRecursive) {
@@ -5242,7 +5244,7 @@ public:
           return;
         }
       }
-      
+
       // If we have a raw value, make sure there's a raw type as well.
       if (auto *rawValue = EED->getRawValueExpr()) {
         if (!ED->hasRawType()) {
@@ -5269,8 +5271,10 @@ public:
       EED->setRecursiveness(ElementRecursiveness::NotRecursive);
     }
 
-    // Set the type of the enum element.
+    // Now that we have an argument type we can set the element's declared
+    // type.
     EED->computeType();
+    EED->setIsBeingTypeChecked(false);
 
     // Test for type parameters, as opposed to a generic decl context, in
     // case the enclosing enum type was illegally declared inside of a generic
