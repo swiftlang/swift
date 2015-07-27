@@ -1547,7 +1547,7 @@ SILCombiner::propagateConcreteTypeOfInitExistential(ApplyInst *AI,
 ///  @thick UnsafeMutableBufferPointer<Int>.Type) -> ()
 ///
 ///  => apply %207<Int>(%227, ...)
-static ApplyInst *optimizeCastThroughThinFuntionPointer(
+static ApplyInst *optimizeCastThroughThinFunctionPointer(
     SILBuilder *Builder, ApplyInst *AI, FunctionRefInst *OrigThinFun,
     PointerToThinFunctionInst *CastedThinFun) {
 
@@ -1776,7 +1776,7 @@ SILInstruction *SILCombiner::visitApplyInst(ApplyInst *AI) {
     if (auto *Ptr =
             dyn_cast<ThinFunctionToPointerInst>(CastedThinFun->getOperand()))
       if (auto *OrigThinFun = dyn_cast<FunctionRefInst>(Ptr->getOperand()))
-        if (auto *NewAI = optimizeCastThroughThinFuntionPointer(
+        if (auto *NewAI = optimizeCastThroughThinFunctionPointer(
                 Builder, AI, OrigThinFun, CastedThinFun)) {
           replaceInstUsesWith(*AI, NewAI, 0);
           eraseInstFromFunction(*AI);
