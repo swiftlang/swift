@@ -581,6 +581,15 @@ class alignas(1 << DeclAlignInBits) Decl {
   enum { NumInfixOperatorDeclBits = NumDeclBits + 14 };
   static_assert(NumInfixOperatorDeclBits <= 32, "fits in an unsigned");
 
+  class AssociatedTypeDeclBitfields {
+    friend class AssociatedTypeDecl;
+    unsigned : NumTypeDeclBits;
+
+    unsigned Recursive : 1;
+  };
+  enum { NumAssociatedTypeDeclBits = NumTypeDeclBits + 1 };
+  static_assert(NumAssociatedTypeDeclBits <= 32, "fits in an unsigned");
+
   class ImportDeclBitfields {
     friend class ImportDecl;
     unsigned : NumDeclBits;
@@ -633,6 +642,7 @@ protected:
     ClassDeclBitfields ClassDeclBits;
     StructDeclBitfields StructDeclBits;
     EnumDeclBitfields EnumDeclBits;
+    AssociatedTypeDeclBitfields AssociatedTypeDeclBits;
     InfixOperatorDeclBitfields InfixOperatorDeclBits;
     ImportDeclBitfields ImportDeclBits;
     ExtensionDeclBitfields ExtensionDeclBits;
@@ -2655,6 +2665,9 @@ public:
 
   SourceLoc getStartLoc() const { return KeywordLoc; }
   SourceRange getSourceRange() const;
+
+  void setIsRecursive() { AssociatedTypeDeclBits.Recursive = true; }
+  bool isRecursive() { return AssociatedTypeDeclBits.Recursive; }
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::AssociatedType;

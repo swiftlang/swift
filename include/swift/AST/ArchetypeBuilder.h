@@ -129,6 +129,11 @@ private:
   bool addConformanceRequirement(PotentialArchetype *T,
                                  ProtocolDecl *Proto,
                                  RequirementSource Source);
+
+  bool addConformanceRequirement(PotentialArchetype *T,
+                                 ProtocolDecl *Proto,
+                                 RequirementSource Source,
+                                llvm::SmallPtrSetImpl<ProtocolDecl *> *Visited);
   
   /// \brief Add a new conformance requirement specifying that the given
   /// potential archetypes are equivalent.

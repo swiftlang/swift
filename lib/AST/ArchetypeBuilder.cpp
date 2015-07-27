@@ -790,7 +790,15 @@ bool ArchetypeBuilder::addGenericParameter(GenericTypeParamType *GenericParam) {
 
 bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
                                                  ProtocolDecl *Proto,
-                                                 RequirementSource Source){
+                                                 RequirementSource Source) {
+  llvm::SmallPtrSet<ProtocolDecl *, 8> Visited;
+  return addConformanceRequirement(PAT, Proto, Source, &Visited);
+}
+
+bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
+                                                 ProtocolDecl *Proto,
+                                                 RequirementSource Source,
+                               llvm::SmallPtrSetImpl<ProtocolDecl *> *Visited) {
   // Add the requirement to the representative.
   auto T = PAT->getRepresentative();
 
@@ -799,10 +807,16 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
     return false;
 
   RequirementSource InnerSource(RequirementSource::Protocol, Source.getLoc());
+  
+  bool inserted = Visited->insert(Proto).second;
+  assert(inserted);
+  (void) inserted;
 
   // Add all of the inherited protocol requirements, recursively.
   for (auto InheritedProto : Impl->getInheritedProtocols(Proto)) {
-    if (addConformanceRequirement(T, InheritedProto, InnerSource))
+    if (Visited->count(InheritedProto))
+      continue;
+    if (addConformanceRequirement(T, InheritedProto, InnerSource, Visited))
       return true;
   }
 
@@ -822,18 +836,20 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
         for (auto InheritedProto : superclassAndConformsTo.second) {
           // If it's a recursive requirement, add it directly to the associated
           // archetype.
-          if (InheritedProto == Proto || InheritedProto->inheritsFrom(Proto)) {
+          if (Visited->count(InheritedProto)) {
             // FIXME: Drop InheritedProto!
-            if (!AssocPA->isRecursive() && !AssocType->getArchetype()) {
+            if (!AssocPA->isRecursive() && !AssocType->isRecursive()) {
               Diags.diagnose(AssocType->getLoc(),
                              diag::recursive_requirement_reference);
+              AssocType->setIsRecursive();
             }
             AssocPA->setIsRecursive();
-            AssocPA->addConformance(Proto, Source, *this);
+            AssocPA->addConformance(InheritedProto, Source, *this);
             continue;
           }
           
-          if (addConformanceRequirement(AssocPA, InheritedProto, InnerSource))
+          if (addConformanceRequirement(AssocPA, InheritedProto, InnerSource,
+                                        Visited))
             return true;
         }
       }
@@ -843,7 +859,8 @@ bool ArchetypeBuilder::addConformanceRequirement(PotentialArchetype *PAT,
 
     // FIXME: Requirement declarations.
   }
-
+  
+  Visited->erase(Proto);
   return false;
 }
 
