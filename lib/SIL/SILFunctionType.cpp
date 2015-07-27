@@ -958,6 +958,10 @@ namespace {
       return ParameterConvention::Direct_Unowned;
     }
 
+    /// Given that a method returns a CF type, infer its method
+    /// family.  Unfortunately, Clang's getMethodFamily() never
+    /// considers a method to be in a special family if its result
+    /// doesn't satisfy isObjCRetainable().
     clang::ObjCMethodFamily getMethodFamilyForCFResult() const {
       // Trust an explicit attribute.
       if (auto attr = Method->getAttr<clang::ObjCMethodFamilyAttr>()) {
