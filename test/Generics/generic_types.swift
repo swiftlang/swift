@@ -305,3 +305,7 @@ struct X4 : P, Q {
 struct X5<T, U where T: P, T: Q, T.AssocP == T.AssocQ> { } // expected-note{{requirement specified as 'T.AssocP' == 'T.AssocQ' [with T = X4]}}
 
 var y: X5<X4, Int> // expected-error{{'X5' requires the types 'AssocP' (aka 'Int') and 'AssocQ' (aka 'String') be equivalent}}
+
+// Recursive generic signature validation.
+class Top {}
+class Bottom<T : Bottom<Top>> {} // expected-error{{type may not reference itself as a requirement}}

@@ -1,10 +1,9 @@
-// RUN: not --crash %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -parse
 
 // Distributed under the terms of the MIT license
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-protocol e {
-enum S<S : S<Int>] = b
-}
-enum A : B, e(()
+struct D : T, f: T>]("")
+class func g<I : NSManagedObject {
+class B<H : B<D> V

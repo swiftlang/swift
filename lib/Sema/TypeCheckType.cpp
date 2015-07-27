@@ -392,6 +392,10 @@ Type TypeChecker::applyGenericArguments(Type type,
                                                 genericArgTypes);
   // Check protocol conformance.
   if (!BGT->hasTypeParameter()) {
+    SourceLoc noteLoc = unbound->getDecl()->getLoc();
+    if (noteLoc.isInvalid())
+      noteLoc = loc;
+
     // FIXME: Record that we're checking substitutions, so we can't end up
     // with infinite recursion.
 
@@ -401,9 +405,11 @@ Type TypeChecker::applyGenericArguments(Type type,
 
     // Check the generic arguments against the generic signature.
     auto genericSig = unbound->getDecl()->getGenericSignature();
-    SourceLoc noteLoc = unbound->getDecl()->getLoc();
-    if (noteLoc.isInvalid())
-      noteLoc = loc;
+    if (unbound->getDecl()->IsValidatingGenericSignature()) {
+      diagnose(loc, diag::recursive_requirement_reference);
+      return BGT;
+    }
+    assert(genericSig != nullptr);
     if (checkGenericArguments(dc, loc, noteLoc, unbound, genericSig,
                               allGenericArgs))
       return nullptr;

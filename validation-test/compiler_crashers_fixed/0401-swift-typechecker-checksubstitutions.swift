@@ -1,9 +1,12 @@
-// RUN: not --crash %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -parse
 
 // Distributed under the terms of the MIT license
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-protocol d == { x }
-class B<l : c<C> String = c] in
-protocol c : B<d>
+let c: NSObject {
+class A {
+[unowned self.c == F>: NSObject {
+}
+self] in
+class C<H : C<A> T>
