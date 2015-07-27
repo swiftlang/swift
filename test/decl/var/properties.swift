@@ -630,7 +630,7 @@ var selfRefTopLevelSetter: Int {
 }
 var selfRefTopLevelSilenced: Int {
   get {
-  return properties.selfRefTopLevelSilenced // no-warning
+    return properties.selfRefTopLevelSilenced // no-warning
   }
   set {
     properties.selfRefTopLevelSilenced = newValue // no-warning
@@ -876,6 +876,14 @@ var globalDidsetWillSet2 : Int = 42 {
 }
 
 
+class Box {
+  var num: Int
+
+  init(num: Int) {
+    self.num = num
+  }
+}
+
 class ObservingPropertiesNotMutableInWillSet {
   var anotherObj : ObservingPropertiesNotMutableInWillSet
   
@@ -885,6 +893,14 @@ class ObservingPropertiesNotMutableInWillSet {
       // <rdar://problem/16826319> willSet immutability behavior is incorrect
       anotherObj.property = 19 // ok
       property = 19  // expected-warning {{attempting to store to property 'property' within its own willSet}}
+    }
+  }
+
+  // <rdar://problem/21392221> - call to getter through BindOptionalExpr was not viewed as a load
+  var _oldBox : Int
+  weak var weakProperty: Box? {
+    willSet {
+      _oldBox = weakProperty?.num ?? -1
     }
   }
 
