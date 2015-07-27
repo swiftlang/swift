@@ -411,7 +411,7 @@ SILInstruction *swift::devirtualizeClassMethod(ApplyInst *AI,
 
   SILType SubstCalleeSILType =
     SILType::getPrimitiveObjectType(SubstCalleeType);
-  ApplyInst *NewAI =
+  SILInstruction *NewAI =
     B.createApply(AI->getLoc(), FRI, SubstCalleeSILType, ReturnType,
                   Subs, NewArgs);
 
@@ -433,7 +433,8 @@ SILInstruction *swift::devirtualizeClassMethod(ApplyInst *AI,
   if (auto *FD = dyn_cast<FuncDecl>(CMI->getMember().getDecl())) {
     if (FD->isAccessor()) {
       if (auto ResultTupleTy = dyn_cast<TupleType>(ReturnType.getSwiftRValueType()))
-        return castTupleReturnType(AI, NewAI, ResultTupleTy, F, B);
+        return castTupleReturnType(AI, dyn_cast<ApplyInst>(NewAI),
+                                   ResultTupleTy, F, B);
     }
   }
 
@@ -450,6 +451,28 @@ SILInstruction *swift::devirtualizeClassMethod(ApplyInst *AI,
 
   auto OptionalAIType = AI->getType().getSwiftRValueType()
     .getAnyOptionalObjectType(AI_OTK);
+
+  // Return type if not an optional, but the expected type is an optional
+  // and the first one is the subclass of the second one.
+  if (OptionalAIType && !OptionalReturnType &&
+      SILType::getPrimitiveObjectType(OptionalAIType)
+               .isSuperclassOf(ReturnType)) {
+    // The devirtualized method returns a non-optional result.
+    // We need to wrap it into an optional.
+    auto OptType = OptionalType::get(AI_OTK,
+                                     ReturnType.getSwiftRValueType()).
+                                 getCanonicalTypeOrNull();
+    NewAI = B.createOptionalSome(AI->getLoc(), NewAI,
+                                 AI_OTK,
+                                 SILType::getPrimitiveObjectType(OptType));
+    OptionalReturnType = ReturnType.getSwiftRValueType();
+
+    if (OptionalAIType == OptionalReturnType) {
+      DEBUG(llvm::dbgs() << "        SUCCESS: " << F->getName() << "\n");
+      NumClassDevirt++;
+      return NewAI;
+    }
+  }
 
   if (OptionalReturnType && OptionalAIType &&
       SILType::getPrimitiveObjectType(OptionalAIType)

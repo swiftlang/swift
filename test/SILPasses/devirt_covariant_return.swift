@@ -104,7 +104,7 @@ func driver() -> () {
 driver()
 
 
-final class Payload {
+class Payload {
   let value: Int32
   init(_ n: Int32) {
     value = n
@@ -112,6 +112,12 @@ final class Payload {
 
   func getValue() -> Int32 {
     return value
+  }
+}
+
+final class Payload1: Payload {
+  override init(_ n: Int32) {
+    super.init(n)
   }
 }
 
@@ -129,6 +135,14 @@ final class C1:C {
    }
 }
 
+final class C2:C {
+   // Override base method, but return a non-optional result of a type,
+   // which is derived from the expected type.
+   override func doSomething() -> Payload1 {
+      return Payload1(2)
+   }
+}
+
 // Check that the Optional return value from doSomething
 // gets properly unwrapped into a Payload object and then further
 // devirtualized.
@@ -140,6 +154,20 @@ final class C1:C {
 // CHECK: return
 func driver1(var c: C1) -> Int32 {
   return c.doSomething().getValue()
+}
+
+// Check that the Optional return value from doSomething
+// gets properly unwrapped into a Payload object and then further
+// devirtualized.
+// CHECK-LABEL: sil hidden @_TF23devirt_covariant_return7driver3FCS_1CVSs5Int32 :
+// CHECK: bb{{[0-9]+}}(%{{[0-9]+}} : $C2):
+// CHECK-NOT: bb{{.*}}:
+// check that for C2, we convert the non-optional result into an optional and then cast.
+// CHECK: enum $Optional
+// CHECK-NEXT: upcast
+// CHECK: return
+func driver3(var c: C) -> Int32 {
+  return c.doSomething()!.getValue()
 }
 
 public class Bear {
