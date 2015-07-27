@@ -1,8 +1,7 @@
-// RUN: not --crash %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -parse
 
 // Distributed under the terms of the MIT license
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-class D{class a{func a class A:a
-var f=A{}class a
+func a:class a}class b:a:class C{protocol a{func u(f

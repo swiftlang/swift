@@ -6779,6 +6779,7 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   // FIXME: Currently skipping generic classes.
   auto classDecl = cast<ClassDecl>(decl);
   assert(!classDecl->hasSuperclass() ||
+         classDecl->getSuperclass()->getAnyNominal()->isInvalid() ||
          classDecl->getSuperclass()->getAnyNominal()
            ->addedImplicitInitializers());
   if (classDecl->hasSuperclass() && !classDecl->isGenericContext() &&

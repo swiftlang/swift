@@ -66,18 +66,28 @@ typealias typealias_redecl2 = UInt // expected-error {{invalid redeclaration}}
 
 var mixed_redecl1: Int // expected-note {{previously declared here}}
 class mixed_redecl1 {} // expected-error {{invalid redeclaration}}
+class mixed_redecl1a : mixed_redecl1 {}
 
 class mixed_redecl2 {} // expected-note {{previously declared here}}
 struct mixed_redecl2 {} // expected-error {{invalid redeclaration}}
 
 class mixed_redecl3 {} // expected-note {{previously declared here}}
+// expected-note @-1 2{{found this candidate}}
 enum mixed_redecl3 {} // expected-error {{invalid redeclaration}}
+// expected-note @-1 2{{found this candidate}}
+enum mixed_redecl3a : mixed_redecl3 {} // expected-error {{'mixed_redecl3' is ambiguous for type lookup in this context}}
+// expected-error @-1{{'mixed_redecl3a' does not conform}}
+class mixed_redecl3b : mixed_redecl3 {} // expected-error {{'mixed_redecl3' is ambiguous for type lookup in this context}}
 
 class mixed_redecl4 {} // expected-note {{previously declared here}}
+// expected-note@-1{{found this candidate}}
 protocol mixed_redecl4 {} // expected-error {{invalid redeclaration}}
+// expected-note@-1{{found this candidate}}
+protocol mixed_redecl4a : mixed_redecl4 {} // expected-error {{'mixed_redecl4' is ambiguous for type lookup in this context}}
 
 class mixed_redecl5 {} // expected-note {{previously declared here}}
 typealias mixed_redecl5 = Int // expected-error {{invalid redeclaration}}
+typealias mixed_redecl5a = mixed_redecl5
 
 func mixed_redecl6() {} // expected-note {{'mixed_redecl6()' previously declared here}}
 var mixed_redecl6: Int // expected-error {{invalid redeclaration of 'mixed_redecl6'}}
@@ -87,6 +97,7 @@ func mixed_redecl7() {} // expected-error {{invalid redeclaration of 'mixed_rede
 
 func mixed_redecl8() {} // expected-note {{previously declared here}}
 class mixed_redecl8 {} // expected-error {{invalid redeclaration}}
+class mixed_redecl8a : mixed_redecl8 {}
 
 class mixed_redecl9 {} // expected-note {{previously declared here}}
 func mixed_redecl9() {} // expected-error {{invalid redeclaration}}
