@@ -3,11 +3,6 @@
 
 // REQUIRES: objc_interop
 
-// REQUIRES: GameplayKit
-// FIXME: There should be no extra requirements in this test.
-// The availability check below is not enough because of:
-// <rdar://problem/20924154> No backward deployment story for overlays for new frameworks
-
 import StdlibUnittest
 import GameplayKit
 
