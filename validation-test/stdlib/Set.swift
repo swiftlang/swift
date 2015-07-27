@@ -1587,10 +1587,11 @@ SetTestSuite.test("BridgedFromObjC.Verbatim.RemoveAtIndex") {
   expectEqual(TestObjCKeyTy(1010), s[foundIndex1])
   expectEqual(identity1, unsafeBitCast(s, Int.self))
 
-  s.removeAtIndex(foundIndex1)
+  let removedElement = s.removeAtIndex(foundIndex1)
   expectNotEqual(identity1, unsafeBitCast(s, Int.self))
   expectTrue(isNativeSet(s))
   expectEqual(2, s.count)
+  expectEqual(TestObjCKeyTy(1010), removedElement)
   expectEmpty(s.indexOf(TestObjCKeyTy(1010)))
 }
 
@@ -1603,9 +1604,10 @@ SetTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAtIndex") {
   expectEqual(1010, s[foundIndex1].value)
   expectEqual(identity1, unsafeBitCast(s, Int.self))
 
-  s.removeAtIndex(foundIndex1)
+  let removedElement = s.removeAtIndex(foundIndex1)
   expectEqual(identity1, unsafeBitCast(s, Int.self))
   expectTrue(isNativeSet(s))
+  expectEqual(1010, removedElement.value)
   expectEqual(2, s.count)
   expectEmpty(s.indexOf(TestBridgedKeyTy(1010)))
 }
@@ -3515,6 +3517,19 @@ SetTestSuite.test("popFirst") {
     }
     expectEqualSequence(expected, Array(popped))
     expectTrue(s.isEmpty)
+  }
+}
+
+SetTestSuite.test("removeAtIndex") {
+  // Test removing from the startIndex, the middle, and the end of a set.
+  for i in 1...3 {
+    var s = Set<Int>([1010, 2020, 3030])
+    let removed = s.removeAtIndex(s.indexOf(i*1010)!)
+    expectEqual(i*1010, removed)
+    expectEqual(2, s.count)
+    expectEmpty(s.indexOf(i*1010))
+    let origKeys: [Int] = [1010, 2020, 3030]
+    expectEqual(origKeys.filter { $0 != (i*1010) }, [Int](s).sort())
   }
 }
 

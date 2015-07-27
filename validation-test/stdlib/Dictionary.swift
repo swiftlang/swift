@@ -1807,9 +1807,11 @@ DictionaryTestSuite.test("BridgedFromObjC.Verbatim.RemoveAtIndex") {
   assert(d[foundIndex1].1.value == 1010)
   assert(identity1 == unsafeBitCast(d, Int.self))
 
-  d.removeAtIndex(foundIndex1)
+  let removedElement = d.removeAtIndex(foundIndex1)
   assert(identity1 != unsafeBitCast(d, Int.self))
   assert(isNativeDictionary(d))
+  assert(removedElement.0 == TestObjCKeyTy(10))
+  assert(removedElement.1.value == 1010)
   assert(d.count == 2)
   assert(d.indexForKey(TestObjCKeyTy(10)) == nil)
 }
@@ -1824,9 +1826,11 @@ DictionaryTestSuite.test("BridgedFromObjC.Nonverbatim.RemoveAtIndex") {
   assert(d[foundIndex1].1.value == 1010)
   assert(identity1 == unsafeBitCast(d, Int.self))
 
-  d.removeAtIndex(foundIndex1)
+  let removedElement = d.removeAtIndex(foundIndex1)
   assert(identity1 == unsafeBitCast(d, Int.self))
   assert(isNativeDictionary(d))
+  assert(removedElement.0 == TestObjCKeyTy(10))
+  assert(removedElement.1.value == 1010)
   assert(d.count == 2)
   assert(d.indexForKey(TestBridgedKeyTy(10)) == nil)
 }
@@ -3848,6 +3852,24 @@ DictionaryTestSuite.test("popFirst") {
       $0.0 == $1.0 && $0.1 == $1.1
     }
     expectTrue(d.isEmpty)
+  }
+}
+
+DictionaryTestSuite.test("removeAtIndex") {
+  // Test removing from the startIndex, the middle, and the end of a dictionary.
+  for i in 1...3 {
+    var d: [Int: Int] = [
+      10: 1010,
+      20: 2020,
+      30: 3030,
+    ]
+    let removed = d.removeAtIndex(d.indexForKey(i*10)!)
+    expectEqual(i*10, removed.0)
+    expectEqual(i*1010, removed.1)
+    expectEqual(2, d.count)
+    expectEmpty(d.indexForKey(i))
+    let origKeys: [Int] = [10, 20, 30]
+    expectEqual(origKeys.filter { $0 != (i*10) }, d.keys.sort())
   }
 }
 

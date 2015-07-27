@@ -211,7 +211,7 @@ internal protocol _HashStorageType {
   func assertingGet(key: Key) -> Value
   func maybeGet(key: Key) -> Value?
   mutating func updateValue(value: Value, forKey: Key) -> Value?
-  mutating func removeAtIndex(index: Index)
+  mutating func removeAtIndex(index: Index) -> SequenceElement
   mutating func removeValueForKey(key: Key) -> Value?
   mutating func removeAll(keepCapacity keepCapacity: Bool)
   var count: Int { get }
@@ -384,8 +384,8 @@ public struct Set<Element : Hashable> :
   }
 
   /// Remove the member referenced by the given index.
-  public mutating func removeAtIndex(index: Index) {
-    _variantStorage.removeAtIndex(index)
+  public mutating func removeAtIndex(index: Index) -> Element {
+    return _variantStorage.removeAtIndex(index)
   }
 
   /// Erase all the elements.  If `keepCapacity` is `true`, `capacity`
@@ -1088,8 +1088,8 @@ public struct Dictionary<Key : Hashable, Value> :
   /// Invalidates all indices with respect to `self`.
   ///
   /// - Complexity: O(`count`).
-  public mutating func removeAtIndex(index: Index) {
-    _variantStorage.removeAtIndex(index)
+  public mutating func removeAtIndex(index: Index) -> Element {
+    return _variantStorage.removeAtIndex(index)
   }
 
   /// Remove a given key and the associated value from the dictionary.
@@ -1881,7 +1881,7 @@ struct _Native${Self}Storage<${TypeParametersDecl}> :
       "don't call mutating methods on _Native${Self}Storage")
   }
 
-  internal mutating func removeAtIndex(index: Index) {
+  internal mutating func removeAtIndex(index: Index) -> SequenceElement {
     _sanityCheckFailure(
       "don't call mutating methods on _Native${Self}Storage")
   }
@@ -2503,7 +2503,7 @@ internal struct _Cocoa${Self}Storage : _HashStorageType {
     _sanityCheckFailure("can not mutate NS${Self}")
   }
 
-  internal mutating func removeAtIndex(index: Index) {
+  internal mutating func removeAtIndex(index: Index) -> SequenceElement {
     _sanityCheckFailure("can not mutate NS${Self}")
   }
 
@@ -2919,7 +2919,9 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
     return oldValue
   }
 
-  internal mutating func nativeRemoveAtIndex(nativeIndex: NativeIndex) {
+  internal mutating func nativeRemoveAtIndex(
+    nativeIndex: NativeIndex
+  ) -> SequenceElement {
     var nativeStorage = native
 
     // The provided index should be valid, so we will always mutating the
@@ -2929,25 +2931,26 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
       nativeStorage = native
     }
 
+    let result = nativeStorage.assertingGet(nativeIndex)
 %if Self == 'Set':
-    let key = nativeStorage.assertingGet(nativeIndex)
+    let key = result
 %elif Self == 'Dictionary':
-    let key = nativeStorage.assertingGet(nativeIndex).0
+    let key = result.0
 %end
 
     nativeDeleteImpl(nativeStorage, idealBucket: nativeStorage._bucket(key),
         offset: nativeIndex.offset)
+    return result
   }
 
-  internal mutating func removeAtIndex(index: Index) {
+  internal mutating func removeAtIndex(index: Index) -> SequenceElement {
     if _fastPath(guaranteedNative) {
-      nativeRemoveAtIndex(index._nativeIndex)
-      return
+      return nativeRemoveAtIndex(index._nativeIndex)
     }
 
     switch self {
     case .Native:
-      nativeRemoveAtIndex(index._nativeIndex)
+      return nativeRemoveAtIndex(index._nativeIndex)
     case .Cocoa(let cocoaStorage):
 #if _runtime(_ObjC)
       // We have to migrate the data first.  But after we do so, the Cocoa
@@ -2959,8 +2962,15 @@ internal enum _Variant${Self}Storage<${TypeParametersDecl}> : _HashStorageType {
       let anyObjectKey: AnyObject =
         cocoaIndex.allKeys[cocoaIndex.currentKeyIndex]
       migrateDataToNativeStorage(cocoaStorage)
-      nativeRemoveObjectForKey(
-        _forceBridgeFromObjectiveC(anyObjectKey, Key.self))
+      let key = _forceBridgeFromObjectiveC(anyObjectKey, Key.self)
+      let value = nativeRemoveObjectForKey(key)
+
+%if Self == 'Set':
+      _sanityCheck(key == value, "bridging did not preserve equality")
+      return key
+%elif Self == 'Dictionary':
+      return (key, _unsafeUnwrap(value))
+%end
 #else
       _sanityCheckFailure("internal error: unexpected cocoa ${Self}")
 #endif
@@ -3696,9 +3706,7 @@ extension ${Self} {
   /// - Complexity: Amortized O(1)
   public mutating func popFirst() -> Element? {
     guard !isEmpty else { return nil }
-    let element = self[startIndex]
-    removeAtIndex(startIndex)
-    return element
+    return removeAtIndex(startIndex)
   }
 }
 
