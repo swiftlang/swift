@@ -1,7 +1,12 @@
-// RUN: not --crash %target-swift-frontend %s -parse
+// RUN: not %target-swift-frontend %s -parse
 
 // Distributed under the terms of the MIT license
 // Test case submitted to project by https://github.com/practicalswift (practicalswift)
 // Test case found by fuzzing
 
-class d<T{class A:d}Void{
+func c{
+class B<T{
+class b{
+struct E{class A:B{
+protocol a
+class c<f:a

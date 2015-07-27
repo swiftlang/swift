@@ -54,6 +54,10 @@ class OuterGenericClass<T> {
     func flip(r: Rooster)
     func flop(t: T)
   }
+
+  class InnerNonGenericClass : InnerNonGenericBase {} // expected-error {{type 'InnerNonGenericClass' nested in generic type 'OuterGenericClass' is not allowed}}
+
+  class InnerNonGenericBase {} // expected-error {{type 'InnerNonGenericBase' nested in generic type 'OuterGenericClass' is not allowed}}
 }
 
 protocol OuterProtocol {

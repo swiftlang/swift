@@ -314,12 +314,16 @@ TypeBase::gatherAllSubstitutions(Module *module,
                                                                 resolver,
                                                                 gpContext));
       type = boundGeneric->getParent();
+      if (gpContext)
+        gpContext = gpContext->getParent();
       continue;
     }
 
     // Skip to the parent of a nominal type.
     if (auto nominal = type->getAs<NominalType>()) {
       type = nominal->getParent();
+      if (gpContext)
+        gpContext = gpContext->getParent();
       continue;
     }
 
@@ -1741,27 +1745,17 @@ bool TypeBase::isSpelledLike(Type other) {
 }
 
 Type TypeBase::getSuperclass(LazyResolver *resolver) {
-  Type superclassTy;
   Type specializedTy;
-  Module *module = nullptr;
+  ClassDecl *classDecl;
   if (auto classTy = getAs<ClassType>()) {
-    superclassTy = classTy->getDecl()->getSuperclass();
-    module = classTy->getDecl()->getModuleContext();
+    classDecl = classTy->getDecl();
     if (auto parentTy = classTy->getParent()) {
       if (parentTy->isSpecialized())
         specializedTy = parentTy;
     }
   } else if (auto boundTy = getAs<BoundGenericType>()) {
-    if (auto classDecl = dyn_cast<ClassDecl>(boundTy->getDecl())) {
-      if (classDecl->hasSuperclass()) {
-        // FIXME: Lame to rely on archetypes in the substitution below.
-        superclassTy = ArchetypeBuilder::mapTypeIntoContext(
-                         classDecl,
-                         classDecl->getSuperclass());
-        module = classDecl->getModuleContext();
-        specializedTy = this;
-      }
-    }
+    classDecl = dyn_cast<ClassDecl>(boundTy->getDecl());
+    specializedTy = this;
   } else if (auto archetype = getAs<ArchetypeType>()) {
     return archetype->getSuperclass();
   } else if (auto dynamicSelfTy = getAs<DynamicSelfType>()) {
@@ -1771,8 +1765,15 @@ Type TypeBase::getSuperclass(LazyResolver *resolver) {
     return nullptr;
   }
 
+  Type superclassTy;
+  if (classDecl)
+    superclassTy = classDecl->getSuperclass();
+
   if (!specializedTy || !superclassTy)
     return superclassTy;
+
+  // FIXME: Lame to rely on archetypes in the substitution below.
+  superclassTy = ArchetypeBuilder::mapTypeIntoContext(classDecl, superclassTy);
 
   // If the type is specialized, we need to gather all of the substitutions.
   // We've already dealt with the top level, but continue gathering
@@ -1796,6 +1797,7 @@ Type TypeBase::getSuperclass(LazyResolver *resolver) {
   }
 
   // Perform substitutions into the base type.
+  Module *module = classDecl->getModuleContext();
   return superclassTy.subst(module, substitutions, None);
 }
 
