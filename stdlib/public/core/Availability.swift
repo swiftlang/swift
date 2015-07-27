@@ -44,7 +44,7 @@ public func _stdlib_isOSVersionAtLeast(
 
 extension _SwiftNSOperatingSystemVersion : Comparable { }
 
-public func ==(
+public func == (
   left: _SwiftNSOperatingSystemVersion,
   right: _SwiftNSOperatingSystemVersion
 ) -> Bool {
@@ -54,62 +54,62 @@ public func ==(
 }
 
 /// Lexicographic comparison of version components.
-public func <(
-  left: _SwiftNSOperatingSystemVersion,
-  right: _SwiftNSOperatingSystemVersion
+public func < (
+  _lhs: _SwiftNSOperatingSystemVersion,
+  _rhs: _SwiftNSOperatingSystemVersion
 ) -> Bool {
-  if left.majorVersion > right.majorVersion {
+  if _lhs.majorVersion > _rhs.majorVersion {
     return false
   }
 
-  if left.majorVersion < right.majorVersion {
+  if _lhs.majorVersion < _rhs.majorVersion {
     return true
   }
 
-  if left.minorVersion > right.minorVersion {
+  if _lhs.minorVersion > _rhs.minorVersion {
     return false
   }
 
-  if left.minorVersion < right.minorVersion {
+  if _lhs.minorVersion < _rhs.minorVersion {
     return true
   }
 
-  if left.patchVersion > right.patchVersion {
+  if _lhs.patchVersion > _rhs.patchVersion {
     return false
   }
 
-  if left.patchVersion < right.patchVersion {
+  if _lhs.patchVersion < _rhs.patchVersion {
     return true
   }
 
   return false
 }
 
-public func >=(
-  left: _SwiftNSOperatingSystemVersion,
-  right: _SwiftNSOperatingSystemVersion
+public func >= (
+  _lhs: _SwiftNSOperatingSystemVersion,
+  _rhs: _SwiftNSOperatingSystemVersion
 ) -> Bool {
-  if left.majorVersion < right.majorVersion {
+  if _lhs.majorVersion < _rhs.majorVersion {
     return false
   }
 
-  if left.majorVersion > right.majorVersion {
+  if _lhs.majorVersion > _rhs.majorVersion {
     return true
   }
 
-  if left.minorVersion < right.minorVersion {
+  if _lhs.minorVersion < _rhs.minorVersion {
     return false
   }
 
-  if left.minorVersion > right.minorVersion {
+  if _lhs.minorVersion > _rhs.minorVersion {
     return true
   }
 
-  if left.patchVersion < right.patchVersion {
+  if _lhs.patchVersion < _rhs.patchVersion {
     return false
   }
 
-  if left.patchVersion > right.patchVersion {
+  if _lhs.patchVersion > _rhs.patchVersion {
     return true
   }
 
