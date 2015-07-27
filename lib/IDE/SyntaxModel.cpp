@@ -1305,8 +1305,12 @@ bool ModelASTWalker::searchForURL(CharSourceRange Range) {
       if (!passNode(Node))
         return false;
       Text = Text.substr(Match.data() - Text.data() + Match.size());
-    } else
-      break;
+    } else {
+      auto Index = Text.find(':');
+      if (Index == StringRef::npos)
+        break;
+      Text = Text.substr(Index + 1);
+    }
   }
   return true;
 }
