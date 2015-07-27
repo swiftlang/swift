@@ -1808,22 +1808,25 @@ SequenceTypeAlgorithms.test("flatMap/SequenceType") {
   }
 }
 
-SequenceTypeAlgorithms.test("flatMap/MinimalSequence/Lazy") {
+% for Kind in 'Sequence', 'ForwardCollection', 'BidirectionalCollection':
+%   Minimal = 'Minimal' + Kind
+SequenceTypeAlgorithms.test("flatMap/${Kind}/Lazy") {
   for test in flatMapTests {
-    let s = MinimalSequence<OpaqueValue<Int>>(
+    let s = ${Minimal}<OpaqueValue<Int>>(
       test.sequence.map(OpaqueValue.init))
     let closureLifetimeTracker = LifetimeTracked(0)
     var timesClosureWasCalled = 0
     var result = s._prext_lazy.flatMap {
-      (element: OpaqueValue<Int>) -> MinimalSequence<OpaqueValue<Int32>> in
+      (element: OpaqueValue<Int>) -> ${Minimal}<OpaqueValue<Int32>> in
       _blackHole(closureLifetimeTracker)
       ++timesClosureWasCalled
-      return MinimalSequence<OpaqueValue<Int32>>(
+      return ${Minimal}<OpaqueValue<Int32>>(
         test.transform(element.value).map { OpaqueValue(Int32($0)) })
     }
     expectEqual(0, timesClosureWasCalled, "Unexpected eagerness")
 
-    checkSequence(
+%   if Kind == 'Sequence':
+    check${Kind}(
       test.expected.map(OpaqueValue.init), result,
       stackTrace: SourceLocStack().with(test.loc),
       resiliencyChecks: .none
@@ -1832,14 +1835,38 @@ SequenceTypeAlgorithms.test("flatMap/MinimalSequence/Lazy") {
       test.sequence.count, timesClosureWasCalled,
       "iterating forward the result of the lazy flatMap() should call "
       + "the closure only once for element")
+%   else:
+    _ = Array(result)
+    /*
+    FIXME: this check is failing.
+    This is a fundamental problem with lazy flatMap().
+    <rdar://problem/21989896> Investigate other CollectionType schemes: indices
+    are compositions of offsets
 
+    expectEqual(
+      test.sequence.count, timesClosureWasCalled,
+      "iterating forward the result of the lazy flatMap() should call "
+      + "the closure only once for element")
+    */
+
+    // FIXME: we are not calling check${Kind} because of the same issue again.
+    // <rdar://problem/21989896>
+    expectEqualSequence(
+      test.expected.map(OpaqueValue.init), result,
+      stackTrace: SourceLocStack().with(test.loc)
+    ) { $0.value == $1.value }
+%   end
+
+    % if Kind == 'Sequence':
     expectTrue(Array(s).isEmpty, "sequence should be consumed")
     expectEqual(
       test.sequence.count, timesClosureWasCalled,
       "iterating a lazy flatMap() should call the predicate"
       + "once per element")
+    % end
   }
 }
+% end
 
 struct FlatMapToOptionalTest {
   let expected: [Int32]
