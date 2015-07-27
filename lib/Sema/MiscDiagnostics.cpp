@@ -613,7 +613,7 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
               shouldDiagnose = false;
 
             if (shouldDiagnose) {
-              TC.diagnose(E->getLoc(), diag::recursive_accessor_reference,
+              TC.diagnose(subExpr->getLoc(), diag::recursive_accessor_reference,
                           Var->getName(), Accessor->isSetter());
             }
           }
@@ -645,11 +645,11 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
               shouldDiagnose = isStore;
 
             if (shouldDiagnose) {
-              TC.diagnose(E->getLoc(), diag::recursive_accessor_reference,
+              TC.diagnose(subExpr->getLoc(), diag::recursive_accessor_reference,
                           Var->getName(), Accessor->isSetter());
-              TC.diagnose(E->getLoc(),
+              TC.diagnose(subExpr->getLoc(),
                           diag::recursive_accessor_reference_silence)
-              .fixItInsert(E->getStartLoc(), "self.");
+              .fixItInsert(subExpr->getStartLoc(), "self.");
             }
           }
 
@@ -658,7 +658,8 @@ static void diagRecursivePropertyAccess(TypeChecker &TC, const Expr *E,
           if (isStore &&
               MRE->getAccessSemantics() == AccessSemantics::DirectToStorage &&
               Accessor->getAccessorKind() == AccessorKind::IsWillSet) {
-              TC.diagnose(E->getLoc(), diag::store_in_willset, Var->getName());
+              TC.diagnose(subExpr->getLoc(), diag::store_in_willset,
+                          Var->getName());
           }
         }
 

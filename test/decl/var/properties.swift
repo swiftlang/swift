@@ -884,6 +884,10 @@ class Box {
   }
 }
 
+func double(inout val: Int) {
+  val *= 2
+}
+
 class ObservingPropertiesNotMutableInWillSet {
   var anotherObj : ObservingPropertiesNotMutableInWillSet
   
@@ -893,6 +897,8 @@ class ObservingPropertiesNotMutableInWillSet {
       // <rdar://problem/16826319> willSet immutability behavior is incorrect
       anotherObj.property = 19 // ok
       property = 19  // expected-warning {{attempting to store to property 'property' within its own willSet}}
+      double(&property)  // expected-warning {{attempting to store to property 'property' within its own willSet}}
+      double(&self.property)  // no-warning
     }
   }
 
