@@ -81,10 +81,34 @@ user:
 (7) Calling a non-mutating method on a collection instance does not invalidate
     any indexes.
 
-(8) The setter of ``MutableCollection.subscript(_: Index)`` does not invalidate
-    any indices.
+(8) Indices behave as if they are composites of offsets in the underlying data
+    structure.  For example:
 
-    Rationale:
+    - an index into a set backed by a hash table with open addressing is the
+      number of the bucket where the element is stored;
+
+    - an index into a collection backed by a tree is a sequence of integers
+      that describe the path from the root of the tree to the leaf node;
+
+    - an index into a lazy flatMap collection consists of a pair of indices, an
+      index into the base collection that is being mapped, and the index into
+      the result of mapping the element designated by the first index.
+
+    This rule does not imply that indices should be cheap to convert to actual
+    integers.  The offsets for consecutive elements could be non-consecutive
+    (e.g., in a hash table with open addressing), or consist of multiple
+    offsets so that the conversion to an integer is non-trival (e.g., in a
+    tree).
+
+    Note that this rule, like all other rules, is an "as if" rule.  As long as
+    the resulting semantics match what the rules dictate, the actual
+    implementation can be anything.
+
+    Rationale and discussion:
+
+    - This rule is mostly motivated by its consequences, in particular, being
+      able to mutate an element of a collection without changing the
+      collection's structure, and, thus, without invalidating indices.
 
     - Replacing a collection element has runtime complexity O(1) and is not
       considered a structural mutation.  Therefore, there seems to be no reason
@@ -97,6 +121,23 @@ user:
       algorithms (like sorting) wouldn't be implementable directly with
       indices; the code would need to maintain its own shadow indices, for
       example, plain integers, that are not invalidated by mutations.
+
+Consequences:
+
+- The setter of ``MutableCollection.subscript(_: Index)`` does not invalidate
+  any indices.  Indices are composites of offsets, so replacing the value does
+  not change the shape of the data structure and preserves offsets.
+
+- A value type mutable linked list can not conform to
+  ``MutableCollectionType``.  An index for a linked list has to be implemented
+  as a pointer to the list node to provide O(1) element access.  Mutating an
+  element of a non-uniquely referenced linked list will create a copy of the
+  nodes that comprise the list.  Indices obtained before the copy was made
+  would point to the old nodes and wouldn't be valid for the copy of the list.
+
+  It is still valid to have a value type linked list conform to
+  ``CollectionType``, or to have a reference type mutable linked list conform
+  to ``MutableCollection``.
 
 The following points apply to all collections by default, but specific
 collection implementations can be less strict:
