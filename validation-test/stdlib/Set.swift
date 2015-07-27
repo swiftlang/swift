@@ -626,7 +626,9 @@ SetTestSuite.test("COW.Fast.RemoveAtIndexDoesNotReallocate") {
 
     expectEqual(1010, s[foundIndex1])
 
-    s.removeAtIndex(foundIndex1)
+    let removed = s.removeAtIndex(foundIndex1)
+    expectEqual(1010, removed)
+
     expectEqual(identity1, unsafeBitCast(s, Int.self))
     expectEmpty(s.indexOf(1010))
   }
@@ -644,7 +646,9 @@ SetTestSuite.test("COW.Fast.RemoveAtIndexDoesNotReallocate") {
     expectEqual(identity1, unsafeBitCast(s1, Int.self))
     expectEqual(identity1, unsafeBitCast(s2, Int.self))
 
-    s2.removeAtIndex(foundIndex1)
+    let removed = s2.removeAtIndex(foundIndex1)
+    expectEqual(1010, removed)
+
     expectEqual(identity1, unsafeBitCast(s1, Int.self))
     expectNotEqual(identity1, unsafeBitCast(s2, Int.self))
     expectEmpty(s2.indexOf(1010))
@@ -661,7 +665,9 @@ SetTestSuite.test("COW.Slow.RemoveAtIndexDoesNotReallocate") {
 
     expectEqual(TestKeyTy(1010), s[foundIndex1])
 
-    s.removeAtIndex(foundIndex1)
+    let removed = s.removeAtIndex(foundIndex1)
+    expectEqual(TestKeyTy(1010), removed)
+
     expectEqual(identity1, unsafeBitCast(s, Int.self))
     expectEmpty(s.indexOf(TestKeyTy(1010)))
   }
@@ -679,7 +685,9 @@ SetTestSuite.test("COW.Slow.RemoveAtIndexDoesNotReallocate") {
     expectEqual(identity1, unsafeBitCast(s1, Int.self))
     expectEqual(identity1, unsafeBitCast(s2, Int.self))
 
-    s2.removeAtIndex(foundIndex1)
+    let removed = s2.removeAtIndex(foundIndex1)
+    expectEqual(TestKeyTy(1010), removed)
+
     expectEqual(identity1, unsafeBitCast(s1, Int.self))
     expectNotEqual(identity1, unsafeBitCast(s2, Int.self))
     expectEmpty(s2.indexOf(TestKeyTy(1010)))

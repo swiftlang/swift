@@ -537,7 +537,10 @@ DictionaryTestSuite.test("COW.Fast.RemoveAtIndexDoesNotReallocate") {
     assert(d[foundIndex1].0 == 10)
     assert(d[foundIndex1].1 == 1010)
 
-    d.removeAtIndex(foundIndex1)
+    let removed = d.removeAtIndex(foundIndex1)
+    assert(removed.0 == 10)
+    assert(removed.1 == 1010)
+
     assert(identity1 == unsafeBitCast(d, Int.self))
     assert(d.indexForKey(10) == nil)
   }
@@ -556,7 +559,10 @@ DictionaryTestSuite.test("COW.Fast.RemoveAtIndexDoesNotReallocate") {
     assert(identity1 == unsafeBitCast(d1, Int.self))
     assert(identity1 == unsafeBitCast(d2, Int.self))
 
-    d2.removeAtIndex(foundIndex1)
+    let removed = d2.removeAtIndex(foundIndex1)
+    assert(removed.0 == 10)
+    assert(removed.1 == 1010)
+
     assert(identity1 == unsafeBitCast(d1, Int.self))
     assert(identity1 != unsafeBitCast(d2, Int.self))
     assert(d2.indexForKey(10) == nil)
@@ -574,7 +580,10 @@ DictionaryTestSuite.test("COW.Slow.RemoveAtIndexDoesNotReallocate") {
     assert(d[foundIndex1].0 == TestKeyTy(10))
     assert(d[foundIndex1].1.value == 1010)
 
-    d.removeAtIndex(foundIndex1)
+    let removed = d.removeAtIndex(foundIndex1)
+    assert(removed.0 == TestKeyTy(10))
+    assert(removed.1.value == 1010)
+
     assert(identity1 == unsafeBitCast(d, Int.self))
     assert(d.indexForKey(TestKeyTy(10)) == nil)
   }
@@ -591,7 +600,10 @@ DictionaryTestSuite.test("COW.Slow.RemoveAtIndexDoesNotReallocate") {
     assert(d2[foundIndex1].0 == TestKeyTy(10))
     assert(d2[foundIndex1].1.value == 1010)
 
-    d2.removeAtIndex(foundIndex1)
+    let removed = d2.removeAtIndex(foundIndex1)
+    assert(removed.0 == TestKeyTy(10))
+    assert(removed.1.value == 1010)
+
     assert(identity1 == unsafeBitCast(d1, Int.self))
     assert(identity1 != unsafeBitCast(d2, Int.self))
     assert(d2.indexForKey(TestKeyTy(10)) == nil)
