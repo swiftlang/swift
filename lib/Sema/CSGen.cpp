@@ -469,6 +469,8 @@ namespace {
     // on the ConstraintSystem object. Because this is a hot path, this keeps
     // the overhead of the check low, and is twice as fast.
     if (!NTD->getSearchedForFailableInits()) {
+      // Set flag before recursing to catch circularity.
+      NTD->setSearchedForFailableInits();
       
       for (auto member : NTD->getMembers()) {
         if (auto CD = dyn_cast<ConstructorDecl>(member)) {
@@ -503,8 +505,6 @@ namespace {
           }
         }
       }
-      
-      NTD->setSearchedForFailableInits();
     }
     
     return NTD->getHasFailableInits();

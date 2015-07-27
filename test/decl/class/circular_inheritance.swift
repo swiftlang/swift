@@ -9,3 +9,5 @@ protocol P : P {} // expected-error{{circular protocol inheritance P}}
 
 class Isomorphism : Automorphism { }
 class Automorphism : Automorphism { } // expected-error{{circular class inheritance Automorphism}}
+
+let _ = A()
