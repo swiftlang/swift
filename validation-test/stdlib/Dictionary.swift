@@ -3849,7 +3849,8 @@ DictionaryTestSuite.test("popFirst") {
       popped.append(element)
     }
     expectEqualSequence(expected, Array(popped)) {
-      $0.0 == $1.0 && $0.1 == $1.1
+      (lhs: (Int, Int), rhs: (Int, Int)) -> Bool in
+      lhs.0 == rhs.0 && lhs.1 == rhs.1
     }
     expectTrue(d.isEmpty)
   }
