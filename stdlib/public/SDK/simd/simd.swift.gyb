@@ -488,13 +488,13 @@ public func norm_inf(x: ${vectype}) -> ${type} {
 
 /// Distance between `x` and `y`, squared.
 @inline(__always)
-public func distance_squared(x: ${vectype}, y: ${vectype}) -> ${type} {
+public func distance_squared(x: ${vectype}, _ y: ${vectype}) -> ${type} {
   return length_squared(x - y)
 }
 
 /// Distance between `x` and `y`.
 @inline(__always)
-public func distance(x: ${vectype}, y: ${vectype}) -> ${type} {
+public func distance(x: ${vectype}, _ y: ${vectype}) -> ${type} {
   return length(x - y)
 }
 

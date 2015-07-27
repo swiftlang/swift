@@ -210,6 +210,31 @@ simdTestSuite.test("vector debugDescription") {
   expectEqual("int4(1, 2, 3, 4)", i4.debugDescription)
 }
 
+simdTestSuite.test("vector distance") {
+% for type in float_types:
+  let ${ctype[type]}2_x = ${ctype[type]}2(0,5)
+  let ${ctype[type]}2_y = ${ctype[type]}2(3,1)
+  expectEqual(5, distance(${ctype[type]}2_x, ${ctype[type]}2_y))
+  expectEqual(0, distance(${ctype[type]}2_x, ${ctype[type]}2_x))
+  expectEqual(25, distance_squared(${ctype[type]}2_x, ${ctype[type]}2_y))
+  expectEqual(0, distance_squared(${ctype[type]}2_x, ${ctype[type]}2_x))
+
+  let ${ctype[type]}3_x = ${ctype[type]}3(-1,-2,-4)
+  let ${ctype[type]}3_y = ${ctype[type]}3( 1, 1, 2)
+  expectEqual(7, distance(${ctype[type]}3_x, ${ctype[type]}3_y))
+  expectEqual(0, distance(${ctype[type]}3_x, ${ctype[type]}3_x))
+  expectEqual(49, distance_squared(${ctype[type]}3_x, ${ctype[type]}3_y))
+  expectEqual(0, distance_squared(${ctype[type]}3_x, ${ctype[type]}3_x))
+
+  let ${ctype[type]}4_x = ${ctype[type]}4(-1, 0, 1, 1)
+  let ${ctype[type]}4_y = ${ctype[type]}4( 0, 1, 0, 2)
+  expectEqual(2, distance(${ctype[type]}4_x, ${ctype[type]}4_y))
+  expectEqual(0, distance(${ctype[type]}4_x, ${ctype[type]}4_x))
+  expectEqual(4, distance_squared(${ctype[type]}4_x, ${ctype[type]}4_y))
+  expectEqual(0, distance_squared(${ctype[type]}4_x, ${ctype[type]}4_x))
+% end # for type in float_types
+}
+
 simdTestSuite.test("matrix init") {
 % for type in float_types:
 %   for cols in [2,3,4]:
