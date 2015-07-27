@@ -370,10 +370,11 @@ func bar(x: Int, y: Int) -> Int { return x + y }
 // CHECK: </doc-comment-line><doc-comment-line>///
 // CHECK: </doc-comment-line><doc-comment-line>/// Simple case.
 // CHECK: </doc-comment-line><doc-comment-line>///
-// CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>parameter</doc-comment-field> x: A number
-// CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>parameter</doc-comment-field> y: Another number
+// CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>Parameters</doc-comment-field>:
+// CHECK: </doc-comment-line><doc-comment-line>/// - x: A number
+// CHECK: </doc-comment-line><doc-comment-line>/// - y: Another number
 // CHECK: </doc-comment-line><doc-comment-line>/// - <doc-comment-field>returns</doc-comment-field>: `x + y`
-// CHECK: </doc-comment-line><kw>func</kw> foo(x: <type>Int</type>, y: <type>Int</type>) -> <type>Int</type> { <kw>return</kw> x + y }
+// CHECK: </doc-comment-line><kw>func</kw> bar(x: <type>Int</type>, y: <type>Int</type>) -> <type>Int</type> { <kw>return</kw> x + y }
 
 /**
   Does pretty much nothing.
@@ -406,7 +407,7 @@ func emptyDocBlockComment() {}
 /**
 */
 func emptyDocBlockComment2() {}
-// CHECK: <doc-comment-block><doc-comment-block><doc-comment-block><doc-comment-block><doc-comment-block>/**
+// CHECK: <doc-comment-block>/**
 // CHECK: */
 // CHECK: <kw>func</kw> emptyDocBlockComment2() {}
 
@@ -422,7 +423,6 @@ func malformedBlockComment(f : ()throws->()) rethrows {}
 // CHECK: <kw>func</kw> malformedBlockComment(f : ()<kw>throws</kw>->()) <attr-builtin>rethrows</attr-builtin> {}
 
 // Keep this as the last test
-// CHECK: <comment-line>// Keep this as the last test</comment-line>
 /**
   Trailing off ...
 func unterminatedBlockComment() {}
