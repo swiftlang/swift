@@ -420,6 +420,243 @@ struct AtomicInt_fetchAndAdd_ReleaseNonAtomicStores_RaceTest
   }
 }
 
+struct AtomicInt_fetchAndAnd_1_RaceTest : RaceTestWithPerTrialDataType {
+  typealias RaceData = AtomicInt4RaceData
+  typealias ThreadLocalData = Void
+  typealias Observation = Observation5Int
+
+  func makeRaceData() -> RaceData {
+    let start = ~(1 + 2) // Set all bits except two.
+    return RaceData(start, start, start, start)
+  }
+
+  func makeThreadLocalData() -> Void {
+    return Void()
+  }
+
+  func thread1(
+    raceData: RaceData, inout _ threadLocalData: ThreadLocalData
+  ) -> Observation {
+    if raceData.writerStarted.fetchAndAdd(1) == 0 {
+      // Writer.
+      consumeCPU(units: 256)
+      let a1 = raceData.a1.fetchAndAnd(1 + 8)
+      consumeCPU(units: 256)
+      let a2 = raceData.a2.fetchAndAnd(1 + 16)
+      consumeCPU(units: 256)
+      let a3 = raceData.a3.andAndFetch(1 + 32)
+      consumeCPU(units: 256)
+      let a4 = raceData.a4.andAndFetch(1 + 64)
+      return Observation(1, a1, a2, a3, a4)
+    } else {
+      // Reader.
+      //
+      // Observing a non-zero a1 does not impose any constraints onto
+      // subsequent loads of a2, a3 or a4: since stores to a2, a3 and a4 don't
+      // happen before the store to a1, there are executions where we observed
+      // a non-zero a1, but storing to a2 does not happen before loading from
+      // a2 (same for a3 and a4).
+      consumeCPU(units: 256)
+      let a1 = raceData.a1.load()
+      consumeCPU(units: 256)
+      let a2 = raceData.a2.load()
+      consumeCPU(units: 256)
+      let a3 = raceData.a3.load()
+      consumeCPU(units: 256)
+      let a4 = raceData.a4.load()
+
+      return Observation(2, a1, a2, a3, a4)
+    }
+  }
+
+  func evaluateObservations(observations: [Observation],
+      _ sink: (RaceTestObservationEvaluation) -> ()) {
+    for observation in observations {
+      switch observation {
+      case Observation(1, -4, -4, 32, 64),
+           Observation(2, -4, -4, -4, -4),
+           Observation(2, -4, -4, -4, 64),
+           Observation(2, -4, -4, 32, -4),
+           Observation(2, -4, -4, 32, 64),
+           Observation(2, -4, 16, -4, -4),
+           Observation(2, -4, 16, -4, 64),
+           Observation(2, -4, 16, 32, -4),
+           Observation(2, -4, 16, 32, 64),
+           Observation(2,  8, -4, -4, -4),
+           Observation(2,  8, -4, -4, 64),
+           Observation(2,  8, -4, 32, -4),
+           Observation(2,  8, -4, 32, 64),
+           Observation(2,  8, 16, -4, -4),
+           Observation(2,  8, 16, -4, 64),
+           Observation(2,  8, 16, 32, -4),
+           Observation(2,  8, 16, 32, 64):
+        sink(.PassInteresting(String(observation)))
+
+      default:
+        sink(.FailureInteresting(String(observation)))
+      }
+    }
+  }
+}
+
+struct AtomicInt_fetchAndOr_1_RaceTest : RaceTestWithPerTrialDataType {
+  typealias RaceData = AtomicInt4RaceData
+  typealias ThreadLocalData = Void
+  typealias Observation = Observation5Int
+
+  func makeRaceData() -> RaceData {
+    let start = 1 + 2 // Set two bits.
+    return RaceData(start, start, start, start)
+  }
+
+  func makeThreadLocalData() -> Void {
+    return Void()
+  }
+
+  func thread1(
+    raceData: RaceData, inout _ threadLocalData: ThreadLocalData
+  ) -> Observation {
+    if raceData.writerStarted.fetchAndAdd(1) == 0 {
+      // Writer.
+      consumeCPU(units: 256)
+      let a1 = raceData.a1.fetchAndOr(1 + 8)
+      consumeCPU(units: 256)
+      let a2 = raceData.a2.fetchAndOr(1 + 16)
+      consumeCPU(units: 256)
+      let a3 = raceData.a3.orAndFetch(1 + 32)
+      consumeCPU(units: 256)
+      let a4 = raceData.a4.orAndFetch(1 + 64)
+      return Observation(1, a1, a2, a3, a4)
+    } else {
+      // Reader.
+      //
+      // Observing a non-zero a1 does not impose any constraints onto
+      // subsequent loads of a2, a3 or a4: since stores to a2, a3 and a4 don't
+      // happen before the store to a1, there are executions where we observed
+      // a non-zero a1, but storing to a2 does not happen before loading from
+      // a2 (same for a3 and a4).
+      consumeCPU(units: 256)
+      let a1 = raceData.a1.load()
+      consumeCPU(units: 256)
+      let a2 = raceData.a2.load()
+      consumeCPU(units: 256)
+      let a3 = raceData.a3.load()
+      consumeCPU(units: 256)
+      let a4 = raceData.a4.load()
+
+      return Observation(2, a1, a2, a3, a4)
+    }
+  }
+
+  func evaluateObservations(observations: [Observation],
+      _ sink: (RaceTestObservationEvaluation) -> ()) {
+    for observation in observations {
+      switch observation {
+      case Observation(1,  3,  3, 35, 67),
+           Observation(2,  3,  3,  3,  3),
+           Observation(2,  3,  3,  3, 67),
+           Observation(2,  3,  3, 35,  3),
+           Observation(2,  3,  3, 35, 67),
+           Observation(2,  3, 19,  3,  3),
+           Observation(2,  3, 19,  3, 67),
+           Observation(2,  3, 19, 35,  3),
+           Observation(2,  3, 19, 35, 67),
+           Observation(2, 11,  3,  3,  3),
+           Observation(2, 11,  3,  3, 67),
+           Observation(2, 11,  3, 35,  3),
+           Observation(2, 11,  3, 35, 67),
+           Observation(2, 11, 19,  3,  3),
+           Observation(2, 11, 19,  3, 67),
+           Observation(2, 11, 19, 35,  3),
+           Observation(2, 11, 19, 35, 67):
+        sink(.PassInteresting(String(observation)))
+
+      default:
+        sink(.FailureInteresting(String(observation)))
+      }
+    }
+  }
+}
+
+struct AtomicInt_fetchAndXor_1_RaceTest : RaceTestWithPerTrialDataType {
+  typealias RaceData = AtomicInt4RaceData
+  typealias ThreadLocalData = Void
+  typealias Observation = Observation5Int
+
+  func makeRaceData() -> RaceData {
+    let start = 1 + 2 // Set two bits.
+    return RaceData(start, start, start, start)
+  }
+
+  func makeThreadLocalData() -> Void {
+    return Void()
+  }
+
+  func thread1(
+    raceData: RaceData, inout _ threadLocalData: ThreadLocalData
+  ) -> Observation {
+    if raceData.writerStarted.fetchAndAdd(1) == 0 {
+      // Writer.
+      consumeCPU(units: 256)
+      let a1 = raceData.a1.fetchAndXor(1 + 8)
+      consumeCPU(units: 256)
+      let a2 = raceData.a2.fetchAndXor(1 + 16)
+      consumeCPU(units: 256)
+      let a3 = raceData.a3.xorAndFetch(1 + 32)
+      consumeCPU(units: 256)
+      let a4 = raceData.a4.xorAndFetch(1 + 64)
+      return Observation(1, a1, a2, a3, a4)
+    } else {
+      // Reader.
+      //
+      // Observing a non-zero a1 does not impose any constraints onto
+      // subsequent loads of a2, a3 or a4: since stores to a2, a3 and a4 don't
+      // happen before the store to a1, there are executions where we observed
+      // a non-zero a1, but storing to a2 does not happen before loading from
+      // a2 (same for a3 and a4).
+      consumeCPU(units: 256)
+      let a1 = raceData.a1.load()
+      consumeCPU(units: 256)
+      let a2 = raceData.a2.load()
+      consumeCPU(units: 256)
+      let a3 = raceData.a3.load()
+      consumeCPU(units: 256)
+      let a4 = raceData.a4.load()
+
+      return Observation(2, a1, a2, a3, a4)
+    }
+  }
+
+  func evaluateObservations(observations: [Observation],
+      _ sink: (RaceTestObservationEvaluation) -> ()) {
+    for observation in observations {
+      switch observation {
+      case Observation(1,  3,  3, 34, 66),
+           Observation(2,  3,  3,  3,  3),
+           Observation(2,  3,  3,  3, 66),
+           Observation(2,  3,  3, 34,  3),
+           Observation(2,  3,  3, 34, 66),
+           Observation(2,  3, 18,  3,  3),
+           Observation(2,  3, 18,  3, 66),
+           Observation(2,  3, 18, 34,  3),
+           Observation(2,  3, 18, 34, 66),
+           Observation(2, 10,  3,  3,  3),
+           Observation(2, 10,  3,  3, 66),
+           Observation(2, 10,  3, 34,  3),
+           Observation(2, 10,  3, 34, 66),
+           Observation(2, 10, 18,  3,  3),
+           Observation(2, 10, 18,  3, 66),
+           Observation(2, 10, 18, 34,  3),
+           Observation(2, 10, 18, 34, 66):
+        sink(.PassInteresting(String(observation)))
+
+      default:
+        sink(.FailureInteresting(String(observation)))
+      }
+    }
+  }
+}
+
 
 var dummyObjectCount = _stdlib_ShardedAtomicCounter()
 
@@ -553,6 +790,22 @@ AtomicIntTestSuite.test("fetchAndAdd/ReleaseNonAtomicStores/1") {
     AtomicInt_fetchAndAdd_ReleaseNonAtomicStores_RaceTest.self,
     operations: 25600)
 }
+
+AtomicIntTestSuite.test("fetchAndAnd/1") {
+  runRaceTest(AtomicInt_fetchAndAnd_1_RaceTest.self, operations: 6400)
+}
+// FIXME: add more tests for fetchAndAnd, like we have for fetchAndAdd.
+
+AtomicIntTestSuite.test("fetchAndOr/1") {
+  runRaceTest(AtomicInt_fetchAndOr_1_RaceTest.self, operations: 6400)
+}
+// FIXME: add more tests for fetchAndOr, like we have for fetchAndAdd.
+
+AtomicIntTestSuite.test("fetchAndXor/1") {
+  runRaceTest(AtomicInt_fetchAndXor_1_RaceTest.self, operations: 6400)
+}
+// FIXME: add more tests for fetchAndXor, like we have for fetchAndAdd.
+
 
 var AtomicARCRefTestSuite = TestSuite("AtomicARCRef")
 

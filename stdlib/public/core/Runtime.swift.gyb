@@ -126,21 +126,23 @@ func _swift_stdlib_atomicLoadInt${bits}(
       object: UnsafeMutablePointer(target)))
 }
 
+%   for operation in [ 'Add', 'And', 'Or', 'Xor' ]:
 // Warning: no overflow checking.
-@asmname("swift_stdlib_atomicFetchAddUInt${bits}")
-func _swift_stdlib_atomicFetchAddUInt${bits}(
+@asmname("swift_stdlib_atomicFetch${operation}UInt${bits}")
+func _swift_stdlib_atomicFetch${operation}UInt${bits}(
   object target: UnsafeMutablePointer<UInt${bits}>,
   operand: UInt${bits}) -> UInt${bits}
 
 // Warning: no overflow checking.
-func _swift_stdlib_atomicFetchAddInt${bits}(
+func _swift_stdlib_atomicFetch${operation}Int${bits}(
   object target: UnsafeMutablePointer<Int${bits}>,
   operand: Int${bits}) -> Int${bits} {
   return Int${bits}(bitPattern:
-    _swift_stdlib_atomicFetchAddUInt${bits}(
+    _swift_stdlib_atomicFetch${operation}UInt${bits}(
       object: UnsafeMutablePointer(target),
       operand: UInt${bits}(bitPattern: operand)))
 }
+%   end
 
 % end
 
@@ -207,22 +209,24 @@ func _stdlib_atomicLoadARCRef(
   return nil
 }
 
+% for operation in [ 'Add', 'And', 'Or', 'Xor' ]:
 // Warning: no overflow checking.
-public func _swift_stdlib_atomicFetchAddInt(
+public func _swift_stdlib_atomicFetch${operation}Int(
   object target: UnsafeMutablePointer<Int>,
   operand: Int) -> Int {
 #if arch(i386) || arch(arm)
   return Int(Int32(bitPattern:
-    _swift_stdlib_atomicFetchAddUInt32(
+    _swift_stdlib_atomicFetch${operation}UInt32(
       object: UnsafeMutablePointer(target),
       operand: UInt32(bitPattern: Int32(operand)))))
 #elseif arch(x86_64) || arch(arm64)
   return Int(Int64(bitPattern:
-    _swift_stdlib_atomicFetchAddUInt64(
+    _swift_stdlib_atomicFetch${operation}UInt64(
       object: UnsafeMutablePointer(target),
       operand: UInt64(bitPattern: Int64(operand)))))
 #endif
 }
+% end
 
 public final class _stdlib_AtomicInt {
   var _value: Int
@@ -243,13 +247,17 @@ public final class _stdlib_AtomicInt {
     return _swift_stdlib_atomicLoadInt(object: _valuePtr)
   }
 
-  public func fetchAndAdd(operand: Int) -> Int {
-    return _swift_stdlib_atomicFetchAddInt(object: _valuePtr, operand: operand)
+% for operation_name, operation in [ ('Add', '+'), ('And', '&'), ('Or', '|'), ('Xor', '^') ]:
+  public func fetchAnd${operation_name}(operand: Int) -> Int {
+    return _swift_stdlib_atomicFetch${operation_name}Int(
+      object: _valuePtr,
+      operand: operand)
   }
 
-  public func addAndFetch(operand: Int) -> Int {
-    return fetchAndAdd(operand) + operand
+  public func ${operation_name.lower()}AndFetch(operand: Int) -> Int {
+    return fetchAnd${operation_name}(operand) ${operation} operand
   }
+% end
 
   public func compareExchange(
     inout expected expected: Int, desired: Int

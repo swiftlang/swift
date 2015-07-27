@@ -317,6 +317,8 @@ extern "C" uintptr_t swift_stdlib_atomicLoadPtr(
   return __c11_atomic_load(object, memory_order_seq_cst);
 }
 
+// fetch_add
+
 extern "C" uint32_t swift_stdlib_atomicFetchAddUInt32(
     _Atomic(uint32_t) * object, uint32_t operand) {
   return __c11_atomic_fetch_add(object, operand, memory_order_seq_cst);
@@ -325,6 +327,42 @@ extern "C" uint32_t swift_stdlib_atomicFetchAddUInt32(
 extern "C" uint64_t swift_stdlib_atomicFetchAddUInt64(
     _Atomic(uint64_t) * object, uint64_t operand) {
   return __c11_atomic_fetch_add(object, operand, memory_order_seq_cst);
+}
+
+// fetch_and
+
+extern "C" uint32_t swift_stdlib_atomicFetchAndUInt32(
+    _Atomic(uint32_t) * object, uint32_t operand) {
+  return __c11_atomic_fetch_and(object, operand, memory_order_seq_cst);
+}
+
+extern "C" uint64_t swift_stdlib_atomicFetchAndUInt64(
+    _Atomic(uint64_t) * object, uint64_t operand) {
+  return __c11_atomic_fetch_and(object, operand, memory_order_seq_cst);
+}
+
+// fetch_or
+
+extern "C" uint32_t swift_stdlib_atomicFetchOrUInt32(
+    _Atomic(uint32_t) * object, uint32_t operand) {
+  return __c11_atomic_fetch_or(object, operand, memory_order_seq_cst);
+}
+
+extern "C" uint64_t swift_stdlib_atomicFetchOrUInt64(
+    _Atomic(uint64_t) * object, uint64_t operand) {
+  return __c11_atomic_fetch_or(object, operand, memory_order_seq_cst);
+}
+
+// fetch_xor
+
+extern "C" uint32_t swift_stdlib_atomicFetchXorUInt32(
+    _Atomic(uint32_t) * object, uint32_t operand) {
+  return __c11_atomic_fetch_xor(object, operand, memory_order_seq_cst);
+}
+
+extern "C" uint64_t swift_stdlib_atomicFetchXorUInt64(
+    _Atomic(uint64_t) * object, uint64_t operand) {
+  return __c11_atomic_fetch_xor(object, operand, memory_order_seq_cst);
 }
 
 // We can't return Float80, but we can receive a pointer to one, so
