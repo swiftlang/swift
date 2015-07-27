@@ -585,9 +585,12 @@ class alignas(1 << DeclAlignInBits) Decl {
     friend class AssociatedTypeDecl;
     unsigned : NumTypeDeclBits;
 
+    // Set if recursive requirements detected.
     unsigned Recursive : 1;
+    // Set if recursive reference in default type detected.
+    unsigned Circularity : 1;
   };
-  enum { NumAssociatedTypeDeclBits = NumTypeDeclBits + 1 };
+  enum { NumAssociatedTypeDeclBits = NumTypeDeclBits + 2 };
   static_assert(NumAssociatedTypeDeclBits <= 32, "fits in an unsigned");
 
   class ImportDeclBitfields {
@@ -2668,6 +2671,13 @@ public:
 
   void setIsRecursive() { AssociatedTypeDeclBits.Recursive = true; }
   bool isRecursive() { return AssociatedTypeDeclBits.Recursive; }
+  
+  void setCircularityCheck(bool cc=true) {
+    AssociatedTypeDeclBits.Circularity = cc;
+  }
+  bool getCircularityCheck() {
+    return AssociatedTypeDeclBits.Circularity;
+  }
 
   static bool classof(const Decl *D) {
     return D->getKind() == DeclKind::AssociatedType;

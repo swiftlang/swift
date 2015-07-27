@@ -975,10 +975,13 @@ WARNING(optional_req_nonobjc_near_match,sema_tcd,none,
         "cannot satisfy optional requirement of @objc protocol %2",
         (RequirementKind, DeclName, DeclName))
 
-// Protocols and existentials
+// Associated types
 ERROR(assoc_type_outside_of_protocol,sema_nb,none,
       "cannot use associated type %0 outside of its protocol", (Identifier))
+ERROR(circular_assoc_type,sema_tct,none,
+      "associated type %0 circularly references itself", (Identifier))
 
+// Protocols and existentials
 ERROR(circular_protocol_def,sema_tcd,none,
       "circular protocol inheritance %0", (StringRef))
 NOTE(protocol_here,sema_tcd,none,

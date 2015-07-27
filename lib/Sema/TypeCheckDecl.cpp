@@ -3258,12 +3258,31 @@ public:
     if (!assocType->hasAccessibility())
       assocType->setAccessibility(assocType->getProtocol()->getFormalAccess());
 
-    // Check the default definition, if there is one.
     TypeLoc &defaultDefinition = assocType->getDefaultDefinitionLoc();
+
+    if (assocType->getCircularityCheck()) {
+      if (assocType->isInvalid())
+        return;
+
+      assocType->setInvalid();
+      assocType->overwriteType(ErrorType::get(TC.Context));
+      assocType->getDefaultDefinitionLoc().setType(ErrorType::get(TC.Context));
+
+      TC.diagnose(assocType->getLoc(), diag::circular_assoc_type,
+                  assocType->getName());
+      return;
+    }
+
+    assocType->setCircularityCheck();
+
+    // Check the default definition, if there is one.
     if (!defaultDefinition.isNull() &&
         TC.validateType(defaultDefinition, assocType->getDeclContext())) {
       defaultDefinition.setInvalidType(TC.Context);
     }
+
+    assocType->setCircularityCheck(false);
+
     TC.checkDeclAttributes(assocType);
   }
 
@@ -5775,6 +5794,7 @@ void TypeChecker::validateDecl(ValueDecl *D, bool resolveTypeParams) {
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(typeParam)) {
         DeclChecker(*this, false, false).visitAssociatedTypeDecl(assocType);
 
+        // We may have got here recursively
         if (!assocType->hasType())
           assocType->computeType();
       }

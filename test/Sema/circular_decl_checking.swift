@@ -66,3 +66,6 @@ struct SomeStruct<A> {
   typealias A = A // expected-error {{type alias 'A' circularly references itself}}
 }
 
+protocol Circle {
+  typealias Radius = Radius // expected-error {{associated type 'Radius' circularly references itself}}
+}
