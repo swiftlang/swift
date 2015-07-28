@@ -710,5 +710,8 @@ func inoutTests(inout arr: Int) {
   (true ? &x : &y)
   let a = (true ? &x : &y)  // expected-error {{type 'inout Int' of variable is not materializable}}
 
-  inoutTests(true ? &x : &y)
+  inoutTests(true ? &x : &y);
+
+  &_ // expected-error {{type of expression is ambiguous without more context}}
+  
 }
