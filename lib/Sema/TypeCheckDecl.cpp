@@ -5702,14 +5702,28 @@ void TypeChecker::typeCheckDecl(Decl *D, bool isFirstPass) {
 // A class is @objc if it does not have generic ancestry, and it either has
 // an explicit @objc attribute, or its superclass is @objc.
 static Optional<ObjCReason> shouldMarkClassAsObjC(TypeChecker &TC,
-                                                  const ClassDecl *CD) {
+                                                  ClassDecl *CD) {
   ObjCClassKind kind = CD->checkObjCAncestry();
 
   if (auto attr = CD->getAttrs().getAttribute<ObjCAttr>()) {
     if (kind == ObjCClassKind::ObjC)
       return ObjCReason::ExplicitlyObjC;
-    if (kind == ObjCClassKind::ObjCMembers)
-      TC.diagnose(attr->getLocation(), diag::objc_for_generic_class);
+
+    if (kind == ObjCClassKind::ObjCMembers) {
+      ObjCClassKind superclassKind = ObjCClassKind::NonObjC;
+      if (CD->hasSuperclass()) {
+        if (auto *super = CD->getSuperclass()->getClassOrBoundGenericClass()) {
+          superclassKind = super->checkObjCAncestry();
+        }
+      }
+
+      auto diagID = diag::objc_for_generic_class;
+      if (superclassKind == ObjCClassKind::NonObjC)
+        diagID = diag::invalid_objc_swift_rooted_class;
+
+      TC.diagnose(attr->getLocation(), diagID)
+        .fixItRemove(attr->getRangeWithAt());
+    }
   }
 
   if (kind == ObjCClassKind::ObjC)

@@ -158,13 +158,25 @@ class subject_class1 { // no-error
 class subject_class2 : Protocol_Class1, PlainProtocol { // no-error
 }
 
-@objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute}}
+@objc // expected-error{{only classes that inherit from NSObject can be declared @objc}}
 class subject_genericClass<T> {
   @objc
   var subject_instanceVar: Int // no-error
 
   @objc
   init() {} // no-error
+
+  @objc
+  func subject_instanceFunc() {} // no_error
+}
+
+@objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute}}
+class subject_genericClass2<T> : Class_ObjC1 {
+  @objc
+  var subject_instanceVar: Int // no-error
+
+  @objc
+  init(foo: Int) {} // no-error
 
   @objc
   func subject_instanceFunc() {} // no_error
@@ -294,8 +306,11 @@ class ConcreteContext3 {
 }
 
 func genericContext1<T>(_: T) {
-  @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute}}
+  @objc // expected-error{{only classes that inherit from NSObject can be declared @objc}}
   class subject_inGenericContext {} // expected-error{{type 'subject_inGenericContext' nested in generic function 'genericContext1' is not allowed}}
+
+  @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute}}
+  class subject_inGenericContext2 : Class_ObjC1 {} // expected-error{{type 'subject_inGenericContext2' nested in generic function 'genericContext1' is not allowed}}
 
   class subject_constructor_inGenericContext { // expected-error{{type 'subject_constructor_inGenericContext' nested in generic function 'genericContext1' is not allowed}}
     @objc
@@ -314,8 +329,11 @@ func genericContext1<T>(_: T) {
 }
 
 class GenericContext2<T> {
-  @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute}}
+  @objc // expected-error{{only classes that inherit from NSObject can be declared @objc}}
   class subject_inGenericContext {} // expected-error{{nested in generic type}}
+
+  @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute}}
+  class subject_inGenericContext2 : Class_ObjC1 {} // expected-error{{nested in generic type}}
 
   @objc
   func f() {} // no-error
@@ -323,16 +341,22 @@ class GenericContext2<T> {
 
 class GenericContext3<T> {
   class MoreNested { // expected-error{{nested in generic type}}
-    @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute}}
+    @objc // expected-error{{only classes that inherit from NSObject can be declared @objc}}
     class subject_inGenericContext {} // expected-error{{nested in generic type}}
+
+    @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute}}
+    class subject_inGenericContext2 : Class_ObjC1 {} // expected-error{{nested in generic type}}
 
     @objc
     func f() {} // no-error
   }
 }
 
-@objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute}}
+@objc // expected-error{{only classes that inherit from NSObject can be declared @objc}}
 class ConcreteSubclassOfGeneric : GenericContext3<Int> {}
+
+@objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute}}
+class ConcreteSubclassOfGeneric2 : subject_genericClass2<Int> {}
 
 class subject_subscriptIndexed1 {
   @objc
