@@ -331,6 +331,7 @@ public func sort<T>(
   _ isOrderedBefore: (T, T) -> Bool
 ) {
 % else:
+@available(*, unavailable, message="call the 'sortInPlace()' method on the collection")
 public func sort<T : Comparable>(inout array: ContiguousArray<T>) {
 % end
   fatalError("unavailable function can't be called")
