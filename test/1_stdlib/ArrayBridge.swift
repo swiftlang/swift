@@ -178,17 +178,18 @@ class Thunks : NSObject {
     return array
   }
 
-  @objc func acceptBridgedSwiftArray(x: [BridgedSwift]) {
+  @objc func acceptBridgedSwiftArray(raw: NSArray) {
+    let x = raw as! [BridgedSwift]
     print("acceptBridgedSwiftArray(\(x))")
   }
 
-  @objc func produceBridgedSwiftArray(numItems: Int) -> [BridgedSwift] {
+  @objc func produceBridgedSwiftArray(numItems: Int) -> NSArray {
     var array: [BridgedSwift] = []
     for i in 0..<numItems {
       array.append(BridgedSwift(i))
     }
     print("produceBridgedSwiftArray(\(array))")
-    return array
+    return array as NSArray
   }
 }
 
@@ -511,16 +512,18 @@ testExplicitlyBridged()
 
 func testRoundTrip() {
   class Test : NSObject {
-    @objc dynamic func call(array: [BridgedSwift]) -> [BridgedSwift] {
+    @objc dynamic func call(array: NSArray) -> NSArray {
 
       // CHECK-NEXT: ---Passed array---
       print("---Passed array---")
+      let result = array as! [BridgedSwift]
       // CHECK-NEXT: bridge operations (from, to) = (0, 0)
-      BridgedSwift.printStats()        
+      BridgedSwift.printStats()
+
 
       // Clear out the stats before returning array
       BridgedSwift.resetStats()
-      return array
+      return result
     }
   }
   

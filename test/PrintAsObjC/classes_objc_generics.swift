@@ -369,11 +369,13 @@ public class NonObjCClass { }
 // CHECK-NEXT: @property (nonatomic) IBOutlet Properties * __null_unspecified typedOutlet;
 // CHECK-NEXT: @property (nonatomic, copy) NSString * __nonnull string;
 // CHECK-NEXT: @property (nonatomic, copy) NSArray * __nonnull array;
-// CHECK-NEXT: @property (nonatomic, copy) NSArray * __nonnull arrayOfClasses;
+// CHECK-NEXT: @property (nonatomic, copy) NSArray<NSArray<NSNumber *> *> * __nonnull arrayOfArrays;
+// CHECK-NEXT: @property (nonatomic, copy) NSArray<BOOL (^)(id __nonnull, NSInteger)> * __nonnull arrayOfBlocks;
 // CHECK-NEXT: @property (nonatomic, copy) NSDictionary<NSString *, NSString *> * __nonnull dictionary;
-// CHECK-NEXT: @property (nonatomic, copy) NSDictionary * __nonnull dictStringInt;
+// CHECK-NEXT: @property (nonatomic, copy) NSDictionary<NSString *, NSNumber *> * __nonnull dictStringInt;
 // CHECK-NEXT: @property (nonatomic, copy) NSSet<NSString *> * __nonnull stringSet;
-// CHECK-NEXT: @property (nonatomic, copy) NSSet * __nonnull intSet;
+// CHECK-NEXT: @property (nonatomic, copy) NSSet<NSNumber *> * __nonnull intSet;
+// CHECK-NEXT: @property (nonatomic, copy) NSArray<NSNumber *> * __nonnull cgFloatArray;
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(Properties) NSArray<Properties *> * __null_unspecified outletCollection;
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(CustomName) NSArray<CustomName *> *  __nullable outletCollectionOptional;
 // CHECK-NEXT: @property (nonatomic, copy) IBOutletCollection(id) NSArray * __nullable outletCollectionAnyObject;
@@ -422,11 +424,13 @@ public class NonObjCClass { }
 
   var string = "abc"
   var array: Array<AnyObject> = []
-  var arrayOfClasses: Array<NonObjCClass> = []
+  var arrayOfArrays: Array<Array<Int>> = []
+  var arrayOfBlocks: Array<@convention(block) (AnyObject, Int) -> Bool> = []
   var dictionary: Dictionary<String, String> = [:]
   var dictStringInt: Dictionary<String, Int> = [:]
   var stringSet: Set<String> = []
   var intSet: Set<Int> = []
+  var cgFloatArray: Array<CGFloat> = []
 
   @IBOutlet var outletCollection: [Properties]!
   @IBOutlet var outletCollectionOptional: [ClassWithCustomName]? = []

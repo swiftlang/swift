@@ -150,7 +150,13 @@ Type TypeChecker::getNSErrorType(DeclContext *dc) {
                                 Context.Id_NSError, dc);
 }
 
-Type 
+Type TypeChecker::getBridgedToObjC(const DeclContext *dc, Type type) {
+  if (auto bridged = Context.getBridgedToObjC(dc, type, this))
+    return *bridged;
+  return nullptr;
+}
+
+Type
 TypeChecker::getDynamicBridgedThroughObjCClass(DeclContext *dc,
                                                Type dynamicType,
                                                Type valueType) {
@@ -2159,10 +2165,10 @@ static CanType lookupUniqueTypeInLibrary(TypeChecker &TC,
   return type->getDeclaredType()->getCanonicalType();
 }
 
-static void lookupLibraryTypes(TypeChecker &TC,
-                               Module *Stdlib,
-                               ArrayRef<Identifier> TypeNames,
-                               llvm::DenseSet<CanType> &Types) {
+static void lookupAndAddLibraryTypes(TypeChecker &TC,
+                                     Module *Stdlib,
+                                     ArrayRef<Identifier> TypeNames,
+                                     llvm::DenseSet<CanType> &Types) {
   SmallVector<ValueDecl *, 4> Results;
   for (Identifier Id : TypeNames) {
     Stdlib->lookupValue({}, Id, NLKind::UnqualifiedLookup, Results);
@@ -2441,6 +2447,10 @@ bool TypeChecker::isRepresentableInObjC(
 
   if (checkObjCInForeignClassContext(*this, AFD, Reason))
     return false;
+  if (checkObjCWithGenericParams(*this, AFD, Reason))
+    return false;
+  if (checkObjCInExtensionContext(*this, AFD, Diagnose))
+    return false;
 
   if (auto *FD = dyn_cast<FuncDecl>(AFD)) {
     if (FD->isAccessor()) {
@@ -2525,12 +2535,6 @@ bool TypeChecker::isRepresentableInObjC(
       return false;
     }
   }
-
-  if (checkObjCWithGenericParams(*this, AFD, Reason))
-    return false;
-
-  if (checkObjCInExtensionContext(*this, AFD, Diagnose))
-    return false;
 
   // Throwing functions must map to a particular error convention.
   if (AFD->isBodyThrowing()) {
@@ -2803,51 +2807,27 @@ bool TypeChecker::isRepresentableInObjC(const SubscriptDecl *SD,
   return Result;
 }
 
-static bool isObjCClassOrProtocol(Type T) {
-  if (auto *CT = T->getAs<ClassType>())
-    return CT->getDecl()->isObjC();
-
-  SmallVector<ProtocolDecl *, 4> Protocols;
-  if (T->isExistentialType(Protocols)) {
-    if (Protocols.empty()) {
-      // protocol<> is not @objc.
-      return false;
-    }
-    // Check that all protocols are @objc.
-    for (auto PD : Protocols) {
-      if (!PD->isObjC())
-        return false;
-    }
-    return true;
-  }
-
-  return false;
-}
-
 /// True if T is representable as a non-nullable ObjC pointer type.
-static bool isUnknownObjectType(Type T) {
-  // FIXME: Return true for closures, and for anything bridged to a class type.
-
+static bool isAnyObjCRepresentableObjectType(Type T) {
   // Look through a single level of metatype.
   if (auto MTT = T->getAs<AnyMetatypeType>())
     T = MTT->getInstanceType();
 
-  if (isObjCClassOrProtocol(T))
-    return true;
-
   if (auto dynSelf = T->getAs<DynamicSelfType>())
-    return isObjCClassOrProtocol(dynSelf->getSelfType());
+    T = dynSelf->getSelfType();
 
-  return false;
+  if (auto *CT = T->getAs<ClassType>())
+    return CT->getDecl()->isObjC();
+  return T->isObjCExistentialType();
 }
 
 /// True if T is representable as an ObjC pointer type, nullable or otherwise.
-static bool isUnknownObjectOrOptionalType(Type T) {
+static bool isNullableObjCRepresentableObjectType(Type T) {
   // Look through a single layer of optional type.
   if (auto valueType = T->getAnyOptionalObjectType()) {
     T = valueType;
   }
-  return isUnknownObjectType(T);
+  return isAnyObjCRepresentableObjectType(T);
 }
 
 bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,
@@ -2862,7 +2842,7 @@ bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,
   }
 
   // T can be represented in Objective-C if T is an @objc class or protocol.
-  if (isUnknownObjectType(T))
+  if (isAnyObjCRepresentableObjectType(T))
     return true;
 
   auto NTD = T->getAnyNominal();
@@ -2874,7 +2854,7 @@ bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,
     if (!BGT)
       return false;
     assert(BGT->getGenericArgs().size() == 1);
-    return isUnknownObjectType(BGT->getGenericArgs().front());
+    return isAnyObjCRepresentableObjectType(BGT->getGenericArgs().front());
   }
 
   // TODO: maybe Optional<UnsafeMutablePointer<T>> should be okay?
@@ -2905,7 +2885,7 @@ bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,
       case PTK_AutoreleasingUnsafeMutablePointer: {
         // An AutoreleasingUnsafeMutablePointer<T> is representable in ObjC if T
         // is a (potentially optional) ObjC pointer type.
-        return isUnknownObjectOrOptionalType(pointerElt);
+        return isNullableObjCRepresentableObjectType(pointerElt);
       }
       }
     }
@@ -2920,10 +2900,77 @@ bool TypeChecker::isTriviallyRepresentableInObjC(const DeclContext *DC,
   return false;
 }
 
-Type TypeChecker::getBridgedToObjC(const DeclContext *dc, Type type) {
-  if (auto bridged = Context.getBridgedToObjC(dc, type, this))
-    return *bridged;
-  return nullptr;
+static bool
+isObjCRepresentableCollection(TypeChecker &TC, const DeclContext *DC, Type T);
+
+static bool
+isElementRepresentableInObjC(TypeChecker &TC, const DeclContext *DC, Type T) {
+  // If you change this function, you must add or modify a test in PrintAsObjC.
+
+  if (isAnyObjCRepresentableObjectType(T))
+    return true;
+
+  if (isObjCRepresentableCollection(TC, DC, T))
+    return true;
+
+  ProtocolDecl *bridgingProto =
+      TC.getProtocol({}, KnownProtocolKind::_ObjectiveCBridgeable);
+  if (bridgingProto &&
+      TC.conformsToProtocol(T, bridgingProto, const_cast<DeclContext *>(DC),
+                            ConformanceCheckOptions())) {
+    return true;
+  }
+
+  if (auto fnTy = T->getAs<AnyFunctionType>())
+    return fnTy->getRepresentation() == FunctionTypeRepresentation::Block;
+
+  return false;
+}
+
+static bool
+isObjCRepresentableCollection(TypeChecker &TC, const DeclContext *DC, Type T) {
+  // If you change this function, you must add or modify a test in PrintAsObjC.
+
+  // Array<T> is representable when T is bridged to Objective-C.
+  if (auto arrayDecl = TC.Context.getArrayDecl()) {
+    if (auto boundGeneric = T->getAs<BoundGenericType>()) {
+      if (boundGeneric->getDecl() == arrayDecl) {
+        auto elementType = boundGeneric->getGenericArgs()[0];
+        return isElementRepresentableInObjC(TC, DC, elementType);
+      }
+    }
+  }
+
+  // Dictionary<K, V> is representable when K and V are bridged to Objective-C.
+  if (auto dictDecl = TC.Context.getDictionaryDecl()) {
+    if (auto boundGeneric = T->getAs<BoundGenericType>()) {
+      if (boundGeneric->getDecl() == dictDecl) {
+        // The key type must be bridged to Objective-C.
+        auto keyType = boundGeneric->getGenericArgs()[0];
+        if (!isElementRepresentableInObjC(TC, DC, keyType))
+          return false;
+
+        // The value type must be bridged to Objective-C.
+        auto valueType = boundGeneric->getGenericArgs()[1];
+        if (!isElementRepresentableInObjC(TC, DC, valueType))
+          return false;
+
+        return true;
+      }
+    }
+  }
+
+  // Set<T> is representable when T is bridged to Objective-C.
+  if (auto setDecl = TC.Context.getSetDecl()) {
+    if (auto boundGeneric = T->getAs<BoundGenericType>()) {
+      if (boundGeneric->getDecl() == setDecl) {
+        auto elementType = boundGeneric->getGenericArgs()[0];
+        return isElementRepresentableInObjC(TC, DC, elementType);
+      }
+    }
+  }
+
+  return false;
 }
 
 bool TypeChecker::isRepresentableInObjC(const DeclContext *DC, Type T) {
@@ -2971,44 +3018,8 @@ bool TypeChecker::isRepresentableInObjC(const DeclContext *DC, Type T) {
     return true;
   }
 
-  // Array<T> is representable when T is bridged to Objective-C.
-  if (auto arrayDecl = Context.getArrayDecl()) {
-    if (auto boundGeneric = T->getAs<BoundGenericType>()) {
-      if (boundGeneric->getDecl() == arrayDecl) {
-        auto elementType = boundGeneric->getGenericArgs()[0];
-        return !getBridgedToObjC(DC, elementType).isNull();
-      }
-    }
-  }
-
-  // Dictionary<K, V> is representable when K and V are bridged to Objective-C.
-  if (auto dictDecl = Context.getDictionaryDecl()) {
-    if (auto boundGeneric = T->getAs<BoundGenericType>()) {
-      if (boundGeneric->getDecl() == dictDecl) {
-        // The key type must be bridged to Objective-C.
-        auto keyType = boundGeneric->getGenericArgs()[0];
-        if (getBridgedToObjC(DC, keyType).isNull())
-          return false;
-
-        // The value type must be bridged to Objective-C.
-        auto valueType = boundGeneric->getGenericArgs()[1];
-        if (getBridgedToObjC(DC, valueType).isNull())
-          return false;
-
-        return true;
-      }
-    }
-  }
-
-  // Set<T> is representable when T is bridged to Objective-C.
-  if (auto setDecl = Context.getSetDecl()) {
-    if (auto boundGeneric = T->getAs<BoundGenericType>()) {
-      if (boundGeneric->getDecl() == setDecl) {
-        auto elementType = boundGeneric->getGenericArgs()[0];
-        return !getBridgedToObjC(DC, elementType).isNull();
-      }
-    }
-  }
+  if (isObjCRepresentableCollection(*this, DC, T))
+    return true;
 
   // Check to see if this is a bridged type.  Note that some bridged
   // types are representable, but their optional type is not.
@@ -3097,11 +3108,12 @@ void TypeChecker::diagnoseTypeNotRepresentableInObjC(const DeclContext *DC,
   }
 }
 
-static void lookupRepresentableType(TypeChecker &TC,
-                                    Module *stdlib,
-                                    Identifier nativeName,
-                                    bool isOptionalRepresentable,
-                                    llvm::DenseMap<CanType, bool> &types) {
+static void
+lookupAndAddRepresentableType(TypeChecker &TC,
+                              Module *stdlib,
+                              Identifier nativeName,
+                              bool isOptionalRepresentable,
+                              llvm::DenseMap<CanType, bool> &types) {
   auto nativeType = lookupUniqueTypeInLibrary(TC, stdlib, nativeName);
   if (!nativeType) return;
 
@@ -3120,22 +3132,22 @@ void TypeChecker::fillObjCRepresentableTypeCache(const DeclContext *DC) {
 #include "swift/ClangImporter/BuiltinMappedTypes.def"
 
   Module *Stdlib = getStdlibModule(DC);
-  lookupLibraryTypes(*this, Stdlib, StdlibTypeNames, ObjCMappedTypes);
+  lookupAndAddLibraryTypes(*this, Stdlib, StdlibTypeNames, ObjCMappedTypes);
 
   StdlibTypeNames.clear();
 #define MAP_BUILTIN_TYPE(_, __)
 #define MAP_BUILTIN_INTEGER_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME) \
   StdlibTypeNames.push_back(Context.getIdentifier(#SWIFT_TYPE_NAME));
 #include "swift/ClangImporter/BuiltinMappedTypes.def"
-  lookupLibraryTypes(*this, Stdlib, StdlibTypeNames, CIntegerTypes);
+  lookupAndAddLibraryTypes(*this, Stdlib, StdlibTypeNames, CIntegerTypes);
 
 #define BRIDGE_TYPE(BRIDGED_MODULE, BRIDGED_TYPE,                          \
                     NATIVE_MODULE, NATIVE_TYPE, OPTIONAL_IS_BRIDGED)       \
   if (Context.getIdentifier(#NATIVE_MODULE) == Context.StdlibModuleName) { \
-    lookupRepresentableType(*this, Stdlib,                                 \
-                            Context.getIdentifier(#NATIVE_TYPE),           \
-                            OPTIONAL_IS_BRIDGED,                           \
-                            ObjCRepresentableTypes);                       \
+    lookupAndAddRepresentableType(*this, Stdlib,                           \
+                                  Context.getIdentifier(#NATIVE_TYPE),     \
+                                  OPTIONAL_IS_BRIDGED,                     \
+                                  ObjCRepresentableTypes);                 \
   }
 #include "swift/SIL/BridgedTypes.def"
 
@@ -3143,7 +3155,8 @@ void TypeChecker::fillObjCRepresentableTypeCache(const DeclContext *DC) {
   if (auto DarwinModule = Context.getLoadedModule(ID_Darwin)) {
     StdlibTypeNames.clear();
     StdlibTypeNames.push_back(Context.getIdentifier("DarwinBoolean"));
-    lookupLibraryTypes(*this, DarwinModule, StdlibTypeNames, ObjCMappedTypes);
+    lookupAndAddLibraryTypes(*this, DarwinModule, StdlibTypeNames,
+                             ObjCMappedTypes);
   }
 
   Identifier ID_ObjectiveC = Context.Id_ObjectiveC;
@@ -3152,23 +3165,24 @@ void TypeChecker::fillObjCRepresentableTypeCache(const DeclContext *DC) {
     StdlibTypeNames.push_back(Context.getIdentifier("Selector"));
     StdlibTypeNames.push_back(Context.getIdentifier("ObjCBool"));
     StdlibTypeNames.push_back(Context.getIdentifier("NSZone"));
-    lookupLibraryTypes(*this, ObjCModule, StdlibTypeNames, ObjCMappedTypes);
+    lookupAndAddLibraryTypes(*this, ObjCModule, StdlibTypeNames,
+                             ObjCMappedTypes);
   }
 
   Identifier ID_CoreGraphics = Context.getIdentifier("CoreGraphics");
   if (auto CoreGraphicsModule = Context.getLoadedModule(ID_CoreGraphics)) {
     StdlibTypeNames.clear();
     StdlibTypeNames.push_back(Context.getIdentifier("CGFloat"));
-    lookupLibraryTypes(*this, CoreGraphicsModule, StdlibTypeNames,
-                       ObjCMappedTypes);
+    lookupAndAddLibraryTypes(*this, CoreGraphicsModule, StdlibTypeNames,
+                             ObjCMappedTypes);
   }
 
   Identifier ID_Foundation = Context.Id_Foundation;
   if (auto FoundationModule = Context.getLoadedModule(ID_Foundation)) {
     StdlibTypeNames.clear();
     StdlibTypeNames.push_back(Context.getIdentifier("NSErrorPointer"));
-    lookupLibraryTypes(*this, FoundationModule, StdlibTypeNames,
-                       ObjCMappedTypes);
+    lookupAndAddLibraryTypes(*this, FoundationModule, StdlibTypeNames,
+                             ObjCMappedTypes);
   }
   
   // Pull SIMD types of size 2...4 from the SIMD module, if it exists.
@@ -3184,7 +3198,8 @@ void TypeChecker::fillObjCRepresentableTypeCache(const DeclContext *DC) {
       }                                                                  \
     }
 #include "swift/ClangImporter/SIMDMappedTypes.def"
-    lookupLibraryTypes(*this, SIMDModule, StdlibTypeNames, ObjCMappedTypes);
+    lookupAndAddLibraryTypes(*this, SIMDModule, StdlibTypeNames,
+                             ObjCMappedTypes);
   }
 }
 

@@ -1303,6 +1303,40 @@ class infer_instanceVar1 {
 
   @objc var var_ArrayType4_: [AnyObject -> AnyObject] 
   // expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+
+  var var_ArrayType5: [Protocol_ObjC1]
+  // CHECK-LABEL: {{^}}  @objc var var_ArrayType5: [Protocol_ObjC1]
+
+  @objc var var_ArrayType5_: [Protocol_ObjC1] // no-error
+
+  var var_ArrayType6: [Class_ObjC1]
+  // CHECK-LABEL: {{^}}  @objc var var_ArrayType6: [Class_ObjC1]
+
+  @objc var var_ArrayType6_: [Class_ObjC1] // no-error
+
+  var var_ArrayType7: [PlainClass]
+  // CHECK-LABEL: {{^}}  var var_ArrayType7: [PlainClass]
+
+  @objc var var_ArrayType7_: [PlainClass]
+  // expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+
+  var var_ArrayType8: [PlainProtocol]
+  // CHECK-LABEL: {{^}}  var var_ArrayType8: [PlainProtocol]
+
+  @objc var var_ArrayType8_: [PlainProtocol]
+  // expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+
+  var var_ArrayType9: [protocol<Protocol_ObjC1, PlainProtocol>]
+  // CHECK-LABEL: {{^}}  var var_ArrayType9: [protocol<{{.+}}>]
+
+  @objc var var_ArrayType9_: [protocol<Protocol_ObjC1, PlainProtocol>]
+  // expected-error @-1{{property cannot be marked @objc because its type cannot be represented in Objective-C}}
+
+  var var_ArrayType10: [protocol<Protocol_ObjC1, Protocol_ObjC2>]
+  // CHECK-LABEL: {{^}}  @objc var var_ArrayType10: [protocol<{{.+}}>]
+
+  @objc var var_ArrayType10_: [protocol<Protocol_ObjC1, Protocol_ObjC2>]
+  // no-error
 }
 
 @objc

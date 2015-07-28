@@ -98,7 +98,7 @@ class ObjCPrinter : private DeclVisitor<ObjCPrinter>,
     specialNames;
   Identifier ID_CFTypeRef;
 
-  ASTContext &ctx;
+  Module &M;
   raw_ostream &os;
 
   SmallVector<const FunctionType *, 4> openFunctionTypes;
@@ -110,9 +110,8 @@ class ObjCPrinter : private DeclVisitor<ObjCPrinter>,
   friend TypeVisitor<ObjCPrinter>;
 
 public:
-  explicit ObjCPrinter(ASTContext &context, raw_ostream &out,
-                       Accessibility access)
-    : ctx(context), os(out), minRequiredAccess(access) {}
+  explicit ObjCPrinter(Module &mod, raw_ostream &out, Accessibility access)
+    : M(mod), os(out), minRequiredAccess(access) {}
 
   void print(const Decl *D) {
     visit(const_cast<Decl *>(D));
@@ -474,7 +473,7 @@ private:
       ty = unwrapped;
 
     auto genericTy = ty->getAs<BoundGenericStructType>();
-    if (!genericTy || genericTy->getDecl() != ctx.getArrayDecl())
+    if (!genericTy || genericTy->getDecl() != M.getASTContext().getArrayDecl())
       return false;
 
     assert(genericTy->getGenericArgs().size() == 1);
@@ -489,7 +488,7 @@ private:
 
   bool isCFTypeRef(Type ty) {
     if (ID_CFTypeRef.empty())
-      ID_CFTypeRef = ctx.getIdentifier("CFTypeRef");
+      ID_CFTypeRef = M.getASTContext().getIdentifier("CFTypeRef");
     while (auto aliasTy = dyn_cast<NameAliasType>(ty.getPointer())) {
       const TypeAliasDecl *TAD = aliasTy->getDecl();
       if (TAD->hasClangNode() && TAD->getName() == ID_CFTypeRef)
@@ -515,6 +514,7 @@ private:
     // For now, never promise atomicity.
     os << "@property (nonatomic";
 
+    ASTContext &ctx = M.getASTContext();
     bool isSettable = VD->isSettable(nullptr);
     if (isSettable && ctx.LangOpts.EnableAccessControl)
       isSettable = (VD->getSetterAccessibility() >= minRequiredAccess);
@@ -682,6 +682,7 @@ private:
   bool printIfKnownTypeName(Identifier moduleName, Identifier name,
                             Optional<OptionalTypeKind> optionalKind) {
     if (specialNames.empty()) {
+      ASTContext &ctx = M.getASTContext();
 #define MAP(SWIFT_NAME, CLANG_REPR, NEEDS_NULLABILITY)                       \
       specialNames[{ctx.StdlibModuleName, ctx.getIdentifier(#SWIFT_NAME)}] = \
         { CLANG_REPR, NEEDS_NULLABILITY}
@@ -773,12 +774,14 @@ private:
   }
 
   bool isClangObjectPointerType(const clang::TypeDecl *clangTypeDecl) const {
+    ASTContext &ctx = M.getASTContext();
     auto &clangASTContext = ctx.getClangModuleLoader()->getClangASTContext();
     clang::QualType clangTy = clangASTContext.getTypeDeclType(clangTypeDecl);
     return clangTy->isObjCRetainableType();
   }
 
   bool isClangPointerType(const clang::TypeDecl *clangTypeDecl) const {
+    ASTContext &ctx = M.getASTContext();
     auto &clangASTContext = ctx.getClangModuleLoader()->getClangASTContext();
     clang::QualType clangTy = clangASTContext.getTypeDeclType(clangTypeDecl);
     return clangTy->isPointerType();
@@ -828,6 +831,7 @@ private:
     if (clangDecl->getTypedefNameForAnonDecl())
       return;
 
+    ASTContext &ctx = M.getASTContext();
     auto importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
     if (importer->hasTypedef(clangDecl))
       return;
@@ -838,7 +842,7 @@ private:
   void visitStructType(StructType *ST, 
                        Optional<OptionalTypeKind> optionalKind) {
     const StructDecl *SD = ST->getStructOrBoundGenericStruct();
-    if (SD == ctx.getStringDecl()) {
+    if (SD == M.getASTContext().getStringDecl()) {
       os << "NSString *";
       printNullability(optionalKind);
       return;
@@ -852,36 +856,22 @@ private:
     os << SD->getName();
   }
 
-  /// Determine whether the given type is an Objective-C object type
-  /// or a Swift value type that is always bridged to an Objective-C
-  /// object type.
-  bool isAlwaysPrintedAsObjectType(Type type) {
-    // Only @objc class types.
-    if (auto classDecl = type->getClassOrBoundGenericClass())
-      return classDecl->isObjC() && !classDecl->isForeign();
-    
-    if (auto structDecl = type->getStructOrBoundGenericStruct()) {
-      // String always bridges to NSString.
-      if (structDecl == ctx.getStringDecl())
-        return true;
+  /// Print a collection element type using Objective-C generics syntax.
+  ///
+  /// This will print the type as bridged to Objective-C.
+  void printCollectionElement(Type ty) {
+    ASTContext &ctx = M.getASTContext();
 
-      // Array bridges to NSArray.
-      if (structDecl == ctx.getArrayDecl())
-        return true;
-
-      // Dictionary bridges to NSDictionary.
-      if (structDecl == ctx.getDictionaryDecl())
-        return true;
-
-      // Set bridges to NSSet.
-      if (structDecl == ctx.getSetDecl())
-        return true;
-
-      return false;
+    // Use the type as bridged to Objective-C unless the element type is itself
+    // a collection.
+    const StructDecl *SD = ty->getStructOrBoundGenericStruct();
+    if (SD != ctx.getArrayDecl() &&
+        SD != ctx.getDictionaryDecl() &&
+        SD != ctx.getSetDecl()) {
+      ty = *ctx.getBridgedToObjC(&M, ty, /*resolver*/nullptr);
     }
 
-    // Everything else is covered by "bridgeable object type".
-    return type->isBridgeableObjectType();
+    print(ty, None);
   }
 
   /// If \p BGT represents a generic struct used to import Clang types, print
@@ -892,11 +882,12 @@ private:
     if (!SD->getModuleContext()->isStdlibModule())
       return false;
 
+    ASTContext &ctx = M.getASTContext();
+
     if (SD == ctx.getArrayDecl()) {
-      if (!BGT->getGenericArgs()[0]->isAnyObject() &&
-          isAlwaysPrintedAsObjectType(BGT->getGenericArgs()[0])) {
+      if (!BGT->getGenericArgs()[0]->isAnyObject()) {
         os << "NSArray<";
-        visitPart(BGT->getGenericArgs()[0], None);
+        printCollectionElement(BGT->getGenericArgs()[0]);
         os << "> *";
       } else {
         os << "NSArray *";
@@ -907,14 +898,12 @@ private:
     }
 
     if (SD == ctx.getDictionaryDecl()) {
-      if ((!isNSObject(BGT->getGenericArgs()[0]) ||
-           !BGT->getGenericArgs()[1]->isAnyObject()) &&
-          isAlwaysPrintedAsObjectType(BGT->getGenericArgs()[0]) &&
-          isAlwaysPrintedAsObjectType(BGT->getGenericArgs()[1])) {
+      if (!isNSObject(BGT->getGenericArgs()[0]) ||
+          !BGT->getGenericArgs()[1]->isAnyObject()) {
         os << "NSDictionary<";
-        visitPart(BGT->getGenericArgs()[0], None);
+        printCollectionElement(BGT->getGenericArgs()[0]);
         os << ", ";
-        visitPart(BGT->getGenericArgs()[1], None);
+        printCollectionElement(BGT->getGenericArgs()[1]);
         os << "> *";
       } else {
         os << "NSDictionary *";
@@ -925,10 +914,9 @@ private:
     }
 
     if (SD == ctx.getSetDecl()) {
-      if (!isNSObject(BGT->getGenericArgs()[0]) &&
-          isAlwaysPrintedAsObjectType(BGT->getGenericArgs()[0])) {
+      if (!isNSObject(BGT->getGenericArgs()[0])) {
         os << "NSSet<";
-        visitPart(BGT->getGenericArgs()[0], None);
+        printCollectionElement(BGT->getGenericArgs()[0]);
         os << "> *";
       } else {
         os << "NSSet *";
@@ -1296,7 +1284,7 @@ class ModuleWriter {
   ObjCPrinter printer;
 public:
   ModuleWriter(Module &mod, StringRef header, Accessibility access)
-    : M(mod), bridgingHeader(header), printer(M.getASTContext(), os, access) {}
+    : M(mod), bridgingHeader(header), printer(M, os, access) {}
 
   /// Returns true if we added the decl's module to the import set, false if
   /// the decl is a local decl.
