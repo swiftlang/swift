@@ -924,11 +924,12 @@ static uint64_t getSizeFromExplosionValue(const clang::TargetInfo &TI,
 /// composite type.
 class ElementSizes {
   const TrackingDIRefMap &DIRefMap;
-  SmallVector<const llvm::DIType *, 12> Stack;
-
+  llvm::SmallPtrSetImpl<const llvm::DIType *> &IndirectEnums;
+  llvm::SmallVector<const llvm::DIType *, 12> Stack;
 public:
-  ElementSizes(const llvm::DIType *DITy, const TrackingDIRefMap &DIRefMap)
-      : DIRefMap(DIRefMap), Stack(1, DITy) {}
+  ElementSizes(const llvm::DIType *DITy, const TrackingDIRefMap &DIRefMap,
+               llvm::SmallPtrSetImpl<const llvm::DIType *> &IndirectEnums)
+    : DIRefMap(DIRefMap), IndirectEnums(IndirectEnums), Stack(1, DITy) {}
 
   struct SizeAlign {
     uint64_t SizeInBits, AlignInBits;
@@ -958,6 +959,11 @@ public:
     }
     switch (Cur->getTag()) {
     case llvm::dwarf::DW_TAG_member:
+      // FIXME: Correctly handle the explosion value for enum types
+      // with indirect members.
+      if (IndirectEnums.count(Cur))
+        return {0, 0};
+      [[clang::fallthrough]];
     case llvm::dwarf::DW_TAG_typedef: {
       // Replace top of stack.
       auto *DTy = cast<llvm::DIDerivedType>(Cur);
@@ -1034,7 +1040,7 @@ void IRGenDebugInfo::emitVariableDeclaration(
   bool IsPiece = Storage.size() > 1;
   uint64_t SizeOfByte = CI.getTargetInfo().getCharWidth();
   unsigned VarSizeInBits = getSizeInBits(Var, DIRefMap);
-  ElementSizes EltSizes(DITy, DIRefMap);
+  ElementSizes EltSizes(DITy, DIRefMap, IndirectEnumCases);
   auto Dim = EltSizes.getNext();
   for (llvm::Value *Piece : Storage) {
     // There are variables without storage, such as "struct { func foo() {} }".
@@ -1254,6 +1260,7 @@ llvm::DINodeArray IRGenDebugInfo::getEnumElements(DebugTypeInfo DbgTy,
                                                   llvm::DIFile *File,
                                                   unsigned Flags) {
   SmallVector<llvm::Metadata *, 16> Elements;
+
   for (auto *ElemDecl : D->getAllElements()) {
     // FIXME <rdar://problem/14845818> Support enums.
     // Swift Enums can be both like DWARF enums and DWARF unions.
@@ -1278,6 +1285,8 @@ llvm::DINodeArray IRGenDebugInfo::getEnumElements(DebugTypeInfo DbgTy,
       auto MTy = createMemberType(ElemDbgTy, ElemDecl->getName().str(), Offset,
                                   Scope, File, Flags);
       Elements.push_back(MTy);
+      if (D->isIndirect() || ElemDecl->isIndirect())
+        IndirectEnumCases.insert(MTy);
     }
   }
   return DBuilder.getOrCreateArray(Elements);

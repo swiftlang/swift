@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-ir -g -o - | FileCheck %s
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -g -o - | FileCheck %s
 
 // CHECK: ![[EMPTY:.*]] = !{}
 // CHECK: !DICompositeType(tag: DW_TAG_union_type, name: "Color",
@@ -59,4 +59,12 @@ public enum Tuple<P> {
   // CHECK: !DICompositeType({{.*}}name: "Tuple", {{.*}}elements: ![[ELTS]],
   // CHECK-SAME:             {{.*}}identifier: "_TtGO4enum5TupleQq_S0__")
 	case C(P, () -> Tuple)
+}
+
+public enum List<T> {
+       indirect case Tail(List, T)
+       case End
+
+// CHECK: !DILocalVariable(tag: DW_TAG_arg_variable, name: "self", arg: 1, {{.*}} line: [[@LINE+1]], type: !"_TtGO4enum4ListQq_S0__", flags: DIFlagArtificial)
+       func fooMyList() {}
 }
