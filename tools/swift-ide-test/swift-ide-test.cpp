@@ -2441,6 +2441,10 @@ int main(int argc, char *argv[]) {
     PrintOpts.SkipDeinit = options::SkipDeinit;
   }
 
+  if (PrintOpts.PrintDocumentationComments) {
+    InitInvok.getLangOptions().AttachCommentsToDecls = true;
+  }
+
   int ExitCode;
 
   switch (options::Action) {
