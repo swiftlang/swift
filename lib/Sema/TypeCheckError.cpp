@@ -18,6 +18,7 @@
 #include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/Attr.h"
 
 using namespace swift;
 
@@ -1096,19 +1097,46 @@ class CheckErrorCoverage : public ErrorHandlingWalker<CheckErrorCoverage> {
 
   Context CurContext;
 
-  /// Are we currently within a 'try'?
-  bool IsInTry = false;
+  class ContextFlags {
+  public:
+    enum ContextFlag : unsigned {
+      /// Is the current context considered 'try'-covered?
+      IsTryCovered = 0x1,
 
-  /// Do we have any throw site in this context?
-  bool HasAnyThrowSite = false;
+      /// Is the current context within a 'try' expression?
+      IsInTry = 0x2,
 
-  /// Do we have a throw site using 'try' in this context?
-  bool HasTryThrowSite = false;
+      /// Is the current context top-level in a debugger function?  This
+      /// causes 'try' suppression to apply recursively within a single
+      /// level of do/catch.
+      IsTopLevelDebuggerFunction = 0x4,
+
+      /// Do we have any throw site in this context?
+      HasAnyThrowSite = 0x8,
+
+      /// Do we have a throw site using 'try' in this context?
+      HasTryThrowSite = 0x10,
+    };
+  private:
+    unsigned Bits;
+  public:
+    ContextFlags() : Bits(0) {}
+
+    void reset() { Bits = 0; }
+    bool has(ContextFlag flag) const { return Bits & flag; }
+    void set(ContextFlag flag) { Bits |= flag; }
+    void clear(ContextFlag flag) { Bits &= ~flag; }
+    void mergeFrom(ContextFlag flag, ContextFlags other) {
+      Bits |= (other.Bits & flag);
+    }
+  };
+
+  ContextFlags Flags;
 
   void flagInvalidCode() {
     // Suppress warnings about useless try or catch.
-    HasAnyThrowSite = true;
-    HasTryThrowSite = true;
+    Flags.set(ContextFlags::HasAnyThrowSite);
+    Flags.set(ContextFlags::HasTryThrowSite);
   }
 
   /// An RAII object for restoring all the interesting state in an
@@ -1117,16 +1145,12 @@ class CheckErrorCoverage : public ErrorHandlingWalker<CheckErrorCoverage> {
     CheckErrorCoverage &Self;
     Context OldContext;
     DeclContext *OldRethrowsDC;
-    bool OldIsInTry;
-    bool OldHasAnyThrowSite;
-    bool OldHasTryThrowSite;
+    ContextFlags OldFlags;
   public:
     ContextScope(CheckErrorCoverage &self, Optional<Context> newContext)
       : Self(self), OldContext(self.CurContext),
         OldRethrowsDC(self.Classifier.RethrowsDC),
-        OldIsInTry(self.IsInTry),
-        OldHasAnyThrowSite(self.HasAnyThrowSite),
-        OldHasTryThrowSite(self.HasTryThrowSite) {
+        OldFlags(self.Flags) {
       if (newContext) self.CurContext = *newContext;
     }
 
@@ -1137,37 +1161,52 @@ class CheckErrorCoverage : public ErrorHandlingWalker<CheckErrorCoverage> {
       Self.Classifier.RethrowsDC = nullptr;
     }
 
+    void enterTry() {
+      Self.Flags.set(ContextFlags::IsInTry);
+      Self.Flags.set(ContextFlags::IsTryCovered);
+      Self.Flags.clear(ContextFlags::HasTryThrowSite);
+    }
+
     void refineLocalContext(Context newContext) {
       Self.CurContext = newContext;
     }
 
     void resetCoverage() {
-      Self.IsInTry = false;
-      Self.HasAnyThrowSite = false;
-      Self.HasTryThrowSite = false;
+      Self.Flags.reset();
+    }
+
+    void resetCoverageForDoCatch() {
+      Self.Flags.reset();
+
+      // Suppress 'try' coverage checking within a single level of
+      // do/catch in debugger functions.
+      if (OldFlags.has(ContextFlags::IsTopLevelDebuggerFunction))
+        Self.Flags.set(ContextFlags::IsTryCovered);
     }
 
     void preserveCoverageFromAutoclosureBody() {
       // An autoclosure body is the part of the enclosing function
       // body for the purposes of deciding whether a try contained
       // a throwing call.
-      OldHasTryThrowSite = Self.HasTryThrowSite;
+      OldFlags.mergeFrom(ContextFlags::HasTryThrowSite, Self.Flags);
     }
 
     void preserveCoverageFromNonExhaustiveCatch() {
-      OldHasAnyThrowSite = Self.HasAnyThrowSite;
+      OldFlags.mergeFrom(ContextFlags::HasAnyThrowSite, Self.Flags);
     }
 
     void preserveCoverageFromTryOperand() {
-      OldHasAnyThrowSite = Self.HasAnyThrowSite;
+      OldFlags.mergeFrom(ContextFlags::HasAnyThrowSite, Self.Flags);
+    }
+
+    bool wasTopLevelDebuggerFunction() const {
+      return OldFlags.has(ContextFlags::IsTopLevelDebuggerFunction);
     }
 
     ~ContextScope() {
       Self.CurContext = OldContext;
       Self.Classifier.RethrowsDC = OldRethrowsDC;
-      Self.IsInTry = OldIsInTry;
-      Self.HasAnyThrowSite = OldHasAnyThrowSite;
-      Self.HasTryThrowSite = OldHasTryThrowSite;
+      Self.Flags = OldFlags;
     }
   };
 
@@ -1180,9 +1219,20 @@ public:
     }
   }
 
-  /// Mark that the current context is covered by a 'try'.
-  void setTryCovered() {
-    IsInTry = true;
+  /// Mark that the current context is top-level code with
+  /// throw-without-try enabled.
+  void setTopLevelThrowWithoutTry() {
+    Flags.set(ContextFlags::IsTryCovered);
+  }
+
+  /// Mark that the current context is covered by a 'try', as
+  /// appropriate for a debugger function.
+  ///
+  /// Top level code in the debugger is actually implicitly wrapped in
+  /// a function with a do/catch block.
+  void setTopLevelDebuggerFunction() {
+    Flags.set(ContextFlags::IsTryCovered);
+    Flags.set(ContextFlags::IsTopLevelDebuggerFunction);
   }
 
 private:
@@ -1205,22 +1255,18 @@ private:
   void checkExhaustiveDoBody(DoCatchStmt *S) {
     // This is a handled context.
     ContextScope scope(*this, Context::getHandled());
-    assert(!IsInTry && "do/catch within try?");
-    scope.resetCoverage();
+    assert(!Flags.has(ContextFlags::IsInTry) && "do/catch within try?");
+    scope.resetCoverageForDoCatch();
 
     S->getBody()->walk(*this);
 
-    // Warn if nothing threw within the body.
-    if (!HasAnyThrowSite) {
-      TC.diagnose(S->getCatches().front()->getCatchLoc(),
-                  diag::no_throw_in_do_with_catch);
-    }
+    diagnoseNoThrowInDo(S, scope);
   }
 
   void checkNonExhaustiveDoBody(DoCatchStmt *S) {
     ContextScope scope(*this, None);
-    assert(!IsInTry && "do/catch within try?");
-    scope.resetCoverage();
+    assert(!Flags.has(ContextFlags::IsInTry) && "do/catch within try?");
+    scope.resetCoverageForDoCatch();
 
     // If the enclosing context doesn't handle anything, use a
     // specialized diagnostic about non-exhaustive catches.
@@ -1230,13 +1276,19 @@ private:
 
     S->getBody()->walk(*this);
 
-    // Warn if nothing threw within the body.
-    if (!HasAnyThrowSite) {
+    diagnoseNoThrowInDo(S, scope);
+
+    scope.preserveCoverageFromNonExhaustiveCatch();
+  }
+
+  void diagnoseNoThrowInDo(DoCatchStmt *S, ContextScope &scope) {
+    // Warn if nothing threw within the body, unless this is the
+    // implicit do/catch in a debugger function.
+    if (!Flags.has(ContextFlags::HasAnyThrowSite) &&
+        !scope.wasTopLevelDebuggerFunction()) {
       TC.diagnose(S->getCatches().front()->getCatchLoc(),
                   diag::no_throw_in_do_with_catch);
     }
-
-    scope.preserveCoverageFromNonExhaustiveCatch();
   }
 
   void checkCatch(CatchStmt *S) {
@@ -1286,23 +1338,24 @@ private:
 
     // Suppress all diagnostics when there's an un-analyzable throw site.
     case ThrowingKind::Invalid:
-      HasAnyThrowSite = true;
-      HasTryThrowSite |= requiresTry;
+      Flags.set(ContextFlags::HasAnyThrowSite);
+      if (requiresTry) Flags.set(ContextFlags::HasTryThrowSite);
       return;
 
     // For the purposes of handling and try-coverage diagnostics,
     // being rethrowing-only still makes this a throw site.
     case ThrowingKind::RethrowingOnly:
     case ThrowingKind::Throws:
-      HasAnyThrowSite = true;
-      HasTryThrowSite |= requiresTry;
+      Flags.set(ContextFlags::HasAnyThrowSite);
+      if (requiresTry) Flags.set(ContextFlags::HasTryThrowSite);
 
       if (auto expr = E.dyn_cast<Expr*>())
         if (auto apply = dyn_cast<ApplyExpr>(expr))
           if (apply->isThrowsSet())
             return;
 
-      bool isTryCovered = (!requiresTry || IsInTry);
+      bool isTryCovered =
+        (!requiresTry || Flags.has(ContextFlags::IsTryCovered));
       if (!CurContext.handles(classification.getResult())) {
         CurContext.diagnoseUnhandledThrowSite(TC, E, isTryCovered,
                                               classification.getThrowsReason());
@@ -1318,13 +1371,12 @@ private:
   ShouldRecurse_t checkTry(TryExpr *E) {
     // Walk the operand.
     ContextScope scope(*this, None);
-    IsInTry = true;
-    HasTryThrowSite = false;
+    scope.enterTry();
 
     E->getSubExpr()->walk(*this);
 
     // Warn about 'try' expressions that weren't actually needed.
-    if (!HasTryThrowSite) {
+    if (!Flags.has(ContextFlags::HasTryThrowSite)) {
       TC.diagnose(E->getTryLoc(), diag::no_throw_in_try);
 
     // Diagnose all the call sites within a single unhandled 'try'
@@ -1340,13 +1392,12 @@ private:
   ShouldRecurse_t checkForceTry(ForceTryExpr *E) {
     // Walk the operand.  'try!' handles errors.
     ContextScope scope(*this, Context::getHandled());
-    IsInTry = true;
-    HasTryThrowSite = false;
+    scope.enterTry();
 
     E->getSubExpr()->walk(*this);
 
     // Warn about 'try' expressions that weren't actually needed.
-    if (!HasTryThrowSite) {
+    if (!Flags.has(ContextFlags::HasTryThrowSite)) {
       TC.diagnose(E->getLoc(), diag::no_throw_in_try);
     }
     return ShouldNotRecurse;
@@ -1360,13 +1411,18 @@ void TypeChecker::checkTopLevelErrorHandling(TopLevelCodeDecl *code) {
 
   // In some language modes, we allow top-level code to omit 'try' marking.
   if (Context.LangOpts.EnableThrowWithoutTry)
-    checker.setTryCovered();
+    checker.setTopLevelThrowWithoutTry();
 
   code->getBody()->walk(checker);
 }
 
 void TypeChecker::checkFunctionErrorHandling(AbstractFunctionDecl *fn) {
   CheckErrorCoverage checker(*this, Context::forFunction(fn));
+
+  // If this is a debugger function, suppress 'try' marking at the top level.
+  if (fn->getAttrs().hasAttribute<LLDBDebuggerFunctionAttr>())
+    checker.setTopLevelDebuggerFunction();
+
   if (auto body = fn->getBody()) {
     body->walk(checker);
   }
