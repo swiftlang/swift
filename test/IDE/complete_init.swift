@@ -9,6 +9,7 @@
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-complete-inits-in-postfix-expr -code-completion-token=L_QUALIFIED_0 | FileCheck %s -check-prefix=L_QUALIFIED_0
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-complete-inits-in-postfix-expr -code-completion-token=INSIDE_L_0 | FileCheck %s -check-prefix=INSIDE_L_0
 // RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-complete-inits-in-postfix-expr -code-completion-token=INSIDE_M_0 | FileCheck %s -check-prefix=INSIDE_M_0
+// RUN: %target-swift-ide-test -code-completion -source-filename=%s -code-completion-token=ALIAS_CONSTRUCTOR_0 | FileCheck %s -check-prefix=ALIAS_CONSTRUCTOR_0
 
 struct A {
   // implicit init()
@@ -133,3 +134,12 @@ struct M<X: G> {
 // INSIDE_M_0-DAG: Decl[Constructor]/CurrNominal:    Y({#x: A#})[#Self#]{{; name=.+}}
 // INSIDE_M_0-DAG: Decl[Constructor]/CurrNominal:    X({#x: A#})[#Self#]{{; name=.+}}
 // INSIDE_M_0: End completions
+
+typealias CAlias = C
+
+var CAliasInstance = CAlias(#^ALIAS_CONSTRUCTOR_0^#
+// rdar://18586415
+// ALIAS_CONSTRUCTOR_0: Decl[Constructor]/CurrNominal:      ['('])[#CAlias#]; name=)
+// ALIAS_CONSTRUCTOR_0: Decl[Constructor]/CurrNominal:      ['(']{#x: A#})[#CAlias#]; name=x: A)
+// ALIAS_CONSTRUCTOR_0: Decl[Constructor]/CurrNominal:      ['('])[#CAlias#]; name=)
+// ALIAS_CONSTRUCTOR_0: Decl[Constructor]/CurrNominal:      ['(']{#y: A#})[#CAlias#]; name=y: A)

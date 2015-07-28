@@ -1476,6 +1476,7 @@ public:
   }
 
   void addConstructorCall(const ConstructorDecl *CD, DeclVisibilityKind Reason,
+                          Optional<Type> Result,
                           Identifier addName = Identifier()) {
     foundFunction(CD);
     Type MemberType = getTypeOfMember(CD);
@@ -1518,7 +1519,9 @@ public:
       Builder.addRightParen();
       addThrows(Builder, ConstructorType, CD);
 
-      addTypeAnnotation(Builder, ConstructorType->getResult());
+      addTypeAnnotation(Builder,
+                        Result.hasValue() ? Result.getValue() :
+                                            ConstructorType->getResult());
     };
 
     if (ConstructorType && hasInterestingDefaultValues(ConstructorType))
@@ -1539,7 +1542,7 @@ public:
         if (init->isPrivateStdlibDecl(/*whitelistProtocols*/ false) ||
             AvailableAttr::isUnavailable(init))
           continue;
-        addConstructorCall(cast<ConstructorDecl>(init), Reason, name);
+        addConstructorCall(cast<ConstructorDecl>(init), Reason, None, name);
       }
     }
   }
@@ -1700,15 +1703,24 @@ public:
     switch (Kind) {
     case LookupKind::ValueExpr:
       if (auto *CD = dyn_cast<ConstructorDecl>(D)) {
-        if (ExprType->is<AnyMetatypeType>()) {
+        if (auto MT = ExprType->getAs<AnyMetatypeType>()) {
           if (HaveDot)
             return;
-          addConstructorCall(CD, Reason);
+
+          // If instance type is type alias, showing users that the contructed
+          // type is the typealias instead of the underlying type of the alias.
+          Optional<Type> Result = None;
+          if (auto AT = MT->getInstanceType()) {
+            if (AT->getKind() == TypeKind::NameAlias &&
+                AT->getDesugaredType() == CD->getResultType().getPointer())
+              Result = AT;
+          }
+          addConstructorCall(CD, Reason, Result);
         }
         if (IsSuperRefExpr) {
           if (!isa<ConstructorDecl>(CurrDeclContext))
             return;
-          addConstructorCall(CD, Reason);
+          addConstructorCall(CD, Reason, None);
         }
         return;
       }
