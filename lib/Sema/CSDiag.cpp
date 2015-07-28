@@ -2944,6 +2944,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError(Type exprType) {
     case CTP_CannotFail:
       assert(0 && "These contextual type purposes cannot fail with a "
              "conversion type specified!");
+      break;
     case CTP_Initialization:
       diagID = diag::cannot_convert_initializer_value;
       break;
@@ -3058,6 +3059,7 @@ bool FailureDiagnosis::diagnoseContextualConversionError(Type exprType) {
   Failure::FailureKind failureKind;
   switch (foundConstraint->getKind()) {
   default: assert(0 && "This list out of sync with isConversionConstraint");
+    break;
   case ConstraintKind::ConformsTo:
   case ConstraintKind::SelfObjectOfProtocol:
     diagnose(expr->getLoc(), diag::type_does_not_conform,
