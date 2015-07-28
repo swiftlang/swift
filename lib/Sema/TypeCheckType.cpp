@@ -2340,13 +2340,24 @@ static bool checkObjCInExtensionContext(TypeChecker &tc,
       return true;
     }
 
+    // Check if any classes in the inheritance hierarchy have generic
+    // parameters.
     // FIXME: This is a current limitation, not inherent. We don't have
     // a concrete class to attach Objective-C category metadata to.
-    if (ED->getGenericParams()) {
-      if (diagnose) {
-        tc.diagnose(value->getLoc(), diag::objc_in_generic_extension);
+    Type extendedTy = ED->getDeclaredTypeInContext();
+    while (!extendedTy.isNull()) {
+      const ClassDecl *CD = extendedTy->getClassOrBoundGenericClass();
+      if (!CD)
+        break;
+
+      if (CD->getGenericParams()) {
+        if (diagnose) {
+          tc.diagnose(value->getLoc(), diag::objc_in_generic_extension);
+        }
+        return true;
       }
-      return true;
+
+      extendedTy = CD->getSuperclass();
     }
   }
 

@@ -355,8 +355,16 @@ class GenericContext3<T> {
 @objc // expected-error{{only classes that inherit from NSObject can be declared @objc}}
 class ConcreteSubclassOfGeneric : GenericContext3<Int> {}
 
+extension ConcreteSubclassOfGeneric {
+  @objc func foo() {} // expected-error {{@objc is not supported within extensions of generic classes}}
+}
+
 @objc // expected-error{{generic subclasses of '@objc' classes cannot have an explicit '@objc' attribute}}
 class ConcreteSubclassOfGeneric2 : subject_genericClass2<Int> {}
+
+extension ConcreteSubclassOfGeneric2 {
+  @objc func foo() {} // expected-error {{@objc is not supported within extensions of generic classes}}
+}
 
 class subject_subscriptIndexed1 {
   @objc
